@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.70 2001/09/29 08:13:40 jinmei Exp $
+$KAME: FAQ,v 1.71 2001/10/19 17:36:31 jinmei Exp $
 
 
 GENERAL
@@ -407,9 +407,9 @@ Q: I think I have problem with my tunnel; how do I track it?
 	down.
 
 Q: My operating system does not have gifconfig(8).
-	On NetBSD and OpenBSD, gifconfig(8) is integrated into ifconfig(8),
-	using the "tunnel" keyword (older OpenBSD releases use "giftunnel"
-        keyword).
+	On FreeBSD 4.4, NetBSD, and OpenBSD, gifconfig(8) is integrated
+	into ifconfig(8), using the "tunnel" keyword (older OpenBSD
+	releases use "giftunnel" keyword).
 
 Q: I would like to know the merge status of KAME kit to *BSD.
 	See http://www.kame.net/dev/cvsweb.cgi/kame/COVERAGE.
