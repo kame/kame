@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.210 2001/09/03 08:28:47 itojun Exp $	*/
+/*	$KAME: key.c,v 1.211 2001/09/12 08:14:42 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -6135,7 +6135,7 @@ key_newspacq(spidx)
 	bcopy(spidx, &acq->spidx, sizeof(acq->spidx));
 	microtime(&tv);
 	acq->created = tv.tv_sec;
-	acq->count = 0;
+	acq->count = 1;
 
 	return acq;
 }
