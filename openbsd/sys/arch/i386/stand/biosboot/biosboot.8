@@ -1,0 +1,136 @@
+.\"	$OpenBSD: biosboot.8,v 1.7 1998/09/07 16:44:38 aaron Exp $
+.\"
+.\" Copyright (c) 1997 Michael Shalayeff
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. All advertising materials mentioning features or use of this software
+.\"    must display the following acknowledgement:
+.\"	This product includes software developed by Michael Shalayeff.
+.\" 4. The name of the author may not be used to endorse or promote products
+.\"    derived from this software without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR 
+.\" IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+.\" WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd September 1, 1997
+.Dt BIOSBOOT 8 i386
+.Os OpenBSD 2.1
+.Sh NAME
+.Nm biosboot
+.Nd
+first-stage system bootstrap
+.Sh DESCRIPTION
+This small program (roughly 256 bytes of code) is responsible for
+loading the second stage
+.Xr boot 8
+program, which in turn, will load the kernel.
+It takes no input or options directly.
+.Pp
+In order for
+.Nm
+to load the second-stage bootstrap, it has a table inside it which
+describes
+.Xr boot 8 's
+location. 
+.Nm
+must be installed by, and have its block table filled in by, the
+.Xr installboot 8
+program.  As this data is BIOS dependant, you must re-run 
+.Xr installboot 8
+each time you reinstall
+.Xr boot 8
+or move your disk or software between machines and/or controllers.
+.Pp
+When 
+.Nm
+receives control from either the BIOS or the MBR it will print the message:
+.Pp
+.Dl loading /boot
+.Pp
+followed by a dot for every successfully loaded block,
+and then put cursor on the next line right before switching into
+protected mode and transferring control to the just loaded /boot program.
+.Sh DIAGNOSTICS
+Diagnostics consist of two error messages:
+.Bl -tag -width read_error_
+.It Er Read error
+Some kind of error returned by the BIOS read call. This might be
+any media error, including bad sectors (common on floppy disks),
+and invalid sectors (can occur with messed up geometry translations).
+.It Er Bad magic
+The just loaded /boot image contains a bad magic in its header.  This
+might indicate some kind of hardware problem, the
+.Ar boot
+argument to the
+.Xr installboot 8
+command was not a valid /boot program, or /boot or has been moved or
+changed.
+.El
+.Pp
+Other common reasons for these errors to appear is that a wrong BIOS geometry
+has been used in
+.Xr installboot 8
+for the device you are booting from.
+.Sh NOTES
+The practice of making OpenBSD use the whole disk (ie: having
+.Nm                                                                            
+as the MBR) has been deprecated, and will not work on certain BIOS versions.
+There is a lot of strange behaviour with different BIOS's, one of well
+known lobotomy cases is that the BIOS does not pass the right boot drive
+number to the
+.Nm
+program.  This is one of the main reasons that having
+.Nm
+as the MBR has been deprecated.
+.Sh FILES
+.Bl -tag -width /usr/mdec/biosbootxx -compact
+.It Pa /usr/mdec/mbr
+Master Boot Record block
+.It Pa /usr/mdec/biosboot
+primary bootstrap
+.It Pa /boot
+secondary bootstrap
+.It Pa /bsd
+system code
+.El
+.Sh SEE ALSO
+.Xr boot_i386 8 ,
+.Xr fdisk 8 ,
+.Xr installboot 8 ,
+.Xr boot 8 .
+.Sh BUGS
+It contains a fake partition table and associated things that it should not.
+.Pp
+It should do a checksum over the loaded /boot image, and check that against
+a value that
+.Xr installboot 8
+has precomputed.
+.Pp
+There is no BIOS error number reported nor is the location of the error
+reported.
+.Pp
+You can pick your motherboard, and you can pick your BIOS,
+but you can't pick your motherboard's BIOS.
+.Sh HISTORY
+This program was written by Michael Shalayeff for
+.Ox 2.1 .
+However it's based on bootstrap code from older versions of this
+operating system, other operating systems, other programs, and
+other people's work.

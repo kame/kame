@@ -1,0 +1,162 @@
+.\"	$OpenBSD: installboot.8,v 1.15 1999/01/24 15:55:31 mickey Exp $
+.\"
+.\" Copyright (c) 1997 Michael Shalayeff
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. All advertising materials mentioning features or use of this software
+.\"    must display the following acknowledgement:
+.\"	This product includes software developed by Michael Shalayeff.
+.\" 4. The name of the author may not be used to endorse or promote products
+.\"    derived from this software without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR 
+.\" IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+.\" WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"
+.Dd 1 Sep 1997
+.Dt INSTALLBOOT 8
+.Os 
+.Sh NAME
+.Nm installboot
+.Nd install a bootstrap on a FFS disk or partition
+.Sh SYNOPSIS
+.Nm installboot
+.Op Fl n
+.Op Fl v
+.Oo Fl s Ar sectors-per-track Oc
+.Oo Fl h Ar tracks-per-cyl Oc
+.Ar boot
+.Ar biosboot
+.Ar disk
+.Sh DESCRIPTION
+.Nm installboot
+is used to install a
+.Dq first-stage
+boot program into the boot area
+of a FFS disk partition, and initialize the table of block numbers the
+.Ar biosboot
+program uses to load the second-stage boot program.
+.Pp
+The options are as follows:
+.Bl -tag -width flag_opt
+.It Fl n
+Do not actually write anything on the disk.
+.It Fl v
+Be verbose, printing out the CHS (Cylinder, Head, Sector)
+triples that are stored in
+.Ar biosboot
+along with lots of other information.
+.It Fl s Ar sectors-per-track
+Used to specify the sectors-per-track value if the drive has
+sector translation activated, and
+.Nm
+is unable to determine the translated geometry.
+.\" If not specified, this defaults to d_nsectors from the disklabel.
+If not specified, this defaults to the value retrieved from the BIOS
+at boot time, available via
+.Xr sysctl 8 .
+.It Fl h Ar tracks-per-cyl
+Used to specify the tracks-per-cylinder value if the drive has
+sector translation activated, and
+.Nm
+is unable to determine the translated geometry.
+.\" If not specified, this defaults to d_ntracks from the disklabel.
+If not specified, this defaults to the value retrieved from the BIOS
+at boot time, available via
+.Xr sysctl 8 .
+.El
+.Pp
+The arguments are:
+.Bl -tag -width biosboot
+.It Ar boot
+The name of the second-stage boot program in the mounted file system
+where the first-stage boot program is to be installed.  This should be
+a full pathname.
+.It Ar biosboot
+The name of the prototype file for the first stage boot program,
+usually
+.Pa /usr/mdec/biosboot .
+.It Ar disk
+The name of the disk containing the partition in which the second-stage
+boot program resides and the first-stage boot program is to be installed.
+This can either be specified in short form (i.e.,
+.Sq sd0
+or
+.Sq wd0 ) ,
+or as the explicit device node, such as
+.Pa /dev/rsd0c
+or
+.Pa /dev/rwd0c .
+.Pp
+Note that you must be in single-user mode or have your kernel in
+insecure mode (see the
+.Xr sysctl 8
+.Va kern.securelevel
+variable or
+.Pa /etc/rc.securelevel )
+to enable access to the raw partition of a mounted disk.
+.Pp
+The
+.Sq c
+partition is always used to represent the
+.Dq entire
+disk on i386.
+.El
+.Sh EXAMPLE
+The typical use is
+.Pp
+.Dl # cp /usr/mdec/boot /boot
+.Dl # /usr/mdec/installboot -v -n /boot /usr/mdec/biosboot sd0
+.Pp
+And if the information supplied looks right, run the above without the
+.Fl n
+flag.  If you are upgrading an old system, you may need to preface
+the above steps with some more steps... and do the following:
+.Pp
+.Dl boot the floppy.fs filesystem floppy
+.Dl # fsck /dev/rsd0a
+.Dl # mount /dev/sd0a /mnt
+.Dl # cp /usr/mdec/boot /mnt/boot
+.Dl # /usr/mdec/installboot -v /mnt/boot /usr/mdec/biosboot sd0
+.Pp
+If you need to find the BIOS geometry of the disk for
+.Fl s
+and
+.Fl h
+you can use the boot block command:
+.Pp
+.Dl boot> machine diskinfo
+.Pp
+.Sh BUGS
+The disklabel
+.Va d_type
+field must be set to a value other than
+.Dq unknown .
+.Pp
+You cannot run
+.Nm installboot
+for a drive/partition other than the one you want the
+.Pa /boot
+to be loaded from.
+.Sh SEE ALSO
+.Xr disklabel 8 ,
+.Xr init 8 ,
+.Xr fdisk 8 ,
+.Xr biosboot 8 .

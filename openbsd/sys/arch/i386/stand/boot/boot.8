@@ -1,0 +1,238 @@
+.\"	$OpenBSD: boot.8,v 1.10 1998/07/11 21:13:58 angelos Exp $
+.\"
+.\" Copyright (c) 1997 Michael Shalayeff
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. All advertising materials mentioning features or use of this software
+.\"    must display the following acknowledgement:
+.\"	This product includes software developed by Michael Shalayeff.
+.\" 4. The name of the author may not be used to endorse or promote products
+.\"    derived from this software without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR 
+.\" IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+.\" WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd September 1, 1997
+.Dt BOOT 8 i386
+.Os
+.Sh NAME
+.Nm boot
+.Nd
+second-stage bootstrap
+.Sh DESCRIPTION
+The main purpose of this program is to load the system kernel, dealing with
+the downfalls of the PC BIOS architecture.
+.Pp
+As described in
+.Xr boot_i386 8
+this program is loaded by the
+.Xr biosboot 8
+primary bootstrap loader and provides a convenient way to load the kernel.
+This program acts as an enhanced boot monitor for PC systems, providing
+common interface for the kernel to start from.
+.Pp
+Basic operations include:
+.Bl -bullet -compact
+.It
+Detecting and switching between multiple consoles.
+.It
+Loading kernels from any device supported by your system BIOS.
+.It
+Loading kernels compressed by
+.Xr gzip 1 .
+.It
+Passing system parameters queried from the BIOS to the kernel.
+.It
+Providing an interactive command line.
+.El
+.Pp
+The sequence of its operation is as follows: initialization,
+parsing the configuration file, then an interactive command line.
+While at the command line you have 5 seconds to type any commands,
+if needed. If time expires, the kernel will be loaded according to
+the current variable settings (See the
+.Nm set
+command).  Each time a kernel load fails, the timeout
+is increased by one second. The sequence of
+.Nm
+operations is as follows:
+.Bl -enum
+.It
+Set up a protected mode environment which catches and reports processor
+exceptions, and provides a simple protected-mode BIOS interface.
+.It
+Probe for console devices, which includes the (default) PC VGA+Keyboard
+console (pc0) and up to four serial consoles (com0 through com3) connected
+to the serial ports. Display messages to the default console about the
+devices found.
+.It
+Detect memory. Conventional memory is detected by quering the BIOS.
+Extended memory is detected by probing page-by-page through the address
+space, rather than asking the BIOS; many BIOS cannot report larger than
+64M of memory.
+All the memory found is reported to the default console device.
+.It
+Probe for APM support in the BIOS. Message printed if support is present.
+.It
+If the file
+.Pa /etc/boot.conf
+exists on the filesystem
+.Nm
+was loaded from, open and parse it. This file may contain any commands
+.Nm
+accepts at the interactive prompt.
+Though default settings usually suffice, they can be changed here.
+.It
+The header line
+.Pp
+.Dl OpenBSD BOOT [x.xx]
+.Pp
+is displayed to the active console, where
+.Ar x.xx
+is a version number of the
+.Nm
+program, followed by the
+.Pp
+.Dl boot>
+.Pp
+prompt, which means you are in the interactive mode and may enter
+commands. If you do not,
+.Nm
+will proceed loading kernel with the current parameters after the
+timeout period has expired.
+.El
+.Sh COMMANDS
+The following commands are accepted at the
+.Nm
+prompt:
+.Bl -tag -width stty_device_baudrate_____
+.It boot Op Ar image Op Fl abcds
+Boots kernel image specified by the
+.Ar image
+with options if any. Image specification consists of a pair
+.Em device : filename ,
+either of each maybe omitted (':' is not needed if both),
+in which case values from
+.Nm
+variables will be used.
+.It echo Op Ar args
+Displays
+.Ar args
+on the console device.
+.It help
+Prints a list of available commands and machine dependant
+commands, if any.
+.It machine Op Ar subcommand
+Issues machine-dependant commands. These are defined for i386 architecture:
+.Bl -tag -width diskinfo_
+.It Nm cnvmem
+Prints/sets the amount of conventional memory.
+.It Nm diskinfo
+Prints list of hard disks installed on your system including:
+BIOS device number, and the BIOS geometry.
+.It Nm extmem
+Prints/sets the amount of extended memory.
+.It Nm memory
+Prints physical memory map.
+.It Nm regs
+Prints contents of processor registers if compiled with
+.Em DEBUG .
+.El
+.It ls Op Ar directory
+Prints contents of the specified
+.Ar directory
+in long format including: attributes and file type, owner, group,
+size, filename.
+.It reboot
+Reboots machine by initiating a warm boot procedure.
+.It set Op Ar varname Op Ar value
+If invoked without arguments, prints a list of variables and their values.
+If only
+.Ar varname
+is specified, displays contents of that variable.
+If
+.Ar varname
+and
+.Ar value
+are both specified, sets that variable to the given value.
+Variables include:
+.Pp
+.Bl -tag -compact -width boothow
+.It Nm addr
+Address at wich to load the kernel.
+.It Nm howto
+Options to pass to the loaded kernel.
+.It Nm debug
+Debug flag if
+.Nm
+was compiled with DEBUG defined.
+.It Nm device
+Boot device name (ie fd0a, sd0a).
+.It Nm tty
+Active console device name.
+.It Nm image
+File name containing the kernel image.
+.El
+.It stty Op Ar device Op Ar baudrate
+Displays or sets the
+.Ar baudrate
+for a console
+.Ar device .
+If changing speed for the currently
+active console, gives you five seconds of pause
+before changing the baud rate to allow you to change your terminal's
+speed to match.  If changing speed
+.Em not
+for the active console, sets the baudrate value to be used the
+.Em next
+time you switch to a serial console.
+The baudrate value is not used for the pc0 console.
+.Pp
+The default baudrate if not specifically
+set is 9600 baud.
+.It time
+Displays system time and date.
+.El
+.Sh FILES
+.Bl -tag -width /usr/mdec/biosbootxx -compact
+.It Pa /usr/mdec/biosboot
+first stage bootstrap
+.It Pa /boot
+system bootstrap
+.It Pa /etc/boot.conf
+system bootstrap's startup file
+.It Pa /bsd
+kernel image
+.El
+.Sh SEE ALSO
+.Xr boot_i386 8 ,
+.Xr fdisk 8 ,
+.Xr installboot 8 ,
+.Xr gzip 1 .
+.Pp
+RFC 1950 describes the zlib library interface.
+.Pp
+The official home page for the version of zlib used in this
+operating system see http://quest.jpl.nasa.gov/zlib/ .
+.Sh BUGS
+Well, nobody is perfect.
+.Sh HISTORY
+This program was written by Michael Shalayeff for
+.Ox 2.1 .

@@ -1,0 +1,70 @@
+#	$OpenBSD: GECKO,v 1.5 1999/03/04 23:26:13 mickey Exp $
+#
+# HP 9000/712/{60,80,80i,100} boxens
+#
+# neverseen devices: telephony, X.21 m-proto adapter, TR/9000
+
+machine hppa
+
+include	"../../../conf/GENERIC"
+
+maxusers	16
+
+option		HP7100LC
+#option		FPEMUL		# has FPU onboard
+
+#option		NS		# XNS
+#option		NSIP		# XNS tunneling over IP
+#option		IPX		# IPX+SPX
+#option		IPXIP		# IPX tunneling over IP
+#option		ISO,TPIP	# OSI
+#option		EON		# OSI tunneling over IP
+#option		CCITT,LLC,HDLC	# X.25
+
+#option	 	COMPAT_HPUX	# HP-UX binary compatibility
+#option		COMPAT_OSF1	# OSF1 binary compatibility
+#option		COMPAT_LINUX	# Mach/Linux binary compatibility
+
+config	bsd swap generic
+
+mainbus0	at root		# root "bus"
+
+mem0	at mainbus0		# /dev/*mem, and memory controller
+pdc0	at mainbus0		# PDC/IODC wrapper for boot console
+cpu0	at mainbus0 #irq 31	# HP PA7100LC processor
+lasi0	at mainbus0 irq 28	# LASI host adapter (LSI ???)
+#lasi1	at mainbus0 irq ?	# LASI host adapter in the GIO slot
+sti0	at mainbus0 		# onboard HCRX-8 graphics
+#sti1	at mainbus0 		# GIO slot HCRX-8 graphics
+
+# internal I/O space
+gsc*	at lasi?
+com0	at gsc? irq 5	# serial ports
+#com1	at gsc?	irq 6?	# serial ports (add-in card)
+lpt*	at gsc?	irq 7	# both com and lpt are on WD16C552
+ie0	at gsc?	irq 8	# 82C596 ether
+#ie1	at gsc?	irq 10?	# 82C596 ether (add-in card)
+siop0	at gsc?	irq 9	# NCR 53C710
+scsibus* at siop?
+#atwo*	at gsc?	irq 13	# Audio Type 2 (CS4215)
+#audio*	at atwo?
+pckbc0	at gsc? irq 27
+pckbd0	at pckbc0	# PS/2 keyboard
+pms0	at pckbc0	# PS/2 mouse
+fdc0	at gsc?	irq ?	# PC floppy controller (WD37C65C)
+
+# MI devices
+wsdisplay*	at sti?
+wskbd*		at pckbd?
+wsmouse*	at pms?
+
+option	FD_DEBUG
+fd0	at fdc0	drive ?	# floppy drives
+
+sd*	at scsibus? target ? lun ?
+st*	at scsibus? target ? lun ?
+cd*	at scsibus? target ? lun ?
+ch*	at scsibus? target ? lun ?
+ss*	at scsibus? target ? lun ?
+uk*	at scsibus? target ? lun ?
+

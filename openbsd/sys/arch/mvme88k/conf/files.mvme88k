@@ -1,0 +1,106 @@
+#	$OpenBSD: files.mvme88k,v 1.3 1999/02/09 06:36:24 smurph Exp $
+#	
+maxpartitions 16
+
+device 	mainbus { [addr = -1 ] }
+attach 	mainbus at root
+
+# this should be removed after bringup
+
+device bugtty: tty
+attach bugtty at mainbus
+file	arch/mvme88k/dev/bugtty.c			bugtty needs-count
+device cpu
+attach cpu at mainbus
+
+#device pcctwo { [addr = -1], [size = 4096], [ipl = 0] }
+device pcctwo { [offset = -1], [ ipl = 0 ] }
+
+attach pcctwo at mainbus
+file	arch/mvme88k/dev/pcctwo.c			pcctwo needs-count
+
+device clock
+attach clock at pcctwo
+file	arch/mvme88k/dev/clock.c			clock
+
+device memc
+attach memc at pcctwo
+file	arch/mvme88k/dev/memc.c			memc
+
+device sram
+attach sram at mainbus
+device nvram
+attach nvram at pcctwo
+file	arch/mvme88k/dev/sram.c				sram needs-count
+file	arch/mvme88k/dev/nvram.c			nvram needs-count
+file	arch/mvme88k/dev/memdevs.c			nvram | sram
+
+device cl: tty
+attach cl at pcctwo
+file	arch/mvme88k/dev/cl.c				cl needs-count
+
+include "../../../scsi/files.scsi"
+
+major { sd = 4 }
+major { st = 5 }
+major { cd = 6 }
+major { rd = 7 }
+major { vnd = 8 }
+
+device siop: scsi
+attach siop at pcctwo
+file	arch/mvme88k/dev/siop.c				siop
+file	arch/mvme88k/dev/siopdma.c			siop
+
+device vme { }
+attach vme at pcctwo
+device vmes { [addr = -1], [len = -1], [vec = -1], [ipl = 0] }
+attach vmes at vme
+device vmel { [addr = -1], [len = -1], [vec = -1], [ipl = 0] }
+attach vmel at vme
+file	arch/mvme88k/dev/vme.c			vme | vmes | vmel
+file	arch/mvme88k/dev/vmes.c			vmes needs-count
+file	arch/mvme88k/dev/vmel.c			vmel needs-count
+
+#ramdisk support
+pseudo-device rd
+file 	dev/ramdisk.c					rd needs-flag
+file 	arch/mvme88k/dev/rd_root.c			ramdisk_hooks
+
+# list of standard files
+file	dev/cons.c					ite | ser | tty
+file	dev/cninit.c
+#file	scsi/scsi_base.c				scsi
+#file	scsi/scsi_ioctl.c				scsi
+#file	scsi/scsiconf.c					scsi
+
+file	netinet/in_cksum.c
+file	netns/ns_cksum.c				ns
+
+file	arch/mvme88k/mvme88k/autoconf.c
+file	arch/mvme88k/mvme88k/conf.c
+file	arch/mvme88k/mvme88k/cmmu.c
+file	arch/mvme88k/mvme88k/disksubr.c
+file	arch/mvme88k/mvme88k/dkbad.c
+file	arch/mvme88k/mvme88k/eh.S
+file	arch/mvme88k/mvme88k/locore_asm_routines.S
+file	arch/mvme88k/mvme88k/locore_c_routines.c
+file	arch/mvme88k/mvme88k/m88100_fp.S
+file	arch/mvme88k/mvme88k/machdep.c
+file	arch/mvme88k/mvme88k/mem.c
+file	arch/mvme88k/mvme88k/pmap.c
+file	arch/mvme88k/mvme88k/process.S
+file	arch/mvme88k/mvme88k/process_machdep.c
+file	arch/mvme88k/mvme88k/trap.c
+file	arch/mvme88k/mvme88k/vm_machdep.c
+file	arch/mvme88k/ddb/db_disasm.c
+file	arch/mvme88k/ddb/db_interface.c
+file	arch/mvme88k/ddb/db_sstep.c
+file	arch/mvme88k/ddb/db_trace.c
+file	arch/mvme88k/dev/mainbus.c
+file	arch/mvme88k/dev/bugio.c
+
+device ie: ifnet, ether
+attach ie at pcctwo: ifnet, ether
+file    arch/mvme88k/dev/if_ie.c			ie
+

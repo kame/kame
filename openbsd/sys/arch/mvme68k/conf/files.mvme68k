@@ -1,0 +1,147 @@
+#	$OpenBSD: files.mvme68k,v 1.9 1997/03/31 00:23:56 downsj Exp $
+
+# config file for mvme68k
+
+# maxpartitions must be first item in files.${ARCH}
+maxpartitions 16
+
+device mainbus { [addr = -1] }
+attach mainbus at root
+
+device pcc { [offset = -1], [ ipl = 0 ] }
+attach pcc at mainbus
+file arch/mvme68k/dev/pcc.c			pcc needs-count
+
+device pcctwo { [offset = -1], [ ipl = 0 ] }
+attach pcctwo at mainbus
+file arch/mvme68k/dev/pcctwo.c			pcctwo needs-count
+
+device mc { [offset = -1], [ ipl = 0 ] }
+attach mc at mainbus
+file arch/mvme68k/dev/mc.c			mc needs-count
+
+device clock
+attach clock at pcc, mc, pcctwo
+file arch/mvme68k/dev/clock.c			clock
+
+device zs: tty
+attach zs at pcc, mc
+file arch/mvme68k/dev/zs.c			zs needs-count
+
+device cl: tty
+attach cl at pcctwo
+file arch/mvme68k/dev/cl.c			cl needs-count
+
+device bugtty: tty
+attach bugtty at mainbus
+file arch/mvme68k/dev/bugtty.c			bugtty needs-count
+file arch/mvme68k/dev/bug.c			bugtty
+
+attach	le at pcc
+file    arch/mvme68k/dev/if_le.c		le
+
+device ie: ifnet, ether
+attach ie at mc, pcctwo
+file    arch/mvme68k/dev/if_ie.c		ie
+
+include "../../../scsi/files.scsi"
+
+device wdsc: scsi
+attach wdsc at pcc
+file	arch/mvme68k/dev/sbic.c			wdsc
+file	arch/mvme68k/dev/wdsc.c			wdsc
+
+device ipic { manu = -1, prod = -1, [vec = -1], [ipl = 0] }
+attach ipic at mc
+file	arch/mvme68k/dev/ipic.c			ipic
+
+device fooip
+attach fooip at ipic
+file	arch/mvme68k/dev/fooip.c		fooip
+
+device siop: scsi
+attach siop at mc, pcctwo
+file	arch/mvme68k/dev/siopdma.c		siop
+file	arch/mvme68k/dev/siop.c			siop
+
+device memc
+attach memc at mc, pcctwo
+file	arch/mvme68k/dev/memc.c			memc
+
+device flash
+attach flash at mainbus
+file	arch/mvme68k/dev/flash.c		flash needs-count
+
+device sram
+attach sram at mainbus
+device nvram
+attach nvram at pcc, mc, pcctwo
+file	arch/mvme68k/dev/sram.c			sram needs-count
+file	arch/mvme68k/dev/nvram.c		nvram needs-count
+file	arch/mvme68k/dev/memdevs.c		nvram | sram
+
+device lp
+attach lp at pcc
+file	arch/mvme68k/dev/lp.c			lp needs-count
+
+device lptwo
+attach lptwo at pcctwo
+file	arch/mvme68k/dev/lptwo.c		lptwo needs-count
+
+# RAM disk for boot tape
+pseudo-device rd
+file dev/ramdisk.c				rd needs-flag
+file arch/mvme68k/dev/rd_root.c			ramdisk_hooks
+
+device vme { }
+attach vme at pcc, mc, pcctwo
+device vmes { [addr = -1], [len = -1], [vec = -1], [ipl = 0] }
+attach vmes at vme
+device vmel { [addr = -1], [len = -1], [vec = -1], [ipl = 0] }
+attach vmel at vme
+file	arch/mvme68k/dev/vme.c			vme | vmes | vmel
+file	arch/mvme68k/dev/vmes.c			vmes needs-count
+file	arch/mvme68k/dev/vmel.c			vmel needs-count
+
+device xdc {target = -1}
+attach xdc at vmes
+device xd: disk
+attach xd at xdc
+file	arch/mvme68k/dev/xd.c			xd needs-flag
+
+major { sd = 4 }
+major { cd = 6 }
+major { vnd = 8 }
+major { rd = 9 }
+major { xd = 10 }
+
+file arch/mvme68k/mvme68k/autoconf.c
+file arch/mvme68k/mvme68k/conf.c
+file arch/mvme68k/mvme68k/disksubr.c
+file arch/mvme68k/mvme68k/dkbad.c
+file arch/mvme68k/mvme68k/machdep.c
+file arch/mvme68k/mvme68k/mem.c
+file arch/mvme68k/mvme68k/pmap.c
+file arch/mvme68k/mvme68k/pmap_bootstrap.c
+file arch/mvme68k/mvme68k/sys_machdep.c
+file arch/mvme68k/mvme68k/trap.c
+file arch/mvme68k/mvme68k/vm_machdep.c
+file dev/cons.c
+file dev/cninit.c
+
+file arch/m68k/m68k/db_memrw.c			ddb
+
+# Compatibility modules
+
+# HP-UX binary compatibility
+include	"compat/hpux/files.hpux"
+file	arch/mvme68k/mvme68k/hpux_machdep.c	compat_hpux
+
+# SunOS Binary Compatibility (COMPAT_SUNOS)
+include	"compat/sunos/files.sunos"
+file	arch/m68k/m68k/sunos_machdep.c		compat_sunos
+
+device wl: tty
+attach wl at vmes
+file arch/mvme68k/dev/wl.c			wl needs-count
+

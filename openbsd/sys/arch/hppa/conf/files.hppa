@@ -1,0 +1,208 @@
+#	$OpenBSD: files.hppa,v 1.11 1999/02/25 16:59:24 mickey Exp $
+#
+# hppa-specific configuration info
+
+# maxpartitions must be the first item in files.${ARCH}
+maxpartitions 16
+
+maxusers 2 8 64
+
+defopt	HP7100
+defopt	HP7100LC
+defopt	HP7150
+defopt	HP7200
+defopt	FPEMUL
+
+# 
+# "workstation console" routines
+#
+
+include "dev/wscons/files.wscons"
+
+#
+# Machine-independent SCSI drivers
+#
+include "scsi/files.scsi"
+major	{ sd = 4 }
+major	{ st = 5 }
+major	{ cd = 6 }
+
+#
+# MI ATAPI drivers
+#
+include "dev/atapi/files.atapi"
+
+#
+# ISA Bus support
+#
+include "dev/isa/files.isa"
+include "dev/isa/files.isapnp"
+
+#
+# EISA Bus support
+#
+include "dev/eisa/files.eisa"
+
+#
+# PCI Bus support
+#
+include "dev/pci/files.pci"
+
+#
+# General System Connect Bus
+#
+define	gscbus	{ }
+
+#
+# Mainbus
+#
+
+define	mainbus {[irq = -1]}
+device	mainbus
+attach	mainbus at root
+file	arch/hppa/hppa/mainbus.c	mainbus
+
+device	pdc
+attach	pdc at mainbus
+file	arch/hppa/dev/pdc.c		pdc
+
+device	mem
+attach	mem at mainbus
+file	arch/hppa/dev/mem.c		mem
+
+device	cpu
+attach	cpu at mainbus
+file	arch/hppa/dev/cpu.c		cpu
+
+device	lasi: gscbus
+attach	lasi at mainbus
+file	arch/hppa/dev/lasi.c		lasi
+
+device	asp: gscbus
+attach	asp at mainbus
+file	arch/hppa/dev/asp.c		asp
+
+device	wax: gscbus, eisabus
+attach	wax at mainbus
+file	arch/hppa/dev/wax.c		wax
+
+device	eba: eisabus
+attach	eba at mainbus
+file	arch/hppa/dev/eba.c		eba
+
+device	dino: pcibus
+attach	dino at mainbus
+file	arch/hppa/dev/dino.c		dino
+
+device	sti: wsemuldisplaydev
+attach	sti at mainbus
+file	arch/hppa/dev/sti.c		sti
+
+###
+
+major	{ccd = 1}
+major	{vnd = 2}
+
+# RAM disk
+pseudo-device rd: disk
+file	dev/ramdisk.c			rd needs-flag
+file	arch/hppa/dev/rd_root.c		ramdisk_hooks
+major	{rd = 3}
+
+#
+# GSC bus devices
+#
+
+device	gsc {[irq = -1]}
+attach	gsc at gscbus
+file	arch/hppa/gsc/gscbus.c		gsc
+
+attach	com at gsc with com_gsc
+file	arch/hppa/gsc/com_gsc.c		com
+
+attach	lpt at gsc with lpt_gsc
+file	arch/hppa/gsc/lpt_gsc.c		lpt
+
+include "dev/fdc/files.fdc"
+major	{ fd = 7 }
+major	{ ft = 8 }
+attach	fdc at gsc with fdc_gsc
+file	arch/hppa/gsc/fdc_gsc.c		fdc
+
+#device	ie: ether, i82586
+attach	ie at gsc with ie_gsc
+file	arch/hppa/gsc/if_ie_gsc.c	ie_gsc
+
+device	siop: ncr53c7xx, scsi
+attach	siop at gsc
+file	arch/hppa/gsc/siop_gsc.c	siop
+
+device	hil: tty
+attach	hil at gsc
+file	arch/hppa/gsc/hil.c		hil
+
+attach	pckbc at gsc with pckbc_gsc
+file	arch/hppa/gsc/pckbc_gsc.c	pckbc_gsc
+
+# PSB 2160-N based 8bit mono audio (705, 710, 745i/*, 747i/*)
+device	aone: audio, mulaw, auconv
+attach	aone at gsc
+file	arch/hppa/gsc/aone.c		aone
+
+# CS4215 based 16bit mono/stereo audio iface (most of others not w/ aone)
+device	atwo: audio, mulaw, auconv
+attach	atwo at gsc
+file	arch/hppa/gsc/atwo.c		atwo
+
+# these we don't know yet
+#device	medusa: fddi
+#attach	medusa at gsc
+#file	arch/hppa/gsc/medusa.c		medusa
+
+# XXX should not be here
+# ANSI/VITA 26-1998 Gbit packet switching network iface
+#device	myri: ether
+#attach	myri at pci
+#file	dev/pci/myri.c			myri
+
+#
+# PC Keyboard controller (ps2)
+#
+
+include "dev/pckbc/files.pckbc"
+
+#
+# Compatibility
+#
+include "compat/hpux/files.hpux"
+file	arch/hppa/hppa/hpux_machdep.c		compat_hpux
+include "compat/osf1/files.osf1"
+file	arch/hppa/hppa/osf1_machdep.c		compat_osf1
+include	"compat/linux/files.linux"
+file	arch/hppa/hppa/linux_machdep.c		compat_linux
+
+# FP emulation
+include "arch/hppa/spmath/files.spmath"
+
+#
+# Non-device files
+#
+
+file	arch/hppa/hppa/autoconf.c
+file	arch/hppa/hppa/conf.c
+file	arch/hppa/hppa/db_interface.c		ddb
+file	arch/hppa/hppa/db_disasm.c		ddb
+file	arch/hppa/hppa/disksubr.c		disk
+file	arch/hppa/hppa/machdep.c
+file	arch/hppa/hppa/dma.c
+file	arch/hppa/hppa/pmap.c
+file	arch/hppa/hppa/process_machdep.c
+file	arch/hppa/hppa/sys_machdep.c
+file	arch/hppa/hppa/trap.c
+file	arch/hppa/hppa/vm_machdep.c
+#file	arch/hppa/hppa/in_cksum.s		inet
+file	netinet/in_cksum.c			inet
+file	arch/hppa/dev/clock.c
+
+file	dev/cons.c
+file	dev/cninit.c

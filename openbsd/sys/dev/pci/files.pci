@@ -1,0 +1,158 @@
+#	$OpenBSD: files.pci,v 1.37 1999/03/11 18:20:13 jason Exp $
+#	$NetBSD: files.pci,v 1.20 1996/09/24 17:47:15 christos Exp $
+#
+# Config file and device description for machine-independent PCI code.
+# Included by ports that need it.  Requires that the SCSI files be
+# defined first.
+
+device	pci {[dev = -1], [function = -1]}
+attach	pci at pcibus
+file	dev/pci/pci.c			pci needs-flag
+file	dev/pci/pci_subr.c		pci
+
+# Generic VGA
+attach	vga at pci with vga_pci
+file	dev/pci/vga_pci.c		vga_pci	needs-flag
+
+# Generic VGA Framebuffer version
+attach	vgafb at pci with vgafb_pci
+file	dev/pci/vgafb_pci.c		vgafb_pci	needs-flag
+
+# Adaptec 3940, 2940, and aic78[5678]0 SCSI controllers
+# device declaration in sys/conf/files
+attach	ahc at pci with ahc_pci
+file	dev/pci/ahc_pci.c		ahc_pci
+file	dev/ic/smc93cx6.c		ahc_pci
+
+# AdvanSys 1200A, 1200B, and ULTRA SCSI controllers
+# device declaration in sys/conf/files
+attach	adv at pci with adv_pci
+file	dev/pci/adv_pci.c		adv_pci
+file	dev/ic/advlib.c			adv_pci
+file	dev/ic/advmcode.c		adv_pci
+
+# AdvanSys ULTRA WIDE SCSI controllers
+# device declaration in sys/conf/files
+attach	adw at pci with adw_pci
+file	dev/pci/adw_pci.c		adw_pci
+file	dev/ic/adwlib.c			adw_pci
+file	dev/ic/adwmcode.c		adw_pci
+
+# BusLogic BT-9xx PCI family
+# device declaration in sys/dev/isa/files.isa
+attach	bha at pci with bha_pci
+file	dev/pci/bha_pci.c		bha_pci
+
+# Ensoniq AudioPCI S5016
+device	eap: audio, auconv, mulaw
+attach	eap at pci
+file	dev/pci/eap.c			eap
+
+# Qlogic ISP 10x0 (PCI) family
+# device declaration in sys/conf/files
+attach	isp at pci with isp_pci
+file	dev/pci/isp_pci.c		isp_pci
+
+# Ethernet driver for DC21040-based boards
+device	de: ether, ifnet, ifmedia
+attach	de at pci
+file	dev/pci/if_de.c			de
+
+# ENI ATM driver
+device	en: atm, ifnet
+attach	en at pci with en_pci
+file    dev/pci/if_en_pci.c		en
+file    dev/ic/midway.c			en
+
+# 3Com 3c590 and 3c595 Ethernet controllers
+# device declaration in sys/conf/files
+attach	ep at pci with ep_pci
+file	dev/pci/if_ep_pci.c		ep_pci
+
+# Digital DEFPA PCI FDDI Controller
+device	fpa: pdq, fddi, ifnet
+attach	fpa at pci
+file	dev/pci/if_fpa.c		fpa
+
+# AMD am7990 (LANCE) -based Ethernet controllers
+# device declaration in sys/conf/files
+attach	le at pci with le_pci
+file	dev/pci/if_le_pci.c		le_pci
+
+# NCR 53c8xx SCSI chips
+device	ncr: scsi
+attach	ncr at pci
+file	dev/pci/ncr.c			ncr
+
+# PCI-PCI bridge chips
+device	ppb: pcibus
+attach	ppb at pci
+file	dev/pci/ppb.c			ppb
+
+# Cyclades Cyclom-8/16/32 
+attach	cy at pci with cy_pci
+file	dev/pci/cy_pci.c		cy_pci
+
+# Intel EtherExpress PRO 10/100B
+device	fxp: ether, ifnet, mii, ifmedia
+attach	fxp at pci 
+file	dev/pci/if_fxp.c		fxp
+
+# RealTek 8129/8139
+device	rl: ether, ifnet, mii, ifmedia
+attach	rl at pci
+file	dev/pci/if_rl.c			rl
+
+# Lite-On PNIC
+device	pn: ether, ifnet, ifmedia
+attach	pn at pci
+file	dev/pci/if_pn.c			pn
+
+# Macronix
+device	mx: ether, ifnet, ifmedia
+attach	mx at pci
+file	dev/pci/if_mx.c			mx
+
+# Via Rhine
+device	vr: ether, ifnet, ifmedia
+attach	vr at pci
+file	dev/pci/if_vr.c			vr
+
+# Texas Instruments ThunderLAN
+device	tl: ether, ifnet, mii, ifmedia
+attach	tl at pci
+file	dev/pci/if_tl.c			tl
+
+# S3 SonicVibes (S3 617)
+device	sv: audio, auconv, mulaw
+attach	sv at pci
+file	dev/pci/sv.c			sv
+
+# Brooktree Bt848 video capture
+device	bktr: pcibus
+attach	bktr at pci
+file	dev/pci/brooktree848.c		bktr	needs-count
+
+# 3C90x
+device	xl: ether, ifnet, ifmedia
+attach	xl at pci
+file	dev/pci/if_xl.c			xl
+
+# SMC EPIC, 83c170
+device	tx: ether, ifnet, ifmedia
+attach	tx at pci
+file	dev/pci/if_tx.c			tx
+
+# NE2000-compatible PCI Ethernet cards
+attach	ne at pci with ne_pci: rtl80x9
+file	dev/pci/if_ne_pci.c		ne_pci
+
+# Invertix AEON
+device	aeon: crypto
+attach	aeon at pci
+file	dev/pci/aeon.c			aeon
+
+# Winbond W89C840F ethernet
+device	wb: ether, ifnet
+attach	wb at pci
+file	dev/pci/if_wb.c			wb
