@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.77 2002/09/25 11:41:23 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.78 2002/10/27 04:26:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -428,8 +428,7 @@ ah4_input(m, va_alist)
 		/* RFC 2402 */
 		stripsiz = sizeof(struct newah) + siz1;
 	}
-	if (!ipsec_tunnel_device &&
-	    ipsec4_tunnel_validate(m, off + stripsiz, nxt, sav)) {
+	if (ipsec4_tunnel_validate(m, off + stripsiz, nxt, sav)) {
 		/*
 		 * strip off all the headers that precedes AH.
 		 *	IP xx AH IP' payload -> IP' payload
@@ -908,8 +907,7 @@ ah6_input(mp, offp, proto)
 		/* RFC 2402 */
 		stripsiz = sizeof(struct newah) + siz1;
 	}
-	if (!ipsec_tunnel_device &&
-	    ipsec6_tunnel_validate(m, off + stripsiz, nxt, sav)) {
+	if (ipsec6_tunnel_validate(m, off + stripsiz, nxt, sav)) {
 		/*
 		 * strip off all the headers that precedes AH.
 		 *	IP6 xx AH IP6' payload -> IP6' payload

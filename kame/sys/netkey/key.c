@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.262 2002/10/04 05:46:42 itojun Exp $	*/
+/*	$KAME: key.c,v 1.263 2002/10/27 04:26:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -67,7 +67,6 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <net/raw_cb.h>
-#include <net/if_sec.h>
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -104,8 +103,6 @@
 #include <netinet6/ipcomp.h>
 
 #include <machine/stdarg.h>
-
-#include "sec.h"
 
 /* randomness */
 #ifdef __NetBSD__
@@ -1165,23 +1162,6 @@ key_delsp(sp)
 			isr->sav = NULL;
 		}
 
-#if NSEC > 0
-		if (isr->tunifp) {
-			int s;
-
-#ifdef __NetBSD__
-			s = splnet();
-#else
-			s = splimp();
-#endif
-			sec_demolish(isr->tunifp);
-			splx(s);
-
-			/* XXX more garbage-collection */
-			isr->tunifp = NULL;
-		}
-#endif
-
 		nextisr = isr->next;
 		KFREE(isr);
 		isr = nextisr;
@@ -1859,45 +1839,6 @@ key_spdadd(so, m, mhp)
 			}
 		}
 	}
-
-#if NSEC > 0
-	/*
-	 * based on newsp->req, create/configure tunnels.
-	 * TODO: reuse devices
-	 * TODO: conflicting devices
-	 */
-	if (ipsec_tunnel_device) {
-		for (isr = newsp->req; isr; isr = isr->next) {
-			struct ifnet *ifp;
-			int s;
-			struct sockaddr *me, *you;
-
-			if (isr->saidx.mode != IPSEC_MODE_TUNNEL)
-				continue;
-
-			if (newsp->spidx.dir == IPSEC_DIR_OUTBOUND) {
-				me = (struct sockaddr *)&isr->saidx.src;
-				you = (struct sockaddr *)&isr->saidx.dst;
-			} else {
-				me = (struct sockaddr *)&isr->saidx.dst;
-				you = (struct sockaddr *)&isr->saidx.src;
-			}
-
-			s = splimp();
-			ifp = sec_establish(me, you);
-			/* bring the interface up, we are willing to receive */
-			if (ifp)
-				if_up(ifp);
-			splx(s);
-			if (!ifp) {
-				keydb_delsecpolicy(newsp);
-				return key_senderror(so, m, EINVAL);
-			}
-
-			isr->tunifp = ifp;
-		}
-	}
-#endif
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	newsp->created = time_second;
