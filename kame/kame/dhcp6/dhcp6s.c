@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.79 2002/05/22 12:42:41 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.80 2002/05/22 14:16:47 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -120,6 +120,9 @@ static int server6_react_request __P((struct dhcp6_if *,
 static int server6_react_renew __P((struct dhcp6_if *,
 				     struct in6_pktinfo *, struct dhcp6 *,
 				     struct dhcp6_optinfo *,
+				     struct sockaddr *, int));
+static int server6_react_rebind __P((struct dhcp6_if *,
+				     struct dhcp6 *, struct dhcp6_optinfo *,
 				     struct sockaddr *, int));
 static int server6_react_informreq __P((struct dhcp6_if *, struct dhcp6 *,
 					struct dhcp6_optinfo *,
@@ -482,7 +485,7 @@ server6_recv(s)
 	}
 	if ((ifp = find_ifconfbyid((unsigned int)pi->ipi6_ifindex)) == NULL) {
 		dprintf(LOG_INFO, "%s" "unexpected interface (%d)", FNAME,
-			(unsigned int)pi->ipi6_ifindex);
+		    (unsigned int)pi->ipi6_ifindex);
 		return;
 	}
 
@@ -494,16 +497,15 @@ server6_recv(s)
 	dh6 = (struct dhcp6 *)rdatabuf;
 
 	dprintf(LOG_DEBUG, "%s" "received %s from %s", FNAME,
-		dhcpmsgstr(dh6->dh6_msgtype),
-		addr2str((struct sockaddr *)&from));
+	    dhcpmsgstr(dh6->dh6_msgtype),
+	    addr2str((struct sockaddr *)&from));
 
 	/*
 	 * parse and validate options in the request
 	 */
 	dhcp6_init_options(&optinfo);
 	if (dhcp6_get_options((struct dhcp6opt *)(dh6 + 1),
-			      (struct dhcp6opt *)(rdatabuf + len),
-			      &optinfo) < 0) {
+		(struct dhcp6opt *)(rdatabuf + len), &optinfo) < 0) {
 		dprintf(LOG_INFO, "%s" "failed to parse options", FNAME);
 		return -1;
 	}
@@ -511,24 +513,27 @@ server6_recv(s)
 	switch (dh6->dh6_msgtype) {
 	case DH6_SOLICIT:
 		(void)server6_react_solicit(ifp, dh6, &optinfo,
-					    (struct sockaddr *)&from, fromlen);
+		    (struct sockaddr *)&from, fromlen);
 		break;
 	case DH6_REQUEST:
 		(void)server6_react_request(ifp, pi, dh6, &optinfo,
-					    (struct sockaddr *)&from, fromlen);
+		    (struct sockaddr *)&from, fromlen);
 		break;
 	case DH6_RENEW:
 		(void)server6_react_renew(ifp, pi, dh6, &optinfo,
-					  (struct sockaddr *)&from, fromlen);
+		    (struct sockaddr *)&from, fromlen);
+		break;
+	case DH6_REBIND:
+		(void)server6_react_rebind(ifp, dh6, &optinfo,
+		    (struct sockaddr *)&from, fromlen);
 		break;
 	case DH6_INFORM_REQ:
 		(void)server6_react_informreq(ifp, dh6, &optinfo,
-					      (struct sockaddr *)&from,
-					      fromlen);
+		    (struct sockaddr *)&from, fromlen);
 		break;
 	default:
 		dprintf(LOG_INFO, "%s" "unknown or unsupported msgtype %s",
-			FNAME, dhcpmsgstr(dh6->dh6_msgtype));
+		    FNAME, dhcpmsgstr(dh6->dh6_msgtype));
 		break;
 	}
 
@@ -815,8 +820,6 @@ server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
 	/* prefixes */
 	for (lv = TAILQ_FIRST(&optinfo->prefix_list); lv;
 	     lv = TAILQ_NEXT(lv, link)) {
-		struct dhcp6_listval *stcode, *prefix;
-
 		binding = find_binding(&optinfo->clientID,
 				       DHCP6_CONFINFO_PREFIX,
 				       &lv->val_prefix6);
@@ -834,25 +837,116 @@ server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
 
 		/* include a Status Code option with value Success. */
 		if (!add_success) {
-			if ((stcode = malloc(sizeof(*stcode))) == NULL) {
-				dprintf(LOG_ERR, "failed to allocate memory "
-				    "for status code", FNAME);
-				goto fail;
+			int stcode = DH6OPT_STCODE_SUCCESS;
+
+			if (dhcp6_add_listval(&roptinfo.stcode_list,
+				&stcode, DHCP6_LISTVAL_NUM) == NULL) {
+				dprintf(LOG_ERR, "%s" "failed to add a "
+				    "status code", FNAME);
 			}
-			memset(stcode, 0, sizeof(*stcode));
-			stcode->val_num = DH6OPT_STCODE_SUCCESS;
-			TAILQ_INSERT_TAIL(&roptinfo.stcode_list, stcode, link);
 			add_success = 1;
 		}
 
 		/* add the prefix */
 		if (dhcp6_add_listval(&roptinfo.prefix_list, binding->val,
 			DHCP6_LISTVAL_PREFIX6) == NULL) {
-			dprintf(LOG_ERR, "failed to add a renewed prefix",
+			dprintf(LOG_ERR, "%s" "failed to add a renewed prefix",
 			    FNAME);
 			goto fail;
 		}
 	}
+
+	(void)server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
+			   &roptinfo);
+
+	dhcp6_clear_options(&roptinfo);
+	return 0;
+
+  fail:
+	dhcp6_clear_options(&roptinfo);
+	return -1;
+}
+
+static int
+server6_react_rebind(ifp, dh6, optinfo, from, fromlen)
+	struct dhcp6_if *ifp;
+	struct dhcp6 *dh6;
+	struct dhcp6_optinfo *optinfo;
+	struct sockaddr *from;
+	int fromlen;
+{
+	struct dhcp6_optinfo roptinfo;
+	struct dhcp6_listval *lv;
+	struct dhcp6_binding *binding;
+	int add_success = 0;
+
+	/* message validation according to Section 15.7 of dhcpv6-24 */
+
+	/* the message must include a Client Identifier option */
+	if (optinfo->clientID.duid_len == 0) {
+		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
+		return -1;
+	}
+
+	if (optinfo->serverID.duid_len) {
+		dprintf(LOG_INFO, "%s" "server ID option is included in "
+		    "a rebind message", FNAME);	/* just drop a note */
+	}
+
+	/*
+	 * configure necessary options based on the options in request.
+	 */
+	dhcp6_init_options(&roptinfo);
+
+	/* server information option */
+	if (duidcpy(&roptinfo.serverID, &server_duid)) {
+		dprintf(LOG_ERR, "%s" "failed to copy server ID", FNAME);
+		goto fail;
+	}
+	/* copy client information back */
+	if (duidcpy(&roptinfo.clientID, &optinfo->clientID)) {
+		dprintf(LOG_ERR, "%s" "failed to copy client ID", FNAME);
+		goto fail;
+	}
+
+	/*
+	 * Locates the client's binding and verifies that the information
+	 * from the client matches the information stored for that client.
+	 */
+	/* prefixes */
+	for (lv = TAILQ_FIRST(&optinfo->prefix_list); lv;
+	     lv = TAILQ_NEXT(lv, link)) {
+		binding = find_binding(&optinfo->clientID,
+				       DHCP6_CONFINFO_PREFIX,
+				       &lv->val_prefix6);
+		if (binding == NULL) {
+			dprintf(LOG_INFO, "%s" "can't find a binding of prefix"
+				" %s/%d for %s", FNAME,
+				in6addr2str(&lv->val_prefix6.addr, 0),
+				lv->val_prefix6.plen,
+				duidstr(&optinfo->clientID));
+			continue; /* XXX: is this okay? */
+		}
+
+		/* we always extend the requested binding. */
+		update_binding(binding);
+
+		/* add the prefix */
+		if (dhcp6_add_listval(&roptinfo.prefix_list, binding->val,
+			DHCP6_LISTVAL_PREFIX6) == NULL) {
+			dprintf(LOG_ERR, "failed to add a rebound prefix",
+			    FNAME);
+			goto fail;
+		}
+	}
+
+	/* add other configuration information */
+	/* DNS server */
+	if (dhcp6_copy_list(&roptinfo.dns_list, &dnslist)) {
+		dprintf(LOG_ERR, "%s" "failed to copy DNS list");
+		goto fail;
+	}
+	/* how about other prefixes? */
 
 	(void)server6_send(DH6_REPLY, ifp, dh6, optinfo, from, fromlen,
 			   &roptinfo);

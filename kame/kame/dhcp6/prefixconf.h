@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.h,v 1.1 2002/05/22 12:42:41 jinmei Exp $	*/
+/*	$KAME: prefixconf.h,v 1.2 2002/05/22 14:16:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -29,13 +29,15 @@
  * SUCH DAMAGE.
  */
 
-typedef enum { PREFIX6S_ACTIVE, PREFIX6S_RENEW } prefix6state_t;
+typedef enum { PREFIX6S_ACTIVE, PREFIX6S_RENEW,
+	       PREFIX6S_REBIND} prefix6state_t;
 
 struct dhcp6_siteprefix {
 	TAILQ_ENTRY(dhcp6_siteprefix) link; /* link to next site prefix */
 
 	struct dhcp6_if *ifp;
 	struct dhcp6_prefix prefix;
+	struct duid serverid;
 
 	prefix6state_t state;
 	struct dhcp6_timer *timer;
@@ -47,4 +49,7 @@ struct dhcp6_siteprefix {
 };
 
 extern void prefix6_init __P((void));
-extern int prefix6_add __P((struct dhcp6_if *, struct dhcp6_prefix *));
+extern int prefix6_add __P((struct dhcp6_if *, struct dhcp6_prefix *,
+			       struct duid *));
+extern int prefix6_update __P((struct dhcp6_event *, struct dhcp6_list *,
+				  struct duid *));

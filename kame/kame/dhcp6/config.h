@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.14 2002/05/22 12:42:41 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.15 2002/05/22 14:16:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -67,6 +67,8 @@ struct dhcp6_event {
 	struct dhcp6_if *ifp;
 	struct dhcp6_timer *timer;
 
+	struct duid serverid;
+
 	/* internal timer parameters */
 	long retrans;
 	long init_retrans;
@@ -104,7 +106,7 @@ struct dhcp6_serverinfo {
 
 /* client status code */
 enum {DHCP6S_INIT, DHCP6S_SOLICIT, DHCP6S_INFOREQ, DHCP6S_REQUEST,
-      DHCP6S_RENEW, DHCP6S_IDLE};
+      DHCP6S_RENEW, DHCP6S_REBIND, DHCP6S_IDLE};
       
 struct dhcp6_ifconf {
 	struct dhcp6_ifconf *next;

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.29 2002/05/22 12:42:41 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.30 2002/05/22 14:16:46 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -46,6 +46,7 @@
 #define DH6_ADVERTISE	2
 #define DH6_REQUEST	3
 #define DH6_RENEW	5
+#define DH6_REBIND	6
 #define DH6_REPLY	7
 #define DH6_INFORM_REQ	11
 
@@ -69,6 +70,8 @@
 #define REQ_MAX_RC	10	/* Max Request retry attempts */
 #define REN_TIMEOUT	10000	/* 10sec */
 #define REN_MAX_RT	600000	/* 600secs */
+#define REB_TIMEOUT	10000	/* 10sec */
+#define REB_MAX_RT	600000	/* 600secs */
 
 #define DHCP6_DURATITION_INFINITE 0xffffffff
 

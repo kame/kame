@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.3 2002/05/22 12:42:41 jinmei Exp $	*/
+/*	$KAME: prefixconf.c,v 1.4 2002/05/22 14:16:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -79,7 +79,8 @@ static struct dhcp6_siteprefix *find_siteprefix6 __P((struct dhcp6_prefix *));
 static struct dhcp6_timer *prefix6_timo __P((void *));
 static int add_ifprefix __P((struct dhcp6_prefix *, struct prefix_ifconf *));
 static void prefix6_remove __P((struct dhcp6_siteprefix *));
-static int update __P((struct dhcp6_siteprefix *, struct dhcp6_prefix *));
+static int update __P((struct dhcp6_siteprefix *, struct dhcp6_prefix *,
+			  struct duid *));
 
 extern struct dhcp6_timer *client6_timo __P((void *));
 extern void client6_send_renew __P((struct dhcp6_event *));
@@ -91,9 +92,10 @@ prefix6_init()
 }
 
 int
-prefix6_add(ifp, prefix)
+prefix6_add(ifp, prefix, serverid)
 	struct dhcp6_if *ifp;
 	struct dhcp6_prefix *prefix;
+	struct duid *serverid;
 {
 	struct prefix_ifconf *pif;
 	struct dhcp6_siteprefix *sp;
@@ -124,8 +126,12 @@ prefix6_add(ifp, prefix)
 	sp->prefix = *prefix;
 	sp->ifp = ifp;
 	sp->state = PREFIX6S_ACTIVE;
+	if (duidcpy(&sp->serverid, serverid)) {
+		dprintf(LOG_ERR, "%s" "failed to copy server ID");
+		goto fail;
+	}
 
-	/* if an finite lease duration is specified, set up a timer. */
+	/* if a finite lease duration is specified, set up a timer. */
 	if (sp->prefix.duration != DHCP6_DURATITION_INFINITE) {
 		struct timeval timo;
 
@@ -143,9 +149,17 @@ prefix6_add(ifp, prefix)
 	}
 
 	for (pif = prefix_ifconflist; pif; pif = pif->next) {
-		if (strcmp(pif->ifname, ifp->ifname)) {
-			add_ifprefix(prefix, pif);
-		}
+		/*
+		 * the requesting router MUST NOT assign any delegated
+		 * prefixes or subnets from the delegated prefix(es) to the
+		 * link through which it received the DHCP message from the
+		 * delegating router.
+		 * [dhcpv6-opt-prefix-delegation-01, Section 11.1]
+		 */
+		if (strcmp(pif->ifname, ifp->ifname) == 0)
+			continue;
+
+		add_ifprefix(prefix, pif);
 	}
 
 	TAILQ_INSERT_TAIL(&siteprefix_listhead, sp, link);
@@ -153,7 +167,10 @@ prefix6_add(ifp, prefix)
 	return 0;
 
   fail:
-	free(sp);
+	if (sp) {
+		duidfree(&sp->serverid);
+		free(sp);
+	}
 	return -1;
 }
 
@@ -172,6 +189,8 @@ prefix6_remove(sp)
 		free(ipf);
 	}
 
+	duidfree(&sp->serverid);
+
 	if (sp->timer)
 		dhcp6_remove_timer(&sp->timer);
 
@@ -187,9 +206,10 @@ prefix6_remove(sp)
 }
 
 int
-prefix6_update(ev, prefix_list)
+prefix6_update(ev, prefix_list, serverid)
 	struct dhcp6_event *ev;
 	struct dhcp6_list *prefix_list;
+	struct duid *serverid;
 {
 	struct dhcp6_listval *lv;
 	struct dhcp6_eventdata *evd, *evd_next;
@@ -201,7 +221,7 @@ prefix6_update(ev, prefix_list)
 		if (find_siteprefix6(&lv->val_prefix6) != NULL)
 			continue;
 
-		if (prefix6_add(ev->ifp, &lv->val_prefix6)) {
+		if (prefix6_add(ev->ifp, &lv->val_prefix6, serverid)) {
 			dprintf(LOG_INFO, "%s" "failed to add a new prefix");
 			/* continue updating */
 		}
@@ -223,7 +243,8 @@ prefix6_update(ev, prefix_list)
 		TAILQ_REMOVE(&ev->data_list, evd, link);
 		((struct dhcp6_siteprefix *)evd->data)->evdata = NULL;
 
-		update((struct dhcp6_siteprefix *)evd->data, &lv->val_prefix6);
+		update((struct dhcp6_siteprefix *)evd->data,
+		    &lv->val_prefix6, serverid);
 
 		free(evd);		    
 	}
@@ -247,9 +268,10 @@ prefix6_update(ev, prefix_list)
 }
 
 static int
-update(sp, prefix)
+update(sp, prefix, serverid)
 	struct dhcp6_siteprefix *sp;
 	struct dhcp6_prefix *prefix;
+	struct duid *serverid;
 {
 	struct timeval timo;
 
@@ -293,6 +315,15 @@ update(sp, prefix)
 		break;
 	}
 
+	/* if we're rebinding the prefix, copy the new server ID. */
+	if (sp->state == PREFIX6S_REBIND) {
+		if (duidcpy(&sp->serverid, serverid)) {
+			dprintf(LOG_ERR, "%s" "failed to copy server ID");
+			prefix6_remove(sp); /* XXX */
+			return -1;
+		}
+	}
+
 	sp->state = PREFIX6S_ACTIVE;
 
 	return 0;
@@ -324,56 +355,96 @@ prefix6_timo(arg)
 	struct dhcp6_eventdata *evd;
 	struct timeval timeo;
 	struct dhcp6_timer *new_timer = NULL;
+	int dhcpstate;
 	double d;
 
 	dprintf(LOG_DEBUG, "%s" "prefix timeout for %s/%d, state=%d", FNAME,
 		in6addr2str(&sp->prefix.addr, 0), sp->prefix.plen, sp->state);
 
+	/* cancel the current event for the prefix. */
+	if (sp->evdata) {
+		TAILQ_REMOVE(&sp->evdata->event->data_list, sp->evdata, link);
+		free(sp->evdata);
+		sp->evdata = NULL;
+	}
+
+	if (sp->state == PREFIX6S_REBIND) {
+		dprintf(LOG_INFO, "%s" "failed to rebind a prefix %s/%d",
+		    FNAME, in6addr2str(&sp->prefix.addr, 0), sp->prefix.plen);
+		prefix6_remove(sp);
+		return(NULL);
+	}
+
 	switch(sp->state) {
 	case PREFIX6S_ACTIVE:
 		sp->state = PREFIX6S_RENEW;
+		dhcpstate = DHCP6S_RENEW;
 		d = sp->prefix.duration * 0.3; /* (0.8 - 0.5) * duration */
 		timeo.tv_sec = (long)d;
 		timeo.tv_usec = 0;
-		new_timer = sp->timer;
+		break;
+	case PREFIX6S_RENEW:
+		sp->state = PREFIX6S_REBIND;
+		dhcpstate = DHCP6S_REBIND;
+		d = sp->prefix.duration * 0.2; /* (1.0 - 0.8) * duration */
+		timeo.tv_sec = (long)d;
+		timeo.tv_usec = 0;
+		duidfree(&sp->serverid);
+		break;
+	}
+	dhcp6_set_timer(&timeo, sp->timer);
 
-		if ((ev = dhcp6_create_event(sp->ifp, DHCP6S_RENEW)) == NULL) {
-			dprintf(LOG_ERR, "%s" "failed to create a new event"
-				FNAME);
-			exit(1); /* XXX: should try to recover */
-		}
-		if ((ev->timer = dhcp6_add_timer(client6_timo, ev)) == NULL) {
-			dprintf(LOG_ERR, "%s" "failed to create a new event "
-				"timer", FNAME);
-			free(ev);
-			exit(1); /* XXX */
-		}
-		if ((evd = malloc(sizeof(*evd))) == NULL) {
-			dprintf(LOG_ERR, "%s" "failed to create a new event "
-				"data", FNAME);
+	if ((ev = dhcp6_create_event(sp->ifp, dhcpstate)) == NULL) {
+		dprintf(LOG_ERR, "%s" "failed to create a new event"
+		    FNAME);
+		exit(1); /* XXX: should try to recover */
+	}
+	if ((ev->timer = dhcp6_add_timer(client6_timo, ev)) == NULL) {
+		dprintf(LOG_ERR, "%s" "failed to create a new event "
+		    "timer", FNAME);
+		free(ev);
+		exit(1); /* XXX */
+	}
+	if ((evd = malloc(sizeof(*evd))) == NULL) {
+		dprintf(LOG_ERR, "%s" "failed to create a new event "
+		    "data", FNAME);
+		free(ev->timer);
+		free(ev);
+		exit(1); /* XXX */
+	}
+	if (sp->state == PREFIX6S_RENEW) {
+		if (duidcpy(&ev->serverid, &sp->serverid)) {
+			dprintf(LOG_ERR, "%s" "failed to copy server ID",
+			    FNAME);
 			free(ev->timer);
 			free(ev);
 			exit(1); /* XXX */
 		}
-		memset(evd, 0, sizeof(*evd));
-		evd->type = DHCP6_DATA_PREFIX;
-		evd->data = sp;
-		evd->event = ev;
-		TAILQ_INSERT_TAIL(&ev->data_list, evd, link);
+	}
+	memset(evd, 0, sizeof(*evd));
+	evd->type = DHCP6_DATA_PREFIX;
+	evd->data = sp;
+	evd->event = ev;
+	TAILQ_INSERT_TAIL(&ev->data_list, evd, link);
 
-		TAILQ_INSERT_TAIL(&sp->ifp->event_list, ev, link);
+	TAILQ_INSERT_TAIL(&sp->ifp->event_list, ev, link);
 
-		ev->timeouts = 0;
-		ev->state = DHCP6S_RENEW;
+	ev->timeouts = 0;
+	dhcp6_set_timeoparam(ev);
+	dhcp6_reset_timer(ev);
+
+	sp->evdata = evd;
+
+	switch(sp->state) {
+	case PREFIX6S_RENEW:
 		client6_send_renew(ev);
-		dhcp6_set_timeoparam(ev);
-		dhcp6_reset_timer(ev);
-
-		sp->evdata = evd;
+		break;
+	case PREFIX6S_REBIND:
+		client6_send_rebind(ev);
 		break;
 	}
 
-	return(new_timer);
+	return(sp->timer);
 }
 
 static int

@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.54 2002/05/22 12:42:41 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.55 2002/05/22 14:16:46 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -238,6 +238,8 @@ dhcp6_remove_event(ev)
 			"event data list is not empty", FNAME);
 		exit(1);
 	}
+
+	duidfree(&ev->serverid);
 
 	if (ev->timer)
 		dhcp6_remove_timer(&ev->timer);
@@ -1184,6 +1186,10 @@ dhcp6_set_timeoparam(ev)
 		ev->init_retrans = REN_TIMEOUT;
 		ev->max_retrans_time = REN_MAX_RT;
 		break;
+	case DHCP6S_REBIND:
+		ev->init_retrans = REB_TIMEOUT;
+		ev->max_retrans_time = REB_MAX_RT;
+		break;
 	default:
 		dprintf(LOG_INFO, "%s" "unexpected state %d on %s",
 			FNAME, ev->state, ev->ifp->ifname);
@@ -1255,6 +1261,9 @@ dhcp6_reset_timer(ev)
 	case DHCP6S_RENEW:
 		statestr = "RENEW";
 		break;
+	case DHCP6S_REBIND:
+		statestr = "REBIND";
+		break;
 	case DHCP6S_IDLE:
 		statestr = "IDLE";
 		break;
@@ -1267,7 +1276,7 @@ dhcp6_reset_timer(ev)
 	interval.tv_usec = (ev->retrans * 1000) % 1000000;
 	dhcp6_set_timer(&interval, ev->timer);
 
-	dprintf(LOG_DEBUG, "%s" "reset timer for %s, "
+	dprintf(LOG_DEBUG, "%s" "reset a timer on %s, "
 		"state=%s, timeo=%d, retrans=%d", FNAME,
 		ev->ifp->ifname, statestr, ev->timeouts, ev->retrans);
 }
@@ -1302,6 +1311,7 @@ duidfree(duid)
 {
 	if (duid->duid_id)
 		free(duid->duid_id);
+	duid->duid_len = 0;
 }
 
 char *
@@ -1354,6 +1364,8 @@ dhcpmsgstr(type)
 		return "advertise";
 	case DH6_RENEW:
 		return "renew";
+	case DH6_REBIND:
+		return "rebind";
 	case DH6_REQUEST:
 		return "request";
 	case DH6_REPLY:

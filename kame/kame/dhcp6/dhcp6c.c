@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.83 2002/05/22 12:42:41 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.84 2002/05/22 14:16:46 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -112,6 +112,7 @@ static void get_rtaddrs __P((int, struct sockaddr *, struct sockaddr **));
 
 struct dhcp6_timer *client6_timo __P((void *));
 void client6_send_renew __P((struct dhcp6_event *));
+void client6_send_rebind __P((struct dhcp6_event *));
 
 #define DHCP6C_CONF "/usr/local/v6/etc/dhcp6c.conf"
 #define DHCP6C_PIDFILE "/var/run/dhcp6c.pid"
@@ -405,7 +406,19 @@ client6_timo(arg)
 		client6_send(ev, outsock);
 		break;
 	case DHCP6S_RENEW:
-		client6_send_renew(ev);
+	case DHCP6S_REBIND:
+		if (!TAILQ_EMPTY(&ev->data_list)) {
+			if (ev->state == DHCP6S_RENEW)
+				client6_send_renew(ev);
+			else
+				client6_send_rebind(ev);
+		} else {
+			dprintf(LOG_INFO, "%s"
+			    "all information to be renewed were canceled",
+			    FNAME);
+			dhcp6_remove_event(ev);
+			return(NULL);
+		}
 		break;
 	case DHCP6S_SOLICIT:
 		if (ifp->servers) {
@@ -794,7 +807,101 @@ client6_send_renew(ev)
 	dhcp6_init_options(&optinfo);
 
 	/* server ID */
-	optinfo.serverID = ifp->current_server->optinfo.serverID;
+	optinfo.serverID = ev->serverid;
+
+	/* client ID */
+	optinfo.clientID = client_duid;
+
+	/* configuration information to be renewed */
+	for (evd = TAILQ_FIRST(&ev->data_list); evd;
+	     evd = TAILQ_NEXT(evd, link)) {
+		switch(evd->type) {
+		case DHCP6_DATA_PREFIX:
+			if ((dlv = malloc(sizeof(*dlv))) == NULL) {
+				dprintf(LOG_ERR, "%s" "failed to allocate "
+					"memory for a renewal prefix", FNAME);
+				goto end;
+			}
+			memset(dlv, 0, sizeof(*dlv));
+			dlv->val_prefix6 =
+				((struct dhcp6_siteprefix *)evd->data)->prefix;
+			TAILQ_INSERT_TAIL(&renew_plist, dlv, link);
+			break;
+		default:
+			dprintf(LOG_ERR, "%s" "unexpected event data (d)",
+				FNAME, evd->type);
+			exit(1);
+		}
+	}
+	optinfo.prefix_list = renew_plist;
+
+	/* set options in the message */
+	if ((optlen = dhcp6_set_options((struct dhcp6opt *)(dh6 + 1),
+					(struct dhcp6opt *)(buf + sizeof(buf)),
+					&optinfo)) < 0) {
+		dprintf(LOG_INFO, "%s" "failed to construct options", FNAME);
+		return;
+	}
+	len += optlen;
+
+	/*
+	 * Unless otherwise specified, a client sends DHCP messages to the
+	 * All_DHCP_Relay_Agents_and_Servers or the DHCP_Anycast address.
+	 * [dhcpv6-24 Section 13.]
+	 * Our current implementation always follows the case.
+	 */
+	dst = *sa6_allagent;
+	dst.sin6_scope_id = ifp->linkid;
+
+	if (transmit_sa(ifp->outsock, (struct sockaddr *)&dst, buf,
+			len) != 0) {
+		dprintf(LOG_ERR, "%s" "transmit failed", FNAME);
+		return;
+	}
+
+	dprintf(LOG_DEBUG, "%s" "send %s to %s", FNAME,
+		dhcpmsgstr(dh6->dh6_msgtype),
+		addr2str((struct sockaddr *)&dst));
+
+  end:
+	dhcp6_clear_list(&renew_plist);
+	return;
+}
+
+void
+client6_send_rebind(ev)
+	struct dhcp6_event *ev;
+{
+	struct dhcp6_if *ifp;
+	struct dhcp6_eventdata *evd;
+	struct dhcp6_optinfo optinfo;
+	struct dhcp6_list renew_plist;
+	struct dhcp6_listval *dlv;
+	struct dhcp6 *dh6;
+	char buf[BUFSIZ];
+	ssize_t optlen, len;
+	struct sockaddr_in6 dst;
+
+	TAILQ_INIT(&renew_plist);
+
+	ifp = ev->ifp;
+	
+	dh6 = (struct dhcp6 *)buf;
+	memset(dh6, 0, sizeof(*dh6));
+	dh6->dh6_msgtype = DH6_REBIND;
+	if (ev->timeouts == 0) {
+		ev->xid = random() & DH6_XIDMASK;
+		dprintf(LOG_DEBUG, "%s" "a new XID (%x) is generated",
+			FNAME, ev->xid);
+	}
+	dh6->dh6_xid &= ~ntohl(DH6_XIDMASK);
+	dh6->dh6_xid |= htonl(ev->xid);
+	len = sizeof(*dh6);
+
+	/*
+	 * construct options
+	 */
+	dhcp6_init_options(&optinfo);
 
 	/* client ID */
 	optinfo.clientID = client_duid;
@@ -1102,6 +1209,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	if (ev->state != DHCP6S_INFOREQ &&
 	    ev->state != DHCP6S_REQUEST &&
 	    ev->state != DHCP6S_RENEW &&
+	    ev->state != DHCP6S_REBIND &&
 	    (ev->state != DHCP6S_SOLICIT ||
 	     !(ifp->send_flags & DHCIFF_RAPID_COMMIT))) {
 		dprintf(LOG_INFO, "%s" "unexpected reply", FNAME);
@@ -1138,17 +1246,17 @@ client6_recvreply(ifp, dh6, len, optinfo)
 		}
 	}
 
-	if (ev->state == DHCP6S_RENEW) {
+	if (ev->state == DHCP6S_RENEW || ev->state == DHCP6S_REBIND) {
 		/*
-		 * Update configuration information to be renewed.
+		 * Update configuration information to be renewed or rebound.
 		 * Note that the returned list is empty, in which case
 		 * the waiting information should be removed.
 		 */
-		prefix6_update(ev, &optinfo->prefix_list);
+		prefix6_update(ev, &optinfo->prefix_list, &optinfo->serverID);
 	} else {
 		for (p = TAILQ_FIRST(&optinfo->prefix_list); p;
 		     p = TAILQ_NEXT(p, link)) {
-			prefix6_add(ifp, &p->val_prefix6);
+			prefix6_add(ifp, &p->val_prefix6, &optinfo->serverID);
 		}
 	}
 
