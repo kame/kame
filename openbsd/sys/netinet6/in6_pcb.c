@@ -1307,7 +1307,11 @@ in6_pcbconnect(inp, nam)
 	 * but if this line is missing, the garbage value remains.
 	 */
 	inp->inp_ipv6.ip6_flow = sin6->sin6_flowinfo;
-
+	/* configure NRL flags properly */
+	if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
+		inp->inp_flags |= INP_IPV6_MAPPED;
+		inp->inp_flags &= ~INP_IPV6_UNDEC;
+	}
 	in_pcbrehash(inp);
 	return(0);
 }
