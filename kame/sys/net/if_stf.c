@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.19 2000/03/12 10:52:47 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.20 2000/03/12 10:55:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -58,6 +58,10 @@
  *
  * ICMPv6:
  * - Redirects cannot be used due to the lack of link-local address.
+ *
+ * 04 draft suggests to have link-local address onto 6to4 interface.
+ * However, it seems to have no real use and does not help the above symptom
+ * much.
  *
  * 6to4 interface has security issues.  Refer to
  * http://playground.iijlab.net/i-d/draft-itojun-ipv6-transition-abuse-00.txt
