@@ -1,0 +1,197 @@
+.\"     $$
+.\"
+.\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd Dec 1, 2004
+.Dt IST 4
+.Os KAME
+.Sh NAME
+.Nm ist
+.Nd ISATAP tunnel interface
+.Sh SYNOPSIS
+.Cd "pseudo-device ist" Op Ar count
+.Sh DESCRIPTION
+The
+.Nm
+interface supports
+.Dq ISATAP
+IPv6 in IPv4 encapsulation.
+It can tunnel IPv6 traffic over IPv4, as specified in
+.Li draft-ietf-ngtrans-isatap-08.txt (ISATAP).
+.Ss ISATAP
+.Nm
+interface requires certain configurations to work properly.
+according to the ISATAP protocol.
+.Bl -bullet
+.It
+A statically configured valid ISATAP linklocal address:
+.Dq A valid ISATAP address
+is an address which has the following properties.
+If any of the following properties are not satisfied,
+.Nm
+raises runtime error on packet transmission.
+Read the specification for more details.
+.Bl -bullet
+.It
+matches
+.Li fe80::0000:5efe:xxyy:zzuu/64
+where
+.Li xxyy:zzuu
+is a hexadecimal notation of an IPv4 address for the node.
+.Pp
+IPv4 address can be taken from any of interfaces your node has.
+.It
+Global IPv6 prefix is automatically configured by Router-Advertisement from an ISATAP router.
+.El
+.It
+At least one IPv4 address of ISATAP routers:
+It is available in many ways, such as a sepecial domain name
+("isatap.domainname"), DHCP option, manual configuration etc.
+.El
+.Pp
+If you would like the node to behave as an ISATAP router,
+you have to assign non-linklocal IPv6 addresses to the ISATAP interface
+in addition to the above two, and distribute the prefixes by Router-Advertisement as is done with normal physical interfaces.
+.Pp
+.Nm
+can also be configured to be ECN friendly by
+.Dv IFF_LINK1 .
+See
+.Xr gif 4
+for details.
+.Pp
+Please note that ISATAP specification is written as
+.Dq accept tunnelled packet from everyone within a site
+tunnelling device.
+By enabling
+.Nm
+device, you are making it much easier for malicious parties to inject 
+fabricated IPv6 packet to your node.
+Also, malicious party can inject an IPv6 packet with fabricated source address 
+to make your node generate improper tunnelled packet.
+Administrators must take caution when enabling the interface.
+To prevent possible attacks,
+.Nm
+interface filters out the following packets.
+Note that the checks are no way complete:
+.Bl -bullet
+.It
+Packets with IPv4 unspecified address as outer IPv4 source/destination
+.Pq Li 0.0.0.0/8
+.It
+Packets with loopback address as outer IPv4 source/destination
+.Pq Li 127.0.0.0/8
+.It
+Packets with IPv4 multicast address as outer IPv4 source/destination
+.Pq Li 224.0.0.0/4
+.It
+Packets with limited broadcast address as outer IPv4 source/destination
+.Pq Li 255.0.0.0/8
+.It
+Packets with subnet broadcast address as outer IPv4 source/destination.
+The check is made against subnet broadcast addresses for
+all of the directly connected subnets.
+.It
+Packets that does not pass ingress filtering.
+Outer IPv4 source address must meet the IPv4 topology on the routing table.
+Ingress filter can be turned off by
+.Dv IFF_LINK2
+bit.
+.It
+The same set of rules are applied against the IPv4 address embedded into
+inner IPv6 address, if the IPv6 address matches on-line prefixes on 
+.Nm
+interface.
+.It
+Packets not from any of the ISATAP routers in terms of IPv4, if the
+inner IPv6 source does not match with on-line prefixes on 
+.Nm
+interface.
+.It
+Packets with multicast address as inner IPv6 source/destination
+.El
+.Pp
+It is recommended to filter/audit
+incoming IPv4 packet with IP protocol number 41, as necessary.
+It is also recommended to filter/audit encapsulated IPv6 packets as well.
+You may also want to run normal ingress filter against inner IPv6 address
+to avoid spoofing.
+.Pp
+By setting the
+.Dv IFF_LINK0
+flag on the
+.Nm
+interface, it is possible to disable the input path,
+making the direct attacks from the outside impossible.
+Note, however, there are other security risks exist.
+.\"
+.Sh EXAMPLES
+.Ss ISATAP
+In this example, the ISATAP router's IPv4 address is 133.4.1.1 and 133.4.1.2.
+.Pp
+Here's the host side configuration. Please take care that you have to send
+Router Solicitation periodically by
+.Dq rtsold
+, since ISATAP routers cannot advertise
+unsolicited Router Advertisements.
+.Bd -literal
+# ifconfig ne0 inet 133.4.5.6 netmask 0xffffff00
+# ifconfig ist0 isataprtr 133.4.1.1
+# ifconfig ist0 isataprtr 133.4.1.2
+# ifconfig ist0 inet6 fe80::5efe:133.4.5.6 prefixlen 64
+# rtsold ist0
+.Ed
+.Pp
+Here's the router side configuration.
+.Bd -literal
+# ifconfig ne0 inet 133.4.1.1 netmask 0xffffff00
+# ifconfig ist0 isataprtr 133.4.1.1
+# ifconfig ist0 isataprtr 133.4.1.2
+# ifconfig ist0 inet6 fe80::5efe:133.4.1.1 prefixlen 64
+# ifconfig ist0 inet6 3ffe:ffff:ffff:1::5efe:133.4.1.1 prefixlen 64 alias
+# rtadvd ist0
+.Ed
+.Pp
+.Sh SEE ALSO
+.Xr gif 4 ,
+.Xr inet 4 ,
+.Xr inet6 4
+.Rs	 
+.%A Fred Templin	 
+.%A Tim Gleeson	 
+.%A Mohit Talwar	 
+.%A Dave Thaler	 
+.%T "Intra-Site Automatic Tunneling Addressing Protocol (ISATAP)"	 
+.%D Dec 2002	 
+.%N draft-ietf-ngtrans-isatap-08.txt	 
+.Re
+.\"
+.Sh HISTORY
+The
+.Nm
+device first appeared in WIDE/KAME IPv6 stack.
