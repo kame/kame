@@ -6,7 +6,7 @@
 # $FreeBSD: ports/lang/ruby/Makefile,v 1.16 2000/01/12 19:16:43 sumikawa Exp $
 #
 
-DISTNAME=	ruby-1.4.3
+DISTNAME=	ruby-1.4.4
 CATEGORIES=	lang
 MASTER_SITES=	ftp://ftp.netlab.co.jp/pub/lang/ruby/${BRANCH_NAME}/ \
 		ftp://ftp.TokyoNet.AD.JP/pub/misc/ruby/${BRANCH_NAME}/ \
