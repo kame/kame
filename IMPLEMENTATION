@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/05/30 05:28:37 $
+			$Date: 2000/05/31 17:47:31 $
 
 1. IPv6
 
@@ -123,6 +123,9 @@ http://playground.iijlab.net/i-d/draft-itojun-ipv6-transition-abuse-00.txt:
     * kame/openbsd completely disables IPv4 mapped address support.
     * kame/netbsd makes IPv4 mapped address support off by default.
     * See section 12.6 and 14 for more details.
+draft-aboba-dnsext-mdns-00.txt: Multicast DNS
+    * kame/mdnsd has test implementation, which will not be compiled in
+      default compilation.
 
 1.2 Neighbor Discovery
 
