@@ -84,7 +84,9 @@ extern int     	check_ipsec_policy  __P((struct inpcb *, u_int32_t));
 #include <machine/stdarg.h>
 
 #ifdef INET6
-#include <netinet6/in6.h>
+#ifndef INET
+#include <netinet/in.h>
+#endif
 #include <netinet6/ip6.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/ip6_var.h>

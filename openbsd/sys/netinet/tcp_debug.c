@@ -81,8 +81,10 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet/tcp_debug.h>
 
 #ifdef INET6
+#ifndef INET
+#include <netinet/in.h>
+#endif
 #include <netinet6/ip6.h>
-#include <netinet6/in6.h>
 #endif /* INET6 */
 
 #ifdef TCPDEBUG
