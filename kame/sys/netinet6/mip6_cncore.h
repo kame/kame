@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.h,v 1.5 2003/08/14 15:29:37 t-momose Exp $	*/
+/*	$KAME: mip6_cncore.h,v 1.6 2003/09/02 04:57:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -43,7 +43,7 @@
 #ifdef _KERNEL
 
 /* Macro for modulo 2^^16 comparison */
-#define MIP6_LEQ(a,b)   ((int16_t)((a)-(b)) < 0)
+#define MIP6_LEQ(a,b)   ((int16_t)((a)-(b)) <= 0)
 
 #define MIP6_TUNNEL_ADD    0
 #define MIP6_TUNNEL_CHANGE 1
