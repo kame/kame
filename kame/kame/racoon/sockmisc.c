@@ -1,4 +1,4 @@
-/*	$KAME: sockmisc.c,v 1.34 2001/12/07 21:35:46 sakane Exp $	*/
+/*	$KAME: sockmisc.c,v 1.35 2001/12/10 18:09:13 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -783,4 +783,3 @@ mask_sockaddr(a, b, l)
 	for (i = l / 8 + 1; i < alen; i++)
 		p[i] = 0x00;
 }
-
