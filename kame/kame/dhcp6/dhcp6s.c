@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.113 2004/01/20 07:24:45 suz Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.114 2004/01/21 11:13:39 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -907,8 +907,10 @@ react_solicit(ifp, dh6, optinfo, from, fromlen, relayinfohead)
 			/*
 			 * find an appropriate prefix for each IA_PD,
 			 * removing the adopted prefixes from the list.
+			 * (dhcp6s cannot create IAs without client config)
 			 */
-			if (make_ia(iapd, &conflist, &roptinfo.iapd_list,
+			if (client_conf &&
+			    make_ia(iapd, &conflist, &roptinfo.iapd_list,
 			    client_conf, do_binding) > 0)
 				found = 1;
 		}
