@@ -185,7 +185,7 @@ struct addrinfo {
 #define AI_NUMERICSERV	0x00001000 /* prevent service resolution */
 
 /* special recommended flags for getipnodebyname */
-#define	AI_DEFAULT	(AI_V4MAPPED_CFG | AI_ADDRCONFIG)
+#define	AI_DEFAULT	AI_ADDRCONFIG
 
 /*
  * Constants for getnameinfo()
