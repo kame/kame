@@ -1,5 +1,5 @@
 /*	$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $	*/
-/*	$KAME: ipsec.c,v 1.23 2000/10/02 17:48:59 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.24 2000/10/04 01:52:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -168,6 +168,12 @@ struct data_info ipsecstat_info = {	/* for bsdi4 only */
 	NULL, 0,
 	&ipsecstat, sizeof(struct ipsecstat)
 };
+
+struct data_info ipsec6stat_info = {	/* for bsdi4 only */
+	"_ipsec6stat",
+	NULL, 0,
+	&ipsecstat, sizeof(struct ipsecstat)
+};
 #endif
 
 static void print_ipsecstats __P((void));
@@ -269,6 +275,17 @@ ipsec_stats0(name)
 	printf("%s:\n", name);
 
 	skread(name, &ipsecstat_info);
+
+	print_ipsecstats();
+}
+
+void
+ipsec6_stats0(name)
+	char *name;
+{
+	printf("%s:\n", name);
+
+	skread(name, &ipsec6stat_info);
 
 	print_ipsecstats();
 }
