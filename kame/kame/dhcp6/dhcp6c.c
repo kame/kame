@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.78 2002/05/09 13:41:06 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.79 2002/05/10 12:58:54 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -701,6 +701,10 @@ client6_recv(ifp)
 	}
 
 	switch(dh6->dh6_msgtype) {
+	case DH6_SOLICIT:
+		dprintf(LOG_INFO, "client6_recv: received a solicit from %s",
+			addr2str((struct sockaddr *)&from));
+		goto fail;
 	case DH6_REPLY:
 		/*
 		 * we only expect reply messages when we've sent an
