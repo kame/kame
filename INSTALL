@@ -1,6 +1,6 @@
 Installation procedure - preparation of the tree
 KAME project
-$Id: INSTALL,v 1.5 1999/08/30 04:49:24 itojun Exp $
+$Id: INSTALL,v 1.6 1999/09/21 07:16:54 itojun Exp $
 
 
 KAME build tree shares part of the tree among operating system
@@ -15,6 +15,11 @@ Makefile will become unusable.  Do not perform "make obj" unless you are
 ready to tackle those troubles.
 
 
+0. If you have installed KAME kit in the past, you may need to remove
+   files under /usr/local/v6 to avoid conflicts or misuse of old file during
+   build process.  We recommend you to remove the following, at least:
+	/usr/local/v6/lib/*
+  
 1. Identify your target operating system, by looking at document named
    "VERSION".  Suppose the target is "netbsd".
 
