@@ -456,11 +456,6 @@ rtrequest(req, dst, gateway, netmask, flags, ret_nrt)
 	case RTM_ADD:
 		if ((ifa = ifa_ifwithroute(flags, dst, gateway)) == 0)
 			senderr(ENETUNREACH);
-
-		/* The interface found in the previous statement may
-		 * be overridden later by rt_setif.  See the code
-		 * for case RTM_ADD in rtsock.c:route_output.
-		 */
 	makeroute:
 		rt = pool_get(&rtentry_pool, PR_NOWAIT);
 		if (rt == 0)
