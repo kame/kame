@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1165 2000/07/29 23:24:21 jinmei Exp $
+$KAME: CHANGELOG,v 1.1166 2000/07/29 23:33:26 jinmei Exp $
 
 <200007>
+2000-07-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/(various files): made FAKE_LOOPBACK_IF default
+	(as previously announced). At this moment, the older behavior can
+	be specified by the "OLD_LOOPBACK_IF" kernel compilation option.
+
+2000-07-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c: made ND6_USE_RTSOCK option default.
+
 2000-07-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6sd/vif.c (init_vifs):
 	* kame/kame/pim6sd/cfparse.y (phyint_config):
