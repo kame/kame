@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.206 2001/08/13 20:13:35 itojun Exp $	*/
+/*	$KAME: key.c,v 1.207 2001/08/13 20:17:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4475,15 +4475,16 @@ key_timehandler(void)
 		key_srandom();
 	}
 
-#ifndef IPSEC_DEBUG2
-	/* do exchange to tick time !! */
+	/*
+	 * should set timeout based on the most closest timer expiration.
+	 * we don't bother to do that yet.
+	 */
 #ifdef __NetBSD__
 	callout_reset(&key_timehandler_ch, hz,
 	    (void *)key_timehandler, (void *)0);
 #else
 	(void)timeout((void *)key_timehandler, (void *)0, hz);
 #endif
-#endif /* IPSEC_DEBUG2 */
 
 	splx(s);
 	return;
@@ -7338,14 +7339,12 @@ key_init()
 	ip6_def_policy.refcnt++;	/*never reclaim this*/
 #endif
 
-#ifndef IPSEC_DEBUG2
 #ifdef __NetBSD__
 	callout_reset(&key_timehandler_ch, hz,
 	    (void *)key_timehandler, (void *)0);
 #else
 	timeout((void *)key_timehandler, (void *)0, hz);
 #endif
-#endif /*IPSEC_DEBUG2*/
 
 	/* initialize key statistics */
 	keystat.getspi_count = 1;
