@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.68 2001/03/04 15:55:14 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.69 2001/03/04 15:55:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -569,6 +569,7 @@ rip6_output(m, va_alist)
 		}
 		off += sizeof(struct ip6_hdr);
 
+		sum = 0;
 		m_copyback(m, off, sizeof(sum), (caddr_t)&sum);
 		sum = in6_cksum(m, ip6->ip6_nxt, sizeof(*ip6), plen);
 		m_copyback(m, off, sizeof(sum), (caddr_t)&sum);
