@@ -1,4 +1,4 @@
-/*	$KAME: ah_output.c,v 1.34 2002/09/11 02:34:16 itojun Exp $	*/
+/*	$KAME: ah_output.c,v 1.35 2002/09/11 03:45:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -154,7 +154,7 @@ ah4_output(m, isr)
 	const struct ah_algorithm *algo;
 	u_int32_t spi;
 	u_char *ahdrpos;
-	u_char *ahsumpos = NULL;
+	u_int8_t *ahsumpos = NULL;
 	size_t hlen = 0;	/* IP header+option in bytes */
 	size_t plen = 0;	/* AH payload size in bytes */
 	size_t ahlen = 0;	/* plen + sizeof(ah) */
@@ -308,7 +308,7 @@ ah4_output(m, isr)
 	 * calcurate the checksum, based on security association
 	 * and the algorithm specified.
 	 */
-	error = ah4_calccksum(m, (caddr_t)ahsumpos, plen, algo, sav);
+	error = ah4_calccksum(m, ahsumpos, plen, algo, sav);
 	if (error) {
 		ipseclog((LOG_ERR,
 		    "error after ah4_calccksum, called from ah4_output"));
@@ -370,7 +370,7 @@ ah6_output(m, nexthdrp, md, isr)
 	struct secasvar *sav = isr->sav;
 	const struct ah_algorithm *algo;
 	u_int32_t spi;
-	u_char *ahsumpos = NULL;
+	u_int8_t *ahsumpos = NULL;
 	size_t plen;	/* AH payload size in bytes */
 	int error = 0;
 	int ahlen;
@@ -489,7 +489,7 @@ ah6_output(m, nexthdrp, md, isr)
 	 * calcurate the checksum, based on security association
 	 * and the algorithm specified.
 	 */
-	error = ah6_calccksum(m, (caddr_t)ahsumpos, plen, algo, sav);
+	error = ah6_calccksum(m, ahsumpos, plen, algo, sav);
 	if (error) {
 		ipsec6stat.out_inval++;
 		m_freem(m);

@@ -1,4 +1,4 @@
-/*	$KAME: esp_rijndael.c,v 1.4 2001/03/02 05:53:05 itojun Exp $	*/
+/*	$KAME: esp_rijndael.c,v 1.5 2002/09/11 03:45:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -71,10 +71,10 @@ esp_rijndael_schedule(algo, sav)
 
 	k = (keyInstance *)sav->sched;
 	if (rijndael_makeKey(&k[0], DIR_DECRYPT, _KEYLEN(sav->key_enc) * 8,
-	    _KEYBUF(sav->key_enc)) < 0)
+	    (char *)_KEYBUF(sav->key_enc)) < 0)
 		return -1;
 	if (rijndael_makeKey(&k[1], DIR_ENCRYPT, _KEYLEN(sav->key_enc) * 8,
-	    _KEYBUF(sav->key_enc)) < 0)
+	    (char *)_KEYBUF(sav->key_enc)) < 0)
 		return -1;
 	return 0;
 }

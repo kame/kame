@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.49 2002/04/16 03:20:36 itojun Exp $	*/
+/*	$KAME: ah_core.c,v 1.50 2002/09/11 03:45:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -111,50 +111,50 @@ static int ah_sumsiz_1216 __P((struct secasvar *));
 static int ah_sumsiz_zero __P((struct secasvar *));
 static int ah_none_mature __P((struct secasvar *));
 static int ah_none_init __P((struct ah_algorithm_state *, struct secasvar *));
-static void ah_none_loop __P((struct ah_algorithm_state *, caddr_t, size_t));
-static void ah_none_result __P((struct ah_algorithm_state *, caddr_t));
+static void ah_none_loop __P((struct ah_algorithm_state *, u_int8_t *, size_t));
+static void ah_none_result __P((struct ah_algorithm_state *, u_int8_t *));
 static int ah_keyed_md5_mature __P((struct secasvar *));
 static int ah_keyed_md5_init __P((struct ah_algorithm_state *,
 	struct secasvar *));
-static void ah_keyed_md5_loop __P((struct ah_algorithm_state *, caddr_t,
+static void ah_keyed_md5_loop __P((struct ah_algorithm_state *, u_int8_t *,
 	size_t));
-static void ah_keyed_md5_result __P((struct ah_algorithm_state *, caddr_t));
+static void ah_keyed_md5_result __P((struct ah_algorithm_state *, u_int8_t *));
 static int ah_keyed_sha1_mature __P((struct secasvar *));
 static int ah_keyed_sha1_init __P((struct ah_algorithm_state *,
 	struct secasvar *));
-static void ah_keyed_sha1_loop __P((struct ah_algorithm_state *, caddr_t,
+static void ah_keyed_sha1_loop __P((struct ah_algorithm_state *, u_int8_t *,
 	size_t));
-static void ah_keyed_sha1_result __P((struct ah_algorithm_state *, caddr_t));
+static void ah_keyed_sha1_result __P((struct ah_algorithm_state *, u_int8_t *));
 static int ah_hmac_md5_mature __P((struct secasvar *));
 static int ah_hmac_md5_init __P((struct ah_algorithm_state *,
 	struct secasvar *));
-static void ah_hmac_md5_loop __P((struct ah_algorithm_state *, caddr_t,
+static void ah_hmac_md5_loop __P((struct ah_algorithm_state *, u_int8_t *,
 	size_t));
-static void ah_hmac_md5_result __P((struct ah_algorithm_state *, caddr_t));
+static void ah_hmac_md5_result __P((struct ah_algorithm_state *, u_int8_t *));
 static int ah_hmac_sha1_mature __P((struct secasvar *));
 static int ah_hmac_sha1_init __P((struct ah_algorithm_state *,
 	struct secasvar *));
-static void ah_hmac_sha1_loop __P((struct ah_algorithm_state *, caddr_t,
+static void ah_hmac_sha1_loop __P((struct ah_algorithm_state *, u_int8_t *,
 	size_t));
-static void ah_hmac_sha1_result __P((struct ah_algorithm_state *, caddr_t));
+static void ah_hmac_sha1_result __P((struct ah_algorithm_state *, u_int8_t *));
 static int ah_hmac_sha2_256_mature __P((struct secasvar *));
 static int ah_hmac_sha2_256_init __P((struct ah_algorithm_state *,
 	struct secasvar *));
-static void ah_hmac_sha2_256_loop __P((struct ah_algorithm_state *, caddr_t,
+static void ah_hmac_sha2_256_loop __P((struct ah_algorithm_state *, u_int8_t *,
 	size_t));
-static void ah_hmac_sha2_256_result __P((struct ah_algorithm_state *, caddr_t));
+static void ah_hmac_sha2_256_result __P((struct ah_algorithm_state *, u_int8_t *));
 static int ah_hmac_sha2_384_mature __P((struct secasvar *));
 static int ah_hmac_sha2_384_init __P((struct ah_algorithm_state *,
 	struct secasvar *));
-static void ah_hmac_sha2_384_loop __P((struct ah_algorithm_state *, caddr_t,
+static void ah_hmac_sha2_384_loop __P((struct ah_algorithm_state *, u_int8_t *,
 	size_t));
-static void ah_hmac_sha2_384_result __P((struct ah_algorithm_state *, caddr_t));
+static void ah_hmac_sha2_384_result __P((struct ah_algorithm_state *, u_int8_t *));
 static int ah_hmac_sha2_512_mature __P((struct secasvar *));
 static int ah_hmac_sha2_512_init __P((struct ah_algorithm_state *,
 	struct secasvar *));
-static void ah_hmac_sha2_512_loop __P((struct ah_algorithm_state *, caddr_t,
+static void ah_hmac_sha2_512_loop __P((struct ah_algorithm_state *, u_int8_t *,
 	size_t));
-static void ah_hmac_sha2_512_result __P((struct ah_algorithm_state *, caddr_t));
+static void ah_hmac_sha2_512_result __P((struct ah_algorithm_state *, u_int8_t *));
 
 static void ah_update_mbuf __P((struct mbuf *, int, int,
 	const struct ah_algorithm *, struct ah_algorithm_state *));
@@ -261,7 +261,7 @@ ah_none_init(state, sav)
 static void
 ah_none_loop(state, addr, len)
 	struct ah_algorithm_state *state;
-	caddr_t addr;
+	u_int8_t * addr;
 	size_t len;
 {
 }
@@ -269,7 +269,7 @@ ah_none_loop(state, addr, len)
 static void
 ah_none_result(state, addr)
 	struct ah_algorithm_state *state;
-	caddr_t addr;
+	u_int8_t * addr;
 {
 }
 
@@ -342,7 +342,7 @@ ah_keyed_md5_init(state, sav)
 static void
 ah_keyed_md5_loop(state, addr, len)
 	struct ah_algorithm_state *state;
-	caddr_t addr;
+	u_int8_t * addr;
 	size_t len;
 {
 	if (!state)
@@ -354,7 +354,7 @@ ah_keyed_md5_loop(state, addr, len)
 static void
 ah_keyed_md5_result(state, addr)
 	struct ah_algorithm_state *state;
-	caddr_t addr;
+	u_int8_t * addr;
 {
 	u_char digest[16];
 
@@ -460,7 +460,7 @@ ah_keyed_sha1_init(state, sav)
 static void
 ah_keyed_sha1_loop(state, addr, len)
 	struct ah_algorithm_state *state;
-	caddr_t addr;
+	u_int8_t * addr;
 	size_t len;
 {
 	SHA1_CTX *ctxt;
@@ -469,13 +469,13 @@ ah_keyed_sha1_loop(state, addr, len)
 		panic("ah_keyed_sha1_loop: what?");
 	ctxt = (SHA1_CTX *)state->foo;
 
-	SHA1Update(ctxt, (caddr_t)addr, (size_t)len);
+	SHA1Update(ctxt, (u_int8_t *)addr, (size_t)len);
 }
 
 static void
 ah_keyed_sha1_result(state, addr)
 	struct ah_algorithm_state *state;
-	caddr_t addr;
+	u_int8_t * addr;
 {
 	u_char digest[SHA1_RESULTLEN];	/* SHA-1 generates 160 bits */
 	SHA1_CTX *ctxt;
@@ -488,7 +488,7 @@ ah_keyed_sha1_result(state, addr)
 		SHA1Update(ctxt, (u_int8_t *)_KEYBUF(state->sav->key_auth),
 			(u_int)_KEYLEN(state->sav->key_auth));
 	}
-	SHA1Final((caddr_t)&digest[0], ctxt);
+	SHA1Final((u_int8_t *)&digest[0], ctxt);
 	bcopy(&digest[0], (void *)addr, HMACSIZE);
 
 	free(state->foo, M_TEMP);
@@ -578,21 +578,21 @@ ah_hmac_md5_init(state, sav)
 static void
 ah_hmac_md5_loop(state, addr, len)
 	struct ah_algorithm_state *state;
-	caddr_t addr;
+	u_int8_t * addr;
 	size_t len;
 {
 	MD5_CTX *ctxt;
 
 	if (!state || !state->foo)
 		panic("ah_hmac_md5_loop: what?");
-	ctxt = (MD5_CTX *)(((caddr_t)state->foo) + 128);
+	ctxt = (MD5_CTX *)(((u_int8_t *)state->foo) + 128);
 	MD5Update(ctxt, addr, len);
 }
 
 static void
 ah_hmac_md5_result(state, addr)
 	struct ah_algorithm_state *state;
-	caddr_t addr;
+	u_int8_t * addr;
 {
 	u_char digest[16];
 	u_char *ipad;
@@ -703,7 +703,7 @@ ah_hmac_sha1_init(state, sav)
 static void
 ah_hmac_sha1_loop(state, addr, len)
 	struct ah_algorithm_state *state;
-	caddr_t addr;
+	u_int8_t * addr;
 	size_t len;
 {
 	SHA1_CTX *ctxt;
@@ -712,13 +712,13 @@ ah_hmac_sha1_loop(state, addr, len)
 		panic("ah_hmac_sha1_loop: what?");
 
 	ctxt = (SHA1_CTX *)(((u_char *)state->foo) + 128);
-	SHA1Update(ctxt, (caddr_t)addr, (size_t)len);
+	SHA1Update(ctxt, (u_int8_t *)addr, (size_t)len);
 }
 
 static void
 ah_hmac_sha1_result(state, addr)
 	struct ah_algorithm_state *state;
-	caddr_t addr;
+	u_int8_t * addr;
 {
 	u_char digest[SHA1_RESULTLEN];	/* SHA-1 generates 160 bits */
 	u_char *ipad;
@@ -732,12 +732,12 @@ ah_hmac_sha1_result(state, addr)
 	opad = (u_char *)(ipad + 64);
 	ctxt = (SHA1_CTX *)(opad + 64);
 
-	SHA1Final((caddr_t)&digest[0], ctxt);
+	SHA1Final((u_int8_t *)&digest[0], ctxt);
 
 	SHA1Init(ctxt);
 	SHA1Update(ctxt, opad, 64);
-	SHA1Update(ctxt, (caddr_t)&digest[0], sizeof(digest));
-	SHA1Final((caddr_t)&digest[0], ctxt);
+	SHA1Update(ctxt, (u_int8_t *)&digest[0], sizeof(digest));
+	SHA1Final((u_int8_t *)&digest[0], ctxt);
 
 	bcopy(&digest[0], (void *)addr, HMACSIZE);
 
@@ -1160,7 +1160,7 @@ ah_update_mbuf(m, off, len, algo, algos)
 
 	/* easy case first */
 	if (off + len <= m->m_len) {
-		(algo->update)(algos, mtod(m, caddr_t) + off, len);
+		(algo->update)(algos, mtod(m, u_int8_t *) + off, len);
 		return;
 	}
 
@@ -1182,7 +1182,7 @@ ah_update_mbuf(m, off, len, algo, algos)
 		else
 			tlen = len;
 
-		(algo->update)(algos, mtod(n, caddr_t) + off, tlen);
+		(algo->update)(algos, mtod(n, u_int8_t *) + off, tlen);
 
 		len -= tlen;
 		off = 0;
@@ -1200,7 +1200,7 @@ ah_update_mbuf(m, off, len, algo, algos)
 int
 ah4_calccksum(m, ahdat, len, algo, sav)
 	struct mbuf *m;
-	caddr_t ahdat;
+	u_int8_t * ahdat;
 	size_t len;
 	const struct ah_algorithm *algo;
 	struct secasvar *sav;
@@ -1251,7 +1251,7 @@ again:
 		if (ip4_ah_cleartos)
 			iphdr.ip_tos = 0;
 		iphdr.ip_off = htons(ntohs(iphdr.ip_off) & ip4_ah_offsetmask);
-		(algo->update)(&algos, (caddr_t)&iphdr, sizeof(struct ip));
+		(algo->update)(&algos, (u_int8_t *)&iphdr, sizeof(struct ip));
 
 		if (hlen != sizeof(struct ip)) {
 			u_char *p;
@@ -1390,8 +1390,8 @@ again:
 			}
 			m_copydata(m, off, totlen, mtod(n, caddr_t));
 			n->m_len = totlen;
-			bzero(mtod(n, caddr_t) + hdrsiz, siz);
-			(algo->update)(&algos, mtod(n, caddr_t), n->m_len);
+			bzero(mtod(n, u_int8_t *) + hdrsiz, siz);
+			(algo->update)(&algos, mtod(n, u_int8_t *), n->m_len);
 			m_free(n);
 			n = NULL;
 		} else
@@ -1443,7 +1443,7 @@ fail:
 int
 ah6_calccksum(m, ahdat, len, algo, sav)
 	struct mbuf *m;
-	caddr_t ahdat;
+	u_int8_t * ahdat;
 	size_t len;
 	const struct ah_algorithm *algo;
 	struct secasvar *sav;
@@ -1498,7 +1498,7 @@ ah6_calccksum(m, ahdat, len, algo, sav)
 			ip6copy.ip6_hlim = 0;
 			in6_clearscope(&ip6copy.ip6_src); /* XXX */
 			in6_clearscope(&ip6copy.ip6_dst); /* XXX */
-			(algo->update)(&algos, (caddr_t)&ip6copy,
+			(algo->update)(&algos, (u_int8_t *)&ip6copy,
 				       sizeof(struct ip6_hdr));
 		} else {
 			newoff = m->m_pkthdr.len;
@@ -1539,8 +1539,8 @@ ah6_calccksum(m, ahdat, len, algo, sav)
 			}
 			m_copydata(m, off, newoff - off, mtod(n, caddr_t));
 			n->m_len = newoff - off;
-			bzero(mtod(n, caddr_t) + hdrsiz, siz);
-			(algo->update)(&algos, mtod(n, caddr_t), n->m_len);
+			bzero(mtod(n, u_int8_t *) + hdrsiz, siz);
+			(algo->update)(&algos, mtod(n, u_int8_t *), n->m_len);
 			m_free(n);
 			n = NULL;
 		} else
@@ -1619,7 +1619,7 @@ ah6_calccksum(m, ahdat, len, algo, sav)
 			optp += optlen;
 		}
 
-		(algo->update)(&algos, mtod(n, caddr_t), n->m_len);
+		(algo->update)(&algos, mtod(n, u_int8_t *), n->m_len);
 		m_free(n);
 		n = NULL;
 		break;

@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.75 2002/09/11 02:40:48 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.76 2002/09/11 03:45:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -122,7 +122,7 @@ ah4_input(m, va_alist)
 	const struct ah_algorithm *algo;
 	size_t siz;
 	size_t siz1;
-	u_char cksum[AH_MAXSUMSIZE];
+	u_int8_t cksum[AH_MAXSUMSIZE];
 	struct secasvar *sav = NULL;
 	u_int16_t nxt;
 	size_t hlen;
@@ -315,7 +315,7 @@ ah4_input(m, va_alist)
 #ifdef WITH_CONVERT_IP_OFF
 	ip->ip_off = htons(ip->ip_off);
 #endif
-	if (ah4_calccksum(m, (caddr_t)cksum, siz1, algo, sav)) {
+	if (ah4_calccksum(m, cksum, siz1, algo, sav)) {
 		ipsecstat.in_inval++;
 		goto fail;
 	}
@@ -678,7 +678,7 @@ ah6_input(mp, offp, proto)
 	const struct ah_algorithm *algo;
 	size_t siz;
 	size_t siz1;
-	u_char cksum[AH_MAXSUMSIZE];
+	u_int8_t cksum[AH_MAXSUMSIZE];
 	struct secasvar *sav = NULL;
 	u_int16_t nxt;
 	int s;
@@ -813,7 +813,7 @@ ah6_input(mp, offp, proto)
 	 * cryptographic checksum.
 	 */
 
-	if (ah6_calccksum(m, (caddr_t)cksum, siz1, algo, sav)) {
+	if (ah6_calccksum(m, cksum, siz1, algo, sav)) {
 		ipsec6stat.in_inval++;
 		goto fail;
 	}
