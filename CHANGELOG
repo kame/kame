@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2193 2002/06/24 16:27:51 itojun Exp $
+$KAME: CHANGELOG,v 1.2194 2002/06/30 22:52:11 itojun Exp $
 
 <200206>
+Sun Jun 30 JST 2002  itojun@iijlab.net
+	* rtadvd: deprecate addrs#n and routes#n from rtadvd.conf, as it was
+	  difficult for users to keep consistency between addrs#n and addrN,
+	  and addrs#n were not really needed.
+
 Tue Jun 25 01:26:45 JST 2002  itojun@iijlab.net
 	* faithd.libevent: faithd re-implementation using libevent (by niels
 	  provos - a great library!).  it does not fork(2) at all.  supports
