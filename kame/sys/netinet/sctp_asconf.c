@@ -1,4 +1,4 @@
-/*	$KAME: sctp_asconf.c,v 1.11 2003/03/10 05:58:12 itojun Exp $	*/
+/*	$KAME: sctp_asconf.c,v 1.12 2003/04/23 10:10:19 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_asconf.c,v 1.72 2002/04/04 15:40:35 randall Exp	*/
 
 /*
@@ -1347,7 +1347,7 @@ sctp_asconf_process_param_ack(struct sctp_tcb *stcb,
 	} /* switch */
 
 	/* remove the param and free it */
-        TAILQ_REMOVE(&stcb->asoc.asconf_queue, aparam, next);
+	TAILQ_REMOVE(&stcb->asoc.asconf_queue, aparam, next);
 	free(aparam, M_PCB);
 }
 

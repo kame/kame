@@ -1,4 +1,4 @@
-/*	$KAME: sctp_indata.c,v 1.18 2003/04/21 06:26:10 itojun Exp $	*/
+/*	$KAME: sctp_indata.c,v 1.19 2003/04/23 10:10:19 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_indata.c,v 1.124 2002/04/04 18:48:39 randall Exp	*/
 
 /*
@@ -636,10 +636,10 @@ sctp_service_reassembly(struct sctp_tcb *stcb,
 				 * recv intf will get a M_EXT so this code
 				 * should be the predominat executor.
 				 */
-                            chk->data->m_flags |= M_PKTHDR;
-                            bzero(&chk->data->m_pkthdr, 
-                                  sizeof(chk->data->m_pkthdr));
-                            chk->data->m_pkthdr.len = chk->send_size;
+				chk->data->m_flags |= M_PKTHDR;
+				bzero(&chk->data->m_pkthdr, 
+				      sizeof(chk->data->m_pkthdr));
+				chk->data->m_pkthdr.len = chk->send_size;
 			}
 		}
 		if (chk->rec.data.rcv_flags & SCTP_DATA_LAST_FRAG) {
@@ -1467,14 +1467,9 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 		 */
 		struct mbuf *op_err;
 		op_err = sctp_generate_invmanparam(SCTP_CAUSE_OUT_OF_RESC);
-		sctp_abort_an_association(stcb->sctp_ep,
-					  stcb, 
-                                          0,
-                                          op_err);
-
-
-                *abort_flag = 1;
-                return(0);
+		sctp_abort_an_association(stcb->sctp_ep, stcb, 0, op_err);
+		*abort_flag = 1;
+		return(0);
 	}
 	/* Now before going further we see
 	 * if there is room. If NOT then
@@ -1504,13 +1499,13 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 			if (stcb->sctp_socket->so_rcv.sb_cc) {
 				sctp_sorwakeup(stcb->sctp_ep, stcb->sctp_socket);
 			}
-/*			printf("1:tsn:%x rwnd %d sbspace:%d delq:%d!\n",
-                        (u_int)tsn,
-                        (int)asoc->my_rwnd,
-                        (int)sctp_sbspace(&stcb->sctp_socket->so_rcv),
-                        (int)stcb->asoc.cnt_on_delivery_queue
-                        );
-*/
+#if 0
+			printf("1:tsn:%x rwnd %d sbspace:%d delq:%d!\n",
+			    (u_int)tsn,
+			    (int)asoc->my_rwnd,
+			    (int)sctp_sbspace(&stcb->sctp_socket->so_rcv),
+			    (int)stcb->asoc.cnt_on_delivery_queue);
+#endif
 			sctp_pegs[SCTP_RWND_DROPS]++;
 			indx = *break_flag;
 			list_tofill[indx] = tsn;
@@ -2161,10 +2156,13 @@ sctp_process_data(struct mbuf **mm,
 		}
 	} /* while */
 	if (break_flag) {
-		/* we need to report rwnd overrun drops.
+		/*
+		 * we need to report rwnd overrun drops.
 		 */
-/*		printf("Sending a PDR (window overrun) %d entries\n",
-                break_flag);*/
+#if 0
+		printf("Sending a PDR (window overrun) %d entries\n",
+		    break_flag);
+#endif
 		sctp_send_packet_dropped(stcb,netp,list_of_dropped,break_flag,
 					 list_of_dropped_data);
 	}
@@ -2315,7 +2313,7 @@ sctp_handle_segments(struct sctp_tcb *stcb,
 							sctp_audit_log(0xB2,(asoc->sent_queue_retran_cnt & 0x000000ff));
 #endif
 
-                                                        if (asoc->sent_queue_retran_cnt < 0) {
+							if (asoc->sent_queue_retran_cnt < 0) {
 								printf("huh3 retran went negative?\n");
 #ifdef SCTP_AUDITING_ENABLED
 								sctp_auditing(30,inp,tcb,NULL);
@@ -2803,12 +2801,12 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 #ifdef SCTP_AUDITING_ENABLED
 					sctp_audit_log(0xB3,(asoc->sent_queue_retran_cnt & 0x000000ff));
 #endif
-                                        if (asoc->sent_queue_retran_cnt < 0) {
-                                            printf("huh4 retran went negative?\n");
+					if (asoc->sent_queue_retran_cnt < 0) {
+						printf("huh4 retran went negative?\n");
 #ifdef SCTP_AUDITING_ENABLED
-					    sctp_auditing(31,inp,tcb,NULL);
+						sctp_auditing(31,inp,tcb,NULL);
 #else
-                                            asoc->sent_queue_retran_cnt = 0;
+						asoc->sent_queue_retran_cnt = 0;
 #endif
 					}
 
@@ -2973,17 +2971,17 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 				/* We are in slow start */
 				if ((net->flight_size+net->net_ack) >= net->cwnd) {
 					if (net->net_ack > net->mtu) {
-                                                net->cwnd += net->mtu;
+						net->cwnd += net->mtu;
 #ifdef SCTP_CWND_LOGGING
-                                                sctp_log_cwnd(net,net->mtu,
-							      SCTP_CWND_LOG_FROM_SS);
+						sctp_log_cwnd(net,net->mtu,
+						    SCTP_CWND_LOG_FROM_SS);
 #endif
 
 					} else {
 						net->cwnd += net->net_ack;
 #ifdef SCTP_CWND_LOGGING
-                                                sctp_log_cwnd(net,net->net_ack,
-							      SCTP_CWND_LOG_FROM_SS);
+						sctp_log_cwnd(net,net->net_ack,
+						    SCTP_CWND_LOG_FROM_SS);
 #endif
 
 					}
@@ -3008,8 +3006,8 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 					}
 					net->cwnd += net->mtu;
 #ifdef SCTP_CWND_LOGGING
-                                        sctp_log_cwnd(net,net->mtu,
-						      SCTP_CWND_LOG_FROM_CA);
+					sctp_log_cwnd(net,net->mtu,
+					    SCTP_CWND_LOG_FROM_CA);
 #endif
 					sctp_pegs[SCTP_CWND_INCRS]++;
 				}
@@ -3133,7 +3131,7 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 				 * cwnd.
 				 */
 #ifdef SCTP_CWND_LOGGING
-                                int old_cwnd = net->cwnd;
+				int old_cwnd = net->cwnd;
 #endif
 				net->ssthresh = net->cwnd / 2;
 				if (net->ssthresh < (net->mtu*2)) {
@@ -3141,8 +3139,8 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 				}
 				net->cwnd = net->ssthresh;
 #ifdef SCTP_CWND_LOGGING
-                                sctp_log_cwnd(net,(net->cwnd-old_cwnd), 
-					      SCTP_CWND_LOG_FROM_FR);
+				sctp_log_cwnd(net,(net->cwnd-old_cwnd),
+				    SCTP_CWND_LOG_FROM_FR);
 #endif
 				net->partial_bytes_acked = 0;
 				/* Turn on fast recovery window */

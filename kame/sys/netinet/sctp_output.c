@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.23 2003/04/21 06:26:10 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.24 2003/04/23 10:10:19 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.c, v 1.308 2002/04/04 18:47:03 randall Exp	*/
 
 /*
@@ -1072,7 +1072,7 @@ sctp_choose_correctv6_scope(struct rtentry *rt,
 			if (inp->sctp_flags & SCTP_PCB_FLAGS_BOUNDALL) {
 				*are_done = 1;
 			        return (sin6);
-                        }
+			}
 			if (sctp_is_addr_in_ep(inp, ifa->ifa_addr)) {
 				*are_done = 1;
 				return (sin6);
@@ -3654,7 +3654,7 @@ sctp_prepare_chunk(struct sctp_tmit_chunk *template,
 	template->rec.data.doing_fast_retransmit = 0;
 	template->rec.data.ect_nonce = 0;
 	if ((srcv->sinfo_flags & MSG_ADDR_OVER) ||
-             (net->dest_state & SCTP_ADDR_UNCONFIRMED)) {
+	     (net->dest_state & SCTP_ADDR_UNCONFIRMED)) {
 		template->whoTo = net;
 	} else {
 		if (tcb->asoc.primary_destination)
@@ -6670,13 +6670,13 @@ sctp_output(inp, m, addr, control, p)
 		m_freem(control);
 		control = NULL;
 	}
-        if (net && ((srcv.sinfo_flags & MSG_ADDR_OVER) ||
-                    (net->dest_state & SCTP_ADDR_UNCONFIRMED))) {
-                /* we take the override or the unconfirmed */
-                ;
-        } else {
-                net = tcb->asoc.primary_destination;
-        }
+	if (net && ((srcv.sinfo_flags & MSG_ADDR_OVER) ||
+		    (net->dest_state & SCTP_ADDR_UNCONFIRMED))) {
+		/* we take the override or the unconfirmed */
+		;
+	} else {
+		net = tcb->asoc.primary_destination;
+	}
 	if ((error = sctp_msg_append(tcb, net, m, &srcv))) {
 		splx(s);
 		return (error);

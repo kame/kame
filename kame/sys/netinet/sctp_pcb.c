@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.20 2003/04/22 07:24:05 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.21 2003/04/23 10:10:20 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.c,v 1.207 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -2058,7 +2058,7 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 	 */
 	struct sctp_nets *netp, *netfirst;
 	int addr_inscope;
-        
+
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
 		printf("Adding an address (from:%d) to the peer: ", from);
@@ -2078,11 +2078,11 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 		 * will have been added... and we don't wan't to
 		 * end up removing it back out.
 		 */
-            if (netfirst->dest_state & SCTP_ADDR_UNCONFIRMED) {
+		if (netfirst->dest_state & SCTP_ADDR_UNCONFIRMED) {
 			netfirst->dest_state = (SCTP_ADDR_REACHABLE|SCTP_ADDR_UNCONFIRMED);
-            } else {
+		} else {
 			netfirst->dest_state = SCTP_ADDR_REACHABLE;
-            }
+		}
 
 		return(0);
 	}

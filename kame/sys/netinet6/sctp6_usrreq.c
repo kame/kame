@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.17 2003/04/15 06:01:31 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.18 2003/04/23 10:10:20 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_usrreq.c,v 1.81 2002/04/04 21:53:15 randall Exp	*/
 
 /*
@@ -270,67 +270,68 @@ sctp6_input(mp, offp, proto)
 	 * Check AH/ESP integrity.
 	 */
 #ifdef __OpenBSD__
-        {
-            struct inpcb *i_inp;
-            struct m_tag *mtag;
-            struct tdb_ident *tdbi;
-            struct tdb *tdb;
-            int error, s;
+	{
+		struct inpcb *i_inp;
+		struct m_tag *mtag;
+		struct tdb_ident *tdbi;
+		struct tdb *tdb;
+		int error, s;
 
-            /* Find most recent IPsec tag */
-            i_inp = in6p_ip;
-            mtag = m_tag_find(m, PACKET_TAG_IPSEC_IN_DONE, NULL);
-            s = splnet();
-            if (mtag != NULL) {
-                tdbi = (struct tdb_ident *)(mtag + 1);
-                tdb = gettdb(tdbi->spi, &tdbi->dst, tdbi->proto);
-            } else
-		tdb = NULL;
+		/* Find most recent IPsec tag */
+		i_inp = in6p_ip;
+		mtag = m_tag_find(m, PACKET_TAG_IPSEC_IN_DONE, NULL);
+		s = splnet();
+		if (mtag != NULL) {
+			tdbi = (struct tdb_ident *)(mtag + 1);
+			tdb = gettdb(tdbi->spi, &tdbi->dst, tdbi->proto);
+		} else
+			tdb = NULL;
 
-            ipsp_spd_lookup(m, af, iphlen, &error, IPSP_DIRECTION_IN,
-                            tdb, i_inp);
-            if (error) {
-		splx(s);
-                goto out_of;
-            }
-
-            /* Latch SA */
-            if (i_inp->inp_tdb_in != tdb) {
-		if (tdb) {
-                    tdb_add_inp(tdb, i_inp, 1);
-                    if (i_inp->inp_ipo == NULL) {
-                        i_inp->inp_ipo = ipsec_add_policy(i_inp, af,
-                                                        IPSP_DIRECTION_OUT);
-                        if (i_inp->inp_ipo == NULL) {
-                            splx(s);
-                            goto bad;
-                        }
-                    }
-                    if (i_inp->inp_ipo->ipo_dstid == NULL &&
-                        tdb->tdb_srcid != NULL) {
-                        i_inp->inp_ipo->ipo_dstid = tdb->tdb_srcid;
-                        tdb->tdb_srcid->ref_count++;
-                    }
-                    if (i_inp->inp_ipsec_remotecred == NULL &&
-                        tdb->tdb_remote_cred != NULL) {
-                        i_inp->inp_ipsec_remotecred =
-                            tdb->tdb_remote_cred;
-                        tdb->tdb_remote_cred->ref_count++;
-                    }
-                    if (i_inp->inp_ipsec_remoteauth == NULL &&
-                        tdb->tdb_remote_auth != NULL) {
-                        i_inp->inp_ipsec_remoteauth =
-                            tdb->tdb_remote_auth;
-                        tdb->tdb_remote_auth->ref_count++;
-                    }
-		} else { /* Just reset */
-                    TAILQ_REMOVE(&i_inp->inp_tdb_in->tdb_inp_in, i_inp,
-                                 inp_tdb_in_next);
-                    i_inp->inp_tdb_in = NULL;
+		ipsp_spd_lookup(m, af, iphlen, &error, IPSP_DIRECTION_IN,
+		    tdb, i_inp);
+		if (error) {
+			splx(s);
+			goto out_of;
 		}
-            }
-            splx(s);
-  }
+
+		/* Latch SA */
+		if (i_inp->inp_tdb_in != tdb) {
+			if (tdb) {
+				tdb_add_inp(tdb, i_inp, 1);
+				if (i_inp->inp_ipo == NULL) {
+					i_inp->inp_ipo = ipsec_add_policy(i_inp,
+					    af, IPSP_DIRECTION_OUT);
+					if (i_inp->inp_ipo == NULL) {
+						splx(s);
+						goto bad;
+					}
+				}
+				if (i_inp->inp_ipo->ipo_dstid == NULL &&
+				    tdb->tdb_srcid != NULL) {
+					i_inp->inp_ipo->ipo_dstid =
+					    tdb->tdb_srcid;
+					tdb->tdb_srcid->ref_count++;
+				}
+				if (i_inp->inp_ipsec_remotecred == NULL &&
+				    tdb->tdb_remote_cred != NULL) {
+					i_inp->inp_ipsec_remotecred =
+					    tdb->tdb_remote_cred;
+					tdb->tdb_remote_cred->ref_count++;
+				}
+				if (i_inp->inp_ipsec_remoteauth == NULL &&
+				    tdb->tdb_remote_auth != NULL) {
+					i_inp->inp_ipsec_remoteauth =
+					    tdb->tdb_remote_auth;
+					tdb->tdb_remote_auth->ref_count++;
+				}
+			} else { /* Just reset */
+				TAILQ_REMOVE(&i_inp->inp_tdb_in->tdb_inp_in,
+				    i_inp,binp_tdb_in_next);
+				i_inp->inp_tdb_in = NULL;
+			}
+		}
+		splx(s);
+	}
 #else
 	if (ipsec6_in_reject_so(m, in6p->sctp_socket)) {
 		ipsec6stat.in_polvio++;
@@ -1040,15 +1041,15 @@ sctp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	}
 	if (
 #if defined (__FreeBSD__)
-            /* FreeBSD uses a flag passed */
-            ((flags & PRUS_MORETOCOME) == 0)
+	    /* FreeBSD uses a flag passed */
+	    ((flags & PRUS_MORETOCOME) == 0)
 #elif defined( __NetBSD__)
-            /* NetBSD uses the so_state field */
-            ((so->so_state & SS_MORETOCOME) == 0)
+	    /* NetBSD uses the so_state field */
+	    ((so->so_state & SS_MORETOCOME) == 0)
 #else
-            1   /* Open BSD does not have any "more to come" indication */
+	    1   /* Open BSD does not have any "more to come" indication */
 #endif
-            ) {
+	    ) {
 		/* note with the current version this code will
 		 * only be used by OpenBSD, NetBSD and FreeBSD
 		 * have methods for re-defining sosend to use
