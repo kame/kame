@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.81 2002/03/08 04:10:35 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.82 2002/03/14 03:12:28 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -153,6 +153,7 @@ void		 natpt_icmp6EchoRequest	__P((struct pcv *, struct pcv *));
 void		 natpt_icmp6EchoReply	__P((struct pcv *, struct pcv *));
 void		 natpt_icmp6MimicPayload	__P((struct pcv *, struct pcv *,
 					     struct pAddr *));
+void		 natpt_translatePing4to66	__P((struct pcv *, struct pcv *, int));
 struct mbuf	*natpt_translateTCPv6To4	__P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateUDPv6To4	__P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateTCPUDPv6To4 __P((struct pcv *, struct pAddr *,
@@ -178,6 +179,7 @@ struct mbuf	*natpt_translateTCPUDPv4To6 __P((struct pcv *, struct pAddr *,
 void		 natpt_translatePYLD4To6	__P((struct pcv *));
 
 void		 natpt_translateFragment4to66 __P((struct pcv *, struct pAddr *));
+void		 natpt_sendFragmentedTail	__P((struct pcv *, struct ip6_hdr *, struct ip6_frag *));
 void		 natpt_ip6_forward	__P((struct mbuf *));
 
 /* IPv4 -> IPv4 */
@@ -848,6 +850,11 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 	switch (cv4->pyld.icmp4->icmp_type) {
 	case ICMP_ECHOREPLY:
 		icmp6len = natpt_icmp4EchoReply(cv4, &cv6);
+		if (frag6) {
+			cv6.fh = frag6;
+			natpt_translatePing4to66(cv4, &cv6, icmp6len);
+			return (NULL);
+		}
 		break;
 
 	case ICMP_UNREACH:
@@ -857,6 +864,11 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 
 	case ICMP_ECHO:
 		icmp6len = natpt_icmp4Echo(cv4, &cv6);
+		if (frag6) {
+			cv6.fh = frag6;
+			natpt_translatePing4to66(cv4, &cv6, icmp6len);
+			return (NULL);
+		}
 		break;
 
 	case ICMP_TIMXCEED:
@@ -1112,6 +1124,49 @@ natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 }
 
 
+void
+natpt_translatePing4to66(struct pcv *cv4, struct pcv *cv6, int icmp6len)
+{
+	u_short		 cksum6, cksum4, typecode4;
+	struct ulc6	 ulc6;
+	struct ip6_hdr	 ip6save;
+	struct ip6_frag	 frg6save;
+	struct icmp	*icmp4;
+	struct icmp6_hdr *icmp6;
+
+	icmp4 = cv4->pyld.icmp4;
+	icmp6 = cv6->pyld.icmp6;
+	icmp6->icmp6_id  = icmp4->icmp_id;
+	icmp6->icmp6_seq = icmp4->icmp_seq;
+
+	typecode4 = htons((icmp4->icmp_type << 8) + icmp4->icmp_code);
+	bzero(&ulc6, sizeof(struct ulc6));
+	ulc6.ulc_src = cv6->ip.ip6->ip6_src;
+	ulc6.ulc_dst = cv6->ip.ip6->ip6_dst;
+	ulc6.ulc_len = htonl(cv4->plen);
+	ulc6.ulc_pr  = IPPROTO_ICMPV6;
+	ulc6.ulc_tu.ih.icmp6_type = icmp6->icmp6_type;
+	ulc6.ulc_tu.ih.icmp6_code = icmp6->icmp6_code;
+
+	cksum4 = icmp4->icmp_cksum;
+	cksum6 = natpt_fixCksum(ntohs(cksum4),
+				(u_char *)&typecode4, sizeof(typecode4),
+				(u_char *)&ulc6,      sizeof(struct ulc6));
+	icmp6->icmp6_cksum = htons(cksum6);
+
+	ip6save = *cv6->ip.ip6;
+	frg6save = *cv6->fh;
+	cv6->m->m_pkthdr.len = cv6->m->m_len = IPV6_MMTU;
+	cv6->m->m_pkthdr.rcvif = cv4->m->m_pkthdr.rcvif;
+	natpt_ip6_forward(cv6->m);		/* send first fragmented packet */
+
+	/*
+	 * Then, send second fragmented v6 packet.
+	 */
+	natpt_sendFragmentedTail(cv4, &ip6save, &frg6save);
+}
+
+
 struct mbuf *
 natpt_translateTCPv4To6(struct pcv *cv4, struct pAddr *pad)
 {
@@ -1292,8 +1347,6 @@ natpt_translateFragment4to6(struct pcv *cv4, struct pAddr *pad)
 void
 natpt_translateFragment4to66(struct pcv *cv4, struct pAddr *pad)
 {
-	int		offset;
-	int		plen;
 	struct mbuf	*m6;
 	struct ip	*ip4 = mtod(cv4->m, struct ip *);
 	struct ip6_hdr	*ip6,  ip6save;
@@ -1369,6 +1422,19 @@ natpt_translateFragment4to66(struct pcv *cv4, struct pAddr *pad)
 	/*
 	 * Then, send second fragmented v6 packet.
 	 */
+	natpt_sendFragmentedTail(cv4, &ip6save, &frg6save);
+}
+
+
+void
+natpt_sendFragmentedTail(struct pcv *cv4, struct ip6_hdr *ip6save, struct ip6_frag *fh6save)
+{
+	int		 offset, plen;
+	struct mbuf	*m6;
+	struct ip	*ip4 = mtod(cv4->m, struct ip *);
+	struct ip6_hdr	*ip6;
+	struct ip6_frag	*frg6;
+	caddr_t		 pyld6;
 
 	plen = cv4->plen - NATPT_MAXULP;
 	if ((m6 = natpt_mgethdr(NATPT_FRGHDRSZ, plen)) == NULL)
@@ -1378,8 +1444,8 @@ natpt_translateFragment4to66(struct pcv *cv4, struct pAddr *pad)
 	frg6 = (struct ip6_frag *)(ip6 + 1);
 	pyld6 = (caddr_t)(ip6 + 1) + sizeof(struct ip6_frag);
 
-	*ip6 = ip6save;
-	*frg6 = frg6save;
+	*ip6 = *ip6save;
+	*frg6 = *fh6save;
 
 	ip6->ip6_plen = htons(sizeof(struct ip6_frag) + plen);
 	offset = ((ip4->ip_off & IP_OFFMASK) << 3) + NATPT_MAXULP;
@@ -2471,6 +2537,8 @@ natpt_composeIPv6Hdr(struct pcv *cv4, struct pAddr *pad, struct ip6_hdr *ip6)
 		    && ((ip4->ip_off & IP_MF) == 0))
 			ip6->ip6_plen = ip4->ip_len - sizeof(struct ip) +
 				sizeof(struct ip6_frag);
+		else if (needFragment(cv4))
+			ip6->ip6_plen = IPV6_MMTU - sizeof(struct ip6_hdr);
 		else if (isNoDF(cv4))
 			ip6->ip6_plen = ip4->ip_len - sizeof(struct ip) +
 				sizeof(struct ip6_frag);
