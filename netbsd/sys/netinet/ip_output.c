@@ -269,6 +269,12 @@ ip_output(m0, va_alist)
 		ifp = ia->ia_ifp;
 		mtu = ifp->if_mtu;
 		ip->ip_ttl = 1;
+	} else if ((IN_MULTICAST(ip->ip_dst.s_addr) ||
+	    (ip->ip_dst.s_addr == INADDR_BROADCAST)) &&
+	    imo != NULL && imo->imo_multicast_ifp != NULL) {
+		ifp = imo->imo_multicast_ifp;
+		mtu = ifp->if_mtu;
+		IFP_TO_IA(ifp, ia);
 	} else {
 		if (ro->ro_rt == 0) {
 #ifdef RADIX_MPATH
@@ -306,14 +312,21 @@ ip_output(m0, va_alist)
 		/*
 		 * See if the caller provided any multicast options
 		 */
-		if (imo != NULL) {
+		if (imo != NULL)
 			ip->ip_ttl = imo->imo_multicast_ttl;
-			if (imo->imo_multicast_ifp != NULL) {
-				ifp = imo->imo_multicast_ifp;
-				mtu = ifp->if_mtu;
-			}
-		} else
+		else
 			ip->ip_ttl = IP_DEFAULT_MULTICAST_TTL;
+
+		/*
+		 * if we don't know the outgoing ifp yet, we can't generate
+		 * output
+		 */
+		if (!ifp) {
+			ipstat.ips_noroute++;
+			error = EHOSTUNREACH;
+			goto bad;
+		}
+
 		/*
 		 * Confirm that the outgoing interface supports multicast.
 		 */

@@ -221,6 +221,10 @@ ip_output(m0, opt, ro, flags, imo)
 		ifp = ia->ia_ifp;
 		ip->ip_ttl = 1;
 		isbroadcast = in_broadcast(dst->sin_addr, ifp);
+	} else if (IN_MULTICAST(ntohl(ip->ip_dst.s_addr)) &&
+	    imo != NULL && imo->imo_multicast_ifp != NULL) {
+		ifp = imo->imo_multicast_ifp;
+		IFP_TO_IA(ifp, ia);
 	} else {
 		/*
 		 * If this is the case, we probably don't want to allocate
@@ -263,13 +267,22 @@ ip_output(m0, opt, ro, flags, imo)
 		 */
 		if (imo != NULL) {
 			ip->ip_ttl = imo->imo_multicast_ttl;
-			if (imo->imo_multicast_ifp != NULL)
-				ifp = imo->imo_multicast_ifp;
 			if (imo->imo_multicast_vif != -1)
 				ip->ip_src.s_addr =
 				    ip_mcast_src(imo->imo_multicast_vif);
 		} else
 			ip->ip_ttl = IP_DEFAULT_MULTICAST_TTL;
+
+		/*
+		 * if we don't know the outgoing ifp yet, we can't generate
+		 * output
+		 */
+		if (!ifp) {
+			ipstat.ips_noroute++;
+			error = EHOSTUNREACH;
+			goto bad;
+		}
+
 		/*
 		 * Confirm that the outgoing interface supports multicast.
 		 */
