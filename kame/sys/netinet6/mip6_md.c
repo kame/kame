@@ -1,4 +1,4 @@
-/*	$KAME: mip6_md.c,v 1.11 2000/02/26 18:08:39 itojun Exp $	*/
+/*	$KAME: mip6_md.c,v 1.12 2000/03/01 16:59:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -35,7 +35,7 @@
  *
  * Author:  Mattias Pettersson <mattias.pettersson@era.ericsson.se>
  *
- * $Id: mip6_md.c,v 1.11 2000/02/26 18:08:39 itojun Exp $
+ * $Id: mip6_md.c,v 1.12 2000/03/01 16:59:51 itojun Exp $
  *
  */
 
@@ -76,11 +76,12 @@
 
 #include <net/net_osdep.h>
 
-struct nd_prefix *mip6_home_prefix;
-struct nd_prefix *mip6_primary_prefix;
-int              mip6_md_state = MIP6_MD_UNDEFINED;
-/*
- *  Mobile IPv6 Home Address route state for the Mobile Node.
+struct nd_prefix	*mip6_home_prefix;
+struct nd_prefix	*mip6_primary_prefix;
+struct in6_addr		mip6_primary_defrtr;
+int             	mip6_md_state = MIP6_MD_UNDEFINED;
+/* 
+ *  Mobile IPv6 Home Address route state for the Mobile Node. 
  *    route_state NET == MD_HOME == network route.
  *    route_state HOST == MD_FOREIGN|UNDEFINED == host route.
  */
@@ -267,20 +268,9 @@ mip6_md_init()
 			       __FUNCTION__, error);
 		mip6_route_state = MIP6_ROUTE_NET;
 		mip6_primary_prefix = mip6_home_prefix;
+		mip6_primary_defrtr = dr->rtaddr;
 
 		mip6_tell_em(MIP6_MD_HOME, mip6_home_prefix, NULL, dr);
-#if 0
-#ifdef MIP6_DEBUG
-		mip6_debug("\nTell machine: HOME!\n");
-		mip6_debug("Home Prefix    = %s\n",
-			   ip6_sprintf(&mip6_home_prefix->
-				       ndpr_prefix.sin6_addr));
-		mip6_debug("Primary Prefix = NULL\n");
-		mip6_debug("Default Router = %s\n",
-			   ip6_sprintf(&dr->rtaddr));
-#endif
-		mip6_new_defrtr(MIP6_MD_HOME, mip6_home_prefix, NULL, dr);
-#endif
 	}
 	else {
 		if (dr) {
@@ -302,21 +292,10 @@ mip6_md_init()
 				}
 			}
 			if (pr) {
-				mip6_primary_prefix = pr;
+				mip6_primary_prefix = pr;  
+				mip6_primary_defrtr = dr->rtaddr;
 				mip6_tell_em(MIP6_MD_FOREIGN, mip6_home_prefix,
 					     pr, dr);
-#if 0
-#ifdef MIP6_DEBUG
-				mip6_debug("\nTell machine: FOREIGN!\n");
-				mip6_debug("Home Prefix    = %s\n",
-					   ip6_sprintf(&mip6_home_prefix->
-						       ndpr_prefix.sin6_addr));
-				mip6_debug("Primary Prefix = %s\n",
-					   ip6_sprintf(&pr->ndpr_prefix.sin6_addr));
-				mip6_debug("Default Router = %s\n", ip6_sprintf(&dr->rtaddr));
-#endif
-				mip6_new_defrtr(MIP6_MD_FOREIGN, mip6_home_prefix, pr, dr);
-#endif
 			}
 			else {
 #ifdef MIP6_DEBUG
@@ -335,21 +314,11 @@ mip6_md_init()
 				printf("%s: address assignment error "
 				       "(errno = %d).\n", __FUNCTION__, error);
 			mip6_route_state = MIP6_ROUTE_NET;
+			mip6_primary_defrtr = in6addr_any;
 			mip6_primary_prefix = NULL;
 
 			mip6_tell_em(MIP6_MD_UNDEFINED, mip6_home_prefix,
 				     NULL, NULL);
-#if 0
-#ifdef MIP6_DEBUG
-                mip6_debug("\nTell machine: UNDEFINED!\n");
-                mip6_debug("Home Prefix    = %s\n",
-                      ip6_sprintf(&mip6_home_prefix->ndpr_prefix.sin6_addr));
-                mip6_debug("Primary Prefix = NULL\n");
-                mip6_debug("Default Router = NULL\n");
-#endif
-                mip6_new_defrtr(MIP6_MD_UNDEFINED, mip6_home_prefix,
-                                NULL, NULL);
-#endif
 		}
 	}
 	  failure:
@@ -373,15 +342,29 @@ mip6_md_init()
 void
 mip6_select_defrtr()
 {
-	struct nd_prefix    *pr = NULL, *prev_primary_prefix;
-	struct nd_defrouter *dr, anydr, *prev_primary_dr;
-	struct nd_pfxrouter *pfxrtr;
-	struct rtentry      *rt = NULL;
-	struct llinfo_nd6   *ln = NULL;
-	int s = splnet(), error;
+	struct nd_prefix	*pr = NULL/*, *prev_primary_prefix*/;
+	struct nd_defrouter	*dr, anydr;
+	struct nd_pfxrouter	*pfxrtr;
+	struct rtentry		*rt = NULL;
+	struct llinfo_nd6	*ln = NULL;
+	int			s = splnet(), error, state;
 
-	prev_primary_prefix = mip6_primary_prefix;
-	prev_primary_dr = TAILQ_FIRST(&nd_defrouter); /*Only for sanity check*/
+	pr = mip6_primary_prefix;
+	/* Only for sanity check */
+	dr = mip6_primary_prefix ? 
+		defrouter_lookup(&mip6_primary_defrtr, 
+				 mip6_primary_prefix->ndpr_ifp) : NULL;
+	state = mip6_md_state;
+
+#ifdef MIP6_DEBUG
+	mip6_debug("\n");
+#endif
+#ifdef MIP6_DEBUG
+	mip6_debug("%s: previous primary dr = %s.\n", __FUNCTION__,
+		   ip6_sprintf(&mip6_primary_defrtr));
+	mip6_debug("%s: dr = %s.\n", __FUNCTION__,
+		   dr ? ip6_sprintf(&dr->rtaddr) : "NULL");
+#endif
 
 	if ( (mip6_md_state == MIP6_MD_HOME) ||
 	     (mip6_md_state == MIP6_MD_UNDEFINED) ) {
@@ -401,8 +384,7 @@ mip6_select_defrtr()
 				  IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_addr))) {
 
 				/* Pick first reachable pfxrtr. */
-				mip6_primary_prefix = pr;
-				mip6_md_state = MIP6_MD_HOME;
+				state = MIP6_MD_HOME;
 
 				dr = pfxrtr->router;
 
@@ -462,14 +444,16 @@ mip6_select_defrtr()
 						    &pr->ndpr_addr) &&
 					    !IN6_IS_ADDR_LINKLOCAL(
 						    &pr->ndpr_addr)) {
-						mip6_primary_prefix = pr;
-						mip6_md_state = MIP6_MD_FOREIGN;
+						state = MIP6_MD_FOREIGN;
 
 #ifdef MIP6_DEBUG
-						mip6_debug("%s: new probably reachable defrtr on foreign subnet selected.\n", __FUNCTION__);
+						mip6_debug("%s: new probably reachable defrtr %s on foreign subnet selected.\n", __FUNCTION__, ip6_sprintf(&dr->rtaddr));
 #endif
 
-						/* Place dr first since its prim. */
+						/*
+						 * Place dr first since 
+						 * its prim.
+						 */
 						TAILQ_REMOVE(&nd_defrouter,
 							     dr, dr_entry);
 						TAILQ_INSERT_HEAD(
@@ -498,13 +482,13 @@ mip6_select_defrtr()
 				    !IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr)&&
 				    !IN6_IS_ADDR_MULTICAST(&pr->ndpr_addr) &&
 				    !IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_addr)) {
-					mip6_primary_prefix = pr;
-					mip6_md_state = MIP6_MD_FOREIGN;
+					state = MIP6_MD_FOREIGN;
 
 #ifdef MIP6_DEBUG
 					mip6_debug("%s: new (unreachable?) "
-						   "defrtr on foreign subnet "
-						   "selected.\n", __FUNCTION__);
+						   "defrtr %s on foreign subnet "
+						   "selected.\n", __FUNCTION__,
+						   ip6_sprintf(&dr->rtaddr));
 #endif
 
 					/* Place dr first since its prim. */
@@ -522,15 +506,22 @@ mip6_select_defrtr()
 	 * No new defrtr or no with an associated Care-of Address found
 	 * -> State = undefined
 	 */
-	mip6_primary_prefix = NULL;
-	mip6_md_state = MIP6_MD_UNDEFINED;
+	pr = NULL;
+	dr = NULL;
+	state = MIP6_MD_UNDEFINED;
 #ifdef MIP6_DEBUG
 	mip6_debug("%s: no new good defrtr found.\n", __FUNCTION__);
 #endif
 
   found:
 	/* XXXYYY Hope this merge is correct now... Fingers crossed. Mattias */
+#ifdef MIP6_DEBUG
+	mip6_debug("%s: found: dr = %s.\n", __FUNCTION__, dr ? ip6_sprintf(&dr->rtaddr) : "NULL");
+#endif
 	if ((dr = TAILQ_FIRST(&nd_defrouter)) != NULL) {
+#ifdef MIP6_DEBUG
+		mip6_debug("%s: TAILQ: dr = %s.\n", __FUNCTION__, dr ? ip6_sprintf(&dr->rtaddr) : "NULL");
+#endif
 		/*
 		 * De-install the previous default gateway and install
 		 * a new one.
@@ -571,8 +562,42 @@ mip6_select_defrtr()
 		}
 	}
 
+
 	/*
-	 * Switch between network and host route for the Home Address
+	 * If we grab a (unreachable) defrouter that actually is a home
+	 * prefix router, we should consider ourself at home rather than
+	 * default foreign.
+	 */
+	if (dr) {
+		struct nd_pfxrouter *pfxrtr;
+
+		pfxrtr = pfxrtr_lookup(mip6_home_prefix, dr);
+		if (pfxrtr && dr == pfxrtr->router) {
+#ifdef MIP6_DEBUG
+			mip6_debug("%s: dr = %s is obviously a home pfxrtr.\n", __FUNCTION__, dr ? ip6_sprintf(&dr->rtaddr) : "NULL");
+#endif
+			state = MIP6_MD_HOME;
+			pr = mip6_home_prefix;
+		}
+	}
+
+	/*
+	 * First case: same router as last time.
+	 * Second case: coming from UNDEFINED, we might have had a router, but
+	 * we didn't have a care-of address.
+	 */
+	if (IN6_ARE_ADDR_EQUAL(&mip6_primary_defrtr, 
+			       (dr ? &dr->rtaddr : &in6addr_any)) &&
+	    !(dr && mip6_primary_prefix == NULL)) {
+#ifdef MIP6_DEBUG
+		mip6_debug("%s: Warning: Primary default router hasn't "
+			   "changed! No action taken.\n", __FUNCTION__);
+#endif
+		return;
+	}
+
+	/*
+	 * Switch between network and host route for the Home Address 
 	 * in the following cases:
 	 *
 	 * md_state                route_state
@@ -583,8 +608,7 @@ mip6_select_defrtr()
 	 * FOREIGN -> UNDEFINED    HOST -> NET
 	 */
 
-	if ((mip6_md_state == MIP6_MD_HOME ||
-	     mip6_md_state == MIP6_MD_UNDEFINED)
+	if ((state == MIP6_MD_HOME || state == MIP6_MD_UNDEFINED) 
 	    && mip6_route_state == MIP6_ROUTE_HOST) {
 		error = mip6_add_ifaddr(&mip6_home_prefix->ndpr_addr,
 					mip6_home_prefix->ndpr_ifp, 64,
@@ -594,7 +618,7 @@ mip6_select_defrtr()
 			       __FUNCTION__, error);
 		mip6_route_state = MIP6_ROUTE_NET;
 	}
-	else if (mip6_md_state == MIP6_MD_FOREIGN &&
+	else if (state == MIP6_MD_FOREIGN && 
 		 mip6_route_state == MIP6_ROUTE_NET) {
 		error = mip6_add_ifaddr(&mip6_home_prefix->ndpr_addr,
 					mip6_home_prefix->ndpr_ifp, 128,
@@ -611,8 +635,7 @@ mip6_select_defrtr()
 	 * cloned from the previous primary prefix. This does not happen when
 	 * we keep the same prefix but change default router.
 	 */
-	if ((prev_primary_prefix != mip6_primary_prefix) &&
-	    (prev_primary_prefix != NULL)) {
+	if (mip6_primary_prefix && (pr != mip6_primary_prefix)) {
 		register struct llinfo_nd6 *ln;
 
 		/* Taken from nd6_timer() */
@@ -645,10 +668,9 @@ mip6_select_defrtr()
 				continue;
 			}
 
-			if (in6_are_prefix_equal(&dst->sin6_addr,
-						 &prev_primary_prefix->
-						 ndpr_prefix.sin6_addr,
-						 prev_primary_prefix->ndpr_plen)) {
+			if (in6_are_prefix_equal(&dst->sin6_addr, 
+						 &pr->ndpr_prefix.sin6_addr, 
+						 pr->ndpr_plen)) {
 
 			/* Fake an INCOMPLETE neighbor that we're giving up */
 				struct mbuf *m = ln->ln_hold;
@@ -699,11 +721,16 @@ mip6_select_defrtr()
 		}
 	}
 
-#ifdef MIP6_DEBUG
-	if (dr == prev_primary_dr)
-		mip6_debug("%s: Warning: Primary default router hasn't "
-			   "changed!/n", __FUNCTION__);
-#endif
+	/* 
+	 * Make decision permanent.
+	 * Primary Default Router is already set above.
+	 */
+	mip6_md_state = state;
+	mip6_primary_prefix = pr;	/* Other depend on this */
+	/*
+	 * Save rtaddr for next mip6_select_defrtr session.
+	 */
+	mip6_primary_defrtr = dr ? dr->rtaddr : in6addr_any;
 
 	/*
 	 * Assumptions made below:
@@ -712,56 +739,23 @@ mip6_select_defrtr()
 	 */
 	switch (mip6_md_state) {
 	case MIP6_MD_HOME:
-#if 0
-#ifdef MIP6_DEBUG
-		mip6_debug("\nTell machine: HOME!\n");
-		mip6_debug("Home Prefix    = %s\n",
-			   ip6_sprintf(&mip6_home_prefix->ndpr_prefix.sin6_addr));
-		mip6_debug("Primary Prefix = NULL\n");
-		mip6_debug("Default Router = %s\n", ip6_sprintf(&dr->rtaddr));
-#endif
-		/* Note: mip6_primary_prefix equals Home Prefix, but we pass NULL. */
-		mip6_new_defrtr(mip6_md_state, mip6_home_prefix, NULL, dr);
-#else
 		mip6_tell_em(mip6_md_state, mip6_home_prefix, NULL, dr);
-#endif /* 0 */
 		break;
 
 	case MIP6_MD_FOREIGN:
-#if 0
-#ifdef MIP6_DEBUG
-		mip6_debug("\nTell machine: FOREIGN!\n");
-		mip6_debug("Home Prefix    = %s\n",
-			   ip6_sprintf(&mip6_home_prefix->ndpr_prefix.sin6_addr));
-		mip6_debug("Primary Prefix = %s\n",
-			   ip6_sprintf(&pr->ndpr_prefix.sin6_addr));
-		mip6_debug("Default Router = %s\n", ip6_sprintf(&dr->rtaddr));
-#endif
-		mip6_new_defrtr(mip6_md_state, mip6_home_prefix, pr, dr);
-#else
 		mip6_tell_em(mip6_md_state, mip6_home_prefix, pr, dr);
-#endif /* 0 */
 		break;
 	case MIP6_MD_UNDEFINED:
-#if 0
-#ifdef MIP6_DEBUG
-		mip6_debug("\nTell machine: UNDEFINED!\n");
-		mip6_debug("Home Prefix    = %s\n",
-			   ip6_sprintf(&mip6_home_prefix->ndpr_prefix.sin6_addr));
-		mip6_debug("Primary Prefix = NULL\n");
-		mip6_debug("Default Router = NULL\n");
-#endif
-        /* Note: we pass dr == NULL, but we might have a Default Router
-           anyway, but with no prefix/Care-of Address associated. */
-        mip6_new_defrtr(mip6_md_state, mip6_home_prefix, NULL, NULL);
-#else
-        mip6_tell_em(mip6_md_state, mip6_home_prefix, NULL, NULL);
-#endif
-	break;
-
+		/* 
+		 * Note: we pass dr == NULL, but we might have a Default 
+		 * Router anyway, but with no prefix/Care-of Address 
+		 * associated.
+		 */
+		mip6_tell_em(mip6_md_state, mip6_home_prefix, NULL, NULL);
+		break;
+	}
 	splx(s);
 	return;
-	}
 }
 
 
@@ -890,7 +884,7 @@ mip6_expired_defrouter(struct nd_defrouter *dr)
 
 	if (dr->advint_expire && dr->advint_expire < time_second) {
 		if (++(dr->advints_lost) < mip6_max_lost_advints) {
-			/* advints_lost starts at 0. max = 1 (eller mer). */
+			/* advints_lost starts at 0. max = 1 (or more). */
 			dr->advint_expire = time_second + dr->advint / 1000;
 #ifdef MIP6_DEBUG
 			mip6_debug("Adv Int #%d lost from router %s.\n",

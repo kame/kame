@@ -1,4 +1,4 @@
-/*	$KAME: mip6_common.h,v 1.6 2000/02/26 18:08:39 itojun Exp $	*/
+/*	$KAME: mip6_common.h,v 1.7 2000/03/01 16:59:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -36,7 +36,7 @@
  * Author:     Hesham Soliman <hesham.soliman@ericsson.com.au>
  *             Martti Kuparinen <martti.kuparinen@ericsson.com>
  *
- *  $Id: mip6_common.h,v 1.6 2000/02/26 18:08:39 itojun Exp $
+ *  $Id: mip6_common.h,v 1.7 2000/03/01 16:59:51 itojun Exp $
  */
 
 
@@ -108,16 +108,16 @@
 #define SIOCSBULISTFLUSH_MIP6    _IOWR('M', 12, int)
 #define SIOCACOADDR_MIP6         _IOWR('M', 13, struct mip6_input_data)
 #define SIOCAHOMEADDR_MIP6       _IOWR('M', 14, struct mip6_input_data)
-#define SIOCSBULIFETIME_MIP6     _IOWR('M', 15, int)
-#define SIOCSHRLIFETIME_MIP6     _IOWR('M', 16, int)
+#define SIOCSBULIFETIME_MIP6     _IOWR('M', 15, struct mip6_input_data)
+#define SIOCSHRLIFETIME_MIP6     _IOWR('M', 16, struct mip6_input_data)
 #define SIOCDCOADDR_MIP6         _IOWR('M', 17, struct mip6_input_data)
-#define SIOCSPROMMODE_MIP6       _IOWR('M', 18, int)
-#define SIOCSBU2CN_MIP6          _IOWR('M', 19, int)
-#define SIOCSREVTUNNEL_MIP6      _IOWR('M', 20, int)
-#define SIOCSAUTOCONFIG_MIP6     _IOWR('M', 21, int)
-#define SIOCSEAGERMD_MIP6        _IOWR('M', 22, int)
-#define SIOCSATTACH_MIP6         _IOWR('M', 23, int)
-#define SIOCSRELEASE_MIP6        _IOWR('M', 24, int)
+#define SIOCSPROMMODE_MIP6       _IOWR('M', 18, struct mip6_input_data)
+#define SIOCSBU2CN_MIP6          _IOWR('M', 19, struct mip6_input_data)
+#define SIOCSREVTUNNEL_MIP6      _IOWR('M', 20, struct mip6_input_data)
+#define SIOCSAUTOCONFIG_MIP6     _IOWR('M', 21, struct mip6_input_data)
+#define SIOCSEAGERMD_MIP6        _IOWR('M', 22, struct mip6_input_data)
+#define SIOCSATTACH_MIP6         _IOWR('M', 23, struct mip6_input_data)
+#define SIOCSRELEASE_MIP6        _IOWR('M', 24, struct mip6_input_data)
 
 /*
  * Code below taken from common.h

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hooks.c,v 1.4 2000/02/26 18:08:39 itojun Exp $	*/
+/*	$KAME: mip6_hooks.c,v 1.5 2000/03/01 16:59:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -36,7 +36,7 @@
  * Author: Hesham Soliman <hesham.soliman@ericsson.com.au>
  *         Martti Kuparinen <martti.kuparinen@ericsson.com>
  *
- * $Id: mip6_hooks.c,v 1.4 2000/02/26 18:08:39 itojun Exp $
+ * $Id: mip6_hooks.c,v 1.5 2000/03/01 16:59:51 itojun Exp $
  *
  */
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
@@ -131,17 +131,16 @@ struct nd_prefix *
 mip6_find_auto_home_addr(void)
 {
     struct nd_prefix *pr;
+    struct in6_ifaddr *ia6;
 
     for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
-        struct in6_ifaddr *ia6;
-
         if (IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr) ||
             IN6_IS_ADDR_MULTICAST(&pr->ndpr_addr) ||
             IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_addr)) {
             continue;
         }
         ia6 = in6ifa_ifpwithaddr(pr->ndpr_ifp, &pr->ndpr_addr);
-        if (ia6->ia6_flags || IN6_IFF_DETACHED)
+        if (ia6 && (ia6->ia6_flags | IN6_IFF_DETACHED))
             continue;
         else
             break;  /* XXXYYY Remove in v2.0. */
@@ -155,11 +154,16 @@ mip6_find_auto_home_addr(void)
     }
     if (pr) {
 #ifdef MIP6_DEBUG
-        mip6_debug("Found an autoconfig'd home address immediately: %s\n",
+        mip6_debug("Found an autoconfigured home address immediately: %s\n",
                    ip6_sprintf(&pr->ndpr_addr));
 #endif
     }
-
+    else {
+#ifdef MIP6_DEBUG
+	    mip6_debug("Couldn't find an autoconfigured home address "
+		       "immediately.\n");
+#endif
+    }
     return pr;
 }
 #endif
@@ -332,8 +336,13 @@ mip6_attach(void)
                 mip6_enable_hooks(MIP6_SPECIFIC_HOOKS);
                 mip6_md_init();
             }
-            else
+            else {
+#ifdef MIP6_DEBUG
+		    mip6_debug("Waiting for Router Advertisement to give me "
+			       "an address.\n");
+#endif
                 mip6_minus_a_case_hook = mip6_minus_a_case;
+	    }
         }
         else {
             /* Manual config */

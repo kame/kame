@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.18 2000/02/28 16:36:01 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.19 2000/03/01 16:59:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -35,7 +35,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6.c,v 1.18 2000/02/28 16:36:01 itojun Exp $
+ * $Id: mip6.c,v 1.19 2000/03/01 16:59:50 itojun Exp $
  *
  */
 
@@ -1834,6 +1834,7 @@ mip6_tunnel_output(mp, bc)
 	struct sockaddr_in6 *sin6_dst = (struct sockaddr_in6 *)&ep->dst;
 	struct ip6_hdr *ip6;
 	u_int8_t itos;
+	int len;
 
 	bzero(&dst, sizeof(dst));
 	dst.sin6_len = sizeof(struct sockaddr_in6);
@@ -1844,16 +1845,13 @@ mip6_tunnel_output(mp, bc)
 	    bcmp(&ep->dst, &dst, dst.sin6_len) != 0 )
 		return EFAULT;
 
-/*  	m->m_flags &= ~(M_BCAST|M_MCAST); */
-#ifdef MIP6_DEBUG
-	printf("m_flags = %x\n", m->m_flags);
-#endif
-
 	/* Recursion problems? */
 
 	if (IN6_IS_ADDR_UNSPECIFIED(&sin6_src->sin6_addr)) {
 		return EFAULT;
 	}
+
+	len = m->m_pkthdr.len;
 
 	if (m->m_len < sizeof(*ip6)) {
 		m = m_pullup(m, sizeof(*ip6));
@@ -1879,7 +1877,7 @@ mip6_tunnel_output(mp, bc)
 	ip6->ip6_flow	= 0;
 	ip6->ip6_vfc	&= ~IPV6_VERSION_MASK;
 	ip6->ip6_vfc	|= IPV6_VERSION;
-	ip6->ip6_plen	= htons((u_short)m->m_pkthdr.len);
+	ip6->ip6_plen	= htons((u_short)len);
 	ip6->ip6_nxt	= IPPROTO_IPV6;
 	ip6->ip6_hlim	= ip6_gif_hlim;   /* Same? */
 	ip6->ip6_src	= sin6_src->sin6_addr;
@@ -1905,31 +1903,15 @@ mip6_tunnel_output(mp, bc)
  */
 int
 mip6_tunnel_input(mp, offp, proto)
-	struct mbuf **mp;
-	int *offp, proto;
+struct mbuf **mp;
+int          *offp, proto;
 {
-	struct mbuf *m = *mp;
+	struct mbuf    *m = *mp;
 	struct ip6_hdr *ip6;
-	int s, af = 0;
-	u_int32_t otos;
-	struct mip6_esm *esm;
+	int             s, af = 0;
+	u_int32_t       otos;
 
 	ip6 = mtod(m, struct ip6_hdr *);
-
-/*
- * XXXYYY
- * Can this be used for checking on tunnelled packets from HA?
- */
-	esm = (struct mip6_esm *)encap_getarg(m);
-
-	if (esm == NULL) {
-		m_freem(m);
-#ifdef MIP6_DEBUG
-		mip6_debug("%s: no esm found.\n", __FUNCTION__);
-#endif
-		return IPPROTO_DONE;
-	}
-
 	otos = ip6->ip6_flow;
 	m_adj(m, *offp);
 
@@ -1943,6 +1925,8 @@ mip6_tunnel_input(mp, offp, proto)
 			if (!m)
 				return IPPROTO_DONE;
 		}
+		m->m_flags |= M_MIP6TUNNEL;	/* Tell MN that this packet
+						   was tunnelled. */
 		ip6 = mtod(m, struct ip6_hdr *);
 
 		s = splimp();
@@ -1992,8 +1976,7 @@ void             *entry;     /* BC or ESM depending on start variable */
 {
 	const struct encaptab *ep;	  /* Encapsulation entry */
 	const struct encaptab **ep_store; /* Where to store encap reference */
-	struct ifaddr         *if_addr;	  /* Interface address */
-	struct sockaddr_in6   src, *srcm;
+	struct sockaddr_in6   src, srcm;
 	struct sockaddr_in6   dst, dstm;
 	struct in6_addr       mask;
 	int                   mask_len = 128;
@@ -2031,10 +2014,11 @@ void             *entry;     /* BC or ESM depending on start variable */
 		src.sin6_len = sizeof(struct sockaddr_in6);
 		src.sin6_addr = *ip6_src;
 
-		if_addr = ifa_ifwithaddr((struct sockaddr *)&src);
-		if (if_addr == NULL)
-			return EINVAL;
-		srcm = (struct sockaddr_in6 *)if_addr->ifa_netmask;
+		in6_prefixlen2mask(&mask, mask_len);
+		bzero(&srcm, sizeof(srcm));
+		srcm.sin6_family = AF_INET6;
+		srcm.sin6_len = sizeof(struct sockaddr_in6);
+		srcm.sin6_addr = mask;
 
 		bzero(&dst, sizeof(dst));
 		dst.sin6_family = AF_INET6;
@@ -2049,7 +2033,7 @@ void             *entry;     /* BC or ESM depending on start variable */
 
 		ep = encap_attach(AF_INET6, -1,
 				  (struct sockaddr *)&src,
-				  (struct sockaddr *)srcm,
+				  (struct sockaddr *)&srcm,
 				  (struct sockaddr *)&dst,
 				  (struct sockaddr *)&dstm,
 				  (struct protosw *)&mip6_tunnel_protosw,
@@ -2116,9 +2100,6 @@ mip6_proxy(struct in6_addr* addr,
 	MALLOC(sdl, struct sockaddr_dl *, ifa->ifa_addr->sa_len, M_IFMADDR,
 	       M_WAITOK);
 	bcopy((struct sockaddr_dl *)ifa->ifa_addr, sdl, ifa->ifa_addr->sa_len);
-#ifdef MIP6_DEBUG
-	printf("sdl->sdl_nlen = %d\n", sdl->sdl_nlen);
-#endif
 
 	/* Create mask */
 	bzero(&mask, sizeof(mask));
@@ -2652,11 +2633,11 @@ u_int32_t         valid_time;  /* Time (s) that the prefix is valid */
 	splx(s);
 
 #ifdef MIP6_DEBUG
-	debug("\nInternal Prefix list entry created (0x%x)\n", pq);
-	debug("Interface:  %s\n", if_name(ifp));
-	debug("Prefix:     %s\n", ip6_sprintf(&pq->prefix));
-	debug("Prefix len: %d\n", pq->prefix_len);
-	debug("Life time:  %d\n", htonl(pq->valid_time));
+	mip6_debug("\nInternal Prefix list entry created (0x%x)\n", pq);
+	mip6_debug("Interface:  %s\n", if_name(ifp));
+	mip6_debug("Prefix:     %s\n", ip6_sprintf(&pq->prefix));
+	mip6_debug("Prefix len: %d\n", pq->prefix_len);
+	mip6_debug("Life time:  %d\n", htonl(pq->valid_time));
 #endif
 
 	if (start_timer) {
@@ -2699,7 +2680,7 @@ struct mip6_prefix  *pre_del;    /* Prefix list entry to be deleted */
 				pre_prev->next = pre->next;
 
 #ifdef MIP6_DEBUG
-			debug("\nMIPv6 prefix entry deleted (0x%x)\n", pre);
+			mip6_debug("\nMIPv6 prefix entry deleted (0x%x)\n", pre);
 #endif
 			free(pre, M_TEMP);
 
