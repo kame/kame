@@ -35,8 +35,6 @@
 #include "opt_inet.h"
 #endif
 
-#define ahdprintf(x)	printf x
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
