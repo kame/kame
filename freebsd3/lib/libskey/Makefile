@@ -28,7 +28,7 @@ beforeinstall:
 		${DESTDIR}/usr/include
 
 # must be larger than default /usr/lib/libskey.so
-SHLIB_MAJOR=	2
-SHLIB_MINOR=	1
+#SHLIB_MAJOR=	2
+#SHLIB_MINOR=	1
 
 .include <bsd.lib.mk>
