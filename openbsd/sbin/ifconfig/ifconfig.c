@@ -581,16 +581,24 @@ printif(ifrm, ifaliases)
 		}
 		if (!strncmp(ifreq.ifr_name, ifrp->ifr_name,
 		    sizeof(ifrp->ifr_name))) {
-			register struct afswtch *p = afp;
+			register struct afswtch *p;
 
+#if 0
 			if (ifaliases == 0 && noinet == 0)
 				continue;
+#endif
 			ifr = *ifrp;
+			/* quickhack: sizeof(ifr) < sizeof(ifr6) */
+			if (ifrp->ifr_addr.sa_family == AF_INET6)
+				bcopy(ifrp, &ifr6, sizeof(ifr6));
 			if ((p = afp) != NULL) {
-				(*p->af_status)(1);
-			} else for (p = afs; p->af_name; p++) {
-				ifr.ifr_addr.sa_family = p->af_af;
-				(*p->af_status)(0);
+				if (ifr.ifr_addr.sa_family == p->af_af)
+					(*p->af_status)(1);
+			} else {
+				for (p = afs; p->af_name; p++) {
+					if (ifr.ifr_addr.sa_family == p->af_af)
+						(*p->af_status)(0);
+				}
 			}
 			count++;
 			noinet = 0;
@@ -1338,37 +1346,7 @@ void
 in6_status(force)
 	int force;
 {
-	char inbuf[8192];
-	struct ifconf ifc;
-	struct ifreq *ifr;
-	int i, siz;
-	char ifrbuf[8192];
-
-	ifc.ifc_len = sizeof(inbuf);
-	ifc.ifc_buf = inbuf;
-	getsock(af);
-	if (s < 0)
-		err(1, "socket");
-	if (ioctl(s, SIOCGIFCONF, &ifc) < 0)
-		err(1, "SIOCGIFCONF");
-	ifr = ifc.ifc_req;
-	for (i = 0; i < ifc.ifc_len; ) {
-		ifr = (struct ifreq *)((caddr_t)ifc.ifc_req + i);
-		siz = sizeof(ifr->ifr_name) +
-			(ifr->ifr_addr.sa_len > sizeof(struct sockaddr)
-				? ifr->ifr_addr.sa_len
-				: sizeof(struct sockaddr));
-		i += siz;
-		/* avoid alignment issue */
-		if (sizeof(ifrbuf) < siz)
-			errx(1, "ifr too big");
-		memcpy(ifrbuf, ifr, siz);
-		ifr = (struct ifreq *)ifrbuf;
-		if (!strncmp(name, ifr->ifr_name, sizeof(ifr->ifr_name))) {
-			if (ifr->ifr_addr.sa_family == AF_INET6)
-				in6_alias((struct in6_ifreq *)ifr);
-		}
-	}
+	in6_alias((struct in6_ifreq *)&ifr6);
 }
 #endif /*INET6*/
 
