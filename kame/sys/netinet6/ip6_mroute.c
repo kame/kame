@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.19 2000/04/21 10:43:02 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.20 2000/04/23 03:38:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1443,13 +1443,17 @@ ip6_mdq(m, ifp, rt)
 			/*
 			 * check if the outgoing packet is going to break
 			 * a scope boundary.
+			 * XXX For packets through PIM register tunnel
+			 * interface, we believe a routing daemon.
 			 */
-			if (in6_addr2scopeid(ifp, &ip6->ip6_dst) !=
-			    in6_addr2scopeid(mif6table[mifi].m6_ifp,
-					     &ip6->ip6_dst) ||
-			    in6_addr2scopeid(ifp, &ip6->ip6_src) !=
-			    in6_addr2scopeid(mif6table[mifi].m6_ifp,
-					     &ip6->ip6_src)) {
+			if ((mif6table[rt->mf6c_parent].m6_flags &
+			     MIFF_REGISTER) == 0 &&
+			    (in6_addr2scopeid(ifp, &ip6->ip6_dst) !=
+			     in6_addr2scopeid(mif6table[mifi].m6_ifp,
+					      &ip6->ip6_dst) ||
+			     in6_addr2scopeid(ifp, &ip6->ip6_src) !=
+			     in6_addr2scopeid(mif6table[mifi].m6_ifp,
+					      &ip6->ip6_src))) {
 				ip6stat.ip6s_badscope++;
 				continue;
 			}
