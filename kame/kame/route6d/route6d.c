@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.76 2001/11/08 09:55:47 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.77 2001/12/18 02:34:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.76 2001/11/08 09:55:47 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.77 2001/12/18 02:34:04 jinmei Exp $";
 #endif
 
 #include <stdio.h>
@@ -965,11 +965,6 @@ sendpacket(sin6, len)
 	struct	sockaddr_in6 *sin6;
 	int	len;
 {
-	/*
-	 * MSG_DONTROUTE should not be specified when it responds with a
-	 * RIP6_REQUEST message.  SO_DONTROUTE has been specified to
-	 * other sockets.
-	 */
 	struct msghdr m;
 	struct cmsghdr *cm;
 	struct iovec iov[2];
@@ -982,10 +977,12 @@ sendpacket(sin6, len)
 	sincopy = *sin6;
 	sin6 = &sincopy;
 
-	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)
-	 || IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr)) {
+	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr) ||
+	    IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr)) {
+		/* XXX: do not mix the interface index and link index */
 		idx = IN6_LINKLOCAL_IFINDEX(sin6->sin6_addr);
 		SET_IN6_LINKLOCAL_IFINDEX(sin6->sin6_addr, 0);
+		sin6->sin6_scope_id = idx;
 	} else
 		idx = 0;
 
