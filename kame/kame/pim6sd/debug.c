@@ -92,6 +92,8 @@ static char     dumpfilename[] = _PATH_PIM6D_DUMP;
 static char     cachefilename[] = _PATH_PIM6D_CACHE;	/* TODO: notused */
 static char	statfilename[] = _PATH_PIM6D_STAT;
 
+static char *sec2str __P((time_t));
+
 static char *
 sec2str(total)
 	time_t total;
