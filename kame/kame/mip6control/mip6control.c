@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.33 2002/09/25 13:52:47 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.34 2002/09/26 16:06:37 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -177,7 +177,7 @@ main(argc, argv)
 	else
 		__progname++;
 
-	while ((ch = getopt(argc, argv, "nli:mMgH:hP:A:aL:bcCu:v:wD:S:T:I:F:")) != -1) {
+	while ((ch = getopt(argc, argv, "nli:mMgH:hP:A:aL:bcC:u:v:wD:S:T:I:F:")) != -1) {
 		switch(ch) {
 		case 'm':
 			enablemn = 1;
