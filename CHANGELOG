@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1115 2000/07/09 13:09:16 itojun Exp $
+$Id: CHANGELOG,v 1.1116 2000/07/10 05:58:20 sumikawa Exp $
 
 <200006>
+Mon Jul 10 14:43:40 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/{libpcap,tcpdump}: use 7/3 snapshot.
+	* freebsd3/ports/w3m: upgrade to 0.1.11.p.
+
 Sun Jul  9 21:50:54 JST 2000  itojun@iijlab.net
 	* *bsd*/sys/netinet/tcp_input.c, kame/sys/netinet6/tcp6_input.c:
 	  be more cautious about tcp option length field.  drop bogus ones
