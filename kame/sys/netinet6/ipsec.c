@@ -2784,7 +2784,9 @@ ipsec6_output_trans(state, nexthdrp, mprev, sp, flags, tun)
 			error = ipcomp6_output(state->m, nexthdrp, mprev->m_next, isr);
 			break;
 		default:
-			printf("ipsec6_output_trans: unknown ipsec protocol %d\n", isr->saidx.proto);
+			printf("ipsec6_output_trans: "
+				"unknown ipsec protocol %d\n",
+				isr->saidx.proto);
 			m_freem(state->m);
 			error = EINVAL;
 			break;
@@ -2795,7 +2797,8 @@ ipsec6_output_trans(state, nexthdrp, mprev, sp, flags, tun)
 		}
 		plen = state->m->m_pkthdr.len - sizeof(struct ip6_hdr);
 		if (plen > IPV6_MAXPACKET) {
-			printf("ipsec6_output: IPsec with IPv6 jumbogram is not supported\n");
+			printf("ipsec6_output_trans: "
+				"IPsec with IPv6 jumbogram is not supported\n");
 			ipsec6stat.out_inval++;
 			error = EINVAL;	/*XXX*/
 			goto bad;
@@ -2910,7 +2913,8 @@ ipsec6_output_tunnel(state, sp, flags)
 			 */
 			/* XXX should be processed with other familiy */
 			if (((struct sockaddr *)&isr->sav->sah->saidx.src)->sa_family != AF_INET6) {
-				printf("ipsec4_output: family mismatched "
+				printf("ipsec6_output_tunnel: "
+					"family mismatched "
 					"between inner and outer, spi=%u\n",
 					(u_int32_t)ntohl(isr->sav->spi));
 				printf("ipsec6_output_tunnel: family mismatched "
