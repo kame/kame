@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.21 2000/08/03 14:22:09 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.22 2000/08/03 15:25:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -338,7 +338,8 @@ struct icmp6_nodeinfo {
 
 #define NI_QTYPE_NOOP		0 /* NOOP  */
 #define NI_QTYPE_SUPTYPES	1 /* Supported Qtypes */
-#define NI_QTYPE_FQDN		2 /* FQDN */
+#define NI_QTYPE_FQDN		2 /* FQDN (draft 04) */
+#define NI_QTYPE_DNSNAME	2 /* DNS Name */
 #define NI_QTYPE_NODEADDR	3 /* Node Addresses */
 #define NI_QTYPE_IPV4ADDR	4 /* IPv4 Addresses */
 
