@@ -1,4 +1,4 @@
-/*	$KAME: in6_prefix.c,v 1.36 2001/01/03 07:19:38 sumikawa Exp $	*/
+/*	$KAME: in6_prefix.c,v 1.37 2001/01/06 05:16:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -679,8 +679,14 @@ add_each_addr(struct socket *so, struct rr_prefix *rpp, struct rp_addr *rap)
 	in6_prefixlen2mask(&ifra.ifra_prefixmask.sin6_addr, rpp->rp_plen);
 	/* don't care ifra_flags for now */
 
+#if 0
+	/*
+	 * XXX: if we did this, the lifetimes would decrese in time.
+	 *      we should need more clarifications on the prefix mechanism...
+	 */
 	ifra.ifra_lifetime.ia6t_vltime = rpp->rp_vltime;
 	ifra.ifra_lifetime.ia6t_pltime = rpp->rp_pltime;
+#endif
 
 	ia6 = in6ifa_ifpwithaddr(rpp->rp_ifp, &ifra.ifra_addr.sin6_addr);
 	if (ia6 != NULL) {
