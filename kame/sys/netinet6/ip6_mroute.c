@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.25 2000/07/12 12:58:03 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.26 2000/07/12 14:12:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1612,7 +1612,7 @@ phyint_send(ip6, mifp, m)
 		dst6->sin6_len = sizeof(struct sockaddr_in6);
 		dst6->sin6_family = AF_INET6;
 		dst6->sin6_addr = ip6->ip6_dst;
-		ip6_mloopback(ifp, m, &ro.ro_dst);
+		ip6_mloopback(ifp, m, (struct sockaddr_in6 *)&ro.ro_dst);
 	}
 	/*
 	 * Put the packet into the sending queue of the outgoing interface
@@ -1626,13 +1626,8 @@ phyint_send(ip6, mifp, m)
 		 * We just call if_output instead of nd6_output here, since
 		 * we need no ND for a multicast forwarded packet...right?
 		 */
-#ifdef NEW_STRUCT_ROUTE
-		error = (*ifp->if_output)(ifp, mb_copy, &ro, NULL);
-#else
 		error = (*ifp->if_output)(ifp, mb_copy,
-					  (struct sockaddr *)&ro.ro_dst,
-					  NULL);
-#endif
+		    (struct sockaddr *)&ro.ro_dst, NULL);
 #ifdef MRT6DEBUG
 		if (mrt6debug & DEBUG_XMIT)
 			log(LOG_DEBUG, "phyint_send on mif %d err %d\n",
