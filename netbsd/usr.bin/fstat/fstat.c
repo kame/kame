@@ -609,7 +609,7 @@ inet6_addrstr(p)
 #ifdef NI_WITHSCOPEID
 	const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
 #else
-	const int niflags = NI_NUMERICHOST
+	const int niflags = NI_NUMERICHOST;
 #endif
 
 	memset(&sin6, 0, sizeof(sin6));
