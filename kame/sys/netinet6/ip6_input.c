@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.190 2001/04/04 05:17:29 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.191 2001/04/24 16:54:59 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -539,7 +539,6 @@ ip6_input(m)
 		m_freem(m);
 		m = n;
 	}
-
 	IP6_EXTHDR_CHECK(m, 0, sizeof(struct ip6_hdr), /*nothing*/);
 #endif
 
@@ -904,6 +903,11 @@ ip6_input(m)
 			/* this address is ready */
 			ours = 1;
 			deliverifp = ia6->ia_ifp;	/* correct? */
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+			/* Count the packet in the ip address stats */
+			ia6->ia_ifa.if_ipackets++;
+			ia6->ia_ifa.if_ibytes += m->m_pkthdr.len;
+#endif
 			goto hbhcheck;
 		} else {
 			/* address is not ready, so discard the packet. */
