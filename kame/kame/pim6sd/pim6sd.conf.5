@@ -1,4 +1,4 @@
-.\"	$KAME: pim6sd.conf.5,v 1.21 2003/04/30 05:09:01 suz Exp $
+.\"	$KAME: pim6sd.conf.5,v 1.22 2003/08/10 17:09:14 suz Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -295,8 +295,8 @@ The default value is 0, which means the highest priority.
 .Op Ic priority Ar priority
 .Ic ;
 .Xc
-Specifies a static group-to-RP mapping.  Must be used when BSR message
-does not arrive from the upstream router.
+Specifies a static group-to-RP mapping.  Necessary when there is a
+IPv6 multicast router not understanding BSR message.
 It cannot be specified with
 .Ic cand_rp
 or
@@ -307,6 +307,10 @@ BSR function remains working independly of this option, so you can specify
 static group-to-RP mappings by this option while flodding BSR messages 
 from upstream to downstreams, but cannot redistribute this static mapping
 by BSR messages.
+.Pp
+If this option and BSR message provides a different RP for the same group,
+the one with higher priority (i.e. smaller priority value) is chosen.  
+If their priority is same, static one wins.
 .Pp
 An optional parameter
 .Ic priority
