@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1847 2001/08/18 05:53:50 jinmei Exp $
+$KAME: CHANGELOG,v 1.1848 2001/08/22 10:27:48 kjc Exp $
 
 <200108>
+2001-08-22  kjc@csl.sony.co.jp
+	* bsdi4/sys/net/if.h:
+	add ALTQ-compat queue macros to bsdi4 in order to
+	reduce "#ifdef ALTQ". (in paticular, sys/net/if_gif.c)
+	(the commit mail didn't go out due to a permission problem in
+	the repository.)
+
 2001-08-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_src.c (in6_selectsrc): changed the number
 	of longest matching rule in source address selection from 8 to 14,
