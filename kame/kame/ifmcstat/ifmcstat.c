@@ -76,8 +76,9 @@ void acmc __P((struct ether_multi *));
 void if6_addrlist __P((struct ifaddr *));
 void in6_multilist __P((struct in6_multi *));
 struct in6_multi * in6_multientry __P((struct in6_multi *));
-#if !defined(__NetBSD__) && !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-static char *ether_ntoa __P((u_char *));
+
+#if !defined(__NetBSD__) && !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__)
+static char *ether_ntoa __P((struct ether_addr *));
 #endif
 
 #define	KREAD(addr, buf, type) \
@@ -96,7 +97,7 @@ const char *inet6_n2a(p)
 int main()
 {
 	char	buf[_POSIX2_LINE_MAX], ifname[IFNAMSIZ];
-	struct	ifnet	*ifp, ifnet;
+	struct	ifnet	*ifp, *nifp, ifnet;
 #ifndef __NetBSD__
 	struct	arpcom	arpcom;
 #else
@@ -121,9 +122,18 @@ int main()
 		KREAD(ifp, &ifnet, struct ifnet);
 		printf("%s:\n", if_indextoname(ifnet.if_index, ifname));
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		if6_addrlist(ifnet.if_addrlist.tqh_first);
+		nifp = ifnet.if_list.tqe_next;
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
+		if6_addrlist(TAILQ_FIRST(&ifnet.if_addrhead));
+		nifp = ifnet.if_link.tqe_next;
+#else
+		if6_addrlist(ifnet.if_addrlist);
+		nifp = ifnet.if_next;
+#endif
 
+#ifdef __NetBSD__
 		KREAD(ifnet.if_sadl, &sdl, struct sockaddr_dl);
 		if (sdl.sdl_type == IFT_ETHER) {
 			printf("\tenaddr %s",
@@ -133,24 +143,25 @@ int main()
 			acmc(ec.ec_multiaddrs.lh_first);
 			printf("\n");
 		}
-
-		ifp = ifnet.if_list.tqe_next;
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-		if6_addrlist(TAILQ_FIRST(&ifnet.if_addrhead));
-		ifp = ifnet.if_link.tqe_next;
-#else /* other cases */
-		if6_addrlist(ifnet.if_addrlist);
-
+		/* not supported */
+#else
 		if (ifnet.if_type == IFT_ETHER) {
 			KREAD(ifp, &arpcom, struct arpcom);
-			printf("\tenaddr %s", ether_ntoa(arpcom.ac_enaddr));
+			printf("\tenaddr %s",
+			    ether_ntoa((struct ether_addr *)arpcom.ac_enaddr));
+			KREAD(ifp, &arpcom, struct arpcom);
 			printf(" multicnt %d", arpcom.ac_multicnt);
+#ifdef __OpenBSD__
+			acmc(arpcom.ac_multiaddrs.lh_first);
+#else
 			acmc(arpcom.ac_multiaddrs);
+#endif
 			printf("\n");
 		}
-
-		ifp = ifnet.if_next;
 #endif
+
+		ifp = nifp;
 	}
 
 	exit(0);
@@ -162,10 +173,10 @@ char *ifname(ifp)
 {
 	static char buf[BUFSIZ];
 
-#ifndef __NetBSD__
-	KREAD(ifp->if_name, buf, IFNAMSIZ);
-#else
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	KREAD(ifp->if_xname, buf, IFNAMSIZ);
+#else
+	KREAD(ifp->if_name, buf, IFNAMSIZ);
 #endif
 	return buf;
 }
@@ -191,15 +202,12 @@ void acmc(am)
 		KREAD(am, &em, struct ether_multi);
 		
 		printf("\n\t\t");
-#ifndef __NetBSD__
-		printf("%s -- ", ether_ntoa(em.enm_addrlo));
-		printf("%s ", ether_ntoa(em.enm_addrhi));
-		printf("%d", em.enm_refcount);
-		am = em.enm_next;
-#else
 		printf("%s -- ", ether_ntoa((struct ether_addr *)em.enm_addrlo));
 		printf("%s ", ether_ntoa((struct ether_addr *)&em.enm_addrhi));
 		printf("%d", em.enm_refcount);
+#if !defined(__NetBSD__) && !defined(__OpenBSD__)
+		am = em.enm_next;
+#else
 		am = em.enm_list.le_next;
 #endif
 	}
@@ -238,7 +246,7 @@ if6_addrlist(ifap)
 		mc = mc ? mc : if6a.ia6_multiaddrs.lh_first;
 #endif
 	nextifap:
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		ifap = ifa.ifa_list.tqe_next;
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 3
 		ifap = ifa.ifa_link.tqe_next;
@@ -306,12 +314,15 @@ in6_multilist(mc)
 		mc = in6_multientry(mc);
 }
 
-#if !defined(__NetBSD__) && !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if !defined(__NetBSD__) && !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__)
 static char *
-ether_ntoa(p)
-	u_char *p;
+ether_ntoa(e)
+	struct ether_addr *e;
 {
 	static char buf[20];
+	u_char *p;
+
+	p = (u_char *)e;
 
 	snprintf(buf, sizeof(buf), "%02x:%02x:%02x:%02x:%02x:%02x",
 		p[0], p[1], p[2], p[3], p[4], p[5]);
