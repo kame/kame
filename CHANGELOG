@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1676 2001/05/18 05:55:06 sakane Exp $
+$KAME: CHANGELOG,v 1.1677 2001/05/18 08:11:49 sakane Exp $
 
 <200105>
+Fri May 18 17:10:10 JST 2001 sakane@ydc.co.jp
+	* kame/racoon:
+	Fixed to copy "reqid" into a proposal table from policy entries.
+	The exchange failed when policy level "unique" was specified.
+
 Fri May 18 14:50:56 JST 2001 sakane@ydc.co.jp
 	* kame/setkey:
 	Enabled to get a protocol number from /etc/protocol as upper layer
