@@ -1,12 +1,12 @@
 die "too few arguments" if (scalar(@ARGV) != 2);
 $me = $ARGV[0];
-$you = $ARGV[0];
+$you = $ARGV[1];
 $hostname = `hostname`;
 $hostname =~ s/\n$//;
 $userfqdn = `whoami`;
 $userfqdn =~ s/\n$//;
 $userfqdn .= '@' . $hostname;
-$rcsid = '$Id: sandiego.pl,v 1.3 2000/01/11 18:40:49 itojun Exp $';
+$rcsid = '$Id: sandiego.pl,v 1.4 2000/01/11 18:50:54 itojun Exp $';
 
 print <<EOF;
 # automatically generated from $rcsid
