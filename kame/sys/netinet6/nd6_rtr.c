@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.76 2001/01/30 14:29:03 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.77 2001/02/01 05:30:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -78,20 +78,17 @@
 #define SDL(s)	((struct sockaddr_dl *)s)
 
 static struct nd_defrouter *defrtrlist_update __P((struct nd_defrouter *));
-static struct in6_ifaddr *in6_ifadd __P((struct ifnet *, struct in6_addr *,
-					 struct in6_addr *, int,
-					 u_int32_t, u_int32_t));
+static struct in6_ifaddr *in6_ifadd __P((struct nd_prefix *));
 /*static struct nd_pfxrouter *pfxrtr_lookup __P((struct nd_prefix *,
   struct nd_defrouter *)); XXXYYYY */
 static void pfxrtr_add __P((struct nd_prefix *, struct nd_defrouter *));
 static void pfxrtr_del __P((struct nd_pfxrouter *));
 /*static struct nd_pfxrouter *find_pfxlist_reachable_router __P((struct nd_prefix *));  XXXYYY */
 /* static void defrouter_addifreq __P((struct ifnet *)); XXXYYY */
-static void defrouter_msg __P((int, struct rtentry *));
+static void nd6_rtmsg __P((int, struct rtentry *));
 
 static void in6_init_address_ltimes __P((struct nd_prefix *ndpr,
-					 struct in6_addrlifetime *lt6,
-					 int update_vltime));
+					 struct in6_addrlifetime *lt6));
 
 static int rt6_deleteroute __P((struct radix_node *, void *));
 
@@ -455,7 +452,7 @@ freeit:
 
 /* tell the change to user processes watching the routing socket. */
 static void
-defrouter_msg(cmd, rt)
+nd6_rtmsg(cmd, rt)
 	int cmd;
 	struct rtentry *rt;
 {
@@ -469,6 +466,8 @@ defrouter_msg(cmd, rt)
 	info.rti_info[RTAX_DST] = rt_key(rt);
 	info.rti_info[RTAX_GATEWAY] = rt->rt_gateway;
 	info.rti_info[RTAX_NETMASK] = rt_mask(rt);
+	info.rti_info[RTAX_IFP] = rt->rt_ifp->if_addrlist->ifa_addr;
+	info.rti_info[RTAX_IFA] = rt->rt_ifa->ifa_addr;
 
 	rt_missmsg(cmd, &info, rt->rt_flags, 0);
 }
@@ -499,7 +498,7 @@ defrouter_addreq(new)
 		(struct sockaddr *)&gate, (struct sockaddr *)&mask,
 		RTF_GATEWAY, &newrt);
 	if (newrt) {
-		defrouter_msg(RTM_ADD, newrt); /* tell user process */
+		nd6_rtmsg(RTM_ADD, newrt); /* tell user process */
 		newrt->rt_refcnt--;
 	}
 	splx(s);
@@ -562,7 +561,7 @@ defrouter_addifreq(ifp)
 			newrt->rt_refcnt--;
 	} else {
 		if (newrt) {
-			defrouter_msg(RTM_ADD, newrt);
+			nd6_rtmsg(RTM_ADD, newrt);
 			newrt->rt_refcnt--;
 		}
 	}
@@ -606,7 +605,7 @@ defrouter_delreq(dr, dofree)
 		  (struct sockaddr *)&mask,
 		  RTF_GATEWAY, &oldrt);
 	if (oldrt) {
-		defrouter_msg(RTM_DELETE, oldrt);
+		nd6_rtmsg(RTM_DELETE, oldrt);
 		if (oldrt->rt_refcnt <= 0) {
 			/*
 			 * XXX: borrowed from the RTM_DELETE case of
@@ -954,6 +953,7 @@ prelist_remove(pr)
 	pr->ndpr_vltime = 0;
 	pr->ndpr_pltime = 0;
 	pr->ndpr_raf_onlink = 0;
+	pr->ndpr_raf_auto = 0;
 	if ((pr->ndpr_stateflags & NDPRF_ONLINK) != 0 &&
 	    (e = nd6_prefix_offlink(pr)) != 0) {
 		log(LOG_ERR, "prelist_remove: failed to make %s/%d offlink "
@@ -973,7 +973,6 @@ prelist_remove(pr)
 #endif
 	/* unlink ndpr_entry from nd_prefix list */
 	LIST_REMOVE(pr, ndpr_entry);
-	splx(s);
 
 	/* free list of routers that adversed the prefix */
 	for (pfr = pr->ndpr_advrtrs.lh_first; pfr; pfr = next) {
@@ -981,6 +980,8 @@ prelist_remove(pr)
 
 		free(pfr, M_IP6NDP);
 	}
+	splx(s);
+
 	free(pr, M_IP6NDP);
 
 	pfxlist_onlink_check();
@@ -992,7 +993,9 @@ prelist_update(new, dr, m)
 	struct nd_defrouter *dr; /* may be NULL */
 	struct mbuf *m;
 {
-	struct in6_ifaddr *ia6 = NULL;
+	struct in6_ifaddr *ia6 = NULL, *ia6_match = NULL;
+	struct ifaddr *ifa;
+	struct ifnet *ifp = new->ndpr_ifp;
 	struct nd_prefix *pr;
 #ifdef __NetBSD__
 	int s = splsoftnet();
@@ -1000,9 +1003,9 @@ prelist_update(new, dr, m)
 	int s = splnet();
 #endif
 	int error = 0;
+	int newprefix = 0;
 	int auth;
 	struct in6_addrlifetime *lt6;
-	u_char onlink;	/* Mobile IPv6 */
 
 	auth = 0;
 	if (m) {
@@ -1017,11 +1020,12 @@ prelist_update(new, dr, m)
 	}
 
 	if ((pr = nd6_prefix_lookup(new)) != NULL) {
-		if (pr->ndpr_ifp != new->ndpr_ifp) {
-			error = EADDRNOTAVAIL;
-			goto end;
-		}
+		newprefix = 1;
 
+		/*
+		 * nd6_prefix_lookup() ensures that pr and new have the same
+		 * prefix on a same interface.
+		 */
 #ifdef MIP6
 		if (mip6_get_home_prefix_hook) {
 			/*
@@ -1034,128 +1038,19 @@ prelist_update(new, dr, m)
 		}
 #endif /* MIP6 */
 
-		/* update prefix information */
-		pr->ndpr_flags = new->ndpr_flags;
+		/*
+		 * Update prefix information.  Note that the on-link (L) bit
+		 * and the autonomous (A) bit should NOT be changed from 1
+		 * to 0.
+		 */
+		if (new->ndpr_raf_onlink == 1)
+			pr->ndpr_raf_onlink = 1;
+		if (new->ndpr_raf_auto == 1)
+			pr->ndpr_raf_auto = 1;
 		pr->ndpr_vltime = new->ndpr_vltime;
 		pr->ndpr_pltime = new->ndpr_pltime;
 		pr->ndpr_preferred = new->ndpr_preferred;
 		pr->ndpr_expire = new->ndpr_expire;
-
-		/*
-		 * RFC 2462 5.5.3 (d) or (e)
-		 * We got a prefix which we have seen in the past.
-		 */
-		if (!new->ndpr_raf_auto)
-			goto noautoconf1;
-
-		if (IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr))
-			ia6 = NULL;
-		else
-			ia6 = in6ifa_ifpwithaddr(pr->ndpr_ifp, &pr->ndpr_addr);
-
-		if (ia6 == NULL) {
-			/*
-			 * Special case:
-			 * (1) We have seen the prefix advertised before, but
-			 * we have never performed autoconfig for this prefix.
-			 * This is because Autonomous bit was 0 previously, or
-			 * autoconfig failed due to some other reasons.
-			 * (2) We have seen the prefix advertised before and
-			 * we have performed autoconfig in the past, but
-			 * we seem to have no interface address right now.
-			 * This is because the interface address has expired.
-			 *
-			 * This prefix is fresh, with respect to autoconfig
-			 * process.
-			 *
-			 * Add an address based on RFC 2462 5.5.3 (d).
-			 */
-			ia6 = in6_ifadd(pr->ndpr_ifp,
-					&pr->ndpr_prefix.sin6_addr,
-					&pr->ndpr_addr, new->ndpr_plen,
-					new->ndpr_vltime, new->ndpr_pltime);
-			if (!ia6) {
-				error = EADDRNOTAVAIL;
-				log(LOG_ERR, "prelist_update: failed to add a "
-				    "new address\n");
-				goto noautoconf1;
-			}
-
-			/* combine the prefix with the address */
-			pr->ndpr_refcnt++;
-			ia6->ia6_ndpr = pr;
-			pfxlist_onlink_check();
-
-			/* lifetime initialization */
-			lt6 = &ia6->ia6_lifetime;
-			lt6->ia6t_vltime = new->ndpr_vltime;
-			lt6->ia6t_pltime = new->ndpr_pltime;
-			in6_init_address_ltimes(new, lt6, 1);
-		} else {
-			u_int32_t storedlifetime;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-			long time_second = time.tv_sec;
-#endif
-
-#define TWOHOUR		(120*60)
-			/*
-			 * We have seen the prefix before, and we have added
-			 * interface address in the past.  We still have
-			 * the interface address assigned.
-			 *
-			 * update address lifetime based on RFC 2462
-			 * 5.5.3 (e).
-			 */
-			int update = 0;
-
-			lt6 = &ia6->ia6_lifetime;
-
-			/* RFC 2462 5.5.3 (e) */
-			storedlifetime = lt6->ia6t_expire > time_second ?
-				lt6->ia6t_expire - time_second : 0;
-
-			if (TWOHOUR < new->ndpr_vltime ||
-			    storedlifetime < new->ndpr_vltime) {
-				lt6->ia6t_vltime = new->ndpr_vltime;
-				update++;
-			} else if (storedlifetime <= TWOHOUR
-#if 0
-				   /*
-				    * This condition is logically redundant,
-				    * so we just omit it.
-				    * See IPng 6712, 6717, and 6721.
-				    */
-				   && new->ndpr_vltime <= storedlifetime
-#endif
-				) {
-				if (auth) {
-					lt6->ia6t_vltime = new->ndpr_vltime;
-					update++;
-				}
-			} else {
-				/*
-				 * new->ndpr_vltime <= TWOHOUR &&
-				 * TWOHOUR < storedlifetime
-				 */
-				lt6->ia6t_vltime = TWOHOUR;
-				update++;
-			}
-
-			/* 2 hour rule is not imposed for pref lifetime */
-			lt6->ia6t_pltime = new->ndpr_pltime;
-
-			in6_init_address_ltimes(new, lt6, update);
-
-			/*
-			 * This update might re-validate an already deprecated
-			 * address.
-			 * XXX: should this check be centralized?
-			 */
-			if (lt6->ia6t_vltime != 0)
-				ia6->ia6_flags &= ~IN6_IFF_DEPRECATED;
-		}
-
- noautoconf1:
 
 		if (new->ndpr_raf_onlink &&
 		    (pr->ndpr_stateflags & NDPRF_ONLINK) == 0) {
@@ -1173,10 +1068,164 @@ prelist_update(new, dr, m)
 
 		if (dr && pfxrtr_lookup(pr, dr) == NULL)
 			pfxrtr_add(pr, dr);
+	} else {
+		struct nd_prefix *newpr = NULL;
 
-		onlink = (pr->ndpr_stateflags & NDPRF_ONLINK); /* for MIP6 */
+		if (new->ndpr_vltime == 0) goto end;
+
+		bzero(&new->ndpr_addr, sizeof(struct in6_addr));
+
+		error = nd6_prelist_add(new, dr, &newpr);
+
+		if (error != 0 || newpr == NULL) {
+			log(LOG_NOTICE, "prelist_update: "
+			    "nd6_prelist_add failed for %s/%d on %s "
+			    "errno=%d, returnpr=%p\n",
+			    ip6_sprintf(&new->ndpr_prefix.sin6_addr),
+					new->ndpr_plen, if_name(new->ndpr_ifp),
+					error, newpr);
+			goto end;
+		}
+		pr = newpr;
+	}
+
+	/*
+	 * Address autoconfiguration based on Section 5.5.3 of RFC 2462.
+	 * Note that pr must be non NULL at this point.
+	 */
+
+	/* 5.5.3 (a). Ignore the prefix without the A bit set. */
+	if (!pr->ndpr_raf_auto)
+		goto end;
+
+	/*
+	 * 5.5.3 (b). the link-local prefix should have been ignored in
+	 * nd6_ra_input.
+	 */
+
+	/*
+	 * 5.5.3 (c). Consistency check on lifetimes: pltime <= vltime.
+	 * This should have been done in nd6_ra_input.
+	 */
+
+ 	/*
+	 * 5.5.3 (d). If the prefix advertised does not match the prefix of an
+	 * address already in the list, and the Valid Lifetime is not 0,
+	 * form an address.  Note that even a manually configured address
+	 * should reject autoconfiguration of a new address.
+	 */
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
+#else
+	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next)
+#endif
+	{
+		struct in6_ifaddr *ifa6;
+		int ifa_plen;
+		u_int32_t storedlifetime;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+		long time_second = time.tv_sec;
+#endif
+
+		if (ifa->ifa_addr->sa_family != AF_INET6)
+			continue;
+
+		ifa6 = (struct in6_ifaddr *)ifa;
+
+		/*
+		 * Spec is not clear here, but I believe we should concentrate
+		 * on unicast (i.e. not anycast) addresses.
+		 * XXX: other ia6_flags? detached or duplicated?
+		 */
+		if ((ifa6->ia6_flags & IN6_IFF_ANYCAST) != 0)
+			continue;
+		
+		ifa_plen = in6_mask2len(&ifa6->ia_prefixmask.sin6_addr, NULL);
+		if (ifa_plen != pr->ndpr_plen ||
+		    !in6_are_prefix_equal(&ifa6->ia_addr.sin6_addr,
+					  &pr->ndpr_prefix.sin6_addr,
+					  ifa_plen))
+			continue;
+
+		if (ia6_match == NULL) /* remember the first one */
+			ia6_match = ifa6;
+
+		if ((ifa6->ia6_flags & IN6_IFF_AUTOCONF) == 0)
+			continue;
+
+		/*
+		 * An already autoconfigured address matched.  Now that we
+		 * are sure there is at least one matched address, we can
+		 * proceed to 5.5.3. (e): update the lifetimes according to the
+		 * "two hours" rule.
+		 */
+#define TWOHOUR		(120*60)
+		lt6 = &ifa6->ia6_lifetime;
+
+		storedlifetime = lt6->ia6t_expire > time_second ?
+			lt6->ia6t_expire - time_second : 0;
+
+		if (TWOHOUR < pr->ndpr_vltime ||
+		    storedlifetime < pr->ndpr_vltime) {
+			lt6->ia6t_vltime = pr->ndpr_vltime;
+		} else if (storedlifetime <= TWOHOUR
+#if 0
+			   /*
+			    * This condition is logically redundant, so we just
+			    * omit it.
+			    * See IPng 6712, 6717, and 6721.
+			    */
+			   && pr->ndpr_vltime <= storedlifetime
+#endif
+			) {
+			if (auth) {
+				lt6->ia6t_vltime = pr->ndpr_vltime;
+			}
+		} else {
+			/*
+			 * pr->ndpr_vltime <= TWOHOUR &&
+			 * TWOHOUR < storedlifetime
+			 */
+			lt6->ia6t_vltime = TWOHOUR;
+		}
+
+		/* The 2 hour rule is not imposed for preferred lifetime. */
+		lt6->ia6t_pltime = pr->ndpr_pltime;
+
+		in6_init_address_ltimes(pr, lt6);
+
+		/*
+		 * This update might re-validate an already deprecated address.
+		 * XXX: should this check be centralized?
+		 */
+		if (lt6->ia6t_vltime != 0)
+			ifa6->ia6_flags &= ~IN6_IFF_DEPRECATED;
+	}
+	if (ia6_match == NULL && pr->ndpr_vltime) {
+		/*
+		 * No address matched and the valid lifetime is non-zero.
+		 * Create a new address.
+		 */
+		if ((ia6 = in6_ifadd(pr)) != NULL) {
+			pr->ndpr_refcnt++;
+			ia6->ia6_ndpr = pr;
+			/*
+			 * A newly added address might affect the status
+			 * of other addresses, so we check and update it.
+			 */
+			pfxlist_onlink_check();
+		} else {
+			/* just set an error. do not bark here. */
+			error = EADDRNOTAVAIL; /* XXX: might be unused. */
+		}
+	}
 
 #ifdef MIP6
+	if (newprefix) {
+		onlink = (pr->ndpr_stateflags & NDPRF_ONLINK); /* for MIP6 */
+
 		if (mip6_prelist_update_hook) {
 			/*
 			 * Check for home prefix. It can't be a fresh prefix
@@ -1193,45 +1242,7 @@ prelist_update(new, dr, m)
 			if (!onlink)
 				(*mip6_probe_pfxrtrs_hook)();
 		}
-#endif /* MIP6 */
 	} else {
-		int error_tmp;
-		struct nd_prefix *newpr = NULL;
-
-		if (new->ndpr_vltime == 0) goto end;
-
-		bzero(&new->ndpr_addr, sizeof(struct in6_addr));
-
-		/*
-		 * RFC 2462 5.5.3 (d)
-		 * We got a fresh prefix.  Perform some sanity checks
-		 * and add an interface address by appending interface ID
-		 * to the advertised prefix.
-		 */
-		if (!new->ndpr_raf_auto)
-			goto noautoconf2;
-
-		ia6 = in6_ifadd(new->ndpr_ifp, &new->ndpr_prefix.sin6_addr,
-				&new->ndpr_addr, new->ndpr_plen,
-				new->ndpr_vltime, new->ndpr_pltime);
-		if (!ia6) {
-			error = EADDRNOTAVAIL;
-			log(LOG_ERR, "prelist_update: "
-			    "failed to add a new address\n");
-			goto noautoconf2;
-		}
-
- noautoconf2:
-		error_tmp = nd6_prelist_add(new, dr, &newpr);
-		if (error_tmp == 0 && newpr != NULL && ia6 != NULL) {
-			newpr->ndpr_refcnt++;
-			ia6->ia6_ndpr = newpr;
-
-			pfxlist_onlink_check();
-		}
-		error = error_tmp ? error_tmp : error;
-
-#ifdef MIP6
 		if (mip6_eager_prefix_hook)
 			/* New prefix: if eager, try to move */
 			(*mip6_eager_prefix_hook)(new, dr);
@@ -1246,14 +1257,13 @@ prelist_update(new, dr, m)
 			 * If we are still looking for an autoconfigured home
 			 * address when we are in "minus a" case, here's a new
 			 * prefix and hopefully we can use the address derived
-			 *from that.
+			 * from that.
 			 */
 			if (ia6)
 				(*mip6_minus_a_case_hook)(new);
 		}
-#endif /* MIP6 */
-
 	}
+#endif /* MIP6 */
 
  end:
 	splx(s);
@@ -1449,6 +1459,7 @@ nd6_prefix_onlink(pr)
 	struct nd_prefix *opr;
 	u_long rtflags;
 	int error = 0;
+	struct rtentry *rt = NULL;
 
 	/* sanity check */
 	if ((pr->ndpr_stateflags & NDPRF_ONLINK) != 0) {
@@ -1526,9 +1537,12 @@ nd6_prefix_onlink(pr)
 	rtflags = ifa->ifa_flags | RTF_CLONING | RTF_UP;
 	error = rtrequest(RTM_ADD, (struct sockaddr *)&pr->ndpr_prefix,
 			  ifa->ifa_addr, (struct sockaddr *)&mask6,
-			  rtflags, NULL);
-	if (error == 0)
+			  rtflags, &rt);
+	if (error == 0) {
+		if (rt != NULL) /* this should be non NULL, though */
+			nd6_rtmsg(RTM_ADD, rt);
 		pr->ndpr_stateflags |= NDPRF_ONLINK;
+	}
 	else {
 		log(LOG_ERR, "nd6_prefix_onlink: failed to add route for a"
 		    " prefix (%s/%d) on %s, gw=%s, mask=%s, flags=%lx "
@@ -1538,6 +1552,9 @@ nd6_prefix_onlink(pr)
 		    ip6_sprintf(&((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr),
 		    ip6_sprintf(&mask6.sin6_addr), rtflags, error);
 	}
+
+	if (rt != NULL)
+		rt->rt_refcnt--;
 
 	return(error);
 }
@@ -1550,6 +1567,7 @@ nd6_prefix_offlink(pr)
 	struct ifnet *ifp = pr->ndpr_ifp;
 	struct nd_prefix *opr;
 	struct sockaddr_in6 sa6, mask6;
+	struct rtentry *rt = NULL;
 
 	/* sanity check */
 	if ((pr->ndpr_stateflags & NDPRF_ONLINK) == 0) {
@@ -1568,9 +1586,13 @@ nd6_prefix_offlink(pr)
 	mask6.sin6_len = sizeof(sa6);
 	bcopy(&pr->ndpr_mask, &mask6.sin6_addr, sizeof(struct in6_addr));
 	error = rtrequest(RTM_DELETE, (struct sockaddr *)&sa6, NULL,
-			  (struct sockaddr *)&mask6, 0, NULL);
+			  (struct sockaddr *)&mask6, 0, &rt);
 	if (error == 0) {
 		pr->ndpr_stateflags &= ~NDPRF_ONLINK;
+
+		/* report the route deletion to the routing socket. */
+		if (rt != NULL)
+			nd6_rtmsg(RTM_DELETE, rt);
 
 		/*
 		 * There might be the same prefix on another interface,
@@ -1620,22 +1642,28 @@ nd6_prefix_offlink(pr)
 		    error);
 	}
 
+	if (rt != NULL) {
+		if (rt->rt_refcnt <= 0) {
+			/* XXX: we should free the entry ourselves. */
+			rt->rt_refcnt++;
+			rtfree(rt);
+		}
+	}
+
 	return(error);
 }
 
 static struct in6_ifaddr *
-in6_ifadd(ifp, in6, addr, prefixlen, vltime, pltime)
-	struct ifnet *ifp;
-	struct in6_addr *in6;
-	struct in6_addr *addr;
-	int prefixlen;	/* prefix len of the new prefix in "in6" */
-	u_int32_t vltime, pltime;
+in6_ifadd(pr)
+	struct nd_prefix *pr;
 {
+	struct ifnet *ifp = pr->ndpr_ifp;
 	struct ifaddr *ifa;
 	struct in6_aliasreq ifra;
 	struct in6_ifaddr *ia, *ib;
 	int error, plen0;
 	struct in6_addr mask;
+	int prefixlen = pr->ndpr_plen;
 
 	in6_len2mask(&mask, prefixlen);
 
@@ -1693,7 +1721,7 @@ in6_ifadd(ifp, in6, addr, prefixlen, vltime, pltime)
 	ifra.ifra_addr.sin6_family = AF_INET6;
 	ifra.ifra_addr.sin6_len = sizeof(struct sockaddr_in6);
 	/* prefix */
-	bcopy(in6, &ifra.ifra_addr.sin6_addr,
+	bcopy(&pr->ndpr_prefix.sin6_addr, &ifra.ifra_addr.sin6_addr,
 	      sizeof(ifra.ifra_addr.sin6_addr));
 	ifra.ifra_addr.sin6_addr.s6_addr32[0] &= mask.s6_addr32[0];
 	ifra.ifra_addr.sin6_addr.s6_addr32[1] &= mask.s6_addr32[1];
@@ -1720,8 +1748,8 @@ in6_ifadd(ifp, in6, addr, prefixlen, vltime, pltime)
 	 * XXX: in6_init_address_ltimes would override these values later.
 	 * We should reconsider this logic. 
 	 */
-	ifra.ifra_lifetime.ia6t_vltime = vltime;
-	ifra.ifra_lifetime.ia6t_pltime = pltime;
+	ifra.ifra_lifetime.ia6t_vltime = pr->ndpr_vltime;
+	ifra.ifra_lifetime.ia6t_pltime = pr->ndpr_pltime;
 
 	/* XXX: scope zone ID? */
 
@@ -1733,8 +1761,12 @@ in6_ifadd(ifp, in6, addr, prefixlen, vltime, pltime)
 	 */
 	ifra.ifra_flags |= IN6_IFF_NOPFX;
 
-	/* keep the new address, regardless of the result of in6_update_ifa */
-	*addr = ifra.ifra_addr.sin6_addr;
+	/*
+	 * keep the new address, regardless of the result of in6_update_ifa.
+	 * XXX: this address is now meaningless.
+	 * We should reconsider its role.
+	 */
+	pr->ndpr_addr = ifra.ifra_addr.sin6_addr;
 
 	/* allocate ifaddr structure, link into chain, etc. */
 	if ((error = in6_update_ifa(ifp, &ifra, NULL)) != 0) {
@@ -1778,22 +1810,19 @@ in6_init_prefix_ltimes(struct nd_prefix *ndpr)
 
 static void
 in6_init_address_ltimes(struct nd_prefix *new,
-			struct in6_addrlifetime *lt6,
-			int update_vltime)
+			struct in6_addrlifetime *lt6)
 {
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
 
 	/* Valid lifetime must not be updated unless explicitly specified. */
-	if (update_vltime) {
-		/* init ia6t_expire */
-		if (lt6->ia6t_vltime == ND6_INFINITE_LIFETIME)
-			lt6->ia6t_expire = 0;
-		else {
-			lt6->ia6t_expire = time_second;
-			lt6->ia6t_expire += lt6->ia6t_vltime;
-		}
+	/* init ia6t_expire */
+	if (lt6->ia6t_vltime == ND6_INFINITE_LIFETIME)
+		lt6->ia6t_expire = 0;
+	else {
+		lt6->ia6t_expire = time_second;
+		lt6->ia6t_expire += lt6->ia6t_vltime;
 	}
 
 	/* init ia6t_preferred */
