@@ -1,4 +1,4 @@
-/*	$KAME: token.l,v 1.40 2003/05/28 08:32:07 itojun Exp $	*/
+/*	$KAME: token.l,v 1.41 2003/06/27 06:02:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -119,6 +119,7 @@ spdadd		{ return(SPDADD); }
 spddelete	{ return(SPDDELETE); }
 spddump		{ return(SPDDUMP); }
 spdflush	{ return(SPDFLUSH); }
+tagged		{ return(TAGGED); }
 {hyphen}P	{ BEGIN S_PL; return(F_POLICY); }
 <S_PL>[a-zA-Z0-9:\.\-_/ \n\t][a-zA-Z0-9:\.%\-_/ \n\t]* {
 			yymore();
