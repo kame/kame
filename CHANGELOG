@@ -1,8 +1,22 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1117 2000/07/10 07:31:56 jinmei Exp $
+$Id: CHANGELOG,v 1.1118 2000/07/10 12:44:26 jinmei Exp $
 
 <200006>
+2000-07-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c: some clarifications about neighbor
+	cache manipulation (this change does not affect behavior from the
+	user side, though):
+	- removed the ND6_LLINFO_WAITDELETE status. Actually, we can just
+	  call rtrequest(RTM_DELETE) for an unreachable
+	  neighbor. Reference to the neighbor cache entry from a cahced
+	  route will be freed at the next time the route is used.
+	- also, we do not have to call pfctlinput(PRC_HOSTDEAD) in
+	  nd6_free() for the same reason.
+	- do not set/refer the RTF_REJECT flag in neighbor cache
+	  manipulation. It was just for (IPv4) arp-flooding prevention,
+	  which is not necessary ND for IPv6.
+
 2000-07-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/route6d/route6d.c: removed "ifndef ADVAPI"
 	parts. Since the advanced API has already been standardized,
