@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: misc.c,v 1.13 2000/05/23 16:25:09 sakane Exp $ */
+/* YIPS @(#)$Id: misc.c,v 1.14 2000/05/23 16:26:04 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -111,27 +111,6 @@ bit2str(n, bl)
 	}
 
 	return b;
-}
-
-/*
- * copy the buffer into new allocated buffer.
- * NOTE: may be used by GET_NEWBUF();
- */
-void *
-get_newbuf(src, len)
-	void *src;
-	size_t len;
-{
-	caddr_t new;
-
-	if ((new = CALLOC(len, caddr_t)) == NULL) {
-		PLOG(logp, LOCATION, NULL,
-			"failed to get buffer.\n", 0);
-		return NULL;
-	}
-	memcpy(new, src, len);
-
-	return new;
 }
 
 const char *

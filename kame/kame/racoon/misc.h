@@ -26,10 +26,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: misc.h,v 1.5 2000/02/23 06:57:59 sakane Exp $ */
+/* YIPS @(#)$Id: misc.h,v 1.6 2000/05/23 16:26:05 sakane Exp $ */
 
-#define GET_NEWBUF(dst, t, src, len) \
-	((dst) = (t)get_newbuf((src), (len)))
 #define BIT2STR(b) bit2str(b, sizeof(b)<<3)
 #define PVDUMP(var) hexdump((var)->v, (var)->l)
 
