@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: ping6.8,v 1.1 1999/08/08 23:31:05 itojun Exp $
+.\"     $Id: ping6.8,v 1.2 1999/08/27 15:03:21 itojun Exp $
 .\"
 .Dd May 17, 1998
 .Dt PING6 8
@@ -184,10 +184,18 @@ packets other than
 that are received are listed.
 .It Fl w
 Generate ICMPv6 Node Information FQDN query, rather than echo-request.
+.Fl s
+has no effect if
+.Fl w
+is specified.
 .It Fl W
 Same as
-.Fl w.
+.Fl w .
 This option was remained for backward compatibility.
+.Fl s
+has no effect if
+.Fl w
+is specified.
 .El
 .Pp
 When using
