@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.418 2004/02/03 08:42:29 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.419 2004/02/04 02:51:03 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1512,8 +1512,7 @@ skip_ipsec2:;
 		if (exthdrs.ip6e_rthdr) {
 			nextproto = *mtod(exthdrs.ip6e_rthdr, u_char *);
 			*mtod(exthdrs.ip6e_rthdr, u_char *) = IPPROTO_FRAGMENT;
-		} else
-		if (exthdrs.ip6e_dest1) {
+		} else if (exthdrs.ip6e_dest1) {
 			nextproto = *mtod(exthdrs.ip6e_dest1, u_char *);
 			*mtod(exthdrs.ip6e_dest1, u_char *) = IPPROTO_FRAGMENT;
 		} else if (exthdrs.ip6e_hbh) {
