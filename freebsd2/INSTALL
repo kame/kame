@@ -1,6 +1,6 @@
 Installation procedure - FreeBSD 2.2.8
 KAME project
-$Id: INSTALL,v 1.5 1999/09/01 09:30:28 itojun Exp $
+$Id: INSTALL,v 1.6 1999/09/01 15:57:37 itojun Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -99,3 +99,16 @@ E-4. There are batch of documents installed into /usr/local/v6/man
      and /usr/local/v6/share/doc.  Please read them as necessary.
      If you wish to develop your own programs, we suggest you to read through
      supplied documents, RFCs, and other documents to learn how.
+
+F. PAO issues
+=============
+Many of FreeBSD228 users install PAO PCMCIA support code.  If you would like
+to use both PAO and KAME, you'll need to apply PAO patches onto KAME tree.
+However, there are tricky things:
+- KAME code is based on FreeBSD 2.2.8-RELEASE, and it has several ALTQ
+  related patch in driver code.
+- PAO code is based on FreeBSD 2.2.8-STABLE on some specific date,
+  and it has bunch of driver fixes.
+As both parties try to modify driver code, and they use different codebase
+as starting point, there can be conflicts during patch operation.
+You need to fix those patch conflicts manually.
