@@ -281,7 +281,7 @@ if_detach(ifp)
 #endif /* INET */
 #ifdef INET6
 		if (ifa->ifa_addr && ifa->ifa_addr->sa_family == AF_INET6) {
-			in6_purgeaddr(ifa, ifp);
+			in6_purgeaddr(ifa);
 			/* ifp_addrhead is already updated */
 			continue;
 		}
