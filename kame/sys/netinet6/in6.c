@@ -2111,6 +2111,22 @@ in6_sin_2_v4mapsin6(struct sockaddr_in *sin, struct sockaddr_in6 *sin6)
 	sin6->sin6_addr.s6_addr32[3] = sin->sin_addr.s_addr;
 }
 
+/* Convert sockaddr_in6 into sockaddr_in. */
+void
+in6_sin6_2_sin_in_sock(struct sockaddr *nam)
+{
+	struct sockaddr_in *sin_p;
+	struct sockaddr_in6 sin6;
+
+	/*
+	 * Save original sockaddr_in6 addr and convert it
+	 * to sockaddr_in.
+	 */
+	sin6 = *(struct sockaddr_in6 *)nam;
+	sin_p = (struct sockaddr_in *)nam;
+	in6_sin6_2_sin(sin_p, &sin6);
+}
+
 /* Convert sockaddr_in into sockaddr_in6 in v4 mapped addr format. */
 void
 in6_sin_2_v4mapsin6_in_sock(struct sockaddr **nam)

@@ -561,6 +561,7 @@ void	in6_sin6_2_sin __P((struct sockaddr_in *sin,
 			    struct sockaddr_in6 *sin6));
 void	in6_sin_2_v4mapsin6 __P((struct sockaddr_in *sin,
 				 struct sockaddr_in6 *sin6));
+void	in6_sin6_2_sin_in_sock __P((struct sockaddr *nam));
 void	in6_sin_2_v4mapsin6_in_sock __P((struct sockaddr **nam));
 #endif /* MAPPED_ADDR_ENABLED */
 

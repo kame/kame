@@ -175,15 +175,10 @@ struct ip6protosw inet6sw[] = {
 },
 { SOCK_DGRAM,	&inet6domain,	IPPROTO_UDP,	PR_ATOMIC | PR_ADDR,
   udp6_input,	0,		udp6_ctlinput,	ip6_ctloutput,
-#ifndef __FreeBSD__
- udp6_usrreq,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+ 0, 0,
 #else
- 0,
-#endif
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-  udp6_init,
-#else
-  0,
+ udp6_usrreq, udp6_init,
 #endif
   0,		0,		0,
 #ifndef __FreeBSD__
@@ -210,10 +205,10 @@ struct ip6protosw inet6sw[] = {
 #else
 { SOCK_STREAM,	&inet6domain,	IPPROTO_TCP,	PR_CONNREQUIRED | PR_WANTRCVD,
   tcp6_input,	0,		tcp6_ctlinput,	tcp_ctloutput,
-#ifndef __FreeBSD__
-  tcp_usrreq,
-#else
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
+#else
+  tcp_usrreq,
 #endif
 #ifdef INET	/* don't call timeout routines twice */
   tcp_init,	0,		0,		tcp_drain,
@@ -231,18 +226,29 @@ struct ip6protosw inet6sw[] = {
 #endif
 { SOCK_RAW,	&inet6domain,	IPPROTO_RAW,	PR_ATOMIC | PR_ADDR,
   rip6_input,	rip6_output,	0,		rip6_ctloutput,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  0,
+#else
   rip6_usrreq,
-  0,		0,		0,		0,		0
+#endif
+  0,		0,		0,		0,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  &rip6_usrreqs
+#endif
 },
 { SOCK_RAW,	&inet6domain,	IPPROTO_ICMPV6,	PR_ATOMIC | PR_ADDR,
   icmp6_input,	rip6_output,	0,		rip6_ctloutput,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  0,
+#else
   rip6_usrreq,
+#endif
   icmp6_init,	icmp6_fasttimo,	0,		0,
 #ifndef __FreeBSD__
   icmp6_sysctl,
 #else
 # if __FreeBSD__ >= 3
-  &nousrreqs,
+  &rip6_usrreqs
 # endif
 #endif
 },
@@ -317,14 +323,28 @@ struct ip6protosw inet6sw[] = {
 #endif /* GIF */
 { SOCK_RAW,     &inet6domain,	IPPROTO_PIM,	PR_ATOMIC|PR_ADDR,
   pim6_input,    rip6_output,	0,              rip6_ctloutput, 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  0,
+#else
   rip6_usrreq,
+#endif
   0,            0,              0,              0,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  &rip6_usrreqs
+# endif
 },
 /* raw wildcard */
 { SOCK_RAW,	&inet6domain,	0,		PR_ATOMIC | PR_ADDR,
   rip6_input,	rip6_output,	0,		rip6_ctloutput,
-  rip6_usrreq,
-  rip6_init,	0,		0,		0,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  0, 0,
+#else
+  rip6_usrreq, rip6_init,
+#endif
+  0,		0,		0,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  &rip6_usrreqs
+#endif
 },
 };
 
@@ -612,6 +632,6 @@ SYSCTL_INT(_net_inet6_tcp6, TCP6CTL_SYN_BUCKET_LIMIT,
 	syn_bucket_limit, CTLFLAG_RW,	&tcp6_syn_bucket_limit, 0, "");
 SYSCTL_INT(_net_inet6_tcp6, TCP6CTL_SYN_CACHE_INTER,
 	syn_cache_interval, CTLFLAG_RW, &tcp6_syn_cache_interval, 0, "");
-#endif
+#endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 3) */
 
 #endif /* __FreeBSD__ */
