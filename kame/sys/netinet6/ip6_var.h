@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.48 2000/12/01 07:42:16 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.49 2000/12/05 15:19:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -301,7 +301,7 @@ struct inpcb;
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 int	icmp6_ctloutput __P((struct socket *, struct sockopt *sopt));
-#elif defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#elif defined(__bsdi__) && _BSDI_VERSION >= 199802
 /* no icmp6_ctloutput */
 #else
 int	icmp6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));

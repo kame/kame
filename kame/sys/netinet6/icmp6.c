@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.167 2000/12/03 00:53:58 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.168 2000/12/05 15:19:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2809,11 +2809,16 @@ fail:
 		m_freem(m0);
 }
 
-#ifndef HAVE_NRL_INPCB
+#if !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#ifdef HAVE_NRL_INPCB
+#define sotoin6pcb	sotoinpcb
+#define in6pcb		inpcb
+#define in6p_icmp6filt	inp_icmp6filt
+#endif
 /*
  * ICMPv6 socket option processing.
  *
- * NOTE: for OSes that use NRL inpcb (bsdi4/openbsd), do not forget to modify
+ * NOTE: for OSes that use NRL inpcb (bsdi4), do not forget to modify
  * sys/netinet6/raw_ipv6.c:rip6_ctloutput().
  */
 int
@@ -2935,7 +2940,12 @@ icmp6_ctloutput(op, so, level, optname, mp)
 
 	return(error);
 }
-#endif /*NRL inpcb*/
+#ifdef HAVE_NRL_INPCB
+#undef sotoin6pcb
+#undef in6pcb
+#undef in6p_icmp6filt
+#endif
+#endif /*!bsdi4*/
 
 #if !defined(HAVE_RATECHECK) || !defined(HAVE_PPSRATECHECK)
 #ifndef timersub

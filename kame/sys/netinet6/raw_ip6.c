@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.48 2000/12/03 00:54:00 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.49 2000/12/05 15:19:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -90,11 +90,21 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet/icmp6.h>
+#ifdef __OpenBSD__
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
+#include <netinet/in_pcb.h>
+#else
 #include <netinet6/in6_pcb.h>
+#endif
 #include <netinet6/nd6.h>
 #include <netinet6/ip6protosw.h>
 #ifdef ENABLE_DEFAULT_SCOPE
 #include <netinet6/scope6_var.h>
+#endif
+
+#ifdef __OpenBSD__
+#undef IPSEC
 #endif
 
 #ifdef IPSEC
@@ -108,7 +118,13 @@
 #include <net/if_faith.h>
 #endif
 
+#include <net/net_osdep.h>
+
+#ifdef HAVE_NRL_INPCB
+struct	inpcbtable rawin6pcbtable;
+#else
 struct	in6pcb rawin6pcb;
+#endif
 #define ifatoia6(ifa)	((struct in6_ifaddr *)(ifa))
 
 /*
@@ -121,9 +137,32 @@ struct	in6pcb rawin6pcb;
 void
 rip6_init()
 {
+#ifdef HAVE_NRL_INPCB
+	in_pcbinit(&rawin6pcbtable, 1);
+#else
 	rawin6pcb.in6p_next = rawin6pcb.in6p_prev = &rawin6pcb;
+#endif
 }
 
+#ifdef HAVE_NRL_INPCB
+/* inpcb members */
+#define in6pcb		inpcb
+#define in6p_laddr	inp_laddr6
+#define in6p_faddr	inp_faddr6
+#define in6p_icmp6filt	inp_icmp6filt
+#define in6p_route	inp_route
+#define in6p_socket	inp_socket
+#define in6p_flags	inp_flags
+#define in6p_moptions	inp_moptions6
+#define in6p_outputopts	inp_outputopts6
+#define in6p_ip6	inp_ipv6
+#define in6p_flowinfo	inp_flowinfo
+/* macro names */
+#define sotoin6pcb	sotoinpcb
+/* function names */
+#define in6_pcbdetach	in_pcbdetach
+#define in6_rtchange	in_rtchange
+#endif
 /*
  * Setup generic address and protocol structures
  * for raw_input routine, then pass them along with
@@ -140,6 +179,9 @@ rip6_input(mp, offp, proto)
 	struct in6pcb *last = NULL;
 	struct sockaddr_in6 rip6src;
 	struct ip6_recvpktopts opts;
+#ifdef HAVE_NRL_INPCB
+	struct icmp6_hdr *icmp6 = NULL;
+#endif
 
 #if defined(NFAITH) && 0 < NFAITH
 	if (faithprefix(&ip6->ip6_dst)) {
@@ -157,6 +199,25 @@ rip6_input(mp, offp, proto)
 		return IPPROTO_DONE;
 	}
 
+#ifdef HAVE_NRL_INPCB
+	if (proto == IPPROTO_ICMPV6) {
+#ifndef PULLDOWN_TEST
+		IP6_EXTHDR_CHECK(m, *offp, sizeof(struct icmp6_hdr),
+		    IPPROTO_DONE);
+		/* m might change if M_LOOP.  So, call mtod again */
+		ip6 = mtod(m, struct ip6_hdr *);
+		icmp6 = (struct icmp6_hdr *)((caddr_t)ip6 + off);
+#else
+		IP6_EXTHDR_GET(icmp6, struct icmp6_hdr *, m, *offp,
+		    sizeof(*icmp6));
+		if (icmp6 == NULL) {
+			icmp6stat.icp6s_tooshort++;
+			return IPPROTO_DONE;
+		}
+#endif
+	}
+#endif
+
 	bzero(&opts, sizeof(opts));
 	bzero(&rip6src, sizeof(rip6src));
 	rip6src.sin6_len = sizeof(struct sockaddr_in6);
@@ -167,8 +228,19 @@ rip6_input(mp, offp, proto)
 	/* KAME hack: recover scopeid */
 	(void)in6_recoverscope(&rip6src, &ip6->ip6_src, m->m_pkthdr.rcvif);
 
+#ifdef HAVE_NRL_INPCB
+	for (in6p = rawin6pcbtable.inpt_queue.cqh_first;
+	     in6p != (struct inpcb *)&rawin6pcbtable.inpt_queue;
+	     in6p = in6p->inp_queue.cqe_next)
+#else
 	for (in6p = rawin6pcb.in6p_next;
-	     in6p != &rawin6pcb; in6p = in6p->in6p_next) {
+	     in6p != &rawin6pcb; in6p = in6p->in6p_next)
+#endif
+	{
+#ifdef HAVE_NRL_INPCB
+		if (!(in6p->in6p_flags & INP_IPV6))
+			continue;
+#endif
 		if (in6p->in6p_ip6.ip6_nxt &&
 		    in6p->in6p_ip6.ip6_nxt != proto)
 			continue;
@@ -184,6 +256,11 @@ rip6_input(mp, offp, proto)
 			/* XXX bark something */
 			continue;
 		}
+#ifdef HAVE_NRL_INPCB
+		if (icmp6 && in6p->in6p_icmp6filt &&
+		    ICMP6_FILTER_WILLBLOCK(icmp6->icmp6_type, in6p->in6p_icmp6filt))
+			continue;
+#endif
 		if (last) {
 			struct	mbuf *n;
 			if ((n = m_copy(m, 0, (int)M_COPYALL)) != NULL) {
@@ -275,8 +352,13 @@ rip6_ctlinput(cmd, sa, d)
 		sa6_src = &sa6_any;
 	}
 
+#ifdef HAVE_NRL_INPCB
+	(void) in6_pcbnotify(&rawin6pcbtable, sa, 0, (struct sockaddr *)sa6_src,
+	    0, cmd, cmdarg, notify);
+#else
 	(void) in6_pcbnotify(&rawin6pcb, sa, 0, (struct sockaddr *)sa6_src,
 	    0, cmd, cmdarg, notify);
+#endif
 }
 
 /*
@@ -533,7 +615,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 	if (req == PRU_CONTROL)
 		return (in6_control(so, (u_long)m, (caddr_t)nam,
 				    (struct ifnet *)control
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(HAVE_NRL_INPCB)
 				    , p
 #endif
 				    ));
@@ -559,8 +641,16 @@ rip6_usrreq(so, req, m, nam, control, p)
 #else
 		s = splnet();
 #endif
-		if ((error = soreserve(so, rip6_sendspace, rip6_recvspace)) ||
-		    (error = in6_pcballoc(so, &rawin6pcb))) {
+		if ((error = soreserve(so, rip6_sendspace, rip6_recvspace)) != 0) {
+			splx(s);
+			break;
+		}
+#ifdef HAVE_NRL_INPCB
+		if ((error = in_pcballoc(so, &rawin6pcbtable)) != 0)
+#else
+		if ((error = in6_pcballoc(so, &rawin6pcb)) != 0)
+#endif
+		{
 			splx(s);
 			break;
 		}
