@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.220 1999/10/27 00:03:59 itojun Exp $
+$Id: CHANGELOG,v 1.221 1999/10/27 01:15:05 itojun Exp $
 
 <199910>
+Wed Oct 27 10:14:07 JST 1999  itojun@iijlab.net
+	* freebsd2/ports/ucd-snmp: upgrade to 4.0.1 with IPv6 fixes.
+
 Wed Oct 27 03:27:13 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd[23]/sys/conf/newver.sh: RELEASE="${REVISION}-${BRANCH}"
 	instead of specified keywords, such as 2.2.8-RELEASE.
