@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.143 2004/02/13 02:52:11 keiichi Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.144 2004/02/16 03:59:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -213,11 +213,11 @@ nd6_ns_input(m, off, icmp6len)
 	 * Attaching target link-layer address to the NA?
 	 * (RFC 2461 7.2.4)
 	 *
-	 * NS IP dst is unicast/anycast			MUST NOT add
-	 * NS IP dst is solicited-node multicast	MUST add
+	 * NS IP dst is multicast			MUST add
+	 * Otherwise					MAY be omitted
 	 *
-	 * In implementation, we add target link-layer address by default.
-	 * We do not add one in MUST NOT cases.
+	 * In this implementation, we omit the target link-layer address
+	 * in the "MAY" case. 
 	 */
 #if 0 /* too much! */
 	ifa = (struct ifaddr *)in6ifa_ifpwithaddr(ifp, &daddr6);
