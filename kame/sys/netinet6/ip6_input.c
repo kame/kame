@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.200 2001/07/05 06:54:59 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.201 2001/07/23 05:10:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -469,10 +469,8 @@ ip6_input(m)
 	 * should the inner packet be considered authentic?
 	 * see comment in ah4_input().
 	 */
-	if (m) {
-		m->m_flags &= ~M_AUTHIPHDR;
-		m->m_flags &= ~M_AUTHIPDGM;
-	}
+	m->m_flags &= ~M_AUTHIPHDR;
+	m->m_flags &= ~M_AUTHIPDGM;
 #endif
 
 	/*
