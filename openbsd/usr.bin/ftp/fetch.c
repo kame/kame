@@ -1,4 +1,4 @@
-/*	$OpenBSD: fetch.c,v 1.24 1999/02/09 03:43:48 deraadt Exp $	*/
+/*	$OpenBSD: fetch.c,v 1.30 2000/05/03 19:50:41 deraadt Exp $	*/
 /*	$NetBSD: fetch.c,v 1.14 1997/08/18 10:20:20 lukem Exp $	*/
 
 /*-
@@ -38,7 +38,7 @@
  */
 
 #ifndef lint
-static char rcsid[] = "$OpenBSD: fetch.c,v 1.24 1999/02/09 03:43:48 deraadt Exp $";
+static char rcsid[] = "$OpenBSD: fetch.c,v 1.30 2000/05/03 19:50:41 deraadt Exp $";
 #endif /* not lint */
 
 /*
@@ -290,6 +290,16 @@ url_get(origline, proxyenv, outfile)
 	hints.ai_socktype = SOCK_STREAM;
 	port = portnum ? portnum : httpport;
 	error = getaddrinfo(host, port, &hints, &res0);
+	if (error == EAI_SERVICE && port == httpport) {
+		/*
+		 * If the services file is corrupt/missing, fall back
+		 * on our hard-coded defines.
+		 */
+		char pbuf[NI_MAXSERV];
+
+		snprintf(pbuf, sizeof(pbuf), "%d", HTTP_PORT);
+		error = getaddrinfo(host, pbuf, &hints, &res0);
+	}
 	if (error) {
 		warnx("%s: %s", gai_strerror(error), host);
 		goto cleanup_url_get;
@@ -836,10 +846,11 @@ int
 isurl(p)
 	const char *p;
 {
+
 	if (strncasecmp(p, FTP_URL, sizeof(FTP_URL) - 1) == 0 ||
 	    strncasecmp(p, HTTP_URL, sizeof(HTTP_URL) - 1) == 0 ||
-	    strncasecmp(p, FILE_URL, sizeof(FILE_URL) - 1) == 0) {
-		return 1;
-	}
-	return 0;
+	    strncasecmp(p, FILE_URL, sizeof(FILE_URL) - 1) == 0 ||
+	    strstr(p, ":/"))
+		return (1);
+	return (0);
 }
