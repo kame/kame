@@ -302,11 +302,11 @@ parse_url(url, desc, type, user, pass, host, port, path)
 	if (strncasecmp(url, HTTP_URL, sizeof(HTTP_URL) - 1) == 0) {
 		url += sizeof(HTTP_URL) - 1;
 		*type = HTTP_URL_T;
-		*port = strdup(httpport);
+		*port = strdup("80");	/*strdup(httpport);*/
 	} else if (strncasecmp(url, FTP_URL, sizeof(FTP_URL) - 1) == 0) {
 		url += sizeof(FTP_URL) - 1;
 		*type = FTP_URL_T;
-		*port = strdup(ftpport);
+		*port = strdup("21");	/*strdup(ftpport);*/
 	} else if (strncasecmp(url, FILE_URL, sizeof(FILE_URL) - 1) == 0) {
 		url += sizeof(FILE_URL) - 1;
 		*type = FILE_URL_T;
@@ -659,7 +659,6 @@ fetch_url(url, proxyenv, proxyauth, wwwauth)
 		}
 #else
 		memset(&hints, 0, sizeof(hints));
-		hints.ai_flags = AI_CANONNAME;
 		hints.ai_family = AF_UNSPEC;
 		hints.ai_socktype = SOCK_STREAM;
 		hints.ai_protocol = 0;
