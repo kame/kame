@@ -1,11 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1682 2001/05/21 14:12:37 jinmei Exp $
+$KAME: CHANGELOG,v 1.1683 2001/05/21 14:15:15 jinmei Exp $
 
 <200105>
 2001-05-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/udp6_output.c (udp6_output): if the
-	destination address is an IPv4-mapped IPv6 address, which is
+	destination address is an IPv4-mapped IPv6 address which is
 	supposed to be sent as an IPv4 packet, call in_selectsrc to
 	determine the source IPv4 address.  Also, some parameters to
 	caclulate the IPv4 checksum are corrected.
