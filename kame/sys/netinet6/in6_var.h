@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.98 2004/06/16 02:35:59 itojun Exp $	*/
+/*	$KAME: in6_var.h,v 1.99 2004/06/16 02:44:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -553,7 +553,9 @@ struct	in6_multi {
 #else
 	struct	ifmultiaddr *in6m_ifma;	/* back pointer to ifmultiaddr */
 #endif
-	u_int	in6m_refcount;		/* # membership claims by sockets */
+	u_int	in6m_refcount;		/* # membership claims by sockets
+					 * (meaningless for FreeBSD)
+					 */
 	u_int	in6m_state;		/* state of the membership */
 	u_int	in6m_timer;		/* MLD6 listener report timer */
 	struct	router6_info *in6m_rti;	/* router info */
