@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2148 2002/05/07 09:36:38 sakane Exp $
+$KAME: CHANGELOG,v 1.2149 2002/05/09 09:42:27 itojun Exp $
 
 <200205>
+Thu May  9 18:41:28 JST 2002  itojun@iijlab.net
+	* faithd: drop rsh/rlogin protocol support.
+
 Tue May  7 18:37:13 JST 2002 sakane@kame.net
 	* kame/racoon:
 	fixed the behavior when
