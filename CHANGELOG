@@ -1,12 +1,17 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.679 2000/03/10 14:06:16 itojun Exp $
+$Id: CHANGELOG,v 1.680 2000/03/11 15:26:25 itojun Exp $
 
 <200003>
+Sun Mar 12 00:25:06 JST 2000  itojun@iijlab.net
+	* sys/net/if_stf.c: now compiles on netbsd, freebsd2, bsdi3 and bsdi4.
+	  TODO: more tests
+
 Fri Mar 10 23:00:45 JST 2000  itojun@iijlab.net
-	* netbsd/sys/net/rtsock.c: fix problem in route_output, when
-	  rnh_lookup returned RNF_ROOT radix node.  This seems to be BSD
+	* {bsdi3,bsdi4,netbsd}/sys/net/rtsock.c: fix problem in route_output,
+	  when rnh_lookup returned RNF_ROOT radix node.  This seems to be BSD
 	  problem, not KAME problem.  we'll try to check other platforms soon.
+	  (freebsd3 have already fixed this in a different manner)
 	  KAME PR: 217
 
 Fri Mar 10 06:11:03 JST 2000  itojun@iijlab.net
