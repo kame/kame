@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.20 2000/06/08 23:52:47 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.21 2000/06/09 00:06:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -619,7 +619,7 @@ in6_pcbsetport(laddr, inp, p)
  * embedded scopeid thing.
  */
 int
-in6_embedscope(in6, sin6, in6p)
+in6_embedscope(in6, sin6, in6p, ifpp)
 	struct in6_addr *in6;
 	const struct sockaddr_in6 *sin6;
 #ifdef HAVE_NRL_INPCB
@@ -629,38 +629,48 @@ in6_embedscope(in6, sin6, in6p)
 #else
 	struct in6pcb *in6p;
 #endif
+	struct ifnet **ifpp;
 {
+	struct ifnet *ifp = NULL;
+
 	*in6 = sin6->sin6_addr;
+	if (ifpp)
+		*ifpp = NULL;
+
 	/*
 	 * don't try to read sin6->sin6_addr beyond here, since the caller may
 	 * ask us to overwrite existing sockaddr_in6
 	 */
 
 	if (IN6_IS_SCOPE_LINKLOCAL(in6)) {
+		struct in6_pktinfo *pi;
+
 		/*
 		 * KAME assumption: link id == interface id
 		 */
 
-		/* XXX boundary check is assumed to be already done. */
-		/* XXX sin6_scope_id is weaker than advanced-api. */
-		struct in6_pktinfo *pi;
-
 		if (in6p->in6p_outputopts &&
 		    (pi = in6p->in6p_outputopts->ip6po_pktinfo) &&
 		    pi->ipi6_ifindex) {
+			ifp = ifindex2ifnet[pi->ipi6_ifindex];
 			in6->s6_addr16[1] = htons(pi->ipi6_ifindex);
 		} else if (IN6_IS_ADDR_MULTICAST(in6)
 			&& in6p->in6p_moptions
 			&& in6p->in6p_moptions->im6o_multicast_ifp) {
-			in6->s6_addr16[1] =
-				htons(in6p->in6p_moptions->im6o_multicast_ifp->if_index);
+			ifp = in6p->in6p_moptions->im6o_multicast_ifp;
+			in6->s6_addr16[1] = htons(ifp->if_index);
 		} else if (sin6->sin6_scope_id) {
 			/* boundary check */
 			if (sin6->sin6_scope_id < 0 ||
 			    if_index < sin6->sin6_scope_id)
 				return ENXIO;  /* XXX EINVAL? */
+			ifp = ifindex2ifnet[sin6->sin6_scope_id];
+			/*XXX assignment to 16bit from 32bit variable */
 			in6->s6_addr16[1] = htons(sin6->sin6_scope_id & 0xffff);
 		}
+
+		if (ifpp)
+			*ifpp = ifp;
 	}
 
 	return 0;
@@ -674,13 +684,15 @@ in6_embedscope(in6, sin6, in6p)
  * embedded scopeid thing.
  */
 int
-in6_recoverscope(sin6, in6)
+in6_recoverscope(sin6, in6, ifp)
 	struct sockaddr_in6 *sin6;
 	const struct in6_addr *in6;
+	struct ifnet *ifp;
 {
 	u_int32_t scopeid;
 
 	sin6->sin6_addr = *in6;
+
 	/*
 	 * don't try to read *in6 beyond here, since the caller may
 	 * ask us to overwrite existing sockaddr_in6
@@ -695,6 +707,8 @@ in6_recoverscope(sin6, in6)
 		if (scopeid) {
 			/* sanity check */
 			if (scopeid < 0 || if_index < scopeid)
+				return ENXIO;
+			if (ifp && ifp->if_index != scopeid)
 				return ENXIO;
 			sin6->sin6_addr.s6_addr16[1] = 0;
 			sin6->sin6_scope_id = scopeid;
