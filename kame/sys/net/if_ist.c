@@ -1,4 +1,4 @@
-/*	$KAME: if_ist.c,v 1.2 2004/12/01 05:07:16 suz Exp $	*/
+/*	$KAME: if_ist.c,v 1.3 2004/12/09 10:38:38 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -133,6 +133,9 @@ static int nist;
 extern int ip_gif_ttl;	/*XXX*/
 #else
 static int ip_gif_ttl = 40;	/*XXX*/
+#endif
+#ifndef __OpenBSD__
+static int ist_rtcachettl = 10; /* XXX appropriate value? configurable? */
 #endif
 
 extern struct domain inetdomain;
@@ -657,27 +660,49 @@ struct rtentry *rt;
 		ip_ecn_ingress(ECN_NOCARE, &ip->ip_tos, &tos);
 
 	dst4 = (struct sockaddr_in *)&sc->sc_ro.ro_dst;
-	if (dst4->sin_family != AF_INET ||
-	    bcmp(&dst4->sin_addr, &ip->ip_dst, sizeof(ip->ip_dst)) != 0) {
-		/* cache route doesn't match */
+
+#ifdef __FreeBSD__
+	microtime(&mono_time);
+#endif
+	/*
+	 * Check if the cached route is still valid.  If not, create another
+	 * one. (see comments in netinet/in_gif.c:in_gif_output())
+	 */
+	if (sc->sc_ro.ro_rt && (!(sc->sc_ro.ro_rt->rt_flags & RTF_UP) ||
+	    dst4->sin_family != AF_INET ||
+	    bcmp(&dst4->sin_addr, &ip->ip_dst, sizeof(ip->ip_dst)) != 0 ||
+	    sc->rtcache_expire == 0 || mono_time.tv_sec >= sc->rtcache_expire)) {
+		/*
+		 * The cache route doesn't match, has been invalidated, or has
+		 * expired.
+		 */
+		RTFREE(sc->sc_ro.ro_rt);
+		sc->sc_ro.ro_rt = NULL;
+	}
+	if (sc->sc_ro.ro_rt == NULL) {
+		bzero(dst, sizeof(*dst));
 		dst4->sin_family = AF_INET;
 		dst4->sin_len = sizeof(struct sockaddr_in);
 		bcopy(&ip->ip_dst, &dst4->sin_addr, sizeof(dst4->sin_addr));
-		if (sc->sc_ro.ro_rt) {
-			RTFREE(sc->sc_ro.ro_rt);
-			sc->sc_ro.ro_rt = NULL;
-		}
-	}
 
-	if (sc->sc_ro.ro_rt == NULL) {
 		rtalloc(&sc->sc_ro);
 		if (sc->sc_ro.ro_rt == NULL) {
 			m_freem(m);
 			ifp->if_oerrors++;
 			return ENETUNREACH;
 		}
-	}
 
+		/* if it constitutes infinite encapsulation, punt. */
+		if (sc->sc_ro.ro_rt->rt_ifp == ifp) {
+			RTFREE(sc->sc_ro.ro_rt);
+			sc->sc_ro.ro_rt = NULL;
+			m_freem(m);
+			ifp->if_oerrors++;
+			return ENETUNREACH;	/* XXX */
+		}
+
+		sc->rtcache_expire = mono_time.tv_sec + ist_rtcachettl;
+	}
 	ifp->if_opackets++;
 	return ip_output(m, NULL, &sc->sc_ro, 0, NULL
 #ifdef __FreeBSD__

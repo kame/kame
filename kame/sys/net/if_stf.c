@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.117 2004/07/27 13:12:00 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.118 2004/12/09 10:38:38 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -172,6 +172,9 @@ static int nstf;
 extern int ip_gif_ttl;	/*XXX*/
 #else
 static int ip_gif_ttl = 40;	/*XXX*/
+#endif
+#ifndef __OpenBSD__
+static int stf_rtcachettl = 10; /* XXX appropriate value? configurable? */
 #endif
 
 extern struct domain inetdomain;
@@ -553,6 +556,9 @@ stf_output(ifp, m, dst, rt)
 	struct ip *ip;
 	struct ip6_hdr *ip6;
 	struct in6_ifaddr *ia6;
+#ifdef __FreeBSD__
+	struct timeval mono_time;
+#endif
 
 	sc = (struct stf_softc*)ifp;
 	dst6 = (struct sockaddr_in6 *)dst;
@@ -652,25 +658,48 @@ stf_output(ifp, m, dst, rt)
 		ip_ecn_ingress(ECN_NOCARE, &ip->ip_tos, &tos);
 
 	dst4 = (struct sockaddr_in *)&sc->sc_ro.ro_dst;
-	if (dst4->sin_family != AF_INET ||
-	    bcmp(&dst4->sin_addr, &ip->ip_dst, sizeof(ip->ip_dst)) != 0) {
-		/* cache route doesn't match */
-		dst4->sin_family = AF_INET;
-		dst4->sin_len = sizeof(struct sockaddr_in);
-		bcopy(&ip->ip_dst, &dst4->sin_addr, sizeof(dst4->sin_addr));
-		if (sc->sc_ro.ro_rt) {
-			RTFREE(sc->sc_ro.ro_rt);
-			sc->sc_ro.ro_rt = NULL;
-		}
+
+#ifdef __FreeBSD__
+	microtime(&mono_time);
+#endif
+	/*
+	 * Check if the cached route is still valid.  If not, create another
+	 * one. (see comments at in_gif_output() in netinet/in_gif.c)
+	 */
+	if (sc->sc_ro.ro_rt && (!(sc->sc_ro.ro_rt->rt_flags & RTF_UP) ||
+	    dst4->sin_family != AF_INET ||
+	    bcmp(&dst4->sin_addr, &ip->ip_dst, sizeof(ip->ip_dst)) != 0 ||
+	    sc->rtcache_expire == 0 || mono_time.tv_sec >= sc->rtcache_expire)) {
+		/*
+		 * The cache route doesn't match, has been invalidated, or has
+		 * expired.
+		 */
+		RTFREE(sc->sc_ro.ro_rt);
+		sc->sc_ro.ro_rt = NULL;
 	}
 
 	if (sc->sc_ro.ro_rt == NULL) {
+		bzero(dst4, sizeof(*dst4));
+		bcopy(&ip->ip_dst, &dst4->sin_addr, sizeof(dst4->sin_addr));
+		dst4->sin_family = AF_INET;
+		dst4->sin_len = sizeof(struct sockaddr_in);
 		rtalloc(&sc->sc_ro);
 		if (sc->sc_ro.ro_rt == NULL) {
 			m_freem(m);
 			ifp->if_oerrors++;
 			return ENETUNREACH;
 		}
+
+		/* if it constitutes infinite encapsulation, punt. */
+		if (sc->sc_ro.ro_rt->rt_ifp == ifp) {
+			RTFREE(sc->sc_ro.ro_rt);
+			sc->sc_ro.ro_rt = NULL;
+			m_freem(m);
+			ifp->if_oerrors++;
+			return ENETUNREACH;	/* XXX */
+		}
+
+		sc->rtcache_expire = mono_time.tv_sec + stf_rtcachettl;
 	}
 
 	ifp->if_opackets++;

@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2704 2004/12/09 07:33:06 t-momose Exp $
+$KAME: CHANGELOG,v 1.2705 2004/12/09 10:38:38 suz Exp $
 
 <200412>
+2004-12-09  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/sys/net/{if_stf.c, if_ist.c}: added a per-I/F timer to 
+	refresh a (possibly) stale cached route towards the tunnel end.
+	(same as the fix to in_gif.c at Oct 23 2001)
+
 2004-12-09  MOMOSE, Tsuyoshi  <momose@az.jp.nec.com>
 	* Mobile IPv6 codes are entirly changed. Most of codes are
 	moved to userland from kernel. And now it also supports NEMO
