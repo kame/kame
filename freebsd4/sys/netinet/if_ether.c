@@ -299,8 +299,12 @@ arp_rtdrain(rt, rtt)
 	struct sockaddr_dl *sdl;
 
 	if ((la = (struct llinfo_arp *)rt->rt_llinfo) == NULL) {
-		printf("arp_rtdrain: null llinfo (rt=%p)\n", rt);
-		return;		/* XXX */
+		/*
+		 * This case can happen when rt_fixdelete() invalidated the
+		 * route entry but there are still positive references to
+		 * this entry.
+		 */
+		return;
 	}
 
 	/* if the arp entry has been resolved, just keep it. */
