@@ -101,6 +101,9 @@
 #include <net/pfil.h>	/* for ipfilter */
 #include <net/if.h>
 #include <net/if_types.h>
+#ifdef ALTQ
+#include <net/if_llc.h>
+#endif
 #include <net/if_var.h>
 
 #include <netinet/in.h> /* for struct arpcom */
@@ -806,10 +809,12 @@ bdg_forward(struct mbuf *m0, struct ifnet *dst)
     struct ether_header *eh;
     struct ifnet *src;
     struct ifnet *ifp, *last;
+    int s;
     int shared = bdg_copy ; /* someone else is using the mbuf */
     int once = 0;      /* loop only once */
     struct ifnet *real_dst = dst ; /* real dst from ether_output */
     struct ip_fw_args args;
+    int error = 0;
 #ifdef PFIL_HOOKS
     struct packet_filter_hook *pfh;
     int rv;
@@ -1026,6 +1031,13 @@ forward:
     for (;;) {
 	if (last) { /* need to forward packet leftover from previous loop */
 	    struct mbuf *m ;
+	    short mflags;
+	    int len;
+#ifdef ALTQ
+	    struct altq_pktattr pktattr;
+	    int af;
+#endif
+
 	    if (shared == 0 && once ) { /* no need to copy */
 		m = m0 ;
 		m0 = NULL ; /* original is gone */
@@ -1037,11 +1049,36 @@ forward:
 		    return m0 ; /* the original is still there... */
 		}
 	    }
-	    if (!IF_HANDOFF(&last->if_snd, m, last)) {
+
+#ifdef ALTQ
+	    if (ALTQ_IS_ENABLED(&last->if_snd)) {
+		u_short     ether_type;
+
+		/*
+		 * if the queueing discipline needs packet classification,
+		 * do it before prepending link headers.
+		 */
+		ether_type = ntohs(eh->ether_type);
+		if (ether_type == ETHERTYPE_IP)
+			af = AF_INET;
+#ifdef INET6
+		else if (ether_type == ETHERTYPE_IPV6)
+			af = AF_INET6;
+#endif
+		else
+			af = AF_UNSPEC;
+		IFQ_CLASSIFY(&last->if_snd, m, af, &pktattr);
+	    }
+#else
+	    IFQ_HANDOFF(last, m, &pktattr, error);
+#endif /* ALTQ */
+	    if (error != 0) {
 #if 0
 		BDG_MUTE(last); /* should I also mute ? */
 #endif
 	    }
+	    splx(s);
+
 	    BDG_STAT(last, BDG_OUT);
 	    last = NULL ;
 	    if (once)
@@ -1054,7 +1091,10 @@ forward:
 	 * up and running, is not the source interface, and belongs to
 	 * the same cluster as the 'real_dst', then send here.
 	 */
-	if ( BDG_USED(ifp) && !BDG_MUTED(ifp) && !_IF_QFULL(&ifp->if_snd)  &&
+	if ( BDG_USED(ifp) && !BDG_MUTED(ifp) &&
+#ifndef ALTQ
+	     !IF_QFULL(&ifp->if_snd)  &&
+#endif
 	     (ifp->if_flags & (IFF_UP|IFF_RUNNING)) == (IFF_UP|IFF_RUNNING) &&
 	     ifp != src && BDG_SAMECLUSTER(ifp, real_dst) )
 	    last = ifp ;

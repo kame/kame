@@ -1,0 +1,4 @@
+conflict md5.c
+conflict md5.h
+conflict sha1.c
+conflict sha1.h

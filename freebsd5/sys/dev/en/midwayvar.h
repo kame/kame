@@ -83,6 +83,17 @@ struct midway_device {
 #define DV_IFNET 1
 
 #endif
+  
+#if 1 /* for ATM_PVCEXT */
+#include <sys/queue.h>
+
+/* round-robin scheduler */
+struct rrp {
+	struct rrp *next;
+	struct ifnet *ifp;
+	int	nref;
+};
+#endif
 
 /*
  * softc
@@ -137,6 +148,10 @@ struct en_softc {
   u_int8_t txspeed[MID_N_VC];	/* speed of tx on a VC */
   u_int8_t txvc2slot[MID_N_VC]; /* map VC to slot */
 
+#if 1 /* for ATM_PVCEXT */
+  struct rrp *txrrp;		/* round-robin pointer to ifnet */
+#endif
+
   /* recv vc ctrl. (per vc).   maps VC number to recv slot */
   u_int16_t rxvc2slot[MID_N_VC];
   int en_nrx;			/* # of active rx slots */
@@ -189,6 +204,10 @@ struct en_softc {
   u_int8_t bestburstmask;	/* bits to check if not multiple of burst */
   u_int8_t alburst;		/* align dma bursts? */
   u_int8_t is_adaptec;		/* adaptec version of midway? */
+
+#if 1 /* for ATM_PVCEXT */
+  LIST_HEAD(sif_list, pvcsif) sif_list;	/* pvc subinterface list */
+#endif
 };
 
 /*

@@ -217,7 +217,8 @@ sn_attach(device_t dev)
 	ifp->if_ioctl = snioctl;
 	ifp->if_watchdog = snwatchdog;
 	ifp->if_init = sninit;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
+	IFQ_SET_READY(&ifp->if_snd);
 	ifp->if_timer = 0;
 
 	ether_ifattach(ifp, sc->arpcom.ac_enaddr);
@@ -388,7 +389,7 @@ startagain:
 	/*
 	 * Sneak a peek at the next packet
 	 */
-	m = sc->arpcom.ac_if.if_snd.ifq_head;
+	IFQ_POLL(&sc->arpcom.ac_if.if_snd, m);
 	if (m == 0) {
 		splx(s);
 		return;
@@ -409,7 +410,7 @@ startagain:
 	if (len + pad > ETHER_MAX_LEN - ETHER_CRC_LEN) {
 		if_printf(ifp, "large packet discarded (A)\n");
 		++sc->arpcom.ac_if.if_oerrors;
-		IF_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
+		IFQ_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
 		m_freem(m);
 		goto readcheck;
 	}
@@ -504,7 +505,7 @@ startagain:
 	 * Get the packet from the kernel.  This will include the Ethernet
 	 * frame header, MAC Addresses etc.
 	 */
-	IF_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
+	IFQ_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
 
 	/*
 	 * Push out the data to the card.
@@ -606,7 +607,7 @@ snresume(struct ifnet *ifp)
 	/*
 	 * Sneak a peek at the next packet
 	 */
-	m = sc->arpcom.ac_if.if_snd.ifq_head;
+	IFQ_POLL(&sc->arpcom.ac_if.if_snd, m);
 	if (m == 0) {
 		if_printf(ifp, "snresume() with nothing to send\n");
 		return;
@@ -627,7 +628,7 @@ snresume(struct ifnet *ifp)
 	if (len + pad > ETHER_MAX_LEN - ETHER_CRC_LEN) {
 		if_printf(ifp, "large packet discarded (B)\n");
 		++sc->arpcom.ac_if.if_oerrors;
-		IF_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
+		IFQ_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
 		m_freem(m);
 		return;
 	}
@@ -703,7 +704,7 @@ snresume(struct ifnet *ifp)
 	 * Get the packet from the kernel.  This will include the Ethernet
 	 * frame header, MAC Addresses etc.
 	 */
-	IF_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
+	IFQ_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
 
 	/*
 	 * Push out the data to the card.

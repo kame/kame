@@ -126,6 +126,7 @@ fddi_output(ifp, m, dst, rt0)
 	struct rtentry *rt;
 	struct fddi_header *fh;
 	struct arpcom *ac = IFP2AC(ifp);
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 #ifdef MAC
 	error = mac_check_ifnet_transmit(ifp, m);
@@ -158,6 +159,13 @@ fddi_output(ifp, m, dst, rt0)
 			    time_second < rt->rt_rmx.rmx_expire)
 				senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
 	}
+
+	/*
+	 * If the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+
 	switch (dst->sa_family) {
 
 #ifdef INET

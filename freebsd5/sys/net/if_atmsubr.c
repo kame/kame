@@ -49,6 +49,7 @@
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
+#include <sys/malloc.h>
 #include <sys/errno.h>
 
 #include <net/if.h>
@@ -97,13 +98,13 @@ atm_output(ifp, m0, dst, rt0)
 	struct rtentry *rt0;
 {
 	u_int16_t etype = 0;			/* if using LLC/SNAP */
-	int error = 0, sz;
 	struct atm_pseudohdr atmdst, *ad;
 	struct mbuf *m = m0;
 	struct rtentry *rt;
 	struct atmllc *atmllc;
 	struct atmllc *llc_hdr = NULL;
 	u_int32_t atm_flags;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 #ifdef MAC
 	error = mac_check_ifnet_transmit(ifp, m);
@@ -113,6 +114,13 @@ atm_output(ifp, m0, dst, rt0)
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
+
+	/*
+	 * if the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m,
+		     (dst != NULL ? dst->sa_family : AF_UNSPEC), &pktattr);
 
 	/*
 	 * check route
@@ -147,12 +155,24 @@ atm_output(ifp, m0, dst, rt0)
 	if (dst) {
 		switch (dst->sa_family) {
 #if defined(INET) || defined(INET6)
+#ifdef INET
 		case AF_INET:
+#endif
+#ifdef INET6
 		case AF_INET6:
+#endif
 			if (dst->sa_family == AF_INET6)
 			        etype = htons(ETHERTYPE_IPV6);
 			else
 			        etype = htons(ETHERTYPE_IP);
+#ifdef ATM_PVCEXT
+			if (ifp->if_flags & IFF_POINTOPOINT) {
+				/* pvc subinterface */
+				struct pvcsif *pvcsif = (struct pvcsif *)ifp;
+				atmdst = pvcsif->sif_aph;
+				break;
+			}
+#endif
 			if (!atmresolve(rt, m, dst, &atmdst)) {
 				m = NULL; 
 				/* XXX: atmresolve already free'd it */
@@ -284,6 +304,33 @@ atm_input(ifp, ah, m, rxhand)
 			m_adj(m, sizeof(*alc));
 		}
 
+#ifdef ATM_PVCEXT
+		/* atm bridging support */
+		if ((ifp->if_flags & (IFF_POINTOPOINT|IFF_LINK2)) ==
+		    (IFF_POINTOPOINT|IFF_LINK2)) {
+			struct pvcsif *pvcsif = (struct pvcsif *)ifp;
+
+			if (pvcsif->sif_fwdifp != NULL) {
+				struct sockaddr dst;
+
+				/* set address family to dummy dst addr */
+				switch (etype) {
+				case ETHERTYPE_IP:
+					dst.sa_family = AF_INET;
+					break;
+				case ETHERTYPE_IPV6:
+					dst.sa_family = AF_INET6;
+					break;
+				default:
+					m_freem(m);
+					return;
+				}
+				atm_output(pvcsif->sif_fwdifp, m, &dst, NULL);
+				return;
+			}
+		}
+#endif /* ATM_PVCEXT */
+
 		switch (etype) {
 #ifdef INET
 		case ETHERTYPE_IP:
@@ -324,7 +371,7 @@ atm_ifattach(ifp)
 #if 0
 	ifp->if_input = atm_input;
 #endif
-	ifp->if_snd.ifq_maxlen = 50;	/* dummy */
+	IFQ_SET_MAXLEN(&ifp->if_snd, 50);	/* dummy */
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
@@ -345,3 +392,86 @@ atm_ifattach(ifp)
 		}
 
 }
+
+#ifdef ATM_PVCEXT
+
+static int pvc_max_number = 16;	/* max number of PVCs */
+static int pvc_number = 0;	/* pvc unit number */
+
+struct ifnet *
+pvcsif_alloc()
+{
+	struct pvcsif *pvcsif;
+
+	if (pvc_number >= pvc_max_number)
+		return (NULL);
+	MALLOC(pvcsif, struct pvcsif *, sizeof(struct pvcsif),
+	       M_DEVBUF, M_WAITOK);
+	if (pvcsif == NULL)
+		return (NULL);
+	bzero(pvcsif, sizeof(struct pvcsif));
+
+#ifdef __NetBSD__
+	sprintf(pvcsif->sif_if.if_xname, "pvc%d", pvc_number++);
+#else
+	pvcsif->sif_if.if_name = "pvc";
+	pvcsif->sif_if.if_unit = pvc_number++;
+#endif
+	return (&pvcsif->sif_if);
+}
+
+/*
+ * pvc bridging support:
+ * add or delete brigding between 2 pvc interfaces.
+ */
+int
+pvc_set_fwd(if_name, if_name2, op)
+	char *if_name, *if_name2;
+	int op;		/* 0:delete 1:add 2:get */
+{
+	struct ifnet *ifp, *ifp2;
+	struct pvcsif *pvcsif, *pvcsif2;
+
+	if (strncmp(if_name, "pvc", 3) != 0
+	    || (ifp = ifunit(if_name)) == NULL)
+		return (EINVAL);
+	pvcsif = (struct pvcsif *)ifp;
+
+	if (op == 2) {
+		/* get bridging info */
+		if ((ifp2 = pvcsif->sif_fwdifp) == NULL)
+			*if_name2 = '\0';
+		else
+#ifdef __NetBSD__
+			sprintf(if_name2, "%s", ifp2->if_xname);
+#else
+			sprintf(if_name2, "%s%d",
+				ifp2->if_name, ifp2->if_unit);
+#endif
+		return (0);
+	}
+
+	if (strncmp(if_name2, "pvc", 3) != 0
+	    || (ifp2 = ifunit(if_name2)) == NULL)
+		return (EINVAL);
+	pvcsif2 = (struct pvcsif *)ifp2;
+
+	if (op) {
+		/* set up bridging */
+		pvcsif->sif_fwdifp = ifp2;
+		pvcsif2->sif_fwdifp = ifp;
+		ifp->if_flags |= IFF_LINK2;	/* use IFF_LINK2 to show */
+		ifp2->if_flags |= IFF_LINK2;	/* bridging is enabled   */
+	}
+	else {
+		/* delete bridging */
+		if (pvcsif->sif_fwdifp != ifp2 || pvcsif2->sif_fwdifp != ifp)
+			return (EINVAL);
+		pvcsif->sif_fwdifp = NULL;
+		pvcsif2->sif_fwdifp = NULL;
+		ifp->if_flags &= ~IFF_LINK2;
+		ifp2->if_flags &= ~IFF_LINK2;
+	}
+	return (0);
+}
+#endif /* ATM_PVCEXT */

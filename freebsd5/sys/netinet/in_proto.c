@@ -38,7 +38,11 @@
 #include "opt_ipx.h"
 #include "opt_ipsec.h"
 #include "opt_inet6.h"
-
+#include "opt_natpt.h"
+#ifdef __FreeBSD__
+#include "opt_mpath.h"
+#endif
+#include "opt_sctp.h"
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/socket.h>
@@ -49,6 +53,9 @@
 
 #include <net/if.h>
 #include <net/route.h>
+#if defined(RADIX_MPATH)
+#include <net/radix_mpath.h>
+#endif
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -89,6 +96,19 @@
 #include <netns/ns_if.h>
 #endif
 
+#ifdef SCTP
+#include <netinet/in_pcb.h>
+#include <netinet/sctp_pcb.h>
+#include <netinet/sctp.h>
+#include <netinet/sctp_var.h>
+#endif /* SCTP */
+
+#ifdef NATPT
+void	natpt_init(void);
+int	natpt_ctloutput(int, struct socket *, int, int, struct mbuf **);
+struct pr_usrreqs natpt_usrreqs;
+#endif
+
 extern	struct domain inetdomain;
 static	struct pr_usrreqs nousrreqs;
 
@@ -112,6 +132,33 @@ struct protosw inetsw[] = {
   tcp_init,	0,		tcp_slowtimo,	tcp_drain,
   &tcp_usrreqs
 },
+#ifdef SCTP
+/*
+ * Order is very important here, we add the good one in
+ * in this postion so it maps to the right ip_protox[]
+ * postion for SCTP. Don't move the one above below
+ * this one or IPv6/4 compatability will break
+ */
+{ SOCK_DGRAM,	&inetdomain,	IPPROTO_SCTP,	PR_ADDR_OPT|PR_WANTRCVD,
+  sctp_input,	0,		sctp_ctlinput,	sctp_ctloutput,
+  0,
+  sctp_init,	0,		0,		sctp_drain,
+  &sctp_usrreqs
+},
+{ SOCK_SEQPACKET,&inetdomain,	IPPROTO_SCTP,	PR_ADDR_OPT|PR_WANTRCVD,
+  sctp_input,	0,		sctp_ctlinput,	sctp_ctloutput,
+  0,
+  0,		0,		0,		sctp_drain,
+  &sctp_usrreqs
+},
+
+{ SOCK_STREAM,	&inetdomain,	IPPROTO_SCTP,	PR_ADDR_OPT|PR_WANTRCVD,
+  sctp_input,	0,		sctp_ctlinput,	sctp_ctloutput,
+  0,
+  0,		0,		0,		sctp_drain,
+  &sctp_usrreqs
+},
+#endif /* SCTP */
 { SOCK_RAW,	&inetdomain,	IPPROTO_RAW,	PR_ATOMIC|PR_ADDR,
   rip_input,	0,		rip_ctlinput,	rip_ctloutput,
   0,
@@ -228,6 +275,14 @@ struct protosw inetsw[] = {
   &rip_usrreqs
 },
 #endif
+#ifdef NATPT
+{ SOCK_RAW,	&inetdomain,	IPPROTO_AHIP,	PR_ATOMIC|PR_ADDR,
+  0,		0,		0,		0,
+  0,
+  natpt_init,	0,		0,		0,
+ &natpt_usrreqs
+},
+#endif
 	/* raw wildcard */
 { SOCK_RAW,	&inetdomain,	0,		PR_ATOMIC|PR_ADDR,
   rip_input,	0,		0,		rip_ctloutput,
@@ -243,7 +298,12 @@ struct domain inetdomain =
     { AF_INET, "internet", 0, 0, 0, 
       inetsw,
       &inetsw[sizeof(inetsw)/sizeof(inetsw[0])], 0,
-      in_inithead, 32, sizeof(struct sockaddr_in)
+#if defined(RADIX_MPATH)
+      rn4_mpath_inithead,
+#else
+      in_inithead,
+#endif
+      32, sizeof(struct sockaddr_in)
     };
 
 DOMAIN_SET(inet);
@@ -255,6 +315,9 @@ SYSCTL_NODE(_net_inet, IPPROTO_IP,	ip,	CTLFLAG_RW, 0,	"IP");
 SYSCTL_NODE(_net_inet, IPPROTO_ICMP,	icmp,	CTLFLAG_RW, 0,	"ICMP");
 SYSCTL_NODE(_net_inet, IPPROTO_UDP,	udp,	CTLFLAG_RW, 0,	"UDP");
 SYSCTL_NODE(_net_inet, IPPROTO_TCP,	tcp,	CTLFLAG_RW, 0,	"TCP");
+#ifdef SCTP
+SYSCTL_NODE(_net_inet, IPPROTO_SCTP,	sctp,	CTLFLAG_RW, 0,	"SCTP");
+#endif /* SCTP */
 SYSCTL_NODE(_net_inet, IPPROTO_IGMP,	igmp,	CTLFLAG_RW, 0,	"IGMP");
 #ifdef FAST_IPSEC
 /* XXX no protocol # to use, pick something "reserved" */

@@ -376,7 +376,8 @@ txp_attach(dev)
 	ifp->if_watchdog = txp_watchdog;
 	ifp->if_init = txp_init;
 	ifp->if_baudrate = 100000000;
-	ifp->if_snd.ifq_maxlen = TX_ENTRIES;
+	IFQ_SET_MAXLEN(&ifp->if_snd, TX_ENTRIES);
+	IFQ_SET_READY(&ifp->if_snd);
 	ifp->if_hwassist = 0;
 	txp_capabilities(sc);
 
@@ -1308,7 +1309,7 @@ txp_start(ifp)
 	cnt = r->r_cnt;
 
 	while (1) {
-		IF_DEQUEUE(&ifp->if_snd, m);
+		IFQ_POLL(&ifp->if_snd, m);
 		if (m == NULL)
 			break;
 
@@ -1376,6 +1377,9 @@ txp_start(ifp)
 
 		}
 
+		/* now we are committed to transmit the packet */
+		IFQ_DEQUEUE(&ifp->if_snd, m);
+
 		ifp->if_timer = 5;
 
 		BPF_MTAP(ifp, m);
@@ -1390,7 +1394,6 @@ oactive:
 	ifp->if_flags |= IFF_OACTIVE;
 	r->r_prod = firstprod;
 	r->r_cnt = firstcnt;
-	IF_PREPEND(&ifp->if_snd, m);
 	return;
 }
 

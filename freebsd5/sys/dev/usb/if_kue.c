@@ -485,7 +485,8 @@ USB_ATTACH(kue)
 	ifp->if_watchdog = kue_watchdog;
 	ifp->if_init = kue_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	kue_qdat.ifp = ifp;
 	kue_qdat.if_rxstart = kue_rxstart;
@@ -1006,7 +1007,7 @@ kue_watchdog(struct ifnet *ifp)
 	usbd_get_xfer_status(c->kue_xfer, NULL, NULL, NULL, &stat);
 	kue_txeof(c->kue_xfer, c, stat);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		kue_start(ifp);
 	KUE_UNLOCK(sc);
 

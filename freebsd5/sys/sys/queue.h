@@ -480,6 +480,106 @@ struct {								\
 	QMD_TRACE_ELEM(&(elm)->field);					\
 } while (0)
 
+/*
+ * Circular queue declarations.
+ * not recommened according to Kunith Volume 1 Chapter 2, 
+ * but kept just for backward compatibility
+ */
+#define	CIRCLEQ_HEAD(name, type)					\
+struct name {								\
+	struct type *cqh_first;		/* first element */		\
+	struct type *cqh_last;		/* last element */		\
+}
+
+#define	CIRCLEQ_HEAD_INITIALIZER(head)					\
+	{ (void *)&(head), (void *)&(head) }
+
+#define	CIRCLEQ_ENTRY(type)						\
+struct {								\
+	struct type *cqe_next;		/* next element */		\
+	struct type *cqe_prev;		/* previous element */		\
+}
+
+/*
+ * Circular queue functions.
+ */
+#define	CIRCLEQ_EMPTY(head)	((head)->cqh_first == (void *)(head))
+
+#define	CIRCLEQ_FIRST(head)	((head)->cqh_first)
+
+#define	CIRCLEQ_FOREACH(var, head, field)				\
+	for ((var) = CIRCLEQ_FIRST((head));				\
+	    (var) != (void *)(head) || ((var) = NULL);			\
+	    (var) = CIRCLEQ_NEXT((var), field))
+
+#define	CIRCLEQ_FOREACH_REVERSE(var, head, field)			\
+	for ((var) = CIRCLEQ_LAST((head));				\
+	    (var) != (void *)(head) || ((var) = NULL);			\
+	    (var) = CIRCLEQ_PREV((var), field))
+
+#define	CIRCLEQ_INIT(head) do {						\
+	CIRCLEQ_FIRST((head)) = (void *)(head);				\
+	CIRCLEQ_LAST((head)) = (void *)(head);				\
+} while (0)
+
+#define	CIRCLEQ_INSERT_AFTER(head, listelm, elm, field) do {		\
+	CIRCLEQ_NEXT((elm), field) = CIRCLEQ_NEXT((listelm), field);	\
+	CIRCLEQ_PREV((elm), field) = (listelm);				\
+	if (CIRCLEQ_NEXT((listelm), field) == (void *)(head))		\
+		CIRCLEQ_LAST((head)) = (elm);				\
+	else								\
+		CIRCLEQ_PREV(CIRCLEQ_NEXT((listelm), field), field) = (elm);\
+	CIRCLEQ_NEXT((listelm), field) = (elm);				\
+} while (0)
+
+#define	CIRCLEQ_INSERT_BEFORE(head, listelm, elm, field) do {		\
+	CIRCLEQ_NEXT((elm), field) = (listelm);				\
+	CIRCLEQ_PREV((elm), field) = CIRCLEQ_PREV((listelm), field);	\
+	if (CIRCLEQ_PREV((listelm), field) == (void *)(head))		\
+		CIRCLEQ_FIRST((head)) = (elm);				\
+	else								\
+		CIRCLEQ_NEXT(CIRCLEQ_PREV((listelm), field), field) = (elm);\
+	CIRCLEQ_PREV((listelm), field) = (elm);				\
+} while (0)
+
+#define	CIRCLEQ_INSERT_HEAD(head, elm, field) do {			\
+	CIRCLEQ_NEXT((elm), field) = CIRCLEQ_FIRST((head));		\
+	CIRCLEQ_PREV((elm), field) = (void *)(head);			\
+	if (CIRCLEQ_LAST((head)) == (void *)(head))			\
+		CIRCLEQ_LAST((head)) = (elm);				\
+	else								\
+		CIRCLEQ_PREV(CIRCLEQ_FIRST((head)), field) = (elm);	\
+	CIRCLEQ_FIRST((head)) = (elm);					\
+} while (0)
+
+#define	CIRCLEQ_INSERT_TAIL(head, elm, field) do {			\
+	CIRCLEQ_NEXT((elm), field) = (void *)(head);			\
+	CIRCLEQ_PREV((elm), field) = CIRCLEQ_LAST((head));		\
+	if (CIRCLEQ_FIRST((head)) == (void *)(head))			\
+		CIRCLEQ_FIRST((head)) = (elm);				\
+	else								\
+		CIRCLEQ_NEXT(CIRCLEQ_LAST((head)), field) = (elm);	\
+	CIRCLEQ_LAST((head)) = (elm);					\
+} while (0)
+
+#define	CIRCLEQ_LAST(head)	((head)->cqh_last)
+
+#define	CIRCLEQ_NEXT(elm,field)	((elm)->field.cqe_next)
+
+#define	CIRCLEQ_PREV(elm,field)	((elm)->field.cqe_prev)
+
+#define	CIRCLEQ_REMOVE(head, elm, field) do {				\
+	if (CIRCLEQ_NEXT((elm), field) == (void *)(head))		\
+		CIRCLEQ_LAST((head)) = CIRCLEQ_PREV((elm), field);	\
+	else								\
+		CIRCLEQ_PREV(CIRCLEQ_NEXT((elm), field), field) =	\
+		    CIRCLEQ_PREV((elm), field);				\
+	if (CIRCLEQ_PREV((elm), field) == (void *)(head))		\
+		CIRCLEQ_FIRST((head)) = CIRCLEQ_NEXT((elm), field);	\
+	else								\
+		CIRCLEQ_NEXT(CIRCLEQ_PREV((elm), field), field) =	\
+		    CIRCLEQ_NEXT((elm), field);				\
+} while (0)
 
 #ifdef _KERNEL
 

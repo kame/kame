@@ -146,6 +146,9 @@ static void	ppp_ccp(struct ppp_softc *, struct mbuf *m, int rcvd);
 static void	ppp_ccp_closed(struct ppp_softc *);
 static void	ppp_inproc(struct ppp_softc *, struct mbuf *);
 static void	pppdumpm(struct mbuf *m0);
+#ifdef ALTQ
+tatic void	ppp_ifstart(struct ifnet *ifp);
+#endif
 static int	ppp_clone_create(struct if_clone *, int);
 static void	ppp_clone_destroy(struct ifnet *);
 
@@ -209,10 +212,14 @@ ppp_clone_create(struct if_clone *ifc, int unit)
 	sc->sc_if.if_hdrlen = PPP_HDRLEN;
 	sc->sc_if.if_ioctl = pppsioctl;
 	sc->sc_if.if_output = pppoutput;
-	sc->sc_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
+#ifdef ALTQ
+	sc->sc_if.if_start = ppp_ifstart;
+#endif
+	IFQ_SET_MAXLEN(&sc->sc_if.if_snd, IFQ_MAXLEN);
 	sc->sc_inq.ifq_maxlen = IFQ_MAXLEN;
 	sc->sc_fastq.ifq_maxlen = IFQ_MAXLEN;
 	sc->sc_rawq.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_READY(&sc->sc_if.if_snd);
 	mtx_init(&sc->sc_inq.ifq_mtx, "ppp_inq", NULL, MTX_DEF);
 	mtx_init(&sc->sc_fastq.ifq_mtx, "ppp_fastq", NULL, MTX_DEF);
 	mtx_init(&sc->sc_rawq.ifq_mtx, "ppp_rawq", NULL, MTX_DEF);
@@ -755,6 +762,7 @@ pppoutput(ifp, m0, dst, rtp)
     struct ifqueue *ifq;
     enum NPmode mode;
     int len;
+    ALTQ_DECL(struct altq_pktattr pktattr;)
 
 #ifdef MAC
     error = mac_check_ifnet_transmit(ifp, m0);
@@ -767,6 +775,8 @@ pppoutput(ifp, m0, dst, rtp)
 	error = ENETDOWN;	/* sort of */
 	goto bad;
     }
+
+    IFQ_CLASSIFY(&ifp->if_snd, m0, dst->sa_family, &pktattr);
 
     /*
      * Compute PPP header.

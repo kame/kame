@@ -34,6 +34,21 @@ kern/device_if.m		standard
 kern/bus_if.m			standard
 kern/clock_if.m			optional genclock
 kern/linker_if.m		standard
+altq/altq_afmap.c	optional altq
+altq/altq_blue.c	optional altq
+altq/altq_cbq.c		optional altq
+altq/altq_cdnr.c	optional altq
+altq/altq_conf.c	optional altq
+altq/altq_fifoq.c	optional altq
+altq/altq_hfsc.c	optional altq
+altq/altq_jobs.c	optional altq
+altq/altq_localq.c	optional altq
+altq/altq_priq.c	optional altq
+altq/altq_red.c		optional altq
+altq/altq_rio.c		optional altq
+altq/altq_rmclass.c	optional altq
+altq/altq_subr.c	optional altq
+altq/altq_wfq.c		optional altq
 cam/cam.c		optional scbus
 cam/cam_periph.c	optional scbus
 cam/cam_queue.c		optional scbus
@@ -199,6 +214,9 @@ crypto/rijndael/rijndael-alg-fst.c	optional ipsec ipsec_esp
 crypto/rijndael/rijndael-api-fst.c	optional ipsec ipsec_esp
 crypto/sha1.c		optional ipsec
 crypto/sha2/sha2.c	optional ipsec
+crypto/twofish/twofish2.c	optional ipsec_esp
+#crypto/rc5/rc5.c		optional ipsec ipsec_esp
+crypto/hmac.c		optional mip6
 ddb/db_access.c		optional ddb
 ddb/db_break.c		optional ddb
 ddb/db_command.c	optional ddb
@@ -1129,31 +1147,33 @@ libkern/strtoul.c	standard
 libkern/strtouq.c	standard
 libkern/strvalid.c	standard
 net/bpf.c		standard
-net/bpf_filter.c	optional bpf
+net/bpf_filter.c	count bpf
 net/bridge.c		optional bridge
 net/bsd_comp.c		optional ppp_bsdcomp
 net/if.c		standard
 net/if_arcsubr.c	optional arcnet
 net/if_atmsubr.c	optional atm
+net/if_dummy.c		count dummy
 net/if_disc.c		optional disc
 net/if_ef.c		optional ef
 net/if_ethersubr.c	optional ether
-net/if_faith.c		optional faith
+net/if_faith.c		count faith
 net/if_fddisubr.c	optional fddi
-net/if_gif.c		optional gif
+net/if_gif.c		count gif
 net/if_gre.c		optional gre
 net/if_iso88025subr.c	optional token
-net/if_loop.c		optional loop
+net/if_loop.c		count loop
 net/if_media.c		standard
 net/if_mib.c		standard
 net/if_ppp.c		optional ppp
 net/if_sl.c		optional sl
 net/if_spppsubr.c	optional sppp
 net/if_spppsubr.c	optional i4bisppp
-net/if_stf.c		optional stf
+net/if_stf.c		count stf
 net/if_tun.c		optional tun
 net/if_tap.c		optional tap
 net/if_vlan.c		optional vlan
+net/if_vrrp.c		count vrrp
 net/intrq.c		standard
 net/net_osdep.c		standard
 net/netisr.c		standard
@@ -1162,6 +1182,7 @@ net/ppp_tty.c		optional ppp
 net/pfil.c		optional pfil_hooks
 net/pfil.c		optional ipfilter
 net/radix.c		standard
+net/radix_mpath.c	optional radix_mpath
 net/raw_cb.c		standard
 net/raw_usrreq.c	standard
 net/route.c		standard
@@ -1306,6 +1327,8 @@ netinet/if_ether.c	optional ether
 netinet/igmp.c		optional inet
 netinet/in.c		optional inet
 netinet/in_gif.c	optional gif inet
+netinet/in_msf.c	optional igmpv3
+netinet/in_msf.c	optional mldv2
 netinet/ip_gre.c	optional gre inet
 netinet/ip_id.c		optional inet
 netinet/in_pcb.c	optional inet
@@ -1324,6 +1347,18 @@ netinet/ip_input.c	optional inet
 netinet/ip_mroute.c	optional mrouting
 netinet/ip_output.c	optional inet
 netinet/raw_ip.c	optional inet
+netinet/sctp_asconf.c	optional inet sctp
+netinet/sctp_crc32.c	optional inet sctp
+netinet/sctp_hashdriver.c	optional inet sctp
+netinet/sctp_indata.c	optional inet sctp
+netinet/sctp_input.c	optional inet sctp
+netinet/sctp_output.c	optional inet sctp
+netinet/sctp_pcb.c	optional inet sctp
+netinet/sctp_peeloff.c	optional inet sctp
+netinet/sctp_sha1.c	optional inet sctp
+netinet/sctp_timer.c	optional inet sctp
+netinet/sctp_usrreq.c	optional inet sctp
+netinet/sctputil.c	optional inet sctp
 netinet/tcp_debug.c	optional tcpdebug
 netinet/tcp_input.c	optional inet
 netinet/tcp_output.c	optional inet
@@ -1337,6 +1372,8 @@ netinet6/ah_input.c	optional ipsec
 netinet6/ah_output.c	optional ipsec
 netinet6/dest6.c	optional inet6
 netinet6/esp_core.c	optional ipsec ipsec_esp
+netinet6/esp_rijndael.c	optional ipsec ipsec_esp
+netinet6/esp_twofish.c	optional ipsec ipsec_esp
 netinet6/esp_input.c	optional ipsec ipsec_esp
 netinet6/esp_output.c	optional ipsec ipsec_esp
 netinet6/esp_rijndael.c	optional ipsec ipsec_esp
@@ -1346,8 +1383,8 @@ netinet6/in6.c		optional inet6
 netinet6/in6_cksum.c	optional inet6
 netinet6/in6_gif.c	optional gif inet6
 netinet6/in6_ifattach.c	optional inet6
+netinet6/in6_msf.c	optional inet6 mldv2
 netinet6/in6_pcb.c	optional inet6
-netinet6/in6_prefix.c	optional inet6
 netinet6/in6_proto.c	optional inet6
 netinet6/in6_rmx.c	optional inet6
 netinet6/in6_src.c	optional inet6
@@ -1356,19 +1393,38 @@ netinet6/ip6_fw.c	optional inet6 ipv6firewall
 netinet6/ip6_input.c	optional inet6
 netinet6/ip6_mroute.c	optional inet6
 netinet6/ip6_output.c	optional inet6
+netinet6/in6_pcb.c	optional inet6
+netinet6/in6_proto.c	optional inet6
+netinet6/in6_rmx.c	optional inet6
 netinet6/ipcomp_core.c	optional ipsec
 netinet6/ipcomp_input.c	optional ipsec
 netinet6/ipcomp_output.c	optional ipsec
 netinet6/ipsec.c	optional ipsec
 netinet6/mld6.c		optional inet6
+netinet6/natpt_dispatch.c	optional inet6 natpt
+netinet6/natpt_log.c	optional inet6 natpt
+netinet6/natpt_rule.c	optional inet6 natpt
+netinet6/natpt_trans.c	optional inet6 natpt
+netinet6/natpt_tslot.c	optional inet6 natpt
+netinet6/natpt_usrreq.c	optional inet6 natpt
 netinet6/nd6.c		optional inet6
 netinet6/nd6_nbr.c	optional inet6
 netinet6/nd6_rtr.c	optional inet6
 netinet6/raw_ip6.c	optional inet6
 netinet6/route6.c	optional inet6
 netinet6/scope6.c	optional inet6
+netinet6/sctp6_usrreq.c	optional inet6 sctp
 netinet6/udp6_output.c	optional inet6
 netinet6/udp6_usrreq.c	optional inet6
+netinet6/mobility6.c	optional inet6 mip6
+netinet6/mip6.c		optional mip6
+netinet6/mip6_subnet.c	optional mip6
+netinet6/mip6_prefix.c	optional mip6
+netinet6/mip6_ha.c	optional mip6
+netinet6/mip6_binding.c	optional mip6
+netinet6/mip6_icmp6.c	optional mip6
+netinet6/mip6_pktproc.c	optional mip6
+netinet6/mip6_fsm.c	optional mip6
 netipsec/ipsec.c	optional fast_ipsec
 netipsec/ipsec_input.c	optional fast_ipsec
 netipsec/ipsec_mbuf.c	optional fast_ipsec

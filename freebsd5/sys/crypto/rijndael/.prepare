@@ -1,0 +1,7 @@
+conflict boxes-fst.dat
+conflict rijndael-alg-fst.c
+conflict rijndael-alg-fst.h
+conflict rijndael-api-fst.c
+conflict rijndael-api-fst.h
+conflict rijndael.h
+conflict rijndael_local.h

@@ -1,5 +1,4 @@
-/*	$FreeBSD: src/sys/net/net_osdep.c,v 1.6 2002/04/19 04:46:21 suz Exp $	*/
-/*	$KAME: net_osdep.c,v 1.9 2001/04/06 09:22:05 itojun Exp $	*/
+/*	$KAME: net_osdep.c,v 1.12 2002/12/02 14:28:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -37,6 +36,9 @@
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/errno.h>
+#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#include <sys/ioctl.h>
+#endif
 #include <sys/time.h>
 #include <sys/syslog.h>
 #include <machine/cpu.h>
@@ -49,6 +51,7 @@
 
 #include <net/net_osdep.h>
 
+#if !(defined(__NetBSD__) || defined(__OpenBSD__))
 const char *
 if_name(ifp)
 	struct ifnet *ifp;
@@ -61,7 +64,87 @@ if_name(ifp)
 	ifbufround = (ifbufround + 1) % MAXNUMBUF;
 	cp = nam[ifbufround];
 
+#ifdef __bsdi__
+	sprintf(cp, "%s%d", ifp->if_name, ifp->if_unit);
+#else
 	snprintf(cp, IFNAMSIZ + 10, "%s%d", ifp->if_name, ifp->if_unit);
-	return((const char *)cp);
+#endif
+	return ((const char *)cp);
 #undef MAXNUMBUF
 }
+#endif
+
+#ifndef HAVE_PPSRATECHECK
+#ifndef timersub
+#define	timersub(tvp, uvp, vvp)						\
+	do {								\
+		(vvp)->tv_sec = (tvp)->tv_sec - (uvp)->tv_sec;		\
+		(vvp)->tv_usec = (tvp)->tv_usec - (uvp)->tv_usec;	\
+		if ((vvp)->tv_usec < 0) {				\
+			(vvp)->tv_sec--;				\
+			(vvp)->tv_usec += 1000000;			\
+		}							\
+	} while (/*CONSTCOND*/ 0)
+#endif
+
+/*
+ * ppsratecheck(): packets (or events) per second limitation.
+ */
+int
+ppsratecheck(lasttime, curpps, maxpps)
+	struct timeval *lasttime;
+	int *curpps;
+	int maxpps;	/* maximum pps allowed */
+{
+	struct timeval tv, delta;
+	int s, rv;
+
+	s = splclock();
+#ifndef __FreeBSD__
+	tv = mono_time;
+#else
+	microtime(&tv);
+#endif
+	splx(s);
+
+	timersub(&tv, lasttime, &delta);
+
+	/*
+	 * Check for 0,0 so that the message will be seen at least once.
+	 * If more than one second has passed since the last update of
+	 * lasttime, reset the counter.
+	 *
+	 * We do increment *curpps even in *curpps < maxpps case, as some may
+	 * try to use *curpps for stat purposes as well.
+	 */
+	if ((lasttime->tv_sec == 0 && lasttime->tv_usec == 0) ||
+	    delta.tv_sec >= 1) {
+		*lasttime = tv;
+		*curpps = 0;
+		rv = 1;
+	} else if (maxpps < 0)
+		rv = 1;
+	else if (*curpps < maxpps)
+		rv = 1;
+	else
+		rv = 0;
+
+#if 1 /* DIAGNOSTIC? */
+	/* be careful about wrap-around */
+	if (*curpps + 1 > *curpps)
+		*curpps = *curpps + 1;
+#else
+	/*
+	 * assume that there's not too many calls to this function.
+	 * not sure if the assumption holds, as it depends on *caller's*
+	 * behavior, not the behavior of this function.
+	 * IMHO it is wrong to make assumption on the caller's behavior,
+	 * so the above #if is #if 1, not #ifdef DIAGNOSTIC.
+	 */
+	*curpps = *curpps + 1;
+#endif
+
+	return (rv);
+}
+#endif
+

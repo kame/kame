@@ -251,7 +251,8 @@ vlan_clone_create(struct if_clone *ifc, int unit)
 	ifp->if_init = vlan_ifinit;
 	ifp->if_start = vlan_start;
 	ifp->if_ioctl = vlan_ioctl;
-	ifp->if_snd.ifq_maxlen = ifqmaxlen;
+	IFQ_SET_MAXLEN(&ifp->if_snd, ifqmaxlen);
+	IFQ_SET_READY(&ifp->if_snd);
 	ether_ifattach(ifp, ifv->ifv_ac.ac_enaddr);
 	/* Now undo some of the damage... */
 	ifp->if_baudrate = 0;
@@ -290,13 +291,16 @@ vlan_start(struct ifnet *ifp)
 	struct ifnet *p;
 	struct ether_vlan_header *evl;
 	struct mbuf *m;
+	int error, len;
+	short mflags;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	ifv = ifp->if_softc;
 	p = ifv->ifv_p;
 
 	ifp->if_flags |= IFF_OACTIVE;
 	for (;;) {
-		IF_DEQUEUE(&ifp->if_snd, m);
+		IFQ_DEQUEUE(&ifp->if_snd, m);
 		if (m == 0)
 			break;
 		BPF_MTAP(ifp, m);
@@ -312,6 +316,16 @@ vlan_start(struct ifnet *ifp)
 			continue;
 		}
 
+#ifdef ALTQ
+		/*
+		 * If ALTQ is enabled on the parent interface, do
+		 * classification; the queueing discipline might
+		 * not require classification, but might require
+		 * the address family/header pointer in the pktattr.
+		 */
+		if (ALTQ_IS_ENABLED(&p->if_snd))
+			altq_etherclassify(&p->if_snd, m, &pktattr);
+#endif
 		/*
 		 * If underlying interface can do VLAN tag insertion itself,
 		 * just pass the packet along. However, we need some way to

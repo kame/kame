@@ -78,9 +78,6 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#ifdef INET6
-#include <netinet6/ipsec6.h>
-#endif
 #endif /*IPSEC*/
 
 #ifdef FAST_IPSEC
@@ -166,8 +163,9 @@ static MALLOC_DEFINE(M_SYNCACHE, "syncache", "TCP syncache");
 
 #define SYNCACHE_HASH6(inc, mask) 					\
 	((tcp_syncache.hash_secret ^					\
-	  (inc)->inc6_faddr.s6_addr32[0] ^ 				\
-	  (inc)->inc6_faddr.s6_addr32[3] ^ 				\
+	  (inc)->inc6_fsa.sin6_addr.s6_addr32[0] ^			\
+	  (inc)->inc6_fsa.sin6_addr.s6_addr32[3] ^			\
+	  (inc)->inc6_fsa.sin6_scope_id ^ 				\
 	  (inc)->inc_fport ^ (inc)->inc_lport) & mask)
 
 #define ENDPTS_EQ(a, b) (						\
@@ -177,7 +175,11 @@ static MALLOC_DEFINE(M_SYNCACHE, "syncache", "TCP syncache");
 	(a)->ie_laddr.s_addr == (b)->ie_laddr.s_addr			\
 )
 
-#define ENDPTS6_EQ(a, b) (memcmp(a, b, sizeof(*a)) == 0)
+#define ENDPTS6_EQ(a, b) (						\
+	(a)->ie_fport == (b)->ie_fport &&				\
+	(a)->ie_lport == (b)->ie_lport &&				\
+	SA6_ARE_ADDR_EQUAL(&(a)->ie6_fsa, &(b)->ie6_fsa) &&		\
+	SA6_ARE_ADDR_EQUAL(&(a)->ie6_lsa, &(b)->ie6_lsa))
 
 #define SYNCACHE_TIMEOUT(sc, slot) do {				\
 	sc->sc_rxtslot = (slot);					\
@@ -580,7 +582,7 @@ syncache_socket(sc, lso, m)
 	inp->inp_inc.inc_isipv6 = sc->sc_inc.inc_isipv6;
 #ifdef INET6
 	if (sc->sc_inc.inc_isipv6) {
-		inp->in6p_laddr = sc->sc_inc.inc6_laddr;
+		sa6_copy_addr(&sc->sc_inc.inc6_lsa, &inp->in6p_lsa);
 	} else {
 		inp->inp_vflag &= ~INP_IPV6;
 		inp->inp_vflag |= INP_IPV4;
@@ -597,7 +599,7 @@ syncache_socket(sc, lso, m)
 		 */
 #ifdef INET6
 		if (sc->sc_inc.inc_isipv6)
-			inp->in6p_laddr = in6addr_any;
+			sa6_copy_addr(&sa6_any, &inp->in6p_lsa);
        		else
 #endif
 			inp->inp_laddr.s_addr = INADDR_ANY;
@@ -606,14 +608,13 @@ syncache_socket(sc, lso, m)
 	}
 #ifdef IPSEC
 	/* copy old policy into new socket's */
-	if (ipsec_copy_policy(sotoinpcb(lso)->inp_sp, inp->inp_sp))
+	if (ipsec_copy_pcbpolicy(sotoinpcb(lso)->inp_sp, inp->inp_sp))
 		printf("syncache_expand: could not copy policy\n");
 #endif
 #ifdef INET6
 	if (sc->sc_inc.inc_isipv6) {
 		struct inpcb *oinp = sotoinpcb(lso);
-		struct in6_addr laddr6;
-		struct sockaddr_in6 *sin6;
+		struct sockaddr_in6 *sin6, lsa6;
 		/*
 		 * Inherit socket options from the listening socket.
 		 * Note that in6p_inputopts are not (and should not be)
@@ -636,13 +637,13 @@ syncache_socket(sc, lso, m)
 			goto abort;
 		sin6->sin6_family = AF_INET6;
 		sin6->sin6_len = sizeof(*sin6);
-		sin6->sin6_addr = sc->sc_inc.inc6_faddr;
 		sin6->sin6_port = sc->sc_inc.inc_fport;
-		laddr6 = inp->in6p_laddr;
+		sa6_copy_addr(&sc->sc_inc.inc6_fsa, sin6);
+		lsa6 = inp->in6p_lsa;
 		if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr))
-			inp->in6p_laddr = sc->sc_inc.inc6_laddr;
+			sa6_copy_addr(&sc->sc_inc.inc6_lsa, &inp->in6p_lsa);
 		if (in6_pcbconnect(inp, (struct sockaddr *)sin6, &thread0)) {
-			inp->in6p_laddr = laddr6;
+			sa6_copy_addr(&lsa6, &inp->in6p_lsa);
 			FREE(sin6, M_SONAME);
 			goto abort;
 		}
@@ -715,6 +716,12 @@ syncache_socket(sc, lso, m)
 		tp->cc_send = sc->sc_cc_send;
 		tp->cc_recv = sc->sc_cc_recv;
 	}
+#ifdef TCP_ECN
+	if (sc->sc_flags & SCF_ECN) {
+		tp->t_flags |= TF_ECN_PERMIT;
+		tcpstat.tcps_ecn_accepts++;
+	}
+#endif
 
 	tcp_mss(tp, sc->sc_peer_mss);
 
@@ -920,8 +927,12 @@ syncache_add(inc, to, th, sop, m)
 #ifdef INET6
 	sc->sc_inc.inc_isipv6 = inc->inc_isipv6;
 	if (inc->inc_isipv6) {
-		sc->sc_inc.inc6_faddr = inc->inc6_faddr;
-		sc->sc_inc.inc6_laddr = inc->inc6_laddr;
+		sc->sc_inc.inc6_fsa.sin6_family =
+			sc->sc_inc.inc6_lsa.sin6_family = AF_INET6;
+		sc->sc_inc.inc6_fsa.sin6_len = sc->sc_inc.inc6_lsa.sin6_len
+			 = sizeof(struct sockaddr_in6);
+		sa6_copy_addr(&inc->inc6_fsa, &sc->sc_inc.inc6_fsa); 
+		sa6_copy_addr(&inc->inc6_lsa, &sc->sc_inc.inc6_lsa); 
 		sc->sc_route6.ro_rt = NULL;
 	} else
 #endif
@@ -976,6 +987,14 @@ syncache_add(inc, to, th, sop, m)
 			sc->sc_flags |= SCF_CC;
 		}
 	}
+#ifdef TCP_ECN
+	/*
+	 * if both ECE and CWR flag bits are set, peer is ECN capable.
+	 */
+	if (tcp_do_ecn &&
+	    (th->th_flags & (TH_ECE|TH_CWR)) == (TH_ECE|TH_CWR))
+		sc->sc_flags |= SCF_ECN;
+#endif
 	if (tp->t_flags & TF_NOOPT)
 		sc->sc_flags = SCF_NOOPT;
 
@@ -1115,8 +1134,8 @@ syncache_respond(sc, m)
 		ip6 = mtod(m, struct ip6_hdr *);
 		ip6->ip6_vfc = IPV6_VERSION;
 		ip6->ip6_nxt = IPPROTO_TCP;
-		ip6->ip6_src = sc->sc_inc.inc6_laddr;
-		ip6->ip6_dst = sc->sc_inc.inc6_faddr;
+		ip6->ip6_src = sc->sc_inc.inc6_lsa.sin6_addr;
+		ip6->ip6_dst = sc->sc_inc.inc6_fsa.sin6_addr;
 		ip6->ip6_plen = htons(tlen - hlen);
 		/* ip6_hlim is set after checksum */
 		/* ip6_flow = ??? */
@@ -1160,6 +1179,11 @@ syncache_respond(sc, m)
 	th->th_off = (sizeof(struct tcphdr) + optlen) >> 2;
 	th->th_x2 = 0;
 	th->th_flags = TH_SYN|TH_ACK;
+#ifdef TCP_ECN
+	/* if peer is ECN-capable, use ECN */
+	if (tcp_do_ecn && (sc->sc_flags & SCF_ECN))
+		th->th_flags |= TH_ECE;
+#endif
 	th->th_win = htons(sc->sc_wnd);
 	th->th_urp = 0;
 
@@ -1205,12 +1229,21 @@ no_options:
 
 #ifdef INET6
 	if (sc->sc_inc.inc_isipv6) {
+#if 1 /* def NEW_STRUCT_ROUTE */
+		struct route *ro6 = &sc->sc_route6;
+#else
 		struct route_in6 *ro6 = &sc->sc_route6;
+#endif
 
 		th->th_sum = 0;
 		th->th_sum = in6_cksum(m, IPPROTO_TCP, hlen, tlen - hlen);
 		ip6->ip6_hlim = in6_selecthlim(NULL,
 		    ro6->ro_rt ? ro6->ro_rt->rt_ifp : NULL);
+		if (!ip6_setpktaddrs(m, &sc->sc_inc.inc6_lsa,
+				     &sc->sc_inc.inc6_fsa)) {
+			m_freem(m);
+			return(ENOBUFS); /* XXX */
+		}
 		error = ip6_output(m, NULL, ro6, 0, NULL, NULL,
 				sc->sc_tp->t_inpcb);
 	} else
@@ -1294,8 +1327,10 @@ syncookie_generate(struct syncache *sc)
 	MD5Init(&syn_ctx);
 #ifdef INET6
 	if (sc->sc_inc.inc_isipv6) {
-		MD5Add(sc->sc_inc.inc6_laddr);
-		MD5Add(sc->sc_inc.inc6_faddr);
+		MD5Add(sc->sc_inc.inc6_lsa.sin6_addr);
+		MD5Add(sc->sc_inc.inc6_lsa.sin6_scope_id);
+		MD5Add(sc->sc_inc.inc6_fsa.sin6_addr);
+		MD5Add(sc->sc_inc.inc6_fsa.sin6_scope_id);
 	} else
 #endif
 	{
@@ -1330,8 +1365,10 @@ syncookie_lookup(inc, th, so)
 	MD5Init(&syn_ctx);
 #ifdef INET6
 	if (inc->inc_isipv6) {
-		MD5Add(inc->inc6_laddr);
-		MD5Add(inc->inc6_faddr);
+		MD5Add(inc->inc6_lsa.sin6_addr);
+		MD5Add(inc->inc6_lsa.sin6_scope_id);
+		MD5Add(inc->inc6_fsa.sin6_addr);
+		MD5Add(inc->inc6_fsa.sin6_scope_id);
 	} else
 #endif
 	{
@@ -1360,8 +1397,12 @@ syncookie_lookup(inc, th, so)
 #ifdef INET6
 	sc->sc_inc.inc_isipv6 = inc->inc_isipv6;
 	if (inc->inc_isipv6) {
-		sc->sc_inc.inc6_faddr = inc->inc6_faddr;
-		sc->sc_inc.inc6_laddr = inc->inc6_laddr;
+		sc->sc_inc.inc6_fsa.sin6_family =
+			sc->sc_inc.inc6_lsa.sin6_family = AF_INET6;
+		sc->sc_inc.inc6_fsa.sin6_len = sc->sc_inc.inc6_lsa.sin6_len =
+			sizeof(struct sockaddr_in6);
+		sa6_copy_addr(&inc->inc6_fsa, &sc->sc_inc.inc6_fsa);
+		sa6_copy_addr(&inc->inc6_lsa, &sc->sc_inc.inc6_lsa);
 		sc->sc_route6.ro_rt = NULL;
 	} else
 #endif

@@ -289,7 +289,8 @@ ep_attach(sc)
 	ifp->if_ioctl = ep_if_ioctl;
 	ifp->if_watchdog = ep_if_watchdog;
 	ifp->if_init = ep_if_init;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	if (!sc->epb.mii_trans) {
 		ifmedia_init(&sc->ifmedia, 0, ep_ifmedia_upd, ep_ifmedia_sts);
@@ -444,7 +445,7 @@ ep_if_start(ifp)
 
 startagain:
     /* Sneak a peek at the next packet */
-    m = ifp->if_snd.ifq_head;
+    IFQ_POLL(&ifp->if_snd, m);
     if (m == 0) {
 	return;
     }
@@ -461,7 +462,7 @@ startagain:
     if (len + pad > ETHER_MAX_LEN) {
 	/* packet is obviously too large: toss it */
 	++ifp->if_oerrors;
-	IF_DEQUEUE(&ifp->if_snd, m);
+	IFQ_DEQUEUE(&ifp->if_snd, m);
 	m_freem(m);
 	goto readcheck;
     }
@@ -477,7 +478,7 @@ startagain:
 	outw(BASE + EP_COMMAND, SET_TX_AVAIL_THRESH | EP_THRESH_DISABLE);
     }
 
-    IF_DEQUEUE(&ifp->if_snd, m);
+    IFQ_DEQUEUE(&ifp->if_snd, m);
 
     s = splhigh();
 
@@ -525,7 +526,7 @@ readcheck:
 	 * we check if we have packets left, in that case we prepare to come
 	 * back later
 	 */
-	if (ifp->if_snd.ifq_head) {
+	if (!IFQ_IS_EMPTY(&ifp->if_snd)) {
 	    outw(BASE + EP_COMMAND, SET_TX_AVAIL_THRESH | 8);
 	}
 	return;
@@ -626,7 +627,7 @@ rescan:
 		     * To have a tx_avail_int but giving the chance to the
 		     * Reception
 		     */
-		    if (ifp->if_snd.ifq_head) {
+		    if (!IFQ_IS_EMPTY(&ifp->if_snd)) {
 			outw(BASE + EP_COMMAND, SET_TX_AVAIL_THRESH | 8);
 		    }
 		}

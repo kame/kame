@@ -54,6 +54,7 @@
 #include <sys/sockio.h>
 #include <sys/syslog.h>
 #include <sys/sysctl.h>
+#include <sys/domain.h>
 #include <sys/jail.h>
 #include <machine/stdarg.h>
 
@@ -66,37 +67,36 @@
 #include <net/route.h>
 
 #if defined(INET) || defined(INET6)
-/*XXX*/
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #ifdef INET6
 #include <netinet6/in6_var.h>
 #include <netinet6/in6_ifattach.h>
+#include <netinet6/nd6.h>
 #endif
 #endif
 #ifdef INET
 #include <netinet/if_ether.h>
 #endif
 
+static void	if_attachdomain(void *);
+static void	if_attachdomain1(struct ifnet *);
 static int	ifconf(u_long, caddr_t);
 static void	if_grow(void);
 static void	if_init(void *);
 static void	if_check(void *);
 static int	if_findindex(struct ifnet *);
+#ifdef ALTQ
+static void	if_qflush(struct ifaltq *);
+#else
 static void	if_qflush(struct ifqueue *);
+#endif
 static void	if_slowtimo(void *);
 static void	link_rtrequest(int, struct rtentry *, struct rt_addrinfo *);
 static int	if_rtdel(struct radix_node *, void *);
 static struct	if_clone *if_clone_lookup(const char *, int *);
 static int	if_clone_list(struct if_clonereq *);
 static int	ifhwioctl(u_long, struct ifnet *, caddr_t, struct thread *);
-#ifdef INET6
-/*
- * XXX: declare here to avoid to include many inet6 related files..
- * should be more generalized?
- */
-extern void	nd6_setmtu(struct ifnet *);
-#endif
 
 int	if_index = 0;
 struct	ifindex_entry *ifindex_table = NULL;
@@ -385,7 +385,6 @@ if_attach(ifp)
 	 * this unlikely case.
 	 */
 	TAILQ_INIT(&ifp->if_addrhead);
-	TAILQ_INIT(&ifp->if_prefixhead);
 	TAILQ_INIT(&ifp->if_multiaddrs);
 	SLIST_INIT(&ifp->if_klist);
 	getmicrotime(&ifp->if_lastchange);
@@ -445,8 +444,53 @@ if_attach(ifp)
 	}
 	ifp->if_broadcastaddr = 0; /* reliably crash if used uninitialized */
 
+#ifdef ALTQ
+	ifp->if_snd.altq_type = 0;
+	ifp->if_snd.altq_disc = NULL;
+	ifp->if_snd.altq_flags &= ALTQF_CANTCHANGE;
+	ifp->if_snd.altq_tbr  = NULL;
+	ifp->if_snd.altq_ifp  = ifp;
+#endif
+
+	if (domains)
+		if_attachdomain1(ifp);
+
 	/* Announce the interface. */
 	rt_ifannouncemsg(ifp, IFAN_ARRIVAL);
+}
+
+static void
+if_attachdomain(dummy)
+	void *dummy;
+{
+	struct ifnet *ifp;
+	int s;
+
+	s = splnet();
+	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list))
+		if_attachdomain1(ifp);
+	splx(s);
+}
+SYSINIT(domainifattach, SI_SUB_PROTO_IFATTACHDOMAIN, SI_ORDER_FIRST, if_attachdomain, NULL);
+
+static void
+if_attachdomain1(ifp)
+	struct ifnet *ifp;
+{
+	struct domain *dp;
+	int s;
+
+	s = splnet();
+
+	/* address family dependent data region */
+	bzero(ifp->if_afdata, sizeof(ifp->if_afdata));
+	for (dp = domains; dp; dp = dp->dom_next) {
+		if (dp->dom_ifattach)
+			ifp->if_afdata[dp->dom_family] =
+			    (*dp->dom_ifattach)(ifp);
+	}
+
+	splx(s);
 }
 
 /*
@@ -461,12 +505,19 @@ if_detach(ifp)
 	struct radix_node_head	*rnh;
 	int s;
 	int i;
+	struct domain *dp;
 
 	/*
 	 * Remove routes and flush queues.
 	 */
 	s = splnet();
 	if_down(ifp);
+#ifdef ALTQ
+	if (ALTQ_IS_ENABLED(&ifp->if_snd))
+		altq_disable(&ifp->if_snd);
+	if (ALTQ_IS_ATTACHED(&ifp->if_snd))
+		altq_detach(&ifp->if_snd);
+#endif
 
 	/*
 	 * Remove address from ifindex_table[] and maybe decrement if_index.
@@ -530,6 +581,12 @@ if_detach(ifp)
 
 	/* Announce that the interface is gone. */
 	rt_ifannouncemsg(ifp, IFAN_DEPARTURE);
+
+	for (dp = domains; dp; dp = dp->dom_next) {
+		if (dp->dom_ifdetach && ifp->if_afdata[dp->dom_family])
+			(*dp->dom_ifdetach)(ifp,
+			    ifp->if_afdata[dp->dom_family]);
+	}
 
 #ifdef MAC
 	mac_destroy_ifnet(ifp);
@@ -1133,10 +1190,18 @@ if_up(ifp)
  */
 static void
 if_qflush(ifq)
+#ifdef ALTQ
+	struct ifaltq *ifq;
+#else
 	register struct ifqueue *ifq;
+#endif
 {
 	register struct mbuf *m, *n;
 
+#ifdef ALTQ
+	if (ALTQ_IS_ENABLED(ifq))
+		ALTQ_PURGE(ifq);
+#endif
 	n = ifq->ifq_head;
 	while ((m = n) != 0) {
 		n = m->m_act;
@@ -1396,6 +1461,9 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 	case SIOCSLIFPHYADDR:
         case SIOCSIFMEDIA:
 	case SIOCSIFGENERIC:
+#ifdef SIOCDIFGENERIC
+	case SIOCDIFGENERIC:
+#endif
 		error = suser(td);
 		if (error)
 			return (error);
@@ -1923,6 +1991,7 @@ if_setlladdr(struct ifnet *ifp, const u_char *lladdr, int len)
 	case IFT_FDDI:
 	case IFT_XETHER:
 	case IFT_ISO88025:
+	case IFT_VRRP:
 	case IFT_L2VLAN:
 		bcopy(lladdr, ((struct arpcom *)ifp->if_softc)->ac_enaddr, len);
 		bcopy(lladdr, LLADDR(sdl), len);

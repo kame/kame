@@ -1054,7 +1054,8 @@ wihap_data_input(struct wi_softc *sc, struct wi_frame *rxfrm, struct mbuf *m)
 	struct ifnet		*ifp = &sc->arpcom.ac_if;
 	struct wihap_info	*whi = &sc->wi_hostap_info;
 	struct wihap_sta_info	*sta;
-	int			mcast, s;
+	int			mcast, s, error;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	/* TODS flag must be set. */
 	if (!(rxfrm->wi_frame_ctl & htole16(WI_FCTL_TODS))) {
@@ -1113,7 +1114,7 @@ wihap_data_input(struct wi_softc *sc, struct wi_frame *rxfrm, struct mbuf *m)
 
 		/* Queue up for repeating.
 		 */
-		IF_HANDOFF(&ifp->if_snd, m, ifp);
+		IFQ_HANDOFF(ifp, m, &pktattr, error);
 		return (!mcast);
 	}
 

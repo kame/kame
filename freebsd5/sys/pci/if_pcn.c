@@ -647,7 +647,8 @@ pcn_attach(dev)
 	ifp->if_watchdog = pcn_watchdog;
 	ifp->if_init = pcn_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = PCN_TX_LIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, PCN_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Do MII setup.
@@ -949,7 +950,7 @@ pcn_tick(xsc)
 	if (!sc->pcn_link && mii->mii_media_status & IFM_ACTIVE &&
 	    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE) {
 		sc->pcn_link++;
-		if (ifp->if_snd.ifq_head != NULL)
+		if (!IFQ_IS_EMPTY(&ifp->if_snd))
 			pcn_start(ifp);
 	}
 
@@ -994,7 +995,7 @@ pcn_intr(arg)
 		}
 	}
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		pcn_start(ifp);
 
 	return;
@@ -1085,15 +1086,16 @@ pcn_start(ifp)
 	}
 
 	while(sc->pcn_cdata.pcn_tx_chain[idx] == NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_POLL(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
 		if (pcn_encap(sc, m_head, &idx)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
+
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -1102,6 +1104,8 @@ pcn_start(ifp)
 		BPF_MTAP(ifp, m_head);
 
 	}
+	if (idx == sc->pcn_cdata.pcn_tx_prod)
+		return;
 
 	/* Transmit */
 	sc->pcn_cdata.pcn_tx_prod = idx;
@@ -1377,7 +1381,7 @@ pcn_watchdog(ifp)
 	pcn_reset(sc);
 	pcn_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		pcn_start(ifp);
 
 	PCN_UNLOCK(sc);

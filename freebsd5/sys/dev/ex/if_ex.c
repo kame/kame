@@ -241,7 +241,8 @@ ex_attach(device_t dev)
 	ifp->if_ioctl = ex_ioctl;
 	ifp->if_watchdog = ex_watchdog;
 	ifp->if_init = ex_init;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	ifmedia_init(&sc->ifmedia, 0, ex_ifmedia_upd, ex_ifmedia_sts);
 
@@ -381,8 +382,10 @@ ex_start(struct ifnet *ifp)
 	 * Main loop: send outgoing packets to network card until there are no
 	 * more packets left, or the card cannot accept any more yet.
 	 */
-	while (((opkt = ifp->if_snd.ifq_head) != NULL) &&
-	       !(ifp->if_flags & IFF_OACTIVE)) {
+	while (!(ifp->if_flags & IFF_OACTIVE)) {
+		IFQ_POLL(&ifp->if_snd, opkt);
+		if (opkt == NULL)
+			break;
 
 		/*
 		 * Ensure there is enough free transmit buffer space for
@@ -415,7 +418,7 @@ ex_start(struct ifnet *ifp)
 		DODEBUG(Sent_Pkts, printf("i=%d, avail=%d\n", i, avail););
 
 		if (avail >= len + XMT_HEADER_LEN) {
-			IF_DEQUEUE(&ifp->if_snd, opkt);
+			IFQ_DEQUEUE(&ifp->if_snd, opkt);
 
 #ifdef EX_PSA_INTR      
 			/*
@@ -603,7 +606,7 @@ ex_intr(void *arg)
 	 * be sent, attempt to send more packets to the network card.
 	 */
 
-	if (send_pkts && (ifp->if_snd.ifq_head != NULL)) {
+	if (send_pkts && !IFQ_IS_EMPTY(&ifp->if_snd)) {
 		ex_start(ifp);
 	}
 

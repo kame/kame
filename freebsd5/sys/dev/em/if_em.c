@@ -469,9 +469,9 @@ em_start(struct ifnet *ifp)
 		return;
 
 	s = splimp();      
-	while (ifp->if_snd.ifq_head != NULL) {
+	while (!IFQ_IS_EMPTY(&ifp->if_snd)) {
 		
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_POLL(&ifp->if_snd, m_head);
 
 		if (m_head == NULL) break;
 
@@ -782,7 +782,7 @@ em_intr(void *arg)
 
 	em_enable_intr(adapter);
 
-	if (ifp->if_flags & IFF_RUNNING && ifp->if_snd.ifq_head != NULL)
+	if (ifp->if_flags & IFF_RUNNING && !IFQ_IS_EMPTY(&ifp->if_snd))
 		em_start(ifp);
 
 	return;
@@ -1424,7 +1424,8 @@ em_setup_interface(device_t dev, struct adapter * adapter)
 	ifp->if_ioctl = em_ioctl;
 	ifp->if_start = em_start;
 	ifp->if_watchdog = em_watchdog;
-	ifp->if_snd.ifq_maxlen = adapter->num_tx_desc - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, adapter->num_tx_desc - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 	ether_ifattach(ifp, adapter->interface_data.ac_enaddr);
 
 	if (adapter->hw.mac_type >= em_82543) {

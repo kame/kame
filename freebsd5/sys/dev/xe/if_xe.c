@@ -241,7 +241,8 @@ xe_attach (device_t dev)
     scp->ifp->if_ioctl = xe_ioctl;
     scp->ifp->if_watchdog = xe_watchdog;
     scp->ifp->if_init = xe_init;
-    scp->ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+    IFQ_SET_MAXLEN(&scp->ifp->if_snd, IFQ_MAXLEN);
+    IFQ_SET_READY(&scp->ifp->if_snd);
   }
 
   /* Initialise the ifmedia structure */
@@ -395,7 +396,7 @@ xe_start(struct ifnet *ifp) {
    * Loop while there are packets to be sent, and space to send them.
    */
   while (1) {
-    IF_DEQUEUE(&ifp->if_snd, mbp);	/* Suck a packet off the send queue */
+    IFQ_POLL(&ifp->if_snd, mbp);
 
     if (mbp == NULL) {
       /*
@@ -410,10 +411,11 @@ xe_start(struct ifnet *ifp) {
     }
 
     if (xe_pio_write_packet(scp, mbp) != 0) {
-      IF_PREPEND(&ifp->if_snd, mbp);	/* Push the packet back onto the queue */
       ifp->if_flags |= IFF_OACTIVE;
       return;
     }
+
+    IFQ_DEQUEUE(&ifp->if_snd, mbp);
 
     /* Tap off here if there is a bpf listener */
     BPF_MTAP(ifp, mbp);

@@ -110,6 +110,7 @@ int	(*ng_ether_output_p)(struct ifnet *ifp, struct mbuf **mp);
 void	(*ng_ether_attach_p)(struct ifnet *ifp);
 void	(*ng_ether_detach_p)(struct ifnet *ifp);
 
+void	(*vrrp_input_p)(struct ether_header *, struct mbuf *);
 void	(*vlan_input_p)(struct ifnet *, struct mbuf *);
 
 /* bridge support */
@@ -603,6 +604,10 @@ ether_input(struct ifnet *ifp, struct mbuf *m)
 			return;
 	}
 
+	if (vrrp_input_p != NULL) {
+		(*vrrp_input_p)(eh, m);
+	}
+
 	/* Check for bridging mode */
 	if (BDG_ACTIVE(ifp) ) {
 		struct ifnet *bif;
@@ -671,7 +676,10 @@ ether_demux(struct ifnet *ifp, struct mbuf *m)
 #if defined(NETATALK)
 	register struct llc *l;
 #endif
+	int len;
 	struct ip_fw *rule = NULL;
+	short mflags;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	/* Extract info from dummynet tag, ignore others */
 	for (;m->m_type == MT_TAG; m = m->m_next)
@@ -710,6 +718,36 @@ ether_demux(struct ifnet *ifp, struct mbuf *m)
 		return;
 	}
 	if (eh->ether_dhost[0] & 1) {
+		/*
+		 * If this is not a simplex interface, drop the packet
+		 * if it came from us.
+		 */
+		if ((ifp->if_flags & IFF_SIMPLEX) == 0) {
+			struct ifaddr *ifa;
+			struct sockaddr_dl *sdl = NULL;
+
+			/* find link-layer address */
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+			TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
+#elif defined(__NetBSD__) || defined(__OpenBSD__)
+			for (ifa = ifp->if_addrlist.tqh_first;
+			     ifa;
+			     ifa = ifa->ifa_list.tqe_next)
+#else
+			for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
+#endif
+				if ((sdl = (struct sockaddr_dl *)ifa->ifa_addr) &&
+				    sdl->sdl_family == AF_LINK)
+					break;
+
+			if (ifp->if_type != IFT_VRRP) {
+				if (sdl && bcmp(LLADDR(sdl), eh->ether_shost,
+				    ETHER_ADDR_LEN) == 0) {
+					m_freem(m);
+					return;
+				}
+			}
+		}
 		if (bcmp((caddr_t)etherbroadcastaddr, (caddr_t)eh->ether_dhost,
 			 sizeof(etherbroadcastaddr)) == 0)
 			m->m_flags |= M_BCAST;
@@ -720,6 +758,12 @@ ether_demux(struct ifnet *ifp, struct mbuf *m)
 		ifp->if_imcasts++;
 
 post_stats:
+#ifdef ALTQ
+	if (ALTQ_IS_ENABLED(&ifp->if_snd))
+		altq_etherclassify(&ifp->if_snd, m, &pktattr);
+#endif
+	mflags = m->m_flags;
+	len = m->m_pkthdr.len;
 	if (IPFW_LOADED && ether_ipfw != 0) {
 		if (ether_ipfw_chk(&m, NULL, &rule, 0) == 0) {
 			if (m)
@@ -1160,3 +1204,79 @@ ether_resolvemulti(ifp, llsa, sa)
 		return EAFNOSUPPORT;
 	}
 }
+
+#ifdef ALTQ
+/*
+ * find the size of ethernet header, and call classifier
+ */
+void
+altq_etherclassify(ifq, m, pktattr)
+	struct ifaltq *ifq;
+	struct mbuf *m;
+	struct altq_pktattr *pktattr;
+{
+	struct ether_header *eh;
+	u_short	ether_type;
+	int	hlen, af, hdrsize;
+	caddr_t hdr;
+
+	hlen = sizeof(struct ether_header);
+	eh = mtod(m, struct ether_header *);
+
+	ether_type = ntohs(eh->ether_type);
+	if (ether_type < ETHERMTU) {
+		/* ick! LLC/SNAP */
+		struct llc *llc = (struct llc *)(eh + 1);
+		hlen += 8;
+
+		if (m->m_len < hlen ||
+		    llc->llc_dsap != LLC_SNAP_LSAP ||
+		    llc->llc_ssap != LLC_SNAP_LSAP ||
+		    llc->llc_control != LLC_UI)
+			goto bad;  /* not snap! */
+
+		ether_type = ntohs(llc->llc_un.type_snap.ether_type);
+	}
+
+	if (ether_type == ETHERTYPE_IP) {
+		af = AF_INET;
+		hdrsize = 20;  /* sizeof(struct ip) */
+#ifdef INET6
+	} else if (ether_type == ETHERTYPE_IPV6) {
+		af = AF_INET6;
+		hdrsize = 40;  /* sizeof(struct ip6_hdr) */
+#endif
+	} else
+		goto bad;
+
+	while (m->m_len <= hlen) {
+		hlen -= m->m_len;
+		m = m->m_next;
+	}
+	hdr = m->m_data + hlen;
+	if (m->m_len < hlen + hdrsize) {
+		/*
+		 * ip header is not in a single mbuf.  this should not
+		 * happen in the current code.
+		 * (todo: use m_pulldown in the future)
+		 */
+		goto bad;
+	}
+	m->m_data += hlen;
+	m->m_len -= hlen;
+	if (ALTQ_NEEDS_CLASSIFY(ifq))
+		pktattr->pattr_class =
+		    (*ifq->altq_classify)(ifq->altq_clfier, m, af);
+	m->m_data -= hlen;
+	m->m_len += hlen;
+
+	pktattr->pattr_af = af;
+	pktattr->pattr_hdr = hdr;
+	return;
+
+bad:
+	pktattr->pattr_class = NULL;
+	pktattr->pattr_hdr = NULL;
+	pktattr->pattr_af = AF_UNSPEC;
+}
+#endif /* ALTQ */

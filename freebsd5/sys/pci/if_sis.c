@@ -1101,7 +1101,8 @@ sis_attach(dev)
 	ifp->if_watchdog = sis_watchdog;
 	ifp->if_init = sis_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = SIS_TX_LIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, SIS_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Do MII setup.
@@ -1461,7 +1462,7 @@ sis_tick(xsc)
 	if (!sc->sis_link && mii->mii_media_status & IFM_ACTIVE &&
 	    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE) {
 		sc->sis_link++;
-		if (ifp->if_snd.ifq_head != NULL)
+		if (!IFQ_IS_EMPTY(&ifp->if_snd))
 			sis_start(ifp);
 	}
 
@@ -1582,7 +1583,7 @@ sis_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, SIS_IER, 1);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		sis_start(ifp);
 done:
 	SIS_UNLOCK(sc);
@@ -1693,6 +1694,8 @@ sis_start(ifp)
 		BPF_MTAP(ifp, m_head);
 
 	}
+	if (idx == sc->sis_cdata.sis_tx_prod)
+		return;
 
 	/* Transmit */
 	sc->sis_cdata.sis_tx_prod = idx;
@@ -1986,7 +1989,7 @@ sis_watchdog(ifp)
 	sis_reset(sc);
 	sis_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		sis_start(ifp);
 
 	SIS_UNLOCK(sc);

@@ -1165,7 +1165,8 @@ sk_attach_xmac(dev)
 	ifp->if_watchdog = sk_watchdog;
 	ifp->if_init = sk_init;
 	ifp->if_baudrate = 1000000000;
-	ifp->if_snd.ifq_maxlen = SK_TX_RING_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, SK_TX_RING_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Call MI attach routine.
@@ -1497,7 +1498,7 @@ sk_start(ifp)
 	idx = sc_if->sk_cdata.sk_tx_prod;
 
 	while(sc_if->sk_cdata.sk_tx_chain[idx].sk_mbuf == NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_POLL(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -1507,10 +1508,11 @@ sk_start(ifp)
 		 * for the NIC to drain the ring.
 		 */
 		if (sk_encap(sc_if, m_head, &idx)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
+
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -1518,6 +1520,8 @@ sk_start(ifp)
 		 */
 		BPF_MTAP(ifp, m_head);
 	}
+	if (idx == sc_if->sk_cdata.sk_tx_prod)
+		return;
 
 	/* Transmit */
 	sc_if->sk_cdata.sk_tx_prod = idx;
@@ -1885,9 +1889,9 @@ sk_intr(xsc)
 
 	CSR_WRITE_4(sc, SK_IMR, sc->sk_intrmask);
 
-	if (ifp0 != NULL && ifp0->if_snd.ifq_head != NULL)
+	if (ifp0 != NULL && !IFQ_IS_EMPTY(&ifp0->if_snd))
 		sk_start(ifp0);
-	if (ifp1 != NULL && ifp1->if_snd.ifq_head != NULL)
+	if (ifp1 != NULL && !IFQ_IS_EMPTY(&ifp1->if_snd))
 		sk_start(ifp1);
 
 	SK_UNLOCK(sc);

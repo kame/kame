@@ -122,6 +122,12 @@ __bswap16(__uint16_t _x)
 #define	__ntohl(x)	__bswap32(x)
 #define	__ntohs(x)	__bswap16(x)
 
+/* added for compatibility with other BSDs */
+#define	NTOHL(x)	((x) = ntohl((u_long)(x)))
+#define	NTOHS(x)	((x) = ntohs((u_short)(x)))
+#define	HTONL(x)	((x) = htonl((u_long)(x)))
+#define	HTONS(x)	((x) = htons((u_short)(x)))
+
 #else /* !__GNUC__ */
 
 /*

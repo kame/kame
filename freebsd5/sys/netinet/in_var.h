@@ -34,6 +34,43 @@
  * $FreeBSD: src/sys/netinet/in_var.h,v 1.45 2002/03/24 10:19:10 bde Exp $
  */
 
+/*
+ * Copyright (c) 2002 INRIA. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by INRIA and its
+ *	contributors.
+ * 4. Neither the name of INRIA nor the names of its contributors may be
+ *    used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+/*
+ * Implementation of Internet Group Management Protocol, Version 3.
+ *
+ * Developed by Hitoshi Asaeda, INRIA, February 2002.
+ */
+
 #ifndef _NETINET_IN_VAR_H_
 #define _NETINET_IN_VAR_H_
 
@@ -140,7 +177,13 @@ extern	u_long in_ifaddrhmask;			/* mask for hash table */
 struct router_info {
 	struct ifnet *rti_ifp;
 	int    rti_type; /* type of router which is querier on this interface */
-	int    rti_time; /* # of slow timeouts since last old query */
+	u_int	rti_time;	/* # of slow timeouts since last old query */
+	u_int	rti_timer1;	/* IGMPv1 Querier Present timer */
+	u_int	rti_timer2;	/* IGMPv2 Querier Present timer */
+	u_int	rti_timer3;	/* IGMPv3 General Query (interface) timer */
+	u_int	rti_qrv;	/* Querier Robustness Variable */
+	u_int	rti_qqi;	/* Querier Interval Variable */
+	u_int	rti_qri;	/* Querier Response Interval */
 	struct router_info *rti_next;
 };
 
@@ -154,12 +197,14 @@ struct router_info {
  */
 struct in_multi {
 	LIST_ENTRY(in_multi) inm_link;	/* queue macro glue */
+#define	inm_list	inm_link	/* compatibility with NetBSD */
 	struct	in_addr inm_addr;	/* IP multicast address, convenience */
 	struct	ifnet *inm_ifp;		/* back pointer to ifnet */
 	struct	ifmultiaddr *inm_ifma;	/* back pointer to ifmultiaddr */
 	u_int	inm_timer;		/* IGMP membership report timer */
 	u_int	inm_state;		/*  state of the membership */
 	struct	router_info *inm_rti;	/* router info*/
+	struct	in_multi_source *inm_source;	/* filtered source list */
 };
 
 #ifdef _KERNEL
@@ -223,8 +268,18 @@ do { \
 } while(0)
 
 struct	route;
+#ifdef IGMPV3
+struct	in_multi * in_addmulti(struct in_addr *, struct ifnet *,
+	    u_int16_t, struct sockaddr_storage *, u_int, int, int *);
+void	in_delmulti((struct in_multi *, u_int16_t,
+	    struct sockaddr_storage *, u_int, int, int *);
+struct	in_multi * in_modmulti(struct in_addr *, struct ifnet *, u_int16_t,
+	    struct sockaddr_storage *, u_int, u_int16_t,
+	    struct sockaddr_storage *, u_int, int, u_int, int *);
+#else
 struct	in_multi *in_addmulti(struct in_addr *, struct ifnet *);
 void	in_delmulti(struct in_multi *);
+#endif
 int	in_control(struct socket *, u_long, caddr_t, struct ifnet *,
 	    struct thread *);
 void	in_rtqdrain(void);

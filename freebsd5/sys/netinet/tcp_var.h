@@ -103,6 +103,12 @@ struct tcpcb {
 #define	TF_LQ_OVERFLOW	0x20000		/* listen queue overflow */
 #define	TF_LASTIDLE	0x40000		/* connection was previously idle */
 #define TF_RXWIN0SENT	0x80000		/* sent a receiver win 0 in response */
+#ifdef TCP_ECN
+#define TF_ECN_PERMIT	0x00100000	/* other side said I could ECN */
+#define TF_RCVD_CE	0x00200000	/* send ECE in subsequent segs */
+#define TF_SEND_CWR	0x00400000	/* send CWR in next seg */
+#define TF_DISABLE_ECN	0x00800000	/* disable ECN for this connection */
+#endif
 	int	t_force;		/* 1 if forcing out a byte */
 
 	tcp_seq	snd_una;		/* send unacknowledged */
@@ -225,6 +231,7 @@ struct syncache {
 #define SCF_CC		0x08			/* negotiated CC */
 #define SCF_UNREACH	0x10			/* icmp unreachable received */
 #define SCF_KEEPROUTE	0x20			/* keep cloned route */
+#define	SCF_ECN		0x40			/* peer will do ecn */
 	TAILQ_ENTRY(syncache)	sc_hash;
 	TAILQ_ENTRY(syncache)	sc_timerq;
 };
@@ -359,7 +366,6 @@ struct	tcpstat {
 	u_long	tcps_badsyn;		/* bogus SYN, e.g. premature ACK */
 	u_long	tcps_mturesent;		/* resends due to MTU discovery */
 	u_long	tcps_listendrop;	/* listen queue overflows */
-
 	u_long	tcps_sc_added;		/* entry added to syncache */
 	u_long	tcps_sc_retransmitted;	/* syncache entry was retransmitted */
 	u_long	tcps_sc_dupsyn;		/* duplicate SYN packet */
@@ -375,6 +381,18 @@ struct	tcpstat {
 	u_long	tcps_sc_zonefail;	/* zalloc() failed */
 	u_long	tcps_sc_sendcookie;	/* SYN cookie sent */
 	u_long	tcps_sc_recvcookie;	/* SYN cookie received */
+
+	/* ECN stats */
+	u_long tcps_ecn_accepts;	/* ecn connections accepted */
+	u_long tcps_ecn_rcvece;		/* # of rcvd ece */
+	u_long tcps_ecn_rcvcwr;		/* # of rcvd cwr */
+	u_long tcps_ecn_rcvce;		/* # of rcvd ce in ip header */
+	u_long tcps_ecn_sndect;		/* # of cwr sent */
+	u_long tcps_ecn_sndece;		/* # of ece sent */
+	u_long tcps_ecn_sndcwr;		/* # of cwr sent */
+	u_long tcps_cwr_ecn;		/* # of cwnd reduced by ecn */
+	u_long tcps_cwr_frecovery;	/* # of cwnd reduced by fastrecovery */
+	u_long tcps_cwr_timeout;	/* # of cwnd reduced by timeout */
 };
 
 /*
@@ -439,6 +457,7 @@ extern	struct tcpstat tcpstat;	/* tcp statistics */
 extern	int tcp_mssdflt;	/* XXX */
 extern	int tcp_delack_enabled;
 extern	int tcp_do_newreno;
+extern	int tcp_do_ecn;		/* RFC3168 ECN enabled/disabled? */
 extern	int path_mtu_discovery;
 extern	int ss_fltsz;
 extern	int ss_fltsz_local;

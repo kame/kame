@@ -33,6 +33,42 @@
  *	@(#)ip_input.c	8.2 (Berkeley) 1/4/94
  * $FreeBSD: src/sys/netinet/ip_input.c,v 1.218 2002/11/20 19:07:27 luigi Exp $
  */
+/*
+ * Copyright (c) 2002 INRIA. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by INRIA and its
+ *	contributors.
+ * 4. Neither the name of INRIA nor the names of its contributors may be
+ *    used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+/*
+ * Implementation of Internet Group Management Protocol, Version 3.
+ *
+ * Developed by Hitoshi Asaeda, INRIA, February 2002.
+ */
 
 #include "opt_bootp.h"
 #include "opt_ipfw.h"
@@ -41,6 +77,7 @@
 #include "opt_ipfilter.h"
 #include "opt_ipstealth.h"
 #include "opt_ipsec.h"
+#include "opt_natpt.h"
 #include "opt_mac.h"
 #include "opt_pfil_hooks.h"
 #include "opt_random_ip_id.h"
@@ -74,7 +111,13 @@
 #include <netinet/in_pcb.h>
 #include <netinet/ip_var.h>
 #include <netinet/ip_icmp.h>
+#include <netinet/igmp_var.h>
 #include <machine/in_cksum.h>
+
+#ifdef NATPT
+#include <netinet/ip6.h>
+#include <netinet6/ip6_var.h>
+#endif
 
 #include <sys/socketvar.h>
 
@@ -222,15 +265,27 @@ static	struct ip_srcrt {
 	struct	in_addr route[MAX_IPOPTLEN/sizeof(struct in_addr)];
 } ip_srcrt;
 
+struct sockaddr_in *ip_fw_fwd_addr;
+
 static void	save_rte(u_char *, struct in_addr);
 static int	ip_dooptions(struct mbuf *m, int,
 			struct sockaddr_in *next_hop);
+#ifdef NATPT
+void		ip_forward(struct mbuf *m, int srcrt,
+			struct sockaddr_in *next_hop);
+#else
 static void	ip_forward(struct mbuf *m, int srcrt,
 			struct sockaddr_in *next_hop);
+#endif
 static void	ip_freef(struct ipqhead *, struct ipq *);
 static struct	mbuf *ip_reass(struct mbuf *, struct ipqhead *,
 		struct ipq *, u_int32_t *, u_int16_t *);
 static void	ipintr(void);
+
+#ifdef NATPT
+extern	int			natpt_enable;
+extern	int natpt_in4		__P((struct mbuf *, struct mbuf **));
+#endif	/* NATPT */
 
 /*
  * IP initialization: fill in IP protocol switch table.
@@ -244,7 +299,7 @@ ip_init()
 
 	TAILQ_INIT(&in_ifaddrhead);
 	in_ifaddrhashtbl = hashinit(INADDR_NHASH, M_IFADDR, &in_ifaddrhmask);
-	pr = pffindproto(PF_INET, IPPROTO_RAW, SOCK_RAW);
+	pr = (struct protosw *)pffindproto(PF_INET, IPPROTO_RAW, SOCK_RAW);
 	if (pr == 0)
 		panic("ip_init");
 	for (i = 0; i < IPPROTO_MAX; i++)
@@ -396,6 +451,11 @@ ip_input(struct mbuf *m)
 		goto bad;
 	}
 
+#ifdef ALTQ
+	if (altq_input != NULL && (*altq_input)(m, AF_INET) == 0)
+		/* packet is dropped by traffic conditioner */
+		return;
+#endif
 	/*
 	 * Convert fields to host representation.
 	 */
@@ -523,6 +583,61 @@ pass:
 	if (rsvp_on && ip->ip_p==IPPROTO_RSVP) 
 		goto ours;
 
+#ifdef NATPT
+	/*
+	 * NATPT (Network Address Translation - Protocol Translation)
+	 */
+	if (natpt_enable) {
+		struct mbuf *m1 = NULL;
+		struct sockaddr_in6 sa6_src, sa6_dst;
+
+		switch (natpt_in4(m, &m1)) {
+		case IPPROTO_IP:	/* this packet is not changed */
+			goto checkaddresses;
+
+		case IPPROTO_IPV4:
+			ip_forward(m1, 0, args.next_hop);
+			break;
+
+		case IPPROTO_IPV6:
+			/*
+			 * record the sockaddr_in6 structures of the source and
+			 * destination addresses for ip6_forward().
+			 * XXX: not care about scope zone ambiguity.
+			 */
+			bzero(&sa6_src, sizeof(sa6_src));
+			bzero(&sa6_dst, sizeof(sa6_dst));
+			sa6_src.sin6_family = sa6_dst.sin6_family = AF_INET6;
+			sa6_src.sin6_len =
+				sa6_dst.sin6_len = sizeof(struct sockaddr_in6);
+			sa6_src.sin6_addr =
+				mtod(m1, struct ip6_hdr *)->ip6_src;
+			sa6_dst.sin6_addr =
+				mtod(m1, struct ip6_hdr *)->ip6_dst;
+			if (!ip6_setpktaddrs(m1, &sa6_src, &sa6_dst)) {
+				m_freem(m1);
+				return;
+			}
+
+			ip6_forward(m1, 1);
+			break;
+
+		case IPPROTO_DONE:	/* discard without free */
+			return;
+
+		case IPPROTO_MAX:	/* discard this packet */
+		default:
+			break;
+		}
+
+		if (m != m1)
+			m_freem(m);
+
+		return;
+	}
+checkaddresses:;
+#endif
+
 	/*
 	 * Check our list of addresses, to see if the packet is for us.
 	 * If we don't have any addresses, assume any unicast packet
@@ -599,6 +714,16 @@ pass:
 		struct in_multi *inm;
 		if (ip_mrouter) {
 			/*
+			 * Fast check of IGMP with IP Router Alert option if
+			 * it's required.
+			 */
+			if (ip->ip_p == IPPROTO_IGMP) {
+				if (igmp_get_router_alert(m) < 0) {
+					m_freem(m);
+					return; /* invalid IGMP message */
+				}
+			}
+			/*
 			 * If we are acting as a multicast router, all
 			 * incoming multicast packets are passed to the
 			 * kernel-level multicast forwarding function.
@@ -626,6 +751,7 @@ pass:
 		 * See if we belong to the destination multicast group on the
 		 * arrival interface.
 		 */
+		/* XXX: ToDo: SSM support for non-UDP packet (e.g. ICMP) */
 		IN_LOOKUP_MULTI(ip->ip_dst, m->m_pkthdr.rcvif, inm);
 		if (inm == NULL) {
 			ipstat.ips_notmember++;
@@ -962,6 +1088,7 @@ ip_reass(struct mbuf *m, struct ipqhead *head, struct ipq *fp,
 	struct mbuf *t;
 	int hlen = ip->ip_hl << 2;
 	int i, next;
+	u_int8_t ecn, ecn0;
 
 	/*
 	 * Presence of header sizes in mbufs
@@ -1011,6 +1138,22 @@ ip_reass(struct mbuf *m, struct ipqhead *head, struct ipq *fp,
 	}
 
 #define GETIP(m)	((struct ip*)((m)->m_pkthdr.header))
+
+	/*
+	 * Handle ECN by comparing this segment with the first one;
+	 * if CE is set, do not lose CE.
+	 * drop if CE and not-ECT are mixed for the same packet.
+	 */
+	ecn = ip->ip_tos & IPTOS_ECN_MASK;
+	ecn0 = GETIP(fp->ipq_frags)->ip_tos & IPTOS_ECN_MASK;
+	if (ecn == IPTOS_ECN_CE) {
+		if (ecn0 == IPTOS_ECN_NOTECT)
+			goto dropfrag;
+		if (ecn0 != IPTOS_ECN_CE)
+			GETIP(fp->ipq_frags)->ip_tos |= IPTOS_ECN_CE;
+	}
+	if (ecn == IPTOS_ECN_NOTECT && ecn0 != IPTOS_ECN_NOTECT)
+		goto dropfrag;
 
 	/*
 	 * Find a segment which begins after this one does.
@@ -1694,7 +1837,11 @@ u_char inetctlerrmap[PRC_NCMDS] = {
  * The srcrt parameter indicates whether the packet is being forwarded
  * via a source route.
  */
+#ifdef NATPT
+void
+#else
 static void
+#endif
 ip_forward(struct mbuf *m, int srcrt, struct sockaddr_in *next_hop)
 {
 	struct ip *ip = mtod(m, struct ip *);
@@ -1909,6 +2056,8 @@ ip_forward(struct mbuf *m, int srcrt, struct sockaddr_in *next_hop)
 					ro = &sp->req->sav->sah->sa_route;
 					if (ro->ro_rt && ro->ro_rt->rt_ifp) {
 						dummyifp.if_mtu =
+						    ro->ro_rt->rt_rmx.rmx_mtu ?
+						    ro->ro_rt->rt_rmx.rmx_mtu :
 						    ro->ro_rt->rt_ifp->if_mtu;
 						dummyifp.if_mtu -= ipsechdr;
 						destifp = &dummyifp;
@@ -2124,6 +2273,40 @@ ip_rsvp_done(void)
 		rsvp_on--;
 	}
 	return 0;
+}
+
+/*
+ * Check whether Router Alert option has been set.
+ */
+int
+ip_check_router_alert(ip)
+	struct ip *ip;
+{
+	u_char *cp;
+	int hlen, cnt, opt, optlen;
+
+	cp = (u_char *)(ip + 1);
+#ifdef _IP_VHL
+	hlen = IP_VHL_HL(ip->ip_vhl) << 2;
+#else
+	hlen = ip->ip_hl << 2;
+#endif
+	cnt = hlen - sizeof(struct ip);
+	for (; cnt > 0; cnt -= optlen, cp += optlen) {
+		opt = cp[IPOPT_OPTVAL];
+		if (opt == IPOPT_EOL)
+			break;
+		else if (opt == IPOPT_NOP)
+			optlen = 1;
+		else if (opt == IPOPT_RA)
+			return 0;
+		else {
+			optlen = cp[IPOPT_OLEN];
+			if (optlen < IPOPT_OLEN + sizeof(*cp) || optlen > cnt)
+				break;
+		}
+	}
+	return 1;
 }
 
 void

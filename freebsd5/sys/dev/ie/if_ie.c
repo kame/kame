@@ -790,6 +790,7 @@ ieattach(struct isa_device *dvp)
 	ifp->if_type = IFT_ETHER;
 	ifp->if_addrlen = 6;
 	ifp->if_hdrlen = 14;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	if (ie->hard_type == IE_EE16)
 		EVENTHANDLER_REGISTER(shutdown_post_sync, ee16_shutdown,
@@ -1401,7 +1402,7 @@ iestart(struct ifnet *ifp)
 		return;
 
 	do {
-		IF_DEQUEUE(&ie->arpcom.ac_if.if_snd, m);
+		IFQ_DEQUEUE(&ie->arpcom.ac_if.if_snd, m);
 		if (!m)
 			break;
 

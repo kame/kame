@@ -124,6 +124,7 @@ static void	arprequest(struct ifnet *,
 static void	arpintr(void);
 static void	arptfree(struct llinfo_arp *);
 static void	arptimer(void *);
+static void	arp_rtdrain(struct rtentry *, struct rttimer *);
 static struct llinfo_arp
 		*arplookup(u_long, int, int);
 #ifdef INET
@@ -164,6 +165,7 @@ arp_rtrequest(req, rt, info)
 	register struct sockaddr *gate = rt->rt_gateway;
 	register struct llinfo_arp *la = (struct llinfo_arp *)rt->rt_llinfo;
 	static struct sockaddr_dl null_sdl = {sizeof(null_sdl), AF_LINK};
+	int mine = 0;
 
 	if (!arpinit_done) {
 		arpinit_done = 1;
@@ -260,6 +262,7 @@ arp_rtrequest(req, rt, info)
 		     * It is now necessary to clear "useloopback" and remove
 		     * the route to force traffic out to the hardware.
 		     */
+			mine = 1;
 			rt->rt_expire = 0;
 			Bcopy(IF_LLADDR(rt->rt_ifp), LLADDR(SDL(gate)),
 			      SDL(gate)->sdl_alen = rt->rt_ifp->if_addrlen);
@@ -267,6 +270,14 @@ arp_rtrequest(req, rt, info)
 				rt->rt_ifp = loif;
 
 		}
+
+		/*
+		 * if this is a cached route, which is very likely,
+		 * put it in the timer queue.
+		 */
+		if (!(rt->rt_flags & (RTF_STATIC | RTF_ANNOUNCE)) && !mine)
+			rt_add_cache(rt, arp_rtdrain);
+
 		break;
 
 	case RTM_DELETE:
@@ -280,6 +291,36 @@ arp_rtrequest(req, rt, info)
 			m_freem(la->la_hold);
 		Free((caddr_t)la);
 	}
+}
+
+static void
+arp_rtdrain(rt, rtt)
+	struct rtentry *rt;
+	struct rttimer *rtt;
+{
+	struct llinfo_arp *la;
+	struct sockaddr_dl *sdl;
+
+	if ((la = (struct llinfo_arp *)rt->rt_llinfo) == NULL) {
+		/*
+		 * This case can happen when rt_fixdelete() invalidated the
+		 * route entry but there are still positive references to
+		 * this entry.
+		 */
+		return;
+	}
+
+	/* if the arp entry has been resolved, just keep it. */
+	sdl = (struct sockaddr_dl *)rt->rt_gateway;
+	if (sdl && sdl->sdl_family == AF_LINK && /* check just in case */
+	    sdl->sdl_alen != 0) {
+		rt_add_cache(rt, arp_rtdrain);
+		return;
+	}
+
+	arptfree(la);
+
+	return;			/* the caller will free rtt */
 }
 
 /*

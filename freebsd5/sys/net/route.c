@@ -37,6 +37,10 @@
 #include "opt_inet.h"
 #include "opt_mrouting.h"
 
+#ifdef __FreeBSD__
+#include "opt_mpath.h"
+#endif
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -59,9 +63,22 @@ struct radix_node_head *rt_tables[AF_MAX+1];
 
 static int	rttrash;		/* routes not in table but not freed */
 
+static struct callout rt_timer_ch;
+
+/* XXX do these values make any sense? */
+static long rt_cache_max;
+static long rt_cache_hiwat;
+static long rt_cache_lowat;
+
+static int rt_cachetimeout = 3600;	/* should be configurable */
+static struct rttimer_queue *rt_cache_timeout_q = NULL;
+
 static void rt_maskedcopy(struct sockaddr *,
 	    struct sockaddr *, struct sockaddr *);
 static void rtable_init(void **);
+
+static void rt_timer_init __P((void));
+static void rt_draincache __P((void));
 
 static void
 rtable_init(table)
@@ -79,6 +96,17 @@ route_init()
 {
 	rn_init();	/* initialize all zeroes, all ones, mask table */
 	rtable_init((void **)rt_tables);
+
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#define VM_KMEM_MAX	(12 * 1024 * 1024)	/* XXX from machine/vmparam.h */
+	rt_cache_max = (VM_KMEM_MAX >> 2) / sizeof(struct rtentry);
+#else
+	rt_cache_max = ((M_RTABLE->ks_limit) >> 2) / sizeof(struct rtentry);
+#endif
+	rt_cache_hiwat = rt_cache_max - (rt_cache_max >> 3);
+	rt_cache_lowat = rt_cache_max - (rt_cache_max >> 2);
+
+	rt_cache_timeout_q = rt_timer_queue_create(rt_cachetimeout);
 }
 
 /*
@@ -147,7 +175,7 @@ rtalloc1(dst, report, ignflags)
 			 * (This implies it wasn't a HOST route.)
 			 */
 			err = rtrequest(RTM_RESOLVE, dst, SA(0),
-					      SA(0), 0, &newrt);
+					      SA(0), RTF_CACHE, &newrt);
 			if (err) {
 				/*
 				 * If the cloning didn't succeed, maybe
@@ -176,8 +204,13 @@ rtalloc1(dst, report, ignflags)
 				info.rti_info[RTAX_IFA] = rt->rt_ifa->ifa_addr;
 			}
 			rt_missmsg(RTM_ADD, &info, rt->rt_flags, 0);
-		} else
+		} else {
+#ifdef RTREUSE			/* for statistics */
+			if (rt->rt_refcnt == 0)
+				RTREUSE(rt);
+#endif
 			rt->rt_refcnt++;
+		}
 	} else {
 		/*
 		 * Either we hit the root or couldn't find any match,
@@ -223,6 +256,10 @@ rtfree(rt)
 	 * and there is a close function defined, call the close function
 	 */
 	rt->rt_refcnt--;
+#ifdef RTRELEASE
+	if (rt->rt_refcnt == 0)
+		RTRELEASE(rt);
+#endif
 	if(rnh->rnh_close && rt->rt_refcnt == 0) {
 		rnh->rnh_close((struct radix_node *)rt, rnh);
 	}
@@ -247,6 +284,8 @@ rtfree(rt)
 			return;
 		}
 #endif
+
+		rt_timer_remove_all(rt);
 
 		/*
 		 * release references on items we hold them on..
@@ -317,7 +356,9 @@ rtredirect(dst, gateway, netmask, flags, src, rtp)
 	 * we have a routing loop, perhaps as a result of an interface
 	 * going down recently.
 	 */
-#define	equal(a1, a2) (bcmp((caddr_t)(a1), (caddr_t)(a2), (a1)->sa_len) == 0)
+#define	equal(a1, a2) \
+	((a1)->sa_len == (a2)->sa_len && \
+	 bcmp((caddr_t)(a1), (caddr_t)(a2), (a1)->sa_len) == 0)
 	if (!(flags & RTF_DONE) && rt &&
 	     (!equal(src, rt->rt_gateway) || rt->rt_ifa != ifa))
 		error = EINVAL;
@@ -352,7 +393,7 @@ rtredirect(dst, gateway, netmask, flags, src, rtp)
 			info.rti_info[RTAX_GATEWAY] = gateway;
 			info.rti_info[RTAX_NETMASK] = netmask;
 			info.rti_ifa = ifa;
-			info.rti_flags = flags;
+			info.rti_flags = flags | RTF_CACHE;
 			rt = NULL;
 			error = rtrequest1(RTM_ADD, &info, &rt);
 			if (rt != NULL)
@@ -539,6 +580,7 @@ rtrequest1(req, info, ret_nrt)
 	struct rtentry **ret_nrt;
 {
 	int s = splnet(); int error = 0;
+	int cache = 0;
 	register struct rtentry *rt;
 	register struct radix_node *rn;
 	register struct radix_node_head *rnh;
@@ -559,6 +601,8 @@ rtrequest1(req, info, ret_nrt)
 		netmask = 0;
 		flags &= ~(RTF_CLONING | RTF_PRCLONING);
 	}
+	if ((flags & (RTF_CACHE|RTF_STATIC)) == RTF_CACHE)
+		cache = 1;
 	switch (req) {
 	case RTM_DELETE:
 		/*
@@ -570,7 +614,18 @@ rtrequest1(req, info, ret_nrt)
 		if (rn->rn_flags & (RNF_ACTIVE | RNF_ROOT))
 			panic ("rtrequest delete");
 		rt = (struct rtentry *)rn;
-
+#ifdef RADIX_MPATH
+		/*
+		 * if we got multipath routes, we require users to specify
+		 * a matching RTAX_GATEWAY.
+		 */
+		if (rn_mpath_capable(rnh)) {
+			rt = rt_mpath_matchgate(rt, gateway);
+			rn = (struct radix_node *)rt;
+			if (!rt)
+				senderr(ESRCH);
+		}
+#endif
 		/*
 		 * Now search what's left of the subtree for any cloned
 		 * routes which might have been formed from this node.
@@ -647,11 +702,22 @@ rtrequest1(req, info, ret_nrt)
 		ifa = info->rti_ifa;
 
 	makeroute:
+		if (cache && rt_cache_max) {
+			unsigned long rtcount;
+
+			rtcount = rt_timer_count(rt_cache_timeout_q);
+			if (rtcount > rt_cache_max)
+				senderr(ENOBUFS);
+			if (rtcount > rt_cache_hiwat)
+				rt_draincache();
+		}
 		R_Malloc(rt, struct rtentry *, sizeof(*rt));
 		if (rt == 0)
 			senderr(ENOBUFS);
 		Bzero(rt, sizeof(*rt));
+		rt->rt_createtime = time_second; /* for statistics */
 		rt->rt_flags = RTF_UP | flags;
+		LIST_INIT(&rt->rt_timer);
 		/*
 		 * Add the gateway. Possibly re-malloc-ing the storage for it
 		 * also add the rt_gwroute if possible.
@@ -682,6 +748,12 @@ rtrequest1(req, info, ret_nrt)
 		ifa->ifa_refcnt++;
 		rt->rt_ifa = ifa;
 		rt->rt_ifp = ifa->ifa_ifp;
+#ifdef RADIX_MPATH
+		/* do not permit exactly the same dst/mask/gw pair */
+		if (rn_mpath_capable(rnh) &&
+		    rt_mpath_conflict(rnh, rt, netmask))
+			senderr(EEXIST);
+#endif
 		/* XXX mtu manipulation will be done in rnh_addaddr -- itojun */
 
 		rn = rnh->rnh_addaddr((caddr_t)ndst, (caddr_t)netmask,
@@ -770,6 +842,9 @@ rtrequest1(req, info, ret_nrt)
 			*ret_nrt = rt;
 			rt->rt_refcnt++;
 		}
+
+		if (cache)
+			rt_add_cache(rt, NULL);
 		break;
 	default:
 		error = EOPNOTSUPP;
@@ -1145,6 +1220,295 @@ rtinit(ifa, cmd, flags)
 	if (m)
 		(void) m_free(m);
 	return (error);
+}
+
+/*
+ * Route timer routines.  These routes allow functions to be called
+ * for various routes at any time.  This is useful in supporting
+ * path MTU discovery and redirect route deletion.
+ *
+ * This is similar to some BSDI internal functions, but it provides
+ * for multiple queues for efficiency's sake...
+ */
+
+LIST_HEAD(, rttimer_queue) rttimer_queue_head;
+static int rt_init_done = 0;
+
+#define RTTIMER_CALLOUT(r)	{				\
+	if (r->rtt_func != NULL) {				\
+		(*r->rtt_func)(r->rtt_rt, r);			\
+	} else {						\
+		rtrequest((int) RTM_DELETE,			\
+			  (struct sockaddr *)rt_key(r->rtt_rt),	\
+			  0, 0, 0, 0);				\
+	}							\
+}
+
+/* 
+ * Some subtle order problems with domain initialization mean that
+ * we cannot count on this being run from rt_init before various
+ * protocol initializations are done.  Therefore, we make sure
+ * that this is run when the first queue is added...
+ */
+
+static void
+rt_timer_init()
+{
+	if (rt_init_done)
+		panic("rt_timer_init");
+
+	LIST_INIT(&rttimer_queue_head);
+	callout_init(&rt_timer_ch, 0);
+	callout_reset(&rt_timer_ch, hz, rt_timer_timer, NULL);
+	rt_init_done = 1;
+}
+
+struct rttimer_queue *
+rt_timer_queue_create(timeout)
+	u_int	timeout;
+{
+	struct rttimer_queue *rtq;
+
+	if (rt_init_done == 0)
+		rt_timer_init();
+
+	R_Malloc(rtq, struct rttimer_queue *, sizeof *rtq);
+	if (rtq == NULL)
+		return (NULL);		
+	Bzero(rtq, sizeof *rtq);
+
+	rtq->rtq_timeout = timeout;
+	rtq->rtq_count = 0;
+	TAILQ_INIT(&rtq->rtq_head);
+	LIST_INSERT_HEAD(&rttimer_queue_head, rtq, rtq_link);
+
+	return (rtq);
+}
+
+void
+rt_timer_queue_change(rtq, timeout)
+	struct rttimer_queue *rtq;
+	long timeout;
+{
+
+	rtq->rtq_timeout = timeout;
+}
+
+void
+rt_timer_queue_destroy(rtq, destroy)
+	struct rttimer_queue *rtq;
+	int destroy;
+{
+	struct rttimer *r;
+
+	while ((r = TAILQ_FIRST(&rtq->rtq_head)) != NULL) {
+		LIST_REMOVE(r, rtt_link);
+		TAILQ_REMOVE(&rtq->rtq_head, r, rtt_next);
+		if (destroy)
+			RTTIMER_CALLOUT(r);
+		Free(r);
+		if (rtq->rtq_count > 0)
+			rtq->rtq_count--;
+		else
+			printf("rt_timer_queue_destroy: rtq_count reached 0\n");
+	}
+
+	LIST_REMOVE(rtq, rtq_link);
+
+	/*
+	 * Caller is responsible for freeing the rttimer_queue structure.
+	 */
+}
+
+unsigned long
+rt_timer_count(rtq)
+	struct rttimer_queue *rtq;
+{
+
+	return rtq->rtq_count;
+}
+
+void     
+rt_timer_remove_all(rt)
+	struct rtentry *rt;
+{
+	struct rttimer *r;
+
+	while ((r = LIST_FIRST(&rt->rt_timer)) != NULL) {
+		LIST_REMOVE(r, rtt_link);
+		TAILQ_REMOVE(&r->rtt_queue->rtq_head, r, rtt_next);
+		if (r->rtt_queue->rtq_count > 0)
+			r->rtt_queue->rtq_count--;
+		else
+			printf("rt_timer_remove_all: rtq_count reached 0\n");
+		Free(r);
+	}
+}
+
+int      
+rt_timer_add(rt, func, queue)
+	struct rtentry *rt;
+	void(*func) __P((struct rtentry *, struct rttimer *));
+	struct rttimer_queue *queue;
+{
+	struct rttimer *r;
+	long current_time = time_second;
+
+	/*
+	 * If there's already a timer with this action, destroy it before
+	 * we add a new one.
+	 */
+	for (r = LIST_FIRST(&rt->rt_timer); r != NULL;
+	     r = LIST_NEXT(r, rtt_link)) {
+		if (r->rtt_func == func) {
+			LIST_REMOVE(r, rtt_link);
+			TAILQ_REMOVE(&r->rtt_queue->rtq_head, r, rtt_next);
+			if (r->rtt_queue->rtq_count > 0)
+				r->rtt_queue->rtq_count--;
+			else
+				printf("rt_timer_add: rtq_count reached 0\n");
+			Free(r);
+			break;  /* only one per list, so we can quit... */
+		}
+	}
+
+	R_Malloc(r, struct rttimer *, sizeof(struct rttimer));
+	if (r == NULL)
+		return (ENOBUFS);
+	Bzero(r, sizeof(*r));
+
+	r->rtt_rt = rt;
+	r->rtt_time = current_time;
+	r->rtt_func = func;
+	r->rtt_queue = queue;
+	LIST_INSERT_HEAD(&rt->rt_timer, r, rtt_link);
+	TAILQ_INSERT_TAIL(&queue->rtq_head, r, rtt_next);
+	r->rtt_queue->rtq_count++;
+	
+	return (0);
+}
+
+/* ARGSUSED */
+void
+rt_timer_timer(arg)
+	void *arg;
+{
+	struct rttimer_queue *rtq;
+	struct rttimer *r;
+	long current_time;
+	int s;
+
+	current_time = time_second;
+
+	s = splnet();
+	for (rtq = LIST_FIRST(&rttimer_queue_head); rtq != NULL; 
+	     rtq = LIST_NEXT(rtq, rtq_link)) {
+		while ((r = TAILQ_FIRST(&rtq->rtq_head)) != NULL &&
+		    (r->rtt_time + rtq->rtq_timeout) < current_time) {
+			LIST_REMOVE(r, rtt_link);
+			TAILQ_REMOVE(&rtq->rtq_head, r, rtt_next);
+			RTTIMER_CALLOUT(r);
+			Free(r);
+			if (rtq->rtq_count > 0)
+				rtq->rtq_count--;
+			else
+				printf("rt_timer_timer: rtq_count reached 0\n");
+		}
+	}
+	splx(s);
+
+	callout_reset(&rt_timer_ch, hz, rt_timer_timer, NULL);
+}
+
+void
+rt_add_cache(rt, func)
+	struct rtentry *rt;
+	void(*func) __P((struct rtentry *, struct rttimer *));
+{
+	struct rttimer *r;
+
+	/*
+	 * check if we already have a cache timer entry associated to the
+	 * route.
+	 */
+	for (r = LIST_FIRST(&rt->rt_timer); r != NULL;
+	     r = LIST_NEXT(r, rtt_link)) {
+		if (r->rtt_queue == rt_cache_timeout_q)
+			return;	/* we already have one.  do nothing. */
+	}
+
+	rt_timer_add(rt, func, rt_cache_timeout_q);
+
+	/* TODO: adjust timeout based on the number of entries */
+}
+
+static void
+rt_draincache()
+{
+	int s, again = 0;
+	struct rttimer *r, *r_next;
+	long rtcount;
+
+	s = splnet();
+
+#if 0				/* for debug */
+	printf("rt_draincache: purge cache entries from %ld", rt_cache_timeout_q->rtq_count);
+#endif
+
+  again:
+	rtcount = rt_cache_timeout_q->rtq_count;
+
+	/* First, make entries that do not have references expire. */
+	for (r = TAILQ_FIRST(&rt_cache_timeout_q->rtq_head); r; r = r_next) {
+		r_next = TAILQ_NEXT(r, rtt_next);
+
+		if (r->rtt_rt->rt_refcnt <= 0) {
+			TAILQ_REMOVE(&rt_cache_timeout_q->rtq_head,
+				     r, rtt_next);
+			r->rtt_time = 0;
+			TAILQ_INSERT_HEAD(&rt_cache_timeout_q->rtq_head, r,
+					  rtt_next);
+		}
+
+		/*
+		 * At the first attempt, we try to limit the number of entries
+		 * being dropped so that entries won't shrink too much beyond
+		 * the lower limit.
+		 */
+		if (!again && --rtcount < rt_cache_lowat)
+			break;
+	}
+
+	/* then perform expiration.  XXX code borrowed from rt_timer_timer() */
+	while ((r = TAILQ_FIRST(&rt_cache_timeout_q->rtq_head)) != NULL &&
+	       (r->rtt_time == 0)) {
+		LIST_REMOVE(r, rtt_link);
+		TAILQ_REMOVE(&rt_cache_timeout_q->rtq_head, r, rtt_next);
+		RTTIMER_CALLOUT(r);
+		Free(r);
+		if (rt_cache_timeout_q->rtq_count > 0)
+			rt_cache_timeout_q->rtq_count--;
+		else
+			printf("rt_draincache: rtq_count reached 0\n");
+	}
+
+	/*
+	 * if we cannot purge enough entries, do it again with a more
+	 * aggressive policy.
+	 */
+	rtcount = rt_cache_timeout_q->rtq_count;
+	if (!again && rtcount > rt_cache_hiwat) {
+#if 0
+		printf("...to %ld (not enough)...", rtcount);
+#endif
+		again = 1;
+		goto again;
+	}
+#if 0
+	printf(" to %ld\n", rtcount);
+#endif
+
+	splx(s);
 }
 
 /* This must be before ip6_init2(), which is now SI_ORDER_MIDDLE */

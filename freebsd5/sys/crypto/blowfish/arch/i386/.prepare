@@ -1,0 +1,4 @@
+conflict bf_cbc.S
+conflict bf_enc.S
+conflict bf_enc_586.S
+conflict bf_enc_686.S

@@ -505,6 +505,7 @@ wlattach(struct isa_device *id)
        ifp->if_done
        ifp->if_reset
        */
+    IFQ_SET_READY(&ifp->if_snd);
     ether_ifattach(ifp, &sc->wl_addr[0]);
 
     bcopy(&sc->wl_addr[0], sc->wl_ac.ac_enaddr, WAVELAN_ADDR_SIZE);
@@ -883,7 +884,7 @@ wlstart(struct ifnet *ifp)
 
     /* get ourselves some data */
     ifp = &(sc->wl_if);
-    IF_DEQUEUE(&ifp->if_snd, m);
+    IFQ_DEQUEUE(&ifp->if_snd, m);
     if (m != (struct mbuf *)0) {
 	/* let BPF see it before we commit it */
 	BPF_MTAP(ifp, m);

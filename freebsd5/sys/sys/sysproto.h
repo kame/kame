@@ -1012,6 +1012,10 @@ struct kevent_args {
 	char nevents_l_[PADL_(int)]; int nevents; char nevents_r_[PADR_(int)];
 	char timeout_l_[PADL_(const struct timespec *)]; const struct timespec * timeout; char timeout_r_[PADR_(const struct timespec *)];
 };
+struct	sctp_peeloff_args {
+	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
+	char name_l_[PADL_(caddr_t)]; caddr_t name; char name_r_[PADR_(caddr_t)];
+};
 struct extattr_set_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
@@ -1427,6 +1431,7 @@ int	getresuid(struct thread *, struct getresuid_args *);
 int	getresgid(struct thread *, struct getresgid_args *);
 int	kqueue(struct thread *, struct kqueue_args *);
 int	kevent(struct thread *, struct kevent_args *);
+int	sctp_peeloff(struct thread *, struct sctp_peeloff_args *);
 int	lkmressys(struct thread *, struct nosys_args *);
 int	extattr_set_fd(struct thread *, struct extattr_set_fd_args *);
 int	extattr_get_fd(struct thread *, struct extattr_get_fd_args *);

@@ -76,6 +76,9 @@ struct	ether_header;
 
 #include <sys/_label.h>		/* struct label */
 #include <sys/queue.h>		/* get TAILQ macros */
+#if 0 /* ALTQ */
+#include <altq/if_altq.h>
+#endif
 
 #ifdef _KERNEL
 #include <sys/mbuf.h>
@@ -86,7 +89,6 @@ struct	ether_header;
 
 TAILQ_HEAD(ifnethead, ifnet);	/* we use TAILQs so that the order of */
 TAILQ_HEAD(ifaddrhead, ifaddr);	/* instantiation is preserved in the list */
-TAILQ_HEAD(ifprefixhead, ifprefix);
 TAILQ_HEAD(ifmultihead, ifmultiaddr);
 
 /*
@@ -173,11 +175,16 @@ struct ifnet {
 		(void *);
 	int	(*if_resolvemulti)	/* validate/resolve multicast */
 		(struct ifnet *, struct sockaddr **, struct sockaddr *);
+#if 0 /* ALTQ */
+	struct	ifaltq if_snd;		/* output queue (includes altq) */
+#else
 	struct	ifqueue if_snd;		/* output queue */
+#endif
 	struct	ifqueue *if_poll_slowq;	/* input queue for slow devices */
-	struct	ifprefixhead if_prefixhead; /* list of prefixes per if */
 	u_int8_t *if_broadcastaddr;	/* linklevel broadcast bytestring */
 	struct	label if_label;		/* interface MAC label */
+
+	void	*if_afdata[AF_MAX];
 };
 
 typedef void if_init_f_t(void *);
@@ -286,6 +293,10 @@ typedef void if_init_f_t(void *);
 	IF_UNLOCK(ifq); 					\
 } while (0)
 
+#define	IF_POLL(ifq, m)		((m) = (ifq)->ifq_head)
+#define	IF_PURGE(ifq)	IF_DRAIN(ifq)
+#define	IF_IS_EMPTY(ifq)	((ifq)->ifq_len == 0)
+
 #ifdef _KERNEL
 #define	IF_HANDOFF(ifq, m, ifp)			if_handoff(ifq, m, ifp, 0)
 #define	IF_HANDOFF_ADJ(ifq, m, ifp, adj)	if_handoff(ifq, m, ifp, adj)
@@ -324,6 +335,135 @@ if_handoff(struct ifqueue *ifq, struct mbuf *m, struct ifnet *ifp, int adjust)
 
 #endif /* _KERNEL */
 
+#ifdef _KERNEL
+#ifdef ALTQ
+#define	ALTQ_DECL(x)		x
+
+#define	IFQ_ENQUEUE(ifq, m, pattr, err)					\
+do {									\
+	if (ALTQ_IS_ENABLED((ifq)))					\
+		ALTQ_ENQUEUE((ifq), (m), (pattr), (err));		\
+	else {								\
+		IF_LOCK(ifq);						\
+		if (_IF_QFULL((ifq))) {					\
+			m_freem((m));					\
+			(err) = ENOBUFS;				\
+		} else {						\
+			IF_ENQUEUE((ifq), (m));				\
+			(err) = 0;					\
+		}							\
+		IF_UNLOCK(ifq);						\
+	}								\
+	if ((err))							\
+		(ifq)->ifq_drops++;					\
+} while (0)
+
+#define	IFQ_DEQUEUE(ifq, m)						\
+do {									\
+	if (TBR_IS_ENABLED((ifq)))					\
+		(m) = tbr_dequeue((ifq), ALTDQ_REMOVE);			\
+	else if (ALTQ_IS_ENABLED((ifq)))				\
+		ALTQ_DEQUEUE((ifq), (m));				\
+	else								\
+		IF_DEQUEUE((ifq), (m));					\
+} while (0)
+
+#define	IFQ_POLL(ifq, m)						\
+do {									\
+	if (TBR_IS_ENABLED((ifq)))					\
+		(m) = tbr_dequeue((ifq), ALTDQ_POLL);			\
+	else if (ALTQ_IS_ENABLED((ifq)))				\
+		ALTQ_POLL((ifq), (m));					\
+	else								\
+		IF_POLL((ifq), (m));					\
+} while (0)
+
+#define	IFQ_PURGE(ifq)							\
+do {									\
+	if (ALTQ_IS_ENABLED((ifq)))					\
+		ALTQ_PURGE((ifq));					\
+	else								\
+		IF_PURGE((ifq));					\
+} while (0)
+
+#define	IFQ_SET_READY(ifq)						\
+	do { ((ifq)->altq_flags |= ALTQF_READY); } while (0)
+
+#define	IFQ_CLASSIFY(ifq, m, af, pa)					\
+do {									\
+	if (ALTQ_IS_ENABLED((ifq))) {					\
+		if (ALTQ_NEEDS_CLASSIFY((ifq)))				\
+			(pa)->pattr_class = (*(ifq)->altq_classify)	\
+				((ifq)->altq_clfier, (m), (af));	\
+		(pa)->pattr_af = (af);					\
+		(pa)->pattr_hdr = mtod((m), caddr_t);			\
+	}								\
+} while (0)
+
+#else /* !ALTQ */
+#define	ALTQ_DECL(x)		/* nothing */
+
+#define	IFQ_ENQUEUE(ifq, m, pattr, err)					\
+do {									\
+	IF_LOCK(ifq);							\
+	if (_IF_QFULL((ifq))) {						\
+		m_freem((m));						\
+		(err) = ENOBUFS;					\
+	} else {							\
+		IF_ENQUEUE((ifq), (m));					\
+		(err) = 0;						\
+	}								\
+	IF_UNLOCK(ifq);							\
+	if ((err))							\
+		(ifq)->ifq_drops++;					\
+} while (0)
+
+#define	IFQ_DEQUEUE(ifq, m)	IF_DEQUEUE((ifq), (m))
+
+#define	IFQ_POLL(ifq, m)	IF_POLL((ifq), (m))
+
+#define	IFQ_PURGE(ifq)							\
+while (1) {								\
+	struct mbuf *m0;						\
+	IF_DEQUEUE((ifq), m0);						\
+	if (m0 == NULL)							\
+		break;							\
+	else								\
+		m_freem(m0);						\
+}
+
+#define	IFQ_SET_READY(ifq)		/* nothing */
+#define	IFQ_CLASSIFY(ifq, m, af, pa)	/* nothing */
+
+#endif /* !ALTQ */
+
+#define	IFQ_IS_EMPTY(ifq)		((ifq)->ifq_len == 0)
+#define	IFQ_INC_LEN(ifq)		((ifq)->ifq_len++)
+#define	IFQ_DEC_LEN(ifq)		(--(ifq)->ifq_len)
+#define	IFQ_INC_DROPS(ifq)		((ifq)->ifq_drops++)
+#define	IFQ_SET_MAXLEN(ifq, len)	((ifq)->ifq_maxlen = (len))
+
+#define	IFQ_HANDOFF(ifp, m, pattr, err)					\
+do {									\
+	int len, s;							\
+	short mflags;							\
+									\
+	len = (m)->m_pkthdr.len;					\
+	mflags = (m)->m_flags;						\
+	s = splimp();							\
+	IFQ_ENQUEUE(&(ifp)->if_snd, m, pattr, err);			\
+	if ((err) == 0) {						\
+		(ifp)->if_obytes += len;				\
+		if (mflags & M_MCAST)					\
+			(ifp)->if_omcasts++;				\
+		if (((ifp)->if_flags & IFF_OACTIVE) == 0)		\
+			(*(ifp)->if_start)(ifp);			\
+	}								\
+	splx(s);							\
+} while (0)
+
+#endif /* _KERNEL */
+
 /*
  * The ifaddr structure contains information about one address
  * of an interface.  They are maintained by the different address families,
@@ -354,20 +494,6 @@ struct ifaddr {
 
 /* for compatibility with other BSDs */
 #define	ifa_list	ifa_link
-
-/*
- * The prefix structure contains information about one prefix
- * of an interface.  They are maintained by the different address families,
- * are allocated and attached when an prefix or an address is set,
- * and are linked together so all prefixes for an interface can be located.
- */
-struct ifprefix {
-	struct	sockaddr *ifpr_prefix;	/* prefix of interface */
-	struct	ifnet *ifpr_ifp;	/* back-pointer to interface */
-	TAILQ_ENTRY(ifprefix) ifpr_list; /* queue macro glue */
-	u_char	ifpr_plen;		/* prefix length in bits */
-	u_char	ifpr_type;		/* protocol dependent prefix type */
-};
 
 /*
  * Multicast address structure.  This is analogous to the ifaddr

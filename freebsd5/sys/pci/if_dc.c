@@ -2206,7 +2206,8 @@ dc_attach(dev)
 	ifp->if_watchdog = dc_watchdog;
 	ifp->if_init = dc_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = DC_TX_LIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, DC_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Do MII setup. If this is a 21143, check for a PHY on the
@@ -2890,7 +2891,7 @@ dc_tick(xsc)
 	if (!sc->dc_link && mii->mii_media_status & IFM_ACTIVE &&
 	    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE) {
 		sc->dc_link++;
-		if (ifp->if_snd.ifq_head != NULL)
+		if (!IFQ_IS_EMPTY(&ifp->if_snd))
 			dc_start(ifp);
 	}
 
@@ -3098,7 +3099,7 @@ dc_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, DC_IMR, DC_INTRS);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		dc_start(ifp);
 
 #ifdef DEVICE_POLLING
@@ -3169,6 +3170,11 @@ dc_encap(sc, m_head, txidx)
 		sc->dc_ldata->dc_tx_list[cur].dc_ctl |= DC_TXCTL_FINT;
 	if (sc->dc_flags & DC_TX_USE_TX_INTR && sc->dc_cdata.dc_tx_cnt > 64)
 		sc->dc_ldata->dc_tx_list[cur].dc_ctl |= DC_TXCTL_FINT;
+#ifdef ALTQ
+	else if ((sc->dc_flags & DC_TX_USE_TX_INTR) &&
+		 TBR_IS_ENABLED(&sc->arpcom.ac_if.if_snd))
+		sc->dc_ldata->dc_tx_list[cur].dc_ctl |= DC_TXCTL_FINT;
+#endif
 	sc->dc_ldata->dc_tx_list[*txidx].dc_status = DC_TXSTAT_OWN;
 	*txidx = frag;
 
@@ -3269,6 +3275,8 @@ dc_start(ifp)
 			break;
 		}
 	}
+	if (idx == sc->dc_cdata.dc_tx_prod)
+		return;
 
 	/* Transmit */
 	sc->dc_cdata.dc_tx_prod = idx;
@@ -3603,7 +3611,7 @@ dc_watchdog(ifp)
 	dc_reset(sc);
 	dc_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		dc_start(ifp);
 
 	DC_UNLOCK(sc);

@@ -402,6 +402,7 @@ struct msghdr {
 #if __BSD_VISIBLE
 #define	MSG_DONTWAIT	0x80		/* this message should be nonblocking */
 #define	MSG_EOF		0x100		/* data completes connection */
+#define MSG_NOTIFICATION 0x200		/* notification message */
 #define MSG_COMPAT      0x8000		/* used in sendit() */
 #endif
 
@@ -455,7 +456,14 @@ struct cmsgcred {
 	    (struct cmsghdr *)NULL : \
 	    (struct cmsghdr *)((char *)(cmsg) + _ALIGN((cmsg)->cmsg_len)))
 
-#define	CMSG_FIRSTHDR(mhdr)	((struct cmsghdr *)(mhdr)->msg_control)
+/*
+ * RFC 2292 requires to check msg_controllen, in case that the kernel returns
+ * an empty list for some reasons.
+ */
+#define	CMSG_FIRSTHDR(mhdr) \
+	((mhdr)->msg_controllen >= sizeof(struct cmsghdr) ? \
+	 (struct cmsghdr *)(mhdr)->msg_control : \
+	 (struct cmsghdr *)NULL)
 
 #if __BSD_VISIBLE
 /* RFC 2292 additions */

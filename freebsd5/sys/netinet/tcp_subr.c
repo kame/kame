@@ -76,6 +76,7 @@
 #include <netinet/ip_var.h>
 #ifdef INET6
 #include <netinet6/ip6_var.h>
+#include <netinet6/scope6_var.h>
 #endif
 #include <netinet/tcp.h>
 #include <netinet/tcp_fsm.h>
@@ -93,9 +94,6 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#ifdef INET6
-#include <netinet6/ipsec6.h>
-#endif
 #endif /*IPSEC*/
 
 #ifdef FAST_IPSEC
@@ -369,8 +367,14 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 	struct ip *ip;
 	struct tcphdr *nth;
 #ifdef INET6
+	struct sockaddr_in6 nsrc6, ndst6, *src6, *dst6;
+#ifdef NEW_STRUCT_ROUTE
+	struct route *ro6 = 0;
+	struct route sro6;
+#else
 	struct route_in6 *ro6 = 0;
 	struct route_in6 sro6;
+#endif
 	struct ip6_hdr *ip6;
 	int isipv6;
 #endif /* INET6 */
@@ -415,6 +419,13 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 		tlen = 0;
 		m->m_data += max_linkhdr;
 #ifdef INET6
+		if (!tp) {
+			m_freem(m);
+			return;	/* XXX: is this possible? */
+		}
+		src6 = &tp->t_inpcb->in6p_lsa;
+		dst6 = &tp->t_inpcb->in6p_fsa;
+
 		if (isipv6) {
 			bcopy((caddr_t)ip6, mtod(m, caddr_t), 
 			      sizeof(struct ip6_hdr));
@@ -438,6 +449,14 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 #define xchg(a,b,type) { type t; t=a; a=b; b=t; }
 #ifdef INET6
 		if (isipv6) {
+			if (ip6_getpktaddrs(m, &src6, &dst6)) {
+				m_freem(m);
+				return;
+			}
+			nsrc6 = *dst6;
+			ndst6 = *src6;
+			src6 = &nsrc6;
+			dst6 = &ndst6;
 			xchg(ip6->ip6_dst, ip6->ip6_src, struct in6_addr);
 			nth = (struct tcphdr *)(ip6 + 1);
 		} else
@@ -525,6 +544,15 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 #endif
 #ifdef INET6
 	if (isipv6) {
+		if (!ip6_setpktaddrs(m, src6, dst6)) {
+			m_freem(m);
+			return;
+		}
+		if (tp && tp->t_inpcb && tp->t_inpcb->in6p_outputopts &&
+		    (tp->t_inpcb->in6p_outputopts->ip6po_minmtu ==
+		     IP6PO_MINMTU_ALL)) {
+ 			ipflags |= IPV6_MINMTU;
+		}
 		(void)ip6_output(m, NULL, ro6, ipflags, NULL, NULL,
 			tp ? tp->t_inpcb : NULL);
 		if (ro6 == &sro6 && ro6->ro_rt) {
@@ -677,7 +705,7 @@ tcp_close(tp)
 			if ((rt = inp->in6p_route.ro_rt) == NULL)
 				goto no_valid_rt;
 			sin6 = (struct sockaddr_in6 *)rt_key(rt);
-			if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))
+			if (SA6_IS_ADDR_UNSPECIFIED(sin6))
 				goto no_valid_rt;
 		}
 		else
@@ -1021,6 +1049,10 @@ tcp6_getcred(SYSCTL_HANDLER_ARGS)
 	error = SYSCTL_IN(req, addrs, sizeof(addrs));
 	if (error)
 		return (error);
+	if ((error = scope6_check_id(&addrs[0], ip6_use_defzone)) != 0 ||
+	    (error = scope6_check_id(&addrs[1], ip6_use_defzone)) != 0) {
+		return (error);
+	}
 	if (IN6_IS_ADDR_V4MAPPED(&addrs[0].sin6_addr)) {
 		if (IN6_IS_ADDR_V4MAPPED(&addrs[1].sin6_addr))
 			mapped = 1;
@@ -1037,9 +1069,9 @@ tcp6_getcred(SYSCTL_HANDLER_ARGS)
 			addrs[0].sin6_port,
 			0, NULL);
 	else
-		inp = in6_pcblookup_hash(&tcbinfo, &addrs[1].sin6_addr,
+		inp = in6_pcblookup_hash(&tcbinfo, &addrs[1],
 				 addrs[1].sin6_port,
-				 &addrs[0].sin6_addr, addrs[0].sin6_port,
+				 &addrs[0], addrs[0].sin6_port,
 				 0, NULL);
 	if (inp == NULL) {
 		error = ENOENT;
@@ -1124,6 +1156,7 @@ tcp_ctlinput(cmd, sa, vip)
 		} else {
 			struct in_conninfo inc;
 
+			bzero(&inc, sizeof(inc));
 			inc.inc_fport = th->th_dport;
 			inc.inc_lport = th->th_sport;
 			inc.inc_faddr = faddr;
@@ -1200,17 +1233,21 @@ tcp6_ctlinput(cmd, sa, d)
 
 		in6_pcbnotify(&tcb, sa, th.th_dport,
 		    (struct sockaddr *)ip6cp->ip6c_src,
-		    th.th_sport, cmd, notify);
+		    th.th_sport, cmd, NULL, notify);
 
+		bzero(&inc, sizeof(inc));
 		inc.inc_fport = th.th_dport;
 		inc.inc_lport = th.th_sport;
-		inc.inc6_faddr = ((struct sockaddr_in6 *)sa)->sin6_addr;
-		inc.inc6_laddr = ip6cp->ip6c_src->sin6_addr;
+		inc.inc6_fsa.sin6_family = inc.inc6_lsa.sin6_family = AF_INET6;
+		inc.inc6_fsa.sin6_len = inc.inc6_lsa.sin6_len =
+			sizeof(struct sockaddr_in6);
+		sa6_copy_addr((struct sockaddr_in6 *)sa, &inc.inc6_fsa);
+		sa6_copy_addr(ip6cp->ip6c_src, &inc.inc6_lsa);
 		inc.inc_isipv6 = 1;
 		syncache_unreach(&inc, &th);
 	} else
 		in6_pcbnotify(&tcb, sa, 0, (const struct sockaddr *)sa6_src,
-			      0, cmd, notify);
+			      0, cmd, NULL, notify);
 }
 #endif /* INET6 */
 
@@ -1457,17 +1494,27 @@ struct rtentry *
 tcp_rtlookup6(inc)
 	struct in_conninfo *inc;
 {
+#ifdef NEW_STRUCT_ROUTE
+	struct route *ro6;
+#else
 	struct route_in6 *ro6;
+#endif
 	struct rtentry *rt;
 
 	ro6 = &inc->inc6_route;
 	rt = ro6->ro_rt;
 	if (rt == NULL || !(rt->rt_flags & RTF_UP)) {
 		/* No route yet, so try to acquire one */
-		if (!IN6_IS_ADDR_UNSPECIFIED(&inc->inc6_faddr)) {
-			ro6->ro_dst.sin6_family = AF_INET6;
-			ro6->ro_dst.sin6_len = sizeof(struct sockaddr_in6);
-			ro6->ro_dst.sin6_addr = inc->inc6_faddr;
+		if (!SA6_IS_ADDR_UNSPECIFIED(&inc->inc6_fsa)) {
+			struct sockaddr_in6 *dst6;
+
+			dst6 = (struct sockaddr_in6 *)&ro6->ro_dst;
+			dst6->sin6_family = AF_INET6;
+			dst6->sin6_len = sizeof(*dst6);
+			sa6_copy_addr(&inc->inc6_fsa, dst6);
+#ifndef SCOPEDROUTING
+			dst6->sin6_scope_id = 0; /* XXX */
+#endif
 			rtalloc((struct route *)ro6);
 			rt = ro6->ro_rt;
 		}
@@ -1504,7 +1551,10 @@ ipsec_hdrsiz_tcp(tp)
 		m->m_pkthdr.len = m->m_len =
 			sizeof(struct ip6_hdr) + sizeof(struct tcphdr);
 		tcp_fillheaders(tp, ip6, th);
-		hdrsiz = ipsec6_hdrsiz(m, IPSEC_DIR_OUTBOUND, inp);
+		if (!ip6_setpktaddrs(m, &inp->in6p_lsa, &inp->in6p_fsa))
+			hdrsiz = 0; /* XXX */
+		else
+			hdrsiz = ipsec6_hdrsiz(m, IPSEC_DIR_OUTBOUND, inp);
 	} else
 #endif /* INET6 */
       {

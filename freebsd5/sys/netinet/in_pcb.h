@@ -63,9 +63,13 @@ typedef	u_quad_t	inp_gen_t;
  * So, AF_INET6 null laddr is also used as AF_INET null laddr,
  * by utilize following structure. (At last, same as INRIA)
  */
-struct in_addr_4in6 {
-	u_int32_t	ia46_pad32[3];
-	struct	in_addr	ia46_addr4;
+#ifndef offsetof		/* XXX */
+#define	offsetof(type, member)	((size_t)(&((type *)0)->member))
+#endif
+struct sa_4in6 {
+	u_int8_t sa46_pad1[offsetof(struct sockaddr_in6, sin6_addr)]; /* XXX */
+	u_int32_t sa46_pad2[3];
+	struct in_addr sa46_addr4;
 };
 
 /*
@@ -73,23 +77,23 @@ struct in_addr_4in6 {
  * in_conninfo has some extra padding to accomplish this.
  */
 struct in_endpoints {
-	u_int16_t	ie_fport;		/* foreign port */
-	u_int16_t	ie_lport;		/* local port */
 	/* protocol dependent part, local and foreign addr */
 	union {
 		/* foreign host table entry */
-		struct	in_addr_4in6 ie46_foreign;
-		struct	in6_addr ie6_foreign;
+		struct	sa_4in6 ie46_foreign;
+		struct	sockaddr_in6 ie6_foreign;
 	} ie_dependfaddr;
 	union {
 		/* local host table entry */
-		struct	in_addr_4in6 ie46_local;
-		struct	in6_addr ie6_local;
+		struct	sa_4in6 ie46_local;
+		struct	sockaddr_in6 ie6_local;
 	} ie_dependladdr;
-#define	ie_faddr	ie_dependfaddr.ie46_foreign.ia46_addr4
-#define	ie_laddr	ie_dependladdr.ie46_local.ia46_addr4
-#define	ie6_faddr	ie_dependfaddr.ie6_foreign
-#define	ie6_laddr	ie_dependladdr.ie6_local
+#define ie_fport	ie_dependfaddr.ie6_foreign.sin6_port
+#define ie_lport	ie_dependladdr.ie6_local.sin6_port
+#define	ie_faddr	ie_dependfaddr.ie46_foreign.sa46_addr4
+#define	ie_laddr	ie_dependladdr.ie46_local.sa46_addr4
+#define	ie6_fsa		ie_dependfaddr.ie6_foreign
+#define	ie6_lsa		ie_dependladdr.ie6_local
 };
 
 /*
@@ -107,17 +111,21 @@ struct in_conninfo {
 	union {
 		/* placeholder for routing entry */
 		struct	route inc4_route;
-		struct	route_in6 inc6_route;
+#if 1 /* def NEW_STRUCT_ROUTE */
+		struct  route inc6_route;
+#else
+		struct  route_in6 inc6_route;
+#endif
 	} inc_dependroute;
 };
-#define inc_isipv6	inc_flags	/* temp compatability */
+#define	inc_isipv6	inc_flags	/* temp compatability */
 #define	inc_fport	inc_ie.ie_fport
 #define	inc_lport	inc_ie.ie_lport
 #define	inc_faddr	inc_ie.ie_faddr
 #define	inc_laddr	inc_ie.ie_laddr
 #define	inc_route	inc_dependroute.inc4_route
-#define	inc6_faddr	inc_ie.ie6_faddr
-#define	inc6_laddr	inc_ie.ie6_laddr
+#define inc6_fsa	inc_ie.ie6_fsa
+#define inc6_lsa	inc_ie.ie6_lsa
 #define	inc6_route	inc_dependroute.inc6_route
 
 struct	icmp6_filter;
@@ -160,6 +168,11 @@ struct inpcb {
 	struct {
 		/* IP options */
 		struct	mbuf *inp6_options;
+		/*
+		 * IP6 options for incoming packets.
+		 * XXX: currently unused but remained just in case.
+		 */
+		struct	ip6_recvpktopts *inp6_inputopts;
 		/* IP6 options for outgoing packets */
 		struct	ip6_pktopts *inp6_outputopts;
 		/* IP multicast options */
@@ -170,15 +183,16 @@ struct inpcb {
 		int	inp6_cksum;
 		u_short	inp6_ifindex;
 		short	inp6_hops;
-		u_int8_t	inp6_hlim;
 	} inp_depend6;
 	LIST_ENTRY(inpcb) inp_portlist;
 	struct	inpcbport *inp_phd;	/* head of this list */
 	inp_gen_t	inp_gencnt;	/* generation count of this instance */
 	struct mtx	inp_mtx;
 
-#define	in6p_faddr	inp_inc.inc6_faddr
-#define	in6p_laddr	inp_inc.inc6_laddr
+#define	in6p_fsa	inp_inc.inc_ie.ie_dependfaddr.ie6_foreign
+#define	in6p_lsa	inp_inc.inc_ie.ie_dependladdr.ie6_local
+#define	in6p_faddr	inp_inc.inc6_fsa.sin6_addr
+#define	in6p_laddr	inp_inc.inc6_lsa.sin6_addr
 #define	in6p_route	inp_inc.inc6_route
 #define	in6p_ip6_hlim	inp_depend6.inp6_hlim
 #define	in6p_hops	inp_depend6.inp6_hops	/* default hop limit */
@@ -186,6 +200,7 @@ struct inpcb {
 #define	in6p_flowinfo	inp_flow
 #define	in6p_vflag	inp_vflag
 #define	in6p_options	inp_depend6.inp6_options
+#define	in6p_inputopts	inp_depend6.inp6_inputopts
 #define	in6p_outputopts	inp_depend6.inp6_outputopts
 #define	in6p_moptions	inp_depend6.inp6_moptions
 #define	in6p_icmp6filt	inp_depend6.inp6_icmp6filt
@@ -283,15 +298,28 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
 #define	IN6P_DSTOPTS		0x080000 /* receive dst options after rthdr */
 #define	IN6P_RTHDR		0x100000 /* receive routing header */
 #define	IN6P_RTHDRDSTOPTS	0x200000 /* receive dstoptions before rthdr */
+#define IN6P_TCLASS		0x400000 /* receive traffic class value */
 #define IN6P_AUTOFLOWLABEL	0x800000 /* attach flowlabel automatically */
+#if 0
+/*
+ * IN6P_BINDV6ONLY should be obsoleted by IN6P_IPV6_V6ONLY.
+ * Once we are sure that this macro is not referred from anywhere, we should
+ * completely delete the definition.
+ * jinmei@kame.net, 20010625.
+ */
+#define	IN6P_BINDV6ONLY		0x10000000 /* do not grab IPv4 traffic */
+#endif
+#define IN6P_RFC2292		0x40000000 /* used RFC2292 API on the socket */
+#define IN6P_MTU                0x80000000 /* receive path MTU */
 
 #define	INP_CONTROLOPTS		(INP_RECVOPTS|INP_RECVRETOPTS|INP_RECVDSTADDR|\
 					INP_RECVIF|\
 				 IN6P_PKTINFO|IN6P_HOPLIMIT|IN6P_HOPOPTS|\
 				 IN6P_DSTOPTS|IN6P_RTHDR|IN6P_RTHDRDSTOPTS|\
-				 IN6P_AUTOFLOWLABEL)
+				 IN6P_TCLASS|IN6P_AUTOFLOWLABEL|IN6P_RFC2292|\
+				 IN6P_MTU)
 #define	INP_UNMAPPABLEOPTS	(IN6P_HOPOPTS|IN6P_DSTOPTS|IN6P_RTHDR|\
-				 IN6P_AUTOFLOWLABEL)
+				 IN6P_TCLASS|IN6P_AUTOFLOWLABEL)
 
  /* for KAME src sync over BSD*'s */
 #define	IN6P_HIGHPORT		INP_HIGHPORT

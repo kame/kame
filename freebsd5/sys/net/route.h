@@ -37,6 +37,8 @@
 #ifndef _NET_ROUTE_H_
 #define _NET_ROUTE_H_
 
+#include <sys/queue.h>
+
 /*
  * Kernel resident routing tables.
  *
@@ -49,10 +51,20 @@
  * to a routing entry.  These are often held by protocols
  * in their control blocks, e.g. inpcb.
  */
+#if 1 /* def NEW_STRUCT_ROUTE */
+struct route {
+	struct	rtentry *ro_rt;
+	struct sockaddr ro_dst;
+	/* trailing pad to store at least IPv6 socket address safely */
+	u_int8_t ro_pad[28 > sizeof(struct sockaddr) ?
+	    (28 - sizeof(struct sockaddr)) : 0];
+};
+#else
 struct route {
 	struct	rtentry *ro_rt;
 	struct	sockaddr ro_dst;
 };
+#endif
 
 /*
  * These numbers are used by reliable protocols for determining
@@ -95,7 +107,14 @@ struct mbuf;
  */
 #ifndef RNF_NORMAL
 #include <net/radix.h>
+#if RADIX_ART
+#include <net/radix_art.h>
 #endif
+#if RADIX_MPATH
+#include <net/radix_mpath.h>
+#endif
+#endif
+
 struct rtentry {
 	struct	radix_node rt_nodes[2];	/* tree glue, and other values */
 #define	rt_key(r)	((struct sockaddr *)((r)->rt_nodes->rn_key))
@@ -114,6 +133,14 @@ struct rtentry {
 					/* output routine for this (rt,if) */
 	struct	rtentry *rt_parent; 	/* cloning parent of this route */
 	void	*rt_filler2;		/* more filler */
+	LIST_HEAD(, rttimer) rt_timer;  /* queue of timeouts for misc funcs */
+
+	/* the following entries are for statistics*/
+	time_t rt_createtime;	/* timestamp at creation of this route */
+	time_t rt_lastreftime;	/* timestamp when the latest reference time */
+	u_long rt_usehist[16];	/* histogram of references for every 5 min */
+	u_long rt_reusehist[16]; /* histogram of re-use of this route */
+	u_long rt_releasehist[16]; /* histogram of release of this route*/
 };
 
 /*
@@ -156,7 +183,9 @@ struct ortentry {
 #define	RTF_LOCAL	0x200000 	/* route represents a local address */
 #define	RTF_BROADCAST	0x400000	/* route represents a bcast address */
 #define	RTF_MULTICAST	0x800000	/* route represents a mcast address */
-					/* 0x1000000 and up unassigned */
+
+#define	RTF_CACHE	0x1000000	/* cached route in general */
+					/* 0x2000000 and up unassigned */
 
 /*
  * Routing statistics.
@@ -262,6 +291,29 @@ struct route_cb {
 	int	any_count;
 };
 
+/* 
+ * This structure, and the prototypes for the rt_timer_{init,remove_all,
+ * add,timer} functions all used with the kind permission of BSDI.
+ * These allow functions to be called for routes at specific times.
+ */
+
+struct rttimer {
+	TAILQ_ENTRY(rttimer)	rtt_next;  /* entry on timer queue */
+	LIST_ENTRY(rttimer) 	rtt_link;  /* multiple timers per rtentry */
+	struct rttimer_queue	*rtt_queue;/* back pointer to queue */
+	struct rtentry  	*rtt_rt;   /* Back pointer to the route */
+	void            	(*rtt_func) __P((struct rtentry *, 
+						 struct rttimer *));
+	time_t          	rtt_time; /* When this timer was registered */
+};
+
+struct rttimer_queue {
+	long				rtq_timeout;
+	unsigned long			rtq_count;
+	TAILQ_HEAD(, rttimer)		rtq_head;
+	LIST_ENTRY(rttimer_queue)	rtq_link;
+};
+
 #ifdef _KERNEL
 #define	RTFREE(rt) \
 	do { \
@@ -269,6 +321,35 @@ struct route_cb {
 			rtfree(rt); \
 		else \
 			(rt)->rt_refcnt--; \
+	} while (0)
+
+#define	RTUSE(rt) \
+	do { \
+		int i; \
+		(rt)->rt_use++; \
+		(rt)->rt_lastreftime = time_second; \
+		i = ((rt)->rt_lastreftime - (rt)->rt_createtime) / 300; \
+		if (i < 0 || i > 12) \
+			i = 12; \
+		(rt)->rt_usehist[i]++; \
+	} while (0)
+
+#define	RTREUSE(rt) \
+	do { \
+		int i; \
+		i = (time_second - (rt)->rt_createtime) / 300; \
+		if (i < 0 || i > 12) \
+			i = 12; \
+		(rt)->rt_reusehist[i]++; \
+	} while (0)
+
+#define	RTRELEASE(rt) \
+	do { \
+		int i; \
+		i = (time_second - (rt)->rt_createtime) / 300; \
+		if (i < 0 || i > 12) \
+			i = 12; \
+		(rt)->rt_releasehist[i]++; \
 	} while (0)
 
 extern struct route_cb route_cb;
@@ -284,6 +365,17 @@ void	 rt_missmsg(int, struct rt_addrinfo *, int, int);
 void	 rt_newaddrmsg(int, struct ifaddr *, int, struct rtentry *);
 void	 rt_newmaddrmsg(int, struct ifmultiaddr *);
 int	 rt_setgate(struct rtentry *, struct sockaddr *, struct sockaddr *);
+int	 rt_timer_add(struct rtentry *,
+		      void(*)(struct rtentry *, struct rttimer *),
+		      struct rttimer_queue *);
+struct	 rttimer_queue *rt_timer_queue_create(u_int);
+void	 rt_timer_queue_change(struct rttimer_queue *, long);
+void	 rt_timer_queue_destroy(struct rttimer_queue *, int);
+void	 rt_timer_remove_all(struct rtentry *);
+unsigned long rt_timer_count(struct rttimer_queue *);
+void	 rt_timer_timer(void *);
+void	 rt_add_cache(struct rtentry *,
+		      void(*)(struct rtentry *, struct rttimer *));
 void	 rtalloc(struct route *);
 void	 rtalloc_ign(struct route *, u_long);
 struct rtentry *

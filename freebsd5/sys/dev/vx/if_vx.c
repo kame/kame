@@ -155,7 +155,7 @@ vxattach(sc)
     ifp->if_unit = sc->unit;
     ifp->if_name = "vx";
     ifp->if_mtu = ETHERMTU;
-    ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+    IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
     ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
     ifp->if_output = ether_output;
     ifp->if_start = vxstart;
@@ -163,6 +163,7 @@ vxattach(sc)
     ifp->if_init = vxinit;
     ifp->if_watchdog = vxwatchdog;
     ifp->if_softc = sc;
+    IFQ_SET_READY(&ifp->if_snd);
 
     ether_ifattach(ifp, sc->arpcom.ac_enaddr);
 
@@ -399,7 +400,7 @@ vxstart(ifp)
 
 startagain:
     /* Sneak a peek at the next packet */
-    m = ifp->if_snd.ifq_head;
+    IFQ_POLL(&ifp->if_snd, m);
     if (m == NULL) {
 	return;
     }
@@ -418,7 +419,7 @@ startagain:
     if (len + pad > ETHER_MAX_LEN) {
 	/* packet is obviously too large: toss it */
 	++ifp->if_oerrors;
-	IF_DEQUEUE(&ifp->if_snd, m);
+	IFQ_DEQUEUE(&ifp->if_snd, m);
 	m_freem(m);
 	goto readcheck;
     }
@@ -433,7 +434,7 @@ startagain:
 	}
     }
     CSR_WRITE_2(sc,  VX_COMMAND, SET_TX_AVAIL_THRESH | (8188 >> 2));
-    IF_DEQUEUE(&ifp->if_snd, m);
+    IFQ_DEQUEUE(&ifp->if_snd, m);
     if (m == NULL) 		/* not really needed */
 	return;
 

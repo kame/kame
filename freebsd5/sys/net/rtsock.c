@@ -34,6 +34,11 @@
  * $FreeBSD: src/sys/net/rtsock.c,v 1.79 2002/10/01 15:48:31 phk Exp $
  */
 
+#include "opt_sctp.h"
+
+#ifdef __FreeBSD__
+#include "opt_mpath.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/domain.h>
@@ -52,6 +57,11 @@
 #include <net/if.h>
 #include <net/raw_cb.h>
 #include <net/route.h>
+
+#ifdef SCTP
+extern void sctp_add_ip_address(struct ifaddr *ifa);
+extern void sctp_delete_ip_address(struct ifaddr *ifa);
+#endif /* SCTP */
 
 MALLOC_DEFINE(M_RTABLE, "routetbl", "routing tables");
 
@@ -322,8 +332,9 @@ route_output(m, so)
 	if (genmask) {
 		struct radix_node *t;
 		t = rn_addmask((caddr_t)genmask, 0, 1);
-		if (t && Bcmp((caddr_t *)genmask + 1, (caddr_t *)t->rn_key + 1,
-			      *(u_char *)t->rn_key - 1) == 0)
+		if (t && genmask->sa_len >= ((struct sockaddr *)t->rn_key)->sa_len &&
+		    Bcmp((caddr_t *)genmask + 1, (caddr_t *)t->rn_key + 1,
+		    ((struct sockaddr *)t->rn_key)->sa_len) - 1)
 			genmask = (struct sockaddr *)(t->rn_key);
 		else
 			senderr(ENOBUFS);
@@ -368,11 +379,32 @@ route_output(m, so)
 		if ((rnh = rt_tables[dst->sa_family]) == 0) {
 			senderr(EAFNOSUPPORT);
 		} else if ((rt = (struct rtentry *)
-				rnh->rnh_lookup(dst, netmask, rnh)) != NULL)
+				rnh->rnh_lookup(dst, netmask, rnh)) != NULL) {
+
+#ifdef RADIX_MPATH
+			/*
+			 * for RTM_CHANGE/LOCK, if we got multipath routes,
+			 * we require users to specify a matching RTAX_GATEWAY.
+			 *
+			 * for RTM_GET, gate is optional even with multipath.
+			 * if gate == NULL the first match is returned.
+			 * (no need to call rt_mpath_matchgate if gate == NULL)
+			 */
+			if (rn_mpath_capable(rnh) &&
+			    (rtm->rtm_type != RTM_GET || gate)) {
+				rt = rt_mpath_matchgate(rt, gate);
+				rnh = (struct radix_node *)rt;
+				if (!rt)
+					senderr(ESRCH);
+			}
 			rt->rt_refcnt++;
+#else
+			rt->rt_refcnt++;
+#endif
+		}
 		else
 			senderr(ESRCH);
-		switch(rtm->rtm_type) {
+		switch (rtm->rtm_type) {
 
 		case RTM_GET:
 		report:
@@ -781,6 +813,19 @@ rt_newaddrmsg(cmd, ifa, error, rt)
 	int pass;
 	struct mbuf *m = 0;
 	struct ifnet *ifp = ifa->ifa_ifp;
+
+#ifdef SCTP
+	/*
+	 * notify the SCTP stack
+	 * this will only get called when an address is added/deleted
+	 * XXX pass the ifaddr struct instead if ifa->ifa_addr...
+	 */
+	if (cmd == RTM_ADD) {
+		sctp_add_ip_address(ifa);
+	} else if (cmd == RTM_DELETE) {
+		sctp_delete_ip_address(ifa);
+	}
+#endif /* SCTP */
 
 	if (route_cb.any_count == 0)
 		return;

@@ -37,6 +37,7 @@
 #include <netinet/in.h>
 #include <netinet/igmp.h>
 #include <netinet/in_systm.h>
+#include <netinet/in_pcb.h>
 #include <netinet/in_var.h>
 #include <netinet/ip.h>
 #include <netinet/ip_encap.h>
@@ -1803,6 +1804,12 @@ X_rsvp_input(struct mbuf *m, int off)
     struct sockaddr_in rsvp_src = { sizeof rsvp_src, AF_INET };
     int s;
     struct ifnet *ifp;
+#ifdef ALTQ
+    /* support IP_RECVIF used by rsvpd rel4.2a1 */
+    struct inpcb *inp;
+    struct socket *so;
+    struct mbuf *opts;
+#endif
 
     if (rsvpdebug)
 	printf("rsvp_input: rsvp_on %d\n",rsvp_on);
@@ -1832,7 +1839,11 @@ X_rsvp_input(struct mbuf *m, int off)
 	if (viftable[vifi].v_ifp == ifp)
 	    break;
 
+#ifdef ALTQ
+    if (vifi == numvifs || (so = viftable[vifi].v_rsvpd) == NULL) {
+#else
     if (vifi == numvifs || viftable[vifi].v_rsvpd == NULL) {
+#endif
 	/*
 	 * If the old-style non-vif-associated socket is set,
 	 * then use it.  Otherwise, drop packet since there
@@ -1858,6 +1869,26 @@ X_rsvp_input(struct mbuf *m, int off)
 	printf("rsvp_input: m->m_len = %d, sbspace() = %ld\n",
 	       m->m_len,sbspace(&(viftable[vifi].v_rsvpd->so_rcv)));
 
+#ifdef ALTQ
+    opts = NULL;
+    inp = (struct inpcb *)so->so_pcb;
+    if (inp->inp_flags & INP_CONTROLOPTS ||
+	inp->inp_socket->so_options & SO_TIMESTAMP)
+	ip_savecontrol(inp, &opts, ip, m);
+    if (sbappendaddr(&so->so_rcv,
+		     (struct sockaddr *)&rsvp_src,m, opts) == 0) {
+	m_freem(m);
+	if (opts)
+	    m_freem(opts);
+	if (rsvpdebug)
+	    printf("rsvp_input: Failed to append to socket\n");
+    }
+    else {
+	sorwakeup(so);
+	if (rsvpdebug)
+	    printf("rsvp_input: send packet up\n");
+    }
+#else /* !ALTQ */
     if (socket_send(viftable[vifi].v_rsvpd, m, &rsvp_src) < 0) {
 	if (rsvpdebug)
 	    printf("rsvp_input: Failed to append to socket\n");
@@ -1865,6 +1896,7 @@ X_rsvp_input(struct mbuf *m, int off)
 	if (rsvpdebug)
 	    printf("rsvp_input: send packet up\n");
     }
+#endif /* !ALTQ */
 
     splx(s);
 }

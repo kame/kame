@@ -34,8 +34,47 @@
  * $FreeBSD: src/sys/netinet/in.h,v 1.73 2002/10/29 16:46:13 fenner Exp $
  */
 
+/*
+ * Copyright (c) 2002 INRIA. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by INRIA and its
+ *	contributors.
+ * 4. Neither the name of INRIA nor the names of its contributors may be
+ *    used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+/*
+ * Implementation of Internet Group Management Protocol, Version 3.
+ *
+ * Developed by Hitoshi Asaeda, INRIA, February 2002.
+ */
+
 #ifndef _NETINET_IN_H_
 #define _NETINET_IN_H_
+
+#include <sys/socket.h>
 
 #include <sys/cdefs.h>
 #include <sys/_types.h>
@@ -193,6 +232,7 @@ __END_DECLS
 #define	IPPROTO_DSTOPTS		60		/* IP6 destination option */
 #define	IPPROTO_AHIP		61		/* any host internal protocol */
 #define	IPPROTO_CFTP		62		/* CFTP */
+#define	IPPROTO_MOBILITY	62		/* XXX is CFTP used? */
 #define	IPPROTO_HELLO		63		/* "hello" routing protocol */
 #define	IPPROTO_SATEXPAK	64		/* SATNET/Backroom EXPAK */
 #define	IPPROTO_KRYPTOLAN	65		/* Kryptolan */
@@ -232,9 +272,10 @@ __END_DECLS
 #define	IPPROTO_APES		99		/* any private encr. scheme */
 #define	IPPROTO_GMTP		100		/* GMTP*/
 #define	IPPROTO_IPCOMP		108		/* payload compression (IPComp) */
-/* 101-254: Partly Unassigned */
 #define	IPPROTO_PIM		103		/* Protocol Independent Mcast */
 #define	IPPROTO_PGM		113		/* PGM */
+#define IPPROTO_SCTP		132		/* SCTP (RFC2960) */
+/* 134-254: Partly Unassigned */
 /* 255: Reserved */
 /* BSD Private, local use, namespace incursion, no longer used */
 #define	IPPROTO_OLD_DIVERT	254		/* OLD divert pseudo-proto */
@@ -345,6 +386,7 @@ __END_DECLS
 
 #define	IN_EXPERIMENTAL(i)	(((u_int32_t)(i) & 0xf0000000) == 0xf0000000)
 #define	IN_BADCLASS(i)		(((u_int32_t)(i) & 0xf0000000) == 0xf0000000)
+#define IN_LOCAL_GROUP(i)	(((u_int32_t)(i) & 0xffffff00) == 0xe0000000)
 
 #define	INADDR_LOOPBACK		(u_int32_t)0x7f000001
 #ifndef _KERNEL
@@ -354,6 +396,7 @@ __END_DECLS
 #define	INADDR_UNSPEC_GROUP	(u_int32_t)0xe0000000	/* 224.0.0.0 */
 #define	INADDR_ALLHOSTS_GROUP	(u_int32_t)0xe0000001	/* 224.0.0.1 */
 #define	INADDR_ALLRTRS_GROUP	(u_int32_t)0xe0000002	/* 224.0.0.2 */
+#define	INADDR_NEW_ALLRTRS_GROUP	(u_int32_t)0xe0000016	/* 224.0.0.22 */
 #define	INADDR_MAX_LOCAL_GROUP	(u_int32_t)0xe00000ff	/* 224.0.0.255 */
 
 #define	IN_LOOPBACKNET		127			/* official! */
@@ -386,6 +429,18 @@ __END_DECLS
 /* for IPSEC */
 #define	IP_IPSEC_POLICY		21   /* int; set/get security policy */
 #define	IP_FAITH		22   /* bool; accept FAITH'ed connections */
+#define	IP_BLOCK_SOURCE		23   /* ip_mreq_source; block data from a src */
+#define	IP_UNBLOCK_SOURCE	24   /* ip_mreq_source; undo block filter */
+#define	IP_ADD_SOURCE_MEMBERSHIP 25  /* ip_mreq_source; add a single source */
+#define	IP_DROP_SOURCE_MEMBERSHIP 26 /* ip_mreq_source; drop a single source */
+
+/* MCAST_* sockopts number should not be duplicated with IPv6-level sockopts */
+#define	MCAST_JOIN_GROUP	70   /* group_req; */
+#define	MCAST_BLOCK_SOURCE	71   /* group_source_req; */
+#define	MCAST_UNBLOCK_SOURCE	72   /* group_source_req; */
+#define	MCAST_LEAVE_GROUP	73   /* group_req; */
+#define	MCAST_JOIN_SOURCE_GROUP	74   /* group_source_req; */
+#define	MCAST_LEAVE_SOURCE_GROUP 75  /* group_source_req; */
 
 #define	IP_FW_ADD     		50   /* add a firewall rule to chain */
 #define	IP_FW_DEL    		51   /* delete a firewall rule from chain */
@@ -405,6 +460,8 @@ __END_DECLS
 #define	IP_DEFAULT_MULTICAST_TTL  1	/* normally limit m'casts to 1 hop  */
 #define	IP_DEFAULT_MULTICAST_LOOP 1	/* normally hear sends if a member  */
 #define	IP_MAX_MEMBERSHIPS	20	/* per socket */
+#define	IP_MAX_SOURCE_FILTER	128	/* max number of MSF per group */
+#define	SO_MAX_SOURCE_FILTER	64	/* max number of MSF per socket */
 
 /*
  * Argument structure for IP_ADD_MEMBERSHIP and IP_DROP_MEMBERSHIP.
@@ -413,6 +470,60 @@ struct ip_mreq {
 	struct	in_addr imr_multiaddr;	/* IP multicast address of group */
 	struct	in_addr imr_interface;	/* local IP address of interface */
 };
+
+#define	MCAST_INCLUDE		1	/* ip_msfilter's imsf_fmode value */
+#define	MCAST_EXCLUDE		2	/* ip_msfilter's imsf_fmode value */
+
+/*
+ * Argument structure for IP_{BLOCK|UNBLOCK}_SOURCE and
+ * IP_{ADD|DORP}_SOURCE_MEMBERSHIP.
+ */
+struct ip_mreq_source {
+	struct	in_addr imr_multiaddr;	/* IP multicast address of group */
+	struct	in_addr imr_sourceaddr;	/* source address of group */
+	struct	in_addr imr_interface;	/* local IP address of interface */
+};
+
+/*
+ * Argument structure for SIOCSIPMSFILTER.
+ */
+struct ip_msfilter {
+	struct	in_addr imsf_multiaddr;	/* IP multicast address of group */
+	struct	in_addr imsf_interface;	/* local IP address of interface */
+	u_int32_t	imsf_fmode;	/* filter mode */
+	u_int32_t	imsf_numsrc;	/* number of sources in src_list */
+	struct	in_addr imsf_slist[1];	/* start of source list */
+};
+
+#define	IP_MSFILTER_SIZE(numsrc) \
+	(sizeof(struct ip_msfilter) - sizeof(struct in_addr) \
+	+ (numsrc) * sizeof(struct in_addr))
+
+/*
+ * Protocol-Independent Multicast Source Filter APIs
+ */
+struct group_req {
+	u_int32_t			gr_interface;	/* interface index */
+	struct	sockaddr_storage	gr_group;	/* group address */
+};
+
+struct group_source_req {
+	u_int32_t			gsr_interface;	/* interface index */
+	struct	sockaddr_storage	gsr_group;	/* group address */
+	struct	sockaddr_storage	gsr_source;	/* source address */
+};
+
+struct group_filter {
+	u_int32_t			gf_interface;	/* interface index */
+	struct	sockaddr_storage	gf_group;	/* multicast address */
+	u_int32_t			gf_fmode;	/* filter mode */
+	u_int32_t			gf_numsrc;	/* number of sources */
+	struct	sockaddr_storage	gf_slist[1];	/* source address */
+};
+
+#define GROUP_FILTER_SIZE(numsrc) \
+	(sizeof(struct group_filter) - sizeof(struct sockaddr_storage) \
+	+ (numsrc) * sizeof(struct sockaddr_storage))
 
 /*
  * Argument for IP_PORTRANGE:

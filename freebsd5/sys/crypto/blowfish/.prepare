@@ -1,0 +1,5 @@
+conflict bf_enc.c
+conflict bf_locl.h
+conflict bf_pi.h
+conflict bf_skey.c
+conflict blowfish.h

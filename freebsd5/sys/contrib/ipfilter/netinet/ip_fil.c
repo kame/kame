@@ -1899,9 +1899,15 @@ struct mbuf *m0, **mpp;
 fr_info_t *fin;
 frdest_t *fdp;
 {
-	struct route_in6 ip6route;
 	struct sockaddr_in6 *dst6;
+#ifdef NEW_STRUCT_ROUTE
+	struct route ip6route;
+	struct route *ro;
+#else
+	struct route_in6 ip6route;
 	struct route_in6 *ro;
+#endif
+	struct nd_ifinfo *ndi;
 	struct ifnet *ifp;
 	frentry_t *fr;
 	int error;
@@ -1941,7 +1947,9 @@ frdest_t *fdp;
 			dst6 = (struct sockaddr_in6 *)ro->ro_rt->rt_gateway;
 		ro->ro_rt->rt_use++;
 
-		if (m0->m_pkthdr.len <= nd_ifinfo[ifp->if_index].linkmtu)
+		ndi = ND_IFINFO(ifp);
+		if (ndi != NULL &&
+		    m0->m_pkthdr.len <= ndi[ifp->if_index].linkmtu)
 			error = nd6_output(ifp, fin->fin_ifp, m0, dst6,
 					   ro->ro_rt);
 		else

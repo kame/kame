@@ -1611,9 +1611,10 @@ ed_attach(sc, unit, flags)
 		ifp->if_ioctl = ed_ioctl;
 		ifp->if_watchdog = ed_watchdog;
 		ifp->if_init = ed_init;
-		ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+		IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
 		ifp->if_linkmib = &sc->mibdata;
 		ifp->if_linkmiblen = sizeof sc->mibdata;
+		IFQ_SET_READY(&ifp->if_snd);
 		/*
 		 * XXX - should do a better job.
 		 */
@@ -2023,7 +2024,7 @@ outloop:
 		ifp->if_flags |= IFF_OACTIVE;
 		return;
 	}
-	IF_DEQUEUE(&ifp->if_snd, m);
+	IFQ_DEQUEUE(&ifp->if_snd, m);
 	if (m == 0) {
 
 		/*

@@ -48,6 +48,26 @@
  *   I would also like to thank Werner for promptly answering email and being
  *   generally helpful.
  */
+/*
+ *  1997/12/02, major update on 1999/04/06 kjc
+ *    new features added:
+ *	- BPF support (link type is DLT_ATM_RFC1483)
+ *	  BPF understands only LLC/SNAP!! (because bpf can't
+ *	  handle variable link header length.)
+ *	  (bpfwrite should work if atm_pseudohdr and LLC/SNAP are prepended.)
+ *	- support vc shaping
+ *	- integrate IPv6 support.
+ *	- support pvc sub interface
+ *
+ *	  initial work on per-pvc-interface for ipv6 was done
+ *	  by Katsushi Kobayashi <ikob@cc.uec.ac.jp> of the WIDE Project.
+ * 	  some of the extensions for pvc subinterfaces are merged from
+ *	  the CAIRN project written by Suresh Bhogavilli (suresh@isi.edu).
+ *
+ *    code cleanup:
+ *	- remove WMAYBE related code.  ENI WMAYBE DMA doen't work.
+ *	- remove updating if_lastchange for every packet.
+ */
 
 #undef	EN_DEBUG
 #undef	EN_DEBUG_RANGE		/* check ranges on en_read/en_write's? */
@@ -125,6 +145,7 @@
 #include <sys/device.h>
 #endif
 #include <sys/sockio.h>
+#include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 
@@ -166,6 +187,16 @@
 #undef vtophys
 #define	vtophys(va)	alpha_XXX_dmamap((vm_offset_t)(va))
 #endif
+
+#ifdef ATM_PVCEXT
+# ifndef NATM
+   /* this is for __KAME__ */
+#  include <netinet/in.h>
+# endif
+# if defined(__KAME__) && defined(INET6)
+#  include <netinet6/in6_ifattach.h>
+# endif
+#endif /*ATM_PVCEXT*/
 
 #ifdef __FreeBSD__
 #define NBPF 1
@@ -216,6 +247,7 @@ struct cfdriver en_cd = {
 };
 #endif
 
+#ifndef __FreeBSD__
 /*
  * local structures
  */
@@ -236,6 +268,7 @@ struct en_launch {
   u_int32_t atm_vci;		/* vci */
   u_int8_t atm_flags;		/* flags */
 };
+#endif
 
 
 /*
@@ -307,6 +340,17 @@ STATIC INLINE	void en_write(struct en_softc *, u_int32_t,
 
 #define EN_READDAT(SC,R) en_read(SC,R)
 #define EN_WRITEDAT(SC,R,V) en_write(SC,R,V)
+
+#ifdef ATM_PVCEXT
+static void rrp_add __P((struct en_softc *, struct ifnet *));
+static struct ifnet *en_pvcattach __P((struct ifnet *));
+static int en_txctl __P((struct en_softc *, int, int, int));
+static int en_pvctx __P((struct en_softc *, struct pvctxreq *));
+static int en_pvctxget __P((struct en_softc *, struct pvctxreq *));
+static int en_pcr2txspeed __P((int));
+static int en_txspeed2pcr __P((int));
+static struct ifnet *en_vci2ifp __P((struct en_softc *, int));
+#endif
 
 /*
  * cooked read/write macros
@@ -625,7 +669,7 @@ u_int totlen, *drqneed;
       if ((m->m_flags & M_EXT) == 0) {
 	m_free(m);
 	m_freem(top);
-	return(NULL);	  /* out of mbuf clusters */
+	return(NULL);	/* out of mbuf clusters */
       }
       m->m_len = MCLBYTES;
     }
@@ -727,6 +771,7 @@ done_probe:
   ifp->if_ioctl = en_ioctl;
   ifp->if_output = atm_output;
   ifp->if_start = en_start;
+  IFQ_SET_READY(&ifp->if_snd);
 
   /*
    * init softc
@@ -753,6 +798,9 @@ done_probe:
     sz -= (EN_TXSZ * 1024);
     sc->txslot[lcv].stop = ptr;
     sc->txslot[lcv].nref = 0;
+#ifdef ATM_PVCEXT
+    sc->txrrp = NULL;
+#endif
     bzero(&sc->txslot[lcv].indma, sizeof(sc->txslot[lcv].indma));
     bzero(&sc->txslot[lcv].q, sizeof(sc->txslot[lcv].q));
 #ifdef EN_DEBUG
@@ -823,6 +871,9 @@ done_probe:
 
 #if NBPF > 0 
   BPFATTACH(ifp, DLT_ATM_RFC1483, sizeof(struct atmllc));
+#endif
+#ifdef ATM_PVCEXT
+  rrp_add(sc, ifp);
 #endif
 }
 
@@ -1186,6 +1237,9 @@ caddr_t data;
 		break;
 #endif
 	case SIOCSIFADDR: 
+#if defined(INET6) && defined(SIOCSIFADDR_IN6)
+	case SIOCSIFADDR_IN6: 
+#endif
 		ifp->if_flags |= IFF_UP;
 #if defined(INET) || defined(INET6)
 		if (ifa->ifa_addr->sa_family == AF_INET
@@ -1206,7 +1260,18 @@ caddr_t data;
 		break;
 
 	case SIOCSIFFLAGS: 
+#ifdef ATM_PVCEXT
+	  	/* point-2-point pvc is allowed to change if_flags */
+		if (((ifp->if_flags & IFF_UP)
+		     && !(ifp->if_flags & IFF_RUNNING))
+		    || (!(ifp->if_flags & IFF_UP)
+			&& (ifp->if_flags & IFF_RUNNING))) {
+			en_reset(sc);
+			en_init(sc);
+		}
+#else
 		error = EINVAL;
+#endif
 		break;
 
 #if defined(SIOCSIFMTU)		/* ??? copied from if_de */
@@ -1229,6 +1294,110 @@ caddr_t data;
 	    en_init(sc);
 	    break;
 #endif /* SIOCSIFMTU */
+
+#ifdef ATM_PVCEXT
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
+		if (ifp == &sc->enif || ifr == 0) {
+			error = EAFNOSUPPORT;	/* XXX */
+			break;
+		}
+		switch (ifr->ifr_addr.sa_family) {
+#ifdef INET
+		case AF_INET:
+			break;
+#endif
+#ifdef INET6
+		case AF_INET6:
+			break;
+#endif
+		default:
+			error = EAFNOSUPPORT;
+			break;
+		}
+		break;
+
+	case SIOCGPVCSIF:
+		if (ifp != &sc->enif) {
+#ifdef __NetBSD__
+		  strcpy(ifr->ifr_name, sc->enif.if_xname);
+#else
+		  sprintf(ifr->ifr_name, "%s%d",
+			  sc->enif.if_name, sc->enif.if_unit);
+#endif
+		}
+		else
+		  error = EINVAL;
+		break;
+
+	case SIOCSPVCSIF:
+		if (ifp == &sc->enif) {
+		  struct ifnet *sifp;
+		    
+#if (__FreeBSD_version >= 400000)
+		  if ((error = suser(curproc)) != 0)
+		    break;
+#else
+		  if (error = suser(curproc->p_ucred, &curproc->p_acflag))
+		    break;
+#endif
+
+		  if ((sifp = en_pvcattach(ifp)) != NULL) {
+#ifdef __NetBSD__
+		    strcpy(ifr->ifr_name, sifp->if_xname);
+#else
+		    sprintf(ifr->ifr_name, "%s%d",
+			    sifp->if_name, sifp->if_unit);
+#endif
+#if defined(__KAME__) && defined(INET6)
+		    /* get EUI64 for PVC, from ATM hardware interface */
+		    in6_ifattach(sifp, ifp);
+#endif
+		  }
+		  else
+		    error = ENOMEM;
+		}
+		else
+		  error = EINVAL;
+		break;
+
+	case SIOCGPVCTX:
+		error = en_pvctxget(sc, (struct pvctxreq *)data);
+		break;
+
+	case SIOCSPVCTX:
+#if (__FreeBSD_version >= 400000)
+		if ((error = suser(curproc)) == 0)
+			error = en_pvctx(sc, (struct pvctxreq *)data);
+#else
+		if ((error = suser(curproc->p_ucred, &curproc->p_acflag)) == 0)
+			error = en_pvctx(sc, (struct pvctxreq *)data);
+#endif
+		break;
+
+	case SIOCGPVCFWD:
+	{
+		struct pvcfwdreq *req = (struct pvcfwdreq *)data;
+		error = pvc_set_fwd(req->pvc_ifname, req->pvc_ifname2, 2);
+		break;
+	}	
+
+	case SIOCSPVCFWD:
+	{
+		struct pvcfwdreq *req = (struct pvcfwdreq *)data;
+#if (__FreeBSD_version >= 400000)
+		if ((error = suser(curproc)) == 0)
+			error = pvc_set_fwd(req->pvc_ifname, req->pvc_ifname2,
+					    req->pvc_op);
+#else
+		if ((error = suser(curproc->p_ucred, &curproc->p_acflag)) == 0)
+			error = pvc_set_fwd(req->pvc_ifname, req->pvc_ifname2,
+					    req->pvc_op);
+#endif
+		break;
+	}
+
+#endif /* ATM_PVCEXT */
 
 	default: 
 	    error = EINVAL;
@@ -1371,12 +1540,14 @@ struct en_softc *sc;
       if (m == NULL) 
 	break;		/* >>> exit 'while(1)' here <<< */
       m_freem(m);
+      IF_DROP(&sc->enif.if_snd);
     }
     while (1) {
       _IF_DEQUEUE(&sc->rxslot[slot].q, m);
       if (m == NULL) 
 	break;		/* >>> exit 'while(1)' here <<< */
       m_freem(m);
+      IF_DROP(&sc->enif.if_snd);
     }
     sc->rxslot[slot].oth_flags &= ~ENOTHER_SWSL;
     if (sc->rxslot[slot].oth_flags & ENOTHER_DRAIN) {
@@ -1405,7 +1576,6 @@ struct en_softc *sc;
 	break;		/* >>> exit 'while(1)' here <<< */
       m_freem(m);
     }
-
     sc->txslot[lcv].mbsize = 0;
   }
 
@@ -1424,8 +1594,23 @@ struct en_softc *sc;
 {
   int vc, slot;
   u_int32_t loc;
+#ifdef ATM_PVCEXT
+    struct pvcsif *pvcsif;
+#endif
 
   if ((sc->enif.if_flags & IFF_UP) == 0) {
+#ifdef ATM_PVCEXT
+    LIST_FOREACH(pvcsif, &sc->sif_list, sif_links) {
+      if (pvcsif->sif_if.if_flags & IFF_UP) {
+	/*
+	 * down the device only when there is no active pvc subinterface.
+	 * if there is, we have to go through the init sequence to reflect
+	 * the software states to the device.
+	 */
+	goto up;
+      }
+    }
+#endif
 #ifdef EN_DEBUG
     printf("%s: going down\n", sc->sc_dev.dv_xname);
 #endif
@@ -1434,10 +1619,18 @@ struct en_softc *sc;
     return;
   }
 
+#ifdef ATM_PVCEXT
+ up:
+#endif
 #ifdef EN_DEBUG
   printf("%s: going up\n", sc->sc_dev.dv_xname);
 #endif
   sc->enif.if_flags |= IFF_RUNNING;	/* enable */
+#ifdef ATM_PVCEXT
+  LIST_FOREACH(pvcsif, &sc->sif_list, sif_links) {
+    pvcsif->sif_if.if_flags |= IFF_RUNNING;
+  }
+#endif
 
   if (sc->en_busreset)
     sc->en_busreset(sc);
@@ -1554,7 +1747,6 @@ struct ifnet *ifp;
 
 {
     struct en_softc *sc = (struct en_softc *) ifp->if_softc;
-    struct ifqueue *ifq = &ifp->if_snd; /* if INPUT QUEUE */
     struct mbuf *m, *lastm, *prev;
     struct atm_pseudohdr *ap, *new_ap;
     int txchan, mlen, got, need, toadd, cellcnt, first;
@@ -1571,7 +1763,7 @@ struct ifnet *ifp;
 
     while (1) {
 
-      IF_DEQUEUE(ifq, m);
+      IFQ_DEQUEUE(&ifp->if_snd, m);
       if (m == NULL)
 	return;		/* EMPTY: >>> exit here <<< */
     
@@ -1597,6 +1789,7 @@ struct ifnet *ifp;
 	    if (en_mfix(sc, &lastm, prev) == 0) {	/* failed? */
 	      m_freem(m);
 	      m = NULL;
+	      sc->enif.if_oerrors++;
               break;
             }
 	    if (first)
@@ -1630,6 +1823,7 @@ struct ifnet *ifp;
 	printf("%s: output vpi=%d, vci=%d out of card range, dropping...\n", 
 		sc->sc_dev.dv_xname, atm_vpi, atm_vci);
 	m_freem(m);
+	sc->enif.if_oerrors++;
 	continue;
       }
 
@@ -1709,6 +1903,7 @@ struct ifnet *ifp;
       if (sc->txslot[txchan].mbsize > EN_TXHIWAT) {
 	EN_COUNT(sc->txmbovr);
 	m_freem(m);
+	IF_DROP(&ifp->if_snd);
 #ifdef EN_DEBUG
 	printf("%s: tx%d: buffer space shortage\n", sc->sc_dev.dv_xname,
 		txchan);
@@ -2105,7 +2300,12 @@ again:
    */
 
   EN_COUNT(sc->launch);
+#ifdef ATM_PVCEXT
+  /* if there's a subinterface for this vci, override ifp. */
+  ifp = en_vci2ifp(sc, launch.atm_vci);
+#else
   ifp = &sc->enif;
+#endif
   ifp->if_opackets++;
   
   if ((launch.atm_flags & EN_OBHDR) == 0) {
@@ -2162,6 +2362,7 @@ dequeue_drop:
   if (launch.t != tmp)
     panic("en dequeue drop");
   m_freem(launch.t);
+  IF_DROP(&sc->enif.if_snd);
   sc->txslot[chan].mbsize -= launch.mlen;
   goto again;
 }
@@ -2303,7 +2504,7 @@ struct en_launch *l;
       cnt = (need - len) % sizeof(u_int32_t);
       if (cnt && M_TRAILINGSPACE(tmp) >= cnt)
         len += cnt;			/* pad for FLUSH */
-    }
+    } 
       
 #if !defined(MIDWAY_ENIONLY)
 
@@ -2708,8 +2909,15 @@ void *arg;
 		EN_DQ_LEN(drq), sc->rxslot[slot].rxhand);
 #endif
 
+#ifdef ATM_PVCEXT
+	  /* if there's a subinterface for this vci, override ifp. */
+	  ifp = en_vci2ifp(sc, sc->rxslot[slot].atm_vci);
+	  ifp->if_ipackets++;
+	  m->m_pkthdr.rcvif = ifp;	/* XXX */
+#else
 	  ifp = &sc->enif;
 	  ifp->if_ipackets++;
+#endif
 
 #if NBPF > 0
 	  if (ifp->if_bpf)
@@ -2797,6 +3005,28 @@ void *arg;
 #ifdef EN_STAT
   sc->otrash += MID_OTRASH(reg);
   sc->vtrash += MID_VTRASH(reg);
+#endif
+
+#ifdef ATM_PVCEXT
+  /*
+   * when the tx buffer is full, packets are left in the interface queue.
+   * (en dequeues all packets even when the tx buffer is full.)
+   * call en_start for each pvc interface using round-robin scheduling
+   * to avoid starvation.
+   */
+  if (kick) {
+    struct rrp *rrp_start;
+
+    if ((rrp_start = sc->txrrp) != NULL) {
+      while (1) {
+	en_start(sc->txrrp->ifp);
+	if (sc->txrrp->next == rrp_start)
+	  break;
+	else
+	  sc->txrrp = sc->txrrp->next;
+      }
+    }
+  }
 #endif
 
   EN_INTR_RET(1); /* for us */
@@ -2944,7 +3174,11 @@ defer:					/* defer processing */
 	}
 	fill = tlen;
 
+#ifdef ATM_PVCEXT
+	ifp = en_vci2ifp(sc, vci);
+#else
 	ifp = &sc->enif;
+#endif
 	ifp->if_ierrors++;
 
       }
@@ -3465,3 +3699,422 @@ int unit, addr, len;
   return(0);
 }
 #endif
+
+#ifdef ATM_PVCEXT
+/*
+ * ATM PVC extention: shaper control and pvc subinterfaces
+ */
+
+/*
+ * the list of the interfaces sharing the physical device.
+ * in order to avoid starvation, the interfaces are scheduled in
+ * a round-robin fashion when en_start is called from tx complete
+ * interrupts.
+ */
+static void rrp_add(sc, ifp)
+	struct en_softc *sc;
+	struct ifnet *ifp;
+{
+	struct rrp *head, *p, *new;
+
+	head = sc->txrrp;
+	if ((p = head) != NULL) {
+		while (1) {
+			if (p->ifp == ifp) {
+				/* an entry for this ifp already exits */
+				p->nref++;
+				return;
+			}
+			if (p->next == head)
+				break;
+			p = p->next;
+		}
+	}
+	
+	/* create a new entry */
+	MALLOC(new, struct rrp *, sizeof(struct rrp), M_DEVBUF, M_WAITOK);
+	if (new == NULL) {
+		printf("en_rrp_add: malloc failed!\n");
+		return;
+	}
+
+	new->ifp = ifp;
+	new->nref = 1;
+
+	if (p == NULL) {
+		/* this is the only one in the list */
+		new->next = new;
+		sc->txrrp = new;
+	}
+	else {
+		/* add the new entry at the tail of the list */
+		new->next = p->next;
+		p->next = new;
+	}
+}
+
+#if 0 /* not used */
+static void rrp_delete(sc, ifp)
+	struct en_softc *sc;
+	struct ifnet *ifp;
+{
+	struct rrp *head, *p, *prev;
+
+	head = sc->txrrp;
+
+	prev = head;
+	if (prev == NULL) {
+		printf("rrp_delete: no list!\n");
+		return;
+	}
+	p = prev->next;
+
+	while (1) {
+		if (p->ifp == ifp) {
+			p->nref--;
+			if (p->nref > 0)
+				return;
+			/* remove this entry */
+			if (p == prev) {
+				/* this is the only entry in the list */
+				sc->txrrp = NULL;
+			}
+			else {
+				prev->next = p->next;
+				if (head == p)
+					sc->txrrp = p->next;
+			}
+			FREE(p, M_DEVBUF);
+		}
+		prev = p;
+		p = prev->next;
+		if (prev == head) {
+			printf("rrp_delete: no matching entry!\n");
+			return;
+		}
+	}
+}
+#endif /* 0 */
+
+static struct ifnet *
+en_vci2ifp(sc, vci)
+	struct en_softc *sc;
+	int vci;
+{
+	struct pvcsif *pvcsif;
+
+	LIST_FOREACH(pvcsif, &sc->sif_list, sif_links) {
+		if (vci == pvcsif->sif_vci)
+			return (&pvcsif->sif_if);
+	}
+	return (&sc->enif);
+}
+
+/*
+ * create and attach per pvc subinterface
+ * (currently detach is not supported)
+ */
+static struct ifnet *
+en_pvcattach(ifp)
+	struct ifnet *ifp;
+{
+	struct en_softc *sc = (struct en_softc *) ifp->if_softc;
+	struct ifnet *pvc_ifp;
+	int s;
+
+	if ((pvc_ifp = pvcsif_alloc()) == NULL)
+		return (NULL);
+
+	pvc_ifp->if_softc = sc;
+	pvc_ifp->if_ioctl = en_ioctl;
+	pvc_ifp->if_start = en_start;
+	pvc_ifp->if_flags = (IFF_POINTOPOINT|IFF_MULTICAST) |
+		(ifp->if_flags & (IFF_RUNNING|IFF_SIMPLEX|IFF_NOTRAILERS));
+	IFQ_SET_READY(&pvc_ifp->if_snd);
+
+	s = splimp();
+	LIST_INSERT_HEAD(&sc->sif_list, (struct pvcsif *)pvc_ifp, sif_links);
+	if_attach(pvc_ifp);
+	atm_ifattach(pvc_ifp); 
+
+#if NBPF > 0 
+	BPFATTACH(pvc_ifp, DLT_ATM_RFC1483, sizeof(struct atmllc));
+#endif
+#ifdef ATM_PVCEXT
+	rrp_add(sc, pvc_ifp);
+#endif
+	splx(s);
+
+	return (pvc_ifp);
+}
+
+
+/* txspeed conversion derived from linux drivers/atm/eni.c
+   by Werner Almesberger, EPFL LRC */
+static const int pre_div[] = { 4,16,128,2048 };
+
+static int en_pcr2txspeed(pcr)
+	int pcr;
+{
+	int pre, res, div;
+
+	if (pcr == 0 || pcr > 347222)
+		pre = res = 0;	/* max rate */
+	else {
+		for (pre = 0; pre < 3; pre++)
+			if (25000000/pre_div[pre]/64 <= pcr)
+				break;
+		div = pre_div[pre]*(pcr);
+#if 1
+		/*
+		 * the shaper value should be rounded down,
+		 * instead of rounded up.
+		 * (which means "res" should be rounded up.)
+		 */
+		res = (25000000 + div -1)/div - 1;
+#else
+		res = 25000000/div-1;
+#endif
+		if (res < 0)
+			res = 0;
+		if (res > 63)
+			res = 63;
+	}
+	return ((pre << 6) + res);
+}
+
+static int en_txspeed2pcr(txspeed)
+	int txspeed;
+{
+	int pre, res, pcr;
+
+	pre = (txspeed >> 6) & 0x3;
+	res = txspeed & 0x3f;
+	pcr = 25000000 / pre_div[pre] / (res+1);
+	return (pcr);
+}
+
+/*
+ * en_txctl selects a hardware transmit channel and sets the shaper value.
+ * en_txctl should be called after enabling the vc by en_rxctl
+ * since it assumes a transmit channel is already assigned by en_rxctl
+ * to the vc.
+ */
+static int en_txctl(sc, vci, joint_vci, pcr)
+	struct en_softc *sc;
+	int vci;
+	int joint_vci;
+	int pcr;
+{
+	int txspeed, txchan, s;
+
+	if (pcr)
+		txspeed = en_pcr2txspeed(pcr);
+	else
+		txspeed = 0;
+
+	s = splimp();
+	txchan = sc->txvc2slot[vci];
+	sc->txslot[txchan].nref--;
+    
+	/* select a slot */
+	if (joint_vci != 0)
+		/* use the same channel */
+		txchan = sc->txvc2slot[joint_vci];
+	else if (pcr == 0)
+		txchan = 0;
+	else {
+		for (txchan = 1; txchan < EN_NTX; txchan++) {
+			if (sc->txslot[txchan].nref == 0)
+				break;
+		}
+	}
+	if (txchan == EN_NTX) {
+#if 1
+		/* no free slot! */
+		splx(s);
+		return (ENOSPC);
+#else
+		/*
+		 * to allow multiple vc's to share a slot,
+		 * use a slot with the smallest reference count
+		 */
+		int slot = 1;
+		txchan = 1;
+		for (slot = 2; slot < EN_NTX; slot++)
+			if (sc->txslot[slot].nref < sc->txslot[txchan].nref)
+				txchan = slot;
+#endif
+	}
+
+	sc->txvc2slot[vci] = txchan;
+	sc->txslot[txchan].nref++;
+
+	/* set the shaper parameter */
+	sc->txspeed[vci] = (u_int8_t)txspeed;
+
+	splx(s);
+#ifdef EN_DEBUG
+	printf("VCI:%d PCR set to %d, tx channel %d\n", vci, pcr, txchan);
+	if (joint_vci != 0)
+		printf("  slot shared with VCI:%d\n", joint_vci);
+#endif
+	return (0);
+}
+
+static int en_pvctx(sc, pvcreq)
+	struct en_softc *sc;
+	struct pvctxreq *pvcreq;
+{
+	struct ifnet *ifp;
+	struct atm_pseudoioctl api;
+	struct atm_pseudohdr *pvc_aph, *pvc_joint;
+	int vci, joint_vci, pcr;
+	int error = 0;
+
+	/* check vpi:vci values */
+	pvc_aph = &pvcreq->pvc_aph;
+	pvc_joint = &pvcreq->pvc_joint;
+
+	vci = ATM_PH_VCI(pvc_aph);
+	joint_vci = ATM_PH_VCI(pvc_joint);
+	pcr = pvcreq->pvc_pcr;
+
+	if (ATM_PH_VPI(pvc_aph) != 0 || vci >= MID_N_VC ||
+	    ATM_PH_VPI(pvc_joint) != 0 || joint_vci >= MID_N_VC)
+		return (EADDRNOTAVAIL);
+
+	if ((ifp = ifunit(pvcreq->pvc_ifname)) == NULL)
+		return (ENXIO);
+
+	if (pcr < 0) {
+		/* negative pcr means disable the vc. */
+		if (sc->rxvc2slot[vci] == RX_NONE)
+			/* already disabled */
+			return 0;
+
+		ATM_PH_FLAGS(&api.aph) = 0;
+		ATM_PH_VPI(&api.aph) = 0;
+		ATM_PH_SETVCI(&api.aph, vci);
+		api.rxhand = NULL;
+
+		error = en_rxctl(sc, &api, 0);
+		
+		if (error == 0 && &sc->enif != ifp) {
+			/* clear vc info of this subinterface */
+			struct pvcsif *pvcsif = (struct pvcsif *)ifp;
+
+			ATM_PH_SETVCI(&api.aph, 0);
+			pvcsif->sif_aph = api.aph;
+			pvcsif->sif_vci = 0;
+		}
+		return (error);
+	}
+
+	if (&sc->enif == ifp) {
+		/* called for an en interface */
+		if (sc->rxvc2slot[vci] == RX_NONE) {
+			/* vc is not active */
+#ifdef __NetBSD__
+			printf("%s: en_pvctx: rx not active! vci=%d\n",
+			       ifp->if_xname, vci);
+#else
+			printf("%s%d: en_pvctx: rx not active! vci=%d\n",
+			       ifp->if_name, ifp->if_unit, vci);
+#endif
+			return (EINVAL);
+		}
+	}
+	else {
+		/* called for a pvc subinterface */
+		struct pvcsif *pvcsif = (struct pvcsif *)ifp;
+
+#ifdef __NetBSD__
+    		strcpy(pvcreq->pvc_ifname, sc->enif.if_xname);
+#else
+    		sprintf(pvcreq->pvc_ifname, "%s%d",
+			sc->enif.if_name, sc->enif.if_unit);
+#endif
+		ATM_PH_FLAGS(&api.aph) =
+			(ATM_PH_FLAGS(pvc_aph) & (ATM_PH_AAL5|ATM_PH_LLCSNAP));
+		ATM_PH_VPI(&api.aph) = 0;
+		ATM_PH_SETVCI(&api.aph, vci);
+		api.rxhand = NULL;
+		pvcsif->sif_aph = api.aph;
+		pvcsif->sif_vci = ATM_PH_VCI(&api.aph);
+
+		if (sc->rxvc2slot[vci] == RX_NONE) {
+			/* vc is not active, enable rx */
+			error = en_rxctl(sc, &api, 1);
+			if (error)
+				return error;
+		}
+		else {
+			/* vc is already active, update aph in softc */
+			sc->rxslot[sc->rxvc2slot[vci]].atm_flags =
+				ATM_PH_FLAGS(&api.aph);
+		}
+	}
+
+	error = en_txctl(sc, vci, joint_vci, pcr);
+
+	if (error == 0) {
+		if (sc->txspeed[vci] != 0)
+			pvcreq->pvc_pcr = en_txspeed2pcr(sc->txspeed[vci]);
+		else
+			pvcreq->pvc_pcr = 0;
+	}
+
+	return error;
+}
+
+static int en_pvctxget(sc, pvcreq)
+	struct en_softc *sc;
+	struct pvctxreq *pvcreq;
+{
+	struct pvcsif *pvcsif;
+	struct ifnet *ifp;
+	int vci, slot;
+
+	if ((ifp = ifunit(pvcreq->pvc_ifname)) == NULL)
+		return (ENXIO);
+
+	if (ifp == &sc->enif) {
+		/* physical interface: assume vci is specified */
+		struct atm_pseudohdr *pvc_aph;
+
+		pvc_aph = &pvcreq->pvc_aph;
+		vci = ATM_PH_VCI(pvc_aph);
+		if ((slot = sc->rxvc2slot[vci]) == RX_NONE)
+			ATM_PH_FLAGS(pvc_aph) = 0;
+		else
+			ATM_PH_FLAGS(pvc_aph) = sc->rxslot[slot].atm_flags;
+		ATM_PH_VPI(pvc_aph) = 0;
+	}
+	else {
+		/* pvc subinterface */
+#ifdef __NetBSD__
+		strcpy(pvcreq->pvc_ifname, sc->enif.if_xname);
+#else
+		sprintf(pvcreq->pvc_ifname, "%s%d",
+			sc->enif.if_name, sc->enif.if_unit);
+#endif
+		pvcsif = (struct pvcsif *)ifp;
+		pvcreq->pvc_aph = pvcsif->sif_aph;
+		vci = pvcsif->sif_vci;
+	}
+
+	if ((slot = sc->rxvc2slot[vci]) == RX_NONE) {
+		/* vc is not active */
+		ATM_PH_FLAGS(&pvcreq->pvc_aph) = 0;
+		pvcreq->pvc_pcr = -1;
+	}
+	else if (sc->txspeed[vci])
+		pvcreq->pvc_pcr = en_txspeed2pcr(sc->txspeed[vci]);
+	else
+		pvcreq->pvc_pcr = 0;
+
+	return (0);
+}
+
+#endif /* ATM_PVCEXT */

@@ -231,6 +231,7 @@ MIASM =  \
 	getresgid.o \
 	kqueue.o \
 	kevent.o \
+	sctp_peeloff.o \
 	extattr_set_fd.o \
 	extattr_get_fd.o \
 	extattr_delete_fd.o \

@@ -105,6 +105,13 @@ SYSCTL_INT(_net_inet_tcp, OID_AUTO, local_slowstart_flightsize, CTLFLAG_RW,
 int     tcp_do_newreno = 1;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, newreno, CTLFLAG_RW, &tcp_do_newreno,
         0, "Enable NewReno Algorithms");
+
+#if 1 /* TCP_ECN */
+int	tcp_do_ecn = 0;		/* RFC3168 ECN enabled/disabled? */
+SYSCTL_INT(_net_inet_tcp, OID_AUTO, ecn, CTLFLAG_RW, &tcp_do_ecn,
+	   0, "Enable ECN (Explicit Congestion Notification)");
+#endif
+
 /*
  * Tcp output routine: figure out what should be sent and send it.
  */
@@ -132,6 +139,9 @@ tcp_output(struct tcpcb *tp)
 
 	isipv6 = (tp->t_inpcb->inp_vflag & INP_IPV6) != 0;
 #endif
+#ifdef TCP_ECN
+	int needect;
+#endif
 
 #ifndef INET6
 	mtx_assert(&tp->t_inpcb->inp_mtx, MA_OWNED);
@@ -156,7 +166,7 @@ tcp_output(struct tcpcb *tp)
 		int ss = ss_fltsz;
 #ifdef INET6
 		if (isipv6) {
-			if (in6_localaddr(&tp->t_inpcb->in6p_faddr))
+			if (in6_localaddr(&tp->t_inpcb->in6p_fsa))
 				ss = ss_fltsz_local;
 		} else
 #endif /* INET6 */
@@ -718,6 +728,39 @@ send:
 		bcopy(opt, th + 1, optlen);
 		th->th_off = (sizeof (struct tcphdr) + optlen) >> 2;
 	}
+#ifdef TCP_ECN
+	if (tcp_do_ecn) {
+		/*
+		 * if we have received congestion experienced segs,
+		 * set ECE bit.
+		 */
+		if (tp->t_flags & TF_RCVD_CE) {
+			flags |= TH_ECE;
+			tcpstat.tcps_ecn_sndece++;
+		}
+		if (!(tp->t_flags & TF_DISABLE_ECN)) {
+			/*
+			 * if this is a SYN seg, set ECE and CWR.
+			 * set only ECE for SYN-ACK if peer supports ECN.
+			 */
+			if ((flags & (TH_SYN|TH_ACK)) == TH_SYN)
+				flags |= (TH_ECE|TH_CWR);
+			else if ((tp->t_flags & TF_ECN_PERMIT) &&
+				 (flags & (TH_SYN|TH_ACK)) == (TH_SYN|TH_ACK))
+				flags |= TH_ECE;
+		}
+		/*
+		 * if we have reduced the congestion window, notify
+		 * the peer by setting CWR bit.
+		 */
+		if ((tp->t_flags & TF_ECN_PERMIT) &&
+		    (tp->t_flags & TF_SEND_CWR)) {
+			flags |= TH_CWR;
+			tp->t_flags &= ~TF_SEND_CWR;
+			tcpstat.tcps_ecn_sndcwr++;
+		}
+	}
+#endif
 	th->th_flags = flags;
 	/*
 	 * Calculate receive window.  Don't shrink window,
@@ -862,6 +905,22 @@ send:
 	 * to handle ttl and tos; we could keep them in
 	 * the template, but need a way to checksum without them.
 	 */
+#ifdef TCP_ECN
+	/*
+	 * if peer is ECN capable, set the ECT bit in the IP header.
+	 * but don't set ECT for a pure ack, a retransmit or a window probe.
+	 */
+	needect = 0;
+	if (tcp_do_ecn && (tp->t_flags & TF_ECN_PERMIT)) {
+		if (len == 0 || SEQ_LT(tp->snd_nxt, tp->snd_max) ||
+		    (tp->t_force && len == 1)) {
+			/* don't set ECT */
+		} else {
+			needect = 1;
+			tcpstat.tcps_ecn_sndect++;
+		}
+	}
+#endif
 	/*
 	 * m->m_pkthdr.len should have been set before cksum calcuration,
 	 * because in6_cksum() need it.
@@ -879,12 +938,28 @@ send:
 					       tp->t_inpcb->in6p_route.ro_rt->rt_ifp
 					       : NULL);
 
-		/* TODO: IPv6 IP6TOS_ECT bit on */
+#ifdef TCP_ECN
+		if (needect)
+			ip6->ip6_flow |= htonl(IPTOS_ECN_ECT0 << 20);
+#endif
+		if (!ip6_setpktaddrs(m, &tp->t_inpcb->in6p_lsa,
+				     &tp->t_inpcb->in6p_fsa)) {
+			m_freem(m);
+			error = ENOBUFS;
+			goto out;
+		}
+#if (defined(__FreeBSD__) && __FreeBSD_version > 500000)
 		error = ip6_output(m,
 			    tp->t_inpcb->in6p_outputopts,
 			    &tp->t_inpcb->in6p_route,
 			    (so->so_options & SO_DONTROUTE), NULL, NULL,
 			    tp->t_inpcb);
+#else
+		error = ip6_output(m,
+			    tp->t_inpcb->in6p_outputopts,
+			    &tp->t_inpcb->in6p_route,
+			    (so->so_options & SO_DONTROUTE), NULL, NULL);
+#endif
 	} else
 #endif /* INET6 */
     {
@@ -900,6 +975,10 @@ send:
 #endif /* INET6 */
 	ip->ip_ttl = tp->t_inpcb->inp_ip_ttl;	/* XXX */
 	ip->ip_tos = tp->t_inpcb->inp_ip_tos;	/* XXX */
+#ifdef TCP_ECN
+	if (needect)
+		ip->ip_tos |= IPTOS_ECN_ECT0;
+#endif
 	/*
 	 * See if we should do MTU discovery.  We do it only if the following
 	 * are true:

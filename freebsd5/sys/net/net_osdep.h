@@ -1,5 +1,4 @@
-/*	$FreeBSD: src/sys/net/net_osdep.h,v 1.8 2002/04/19 04:46:21 suz Exp $	*/
-/*	$KAME: net_osdep.h,v 1.68 2001/12/21 08:14:58 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.75 2002/12/02 14:28:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -91,10 +90,6 @@
  *		struct proc *p;
  *		if (p && !suser(p))
  *			privileged;
- *	FreeBSD 5
- *		struct thread *td;
- *		if (suser(td))
- *			privileged;
  *	OpenBSD, BSDI [34], FreeBSD 2
  *		struct socket *so;
  *		if (so->so_state & SS_PRIV)
@@ -110,6 +105,18 @@
  *		need caddr_t * (= if_bpf **) and struct ifnet *
  *	FreeBSD 2, FreeBSD 3, NetBSD post-1.5N
  *		need only struct ifnet * as argument
+ *
+ * - bpfattach:
+ *	OpenBSD, NetBSD 1.5, BSDI [34]
+ *		bpfattach(caddr_t *, struct ifnet *, u_int, u_int)
+ *	FreeBSD, NetBSD 1.6:
+ *		bpfattach(struct ifnet *, u_int, u_int)
+ *
+ * - bpf_mtap:
+ *	OpenBSD, NetBSD, BSDI [34]
+ *		bpf_mtap(caddr_t, struct mbuf *)
+ *	FreeBSD
+ *		bpf_mtap(struct ifnet *, struct mbuf *)
  *
  * - struct ifnet
  *			use queue.h?	member names	if name
@@ -149,7 +156,8 @@
  *	FreeBSD [34]
  *		time_second
  *	if you need portability, #ifdef out FreeBSD[34], or use microtime(&tv)
- *	then touch tv.tv_sec (note: microtime is an expensive operation).
+ *	then touch tv.tv_sec (note: microtime is an expensive operation, so
+ *	the use of mono_time is preferred).
  *
  * - sysctl
  *	NetBSD, OpenBSD
@@ -190,11 +198,11 @@
  *	we have updated sys/systm.h to include declaration.
  *
  * - splnet()
- *	NetBSD 1.4 or later requires splsoftnet().
+ *	NetBSD 1.4 or later, and OpenBSD, requires splsoftnet().
  *	other operating systems use splnet().
  *
  * - splimp()
- *	NetBSD-current (2001/4/13): use splnet() in network, splvm() in vm.
+ *	NetBSD 1.6: use splnet() in network, splvm() in vm.
  *	other operating systems: use splimp().
  *
  * - dtom()
@@ -226,7 +234,7 @@
  *
  * - protosw in general.
  *	NetBSD 1.5 has extra member for ipfilter (netbsd-current dropped
- *	it so it will go away in 1.6).
+ *	it so it went away in 1.6).
  *	NetBSD 1.5 requires PR_LISTEN flag bit with protocols that permit
  *	listen/accept (like tcp).
  *
@@ -289,55 +297,74 @@
  *	openbsd30: M_COPY_PKTHDR is deprecated.  use M_MOVE_PKTHDR or
  *		M_DUP_PKTHDR, depending on how you want to handle m_tag.
  *	others: M_COPY_PKTHDR is available as usual.
+ *
+ * - M_READONLY() macro
+ *	OpenBSD 3.0 and NetBSD 1.6 has it.
+ *	FreeBSD 4.x uses M_WRITABLE() macro, which is opposite (NIH!).
+ *	KAME tree has it for all platforms except FreeBSD 4.x.
  */
 
 #ifndef __NET_NET_OSDEP_H_DEFINED_
 #define __NET_NET_OSDEP_H_DEFINED_
 #ifdef _KERNEL
 
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+#define if_name(ifp)	((ifp)->if_xname)
+#else
 struct ifnet;
-extern const char *if_name(struct ifnet *);
+extern const char *if_name __P((struct ifnet *));
+#endif
 
-#define HAVE_OLD_BPF
+#if defined(__FreeBSD__) || defined(__NetBSD__)
+#define HAVE_NEW_BPFATTACH
+#endif
+#if defined(__FreeBSD__) && __FreeBSD_version < 500000
+#define HAVE_NEW_BPF
+#endif
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #define ifa_list	ifa_link
 #define if_addrlist	if_addrhead
 #define if_list		if_link
+#endif
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+#define HAVE_RATECHECK
+#endif
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+#define HAVE_PPSRATECHECK
+#else
+int ppsratecheck __P((struct timeval *, int *, int));
+#endif
+
+#if defined(__NetBSD__) && __NetBSD_Version__ >= 104000000
+#define ovbcopy(src, dst, len)  memmove((dst), (src), (len))
+#endif
+
+#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#define HAVE_NRL_INPCB
+#endif
 
 /* sys/net/if.h */
-#define IFAREF(ifa)	do { ++(ifa)->ifa_refcnt; } while (0)
+#ifndef __NetBSD__
+#define IFAREF(ifa)	do { ++(ifa)->ifa_refcnt; } while (/*CONSTCOND*/ 0)
+#endif
 
+#if defined(__bsdi__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 #define WITH_CONVERT_AND_STRIP_IP_LEN
+#endif
+#ifdef __NetBSD__
+#define WITH_CONVERT_IP_LEN
+#endif
+
+#if (defined(__bsdi__) && _BSDI_VERSION < 199802) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ < 4)
+#define WITH_CONVERT_IP_ID
+#endif
 
 #if 1				/* at this moment, all OSes do this */
 #define WITH_CONVERT_IP_OFF
 #endif
-
-/*
- * Deprecated.
- */
-#include <sys/module.h>
-#define	PSEUDO_SET(sym, name) \
-	static int name ## _modevent(module_t mod, int type, void *data) \
-	{ \
-		void (*initfunc)(void *) = (void (*)(void *))data; \
-		switch (type) { \
-		case MOD_LOAD: \
-			/* printf(#name " module load\n"); */ \
-			initfunc(NULL); \
-			break; \
-		case MOD_UNLOAD: \
-			printf(#name " module unload - not possible for this module type\n"); \
-			return EINVAL; \
-		} \
-		return 0; \
-	} \
-	static moduledata_t name ## _mod = { \
-		#name, \
-		name ## _modevent, \
-		(void *)sym \
-	}; \
-	DECLARE_MODULE(name, name ## _mod, SI_SUB_PSEUDO, SI_ORDER_ANY)
 
 #endif /*_KERNEL*/
 #endif /*__NET_NET_OSDEP_H_DEFINED_ */

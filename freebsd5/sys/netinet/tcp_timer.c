@@ -480,6 +480,16 @@ tcp_timer_rexmt(xtp)
 	 */
 	if ((tp->t_state == TCPS_SYN_SENT) && (tp->t_rxtshift == 3))
 		tp->t_flags &= ~(TF_REQ_SCALE|TF_REQ_TSTMP|TF_REQ_CC);
+#ifdef TCP_ECN
+	/*
+	 * if ECN is enabled, there might be a broken firewall which
+	 * blocks ecn packets.  fall back to non-ecn.
+	 */
+	if ((tp->t_state == TCPS_SYN_SENT ||
+	     tp->t_state == TCPS_SYN_RECEIVED) &&
+	    tcp_do_ecn && !(tp->t_flags & TF_DISABLE_ECN))
+		tp->t_flags |= TF_DISABLE_ECN;
+#endif
 	/*
 	 * If losing, let the lower level know and try for
 	 * a better route.  Also, if we backed off this far,
@@ -504,6 +514,12 @@ tcp_timer_rexmt(xtp)
 	 * snd_last variable described in RFC 2582
 	 */
 	tp->snd_recover = tp->snd_max;
+#ifdef TCP_ECN
+	tp->t_flags |= TF_SEND_CWR;
+#endif
+#if 1 /* TCP_ECN */
+	tcpstat.tcps_cwr_timeout++;
+#endif
 	/*
 	 * Force a segment to be sent.
 	 */

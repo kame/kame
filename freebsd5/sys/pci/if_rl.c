@@ -1067,7 +1067,8 @@ rl_attach(dev)
 	ifp->if_watchdog = rl_watchdog;
 	ifp->if_init = rl_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Call MI attach routine.
@@ -1386,7 +1387,7 @@ rl_poll (struct ifnet *ifp, enum poll_cmd cmd, int count)
 	sc->rxcycles = count;
 	rl_rxeof(sc);
 	rl_txeof(sc);
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		rl_start(ifp);
 
 	if (cmd == POLL_AND_CHECK_STATUS) { /* also check status register */
@@ -1467,7 +1468,7 @@ rl_intr(arg)
 
 	}
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		rl_start(ifp);
 
 #ifdef DEVICE_POLLING

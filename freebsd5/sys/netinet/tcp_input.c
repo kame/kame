@@ -91,7 +91,6 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#include <netinet6/ipsec6.h>
 #include <netkey/key.h>
 #endif /*IPSEC*/
 
@@ -161,6 +160,19 @@ do { \
 #define DELAY_ACK(tp) \
 	(tcp_delack_enabled && !callout_pending(tp->tt_delack) && \
 	(tp->t_flags & TF_RXWIN0SENT) == 0)
+
+#ifdef TCP_ECN
+/*
+ * ECN (Explicit Congestion Notification) support based on RFC3168
+ *	by Kenjiro Cho <kjc@csl.sony.co.jp>
+ * implementation note:
+ *   snd_recover is used to track a recovery phase.
+ *   when cwnd is reduced, snd_recover is set to snd_max.
+ *   while snd_recover > snd_una, the sender is in a recovery phase and
+ *   its cwnd should not be reduced again.
+ *   snd_recover follows snd_una when not in a recovery phase.
+ */
+#endif
 
 static int
 tcp_reass(tp, th, tlenp, m)
@@ -343,6 +355,9 @@ tcp_input(m, off0)
 	register int thflags;
 	struct socket *so = 0;
 	int todrop, acked, ourfinisacked, needoutput = 0;
+#ifdef INET6
+	struct sockaddr_in6 *src_sa6, *dst_sa6;
+#endif
 	u_long tiwin;
 	struct tcpopt to;		/* options in this segment */
 	struct rmxp_tao *taop;		/* pointer to our TAO cache entry */
@@ -350,6 +365,9 @@ tcp_input(m, off0)
 	int headlocked = 0;
 	struct sockaddr_in *next_hop = NULL;
 	int rstreason; /* For badport_bandlim accounting purposes */
+#ifdef TCP_ECN
+	u_char iptos;
+#endif
 
 	struct ip6_hdr *ip6 = NULL;
 #ifdef INET6
@@ -388,6 +406,9 @@ tcp_input(m, off0)
 		/* IP6_EXTHDR_CHECK() is already done at tcp6_input() */
 		ip6 = mtod(m, struct ip6_hdr *);
 		tlen = sizeof(*ip6) + ntohs(ip6->ip6_plen) - off0;
+#ifdef TCP_ECN
+		iptos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
+#endif
 		if (in6_cksum(m, IPPROTO_TCP, off0, tlen)) {
 			tcpstat.tcps_rcvbadsum++;
 			goto drop;
@@ -425,6 +446,10 @@ tcp_input(m, off0)
 		ipov = (struct ipovly *)ip;
 		th = (struct tcphdr *)((caddr_t)ip + off0);
 		tlen = ip->ip_len;
+#ifdef TCP_ECN
+		/* save ip_tos before clearing it for checksum */
+		iptos = ip->ip_tos;
+#endif
 
 		if (m->m_pkthdr.csum_flags & CSUM_DATA_VALID) {
 			if (m->m_pkthdr.csum_flags & CSUM_PSEUDO_HDR)
@@ -500,6 +525,14 @@ tcp_input(m, off0)
 		goto drop;
 #endif
 
+#ifdef INET6
+	/* extract full sockaddr structures for the src/dst addresses */
+	if (isipv6) {
+		if (ip6_getpktaddrs(m, &src_sa6, &dst_sa6))
+			goto drop;
+	}
+#endif
+
 	/*
 	 * Convert TCP protocol specific fields to host format.
 	 */
@@ -532,9 +565,9 @@ findpcb:
 		 * Transparently forwarded. Pretend to be the destination.
 		 * already got one like this? 
 		 */
-		inp = in_pcblookup_hash(&tcbinfo, ip->ip_src, th->th_sport,
-					ip->ip_dst, th->th_dport,
-					0, m->m_pkthdr.rcvif);
+		inp = in6_pcblookup_hash(&tcbinfo, src_sa6, th->th_sport,
+					 dst_sa6, th->th_dport, 1,
+					 m->m_pkthdr.rcvif);
 		if (!inp) {
 			/* It's new.  Try find the ambushing socket. */
 			inp = in_pcblookup_hash(&tcbinfo,
@@ -548,8 +581,8 @@ findpcb:
 	} else {
 		if (isipv6)
 			inp = in6_pcblookup_hash(&tcbinfo,
-						 &ip6->ip6_src, th->th_sport,
-						 &ip6->ip6_dst, th->th_dport,
+						 src_sa6, th->th_sport,
+						 dst_sa6, th->th_dport,
 						 1, m->m_pkthdr.rcvif);
 		else
 			inp = in_pcblookup_hash(&tcbinfo,
@@ -681,12 +714,18 @@ findpcb:
 		/* skip if this isn't a listen socket */
 		if ((so->so_options & SO_ACCEPTCONN) == 0)
 			goto after_listen;
+
+		bzero(&inc, sizeof(inc));
 #ifdef INET6
 		inc.inc_isipv6 = isipv6;
 #endif
 		if (isipv6) {
-			inc.inc6_faddr = ip6->ip6_src;
-			inc.inc6_laddr = ip6->ip6_dst;
+			inc.inc6_lsa.sin6_family =
+				inc.inc6_fsa.sin6_family = AF_INET6;
+			inc.inc6_lsa.sin6_len = inc.inc6_fsa.sin6_len =
+				sizeof(struct sockaddr_in6);
+			sa6_copy_addr(src_sa6, &inc.inc6_fsa);
+			sa6_copy_addr(dst_sa6, &inc.inc6_lsa);
 			inc.inc6_route.ro_rt = NULL;		/* XXX */
 		} else {
 			inc.inc_faddr = ip->ip_src;
@@ -818,8 +857,7 @@ findpcb:
 		 */
 		if (th->th_dport == th->th_sport) {
 			if (isipv6) {
-				if (IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst,
-						       &ip6->ip6_src))
+				if (SA6_ARE_ADDR_EQUAL(src_sa6, dst_sa6))
 					goto drop;
 			} else {
 				if (ip->ip_dst.s_addr == ip->ip_src.s_addr)
@@ -885,7 +923,7 @@ findpcb:
 			if (DELAY_ACK(tp) &&
 			    ((thflags & TH_FIN) ||
 			     (tlen != 0 &&
-			      ((isipv6 && in6_localaddr(&inp->in6p_faddr)) ||
+			      ((isipv6 && in6_localaddr(&inp->in6p_fsa)) ||
 			       (!isipv6 && in_localaddr(inp->inp_faddr)))))) {
 				callout_reset(tp->tt_delack, tcp_delacktime,  
 						tcp_timer_delack, tp);  
@@ -935,6 +973,13 @@ after_listen:
 			tcp_mss(tp, to.to_mss);
 	}
 
+#ifdef TCP_ECN
+	/* if congestion experienced, set ECE bit in subsequent packets. */
+	if ((iptos & IPTOS_ECN_MASK) == IPTOS_ECN_CE) {
+		tp->t_flags |= TF_RCVD_CE;
+		tcpstat.tcps_ecn_rcvce++;
+	}
+#endif
 	/*
 	 * Header prediction: check for the two common cases
 	 * of a uni-directional data xfer.  If the packet has
@@ -953,7 +998,11 @@ after_listen:
 	 * be TH_NEEDSYN.
 	 */
 	if (tp->t_state == TCPS_ESTABLISHED &&
+#ifdef TCP_ECN
+	    (thflags & (TH_SYN|TH_FIN|TH_RST|TH_URG|TH_ECE|TH_CWR|TH_ACK)) == TH_ACK &&
+#else
 	    (thflags & (TH_SYN|TH_FIN|TH_RST|TH_URG|TH_ACK)) == TH_ACK &&
+#endif
 	    ((tp->t_flags & (TF_NEEDSYN|TF_NEEDFIN)) == 0) &&
 	    ((to.to_flags & TOF_TS) == 0 ||
 	     TSTMP_GEQ(to.to_tsval, tp->ts_recent)) &&
@@ -1026,6 +1075,14 @@ after_listen:
 				tcpstat.tcps_rcvackpack++;
 				tcpstat.tcps_rcvackbyte += acked;
 				sbdrop(&so->so_snd, acked);
+#ifdef TCP_ECN
+				/*
+				 * if not in recovery, sync snd_recover with
+				 * snd_una to avoid wraparound problems.
+				 */
+				if (SEQ_GT(tp->snd_una, tp->snd_recover))
+					tp->snd_recover = tp->snd_una;
+#endif
 				/*
 				 * pull snd_wl2 up to prevent seq wrap relative
 				 * to th_ack.
@@ -1171,6 +1228,11 @@ after_listen:
 			}
 		}
 		if (thflags & TH_RST) {
+#ifdef TCP_ECN
+			/* if ECN is enabled, fall back to non-ecn at rexmit */
+			if (tcp_do_ecn && !(tp->t_flags & TF_DISABLE_ECN))
+				goto drop;
+#endif
 			if (thflags & TH_ACK)
 				tp = tcp_drop(tp, ECONNREFUSED);
 			goto drop;
@@ -1182,6 +1244,23 @@ after_listen:
 
 		tp->irs = th->th_seq;
 		tcp_rcvseqinit(tp);
+#ifdef TCP_ECN
+		/*
+		 * if ECE is set but CWR is not set for SYN-ACK, or
+		 * both ECE and CWR are set for simultaneous open,
+		 * peer is ECN capable.
+		 */
+		if (tcp_do_ecn) {
+			if ((thflags & (TH_ACK|TH_ECE|TH_CWR))
+			    == (TH_ACK|TH_ECE) ||
+			    (thflags & (TH_ACK|TH_ECE|TH_CWR))
+			    == (TH_ECE|TH_CWR)) {
+				tp->t_flags |= TF_ECN_PERMIT;
+				thflags &= ~(TH_ECE|TH_CWR);
+				tcpstat.tcps_ecn_accepts++;
+			}
+		}
+#endif
 		if (thflags & TH_ACK) {
 			/*
 			 * Our SYN was acked.  If segment contains CC.ECHO
@@ -1693,6 +1772,39 @@ trimthenstep6:
 	case TCPS_LAST_ACK:
 	case TCPS_TIME_WAIT:
 
+#ifdef TCP_ECN
+		/*
+		 * if we receive ECE and are not already in recovery phase,
+		 * reduce cwnd by half but don't slow-start.
+		 * advance snd_recover to snd_max not to reduce cwnd again
+		 * until all outstanding packets are acked.
+		 */
+		if (tcp_do_ecn && (thflags & TH_ECE)) {
+			if ((tp->t_flags & TF_ECN_PERMIT) &&
+			    SEQ_GEQ(tp->snd_una, tp->snd_recover)) {
+				u_int win;
+
+				win = min(tp->snd_wnd, tp->snd_cwnd) / tp->t_maxseg;
+				if (win > 1) {
+					tp->snd_ssthresh = win / 2 * tp->t_maxseg;
+					tp->snd_cwnd = tp->snd_ssthresh;
+					tp->snd_recover = tp->snd_max;
+					tp->t_flags |= TF_SEND_CWR;
+					tcpstat.tcps_cwr_ecn++;
+				}
+			}
+			tcpstat.tcps_ecn_rcvece++;
+		}
+		/*
+		 * if we receive CWR, we know that the peer has reduced
+		 * its congestion window.  stop sending ecn-echo.
+		 */
+		if ((thflags & TH_CWR)) {
+			tp->t_flags &= ~TF_RCVD_CE;
+			tcpstat.tcps_ecn_rcvcwr++;
+		}
+#endif /* TCP_ECN */
+
 		if (SEQ_LEQ(th->th_ack, tp->snd_una)) {
 			if (tlen == 0 && tiwin == tp->snd_wnd) {
 				tcpstat.tcps_rcvdupack++;
@@ -1728,9 +1840,12 @@ trimthenstep6:
 					u_int win =
 					    min(tp->snd_wnd, tp->snd_cwnd) / 2 /
 						tp->t_maxseg;
-					if (tcp_do_newreno &&
-					    SEQ_LT(th->th_ack,
-						   tp->snd_recover)) {
+					if ((tcp_do_newreno
+#ifdef TCP_ECN
+					     || tcp_do_ecn
+#endif
+						) && SEQ_LT(th->th_ack,
+							    tp->snd_recover)) {
 						/* False retransmit, should not
 						 * cut window
 						 */
@@ -1747,6 +1862,12 @@ trimthenstep6:
 					tp->t_rtttime = 0;
 					tp->snd_nxt = th->th_ack;
 					tp->snd_cwnd = tp->t_maxseg;
+#ifdef TCP_ECN
+					tp->t_flags |= TF_SEND_CWR;
+#endif
+#if 1 /* TCP_ECN */
+					tcpstat.tcps_cwr_frecovery++;
+#endif
 					(void) tcp_output(tp);
 					tp->snd_cwnd = tp->snd_ssthresh +
 						tp->t_maxseg * tp->t_dupacks;
@@ -1924,6 +2045,11 @@ process_ACK:
 		tp->snd_una = th->th_ack;
 		if (SEQ_LT(tp->snd_nxt, tp->snd_una))
 			tp->snd_nxt = tp->snd_una;
+#ifdef TCP_ECN
+		/* sync snd_recover with snd_una */
+		if (SEQ_GT(tp->snd_una, tp->snd_recover))
+			tp->snd_recover = tp->snd_una;
+#endif
 
 		switch (tp->t_state) {
 
@@ -2658,16 +2784,23 @@ tcp_mss(tp, offer)
 	if (rt->rt_rmx.rmx_mtu)
 		mss = rt->rt_rmx.rmx_mtu - min_protoh;
 	else {
-		if (isipv6) {
-			mss = nd_ifinfo[rt->rt_ifp->if_index].linkmtu -
-				min_protoh;
-			if (!in6_localaddr(&inp->in6p_faddr))
-				mss = min(mss, tcp_v6mssdflt);
-		} else {
-			mss = ifp->if_mtu - min_protoh;
+		mss = 
+#ifdef INET6
+			(isipv6 ? IN6_LINKMTU(rt->rt_ifp) :
+#endif
+			ifp->if_mtu
+#ifdef INET6
+			)
+#endif
+			- min_protoh;
+#ifdef INET6
+  		if (isipv6) {
+			if (!in6_localaddr(&inp->in6p_fsa))
+  				mss = min(mss, tcp_v6mssdflt);
+		} else
+#endif
 			if (!in_localaddr(inp->inp_faddr))
 				mss = min(mss, tcp_mssdflt);
-		}
 	}
 	mss = min(mss, offer);
 	/*
@@ -2737,8 +2870,16 @@ tcp_mss(tp, offer)
 	 * Set the slow-start flight size depending on whether this
 	 * is a local network or not.
 	 */
-	if ((isipv6 && in6_localaddr(&inp->in6p_faddr)) ||
-	    (!isipv6 && in_localaddr(inp->inp_faddr)))
+	if (
+#ifdef INET6
+	    (isipv6 && in6_localaddr(&inp->in6p_fsa)) ||
+	    (!isipv6 &&
+#endif
+	     in_localaddr(inp->inp_faddr)
+#ifdef INET6
+	     )
+#endif
+	    )
 		tp->snd_cwnd = mss * ss_fltsz_local;
 	else 
 		tp->snd_cwnd = mss * ss_fltsz;
@@ -2780,7 +2921,11 @@ tcp_mssopt(tp)
 	if (rt == NULL)
 		return (isipv6 ? tcp_v6mssdflt : tcp_mssdflt);
 
-	return (rt->rt_ifp->if_mtu - min_protoh);
+	return
+#ifdef INET6
+		isipv6 ? IN6_LINKMTU(rt->rt_ifp) :
+#endif
+		rt->rt_ifp->if_mtu - min_protoh;
 }
 
 

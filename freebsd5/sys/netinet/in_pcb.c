@@ -34,6 +34,38 @@
  * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.114 2002/11/08 23:50:32 sam Exp $
  */
 
+/*
+ * Copyright (c) 2002 INRIA. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by INRIA and its
+ *	contributors.
+ * 4. Neither the name of INRIA nor the names of its contributors may be
+ *    used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
 #include "opt_ipsec.h"
 #include "opt_inet6.h"
 
@@ -62,6 +94,10 @@
 #include <netinet/in_pcb.h>
 #include <netinet/in_var.h>
 #include <netinet/ip_var.h>
+#ifdef IGMPV3
+#include <netinet/in_msf.h>
+#endif
+
 #ifdef INET6
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
@@ -165,15 +201,21 @@ in_pcballoc(so, pcbinfo, td)
 	inp->inp_pcbinfo = pcbinfo;
 	inp->inp_socket = so;
 #ifdef IPSEC
-	error = ipsec_init_policy(so, &inp->inp_sp);
+	error = ipsec_init_pcbpolicy(so, &inp->inp_sp);
 	if (error != 0) {
 		uma_zfree(pcbinfo->ipi_zone, inp);
 		return error;
 	}
 #endif /*IPSEC*/
 #if defined(INET6)
-	if (INP_SOCKAF(so) == AF_INET6 && ip6_v6only)
-		inp->inp_flags |= IN6P_IPV6_V6ONLY;
+	if (INP_SOCKAF(so) == AF_INET6) {
+		if (ip6_v6only)
+			inp->inp_flags |= IN6P_IPV6_V6ONLY;
+		inp->in6p_fsa.sin6_family =
+			inp->in6p_lsa.sin6_family = AF_INET6;
+		inp->in6p_fsa.sin6_len =
+			inp->in6p_lsa.sin6_len = sizeof(struct sockaddr_in6);
+	}
 #endif
 	LIST_INSERT_HEAD(pcbinfo->listhead, inp, inp_list);
 	pcbinfo->ipi_count++;
@@ -447,6 +489,10 @@ in_pcbconnect(inp, nam, td)
 	inp->inp_faddr.s_addr = faddr;
 	inp->inp_fport = fport;
 	in_pcbrehash(inp);
+#ifdef IPSEC
+	if (inp->inp_socket->so_type == SOCK_STREAM)
+		ipsec_pcbconn(inp->inp_sp);
+#endif
 	if (anonport)
 		inp->inp_flags |= INP_ANONPORT;
 	return (0);
@@ -629,6 +675,9 @@ in_pcbdisconnect(inp)
 	in_pcbrehash(inp);
 	if (inp->inp_socket->so_state & SS_NOFDREF)
 		in_pcbdetach(inp);
+#ifdef IPSEC
+	ipsec_pcbdisconn(inp->inp_sp);
+#endif
 }
 
 void
@@ -786,6 +835,12 @@ in_pcbpurgeif0(pcbinfo, ifp)
 	struct inpcb *inp;
 	struct ip_moptions *imo;
 	int i, gap;
+#ifdef IGMPV3
+	struct sockaddr_storage *del_ss;
+	u_int16_t numsrc;
+	u_int mode;
+	int final, error;
+#endif
 
 	/* why no splnet here? XXX */
 	INP_INFO_RLOCK(pcbinfo);
@@ -808,7 +863,30 @@ in_pcbpurgeif0(pcbinfo, ifp)
 			for (i = 0, gap = 0; i < imo->imo_num_memberships;
 			    i++) {
 				if (imo->imo_membership[i]->inm_ifp == ifp) {
+#ifdef IGMPV3
+					error = in_getmopt_source_list
+						(imo->imo_msf[i], &numsrc,
+						 &del_ss, &mode);
+					if (error != 0) {
+						/* XXX strange... panic/skip? */
+						if (del_ss != NULL)
+							FREE(del_ss, M_IPMOPTS);
+						continue;
+					}
+					final = 1;
+					in_delmulti(imo->imo_membership[i],
+						    numsrc, del_ss, mode,
+						    final, &error);
+					if (del_ss != NULL)
+						FREE(del_ss, M_IPMOPTS);
+					in_freemopt_source_list
+						(imo->imo_msf[i],
+						 imo->imo_msf[i]->msf_head,
+						 imo->imo_msf[i]->msf_blkhead);
+					IMO_MSF_FREE(imo->imo_msf[i]);
+#else
 					in_delmulti(imo->imo_membership[i]);
+#endif
 					gap++;
 				} else if (gap != 0)
 					imo->imo_membership[i - gap] =
@@ -875,6 +953,12 @@ in_rtchange(inp, errno)
 /*
  * Lookup a PCB based on the local address and port.
  */
+/*
+ * we never select the wildcard pcb which has INP_IPV6 flag if we have
+ * INP_IPV4 only wildcard pcb.  INP_LOOKUP_MAPPED_PCB_COST must be
+ * greater than the max value of matchwild (currently 3).
+ */
+#define INP_LOOKUP_MAPPED_PCB_COST 4
 struct inpcb *
 in_pcblookup_local(pcbinfo, laddr, lport_arg, wild_okay)
 	struct inpcbinfo *pcbinfo;
@@ -883,7 +967,7 @@ in_pcblookup_local(pcbinfo, laddr, lport_arg, wild_okay)
 	int wild_okay;
 {
 	register struct inpcb *inp;
-	int matchwild = 3, wildcard;
+	int matchwild = 3 + INP_LOOKUP_MAPPED_PCB_COST, wildcard;
 	u_short lport = lport_arg;
 
 	if (!wild_okay) {
@@ -937,6 +1021,8 @@ in_pcblookup_local(pcbinfo, laddr, lport_arg, wild_okay)
 #ifdef INET6
 				if ((inp->inp_vflag & INP_IPV4) == 0)
 					continue;
+				if ((inp->inp_vflag & INP_IPV6) != 0)
+					wildcard += INP_LOOKUP_MAPPED_PCB_COST;
 #endif
 				if (inp->inp_faddr.s_addr != INADDR_ANY)
 					wildcard++;
@@ -961,6 +1047,7 @@ in_pcblookup_local(pcbinfo, laddr, lport_arg, wild_okay)
 		return (match);
 	}
 }
+#undef INP_LOOKUP_MAPPED_PCB_COST
 
 /*
  * Lookup PCB in hash list.

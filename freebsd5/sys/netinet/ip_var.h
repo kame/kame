@@ -1,4 +1,41 @@
 /*
+ * Copyright (c) 2002 INRIA. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by INRIA and its
+ *	contributors.
+ * 4. Neither the name of INRIA nor the names of its contributors may be
+ *    used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+/*
+ * Source Specific Multicast (SSM) implementation.
+ *
+ * Developed by Hitoshi Asaeda, INRIA, Feb 2002.
+ */
+
+/*
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -75,6 +112,26 @@ struct ipq {
 #endif /* _KERNEL */
 
 /*
+ * Socket argument of multicast source filters.
+ */
+LIST_HEAD(msf_head, sock_msf_source);
+
+struct sock_msf_source {
+	struct	  sockaddr_storage src;	/* source address */
+	LIST_ENTRY(sock_msf_source) list; /* list of source addresses */
+	u_int	refcount;		/* reference count of the source */
+};
+
+struct sock_msf {
+/*	u_int32_t msf_mode;		 * source filter mode */
+	u_int	  msf_grpjoin;		/* number of (*,G) join requests */
+	struct	  msf_head *msf_head;	/* head of joined source list chain */
+	struct	  msf_head *msf_blkhead;/* head of muted source list chain */
+	u_int16_t msf_numsrc;		/* no. of joined src on this socket */
+	u_int16_t msf_blknumsrc;	/* no. of muted src on this socket */
+};
+
+/*
  * Structure stored in mbuf in inpcb.ip_options
  * and passed to ip_output when ip options are in use.
  * The actual length of the options (including ipopt_dst)
@@ -99,6 +156,7 @@ struct ip_moptions {
 	u_short	imo_num_memberships;	/* no. memberships this socket */
 	struct	in_multi *imo_membership[IP_MAX_MEMBERSHIPS];
 	u_long	imo_multicast_vif;	/* vif num outgoing multicasts */
+	struct  sock_msf *imo_msf[IP_MAX_MEMBERSHIPS];
 };
 
 struct	ipstat {
@@ -160,6 +218,8 @@ extern int	(*legal_vif_num)(int);
 extern u_long	(*ip_mcast_src)(int);
 extern int rsvp_on;
 extern struct	pr_usrreqs rip_usrreqs;
+extern int	igmpmaxsrcfilter;	/* maximum num .of msf per interface */
+extern int	igmpsomaxsrc;		/* maximum num .of msf per socket */
 
 int	 ip_ctloutput(struct socket *, struct sockopt *sopt);
 void	 ip_drain(void);
@@ -182,6 +242,11 @@ void	 ip_stripoptions(struct mbuf *, struct mbuf *);
 u_int16_t	
 	 ip_randomid(void);
 #endif
+struct ifnet *
+	ip_multicast_if(struct in_addr *, int *);
+int	ip_check_router_alert(struct ip *);
+int	ip_getmopt_msflist(struct sock_msf *, u_int16_t *,
+			   struct sockaddr_storage **, u_int *);
 int	rip_ctloutput(struct socket *, struct sockopt *);
 void	rip_ctlinput(int, struct sockaddr *, void *);
 void	rip_init(void);

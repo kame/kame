@@ -79,6 +79,7 @@
 #include <sys/socketvar.h>
 #include <sys/sx.h>
 #include <sys/systm.h>
+#include <sys/syslog.h>
 
 #include <net/if.h>
 #include <net/if_types.h>
@@ -91,18 +92,19 @@
 #include <netinet/in_pcb.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6protosw.h>
+#ifdef ENABLE_DEFAULT_SCOPE
+#include <netinet6/scope6_var.h>
+#endif
 #include <netinet6/ip6_mroute.h>
 #include <netinet6/in6_pcb.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
 #include <netinet6/raw_ip6.h>
-#ifdef ENABLE_DEFAULT_SCOPE
 #include <netinet6/scope6_var.h>
-#endif
+#include <netinet6/raw_ip6.h>
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#include <netinet6/ipsec6.h>
 #endif /*IPSEC*/
 
 #ifdef FAST_IPSEC
@@ -140,10 +142,33 @@ rip6_input(mp, offp, proto)
 	register struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	register struct inpcb *in6p;
 	struct inpcb *last = 0;
-	struct mbuf *opts = NULL;
-	struct sockaddr_in6 rip6src;
+	struct ip6_recvpktopts opts;
+	struct sockaddr_in6 *src, *dst, src_storage, dst_storage, fromsa;
 
 	rip6stat.rip6s_ipackets++;
+
+	/*
+	 * extract full sockaddr structures for the src/dst addresses,
+	 * and make local copies of them.  The copies are necessary
+	 * because the memory that stores src and dst may be freed during
+	 * the process below.
+	 */
+	if (ip6_getpktaddrs(m, &src, &dst)) {
+		m_freem(m);
+		return (IPPROTO_DONE);
+	}
+	src_storage = *src;
+	dst_storage = *dst;
+	src = &src_storage;
+	dst = &dst_storage;
+	/*
+	 * XXX: the address may have embedded scope zone ID, which should be
+	 * hidden from applications.
+	 */
+	fromsa = *src;
+#ifndef SCOPEDROUTING
+	in6_clearscope(&fromsa.sin6_addr);
+#endif
 
 	if (faithprefix_p != NULL && (*faithprefix_p)(&ip6->ip6_dst)) {
 		/* XXX send icmp6 host/port unreach? */
@@ -151,7 +176,7 @@ rip6_input(mp, offp, proto)
 		return IPPROTO_DONE;
 	}
 
-	init_sin6(&rip6src, m); /* general init */
+	bzero(&opts, sizeof(opts));
 
 	LIST_FOREACH(in6p, &ripcb, inp_list) {
 		if ((in6p->in6p_vflag & INP_IPV6) == 0)
@@ -159,11 +184,11 @@ rip6_input(mp, offp, proto)
 		if (in6p->in6p_ip6_nxt &&
 		    in6p->in6p_ip6_nxt != proto)
 			continue;
-		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr) &&
-		    !IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, &ip6->ip6_dst))
+		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa) &&
+		    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst))
 			continue;
-		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr) &&
-		    !IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, &ip6->ip6_src))
+		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa) &&
+		    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, src))
 			continue;
 		if (in6p->in6p_cksum != -1) {
 			rip6stat.rip6s_isum++;
@@ -198,19 +223,29 @@ rip6_input(mp, offp, proto)
 			if (n) {
 				if (last->in6p_flags & IN6P_CONTROLOPTS ||
 				    last->in6p_socket->so_options & SO_TIMESTAMP)
-					ip6_savecontrol(last, &opts, ip6, n);
+					ip6_savecontrol(last, ip6, n, &opts);
 				/* strip intermediate headers */
 				m_adj(n, *offp);
 				if (sbappendaddr(&last->in6p_socket->so_rcv,
-						(struct sockaddr *)&rip6src,
-						 n, opts) == 0) {
+						(struct sockaddr *)&fromsa,
+						 n, opts.head) == 0) {
 					m_freem(n);
-					if (opts)
-						m_freem(opts);
+					if (opts.head)
+						m_freem(opts.head);
 					rip6stat.rip6s_fullsock++;
 				} else
 					sorwakeup(last->in6p_socket);
-				opts = NULL;
+				bzero(&opts, sizeof(opts));
+			}
+			/*
+			 * XXX: m_copy above removes m_aux that
+			 * contains the packet addresses, while we
+			 * still need them for IPsec.
+			 */
+			if (!ip6_setpktaddrs(m, src, dst)) {
+				m_freem(m);
+				ip6stat.ip6s_delivered--;
+				return(IPPROTO_DONE); /* XXX */
 			}
 		}
 		last = in6p;
@@ -239,14 +274,15 @@ rip6_input(mp, offp, proto)
 	if (last) {
 		if (last->in6p_flags & IN6P_CONTROLOPTS ||
 		    last->in6p_socket->so_options & SO_TIMESTAMP)
-			ip6_savecontrol(last, &opts, ip6, m);
+			ip6_savecontrol(last, ip6, m, &opts);
 		/* strip intermediate headers */
 		m_adj(m, *offp);
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
-				(struct sockaddr *)&rip6src, m, opts) == 0) {
+				(struct sockaddr *)&fromsa, m,
+				 opts.head) == 0) {
 			m_freem(m);
-			if (opts)
-				m_freem(opts);
+			if (opts.head)
+				m_freem(opts.head);
 			rip6stat.rip6s_fullsock++;
 		} else
 			sorwakeup(last->in6p_socket);
@@ -278,6 +314,7 @@ rip6_ctlinput(cmd, sa, d)
 	int off = 0;
 	struct ip6ctlparam *ip6cp = NULL;
 	const struct sockaddr_in6 *sa6_src = NULL;
+	void *cmdarg;
 	struct inpcb *(*notify) __P((struct inpcb *, int)) = in6_rtchange;
 
 	if (sa->sa_family != AF_INET6 ||
@@ -299,15 +336,17 @@ rip6_ctlinput(cmd, sa, d)
 		m = ip6cp->ip6c_m;
 		ip6 = ip6cp->ip6c_ip6;
 		off = ip6cp->ip6c_off;
+		cmdarg = ip6cp->ip6c_cmdarg;
 		sa6_src = ip6cp->ip6c_src;
 	} else {
 		m = NULL;
 		ip6 = NULL;
+		cmdarg = NULL;
 		sa6_src = &sa6_any;
 	}
 
 	(void) in6_pcbnotify(&ripcb, sa, 0, (const struct sockaddr *)sa6_src,
-			     0, cmd, notify);
+			     0, cmd, cmdarg, notify);
 }
 
 /*
@@ -323,18 +362,19 @@ rip6_output(m, va_alist)
 	va_dcl
 #endif
 {
+	struct mbuf *control;
 	struct socket *so;
 	struct sockaddr_in6 *dstsock;
-	struct mbuf *control;
 	struct in6_addr *dst;
 	struct ip6_hdr *ip6;
 	struct inpcb *in6p;
 	u_int	plen = m->m_pkthdr.len;
 	int error = 0;
-	struct ip6_pktopts opt, *optp = 0;
+	struct ip6_pktopts opt, *stickyopt = NULL;
 	struct ifnet *oifp = NULL;
 	int type = 0, code = 0;		/* for ICMPv6 output statistics only */
 	int priv = 0;
+	struct sockaddr_in6 *sa6;
 	va_list ap;
 
 	va_start(ap, m);
@@ -344,17 +384,21 @@ rip6_output(m, va_alist)
 	va_end(ap);
 
 	in6p = sotoin6pcb(so);
+	stickyopt = in6p->in6p_outputopts;
 
 	priv = 0;
 	if (so->so_cred->cr_uid == 0)
 		priv = 1;
 	dst = &dstsock->sin6_addr;
 	if (control) {
-		if ((error = ip6_setpktoptions(control, &opt, priv, 0)) != 0)
+		if ((error = ip6_setpktoptions(control, &opt,
+					       stickyopt, priv, 0,
+					       so->so_proto->pr_protocol))
+		    != 0) {
 			goto bad;
-		optp = &opt;
-	} else
-		optp = in6p->in6p_outputopts;
+		}
+		in6p->in6p_outputopts = &opt;
+	}
 
 	/*
 	 * For an ICMPv6 packet, we should know its type and code
@@ -375,63 +419,23 @@ rip6_output(m, va_alist)
 	M_PREPEND(m, sizeof(*ip6), M_TRYWAIT);
 	ip6 = mtod(m, struct ip6_hdr *);
 
-	/*
-	 * Next header might not be ICMP6 but use its pseudo header anyway.
-	 */
+	/* Source address selection. */
+	if ((sa6 = in6_selectsrc(dstsock, in6p->in6p_outputopts,
+				 in6p->in6p_moptions, &in6p->in6p_route,
+				 &in6p->in6p_lsa, &oifp, &error)) == NULL) {
+		if (error == 0)
+			error = EADDRNOTAVAIL;
+		goto bad;
+	}
+	ip6->ip6_src = sa6->sin6_addr;
+
+	if (oifp && dstsock->sin6_scope_id == 0 &&
+	    (error = scope6_setzoneid(oifp, dstsock)) != 0) { /* XXX */
+		goto bad;
+	}
+
+	/* fill in the rest of the IPv6 header fields */
 	ip6->ip6_dst = *dst;
-
-	/*
-	 * If the scope of the destination is link-local, embed the interface
-	 * index in the address.
-	 *
-	 * XXX advanced-api value overrides sin6_scope_id
-	 */
-	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst)) {
-		struct in6_pktinfo *pi;
-
-		/*
-		 * XXX Boundary check is assumed to be already done in
-		 * ip6_setpktoptions().
-		 */
-		if (optp && (pi = optp->ip6po_pktinfo) && pi->ipi6_ifindex) {
-			ip6->ip6_dst.s6_addr16[1] = htons(pi->ipi6_ifindex);
-			oifp = ifnet_byindex(pi->ipi6_ifindex);
-		} else if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) &&
-			 in6p->in6p_moptions &&
-			 in6p->in6p_moptions->im6o_multicast_ifp) {
-			oifp = in6p->in6p_moptions->im6o_multicast_ifp;
-			ip6->ip6_dst.s6_addr16[1] = htons(oifp->if_index);
-		} else if (dstsock->sin6_scope_id) {
-			/* boundary check */
-			if (dstsock->sin6_scope_id < 0
-			 || if_index < dstsock->sin6_scope_id) {
-				error = ENXIO;  /* XXX EINVAL? */
-				goto bad;
-			}
-			ip6->ip6_dst.s6_addr16[1]
-				= htons(dstsock->sin6_scope_id & 0xffff);/*XXX*/
-		}
-	}
-
-	/*
-	 * Source address selection.
-	 */
-	{
-		struct in6_addr *in6a;
-
-		if ((in6a = in6_selectsrc(dstsock, optp,
-					  in6p->in6p_moptions,
-					  &in6p->in6p_route,
-					  &in6p->in6p_laddr,
-					  &error)) == 0) {
-			if (error == 0)
-				error = EADDRNOTAVAIL;
-			goto bad;
-		}
-		ip6->ip6_src = *in6a;
-		if (in6p->in6p_route.ro_rt)
-			oifp = ifnet_byindex(in6p->in6p_route.ro_rt->rt_ifp->if_index);
-	}
 	ip6->ip6_flow = (ip6->ip6_flow & ~IPV6_FLOWINFO_MASK) |
 		(in6p->in6p_flowinfo & IPV6_FLOWINFO_MASK);
 	ip6->ip6_vfc = (ip6->ip6_vfc & ~IPV6_VERSION_MASK) |
@@ -469,7 +473,34 @@ rip6_output(m, va_alist)
 		*p = in6_cksum(m, ip6->ip6_nxt, sizeof(*ip6), plen);
 	}
 
-	error = ip6_output(m, optp, &in6p->in6p_route, 0,
+	/*
+	 * attach the full sockaddr_in6 addresses to the packet.
+	 * XXX: sa6 may not have a valid sin6_scope_id in the
+	 * non-SCOPEDROUTING case.
+	 */
+#ifdef SCOPEDROUTING
+	if (!ip6_setpktaddrs(m, sa6, dstsock)) {
+		error = ENOBUFS;
+		goto bad;
+	}
+#else
+	{
+		struct sockaddr_in6 sa6_src = *sa6;
+
+		if ((error = in6_recoverscope(&sa6_src, &sa6->sin6_addr,
+					      oifp)) != 0) {
+			goto bad;
+		}
+		sa6_src.sin6_addr = sa6->sin6_addr; /* XXX */
+		if (!ip6_setpktaddrs(m, &sa6_src, dstsock)) {
+			error = ENOBUFS;
+			goto bad;
+		}
+	}
+#endif
+
+	oifp = NULL;		/* just in case */
+	error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route, 0,
 			   in6p->in6p_moptions, &oifp, in6p);
 	if (so->so_proto->pr_protocol == IPPROTO_ICMPV6) {
 		if (oifp)
@@ -485,11 +516,9 @@ rip6_output(m, va_alist)
 		m_freem(m);
 
  freectl:
-	if (optp == &opt && optp->ip6po_rthdr && optp->ip6po_route.ro_rt)
-		RTFREE(optp->ip6po_route.ro_rt);
 	if (control) {
-		if (optp == &opt)
-			ip6_clearpktopts(optp, 0, -1);
+		ip6_clearpktopts(in6p->in6p_outputopts, -1);
+		in6p->in6p_outputopts = stickyopt;
 		m_freem(control);
 	}
 	return(error);
@@ -528,6 +557,9 @@ rip6_ctloutput(so, sopt)
 		case MRT6_PIM:
 			error = ip6_mrouter_get(so, sopt);
 			break;
+		case IPV6_CHECKSUM:
+			error = ip6_raw_ctloutput(so, sopt);
+			break;
 		default:
 			error = ip6_ctloutput(so, sopt);
 			break;
@@ -544,6 +576,9 @@ rip6_ctloutput(so, sopt)
 		case MRT6_DEL_MFC:
 		case MRT6_PIM:
 			error = ip6_mrouter_set(so, sopt);
+			break;
+		case IPV6_CHECKSUM:
+			error = ip6_raw_ctloutput(so, sopt);
 			break;
 		default:
 			error = ip6_ctloutput(so, sopt);
@@ -619,7 +654,7 @@ rip6_disconnect(struct socket *so)
 
 	if ((so->so_state & SS_ISCONNECTED) == 0)
 		return ENOTCONN;
-	inp->in6p_faddr = in6addr_any;
+	sa6_copy_addr(&sa6_any, &inp->in6p_fsa);
 	return rip6_abort(so);
 }
 
@@ -629,18 +664,25 @@ rip6_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 	struct inpcb *inp = sotoinpcb(so);
 	struct sockaddr_in6 *addr = (struct sockaddr_in6 *)nam;
 	struct ifaddr *ia = NULL;
+	int error = 0;
+#ifndef SCOPEDROUTING
+	u_int32_t lzone;
+#endif
 
 	if (nam->sa_len != sizeof(*addr))
 		return EINVAL;
-
+	if (nam->sa_family != AF_INET6)
+		return EAFNOSUPPORT;
 	if (TAILQ_EMPTY(&ifnet) || addr->sin6_family != AF_INET6)
 		return EADDRNOTAVAIL;
-#ifdef ENABLE_DEFAULT_SCOPE
-	if (addr->sin6_scope_id == 0) {	/* not change if specified  */
-		addr->sin6_scope_id = scope6_addr2default(&addr->sin6_addr);
-	}
+	if ((error = scope6_check_id(addr, ip6_use_defzone)) != 0)
+		return(error);
+#ifndef SCOPEDROUTING
+	lzone = addr->sin6_scope_id;
+	addr->sin6_scope_id = 0; /* for ifa_ifwithaddr */
 #endif
-	if (!IN6_IS_ADDR_UNSPECIFIED(&addr->sin6_addr) &&
+
+	if (!SA6_IS_ADDR_UNSPECIFIED(addr) &&
 	    (ia = ifa_ifwithaddr((struct sockaddr *)addr)) == 0)
 		return EADDRNOTAVAIL;
 	if (ia &&
@@ -649,7 +691,10 @@ rip6_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 	     IN6_IFF_DETACHED|IN6_IFF_DEPRECATED)) {
 		return(EADDRNOTAVAIL);
 	}
-	inp->in6p_laddr = addr->sin6_addr;
+#ifndef SCOPEDROUTING
+	addr->sin6_scope_id = lzone;
+#endif
+	sa6_copy_addr(addr, &inp->in6p_lsa);
 	return 0;
 }
 
@@ -657,11 +702,11 @@ static int
 rip6_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 {
 	struct inpcb *inp = sotoinpcb(so);
-	struct sockaddr_in6 *addr = (struct sockaddr_in6 *)nam;
-	struct in6_addr *in6a = NULL;
+	struct sockaddr_in6 *addr = (struct sockaddr_in6 *)nam, *sa6;
+	struct ifnet *ifp = NULL;
 	int error = 0;
-#ifdef ENABLE_DEFAULT_SCOPE
-	struct sockaddr_in6 tmp;
+#ifndef SCOPEDROUTING
+	struct sockaddr_in6 sa6_storage;
 #endif
 
 	if (nam->sa_len != sizeof(*addr))
@@ -670,22 +715,38 @@ rip6_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 		return EADDRNOTAVAIL;
 	if (addr->sin6_family != AF_INET6)
 		return EAFNOSUPPORT;
-#ifdef ENABLE_DEFAULT_SCOPE
-	if (addr->sin6_scope_id == 0) {	/* not change if specified  */
-		/* avoid overwrites */
-		tmp = *addr;
-		addr = &tmp;
-		addr->sin6_scope_id = scope6_addr2default(&addr->sin6_addr);
-	}
-#endif
+	if ((error = scope6_check_id(addr, ip6_use_defzone)) != 0)
+		return(error);
+
 	/* Source address selection. XXX: need pcblookup? */
-	in6a = in6_selectsrc(addr, inp->in6p_outputopts,
-			     inp->in6p_moptions, &inp->in6p_route,
-			     &inp->in6p_laddr, &error);
-	if (in6a == NULL)
+	sa6 = in6_selectsrc(addr, inp->in6p_outputopts,
+			    inp->in6p_moptions, &inp->in6p_route,
+			    &inp->in6p_lsa, &ifp, &error);
+	if (sa6 == NULL)
 		return (error ? error : EADDRNOTAVAIL);
-	inp->in6p_laddr = *in6a;
-	inp->in6p_faddr = addr->sin6_addr;
+#ifndef SCOPEDROUTING
+	/*
+	 * XXX: sa6 may not have a valid sin6_scope_id in
+	 * the non-SCOPEDROUTING case.
+	 */
+	bzero(&sa6_storage, sizeof(sa6_storage));
+	sa6_storage.sin6_family = AF_INET6;
+	sa6_storage.sin6_len = sizeof(sa6_storage);
+	if ((error = in6_recoverscope(&sa6_storage, &sa6->sin6_addr,
+				      NULL)) != 0) {
+		return(error);
+	}
+	sa6_storage.sin6_addr = sa6->sin6_addr;	/* XXX */
+	sa6 = &sa6_storage;
+#endif
+
+	/* see above */
+	if (ifp && addr->sin6_scope_id == 0 &&
+	    (error = scope6_setzoneid(ifp, addr)) != 0) { /* XXX */
+		return(error);
+	}
+	sa6_copy_addr(sa6, &inp->in6p_lsa);
+	sa6_copy_addr(addr, &inp->in6p_fsa);
 	soisconnected(so);
 	return 0;
 }
@@ -701,6 +762,7 @@ static int
 rip6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 	 struct mbuf *control, struct thread *td)
 {
+	int error = 0;
 	struct inpcb *inp = sotoinpcb(so);
 	struct sockaddr_in6 tmp;
 	struct sockaddr_in6 *dst;
@@ -723,14 +785,30 @@ rip6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 			m_freem(m);
 			return ENOTCONN;
 		}
+		if (nam->sa_len != sizeof(struct sockaddr_in6)) {
+			m_freem(m);
+			return(EINVAL);
+		}
 		tmp = *(struct sockaddr_in6 *)nam;
 		dst = &tmp;
+		if (dst->sin6_family == AF_UNSPEC) {
+			/*
+			 * XXX: we allow this case for backward
+			 * compatibility to buggy applications that
+			 * rely on old (and wrong) kernel behavior.
+			 */
+			log(LOG_INFO, "rip6 SEND: address family is "
+			    "unspec. Assume AF_INET6\n");
+			dst->sin6_family = AF_INET6;
+		} else if (dst->sin6_family != AF_INET6) {
+			m_freem(m);
+			return(EAFNOSUPPORT);
+		}
+		if ((error = scope6_check_id(dst, ip6_use_defzone)) != 0) {
+			m_freem(m);
+			return(error);
+		}
 	}
-#ifdef ENABLE_DEFAULT_SCOPE
-	if (dst->sin6_scope_id == 0) {	/* not change if specified  */
-		dst->sin6_scope_id = scope6_addr2default(&dst->sin6_addr);
-	}
-#endif
 	return rip6_output(m, so, dst, control);
 }
 

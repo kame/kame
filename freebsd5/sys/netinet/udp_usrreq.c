@@ -34,6 +34,43 @@
  * $FreeBSD: src/sys/netinet/udp_usrreq.c,v 1.130 2002/11/20 19:00:54 luigi Exp $
  */
 
+/*
+ * Copyright (c) 2002 INRIA. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by INRIA and its
+ *	contributors.
+ * 4. Neither the name of INRIA nor the names of its contributors may be
+ *    used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+/*
+ * Implementation of Internet Group Management Protocol, Version 3.
+ *
+ * Developed by Hitoshi Asaeda, INRIA, February 2002.
+ */
+
 #include "opt_ipsec.h"
 #include "opt_inet6.h"
 #include "opt_mac.h"
@@ -72,6 +109,9 @@
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp_var.h>
 #include <netinet/ip_var.h>
+#ifdef IGMPV3
+#include <netinet/in_msf.h>
+#endif
 #ifdef INET6
 #include <netinet6/ip6_var.h>
 #endif
@@ -93,9 +133,9 @@
  * Per RFC 768, August, 1980.
  */
 #ifndef	COMPAT_42
-static int	udpcksum = 1;
+int	udpcksum = 1;
 #else
-static int	udpcksum = 0;		/* XXX */
+int	udpcksum = 0;		/* XXX */
 #endif
 SYSCTL_INT(_net_inet_udp, UDPCTL_CHECKSUM, checksum, CTLFLAG_RW,
 		&udpcksum, 0, "");
@@ -169,10 +209,23 @@ udp_input(m, off)
 	register struct udphdr *uh;
 	register struct inpcb *inp;
 	struct mbuf *opts = 0;
+#ifdef INET6
+	struct ip6_recvpktopts opts6;
+#endif 
 	int len;
 	struct ip save_ip;
+#ifdef IGMPV3
+	struct sockaddr_in src;
+	struct ip_moptions *imo;
+	struct sockaddr_in *sin;
+	struct sock_msf_source *msfsrc;
+	int i;
+#endif
 
 	udpstat.udps_ipackets++;
+#ifdef INET6
+	bzero(&opts6, sizeof(opts6));
+#endif
 
 	/*
 	 * Strip IP options, if any; should skip this,
@@ -189,6 +242,7 @@ udp_input(m, off)
 	 * Get IP and UDP header together in first mbuf.
 	 */
 	ip = mtod(m, struct ip *);
+#ifndef PULLDOWN_TEST
 	if (m->m_len < iphlen + sizeof(struct udphdr)) {
 		if ((m = m_pullup(m, iphlen + sizeof(struct udphdr))) == 0) {
 			udpstat.udps_hdrops++;
@@ -197,6 +251,13 @@ udp_input(m, off)
 		ip = mtod(m, struct ip *);
 	}
 	uh = (struct udphdr *)((caddr_t)ip + iphlen);
+#else
+	IP6_EXTHDR_GET(uh, struct udphdr *, m, iphlen, sizeof(struct udphdr));
+	if (!uh) {
+		udpstat.udps_hdrops++;
+		return;
+	}
+#endif
 
 	/* destination port of 0 is illegal, based on RFC768. */
 	if (uh->uh_dport == 0)
@@ -307,7 +368,113 @@ udp_input(m, off)
 				    inp->inp_fport != uh->uh_sport)
 					goto docontinue;
 			}
+#ifdef IGMPV3
+#ifdef IPSEC
+#define PASS_TO_PCB() \
+	do { \
+		if (last != NULL) { \
+			struct mbuf *n; \
+			/* check AH/ESP integrity. */ \
+			if (ipsec4_in_reject_so(m, last->inp_socket)) \
+				ipsecstat.in_polvio++; \
+				/* do not inject data to pcb */ \
+			else \
+			if ((n = m_copy(m, 0, M_COPYALL)) != NULL) \
+				udp_append(last, ip, n, iphlen + sizeof(struct udphdr)); \
+		} \
+		last = inp; \
+	} while (0)
+#else /* !IPSEC */
+#define PASS_TO_PCB() \
+	do { \
+		if (last != NULL) { \
+			struct mbuf *n; \
+			if ((n = m_copy(m, 0, M_COPYALL)) != NULL) \
+				udp_append(last, ip, n, iphlen + sizeof(struct udphdr)); \
+		} \
+		last = inp; \
+	} while (0)
+#endif /* IPSEC */
+			/*
+			 * Receive multicast data which fits MSF condition.
+			 */
+			if (!IN_MULTICAST(ntohl(ip->ip_dst.s_addr)))
+				continue;
+			
+			imo = inp->inp_moptions;
+			bzero(&src, sizeof(src));
+			src.sin_family = AF_INET;
+			src.sin_len = sizeof(src);
+			bcopy(&ip->ip_src, &src.sin_addr, sizeof(ip->ip_src));
+			for (i = 0; i < imo->imo_num_memberships; i++) {
+				if (imo->imo_membership[i]->inm_addr.s_addr
+				    != ip->ip_dst.s_addr)
+					continue;
+				
+				/* receive data from any source */
+				if (imo->imo_msf[i]->msf_grpjoin != 0) {
+					PASS_TO_PCB();
+					break;
+				}
+				goto search_allow_list;
 
+			search_allow_list:
+				if (imo->imo_msf[i]->msf_numsrc == 0)
+					goto search_block_list;
+				
+				LIST_FOREACH(msfsrc,
+					     imo->imo_msf[i]->msf_head,
+					     list) {
+					sin = (struct sockaddr_in *)&msfsrc->src;
+					if (sin->sin_family != AF_INET)
+						continue;
+					if (SS_CMP(sin, <, &src))
+						continue;
+					if (SS_CMP(sin, >, &src)) {
+						/* terminate search, as there
+						 * will be no match */
+						break;
+					}
+					
+					PASS_TO_PCB();
+					break;
+				}
+				
+			search_block_list:
+				if (imo->imo_msf[i]->msf_blknumsrc == 0)
+					goto end_of_search;
+
+				LIST_FOREACH(msfsrc,
+					     imo->imo_msf[i]->msf_blkhead,
+					     list) {
+					sin = (struct sockaddr_in *)&msfsrc->src;
+					if (sin->sin_family != AF_INET)
+						continue;
+					if (SS_CMP(sin, <, &src))
+						continue;
+					if (SS_CMP(sin, ==, &src)) {
+						/* blocks since the src matched
+						 * with block list */
+						break;
+					}
+					
+					/* terminate search, as there will be
+					 * no match */
+					msfsrc = NULL;
+					break;
+				}
+				/* blocks since the source matched with block
+				 * list */
+				if (msfsrc == NULL)
+					PASS_TO_PCB();
+				
+			end_of_search:
+				goto next_inp;
+			}
+			if (i == imo->imo_num_memberships)
+				continue;
+#undef PASS_TO_PCB
+#else
 			if (last != NULL) {
 				struct mbuf *n;
 
@@ -318,6 +485,8 @@ udp_input(m, off)
 						   sizeof(struct udphdr));
 				INP_UNLOCK(last);
 			}
+#endif /* IGMPV3 */
+
 			last = inp;
 			/*
 			 * Don't look for additional matches if this one does
@@ -329,6 +498,10 @@ udp_input(m, off)
 			 */
 			if ((last->inp_socket->so_options&(SO_REUSEPORT|SO_REUSEADDR)) == 0)
 				break;
+
+#ifdef IGMPV3
+		next_inp:;
+#endif
 		}
 
 		if (last == NULL) {
@@ -424,6 +597,11 @@ udp_append(last, ip, n, off)
 {
 	struct sockaddr *append_sa;
 	struct mbuf *opts = 0;
+#ifdef INET6
+	struct ip6_recvpktopts opts6;
+
+	bzero(&opts6, sizeof(opts6));
+#endif
 
 #ifdef IPSEC
 	/* check AH/ESP integrity. */
@@ -458,7 +636,7 @@ udp_append(last, ip, n, off)
 			}
 			savedflags = last->inp_flags;
 			last->inp_flags &= ~INP_UNMAPPABLEOPTS;
-			ip6_savecontrol(last, &opts, &udp_ip6.uip6_ip6, n);
+ 			ip6_savecontrol(last, &udp_ip6.uip6_ip6, n, &opts6);
 			last->inp_flags = savedflags;
 		} else
 #endif
@@ -471,6 +649,7 @@ udp_append(last, ip, n, off)
 			udp_in6.uin6_init_done = 1;
 		}
 		append_sa = (struct sockaddr *)&udp_in6.uin6_sin;
+ 		opts = opts6.head;
 	} else
 #endif
 	append_sa = (struct sockaddr *)&udp_in;

@@ -155,6 +155,7 @@ struct mbuf {
 #define	M_PROTO3	0x0040	/* protocol-specific */
 #define	M_PROTO4	0x0080	/* protocol-specific */
 #define	M_PROTO5	0x0100	/* protocol-specific */
+#define	M_PROTO6	0x4000	/* protocol-specific */
 
 /*
  * mbuf pkthdr flags (also stored in m_flags).
@@ -164,6 +165,8 @@ struct mbuf {
 #define	M_FRAG		0x0800	/* packet is a fragment of a larger packet */
 #define	M_FIRSTFRAG	0x1000	/* packet is first fragment */
 #define	M_LASTFRAG	0x2000	/* packet is last fragment */
+
+#define M_NOTIFICATION	0x8000	/* notification event */
 
 /*
  * External buffer types: identify ext_buf type.
@@ -177,8 +180,9 @@ struct mbuf {
 /*
  * Flags copied when copying m_pkthdr.
  */
-#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_PROTO1|M_PROTO2|M_PROTO3 | \
-			    M_PROTO4|M_PROTO5|M_BCAST|M_MCAST|M_FRAG|M_RDONLY)
+#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_PROTO1|M_PROTO2|M_PROTO3| \
+			    M_PROTO4|M_PROTO5|M_PROTO6|M_BCAST|M_MCAST|M_FRAG| \
+			    M_NOTIFICATION)
 
 /*
  * Flags indicating hw checksum support and sw checksum requirements.
@@ -257,6 +261,20 @@ struct mbstat {
 	u_long	m_mhlen;	/* length of data in a header mbuf */
 	/* Number of mbtypes (gives # elems in mbpstat's mb_mbtypes[] array: */
 	short	m_numtypes;
+
+	u_quad_t m_exthdrget;	/* # of calls to IP6_EXTHDR_GET */
+	u_quad_t m_exthdrget0;	/* # of calls to IP6_EXTHDR_GET0 */
+	u_quad_t m_pulldowns;	/* # of calls to m_pulldown */
+	u_quad_t m_pulldown_copy; /* # of mbuf copies in m_pulldown */
+	u_quad_t m_pulldown_alloc; /* # of mbuf allocs in m_pulldown */
+	u_quad_t m_pullups;	/* # of calls to m_pullup */
+	u_quad_t m_pullup_copy;	/* # of possible m_pullup copies */
+	u_quad_t m_pullup_alloc; /* # of possible m_pullup mallocs */
+	u_quad_t m_pullup_fail;	/* # of possible m_pullup failures */
+	u_quad_t m_pullup2;	/* # of calls to m_pullup2 */
+	u_quad_t m_pullup2_copy; /* # of possible m_pullup2 copies */
+	u_quad_t m_pullup2_alloc; /* # of possible m_pullup2 mallocs */
+	u_quad_t m_pullup2_fail; /* # of possible m_pullup2 failures */
 };
 
 /*
@@ -507,7 +525,7 @@ struct	mbuf	*m_split(struct mbuf *, int, int);
  * mbufs (or lookalikes) prepended to the actual mbuf chain.
  *
  *	m_type	= MT_TAG
- *	m_flags = m_tag_id
+ *	m_flags	= _m_tag_id
  *	m_next	= next buffer in chain.
  *
  * BE VERY CAREFUL not to pass these blocks to the mbuf handling routines.
@@ -519,6 +537,10 @@ struct	mbuf	*m_split(struct mbuf *, int, int);
 #define	PACKET_TAG_IPFW				16 /* ipfw classification */
 #define	PACKET_TAG_DIVERT			17 /* divert info */
 #define	PACKET_TAG_IPFORWARD			18 /* ipforward info */
+#define PACKET_TAG_INET6			19 /* IPv6 info */
+#define PACKET_TAG_ESP				20 /* ESP information */
+
+#define	PACKET_TAG_MAX				21
 
 /* Packet tag routines */
 struct	m_tag 	*m_tag_alloc(u_int32_t, int, int, int);

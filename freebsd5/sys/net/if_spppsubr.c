@@ -774,9 +774,10 @@ sppp_output(struct ifnet *ifp, struct mbuf *m,
 	struct sppp *sp = (struct sppp*) ifp;
 	struct ppp_header *h;
 	struct ifqueue *ifq = NULL;
-	int s, rv = 0;
+	int s, len, rv = 0;
 	int ipproto = PPP_IP;
 	int debug = ifp->if_flags & IFF_DEBUG;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	s = splimp();
 
@@ -814,7 +815,13 @@ sppp_output(struct ifnet *ifp, struct mbuf *m,
 		s = splimp();
 	}
 
-	ifq = &ifp->if_snd;
+#ifdef ALTQ
+	/*
+	 * if the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+#endif
 #ifdef INET
 	if (dst->sa_family == AF_INET) {
 		/* XXX Check mbuf length here? */
@@ -1075,7 +1082,7 @@ sppp_flush(struct ifnet *ifp)
 {
 	struct sppp *sp = (struct sppp*) ifp;
 
-	sppp_qflush (&sp->pp_if.if_snd);
+	IFQ_PURGE(&sp->pp_if.if_snd);
 	sppp_qflush (&sp->pp_fastq);
 	sppp_qflush (&sp->pp_cpq);
 }
@@ -1091,7 +1098,7 @@ sppp_isempty(struct ifnet *ifp)
 
 	s = splimp();
 	empty = !sp->pp_fastq.ifq_head && !sp->pp_cpq.ifq_head &&
-		!sp->pp_if.if_snd.ifq_head;
+		IFQ_IS_EMPTY(&sp->pp_if.if_snd);
 	splx(s);
 	return (empty);
 }
@@ -1118,7 +1125,7 @@ sppp_dequeue(struct ifnet *ifp)
 	    (sppp_ncp_check(sp) || sp->pp_mode == IFF_CISCO)) {
 		IF_DEQUEUE(&sp->pp_fastq, m);
 		if (m == NULL)
-			IF_DEQUEUE (&sp->pp_if.if_snd, m);
+			IFQ_DEQUEUE (&sp->pp_if.if_snd, m);
 	}
 	splx(s);
 	return m;
@@ -1140,7 +1147,7 @@ sppp_pick(struct ifnet *ifp)
 	if (m == NULL &&
 	    (sp->pp_phase == PHASE_NETWORK || sp->pp_mode == IFF_CISCO))
 		if ((m = sp->pp_fastq.ifq_head) == NULL)
-			m = sp->pp_if.if_snd.ifq_head;
+			IFQ_POLL(&sp->pp_if.if_snd, m);
 	splx (s);
 	return (m);
 }

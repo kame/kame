@@ -39,6 +39,7 @@
 
 #include "opt_compat.h"
 #include "opt_ktrace.h"
+#include "opt_sctp.h"
 #include "opt_mac.h"
 
 #include <sys/param.h>
@@ -73,6 +74,9 @@
 #include <vm/vm_pageout.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_extern.h>
+#ifdef SCTP
+#include <netinet/sctp_peeloff.h>
+#endif /* SCTP */
 
 static void sf_buf_init(void *arg);
 SYSINIT(sock_sf, SI_SUB_MBUF, SI_ORDER_ANY, sf_buf_init, NULL)
@@ -1887,6 +1891,7 @@ retry_lookup:
 			vm_page_io_finish(pg);
 			if (error) {
 				vm_page_unwire(pg, 0);
+
 				/*
 				 * See if anyone else might know about this page.
 				 * If not and it is not valid, then free it.
@@ -2041,4 +2046,102 @@ done:
 		fputsock(so);
 	mtx_unlock(&Giant);
 	return (error);
+}
+
+int
+sctp_peeloff(td, uap)
+     struct thread *td;
+     struct sctp_peeloff_args *uap; /*
+				      int	s;
+				      caddr_t	assoc_id;
+				     */
+{
+#ifdef SCTP
+	struct filedesc *fdp = td->tp_fd;
+	struct file *lfp = NULL;
+	struct file *nfp = NULL;
+	int error, s;
+	struct socket *head, *so;
+	caddr_t assoc_id;
+	int fd;
+	short fflag;		/* type must match fp->f_flag */
+
+	error = copyin((caddr_t)uap->name, &assoc_id, sizeof (assoc_id));
+	if (error) {
+		return(error);
+	}
+	error = holdsock(fdp, uap->sd, &lfp);
+	if (error)
+		return (error);
+	s = splnet();
+	head = (struct socket *)lfp->f_data;
+	error = sctp_can_peel_off(head, assoc_id);
+	if (error) {
+		splx(s);
+		goto done;
+	}
+	/*
+	 * At this point we know we do have a assoc to pull
+	 * we proceed to get the fd setup. This may block
+	 * but that is ok.
+	 */
+
+	fflag = lfp->f_flag;
+	error = falloc(p, &nfp, &fd);
+	if (error) {
+		/*
+		 * Probably ran out of file descriptors. Put the
+		 * unaccepted connection back onto the queue and
+		 * do another wakeup so some other process might
+		 * have a chance at it.
+		 */
+		splx(s);
+		goto done;
+	}
+	fhold(nfp);
+	p->p_retval[0] = fd;
+
+	so = sctp_get_peeloff(head, assoc_id, &error);
+	if (so == NULL) {
+		/* 
+		 * Either someone else peeled it off OR
+		 * we can't get a socket.
+		 */
+		goto noconnection;
+	}
+	so->so_state &= ~SS_COMP;
+	so->so_state &= ~SS_NOFDREF;
+	so->so_head = NULL;
+	if (head->so_sigio != NULL)
+		fsetown(fgetown(head->so_sigio), &so->so_sigio);
+
+	nfp->f_data = (caddr_t)so;
+	nfp->f_flag = fflag;
+	nfp->f_ops = &socketops;
+	nfp->f_type = DTYPE_SOCKET;
+
+ noconnection:
+	/*
+	 * close the new descriptor, assuming someone hasn't ripped it
+	 * out from under us.
+	 */
+	if (error) {
+		if (fdp->fd_ofiles[fd] == nfp) {
+			fdp->fd_ofiles[fd] = NULL;
+			fdrop(nfp, p);
+		}
+	}
+	splx(s);
+
+	/*
+	 * Release explicitly held references before returning.
+	 */
+ done:
+	if (nfp != NULL)
+		fdrop(nfp, p);
+	fdrop(lfp, p);
+	return (error);
+#else
+	return(EOPNOTSUPP);
+#endif
 }

@@ -530,7 +530,7 @@
 			    const struct kevent *changelist, int nchanges, \
 			    struct kevent *eventlist, int nevents, \
 			    const struct timespec *timeout); }
-364	UNIMPL	BSD	__cap_get_proc
+364	STD	BSD	{ int sctp_peeloff(int sd, caddr_t name ); }
 365	UNIMPL	BSD	__cap_set_proc
 366	UNIMPL	BSD	__cap_get_fd
 367	UNIMPL	BSD	__cap_get_file

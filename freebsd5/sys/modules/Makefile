@@ -211,6 +211,8 @@ SUBDIR+=aac \
 	s3 \
 	vesa
 	
+#SUBDIR+=altq
+
 .elif ${MACHINE} == "pc98"
 SUBDIR+=pcspeaker \
 	pmc \

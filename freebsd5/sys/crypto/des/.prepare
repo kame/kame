@@ -1,0 +1,8 @@
+conflict des.h
+conflict des_ecb.c
+conflict des_enc.c
+conflict des_locl.h
+conflict des_setkey.c
+conflict podd.h
+conflict sk.h
+conflict spr.h

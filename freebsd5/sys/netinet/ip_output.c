@@ -1,4 +1,41 @@
 /*
+ * Copyright (c) 2002 INRIA. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by INRIA and its
+ *	contributors.
+ * 4. Neither the name of INRIA nor the names of its contributors may be
+ *    used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+/*
+ * Source Specific Multicast (SSM) implementation.
+ *
+ * Developed by Hitoshi Asaeda, INRIA, Feb 2002.
+ */
+
+/*
  * Copyright (c) 1982, 1986, 1988, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -34,6 +71,10 @@
  * $FreeBSD: src/sys/netinet/ip_output.c,v 1.172 2002/11/20 18:56:25 luigi Exp $
  */
 
+#ifdef __FreeBSD__
+#include "opt_mpath.h"
+#endif
+#include "opt_inet.h"
 #include "opt_ipfw.h"
 #include "opt_ipdn.h"
 #include "opt_ipdivert.h"
@@ -59,13 +100,16 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
+#ifdef IGMPV3
+#include <netinet/in_msf.h>
+#endif
 #include <netinet/in_pcb.h>
 #include <netinet/in_var.h>
 #include <netinet/ip_var.h>
 
 #include <machine/in_cksum.h>
 
-static MALLOC_DEFINE(M_IPMOPTS, "ip_moptions", "internet multicast options");
+MALLOC_DEFINE(M_IPMOPTS, "ip_moptions", "internet multicast options");
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
@@ -95,7 +139,14 @@ static MALLOC_DEFINE(M_IPMOPTS, "ip_moptions", "internet multicast options");
 u_short ip_id;
 
 static struct mbuf *ip_insertoptions(struct mbuf *, struct mbuf *, int *);
-static struct ifnet *ip_multicast_if(struct in_addr *, int *);
+static int ip_getmopt_ifargs
+	(struct sockopt *, struct ifnet **, struct in_addr *, struct in_addr *);
+#ifdef IGMPV3
+static int in_getmopt_ifargs
+	(struct sockopt *, struct ifnet **, struct in_addr *, u_int32_t);
+static int ip_getmopt_sgaddr
+	(struct sockopt *, struct ifnet **, struct sockaddr_storage *, struct sockaddr_storage *);
+#endif
 static void	ip_mloopback
 	(struct ifnet *, struct mbuf *, struct sockaddr_in *, int);
 static int	ip_getmoptions
@@ -108,6 +159,11 @@ int	ip_optcopy(struct ip *, struct ip *);
 
 
 extern	struct protosw inetsw[];
+
+#ifdef IGMPV3
+#define SIN(x)	((struct sockaddr_in *)(x))
+#define SIN_ADDR_H(x)	(ntohl(SIN(x)->sin_addr.s_addr))
+#endif
 
 /*
  * IP output.  The packet in mbuf chain m contains a skeletal IP
@@ -291,8 +347,14 @@ ip_output(m0, opt, ro, flags, imo, inp)
 		 * the link layer, as this is probably required in all cases
 		 * for correct operation (as it is for ARP).
 		 */
-		if (ro->ro_rt == 0)
+		if (ro->ro_rt == 0){
+#ifdef RADIX_MPATH
+			rtalloc_mpath(ro,
+			    ntohl(ip->ip_src.s_addr ^ ip->ip_dst.s_addr));
+#else
 			rtalloc_ign(ro, RTF_PRCLONING);
+#endif
+		}
 		if (ro->ro_rt == 0) {
 			ipstat.ips_noroute++;
 			error = EHOSTUNREACH;
@@ -300,7 +362,11 @@ ip_output(m0, opt, ro, flags, imo, inp)
 		}
 		ia = ifatoia(ro->ro_rt->rt_ifa);
 		ifp = ro->ro_rt->rt_ifp;
+#ifdef RTUSE			/* for statistics */
+		RTUSE(ro->ro_rt);
+#else
 		ro->ro_rt->rt_use++;
+#endif
 		if (ro->ro_rt->rt_flags & RTF_GATEWAY)
 			dst = (struct sockaddr_in *)ro->ro_rt->rt_gateway;
 		if (ro->ro_rt->rt_flags & RTF_HOST)
@@ -432,6 +498,12 @@ ip_output(m0, opt, ro, flags, imo, inp)
 		}
 	}
 #endif /* notdef */
+#ifdef ALTQ
+	/*
+	 * disable packet drop hack.
+	 * packetdrop should be done by queueing.
+	 */
+#else /* !ALTQ */
 	/*
 	 * Verify that we have any chance at all of being able to queue
 	 *      the packet or packet fragments
@@ -442,6 +514,7 @@ ip_output(m0, opt, ro, flags, imo, inp)
 			ipstat.ips_odropped++;
 			goto bad;
 	}
+#endif /* !ALTQ */
 
 	/*
 	 * Look for broadcast address and
@@ -568,7 +641,6 @@ sendit:
 		}
 		goto bad;
 	}
-    }
 
 	/* be sure to update variables that are affected by ipsec4_output() */
 	ip = mtod(m, struct ip *);
@@ -581,9 +653,12 @@ sendit:
 			goto bad;
 		}
 	} else {
-		ia = ifatoia(ro->ro_rt->rt_ifa);
-		ifp = ro->ro_rt->rt_ifp;
+		if (state.encap) {
+			ia = ifatoia(ro->ro_rt->rt_ifa);
+			ifp = ro->ro_rt->rt_ifp;
+		}
 	}
+    }
 
 	/* make it flipped, again. */
 	ip->ip_len = ntohs(ip->ip_len);
@@ -928,7 +1003,11 @@ spd_done:
 
 			ia = ifatoia(ro_fwd->ro_rt->rt_ifa);
 			ifp = ro_fwd->ro_rt->rt_ifp;
+#ifdef RTUSE			/* for statistics */
+			RTUSE(ro_fwd->ro_rt);
+#else
 			ro_fwd->ro_rt->rt_use++;
+#endif
 			if (ro_fwd->ro_rt->rt_flags & RTF_GATEWAY)
 				dst = (struct sockaddr_in *)
 					ro_fwd->ro_rt->rt_gateway;
@@ -1438,6 +1517,18 @@ ip_ctloutput(so, sopt)
 		case IP_MULTICAST_LOOP:
 		case IP_ADD_MEMBERSHIP:
 		case IP_DROP_MEMBERSHIP:
+#ifdef IGMPV3
+		case IP_BLOCK_SOURCE:
+		case IP_UNBLOCK_SOURCE:
+		case IP_ADD_SOURCE_MEMBERSHIP:
+		case IP_DROP_SOURCE_MEMBERSHIP:
+		case MCAST_JOIN_GROUP:
+		case MCAST_BLOCK_SOURCE:
+		case MCAST_UNBLOCK_SOURCE:
+		case MCAST_LEAVE_GROUP:
+		case MCAST_JOIN_SOURCE_GROUP:
+		case MCAST_LEAVE_SOURCE_GROUP:
+#endif
 			error = ip_setmoptions(sopt, &inp->inp_moptions);
 			break;
 
@@ -1576,17 +1667,29 @@ ip_ctloutput(so, sopt)
 #if defined(IPSEC) || defined(FAST_IPSEC)
 		case IP_IPSEC_POLICY:
 		{
-			struct mbuf *m = NULL;
 			caddr_t req = NULL;
 			size_t len = 0;
+			struct mbuf *m = NULL;
+			size_t ovalsize = sopt->sopt_valsize;
+			caddr_t oval = (caddr_t)sopt->sopt_val;
 
+			error = soopt_getm(sopt, &m); /* XXX */
+			if (error != NULL)
+				break;
+
+			error = soopt_mcopyin(sopt, m); /* XXX */
+			if (error != NULL)
+				break;
+			sopt->sopt_valsize = ovalsize;
+			sopt->sopt_val = oval;
 			if (m != 0) {
 				req = mtod(m, caddr_t);
 				len = m->m_len;
 			}
+
 			error = ipsec4_get_policy(sotoinpcb(so), req, len, &m);
 			if (error == 0)
-				error = soopt_mcopyout(sopt, m); /* XXX */
+				error = soopt_mcopyout(sopt, m);
 			if (error == 0)
 				m_freem(m);
 			break;
@@ -1716,7 +1819,7 @@ bad:
 /*
  * following RFC1724 section 3.3, 0.0.0.0/8 is interpreted as interface index.
  */
-static struct ifnet *
+struct ifnet *
 ip_multicast_if(a, ifindexp)
 	struct in_addr *a;
 	int *ifindexp;
@@ -1753,10 +1856,16 @@ ip_setmoptions(sopt, imop)
 	struct ip_mreq mreq;
 	struct ifnet *ifp;
 	struct ip_moptions *imo = *imop;
-	struct route ro;
-	struct sockaddr_in *dst;
 	int ifindex;
-	int s;
+	int s = 0;
+#ifdef IGMPV3
+	struct sockaddr_storage ss_src, ss_grp;
+	struct sockaddr_storage *del_ss;
+	u_int16_t numsrc;
+	u_int mode;
+	int init;		/* indicate initial group join */
+	int final;		/* indicate final group leave */
+#endif
 
 	if (imo == NULL) {
 		/*
@@ -1892,39 +2001,12 @@ ip_setmoptions(sopt, imop)
 			error = EINVAL;
 			break;
 		}
-		s = splimp();
-		/*
-		 * If no interface address was provided, use the interface of
-		 * the route to the given multicast address.
-		 */
-		if (mreq.imr_interface.s_addr == INADDR_ANY) {
-			bzero((caddr_t)&ro, sizeof(ro));
-			dst = (struct sockaddr_in *)&ro.ro_dst;
-			dst->sin_len = sizeof(*dst);
-			dst->sin_family = AF_INET;
-			dst->sin_addr = mreq.imr_multiaddr;
-			rtalloc(&ro);
-			if (ro.ro_rt == NULL) {
-				error = EADDRNOTAVAIL;
-				splx(s);
-				break;
-			}
-			ifp = ro.ro_rt->rt_ifp;
-			rtfree(ro.ro_rt);
-		}
-		else {
-			ifp = ip_multicast_if(&mreq.imr_interface, NULL);
-		}
 
-		/*
-		 * See if we found an interface, and confirm that it
-		 * supports multicast.
-		 */
-		if (ifp == NULL || (ifp->if_flags & IFF_MULTICAST) == 0) {
-			error = EADDRNOTAVAIL;
-			splx(s);
+		if ((error = ip_getmopt_ifargs(sopt, &ifp,
+						&mreq.imr_multiaddr,
+						&mreq.imr_interface)) != 0)
 			break;
-		}
+
 		/*
 		 * See if the membership already exists or if all the
 		 * membership slots are full.
@@ -1949,12 +2031,32 @@ ip_setmoptions(sopt, imop)
 		 * Everything looks good; add a new record to the multicast
 		 * address list for the given interface.
 		 */
+#ifdef IGMPV3
+		/*
+		 * Even this request doesn't add any source filter, create
+		 * msf entry list. This is needed to indicate current msf state.
+		 */
+		IMO_MSF_ALLOC(imo->imo_msf[i]);
+		if (error != 0)
+			break;
+		init = 1;
+		if ((imo->imo_membership[i] =
+		    in_addmulti(&mreq.imr_multiaddr, ifp, 0, NULL,
+				MCAST_EXCLUDE, init, &error)) == NULL) {
+			IMO_MSF_FREE(imo->imo_msf[i]);
+			break;
+		}
+#else
 		if ((imo->imo_membership[i] =
 		    in_addmulti(&mreq.imr_multiaddr, ifp)) == NULL) {
 			error = ENOBUFS;
 			splx(s);
 			break;
 		}
+#endif
+#ifdef IGMPV3
+		imo->imo_msf[i]->msf_grpjoin = 1;
+#endif
 		++imo->imo_num_memberships;
 		splx(s);
 		break;
@@ -1974,20 +2076,11 @@ ip_setmoptions(sopt, imop)
 		}
 
 		s = splimp();
-		/*
-		 * If an interface address was specified, get a pointer
-		 * to its ifnet structure.
-		 */
-		if (mreq.imr_interface.s_addr == INADDR_ANY)
-			ifp = NULL;
-		else {
-			ifp = ip_multicast_if(&mreq.imr_interface, NULL);
-			if (ifp == NULL) {
-				error = EADDRNOTAVAIL;
-				splx(s);
-				break;
-			}
-		}
+
+		if ((error = ip_getmopt_ifargs(sopt, &ifp, NULL,
+						&mreq.imr_interface)) != 0)
+			break;
+
 		/*
 		 * Find the membership in the membership array.
 		 */
@@ -2005,9 +2098,117 @@ ip_setmoptions(sopt, imop)
 		}
 		/*
 		 * Give up the multicast address record to which the
-		 * membership points.
+		 * membership points if there is no member.
 		 */
+#ifdef IGMPV3
+		error = in_getmopt_source_list(imo->imo_msf[i], &numsrc,
+					   &del_ss, &mode);
+		if (error != 0) {
+			in_undomopt_source_addr(imo->imo_msf[i], sopt->sopt_name);
+			if (del_ss != NULL)
+				FREE(del_ss, M_IPMOPTS);
+			break;
+		}
+
+		final = 1;
+		in_delmulti(imo->imo_membership[i], numsrc, del_ss, mode,
+			    final, &error);
+		if (del_ss != NULL)
+			FREE(del_ss, M_IPMOPTS);
+		in_freemopt_source_list(imo->imo_msf[i],
+					imo->imo_msf[i]->msf_head,
+					imo->imo_msf[i]->msf_blkhead);
+		IMO_MSF_FREE(imo->imo_msf[i]);
+#else
 		in_delmulti(imo->imo_membership[i]);
+#endif
+
+		/*
+		 * Remove the gap in the membership array.
+		 */
+		for (++i; i < imo->imo_num_memberships; ++i)
+			imo->imo_membership[i-1] = imo->imo_membership[i];
+		--imo->imo_num_memberships;
+		break;
+
+#ifdef IGMPV3
+	case MCAST_JOIN_GROUP:
+		error = ip_getmopt_sgaddr(sopt, &ifp, &ss_grp, NULL);
+		if (error != 0)
+			break;
+		/*
+		 * See if all the membership slots are full.
+		 */
+		for (i = 0; i < imo->imo_num_memberships; ++i) {
+			if (imo->imo_membership[i]->inm_ifp == ifp &&
+			    imo->imo_membership[i]->inm_addr.s_addr == SIN(&ss_grp)->sin_addr.s_addr)
+				break;
+		}
+		if (i < imo->imo_num_memberships) {
+			error = EADDRINUSE;
+			break;
+		}
+		if (i == IP_MAX_MEMBERSHIPS) {
+			error = ETOOMANYREFS;
+			break;
+		}
+
+		/*
+		 * Everything looks good; add a new record to the multicast
+		 * address list for the given interface.
+		 */
+		IMO_MSF_ALLOC(imo->imo_msf[i]);
+		if (error != 0)
+			break;
+		init = 1;
+		if ((imo->imo_membership[i] =
+		    in_addmulti(&SIN(&ss_grp)->sin_addr, ifp, 0, NULL,
+		    		MCAST_EXCLUDE, init, &error)) == NULL) {
+			IMO_MSF_FREE(imo->imo_msf[i]);
+			break;
+		}
+
+		imo->imo_msf[i]->msf_grpjoin = 1;
+		++imo->imo_num_memberships;
+		break;
+
+	case MCAST_LEAVE_GROUP:
+		error = ip_getmopt_sgaddr(sopt, &ifp, &ss_grp, NULL);
+		if (error != 0)
+			break;
+		/*
+		 * Find the membership in the membership array.
+		 */
+		for (i = 0; i < imo->imo_num_memberships; ++i) {
+			if ((ifp == NULL ||
+			     imo->imo_membership[i]->inm_ifp == ifp) &&
+			     imo->imo_membership[i]->inm_addr.s_addr == SIN(&ss_grp)->sin_addr.s_addr)
+				break;
+		}
+		if (i == imo->imo_num_memberships) {
+			error = EADDRNOTAVAIL;
+			break;
+		}
+
+		error = in_getmopt_source_list(imo->imo_msf[i], &numsrc,
+					       &del_ss, &mode);
+		if (error != 0) {
+			in_undomopt_source_addr(imo->imo_msf[i], sopt->sopt_name);
+			if (del_ss != NULL)
+				FREE(del_ss, M_IPMOPTS);
+			break;
+		}
+
+		final = 1;
+		in_delmulti(imo->imo_membership[i], numsrc, del_ss, mode,
+			    final, &error);
+		if (del_ss != NULL)
+			FREE(del_ss, M_IPMOPTS);
+		in_freemopt_source_list(imo->imo_msf[i],
+					imo->imo_msf[i]->msf_head,
+					imo->imo_msf[i]->msf_blkhead);
+		IMO_MSF_FREE(imo->imo_msf[i]);
+
 		/*
 		 * Remove the gap in the membership array.
 		 */
@@ -2016,6 +2217,319 @@ ip_setmoptions(sopt, imop)
 		--imo->imo_num_memberships;
 		splx(s);
 		break;
+
+	case IP_ADD_SOURCE_MEMBERSHIP:
+	case MCAST_JOIN_SOURCE_GROUP:
+		error = ip_getmopt_sgaddr(sopt, &ifp, &ss_grp, &ss_src);
+		if (error != 0)
+			break;
+		/*
+		 * Find the membership in the membership array.
+		 */
+		for (i = 0; i < imo->imo_num_memberships; ++i) {
+			if (imo->imo_membership[i]->inm_ifp == ifp &&
+			    imo->imo_membership[i]->inm_addr.s_addr == SIN(&ss_grp)->sin_addr.s_addr)
+				break;
+		}
+		if (i == IP_MAX_MEMBERSHIPS) {
+			error = ETOOMANYREFS;
+			break;
+		}
+		if (i < imo->imo_num_memberships) {
+			/*
+			 * If Any-Source join was already requested, return
+			 * EINVAL.
+			 */
+			if (imo->imo_msf[i]->msf_grpjoin != 0) {
+				error = EINVAL;
+				break;
+			}
+			/*
+			 * If there is EXCLUDE msf state, return EINVAL.
+			 */
+			if (imo->imo_msf[i]->msf_blknumsrc != 0) {
+				error = EINVAL;
+				break;
+			}
+			/*
+			 * If the implementation imposes a limit on the
+			 * maximum number of sources in a source filter,
+			 * ENOBUFS is generated.
+			 */
+			if (imo->imo_msf[i]->msf_numsrc >= igmpsomaxsrc) {
+				error = ENOBUFS;
+				break;
+			}
+			init = 0;
+		} else {
+			IMO_MSF_ALLOC(imo->imo_msf[i]);
+			if (error != 0)
+				break;
+			init = 1;
+		}
+
+		/*
+		 * Set source address to the msf.
+		 * If requested source address was already in the socket list,
+		 * return EADDRNOTAVAIL. 
+		 * If there is not enough memory, return ENOBUFS.
+		 * Otherwise, 0 will be returned, which means okay.
+		 */
+		error = in_setmopt_source_addr(&ss_src, imo->imo_msf[i],
+					       sopt->sopt_name);
+		if (error != 0) {
+			if (init)
+				IMO_MSF_FREE(imo->imo_msf[i]);
+			break;
+		}
+
+		/*
+		 * Everything looks good; add a new record to the multicast
+		 * address list for the given interface.
+		 * But if some error occurs when source list is added to
+		 * the list, undo added msf list from the socket.
+		 */
+		numsrc = 1;
+		imo->imo_membership[i] =
+			in_addmulti(&SIN(&ss_grp)->sin_addr, ifp, numsrc,
+				    &ss_src, MCAST_INCLUDE, init, &error);
+		if (imo->imo_membership[i] == NULL) {
+			in_undomopt_source_addr(imo->imo_msf[i], sopt->sopt_name);
+			break;
+		}
+		in_cleanmopt_source_addr(imo->imo_msf[i], sopt->sopt_name);
+
+		if (init)
+			++imo->imo_num_memberships;
+		break;
+
+	case IP_DROP_SOURCE_MEMBERSHIP:
+	case MCAST_LEAVE_SOURCE_GROUP:
+		error = ip_getmopt_sgaddr(sopt, &ifp, &ss_grp, &ss_src);
+		if (error != 0)
+			break;
+		/*
+		 * Find the membership in the membership array.
+		 */
+		for (i = 0; i < imo->imo_num_memberships; ++i) {
+			if ((ifp == NULL ||
+			     imo->imo_membership[i]->inm_ifp == ifp) &&
+			     imo->imo_membership[i]->inm_addr.s_addr == SIN(&ss_grp)->sin_addr.s_addr)
+				break;
+		}
+		if (i == imo->imo_num_memberships) {
+			error = EADDRNOTAVAIL;
+			break;
+		}
+
+		/*
+		 * Remove source address from the msf.
+		 * If (*,G) join or EXCLUDE join was requested previously,
+		 * return EINVAL.
+		 * If requested source address was not in the socket list,
+		 * return EADDRNOTAVAIL. 
+		 * If there is not enough memory, return ENOBUFS.
+		 * Otherwise, 0 will be returned, which means okay.
+		 */
+		if ((imo->imo_msf[i]->msf_grpjoin != 0) ||
+				(imo->imo_msf[i]->msf_blknumsrc != 0)) {
+			error = EINVAL;
+			break;
+		}
+		error = in_setmopt_source_addr(&ss_src, imo->imo_msf[i],
+					       sopt->sopt_name);
+		if (error != 0)
+			break;
+		if (imo->imo_msf[i]->msf_numsrc == 0)
+			final = 1;
+		else
+			final = 0;
+
+		/*
+		 * Give up the multicast address record to which the
+		 * membership points.
+		 */
+		numsrc = 1;
+		in_delmulti(imo->imo_membership[i], numsrc, &ss_src,
+				MCAST_INCLUDE, final, &error);
+		if (error != 0) {
+			printf("ip_setmoptions: error must be 0! panic!\n");
+			in_undomopt_source_addr(imo->imo_msf[i], sopt->sopt_name);
+			break; /* strange... */
+		}
+		in_cleanmopt_source_addr(imo->imo_msf[i], sopt->sopt_name);
+
+
+		/*
+		 * Remove the gap in the membership array if there is no
+		 * msf member.
+		 */
+		if (final) {
+			for (++i; i < imo->imo_num_memberships; ++i)
+				imo->imo_membership[i-1]
+						= imo->imo_membership[i];
+			--imo->imo_num_memberships;
+		}
+		break;
+
+	case IP_BLOCK_SOURCE:
+	case MCAST_BLOCK_SOURCE:
+		error = ip_getmopt_sgaddr(sopt, &ifp, &ss_grp, &ss_src);
+		if (error != 0)
+			break;
+		/*
+		 * Find the membership in the membership array.
+		 */
+		for (i = 0; i < imo->imo_num_memberships; ++i) {
+			if (imo->imo_membership[i]->inm_ifp == ifp &&
+			    imo->imo_membership[i]->inm_addr.s_addr == SIN(&ss_grp)->sin_addr.s_addr)
+				break;
+		}
+		if (i == IP_MAX_MEMBERSHIPS) {
+			error = ETOOMANYREFS;
+			break;
+		}
+		if (i < imo->imo_num_memberships) {
+			/*
+			 * If there is INCLUDE msf state, return EINVAL.
+			 */
+			if (imo->imo_msf[i]->msf_numsrc != 0) {
+				error = EINVAL;
+				break;
+			}
+			if (imo->imo_msf[i]->msf_blknumsrc >= igmpsomaxsrc) {
+				error = ENOBUFS;
+				break;
+			}
+			init = 0;
+		} else {
+			IMO_MSF_ALLOC(imo->imo_msf[i]);
+			if (error != 0)
+				break;
+			init = 1;
+		}
+
+		/*
+		 * Set source address to the msf.
+		 * If requested source address was already in the socket list,
+		 * return EADDRNOTAVAIL. 
+		 * If there is not enough memory, return ENOBUFS.
+		 * Otherwise, 0 will be returned, which means okay.
+		 */
+		error = in_setmopt_source_addr(&ss_src, imo->imo_msf[i],
+					       sopt->sopt_name);
+		if (error != 0) {
+			if (init)
+				IMO_MSF_FREE(imo->imo_msf[i]);
+			break;
+		}
+
+		/*
+		 * Everything looks good; add a new record to the multicast
+		 * address list for the given interface.
+		 * But if some error occurs when source list is added to
+		 * the list, undo added msf list from the socket.
+		 */
+		numsrc = 1;
+		if (imo->imo_msf[i]->msf_grpjoin == 0) {
+			/* IN{NULL}/EX{non NULL} -> EX{non NULL} */
+			imo->imo_membership[i] =
+				in_addmulti(&SIN(&ss_grp)->sin_addr, ifp,
+					    numsrc, &ss_src, MCAST_EXCLUDE,
+					    init, &error);
+			if (imo->imo_membership[i] == NULL) {
+				in_undomopt_source_addr
+					(imo->imo_msf[i], sopt->sopt_name);
+				break;
+			}
+		} else {
+			/* EX{NULL} -> EX{non NULL} */
+			imo->imo_membership[i] =
+				in_modmulti(&SIN(&ss_grp)->sin_addr,
+					    ifp, numsrc, &ss_src, MCAST_EXCLUDE,
+					    0, NULL, MCAST_EXCLUDE, init,
+					    imo->imo_msf[i]->msf_grpjoin, &error);
+			if (imo->imo_membership[i] == NULL) {
+				in_undomopt_source_addr
+					(imo->imo_msf[i], sopt->sopt_name);
+				break;
+			}
+			imo->imo_msf[i]->msf_grpjoin = 0;
+		}
+		in_cleanmopt_source_addr(imo->imo_msf[i], sopt->sopt_name);
+
+		if (init)
+			++imo->imo_num_memberships;
+		break;
+
+	case IP_UNBLOCK_SOURCE:
+	case MCAST_UNBLOCK_SOURCE:
+		error = ip_getmopt_sgaddr(sopt, &ifp, &ss_grp, &ss_src);
+		if (error != 0)
+			break;
+		/*
+		 * Find the membership in the membership array.
+		 */
+		for (i = 0; i < imo->imo_num_memberships; ++i) {
+			if ((ifp == NULL ||
+			     imo->imo_membership[i]->inm_ifp == ifp) &&
+			     imo->imo_membership[i]->inm_addr.s_addr == SIN(&ss_grp)->sin_addr.s_addr)
+				break;
+		}
+		if (i == imo->imo_num_memberships) {
+			error = EADDRNOTAVAIL;
+			break;
+		}
+
+		/*
+		 * Remove source address from the msf.
+		 * If (*,G) join or INCLUDE join was requested previously,
+		 * return EINVAL.
+		 * If requested source address was not in the socket list,
+		 * return EADDRNOTAVAIL. 
+		 * If there is not enough memory, return ENOBUFS.
+		 * Otherwise, 0 will be returned, which means okay.
+		 */
+		if ((imo->imo_msf[i]->msf_grpjoin != 0) ||
+				(imo->imo_msf[i]->msf_numsrc != 0)) {
+			error = EINVAL;
+			break;
+		}
+		error = in_setmopt_source_addr(&ss_src, imo->imo_msf[i],
+					       sopt->sopt_name);
+		if (error != 0)
+			break;
+		if (imo->imo_msf[i]->msf_blknumsrc == 0)
+			final = 1;
+		else
+			final = 0;
+
+		/*
+		 * Give up the multicast address record to which the
+		 * membership points.
+		 */
+		numsrc = 1;
+		in_delmulti(imo->imo_membership[i], numsrc, &ss_src,
+				MCAST_EXCLUDE, final, &error);
+		if (error != 0) {
+			printf("ip_setmoptions: error must be 0! panic!\n");
+			in_undomopt_source_addr(imo->imo_msf[i], sopt->sopt_name);
+			break; /* strange... */
+		}
+		in_cleanmopt_source_addr(imo->imo_msf[i], sopt->sopt_name);
+
+		/*
+		 * Remove the gap in the membership array if there is no
+		 * msf member.
+		 */
+		if (final) {
+			for (++i; i < imo->imo_num_memberships; ++i)
+				imo->imo_membership[i-1]
+						= imo->imo_membership[i];
+			--imo->imo_num_memberships;
+		}
+		break;
+#endif /* IGMPV3 */
 
 	default:
 		error = EOPNOTSUPP;
@@ -2111,10 +2625,44 @@ ip_freemoptions(imo)
 	register struct ip_moptions *imo;
 {
 	register int i;
+#ifdef IGMPV3
+	struct sockaddr_storage *del_ss;
+	u_int16_t numsrc;
+	u_int mode;
+	int final;
+	int error;
+#endif
 
 	if (imo != NULL) {
-		for (i = 0; i < imo->imo_num_memberships; ++i)
+		for (i = 0; i < imo->imo_num_memberships; ++i) {
+#ifdef IGMPV3
+			error = in_getmopt_source_list(imo->imo_msf[i], &numsrc,
+						       &del_ss, &mode);
+			if (error != 0) {
+				/* XXX strange... panic or skip ? */
+				/*
+				in_undomopt_source_addr(imo->imo_msf[i],
+							sopt->sopt_name);
+				 */
+				if (del_ss != NULL)
+					FREE(del_ss, M_IPMOPTS);
+				printf("ip_freemoptions: error must be 0! panic!\n");
+				continue; /* XXX */
+			}
+
+			final = 1;
+			in_delmulti(imo->imo_membership[i], numsrc, del_ss,
+				    mode, final, &error);
+			if (del_ss != NULL)
+				FREE(del_ss, M_IPMOPTS);
+			in_freemopt_source_list(imo->imo_msf[i],
+						imo->imo_msf[i]->msf_head,
+						imo->imo_msf[i]->msf_blkhead);
+			IMO_MSF_FREE(imo->imo_msf[i]);
+#else
 			in_delmulti(imo->imo_membership[i]);
+#endif
+		}
 		free(imo, M_IPMOPTS);
 	}
 }
@@ -2182,3 +2730,302 @@ ip_mloopback(ifp, m, dst, hlen)
 #endif
 	}
 }
+
+static int
+ip_getmopt_ifargs(sopt, ifp, ia_grp, ia_ifa)
+	struct sockopt *sopt;
+	struct ifnet **ifp;
+	struct in_addr *ia_grp, *ia_ifa;
+{
+	struct route ro;
+	struct sockaddr_in *dst;
+	int error = 0;
+	int optname = sopt->sopt_name;
+
+	switch (optname) {
+	case IP_ADD_MEMBERSHIP:
+#ifdef IGMPV3
+	case IP_ADD_SOURCE_MEMBERSHIP:
+	case IP_BLOCK_SOURCE:
+#endif
+		/*
+		 * If no interface address was provided, use the interface of
+		 * the route to the given multicast address.
+		 */
+		if (ia_ifa->s_addr == INADDR_ANY) {
+			bzero((caddr_t)&ro, sizeof(ro));
+			ro.ro_rt = NULL;
+			dst = satosin(&ro.ro_dst);
+			dst->sin_len = sizeof(struct sockaddr_in);
+			dst->sin_family = AF_INET;
+			dst->sin_addr = *ia_grp;
+			rtalloc(&ro);
+			if (ro.ro_rt == NULL) {
+				error = EADDRNOTAVAIL;
+				return error;
+			}
+			*ifp = ro.ro_rt->rt_ifp;
+			rtfree(ro.ro_rt);
+		} else {
+			*ifp = ip_multicast_if(ia_ifa, NULL);
+		}
+		/*
+		 * See if we found an interface, and confirm that it supports
+		 * multicast.
+		 */
+		if (*ifp == NULL || ((*ifp)->if_flags & IFF_MULTICAST) == 0)
+			error = EADDRNOTAVAIL;
+		break;
+
+	case IP_DROP_MEMBERSHIP:
+#ifdef IGMPV3
+	case IP_DROP_SOURCE_MEMBERSHIP:
+	case IP_UNBLOCK_SOURCE:
+#endif
+		/*
+		 * If an interface address was specified, get a pointer
+		 * to its ifnet structure.
+		 */
+		if (ia_ifa->s_addr == INADDR_ANY)
+			*ifp = NULL;
+		else {
+			*ifp = ip_multicast_if(ia_ifa, NULL);
+			if (*ifp == NULL) {
+				error = EADDRNOTAVAIL;
+				break;
+			}
+		}
+		break;
+	}
+	return error;
+}
+
+#ifdef IGMPV3
+static int
+in_getmopt_ifargs(sopt, ifp, ia_grp, index)
+	struct sockopt *sopt;
+	struct ifnet **ifp;
+	struct in_addr *ia_grp;
+	u_int32_t index;
+{
+	struct route ro;
+	struct sockaddr_in *dst;
+	int error = 0;
+	int optname = sopt->sopt_name;
+
+	/*
+	 * If the interface is specified, validate it.
+	 */
+	if (index < 0 || if_index < index)
+		return ENXIO;	/* XXX EINVAL? */
+
+	switch (optname) {
+	case MCAST_JOIN_GROUP:
+	case MCAST_BLOCK_SOURCE:
+	case MCAST_JOIN_SOURCE_GROUP:
+		/*
+		 * If no interface was explicitly specified, choose an
+		 * appropriate one according to the given multicast address.
+		 */
+		if (index == 0) {
+			bzero((caddr_t)&ro, sizeof(ro));
+			ro.ro_rt = NULL;
+			dst = satosin(&ro.ro_dst);
+			dst->sin_len = sizeof(struct sockaddr_in);
+			dst->sin_family = AF_INET;
+			dst->sin_addr = *ia_grp;
+			rtalloc((struct route *)&ro);
+			if (ro.ro_rt == NULL) {
+				error = EADDRNOTAVAIL;
+				break;
+			}
+			*ifp = ro.ro_rt->rt_ifp;
+			rtfree(ro.ro_rt);
+		} else
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+			*ifp = ifnet_byindex(index);
+#else
+			*ifp = ifindex2ifnet[index];
+#endif
+
+		if (*ifp == NULL || ((*ifp)->if_flags & IFF_MULTICAST) == 0) {
+#ifdef IGMPV3_DEBUG
+			printf("invalid interface (#%d) specified", index);
+#endif
+			error = EINVAL;
+		}
+
+		break;
+
+	case MCAST_LEAVE_GROUP:
+	case MCAST_UNBLOCK_SOURCE:
+	case MCAST_LEAVE_SOURCE_GROUP:
+		/*
+		 * If an interface address was specified, get a pointer
+		 * to its ifnet structure.
+		 */
+		if (index == 0)
+			*ifp = NULL;
+		else {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+			*ifp = ifnet_byindex(index);
+#else
+			*ifp = ifindex2ifnet[index];
+#endif
+			if (*ifp == NULL) {
+				error = EADDRNOTAVAIL;
+				break;
+			}
+		}
+		break;
+	}
+	return error;
+}
+
+static int
+ip_getmopt_sgaddr(sopt, ifp, ss_grp, ss_src)
+	struct sockopt *sopt;
+	struct ifnet **ifp;
+	struct sockaddr_storage *ss_grp;
+	struct sockaddr_storage *ss_src;
+{
+	struct sockaddr_in *sin_src, *sin_grp;
+	int error = 0;
+	int optname = sopt->sopt_name;
+
+	switch (optname) {
+	case MCAST_JOIN_GROUP:
+	case MCAST_LEAVE_GROUP:
+	    {
+		struct group_req greq;
+
+		error = sooptcopyin(sopt, &greq, sizeof greq, sizeof greq);
+		if (error)
+			break;
+		if (greq.gr_group.ss_family != AF_INET) {
+			error = EPFNOSUPPORT;
+			break;
+		}
+
+		sin_grp = SIN(ss_grp);
+		sin_grp->sin_addr = SIN(&greq.gr_group)->sin_addr;
+		sin_grp->sin_len = sizeof(*sin_grp);
+		sin_grp->sin_family = AF_INET;
+
+		if (!IN_MULTICAST(SIN_ADDR_H(sin_grp))) {
+			error = EINVAL;
+			break;
+		}
+
+		/*
+		 * Get a pointer to the ifnet structure.
+		 */
+		error = in_getmopt_ifargs(sopt, ifp, &sin_grp->sin_addr,
+					  greq.gr_interface);
+
+		break;
+	    }
+
+	case IP_BLOCK_SOURCE:
+	case IP_UNBLOCK_SOURCE:
+	case IP_ADD_SOURCE_MEMBERSHIP:
+	case IP_DROP_SOURCE_MEMBERSHIP:
+	    {
+		struct ip_mreq_source mreqsrc;
+		struct sockaddr_in sin_ifa;
+
+		error = sooptcopyin(sopt, &mreqsrc, sizeof mreqsrc, sizeof mreqsrc);
+		if (error)
+			break;
+
+		sin_src = SIN(ss_src);
+		sin_src->sin_addr = mreqsrc.imr_sourceaddr;
+		sin_src->sin_len = sizeof(*sin_src);
+		sin_src->sin_family = AF_INET;
+		sin_grp = SIN(ss_grp);
+		sin_grp->sin_addr = mreqsrc.imr_multiaddr;
+		sin_grp->sin_len = sizeof(*sin_grp);
+		sin_grp->sin_family = AF_INET;
+		sin_ifa.sin_addr = mreqsrc.imr_interface;
+
+		/*
+		 * Group must be a valid IP multicast address.
+		 */
+		if (!IN_MULTICAST(SIN_ADDR_H(sin_grp)) ||
+				IN_LOCAL_GROUP(SIN_ADDR_H(sin_grp))) {
+			error = EINVAL;
+			break;
+		}
+		/*
+		 * If no source address was provided or was class-d, bad
+		 * class, return error.
+		 */
+		if (IN_MULTICAST(SIN_ADDR_H(sin_src)) ||
+			    IN_BADCLASS(SIN_ADDR_H(sin_src)) ||
+			    (SIN_ADDR_H(sin_src) & IN_CLASSA_NET) == 0) {
+			error = EINVAL;
+			break;
+		}
+
+		/*
+		 * Get a pointer to the ifnet structure.
+		 */
+		error = ip_getmopt_ifargs(sopt, ifp, &sin_grp->sin_addr,
+					  &sin_ifa.sin_addr);
+
+		break;
+	    }
+
+	case MCAST_BLOCK_SOURCE:
+	case MCAST_UNBLOCK_SOURCE:
+	case MCAST_JOIN_SOURCE_GROUP:
+	case MCAST_LEAVE_SOURCE_GROUP:
+	    {
+		struct group_source_req gsreq;
+
+		error = sooptcopyin(sopt, &gsreq, sizeof gsreq, sizeof gsreq);
+		if (error)
+			break;
+		if ((gsreq.gsr_group.ss_family != AF_INET) ||
+				(gsreq.gsr_source.ss_family != AF_INET)) {
+			error = EPFNOSUPPORT;
+			break;
+		}
+
+		sin_src = SIN(ss_src);
+		sin_src->sin_addr = SIN(&gsreq.gsr_source)->sin_addr;
+		sin_src->sin_len = sizeof(*sin_src);
+		sin_src->sin_family = AF_INET;
+		sin_grp = SIN(ss_grp);
+		sin_grp->sin_addr = SIN(&gsreq.gsr_group)->sin_addr;
+		sin_grp->sin_len = sizeof(*sin_grp);
+		sin_grp->sin_family = AF_INET;
+
+		if (!IN_MULTICAST(SIN_ADDR_H(sin_grp)) ||
+			IN_LOCAL_GROUP(SIN_ADDR_H(sin_grp))) {
+#ifdef IGMPV3_DEBUG
+			printf("invalid group %s specified\n", inet_ntoa(sin_grp->sin_addr));
+#endif
+			error = EINVAL;
+			break;
+		}
+		if (IN_MULTICAST(SIN_ADDR_H(sin_src)) ||
+		    IN_BADCLASS(SIN_ADDR_H(sin_src)) ||
+		    (SIN_ADDR_H(sin_src) & IN_CLASSA_NET) == 0) {
+#ifdef IGMPV3_DEBUG
+			printf("invalid source %s specified\n", inet_ntoa(sin_src->sin_addr));
+#endif
+			error = EINVAL;
+			break;
+		}
+
+		error = in_getmopt_ifargs(sopt, ifp, &sin_grp->sin_addr,
+					  gsreq.gsr_interface);
+
+		break;
+	    }
+	}
+
+	return error;
+}
+#endif /* IGMPV3 */

@@ -646,7 +646,8 @@ lge_attach(dev)
 	ifp->if_watchdog = lge_watchdog;
 	ifp->if_init = lge_init;
 	ifp->if_baudrate = 1000000000;
-	ifp->if_snd.ifq_maxlen = LGE_TX_LIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, LGE_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 	ifp->if_capabilities = IFCAP_RXCSUM;
 	ifp->if_capenable = ifp->if_capabilities;
 
@@ -1138,7 +1139,7 @@ lge_tick(xsc)
 			    IFM_SUBTYPE(mii->mii_media_active) == IFM_1000_T)
 				printf("lge%d: gigabit link up\n",
 				    sc->lge_unit);
-			if (ifp->if_snd.ifq_head != NULL)
+			if (!IFQ_IS_EMPTY(&ifp->if_snd))
 				lge_start(ifp);
 		}
 	}
@@ -1197,7 +1198,7 @@ lge_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, LGE_IMR, LGE_IMR_SETRST_CTL0|LGE_IMR_INTR_ENB);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		lge_start(ifp);
 
 	return;
@@ -1265,6 +1266,7 @@ lge_start(ifp)
 	struct lge_softc	*sc;
 	struct mbuf		*m_head = NULL;
 	u_int32_t		idx;
+	int			pkts = 0;
 
 	sc = ifp->if_softc;
 
@@ -1280,15 +1282,18 @@ lge_start(ifp)
 		if (CSR_READ_1(sc, LGE_TXCMDFREE_8BIT) == 0)
 			break;
 
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_POLL(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
 		if (lge_encap(sc, m_head, &idx)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
+
+		/* now we are committed to transmit the packet */
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
+		pkts++;
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -1296,6 +1301,8 @@ lge_start(ifp)
 		 */
 		BPF_MTAP(ifp, m_head);
 	}
+	if (pkts == 0)
+		return;
 
 	sc->lge_cdata.lge_tx_prod = idx;
 
@@ -1568,7 +1575,7 @@ lge_watchdog(ifp)
 	ifp->if_flags &= ~IFF_RUNNING;
 	lge_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		lge_start(ifp);
 
 	return;

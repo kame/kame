@@ -458,7 +458,8 @@ an_attach(sc, unit, flags)
 	ifp->if_watchdog = an_watchdog;
 	ifp->if_init = an_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	bzero(sc->an_config.an_nodename, sizeof(sc->an_config.an_nodename));
 	bcopy(AN_DEFAULT_NODENAME, sc->an_config.an_nodename,
@@ -796,7 +797,7 @@ an_intr(xsc)
 	/* Re-enable interrupts. */
 	CSR_WRITE_2(sc, AN_INT_EN, AN_INTRS);
 
-	if ((ifp->if_flags & IFF_UP) && (ifp->if_snd.ifq_head != NULL))
+	if ((ifp->if_flags & IFF_UP) && !IFQ_IS_EMPTY(&ifp->if_snd))
 		an_start(ifp);
 
 	AN_UNLOCK(sc);
@@ -1981,7 +1982,7 @@ an_start(ifp)
 	bzero((char *)&tx_frame_802_3, sizeof(tx_frame_802_3));
 
 	while (sc->an_rdata.an_tx_ring[idx] == 0) {
-		IF_DEQUEUE(&ifp->if_snd, m0);
+		IFQ_DEQUEUE(&ifp->if_snd, m0);
 		if (m0 == NULL)
 			break;
 
@@ -2028,6 +2029,8 @@ an_start(ifp)
 
 		AN_INC(idx, AN_TX_RING_CNT);
 	}
+	if (idx == sc->an_rdata.an_tx_prod)
+		return;
 
 	if (m0 != NULL)
 		ifp->if_flags |= IFF_OACTIVE;
