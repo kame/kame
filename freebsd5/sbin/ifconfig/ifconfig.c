@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)ifconfig.c	8.2 (Berkeley) 2/16/94";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.90 2003/04/28 16:37:38 sam Exp $";
+  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.92 2003/10/26 04:36:47 peter Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -252,6 +252,8 @@ struct	cmd {
 	{ "-link2",	-IFF_LINK2,	setifflags },
 	{ "monitor",	IFF_MONITOR,	setifflags },
 	{ "-monitor",	-IFF_MONITOR,	setifflags },
+	{ "staticarp",	IFF_STATICARP,	setifflags },
+	{ "-staticarp",	-IFF_STATICARP,	setifflags },
 #ifdef USE_IF_MEDIA
 	{ "media",	NEXTARG,	setmedia },
 	{ "mode",	NEXTARG,	setmediamode },
@@ -1146,7 +1148,7 @@ setifmtu(const char *val, int dummy __unused, int s,
 #define	IFFBITS \
 "\020\1UP\2BROADCAST\3DEBUG\4LOOPBACK\5POINTOPOINT\6SMART\7RUNNING" \
 "\10NOARP\11PROMISC\12ALLMULTI\13OACTIVE\14SIMPLEX\15LINK0\16LINK1\17LINK2" \
-"\20MULTICAST\023MONITOR"
+"\20MULTICAST\023MONITOR\024STATICARP"
 
 #define	IFCAPBITS \
 "\003\1RXCSUM\2TXCSUM\3NETCONS\4VLAN_MTU\5VLAN_HWTAGGING\6JUMBO_MTU"
@@ -1856,9 +1858,9 @@ void
 setatrange(const char *range, int dummy __unused, int s, 
     const struct afswtch *afp)
 {
-	u_short	first = 123, last = 123;
+	u_int	first = 123, last = 123;
 
-	if (sscanf(range, "%hu-%hu", &first, &last) != 2
+	if (sscanf(range, "%u-%u", &first, &last) != 2
 	    || first == 0 || first > 0xffff
 	    || last == 0 || last > 0xffff || first > last)
 		errx(1, "%s: illegal net range: %u-%u", range, first, last);

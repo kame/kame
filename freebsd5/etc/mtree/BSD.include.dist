@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.include.dist,v 1.66 2003/03/05 19:21:23 peter Exp $
+# $FreeBSD: src/etc/mtree/BSD.include.dist,v 1.77 2003/11/29 18:22:01 ru Exp $
 #
 # Please see the file src/etc/mtree/README before making changes to this file.
 #
@@ -9,6 +9,18 @@
     ..
     arpa
     ..
+    bsnmp
+    ..
+    c++
+        3.3
+            backward
+            ..
+            bits
+            ..
+            ext
+            ..
+        ..
+    ..
     cam
         scsi
         ..
@@ -18,11 +30,11 @@
     dev
         an
         ..
+        firewire
+        ..
         ic
         ..
         iicbus
-        ..
-        firewire
         ..
         ofw
         ..
@@ -31,6 +43,8 @@
         smbus
         ..
         usb
+        ..
+        utopia
         ..
         wi
         ..
@@ -56,17 +70,11 @@
         ..
         smbfs
         ..
+        udf
+        ..
         umapfs
         ..
         unionfs
-        ..
-    ..
-    g++
-        backward
-        ..
-        bits
-        ..
-        ext
         ..
     ..
     geom
@@ -77,6 +85,8 @@
         cd9660
         ..
     ..
+    kadm5
+    ..
     libmilter
     ..
     machine
@@ -84,6 +94,8 @@
         ..
     ..
     net
+    ..
+    net80211
     ..
     netatalk
     ..
@@ -98,6 +110,8 @@
         ..
     ..
     netgraph
+        atm
+        ..
         bluetooth
             include
             ..
@@ -114,6 +128,12 @@
     netkey
     ..
     netnatm
+        msg
+        ..
+        saal
+        ..
+        sig
+        ..
     ..
     netncp
     ..

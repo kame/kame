@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)inet.c	8.5 (Berkeley) 5/24/95";
 */
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/inet.c,v 1.58 2003/04/02 20:14:44 mdodd Exp $";
+  "$FreeBSD: src/usr.bin/netstat/inet.c,v 1.60 2003/10/23 13:53:19 ru Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -58,6 +58,7 @@ static const char rcsid[] =
 #include <netinet/icmp_var.h>
 #include <netinet/igmp_var.h>
 #include <netinet/ip_var.h>
+#include <netinet/pim_var.h>
 #include <netinet/tcp.h>
 #include <netinet/tcpip.h>
 #include <netinet/tcp_seq.h>
@@ -791,7 +792,7 @@ icmp_stats(u_long off __unused, const char *name, int af1 __unused)
 		}
 	p(icps_reflect, "\t%lu message response%s generated\n");
 	p2(icps_badaddr, "\t%lu invalid return address%s\n");
-	p(icps_badaddr, "\t%lu no return route%s\n");
+	p(icps_noroute, "\t%lu no return route%s\n");
 #undef p
 #undef p1a
 #undef p2
@@ -840,6 +841,44 @@ igmp_stats(u_long off __unused, const char *name, int af1 __unused)
         p(igps_rcv_ourreports, "\t%u membership report%s received for groups to which we belong\n");
         p(igps_snd_v1v2_reports, "\t%u v1/v2 membership report%s sent\n");
         p(igps_snd_v3_reports, "\t%u v3 membership report%s sent\n");
+#undef p
+#undef py
+}
+
+/*
+ * Dump PIM statistics structure.
+ */
+void
+pim_stats(u_long off __unused, const char *name, int af1 __unused)
+{
+	struct pimstat pimstat, zerostat;
+	size_t len = sizeof pimstat;
+
+	if (zflag)
+		memset(&zerostat, 0, len);
+	if (sysctlbyname("net.inet.pim.stats", &pimstat, &len,
+	    zflag ? &zerostat : NULL, zflag ? len : 0) < 0) {
+		warn("sysctl: net.inet.pim.stats");
+		return;
+	}
+
+	printf("%s:\n", name);
+
+#define	p(f, m) if (pimstat.f || sflag <= 1) \
+    printf(m, pimstat.f, plural(pimstat.f))
+#define	py(f, m) if (pimstat.f || sflag <= 1) \
+    printf(m, pimstat.f, pimstat.f != 1 ? "ies" : "y")
+	p(pims_rcv_total_msgs, "\t%llu message%s received\n");
+	p(pims_rcv_total_bytes, "\t%llu byte%s received\n");
+	p(pims_rcv_tooshort, "\t%llu message%s received with too few bytes\n");
+        p(pims_rcv_badsum, "\t%llu message%s received with bad checksum\n");
+	p(pims_rcv_badversion, "\t%llu message%s received with bad version\n");
+	p(pims_rcv_registers_msgs, "\t%llu data register message%s received\n");
+	p(pims_rcv_registers_bytes, "\t%llu data register byte%s received\n");
+	p(pims_rcv_registers_wrongiif, "\t%llu data register message%s received on wrong iif\n");
+	p(pims_rcv_badregisters, "\t%llu bad register%s received\n");
+	p(pims_snd_registers_msgs, "\t%llu data register message%s sent\n");
+	p(pims_snd_registers_bytes, "\t%llu data register byte%s sent\n");
 #undef p
 #undef py
 }
