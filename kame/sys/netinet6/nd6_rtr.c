@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.115 2001/05/31 08:18:58 suz Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.116 2001/05/31 20:39:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -881,7 +881,7 @@ defrouter_select()
 	else {
 		/*
 		 * The Default Router List is empty, so install the default
-		 * route to an inteface.
+		 * route to an interface.
 		 * XXX: The specification does not say this mechanism should
 		 * be restricted to hosts, but this would be not useful
 		 * (even harmful) for routers.
