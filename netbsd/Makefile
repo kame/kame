@@ -1,6 +1,6 @@
 .include <bsd.own.mk>			# for configuration variables.
 
-SUBDIR=	lib include libexec sbin usr.bin usr.sbin share
+SUBDIR=	lib include libexec sbin usr.bin usr.sbin share sys
 
 #build:
 #	$(MAKE) includes
