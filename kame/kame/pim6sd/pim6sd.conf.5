@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"	$Id: pim6sd.conf.5,v 1.3 1999/10/29 11:00:53 jinmei Exp $
+.\"	$Id: pim6sd.conf.5,v 1.4 1999/10/29 12:12:26 jinmei Exp $
 .\"
 .Dd Oct 6, 1999
 .Dt PIM6SD.CONF 5
@@ -42,6 +42,8 @@ by a semi-colon (`;'), each of which specifies how the daemon treats
 each interface on the system, specifies some parameters of the PIM
 protocol, and requires some special behavior defined by the protocol.
 .Pp
+Each statement can be constructed by multiple lines.
+.Pp
 Lines beginning with
 .Ql #
 are comments.
@@ -57,6 +59,33 @@ to each configurable parameter.
 The following statements can be specified in the configuration file.
 .Pp
 .Bl -tag -width Ds -compact
+.It Xo
+.Ic log
+.Ar option...
+.Ic ;
+.Xc
+Specify debug messages to be printed out. Each
+.Ar option
+usually specifies a subset of the messages to be printed.
+If an
+.Ar option
+begins with
+.Ic no ,
+it means that the set of the messages that are specified by the option
+will not be printed. For example,
+.Ic `all nomld'
+means that all the messages except MLD related ones will be printed.
+Valid options are
+.Ic mld_proto, mld_timer, mld_member, mld, switch, trace, mtrace, traceroute,
+.Ic timeout, callout, pkt, packets, interfaces, vif, kernel, cache, mfc,
+.Ic k_cache, k_mfc, rsrr, pim_detail, pim_hello, pim_neighbors, pim_register,
+.Ic registers, pim_join_prune, pim_j_p, pim_jp, pim_bootstrap, pim_bsr, bsr,
+.Ic bootstrap, pim_asserts, pim_cand_rp, pim_c_rp, pim_rp, rp, pim_routes,
+.Ic pim_routing, pim_mrt, pim_timers, pim_rpf, rpf, pim, routes, routing,
+.Ic mrt, routers, mrouters, neighbors, timers, asserts,
+and
+.Ic all .
+.\"
 .It Xo
 .Ic phyint Ar interface
 .Op disable
