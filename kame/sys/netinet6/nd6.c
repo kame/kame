@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.126 2001/02/16 12:49:45 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.127 2001/02/19 04:40:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1592,15 +1592,24 @@ nd6_ioctl(cmd, data, ifp)
 			struct nd_pfxrouter *pfr;
 			int j;
 
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__)
+			(void)in6_embedscope(&prl->prefix[i].prefix,
+			    &pr->ndpr_prefix, NULL, NULL);
+#else
+			/* XXX binary backward compatibility breakage */
 			prl->prefix[i].prefix = pr->ndpr_prefix;
+#endif
 			prl->prefix[i].raflags = pr->ndpr_raf;
 			prl->prefix[i].prefixlen = pr->ndpr_plen;
 			prl->prefix[i].vltime = pr->ndpr_vltime;
 			prl->prefix[i].pltime = pr->ndpr_pltime;
 			prl->prefix[i].if_index = pr->ndpr_ifp->if_index;
 			prl->prefix[i].expire = pr->ndpr_expire;
+#if !(defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__))
+			/* XXX binary backward compatibility breakage */
 			prl->prefix[i].refcnt = pr->ndpr_refcnt;
 			prl->prefix[i].flags = pr->ndpr_stateflags;
+#endif
 
 			pfr = pr->ndpr_advrtrs.lh_first;
 			j = 0;
@@ -1635,7 +1644,13 @@ nd6_ioctl(cmd, data, ifp)
 		     rpp = LIST_NEXT(rpp, rp_entry)) {
 			if (i >= PRLSTSIZ)
 				break;
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__)
+			(void)in6_embedscope(&prl->prefix[i].prefix,
+			    &pr->ndpr_prefix, NULL, NULL);
+#else
+			/* XXX binary backward compatibility breakage */
 			prl->prefix[i].prefix = rpp->rp_prefix;
+#endif
 			prl->prefix[i].raflags = rpp->rp_raf;
 			prl->prefix[i].prefixlen = rpp->rp_plen;
 			prl->prefix[i].vltime = rpp->rp_vltime;
@@ -1643,7 +1658,10 @@ nd6_ioctl(cmd, data, ifp)
 			prl->prefix[i].if_index = rpp->rp_ifp->if_index;
 			prl->prefix[i].expire = rpp->rp_expire;
 			prl->prefix[i].advrtrs = 0;
+#if !(defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__))
+			/* XXX binary backward compatibility breakage */
 			prl->prefix[i].refcnt = pr->ndpr_refcnt; /* XXX */
+#endif
 			prl->prefix[i].origin = rpp->rp_origin;
 			i++;
 		}

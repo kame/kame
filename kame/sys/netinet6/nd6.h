@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.51 2001/02/16 12:49:45 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.52 2001/02/19 04:40:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -124,15 +124,23 @@ struct	in6_defrouter {
 struct	in6_prlist {
 	char ifname[IFNAMSIZ];
 	struct {
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__)
+		struct	in6_addr prefix;
+#else
+		/* XXX binary backward compatibility breakage */
 		struct	sockaddr_in6 prefix;
+#endif
 		struct prf_ra raflags;
 		u_char	prefixlen;
 		u_char	origin;
 		u_long	vltime;
 		u_long	pltime;
 		u_long	expire;
+#if !(defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__))
+		/* XXX binary backward compatibility breakage */
 		u_int32_t flags;
 		int refcnt;
+#endif
 		u_short if_index;
 		u_short advrtrs; /* number of advertisement routers */
 		struct	in6_addr advrtr[DRLSTSIZ]; /* XXX: explicit limit */
