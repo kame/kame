@@ -1,4 +1,4 @@
-.\"	$KAME: gif.4,v 1.26 2001/05/18 13:08:44 itojun Exp $
+.\"	$KAME: gif.4,v 1.27 2001/05/18 13:09:36 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -192,7 +192,7 @@ If the outer protocol is IPv6, path MTU discovery for encapsulated packet
 may affect communication over the interface.
 To avoid the problem, you may want to set the interface MTU for
 .Nm
-to 1240 or smaller.
+to 1240 or smaller, when outer header is IPv6 and inner header is IPv4.
 .Pp
 In the past,
 .Nm
