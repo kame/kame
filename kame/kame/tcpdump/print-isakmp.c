@@ -30,7 +30,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.17 2001/10/26 03:39:32 sakane Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.18 2004/04/02 07:46:49 sakane Exp $ (LBL)";
 #endif
 
 #include <string.h>
@@ -1073,7 +1073,7 @@ isakmp_sub_print(u_char np, struct isakmp_gen *ext, u_char *ep,
 
 	while (np) {
 		if (ntohs(ext->len) > 0x1000 || ntohs(ext->len) == 0) {
-			printf(" the length is too big [%ud]", ntohs(ext->len));
+			printf("invalid length=%ud", ntohs(ext->len));
 			cp = ep + 1;
 			break;
 		}
