@@ -1,0 +1,13 @@
+diff -ur orig/ssh/sshd.c ./sshd.c
+--- orig/ssh/sshd.c	Tue Jan 25 14:46:02 2000
++++ ./sshd.c	Mon Jan 24 22:44:02 2000
+@@ -26,7 +28,9 @@
+ #include "servconf.h"
+ #include "uidswap.h"
+ #include "compat.h"
++#if !defined(__FreeBSD__) || __FreeBSD__ >= 3
+ #include <poll.h>
++#endif
+ #include <time.h>
+ 
+ #ifdef LIBWRAP

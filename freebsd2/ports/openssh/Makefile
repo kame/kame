@@ -15,8 +15,6 @@ MASTER_SITES=	ftp://internat.FreeBSD.org/pub/Crypto/OpenSSH/
 
 MAINTAINER=	sumikawa@kame.net
 
-BROKEN=		"can't buildable. we need volunteers"
-
 BUILD_DEPENDS=	openssl:${.CURDIR}/../openssl
 
 .include <bsd.port.pre.mk>
