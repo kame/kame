@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.73 2001/11/07 03:28:30 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.74 2001/11/07 11:38:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1039,10 +1039,21 @@ mip6_add_haddrs(sc, ifp)
 				in6_prefixlen2mask(&ifra.ifra_prefixmask.sin6_addr,
 						   mpfx->mpfx_prefixlen);
 			}
+			/*
+			 * XXX: TODO mobile prefix sol/adv to update
+			 * address lifetime.
+			 */
+#if 0
 			ifra.ifra_lifetime.ia6t_vltime
 				= mpfx->mpfx_lifetime; /* XXX */
 			ifra.ifra_lifetime.ia6t_pltime
 				= mpfx->mpfx_lifetime; /* XXX */
+#else
+			ifra.ifra_lifetime.ia6t_vltime
+				= ND6_INFINITE_LIFETIME; /* XXX */
+			ifra.ifra_lifetime.ia6t_pltime
+				= ND6_INFINITE_LIFETIME; /* XXX */
+#endif
 #if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 			if (in6_control(NULL, SIOCAIFADDR_IN6, (caddr_t)&ifra,
 					ifp, curproc))
