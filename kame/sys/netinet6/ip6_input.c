@@ -715,6 +715,7 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 			 optlen = *(opt + 1) + 2;
 			 break;
 		 case IP6OPT_RTALERT:
+			 /* XXX may need check for alignment */
 			 if (hbhlen < IP6OPT_RTALERT_LEN) {
 				 ip6stat.ip6s_toosmall++;
 				 goto bad;
@@ -728,6 +729,7 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 			 *rtalertp = ntohs(rtalert_val);
 			 break;
 		 case IP6OPT_JUMBO:
+			 /* XXX may need check for alignment */
 			 if (hbhlen < IP6OPT_JUMBO_LEN) {
 				 ip6stat.ip6s_toosmall++;
 				 goto bad;
@@ -743,7 +745,12 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 			  * We can simply cast because of the alignment
 			  * requirement of the jumbo payload option.
 			  */
+#if 0
 			 *plenp = ntohl(*(u_int32_t *)(opt + 2));
+#else
+			 bcopy(opt + 2, plenp, sizeof(*plenp));
+			 *plenp = htonl(*plenp);
+#endif
 			 if (*plenp <= IPV6_MAXPACKET) {
 				 /*
 				  * jumbo payload length must be larger
