@@ -157,7 +157,7 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #define	F_VERBOSE	0x0100
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
-#define	F_POLICY	0x4000
+#define	F_POLICY	0x0400
 #else
 #define F_AUTHHDR	0x0200
 #define F_ENCRYPT	0x0400
