@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.284 2003/06/29 07:00:53 sakane Exp $	*/
+/*	$KAME: key.c,v 1.285 2003/06/29 11:45:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1333,7 +1333,7 @@ struct secpolicy *
 key_newsp(id)
 	u_int32_t id;
 {
-	struct secpolicy *newsp = NULL;
+	struct secpolicy *newsp = NULL, *sp;
 	u_int32_t newid;
 
 	if (id > IPSEC_MANUAL_POLICYID_MAX) {
@@ -1350,9 +1350,11 @@ key_newsp(id)
 			return NULL;
 		}
 	} else {
-		if (key_getspbyid(id) != NULL) {
+		sp = key_getspbyid(id);
+		if (sp != NULL) {
 			ipseclog((LOG_DEBUG,
 			    "key_newsp: policy_id(%u) has been used.\n", id));
+			key_freesp(sp);
 			return NULL;
 		}
 		newid = id;
