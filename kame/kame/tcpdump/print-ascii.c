@@ -41,12 +41,10 @@
 #endif
 
 #include <sys/cdefs.h>
+#if 0
 #ifndef lint
-#ifndef __bsdi__
 __RCSID("$NetBSD: print-ascii.c,v 1.1 1999/09/30 14:49:12 sjg Exp $");
-#else
-static const char rcsid[] = "$NetBSD: print-ascii.c,v 1.1 1999/09/30 14:49:12 sjg Exp $";
-#endif 
+#endif
 #endif
 #include <stdio.h>
 #include <sys/types.h>

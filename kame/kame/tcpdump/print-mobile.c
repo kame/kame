@@ -39,11 +39,7 @@
 #if 0
 #include <sys/cdefs.h>
 #ifndef lint
-#ifndef __bsdi__
 __RCSID("$NetBSD: print-mobile.c,v 1.2 1998/09/30 08:57:01 hwr Exp $");
-#else
-static const char rcsid[] = "$NetBSD: print-mobile.c,v 1.2 1998/09/30 08:57:01 hwr Exp $";
-#endif 
 #endif
 #endif
 
