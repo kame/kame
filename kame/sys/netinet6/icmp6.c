@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.77 2000/04/13 11:31:39 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.78 2000/04/21 10:41:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1154,7 +1154,7 @@ ni6_input(m, off)
 		 if (hostnamelen > 255) { /* XXX: rare case, but may happen */
 			 printf("ni6_input: "
 				"hostname length(%d) is too large for reply\n",
-				hostnamelen);
+				(int)hostnamelen);
 			 goto bad;
 		 }
 		 fqdn = (struct ni_reply_fqdn *)(mtod(n, caddr_t) +
