@@ -1,8 +1,25 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.550 2000/02/10 16:49:51 itojun Exp $
+$Id: CHANGELOG,v 1.551 2000/02/10 17:45:47 itojun Exp $
 
 <200002>
+Fri Feb 11 02:42:16 JST 2000  itojun@iijlab.net
+	* sys/netinet/ip_encap.c: revisit input logic for tunnelled packets.
+	  split outer address match logic in in{,6}_gif_input() into
+	  encap[46]_input(), so that other guys (like mobile-ip6, 6to4,
+	  6over4, whatever) can match packets based on not only by proto #,
+	  but also by src/dst with masks.
+	  see comment on ip_encap.c for detail - I hate tunnelling.  really.
+	  TODO: we do not really support subnet match for input logic.  it
+		needs careful ordering of packet matching table in encap[46],
+		so that we can check for better match earlier.
+		(since we have mask parameter for both src and dst, it is
+		not trivial to define total order among entries)
+	  TODO: change ipip_input() to conform to this framework?
+	  CAVEAT: IFF_LINK0 for gif is not working with this change, i'll try
+		to clean it up.
+	* allow raw ip{,6} output for proto #4 and #41.
+
 Fri Feb 11 01:48:16 JST 2000  itojun@iijlab.net
 	* sys/netinet6/raw_ip6.c: implement rip6_ctlinput(), so that we can
 	  notify of route changes to raw ip6 layer (freebsd2/bsdi3/netbsd only
