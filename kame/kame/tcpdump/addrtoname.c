@@ -23,7 +23,7 @@
  */
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/addrtoname.c,v 1.3 1999/10/14 08:27:16 itojun Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/addrtoname.c,v 1.4 1999/11/20 15:32:35 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/types.h>
@@ -40,7 +40,7 @@ struct rtentry;
 #include <netinet/if_ether.h>
 
 #ifdef INET6
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #endif
 
 #include <arpa/inet.h>
