@@ -48,8 +48,14 @@ SRCS+=	ipsec_dump_policy.c ipsec_get_policylen.c
 SRCS+=	key_debug.c
 LDADD+=	-ll -ly
 CLEANFILES+=	y.tab.c y.tab.h lex.__libyy.c test-policy
+.if (${OPSYS} != "NetBSD")
 YFLAGS+=-d -p __libyy
 LFLAGS+=-P__libyy
+.else
+YPREFIX+=__libyy
+LPREFIX+=__libyy
+YHEADER=1
+.endif
 
 .if (${OPSYS} != "NetBSD")
 MAN3=	ipsec_set_policy.3 ipsec_strerror.3
@@ -74,6 +80,8 @@ y.tab.h:	policy_parse.y
 
 .if (${OPSYS} == "NetBSD")
 MKPIC=no
+MKPROFILE=no
+MKLINT=no
 LFLAGS+=-olex.yy.c
 .endif
 
