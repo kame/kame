@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.19 2000/05/31 14:17:55 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.20 2000/05/31 16:51:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -47,6 +47,7 @@
 #else
 #include <varargs.h>
 #endif
+#include <syslog.h>
 
 #include "mdnsd.h"
 #include "db.h"
@@ -62,7 +63,8 @@ static char hostnamebuf[MAXHOSTNAMELEN];
 const char *hostname = NULL;
 static int mcasthops = 1;
 static int mcastloop = 0;
-int dflag = 1;
+int dflag = 0;
+int fflag = 0;
 struct timeval hz = { 1, 0 };	/* timeout every 1 second */
 static int mflag;
 #ifdef NI_WITHSCOPEID
@@ -88,8 +90,9 @@ main(argc, argv)
 	int ch;
 	int ready4, ready6;
 	struct sockdb *sd;
+	int nsock;
 
-	while ((ch = getopt(argc, argv, "46d:h:i:mp:P:")) != EOF) {
+	while ((ch = getopt(argc, argv, "46d:Dfh:i:mp:P:")) != EOF) {
 		switch (ch) {
 		case '4':
 			family = AF_INET;
@@ -106,6 +109,10 @@ main(argc, argv)
 			break;
 		case 'D':
 			dflag++;
+			break;
+		case 'f':
+			fflag++;
+			break;
 		case 'h':
 			hostname = optarg;
 			break;
@@ -172,7 +179,10 @@ main(argc, argv)
 	}
 
 	ready4 = ready6 = 0;
+	nsock = 0;
 	for (sd = LIST_FIRST(&sockdb); sd; sd = LIST_NEXT(sd, link)) {
+		nsock++;
+
 		switch (sd->type) {
 		case S_MEDIATOR:
 		case S_UNICAST:
@@ -229,6 +239,12 @@ main(argc, argv)
 	}
 	dprintf("hostname=\"%s\"\n", hostname);
 
+	if (!fflag) {
+		daemon(0, 0);
+		syslog(LOG_INFO, "started with %d listening sockets\n", nsock);
+	} else
+		dprintf("started with %d listening sockets\n", nsock);
+
 	mainloop();
 	exit(0);
 }
@@ -237,7 +253,7 @@ static void
 usage()
 {
 	fprintf(stderr,
-"usage: mdnsd [-46Dm] [-d server] [-h hostname] [-p srcport] [-P dstport]\n"
+"usage: mdnsd [-46Dfm] [-d server] [-h hostname] [-p srcport] [-P dstport]\n"
 "             -i iface [userv...]\n");
 }
 
@@ -274,7 +290,7 @@ getsock(af, host, serv, socktype, flags, stype)
 			continue;
 		}
 		sd->type = stype;
-		printf("sock %d type %d\n", sd->s, sd->type);
+		dprintf("sock %d type %d\n", sd->s, sd->type);
 	}
 
 	freeaddrinfo(res);
@@ -649,8 +665,12 @@ dprintf(fmt, va_alist)
 #else
 	va_start(ap);
 #endif
-	if (dflag)
+	if (fflag)
 		ret = vfprintf(stderr, fmt, ap);
+	else {
+		vsyslog(LOG_DEBUG, fmt, ap);
+		ret = 0;
+	}
 	va_end(ap);
 	return ret;
 }
