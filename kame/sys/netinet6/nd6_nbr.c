@@ -73,11 +73,12 @@ extern	struct timeval time;
 struct dadq;
 static struct dadq *nd6_dad_find __P((struct ifaddr *));
 static void nd6_dad_timer __P((struct ifaddr *));
+static void nd6_dad_ns_output __P((struct dadq *, struct ifaddr *));
 static void nd6_dad_ns_input __P((struct ifaddr *));
 static void nd6_dad_na_input __P((struct ifaddr *));
 
-/* ignore NS in DAD - specwise incorrect, */
-int dad_ignore_ns = 0;
+static int dad_ignore_ns = 0;	/* ignore NS in DAD - specwise incorrect*/
+static int dad_maxtry = 15;	/* max # of *tries* to transmit DAD packet */
 
 /*
  * Input an Neighbor Solicitation Message.
@@ -865,6 +866,7 @@ struct dadq {
 	TAILQ_ENTRY(dadq) dad_list;
 	struct ifaddr *dad_ifa;
 	int dad_count;		/* max NS to send */
+	int dad_ns_tcount;	/* # of trials to send NS */
 	int dad_ns_ocount;	/* NS sent so far */
 	int dad_ns_icount;
 	int dad_na_icount;
@@ -960,11 +962,9 @@ nd6_dad_start(ifa, tick)
 	ifa->ifa_refcnt++;	/*just for safety*/
 	dp->dad_count = ip6_dad_count;
 	dp->dad_ns_icount = dp->dad_na_icount = 0;
-	dp->dad_ns_ocount = 0;
+	dp->dad_ns_ocount = dp->dad_ns_tcount = 0;
 	if (!tick) {
-		dp->dad_ns_ocount++;
-		nd6_ns_output(ifa->ifa_ifp, NULL, &ia->ia_addr.sin6_addr,
-			NULL, 1);
+		nd6_dad_ns_output(dp, ifa);
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 		dp->dad_timer =
 #endif
@@ -1025,14 +1025,24 @@ nd6_dad_timer(ifa)
 		goto done;
 	}
 
+	/* timeouted with IFF_{RUNNING,UP} check */
+	if (dp->dad_ns_tcount > dad_maxtry) {
+		printf("%s: could not run DAD, driver problem?\n",
+		    if_name(ifa->ifa_ifp));
+
+		TAILQ_REMOVE(&dadq, (struct dadq *)dp, dad_list);
+		free(dp, M_IP6NDP);
+		dp = NULL;
+		ifa->ifa_refcnt--;
+		goto done;
+	}
+
 	/* Need more checks? */
 	if (dp->dad_ns_ocount < dp->dad_count) {
 		/*
 		 * We have more NS to go.  Send NS packet for DAD.
 		 */
-		dp->dad_ns_ocount++;
-		nd6_ns_output(ifa->ifa_ifp, NULL, &ia->ia_addr.sin6_addr,
-			NULL, 1);
+		nd6_dad_ns_output(dp, ifa);
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 		dp->dad_timer =
 #endif
@@ -1150,7 +1160,33 @@ nd6_dad_duplicated(ifa)
 	ifa->ifa_refcnt--;
 }
 
-void
+static void
+nd6_dad_ns_output(dp, ifa)
+	struct dadq *dp;
+	struct ifaddr *ifa;
+{
+	struct in6_ifaddr *ia = (struct in6_ifaddr *)ifa;
+	struct ifnet *ifp = ifa->ifa_ifp;
+
+	dp->dad_ns_tcount++;
+	if ((ifp->if_flags & IFF_UP) == 0) {
+#if 0
+		printf("%s: interface down?\n", if_name(ifp));
+#endif
+		return;
+	}
+	if ((ifp->if_flags & IFF_RUNNING) == 0) {
+#if 0
+		printf("%s: interface not running?\n", if_name(ifp));
+#endif
+		return;
+	}
+
+	dp->dad_ns_ocount++;
+	nd6_ns_output(ifp, NULL, &ia->ia_addr.sin6_addr, NULL, 1);
+}
+
+static void
 nd6_dad_ns_input(ifa)
 	struct ifaddr *ifa;
 {
@@ -1205,7 +1241,7 @@ nd6_dad_ns_input(ifa)
 	}
 }
 
-void
+static void
 nd6_dad_na_input(ifa)
 	struct ifaddr *ifa;
 {
