@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.136 2002/06/24 10:50:33 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.137 2002/06/24 13:13:40 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -199,8 +199,6 @@ static int mip6_haddr_destopt_create __P((struct ip6_dest **,
 static void mip6_create_nonce __P((mip6_nonce_t *));
 static void mip6_create_nodekey __P((mip6_nodekey_t *));
 static int mip6_get_nodekey __P((int, mip6_nodekey_t *));
-static int mip6_get_mobility_options __P((struct ip6m_binding_update *,
-					 int, struct mip6_mobility_options *));
 #endif /* MIP6_DRAFT17 */
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
@@ -2561,14 +2559,14 @@ mip6_get_nodekey(index, nonce)
  *	Check a Binding Update packet whether it is valid 
  */
 int
-mip6_is_valid_bu(ip6, ip6mu, ip6mulen, hoa_sa)
+mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa)
 	struct ip6_hdr *ip6;
 	struct ip6m_binding_update *ip6mu;
 	int ip6mulen;
+	struct mip6_mobility_options *mopt;
 	struct sockaddr_in6 *hoa_sa;
 {
 	int error;
-	struct mip6_mobility_options mopt;
 	mip6_nonce_t home_nonce, coa_nonce;
 	mip6_nodekey_t home_nodekey, coa_nodekey;
 	mip6_home_cookie_t home_cookie;
@@ -2577,19 +2575,16 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, hoa_sa)
 	u_int8_t authdata[SHA1_RESULTLEN];
 	SHA1_CTX ctx;
 
-	if ((error = mip6_get_mobility_options(ip6mu, ip6mulen, &mopt)) != 0)
-		return (error);
-
 	/* Nonce index & Auth. data mobility options are required */
-	if ((mopt.valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA)) == 0)
+	if (mopt->valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA) == 0)
 		return (EINVAL);
 
-	if ((mip6_get_nonce(mopt.mopt_ho_nonce_idx, &home_nonce) != 0) ||
-	    (mip6_get_nonce(mopt.mopt_co_nonce_idx, &coa_nonce) != 0))
+	if ((mip6_get_nonce(mopt->mopt_ho_nonce_idx, &home_nonce) != 0) ||
+	    (mip6_get_nonce(mopt->mopt_co_nonce_idx, &coa_nonce) != 0))
 		return (EINVAL);
 
-	if ((mip6_get_nodekey(mopt.mopt_ho_nonce_idx, &home_nodekey) != 0) ||
-	    (mip6_get_nodekey(mopt.mopt_co_nonce_idx, &coa_nodekey) != 0))
+	if ((mip6_get_nodekey(mopt->mopt_ho_nonce_idx, &home_nodekey) != 0) ||
+	    (mip6_get_nodekey(mopt->mopt_co_nonce_idx, &coa_nodekey) != 0))
 		return (EINVAL);
 #if 0
 	hmac_sha1_init(state);
@@ -2621,10 +2616,10 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, hoa_sa)
 	hmac_sha1_result(state, authdata);
 #endif
 
-	return (bcmp(mopt.mopt_auth, authdata, sizeof(authdata)));
+	return (bcmp(mopt->mopt_auth, authdata, sizeof(authdata)));
 }
 
-static int
+int
 mip6_get_mobility_options(ip6mu, ip6mulen, mopt)
 	struct ip6m_binding_update *ip6mu;
 	int ip6mulen;

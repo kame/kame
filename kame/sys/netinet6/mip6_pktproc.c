@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.14 2002/06/24 10:50:34 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.15 2002/06/24 13:13:40 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -84,7 +84,8 @@ static int mip6_ip6mc_create __P((struct ip6_mobility **,
 				  struct sockaddr_in6 *,
 				  u_int32_t));
 static int mip6_ip6mu_process __P((struct mbuf *,
-				   struct ip6m_binding_update *, int));
+				   struct ip6m_binding_update *, int,
+				   struct mip6_bc *));
 static int mip6_ip6ma_process __P((struct mbuf *,
 				   struct ip6m_binding_ack *, int));
 static int mip6_ip6mhi_create __P((struct ip6_mobility **,
@@ -441,7 +442,8 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	struct mip6_bc *mbc;
 	u_int16_t seqno;
 	int error = 0;
-	u_int8_t bu_safe = 0;
+	u_int8_t bu_safe = 0;	/* To accept bu always without authentication, this value is set to non-zero */
+	struct mip6_mobility_options mopt;
 
 #ifdef IPSEC
 	/*
@@ -528,10 +530,13 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		hoa_sa.sin6_addr = ip6mu->ip6mu_addr;
 	}
 
+	if (error = mip6_get_mobility_options(ip6mu, ip6mulen, &mopt))
+		return (error);
+
 	/* ip6_src and HAO has been already swapped at this point. */
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &hoa_sa);
 	if (mbc == NULL) {
-		if (!bu_safe && mip6_is_valid_bu(ip6, ip6mu, ip6mulen, &hoa_sa)) {
+		if (!bu_safe && mip6_is_valid_bu(ip6, ip6mu, ip6mulen, &mopt, &hoa_sa)) {
 			mip6log((LOG_ERR,
 				 "%s:%d: RR authentication was failed.\n",
 				 __FILE__, __LINE__));
@@ -569,14 +574,15 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		}
 	}
 
-	return (mip6_ip6mu_process(m, ip6mu, ip6mulen));
+	return (mip6_ip6mu_process(m, ip6mu, ip6mulen, mbc));
 }
 
 static int
-mip6_ip6mu_process(m, ip6mu, ip6mulen)
+mip6_ip6mu_process(m, ip6mu, ip6mulen, mbc)
 	struct mbuf *m;
 	struct ip6m_binding_update *ip6mu;
 	int ip6mulen;
+	struct mip6_bc *mbc;
 {
 	struct ip6_hdr *ip6;
 	struct sockaddr_in6 *src_sa, *dst_sa;
@@ -654,9 +660,39 @@ mip6_ip6mu_process(m, ip6mu, ip6mulen)
 			}
 		}
 	} else {
-		/* request to cache/remove a binding. */
-	}
+		/* request to cache/remove a binding for CN. */
+		if (IS_REQUEST_TO_CACHE(lifetime, src_sa, coa_sa)) {
+			if (mbc == NULL)
+				error = mip6_bc_register(mbc, src_sa, coa_sa,
+							 dst_sa,
+							 ip6mu->ip6mu_flags,
+							 seqno, lifetime);
+			else
+			  /* Update a cache */
+				error = mip6_bc_update(mbc, coa_sa, dst_sa,
+						       ip6mu->ip6mu_flags,
+						       seqno, lifetime);
+		} else {
+			mip6_bc_delete(mbc);
+		}
 
+		if (ip6mu->ip6mu_flags & IP6MU_ACK) {
+			if (mip6_bc_send_ba(&ip6a->ip6a_dst,
+					    &ip6a->ip6a_home,
+					    coa_sa,
+					    IP6MA_STATUS_ACCEPTED, /* XXX */
+					    seqno,
+					    lifetime,
+					    lifetime)) {
+				mip6log((LOG_ERR,
+					 "%s:%d: sending BA to %s(%s) failed. "
+					 "send it later.\n",
+					 __FILE__, __LINE__,
+					 ip6_sprintf(&ip6a->ip6a_home.sin6_addr),
+					 ip6_sprintf(&coa_sa->sin6_addr)));
+			}
+		}
+	}
 
 	return (0);
 }

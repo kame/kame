@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.107 2002/06/18 02:11:06 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.108 2002/06/24 13:13:40 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1842,6 +1842,78 @@ mip6_bc_init()
         callout_init(&mip6_bc_ch);
 #endif
 	bzero(&mip6_bc_hash, sizeof(mip6_bc_hash));
+}
+
+int
+mip6_bc_register(mbc, hoa_sa, coa_sa, dst_sa, flags, seqno, lifetime)
+	struct mip6_bc *mbc;
+	struct sockaddr_in6 *hoa_sa;
+	struct sockaddr_in6 *coa_sa;
+	struct sockaddr_in6 *dst_sa;
+	u_int16_t flags;
+	u_int16_t seqno;
+	u_int32_t lifetime;
+{
+	/* create a binding cache entry. */
+	mbc = mip6_bc_create(hoa_sa, coa_sa, dst_sa,
+			     flags, seqno, lifetime, NULL);
+	if (mbc == NULL) {
+		mip6log((LOG_ERR,
+			 "%s:%d: mip6_bc memory allocation failed.\n",
+			 __FILE__, __LINE__));
+		return (ENOMEM);
+	}
+	
+	return (mip6_bc_list_insert(&mip6_bc_list, mbc));
+}
+
+int
+mip6_bc_update(mbc, coa_sa, dst_sa, flags, seqno, lifetime)
+	struct mip6_bc *mbc;
+	struct sockaddr_in6 *coa_sa;
+	struct sockaddr_in6 *dst_sa;
+	u_int16_t flags;
+	u_int16_t seqno;
+	u_int32_t lifetime;
+{
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
+	/* update a BC entry. */
+	mbc->mbc_pcoa = *coa_sa;
+	mbc->mbc_flags = flags;
+	mbc->mbc_seqno = seqno;
+	mbc->mbc_lifetime = lifetime;
+	mbc->mbc_expire	= time_second + mbc->mbc_lifetime;
+	/* sanity check for overflow */
+	if (mbc->mbc_expire < time_second)
+		mbc->mbc_expire = 0x7fffffff;
+	mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
+
+	return (0);
+}
+
+int
+mip6_bc_delete(mbc)
+	struct mip6_bc *mbc;
+{
+	int error;
+
+	/* a request to delete a binding. */
+	if (mbc) {
+		error = mip6_bc_list_remove(&mip6_bc_list, mbc);
+		if (error) {
+			mip6log((LOG_ERR,
+				 "%s:%d: can't remove BC.\n",
+				 __FILE__, __LINE__));
+			return (error);
+		}
+	} else {
+		/* There was no Binding Cache entry */
+		/* Is there someting to do ? */
+	}
+		
+	return (0);
 }
 
 static struct mip6_bc *

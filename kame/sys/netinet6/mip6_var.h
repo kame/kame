@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.37 2002/06/19 12:30:05 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.38 2002/06/24 13:13:40 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -559,7 +559,10 @@ int mip6_setpktaddrs __P((struct mbuf *));
 #ifdef MIP6_DRAFT17
 int mip6_get_nonce __P((int, mip6_nonce_t *));
 int mip6_is_valid_bu (struct ip6_hdr *, struct ip6m_binding_update *,
-		      int, struct sockaddr_in6 *);
+		      int, struct mip6_mobility_options *,
+		      struct sockaddr_in6 *);
+int mip6_get_mobility_options __P((struct ip6m_binding_update *,
+				   int, struct mip6_mobility_options *));
 #endif /* MIP6_DRAFT17 */
 
 #endif /* _KERNEL */
