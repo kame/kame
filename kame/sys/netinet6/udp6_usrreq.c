@@ -483,7 +483,7 @@ bad:
 
 /*
  * Notify a udp user of an asynchronous error;
- * just wake up so tat he can collect error status.
+ * just wake up so that he can collect error status.
  */
 static	void
 udp6_notify(in6p, errno)
