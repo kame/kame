@@ -124,7 +124,7 @@ config_vifs_from_kernel()
 			continue;
 		}
 
-		memcpy(&addr, &ifa->ifa_addr, sizeof(struct sockaddr_in6));
+		memcpy(&addr, ifa->ifa_addr, sizeof(struct sockaddr_in6));
 
 		flags = ifa->ifa_flags;
 
@@ -142,7 +142,7 @@ config_vifs_from_kernel()
 		 * detached address?
 		 */
 		memcpy(ifr6.ifr_name, ifa->ifa_name, sizeof(ifr6.ifr_name));
-		ifr6.ifr_addr = *(struct sockaddr_in6 *)&ifa->ifa_addr;
+		ifr6.ifr_addr = *(struct sockaddr_in6 *)ifa->ifa_addr;
 		if (ioctl(udp_socket, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
 			log(LOG_ERR, errno, "ioctl SIOCGIFAFLAG_IN6 for %s",
 			    inet6_fmt(&ifr6.ifr_addr.sin6_addr));
