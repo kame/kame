@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.6 2001/11/29 04:40:15 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.7 2001/12/04 11:43:05 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -477,6 +477,7 @@ ip6_sprintf(addr)
 	u_short *a = (u_short *)addr;
 	u_char *d;
 	int dcolon = 0;
+	u_char leadingzero = 0x0;
 
 	ip6round = (ip6round + 1) & 7;
 	cp = ip6buf[ip6round];
@@ -505,9 +506,18 @@ ip6_sprintf(addr)
 			continue;
 		}
 		d = (u_char *)a;
-		*cp++ = digits[*d >> 4];
-		*cp++ = digits[*d++ & 0xf];
-		*cp++ = digits[*d >> 4];
+		leadingzero = 0;
+		if ((*d >> 4) == 0)
+			leadingzero = 1;
+		else
+			*cp++ = digits[*d >> 4];
+		if ((*d & 0xf) == 0 && (leadingzero == 1))
+			leadingzero = 2;
+		else
+			*cp++ = digits[*d & 0xf];
+		d++;
+		if ((*d >> 4) != 0 || (leadingzero != 2))
+			*cp++ = digits[*d >> 4];
 		*cp++ = digits[*d & 0xf];
 		*cp++ = ':';
 		a++;
