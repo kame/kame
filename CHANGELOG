@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2527 2004/01/16 05:22:44 itojun Exp $
+$KAME: CHANGELOG,v 1.2528 2004/01/19 07:17:27 keiichi Exp $
 
 <200401>
+Mon Jan 19 16:15:48 JST 2004	keiichi@iij.ad.jp
+	* kame/sys/netinet6/dest6.c
+	send a binding error message when CN receives a home
+	address option which includes an inappropriate address.
+
+Mon Jan 19 16:14:14 JST 2004	keiichi@iij.ad.jp
+	* kame/sys/netinet6/mip6_hacore.c:
+	convert ICMPv6 time exceeded to address unreachable, when
+	receiving an error packet from Mobile IPv6 tunnel interface.
+
 Fri Jan 16 JST 2004  itojun@iijlab.net
 	* racoon/isakmp_inf.c: validation of hash payload was missing.
 	  code from IIJ SEIL team.  [attack script is in public knowledge,
