@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.16 2000/08/31 17:45:27 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.17 2000/12/26 13:01:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -995,7 +995,7 @@ get_ai(pai, afd, addr)
 
 #ifdef FAITH
 	/*
-	 * Transfrom an IPv4 addr into a special IPv6 addr format for
+	 * Transform an IPv4 addr into a special IPv6 addr format for
 	 * IPv6->IPv4 translation gateway. (only TCP is supported now)
 	 *
 	 * +-----------------------------------+------------+
