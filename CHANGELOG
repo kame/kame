@@ -1,5 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2209 2002/07/31 10:33:37 itojun Exp $
+$KAME: CHANGELOG,v 1.2210 2002/08/02 08:20:18 k-sugyou Exp $
+
+<200208>
+Fri Aug  2 17:18:54 JST 2002  k-sugyou@kame.ney
+	* sys/netinet6/dest6.c: disable home address destination option
+	  in default KAME(support MIP6 kernel only)
 
 <200207>
 Wed Jul 31 19:28:52 JST 2002  itojun@iijlab.net
