@@ -936,7 +936,7 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 		if (notify)
 			(*notify)(oinp, errno);
 		if (notify2)
-			(*notify2)(oin6p, errno);
+			(*notify2)(oinp, errno);
 	}
 	splx(s);
 }
