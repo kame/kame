@@ -882,6 +882,8 @@ zpread(sc)
 		m->m_data = m->m_pktdat;
 		m->m_flags = M_PKTHDR;
 	}
+	if (totlen >= MHLEN)
+		MCLGET(m, M_DONTWAIT);
 
 	top = m0 = m;		/* We assign top so we can "goto out" */
 #define EROUND  ((sizeof(struct ether_header) + 3) & ~3)
