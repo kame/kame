@@ -1,4 +1,4 @@
-.\"	$KAME: getaddrinfo.3,v 1.17 2000/07/25 02:18:59 itojun Exp $
+.\"	$KAME: getaddrinfo.3,v 1.18 2000/07/25 02:22:06 itojun Exp $
 .\"
 .\" Copyright (c) 1983, 1987, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -227,7 +227,7 @@ This is because the numeric
 .Fa servname
 does not identify any socket type, and
 .Fn getaddrinfo
-is not allowed to glob the argument.
+is not allowed to glob the argument in such case.
 .El
 .Pp
 Upon successful return a pointer to a linked list of one or more
