@@ -1,4 +1,4 @@
-/*	$KAME: faithd.h,v 1.6 2000/10/05 22:20:37 itojun Exp $	*/
+/*	$KAME: faithd.h,v 1.7 2001/07/02 14:36:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -66,7 +66,5 @@ extern void exit_failure __P((const char *, ...))
 #define NUMARG	2
 
 #define UC(b)	(((int)b)&0xff)
-
-#define ERRSTR	strerror(errno)
 
 #define FAITH_TIMEOUT	(30 * 60)	/*second*/
