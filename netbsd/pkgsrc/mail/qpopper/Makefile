@@ -7,6 +7,8 @@ CATEGORIES=		mail
 MASTER_SITES=		ftp://ftp.qualcomm.com/eudora/servers/unix/popper/
 EXTRACT_SUFX=		.tar.Z
 
+BROKEN=			"security issue"
+
 MAINTAINER=		mellon@fugue.com
 HOMEPAGE=		http://eudora.qualcomm.com/freeware/qpop.html
 
@@ -18,6 +20,8 @@ GNU_CONFIGURE=		yes
 CONFIGURE_ARGS+=	--libexecdir=${PREFIX}/libexec \
 			--sysconfdir=${PREFIX}/etc --enable-apop \
 			--with-apop=/etc/apop.auth --with-apopuid=root
+CONFIGURE_ENV+=		LIBS="${P_LIBS} -L/usr/local/v6/lib -linet6" \
+			O_DEFS="${O_DEFS}" CFLAGS="-DINET6"
 
 # popper makefile doesn't have an install target...
 do-install:
