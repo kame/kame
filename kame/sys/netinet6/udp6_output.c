@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.32 2001/06/19 07:03:37 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.33 2001/06/22 19:07:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -283,7 +283,7 @@ udp6_output(in6p, m, addr6, control)
 			/*
 			 * XXX: freebsd4 does not have in_selectsrc, but
 			 * we can omit the whole part because freebsd4 calls
-			 * udp_output() directory in this case, and thus we'll
+			 * udp_output() directly in this case, and thus we'll
 			 * never see this path.
 			 */
 			if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
