@@ -1,6 +1,6 @@
 	Installation procedure - preparation of the tree
 	KAME project
-	$Id: INSTALL,v 1.15 2000/02/05 05:48:34 itojun Exp $
+	$Id: INSTALL,v 1.16 2000/02/10 05:10:03 itojun Exp $
 
 Let's call the entire file-tree under this directory "the KAME tree".
 
@@ -57,20 +57,21 @@ perform "make obj" unless you are ready to tackle those troubles.
 		If there is SSLeay or OpenSSL installed beforehand, 
 		tcpdump will let you look inside IPsec packet (-E option).
 	usr.sbin/racoon:
-		Compiles only if SSLeay or OpenSSL is installed beforehand.
+		Compiles only when OpenSSL 0.9.4 is installed beforehand,
+		and shell search path is configured to reach "openssl" program.
    Please install those libraries before building.
 
    We support the following installations.
-   - You installed SSLeay, with default installation path
-   - You installed OpenSSL, with default installation path
+   - You installed OpenSSL, with default installation path.
 	This means that you have given no option to "./configure".
-   - You installed SSLeay, via FreeBSD ports/NetBSD pkgsrc system
+	In this case you should have /usr/local/ssl/include/openssl/des.h.
    - You installed OpenSSL, via FreeBSD ports/NetBSD pkgsrc system.
 	Note that we do not support ports-current/pkgsrc-current.  Please
 	stick to the ports/pkgsrc came the FreeBSD/NetBSD you are using.
+	In this case you should have /usr/{pkg,local}/include/openssl/des.h.
 
-   If you install SSLeay/OpenSSL with some other ways, the KAME tree
-   may fail to find SSLeay/OpenSSL and omit compilation of, for
+   If you install OpenSSL with some other ways, the KAME tree
+   may fail to find OpenSSL and omit compilation of, for
    example, usr.sbin/racoon.
 
 5. Go down to the target directory that you have specified (e.g
