@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.67 2001/06/02 08:20:42 jinmei Exp $	*/
+/*	$KAME: ndp.c,v 1.68 2001/07/23 14:41:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -114,6 +114,7 @@
 #include <stdlib.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <err.h>
 #include "gmt2local.h"
 
 #ifndef NI_WITHSCOPEID
@@ -340,8 +341,8 @@ getsocket()
 	if (s < 0) {
 		s = socket(PF_ROUTE, SOCK_RAW, 0);
 		if (s < 0) {
-			perror("ndp: socket");
-			exit(1);
+			err(1, "ndp: socket");
+			/* NOTREACHED */
 		}
 	}
 }
@@ -406,8 +407,8 @@ set(argc, argv)
 		argv++;
 	}
 	if (rtmsg(RTM_GET) < 0) {
-		perror(host);
-		return (1);
+		errx(1, "RTM_GET(%s) failed", host);
+		/* NOTREACHED */
 	}
 	sin = (struct sockaddr_in6 *)(rtm + 1);
 	sdl = (struct sockaddr_dl *)(ROUNDUP(sin->sin6_len) + (char *)sin);
@@ -505,8 +506,8 @@ delete(host)
 	}
 #endif
 	if (rtmsg(RTM_GET) < 0) {
-		perror(host);
-		return (1);
+		errx(1, "RTM_GET(%s) failed", host);
+		/* NOTREACHED */
 	}
 	sin = (struct sockaddr_in6 *)(rtm + 1);
 	sdl = (struct sockaddr_dl *)(ROUNDUP(sin->sin6_len) + (char *)sin);
@@ -880,8 +881,8 @@ doit:
 	rtm->rtm_type = cmd;
 	if ((rlen = write(s, (char *)&m_rtmsg, l)) < 0) {
 		if (errno != ESRCH || cmd != RTM_DELETE) {
-			perror("writing to routing socket");
-			return (-1);
+			err(1, "writing to routing socket");
+			/* NOTREACHED */
 		}
 	}
 	do {
@@ -907,14 +908,14 @@ ifinfo(argc, argv)
 #endif
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
-		perror("ndp: socket");
-		exit(1);
+		err(1, "socket");
+		/* NOTREACHED */
 	}
 	bzero(&nd, sizeof(nd));
 	strcpy(nd.ifname, ifname);
 	if (ioctl(s, SIOCGIFINFO_IN6, (caddr_t)&nd) < 0) {
- 		perror("ioctl (SIOCGIFINFO_IN6)");
- 		exit(1);
+ 		err(1, "ioctl(SIOCGIFINFO_IN6)");
+		/* NOTREACHED */
  	}
 #define ND nd.ndi
 	newflags = ND.flags;
@@ -940,10 +941,15 @@ ifinfo(argc, argv)
 
 		ND.flags = newflags;
 		if (ioctl(s, SIOCSIFINFO_FLAGS, (caddr_t)&nd) < 0) {
-			perror("ioctl(SIOCSIFINFO_FLAGS)");
-			exit(1);
+			err(1, "ioctl(SIOCSIFINFO_FLAGS)");
+			/* NOTREACHED */
 		}
 #undef SETFLAG
+	}
+
+	if (!ND.linkmtu) {
+		errx(1, "%s: not initialized yet", ifname);
+		/* NOTREACHED */
 	}
 
 	printf("linkmtu=%d", ND.linkmtu);
@@ -1048,14 +1054,14 @@ rtrlist()
 	struct timeval time;
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
-		perror("ndp: socket");
-		exit(1);
+		err(1, "socket");
+		/* NOTREACHED */
 	}
 	bzero(&dr, sizeof(dr));
 	strcpy(dr.ifname, "lo0"); /* dummy */
 	if (ioctl(s, SIOCGDRLST_IN6, (caddr_t)&dr) < 0) {
- 		perror("ioctl (SIOCGDRLST_IN6)");
- 		exit(1);
+ 		err(1, "ioctl(SIOCGDRLST_IN6)");
+		/* NOTREACHED */
  	}
 #define DR dr.defrouter[i]
 	for (i = 0 ; DR.if_index && i < DRLSTSIZ ; i++) {
@@ -1212,14 +1218,14 @@ plist()
 	gettimeofday(&time, 0);
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
-		perror("ndp: socket");
-		exit(1);
+		err(1, "socket");
+		/* NOTREACHED */
 	}
 	bzero(&pr, sizeof(pr));
 	strcpy(pr.ifname, "lo0"); /* dummy */
 	if (ioctl(s, SIOCGPRLST_IN6, (caddr_t)&pr) < 0) {
- 		perror("ioctl (SIOCGPRLST_IN6)");
- 		exit(1);
+ 		err(1, "ioctl(SIOCGPRLST_IN6)");
+		/* NOTREACHED */
  	}
 #define PR pr.prefix[i]
 	for (i = 0; PR.if_index && i < PRLSTSIZ ; i++) {
@@ -1418,7 +1424,7 @@ harmonize_rtr()
 		err(1, "socket");
 	strcpy(dummyif, "lo0"); /* dummy */
 	if (ioctl(s, SIOCSNDFLUSH_IN6, (caddr_t)&dummyif) < 0)
- 		err(1, "ioctl (SIOCSNDFLUSH_IN6)");
+ 		err(1, "ioctl(SIOCSNDFLUSH_IN6)");
 
 	close(s);
 }
@@ -1445,7 +1451,7 @@ setdefif(ifname)
 	ndifreq.ifindex = ifindex;
 
 	if (ioctl(s, SIOCSDEFIFACE_IN6, (caddr_t)&ndifreq) < 0)
- 		err(1, "ioctl (SIOCSDEFIFACE_IN6)");
+ 		err(1, "ioctl(SIOCSDEFIFACE_IN6)");
 
 	close(s);
 }
@@ -1463,7 +1469,7 @@ getdefif()
 	strcpy(ndifreq.ifname, "lo0"); /* dummy */
 
 	if (ioctl(s, SIOCGDEFIFACE_IN6, (caddr_t)&ndifreq) < 0)
- 		err(1, "ioctl (SIOCGDEFIFACE_IN6)");
+ 		err(1, "ioctl(SIOCGDEFIFACE_IN6)");
 
 	if (ndifreq.ifindex == 0)
 		printf("No default interface.\n");
