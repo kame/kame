@@ -1,5 +1,5 @@
 #
-# $Id: Makefile,v 1.1 2000/02/07 17:28:24 itojun Exp $
+# $Id: Makefile,v 1.2 2000/02/07 17:58:30 itojun Exp $
 #
 SRCDIR=	${.CURDIR}/../../kame/mip6config
 
@@ -18,7 +18,7 @@ MAN=	mip6config.8
 
 afterinstall:
 	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m 444 \
-		${.CURDIR}/mip6.conf.sample ${DESTDIR} ${ETCDIR}
+		${SRCDIR}/mip6.conf.sample ${DESTDIR} ${ETCDIR}
 
 .PATH:	${SRCDIR}
 
