@@ -1,4 +1,4 @@
-/*	$KAME: scope.c,v 1.1 2000/05/22 09:49:43 jinmei Exp $ */
+/*	$KAME: scope.c,v 1.2 2001/07/03 08:12:29 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -48,6 +48,7 @@ addr2scopetype(sa)
 #ifdef INET6
 	struct sockaddr_in6 *sa6;
 #endif
+	struct sockaddr_in *sa4;
 
 	switch(sa->sa_family) {
 #ifdef INET6
@@ -71,6 +72,28 @@ addr2scopetype(sa)
 		return(14);	/* global scope */
 		break;
 #endif
+	case AF_INET:
+		/*
+		 * IPv4 pseudo scoping according to
+		 * draft-ietf-ipngwg-default-addr-select.
+		 */
+		sa4 = (struct sockaddr_in *)sa;
+		/* IPv4 autoconfiguration addresses have link-local scope. */
+		if (sa4->sin_addr.s_addr[0] == 169 &&
+		    sa4->sin_addr.s_addr[1] == 254)
+			return(2);
+		/* Private addresses have site-local scope. */
+		if (sa4->sin_addr.s_addr[0] == 10 ||
+		    (sa4->sin_addr.s_addr[0] == 172 &&
+		     (sa4->sin_addr.s_addr[1] & 0xf0) == 16) ||
+		    (sa4->sin_addr.s_addr[0] == 192 &&
+		     sa4->sin_addr.s_addr[1] == 168))
+			return(5);
+		/* Loopback addresses have link-local scope. */
+		if (sa4->sin_addr.s_addr[0] == 127)
+			return(2);
+		return(14);
+		break;
 	default:
 		errno = EAFNOSUPPORT; /* is this a good error? */
 		return(-1);
@@ -78,7 +101,7 @@ addr2scopetype(sa)
 }
 
 int
-inet_scopeid(family, type, ifname, identp)
+inet_zoneid(family, type, ifname, identp)
 	int family, type;
 	char *ifname;
 	u_int32_t *identp;
