@@ -1237,8 +1237,20 @@ set_isakmp_proposal(rmconf, prspec)
 	/* mandatory check */
 	for (s = p->spspec; s != NULL; s = s->next) {
 		/* XXX need more to check */
+		if (s->algclass[algclass_isakmp_enc] == 0) {
+			yyerror("encryption algorithm required.");
+			return -1;
+		}
+		if (s->algclass[algclass_isakmp_hash] == 0) {
+			yyerror("hash algorithm required.");
+			return -1;
+		}
 		if (s->algclass[algclass_isakmp_dh] == 0) {
 			yyerror("DH group required.");
+			return -1;
+		}
+		if (s->algclass[algclass_isakmp_ameth] == 0) {
+			yyerror("authentication method required.");
 			return -1;
 		}
 	}
