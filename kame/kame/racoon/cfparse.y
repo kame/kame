@@ -733,6 +733,14 @@ sainfo_id
 			vfree($2);
 			if (!res)
 				return -1;
+
+			if ((res->ai_family == AF_INET6 && $5 == IPPROTO_ICMP)
+			 || (res->ai_family == AF_INET && $5 == IPPROTO_ICMPV6)) {
+				yyerror("upper layer protocol mismatched.\n");
+				freeaddrinfo(res);
+				return -1;
+			}
+
 			$$ = ipsecdoi_sockaddr2id(res->ai_addr,
 					_INALENBYAF(res->ai_family) << 3, $5);
 			freeaddrinfo(res);
