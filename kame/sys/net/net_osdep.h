@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.39 2001/02/14 12:30:09 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.40 2001/02/14 17:07:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -192,7 +192,9 @@
  *   the mbuf == MCLBYTES.
  *
  * - sys/kern/uipc_mbuf.c:m_dup()
- *	freebsd[34] and netbsd have it.  others do not.
+ *	freebsd[34]: copies the whole mbuf chain.
+ *	netbsd: similar arg with m_copym().
+ *	others: no m_dup().
  *
  * - ifa_refcnt (struct ifaddr) management (IFAREF/IFAFREE).
  *	NetBSD 1.5: always use IFAREF whenever reference gets added.
