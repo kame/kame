@@ -1,4 +1,4 @@
-/*	$KAME: policy.c,v 1.42 2001/08/20 06:46:28 itojun Exp $	*/
+/*	$KAME: policy.c,v 1.43 2001/10/02 02:47:34 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -84,7 +84,7 @@ getsp(spidx)
 #if 1
 struct secpolicy *
 getsp_r(spidx)
-	struct policyindex *spidx;	/* from peer */
+	struct policyindex *spidx;
 {
 	struct secpolicy *p;
 
@@ -98,7 +98,7 @@ getsp_r(spidx)
 #else
 struct secpolicy *
 getsp_r(spidx, iph2)
-	struct policyindex *spidx;	/* from peer */
+	struct policyindex *spidx;
 	struct ph2handle *iph2;
 {
 	struct secpolicy *p;
