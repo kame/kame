@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.32 2001/05/18 08:35:48 jinmei Exp $	*/
+/*	$KAME: bindtest.c,v 1.33 2001/05/18 08:43:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -98,6 +98,7 @@ static struct testitem{
 
 int main __P((int, char **));
 static void usage __P((void));
+static void printversion __P((void));
 static struct addrinfo *getres __P((int, const char *, const char *, int));
 static const char *printsa __P((struct sockaddr *, socklen_t));
 static const char *printres __P((struct addrinfo *));
@@ -105,7 +106,7 @@ static int test __P((struct testitem *, struct testitem *));
 static void sendtest __P((int, int, struct addrinfo *));
 static void conntest __P((int, int, struct addrinfo *));
 
-static char *versionstr = "$KAME: bindtest.c,v 1.32 2001/05/18 08:35:48 jinmei Exp $"; 
+static char *versionstr = "$KAME: bindtest.c,v 1.33 2001/05/18 08:43:03 jinmei Exp $"; 
 static char *port = NULL;
 static char *otheraddr = NULL;
 static struct addrinfo *oai;
@@ -127,7 +128,7 @@ main(argc, argv)
 	extern char *optarg;
 	struct testitem *testi, *testj;
 
-	while ((ch = getopt(argc, argv, "126Alo:Pp:st")) != -1) {
+	while ((ch = getopt(argc, argv, "126Alo:Pp:stv")) != -1) {
 		switch (ch) {
 		case '1':
 			connect1st = 1;
@@ -168,6 +169,9 @@ main(argc, argv)
 		case 't':
 			socktype = SOCK_STREAM;
 			break;
+		case 'v':
+			printversion();
+			exit(0);
 		default:
 			usage();
 			exit(1);
@@ -243,7 +247,13 @@ static void
 usage()
 {
 	fprintf(stderr,
-		"usage: bindtest [-[1|2]6APlst] [-o IPv4address] -p port\n");
+		"usage: bindtest [-[1|2]6APlstv] [-o IPv4address] -p port\n");
+}
+
+static void
+printversion()
+{
+	printf("%s\n", versionstr);
 }
 
 static struct addrinfo *
