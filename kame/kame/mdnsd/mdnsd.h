@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.h,v 1.23 2002/09/10 01:49:44 itojun Exp $	*/
+/*	$KAME: mdnsd.h,v 1.24 2002/09/10 02:04:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 
+#define DNS_PORT	"53"
 #define MDNS_PORT	"5353"
 #define MDNS_GROUP4	"224.0.0.251"
 #define MDNS_GROUP6	"ff02::1"	/* XXX not declared in i-d */

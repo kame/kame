@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.55 2002/09/10 01:49:44 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.56 2002/09/10 02:04:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -58,7 +58,8 @@
 
 u_int16_t dnsid;
 const char *srcport = "53";
-const char *dstport = MDNS_PORT;
+const char *dstport = DNS_PORT;
+const char *mdstport = MDNS_PORT;
 const char *intface = NULL;
 int family = PF_UNSPEC;
 static char hostnamebuf[MAXHOSTNAMELEN];
@@ -144,7 +145,7 @@ main(argc, argv)
 			srcport = optarg;
 			break;
 		case 'P':
-			dstport = optarg;
+			mdstport = optarg;
 			mcastloop4 = 1;
 			mcastloop6 = 1;
 			break;
@@ -608,7 +609,7 @@ addserv(n, ttl, comment)
 	hints.ai_family = PF_UNSPEC;
 	hints.ai_socktype = SOCK_DGRAM;		/*dummy*/
 	hints.ai_flags = AI_NUMERICHOST;
-	if (getaddrinfo(n, dstport, &hints, &res) != 0)
+	if (getaddrinfo(n, "0", &hints, &res) != 0)
 		return -1;
 	if (res->ai_next) {
 		freeaddrinfo(res);
@@ -624,10 +625,22 @@ addserv(n, ttl, comment)
 		multicast = IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr) ? 1 : 0;
 		break;
 	default:
-		flags = 0;
 		multicast = 0;
 		break;
 	}
+	freeaddrinfo(res);
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;		/*dummy*/
+	hints.ai_flags = AI_NUMERICHOST;
+	if (getaddrinfo(n, multicast ? mdstport : dstport, &hints, &res) != 0)
+		return -1;
+	if (res->ai_next) {
+		freeaddrinfo(res);
+		return -1;
+	}
+
 	ns = newnsdb(res->ai_addr, res->ai_addrlen, comment);
 	if (ns == NULL) {
 		freeaddrinfo(res);
