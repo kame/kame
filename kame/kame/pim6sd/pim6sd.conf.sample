@@ -76,10 +76,12 @@
 #group_prefix ff2e::/16
 
 #syntax : <cand_bootstrap_router> <interface> <priority> [priority] <time> [time]
-#the bootstrap period is configurable , BUT the holdtime of a bootstrap router is not in
-#the fields of a bootstrap message : it is hardcoded in the pim6sd include file!
-#so be sure to have a time < PIM_BOOSTRAP_TIMEOUT (file pimd.h )
-
+#Typically, you can simply set cand_bootstrap_router for a candidate bootstrap
+#router. All other parameters are optional.
+#the bootstrap period is configurable, BUT the holdtime of a bootstrap
+#router is not in the fields of a bootstrap message : it is hardcoded
+#in the pim6sd include file!
+#So be sure to have a time < PIM_BOOSTRAP_TIMEOUT (file pimd.h )
 #cand_bootstrap_router de0 priority 15 time 5
 
 #syntax : <switch_register_threshold> <rate> [number] <interval> [number]
