@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.37 2000/06/13 02:40:22 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.38 2000/06/13 02:45:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1404,24 +1404,14 @@ in6_ifadd(ifp, in6, addr, prefixlen)
 		for ( ; ifa->ifa_next; ifa = ifa->ifa_next)
 			continue;
 		ifa->ifa_next = (struct ifaddr *)ia;
-	}
+	} else
+		ifp->if_addrlist = (struct ifaddr *)ia;
 #else
-	if (ifp->if_addrlist.tqh_first != NULL) {
-		TAILQ_INSERT_TAIL(&ifp->if_addrlist, (struct ifaddr *)ia,
-			ifa_list);
-	}
+	TAILQ_INSERT_TAIL(&ifp->if_addrlist, (struct ifaddr *)ia,
+	    ifa_list);
 #endif
 	/* gain another refcnt for the link from if_addrlist */
 	ia->ia_ifa.ifa_refcnt++;
-#if 0
-	else {
-		/*
-		 * this should not be the case because there is at least one
-		 * link-local address(see the beginning of the function).
-		 */
-		TAILQ_INIT(&ifp->if_addrlist);
-	}
-#endif
 
 	/* new address */
 	ia->ia_addr.sin6_len = sizeof(struct sockaddr_in6);
