@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.90 2000/05/08 02:32:09 itojun Exp $	*/
+/*	$KAME: key.c,v 1.91 2000/05/08 02:52:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -6775,7 +6775,7 @@ key_align(m, mhp)
 
 			ext_addr = (struct sadb_address *)ext;
 			sa = (struct sockaddr *)(ext_addr + 1);
-			if (extlen < sizeof(*ext_addr) + offsetof(struct sockaddr, sa_len) ||
+			if (extlen < sizeof(*ext_addr) + offsetof(struct sockaddr, sa_len) + sizeof(sa->sa_len) ||
 			    sizeof(*ext_addr) + PFKEY_ALIGN8(sa->sa_len) != extlen) {
 #ifdef IPSEC_DEBUG
 				printf("key_align: invalid sa_len.\n");
