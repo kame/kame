@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.24 2000/06/04 12:47:03 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.25 2000/07/09 12:52:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1774,8 +1774,10 @@ tcp6_dooptions(t6p, cp, cnt, th, oi)
 		if (opt == TCP6OPT_NOP)
 			optlen = 1;
 		else {
+			if (cnt < 2)
+				break;
 			optlen = cp[1];
-			if (optlen <= 0)
+			if (optlen < 2 || optlen > cnt)
 				break;
 		}
 		switch (opt) {
