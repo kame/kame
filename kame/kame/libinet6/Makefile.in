@@ -25,10 +25,11 @@ OBJS+=	res_comp.o res_data.o res_debug.o
 OBJS+=	res_init.o res_mkquery.o res_query.o 
 OBJS+=	res_send.o
 OBJS+=	inet_pton.o inet_addr.o
+OBJS+=	bindresvport.o
 
 MAN3=	getaddrinfo.3 getnameinfo.3 gethostbyname.3 resolver.3 \
 	rresvport_af.3 if_indextoname.3 getipnodebyname.3 inet6_option_space.3 \
-	inet6_rthdr_space.3
+	inet6_rthdr_space.3 bindresvport.3
 MLINKS+=	getipnodebyname.3 getipnodebyaddr.3 \
 		getipnodebyname.3 freehostent.3 \
 		getaddrinfo.3 freeaddrinfo.3 \
@@ -47,7 +48,8 @@ MLINKS+=	getipnodebyname.3 getipnodebyaddr.3 \
 		inet6_rthdr_space.3 inet6_rthdr_reverse.3 \
 		inet6_rthdr_space.3 inet6_rthdr_segments.3 \
 		inet6_rthdr_space.3 inet6_rthdr_getaddr.3 \
-		inet6_rthdr_space.3 inet6_rthdr_getflags.3
+		inet6_rthdr_space.3 inet6_rthdr_getflags.3 \
+		bindresvport.3 bindresvport_sa.3
 
 libinet6.a: $(OBJS)
 	$(AR) cq libinet6.a $(OBJS)
