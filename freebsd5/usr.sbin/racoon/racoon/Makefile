@@ -9,12 +9,13 @@ SRCS=	main.c session.c isakmp.c handler.c \
 	proposal.c sainfo.c vendorid.c safefile.c backupsa.c \
 	dnssec.c getcertsbyname.c
 
-# debugging code with print-isakmp.c
-SRCS+=	print-isakmp.c
 SRCS+=	rijndael-alg-fst.c rijndael-api-fst.c sha2.c
-CFLAGS+=-I${SRCDIR}/../tcpdump -I${SRCDIR}/../tcpdump/lbl \
-	-DHAVE_PRINT_ISAKMP_C=1 -DHAVE_ARC4RANDOM=1
-CFLAGS+=-I${SRCDIR}/missing
+CFLAGS+=-I${SRCDIR}/missing -DHAVE_ARC4RANDOM=1
+
+# debugging code with print-isakmp.c
+#SRCS+=	print-isakmp.c
+#CFLAGS+=-I${SRCDIR}/../tcpdump -I${SRCDIR}/../tcpdump/lbl \
+#	-DHAVE_PRINT_ISAKMP_C=1
 
 # for debugging malloc/mfree
 #.if exists(/usr/local/lib/libefence.a) || exists(/usr/local/lib/libefence.so)

@@ -18,8 +18,10 @@ SRCS+=	rijndael-alg-fst.c rijndael-api-fst.c sha2.c
 MAN=	racoon.8 racoon.conf.5
 
 # debugging code with print-isakmp.c
-SRCS+=	print-isakmp.c
-CPPFLAGS+=-I${TCPDUMPSRCDIR} -I${TCPDUMPSRCDIR}/lbl -DHAVE_PRINT_ISAKMP_C=1
+#SRCS+=	print-isakmp.c
+#CPPFLAGS+=-I${TCPDUMPSRCDIR} -I${TCPDUMPSRCDIR}/lbl -DHAVE_PRINT_ISAKMP_C=1
+
+# kerberos
 .if (${MKKERBEROS} != "no")
 CPPFLAGS+=-I${DESTDIR}/usr/include/krb5
 .endif
