@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.200 1999/10/20 15:23:28 sakane Exp $
+$Id: CHANGELOG,v 1.201 1999/10/20 23:50:06 itojun Exp $
 
 <199910>
+Wed Oct 20 09:01:53 PDT 1999  itojun@iijlab.net
+	* netbsd/pkgsrc/net/wu-ftpd: upgrade to 2.5.0 with iPv6 patch.
+
 Thu Oct 21 00:19:23 JST 1999 sakane@ydc.co.jp
 	* kame/kame/libipsec:
 	Improved IPsec policy parser.  Following requests are allowed:
@@ -14,7 +17,7 @@ Thu Oct 21 00:19:23 JST 1999 sakane@ydc.co.jp
 	See policy_parse.y for detail.
 
 Wed Oct 20 20:13:50 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
-	* freebsd[23]/ports/ncftp3, netbsd/pkgsrc/net/ncftp4: upgrade to
+	* freebsd[23]/ports/ncftp3, netbsd/pkgsrc/net/ncftp3: upgrade to
 	3.0 beta 21.
 
 1999-10-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
