@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.795 2000/04/19 14:14:52 jinmei Exp $
+$Id: CHANGELOG,v 1.796 2000/04/20 09:22:58 itojun Exp $
 
 <200004>
+Thu Apr 20 18:22:26 JST 2000  itojun@iijlab.net
+	* libpcap/tcpdump pkgsrc (netbsd): upgrade to 4/17 snapshot.
+	* libpcap/tcpdump pkgsrc (openbsd): added port for 4/17 snapshot.
+
 2000-04-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/netinet6/raw_ipv6.c (rip6_ctloutput): 
 	- just (implicitly) call ip6_ctloutput for IPV6_CHECKSUM.
