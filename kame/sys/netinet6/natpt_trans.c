@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.142 2002/08/09 11:30:19 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.143 2002/08/13 08:09:02 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -169,6 +169,7 @@ void		 natpt_icmp6Informational __P((struct pcv *, struct pcv *));
 void		 natpt_icmp6MimicPayload	__P((struct pcv *, struct pcv *,
 					     struct pAddr *));
 void		 natpt_translatePing4to66	__P((struct pcv *, struct pcv *, int));
+void		 natpt_revertICMPv6To4address	__P((struct pcv *, struct mbuf *));
 struct mbuf	*natpt_translateTCPv6To4	__P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateUDPv6To4	__P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateTCPUDPv6To4 __P((struct pcv *, struct pAddr *,
@@ -251,15 +252,7 @@ natpt_translateIPv6To4(struct pcv *cv6, struct pAddr *pad)
 	switch (cv6->ip_p) {
 	case IPPROTO_ICMPV6:
 		m4 = natpt_translateICMPv6To4(cv6, pad);
-		{
-			struct cSlot *csl;
-			struct ip    *ip4;
-
-			if ((csl = natpt_lookForRule6(cv6)) != NULL) {
-				ip4 = mtod(m4, struct ip *);
-				ip4->ip_src = csl->Remote.in4src;
-			}
-		}
+		natpt_revertICMPv6To4address(cv6, m4);
 		break;
 
 	case IPPROTO_TCP:
@@ -594,6 +587,20 @@ natpt_icmp6MimicPayload(struct pcv *cv6, struct pcv *cv4, struct pAddr *pad)
 				       (u_char *)&ulc6, sizeof(struct ulc6),
 				       (u_char *)&ulc4, sizeof(struct ulc4));
 		udp4->uh_sum = htons(cksum4);
+	}
+}
+
+
+void
+natpt_revertICMPv6To4address(struct pcv *cv6, struct mbuf *m4)
+{
+	struct cSlot *csl;
+	struct ip    *ip4;
+
+	/* revert outermost IPv4 address */
+	if ((csl = natpt_lookForRule6(cv6)) != NULL) {
+		ip4 = mtod(m4, struct ip *);
+		ip4->ip_src = csl->Remote.in4src;
 	}
 }
 
