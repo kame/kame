@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.5 2001/11/19 09:25:36 k-sugyou Exp $	*/
+/*	$KAME: mip6control.c,v 1.6 2001/11/29 04:40:15 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -54,6 +54,8 @@
 
 #include <netinet6/mip6.h>
 
+#define IOC_ENTRY_COUNT 100 /* XXX */
+
 static int getaddress(char *, struct in6_addr *);
 #if 0
 static char *ip6addr_print(struct in6_addr *in6, int plen, char *);
@@ -61,8 +63,8 @@ static char *ip6addr_print(struct in6_addr *in6, int plen, char *);
 static char *ip6_sprintf(const struct in6_addr *);
 
 static const char *pfx_desc[] = {
-	"prefix\t\tplen\tlifetim\tltrem\thaddr\n",
-	"prefix\t\t\t\tplen\tlifetim\tltrem\thaddr\n"
+	"prefix\t\tplen\tvltime\tvlrem\tpltime\tplrem\thaddr\n",
+	"prefix\t\t\t\tplen\tvltime\tvlrem\tpltime\tplrem\thaddr\n"
 };
 static const char *bu_desc[] = {
 	"paddr\t\thaddr\t\tcoa\t\tlifetim\tltrem\trefresh\trefrem\tacktimo\tackrem\tseqno\tflags\trstate\tstate\tdontsnd\tcoafb\n",
@@ -189,7 +191,8 @@ main(argc, argv)
 		ifr->ifr_ifru.ifr_mpfx = mpfx;
 		getaddress(smhparg, &mpfx->mpfx_prefix);
 		mpfx->mpfx_prefixlen = atoi(pfxarg);
-		mpfx->mpfx_lifetime = 0xffff;
+		mpfx->mpfx_vltime = 0xffff; /* XXX */
+		mpfx->mpfx_pltime = 0xff00; /* XXX */
 		if(ioctl(s, SIOCAHOMEPREFIX_HIF, (caddr_t)ifr) == -1) {
 			perror("ioctl");
 			exit(-1);
@@ -202,16 +205,16 @@ main(argc, argv)
 		int i;
 
 		ifr = malloc(sizeof(struct hif_ifreq)
-			     + 10 * sizeof(struct mip6_prefix));
+			     + IOC_ENTRY_COUNT * sizeof(struct mip6_prefix));
 		if (ifr == NULL) {
 			perror("malloc");
 			exit(-1);
 		}
 		bzero(ifr, sizeof(sizeof(struct hif_ifreq)
-				  + 10 * sizeof(struct mip6_prefix)));
+				  + IOC_ENTRY_COUNT * sizeof(struct mip6_prefix)));
 
 		strcpy(ifr->ifr_name, ifnarg);
-		ifr->ifr_count = 10;
+		ifr->ifr_count = IOC_ENTRY_COUNT;
 		mpfx = (struct mip6_prefix *)((caddr_t)ifr 
 					   + sizeof(struct hif_ifreq));
 		ifr->ifr_ifru.ifr_mpfx = mpfx;
@@ -224,10 +227,12 @@ main(argc, argv)
 		for (i = 0; i < ifr->ifr_count; i++) {
 			printf(ipaddr_fmt[longdisp],
 			       ip6_sprintf(&mpfx->mpfx_prefix));
-			printf("%7u %7u %7qd ",
+			printf("%7u %7u %7qd %7u %7qd ",
 			       mpfx->mpfx_prefixlen,
-			       mpfx->mpfx_lifetime,
-			       mpfx->mpfx_remain);
+			       mpfx->mpfx_vltime,
+			       mpfx->mpfx_vlremain,
+			       mpfx->mpfx_pltime,
+			       mpfx->mpfx_plremain);
 			printf(ipaddr_fmt[longdisp],
 			       ip6_sprintf(&mpfx->mpfx_haddr));
 			printf("\n");
@@ -268,16 +273,16 @@ main(argc, argv)
 		int i;
 
 		ifr = malloc(sizeof(struct hif_ifreq)
-			     + 10 * sizeof(struct mip6_ha));
+			     + IOC_ENTRY_COUNT * sizeof(struct mip6_ha));
 		if (ifr == NULL) {
 			perror("malloc");
 			exit(-1);
 		}
 		bzero(ifr, sizeof(sizeof(struct hif_ifreq)
-				  + 10 * sizeof(struct mip6_ha)));
+				  + IOC_ENTRY_COUNT * sizeof(struct mip6_ha)));
 
 		strcpy(ifr->ifr_name, ifnarg);
-		ifr->ifr_count = 10;
+		ifr->ifr_count = IOC_ENTRY_COUNT;
 		mha = (struct mip6_ha *)((caddr_t)ifr 
 					 + sizeof(struct hif_ifreq));
 		ifr->ifr_ifru.ifr_mha = mha;
@@ -308,16 +313,16 @@ main(argc, argv)
 		int i;
 
 		ifr = malloc(sizeof(struct hif_ifreq)
-			     + 10 * sizeof(struct mip6_bu));
+			     + IOC_ENTRY_COUNT * sizeof(struct mip6_bu));
 		if (ifr == NULL) {
 			perror("malloc");
 			exit(-1);
 		}
 		bzero(ifr, sizeof(sizeof(struct hif_ifreq)
-				  + 10 * sizeof(struct mip6_bu)));
+				  + IOC_ENTRY_COUNT * sizeof(struct mip6_bu)));
 
 		strcpy(ifr->ifr_name, ifnarg);
-		ifr->ifr_count = 10;
+		ifr->ifr_count = IOC_ENTRY_COUNT;
 		mbu = (struct mip6_bu *)((caddr_t)ifr 
 					 + sizeof(struct hif_ifreq));
 		ifr->ifr_ifru.ifr_mbu = mbu;
@@ -356,14 +361,14 @@ main(argc, argv)
 		int i;
 
 		mr = malloc(sizeof(struct mip6_req)
-			    + 10 * sizeof(struct mip6_bc));
+			    + IOC_ENTRY_COUNT * sizeof(struct mip6_bc));
 		if (mr == NULL) {
 			perror("malloc");
 			exit(-1);
 		}
-		bzero(mr, sizeof(*mr) + 10 * sizeof(*mbc));
+		bzero(mr, sizeof(*mr) + IOC_ENTRY_COUNT * sizeof(*mbc));
 
-		mr->mip6r_count = 10;
+		mr->mip6r_count = IOC_ENTRY_COUNT;
 		mbc = (struct mip6_bc *)((caddr_t)mr
 					 + sizeof(*mr));
 		mr->mip6r_ru.mip6r_mbc = mbc;
