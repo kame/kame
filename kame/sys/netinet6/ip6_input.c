@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.213 2001/08/03 11:56:02 keiichi Exp $	*/
+/*	$KAME: ip6_input.c,v 1.214 2001/08/16 12:13:36 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2705,6 +2705,9 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case IPV6CTL_AUTO_LINKLOCAL:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 				  &ip6_auto_linklocal);
+	case IPV6CTL_PREFER_TEMPADDR:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+				  &ip6_prefer_tempaddr);
 	default:
 		return EOPNOTSUPP;
 	}
