@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.108 2003/07/31 23:20:25 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.109 2003/07/31 23:33:38 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -2009,7 +2009,7 @@ update_binding_duration(binding)
 	struct dhcp6_list *ia_list = &binding->val_list;
 	struct dhcp6_listval *iav;
 	int duration = DHCP6_DURATITION_INFINITE;
-	u_int32_t past, lifetime, min_lifetime;
+	u_int32_t past, min_lifetime;
 	time_t now = time(NULL);
 
 	min_lifetime = 0;
@@ -2024,10 +2024,15 @@ update_binding_duration(binding)
 		 */
 		for (iav = TAILQ_FIRST(ia_list); iav;
 		    iav = TAILQ_NEXT(iav, link)) {
+			u_int32_t lifetime;
+
 			switch (binding->iatype) {
 			case DHCP6_LISTVAL_IAPD:
 				lifetime = iav->val_prefix6.vltime;
 				break;
+			default:
+				dprintf(LOG_ERR, FNAME, "unsupported IA type");
+				return;	/* XXX */
 			}
 
 			if (min_lifetime == 0 ||
