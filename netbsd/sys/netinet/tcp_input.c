@@ -699,6 +699,7 @@ tcp_input(m, va_alist)
 	 */
 
 	if (off > sizeof (struct tcphdr)) {
+#ifndef PULLDOWN_TEST
 		if (m->m_len < toff + off) {
 			if ((m = m_pullup(m, toff + off)) == 0) {
 				tcpstat.tcps_rcvshort++;
@@ -716,6 +717,17 @@ tcp_input(m, va_alist)
 			}
 			th = (struct tcphdr *)(mtod(m, caddr_t) + toff);
 		}
+#else
+		IP6_EXTHDR_GET(th, struct tcphdr *, m, toff, off);
+		if (th == NULL) {
+			tcpstat.tcps_rcvshort++;
+			return;
+		}
+		/*
+		 * NOTE: ip/ip6 will not be affected by m_pulldown()
+		 * (as they're before toff) and we don't need to update those.
+		 */
+#endif
 		optlen = off - sizeof (struct tcphdr);
 		optp = (caddr_t)(th + 1);
 		/* 
