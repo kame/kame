@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.10 2003/06/25 07:36:22 itojun Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.11 2003/06/26 09:30:22 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -605,9 +605,6 @@ void
 mip6_probe_routers(void)
 {
 	struct llinfo_nd6 *ln;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
-#endif
 
 	ln = llinfo_nd6.ln_next;
 	while (ln && ln != &llinfo_nd6) {
