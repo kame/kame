@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2442 2003/07/25 09:08:09 sakane Exp $
+$KAME: CHANGELOG,v 1.2443 2003/07/25 09:35:04 itojun Exp $
 
 <200307>
+Fri Jul 25 19:12:15 JST 2003  itojun@iijlab.net
+	* sys/netinet/ah_core.c: hmac-ripemd160 support
+
 Fri Jul 25 18:07:43 JST 2003 sakane@kame.net
 	* kame/sys/netkey/key.c
 	fixed that the kernel crashed when key_spdacquire() was called
