@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.60 2003/05/15 00:21:08 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.61 2003/08/19 12:52:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -58,6 +58,9 @@
 #include <signal.h>
 #include <fcntl.h>
 #include <termios.h>
+#ifdef HAVE_POLL_H
+#include <poll.h>
+#endif
 
 #include <net/if_types.h>
 #ifdef IFT_FAITH
@@ -348,9 +351,13 @@ play_service(int s_wld)
 	socklen_t len;
 	int s_src;
 	pid_t child_pid;
+#ifdef HAVE_POLL_H
+	struct pollfd pfd[2];
+#else
 	fd_set rfds;
-	int error;
 	int maxfd;
+#endif
+	int error;
 
 	/*
 	 * Wait, accept, fork, faith....
@@ -358,21 +365,37 @@ play_service(int s_wld)
 again:
 	setproctitle("%s", procname);
 
+#ifdef HAVE_POLL_H
+	pfd[0].fd = s_wld;
+	pfd[0].events = POLLIN;
+	pfd[1].fd = -1;
+	pfd[1].revents = 0;
+#else
 	FD_ZERO(&rfds);
 	if (s_wld >= FD_SETSIZE)
 		exit_failure("descriptor too big");
 	FD_SET(s_wld, &rfds);
 	maxfd = s_wld;
+#endif
 #ifdef USE_ROUTE
 	if (sockfd) {
+#ifdef HAVE_POLL_H
+		pfd[1].fd = sockfd;
+		pfd[1].events = POLLIN;
+#else
 		if (sockfd >= FD_SETSIZE)
 			exit_failure("descriptor too big");
 		FD_SET(sockfd, &rfds);
 		maxfd = (maxfd < sockfd) ? sockfd : maxfd;
+#endif
 	}
 #endif
 
+#ifdef HAVE_POLL_H
+	error = poll(pfd, sizeof(pfd)/sizeof(pfd[0]), 0);
+#else
 	error = select(maxfd + 1, &rfds, NULL, NULL, NULL);
+#endif
 	if (error < 0) {
 		if (errno == EINTR)
 			goto again;
@@ -381,11 +404,21 @@ again:
 	}
 
 #ifdef USE_ROUTE
-	if (FD_ISSET(sockfd, &rfds)) {
+#ifdef HAVE_POLL_H
+	if (pfd[1].revents & POLLIN)
+#else
+	if (FD_ISSET(sockfd, &rfds))
+#endif
+	{
 		update_myaddrs();
 	}
 #endif
-	if (FD_ISSET(s_wld, &rfds)) {
+#ifdef HAVE_POLL_H
+	if (pfd[0].revents & POLLIN)
+#else
+	if (FD_ISSET(s_wld, &rfds))
+#endif
+	{
 		len = sizeof(srcaddr);
 		s_src = accept(s_wld, (struct sockaddr *)&srcaddr, &len);
 		if (s_src < 0) {

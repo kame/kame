@@ -1,4 +1,4 @@
-/*	$KAME: ftp.c,v 1.21 2003/04/18 08:21:18 itojun Exp $	*/
+/*	$KAME: ftp.c,v 1.22 2003/08/19 12:52:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -42,6 +42,9 @@
 #include <unistd.h>
 #include <errno.h>
 #include <ctype.h>
+#ifdef HAVE_POLL_H
+#include <poll.h>
+#endif
 
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -71,7 +74,11 @@ static int ftp_copycommand __P((int, int, enum state *));
 void
 ftp_relay(int ctl6, int ctl4)
 {
+#ifdef HAVE_POLL_H
+	struct pollfd pfd[6];
+#else
 	fd_set readfds;
+#endif
 	int error;
 	enum state state = NONE;
 	struct timeval tv;
@@ -79,6 +86,37 @@ ftp_relay(int ctl6, int ctl4)
 	syslog(LOG_INFO, "starting ftp control connection");
 
 	for (;;) {
+#ifdef HAVE_POLL_H
+		pfd[0].fd = ctl4;
+		pfd[0].events = POLLIN;
+		pfd[1].fd = ctl6;
+		pfd[1].events = POLLIN;
+		if (0 <= port4) {
+			pfd[2].fd = port4;
+			pfd[2].events = POLLIN;
+		} else
+			pfd[2].fd = -1;
+		if (0 <= port6) {
+			pfd[3].fd = port6;
+			pfd[3].events = POLLIN;
+		} else
+			pfd[3].fd = -1;
+#if 0
+		if (0 <= wport4) {
+			pfd[4].fd = wport4;
+			pfd[4].events = POLLIN;
+		} else
+			pfd[4].fd = -1;
+		if (0 <= wport6) {
+			pfd[5].fd = wport4;
+			pfd[5].events = POLLIN;
+		} else
+			pfd[5].fd = -1;
+#else
+		pfd[4].fd = pfd[5].fd = -1;
+		pfd[4].events = pfd[5].events = 0;
+#endif
+#else
 		int maxfd = 0;
 
 		FD_ZERO(&readfds);
@@ -116,12 +154,22 @@ ftp_relay(int ctl6, int ctl4)
 			maxfd = (wport6 > maxfd) ? wport6 : maxfd;
 		}
 #endif
+#endif
 		tv.tv_sec = FAITH_TIMEOUT;
 		tv.tv_usec = 0;
 
+#ifdef HAVE_POLL_H
+		error = poll(pfd, sizeof(pfd)/sizeof(pfd[0]), tv.tv_sec * 1000);
+#else
 		error = select(maxfd + 1, &readfds, NULL, NULL, &tv);
-		if (error == -1)
+#endif
+		if (error == -1) {
+#ifdef HAVE_POLL_H
+			exit_failure("poll: %s", strerror(errno));
+#else
 			exit_failure("select: %s", strerror(errno));
+#endif
+		}
 		else if (error == 0)
 			exit_failure("connection timeout");
 
@@ -131,7 +179,12 @@ ftp_relay(int ctl6, int ctl4)
 		 * otherwise some of the pipe may become full and we cannot
 		 * relay correctly.
 		 */
-		if (FD_ISSET(ctl6, &readfds)) {
+#ifdef HAVE_POLL_H
+		if (pfd[1].revents & POLLIN)
+#else
+		if (FD_ISSET(ctl6, &readfds))
+#endif
+		{
 			/*
 			 * copy control connection from the client.
 			 * command translation is necessary.
@@ -147,7 +200,12 @@ ftp_relay(int ctl6, int ctl4)
 				/*NOTREACHED*/
 			}
 		}
-		if (FD_ISSET(ctl4, &readfds)) {
+#ifdef HAVE_POLL_H
+		if (pfd[0].revents & POLLIN)
+#else
+		if (FD_ISSET(ctl4, &readfds))
+#endif
+		{
 			/*
 			 * copy control connection from the server
 			 * translation of result code is necessary.
@@ -163,12 +221,21 @@ ftp_relay(int ctl6, int ctl4)
 				/*NOTREACHED*/
 			}
 		}
-		if (0 <= port4 && 0 <= port6 && FD_ISSET(port4, &readfds)) {
+#ifdef HAVE_POLL_H
+		if (0 <= port4 && 0 <= port6 && (pfd[2].revents & POLLIN))
+#else
+		if (0 <= port4 && 0 <= port6 && FD_ISSET(port4, &readfds))
+#endif
+		{
 			/*
 			 * copy data connection.
 			 * no special treatment necessary.
 			 */
+#ifdef HAVE_POLL_H
+			if (pfd[2].revents & POLLIN)
+#else
 			if (FD_ISSET(port4, &readfds))
+#endif
 				error = ftp_copy(port4, port6);
 			switch (error) {
 			case -1:
@@ -183,12 +250,21 @@ ftp_relay(int ctl6, int ctl4)
 				break;
 			}
 		}
-		if (0 <= port4 && 0 <= port6 && FD_ISSET(port6, &readfds)) {
+#ifdef HAVE_POLL_H
+		if (0 <= port4 && 0 <= port6 && (pfd[3].revents & POLLIN))
+#else
+		if (0 <= port4 && 0 <= port6 && FD_ISSET(port6, &readfds))
+#endif
+		{
 			/*
 			 * copy data connection.
 			 * no special treatment necessary.
 			 */
+#ifdef HAVE_POLL_H
+			if (pfd[3].revents & POLLIN)
+#else
 			if (FD_ISSET(port6, &readfds))
+#endif
 				error = ftp_copy(port6, port4);
 			switch (error) {
 			case -1:
@@ -204,13 +280,23 @@ ftp_relay(int ctl6, int ctl4)
 			}
 		}
 #if 0
-		if (wport4 && FD_ISSET(wport4, &readfds)) {
+#ifdef HAVE_POLL_H
+		if (wport4 && (pfd[4].revents & POLLIN))
+#else
+		if (wport4 && FD_ISSET(wport4, &readfds))
+#endif
+		{
 			/*
 			 * establish active data connection from the server.
 			 */
 			ftp_activeconn();
 		}
-		if (wport6 && FD_ISSET(wport6, &readfds)) {
+#ifdef HAVE_POLL_H
+		if (wport4 && (pfd[5].revents & POLLIN))
+#else
+		if (wport6 && FD_ISSET(wport6, &readfds))
+#endif
+		{
 			/*
 			 * establish passive data connection from the client.
 			 */
@@ -228,20 +314,35 @@ ftp_activeconn()
 {
 	socklen_t n;
 	int error;
+#ifdef HAVE_POLL_H
+	struct pollfd pfd[1];
+#else
 	fd_set set;
+#endif
 	struct timeval timeout;
 	struct sockaddr *sa;
 
 	/* get active connection from server */
+#ifdef HAVE_POLL_H
+	pfd[0].fd = wport4;
+	pfd[0].events = POLLIN;
+#else
 	FD_ZERO(&set);
 	if (wport4 >= FD_SETSIZE)
 		exit_failure("descriptor too big");
 	FD_SET(wport4, &set);
+#endif
 	timeout.tv_sec = 120;
-	timeout.tv_usec = -1;
+	timeout.tv_usec = 0;
 	n = sizeof(data4);
-	if (select(wport4 + 1, &set, NULL, NULL, &timeout) == 0
-	 || (port4 = accept(wport4, (struct sockaddr *)&data4, &n)) < 0) {
+#ifdef HAVE_POLL_H
+	if (poll(pfd, sizeof(pfd)/sizeof(pfd[0]), timeout.tv_sec * 1000) == 0 ||
+	    (port4 = accept(wport4, (struct sockaddr *)&data4, &n)) < 0)
+#else
+	if (select(wport4 + 1, &set, NULL, NULL, &timeout) == 0 ||
+	    (port4 = accept(wport4, (struct sockaddr *)&data4, &n)) < 0)
+#endif
+	{
 		close(wport4);
 		wport4 = -1;
 		syslog(LOG_INFO, "active mode data connection failed");
@@ -277,20 +378,35 @@ ftp_passiveconn()
 {
 	socklen_t len;
 	int error;
+#ifdef HAVE_POLL_H
+	struct pollfd pfd[1];
+#else
 	fd_set set;
+#endif
 	struct timeval timeout;
 	struct sockaddr *sa;
 
 	/* get passive connection from client */
+#ifdef HAVE_POLL_H
+	pfd[0].fd = wport6;
+	pfd[0].events = POLLIN;
+#else
 	FD_ZERO(&set);
 	if (wport6 >= FD_SETSIZE)
 		exit_failure("descriptor too big");
 	FD_SET(wport6, &set);
+#endif
 	timeout.tv_sec = 120;
 	timeout.tv_usec = 0;
 	len = sizeof(data6);
-	if (select(wport6 + 1, &set, NULL, NULL, &timeout) == 0
-	 || (port6 = accept(wport6, (struct sockaddr *)&data6, &len)) < 0) {
+#ifdef HAVE_POLL_H
+	if (poll(pfd, sizeof(pfd)/sizeof(pfd[0]), timeout.tv_sec * 1000) == 0 ||
+	    (port6 = accept(wport6, (struct sockaddr *)&data6, &len)) < 0)
+#else
+	if (select(wport6 + 1, &set, NULL, NULL, &timeout) == 0 ||
+	    (port6 = accept(wport6, (struct sockaddr *)&data6, &len)) < 0)
+#endif
+	{
 		close(wport6);
 		wport6 = -1;
 		syslog(LOG_INFO, "passive mode data connection failed");
