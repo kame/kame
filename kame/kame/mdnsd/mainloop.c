@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.25 2000/05/31 12:25:56 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.26 2000/05/31 13:17:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -697,9 +697,11 @@ relay(buf, len, from)
 		}
 
 		if (sent == 0) {
+			dprintf("no matching socket, not sent\n");
 			delqcache(qc);
 			return -1;
-		}
+		} else
+			dprintf("sent\n");
 
 		return 0;
 	} else
