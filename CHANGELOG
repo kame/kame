@@ -1,8 +1,24 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1606 2001/03/15 13:12:19 jinmei Exp $
+$KAME: CHANGELOG,v 1.1607 2001/03/18 10:44:21 fujisawa Exp $
 
 <200103>
+2001-03-18  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* freebsd4/sys/netinet/ip_input.c 
+	  - Move NATPT hook to just before check to see if the packet is
+	    for us.  Because NATPT need one more extra IPv4 address to
+	    translate IPv6 to IPv4 when this NATPT hook was put after this
+	    inspection.
+	  - Change indent to an 8 character tab.
+	* kame/sys/netinet6/natpt_dispatch.c 
+	  - Add IPv6 outbound packet counter.
+	  - Fix bug of comparison that size of packet exceeds mtu.
+	* kame/sys/netinet6/natpt_trans.c 
+	  - Fix a bug to clear UDP header when calculate UDP checksum.
+	* kame/sys/netinet6/natpt_{defs.h,dispatch.c,tslot.c}
+	  - Remove code evading a bug of SuMiRe NAT.
+	    SuMiRe NAT is obsolete.
+
 Thu Mar 15 20:39:03 JST 2001 sakane@ydc.co.jp
 	* racoon:
 	- fixed a phase 2 handler deletion.  racoon will delete a phase2
