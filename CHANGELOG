@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1487 2001/01/20 16:05:16 jinmei Exp $
+$KAME: CHANGELOG,v 1.1488 2001/01/20 16:06:35 jinmei Exp $
 
 <200101>
 2001-01-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -8,7 +8,7 @@ $KAME: CHANGELOG,v 1.1487 2001/01/20 16:05:16 jinmei Exp $
 	* bsdi4/sys/netinet/tcp_input.c (tcp_input):
 	made a local copy of the IPv6 header and called in6_clearscope()
 	(which was newly implemented with this change) to remove
-	(possibly) embedded scope identifier.
+	(possibly) embedded scope identifiers.
 	XXX: this change would reduce efficiency, but is necessary to
 	compute checksum correctly for a packet with scoped source or
 	destination addresses.
