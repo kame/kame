@@ -1,4 +1,4 @@
-/*	$KAME: token.l,v 1.24 2001/08/16 11:50:05 itojun Exp $	*/
+/*	$KAME: token.l,v 1.25 2001/08/16 13:20:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -52,20 +52,17 @@
 #include "y.tab.h"
 #endif
 
-#define DECHO \
-	if (f_debug) {printf("<%d>", yy_start); ECHO ; printf("\n"); }
-
 #define CMDARG \
-{ \
+do { \
 	char *__buf__ = strdup(yytext), *__p__; \
 	for (__p__ = __buf__; *__p__ != NULL; __p__++) \
 		if (*__p__ == '\n' || *__p__ == '\t') \
 			*__p__ = ' '; \
 	strlcat(cmdarg, __buf__, sizeof(cmdarg)); \
 	free(__buf__); \
-}
+} while (0)
 
-#define PREPROC	DECHO CMDARG
+#define PREPROC	CMDARG
 
 int lineno = 1;
 char cmdarg[8192]; /* XXX: BUFSIZ is the better ? */

@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.42 2001/08/16 10:32:01 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.43 2001/08/16 13:20:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -72,13 +72,13 @@ char *p_policy;
 static caddr_t pp_key;
 
 extern char cmdarg[8192];
-extern int f_debug;
 
 static struct addrinfo *parse_addr __P((char *, char *));
 static int setvarbuf __P((char *, int *, struct sadb_ext *, int, caddr_t, int));
 void parse_init __P((void));
 void free_buffer __P((void));
 
+int setkeymsg0 __P((struct sadb_msg *, unsigned int, unsigned int, size_t));
 extern int setkeymsg __P((char *, size_t *));
 extern int sendkeymsg __P((char *, size_t));
 
@@ -88,6 +88,7 @@ extern void yyerror __P((const char *));
 %}
 
 %union {
+	int s;
 	unsigned long num;
 	unsigned int intnum;
 	vchar_t val;
@@ -108,11 +109,12 @@ extern void yyerror __P((const char *));
 %token SPDADD SPDDELETE SPDDUMP SPDFLUSH
 %token F_POLICY PL_REQUESTS
 
+%type <s> command flush_command dump_command spdflush_command spddump_command
 %type <num> PREFIX EXTENSION MODE
 %type <num> UP_PROTO PR_ESP PR_AH PR_IPCOMP
 %type <num> ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP
 %type <num> DECSTRING
-%type <intnum> prefix port
+%type <intnum> prefix port protocol_spec
 %type <val> PORT ADDRESS PL_REQUESTS
 %type <val> key_string policy_requests
 %type <val> QUOTEDSTRING HEXSTRING STRING
@@ -126,9 +128,7 @@ commands
 			char buf[BUFSIZ];
 			size_t len;
 
-			if (f_debug)
-				printf("cmdarg:\n%s\n", cmdarg);
-			else {
+			if ($2 == 0) {
 				len = sizeof(buf);
 				if (setkeymsg(buf, &len) < 0) {
 					yyerror("insufficient buffer size");
@@ -143,22 +143,54 @@ commands
 
 command
 	:	add_command
+		{
+			$$ = 0;
+		}
 	|	get_command
+		{
+			$$ = 0;
+		}
 	|	delete_command
+		{
+			$$ = 0;
+		}
 	|	deleteall_command
+		{
+			$$ = 0;
+		}
 	|	flush_command
+		{
+			$$ = $1;
+		}
 	|	dump_command
+		{
+			$$ = $1;
+		}
 	|	spdadd_command
+		{
+			$$ = 0;
+		}
 	|	spddelete_command
+		{
+			$$ = 0;
+		}
 	|	spddump_command
+		{
+			$$ = $1;
+		}
 	|	spdflush_command
+		{
+			$$ = $1;
+		}
 	;
 	/* commands concerned with management, there is in tail of this file. */
 
 	/* add command */
 add_command
-	:	ADD { p_type = SADB_ADD; }
-		sa_selector_spec extension_spec algorithm_spec EOT
+	:	ADD sa_selector_spec extension_spec algorithm_spec EOT
+		{
+			p_type = SADB_ADD;
+		}
 	;
 
 	/* delete */
@@ -196,7 +228,10 @@ get_command
 flush_command
 	:	FLUSH protocol_spec EOT
 		{
-			p_type = SADB_FLUSH;
+			struct sadb_msg msg;
+			setkeymsg0(&msg, SADB_FLUSH, $2, sizeof(msg));
+			sendkeymsg((char *)&msg, sizeof(msg));
+			$$ = 1;
 		}
 	;
 
@@ -204,7 +239,10 @@ flush_command
 dump_command
 	:	DUMP protocol_spec EOT
 		{
-			p_type = SADB_DUMP;
+			struct sadb_msg msg;
+			setkeymsg0(&msg, SADB_DUMP, $2, sizeof(msg));
+			sendkeymsg((char *)&msg, sizeof(msg));
+			$$ = 1;
 		}
 	;
 
@@ -220,11 +258,11 @@ sa_selector_spec
 protocol_spec
 	:	/*NOTHING*/
 		{
-			p_satype = SADB_SATYPE_UNSPEC;
+			$$ = p_satype = SADB_SATYPE_UNSPEC;
 		}
 	|	PR_ESP
 		{
-			p_satype = SADB_SATYPE_ESP;
+			$$ = p_satype = SADB_SATYPE_ESP;
 			if ($1 == 1)
 				p_ext |= SADB_X_EXT_OLD;
 			else
@@ -232,7 +270,7 @@ protocol_spec
 		}
 	|	PR_AH
 		{
-			p_satype = SADB_SATYPE_AH;
+			$$ = p_satype = SADB_SATYPE_AH;
 			if ($1 == 1)
 				p_ext |= SADB_X_EXT_OLD;
 			else
@@ -240,7 +278,7 @@ protocol_spec
 		}
 	|	PR_IPCOMP
 		{
-			p_satype = SADB_X_SATYPE_IPCOMP;
+			$$ = p_satype = SADB_X_SATYPE_IPCOMP;
 		}
 	;
 	
@@ -425,39 +463,41 @@ extension
 	/* definition about command for SPD management */
 	/* spdadd */
 spdadd_command
-	:	SPDADD
+	:	SPDADD sp_selector_spec policy_spec EOT
 		{
 			p_type = SADB_X_SPDADD;
 			p_satype = SADB_SATYPE_UNSPEC;
 		}
-		sp_selector_spec policy_spec EOT
 	;
 
 spddelete_command:
-		SPDDELETE
+		SPDDELETE sp_selector_spec policy_spec EOT
 		{
 			p_type = SADB_X_SPDDELETE;
 			p_satype = SADB_SATYPE_UNSPEC;
 		}
-		sp_selector_spec policy_spec EOT
 	;
 
 spddump_command:
-		SPDDUMP
+		SPDDUMP EOT
 		{
-			p_type = SADB_X_SPDDUMP;
-			p_satype = SADB_SATYPE_UNSPEC;
+			struct sadb_msg msg;
+			setkeymsg0(&msg, SADB_X_SPDDUMP, SADB_SATYPE_UNSPEC,
+			    sizeof(msg));
+			sendkeymsg((char *)&msg, sizeof(msg));
+			$$ = 1;
 		}
-		EOT
 	;
 
 spdflush_command:
-		SPDFLUSH
+		SPDFLUSH EOT
 		{
-			p_type = SADB_X_SPDFLUSH;
-			p_satype = SADB_SATYPE_UNSPEC;
+			struct sadb_msg msg;
+			setkeymsg0(&msg, SADB_X_SPDFLUSH, SADB_SATYPE_UNSPEC,
+			    sizeof(msg));
+			sendkeymsg((char *)&msg, sizeof(msg));
+			$$ = 1;
 		}
-		EOT
 	;
 
 	/* sp_selector_spec */
@@ -601,23 +641,34 @@ policy_requests
 
 %%
 
+int
+setkeymsg0(msg, type, satype, l)
+	struct sadb_msg *msg;
+	unsigned int type;
+	unsigned int satype;
+	size_t l;
+{
+
+	msg->sadb_msg_version = PF_KEY_V2;
+	msg->sadb_msg_type = type;
+	msg->sadb_msg_errno = 0;
+	msg->sadb_msg_satype = satype;
+	msg->sadb_msg_reserved = 0;
+	msg->sadb_msg_seq = 0;
+	msg->sadb_msg_pid = getpid();
+	msg->sadb_msg_len = PFKEY_UNIT64(l);
+	return 0;
+}
+
 /* XXX NO BUFFER OVERRUN CHECK! BAD BAD! */
 int
 setkeymsg(buf, lenp)
 	char *buf;
 	size_t *lenp;
 {
-	struct sadb_msg *msg;
 	int l;
 
-	msg = (struct sadb_msg *)buf;
-	msg->sadb_msg_version = PF_KEY_V2;
-	msg->sadb_msg_type = p_type;
-	msg->sadb_msg_errno = 0;
-	msg->sadb_msg_satype = p_satype;
-	msg->sadb_msg_reserved = 0;
-	msg->sadb_msg_seq = 0;
-	msg->sadb_msg_pid = getpid();
+	setkeymsg0((struct sadb_msg *)buf, p_type, p_satype, 0);
 
 	l = sizeof(struct sadb_msg);
 

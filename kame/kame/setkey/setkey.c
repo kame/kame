@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.23 2001/08/16 10:40:07 itojun Exp $	*/
+/*	$KAME: setkey.c,v 1.24 2001/08/16 13:20:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -52,7 +52,7 @@
 
 #include "libpfkey.h"
 
-void Usage __P((void));
+void usage __P((void));
 int main __P((int, char **));
 int get_supported __P((void));
 void sendkeyshort __P((u_int));
@@ -74,7 +74,6 @@ int so;
 
 int f_forever = 0;
 int f_all = 0;
-int f_debug = 0;
 int f_verbose = 0;
 int f_mode = 0;
 int f_cmddump = 0;
@@ -90,12 +89,12 @@ extern int lineno;
 extern int parse __P((FILE **));
 
 void
-Usage()
+usage()
 {
-	printf("Usage:\t%s [-dv] -c\n", pname);
-	printf("\t%s [-dv] -f (file)\n", pname);
-	printf("\t%s [-Padlv] -D\n", pname);
-	printf("\t%s [-Pdv] -F\n", pname);
+	printf("usage:\t%s [-v] -c\n", pname);
+	printf("\t%s [-v] -f (file)\n", pname);
+	printf("\t%s [-Palv] -D\n", pname);
+	printf("\t%s [-Pv] -F\n", pname);
 	printf("\t%s [-h] -x\n", pname);
 	exit(1);
 }
@@ -110,7 +109,7 @@ main(ac, av)
 
 	pname = *av;
 
-	if (ac == 1) Usage();
+	if (ac == 1) usage();
 
 	thiszone = gmt2local(0);
 
@@ -149,14 +148,11 @@ main(ac, av)
 		case 'P':
 			f_policy = 1;
 			break;
-		case 'd':
-			f_debug = 1;
-			break;
 		case 'v':
 			f_verbose = 1;
 			break;
 		default:
-			Usage();
+			usage();
 			/*NOTREACHED*/
 		}
 	}
@@ -186,7 +182,7 @@ main(ac, av)
 		promisc();
 		/*NOTREACHED*/
 	default:
-		Usage();
+		usage();
 		/*NOTREACHED*/
 	}
 
@@ -196,10 +192,6 @@ main(ac, av)
 int
 get_supported()
 {
-
-	/* debug mode ? */
-	if (f_debug)
-		return 0;
 
 	if (pfkey_send_register(so, SADB_SATYPE_UNSPEC) < 0)
 		return -1;

@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.55 2001/08/16 09:16:05 itojun Exp $
+.\"	$KAME: setkey.8,v 1.56 2001/08/16 13:20:41 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -37,16 +37,16 @@
 .\"
 .Sh SYNOPSIS
 .Nm setkey
-.Op Fl dv
+.Op Fl v
 .Fl c
 .Nm setkey
-.Op Fl dv
+.Op Fl v
 .Fl f Ar filename
 .Nm setkey
-.Op Fl adPlv
+.Op Fl aPlv
 .Fl D
 .Nm setkey
-.Op Fl dPv
+.Op Fl Pv
 .Fl F
 .Nm setkey
 .Op Fl h
@@ -91,10 +91,6 @@ the dead SAD entries will be displayed as well.
 A dead SAD entry means that
 it has been expired but remains
 because it is referenced by SPD entries.
-.It Fl d
-Enable to print debugging messages for command parser,
-without talking to kernel.
-It is not used usually.
 .It Fl x
 Loop forever and dump all the messages transmitted to
 .Dv PF_KEY
