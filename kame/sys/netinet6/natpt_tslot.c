@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.57 2002/07/11 05:29:22 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.58 2002/07/29 07:02:24 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -108,6 +108,7 @@ static int	 natpt_hashSin6		__P((struct sockaddr_in6 *));
 static int	 natpt_hashPJW		__P((u_char *, int));
 
 static void	 natpt_expireFragment	__P((void *));
+static void	 natpt_appendTSlot	__P((struct tSlot *));
 static void	 natpt_expireTSlot	__P((void *));
 static void	 natpt_removeTSlotEntry	__P((struct tSlot *));
 
@@ -149,9 +150,6 @@ natpt_lookForHash4(struct pcv *cv)
 struct tSlot *
 natpt_internHash6(struct cSlot *acs, struct pcv *cv6)
 {
-	int		 s;
-	int		 hvl, hvr;
-	struct tslhash	*thl, *thr;
 	struct pAddr	*local, *remote;
 	struct tSlot	*ats;
 
@@ -187,23 +185,10 @@ natpt_internHash6(struct cSlot *acs, struct pcv *cv6)
 
 	ats->ip_p = cv6->ip_p;
 	ats->csl = acs;
+	ats->hvl = natpt_hashPad6(local);
+	ats->hvr = natpt_hashPad4(remote);
 
-	ats->hvl = hvl = natpt_hashPad6(local);
-	thl = &tslhashl[hvl];
-	ats->hvr = hvr = natpt_hashPad4(remote);
-	thr = &tslhashr[hvr];
-
-	s = splnet();
-	thl->curlen++;
-	thl->maxlen = max(thl->maxlen, thl->curlen);
-	thr->curlen++;
-	thr->maxlen = max(thr->maxlen, thr->curlen);
-
-	TAILQ_INSERT_TAIL(&tsl_head, ats, tsl_list);
-	TAILQ_INSERT_TAIL(&thl->tslhead, ats, tsl_hashl);
-	TAILQ_INSERT_TAIL(&thr->tslhead, ats, tsl_hashr);
-	splx(s);
-
+	natpt_appendTSlot(ats);
 	return (ats);
 }
 
@@ -211,9 +196,6 @@ natpt_internHash6(struct cSlot *acs, struct pcv *cv6)
 struct tSlot *
 natpt_internHash4(struct cSlot *acs, struct pcv *cv4)
 {
-	int		 s;
-	int		 hvl, hvr;
-	struct tslhash	*thl, *thr;
 	struct pAddr	*local, *remote;
 	struct tSlot	*ats;
 
@@ -286,30 +268,15 @@ natpt_internHash4(struct cSlot *acs, struct pcv *cv4)
 	ats->ip_p = cv4->ip_p;
 	ats->csl = acs;
 
-	ats->hvl = hvl = natpt_hashPad4(local);
-	thl = &tslhashl[hvl];
+	ats->hvl = natpt_hashPad4(local);
 #ifdef NATPT_NAT
 	if (remote->sa_family == AF_INET)
-		hvr = natpt_hashPad4(remote);
+		ats->hvr = natpt_hashPad4(remote);
 	else
 #endif
-		hvr = natpt_hashPad6(remote);
-	ats->hvr = hvr;
-	thr = &tslhashr[hvr];
+		ats->hvr = natpt_hashPad6(remote);
 
-	s = splnet();
-	thl->curlen++;
-	thl->maxlen = max(thl->maxlen, thl->curlen);
-	thr->curlen++;
-	thr->maxlen = max(thr->maxlen, thr->curlen);
-
-	TAILQ_INSERT_TAIL(&tsl_head, ats, tsl_list);
-	TAILQ_INSERT_TAIL(&thl->tslhead, ats, tsl_hashl);
-	TAILQ_INSERT_TAIL(&thr->tslhead, ats, tsl_hashr);
-	splx(s);
-
-	natpt_logAccess(LOG_INFO, ats);
-
+	natpt_appendTSlot(ats);
 	return (ats);
 }
 
@@ -317,9 +284,6 @@ natpt_internHash4(struct cSlot *acs, struct pcv *cv4)
 struct tSlot *
 natpt_openIncomingV4Conn(int proto, struct pAddr *local, struct pAddr *remote)
 {
-	int		 s;
-	int		 hvl, hvr;
-	struct tslhash	*thl, *thr;
 	struct tSlot	*ats;
 	struct tcpstate	*ts;
 
@@ -344,28 +308,16 @@ natpt_openIncomingV4Conn(int proto, struct pAddr *local, struct pAddr *remote)
 	ats->suit.tcps = ts;
 
 	if (local->sa_family == AF_INET)
-		hvl = natpt_hashPad4(local);
+		ats->hvl = natpt_hashPad4(local);
 	else
-		hvl = natpt_hashPad6(local);
-	thl = &tslhashl[hvl];
+		ats->hvl = natpt_hashPad6(local);
 
 	if (remote->sa_family == AF_INET)
-		hvr = natpt_hashPad4(remote);
+		ats->hvr = natpt_hashPad4(remote);
 	else
-		hvr = natpt_hashPad6(remote);
-	thr = &tslhashr[hvr];
+		ats->hvr = natpt_hashPad6(remote);
 
-	s = splnet();
-	thl->curlen++;
-	thl->maxlen = max(thl->maxlen, thl->curlen);
-	thr->curlen++;
-	thr->maxlen = max(thr->maxlen, thr->curlen);
-
-	TAILQ_INSERT_TAIL(&tsl_head, ats, tsl_list);
-	TAILQ_INSERT_TAIL(&thl->tslhead, ats, tsl_hashl);
-	TAILQ_INSERT_TAIL(&thr->tslhead, ats, tsl_hashr);
-	splx(s);
-
+	natpt_appendTSlot(ats);
 	return (ats);
 }
 
@@ -947,6 +899,30 @@ natpt_hashPJW(u_char *s, int len)
 /*
  *
  */
+
+static void
+natpt_appendTSlot(struct tSlot *ats)
+{
+	int	s;
+	struct tslhash	*thl, *thr;
+
+	thl = &tslhashl[ats->hvl];
+	thr = &tslhashr[ats->hvr];
+
+	s = splnet();
+	thl->curlen++;
+	thl->maxlen = max(thl->maxlen, thl->curlen);
+	thr->curlen++;
+	thr->maxlen = max(thr->maxlen, thr->curlen);
+
+	TAILQ_INSERT_TAIL(&tsl_head, ats, tsl_list);
+	TAILQ_INSERT_TAIL(&thl->tslhead, ats, tsl_hashl);
+	TAILQ_INSERT_TAIL(&thr->tslhead, ats, tsl_hashr);
+	splx(s);
+
+	natpt_logAccess(LOG_INFO, ats);
+}
+
 
 static void
 natpt_expireTSlot(void *ignored_arg)
