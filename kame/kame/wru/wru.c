@@ -1,4 +1,4 @@
- /*	$KAME: wru.c,v 1.2 2002/01/21 07:33:23 jinmei Exp $	*/
+ /*	$KAME: wru.c,v 1.3 2002/01/21 07:57:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -36,6 +36,9 @@
 #include <sys/sysctl.h>
 
 #include <net/if.h>
+#ifdef __FreeBSD__
+#include <net/if_var.h>
+#endif
 #include <net/if_dl.h>
 #include <net/route.h>
 
@@ -683,7 +686,10 @@ set_zone(dst)
 			continue;
 
 		defif = ((struct sockaddr_dl *)sa)->sdl_index;
+		goto setzone;
 	}
+	warnx("can't find the default interface");
+	return(0);		/* exit? */
 
   setzone:
 	if (if_indextoname(defif, ifname) == NULL)
