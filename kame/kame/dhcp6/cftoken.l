@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.29 2004/03/21 14:40:51 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.30 2004/06/08 07:27:59 jinmei Exp $	*/
 
 %{
 /*
@@ -86,7 +86,7 @@ ws		[ \t]+
 comma		,
 comment		\#.*
 semi		\;
-quotedstring	\".*\"
+quotedstring	\"[^\"]*\"
 string		[a-zA-Z0-9:\._][a-zA-Z0-9:\._]*
 digit		[0-9]
 integer 	{digit}+
@@ -106,6 +106,8 @@ ecl		\}
 %s S_HOST
 %s S_DUID
 %s S_IA
+%s S_AUTH
+%s S_KEY
 
 %%
 %{
@@ -187,6 +189,56 @@ ecl		\}
 	/* duration */
 <S_CNF>infinity { DECHO; return (INFINITY); }
 
+	/* authentication information */
+<S_CNF>authinfo { DECHO; BEGIN S_AUTH; return (AUTHINFO); }
+<S_AUTH>{string} {
+	DECHO;
+	yylval.str = strdup(yytext);
+	BEGIN S_CNF;
+	return (AUTHNAME);
+}
+
+	/* authentication parameters */
+<S_CNF>protocol { DECHO; return (PROTOCOL); };
+<S_CNF>algorithm { DECHO; return (ALGORITHM); };
+<S_CNF>rdm { DECHO; return (RDM); };
+<S_CNF>key { DECHO; return (KEY); };
+
+	/* authentication protocols */
+<S_CNF>delayed { DECHO; return (DELAYED); };
+<S_CNF>reconfig { DECHO; return (RECONFIG); };
+
+	/* authentication algorithms */
+<S_CNF>hmac-md5 { DECHO; return (HMACMD5); };
+<S_CNF>HMAC-MD5 { DECHO; return (HMACMD5); };
+<S_CNF>hmacmd5 { DECHO; return (HMACMD5); };
+<S_CNF>HMACMD5 { DECHO; return (HMACMD5); };
+
+	/* authentication RDM */
+<S_CNF>monocounter { DECHO; return (MONOCOUNTER); };
+
+	/* secret keys */
+<S_CNF>keyinfo { DECHO; BEGIN S_KEY; return (KEYINFO); }
+<S_KEY>{string} {
+	DECHO;
+	yylval.str = strdup(yytext);
+	BEGIN S_CNF;
+	return (KEYNAME);
+}
+
+	/* key parameters */
+<S_CNF>realm { DECHO; return (REALM); }
+<S_CNF>keyid { DECHO; return (KEYID); }
+<S_CNF>secret { DECHO; return (SECRET); }
+<S_CNF>expire { DECHO; return (EXPIRE); }
+
+	/* quoted string */
+{quotedstring} {
+		DECHO;
+		yylval.str = strdup(yytext);
+		return (QSTRING);
+	}
+
 	/* misc */
 {ws}		{ ; }
 {nl}		{ lineno++; }
@@ -203,12 +255,6 @@ ecl		\}
 {ecl} { DP("end of closure"); return (ECL); }
 
 	/* generic string */
-{quotedstring} {
-		DECHO;
-		yylval.str = strdup(yytext);
-		return (QSTRING);
-	}
-
 {string} {
 		DECHO;
 		yylval.str = strdup(yytext);

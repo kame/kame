@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.1 2003/10/31 05:51:46 suz Exp $	*/
+/*	$KAME: if.c,v 1.2 2004/06/08 07:27:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -92,6 +92,10 @@ ifinit(ifname)
 
 	TAILQ_INIT(&ifp->reqopt_list);
 	TAILQ_INIT(&ifp->iaconf_list);
+
+	ifp->authproto = DHCP6_AUTHPROTO_UNDEF;
+	ifp->authalgorithm = DHCP6_AUTHALG_UNDEF;
+	ifp->authrdm = DHCP6_AUTHRDM_UNDEF;
 
 	ifp->next = dhcp6_if;
 	dhcp6_if = ifp;

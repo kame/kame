@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.27 2004/05/14 02:29:23 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.28 2004/06/08 07:27:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -82,6 +82,7 @@ extern void yyerror __P((char *, ...))
 	} while (0)
 
 static struct cf_namelist *iflist_head, *hostlist_head, *iapdlist_head;
+static struct cf_namelist *authinfolist_head, *keylist_head;
 struct cf_list *cf_dns_list, *cf_dns_name_list, *cf_ntp_list;
 struct cf_list *cf_sip_list, *cf_sip_name_list;
 long long cf_lifetime = -1;
@@ -101,6 +102,9 @@ static void cleanup_cflist __P((struct cf_list *));
 %token SIP_SERVERS SIP_NAME
 %token INFO_ONLY
 %token SCRIPT
+%token AUTHINFO PROTOCOL ALGORITHM DELAYED RECONFIG HMACMD5 MONOCOUNTER
+%token AUTHNAME RDM KEY
+%token KEYINFO REALM KEYID SECRET KEYNAME EXPIRE
 
 %token NUMBER SLASH EOS BCL ECL STRING QSTRING PREFIX INFINITY
 %token COMMA
@@ -112,11 +116,13 @@ static void cleanup_cflist __P((struct cf_list *));
 	struct dhcp6_prefix *prefix;
 }
 
-%type <str> IFNAME HOSTNAME DUID_ID STRING QSTRING IAID
-%type <num> NUMBER duration
+%type <str> IFNAME HOSTNAME AUTHNAME KEYNAME DUID_ID STRING QSTRING IAID
+%type <num> NUMBER duration authproto authalg authrdm
 %type <list> declaration declarations dhcpoption ifparam ifparams
 %type <list> address_list address_list_ent dhcpoption_list
 %type <list> iaconf_list iaconf prefix_interface
+%type <list> authparam_list authparam
+%type <list> keyparam_list keyparam
 %type <prefix> prefixparam
 
 %%
@@ -130,6 +136,8 @@ statement:
 	|	host_statement
 	|	option_statement
 	|	ia_statement
+	|	authinfo_statement
+	|	key_statement
 	;
 
 interface_statement:
@@ -259,6 +267,30 @@ ia_statement:
 		}
 	;
 
+authinfo_statement:
+	AUTHINFO AUTHNAME BCL authparam_list ECL EOS
+	{
+		struct cf_namelist *authinfo;
+
+		MAKE_NAMELIST(authinfo, $2, $4);
+
+		if (add_namelist(authinfo, &authinfolist_head))
+			return (-1);
+	}
+	;
+
+key_statement:
+	KEYINFO KEYNAME BCL keyparam_list ECL EOS
+	{
+		struct cf_namelist *key;
+
+		MAKE_NAMELIST(key, $2, $4);
+
+		if (add_namelist(key, &keylist_head))
+			return (-1);
+	}
+	;
+
 address_list:
 		{ $$ = NULL; }
 	|	address_list address_list_ent
@@ -271,7 +303,7 @@ address_list:
 				head = $2;
 			} else {
 				head->tail->next = $2;
-				head->tail = $2;
+				head->tail = $2->tail;
 			}
 
 			$$ = head;
@@ -312,7 +344,7 @@ declarations:
 				head = $2;
 			} else {
 				head->tail->next = $2;
-				head->tail = $2;
+				head->tail = $2->tail;
 			}
 
 			$$ = head;
@@ -407,6 +439,14 @@ dhcpoption:
 
 			MAKE_CFLIST(l, DHCPOPT_RAPID_COMMIT, NULL, NULL);
 			/* no value */
+			$$ = l;
+		}
+	|	AUTHINFO AUTHNAME
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, DHCPOPT_AUTHINFO, NULL, NULL);
+			l->ptr = $2;
 			$$ = l;
 		}
 	|	IA_PD NUMBER
@@ -525,7 +565,6 @@ prefixparam:
 
 			$$ = pconf;
 		}
-	
 
 duration:
 		INFINITY
@@ -550,7 +589,7 @@ iaconf_list:
 				head = $2;
 			} else {
 				head->tail->next = $2;
-				head->tail = $2;
+				head->tail = $2->tail;
 			}
 
 			$$ = head;
@@ -591,7 +630,7 @@ ifparams:
 				head = $2;
 			} else {
 				head->tail->next = $2;
-				head->tail = $2;
+				head->tail = $2->tail;
 			}
 
 			$$ = head;
@@ -613,6 +652,127 @@ ifparam:
 
 			MAKE_CFLIST(l, IFPARAM_SLA_LEN, NULL, NULL);
 			l->num = $2;
+			$$ = l;
+		}
+	;
+
+authparam_list:
+		{ $$ = NULL; }
+	|	authparam_list authparam
+		{
+			struct cf_list *head;
+
+			if ((head = $1) == NULL) {
+				$2->next = NULL;
+				$2->tail = $2;
+				head = $2;
+			} else {
+				head->tail->next = $2;
+				head->tail = $2->tail;
+			}
+
+			$$ = head;
+		}
+	;
+
+authparam:
+		PROTOCOL authproto EOS
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, AUTHPARAM_PROTO, NULL, NULL);
+			l->num = $2;
+			$$ = l;
+		}
+	|	ALGORITHM authalg EOS
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, AUTHPARAM_ALG, NULL, NULL);
+			l->num = $2;
+			$$ = l;
+		}
+	|	RDM authrdm EOS
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, AUTHPARAM_RDM, NULL, NULL);
+			l->num = $2;
+			$$ = l;
+		}
+	|	KEY STRING EOS
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, AUTHPARAM_KEY, NULL, NULL);
+			l->ptr = $2;
+			$$ = l;
+		}
+	;
+
+authproto:
+		DELAYED { $$ = DHCP6_AUTHPROTO_DELAYED; }
+	|	RECONFIG { $$ = DHCP6_AUTHPROTO_RECONFIG; }
+	;
+
+authalg:
+	HMACMD5 { $$ = DHCP6_AUTHALG_HMACMD5; }
+	;
+
+authrdm:
+	MONOCOUNTER { $$ = DHCP6_AUTHRDM_MONOCOUNTER; }
+	;
+
+keyparam_list:
+		{ $$ = NULL; }
+	|	keyparam_list keyparam
+		{
+			struct cf_list *head;
+
+			if ((head = $1) == NULL) {
+				$2->next = NULL;
+				$2->tail = $2;
+				head = $2;
+			} else {
+				head->tail->next = $2;
+				head->tail = $2->tail;
+			}
+
+			$$ = head;
+		}
+	;
+
+keyparam:
+		REALM QSTRING EOS
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, KEYPARAM_REALM, NULL, NULL);
+			l->ptr = $2;
+			$$ = l;
+		}
+	|	KEYID NUMBER EOS
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, KEYPARAM_KEYID, NULL, NULL);
+			l->num = $2;
+			$$ = l;
+		}
+	|	SECRET QSTRING EOS
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, KEYPARAM_SECRET, NULL, NULL);
+			l->ptr = $2;
+			$$ = l;
+		}
+	|	EXPIRE QSTRING EOS
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, KEYPARAM_EXPIRE, NULL, NULL);
+			l->ptr = $2;
 			$$ = l;
 		}
 	;
@@ -648,6 +808,8 @@ cleanup()
 	cleanup_namelist(iflist_head);
 	cleanup_namelist(hostlist_head);
 	cleanup_namelist(iapdlist_head);
+	cleanup_namelist(authinfolist_head);
+	cleanup_namelist(keylist_head);
 
 	cleanup_cflist(cf_sip_list);
 	cleanup_cflist(cf_sip_name_list);
@@ -695,6 +857,12 @@ cleanup_cflist(p)
 int
 cf_post_config()
 {
+	if (configure_keys(keylist_head))
+		config_fail();
+
+	if (configure_authinfo(authinfolist_head))
+		config_fail();
+
 	if (configure_ia(iapdlist_head, IATYPE_PD))
 		config_fail();
 

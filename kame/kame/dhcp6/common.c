@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.103 2004/05/13 14:44:43 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.104 2004/06/08 07:27:59 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -852,6 +852,10 @@ dhcp6_init_options(optinfo)
 	TAILQ_INIT(&optinfo->dnsname_list);
 	TAILQ_INIT(&optinfo->ntp_list);
 	TAILQ_INIT(&optinfo->prefix_list);
+
+	optinfo->authproto = DHCP6_AUTHPROTO_UNDEF;
+	optinfo->authalgorithm = DHCP6_AUTHALG_UNDEF;
+	optinfo->authrdm = DHCP6_AUTHRDM_UNDEF;
 }
 
 void
@@ -872,11 +876,17 @@ dhcp6_clear_options(optinfo)
 	dhcp6_clear_list(&optinfo->ntp_list);
 	dhcp6_clear_list(&optinfo->prefix_list);
 
-	if (optinfo->relaymsg_msg)
+	if (optinfo->relaymsg_msg != NULL)
 		free(optinfo->relaymsg_msg);
 
-	if (optinfo->ifidopt_id)
+	if (optinfo->ifidopt_id != NULL)
 		free(optinfo->ifidopt_id);
+
+	if (optinfo->authopt_keyval != NULL)
+		free(optinfo->authopt_keyval);
+
+	if (optinfo->authopt_realmval != NULL)
+		free(optinfo->authopt_realmval);
 
 	dhcp6_init_options(optinfo);
 }
@@ -909,9 +919,11 @@ dhcp6_copy_options(dst, src)
 		goto fail;
 	if (dhcp6_copy_list(&dst->prefix_list, &src->prefix_list))
 		goto fail;
+	dst->elapsed_time = src->elapsed_time;
+	dst->lifetime = src->lifetime;
 	dst->pref = src->pref;
 
-	if (src->relaymsg_msg) {
+	if (src->relaymsg_msg != NULL) {
 		if ((dst->relaymsg_msg = malloc(src->relaymsg_len)) == NULL)
 			goto fail;
 		dst->relaymsg_len = src->relaymsg_len;
@@ -919,11 +931,36 @@ dhcp6_copy_options(dst, src)
 		    src->relaymsg_len);
 	}
 
-	if (src->ifidopt_id) {
+	if (src->ifidopt_id != NULL) {
 		if ((dst->ifidopt_id = malloc(src->ifidopt_len)) == NULL)
 			goto fail;
 		dst->ifidopt_len = src->ifidopt_len;
 		memcpy(dst->ifidopt_id, src->ifidopt_id, src->ifidopt_len);
+	}
+
+	dst->authflags = src->authflags;
+	dst->authproto = src->authproto;
+	dst->authalgorithm = src->authalgorithm;
+	dst->authrdm = src->authrdm;
+	dst->authrd = src->authrd;
+	dst->authkeyid = src->authkeyid;
+	if (src->authopt_keyval != NULL) {
+		if ((dst->authopt_keyval = malloc(src->authopt_keylen))
+		    == NULL) {
+			goto fail;
+		}
+		dst->authopt_keylen = src->authopt_keylen;
+		memcpy(dst->authopt_keyval, src->authopt_keyval,
+		    src->authopt_keylen);
+	}
+	if (src->authopt_realmval != NULL) {
+		if ((dst->authopt_realmval = malloc(src->authopt_realmlen))
+		    == NULL) {
+			goto fail;
+		}
+		dst->authopt_realmval = src->authopt_realmval;
+		memcpy(dst->authopt_realmval, src->authopt_realmval,
+		    src->authopt_realmlen);
 	}
 
 	return (0);
@@ -1880,6 +1917,81 @@ dhcp6_set_options(bp, ep, optinfo)
 
 		p32 = htonl(p32);
 		COPY_OPTION(DH6OPT_LIFETIME, sizeof(p32), &p32, p);
+	}
+
+	/*
+	 * Add authentication information, if necessary.  This must be done
+	 * after adding all other options since we may have to calculate
+	 * authentication code over the entire message including the options.
+	 */
+	if (optinfo->authproto != DHCP6_AUTHPROTO_UNDEF) {
+		struct dhcp6opt_auth *auth;
+		int authlen;
+		char *authinfo;
+
+		authlen = sizeof(*auth);
+		if (!(optinfo->authflags & DHCP6OPT_AUTHFLAG_NOINFO)) {
+			switch (optinfo->authproto) {
+			case DHCP6_AUTHPROTO_DELAYED:
+				/* Realm + key ID + HMAC-MD5 */
+				authlen += optinfo->authopt_realmlen +
+				    sizeof(optinfo->authkeyid) + 16;
+				break;
+#ifdef notyet
+			case DHCP6_AUTHPROTO_RECONFIG:
+				/* type + key-or-HAMC */
+				authlen += 17;
+				break;
+#endif
+			default:
+				dprintf(LOG_ERR, FNAME,
+				    "unexpected authentication protocol");
+				goto fail;
+			}
+		}
+		if ((auth = malloc(authlen)) == NULL) {
+			dprintf(LOG_WARNING, FNAME, "failed to allocate "
+			    "memory for authentication information");
+			goto fail;
+		}
+
+		memset(auth, 0, authlen);
+		/* COPY_OPTION will take care of type and len later */
+		auth->dh6_auth_proto = (u_int8_t)optinfo->authproto;
+		auth->dh6_auth_alg = (u_int8_t)optinfo->authalgorithm;
+		auth->dh6_auth_rdm = (u_int8_t)optinfo->authrdm;
+		memcpy(auth->dh6_auth_rdinfo, &optinfo->authrd,
+		    sizeof(auth->dh6_auth_rdinfo));
+
+		if (!(optinfo->authflags & DHCP6OPT_AUTHFLAG_NOINFO)) {
+			switch (optinfo->authproto) {
+			case DHCP6_AUTHPROTO_DELAYED:
+				authinfo = (char *)(auth + 1);
+
+				/* copy realm */
+				memcpy(authinfo, optinfo->authopt_realmval,
+				    optinfo->authopt_realmlen);
+				authinfo += optinfo->authopt_realmlen;
+
+				/* copy key ID (need memcpy for alignment) */
+				memcpy(authinfo, &optinfo->authkey,
+				    sizeof(optinfo->authkey));
+				break;
+
+				/* calculate HMAC (not yet) */
+
+#ifdef notyet
+			case DHCP6_AUTHPROTO_RECONFIG:
+#endif
+			default:
+				dprintf(LOG_ERR, FNAME,
+				    "unexpected authentication protocol");
+				goto fail;
+			}
+		}
+
+		COPY_OPTION(DH6OPT_AUTH, authlen - 4,
+		    &auth->dh6_auth_proto, p);
 	}
 
 	return (len);

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.133 2004/05/22 04:50:15 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.134 2004/06/08 07:27:59 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -990,6 +990,15 @@ client6_send(ev)
 			    evd->type);
 			exit(1);
 		}
+	}
+
+	/* authentication information */
+	if (ev->state == DHCP6S_SOLICIT &&
+	    ifp->authproto != DHCP6_AUTHPROTO_UNDEF) {
+		optinfo.authflags = DHCP6OPT_AUTHFLAG_NOINFO;
+		optinfo.authproto = ifp->authproto;
+		optinfo.authalgorithm = ifp->authalgorithm;
+		optinfo.authrdm = ifp->authrdm;
 	}
 
 	/* set options in the message */

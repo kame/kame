@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.28 2004/03/21 14:40:51 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.29 2004/06/08 07:27:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -62,6 +62,12 @@ struct dhcp6_if {
 
 	struct dhcp6_list reqopt_list;
 	struct ia_conflist iaconf_list;
+
+	/* authentication information */
+	int authproto;		/* protocol */
+	/* the followings are valid only if authproto is not UNDEF */
+	int authalgorithm;	/* algorithm */
+	int authrdm;		/* replay attack detection method */
 };
 
 struct dhcp6_event {
@@ -170,6 +176,33 @@ struct host_conf {
 	struct dhcp6_list prefix_binding_list;
 };
 
+/* DHCPv6 authentication information */
+struct authinfo {
+	struct authinfo *next;
+
+	char *name;		/* auth info name */
+
+	int protocol;		/* authentication protocol */
+	int algorithm;		/* authentication algorithm */
+	int rdm;		/* random attack detection method */
+
+	/* keys specific to this info? */
+};
+
+/* secret key information */
+struct keyinfo {
+	struct keyinfo *next;
+
+	char *name;		/* key name */
+
+	char *realm;		/* DHCP realm */
+	size_t realmlen;	/* length of realm */
+	u_int32_t keyid;	/* key ID */
+	char *secret;		/* binary key */
+	size_t secretlen;	/* length of the key */
+	u_int32_t expire;	/* expiration time (0 means forever) */
+};
+
 /* structures and definitions used in the config file parser */
 struct cf_namelist {
 	struct cf_namelist *next;
@@ -190,15 +223,18 @@ struct cf_list {
 	void *ptr;
 };
 
-enum {DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY, DECL_REQUEST, DECL_DUID,
-      DECL_PREFIX, DECL_PREFERENCE, DECL_SCRIPT,
-      IFPARAM_SLA_ID, IFPARAM_SLA_LEN,
-      DHCPOPT_RAPID_COMMIT, DHCPOPT_DNS, DHCPOPT_DNSNAME,
-      DHCPOPT_IA_PD, DHCPOPT_NTP,
-      DHCPOPT_LIFETIME,
-      CFLISTENT_GENERIC,
-      IACONF_PIF, IACONF_PREFIX,
-      DHCPOPT_SIP, DHCPOPT_SIPNAME };
+enum { DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY, DECL_REQUEST, DECL_DUID,
+       DECL_PREFIX, DECL_PREFERENCE, DECL_SCRIPT,
+       IFPARAM_SLA_ID, IFPARAM_SLA_LEN,
+       DHCPOPT_RAPID_COMMIT, DHCPOPT_AUTHINFO,
+       DHCPOPT_DNS, DHCPOPT_DNSNAME,
+       DHCPOPT_IA_PD, DHCPOPT_NTP,
+       DHCPOPT_LIFETIME,
+       CFLISTENT_GENERIC,
+       IACONF_PIF, IACONF_PREFIX,
+       DHCPOPT_SIP, DHCPOPT_SIPNAME,
+       AUTHPARAM_PROTO, AUTHPARAM_ALG, AUTHPARAM_RDM, AUTHPARAM_KEY,
+       KEYPARAM_REALM, KEYPARAM_KEYID, KEYPARAM_SECRET, KEYPARAM_EXPIRE };
 
 typedef enum {DHCP6_MODE_SERVER, DHCP6_MODE_CLIENT, DHCP6_MODE_RELAY }
 dhcp6_mode_t;
@@ -218,6 +254,8 @@ extern long long optlifetime;
 extern void ifinit __P((char *));
 extern int configure_interface __P((struct cf_namelist *));
 extern int configure_host __P((struct cf_namelist *));
+extern int configure_keys __P((struct cf_namelist *));
+extern int configure_authinfo __P((struct cf_namelist *));
 extern int configure_ia __P((struct cf_namelist *, iatype_t));
 extern int configure_global_option __P((void));
 extern void configure_cleanup __P((void));
@@ -227,6 +265,7 @@ extern struct dhcp6_if *find_ifconfbyname __P((char *));
 extern struct dhcp6_if *find_ifconfbyid __P((unsigned int));
 extern struct prefix_ifconf *find_prefixifconf __P((char *));
 extern struct host_conf *find_hostconf __P((struct duid *));
+extern struct authinfo *find_authinfo __P((struct authinfo *, char *));
 extern struct dhcp6_prefix *find_prefix6 __P((struct dhcp6_list *,
 					      struct dhcp6_prefix *));
 extern struct ia_conf *find_iaconf __P((struct ia_conflist *, int, u_int32_t));

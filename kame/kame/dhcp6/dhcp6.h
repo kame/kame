@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.47 2004/03/21 14:40:51 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.48 2004/06/08 07:27:59 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -164,6 +164,22 @@ struct dhcp6_optinfo {
 	struct dhcp6_vbuf ifidopt; /* Interface-id */
 #define ifidopt_len ifidopt.dv_len
 #define ifidopt_id ifidopt.dv_buf
+
+	u_int authflags;
+#define DHCP6OPT_AUTHFLAG_NOINFO	0x1
+#define DHCP6OPT_AUTHFLAG_INVALID	0x2
+	int authproto;
+	int authalgorithm;
+	int authrdm;
+	/* the followings are effective only when NOINFO is unset */
+	u_int64_t authrd;
+	u_int32_t authkeyid;
+	struct dhcp6_vbuf authkey;
+#define authopt_keylen authkey.dv_len
+#define authopt_keyval authkey.dv_buf
+	struct dhcp6_vbuf authrealm;
+#define authopt_realmlen authrealm.dv_len
+#define authopt_realmval authrealm.dv_buf
 };
 
 /* DHCP6 base packet format */
@@ -202,6 +218,9 @@ struct dhcp6_relay {
 #define DH6OPT_RELAY_MSG 9
 /* #define DH6OPT_SERVER_MSG 10: deprecated */
 #define DH6OPT_AUTH 11
+#  define DH6OPT_AUTH_PROTO_DELAYED 2
+#  define DH6OPT_AUTH_RRECONFIGURE 3
+#  define DH6OPT_AUTH_ALG_HMACMD5 1
 #define DH6OPT_UNICAST 12
 #define DH6OPT_STATUS_CODE 13
 #  define DH6OPT_STCODE_SUCCESS 0
@@ -310,5 +329,21 @@ struct dhcp6opt_ia_pd_prefix {
 	u_int8_t dh6_iapd_prefix_prefix_len;
 	struct in6_addr dh6_iapd_prefix_prefix_addr;
 } __attribute__ ((__packed__));
+
+/* Authentication */
+struct dhcp6opt_auth {
+	u_int16_t dh6_auth_type;
+	u_int16_t dh6_auth_len;
+	u_int8_t dh6_auth_proto;
+	u_int8_t dh6_auth_alg;
+	u_int8_t dh6_auth_rdm;
+	u_int8_t dh6_auth_rdinfo[8];
+	/* authentication information follows */
+} __attribute__ ((__packed__));
+
+enum { DHCP6_AUTHPROTO_UNDEF = -1, DHCP6_AUTHPROTO_DELAYED = 2,
+       DHCP6_AUTHPROTO_RECONFIG = 3 };
+enum { DHCP6_AUTHALG_UNDEF = -1, DHCP6_AUTHALG_HMACMD5 = 1 };
+enum { DHCP6_AUTHRDM_UNDEF = -1, DHCP6_AUTHRDM_MONOCOUNTER = 0 };
 
 #endif /*__DHCP6_H_DEFINED*/

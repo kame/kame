@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.39 2004/05/13 13:58:58 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.40 2004/06/08 07:27:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -56,6 +56,8 @@ long long optlifetime = -1;
 static struct dhcp6_ifconf *dhcp6_ifconflist;
 struct ia_conflist ia_conflist0;
 static struct host_conf *host_conflist0, *host_conflist;
+static struct keyinfo *key_list, *key_list0;
+static struct authinfo *auth_list, *auth_list0;
 static struct dhcp6_list siplist0, sipnamelist0, dnslist0, dnsnamelist0, ntplist0;
 static long long optlifetime0;
 
@@ -77,12 +79,17 @@ struct dhcp6_ifconf {
 
 	struct dhcp6_list reqopt_list;
 	struct ia_conflist iaconf_list;
+
+	struct authinfo *authinfo; /* authentication information
+				    * (no need to clear) */
 };
 
 extern struct cf_list *cf_dns_list, *cf_dns_name_list, *cf_ntp_list;
 extern struct cf_list *cf_sip_list, *cf_sip_name_list;
 extern long long cf_lifetime;
 extern char *configfilename;
+
+extern int base64_decodestring __P((const char *, char *, size_t));
 
 static int add_pd_pif __P((struct iapd_conf *, struct cf_list *));
 static int add_options __P((int, struct dhcp6_ifconf *, struct cf_list *));
@@ -92,8 +99,11 @@ static void clear_pd_pif __P((struct iapd_conf *));
 static void clear_ifconf __P((struct dhcp6_ifconf *));
 static void clear_iaconf __P((struct ia_conflist *));
 static void clear_hostconf __P((struct host_conf *));
+static void clear_keys __P((struct keyinfo *));
+static void clear_authinfo __P((struct authinfo *));
 static int configure_duid __P((char *, struct duid *));
 static int get_default_ifid __P((struct prefix_ifconf *));
+static char *qstrdup __P((char *));
 
 int
 configure_interface(iflist)
@@ -471,6 +481,282 @@ configure_host(hostlist)
 }
 
 int
+configure_keys(keylist)
+	struct cf_namelist *keylist;
+{
+	struct cf_namelist *key;
+	char *secretstr;
+	size_t secretstrlen;
+	char secret[1024];
+	int secretlen;
+	struct keyinfo *kinfo;
+	long long keyid;
+	char *expire;
+
+	for (key = keylist; key; key = key->next) {
+		struct cf_list *cfl;
+
+		if ((kinfo = malloc(sizeof(*kinfo))) == NULL) {
+			dprintf(LOG_ERR, FNAME, "memory allocation failed "
+				"for key %s", key->name);
+			goto bad;
+		}
+		memset(kinfo, 0, sizeof(*kinfo));
+		kinfo->next = key_list0;
+		key_list0 = kinfo;
+
+		if ((kinfo->name = strdup(key->name)) == NULL) {
+			dprintf(LOG_ERR, FNAME, "failed to copy key name: %s",
+			    key->name);
+			goto bad;
+		}
+
+		keyid = -1;
+		expire = NULL;
+		for (cfl = key->params; cfl; cfl = cfl->next) {
+			switch (cfl->type) {
+			case KEYPARAM_REALM:
+				if (kinfo->realm != NULL) {
+					dprintf(LOG_WARNING, FNAME,
+					    "%s:%d duplicate realm for key %s "
+					    "(ignored)", configfilename,
+					    cfl->line, key->name);
+					continue;
+				}
+				kinfo->realm = qstrdup(cfl->ptr);
+				if (kinfo->realm == NULL) {
+					dprintf(LOG_WARNING, FNAME,
+					    "failed to allocate memory for "
+					    "realm");
+					goto bad;
+				}
+				kinfo->realmlen = strlen(kinfo->realm);
+				break;
+			case KEYPARAM_KEYID:
+				if (keyid != -1) {
+					dprintf(LOG_WARNING, FNAME,
+					    "%s:%d duplicate realm for key %s "
+					    "(ignored)",
+					    configfilename, cfl->line);
+					continue;
+				}
+				keyid = cfl->num;
+				if (keyid < 0 || keyid > 0xffffffff) {
+					dprintf(LOG_WARNING, FNAME,
+					    "%s:%d key ID overflow",
+					     configfilename, cfl->line);
+					goto bad;
+				}
+				break;
+			case KEYPARAM_SECRET:
+				/* duplicate check */
+				if (kinfo->secret != NULL) {
+					dprintf(LOG_WARNING, FNAME,
+					    "%s:%d duplicate secret "
+					    "for key %s (ignored)",
+					    configfilename, cfl->line,
+					    key->name);
+					continue; /* ignored */
+				}
+
+				/* convert base64 string to binary secret */
+				if ((secretstr = qstrdup(cfl->ptr)) == NULL) {
+					dprintf(LOG_WARNING, FNAME,
+					    "failed to make a copy of secret");
+					goto bad;
+				}
+				memset(secret, 0, sizeof(secret));
+				secretlen = base64_decodestring(secretstr,
+				    secret, sizeof(secret));
+				if (secretlen < 0) {
+					dprintf(LOG_ERR, FNAME,
+					    "%s:%d failed to parse base64 key",
+					    configfilename, cfl->line);
+					free(secretstr);
+					goto bad;
+				}
+				free(secretstr);
+
+				/* set the binary secret */
+				kinfo->secret = malloc(secretlen);
+				if (kinfo->secret == NULL) {
+					dprintf(LOG_WARNING, FNAME,
+					    "failed to allocate memory "
+					    "for secret");
+					goto bad;
+				}
+				memcpy(kinfo->secret, secret, secretlen); 
+				kinfo->secretlen = secretlen;
+				break;
+			case KEYPARAM_EXPIRE:
+				if (expire != NULL) {
+					dprintf(LOG_WARNING, FNAME,
+					    "%s:%d duplicate expire for key "
+					    "%s (ignored)", configfilename,
+					    cfl->line, key->name);
+					continue;
+				}
+				expire = qstrdup(cfl->ptr);
+				break;
+			default:
+				dprintf(LOG_ERR, FNAME,
+				    "%s:%d invalid key parameter for %s",
+				    configfilename, cfl->line, key->name);
+				goto bad;
+			}
+		}
+
+		/* check for mandatory parameters or use default */
+		if (kinfo->realm == NULL) {
+			dprintf(LOG_ERR, FNAME,
+			    "realm not specified for key %s", key->name);
+			goto bad;
+		}
+		if (keyid == -1) {
+			dprintf(LOG_ERR, FNAME,
+			    "key ID not specified for key %s", key->name);
+			goto bad;
+		}
+		if (kinfo->secret == NULL) {
+			dprintf(LOG_ERR, FNAME,
+			    "secret not specified for key %s", key->name);
+			goto bad;
+		}
+		if (expire != NULL) {
+			if (strcmp(expire, "forever") != 0) { /* XXX */
+				dprintf(LOG_ERR, FNAME,
+				    "unsupported expiration (%s) time "
+				    "for key %s", expire, key->name); 
+				goto bad;
+			}
+		}
+		kinfo->expire = 0; /* never expire */
+	}
+
+	return (0);
+
+  bad:
+	if (expire != NULL)
+		free(expire);
+	return (-1);
+}
+
+int
+configure_authinfo(authlist)
+	struct cf_namelist *authlist;
+{
+	struct cf_namelist *auth;
+	struct authinfo *ainfo;
+
+	for (auth = authlist; auth; auth = auth->next) {
+		struct cf_list *cfl;
+
+		if ((ainfo = malloc(sizeof(*ainfo))) == NULL) {
+			dprintf(LOG_ERR, FNAME, "memory allocation failed "
+				"for auth info %s", auth->name);
+			goto bad;
+		}
+		memset(ainfo, 0, sizeof(*ainfo));
+		ainfo->next = auth_list0;
+		auth_list0 = ainfo;
+		ainfo->protocol = DHCP6_AUTHPROTO_UNDEF;
+		ainfo->algorithm = DHCP6_AUTHALG_UNDEF;
+		ainfo->rdm = DHCP6_AUTHRDM_UNDEF;
+
+		if ((ainfo->name = strdup(auth->name)) == NULL) {
+			dprintf(LOG_ERR, FNAME,
+			    "failed to copy auth info name: %s", auth->name);
+			goto bad;
+		}
+
+		for (cfl = auth->params; cfl; cfl = cfl->next) {
+			switch (cfl->type) {
+			case AUTHPARAM_PROTO:
+				if (ainfo->protocol != DHCP6_AUTHPROTO_UNDEF) {
+					dprintf(LOG_WARNING, FNAME,
+					    "%s:%d duplicate protocol "
+					    "for auth info %s "
+					    "(ignored)",
+					    configfilename, cfl->line,
+					    auth->name);
+					continue; /* ignored */
+				}
+				ainfo->protocol = (int)cfl->num;
+				break;
+			case AUTHPARAM_ALG:
+				if (ainfo->algorithm != DHCP6_AUTHALG_UNDEF) {
+					dprintf(LOG_WARNING, FNAME,
+					    "%s:%d duplicate algorithm "
+					    "for auth info %s "
+					    "(ignored)",
+					    configfilename, cfl->line,
+					    auth->name);
+					continue; /* ignored */
+				}
+				ainfo->algorithm = (int)cfl->num;
+				break;
+			case AUTHPARAM_RDM:
+				if (ainfo->rdm != DHCP6_AUTHRDM_UNDEF) {
+					dprintf(LOG_WARNING, FNAME,
+					    "%s:%d duplicate RDM "
+					    "for auth info %s "
+					    "(ignored)",
+					    configfilename, cfl->line,
+					    auth->name);
+					continue; /* ignored */
+				}
+				ainfo->rdm = (int)cfl->num;
+				break;
+			case AUTHPARAM_KEY:
+				dprintf(LOG_WARNING, FNAME,
+				    "%s:%d auth info specific keys "
+				    "are not supported",
+				    configfilename, cfl->line);
+				break;
+			default:
+				dprintf(LOG_ERR, FNAME,
+				    "%s:%d invalid auth info parameter for %s",
+				    configfilename, cfl->line, auth->name);
+				goto bad;
+			}
+		}
+
+		/* check for mandatory parameters and consistency */
+		switch (ainfo->protocol) {
+		case DHCP6_AUTHPROTO_UNDEF:
+			dprintf(LOG_ERR, FNAME,
+			    "auth protocol is not specified for %s",
+			    auth->name);
+			goto bad;
+		case DHCP6_AUTHPROTO_DELAYED:
+			if (dhcp6_mode != DHCP6_MODE_CLIENT) {
+				dprintf(LOG_ERR, FNAME,
+				    "client-only auth protocol is specified");
+				goto bad;
+			}
+			break;
+		case DHCP6_AUTHPROTO_RECONFIG:
+			if (dhcp6_mode != DHCP6_MODE_SERVER) {
+				dprintf(LOG_ERR, FNAME,
+				    "server-only auth protocol is specified");
+				goto bad;
+			}
+			break;
+		}
+		if (ainfo->algorithm == DHCP6_AUTHALG_UNDEF)
+			ainfo->algorithm = DHCP6_AUTHALG_HMACMD5;
+		if (ainfo->rdm = DHCP6_AUTHRDM_UNDEF)
+			ainfo->rdm = DHCP6_AUTHRDM_MONOCOUNTER;
+	}
+
+	return (0);
+
+  bad:
+	/* there is currently nothing special to recover the error */
+	return (-1);
+}
+
+int
 configure_global_option()
 {
 	struct cf_list *cl;
@@ -756,6 +1042,11 @@ configure_cleanup()
 	dhcp6_ifconflist = NULL;
 	clear_hostconf(host_conflist0);
 	host_conflist0 = NULL;
+	clear_keys(key_list0);
+	key_list0 = NULL;
+	clear_authinfo(auth_list0);
+	auth_list0 = NULL;
+
 	dhcp6_clear_list(&siplist0);
 	TAILQ_INIT(&siplist0);
 	dhcp6_clear_list(&sipnamelist0);
@@ -798,6 +1089,12 @@ configure_commit()
 
 			ifp->scriptpath = ifc->scriptpath;
 			ifc->scriptpath = NULL;
+
+			if (ifc->authinfo != NULL) {
+				ifp->authproto = ifc->authinfo->protocol;
+				ifp->authalgorithm = ifc->authinfo->algorithm;
+				ifp->authrdm = ifc->authinfo->rdm;
+			}
 		}
 	}
 	clear_ifconf(dhcp6_ifconflist);
@@ -814,6 +1111,16 @@ configure_commit()
 	clear_hostconf(host_conflist);
 	host_conflist = host_conflist0;
 	host_conflist0 = NULL;
+
+	/* commit secret key information */
+	clear_keys(key_list);
+	key_list = key_list0;
+	key_list0 = NULL;
+
+	/* commit authentication information */
+	clear_authinfo(auth_list);
+	auth_list = auth_list0;
+	auth_list0 = NULL;
 
 	/* commit SIP server addresses */
 	dhcp6_clear_list(&siplist);
@@ -916,6 +1223,34 @@ clear_hostconf(hlist)
 	}
 }
 
+static void
+clear_keys(klist)
+	struct keyinfo *klist;
+{
+	struct keyinfo *key, *key_next;
+
+	for (key = klist; key; key = key_next) {
+		key_next = key->next;
+
+		free(key->name);
+		free(key->realm);
+		free(key->secret);
+		free(key);
+	}
+}
+
+static void
+clear_authinfo(alist)
+	struct authinfo *alist;
+{
+	struct authinfo *auth, *auth_next;
+
+	for (auth = alist; auth; auth = auth_next) {
+		auth_next = auth->next;
+		free(auth);
+	}
+}
+
 static int
 add_options(opcode, ifc, cfl0)
 	int opcode;
@@ -925,6 +1260,7 @@ add_options(opcode, ifc, cfl0)
 	struct dhcp6_listval *opt;
 	struct cf_list *cfl;
 	int opttype;
+	struct authinfo *ainfo;
 	struct ia_conf *iac;
 
 	for (cfl = cfl0; cfl; cfl = cfl->next) {
@@ -943,7 +1279,7 @@ add_options(opcode, ifc, cfl0)
 
 		switch(cfl->type) {
 		case DHCPOPT_RAPID_COMMIT:
-			switch(opcode) {
+			switch (opcode) {
 			case DHCPOPTCODE_SEND:
 				ifc->send_flags |= DHCIFF_RAPID_COMMIT;
 				break;
@@ -958,8 +1294,32 @@ add_options(opcode, ifc, cfl0)
 				return (-1);
 			}
 			break;
+		case DHCPOPT_AUTHINFO:
+			if (opcode != DHCPOPTCODE_SEND) {
+				dprintf(LOG_ERR, FNAME,
+				    "invalid operation (%d) "
+				    "for option type (%d)",
+				    opcode, cfl->type);
+				return (-1);
+			}
+			ainfo = find_authinfo(auth_list0, cfl->ptr);
+			if (ainfo == NULL) {
+				dprintf(LOG_ERR, FNAME, "%s:%d "
+				    "auth info (%s) is not defined",
+				    configfilename, cfl->line,
+				    (char *)cfl->ptr);
+				return (-1);
+			}
+			if (ifc->authinfo != NULL) {
+				dprintf(LOG_ERR, FNAME,
+				    "%s:%d authinfo is doubly specified on %s",
+				    configfilename, cfl->line, ifc->ifname);
+				return (-1);
+			}
+			ifc->authinfo = ainfo; 
+			break;
 		case DHCPOPT_IA_PD:
-			switch(opcode) {
+			switch (opcode) {
 			case DHCPOPTCODE_SEND:
 				iac = find_iaconf(&ia_conflist0, IATYPE_PD,
 				    (u_int32_t)cfl->num);
@@ -1136,6 +1496,21 @@ find_hostconf(duid)
 	return (NULL);
 }
 
+struct authinfo *
+find_authinfo(head, name)
+	struct authinfo *head;
+	char *name;
+{
+	struct authinfo *ainfo;
+
+	for (ainfo = head; ainfo; ainfo = ainfo->next) {
+		if (strcmp(ainfo->name, name) == 0)
+			return (ainfo);
+	}
+
+	return (NULL);
+}
+
 struct dhcp6_prefix *
 find_prefix6(list, prefix)
 	struct dhcp6_list *list;
@@ -1150,4 +1525,24 @@ find_prefix6(list, prefix)
 		}
 	}
 	return (NULL);
+}
+
+static char *
+qstrdup(qstr)
+	char *qstr;
+{
+	size_t len;
+	char *dup;
+
+	len = strlen(qstr);
+	if (qstr[0] != '"' || len < 2 || qstr[len - 1] != '"')
+		return (NULL);
+
+	if ((dup = malloc(len)) == NULL)
+		return (NULL);
+
+	memcpy(dup, qstr + 1, len - 1);
+	dup[len - 2] = '\0';
+
+	return (dup);
 }
