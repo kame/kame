@@ -540,6 +540,51 @@ gethwid(buf, len, ifname, hwtypep)
 	return -1;
 }
 
+int
+get_dhcp6_option(bp, ep, opt, retbuf)
+	struct dhcp6opt *bp, *ep;
+	int opt;
+	void *retbuf;
+{
+	char *cp;
+	struct duid *duid;
+	struct dhcp6opt *p, *np;
+	int optlen;
+
+	for (; p + 1 <= ep; p = np) {
+		cp = (char *)(p + 1);
+		optlen = ntohs(p->dh6opt_len);
+		np = (struct dhcp6opt *)(cp + optlen);
+		/* option length field overrun */
+		if (np > ep) {
+			dprintf(LOG_INFO, "malformed DHCP option");
+			return -1;
+		}
+
+		if (ntohs(p->dh6opt_type) != opt)
+			continue;
+
+		switch (opt) {
+		case DH6OPT_CLIENTID:
+		case DH6OPT_SERVERID:
+			if (retbuf) {
+				duid = (struct duid *)retbuf;
+				duid->duid_len = optlen;
+				duid->duid_id = cp;
+			}
+			break;
+		default:
+			/* no option specific behavior */
+			break;
+		}
+
+		return(0);
+	}
+
+	/* not found */
+	return(-1);
+}
+
 void
 setloglevel(debuglevel)
 	int debuglevel;

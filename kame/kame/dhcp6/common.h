@@ -48,6 +48,8 @@ extern int in6_scope __P((struct in6_addr *));
 extern void setloglevel __P((int));
 extern void dprintf __P((int, const char *, ...));
 extern int get_duid __P((char *, struct duid *));
+extern int get_dhcp6_option __P((struct dhcp6opt *, struct dhcp6opt *,
+				 int, void *));
 
 /* missing */
 #ifndef HAVE_STRLCAT

@@ -84,6 +84,7 @@ struct dhcp6_duid_type1 {
 
 /* option */
 #define DH6OPT_CLIENTID	1	/* TBD */
+#define DH6OPT_SERVERID	2	/* TBD */
 #define DH6OPT_DNS	11	/* TBD */
 struct dhcp6opt {
 	u_int16_t dh6opt_type;

@@ -604,6 +604,7 @@ client6_recvreply(s)
 	struct dhcp6opt *p, *ep, *np;
 	int i;
 	struct in6_addr in6;
+	struct duid reply_duid;
 
 	fromlen = sizeof(from);
 	if ((len = recvfrom(s, rbuf, sizeof(rbuf), 0,
@@ -630,8 +631,32 @@ client6_recvreply(s)
 		return -1;
 	}
 
+	/* option processing */
+
 	p = (struct dhcp6opt *)(dh6 + 1);
 	ep = (struct dhcp6opt *)(rbuf + len);
+
+	/* A Reply message must contain a Server ID option */
+	if ((get_dhcp6_option(p, ep, DH6OPT_SERVERID, NULL)) < 0) {
+		dprintf(LOG_INFO, "client6_recvreply: no server ID option");
+		return -1;
+	}
+
+	/*
+	 * DUID in the Client ID option (which must be contained for our
+	 * client implementation) must match ours.
+	 */
+	if ((get_dhcp6_option(p, ep, DH6OPT_CLIENTID, &reply_duid)) < 0) {
+		dprintf(LOG_INFO, "client6_recvreply: no client ID option");
+		return -1;
+	}
+	if (reply_duid.duid_len != client_duid.duid_len ||
+	    memcmp(reply_duid.duid_id, client_duid.duid_id,
+		   client_duid.duid_len)) {
+		dprintf(LOG_INFO, "client6_recvreply: client DUID mismatch");
+		return -1;
+	}
+
 	while (p + 1 <= ep) {
 		cp = (char *)(p + 1);
 		np = (struct dhcp6opt *)(cp + ntohs(p->dh6opt_len));
