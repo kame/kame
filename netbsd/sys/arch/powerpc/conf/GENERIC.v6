@@ -16,3 +16,17 @@ options 	IPSEC_ESP	# IP security (encryption part; define w/ IPSEC)
 pseudo-device	gif		4
 #pseudo-device	dummy		1
 #pseudo-device	faith		1
+
+# IPv6 firewall - not tested
+#options 	IPV6FIREWALL
+#options 	IPV6FIREWALL_VERBOSE
+#options 	IPV6FIREWALL_DEFAULT_TO_ACCEPT
+
+# Packet Management by SuMiRe - may not work
+#options 	PM			# SuMiRe (NAT).
+#options 	PM_USE_SOCKET		# Use socket instead of ioctl.
+#options 	PMDEBUG			# Enable debug feature.
+
+# Network Address Translation - Protocol Translation (NAT-PT)
+# not tested
+#options 	NATPT
