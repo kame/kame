@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.26 2000/12/02 07:02:57 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.27 2000/12/02 07:09:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -87,10 +87,12 @@
  *	FreeBSD 3
  *		non-mbuf manipulation using sooptcopy{in,out}()
  * - timeout() and untimeout()
- *	NetBSD, OpenBSD, BSDI [34], FreeBSD 2
+ *	NetBSD 1.4.x, OpenBSD, BSDI [34], FreeBSD 2
  *		timeout() is a void function
  *	FreeBSD 3
  *		timeout() is non-void, must keep returned value for untimeout()
+ *	NetBSD 1.5
+ *		timeout() is obsoleted, use callout_xx (sys/callout.h)
  * - sysctl
  *	NetBSD, OpenBSD
  *		foo_sysctl()
