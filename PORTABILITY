@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$KAME: PORTABILITY,v 1.63 2002/01/11 02:47:56 itojun Exp $
+	$KAME: PORTABILITY,v 1.64 2002/03/28 09:30:09 jinmei Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -279,29 +279,24 @@ across those possibilities.
 - For portability in kernel networking code, look at kame/sys/net/net_osdep.h.
 
 - The -interface modifier of the route(8) command does not take an
-  argument except on FreeBSD.  Also, the original FreeBSD's extension
-  has several bugs (although those bugs are fixed in the route command
-  in the KAME kit).  If you regard portability and stability, it would
-  be better to use a mixture of the "change" operation and the -ifp
-  modifier of the route command.
+  argument except on FreeBSD.  On other platforms, you should use the
+  -ifp modifier with a dummy gateway.
 
   For example,
   # route add -inet6 default -interface gif0 (on FreeBSD)
-  is equivalent to
+  is (almost) equivalent to
+  # route add -inet6 default ::1 -ifp gif0 -interface (on others)
+
+  Unfortunately, the latter does not work for FreeBSD.  Thus, there is
+  no portable usage that works for all *BSDs.
+
+  Please also note that the usage of the -ifp modifier in the above
+  example may not work on older versions of *BSD.  If this is the
+  case, you will need a mixture of the "change" operation and the -ifp
+  modifier of the route command.  The following sequence is an
+  equivalent of the latter example above.
   # route add -inet6 default ::1
   # route change -inet6 default ::1 -ifp gif0
-
-  Note that the kernel code to perform the change operation assumes
-  that gif0 has at least one IPv6 address.  If you are not sure about
-  this, you might want to execute
-  # ifconfig gif0 up
-  before executing the route command.
-
-  BSDI4 users can take the following approach as well:
-  # route add -inet6 default ::1 -ifp gif0
-  which would be much simpler.  This is because BSDI4 has improved
-  kernel code of handling routing sockets.  We will eventually merge
-  this improvement into other OSes.
 
 - (Not really a portability issue)  Fixes/improvements to libpcap and tcpdump
   should be sent to itojun, or patches@tcpdump.org.  We no longer maintain
