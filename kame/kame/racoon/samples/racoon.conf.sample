@@ -1,8 +1,8 @@
-# $KAME: racoon.conf.sample,v 1.4 2000/04/26 20:07:12 sakane Exp $
+# $KAME: racoon.conf.sample,v 1.5 2000/04/26 20:14:30 sakane Exp $
 
 # "path" must be placed before it should be used.
 # You can overwrite which you defined, but it should not use due to confusing.
-path include "/usr/local/v6/etc" ;
+#path include "/usr/local/v6/etc" ;
 #include "remote.conf" ;
 
 # search this file for pre_shared_key with various ID key.
@@ -10,7 +10,7 @@ path pre_shared_key "/usr/local/v6/etc/psk.txt" ;
 
 # racoon will search this directory if the certificate or certificate request
 # is received.
-path certificate "/usr/local/openssl/certs" ;
+#path certificate "/usr/local/openssl/certs" ;
 
 # personal information.
 identifier user_fqdn "foo@kame.net";
@@ -24,8 +24,6 @@ remote anonymous
 {
 	#exchange_mode main,aggressive,base;
 	exchange_mode aggressive,main,base;
-	doi ipsec_doi;
-	situation identity_only;
 
 	#identifier address;
 	identifier user_fqdn;
