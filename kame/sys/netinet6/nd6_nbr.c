@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.76 2001/07/29 11:58:16 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.77 2001/10/16 05:47:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -878,7 +878,7 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 		printf("nd6_na_output: max_linkhdr + maxlen >= MCLBYTES "
 		    "(%d + %d > %d)\n", max_linkhdr, maxlen, MCLBYTES);
 		panic("nd6_na_output: insufficient MCLBYTES");
-		return;
+		/* NOTREACHED */
 	}
 #endif
 
