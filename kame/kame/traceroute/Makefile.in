@@ -17,7 +17,7 @@
 #  WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
 #  MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 #
-# @(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/Makefile.in,v 1.1 1999/08/08 23:32:23 itojun Exp $ (LBL)
+# @(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/Makefile.in,v 1.2 1999/09/08 01:26:00 itojun Exp $ (LBL)
 
 #
 # Various configurable paths (remember to edit Makefile.in, not Makefile)
@@ -42,7 +42,7 @@ VPATH = @srcdir@
 CC = @CC@
 CCOPT = @V_CCOPT@
 INCLS = -I. @V_INCLS@
-DEFS = @DEFS@ -DIPSEC
+DEFS = @DEFS@
 
 # Standard CFLAGS
 CFLAGS = $(CCOPT) $(DEFS) $(INCLS)

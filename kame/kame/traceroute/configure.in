@@ -1,4 +1,4 @@
-dnl @(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/configure.in,v 1.1 1999/08/08 23:32:25 itojun Exp $ (LBL)
+dnl @(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/configure.in,v 1.2 1999/09/08 01:26:00 itojun Exp $ (LBL)
 dnl
 dnl Copyright (c) 1995, 1996, 1997
 dnl	The Regents of the University of California.  All rights reserved.
@@ -81,6 +81,7 @@ AC_MSG_CHECKING(for libipsec)
 if test -f ../libipsec/libipsec.a; then
 	AC_MSG_RESULT(yes)
 	LIBS="$LIBS -L../libipsec -lipsec"
+	AC_DEFINE(IPSEC)
 else
 	AC_MSG_RESULT(no)
 fi

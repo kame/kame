@@ -1961,11 +1961,15 @@ echo "configure:1961: checking for libipsec" >&5
 if test -f ../libipsec/libipsec.a; then
 	echo "$ac_t""yes" 1>&6
 	LIBS="$LIBS -L../libipsec -lipsec"
+	cat >> confdefs.h <<\EOF
+#define IPSEC 1
+EOF
+
 else
 	echo "$ac_t""no" 1>&6
 fi
 echo $ac_n "checking for libinet6""... $ac_c" 1>&6
-echo "configure:1969: checking for libinet6" >&5
+echo "configure:1973: checking for libinet6" >&5
 if test -f ../libinet6/libinet6.a; then
 	echo "$ac_t""yes" 1>&6
 	LIBS="$LIBS -L../libinet6 -linet6"
@@ -1988,7 +1992,7 @@ fi
 # SVR4 /usr/ucb/install, which tries to use the nonexistent group "staff"
 # ./install, which can be erroneously created by make from ./install.sh.
 echo $ac_n "checking for a BSD compatible install""... $ac_c" 1>&6
-echo "configure:1992: checking for a BSD compatible install" >&5
+echo "configure:1996: checking for a BSD compatible install" >&5
 if test -z "$INSTALL"; then
 if eval "test \"`echo '$''{'ac_cv_path_install'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
