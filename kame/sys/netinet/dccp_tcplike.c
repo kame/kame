@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.c,v 1.14 2004/10/28 04:27:23 itojun Exp $	*/
+/*	$KAME: dccp_tcplike.c,v 1.15 2004/10/28 04:33:26 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -366,7 +366,6 @@ int tcplike_send_packet(void *ccb, long datasize)
 			timeout_set(&cb->rto_timer, tcplike_rto_timeout,
 			    (void *)cb);
 			timeout_add(&cb->rto_timer, ticks);
-			    tcplike_rto_timeout, (void *)cb);
 #else
 			callout_reset(&cb->rto_timer, ticks,
 			    tcplike_rto_timeout, (void *)cb);
@@ -918,7 +917,7 @@ void *tcplike_recv_init(struct dccpcb *pcb)
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	callout_init(&ccb->free_timer, 0);
 #elif defined(__OpenBSD__)
-#endif
+#else
 	callout_init(&ccb->free_timer);
 #endif
 	

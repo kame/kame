@@ -1,4 +1,4 @@
-/*	$KAME: dccp6_usrreq.c,v 1.6 2004/02/11 20:11:52 itojun Exp $	*/
+/*	$KAME: dccp6_usrreq.c,v 1.7 2004/10/28 04:33:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -312,8 +312,15 @@ dccp6_connect(struct socket *so, struct mbuf *m, struct proc *td)
 	if (error != 0)
 		goto bad;
 
+#ifdef __OpenBSD__
+	timeout_set(&dp->retrans_timer, dccp_retrans_t, dp);
+	timeout_add(&dp->retrans_timer, dp->retrans);
+	timeout_set(&dp->connect_timer, dccp_connect_t, dp);
+	timeout_add(&dp->connect_timer, DCCP_CONNECT_TIMER);
+#else
 	callout_reset(&dp->retrans_timer, dp->retrans, dccp_retrans_t, dp);
 	callout_reset(&dp->connect_timer, DCCP_CONNECT_TIMER, dccp_connect_t, dp);
+#endif
 
 	test[0] = dp->pref_cc;
 	/* FIX THIS LATER */
