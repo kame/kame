@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.31 2000/07/07 12:17:15 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.32 2000/07/07 12:21:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -890,7 +890,7 @@ setpolicy(so, policy)
 
 	buf = ipsec_set_policy(policy, strlen(policy));
 	if (buf == NULL) {
-		warnx("%s", "%s", ipsec_strerror());
+		warnx("%s", ipsec_strerror());
 		return -1;
 	}
 	(void)setsockopt(so, IPPROTO_IPV6, IPV6_IPSEC_POLICY,
