@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.131 2000/08/03 15:24:34 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.132 2000/08/06 13:12:29 kjc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -119,6 +119,9 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#include <netinet6/ipsec6.h>
+#endif
 #include <netkey/key.h>
 #endif
 
