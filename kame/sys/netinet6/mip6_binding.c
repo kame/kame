@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.37 2001/11/22 01:27:27 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.38 2001/11/26 05:20:31 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -63,6 +63,7 @@
 #include <net/if_types.h>
 #include <net/route.h>
 #include <net/if_dl.h>
+#include <net/net_osdep.h>
 
 #include <net/if_hif.h>
 
@@ -1633,9 +1634,10 @@ mip6_bc_proxy_control(target, local, cmd)
 		
 		{
 			/* very XXX */
-			struct in6_addr daddr
-				= IN6ADDR_LINKLOCAL_ALLNODES_INIT;
+			struct in6_addr daddr;
 			
+			daddr = in6addr_linklocal_allnodes;
+			daddr.s6_addr16[1] = htons(ifp->if_index);
 			nd6_na_output(ifp, &daddr, target,
 				      ND_NA_FLAG_OVERRIDE,
 				      1,
@@ -1867,6 +1869,12 @@ mip6_process_ba(m, opt)
 		mip6log((LOG_NOTICE, 
 			 "%s:%d: BU rejected (error code %d).\n",
 			 __FILE__, __LINE__, ba_opt->ip6oa_status));
+		if (ba_opt->ip6oa_status == MIP6_BA_STATUS_NOT_HOME_AGENT &&
+		    mbu->mbu_flags & IP6_BUF_HOME &&
+		    mbu->mbu_reg_state == MIP6_BU_REG_STATE_DEREGWAITACK) {
+			/* XXX no registration? */
+			goto success;
+		}
 #ifndef MIP6_DRAFT13
 		if (ba_opt->ip6oa_status == MIP6_BA_STATUS_SEQNO_TOO_SMALL) {
 			/* seqno is too small.  adjust it and re-send BU. */
@@ -1887,6 +1895,7 @@ mip6_process_ba(m, opt)
 		return (0);
 	}
 
+success:
 	/*
 	 * the binding updated has been accepted.  reset WAIT_ACK
 	 * status.
@@ -1958,8 +1967,28 @@ mip6_process_ba(m, opt)
 				return (error);
 			}
 
-			/* XXX: TODO send a unsolicited na. */
+			/* XXX: send a unsolicited na. */
+		{
+			struct sockaddr_in6 sa6;
+			struct ifaddr *ifa;
+			struct in6_addr daddr;
 
+			bzero(&sa6, sizeof(sa6));
+			sa6.sin6_family = AF_INET6;
+			sa6.sin6_len = sizeof(sa6);
+			sa6.sin6_addr = mbu->mbu_coa;	/* XXX or mbu_haddr */
+
+			ifa = ifa_ifwithaddr((struct sockaddr *)&sa6);
+			daddr = in6addr_linklocal_allnodes;
+			daddr.s6_addr16[1] = htons(ifa->ifa_ifp->if_index);
+			nd6_na_output(ifa->ifa_ifp, &daddr,
+					      &mbu->mbu_haddr,
+					      ND_NA_FLAG_OVERRIDE,
+					      1, NULL);
+			mip6log((LOG_INFO,
+				 "%s:%d: send a unsolicited na to %s\n",
+				 __FILE__, __LINE__, if_name(ifa->ifa_ifp)));
+		}
 			/* for safty. */
 			mbu->mbu_reg_state = MIP6_BU_REG_STATE_NOTREG;
 		} else if (mbu->mbu_reg_state
