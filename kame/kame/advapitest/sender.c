@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.10 2000/11/27 14:19:13 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.11 2001/02/07 05:18:15 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -63,6 +63,10 @@ static void setopthdr __P((int, int));
 static void usage __P((void));
 static int mflag;
 
+#ifndef IPV6_MINMTU
+#define IPV6_MINMTU 1280
+#endif
+
 int
 main(argc, argv)
     int argc;
@@ -75,6 +79,7 @@ main(argc, argv)
 	struct iovec msgiov;
 	char *e, *databuf;
 	int datalen = 1, ch;
+	int minmtu = 0;
 	char *mtup = NULL;
 	struct addrinfo hints, *res;
 	extern int optind;
@@ -137,13 +142,26 @@ main(argc, argv)
 		ip6optlen += CMSG_SPACE(sizeof(int));
 	}
 	if (mtup != NULL) {
-		mtu = atoi(mtup);
+		if (strcmp(mtup, "min") == 0) {
+			minmtu = 1;
+			mtup = NULL; /* XXX */
+			if (datalen < IPV6_MINMTU)
+				warnx("sender: minimum mtu is specified, "
+				      "but data size is smaller.\n");
+
+		}
+		else {
+			mtu = atoi(mtup);
 #if 0
-		/* intentionally omit the check to see the kernel behavior. */
-		if (mtu < IPV6_MINMTU)
-			errx(1, "invalid MTU: %s", mtup);
+			/*
+			 * intentionally omit the check to see the kernel
+			 * behavior.
+			 */
+			if (mtu < IPV6_MINMTU)
+				errx(1, "invalid MTU: %s", mtup);
 #endif
-		ip6optlen += CMSG_SPACE(sizeof(int));
+			ip6optlen += CMSG_SPACE(sizeof(int));
+		}
 	}
 	if (argc > 1) {		/* intermediate node(s) exist(s) */
 		hops = argc - 1;
@@ -230,6 +248,14 @@ main(argc, argv)
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_RECVPATHMTU, &on,
 			       sizeof(on)) != 0)
 			err(1, "setsockopt(IPV6_RECVPATHMTU)");
+	}
+
+	if (minmtu) {
+		int on = 1;
+
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_USE_MIN_MTU, &on,
+			       sizeof(on)) != 0)
+			err(1, "setsockopt(IPV6_USE_MIN_MTU)");
 	}
 
 #if 0
