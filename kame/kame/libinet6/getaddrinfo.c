@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.142 2003/03/17 23:10:33 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.143 2003/03/22 05:50:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1238,8 +1238,7 @@ gai_addr2scopetype(sa)
 #endif
 	case AF_INET:
 		/*
-		 * IPv4 pseudo scoping according to
-		 * draft-ietf-ipngwg-default-addr-select.
+		 * IPv4 pseudo scoping according to RFC 3484.
 		 */
 		sa4 = (struct sockaddr_in *)sa;
 		/* IPv4 autoconfiguration addresses have link-local scope. */

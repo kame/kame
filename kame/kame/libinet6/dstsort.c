@@ -1,4 +1,4 @@
-/*	$KAME: dstsort.c,v 1.3 2001/08/20 02:32:40 itojun Exp $	*/
+/*	$KAME: dstsort.c,v 1.4 2003/03/22 05:50:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -30,8 +30,7 @@
  */
 
 /*
- * Sort AF_INET6 destination addresses based on
- * draft-ietf-ipngwg-default-addr-select-00.txt.
+ * Sort AF_INET6 destination addresses based on RFC 3484.
  * It affects AF_INET6 addresses only.
  *
  * XXX calls getifaddrs() only once, can't adapt to interface addr addition
@@ -308,7 +307,7 @@ matchsrc(ai)
 
 /*------------------------------------------------------------*/
 
-/* draft-ietf-ipngwg-default-addr-select-00 section 3 */
+/* RFC 3484 */
 static int
 addrcmp(arg1, arg2)
 	void *arg1;

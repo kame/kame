@@ -1,4 +1,4 @@
-/*	$KAME: scope.c,v 1.9 2002/01/21 08:15:46 jinmei Exp $ */
+/*	$KAME: scope.c,v 1.10 2003/03/22 05:50:17 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -80,8 +80,7 @@ addr2scopetype(sa)
 #endif
 	case AF_INET:
 		/*
-		 * IPv4 pseudo scoping according to
-		 * draft-ietf-ipngwg-default-addr-select.
+		 * IPv4 pseudo scoping according to RFC 3484.
 		 */
 		addr4 = (u_int8_t *)&((struct sockaddr_in *)sa)->sin_addr;
 		/* IPv4 autoconfiguration addresses have link-local scope. */
