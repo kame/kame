@@ -1,6 +1,6 @@
 #
 # perl prepare.pl kame <osname>
-# $Id: prepare.pl,v 1.12 1999/10/04 15:21:43 itojun Exp $
+# $Id: prepare.pl,v 1.13 2000/04/25 23:57:06 itojun Exp $
 #
 
 $debug = 1;
@@ -85,8 +85,13 @@ sub dig {
 			}
 
 			if (-f "$dst/$j" && ! -l "$dst/$j") {
-				print "conflict: $dst/$j\n";
-				exit 1 if (!defined $conflict{$j});
+				print "conflict: $dst/$j";
+				if (defined $conflict{$j}) {
+					print " (expected)\n";
+				} else {
+					print " (UNEXPECTED!)\n";
+					exit 1;
+				}
 			} else {
 				if (-l "$dst/$j") {
 					print "unlink $dst/$j (symlink)\n" if $debug;
