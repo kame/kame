@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.25 2002/02/12 04:05:05 itojun Exp $	*/
+/*	$KAME: if_faith.c,v 1.26 2002/05/13 03:31:22 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -167,7 +167,7 @@ static struct ifnet faithif[NFAITH];
 
 #define	FAITHMTU	1500
 
-#if defined(__FreeBSD__) || __FreeBSD__ >= 4
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
 static int
 faithmodevent(mod, type, data)
 	module_t mod;
