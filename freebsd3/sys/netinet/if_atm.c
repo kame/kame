@@ -93,7 +93,9 @@ atm_rtrequest(req, rt, sa)
 	switch (req) {
 
 	case RTM_RESOLVE: /* resolve: only happens when cloning */
+#ifdef DIAGNOSTIC
 		printf("atm_rtrequest: RTM_RESOLVE request detected?\n");
+#endif
 		break;
 
 	case RTM_ADD:
@@ -114,12 +116,16 @@ atm_rtrequest(req, rt, sa)
 		}
 
 		if ((rt->rt_flags & RTF_CLONING) != 0) {
+#ifdef DIAGNOSTIC
 			printf("atm_rtrequest: cloning route detected?\n");
+#endif
 			break;
 		}
 		if (gate->sa_family != AF_LINK ||
 		    gate->sa_len < sizeof(null_sdl)) {
+#ifdef DIAGNOSTIC
 			log(LOG_DEBUG, "atm_rtrequest: bad gateway value");
+#endif
 			break;
 		}
 

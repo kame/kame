@@ -212,7 +212,7 @@ struct en_softc {
   u_int8_t is_adaptec;		/* adaptec version of midway? */
 
 #if 1 /* for ATM_PVCEXT */
-  SLIST_HEAD(sif_list, pvcsif) sif_list;	/* pvc subinterface list */
+  LIST_HEAD(sif_list, pvcsif) sif_list;	/* pvc subinterface list */
 #endif
 };
 

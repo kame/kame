@@ -1,8 +1,8 @@
-/*	$KAME: altq_blue.h,v 1.2 2000/02/22 14:00:30 itojun Exp $	*/
+/*	$KAME: altq_blue.h,v 1.3 2000/07/25 10:12:29 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-1999
- *	Sony Computer Science Laboratory Inc.  All rights reserved.
+ * Copyright (C) 1997-2000
+ *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,11 +25,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_blue.h,v 1.2 2000/02/22 14:00:30 itojun Exp $
+ * $Id: altq_blue.h,v 1.3 2000/07/25 10:12:29 kjc Exp $
  */
 
 #ifndef _ALTQ_ALTQ_BLUE_H_
-#define _ALTQ_ALTQ_BLUE_H_
+#define	_ALTQ_ALTQ_BLUE_H_
 
 #include <altq/altq_classq.h>
 
@@ -61,15 +61,15 @@ struct blue_conf {
 };
 
 /* blue flags */
-#define BLUEF_ECN4	0x01	/* use packet marking for IPv4 packets */
-#define BLUEF_ECN6	0x02	/* use packet marking for IPv6 packets */
-#define BLUEF_ECN	(BLUEF_ECN4 | BLUEF_ECN6)
+#define	BLUEF_ECN4	0x01	/* use packet marking for IPv4 packets */
+#define	BLUEF_ECN6	0x02	/* use packet marking for IPv6 packets */
+#define	BLUEF_ECN	(BLUEF_ECN4 | BLUEF_ECN6)
 
 /* 
  * IOCTLs for BLUE
  */
-#define BLUE_ENABLE		_IOW('Q', 1, struct blue_interface)
-#define BLUE_DISABLE		_IOW('Q', 2, struct blue_interface)
+#define	BLUE_ENABLE		_IOW('Q', 1, struct blue_interface)
+#define	BLUE_DISABLE		_IOW('Q', 2, struct blue_interface)
 #define	BLUE_IF_ATTACH		_IOW('Q', 3, struct blue_interface)
 #define	BLUE_IF_DETACH		_IOW('Q', 4, struct blue_interface)
 #define	BLUE_ACC_ENABLE		_IOW('Q', 5, struct blue_interface)
@@ -77,7 +77,7 @@ struct blue_conf {
 #define	BLUE_GETSTATS		_IOWR('Q', 7, struct blue_stats)
 #define	BLUE_CONFIG		_IOWR('Q', 8, struct blue_conf)
 
-#if defined(KERNEL) || defined(_KERNEL)
+#ifdef _KERNEL
 
 typedef struct blue {
 	int blue_pkttime; 	/* average packet time in micro sec
@@ -105,7 +105,7 @@ typedef struct blue {
 
 typedef struct blue_queue {
 	struct blue_queue *rq_next;	/* next blue_state in the list */
-	struct ifnet *rq_ifp;		/* backpointer to ifnet */
+	struct ifaltq *rq_ifq;		/* backpointer to ifaltq */
 
 	class_queue_t *rq_q;
 
@@ -114,9 +114,9 @@ typedef struct blue_queue {
 
 extern int blue_init __P((blue_t *, int, int, int, int));
 extern int blue_addq __P((blue_t *, class_queue_t *, struct mbuf *,
-			 struct pr_hdr *));
+			 struct altq_pktattr *));
 extern struct mbuf *blue_getq __P((blue_t *, class_queue_t *));
 
-#endif /* KERNEL */
+#endif /* _KERNEL */
 
 #endif /* _ALTQ_ALTQ_BLUE_H_ */

@@ -163,9 +163,9 @@ loopattach(dummy)
 	    ifp->if_ioctl = loioctl;
 	    ifp->if_output = looutput;
 	    ifp->if_type = IFT_LOOP;
+	    IFQ_SET_READY(&ifp->if_snd);
 #ifdef ALTQ
 	    ifp->if_start = lo_altqstart;
-	    ifp->if_altqflags |= ALTQF_READY;
 #endif
 	    if_attach(ifp);
 #if NBPFILTER > 0
@@ -224,32 +224,6 @@ contiguousfail:
 
 	ifp->if_opackets++;
 	ifp->if_obytes += m->m_pkthdr.len;
-#ifdef ALTQ
-	/*
-	 * altq for loop is just for debugging.
-	 * only used when called for loop interface (not for
-	 * a simplex interface).
-	 */
-	if (ALTQ_IS_ON(ifp) && ifp->if_start == lo_altqstart) {
-		struct pr_hdr pr_hdr;
-		int32_t *afp;
-	        int s, error;
-
-		pr_hdr.ph_family = dst->sa_family;
-		pr_hdr.ph_hdr = mtod(m, caddr_t);
-
-		M_PREPEND(m, sizeof(int32_t), M_DONTWAIT);
-		if (m == 0)
-			return(ENOBUFS);
-		afp = mtod(m, int32_t *);
-		*afp = (int32_t)dst->sa_family;
-
-	        s = splimp();
-		error = (*ifp->if_altqenqueue)(ifp, m, &pr_hdr, ALTEQ_NORMAL);
-		splx(s);
-		return (error);
-	}
-#endif /* ALTQ */
 #if 1	/* XXX */
 	switch (dst->sa_family) {
 	case AF_INET:
@@ -337,6 +311,38 @@ if_simloop(ifp, m, dst, hlen)
 		m_adj(m, hlen);
 	}
 
+#ifdef ALTQ
+	/*
+	 * altq for loop is just for debugging.
+	 * only used when called for loop interface (not for
+	 * a simplex interface).
+	 */
+	if ((ALTQ_IS_ENABLED(&ifp->if_snd) || TBR_IS_ENABLED(&ifp->if_snd))
+	    && ifp->if_start == lo_altqstart) {
+		struct altq_pktattr pktattr;
+		int32_t *afp;
+	        int error;
+
+		/*
+		 * if the queueing discipline needs packet classification,
+		 * do it before prepending link headers.
+		 */
+		IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+
+		M_PREPEND(m, sizeof(int32_t), M_DONTWAIT);
+		if (m == 0)
+			return(ENOBUFS);
+		afp = mtod(m, int32_t *);
+		*afp = (int32_t)dst->sa_family;
+
+	        s = splimp();
+		IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+		(*ifp->if_start)(ifp);
+		splx(s);
+		return (error);
+	}
+#endif /* ALTQ */
+
 	switch (dst->sa_family) {
 #ifdef INET
 	case AF_INET:
@@ -405,14 +411,10 @@ lo_altqstart(ifp)
 	int32_t af, *afp;
 	int s, isr;
 	
-	if (!ALTQ_IS_ON(ifp))
-		return;
-    
 	while (1) {
 		s = splimp();
-		m = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		IFQ_DEQUEUE(&ifp->if_snd, m);
 		splx(s);
-
 		if (m == NULL)
 			return;
 

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.97 2000/07/24 00:16:18 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.98 2000/07/25 10:12:32 kjc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -135,10 +135,6 @@
 
 #ifdef IPV6FIREWALL
 #include <netinet6/ip6_fw.h>
-#endif
-
-#ifdef ALTQ
-#include <altq/altq_cdnr.h>
 #endif
 
 #include <netinet6/ip6protosw.h>

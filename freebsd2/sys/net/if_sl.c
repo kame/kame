@@ -68,10 +68,6 @@
 #include "sl.h"
 #if NSL > 0
 
-#ifdef ALTQ
-#include "opt_altq.h"
-#endif
-
 #include "bpfilter.h"
 
 #include <sys/param.h>
@@ -228,13 +224,11 @@ slattach(dummy)
 		sc->sc_if.if_type = IFT_SLIP;
 		sc->sc_if.if_ioctl = slioctl;
 		sc->sc_if.if_output = sloutput;
-		sc->sc_if.if_snd.ifq_maxlen = 50;
+		IFQ_SET_MAXLEN(&sc->sc_if.if_snd, 50);
 		sc->sc_fastq.ifq_maxlen = 32;
 		sc->sc_if.if_linkmib = sc;
 		sc->sc_if.if_linkmiblen = sizeof *sc;
-#ifdef ALTQ
-		sc->sc_if.if_altqflags |= ALTQF_READY;
-#endif
+		IFQ_SET_READY(&sc->sc_if.if_snd);
 		if_attach(&sc->sc_if);
 #if NBPFILTER > 0
 		bpfattach(&sc->sc_if, DLT_SLIP, SLIP_HDRLEN);
@@ -472,14 +466,14 @@ sloutput(ifp, m, dst, rtp)
 	register struct sl_softc *sc = &sl_softc[ifp->if_unit];
 	register struct ip *ip;
 	register struct ifqueue *ifq;
-	int s;
+	int s, error;
 #ifdef ALTQ
-	struct pr_hdr pr_hdr;
-
-	pr_hdr.ph_family = dst->sa_family;
-	pr_hdr.ph_hdr = mtod(m, caddr_t);
+	struct altq_pktattr pktattr;
 #endif
 
+#ifdef ALTQ
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+#endif
 	/*
 	 * `Cannot happen' (see slioctl).  Someday we will extend
 	 * the line protocol to support other address families.
@@ -500,46 +494,37 @@ sloutput(ifp, m, dst, rtp)
 		m_freem(m);
 		return (EHOSTUNREACH);
 	}
-	ifq = &sc->sc_if.if_snd;
 	ip = mtod(m, struct ip *);
 	if (sc->sc_if.if_flags & SC_NOICMP && ip->ip_p == IPPROTO_ICMP) {
 		m_freem(m);
 		return (ENETRESET);		/* XXX ? */
 	}
-	if (ip->ip_tos & IPTOS_LOWDELAY)
-		ifq = &sc->sc_fastq;
 	s = splimp();
+	if ((ip->ip_tos & IPTOS_LOWDELAY)
 #ifdef ALTQ
-	if (ALTQ_IS_ON(ifp)) {
-	        int error;
-		
-	        error = (*ifp->if_altqenqueue)(ifp, m, &pr_hdr, ALTEQ_NORMAL);
-	        if (error) {
-			splx(s);
-			IF_DROP(&sc->sc_if.if_snd);
-			sc->sc_if.if_oerrors++;
-			return (error);
+	    && !ALTQ_IS_ENABLED(&sc->sc_if.if_snd)
+#endif
+		) {
+		ifq = &sc->sc_fastq;
+		if (IF_QFULL(ifq)) {
+			IF_DROP(ifq);
+			m_freem(m);
+			error = ENOBUFS;
+		} else {
+			IF_ENQUEUE(ifq, m);
+			error = 0;
 		}
-	}
-	else {
-#endif /* ALTQ */
-	if (IF_QFULL(ifq)) {
-		IF_DROP(ifq);
-#ifdef ALTQ_ACCOUNT
-		ALTQ_ACCOUNTING(ifp, m, &pr_hdr, ALTEQ_ACCDROP);
-#endif
-		m_freem(m);
-		splx(s);
-		sc->sc_if.if_oerrors++;
-		return (ENOBUFS);
-	}
-	IF_ENQUEUE(ifq, m);
-#ifdef ALTQ_ACCOUNT
-	ALTQ_ACCOUNTING(ifp, m, &pr_hdr, ALTEQ_ACCOK);
-#endif
+	} else {
 #ifdef ALTQ
-	}
+		IFQ_ENQUEUE(&sc->sc_if.if_snd, m, &pktattr, error);
+#else
+		IFQ_ENQUEUE(&sc->sc_if.if_snd, m, error);
 #endif
+	}
+	if (error) {
+		splx(s);		sc->sc_if.if_oerrors++;
+		return (error);
+	}
 	if (sc->sc_ttyp->t_outq.c_cc == 0)
 		slstart(sc->sc_ttyp);
 	splx(s);
@@ -591,20 +576,11 @@ slstart(tp)
 		 * Get a packet and send it to the interface.
 		 */
 		s = splimp();
-#ifdef ALTQ
-		if (ALTQ_IS_ON(&sc->sc_if))
-			m = (*sc->sc_if.if_altqdequeue)(&sc->sc_if,
-							ALTDQ_DEQUEUE);
-		else {
-#endif
 		IF_DEQUEUE(&sc->sc_fastq, m);
 		if (m)
 			sc->sc_if.if_omcasts++;		/* XXX */
 		else
-			IF_DEQUEUE(&sc->sc_if.if_snd, m);
-#ifdef ALTQ
-		}
-#endif
+			IFQ_DEQUEUE(&sc->sc_if.if_snd, m);
 		splx(s);
 		if (m == NULL)
 			return 0;

@@ -16,7 +16,7 @@
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
 # $FreeBSD: src/sys/i386/conf/GENERIC,v 1.143.2.27 2000/03/01 10:51:37 nik Exp $
-# $KAME: GENERIC.v6,v 1.17 2000/06/25 08:05:31 sumikawa Exp $
+# $KAME: GENERIC.v6,v 1.18 2000/07/25 10:12:16 kjc Exp $
 
 machine		"i386"
 cpu		"I386_CPU"
@@ -70,6 +70,8 @@ options 	ALTQ		#alternate queueing
 #options 	ALTQ_ECN	#ecn extention to tcp
 #options 	CDNR		#diffserv traffic conditioner
 #options 	BLUE		#blue by wu-chang feng
+#options 	ALTQ_NOPCC	#don't use processor cycle counter
+#options 	ALTQ_DEBUG	#for debugging
 # you might want to set kernel timer to 1kHz if you use CBQ,
 # especially with 100baseT
 #options 	HZ=1000

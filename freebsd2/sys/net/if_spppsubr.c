@@ -18,10 +18,6 @@
  */
 #undef DEBUG
 
-#ifdef ALTQ
-#include "opt_altq.h"
-#endif
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -418,11 +414,13 @@ sppp_output (struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst, struct rte
 {
 	struct sppp *sp = (struct sppp*) ifp;
 	struct ppp_header *h;
-	struct ifqueue *ifq;
+	struct ifqueue *ifq = NULL;
+	int s, len, error;
 #ifdef ALTQ
-	struct pr_hdr pr_hdr;
+	struct altq_pktattr pktattr;
 #endif
-	int s = splimp ();
+
+	s = splimp ();
 
 	if (! (ifp->if_flags & IFF_UP) || ! (ifp->if_flags & IFF_RUNNING)) {
 		m_freem (m);
@@ -432,17 +430,11 @@ sppp_output (struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst, struct rte
 
 #ifdef ALTQ
 	/*
-	 * save a pointer to the protocol level header before adding
-	 * link headers.
+	 * if the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
 	 */
-	pr_hdr.ph_family = dst->sa_family;
-	pr_hdr.ph_hdr = mtod(m, caddr_t);
-#endif /* ALTQ */
-
-#ifdef ALTQ
-	if (!ALTQ_IS_ON(ifp)) {
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
 #endif
-	ifq = &ifp->if_snd;
 #ifdef INET
 	/*
 	 * Put low delay, telnet, rlogin and ftp control packets
@@ -477,9 +469,6 @@ sppp_output (struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst, struct rte
 	}
 #endif /* 0 */
 #endif /*INET6*/
-#ifdef ALTQ
-        }
-#endif
 
 	/*
 	 * Prepend general data packet PPP header. For now, IP only.
@@ -554,38 +543,37 @@ nosupport:
 		return (EAFNOSUPPORT);
 	}
 
-#ifdef ALTQ
-	if (ALTQ_IS_ON(ifp)) {
-	        int error, len;
-	        len = m->m_pkthdr.len;
-	        error = (*ifp->if_altqenqueue)(ifp, m, &pr_hdr, ALTEQ_NORMAL);
-	        if (error) {
-			IF_DROP (&ifp->if_snd);
-		}
-		else
-		        ifp->if_obytes += len + 3;
-	        splx(s);
-	        return (error);
-	}
-#endif /* ALTQ */
-
 	/*
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
-	if (IF_QFULL (ifq)) {
-		IF_DROP (&ifp->if_snd);
-#ifdef ALTQ_ACCOUNT
-		ALTQ_ACCOUNTING(ifp, m, &pr_hdr, ALTEQ_ACCDROP);
+	len = m->m_pkthdr.len;
+	if (ifq != NULL
+#ifdef ALTQ
+	    && !ALTQ_IS_ENABLED(&ifp->if_snd)
 #endif
-		m_freem (m);
-		splx (s);
-		return (ENOBUFS);
+		) {
+		if (IF_QFULL (ifq)) {
+			IF_DROP (&ifp->if_snd);
+			m_freem (m);
+			error = ENOBUFS;
+		} else {
+			IF_ENQUEUE (ifq, m);
+			error = 0;
+		}
+	} else {
+#ifdef ALTQ
+		IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+#else
+		IFQ_ENQUEUE(&ifp->if_snd, m, error);
+#endif
 	}
-	IF_ENQUEUE (ifq, m);
-#ifdef ALTQ_ACCOUNT
-	ALTQ_ACCOUNTING(ifp, m, &pr_hdr, ALTEQ_ACCOK);
-#endif
+	if (error != 0) {
+		++ifp->if_oerrors;
+		splx (s);
+		return (error);
+	}
+
 	if (! (ifp->if_flags & IFF_OACTIVE))
 		(*ifp->if_start) (ifp);
 
@@ -594,7 +582,7 @@ nosupport:
 	 * The packet length includes header, FCS and 1 flag,
 	 * according to RFC 1333.
 	 */
-	ifp->if_obytes += m->m_pkthdr.len + 3;
+	ifp->if_obytes += len + 3;
 	splx (s);
 	return (0);
 }
@@ -653,13 +641,7 @@ void sppp_flush (struct ifnet *ifp)
 {
 	struct sppp *sp = (struct sppp*) ifp;
 
-#ifdef ALTQ
-	if (ALTQ_IS_ON(ifp)) {
-	        (void)(*ifp->if_altqdequeue)(ifp, ALTDQ_FLUSH);
-	        return;
-	}
-#endif
-	qflush (&sp->pp_if.if_snd);
+	IFQ_PURGE(&sp->pp_if.if_snd);
 	qflush (&sp->pp_fastq);
 }
 
@@ -672,12 +654,7 @@ sppp_isempty (struct ifnet *ifp)
 	struct sppp *sp = (struct sppp*) ifp;
 	int empty, s = splimp ();
 
-#ifdef ALTQ
-	if (ALTQ_IS_ON(ifp))
-	        empty = ((*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK) == NULL);
-	else
-#endif
-	empty = !sp->pp_fastq.ifq_head && !sp->pp_if.if_snd.ifq_head;
+	empty = !sp->pp_fastq.ifq_head && IFQ_IS_EMPTY(&sp->pp_if.if_snd);
 	splx (s);
 	return (empty);
 }
@@ -691,16 +668,9 @@ struct mbuf *sppp_dequeue (struct ifnet *ifp)
 	struct mbuf *m;
 	int s = splimp ();
 
-#ifdef ALTQ
-	if (ALTQ_IS_ON(ifp)) {
-	        m = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
-	        splx(s);
-	        return (m);
-	}
-#endif /* ALTQ */
 	IF_DEQUEUE (&sp->pp_fastq, m);
 	if (! m)
-		IF_DEQUEUE (&sp->pp_if.if_snd, m);
+		IFQ_DEQUEUE (&sp->pp_if.if_snd, m);
 	splx (s);
 	return (m);
 }
@@ -731,10 +701,6 @@ void sppp_keepalive (void *dummy)
 			printf ("%s%d: down\n", ifp->if_name, ifp->if_unit);
 			if_down (ifp);
 			qflush (&sp->pp_fastq);
-#ifdef ALTQ
-			if (ALTQ_IS_ON(ifp))
-			        (void)(*ifp->if_altqdequeue)(ifp, ALTDQ_FLUSH);
-#endif
 			if (! (sp->pp_flags & PP_CISCO)) {
 				/* Shut down the PPP link. */
 				sp->lcp.state = LCP_STATE_CLOSED;
@@ -825,11 +791,6 @@ void sppp_lcp_input (struct sppp *sp, struct mbuf *m)
 				if (ifp->if_flags & IFF_UP) {
 					if_down (ifp);
 					qflush (&sp->pp_fastq);
-#ifdef ALTQ
-					if (ALTQ_IS_ON(ifp))
-					        (void)(*ifp->if_altqdequeue)
-						        (ifp, ALTDQ_FLUSH);
-#endif
 				}
 			} else if (ifp->if_flags & IFF_DEBUG)
 				printf ("%s%d: conf req: magic glitch\n",
@@ -1009,10 +970,6 @@ badreq:
 			printf ("%s%d: loopback\n", ifp->if_name, ifp->if_unit);
 			if_down (ifp);
 			qflush (&sp->pp_fastq);
-#ifdef ALTQ
-			if (ALTQ_IS_ON(ifp))
-			        (void)(*ifp->if_altqdequeue)(ifp, ALTDQ_FLUSH);
-#endif
 
 			/* Shut down the PPP link. */
 			sp->lcp.state = LCP_STATE_CLOSED;
@@ -1089,11 +1046,6 @@ sppp_cisco_input (struct sppp *sp, struct mbuf *m)
 				if (ifp->if_flags & IFF_UP) {
 					if_down (ifp);
 					qflush (&sp->pp_fastq);
-#ifdef ALTQ
-					if (ALTQ_IS_ON(ifp))
-					        (void)(*ifp->if_altqdequeue)
-						    (ifp, ALTDQ_FLUSH);
-#endif
 				}
 			}
 			++sp->pp_loopcnt;
@@ -1190,22 +1142,6 @@ sppp_cp_send (struct sppp *sp, u_short proto, u_char type,
 			sppp_print_bytes ((u_char*) (lh+1), len);
 		printf (">\n");
 	}
-#ifdef ALTQ
-	if (ALTQ_IS_ON(ifp)) {
-		struct pr_hdr pr_hdr;
-	        int error, len;
-
-	        len = m->m_pkthdr.len;
-		altq_mkctlhdr(&pr_hdr);  /* fake a control type header */
-	        error = (*ifp->if_altqenqueue)(ifp, m, &pr_hdr, ALTEQ_NORMAL);
-	        if (error) {
-			IF_DROP (&ifp->if_snd);
-		}
-		else
-		        ifp->if_obytes += len + 3;
-	        return;
-	}
-#endif /* ALTQ */
 	if (IF_QFULL (&sp->pp_fastq)) {
 		IF_DROP (&ifp->if_snd);
 		m_freem (m);
@@ -1252,19 +1188,6 @@ sppp_cisco_send (struct sppp *sp, int type, long par1, long par2)
 			ifp->if_name, ifp->if_unit, ntohl (ch->type), ch->par1,
 			ch->par2, ch->rel, ch->time0, ch->time1);
 
-#ifdef ALTQ
-	if (ALTQ_IS_ON(ifp)) {
-		struct pr_hdr pr_hdr;
-	        int error, len;
-
-	        len = m->m_pkthdr.len;
-		altq_mkctlhdr(&pr_hdr);  /* fake a control type header */
-	        error = (*ifp->if_altqenqueue)(ifp, m, &pr_hdr, ALTEQ_NORMAL);
-	        if (error == 0)
-		        ifp->if_obytes += len + 3;
-	        return;
-	}
-#endif /* ALTQ */
 	if (IF_QFULL (&sp->pp_fastq)) {
 		IF_DROP (&ifp->if_snd);
 		m_freem (m);

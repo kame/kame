@@ -1,7 +1,7 @@
-/*	$KAME: altq_fifoq.c,v 1.3 2000/04/17 10:46:57 kjc Exp $	*/
+/*	$KAME: altq_fifoq.c,v 1.4 2000/07/25 10:12:30 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-1999
+ * Copyright (C) 1997-2000
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_fifoq.c,v 1.3 2000/04/17 10:46:57 kjc Exp $
+ * $Id: altq_fifoq.c,v 1.4 2000/07/25 10:12:30 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
@@ -58,17 +58,18 @@
 #include <altq/altq_conf.h>
 #include <altq/altq_fifoq.h>
 
-#define FIFOQ_STATS	/* collect statistics */
+#define	FIFOQ_STATS	/* collect statistics */
 
 /* fifoq_list keeps all fifoq_state_t's allocated. */
 static fifoq_state_t *fifoq_list = NULL;
 
 /* internal function prototypes */
-static int		fifoq_enqueue __P((struct ifnet *, struct mbuf *,
-					   struct pr_hdr *, int));
-static struct mbuf 	*fifoq_dequeue __P((struct ifnet *, int));
+static int		fifoq_enqueue __P((struct ifaltq *, struct mbuf *,
+					   struct altq_pktattr *));
+static struct mbuf 	*fifoq_dequeue __P((struct ifaltq *, int));
 static int 		fifoq_detach __P((fifoq_state_t *));
-static void 		fifoq_flush __P((fifoq_state_t *));
+static int		fifoq_request __P((struct ifaltq *, int, void *));
+static void 		fifoq_purge __P((fifoq_state_t *));
 
 /*
  * fifoq device interface
@@ -135,15 +136,15 @@ fifoqioctl(dev, cmd, addr, flag, p)
 	default:
 #if (__FreeBSD_version > 400000)
 		if ((error = suser(p)) != 0)
+			return (error);
 #else
 		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
-#endif
 			return (error);
+#endif
 		break;
 	}
     
 	switch (cmd) {
-
 	case FIFOQ_ENABLE:
 		ifacep = (struct fifoq_interface *)addr;
 		if ((q = altq_lookup(ifacep->fifoq_ifname, ALTQT_FIFOQ))
@@ -151,8 +152,7 @@ fifoqioctl(dev, cmd, addr, flag, p)
 			error = EBADF;
 			break;
 		}
-    
-		error = if_altqenable(q->q_ifp);
+		error = altq_enable(q->q_ifq);
 		break;
 
 	case FIFOQ_DISABLE:
@@ -162,7 +162,7 @@ fifoqioctl(dev, cmd, addr, flag, p)
 			error = EBADF;
 			break;
 		}
-		error = if_altqdisable(q->q_ifp);
+		error = altq_disable(q->q_ifq);
 		break;
 
 	case FIFOQ_IF_ATTACH:
@@ -181,7 +181,7 @@ fifoqioctl(dev, cmd, addr, flag, p)
 		}
 		bzero(q, sizeof(fifoq_state_t));
 
-		q->q_ifp = ifp;
+		q->q_ifq = &ifp->if_snd;
 		q->q_head = q->q_tail = NULL;
 		q->q_len = 0;
 		q->q_limit = FIFOQ_LIMIT;
@@ -189,8 +189,9 @@ fifoqioctl(dev, cmd, addr, flag, p)
 		/*
 		 * set FIFOQ to this ifnet structure.
 		 */
-		error = if_altqattach(ifp, q, fifoq_enqueue, fifoq_dequeue,
-				      ALTQT_FIFOQ);
+		error = altq_attach(q->q_ifq, ALTQT_FIFOQ, q,
+				    fifoq_enqueue, fifoq_dequeue, fifoq_request,
+				    NULL, NULL);
 		if (error) {
 			FREE(q, M_DEVBUF);
 			break;
@@ -208,7 +209,6 @@ fifoqioctl(dev, cmd, addr, flag, p)
 			error = EBADF;
 			break;
 		}
-    
 		error = fifoq_detach(q);
 		break;
 
@@ -251,28 +251,6 @@ fifoqioctl(dev, cmd, addr, flag, p)
 		} while (0);
 		break;
 
-	case FIFOQ_ACC_ENABLE:
-		/* enable accounting mode */
-		ifacep = (struct fifoq_interface *)addr;
-		if ((q = altq_lookup(ifacep->fifoq_ifname, ALTQT_FIFOQ))
-		    == NULL) {
-			error = EBADF;
-			break;
-		}
-		SET_ACCOUNTING(q->q_ifp);
-		break;
-
-	case FIFOQ_ACC_DISABLE:
-		/* disable accounting mode */
-		ifacep = (struct fifoq_interface *)addr;
-		if ((q = altq_lookup(ifacep->fifoq_ifname, ALTQT_FIFOQ))
-		    == NULL) {
-			error = EBADF;
-			break;
-		}
-		CLEAR_ACCOUNTING(q->q_ifp);
-		break;
-
 	default:
 		error = EINVAL;
 		break;
@@ -291,57 +269,32 @@ fifoqioctl(dev, cmd, addr, flag, p)
  *		 ENOBUFS when drop occurs.
  */
 static int
-fifoq_enqueue(ifp, m, pr_hdr, mode)
-	struct ifnet *ifp;
+fifoq_enqueue(ifq, m, pktattr)
+	struct ifaltq *ifq;
 	struct mbuf *m;
-	struct pr_hdr *pr_hdr;
-	int mode;
+	struct altq_pktattr *pktattr;
 {
-	fifoq_state_t *q = (fifoq_state_t *)ifp->if_altqp;
+	fifoq_state_t *q = (fifoq_state_t *)ifq->altq_disc;
 
-	switch (mode) {
-	case ALTEQ_NORMAL:
-		/* if the queue is full, drop the incoming packet(drop-tail) */
-		if (q->q_len >= q->q_limit) {
+	/* if the queue is full, drop the incoming packet(drop-tail) */
+	if (q->q_len >= q->q_limit) {
 #ifdef FIFOQ_STATS
-			q->q_stats.drop_packets++;
-			q->q_stats.drop_bytes += m->m_pkthdr.len;
-#endif
-			m_freem(m);
-			return (ENOBUFS);
-		}
-
-		/* enqueue the packet at the taile of the queue */
-		m->m_nextpkt = NULL;
-		if (q->q_tail == NULL)
-			q->q_head = m;
-		else
-			q->q_tail->m_nextpkt = m;
-		q->q_tail = m;
-		q->q_len++;
-
-		/* start the driver */
-		if (ifp->if_start && (ifp->if_flags & IFF_OACTIVE) == 0)
-			(*ifp->if_start)(ifp);
-
-		break;
-
-#if defined(ALTQ_ACCOUNT) && defined(FIFOQ_STATS)
-		/*
-		 * altq accounting mode: used just for statistics.
-		 */
-	case ALTEQ_ACCOK:
-		q->q_stats.xmit_packets++;
-		q->q_stats.xmit_bytes += m->m_pkthdr.len;
-		break;
-
-	case ALTEQ_ACCDROP:
 		q->q_stats.drop_packets++;
 		q->q_stats.drop_bytes += m->m_pkthdr.len;
-		break;
-
-#endif /* ALTQ_ACCOUNT && FIFOQ_STATS */
+#endif
+		m_freem(m);
+		return (ENOBUFS);
 	}
+
+	/* enqueue the packet at the taile of the queue */
+	m->m_nextpkt = NULL;
+	if (q->q_tail == NULL)
+		q->q_head = m;
+	else
+		q->q_tail->m_nextpkt = m;
+	q->q_tail = m;
+	q->q_len++;
+	ifq->ifq_len++;
 	return 0;
 }
 
@@ -361,36 +314,47 @@ fifoq_enqueue(ifp, m, pr_hdr, mode)
  * operation, the same packet should be returned.
  */
 static struct mbuf *
-fifoq_dequeue(ifp, mode)
-	struct ifnet *ifp;
-	int mode;
+fifoq_dequeue(ifq, op)
+	struct ifaltq *ifq;
+	int op;
 {
-	fifoq_state_t *q = (fifoq_state_t *)ifp->if_altqp;
+	fifoq_state_t *q = (fifoq_state_t *)ifq->altq_disc;
 	struct mbuf *m = NULL;
 
-	switch (mode) {
-	case ALTDQ_DEQUEUE:
-		if ((m = q->q_head) == NULL)
-			break;
-		if ((q->q_head = m->m_nextpkt) == NULL)
-			q->q_tail = NULL;
-		m->m_nextpkt = NULL;
-		q->q_len--;
+	if (op == ALTDQ_POLL)
+		return (q->q_head);
+		
+	if ((m = q->q_head) == NULL)
+		return (NULL);
 
+	if ((q->q_head = m->m_nextpkt) == NULL)
+		q->q_tail = NULL;
+	m->m_nextpkt = NULL;
+	q->q_len--;
+	ifq->ifq_len--;
 #ifdef FIFOQ_STATS
-		q->q_stats.xmit_packets++;
-		q->q_stats.xmit_bytes += m->m_pkthdr.len;
+	q->q_stats.xmit_packets++;
+	q->q_stats.xmit_bytes += m->m_pkthdr.len;
 #endif
-		break;
-	case ALTDQ_PEEK:
-		m = q->q_head;
-		break;
-	case ALTDQ_FLUSH:
-		fifoq_flush(q);
+	return (m);
+}
+
+static int
+fifoq_request(ifq, req, arg)
+	struct ifaltq *ifq;
+	int req;
+	void *arg;
+{
+	fifoq_state_t *q = (fifoq_state_t *)ifq->altq_disc;
+
+	switch (req) {
+	case ALTRQ_PURGE:
+		fifoq_purge(q);
 		break;
 	}
-	return m;
+	return (0);
 }
+
 
 static int fifoq_detach(q)
 	fifoq_state_t *q;
@@ -398,12 +362,12 @@ static int fifoq_detach(q)
 	fifoq_state_t *tmp;
 	int error = 0;
 
-	if (ALTQ_IS_ON(q->q_ifp))
-		if_altqdisable(q->q_ifp);
+	if (ALTQ_IS_ENABLED(q->q_ifq))
+		altq_disable(q->q_ifq);
 
-	fifoq_flush(q);
+	fifoq_purge(q);
 
-	if ((error = if_altqdetach(q->q_ifp)))
+	if ((error = altq_detach(q->q_ifq)))
 		return (error);
 
 	if (fifoq_list == q)
@@ -423,20 +387,22 @@ static int fifoq_detach(q)
 }
 
 /*
- * fifoq_flush
+ * fifoq_purge
  * should be called in splimp or after disabling the fifoq.
  */
-static void fifoq_flush(q)
+static void fifoq_purge(q)
 	fifoq_state_t *q;
 {
 	struct mbuf *m;
-    
+
 	while ((m = q->q_head) != NULL) {
 		q->q_head = m->m_nextpkt;
 		m_freem(m);
 	}
 	q->q_tail = NULL;
 	q->q_len = 0;
+	if (ALTQ_IS_ENABLED(q->q_ifq))
+		q->q_ifq->ifq_len = 0;
 }
 
 #ifdef KLD_MODULE

@@ -126,7 +126,8 @@ static void flush_table(void);
 static void bdg_promisc_on(void);
 static void parse_bdg_cfg(void);
 #ifdef ALTQ
-static int make_ether_prhdr __P((struct mbuf *, struct pr_hdr *));
+static int do_classify __P((struct ifaltq *, struct mbuf *,
+			    struct altq_pktattr *));
 #endif
 
 static int bdg_ipfw = 0 ;
@@ -791,6 +792,12 @@ forward:
     }
     for (;;) {
 	if (last) { /* need to forward packet */
+	    short mflags;
+	    int len;
+#ifdef ALTQ
+	    struct altq_pktattr pktattr;
+#endif
+
 	    if (canfree && once ) { /* no need to copy */
 		m = *m0 ;
 		*m0 = NULL ; /* original is gone */
@@ -804,55 +811,28 @@ forward:
 	     * Last part of ether_output: queue pkt and start
 	     * output if interface not yet active.
 	     */
+#ifdef ALTQ
+	    if (ALTQ_IS_ENABLED(&last->if_snd) &&
+		ALTQ_NEEDS_CLASSIFY(&last->if_snd))
+		do_classify(&last->if_snd, m, &pktattr);
+#endif
+	    mflags = m->m_flags;
+	    len = m->m_pkthdr.len;
 	    s = splimp();
 #ifdef ALTQ
-	    if (ALTQ_IS_ON(ifp)) {
-		    struct pr_hdr pr_hdr;
-		    int len, mcast;
-		    
-		    /*
-		     * if_altqenqueue frees mbuf even when it fails.
-		     * it also calls if_start if necessary.
-		     */
-		    if (m == *m0)
-			    *m0 = NULL ; /* original is gone... */
-		    len = m->m_pkthdr.len;
-		    mcast = m->m_flags & M_MCAST;
-		    make_ether_prhdr(m, &pr_hdr);
-		    error = (*ifp->if_altqenqueue)(ifp, m, &pr_hdr,
-						   ALTEQ_NORMAL);
-		    if (error) {
-			    IF_DROP(&ifp->if_snd);
-		    }
-		    else {
-			    ifp->if_obytes += len;
-			    if (mcast)
-				    ifp->if_omcasts++;
-		    }
-		    splx(s);
-	    }
-	    else {
-#endif /* ALTQ */
-	    if (IF_QFULL(&last->if_snd)) {
-		IF_DROP(&last->if_snd);
-#if 0
-		MUTE(last); /* should I also mute ? */
+	    IFQ_ENQUEUE(&last->if_snd, m, &pktattr, error);
+#else
+	    IFQ_ENQUEUE(&last->if_snd, m, error);
 #endif
-		splx(s);
-		m_freem(m); /* consume the pkt anyways */
-		error = ENOBUFS ;
-	    } else {
-		last->if_obytes += m->m_pkthdr.len ;
-		if (m->m_flags & M_MCAST)
+	    if (error == 0) {
+		last->if_obytes += len;
+		if (mflags & M_MCAST)
 		    last->if_omcasts++;
-		IF_ENQUEUE(&last->if_snd, m);
 		if ((last->if_flags & IFF_OACTIVE) == 0)
 		    (*last->if_start)(last);
-		splx(s);
 	    }
-#ifdef ALTQ
-	    }
-#endif
+	    splx(s);
+
 	    BDG_STAT(last, BDG_OUT);
 	    last = NULL ;
 	    if (once)
@@ -862,7 +842,9 @@ forward:
 	    break ;
 	if (ifp != src &&       /* do not send to self */
 		USED(ifp) &&	/* if used for bridging */
+#ifndef ALTQ
 		! IF_QFULL(&ifp->if_snd) &&
+#endif
 		(ifp->if_flags & (IFF_UP|IFF_RUNNING)) ==
 			 (IFF_UP|IFF_RUNNING) &&
 		SAMECLUSTER(ifp, src, eh) && !MUTED(ifp) )
@@ -877,17 +859,18 @@ forward:
 
 #ifdef ALTQ
 /*
- * get the protocol type (address family) and a pointer to the
- * network layer header
+ * find the size of ethernet header, and call classifier
  */
 static int
-make_ether_prhdr(m, pr_hdr)
+do_classify(ifq, m, pktattr)
+	struct ifaltq *ifq;
 	struct mbuf *m;
-	struct pr_hdr *pr_hdr;
+	struct altq_pktattr *pktattr;
 {
 	struct ether_header *eh;
 	u_short	ether_type;
-	int	hsize;
+	int	hsize, af;
+	caddr_t hdr;
 
 	hsize = sizeof(struct ether_header);
 	eh = mtod(m, struct ether_header *);
@@ -901,27 +884,40 @@ make_ether_prhdr(m, pr_hdr)
 		if (m->m_len < hsize ||
 		    llc->llc_dsap != LLC_SNAP_LSAP ||
 		    llc->llc_ssap != LLC_SNAP_LSAP ||
-		    llc->llc_control != LLC_UI)
+		    llc->llc_control != LLC_UI) {
 			/* not snap! */
+			pktattr->pattr_class = NULL;
+			pktattr->pattr_hdr = NULL;
+			pktattr->pattr_af = AF_UNSPEC;
 			return (0);
+		}
 
 		ether_type = ntohs(llc->llc_un.type_snap.ether_type);
 	}
 
 	if (ether_type == ETHERTYPE_IP)
-		pr_hdr->ph_family = AF_INET;
+		af = AF_INET;
 #ifdef INET6
 	else if (ether_type == ETHERTYPE_IPV6)
-		pr_hdr->ph_family = AF_INET6;
+		af = AF_INET6;
 #endif
 	else
-		pr_hdr->ph_family = AF_UNSPEC;
+		af = AF_UNSPEC;
 
 	while (m->m_len <= hsize) {
 		hsize -= m->m_len;
 		m = m->m_next;
 	}
-	pr_hdr->ph_hdr = m->m_data + hsize;
+	hdr = m->m_data + hsize;
+
+	m->m_data += hsize;
+	m->m_len -= hsize;
+	pktattr->pattr_class = (*ifq->altq_classify)(ifq->altq_clfier, m, af);
+	m->m_data -= hsize;
+	m->m_len += hsize;
+
+	pktattr->pattr_af = af;
+	pktattr->pattr_hdr = hdr;
 	return (1);
 }
 #endif /* ALTQ */

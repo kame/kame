@@ -192,20 +192,6 @@
 #include "i386/pci/if_lmcvar.h"
 #endif
 
-#ifdef ALTQ
-/*
- * device dependent tweak for ALTQ:  if a driver is designed to dequeue
- * too many packets at a time, we have to modify the driver to limit the
- * number of packets buffered in the device.  This modification
- * often needs to change handling of tx complete interrupts as well.
- * the lmc driver can pull as many as 128 packets (when LMC_TXDESCS is 128).
- * TXBUF_THRESH4ALTQ limits buffered packets up to 8.
- * note that enqueue and dequeue for altq is done in if_spppsubr.c and not
- * in this driver.
- */
-#define TXBUF_THRESH4ALTQ	8
-#endif
-
 /*
  * This module supports
  *	the DEC 21140A pass 2.2 PCI Fast Ethernet Controller.
@@ -1300,33 +1286,20 @@ static ifnet_ret_t
 lmc_ifstart(struct ifnet * const ifp)
 {
 	lmc_softc_t * const sc = LMC_IFP_TO_SOFTC(ifp);
-	struct mbuf *m;
+	struct mbuf *m, *m0;
 
 	if (sc->lmc_flags & LMC_IFUP) {
 		while (sppp_isempty(ifp) == 0) {
-#ifdef ALTQ
-			if (ALTQ_IS_ON(ifp)) {
-				if (sc->lmc_txq.ifq_len >= TXBUF_THRESH4ALTQ) {
-					/*
-					 * stop filling tx buffer if we already
-					 * have enough packets to transmit.
-					 * we need to call tulip_tx_intr to
-					 * release completed packets from txq,
-					 * and check the queue length again.
-					 */
-					(void)lmc_tx_intr(sc);
-					if (sc->lmc_txq.ifq_len >= TXBUF_THRESH4ALTQ) {
-						sc->lmc_flags |= LMC_WANTTXSTART;
-						break;
-					}
-				}
-			}
-#endif
-			m = sppp_dequeue(ifp);
-			if ((m = lmc_txput(sc, m)) != NULL) {
-				IF_PREPEND(&((struct sppp *)ifp)->pp_fastq, m);
+			m = sppp_pick(ifp);
+			if (m == NULL)
 				break;
-			}
+			if ((m = lmc_txput(sc, m)) != NULL)
+				break;
+			m0 = sppp_dequeue(ifp);
+#if defined(LMC_DEBUG)
+			if (m0 != m)
+				printf("lmc_ifstart: mbuf mismatch!\n");
+#endif
 		}
 		LMC_CSR_WRITE(sc, csr_txpoll, 1);
 	}
@@ -1336,31 +1309,17 @@ static ifnet_ret_t
 lmc_ifstart_one(struct ifnet * const ifp)
 {
 	lmc_softc_t * const sc = LMC_IFP_TO_SOFTC(ifp);
-	struct mbuf *m;
+	struct mbuf *m, *m0;
 
 	if ((sc->lmc_flags & LMC_IFUP) && (sppp_isempty(ifp) == 0)) {
-#ifdef ALTQ
-		if (ALTQ_IS_ON(ifp)) {
-			if (sc->lmc_txq.ifq_len >= TXBUF_THRESH4ALTQ) {
-				/*
-				 * stop filling tx buffer if we already
-				 * have enough packets to transmit.
-				 * we need to call tulip_tx_intr to
-				 * release completed packets from txq,
-				 * and check the queue length again.
-				 */
-				(void)lmc_tx_intr(sc);
-				if (sc->lmc_txq.ifq_len >= TXBUF_THRESH4ALTQ) {
-					sc->lmc_flags |= LMC_WANTTXSTART;
-					return;
-				}
-			}
-		}
+		m = sppp_pick(ifp);
+		if ((m = lmc_txput(sc, m)) != NULL)
+			return;
+		m0 = sppp_dequeue(ifp);
+#if defined(LMC_DEBUG)
+		if (m0 != m)
+			printf("lmc_ifstart: mbuf mismatch!\n");
 #endif
-		m = sppp_dequeue(ifp);
-		if ((m = lmc_txput(sc, m)) != NULL) {
-			IF_PREPEND(&((struct sppp *)ifp)->pp_fastq, m);
-		}
 		LMC_CSR_WRITE(sc, csr_txpoll, 1);
 	}
 }
@@ -1478,9 +1437,7 @@ lmc_attach(lmc_softc_t * const sc)
 	ifp->if_watchdog = lmc_watchdog;
 	ifp->if_timer = 1;
 	ifp->if_mtu = LMC_MTU;
-#ifdef ALTQ
-	ifp->if_altqflags |= ALTQF_READY;
-#endif
+	IFQ_SET_READY(&ifp->if_snd);
 
 #if defined(__bsdi__)
 	ifp->if_type = IFT_NONE;

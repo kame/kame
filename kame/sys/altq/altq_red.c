@@ -1,7 +1,7 @@
-/*	$KAME: altq_red.c,v 1.4 2000/05/07 06:29:23 kjc Exp $	*/
+/*	$KAME: altq_red.c,v 1.5 2000/07/25 10:12:31 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-1999
+ * Copyright (C) 1997-2000
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -58,7 +58,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_red.c,v 1.4 2000/05/07 06:29:23 kjc Exp $
+ * $Id: altq_red.c,v 1.5 2000/07/25 10:12:31 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
@@ -139,27 +139,27 @@
  * see Sally's paper for more details.
  */
 /* normal red parameters */
-#define W_WEIGHT	512	/* inverse of weight of EWMA (511/512) */
+#define	W_WEIGHT	512	/* inverse of weight of EWMA (511/512) */
 				/* q_weight = 0.00195 */
 
 /* red parameters for a slow link */
-#define W_WEIGHT_1	128	/* inverse of weight of EWMA (127/128) */
+#define	W_WEIGHT_1	128	/* inverse of weight of EWMA (127/128) */
 				/* q_weight = 0.0078125 */
 
 /* red parameters for a very slow link (e.g., dialup) */
-#define W_WEIGHT_2	64	/* inverse of weight of EWMA (63/64) */
+#define	W_WEIGHT_2	64	/* inverse of weight of EWMA (63/64) */
 				/* q_weight = 0.015625 */
 
 /* fixed-point uses 12-bit decimal places */
-#define FP_SHIFT	12	/* fixed-point shift */
+#define	FP_SHIFT	12	/* fixed-point shift */
 
 /* red parameters for drop probability */
-#define INV_P_MAX	10	/* inverse of max drop probability */
-#define TH_MIN		5	/* min threshold */
-#define TH_MAX		15	/* max threshold */
+#define	INV_P_MAX	10	/* inverse of max drop probability */
+#define	TH_MIN		5	/* min threshold */
+#define	TH_MAX		15	/* max threshold */
 
-#define RED_LIMIT	60	/* default max queue lenght */
-#define RED_STATS		/* collect statistics */
+#define	RED_LIMIT	60	/* default max queue lenght */
+#define	RED_STATS		/* collect statistics */
 
 /*
  * our default policy for forced-drop is drop-tail.
@@ -192,23 +192,25 @@ static int default_th_max = TH_MAX;
 static int default_inv_pmax = INV_P_MAX;
 
 /* internal function prototypes */
-static int red_enqueue __P((struct ifnet *, struct mbuf *,
-			    struct pr_hdr *, int));
-static struct mbuf *red_dequeue __P((struct ifnet *, int));
+static int red_enqueue __P((struct ifaltq *, struct mbuf *,
+			    struct altq_pktattr *));
+static struct mbuf *red_dequeue __P((struct ifaltq *, int));
+static int red_request __P((struct ifaltq *, int, void *));
+static void red_purgeq __P((red_queue_t *));
 static int red_detach __P((red_queue_t *));
 #ifdef FLOWVALVE
 static __inline struct fve *flowlist_lookup __P((struct flowvalve *,
-					 struct pr_hdr *, struct timeval *));
+			 struct altq_pktattr *, struct timeval *));
 static __inline struct fve *flowlist_reclaim __P((struct flowvalve *,
-						  struct pr_hdr *));
+						  struct altq_pktattr *));
 static __inline void flowlist_move_to_head __P((struct flowvalve *,
 						struct fve *));
 static __inline int fv_p2f __P((struct flowvalve *, int));
 static struct flowvalve *fv_alloc __P((struct red *));
 static void fv_destroy __P((struct flowvalve *));
-static int fv_checkflow __P((struct flowvalve *, struct pr_hdr *,
+static int fv_checkflow __P((struct flowvalve *, struct altq_pktattr *,
 			     struct fve **));
-static void fv_dropbyred __P((struct flowvalve *fv, struct pr_hdr *,
+static void fv_dropbyred __P((struct flowvalve *fv, struct altq_pktattr *,
 			      struct fve *));
 #endif
 
@@ -281,7 +283,7 @@ redioctl(dev, cmd, addr, flag, p)
 			error = EBADF;
 			break;
 		}
-		error = if_altqenable(rqp->rq_ifp);
+		error = altq_enable(rqp->rq_ifq);
 		break;
 
 	case RED_DISABLE:
@@ -290,7 +292,7 @@ redioctl(dev, cmd, addr, flag, p)
 			error = EBADF;
 			break;
 		}
-		error = if_altqdisable(rqp->rq_ifp);
+		error = altq_disable(rqp->rq_ifq);
 		break;
 
 	case RED_IF_ATTACH:
@@ -325,7 +327,7 @@ redioctl(dev, cmd, addr, flag, p)
 			break;
 		}
 
-		rqp->rq_ifp = ifp;
+		rqp->rq_ifq = &ifp->if_snd;
 		qtail(rqp->rq_q) = NULL;
 		qlen(rqp->rq_q) = 0;
 		qlimit(rqp->rq_q) = RED_LIMIT;
@@ -334,8 +336,9 @@ redioctl(dev, cmd, addr, flag, p)
 		/*
 		 * set RED to this ifnet structure.
 		 */
-		error = if_altqattach(ifp, rqp, red_enqueue, red_dequeue,
-				      ALTQT_RED);
+		error = altq_attach(rqp->rq_ifq, ALTQT_RED, rqp,
+				    red_enqueue, red_dequeue, red_request,
+				    NULL, NULL);
 		if (error) {
 			red_destroy(rqp->rq_red);
 			FREE(rqp->rq_q, M_DEVBUF);
@@ -433,7 +436,7 @@ redioctl(dev, cmd, addr, flag, p)
 			}
 
 			s = splimp();
-			_flushq(rqp->rq_q);
+			red_purgeq(rqp);
 			limit = fc->red_limit;
 			if (limit < fc->red_thmax)
 				limit = fc->red_thmax;
@@ -466,26 +469,6 @@ redioctl(dev, cmd, addr, flag, p)
 		} while (0);
 		break;
 		
-	case RED_ACC_ENABLE:
-		/* enable accounting mode */
-		ifacep = (struct red_interface *)addr;
-		if ((rqp = altq_lookup(ifacep->red_ifname, ALTQT_RED)) == NULL) {
-			error = EBADF;
-			break;
-		}
-		SET_ACCOUNTING(rqp->rq_ifp);
-		break;
-
-	case RED_ACC_DISABLE:
-		/* disable accounting mode */
-		ifacep = (struct red_interface *)addr;
-		if ((rqp = altq_lookup(ifacep->red_ifname, ALTQT_RED)) == NULL) {
-			error = EBADF;
-			break;
-		}
-		CLEAR_ACCOUNTING(rqp->rq_ifp);
-		break;
-
 	default:
 		error = EINVAL;
 		break;
@@ -493,18 +476,17 @@ redioctl(dev, cmd, addr, flag, p)
 	return error;
 }
 
-static int red_detach(rqp)
+static int
+red_detach(rqp)
 	red_queue_t *rqp;
 {
 	red_queue_t *tmp;
 	int error = 0;
 
-	if (ALTQ_IS_ON(rqp->rq_ifp))
-		if_altqdisable(rqp->rq_ifp);
+	if (ALTQ_IS_ENABLED(rqp->rq_ifq))
+		altq_disable(rqp->rq_ifq);
 
-	_flushq(rqp->rq_q);
-
-	if ((error = if_altqdetach(rqp->rq_ifp)))
+	if ((error = altq_detach(rqp->rq_ifq)))
 		return (error);
 
 	if (red_list == rqp)
@@ -656,50 +638,25 @@ red_getstats(rp, sp)
  *		 ENOBUFS when drop occurs.
  */
 static int
-red_enqueue(ifp, m, pr_hdr, mode)
-	struct ifnet *ifp;
+red_enqueue(ifq, m, pktattr)
+	struct ifaltq *ifq;
 	struct mbuf *m;
-	struct pr_hdr *pr_hdr;
-	int mode;
+	struct altq_pktattr *pktattr;
 {
-	red_queue_t *rqp = (red_queue_t *)ifp->if_altqp;
-	int error = 0;
+	red_queue_t *rqp = (red_queue_t *)ifq->altq_disc;
 
-	switch (mode) {
-	case ALTEQ_NORMAL:
-		if (red_addq(rqp->rq_red, rqp->rq_q, m, pr_hdr) == 0) {
-			/* successfully queued.  start the driver */
-			if (ifp->if_start && (ifp->if_flags & IFF_OACTIVE) == 0)
-				(*ifp->if_start)(ifp);
-		}
-		else
-			error = ENOBUFS;
-		break;
-
-#if defined(ALTQ_ACCOUNT) && defined(RED_STATS)
-		/*
-		 * altq accounting mode: used just for statistics.
-		 */
-	case ALTEQ_ACCOK:
-		rqp->rq_red->red_stats.xmit_packets++;
-		rqp->rq_red->red_stats.xmit_bytes += m->m_pkthdr.len;
-		break;
-
-	case ALTEQ_ACCDROP:
-		rqp->rq_red->red_stats.drop_packets++;
-		rqp->rq_red->red_stats.drop_bytes += m->m_pkthdr.len;
-		break;
-
-#endif /* ALTQ_ACCOUNT && RED_STATS */
-	}
-	return error;
+	if (red_addq(rqp->rq_red, rqp->rq_q, m, pktattr) == 0)
+		return ENOBUFS;
+	ifq->ifq_len++;
+	return 0;
 }
 
-int red_addq(rp, q, m, pr_hdr)
+int
+red_addq(rp, q, m, pktattr)
 	red_t *rp;
 	class_queue_t *q;
 	struct mbuf *m;
-	struct pr_hdr *pr_hdr;
+	struct altq_pktattr *pktattr;
 {
 	int avg, droptype;
 	int n;
@@ -707,14 +664,14 @@ int red_addq(rp, q, m, pr_hdr)
 	struct fve *fve = NULL;
 
 	if (rp->red_flowvalve != NULL && rp->red_flowvalve->fv_flows > 0)
-		if (fv_checkflow(rp->red_flowvalve, pr_hdr, &fve)) {
+		if (fv_checkflow(rp->red_flowvalve, pktattr, &fve)) {
 			m_freem(m);
 			return (-1);
 		}
 #endif
-	
+
 	avg = rp->red_avg;
-    
+
 	/*
 	 * if we were idle, we pretend that n packets arrived during
 	 * the idle period.
@@ -722,7 +679,7 @@ int red_addq(rp, q, m, pr_hdr)
 	if (rp->red_idle) {
 		struct timeval now;
 		int t;
-	
+
 		rp->red_idle = 0;
 		microtime(&now);
 		t = (now.tv_sec - rp->red_last.tv_sec);
@@ -730,17 +687,16 @@ int red_addq(rp, q, m, pr_hdr)
 			/*
 			 * being idle for more than 1 minute, set avg to zero.
 			 * this prevents t from overflow.
-			 */ 
+			 */
 			avg = 0;
-		}
-		else {
+		} else {
 			t = t * 1000000 + (now.tv_usec - rp->red_last.tv_usec);
 			n = t / rp->red_pkttime - 1;
 
 			/* the following line does (avg = (1 - Wq)^n * avg) */
 			if (n > 0)
 				avg = (avg >> FP_SHIFT) *
-					pow_w(rp->red_wtab, n);
+				    pow_w(rp->red_wtab, n);
 		}
 	}
 
@@ -753,37 +709,33 @@ int red_addq(rp, q, m, pr_hdr)
 	 * been dropped.
 	 */
 	rp->red_count++;
-    
+
 	/* see if we drop early */
 	droptype = DTYPE_NODROP;
 	if (avg >= rp->red_thmin_s && qlen(q) > 1) {
 		if (avg >= rp->red_thmax_s) {
 			/* avg >= th_max: forced drop */
 			droptype = DTYPE_FORCED;
-		}
-		else if (rp->red_old == 0) {
+		} else if (rp->red_old == 0) {
 			/* first exceeds th_min */
 			rp->red_count = 1;
 			rp->red_old = 1;
-		}
-		else if (drop_early((avg - rp->red_thmin_s) >> rp->red_wshift,
-				    rp->red_probd, rp->red_count)) {
+		} else if (drop_early((avg - rp->red_thmin_s) >> rp->red_wshift,
+				      rp->red_probd, rp->red_count)) {
 			/* mark or drop by red */
 			if ((rp->red_flags & REDF_ECN) &&
-			    mark_ecn(pr_hdr, rp->red_flags)) {
+			    mark_ecn(pktattr, rp->red_flags)) {
 				/* successfully marked.  do not drop. */
 				rp->red_count = 0;
 #ifdef RED_STATS
 				rp->red_stats.marked_packets++;
 #endif
-			}
-			else { 
+			} else { 
 				/* unforced drop by red */
 				droptype = DTYPE_EARLY;
 			}
 		}
-	}
-	else {
+	} else {
 		/* avg < th_min */
 		rp->red_old = 0;
 	}
@@ -809,8 +761,7 @@ int red_addq(rp, q, m, pr_hdr)
 #ifdef RED_STATS
 			rp->red_stats.drop_unforced++;
 #endif
-		}
-		else {
+		} else {
 			/* forced drop, select a victim packet in the queue. */
 #ifdef RED_RANDOM_DROP
 			m = _getq_random(q);
@@ -826,7 +777,7 @@ int red_addq(rp, q, m, pr_hdr)
 		rp->red_count = 0;
 #ifdef FLOWVALVE
 		if (rp->red_flowvalve != NULL)
-			fv_dropbyred(rp->red_flowvalve, pr_hdr, fve);
+			fv_dropbyred(rp->red_flowvalve, pktattr, fve);
 #endif
 		m_freem(m);
 		return (-1);
@@ -844,7 +795,8 @@ int red_addq(rp, q, m, pr_hdr)
  * (prob_a starts from prob/2, becomes prob when (count == (1 / prob)),
  * becomes 1 when (count >= (2 / prob))).
  */
-int drop_early(fp_len, fp_probd, count)
+int
+drop_early(fp_len, fp_probd, count)
 	int fp_len;	/* (avg - TH_MIN) in fixed-point */
 	int fp_probd;	/* (2 * (TH_MAX-TH_MIN) / pmax) in fixed-point */
 	int count;	/* how many successive undropped packets */
@@ -874,15 +826,19 @@ int drop_early(fp_len, fp_probd, count)
  * try to mark CE bit to the packet.
  *    returns 1 if successfully marked, 0 otherwise.
  */
-int mark_ecn(pr_hdr, flags)
-	struct pr_hdr *pr_hdr;
+int
+mark_ecn(pktattr, flags)
+	struct altq_pktattr *pktattr;
 	int flags;
 {
 
-	switch (pr_hdr->ph_family) {
+	if (pktattr == NULL)
+		return (0);
+
+	switch (pktattr->pattr_af) {
 	case AF_INET:
 		if (flags & REDF_ECN4) {
-			struct ip *ip = (struct ip *)pr_hdr->ph_hdr;
+			struct ip *ip = (struct ip *)pktattr->pattr_hdr;
 	    
 			if (ip->ip_tos & IPTOS_ECT) {
 				/* ECN-capable, mark ECN bit. */
@@ -905,7 +861,7 @@ int mark_ecn(pr_hdr, flags)
 					ip->ip_sum = htons(sum);
 #else /* IPTOS_CE != 0x01 */
 					long sum;
-		    
+
 					ip->ip_tos |= IPTOS_CE;
 					/*
 					 * update checksum (from RFC1624)
@@ -915,7 +871,7 @@ int mark_ecn(pr_hdr, flags)
 					sum += 0xffff + IPTOS_CE;
 					sum = (sum >> 16) + (sum & 0xffff);
 					sum += (sum >> 16);  /* add carry */
-		
+
 					ip->ip_sum = htons(~sum & 0xffff);
 #endif /* IPTOS_CE != 0x01 */
 				}
@@ -926,7 +882,7 @@ int mark_ecn(pr_hdr, flags)
 #ifdef INET6
 	case AF_INET6:
 		if (flags & REDF_ECN6) {
-			struct ip6_hdr *ip6 = (struct ip6_hdr *)pr_hdr->ph_hdr;
+			struct ip6_hdr *ip6 = (struct ip6_hdr *)pktattr->pattr_hdr;
 			u_int32_t flowlabel;
 
 			flowlabel = ntohl(ip6->ip6_flow);
@@ -954,30 +910,25 @@ int mark_ecn(pr_hdr, flags)
  */
 
 static struct mbuf *
-red_dequeue(ifp, mode)
-	struct ifnet *ifp;
-	int mode;
+red_dequeue(ifq, op)
+	struct ifaltq *ifq;
+	int op;
 {
-	red_queue_t *rqp = (red_queue_t *)ifp->if_altqp;
-	struct mbuf *m = NULL;
+	red_queue_t *rqp = (red_queue_t *)ifq->altq_disc;
+	struct mbuf *m;
 
-	switch (mode) {
-	case ALTDQ_DEQUEUE:
-		m = red_getq(rqp->rq_red, rqp->rq_q);
-		break;
+	if (op == ALTDQ_POLL)
+		return qhead(rqp->rq_q);
 
-	case ALTDQ_PEEK:
-		m = qhead(rqp->rq_q);
-		break;
-
-	case ALTDQ_FLUSH:
-		_flushq(rqp->rq_q);
-		break;
-	}
-	return m;
+	/* op == ALTDQ_REMOVE */
+	m =  red_getq(rqp->rq_red, rqp->rq_q);
+	if (m != NULL)
+		ifq->ifq_len--;
+	return (m);
 }
 
-struct mbuf *red_getq(rp, q)
+struct mbuf *
+red_getq(rp, q)
 	red_t *rp;
 	class_queue_t *q;
 {
@@ -999,6 +950,32 @@ struct mbuf *red_getq(rp, q)
 	return (m);
 }
 
+static int
+red_request(ifq, req, arg)
+	struct ifaltq *ifq;
+	int req;
+	void *arg;
+{
+	red_queue_t *rqp = (red_queue_t *)ifq->altq_disc;
+
+	switch (req) {
+	case ALTRQ_PURGE:
+		red_purgeq(rqp);
+		break;
+	}
+	return (0);
+}
+
+static void
+red_purgeq(rqp)
+	red_queue_t *rqp;
+{
+	_flushq(rqp->rq_q);
+	if (ALTQ_IS_ENABLED(rqp->rq_ifq))
+		rqp->rq_ifq->ifq_len = 0;
+}
+
+
 /*
  * helper routine to calibrate avg during idle.
  * pow_w(wtab, n) returns (1 - Wq)^n in fixed-point
@@ -1014,13 +991,13 @@ wtab_alloc(weight)
 {
 	struct wtab *w;
 	int i;
-	
+
 	for (w = wtab_list; w != NULL; w = w->w_next)
 		if (w->w_weight == weight) {
 			w->w_refcount++;
 			return (w);
 		}
-	
+
 	MALLOC(w, struct wtab *, sizeof(struct wtab), M_DEVBUF, M_WAITOK);
 	if (w == NULL)
 		panic("wtab_alloc: malloc failed!");
@@ -1029,7 +1006,7 @@ wtab_alloc(weight)
 	w->w_refcount = 1;
 	w->w_next = wtab_list;
 	wtab_list = w;
-	
+
 	/* initialize the weight table */
 	w->w_tab[0] = ((weight - 1) << FP_SHIFT) / weight;
 	for (i = 1; i < 32; i++) {
@@ -1037,7 +1014,7 @@ wtab_alloc(weight)
 		if (w->w_tab[i] == 0 && w->w_param_max == 0)
 			w->w_param_max = 1 << i;
 	}
-	
+
 	return (w);
 }
 
@@ -1057,7 +1034,7 @@ wtab_destroy(w)
 			prev->w_next = w->w_next;
 			break;
 		}
-	
+
 	FREE(w, M_DEVBUF);
 	return (0);
 }
@@ -1092,28 +1069,28 @@ pow_w(w, n)
 
 #ifdef FLOWVALVE
 
-#define FV_PSHIFT	7	/* weight of average drop rate -- 1/128 */
-#define FV_PSCALE(x)	((x) << FV_PSHIFT)
-#define FV_PUNSCALE(x)	((x) >> FV_PSHIFT)
-#define FV_FSHIFT	5	/* weight of average fraction -- 1/32 */
-#define FV_FSCALE(x)	((x) << FV_FSHIFT)
-#define FV_FUNSCALE(x)	((x) >> FV_FSHIFT)
+#define	FV_PSHIFT	7	/* weight of average drop rate -- 1/128 */
+#define	FV_PSCALE(x)	((x) << FV_PSHIFT)
+#define	FV_PUNSCALE(x)	((x) >> FV_PSHIFT)
+#define	FV_FSHIFT	5	/* weight of average fraction -- 1/32 */
+#define	FV_FSCALE(x)	((x) << FV_FSHIFT)
+#define	FV_FUNSCALE(x)	((x) >> FV_FSHIFT)
 
-#define FV_TIMER	(3 * hz)	/* timer value for garbage collector */
-#define FV_FLOWLISTSIZE		64	/* how many flows in flowlist */
+#define	FV_TIMER	(3 * hz)	/* timer value for garbage collector */
+#define	FV_FLOWLISTSIZE		64	/* how many flows in flowlist */
 
-#define FV_N			10	/* update fve_f every FV_N packets */
+#define	FV_N			10	/* update fve_f every FV_N packets */
 
-#define FV_BACKOFFTHRESH	1  /* backoff threshold interval in second */
-#define FV_TTHRESH		3  /* time threshold to delete fve */  
-#define FV_ALPHA		5  /* extra packet count */
+#define	FV_BACKOFFTHRESH	1  /* backoff threshold interval in second */
+#define	FV_TTHRESH		3  /* time threshold to delete fve */  
+#define	FV_ALPHA		5  /* extra packet count */
 
-#define FV_STATS
+#define	FV_STATS
 
 #if (__FreeBSD_version > 300000)
-#define FV_TIMESTAMP(tp)	getmicrotime(tp)
+#define	FV_TIMESTAMP(tp)	getmicrotime(tp)
 #else
-#define FV_TIMESTAMP(tp)	{ (*(tp)) = time; }
+#define	FV_TIMESTAMP(tp)	{ (*(tp)) = time; }
 #endif
 
 /*
@@ -1125,10 +1102,10 @@ pow_w(w, n)
  *   Brtt(p) = 1 /(sqrt(4*p/3) + min(1,3*sqrt(p*6/8)) * p * (1+32 * p*p))
  *   f = Brtt(p) / (max_th + alpha)
  */
-#define BRTT_SIZE	128
-#define BRTT_SHIFT	12
-#define BRTT_MASK	0x0007f000
-#define BRTT_PMAX	(1 << (FV_PSHIFT + FP_SHIFT))
+#define	BRTT_SIZE	128
+#define	BRTT_SHIFT	12
+#define	BRTT_MASK	0x0007f000
+#define	BRTT_PMAX	(1 << (FV_PSHIFT + FP_SHIFT))
 
 const int brtt_tab[BRTT_SIZE] = {
 	0, 1262010, 877019, 703694, 598706, 525854, 471107, 427728, 
@@ -1149,10 +1126,10 @@ const int brtt_tab[BRTT_SIZE] = {
 	4611, 4504, 4400, 4299, 4201, 4106, 4014, 3924
 };
 
-
-static __inline struct fve *flowlist_lookup(fv, pr_hdr, now)
+static __inline struct fve *
+flowlist_lookup(fv, pktattr, now)
 	struct flowvalve *fv;
-	struct pr_hdr *pr_hdr;
+	struct altq_pktattr *pktattr;
 	struct timeval *now;
 {
 	struct fve *fve;
@@ -1163,14 +1140,17 @@ static __inline struct fve *flowlist_lookup(fv, pr_hdr, now)
 #endif
 	struct timeval tthresh;
 
+	if (pktattr == NULL)
+		return (NULL);
+
 	tthresh.tv_sec = now->tv_sec - FV_TTHRESH;
 	flows = 0;
 	/*
 	 * search the flow list
 	 */
-	switch (pr_hdr->ph_family) {
+	switch (pktattr->pattr_af) {
 	case AF_INET:
-		ip = (struct ip *)pr_hdr->ph_hdr;
+		ip = (struct ip *)pktattr->pattr_hdr;
 		TAILQ_FOREACH(fve, &fv->fv_flowlist, fve_lru){
 			if (fve->fve_lastdrop.tv_sec == 0)
 				break;
@@ -1189,7 +1169,7 @@ static __inline struct fve *flowlist_lookup(fv, pr_hdr, now)
 		break;
 #ifdef INET6
 	case AF_INET6:
-		ip6 = (struct ip6_hdr *)pr_hdr->ph_hdr;
+		ip6 = (struct ip6_hdr *)pktattr->pattr_hdr;
 		TAILQ_FOREACH(fve, &fv->fv_flowlist, fve_lru){
 			if (fve->fve_lastdrop.tv_sec == 0)
 				break;
@@ -1216,9 +1196,10 @@ static __inline struct fve *flowlist_lookup(fv, pr_hdr, now)
 	return (NULL);
 }
 
-static __inline struct fve *flowlist_reclaim(fv, pr_hdr)
+static __inline struct fve *
+flowlist_reclaim(fv, pktattr)
 	struct flowvalve *fv;
-	struct pr_hdr *pr_hdr;
+	struct altq_pktattr *pktattr;
 {
 	struct fve *fve;
 	struct ip *ip;
@@ -1231,16 +1212,16 @@ static __inline struct fve *flowlist_reclaim(fv, pr_hdr)
 	 */
 	fve = TAILQ_LAST(&fv->fv_flowlist, fv_flowhead);
 
-	switch (pr_hdr->ph_family) {
+	switch (pktattr->pattr_af) {
 	case AF_INET:
-		ip = (struct ip *)pr_hdr->ph_hdr;
+		ip = (struct ip *)pktattr->pattr_hdr;
 		fve->fve_flow.flow_af = AF_INET;
 		fve->fve_flow.flow_ip.ip_src = ip->ip_src;
 		fve->fve_flow.flow_ip.ip_dst = ip->ip_dst;
 		break;
 #ifdef INET6
 	case AF_INET6:
-		ip6 = (struct ip6_hdr *)pr_hdr->ph_hdr;
+		ip6 = (struct ip6_hdr *)pktattr->pattr_hdr;
 		fve->fve_flow.flow_af = AF_INET6;
 		fve->fve_flow.flow_ip6.ip6_src = ip6->ip6_src;
 		fve->fve_flow.flow_ip6.ip6_dst = ip6->ip6_dst;
@@ -1261,7 +1242,8 @@ static __inline struct fve *flowlist_reclaim(fv, pr_hdr)
 	return (fve);
 }
 
-static __inline void flowlist_move_to_head(fv, fve)
+static __inline void
+flowlist_move_to_head(fv, fve)
 	struct flowvalve *fv;
 	struct fve *fve;
 {
@@ -1281,7 +1263,7 @@ fv_alloc(rp)
 	struct flowvalve *fv;
 	struct fve *fve;
 	int i, num;
-	
+
 	num = FV_FLOWLISTSIZE;
 	MALLOC(fv, struct flowvalve *, sizeof(struct flowvalve),
 	       M_DEVBUF, M_WAITOK);
@@ -1296,7 +1278,7 @@ fv_alloc(rp)
 		return (NULL);
 	}
 	bzero(fv->fv_fves, sizeof(struct fve) * num);
-	
+
 	fv->fv_flows = 0;
 	TAILQ_INIT(&fv->fv_flowlist);
 	for (i = 0; i < num; i++) {
@@ -1338,7 +1320,8 @@ static void fv_destroy(fv)
 	FREE(fv, M_DEVBUF);
 }
 
-static __inline int fv_p2f(fv, p)
+static __inline int
+fv_p2f(fv, p)
 	struct flowvalve	*fv;
 	int	p;
 {
@@ -1359,9 +1342,10 @@ static __inline int fv_p2f(fv, p)
  * returns 1 when the packet should be pre-dropped.
  * should be called in splimp.
  */
-static int fv_checkflow(fv, pr_hdr, fcache)
+static int
+fv_checkflow(fv, pktattr, fcache)
 	struct flowvalve *fv;
-	struct pr_hdr *pr_hdr;
+	struct altq_pktattr *pktattr;
 	struct fve **fcache;
 {
 	struct fve *fve;
@@ -1370,7 +1354,7 @@ static int fv_checkflow(fv, pr_hdr, fcache)
 	fv->fv_ifseq++;
 	FV_TIMESTAMP(&now);
 
-	if ((fve = flowlist_lookup(fv, pr_hdr, &now)) == NULL)
+	if ((fve = flowlist_lookup(fv, pktattr, &now)) == NULL)
 		/* no matching entry in the flowlist */
 		return (0);
 
@@ -1439,22 +1423,24 @@ static int fv_checkflow(fv, pr_hdr, fcache)
  * called from red_addq when a packet is dropped by red.
  * should be called in splimp.
  */
-static void fv_dropbyred(fv, pr_hdr, fcache)
+static void fv_dropbyred(fv, pktattr, fcache)
 	struct flowvalve *fv;
-	struct pr_hdr *pr_hdr;
+	struct altq_pktattr *pktattr;
 	struct fve *fcache;
 {
 	struct fve *fve;
 	struct timeval now;
 
+	if (pktattr == NULL)
+		return;
 	FV_TIMESTAMP(&now);
-	
+
 	if (fcache != NULL)
 		/* the fve of this packet is already cached */
 		fve = fcache;
-	else if ((fve = flowlist_lookup(fv, pr_hdr, &now)) == NULL)
-		fve = flowlist_reclaim(fv, pr_hdr);
-	
+	else if ((fve = flowlist_lookup(fv, pktattr, &now)) == NULL)
+		fve = flowlist_reclaim(fv, pktattr);
+
 	flowlist_move_to_head(fv, fve);
 
 	/*

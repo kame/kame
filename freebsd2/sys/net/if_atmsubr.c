@@ -35,10 +35,6 @@
 /*
  * if_atmsubr.c
  */
-#ifdef ALTQ
-#include "opt_altq.h"
-#endif
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
@@ -61,13 +57,6 @@
 #endif
 #ifdef NATM
 #include <netnatm/natm.h>
-#endif
-
-#ifdef ALTQ
-#include <altq/altq.h>
-#ifdef AFMAP
-#include <altq/altq_afmap.h>
-#endif
 #endif
 
 #ifndef ETHERTYPE_IPV6
@@ -99,7 +88,7 @@ atm_output(ifp, m0, dst, rt0)
 	struct rtentry *rt0;
 {
 	u_int16_t etype = 0;			/* if using LLC/SNAP */
-	int s, error = 0, sz;
+	int s, error = 0, sz, len;
 	struct atm_pseudohdr atmdst, *ad;
 	register struct mbuf *m = m0;
 	register struct rtentry *rt;
@@ -107,7 +96,7 @@ atm_output(ifp, m0, dst, rt0)
 	struct atmllc *llc_hdr = NULL;
 	u_int32_t atm_flags;
 #ifdef ALTQ
-	struct pr_hdr pr_hdr;
+	struct altq_pktattr pktattr;
 #endif
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
@@ -115,15 +104,12 @@ atm_output(ifp, m0, dst, rt0)
 
 #ifdef ALTQ
 	/*
-	 * save a pointer to the protocol level header before adding
-	 * link headers.
+	 * if the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
 	 */
-	if (dst)
-		pr_hdr.ph_family = dst->sa_family;
-	else
-		pr_hdr.ph_family = AF_UNSPEC;
-	pr_hdr.ph_hdr = mtod(m, caddr_t);
-#endif /* ALTQ */
+	IFQ_CLASSIFY(&ifp->if_snd, m,
+		     (dst != NULL ? dst->sa_family : AF_UNSPEC), &pktattr);
+#endif
 
 	/*
 	 * check route
@@ -202,29 +188,6 @@ atm_output(ifp, m0, dst, rt0)
 			senderr(EAFNOSUPPORT);
 		}
 
-#if defined(ALTQ) && defined(AFMAP)
-		if (ifp->if_altqflags & ALTQF_DRIVER1) {
-		        /* try to map flow to vpi/vci. */
-			struct flowinfo flow;
-		        struct afm *afm;
-
-			altq_extractflow(m, &pr_hdr, &flow, FIMB_ALL);
-		        if ((afm = afm_match(ifp, &flow)) != NULL) {
-			        /* matching entry found.  overwrite vpi:vci. */
-#if 0
-				printf("%s%d: atm_output:afmap vci %d -> %d\n",
-				       ifp->if_name, ifp->if_unit,
-				       ATM_PH_VCI(&atmdst), afm->afm_vci);
-#endif
-			        ATM_PH_VPI(&atmdst) = afm->afm_vpi;
-			        ATM_PH_SETVCI(&atmdst, afm->afm_vci);
-
-				afm->afms_packets++;
-				afm->afms_bytes = m->m_pkthdr.len;
-			}
-		}
-#endif /* ALTQ && AFMAP */
-
 		/*
 		 * must add atm_pseudohdr to data
 		 */
@@ -253,37 +216,18 @@ atm_output(ifp, m0, dst, rt0)
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
+	len = m->m_pkthdr.len;
+	s = splimp();
 #ifdef ALTQ
-	if (ALTQ_IS_ON(ifp)) {
-	        s = splimp();
-		error = (*ifp->if_altqenqueue)(ifp, m, &pr_hdr, ALTEQ_NORMAL);
+	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+#else
+	IFQ_ENQUEUE(&ifp->if_snd, m, error);
+#endif
+	if (error) {
 		splx(s);
-		if (error) {
-			IF_DROP(&ifp->if_snd);
-		}
-		else {
-			ifp->if_obytes += m->m_pkthdr.len;
-			if (m->m_flags & M_MCAST)
-				ifp->if_omcasts++;
-		}
 		return (error);
 	}
-#endif /* ALTQ */
-
-	s = splimp();
-	if (IF_QFULL(&ifp->if_snd)) {
-		IF_DROP(&ifp->if_snd);
-#ifdef ALTQ_ACCOUNT
-		ALTQ_ACCOUNTING(ifp, m, &pr_hdr, ALTEQ_ACCDROP);
-#endif
-		splx(s);
-		senderr(ENOBUFS);
-	}
-	ifp->if_obytes += m->m_pkthdr.len;
-	IF_ENQUEUE(&ifp->if_snd, m);
-#ifdef ALTQ_ACCOUNT
-	ALTQ_ACCOUNTING(ifp, m, &pr_hdr, ALTEQ_ACCOK);
-#endif
+	ifp->if_obytes += len;
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);
@@ -425,7 +369,7 @@ atm_ifattach(ifp)
 	ifp->if_hdrlen = 0;
 	ifp->if_mtu = ATMMTU;
 	ifp->if_output = atm_output;
-	ifp->if_snd.ifq_maxlen = 50;	/* dummy */
+	IFQ_SET_MAXLEN(&ifp->if_snd, 50);	/* dummy */
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	for (ifa = ifp->if_addrlist.tqh_first; ifa != 0;

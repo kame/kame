@@ -1,7 +1,7 @@
-/*	$KAME: altq_rio.h,v 1.2 2000/02/22 14:00:34 itojun Exp $	*/
+/*	$KAME: altq_rio.h,v 1.3 2000/07/25 10:12:31 kjc Exp $	*/
 
 /*
- * Copyright (C) 1998-1999
+ * Copyright (C) 1998-2000
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,11 +25,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_rio.h,v 1.2 2000/02/22 14:00:34 itojun Exp $
+ * $Id: altq_rio.h,v 1.3 2000/07/25 10:12:31 kjc Exp $
  */
 
 #ifndef _ALTQ_ALTQ_RIO_H_
-#define _ALTQ_ALTQ_RIO_H_
+#define	_ALTQ_ALTQ_RIO_H_
 
 #include <altq/altq_classq.h>
 
@@ -37,7 +37,7 @@
  * RIO: RED with IN/OUT bit
  * (extended to support more than 2 drop precedence values)
  */
-#define RIO_NDROPPREC	3	/* number of drop precedence values */
+#define	RIO_NDROPPREC	3	/* number of drop precedence values */
 
 struct rio_interface {
 	char	rio_ifname[IFNAMSIZ];
@@ -65,16 +65,16 @@ struct rio_conf {
 };
 
 /* rio flags */
-#define RIOF_ECN4	0x01	/* use packet marking for IPv4 packets */
-#define RIOF_ECN6	0x02	/* use packet marking for IPv6 packets */
-#define RIOF_ECN	(RIOF_ECN4 | RIOF_ECN6)
-#define RIOF_CLEARDSCP	0x200	/* clear diffserv codepoint */
+#define	RIOF_ECN4	0x01	/* use packet marking for IPv4 packets */
+#define	RIOF_ECN6	0x02	/* use packet marking for IPv6 packets */
+#define	RIOF_ECN	(RIOF_ECN4 | RIOF_ECN6)
+#define	RIOF_CLEARDSCP	0x200	/* clear diffserv codepoint */
 
 /* 
  * IOCTLs for RIO
  */
-#define RIO_ENABLE		_IOW('Q', 1, struct rio_interface)
-#define RIO_DISABLE		_IOW('Q', 2, struct rio_interface)
+#define	RIO_ENABLE		_IOW('Q', 1, struct rio_interface)
+#define	RIO_DISABLE		_IOW('Q', 2, struct rio_interface)
 #define	RIO_IF_ATTACH		_IOW('Q', 3, struct rio_interface)
 #define	RIO_IF_DETACH		_IOW('Q', 4, struct rio_interface)
 #define	RIO_ACC_ENABLE		_IOW('Q', 5, struct rio_interface)
@@ -83,7 +83,7 @@ struct rio_conf {
 #define	RIO_CONFIG		_IOWR('Q', 8, struct rio_conf)
 #define	RIO_SETDEFAULTS		_IOW('Q', 9, struct redparams[RIO_NDROPPREC])
 
-#if defined(KERNEL) || defined(_KERNEL)
+#ifdef _KERNEL
 
 typedef struct rio {
 	/* per drop precedence structure */
@@ -121,10 +121,9 @@ typedef struct rio {
 	struct redstats q_stats[RIO_NDROPPREC];	/* statistics */
 } rio_t;
 
-
 typedef struct rio_queue {
 	struct rio_queue *rq_next;	/* next red_state in the list */
-	struct ifnet *rq_ifp;		/* backpointer to ifnet */
+	struct ifaltq *rq_ifq;		/* backpointer to ifaltq */
 
 	class_queue_t *rq_q;
 
@@ -135,10 +134,10 @@ extern rio_t *rio_alloc __P((int, struct redparams *, int, int));
 extern void rio_destroy __P((rio_t *));
 extern void rio_getstats __P((rio_t *, struct redstats *));
 extern int rio_addq __P((rio_t *, class_queue_t *, struct mbuf *,
-			 struct pr_hdr *));
+			 struct altq_pktattr *));
 extern struct mbuf *rio_getq __P((rio_t *, class_queue_t *));
 extern int rio_set_meter __P((rio_t *, int, int, int));
 
-#endif /* KERNEL */
+#endif /* _KERNEL */
 
 #endif /* _ALTQ_ALTQ_RIO_H_ */

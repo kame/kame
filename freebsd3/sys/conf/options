@@ -228,7 +228,6 @@ FLOWVALVE		opt_altq.h
 CBQ_RED			opt_altq.h
 RIO			opt_altq.h
 CBQ_RIO			opt_altq.h
-ALTQ_ACCOUNT		opt_altq.h
 ALTQ_IPSEC		opt_altq.h
 LOCALQ			opt_altq.h
 HFSC			opt_altq.h
@@ -236,6 +235,7 @@ HFSC_RED		opt_altq.h
 HFSC_RIO		opt_altq.h
 CDNR			opt_altq.h
 BLUE			opt_altq.h
+ALTQ_NOPCC		opt_altq.h
 ALTQ_DEBUG		opt_altq.h
 
 BOOTP			opt_bootp.h

@@ -105,6 +105,17 @@ struct	if_data {
 
 /*
  * Structure defining a queue for a network interface.
+ */
+struct	ifqueue {
+	struct	mbuf *ifq_head;
+	struct	mbuf *ifq_tail;
+	int	ifq_len;
+	int	ifq_maxlen;
+	int	ifq_drops;
+};
+
+/*
+ * Structure defining a network interface.
  *
  * (Would like to call this struct ``if'', but C isn't PL/1.)
  */
@@ -143,26 +154,13 @@ struct ifnet {				/* and the entries */
 		__P((struct ifnet *));
 	void	(*if_drain)		/* routine to release resources */
 		__P((struct ifnet *));
-	struct	ifqueue {
-		struct	mbuf *ifq_head;
-		struct	mbuf *ifq_tail;
-		int	ifq_len;
-		int	ifq_maxlen;
-		int	ifq_drops;
-	} if_snd;			/* output queue */
+#if 1 /* ALTQ */
+	struct	ifaltq if_snd;		/* output queue (includes altq) */
+#else
+	struct	ifqueue if_snd;		/* output queue */
+#endif
 	struct	sockaddr_dl *if_sadl;	/* pointer to our sockaddr_dl */
 	u_int8_t *if_broadcastaddr;	/* linklevel broadcast bytestring */
-#if 1 /* ALTQ */
-	/* alternate queueing related stuff */
-	int	if_altqtype;		/* queueing scheme id */
-	int	if_altqflags;		/* altq flags (e.g. ready, in-use) */
-	void	*if_altqp;		/* queue state */
-	int	(*if_altqenqueue)
-		__P((struct ifnet *, struct mbuf *, struct pr_hdr *, int));
-	struct mbuf *(*if_altqdequeue)
-		__P((struct ifnet *, int));
-	void	*if_altqcdnr;		/* input traffic conditioner */
-#endif /* ALTQ */
 	struct ifprefix *if_prefixlist; /* linked list of prefixes per if */
 };
 #define	if_mtu		if_data.ifi_mtu
@@ -239,6 +237,17 @@ struct ifnet {				/* and the entries */
 		(ifq)->ifq_len--; \
 	} \
 }
+#define	IF_POLL(ifq, m)		((m) = (ifq)->ifq_head)
+#define	IF_PURGE(ifq)							\
+while (1) {								\
+	struct mbuf *m0;						\
+	IF_DEQUEUE((ifq), m0);						\
+	if (m0 == NULL)							\
+		break;							\
+	else								\
+		m_freem(m0);						\
+}
+#define	IF_IS_EMPTY(ifq)	((ifq)->ifq_len == 0)
 
 #define	IFQ_MAXLEN	50
 #define	IFNET_SLOWHZ	1		/* granularity is 1 second */
@@ -408,6 +417,107 @@ do { \
 	else \
 		(ifa)->ifa_refcnt--; \
 } while (0)
+
+#ifdef ALTQ
+
+#define	IFQ_ENQUEUE(ifq, m, pattr, err)					\
+do {									\
+	if (ALTQ_IS_ENABLED((ifq)))					\
+		ALTQ_ENQUEUE((ifq), (m), (pattr), (err));		\
+	else {								\
+		if (IF_QFULL((ifq))) {					\
+			m_freem((m));					\
+			(err) = ENOBUFS;				\
+		} else {						\
+			IF_ENQUEUE((ifq), (m));				\
+			(err) = 0;					\
+		}							\
+	}								\
+	if ((err))							\
+		(ifq)->ifq_drops++;					\
+} while (0)
+
+#define	IFQ_DEQUEUE(ifq, m)						\
+do {									\
+	if (TBR_IS_ENABLED((ifq)))					\
+		(m) = tbr_dequeue((ifq), ALTDQ_REMOVE);			\
+	else if (ALTQ_IS_ENABLED((ifq)))				\
+		ALTQ_DEQUEUE((ifq), (m));				\
+	else								\
+		IF_DEQUEUE((ifq), (m));					\
+} while (0)
+
+#define	IFQ_POLL(ifq, m)						\
+do {									\
+	if (TBR_IS_ENABLED((ifq)))					\
+		(m) = tbr_dequeue((ifq), ALTDQ_POLL);			\
+	else if (ALTQ_IS_ENABLED((ifq)))				\
+		ALTQ_POLL((ifq), (m));					\
+	else								\
+		IF_POLL((ifq), (m));					\
+} while (0)
+
+#define	IFQ_PURGE(ifq)							\
+do {									\
+	if (ALTQ_IS_ENABLED((ifq)))					\
+		ALTQ_PURGE((ifq));					\
+	else								\
+		IF_PURGE((ifq));					\
+} while (0)
+
+#define	IFQ_SET_READY(ifq)						\
+	do { ((ifq)->altq_flags |= ALTQF_READY); } while (0)
+
+#define	IFQ_CLASSIFY(ifq, m, af, pa)					\
+do {									\
+	if (ALTQ_IS_ENABLED((ifq))) {					\
+		if (ALTQ_NEEDS_CLASSIFY((ifq)))				\
+			(pa)->pattr_class = (*(ifq)->altq_classify)	\
+				((ifq)->altq_clfier, (m), (af));	\
+		(pa)->pattr_af = (af);					\
+		(pa)->pattr_hdr = mtod((m), caddr_t);			\
+	}								\
+} while (0)
+
+#else /* !ALTQ */
+
+#define	IFQ_ENQUEUE(ifq, m, err)					\
+do {									\
+	if (IF_QFULL((ifq))) {						\
+		m_freem((m));						\
+		(err) = ENOBUFS;					\
+	} else {							\
+		IF_ENQUEUE((ifq), (m));					\
+		(err) = 0;						\
+	}								\
+	if ((err))							\
+		(ifq)->ifq_drops++;					\
+} while (0)
+
+#define	IFQ_DEQUEUE(ifq, m)	IF_DEQUEUE((ifq), (m))
+
+#define	IFQ_POLL(ifq, m)	IF_POLL((ifq), (m))
+
+#define	IFQ_PURGE(ifq)							\
+while (1) {								\
+	struct mbuf *m0;						\
+	IF_DEQUEUE((ifq), m0);						\
+	if (m0 == NULL)							\
+		break;							\
+	else								\
+		m_freem(m0);						\
+}
+
+#define	IFQ_SET_READY(ifq)		((void)0)
+#define	IFQ_CLASSIFY(ifq, m, af, pa)	((void)0)
+
+#endif /* !ALTQ */
+
+#define	IFQ_IS_EMPTY(ifq)		((ifq)->ifq_len == 0)
+#define	IFQ_INC_LEN(ifq)		((ifq)->ifq_len++)
+#define	IFQ_DEC_LEN(ifq)		(--(ifq)->ifq_len)
+#define	IFQ_INC_DROPS(ifq)		((ifq)->ifq_drops++)
+#define	IFQ_SET_MAXLEN(ifq, len)	((ifq)->ifq_maxlen = (len))
 
 struct ifnet_head ifnet;
 struct ifnet **ifindex2ifnet;

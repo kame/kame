@@ -209,10 +209,11 @@ pppattach()
 	sc->sc_if.if_hdrlen = PPP_HDRLEN;
 	sc->sc_if.if_ioctl = pppsioctl;
 	sc->sc_if.if_output = pppoutput;
-	sc->sc_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_MAXLEN(&sc->sc_if.if_snd, IFQ_MAXLEN);
 	sc->sc_inq.ifq_maxlen = IFQ_MAXLEN;
 	sc->sc_fastq.ifq_maxlen = IFQ_MAXLEN;
 	sc->sc_rawq.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_READY(&sc->sc_if.if_snd);
 	if_attach(&sc->sc_if);
 #if NBPFILTER > 0
 	bpfattach(&sc->sc_bpf, &sc->sc_if, DLT_PPP, PPP_HDRLEN);
@@ -722,6 +723,9 @@ pppoutput(ifp, m0, dst, rtp)
     enum NPmode mode;
     int len;
     struct mbuf *m;
+#ifdef ALTQ
+    struct altq_pktattr pktattr;
+#endif
 
     if (sc->sc_devp == NULL || (ifp->if_flags & IFF_RUNNING) == 0
 	|| ((ifp->if_flags & IFF_UP) == 0 && dst->sa_family != AF_UNSPEC)) {
@@ -729,6 +733,9 @@ pppoutput(ifp, m0, dst, rtp)
 	goto bad;
     }
 
+#ifdef ALTQ
+    IFQ_CLASSIFY(&ifp->if_snd, m0, dst->sa_family, &pktattr);
+#endif
     /*
      * Compute PPP header.
      */
@@ -868,16 +875,34 @@ pppoutput(ifp, m0, dst, rtp)
 	m0->m_nextpkt = NULL;
 	sc->sc_npqtail = &m0->m_nextpkt;
     } else {
-	ifq = (m0->m_flags & M_HIGHPRI)? &sc->sc_fastq: &ifp->if_snd;
-	if (IF_QFULL(ifq) && dst->sa_family != AF_UNSPEC) {
-	    IF_DROP(ifq);
+	if ((m0->m_flags & M_HIGHPRI)
+#ifdef ALTQ
+	    && !ALTQ_IS_ENABLED(&sc->sc_if.if_snd)
+#endif
+	    ) {
+	    ifq = &sc->sc_fastq;
+	    if (IF_QFULL(ifq) && dst->sa_family != AF_UNSPEC) {
+		IF_DROP(ifq);
+		m_freem(m0);
+		error = ENOBUFS;
+	    }
+	    else {
+		IF_ENQUEUE(ifq, m0);
+		error = 0;
+	    }
+	} else {
+#ifdef ALTQ
+	    IFQ_ENQUEUE(&sc->sc_if.if_snd, m0, &pktattr, error);
+#else
+	    IFQ_ENQUEUE(&sc->sc_if.if_snd, m0, error);
+#endif
+	}
+	if (error) {
 	    splx(s);
 	    sc->sc_if.if_oerrors++;
 	    sc->sc_stats.ppp_oerrors++;
-	    error = ENOBUFS;
-	    goto bad;
+	    return (error);
 	}
-	IF_ENQUEUE(ifq, m0);
 	ppp_restart(sc);
     }
     ifp->if_lastchange = time;
@@ -904,6 +929,7 @@ ppp_requeue(sc)
     struct mbuf *m, **mpp;
     struct ifqueue *ifq;
     enum NPmode mode;
+    int error;
 
     for (mpp = &sc->sc_npqueue; (m = *mpp) != NULL; ) {
 	switch (PPP_PROTOCOL(mtod(m, u_char *))) {
@@ -924,13 +950,32 @@ ppp_requeue(sc)
 	     */
 	    *mpp = m->m_nextpkt;
 	    m->m_nextpkt = NULL;
-	    ifq = (m->m_flags & M_HIGHPRI)? &sc->sc_fastq: &sc->sc_if.if_snd;
-	    if (IF_QFULL(ifq)) {
-		IF_DROP(ifq);
+	    if ((m->m_flags & M_HIGHPRI)
+#ifdef ALTQ
+		&& !ALTQ_IS_ENABLED(&sc->sc_if.if_snd)
+#endif
+		) {
+		ifq = &sc->sc_fastq;
+		if (IF_QFULL(ifq)) {
+		    IF_DROP(ifq);
+		    m_freem(m);
+		    error = ENOBUFS;
+		}
+		else {
+		    IF_ENQUEUE(ifq, m);
+		    error = 0;
+		}
+	    } else {
+#ifdef ALTQ
+		IFQ_ENQUEUE(&sc->sc_if.if_snd, m, NULL, error);
+#else
+		IFQ_ENQUEUE(&sc->sc_if.if_snd, m, error);
+#endif
+	    }
+	    if (error) {
 		sc->sc_if.if_oerrors++;
 		sc->sc_stats.ppp_oerrors++;
-	    } else
-		IF_ENQUEUE(ifq, m);
+	    }
 	    break;
 
 	case NPMODE_DROP:
@@ -984,7 +1029,7 @@ ppp_dequeue(sc)
     s = splimp();    
     IF_DEQUEUE(&sc->sc_fastq, m);
     if (m == NULL)
-	IF_DEQUEUE(&sc->sc_if.if_snd, m);
+	IFQ_DEQUEUE(&sc->sc_if.if_snd, m);
     splx(s);
     
     if (m == NULL)
@@ -1111,7 +1156,7 @@ pppintr()
     s = splsoftnet();
     for (i = 0; i < NPPP; ++i, ++sc) {
 	if (!(sc->sc_flags & SC_TBUSY)
-	    && (sc->sc_if.if_snd.ifq_head || sc->sc_fastq.ifq_head
+	    && (!IFQ_IS_EMPTY(&sc->sc_if.if_snd) || sc->sc_fastq.ifq_head
 		|| sc->sc_outm)) {
 	    s2 = splimp();
 	    sc->sc_flags |= SC_TBUSY;

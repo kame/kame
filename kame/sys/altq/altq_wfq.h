@@ -1,7 +1,7 @@
-/*	$KAME: altq_wfq.h,v 1.2 2000/02/22 14:00:36 itojun Exp $	*/
+/*	$KAME: altq_wfq.h,v 1.3 2000/07/25 10:12:31 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-1999
+ * Copyright (C) 1997-2000
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_wfq.h,v 1.2 2000/02/22 14:00:36 itojun Exp $
+ * $Id: altq_wfq.h,v 1.3 2000/07/25 10:12:31 kjc Exp $
  */
 /*
  *  March 27, 1997.  Written by Hiroshi Kyusojin of Keio University
@@ -33,20 +33,20 @@
  */
 
 #ifndef _ALTQ_ALTQ_WFQ_H_
-#define _ALTQ_ALTQ_WFQ_H_
+#define	_ALTQ_ALTQ_WFQ_H_
 
 #include <altq/altq.h>
 
-#define DEFAULT_QSIZE	256
-#define MAX_QSIZE	2048
+#define	DEFAULT_QSIZE	256
+#define	MAX_QSIZE	2048
 
-#if defined(KERNEL) || defined(_KERNEL)
+#ifdef _KERNEL
 
 #define	HWM			(64 * 1024)
-#define WFQ_QUOTA		512	/* quota bytes to send at a time */
-#define WFQ_ADDQUOTA(q)		((q)->quota += WFQ_QUOTA * (q)->weight / 100)
-#define ENABLE			0
-#define DISABLE			1
+#define	WFQ_QUOTA		512	/* quota bytes to send at a time */
+#define	WFQ_ADDQUOTA(q)		((q)->quota += WFQ_QUOTA * (q)->weight / 100)
+#define	ENABLE			0
+#define	DISABLE			1
 
 typedef struct weighted_fair_queue{
 	struct weighted_fair_queue *next, *prev;
@@ -64,7 +64,7 @@ typedef struct weighted_fair_queue{
 
 typedef struct wfqstate {
 	struct wfqstate *next;		/* for wfqstate list */
-	struct ifnet *ifp;
+	struct ifaltq *ifq;
 	int nums;			/* number of queues */
 	int hwm;			/* high water mark */
 	int bytes;			/* total bytes in all the queues */
@@ -74,22 +74,18 @@ typedef struct wfqstate {
 	u_int32_t fbmask;		/* filter bitmask */
 } wfq_state_t;
 
-#endif /* KERNEL */
-
-#ifndef IFNAMSIZ
-#define IFNAMSIZ        16
-#endif
+#endif /* _KERNEL */
 
 typedef struct wfq_interface{
 	char wfq_ifacename[IFNAMSIZ];
 	u_int wfq_ifacelen;
 } wfq_iface_t;
 
-#define WFQ_ENABLE		_IOW('Q', 1, struct wfq_interface)
-#define WFQ_DISABLE		_IOW('Q', 2, struct wfq_interface)
+#define	WFQ_ENABLE		_IOW('Q', 1, struct wfq_interface)
+#define	WFQ_DISABLE		_IOW('Q', 2, struct wfq_interface)
 
-#define WFQ_IF_ATTACH		_IOW('Q', 3, struct wfq_interface)
-#define WFQ_IF_DETACH		_IOW('Q', 4, struct wfq_interface)
+#define	WFQ_IF_ATTACH		_IOW('Q', 3, struct wfq_interface)
+#define	WFQ_IF_DETACH		_IOW('Q', 4, struct wfq_interface)
 
 struct wfq_getqid{
 	wfq_iface_t 	iface;
@@ -97,7 +93,7 @@ struct wfq_getqid{
 	u_long		qid;
 };
 
-#define WFQ_GET_QID		_IOWR('Q', 5, struct wfq_getqid)
+#define	WFQ_GET_QID		_IOWR('Q', 5, struct wfq_getqid)
 
 struct wfq_setweight {
 	wfq_iface_t iface;
@@ -105,7 +101,7 @@ struct wfq_setweight {
 	int weight;
 };
 
-#define WFQ_SET_WEIGHT		_IOWR('Q', 6, struct wfq_setweight)
+#define	WFQ_SET_WEIGHT		_IOWR('Q', 6, struct wfq_setweight)
 
 typedef struct each_queue_stats {
 	int bytes;		/* bytes in this queue */
@@ -122,7 +118,7 @@ struct wfq_getstats{
 	queue_stats stats;
 };
 
-#define WFQ_GET_STATS		_IOWR('Q', 7, struct wfq_getstats)
+#define	WFQ_GET_STATS		_IOWR('Q', 7, struct wfq_getstats)
 
 struct wfq_conf {
 	wfq_iface_t iface;
@@ -131,10 +127,10 @@ struct wfq_conf {
 	int qlimit;		/* queue size in bytes */
 };
 
-#define WFQ_HASH_DSTADDR	0	/* hash by dst address */
-#define WFQ_HASH_SRCPORT	1	/* hash by src port */
-#define WFQ_HASH_FULL		2	/* hash by all fields */
+#define	WFQ_HASH_DSTADDR	0	/* hash by dst address */
+#define	WFQ_HASH_SRCPORT	1	/* hash by src port */
+#define	WFQ_HASH_FULL		2	/* hash by all fields */
 
-#define WFQ_CONFIG		_IOWR('Q', 8, struct wfq_conf)
+#define	WFQ_CONFIG		_IOWR('Q', 8, struct wfq_conf)
 
 #endif /* _ALTQ_ALTQ_WFQ_H */

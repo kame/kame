@@ -140,20 +140,13 @@ struct ifnet {
 		__P((void *));
 	int	(*if_resolvemulti)	/* validate/resolve multicast */
 		__P((struct ifnet *, struct sockaddr **, struct sockaddr *));
+#if 1 /* ALTQ */
+	struct	ifaltq if_snd;		/* output queue (includes altq) */
+#else
 	struct	ifqueue if_snd;		/* output queue */
+#endif
 	struct	ifqueue *if_poll_slowq;	/* input queue for slow devices */
 	struct	ifprefixhead if_prefixhead; /* list of prefixes per if */
-#if 1 /* ALTQ */
-	/* alternate queueing related stuff */
-	int	if_altqtype;		/* queueing scheme id */
-	int	if_altqflags;		/* altq flags (e.g. ready, in-use) */
-	void	*if_altqp;		/* queue state */
-	int	(*if_altqenqueue)
-		__P((struct ifnet *, struct mbuf *, struct pr_hdr *, int));
-	struct mbuf *(*if_altqdequeue)
-		__P((struct ifnet *, int));
-	void	*if_altqcdnr;		/* input traffic conditioner */
-#endif /* ALTQ */
 };
 typedef void if_init_f_t __P((void *));
 
@@ -223,6 +216,17 @@ typedef void if_init_f_t __P((void *));
 		(ifq)->ifq_len--; \
 	} \
 }
+#define	IF_POLL(ifq, m)		((m) = (ifq)->ifq_head)
+#define	IF_PURGE(ifq)							\
+while (1) {								\
+	struct mbuf *m0;						\
+	IF_DEQUEUE((ifq), m0);						\
+	if (m0 == NULL)							\
+		break;							\
+	else								\
+		m_freem(m0);						\
+}
+#define	IF_IS_EMPTY(ifq)	((ifq)->ifq_len == 0)
 
 #ifdef _KERNEL
 #define	IF_ENQ_DROP(ifq, m)	if_enq_drop(ifq, m)
@@ -258,6 +262,110 @@ int	if_enq_drop __P((struct ifqueue *, struct mbuf *));
  */
 #define	IF_MINMTU	72
 #define	IF_MAXMTU	65535
+
+#endif /* _KERNEL */
+
+#ifdef _KERNEL
+#ifdef ALTQ
+
+#define	IFQ_ENQUEUE(ifq, m, pattr, err)					\
+do {									\
+	if (ALTQ_IS_ENABLED((ifq)))					\
+		ALTQ_ENQUEUE((ifq), (m), (pattr), (err));		\
+	else {								\
+		if (IF_QFULL((ifq))) {					\
+			m_freem((m));					\
+			(err) = ENOBUFS;				\
+		} else {						\
+			IF_ENQUEUE((ifq), (m));				\
+			(err) = 0;					\
+		}							\
+	}								\
+	if ((err))							\
+		(ifq)->ifq_drops++;					\
+} while (0)
+
+#define	IFQ_DEQUEUE(ifq, m)						\
+do {									\
+	if (TBR_IS_ENABLED((ifq)))					\
+		(m) = tbr_dequeue((ifq), ALTDQ_REMOVE);			\
+	else if (ALTQ_IS_ENABLED((ifq)))				\
+		ALTQ_DEQUEUE((ifq), (m));				\
+	else								\
+		IF_DEQUEUE((ifq), (m));					\
+} while (0)
+
+#define	IFQ_POLL(ifq, m)						\
+do {									\
+	if (TBR_IS_ENABLED((ifq)))					\
+		(m) = tbr_dequeue((ifq), ALTDQ_POLL);			\
+	else if (ALTQ_IS_ENABLED((ifq)))				\
+		ALTQ_POLL((ifq), (m));					\
+	else								\
+		IF_POLL((ifq), (m));					\
+} while (0)
+
+#define	IFQ_PURGE(ifq)							\
+do {									\
+	if (ALTQ_IS_ENABLED((ifq)))					\
+		ALTQ_PURGE((ifq));					\
+	else								\
+		IF_PURGE((ifq));					\
+} while (0)
+
+#define	IFQ_SET_READY(ifq)						\
+	do { ((ifq)->altq_flags |= ALTQF_READY); } while (0)
+
+#define	IFQ_CLASSIFY(ifq, m, af, pa)					\
+do {									\
+	if (ALTQ_IS_ENABLED((ifq))) {					\
+		if (ALTQ_NEEDS_CLASSIFY((ifq)))				\
+			(pa)->pattr_class = (*(ifq)->altq_classify)	\
+				((ifq)->altq_clfier, (m), (af));	\
+		(pa)->pattr_af = (af);					\
+		(pa)->pattr_hdr = mtod((m), caddr_t);			\
+	}								\
+} while (0)
+
+#else /* !ALTQ */
+
+#define	IFQ_ENQUEUE(ifq, m, err)					\
+do {									\
+	if (IF_QFULL((ifq))) {						\
+		m_freem((m));						\
+		(err) = ENOBUFS;					\
+	} else {							\
+		IF_ENQUEUE((ifq), (m));					\
+		(err) = 0;						\
+	}								\
+	if ((err))							\
+		(ifq)->ifq_drops++;					\
+} while (0)
+
+#define	IFQ_DEQUEUE(ifq, m)	IF_DEQUEUE((ifq), (m))
+
+#define	IFQ_POLL(ifq, m)	IF_POLL((ifq), (m))
+
+#define	IFQ_PURGE(ifq)							\
+while (1) {								\
+	struct mbuf *m0;						\
+	IF_DEQUEUE((ifq), m0);						\
+	if (m0 == NULL)							\
+		break;							\
+	else								\
+		m_freem(m0);						\
+}
+
+#define	IFQ_SET_READY(ifq)		((void)0)
+#define	IFQ_CLASSIFY(ifq, m, af, pa)	((void)0)
+
+#endif /* !ALTQ */
+
+#define	IFQ_IS_EMPTY(ifq)		((ifq)->ifq_len == 0)
+#define	IFQ_INC_LEN(ifq)		((ifq)->ifq_len++)
+#define	IFQ_DEC_LEN(ifq)		(--(ifq)->ifq_len)
+#define	IFQ_INC_DROPS(ifq)		((ifq)->ifq_drops++)
+#define	IFQ_SET_MAXLEN(ifq, len)	((ifq)->ifq_maxlen = (len))
 
 #endif /* _KERNEL */
 

@@ -1,7 +1,7 @@
-/*	$KAME: altq.h,v 1.2 2000/02/22 14:00:28 itojun Exp $	*/
+/*	$KAME: altq.h,v 1.3 2000/07/25 10:12:29 kjc Exp $	*/
 
 /*
- * Copyright (C) 1998-1999
+ * Copyright (C) 1998-2000
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,26 +25,48 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq.h,v 1.2 2000/02/22 14:00:28 itojun Exp $
+ * $Id: altq.h,v 1.3 2000/07/25 10:12:29 kjc Exp $
  */
 #ifndef _ALTQ_ALTQ_H_
-#define _ALTQ_ALTQ_H_
+#define	_ALTQ_ALTQ_H_
 
+#include <sys/param.h>
+#include <sys/ioccom.h>
 #include <netinet/in.h>
 
+#ifndef IFNAMSIZ
+#define	IFNAMSIZ	16
+#endif
+
 /* altq discipline type */
-#define ALTQT_NONE	0	/* reserved */
-#define ALTQT_CBQ	1	/* cbq */
-#define ALTQT_WFQ	2	/* wfq */
-#define ALTQT_AFMAP	3	/* afmap */
-#define ALTQT_FIFOQ	4	/* fifoq */
-#define ALTQT_RED	5	/* red */
-#define ALTQT_RIO	6	/* rio */
-#define ALTQT_LOCALQ	7	/* local use */
-#define ALTQT_HFSC	8	/* hfsc */
-#define ALTQT_CDNR	9	/* traffic conditioner */
-#define ALTQT_BLUE	10	/* blue */
-#define ALTQT_MAX	10
+#define	ALTQT_NONE		0	/* reserved */
+#define	ALTQT_CBQ		1	/* cbq */
+#define	ALTQT_WFQ		2	/* wfq */
+#define	ALTQT_AFMAP		3	/* afmap */
+#define	ALTQT_FIFOQ		4	/* fifoq */
+#define	ALTQT_RED		5	/* red */
+#define	ALTQT_RIO		6	/* rio */
+#define	ALTQT_LOCALQ		7	/* local use */
+#define	ALTQT_HFSC		8	/* hfsc */
+#define	ALTQT_CDNR		9	/* traffic conditioner */
+#define	ALTQT_BLUE		10	/* blue */
+#define	ALTQT_MAX		10
+
+struct	qtypereq {
+	char	ifname[IFNAMSIZ];	/* if name, e.g. "en0" */
+	int	altqtype;		/* altq discipline type */
+};
+
+/* simple token backet meter profile */
+struct tb_profile {
+	u_int	rate;	/* rate in bit-per-sec */
+	u_int	depth;	/* depth in bytes */
+};
+
+struct	tbrreq {
+	char	ifname[IFNAMSIZ];	/* if name, e.g. "en0" */
+	struct	tb_profile tb_prof;	/* token bucket profile */
+};
 
 /*
  * common network flow info structure
@@ -60,7 +82,6 @@ struct flowinfo {
  * flow info structure for internet protocol family.
  * (currently this is the only protocol family supported)
  */
-
 struct flowinfo_in {
 	u_char		fi_len;		/* sizeof(struct flowinfo_in) */
 	u_char		fi_family;	/* AF_INET */
@@ -118,17 +139,30 @@ struct flow_filter6 {
 };
 #endif /* INET6 */
 
-#if defined(KERNEL) || defined(_KERNEL)
-#include <altq/altq_var.h>
-#endif
+/*
+ * altq related ioctls
+ */
+#define	ALTQGTYPE	_IOWR('Q', 0, struct qtypereq)  /* get queue type */
+#define	ALTQTBRSET	_IOW('Q', 1, struct tbrreq)     /* set tb regulator */
+#define	ALTQTBRGET	_IOWR('Q', 2, struct tbrreq)    /* get tb regulator */
 
 /* queue macros only in FreeBSD */
 #ifndef LIST_EMPTY
 #define	LIST_EMPTY(head) ((head)->lh_first == NULL)
 #endif
 #ifndef LIST_FOREACH
-#define LIST_FOREACH(var, head, field)					\
+#define	LIST_FOREACH(var, head, field)					\
 	for((var) = (head)->lh_first; (var); (var) = (var)->field.le_next)
+#endif
+
+#ifdef KERNEL
+#ifndef _KERNEL
+#define	_KERNEL
+#endif
+#endif
+
+#ifdef _KERNEL
+#include <altq/altq_var.h>
 #endif
 
 #endif /* _ALTQ_ALTQ_H_ */

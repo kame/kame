@@ -1,4 +1,4 @@
-/*	$KAME: altq_rmclass.c,v 1.5 2000/05/07 06:29:23 kjc Exp $	*/
+/*	$KAME: altq_rmclass.c,v 1.6 2000/07/25 10:12:31 kjc Exp $	*/
 
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
@@ -35,7 +35,7 @@
  * LBL code modified by speer@eng.sun.com, May 1977.
  * For questions and/or comments, please send mail to cbq@ee.lbl.gov
  *
- * $Id: altq_rmclass.c,v 1.5 2000/05/07 06:29:23 kjc Exp $
+ * $Id: altq_rmclass.c,v 1.6 2000/07/25 10:12:31 kjc Exp $
  */
 
 #ident "@(#)rm_class.c  1.48     97/12/05 SMI"
@@ -75,7 +75,7 @@
  * Local Macros
  */
 
-#define reset_cutoff(ifd)	{ ifd->cutoff_ = RM_MAXDEPTH; }
+#define	reset_cutoff(ifd)	{ ifd->cutoff_ = RM_MAXDEPTH; }
 
 /*
  * Local routines.
@@ -92,7 +92,7 @@ static mbuf_t	*_rmc_prr_dequeue_next __P((struct rm_ifdat *, int));
 static int	_rmc_addq __P((rm_class_t *, mbuf_t *));
 static void	_rmc_dropq __P((rm_class_t *));
 static mbuf_t	*_rmc_getq __P((rm_class_t *));
-static mbuf_t	*_rmc_peekq __P((rm_class_t *));
+static mbuf_t	*_rmc_pollq __P((rm_class_t *));
 
 static int	rmc_under_limit __P((struct rm_class *, struct timeval *));
 static void	rmc_tl_satisfied __P((struct rm_ifdat *, struct timeval *));
@@ -100,7 +100,7 @@ static void	rmc_drop_action __P((struct rm_class *));
 static void	rmc_restart __P((struct rm_class *));
 static void	rmc_root_overlimit __P((struct rm_class *, struct rm_class *));
 
-#define BORROW_OFFTIME
+#define	BORROW_OFFTIME
 /*
  * BORROW_OFFTIME (experimental):
  * borrow the offtime of the class borrowing from.
@@ -109,7 +109,7 @@ static void	rmc_root_overlimit __P((struct rm_class *, struct rm_class *));
  * but when the borrowed class is overloaded (advidle is close to minidle),
  * use the borrowing class's offtime to avoid overload.
  */
-#define ADJUST_CUTOFF
+#define	ADJUST_CUTOFF
 /*
  * ADJUST_CUTOFF (experimental):
  * if no underlimit class is found due to cutoff, increase cutoff and
@@ -678,19 +678,19 @@ rmc_delete_class(ifd, cl)
  */
 
 void
-rmc_init(ifp, ifd, nsecPerByte, restart, maxq, maxqueued, maxidle,
+rmc_init(ifq, ifd, nsecPerByte, restart, maxq, maxqueued, maxidle,
 	 minidle, offtime, flags)
-	struct ifnet	*ifp;
+	struct ifaltq	*ifq;
 	struct rm_ifdat *ifd;
 	u_int	nsecPerByte;
-	void	(*restart)(struct ifnet *);
+	void	(*restart)(struct ifaltq *);
 	int	maxq, maxqueued;
 	u_int	maxidle;
 	int	minidle;
 	u_int	offtime;
 	int	flags;
 {
-	int		i;
+	int		i, mtu;
 
 	/*
 	 * Initialize the CBQ traciing/debug facility.
@@ -698,16 +698,17 @@ rmc_init(ifp, ifd, nsecPerByte, restart, maxq, maxqueued, maxidle,
 	CBQTRACEINIT();	
 
 	bzero((char *)ifd, sizeof (*ifd));
-	ifd->ifp = ifp;
+	mtu = ifq->altq_ifp->if_mtu;
+	ifd->ifq_ = ifq;
 	ifd->restart = restart;
 	ifd->maxqueued_ = maxqueued;
 	ifd->ns_per_byte_ = nsecPerByte;
-	ifd->maxpkt_ = ifp->if_mtu;
+	ifd->maxpkt_ = mtu;
 	ifd->wrr_ = (flags & RMCF_WRR) ? 1 : 0;
 	ifd->efficient_ = (flags & RMCF_EFFICIENT) ? 1 : 0;
-#if 1 /* ALTQ4PPP */
-	ifd->maxiftime_ = ifp->if_mtu * nsecPerByte / 1000 * 16;
-	if (ifp->if_mtu * nsecPerByte > 10 * 1000000)
+#if 1
+	ifd->maxiftime_ = mtu * nsecPerByte / 1000 * 16;
+	if (mtu * nsecPerByte > 10 * 1000000)
 		ifd->maxiftime_ /= 4;
 #endif
 
@@ -979,9 +980,9 @@ rmc_under_limit(cl, now)
  */
 
 static mbuf_t *
-_rmc_wrr_dequeue_next(ifd, mode)
+_rmc_wrr_dequeue_next(ifd, op)
 	struct rm_ifdat *ifd;
-	int mode;
+	int op;
 {
 	struct rm_class	*cl = NULL, *first = NULL;
 	u_int		deficit;
@@ -992,11 +993,11 @@ _rmc_wrr_dequeue_next(ifd, mode)
 	RM_GETTIME(now);
 
 	/*
-	 * if the driver peeks the top of the queue and then removes
-	 * the peeked packet, we must return the same packet.
+	 * if the driver polls the top of the queue and then removes
+	 * the polled packet, we must return the same packet.
 	 */
-	if (mode == ALTDQ_DEQUEUE && ifd->peekcache_) {
-		cl = ifd->peekcache_;
+	if (op == ALTDQ_REMOVE && ifd->pollcache_) {
+		cl = ifd->pollcache_;
 		cpri = cl->pri_;
 		if (ifd->efficient_) {
 			/* check if this class is overlimit */
@@ -1004,12 +1005,12 @@ _rmc_wrr_dequeue_next(ifd, mode)
 			    rmc_under_limit(cl, &now) == 0)
 				first = cl;
 		}
-		ifd->peekcache_ = NULL;
+		ifd->pollcache_ = NULL;
 		goto _wrr_out;
 	}
 	else {
-		/* mode == ALTDQ_PEEK || peekcache == NULL */
-		ifd->peekcache_ = NULL;
+		/* mode == ALTDQ_POLL || pollcache == NULL */
+		ifd->pollcache_ = NULL;
 		ifd->borrowed_[ifd->qi_] = NULL;
 	}
 #ifdef ADJUST_CUTOFF
@@ -1099,7 +1100,7 @@ _rmc_wrr_dequeue_next(ifd, mode)
 	 * Deque the packet and do the book keeping...
 	 */
  _wrr_out:
-	if (mode == ALTDQ_DEQUEUE) {
+	if (op == ALTDQ_REMOVE) {
 		m = _rmc_getq(cl);
 		if (m == NULL)
 			panic("_rmc_wrr_dequeue_next");
@@ -1124,9 +1125,9 @@ _rmc_wrr_dequeue_next(ifd, mode)
 		ifd->queued_++;
 	}
 	else {
-		/* mode == ALTDQ_PEEK */
-		m = _rmc_peekq(cl);
-		ifd->peekcache_ = cl;
+		/* mode == ALTDQ_PPOLL */
+		m = _rmc_pollq(cl);
+		ifd->pollcache_ = cl;
 	}
 	return (m);
 }
@@ -1138,9 +1139,9 @@ _rmc_wrr_dequeue_next(ifd, mode)
  * output.
  */
 static mbuf_t *
-_rmc_prr_dequeue_next(ifd, mode)
+_rmc_prr_dequeue_next(ifd, op)
 	struct rm_ifdat *ifd;
-	int mode;
+	int op;
 {
 	mbuf_t		*m;
 	int		cpri;
@@ -1150,18 +1151,18 @@ _rmc_prr_dequeue_next(ifd, mode)
 	RM_GETTIME(now);
 
 	/*
-	 * if the driver peeks the top of the queue and then removes
-	 * the peeked packet, we must return the same packet.
+	 * if the driver polls the top of the queue and then removes
+	 * the polled packet, we must return the same packet.
 	 */
-	if (mode == ALTDQ_DEQUEUE && ifd->peekcache_) {
-		cl = ifd->peekcache_;
+	if (op == ALTDQ_REMOVE && ifd->pollcache_) {
+		cl = ifd->pollcache_;
 		cpri = cl->pri_;
-		ifd->peekcache_ = NULL;
+		ifd->pollcache_ = NULL;
 		goto _prr_out;
 	}
 	else {
-		/* mode == ALTDQ_PEEK || peekcache == NULL */
-		ifd->peekcache_ = NULL;
+		/* mode == ALTDQ_POLL || pollcache == NULL */
+		ifd->pollcache_ = NULL;
 		ifd->borrowed_[ifd->qi_] = NULL;
 	}
 #ifdef ADJUST_CUTOFF
@@ -1218,7 +1219,7 @@ _rmc_prr_dequeue_next(ifd, mode)
 	 * Deque the packet and do the book keeping...
 	 */
  _prr_out:
-	if (mode == ALTDQ_DEQUEUE) {
+	if (op == ALTDQ_REMOVE) {
 		m = _rmc_getq(cl);
 		if (m == NULL)
 			panic("_rmc_prr_dequeue_next");
@@ -1234,9 +1235,9 @@ _rmc_prr_dequeue_next(ifd, mode)
 		ifd->queued_++;
 	}
 	else {
-		/* mode == ALTDQ_PEEK */
-		m = _rmc_peekq(cl);
-		ifd->peekcache_ = cl;
+		/* mode == ALTDQ_POLL */
+		m = _rmc_pollq(cl);
+		ifd->pollcache_ = cl;
 	}
 	return (m);
 }
@@ -1280,7 +1281,7 @@ rmc_dequeue_next(ifd, mode)
  * if a value has enough effective digits.
  * (on pentium, mul takes 9 cycles but div takes 46!)
  */
-#define NSEC_TO_USEC(t)	(((t) >> 10) + ((t) >> 16) + ((t) >> 17))
+#define	NSEC_TO_USEC(t)	(((t) >> 10) + ((t) >> 16) + ((t) >> 17))
 void
 rmc_update_class_util(ifd)
 	struct rm_ifdat *ifd;
@@ -1614,10 +1615,10 @@ rmc_restart(cl)
 	if (cl->sleeping_) {
 		cl->sleeping_ = 0;
 		cl->undertime_.tv_sec = 0;
-	
-		if (ifd->queued_ < ifd->maxqueued_) {
+
+		if (ifd->queued_ < ifd->maxqueued_ && ifd->restart != NULL) {
 			CBQTRACE(rmc_restart, 'trts', cl->stats_.handle);
-			(ifd->restart)(ifd->ifp);
+			(ifd->restart)(ifd->ifq_);
 		}
 	}
 	splx(s);
@@ -1654,11 +1655,11 @@ _rmc_addq(cl, m)
 		int rval = 0, len = m_pktlen(m);
 		
 		if (q_is_red(cl->q_)) 
-			rval = red_addq(cl->red_, cl->q_, m, cl->pr_hdr_);
+			rval = red_addq(cl->red_, cl->q_, m, cl->pktattr_);
 #ifdef CBQ_RIO
 		else
-			rval = rio_addq((rio_t *)cl->red_, cl->q_,
-					m, cl->pr_hdr_);
+			rval = rio_addq((rio_t *)cl->red_, cl->q_, m,
+					cl->pktattr_);
 #endif
 		if (rval < 0) {
 			++cl->stats_.drops;
@@ -1670,7 +1671,7 @@ _rmc_addq(cl, m)
 #endif /* CBQ_RED */
 
 	if (cl->flags_ & RMCF_CLEARDSCP)
-		write_dsfield(cl->pr_hdr_, 0);
+		write_dsfield(cl->pktattr_, 0);
 
 	_addq(cl->q_, m);
 	return (0);
@@ -1707,7 +1708,7 @@ _rmc_getq(cl)
 }
 
 static mbuf_t *
-_rmc_peekq(cl)
+_rmc_pollq(cl)
 	rm_class_t *cl;
 {
 	return qhead(cl->q_);

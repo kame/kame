@@ -1,7 +1,7 @@
-/*	$KAME: altq_cdnr.h,v 1.3 2000/02/22 14:00:31 itojun Exp $	*/
+/*	$KAME: altq_cdnr.h,v 1.4 2000/07/25 10:12:29 kjc Exp $	*/
 
 /*
- * Copyright (C) 1999
+ * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,24 +25,24 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_cdnr.h,v 1.3 2000/02/22 14:00:31 itojun Exp $
+ * $Id: altq_cdnr.h,v 1.4 2000/07/25 10:12:29 kjc Exp $
  */
 
 #ifndef _ALTQ_ALTQ_CDNR_H_
-#define _ALTQ_ALTQ_CDNR_H_
+#define	_ALTQ_ALTQ_CDNR_H_
 
 #include <altq/altq.h>
 
 /*
  * traffic conditioner element types
  */
-#define TCETYPE_NONE		0
-#define TCETYPE_TOP		1	/* top level conditioner */
-#define TCETYPE_ELEMENT		2	/* a simple tc element */
-#define TCETYPE_TBMETER		3	/* token bucket meter */
-#define TCETYPE_TRTCM		4	/* (two-rate) three color marker */
-#define TCETYPE_TBRIO		5	/* token-bucket rio */
-#define TCETYPE_TSWTCM		6	/* time sliding window 3-color maker */
+#define	TCETYPE_NONE		0
+#define	TCETYPE_TOP		1	/* top level conditioner */
+#define	TCETYPE_ELEMENT		2	/* a simple tc element */
+#define	TCETYPE_TBMETER		3	/* token bucket meter */
+#define	TCETYPE_TRTCM		4	/* (two-rate) three color marker */
+#define	TCETYPE_TBRIO		5	/* token-bucket rio */
+#define	TCETYPE_TSWTCM		6	/* time sliding window 3-color maker */
 
 /*
  * traffic conditioner action
@@ -59,30 +59,24 @@ struct tc_action {
 		struct cdnr_block *un_next;	/* next tc element block */
 	} tca_un;
 };
-#define tca_value	tca_un.un_value
-#define tca_dscp	tca_un.un_dscp
-#define tca_handle	tca_un.un_handle
-#define tca_next	tca_un.un_next
+#define	tca_value	tca_un.un_value
+#define	tca_dscp	tca_un.un_dscp
+#define	tca_handle	tca_un.un_handle
+#define	tca_next	tca_un.un_next
 
-#define TCACODE_NONE	0	/* action is not set */
-#define TCACODE_PASS	1 	/* pass this packet */
-#define TCACODE_DROP	2	/* discard this packet */
-#define TCACODE_RETURN	3	/* do not process this packet */
-#define TCACODE_MARK	4	/* mark dscp */
-#define TCACODE_HANDLE	5	/* take action specified by handle */
-#define TCACODE_NEXT	6	/* take action in the next tc element */
-#define TCACODE_MAX	6
+#define	TCACODE_NONE	0	/* action is not set */
+#define	TCACODE_PASS	1 	/* pass this packet */
+#define	TCACODE_DROP	2	/* discard this packet */
+#define	TCACODE_RETURN	3	/* do not process this packet */
+#define	TCACODE_MARK	4	/* mark dscp */
+#define	TCACODE_HANDLE	5	/* take action specified by handle */
+#define	TCACODE_NEXT	6	/* take action in the next tc element */
+#define	TCACODE_MAX	6
 
-#define CDNR_NULL_HANDLE	0
+#define	CDNR_NULL_HANDLE	0
 
 struct cdnr_interface {
 	char	cdnr_ifname[IFNAMSIZ];  /* interface name (e.g., fxp0) */
-};
-
-/* simple token backet meter profile */
-struct tb_profile {
-	u_int	rate;	/* rate in bit-per-sec */
-	u_int	depth;	/* depth in bytes */
 };
 
 /* conditioner statistics */
@@ -173,15 +167,15 @@ struct cdnr_modify_tbrio {
 };
 
 /* tbrio color index values */
-#define TBRIO_CINDEX_GREEN	0
-#define TBRIO_CINDEX_YELLOW	1
-#define TBRIO_CINDEX_RED	2
-#define TBRIO_CINDEX_NUM	3	/* number of drop index values */
+#define	TBRIO_CINDEX_GREEN	0
+#define	TBRIO_CINDEX_YELLOW	1
+#define	TBRIO_CINDEX_RED	2
+#define	TBRIO_CINDEX_NUM	3	/* number of drop index values */
 
 /* tbrio drop types */
-#define TBRIO_DTYPE_PASS	0	/* no drop */
-#define TBRIO_DTYPE_DROP	1	/* drop */
-#define TBRIO_DTYPE_NUM		2	/* number of drop types */
+#define	TBRIO_DTYPE_PASS	0	/* no drop */
+#define	TBRIO_DTYPE_DROP	1	/* drop */
+#define	TBRIO_DTYPE_NUM		2	/* number of drop types */
 
 struct cdnr_tbrio_stats {
 	struct cdnr_interface	iface;
@@ -249,8 +243,8 @@ struct cdnr_get_stats {
 
 #define	CDNR_IF_ATTACH		_IOW('Q', 1, struct cdnr_interface)
 #define	CDNR_IF_DETACH		_IOW('Q', 2, struct cdnr_interface)
-#define CDNR_ENABLE		_IOW('Q', 3, struct cdnr_interface)
-#define CDNR_DISABLE		_IOW('Q', 4, struct cdnr_interface)
+#define	CDNR_ENABLE		_IOW('Q', 3, struct cdnr_interface)
+#define	CDNR_DISABLE		_IOW('Q', 4, struct cdnr_interface)
 #define	CDNR_ADD_ELEM		_IOWR('Q', 5, struct cdnr_add_element)
 #define	CDNR_DEL_ELEM		_IOW('Q', 6, struct cdnr_delete_element)
 #define	CDNR_ADD_TBM		_IOWR('Q', 7, struct cdnr_add_tbmeter)
@@ -272,26 +266,26 @@ struct cdnr_get_stats {
 
 #ifndef DSCP_EF
 /* diffserve code points */
-#define DSCP_MASK	0xfc
-#define DSCP_CUMASK	0x03
-#define DSCP_EF		0xb8
-#define DSCP_AF11	0x28
-#define DSCP_AF12	0x30
-#define DSCP_AF13	0x38
-#define DSCP_AF21	0x48
-#define DSCP_AF22	0x50
-#define DSCP_AF23	0x58
-#define DSCP_AF31	0x68
-#define DSCP_AF32	0x70
-#define DSCP_AF33	0x78
-#define DSCP_AF41	0x88
-#define DSCP_AF42	0x90
-#define DSCP_AF43	0x98
-#define AF_CLASSMASK		0xe0
-#define AF_DROPPRECMASK		0x18
+#define	DSCP_MASK	0xfc
+#define	DSCP_CUMASK	0x03
+#define	DSCP_EF		0xb8
+#define	DSCP_AF11	0x28
+#define	DSCP_AF12	0x30
+#define	DSCP_AF13	0x38
+#define	DSCP_AF21	0x48
+#define	DSCP_AF22	0x50
+#define	DSCP_AF23	0x58
+#define	DSCP_AF31	0x68
+#define	DSCP_AF32	0x70
+#define	DSCP_AF33	0x78
+#define	DSCP_AF41	0x88
+#define	DSCP_AF42	0x90
+#define	DSCP_AF43	0x98
+#define	AF_CLASSMASK		0xe0
+#define	AF_DROPPRECMASK		0x18
 #endif
 
-#if defined(KERNEL) || defined(_KERNEL)
+#ifdef _KERNEL
 
 /*
  * packet information passed to the input function of tc elements
@@ -323,7 +317,7 @@ struct top_cdnr {
 	struct cdnr_block	tc_block;
 
 	LIST_ENTRY(top_cdnr)	tc_next;
-	struct ifnet		*tc_ifp;
+	struct ifaltq		*tc_ifq;
 
 	LIST_HEAD(, cdnr_block) tc_elements;
 	struct acc_classifier	tc_classifier;
@@ -411,9 +405,6 @@ struct tswtcm {
 	struct cdnr_stats	red_stats;
 };
 
-extern int (*altq_input) __P((struct mbuf *, int));
-extern int altq_cdnr_input __P((struct mbuf *, int));
-
-#endif /* KERNEL */
+#endif /* _KERNEL */
 
 #endif /* _ALTQ_ALTQ_CDNR_H_ */

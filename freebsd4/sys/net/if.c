@@ -73,7 +73,11 @@
 
 static int ifconf __P((u_long, caddr_t));
 static void ifinit __P((void *));
+#ifdef ALTQ
+static void if_qflush __P((struct ifaltq *));
+#else
 static void if_qflush __P((struct ifqueue *));
+#endif
 static void if_slowtimo __P((void *));
 static void link_rtrequest __P((int, struct rtentry *, struct sockaddr *));
 static int  if_rtdel __P((struct radix_node *, void *));
@@ -215,6 +219,13 @@ if_attach(ifp)
 			sdl->sdl_data[--namelen] = 0xff;
 		TAILQ_INSERT_HEAD(&ifp->if_addrhead, ifa, ifa_link);
 	}
+#ifdef ALTQ
+	ifp->if_snd.altq_type = 0;
+	ifp->if_snd.altq_disc = NULL;
+	ifp->if_snd.altq_flags &= ALTQF_CANTCHANGE;
+	ifp->if_snd.altq_tbr  = NULL;
+	ifp->if_snd.altq_ifp  = ifp;
+#endif
 }
 
 /*
@@ -235,6 +246,12 @@ if_detach(ifp)
 	 */
 	s = splnet();
 	if_down(ifp);
+#ifdef ALTQ
+	if (ALTQ_IS_ENABLED(&ifp->if_snd))
+		altq_disable(&ifp->if_snd);
+	if (ALTQ_IS_ATTACHED(&ifp->if_snd))
+		altq_detach(&ifp->if_snd);
+#endif
 
 	/*
 	 * Remove address from ifnet_addrs[] and maybe decrement if_index.
@@ -637,10 +654,18 @@ if_up(ifp)
  */
 static void
 if_qflush(ifq)
+#ifdef ALTQ
+	struct ifaltq *ifq;
+#else
 	register struct ifqueue *ifq;
+#endif
 {
 	register struct mbuf *m, *n;
 
+#ifdef ALTQ
+	if (ALTQ_IS_ENABLED(ifq))
+		ALTQ_PURGE(ifq);
+#endif
 	n = ifq->ifq_head;
 	while ((m = n) != 0) {
 		n = m->m_act;

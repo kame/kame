@@ -66,9 +66,6 @@
  *	- remove WMAYBE related code.  ENI WMAYBE DMA doen't work.
  *	- remove updating if_lastchange for every packet.
  */
-#if defined(__FreeBSD__) && defined(ALTQ)
-#include "opt_altq.h"
-#endif
 
 #undef	EN_DEBUG
 #undef	EN_DEBUG_RANGE		/* check ranges on en_read/en_write's? */
@@ -160,13 +157,6 @@
 #include <netnatm/natm.h>
 #endif
 
-#ifdef ALTQ
-#include <altq/altq.h>
-#ifdef AFMAP
-#include <altq/altq_afmap.h>
-#endif
-#endif
-
 #if !defined(sparc) && !defined(__FreeBSD__)
 #include <machine/bus.h>
 #endif
@@ -212,18 +202,6 @@
 #define BPF_MTAP(ifp, m)		bpf_mtap((ifp)->if_bpf, (m))
 #endif
 #endif /* NBPFILTER > 0 */
-
-#ifdef ALTQ
-/*
- * device dependent tweak for ALTQ:  if a driver is designed to dequeue
- * too many packets at a time, we have to modify the driver to limit the
- * number of packets buffered in the device.  This modification
- * often needs to change handling of tx complete interrupts as well.
- * the en driver pulls all the packets in the queue.
- * TXBUF_THRESH4ALTQ limits buffered packets up to 12KB.
- */
-#define TXBUF_THRESH4ALTQ	(12 * 1024)
-#endif
 
 /*
  * params
@@ -349,12 +327,6 @@ static int en_pvctxget __P((struct en_softc *, struct pvctxreq *));
 static int en_pcr2txspeed __P((int));
 static int en_txspeed2pcr __P((int));
 static struct ifnet *en_vci2ifp __P((struct en_softc *, int));
-#endif
-
-#if defined(ALTQ) && defined(AFMAP)
-static int en_flowmap_add __P((struct en_softc *, struct atm_flowmap *));
-static int en_flowmap_delete __P((struct en_softc *, int, int));
-static int en_flowmap_get __P((struct en_softc *, struct atm_flowmap *));
 #endif
 
 /*
@@ -787,9 +759,7 @@ done_probe:
   ifp->if_ioctl = en_ioctl;
   ifp->if_output = atm_output;
   ifp->if_start = en_start;
-#ifdef ALTQ
-  ifp->if_altqflags |= ALTQF_READY;
-#endif  /* ALTQ */
+  IFQ_SET_READY(&ifp->if_snd);
 
   /*
    * init softc
@@ -889,9 +859,6 @@ done_probe:
 
 #if NBPFILTER > 0 
   BPFATTACH(ifp, DLT_ATM_RFC1483, sizeof(struct atmllc));
-#endif
-#if defined(ALTQ) && defined(AFMAP)
-  afm_alloc(ifp);
 #endif
 #ifdef ATM_PVCEXT
   rrp_add(sc, ifp);
@@ -1394,43 +1361,6 @@ caddr_t data;
 
 #endif /* ATM_PVCEXT */
 
-#if defined(ALTQ) && defined(AFMAP)
-	case AFM_ADDFMAP:
-		do {
-			struct afm *afm = afm_top(ifp);
-			error = en_flowmap_add(sc, (struct atm_flowmap *)data);
-			if (afm == NULL && error == 0)
-				ifp->if_altqflags |= ALTQF_DRIVER1;
-		} while (0);
-		break;
-		
-	case AFM_DELFMAP:
-		do {
-			struct atm_flowmap *fmap = (struct atm_flowmap *)data;
-			error = en_flowmap_delete(sc, fmap->af_vpi, fmap->af_vci);
-		    
-			if (afm_top(ifp) == NULL)
-				ifp->if_altqflags &= ~ALTQF_DRIVER1;
-
-		} while (0);
-		break;
-		
-	case AFM_CLEANFMAP:
-		do {
-			struct afm *afm;
-			while ((afm = afm_top(ifp)) != NULL)
-				en_flowmap_delete(sc, afm->afm_vpi, afm->afm_vci);
-		
-			ifp->if_altqflags &= ~ALTQF_DRIVER1;
-		} while (0);
-		break;
-
-	case AFM_GETFMAP:
-		error = en_flowmap_get(sc, (struct atm_flowmap *)data);
-		break;
-
-#endif /* ALTQ && AFMAP */
-
 	default: 
 	    error = EINVAL;
 	    break;
@@ -1609,14 +1539,6 @@ struct en_softc *sc;
       IF_DROP(&sc->enif.if_snd);
     }
 
-#ifdef ALTQ
-    do {
-	    struct ifnet *ifp = &sc->enif;
-
-	    if (ALTQ_IS_ON(ifp))
-		    (void)(*ifp->if_altqdequeue)(ifp, ALTDQ_FLUSH);
-    } while (0);
-#endif /* ALTQ */
     sc->txslot[lcv].mbsize = 0;
   }
 
@@ -1641,7 +1563,7 @@ struct en_softc *sc;
 
   if ((sc->enif.if_flags & IFF_UP) == 0) {
 #ifdef ATM_PVCEXT
-    SLIST_FOREACH(pvcsif, &sc->sif_list, sif_links) {
+    LIST_FOREACH(pvcsif, &sc->sif_list, sif_links) {
       if (pvcsif->sif_if.if_flags & IFF_UP) {
 	/*
 	 * down the device only when there is no active pvc subinterface.
@@ -1668,7 +1590,7 @@ struct en_softc *sc;
 #endif
   sc->enif.if_flags |= IFF_RUNNING;	/* enable */
 #ifdef ATM_PVCEXT
-  SLIST_FOREACH(pvcsif, &sc->sif_list, sif_links) {
+  LIST_FOREACH(pvcsif, &sc->sif_list, sif_links) {
     pvcsif->sif_if.if_flags |= IFF_RUNNING;
   }
 #endif
@@ -1788,7 +1710,6 @@ struct ifnet *ifp;
 
 {
     struct en_softc *sc = (struct en_softc *) ifp->if_softc;
-    struct ifqueue *ifq = &ifp->if_snd; /* if INPUT QUEUE */
     struct mbuf *m, *lastm, *prev;
     struct atm_pseudohdr *ap, *new_ap;
     int txchan, mlen, got, need, toadd, cellcnt, first;
@@ -1805,49 +1726,7 @@ struct ifnet *ifp;
 
     while (1) {
 
-#ifdef ALTQ
-      if (ALTQ_IS_ON(ifp)) {
-	  struct mbuf *tmp;
-	  /*
-	   * when altq is used, don't dequeue the packet until we
-	   * know we have enough buffer space.  this makes packet
-	   * dropping is done in altq_enqueue.
-	   * also make the internal buffer smaller (12KB instead of 64KB)
-	   * to keep packets remaining in altq.
-	   */
-	  m = (*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK);
-	  if (m != NULL) {
-	      ap = mtod(m, struct atm_pseudohdr *);
-	      atm_vci = ATM_PH_VCI(ap);
-	      txchan = sc->txvc2slot[atm_vci];
-	      if (sc->txslot[txchan].mbsize >= TXBUF_THRESH4ALTQ)
-		  return;
-
-	      tmp = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
-	      if (tmp != m)
-		  panic("en_start: different mbuf dequeued!");
-	  }
-      }
-      else {
-#endif
-#ifdef ATM_PVCEXT
-      /*
-       * if this is a pvc sub-interface and the tx channel is backlogged,
-       * don't dequeue the packet.  a pvc interface doesn't suffer from
-       * head-of-line blocking so that we should prevent tx buffer overflow.
-       */
-      if (ifp != &sc->enif && (m = ifp->if_snd.ifq_head) != NULL) {
-	      ap = mtod(m, struct atm_pseudohdr *);
-	      atm_vci = ATM_PH_VCI(ap);
-	      txchan = sc->txvc2slot[atm_vci];
-	      if (sc->txslot[txchan].mbsize >= EN_TXHIWAT - ATMMTU)
-		      return;
-      }
-#endif
-      IF_DEQUEUE(ifq, m);
-#ifdef ALTQ
-      }
-#endif
+      IFQ_DEQUEUE(&ifp->if_snd, m);
       if (m == NULL)
 	return;		/* EMPTY: >>> exit here <<< */
     
@@ -1985,35 +1864,6 @@ struct ifnet *ifp;
       txchan = sc->txvc2slot[atm_vci];
 
       if (sc->txslot[txchan].mbsize > EN_TXHIWAT) {
-#ifdef ALTQ_ACCOUNT
-	/*
-	 * special process for altq drop accounting.
-	 * re-extract flow and do drop-accounting here.
-	 */
-	struct pr_hdr pr_hdr;
-	int size;
-
-	pr_hdr.ph_family = AF_INET;  /* XXX */
-	if (ifp->if_altqflags & ALTQF_ACCOUNTING) {
-	    size = sizeof(struct atm_pseudohdr);
-	    if (atm_flags & ATM_PH_LLCSNAP)
-		size += 8; /* sizeof snap == 8 */
-	    if (atm_flags & EN_OBHDR)
-		size += MID_TBD_SIZE;
-	    if (m->m_len >= size + 20)
-		/* ip header in the first mbuf */
-		pr_hdr.ph_hdr = mtod(m, caddr_t) + size;
-	    else if (m->m_len == size && m->m_next->m_len >= 20)
-		/* ip header is in the second mbuf */
-		pr_hdr.ph_hdr = mtod(m->m_next, caddr_t);
-	    else
-		/* give up otherwise */
-	        pr_hdr.ph_hdr = NULL;
-	}
-	else
-	    pr_hdr.ph_hdr = NULL;
-	ALTQ_ACCOUNTING(ifp, m, &pr_hdr, ALTEQ_ACCDROP);
-#endif
 	EN_COUNT(sc->txmbovr);
 	m_freem(m);
 	IF_DROP(&ifp->if_snd);
@@ -3888,13 +3738,9 @@ en_vci2ifp(sc, vci)
 {
 	struct pvcsif *pvcsif;
 
-	SLIST_FOREACH(pvcsif, &sc->sif_list, sif_links) {
+	LIST_FOREACH(pvcsif, &sc->sif_list, sif_links) {
 		if (vci == pvcsif->sif_vci)
 			return (&pvcsif->sif_if);
-#if defined(ALTQ) && defined(AFMAP)
-		if (afm_lookup(&pvcsif->sif_if, 0, vci) != NULL)
-			return (&pvcsif->sif_if);
-#endif
 	}
 	return (&sc->enif);
 }
@@ -3919,12 +3765,10 @@ en_pvcattach(ifp)
 	pvc_ifp->if_start = en_start;
 	pvc_ifp->if_flags = (IFF_POINTOPOINT|IFF_MULTICAST) |
 		(ifp->if_flags & (IFF_RUNNING|IFF_SIMPLEX|IFF_NOTRAILERS));
-#ifdef ALTQ
-	pvc_ifp->if_altqflags |= ALTQF_READY;
-#endif  /* ALTQ */
+	IFQ_SET_READY(&pvc_ifp->if_snd);
 
 	s = splimp();
-	SLIST_INSERT_HEAD(&sc->sif_list, (struct pvcsif *)pvc_ifp, sif_links);
+	LIST_INSERT_HEAD(&sc->sif_list, (struct pvcsif *)pvc_ifp, sif_links);
 	if_attach(pvc_ifp);
 	atm_ifattach(pvc_ifp); 
 
@@ -4197,89 +4041,5 @@ static int en_pvctxget(sc, pvcreq)
 }
 
 #endif /* ATM_PVCEXT */
-
-#if defined(ALTQ) && defined(AFMAP)
-
-static int en_flowmap_add(sc, fmap)
-	struct en_softc *sc;
-	struct atm_flowmap *fmap;
-{
-	struct afm *afm;
-	struct atm_pseudoioctl api;
-	int error = 0;
-
-	afm = afm_lookup(&sc->enif, fmap->af_vpi, fmap->af_vci);
-	if (afm)
-		/* already in use */
-		return (EEXIST);
-
-	if ((error = afm_add(&sc->enif, fmap)))
-		return error;
-
-	/* enable rx */
-	ATM_PH_FLAGS(&api.aph) = ATM_PH_AAL5 | ATM_PH_LLCSNAP;
-	ATM_PH_VPI(&api.aph) = fmap->af_vpi;
-	ATM_PH_SETVCI(&api.aph, fmap->af_vci);
-	api.rxhand = NULL;
-	error = en_rxctl(sc, &api, 1);
-	if (error != 0)
-		error = en_txctl(sc, fmap->af_vci, 0, fmap->af_pcr);
-	if (error)
-		(void)en_flowmap_delete(sc, fmap->af_vpi, fmap->af_vci);
-
-	return error;
-}
-
-static int en_flowmap_delete(sc, vpi, vci)
-	struct en_softc *sc;
-	int vpi, vci;
-{
-	struct afm *afm;
-	struct atm_pseudoioctl api;
-	int error = 0;
-
-	afm = afm_lookup(&sc->enif, vpi, vci);
-	if (afm == NULL)
-		return (ENOENT);
-    
-	afm_remove(afm);
-
-	/* disable rx */
-	ATM_PH_FLAGS(&api.aph) = 0;
-	ATM_PH_VPI(&api.aph) = vpi;
-	ATM_PH_SETVCI(&api.aph, vci);
-	api.rxhand = NULL;
-	error = en_rxctl(sc, &api, 0);
-
-	return error;
-}
-
-static int en_flowmap_get(sc, fmap)
-	struct en_softc *sc;
-	struct atm_flowmap *fmap;
-{
-	struct afm *afm;
-	int error = 0;
-
-	afm = afm_lookup(&sc->enif, fmap->af_vpi, fmap->af_vci);
-	if (afm == NULL)
-		return (ENOENT);
-
-	bcopy(&afm->afm_flowinfo, &fmap->af_flowinfo, sizeof(struct flowinfo));
-
-	/* get pcr value */
-	if (sc->txspeed[fmap->af_vci] != 0)
-		fmap->af_pcr = en_txspeed2pcr(sc->txspeed[fmap->af_vci]);
-	else
-		fmap->af_pcr = 0;
-
-	/* get stats */
-	fmap->afs_packets = afm->afms_packets;
-	fmap->afs_bytes = afm->afms_bytes;
-
-	return error;
-}
-
-#endif /* ALTQ && AFMAP */
 
 #endif /* NEN > 0 || !defined(__FreeBSD__) */

@@ -201,7 +201,7 @@ vxattach(sc)
     ifp->if_unit = sc->unit;
     ifp->if_name = "vx";
     ifp->if_mtu = ETHERMTU;
-    ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+    IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
     ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
     ifp->if_output = ether_output;
     ifp->if_start = vxstart;
@@ -209,9 +209,7 @@ vxattach(sc)
     ifp->if_init = vxinit;
     ifp->if_watchdog = vxwatchdog;
     ifp->if_softc = sc;
-#ifdef ALTQ
-    ifp->if_altqflags |= ALTQF_READY;
-#endif
+    IFQ_SET_READY(&ifp->if_snd);
 
     if_attach(ifp);
     ether_ifattach(ifp);
@@ -451,12 +449,7 @@ vxstart(ifp)
 
 startagain:
     /* Sneak a peek at the next packet */
-#ifdef ALTQ
-    if (ALTQ_IS_ON(ifp))
-	m0 = (*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK);
-    else
-#endif
-    m0 = ifp->if_snd.ifq_head;
+    IFQ_POLL(&ifp->if_snd, m0);
     if (m0 == 0) {
 	return;
     }
@@ -475,15 +468,7 @@ startagain:
     if (len + pad > ETHER_MAX_LEN) {
 	/* packet is obviously too large: toss it */
 	++ifp->if_oerrors;
-#ifdef ALTQ
-	if (ALTQ_IS_ON(ifp)) {
-	    struct mbuf *tmp = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
-	    if (tmp != m0)
-		panic("vxstart: different mbuf dequeued!");
-	}
-	else
-#endif
-	IF_DEQUEUE(&ifp->if_snd, m0);
+	IFQ_DEQUEUE(&ifp->if_snd, m0);
 	m_freem(m0);
 	goto readcheck;
     }
@@ -498,15 +483,7 @@ startagain:
 	}
     }
     outw(BASE + VX_COMMAND, SET_TX_AVAIL_THRESH | (8188 >> 2));
-#ifdef ALTQ
-    if (ALTQ_IS_ON(ifp)) {
-	struct mbuf *tmp = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
-	if (tmp != m0)
-	    panic("vxstart: different mbuf dequeued!");
-    }
-    else
-#endif
-    IF_DEQUEUE(&ifp->if_snd, m0);
+    IFQ_DEQUEUE(&ifp->if_snd, m0);
     if (m0 == 0) {		/* not really needed */
 	return;
     }

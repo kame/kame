@@ -192,10 +192,6 @@ int	ipprintfs = 0;
 
 struct rttimer_queue *ip_mtudisc_timeout_q = NULL;
 
-#ifdef ALTQ
-int (*altq_input) __P((struct mbuf *, int)) = NULL;
-#endif
-
 extern	struct domain inetdomain;
 extern	struct protosw inetsw[];
 u_char	ip_protox[IPPROTO_MAX];

@@ -1,7 +1,7 @@
-/*	$KAME: altq_conf.h,v 1.2 2000/02/22 14:00:32 itojun Exp $	*/
+/*	$KAME: altq_conf.h,v 1.3 2000/07/25 10:12:30 kjc Exp $	*/
 
 /*
- * Copyright (C) 1998-1999
+ * Copyright (C) 1998-2000
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,32 +25,20 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_conf.h,v 1.2 2000/02/22 14:00:32 itojun Exp $
+ * $Id: altq_conf.h,v 1.3 2000/07/25 10:12:30 kjc Exp $
  */
 #ifndef _ALTQ_ALTQ_CONF_H_
-#define _ALTQ_ALTQ_CONF_H_
+#define	_ALTQ_ALTQ_CONF_H_
 
 #include <sys/param.h>
 #include <sys/conf.h>
-#include <sys/ioccom.h>
 
-#ifndef IFNAMSIZ
-#define	IFNAMSIZ	16
-#endif
-
-struct	qtypereq {
-	char	ifname[IFNAMSIZ];	/* if name, e.g. "en0" */
-	int	altqtype;		/* altq discipline type */
-};
-
-#define ALTQGTYPE	_IOWR('Q', 0, struct qtypereq)  /* get queue type */
-
-#if defined(KERNEL) || defined(_KERNEL)
+#ifdef _KERNEL
 
 #include <sys/kernel.h>
 
 #if (__FreeBSD_version > 300000)
-#define ALTQ_KLD
+#define	ALTQ_KLD
 #endif
 
 #ifdef ALTQ_KLD
@@ -59,9 +47,9 @@ struct	qtypereq {
 
 #ifndef dev_decl
 #ifdef __STDC__
-#define dev_decl(n,t)	d_ ## t ## _t n ## t
+#define	dev_decl(n,t)	d_ ## t ## _t n ## t
 #else
-#define dev_decl(n,t)	d_/**/t/**/_t n/**/t
+#define	dev_decl(n,t)	d_/**/t/**/_t n/**/t
 #endif
 #endif
 
@@ -71,9 +59,9 @@ typedef int d_close_t __P((dev_t dev, int fflag, int devtype, struct proc *p));
 typedef int d_ioctl_t __P((dev_t dev, u_long cmd, caddr_t data,
 			   int fflag, struct proc *p));
 
-#define noopen	(dev_type_open((*))) enodev
-#define noclose	(dev_type_close((*))) enodev
-#define noioctl	(dev_type_ioctl((*))) enodev
+#define	noopen	(dev_type_open((*))) enodev
+#define	noclose	(dev_type_close((*))) enodev
+#define	noioctl	(dev_type_ioctl((*))) enodev
 #endif /* __NetBSD__ || __OpenBSD__ */
 
 #if defined(__OpenBSD__)
@@ -104,7 +92,7 @@ struct altq_module_data {
 	struct	altqsw *altqsw; /* discipline functions */
 };
 
-#define ALTQ_MODULE(name, type, devsw)					\
+#define	ALTQ_MODULE(name, type, devsw)					\
 static struct altq_module_data name##_moddata = { type, 0, devsw };	\
 									\
 moduledata_t name##_mod = {						\
@@ -120,5 +108,5 @@ int altq_module_handler __P((module_t, int, void *));
 
 #endif /* ALTQ_KLD */
 
-#endif /* KERNEL */
+#endif /* _KERNEL */
 #endif /* _ALTQ_ALTQ_CONF_H_ */

@@ -155,18 +155,6 @@ static const char rcsid[] =
   "$FreeBSD: src/sys/pci/if_dc.c,v 1.9 2000/03/11 05:20:56 msmith Exp $";
 #endif
 
-#ifdef ALTQ
-/*
- * device dependent tweak for ALTQ:  if a driver is designed to dequeue
- * too many packets at a time, we have to modify the driver to limit the
- * number of packets buffered in the device.  This modification
- * often needs to change handling of tx complete interrupts as well.
- * the dc driver can pull as many as 256 packets (when DC_TX_LIST_CNT is 256).
- * TXBUF_THRESH4ALTQ limits buffered packets up to 8.
- */
-#define TXBUF_THRESH4ALTQ	8
-#endif
-
 /*
  * Various supported device vendors/types and their names.
  */
@@ -1705,10 +1693,8 @@ static int dc_attach(dev)
 	ifp->if_watchdog = dc_watchdog;
 	ifp->if_init = dc_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = DC_TX_LIST_CNT - 1;
-#ifdef ALTQ
-	ifp->if_altqflags |= ALTQF_READY;
-#endif
+	IFQ_SET_MAXLEN(&ifp->if_snd, DC_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Do MII setup.
@@ -1831,9 +1817,6 @@ static int dc_list_tx_init(sc)
 	}
 
 	cd->dc_tx_prod = cd->dc_tx_cons = cd->dc_tx_cnt = 0;
-#ifdef ALTQ
-	sc->dc_tx_queued = 0;
-#endif
 
 	return(0);
 }
@@ -2270,9 +2253,6 @@ static void dc_txeof(sc)
 		if (sc->dc_cdata.dc_tx_chain[idx] != NULL) {
 			m_freem(sc->dc_cdata.dc_tx_chain[idx]);
 			sc->dc_cdata.dc_tx_chain[idx] = NULL;
-#ifdef ALTQ
-			sc->dc_tx_queued--;
-#endif
 		}
 
 		sc->dc_cdata.dc_tx_cnt--;
@@ -2340,12 +2320,7 @@ static void dc_tick(xsc)
 		if (mii->mii_media_status & IFM_ACTIVE &&
 		    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE) {
 			sc->dc_link++;
-#ifdef ALTQ
-			if (ALTQ_IS_ON(ifp))
-				dc_start(ifp);
-			else
-#endif
-			if (ifp->if_snd.ifq_head != NULL)
+			if (!IFQ_IS_EMPTY(&ifp->if_snd))
 				dc_start(ifp);
 		}
 	}
@@ -2444,12 +2419,7 @@ static void dc_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, DC_IMR, DC_INTRS);
 
-#ifdef ALTQ
-	if (ALTQ_IS_ON(ifp))
-		dc_start(ifp);
-	else
-#endif
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		dc_start(ifp);
 
 	return;
@@ -2565,9 +2535,6 @@ static void dc_start(ifp)
 	struct dc_softc		*sc;
 	struct mbuf		*m_head = NULL;
 	int			idx;
-#ifdef ALTQ
-	int			pkts = 0;
-#endif
 
 	sc = ifp->if_softc;
 
@@ -2580,51 +2547,25 @@ static void dc_start(ifp)
 	idx = sc->dc_cdata.dc_tx_prod;
 
 	while(sc->dc_cdata.dc_tx_chain[idx] == NULL) {
-#ifdef ALTQ
-		if (ALTQ_IS_ON(ifp)) {
-			if (sc->dc_tx_queued >= TXBUF_THRESH4ALTQ) {
-				/*
-				 * stop filling tx buffer if we already have
-				 * enough packets to transmit.
-				 */
-				break;
-			}
-
-			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK);
-		}
-		else
-#endif
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_POLL(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
 		if (sc->dc_flags & DC_TX_COALESCE) {
 			if (dc_coal(sc, &m_head)) {
-#ifdef ALTQ
-				if (!ALTQ_IS_ON(ifp))
-#endif
-				IF_PREPEND(&ifp->if_snd, m_head);
 				ifp->if_flags |= IFF_OACTIVE;
 				break;
 			}
 		}
 
 		if (dc_encap(sc, m_head, &idx)) {
-#ifdef ALTQ
-			if (!ALTQ_IS_ON(ifp))
-#endif
-			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
 
-#ifdef ALTQ
 		/* now we are committed to transmit the packet */
-		if (ALTQ_IS_ON(ifp))
-			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
-		sc->dc_tx_queued++;
-		pkts++;
-#endif
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
+
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
 		 * to him.
@@ -2632,11 +2573,8 @@ static void dc_start(ifp)
 		if (ifp->if_bpf)
 			bpf_mtap(ifp, m_head);
 	}
-#ifdef ALTQ
-	if (ALTQ_IS_ON(ifp) && pkts == 0)
-		/* no packet to send */
+	if (idx == sc->dc_cdata.dc_tx_prod)
 		return;
-#endif
 
 	/* Transmit */
 	sc->dc_cdata.dc_tx_prod = idx;
@@ -2924,12 +2862,7 @@ static void dc_watchdog(ifp)
 	dc_reset(sc);
 	dc_init(sc);
 
-#ifdef ALTQ
-	if (ALTQ_IS_ON(ifp))
-		dc_start(ifp);
-	else
-#endif
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		dc_start(ifp);
 
 	return;

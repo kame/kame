@@ -1,7 +1,7 @@
-/*	$KAME: altq_conf.c,v 1.5 2000/06/21 01:50:42 kjc Exp $	*/
+/*	$KAME: altq_conf.c,v 1.6 2000/07/25 10:12:29 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-1999
+ * Copyright (C) 1997-2000
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_conf.c,v 1.5 2000/06/21 01:50:42 kjc Exp $
+ * $Id: altq_conf.c,v 1.6 2000/07/25 10:12:29 kjc Exp $
  */
 
 #ifdef ALTQ
@@ -46,6 +46,7 @@
 #include <sys/systm.h>
 #include <sys/socket.h>
 #include <sys/kernel.h>
+#include <sys/proc.h>
 #include <sys/errno.h>
 #if defined(__FreeBSD__) && (__FreeBSD_version < 400000) && defined(DEVFS)
 #include <sys/devfsext.h>
@@ -160,12 +161,22 @@ void	altqattach __P((int));
 #endif
 
 #if defined(__FreeBSD__)
-#define CDEV_MAJOR 96		 /* FreeBSD official number */
+#define	CDEV_MAJOR 96		/* FreeBSD official number */
 #elif defined(__NetBSD__)
-#define CDEV_MAJOR 65		 /* not official */
+#if defined(__i386__)
+#define	CDEV_MAJOR 65		/* NetBSD i386 (not official) */
+#elif defined(__alpha__)
+#define	CDEV_MAJOR 56		/* NetBSD alpha (not official) */
+#else
+#error arch not supported
+#endif
 #elif defined(__OpenBSD__)
 #if defined(__i386__)
-#define CDEV_MAJOR 66		/* not official either */
+#define	CDEV_MAJOR 66		/* OpenBSD i386 (not official) */
+#elif defined(__alpha__)
+#define	CDEV_MAJOR 52		/* OpenBSD alpha (not official) */
+#else
+#error arch not supported
 #endif
 #endif
 
@@ -242,16 +253,42 @@ altqioctl(dev, cmd, addr, flag, p)
 
 	if (unit == 0) {
 		struct ifnet *ifp;
-		struct qtypereq *req;
+		struct qtypereq *typereq;
+		struct tbrreq *tbrreq;
+		int error;
 
 		switch (cmd) {
 		case ALTQGTYPE:
-			req = (struct qtypereq *)addr;
-			if ((ifp = ifunit(req->ifname)) != NULL) {
-				req->altqtype = ifp->if_altqtype;
-				return (0);
-			}
-			/* fall into... */
+		case ALTQTBRGET:
+			break;
+		default:
+#if (__FreeBSD_version > 400000)
+			if ((error = suser(p)) != 0)
+				return (error);
+#else
+			if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+				return (error);
+#endif
+			break;
+		}
+
+		switch (cmd) {
+		case ALTQGTYPE:
+			typereq = (struct qtypereq *)addr;
+			if ((ifp = ifunit(typereq->ifname)) == NULL)
+				return (EINVAL);
+			typereq->altqtype = ifp->if_snd.altq_type;
+			return (0);
+		case ALTQTBRSET:
+			tbrreq = (struct tbrreq *)addr;
+			if ((ifp = ifunit(tbrreq->ifname)) == NULL)
+				return (EINVAL);
+			return tbr_set(&ifp->if_snd, &tbrreq->tb_prof);
+		case ALTQTBRGET:
+			tbrreq = (struct tbrreq *)addr;
+			if ((ifp = ifunit(tbrreq->ifname)) == NULL)
+				return (EINVAL);
+			return tbr_get(&ifp->if_snd, &tbrreq->tb_prof);
 		default:
 			return (EINVAL);
 		}

@@ -1,7 +1,7 @@
-/*	$KAME: altq_fifoq.h,v 1.2 2000/02/22 14:00:32 itojun Exp $	*/
+/*	$KAME: altq_fifoq.h,v 1.3 2000/07/25 10:12:30 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-1999
+ * Copyright (C) 1997-2000
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,15 +25,15 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_fifoq.h,v 1.2 2000/02/22 14:00:32 itojun Exp $
+ * $Id: altq_fifoq.h,v 1.3 2000/07/25 10:12:30 kjc Exp $
  */
 
 #ifndef _ALTQ_ALTQ_FIFOQ_H_
-#define _ALTQ_ALTQ_FIFOQ_H_
+#define	_ALTQ_ALTQ_FIFOQ_H_
 
 typedef struct fifoq_state {
 	struct fifoq_state *q_next;	/* next fifoq_state in the list */
-	struct ifnet *q_ifp;		/* backpointer to ifnet */
+	struct ifaltq *q_ifq;		/* backpointer to ifaltq */
 
 	struct mbuf *q_head;		/* head of queue */
 	struct mbuf *q_tail;		/* tail of queue */
@@ -68,13 +68,13 @@ struct fifoq_conf {
 	int fifoq_limit;
 };
 
-#define FIFOQ_LIMIT	50	/* default max queue lenght */
+#define	FIFOQ_LIMIT	50	/* default max queue lenght */
 
 /* 
  * IOCTLs for FIFOQ
  */
-#define FIFOQ_ENABLE		_IOW('Q', 1, struct fifoq_interface)
-#define FIFOQ_DISABLE		_IOW('Q', 2, struct fifoq_interface)
+#define	FIFOQ_ENABLE		_IOW('Q', 1, struct fifoq_interface)
+#define	FIFOQ_DISABLE		_IOW('Q', 2, struct fifoq_interface)
 #define	FIFOQ_IF_ATTACH		_IOW('Q', 3, struct fifoq_interface)
 #define	FIFOQ_IF_DETACH		_IOW('Q', 4, struct fifoq_interface)
 #define	FIFOQ_ACC_ENABLE	_IOW('Q', 5, struct fifoq_interface)

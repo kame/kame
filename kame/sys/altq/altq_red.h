@@ -1,7 +1,7 @@
-/*	$KAME: altq_red.h,v 1.2 2000/02/22 14:00:34 itojun Exp $	*/
+/*	$KAME: altq_red.h,v 1.3 2000/07/25 10:12:31 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-1999
+ * Copyright (C) 1997-2000
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,11 +25,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_red.h,v 1.2 2000/02/22 14:00:34 itojun Exp $
+ * $Id: altq_red.h,v 1.3 2000/07/25 10:12:31 kjc Exp $
  */
 
 #ifndef _ALTQ_ALTQ_RED_H_
-#define _ALTQ_ALTQ_RED_H_
+#define	_ALTQ_ALTQ_RED_H_
 
 #include <altq/altq_classq.h>
 
@@ -77,10 +77,10 @@ struct red_conf {
 };
 
 /* red flags */
-#define REDF_ECN4	0x01	/* use packet marking for IPv4 packets */
-#define REDF_ECN6	0x02	/* use packet marking for IPv6 packets */
-#define REDF_ECN	(REDF_ECN4 | REDF_ECN6)
-#define REDF_FLOWVALVE	0x04	/* use flowvalve (aka penalty-box) */
+#define	REDF_ECN4	0x01	/* use packet marking for IPv4 packets */
+#define	REDF_ECN6	0x02	/* use packet marking for IPv6 packets */
+#define	REDF_ECN	(REDF_ECN4 | REDF_ECN6)
+#define	REDF_FLOWVALVE	0x04	/* use flowvalve (aka penalty-box) */
 
 /*
  * simpler versions of red parameters and statistics used by other
@@ -107,8 +107,8 @@ struct redstats {
 /* 
  * IOCTLs for RED
  */
-#define RED_ENABLE		_IOW('Q', 1, struct red_interface)
-#define RED_DISABLE		_IOW('Q', 2, struct red_interface)
+#define	RED_ENABLE		_IOW('Q', 1, struct red_interface)
+#define	RED_DISABLE		_IOW('Q', 2, struct red_interface)
 #define	RED_IF_ATTACH		_IOW('Q', 3, struct red_interface)
 #define	RED_IF_DETACH		_IOW('Q', 4, struct red_interface)
 #define	RED_ACC_ENABLE		_IOW('Q', 5, struct red_interface)
@@ -117,7 +117,7 @@ struct redstats {
 #define	RED_CONFIG		_IOWR('Q', 8, struct red_conf)
 #define	RED_SETDEFAULTS		_IOW('Q', 9, struct redparams)
 
-#if defined(KERNEL) || defined(_KERNEL)
+#ifdef _KERNEL
 
 struct flowvalve;
 
@@ -170,7 +170,7 @@ typedef struct red {
 
 typedef struct red_queue {
 	struct red_queue *rq_next;	/* next red_state in the list */
-	struct ifnet *rq_ifp;		/* backpointer to ifnet */
+	struct ifaltq *rq_ifq;		/* backpointer to ifaltq */
 
 	class_queue_t *rq_q;
 
@@ -178,22 +178,22 @@ typedef struct red_queue {
 } red_queue_t;
 
 /* red drop types */
-#define DTYPE_NODROP	0	/* no drop */
-#define DTYPE_FORCED	1	/* a "forced" drop */
-#define DTYPE_EARLY	2	/* an "unforced" (early) drop */
+#define	DTYPE_NODROP	0	/* no drop */
+#define	DTYPE_FORCED	1	/* a "forced" drop */
+#define	DTYPE_EARLY	2	/* an "unforced" (early) drop */
 
 extern red_t *red_alloc __P((int, int, int, int, int, int));
 extern void red_destroy __P((red_t *));
 extern void red_getstats __P((red_t *, struct redstats *));
 extern int red_addq __P((red_t *, class_queue_t *, struct mbuf *,
-			 struct pr_hdr *));
+			 struct altq_pktattr *));
 extern struct mbuf *red_getq __P((red_t *, class_queue_t *));
 extern int drop_early __P((int, int, int));
-extern int mark_ecn __P((struct pr_hdr *, int));
+extern int mark_ecn __P((struct altq_pktattr *, int));
 extern struct wtab *wtab_alloc __P((int));
 extern int wtab_destroy __P((struct wtab *));
 extern int32_t pow_w __P((struct wtab *, int));
 
-#endif /* KERNEL */
+#endif /* _KERNEL */
 
 #endif /* _ALTQ_ALTQ_RED_H_ */

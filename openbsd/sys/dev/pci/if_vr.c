@@ -191,18 +191,6 @@ int vr_list_tx_init		__P((struct vr_softc *));
 	CSR_WRITE_1(sc, VR_MIICMD,			\
 		CSR_READ_1(sc, VR_MIICMD) & ~x)
 
-#ifdef ALTQ
-/*
- * device dependent tweak for ALTQ:  if a driver is designed to dequeue
- * too many packets at a time, we have to modify the driver to limit the
- * number of packets buffered in the device.  This modification
- * often needs to change handling of tx complete interrupts as well.
- * the vr driver can pull as many as 128 packets (when VR_TX_LIST_CNT is 128).
- * TXBUF_THRESH4ALTQ limits buffered packets up to 8.
- */
-#define TXBUF_THRESH4ALTQ	8
-#endif
-
 /*
  * Sync the PHYs by setting data bit and strobing the clock 32 times.
  */
@@ -1055,9 +1043,7 @@ vr_attach(parent, self, aux)
 	ifp->if_start = vr_start;
 	ifp->if_watchdog = vr_watchdog;
 	ifp->if_baudrate = 10000000;
-#ifdef ALTQ
-	ifp->if_altqflags |= ALTQF_READY;
-#endif
+	IFQ_SET_READY(&ifp->if_snd);
 	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
 
 	for (i = VR_PHYADDR_MIN; i < VR_PHYADDR_MAX + 1; i++) {
@@ -1142,9 +1128,6 @@ vr_list_tx_init(sc)
 
 	cd->vr_tx_free = &cd->vr_tx_chain[0];
 	cd->vr_tx_tail = cd->vr_tx_head = NULL;
-#ifdef ALTQ
-	sc->vr_cdata.vr_tx_queued = 0;
-#endif
 
 	return(0);
 }
@@ -1391,9 +1374,6 @@ vr_txeof(sc)
 		ifp->if_opackets++;
         	MFREE(cur_tx->vr_mbuf, n);
 		cur_tx->vr_mbuf = NULL;
-#ifdef ALTQ
-		sc->vr_cdata.vr_tx_queued--;
-#endif
 
 		if (sc->vr_cdata.vr_tx_head == sc->vr_cdata.vr_tx_tail) {
 			sc->vr_cdata.vr_tx_head = NULL;
@@ -1495,13 +1475,7 @@ vr_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_2(sc, VR_IMR, VR_INTRS);
 
-#ifdef ALTQ
-	if (ALTQ_IS_ON(ifp)) {
-		vr_start(ifp);
-	}
-	else
-#endif
-	if (ifp->if_snd.ifq_head != NULL) {
+	if (!IFQ_IS_EMPTY(&ifp->if_snd)) {
 		vr_start(ifp);
 	}
 
@@ -1609,30 +1583,13 @@ vr_start(ifp)
 	start_tx = sc->vr_cdata.vr_tx_free;
 
 	while(sc->vr_cdata.vr_tx_free->vr_mbuf == NULL) {
-#ifdef ALTQ
-		if (ALTQ_IS_ON(ifp)) {
-			if (sc->vr_cdata.vr_tx_queued >= TXBUF_THRESH4ALTQ) {
-				/*
-				 * stop filling tx buffer if we already have
-				 * enough packets to transmit.
-				 */
-				break;
-			}
-
-			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
-		}
-		else
-#endif
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
 		/* Pick a descriptor off the free list. */
 		cur_tx = sc->vr_cdata.vr_tx_free;
 		sc->vr_cdata.vr_tx_free = cur_tx->vr_nextdesc;
-#ifdef ALTQ
-		sc->vr_cdata.vr_tx_queued++;
-#endif
 
 		/* Pack the data into the descriptor. */
 		vr_encap(sc, cur_tx, m_head);
@@ -1931,12 +1888,7 @@ vr_watchdog(ifp)
 	vr_reset(sc);
 	vr_init(sc);
 
-#ifdef ALTQ
-	if (ALTQ_IS_ON(ifp))
-		vr_start(ifp);
-	else
-#endif
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		vr_start(ifp);
 
 	return;

@@ -428,9 +428,7 @@ arattach(struct isa_device *id)
 		ifp->if_ioctl = arioctl;
 		ifp->if_start = arstart;
 		ifp->if_watchdog = arwatchdog;
-#ifdef ALTQ
-		ifp->if_altqflags |= ALTQF_READY;
-#endif
+		IFQ_SET_READY(&ifp->if_snd);
 
 		sc->ifsppp.pp_flags = PP_KEEPALIVE;
 

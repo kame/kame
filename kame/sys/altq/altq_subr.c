@@ -1,7 +1,7 @@
-/*	$KAME: altq_subr.c,v 1.4 2000/05/07 06:29:23 kjc Exp $	*/
+/*	$KAME: altq_subr.c,v 1.5 2000/07/25 10:12:31 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-1999
+ * Copyright (C) 1997-2000
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_subr.c,v 1.4 2000/05/07 06:29:23 kjc Exp $
+ * $Id: altq_subr.c,v 1.5 2000/07/25 10:12:31 kjc Exp $
  */
 
 #ifdef ALTQ
@@ -77,6 +77,7 @@
 /*
  * internal function prototypes
  */
+static void	tbr_timeout __P((void *));
 static int 	extract_ports4 __P((struct mbuf *, struct ip *,
 				    struct flowinfo_in *));
 #ifdef INET6
@@ -91,10 +92,8 @@ static int	apply_ppfilter4 __P((u_int32_t, struct flow_filter *,
 static int	apply_filter6 __P((u_int32_t, struct flow_filter6 *,
 					   struct flowinfo_in6 *));
 #endif
-#ifdef CBQ_RIO
 static int	apply_tosfilter4 __P((u_int32_t, struct flow_filter *,
 					     struct flowinfo_in *));
-#endif
 static u_long	get_filt_handle __P((struct acc_classifier *, int));
 static struct acc_filter *filth_to_filtp __P((struct acc_classifier *,
 					      u_long));
@@ -106,9 +105,13 @@ static int 	ip4f_init __P((void));
 static struct ip4_frag	*ip4f_alloc __P((void));
 static void 	ip4f_free __P((struct ip4_frag *));
 
+int (*altq_input) __P((struct mbuf *, int)) = NULL;
+static int tbr_timer = 0;	/* token bucket regulator timer */
+
 /*
  * alternate queueing support routines
  */
+
 /* look up the queue state by the interface name and the queuing type. */
 void *
 altq_lookup(name, type)
@@ -117,33 +120,39 @@ altq_lookup(name, type)
 {
 	struct ifnet *ifp;
 
-	if ((ifp = ifunit(name))) {
-		if (type != ALTQT_NONE && ifp->if_altqtype != type)
-			return NULL;
-		return (void *)ifp->if_altqp;
+	if ((ifp = ifunit(name)) != NULL) {
+		if (type != ALTQT_NONE && ifp->if_snd.altq_type == type)
+			return (ifp->if_snd.altq_disc);
 	}
 
 	return NULL;
 }
 
 int
-if_altqattach(ifp, queue_state, enqueue, dequeue, type)
-	struct ifnet *ifp;
-	void *queue_state;
-	int (*enqueue)(struct ifnet *, struct mbuf *, struct pr_hdr *, int);
-	struct mbuf *(*dequeue)(struct ifnet *, int);
+altq_attach(ifq, type, discipline, enqueue, dequeue, request, clfier, classify)
+	struct ifaltq *ifq;
+	int type;
+	void *discipline;
+	int (*enqueue)(struct ifaltq *, struct mbuf *, struct altq_pktattr *);
+	struct mbuf *(*dequeue)(struct ifaltq *, int);
+	int (*request)(struct ifaltq *, int, void *);
+	void *clfier;
+	void *(*classify)(void *, struct mbuf *, int);
 {
-	if (!ALTQ_IS_READY(ifp))
+	if (!ALTQ_IS_READY(ifq))
 		return ENXIO;
-	if (ALTQ_IS_ON(ifp))
+	if (ALTQ_IS_ENABLED(ifq))
 		return EBUSY;
-	if (ifp->if_altqp != NULL)
+	if (ALTQ_IS_ATTACHED(ifq))
 		return EEXIST;
-	ifp->if_altqp = queue_state;
-	ifp->if_altqenqueue = enqueue;
-	ifp->if_altqdequeue = dequeue;
-	ifp->if_altqflags &= ALTQF_CANTCHANGE;
-	ifp->if_altqtype = type;
+	ifq->altq_type     = type;
+	ifq->altq_disc     = discipline;
+	ifq->altq_enqueue  = enqueue;
+	ifq->altq_dequeue  = dequeue;
+	ifq->altq_request  = request;
+	ifq->altq_clfier   = clfier;
+	ifq->altq_classify = classify;
+	ifq->altq_flags &= ALTQF_CANTCHANGE;
 #ifdef ALTQ_KLD
 	altq_module_incref(type);
 #endif
@@ -151,62 +160,65 @@ if_altqattach(ifp, queue_state, enqueue, dequeue, type)
 }
 
 int
-if_altqdetach(ifp)
-	struct ifnet *ifp;
+altq_detach(ifq)
+	struct ifaltq *ifq;
 {
-	if (!ALTQ_IS_READY(ifp))
+	if (!ALTQ_IS_READY(ifq))
 		return ENXIO;
-	if (ALTQ_IS_ON(ifp))
+	if (ALTQ_IS_ENABLED(ifq))
 		return EBUSY;
+	if (!ALTQ_IS_ATTACHED(ifq))
+		return (0);
 
 #ifdef ALTQ_KLD
-	altq_module_declref(ifp->if_altqtype);
+	altq_module_declref(ifq->altq_type);
 #endif
-	ifp->if_altqp = NULL;
-	ifp->if_altqenqueue = NULL;
-	ifp->if_altqdequeue = NULL;
-	ifp->if_altqflags &= ALTQF_CANTCHANGE;
-	ifp->if_altqtype = ALTQT_NONE;
+	ifq->altq_type     = ALTQT_NONE;
+	ifq->altq_disc     = NULL;
+	ifq->altq_enqueue  = NULL;
+	ifq->altq_dequeue  = NULL;
+	ifq->altq_request  = NULL;
+	ifq->altq_clfier   = NULL;
+	ifq->altq_classify = NULL;
+	ifq->altq_flags &= ALTQF_CANTCHANGE;
 	return 0;
 }
 
 int
-if_altqenable(ifp)
-	struct ifnet *ifp;
+altq_enable(ifq)
+	struct ifaltq *ifq;
 {
-	struct mbuf *m;
 	int s;
     
-	if (!ALTQ_IS_READY(ifp))
+	if (!ALTQ_IS_READY(ifq))
 		return ENXIO;
-	if (ALTQ_IS_ON(ifp))
+	if (ALTQ_IS_ENABLED(ifq))
 		return 0;
 
 	s = splimp();
-	do {
-		IF_DEQUEUE(&ifp->if_snd, m);
-		if (m)
-			m_freem(m);
-	} while (m);
-
-	ifp->if_altqflags |= ALTQF_ENABLE;
+	IFQ_PURGE(ifq);
+	ASSERT(ifq->ifq_len == 0);
+	ifq->altq_flags |= ALTQF_ENABLED;
+	if (ifq->altq_clfier != NULL)
+		ifq->altq_flags |= ALTQF_CLASSIFY;
 	splx(s);
 
 	return 0;
 }
 
 int
-if_altqdisable(ifp)
-	struct ifnet *ifp;
+altq_disable(ifq)
+	struct ifaltq *ifq;
 {
 	int s;
     
-	if (!ALTQ_IS_ON(ifp))
+	if (!ALTQ_IS_ENABLED(ifq))
 		return 0;
 
 	s = splimp();
-	(void)(*ifp->if_altqdequeue)(ifp, ALTDQ_FLUSH);
-	ifp->if_altqflags &= ~ALTQF_ENABLE;
+	IFQ_PURGE(ifq);
+	ASSERT(ifq->ifq_len == 0);
+	ifq->altq_flags &= ~(ALTQF_ENABLED|ALTQF_CLASSIFY);
 	splx(s);
 	return 0;
 }
@@ -222,34 +234,222 @@ altq_assert(file, line, failedexpr)
 	/* NOTREACHED */
 }
 
+/*
+ * internal representation of token bucket parameters
+ *	rate: 	byte_per_unittime << 32
+ *		(((bits_per_sec) / 8) << 32) / machclk_freq
+ *	depth:	byte << 32
+ *
+ */
+#define	TBR_SHIFT	32
+#define	TBR_SCALE(x)	((int64_t)(x) << TBR_SHIFT)
+#define	TBR_UNSCALE(x)	((x) >> TBR_SHIFT)
+
+struct mbuf *
+tbr_dequeue(ifq, op)
+	struct ifaltq *ifq;
+	int op;
+{
+	struct tb_regulator *tbr;
+	struct mbuf *m;
+	int64_t interval;
+	u_int64_t now;
+
+	tbr = ifq->altq_tbr;
+	if (op == ALTDQ_REMOVE && tbr->tbr_lastop == ALTDQ_POLL) {
+		/* if this is a remove after poll, bypass tbr check */
+	} else {
+		/* update token only when it is negative */
+		if (tbr->tbr_token <= 0) {
+			now = read_machclk();
+			interval = now - tbr->tbr_last;
+			if (interval >= tbr->tbr_filluptime)
+				tbr->tbr_token = tbr->tbr_depth;
+			else {
+				tbr->tbr_token += interval * tbr->tbr_rate;
+				if (tbr->tbr_token > tbr->tbr_depth)
+					tbr->tbr_token = tbr->tbr_depth;
+			}
+			tbr->tbr_last = now;
+		}
+		/* if token is still negative, don't allow dequeue */
+		if (tbr->tbr_token <= 0)
+			return (NULL);
+	}
+
+	if (ALTQ_IS_ENABLED(ifq))
+		m = (*ifq->altq_dequeue)(ifq, op);
+	else {
+		if (op == ALTDQ_POLL)
+			IF_POLL(ifq, m);
+		else
+			IF_DEQUEUE(ifq, m);
+	}
+
+	if (m != NULL && op == ALTDQ_REMOVE)
+		tbr->tbr_token -= TBR_SCALE(m_pktlen(m));
+	tbr->tbr_lastop = op;
+	return (m);
+}
+
+/*
+ * set a token bucket regulator.
+ * if the specified rate is zero, the token bucket regulator is deleted.
+ */
+int
+tbr_set(ifq, profile)
+	struct ifaltq *ifq;
+	struct tb_profile *profile;
+{
+	struct tb_regulator *tbr, *otbr;
+
+	if (machclk_freq == 0)
+		init_machclk();
+	if (machclk_freq == 0) {
+		printf("tbr_set: no cpu clock available!\n");
+		return (ENXIO);
+	}
+	
+	if (profile->rate == 0) {
+		/* delete this tbr */
+		if ((tbr = ifq->altq_tbr) == NULL)
+			return (ENOENT);
+		ifq->altq_tbr = NULL;
+		FREE(tbr, M_DEVBUF);
+		return (0);
+	}
+
+	MALLOC(tbr, struct tb_regulator *, sizeof(struct tb_regulator),
+	       M_DEVBUF, M_WAITOK);
+	if (tbr == NULL)
+		return (ENOMEM);
+	bzero(tbr, sizeof(struct tb_regulator));
+
+	tbr->tbr_rate = TBR_SCALE(profile->rate / 8) / machclk_freq;
+	tbr->tbr_depth = TBR_SCALE(profile->depth);
+	if (tbr->tbr_rate > 0)
+		tbr->tbr_filluptime = tbr->tbr_depth / tbr->tbr_rate;
+	else
+		tbr->tbr_filluptime = 0xffffffffffffffffLL;
+	tbr->tbr_token = tbr->tbr_depth;
+	tbr->tbr_last = read_machclk();
+	tbr->tbr_lastop = ALTDQ_REMOVE;
+
+	otbr = ifq->altq_tbr;
+	ifq->altq_tbr = tbr;	/* set the new tbr */
+
+	if (otbr != NULL)
+		FREE(otbr, M_DEVBUF);
+	else {
+		if (tbr_timer == 0) {
+			timeout(tbr_timeout, (void *)0, 1);
+			tbr_timer = 1;
+		}
+	}
+	return (0);
+}
+
+/*
+ * tbr_timeout goes through the interface list, and kicks the drivers
+ * if necessary.
+ */
+static void
+tbr_timeout(arg)
+	void *arg;
+{
+	struct ifnet *ifp;
+	int i, s;
+
+	i = 0;
+	s = splimp();
+#ifdef __FreeBSD__
+#if (__FreeBSD_version < 300000)
+	for (ifp = ifnet; ifp; ifp = ifp->if_next)
+#else
+	for (ifp = ifnet.tqh_first; ifp != NULL; ifp = ifp->if_link.tqe_next)
+#endif
+#else /* !FreeBSD */
+	for (ifp = ifnet.tqh_first; ifp != NULL; ifp = ifp->if_list.tqe_next)
+#endif
+	{
+		if (!TBR_IS_ENABLED(&ifp->if_snd))
+			continue;
+		i++;
+		if (!IFQ_IS_EMPTY(&ifp->if_snd) &&
+		    ifp->if_snd.altq_tbr->tbr_token <= 0 &&
+		    ifp->if_start != NULL)
+			(*ifp->if_start)(ifp);
+	}
+	splx(s);
+	if (i > 0)
+		timeout(tbr_timeout, (void *)0, 1);
+	else
+		tbr_timer = 0;	/* don't need tbr_timer anymore */
+#ifdef __alpha__
+	{
+		/*
+		 * XXX read out the machine dependent clock once a second
+		 * to detect counter wrap-around.
+		 */
+		static u_int cnt;
+
+		if (++cnt >= hz) {
+			(void)read_machclk();
+			cnt = 0;
+		}
+	}
+#endif /* __alpha__ */
+}
+
+/*
+ * get token bucket regulator profile
+ */
+int
+tbr_get(ifq, profile)
+	struct ifaltq *ifq;
+	struct tb_profile *profile;
+{
+	struct tb_regulator *tbr;
+
+	if ((tbr = ifq->altq_tbr) == NULL) {
+		profile->rate = 0;
+		profile->depth = 0;
+	} else {
+		profile->rate =
+		    (u_int)TBR_UNSCALE(tbr->tbr_rate * 8 * machclk_freq);
+		profile->depth = (u_int)TBR_UNSCALE(tbr->tbr_depth);
+	}
+	return (0);
+}
+
+
 #ifndef IPPROTO_ESP
-#define IPPROTO_ESP	50		/* encapsulating security payload */
+#define	IPPROTO_ESP	50		/* encapsulating security payload */
 #endif
 #ifndef IPPROTO_AH
-#define IPPROTO_AH	51		/* authentication header */
+#define	IPPROTO_AH	51		/* authentication header */
 #endif
 
 /* 
  * extract flow information from a given packet.
- * pr_hdr holds a pointer to the ip header.  filt_mask shows flowinfo
- * fields required.
+ * filt_mask shows flowinfo fields required.
  * we assume the ip header is in one mbuf, and addresses and ports are
  * in network byte order.
  */
 int 
-altq_extractflow(m, pr_hdr, flow, filt_bmask)
+altq_extractflow(m, af, flow, filt_bmask)
 	struct mbuf *m;
-	struct pr_hdr *pr_hdr;
+	int af;
 	struct flowinfo *flow;
 	u_int32_t	filt_bmask;
 {
 
-	switch (pr_hdr->ph_family) {
+	switch (af) {
 	case PF_INET: {
 		struct flowinfo_in *fin;
 		struct ip *ip;
 
-		ip = (struct ip *)pr_hdr->ph_hdr;
+		ip = mtod(m, struct ip *);
 
 		if (ip->ip_v != 4)
 			break;
@@ -280,7 +480,7 @@ altq_extractflow(m, pr_hdr, flow, filt_bmask)
 		struct flowinfo_in6 *fin6;
 		struct ip6_hdr *ip6;
 
-		ip6 = (struct ip6_hdr *)pr_hdr->ph_hdr;
+		ip6 = mtod(m, struct ip6_hdr *);
 		/* should we check the ip version? */
 		
 		fin6 = (struct flowinfo_in6 *)flow;
@@ -313,9 +513,6 @@ altq_extractflow(m, pr_hdr, flow, filt_bmask)
 #endif /* INET6 */
 
 	default:
-#ifdef ALTQ_DEBUG
-		printf("altq_extractflow: unknown proto family=%d\n", pr_hdr->ph_family);
-#endif
 		break;
 	}
 
@@ -532,7 +729,8 @@ extract_ports6(m, ip6, fin6)
 /*
  * altq common classifier
  */
-int acc_add_filter(classifier, filter, class, phandle)
+int
+acc_add_filter(classifier, filter, class, phandle)
 	struct acc_classifier *classifier;
 	struct flow_filter *filter;
 	void	*class;
@@ -590,8 +788,8 @@ int acc_add_filter(classifier, filter, class, phandle)
 		struct flow_filter6 *filter6 =
 			(struct flow_filter6 *)&afp->f_filter;
 #ifndef IN6MASK0 /* taken from kame ipv6 */
-#define IN6MASK0	{{{ 0, 0, 0, 0 }}}
-#define IN6MASK128	{{{ 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff }}}
+#define	IN6MASK0	{{{ 0, 0, 0, 0 }}}
+#define	IN6MASK128	{{{ 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff }}}
 		const struct in6_addr in6mask0 = IN6MASK0;
 		const struct in6_addr in6mask128 = IN6MASK128;
 #endif
@@ -640,7 +838,8 @@ int acc_add_filter(classifier, filter, class, phandle)
 	return (0);
 }
 
-int acc_delete_filter(classifier, handle)
+int
+acc_delete_filter(classifier, handle)
 	struct acc_classifier *classifier;
 	u_long handle;
 {
@@ -665,7 +864,8 @@ int acc_delete_filter(classifier, handle)
  * delete filters referencing to the specified class.
  * if the all flag is not 0, delete all the filters.
  */
-int acc_discard_filters(classifier, class, all)
+int
+acc_discard_filters(classifier, class, all)
 	struct acc_classifier *classifier;
 	void	*class;
 	int	all;
@@ -693,18 +893,23 @@ int acc_discard_filters(classifier, class, all)
 	return (0);
 }
 
-void *acc_classify(classifier, flowinfo)
-	struct acc_classifier *classifier;
-	struct flowinfo *flowinfo;
+void *
+acc_classify(clfier, m, af)
+	void *clfier;
+	struct mbuf *m;
+	int af;
 {
+	struct acc_classifier *classifier;
+	struct flowinfo flow;
 	struct acc_filter *afp;
 	int	i;
 
-	if (flowinfo->fi_family == AF_INET) {
-		/* currently only AF_INET is supported */
-		struct flowinfo_in *fp = (struct flowinfo_in *)flowinfo;
+	classifier = (struct acc_classifier *)clfier;
+	altq_extractflow(m, af, &flow, classifier->acc_fbmask);
+
+	if (flow.fi_family == AF_INET) {
+		struct flowinfo_in *fp = (struct flowinfo_in *)&flow;
 	
-#ifdef CBQ_RIO
 		if ((classifier->acc_fbmask & FIMB4_ALL) == FIMB4_TOS) {
 			/* only tos is used */
 			LIST_FOREACH(afp,
@@ -714,11 +919,8 @@ void *acc_classify(classifier, flowinfo)
 						     &afp->f_filter, fp))
 					/* filter matched */
 					return (afp->f_class);
-		}
-		else
-#endif 		
-		if ((classifier->acc_fbmask &
-		     (~(FIMB4_PROTO|FIMB4_SPORT|FIMB4_DPORT) & FIMB4_ALL))
+		} else if ((classifier->acc_fbmask &
+			(~(FIMB4_PROTO|FIMB4_SPORT|FIMB4_DPORT) & FIMB4_ALL))
 		    == 0) {
 			/* only proto and ports are used */
 			LIST_FOREACH(afp,
@@ -757,8 +959,8 @@ void *acc_classify(classifier, flowinfo)
 		}
 	}
 #ifdef INET6
-	else if (flowinfo->fi_family == AF_INET6) {
-		struct flowinfo_in6 *fp6 = (struct flowinfo_in6 *)flowinfo;
+	else if (flow.fi_family == AF_INET6) {
+		struct flowinfo_in6 *fp6 = (struct flowinfo_in6 *)&flow;
 	
 		/* get the filter hash entry from its flow ID */
 		if (fp6->fi6_flowlabel != 0)
@@ -845,7 +1047,6 @@ apply_ppfilter4(fbmask, filt, pkt)
 	return (1);
 }
 
-#ifdef CBQ_RIO
 /*
  * filter matching function only for tos field.
  */
@@ -863,7 +1064,6 @@ apply_tosfilter4(fbmask, filt, pkt)
 	/* match */
 	return (1);
 }
-#endif /* CBQ_RIO */
 
 #ifdef INET6
 static int
@@ -939,7 +1139,8 @@ apply_filter6(fbmask, filt, pkt)
  *	bit 20-28: index to the filter hash table
  *	bit  0-19: unique id in the hash bucket.
  */
-static u_long get_filt_handle(classifier, i)
+static u_long
+get_filt_handle(classifier, i)
 	struct acc_classifier *classifier;
 	int	i;
 {
@@ -1053,10 +1254,11 @@ struct ip4_frag {
 
 static TAILQ_HEAD(ip4f_list, ip4_frag) ip4f_list; /* IPv4 fragment cache */
 
-#define IP4F_TABSIZE		8	/* IPv4 fragment cache size */
+#define	IP4F_TABSIZE		8	/* IPv4 fragment cache size */
 
 
-static void ip4f_cache(ip, fin)
+static void
+ip4f_cache(ip, fin)
 	struct ip *ip;
 	struct flowinfo_in *fin;
 {
@@ -1078,7 +1280,8 @@ static void ip4f_cache(ip, fin)
 	fp->ip4f_info.fi_gpi   = fin->fi_gpi;
 }
 
-static int ip4f_lookup(ip, fin)
+static int
+ip4f_lookup(ip, fin)
 	struct ip *ip;
 	struct flowinfo_in *fin;
 {
@@ -1108,7 +1311,8 @@ static int ip4f_lookup(ip, fin)
 	return (0);
 }
 
-static int ip4f_init(void)
+static int
+ip4f_init(void)
 {
 	struct ip4_frag *fp;
 	int i;
@@ -1127,7 +1331,8 @@ static int ip4f_init(void)
 	return (0);
 }
 
-static struct ip4_frag *ip4f_alloc(void)
+static struct ip4_frag *
+ip4f_alloc(void)
 {
 	struct ip4_frag *fp;
 
@@ -1139,7 +1344,8 @@ static struct ip4_frag *ip4f_alloc(void)
 	return (fp);
 }
 
-static void ip4f_free(fp)
+static void
+ip4f_free(fp)
 	struct ip4_frag *fp;
 {
 	TAILQ_REMOVE(&ip4f_list, fp, ip4f_chain);
@@ -1148,48 +1354,24 @@ static void ip4f_free(fp)
 }
 
 /*
- * make a control type ip header.  fake an ICMP type for now.
- */
-int altq_mkctlhdr(pr_hdr)
-	struct pr_hdr *pr_hdr;
-{
-	static struct ip *ip = NULL;
-
-	if (ip == NULL) {
-		MALLOC(ip, struct ip *, sizeof(struct ip), M_DEVBUF, M_WAITOK);
-		if (ip == NULL) {
-			printf("altq_mkctlhdr: malloc failed!\n");
-			return (-1);
-		}
-		ip->ip_len = htons(sizeof(struct ip));
-		ip->ip_v = 4;
-		ip->ip_hl = sizeof(struct ip) >> 2;
-		ip->ip_p = IPPROTO_ICMP;
-		ip->ip_tos = 0;
-		ip->ip_src.s_addr = htonl(0);	/* XXX */
-		ip->ip_dst.s_addr = htonl(0);	/* XXX */
-	}
-	pr_hdr->ph_family = AF_INET;
-	pr_hdr->ph_hdr = (caddr_t)ip;
-	return (0);
-}
-
-/*
  * read and write diffserv field in IPv4 or IPv6 header
  */
 u_int8_t
-read_dsfield(ph)
-	struct pr_hdr *ph;
+read_dsfield(pktattr)
+	struct altq_pktattr *pktattr;
 {
 	u_int8_t ds_field;
 	
-	if (ph->ph_family == AF_INET)
-		ds_field = ((struct ip *)ph->ph_hdr)->ip_tos;
+	if (pktattr == NULL)
+		return ((u_int8_t)0);
+
+	if (pktattr->pattr_af == AF_INET)
+		ds_field = ((struct ip *)pktattr->pattr_hdr)->ip_tos;
 #ifdef INET6
-	else if (ph->ph_family == AF_INET6) {
+	else if (pktattr->pattr_af == AF_INET6) {
 		u_int32_t flowlabel;
 		
-		flowlabel = ((struct ip6_hdr *)ph->ph_hdr)->ip6_flow;
+		flowlabel = ((struct ip6_hdr *)pktattr->pattr_hdr)->ip6_flow;
 		ds_field = (ntohl(flowlabel) >> 20) & 0xff;
 	}
 #endif
@@ -1200,12 +1382,15 @@ read_dsfield(ph)
 }
 
 void
-write_dsfield(ph, dsfield)
-	struct pr_hdr *ph;
+write_dsfield(pktattr, dsfield)
+	struct altq_pktattr *pktattr;
 	u_int8_t dsfield;
 {
-	if (ph->ph_family == AF_INET) {
-		struct ip *ip = (struct ip *)ph->ph_hdr;
+	if (pktattr == NULL)
+		return;
+
+	if (pktattr->pattr_af == AF_INET) {
+		struct ip *ip = (struct ip *)pktattr->pattr_hdr;
 		u_int8_t old;
 		int32_t sum;
 		
@@ -1226,8 +1411,8 @@ write_dsfield(ph, dsfield)
 		ip->ip_sum = htons(~sum & 0xffff);
 	}
 #ifdef INET6
-	else if (ph->ph_family == AF_INET6) {
-		struct ip6_hdr *ip6 = (struct ip6_hdr *)ph->ph_hdr;
+	else if (pktattr->pattr_af == AF_INET6) {
+		struct ip6_hdr *ip6 = (struct ip6_hdr *)pktattr->pattr_hdr;
 		u_int32_t flowlabel;
 
 		flowlabel = ntohl(ip6->ip6_flow);
@@ -1244,29 +1429,39 @@ write_dsfield(ph, dsfield)
  * high resolution time counter (e.g., timestamp counter of intel pentium).
  * we assume
  *  - 64-bit-long monotonically-increasing counter
- *  - frequency range is 100M-1GHz (CPU speed)
+ *  - frequency range is 100M-4GHz (CPU speed)
  */
 u_int32_t machclk_freq = 0;
 u_int32_t machclk_per_tick = 0;
 
-#if defined(__i386__)
+#if (defined(__i386__) || defined(__alpha__)) && !defined(ALTQ_NOPCC)
 #ifdef __FreeBSD__
-void init_machclk(void) 
+/* freebsd makes clock frequency accessible */
+#ifdef __alpha__
+extern u_int32_t cycles_per_sec;	/* alpha cpu clock frequency */
+#endif
+void
+init_machclk(void) 
 {
+#if defined(__i386__)
 #if (__FreeBSD_version > 300000)
 	machclk_freq = tsc_freq;
 #else
 	machclk_freq = i586_ctr_freq;
 #endif
+#elif defined(__alpha__)
+	machclk_freq = cycles_per_sec;
+#endif /* __alpha__ */
 	machclk_per_tick = machclk_freq / hz;
 }
 #else /* !__FreeBSD__ */
 /*
- * measure Pentium TSC clock frequency 
+ * measure Pentium TSC or Alpha PCC clock frequency 
  */
-void init_machclk(void) 
+void
+init_machclk(void) 
 {
-	static int	hfscwait;
+	static int	wait;
 	struct timeval	tv_start, tv_end;
 	u_int64_t	start, end, diff;
 	int		timo;
@@ -1274,7 +1469,7 @@ void init_machclk(void)
 	microtime(&tv_start);
 	start = read_machclk();
 	timo = hz;	/* 1 sec */
-	(void)tsleep(&hfscwait, PWAIT | PCATCH, "hfscopen", timo);
+	(void)tsleep(&wait, PWAIT | PCATCH, "init_machclk", timo);
 	microtime(&tv_end);
 	end = read_machclk();
 	diff = (u_int64_t)(tv_end.tv_sec - tv_start.tv_sec) * 1000000
@@ -1283,17 +1478,38 @@ void init_machclk(void)
 		machclk_freq = (u_int)((end - start) * 1000000 / diff);
 	machclk_per_tick = machclk_freq / hz;
 
-	printf("altq: TSC clock: %uHz\n", machclk_freq);
+	printf("altq: CPU clock: %uHz\n", machclk_freq);
 }
 #endif /* !__FreeBSD__ */
-#else /* !i386 */
+#ifdef __alpha__
+/*
+ * make a 64bit counter value out of the 32bit alpha processor cycle counter.
+ * read_machclk must be called within a half of its wrap-around cycle
+ * (about 5 sec for 400MHz cpu) to properly detect a counter wrap-around.
+ * tbr_timeout calls read_machclk once a second.
+ */
+u_int64_t
+read_machclk(void)
+{
+	static u_int32_t last_pcc, upper;
+	u_int32_t pcc;
+
+	pcc = (u_int32_t)alpha_rpcc();
+	if (pcc <= last_pcc)
+		upper++;
+	last_pcc = pcc;
+	return (((u_int64_t)upper << 32) + pcc);
+}
+#endif /* __alpha__ */
+#else /* !i386  && !alpha */
 /* use microtime() for now */
-void init_machclk(void) 
+void
+init_machclk(void) 
 {
 	machclk_freq = 1000000 << MACHCLK_SHIFT;
 	machclk_per_tick = machclk_freq / hz;
 	printf("altq: emulate %uHz cpu clock\n", machclk_freq);
 }
-#endif /* !i386 */
+#endif /* !i386 && !alpha */
 
 #endif /* ALTQ */

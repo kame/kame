@@ -1,4 +1,4 @@
-/*	$KAME: altq_classq.h,v 1.2 2000/02/22 14:00:31 itojun Exp $	*/
+/*	$KAME: altq_classq.h,v 1.3 2000/07/25 10:12:29 kjc Exp $	*/
 
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
@@ -45,12 +45,12 @@ extern "C" {
 /*
  * Packet Queue types: RED or DROPHEAD.
  */
-#define Q_DROPHEAD	0x00
-#define Q_RED		0x01
-#define Q_RIO		0x02
-#define Q_DROPTAIL	0x03
+#define	Q_DROPHEAD	0x00
+#define	Q_RED		0x01
+#define	Q_RIO		0x02
+#define	Q_DROPTAIL	0x03
 
-#if defined(KERNEL) || defined(_KERNEL)
+#ifdef _KERNEL
 
 /*
  * Packet Queue strcutures and macros to manipulate them.
@@ -64,16 +64,16 @@ struct _class_queue_ {
 
 typedef struct _class_queue_	class_queue_t;
 
-#define qtype(q)	(q)->qtype_		/* Get queue type */
-#define qlimit(q)	(q)->qlim_		/* Max packets to be queued */
+#define	qtype(q)	(q)->qtype_		/* Get queue type */
+#define	qlimit(q)	(q)->qlim_		/* Max packets to be queued */
 #define	qlen(q)		(q)->qlen_		/* Current queue length. */
 #define	qtail(q)	(q)->tail_		/* Tail of the queue */
-#define qhead(q)	((q)->tail_ ? (q)->tail_->m_nextpkt : NULL)
+#define	qhead(q)	((q)->tail_ ? (q)->tail_->m_nextpkt : NULL)
 
-#define qempty(q)	((q)->qlen_ == 0)	/* Is the queue empty?? */
-#define q_is_red(q)	((q)->qtype_ == Q_RED)	/* Is the queue a red queue */
-#define q_is_rio(q)	((q)->qtype_ == Q_RIO)	/* Is the queue a rio queue */
-#define q_is_red_or_rio(q)	((q)->qtype_ == Q_RED || (q)->qtype_ == Q_RIO)
+#define	qempty(q)	((q)->qlen_ == 0)	/* Is the queue empty?? */
+#define	q_is_red(q)	((q)->qtype_ == Q_RED)	/* Is the queue a red queue */
+#define	q_is_rio(q)	((q)->qtype_ == Q_RIO)	/* Is the queue a rio queue */
+#define	q_is_red_or_rio(q)	((q)->qtype_ == Q_RED || (q)->qtype_ == Q_RIO)
 
 #if !defined(__GNUC__) || defined(ALTQ_DEBUG)
 
@@ -194,7 +194,7 @@ _flushq(class_queue_t *q)
 
 #endif /* __GNUC__ && !ALTQ_DEBUG */
 
-#endif /* KERNEL */
+#endif /* _KERNEL */
 
 #ifdef __cplusplus
 }

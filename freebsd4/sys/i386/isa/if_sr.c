@@ -934,9 +934,7 @@ srattach(struct sr_hardc *hc)
 		ifp->if_ioctl = srioctl;
 		ifp->if_start = srstart;
 		ifp->if_watchdog = srwatchdog;
-#ifdef ALTQ
-		ifp->if_altqflags |= ALTQF_READY;
-#endif
+		IFQ_SET_READY(&ifp->if_snd);
 
 		/*
 		 * Despite the fact that we want to allow both PPP *and*
@@ -1333,13 +1331,7 @@ top_srstart:
 		 * hardcoded.  A packet can't be larger than 3 buffers (3 x
 		 * 512).
 		 */
-#if 0 /* defined(ALTQ) */
-		/* XXX use 6KB buffer instead of 16KB to reduce latency */
-		/* quick dirty hack, but very effective! */
-		if ((i + 3) >= (blkp->txmax * 6 / 16)) {  /* enough remains? */
-#else
 		if ((i + 3) >= blkp->txmax) {	/* enough remains? */
-#endif
 #if BUGGY > 9
 			printf("sr%d.srstart: i=%d (%d pkts); card full.\n",
 			       sc->unit, i, pkts);

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: if_ex.c,v 1.13 1998/10/22 05:58:39 bde Exp $
+ * $FreeBSD: src/sys/i386/isa/if_ex.c,v 1.13.2.1 1999/08/29 16:07:21 peter Exp $
  */
 
 /*
@@ -270,6 +270,7 @@ int ex_attach(struct isa_device *dev)
 	ifp->if_watchdog = ex_watchdog;
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_SIMPLEX | IFF_BROADCAST /* XXX not done yet. | IFF_MULTICAST */;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Attach the interface.
@@ -408,7 +409,10 @@ void ex_start(struct ifnet *ifp)
    * Main loop: send outgoing packets to network card until there are no
    * more packets left, or the card cannot accept any more yet.
    */
-  while (((opkt = ifp->if_snd.ifq_head) != NULL) && ! (ifp->if_flags & IFF_OACTIVE)) {
+  while (!(ifp->if_flags & IFF_OACTIVE)) {
+    IFQ_POLL(&ifp->if_snd, opkt);
+    if (opkt == NULL)
+      break;
 
     /*
      * Ensure there is enough free transmit buffer space for this packet,
@@ -430,7 +434,7 @@ void ex_start(struct ifnet *ifp)
       avail = -i;
 	DODEBUG(Sent_Pkts, printf("i=%d, avail=%d\n", i, avail););
     if (avail >= len + XMT_HEADER_LEN) {
-      IF_DEQUEUE(&ifp->if_snd, opkt);
+      IFQ_DEQUEUE(&ifp->if_snd, opkt);
 
 #ifdef EX_PSA_INTR      
       /*
@@ -600,7 +604,7 @@ static void exintr(int unit)
    * be sent, attempt to send more packets to the network card.
    */
 
-  if (send_pkts && (ifp->if_snd.ifq_head != NULL))
+  if (send_pkts && !IFQ_IS_EMPTY(&ifp->if_snd))
     ex_start(ifp);
 
 #ifdef EXDEBUG

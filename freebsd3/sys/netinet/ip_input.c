@@ -227,10 +227,6 @@ int iplattach __P((void));
 int (*fr_checkp) __P((struct ip *, int, struct ifnet *, int, struct mbuf **)) = NULL;
 #endif
 
-#ifdef ALTQ
-int (*altq_input) __P((struct mbuf *, int)) = NULL;
-#endif
-
 /*
  * We need to save the IP options in case a protocol wants to respond
  * to an incoming packet over the same route if the packet got here

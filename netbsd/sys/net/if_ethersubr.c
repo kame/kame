@@ -165,12 +165,13 @@ ether_output(ifp, m0, dst, rt0)
 	struct rtentry *rt0;
 {
 	u_int16_t etype;
-	int s, error = 0, hdrcmplt = 0;
+	int s, len, error = 0, hdrcmplt = 0;
  	u_char esrc[6], edst[6];
 	struct mbuf *m = m0;
 	struct rtentry *rt;
 	struct mbuf *mcopy = (struct mbuf *)0;
 	struct ether_header *eh;
+	short mflags;
 #ifdef INET
 	struct arphdr *ah;
 #endif /* INET */
@@ -178,7 +179,7 @@ ether_output(ifp, m0, dst, rt0)
 	struct at_ifaddr *aa;
 #endif /* NETATALK */
 #ifdef ALTQ
-	struct pr_hdr pr_hdr;
+	struct altq_pktattr pktattr;
 #endif
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
@@ -218,12 +219,11 @@ ether_output(ifp, m0, dst, rt0)
 	}
 #ifdef ALTQ
 	/*
-	 * save a pointer to the protocol level header before adding
-	 * link headers.
+	 * if the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
 	 */
-	pr_hdr.ph_family = dst->sa_family;
-	pr_hdr.ph_hdr = mtod(m, caddr_t);
-#endif /* ALTQ */
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+#endif
 	switch (dst->sa_family) {
 
 #ifdef INET
@@ -470,45 +470,29 @@ ether_output(ifp, m0, dst, rt0)
 	else
 	 	bcopy(LLADDR(ifp->if_sadl), (caddr_t)eh->ether_shost,
 		    sizeof(eh->ether_shost));
-#ifdef ALTQ
-	if (ALTQ_IS_ON(ifp)) {
-	        s = splimp();
-		error = (*ifp->if_altqenqueue)(ifp, m, &pr_hdr, ALTEQ_NORMAL);
-		splx(s);
-		if (error) {
-			IF_DROP(&ifp->if_snd);
-		}
-		else {
-		    ifp->if_obytes += m->m_pkthdr.len;
-		    if (m->m_flags & M_MCAST)
-		    	ifp->if_omcasts++;
-		}
-		return (error);
-	}
-#endif /* ALTQ */
+	mflags = m->m_flags;
+	len = m->m_pkthdr.len;
 	s = splimp();
 	/*
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
-	if (IF_QFULL(&ifp->if_snd)) {
-		IF_DROP(&ifp->if_snd);
-#ifdef ALTQ_ACCOUNT
-		ALTQ_ACCOUNTING(ifp, m, &pr_hdr, ALTEQ_ACCDROP);
+#ifdef ALTQ
+	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+#else
+	IFQ_ENQUEUE(&ifp->if_snd, m, error);
 #endif
+	if (error) {
+		/* mbuf is already freed */
 		splx(s);
-		senderr(ENOBUFS);
+		return (error);
 	}
-	ifp->if_obytes += m->m_pkthdr.len;
-	IF_ENQUEUE(&ifp->if_snd, m);
-#ifdef ALTQ_ACCOUNT
-	ALTQ_ACCOUNTING(ifp, m, &pr_hdr, ALTEQ_ACCOK);
-#endif
+	ifp->if_obytes += len + sizeof (struct ether_header);
+	if (mflags & M_MCAST)
+		ifp->if_omcasts++;
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);
-	if (m->m_flags & M_MCAST)
-		ifp->if_omcasts++;
 	return (error);
 
 bad:

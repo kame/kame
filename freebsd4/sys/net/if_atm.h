@@ -164,7 +164,7 @@ struct pvcsif {
 	struct atm_pseudohdr sif_aph;	/* flags + vpi:vci */
 	int	sif_vci;		/* vci no */
 	struct ifnet *sif_fwdifp;	/* bridging ifp */
-	SLIST_ENTRY(pvcsif) sif_links;
+	LIST_ENTRY(pvcsif) sif_links;
 };
 struct ifnet *pvcsif_alloc __P((void));
 int pvc_set_fwd __P((char *, char *, int));

@@ -1,7 +1,7 @@
-/*	$KAME: altq_cdnr.c,v 1.5 2000/05/07 06:29:23 kjc Exp $	*/
+/*	$KAME: altq_cdnr.c,v 1.6 2000/07/25 10:12:29 kjc Exp $	*/
 
 /*
- * Copyright (C) 1999
+ * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_cdnr.c,v 1.5 2000/05/07 06:29:23 kjc Exp $
+ * $Id: altq_cdnr.c,v 1.6 2000/07/25 10:12:29 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
@@ -84,6 +84,7 @@ int cdnropen __P((dev_t, int, int, struct proc *));
 int cdnrclose __P((dev_t, int, int, struct proc *));
 int cdnrioctl __P((dev_t, ioctlcmd_t, caddr_t, int, struct proc *));
 
+static int altq_cdnr_input __P((struct mbuf *, int));
 static struct top_cdnr *tcb_lookup __P((char *ifname));
 static struct cdnr_block *cdnr_handle2cb __P((u_long));
 static u_long cdnr_cb2handle __P((struct cdnr_block *));
@@ -95,7 +96,7 @@ static void tca_import_action __P((struct tc_action *, struct tc_action *));
 static void tca_invalidate_action __P((struct tc_action *));
 
 static int generic_element_destroy __P((struct cdnr_block *));
-static struct top_cdnr *top_create __P((struct ifnet *));
+static struct top_cdnr *top_create __P((struct ifaltq *));
 static int top_destroy __P((struct top_cdnr *));
 static struct cdnr_block *element_create __P((struct top_cdnr *,
 					      struct tc_action *));
@@ -161,15 +162,13 @@ altq_cdnr_input(m, af)
 	struct tc_action	*tca;
 	struct cdnr_block	*cb;
 	struct cdnr_pktinfo	pktinfo;
-	struct pr_hdr		pr_hdr;
-	struct flowinfo		flow;
 
 	ifp = m->m_pkthdr.rcvif;
-	if (!ALTQ_IS_CNDTNING(ifp))
+	if (!ALTQ_IS_CNDTNING(&ifp->if_snd))
 		/* traffic conditioner is not enabled on this interface */
 		return (1);
 
-	top = ifp->if_altqcdnr;
+	top = ifp->if_snd.altq_cdnr;
 
 	ip = mtod(m, struct ip *);
 #ifdef INET6
@@ -178,19 +177,14 @@ altq_cdnr_input(m, af)
 		
 		flowlabel = ((struct ip6_hdr *)ip)->ip6_flow;
 		pktinfo.pkt_dscp = (ntohl(flowlabel) >> 20) & DSCP_MASK;
-	}
-	else
+	} else
 #endif
 		pktinfo.pkt_dscp = ip->ip_tos & DSCP_MASK;
 	pktinfo.pkt_len = m_pktlen(m);
 
 	tca = NULL;
 
-	pr_hdr.ph_family = af;
-	pr_hdr.ph_hdr = (caddr_t)ip;
-	altq_extractflow(m, &pr_hdr, &flow,
-			 top->tc_classifier.acc_fbmask);
-	cb = acc_classify(&top->tc_classifier, &flow);
+	cb = acc_classify(&top->tc_classifier, m, af);
 	if (cb != NULL)
 		tca = &cb->cb_action;
 
@@ -245,7 +239,7 @@ tcb_lookup(ifname)
 
 	if ((ifp = ifunit(ifname)) != NULL)
 		LIST_FOREACH(top, &tcb_list, tc_next)
-			if (top->tc_ifp == ifp)
+			if (top->tc_ifq->altq_ifp == ifp)
 				return (top);
 	return (NULL);
 }
@@ -457,21 +451,21 @@ tca_invalidate_action(tca)
  * top level traffic conditioner
  */
 static struct top_cdnr *
-top_create(ifp)
-	struct ifnet *ifp;
+top_create(ifq)
+	struct ifaltq *ifq;
 {
 	struct top_cdnr *top;
 
 	if ((top = cdnr_cballoc(NULL, TCETYPE_TOP, NULL)) == NULL)
 		return (NULL);
 
-	top->tc_ifp = ifp;
+	top->tc_ifq = ifq;
 	/* set default action for the top level conditioner */
 	top->tc_block.cb_action.tca_code = TCACODE_PASS;
 
 	LIST_INSERT_HEAD(&tcb_list, top, tc_next);
 
-	ifp->if_altqcdnr = top;
+	ifq->altq_cdnr = top;
 
 	return (top);
 }
@@ -482,9 +476,9 @@ top_destroy(top)
 {
 	struct cdnr_block *cb;
 
-	if (ALTQ_IS_CNDTNING(top->tc_ifp))
-		CLEAR_CNDTNING(top->tc_ifp);
-	top->tc_ifp->if_altqcdnr = NULL;
+	if (ALTQ_IS_CNDTNING(top->tc_ifq))
+		ALTQ_CLEAR_CNDTNING(top->tc_ifq);
+	top->tc_ifq->altq_cdnr = NULL;
 
 	/*
 	 * destroy all the conditioner elements belonging to this interface
@@ -503,7 +497,7 @@ top_destroy(top)
 	/* if there is no active conditioner, remove the input hook */
 	if (altq_input != NULL) {
 		LIST_FOREACH(top, &tcb_list, tc_next)
-			if (ALTQ_IS_CNDTNING(top->tc_ifp))
+			if (ALTQ_IS_CNDTNING(top->tc_ifq))
 				break;
 		if (top == NULL)
 			altq_input = NULL;
@@ -553,9 +547,9 @@ element_destroy(cb)
  *	depth:	byte << 32
  *
  */
-#define TB_SHIFT	32
-#define TB_SCALE(x)	((u_int64_t)(x) << TB_SHIFT)
-#define TB_UNSCALE(x)	((x) >> TB_SHIFT)
+#define	TB_SHIFT	32
+#define	TB_SCALE(x)	((u_int64_t)(x) << TB_SHIFT)
+#define	TB_UNSCALE(x)	((x) >> TB_SHIFT)
 
 static void
 tb_import_profile(tb, profile)
@@ -784,8 +778,8 @@ trtcm_input(cb, pktinfo)
 /*
  * token bucket rio dropper
  */
-#define TBRIOPROB_MAX	(128*1024)
-#define TBRIOPROB_MIN	(TBRIOPROB_MAX * 5 / 1000)	/* 0.005 */
+#define	TBRIOPROB_MAX	(128*1024)
+#define	TBRIOPROB_MIN	(TBRIOPROB_MAX * 5 / 1000)	/* 0.005 */
 
 static struct tbrio *
 tbrio_create(top, profile, pass_action, drop_action)
@@ -1130,10 +1124,10 @@ cdnrcmd_if_attach(ifname)
 	if ((ifp = ifunit(ifname)) == NULL)
 		return (EBADF);
 
-	if (ifp->if_altqcdnr != NULL)
+	if (ifp->if_snd.altq_cdnr != NULL)
 		return (EBUSY);
 
-	if ((top = top_create(ifp)) == NULL)
+	if ((top = top_create(&ifp->if_snd)) == NULL)
 		return (ENOMEM);
 	return (0);
 }
@@ -1622,15 +1616,15 @@ cdnrioctl(dev, cmd, addr, flag, p)
 		switch (cmd) {
 
 		case CDNR_ENABLE:
-			SET_CNDTNING(top->tc_ifp);
+			ALTQ_SET_CNDTNING(top->tc_ifq);
 			if (altq_input == NULL)
 				altq_input = altq_cdnr_input;
 			break;
 
 		case CDNR_DISABLE:
-			CLEAR_CNDTNING(top->tc_ifp);
+			ALTQ_CLEAR_CNDTNING(top->tc_ifq);
 			LIST_FOREACH(top, &tcb_list, tc_next)
-				if (ALTQ_IS_CNDTNING(top->tc_ifp))
+				if (ALTQ_IS_CNDTNING(top->tc_ifq))
 					break;
 			if (top == NULL)
 				altq_input = NULL;

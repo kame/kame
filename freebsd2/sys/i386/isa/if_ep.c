@@ -224,7 +224,7 @@ ep_pccard_init(devi)
     if (ep_pccard_attach(devi) == 0)
 	return (ENXIO);
 
-    sc->arpcom.ac_if.if_snd.ifq_maxlen = ifqmaxlen;
+    IFQ_SET_MAXLEN(&sc->arpcom.ac_if.if_snd, ifqmaxlen);
     return (0);
 }
 
@@ -635,9 +635,7 @@ ep_attach(sc)
     ifp->if_start = epstart;
     ifp->if_ioctl = epioctl;
     ifp->if_watchdog = epwatchdog;
-#ifdef ALTQ
-    ifp->if_altqflags |= ALTQF_READY;
-#endif
+    IFQ_SET_READY(&ifp->if_snd);
 
     if (!attached) {
 	if_attach(ifp);
@@ -853,12 +851,7 @@ epstart(ifp)
     }
 startagain:
     /* Sneak a peek at the next packet */
-#ifdef ALTQ
-    if (ALTQ_IS_ON(ifp))
-	m = (*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK);
-    else
-#endif
-    m = ifp->if_snd.ifq_head;
+    IFQ_POLL(&ifp->if_snd, m);
     if (m == 0) {
 	splx(s);
 	return;
@@ -876,15 +869,7 @@ startagain:
     if (len + pad > ETHER_MAX_LEN) {
 	/* packet is obviously too large: toss it */
 	++ifp->if_oerrors;
-#ifdef ALTQ
-	if (ALTQ_IS_ON(ifp)) {
-	    m = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
-	    if (m != top)
-		panic("epstart: different mbuf dequeued!");
-	}
-	else
-#endif
-	IF_DEQUEUE(&ifp->if_snd, m);
+	IFQ_DEQUEUE(&ifp->if_snd, m);
 	m_freem(m);
 	goto readcheck;
     }
@@ -898,15 +883,7 @@ startagain:
 	    return;
 	}
     }
-#ifdef ALTQ
-    if (ALTQ_IS_ON(ifp)) {
-	m = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
-	if (m != top)
-	    panic("epstart: different mbuf dequeued!");
-    }
-    else
-#endif
-    IF_DEQUEUE(&ifp->if_snd, m);
+    IFQ_DEQUEUE(&ifp->if_snd, m);
 
     outw(BASE + EP_W1_TX_PIO_WR_1, len); 
     outw(BASE + EP_W1_TX_PIO_WR_1, 0x0);	/* Second dword meaningless */
@@ -949,7 +926,7 @@ readcheck:
 	 * we check if we have packets left, in that case we prepare to come
 	 * back later
 	 */
-	if (ifp->if_snd.ifq_head) {
+	if (!IFQ_IS_EMPTY(&ifp->if_snd)) {
 	    outw(BASE + EP_COMMAND, SET_TX_AVAIL_THRESH | 8);
 	}
 	splx(s);
@@ -1058,7 +1035,7 @@ rescan:
 		     * To have a tx_avail_int but giving the chance to the
 		     * Reception
 		     */
-		    if (ifp->if_snd.ifq_head) {
+		    if (!IFQ_IS_EMPTY(&ifp->if_snd)) {
 			outw(BASE + EP_COMMAND, SET_TX_AVAIL_THRESH | 8);
 		    }
 		}

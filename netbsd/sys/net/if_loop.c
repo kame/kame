@@ -161,9 +161,9 @@ loopattach(n)
 		ifp->if_type = IFT_LOOP;
 		ifp->if_hdrlen = 0;
 		ifp->if_addrlen = 0;
+		IFQ_SET_READY(&ifp->if_snd);
 #ifdef ALTQ
 		ifp->if_start = lo_altqstart;
-		ifp->if_altqflags |= ALTQF_READY;
 #endif
 		if_attach(ifp);
 #if NBPFILTER > 0
@@ -296,13 +296,17 @@ looutput(ifp, m, dst, rt)
 	 * only used when called for loop interface (not for
 	 * a simplex interface).
 	 */
-	if (ALTQ_IS_ON(ifp) && ifp->if_start == lo_altqstart) {
-		struct pr_hdr pr_hdr;
+	if ((ALTQ_IS_ENABLED(&ifp->if_snd) || TBR_IS_ENABLED(&ifp->if_snd))
+	    && ifp->if_start == lo_altqstart) {
+		struct altq_pktattr pktattr;
 		int32_t *afp;
 	        int error;
 
-		pr_hdr.ph_family = dst->sa_family;
-		pr_hdr.ph_hdr = mtod(m, caddr_t);
+		/*
+		 * if the queueing discipline needs packet classification,
+		 * do it before prepending link headers.
+		 */
+		IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
 
 		M_PREPEND(m, sizeof(int32_t), M_DONTWAIT);
 		if (m == 0)
@@ -311,11 +315,9 @@ looutput(ifp, m, dst, rt)
 		*afp = (int32_t)dst->sa_family;
 
 	        s = splimp();
-		error = (*ifp->if_altqenqueue)(ifp, m, &pr_hdr, ALTEQ_NORMAL);
+		IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+		(*ifp->if_start)(ifp);
 		splx(s);
-		if (error) {
-			IF_DROP(&ifp->if_snd);
-		}
 		return (error);
 	}
 #endif /* ALTQ */
@@ -389,14 +391,10 @@ lo_altqstart(ifp)
 	int32_t af, *afp;
 	int s, isr;
 	
-	if (!ALTQ_IS_ON(ifp))
-		return;
-    
 	while (1) {
 		s = splimp();
-		m = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		IFQ_DEQUEUE(&ifp->if_snd, m);
 		splx(s);
-
 		if (m == NULL)
 			return;
 
@@ -413,6 +411,7 @@ lo_altqstart(ifp)
 #endif
 #ifdef INET6
 		case AF_INET6:
+			m->m_flags |= M_LOOP;
 			ifq = &ip6intrq;
 			isr = NETISR_IPV6;
 			break;

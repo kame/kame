@@ -234,6 +234,13 @@ if_attachsetup(ifp)
 	sdl->sdl_len = masklen;
 	while (namelen != 0)
 		sdl->sdl_data[--namelen] = 0xff;
+#ifdef ALTQ
+	ifp->if_snd.altq_type = 0;
+	ifp->if_snd.altq_disc = NULL;
+	ifp->if_snd.altq_flags &= ALTQF_CANTCHANGE;
+	ifp->if_snd.altq_tbr  = NULL;
+	ifp->if_snd.altq_ifp  = ifp;
+#endif
 }
 
 void
@@ -306,6 +313,12 @@ if_detach(ifp)
 	/* If there is a bpf device attached, detach from it.  */
 	if (ifp->if_bpf)
 		bpfdetach(ifp);
+#endif
+#ifdef ALTQ
+	if (ALTQ_IS_ENABLED(&ifp->if_snd))
+		altq_disable(&ifp->if_snd);
+	if (ALTQ_IS_ATTACHED(&ifp->if_snd))
+		altq_detach(&ifp->if_snd);
 #endif
 
 	/*
@@ -548,7 +561,7 @@ if_down(ifp)
 	ifp->if_flags &= ~IFF_UP;
 	for (ifa = ifp->if_addrlist.tqh_first; ifa != 0; ifa = ifa->ifa_list.tqe_next)
 		pfctlinput(PRC_IFDOWN, ifa->ifa_addr);
-	if_qflush(&ifp->if_snd);
+	IFQ_PURGE(&ifp->if_snd);
 	rt_ifmsg(ifp);
 }
 

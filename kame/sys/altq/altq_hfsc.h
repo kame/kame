@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.h,v 1.3 2000/02/22 14:00:33 itojun Exp $	*/
+/*	$KAME: altq_hfsc.h,v 1.4 2000/07/25 10:12:30 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -32,10 +32,10 @@
  * and to grant Carnegie Mellon the rights to redistribute these
  * changes without encumbrance.
  *
- * $Id: altq_hfsc.h,v 1.3 2000/02/22 14:00:33 itojun Exp $
+ * $Id: altq_hfsc.h,v 1.4 2000/07/25 10:12:30 kjc Exp $
  */
 #ifndef _ALTQ_ALTQ_HFSC_H_
-#define _ALTQ_ALTQ_HFSC_H_
+#define	_ALTQ_ALTQ_HFSC_H_
 
 #include <altq/altq.h>
 #include <altq/altq_classq.h>
@@ -72,15 +72,15 @@ struct hfsc_add_class {
 };
 
 /* special class handles */
-#define HFSC_ROOTCLASS_HANDLE	0
-#define HFSC_NULLCLASS_HANDLE	0
+#define	HFSC_ROOTCLASS_HANDLE	0
+#define	HFSC_NULLCLASS_HANDLE	0
 
 /* hfsc class flags */
-#define HFCF_RED		0x0001	/* use RED */
-#define HFCF_ECN		0x0002  /* use RED/ECN */
-#define HFCF_RIO		0x0004  /* use RIO */
-#define HFCF_CLEARDSCP		0x0010  /* clear diffserv codepoint */
-#define HFCF_DEFAULTCLASS	0x1000	/* default class */
+#define	HFCF_RED		0x0001	/* use RED */
+#define	HFCF_ECN		0x0002  /* use RED/ECN */
+#define	HFCF_RIO		0x0004  /* use RIO */
+#define	HFCF_CLEARDSCP		0x0010  /* clear diffserv codepoint */
+#define	HFCF_DEFAULTCLASS	0x1000	/* default class */
 
 struct hfsc_delete_class {
 	struct hfsc_interface	iface;
@@ -88,9 +88,9 @@ struct hfsc_delete_class {
 };
 
 /* service curve types */
-#define HFSC_REALTIMESC		1
-#define HFSC_LINKSHARINGSC	2
-#define HFSC_DEFAULTSC		(HFSC_REALTIMESC|HFSC_LINKSHARINGSC)
+#define	HFSC_REALTIMESC		1
+#define	HFSC_LINKSHARINGSC	2
+#define	HFSC_DEFAULTSC		(HFSC_REALTIMESC|HFSC_LINKSHARINGSC)
 
 struct hfsc_modify_class {
 	struct hfsc_interface	iface;
@@ -147,19 +147,19 @@ struct hfsc_class_stats {
 
 #define	HFSC_IF_ATTACH		_IOW('Q', 1, struct hfsc_attach)
 #define	HFSC_IF_DETACH		_IOW('Q', 2, struct hfsc_interface)
-#define HFSC_ENABLE		_IOW('Q', 3, struct hfsc_interface)
-#define HFSC_DISABLE		_IOW('Q', 4, struct hfsc_interface)
+#define	HFSC_ENABLE		_IOW('Q', 3, struct hfsc_interface)
+#define	HFSC_DISABLE		_IOW('Q', 4, struct hfsc_interface)
 #define	HFSC_ACC_ENABLE		_IOW('Q', 5, struct hfsc_interface)
 #define	HFSC_ACC_DISABLE	_IOW('Q', 6, struct hfsc_interface)
-#define HFSC_ADD_CLASS		_IOWR('Q', 7, struct hfsc_add_class)
-#define HFSC_DEL_CLASS		_IOW('Q', 8, struct hfsc_delete_class)
-#define HFSC_MOD_CLASS		_IOW('Q', 9, struct hfsc_modify_class)
-#define HFSC_CLEAR_HIERARCHY	_IOW('Q', 10, struct hfsc_interface)
+#define	HFSC_ADD_CLASS		_IOWR('Q', 7, struct hfsc_add_class)
+#define	HFSC_DEL_CLASS		_IOW('Q', 8, struct hfsc_delete_class)
+#define	HFSC_MOD_CLASS		_IOW('Q', 9, struct hfsc_modify_class)
+#define	HFSC_CLEAR_HIERARCHY	_IOW('Q', 10, struct hfsc_interface)
 #define	HFSC_ADD_FILTER		_IOWR('Q', 11, struct hfsc_add_filter)
 #define	HFSC_DEL_FILTER		_IOW('Q', 12, struct hfsc_delete_filter)
 #define	HFSC_GETSTATS		_IOWR('Q', 13, struct hfsc_class_stats)
 
-#if defined(KERNEL) || defined(_KERNEL)
+#ifdef _KERNEL
 /*
  * kernel internal service curve representation
  *	coordinates are given by 64 bit unsigned integers.
@@ -208,9 +208,9 @@ typedef TAILQ_HEAD(_eligible, hfsc_class) ellist_t;
 typedef TAILQ_ENTRY(hfsc_class) elentry_t;
 typedef TAILQ_HEAD(_active, hfsc_class) actlist_t;
 typedef TAILQ_ENTRY(hfsc_class) actentry_t;
-#define ellist_first(s)		TAILQ_FIRST(s)
-#define actlist_first(s)	TAILQ_FIRST(s)
-#define actlist_last(s)		TAILQ_LAST(s, _active)
+#define	ellist_first(s)		TAILQ_FIRST(s)
+#define	actlist_first(s)	TAILQ_FIRST(s)
+#define	actlist_last(s)		TAILQ_LAST(s, _active)
 
 struct hfsc_class {
 	u_int		cl_id;		/* class id (just for debug) */
@@ -224,7 +224,7 @@ struct hfsc_class {
 
 	class_queue_t	*cl_q;		/* class queue structure */
 	struct red	*cl_red;	/* RED state */
-	struct pr_hdr	*cl_prhdr;	/* saved protocol header used by ECN */
+	struct altq_pktattr *cl_pktattr; /* saved header used by ECN */
 
 	u_int64_t	cl_total;	/* total work in bytes */
 	u_int64_t	cl_cumul;	/* cumulative work in bytes
@@ -259,13 +259,10 @@ struct hfsc_class {
  */
 struct hfsc_if {
 	struct hfsc_if		*hif_next;	/* interface state list */
-	struct ifnet		*hif_ifp;	/* backpointer to ifnet */
+	struct ifaltq		*hif_ifq;	/* backpointer to ifaltq */
 	struct hfsc_class	*hif_rootclass;		/* root class */
 	struct hfsc_class	*hif_defaultclass;	/* default class */
-	struct hfsc_class	*hif_peekcache;	/* cache for peek operation */
-
-	struct callout_handle	hif_callout;	/* handle for timeouts */
-	int			hif_armed;	/* timeout is set */
+	struct hfsc_class	*hif_pollcache;	/* cache for poll operation */
 
 	u_int	hif_classes;			/* # of classes in the tree */
 	u_int	hif_packets;			/* # of packets in the tree */
@@ -276,7 +273,7 @@ struct hfsc_if {
 	struct acc_classifier	hif_classifier;
 };
 
-#endif /* KERNEL */
+#endif /* _KERNEL */
 
 #ifdef __cplusplus
 }

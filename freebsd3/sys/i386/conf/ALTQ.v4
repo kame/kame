@@ -65,10 +65,11 @@ options 	ALTQ		#alternate queueing
 #options 	HFSC		#hierarchical fair service curve
 #options 	HFSC_RED	#red for hfsc (needs HFSC and RED)
 #options 	HFSC_RIO	#rio for hfsc (needs HFSC, RIO, RED, HFSC_RED)
-#options 	ALTQ_ACCOUNT	#altq accounting
 #options 	ALTQ_ECN	#ecn extention to tcp
 #options 	CDNR		#diffserv traffic conditioner
 #options 	BLUE		#blue by wu-chang feng
+#options 	ALTQ_NOPCC	#don't use processor cycle counter
+#options 	ALTQ_DEBUG	#for debugging
 # you might want to set kernel timer to 1kHz if you use CBQ,
 # especially with 100baseT
 #options 	HZ=1000

@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.c,v 1.5 2000/05/07 06:29:23 kjc Exp $	*/
+/*	$KAME: altq_hfsc.c,v 1.6 2000/07/25 10:12:30 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -32,7 +32,7 @@
  * and to grant Carnegie Mellon the rights to redistribute these
  * changes without encumbrance.
  *
- * $Id: altq_hfsc.c,v 1.5 2000/05/07 06:29:23 kjc Exp $
+ * $Id: altq_hfsc.c,v 1.6 2000/07/25 10:12:30 kjc Exp $
  */
 /*
  * H-FSC is described in Proceedings of SIGCOMM'97,
@@ -74,10 +74,11 @@
 /*
  * function prototypes
  */
-static struct hfsc_if *hfsc_attach __P((struct ifnet *, u_int));
+static struct hfsc_if *hfsc_attach __P((struct ifaltq *, u_int));
 static int hfsc_detach __P((struct hfsc_if *));
 static int hfsc_clear_interface __P((struct hfsc_if *));
-static void hfsc_flush __P((struct hfsc_if *));
+static int hfsc_request __P((struct ifaltq *, int, void *));
+static void hfsc_purge __P((struct hfsc_if *));
 static struct hfsc_class *hfsc_class_create __P((struct hfsc_if *,
 		 struct service_curve *, struct hfsc_class *, int, int));
 static int hfsc_class_destroy __P((struct hfsc_class *));
@@ -85,18 +86,14 @@ static int hfsc_class_modify __P((struct hfsc_class *,
 			  struct service_curve *, struct service_curve *));
 static struct hfsc_class *hfsc_nextclass __P((struct hfsc_class *));
 
-static int hfsc_enqueue __P((struct ifnet *, struct mbuf *,
-			     struct pr_hdr *, int));
-static struct mbuf *hfsc_dequeue __P((struct ifnet *, int));
-static struct hfsc_class *hfsc_classify __P((struct hfsc_if *,
-					     struct flowinfo *));
-static void hfsc_restart __P((struct ifnet *));
-static void hfsc_settimer __P((struct hfsc_if *));
+static int hfsc_enqueue __P((struct ifaltq *, struct mbuf *,
+			     struct altq_pktattr *));
+static struct mbuf *hfsc_dequeue __P((struct ifaltq *, int));
 
 static int hfsc_addq __P((struct hfsc_class *, struct mbuf *));
 static struct mbuf *hfsc_getq __P((struct hfsc_class *));
-static struct mbuf *hfsc_peekq __P((struct hfsc_class *));
-static void hfsc_flushq __P((struct hfsc_class *));
+static struct mbuf *hfsc_pollq __P((struct hfsc_class *));
+static void hfsc_purgeq __P((struct hfsc_class *));
 
 static void set_active __P((struct hfsc_class *, int));
 static void set_passive __P((struct hfsc_class *));
@@ -152,14 +149,14 @@ static u_long clp_to_clh __P((struct hfsc_class *));
 /*
  * macros
  */
-#define is_a_parent_class(cl)	((cl)->cl_children != NULL)
+#define	is_a_parent_class(cl)	((cl)->cl_children != NULL)
 
 /* hif_list keeps all hfsc_if's allocated. */
 static struct hfsc_if *hif_list = NULL;
 
 static struct hfsc_if *
-hfsc_attach(ifp, bandwidth)
-	struct ifnet *ifp;
+hfsc_attach(ifq, bandwidth)
+	struct ifaltq *ifq;
 	u_int bandwidth;
 {
 	struct hfsc_if *hif;
@@ -177,7 +174,7 @@ hfsc_attach(ifp, bandwidth)
 		return NULL;
 	}
 
-	hif->hif_ifp = ifp;
+	hif->hif_ifq = ifq;
 
 	/*
 	 * create root class
@@ -220,6 +217,7 @@ hfsc_detach(hif)
 	}
 
 	ellist_destroy(hif->hif_eligible);
+
 	FREE(hif, M_DEVBUF);
 
 	return (0);
@@ -255,16 +253,34 @@ hfsc_clear_interface(hif)
 	return (0);
 }
 
+static int
+hfsc_request(ifq, req, arg)
+	struct ifaltq *ifq;
+	int req;
+	void *arg;
+{
+	struct hfsc_if	*hif = (struct hfsc_if *)ifq->altq_disc;
+
+	switch (req) {
+	case ALTRQ_PURGE:
+		hfsc_purge(hif);
+		break;
+	}
+	return (0);
+}
+
 /* discard all the queued packets on the interface */
 static void
-hfsc_flush(hif)
+hfsc_purge(hif)
 	struct hfsc_if *hif;
 {
 	struct hfsc_class *cl;
 
 	for (cl = hif->hif_rootclass; cl != NULL; cl = hfsc_nextclass(cl))
 		if (!qempty(cl->cl_q))
-			hfsc_flushq(cl);
+			hfsc_purgeq(cl);
+	if (ALTQ_IS_ENABLED(hif->hif_ifq))
+		hif->hif_ifq->ifq_len = 0;
 }
 
 struct hfsc_class *
@@ -320,7 +336,7 @@ hfsc_class_create(hif, sc, parent, qlimit, flags)
 		if (sc->m2 == 0)
 			red_pkttime = 1000 * 1000 * 1000; /* 1 sec */
 		else
-			red_pkttime = (int64_t)hif->hif_ifp->if_mtu
+			red_pkttime = (int64_t)hif->hif_ifq->altq_ifp->if_mtu
 				* 1000 * 1000 * 1000 / (sc->m2 / 8);
 		if (flags & HFCF_RED) {
 			cl->cl_red = red_alloc(0, 0, 0, 0,
@@ -421,7 +437,7 @@ hfsc_class_destroy(cl)
 	acc_discard_filters(&cl->cl_hif->hif_classifier, cl, 0);
 
 	if (!qempty(cl->cl_q))
-		hfsc_flushq(cl);
+		hfsc_purgeq(cl);
 
 	if (cl->cl_parent == NULL) {
 		/* this is root class */
@@ -473,7 +489,7 @@ hfsc_class_modify(cl, rsc, fsc)
 
 	s = splimp();
 	if (!qempty(cl->cl_q))
-		hfsc_flushq(cl);
+		hfsc_purgeq(cl);
 
 	if (rsc != NULL) {
 		if (rsc->m1 == 0 && rsc->m2 == 0) {
@@ -555,114 +571,73 @@ hfsc_nextclass(cl)
 
 /*
  * hfsc_enqueue is an enqueue function to be registered to
- * (*if_altqenqueue) in struct ifnet.
- *
- * note: when mode is ALTEQ_NORMAL, it is a normal enqueue operation.
- *	ALTEQ_ACCOK and ALTEQ_ACCDROP are optional and just for profiling.
+ * (*altq_enqueue) in struct ifaltq.
  */
 static int 
-hfsc_enqueue(ifp, m, pr_hdr, mode)
-	struct ifnet *ifp;
+hfsc_enqueue(ifq, m, pktattr)
+	struct ifaltq *ifq;
 	struct mbuf *m;
-	struct pr_hdr *pr_hdr;
-	int mode;
+	struct altq_pktattr *pktattr;
 {
-	struct hfsc_if	*hif = (struct hfsc_if *)ifp->if_altqp;
+	struct hfsc_if	*hif = (struct hfsc_if *)ifq->altq_disc;
 	struct hfsc_class *cl;
-	struct flowinfo flow;
 
-	altq_extractflow(m, pr_hdr, &flow, hif->hif_classifier.acc_fbmask);
+	/* grab class set by classifier */
+	if (pktattr == NULL || (cl = pktattr->pattr_class) == NULL)
+		cl = hif->hif_defaultclass;
+	cl->cl_pktattr = pktattr;  /* save proto hdr used by ECN */
 
-	if (mode == ALTEQ_NORMAL) {
-		if ((cl = hfsc_classify(hif, &flow)) == NULL) {
-			/* no class found */
-			ASSERT(0);	/* should not happen */
-			m_freem(m);
-			return (ENOBUFS);	/* XXX */
-		}
+	if (hfsc_addq(cl, m) != 0) {
+		/* drop occurred.  mbuf was freed in hfsc_addq. */
+		return (ENOBUFS);
+	}
+	ifq->ifq_len++;
 
-		cl->cl_prhdr = pr_hdr;  /* save proto hdr used by ECN */
-
-		if (hfsc_addq(cl, m) != 0) {
-			/* drop occurred.  mbuf was freed in hfsc_addq. */
-			return (ENOBUFS);
-		}
-
-		/* successfully queued. */
-		if (qlen(cl->cl_q) == 1)
-			set_active(cl, m_pktlen(m));
+	/* successfully queued. */
+	if (qlen(cl->cl_q) == 1)
+		set_active(cl, m_pktlen(m));
 
 #ifdef HFSC_PKTLOG
-		/* put the logging_hook here */
+	/* put the logging_hook here */
 #endif
-
-		/* call the driver's start routine */
-		if (ifp->if_start && (ifp->if_flags & IFF_OACTIVE) == 0)
-			(*ifp->if_start)(ifp);
-		return (0);
-	}
-
-#ifdef ALTQ_ACCOUNT
-	/* accounting mode */
-	if ((cl = hfsc_classify(hif, &flow)) != NULL) {
-		/* class found */
-		if (mode == ALTEQ_ACCOK) {
-			++cl->cl_stats.npackets;
-			cl->cl_total += m_pktlen(m);
-		}
-		else {
-			/* mode == ALTEQ_ACCDROP */
-			++cl->cl_stats.drops;
-			cl->cl_total += m_pktlen(m);
-		}
-	}
-#endif /* ALTQ_ACCOUNT */
-
 	return (0);
 }
 
 /*
  * hfsc_dequeue is a dequeue function to be registered to
- * (*if_altqdequeue) in struct ifnet.
+ * (*altq_dequeue) in struct ifaltq.
  *
- * note: when mode is ALTDQ_FLUSH, all packets should be discarded.
- *	ALTDQ_PEEK returns the next packet without removing the packet
- *	from the queue.  ALTDQ_DEQUEUE is a normal dequeue operation.
- *	ALTDQ_DEQUEUE must return the same packet if called immediately
- *	after ALTDQ_PEEK.
+ * note: ALTDQ_POLL returns the next packet without removing the packet
+ *	from the queue.  ALTDQ_REMOVE is a normal dequeue operation.
+ *	ALTDQ_REMOVE must return the same packet if called immediately
+ *	after ALTDQ_POLL.
  */
 static struct mbuf *
-hfsc_dequeue(ifp, mode)
-	struct ifnet	*ifp;
-	int		mode;
+hfsc_dequeue(ifq, op)
+	struct ifaltq	*ifq;
+	int		op;
 {
-	struct hfsc_if	*hif = (struct hfsc_if *)ifp->if_altqp;
+	struct hfsc_if	*hif = (struct hfsc_if *)ifq->altq_disc;
 	struct hfsc_class *cl;
 	struct mbuf *m;
 	int len, next_len;
 	int realtime = 0;
 
-	if (mode == ALTDQ_FLUSH) {
-		hfsc_flush(hif);
-		return (NULL);
-	}
-
 	if (hif->hif_packets == 0)
 		/* no packet in the tree */
 		return (NULL);
 
-	if (mode == ALTDQ_DEQUEUE && hif->hif_peekcache != NULL) {
+	if (op == ALTDQ_REMOVE && hif->hif_pollcache != NULL) {
 		u_int64_t cur_time;
 		
-		cl = hif->hif_peekcache;
-		hif->hif_peekcache = NULL;
+		cl = hif->hif_pollcache;
+		hif->hif_pollcache = NULL;
 		/* check if the class was scheduled by real-time criteria */
 		if (cl->cl_rsc != NULL) {
 			cur_time = read_machclk();
 			realtime = (cl->cl_e <= cur_time);
 		}
-	}
-	else {
+	} else {
 		/*
 		 * if there are eligible classes, use real-time criteria.
 		 * find the class with the minimum deadline among
@@ -670,8 +645,7 @@ hfsc_dequeue(ifp, mode)
 		 */
 		if ((cl = ellist_get_mindl(hif->hif_eligible)) != NULL) {
 			realtime = 1;
-		}
-		else {
+		} else {
 			/*
 			 * use link-sharing criteria
 			 * get the class with the minimum vt in the hierarchy
@@ -679,24 +653,14 @@ hfsc_dequeue(ifp, mode)
 			cl = hif->hif_rootclass;
 			while (is_a_parent_class(cl)) {
 				cl = actlist_first(cl->cl_actc);
-				if (cl == NULL) {
-					/*
-					 * no active class.
-					 * if there is a realtime non-work
-					 * conserving class with backlog,
-					 * set timeout.
-					 */
-					if (hif->hif_packets > 0 &&
-					    hif->hif_armed == 0)
-						hfsc_settimer(hif);
+				if (cl == NULL)
 					return (NULL);
-				}
 			}
 		}
 
-		if (mode == ALTDQ_PEEK) {
-			hif->hif_peekcache = cl;
-			m = hfsc_peekq(cl);
+		if (op == ALTDQ_POLL) {
+			hif->hif_pollcache = cl;
+			m = hfsc_pollq(cl);
 			return (m);
 		}
 	}
@@ -718,98 +682,18 @@ hfsc_dequeue(ifp, mode)
 			else
 				update_d(cl, next_len);
 		}
-	}
-	else {
+	} else {
 		/* the class becomes passive */
 		set_passive(cl);
 	}
 
 #ifdef HFSC_PKTLOG
-		/* put the logging_hook here */
+	/* put the logging_hook here */
 #endif
 
+	ifq->ifq_len--;
 	return (m);
 }
-
-/*
- * hfsc_restart is called by the system timer code in case that
- * there are packets remaning in the queue.  it happens only when
- * a link-sharing service curve has 0 slope.
- */
-static void
-hfsc_restart(ifp)
-	struct ifnet *ifp;
-{
-	struct hfsc_if	*hif;
-	int	s;
-
-	if (!ALTQ_IS_ON(ifp))
-		/* hfsc must have been detached */
-		return;
-
-	if ((hif = (struct hfsc_if *)ifp->if_altqp) == NULL)
-		/* should not happen */
-		return;
-
-	s = splimp();
-	hif->hif_armed = 0;
-	if (hif->hif_packets > 0 && ifp->if_start != NULL &&
-	    (ifp->if_flags & IFF_OACTIVE) == 0)
-		(*ifp->if_start)(ifp);
-	splx(s);
-}
-
-/*
- * hfsc_settimer sets a system timer to drain packets from non-work
- * conserving classes.
- */
-static void
-hfsc_settimer(hif)
-	struct hfsc_if	*hif;
-{
-	struct hfsc_class *cl;
-	u_int64_t	now, waittime;
-	int		ticks;
-
-	if ((cl = ellist_first(hif->hif_eligible)) == NULL)
-		return;
-	now = read_machclk();
-	if (now >= cl->cl_e) {
-		/* ick! the class has already become eligible */
-		ticks = 1;
-	}
-	else {
-		waittime = cl->cl_e - now;
-		if (waittime <= machclk_per_tick)
-			ticks = 1;
-		else
-			ticks = (int)(waittime / machclk_per_tick);
-	}
-	hif->hif_armed = 1;
-	TIMEOUT((timeout_t *)hfsc_restart, hif->hif_ifp,
-		ticks, hif->hif_callout);
-}
-
-static struct hfsc_class *
-hfsc_classify(hif, flow)
-	struct hfsc_if	*hif;
-	struct flowinfo *flow;
-{
-	struct hfsc_class *cl;
-
-	if ((cl = acc_classify(&hif->hif_classifier, flow)) != NULL) {
-#if 1
-		if (is_a_parent_class(cl))
-			printf("hfsc_classify: not a leaf class[id:%u]!\n",
-			       cl->cl_id);
-#endif
-		return (cl);
-	}
-	
-	/* no filter matched.  use default class. */
-	return (hif->hif_defaultclass);
-}
-
 
 static int
 hfsc_addq(cl, m)
@@ -822,11 +706,12 @@ hfsc_addq(cl, m)
 		int rval = 0;
 		
 		if (q_is_red(cl->cl_q))
-			rval = red_addq(cl->cl_red, cl->cl_q, m, cl->cl_prhdr);
+			rval = red_addq(cl->cl_red, cl->cl_q, m,
+					cl->cl_pktattr);
 #ifdef HFSC_RIO
 		else
 			rval = rio_addq((rio_t *)cl->cl_red, cl->cl_q,
-					m, cl->cl_prhdr);
+					m, cl->cl_pktattr);
 #endif
 		if (rval < 0) {
 			cl->cl_stats.drops++;
@@ -843,7 +728,7 @@ hfsc_addq(cl, m)
 	}
 
 	if (cl->cl_flags & HFCF_CLEARDSCP)
-		write_dsfield(cl->cl_prhdr, 0);
+		write_dsfield(cl->cl_pktattr, 0);
 
 	_addq(cl->cl_q, m);
 	cl->cl_hif->hif_packets++;
@@ -875,14 +760,14 @@ hfsc_getq(cl)
 }
 
 static struct mbuf *
-hfsc_peekq(cl)
+hfsc_pollq(cl)
 	struct hfsc_class *cl;
 {
 	return qhead(cl->cl_q);
 }
 
 static void
-hfsc_flushq(cl)
+hfsc_purgeq(cl)
 	struct hfsc_class *cl;
 {
 	struct mbuf *m;
@@ -1011,8 +896,7 @@ init_v(cl, len)
 			if (cl->cl_parent->cl_vtperiod == cl->cl_parentperiod)
 				vt = max(cl->cl_vt, vt);
 			cl->cl_vt = vt;
-		}
-		else {
+		} else {
 			/* no packet is backlogged.  set vt to 0 */
 			cl->cl_vt = 0;
 		}
@@ -1056,6 +940,7 @@ update_v(cl, len)
 
 /*
  * TAILQ based ellist and actlist implementation
+ * (ion wanted to make a calendar queue based implementation)
  */
 /*
  * eligible list holds backlogged classes being sorted by their eligible times.
@@ -1282,11 +1167,11 @@ actlist_update(cl)
  *  ism(500MHz) 40000      4000       400        40         4
  *  ism(200MHz) 16000      1600       160        16         1.6
  */
-#define SM_SHIFT	24
-#define ISM_SHIFT	10
+#define	SM_SHIFT	24
+#define	ISM_SHIFT	10
 
-#define SC_LARGEVAL	(1LL << 32)
-#define SC_INFINITY	0xffffffffffffffffLL
+#define	SC_LARGEVAL	(1LL << 32)
+#define	SC_INFINITY	0xffffffffffffffffLL
 
 static __inline u_int64_t 
 seg_x2y(x, sm)
@@ -1425,11 +1310,10 @@ rtsc_y2x(rtsc, y)
 			x = rtsc->x + rtsc->dx;
 		else
 			x = rtsc->x + seg_y2x(y - rtsc->y, rtsc->ism1);
-	}
-	else {
+	} else {
 		/* x belongs to the 2nd segment */
 		x = rtsc->x + rtsc->dx
-			+ seg_y2x(y - rtsc->y - rtsc->dy, rtsc->ism2);
+		    + seg_y2x(y - rtsc->y - rtsc->dy, rtsc->ism2);
 	}
 	return (x);
 }
@@ -1449,7 +1333,7 @@ rtsc_x2y(rtsc, x)
 	else
 		/* y belongs to the 2nd segment */
 		y = rtsc->y + rtsc->dy
-			+ seg_x2y(x - rtsc->x - rtsc->dx, rtsc->sm2);
+		    + seg_x2y(x - rtsc->x - rtsc->dx, rtsc->sm2);
 	return (y);
 }
 
@@ -1552,10 +1436,10 @@ hfscclose(dev, flag, fmt, p)
 
 	while ((hif = hif_list) != NULL) {
 		/* destroy all */
-		if (ALTQ_IS_ON(hif->hif_ifp))
-			if_altqdisable(hif->hif_ifp);
+		if (ALTQ_IS_ENABLED(hif->hif_ifq))
+			altq_disable(hif->hif_ifq);
 
-		err = if_altqdetach(hif->hif_ifp);
+		err = altq_detach(hif->hif_ifq);
 		if (err == 0)
 			err = hfsc_detach(hif);
 		if (err != 0 && error == 0)
@@ -1584,10 +1468,11 @@ hfscioctl(dev, cmd, addr, flag, p)
 	default:
 #if (__FreeBSD_version > 400000)
 		if ((error = suser(p)) != 0)
+			return (error);
 #else
 		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
-#endif
 			return (error);
+#endif
 		break;
 	}
     
@@ -1603,8 +1488,6 @@ hfscioctl(dev, cmd, addr, flag, p)
 
 	case HFSC_ENABLE:
 	case HFSC_DISABLE:
-	case HFSC_ACC_ENABLE:
-	case HFSC_ACC_DISABLE:
 	case HFSC_CLEAR_HIERARCHY:
 		ifacep = (struct hfsc_interface *)addr;
 		if ((hif = altq_lookup(ifacep->hfsc_ifname,
@@ -1623,21 +1506,11 @@ hfscioctl(dev, cmd, addr, flag, p)
 				error = EINVAL;
 				break;
 			}
-			error = if_altqenable(hif->hif_ifp);
+			error = altq_enable(hif->hif_ifq);
 			break;
 
 		case HFSC_DISABLE:
-			error = if_altqdisable(hif->hif_ifp);
-			break;
-
-		case HFSC_ACC_ENABLE:
-			/* enable accounting mode */
-			SET_ACCOUNTING(hif->hif_ifp);
-			break;
-
-		case HFSC_ACC_DISABLE:
-			/* disable accounting mode */
-			CLEAR_ACCOUNTING(hif->hif_ifp);
+			error = altq_disable(hif->hif_ifq);
 			break;
 
 		case HFSC_CLEAR_HIERARCHY:
@@ -1688,14 +1561,15 @@ hfsccmd_if_attach(ap)
 	if ((ifp = ifunit(ap->iface.hfsc_ifname)) == NULL)
 		return (ENXIO);
 
-	if ((hif = hfsc_attach(ifp, ap->bandwidth)) == NULL)
+	if ((hif = hfsc_attach(&ifp->if_snd, ap->bandwidth)) == NULL)
 		return (ENOMEM);
 	
 	/*
 	 * set HFSC to this ifnet structure.
 	 */
-	if ((error = if_altqattach(ifp, hif, hfsc_enqueue, hfsc_dequeue,
-				   ALTQT_HFSC)) != 0)
+	if ((error = altq_attach(&ifp->if_snd, ALTQT_HFSC, hif,
+				 hfsc_enqueue, hfsc_dequeue, hfsc_request,
+				 &hif->hif_classifier, acc_classify)) != 0)
 		(void)hfsc_detach(hif);
 
 	return (error);
@@ -1711,10 +1585,10 @@ hfsccmd_if_detach(ap)
 	if ((hif = altq_lookup(ap->hfsc_ifname, ALTQT_HFSC)) == NULL)
 		return (EBADF);
 	
-	if (ALTQ_IS_ON(hif->hif_ifp))
-		if_altqdisable(hif->hif_ifp);
+	if (ALTQ_IS_ENABLED(hif->hif_ifq))
+		altq_disable(hif->hif_ifq);
 
-	if ((error = if_altqdetach(hif->hif_ifp)))
+	if ((error = altq_detach(hif->hif_ifq)))
 		return (error);
 
 	return hfsc_detach(hif);
@@ -1874,8 +1748,7 @@ static void get_class_stats(sp, cl)
 		sp->rsc.m1 = sm2m(cl->cl_rsc->sm1);
 		sp->rsc.d = dx2d(cl->cl_rsc->dx);
 		sp->rsc.m2 = sm2m(cl->cl_rsc->sm2);
-	}
-	else {
+	} else {
 		sp->rsc.m1 = 0;
 		sp->rsc.d = 0;
 		sp->rsc.m2 = 0;
@@ -1884,8 +1757,7 @@ static void get_class_stats(sp, cl)
 		sp->fsc.m1 = sm2m(cl->cl_fsc->sm1);
 		sp->fsc.d = dx2d(cl->cl_fsc->dx);
 		sp->fsc.m2 = sm2m(cl->cl_fsc->sm2);
-	}
-	else {
+	} else {
 		sp->fsc.m1 = 0;
 		sp->fsc.d = 0;
 		sp->fsc.m2 = 0;

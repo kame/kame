@@ -1,7 +1,7 @@
-/*	$KAME: altq_wfq.c,v 1.4 2000/05/07 06:29:23 kjc Exp $	*/
+/*	$KAME: altq_wfq.c,v 1.5 2000/07/25 10:12:31 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-1999
+ * Copyright (C) 1997-2000
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_wfq.c,v 1.4 2000/05/07 06:29:23 kjc Exp $
+ * $Id: altq_wfq.c,v 1.5 2000/07/25 10:12:31 kjc Exp $
  */
 /*
  *  March 27, 1997.  Written by Hiroshi Kyusojin of Keio University
@@ -64,24 +64,26 @@
 #include <altq/altq_wfq.h>
 
 /*
-#define WFQ_DEBUG
+#define	WFQ_DEBUG
 */
 
 static int		wfq_setenable(struct wfq_interface *, int);
 static int		wfq_ifattach(struct wfq_interface *);
 static int		wfq_ifdetach(struct wfq_interface *);
-static int		wfq_ifenqueue(struct ifnet *, struct mbuf *,
-				      struct pr_hdr *, int);
+static int		wfq_ifenqueue(struct ifaltq *, struct mbuf *,
+				      struct altq_pktattr *);
 static u_long		wfq_hash(struct flowinfo *, int);
 static __inline u_long	wfq_hashbydstaddr(struct flowinfo *, int);
 static __inline u_long	wfq_hashbysrcport(struct flowinfo *, int);
 static wfq		*wfq_maxqueue(wfq_state_t *);
-static struct mbuf	*wfq_ifdequeue(struct ifnet *, int);
+static struct mbuf	*wfq_ifdequeue(struct ifaltq *, int);
 static int		wfq_getqid(struct wfq_getqid *);
 static int		wfq_setweight(struct wfq_setweight *);
 static int		wfq_getstats(struct wfq_getstats *);
 static int		wfq_config(struct wfq_conf *);
-static int		wfq_flush(struct ifnet *);
+static int		wfq_request __P((struct ifaltq *, int, void *));
+static int		wfq_flush(struct ifaltq *);
+static void		*wfq_classify(void *, struct mbuf *, int);
 
 /* global value : pointer to wfq queue list */
 static wfq_state_t *wfq_list = NULL;
@@ -99,10 +101,10 @@ wfq_setenable(ifacep, flag)
 
 	switch(flag){
 	case ENABLE:
-		error = if_altqenable(wfqp->ifp);
+		error = altq_enable(wfqp->ifq);
 		break;
 	case DISABLE:
-		error = if_altqdisable(wfqp->ifp);
+		error = altq_disable(wfqp->ifq);
 		break;
 	}
 	return error;
@@ -125,7 +127,7 @@ wfq_ifattach(ifacep)
 		return (ENXIO);
 	}
 
-	if (!ALTQ_IS_READY(ifp)) {
+	if (!ALTQ_IS_READY(&ifp->if_snd)) {
 #ifdef WFQ_DEBUG
 		printf("wfq_ifattach()...altq is not ready\n");
 #endif
@@ -146,8 +148,8 @@ wfq_ifattach(ifacep)
 	}
 	bzero(queue, sizeof(wfq) * DEFAULT_QSIZE);
 
-	/* keep the ifp */
-	new_wfqp->ifp = ifp;
+	/* keep the ifq */
+	new_wfqp->ifq = &ifp->if_snd;
 	new_wfqp->nums = DEFAULT_QSIZE;
 	new_wfqp->hwm = HWM;
 	new_wfqp->bytes = 0;
@@ -166,8 +168,9 @@ wfq_ifattach(ifacep)
 	/*
 	 * set WFQ to this ifnet structure.
 	 */
-	if ((error = if_altqattach(ifp, new_wfqp, wfq_ifenqueue, wfq_ifdequeue,
-				  ALTQT_WFQ)) != 0) {
+	if ((error = altq_attach(&ifp->if_snd, ALTQT_WFQ, new_wfqp,
+				 wfq_ifenqueue, wfq_ifdequeue, wfq_request,
+				 new_wfqp, wfq_classify)) != 0) {
 		FREE(queue, M_DEVBUF);
 		FREE(new_wfqp, M_DEVBUF);
 		return (error);
@@ -191,11 +194,11 @@ wfq_ifdetach(ifacep)
 		return (EBADF);
 
 	/* free queued mbuf */
-	wfq_flush(wfqp->ifp);
+	wfq_flush(wfqp->ifq);
 
 	/* remove WFQ from the ifnet structure. */
-	(void)if_altqdisable(wfqp->ifp);
-	(void)if_altqdetach(wfqp->ifp);
+	(void)altq_disable(wfqp->ifq);
+	(void)altq_detach(wfqp->ifq);
     
 	/* remove from the wfqstate list */
 	if (wfq_list == wfqp)
@@ -217,36 +220,65 @@ wfq_ifdetach(ifacep)
 }
 
 static int
-wfq_flush(ifp)
-	struct ifnet *ifp;
+wfq_request(ifq, req, arg)
+	struct ifaltq *ifq;
+	int req;
+	void *arg;
+{
+	wfq_state_t *wfqp = (wfq_state_t *)ifq->altq_disc;
+
+	switch (req) {
+	case ALTRQ_PURGE:
+		wfq_flush(wfqp->ifq);
+		break;
+	}
+	return (0);
+}
+
+
+static int
+wfq_flush(ifq)
+	struct ifaltq *ifq;
 {
 	struct mbuf *mp;
 
-	while ((mp = wfq_ifdequeue(ifp, ALTDQ_DEQUEUE)) != NULL)
+	while ((mp = wfq_ifdequeue(ifq, ALTDQ_REMOVE)) != NULL)
 		m_freem(mp);
+	if (ALTQ_IS_ENABLED(ifq))
+		ifq->ifq_len = 0;
 	return 0;
 }
 
+static void *
+wfq_classify(clfier, m, af)
+	void *clfier;
+	struct mbuf *m;
+	int af;
+{
+	wfq_state_t *wfqp = (wfq_state_t *)clfier;
+	struct flowinfo flow;
+
+	altq_extractflow(m, af, &flow, wfqp->fbmask);
+	return (&wfqp->queue[(*wfqp->hash_func)(&flow, wfqp->nums)]);
+}
+
 static int
-wfq_ifenqueue(ifp, mp, pr_hdr, mode)
-	struct ifnet *ifp;
+wfq_ifenqueue(ifq, mp, pktattr)
+	struct ifaltq *ifq;
 	struct mbuf *mp;
-	struct pr_hdr *pr_hdr;
-	int mode;
+	struct altq_pktattr *pktattr;
 {
 	wfq_state_t *wfqp;
-	struct flowinfo flow;
 	wfq *queue;
 	int byte, error = 0;
 
-	if (mode != ALTEQ_NORMAL)
-		return 0;
-
-	wfqp = (wfq_state_t *)ifp->if_altqp;
+	wfqp = (wfq_state_t *)ifq->altq_disc;
 	mp->m_nextpkt = NULL;
 
-	altq_extractflow(mp, pr_hdr, &flow, wfqp->fbmask);
-	queue = &wfqp->queue[(*wfqp->hash_func)(&flow, wfqp->nums)];
+	/* grab a queue selected by classifier */
+	if (pktattr == NULL || (queue = pktattr->pattr_class) == NULL)
+		queue = &wfqp->queue[0];
+
 	if (queue->tail == NULL)
 		queue->head = mp;
 	else
@@ -255,6 +287,7 @@ wfq_ifenqueue(ifp, mp, pr_hdr, mode)
 	byte = mp->m_pkthdr.len;
 	queue->bytes += byte;
 	wfqp->bytes += byte;
+	ifq->ifq_len++;
 
 	if (queue->next == NULL) {
 		/* this queue gets active. add the queue to the active list */
@@ -290,18 +323,11 @@ wfq_ifenqueue(ifp, mp, pr_hdr, mode)
 		drop_queue->drop_bytes += byte;
 		wfqp->bytes -= byte;
 		m_freem(mp);
+		ifq->ifq_len--;
 		if(drop_queue == queue)
 			/* the queue for this flow is selected to drop */
 			error = ENOBUFS;
 	}
-
-	/*
-	 * call the driver's start routine.
-	 */
-	ifp = wfqp->ifp;
-	if(ifp->if_start && (ifp->if_flags & IFF_OACTIVE) == 0)
-		(*ifp->if_start)(ifp);
-
 	return error;
 }
 	
@@ -407,21 +433,16 @@ static wfq *wfq_maxqueue(wfqp)
 
 
 static struct mbuf *
-wfq_ifdequeue(ifp, mode)
-	struct ifnet *ifp;
-	int mode;
+wfq_ifdequeue(ifq, op)
+	struct ifaltq *ifq;
+	int op;
 {
 	wfq_state_t *wfqp;
 	wfq *queue;
 	struct mbuf *mp;
 	int byte;
 
-	wfqp = (wfq_state_t *)ifp->if_altqp;
-
-	if (mode == ALTDQ_FLUSH) {
-		wfq_flush(ifp);
-		return NULL;
-	}
+	wfqp = (wfq_state_t *)ifq->altq_disc;
 
 	if ((wfqp->bytes == 0) || ((queue = wfqp->rrp) == NULL))
 		/* no packet in the queues */
@@ -455,7 +476,7 @@ wfq_ifdequeue(ifp, mode)
 
 			/* dequeue a packet from this queue */
 			mp = queue->head;
-			if (mode == ALTDQ_DEQUEUE) {
+			if (op == ALTDQ_REMOVE) {
 				if((queue->head = mp->m_nextpkt) == NULL)
 					queue->tail = NULL;
 				byte = mp->m_pkthdr.len;
@@ -465,6 +486,8 @@ wfq_ifdequeue(ifp, mode)
 				queue->sent_packets++;
 				queue->sent_bytes += byte;
 				wfqp->bytes -= byte;
+				if (ALTQ_IS_ENABLED(ifq))
+					ifq->ifq_len--;
 			}
 			return mp;
 
@@ -561,7 +584,7 @@ wfq_config(cf)
 
 	if (cf->nqueues != wfqp->nums) {
 		/* free queued mbuf */
-		wfq_flush(wfqp->ifp);
+		wfq_flush(wfqp->ifq);
 		FREE(wfqp->queue, M_DEVBUF);
 
 		MALLOC(queue, wfq *, sizeof(wfq) * cf->nqueues,
@@ -614,8 +637,6 @@ wfq_config(cf)
 	return error;
 }
 
-
-
 /*
  * wfq device interface
  */
@@ -644,7 +665,7 @@ wfqclose(dev, flag, fmt, p)
     
 	s = splimp();
 	while ((wfqp = wfq_list) != NULL) {
-		ifp = wfqp->ifp;
+		ifp = wfqp->ifq->altq_ifp;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		sprintf(iface.wfq_ifacename, "%s", ifp->if_xname);
 #else

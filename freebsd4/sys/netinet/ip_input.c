@@ -182,9 +182,6 @@ ip_dn_ctl_t *ip_dn_ctl_ptr;
 
 int (*fr_checkp) __P((struct ip *, int, struct ifnet *, int, struct mbuf **)) = NULL;
 
-#ifdef ALTQ
-int (*altq_input) __P((struct mbuf *, int)) = NULL;
-#endif
 
 /*
  * We need to save the IP options in case a protocol wants to respond

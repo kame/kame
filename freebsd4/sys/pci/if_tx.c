@@ -448,10 +448,8 @@ epic_freebsd_attach(
 	ifp->if_init = (if_init_f_t*)epic_init;
 	ifp->if_timer = 0;
 	ifp->if_output = ether_output;
-	ifp->if_snd.ifq_maxlen = TX_RING_SIZE;
-#ifdef ALTQ
-	ifp->if_altqflags |= ALTQF_READY;
-#endif
+	IFQ_SET_MAXLEN(&ifp->if_snd, TX_RING_SIZE);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Get iobase or membase */
 #if defined(EPIC_USEIOSPACE)
@@ -805,17 +803,7 @@ epic_ifstart(struct ifnet * const ifp){
 	/* If no link is established, simply free all mbufs in queue */
 	PHY_READ_2( sc, DP83840_BMSR );
 	if( !(BMSR_LINK_STATUS & PHY_READ_2( sc, DP83840_BMSR )) ){
-#ifdef ALTQ
-	        if (ALTQ_IS_ON(ifp)) {
-			m0 = (*ifp->if_altqdequeue)(ifp, ALTDQ_FLUSH);
-			return;
-		}
-#endif
-		IF_DEQUEUE( &ifp->if_snd, m0 );
-		while( m0 ) {
-			m_freem(m0);
-			IF_DEQUEUE( &ifp->if_snd, m0 );
-		}
+		IFQ_PURGE( &ifp->if_snd );
 		return;
 	}
 #endif
@@ -827,12 +815,7 @@ epic_ifstart(struct ifnet * const ifp){
 		flist = sc->tx_flist + sc->cur_tx;
 
 		/* Get next packet to send */
-#ifdef ALTQ
-		if (ALTQ_IS_ON(ifp))
-			m0 = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
-		else
-#endif
-		IF_DEQUEUE( &ifp->if_snd, m0 );
+		IFQ_DEQUEUE( &ifp->if_snd, m0 );
 
 		/* If nothing to send, return */
 		if( NULL == m0 ) return;
@@ -1113,14 +1096,8 @@ epic_intr (
 
         if( status & (INTSTAT_TXC|INTSTAT_TCC|INTSTAT_TQE) ) {
             epic_tx_done( sc );
-#ifdef ALTQ
-	    if (ALTQ_IS_ON(&sc->sc_if)) {
-		epic_ifstart( &sc->sc_if );
-	    }
-	    else
-#endif
 	    if(!(sc->sc_if.if_flags & IFF_OACTIVE) &&
-		sc->sc_if.if_snd.ifq_head )
+		!IFQ_IS_EMPTY( &sc->sc_if.if_snd ))
 		    epic_ifstart( &sc->sc_if );
 	}
 
@@ -1256,13 +1233,7 @@ epic_ifwatchdog __P((
 		printf("seems we can continue normaly\n");
 
 	/* Start output */
-#ifdef ALTQ
-	if (ALTQ_IS_ON(ifp)) {
-	        epic_ifstart(ifp);
-	}
-	else
-#endif
-	if( ifp->if_snd.ifq_head ) epic_ifstart( ifp );
+	if( !IFQ_IS_EMPTY( &ifp->if_snd ) ) epic_ifstart( ifp );
 
 	splx(x);
 }

@@ -181,18 +181,6 @@ static int pn_list_tx_init	__P((struct pn_softc *));
 	CSR_WRITE_4(sc, reg,				\
 		CSR_READ_4(sc, reg) & ~(x))
 
-#ifdef ALTQ
-/*
- * device dependent tweak for ALTQ:  if a driver is designed to dequeue
- * too many packets at a time, we have to modify the driver to limit the
- * number of packets buffered in the device.  This modification
- * often needs to change handling of tx complete interrupts as well.
- * the pn driver can pull as many as 128 packets (when PN_TX_LIST_CNT is 128).
- * TXBUF_THRESH4ALTQ limits buffered packets up to 8.
- */
-#define TXBUF_THRESH4ALTQ	8
-#endif
-
 /*
  * Read a word of data stored in the EEPROM at address 'addr.'
  */
@@ -1154,10 +1142,8 @@ pn_attach(config_id, unit)
 	ifp->if_watchdog = pn_watchdog;
 	ifp->if_init = pn_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = PN_TX_LIST_CNT - 1;
-#ifdef ALTQ
-	ifp->if_altqflags |= ALTQF_READY;
-#endif
+	IFQ_SET_MAXLEN(&ifp->if_snd, PN_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	ifmedia_init(&sc->ifmedia, 0, pn_ifmedia_upd, pn_ifmedia_sts);
 
@@ -1259,9 +1245,6 @@ static int pn_list_tx_init(sc)
 
 	cd->pn_tx_free = &cd->pn_tx_chain[0];
 	cd->pn_tx_tail = cd->pn_tx_head = NULL;
-#ifdef ALTQ
-	sc->pn_cdata.pn_tx_queued = 0;
-#endif
 
 	return(0);
 }
@@ -1671,9 +1654,6 @@ static void pn_txeof(sc)
 		ifp->if_opackets++;
 		m_freem(cur_tx->pn_mbuf);
 		cur_tx->pn_mbuf = NULL;
-#ifdef ALTQ
-		sc->pn_cdata.pn_tx_queued--;
-#endif
 
 		if (sc->pn_cdata.pn_tx_head == sc->pn_cdata.pn_tx_tail) {
 			sc->pn_cdata.pn_tx_head = NULL;
@@ -1780,13 +1760,7 @@ static void pn_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, PN_IMR, PN_INTRS);
 
-#ifdef ALTQ
-	if (ALTQ_IS_ON(ifp)) {
-		pn_start(ifp);
-	}
-	else
-#endif
-	if (ifp->if_snd.ifq_head != NULL) {
+	if (!IFQ_IS_EMPTY(&ifp->if_snd)) {
 		pn_start(ifp);
 	}
 
@@ -1912,30 +1886,13 @@ static void pn_start(ifp)
 	start_tx = sc->pn_cdata.pn_tx_free;
 
 	while(sc->pn_cdata.pn_tx_free->pn_mbuf == NULL) {
-#ifdef ALTQ
-		if (ALTQ_IS_ON(ifp)) {
-			if (sc->pn_cdata.pn_tx_queued >= TXBUF_THRESH4ALTQ) {
-				/*
-				 * stop filling tx buffer if we already have
-				 * enough packets to transmit.
-				 */
-				break;
-			}
-
-			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
-		}
-		else
-#endif
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
 		/* Pick a descriptor off the free list. */
 		cur_tx = sc->pn_cdata.pn_tx_free;
 		sc->pn_cdata.pn_tx_free = cur_tx->pn_nextdesc;
-#ifdef ALTQ
-		sc->pn_cdata.pn_tx_queued++;
-#endif
 
 		/* Pack the data into the descriptor. */
 		pn_encap(sc, cur_tx, m_head);
@@ -2242,12 +2199,7 @@ static void pn_watchdog(ifp)
 	pn_reset(sc);
 	pn_init(sc);
 
-#ifdef ALTQ
-	if (ALTQ_IS_ON(ifp))
-		pn_start(ifp);
-	else
-#endif
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		pn_start(ifp);
 
 	return;

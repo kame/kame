@@ -649,14 +649,13 @@ lemac_ifstart(
     struct ifnet *ifp)
 {
     lemac_softc_t * const sc = LEMAC_IFP_TO_SOFTC(ifp);
-    struct ifqueue * const ifq = &ifp->if_snd;
 
     if ((ifp->if_flags & IFF_RUNNING) == 0)
 	return;
 
     LEMAC_INTR_DISABLE(sc);
 
-    while (ifq->ifq_head != NULL) {
+    while (!IFQ_IS_EMPTY(&ifp->if_snd)) {
 	struct mbuf *m;
 	struct mbuf *m0;
 	int tx_pg;
@@ -680,7 +679,9 @@ lemac_ifstart(
 	    break;
 	}
 
-	IF_DEQUEUE(ifq, m);
+	IFQ_DEQUEUE(&ifp->if_snd, m);
+	if (m == NULL)
+		break;
 
 	/*
 	 * The first four bytes of each transmit buffer are for
@@ -1053,6 +1054,7 @@ lemac_ifattach(
 	| IFF_NOTRAILERS
 #endif
 	| IFF_MULTICAST;
+    IFQ_SET_READY(&ifp->if_snd);
 
     if (sc->sc_flags & LEMAC_ALIVE) {
 	int media;

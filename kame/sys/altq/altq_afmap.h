@@ -1,7 +1,7 @@
-/*	$KAME: altq_afmap.h,v 1.2 2000/02/22 14:00:30 itojun Exp $	*/
+/*	$KAME: altq_afmap.h,v 1.3 2000/07/25 10:12:29 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-1999
+ * Copyright (C) 1997-2000
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,11 +25,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_afmap.h,v 1.2 2000/02/22 14:00:30 itojun Exp $
+ * $Id: altq_afmap.h,v 1.3 2000/07/25 10:12:29 kjc Exp $
  */
 
 #ifndef _ALTQ_ALTQ_AFMAP_H_
-#define _ALTQ_ALTQ_AFMAP_H_
+#define	_ALTQ_ALTQ_AFMAP_H_
 
 #include <sys/queue.h>
 #include <altq/altq.h>
@@ -46,9 +46,9 @@ struct atm_flowmap {
 		struct flowinfo_in6   afu_fi6;
 #endif
 	} af_fiu;
-#define af_flowinfo	af_fiu.afu_fi
-#define af_flowinfo4	af_fiu.afu_fi4
-#define af_flowinfo6	af_fiu.afu_fi6
+#define	af_flowinfo	af_fiu.afu_fi
+#define	af_flowinfo4	af_fiu.afu_fi4
+#define	af_flowinfo6	af_fiu.afu_fi6
 
 	/* statistics */
 	u_int32_t	afs_packets;		/* total packet count */
@@ -56,12 +56,12 @@ struct atm_flowmap {
 };
 
 /* set or get flowmap */
-#define AFM_ADDFMAP	_IOWR('F', 1, struct atm_flowmap)
-#define AFM_DELFMAP	_IOWR('F', 2, struct atm_flowmap)
-#define AFM_CLEANFMAP	_IOWR('F', 3, struct atm_flowmap)
-#define AFM_GETFMAP	_IOWR('F', 4, struct atm_flowmap)
+#define	AFM_ADDFMAP	_IOWR('F', 1, struct atm_flowmap)
+#define	AFM_DELFMAP	_IOWR('F', 2, struct atm_flowmap)
+#define	AFM_CLEANFMAP	_IOWR('F', 3, struct atm_flowmap)
+#define	AFM_GETFMAP	_IOWR('F', 4, struct atm_flowmap)
 
-#if defined(KERNEL) || defined(_KERNEL)
+#ifdef _KERNEL
 
 /* per flow information */
 struct afm {
@@ -75,9 +75,9 @@ struct afm {
 		struct flowinfo_in6  afmu_fi6;
 #endif
 	} afm_fiu;
-#define afm_flowinfo	afm_fiu.afmu_fi
-#define afm_flowinfo4	afm_fiu.afmu_fi4
-#define afm_flowinfo6	afm_fiu.afmu_fi6
+#define	afm_flowinfo	afm_fiu.afmu_fi
+#define	afm_flowinfo4	afm_fiu.afmu_fi4
+#define	afm_flowinfo6	afm_fiu.afmu_fi6
 
 	/* statistics */
 	u_int32_t		afms_packets;	/* total packet count */
@@ -100,6 +100,6 @@ int		afm_removeall __P((struct ifnet *));
 struct		afm *afm_lookup __P((struct ifnet *, int, int));
 struct afm 	*afm_match __P((struct ifnet *, struct flowinfo *));
 
-#endif /* KERNEL */
+#endif /* _KERNEL */
 
 #endif /* _ALTQ_ALTQ_AFMAP_H_ */

@@ -834,9 +834,7 @@ srattach(struct sr_hardc *hc)
 		ifp->if_type = IFT_PPP;	/*ppp only*/
 #endif
 #endif
-#ifdef ALTQ
-		ifp->if_altqflags |= ALTQF_READY;
-#endif
+		IFQ_SET_READY(&ifp->if_snd);
 
 		printf("sr%d: Adapter %d, port %d.\n",
 		       sc->unit, hc->cunit, sc->subunit);

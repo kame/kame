@@ -136,14 +136,8 @@ dp8390_config(sc, media, nmedia, defmedia)
 		ifmedia_add(&sc->sc_media, IFM_ETHER|IFM_MANUAL, 0, NULL);
 		ifmedia_set(&sc->sc_media, IFM_ETHER|IFM_MANUAL);
 	}
+	IFQ_SET_READY(&ifp->if_snd);
 
-#ifdef ALTQ
-	/*
-	 * set ALTQF_READY to show this driver supports
-	 * alternate queueing.
-	 */
-	ifp->if_altqflags |= ALTQF_READY;
-#endif
 	/* Attach the interface. */
 	if_attach(ifp);
 	ether_ifattach(ifp, sc->sc_enaddr);
@@ -461,12 +455,7 @@ outloop:
 		ifp->if_flags |= IFF_OACTIVE;
 		return;
 	}
-#ifdef ALTQ
-	if (ALTQ_IS_ON(ifp))
-		m0 = (*ifp->if_altqdequeue) (ifp, ALTDQ_DEQUEUE);
-	else
-#endif
-	IF_DEQUEUE(&ifp->if_snd, m0);
+	IFQ_DEQUEUE(&ifp->if_snd, m0);
 	if (m0 == 0)
 		return;
 

@@ -313,6 +313,9 @@ struct cdevsw	cdevsw[] =
 	cdev_notdef(),			/* 54 */
 	cdev_notdef(),			/* 55 */
 #endif
+#ifdef ALTQ
+	cdev_notdef(),			/* 56: ALTQ */
+#endif
 	
 };
 int	nchrdev = sizeof (cdevsw) / sizeof (cdevsw[0]);

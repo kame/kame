@@ -439,9 +439,6 @@ struct pn_chain_data {
 	struct pn_chain		*pn_tx_head;
 	struct pn_chain		*pn_tx_tail;
 	struct pn_chain		*pn_tx_free;
-#ifdef ALTQ
-	int			pn_tx_queued;	/* # of active tx chains */
-#endif
 };
 
 struct pn_type {

@@ -1,7 +1,7 @@
-/*	$KAME: altq_afmap.c,v 1.4 2000/05/07 06:29:23 kjc Exp $	*/
+/*	$KAME: altq_afmap.c,v 1.5 2000/07/25 10:12:29 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-1999
+ * Copyright (C) 1997-2000
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_afmap.c,v 1.4 2000/05/07 06:29:23 kjc Exp $
+ * $Id: altq_afmap.c,v 1.5 2000/07/25 10:12:29 kjc Exp $
  */
 
 /*

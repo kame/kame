@@ -127,10 +127,6 @@ extern int ipport_hifirstauto;
 extern int ipport_hilastauto;
 extern struct baddynamicports baddynamicports;
 
-#ifdef ALTQ
-int (*altq_input) __P((struct mbuf *, int)) = NULL;
-#endif
-
 extern	struct domain inetdomain;
 extern	struct protosw inetsw[];
 u_char	ip_protox[IPPROTO_MAX];

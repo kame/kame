@@ -120,18 +120,6 @@
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcidevs.h>
 
-#ifdef ALTQ
-/*
- * device dependent tweak for ALTQ:  if a driver is designed to dequeue
- * too many packets at a time, we have to modify the driver to limit the
- * number of packets buffered in the device.  This modification
- * often needs to change handling of tx complete interrupts as well.
- * the fxp driver can pull as many as 128 packets (when FXP_NTXCB is 128).
- * TXBUF_THRESH4ALTQ limits buffered packets up to 8.
- */
-#define TXBUF_THRESH4ALTQ	8
-#endif
-
 /*
  * NOTE!  On the Alpha, we have an alignment constraint.  The
  * card DMAs the packet immediately following the RFA.  However,
@@ -490,9 +478,7 @@ fxp_attach(parent, self, aux)
 	ifp->if_ioctl = fxp_ioctl;
 	ifp->if_start = fxp_start;
 	ifp->if_watchdog = fxp_watchdog;
-#ifdef ALTQ
-	ifp->if_altqflags |= ALTQF_READY;
-#endif
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Attach the interface.
@@ -501,7 +487,7 @@ fxp_attach(parent, self, aux)
 	/*
 	 * Let the system queue as many packets as we have TX descriptors.
 	 */
-	ifp->if_snd.ifq_maxlen = FXP_NTXCB;
+	IFQ_SET_MAXLEN(&ifp->if_snd, FXP_NTXCB);
 	ether_ifattach(ifp, enaddr);
 #if NBPFILTER > 0
 	bpfattach(&sc->sc_ethercom.ec_if.if_bpf, ifp, DLT_EN10MB,
@@ -735,11 +721,7 @@ fxp_start(ifp)
 	struct ifnet *ifp;
 {
 	struct fxp_softc *sc = ifp->if_softc;
-#ifdef ALTQ
-	struct fxp_cb_tx *txp = NULL;
-#else
 	struct fxp_cb_tx *txp;
-#endif
 	bus_dmamap_t dmamap;
 	int old_queued;
 
@@ -757,40 +739,16 @@ fxp_start(ifp)
 	 * We're finished if there is nothing more to add to the list or if
 	 * we're all filled up with buffers to transmit.
 	 */
-#ifdef ALTQ
-	while (sc->tx_queued < FXP_NTXCB) {
-#else
-	while (ifp->if_snd.ifq_head != NULL && sc->tx_queued < FXP_NTXCB) {
-#endif
+	while (!IFQ_IS_EMPTY(&ifp->if_snd) && sc->tx_queued < FXP_NTXCB) {
 		struct mbuf *mb_head;
 		int segment, error;
 
 		/*
 		 * Grab a packet to transmit.
 		 */
-#ifdef ALTQ
-		if (ALTQ_IS_ON(ifp)) {
-			if (sc->tx_queued >= TXBUF_THRESH4ALTQ) {
-				/*
-				 * stop filling tx buffer if we already have
-				 * enough packets to transmit.
-				 * we need an interrupt upon tx complete
-				 * to continue sending.
-				 */
-				if (txp != NULL)
-					txp->cb_command |= FXP_CB_COMMAND_I;
-				break;
-			}
-
-			mb_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
-		}
-		else
-			IF_DEQUEUE(&ifp->if_snd, mb_head);
+		IFQ_DEQUEUE(&ifp->if_snd, mb_head);
 		if (mb_head == NULL)
 			break;
-#else
-		IF_DEQUEUE(&ifp->if_snd, mb_head);
-#endif
 
 		/*
 		 * Get pointer to next available tx desc.
@@ -913,6 +871,11 @@ fxp_start(ifp)
 	 * going again if suspended.
 	 */
 	if (old_queued != sc->tx_queued) {
+#ifdef ALTQ
+		/* if tb regulator is used, we need tx complete interrupt */
+		if (TBR_IS_ENABLED(&ifp->if_snd))
+			txp->cb_command |= FXP_CB_COMMAND_I;
+#endif
 		fxp_scb_wait(sc);
 		CSR_WRITE_1(sc, FXP_CSR_SCB_COMMAND, FXP_SCB_COMMAND_CU_RESUME);
 
@@ -1064,12 +1027,7 @@ fxp_intr(arg)
 			/*
 			 * Try to start more packets transmitting.
 			 */
-#ifdef ALTQ
-			if (ALTQ_IS_ON(ifp))
-			        fxp_start(ifp);
-			else
-#endif
-			if (ifp->if_snd.ifq_head != NULL)
+			if (!IFQ_IS_EMPTY(&ifp->if_snd))
 				fxp_start(ifp);
 		}
 	}

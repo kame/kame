@@ -1,7 +1,7 @@
-/*	$KAME: altq_flowvalve.h,v 1.2 2000/02/22 14:00:33 itojun Exp $	*/
+/*	$KAME: altq_flowvalve.h,v 1.3 2000/07/25 10:12:30 kjc Exp $	*/
 
 /*
- * Copyright (C) 1998-1999
+ * Copyright (C) 1998-2000
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,13 +25,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_flowvalve.h,v 1.2 2000/02/22 14:00:33 itojun Exp $
+ * $Id: altq_flowvalve.h,v 1.3 2000/07/25 10:12:30 kjc Exp $
  */
 
 #ifndef _ALTQ_ALTQ_FLOWVALVE_H_
-#define _ALTQ_ALTQ_FLOWVALVE_H_
+#define	_ALTQ_ALTQ_FLOWVALVE_H_
 
-#if defined(KERNEL) || defined(_KERNEL)
+#ifdef _KERNEL
 
 /* fv_flow structure to define a unique address pair */
 struct fv_flow {
@@ -50,8 +50,8 @@ struct fv_flow {
 	} flow_un;
 };
 
-#define flow_ip		flow_un._ip
-#define flow_ip6	flow_un._ip6
+#define	flow_ip		flow_un._ip
+#define	flow_ip6	flow_un._ip6
 
 /* flowvalve entry */
 struct fve {
@@ -89,6 +89,6 @@ struct flowvalve {
 	} fv_stats;
 };
 
-#endif /* KERNEL */
+#endif /* _KERNEL */
 
 #endif /* _ALTQ_ALTQ_FLOWVALVE_H_ */

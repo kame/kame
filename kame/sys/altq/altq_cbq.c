@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.c,v 1.4 2000/05/07 06:29:23 kjc Exp $	*/
+/*	$KAME: altq_cbq.c,v 1.5 2000/07/25 10:12:29 kjc Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -29,7 +29,7 @@
  *  
  * These notices must be retained in any copies of any part of this software.
  *
- * $Id: altq_cbq.c,v 1.4 2000/05/07 06:29:23 kjc Exp $
+ * $Id: altq_cbq.c,v 1.5 2000/07/25 10:12:29 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
@@ -76,8 +76,8 @@ static cbq_state_t *cbq_list = NULL;
 static int	cbq_add_class __P((struct cbq_add_class *));
 static int	cbq_delete_class __P((struct cbq_delete_class *));
 static int	cbq_modify_class __P((struct cbq_modify_class *));
-static int cbq_class_create __P((cbq_state_t *, struct cbq_add_class *,
-				 struct rm_class *, struct rm_class *));
+static int 	cbq_class_create __P((cbq_state_t *, struct cbq_add_class *,
+				      struct rm_class *, struct rm_class *));
 static int	cbq_class_destroy __P((cbq_state_t *, struct rm_class *));
 static struct rm_class  *clh_to_clp __P((cbq_state_t *, u_long));
 static int	cbq_add_filter __P((struct cbq_add_filter *));
@@ -85,23 +85,19 @@ static int	cbq_delete_filter __P((struct cbq_delete_filter *));
 
 static int	cbq_clear_hierarchy __P((struct cbq_interface *));
 static int	cbq_clear_interface __P((cbq_state_t *));
+static int	cbq_request __P((struct ifaltq *, int, void *));
 static int	cbq_set_enable __P((struct cbq_interface *, int));
 static int	cbq_ifattach __P((struct cbq_interface *));
 static int	cbq_ifdetach __P((struct cbq_interface *));
-static int	cbq_enqueue __P((struct ifnet *, struct mbuf *,
-				 struct pr_hdr *, int));
-static struct rm_class	*cbq_classify __P((cbq_state_t *, struct flowinfo *));
-static struct mbuf 	*cbq_dequeue __P((struct ifnet *, int));
-static void	cbqrestart __P((struct ifnet *));
-static void	cbqwatchdog __P((cbq_state_t *));
-
+static int	cbq_enqueue __P((struct ifaltq *, struct mbuf *,
+				 struct altq_pktattr *));
+static struct mbuf 	*cbq_dequeue __P((struct ifaltq *, int));
+#if 0
+static void	cbqrestart __P((struct ifaltq *));
+#endif
 static void 	get_class_stats __P((class_stats_t *, struct rm_class *));
 static int 	cbq_getstats __P((struct cbq_getstats *));
-static void	cbq_flush(cbq_state_t *);
-
-#ifdef CBQ_RIO
-static int		cbq_add_riometer __P((struct cbq_riometer *));
-#endif
+static void	cbq_purge(cbq_state_t *);
 
 static int
 cbq_add_class(acp)
@@ -252,8 +248,8 @@ cbq_class_create(cbqp, acp, parent, borrow)
 	 * interface.
 	 */
 	if (chandle == ROOT_CLASS_HANDLE) {
-		rmc_init(cbqp->ifnp.ifp, &cbqp->ifnp, spec->nano_sec_per_byte,
-			 cbqrestart, spec->maxq, RM_MAXQUEUED,
+		rmc_init(cbqp->ifnp.ifq_, &cbqp->ifnp, spec->nano_sec_per_byte,
+			 NULL, spec->maxq, RM_MAXQUEUED,
 			 spec->maxidle, spec->minidle, spec->offtime,
 			 spec->flags);
 		cl = cbqp->ifnp.root_;
@@ -453,6 +449,21 @@ cbq_clear_interface(cbqp)
 	return (0);
 }
 
+static int
+cbq_request(ifq, req, arg)
+	struct ifaltq *ifq;
+	int req;
+	void *arg;
+{
+	cbq_state_t *cbqp = (cbq_state_t *)ifq->altq_disc;
+
+	switch (req) {
+	case ALTRQ_PURGE:
+		cbq_purge(cbqp);
+		break;
+	}
+	return (0);
+}
 
 /*
  * static int
@@ -490,25 +501,13 @@ cbq_set_enable(ep, enable)
 				printf("No Control Class for %s\n", ifacename);
 			error = EINVAL;
 		}
-		else if ((error = if_altqenable(cbqp->ifnp.ifp)) == 0) {
+		else if ((error = altq_enable(cbqp->ifnp.ifq_)) == 0) {
 			cbqp->cbq_qlen = 0;
-			TIMEOUT((timeout_t *)cbqwatchdog, cbqp, CBQ_TIMEOUT,
-				cbqp->callout_handle);
 		}
 		break;
 
 	case DISABLE:
-		UNTIMEOUT((timeout_t *)cbqwatchdog, cbqp,
-			  cbqp->callout_handle); 
-		error = if_altqdisable(cbqp->ifnp.ifp);
-		break;
-
-	case ACC_ENABLE:
-		SET_ACCOUNTING(cbqp->ifnp.ifp);
-		break;
-
-	case ACC_DISABLE:
-		CLEAR_ACCOUNTING(cbqp->ifnp.ifp);
+		error = altq_disable(cbqp->ifnp.ifq_);
 		break;
 	}
 	return (error);
@@ -618,7 +617,7 @@ cbq_ifattach(ifacep)
 	ifacename = ifacep->cbq_ifacename;
 	if ((ifp = ifunit(ifacename)) == NULL)
 		return (ENXIO);
-	if (!ALTQ_IS_READY(ifp))
+	if (!ALTQ_IS_READY(&ifp->if_snd))
 		return (ENXIO);
 
 	/* allocate and initialize cbq_state_t */
@@ -635,13 +634,14 @@ cbq_ifattach(ifacep)
 	}
 	bzero(new_cbqp->cbq_class_tbl, sizeof(struct rm_class *) * CBQ_MAX_CLASSES);
 	new_cbqp->cbq_qlen = 0;
-	new_cbqp->ifnp.ifp = ifp;	    /* keep the ifp */
+	new_cbqp->ifnp.ifq_ = &ifp->if_snd;	    /* keep the ifq */
        
 	/*
 	 * set CBQ to this ifnet structure.
 	 */
-	error = if_altqattach(ifp, new_cbqp, cbq_enqueue, cbq_dequeue,
-			      ALTQT_CBQ);
+	error = altq_attach(&ifp->if_snd, ALTQT_CBQ, new_cbqp,
+			    cbq_enqueue, cbq_dequeue, cbq_request,
+			    &new_cbqp->cbq_classifier, acc_classify);
 	if (error) {
 		FREE(new_cbqp->cbq_class_tbl, M_DEVBUF);
 		FREE(new_cbqp, M_DEVBUF);
@@ -667,7 +667,6 @@ cbq_ifdetach(ifacep)
 		return (EBADF);
 
 	(void)cbq_set_enable(ifacep, DISABLE);
-	(void)cbq_set_enable(ifacep, ACC_DISABLE);
 
 	cbq_clear_interface(cbqp);
 
@@ -679,7 +678,7 @@ cbq_ifdetach(ifacep)
 		cbq_class_destroy(cbqp, cbqp->ifnp.root_);
 
 	/* remove CBQ from the ifnet structure. */
-	(void)if_altqdetach(cbqp->ifnp.ifp);
+	(void)altq_detach(cbqp->ifnp.ifq_);
 
 	/* remove from the list of cbq_state_t's. */
 	if (cbq_list == cbqp)
@@ -704,7 +703,7 @@ cbq_ifdetach(ifacep)
 
 /*
  * int
- * cbq_enqueue(struct ifnet *ifp, struct mbuf *mp, int mode)
+ * cbq_enqueue(struct ifaltq *ifq, struct mbuf *m, struct altq_pktattr *pattr)
  *		- Queue data packets.
  *
  *	cbq_enqueue is set to ifp->if_altqenqueue and called by an upper
@@ -718,92 +717,42 @@ cbq_ifdetach(ifacep)
  */
 
 static int
-cbq_enqueue(ifp, m, pr_hdr, mode)
-	struct ifnet *ifp;
+cbq_enqueue(ifq, m, pktattr)
+	struct ifaltq *ifq;
 	struct mbuf *m;
-	struct pr_hdr *pr_hdr;
-	int mode;
+	struct altq_pktattr *pktattr;
 {
-	cbq_state_t *cbqp = (cbq_state_t *)ifp->if_altqp;
+	cbq_state_t *cbqp = (cbq_state_t *)ifq->altq_disc;
 	struct rm_class *cl;
-	struct flowinfo flow;
 
-	altq_extractflow(m, pr_hdr, &flow, cbqp->cbq_classifier.acc_fbmask);
+	/* grab class set by classifier */
+	if (pktattr == NULL || (cl = pktattr->pattr_class) == NULL)
+		cl = cbqp->ifnp.default_;
+	cl->pktattr_ = pktattr;  /* save proto hdr used by ECN */
 
-	if (mode == ALTEQ_NORMAL) {
-		if ((cl = cbq_classify(cbqp, &flow)) == NULL) {
-			/* no class found */
-			ASSERT(0);	/* should not happen */
-			m_freem(m);
-			return (ENOBUFS);	/* XXX */
-		}
-
-		cl->pr_hdr_ = pr_hdr;  /* save proto hdr used by RED/ECN */
-		if (rmc_queue_packet(cl, m) == 0) {
-			/* successfully queued. */
-			++cbqp->cbq_qlen;
-
-			/* call the driver's start routine */
-			if (ifp->if_start &&
-			    (ifp->if_flags & IFF_OACTIVE) == 0)
-				(*ifp->if_start)(ifp);
-			return (0);
-		}
-
+	if (rmc_queue_packet(cl, m) != 0)
 		/* drop occurred.  some mbuf was freed in rmc_queue_packet. */
 		return (ENOBUFS);
-	}
 
-#ifdef ALTQ_ACCOUNT
-	/* accounting mode */
-	if ((cl = cbq_classify(cbqp, &flow)) != NULL) {
-		/* class found */
-		if (mode == ALTEQ_ACCOK) {
-			++cl->stats_.npackets;
-			cl->stats_.nbytes += m->m_pkthdr.len;
-		}
-		else {
-			/* mode == ALTEQ_ACCDROP */
-			++cl->stats_.drops;
-			cl->stats_.drop_bytes += m->m_pkthdr.len;
-		}
-	}
-#endif /* ALTQ_ACCOUNT */
-
+	/* successfully queued. */
+	++cbqp->cbq_qlen;
+	ifq->ifq_len++;
 	return (0);
 }
 
-static struct rm_class *
-cbq_classify(cbqp, flow)
-	cbq_state_t	*cbqp;
-	struct flowinfo *flow;
-{
-	struct rm_class *cl;
-
-	if ((cl = acc_classify(&cbqp->cbq_classifier, flow)) != NULL)
-		return (cl);
-	
-	/* no filter matched.  use default class. */
-	return (cbqp->ifnp.default_);
-}
-
 static struct mbuf *
-cbq_dequeue(ifp, mode)
-	struct ifnet *ifp;
-	int mode;
+cbq_dequeue(ifq, op)
+	struct ifaltq *ifq;
+	int op;
 {
-	cbq_state_t 	*cbqp = (cbq_state_t *)ifp->if_altqp;
+	cbq_state_t 	*cbqp = (cbq_state_t *)ifq->altq_disc;
 	struct mbuf 	*m;
 
-	if (mode == ALTDQ_FLUSH) {
-		cbq_flush(cbqp);
-		return (NULL);
-	}
+	m = rmc_dequeue_next(&cbqp->ifnp, op);
 
-	m = rmc_dequeue_next(&cbqp->ifnp, mode);
-
-	if (m && mode == ALTDQ_DEQUEUE) {
+	if (m && op == ALTDQ_REMOVE) {
 		--cbqp->cbq_qlen;  /* decrement # of packets in cbq */
+		--ifq->ifq_len;
 
 		/* Update the class. */
 		rmc_update_class_util(&cbqp->ifnp);
@@ -811,6 +760,7 @@ cbq_dequeue(ifp, mode)
 	return (m);
 }
 
+#if 0
 /*
  * void
  * cbqrestart(queue_t *) - Restart sending of data.
@@ -820,25 +770,28 @@ cbq_dequeue(ifp, mode)
  */
 
 static void
-cbqrestart(ifp)
-	struct ifnet *ifp;
+cbqrestart(ifq)
+	struct ifaltq *ifq;
 {
 	cbq_state_t	*cbqp;
+	struct ifnet	*ifp;
 
-	if (!ALTQ_IS_ON(ifp))
+	if (!ALTQ_IS_ENABLED(ifq))
 		/* cbq must have been detached */
 		return;
-
-	if ((cbqp = (cbq_state_t *)ifp->if_altqp) == NULL)
+	if ((cbqp = (cbq_state_t *)ifq->altq_disc) == NULL)
 		/* should not happen */
 		return;
 
+	ifp = ifq->altq_ifp;
 	if (ifp->if_start &&
 	    cbqp->cbq_qlen > 0 && (ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 }
 
-static void cbq_flush(cbqp)
+#endif
+
+static void cbq_purge(cbqp)
 	cbq_state_t *cbqp;
 {
 	struct rm_class	*cl;
@@ -847,85 +800,9 @@ static void cbq_flush(cbqp)
 	for (i = 0; i < CBQ_MAX_CLASSES; i++)
 		if ((cl = cbqp->cbq_class_tbl[i]) != NULL)
 			rmc_dropall(cl);
+	if (ALTQ_IS_ENABLED(cbqp->ifnp.ifq_))
+		cbqp->ifnp.ifq_->ifq_len = 0;
 }
-
-/*
- * void
- * cbqwatchdog(queue_t *) - this function is called via timeout while the
- *	interface below is enabled.  This is necessary to flush regulated
- *	class queues.
- *
- *	Returns:	NONE
- */
-
-static void
-cbqwatchdog(cbqp)
-	cbq_state_t *cbqp;
-{
-	struct ifnet	*ifp;
-	int		s;
-
-	/*
-	 * If the CBQ is enabled on this interface, make sure
-	 * that it is running if there are packets to send.
-	 */
-	ifp = cbqp->ifnp.ifp;
-	if (ALTQ_IS_ON(ifp) && ifp->if_start) {
-		s = splimp();
-		if (cbqp->cbq_qlen > 0 && (ifp->if_flags & IFF_OACTIVE) == 0)
-			(*ifp->if_start)(ifp);
-		splx(s);
-		TIMEOUT((timeout_t *)cbqwatchdog, cbqp, CBQ_TIMEOUT,
-			cbqp->callout_handle);
-	}
-}
-
-#ifdef CBQ_RIO
-/* add RIO meter/tagger to a class */
-static int
-cbq_add_riometer(rmp)
-	struct cbq_riometer *rmp;
-{
-#if 1
-	return (0);
-#else
-	char		*ifacename;
-	cbq_state_t 	*cbqp;
-	rio_t		*rp;
-	struct rm_class	*cl;
-	int		rate, depth;
-
-	ifacename = rmp->iface.cbq_ifacename;
-	if ((cbqp = altq_lookup(ifacename, ALTQT_CBQ)) == NULL)
-		return (EBADF);
-
-	/* Get the pointer to class. */
-	if ((cl = clh_to_clp(cbqp, rmp->class_handle)) == NULL ||
-	    qtype(cl->q_) != Q_RIO)
-		return (EINVAL);
-
-	rp = (rio_t *)cl->red_;
-	
-	if (rmp->flags & CBQRIOF_CLEARCODEPOINT) {
-		rp->rio_flags |= RIOF_CLEARCODEPOINT;
-		/* we don't set a meter for this case. */
-		return (0);
-	}
-	
-	if (rmp->flags & CBQRIOF_METERONLY)
-		rp->rio_flags |= RIOF_METERONLY;
-
-	rate = rmp->rate;
-	if (rate == 0)
-		rate = RM_NS_PER_SEC / cl->ns_per_byte_ * 8;
-	depth = rmp->depth;
-	if (depth == 0)
-		depth = cl->ifdat_->maxpkt_ * 6;
-	return rio_set_meter(rp, rate, depth, rmp->codepoint);
-#endif
-}
-
-#endif /* CBQ_RIO */
 
 /*
  * cbq device interface
@@ -953,7 +830,7 @@ cbqclose(dev, flag, fmt, p)
 	int err, error = 0;
 
 	while (cbq_list) {
-		ifp = cbq_list->ifnp.ifp;
+		ifp = cbq_list->ifnp.ifq_->altq_ifp;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		sprintf(iface.cbq_ifacename, "%s", ifp->if_xname);
 #else
@@ -1041,20 +918,6 @@ cbqioctl(dev, cmd, addr, flag, p)
 	case CBQ_GETSTATS:
 		error = cbq_getstats((struct cbq_getstats *)addr);
 		break;
-
-	case CBQ_ACC_ENABLE:
-		error = cbq_set_enable((struct cbq_interface *)addr, ACC_ENABLE);
-		break;
-
-	case CBQ_ACC_DISABLE:
-		error = cbq_set_enable((struct cbq_interface *)addr, ACC_DISABLE);
-		break;
-
-#ifdef CBQ_RIO
-	case CBQ_ADD_RIOMETER:
-		error = cbq_add_riometer((struct cbq_riometer *)addr);
-		break;
-#endif
 
 	default:
 		error = EINVAL;

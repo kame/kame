@@ -612,8 +612,11 @@ sppp_output(struct ifnet *ifp, struct mbuf *m,
 {
 	struct sppp *sp = (struct sppp*) ifp;
 	struct ppp_header *h;
-	struct ifqueue *ifq;
-	int s, rv = 0;
+	struct ifqueue *ifq = NULL;
+	int s, len, rv = 0;
+#ifdef ALTQ
+	struct altq_pktattr pktattr;
+#endif
 
 	s = splimp();
 
@@ -635,8 +638,13 @@ sppp_output(struct ifnet *ifp, struct mbuf *m,
 		s = splimp();
 	}
 
-	ifq = &ifp->if_snd;
-
+#ifdef ALTQ
+	/*
+	 * if the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+#endif
 #ifdef INET
 	if (dst->sa_family == AF_INET)
 	{
@@ -757,14 +765,33 @@ nosupport:
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
-	if (IF_QFULL (ifq)) {
-		IF_DROP (&ifp->if_snd);
-		m_freem (m);
+	len = m->m_pkthdr.len;
+	if (ifq != NULL
+#ifdef ALTQ
+	    && !ALTQ_IS_ENABLED(&ifp->if_snd)
+#endif
+		) {
+		if (IF_QFULL (ifq)) {
+			IF_DROP (&ifp->if_snd);
+			m_freem (m);
+			if (rv == 0)
+				rv = ENOBUFS;
+		}
+		IF_ENQUEUE (ifq, m);
+	}
+	else {
+#ifdef ALTQ
+		IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, rv);
+#else
+		IFQ_ENQUEUE(&ifp->if_snd, m, rv);
+#endif
+	}
+	if (rv != 0) {
 		++ifp->if_oerrors;
 		splx (s);
-		return (rv? rv: ENOBUFS);
+		return (rv);
 	}
-	IF_ENQUEUE (ifq, m);
+
 	if (! (ifp->if_flags & IFF_OACTIVE))
 		(*ifp->if_start) (ifp);
 
@@ -773,7 +800,7 @@ nosupport:
 	 * The packet length includes header, FCS and 1 flag,
 	 * according to RFC 1333.
 	 */
-	ifp->if_obytes += m->m_pkthdr.len + 3;
+	ifp->if_obytes += len + 3;
 	splx (s);
 	return (0);
 }
@@ -854,7 +881,7 @@ sppp_flush(struct ifnet *ifp)
 {
 	struct sppp *sp = (struct sppp*) ifp;
 
-	sppp_qflush (&sp->pp_if.if_snd);
+	IFQ_PURGE(&sp->pp_if.if_snd);
 	sppp_qflush (&sp->pp_fastq);
 	sppp_qflush (&sp->pp_cpq);
 }
@@ -870,7 +897,7 @@ sppp_isempty(struct ifnet *ifp)
 
 	s = splimp();
 	empty = !sp->pp_fastq.ifq_head && !sp->pp_cpq.ifq_head &&
-		!sp->pp_if.if_snd.ifq_head;
+		IFQ_IS_EMPTY(&sp->pp_if.if_snd);
 	splx(s);
 	return (empty);
 }
@@ -897,7 +924,7 @@ sppp_dequeue(struct ifnet *ifp)
 	    (sppp_ncp_check(sp) || (sp->pp_flags & PP_CISCO) != 0)) {
 		IF_DEQUEUE(&sp->pp_fastq, m);
 		if (m == NULL)
-			IF_DEQUEUE (&sp->pp_if.if_snd, m);
+			IFQ_DEQUEUE (&sp->pp_if.if_snd, m);
 	}
 	splx(s);
 	return m;
@@ -920,7 +947,7 @@ sppp_pick(struct ifnet *ifp)
 	    (sp->pp_phase == PHASE_NETWORK ||
 	     (sp->pp_flags & PP_CISCO) != 0))
 		if ((m = sp->pp_fastq.ifq_head) == NULL)
-			m = sp->pp_if.if_snd.ifq_head;
+			IFQ_POLL(&sp->pp_if.if_snd, m);
 	splx (s);
 	return (m);
 }

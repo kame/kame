@@ -1,4 +1,4 @@
-/*	$KAME: altq_rmclass.h,v 1.2 2000/02/22 14:00:35 itojun Exp $	*/
+/*	$KAME: altq_rmclass.h,v 1.3 2000/07/25 10:12:31 kjc Exp $	*/
 
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
@@ -44,7 +44,7 @@
 extern "C" {
 #endif
 
-#if defined(KERNEL) || defined(_KERNEL)
+#ifdef _KERNEL
 
 typedef struct mbuf		mbuf_t;
 typedef struct rm_ifdat		rm_ifdat_t;
@@ -70,7 +70,7 @@ struct red;
 
 #define	RM_GETTIME(now) microtime(&now)
 
-#define TV_LT(a, b) (((a)->tv_sec < (b)->tv_sec) ||  \
+#define	TV_LT(a, b) (((a)->tv_sec < (b)->tv_sec) ||  \
 	(((a)->tv_usec < (b)->tv_usec) && ((a)->tv_sec <= (b)->tv_sec)))
 
 #define	TV_DELTA(a, b, delta) { \
@@ -105,7 +105,7 @@ struct red;
 	(res)->tv_usec = xxus; \
 }
 
-#define RM_TIMEOUT	2	/* 1 Clock tick. */
+#define	RM_TIMEOUT	2	/* 1 Clock tick. */
 
 #if 1
 #define	RM_MAXQUEUED	1	/* this isn't used in ALTQ/CBQ */
@@ -115,7 +115,7 @@ struct red;
 #define	RM_MAXPRIO	8	/* Max priority */
 #define	RM_MAXQUEUE	64	/* Max queue length */
 #define	RM_FILTER_GAIN	5	/* log2 of gain, e.g., 5 => 31/32 */
-#define RM_POWER	(1 << RM_FILTER_GAIN)
+#define	RM_POWER	(1 << RM_FILTER_GAIN)
 #define	RM_MAXDEPTH	32
 #define	RM_NS_PER_SEC	(1000000000)
 
@@ -166,7 +166,7 @@ struct rm_class {
 	void	(*drop)(struct rm_class *);       /* Class drop action. */
 
 	struct red	*red_;		/* RED state pointer */
-	struct pr_hdr	*pr_hdr_;	/* saved proto hdr used by RED/ECN */
+	struct altq_pktattr *pktattr_;	/* saved hdr used by RED/ECN */
 	int		flags_;
 
 	int		last_pkttime_;	/* saved pkt_time */
@@ -203,11 +203,11 @@ struct rm_ifdat {
 	/*
 	 * Network Interface/Solaris Queue state pointer.
 	 */
-	struct ifnet	*ifp;
+	struct ifaltq	*ifq_;
 	rm_class_t	*default_;	/* Default Pkt class, BE */
 	rm_class_t	*root_;		/* Root Link class. */
 	rm_class_t	*ctl_;		/* Control Traffic class. */
-	void		(*restart)(struct ifnet *);	/* Restart routine. */
+	void		(*restart)(struct ifaltq *);	/* Restart routine. */
 
 	/*
 	 * Current packet downstream packet state and dynamic state.
@@ -224,22 +224,22 @@ struct rm_ifdat {
 #if 1 /* ALTQ4PPP */
 	int		maxiftime_;	/* max delay inside interface */
 #endif
-        rm_class_t	*peekcache_;	/* cached rm_class by peek operation */
+        rm_class_t	*pollcache_;	/* cached rm_class by poll operation */
 };
 
 /* flags for rmc_init and rmc_newclass */
 /* class flags */
-#define RMCF_RED		0x0001
-#define RMCF_ECN		0x0002
-#define RMCF_RIO		0x0004
-#define RMCF_FLOWVALVE		0x0008	/* use flowvalve (aka penalty-box) */
-#define RMCF_CLEARDSCP		0x0010  /* clear diffserv codepoint */
+#define	RMCF_RED		0x0001
+#define	RMCF_ECN		0x0002
+#define	RMCF_RIO		0x0004
+#define	RMCF_FLOWVALVE		0x0008	/* use flowvalve (aka penalty-box) */
+#define	RMCF_CLEARDSCP		0x0010  /* clear diffserv codepoint */
 
 /* flags for rmc_init */
-#define RMCF_WRR		0x0100
-#define RMCF_EFFICIENT		0x0200
+#define	RMCF_WRR		0x0100
+#define	RMCF_EFFICIENT		0x0200
 
-#define is_a_parent_class(cl)	((cl)->children_ != NULL)
+#define	is_a_parent_class(cl)	((cl)->children_ != NULL)
 
 extern rm_class_t *rmc_newclass __P((int, struct rm_ifdat *, u_int,
 				     void (*)(struct rm_class *,
@@ -249,8 +249,8 @@ extern rm_class_t *rmc_newclass __P((int, struct rm_ifdat *, u_int,
 extern void	rmc_delete_class __P((struct rm_ifdat *, struct rm_class *));
 extern int 	rmc_modclass __P((struct rm_class *, u_int, int,
 				  u_int, int, u_int, int));
-extern void	rmc_init __P((struct ifnet *, struct rm_ifdat *, u_int,
-			      void (*)(struct ifnet *),
+extern void	rmc_init __P((struct ifaltq *, struct rm_ifdat *, u_int,
+			      void (*)(struct ifaltq *),
 			      int, int, u_int, int, u_int, int));
 extern int	rmc_queue_packet __P((struct rm_class *, mbuf_t *));
 extern mbuf_t	*rmc_dequeue_next __P((struct rm_ifdat *, int));
@@ -259,7 +259,7 @@ extern void	rmc_delay_action __P((struct rm_class *, struct rm_class *));
 extern void	rmc_dropall __P((struct rm_class *));
 extern int	rmc_get_weight __P((struct rm_ifdat *, int));
 
-#endif /* KERNEL */
+#endif /* _KERNEL */
 
 #ifdef __cplusplus
 }

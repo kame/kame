@@ -288,18 +288,6 @@ static devclass_t xl_devclass;
 DRIVER_MODULE(if_xl, pci, xl_driver, xl_devclass, 0, 0);
 DRIVER_MODULE(miibus, xl, miibus_driver, miibus_devclass, 0, 0);
 
-#ifdef ALTQ
-/*
- * device dependent tweak for ALTQ:  if a driver is designed to dequeue
- * too many packets at a time, we have to modify the driver to limit the
- * number of packets buffered in the device.  This modification
- * often needs to change handling of tx complete interrupts as well.
- * the xl driver can pull as many as 256 packets (when XL_TX_LIST_CNT is 256).
- * TXBUF_THRESH4ALTQ limits buffered packets up to 8.
- */
-#define TXBUF_THRESH4ALTQ	8
-#endif
-
 /*
  * Murphy's law says that it's possible the chip can wedge and
  * the 'command in progress' bit may never clear. Hence, we wait
@@ -854,6 +842,7 @@ static void xl_testpacket(sc)
 {
 	struct mbuf		*m;
 	struct ifnet		*ifp;
+	int			error;
 
 	ifp = &sc->arpcom.ac_if;
 
@@ -871,7 +860,11 @@ static void xl_testpacket(sc)
 	mtod(m, unsigned char *)[15] = 0;
 	mtod(m, unsigned char *)[16] = 0xE3;
 	m->m_len = m->m_pkthdr.len = sizeof(struct ether_header) + 3;
-	IF_ENQUEUE(&ifp->if_snd, m);
+#ifdef ALTQ
+	IFQ_ENQUEUE(&ifp->if_snd, m, NULL, error);
+#else
+	IFQ_ENQUEUE(&ifp->if_snd, m, error);
+#endif
 	xl_start(ifp);
 
 	return;
@@ -1364,10 +1357,8 @@ static int xl_attach(dev)
 	ifp->if_watchdog = xl_watchdog;
 	ifp->if_init = xl_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = XL_TX_LIST_CNT - 1;
-#ifdef ALTQ
-	ifp->if_altqflags |= ALTQF_READY;
-#endif
+	IFQ_SET_MAXLEN(&ifp->if_snd, XL_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Now we have to see what sort of media we have.
@@ -1577,9 +1568,6 @@ static int xl_list_tx_init(sc)
 
 	cd->xl_tx_free = &cd->xl_tx_chain[0];
 	cd->xl_tx_tail = cd->xl_tx_head = NULL;
-#ifdef ALTQ
-	sc->xl_cdata.xl_tx_queued = 0;
-#endif
 
 	return(0);
 }
@@ -1886,9 +1874,6 @@ static void xl_txeof(sc)
 
 		cur_tx->xl_next = sc->xl_cdata.xl_tx_free;
 		sc->xl_cdata.xl_tx_free = cur_tx;
-#ifdef ALTQ
-		sc->xl_cdata.xl_tx_queued--;
-#endif
 	}
 
 	if (sc->xl_cdata.xl_tx_head == NULL) {
@@ -2060,12 +2045,7 @@ static void xl_intr(arg)
 		}
 	}
 
-#ifdef ALTQ
-	if (ALTQ_IS_ON(ifp))
-		(*ifp->if_start)(ifp);
-	else
-#endif
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		(*ifp->if_start)(ifp);
 
 	return;
@@ -2231,30 +2211,13 @@ static void xl_start(ifp)
 	start_tx = sc->xl_cdata.xl_tx_free;
 
 	while(sc->xl_cdata.xl_tx_free != NULL) {
-#ifdef ALTQ
-		if (ALTQ_IS_ON(ifp)) {
-			if (sc->xl_cdata.xl_tx_queued >= TXBUF_THRESH4ALTQ) {
-				/*
-				 * stop filling tx buffer if we already have
-				 * enough packets to transmit.
-				 */
-				break;
-			}
-
-			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
-		}
-		else
-#endif
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
 		/* Pick a descriptor off the free list. */
 		cur_tx = sc->xl_cdata.xl_tx_free;
 		sc->xl_cdata.xl_tx_free = cur_tx->xl_next;
-#ifdef ALTQ
-		sc->xl_cdata.xl_tx_queued++;
-#endif
 
 		cur_tx->xl_next = NULL;
 
@@ -2401,21 +2364,7 @@ static void xl_start_90xB(ifp)
 			break;
 		}
 
-#ifdef ALTQ
-		if (ALTQ_IS_ON(ifp)) {
-			if (sc->xl_cdata.xl_tx_cnt >= TXBUF_THRESH4ALTQ) {
-				/*
-				 * stop filling tx buffer if we already have
-				 * enough packets to transmit.
-				 */
-				break;
-			}
-
-			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
-		}
-		else
-#endif
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -2871,12 +2820,7 @@ static void xl_watchdog(ifp)
 	xl_reset(sc);
 	xl_init(sc);
 
-#ifdef ALTQ
-	if (ALTQ_IS_ON(ifp))
-		(*ifp->if_start)(ifp);
-	else
-#endif
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		(*ifp->if_start)(ifp);
 
 	return;
