@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.343 2003/07/31 08:24:23 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.344 2003/08/01 01:48:20 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -190,8 +190,10 @@ RFC3152: Delegation of IP6.ARPA
       the ip6.arpa domain (with the nibble format) for IPv6 reverse
       lookups.
 RFC3315: Dynamic Host Configuration Protocol for IPv6 (DHCPv6)
-    * kame/dhcp6 has test implementation, which will not be compiled in
-      default compilation.
+    * the implementation is quite compliant to the specification for prefix
+      delegation and and stateless services.  However, it intentionally drops
+      the support of one very essential feature specification: address
+      assignment.
 RFC3376: Internet Group Management Protocol, Version 3
     * host-side implementation on kame/freebsd4, kame/netbsd, and kame/openbsd.
     * Multicast Source Filter works only for UDP packets.
