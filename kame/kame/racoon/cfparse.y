@@ -150,7 +150,8 @@ static int expand_isakmpspec __P((int prop_no, int trns_no, int *types,
 	/* remote */
 %token REMOTE ANONYMOUS
 %token EXCHANGE_MODE EXCHANGETYPE DOI DOITYPE SITUATION SITUATIONTYPE
-%token CERTIFICATE_TYPE CERTTYPE
+%token CERTIFICATE_TYPE CERTTYPE PEERS_CERTFILE
+%token CERT_X509
 %token NONCE_SIZE DH_GROUP KEEPALIVE
 %token POST_COMMAND
 %token EXEC_PATH EXEC_COMMAND EXEC_SUCCESS EXEC_FAILURE
@@ -173,7 +174,8 @@ static int expand_isakmpspec __P((int prop_no, int trns_no, int *types,
 %type <num> ul_proto UL_PROTO secproto
 %type <num> LIFETYPE UNITTYPE
 %type <num> SECLEVELTYPE SECMODETYPE 
-%type <num> EXCHANGETYPE DOITYPE SITUATIONTYPE CERTTYPE
+%type <num> EXCHANGETYPE DOITYPE SITUATIONTYPE
+%type <num> CERTTYPE CERT_X509
 %type <val> QUOTEDSTRING HEXSTRING ADDRSTRING STATICSA_STATEMENT sainfo_id
 %type <res> ike_addrinfo_port
 %type <spidx> policy_index
@@ -966,7 +968,13 @@ remote_spec
 	:	EXCHANGE_MODE exchange_types EOS
 	|	DOI DOITYPE EOS { cur_rmconf->doitype = $2; }
 	|	SITUATION SITUATIONTYPE EOS { cur_rmconf->sittype = $2; }
-	|	CERTIFICATE_TYPE CERTTYPE EOS { cur_rmconf->certtype = $2; }
+	|	CERTIFICATE_TYPE cert_spec
+	|	PEERS_CERTFILE QUOTEDSTRING
+		{
+			cur_rmconf->peerscertfile = strdup($2->v);
+			vfree($2);
+		}
+		EOS
 	|	IDENTIFIER IDENTIFIERTYPE EOS
 		{
 			cur_rmconf->identtype = idtype2doi($2);
@@ -1033,6 +1041,16 @@ exchange_types
 			}
 		}
 	;
+cert_spec
+	:	CERT_X509 QUOTEDSTRING QUOTEDSTRING
+		{
+			cur_rmconf->certtype = $1;
+			cur_rmconf->mycertfile = strdup($2->v);
+			vfree($2);
+			cur_rmconf->myprivfile = strdup($3->v);
+			vfree($3);
+		}
+		EOS
 dh_group_num
 	:	ALGORITHMTYPE
 		{
