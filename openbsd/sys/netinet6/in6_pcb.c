@@ -606,6 +606,21 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		}
 
 		/*
+		 * XXX See comment in NetBSD sys/netinet6/in6_pcb.c
+		 */
+		if ((PRC_IS_REDIRECT(cmd) || cmd == PRC_HOSTDEAD) &&
+		    IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6) &&
+		    inp->inp_route.ro_rt &&
+		    !(inp->inp_route.ro_rt->rt_flags & RTF_HOST)) {
+			struct sockaddr_in6 *dst6;
+
+			dst6 = (struct sockaddr_in6 *)&inp->inp_route.ro_dst;
+			if (IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr,
+			    &sa6_dst->sin6_addr))
+				goto do_notify;
+		}
+
+		/*
 		 * Detect if we should notify the error. If no source and
 		 * destination ports are specifed, but non-zero flowinfo and
 		 * local address match, notify the error. This is the case
