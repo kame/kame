@@ -2045,6 +2045,8 @@ cs_start_output(ifp)
 	while (!IFQ_IS_EMPTY(&ifp->if_snd) && !(sc->sc_txbusy) &&
 	    !(dropout)) {
 		IFQ_DEQUEUE(&ifp->if_snd, pMbufChain);
+		if (pMbufChain == NULL)
+			break;
 
 #if NBPFILTER > 0
 		/*

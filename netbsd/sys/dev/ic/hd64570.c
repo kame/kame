@@ -447,11 +447,12 @@ sca_port_attach(struct sca_softc *sc, u_int port)
 	ifp->if_ioctl = sca_ioctl;
 	ifp->if_output = sca_output;
 	ifp->if_watchdog = sca_watchdog;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
 	scp->linkq.ifq_maxlen = 5; /* if we exceed this we are hosed already */
 #ifdef SCA_USE_FASTQ
 	scp->fastq.ifq_maxlen = IFQ_MAXLEN;
 #endif
+	IFQ_SET_READY(&ifp->if_snd);
 	if_attach(ifp);
 
 #if NBPFILTER > 0
@@ -797,12 +798,12 @@ sca_output(ifp, m, dst, rt0)
 	struct hdlc_llc_header *llc;
 #endif
 	struct hdlc_header *hdlc;
-#if 1 /*XXX*/
-	struct ifaltq *ifq;
-#else
 	struct ifqueue *ifq;
+	int s, error, len;
+	short mflags;
+#ifdef ALTQ
+	struct altq_pktattr pktattr;
 #endif
-	int s, error;
 
 	error = 0;
 	ifp->if_lastchange = time;
@@ -812,7 +813,14 @@ sca_output(ifp, m, dst, rt0)
 		goto bad;
 	}
 
-	ifq = &ifp->if_snd;
+#ifdef ALTQ
+	/*
+	 * if the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+#endif
+	ifq = NULL;
 
 	/*
 	 * determine address family, and priority for this packet
@@ -822,7 +830,7 @@ sca_output(ifp, m, dst, rt0)
 	case AF_INET:
 #ifdef SCA_USE_FASTQ
 		if ((mtod(m, struct ip *)->ip_tos & IPTOS_LOWDELAY)
-		    == IPTOS_LOWDELAY)
+		    == IPTOS_LOWDELAY && !ALTQ_IS_ENABLED(&ifp->if_snd))
 			ifq = &((sca_port_t *)ifp->if_softc)->fastq;
 #endif
 		/*
@@ -868,21 +876,33 @@ sca_output(ifp, m, dst, rt0)
 	/*
 	 * queue the packet.  If interactive, use the fast queue.
 	 */
+	mflags = m->m_flags;
+	len = m->m_pkthdr.len;
 	s = splnet();
-	if (IF_QFULL(ifq)) {
-		IF_DROP(ifq);
+	if (ifq != NULL) {
+		if (IF_QFULL(ifq)) {
+			IF_DROP(ifq);
+			m_freem(m);
+			error = ENOBUFS;
+		} else
+			IF_ENQUEUE(ifq, m);
+	} else {
+#ifdef ALTQ
+		IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+#else
+		IFQ_ENQUEUE(&ifp->if_snd, m, error);
+#endif
+	}
+
+	if (error != 0) {
+		splx(s);
 		ifp->if_oerrors++;
 		ifp->if_collisions++;
-		error = ENOBUFS;
-		splx(s);
-		goto bad;
+		return (error);
 	}
-	ifp->if_obytes += m->m_pkthdr.len;
-	IF_ENQUEUE(ifq, m);
-
+	ifp->if_obytes += len;
 	ifp->if_lastchange = time;
-
-	if (m->m_flags & M_MCAST)
+	if (mflags & M_MCAST)
 		ifp->if_omcasts++;
 
 	sca_start(ifp);
@@ -1025,7 +1045,7 @@ sca_start(ifp)
 		IF_DEQUEUE(&scp->fastq, mb_head);
 	if (mb_head == NULL)
 #endif
-		IF_DEQUEUE(&ifp->if_snd, mb_head);
+		IFQ_DEQUEUE(&ifp->if_snd, mb_head);
 	if (mb_head == NULL)
 		goto start_xmit;
 

@@ -42,9 +42,7 @@
 
 #include "bpfilter.h"
 
-#if 0 /*XXXnot friendly with ALTQ yet*/
 #define SCA_USE_FASTQ		/* use a split queue, one for fast traffic */
-#endif
 
 #define SCA_MTU		1500	/* hard coded */
 
