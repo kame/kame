@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.272 2001/12/26 01:03:28 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.273 2002/01/07 11:45:20 kjc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -930,13 +930,22 @@ skip_ipsec2:;
 #endif /* OpenBSD */
 #endif /* IPSEC */
 
-	/* if specified, fill in the traffic class field. */
-	if (opt) {
-		ip6->ip6_flow &= ~htonl(0xff << 20);
-		if (opt->ip6po_tclass >= 0)
-			ip6->ip6_flow |=
-			    htonl((opt->ip6po_tclass & 0xff) << 20);
+	/*
+	 * if specified, try to fill in the traffic class field.
+	 * do not override if a non-zero value is already set.
+	 * we check the diffserv field and the ecn field separately.
+	 */
+	if (opt && opt->ip6po_tclass >= 0) {
+		int mask = 0;
+
+		if ((ip6->ip6_flow & htonl(0xfc << 20)) == 0)
+			mask |= 0xfc;
+		if ((ip6->ip6_flow & htonl(0x03 << 20)) == 0)
+			mask |= 0x03;
+		if (mask != 0)
+			ip6->ip6_flow |= htonl((opt->ip6po_tclass & mask) << 20);
 	}
+
 	/* fill in or override the hop limit field, if necessary. */
 	if (opt && opt->ip6po_hlim != -1)
 		ip6->ip6_hlim = opt->ip6po_hlim & 0xff;
