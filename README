@@ -1,6 +1,6 @@
 	README of KAME kit
 	KAME Project
-	$KAME: README,v 1.54 2001/06/02 00:23:18 itojun Exp $
+	$KAME: README,v 1.55 2001/06/02 00:38:42 itojun Exp $
 
 <<<Project Overview>>>
 
@@ -49,13 +49,14 @@ to be terminated in March 2002 (may be extended).
 READ CAREFULLY: Several countries have legal enforcement for
 export/import/use of cryptographic software.  Check it before playing
 with the kit.  We do not intend to be your legalease clearing house,
-so if you intend to include KAME into your product, you'll need to do
-fact-check yourself.
+so if you intend to include KAME stack into your product, you'll need to do
+fact-check BY YOURSELF for copyright and patent issues.
 
 In KAME kit, there are some software which come with restricted copyright
 notices.  Here is a list of those software (may not be comprehensive):
 
-kame/bsdi[34]: some of the modules are BSDi copyrighted.
+kame/bsdi[34]: some of the modules are BSDi copyrighted.  for those modules
+	we ship diffs instead of full source.
 kame/kame/kame/pim6[sd]d: see LICENCE.{pimd,mrouted}.
 
 
