@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.19 2003/07/31 23:20:25 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.20 2003/12/16 10:31:48 suz Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -30,6 +30,7 @@
  */
 #include <sys/types.h>
 #include <sys/queue.h>
+#include <sys/socket.h>
 #include <sys/time.h>
 
 #include <netinet/in.h>
@@ -37,6 +38,7 @@
 #include <syslog.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "dhcp6.h"
 #include "config.h"
@@ -243,6 +245,7 @@ update_ia(iatype, ialist, ifp, serverid)
 		ia->state = IAS_ACTIVE;
 
 	  nextia:
+		;
 	}
 }
 

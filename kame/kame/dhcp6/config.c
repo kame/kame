@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.35 2003/10/31 05:51:46 suz Exp $	*/
+/*	$KAME: config.c,v 1.36 2003/12/16 10:31:48 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -937,6 +937,7 @@ add_options(opcode, ifc, cfl0)
 		}
 
 	  next:
+		;
 	}
 
 	return (0);

@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.92 2003/08/01 01:20:05 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.93 2003/12/16 10:31:48 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1067,6 +1067,7 @@ dhcp6_get_options(p, ep, optinfo)
 					goto fail;
 				}
 			  nextoption:
+				;
 			}
 			break;
 		case DH6OPT_PREFERENCE:
@@ -1132,6 +1133,7 @@ dhcp6_get_options(p, ep, optinfo)
 					goto fail;
 				}
 			  nextdns:
+				;
 			}
 			break;
 		case DH6OPT_DNSNAME:
@@ -1180,6 +1182,7 @@ dhcp6_get_options(p, ep, optinfo)
 					goto fail;
 				}
 			  nextntp:
+				;
 			}
 			break;
 		case DH6OPT_IA_PD:
@@ -1424,6 +1427,7 @@ copyin_option(type, p, ep, list)
 			break;
 		}
 	  nextoption:
+		;
 	}
 
 	return (0);
@@ -1520,6 +1524,7 @@ get_delegated_prefixes(p, ep, optinfo)
 		}
 
 	  nextoption:
+		;
 	}
 
 	return (0);
