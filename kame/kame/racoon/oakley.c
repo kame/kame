@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.55 2000/09/19 06:49:30 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.56 2000/09/19 07:46:19 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,10 +28,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.55 2000/09/19 06:49:30 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.56 2000/09/19 07:46:19 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
+#include <sys/socket.h>	/* XXX for subjectaltname */
+#include <netinet/in.h>	/* XXX for subjectaltname */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -1395,8 +1397,8 @@ oakley_check_certid(iph1)
 	struct ph1handle *iph1;
 {
 	struct ipsecdoi_id_b *id_b;
-	vchar_t *name;
-	char *altname;
+	vchar_t *name = NULL;
+	char *altname = NULL;
 	int idlen, type;
 	int error;
 
@@ -1425,10 +1427,58 @@ oakley_check_certid(iph1)
 		error = memcmp(id_b + 1, name->v, idlen);
 		vfree(name);
 		return error == 0 ? 0 : -1;
-	case IPSECDOI_ID_FQDN:
-	case IPSECDOI_ID_USER_FQDN:
 	case IPSECDOI_ID_IPV4_ADDR:
 	case IPSECDOI_ID_IPV6_ADDR:
+	{
+		/*
+		 * converting to binary from string becuase openssl return
+		 * a string even if object is a binary.
+		 * XXX fix it !  access by ASN.1 directly without.
+		 */
+		struct addrinfo hints, *res;
+		caddr_t a = NULL;
+
+		if (eay_get_x509subjectaltname(&iph1->cert_p->cert,
+				&altname, &type) !=0) {
+			plog(logp, LOCATION, NULL,
+				"ERROR: Invalid SubjectAltName.\n");
+			free(altname);
+			return -1;
+		}
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = PF_UNSPEC;
+		hints.ai_socktype = SOCK_RAW;
+		hints.ai_flags = AI_NUMERICHOST;
+		error = getaddrinfo(altname, NULL, &hints, &res);
+		if (error != 0) {
+			plog(logp, LOCATION, NULL,
+				"ERROR: Invalid SubjectAltName.\n");
+			free(altname);
+			return -1;
+		}
+		switch (res->ai_family) {
+		case AF_INET:
+			a = (caddr_t)&((struct sockaddr_in *)res->ai_addr)->sin_addr.s_addr;
+			break;
+#ifdef INET6
+		case AF_INET6:
+			a = (caddr_t)&((struct sockaddr_in6 *)res->ai_addr)->sin6_addr.s6_addr;
+			break;
+#endif
+		default:
+			plog(logp, LOCATION, NULL,
+				"ERROR: family not supported: %d.\n", res->ai_family);
+			free(altname);
+			freeaddrinfo(res);
+			return -1;
+		}
+		error = memcmp(id_b + 1, a, idlen);
+		freeaddrinfo(res);
+		vfree(name);
+		return error == 0 ? 0 : -1;
+	}
+	case IPSECDOI_ID_FQDN:
+	case IPSECDOI_ID_USER_FQDN:
 		if (eay_get_x509subjectaltname(&iph1->cert_p->cert,
 				&altname, &type) !=0){
 			plog(logp, LOCATION, NULL,
