@@ -1647,6 +1647,7 @@ ip_forward(m, srcrt)
 			struct route *ro;
 
 			sp = ipsec4_getpolicybyaddr(mcopy,
+			                            IPSEC_DIR_INBOUND,
 			                            IP_FORWARDING,
 			                            &ipsecerror);
 
@@ -1654,7 +1655,9 @@ ip_forward(m, srcrt)
 				destifp = ipforward_rt.ro_rt->rt_ifp;
 			else {
 				/* count IPsec header size */
-				ipsechdr = ipsec4_hdrsiz(mcopy, NULL);
+				ipsechdr = ipsec4_hdrsiz(mcopy,
+				                         IPSEC_DIR_OUTBOUND,
+				                         NULL);
 
 				/*
 				 * find the correct route for outer IPv4
@@ -1667,8 +1670,9 @@ ip_forward(m, srcrt)
 				/*XXX*/
 				destifp = NULL;
 				if (sp->req != NULL
-				 && sp->req->sa != NULL) {
-					ro = &sp->req->sa->saidx->sa_route;
+				 && sp->req->sav != NULL
+				 && sp->req->sav->sah != NULL) {
+					ro = &sp->req->sav->sah->sa_route;
 					if (ro->ro_rt && ro->ro_rt->rt_ifp) {
 						dummyifp.if_mtu =
 						    ro->ro_rt->rt_ifp->if_mtu;

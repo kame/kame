@@ -383,7 +383,12 @@ rip_usrreq(so, req, m, nam, control)
 		inp = (struct inpcb *)so->so_pcb;
 		inp->inp_ip_p = (int)nam;
 #ifdef IPSEC
-		error = ipsec_init_policy(&inp->inp_sp);
+		error = ipsec_init_policy(&inp->inp_sp_in);
+		if (error)
+			break;
+		error = ipsec_init_policy(&inp->inp_sp_out);
+		if (error)
+			break;
 #endif /*IPSEC*/
 		break;
 

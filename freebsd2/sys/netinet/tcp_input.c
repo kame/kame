@@ -534,10 +534,16 @@ findpcb:
 			inp->inp_options = ip_srcroute();
 #endif
 #ifdef IPSEC
-			key_freesp(inp->inp_sp);
-			inp->inp_sp = sotoinpcb(oso)->inp_sp;
-			if (inp->inp_sp)
-				inp->inp_sp->refcnt++;
+			/* point to old policy from new socket's */
+			key_freesp(inp->inp_sp_in);
+			inp->inp_sp_in = sotoinpcb(oso)->inp_sp_in;
+			if (inp->inp_sp_in)
+				inp->inp_sp_in->refcnt++;
+
+			key_freesp(inp->inp_sp_out);
+			inp->inp_sp_out = sotoinpcb(oso)->inp_sp_out;
+			if (inp->inp_sp_out)
+				inp->inp_sp_out->refcnt++;
 #endif
 			tp = intotcpcb(inp);
 			tp->t_state = TCPS_LISTEN;

@@ -758,7 +758,11 @@ tcp_attach(so)
 		return (error);
 	inp = sotoinpcb(so);
 #ifdef IPSEC
-	if ((error = ipsec_init_policy(&inp->inp_sp)) != 0) {
+	if (inp && (error = ipsec_init_policy(&inp->inp_sp_in)) != 0) {
+		in_pcbdetach(inp);
+		return (error);
+	}
+	if (inp && (error = ipsec_init_policy(&inp->inp_sp_out)) != 0) {
 		in_pcbdetach(inp);
 		return (error);
 	}

@@ -712,7 +712,8 @@ ipsec4_hdrsiz_tcp(tp)
 	m->m_pkthdr.len = m->m_len = sizeof(struct tcpiphdr);
 	bcopy(tp->t_template, mtod(m, u_char *), sizeof(struct tcpiphdr));
 
-	hdrsiz = ipsec4_hdrsiz(m, inp);
+	/* XXX: should use currect direction. */
+	hdrsiz = ipsec4_hdrsiz(m, IPSEC_DIR_OUTBOUND, inp);
 
 	m_free(m);
 	return hdrsiz;
