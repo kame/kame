@@ -391,15 +391,24 @@ rip6_ctlinput(cmd, sa, d)
 		 * XXX: We assume that when IPV6 is non NULL,
 		 * M and OFF are valid.
 		 */
-		struct in6_addr s;
+		struct sockaddr_in6 sa6_src;
 
-		/* translate addresses into internal form */
-		bcopy(&ip6->ip6_src, &s, sizeof(s));
-		if (IN6_IS_ADDR_LINKLOCAL(&s))
-			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
-
+		bzero(&sa6, sizeof(sa6_src));
+		sa6_src.sin6_family = AF_INET6;
+		sa6_src.sin6_len = sizeof(sa6_src);
+		sa6_src.sin6_addr = ip6->ip6_src;
+		sa6_src.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
+							 &ip6->ip6_src);
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(&ip6->ip6_src, &sa6_src, NULL, NULL)) {
+			/* should be impossbile */
+			printf("rip6_ctlinput: in6_embedscope failed\n");
+			return;
+		}
+#endif
 		(void) in6_pcbnotify(&rawin6pcbtable, (struct sockaddr *)&sa6,
-				     0, &s, 0, cmd, cmdarg, notify);
+				     0, &sa6_src.sin6_addr, 0, cmd, cmdarg,
+				     notify);
 	} else {
 		(void) in6_pcbnotify(&rawin6pcbtable, (struct sockaddr *)&sa6,
 				     0, &zeroin6_addr, 0, cmd, cmdarg, notify);
