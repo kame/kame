@@ -446,6 +446,7 @@ send:
 	optlen = 0;
 
 	switch (tp->pf) {
+	case 0:	/*default to PF_INET*/
 #ifdef INET
 	case PF_INET:
 		hdrlen = sizeof(struct ip) + sizeof(struct tcphdr);
@@ -772,12 +773,8 @@ send:
 		tp->snd_up = tp->snd_una;		/* drag it along */
 
 	/* Put TCP length in pseudo-header */
-#if defined(INET) && defined(INET6)
 	switch (tp->pf) {
-#else /* defined(INET) && defined(INET6) */
-	switch (0) {
-#endif /* defined(INET) && defined(INET6) */
-	case 0:
+	case 0:	/*default to PF_INET*/
 #ifdef INET
 	case AF_INET:
 		if (len + optlen)
@@ -799,12 +796,8 @@ send:
 
 		memset(&sa, 0, sizeof(union sockaddr_union));
 
-#if defined(INET) && defined(INET6)
-		switch(tp->pf) {
-#else /* defined(INET) && defined(INET6) */
-		switch (0) {
-#endif /* defined(INET) && defined(INET6) */
-		case 0:
+		switch (tp->pf) {
+		case 0:	/*default to PF_INET*/
 #ifdef INET
 		case AF_INET:
 			sa.sa.sa_len = sizeof(struct sockaddr_in);
@@ -827,12 +820,8 @@ send:
 
 		MD5Init(&ctx);
 
-#if defined(INET) && defined(INET6)
-		switch(tp->pf) {
-#else /* defined(INET) && defined(INET6) */
-		switch (0) {
-#endif /* defined(INET) && defined(INET6) */
-		case 0:
+		switch (tp->pf) {
+		case 0:	/*default to PF_INET*/
 #ifdef INET
 		case AF_INET:
 			{
@@ -883,6 +872,7 @@ send:
 	 * checksum extended header and data.
 	 */
 	switch (tp->pf) {
+	case 0:	/*default to PF_INET*/
 #ifdef INET
 	case AF_INET:
 		th->th_sum = in_cksum(m, (int)(hdrlen + len));
@@ -985,6 +975,7 @@ send:
 	m->m_pkthdr.len = hdrlen + len;
 
 	switch (tp->pf) {
+	case 0:	/*default to PF_INET*/
 #ifdef INET
 	case AF_INET:
 		{

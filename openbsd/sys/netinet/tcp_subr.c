@@ -172,6 +172,7 @@ tcp_template(tp)
 			return (0);
 
 		switch (tp->pf) {
+		case 0:	/*default to PF_INET*/
 #ifdef INET
 		case AF_INET:
 			m->m_len = sizeof(struct ip);
@@ -449,7 +450,11 @@ tcp_newtcpcb(inp)
 	 */
 	if ((inp->inp_flags & INP_IPV6) == 0)
 		tp->pf = PF_INET;  /* If AF_INET socket, we can't do v6 from it. */
+#else
+	tp->pf = PF_INET;
+#endif
 
+#ifdef INET6
 	if (inp->inp_flags & INP_IPV6) 
 		inp->inp_ipv6.ip6_hlim = ip6_defhlim;
 	else

@@ -1063,6 +1063,7 @@ findpcb:
 			goto drop;
 		}
 		(void) m_free(am);
+		tp->pf = PF_INET;
 #ifdef INET6
 		  }  /* if (inp->inp_flags & INP_IPV6) */
 		} /* if (is_ipv6) */
