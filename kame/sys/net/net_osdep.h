@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.70 2002/05/30 06:55:13 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.71 2002/05/30 16:14:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -287,7 +287,9 @@
  *	others: M_COPY_PKTHDR is available as usual.
  *
  * - M_READONLY() macro
- *	OpenBSD 3.0 and NetBSD 1.6 has it.  KAME tree has it for all platforms.
+ *	OpenBSD 3.0 and NetBSD 1.6 has it.
+ *	FreeBSD 4.x uses M_WRITABLE() macro, which is opposite (NIH!).
+ *	KAME tree has it for all platforms except FreeBSD 4.x.
  */
 
 #ifndef __NET_NET_OSDEP_H_DEFINED_
