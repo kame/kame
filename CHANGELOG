@@ -1,5 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1825 2001/07/31 13:57:28 suz Exp $
+$KAME: CHANGELOG,v 1.1826 2001/08/01 16:54:28 jinmei Exp $
+
+<200108>
+2001-08-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_is_addr_neighbor): check on-link
+	prefixes (not addresses) to see if a given address is a neighbor
+	in a given link.
 
 <200107>
 Tue Jul 31 22:54:57 JST 2001	suz@sdl.hitachi.co.jp
