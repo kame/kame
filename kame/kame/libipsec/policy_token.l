@@ -32,7 +32,7 @@
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <net/route.h>
-#include <netkey/keyv2.h>
+#include <net/pfkeyv2.h>
 #include <netkey/keydb.h>
 #include <netkey/key_debug.h>
 #include <netinet/in.h>
