@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.80 2001/06/27 14:15:29 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.81 2001/06/27 15:57:50 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1586,6 +1586,11 @@ quick_r3prep(iph2, msg0)
 		/* make inbound policy */
 		iph2->src = dst;
 		iph2->dst = src;
+		if (pk_sendspddelete(iph2) < 0) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"pfkey spddelete(inbound) failed.\n");
+			goto end;
+		}
 		if (pk_sendspdadd2(iph2) < 0) {
 			plog(LLV_ERROR, LOCATION, NULL,
 				"pfkey spdadd2(inbound) failed.\n");
@@ -1606,6 +1611,11 @@ quick_r3prep(iph2, msg0)
 		spidx->prefs = spidx->prefd;
 		spidx->prefd = pref;
 
+		if (pk_sendspddelete(iph2) < 0) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"pfkey spddelete(outbound) failed.\n");
+			goto end;
+		}
 		if (pk_sendspdadd2(iph2) < 0) {
 			plog(LLV_ERROR, LOCATION, NULL,
 				"pfkey spdadd2(outbound) failed.\n");
@@ -1949,18 +1959,14 @@ get_proposal_r(iph2)
 		saddr2str((struct sockaddr *)&spidx.dst),
 		spidx.prefd, spidx.ul_proto);
 
-	/* clear spidx, just make sure */
-	if (iph2->spidx_gen) {
-		racoon_free(iph2->spidx_gen);
-		iph2->spidx_gen = NULL;
-	}
-
 	/* get inbound policy */
 	sp_in = getsp_r(&spidx);
 	if (sp_in == NULL) {
 		if (iph2->ph1->rmconf->gen_policy) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"no policy found: %s\n", spidx2str(&spidx));
+			plog(LLV_INFO, LOCATION, NULL,
+				"no policy found, "
+				"try to generate the policy : %s\n",
+				spidx2str(&spidx));
 			iph2->spidx_gen = racoon_malloc(sizeof(spidx));
 			if (!iph2->spidx_gen) {
 				plog(LLV_ERROR, LOCATION, NULL,
@@ -1970,6 +1976,8 @@ get_proposal_r(iph2)
 			memcpy(iph2->spidx_gen, &spidx, sizeof(spidx));
 			return -2;	/* special value */
 		}
+		plog(LLV_ERROR, LOCATION, NULL,
+			"no policy found: %s\n", spidx2str(&spidx));
 		return ISAKMP_INTERNAL_ERROR;
 	}
 
