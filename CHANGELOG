@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1605 2001/03/15 11:44:43 sakane Exp $
+$KAME: CHANGELOG,v 1.1606 2001/03/15 13:12:19 jinmei Exp $
 
 <200103>
 Thu Mar 15 20:39:03 JST 2001 sakane@ydc.co.jp
@@ -28,7 +28,7 @@ Thu Mar 15 17:48:54 JST 2001  itojun@iijlab.net
 	2001:200::3ca2:ffef:eff5:f9fd ::1  UH lo0
 	However, since some routing daemons try to install kernel internal
 	routes that do not have the RTF_LLINFO flag, this kind of entry
-	could cause an intentional host route propagated.  The new kernel,
+	could cause unintentional host routes propagated.  The new kernel,
 	instead, installs
 	2001:200::c049:d099:ab4b:b637 0:a0:12:34:ab:cd UHL lo0
 	just like far older versions of the kernel (except for the
