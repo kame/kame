@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.12 2000/01/11 19:50:47 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.13 2000/01/11 21:01:03 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1231,7 +1231,7 @@ quick_r2send(iph2, msg)
 	}
 
 	/* create SA;NONCE payload, and KE and ID if need */
-	tlen = sizeof(*gen) + sa->l
+	tlen = sizeof(*gen) + iph2->sa_ret->l
 		+ sizeof(*gen) + iph2->nonce->l;
 	if (iph2->dhpub_p != NULL && pfsgroup != 0)
 		tlen += (sizeof(*gen) + iph2->dhpub->l);
@@ -1248,13 +1248,15 @@ quick_r2send(iph2, msg)
 	p = body->v;
 
 	/* make SA payload */ 
-	p = set_isakmp_payload(body->v, sa, ISAKMP_NPTYPE_NONCE);
+	p = set_isakmp_payload(body->v, iph2->sa_ret, ISAKMP_NPTYPE_NONCE);
 
 	/* add NONCE payload */
 	p = set_isakmp_payload(p, iph2->nonce,
 		(iph2->dhpub_p != NULL && pfsgroup != 0)
 				? ISAKMP_NPTYPE_KE
-				: ISAKMP_NPTYPE_NONE);
+				: (iph2->id_p != NULL
+					? ISAKMP_NPTYPE_ID
+					: ISAKMP_NPTYPE_NONE));
 
 	/* add KE payload if need. */
 	if (iph2->dhpub_p != NULL && pfsgroup != 0) {
@@ -1623,14 +1625,15 @@ quick_ir1sendmx(iph2, body)
 	int error = -1;
 
 	/* create buffer for isakmp payload */
-	tlen = sizeof(*isakmp) + sizeof(*gen) + iph2->hash->l + body->l;
+	tlen = sizeof(*isakmp)
+		+ sizeof(*gen) + iph2->hash->l
+		+ body->l;
 	buf = vmalloc(tlen);
 	if (buf == NULL) { 
 		plog(logp, LOCATION, NULL,
 			"vmalloc (%s)\n", strerror(errno));
 		goto end;
 	}
-	p = buf->v;
 
 	/* re-set encryption flag, for serurity. */
 	iph2->ph1->flags |= ISAKMP_FLAG_E;
