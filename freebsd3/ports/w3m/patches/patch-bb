@@ -1,0 +1,84 @@
+--- ftp.c.orig	Tue Jun  6 14:39:13 2000
++++ ftp.c	Wed Sep  6 12:09:55 2000
+@@ -13,8 +13,8 @@
+ #include <malloc.h>
+ #endif				/* DEBUG */
+ 
+-#ifdef FTPPASS_HOSTNAMEGEN
+ #include <sys/socket.h>
++#if defined(FTPPASS_HOSTNAMEGEN) || defined(INET6)
+ #include <netinet/in.h>
+ #include <netdb.h>
+ #include <arpa/inet.h>
+@@ -181,18 +181,61 @@
+     int data_s;
+     char *p;
+     Str tmp;
++    int family;
++#ifdef INET6
++    struct sockaddr_storage sin;
++    int sinlen, port;
++    unsigned char d1, d2, d3, d4;
++    char abuf[INET6_ADDRSTRLEN];
++#endif
+ 
+-    fwrite("PASV\r\n", 6, sizeof(char), ftp->wcontrol);
+-    fflush(ftp->wcontrol);
+-    tmp = read_response(ftp);
+-    if (atoi(tmp->ptr) != 227)
+-	return -1;
+-    for (p = tmp->ptr + 4; *p && !isdigit(*p); p++);
+-    if (*p == '\0')
++#ifdef INET6
++    sinlen = sizeof(sin);
++    if (getpeername(fileno(ftp->wcontrol),
++		    (struct sockaddr *)&sin, &sinlen) < 0)
++	return -1;
++    family = sin.ss_family;
++#else
++    family = AF_INET;
++#endif
++    switch (family) {
++#ifdef INET6
++    case AF_INET6:
++	fwrite("EPSV\r\n", 6, sizeof(char), ftp->wcontrol);
++	fflush(ftp->wcontrol);
++	tmp = read_response(ftp);
++	if (atoi(tmp->ptr) != 229)
++	    return -1;
++	for (p = tmp->ptr + 4; *p && *p != '('; p++);
++	if (*p == '\0')
++	    return -1;
++	if (sscanf(++p, "%c%c%c%d%c", &d1, &d2, &d3, &port, &d4) != 5
++	    || d1 != d2 || d1 != d3 || d1 != d4)
++	    return -1;
++	if (getnameinfo((struct sockaddr *)&sin, sin.ss_len,
++			abuf, sizeof(abuf),
++			NULL, 0, NI_NUMERICHOST) != 0)
++	    return -1;
++	tmp = Sprintf("%s", abuf);
++	data_s = openSocket(tmp->ptr, "", port);
++	break;
++#endif
++    case AF_INET:
++	fwrite("PASV\r\n", 6, sizeof(char), ftp->wcontrol);
++	fflush(ftp->wcontrol);
++	tmp = read_response(ftp);
++	if (atoi(tmp->ptr) != 227)
++	    return -1;
++	for (p = tmp->ptr + 4; *p && !isdigit(*p); p++);
++	if (*p == '\0')
++	    return -1;
++	sscanf(p, "%d,%d,%d,%d,%d,%d", &n1, &n2, &n3, &n4, &p1, &p2);
++	tmp = Sprintf("%d.%d.%d.%d", n1, n2, n3, n4);
++	data_s = openSocket(tmp->ptr, "", p1 * 256 + p2);
++	break;
++    default:
+ 	return -1;
+-    sscanf(p, "%d,%d,%d,%d,%d,%d", &n1, &n2, &n3, &n4, &p1, &p2);
+-    tmp = Sprintf("%d.%d.%d.%d", n1, n2, n3, n4);
+-    data_s = openSocket(tmp->ptr, "", p1 * 256 + p2);
++    }
+     if (data_s < 0)
+ 	return -1;
+     ftp->data = fdopen(data_s, "rb");
