@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.62 2001/09/26 08:54:13 itojun Exp $
+$KAME: FAQ,v 1.63 2001/09/26 08:59:33 jinmei Exp $
 
 
 GENERAL
@@ -106,8 +106,8 @@ Q: Which operating systems/vendor routers use KAME stack?
 	- IIJ SEIL-T1, http://www.seil-t1.com/
 	- (more)
 
-Q: How portable KAME stack is?  is it possible to port it to embedded operating
-systems like VxWorks?
+Q: How portable is the KAME stack?  Is it possible to port it to embedded
+   operating systems like VxWorks?
 	KAME stack assumes that the following items are available:
 	- mbuf for holding packet data
 	- software interrupts to handle incoming packets
