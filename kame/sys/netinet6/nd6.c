@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.48 2000/03/18 07:12:48 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.49 2000/03/20 14:09:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1855,7 +1855,6 @@ nd6_output(ifp, m0, dst, rt0)
 	register struct rtentry *rt = rt0;
 	struct llinfo_nd6 *ln = NULL;
 	int error = 0;
-	struct nd_ifinfo *ndi;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
