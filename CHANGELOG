@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1721 2001/06/14 05:08:05 itojun Exp $
+$KAME: CHANGELOG,v 1.1722 2001/06/14 05:55:17 suz Exp $
 
 <200106>
+Thu Jun 14 13:42:55 JST 2001	suz@sdl.hitachi.co.jp
+	* kame/sys/netinet6/ip6_mroute.h
+	+ fixed a bug that bsdi3's "netstat -gn" does not display multicast 
+	I/F list due to a lack of NEW_STRUCT_ROUTE macro.
+
 Wed Jun 13 22:31:49 JST 2001  itojun@iijlab.net
 	* *bsd*/sys/net/if_ethersubr.c: in ether_input(), drop multicast packet
 	  from myself, if the interface is !IFF_SIMPLEX.  multicast packets
