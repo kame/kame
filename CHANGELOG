@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1835 2001/08/11 11:23:18 itojun Exp $
+$KAME: CHANGELOG,v 1.1836 2001/08/12 08:09:40 jinmei Exp $
 
 <200108>
+2001-08-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_setpktoption): newly added,
+	in order to centralize the routine for handling outgoing packet
+	options both as socket options and as ancillary data.
+	It also introduced additional data validation.  For example,
+	IPV6_USE_MIN_MTU is not allowed in the context of RFC2292 (i.e. by
+	the IPV6_PKTOPTIONS.)
+
 Thu Aug  9 09:37:44 BST 2001	suz@sdl.hitachi.co.jp
 	* kame/kame/pim6sd: s/vifi_t/mifi_t/ to sync with kernel implementation
 	of IPv6 multicast interface. 
