@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.30 2000/04/19 04:29:37 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.31 2000/04/19 06:56:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -135,7 +135,7 @@ encap_init()
 #if 0
 	/*
 	 * we cannot use LIST_INIT() here, since drivers may want to call
-	 * encap_attach(), on driver attach.  encap_init() wlil be called
+	 * encap_attach(), on driver attach.  encap_init() will be called
 	 * on AF_INET{,6} initialization, which happens after driver
 	 * initialization - using LIST_INIT() here can nuke encap_attach()
 	 * from drivers.
