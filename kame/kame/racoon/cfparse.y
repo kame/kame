@@ -239,16 +239,11 @@ identifier_statement
 	:	IDENTIFIER identifier_stmt
 	;
 identifier_stmt
-	:	VENDORID QUOTEDSTRING EOS
+	:	VENDORID
 		{
-			$2->l--;	/* nuke '\0' */
-			lcconf->vendorid = $2;
-			if (lcconf->vendorid == NULL) {
-				yyerror("failed to set vendorid: %s",
-					strerror(errno));
-				return -1;
-			}
+			yywarn("vendorid directive is obsoleted.");
 		}
+		QUOTEDSTRING EOS
 	|	IDENTIFIERTYPE QUOTEDSTRING EOS
 		{
 			$2->l--;	/* nuke '\0' */

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.6 2000/04/26 08:35:19 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.7 2000/04/26 20:05:24 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -49,6 +49,7 @@
 #include "isakmp.h"
 #include "ipsec_doi.h"
 #include "admin_var.h"
+#include "vendorid.h"
 
 struct localconf *lcconf;
 
@@ -111,6 +112,20 @@ initlcconf()
 	lcconf->retry_checkph1 = LC_DEFAULT_RETRY_CHECKPH1;
 	lcconf->wait_ph2complete = LC_DEFAULT_WAIT_PH2COMPLETE;
 	lcconf->strict_address = FALSE;
+
+	/* set vendor id */
+    {
+	/*
+	 * XXX move this section to vendorid.c. and calculate HASH same time.
+	 */
+	char *vid = VENDORID;
+	lcconf->vendorid = vmalloc(strlen(vid));
+	if (lcconf->vendorid == NULL) {
+		fprintf(stderr, "failed to set vendorid.\n");
+		exit(1);
+	}
+	memcpy(lcconf->vendorid->v, vid, strlen(vid));
+    }
 }
 
 vchar_t *
