@@ -682,12 +682,6 @@ ip_input(struct mbuf *m)
 #endif
 
 	/*
-	 * Convert fields to host representation.
-	 */
-	NTOHS(ip->ip_len);
-	NTOHS(ip->ip_off);
-
-	/*
 	 * Process options and, if not destined for us,
 	 * ship it on.  ip_dooptions returns 1 when an
 	 * error was detected (causing an icmp message
