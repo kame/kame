@@ -45,6 +45,16 @@ CFLAGS+=-DHAVE_RC5_H=1
 .endif
 #CFLAGS+=-DHAVE_CAST_H=1 
 CFLAGS+=-I/usr/local/include
+.if exists(/usr/local/include/openssl)
+CFLAGS+=-I/usr/local/include/openssl
+.elif exists(/usr/local/include/ssleay)
+CFLAGS+=-I/usr/local/include/ssleay
+.elif exists(/usr/local/ssl/include)
+CFLAGS+=-I/usr/local/ssl/include
+.if exists(/usr/local/ssl/include/openssl)
+CFLAGS+=-I/usr/local/ssl/include/openssl
+.endif
+.endif  
 LDADD+=	-L/usr/local/lib -lcrypto
 DPADD+=	/usr/local/lib/libcrypto.a
 .endif
