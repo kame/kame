@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.46 2001/01/05 17:26:03 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.47 2001/01/06 00:40:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1597,9 +1597,13 @@ again:
 	goto again;
 
 found:
-	hints = *pai;
+	/* we should not glob socktype/protocol here */
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = pai->ai_family;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = 0;
 	hints.ai_flags = AI_NUMERICHOST;
-	error = getaddrinfo(addr, NULL, &hints, &res0);
+	error = getaddrinfo(addr, "0", &hints, &res0);
 	if (error)
 		goto again;
 #ifdef FILTER_V4MAPPED
@@ -1613,6 +1617,8 @@ found:
 	for (res = res0; res; res = res->ai_next) {
 		/* cover it up */
 		res->ai_flags = pai->ai_flags;
+		res->ai_socktype = pai->ai_socktype;
+		res->ai_protocol = pai->ai_protocol;
 
 		if (pai->ai_flags & AI_CANONNAME) {
 			if (get_canonname(pai, res, cname) != 0) {
