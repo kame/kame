@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/23 05:23:22 $
+		     $Date: 2000/04/25 02:41:17 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -73,5 +73,9 @@ Many of old ones have been solved.
   and kame/netbsd.
 
 - stf interface may not work correctly on freebsd3.
+
+- netbsd usr.sbin/lpr has couple of bugs.  Namely,
+	(1) it does not allow lp=port@host notation,
+	(2) it will SEGV if you put rp=<numeric IPv4/v6 address>.
 
 							<end of RELNOTES>
