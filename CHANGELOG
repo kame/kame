@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.123.2.2 1999/10/05 04:03:14 itojun Exp $
+$Id: CHANGELOG,v 1.123.2.3 1999/10/06 04:42:15 jinmei Exp $
 
+
+<199910>
+1999-10-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6sd/pim6sd.conf.5: was added for configuration
+	guide.
 
 <199909>
 1999-09-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
