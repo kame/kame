@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.66 2002/11/04 04:22:15 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.67 2002/11/04 04:25:19 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1639,7 +1639,7 @@ mld_send_current_state_report(m0, buflenp, in6m)
 		m = *m0;
 		*buflenp = 0;
 	} else {
-		if (ghdrlen + SOURCE_RECORD_LEN(numsrc) > M_TRAILINGSPACE(m)) {
+		if (ghdrlen + SOURCE_RECORD_LEN(numsrc) > MCLBYTES - *buflenp) {
 			/*
 			 * When remaining buffer is not enough to insert new 
 			 * group record, send current buffer and create a new 
@@ -1827,8 +1827,7 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 		m = *m0;
 		*buflenp = 0;
 	} else {
-		if (ghdrlen + SOURCE_RECORD_LEN(numsrc)
-		    > M_TRAILINGSPACE(m) - sizeof(struct ip6_hdr) - *buflenp) {
+		if (ghdrlen + SOURCE_RECORD_LEN(numsrc) > MCLBYTES - *buflenp) {
 			/*
 			 * When remaining buffer is not enough to insert new 
 			 * group record, send current buffer and create a new
