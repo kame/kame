@@ -1,7 +1,19 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2495 2003/10/21 06:58:27 jinmei Exp $
+$KAME: CHANGELOG,v 1.2496 2003/10/22 02:44:27 keiichi Exp $
 
 <200310>
+Wed Oct 22 11:32:25 JST 2003	keiichi@iij.ad.jp
+	* kame/sys/netinet6/in6.c,in6_ifattach.c,mip6_mncore.c,mip6_icmp6.c
+	fixed a panic when removing an interface which has a CoA
+	of a mobile node.
+
+Tue Oct 21 12:03:10 JST 2003	keiichi@iij.ad.jp
+	* kame/sys/netinet6/icmp6.c,mip6_cncore.[hc]
+	fixed a bug of icmp dest unreach lost when sending an icmp to
+	an (non-existent) onlink destination with extension headers.
+	also, fixed a coresspondent node bug that ignores icmp dest unreach
+	from a mobile node.
+
 2003-10-17  Hideki ONO  <ono@soft.net.fujitsu.co.jp>
 	* kame/sys/netinet/dccp_*: imported dccp code for freebsd5
 	from http://www.dccp.org
@@ -11,6 +23,11 @@ $KAME: CHANGELOG,v 1.2495 2003/10/21 06:58:27 jinmei Exp $
 	* kame/pim6sd/pim6_proto.c: sends the interface-address-list
 	option in option-24, as well as in option-65001, to catch up with
 	draft-ietf-pim-sm-v2-new-08.txt.
+
+Thu Oct 16 17:12:54 JST 2003	keiichi@iij.ad.jp
+	* kame/sys/netinet6/mip6_cncore.[hc]
+	take care the case when a wrapping occurs on the nonce and nodekey
+	ring buffer of a correspondent node.
 
 2003-10-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_var.h: defined the prf_ra structure
