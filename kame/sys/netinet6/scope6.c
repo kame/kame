@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.30 2002/03/23 00:30:08 itojun Exp $	*/
+/*	$KAME: scope6.c,v 1.31 2002/05/25 12:07:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -60,6 +60,37 @@ struct scope6_id {
 static size_t if_indexlim = 8;
 struct scope6_id *scope6_ids = NULL;
 
+/*
+ * Set default scope zone IDs for as many interfaces as possible.
+ * This is important when an interface is somehow used for IPv6 before
+ * activating (i.e. making it up) the interface.
+ * XXX: we still need scope6_ifattach() for the case where an interface
+ * can be attached or purged dynamically.
+ */
+void
+scope6_init()
+{
+	struct ifnet *ifp;
+	int i;
+
+	for (i = 1; i <= if_index; i++) {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+		ifp = ifnet_byindex(i);
+#else
+		ifp = ifindex2ifnet[i];
+#endif
+		if (ifp == NULL) /* in some OSes this can happen */
+			continue;
+
+		scope6_ifattach(ifp);
+	}
+}
+
+/*
+ * TODO: this function should be called when an interface is attached
+ * even if the interface has not become up.  We'll need a hook in net/if.c
+ * for this.
+ */
 void
 scope6_ifattach(ifp)
 	struct ifnet *ifp;

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.274 2002/05/20 09:27:54 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.275 2002/05/25 12:07:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -130,6 +130,7 @@
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet/icmp6.h>
+#include <netinet6/scope6_var.h>
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/nd6.h>
 #ifdef __bsdi__
@@ -265,6 +266,7 @@ ip6_init()
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	register_netisr(NETISR_IPV6, ip6intr);
 #endif
+	scope6_init();
 	addrsel_policy_init();
 	nd6_init();
 	frag6_init();
