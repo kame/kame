@@ -1,4 +1,4 @@
-/* $Id: name6.c,v 1.16 2000/03/21 09:43:12 itojun Exp $ */
+/* $Id: name6.c,v 1.17 2000/04/28 17:10:22 itojun Exp $ */
 /*
  *	Atsushi Onoe <onoe@sm.sony.co.jp>
  */
@@ -1167,10 +1167,13 @@ _dns_ghbyname(const char *name, int af, int *errp)
 			DNS_ASSERT(n == hbuf.h_length);
 			DNS_ASSERT(n < buflen);
 #ifdef FILTER_V4MAPPED
-			if (type == T_AAAA &&
-			    IN6_IS_ADDR_V4MAPPED((struct in6_addr *)bp)) {
-				cp += n;
-				break;
+			if (type == T_AAAA) {
+				struct in6_addr in6;
+				memcpy(&in6, cp, sizeof(in6));
+				if (IN6_IS_ADDR_V4MAPPED(&in6)) {
+					cp += n;
+					break;
+				}
 			}
 #endif
 			if (nh < MAXADDRS-1) {
