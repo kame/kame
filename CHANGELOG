@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1342 2000/10/18 13:30:45 sakane Exp $
+$KAME: CHANGELOG,v 1.1343 2000/10/19 01:40:41 itojun Exp $
 
 <200010>
+Thu Oct 19 10:37:05 JST 2000  itojun@iijlab.net
+	* sys/netinet6/icmp6.c: (netbsd only for now) try to prevent
+	  DoS attack using path MTU messages.  validate ICMPv6 too big messages
+	  using content of TCP/UDP connection table and/or IPsec SAs.
+	  framework by thorpej@netbsd.org.  sync with netbsd-current.
+
 Wed Oct 18 18:54:50 JST 2000 sakane@ydc.co.jp
 	* racoon:
 	- fixed to parse the timer directive in the racoon configuration.
