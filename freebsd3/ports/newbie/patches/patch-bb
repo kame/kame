@@ -1,20 +1,5 @@
 use /var/run instead of /etc.
 
---- config.h.in.orig	Wed Aug 12 04:15:48 1998
-+++ config.h.in	Wed Aug 12 04:15:58 1998
-@@ -27,10 +27,10 @@
- #undef USE_DMALLOC
- 
- /* pid file -- if NULL no pid file.*/
--#define NS_PID_FILE "/etc/newbie.pid"
-+#define NS_PID_FILE "/var/run/newbie.pid"
- 
- /* mode file -- if NULL no mode file */
--#define NS_MODE_FILE "/etc/newbie.mode"
-+#define NS_MODE_FILE "/var/run/newbie.mode"
- 
- /* this is the location of config file */
- #define NS_CONFIG_FILE "/etc/newbie.boot"
 --- newbie.kill.in.orig	Wed Aug 12 04:18:41 1998
 +++ newbie.kill.in	Wed Aug 12 04:18:49 1998
 @@ -1,7 +1,7 @@
@@ -38,3 +23,18 @@ use /var/run instead of /etc.
  	echo 'there was no newbie, but pid file. -- deleted.'
  fi
  
+--- conf.h	Mon Aug 16 17:06:27 1999
++++ 00conf.h	Mon Aug 16 17:24:10 1999
+@@ -23,10 +23,10 @@
+ #undef USE_DMALLOC
+ 
+ /* pid file -- if NULL no pid file.*/
+-#define NS_PID_FILE	"/etc/newbie.pid"
++#define NS_PID_FILE	"/var/run/newbie.pid"
+ 
+ /* mode file -- if NULL no mode file */
+-#define NS_MODE_FILE	"/etc/newbie.mode"
++#define NS_MODE_FILE	"/var/run/newbie.mode"
+ 
+ /* this is the location of config file */
+ #define NS_CONFIG_FILE	"/etc/newbie.boot"

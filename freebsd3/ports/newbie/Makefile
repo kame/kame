@@ -1,13 +1,14 @@
 # New ports collection makefile for:    newbie
-# Version required:     0.21p6
+# Version required:     0.22
 # Date created:         6 May 1998
 # Whom:                 itojun@itojun.org
+# Modified by:		doi@sfc.wide.ad.jp	(1999/08/16)
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:10:16 itojun Exp $
+# $Id: Makefile,v 1.2 1999/08/19 19:12:38 sumikawa Exp $
 #
 
-DISTNAME=       newbie-0.21-p7
-PKGNAME=	newbie-0.21p7
+DISTNAME=       newbie-0.22
+PKGNAME=	newbie-0.22
 CATEGORIES=	net
 MASTER_SITES=   http://www.sfc.wide.ad.jp/~doi/softs/newbie/
 
