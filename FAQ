@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.11 2001/06/20 12:46:28 jinmei Exp $
+$KAME: FAQ,v 1.12 2001/06/21 04:18:58 itojun Exp $
 
 
 GENERAL
@@ -403,4 +403,14 @@ Q: What is "KAME"?  Why did you choose the name?
 Q: How can I differentiate IPv6 http connections from IPv4 ones on my
 web page?  (In other words, how can I provide dancing stuff for IPv6
 users only, like www.kame.net?)
-      TBD
+	If you are using apache webserver, you can refer to environment
+	variable REMOTE_HOST to know the address of the client (in textual
+	numeric representation).  For example, the following perl script
+	fragment would print "IPv6 <address>" or "not IPv6 <address>"
+	depending on the clients' address.
+
+		if ($ENV{'REMOTE_HOST'} =~ /^[a-fA-F0-9:]$/) {
+			print "IPv6 " . $ENV{'REMOTE_HOST'} . "\n";
+		} else {
+			print "not IPv6 " . $ENV{'REMOTE_HOST'} . "\n";
+		}
