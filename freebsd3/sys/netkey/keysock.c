@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: keysock.c,v 1.3 2000/01/10 17:02:39 itojun Exp $ */
+/* KAME @(#)$Id: keysock.c,v 1.4 2000/01/16 16:00:27 sumikawa Exp $ */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
@@ -78,11 +78,6 @@
 #include <netkey/key_debug.h>
 
 #include <machine/stdarg.h>
-
-#if defined(__FreeBSD__) && __FreeBSD >= 3
-static MALLOC_DEFINE(M_SECA, "key mgmt",
-		     "security associations, key management");
-#endif
 
 struct sockaddr key_dst = { 2, PF_KEY, };
 struct sockaddr key_src = { 2, PF_KEY, };
