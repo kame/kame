@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1595 2001/03/06 20:41:01 thorpej Exp $
+$KAME: CHANGELOG,v 1.1596 2001/03/08 02:18:08 onoe Exp $
 
 <200103>
+2001-03-08  Atsushi Onoe <onoe@sm.sony.co.jp>
+	* kame/route6d.c: correct deleting host route, based on
+	report from enami@sm.sony.co.jp.
+
 2001-03-06  Jason R. Thorpe  <thorpej@zembu.com>
 
 	* kame/racoon/schedule.c: Implement sched_scrub_param(),
