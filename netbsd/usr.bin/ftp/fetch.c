@@ -594,6 +594,17 @@ fetch_url(url, proxyenv, proxyauth, wwwauth)
 					goto cleanup_fetch_url;
 				}
 
+				if (strchr(phost, ':') != NULL &&
+				    strchr(phost, '%') != NULL) {
+					warnx(
+"Scoped address notation `%s' disallowed via web proxy",
+					    phost);
+					FREEPTR(phost);
+					FREEPTR(pport);
+					FREEPTR(ppath);
+					goto cleanup_fetch_url;
+				}
+
 				FREEPTR(host);
 				host = phost;
 				FREEPTR(port);
@@ -736,6 +747,7 @@ fetch_url(url, proxyenv, proxyauth, wwwauth)
 				fprintf(ttyout, "Requesting %s\n", url);
 			fprintf(fin, "GET %s HTTP/1.1\r\n", path);
 			if (strchr(host, ':')) {
+				/* strip off scoped address extension */
 				char *h, *p;
 				h = xstrdup(host);
 				if ((p = strchr(h, '%')) != NULL)
