@@ -258,8 +258,7 @@ options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 
 #options 	ND6_DEBUG	# net.inet6.icmp6.nd6_debug=1 by default
 
-# these options will become the default behavior soon.
-options 	NEW_STRUCT_ROUTE
+options 	NEW_STRUCT_ROUTE	# mandatory
 
 # IPv6 firewall
 #options 	"IPV6FIREWALL"

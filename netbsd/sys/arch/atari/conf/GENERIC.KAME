@@ -2,9 +2,7 @@ include	"arch/atari/conf/GENERIC"
 
 # INET6 and IPSEC items are defined in GENERIC
 
-# these options will become the default behavior soon.
-options 	NEW_STRUCT_ROUTE
-#options 	USE_FIXED_P2P_PLEN
+options 	NEW_STRUCT_ROUTE		# mandatory
 
 # IPv6 firewall - not tested
 #options 	IPV6FIREWALL
