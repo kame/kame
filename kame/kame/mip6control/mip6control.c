@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.50 2003/08/14 10:06:06 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.51 2003/08/15 06:46:56 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -371,7 +371,7 @@ main(argc, argv)
 		getaddress(smhparg, &mpfx->mpfx_prefix);
 		mpfx->mpfx_prefixlen = atoi(pfxarg);
 		mpfx->mpfx_vltime = 0xffff; /* XXX */
-		mpfx->mpfx_pltime = 0xff00; /* XXX */
+		mpfx->mpfx_pltime = 0x0000; /* XXX */
 		if(ioctl(s, SIOCAHOMEPREFIX_HIF, (caddr_t)ifr) == -1) {
 			perror("ioctl");
 			exit(1);
