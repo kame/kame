@@ -1,4 +1,4 @@
-/*	$KAME: altq_subr.c,v 1.17 2002/11/29 07:47:59 kjc Exp $	*/
+/*	$KAME: altq_subr.c,v 1.18 2003/01/09 08:31:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -236,6 +236,7 @@ altq_disable(ifq)
 	return 0;
 }
 
+#ifdef ALTQ_DEBUG
 void
 altq_assert(file, line, failedexpr)
 	const char *file, *failedexpr;
@@ -246,6 +247,7 @@ altq_assert(file, line, failedexpr)
 	panic("altq assertion");
 	/* NOTREACHED */
 }
+#endif
 
 /*
  * internal representation of token bucket parameters
