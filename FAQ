@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.71 2001/10/19 17:36:31 jinmei Exp $
+$KAME: FAQ,v 1.72 2001/10/20 06:34:55 jinmei Exp $
 
 
 GENERAL
@@ -121,6 +121,8 @@ Q: How portable is the KAME stack?  Is it possible to port it to embedded
 	Also it is apparent that some of the vendor routers are using KAME
 	stack on top of VxWorks.
 
+Q: How should "gif" be pronounced?
+	To be answered.
 
 INSTALLATION
 ============
