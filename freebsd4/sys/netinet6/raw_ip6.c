@@ -763,6 +763,7 @@ rip6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 			 */
 			log(LOG_INFO, "rip6 SEND: address family is "
 			    "unspec. Assume AF_INET6\n");
+			dst->sin6_family = AF_INET6;
 		} else if (dst->sin6_family != AF_INET6) {
 			m_freem(m);
 			return(EAFNOSUPPORT);
