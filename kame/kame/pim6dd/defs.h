@@ -1,4 +1,4 @@
-/*	$KAME: defs.h,v 1.10 2000/12/04 06:33:09 itojun Exp $	*/
+/*	$KAME: defs.h,v 1.11 2001/02/21 03:49:56 itojun Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Oregon.
@@ -142,7 +142,7 @@ typedef void (*ihfunc_t) __P((int, fd_set *));
 
 /* Versions of Solaris older than 2.6 don't have routing sockets. */
 /* XXX TODO: check FreeBSD version and add all other platforms */
-#if ((defined(SunOS) && SunOS >=56) || (defined __FreeBSD__) || (defined IRIX) || (defined __bsdi__) || defined(__NetBSD__))
+#if ((defined(SunOS) && SunOS >=56) || (defined __FreeBSD__) || (defined IRIX) || (defined __bsdi__) || defined(__NetBSD__) || defined(__OpenBSD__))
 #define HAVE_ROUTING_SOCKETS
 #endif
 
