@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.12 2000/01/12 00:45:57 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.13 2000/01/12 20:34:28 itojun Exp $ */
 
 #define _PFKEY_C_
 
@@ -87,7 +87,7 @@ static u_int ipsecdoi2pfkey_proto __P((u_int proto));
 static u_int pfkey2ipsecdoi_mode __P((u_int mode));
 static u_int ipsecdoi2pfkey_mode __P((u_int mode));
 static u_int keylen_aalg __P((u_int hashtype));
-static u_int keylen_ealg __P((u_int t_id));
+static u_int keylen_ealg __P((u_int t_id, int encklen));
 
 static int pk_recvgetspi __P((caddr_t *mhp));
 static int pk_recvupdate __P((caddr_t *mhp));
@@ -632,8 +632,9 @@ keylen_aalg(hashtype)
 
 /* default key length for encryption algorithm */
 static u_int
-keylen_ealg(t_id)
+keylen_ealg(t_id, encklen)
 	u_int t_id;
+	int encklen;
 {
 	switch (t_id) {
 	case IPSECDOI_ESP_DES_IV64:		/* sa_flags |= SADB_X_EXT_OLD */
@@ -643,11 +644,11 @@ keylen_ealg(t_id)
 	case IPSECDOI_ESP_3DES:
 		return 192;
 	case IPSECDOI_ESP_RC5:
-		return 40;
+		return encklen ? encklen : 128;
 	case IPSECDOI_ESP_CAST:
-		return 40;
+		return encklen ? encklen : 128;
 	case IPSECDOI_ESP_BLOWFISH:
-		return 64;
+		return encklen ? encklen : 128;
 	case IPSECDOI_ESP_DES_IV32:	/* flags |= (SADB_X_EXT_OLD|
 							SADB_X_EXT_IV4B)*/
 		return 64;
@@ -687,7 +688,7 @@ int pfkey_convertfromipsecdoi(proto_id, t_id, hashtype,
 	case IPSECDOI_PROTO_IPSEC_ESP:
 		if ((*e_type = ipsecdoi2pfkey_ealg(t_id)) == ~0)
 			goto bad;
-		if ((*e_keylen = keylen_ealg(t_id)) == ~0)
+		if ((*e_keylen = keylen_ealg(t_id, *e_keylen)) == ~0)
 			goto bad;
 		*e_keylen >>= 3;
 
@@ -961,6 +962,7 @@ pk_sendupdate(iph2)
 
 		/* set algorithm type and key length */
 		plog(logp, LOCATION, NULL, "%d %d %d\n", s->proto_id, s->enctype, s->authtype);
+		e_keylen = iph2->approval->encklen;
 		if (pfkey_convertfromipsecdoi(
 				s->proto_id,
 				s->enctype,
@@ -1152,6 +1154,7 @@ pk_sendadd(iph2)
 		}
 
 		/* set algorithm type and key length */
+		e_keylen = iph2->approval->encklen;
 		if (pfkey_convertfromipsecdoi(
 				s->proto_id,
 				s->enctype,
