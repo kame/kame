@@ -1055,13 +1055,13 @@ echo "$ac_t""$host" 1>&6
 
 
 
-OPTFLAG="-O"
+OPTFLAG="-O -DYIPS_DEBUG"
 echo $ac_n "checking if --enable-debug option is specified""... $ac_c" 1>&6
 echo "configure:1061: checking if --enable-debug option is specified" >&5
 # Check whether --enable-debug or --disable-debug was given.
 if test "${enable_debug+set}" = set; then
   enableval="$enable_debug"
-  OPTFLAG="-DYIPS_DEBUG -g $OPTFLAG"; enable_debug=yes
+  OPTFLAG="-g $OPTFLAG"; enable_debug=yes
 else
   enable_debug=no
 fi
