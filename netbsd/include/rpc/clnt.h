@@ -1,4 +1,4 @@
-/*	$NetBSD: clnt.h,v 1.14 2000/06/02 22:57:55 fvdl Exp $	*/
+/*	$NetBSD: clnt.h,v 1.16 2001/06/19 12:52:20 wiz Exp $	*/
 
 /*
  * Sun RPC is a product of Sun Microsystems, Inc. and is provided for
@@ -282,7 +282,7 @@ struct rpc_timers {
 
 
 /*
- * RPCTEST is a test program which is accessable on every rpc
+ * RPCTEST is a test program which is accessible on every rpc
  * transport/port.  It is used for testing, performance evaluation,
  * and network administration.
  */
@@ -418,8 +418,8 @@ __END_DECLS
  * Print why creation failed
  */
 __BEGIN_DECLS
-extern void clnt_pcreateerror	__P((char *));			/* stderr */
-extern char *clnt_spcreateerror	__P((char *));			/* string */
+extern void clnt_pcreateerror	__P((const char *));		/* stderr */
+extern char *clnt_spcreateerror	__P((const char *));		/* string */
 __END_DECLS
 
 /*
@@ -434,8 +434,8 @@ __END_DECLS
  * Print an English error message, given the client error code
  */
 __BEGIN_DECLS
-extern void clnt_perror		__P((CLIENT *, char *)); 	/* stderr */
-extern char *clnt_sperror	__P((CLIENT *, char *));	/* string */
+extern void clnt_perror		__P((CLIENT *, const char *)); 	/* stderr */
+extern char *clnt_sperror	__P((CLIENT *, const char *));	/* string */
 __END_DECLS
 
 

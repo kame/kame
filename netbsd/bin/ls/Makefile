@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.11 1999/05/17 12:16:03 lukem Exp $
+#	$NetBSD: Makefile,v 1.13 2001/11/03 13:40:30 lukem Exp $
 #	@(#)Makefile	8.1 (Berkeley) 6/2/93
 
 PROG=	ls

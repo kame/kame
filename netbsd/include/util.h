@@ -1,4 +1,4 @@
-/*	$NetBSD: util.h,v 1.15.4.1 2002/02/26 22:10:42 he Exp $	*/
+/*	$NetBSD: util.h,v 1.21 2001/08/18 19:31:47 ad Exp $	*/
 
 /*-
  * Copyright (c) 1995
@@ -60,32 +60,36 @@ struct termios;
 struct utmp;
 struct winsize;
 
-pid_t	forkpty(int *, char *, struct termios *, struct winsize *);
-char   *fparseln(FILE *, size_t *, size_t *, const char[3], int);
-int	getmaxpartitions(void);
-int	getrawpartition(void);
-void	login(const struct utmp *);
-int	login_tty(int);
-int	logout(const char *);
-void	logwtmp(const char *, const char *, const char *);
-int	opendisk(const char *, int, char *, size_t, int);
-int	openpty(int *, int *, char *, struct termios *, struct winsize *);
-void	pidfile(const char *);
-int	pidlock(const char *, int, pid_t *, const char *);
-int	pw_abort(void);
-void	pw_copy(int, int, struct passwd *, struct passwd *);
-void	pw_edit(int, const char *);
-void	pw_error(const char *, int, int);
-void	pw_getconf(char *, size_t, const char *, const char *);
-void	pw_init(void);
-int	pw_lock(int);
-int	pw_mkdb(void);
-void	pw_prompt(void);
-int	secure_path(char *);
-int	ttyaction(const char *, const char *, const char *);
-int	ttylock(const char *, int, pid_t *);
-char   *ttymsg(struct iovec *, int, const char *, int);
-int	ttyunlock(const char *);
+pid_t		forkpty(int *, char *, struct termios *, struct winsize *);
+char	       *fparseln(FILE *, size_t *, size_t *, const char[3], int);
+const char     *getbootfile(void);
+int		getmaxpartitions(void);
+int		getrawpartition(void);
+void		login(const struct utmp *);
+int		login_tty(int);
+int		logout(const char *);
+void		logwtmp(const char *, const char *, const char *);
+int		opendisk(const char *, int, char *, size_t, int);
+int		openpty(int *, int *, char *, struct termios *,
+			struct winsize *);
+void		pidfile(const char *);
+int		pidlock(const char *, int, pid_t *, const char *);
+int		pw_abort(void);
+void		pw_copy(int, int, struct passwd *, struct passwd *);
+void		pw_edit(int, const char *);
+void		pw_error(const char *, int, int);
+void		pw_getconf(char *, size_t, const char *, const char *);
+const char     *pw_getprefix(void);
+void		pw_init(void);
+int		pw_lock(int);
+int		pw_mkdb(const char *, int);
+void		pw_prompt(void);
+int		pw_setprefix(const char *);
+int		secure_path(const char *);
+int		ttyaction(const char *, const char *, const char *);
+int		ttylock(const char *, int, pid_t *);
+char	       *ttymsg(struct iovec *, int, const char *, int);
+int		ttyunlock(const char *);
 __END_DECLS
 
 #endif /* !_UTIL_H_ */

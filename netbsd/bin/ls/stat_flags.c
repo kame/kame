@@ -1,4 +1,4 @@
-/*	$NetBSD: stat_flags.c,v 1.7 1999/01/03 01:30:10 lukem Exp $	*/
+/*	$NetBSD: stat_flags.c,v 1.13 2002/01/31 22:43:34 tv Exp $	*/
 
 /*-
  * Copyright (c) 1993
@@ -34,20 +34,25 @@
  */
 
 #include <sys/cdefs.h>
-#ifndef lint
+#if defined(__RCSID) && !defined(lint)
 #if 0
 static char sccsid[] = "@(#)stat_flags.c	8.2 (Berkeley) 7/28/94";
 #else
-__RCSID("$NetBSD: stat_flags.c,v 1.7 1999/01/03 01:30:10 lukem Exp $");
+__RCSID("$NetBSD: stat_flags.c,v 1.13 2002/01/31 22:43:34 tv Exp $");
 #endif
 #endif /* not lint */
 
+#if HAVE_CONFIG_H
+#include "config.h"
+#else
+#define HAVE_STRUCT_STAT_ST_FLAGS 1
+#endif
+
 #include <sys/types.h>
 #include <sys/stat.h>
-
+#include <fts.h>
 #include <stddef.h>
 #include <string.h>
-#include <fts.h>
 
 #include "stat_flags.h"
 
@@ -64,15 +69,14 @@ __RCSID("$NetBSD: stat_flags.c,v 1.7 1999/01/03 01:30:10 lukem Exp $");
  *	are set, return the default string.
  */
 char *
-flags_to_string(flags, def)
-	u_long flags;
-	char *def;
+flags_to_string(u_long flags, const char *def)
 {
 	static char string[128];
-	char *prefix;
+	const char *prefix;
 
 	string[0] = '\0';
 	prefix = NULL;
+#if HAVE_STRUCT_STAT_ST_FLAGS
 	if (flags & UF_APPEND)
 		SAPPEND("uappnd");
 	if (flags & UF_IMMUTABLE)
@@ -87,16 +91,25 @@ flags_to_string(flags, def)
 		SAPPEND("arch");
 	if (flags & SF_IMMUTABLE)
 		SAPPEND("schg");
-	return (prefix == NULL && def != NULL ? def : string);
+#endif
+	if (prefix == NULL)
+		strlcpy(string, def, sizeof(string));
+	return (string);
 }
 
 #define	TEST(a, b, f) {							\
-	if (!memcmp(a, b, sizeof(b))) {					\
+	if (!strcmp(a, b)) {						\
 		if (clear) {						\
 			if (clrp)					\
 				*clrp |= (f);				\
-		} else if (setp)					\
-			*setp |= (f);					\
+			if (setp)					\
+				*setp &= ~(f);				\
+		} else {						\
+			if (setp)					\
+				*setp |= (f);				\
+			if (clrp)					\
+				*clrp &= ~(f);				\
+		}							\
 		break;							\
 	}								\
 }
@@ -108,20 +121,20 @@ flags_to_string(flags, def)
  *	to the offending token.
  */
 int
-string_to_flags(stringp, setp, clrp)
-	char **stringp;
-	u_long *setp, *clrp;
+string_to_flags(char **stringp, u_long *setp, u_long *clrp)
 {
 	int clear;
 	char *string, *p;
 
-	clear = 0;
 	if (setp)
 		*setp = 0;
 	if (clrp)
 		*clrp = 0;
+
+#if HAVE_STRUCT_STAT_ST_FLAGS
 	string = *stringp;
 	while ((p = strsep(&string, "\t ,")) != NULL) {
+		clear = 0;
 		*stringp = p;
 		if (*p == '\0')
 			continue;
@@ -166,5 +179,7 @@ string_to_flags(stringp, setp, clrp)
 			return (1);
 		}
 	}
+#endif
+
 	return (0);
 }

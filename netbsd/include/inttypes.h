@@ -1,11 +1,11 @@
-/*	$NetBSD: main.c,v 1.2 2000/07/29 03:46:15 lukem Exp $	*/
+/*	$NetBSD: inttypes.h,v 1.1 2001/04/28 15:41:28 kleink Exp $	*/
 
 /*-
- * Copyright (c) 1999 The NetBSD Foundation, Inc.
+ * Copyright (c) 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Luke Mewburn.
+ * by Klaus Klein.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,24 +36,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef _INTTYPES_H_
+#define _INTTYPES_H_
+
 #include <sys/cdefs.h>
+#include <sys/inttypes.h>
 
-#ifndef lint
-__RCSID("$NetBSD: main.c,v 1.2 2000/07/29 03:46:15 lukem Exp $");
-#endif /* not lint */
+__BEGIN_DECLS
+intmax_t	strtoimax __P((const char * __restrict,
+		    char ** __restrict, int));
+uintmax_t	strtoumax __P((const char * __restrict,
+		    char ** __restrict, int));
+__END_DECLS
 
-#include <sys/types.h>
-#include <fts.h>
-
-#include "ls.h"
-#include "extern.h"
-
-int	main(int, char *[]);
-
-int
-main(int argc, char *argv[])
-{
-
-	return (ls_main(argc, argv));
-	/* NOTREACHED */
-}
+#endif /* !_INTTYPES_H_ */

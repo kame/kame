@@ -1,4 +1,4 @@
-/*	$NetBSD: kvm.h,v 1.8 2000/05/26 02:34:01 simonb Exp $	*/
+/*	$NetBSD: kvm.h,v 1.10 2000/06/26 06:38:02 kleink Exp $	*/
 
 /*-
  * Copyright (c) 1989, 1993
@@ -51,6 +51,7 @@
 
 #include <nlist.h>
 #include <sys/cdefs.h>
+#include <sys/types.h>
 #include <stdio.h>
 
 __BEGIN_DECLS

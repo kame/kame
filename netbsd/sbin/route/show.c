@@ -1,4 +1,4 @@
-/*	$NetBSD: show.c,v 1.14.4.3 2001/04/05 12:42:04 he Exp $	*/
+/*	$NetBSD: show.c,v 1.19 2001/10/24 16:05:07 atatat Exp $	*/
 
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)route.c	8.3 (Berkeley) 3/9/94";
 #else
-__RCSID("$NetBSD: show.c,v 1.14.4.3 2001/04/05 12:42:04 he Exp $");
+__RCSID("$NetBSD: show.c,v 1.19 2001/10/24 16:05:07 atatat Exp $");
 #endif
 #endif /* not lint */
 
@@ -99,7 +99,7 @@ static const struct bits bits[] = {
 static void pr_rthdr __P((void));
 static void p_rtentry __P((struct rt_msghdr *));
 static void pr_family __P((int));
-static void p_sockaddr __P((struct sockaddr *, int, int ));
+static void p_sockaddr __P((struct sockaddr *, struct sockaddr *, int, int ));
 static void p_flags __P((int));
 
 /*
@@ -144,7 +144,7 @@ show(argc, argv)
 
 
 /* column widths; each followed by one space */
-#define	WID_DST		16	/* width of destination column */
+#define	WID_DST		17	/* width of destination column */
 #define	WID_GW		18	/* width of gateway column */
 
 /*
@@ -173,7 +173,7 @@ p_rtentry(rtm)
 	static int masks_done, banner_printed;
 #endif
 	static int old_af;
-	int af = 0, interesting = RTF_UP | RTF_GATEWAY | RTF_HOST;
+	int af = 0, interesting = RTF_UP | RTF_GATEWAY | RTF_HOST | RTF_REJECT;
 
 #ifdef notdef
 	/* for the moment, netmasks are skipped over */
@@ -195,11 +195,24 @@ p_rtentry(rtm)
 		pr_rthdr();
 	}
 	if (rtm->rtm_addrs == RTA_DST)
-		p_sockaddr(sa, 0, WID_DST + 1 + WID_GW + 1);
+		p_sockaddr(sa, NULL, 0, WID_DST + 1 + WID_GW + 1);
 	else {
-		p_sockaddr(sa, rtm->rtm_flags, WID_DST);
+		struct sockaddr *nm;
+
+		if ((rtm->rtm_addrs & RTA_NETMASK) == 0)
+			nm = NULL;
+		else {
+			/* skip to gateway */
+			nm = (struct sockaddr *)
+			    (ROUNDUP(sa->sa_len) + (char *)sa);
+			/* skip over gateway to netmask */
+			nm = (struct sockaddr *)
+			    (ROUNDUP(nm->sa_len) + (char *)nm);
+		}
+
+		p_sockaddr(sa, nm, rtm->rtm_flags, WID_DST);
 		sa = (struct sockaddr *)(ROUNDUP(sa->sa_len) + (char *)sa);
-		p_sockaddr(sa, 0, WID_GW);
+		p_sockaddr(sa, NULL, 0, WID_GW);
 	}
 	p_flags(rtm->rtm_flags & interesting);
 	putchar('\n');
@@ -250,73 +263,34 @@ pr_family(af)
 
 
 static void
-p_sockaddr(sa, flags, width)
-	struct sockaddr *sa;
+p_sockaddr(sa, nm, flags, width)
+	struct sockaddr *sa, *nm;
 	int flags, width;
 {
 	char workbuf[128], *cplim;
 	char *cp = workbuf;
-	int cplen = 0, len;
 
 	switch(sa->sa_family) {
 
 	case AF_LINK:
-	    {
-		struct sockaddr_dl *sdl = (struct sockaddr_dl *)sa;
-
-		if (sdl->sdl_nlen == 0 && sdl->sdl_alen == 0 &&
-		    sdl->sdl_slen == 0)
-			(void)snprintf(workbuf, sizeof workbuf, "link#%d",
-			    sdl->sdl_index);
-		else switch (sdl->sdl_type) {
-		case IFT_ETHER:
-		    {
-			int i;
-			u_char *lla = (u_char *)sdl->sdl_data +
-			    sdl->sdl_nlen;
-
-			cplim = "";
-			for (i = 0; i < sdl->sdl_alen; i++, lla++) {
-				len = snprintf(cp, sizeof(workbuf) - cplen,
-				    "%s%x", cplim, *lla);
-				cp += len;
-				cplen += len;
-				cplim = ":";
-			}
-			cp = workbuf;
-			break;
-		    }
-		default:
-			cp = link_ntoa(sdl);
-			break;
-		}
+		if (getnameinfo(sa, sa->sa_len, workbuf, sizeof(workbuf),
+		    NULL, 0, NI_NUMERICHOST) != 0)
+			strncpy(workbuf, "invalid", sizeof(workbuf));
+		cp = workbuf;
 		break;
-	    }
 
 	case AF_INET:
-	    {
-		struct sockaddr_in *sin = (struct sockaddr_in *)sa;
-
-		cp = (sin->sin_addr.s_addr == 0) ? "default" :
-			((flags & RTF_HOST) ?
-			routename(sa) :	netname(sa));
+		cp = routename(sa, nm, flags);
 		break;
-	    }
 
 #ifndef SMALL
 #ifdef INET6
 	case AF_INET6:
-	    {
-		struct sockaddr_in6 *sin = (struct sockaddr_in6 *)sa;
-
-		cp = IN6_IS_ADDR_UNSPECIFIED(&sin->sin6_addr) ? "default" :
-			((flags & RTF_HOST) ?
-			routename(sa) :	netname(sa));
+		cp = routename(sa, nm, flags);
 		/* make sure numeric address is not truncated */
 		if (strchr(cp, ':') != NULL && strlen(cp) > width)
 			width = strlen(cp);
 		break;
-	    }
 #endif /* INET6 */
 
 	case AF_NS:

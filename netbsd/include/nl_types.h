@@ -1,4 +1,4 @@
-/*	$NetBSD: nl_types.h,v 1.8.12.1 2000/10/18 17:13:00 tv Exp $	*/
+/*	$NetBSD: nl_types.h,v 1.10 2001/12/06 23:04:06 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -81,7 +81,7 @@ struct _nls_msg_hdr {
 #define	NL_SETD		1
 #define NL_CAT_LOCALE   1
 
-typedef struct {
+typedef struct __nl_cat_d {
 	void	*__data;
 	int	__size;
 } *nl_catd;

@@ -1,4 +1,4 @@
-/*	$NetBSD: xdr.h,v 1.17.2.2 2000/07/18 19:12:06 matt Exp $	*/
+/*	$NetBSD: xdr.h,v 1.19 2000/07/17 05:00:45 matt Exp $	*/
 
 /*
  * Sun RPC is a product of Sun Microsystems, Inc. and is provided for

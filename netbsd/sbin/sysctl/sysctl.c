@@ -1,4 +1,4 @@
-/*	$NetBSD: sysctl.c,v 1.37.2.3 2000/07/22 04:40:39 simonb Exp $	*/
+/*	$NetBSD: sysctl.c,v 1.58 2002/03/24 00:11:00 sommerfeld Exp $	*/
 
 /*
  * Copyright (c) 1993
@@ -44,7 +44,7 @@ __COPYRIGHT(
 #if 0
 static char sccsid[] = "@(#)sysctl.c	8.1 (Berkeley) 6/6/93";
 #else
-__RCSID("$NetBSD: sysctl.c,v 1.37.2.3 2000/07/22 04:40:39 simonb Exp $");
+__RCSID("$NetBSD: sysctl.c,v 1.58 2002/03/24 00:11:00 sommerfeld Exp $");
 #endif
 #endif /* not lint */
 
@@ -56,7 +56,7 @@ __RCSID("$NetBSD: sysctl.c,v 1.37.2.3 2000/07/22 04:40:39 simonb Exp $");
 #include <sys/mount.h>
 #include <sys/mbuf.h>
 #include <sys/resource.h>
-#include <vm/vm_param.h>
+#include <uvm/uvm_param.h>
 #include <machine/cpu.h>
 
 #include <ufs/ufs/dinode.h>
@@ -94,11 +94,15 @@ __RCSID("$NetBSD: sysctl.c,v 1.37.2.3 2000/07/22 04:40:39 simonb Exp $");
 #include <netinet6/pim6_var.h>
 #endif /* INET6 */
 
+#include "../../sys/compat/linux/common/linux_exec.h"
+
 #ifdef IPSEC
 #include <net/route.h>
 #include <netinet6/ipsec.h>
 #include <netkey/key_var.h>
 #endif /* IPSEC */
+
+#include <sys/pipe.h>
 
 #include <err.h>
 #include <ctype.h>
@@ -121,6 +125,9 @@ struct ctlname debugname[CTL_DEBUG_MAXID];
 #ifdef CTL_MACHDEP_NAMES
 struct ctlname machdepname[] = CTL_MACHDEP_NAMES;
 #endif
+struct ctlname emulname[] = CTL_EMUL_NAMES;
+struct ctlname vendorname[] = { { 0, 0 } };
+
 /* this one is dummy, it's used only for '-a' or '-A' */
 struct ctlname procname[] = { {0, 0}, {"curproc", CTLTYPE_NODE} };
 
@@ -147,9 +154,13 @@ struct list secondlevel[] = {
 	{ username, USER_MAXID },	/* CTL_USER_NAMES */
 	{ ddbname, DDBCTL_MAXID },	/* CTL_DDB_NAMES */
 	{ procname, 2 },		/* dummy name */
+	{ vendorname, 0 },		/* CTL_VENDOR_NAMES */
+	{ emulname, EMUL_MAXID },	/* CTL_EMUL_NAMES */
+
+	{ 0, 0},
 };
 
-int	Aflag, aflag, nflag, wflag;
+int	Aflag, aflag, nflag, qflag, wflag;
 
 /*
  * Variables requiring special processing.
@@ -165,34 +176,47 @@ int	Aflag, aflag, nflag, wflag;
  */
 #define CTLTYPE_LIMIT	((~0x1) << 31)
 
-int main __P((int, char *[]));
+int main(int, char *[]);
 
-static void listall __P((const char *, struct list *));
-static void parse __P((char *, int));
-static void debuginit __P((void));
-static int sysctl_inet __P((char *, char **, int[], int, int *));
+static void listall(const char *, struct list *);
+static void parse(char *, int);
+static void debuginit(void);
+static int sysctl_inet(char *, char **, int[], int, int *);
 #ifdef INET6
-static int sysctl_inet6 __P((char *, char **, int[], int, int *));
+static int sysctl_inet6(char *, char **, int[], int, int *);
 #endif
+static int sysctl_vfs(char *, char **, int[], int, int *);
+static int sysctl_proc(char *, char **, int[], int, int *);
+static int sysctl_3rd(struct list *, char *, char **, int[], int, int *);
+
 #ifdef IPSEC
-static int sysctl_key __P((char *, char **, int[], int, int *));
-#endif
-static int sysctl_vfs __P((char *, char **, int[], int, int *));
-static int sysctl_vfsgen __P((char *, char **, int[], int, int *));
-static int sysctl_mbuf __P((char *, char **, int[], int, int *));
-static int sysctl_proc __P((char *, char **, int[], int, int *));
-static int findname __P((char *, char *, char **, struct list *));
-static void usage __P((void));
+struct ctlname keynames[] = KEYCTL_NAMES;
+struct list keyvars = { keynames, KEYCTL_MAXID };
+#endif /*IPSEC*/
+struct ctlname vfsgenname[] = CTL_VFSGENCTL_NAMES;
+struct list vfsgenvars = { vfsgenname, VFSGEN_MAXID };
+struct ctlname mbufnames[] = CTL_MBUF_NAMES;
+struct list mbufvars = { mbufnames, MBUF_MAXID };
+struct ctlname pipenames[] = CTL_PIPE_NAMES;
+struct list pipevars = { pipenames, KERN_PIPE_MAXID };
+struct ctlname tkstatnames[] = KERN_TKSTAT_NAMES;
+struct list tkstatvars = { tkstatnames, KERN_TKSTAT_MAXID };
+
+static int sysctl_linux(char *, char **, int[], int, int *);
+static int findname(char *, char *, char **, struct list *);
+static void usage(void);
+
+#define USEAPP(s, a) \
+    if (flags) printf("%s: use '%s' to view this information\n", s, a)
+
 
 int
-main(argc, argv)
-	int argc;
-	char *argv[];
+main(int argc, char *argv[])
 {
 	char *fn = NULL;
 	int ch, lvl1;
 
-	while ((ch = getopt(argc, argv, "Aaf:nw")) != -1) {
+	while ((ch = getopt(argc, argv, "Aaf:nqw")) != -1) {
 		switch (ch) {
 
 		case 'A':
@@ -212,6 +236,10 @@ main(argc, argv)
 			nflag = 1;
 			break;
 
+		case 'q':
+			qflag = 1;
+			break;
+
 		case 'w':
 			wflag = 1;
 			break;
@@ -220,6 +248,10 @@ main(argc, argv)
 			usage();
 		}
 	}
+
+	if (qflag && !wflag)
+		usage();
+
 	argc -= optind;
 	argv += optind;
 
@@ -233,7 +265,7 @@ main(argc, argv)
 	if (fn) {
 		FILE *fp;
 		char *l;
-		
+
 		fp = fopen(fn, "r");
 		if (fp == NULL) {
 			err(1, "%s", fn);
@@ -258,9 +290,7 @@ main(argc, argv)
  * List all variables known to the system.
  */
 static void
-listall(prefix, lp)
-	const char *prefix;
-	struct list *lp;
+listall(const char *prefix, struct list *lp)
 {
 	int lvl2;
 	char *cp, name[BUFSIZ];
@@ -284,9 +314,7 @@ listall(prefix, lp)
  * Set a new value if requested.
  */
 static void
-parse(string, flags)
-	char *string;
-	int flags;
+parse(char *string, int flags)
 {
 	int indx, type, state, len;
 	int special = 0;
@@ -297,6 +325,7 @@ parse(string, flags)
 	struct list *lp;
 	int mib[CTL_MAXNAME];
 	char *cp, *bufp, buf[BUFSIZ];
+	double loads[3];
 
 	bufp = buf;
 	snprintf(buf, BUFSIZ, "%s", string);
@@ -322,7 +351,7 @@ parse(string, flags)
 		lp = &secondlevel[indx];
 		if (lp->list == 0) {
 			warnx("Class `%s' is not implemented",
-			topname[indx].ctl_name);
+			    topname[indx].ctl_name);
 			return;
 		}
 		if (bufp == NULL) {
@@ -347,7 +376,8 @@ parse(string, flags)
 					return;
 				if (!nflag)
 					printf("%s: ", string);
-				warnx("Kernel is not compiled for profiling");
+				printf(
+				    "kernel is not compiled for profiling\n");
 				return;
 			}
 			if (!nflag)
@@ -356,16 +386,12 @@ parse(string, flags)
 			return;
 		case KERN_VNODE:
 		case KERN_FILE:
-			if (flags == 0)
-				return;
-			warnx("Use pstat to view %s information", string);
+			USEAPP(string, "pstat");
 			return;
 		case KERN_PROC:
 		case KERN_PROC2:
 		case KERN_PROC_ARGS:
-			if (flags == 0)
-				return;
-			warnx("Use ps to view %s information", string);
+			USEAPP(string, "ps");
 			return;
 		case KERN_CLOCKRATE:
 			special |= CLOCK;
@@ -374,13 +400,11 @@ parse(string, flags)
 			special |= BOOTTIME;
 			break;
 		case KERN_NTPTIME:
-			if (flags == 0)
-				return;
-			warnx("Use xntpdc -c kerninfo to view %s information",
-			    string);
+			USEAPP(string, "ntpdc -c kerninfo");
 			return;
 		case KERN_MBUF:
-			len = sysctl_mbuf(string, &bufp, mib, flags, &type);
+			len = sysctl_3rd(&mbufvars, string, &bufp, mib, flags,
+			    &type);
 			if (len < 0)
 				return;
 			break;
@@ -388,49 +412,51 @@ parse(string, flags)
 			special |= CPTIME;
 			break;
 		case KERN_MSGBUF:
-			if (flags == 0)
-				return;
-			warnx("Use dmesg to view %s information", string);
+			USEAPP(string, "dmesg");
 			return;
 		case KERN_CONSDEV:
 			special |= CONSDEV;
+			break;
+		case KERN_PIPE:
+			len = sysctl_3rd(&pipevars, string, &bufp, mib, flags,
+			    &type);
+			if (len < 0)
+				return;
+			break;
+		case KERN_TKSTAT:
+			len = sysctl_3rd(&tkstatvars, string, &bufp, mib, flags,
+			    &type);
+			if (len < 0)
+				return;
 			break;
 		}
 		break;
 
 	case CTL_HW:
+		switch (mib[1]) {
+		case HW_DISKSTATS:
+			USEAPP(string, "iostat");
+			return;
+		}
 		break;
 
 	case CTL_VM:
-		if (mib[1] == VM_LOADAVG) {
-			double loads[3];
-
+		switch (mib[1]) {
+		case VM_LOADAVG:
 			getloadavg(loads, 3);
 			if (!nflag)
 				printf("%s: ", string);
 			printf("%.2f %.2f %.2f\n", loads[0], loads[1],
 			    loads[2]);
 			return;
-		}
-		if (mib[1] == VM_NKMEMPAGES) {
-			size_t nkmempages_len;
-			int nkmempages;
 
-			nkmempages_len = sizeof(nkmempages);
-
-			if (sysctl(mib, 2, &nkmempages, &nkmempages_len,
-			    NULL, 0)) {
-				warn("unable to get %s", string);
-				return;
-			}
-			if (!nflag)
-				printf("%s: ", string);
-			printf("%d\n", nkmempages);
-		}
-		if (flags == 0)
+		case VM_METER:
+		case VM_UVMEXP:
+		case VM_UVMEXP2:
+			USEAPP(string, "vmstat' or 'systat");
 			return;
-		warnx("Use vmstat or systat to view %s information", string);
-		return;
+		}
+		break;
 
 	case CTL_NET:
 		if (mib[1] == PF_INET) {
@@ -449,7 +475,8 @@ parse(string, flags)
 #endif /* INET6 */
 #ifdef IPSEC
 		else if (mib[1] == PF_KEY) {
-			len = sysctl_key(string, &bufp, mib, flags, &type);
+			len = sysctl_3rd(&keyvars, string, &bufp, mib, flags,
+			    &type);
 			if (len >= 0)
 				break;
 			return;
@@ -457,7 +484,7 @@ parse(string, flags)
 #endif /* IPSEC */
 		if (flags == 0)
 			return;
-		warnx("Use netstat to view %s information", string);
+		USEAPP(string, "netstat");
 		return;
 
 	case CTL_DEBUG:
@@ -477,22 +504,25 @@ parse(string, flags)
 		break;
 
 	case CTL_VFS:
-		if (mib[1] == VFS_GENERIC)
-			len = sysctl_vfsgen(string, &bufp, mib, flags, &type);
-		else
+		if (mib[1] == VFS_GENERIC) {
+			len = sysctl_3rd(&vfsgenvars, string, &bufp, mib, flags,
+			    &type);
+			/* Don't bother with VFS_CONF. */
+			if (mib[2] == VFS_CONF)
+				len = -1;
+		} else
 			len = sysctl_vfs(string, &bufp, mib, flags, &type);
 		if (len < 0)
 			return;
 
 		/* XXX Special-case for NFS stats. */
 		if (mib[1] == 2 && mib[2] == NFS_NFSSTATS) {
-			if (flags == 0)
-				return;
-			warnx("Use nfsstat to view %s information", string);
+			USEAPP(string, "nfsstat");
 			return;
 		}
 		break;
 
+	case CTL_VENDOR:
 	case CTL_USER:
 	case CTL_DDB:
 		break;
@@ -501,10 +531,22 @@ parse(string, flags)
 		if (len < 0)
 			return;
 		break;
+	case CTL_EMUL:
+		switch (mib[1]) {
+		case EMUL_LINUX:
+		    len = sysctl_linux(string, &bufp, mib, flags, &type);
+		    break;
+		default:
+		    warnx("Illegal emul level value: %d", mib[0]);
+		    break;
+		}
+		if (len < 0)
+			return;
+		break;
 	default:
 		warnx("Illegal top level value: %d", mib[0]);
 		return;
-	
+
 	}
 	if (bufp) {
 		warnx("Name %s in %s is unknown", bufp, string);
@@ -527,7 +569,7 @@ parse(string, flags)
 			}
 			/* FALLTHROUGH */
 		case CTLTYPE_QUAD:
-			sscanf(newval, "%qd", (long long *)&quadval);
+			sscanf(newval, "%lld", (long long *)&quadval);
 			newval = &quadval;
 			newsize = sizeof quadval;
 			break;
@@ -539,21 +581,23 @@ parse(string, flags)
 			return;
 		switch (errno) {
 		case EOPNOTSUPP:
-			warnx("The value of %s is not available", string);
+			printf("%s: the value is not available\n", string);
 			return;
 		case ENOTDIR:
-			warnx("The specification of %s is incomplete",
-			    string);
+			printf("%s: the specification is incomplete\n", string);
 			return;
 		case ENOMEM:
-			warnx("The type %s is unknown to this program",
+			printf("%s: this type is unknown to this program\n",
 			    string);
 			return;
 		default:
-			warn("sysctl() for %s failed", string);
+			printf("%s: sysctl() failed with %s\n",
+			    string, strerror(errno));
 			return;
 		}
 	}
+	if (qflag && (newsize > 0))
+		return;
 	if (special & CLOCK) {
 		struct clockinfo *clkp = (struct clockinfo *)buf;
 
@@ -602,7 +646,7 @@ parse(string, flags)
 		    (unsigned long long) cp_time[4]);
 		return;
 	}
-		
+
 	switch (type) {
 	case CTLTYPE_INT:
 		if (newsize == 0) {
@@ -633,7 +677,7 @@ parse(string, flags)
 if ((lim) == RLIM_INFINITY) \
 	printf("unlimited");\
 else \
-	printf("%qd", (lim)); \
+	printf("%lld", (long long)(lim)); \
 }
 
 		if (newsize == 0) {
@@ -656,12 +700,12 @@ else \
 		if (newsize == 0) {
 			if (!nflag)
 				printf("%s = ", string);
-			printf("%qd\n", (long long)(*(quad_t *)buf));
+			printf("%lld\n", (long long)(*(quad_t *)buf));
 		} else {
 			if (!nflag)
-				printf("%s: %qd -> ", string,
+				printf("%s: %lld -> ", string,
 				    (long long)(*(quad_t *)buf));
-			printf("%qd\n", (long long)(*(quad_t *)newval));
+			printf("%lld\n", (long long)(*(quad_t *)newval));
 		}
 		return;
 
@@ -680,7 +724,7 @@ else \
  * Initialize the set of debugging names
  */
 static void
-debuginit()
+debuginit(void)
 {
 	int mib[3], loc, i;
 	size_t size;
@@ -758,12 +802,7 @@ struct list inetvars[] = {
  * handle internet requests
  */
 static int
-sysctl_inet(string, bufpp, mib, flags, typep)
-	char *string;
-	char **bufpp;
-	int mib[];
-	int flags;
-	int *typep;
+sysctl_inet(char *string, char **bufpp, int mib[], int flags, int *typep)
 {
 	struct list *lp;
 	int indx;
@@ -780,7 +819,7 @@ sysctl_inet(string, bufpp, mib, flags, typep)
 	else if (!flags)
 		return (-1);
 	else {
-		warnx("No variables defined for protocol %s", string);
+		printf("%s: no variables defined for protocol\n", string);
 		return (-1);
 	}
 	if (*bufpp == NULL) {
@@ -798,9 +837,6 @@ sysctl_inet(string, bufpp, mib, flags, typep)
 struct ctlname inet6name[] = CTL_IPV6PROTO_NAMES;
 struct ctlname ip6name[] = IPV6CTL_NAMES;
 struct ctlname icmp6name[] = ICMPV6CTL_NAMES;
-#ifdef TCP6
-struct ctlname tcp6name[] = TCP6CTL_NAMES;
-#endif
 struct ctlname udp6name[] = UDP6CTL_NAMES;
 struct ctlname pim6name[] = PIM6CTL_NAMES;
 struct ctlname ipsec6name[] = IPSEC6CTL_NAMES;
@@ -808,11 +844,7 @@ struct list inet6list = { inet6name, IPV6PROTO_MAXID };
 struct list inet6vars[] = {
 /*0*/	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
 	{ 0, 0 },
-#ifdef TCP6
-	{ tcp6name, TCP6CTL_MAXID },	/* tcp6 */
-#else
-	{ 0, 0 },
-#endif
+	{ tcpname, TCPCTL_MAXID },	/* tcp6 */
 	{ 0, 0 },
 	{ 0, 0 },
 	{ 0, 0 },
@@ -865,12 +897,7 @@ struct list inet6vars[] = {
  * handle internet6 requests
  */
 static int
-sysctl_inet6(string, bufpp, mib, flags, typep)
-	char *string;
-	char **bufpp;
-	int mib[];
-	int flags;
-	int *typep;
+sysctl_inet6(char *string, char **bufpp, int mib[], int flags, int *typep)
 {
 	struct list *lp;
 	int indx;
@@ -904,37 +931,6 @@ sysctl_inet6(string, bufpp, mib, flags, typep)
 }
 #endif /* INET6 */
 
-#ifdef IPSEC
-struct ctlname keynames[] = KEYCTL_NAMES;
-struct list keylist = { keynames, KEYCTL_MAXID };
-
-/*
- * handle key requests
- */
-static int
-sysctl_key(string, bufpp, mib, flags, typep)
-	char *string;
-	char **bufpp;
-	int mib[];
-	int flags;
-	int *typep;
-{
-	struct list *lp;
-	int indx;
-
-	if (*bufpp == NULL) {
-		listall(string, &keylist);
-		return (-1);
-	}
-	if ((indx = findname(string, "third", bufpp, &keylist)) == -1)
-		return (-1);
-	mib[2] = indx;
-	lp = &keylist;
-	*typep = lp->list[indx].ctl_type;
-	return 3;
-}
-#endif /*IPSEC*/
-
 struct ctlname ffsname[] = FFS_NAMES;
 struct ctlname nfsname[] = NFS_NAMES;
 struct list vfsvars[] = {
@@ -964,19 +960,14 @@ struct list vfsvars[] = {
  * handle vfs requests
  */
 static int
-sysctl_vfs(string, bufpp, mib, flags, typep)
-	char *string;
-	char **bufpp;
-	int mib[];
-	int flags;
-	int *typep;
+sysctl_vfs(char *string, char **bufpp, int mib[], int flags, int *typep)
 {
 	struct list *lp = &vfsvars[mib[1]];
 	int indx;
 
 	if (lp->list == NULL) {
 		if (flags)
-			warnx("No variables defined for file system %s",
+			printf("%s: no variables defined for file system\n",
 			    string);
 		return (-1);
 	}
@@ -991,21 +982,13 @@ sysctl_vfs(string, bufpp, mib, flags, typep)
 	return (3);
 }
 
-struct ctlname vfsgenname[] = CTL_VFSGENCTL_NAMES;
-struct list vfsgenvars = { vfsgenname, VFSGEN_MAXID };
-
 /*
- * handle vfs.generic requests
+ * handle 3rd level requests.
  */
 static int
-sysctl_vfsgen(string, bufpp, mib, flags, typep)
-	char *string;
-	char **bufpp;
-	int mib[];
-	int flags;
-	int *typep;
+sysctl_3rd(struct list *lp, char *string, char **bufpp, int mib[], int flags,
+    int *typep)
 {
-	struct list *lp = &vfsgenvars;
 	int indx;
 
 	if (*bufpp == NULL) {
@@ -1013,9 +996,6 @@ sysctl_vfsgen(string, bufpp, mib, flags, typep)
 		return (-1);
 	}
 	if ((indx = findname(string, "third", bufpp, lp)) == -1)
-		return (-1);
-	/* Don't bother with VFS_CONF. */
-	if (indx == VFS_CONF)
 		return (-1);
 	mib[2] = indx;
 	*typep = lp->list[indx].ctl_type;
@@ -1033,12 +1013,7 @@ struct list proclimittypevars = {proclimittypenames,
  * handle kern.proc requests
  */
 static int
-sysctl_proc(string, bufpp, mib, flags, typep)
-	char *string;
-	char **bufpp;
-	int mib[];
-	int flags;
-	int *typep;
+sysctl_proc(char *string, char **bufpp, int mib[], int flags, int *typep)
 {
 	char *cp, name[BUFSIZ];
 	struct list *lp;
@@ -1049,7 +1024,7 @@ sysctl_proc(string, bufpp, mib, flags, typep)
 		cp = &name[strlen(name)];
 		*cp++ = '.';
 		strcpy(cp, "curproc");
-		parse (name, Aflag);
+		parse(name, Aflag);
 		return (-1);
 	}
 	cp = strsep(bufpp, ".");
@@ -1099,42 +1074,43 @@ sysctl_proc(string, bufpp, mib, flags, typep)
 	return(5);
 }
 
-struct ctlname mbufnames[] = CTL_MBUF_NAMES;
-struct list mbufvars = { mbufnames, MBUF_MAXID };
-/*
- * handle kern.mbuf requests
- */
+struct ctlname linuxnames[] = EMUL_LINUX_NAMES;
+struct list linuxvars = { linuxnames, EMUL_LINUX_MAXID };
+struct ctlname linuxkernnames[] = EMUL_LINUX_KERN_NAMES;
+struct list linuxkernvars = { linuxkernnames, EMUL_LINUX_KERN_MAXID };
+
 static int
-sysctl_mbuf(string, bufpp, mib, flags, typep)
-	char *string;
-	char **bufpp;
-	int mib[];
-	int flags;
-	int *typep;
+sysctl_linux(char *string, char **bufpp, int mib[], int flags, int *typep)
 {
-	struct list *lp = &mbufvars;
+	struct list *lp = &linuxvars;
 	int indx;
+	char name[BUFSIZ], *cp;
 
 	if (*bufpp == NULL) {
-		listall(string, lp);
+		(void)strcpy(name, string);
+		cp = &name[strlen(name)];
+		*cp++ = '.';
+		(void)strcpy(cp, "kern");
+		listall(name, &linuxkernvars);
 		return (-1);
 	}
 	if ((indx = findname(string, "third", bufpp, lp)) == -1)
 		return (-1);
 	mib[2] = indx;
+	lp = &linuxkernvars;
 	*typep = lp->list[indx].ctl_type;
-	return (3);
+	if ((indx = findname(string, "fourth", bufpp, lp)) == -1)
+		return (-1);
+	mib[3] = indx;
+	*typep = lp->list[indx].ctl_type;
+	return (4);
 }
 
 /*
  * Scan a list of names searching for a particular name.
  */
 static int
-findname(string, level, bufp, namelist)
-	char *string;
-	char *level;
-	char **bufp;
-	struct list *namelist;
+findname(char *string, char *level, char **bufp, struct list *namelist)
 {
 	char *name;
 	int i;
@@ -1156,15 +1132,16 @@ findname(string, level, bufp, namelist)
 }
 
 static void
-usage()
+usage(void)
 {
-	extern char *__progname;
+	const char *progname = getprogname();
 
-	(void)fprintf(stderr, "Usage:\t%s %s\n\t%s %s\n\t%s %s\n\t%s %s\n\t%s %s\n",
-	    __progname, "[-n] variable ...", 
-	    __progname, "[-n] -w variable=value ...",
-	    __progname, "[-n] -a",
-	    __progname, "[-n] -A",
-	    __progname, "[-n] -f file");
+	(void)fprintf(stderr,
+	    "Usage:\t%s %s\n\t%s %s\n\t%s %s\n\t%s %s\n\t%s %s\n",
+	    progname, "[-n] variable ...",
+	    progname, "[-n] [-q] -w variable=value ...",
+	    progname, "[-n] -a",
+	    progname, "[-n] -A",
+	    progname, "[-n] [-q] -f file");
 	exit(1);
 }

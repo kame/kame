@@ -1,8 +1,8 @@
-/*	$NetBSD: stat_flags.h,v 1.3 2001/10/18 03:16:20 lukem Exp $	*/
+/*	$NetBSD: wctype.h,v 1.4 2001/01/20 17:40:09 itojun Exp $	*/
 
 /*-
- * Copyright (c) 1991, 1993
- *	The Regents of the University of California.  All rights reserved.
+ * Copyright (c)1999 Citrus Project,
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -12,18 +12,11 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
@@ -32,8 +25,39 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)extern.h	8.1 (Berkeley) 5/31/93
+ *	citrus Id: wctype.h,v 1.4 2000/12/21 01:50:21 itojun Exp
  */
 
-char	*flags_to_string(u_long, const char *);
-int	 string_to_flags(char **, u_long *, u_long *);
+#ifndef _WCTYPE_H_
+#define	_WCTYPE_H_
+
+#include <sys/cdefs.h>
+#include <machine/ansi.h>
+
+#ifdef	_BSD_WINT_T_
+typedef	_BSD_WINT_T_    wint_t;
+#undef	_BSD_WINT_T_
+#endif
+
+#ifndef WEOF
+#define	WEOF	((wint_t)-1)
+#endif
+
+__BEGIN_DECLS
+int	iswalnum __P((wint_t));
+int	iswalpha __P((wint_t));
+int	iswblank __P((wint_t));
+int	iswcntrl __P((wint_t));
+int	iswdigit __P((wint_t));
+int	iswgraph __P((wint_t));
+int	iswlower __P((wint_t));
+int	iswprint __P((wint_t));
+int	iswpunct __P((wint_t));
+int	iswspace __P((wint_t));
+int	iswupper __P((wint_t));
+int	iswxdigit __P((wint_t));
+wint_t	towlower __P((wint_t));
+wint_t	towupper __P((wint_t));
+__END_DECLS
+
+#endif		/* _WCTYPE_H_ */

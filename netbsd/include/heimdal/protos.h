@@ -34,7 +34,7 @@
 /*
  * Add here functions that don't have a prototype on your system.
  *
- * $Id: protos.h,v 1.1.1.1 2000/12/02 06:23:28 itojun Exp $
+ * $Id: protos.h,v 1.1.1.2 2002/09/25 11:48:33 itojun Exp $
  */
 
 #ifdef NEED_CRYPT_PROTO

@@ -1,4 +1,4 @@
-/*	$NetBSD: pwd.h,v 1.20.4.2 2002/01/23 19:04:20 he Exp $	*/
+/*	$NetBSD: pwd.h,v 1.25 2002/01/27 07:00:43 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1989, 1993
@@ -50,9 +50,12 @@
 
 #if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
 #define	_PATH_PASSWD		"/etc/passwd"
-#define	_PATH_PASSWDCONF	"/etc/passwd.conf"
 #define	_PATH_MASTERPASSWD	"/etc/master.passwd"
 #define	_PATH_MASTERPASSWD_LOCK	"/etc/ptmp"
+
+#define	_PATH_PASSWD_CONF	"/etc/passwd.conf"
+#define	_PATH_PASSWDCONF	_PATH_PASSWD_CONF	/* XXX: compat */
+#define	_PATH_USERMGMT_CONF	"/etc/usermgmt.conf"
 
 #define	_PATH_MP_DB		"/etc/pwd.db"
 #define	_PATH_SMP_DB		"/etc/spwd.db"
@@ -107,6 +110,9 @@ int		 pw_scan __P((char *bp, struct passwd *pw, int *flags));
 int		 setpassent __P((int));
 const char	*user_from_uid __P((uid_t, int));
 int		 uid_from_user __P((const char *, uid_t *));
+int		 pwcache_userdb __P((int (*)(int), void (*)(void),
+				    struct passwd * (*)(const char *),
+				    struct passwd * (*)(uid_t)));
 #endif
 __END_DECLS
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: paths.h,v 1.14.4.1 2000/07/17 19:55:51 mjl Exp $	*/
+/*	$NetBSD: paths.h,v 1.19 2002/03/17 22:14:12 tshiozak Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -53,28 +53,33 @@
 #define	_PATH_STDPATH \
 	"/usr/bin:/bin:/usr/sbin:/sbin:/usr/pkg/bin:/usr/pkg/sbin:/usr/local/bin:/usr/local/sbin"
 
-#define	_PATH_AUDIO	"/dev/audio0"
-#define	_PATH_AUDIOCTL	"/dev/audioctl0"
+#define	_PATH_AUDIO	"/dev/audio"
+#define	_PATH_AUDIO0	"/dev/audio0"
+#define	_PATH_AUDIOCTL	"/dev/audioctl"
+#define	_PATH_AUDIOCTL0	"/dev/audioctl0"
 #define	_PATH_BSHELL	"/bin/sh"
+#define	_PATH_CLOCKCTL	"/dev/clockctl"
 #define	_PATH_CONSOLE	"/dev/console"
 #define	_PATH_CSHELL	"/bin/csh"
 #define	_PATH_DEFTAPE	"/dev/nrst0"
 #define	_PATH_DEVDB	"/var/run/dev.db"
 #define	_PATH_DEVNULL	"/dev/null"
 #define	_PATH_DRUM	"/dev/drum"
+#define	_PATH_I18NMODULE "/usr/lib/i18n"
 #define	_PATH_KMEM	"/dev/kmem"
 #define	_PATH_KVMDB	"/var/db/kvm.db"
 #define	_PATH_LOCALE	"/usr/share/locale"
 #define	_PATH_MAILDIR	"/var/mail"
 #define	_PATH_MAN	"/usr/share/man"
 #define	_PATH_MEM	"/dev/mem"
+#define	_PATH_MIXER	"/dev/mixer"
+#define	_PATH_MIXER0	"/dev/mixer0"
 #define	_PATH_NOLOGIN	"/etc/nologin"
-#define	_PATH_OAUDIO	"/dev/audio"
-#define	_PATH_OAUDIOCTL	"/dev/audioctl"
 #define	_PATH_SENDMAIL	"/usr/sbin/sendmail"
 #define	_PATH_SHELLS	"/etc/shells"
 #define	_PATH_SKEYKEYS	"/etc/skeykeys"
-#define	_PATH_SOUND	"/dev/sound0"
+#define	_PATH_SOUND	"/dev/sound"
+#define	_PATH_SOUND0	"/dev/sound0"
 #define	_PATH_TTY	"/dev/tty"
 #define	_PATH_UNIX	"/netbsd"
 #define	_PATH_VI	"/usr/bin/vi"

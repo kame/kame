@@ -1,11 +1,11 @@
-/*	$NetBSD: main.c,v 1.2 2000/07/29 03:46:15 lukem Exp $	*/
+/*	$NetBSD: stdbool.h,v 1.1 2002/02/02 17:31:52 thorpej Exp $	*/
 
 /*-
- * Copyright (c) 1999 The NetBSD Foundation, Inc.
+ * Copyright (c) 2002 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Luke Mewburn.
+ * by Jason R. Thorpe of Wasabi Systems, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,24 +36,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
+#ifndef _STDBOOL_H_
+#define	_STDBOOL_H_
 
-#ifndef lint
-__RCSID("$NetBSD: main.c,v 1.2 2000/07/29 03:46:15 lukem Exp $");
-#endif /* not lint */
+#define	bool	_Bool
 
-#include <sys/types.h>
-#include <fts.h>
+#define	true	1
+#define	false	0
 
-#include "ls.h"
-#include "extern.h"
+#define	__bool_true_false_are_defined	1
 
-int	main(int, char *[]);
-
-int
-main(int argc, char *argv[])
-{
-
-	return (ls_main(argc, argv));
-	/* NOTREACHED */
-}
+#endif /* _STDBOOL_H_ */

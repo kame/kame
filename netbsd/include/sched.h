@@ -1,11 +1,11 @@
-/*	$NetBSD: main.c,v 1.2 2000/07/29 03:46:15 lukem Exp $	*/
+/*	$NetBSD: sched.h,v 1.1 2001/07/17 03:04:16 thorpej Exp $	*/
 
 /*-
- * Copyright (c) 1999 The NetBSD Foundation, Inc.
+ * Copyright (c) 2001 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Luke Mewburn.
+ * by Jason R. Thorpe.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,24 +36,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
+#ifndef	_SCHED_H_
+#define	_SCHED_H_
 
-#ifndef lint
-__RCSID("$NetBSD: main.c,v 1.2 2000/07/29 03:46:15 lukem Exp $");
-#endif /* not lint */
+#include <sys/sched.h>
 
-#include <sys/types.h>
-#include <fts.h>
+#if !defined(_POSIX_SOURCE) && !defined(_XOPEN_SOURCE) && \
+    !defined(_ANSI_SOURCE)
 
-#include "ls.h"
-#include "extern.h"
+pid_t	clone __P((int (*)(void *), void *, int, void *));
+pid_t	__clone __P((int (*)(void *), void *, int, void *)); 
 
-int	main(int, char *[]);
+#endif /* !_POSIX_SOURCE && !_XOPEN_SOURCE && !_ANSI_SOURCE */
 
-int
-main(int argc, char *argv[])
-{
-
-	return (ls_main(argc, argv));
-	/* NOTREACHED */
-}
+#endif	/* _SCHED_H_ */
