@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.32 2000/07/15 04:50:43 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.33 2000/07/30 17:19:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.32 2000/07/15 04:50:43 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.33 2000/07/30 17:19:09 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -2782,6 +2782,7 @@ ifonly:
 		rrt->rrt_rflags = RRTF_AGGREGATE;
 		rrt->rrt_t = 0;
 		rrt->rrt_index = loopifindex;
+#if 0
 		if (getroute(&rrt->rrt_info, &gw)) {
 #if 0
 			/*
@@ -2798,6 +2799,7 @@ ifonly:
 			    rrt->rrt_info.rip6_plen);
 #endif
 		}
+#endif
 		/* Put the route to the list */
 		rrt->rrt_next = riprt;
 		riprt = rrt;
