@@ -890,7 +890,7 @@ sendorfree:
 		error = ENOBUFS;
 	splx(s);
 
-	return (0);
+	return (error);
 }
 
 /*
