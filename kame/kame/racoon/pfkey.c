@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.32 2000/04/24 18:34:42 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.33 2000/05/11 07:22:28 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1056,13 +1056,14 @@ pk_recvupdate(mhp)
 		 && pr->spi == sa->sadb_sa_spi) {
 			pr->ok = 1;
 			YIPSDEBUG(DEBUG_MISC,
+				char *xsrc = strdup(saddrwop2str(iph2->src));
 				plog(logp, LOCATION, NULL,
 					"pfkey %s success %s/%s/%s->%s\n",
 					s_pfkey_type(msg->sadb_msg_type),
 					s_ipsecdoi_proto(pr->proto_id),
 					s_ipsecdoi_encmode(pr->encmode),
-					saddrwop2str(iph2->src));
-					saddrwop2str(iph2->dst));
+					xsrc,
+					saddrwop2str(iph2->dst)));
 		}
 
 		if (pr->ok == 0)
