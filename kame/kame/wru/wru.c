@@ -1,4 +1,4 @@
- /*	$KAME: wru.c,v 1.1 2002/01/12 08:35:25 jinmei Exp $	*/
+ /*	$KAME: wru.c,v 1.2 2002/01/21 07:33:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -32,9 +32,18 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/ioctl.h>
+#include <sys/sysctl.h>
+
+#include <net/if.h>
+#include <net/if_dl.h>
+#include <net/route.h>
 
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
+
+#include <netinet6/in6_var.h>
+#include <netinet6/nd6.h>
 
 #include <netdb.h>
 #include <arpa/nameser.h>
@@ -50,6 +59,8 @@ static int do_reply __P((char *, int, int, char *, struct sockaddr *,
 static char *dnsdecode __P((const u_char **, const u_char *,
 			    const u_char *, u_char *, size_t));
 static void pr_nodeaddr __P((struct icmp6_nodeinfo *, int));
+
+static int set_zone __P((struct sockaddr *));
 static void timeval_add __P((struct timeval *, struct timeval *,
 			     struct timeval *));
 static void timeval_sub __P((struct timeval *, struct timeval *,
@@ -63,6 +74,8 @@ static int opt_flags;
 #define F_SINGLEWAIT 0x4
 #define F_TRYALL 0x8
 
+#define DEFAULTHOST "ff02::1"
+
 int
 main(argc, argv)
 	int argc;
@@ -74,7 +87,7 @@ main(argc, argv)
 	int qdatalen = sizeof(struct in6_addr), qbuflen;
 	int count = 1;
 	int rsbsize = 81920;	/* about 40 clusters */
-	char *qbuf, *qdata, rbuf[2048];
+	char *host, *qbuf, *qdata, rbuf[2048];
 	u_int16_t qflags = 0;
 	u_int8_t nonce[8];
 	struct addrinfo hints, *res, *res0;
@@ -163,19 +176,30 @@ main(argc, argv)
 	argc -= optind;
 	argv += optind;
 
-	if (argc < 1)
-		usage();
-
 	if ((opt_flags & F_SINGLEWAIT) && (opt_flags & F_MULTIWAIT))
 		errx(1, "-1 and -m are exclusive");
+
+	if (argc < 1)
+		host = DEFAULTHOST;
+	else
+		host = argv[0];
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET6;
 	hints.ai_socktype = SOCK_RAW;
 	hints.ai_protocol = IPPROTO_ICMPV6;
-	ret_ga = getaddrinfo(argv[0], NULL, &hints, &res0);
+	ret_ga = getaddrinfo(host, NULL, &hints, &res0);
 	if (ret_ga)
 		errx(1, "%s", gai_strerror(ret_ga));
+	if (argc < 1) {
+		/* try to set the default link ID */
+		if (res0->ai_next) {
+			errx(1,
+			     "getaddrinfo returned multiple addresses for %s",
+			     DEFAULTHOST);
+		}
+		set_zone(res0->ai_addr);
+	}
 
 	/* set up a query socket */
 	if ((s = socket(res0->ai_family, res0->ai_socktype,
@@ -586,6 +610,102 @@ pr_nodeaddr(ni, nilen)
 	}
 }
 
+#define ROUNDUP(a) \
+	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
+#define NEXTSA(s) \
+	((s) = (struct sockaddr *)(ROUNDUP((s)->sa_len) + (char *)(s)))
+static int
+set_zone(dst)
+	struct sockaddr *dst;
+{
+	size_t needed;
+	int mib[] = { CTL_NET, PF_ROUTE, 0, 0, NET_RT_DUMP, 0 };
+	int s;
+	char *buf, *next, *lim, ifname[IFNAMSIZ];
+	struct rt_msghdr *rtm;
+	struct in6_ndifreq ndifreq;
+	u_long defif;
+	u_int32_t zoneid = 0;
+
+	/*
+	 * first try to get the default interface in the kernel,
+	 * if specified.
+	 */
+	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
+		err(1, "socket");
+
+	memset(&ndifreq, 0, sizeof(ndifreq));
+	strcpy(ndifreq.ifname, "lo0"); /* dummy */
+
+	if (ioctl(s, SIOCGDEFIFACE_IN6, (caddr_t)&ndifreq) < 0)
+ 		err(1, "ioctl(SIOCGDEFIFACE_IN6)");
+	close(s);
+
+	if ((defif = ndifreq.ifindex) > 0)
+		goto setzone;
+
+	/* then get the default route, and use the outgoing interface. */
+	if (sysctl(mib, 6, NULL, &needed, NULL, 0) < 0)
+		err(1, "route sysctl estimate");
+	if ((buf = malloc(needed)) == 0)
+		errx(1, "out of space");
+	if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0)
+		err(1, "sysctl of routing table");
+	lim  = buf + needed;
+	for (next = buf; next < lim; next += rtm->rtm_msglen) {
+		struct sockaddr *sa;
+
+		rtm = (struct rt_msghdr *)next;
+		if ((rtm->rtm_addrs & (RTA_DST | RTA_NETMASK | RTA_IFP)) !=
+		    (RTA_DST | RTA_NETMASK | RTA_IFP)) {
+			continue;
+		}
+
+		/* get the destination, skip it if it's not :: */
+		sa = (struct sockaddr *)(rtm + 1);
+		if (sa->sa_family != AF_INET6 ||
+		    !IN6_IS_ADDR_UNSPECIFIED(&((struct sockaddr_in6 *)sa)->sin6_addr)) {
+			continue;
+		}
+
+		/* get the netmask, skip it if it's not the null mask */
+		NEXTSA(sa);
+		if ((rtm->rtm_addrs & RTA_GATEWAY))
+			NEXTSA(sa);
+		if (sa->sa_family != AF_UNSPEC || sa->sa_len > 0)
+			continue;
+
+		/* get the outgoing interface */
+		NEXTSA(sa);
+		if ((rtm->rtm_addrs & RTA_GENMASK))
+			NEXTSA(sa);
+		if (sa->sa_family != AF_LINK) /* XXX: should not happen */
+			continue;
+
+		defif = ((struct sockaddr_dl *)sa)->sdl_index;
+	}
+
+  setzone:
+	if (if_indextoname(defif, ifname) == NULL)
+		err(1, "if_indextoname(%d)", defif);
+#ifdef HAVE_SCOPELIB
+	if (inet_zoneid(dst->sa_family, addr2scopetype(dst), ifname, &zoneid))
+		err(1, "inet_zoneid");
+#else
+ 	{
+		struct sockaddr_in6 *dst6 = (struct sockaddr_in6 *)dst;
+ 
+		if (IN6_IS_ADDR_LINKLOCAL(&dst6->sin6_addr) ||
+		    IN6_IS_ADDR_MC_LINKLOCAL(&dst6->sin6_addr)) {
+			zoneid = defif;
+		}
+	}
+#endif
+	((struct sockaddr_in6 *)dst)->sin6_scope_id = zoneid;
+
+	return(0);
+}
+
 static char *
 sa2str(sa, salen)
 	struct sockaddr *sa;
@@ -644,6 +764,6 @@ static void
 usage()
 {
 	fprintf(stderr, "usage: wru [-(1|m)] [-Av] [-a [aAclsg]] "
-		"[-c count] [-i interval] host\n");
+		"[-c count] [-i interval] [host]\n");
 	exit(1);
 }
