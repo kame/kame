@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2093 2002/02/26 10:44:41 jinmei Exp $
+$KAME: CHANGELOG,v 1.2094 2002/02/26 16:07:33 sumikawa Exp $
 
 <200202>
+Tue Feb 26 16:05:53 2002  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd4/ports/ppp: awkhulhak ppp
+
 2002-02-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/netinet6/in6_pcb.c (in6_mapped_sockaddr,
 	in6_mapped_peeraddr): do not convert the unspecified address (::)
