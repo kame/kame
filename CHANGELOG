@@ -1,5 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1856 2001/08/31 09:59:52 suz Exp $
+$KAME: CHANGELOG,v 1.1857 2001/09/02 13:25:43 jinmei Exp $
+
+<200109>
+2001-09-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi[34]/sys/sys/mbuf.h (MFREE): corrected the point of calling
+	splmem_fast(), so that the lock would not be freed
+	unintentionally.  A busy kernel, such as the one processing IPsec,
+	could panic without this fix, so all bsdi users are recommended to
+	apply this fix.
+	The fix is a back port from BSD/OS 4.3 beta.
 
 <200108>
 2001-08-31  SUZUKI Shinsuke  <suz@sdl.hitachi.co.jp>
