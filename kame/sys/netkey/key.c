@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.197 2001/07/27 07:27:53 itojun Exp $	*/
+/*	$KAME: key.c,v 1.198 2001/07/27 07:38:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -106,6 +106,8 @@
 #include <netinet6/ipcomp.h>
 
 #include <machine/stdarg.h>
+
+#include "gif.h"
 
 /* randomness */
 #ifdef __NetBSD__
@@ -1152,6 +1154,20 @@ key_delsp(sp)
 			isr->sav = NULL;
 		}
 
+#if NGIF > 0
+		if (isr->tunifp) {
+			int s;
+
+			(void)gif_delete_tunnel(isr->tunifp);
+			s = splimp();
+			if_down(isr->tunifp);
+			splx(s);
+
+			/* XXX more garbage-collection */
+			isr->tunifp = NULL;
+		}
+#endif
+
 		nextisr = isr->next;
 		KFREE(isr);
 		isr = nextisr;
@@ -1835,6 +1851,7 @@ key_spdadd(so, m, mhp)
 		}
 	}
 
+#if NGIF > 0
 	/*
 	 * based on newsp->req, create/configure tunnels.
 	 * TODO: reuse devices
@@ -1873,6 +1890,7 @@ key_spdadd(so, m, mhp)
 			}
 		}
 	}
+#endif
 
 	microtime(&tv);
 	newsp->created = tv.tv_sec;
