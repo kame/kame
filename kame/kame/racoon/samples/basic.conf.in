@@ -1,4 +1,4 @@
-# $Id: basic.conf.in,v 1.6 2000/01/18 21:41:53 sakane Exp $
+# $Id: basic.conf.in,v 1.7 2000/02/16 04:02:56 sakane Exp $
 
 # search this file for pre_shared_key with various ID key.
 path pre_shared_key "@sysconfdir_x@/racoon/psk.txt" ;
@@ -7,7 +7,7 @@ path pre_shared_key "@sysconfdir_x@/racoon/psk.txt" ;
 # is received.
 path certificate "@sysconfdir_x@/cert" ;
 
-# personal infomation.
+# personal information.
 identifier vendor_id "KAME/racoon";
 #identifier user_fqdn "sakane@kame.net";
 #identifier fqdn "mine.kame.net";
@@ -20,7 +20,7 @@ log debug4;
 # "padding" defines some parameter of padding.  You should not touch these.
 padding {
 	maximum_length 20;	# maximum padding length.
-	randomize off;		# enbale randomize length.
+	randomize off;		# enable randomize length.
 	restrict_check off;	# enable restrict check.
 	exclusive_tail off;	# extract last one octet.
 }
@@ -36,8 +36,8 @@ listen {
 # Specification of default various timer.
 timer {
 	# These value can be changed per remote node.
-	counter 5;		# maximun trying count to send.
-	interval 20 sec;	# maximun interval to resend.
+	counter 5;		# maximum trying count to send.
+	interval 20 sec;	# maximum interval to resend.
 	persend 1;		# the number of packets per a send.
 
 	# timer for waiting to complete each phase.
@@ -55,8 +55,8 @@ timer {
 #	"IPsec authentication algorithm",
 #	"IPsec compression algorithm",
 # Each class can be defined three level; "normal", "high" and "extra_high".
-# Each level can be omited.  If so, it is interpreted that there is no
-# algorithm appropreately for use in its level.  algorithm type may be
+# Each level can be omitted.  If so, it is interpreted that there is no
+# algorithm appropriately for use in its level.  algorithm type may be
 # defined at multiple level.
 algorithm_strength {
 	isakmp_auth_method {

@@ -1,9 +1,9 @@
-# YIPS @(#)$Id: policy.conf.in,v 1.3 2000/01/10 19:52:41 itojun Exp $
+# YIPS @(#)$Id: policy.conf.in,v 1.4 2000/02/16 04:02:57 sakane Exp $
 
 # IPsec SA configuration
 
 # basic usage is:
-#	"policy" local remote protocol direciton "ipsec" { ... } ;
+#	"policy" local remote protocol direction "ipsec" { ... } ;
 #	"policy" local remote protocol direction "discard" ;
 #
 #		direction := "in", "out", "inout"
@@ -43,7 +43,7 @@ policy 10.1.1.0/24 10.2.2.0/24 any inout ipsec
 
 			# "mode" can be followed by either "tunnel" or "use".
 			# If tunnel mode is specified, peer's address must be
-			# specifyed carefully.
+			# specified carefully.
 			mode tunnel 172.168.2.2;
 
 			# "strength" defines a strength of algorithm in use.
