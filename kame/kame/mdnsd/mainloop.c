@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.22 2000/05/31 12:12:58 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.23 2000/05/31 12:14:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -159,8 +159,10 @@ mainloop0(i)
 			continue;
 		ns->prio++;
 		gettimeofday(&ns->lastrx, NULL);
-		if (dflag)
+		if (dflag) {
 			printnsdb(ns);
+			printf("ns %p reachable\n", ns);
+		}
 	}
 
 	if (ismyaddr((struct sockaddr *)&from)) {
