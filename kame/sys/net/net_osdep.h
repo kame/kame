@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.71 2002/05/30 16:14:24 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.72 2002/06/08 21:42:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -186,7 +186,7 @@
  *	we have updated sys/systm.h to include declaration.
  *
  * - splnet()
- *	NetBSD 1.4 or later requires splsoftnet().
+ *	NetBSD 1.4 or later, and OpenBSD, requires splsoftnet().
  *	other operating systems use splnet().
  *
  * - splimp()
