@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1430 2000/12/07 11:55:35 jinmei Exp $
+$KAME: CHANGELOG,v 1.1431 2000/12/07 12:13:19 jinmei Exp $
 
 <200012>
+2000-12-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ipsec.c (ipsec6_output_trans): when an ipsec
+	SA cannot be found while ipsec is required, send an icmp6
+	dst_unreach_admin error (instead of silent discard).
+	NOTE: Please be sure to update icmp6.c as well.
+
 2000-12-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/icmp6.c (icmp6_reflect):
 	- processed scoped addresses in a generic manner.
