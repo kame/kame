@@ -1,6 +1,6 @@
 #!/bin/sh
 
-#	$KAME: prefix.sh,v 1.10 2001/02/04 03:47:43 jinmei Exp $
+#	$KAME: prefix.sh,v 1.11 2001/02/04 03:52:16 jinmei Exp $
 
 # Copyright (c) 2001 WIDE Project. All rights reserved.
 #
@@ -36,7 +36,7 @@ usage() {
 }
 
 # We're now invalidating the prefix ioctls and the corresponding command.
-echo "** The prefix command are almost invalidated. Please use ifconfig(8). **"
+echo "** The prefix command is almost invalidated. Please use ifconfig(8). **"
 
 if [ X"$iface" = X -o X"$prefix" = X ]; then
     usage
