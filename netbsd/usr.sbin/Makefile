@@ -1,6 +1,6 @@
 SUBDIR+=trpt traceroute
 
-SUBDIR+=bgpd faithd icmp6dump ifmcstat mld6query mping \
+SUBDIR+=faithd icmp6dump ifmcstat mld6query mping \
 	ndp pim6dd pim6sd route6d \
 	traceroute6 rtsold rtadvd rip6query hroute6d ip6addrctl
 #SUBDIR+=pvcbridge
