@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.462 2005/01/16 02:48:31 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.463 2005/01/17 06:21:11 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1419,17 +1419,6 @@ skip_ipsec2:;
 		goto done;
 	ip6 = mtod(m, struct ip6_hdr *);
 #endif /* PFIL_HOOKS */
-
-#if NPF > 0
-	if (pf_test6(PF_OUT, ifp, &m) != PF_PASS) {
-		error = EHOSTUNREACH;
-		m_freem(m);
-		goto done;
-	}
-	if (m == NULL)
-		goto done;
-	ip6 = mtod(m, struct ip6_hdr *);
-#endif
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 503000
 passout:

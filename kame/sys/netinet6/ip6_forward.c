@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.144 2004/12/27 05:41:17 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.145 2005/01/17 06:21:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -151,8 +151,8 @@ ip6_forward(m, srcrt)
 #ifdef MIP6 
 	struct mip6_bc_internal *bce;
 #endif
-#ifndef __FreeBSD__
-	long time_second = time.tv_sec;
+#if !defined(__FreeBSD__) && !defined(__NetBSD__)
+	long time_second = time.tv_sec
 #endif
 
 #ifdef IPSEC
@@ -800,17 +800,6 @@ ip6_forward(m, srcrt)
 			goto freecopy;
 		ip6 = mtod(m, struct ip6_hdr *);
 	}
-#endif
-
-#if NPF > 0
-	if (pf_test6(PF_OUT, rt->rt_ifp, &m) != PF_PASS) {
-		m_freem(m);
-		goto senderr;
-	}
-	if (m == NULL)
-		goto senderr;
-
-	ip6 = mtod(m, struct ip6_hdr *);
 #endif
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 503000
