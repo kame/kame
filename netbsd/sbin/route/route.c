@@ -130,9 +130,6 @@ int	iflag, verbose, aflen = sizeof (struct sockaddr_in);
 int	locking, lockrest, debugonly;
 struct	rt_metrics rt_metrics;
 u_int32_t  rtm_inits;
-#ifdef INET6
-char ntop_buf[INET6_ADDRSTRLEN];	/*for inet_ntop()*/
-#endif
 
 static void
 usage(cp)
@@ -384,6 +381,9 @@ routename(sa)
 	static char domain[MAXHOSTNAMELEN + 1];
 	static int first = 1;
 	struct in_addr in;
+#ifdef INET6
+	char ntop_buf[NI_MAXHOST];
+#endif
 
 	if (first) {
 		first = 0;
@@ -479,6 +479,9 @@ netname(sa)
 	u_int32_t i;
 	int subnetshift;
 	struct in_addr in;
+#ifdef INET6
+	char ntop_buf[NI_MAXHOST];
+#endif
 
 	switch (sa->sa_family) {
 
@@ -1582,6 +1585,10 @@ sodump(su, which)
 	sup su;
 	char *which;
 {
+#ifdef INET6
+	char ntop_buf[NI_MAXHOST];
+#endif
+
 	switch (su->sa.sa_family) {
 	case AF_INET:
 		(void) printf("%s: inet %s; ",
