@@ -1,4 +1,4 @@
-.\"	$KAME: ndp.8,v 1.17 2001/08/28 12:04:08 jinmei Exp $
+.\"	$KAME: ndp.8,v 1.18 2001/08/28 14:52:38 jinmei Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -175,6 +175,17 @@ unless the
 .Li net.inet6.ip6.accept_rtadv
 variable is non-0, even if the flag is on.
 This flag is set to 1 by default.
+.It Xo
+.Ic prefer_source
+.Xc
+prefer addresses on the
+.Ar interface
+as candidates of the source address for outgoing packets.
+The default value of this flag is off.
+For more details about the entire algorithm of source address
+selection, see the
+.Pa IMPLEMENTATION
+file supplied with the KAME kit.
 .El
 .It Fl n
 Do not try to resolve numeric address to hostname.
