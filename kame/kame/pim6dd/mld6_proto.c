@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.10 2001/12/18 03:10:42 jinmei Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.11 2002/11/12 11:20:51 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -82,7 +82,7 @@
 
 #include "defs.h"
 
-extern struct in6_addr in6addr_any;
+extern const struct in6_addr in6addr_any;
 
 typedef struct {
 	mifi_t  mifi;

@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.23 2002/08/01 03:35:01 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.24 2002/11/12 11:20:51 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -83,7 +83,7 @@ struct sockaddr_in6 allnodes_group = {sizeof(struct sockaddr_in6), AF_INET6};
 
 /* Extenals */
 
-extern struct in6_addr in6addr_linklocal_allnodes;
+extern const struct in6_addr in6addr_linklocal_allnodes;
 
 /* local variables. */
 static struct sockaddr_in6 	dst = {sizeof(dst), AF_INET6};
