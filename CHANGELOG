@@ -1,6 +1,21 @@
-$Id: CHANGELOG,v 1.457 2000/01/18 05:42:58 jinmei Exp $
+$Id: CHANGELOG,v 1.458 2000/01/18 09:38:55 kjc Exp $
+
 
 <200001>
+Tue Jan 18 16:30:05 JST 2000 kjc@csl.sony.co.jp
+	update ALTQ from 2.0 to 2.1.
+	this version supports openbsd in addition to freebsd2, freebsd3
+	and netbsd.
+	kernel:
+	- altq related files are moved from "sys/net" and "sys/netinet"
+	  to "sys/altq" not to bloat the standard directories.
+	- rename the altq kernel config file from ALTQ to ALTQ.v4 since
+	  it's only for IPv4 and GENERIC.v6 has ALTQ already defined.
+	userland:
+	- the following altq tools are added to the tree:
+	  lib/altqlib, usr.sbin/altqd, user.bin/altqstat.
+	- install MAKEDEV.altq to /dev.
+
 2000-01-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/icmp6.h: changed the type of the
 	icmp6_n[il]_nonece member of the icmp6_{namelookup, nodeinfo}
