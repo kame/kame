@@ -292,8 +292,6 @@ options 	ALTQ		#alternate queueing
 #options 	NATPT
 
 # mobile-ip6 options
-# NOTE: Don't define with IPsec options
-# NOTE: may not work due to prefix management changes (Feb2001)
 #options 	"MIP6"
 ##options 	"MIP6_DEBUG"
 

@@ -28,7 +28,6 @@ option		ALTQ_PRIQ	#priority queue
 #option		ALTQ_DEBUG	#for debugging
 
 # mobile-ip6 options
-# NOTE: may not work due to prefix management changes (Feb2001)
 #option		MIP6
 #option		MIP6_DEBUG
 #rmoption 	IPSEC

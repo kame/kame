@@ -41,7 +41,5 @@ options 	ALTQ_PRIQ	#priority queue
 #options 	RADIX_ART
 
 # mobile-ip6 options
-# NOTE: Don't define with IPsec options
-# NOTE: may not work due to prefix management changes (Feb2001)
 #option		MIP6
 #option		MIP6_DEBUG
