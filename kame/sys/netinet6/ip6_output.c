@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.193 2001/07/02 08:56:39 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.194 2001/07/09 13:45:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3010,6 +3010,7 @@ ip6_getpcbopt(pktopt, optname, datap, datalenp)
 	case IPV6_TCLASS:
 		optdata = (void *)&pktopt->ip6po_tclass;
 		optdatalen = sizeof(pktopt->ip6po_tclass);
+		break;
 	case IPV6_HOPOPTS:
 		if (pktopt->ip6po_hbh) {
 			optdata = (void *)pktopt->ip6po_hbh;
