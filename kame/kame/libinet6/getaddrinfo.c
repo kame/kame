@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.208 2004/12/26 07:27:11 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.209 2005/01/18 09:30:15 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -493,6 +493,9 @@ getaddrinfo(hostname, servname, hints, res)
 	/* ensure we return NULL on errors */
 	*res = NULL;
 
+	/* ac must be initilized before using ERR() */
+	memset(&ac, 0, sizeof(ac));
+
 	memset(&ai, 0, sizeof(ai));
 
 	memset(afailist, 0, sizeof(afailist));
@@ -557,7 +560,6 @@ getaddrinfo(hostname, servname, hints, res)
 		}
 	}
 
-	memset(&ac, 0, sizeof(ac));
 	if ((error = init(&ac, pai->ai_flags)) != 0)
 		goto bad;
 
