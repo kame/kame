@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.33 2002/02/19 03:40:39 keiichi Exp $	*/
+/*	$KAME: route6.c,v 1.34 2002/02/19 05:50:06 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -214,7 +214,7 @@ ip6_rthdr0(m, ip6, rh0)
 				 */
 				n = ip6_findaux(m);
 				if (n) {
-					ip6a = mtod(m, struct ip6aux *);
+					ip6a = mtod(n, struct ip6aux *);
 					ip6a->ip6a_flags
 						|= IP6A_ROUTEOPTIMIZED;
 				}
