@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.39 2000/01/14 03:18:28 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.40 2000/01/14 03:31:25 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2799,11 +2799,11 @@ getph2proplen(proposal)
 
 			if (b->lifetime) {
 				len += sizeof(struct isakmp_data) +
-					sizeof(struct isakmp_data) + sizeof(b->lifetime);
+					sizeof(struct isakmp_data) + sizeof(u_int32_t);
 			}
 			if (b->lifebyte) {
 				len += sizeof(struct isakmp_data) +
-					sizeof(struct isakmp_data) + sizeof(b->lifebyte);
+					sizeof(struct isakmp_data) + sizeof(u_int32_t);
 			}
 			if (b->encklen)
 				len += sizeof(struct isakmp_data);
@@ -2907,11 +2907,11 @@ ipsecdoi_setph2proposal0(iph2, keys, b)
 	len = sizeof(struct isakmp_data);
 	if (b->lifetime) {
 		len += sizeof(struct isakmp_data) +
-			sizeof(struct isakmp_data) + sizeof(b->lifetime);
+			sizeof(struct isakmp_data) + sizeof(u_int32_t);
 	}
 	if (b->lifebyte) {
 		len += sizeof(struct isakmp_data) +
-			sizeof(struct isakmp_data) + sizeof(b->lifebyte);
+			sizeof(struct isakmp_data) + sizeof(u_int32_t);
 	}
 	if (b->encklen)
 		len += sizeof(struct isakmp_data);
