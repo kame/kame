@@ -590,7 +590,7 @@ secproto_spec
 					yyerror("algorithm mismatched");
 					return -1;
 				}
-				prhead->spspec->algclass[algclass_ipsec_auth] = doi;
+				prhead->spspec->algclass[algclass_ipsec_comp] = doi;
 				break;
 			default:
 				yyerror("algorithm mismatched");
