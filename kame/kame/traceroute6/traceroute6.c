@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.35 2000/11/24 11:19:32 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.36 2000/11/26 23:40:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -280,9 +280,6 @@ static char sccsid[] = "@(#)traceroute.c	8.1 (Berkeley) 6/6/93";
 #define DUMMY_PORT 10010
 
 #define	MAXPACKET	65535	/* max ip packet size */
-#ifndef MAXHOSTNAMELEN
-#define MAXHOSTNAMELEN	64
-#endif
 
 #ifndef FD_SET
 #define NFDBITS         (8*sizeof(fd_set))
