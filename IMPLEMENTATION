@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/02/28 13:47:40 $
+			$Date: 2000/03/09 19:48:23 $
 
 1. IPv6
 
@@ -1137,6 +1137,15 @@ Basically you'll need to run racoon as daemon, then setup a policy
 to require keys (like ping -P 'out ipsec esp/transport//use').
 The kernel will contact racoon daemon as necessary to exchange keys.
 
+In IKE spec, there's ambiguity about interpretation of "tunnel" proposal.
+For example, if we would like to propose the use of following packet:
+	IP AH ESP IP payload
+some implmementation proposes it as "AH transport and ESP tunnel", since
+this is more logical from packet construction point of view.  Some
+implementation proposes it as "AH tunnel and ESP tunnel".
+Racoon follows the former route.
+This raises real interoperability issue.  We hope this to be resolved quickly.
+
 4.3 AH and ESP handling
 
 IPsec module is implemented as "hooks" to the standard IPv4/IPv6
@@ -1169,6 +1178,19 @@ Tunnel mode works basically fine, but comes with the following restrictions:
   If you need to perform experiments, add "options IPSEC_IPV6FWD" into
   the kernel configuration file.  Note that path MTU discovery does not work
   across IPv6 IPsec tunnel gateway due to insufficient code.
+
+AH specificaton does not talk much about "multiple AH on a packet" case.
+We incrementally compute AH checksum, from inside to outside.  Also, we
+treat inner AH to be immutable.
+For example, if we are to create the following packet:
+	IP AH1 AH2 AH3 payload
+we do it incrementally.  As a result, we get crypto checksums like below:
+	AH3 has checksum against "IP AH3' payload".
+		where AH3' = AH3 with checksum field filled with 0.
+	AH2 has checksum against "IP AH2' AH3 payload".
+	AH1 has checksum against "IP AH1' AH2 AH3 payload",
+Also note that AH3 has the smallest sequence number, and AH1 has the largest
+sequence number.
 
 4.4 IPComp handling
 
