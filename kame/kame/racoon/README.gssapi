@@ -1,5 +1,5 @@
 The gss-api authentication mechanism implementation for racoon was
-based on the ietf draft dratf-ietf-ipsec-isakmp-gss-auth-06.txt.
+based on the ietf draft draft-ietf-ipsec-isakmp-gss-auth-06.txt.
 
 The implementation uses the Heimdal gss-api library, i.e. gss-api
 on top of Kerberos 5. The Heimdal gss-api library had to be modified
