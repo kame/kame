@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.45 2003/11/06 10:35:49 suz Exp $	*/
+/*	$KAME: dhcp6.h,v 1.46 2004/01/20 07:24:45 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -149,6 +149,8 @@ struct dhcp6_optinfo {
 	struct dhcp6_list iapd_list; /* list of IA_PD */
 	struct dhcp6_list reqopt_list; /* options in option request */
 	struct dhcp6_list stcode_list; /* status code */
+	struct dhcp6_list sip_list; /* SIP server list */
+	struct dhcp6_list sipname_list; /* SIP server domain list */
 	struct dhcp6_list dns_list; /* DNS server list */
 	struct dhcp6_list dnsname_list; /* Domain Search list */
 	struct dhcp6_list ntp_list; /* NTP server list */
@@ -222,6 +224,12 @@ struct dhcp6_relay {
  * provide a way to configure these values.  It is highly recommended to use
  * the standard values whenever possible, of course.
  */
+#ifndef DH6OPT_SIP_SERVER_D
+#define DH6OPT_SIP_SERVER_D 21
+#endif
+#ifndef DH6OPT_SIP_SERVER_A
+#define DH6OPT_SIP_SERVER_A 22
+#endif
 #ifndef DH6OPT_DNS
 #define DH6OPT_DNS 23
 #endif

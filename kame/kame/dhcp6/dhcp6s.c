@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.112 2003/08/01 07:00:05 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.113 2004/01/20 07:24:45 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -196,6 +196,8 @@ main(argc, argv)
 	TAILQ_INIT(&arg_dnslist);
 	TAILQ_INIT(&dnslist);
 	TAILQ_INIT(&dnsnamelist);
+	TAILQ_INIT(&siplist);
+	TAILQ_INIT(&sipnamelist);
 	TAILQ_INIT(&ntplist);
 
 	srandom(time(NULL) & getpid());
@@ -778,6 +780,18 @@ static int
 set_statelessinfo(optinfo)
 	struct dhcp6_optinfo *optinfo;
 {
+	/* SIP server domain name */
+	if (dhcp6_copy_list(&optinfo->sipname_list, &sipnamelist)) {
+		dprintf(LOG_ERR, FNAME, "failed to copy SIP server domain list");
+		return (-1);
+	}
+
+	/* SIP server */
+	if (dhcp6_copy_list(&optinfo->sip_list, &siplist)) {
+		dprintf(LOG_ERR, FNAME, "failed to copy SIP servers");
+		return (-1);
+	}
+
 	/* DNS server */
 	if (dhcp6_copy_list(&optinfo->dns_list, &dnslist)) {
 		dprintf(LOG_ERR, FNAME, "failed to copy DNS servers");

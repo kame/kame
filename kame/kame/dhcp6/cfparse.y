@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.24 2003/07/31 23:20:25 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.25 2004/01/20 07:24:44 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -82,6 +82,7 @@ extern void yyerror __P((char *, ...))
 
 static struct cf_namelist *iflist_head, *hostlist_head, *iapdlist_head;
 struct cf_list *cf_dns_list, *cf_dns_name_list, *cf_ntp_list;
+struct cf_list *cf_sip_list, *cf_sip_name_list;
 
 extern int yylex __P((void));
 static void cleanup __P((void));
@@ -95,6 +96,7 @@ static void cleanup_cflist __P((struct cf_list *));
 %token REQUEST SEND ALLOW PREFERENCE
 %token HOST HOSTNAME DUID
 %token OPTION RAPID_COMMIT IA_PD DNS_SERVERS DNS_NAME NTP_SERVERS
+%token SIP_SERVERS SIP_NAME
 %token INFO_ONLY
 %token SCRIPT
 
@@ -184,6 +186,30 @@ option_statement:
 			else {
 				cf_ntp_list->tail->next = $3;
 				cf_ntp_list->tail = $3->next;
+			}
+		}
+	|	OPTION SIP_SERVERS address_list EOS
+		{
+			if (cf_sip_list == NULL)
+				cf_sip_list = $3;
+			else {
+				cf_sip_list->tail->next = $3;
+				cf_sip_list->tail = $3->next;
+			}
+		}
+	|	OPTION SIP_NAME QSTRING EOS
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, CFLISTENT_GENERIC, $3, NULL);
+
+			if (cf_sip_name_list == NULL) {
+				cf_sip_name_list = l;
+				cf_sip_name_list->tail = l;
+				cf_sip_name_list->next = NULL;
+			} else {
+				cf_sip_name_list->tail->next = l;
+				cf_sip_name_list->tail = l->next;
 			}
 		}
 	;
@@ -370,6 +396,22 @@ dhcpoption:
 
 			MAKE_CFLIST(l, DHCPOPT_IA_PD, NULL, NULL);
 			l->num = $2;
+			$$ = l;
+		}
+	|	SIP_SERVERS
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, DHCPOPT_SIP, NULL, NULL);
+			/* currently no value */
+			$$ = l;
+		}
+	|	SIP_NAME
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, DHCPOPT_SIPNAME, NULL, NULL);
+			/* currently no value */
 			$$ = l;
 		}
 	|	DNS_SERVERS
@@ -580,6 +622,8 @@ cleanup()
 	cleanup_namelist(hostlist_head);
 	cleanup_namelist(iapdlist_head);
 
+	cleanup_cflist(cf_sip_list);
+	cleanup_cflist(cf_sip_name_list);
 	cleanup_cflist(cf_dns_list);
 	cleanup_cflist(cf_dns_name_list);
 	cleanup_cflist(cf_ntp_list);

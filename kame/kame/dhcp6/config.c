@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.36 2003/12/16 10:31:48 suz Exp $	*/
+/*	$KAME: config.c,v 1.37 2004/01/20 07:24:45 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -50,12 +50,12 @@
 extern int errno;
 
 struct prefix_ifconf *prefix_ifconflist;
-struct dhcp6_list dnslist, dnsnamelist, ntplist;
+struct dhcp6_list siplist, sipnamelist, dnslist, dnsnamelist, ntplist;
 
 static struct dhcp6_ifconf *dhcp6_ifconflist;
 struct ia_conflist ia_conflist0;
 static struct host_conf *host_conflist0, *host_conflist;
-static struct dhcp6_list dnslist0, dnsnamelist0, ntplist0;
+static struct dhcp6_list siplist0, sipnamelist0, dnslist0, dnsnamelist0, ntplist0;
 
 enum { DHCPOPTCODE_SEND, DHCPOPTCODE_REQUEST, DHCPOPTCODE_ALLOW };
 
@@ -78,6 +78,7 @@ struct dhcp6_ifconf {
 };
 
 extern struct cf_list *cf_dns_list, *cf_dns_name_list, *cf_ntp_list;
+extern struct cf_list *cf_sip_list, *cf_sip_name_list;
 extern char *configfilename;
 
 static int add_pd_pif __P((struct iapd_conf *, struct cf_list *));
@@ -478,6 +479,68 @@ configure_global_option()
 		    configfilename, cf_dns_list->line);
 		goto bad;
 	}
+	if ((cf_sip_list && cf_sip_name_list) &&
+	    dhcp6_mode != DHCP6_MODE_SERVER) {
+		dprintf(LOG_INFO, FNAME, "%s:%d server-only configuration",
+		    configfilename, cf_sip_list->line);
+		goto bad;
+	}
+
+	/* SIP Server address */
+	TAILQ_INIT(&siplist0);
+	for (cl = cf_sip_list; cl; cl = cl->next) {
+		/* duplication check */
+		if (dhcp6_find_listval(&siplist0, DHCP6_LISTVAL_ADDR6,
+		    cl->ptr, 0)) {
+			dprintf(LOG_INFO, FNAME,
+			    "%s:%d duplicated SIP server: %s",
+			    configfilename, cl->line,
+			    in6addr2str((struct in6_addr *)cl->ptr, 0));
+			goto bad;
+		}
+		if (dhcp6_add_listval(&siplist0, DHCP6_LISTVAL_ADDR6,
+		    cl->ptr, NULL) == NULL) {
+			dprintf(LOG_ERR, FNAME, "failed to add a SIP server");
+			goto bad;
+		}
+	}
+
+	/* SIP Server domain name */
+	TAILQ_INIT(&sipnamelist0);
+	for (cl = cf_sip_name_list; cl; cl = cl->next) {
+		char *name, *cp;
+		struct dhcp6_vbuf name_vbuf;
+
+		name = strdup(cl->ptr + 1);
+		if (name == NULL) {
+			dprintf(LOG_ERR, FNAME, "failed to copy a SIP server domain name");
+			goto bad;
+		}
+		cp = name + strlen(name) - 1;
+		*cp = '\0';	/* clear the terminating quote */
+
+		name_vbuf.dv_buf = name;
+		name_vbuf.dv_len = strlen(name) + 1;
+
+		/* duplication check */
+		if (dhcp6_find_listval(&sipnamelist0, DHCP6_LISTVAL_VBUF,
+		    &name_vbuf, 0)) {
+			dprintf(LOG_INFO, FNAME,
+			    "%s:%d duplicated SIP name: %s",
+			    configfilename, cl->line);
+			dhcp6_vbuf_free(&name_vbuf);
+			goto bad;
+		}
+
+		/* add the name */
+		if (dhcp6_add_listval(&sipnamelist0, DHCP6_LISTVAL_VBUF,
+		    &name_vbuf, NULL) == NULL) {
+			dprintf(LOG_ERR, FNAME, "failed to add a SIP name");
+			dhcp6_vbuf_free(&name_vbuf);
+			goto bad;
+		}
+		dhcp6_vbuf_free(&name_vbuf);
+	}
 
 	/* DNS servers */
 	TAILQ_INIT(&dnslist0);
@@ -687,6 +750,10 @@ configure_cleanup()
 	dhcp6_ifconflist = NULL;
 	clear_hostconf(host_conflist0);
 	host_conflist0 = NULL;
+	dhcp6_clear_list(&siplist0);
+	TAILQ_INIT(&siplist0);
+	dhcp6_clear_list(&sipnamelist0);
+	TAILQ_INIT(&sipnamelist0);
 	dhcp6_clear_list(&dnslist0);
 	TAILQ_INIT(&dnslist0);
 	dhcp6_clear_list(&dnsnamelist0);
@@ -740,6 +807,14 @@ configure_commit()
 	clear_hostconf(host_conflist);
 	host_conflist = host_conflist0;
 	host_conflist0 = NULL;
+
+	/* commit SIP server addresses */
+	dhcp6_clear_list(&siplist);
+	dhcp6_move_list(&siplist, &siplist0);
+
+	/* commit SIP server domain names */
+	dhcp6_clear_list(&sipnamelist);
+	dhcp6_move_list(&sipnamelist, &sipnamelist0);
 
 	/* commit DNS addresses */
 	dhcp6_clear_list(&dnslist);
@@ -898,10 +973,18 @@ add_options(opcode, ifc, cfl0)
 				break;
 			}
 			break;
+		case DHCPOPT_SIP:
+		case DHCPOPT_SIPNAME:
 		case DHCPOPT_DNS:
 		case DHCPOPT_DNSNAME:
 		case DHCPOPT_NTP:
 			switch (cfl->type) {
+			case DHCPOPT_SIP:
+				opttype = DH6OPT_SIP_SERVER_A;
+				break;
+			case DHCPOPT_SIPNAME:
+				opttype = DH6OPT_SIP_SERVER_D;
+				break;
 			case DHCPOPT_DNS:
 				opttype = DH6OPT_DNS;
 				break;

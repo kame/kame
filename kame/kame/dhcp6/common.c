@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.94 2004/01/20 07:14:35 suz Exp $	*/
+/*	$KAME: common.c,v 1.95 2004/01/20 07:24:45 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -878,6 +878,8 @@ dhcp6_init_options(optinfo)
 	TAILQ_INIT(&optinfo->iapd_list);
 	TAILQ_INIT(&optinfo->reqopt_list);
 	TAILQ_INIT(&optinfo->stcode_list);
+	TAILQ_INIT(&optinfo->sip_list);
+	TAILQ_INIT(&optinfo->sipname_list);
 	TAILQ_INIT(&optinfo->dns_list);
 	TAILQ_INIT(&optinfo->dnsname_list);
 	TAILQ_INIT(&optinfo->ntp_list);
@@ -895,6 +897,8 @@ dhcp6_clear_options(optinfo)
 	dhcp6_clear_list(&optinfo->iapd_list);
 	dhcp6_clear_list(&optinfo->reqopt_list);
 	dhcp6_clear_list(&optinfo->stcode_list);
+	dhcp6_clear_list(&optinfo->sip_list);
+	dhcp6_clear_list(&optinfo->sipname_list);
 	dhcp6_clear_list(&optinfo->dns_list);
 	dhcp6_clear_list(&optinfo->dnsname_list);
 	dhcp6_clear_list(&optinfo->ntp_list);
@@ -924,6 +928,10 @@ dhcp6_copy_options(dst, src)
 	if (dhcp6_copy_list(&dst->reqopt_list, &src->reqopt_list))
 		goto fail;
 	if (dhcp6_copy_list(&dst->stcode_list, &src->stcode_list))
+		goto fail;
+	if (dhcp6_copy_list(&dst->sip_list, &src->sip_list))
+		goto fail;
+	if (dhcp6_copy_list(&dst->sipname_list, &src->sipname_list))
 		goto fail;
 	if (dhcp6_copy_list(&dst->dns_list, &src->dns_list))
 		goto fail;
@@ -1111,6 +1119,55 @@ dhcp6_get_options(p, ep, optinfo)
 				goto fail;
 			memcpy(optinfo->ifidopt_id, cp, optlen);
 			optinfo->ifidopt_len = optlen;
+			break;
+		case DH6OPT_SIP_SERVER_D:
+			val = cp;
+			while (val < cp + optlen) {
+				struct dhcp6_vbuf vb;
+				char name[MAXDNAME + 1];
+
+				if (dnsdecode((u_char **)&val,
+				    (u_char *)(cp + optlen), name,
+				    sizeof(name)) == NULL) {
+					dprintf(LOG_INFO, FNAME, "failed to"
+					    "decode a SIP domain name");
+					goto malformed;	/* or proceed? */
+				}
+
+				vb.dv_len = strlen(name) + 1;
+				vb.dv_buf = name;
+
+				if (dhcp6_add_listval(&optinfo->sipname_list,
+				    DHCP6_LISTVAL_VBUF, &vb, NULL) == NULL) {
+					dprintf(LOG_ERR, FNAME, "failed to"
+					    "copy a SIP domain name");
+					goto fail;
+				}
+			}
+			break;
+		case DH6OPT_SIP_SERVER_A:
+			if (optlen % sizeof(struct in6_addr) || optlen == 0)
+				goto malformed;
+			for (val = cp; val < cp + optlen;
+			     val += sizeof(struct in6_addr)) {
+				if (dhcp6_find_listval(&optinfo->sip_list,
+				    DHCP6_LISTVAL_ADDR6, val, 0)) {
+					dprintf(LOG_INFO, FNAME, "duplicated "
+					    "SIP server address (%s)",
+					    in6addr2str((struct in6_addr *)val,
+						0));
+					goto nextsip;
+				}
+
+				if (dhcp6_add_listval(&optinfo->sip_list,
+				    DHCP6_LISTVAL_ADDR6, val, NULL) == NULL) {
+					dprintf(LOG_ERR, FNAME,
+					    "failed to copy SIP server address");
+					goto fail;
+				}
+			  nextsip:
+				;
+			}
 			break;
 		case DH6OPT_DNS:
 			if (optlen % sizeof(struct in6_addr) || optlen == 0)
@@ -1614,6 +1671,64 @@ dhcp6_set_options(bp, ep, optinfo)
 			*valp = htons((u_int16_t)opt->val_num);
 		}
 		COPY_OPTION(DH6OPT_ORO, optlen, tmpbuf, p);
+		free(tmpbuf);
+	}
+
+	optlen = 0;
+	for (d = TAILQ_FIRST(&optinfo->sipname_list); d;
+	    d = TAILQ_NEXT(d, link)) {
+		optlen += (d->val_vbuf.dv_len + 1);
+	}
+	if (optlen) {
+		char name[MAXDNAME], *cp, *ep;
+		tmpbuf = NULL;
+
+		if ((tmpbuf = malloc(optlen)) == NULL) {
+			dprintf(LOG_ERR, FNAME,
+			    "memory allocation failed for SIP server domain options");
+			goto fail;
+		}
+		cp = tmpbuf;
+		ep = cp + optlen;
+		for (d = TAILQ_FIRST(&optinfo->sipname_list); d;
+		     d = TAILQ_NEXT(d, link)) {
+			int nlen;
+
+			nlen = dnsencode((const char *)d->val_vbuf.dv_buf,
+			    name, sizeof (name));
+			if (nlen < 0) {
+				dprintf(LOG_ERR, FNAME,
+				    "failed to encode a SIP server domain name");
+				goto fail;
+			}
+			if (ep - cp < nlen) {
+				dprintf(LOG_ERR, FNAME,
+				    "buffer length for SIP server domain name is too short");
+				goto fail;
+			}
+			memcpy(cp, name, nlen);
+			cp += nlen;
+		}
+		COPY_OPTION(DH6OPT_SIP_SERVER_D, optlen, tmpbuf, p);
+		free(tmpbuf);
+	}
+	if (!TAILQ_EMPTY(&optinfo->sip_list)) {
+		struct in6_addr *in6;
+
+		tmpbuf = NULL;
+		optlen = dhcp6_count_list(&optinfo->sip_list) *
+			sizeof(struct in6_addr);
+		if ((tmpbuf = malloc(optlen)) == NULL) {
+			dprintf(LOG_ERR, FNAME,
+			    "memory allocation failed for SIP server options");
+			goto fail;
+		}
+		in6 = (struct in6_addr *)tmpbuf;
+		for (d = TAILQ_FIRST(&optinfo->sip_list); d;
+		     d = TAILQ_NEXT(d, link), in6++) {
+			memcpy(in6, &d->val_addr6, sizeof(*in6));
+		}
+		COPY_OPTION(DH6OPT_SIP_SERVER_A, optlen, tmpbuf, p);
 		free(tmpbuf);
 	}
 
@@ -2131,6 +2246,10 @@ dhcp6optstr(type)
 		return ("interface ID");
 	case DH6OPT_RECONF_MSG:
 		return ("reconfigure message");
+	case DH6OPT_SIP_SERVER_D:
+		return ("SIP server domain name ");
+	case DH6OPT_SIP_SERVER_A:
+		return ("SIP server address");
 	case DH6OPT_DNS:
 		return ("DNS");
 	case DH6OPT_DNSNAME:

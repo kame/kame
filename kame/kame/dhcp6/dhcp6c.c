@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.125 2003/12/16 10:32:51 suz Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.126 2004/01/20 07:24:45 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1404,6 +1404,27 @@ client6_recvreply(ifp, dh6, len, optinfo)
 		}
 	}
 
+	if (!TAILQ_EMPTY(&optinfo->sip_list)) {
+		struct dhcp6_listval *d;
+		int i = 0;
+
+		for (d = TAILQ_FIRST(&optinfo->sip_list); d;
+		     d = TAILQ_NEXT(d, link), i++) {
+			dprintf(LOG_DEBUG, FNAME, "SIP server address[%d] %s",
+			    i, in6addr2str(&d->val_addr6, 0));
+		}
+	}
+
+	if (!TAILQ_EMPTY(&optinfo->sipname_list)) {
+		struct dhcp6_listval *d;
+		int i = 0;
+
+		for (d = TAILQ_FIRST(&optinfo->sipname_list); d;
+		     d = TAILQ_NEXT(d, link), i++) {
+			dprintf(LOG_DEBUG, FNAME, "SIP server domain name[%d] %s",
+			    i, d->val_vbuf.dv_buf);
+		}
+	}
 	/*
 	 * Call the configuration script, if specified, to handle various
 	 * configuration parameters.

@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.26 2003/07/31 21:44:11 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.27 2004/01/20 07:24:45 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -196,7 +196,8 @@ enum {DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY, DECL_REQUEST, DECL_DUID,
       DHCPOPT_RAPID_COMMIT, DHCPOPT_DNS, DHCPOPT_DNSNAME,
       DHCPOPT_IA_PD, DHCPOPT_NTP,
       CFLISTENT_GENERIC,
-      IACONF_PIF, IACONF_PREFIX };
+      IACONF_PIF, IACONF_PREFIX,
+      DHCPOPT_SIP, DHCPOPT_SIPNAME };
 
 typedef enum {DHCP6_MODE_SERVER, DHCP6_MODE_CLIENT, DHCP6_MODE_RELAY }
 dhcp6_mode_t;
@@ -206,6 +207,8 @@ extern const dhcp6_mode_t dhcp6_mode;
 extern struct dhcp6_if *dhcp6_if;
 extern struct dhcp6_ifconf *dhcp6_iflist;
 extern struct prefix_ifconf *prefix_ifconflist;
+extern struct dhcp6_list siplist;
+extern struct dhcp6_list sipnamelist;
 extern struct dhcp6_list dnslist;
 extern struct dhcp6_list dnsnamelist;
 extern struct dhcp6_list ntplist;

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_script.c,v 1.8 2003/10/31 05:51:46 suz Exp $	*/
+/*	$KAME: dhcp6c_script.c,v 1.9 2004/01/20 07:24:45 suz Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -60,6 +60,8 @@
 #include "config.h"
 #include "common.h"
 
+static char sipserver_str[] = "new_sip_name_servers";
+static char sipname_str[] = "new_sip_name";
 static char dnsserver_str[] = "new_domain_name_servers";
 static char dnsname_str[] = "new_domain_name";
 static char ntpserver_str[] = "new_ntp_servers";
@@ -73,6 +75,7 @@ client6_script(scriptpath, state, optinfo)
 	struct dhcp6_optinfo *optinfo;
 {
 	int i, dnsservers, ntpservers, dnsnamelen, envc, elen, ret = 0;
+	int sipservers, sipnamelen;
 	char **envp, *s;
 	char reason[] = "REASON=NBI";
 	struct dhcp6_listval *v;
@@ -86,6 +89,8 @@ client6_script(scriptpath, state, optinfo)
 	dnsservers = 0;
 	ntpservers = 0;
 	dnsnamelen = 0;
+	sipservers = 0;
+	sipnamelen = 0;
 	envc = 2;     /* we at least include the reason and the terminator */
 
 	/* count the number of variables */
@@ -100,6 +105,14 @@ client6_script(scriptpath, state, optinfo)
 	for (v = TAILQ_FIRST(&optinfo->ntp_list); v; v = TAILQ_NEXT(v, link))
 		ntpservers++;
 	envc += ntpservers ? 1 : 0;
+	for (v = TAILQ_FIRST(&optinfo->sip_list); v; v = TAILQ_NEXT(v, link))
+		sipservers++;
+	envc += sipservers ? 1 : 0;
+	for (v = TAILQ_FIRST(&optinfo->sipname_list); v;
+	    v = TAILQ_NEXT(v, link)) {
+		sipnamelen += v->val_vbuf.dv_len;
+	}
+	envc += sipnamelen ? 1 : 0;
 
 	/* allocate an environments array */
 	if ((envp = malloc(sizeof (char *) * envc)) == NULL) {
@@ -179,6 +192,42 @@ client6_script(scriptpath, state, optinfo)
 		}
 	}
 
+	if (sipservers) {
+		elen = sizeof (sipserver_str) +
+		    (INET6_ADDRSTRLEN + 1) * sipservers + 1;
+		if ((s = envp[i++] = malloc(elen)) == NULL) {
+			dprintf(LOG_NOTICE, FNAME,
+			    "failed to allocate strings for SIP servers");
+			ret = -1;
+			goto clean;
+		}
+		memset(s, 0, elen);
+		snprintf(s, elen, "%s=", sipserver_str);
+		for (v = TAILQ_FIRST(&optinfo->dns_list); v;
+		    v = TAILQ_NEXT(v, link)) {
+			char *addr;
+
+			addr = in6addr2str(&v->val_addr6, 0);
+			strlcat(s, addr, elen);
+			strlcat(s, " ", elen);
+		}
+	}
+	if (sipnamelen) {
+		elen = sizeof (sipname_str) + sipnamelen + 1;
+		if ((s = envp[i++] = malloc(elen)) == NULL) {
+			dprintf(LOG_NOTICE, FNAME,
+			    "failed to allocate strings for SIP server domain name");
+			ret = -1;
+			goto clean;
+		}
+		memset(s, 0, elen);
+		snprintf(s, elen, "%s=", sipname_str);
+		for (v = TAILQ_FIRST(&optinfo->sipname_list); v;
+		    v = TAILQ_NEXT(v, link)) {
+			strlcat(s, v->val_vbuf.dv_buf, elen);
+			strlcat(s, " ", elen);
+		}
+	}
 	/* launch the script */
 	pid = fork();
 	if (pid < 0) {
