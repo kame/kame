@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.103 2003/05/17 01:01:10 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.104 2003/06/27 07:48:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -365,7 +365,7 @@ getsocket()
 	if (s < 0) {
 		s = socket(PF_ROUTE, SOCK_RAW, 0);
 		if (s < 0) {
-			err(1, "ndp: socket");
+			err(1, "socket");
 			/* NOTREACHED */
 		}
 	}
@@ -619,7 +619,7 @@ again:;
 		err(1, "sysctl(PF_ROUTE estimate)");
 	if (needed > 0) {
 		if ((buf = malloc(needed)) == NULL)
-			errx(1, "malloc");
+			err(1, "malloc");
 		if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0)
 			err(1, "sysctl(PF_ROUTE, NET_RT_FLAGS)");
 		lim = buf + needed;
@@ -1074,7 +1074,7 @@ rtrlist()
 	}
 	buf = malloc(l);
 	if (!buf) {
-		errx(1, "not enough core");
+		err(1, "malloc");
 		/*NOTREACHED*/
 	}
 	if (sysctl(mib, sizeof(mib) / sizeof(mib[0]), buf, &l, NULL, 0) < 0) {
@@ -1171,7 +1171,7 @@ plist()
 	}
 	buf = malloc(l);
 	if (!buf) {
-		errx(1, "not enough core");
+		err(1, "malloc");
 		/*NOTREACHED*/
 	}
 	if (sysctl(mib, sizeof(mib) / sizeof(mib[0]), buf, &l, NULL, 0) < 0) {
