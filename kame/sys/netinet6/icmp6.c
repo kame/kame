@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.341 2003/03/19 08:35:07 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.342 2003/04/01 00:56:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3160,15 +3160,6 @@ icmp6_redirect_output(m0, rt)
 		len = maxlen - (p - (u_char *)ip6);
 		len &= ~7;
 
-		/* This is just for simplicity. */
-		if (m0->m_pkthdr.len != m0->m_len) {
-			if (m0->m_next) {
-				m_freem(m0->m_next);
-				m0->m_next = NULL;
-			}
-			m0->m_pkthdr.len = m0->m_len;
-		}
-
 		/*
 		 * Redirected header option spec (RFC2461 4.6.3) talks nothing
 		 * about padding/truncate rule for the original IP packet.
@@ -3180,34 +3171,22 @@ icmp6_redirect_output(m0, rt)
 		 * Following code adds the padding if it is simple enough,
 		 * and truncates if not.
 		 */
-		if (m0->m_next || m0->m_pkthdr.len != m0->m_len)
-			panic("assumption failed in %s:%d", __FILE__,
-			      __LINE__);
-
 		if (len - sizeof(*nd_opt_rh) < m0->m_pkthdr.len) {
 			/* not enough room, truncate */
-			m0->m_pkthdr.len = m0->m_len =
-				len - sizeof(*nd_opt_rh);
+			m_adj(m0, (len - sizeof(*nd_opt_rh)) -
+			    m0->m_pkthdr.len);
 		} else {
-			/* enough room, pad or truncate */
+			/*
+			 * enough room, truncate if not aligned.
+			 * we don't pad here for simplicity.
+			 */
 			size_t extra;
 
 			extra = m0->m_pkthdr.len % 8;
 			if (extra) {
-				/* pad if easy enough, truncate if not */
-				if (8 - extra <= M_TRAILINGSPACE(m0)) {
-					/* pad */
-					m0->m_len += (8 - extra);
-					m0->m_pkthdr.len += (8 - extra);
-				} else {
-					/* truncate */
-					m0->m_pkthdr.len -= extra;
-					m0->m_len -= extra;
-				}
+				/* truncate */
+				m_adj(m0, -extra);
 			}
-			len = m0->m_pkthdr.len + sizeof(*nd_opt_rh);
-			m0->m_pkthdr.len =
-				m0->m_len = len - sizeof(*nd_opt_rh);
 		}
 
 		nd_opt_rh = (struct nd_opt_rd_hdr *)p;
@@ -3221,9 +3200,9 @@ icmp6_redirect_output(m0, rt)
 #if defined(__OpenBSD__) || defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 		m_tag_delete_chain(m0, NULL);
 #endif
+		m_cat(m, m0);
+		m->m_pkthdr.len += m0->m_pkthdr.len;
 		m0->m_flags &= ~M_PKTHDR;
-		m->m_next = m0;
-		m->m_pkthdr.len = m->m_len + m0->m_len;
 		m0 = NULL;
 	}
 noredhdropt:
