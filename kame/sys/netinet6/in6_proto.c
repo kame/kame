@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.156 2004/12/27 05:41:17 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.157 2004/12/27 06:10:30 itojun Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -289,7 +289,7 @@ struct ip6protosw inet6sw[] = {
   sctp6_usrreq,
 #endif
   0,		0,		0,		sctp_drain,
-#ifndef __OpenBSD__
+#ifdef __OpenBSD__
   sctp_sysctl,
 #elif defined(__FreeBSD__)
   &sctp6_usrreqs
