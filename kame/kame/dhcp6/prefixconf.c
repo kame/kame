@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.27 2005/01/12 06:06:12 suz Exp $	*/
+/*	$KAME: prefixconf.c,v 1.28 2005/01/30 03:11:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -681,8 +681,6 @@ add_ifaddr(siteprefix, prefix, ifname)
 	ifpfx->ifconf->ifname = ifname;
 	if (ifaddrconf(IFADDRCONF_ADD, ifpfx))
 		goto bad;
-
-	/* TODO: send a control message for other processes */
 
 	TAILQ_INSERT_TAIL(&siteprefix->ifprefix_list, ifpfx, plink);
 
