@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/12/21 03:31:04 $
+			$Date: 1999/12/21 08:41:18 $
 
 1. IPv6
 
@@ -558,7 +558,9 @@ different between them.  To summarize:
   AF_INET6.  It is enabled by default.  You can disable those two by runtime
   and kernel compile configuration.
   (you can't enable only one of them: they come together)
-- KAME/NetBSD supports both.  This is always enabled.
+- KAME/NetBSD supports both.  It is completely disabled by default.
+  You can compile in the code by certain kernel config, control it via sysctl/
+  setsockopt.
 - KAME/BSDI4 supports both.  This is always enabled.
 
 The following sections will give you the details, and how you can
@@ -676,7 +678,7 @@ If the following events happen, KAME/FreeBSD3x will behave like this:
 - sendmail4 is running.  It is doing wildcard bind on AF_INET.
 - Invoke sendmail6.  It will do a wildcard bind on AF_INET6.
 - Stop sendmail4.  Here, on KAME/FreeBSD3x, IPv4 and IPv6 conections will
-  be routed to sendmail6.  This is different from KAME/FreeBSD228.
+  be routed to sendmail6.
 
 1.12.4 KAME/NetBSD
 
@@ -686,6 +688,61 @@ from KAME/FreeBSD3x.  KAME/NetBSD uses separate inpcb/in6pcb structures,
 while KAME/FreeBSD3x uses merged inpcb structure.
 Supports for IPv4 mapped address/special AF_INET6 wildcard bind are
 enabled by default.  At this moment there is no way to disable it.
+
+The platform can be configured to support IPv4 mapped address/special AF_INET6
+wildcard bind (disabled by default).  If you disable it, it behaves as
+described in 1.12.1.
+
+The IPv4 mapped address support needs tweaked implementation in
+DNS support libraries.  This is documented in RFC2553 6.1.
+KAME libraries (namely libinet6.a) actually support that.
+
+RFC2553 does not talk about how port number space should be designed
+(i.e. should they be separate between AF_INET and AF_INET6, or
+should they be common)
+In KAME with the behavior enabled, port number space is separate
+between AF_INET and AF_INET6 sockets in most cases.  The only
+exception is wildcard bind socket, where the special behavior appears.
+
+If a server application would like to accept IPv4 and IPv6 connections,
+it can use IPv6 socket with wildcard bind, or use two sockets (for
+AF_INET6 and AF_INET).  You can handle IPv4 and IPv6 connections
+by using AF_INET6 socket.  Porting of an application can be simpler in
+this case, like:
+- change AF_INET into AF_INET6
+- use gethostbyname2(hostname, AF_INET6) or getipnodebyname(), instead of
+  gethostbyname(hostname)
+- use struct sockaddr_in6 instead of sockaddr_in
+
+To provide services to both IPv4 and IPv6 clients, you will run a single
+server which binds to single AF_INET6 wildcard socket.  This server will
+accept both IPv4 and IPv6 connections to the tcp/udp port.
+If you run two daemons, which binds to AF_INET6 wildcard socket and
+AF_INET socket (say, sendmail4 and sendmail6), story start to look
+a bit complicated.  The next sections have the detail.
+
+Kernel behavior can be summarized as follows:
+- default: No special support code for AF_INET6 wildcard socket will be
+  compiled in.  AF_INET6 sockets and AF_INET sockets are totally separate.
+- add "MAPPED_ADDR_ENABLED=0" option to kernel config: special support code
+  will be compiled in, but is disabled by default.  It can be controlled by
+  sysctl (net.inet6.ip6.mapped_addr), or setsockopt(IPV6_BINDV6ONLY).
+- add "MAPPED_ADDR_ENABLED=1" option to kernel config: special support code
+  will be compiled in, but is enabled by default.  It can be controlled by
+  sysctl (net.inet6.ip6.mapped_addr), or setsockopt(IPV6_BINDV6ONLY).
+
+sysctl setting will affect per-socket configuration at in6pcb creation time
+only.  In other words, per-socket configuration will be copied from sysctl
+configuration at in6pcb creation time.  To change per-socket behavior, you
+must perform setsockopt or reopen the socket.  Change in sysctl configuration
+will not change the behavior or sockets that are already opened.
+
+Wildcard AF_INET6 socket grabs IPv4 connection if and only if the following 
+conditions are satisfied:
+- there's no AF_INET socket that matches the IPv4 connection
+- the AF_INET6 socket is configured to accept IPv4 traffic, i.e.
+  getsockopt(IPV6_BINDV6ONLY) returns 0.
+There's no problem with open/close ordering.
 
 1.12.5 KAME/BSDI4
 
