@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: grabmyaddr.c,v 1.10 2000/04/17 16:00:35 sakane Exp $ */
+/* YIPS @(#)$Id: grabmyaddr.c,v 1.11 2000/04/29 19:54:34 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -224,7 +224,8 @@ grab_myaddrs()
 #endif
 
 	maxif = if_maxindex() + 1;
-	len = maxif * sizeof(*iflist) * 5;	/* guess guess */
+	len = maxif * sizeof(struct sockaddr_storage) * 4; /* guess guess */
+
 	iflist = (struct ifreq *)malloc(len);
 	if (!iflist) {
 		plog(logp, LOCATION, NULL,
@@ -256,10 +257,15 @@ grab_myaddrs()
 
 	/* Look for this interface in the list */
 	ifr_end = (struct ifreq *) (ifconf.ifc_buf + ifconf.ifc_len);
+
+#define _IFREQ_LEN(p) \
+  (sizeof((p)->ifr_name) + (p)->ifr_addr.sa_len > sizeof(struct ifreq) \
+    ? sizeof((p)->ifr_name) + (p)->ifr_addr.sa_len : sizeof(struct ifreq))
+
 	for (ifr = ifconf.ifc_req;
 	     ifr < ifr_end;
-	     ifr = (struct ifreq *) ((char *) &ifr->ifr_addr
-				    + ifr->ifr_addr.sa_len)) {
+	     ifr = (struct ifreq *)((caddr_t)ifr + _IFREQ_LEN(ifr))) {
+
 		switch (ifr->ifr_addr.sa_family) {
 		case AF_INET:
 #ifdef INET6
