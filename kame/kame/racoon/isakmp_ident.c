@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.12 2000/01/12 23:02:57 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.13 2000/01/18 19:32:22 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -306,7 +306,7 @@ end:
 /*
  * receive from responder
  * 	psk: HDR, KE, Nr
- * 	sig: HDR, KE, Nr
+ * 	sig: HDR, KE, Nr [, CR ]
  * 	rsa: HDR, KE, <IDr1_b>PubKey_i, <Nr_b>PubKey_i
  * 	rev: HDR, <Nr_b>PubKey_i, <KE_b>Ke_r, <IDr1_b>Ke_r,
  */
@@ -386,7 +386,7 @@ end:
 /*
  * send to responder
  * 	psk: HDR*, IDi1, HASH_I
- * 	sig: HDR*, IDi1, [ CERT, ] SIG_I
+ * 	sig: HDR*, IDi1, [ CR, ] [ CERT, ] SIG_I
  * 	rsa: HDR*, HASH_I
  * 	rev: HDR*, HASH_I
  */
@@ -882,7 +882,7 @@ end:
 /*
  * send to initiator
  * 	psk: HDR, KE, Nr
- * 	sig: HDR, KE, Nr
+ * 	sig: HDR, KE, Nr [, CR ]
  * 	rsa: HDR, KE, <IDr1_b>PubKey_i, <Nr_b>PubKey_i
  * 	rev: HDR, <Nr_b>PubKey_i, <KE_b>Ke_r, <IDr1_b>Ke_r,
  */
@@ -942,7 +942,7 @@ end:
 /*
  * receive from initiator
  * 	psk: HDR*, IDi1, HASH_I
- * 	sig: HDR*, IDi1, [ CERT, ] SIG_I
+ * 	sig: HDR*, IDi1, [ CR, ] [ CERT, ] SIG_I
  * 	rsa: HDR*, HASH_I
  * 	rev: HDR*, HASH_I
  */

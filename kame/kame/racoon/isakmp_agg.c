@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.11 2000/01/12 23:02:56 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.12 2000/01/18 19:32:22 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -74,7 +74,7 @@
 /*
  * send to responder
  * 	psk: HDR, SA, KE, Ni, IDi1
- * 	sig: HDR, SA, KE, Ni, IDi1
+ * 	sig: HDR, SA, KE, Ni, IDi1 [, CR ]
  * 	rsa: HDR, SA, [ HASH(1),] KE, <IDi1_b>Pubkey_r, <Ni_b>Pubkey_r
  * 	rev: HDR, SA, [ HASH(1),] <Ni_b>Pubkey_r, <KE_b>Ke_i,
  * 	     <IDii_b>Ke_i [, <Cert-I_b>Ke_i ]
@@ -182,7 +182,7 @@ end:
 /*
  * receive from responder
  * 	psk: HDR, SA, KE, Nr, IDr1, HASH_R
- * 	sig: HDR, SA, KE, Nr, IDr1, [ CERT, ] SIG_R
+ * 	sig: HDR, SA, KE, Nr, IDr1, [ CR, ] [ CERT, ] SIG_R
  * 	rsa: HDR, SA, KE, <IDr1_b>PubKey_i, <Nr_b>PubKey_i, HASH_R
  * 	rev: HDR, SA, <Nr_b>PubKey_i, <KE_b>Ke_r, <IDir_b>Ke_r, HASH_R
  */
@@ -413,7 +413,7 @@ end:
 /*
  * receive from initiator
  * 	psk: HDR, SA, KE, Ni, IDi1
- * 	sig: HDR, SA, KE, Ni, IDi1
+ * 	sig: HDR, SA, KE, Ni, IDi1 [, CR ]
  * 	rsa: HDR, SA, [ HASH(1),] KE, <IDi1_b>Pubkey_r, <Ni_b>Pubkey_r
  * 	rev: HDR, SA, [ HASH(1),] <Ni_b>Pubkey_r, <KE_b>Ke_i,
  * 	     <IDii_b>Ke_i [, <Cert-I_b>Ke_i ]
@@ -542,7 +542,7 @@ end:
 /*
  * send to initiator
  * 	psk: HDR, SA, KE, Nr, IDr1, HASH_R
- * 	sig: HDR, SA, KE, Nr, IDr1, [ CERT, ] SIG_R
+ * 	sig: HDR, SA, KE, Nr, IDr1, [ CR, ] [ CERT, ] SIG_R
  * 	rsa: HDR, SA, KE, <IDr1_b>PubKey_i, <Nr_b>PubKey_i, HASH_R
  * 	rev: HDR, SA, <Nr_b>PubKey_i, <KE_b>Ke_r, <IDir_b>Ke_r, HASH_R
  */
