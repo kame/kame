@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.123 2001/07/27 10:29:06 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.124 2001/08/13 10:47:23 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2255,8 +2255,9 @@ pk_checkalg(class, calg, keylen)
 		sup = SADB_EXT_SUPPORTED_AUTH;
 		break;
 	case IPSECDOI_PROTO_IPCOMP:
-		plog(LLV_WARNING, LOCATION, NULL,
-			"compression algorithm can not be checked.\n");
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"compression algorithm can not be checked "
+			"because sadb message doesn't support it.\n");
 		return 0;
 	default:
 		plog(LLV_ERROR, LOCATION, NULL,
