@@ -846,8 +846,9 @@ ip_fragment(struct mbuf *m, struct ifnet *ifp, u_long mtu)
 			mhip->ip_hl = mhlen >> 2;
 		}
 		m->m_len = mhlen;
-		mhip->ip_off = ((off - hlen) >> 3) + (ip->ip_off & ~IP_MF);
-		if (ip->ip_off & IP_MF)
+		mhip->ip_off = ((off - hlen) >> 3) +
+		    (ntohs(ip->ip_off) & ~IP_MF);
+		if (ip->ip_off & htons(IP_MF))
 			mhip->ip_off |= IP_MF;
 		if (off + len >= ntohs(ip->ip_len))
 			len = ntohs(ip->ip_len) - off;
