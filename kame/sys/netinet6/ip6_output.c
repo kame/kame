@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.214 2001/08/11 10:54:34 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.215 2001/08/12 08:05:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -175,6 +175,8 @@ static int ip6_pcbopts __P((struct ip6_pktopts **, struct mbuf *,
 static int ip6_pcbopts __P((struct ip6_pktopts **, struct mbuf *,
 			    struct socket *));
 #endif
+static int ip6_setpktoption __P((int, u_char *, int, struct ip6_pktopts *, int,
+				 int, int));
 static int ip6_setmoptions __P((int, struct ip6_moptions **, struct mbuf *));
 static int ip6_getmoptions __P((int, struct ip6_moptions *, struct mbuf **));
 static int ip6_copyexthdr __P((struct mbuf **, caddr_t, int));
@@ -2887,7 +2889,6 @@ ip6_pcbopt(optname, buf, len, pktopt, priv)
 	struct ip6_pktopts **pktopt;
 {
 	struct ip6_pktopts *opt;
-	struct in6_pktinfo *pktinfo;
 	
 	if (*pktopt == NULL) {
 		*pktopt = malloc(sizeof(struct ip6_pktopts), M_IP6OPT,
@@ -2897,241 +2898,7 @@ ip6_pcbopt(optname, buf, len, pktopt, priv)
 	}
 	opt = *pktopt;
 
-	switch (optname) {
-	case IPV6_PKTINFO:
-		if (len == 0) {	/* just remove the option */
-			ip6_clearpktopts(opt, 1, IPV6_PKTINFO);
-			break;
-		}
-		
-		if (len != sizeof(struct in6_pktinfo))
-			return EINVAL;
-		pktinfo = (struct in6_pktinfo *)buf;
-
-		/*
-		 * An application can clear any sticky IPV6_PKTINFO option by
-		 * doing a "regular" setsockopt with ipi6_addr being
-		 * in6addr_any and ipi6_ifindex being zero.
-		 * [rfc2292bis-01, Section 6]
-		 * XXX: Is this a good feature?? (jinmei@kame.net)
-		 */
-		if (pktinfo->ipi6_ifindex == 0 &&
-		    IN6_IS_ADDR_UNSPECIFIED(&pktinfo->ipi6_addr)) {
-			ip6_clearpktopts(opt, 1, IPV6_PKTINFO);
-			break;
-		}
-
-		/* XXX: this overrides the original data space */
-		if (pktinfo->ipi6_ifindex &&
-		    IN6_IS_ADDR_LINKLOCAL(&pktinfo->ipi6_addr))
-			pktinfo->ipi6_addr.s6_addr16[1] =
-				htons(pktinfo->ipi6_ifindex);
-
-		if (pktinfo->ipi6_ifindex > if_index ||
-		    pktinfo->ipi6_ifindex < 0)
-			return(ENXIO);
-
-		/*
-		 * Check if the requested source address is indeed a unicast
-		 * address assigned to the node, and can be used as the
-		 * packet's source address.
-		 */
-		if (!IN6_IS_ADDR_UNSPECIFIED(&pktinfo->ipi6_addr)) {
-			struct in6_ifaddr *ia6;
-			struct sockaddr_in6 sin6;
-
-			bzero(&sin6, sizeof(sin6));
-			sin6.sin6_len = sizeof(sin6);
-			sin6.sin6_family = AF_INET6;
-			sin6.sin6_addr = pktinfo->ipi6_addr;
-			ia6 = (struct in6_ifaddr *)ifa_ifwithaddr(sin6tosa(&sin6));
-			if (ia6 == NULL ||
-			    (ia6->ia6_flags & (IN6_IFF_ANYCAST |
-					       IN6_IFF_NOTREADY)) != 0)
-				return(EADDRNOTAVAIL);
-		}
-
-		if (opt->ip6po_pktinfo == NULL)
-			opt->ip6po_pktinfo = malloc(sizeof(struct in6_pktinfo),
-						    M_IP6OPT, M_WAITOK);
-		bcopy(pktinfo, opt->ip6po_pktinfo, sizeof(*pktinfo));
-		
-		break;
-	case IPV6_HOPLIMIT:
-	{
-		int *hlimp;
-
-		if (len != sizeof(int))
-			return(EINVAL);
-		hlimp = (int *)buf;
-		if (*hlimp < -1 || *hlimp > 255)
-			return(EINVAL);
-
-		opt->ip6po_hlim = *hlimp;
-		break;
-	}
-	case IPV6_TCLASS:
-	{
-		if (len != sizeof(u_int8_t))
-			return(EINVAL);
-		opt->ip6po_tclass = *(u_int8_t *)buf;
-		break;
-	}
-	case IPV6_NEXTHOP:
-		if (!priv)
-			return(EPERM);
-
-		if (len == 0) {	/* just remove the option */
-			ip6_clearpktopts(opt, 1, IPV6_NEXTHOP);
-			break;
-		}
-
-		/* check if cmsg_len is large enough for sa_len */
-		if (len < sizeof(struct sockaddr) || len < *buf)
-			return(EINVAL);
-
-		switch(((struct sockaddr *)buf)->sa_family) {
-		case AF_INET6:
-		{
-			struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)buf;
-
-			if (IN6_IS_ADDR_UNSPECIFIED(&sa6->sin6_addr) ||
-			    IN6_IS_ADDR_MULTICAST(&sa6->sin6_addr)) {
-				return(EINVAL);
-			}
-			if (sa6->sin6_scope_id == 0)
-				sa6->sin6_scope_id =
-					scope6_addr2default(&sa6->sin6_addr);
-#ifndef SCOPEDROUTING
-			if (in6_embedscope(&sa6->sin6_addr, sa6, NULL, NULL)
-			    != 0) {
-				return(EINVAL);
-			}
-			sa6->sin6_scope_id = 0; /* XXX */
-#endif
-			break;
-		}
-		case AF_LINK:	/* should eventually be supported */
-		default:
-			return(EAFNOSUPPORT);
-		}
-
-		/* turn off the previous option */
-		ip6_clearpktopts(opt, 1, IPV6_NEXTHOP);
-
-		opt->ip6po_nexthop = malloc(*buf, M_IP6OPT, M_WAITOK);
-		bcopy(buf, opt->ip6po_nexthop, *buf);
-		break;
-	case IPV6_HOPOPTS:
-	{
-		struct ip6_hbh *hbh;
-		int hbhlen;
-
-		/*
-		 * XXX: We don't allow a non-privileged user to set ANY HbH
-		 * options, since per-option restriction has too much
-		 * overhead.
-		 */
-		if (!priv)
-			return(EPERM);
-		
-		if (len == 0) {
-			ip6_clearpktopts(opt, 1, IPV6_HOPOPTS);
-			break;	/* just remove the option */
-		}
-
-		if (len < sizeof(struct ip6_hbh))
-			return(EINVAL);
-		hbh = (struct ip6_hbh *)buf;
-		hbhlen = (hbh->ip6h_len + 1) << 3;
-		if (len != hbhlen)
-			return(EINVAL);
-
-		/* turn off the previous option */
-		ip6_clearpktopts(opt, 1, IPV6_HOPOPTS);
-		
-		opt->ip6po_hbh = malloc(hbhlen, M_IP6OPT, M_WAITOK);
-		bcopy(buf, opt->ip6po_hbh, hbhlen);
-
-		break;
-	}
-	case IPV6_DSTOPTS:
-	case IPV6_RTHDRDSTOPTS:
-	{
-		struct ip6_dest *dest, *newdest;
-		int destlen;
-
-		if (!priv)	/* XXX: see the comment for IPV6_HOPOPTS */
-			return(EPERM);
-
-		if (len == 0) {
-			ip6_clearpktopts(opt, 1, optname);
-			break;	/* just remove the option */
-		}
-
-		if (len < sizeof(struct ip6_dest))
-			return(EINVAL);
-		dest = (struct ip6_dest *)buf;
-		destlen = (dest->ip6d_len + 1) << 3;
-		if (len != destlen)
-			return(EINVAL);
-
-		/* turn off the previous option */
-		ip6_clearpktopts(opt, 1, optname);
-		
-		newdest = malloc(destlen, M_IP6OPT, M_WAITOK);
-		bcopy(buf, newdest, destlen);
-
-		if (optname == IPV6_DSTOPTS)
-			opt->ip6po_dest2 = newdest;
-		else
-			opt->ip6po_dest1 = newdest;
-
-		break;
-	}
-	case IPV6_RTHDR:
-	{
-		struct ip6_rthdr *rth;
-		int rthlen;
-
-		if (len == 0) {
-			ip6_clearpktopts(opt, 1, IPV6_RTHDR);
-			break;	/* just remove the option */
-		}
-
-		if (len < sizeof(struct ip6_rthdr))
-			return(EINVAL);
-		rth = (struct ip6_rthdr *)buf;
-		rthlen = (rth->ip6r_len + 1) << 3;
-		if (len != rthlen)
-			return(EINVAL);
-
-		switch (rth->ip6r_type) {
-		case IPV6_RTHDR_TYPE_0:
-			if (rth->ip6r_len == 0)	/* must contain one addr */
-				return(EINVAL);
-			if (rth->ip6r_len % 2) /* length must be even */
-				return(EINVAL);
-			if (rth->ip6r_len / 2 != rth->ip6r_segleft)
-				return(EINVAL);
-			break;
-		default:
-			return(EINVAL);	/* not supported */
-		}
-
-		/* turn off the previous option */
-		ip6_clearpktopts(opt, 1, IPV6_RTHDR);
-
-		opt->ip6po_rthdr = malloc(rthlen, M_IP6OPT, M_WAITOK);
-		bcopy(buf, opt->ip6po_rthdr, rthlen);
-		
-		break;
-	}
-	default:
-		return(ENOPROTOOPT);	
-	} /* end of switch */
-
-	return(0);
+	return(ip6_setpktoption(optname, buf, len, opt, priv, 1, 0));
 }
 
 static int
@@ -3731,272 +3498,465 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 
 	for (; control->m_len; control->m_data += CMSG_ALIGN(cm->cmsg_len),
 		     control->m_len -= CMSG_ALIGN(cm->cmsg_len)) {
+		int error;
+
 		cm = mtod(control, struct cmsghdr *);
 		if (cm->cmsg_len == 0 || cm->cmsg_len > control->m_len)
 			return(EINVAL);
 		if (cm->cmsg_level != IPPROTO_IPV6)
 			continue;
 
-		/*
-		 * XXX should check if RFC2292 API is mixed with 2292bis API
-		 */
-		switch (cm->cmsg_type) {
+		error = ip6_setpktoption(cm->cmsg_type, CMSG_DATA(cm),
+					 cm->cmsg_len, opt, priv, needcopy, 1);
+		if (error)
+			return(error);
+	}
+
+	return(0);
+}
+
+/*
+ * Set a particular packet option, as a sticky option or an ancillary data
+ * item.  "len" can be 0 only when it's a sticky option.
+ * We have 4 cases of combination of "sticky" and "cmsg":
+ * "sticky=0, cmsg=0": impossible
+ * "sticky=0, cmsg=1": RFC2292 or rfc2292bis ancillary data
+ * "sticky=1, cmsg=0": rfc2292bis socket option
+ * "sticky=1, cmsg=1": RFC2292 socket option
+ */
+static int
+ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
+	int optname, len, priv;
+	u_char *buf;
+	struct ip6_pktopts *opt;
+	int sticky;
+{
+	if (!sticky && !cmsg) {
+#ifdef DIAGNOSTIC
+		printf("ip6_setpktoption: impossible case\n");
+#endif
+		return(EINVAL);
+	}
+
+	/*
+	 * IPV6_2292xxx is for backward compatibility to RFC2292, and should
+	 * not be specified in the context of rfc2292bis.  Conversely,
+	 * rfc2292bis types should not be specified in the context of RFC2292.
+	 *
+	 */
+	if (!cmsg) {
+		switch(optname) {
 		case IPV6_2292PKTINFO:
-		case IPV6_PKTINFO:
-			if (cm->cmsg_len != CMSG_LEN(sizeof(struct in6_pktinfo)))
-				return(EINVAL);
-			if (needcopy) {
-				opt->ip6po_pktinfo =
-					malloc(sizeof(struct in6_pktinfo),
-					       M_IP6OPT, M_WAITOK);
-				bcopy(CMSG_DATA(cm), opt->ip6po_pktinfo,
-				    sizeof(struct in6_pktinfo));
-			} else
-				opt->ip6po_pktinfo =
-					(struct in6_pktinfo *)CMSG_DATA(cm);
-			if (opt->ip6po_pktinfo->ipi6_ifindex &&
-			    IN6_IS_ADDR_LINKLOCAL(&opt->ip6po_pktinfo->ipi6_addr))
-				opt->ip6po_pktinfo->ipi6_addr.s6_addr16[1] =
-					htons(opt->ip6po_pktinfo->ipi6_ifindex);
-
-			if (opt->ip6po_pktinfo->ipi6_ifindex > if_index
-			 || opt->ip6po_pktinfo->ipi6_ifindex < 0) {
-				return(ENXIO);
-			}
-
-			/*
-			 * Check if the requested source address is indeed a
-			 * unicast address assigned to the node, and can be
-			 * used as the packet's source address.
-			 */
-			if (!IN6_IS_ADDR_UNSPECIFIED(&opt->ip6po_pktinfo->ipi6_addr)) {
-				struct in6_ifaddr *ia6;
-				struct sockaddr_in6 sin6;
-
-				bzero(&sin6, sizeof(sin6));
-				sin6.sin6_len = sizeof(sin6);
-				sin6.sin6_family = AF_INET6;
-				sin6.sin6_addr =
-					opt->ip6po_pktinfo->ipi6_addr;
-				ia6 = (struct in6_ifaddr *)ifa_ifwithaddr(sin6tosa(&sin6));
-				if (ia6 == NULL ||
-				    (ia6->ia6_flags & (IN6_IFF_ANYCAST |
-						       IN6_IFF_NOTREADY)) != 0)
-					return(EADDRNOTAVAIL);
-			}
-			break;
-
 		case IPV6_2292HOPLIMIT:
-		case IPV6_HOPLIMIT:
-			if (cm->cmsg_len != CMSG_LEN(sizeof(int)))
-				return(EINVAL);
-
-			opt->ip6po_hlim = *(int *)CMSG_DATA(cm);
-			if (opt->ip6po_hlim < -1 || opt->ip6po_hlim > 255)
-				return(EINVAL);
-			break;
-
-		case IPV6_TCLASS:
-			if (cm->cmsg_len != CMSG_LEN(sizeof(u_int8_t)))
-				return(EINVAL);
-
-			opt->ip6po_tclass = *(u_int8_t *)CMSG_DATA(cm);
-			break;
-
 		case IPV6_2292NEXTHOP:
-		case IPV6_NEXTHOP:
-		{
-			struct sockaddr *sa = (struct sockaddr *)CMSG_DATA(cm);
-			struct sockaddr_in6 *sa6;
-
-			if (!priv)
-				return(EPERM);
-
-			if (cm->cmsg_len < sizeof(struct sockaddr) ||
-			    cm->cmsg_len < sa->sa_len) {
-				return(EINVAL);
-			}
-
-			switch(sa->sa_family) {
-			case AF_INET6:
-				sa6 = (struct sockaddr_in6 *)sa;
-				if (IN6_IS_ADDR_UNSPECIFIED(&sa6->sin6_addr) ||
-				    IN6_IS_ADDR_MULTICAST(&sa6->sin6_addr)) {
-					return(EINVAL);
-				}
-				if (sa6->sin6_scope_id == 0) {
-					sa6->sin6_scope_id =
-						scope6_addr2default(&sa6->sin6_addr);
-				}
-#ifndef SCOPEDROUTING
-				if (in6_embedscope(&sa6->sin6_addr, sa6, NULL,
-						   NULL)
-				    != 0) {
-					return(EINVAL);
-				}
-				sa6->sin6_scope_id = 0; /* XXX */
-#endif
-				break;
-			case AF_LINK:	/* should eventually be supported */
-			default:
-				return(EAFNOSUPPORT);
-			}
-
-			if (needcopy) {
-				opt->ip6po_nexthop = malloc(sa->sa_len,
-							     M_IP6OPT,
-							    M_WAITOK);
-				bcopy(sa, opt->ip6po_nexthop, sa->sa_len);
-			} else
-				opt->ip6po_nexthop = sa;
-			break;
-		}
 		case IPV6_2292HOPOPTS:
-		case IPV6_HOPOPTS:
-		{
-			struct ip6_hbh *hbh;
-			int hbhlen;
-
-			if (cm->cmsg_len < CMSG_LEN(sizeof(struct ip6_hbh)))
-				return(EINVAL);
-			hbh = (struct ip6_hbh *)CMSG_DATA(cm);
-			hbhlen = (hbh->ip6h_len + 1) << 3;
-			if (cm->cmsg_len != CMSG_LEN(hbhlen))
-				return(EINVAL);
-
-			if (needcopy) {
-				opt->ip6po_hbh =
-					malloc(hbhlen, M_IP6OPT, M_WAITOK);
-				bcopy(hbh, opt->ip6po_hbh, hbhlen);
-			} else
-				opt->ip6po_hbh = hbh;
-			break;
-		}
-
 		case IPV6_2292DSTOPTS:
-		case IPV6_DSTOPTS:
-		case IPV6_RTHDRDSTOPTS:
-		{
-			struct ip6_dest *dest, **newdest;
-			int destlen;
-
-			if (cm->cmsg_len < CMSG_LEN(sizeof(struct ip6_dest)))
-				return(EINVAL);
-			dest = (struct ip6_dest *)CMSG_DATA(cm);
-			destlen = (dest->ip6d_len + 1) << 3;
-			if (cm->cmsg_len != CMSG_LEN(destlen))
-				return(EINVAL);
-
-			/*
-			 * Determine the position that the destination options
-			 * header should be inserted; before or after the
-			 * routing header.
-			 */
-			switch (cm->cmsg_type) {
-			case IPV6_2292DSTOPTS:
-				/* 
-				 * The old advacned API is ambiguous on this
-				 * point. Our approach is to determine the
-				 * position based according to the existence
-				 * of a routing header. Note, however, that
-				 * this depends on the order of the extension
-				 * headers in the ancillary data; the 1st part
-				 * of the destination options header must
-				 * appear before the routing header in the
-				 * ancillary data, too.
-				 * RFC2292bis solved the ambiguity by
-				 * introducing separate cmsg types.
-				 */
-				if (opt->ip6po_rthdr == NULL)
-					newdest = &opt->ip6po_dest1;
-				else
-					newdest = &opt->ip6po_dest2;
-				break;
-			case IPV6_RTHDRDSTOPTS:
-				newdest = &opt->ip6po_dest1;
-				break;
-			case IPV6_DSTOPTS:
-				newdest = &opt->ip6po_dest2;
-				break;
-			}
-
-			if (needcopy) {
-				*newdest = malloc(destlen, M_IP6OPT, M_WAITOK);
-				bcopy(dest, *newdest, destlen);
-			} else
-				*newdest = dest;
-
-			break;
-		}
-
 		case IPV6_2292RTHDR:
-		case IPV6_RTHDR:
-		{
-			struct ip6_rthdr *rth;
-			int rthlen;
-
-			if (cm->cmsg_len < CMSG_LEN(sizeof(struct ip6_rthdr)))
-				return(EINVAL);
-			rth = (struct ip6_rthdr *)CMSG_DATA(cm);
-			rthlen = (rth->ip6r_len + 1) << 3;
-			if (cm->cmsg_len != CMSG_LEN(rthlen))
-				return(EINVAL);
-
-			switch (rth->ip6r_type) {
-			case IPV6_RTHDR_TYPE_0:
-				/* must contain one addr */
-				if (rth->ip6r_len == 0)
-					return(EINVAL);
-				/* length must be even */
-				if (rth->ip6r_len % 2)
-					return(EINVAL);
-				if (rth->ip6r_len / 2 != rth->ip6r_segleft)
-					return(EINVAL);
-				break;
-			default:
-				return(EINVAL);	/* not supported */
-			}
-
-			if (needcopy) {
-				opt->ip6po_rthdr = malloc(rthlen, M_IP6OPT,
-							  M_WAITOK);
-				bcopy(rth, opt->ip6po_rthdr, rthlen);
-			} else
-				opt->ip6po_rthdr = rth;
-
-			break;
-		}
-
-		case IPV6_REACHCONF:
-#if 0
-			/*
-			 * it looks dangerous to allow IPV6_REACHCONF to
-			 * normal user.  it affects the ND state (system state)
-			 * and can affect communication by others - jinmei
-			 */
-			if (!priv)
-				return(EPERM);
-#else
-			/*
-			 * we limit max # of subsequent userland reachability
-			 * conformation by using ln->ln_byhint.
-			 */
-#endif
-			if (cm->cmsg_len != CMSG_LEN(0))
-				return(EINVAL);
-			opt->ip6po_flags |= IP6PO_REACHCONF;
-			break;
-
-		case IPV6_USE_MIN_MTU:
-			if (cm->cmsg_len != CMSG_LEN(0))
-				return(EINVAL);
-			opt->ip6po_flags |= IP6PO_MINMTU;
-			break;
-
-		default:
+		case IPV6_2292PKTOPTIONS:
 			return(ENOPROTOOPT);
 		}
 	}
+	if (sticky && cmsg) {
+		switch(optname) {
+		case IPV6_PKTINFO:
+		case IPV6_HOPLIMIT:
+		case IPV6_NEXTHOP:
+		case IPV6_HOPOPTS:
+		case IPV6_DSTOPTS:
+		case IPV6_RTHDRDSTOPTS:
+		case IPV6_RTHDR:
+		case IPV6_REACHCONF:
+		case IPV6_USE_MIN_MTU:
+			return(ENOPROTOOPT);
+		}
+	}
+
+	switch (optname) {
+	case IPV6_2292PKTINFO:
+	case IPV6_PKTINFO:
+	{
+		struct ifnet *ifp = NULL;
+		struct in6_pktinfo *pktinfo;
+
+		if (len == 0) {	/* just remove the option */
+			ip6_clearpktopts(opt, 1, IPV6_PKTINFO);
+			break;
+		}
+
+		if (cmsg) {
+			if (len != CMSG_LEN(sizeof(struct in6_pktinfo)))
+				return(EINVAL);
+		} else if (len != sizeof(struct in6_pktinfo))
+			return(EINVAL);
+
+		pktinfo = (struct in6_pktinfo *)buf;
+
+		/*
+		 * An application can clear any sticky IPV6_PKTINFO option by
+		 * doing a "regular" setsockopt with ipi6_addr being
+		 * in6addr_any and ipi6_ifindex being zero.
+		 * [rfc2292bis-02, Section 6]
+		 * XXX: Is this a good feature?? (jinmei@kame.net)
+		 */
+		if (sticky && optname == IPV6_PKTINFO && opt->ip6po_pktinfo) {
+			if (pktinfo->ipi6_ifindex == 0 &&
+			    IN6_IS_ADDR_UNSPECIFIED(&pktinfo->ipi6_addr)) {
+				ip6_clearpktopts(opt, 1, optname);
+				break;
+			}
+		}
+
+		/* valid the interface index if specified. */
+		if (pktinfo->ipi6_ifindex > if_index ||
+		    pktinfo->ipi6_ifindex < 0) {
+			 return(ENXIO);
+		}
+		if (pktinfo->ipi6_ifindex &&
+		    (ifp = ifindex2ifnet[pktinfo->ipi6_ifindex]) == NULL) {
+			return(ENXIO);
+		}
+
+		/*
+		 * Check if the requested source address is indeed a unicast
+		 * address assigned to the node, and can be used as the
+		 * packet's source address.
+		 */
+		if (!IN6_IS_ADDR_UNSPECIFIED(&pktinfo->ipi6_addr)) {
+			struct in6_ifaddr *ia6;
+			struct sockaddr_in6 sin6;
+
+			bzero(&sin6, sizeof(sin6));
+			sin6.sin6_len = sizeof(sin6);
+			sin6.sin6_family = AF_INET6;
+			if (ifp) {
+				sin6.sin6_scope_id = in6_addr2zoneid(ifp,
+								     &pktinfo->ipi6_addr);
+				if (sin6.sin6_scope_id == -1) {
+					/* XXX: this should not happen */
+					return(EINVAL);
+				}
+			}
+			sin6.sin6_addr = pktinfo->ipi6_addr;
+#ifndef SCOPEDROUTING
+			/* XXX: the following may override the original data */
+			if (in6_embedscope(&sin6.sin6_addr, &sin6,
+					   NULL, NULL)) {
+				return(EINVAL);
+			}
+			sin6.sin6_scope_id = 0; /* XXX */
+			pktinfo->ipi6_addr = sin6.sin6_addr; /* XXX */
+#endif
+			ia6 = (struct in6_ifaddr *)ifa_ifwithaddr(sin6tosa(&sin6));
+			if (ia6 == NULL ||
+			    (ia6->ia6_flags & (IN6_IFF_ANYCAST |
+					       IN6_IFF_NOTREADY)) != 0) {
+				return(EADDRNOTAVAIL);
+			}
+		}
+
+		if (sticky) {
+			if (opt->ip6po_pktinfo == NULL) {
+				opt->ip6po_pktinfo = malloc(sizeof(*pktinfo),
+							    M_IP6OPT,
+							    M_WAITOK);
+			}
+			bcopy(pktinfo, opt->ip6po_pktinfo, sizeof(*pktinfo));
+		} else
+			opt->ip6po_pktinfo = pktinfo;
+		break;
+	}
+
+	case IPV6_2292HOPLIMIT:
+	case IPV6_HOPLIMIT:
+	{
+		int *hlimp;
+
+		if (cmsg) {
+			if (len != CMSG_LEN(sizeof(int)))
+				return(EINVAL);
+		} else if (len != sizeof(int))
+			return(EINVAL);
+		hlimp = (int *)buf;
+		if (*hlimp < -1 || *hlimp > 255)
+			return(EINVAL);
+
+		opt->ip6po_hlim = *hlimp;
+		break;
+	}
+
+	case IPV6_TCLASS:
+	{
+		if (cmsg) {
+			if (len != CMSG_LEN(sizeof(u_int8_t)))
+				return(EINVAL);
+		} else if (len != sizeof(u_int8_t))
+			return(EINVAL);
+
+		opt->ip6po_tclass = *(u_int8_t *)buf;
+		break;
+	}
+
+	case IPV6_2292NEXTHOP:
+	case IPV6_NEXTHOP:
+		if (!priv)
+			return(EPERM);
+
+		if (len == 0) {	/* just remove the option */
+			ip6_clearpktopts(opt, 1, IPV6_NEXTHOP);
+			break;
+		}
+
+		/* check if cmsg_len is large enough for sa_len */
+		if (cmsg) {
+			if (len < CMSG_LEN(sizeof(struct sockaddr)) ||
+			    len < CMSG_LEN(*buf)) {
+				return(EINVAL);
+			}
+		} else if (len < sizeof(struct sockaddr) || len < *buf)
+			return(EINVAL);
+
+		switch(((struct sockaddr *)buf)->sa_family) {
+		case AF_INET6:
+		{
+			struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)buf;
+
+			if (IN6_IS_ADDR_UNSPECIFIED(&sa6->sin6_addr) ||
+			    IN6_IS_ADDR_MULTICAST(&sa6->sin6_addr)) {
+				return(EINVAL);
+			}
+			if (sa6->sin6_scope_id == 0) {
+				sa6->sin6_scope_id =
+					scope6_addr2default(&sa6->sin6_addr);
+			}
+#ifndef SCOPEDROUTING
+			if (in6_embedscope(&sa6->sin6_addr, sa6, NULL, NULL)
+			    != 0) {
+				return(EINVAL);
+			}
+			sa6->sin6_scope_id = 0; /* XXX */
+#endif
+			break;
+		}
+		case AF_LINK:	/* should eventually be supported */
+		default:
+			return(EAFNOSUPPORT);
+		}
+
+		/* turn off the previous option */
+		if (sticky) {
+			ip6_clearpktopts(opt, 1, IPV6_NEXTHOP);
+
+			opt->ip6po_nexthop = malloc(*buf, M_IP6OPT, M_WAITOK);
+			bcopy(buf, opt->ip6po_nexthop, *buf);
+		} else
+			opt->ip6po_nexthop = (struct sockaddr *)buf;
+		break;
+		
+	case IPV6_2292HOPOPTS:
+	case IPV6_HOPOPTS:
+	{
+		struct ip6_hbh *hbh;
+		int hbhlen;
+
+		/*
+		 * XXX: We don't allow a non-privileged user to set ANY HbH
+		 * options, since per-option restriction has too much
+		 * overhead.
+		 */
+		if (!priv)
+			return(EPERM);
+
+		if (len == 0) {
+			ip6_clearpktopts(opt, 1, IPV6_HOPOPTS);
+			break;	/* just remove the option */
+		}
+
+		/* message length validation */
+		if (cmsg) {
+			if (len < CMSG_LEN(sizeof(struct ip6_hbh)))
+				return(EINVAL);
+		} else if (len < sizeof(struct ip6_hbh))
+			return(EINVAL);
+		hbh = (struct ip6_hbh *)buf;
+		hbhlen = (hbh->ip6h_len + 1) << 3;
+		if (cmsg) {
+			if (len != CMSG_LEN(hbhlen))
+				return(EINVAL);
+		} else if (len != hbhlen)
+			return(EINVAL);
+
+		if (sticky) {
+			/* turn off the previous option */
+			ip6_clearpktopts(opt, 1, IPV6_HOPOPTS);
+		
+			opt->ip6po_hbh = malloc(hbhlen, M_IP6OPT, M_WAITOK);
+			bcopy(hbh, opt->ip6po_hbh, hbhlen);
+		} else
+			opt->ip6po_hbh = hbh;
+
+		break;
+	}
+
+	case IPV6_2292DSTOPTS:
+	case IPV6_DSTOPTS:
+	case IPV6_RTHDRDSTOPTS:
+	{
+		struct ip6_dest *dest, **newdest = NULL;
+		int destlen;
+
+		if (!priv)	/* XXX: see the comment for IPV6_HOPOPTS */
+			return(EPERM);
+
+		if (len == 0) {
+			ip6_clearpktopts(opt, 1, optname);
+			break;	/* just remove the option */
+		}
+
+		/* message length validation */
+		if (cmsg) {
+			if (len < CMSG_LEN(sizeof(struct ip6_dest)))
+				return(EINVAL);
+		}
+		else if (len < sizeof(struct ip6_dest))
+			return(EINVAL);
+		dest = (struct ip6_dest *)buf;
+		destlen = (dest->ip6d_len + 1) << 3;
+		if (cmsg) {
+			if (len != CMSG_LEN(destlen))
+				return(EINVAL);
+		} else if (len != destlen)
+			return(EINVAL);
+
+		/*
+		 * Determine the position that the destination options header
+		 * should be inserted; before or after the routing header.
+		 */
+		switch(optname) {
+		case IPV6_2292DSTOPTS:
+			/*
+			 * The old advacned API is ambiguous on this point.
+			 * Our approach is to determine the position based
+			 * according to the existence of a routing header.
+			 * Note, however, that this depends on the order of the
+			 * extension headers in the ancillary data; the 1st
+			 * part of the destination options header must appear
+			 * before the routing header in the ancillary data,
+			 * too.
+			 * RFC2292bis solved the ambiguity by introducing
+			 * separate ancillary data or option types.
+			 */
+			if (opt->ip6po_rthdr == NULL)
+				newdest = &opt->ip6po_dest1;
+			else
+				newdest = &opt->ip6po_dest2;
+			break;
+		case IPV6_RTHDRDSTOPTS:
+			newdest = &opt->ip6po_dest1;
+			break;
+		case IPV6_DSTOPTS:
+			newdest = &opt->ip6po_dest2;
+			break;
+		}
+
+		if (sticky) {
+			/* turn off the previous option */
+			ip6_clearpktopts(opt, 1, optname);
+		
+			*newdest = malloc(destlen, M_IP6OPT, M_WAITOK);
+			bcopy(dest, *newdest, destlen);
+		} else
+			*newdest = dest;
+
+		break;
+	}
+
+	case IPV6_2292RTHDR:
+	case IPV6_RTHDR:
+	{
+		struct ip6_rthdr *rth;
+		int rthlen;
+
+		if (len == 0) {
+			ip6_clearpktopts(opt, 1, IPV6_RTHDR);
+			break;	/* just remove the option */
+		}
+
+		/* message length validation */
+		if (cmsg) {
+			if (len < CMSG_LEN(sizeof(struct ip6_rthdr)))
+				return(EINVAL);
+		}
+		else if (len < sizeof(struct ip6_rthdr))
+			return(EINVAL);
+		rth = (struct ip6_rthdr *)buf;
+		rthlen = (rth->ip6r_len + 1) << 3;
+		if (cmsg) {
+			if (len != CMSG_LEN(rthlen))
+				return(EINVAL);
+		} else if (len != rthlen)
+			return(EINVAL);
+
+		switch (rth->ip6r_type) {
+		case IPV6_RTHDR_TYPE_0:
+			if (rth->ip6r_len == 0)	/* must contain one addr */
+				return(EINVAL);
+			if (rth->ip6r_len % 2) /* length must be even */
+				return(EINVAL);
+			if (rth->ip6r_len / 2 != rth->ip6r_segleft)
+				return(EINVAL);
+			break;
+		default:
+			return(EINVAL);	/* not supported */
+		}
+
+		if (sticky) {
+			/* turn off the previous option */
+			ip6_clearpktopts(opt, 1, IPV6_RTHDR);
+
+			opt->ip6po_rthdr = malloc(rthlen, M_IP6OPT, M_WAITOK);
+			bcopy(rth, opt->ip6po_rthdr, rthlen);
+		} else
+			opt->ip6po_rthdr = rth;
+		
+		break;
+	}
+
+	case IPV6_REACHCONF:
+		if (!cmsg)
+			return(ENOPROTOOPT);
+
+#if 0
+		/*
+		 * it looks dangerous to allow IPV6_REACHCONF to
+		 * normal user.  it affects the ND state (system state)
+		 * and can affect communication by others - jinmei
+		 */
+		if (!priv)
+			return(EPERM);
+#else
+		/*
+		 * we limit max # of subsequent userland reachability
+		 * conformation by using ln->ln_byhint.
+		 */
+#endif
+		if (len != CMSG_LEN(0))
+			return(EINVAL);
+		opt->ip6po_flags |= IP6PO_REACHCONF;
+		break;
+
+	case IPV6_USE_MIN_MTU:
+		if (cmsg) {
+			if (len != CMSG_LEN(0))
+				return(EINVAL);
+		} else if (len != 0)
+			return(EINVAL);
+
+		opt->ip6po_flags |= IP6PO_MINMTU;
+		break;
+
+	default:
+		return(ENOPROTOOPT);	
+	} /* end of switch */
 
 	return(0);
 }
