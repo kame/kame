@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2366 2003/03/28 05:46:33 suz Exp $
+$KAME: CHANGELOG,v 1.2367 2003/03/28 08:22:20 suz Exp $
 
 <200303>
+Fri Mar 28 17:18:29 JST 2003	suz@crl.hitachi.co.jp
+	* freebsd5/sys/conf/file, kame/sys/netinet6/mip6*, mobility6.c:
+	 makes MIP6 compilable on freebsd5 
+
 Fri Mar 28 14:27:07 JST 2003	suz@crl.hitachi.co.jp
 	* freebsd5/sys/sys/kernel.h, freebsd5/sys/net/if_var.h,
 	  kame/sys/net/if_{dummy,faith,gif,stf}.c: KAME-origined 

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.200 2003/03/03 22:50:07 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.201 2003/03/28 08:22:20 suz Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -234,8 +234,10 @@ mip6_init()
 	mip6_config.mcfg_hrbu_maxlifetime = MIP6_CONFIG_HRBU_MAXLIFETIME;
 	mip6_config.mcfg_bu_use_single = MIP6_CONFIG_BU_USE_SINGLE;
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-        callout_init(&mip6_pfx_ch);
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	callout_init(&mip6_pfx_ch, NULL);
+#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	callout_init(&mip6_pfx_ch);
 #endif
 
 	mip6_bu_init(); /* binding update routine initialize */
@@ -252,8 +254,12 @@ mip6_init()
 	nonce_index = 0;
 	mip6_create_nonce(mip6_nonce);
 	mip6_create_nodekey(mip6_nodekey);
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-        callout_init(&mip6_nonce_upd_ch);
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	callout_init(&mip6_nonce_upd_ch, NULL);
+	callout_reset(&mip6_nonce_upd_ch, hz * NONCE_UPDATE_PERIOD,
+		      mip6_update_nonce_nodekey, NULL);
+#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	callout_init(&mip6_nonce_upd_ch);
 	callout_reset(&mip6_nonce_upd_ch, hz * NONCE_UPDATE_PERIOD,
 		      mip6_update_nonce_nodekey, NULL);
 #elif defined(__OpenBSD__)

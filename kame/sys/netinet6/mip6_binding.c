@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.176 2003/02/28 12:03:04 t-momose Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.177 2003/03/28 08:22:21 suz Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -174,8 +174,10 @@ static const struct sockaddr_in6 sin6_any = {
 void
 mip6_bu_init()
 {
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-        callout_init(&mip6_bu_ch);
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	callout_init(&mip6_bu_ch, NULL);
+#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	callout_init(&mip6_bu_ch);
 #endif
 }
 
@@ -778,7 +780,11 @@ mip6_bu_send_bu(mbu)
 		error = EINVAL;
 		goto free_ip6pktopts;
 	}
-	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
+	error = ip6_output(m, &opt, NULL, 0, NULL, NULL
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+			   , NULL
+#endif
+			  );
 	if (error) {
 		mip6log((LOG_ERR,
 			 "%s:%d: ip6_output returns error (%d) "
@@ -1938,7 +1944,9 @@ mip6_process_br(m, opt)
 void
 mip6_bc_init()
 {
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+        callout_init(&mip6_bc_ch, NULL);
+#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
         callout_init(&mip6_bc_ch);
 #endif
 	bzero(&mip6_bc_hash, sizeof(mip6_bc_hash));
@@ -2637,7 +2645,9 @@ mip6_tunnel_input(mp, offp, proto)
 {
 	struct mbuf *m = *mp;
 	struct ip6_hdr *ip6;
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	int s;
+#endif
 
 	m_adj(m, *offp);
 
@@ -2655,20 +2665,29 @@ mip6_tunnel_input(mp, offp, proto)
 
 #ifdef __NetBSD__
 		s = splnet();
-#else
+#elif !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 		s = splimp();
 #endif
+
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+		if (!IF_HANDOFF(&ip6intrq, m, NULL))
+			goto bad;
+#else
 		if (IF_QFULL(&ip6intrq)) {
 			IF_DROP(&ip6intrq);	/* update statistics */
 			splx(s);
 			goto bad;
 		}
 		IF_ENQUEUE(&ip6intrq, m);
+#endif
+
 #if 0
 		/* we don't need it as we tunnel IPv6 in IPv6 only. */
 		schednetisr(NETISR_IPV6);
 #endif
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 		splx(s);
+#endif
 		break;
 	default:
 		mip6log((LOG_ERR,
@@ -2776,9 +2795,17 @@ mip6_tunnel_output(mp, mbc)
 	 * it is too painful to ask for resend of inner packet, to achieve
 	 * path MTU discovery for encapsulated packets.
 	 */
-	return (ip6_output(m, 0, 0, IPV6_MINMTU, 0, NULL));
+	return (ip6_output(m, 0, 0, IPV6_MINMTU, 0, NULL
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+			   , NULL
+#endif
+			  ));
 #else
-	return (ip6_output(m, 0, 0, 0, 0, NULL));
+	return (ip6_output(m, 0, 0, 0, 0, NULL
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+			   , NULL
+#endif
+			  ));
 #endif
 }
 

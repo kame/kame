@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.64 2003/03/03 00:56:13 t-momose Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.65 2003/03/28 08:22:21 suz Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -438,7 +438,11 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 
 	/* XXX IPSEC? */
 
-	error = ip6_output(n, NULL, NULL, 0, NULL, NULL);
+	error = ip6_output(n, NULL, NULL, 0, NULL, NULL
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+			   , NULL
+#endif
+			  );
 	if (error) {
 		mip6log((LOG_ERR,
 			 "%s:%d: send failed. (errno = %d)\n",
@@ -844,7 +848,11 @@ mip6_icmp6_dhaad_req_output(sc)
 		m_freem(m);
 		return (EINVAL);
 	}
-	error = ip6_output(m, NULL, NULL, 0, NULL, NULL);
+	error = ip6_output(m, NULL, NULL, 0, NULL, NULL
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+			   , NULL
+#endif
+			  );
 	if (error) {
 		mip6log((LOG_ERR,
 			 "%s:%d: "
@@ -969,7 +977,11 @@ mip6_icmp6_mp_sol_output(mpfx, mha)
 		m_freem(m);
 		return (EINVAL);
 	}
-	error = ip6_output(m, 0, 0, 0, 0,NULL);
+	error = ip6_output(m, 0, 0, 0, 0 ,NULL
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+			   , NULL
+#endif
+			  );
 	if (error) {
 		mip6log((LOG_ERR,
 			 "%s:%d: mobile prefix sol send failed (code = %d)\n",
