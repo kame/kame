@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: keysock.h,v 1.4 2000/01/16 16:09:35 itojun Exp $ */
+/* $Id: keysock.h,v 1.5 2000/01/29 06:21:03 itojun Exp $ */
 
 #ifndef _NETKEY_KEYSOCK_H_
 #define _NETKEY_KEYSOCK_H_
@@ -61,7 +61,7 @@ struct pfkeystat {
 #define KEY_SENDUP_ALL		1
 #define KEY_SENDUP_REGISTERED	2
 
-#if defined(KERNEL) || defined(_KERNEL)
+#ifdef _KERNEL
 struct keycb {
 	struct rawcb kp_raw;	/* rawcb */
 	int kp_promisc;		/* promiscuous mode */
@@ -81,6 +81,6 @@ extern int key_usrreq __P((struct socket *,
 
 extern int key_sendup __P((struct socket *, struct sadb_msg *, u_int, int));
 extern int key_sendup_mbuf __P((struct socket *, struct mbuf *, int));
-#endif /* KERNEL */
+#endif /* _KERNEL */
 
 #endif /*_NETKEY_KEYSOCK_H_*/

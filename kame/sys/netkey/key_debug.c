@@ -27,15 +27,9 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: key_debug.c,v 1.9 2000/01/17 11:13:16 itojun Exp $ */
+/* KAME @(#)$Id: key_debug.c,v 1.10 2000/01/29 06:21:01 itojun Exp $ */
 
 #ifdef _KERNEL
-# ifndef KERNEL
-#  define KERNEL
-# endif
-#endif
-
-#ifdef KERNEL
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 #include "opt_inet.h"
 #endif
@@ -43,7 +37,7 @@
 
 #include <sys/types.h>
 #include <sys/param.h>
-#ifdef KERNEL
+#ifdef _KERNEL
 #include <sys/systm.h>
 #include <sys/mbuf.h>
 #endif
@@ -58,19 +52,13 @@
 #include <netinet6/in6.h>
 #include <netinet6/ipsec.h>
 
-#if !defined(KERNEL)
+#ifndef _KERNEL
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
-#endif /* defined(KERNEL) */
+#endif /* !_KERNEL */
 
-#if !defined(KERNEL) || (defined(KERNEL) && defined(IPSEC_DEBUG))
-
-#ifdef __NetBSD__
-# ifdef _KERNEL
-#  define KERNEL
-# endif
-#endif
+#if !defined(_KERNEL) || (defined(_KERNEL) && defined(IPSEC_DEBUG))
 
 static void kdebug_sadb_prop __P((struct sadb_ext *));
 static void kdebug_sadb_identity __P((struct sadb_ext *));
@@ -80,11 +68,11 @@ static void kdebug_sadb_sa __P((struct sadb_ext *));
 static void kdebug_sadb_address __P((struct sadb_ext *));
 static void kdebug_sadb_key __P((struct sadb_ext *));
 
-#ifdef KERNEL
+#ifdef _KERNEL
 static void kdebug_secreplay __P((struct secreplay *));
 #endif
 
-#ifndef KERNEL
+#ifndef _KERNEL
 #define panic(param)	{ printf(param); exit(-1); }
 #endif
 
@@ -258,7 +246,7 @@ kdebug_sadb_identity(ext)
 		printf(" type=%d id=%lu",
 			id->sadb_ident_type, (u_long)id->sadb_ident_id);
 		if (len) {
-#ifdef KERNEL
+#ifdef _KERNEL
 			ipsec_hexdump((caddr_t)(id + 1), len); /*XXX cast ?*/
 #else
 			char *p, *ep;
@@ -460,7 +448,7 @@ kdebug_sadb_x_policy(ext)
 	return;
 }
 
-#ifdef KERNEL
+#ifdef _KERNEL
 /* %%%: about SPD and SAD */
 void
 kdebug_secpolicy(sp)
@@ -676,7 +664,7 @@ kdebug_mbuf(m0)
 
 	return;
 }
-#endif /* KERNEL */
+#endif /* _KERNEL */
 
 void
 kdebug_sockaddr(addr)
@@ -705,7 +693,7 @@ kdebug_sockaddr(addr)
 	return;
 }
 
-#endif /* !defined(KERNEL) || (defined(KERNEL) && defined(IPSEC_DEBUG)) */
+#endif /* !defined(_KERNEL) || (defined(_KERNEL) && defined(IPSEC_DEBUG)) */
 
 void
 ipsec_bindump(buf, len)

@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: key.h,v 1.7 2000/01/28 06:37:01 itojun Exp $ */
+/* $Id: key.h,v 1.8 2000/01/29 06:21:01 itojun Exp $ */
 
 #ifndef _NETKEY_KEY_H_
 #define _NETKEY_KEY_H_
@@ -78,5 +78,5 @@ MALLOC_DECLARE(M_SECA);
 extern int key_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 #endif
 
-#endif /* defined(KERNEL) */
+#endif /* defined(_KERNEL) */
 #endif /* _NETKEY_KEY_H_ */

@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: keyv2.h,v 1.13 2000/01/27 18:24:26 itojun Exp $ */
+/* $Id: keyv2.h,v 1.14 2000/01/29 06:21:03 itojun Exp $ */
 
 /*
  * This file has been derived rfc 2367,
@@ -414,7 +414,7 @@ int pfkey_send __P((int, struct sadb_msg *, int));
 int pfkey_align __P((struct sadb_msg *, caddr_t *));
 int pfkey_check __P((caddr_t *));
 
-#endif /*!KERNEL*/
+#endif /*!_KERNEL*/
 
 #endif /* __PFKEY_V2_H */
 

@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.61 2000/01/28 06:36:59 itojun Exp $ */
+/* KAME $Id: key.c,v 1.62 2000/01/29 06:21:00 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -38,12 +38,6 @@
 #ifdef __NetBSD__
 #include "opt_ipsec.h"
 #endif
-#endif
-
-#ifdef __NetBSD__
-# ifdef _KERNEL
-#  define KERNEL
-# endif
 #endif
 
 /* this is for backward compatibility. we should not touch those. */

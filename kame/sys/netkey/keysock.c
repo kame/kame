@@ -27,19 +27,13 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: keysock.c,v 1.9 2000/01/17 09:24:40 itojun Exp $ */
+/* KAME @(#)$Id: keysock.c,v 1.10 2000/01/29 06:21:02 itojun Exp $ */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
 #endif
 
 /* This code has derived from sys/net/rtsock.c on FreeBSD2.2.5 */
-
-#ifdef __NetBSD__
-# ifdef _KERNEL
-#  define KERNEL
-# endif
-#endif
 
 #include <sys/types.h>
 #include <sys/param.h>
