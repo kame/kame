@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.131 2001/11/06 08:06:21 sakane Exp $	*/
+/*	$KAME: ipsec.c,v 1.132 2001/11/20 08:32:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2748,6 +2748,7 @@ ipsec4_output(state, sp, flags)
 		panic("state->ro == NULL in ipsec4_output");
 	if (!state->dst)
 		panic("state->dst == NULL in ipsec4_output");
+	state->encap = 0;
 
 	KEYDEBUG(KEYDEBUG_IPSEC_DATA,
 		printf("ipsec4_output: applyed SP\n");
@@ -2889,6 +2890,8 @@ ipsec4_output(state, sp, flags)
 				state->dst = (struct sockaddr *)state->ro->ro_rt->rt_gateway;
 				dst4 = (struct sockaddr_in *)state->dst;
 			}
+
+			state->encap++;
 		} else
 			splx(s);
 

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.52 2001/09/21 05:12:53 sakane Exp $	*/
+/*	$KAME: ipsec.h,v 1.53 2001/11/20 08:32:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -338,6 +338,7 @@ struct ipsec_output_state {
 	struct mbuf *m;
 	struct route *ro;
 	struct sockaddr *dst;
+	int encap;
 };
 
 struct ipsec_history {
