@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2575 2004/03/29 13:06:03 suz Exp $
+$KAME: CHANGELOG,v 1.2576 2004/03/31 06:59:06 sakane Exp $
 
 <200403>
+Wed Mar 31 15:47:19 JST 2004 sakane@kame.net
+	* kame/kame/racoon/isakmp.c:
+	fixed a critical bug in the case of FreeBSD.  racoon will reject
+	the packet in which the value of the length field is too big.
+	however the problem is due to malloc(3) of FreeBSD.
+
 2004-03-29  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* freebsd[45]/sys/netinet/in.c, kame/sys/netinet6/mldv2.c
 	fixed a kernel crash when an IGMPv3/MLDv2 Advanced-API function
