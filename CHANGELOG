@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.363 1999/12/22 08:40:32 itojun Exp $
+$Id: CHANGELOG,v 1.364 1999/12/22 08:54:51 sakane Exp $
 
 <199912>
+Wed Dec 22 17:52:14 JST 1999 sakane@ydc.co.jp
+	* kame/sys/netinet6:
+	Alart when sequence number cycles.
+	If cyclic sequence number is NOT allowed, sender doesn't send any
+	packet with auditing.  Receiver discard packet with counting ipsecstat.
+
 Wed Dec 22 17:42:43 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/mail/fetchmail: upgrade to 5.2.1.
 
