@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.136 2001/07/21 09:33:19 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.137 2001/07/21 09:35:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -776,6 +776,7 @@ defrouter_select()
 		nd6log((LOG_WARNING,
 		    "defrouter_select: called unexpectedly (forwarding=%d, "
 		    "accept_rtadv=%d)\n", ip6_forwarding, ip6_accept_rtadv));
+		splx(s);
 		return;
 	}
 
@@ -874,7 +875,8 @@ defrouter_select()
 				    " interface\n"));
 			}
 		}
-	}
+	} else
+		defrouter_delifreq();
 
 	splx(s);
 	return;
