@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.160 2002/12/13 10:59:46 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.161 2002/12/17 22:33:26 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2751,7 +2751,7 @@ mip6_bc_encapcheck(m, off, proto, arg)
 	}
 
 	ip6 = mtod(m, struct ip6_hdr*);
-	if (ip6_findaux((struct mbuf *)m) &&
+	if (!ip6_findaux((struct mbuf *)m) ||
 	    ip6_getpktaddrs((struct mbuf *)m, &encap_src, &encap_dst))
 		return (0);
 
