@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.59 2000/10/04 17:41:00 itojun Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.60 2000/10/19 05:11:05 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1007,6 +1007,16 @@ info_recv_initialcontact(iph1)
 
 	if (f_local)
 		goto step_ph1;
+
+	/*
+	 * if the initial contact is acceptable.  when both ends are using
+	 * "use" as the policy level, both ends initiate the phase 1 and
+	 * send initial-contacts under each phase 1 SA.  In this case, each
+	 * phase 1 SA will be banished by the another initial-contact.
+	 * Simply calling getcontacted() is the solution to avoid the case.
+	 */
+	if (getcontacted(iph1->remote))
+		return;
 
 	/* purge IPsec-SA(s) */
 	buf = pfkey_dump_sadb(SADB_SATYPE_UNSPEC);
