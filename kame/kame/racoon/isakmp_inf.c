@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.76 2001/11/16 04:08:10 sakane Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.77 2001/12/11 04:39:32 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1052,10 +1052,10 @@ info_recv_initialcontact(iph1)
 
 		/*
 		 * RFC2407 4.6.3.3 INITIAL-CONTACT is the message that
-		 * announces the peer the sender of the message was rebooted.
+		 * announces the sender of the message was rebooted.
 		 * it is interpreted to delete all SAs which source address
 		 * is the sender of the message.
-		 * but racoon only deletes SA which is matched both the
+		 * racoon only deletes SA which is matched both the
 		 * source address and the destination accress.
 		 */
 		if ((cmpsaddrwop(iph1->local, src)
