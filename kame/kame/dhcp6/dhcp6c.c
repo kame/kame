@@ -372,6 +372,7 @@ client6_findserv()
 		t = time(NULL);
 		dprintf((stderr, "sendtime=%ld waittime=%d delaytime=%d\n",
 			(long)sendtime, (int)waittime, (int)delaytime));
+		mode = WAIT;	/* to fake a nosiy compiler */
 		if (waittime && waittime < delaytime) {
 			if (sendtime + waittime > t) {
 				w.tv_sec = waittime - (t - sendtime);
@@ -601,7 +602,7 @@ client6_sendrequest(s, p)
 	int s;
 	struct servtab *p;
 {
-	int offlinkserv, direct;
+	int offlinkserv = 0, direct;
 	struct sockaddr_in6 dst;
 	struct addrinfo hints, *res;
 	int error;
@@ -685,6 +686,8 @@ client6_sendrequest(s, p)
 		else
 			direct = 0;
 	}
+	else
+		direct = 1;
 	if (direct) {
 		memcpy(&dst.sin6_addr, &p->st_serv, sizeof(p->st_serv));
 		dst.sin6_scope_id = in6_addrscopebyif(&p->st_serv, device);
@@ -827,7 +830,7 @@ client6_recvreply(s, serv)
 		{
 			struct sockaddr_in to_mediator;
 			struct in6_addr in6;
-			int s = -1, i;
+			int s = -1;
 			char *ap;
 
 			if ( (s = socket(AF_INET, SOCK_DGRAM, 0)) < 0 ) {
