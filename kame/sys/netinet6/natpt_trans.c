@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.61 2001/11/28 08:05:16 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.62 2001/12/03 11:55:24 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -667,38 +667,6 @@ natpt_translateTCPUDPv6To4(struct pcv *cv6, struct pAddr *pad, struct pcv *cv4)
 }
 
 
-struct mbuf *
-natpt_translateFragment6(struct pcv *cv6, struct pAddr *pad)
-{
-	struct pcv	 cv4;
-	struct mbuf	*m4;
-	struct ip	*ip4;
-	struct ip6_hdr	*ip6 = mtod(cv6->m, struct ip6_hdr *);
-
-	caddr_t		 frag6end = (caddr_t)ip6 + cv6->m->m_pkthdr.len;
-	int		 frag6len = frag6end - cv6->pyld.caddr;
-
-	bzero(&cv4, sizeof(struct pcv));
-	if ((m4 = natpt_mgethdr(sizeof(struct ip), frag6len)) == NULL)
-		return (NULL);
-
-	cv4.m = m4;
-	cv4.ip.ip4 = ip4 = mtod(m4, struct ip *);
-	cv4.pyld.caddr = (caddr_t)cv4.ip.ip4 + sizeof(struct ip);
-	cv4.fromto = cv6->fromto;
-
-	natpt_composeIPv4Hdr(cv6, pad, &cv4);
-
-	bcopy(cv6->pyld.caddr, cv4.pyld.caddr, frag6len);
-	cv4.m->m_len = ip4->ip_len;
-
-	if (m4)
-		natpt_adjustMBuf(cv6->m, m4);
-
-	return (m4);
-}
-
-
 void
 natpt_translatePYLD6To4(struct pcv *cv4)
 {
@@ -769,6 +737,38 @@ natpt_watchUDP6(struct pcv *cv4)
 
 		natpt_prependRule(cst);
 	}
+}
+
+
+struct mbuf *
+natpt_translateFragment6(struct pcv *cv6, struct pAddr *pad)
+{
+	struct pcv	 cv4;
+	struct mbuf	*m4;
+	struct ip	*ip4;
+	struct ip6_hdr	*ip6 = mtod(cv6->m, struct ip6_hdr *);
+
+	caddr_t		 frag6end = (caddr_t)ip6 + cv6->m->m_pkthdr.len;
+	int		 frag6len = frag6end - cv6->pyld.caddr;
+
+	bzero(&cv4, sizeof(struct pcv));
+	if ((m4 = natpt_mgethdr(sizeof(struct ip), frag6len)) == NULL)
+		return (NULL);
+
+	cv4.m = m4;
+	cv4.ip.ip4 = ip4 = mtod(m4, struct ip *);
+	cv4.pyld.caddr = (caddr_t)cv4.ip.ip4 + sizeof(struct ip);
+	cv4.fromto = cv6->fromto;
+
+	natpt_composeIPv4Hdr(cv6, pad, &cv4);
+
+	bcopy(cv6->pyld.caddr, cv4.pyld.caddr, frag6len);
+	cv4.m->m_len = ip4->ip_len;
+
+	if (m4)
+		natpt_adjustMBuf(cv6->m, m4);
+
+	return (m4);
 }
 
 
