@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.93 2000/05/08 03:28:43 itojun Exp $	*/
+/*	$KAME: key.c,v 1.94 2000/05/08 04:02:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -344,7 +344,8 @@ static void key_delsp __P((struct secpolicy *));
 static struct secpolicy *key_getsp __P((struct secpolicyindex *));
 static struct secpolicy *key_getspbyid __P((u_int32_t));
 static u_int32_t key_newreqid __P((void));
-static struct sadb_msg *key_spdadd __P((caddr_t *));
+static int key_spdadd __P((struct socket *, struct mbuf *,
+	struct sadb_msghdr *));
 static u_int32_t key_getnewspid __P((void));
 static int key_spddelete __P((struct socket *, struct mbuf *,
 	struct sadb_msghdr *));
@@ -1407,11 +1408,12 @@ key_sp2msg(sp)
  *	other if success, return pointer to the message to send.
  *
  */
-static struct sadb_msg *
-key_spdadd(mhp)
-	caddr_t *mhp;
+static int
+key_spdadd(so, m, mhp)
+	struct socket *so;
+	struct mbuf *m;
+	struct sadb_msghdr *mhp;
 {
-	struct sadb_msg *msg0;
 	struct sadb_address *src0, *dst0;
 	struct sadb_x_policy *xpl0;
 	struct secpolicyindex spidx;
@@ -1419,24 +1421,29 @@ key_spdadd(mhp)
 	int error;
 
 	/* sanity check */
-	if (mhp == NULL || mhp[0] == NULL)
+	if (so == NULL || m == NULL || mhp == NULL || mhp->msg == NULL)
 		panic("key_spdadd: NULL pointer is passed.\n");
 
-	msg0 = (struct sadb_msg *)mhp[0];
-
-	if (mhp[SADB_EXT_ADDRESS_SRC] == NULL
-	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
-	 || mhp[SADB_X_EXT_POLICY] == NULL) {
+	if (mhp->ext[SADB_EXT_ADDRESS_SRC] == NULL ||
+	    mhp->ext[SADB_EXT_ADDRESS_DST] == NULL ||
+	    mhp->ext[SADB_X_EXT_POLICY] == NULL) {
 #ifdef IPSEC_DEBUG
 		printf("key_spdadd: invalid message is passed.\n");
 #endif
-		msg0->sadb_msg_errno = EINVAL;
-		return NULL;
+		return key_senderror(so, m, EINVAL);
+	}
+	if (mhp->extlen[SADB_EXT_ADDRESS_SRC] < sizeof(struct sadb_address) ||
+	    mhp->extlen[SADB_EXT_ADDRESS_DST] < sizeof(struct sadb_address) ||
+	    mhp->extlen[SADB_X_EXT_POLICY] < sizeof(struct sadb_x_policy)) {
+#ifdef IPSEC_DEBUG
+		printf("key_spdadd: invalid message is passed.\n");
+#endif
+		return key_senderror(so, m, EINVAL);
 	}
 
-	src0 = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_SRC];
-	dst0 = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_DST];
-	xpl0 = (struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY];
+	src0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_SRC];
+	dst0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_DST];
+	xpl0 = (struct sadb_x_policy *)mhp->ext[SADB_X_EXT_POLICY];
 
 	/* make secindex */
 	/* XXX boundary check against sa_len */
@@ -1457,7 +1464,7 @@ key_spdadd(mhp)
 #ifdef IPSEC_DEBUG
 		printf("key_spdadd: Invalid SP direction.\n");
 #endif
-		msg0->sadb_msg_errno = EINVAL;
+		mhp->msg->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
 
@@ -1468,19 +1475,17 @@ key_spdadd(mhp)
 #ifdef IPSEC_DEBUG
 		printf("key_spdadd: Invalid policy type.\n");
 #endif
-		msg0->sadb_msg_errno = EINVAL;
-		return NULL;
+		return key_senderror(so, m, EINVAL);
 	}
 
 	/* policy requests are mandatory when action is ipsec. */
-        if (msg0->sadb_msg_type != SADB_X_SPDSETIDX
+        if (mhp->msg->sadb_msg_type != SADB_X_SPDSETIDX
 	 && xpl0->sadb_x_policy_type == IPSEC_POLICY_IPSEC
-	 && PFKEY_EXTLEN(xpl0) <= sizeof(*xpl0)) {
+	 && mhp->extlen[SADB_X_EXT_POLICY] <= sizeof(*xpl0)) {
 #ifdef IPSEC_DEBUG
 		printf("key_spdadd: some policy requests part required.\n");
 #endif
-		msg0->sadb_msg_errno = EINVAL;
-		return NULL;
+		return key_senderror(so, m, EINVAL);
 	}
 
 	/*
@@ -1489,13 +1494,12 @@ key_spdadd(mhp)
 	 * If type is either SPDADD or SPDSETIDX and SP found, then error.
 	 */
 	newsp = key_getsp(&spidx);
-	if (msg0->sadb_msg_type == SADB_X_SPDUPDATE) {
+	if (mhp->msg->sadb_msg_type == SADB_X_SPDUPDATE) {
 		if (newsp == NULL) {
 #ifdef IPSEC_DEBUG
 			printf("key_spdadd: no SP found.\n");
 #endif
-			msg0->sadb_msg_errno = ENOENT;
-			return NULL;
+			return key_senderror(so, m, ENOENT);
 		}
 
 		newsp->state = IPSEC_SPSTATE_DEAD;
@@ -1506,21 +1510,18 @@ key_spdadd(mhp)
 #ifdef IPSEC_DEBUG
 			printf("key_spdadd: a SP entry exists already.\n");
 #endif
-			msg0->sadb_msg_errno = EEXIST;
-			return NULL;
+			return key_senderror(so, m, EEXIST);
 		}
 	}
 
 	/* allocation new SP entry */
 	if ((newsp = key_msg2sp(xpl0, PFKEY_EXTLEN(xpl0), &error)) == NULL) {
-		msg0->sadb_msg_errno = error;
-		return NULL;
+		return key_senderror(so, m, error);
 	}
 
 	if ((newsp->id = key_getnewspid()) == 0) {
-		msg0->sadb_msg_errno = ENOBUFS;
 		keydb_delsecpolicy(newsp);
-		return NULL;
+		return key_senderror(so, m, ENOBUFS);
 	}
 
 	/* XXX boundary check against sa_len */
@@ -1535,27 +1536,24 @@ key_spdadd(mhp)
 	/* sanity check on addr pair */
 	if (((struct sockaddr *)(src0 + 1))->sa_family !=
 			((struct sockaddr *)(dst0+ 1))->sa_family) {
-		msg0->sadb_msg_errno = EINVAL;
 		keydb_delsecpolicy(newsp);
-		return NULL;
+		return key_senderror(so, m, EINVAL);
 	}
 #if 1
 	if (newsp->req && newsp->req->saidx.src.ss_family) {
 		struct sockaddr *sa;
 		sa = (struct sockaddr *)(src0 + 1);
 		if (sa->sa_family != newsp->req->saidx.src.ss_family) {
-			msg0->sadb_msg_errno = EINVAL;
 			keydb_delsecpolicy(newsp);
-			return NULL;
+			return key_senderror(so, m, EINVAL);
 		}
 	}
 	if (newsp->req && newsp->req->saidx.dst.ss_family) {
 		struct sockaddr *sa;
 		sa = (struct sockaddr *)(dst0 + 1);
 		if (sa->sa_family != newsp->req->saidx.dst.ss_family) {
-			msg0->sadb_msg_errno = EINVAL;
 			keydb_delsecpolicy(newsp);
-			return NULL;
+			return key_senderror(so, m, EINVAL);
 		}
 	}
 #endif
@@ -1565,7 +1563,7 @@ key_spdadd(mhp)
 	LIST_INSERT_HEAD(&sptree[newsp->spidx.dir], newsp, chain);
 
 	/* delete the entry in spacqtree */
-	if (msg0->sadb_msg_type == SADB_X_SPDUPDATE) {
+	if (mhp->msg->sadb_msg_type == SADB_X_SPDUPDATE) {
 		struct secspacq *spacq;
 		if ((spacq = key_getspacq(&spidx)) != NULL) {
 			/* reset counter in order to deletion by timehander. */
@@ -1575,43 +1573,64 @@ key_spdadd(mhp)
     	}
 
     {
+	struct mbuf *n;
 	struct sadb_msg *newmsg;
-	u_int len;
-	caddr_t p;
+	int off, len;
 
 	/* create new sadb_msg to reply. */
-	len = sizeof(struct sadb_msg)
-	    + PFKEY_EXTLEN(mhp[SADB_X_EXT_POLICY])
-	    + PFKEY_EXTLEN(mhp[SADB_EXT_ADDRESS_SRC])
-	    + PFKEY_EXTLEN(mhp[SADB_EXT_ADDRESS_DST]);
+	len = sizeof(struct sadb_msg) + mhp->extlen[SADB_X_EXT_POLICY] +
+	    mhp->extlen[SADB_EXT_ADDRESS_SRC] +
+	    mhp->extlen[SADB_EXT_ADDRESS_DST];
+	if (len > MCLBYTES)
+		return key_senderror(so, m, ENOBUFS);
 
-	KMALLOC(newmsg, struct sadb_msg *, len);
-	if (newmsg == NULL) {
-#ifdef IPSEC_DEBUG
-		printf("key_spdadd: No more memory.\n");
-#endif
-		/* newsp persists in the kernel */
-		msg0->sadb_msg_errno = ENOBUFS;
-		return NULL;
+	MGETHDR(n, M_DONTWAIT, MT_DATA);
+	if (len > MHLEN) {
+		MCLGET(n, M_DONTWAIT);
+		if ((n->m_flags & M_EXT) == 0) {
+			m_freem(n);
+			n = NULL;
+		}
 	}
-	bzero((caddr_t)newmsg, len);
+	if (!n)
+		return key_senderror(so, m, ENOBUFS);
 
-	bcopy((caddr_t)msg0, (caddr_t)newmsg, sizeof(*msg0));
-	newmsg->sadb_msg_errno = 0;
-	newmsg->sadb_msg_len = PFKEY_UNIT64(len);
-	p = (caddr_t)newmsg + sizeof(*msg0);
+	n->m_pkthdr.len = n->m_len = len;
+	n->m_next = NULL;
+	off = 0;
 
+	m_copydata(m, 0, sizeof(struct sadb_msg), mtod(n, caddr_t) + off);
+	off += PFKEY_ALIGN8(sizeof(struct sadb_msg));
+
+	m_copydata(m, mhp->extoff[SADB_X_EXT_POLICY],
+	    mhp->extlen[SADB_X_EXT_POLICY], mtod(n, caddr_t) + off);
 	/*
 	 * reqid may had been updated at key_msg2sp() if reqid's
 	 * range violation.
 	 */
-	((struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY])->sadb_x_policy_id = newsp->id;
-	p = key_setsadbext(p, mhp[SADB_X_EXT_POLICY]);
+	((struct sadb_x_policy *)(mtod(n, caddr_t) + off))->sadb_x_policy_id =
+	    newsp->id;
+	off += mhp->extlen[SADB_X_EXT_POLICY];
 
-	p = key_setsadbext(p, mhp[SADB_EXT_ADDRESS_SRC]);
-	p = key_setsadbext(p, mhp[SADB_EXT_ADDRESS_DST]);
+	m_copydata(m, mhp->extoff[SADB_EXT_ADDRESS_SRC],
+	    mhp->extlen[SADB_EXT_ADDRESS_SRC], mtod(n, caddr_t) + off);
+	off += mhp->extlen[SADB_EXT_ADDRESS_SRC];
 
-	return newmsg;
+	m_copydata(m, mhp->extoff[SADB_EXT_ADDRESS_DST],
+	    mhp->extlen[SADB_EXT_ADDRESS_DST], mtod(n, caddr_t) + off);
+	off += mhp->extlen[SADB_EXT_ADDRESS_DST];
+
+#ifdef DIAGNOSTIC
+	if (off != len)
+		panic("length inconsistency in key_spdadd");
+#endif
+
+	newmsg = mtod(n, struct sadb_msg *);
+	newmsg->sadb_msg_errno = 0;
+	newmsg->sadb_msg_len = PFKEY_UNIT64(n->m_pkthdr.len);
+
+	m_freem(m);
+	return key_sendup_mbuf(so, n, KEY_SENDUP_ALL);
     }
 }
 
@@ -6579,10 +6598,7 @@ key_parse(m, so)
 	case SADB_X_SPDADD:
 	case SADB_X_SPDSETIDX:
 	case SADB_X_SPDUPDATE:
-		if ((newmsg = key_spdadd((caddr_t *)mh.ext)) == NULL)
-			goto sendback;
-		target = KEY_SENDUP_ALL;
-	        break;
+		return key_spdadd(so, m, &mh);
 
 	case SADB_X_SPDDELETE:	/*done*/
 		return key_spddelete(so, m, &mh);
