@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.26 2000/07/28 07:03:14 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.27 2000/07/28 07:34:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -116,6 +116,7 @@ static int map4to6 __P((struct sockaddr_in *, struct sockaddr_in6 *));
 static void sig_child __P((int));
 static void sig_terminate __P((int));
 static void start_daemon __P((void));
+static void exit_stderr __P((const char *, ...));
 #ifndef HAVE_GETIFADDRS
 static unsigned int if_maxindex __P((void));
 #endif
@@ -720,7 +721,7 @@ start_daemon(void)
 		exit_failure("signal TERM: %s", ERRSTR);
 }
 
-void
+static void
 exit_stderr(const char *fmt, ...)
 {
 	va_list ap;
