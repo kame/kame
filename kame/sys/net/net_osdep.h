@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.18 2000/06/04 22:54:32 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.19 2000/06/13 05:41:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -35,6 +35,12 @@
 /*
  * OS dependencies:
  *
+ * - side effects of rtrequest[1](RTM_DELETE)
+ *	BSDI[34]: delete all cloned routes underneath the route.
+ *	FreeBSD[234]: delete all protocol-cloned routes underneath the route.
+ *		      note that cloned routes from an interface direct route
+ *		      still remain.
+ *	NetBSD, OpenBSD: no side effects.
  * - privileged process
  *	NetBSD, FreeBSD 3
  *		struct proc *p;
