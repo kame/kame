@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.311 2003/09/08 07:23:04 itojun Exp $	*/
+/*	$KAME: key.c,v 1.312 2003/09/11 23:57:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -6982,7 +6982,6 @@ key_dump(so, m, mhp)
 	u_int8_t satype;
 	u_int8_t state;
 	int cnt;
-	struct sadb_msg *newmsg;
 	struct mbuf *n;
 
 	/* sanity check */
@@ -7016,7 +7015,6 @@ key_dump(so, m, mhp)
 		return key_senderror(so, m, ENOENT);
 
 	/* send this to the userland, one at a time. */
-	newmsg = NULL;
 	LIST_FOREACH(sah, &sahtree, chain) {
 		if (mhp->msg->sadb_msg_satype != SADB_SATYPE_UNSPEC &&
 		    proto != sah->saidx.proto)
