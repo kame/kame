@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.8 2005/01/26 07:41:59 t-momose Exp $	*/
+/*	$KAME: fsm.c,v 1.9 2005/01/27 05:10:26 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -2303,6 +2303,15 @@ bul_fsm_back_preprocess(bul, fsmmsg)
                 /* silently ignore. */
 		mip6stat.mip6s_seqno++;
                 return (-1);
+	}
+	/* check the status code */
+	if ((ip6mhba->ip6mhba_status != IP6_MH_BAS_ACCEPTED)
+	    || (ip6mhba->ip6mhba_status != IP6_MH_BAS_PRFX_DISCOV)) {
+		syslog(LOG_NOTICE,
+		    "bul_fsm_back_preprocess:"
+		    "received an error status %d.\n",
+		    ip6mhba->ip6mhba_status);
+		return (-1);
 	}
 
 	/* retrieve Mobility Options */
