@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_ident.c,v 1.49 2000/12/12 19:11:26 sakane Exp $	*/
+/*	$KAME: isakmp_ident.c,v 1.50 2000/12/12 23:22:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -332,7 +332,7 @@ ident_i3recv(iph1, msg)
 	struct isakmp_parse_t *pa;
 	int error = -1;
 #ifdef HAVE_GSSAPI
-	vchar_t *gsstoken;
+	vchar_t *gsstoken = NULL;
 #endif
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
