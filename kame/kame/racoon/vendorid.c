@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: vendorid.c,v 1.1 2000/05/24 09:39:18 sakane Exp $ */
+/* YIPS @(#)$Id: vendorid.c,v 1.2 2000/05/24 09:52:18 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -49,22 +49,24 @@
 #include "vendorid.h"
 #include "crypto_openssl.h"
 
-	/* set vendor id */
+/*
+ * set hashed vendor id.
+ * hash function is always MD5.
+ */
 vchar_t *
 set_vendorid()
 {
-	vchar_t *vid;
-	const char *v = VENDORID;
+	vchar_t vid, *vidhash;
+	char *v = VENDORID;
 
-	/*
-	 * XXX calculate HASH same time.
-	 */
-	vid = vmalloc(strlen(v));
-	if (vid == NULL)
+	vid.v = v;
+	vid.l = strlen(v);
+
+	vidhash = eay_md5_one(&vid);
+	if (vidhash == NULL)
 		return NULL;
-	memcpy(vid->v, v, vid->l);
 
-	return vid;
+	return vidhash;
 }
 
 int
@@ -72,33 +74,25 @@ check_vendorid(gen, from)
 	struct isakmp_gen *gen;		/* points to Vendor ID payload */
 	struct sockaddr *from;
 {
-	vchar_t *vidhash;
-	vchar_t *vid = lcconf->vendorid;
+	vchar_t *vidhash = lcconf->vendorid;
 
 	if (!gen)
 		return -1;
-	if (vid == NULL) {
+	if (vidhash == NULL) {
 		plog(logp, LOCATION, NULL,
 			"ignoring Vendor ID as I don't have one.\n");
 		return 0;
 	}
 
-	/* XXX should this be configurable? */
-	vidhash = eay_md5_one(vid);
-	if (!vidhash) {
-		plog(logp, LOCATION, from,
-			"failed to hash my Vendor ID.\n");
-		return -1;
-	}
 	if (vidhash->l == ntohs(gen->len) - sizeof(*gen)
 	 && memcmp(vidhash->v, gen + 1, vidhash->l) == 0) {
-		plog(logp, LOCATION, from,
-			"Vendor ID matched <%s>.\n",
-			vid->v);
+		YIPSDEBUG(DEBUG_SA,
+			plog(logp, LOCATION, from,
+				"Vendor ID matched.\n"));
+		;
 	} else
 		plog(logp, LOCATION, from,
 			"Vendor ID mismatch.\n");
-	vfree(vidhash);
 
 	return 0;
 }

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.26 2000/05/24 09:39:17 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.27 2000/05/24 09:52:18 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -1182,7 +1182,6 @@ ident_ir2sendmx(iph1)
 {
 	vchar_t *buf = 0;
 	struct isakmp_gen *gen;
-	vchar_t *vidhash = NULL;
 	char *p;
 	int tlen;
 	int error = -1;
@@ -1191,10 +1190,8 @@ ident_ir2sendmx(iph1)
 	tlen = sizeof(struct isakmp)
 	     + sizeof(*gen) + iph1->dhpub->l
 	     + sizeof(*gen) + iph1->nonce->l;
-	if (lcconf->vendorid) {
-		vidhash = oakley_hash(lcconf->vendorid, iph1);
-		tlen += sizeof(*gen) + vidhash->l;
-	}
+	if (lcconf->vendorid)
+		tlen += sizeof(*gen) + lcconf->vendorid->l;
 
 	buf = vmalloc(tlen);
 	if (buf == NULL) {
@@ -1213,11 +1210,11 @@ ident_ir2sendmx(iph1)
 
 	/* create isakmp NONCE payload */
 	p = set_isakmp_payload(p, iph1->nonce,
-		vidhash ? ISAKMP_NPTYPE_VID : ISAKMP_NPTYPE_NONE);
+		lcconf->vendorid ? ISAKMP_NPTYPE_VID : ISAKMP_NPTYPE_NONE);
 
 	/* append vendor id, if needed */
-	if (vidhash)
-		p = set_isakmp_payload(p, vidhash, ISAKMP_NPTYPE_NONE);
+	if (lcconf->vendorid)
+		p = set_isakmp_payload(p, lcconf->vendorid, ISAKMP_NPTYPE_NONE);
 
 #ifdef HAVE_PRINT_ISAKMP_C
 	isakmp_printpacket(buf, iph1->local, iph1->remote, 0);
@@ -1234,9 +1231,6 @@ end:
 		vfree(buf);
 		buf = NULL;
 	}
-
-	if (vidhash != NULL)
-		vfree(vidhash);
 
 	return buf;
 }

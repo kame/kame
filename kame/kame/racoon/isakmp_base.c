@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.18 2000/05/24 09:39:17 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.19 2000/05/24 09:52:18 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -853,7 +853,6 @@ base_ir2sendmx(iph1)
 {
 	vchar_t *buf = 0;
 	struct isakmp_gen *gen;
-	vchar_t *vidhash = NULL;
 	char *p;
 	int tlen;
 	int error = -1;
@@ -865,8 +864,7 @@ base_ir2sendmx(iph1)
 		tlen += sizeof(*gen) + iph1->dhpub->l
 			+ sizeof(*gen) + iph1->hash->l;
 		if (lcconf->vendorid) {
-			vidhash = oakley_hash(lcconf->vendorid, iph1);
-			tlen += sizeof(*gen) + vidhash->l;
+			tlen += sizeof(*gen) + lcconf->vendorid->l;
 		}
 
 		buf = vmalloc(tlen);
@@ -886,11 +884,11 @@ base_ir2sendmx(iph1)
 
 		/* create isakmp HASH payload */
 		p = set_isakmp_payload(p, iph1->hash,
-			vidhash ? ISAKMP_NPTYPE_VID : ISAKMP_NPTYPE_NONE);
+			lcconf->vendorid ? ISAKMP_NPTYPE_VID : ISAKMP_NPTYPE_NONE);
 
 		/* append vendor id, if needed */
-		if (vidhash)
-			p = set_isakmp_payload(p, vidhash, ISAKMP_NPTYPE_NONE);
+		if (lcconf->vendorid)
+			p = set_isakmp_payload(p, lcconf->vendorid, ISAKMP_NPTYPE_NONE);
 		break;
 #ifdef HAVE_SIGNING_C
 	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
@@ -953,9 +951,6 @@ end:
 		vfree(buf);
 		buf = NULL;
 	}
-
-	if (vidhash != NULL)
-		vfree(vidhash);
 
 	return buf;
 }

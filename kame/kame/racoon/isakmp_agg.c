@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.25 2000/05/24 09:39:17 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.26 2000/05/24 09:52:17 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -597,7 +597,6 @@ agg_r1send(iph1, msg)
 	struct isakmp_gen *gen;
 	char *p;
 	int tlen;
-	vchar_t *vidhash = NULL;
 	int error = -1;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
@@ -657,10 +656,8 @@ agg_r1send(iph1, msg)
 			+ sizeof(*gen) + iph1->nonce->l
 			+ sizeof(*gen) + iph1->id->l
 			+ sizeof(*gen) + iph1->hash->l;
-		if (lcconf->vendorid) {
-			vidhash = oakley_hash(lcconf->vendorid, iph1);
-			tlen += sizeof(*gen) + vidhash->l;
-		}
+		if (lcconf->vendorid)
+			tlen += sizeof(*gen) + lcconf->vendorid->l;
 
 		iph1->sendbuf = vmalloc(tlen);
 		if (iph1->sendbuf == NULL) { 
@@ -688,11 +685,12 @@ agg_r1send(iph1, msg)
 
 		/* create isakmp HASH payload */
 		p = set_isakmp_payload(p, iph1->hash,
-			vidhash ? ISAKMP_NPTYPE_VID : ISAKMP_NPTYPE_NONE);
+			lcconf->vendorid ? ISAKMP_NPTYPE_VID
+					 : ISAKMP_NPTYPE_NONE);
 
 		/* append vendor id, if needed */
-		if (vidhash)
-			p = set_isakmp_payload(p, vidhash, ISAKMP_NPTYPE_NONE);
+		if (lcconf->vendorid)
+			p = set_isakmp_payload(p, lcconf->vendorid, ISAKMP_NPTYPE_NONE);
 		break;
 #ifdef HAVE_SIGNING_C
 	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
@@ -712,10 +710,8 @@ agg_r1send(iph1, msg)
 			+ sizeof(*gen) + iph1->sig->l;
 		if (iph1->cert != NULL)
 			tlen += sizeof(*gen) + iph1->cert->l;
-		if (lcconf->vendorid) {
-			vidhash = oakley_hash(lcconf->vendorid, iph1);
-			tlen += sizeof(*gen) + vidhash->l;
-		}
+		if (lcconf->vendorid)
+			tlen += sizeof(*gen) + lcconf->vendorid->l;
 
 		iph1->sendbuf = vmalloc(tlen);
 		if (iph1->sendbuf == NULL) { 
@@ -748,11 +744,12 @@ agg_r1send(iph1, msg)
 			p = set_isakmp_payload(p, iph1->cert, ISAKMP_NPTYPE_SIG);
 		/* add SIG payload */
 		p = set_isakmp_payload(p, iph1->sig,
-			vidhash ? ISAKMP_NPTYPE_VID : ISAKMP_NPTYPE_NONE);
+			lcconf->vendorid ? ISAKMP_NPTYPE_VID
+					 : ISAKMP_NPTYPE_NONE);
 
 		/* append vendor id, if needed */
-		if (vidhash)
-			p = set_isakmp_payload(p, vidhash, ISAKMP_NPTYPE_NONE);
+		if (lcconf->vendorid)
+			p = set_isakmp_payload(p, lcconf->vendorid, ISAKMP_NPTYPE_NONE);
 		break;
 #endif
 	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
@@ -783,8 +780,6 @@ end:
 		vfree(iph1->sa_ret);
 		iph1->sa_ret = NULL;
 	}
-	if (vidhash != NULL)
-		vfree(vidhash);
 
 	return error;
 }
