@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.942 2000/05/27 11:42:38 jinmei Exp $
+$Id: CHANGELOG,v 1.943 2000/05/27 11:47:04 jinmei Exp $
 
 <200005>
+2000-05-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dtcp/dtcpc.rb: added a new option "-r (static|solict)"
+	to specifiy how the default route should be configured.
+
 2000-05-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtadvd: became more conscious of interface status
 	(up or down);
