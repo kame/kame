@@ -45,7 +45,7 @@ int          bgpsbsize = BGP_DEFAULT_SBSIZE;
 u_int16_t    my_as_number;         /* my AS number                     */
 u_int32_t    bgpIdentifier;        /* BGP Identifier  (net-order)      */
 u_int32_t    clusterId;            /* CLUSTER_ID                       */
-u_int16_t    bgpHoldtime;          /* hold timer                       */
+u_int16_t    bgpHoldtime = BGP_HOLDTIME; /* hold timer */
 byte         IamRR;                /* I am Route Reflector             */
 
 /* lists */

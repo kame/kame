@@ -82,6 +82,7 @@ void             mask_nclear __P((struct in6_addr  *, int));
 int              inet_ptox   __P((int, const char *, void *, u_char *));
 u_int16_t        ip6_cksum   __P((struct ip6_pseudohdr *, u_char *));
 char            *ip6str      __P((struct in6_addr *, unsigned int));
+char            *ip6str2     __P((struct sockaddr_in6 *));
 int		 get_in6_addr __P((char *, struct sockaddr_in6 *));
 int		 sa6_equal   __P((struct sockaddr_in6 *, struct sockaddr_in6 *));
 

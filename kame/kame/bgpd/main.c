@@ -44,6 +44,7 @@
 #include "cfparse.h"
 #endif 
 
+int confcheck = 0;		/* configuration check only */
 int              rtsock;       /* the routing socket               */
 pid_t            pid;
 fd_set           fdmask;
@@ -96,8 +97,11 @@ main(argc, argv)
   FD_ZERO(&fdmask);  
 
   /* get options */
-  while ((ch = getopt(argc, argv, "c:f")) != EOF){
+  while ((ch = getopt(argc, argv, "Cc:f")) != EOF){
     switch (ch){
+    case 'C':
+      confcheck++;
+      break;
     case 'c':
       conf = optarg;
       break;
@@ -112,7 +116,7 @@ main(argc, argv)
     }
   }
 
-  if (foreground == 0) {
+  if (confcheck == 0 && foreground == 0) {
     if ((pid = fork()) < 0){
       fprintf(stderr, "Cannot fork: %s\n", strerror(errno));
       exit(1);
@@ -138,24 +142,27 @@ main(argc, argv)
 
 
   /* write PID file */
-  pfp = fopen(PIDFILENAME, "w");
-  if (pfp == NULL)
-    {
+  if (confcheck == 0) { 
+    pfp = fopen(PIDFILENAME, "w");
+    if (pfp == NULL) {
       fprintf(stderr, "Cannot open PID file: %s. Exit.\n", strerror(errno));
       exit(1);
     }
 
-  fprintf(pfp, "%d\n", pid);
-  fclose(pfp);
-
+    fprintf(pfp, "%d\n", pid);
+    fclose(pfp);
+  }
 
   loconfig("lo0");
   ifconfig();
-  krt_init();
+  if (confcheck == 0)
+    krt_init();
 
 #ifdef USE_LEX_YACC
   if (cfparse(1, conf ? conf : CONFFILENAME))
     exit(1);
+  if (confcheck)
+    exit(0);
 #else
   conf_check(conf ? conf : CONFFILENAME);
 #endif

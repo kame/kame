@@ -35,6 +35,7 @@ struct ripif {
   struct ifinfo    *rip_ife;
   struct rt_entry  *rip_adj_ribs_in;  /* Imported RTEs via BGP message   */
   struct rtproto   *rip_adj_ribs_out; /* Exporting RTEs of protocols     */
+  char *rip_desc;		/* interface description */
   byte              rip_mode;         /* info bit                        */
 #define IFS_NORIPIN          0x80
 #define IFS_NORIPOUT         0x40

@@ -256,21 +256,31 @@ ip6str(addr, ifindex)
 	struct in6_addr *addr;
 	unsigned int ifindex;
 {
-	static char ip6buf[8][MAXHOSTNAMELEN];
-	static int ip6round = 0;
-	char *cp;
 	struct sockaddr_in6 sa6;
-
-	ip6round = (ip6round + 1) & 7;
-	cp = ip6buf[ip6round];
 
 	memset(&sa6, 0, sizeof(sa6));
 	sa6.sin6_len = sizeof(sa6);
 	sa6.sin6_family = AF_INET6;
 	sa6.sin6_addr = *addr;
 	sa6.sin6_scope_id = ifindex; /* XXX: link(not i/f) index should be used */
-	getnameinfo((struct sockaddr *)&sa6, sa6.sin6_len, cp, MAXHOSTNAMELEN,
+	return(ip6str2(&sa6));
+}
+
+/* same as ip6str(), but takes sockaddr_in6 instead of in6_addr */
+char *
+ip6str2(sa6)
+	struct sockaddr_in6 *sa6;
+{
+	static char ip6buf[8][MAXHOSTNAMELEN];
+	static int ip6round = 0;
+	char *cp;
+
+	ip6round = (ip6round + 1) & 7;
+	cp = ip6buf[ip6round];
+
+	getnameinfo((struct sockaddr *)sa6, sa6->sin6_len, cp, MAXHOSTNAMELEN,
 		    NULL, 0, NI_NUMERICHOST|NI_WITHSCOPEID);
+
 	return(cp);
 }
 

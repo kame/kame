@@ -40,7 +40,18 @@
 #include <netdb.h>
 #include <string.h>
 #include <syslog.h>
+#include <err.h>
 
+#include "include.h"
+#include "bgp.h"
+#include "router.h"
+#include "task.h"
+#include "rt_table.h"
+#include "aspath.h"
+#include "bgp_var.h"
+#include "in6.h"
+#include "ripng.h"
+#include "ripng_var.h"
 #include "debug.h"
 #include "cfparse.h"
 #include "vmbuf.h"
@@ -65,6 +76,8 @@
 		}\
 	} while(0)
 
+#define cprint if (confcheck) printf
+
 struct in6_prefix {
 	struct sockaddr_in6 paddr;
 	int plen;
@@ -73,6 +86,8 @@ struct in6_prefix {
 struct attr_list {
 	struct attr_list *next;
 	int code;
+	int type;
+	int line;
 	union {
 		char *str;
 		void *data;
@@ -80,6 +95,7 @@ struct attr_list {
 		int number;
 		struct sockaddr_in6 in6addr;
 		struct in6_prefix prefix;
+		struct attr_list *list;
 	}attru;
 };
 
@@ -87,6 +103,7 @@ struct yy_ripifinfo {
 	struct yy_ripifinfo *next;
 	char ifname[IFNAMSIZ];
 	struct attr_list *attribute;
+	int line;
 };
 
 struct yy_bgppeerinfo {
@@ -96,13 +113,21 @@ struct yy_bgppeerinfo {
 	int peertype;		/* an ordinal peer or an IBGP cluster client */
 	struct sockaddr_in6 peeraddr;
 	struct attr_list *attribute;
+	int line;
 };
 
 struct yy_exportinfo {		/* XXX: BGP depend */
 	struct yy_exportinfo *next;
 	int asnum;
+	int line;
 	struct sockaddr_in6 peeraddr;
 	struct attr_list *protolist;
+};
+
+struct yy_aggrinfo {
+	struct yy_aggrinfo *next;
+	struct in6_prefix prefix;
+	struct attr_list *aggrinfo;
 };
 
 struct yy_rtproto {
@@ -111,38 +136,48 @@ struct yy_rtproto {
 		struct {
 			int peeras;
 			struct sockaddr_in6 peeraddr;
-		}rtp_bgp;
+		}rtpu_bgp;
 		char ifname[IFNAMSIZ];
 	}rtpu;
 };
 
-enum {RIPIFA_DEFAULT, RIPIFA_NORIPIN, RIPIFA_NORIPOUT, RIPIFA_FILINDEF,
-      RIPIFA_FILOUTDEF, RIPIFA_RESINDEF, RIPIFA_RESOUTDEF, RIPIFA_FILINPFX,
-      RIPIFA_FILOUTPFX, RIPIFA_RESINPFX, RIPIFA_RESOUTPFX, RIPIFA_DESCR,
-      BGPPA_IFNAME, BGPPA_NOSYNC, BGPPA_NEXTHOPSELF, BGPPA_LCLADDR,
-      BGPPA_PREFERENCE, BGPPA_PREPEND, BGPPA_DESCR,
-      EXPA_PROTO};
+enum {RIPIFA_DEFAULT, RIPIFA_NORIPIN, RIPIFA_NORIPOUT, RIPIFA_METRICIN,
+      RIPIFA_FILINDEF, RIPIFA_FILOUTDEF, RIPIFA_RESINDEF, RIPIFA_RESOUTDEF,
+      RIPIFA_FILINPFX, RIPIFA_FILOUTPFX, RIPIFA_RESINPFX, RIPIFA_RESOUTPFX,
+      RIPIFA_DESCR, BGPPA_IFNAME, BGPPA_NOSYNC, BGPPA_NEXTHOPSELF,
+      BGPPA_LCLADDR, BGPPA_PREFERENCE, BGPPA_PREPEND, BGPPA_DESCR,
+      EXPA_PROTO, AGGA_PROTO, AGGA_EXPFX};
 enum {ATTR_FLAG, ATTR_PREFIX, ATTR_STRING, ATTR_ADDR, ATTR_NUMBER,
-      ATTR_DATA};
+      ATTR_DATA, ATTR_LIST};
 enum {BGPPEER_NORMAL, BGPPEER_CLIENT}; 
 enum {RTP_IFACE, RTP_BGP, RTP_RIP, RTP_IBGP}; 
 
 static struct in6_prefix in6pfx_temp; /* XXX */
 static struct yy_bgppeerinfo bgppeer_temp; /* XXX file global */
-static struct yy_bgppeerinfo *bgppeer_head;
+static struct yy_bgppeerinfo *yy_bgppeer_head;
 static int yy_debug, yy_asnum, yy_bgpsbsize, yy_holdtime, yy_rrflag,
 	yy_rip, yy_rip_sitelocal;
+static long yy_routerid, yy_clusterid; /* XXX sizoef(long)? */
 static int yy_bgp;
-static char *yy_dumpfile, *yy_routerid;
+static char *yy_dumpfile;
 static struct yy_ripifinfo *yy_ripifinfo_head;
 static struct yy_exportinfo *yy_exportinfo_head;
+static struct yy_aggrinfo *yy_aggr_head;
+
+extern int lineno;
+extern int confcheck;
+extern char *configfilename;
 
 extern char *dumpfile;
+extern u_int32_t bgpIdentifier, clusterId;
+extern u_int16_t my_as_number, bgpHoldtime;
+extern byte ripyes, bgpyes, IamRR;
+extern struct rpcb *bgb;
 
+#define DUMPFILENAME "/var/run/bgpd.dump"
+
+extern void insque __P((void *, void *)); /* XXX */
 extern int yylex __P((void));
-extern int get_in6_addr __P((char *, struct sockaddr_in6 *));
-extern char *ip6str __P((struct in6_addr *, unsigned int));
-extern int sa6_equal __P((struct sockaddr_in6 *, struct sockaddr_in6 *));
 %}
 
 %union {
@@ -159,7 +194,7 @@ extern int sa6_equal __P((struct sockaddr_in6 *, struct sockaddr_in6 *));
 %token NUMBER STRING SLASH
 %token LOG LOGLEV NOLOGLEV
 %token DUMPFILE
-%token AUTONOMOUSSYSTEM ROUTERID HOLDTIME ROUTEREFLECTOR BGPSBSIZE
+%token AUTONOMOUSSYSTEM ROUTERID CLUSTERID HOLDTIME ROUTEREFLECTOR BGPSBSIZE
 %token INTERFACE IFNAME
 %token RIP DEFAULT ORIGINATE NORIPIN NORIPOUT SITELOCAL METRICIN
 %token FILTERIN FILTEROUT RESTRICTIN RESTRICTOUT
@@ -172,6 +207,7 @@ extern int sa6_equal __P((struct sockaddr_in6 *, struct sockaddr_in6 *));
 %type <num> LOGLEV NOLOGLEV NUMBER
 %type <val> STRING IFNAME DESCSTRING
 %type <attr> rip_ifattributes peerattributes export_list
+%type <attr> aggregate_substatements prefix_list
 %type <prefix> prefix
 %type <bpeer> peerstatements
 %type <rtp> protocol
@@ -218,7 +254,31 @@ param_statement:
 		}
 	|	ROUTERID STRING EOS
 		{
-			set_string(yy_routerid, $2.v, "RouterID");
+			struct in_addr routerid;
+
+			/* we don't regared -1 as a valid IPv4 address */
+			if ((inet_aton($2.v, &routerid)) == 0 &&
+			    routerid.s_addr == (u_int32_t)-1) {
+				yywarn("invalid router ID: %s", $2.v);
+				free($2.v);
+				return(-1);
+			}
+			set_param(yy_routerid, routerid.s_addr, "RouterID");
+			free($2.v);
+		}
+	|	CLUSTERID STRING EOS
+		{
+			struct in_addr clusterid;
+
+			/* we don't regared -1 as a valid IPv4 address */
+			if ((inet_aton($2.v, &clusterid)) == 0 &&
+			    clusterid.s_addr == (u_int32_t)-1) {
+				yywarn("invalid cluster ID: %s", $2.v);
+				free($2.v);
+				return(-1);
+			}
+			set_param(yy_clusterid, clusterid.s_addr, "ClusterID");
+			free($2.v);
 		}
 	|	HOLDTIME NUMBER EOS
 		{
@@ -233,7 +293,7 @@ param_statement:
 
 /* RIP */
 rip_statement:
-		RIP YES BCL rip_substatements ECL
+		RIP YES BCL rip_substatements ECL EOS
 		{
 			if (yy_rip != -1) {
 				yywarn("RIP(yes) doubly defined (ignored)");
@@ -241,7 +301,7 @@ rip_statement:
 			}
 			yy_rip = 1;
 		}
-	|	RIP BCL rip_substatements ECL
+	|	RIP BCL rip_substatements ECL EOS
 		{
 			if (yy_rip != -1) {
 				yywarn("RIP(yes) doubly defined (ignored)");
@@ -249,7 +309,7 @@ rip_statement:
 			}
 			yy_rip = 1;
 		}
-	|	RIP NO IGNORE_END
+	|	RIP NO IGNORE_END EOS
 		{
 			if (yy_rip != -1) {
 				yywarn("RIP(no) doubly defined (ignored)");
@@ -269,9 +329,9 @@ rip_substatement:
 		{
 			struct yy_ripifinfo *ifinfo;
 			
-			ifinfo = find_ripifinfo($2.v);
+			ifinfo = add_ripifinfo($2.v);
 			if (ifinfo == NULL) {
-				yywarn("can't find RIP interface: %s", $2.v);
+				yywarn("can't add RIP interface: %s", $2.v);
 				free($2.v);
 				return(-1);
 			}
@@ -316,6 +376,19 @@ rip_ifattributes:
 		{
 			if (($$ = add_attribute($1, ATTR_FLAG,
 						RIPIFA_NORIPOUT, 0)) == NULL)
+				return(-1);
+		}
+	|	rip_ifattributes METRICIN NUMBER
+		{
+			int metric = $3;
+			
+			if (metric < 0 || metric >= 16) {
+				yywarn("invalid RIP metric(%d)", metric);
+				return(-1);
+			}
+			if (($$ = add_attribute($1, ATTR_NUMBER,
+						RIPIFA_METRICIN, &metric)) ==
+			    NULL)
 				return(-1);
 		}
 	|	rip_ifattributes FILTERIN DEFAULT
@@ -376,7 +449,16 @@ rip_ifattributes:
 
 /* BGP */
 bgp_statement:
-		BGP YES BCL bgp_substatements ECL
+		BGP YES BCL bgp_substatements ECL EOS
+		{
+			if (yy_bgp != -1) {
+				yywarn("BGP(yes) doubly defined (ignored)");
+				return(-1);
+			}
+			yy_bgp = 1;
+		}
+	|
+		BGP BCL bgp_substatements ECL EOS
 		{
 			if (yy_bgp != -1) {
 				yywarn("BGP(yes) doubly defined (ignored)");
@@ -500,7 +582,7 @@ peerattributes:
 		}
 	|	peerattributes PREPEND
 		{
-			int pref = 1;
+			int pref = BGP_DEF_ASPREPEND;
 
 			if (($$ = add_attribute($1, ATTR_NUMBER,
 						BGPPA_PREPEND,
@@ -586,14 +668,13 @@ protocol:			/* XXX: currently too restrictive */
 			}
 			memset(p, 0, sizeof(*p));
 			p->type = RTP_BGP;
-			p->rtpu.rtp_bgp.peeras = $4;
+			p->rtpu.rtpu_bgp.peeras = $4;
 
 			$$ = p;
 		}
 	|	PROTO BGP PEER STRING all_block EOS
 		{
 			struct yy_rtproto *p;
-			struct sockaddr_in6 peeraddr;
 
 			if ((p = malloc(sizeof(*p))) == NULL) {
 				yywarn("can't allocate memory");
@@ -602,7 +683,7 @@ protocol:			/* XXX: currently too restrictive */
 			}
 			memset(p, 0, sizeof(*p));
 			p->type = RTP_BGP;
-			if (get_in6_addr($4.v, &p->rtpu.rtp_bgp.peeraddr)) {
+			if (get_in6_addr($4.v, &p->rtpu.rtpu_bgp.peeraddr)) {
 				yywarn("bad peer address: %s", $4.v);
 				free($4.v);
 				return(-1);
@@ -648,23 +729,35 @@ all_block:			/* do nothing */
 aggregate_statement:
 	AGGREGATE prefix BCL aggregate_substatements ECL EOS
 	{
-		
+		if (add_aggregation($2, $4))
+			return(-1);
 	};
 
 aggregate_substatements:
-		/* empty */
-	|	protocol
+		{ $$ = NULL; }	/* empty */
+	|	aggregate_substatements protocol
 		{
+			if (($$ = add_attribute($1, ATTR_DATA, AGGA_PROTO,
+						$2)) == NULL)
+				return(-1);
 		}
-	|	EXPLICIT BCL prefix_list ECL EOS
+	|	aggregate_substatements EXPLICIT BCL prefix_list ECL EOS
 		{
+			if (($$ = add_attribute($1, ATTR_LIST, AGGA_EXPFX,
+						$4)) == NULL)
+				return(-1);
 		}
 	;
 
 /* prefix */
 prefix_list:
-		/* empty */
+		{ $$ = NULL; }	/* empty */
 	|	prefix_list prefix EOS
+		{
+			if (($$ = add_attribute($1, ATTR_PREFIX, ATTR_PREFIX,
+						$2)) == NULL)
+				return(-1);
+		}
 	;
 
 prefix:
@@ -699,6 +792,38 @@ prefix:
 
 %%
 static int
+add_aggregation(prefix, aggrinfo)
+	struct in6_prefix *prefix;
+	struct attr_list *aggrinfo;
+{
+	struct yy_aggrinfo *info;
+
+	/* check if duplicated */
+	for (info = yy_aggr_head; info; info = info->next) {
+		if (sa6_equal(&info->prefix.paddr, &prefix->paddr) &&
+		    info->prefix.plen == prefix->plen) {
+			yywarn("aggregate prefix(%s/%d) doulby defined",
+			       ip6str2(&prefix->paddr), prefix->plen);
+			return(-1);
+		}
+	}
+
+	/* allocate a new one */
+	if ((info = malloc(sizeof(*info))) == NULL) {
+		yywarn("can't allocate memory for aggregation");
+		return(-1);
+	}
+	memset(info, 0, sizeof(*info));
+	info->prefix = *prefix;
+	info->aggrinfo = aggrinfo;
+
+	info->next = yy_aggr_head;
+	yy_aggr_head = info;
+
+	return(0);
+}
+
+static int
 add_export(asnum, peer, list)	/* XXX BGP depend */
 	int asnum;
 	struct sockaddr_in6 *peer;
@@ -714,8 +839,7 @@ add_export(asnum, peer, list)	/* XXX BGP depend */
 		}
 		if (peer && sa6_equal(peer, &info->peeraddr)) {
 			yywarn("export peer (addr: %s) doubly defined",
-			       ip6str(&info->peeraddr.sin6_addr,
-				      info->peeraddr.sin6_scope_id));
+			       ip6str2(&info->peeraddr));
 			return(-1);
 		}
 	}
@@ -727,6 +851,7 @@ add_export(asnum, peer, list)	/* XXX BGP depend */
 	}
 	memset(info, 0, sizeof(*info));
 	info->asnum = asnum;
+	info->line = lineno;
 	if (peer)
 		info->peeraddr = *peer;
 	info->protolist = list;
@@ -746,7 +871,7 @@ add_bgppeer(asnum, routerid, peerinfo)
 	struct yy_bgppeerinfo *info;
 
 	/* check if duplicated */
-	for (info = bgppeer_head; info; info = info->next) {
+	for (info = yy_bgppeer_head; info; info = info->next) {
 		if (asnum >= 0 && info->asnum == asnum) {
 			yywarn("BGP peer (AS: %d) doubly defined", asnum);
 			return(-1);
@@ -758,8 +883,7 @@ add_bgppeer(asnum, routerid, peerinfo)
 		}
 		if (sa6_equal(&info->peeraddr, &peerinfo->peeraddr)) {
 			yywarn("BGP peer (addr: %s) doubly defined",
-			       ip6str(&info->peeraddr.sin6_addr,
-				      info->peeraddr.sin6_scope_id));
+			       ip6str2(&info->peeraddr));
 			return(-1);
 		}
 	}
@@ -775,23 +899,19 @@ add_bgppeer(asnum, routerid, peerinfo)
 	info->peertype = peerinfo->peertype;
 	info->peeraddr = peerinfo->peeraddr;
 	info->attribute = peerinfo->attribute;
+	info->line = lineno;
 
-	info->next = bgppeer_head;
-	bgppeer_head = info;
+	info->next = yy_bgppeer_head;
+	yy_bgppeer_head = info;
 
 	return(0);
 }
 
 static struct yy_ripifinfo *
-find_ripifinfo(ifname)
+add_ripifinfo(ifname)
 	char *ifname;
 {
 	struct yy_ripifinfo *info;
-
-	for (info = yy_ripifinfo_head; info; info = info->next) {
-		if (strcmp(info->ifname, ifname) == 0)
-			return(info);
-	}
 
 	if ((info = malloc(sizeof(*info))) == NULL) {
 		yywarn("can't allocate memory for ripifinfo");
@@ -804,6 +924,7 @@ find_ripifinfo(ifname)
 	}
 	memset(info, 0, sizeof(*info));
 	strcpy(info->ifname, ifname);
+	info->line = lineno;
 	info->next = yy_ripifinfo_head;
 	yy_ripifinfo_head = info;
 
@@ -824,6 +945,8 @@ add_attribute(list, type, code, val)
 	}
 	memset((void *)p, 0, sizeof(*p));
 	p->code = code;
+	p->type = type;
+	p->line = lineno;
 	switch(type) {
 	case ATTR_FLAG:
 		p->attru.flags++;
@@ -843,6 +966,9 @@ add_attribute(list, type, code, val)
 	case ATTR_DATA:
 		p->attru.data = val;
 		break;
+	case ATTR_LIST:
+		p->attru.list = (struct attr_list *)val;
+		break;
 	default:
 		/* XXX what do I do? */
 		yywarn("unknown attribute type(%d)", type);
@@ -853,195 +979,912 @@ add_attribute(list, type, code, val)
 	return(p);
 }
 
+static int
+set_filter(headp, prefix, line)
+	struct filtinfo **headp;
+	struct in6_prefix *prefix;
+	int line;
+{
+	struct filtinfo *filter;
+
+	if ((filter = malloc(sizeof(*filter))) == NULL) {
+		warnx("can't allocate space for filter");
+		return(-1);
+	}
+	memset(filter, 0, sizeof(*filter));
+	memset(filter, 0, sizeof(struct filtinfo));
+	filter->filtinfo_addr = prefix->paddr.sin6_addr; /* XXX */
+	filter->filtinfo_plen = prefix->plen;
+
+	if (*headp) {
+		if (find_filter(*headp, filter)) {
+			fprintf(stderr, "%s:%d route filter(%s/%d) doubly "
+				"defined\n",
+				configfilename, line,ip6str2(&prefix->paddr),
+				prefix->plen);
+			return(-1);
+		}
+		insque(filter, *headp);
+	} else {
+		filter->filtinfo_next = filter->filtinfo_prev = filter;
+		*headp = filter;
+	}
+
+	return(0);
+}
+
 static void
+param_config()
+{
+	if (yy_debug >= 0) {	/* debug flag */
+		debug = yy_debug;
+		cprint("set %x to the debug flag\n", (u_int)debug);
+	}
+	if (yy_asnum >= 0) {	/* our AS number */
+		my_as_number = yy_asnum;
+		cprint("set %d to AS number\n", my_as_number);
+	}
+	if (yy_bgpsbsize >= 0) { /* BGP socket buffer size */
+		bgpsbsize = yy_bgpsbsize;
+		cprint("set %d to the BGP socket buffer size\n", bgpsbsize);
+	}
+	if (yy_holdtime >= 0) {	/* BGP holdtimer value */
+		bgpHoldtime = yy_holdtime;
+		cprint("set %d to BGP hold timer\n", bgpHoldtime);
+	}
+	if ((yy_rrflag >= 0)) {
+		IamRR = yy_rrflag;
+		cprint("act as a route reflector\n");
+	}
+	if (yy_rip >= 0) {
+		ripyes = yy_rip;
+		cprint("Enable RIPng\n");
+	}
+	if (yy_bgp >= 0) {
+		bgpyes = yy_bgp;
+		cprint("Enable BGP4+\n");
+	}
+	if (dumpfile)
+		free(dumpfile);
+	if (yy_dumpfile) {
+		dumpfile = strdup(yy_dumpfile);
+		cprint("set %s to the dump file\n", dumpfile);
+	}
+	else
+		dumpfile = strdup(DUMPFILENAME);
+	if (yy_routerid != -1) {
+		bgpIdentifier = htonl((u_int32_t)yy_routerid);
+		cprint("set %x to the BGP Identifier\n", (u_int)yy_routerid);
+	}
+	if (yy_clusterid != -1) {
+		clusterId = htonl((u_int32_t)yy_clusterid);
+		cprint("set %x to the BGP cluster ID\n", (u_int)yy_clusterid);
+	}
+}
+
+static int
 rip_config()
 {
 	struct yy_ripifinfo *info;
 	struct attr_list *attr;
+	struct ifinfo *ifp;
+	struct ripif *ripif;
 
-	printf("RIP config\n");
+	if (ripyes == 0)
+		return(0);
+	rip_init();
+
+	cprint("RIP config\n");
 
 	for (info = yy_ripifinfo_head; info; info = info->next) {
-		printf("  %s: ", info->ifname);
+		cprint("  %s: ", info->ifname);
+		if ((ifp = find_if_by_name(info->ifname)) == NULL ||
+		    (ripif = find_rip_by_index(ifp->ifi_ifn->if_index)) ==
+		    NULL) {
+			warnx("%s line %d: invalid interface: %s\n", 
+			      configfilename, info->line,
+			      info->ifname);
+			return(-1);
+		}
 
 		for (attr = info->attribute; attr; attr = attr->next) {
 			switch(attr->code) {
 			case RIPIFA_DEFAULT:
-				printf("default_originate ");
+				ripif->rip_mode |= IFS_DEFAULTORIGINATE;
+				cprint("default_originate ");
 				break;
 			case RIPIFA_NORIPIN:
-				printf("noripin ");
+				ripif->rip_mode |= IFS_NORIPIN;
+				cprint("noripin ");
 				break;
 			case RIPIFA_NORIPOUT:
-				printf("noripout ");
+				ripif->rip_mode |= IFS_NORIPOUT;
+				cprint("noripout ");
+				break;
+			case RIPIFA_METRICIN:
+				ripif->rip_metricin = attr->attru.number;
+				cprint("metricin %d ", attr->attru.number);
 				break;
 			case RIPIFA_FILINDEF:
-				printf("input_filter_default ");
+				ripif->rip_mode |= IFS_DEFAULT_FILTERIN;
+				cprint("input_filter_default ");
 				break;
 			case RIPIFA_FILOUTDEF:
-				printf("output_filter_default ");
+				ripif->rip_mode |= IFS_DEFAULT_FILTEROUT;
+				cprint("output_filter_default ");
 				break;
 			case RIPIFA_RESINDEF:
-				printf("input_restriction_default ");
+				ripif->rip_mode |= IFS_DEFAULT_RESTRICTIN;
+				cprint("input_restriction_default ");
 				break;
 			case RIPIFA_RESOUTDEF:
-				printf("output_restriction_default ");
+				ripif->rip_mode |= IFS_DEFAULT_RESTRICTOUT;
+				cprint("output_restriction_default ");
 				break;
 			case RIPIFA_FILINPFX:
-				printf("input_filter(%s/%d) ",
-				   ip6str(&attr->attru.prefix.paddr.sin6_addr,
-					  attr->attru.prefix.paddr.sin6_scope_id),
-				   attr->attru.prefix.plen);
+				if (set_filter(&ripif->rip_filterin,
+					       &attr->attru.prefix,
+					       attr->line))
+					return(-1);
+				cprint("input_filter(%s/%d) ",
+				       ip6str2(&attr->attru.prefix.paddr),
+				       attr->attru.prefix.plen);
 				break;
 			case RIPIFA_FILOUTPFX:
-				printf("output_filter(%s/%d) ",
-				   ip6str(&attr->attru.prefix.paddr.sin6_addr,
-					  attr->attru.prefix.paddr.sin6_scope_id),
-				   attr->attru.prefix.plen);
+				if (set_filter(&ripif->rip_filterout,
+					       &attr->attru.prefix,
+					       attr->line))
+					return(-1);
+				cprint("output_filter(%s/%d) ",
+				       ip6str2(&attr->attru.prefix.paddr),
+				       attr->attru.prefix.plen);
 				break;
 			case RIPIFA_RESINPFX:
-				printf("input_restriction(%s/%d) ",
-				   ip6str(&attr->attru.prefix.paddr.sin6_addr,
-					  attr->attru.prefix.paddr.sin6_scope_id),
-				   attr->attru.prefix.plen);
+				if (set_filter(&ripif->rip_restrictin,
+					       &attr->attru.prefix,
+					       attr->line))
+					return(-1);
+				cprint("input_restriction(%s/%d) ",
+				       ip6str2(&attr->attru.prefix.paddr),
+				       attr->attru.prefix.plen);
 				break;
 			case RIPIFA_RESOUTPFX:
-				printf("output_restriction(%s/%d) ",
-				       ip6str(&attr->attru.prefix.paddr.sin6_addr,
-					      attr->attru.prefix.paddr.sin6_scope_id),
+				if (set_filter(&ripif->rip_restrictout,
+					       &attr->attru.prefix,
+					       attr->line))
+					return(-1);
+				cprint("output_restriction(%s/%d) ",
+				       ip6str2(&attr->attru.prefix.paddr),
 				       attr->attru.prefix.plen);
 				break;
 			case RIPIFA_DESCR:
-				printf("descr=%s ", attr->attru.str);
+				if (ripif->rip_desc) {
+					free(ripif->rip_desc);
+					ripif->rip_desc = NULL;
+				}
+				ripif->rip_desc = strdup(attr->attru.str);
+				if (ripif->rip_desc == NULL) {
+					warnx("can't allocate memory "
+					      "for RIPng I/F description");
+					return(-1);
+				}
+				cprint("descr=%s ", attr->attru.str);
 				break;
 			default:
-				printf("unknown_attribute(%d) ", attr->code);
+				cprint("unknown_attribute(%d) ", attr->code);
 			}
 		}
-		printf("\n");
+		cprint("\n");
 	}
+
+	return(0);
 }
 
-static void
+static int
 bgp_config()
 {
 	struct yy_bgppeerinfo *info;
 	struct attr_list *attr;
+	struct rpcb *bnp;
 
-	printf("BGP config\n");
+	if (bgpyes == 0)
+		return(0);
 
-	for (info = bgppeer_head; info; info = info->next) {
-		printf("  peer: %s ",
-		       ip6str(&info->peeraddr.sin6_addr,
-			      info->peeraddr.sin6_scope_id));
-		if (info->asnum < 0) {
-			printf("IBGP ");
-			if (info->peertype == BGPPEER_CLIENT)
-				printf("CLIENT ");
-			if (info->routerid)
-				printf("routerID: %x ", htonl(info->routerid));
+	if (my_as_number == 0) {
+		warnx("%s: BGP specified without internal AS number",
+		      configfilename);
+		return(-1);
+	}
+
+	cprint("BGP config\n");
+
+	for (info = yy_bgppeer_head; info; info = info->next) {
+		/* make a new peer structure */
+		bnp = bgp_new_peer();
+		if (bgb == NULL) {
+			bgb = bnp;
+			bgb->rp_next = bgb->rp_prev = bgb;
 		}
 		else
-			printf("EBGP ");
+			insque(bnp, bgb);
+
+		cprint("  peer: %s ", ip6str2(&info->peeraddr));
+		if (info->asnum < 0) { /* IBGP */
+			cprint("IBGP ");
+
+			bnp->rp_mode |= BGPO_IGP;
+			if (info->peertype == BGPPEER_CLIENT) {
+				if (!IamRR) {
+					warnx("%s line %d: a BGP client "
+					      "specified while we're not "
+					      "a reflector",
+					      configfilename, info->line);
+					return(-1);
+				}
+				bnp->rp_mode |= BGPO_RRCLIENT;
+				cprint("CLIENT ");
+			}
+			if (info->routerid) {
+				bnp->rp_mode |= BGPO_IDSTATIC;
+				bnp->rp_id = htonl(info->routerid);
+				cprint("routerID: %x ", htonl(info->routerid));
+			}
+		}
+		else {		/* EBGP */
+			cprint("EBGP ");
+			bnp->rp_as = info->asnum;
+		}
+
+		/* peer address setting */
+		bnp->rp_addr = info->peeraddr;
+		if (IN6_IS_ADDR_LINKLOCAL(&bnp->rp_addr.sin6_addr))
+			bnp->rp_laddr = bnp->rp_addr.sin6_addr; /* copy  */
+		else
+			bnp->rp_gaddr = bnp->rp_addr.sin6_addr; /* ummh  */
+		{
+			struct ifinfo *ife_dummy = NULL; /* XXX */
+			if (in6_is_addr_onlink(&bnp->rp_addr.sin6_addr,
+					       &ife_dummy))
+				bnp->rp_mode |= BGPO_ONLINK;
+		}
 
 		for (attr = info->attribute; attr; attr = attr->next) {
 			switch(attr->code) {
 			case BGPPA_IFNAME:
-				printf("interface: %s ", attr->attru.str);
+				cprint("interface: %s ", attr->attru.str);
+				if ((bnp->rp_ife = find_if_by_name(attr->attru.str)))
+					bnp->rp_mode |= BGPO_IFSTATIC;
+				else {
+					warnx("Bad interface for a BGP peer "
+					      ": %s", attr->attru.str);
+					return(-1);
+				}
+				/* scope check: XXX for link-local only */
+				if (bnp->rp_addr.sin6_scope_id &&
+				    bnp->rp_addr.sin6_scope_id !=
+				    bnp->rp_ife->ifi_ifn->if_index) {
+					warnx("BGP peer address(%s) "
+					      "condradicts interface(%s)",
+					      ip6str2(&bnp->rp_addr));
+					return(-1);
+				}
+				    
 				break;
 			case BGPPA_NOSYNC:
-				printf("nosync ");
+				cprint("nosync ");
+				bnp->rp_mode |= BGPO_NOSYNC;
 				break;
 			case BGPPA_NEXTHOPSELF:
-				printf("nexthop_self ");
+				cprint("nexthop_self ");
+				bnp->rp_mode |= BGPO_NEXTHOPSELF;
 				break;
 			case BGPPA_LCLADDR:
-				printf("lcladdr %s ",
-				       ip6str(&attr->attru.in6addr.sin6_addr,
-					      attr->attru.in6addr.sin6_scope_id));
+				cprint("lcladdr %s ",
+				       ip6str2(&attr->attru.in6addr));
+				bnp->rp_lcladdr = attr->attru.in6addr;
 				break;
 			case BGPPA_PREFERENCE:
-				printf("preference %d ", attr->attru.number);
+				cprint("preference %d ", attr->attru.number);
+				bnp->rp_prefer = htonl(attr->attru.number);
 				break;
 			case BGPPA_PREPEND:
-				printf("prepend %d ", attr->attru.number);
+				cprint("prepend %d ", attr->attru.number);
+				bnp->rp_ebgp_as_prepends = attr->attru.number;
 				break;
 			case BGPPA_DESCR:
-				printf("descr=%s ", attr->attru.str);
+				cprint("descr=%s ", attr->attru.str);
 				break;
 			default:
-				printf("unknown_attribute(%d) ", attr->code);
+				cprint("unknown_attribute(%d) ", attr->code);
 			}
 		}
+		cprint("\n");
 
-		putchar('\n');
+		/*
+		 * We need to disambigute the scope for a peer with a scoped
+		 * address.
+		 * XXX: site-local address?
+		 */
+		if (IN6_IS_ADDR_LINKLOCAL(&bnp->rp_addr.sin6_addr)) {
+			if (bnp->rp_addr.sin6_scope_id == 0 &&
+			    bnp->rp_ife == NULL) {
+				warnx("%s line %d: link-local peer(%s) "
+				      "without I/F or scope ID",
+				      configfilename, info->line,
+				      ip6str2(&bnp->rp_addr));
+				return(-1);
+			}
+		}
+	}
+
+	return(0);
+}
+
+static int
+add_protoexport(bnp, attr, ptype, pdata)
+	struct rpcb *bnp;
+	struct attr_list *attr;
+	int ptype;
+	void *pdata;
+{
+	struct rtproto *rtp = NULL;
+
+	if ((rtp = malloc(sizeof(*rtp))) == NULL) {
+		warnx("can't allocate space for export protocol");
+		return(-1);
+	}
+	rtp->rtp_type = ptype;
+	switch(ptype) {
+	case RTPROTO_IF:
+		rtp->rtp_if = (struct ifinfo *)pdata;
+		break;
+	case RTPROTO_BGP:
+		rtp->rtp_bgp = (struct rpcb *)pdata;
+		break;
+	case RTPROTO_RIP:
+		rtp->rtp_rip = (struct ripif *)pdata;
+		break;
+	/* default? */
+	}
+
+	if (bnp->rp_adj_ribs_out != NULL) {
+		if (find_rtp(rtp, bnp->rp_adj_ribs_out)) {
+			warnx("%s line %d: export protocol doubly defined",
+			      configfilename, attr->line);
+			free(rtp); /* necessary? */
+			return(-1);
+		}
+		insque(rtp, bnp->rp_adj_ribs_out);
+	} else {
+		rtp->rtp_next = rtp;
+		rtp->rtp_prev = rtp;
+		bnp->rp_adj_ribs_out = rtp;
+	}
+
+	return(0);
+
+}
+static int
+add_protoexportlist(exportinfo, bnp)
+	struct yy_exportinfo *exportinfo;
+	struct rpcb *bnp;	/* BGP depend */
+{
+	struct attr_list *attr;
+	struct ifinfo *ifp;
+	struct rpcb *ibnp;
+	struct ripif *ripif;
+	extern struct ripif *ripifs; 
+
+	for (attr = exportinfo->protolist; attr; attr = attr->next) {
+		struct yy_rtproto *proto;
+			
+		proto = (struct yy_rtproto *)attr->attru.data;
+		switch(proto->type) {
+		case RTP_IFACE:
+			cprint("interface_route(%s) ", proto->rtpu.ifname);
+
+			if ((ifp = find_if_by_name(proto->rtpu.ifname)) == NULL) {
+				warnx("%s line %d: invalid I/F name: %s",
+				      configfilename, attr->line,
+				      proto->rtpu.ifname);
+				return(-1);
+			}
+			if (add_protoexport(bnp, attr, RTPROTO_IF, (void *)ifp))
+				return(-1);
+			break;
+		case RTP_BGP:
+			cprint("BGP(AS: %d) ", proto->rtpu.rtpu_bgp.peeras);
+
+			if (proto->rtpu.rtpu_bgp.peeras == my_as_number)
+				goto ibgp;
+
+			if ((ibnp = find_peer_by_as(proto->rtpu.rtpu_bgp.peeras))
+			    == NULL) {
+				warnx("%s line %d: invalid AS number: %d",
+				      configfilename, attr->line,
+				      proto->rtpu.rtpu_bgp.peeras);
+				return(-1);
+			}
+
+			if (add_protoexport(bnp, attr, RTPROTO_BGP, (void *)ibnp))
+				return(-1);
+			break;
+		case RTP_RIP:
+			cprint("RIP ");
+
+			if (!ripyes || !ripifs) {
+				warnx("%s line %d: RIPng specified but disabled",
+				      configfilename, attr->line);
+				return(-1);
+			}
+
+			ripif = ripifs;
+			while(ripifs) {	/* XXX: odd loop */
+				if (add_protoexport(bnp, attr, RTPROTO_RIP,
+						    (void *)ripif))
+					return(-1);
+
+				if ((ripif = ripif->rip_next) == ripifs)
+					break;
+			}
+			break;
+		case RTP_IBGP:
+		  ibgp:
+			cprint("IBGP ");
+
+			ibnp = bgb;
+			while(ibnp) { /* XXX: odd loop */
+				if (ibnp->rp_mode & BGPO_IGP)
+					if (add_protoexport(bnp, attr,
+							    RTPROTO_BGP,
+							    (void *)ibnp))
+						return(-1);
+				if ((ibnp = ibnp->rp_next) == bgb)
+					break;
+			}
+			break;
+		default:
+			cprint("unknown or unsupported proto(%d) ", proto->type);
+			break;
+		}
+	}
+
+	return(0);
+}
+
+static int
+export_config()
+{
+	struct yy_exportinfo *info;
+	struct sockaddr_in6 *peeraddr;
+	struct rpcb *asp, *bnp;
+	int peeras;
+
+	cprint("Export config\n");
+	for (info = yy_exportinfo_head; info; info = info->next) {
+		cprint("  peer: ");
+
+		peeras = info->asnum;
+		peeraddr = &info->peeraddr;
+		if (!IN6_IS_ADDR_UNSPECIFIED(&peeraddr->sin6_addr)) {
+			cprint(" peer addr: %s ", ip6str2(peeraddr));
+
+			/* XXX scoped address support */
+			asp = find_apeer_by_addr(&peeraddr->sin6_addr);
+			if (asp == NULL) {
+				warnx("%s line %d: invalid BGP peer address: "
+				      "%s", configfilename, info->line,
+				      ip6str2(peeraddr));
+				return(-1);
+			}
+			/* this check is in fact redundant */
+			if (peeras > 0 && peeras != asp->rp_as) {
+				warnx("%s line %d: bad peer AS(%d) for %s",
+				      configfilename, info->line,
+				      peeras,
+				      ip6str2(peeraddr));
+				return(-1);
+			}
+
+			if (add_protoexportlist(info, asp))
+				return(-1);
+
+			cprint("\n");
+			continue;
+		}
+
+		for (bnp = bgb; bnp; ) { /* XXX: odd loop... */
+			if (bnp->rp_as == peeras) {
+				cprint(" peer as: %d (addr: %s) ",
+				       peeras, ip6str2(&bnp->rp_addr));
+				if (add_protoexportlist(info, bnp))
+					return(-1);
+				cprint("\n");
+			}
+
+			if ((bnp = bnp->rp_next) == bgb)
+				break;
+		}
+	}
+
+	return(0);
+}
+
+static int
+add_protoaggr(attr, aggregated, ptype, pdata)
+	struct attr_list *attr;
+	struct rt_entry *aggregated;
+	int ptype;
+	void *pdata;
+{
+	struct rtproto *rtp = NULL;
+	if ((rtp = malloc(sizeof(*rtp))) == NULL) {
+		warnx("can't allocate space for aggregation");
+		return(-1);
+	}
+	memset(rtp, 0, sizeof(*rtp));
+
+	rtp->rtp_type = ptype;
+	switch(ptype) {
+	case RTPROTO_IF:
+		rtp->rtp_if = (struct ifinfo *)pdata;
+		break;
+	case RTPROTO_BGP:
+		rtp->rtp_bgp = (struct rpcb *)pdata;
+		break;
+	}
+
+	if (aggregated->rt_aggr.ag_rtp != NULL) {
+		if (find_rtp(rtp, aggregated->rt_aggr.ag_rtp)) {
+			warnx("%s line %d: aggregation doubly defined: %s/%d",
+			      configfilename, attr->line,
+			      ip6str(&aggregated->rt_ripinfo.rip6_dest,
+				     aggregated->rt_ripinfo.rip6_plen));
+			goto bad;
+		}
+		insque(rtp, aggregated->rt_aggr.ag_rtp);
+	}
+	else {
+		rtp->rtp_next = rtp->rtp_prev = rtp;
+		aggregated->rt_aggr.ag_rtp = rtp;
+	}
+
+	return(0);
+
+  bad:
+	free(rtp);
+	return(-1);
+}
+
+static int
+aggr_proto_config(attr, aggregated)
+	struct attr_list *attr;
+	struct rt_entry *aggregated;
+{
+	struct yy_rtproto *proto;
+	struct ifinfo *ifp;
+	struct sockaddr_in6 *peeraddr;
+	int peeras;
+	struct rtproto *rtp = NULL;
+	struct rpcb *asp = NULL, *bnp;
+
+	proto = (struct yy_rtproto *)attr->attru.data;
+
+	switch(proto->type) {
+	case RTP_IFACE:
+		cprint("   interface_route(%s) ",
+		       proto->rtpu.ifname);
+
+		if ((ifp = find_if_by_name(proto->rtpu.ifname)) == NULL) {
+			warnx("%s line %d: invalid interface name: %s",
+			      configfilename, attr->line,
+			      proto->rtpu.ifname);
+			return(-1);
+		}
+
+		rtp->rtp_type = RTPROTO_IF;
+		rtp->rtp_if = ifp;
+
+		if (add_protoaggr(attr, aggregated, RTPROTO_IF, (void *)ifp))
+			return(-1);
+		break;
+	case RTP_BGP:
+		cprint("   BGP");
+
+		peeraddr = &proto->rtpu.rtpu_bgp.peeraddr;
+		peeras = proto->rtpu.rtpu_bgp.peeras;
+
+		if (peeras > 0)
+			cprint(" AS(%d)", peeras);
+
+		if (!IN6_IS_ADDR_UNSPECIFIED(&peeraddr->sin6_addr)) {
+			cprint(" peer(%s)", ip6str2(peeraddr));
+
+			/* XXX scoped address support */
+			asp = find_apeer_by_addr(&peeraddr->sin6_addr);
+			if (asp == NULL) {
+				warnx("%s line %d: invalid BGP peer address: "
+				      "%s", configfilename, attr->line,
+				      ip6str2(peeraddr));
+				return(-1);
+			}
+			/* this check is in fact redundant */
+			if (peeras > 0 && peeras != asp->rp_as) {
+				warnx("%s line %d: bad peer AS(%d) for %s",
+				      configfilename, attr->line,
+				      peeras,
+				      ip6str2(peeraddr));
+				return(-1);
+			}
+			if (add_protoaggr(attr, aggregated,
+					  RTPROTO_BGP, (void *)asp))
+				return(-1);
+
+			break;
+		}
+
+		for (bnp = bgb; bnp; ) { /* XXX: odd loop... */
+			if (bnp->rp_as == peeras)
+				if (add_protoaggr(attr, aggregated,
+						  RTPROTO_BGP, (void *)bnp))
+					return(-1);
+
+			if ((bnp = bnp->rp_next) == bgb)
+				break;
+		}
+		break;
+	case RTP_RIP:
+		cprint("   RIP ");
+		warnx("%s line %d: proto RIP can't specified for aggregation "
+		      "(sorry)", configfilename, attr->line);
+		return(-1);
+		break;
+	case RTP_IBGP:
+		cprint("   IBGP ");
+		warnx("%s line %d: proto IBGP can't specified for aggregation",
+		      configfilename, attr->line);
+		return(-1);
+		break;
+	default:
+		cprint("   unknown proto(%d) ", proto->type);
+		warnx("%s line %d: unkonw proto for aggregation: %d",
+		      configfilename, attr->line, proto->type);
+		return(-1);
+		break;
+	}
+
+	return(0);
+}
+
+static int
+aggr_explict_config(aggr, aggregated, expl)
+	struct attr_list *aggr;
+	struct rt_entry *aggregated, *expl;
+{
+	struct rt_entry *e;
+	struct attr_list *epfx;
+
+	cprint("   Explicit: ");
+
+	for (epfx = aggr->attru.list; epfx; epfx = epfx->next) {
+		struct in6_prefix *pfx = &epfx->attru.prefix;
+
+		cprint("%s/%d ", ip6str2(&pfx->paddr), pfx->plen);
+
+		if ((e = malloc(sizeof(*e))) == NULL) {
+			warnx("can't allocate space for explict route");
+			return(-1);
+		}
+		memset(e, 0, sizeof(*e));
+		e->rt_ripinfo.rip6_dest = pfx->paddr.sin6_addr; /* XXX */
+		e->rt_ripinfo.rip6_plen = pfx->plen;
+			
+		/* check if this is really aggregatable. */
+		if (aggregated != aggregatable(e)) {
+			warnx("%s line %d: not aggregatable(%s/%d)",
+			      configfilename, aggr->line,
+			      ip6str2(&pfx->paddr), pfx->plen);
+			return(-1);
+		}
+
+		if (aggregated->rt_aggr.ag_explt) {
+			if (find_rte(e, aggregated->rt_aggr.ag_explt)) {
+				warnx("%s line %d: explict prefix (%s/%d) "
+				      "doubly defined",
+				      configfilename, aggr->line,
+				      ip6str2(&pfx->paddr), pfx->plen);
+				return(-1);
+			}
+			insque(e, aggregated->rt_aggr.ag_explt);
+		} else {
+			e->rt_next = e->rt_prev = e;
+			aggregated->rt_aggr.ag_explt = e;
+		}
+	}
+
+	return(0);
+}
+
+static int
+aggregate_config()
+{
+	struct yy_aggrinfo *info;
+	struct attr_list *attr;
+	struct rt_entry *aggregated;
+
+	cprint("Aggregation config\n");
+	for (info = yy_aggr_head; info; info = info->next) {
+		cprint("  prefix: %s/%d\n",
+		       ip6str2(&info->prefix.paddr),
+		       info->prefix.plen);
+
+		if ((aggregated = malloc(sizeof(*aggregated))) == NULL) {
+			warnx("can't allocate space for aggregation");
+			return(-1);
+		}
+		memset(aggregated, 0, sizeof(*aggregated));
+		aggregated->rt_proto.rtp_type = RTPROTO_AGGR;
+		/* XXX: this would drop scope information */
+		aggregated->rt_ripinfo.rip6_dest =
+			info->prefix.paddr.sin6_addr;
+		aggregated->rt_ripinfo.rip6_plen = info->prefix.plen;
+		/* canonize the address part */
+		mask_nclear(&aggregated->rt_ripinfo.rip6_dest, 
+			    aggregated->rt_ripinfo.rip6_plen);
+
+		for (attr = info->aggrinfo; attr; attr = attr->next) {
+			switch(attr->code) {
+			case AGGA_PROTO:
+				if (aggr_proto_config(attr, aggregated))
+					return(-1);
+				break;
+			case AGGA_EXPFX:
+				if (aggr_explict_config(info, aggregated,
+							attr))
+					return(-1);
+				break;
+			default:
+				cprint("   unkown info(%d)\n", attr->code);
+				break;
+			}
+			cprint("\n");
+		}
+	}
+
+	return(0);
+}
+
+/*
+ * The followings statics are cleanup fucntions.
+ */
+static void
+attr_cleanup(head)
+	struct attr_list *head;
+{
+	struct attr_list *attr, *nattr;
+
+	for (attr = head; attr; attr = nattr) {
+		nattr = attr->next;
+
+		switch(attr->type) {
+		case ATTR_STRING:
+			free(attr->attru.str);
+			break;
+		case ATTR_DATA:
+			free(attr->attru.data);
+			break;
+		case ATTR_LIST:
+			attr_cleanup(attr->attru.list);
+			break;
+		default:	/* nothing to do */
+			break;
+		}
+
+		free(attr);
 	}
 }
 
 static void
-export_config()
+ripconfig_cleanup(head)
+	struct yy_ripifinfo *head;
 {
-	struct yy_exportinfo *info;
-	struct attr_list *attr;
+	struct yy_ripifinfo *info, *ninfo;
 
-	printf("Export config\n");
-	for (info = yy_exportinfo_head; info; info = info->next) {
-		printf("  peer: ");
-		if (info->asnum >= 0)
-			printf(" AS: %d ", info->asnum);
-		if (!IN6_IS_ADDR_UNSPECIFIED(&info->peeraddr.sin6_addr))
-			printf(" addr: %s ",
-			       ip6str(&info->peeraddr.sin6_addr,
-				      info->peeraddr.sin6_scope_id));
+	for (info = head; info; info = ninfo) {
+		ninfo = info->next;
 
-		for (attr = info->protolist; attr; attr = attr->next) {
-			struct yy_rtproto *proto;
-			
-			proto = (struct yy_rtproto *)attr->attru.data;
-
-			switch(proto->type) {
-			case RTP_IFACE:
-				printf("interface_route(%s) ",
-				       proto->rtpu.ifname);
-				break;
-			case RTP_BGP:
-				printf("BGP(AS: %d) ",
-				       proto->rtpu.rtp_bgp.peeras);
-				break;
-			case RTP_RIP:
-				printf("RIP ");
-				break;
-			case RTP_IBGP:
-				printf("IBGP ");
-				break;
-			default:
-				printf("unknown proto(%d) ", proto->type);
-				break;
-			}
-		}
-		putchar('\n');
+		attr_cleanup(info->attribute);
+		free(info);
 	}
 }
 
+static void
+bgpconfig_cleanup(head)
+	struct yy_bgppeerinfo *head;
+{
+	struct yy_bgppeerinfo *info, *ninfo;
+
+	for (info = head; info; info = ninfo) {
+		ninfo = info->next;
+
+		attr_cleanup(info->attribute);
+		free(info);
+	}
+}
+
+static void
+exportconfig_cleanup(head)
+	struct yy_exportinfo *head;
+{
+	struct yy_exportinfo *info, *ninfo;
+
+	for (info = head; info; info = ninfo) {
+		ninfo = info->next;
+
+		attr_cleanup(info->protolist);
+		free(info);
+	}
+}
+
+static void
+aggrconfig_cleanup(head)
+	struct yy_aggrinfo *head;
+{
+	struct yy_aggrinfo *info, *ninfo;
+
+	for (info = head; info; info = ninfo) {
+		ninfo = info->next;
+
+		attr_cleanup(info->aggrinfo);
+		free(info);
+	}
+}
+
+static void
+config_cleanup()
+{
+	if (yy_dumpfile)
+		free(yy_dumpfile);
+	ripconfig_cleanup(yy_ripifinfo_head);
+	bgpconfig_cleanup(yy_bgppeer_head);
+	exportconfig_cleanup(yy_exportinfo_head);
+	aggrconfig_cleanup(yy_aggr_head);
+
+	cf_init();		/* maybe unnecessary, but call it for safety */
+}
+
+/*
+ * Global functions called from outside of the parser. 
+ */
 int
 cf_post_config()
 {
-	rip_config();
-	bgp_config();
-	export_config();
+	param_config();	 /* always success */
+	if (rip_config())
+		return(-1);
+	if (bgp_config())
+		return(-1);
+	if (aggregate_config())
+		return(-1);
+	if (export_config())
+		return(-1);
+	config_cleanup();
  
 	return(0);
 }
 
-/* initialize all the temporary variables */
+/* initialize all temporary variables */
 void
 cf_init()
 {
 	yy_debug = yy_asnum = yy_bgpsbsize = yy_holdtime = yy_rrflag = -1;
 	yy_rip = yy_rip_sitelocal = yy_bgp = -1;
-	yy_dumpfile = yy_routerid = NULL;
+	yy_routerid = yy_clusterid = -1;
+	yy_dumpfile = NULL;
 	yy_ripifinfo_head = NULL;
+	yy_bgppeer_head = NULL;
 	yy_exportinfo_head = NULL;
+	yy_aggr_head = NULL;
 	
 	return;
 }

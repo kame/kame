@@ -45,7 +45,6 @@ extern struct ripif *ripifs;	/* defined in ripng.c */
 extern task *taskhead;
 
 char *dumpfile;
-#define DUMPFILE "/var/run/bgpd.dump"
 
 static char *aspath2str(struct aspath *);
 static char *cll2str(struct clstrlist *);
@@ -429,8 +428,11 @@ print_rip_dump(FILE *fp)
 
 	fprintf(fp, "\n=== RIPng per interface information ===\n");
 	while(ripif) {
-		fprintf(fp, " Interface: %s\n",
+		fprintf(fp, " Interface: %s",
 			ripif->rip_ife->ifi_ifn->if_name);
+		if (ripif->rip_desc)
+			fprintf(fp, " Description: %s", ripif->rip_desc);
+		fputc('\n', fp);
 		/* RIPng related flags */
 		fprintf(fp, "  Flags:");
 		if (ripif->rip_mode & IFS_NORIPIN)
@@ -798,8 +800,6 @@ bgpd_dump_file()
 	time_t tloc;
 	FILE *fp;
 
-	if (dumpfile == NULL)
-		dumpfile = DUMPFILE;
 	if ((fp = fopen(dumpfile, "w")) == NULL) {
 		syslog(LOG_ERR, "<%s>: can't open dump file(%s): %s",
 			__FUNCTION__, dumpfile, strerror(errno));

@@ -1315,8 +1315,8 @@ conf_check(char *filename)
  *   "bgp yes {...}"
  */
 void
-parse_bgp_yes(char *filename) {
-
+parse_bgp_yes(char *filename)
+{
   u_int16_t asnum;
   u_int32_t peerid;
   extern struct rpcb *bgb;

@@ -47,9 +47,9 @@
 static int yyerrorcount = 0;
 int lineno = 1;
 int yy_first_time = 1;
+char *configfilename;
 
 static int blockcount;
-static char *configfilename;
 
 #ifdef YIPS_DEBUG
 static void cfdebug_print __P((char *, char *, int));
@@ -143,6 +143,9 @@ description { DP("begin description"); BEGIN S_DESCR; return(DESCR); }
 	/* routerid */
 <S_CNF>routerid { YYD_ECHO; return(ROUTERID); }
 
+	/* clusterid */
+<S_CNF>clusterid { YYD_ECHO; return(CLUSTERID); }
+
 	/* holdtime */
 <S_CNF>holdtime { YYD_ECHO; return(HOLDTIME); }
 
@@ -172,7 +175,7 @@ description { DP("begin description"); BEGIN S_DESCR; return(DESCR); }
 <S_CNF>noripin { YYD_ECHO; return(NORIPIN); }
 <S_CNF>noripout { YYD_ECHO; return(NORIPOUT); }
 <S_CNF>sitelocal { YYD_ECHO; return(SITELOCAL); }
-<S_CNF>metrictin { YYD_ECHO; return(METRICIN); }
+<S_CNF>metricin { YYD_ECHO; return(METRICIN); }
 
 	/* filters */
 <S_CNF>filterin { YYD_ECHO; return(FILTERIN); }
@@ -302,9 +305,5 @@ cfparse(strict, conf)
 
 	YIPSDP(PLOG("parse successed.\n"));
 
-	cf_post_config();
-#if 0
-	return(0);
-#endif
-	exit(0);
+	return(cf_post_config());
 }
