@@ -1,4 +1,4 @@
-/* $KAME: in_msf.h,v 1.10 2004/02/06 07:29:07 suz Exp $	*/
+/* $KAME: in_msf.h,v 1.11 2004/03/19 12:13:51 suz Exp $	*/
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.
@@ -227,9 +227,15 @@ struct in_multi_source {
 
 #define	IN_IS_LOCAL_GROUP(x)	/* struct in_addr x */			\
 	((ntohl((x).sin_addr.s_addr) & 0xffffff00) == 0xe0000000)
-#define	IN6_IS_LOCAL_GROUP(x)	/* struct in6_addr *x */		\
-	    (IPV6_ADDR_MC_SCOPE(x) < IPV6_ADDR_SCOPE_LINKLOCAL || 	\
-	     IN6_ARE_ADDR_EQUAL((x), &in6addr_linklocal_allnodes))
+
+#define	IN6_IS_LOCAL_GROUP(x)						\
+	/* struct in6_addr *x, not compare embedded ifindex */		\
+	(IPV6_ADDR_MC_SCOPE(x) < IPV6_ADDR_SCOPE_LINKLOCAL || 		\
+	((*(const u_int16_t *)(const void *)(&(x)->s6_addr[0]) == ntohs(0xff02))&&\
+	 (*(const u_int32_t *)(const void *)(&(x)->s6_addr[4]) == 0) &&	\
+	 (*(const u_int32_t *)(const void *)(&(x)->s6_addr[8]) == 0) &&	\
+	 (*(const u_int32_t *)(const void *)(&(x)->s6_addr[12]) == ntohl(1))))
+
 #define	SS_IS_LOCAL_GROUP(x)	/* struct sockaddr *x */		\
 	(((struct sockaddr *)(x))->sa_family == AF_INET ?		\
 	    IN_IS_LOCAL_GROUP(SIN(x)->sin_addr) :			\
