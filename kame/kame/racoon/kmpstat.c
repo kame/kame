@@ -1,4 +1,4 @@
-/*	$KAME: kmpstat.c,v 1.19 2000/09/19 16:04:00 itojun Exp $	*/
+/*	$KAME: kmpstat.c,v 1.20 2000/09/19 16:04:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: kmpstat.c,v 1.19 2000/09/19 16:04:00 itojun Exp $ */
+/* YIPS @(#)$Id: kmpstat.c,v 1.20 2000/09/19 16:04:55 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -76,7 +76,7 @@
 #include "admin_var.h"
 #include "admin.h"
 
-static void Usage __P((void));
+static void usage __P((void));
 static int com_init __P((void));
 static int com_send __P((vchar_t *));
 static vchar_t *com_recv __P((void));
@@ -156,7 +156,7 @@ void print_schedule __P((caddr_t, int));
 char * fixed_addr __P((char *, char *, int));
 
 static void
-Usage()
+usage()
 {
 	printf(
 "Usage:\n"
@@ -204,7 +204,7 @@ main(ac, av)
 			break;
 
 		default:
-			Usage();
+			usage();
 			exit(0);
 		}
 	}
@@ -414,7 +414,7 @@ get_combuf(ac, av)
 	struct cmd_tag *cp;
 
 	if (ac == 0) {
-		Usage();
+		usage();
 		exit(0);
 	}
 
