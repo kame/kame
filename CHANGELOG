@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1534 2001/02/04 22:25:04 itojun Exp $
+$KAME: CHANGELOG,v 1.1535 2001/02/06 01:51:03 itojun Exp $
 
 <200102>
+Tue Feb  6 10:49:36 JST 2001  itojun@iijlab.net
+	* sys/netinet6/ip6_output.c: correct m->m_pkthdr.rcvif setting for
+	  own linklocal address cases.  broken around Feb 2.
+
 2001-02-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* *BSD/sbin/ifconfig/ifconfig.c: marked "temporary" for temporary
 	IPv6 addresses (see the next log).
