@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.78 2000/09/22 05:29:48 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.79 2000/09/25 15:00:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -79,8 +79,8 @@
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
 
-#ifdef INET6
 #include <netinet/ip6.h>
+#ifdef INET6
 #include <netinet6/ip6_var.h>
 #endif
 #include <netinet/in_pcb.h>
