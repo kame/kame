@@ -2572,11 +2572,12 @@ ipsec6_output_tunnel(state, sp, flags)
 				error = EHOSTUNREACH;
 				goto bad;
 			}
-
+#if 0	/* XXX Is the following need ? */
 			if (state->ro->ro_rt->rt_flags & RTF_GATEWAY) {
 				state->dst = (struct sockaddr *)state->ro->ro_rt->rt_gateway;
 				dst6 = (struct sockaddr_in6 *)state->dst;
 			}
+#endif
 			ia6 = in6_selectsrc(dst6, NULL, NULL,
 					    (struct route_in6 *)state->ro,
 					    NULL, &error);
