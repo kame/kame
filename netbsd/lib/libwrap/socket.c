@@ -169,9 +169,6 @@ struct host_info *host;
     int af, alen;
     char *ap;
     char hbuf[MAXHOSTNAMELEN];
-#ifdef INET6
-    struct sockaddr_in map4;
-#endif
 
     /*
      * On some systems, for example Solaris 2.3, gethostbyaddr(0.0.0.0) does
