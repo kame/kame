@@ -1,0 +1,11 @@
+--- docshell/build/nsDocShellModule.cpp.orig	Wed Dec 22 02:37:30 1999
++++ docshell/build/nsDocShellModule.cpp	Wed Dec 22 02:38:08 1999
+@@ -46,7 +46,7 @@
+    nsIGenericFactory* fact;
+ 
+ 	if(aClass.Equals(kDocShellCID))
+-		rv = NS_NewGenericFactory(&fact, nsDocShell::Create);
++		rv = NS_NewGenericFactory(&fact, &nsDocShell::Create);
+    else 
+ 		rv = NS_NOINTERFACE;
+ 

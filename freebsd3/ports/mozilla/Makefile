@@ -1,55 +1,69 @@
 # New ports collection makefile for:	mozilla
-# Version required:	1998-07-28
-# Date created:		5 Oct 1998
-# Whom:			k-sugyo/shin
+# Date created:		31 Mar 1998
+# Whom:			eivind/dima/jseger
 #
-# $Id: Makefile,v 1.2 1999/12/07 12:09:42 sumikawa Exp $
+# $FreeBSD: ports/www/mozilla/Makefile,v 1.42 2000/04/21 02:36:44 reg Exp $
 #
 
-DISTNAME=	mozilla-19980728
-PKGNAME=	mozilla-kame-19980728
-CATEGORIES=	www
-MASTER_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-# .jp
-MASTER_SITES+=	ftp://ftp.cin.nihon-u.ac.jp/pub/Mozilla/mozilla/source/
-MASTER_SITES+=	ftp://mirror.neosoft.com/pub/mozilla/mozilla/source/ \
-		ftp://ftp.bitcon.no/pub/www/mozilla/mozilla/source/ \
-		ftp://ftp.mozilla.org/pub/mozilla/source/
-DISTFILES=	mozilla-19980728.tar.gz ipv6-anim-mozilla-19980603.tar.gz
+PORTNAME=	mozilla
+PORTVERSION= 	M15
+CATEGORIES=	www ipv6
+MASTER_SITES=	ftp://ftp.mozilla.org/pub/mozilla/releases/${PORTVERSION:S/M/m/}/src/
+DISTNAME=	${PORTNAME}-source-${PORTVERSION}
 
-PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	mozilla-19980728-kame-patch_at_19981002.gz
-PATCH_DIST_STRIP=	-p1
+MAINTAINER=	reg@FreeBSD.org
 
-MAINTAINER=	jseger@FreeBSD.org
+LIB_DEPENDS=	gtk12.2:${PORTSDIR}/x11-toolkits/gtk12 \
+		IDL.2:${PORTSDIR}/devel/ORBit
 
-WRKSRC=		${WRKDIR}/mozilla
-PATCH_STRIP=	-p1
+GLIB_CONFIG?=	${LOCALBASE}/bin/glib12-config
+GTK_CONFIG?=	${X11BASE}/bin/gtk12-config
+
+WRKSRC=		${WRKDIR}/${PORTNAME}
+
+USE_BZIP2=	yes
+USE_X_PREFIX=	yes
+USE_PERL5=	yes
+GNU_CONFIGURE=	yes
 USE_GMAKE=	yes
-DIST_SUBDIR=	mozilla
-MAKE_ENV=	NO_SECURITY=1 MOZ_MEDIUM=1 MOZILLA_CLIENT=1 NO_MDUPDATE=1 \
-		USE_IPV6=1 MOTIF_STATIC=1 \
-	BUILD_OPT=1 NO_NETSCAPE_STATIC=1 LD_LIBRARY_PATH=${LOCALBASE}/lib
-REQUIRES_MOTIF=	yes
+USE_NEWGCC=	yes
+CONFIGURE_ARGS=					\
+		--disable-cpp-rtti		\
+		--disable-debug			\
+		--disable-idltool		\
+		--disable-md			\
+		--disable-pedantic		\
+		--disable-xterm-updates		\
+		--enable-cpp-exceptions		\
+		--enable-double-buffer		\
+		--enable-editor			\
+		--enable-mailnews		\
+		--enable-mathml			\
+		--enable-optimize		\
+		--enable-pics			\
+		--enable-tests			\
+		--enable-toolkit=gtk		\
+		--enable-x11-shm		\
+		--with-pthreads			\
+		--with-jpeg=${LOCALBASE}	\
+		--with-png=${LOCALBASE}
+CONFIGURE_ENV=	GLIB_CONFIG="${GLIB_CONFIG}"	\
+		GTK_CONFIG="${GTK_CONFIG}"
+MAKE_ENV=	LD_LIBRARY_PATH=${WRKSRC}/dist/bin \
+		CC_ONLY_FLAGS="${FLAGS}" CCC_ONLY_FLAGS="${CXXFLAGS}"
 
-OSNAME=	`uname -s`
-OSVER=	`uname -r | ${SED} 's/-.*//'`
-OBJDIR=	${WRKSRC}/dist/${OSNAME}${OSVER}_OPT.OBJ
-
-post-install:
-	sed 's/so\.1$$/so.1.0/' ${TMPPLIST} > ${TMPPLIST}.tmp
-	mv ${TMPPLIST}.tmp ${TMPPLIST}
+post-build:
+	@${SED} -e "s;@PREFIX@;${PREFIX};g" \
+		${FILESDIR}/mozilla.sh >${WRKSRC}/mozilla
+	@${CHMOD} 555 ${WRKSRC}/mozilla
 
 do-install:
-	@${MKDIR} ${PREFIX}/lib/mozilla/bin
-	@cd ${OBJDIR}/bin && tar -chf - bsdecho lib* moz-export \
-		nsinstall vreg | tar -xf - -C ${PREFIX}/lib/mozilla/bin
-	@chmod 755 ${PREFIX}/lib/mozilla/bin
-	@${INSTALL_SCRIPT} ${WRKSRC}/mozilla ${PREFIX}/bin
-	@if [ ! -f ${PREFIX}/lib/mozilla/mailcap ] ; then \
-		${INSTALL_DATA} ${FILESDIR}/mailcap ${PREFIX}/lib/mozilla ; \
-	fi
-	@strip ${PREFIX}/lib/mozilla/bin/moz-export
-	@chown -R bin.bin ${PREFIX}/lib/mozilla
+	${MKDIR} ${PREFIX}/lib/mozilla
+	${CHMOD} 755 ${PREFIX}/lib/mozilla
+	cd ${WRKSRC}/dist/bin && ${TAR} -chf - * | \
+		${TAR} -xf - -C ${PREFIX}/lib/mozilla
+	${INSTALL_SCRIPT} ${WRKSRC}/mozilla ${PREFIX}/bin
+	${TOUCH} ${PREFIX}/lib/mozilla/component.reg
+	${CHMOD} 666 ${PREFIX}/lib/mozilla/component.reg
 
 .include <bsd.port.mk>
