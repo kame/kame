@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.429 2004/02/25 05:56:55 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.430 2004/02/25 06:01:12 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1102,8 +1102,11 @@ skip_ipsec2:;
 		goto bad;
 	}
 	if (rt == NULL) {
-		/* XXX */
-		dst->sin6_addr = ip6->ip6_dst;
+		/*
+		 * If in6_selectroute() does not return a route entry,
+		 * dst may not have been updated.
+		 */
+		*dst = dst_sa;	/* XXX */
 	}
 
 	/*
