@@ -1205,12 +1205,21 @@ FILE	*fconfig = NULL;
 struct	servtab serv;
 char	line[LINE_MAX];
 char    *defhost;
+#ifdef IPSEC
+static char *policy = NULL;
+#endif
 
 int
 setconfig()
 {
-	if (defhost) free(defhost);
+	if (defhost)
+		free(defhost);
 	defhost = newstr("*");
+#ifdef IPSEC
+	if (policy)
+		free(policy);
+	policy = NULL;
+#endif
 	if (fconfig != NULL) {
 		fseek(fconfig, 0L, SEEK_SET);
 		return (1);
@@ -1241,9 +1250,6 @@ getconfigent()
 	static char TCPMUX_TOKEN[] = "tcpmux/";
 #define MUX_LEN		(sizeof(TCPMUX_TOKEN)-1)
 	char *hostdelim;
-#ifdef IPSEC
-	char *policy = NULL;
-#endif
 
 more:
 	while ((cp = nextline(fconfig))) {
