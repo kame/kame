@@ -1164,8 +1164,8 @@ done:
 		ro->ro_rt = NULL;
 	}
 #ifdef IPSEC
-	if (sp != NULL)
-		KEY_DEBUG(KEYDEBUG_IPSEC_STAMP,
+	if (sp != NULL) {
+		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
 			printf("DP ip_input call free SP:%p\n", sp));
 		key_freesp(sp);
 	}
