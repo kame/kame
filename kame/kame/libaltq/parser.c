@@ -1,4 +1,4 @@
-/* $Id: parser.c,v 1.3 2000/03/03 09:26:17 kjc Exp $ */
+/* $Id: parser.c,v 1.4 2000/05/05 16:37:10 itojun Exp $ */
 /*******************************************************************
 
   Copyright (c) 1996 by the University of Southern California
@@ -35,8 +35,8 @@
 #include <ctype.h>
 #include <errno.h>
 #include <syslog.h>
-#include <netdb.h>
 #include <sys/socket.h>
+#include <netdb.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>

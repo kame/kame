@@ -32,6 +32,7 @@ __RCSID("$NetBSD: hosts_access.c,v 1.5 1999/01/18 20:21:19 christos Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
+#include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdio.h>
@@ -45,9 +46,6 @@ __RCSID("$NetBSD: hosts_access.c,v 1.5 1999/01/18 20:21:19 christos Exp $");
 #ifdef  NETGROUP
 #include <netgroup.h>
 #include <rpcsvc/ypclnt.h>
-#endif
-#ifdef INET6
-#include <sys/socket.h>
 #endif
 
 extern int errno;

@@ -44,6 +44,7 @@ __RCSID("$NetBSD: ruserpass.c,v 1.21 1998/08/08 03:17:40 lukem Exp $");
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
 
 #include <ctype.h>
 #include <err.h>
