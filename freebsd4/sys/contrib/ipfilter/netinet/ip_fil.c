@@ -1998,7 +1998,8 @@ frdest_t *fdp;
 		error = ip6_getpmtu(ro_pmtu, ro, ifp, &finaldst, &mtu);
 		if (error == 0) {
 #else
-			mtu = nd_ifinfo[ifp->if_index].linkmtu;
+			ndi = ND_IFINFO(ifp);
+			mtu = ndi[ifp->if_index].linkmtu;
 #endif
 			if (m0->m_pkthdr.len <= mtu)
 				error = nd6_output(ifp, fin->fin_ifp, m0,
