@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.278 2002/05/28 10:24:24 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.279 2002/06/08 07:01:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2168,47 +2168,44 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		return ENOTDIR;
 
 	switch (name[0]) {
-
 	case IPV6CTL_FORWARDING:
-		return sysctl_int(oldp, oldlenp, newp, newlen,
-				  &ip6_forwarding);
+		return sysctl_int(oldp, oldlenp, newp, newlen, &ip6_forwarding);
 	case IPV6CTL_SENDREDIRECTS:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				&ip6_sendredirects);
+		    &ip6_sendredirects);
 	case IPV6CTL_DEFHLIM:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &ip6_defhlim);
 	case IPV6CTL_MAXFRAGPACKETS:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				&ip6_maxfragpackets);
+		    &ip6_maxfragpackets);
 	case IPV6CTL_ACCEPT_RTADV:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				&ip6_accept_rtadv);
+		    &ip6_accept_rtadv);
 	case IPV6CTL_KEEPFAITH:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &ip6_keepfaith);
 	case IPV6CTL_LOG_INTERVAL:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				&ip6_log_interval);
+		    &ip6_log_interval);
 	case IPV6CTL_HDRNESTLIMIT:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				&ip6_hdrnestlimit);
+		    &ip6_hdrnestlimit);
 	case IPV6CTL_DAD_COUNT:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &ip6_dad_count);
 	case IPV6CTL_AUTO_FLOWLABEL:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				&ip6_auto_flowlabel);
+		    &ip6_auto_flowlabel);
 	case IPV6CTL_DEFMCASTHLIM:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				&ip6_defmcasthlim);
+		    &ip6_defmcasthlim);
 #if NGIF > 0
 	case IPV6CTL_GIF_HLIM:
-		return sysctl_int(oldp, oldlenp, newp, newlen,
-				&ip6_gif_hlim);
+		return sysctl_int(oldp, oldlenp, newp, newlen, &ip6_gif_hlim);
 #endif
 	case IPV6CTL_KAME_VERSION:
 		return sysctl_rdstring(oldp, oldlenp, newp, __KAME_VERSION);
 	case IPV6CTL_USE_DEPRECATED:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				&ip6_use_deprecated);
+		    &ip6_use_deprecated);
 	case IPV6CTL_RR_PRUNE:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &ip6_rr_prune);
 	case IPV6CTL_V6ONLY:
@@ -2279,11 +2276,11 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 #endif /* !IPNOPRIVPORTS */
 	case IPV6CTL_USETEMPADDR:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				  &ip6_use_tempaddr);
+		    &ip6_use_tempaddr);
 	case IPV6CTL_TEMPPLTIME:
 		old = ip6_temp_preferred_lifetime;
 		error = sysctl_int(oldp, oldlenp, newp, newlen,
-				   &ip6_temp_preferred_lifetime);
+		    &ip6_temp_preferred_lifetime);
 		if (ip6_temp_preferred_lifetime <
 		    ip6_desync_factor + ip6_temp_regen_advance) {
 			ip6_temp_preferred_lifetime = old;
@@ -2293,7 +2290,7 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case IPV6CTL_TEMPVLTIME:
 		old = ip6_temp_valid_lifetime;
 		error = sysctl_int(oldp, oldlenp, newp, newlen,
-				   &ip6_temp_valid_lifetime);
+		    &ip6_temp_valid_lifetime);
 		if (ip6_temp_valid_lifetime < ip6_temp_preferred_lifetime) {
 			ip6_temp_valid_lifetime = old;
 			return(EINVAL);
@@ -2301,15 +2298,15 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		return(error);
 	case IPV6CTL_AUTO_LINKLOCAL:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				  &ip6_auto_linklocal);
+		    &ip6_auto_linklocal);
 	case IPV6CTL_PREFER_TEMPADDR:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				  &ip6_prefer_tempaddr);
+		    &ip6_prefer_tempaddr);
 	case IPV6CTL_ADDRCTLPOLICY:
 		return in6_src_sysctl(oldp, oldlenp, newp, newlen);
 	case IPV6CTL_USE_DEFAULTZONE:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				  &ip6_use_defzone);
+		    &ip6_use_defzone);
 	case IPV6CTL_MAXFRAGS:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &ip6_maxfrags);
 	default:
@@ -2339,12 +2336,12 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	switch (name[0]) {
 	case IPV6CTL_STATS:
 		return sysctl_rdtrunc(oldp, oldlenp, newp, &ip6stat,
-				      sizeof(ip6stat));
+		    sizeof(ip6stat));
 	case IPV6CTL_KAME_VERSION:
 		return sysctl_rdstring(oldp, oldlenp, newp, __KAME_VERSION);
 	case IPV6CTL_TEMPPLTIME:
 		error = sysctl_int_arr(ip6_sysvars, name, namelen,
-				       oldp, oldlenp, newp, newlen);
+		    oldp, oldlenp, newp, newlen);
 		if (ip6_temp_preferred_lifetime <
 		    ip6_desync_factor + ip6_temp_regen_advance) {
 			ip6_temp_preferred_lifetime = *(int *)oldp;
@@ -2353,7 +2350,7 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		return(error);
 	case IPV6CTL_TEMPVLTIME:
 		error = sysctl_int_arr(ip6_sysvars, name, namelen,
-				       oldp, oldlenp, newp, newlen);
+		    oldp, oldlenp, newp, newlen);
 		if (ip6_temp_valid_lifetime < ip6_temp_preferred_lifetime) {
 			ip6_temp_valid_lifetime = *(int *)oldp;
 			return(EINVAL);
@@ -2371,7 +2368,7 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		return in6_src_sysctl(oldp, oldlenp, newp, newlen);
 	default:
 		return (sysctl_int_arr(ip6_sysvars, name, namelen,
-				       oldp, oldlenp, newp, newlen));
+		    oldp, oldlenp, newp, newlen));
 	}
 }
 #endif /* __bsdi__ */
