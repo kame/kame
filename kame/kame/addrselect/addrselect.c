@@ -1,4 +1,4 @@
-/*	$KAME: addrselect.c,v 1.3 2001/09/26 08:29:27 itojun Exp $	*/
+/*	$KAME: addrselect.c,v 1.4 2001/09/26 14:39:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -489,8 +489,9 @@ usage()
 {
 	fprintf(stderr, "usage: addrselect -c configfile\n");
 	fprintf(stderr, "       addrselect [show]\n");
-	fprintf(stderr, "       addrselect add prefix precedence label\n");
-	fprintf(stderr, "       addrselect delete prefix\n");
+	fprintf(stderr, "       addrselect add "
+		"<prefix> <precedence> <label>\n");
+	fprintf(stderr, "       addrselect delete <prefix>\n");
 	fprintf(stderr, "       addrselect flush\n");
 
 	exit(1);
