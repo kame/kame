@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.320 1999/12/07 11:41:48 sumikawa Exp $
+$Id: CHANGELOG,v 1.321 1999/12/08 07:50:34 itojun Exp $
 
 <199912>
+Wed Dec  8 16:47:58 JST 1999  itojun@iijlab.net
+	* netbsd/pkgsrc/net/zebra, openbsd/ports/net/zebra,
+	  freebsd[23]/ports/zebra: upgrade to 0.83.  if you are using BGP4+
+	  and using 0.82, you MUST upgrade it.
+
 Tue Dec  7 20:38:34 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/pc98/conf/GENERIC.v6, Makefile.pc98: support IPv6 on
 	  NEC PC-98 architecture.
