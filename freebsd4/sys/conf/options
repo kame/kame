@@ -284,6 +284,8 @@ IP6_AUTO_LINKLOCAL	opt_inet6.h
 SCOPEDEBUG		opt_inet6.h	# for debug only.  don't merge it.
 LARGE_LOMTU		opt_inet6.h
 MIP6			opt_mip6.h
+MIP6_MOBILE_NODE	opt_mip6.h
+MIP6_HOME_AGENT		opt_mip6.h
 MIP6_DEBUG		opt_mip6.h
 MIP6_STATIC_HADDR	opt_mip6.h
 MIP6_CALLOUTTEST	opt_mip6.h
