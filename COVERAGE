@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.51 2000/06/20 03:41:11 itojun Exp $
+$KAME: COVERAGE,v 1.52 2000/06/25 10:54:44 sumikawa Exp $
 
 
 x: supported/integrated
@@ -8,7 +8,7 @@ x: supported/integrated
 
 
 		KAME
-		net142	open26	free228	free34	free4	bsdi31	bsdi41
+		net142	open26	free228	free35	free4	bsdi31	bsdi41
 		--	--	--	--	--	--	--
 TCP/UDP		see IMPLEMENTATION for details
 
