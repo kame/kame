@@ -1,6 +1,10 @@
-$Id: CHANGELOG,v 1.499 2000/01/30 08:42:09 itojun Exp $
+$Id: CHANGELOG,v 1.500 2000/01/30 15:44:07 itojun Exp $
 
 <200001>
+Mon Jan 31 00:42:47 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/mail/{sendmail,smtpfeed}: upgrade smtpfeed to 1.04.
+	  synchronize with latest NetBSD pkgsrc.
+
 Sun Jan 30 15:30:14 JST 2000  itojun@iijlab.net
 	* kame/libinet6/rcmd.c: fix behavior on non-IPv6 node.  From shin.
 	* kame/libinet6/getaddrinfo: fix AI_ADDRCONFIG concern when
