@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.30 2001/11/06 07:46:19 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.31 2001/11/07 03:31:41 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -105,11 +105,11 @@ static int mip6_bu_encapcheck __P((const struct mbuf *, int, int, void *));
 #ifdef MIP6_DRAFT13
 static struct mip6_bc *mip6_bc_create 
     __P((struct in6_addr *, struct in6_addr *, struct in6_addr *,
-	 u_int8_t, u_int8_t, MIP6_SEQNO_T, u_int32_t));
+	 u_int8_t, u_int8_t, MIP6_SEQNO_T, u_int32_t, struct ifnet *));
 #else
 static struct mip6_bc *mip6_bc_create 
     __P((struct in6_addr *, struct in6_addr *, struct in6_addr *,
-	 u_int8_t, MIP6_SEQNO_T, u_int32_t));
+	 u_int8_t, MIP6_SEQNO_T, u_int32_t, struct ifnet *));
 #endif /* MIP6_DRAFT13 */
 static int mip6_bc_list_insert __P((struct mip6_bc_list *, struct mip6_bc *));
 static int mip6_bc_send_ba __P((struct in6_addr *, struct in6_addr *,
@@ -877,15 +877,16 @@ mip6_process_bu(m, opt)
 						  lifetime,
 						  &ip6->ip6_dst);
 			} else {
-				/* this is not HA.  return BA with error. */
-				/* XXX */
+				/* this is not acting as a homeagent. */
+				/* XXX: TODO send a binding ack. */
+				return (0); /* XXX is 0 OK? */
 			}
 		} else {
 			/* a request to cache binding. */
 			mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
 							   &ip6a->ip6a_home);
 			if (mbc == NULL) {
-				/* create a BC entry. */
+				/* create a binding cache entry. */
 				mbc = mip6_bc_create(&ip6a->ip6a_home,
 						     pcoa,
 						     &ip6->ip6_dst,
@@ -894,7 +895,8 @@ mip6_process_bu(m, opt)
 						     bu_opt->ip6ou_prefixlen,
 #endif /* MIP6_DRAFT13 */
 						     seqno,
-						     lifetime);
+						     lifetime,
+						     NULL);
 				if (mbc == NULL) {
 					mip6log((LOG_ERR,
 						 "%s:%d: mip6_bc memory "
@@ -978,11 +980,42 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 	struct in6_addr *haaddr;
 {
 	struct mip6_bc *mbc, *mbc_next;
+	struct nd_prefix *pr;
+	struct ifnet *hifp = NULL;
 	int error = 0;
 #ifdef MIP6_DRAFT13
 	u_int8_t prefixlen;
 #endif /* MIP6_DRAFT13 */
 
+	/* find the home ifp of this homeaddress. */
+	for(pr = nd_prefix.lh_first;
+	    pr;
+	    pr = pr->ndpr_next) {
+		if (in6_are_prefix_equal(haddr0,
+					 &pr->ndpr_prefix.sin6_addr,
+					 pr->ndpr_plen)) {
+			hifp = pr->ndpr_ifp; /* home ifp. */
+		}
+	}
+	if (hifp == NULL) {
+		/*
+		 * the haddr0 doesn't have an online prefix.  return a
+		 * binding ack with an error NOT_HOME_SUBNET.
+		 */
+		if (mip6_bc_send_ba(haaddr, haddr0, coa,
+				    MIP6_BA_STATUS_NOT_HOME_SUBNET,
+				    bu_opt->ip6ou_seqno,
+				    0,
+				    0)) {
+			mip6log((LOG_ERR,
+				 "%s:%d: sending BA to %s(%s) failed. "
+				 "send it later.\n",
+				 __FILE__, __LINE__,
+				 ip6_sprintf(haddr0),
+				 ip6_sprintf(coa)));
+		}
+		return (0); /* XXX is 0 OK? */
+	}
 #ifdef MIP6_DRAFT13
 	prefixlen = bu_opt->ip6ou_prefixlen;
 	if (prefixlen == 0) {
@@ -1033,6 +1066,9 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 		    mbc;
 		    mbc = mbc_next) {
 			mbc_next = LIST_NEXT(mbc, mbc_entry);
+
+			if (mbc->mbc_ifp != hifp)
+				continue;
 
 			if (!mip6_are_ifid_equal(&mbc->mbc_phaddr,
 						 haddr0,
@@ -1135,27 +1171,52 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 	struct in6_addr *haaddr;
 {
 	struct nd_prefix *pr;
+	struct ifnet *hifp = NULL;
 	struct in6_addr haddr;
 	struct mip6_bc *mbc = NULL;
 	u_int32_t prlifetime;
-	int found = 0;
 
-	prlifetime = 0xffffffff;
+	/* find the home ifp of this homeaddress. */
 	for(pr = nd_prefix.lh_first;
 	    pr;
 	    pr = pr->ndpr_next) {
 		if (in6_are_prefix_equal(haddr0,
 					 &pr->ndpr_prefix.sin6_addr,
-					 pr->ndpr_plen))
-			found = 1;
-
+					 pr->ndpr_plen)) {
+			hifp = pr->ndpr_ifp; /* home ifp. */
+		}
+	}
+	/* XXX really stupid to loop twice? */
+	prlifetime = 0xffffffff;
+	for(pr = nd_prefix.lh_first;
+	    pr;
+	    pr = pr->ndpr_next) {
+		if (pr->ndpr_ifp != hifp) {
+			/* this prefix is not a home prefix. */
+			continue;
+		}
 		/* save minimum prefix lifetime for later use. */
 		if (prlifetime > pr->ndpr_vltime)
 			prlifetime = pr->ndpr_vltime;
 	}
-	if (found == 0) {
-		/* the haddr0 doesn't have an online prefix. */
-		/* XXX return 133 NOT HOME SUBNET */
+	if (hifp == NULL) {
+		/*
+		 * the haddr0 doesn't have an online prefix.  return a
+		 * binding ack with an error NOT_HOME_SUBNET.
+		 */
+		if (mip6_bc_send_ba(haaddr, haddr0, coa,
+				    MIP6_BA_STATUS_NOT_HOME_SUBNET,
+				    bu_opt->ip6ou_seqno,
+				    0,
+				    0)) {
+			mip6log((LOG_ERR,
+				 "%s:%d: sending BA to %s(%s) failed. "
+				 "send it later.\n",
+				 __FILE__, __LINE__,
+				 ip6_sprintf(haddr0),
+				 ip6_sprintf(coa)));
+		}
+		return (0); /* XXX is 0 OK? */
 	}
 #ifdef MIP6_DRAFT13
 	if (pr->ndpr_plen != bu_opt->ip6ou_prefixlen) {
@@ -1184,7 +1245,8 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 					     bu_opt->ip6ou_flags,
 					     bu_opt->ip6ou_prefixlen,
 					     seqno,
-					     lifetime);
+					     lifetime,
+					     hifp);
 			if (mbc == NULL) {
 				/* XXX STATUS_RESOUCE */
 				return (-1);
@@ -1242,6 +1304,8 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 				continue;
 			if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix.sin6_addr))
 				continue;
+			if (pr->ndpr_ifp != hifp)
+				continue;
 
 			mip6_create_addr(&haddr, haddr0,
 					 &pr->ndpr_prefix.sin6_addr,
@@ -1259,7 +1323,8 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 						     bu_opt->ip6ou_prefixlen,
 #endif /* MIP6_DRAFT13 */
 						     seqno,
-						     lifetime);
+						     lifetime,
+						     hifp);
 				if (mip6_bc_list_insert(&mip6_bc_list, mbc))
 					return (-1);
 
@@ -1791,6 +1856,8 @@ mip6_process_ba(m, opt)
 				return (error);
 			}
 
+			/* XXX: TODO send a unsolicited na. */
+
 			/* for safty. */
 			mbu->mbu_reg_state = MIP6_BU_REG_STATE_NOTREG;
 		}
@@ -1910,7 +1977,7 @@ mip6_bc_init()
 
 #ifdef MIP6_DRAFT13
 static struct mip6_bc *
-mip6_bc_create(phaddr, pcoa, addr, flags, prefixlen, seqno, lifetime)
+mip6_bc_create(phaddr, pcoa, addr, flags, prefixlen, seqno, lifetime, ifp)
 	struct in6_addr *phaddr;
 	struct in6_addr *pcoa;
 	struct in6_addr *addr;
@@ -1918,15 +1985,17 @@ mip6_bc_create(phaddr, pcoa, addr, flags, prefixlen, seqno, lifetime)
 	u_int8_t prefixlen;
 	MIP6_SEQNO_T seqno;
 	u_int32_t lifetime;
+	struct ifnet *ifp;
 #else
 static struct mip6_bc *
-mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime)
+mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
 	struct in6_addr *phaddr;
 	struct in6_addr *pcoa;
 	struct in6_addr *addr;
 	u_int8_t flags;
 	MIP6_SEQNO_T seqno;
 	u_int32_t lifetime;
+	struct ifnet *ifp;
 #endif /* MIP6_DRAFT13 */
 {
 	struct mip6_bc *mbc;
@@ -1952,6 +2021,7 @@ mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime)
 	mbc->mbc_lifetime = lifetime;
 	mbc->mbc_remain = mbc->mbc_lifetime;
 	mbc->mbc_state = 0;
+	mbc->mbc_ifp = ifp;
 
 	return (mbc);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.11 2001/11/06 09:43:11 k-sugyou Exp $	*/
+/*	$KAME: mip6_var.h,v 1.12 2001/11/07 03:31:41 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -136,6 +136,8 @@ struct mip6_bc {
 	u_int32_t             mbc_lifetime;  /* recved BU lifetime */
 	int64_t               mbc_remain;    /* remaining lifetime */
 	u_int8_t              mbc_state;     /* BC state */
+	struct ifnet          *mbc_ifp;      /* ifp that the BC belongs to. */
+	                                     /* valid only when BUF_HOME. */
 	const struct encaptab *mbc_encap;    /* encapsulation from MN */
 };
 
