@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.65 2002/05/01 10:43:09 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.66 2002/05/01 10:54:54 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -593,7 +593,7 @@ server6_send_reply(ifp, origmsg, optinfo, from, fromlen)
 	dst.sin6_scope_id = ((struct sockaddr_in6 *)from)->sin6_scope_id;
 
 	if (transmit_sa(outsock, (struct sockaddr *)&dst,
-			0, replybuf, len) != 0) {
+			replybuf, len) != 0) {
 		dprintf(LOG_ERR, "transmit to %s failed",
 			addr2str((struct sockaddr *)&dst));
 		/* NOTREACHED */

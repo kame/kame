@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.71 2002/05/01 10:30:35 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.72 2002/05/01 10:54:54 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -646,7 +646,7 @@ client6_send(ifp, s)
 		break;
 	}
 
-	if (transmit_sa(s, (struct sockaddr *)&dst, 0, buf, len) != 0) {
+	if (transmit_sa(s, (struct sockaddr *)&dst, buf, len) != 0) {
 		dprintf(LOG_ERR, "transmit failed");
 		return;
 	}

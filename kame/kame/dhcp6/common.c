@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.37 2002/05/01 10:53:46 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.38 2002/05/01 10:54:54 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -233,23 +233,13 @@ getdev(addr)
 }
 
 int
-transmit_sa(s, sa, hlim, buf, len)
+transmit_sa(s, sa, buf, len)
 	int s;
 	struct sockaddr *sa;
-	int hlim;
 	char *buf;
 	size_t len;
 {
 	int error;
-
-	if (hlim == 0)
-		hlim = 64;
-	if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &hlim,
-			sizeof(hlim)) < 0) {
-		dprintf(LOG_ERR, "setsockopt(IPV6_MULTICAST_HOPS): %s",
-			strerror(errno));
-		exit(1);	/* XXX */
-	}
 
 	error = sendto(s, buf, len, 0, sa, sa->sa_len);
 
