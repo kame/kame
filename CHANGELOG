@@ -1,9 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.885 2000/05/17 03:00:45 suz Exp $
+$Id: CHANGELOG,v 1.886 2000/05/17 03:25:09 suz Exp $
 
 <200005>
 2000-05-17  SUZUKI Shinsuke  <suz@sdl.hitachi.co.jp>
+	* bsdi3/sys/net/if_tun.c:
+	- fixed mbuf allocation bug on tun?
+	- enabled IPv6 addressing on tun?
 	* {freebsd[23]/ports,netbsd/pkgsrc/net}/gated-ipv6
 	updated to May 11's snapshot
 
