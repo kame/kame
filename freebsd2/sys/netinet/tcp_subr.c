@@ -561,30 +561,6 @@ tcp_mtudisc(inp, errno)
 		taop = rmx_taop(rt->rt_rmx);
 		offered = taop->tao_mssopt;
 		mss = rt->rt_rmx.rmx_mtu - sizeof(struct tcpiphdr);
-#ifdef IPSEC
-	    {
-		int tmp;
-		struct ipoption *p;
-
-		/* why we don't have this here?  could anyone comment? */
-		if (inp->inp_options) {
-			tmp = inp->inp_options->m_len - sizeof(p->ipopt_dst);
-			if (mss > tmp)
-				mss -= tmp;
-			else {
-				printf("tcp_mtudisc: "
-					"invalid mss(IP4 option)\n");
-			}
-		}
-
-		/* plug for AH/ESP. */
-		tmp = ipsec4_hdrsiz_tcp(tp);
-		if (mss > tmp)
-			mss -= tmp;
-		else
-			printf("tcp_mtudisc: invalid mss(IPsec)\n");
-	    }
-#endif /*IPSEC*/
 		if (offered)
 			mss = min(mss, offered);
 		/*

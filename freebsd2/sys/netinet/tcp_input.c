@@ -2216,60 +2216,10 @@ tcp_mss(tp, offer)
 	/*
 	 * if there's an mtu associated with the route, use it
 	 */
-	if (rt->rt_rmx.rmx_mtu) {
+	if (rt->rt_rmx.rmx_mtu)
 		mss = rt->rt_rmx.rmx_mtu - sizeof(struct tcpiphdr);
-#ifdef IPSEC
-	    {
-		int tmp;
-		struct ipoption *p;
-
-		/* why we don't have this here?  could anyone comment? */
-		if (inp->inp_options) {
-			tmp = inp->inp_options->m_len - sizeof(p->ipopt_dst);
-			if (mss > tmp)
-				mss -= tmp;
-			else {
-				printf("tcp_mss(1): "
-					"invalid mss(IP4 option)\n");
-			}
-		}
-
-		/* plug for AH/ESP. */
-		tmp = ipsec4_hdrsiz_tcp(tp);
-		if (mss > tmp)
-			mss -= tmp;
-		else
-			printf("tcp_mss(1): invalid mss(IPsec)\n");
-	    }
-#endif /*IPSEC*/
-	}
-	else
-	{
+	else {
 		mss = ifp->if_mtu - sizeof(struct tcpiphdr);
-#ifdef IPSEC
-	    {
-		int tmp;
-		struct ipoption *p;
-
-		/* why we don't have this here?  could anyone comment? */
-		if (inp->inp_options) {
-			tmp = inp->inp_options->m_len - sizeof(p->ipopt_dst);
-			if (mss > tmp)
-				mss -= tmp;
-			else {
-				printf("tcp_mss(2): "
-					"invalid mss(IP4 option)\n");
-			}
-		}
-
-		/* plug for AH/ESP. */
-		tmp = ipsec4_hdrsiz_tcp(tp);
-		if (mss > tmp)
-			mss -= tmp;
-		else
-			printf("tcp_mss(2): invalid mss(IPsec)\n");
-	    }
-#endif /*IPSEC*/
 		if (!in_localaddr(inp->inp_faddr))
 			mss = min(mss, tcp_mssdflt);
 	}
@@ -2368,33 +2318,6 @@ tcp_mssopt(tp)
 		return tcp_mssdflt;
 
 	mss = rt->rt_ifp->if_mtu - sizeof(struct tcpiphdr);
-#ifdef IPSEC
-    {
-	struct inpcb *inp;
-	int tmp;
-	struct ipoption *p;
-
-	inp = tp->t_inpcb;
-
-	/* why we don't have this here?  could anyone comment? */
-	if (inp->inp_options) {
-		tmp = inp->inp_options->m_len - sizeof(p->ipopt_dst);
-		if (mss > tmp)
-			mss -= tmp;
-		else {
-			printf("tcp_mssopt: "
-				"invalid mss(IP4 option)\n");
-		}
-	}
-
-	/* plug for AH/ESP. */
-	tmp = ipsec4_hdrsiz_tcp(tp);
-	if (mss > tmp)
-		mss -= tmp;
-	else
-		printf("tcp_mssopt: invalid mss(IPsec)\n");
-    }
-#endif /*IPSEC*/
 	return mss;
 }
 #endif /* TUBA_INCLUDE */

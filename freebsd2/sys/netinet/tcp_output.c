@@ -95,6 +95,10 @@
 #include <netinet/tcp_debug.h>
 #endif
 
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#endif
+
 #ifdef notyet
 extern struct mbuf *m_copypack();
 #endif
@@ -473,6 +477,9 @@ send:
 	} else {
 		ipoptlen = 0;
 	}
+#ifdef IPSEC
+	ipoptlen = ipsec4_hdrsiz_tcp(tp);
+#endif
 
 	/*
 	 * Adjust data length if insertion of options will
