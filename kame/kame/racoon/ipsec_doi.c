@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.77 2000/06/01 06:24:15 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.78 2000/06/05 15:30:47 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -83,12 +83,16 @@ static vchar_t *get_ph1approval __P((struct ph1handle *iph1,
 static struct isakmpsa *get_ph1approvalx __P((struct prop_pair *p,
 	struct isakmpsa *proposal));
 static int t2isakmpsa __P((struct isakmp_pl_t *trns, struct isakmpsa *sa));
-static int get_ph2approval __P((struct ph2handle *, struct prop_pair **));
-static int get_ph2approvalx __P((struct ph2handle *, struct prop_pair *));
+static int cmp_aproppair __P((struct prop_pair *, struct prop_pair *));
+static struct prop_pair *get_ph2approval __P((struct ph2handle *,
+	struct prop_pair **));
+static struct prop_pair *get_ph2approvalx __P((struct ph2handle *,
+	struct prop_pair *));
+static void free_proppair0 __P((struct prop_pair *));
 
 static int get_transform
 	__P((struct isakmp_pl_p *prop, struct prop_pair **pair, int *num_p));
-static vchar_t *get_sabyproppair __P((struct prop_pair *pair));
+static vchar_t *get_sabyproppair __P((struct prop_pair *, struct ph1handle *));
 static u_int32_t ipsecdoi_set_ld __P((vchar_t *buf));
 
 static int check_doi __P((u_int32_t));
@@ -164,10 +168,6 @@ ipsecdoi_checkph1proposal(sa, iph1)
 
 	if (newsa == NULL)
 		return -1;
-
-	/* update some of values in SA header */
-	((struct ipsecdoi_sa_b *)newsa->v)->doi = htonl(iph1->rmconf->doitype);
-	((struct ipsecdoi_sa_b *)newsa->v)->sit = htonl(iph1->rmconf->sittype);
 
 	iph1->sa_ret = newsa;
 
@@ -254,7 +254,7 @@ found:
 saok:
 	iph1->approval = sa;
 
-	newsa = get_sabyproppair(p);
+	newsa = get_sabyproppair(p, iph1);
 	if (newsa == NULL)
 		iph1->approval = NULL;
 
@@ -586,29 +586,193 @@ err:
 
 /*%%%*/
 /*
- * check phase 2 SA payload.
+ * check phase 2 SA payload and select single proposal.
  * make new SA payload to be replyed not including general header.
- * the pointer to one of ipsecsa in proposal is set into iph2->approval.
+ * This function is called by responder only.
  * OUT:
- *	positive: the pointer to new buffer of SA payload.
- *		  network byte order.
- *	NULL	: error occured.
+ *	0: succeed.
+ *	-1: error occured.
  */
 int
-ipsecdoi_checkph2proposal(sa, iph2)
-	vchar_t *sa;
+ipsecdoi_selectph2proposal(iph2)
 	struct ph2handle *iph2;
 {
 	struct prop_pair **pair;
+	struct prop_pair *ret;
 
 	/* get proposal pair */
-	pair = get_proppair(sa, IPSECDOI_TYPE_PH2);
+	pair = get_proppair(iph2->sa, IPSECDOI_TYPE_PH2);
 	if (pair == NULL)
 		return -1;
 
-	/* check and get one proposal for use */
-	if (get_ph2approval(iph2, pair) != 0) {
-		free_proppair(pair);
+	/* check and select a proposal. */
+	ret = get_ph2approval(iph2, pair);
+	free_proppair(pair);
+	if (ret == NULL)
+		return -1;
+
+	/* make a SA to be replayed. */
+	iph2->sa_ret = get_sabyproppair(ret, iph2->ph1);
+	free_proppair0(ret);
+	if (iph2->sa_ret == NULL)
+		return -1;
+
+	return 0;
+}
+
+/*
+ * check phase 2 SA payload returned from responder.
+ * This function is called by initiator only.
+ * OUT:
+ *	0: valid.
+ *	-1: invalid.
+ */
+int
+ipsecdoi_checkph2proposal(iph2)
+	struct ph2handle *iph2;
+{
+	struct prop_pair **rpair = NULL, **spair = NULL;
+	struct prop_pair *p;
+	int i;
+	int error = -1;
+
+	/* get proposal pair of SA sent. */
+	spair = get_proppair(iph2->sa_ret, IPSECDOI_TYPE_PH2);
+	if (spair == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to get prop pair.\n");
+		goto end;
+	}
+
+	/* get proposal pair of SA replyed */
+	rpair = get_proppair(iph2->sa_ret, IPSECDOI_TYPE_PH2);
+	if (rpair == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to get prop pair.\n");
+		goto end;
+	}
+
+	for (i = 0; i < MAXPROPPAIRLEN; i++) {
+		if (spair[i] == NULL)
+			continue;
+
+		if (rpair[i] == NULL) {
+			YIPSDEBUG(DEBUG_SA,
+				plog(logp, LOCATION, NULL,
+				"ERROR: proposal# mismatched.\n"));
+			goto end;
+		}
+
+		if (rpair[i]->tnext != NULL) {
+			YIPSDEBUG(DEBUG_SA,
+				plog(logp, LOCATION, NULL,
+				"ERROR: multi transforms replyed.\n"));
+			goto end;
+		}
+
+		for (p = rpair[i]; p; p = p->next) {
+			if (cmp_aproppair(p, spair[i])) {
+				YIPSDEBUG(DEBUG_SA,
+					plog(logp, LOCATION, NULL,
+					"ERROR: no proposal mismathed.\n"));
+				goto end;
+			}
+		}
+	}
+
+	/* check and select a proposal. */
+	p = get_ph2approval(iph2, rpair);
+	if (p == NULL)
+		goto end;
+
+	/* make a SA to be replayed. */
+	iph2->sa_ret = get_sabyproppair(p, iph2->ph1);
+	free_proppair0(p);
+	if (iph2->sa_ret == NULL)
+		goto end;
+
+	error = 0;
+
+end:
+	if (rpair)
+		free_proppair(rpair);
+	if (spair)
+		free_proppair(spair);
+
+	return error;
+}
+
+/*
+ * compare two prop_pair which is assumed to have same proposal number.
+ * the case of bundle or single SA, NOT multi transforms.
+ * a: a proposal that is multi protocols and single transform, usually replyed.
+ * b: a proposal that is multi protocols and multi transform, usually sent.
+ * OUT
+ *	0: equal
+ *	1: not equal
+ */
+static int
+cmp_aproppair(a, b)
+	struct prop_pair *a, *b;
+{
+	struct prop_pair *p, *q, *r;
+	int len;
+
+	for (p = a, q = b; p && q; p = p->next, q = q->next) {
+		for (r = q; r; r = r->tnext) {
+			/* compare trns */
+			if (p->trns->t_no == r->trns->t_no)
+				break;
+		}
+		if (!r) {
+			/* no suitable transform found */
+			YIPSDEBUG(DEBUG_SA,
+				plog(logp, LOCATION, NULL,
+				"ERROR: no suitable transform found.\n"));
+			return -1;
+		}
+
+		/* compare prop */
+		if (p->prop->p_no != r->prop->p_no
+		 || p->prop->proto_id != r->prop->proto_id
+		 || p->prop->spi_size != r->prop->spi_size) {
+			YIPSDEBUG(DEBUG_SA,
+				plog(logp, LOCATION, NULL,
+				"ERROR: no suitable proposal found.\n"));
+			return -1;
+		}
+
+		/* check #of transforms */
+		if (p->prop->num_t != 1) {
+			YIPSDEBUG(DEBUG_SA,
+				plog(logp, LOCATION, NULL,
+				"NOTICE: #of transform is %d, "
+				"but expected 1.\n", p->prop->num_t));
+			/*FALLTHROUGH*/
+		}
+
+		if (p->trns->t_id != r->trns->t_id
+		 || p->trns->reserved != r->trns->reserved) {
+			YIPSDEBUG(DEBUG_SA,
+				plog(logp, LOCATION, NULL,
+				"ERROR: no suitable transform found.\n"));
+			return -1;
+		}
+
+		/* compare attribute */
+		len = ntohs(r->trns->h.len) - sizeof(*p->trns);
+		if (memcmp(p->trns + 1, r->trns + 1, len) != 0) {
+			YIPSDEBUG(DEBUG_SA,
+				plog(logp, LOCATION, NULL,
+				"WARNING: attribute is modified.\n"));
+			/*FALLTHROUGH*/
+		}
+	}
+	if ((p && !q) || (!p && q)) {
+		/* # of protocols mismatched */
+		YIPSDEBUG(DEBUG_SA,
+			plog(logp, LOCATION, NULL,
+			"ERROR: #of protocols mismatched.\n"));
 		return -1;
 	}
 
@@ -619,12 +783,12 @@ ipsecdoi_checkph2proposal(sa, iph2)
  * acceptable check for policy configuration.
  * return a new SA payload to be reply to peer.
  */
-static int
+static struct prop_pair *
 get_ph2approval(iph2, pair)
 	struct ph2handle *iph2;
 	struct prop_pair **pair;
 {
-	int prophlen;
+	struct prop_pair *ret;
 	int i;
 
 	iph2->approval = NULL;
@@ -640,33 +804,35 @@ get_ph2approval(iph2, pair)
 				"pair[%d]: %p\n", i, pair[i]);
 			print_proppair(pair[i]););
 
-		prophlen = sizeof(struct isakmp_pl_p)
-				+ pair[i]->prop->spi_size;
 		/* compare proposal and select one */
-		if (get_ph2approvalx(iph2, pair[i]) == 0)
-			return 0;
+		ret = get_ph2approvalx(iph2, pair[i]);
+		if (ret != NULL) {
+			/* found */
+			return ret;
+		}
 	}
 
 	plog(logp, LOCATION, NULL, "no suitable policy found.\n");
 
-	return -1;
+	return NULL;
 }
 
 /*
  * compare my proposal and peers just one proposal.
  * set a approval.
  */
-static int
+static struct prop_pair *
 get_ph2approvalx(iph2, pp)
 	struct ph2handle *iph2;
 	struct prop_pair *pp;
 {
+	struct prop_pair *ret = NULL;
 	struct saprop *pr0, *pr = NULL;
 	struct saprop *q1, *q2;
 
 	pr0 = aproppair2saprop(pp);
 	if (pr0 == NULL)
-		return -1;
+		return NULL;
 
 	for (q1 = pr0; q1; q1 = q1->next) {
 		for (q2 = iph2->proposal; q2; q2 = q2->next) {
@@ -688,31 +854,88 @@ get_ph2approvalx(iph2, pp)
 		}
 	}
 	/* no proposal matching */
+err:
 	flushsaprop(pr0);
-	return -1;
+	return NULL;
 
 found:
 	YIPSDEBUG(DEBUG_DSA, plog(logp, LOCATION, NULL, "matched\n"););
 	iph2->approval = pr;
 
-	return 0;
+    {
+	struct saproto *sp;
+	struct prop_pair *p, *n, *x;
+
+	ret = NULL;
+
+	for (sp = pr->head, p = pp;
+	     sp && p;
+	     sp = sp->next, p = p->next) {
+		if (sp->proto_id != p->prop->proto_id)
+			goto err;	/* XXX */
+		if (sp->head->next)
+			goto err;	/* XXX */
+		for (x = p; x; x = x->tnext)
+			if (sp->head->trns_no == x->trns->t_no)
+				break;
+		if (!x)
+			goto err;	/* XXX */
+
+		n = CALLOC(sizeof(struct prop_pair), struct prop_pair *);
+		if (!n) {
+			plog(logp, LOCATION, NULL,
+				"failed to get buffer.\n");
+			goto err;
+		}
+
+		n->prop = x->prop;
+		n->trns = x->trns;
+
+		/* need to preserve the order */
+		for (x = ret; x && x->next; x = x->next)
+			;
+		if (x && x->prop == n->prop) {
+			for (/*nothing*/; x && x->tnext; x = x->tnext)
+				;
+			x->tnext = n;
+		} else {
+			if (x)
+				x->next = n;
+			else {
+				ret = n;
+			}
+		}
+
+		/* #of transforms should be updated ? */
+	}
+    }
+
+	return ret;
 }
 
 void
 free_proppair(pair)
 	struct prop_pair **pair;
 {
-	struct prop_pair *p, *q;
 	int i;
 
 	for (i = 0; i < MAXPROPPAIRLEN; i++) {
-		for (p = pair[i]; p; p = q) {
-			q = p->next;
-			free(p);
-		}
+		free_proppair0(pair[i]);
 		pair[i] = NULL;
 	}
 	free(pair);
+}
+
+static void
+free_proppair0(pair)
+	struct prop_pair *pair;
+{
+	struct prop_pair *p, *q;
+
+	for (p = pair; p; p = q) {
+		q = p->next;
+		free(p);
+	}
 }
 
 /*
@@ -778,6 +1001,7 @@ get_proppair(sa, mode)
 		if (pa->type != ISAKMP_NPTYPE_P) {
 			plog(logp, LOCATION, NULL,
 				"Invalid payload type=%u\n", pa->type);
+			vfree(pbuf);
 			return NULL;
 		}
 
@@ -791,6 +1015,7 @@ get_proppair(sa, mode)
 		if (proplen == 0) {
 			plog(logp, LOCATION, NULL,
 				"invalid proposal with length %d\n", proplen);
+			vfree(pbuf);
 			return NULL;
 		}
 
@@ -808,16 +1033,11 @@ get_proppair(sa, mode)
 		if (check_spi_size(prop->proto_id, prop->spi_size) < 0)
 			continue;
 
-		/* check the number of transform */
-		if (prop->num_t == 0) {
-			plog(logp, LOCATION, NULL,
-				"Illegal the number of transform. num_t=%u\n",
-				prop->num_t);
-			continue;
-		}
-
 		/* get transform */
-		get_transform(prop, pair, &num_p);
+		if (get_transform(prop, pair, &num_p) < 0) {
+			vfree(pbuf);
+			return NULL;
+		}
 	}
 	vfree(pbuf);
 	pbuf = NULL;
@@ -902,9 +1122,10 @@ get_transform(prop, pair, num_p)
 	caddr_t bp;
 	struct isakmp_pl_t *trns;
 	int trnslen;
-	vchar_t *pbuf;
+	vchar_t *pbuf = NULL;
 	struct isakmp_parse_t *pa;
 	struct prop_pair *p = NULL, *q;
+	int num_t;
 
 	bp = (caddr_t)prop + sizeof(struct isakmp_pl_p) + prop->spi_size;
 	tlen = ntohs(prop->h.len)
@@ -914,9 +1135,13 @@ get_transform(prop, pair, num_p)
 		return -1;
 
 	/* check and get transform for use */
+	num_t = 0;
 	for (pa = (struct isakmp_parse_t *)pbuf->v;
 	     pa->type != ISAKMP_NPTYPE_NONE;
 	     pa++) {
+
+		num_t++;
+
 		/* check the value of next payload */
 		if (pa->type != ISAKMP_NPTYPE_T) {
 			plog(logp, LOCATION, NULL,
@@ -960,6 +1185,7 @@ get_transform(prop, pair, num_p)
 		if (p == NULL) {
 			plog(logp, LOCATION, NULL,
 				"failed to get buffer.\n");
+			vfree(pbuf);
 			return -1;
 		}
 		p->prop = prop;
@@ -982,6 +1208,16 @@ get_transform(prop, pair, num_p)
 		}
 	}
 
+	/* check the number of transform */
+	if (num_t != prop->num_t) {
+		plog(logp, LOCATION, NULL,
+			"ERROR: the number of transform mismatched, "
+			"haeder:%u body:%d.\n",
+			prop->num_t, num_t);
+		vfree(pbuf);
+		return -1;
+	}
+
 	vfree(pbuf);
 
 	return 0;
@@ -991,8 +1227,9 @@ get_transform(prop, pair, num_p)
  * make a new SA payload from prop_pair.
  */
 static vchar_t *
-get_sabyproppair(pair)
+get_sabyproppair(pair, iph1)
 	struct prop_pair *pair;
+	struct ph1handle *iph1;
 {
 	vchar_t *newsa;
 	int newtlen;
@@ -1016,8 +1253,11 @@ get_sabyproppair(pair)
 	}
 	bp = newsa->v;
 
-	/* some of values of SA must be updated in the out of this function */
 	((struct isakmp_gen *)bp)->len = htons(newtlen);
+
+	/* update some of values in SA header */
+	((struct ipsecdoi_sa_b *)bp)->doi = htonl(iph1->rmconf->doitype);
+	((struct ipsecdoi_sa_b *)bp)->sit = htonl(iph1->rmconf->sittype);
 	bp += sizeof(struct ipsecdoi_sa_b);
 
 	/* create proposal payloads */
@@ -2252,6 +2492,7 @@ setph2proposal0(iph2, pp, pr)
 		p = vrealloc(p, p->l + sizeof(*trns) + attrlen);
 		if (p == NULL)
 			return NULL;
+		prop = (struct isakmp_pl_p *)p->v;
 
 		/* set transform's values */
 		trns = (struct isakmp_pl_t *)(p->v + trnsoff);
@@ -2320,7 +2561,6 @@ setph2proposal0(iph2, pp, pr)
 	}
 
 	/* update length of this protocol. */
-	prop = (struct isakmp_pl_p *)p->v;
 	prop->h.len = htons(p->l);
 
 	return p;
@@ -2331,30 +2571,28 @@ setph2proposal0(iph2, pp, pr)
  * NOT INCLUDING isakmp general header of SA payload.
  * This function is called by initiator only.
  */
-vchar_t *
+int
 ipsecdoi_setph2proposal(iph2)
 	struct ph2handle *iph2;
 {
 	struct saprop *proposal, *a;
 	struct saproto *b = NULL;
-	vchar_t *mysa, *q;
+	vchar_t *q;
 	struct ipsecdoi_sa_b *sab;
 	struct isakmp_pl_p *prop;
 	size_t propoff;
 
-	proposal = iph2->side == INITIATOR
-			? iph2->proposal
-			: iph2->approval;
+	proposal = iph2->proposal;
 
-	mysa = vmalloc(sizeof(*sab));
-	if (mysa == NULL) {
+	iph2->sa = vmalloc(sizeof(*sab));
+	if (iph2->sa == NULL) {
 		plog(logp, LOCATION, NULL,
 			"failed to allocate my sa buffer\n");
-		return NULL;
+		return -1;
 	}
 
 	/* create SA payload */
-	sab = (struct ipsecdoi_sa_b *)mysa->v;
+	sab = (struct ipsecdoi_sa_b *)iph2->sa->v;
 	sab->doi = htonl(IPSEC_DOI);
 	sab->sit = htonl(IPSECDOI_SIT_IDENTITY_ONLY);	/* XXX configurable ? */
 
@@ -2364,24 +2602,29 @@ ipsecdoi_setph2proposal(iph2)
 		for (b = a->head; b; b = b->next) {
 			q = setph2proposal0(iph2, a, b);
 			if (q == NULL) {
-				vfree(mysa);
-				return NULL;
+				vfree(iph2->sa);
+				return -1;
 			}
 
-			mysa = vrealloc(mysa, mysa->l + q->l);
-			memcpy(mysa->v + mysa->l - q->l, q->v, q->l);
+			iph2->sa = vrealloc(iph2->sa, iph2->sa->l + q->l);
+			if (iph2->sa == NULL) {
+				plog(logp, LOCATION, NULL,
+					"failed to allocate my sa buffer\n");
+				return -1;
+			}
+			memcpy(iph2->sa->v + iph2->sa->l - q->l, q->v, q->l);
 			if (propoff >= 0) {
-				prop = (struct isakmp_pl_p *)(mysa->v +
+				prop = (struct isakmp_pl_p *)(iph2->sa->v +
 					propoff);
 				prop->h.np = ISAKMP_NPTYPE_P;
 			}
-			propoff = mysa->l - q->l;
+			propoff = iph2->sa->l - q->l;
 
 			vfree(q);
 		}
 	}
 
-	return mysa;
+	return 0;
 }
 
 int

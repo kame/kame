@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.16 2000/05/31 15:45:18 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.17 2000/06/05 15:30:48 sakane Exp $ */
 
 /* refered to RFC2407 */
 
@@ -156,9 +156,9 @@ struct satrns;
 struct prop_pair;
 
 extern int ipsecdoi_checkph1proposal __P((vchar_t *, struct ph1handle *));
-extern int ipsecdoi_checkph2proposal __P((vchar_t *, struct ph2handle *));
+extern int ipsecdoi_selectph2proposal __P((struct ph2handle *));
+extern int ipsecdoi_checkph2proposal __P((struct ph2handle *));
 
-extern void free_proppair __P((struct prop_pair **));
 extern struct prop_pair **get_proppair __P((vchar_t *, int mode));
 extern vchar_t *get_sabysaprop __P((struct saprop *, vchar_t *));
 extern int ipsecdoi_checkid1 __P((struct ph1handle *iph1));
@@ -170,7 +170,7 @@ extern int ipsecdoi_id2sockaddr __P((vchar_t *buf, struct sockaddr *saddr,
 extern const char *ipsecdoi_id2str __P((const vchar_t *id));
 
 extern vchar_t *ipsecdoi_setph1proposal __P((struct isakmpsa *proposal));
-extern vchar_t *ipsecdoi_setph2proposal __P((struct ph2handle *iph2));
+extern int ipsecdoi_setph2proposal __P((struct ph2handle *iph2));
 extern int ipsecdoi_get_defaultlifetime __P((void));
 extern int ipsecdoi_checkalgtypes __P((int proto_id, int enc, int auth, int comp));
 extern int ipproto2doi __P((int proto));

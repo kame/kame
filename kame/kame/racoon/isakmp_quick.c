@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.35 2000/05/31 17:45:47 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.36 2000/06/05 15:30:48 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -148,7 +148,6 @@ quick_i1send(iph2, msg)
 {
 	vchar_t *body = NULL;
 	struct isakmp_gen *gen;
-	vchar_t *sa_tmp = NULL;
 	char *p;
 	int tlen;
 	int error = -1;
@@ -164,8 +163,7 @@ quick_i1send(iph2, msg)
 	}
 
 	/* create SA payload for my proposal */
-	sa_tmp = ipsecdoi_setph2proposal(iph2);
-	if (sa_tmp == NULL)
+	if (ipsecdoi_setph2proposal(iph2) < 0)
 		goto end;
 
 	/* generate NONCE value */
@@ -207,7 +205,7 @@ quick_i1send(iph2, msg)
 		PVDUMP(iph2->id_p));
 
 	/* create SA;NONCE payload, and KE if need, and IDii, IDir. */
-	tlen = + sizeof(*gen) + sa_tmp->l
+	tlen = + sizeof(*gen) + iph2->sa->l
 		+ sizeof(*gen) + iph2->nonce->l
 		+ sizeof(*gen) + iph2->id->l
 		+ sizeof(*gen) + iph2->id_p->l;
@@ -224,7 +222,7 @@ quick_i1send(iph2, msg)
 	p = body->v;
 
 	/* add SA payload */
-	p = set_isakmp_payload(p, sa_tmp, ISAKMP_NPTYPE_NONCE);
+	p = set_isakmp_payload(p, iph2->sa, ISAKMP_NPTYPE_NONCE);
 
 	/* add NONCE payload */
 	p = set_isakmp_payload(p, iph2->nonce,
@@ -263,8 +261,6 @@ quick_i1send(iph2, msg)
 end:
 	if (body != NULL)
 		vfree(body);
-	if (sa_tmp != NULL)
-		vfree(sa_tmp);
 
 	return error;
 }
@@ -373,13 +369,13 @@ quick_i2recv(iph2, msg0)
 
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_SA:
-			if (iph2->sa != NULL) {
+			if (iph2->sa_ret != NULL) {
 				plog(logp, LOCATION, NULL,
 					"Ignored, multiple SA "
 					"isn't supported.\n");
 				break;
 			}
-			if (isakmp_p2ph(&iph2->sa, pa->ptr) < 0)
+			if (isakmp_p2ph(&iph2->sa_ret, pa->ptr) < 0)
 				goto end;
 			break;
 
@@ -439,7 +435,7 @@ quick_i2recv(iph2, msg0)
 	}
 
 	/* payload existency check */
-	if (hash == NULL || iph2->sa == NULL || iph2->nonce_p == NULL) {
+	if (hash == NULL || iph2->sa_ret == NULL || iph2->nonce_p == NULL) {
 		plog(logp, LOCATION, iph2->ph1->remote,
 			"few isakmp message received.\n");
 		goto end;
@@ -480,9 +476,9 @@ quick_i2recv(iph2, msg0)
 	}
     }
 
-	/* check SA payload and set approval SA for use */
-	if (ipsecdoi_checkph2proposal(iph2->sa, iph2) < 0) {
-		/* XXX send information */
+	/* validity check SA payload sent from responder */
+	if (ipsecdoi_checkph2proposal(iph2) < 0) {
+		error = ISAKMP_NTYPE_NO_PROPOSAL_CHOSEN;
 		goto end;
 	}
 
@@ -1035,16 +1031,16 @@ quick_r1recv(iph2, msg0)
 		}
 	}
 
-	/* If initiator requests PFS, we must check to ready to do that. */
-	if (iph2->dhpub_p != NULL && iph2->proposal->pfs_group == 0) {
-		plog(logp, LOCATION, NULL,
-			"responder is not ready to do PFS.\n");
+	/* select single proposal or reject it. */
+	if (ipsecdoi_selectph2proposal(iph2) < 0) {
 		error = ISAKMP_NTYPE_NO_PROPOSAL_CHOSEN;
 		goto end;
 	}
 
-	/* check SA payload and set approval SA for use */
-	if (ipsecdoi_checkph2proposal(iph2->sa, iph2) < 0) {
+	/* If initiator requests PFS, we must check to ready to do that. */
+	if (iph2->dhpub_p != NULL && iph2->proposal->pfs_group == 0) {
+		plog(logp, LOCATION, NULL,
+			"responder is not ready to do PFS.\n");
 		error = ISAKMP_NTYPE_NO_PROPOSAL_CHOSEN;
 		goto end;
 	}
@@ -1113,7 +1109,6 @@ quick_r2send(iph2, msg)
 {
 	vchar_t *body = NULL;
 	struct isakmp_gen *gen;
-	vchar_t *sa_tmp;
 	char *p;
 	int tlen;
 	int error = -1;
@@ -1127,11 +1122,6 @@ quick_r2send(iph2, msg)
 			"status mismatched %d.\n", iph2->status);
 		goto end;
 	}
-
-	/* create SA payload for my proposal */
-	sa_tmp = ipsecdoi_setph2proposal(iph2);
-	if (sa_tmp == NULL)
-		goto end;
 
 	/* generate NONCE value */
 	iph2->nonce = eay_set_random(iph2->ph1->rmconf->nonce_size);
@@ -1155,7 +1145,7 @@ quick_r2send(iph2, msg)
 	}
 
 	/* create SA;NONCE payload, and KE and ID if need */
-	tlen = sizeof(*gen) + sa_tmp->l
+	tlen = sizeof(*gen) + iph2->sa_ret->l
 		+ sizeof(*gen) + iph2->nonce->l;
 	if (iph2->dhpub_p != NULL && pfsgroup != 0)
 		tlen += (sizeof(*gen) + iph2->dhpub->l);
@@ -1172,7 +1162,7 @@ quick_r2send(iph2, msg)
 	p = body->v;
 
 	/* make SA payload */ 
-	p = set_isakmp_payload(body->v, sa_tmp, ISAKMP_NPTYPE_NONCE);
+	p = set_isakmp_payload(body->v, iph2->sa_ret, ISAKMP_NPTYPE_NONCE);
 
 	/* add NONCE payload */
 	p = set_isakmp_payload(p, iph2->nonce,
