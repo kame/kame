@@ -2,7 +2,7 @@
 
 			KAME Project
 
-			$Date: 2000/04/18 12:30:00 $
+			$Date: 2000/04/20 01:58:18 $
 
 <<<Project Overview>>>
 
@@ -77,6 +77,8 @@ Basically,
   well as additional functionalities which haven't integrated into *BSDs yet.
 
 http://www.kame.net/project-overview.html#release talks more about this issue.
+A file named COVERAGE has detailed comparison between kame/*bsd, *bsd-curernt
+and recent *bsd releases.
 
 Please do not mix up development cycle in *BSD team, and in KAME team.  They
 are totally separate.  For example, "FreeBSD 4.0-STABLE" has nothing to do
@@ -100,7 +102,7 @@ When you report bugs, please be sure to include the following information:
 - (if necessary) packet trace taken by "tcpdump" command.
 - (if necessary) IPv6/v4 connectivity status in your network
 
-Don't try to *describe* your settings, paste command output itself
+Don't try to *describe* your settings, just paste command output itself
 onto the report instead.
 
 If you track the bugs, please notice the following items:
