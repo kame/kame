@@ -1,4 +1,4 @@
-.\"	$KAME: getaddrinfo.3,v 1.30 2001/08/05 18:14:31 itojun Exp $
+.\"	$KAME: getaddrinfo.3,v 1.31 2001/08/05 18:19:38 itojun Exp $
 .\"
 .\" Copyright (c) 1983, 1987, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -494,12 +494,6 @@ if (nsock == 0) {
 freeaddrinfo(res0);
 .Ed
 .\"
-.Sh FILES
-.Bl -tag -width /etc/resolv.conf -compact
-.It Pa /etc/hosts
-.It Pa /etc/resolv.conf
-.El
-.\"
 .Sh DIAGNOSTICS
 Error return status from
 .Fn getaddrinfo
@@ -560,6 +554,7 @@ indicate an unknown error.
 .Xr gethostbyname 3 ,
 .Xr getservbyname 3 ,
 .Xr hosts 5 ,
+.Xr resolv.conf 5 ,
 .Xr services 5 ,
 .Xr hostname 7 ,
 .Xr named 8

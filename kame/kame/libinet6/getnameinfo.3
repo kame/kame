@@ -1,4 +1,4 @@
-.\"	$KAME: getnameinfo.3,v 1.24 2001/08/05 18:14:31 itojun Exp $
+.\"	$KAME: getnameinfo.3,v 1.25 2001/08/05 18:19:38 itojun Exp $
 .\"
 .\" Copyright (c) 1983, 1987, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -223,11 +223,6 @@ if (getnameinfo(sa, sa->sa_len, hbuf, sizeof(hbuf), NULL, 0,
 }
 printf("host=%s\en", hbuf);
 .Ed
-.\"
-.Sh FILES
-.Bl -tag -width /etc/resolv.conf -compact
-.It Pa /etc/hosts
-.It Pa /etc/resolv.conf
 .El
 .\"
 .Sh DIAGNOSTICS
@@ -262,6 +257,7 @@ The error code can be found in errno.
 .Xr gethostbyaddr 3 ,
 .Xr getservbyport 3 ,
 .Xr hosts 5 ,
+.Xr resolv.conf 5 ,
 .Xr services 5 ,
 .Xr hostname 7 ,
 .Xr named 8
