@@ -36,6 +36,8 @@
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
 
+#include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 #include <err.h>
 #include <unistd.h>
