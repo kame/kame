@@ -1,3 +1,4 @@
+@comment $NetBSD$
 share/quake/id1/pak0.pak
 @dirrm share/quake/id1
 @dirrm share/quake
