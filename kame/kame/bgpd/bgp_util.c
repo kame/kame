@@ -1185,10 +1185,8 @@ bgp_peerstr(bnp)
 	char *cp;
 	struct rpcb *abnp;
 
-	if (IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_addr.sin6_addr)) {
-		cp = ip6str(&bnp->rp_addr.sin6_addr,
-			    bnp->rp_addr.sin6_scope_id);
-	}
+	if (!IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_addr.sin6_addr))
+		cp = ip6str2(&bnp->rp_addr);
 	else if (!IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_gaddr))
 		cp = ip6str(&bnp->rp_gaddr, 0);
 	else {
