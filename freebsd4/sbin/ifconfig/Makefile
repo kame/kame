@@ -1,5 +1,5 @@
 #	From: @(#)Makefile	8.1 (Berkeley) 6/5/93
-# $FreeBSD: src/sbin/ifconfig/Makefile,v 1.14.2.5 2001/07/21 17:47:39 obrien Exp $
+# $FreeBSD: src/sbin/ifconfig/Makefile,v 1.14.2.6 2001/12/19 04:49:11 dd Exp $
 
 PROG=	ifconfig
 SRCS=	ifconfig.c
@@ -28,7 +28,7 @@ DPADD=	${LIBIPX}
 LDADD=	-lipx
 .endif
 
-COPTS=	-DNS -Wall -Wmissing-prototypes -Wcast-qual -Wwrite-strings \
+CFLAGS+=-DNS -Wall -Wmissing-prototypes -Wcast-qual -Wwrite-strings \
 	-Wnested-externs -I..
 
 #link KAME libinet6
