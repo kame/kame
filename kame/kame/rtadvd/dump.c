@@ -56,6 +56,12 @@ extern struct rainfo *ralist;
 static char *ether_str __P((struct sockaddr_dl *));
 static void if_dump __P((void));
 
+#ifdef __FreeBSD__		/* XXX: see PORTABILITY */
+#define LONGLONG "%qu"
+#else
+#define LONGLONG "%llu"
+#endif
+
 static char *
 ether_str(sdl)
 	struct sockaddr_dl *sdl;
@@ -93,6 +99,16 @@ if_dump()
 			fprintf(fp, "  Last RA sent: %s", ctime(&lastsent));
 		fprintf(fp, "  waits: %d, initcount: %d\n",
 			rai->waiting, rai->initcounter);
+
+		/* statistics */
+		fprintf(fp,
+			"  statistics: RA(out/in/inconsistent): "
+			LONGLONG "/" LONGLONG "/" LONGLONG ", ",
+			(unsigned long long)rai->raoutput,
+			(unsigned long long)rai->rainput,
+			(unsigned long long)rai->rainconsistent);
+		fprintf(fp, "RS(input): " LONGLONG "\n",
+			(unsigned long long)rai->rsinput);
 
 		/* interface information */
 		if (rai->advlinkopt)

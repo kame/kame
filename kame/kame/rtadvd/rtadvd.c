@@ -70,6 +70,7 @@ struct iovec sndiov[2];
 struct sockaddr_in6 from;
 struct sockaddr_in6 sin6_allnodes = {sizeof(sin6_allnodes), AF_INET6};
 static char *dumpfilename = "/var/run/rtadvd.dump"; /* XXX: should be configurable */
+static char *pidfilename = "/var/run/rtadvd.pid"; /* should be configurable */
 int sock, rtsock;
 #ifdef MIP6
 int mobileip6 = 0;
@@ -123,8 +124,8 @@ static void rs_input __P((int, struct nd_router_solicit *,
 			  struct in6_pktinfo *, struct sockaddr_in6 *));
 static void ra_input __P((int, struct nd_router_advert *,
 			  struct in6_pktinfo *, struct sockaddr_in6 *));
-static void prefix_check __P((struct nd_opt_prefix_info *, struct rainfo *,
-			      struct sockaddr_in6 *));
+static int prefix_check __P((struct nd_opt_prefix_info *, struct rainfo *,
+			     struct sockaddr_in6 *));
 static int nd6_options __P((struct nd_opt_hdr *, int,
 			    union nd_opts *, u_int32_t));
 static void free_ndopts __P((union nd_opts *));
@@ -147,6 +148,8 @@ main(argc, argv)
 	struct timeval *timeout;
 	int i, ch;
 	int fflag = 0;
+	FILE *pidfp;
+	pid_t pid;
 
 	openlog(*argv, LOG_NDELAY|LOG_PID, LOG_DAEMON);
 
@@ -224,6 +227,17 @@ main(argc, argv)
 	if (!fflag)
 		daemon(1, 0);
 
+	/* record the current PID */
+	pid = getpid();
+	if ((pidfp = fopen(pidfilename, "w")) == NULL)
+		syslog(LOG_ERR, __FUNCTION__,
+		       "failed to open a log file(%s), run anyway.",
+		       pidfilename, strerror(errno));
+	else {
+		fprintf(pidfp, "%d\n", pid);
+		fclose(pidfp);
+	}
+
 	FD_ZERO(&fdset);
 	FD_SET(sock, &fdset);
 	maxfd = sock;
@@ -255,9 +269,11 @@ main(argc, argv)
 		       timeout->tv_sec, timeout->tv_usec);
 
 		if ((i = select(maxfd + 1, &select_fd,
-				NULL, NULL, timeout)) < 0){
-			syslog(LOG_ERR, "<%s> select: %s",
-			       __FUNCTION__, strerror(errno));
+				NULL, NULL, timeout)) < 0) {
+			/* EINTR would occur upon SIGUSR1 for status dump */
+			if (errno != EINTR)
+				syslog(LOG_ERR, "<%s> select: %s",
+				       __FUNCTION__, strerror(errno));
 			continue;
 		}
 		if (i == 0)	/* timeout */
@@ -714,6 +730,8 @@ rs_input(int len, struct nd_router_solicit *rs,
 		goto done;
 	}
 
+	ra->rsinput++;		/* increment statistics */
+
 	/*
 	 * Decide whether to send RA according to the rate-limit
 	 * consideration.
@@ -781,6 +799,7 @@ ra_input(int len, struct nd_router_advert *ra,
 	union nd_opts ndopts;
 	char *on_off[] = {"OFF", "ON"};
 	u_int32_t reachabletime, retranstimer, mtu;
+	int inconsistent = 0;
 
 	syslog(LOG_DEBUG,
 	       "<%s> RA received from %s on %s",
@@ -817,6 +836,8 @@ ra_input(int len, struct nd_router_advert *ra,
 		       if_indextoname(pi->ipi6_ifindex, ifnamebuf));
 		goto done;
 	}
+	rai->rainput++;		/* increment statistics */
+	
 	/* Cur Hop Limit value */
 	if (ra->nd_ra_curhoplimit && rai->hoplimit &&
 	    ra->nd_ra_curhoplimit != rai->hoplimit) {
@@ -829,6 +850,7 @@ ra_input(int len, struct nd_router_advert *ra,
 		       inet_ntop(AF_INET6, &from->sin6_addr,
 				 ntopbuf, INET6_ADDRSTRLEN),
 		       rai->hoplimit);
+		inconsistent++;
 	}
 	/* M flag */
 	if ((ra->nd_ra_flags_reserved & ND_RA_FLAG_MANAGED) !=
@@ -842,6 +864,7 @@ ra_input(int len, struct nd_router_advert *ra,
 		       inet_ntop(AF_INET6, &from->sin6_addr,
 				 ntopbuf, INET6_ADDRSTRLEN),
 		       on_off[rai->managedflg]);
+		inconsistent++;
 	}
 	/* O flag */
 	if ((ra->nd_ra_flags_reserved & ND_RA_FLAG_OTHER) !=
@@ -855,6 +878,7 @@ ra_input(int len, struct nd_router_advert *ra,
 		       inet_ntop(AF_INET6, &from->sin6_addr,
 				 ntopbuf, INET6_ADDRSTRLEN),
 		       on_off[rai->otherflg]);
+		inconsistent++;
 	}
 	/* Reachable Time */
 	reachabletime = ntohl(ra->nd_ra_reachable);
@@ -869,6 +893,7 @@ ra_input(int len, struct nd_router_advert *ra,
 		       inet_ntop(AF_INET6, &from->sin6_addr,
 				 ntopbuf, INET6_ADDRSTRLEN),
 		       rai->reachabletime);
+		inconsistent++;
 	}
 	/* Retrans Timer */
 	retranstimer = ntohl(ra->nd_ra_retransmit);
@@ -883,6 +908,7 @@ ra_input(int len, struct nd_router_advert *ra,
 		       inet_ntop(AF_INET6, &from->sin6_addr,
 				 ntopbuf, INET6_ADDRSTRLEN),
 		       rai->retranstimer);
+		inconsistent++;
 	}
 	/* Values in the MTU options */
 	if (ndopts.nd_opts_mtu) {
@@ -896,19 +922,28 @@ ra_input(int len, struct nd_router_advert *ra,
 			       inet_ntop(AF_INET6, &from->sin6_addr,
 					 ntopbuf, INET6_ADDRSTRLEN),
 			       rai->linkmtu);
+			inconsistent++;
 		}
 	}
 	/* Preferred and Valid Lifetimes for prefixes */
 	{
 		struct nd_optlist *optp = ndopts.nd_opts_list;
 		
-		if (ndopts.nd_opts_pi)
-			prefix_check(ndopts.nd_opts_pi, rai, from);
+		if (ndopts.nd_opts_pi) {
+			if (prefix_check(ndopts.nd_opts_pi, rai, from))
+				inconsistent++;
+		}
 		while (optp) {
-			prefix_check((struct nd_opt_prefix_info *)optp->opt,
-				     rai, from);
+			if (prefix_check((struct nd_opt_prefix_info *)optp->opt,
+					 rai, from))
+				inconsistent++;
 			optp = optp->next;
 		}
+	}
+
+	if (inconsistent) {
+		printf("RA input %d inconsistents\n", inconsistent);
+		rai->rainconsistent++;
 	}
 	
   done:
@@ -916,17 +951,19 @@ ra_input(int len, struct nd_router_advert *ra,
 	return;
 }
 
-static void
+/* return a non-zero value if the received prefix is inconsitent with ours */
+static int
 prefix_check(struct nd_opt_prefix_info *pinfo,
 	     struct rainfo *rai, struct sockaddr_in6 *from)
 {
 	u_int32_t preferred_time, valid_time;
 	struct prefix *pp;
+	int inconsistent = 0;
 	u_char ntopbuf[INET6_ADDRSTRLEN], prefixbuf[INET6_ADDRSTRLEN];
 
 #if 0				/* impossible */
 	if (pinfo->nd_opt_pi_type != ND_OPT_PREFIX_INFORMATION)
-		return;
+		return(0);
 #endif
 
 	/*
@@ -956,11 +993,11 @@ prefix_check(struct nd_opt_prefix_info *pinfo,
 		       inet_ntop(AF_INET6, &from->sin6_addr,
 				 ntopbuf, INET6_ADDRSTRLEN),
 		       rai->ifname);
-		return;
+		return(0);
 	}
 
 	preferred_time = ntohl(pinfo->nd_opt_pi_preferred_time);
-	if (preferred_time != pp->preflifetime)
+	if (preferred_time != pp->preflifetime) {
 		syslog(LOG_WARNING,
 		       "<%s> prefeerred lifetime for %s/%d"
 		       " inconsistent on %s:"
@@ -973,9 +1010,11 @@ prefix_check(struct nd_opt_prefix_info *pinfo,
 		       inet_ntop(AF_INET6, &from->sin6_addr,
 				 ntopbuf, INET6_ADDRSTRLEN),
 		       pp->preflifetime);
+		inconsistent++;
+	}
 
 	valid_time = ntohl(pinfo->nd_opt_pi_valid_time);
-	if (valid_time != pp->validlifetime)
+	if (valid_time != pp->validlifetime) {
 		syslog(LOG_WARNING,
 		       "<%s> valid lifetime for %s/%d"
 		       " inconsistent on %s:"
@@ -988,6 +1027,10 @@ prefix_check(struct nd_opt_prefix_info *pinfo,
 		       inet_ntop(AF_INET6, &from->sin6_addr,
 				 ntopbuf, INET6_ADDRSTRLEN),
 		       pp->validlifetime);
+		inconsistent++;
+	}
+
+	return(inconsistent);
 }
 
 struct prefix *
@@ -1298,6 +1341,7 @@ struct rainfo *rainfo;
 	/* update counter */
 	if (rainfo->initcounter < MAX_INITIAL_RTR_ADVERTISEMENTS)
 		rainfo->initcounter++;
+	rainfo->raoutput++;
 
 	/* update timestamp */
 	gettimeofday(&rainfo->lastsent, NULL);

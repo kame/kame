@@ -122,6 +122,12 @@ struct	rainfo {
 	/* actual RA packet data and its length */
 	size_t ra_datalen;
 	u_char *ra_data;
+
+	/* statistics */
+	u_quad_t raoutput;	/* number of RAs sent */
+	u_quad_t rainput;	/* number of RAs received */
+	u_quad_t rainconsistent; /* number of RAs inconsistent with ours */
+	u_quad_t rsinput;	/* number of RSs received */
 };
 
 void ra_timeout __P((void *));
