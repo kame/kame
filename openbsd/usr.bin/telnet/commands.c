@@ -2463,8 +2463,8 @@ tn(argc, argv)
 		continue;
 	    }
 	    if (bind(net, res->ai_addr, res->ai_addrlen) < 0) {
-                perror(aliasp);
-                (void) close(net);   /* dump descriptor */
+		perror(aliasp);
+		(void) close(net);   /* dump descriptor */
 		freeaddrinfo(ares);
 		continue;
             }
@@ -2517,11 +2517,11 @@ tn(argc, argv)
 #endif	/* defined(AUTHENTICATION) */
 	break;
     }
+    freeaddrinfo(res0);
     if (net < 0) {
 	return 0;
     }
     cmdrc(hostp, hostname);
-    freeaddrinfo(res0);
     if (autologin && user == NULL) {
 	struct passwd *pw;
 
