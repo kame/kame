@@ -6,7 +6,7 @@ BINOWN=	root
 BINGRP=	bin
 BINMODE=4555
 
-CPPFLAGS+=-DINET6
+CPPFLAGS+=-DINET6 -DUSE_RFC2292BIS
 LDADD+=	-L${.CURDIR}/../../lib/libipsec -L${.CURDIR}/../../lib/libipsec/obj \
 	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6

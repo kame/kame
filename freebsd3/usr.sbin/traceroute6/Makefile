@@ -6,7 +6,7 @@ BINOWN=	root
 BINGRP=	bin
 BINMODE=4555
 
-CFLAGS+=-DINET6 -DIPSEC
+CFLAGS+=-DINET6 -DIPSEC -DUSE_RFC2292BIS
 LDADD+=	-L${.OBJDIR}/../../lib/libipsec -L${.OBJDIR}/../../lib/libinet6 \
 	-L/usr/local/v6/lib -lipsec -linet6
 DPADD+=	${.OBJDIR}/../../lib/libipsec/libipsec.a \
