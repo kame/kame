@@ -1,4 +1,4 @@
-/*	$KAME: remoteconf.c,v 1.27 2001/10/02 03:43:16 sakane Exp $	*/
+/*	$KAME: remoteconf.c,v 1.28 2001/10/02 03:46:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -114,7 +114,7 @@ getrmconf(remote)
 
 	LIST_FOREACH(p, &rmtree, chain) {
 		if ((!withport && cmpsaddrwop(remote, p->remote) == 0)
-		 || (withport && cmpsaddrwild(remote, p->remote) == 0)) {
+		 || (withport && cmpsaddrstrict(remote, p->remote) == 0)) {
 			plog(LLV_DEBUG, LOCATION, NULL,
 				"configuration found for %s.\n", buf);
 			return p;
