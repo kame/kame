@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2281 2002/11/13 12:44:08 jinmei Exp $
+$KAME: CHANGELOG,v 1.2282 2002/11/17 16:31:56 itojun Exp $
 
 <200211>
+Mon Nov 18 01:31:07 JST 2002  itojun@iijlab.net
+	* sys/net/if_stf.c: more strict sanity check based on suggestions in
+	  draft-savola-v6ops-6to4-security-00.txt.
+
 Mon Nov 11 20:40:22 JST 2002	suz@crl.hitachi.co.jp
 	* kame/sys/netinet6/mld6.c: fixed an MLDv2-kernel crash by MLDv2 Query
 	  packet with small maximum-response-code.
