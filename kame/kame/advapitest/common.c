@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.4 2000/11/21 08:49:25 jinmei Exp $ */
+/*	$KAME: common.c,v 1.5 2000/11/21 08:54:03 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -138,6 +138,7 @@ print_options(mh)
 		case IPV6_PATHMTU:
 			if (cm->cmsg_len == CMSG_LEN(sizeof(*mtuinfo)))
 				mtuinfo = (struct ip6_mtuinfo *)CMSG_DATA(cm);
+			break;
 		}
 	}
 
