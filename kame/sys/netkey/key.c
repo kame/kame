@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.216 2001/10/29 14:14:32 sakane Exp $	*/
+/*	$KAME: key.c,v 1.217 2001/10/30 01:21:15 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -601,26 +601,6 @@ key_gettunnel(osrc, odst, isrc, idst)
 		ipseclog((LOG_ERR, "protocol family mismatched %d != %d\n.",
 			isrc->sa_family, idst->sa_family));
 		return NULL;
-	}
-
-	/* if no SP found, use default policy. */
-	if (LIST_FIRST(&sptree[dir]) == NULL) {
-		switch (isrc->sa_family) {
-		case PF_INET:
-			if (ip4_def_policy.policy == IPSEC_POLICY_DISCARD)
-				return NULL;
-			ip4_def_policy.refcnt++;
-			return &ip4_def_policy;
-		case PF_INET6:
-			if (ip6_def_policy.policy == IPSEC_POLICY_DISCARD)
-				return NULL;
-			ip6_def_policy.refcnt++;
-			return &ip6_def_policy;
-		default:
-			ipseclog((LOG_ERR, "invalid protocol family %d\n.",
-				isrc->sa_family));
-			return NULL;
-		}
 	}
 
 #ifdef __NetBSD__

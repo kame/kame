@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.128 2001/09/21 06:59:37 sakane Exp $	*/
+/*	$KAME: ipsec.c,v 1.129 2001/10/30 01:21:18 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3531,9 +3531,13 @@ ipsec4_tunnel_validate(m, off, nxt0, sav)
 
 	sp = key_gettunnel((struct sockaddr *)&osrc, (struct sockaddr *)&odst,
 	    (struct sockaddr *)&isrc, (struct sockaddr *)&idst);
-	if (!sp)
+
+	/* if no SP found, use default policy. */
+	if (!sp && ip4_def_policy.policy == IPSEC_POLICY_DISCARD)
 		return 0;
-	key_freesp(sp);
+
+	if (sp)
+		key_freesp(sp);
 
 	return 1;
 }
@@ -3596,9 +3600,13 @@ ipsec6_tunnel_validate(m, off, nxt0, sav)
 
 	sp = key_gettunnel((struct sockaddr *)&osrc, (struct sockaddr *)&odst,
 	    (struct sockaddr *)&isrc, (struct sockaddr *)&idst);
-	if (!sp)
+
+	/* if no SP found, use default policy. */
+	if (!sp && ip6_def_policy.policy == IPSEC_POLICY_DISCARD)
 		return 0;
-	key_freesp(sp);
+
+	if (sp)
+		key_freesp(sp);
 
 	return 1;
 }
