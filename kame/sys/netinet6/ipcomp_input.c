@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_input.c,v 1.32 2003/02/07 09:34:39 jinmei Exp $	*/
+/*	$KAME: ipcomp_input.c,v 1.33 2003/07/02 13:54:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -137,7 +137,7 @@ ipcomp4_input(m, va_alist)
 	}
 
 	md = m_pulldown(m, off, sizeof(*ipcomp), NULL);
-	if (!m) {
+	if (!md) {
 		m = NULL;	/* already freed */
 		ipseclog((LOG_DEBUG, "IPv4 IPComp input: assumption failed "
 		    "(pulldown failure)\n"));
