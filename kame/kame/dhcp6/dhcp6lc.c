@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6lc.c,v 1.3 2004/09/03 10:52:35 jinmei Exp $	*/
+/*	$KAME: dhcp6lc.c,v 1.4 2004/09/03 11:02:15 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -144,16 +144,15 @@ main(argc, argv)
 		exit(0);
 	}
 	if (script == NULL || strlen(script) == 0) {
-		fprintf(stderr, "Just stateless DHCPv6 protocol messages "
-		    "are exchanged.\n");
+		printf("Just stateless DHCPv6 protocol messages"
+		       "are exchanged.\n");
 	}
 	device = argv[0];
 
 	openlog(progname, LOG_NDELAY|LOG_PID, LOG_DAEMON);
 	setloglevel(debug);
 
-	if (ifinit(device) == NULL)
-		exit(1);
+	ifinit(device);
 
 	client6_init();
 	ifinit_all();
@@ -332,6 +331,7 @@ client6_init()
 		dprintf(LOG_ERR, FNAME, "interface %s not configured", device);
 		exit(1);
 	}
+	ifp->outsock = outsock;
 }
 
 int
@@ -512,7 +512,7 @@ client6_send(ev)
 	dst = *sa6_allagent;
 	dst.sin6_scope_id = ifp->linkid;
 
-	if (sendto(outsock, buf, len, 0, (struct sockaddr *)&dst,
+	if (sendto(ifp->outsock, buf, len, 0, (struct sockaddr *)&dst,
 	    ((struct sockaddr *)&dst)->sa_len) == -1) {
 		dprintf(LOG_ERR, FNAME,
 		    "transmit failed: %s", strerror(errno));

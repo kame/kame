@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.134 2004/09/03 10:52:35 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.135 2004/09/03 11:02:15 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -278,8 +278,7 @@ main(argc, argv)
 
 	setloglevel(debug);
 
-	if (ifinit(device) == NULL)
-		exit(1);
+	ifinit(device);
 
 	if ((cfparse(conffile)) != 0) {
 		dprintf(LOG_ERR, FNAME, "failed to parse configuration file");

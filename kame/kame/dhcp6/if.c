@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.3 2004/09/03 10:52:36 jinmei Exp $	*/
+/*	$KAME: if.c,v 1.4 2004/09/03 11:02:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -51,7 +51,7 @@ extern int errno;
 
 struct dhcp6_if *dhcp6_if;
 
-struct dhcp6_if *
+void
 ifinit(ifname)
 	char *ifname;
 {
@@ -59,12 +59,12 @@ ifinit(ifname)
 
 	if ((ifp = find_ifconfbyname(ifname)) != NULL) {
 		dprintf(LOG_NOTICE, FNAME, "duplicated interface: %s", ifname);
-		return (NULL);
+		return;
 	}
 
 	if ((ifp = malloc(sizeof(*ifp))) == NULL) {
 		dprintf(LOG_ERR, FNAME, "malloc failed");
-		goto fail;
+		goto die;
 	}
 	memset(ifp, 0, sizeof(*ifp));
 
@@ -72,19 +72,19 @@ ifinit(ifname)
 
 	if ((ifp->ifname = strdup(ifname)) == NULL) {
 		dprintf(LOG_ERR, FNAME, "failed to copy ifname");
-		goto fail;
+		goto die;
 	}
 
 	if ((ifp->ifid = if_nametoindex(ifname)) == 0) {
 		dprintf(LOG_ERR, FNAME, "invalid interface(%s): %s",
 			ifname, strerror(errno));
-		goto fail;
+		goto die;
 	}
 #ifdef HAVE_SCOPELIB
 	if (inet_zoneid(AF_INET6, 2, ifname, &ifp->linkid)) {
 		dprintf(LOG_ERR, FNAME, "failed to get link ID for %s",
 		    ifname);
-		goto fail;
+		goto die;
 	}
 #else
 	ifp->linkid = ifp->ifid; /* XXX */
@@ -99,13 +99,10 @@ ifinit(ifname)
 
 	ifp->next = dhcp6_if;
 	dhcp6_if = ifp;
-	return (ifp);
+	return;
 
-  fail:
-	if (ifp->ifname != NULL)
-		free(ifp->ifname);
-	free(ifp);
-	return (NULL);
+  die:
+	exit(1);
 }
 
 struct dhcp6_if *
