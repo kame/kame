@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.154 2004/04/09 09:38:48 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.155 2004/04/22 05:36:45 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -232,7 +232,7 @@ rip6_input(mp, offp, proto)
 			continue;
 		if (in6p->in6p_cksum != -1) {
 			rip6stat.rip6s_isum++;
-			if (in6_cksum(m, ip6->ip6_nxt, *offp,
+			if (in6_cksum(m, proto, *offp,
 			    m->m_pkthdr.len - *offp)) {
 				rip6stat.rip6s_badsum++;
 				continue;
