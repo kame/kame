@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.38 2001/06/25 05:55:44 itojun Exp $	*/
+/*	$KAME: bindtest.c,v 1.39 2001/06/25 05:58:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -109,7 +109,7 @@ static int test __P((struct testitem *, struct testitem *));
 static void sendtest __P((int, int, struct addrinfo *));
 static void conntest __P((int, int, struct addrinfo *));
 
-static char *versionstr = "$KAME: bindtest.c,v 1.38 2001/06/25 05:55:44 itojun Exp $"; 
+static char *versionstr = "$KAME: bindtest.c,v 1.39 2001/06/25 05:58:56 itojun Exp $"; 
 static char *port = NULL;
 static char *otheraddr = NULL;
 static struct addrinfo *oai;
@@ -325,8 +325,11 @@ printsa(sa, salen)
 	char hbuf[NI_MAXHOST], pbuf[10];
 	static char buf[sizeof(hbuf) + sizeof(pbuf)];
 
-	getnameinfo(sa, salen, hbuf, sizeof(hbuf),
-		pbuf, sizeof(pbuf), NI_NUMERICHOST | NI_NUMERICSERV);
+	if (getnameinfo(sa, salen, hbuf, sizeof(hbuf), pbuf, sizeof(pbuf),
+	    NI_NUMERICHOST | NI_NUMERICSERV)) {
+		strcpy(hbuf, "?");
+		strcpy(pbuf, "?");
+	}
 	snprintf(buf, sizeof(buf), "%s/%s", hbuf, pbuf);
 
 	return(buf);
