@@ -484,7 +484,7 @@ DMenu MenuMediaFTP = {
     { { "KAME (IPv4/IPv6)",    "ftp.kame.net", NULL, dmenuSetVariable, NULL,
 	VAR_FTP_PATH "=ftp://ftp.kame.net/pub/FreeBSD/" },
       { "ITNet(IPv4/IPv6)",    "ftp.itjit.ad.jp", NULL, dmenuSetVariable, NULL,
-	VAR_FTP_PATH "=ftp://ftp.itjit.ad.jp/pub/FreeBSD/" },
+	VAR_FTP_PATH "=ftp://ftp.itjit.ad.jp/pub/FreeBSD/releases/i386/" },
       { "URL", "Specify some other ftp site by URL", NULL, dmenuSetVariable, NULL,
 	VAR_FTP_PATH "=other" },
       { NULL } }
