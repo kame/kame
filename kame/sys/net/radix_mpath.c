@@ -1,4 +1,4 @@
-/*	$KAME: radix_mpath.c,v 1.11 2002/07/04 01:57:01 itojun Exp $	*/
+/*	$KAME: radix_mpath.c,v 1.12 2002/10/28 20:48:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -46,6 +46,11 @@
 #ifdef __NetBSD__
 #include <sys/pool.h>
 #endif
+
+/*
+ * give some jitter to hash, to avoid synchronization between routers
+ */
+static u_int32_t hashjitter;
 
 int
 rn_mpath_capable(rnh)
@@ -241,6 +246,7 @@ rtalloc_mpath(ro, hash)
 	n = rn_mpath_count(rn0);
 
 	/* gw selection by Modulo-N Hash (RFC2991) XXX need improvement? */
+	hash += hashjitter;
 	hash %= n;
 	while (hash-- > 0 && rn) {
 		/* stay within the multipath routes */
@@ -284,6 +290,7 @@ rn4_mpath_inithead(head, off)
 {
 	struct radix_node_head *rnh;
 
+	hashjitter = arc4random();
 	if (in_inithead(head, off) == 1) {
 		rnh = (struct radix_node_head *)*head;
 		rnh->rnh_lookup = rn_mpath_lookup;
@@ -299,6 +306,7 @@ rn6_mpath_inithead(head, off)
 {
 	struct radix_node_head *rnh;
 
+	hashjitter = arc4random();
 	if (in6_inithead(head, off) == 1) {
 		rnh = (struct radix_node_head *)*head;
 		rnh->rnh_lookup = rn_mpath_lookup;
@@ -315,6 +323,7 @@ rn_mpath_inithead(head, off)
 {
 	struct radix_node_head *rnh;
 
+	hashjitter = arc4random();
 	if (rn_inithead(head, off) == 1) {
 		rnh = (struct radix_node_head *)*head;
 		rnh->rnh_lookup = rn_mpath_lookup;
