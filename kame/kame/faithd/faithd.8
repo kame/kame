@@ -1,4 +1,4 @@
-.\"	$KAME: faithd.8,v 1.18 2000/12/02 21:39:14 itojun Exp $
+.\"	$KAME: faithd.8,v 1.19 2001/01/22 02:20:40 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -97,6 +97,24 @@ address prefix, by using
 and
 .Xr sysctl 8
 commands.
+.Pp
+.Nm
+needs a special name-to-address translation logic, so that
+hostnames gets resolved into special
+.Tn IPv6
+address prefix.
+For small-scale installation, use
+.Xr hosts 5 .
+For large-scale installation, it is useful to have
+a DNS server with special address translation support.
+An implementation called
+.Nm totd
+is available
+at
+.Pa http://www.vermicelli.pasta.cs.uit.no/ipv6/software.html .
+Make sure you do not propagate translated DNS records to normal DNS cloud,
+it is highly harmful.
+.Pp
 .Ss Daemon mode
 When
 .Nm
