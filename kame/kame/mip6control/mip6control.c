@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.15 2002/01/17 05:24:04 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.16 2002/01/17 09:40:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -65,13 +65,13 @@
 
 #define IOC_ENTRY_COUNT 100 /* XXX */
 
-static int getaddress(char *, struct in6_addr *);
-static const char *ip6_sprintf(const struct in6_addr *);
-static const char *raflg_sprintf(u_int8_t);
-static const char *buflg_sprintf(u_int8_t);
-static const char *bustate_sprintf(u_int8_t);
-static const char *bcflg_sprintf(u_int8_t);
-static struct hif_softc *get_hif_softc(char *);
+static int getaddress __P((char *, struct in6_addr *));
+static const char *ip6_sprintf __P((const struct in6_addr *));
+static const char *raflg_sprintf __P((u_int8_t));
+static const char *buflg_sprintf __P((u_int8_t));
+static const char *bustate_sprintf __P((u_int8_t));
+static const char *bcflg_sprintf __P((u_int8_t));
+static struct hif_softc *get_hif_softc __P((char *));
 static void kread __P((u_long, void *, int));
 
 static const char *pfx_desc[] = {
