@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.193 2001/02/20 17:24:36 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.194 2001/02/20 17:26:55 jinmei Exp $
 
 1. IPv6
 
@@ -489,9 +489,10 @@ automatically assigned to the gif interface.
 KAME's source address selection takes care of the following
 conditions:
 - address scope
-- prefix matching against the destination
 - outgoing interface
 - whether an address is deprecated
+- whether an address is temporary (in terms of RFC 3041)
+- prefix matching against the destination
 
 Roughly speaking, the selection policy is as follows:
 - always use an address that belongs to the same scope zone as the
