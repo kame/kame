@@ -519,7 +519,7 @@ pass:
 		struct sockaddr_in6 sa6_src, sa6_dst;
 
 		switch (natpt_in4(m, &m1)) {
-		case IPPROTO_IP:	/* this packet is not changed	*/
+		case IPPROTO_IP:	/* this packet is not changed */
 			goto checkaddresses;
 
 		case IPPROTO_IPV4:
@@ -549,10 +549,10 @@ pass:
 			ip6_forward(m1, 1);
 			break;
 
-		case IPPROTO_DONE:	/* discard without free	*/
+		case IPPROTO_DONE:	/* discard without free */
 			return;
 
-		case IPPROTO_MAX:	/* discard this packet	*/
+		case IPPROTO_MAX:	/* discard this packet */
 		default:
 			break;
 		}
