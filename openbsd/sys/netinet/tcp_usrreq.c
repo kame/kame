@@ -552,18 +552,19 @@ tcp_ctloutput(op, so, level, optname, mp)
 	tp = intotcpcb(inp);
 #endif /* INET6 */
 	if (level != IPPROTO_TCP) {
+		switch (so->so_proto->pr_domain->dom_family) {
 #ifdef INET6
-		/*
-		 * Not sure if this is the best approach.
-		 * It seems to be, but we don't set tp->pf until the connection
-		 * is established, which may lead to confusion in the case of
-		 * AF_INET6 sockets which get SET/GET options for IPv4.
-		 */
-		if (tp->pf == PF_INET6)
+		case AF_INET6:
 			error = ip6_ctloutput(op, so, level, optname, mp);
-		else
+			break;
 #endif /* INET6 */
+		case AF_INET:
 			error = ip_ctloutput(op, so, level, optname, mp);
+			break;
+		default:
+			error = EAFNOSUPPORT;	/*?*/
+			break;
+		}
 		splx(s);
 		return (error);
 	}
