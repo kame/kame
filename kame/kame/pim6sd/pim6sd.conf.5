@@ -1,4 +1,4 @@
-.\"	$KAME: pim6sd.conf.5,v 1.18 2002/10/04 11:11:48 suz Exp $
+.\"	$KAME: pim6sd.conf.5,v 1.19 2002/11/11 02:52:16 suz Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -154,7 +154,10 @@ is used to specify the acceptable version of MLD.  For example if it is
 configured as 1, then only MLDv1 packet is permitted on this interface.
 If the argument is 
 .Ic any
-, then any version of MLD (currently v1 and v2) are permitted.
+, then any version of MLD (currently v1 and v2) are permitted.  If you are
+to enable MLDv1-compat-mode under MLDv2, you should specify
+.Ic any
+, since only MLDv2 packet is permitted if it is configured as 2.
 Its default value is 1.
 .\"
 .It Xo
