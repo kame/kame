@@ -171,7 +171,7 @@ struct nlist nl[] = {
 	{ "_mf6ctable" },
 #define N_MIF6TABLE	50
 	{ "_mif6table" },
-#define N_RIP6STATS	51
+#define N_RIP6STAT	51
 	{ "_rip6stat" },
 	{ ""},
 };
