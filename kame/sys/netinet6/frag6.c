@@ -38,9 +38,6 @@
 #include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/syslog.h>
-#ifdef __OpenBSD__
-#include <dev/rndvar.h>
-#endif
 
 #include <net/if.h>
 #include <net/route.h>
@@ -55,6 +52,10 @@
 #include <netinet6/icmp6.h>
 
 #include <net/net_osdep.h>
+
+#ifdef __OpenBSD__
+#include <dev/rndvar.h>
+#endif
 
 /*
  * Define it to get a correct behavior on per-interface statistics.
