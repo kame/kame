@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.127 2003/10/03 04:27:12 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.128 2004/01/09 03:18:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -328,8 +328,8 @@ ip6_forward(m, srcrt)
 
 	/*
 	 * when the kernel forwards a packet, it is not proper to apply
-	 * IPsec transport mode to the packet is not proper.  this check
-	 * avoid from this.
+	 * IPsec transport mode to the packet.
+	 * the following check avoids such situation.
 	 * at present, if there is even a transport mode SA request in the
 	 * security policy, the kernel does not apply IPsec to the packet.
 	 * this check is not enough because the following case is valid.
