@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1544 2001/02/08 15:20:13 itojun Exp $
+$KAME: CHANGELOG,v 1.1545 2001/02/08 15:52:18 itojun Exp $
 
 <200102>
+Fri Feb  9 00:51:01 JST 2001  itojun@iijlab.net
+	* sys/netinet6/in6.h: correct SA6_ARE_ADDR_EQUAL definition.
+	  kernel responds to ping6 -w again.
+
 Fri Feb  9 00:18:46 JST 2001  itojun@iijlab.net
 	* sys/netinet6/icmp6.c: negative {mtudisc,redirect}_{hi,lo}wat
 	  value will turn off the checks.  See changelog on 2000/12/09.
