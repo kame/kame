@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.14 2001/10/22 07:53:16 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.15 2001/10/23 07:29:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -148,6 +148,7 @@ main(argc, argv)
 void
 usage()
 {
+
 	fprintf(stderr, "usage: nodeinfod [-df] [-n name]\n");
 }
 
@@ -998,6 +999,8 @@ ni6_addrs(ni6, p, buf, buflen, sa, salen, subj, af)
 			ap = (u_int8_t *)in;
 			alen = sizeof(*in);
 			break;
+		default:
+			goto fail;
 		}
 
 		/* now we can copy the address */
