@@ -3577,15 +3577,14 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	if (mifi == incoming)
 	    continue;
 	if (uvifs[mifi].uv_flags & (VIFF_DISABLED | VIFF_DOWN |
-				 MIFF_REGISTER | VIFF_TUNNEL | VIFF_NONBRS))
+				    MIFF_REGISTER | VIFF_TUNNEL | VIFF_NONBRS))
 	    continue;
 
-	bcopy(pim_message, (char *) (pim6_send_buf ),
-	      datalen);
+	bcopy(pim_message, (char *) (pim6_send_buf), datalen);
 
 	send_pim6(pim6_send_buf, &uvifs[mifi].uv_linklocal->pa_addr,
-          	&allpim6routers_group, PIM_BOOTSTRAP,
-            datalen - sizeof(struct pim));
+		  &allpim6routers_group, PIM_BOOTSTRAP,
+		  datalen - sizeof(struct pim));
     }
 
     max_data_ptr = (u_int8 *) pim_message + datalen;
@@ -3912,7 +3911,6 @@ receive_pim6_cand_rp_adv(src, dst, pim_message, datalen)
 	 * note that we don't have to take care of scope id, since
 	 * the address should be global(see above).
 	 */
-
 	add_rp_grp_entry(&cand_rp_list, &grp_mask_list,
 			 &rpp_, priority, holdtime,
 			 &sockaddr6_d, grp_mask,
