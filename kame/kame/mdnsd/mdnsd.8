@@ -1,4 +1,4 @@
-.\"     $KAME: mdnsd.8,v 1.2 2000/05/30 15:55:35 itojun Exp $
+.\"     $KAME: mdnsd.8,v 1.3 2000/05/30 16:03:56 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -94,6 +94,41 @@ lets you change the outgoing UDP port, used for multicast queries.
 is for debugging purposes only.
 .El
 .\"
+.Sh EXAMPLES
+First, run
+.Nm
+on UDP port 53
+.Pq standard DNS UDP port .
+You need to be root to issue
+.Xr bind 2
+to privileged port.
+.Bd -literal -offset indent
+# mdnsd -6 -i wi0
+.Ed
+.Pp
+Then, configure
+.Xr resolv.conf 5
+to ask names to
+.Nm
+on the local node.
+.Bd -literal -offset indent
+search itojun.org
+nameserver ::
+.Ed
+.Pp
+DNS queries from normal application, like
+.Xr ping 8 ,
+will be routed to
+.Nm Ns .
+.Nm
+will forward the query to multicast DNS servers.
+.Nm
+also acts as multicast DNS server for the local hostname.
+When a query from adjacent node reach
+.Nm Ns ,
+.Nm
+will transmit appropriate reply to the querier.
+.\"
 .Sh SEE ALSO
 .Rs
 .%A Bernard Aboba
@@ -121,3 +156,8 @@ does not handle DNS queries/replies over TCP transport.
 Some of
 .Pq or most of
 the features are not implemented yet.
+.Pp
+Since there is no standard IPv6 multicast address assigned for multicast DNS,
+we use linklocal all-node multicast address at this moment.
+.Pp
+IPv4 mode does not work at this moment.
