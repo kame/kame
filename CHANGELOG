@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2204 2002/07/26 12:51:11 suz Exp $
+$KAME: CHANGELOG,v 1.2205 2002/07/29 02:35:17 itojun Exp $
 
 <200207>
 Fri Jul 26 17:20:25 JST 2002 suz@crl.hitacih.co.jp
@@ -10,7 +10,7 @@ Fri Jul 26 17:20:25 JST 2002 suz@crl.hitacih.co.jp
 2002-07-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/getifaddrs.c (getifaddrs): tried
 	sysctl(NET_RT_IFLIST) up to several (currently 5) times.
-	This will make the behavior robuster if many addresses are added
+	This will make the behavior more robust if many addresses are added
 	after the size estimation of storage at the first sysctl.
 	From: Hajimu UMEMOTO <ume@mahoroba.org>
 
