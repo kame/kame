@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.193 2004/06/16 05:22:19 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.194 2004/06/16 05:23:08 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1926,7 +1926,7 @@ _dns_getaddrinfo(rv, cb_data, ap)
 	name = va_arg(ap, char *);
 	pai = va_arg(ap, const struct addrinfo *);
 
-	memset(&q, 0, sizeof(q2));
+	memset(&q, 0, sizeof(q));
 	memset(&q2, 0, sizeof(q2));
 	memset(&sentinel, 0, sizeof(sentinel));
 	cur = &sentinel;
@@ -2959,7 +2959,7 @@ _dns_getaddrinfo(name, pai)
 	struct addrinfo sentinel, *cur;
 	struct res_target q, q2;
 
-	memset(&q, 0, sizeof(q2));
+	memset(&q, 0, sizeof(q));
 	memset(&q2, 0, sizeof(q2));
 	memset(&sentinel, 0, sizeof(sentinel));
 	cur = &sentinel;
