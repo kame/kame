@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.35 2002/10/02 02:02:45 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.36 2002/10/07 06:44:03 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -69,6 +69,7 @@ static int getaddress __P((char *, struct sockaddr_in6 *));
 static const char *ip6_sprintf __P((const struct in6_addr *));
 static const char *raflg_sprintf __P((u_int8_t));
 static const char *buflg_sprintf __P((u_int8_t));
+static const char *bufsmstate_sprintf __P((u_int8_t));
 static const char *bustate_sprintf __P((u_int8_t));
 static const char *bcflg_sprintf __P((u_int8_t));
 static struct hif_softc *get_hif_softc __P((char *));
@@ -525,7 +526,7 @@ main(argc, argv)
 			       ip6_sprintf(&mbu->mbu_haddr.sin6_addr));
 			printf(ipaddr_fmt[longdisp],
 			       ip6_sprintf(&mbu->mbu_coa.sin6_addr));
-			printf("%7u %7ld %7u %7ld %7u %7ld %7u %-7s %7x %-7s\n",
+			printf("%7u %7ld %7u %7ld %7u %7ld %7u %-7s %-7s %-7s\n",
 			       mbu->mbu_lifetime,
 			       mbu->mbu_expire - time.tv_sec,
 			       mbu->mbu_refresh,
@@ -535,7 +536,7 @@ main(argc, argv)
 			       : (mbu->mbu_ackexpire - time.tv_sec), /* XXX */
 			       mbu->mbu_seqno,
 			       buflg_sprintf(mbu->mbu_flags),
-			       mbu->mbu_fsm_state,
+			       bufsmstate_sprintf(mbu->mbu_fsm_state),
 			       bustate_sprintf(mbu->mbu_state));
 		}
 	}
@@ -776,9 +777,9 @@ raflg_sprintf(flags)
 	static char buf[] = "MOH";
 
 	snprintf(buf, sizeof(buf), "%s%s%s",
-		 (flags & ND_RA_FLAG_MANAGED ? "M" : ""),
-		 (flags & ND_RA_FLAG_OTHER ? "O" : ""),
-		 (flags & ND_RA_FLAG_HOME_AGENT ? "H" : ""));
+		 (flags & ND_RA_FLAG_MANAGED ? "M" : "-"),
+		 (flags & ND_RA_FLAG_OTHER ? "O" : "-"),
+		 (flags & ND_RA_FLAG_HOME_AGENT ? "H" : "-"));
 
 	return buf;
 }
@@ -828,14 +829,32 @@ buflg_sprintf(flags)
 	static char buf[] = "AHSDLc";
 
 	snprintf(buf, sizeof(buf), "%s%s%s%s%s%s",
-		 (flags & IP6MU_ACK ?    "A" : ""),
-		 (flags & IP6MU_HOME ?   "H" : ""),
-		 (flags & IP6MU_SINGLE ? "S" : ""),
-		 (flags & IP6MU_DAD ?    "D" : ""),
-		 (flags & IP6MU_LINK ?   "L" : ""),
-		 (flags & IP6MU_CLONED ? "c" : ""));
+		 (flags & IP6MU_ACK ?    "A" : "-"),
+		 (flags & IP6MU_HOME ?   "H" : "-"),
+		 (flags & IP6MU_SINGLE ? "S" : "-"),
+		 (flags & IP6MU_DAD ?    "D" : "-"),
+		 (flags & IP6MU_LINK ?   "L" : "-"),
+		 (flags & IP6MU_CLONED ? "c" : "-"));
 
 	return buf;
+}
+
+static const char *
+bufsmstate_sprintf(state)
+	u_int8_t state;
+{
+	static char *buf[] = {
+		"IDLE",
+		"WAITHC",
+		"WAITH",
+		"WAITC",
+		"WAITA",
+		"BOUND",
+		"WAITD",
+		"WAITDH"
+	};
+
+	return buf[state];
 }
 
 static const char *
@@ -845,10 +864,10 @@ bustate_sprintf(flags)
 	static char buf[] = "MUAS";
 
 	snprintf(buf, sizeof(buf), "%s%s%s%s",
-		 (flags & MIP6_BU_STATE_MIP6NOTSUPP ? "M" : ""),
-		 (flags & MIP6_BU_STATE_BUNOTSUPP ? "U" : ""),
-		 (flags & MIP6_BU_STATE_WAITACK ? "A" : ""),
-		 (flags & MIP6_BU_STATE_WAITSENT ? "S" : ""));
+		 (flags & MIP6_BU_STATE_MIP6NOTSUPP ? "M" : "-"),
+		 (flags & MIP6_BU_STATE_BUNOTSUPP ? "U" : "-"),
+		 (flags & MIP6_BU_STATE_WAITACK ? "A" : "-"),
+		 (flags & MIP6_BU_STATE_WAITSENT ? "S" : "-"));
 
 	return buf;
 }
@@ -860,9 +879,9 @@ bcflg_sprintf(flags)
 	static char buf[] = "DRA";
 
 	snprintf(buf, sizeof(buf), "%s%s%s",
-		 (flags & MIP6_BC_STATE_DAD_WAIT ? "D" : ""),
-		 (flags & MIP6_BC_STATE_BR_WAITSENT ? "R" : ""),
-		 (flags & MIP6_BC_STATE_BA_WAITSENT ? "A" : ""));
+		 (flags & MIP6_BC_STATE_DAD_WAIT ? "D" : "-"),
+		 (flags & MIP6_BC_STATE_BR_WAITSENT ? "R" : "-"),
+		 (flags & MIP6_BC_STATE_BA_WAITSENT ? "A" : "-"));
 
 	return buf;
 }
