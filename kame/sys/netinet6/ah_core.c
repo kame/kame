@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.48 2002/01/31 14:14:49 jinmei Exp $	*/
+/*	$KAME: ah_core.c,v 1.49 2002/04/16 03:20:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -221,7 +221,7 @@ ah_sumsiz_1216(sav)
 	struct secasvar *sav;
 {
 	if (!sav)
-		return -1;
+		panic("ah_sumsiz_1216: null pointer is passed");
 	if (sav->flags & SADB_X_EXT_OLD)
 		return 16;
 	else
@@ -233,7 +233,7 @@ ah_sumsiz_zero(sav)
 	struct secasvar *sav;
 {
 	if (!sav)
-		return -1;
+		panic("ah_sumsiz_zero: null pointer is passed");
 	return 0;
 }
 
