@@ -1,4 +1,4 @@
-/* $KAME: in6_msf.h,v 1.8 2004/04/04 15:26:52 suz Exp $	*/
+/*	$KAME: in6_msf.h,v 1.9 2004/04/09 07:47:39 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
