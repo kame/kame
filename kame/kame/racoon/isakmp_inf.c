@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.15 2000/01/11 04:53:02 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.16 2000/01/11 05:18:02 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -751,15 +751,18 @@ isakmp_info_recv_n(iph1, msg, remote)
 	}
 
 	switch (type) {
-	case ISAKMP_NTYPE_UNEQUAL_PAYLOAD_LENGTHS:
+	case ISAKMP_NTYPE_CONNECTED:
+	case ISAKMP_NTYPE_RESPONDER_LIFETIME:
+	case ISAKMP_NTYPE_REPLAY_STATUS:
+	case ISAKMP_NTYPE_INITIAL_CONTACT:
+		/* do something */
+		break;
+	default:
 		/* delete ph1 */
 		/* XXX there is a potential of dos attack. */
 		plog(logp, LOCATION, remote, "delete phase1 handle.\n");
 		remph1(iph1);
 		delph1(iph1);
-		break;
-	default:
-		/* do something */
 		break;
 	}
 
@@ -964,15 +967,19 @@ isakmp_check_notify(gen, iph1)
 	struct isakmp_pl_n *notify = (struct isakmp_pl_n *)gen;
 
 	switch (ntohs(notify->type)) {
-	case IPSECDOI_NTYPE_RESPONDER_LIFETIME:
+	case ISAKMP_NTYPE_CONNECTED:
+		plog(logp, LOCATION, iph1->remote,
+			"ignoring CONNECTED notification.\n");
+		break;
+	case ISAKMP_NTYPE_RESPONDER_LIFETIME:
 		plog(logp, LOCATION, iph1->remote,
 			"ignoring RESPONDER-LIFETIME notification.\n");
 		break;
-	case IPSECDOI_NTYPE_REPLAY_STATUS:
+	case ISAKMP_NTYPE_REPLAY_STATUS:
 		plog(logp, LOCATION, iph1->remote,
 			"ignoring REPLAY-STATUS notification.\n");
 		break;
-	case IPSECDOI_NTYPE_INITIAL_CONTACT:
+	case ISAKMP_NTYPE_INITIAL_CONTACT:
 		plog(logp, LOCATION, iph1->remote,
 			"ignoring INITIAL-CONTACT notification.\n");
 		break;

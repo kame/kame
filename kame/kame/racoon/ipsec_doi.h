@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.6 2000/01/11 04:59:30 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.7 2000/01/11 05:18:00 sakane Exp $ */
 
 /* refered to RFC2407 */
 
@@ -140,12 +140,6 @@ struct ipsecdoi_pl_id {
 #define IPSECDOI_ID_DER_ASN1_DN                      9
 #define IPSECDOI_ID_DER_ASN1_GN                      10
 #define IPSECDOI_ID_KEY_ID                           11
-
-/* 4.6.3 IPSEC DOI Notify Message Types */
-/* Notify Messages - Status Types */
-#define IPSECDOI_NTYPE_RESPONDER_LIFETIME	24576
-#define IPSECDOI_NTYPE_REPLAY_STATUS		24577
-#define IPSECDOI_NTYPE_INITIAL_CONTACT		24578
 
 /* The use for checking proposal payload. This is not exchange type. */
 #define IPSECDOI_TYPE_PH1	0

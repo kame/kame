@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.h,v 1.8 2000/01/11 04:53:02 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.h,v 1.9 2000/01/11 05:18:02 sakane Exp $ */
 
 /* refer to RFC 2408 */
 
@@ -303,6 +303,12 @@ struct isakmp_pl_n {
 #define ISAKMP_NTYPE_UNEQUAL_PAYLOAD_LENGTHS        30
 /* NOTIFY MESSAGES - STATUS TYPES */
 #define ISAKMP_NTYPE_CONNECTED                   16384
+/* 4.6.3 IPSEC DOI Notify Message Types */
+#define ISAKMP_NTYPE_RESPONDER_LIFETIME		24576
+#define ISAKMP_NTYPE_REPLAY_STATUS		24577
+#define ISAKMP_NTYPE_INITIAL_CONTACT		24578
+
+
 /* using only to log */
 #define ISAKMP_LOG_RETRY_LIMIT_REACHED           65530
 
