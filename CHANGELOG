@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1729 2001/06/18 03:03:59 jinmei Exp $
+$KAME: CHANGELOG,v 1.1730 2001/06/18 08:02:22 itojun Exp $
 
 <200106>
+Mon Jun 18 16:59:35 JST 2001  itojun@iijlab.net
+	* sys/netinet6/icmp6.c: on icmp6 node information query (FQDN),
+	  do not respond with hostnames with two dots (like "foo..bar").
+	  0-length labels are not distinguishable with multiple name replies.
+	  yoshfuji@usagi
+
 2001-06-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_rtr.c (in6_tmpifadd): called
 	pfxlist_onlink_check() at the end of this function, to make sure
