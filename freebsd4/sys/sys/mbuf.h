@@ -429,12 +429,20 @@ union mcluster {
  * MFREE(struct mbuf *m, struct mbuf *n)
  * Free a single mbuf and associated external storage.
  * Place the successor, if any, in n.
+ *
+ * we do need to check non-first mbuf for m_aux, since some of existing
+ * code does not call M_PREPEND properly.
+ * (example: call to bpf_mtap from drivers)
  */
 #define	MFREE(m, n) MBUFLOCK(						\
 	struct mbuf *_mm = (m);						\
 									\
 	KASSERT(_mm->m_type != MT_FREE, ("freeing free mbuf"));		\
 	mbstat.m_mtypes[_mm->m_type]--;					\
+	if ((_mm->m_flags & M_PKTHDR) != 0 && _mm->m_pkthdr.aux) {	\
+		m_freem(_mm->m_pkthdr.aux);				\
+		_mm->m_pkthdr.aux = NULL;				\
+	}								\
 	if (_mm->m_flags & M_EXT)					\
 		MEXTFREE1(m);						\
 	(n) = _mm->m_next;						\

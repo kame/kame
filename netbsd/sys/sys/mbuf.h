@@ -395,10 +395,18 @@ do {									\
  * MFREE(struct mbuf *m, struct mbuf *n)
  * Free a single mbuf and associated external storage.
  * Place the successor, if any, in n.
+ *
+ * we do need to check non-first mbuf for m_aux, since some of existing
+ * code does not call M_PREPEND properly.
+ * (example: call to bpf_mtap from drivers)
  */
 #define	MFREE(m, n) \
 	MBUFLOCK( \
 		mbstat.m_mtypes[(m)->m_type]--; \
+		if (((m)->m_flags & M_PKTHDR) != 0 && (m)->m_pkthdr.aux) { \
+			m_freem((m)->m_pkthdr.aux); \
+			(m)->m_pkthdr.aux = NULL; \
+		} \
 		if ((m)->m_flags & M_EXT) { \
 			_MEXTREMOVE((m)); \
 		} \
