@@ -431,7 +431,8 @@ insert_bgp_route_entry(list, rte, bnp)
 	for (brl = bgp_route_head(list); !bgp_route_isend(brl, list);
 	     brl = bgp_route_next(brl)) {
 		if (brl->entry == NULL || (orte = brl->entry->rte) == NULL) {
-			syslog(LOG_ERR, "<%s>: bogus bgproute list(%p)", brl);
+			syslog(LOG_ERR, "<%s>: bogus bgproute list(%p)",
+				__FUNCTION__, brl);
 			continue; /* XXX */
 		}
 		if ((cmp = prefix_comp(rte, orte)) == 0) /* rte == orte */
