@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.11 2003/11/05 09:18:02 ono Exp $	*/
+/*	$KAME: dccp_var.h,v 1.12 2003/11/06 08:25:59 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -231,8 +231,12 @@ extern const char *dccpstates[];
 #ifdef _KERNEL
 
 #if defined(DCCP_DEBUG_ON)
-#define DCCP_DEBUG(args) dccp_log args
+#ifdef __FreeBSD__
+#define DCCP_DEBUG(args) log args
 #else
+#define DCCP_DEBUG(args) dccp_log args
+#endif
+#else /* !DCCP_DEBUG_ON */
 #define DCCP_DEBUG(args)
 #endif
 
