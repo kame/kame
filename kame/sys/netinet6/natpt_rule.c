@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.17 2001/05/05 11:19:04 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.18 2001/06/20 04:59:26 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -49,6 +49,8 @@
 #include <netinet6/tcp6.h>
 #endif
 
+#include <netinet6/in6_var.h>
+
 #include <netinet6/natpt_defs.h>
 #include <netinet6/natpt_list.h>
 #include <netinet6/natpt_log.h>
@@ -74,7 +76,6 @@ extern	struct in6_addr	 faith_prefixmask;
 extern	struct in6_addr	 natpt_prefix;
 extern	struct in6_addr	 natpt_prefixmask;
 
-extern	void	in6_len2mask	__P((struct in6_addr *, int));
 extern	int	toOneself4	__P((struct ifBox *, struct _cv *));
 extern	void	setMTU		__P((void));
 
@@ -434,7 +435,7 @@ _natptSetRule(caddr_t addr)
 	    }
 	    else
 	    {
-		in6_len2mask(&from->in6Mask, cst->prefix);
+		in6_prefixlen2mask(&from->in6Mask, cst->prefix);
 		from->in6Addr.s6_addr32[0]
 		    = from->in6Addr.s6_addr32[0] & from->in6Mask.s6_addr32[0];
 		from->in6Addr.s6_addr32[1]

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.189 2001/06/11 12:52:48 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.190 2001/06/20 04:59:26 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -404,20 +404,6 @@ in6_mask2len(mask, lim0)
 	}
 	
 	return x * 8 + y;
-}
-
-void
-in6_len2mask(mask, len)
-	struct in6_addr *mask;
-	int len;
-{
-	int i;
-
-	bzero(mask, sizeof(*mask));
-	for (i = 0; i < len / 8; i++)
-		mask->s6_addr8[i] = 0xff;
-	if (len % 8)
-		mask->s6_addr8[i] = (0xff00 >> (len % 8)) & 0xff;
 }
 
 #define ifa2ia6(ifa)	((struct in6_ifaddr *)(ifa))
@@ -1637,7 +1623,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 		}
 
 		ifra.ifra_prefixmask.sin6_len = sizeof(struct sockaddr_in6);
-		in6_len2mask(&ifra.ifra_prefixmask.sin6_addr, prefixlen);
+		in6_prefixlen2mask(&ifra.ifra_prefixmask.sin6_addr, prefixlen);
 
 		ifra.ifra_flags = iflr->flags & ~IFLR_PREFIX;
 #if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
@@ -1657,7 +1643,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 		bzero(&mask, sizeof(mask));
 		if (iflr->flags & IFLR_PREFIX) {
 			/* lookup a prefix rather than address. */
-			in6_len2mask(&mask, iflr->prefixlen);
+			in6_prefixlen2mask(&mask, iflr->prefixlen);
 
 			sin6 = (struct sockaddr_in6 *)&iflr->addr;
 			bcopy(&sin6->sin6_addr, &match, sizeof(match));
@@ -1677,7 +1663,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 				cmp = 0;	/*XXX*/
 			} else {
 				/* on deleting an address, do exact match */
-				in6_len2mask(&mask, 128);
+				in6_prefixlen2mask(&mask, 128);
 				sin6 = (struct sockaddr_in6 *)&iflr->addr;
 				bcopy(&sin6->sin6_addr, &match, sizeof(match));
 

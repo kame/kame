@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.121 2001/06/18 03:10:25 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.122 2001/06/20 04:59:26 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1776,7 +1776,7 @@ in6_ifadd(pr, ifid)
 	struct in6_addr mask;
 	int prefixlen = pr->ndpr_plen;
 
-	in6_len2mask(&mask, prefixlen);
+	in6_prefixlen2mask(&mask, prefixlen);
 
 	/*
 	 * find a link-local address (will be interface ID).
