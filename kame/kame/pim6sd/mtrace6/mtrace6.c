@@ -260,24 +260,30 @@ show_ip6_result(from6, datalen)
 			return;	/* XXX: bark here? */
 
 		for (i = 0, rp = tr6_resp; rp < rp_end; i++, rp++) {
-			struct sockaddr_in6 sa_resp;
+			struct sockaddr_in6 sa_resp, sa_upstream;
 
 			/* reinitialize the sockaddr. paranoid? */
 			memset((void *)&sa_resp, 0, sizeof(sa_resp));
 			sa_resp.sin6_family = AF_INET6;
 			sa_resp.sin6_len = sizeof(sa_resp);
+			memset((void *)&sa_upstream, 0, sizeof(sa_upstream));
+			sa_upstream.sin6_family = AF_INET6;
+			sa_upstream.sin6_len = sizeof(sa_upstream);
 
-			/* resolve the name of the router */
 			sa_resp.sin6_addr = rp->tr_lcladdr;
+			sa_upstream.sin6_addr = rp->tr_rmtaddr;
 
 			/* print information for the router */
 			printf("%3d  ", -i);/* index */
 			/* router address and incoming/outgoing interface */
-			printf("%s(%d->%d) ",
-			       pr_addr((struct sockaddr *)&sa_resp, opt_n),
-			       rp->tr_inifid, rp->tr_outifid);
+			printf("%s", pr_addr((struct sockaddr *)&sa_resp, opt_n));
+			printf("(%s/%d->%d) ",
+			       pr_addr((struct sckaddr *)&sa_upstream),
+			       ntohl(rp->tr_inifid), ntohl(rp->tr_outifid));
 			/* multicast routing protocol type */
 			printf("%s", proto_type(rp->tr_rproto));
+
+			putchar('\n');
 		}
 
 		break;
