@@ -1,4 +1,4 @@
-/*      $KAME: binding.c,v 1.7 2005/02/18 17:22:40 t-momose Exp $	*/
+/*      $KAME: binding.c,v 1.8 2005/03/07 23:18:27 keiichi Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -64,6 +64,24 @@
 void bul_flush(struct mip6_hoainfo *);
 static struct binding_update_list *bul_create(struct in6_addr *,
     struct in6_addr *, u_int16_t, struct mip6_hoainfo *);
+
+static char reg_fsm_desc[] = {
+  "IDLE",
+  "RRINIT",
+  "RRREDO",
+  "RRDEL",
+  "WAITA",
+  "WAITAR",
+  "WAITD",
+  "BOUND",
+  "DHAAD"
+};
+static rr_fsm_desc[] = {
+  "START",
+  "WAITHC",
+  "WAITH",
+  "WAITC"
+};
 #endif /* MIP_MN */
 
 #ifndef MIP_MN
@@ -824,13 +842,13 @@ command_show_bul(s, dummy)
 				(bul->bul_state & MIP6_BUL_STATE_DISABLE) ? 'D' : '-');
 
 			command_printf(s,
-				"reg=%d, rr=%d, ret=%ld, exp=%ld\n",
-				bul->bul_reg_fsm_state,
-				bul->bul_rr_fsm_state,
-				(bul->bul_retrans) ? 
-				(bul->bul_retrans->exptime.tv_sec - now.tv_sec) : -1,
-				(bul->bul_expire) ? 
-				(bul->bul_expire->exptime.tv_sec - now.tv_sec) : -1);
+			    "%s, %s, ret=%ld, exp=%ld\n",
+			    reg_fsm_desc[bul->bul_reg_fsm_state],
+			    rr_fsm_desc[bul->bul_rr_fsm_state],
+			    (bul->bul_retrans) ? 
+			    (bul->bul_retrans->exptime.tv_sec - now.tv_sec) : -1,
+			    (bul->bul_expire) ? 
+			    (bul->bul_expire->exptime.tv_sec - now.tv_sec) : -1);
 		}
 	}
 } 
