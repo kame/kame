@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1808 2001/07/24 05:57:41 jinmei Exp $
+$KAME: CHANGELOG,v 1.1809 2001/07/24 08:56:57 itojun Exp $
 
 <200107>
+Tue Jul 24 17:54:10 JST 2001  itojun@iijlab.net
+	* sys/netinet6/in6_prefix.c: RIP.
+
 2001-07-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ping6/ping6.c: use bind(2) to specify the source
 	address with the -S option.  (Unfortunately) IPV6_PKTINFO is not a
