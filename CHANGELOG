@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1260 2000/09/08 10:55:39 itojun Exp $
+$KAME: CHANGELOG,v 1.1261 2000/09/10 07:17:39 jinmei Exp $
 
 <200009>
+2000-09-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_mroute.c (pim6_input): added validation
+	for the IP version of inner packets.
+
+2000-09-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6sd/pim6_proto.c (receive_pim6_register): improved
+	robustness:
+	- added validation for the length of register messages.
+	- added validation for the IP version of inner packets, according
+	  to the recent discussion in the IETF pim ML.
+
 Fri Sep  8 15:58:38 JST 2000 sakane@ydc.co.jp
 	* freebsd3/ports/apache13, netbsd/pkgsrc/www/apache13:
 	  apache 1.3.12 + latest IPv6 patch.
