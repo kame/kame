@@ -368,10 +368,10 @@ routename(sa)
 	{
 		struct sockaddr_in6 sin6; /* use static var for safety */
 		int niflags = 0;
+
 #ifdef NI_WITHSCOPEID
 		niflags = NI_WITHSCOPEID;
 #endif
-
 		memset(&sin6, 0, sizeof(sin6));
 		memcpy(&sin6, sa, sa->sa_len);
 		sin6.sin6_len = sizeof(struct sockaddr_in6);
@@ -498,10 +498,10 @@ netname(sa)
 	{
 		struct sockaddr_in6 sin6; /* use static var for safety */
 		int niflags = 0;
+
 #ifdef NI_WITHSCOPEID
 		niflags = NI_WITHSCOPEID;
 #endif
-
 		memset(&sin6, 0, sizeof(sin6));
 		memcpy(&sin6, sa, sa->sa_len);
 		sin6.sin6_len = sizeof(struct sockaddr_in6);
@@ -524,16 +524,6 @@ netname(sa)
 
 		return(line);
 	}
-
-	    {	struct in6_addr in6;
-		int gap;
-
-		in6 = ((struct sockaddr_in6 *)sa)->sin6_addr;
-		gap = sizeof(struct sockaddr_in6) - sa->sa_len;
-		if (gap > 0)
-			bzero((char *)(&in6 + 1) - gap, gap);
-		return (inet_ntop(AF_INET6, &in6, ntop_buf, sizeof(ntop_buf)));
-	    }
 #endif
 
 	case AF_APPLETALK:
