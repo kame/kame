@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.34 2002/06/28 02:17:26 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.35 2002/06/28 02:27:44 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -144,6 +144,7 @@ yyerror(char *msg, ...)
 %token		STEST
 %token		STIMER
 %token		STO
+%token		STRACE
 %token		STTL
 %token		SUDP
 %token		SVARIABLES
