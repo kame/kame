@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.243 2001/11/28 11:08:55 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.244 2001/12/07 07:27:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2907,9 +2907,8 @@ do { \
 					    inp->inp_seclevel[SL_ESP_NETWORK];
 					break;
 
-				case IP_IPCOMP_LEVEL:
-					optval =
-					    inp->inp_seclevel[SL_IPCOMP];
+				case IPV6_IPCOMP_LEVEL:
+					optval = inp->inp_seclevel[SL_IPCOMP];
 					break;
 				}
 				*mtod(m, int *) = optval;
