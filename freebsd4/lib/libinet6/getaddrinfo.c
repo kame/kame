@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.5 2000/05/05 07:36:15 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.6 2000/05/05 07:43:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -226,7 +226,7 @@ static struct addrinfo *get_ai __P((const struct addrinfo *,
 static int get_portmatch __P((const struct addrinfo *, const char *));
 static int get_port __P((struct addrinfo *, const char *, int));
 static const struct afd *find_afd __P((int));
-static int addrconfig __P((struct addrinfo *));
+static int addrconfig __P((const struct addrinfo *));
 #ifdef INET6
 static int ip6_str2scopeid __P((char *, struct sockaddr_in6 *));
 #endif
@@ -546,9 +546,6 @@ getaddrinfo(hostname, servname, hints, res)
 	if (hostname == NULL)
 		ERR(EAI_NONAME);
 
-	if ((pai->ai_flags & AI_ADDRCONFIG) != 0 && !addrconfig(&ai0))
-		ERR(EAI_FAIL);
-
 	/*
 	 * hostname as alphabetical name.
 	 * we would like to prefer AF_INET6 than AF_INET, so we'll make a
@@ -575,7 +572,35 @@ getaddrinfo(hostname, servname, hints, res)
 		if (pai->ai_protocol == ANY && ex->e_protocol != ANY)
 			pai->ai_protocol = ex->e_protocol;
 
-		error = explore_fqdn(pai, hostname, servname, &cur->ai_next);
+		error = explore_fqdn(pai, hostname, servname,
+			&cur->ai_next);
+
+#ifdef AI_ADDRCONFIG
+		/*
+		 * If AI_ADDRCONFIG is specified, check if we are expected to
+		 * return the address family or not.
+		 */
+		if ((pai->ai_flags & AI_ADDRCONFIG) != 0) {
+			struct addrinfo *prev, *next, *p;
+
+			prev = NULL;
+			for (p = cur->ai_next; p; p = next) {
+				next = p->ai_next;
+				if (addrconfig(p)) {
+					prev = p;
+					continue;
+				}
+
+				if (prev == NULL)
+					cur->ai_next = next;
+				else
+					prev->ai_next = next;
+				p->ai_next = NULL;
+				freeaddrinfo(p);
+				p = NULL;	/*just in case*/
+			}
+		}
+#endif
 
 		while (cur && cur->ai_next)
 			cur = cur->ai_next;
@@ -736,7 +761,6 @@ explore_null(pai, servname, res)
 	const char *servname;
 	struct addrinfo **res;
 {
-	int s;
 	const struct afd *afd;
 	struct addrinfo *cur;
 	struct addrinfo sentinel;
@@ -750,12 +774,8 @@ explore_null(pai, servname, res)
 	 * filter out AFs that are not supported by the kernel
 	 * XXX errno?
 	 */
-	s = socket(pai->ai_family, SOCK_DGRAM, 0);
-	if (s < 0) {
-		if (errno != EMFILE)
-			return 0;
-	} else
-		_close(s);
+	if (!addrconfig(pai))
+		return 0;
 
 	/*
 	 * if the servname does not match socktype/protocol, ignore it.
@@ -1138,42 +1158,20 @@ find_afd(af)
  * will take care of it.
  * the semantics of AI_ADDRCONFIG is not defined well.  we are not sure
  * if the code is right or not.
- *
- * XXX PF_UNSPEC -> PF_INET6 + PF_INET mapping needs to be in sync with
- * _dns_getaddrinfo.
  */
 static int
 addrconfig(pai)
-	struct addrinfo *pai;
+	const struct addrinfo *pai;
 {
-	int s, af;
+	int s;
 
-	/*
-	 * TODO:
-	 * Note that implementation dependent test for address
-	 * configuration should be done everytime called
-	 * (or apropriate interval),
-	 * because addresses will be dynamically assigned or deleted.
-	 */
-	af = pai->ai_family;
-	if (af == AF_UNSPEC) {
-		if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
-			af = AF_INET;
-		else {
-			close(s);
-			if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
-				af = AF_INET6;
-			else
-				close(s);
-		}
-
-	}
-	if (af != AF_UNSPEC) {
-		if ((s = socket(af, SOCK_DGRAM, 0)) < 0)
+	/* XXX errno */
+	s = socket(pai->ai_family, SOCK_DGRAM, 0);
+	if (s < 0) {
+		if (errno != EMFILE)
 			return 0;
-		close(s);
 	}
-	pai->ai_family = af;
+	close(s);
 	return 1;
 }
 
