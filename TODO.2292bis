@@ -1,45 +1,45 @@
 TODO list for the new advanced API (aka rfc2292bis)
 KAME project
-$Id: TODO.2292bis,v 1.5 1999/12/23 17:19:46 itojun Exp $
+$Id: TODO.2292bis,v 1.6 2000/01/04 11:34:59 jinmei Exp $
 
 new socket options or ancillary data types:
-- IPV6_RTHDRDSTOPTS	done/19991221	jinmei	*
+- IPV6_RTHDRDSTOPTS	done/20000102	jinmei
 - IPV6_RECVPKTINFO	done/19991217	jinmei
 - IPV6_RECVHOPLIMIT	done/19991217	jinmei
 - IPV6_RECVRTHDR	done/19991217	jinmei
 - IPV6_RECVHOPOPTS	done/19991217	jinmei
 - IPV6_RECVDSTOPTS	done/19991217	jinmei	*
-- IPV6_RECVRTHDRDSTOPTS	done/19991217	jinmei
+- IPV6_RECVRTHDRDSTOPTS	done/19991217	jinmei  *
 - IPV6_USE_MIN_MTU
 - IPV6_RECVPATHMTU
 - IPV6_REACHCONF	done/19991223	itojun
 (*) the current implementation returns each dst opt header in a single
-    ancillary object, but the specfication requires that all headers is
+    ancillary object, but the specfication requires that all headers are
     stored in a single object.
 
 existing options whose semantics is changed in 2292bis:
-- IPV6_PKTINFO
-- IPV6_HOPLIMIT
-- IPV6_RTHDR
-- IPV6_HOPOPTS
-- IPV6_DSTOPTS
+- IPV6_PKTINFO		done/20000102	jinmei
+- IPV6_HOPLIMIT		done/20000102	jinmei
+- IPV6_RTHDR		done/20000102	jinmei
+- IPV6_HOPOPTS		done/20000102	jinmei
+- IPV6_DSTOPTS		done/20000102	jinmei
 
 new library functions:
 Function		Status		Date		Commiter
 ----------------------------------------------------------------
-- inet6_opt_append()
+- inet6_opt_init()	worked		20000102	jinmei
+- inet6_opt_append()	worked		20000102	jinmei
+- inet6_opt_finish()	worked		20000102	jinmei
+- inet6_opt_set_val()	worked		20000102	jinmei
 - inet6_opt_get_val()	worked		19991223	jinmei
 - inet6_opt_find()	implemented	19991223	jinmei
-- inet6_opt_finish()
-- inet6_opt_init()
 - inet6_opt_next()	worked		19991223	jinmei
-- inet6_opt_set_val()
-- inet6_rth_add()
+- inet6_rth_add()	worked		20000102	jinmei
 - inet6_rth_getaddr()	worked		19991223	jinmei
-- inet6_rth_init()
-- inet6_rth_reverse()
+- inet6_rth_init()	worked		20000102	jinmei
+- inet6_rth_reverse()	implemented	20000102	jinmei
 - inet6_rth_segments()	worked		19991223	jinmei
-- inet6_rth_space()
+- inet6_rth_space()	worked		20000102	jinmei
 - rcmd_af()
 - rexec_af()
 
@@ -48,10 +48,10 @@ Application	Status		Date		Commiter
 --------------------------------------------------------
 - bgpd		recvcode	19991221	jinmei
 - hroute6d	recvcode	19991221	jinmei
-- mld6query	(sendonly)
+- mld6query	done		20000104	jinmei
 - pim6dd	recvcode	19991221	jinmei
 - pim6sd	recvcode	19991221	jinmei
-- ping6		recvcode	19991221	jinmei
+- ping6		done		20000102	jinmei
 - racoon	recvcode	19991221	jinmei
 - route6d	recvcode	19991221	jinmei
 - rtadvd	recvcode	19991221	jinmei
