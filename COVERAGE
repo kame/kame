@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.15 2000/02/28 13:51:22 itojun Exp $
+$Id: COVERAGE,v 1.16 2000/02/28 14:07:25 itojun Exp $
 
 
 x: supported/integrated
@@ -50,7 +50,7 @@ advanced API	2292	2292	2292	notyet	notyet	notyet
 
 getifaddrs	x	x	-	notyet	notyet	notyet
 
-icmp6 nodeinfo	05	04	04	notyet	notyet	notyet
+icmp6 nodeinfo	05	05	04	notyet	notyet	notyet
 
 nd6_proxyall	-	-	x	notyet	notyet	notyet
 
