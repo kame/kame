@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_core.c,v 1.20 2000/09/21 17:53:21 itojun Exp $	*/
+/*	$KAME: ipcomp_core.c,v 1.21 2000/09/21 18:07:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -236,39 +236,6 @@ do { \
 
 	if (zerror == Z_STREAM_END)
 		goto terminate;
-
-	/* output stream only */
-	while (1) {
-		/* get output buffer */
-		if (zs.next_out == NULL || zs.avail_out == 0) {
-			MOREBLOCK();
-		}
-
-		zerror = mode ? inflate(&zs, Z_SYNC_FLUSH)
-			      : deflate(&zs, Z_SYNC_FLUSH);
-
-		if (zerror == Z_STREAM_END)
-			goto terminate;
-		else if (zerror == Z_OK)
-			; /*once more.*/
-		else {
-			if (zs.msg) {
-				ipseclog((LOG_ERR, "ipcomp_%scompress: "
-				    "%sflate(Z_SYNC_FLUSH): %s\n",
-				    mode ? "de" : "", mode ? "in" : "de",
-				    zs.msg));
-			} else {
-				ipseclog((LOG_ERR, "ipcomp_%scompress: "
-				    "%sflate(Z_SYNC_FLUSH): "
-				    "unknown error (%d)\n",
-				    mode ? "de" : "", mode ? "in" : "de",
-				    zerror));
-			}
-			mode ? inflateEnd(&zs) : deflateEnd(&zs);
-			error = EINVAL;
-			goto fail;
-		}
-	}
 
 	/* termination */
 	while (1) {
