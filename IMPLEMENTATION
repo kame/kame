@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.158 2000/09/20 15:44:39 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.159 2000/09/20 18:26:40 sakane Exp $
 
 1. IPv6
 
@@ -1674,13 +1674,15 @@ Here are (some of) platforms we have tested IPsec/IKE interoperability
 in the past, in no particular order.  Note that both ends (KAME and
 others) may have modified their implementation, so use the following
 list just for reference purposes.
-	Altiga, Ashley-laurent (vpcom.com), Data Fellows (F-Secure),
-	BlueSteel, CISCO, Ericsson, ACC, Fitel, FreeS/WAN, HITACHI, IBM
-	AIX, IIJ, Intel, Microsoft WinNT, NAI PGPnet,
-	NIST (linux IPsec + plutoplus), Netscreen, OpenBSD isakmpd, Radguard,
-	RedCreek, Routerware, SSH (both IPv4/IPv6), Secure Computing, Soliton,
-	Toshiba, TIS/NAI Gauntret, VPNet, Yamaha RT100i, Cryptek, RapidStream,
-	Furukawa electric, NxNetworks
+
+	ACC, allied-telesis, Altiga, Ashley-laurent (vpcom.com), BlueSteel,
+	CISCO IOS, Cryptek, Checkpoint FW-1, Data Fellows (F-Secure),
+	Ericsson, Fitel, FreeS/WAN, hifn, HITACHI, IBM AIX, IIJ, Intel Canada,
+	Intel Packet Protect, MEW NetCocoon , MGCS, Microsoft WinNT/2000,
+	NAI PGPnet, NIST (linux IPsec + plutoplus), NEC IX5000, Netscreen,
+	NxNetworks, OpenBSD isakmpd, Radguard, RapidStream, RedCreek,
+	Routerware, SSH (both IPv4/IPv6), Secure Computing, Soliton,
+	Sun Solaris8, TIS/NAI Gauntret, Toshiba, VPNet, Yamaha RT series
 
 Here are (some of) platforms we have tested IPComp/IKE interoperability
 in the past, in no particular order.
