@@ -802,7 +802,7 @@ ifioctl(so, cmd, data, p)
 	if (((oif_flags ^ ifp->if_flags) & IFF_UP) != 0) {
 #ifdef INET6
 		if ((ifp->if_flags & IFF_UP) != 0) {
-			int s = splimp();
+			int s = splsoftnet();
 			in6_if_up(ifp);
 			splx(s);
 		}
