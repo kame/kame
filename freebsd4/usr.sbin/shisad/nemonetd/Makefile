@@ -26,9 +26,9 @@
 
 SRCDIR=	${.CURDIR}/../../../kame/shisad
 
-PROG=	nemonetd
+PROG=	nemod
 SRCS=	nemo_netconfig.c network.c 
-CFLAGS+= -g -Wall -Werror  -DMIP_NEMO -DMIP_MCOA
+CFLAGS+= -g -Wall -Werror  -DMIP_NEMO 
 
 #LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \
 #	-L/usr/local/v6/lib -linet6 -lssl -lcrypto
