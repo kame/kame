@@ -169,6 +169,9 @@ struct host_info *host;
     int af, alen;
     char *ap;
     char hbuf[MAXHOSTNAMELEN];
+#ifdef INET6
+    struct sockaddr_in map4;
+#endif
 
     /*
      * On some systems, for example Solaris 2.3, gethostbyaddr(0.0.0.0) does
@@ -188,12 +191,17 @@ struct host_info *host;
 	break;
 #ifdef INET6
     case AF_INET6:
-	/* XXX more special cases? */
 	ap = (char *)&((struct sockaddr_in6 *)sin)->sin6_addr;
 	alen = sizeof(struct in6_addr);
+	/* special case on reverse lookup: mapped addr.  I hate it */
+	if (IN6_IS_ADDR_V4MAPPED((struct in6_addr *)ap)) {
+	    af = AF_INET;
+	    ap += (sizeof(struct in6_addr) - sizeof(struct in_addr));
+	    alen = sizeof(struct in_addr);
+	}
 	break;
 #endif
-    defalut:
+    default:
 	return;
     }
     if ((hp = gethostbyaddr(ap, alen, af)) != 0) {

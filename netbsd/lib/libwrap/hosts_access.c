@@ -99,6 +99,7 @@ static int host_match __P((char *, struct host_info *));
 static int rbl_match __P((char *, char *));
 static int string_match __P((char *, char *));
 static int masked_match __P((char *, char *, char *));
+static int masked_match4 __P((char *, char *, char *));
 #ifdef INET6
 static int masked_match6 __P((char *, char *, char *));
 #endif
@@ -301,12 +302,7 @@ struct host_info *host;
     } else if (strncmp(tok, "{RBL}.", 6) == 0) { /* RBL lookup in domain */
 	return rbl_match(tok+6, eval_hostaddr(host));
     } else if ((mask = split_at(tok, '/')) != 0) {	/* net/mask */
-#ifndef INET6
 	return (masked_match(tok, mask, eval_hostaddr(host)));
-#else
-	return (masked_match(tok, mask, eval_hostaddr(host))
-	    || masked_match6(tok, mask, eval_hostaddr(host)));
-#endif
     } else {					/* anything else */
 	return (string_match(tok, eval_hostaddr(host))
 	    || (NOT_INADDR(tok) && string_match(tok, eval_hostname(host))));
@@ -378,6 +374,23 @@ char   *net_tok;
 char   *mask_tok;
 char   *string;
 {
+#ifndef INET6
+    return masked_match4(net_tok, mask_tok, string);
+#else
+    if (dot_quad_addr(net_tok) != INADDR_NONE
+     && dot_quad_addr(mask_tok) != INADDR_NONE
+     && dot_quad_addr(string) != INADDR_NONE) {
+	return masked_match4(net_tok, mask_tok, string);
+    } else
+	return masked_match6(net_tok, mask_tok, string);
+#endif
+}
+
+static int masked_match4(net_tok, mask_tok, string)
+char   *net_tok;
+char   *mask_tok;
+char   *string;
+{
     unsigned long net;
     unsigned long mask;
     unsigned long addr;
@@ -399,6 +412,7 @@ char   *string;
 }
 
 #ifdef INET6
+/* Ugly because it covers IPv4 mapped address.  I hate mapped addresses. */
 static int masked_match6(net_tok, mask_tok, string)
 char   *net_tok;
 char   *mask_tok;
@@ -410,14 +424,32 @@ char   *string;
     int masklen;
     int fail;
     int i;
+    int maskoff;
+    int netaf;
+    const int sizoff64 = sizeof(struct in6_addr) - sizeof(struct in_addr);
 
-    if (inet_pton(AF_INET6, string, &addr) != 1)
-	return (NO);
+    memset(&addr, 0, sizeof(addr));
+    if (inet_pton(AF_INET6, string, &addr) == 1)
+	; /* okay */
+    else if (inet_pton(AF_INET, string, &addr.s6_addr[sizoff64]) == 1)
+	addr.s6_addr[10] = addr.s6_addr[11] = 0xff;
+    else
+	return NO;
+
+    memset(&net, 0, sizeof(net));
+    if (inet_pton(AF_INET6, net_tok, &net) == 1) {
+	netaf = AF_INET6;
+	maskoff = 0;
+    } else if (inet_pton(AF_INET, net_tok, &net.s6_addr[sizoff64]) == 1) {
+	netaf = AF_INET;
+	maskoff = sizoff64;
+	net.s6_addr[10] = net.s6_addr[11] = 0xff;
+    } else
+	return NO;
+
     fail = 0;
-    if (inet_pton(AF_INET6, net_tok, &net) != 1)
-	fail++;
-    if (strchr(mask_tok, ':') == NULL) {
-	masklen = atoi(mask_tok);
+    if (mask_tok[strspn(mask_tok, "0123456789")] == '\0') {
+	masklen = atoi(mask_tok) + maskoff * 8;
 	if (0 <= masklen && masklen <= 128) {
 	    memset(&mask, 0, sizeof(mask));
 	    memset(&mask, 0xff, masklen / 8);
@@ -427,10 +459,13 @@ char   *string;
 	    }
 	} else
 	    fail++;
-    } else {
-	if (inet_pton(AF_INET6, mask_tok, &mask) != 1)
-	    fail++;
-    }
+    } else if (netaf == AF_INET6 && inet_pton(AF_INET6, mask_tok, &mask) == 1)
+	; /* okay */
+    else if (netaf == AF_INET
+	  && inet_pton(AF_INET, mask_tok, &mask.s6_addr[12]) == 1) {
+	memset(&mask, 0xff, sizoff64);
+    } else
+	fail++;
     if (fail) {
 	tcpd_warn("bad net/mask expression: %s/%s", net_tok, mask_tok);
 	return (NO);				/* not tcpd_jump() */

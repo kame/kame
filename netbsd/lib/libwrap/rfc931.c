@@ -110,10 +110,25 @@ char   *dest;
     switch (rmt_sin->sa_family) {
     case AF_INET:
 	salen = sizeof(struct sockaddr_in);
+	rmt_portp = &((struct sockaddr_in *)&rmt_sin)->sin_port;
 	break;
 #ifdef INET6
     case AF_INET6:
 	salen = sizeof(struct sockaddr_in6);
+	rmt_portp = &((struct sockaddr_in6 *)&rmt_sin)->sin6_port;
+	break;
+#endif
+    default:
+	STRN_CPY(dest, result, STRING_LENGTH);
+	return;
+    }
+    switch (our_sin->sa_family) {
+    case AF_INET:
+	our_portp = &((struct sockaddr_in *)&our_sin)->sin_port;
+	break;
+#ifdef INET6
+    case AF_INET6:
+	our_portp = &((struct sockaddr_in6 *)&our_sin)->sin6_port;
 	break;
 #endif
     default:
@@ -154,27 +169,29 @@ char   *dest;
 	    memcpy(&our_query_sin, our_sin, salen);
 	    switch (our_query_sin.ss_family) {
 	    case AF_INET:
-		our_portp = &((struct sockaddr_in *)&our_query_sin)->sin_port;
+		((struct sockaddr_in *)&our_query_sin)->sin_port =
+			htons(ANY_PORT);
 		break;
 #ifdef INET6
 	    case AF_INET6:
-		our_portp = &((struct sockaddr_in6 *)&our_query_sin)->sin6_port;
+		((struct sockaddr_in6 *)&our_query_sin)->sin6_port =
+			htons(ANY_PORT);
 		break;
 #endif
 	    }
-	    *rmt_portp = htons(ANY_PORT);
 	    memcpy(&rmt_query_sin, rmt_sin, salen);
 	    switch (rmt_query_sin.ss_family) {
 	    case AF_INET:
-		rmt_portp = &((struct sockaddr_in *)&rmt_query_sin)->sin_port;
+		((struct sockaddr_in *)&rmt_query_sin)->sin_port =
+			htons(RFC931_PORT);
 		break;
 #ifdef INET6
 	    case AF_INET6:
-		rmt_portp = &((struct sockaddr_in6 *)&rmt_query_sin)->sin6_port;
+		((struct sockaddr_in6 *)&rmt_query_sin)->sin6_port = 
+			htons(RFC931_PORT);
 		break;
 #endif
 	    }
-	    *rmt_portp = htons(RFC931_PORT);
 
 	    if (bind(fileno(fp), (struct sockaddr *) & our_query_sin,
 		     salen) >= 0 &&
