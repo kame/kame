@@ -63,6 +63,9 @@
  */
 
 #include <i386/include/asm.h>
+#ifdef __FreeBSD__
+#define	_C_LABEL	CNAME
+#endif
 
 ENTRY(des_encrypt1)
 	pushl	%esi
