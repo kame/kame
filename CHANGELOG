@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.316 1999/12/03 09:03:53 jinmei Exp $
+$Id: CHANGELOG,v 1.317 1999/12/06 06:20:53 jinmei Exp $
 
 <199912>
+1999-12-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_mroute.h: removed the definition of
+	sioc6_sg_req{}, which was replaced with sioc_sg_req6{} due to
+	(possible) scope issues.
+	If there is a compilation problem caused by this change, please
+	let me know.
+
 1999-12-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6sd: massive improvements including
 	- sanity checks for incoming PIM messages
