@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.87 2001/02/22 01:11:42 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.88 2001/02/26 06:19:16 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -210,7 +210,7 @@ statement
 
 	/* path */
 path_statement
-	:	PATH PATHTYPE QUOTEDSTRING EOS
+	:	PATH PATHTYPE QUOTEDSTRING
 		{
 			if ($2 > LC_PATHTYPE_MAX) {
 				yyerror("invalid path type %d", $2);
@@ -225,16 +225,17 @@ path_statement
 			lcconf->pathinfo[$2] = strdup($3->v);
 			vfree($3);
 		}
+		EOS
 	;
 
 	/* special */
 special_statement
-	:	COMPLEX_BUNDLE SWITCH EOS { lcconf->complex_bundle = $2; }
+	:	COMPLEX_BUNDLE SWITCH { lcconf->complex_bundle = $2; } EOS
 	;
 
 	/* include */
 include_statement
-	:	INCLUDE QUOTEDSTRING EOS
+	:	INCLUDE QUOTEDSTRING
 		{
 			char path[MAXPATHLEN];
 
@@ -244,6 +245,7 @@ include_statement
 			if (yycf_switch_buffer(path) != 0)
 				return -1;
 		}
+		EOS
 	;
 
 	/* self infomation */
@@ -256,7 +258,7 @@ identifier_stmt
 			/*XXX to be deleted */
 		}
 		QUOTEDSTRING EOS
-	|	IDENTIFIERTYPE QUOTEDSTRING EOS
+	|	IDENTIFIERTYPE QUOTEDSTRING
 		{
 			/*XXX to be deleted */
 			$2->l--;	/* nuke '\0' */
@@ -267,6 +269,7 @@ identifier_stmt
 				return -1;
 			}
 		}
+		EOS
 	;
 
 	/* logging */
@@ -303,11 +306,11 @@ padding_stmts
 	|	padding_stmts padding_stmt
 	;
 padding_stmt
-	:	PAD_RANDOMIZE SWITCH EOS { lcconf->pad_random = $2; }
-	|	PAD_RANDOMIZELEN SWITCH EOS { lcconf->pad_randomlen = $2; }
-	|	PAD_MAXLEN NUMBER EOS { lcconf->pad_maxsize = $2; }
-	|	PAD_STRICT SWITCH EOS { lcconf->pad_strict = $2; }
-	|	PAD_EXCLTAIL SWITCH EOS { lcconf->pad_excltail = $2; }
+	:	PAD_RANDOMIZE SWITCH { lcconf->pad_random = $2; } EOS
+	|	PAD_RANDOMIZELEN SWITCH { lcconf->pad_randomlen = $2; } EOS
+	|	PAD_MAXLEN NUMBER { lcconf->pad_maxsize = $2; } EOS
+	|	PAD_STRICT SWITCH { lcconf->pad_strict = $2; } EOS
+	|	PAD_EXCLTAIL SWITCH { lcconf->pad_excltail = $2; } EOS
 	;
 
 	/* listen */
@@ -319,7 +322,7 @@ listen_stmts
 	|	listen_stmts listen_stmt
 	;
 listen_stmt
-	:	X_ISAKMP ike_addrinfo_port EOS
+	:	X_ISAKMP ike_addrinfo_port
 		{
 			struct myaddrs *p;
 
@@ -339,11 +342,13 @@ listen_stmt
 
 			lcconf->autograbaddr = 0;
 		}
-	|	X_ADMIN PORT EOS
+		EOS
+	|	X_ADMIN PORT
 		{
 			lcconf->port_admin = $2;
 		}
-	|	STRICT_ADDRESS EOS { lcconf->strict_address = TRUE; }
+		EOS
+	|	STRICT_ADDRESS { lcconf->strict_address = TRUE; } EOS
 	;
 ike_addrinfo_port
 	:	ADDRSTRING ike_port
@@ -374,23 +379,28 @@ timer_stmt
 	:	RETRY_COUNTER NUMBER
 		{
 			lcconf->retry_counter = $2;
-		} EOS
+		}
+		EOS
 	|	RETRY_INTERVAL NUMBER UNITTYPE
 		{
 			lcconf->retry_interval = $2 * $3;
-		} EOS
+		}
+		EOS
 	|	RETRY_PERSEND NUMBER
 		{
 			lcconf->count_persend = $2;
-		} EOS
+		}
+		EOS
 	|	RETRY_PHASE1 NUMBER UNITTYPE
 		{
 			lcconf->retry_checkph1 = $2 * $3;
-		} EOS
+		}
+		EOS
 	|	RETRY_PHASE2 NUMBER UNITTYPE
 		{
 			lcconf->wait_ph2complete = $2 * $3;
-		} EOS
+		}
+		EOS
 	;
 
 	/* algorithm */
@@ -516,7 +526,7 @@ policy_specs
 	|	policy_specs policy_spec
 	;
 policy_spec
-	:	PFS_GROUP dh_group_num EOS
+	:	PFS_GROUP dh_group_num
 		{
 			/*
 			int doi;
@@ -529,6 +539,7 @@ policy_spec
 			cur_spidx->policy->pfs_group = doi;
 			*/
 		}
+		EOS
 	|	PROPOSAL
 		{
 			/*
@@ -548,7 +559,7 @@ ipsecproposal_specs
 	|	ipsecproposal_specs ipsecproposal_spec
 	;
 ipsecproposal_spec
-	:	LIFETIME LIFETYPE NUMBER UNITTYPE EOS
+	:	LIFETIME LIFETYPE NUMBER UNITTYPE
 		{
 			if ($2 == CF_LIFETYPE_TIME)
 				prhead->lifetime = $3 * $4;
@@ -562,6 +573,7 @@ ipsecproposal_spec
 				prhead->lifebyte /= 1024;
 			}
 		}
+		EOS
 	|	PROTOCOL secproto
 		{
 			struct secprotospec *spspec;
@@ -594,13 +606,13 @@ secproto_specs
 	|	secproto_specs secproto_spec
 	;
 secproto_spec
-	:	SECLEVEL SECLEVELTYPE EOS { prhead->spspec->ipsec_level = $2; }
+	:	SECLEVEL SECLEVELTYPE { prhead->spspec->ipsec_level = $2; } EOS
 	|	SECMODE secmode EOS
 	|	STRENGTH
 		{
 			yyerror("strength directive is obsoleted.");
 		} STRENGTHTYPE EOS
-	|	ALGORITHM_CLASS ALGORITHMTYPE keylength EOS
+	|	ALGORITHM_CLASS ALGORITHMTYPE keylength
 		{
 			int doi;
 			int defklen;
@@ -653,6 +665,7 @@ secproto_spec
 				return -1;
 			}
 		}
+		EOS
 	;
 secmode
 	:	SECMODETYPE {
@@ -818,7 +831,7 @@ sainfo_specs
 	|	sainfo_specs sainfo_spec
 	;
 sainfo_spec
-	:	PFS_GROUP dh_group_num EOS
+	:	PFS_GROUP dh_group_num
 		{
 			int doi;
 
@@ -829,7 +842,8 @@ sainfo_spec
 			}
 			cur_sainfo->pfs_group = doi;
 		}
-	|	LIFETIME LIFETYPE NUMBER UNITTYPE EOS
+		EOS
+	|	LIFETIME LIFETYPE NUMBER UNITTYPE
 		{
 			if ($2 == CF_LIFETYPE_TIME)
 				cur_sainfo->lifetime = $3 * $4;
@@ -843,6 +857,7 @@ sainfo_spec
 				cur_sainfo->lifebyte /= 1024;
 			}
 		}
+		EOS
 	|	ALGORITHM_CLASS {
 			cur_algclass = $1;
 		}
@@ -1035,8 +1050,8 @@ remote_specs
 	;
 remote_spec
 	:	EXCHANGE_MODE exchange_types EOS
-	|	DOI DOITYPE EOS { cur_rmconf->doitype = $2; }
-	|	SITUATION SITUATIONTYPE EOS { cur_rmconf->sittype = $2; }
+	|	DOI DOITYPE { cur_rmconf->doitype = $2; } EOS
+	|	SITUATION SITUATIONTYPE { cur_rmconf->sittype = $2; } EOS
 	|	CERTIFICATE_TYPE cert_spec
 	|	PEERS_CERTFILE QUOTEDSTRING
 		{
@@ -1049,15 +1064,16 @@ remote_spec
 #endif
 		}
 		EOS
-	|	VERIFY_CERT SWITCH EOS { cur_rmconf->verify_cert = $2; }
-	|	SEND_CERT SWITCH EOS { cur_rmconf->send_cert = $2; }
-	|	SEND_CR SWITCH EOS { cur_rmconf->send_cr = $2; }
-	|	IDENTIFIER IDENTIFIERTYPE EOS
+	|	VERIFY_CERT SWITCH { cur_rmconf->verify_cert = $2; } EOS
+	|	SEND_CERT SWITCH { cur_rmconf->send_cert = $2; } EOS
+	|	SEND_CR SWITCH { cur_rmconf->send_cr = $2; } EOS
+	|	IDENTIFIER IDENTIFIERTYPE
 		{
 			/*XXX to be deleted */
 			cur_rmconf->idvtype = $2;
 		}
-	|	MY_IDENTIFIER IDENTIFIERTYPE identifierstring EOS
+		EOS
+	|	MY_IDENTIFIER IDENTIFIERTYPE identifierstring
 		{
 			if (set_identifier(&cur_rmconf->idv, $2, $3) != 0) {
 				yyerror("failed to set identifer.\n");
@@ -1065,7 +1081,8 @@ remote_spec
 			}
 			cur_rmconf->idvtype = $2;
 		}
-	|	PEERS_IDENTIFIER IDENTIFIERTYPE identifierstring EOS
+		EOS
+	|	PEERS_IDENTIFIER IDENTIFIERTYPE identifierstring
 		{
 			if (set_identifier(&cur_rmconf->idv_p, $2, $3) != 0) {
 				yyerror("failed to set identifer.\n");
@@ -1073,19 +1090,20 @@ remote_spec
 			}
 			cur_rmconf->idvtype_p = $2;
 		}
-	|	NONCE_SIZE NUMBER EOS { cur_rmconf->nonce_size = $2; }
+		EOS
+	|	NONCE_SIZE NUMBER { cur_rmconf->nonce_size = $2; } EOS
 	|	DH_GROUP
 		{
 			yyerror("dh_group cannot be defined here.");
 			return -1;
 		}
 		dh_group_num EOS
-	|	KEEPALIVE EOS { cur_rmconf->keepalive = TRUE; }
-	|	GENERATE_POLICY SWITCH EOS { cur_rmconf->gen_policy = $2; }
-	|	SUPPORT_MIP6 SWITCH EOS { cur_rmconf->support_mip6 = $2; }
-	|	INITIAL_CONTACT SWITCH EOS { cur_rmconf->ini_contact = $2; }
-	|	PROPOSAL_CHECK PROPOSAL_CHECK_LEVEL EOS { cur_rmconf->pcheck_level = $2; }
-	|	LIFETIME LIFETYPE NUMBER UNITTYPE EOS
+	|	KEEPALIVE { cur_rmconf->keepalive = TRUE; } EOS
+	|	GENERATE_POLICY SWITCH { cur_rmconf->gen_policy = $2; } EOS
+	|	SUPPORT_MIP6 SWITCH { cur_rmconf->support_mip6 = $2; } EOS
+	|	INITIAL_CONTACT SWITCH { cur_rmconf->ini_contact = $2; } EOS
+	|	PROPOSAL_CHECK PROPOSAL_CHECK_LEVEL { cur_rmconf->pcheck_level = $2; } EOS
+	|	LIFETIME LIFETYPE NUMBER UNITTYPE
 		{
 			if ($2 == CF_LIFETYPE_TIME)
 				prhead->lifetime = $3 * $4;
@@ -1104,6 +1122,7 @@ remote_spec
 				prhead->lifebyte /= 1024;
 			}
 		}
+		EOS
 	|	PROPOSAL
 		{
 			struct secprotospec *spspec;
@@ -1187,7 +1206,7 @@ isakmpproposal_spec
 		{
 			yyerror("strength directive is obsoleted.");
 		} STRENGTHTYPE EOS
-	|	LIFETIME LIFETYPE NUMBER UNITTYPE EOS
+	|	LIFETIME LIFETYPE NUMBER UNITTYPE
 		{
 			if ($2 == CF_LIFETYPE_TIME)
 				prhead->spspec->lifetime = $3 * $4;
@@ -1206,15 +1225,18 @@ isakmpproposal_spec
 				prhead->spspec->lifebyte /= 1024;
 			}
 		}
-	|	DH_GROUP dh_group_num EOS
+		EOS
+	|	DH_GROUP dh_group_num
 		{
 			prhead->spspec->algclass[algclass_isakmp_dh] = $2;
 		}
-	|	GSSAPI_ID QUOTEDSTRING EOS
+		EOS
+	|	GSSAPI_ID QUOTEDSTRING
 		{
 			prhead->spspec->gssid = strdup($2->v);
 		}
-	|	ALGORITHM_CLASS ALGORITHMTYPE keylength EOS
+		EOS
+	|	ALGORITHM_CLASS ALGORITHMTYPE keylength
 		{
 			int doi;
 			int defklen;
@@ -1272,6 +1294,7 @@ isakmpproposal_spec
 				return -1;
 			}
 		}
+		EOS
 	;
 
 %%
