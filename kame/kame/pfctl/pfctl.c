@@ -1213,7 +1213,6 @@ pfctl_clear_rule_counters(int dev, int opts)
 int
 pfctl_test_altqsupport(int dev, int opts)
 {
-#ifdef __OpenBSD__	/* for now */
 	struct pfioc_altq pa;
 
 	if (ioctl(dev, DIOCGETALTQS, &pa)) {
@@ -1226,9 +1225,6 @@ pfctl_test_altqsupport(int dev, int opts)
 			err(1, "DIOCGETALTQS");
 	}
 	return (1);
-#else
-	return (0);
-#endif
 }
 
 int
