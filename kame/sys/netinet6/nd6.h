@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.95 2002/06/08 11:31:06 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.96 2002/06/08 20:22:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -400,8 +400,8 @@ void nd6_setmtu __P((struct ifnet *));
 void nd6_timer __P((void *));
 void nd6_purge __P((struct ifnet *));
 void nd6_nud_hint __P((struct rtentry *, struct sockaddr_in6 *, int));
-int nd6_resolve __P((struct ifnet *, struct rtentry *,
-		     struct mbuf *, struct sockaddr *, u_char *));
+int nd6_resolve __P((struct ifnet *, struct rtentry *, struct mbuf *,
+	struct sockaddr *, u_char *));
 #if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ > 4)
 void nd6_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 #else
@@ -411,9 +411,9 @@ int nd6_ioctl __P((u_long, caddr_t, struct ifnet *));
 struct rtentry *nd6_cache_lladdr __P((struct ifnet *, struct sockaddr_in6 *,
 	char *, int, int, int));
 int nd6_output __P((struct ifnet *, struct ifnet *, struct mbuf *,
-		    struct sockaddr_in6 *, struct rtentry *));
+	struct sockaddr_in6 *, struct rtentry *));
 int nd6_storelladdr __P((struct ifnet *, struct rtentry *, struct mbuf *,
-			 struct sockaddr *, u_char *));
+	struct sockaddr *, u_char *));
 #ifndef __FreeBSD__
 int nd6_sysctl __P((int, void *, size_t *, void *, size_t));
 #endif
@@ -422,12 +422,10 @@ int nd6_need_cache __P((struct ifnet *));
 /* nd6_nbr.c */
 void nd6_na_input __P((struct mbuf *, int, int));
 void nd6_na_output __P((struct ifnet *, const struct sockaddr_in6 *,
-			const struct sockaddr_in6 *, u_long, int,
-			struct sockaddr *));
+	const struct sockaddr_in6 *, u_long, int, struct sockaddr *));
 void nd6_ns_input __P((struct mbuf *, int, int));
 void nd6_ns_output __P((struct ifnet *, const struct sockaddr_in6 *,
-			const struct sockaddr_in6 *,
-			struct llinfo_nd6 *, int));
+	const struct sockaddr_in6 *, struct llinfo_nd6 *, int));
 caddr_t nd6_ifptomac __P((struct ifnet *));
 void nd6_dad_start __P((struct ifaddr *, int *));
 void nd6_dad_stop __P((struct ifaddr *));
@@ -443,9 +441,9 @@ void defrouter_select __P((void));
 void defrtrlist_del __P((struct nd_defrouter *));
 void prelist_remove __P((struct nd_prefix *));
 int prelist_update __P((struct nd_prefix *, struct nd_defrouter *,
-			struct mbuf *));
+	struct mbuf *));
 int nd6_prelist_add __P((struct nd_prefix *, struct nd_defrouter *,
-			 struct nd_prefix **));
+	struct nd_prefix **));
 int nd6_prefix_onlink __P((struct nd_prefix *));
 int nd6_prefix_offlink __P((struct nd_prefix *));
 void pfxlist_onlink_check __P((void));
