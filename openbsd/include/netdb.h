@@ -244,7 +244,7 @@ struct addrinfo {
 /*
  * Scope delimit character
  */
-#define SCOPE_DELIMITER '@'
+#define SCOPE_DELIMITER '%'
 #endif /* !_XOPEN_SOURCE */
 
 #if 0	/*NRL IPv6*/
