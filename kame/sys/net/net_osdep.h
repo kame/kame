@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.40 2001/02/14 17:07:50 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.41 2001/04/27 23:45:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -121,8 +121,19 @@
  *		foo_sysctl()
  *	BSDI [34]
  *		foo_sysctl() but with different style
- *	FreeBSD 2, FreeBSD 3
- *		linker hack
+ *	FreeBSD
+ *		linker hack.  however, there are freebsd version differences
+ *		(how wonderful!).
+ *		on FreeBSD[23] function arg #define includes paren.
+ *			int foo SYSCTL_HANDLER_ARGS;
+ *		on FreeBSD4, function arg #define does not include paren.
+ *			int foo(SYSCTL_HANDLER_ARGS);
+ *		on some versions, forward reference to the tree is okay.
+ *		on some versions, you need SYSCTL_DECL().  you need things
+ *		like this.
+ *			#ifdef SYSCTL_DECL
+ *			SYSCTL_DECL(net_inet_ip6);
+ *			#endif
  *
  * - if_ioctl
  *	NetBSD, FreeBSD 3, BSDI [34]
