@@ -181,6 +181,7 @@ int	tcbhashsize = TCBHASHSIZE;
 int	tcp_freeq __P((struct tcpcb *));
 
 struct pool tcpcb_pool;
+extern struct pool syn_cache_link_pool;
 
 /*
  * Tcp initialization
@@ -902,17 +903,23 @@ tcp_close(tp)
 		m_free(tp->t_template);
 		tp->t_template = NULL;
 	}
+	if (tp->t_scl) {
+		tp->t_scl->scl_refcnt--;
+		tp->t_scl->scl_tp = NULL;
+		if (tp->t_scl->scl_refcnt < 0)
+			printf("%s %d: scl_refcnt < 0\n", __FILE__, __LINE__);
+		if (tp->t_scl->scl_refcnt <= 0)
+			pool_put(&syn_cache_link_pool, tp->t_scl);
+	}
 	pool_put(&tcpcb_pool, tp);
 	if (inp) {
 		inp->inp_ppcb = 0;
-		syn_cache_cleanup(so);
 		soisdisconnected(so);
 		in_pcbdetach(inp);
 	}
 #ifdef INET6
 	else if (in6p) {
 		in6p->in6p_ppcb = 0;
-		syn_cache_cleanup(so);
 		soisdisconnected(so);
 		in6_pcbdetach(in6p);
 	}
