@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.80 2002/02/07 05:31:00 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.81 2002/02/08 03:22:32 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2936,7 +2936,7 @@ mip6_bu_authdata_calc(sav, src, dst, coa, bu_opt, authdata, sumbuf)
 {
 	const struct ah_algorithm *algo;
 	struct ah_algorithm_state algos;
-	int suboptlen = 0;
+	int suboptlen = 0, bytes;
 
 	/* sanity check. */
 	if (sav == NULL)
@@ -2956,22 +2956,48 @@ mip6_bu_authdata_calc(sav, src, dst, coa, bu_opt, authdata, sumbuf)
 	 * the security association.
 	 */
 	(algo->init)(&algos, sav);
+	bytes = 0;
 	(algo->update)(&algos, (caddr_t)dst, 16);
+	bytes += 16;
 	(algo->update)(&algos, (caddr_t)coa, 16);
+	bytes += 16;
 	(algo->update)(&algos, (caddr_t)src, 16);
+	bytes += 16;
 	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_type, 1);
+	bytes += 1;
 	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_len, 1);
+	bytes += 1;
 	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_flags, 1);
+	bytes += 1;
 	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_reserved, 2);
+	bytes += 2;
 	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_seqno, 1);
+	bytes += 1;
 	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_lifetime[0], 4);
+	bytes += 4;
 	suboptlen = (caddr_t)authdata - (caddr_t)(bu_opt + 1);
 	(algo->update)(&algos, (caddr_t)(bu_opt + 1), suboptlen);
+	bytes += suboptlen;
 	(algo->update)(&algos, (caddr_t)&authdata->type, 1);
+	bytes += 1;
 	(algo->update)(&algos, (caddr_t)&authdata->len, 1);
+	bytes += 1;
 	(algo->update)(&algos, (caddr_t)&authdata->spi, 4);
+	bytes += 4;
 	/* calculate the result. */
 	(algo->result)(&algos, sumbuf);
+
+	/* record data transfer on SA, and update timestamps */
+	/* XXX key.c:key_sa_recordxfer(sav, m) */
+	if (sav->lft_c == NULL)
+		return (0);
+	sav->lft_c->sadb_lifetime_bytes += bytes;
+	sav->lft_c->sadb_lifetime_allocations++;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	sav->lft_c->sadb_lifetime_usetime = time_second;
+#else
+	sav->lft_c->sadb_lifetime_usetime = time.tv_sec;
+#endif
 
 	return (0);
 }
@@ -2987,7 +3013,7 @@ mip6_ba_authdata_calc(sav, src, dst, ba_opt, authdata, sumbuf)
 {
 	const struct ah_algorithm *algo;
 	struct ah_algorithm_state algos;
-	int suboptlen = 0;
+	int suboptlen = 0, bytes;
 
 	/* sanity check. */
 	if (sav == NULL)
@@ -3007,22 +3033,48 @@ mip6_ba_authdata_calc(sav, src, dst, ba_opt, authdata, sumbuf)
 	 * the security association.
 	 */
 	(algo->init)(&algos, sav);
+	bytes = 0;
 	(algo->update)(&algos, (caddr_t)dst, 16);
+	bytes += 16;
 	(algo->update)(&algos, (caddr_t)src, 16);
+	bytes += 16;
 	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_type, 1);
+	bytes += 1;
 	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_len, 1);
+	bytes += 1;
 	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_status, 1);
+	bytes += 1;
 	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_reserved, 1);
+	bytes += 1;
 	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_seqno, 1);
+	bytes += 1;
 	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_lifetime[0], 4);
+	bytes += 4;
 	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_refresh[0], 4);
+	bytes += 4;
 	suboptlen = (caddr_t)authdata - (caddr_t)(ba_opt + 1);
 	(algo->update)(&algos, (caddr_t)(ba_opt + 1), suboptlen);
+	bytes += suboptlen;
 	(algo->update)(&algos, (caddr_t)&authdata->type, 1);
+	bytes += 1;
 	(algo->update)(&algos, (caddr_t)&authdata->len, 1);
+	bytes += 1;
 	(algo->update)(&algos, (caddr_t)&authdata->spi, 4);
+	bytes += 4;
 	/* calculate the result. */
 	(algo->result)(&algos, sumbuf);
+
+	/* record data transfer on SA, and update timestamps */
+	/* XXX key.c:key_sa_recordxfer(sav, m) */
+	if (sav->lft_c == NULL)
+		return (0);
+	sav->lft_c->sadb_lifetime_bytes += bytes;
+	sav->lft_c->sadb_lifetime_allocations++;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	sav->lft_c->sadb_lifetime_usetime = time_second;
+#else
+	sav->lft_c->sadb_lifetime_usetime = time.tv_sec;
+#endif
 
 	return (0);
 }
