@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.49 2000/06/15 08:23:29 itojun Exp $
+$Id: COVERAGE,v 1.50 2000/06/20 02:11:24 itojun Exp $
 
 
 x: supported/integrated
@@ -42,6 +42,10 @@ KAME extended resolver (IPv6 transport, EDNS0, bogus address filtering)
 		--	--	--	--	--	--	--	---
 KAME IPv6 as of	latest	early	early	early	notyet	late	early
 			june00	june00	nov99		may00	nov99
+
+IPv4 IPsec	KAME	KAME	openbsd	KAME	notyet	openbsd	KAME
+
+IPv6 IPsec	KAME	KAME	openbsd	KAME	notyet	-	KAME
 
 KAME IPsec as of
 		latest	12jun00	-	early	notyet	-	early
