@@ -4,6 +4,9 @@ SUBDIR+=inetd sysctl
 
 SUBDIR+=rtsold ifmcstat ndp tcpdump mping
 SUBDIR+=traceroute6 rtadvd mld6query rrenumd prefix icmp6dump gifconfig
-SUBDIR+=rip6query route6d faithd bgpd hroute6d altqd
+SUBDIR+=rip6query route6d faithd bgpd hroute6d
+.if ${MACHINE_ARCH} == "i386"
+SUBDIR+=altqd
+.endif
 
 .include <bsd.subdir.mk>
