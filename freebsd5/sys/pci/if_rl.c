@@ -30,6 +30,9 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/if_rl.c,v 1.126 2003/11/28 05:28:29 imp Exp $");
+
 /*
  * RealTek 8129/8139 PCI NIC driver
  *
@@ -41,7 +44,6 @@
  * Electrical Engineering Department
  * Columbia University, New York City
  */
-
 /*
  * The RealTek 8139 PCI NIC redefines the meaning of 'low end.' This is
  * probably the worst PCI ethernet controller ever made, with the possible
@@ -108,8 +110,8 @@
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 MODULE_DEPEND(rl, pci, 1, 1, 1);
 MODULE_DEPEND(rl, ether, 1, 1, 1);
@@ -130,38 +132,44 @@ MODULE_DEPEND(rl, miibus, 1, 1, 1);
 
 #include <pci/if_rlreg.h>
 
-__FBSDID("$FreeBSD: src/sys/pci/if_rl.c,v 1.98 2003/04/21 18:34:04 imp Exp $");
-
 /*
  * Various supported device vendors/types and their names.
  */
 static struct rl_type rl_devs[] = {
-	{ RT_VENDORID, RT_DEVICEID_8129,
+	{ RT_VENDORID, RT_DEVICEID_8129, RL_8129,
 		"RealTek 8129 10/100BaseTX" },
-	{ RT_VENDORID, RT_DEVICEID_8139,
+	{ RT_VENDORID, RT_DEVICEID_8139, RL_8139,
 		"RealTek 8139 10/100BaseTX" },
-	{ RT_VENDORID, RT_DEVICEID_8138,
+	{ RT_VENDORID, RT_DEVICEID_8138, RL_8139,
 		"RealTek 8139 10/100BaseTX CardBus" },
-	{ ACCTON_VENDORID, ACCTON_DEVICEID_5030,
+	{ RT_VENDORID, RT_DEVICEID_8100, RL_8139,
+		"RealTek 8100 10/100BaseTX" },
+	{ ACCTON_VENDORID, ACCTON_DEVICEID_5030, RL_8139,
 		"Accton MPX 5030/5038 10/100BaseTX" },
-	{ DELTA_VENDORID, DELTA_DEVICEID_8139,
+	{ DELTA_VENDORID, DELTA_DEVICEID_8139, RL_8139,
 		"Delta Electronics 8139 10/100BaseTX" },
-	{ ADDTRON_VENDORID, ADDTRON_DEVICEID_8139,
+	{ ADDTRON_VENDORID, ADDTRON_DEVICEID_8139, RL_8139,
 		"Addtron Technolgy 8139 10/100BaseTX" },
-	{ DLINK_VENDORID, DLINK_DEVICEID_530TXPLUS,
+	{ DLINK_VENDORID, DLINK_DEVICEID_530TXPLUS, RL_8139,
 		"D-Link DFE-530TX+ 10/100BaseTX" },
-	{ DLINK_VENDORID, DLINK_DEVICEID_690TXD,
+	{ DLINK_VENDORID, DLINK_DEVICEID_690TXD, RL_8139,
 		"D-Link DFE-690TXD 10/100BaseTX" },
-	{ NORTEL_VENDORID, ACCTON_DEVICEID_5030,
+	{ NORTEL_VENDORID, ACCTON_DEVICEID_5030, RL_8139,
 		"Nortel Networks 10/100BaseTX" },
-	{ COREGA_VENDORID, COREGA_DEVICEID_FETHERCBTXD,
+	{ COREGA_VENDORID, COREGA_DEVICEID_FETHERCBTXD, RL_8139,
 		"Corega FEther CB-TXD" },
-	{ COREGA_VENDORID, COREGA_DEVICEID_FETHERIICBTXD,
+	{ COREGA_VENDORID, COREGA_DEVICEID_FETHERIICBTXD, RL_8139,
 		"Corega FEtherII CB-TXD" },
-	{ PEPPERCON_VENDORID, PEPPERCON_DEVICEID_ROLF,
+	{ PEPPERCON_VENDORID, PEPPERCON_DEVICEID_ROLF, RL_8139,
 		"Peppercon AG ROL-F" },
-	{ PLANEX_VENDORID, PLANEX_DEVICEID_FNW3800TX,
+	{ PLANEX_VENDORID, PLANEX_DEVICEID_FNW3800TX, RL_8139,
 		"Planex FNW-3800-TX" },
+	{ CP_VENDORID, RT_DEVICEID_8139, RL_8139,
+		"Compaq HNE-300" },
+	{ LEVEL1_VENDORID, LEVEL1_DEVICEID_FPC0106TX, RL_8139,
+		"LevelOne FPC-0106TX" },
+	{ EDIMAX_VENDORID, EDIMAX_DEVICEID_EP4103DL, RL_8139,
+		"Edimax EP-4103DL CardBus" },
 	{ 0, 0, NULL }
 };
 
@@ -198,7 +206,7 @@ static int rl_miibus_readreg	(device_t, int, int);
 static int rl_miibus_writereg	(device_t, int, int, int);
 static void rl_miibus_statchg	(device_t);
 
-static u_int8_t rl_calchash	(caddr_t);
+static u_int32_t rl_mchash	(caddr_t);
 static void rl_setmulti		(struct rl_softc *);
 static void rl_reset		(struct rl_softc *);
 static int rl_list_tx_init	(struct rl_softc *);
@@ -626,7 +634,6 @@ rl_miibus_readreg(dev, phy, reg)
 		case MII_PHYIDR2:
 			RL_UNLOCK(sc);
 			return(0);
-			break;
 		/*
 		 * Allow the rlphy driver to read the media status
 		 * register. If we have a link partner which does not
@@ -637,7 +644,6 @@ rl_miibus_readreg(dev, phy, reg)
 			rval = CSR_READ_1(sc, RL_MEDIASTAT);
 			RL_UNLOCK(sc);
 			return(rval);
-			break;
 		default:
 			printf("rl%d: bad phy register\n", sc->rl_unit);
 			RL_UNLOCK(sc);
@@ -729,23 +735,21 @@ rl_miibus_statchg(dev)
 /*
  * Calculate CRC of a multicast group address, return the upper 6 bits.
  */
-static u_int8_t
-rl_calchash(addr)
-	caddr_t			addr;
+static u_int32_t
+rl_mchash(addr)
+	caddr_t		addr;
 {
-	u_int32_t		crc, carry;
-	int			i, j;
-	u_int8_t		c;
+	u_int32_t	crc, carry;
+	int		idx, bit;
+	u_int8_t	data;
 
 	/* Compute CRC for the address value. */
 	crc = 0xFFFFFFFF; /* initial value */
 
-	for (i = 0; i < 6; i++) {
-		c = *(addr + i);
-		for (j = 0; j < 8; j++) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (c & 0x01);
+	for (idx = 0; idx < 6; idx++) {
+		for (data = *addr++, bit = 0; bit < 8; bit++, data >>=1 ) {
+			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
 			crc <<= 1;
-			c >>= 1;
 			if (carry)
 				crc = (crc ^ 0x04c11db6) | carry;
 		}
@@ -789,7 +793,7 @@ rl_setmulti(sc)
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = rl_calchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = rl_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
 		if (h < 32)
 			hashes[0] |= (1 << h);
 		else
@@ -837,12 +841,49 @@ rl_probe(dev)
 	device_t		dev;
 {
 	struct rl_type		*t;
+        struct rl_softc		*sc;
+	int			rid;
+	u_int32_t		hwrev;
 
 	t = rl_devs;
+	sc = device_get_softc(dev);
 
 	while(t->rl_name != NULL) {
 		if ((pci_get_vendor(dev) == t->rl_vid) &&
 		    (pci_get_device(dev) == t->rl_did)) {
+
+			/*
+			 * Temporarily map the I/O space
+			 * so we can read the chip ID register.
+			 */
+			rid = RL_RID;
+			sc->rl_res = bus_alloc_resource(dev, RL_RES, &rid,
+			    0, ~0, 1, RF_ACTIVE);
+			if (sc->rl_res == NULL) {
+				device_printf(dev,
+				    "couldn't map ports/memory\n");
+				return(ENXIO);
+			}
+			sc->rl_btag = rman_get_bustag(sc->rl_res);
+			sc->rl_bhandle = rman_get_bushandle(sc->rl_res);
+			mtx_init(&sc->rl_mtx,
+			    device_get_nameunit(dev),
+			    MTX_NETWORK_LOCK, MTX_DEF);
+                        RL_LOCK(sc);
+			hwrev = CSR_READ_4(sc, RL_TXCFG) & RL_TXCFG_HWREV;
+			bus_release_resource(dev, RL_RES, RL_RID, sc->rl_res);
+			RL_UNLOCK(sc);
+			mtx_destroy(&sc->rl_mtx);
+
+			/* Don't attach to 8139C+ or 8169/8110 chips. */
+			if (hwrev == RL_HWREV_8139CPLUS ||
+			    hwrev == RL_HWREV_8169 ||
+			    hwrev == RL_HWREV_8169S ||
+			    hwrev == RL_HWREV_8110S) {
+				t++;
+				continue;
+			}
+
 			device_set_desc(dev, t->rl_name);
 			return(0);
 		}
@@ -865,6 +906,7 @@ rl_attach(dev)
 	struct rl_softc		*sc;
 	struct ifnet		*ifp;
 	u_int16_t		rl_did = 0;
+	struct rl_type		*t;
 	int			unit, error = 0, rid, i;
 
 	sc = device_get_softc(dev);
@@ -872,7 +914,7 @@ rl_attach(dev)
 
 	mtx_init(&sc->rl_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
-
+#ifndef BURN_BRIDGES
 	/*
 	 * Handle power management nonsense.
 	 */
@@ -897,7 +939,7 @@ rl_attach(dev)
 		pci_write_config(dev, RL_PCI_LOMEM, membase, 4);
 		pci_write_config(dev, RL_PCI_INTLINE, irq, 4);
 	}
-
+#endif
 	/*
 	 * Map control/status registers.
 	 */
@@ -913,6 +955,7 @@ rl_attach(dev)
 		goto fail;
 	}
 
+#ifdef notdef
 	/* Detect the Realtek 8139B. For some reason, this chip is very
 	 * unstable when left to autoselect the media
 	 * The best workaround is to set the device to the required
@@ -920,8 +963,10 @@ rl_attach(dev)
 	 */
 
 	if ((rman_get_end(sc->rl_res)-rman_get_start(sc->rl_res))==0xff) {
-		printf("rl%d: Realtek 8139B detected. Warning, this may be unstable in autoselect mode\n", unit);
+		printf("rl%d: Realtek 8139B detected. Warning, "
+		    "this may be unstable in autoselect mode\n", unit);
 	}
+#endif
 
 	sc->rl_btag = rman_get_bustag(sc->rl_res);
 	sc->rl_bhandle = rman_get_bushandle(sc->rl_res);
@@ -967,17 +1012,17 @@ rl_attach(dev)
 	 */
 	rl_read_eeprom(sc, (caddr_t)&rl_did, RL_EE_PCI_DID, 1, 0);
 
-	if (rl_did == RT_DEVICEID_8139 || rl_did == ACCTON_DEVICEID_5030 ||
-	    rl_did == DELTA_DEVICEID_8139 || rl_did == ADDTRON_DEVICEID_8139 ||
-	    rl_did == RT_DEVICEID_8138 || rl_did == DLINK_DEVICEID_530TXPLUS ||
-	    rl_did == DLINK_DEVICEID_690TXD ||
-	    rl_did == COREGA_DEVICEID_FETHERCBTXD ||
-	    rl_did == COREGA_DEVICEID_FETHERIICBTXD ||
-	    rl_did == PLANEX_DEVICEID_FNW3800TX)
-		sc->rl_type = RL_8139;
-	else if (rl_did == RT_DEVICEID_8129)
-		sc->rl_type = RL_8129;
-	else {
+	t = rl_devs;
+	sc->rl_type = 0;
+	while(t->rl_name != NULL) {
+		if (rl_did == t->rl_did) {
+			sc->rl_type = t->rl_basetype;
+			break;
+		}
+		t++;
+	}
+
+	if (sc->rl_type == 0) {
 		printf("rl%d: unknown device ID: %x\n", unit, rl_did);
 		error = ENXIO;
 		goto fail;
@@ -995,6 +1040,7 @@ rl_attach(dev)
 			MAXBSIZE, RL_NSEG_NEW,	/* maxsize, nsegments */
 			BUS_SPACE_MAXSIZE_32BIT,/* maxsegsize */
 			BUS_DMA_ALLOCNOW,	/* flags */
+			NULL, NULL,		/* lockfunc, lockarg */
 			&sc->rl_parent_tag);
 	if (error)
 		goto fail;
@@ -1011,7 +1057,8 @@ rl_attach(dev)
 			NULL, NULL,		/* filter, filterarg */
 			RL_RXBUFLEN + 1518, 1,	/* maxsize,nsegments */
 			BUS_SPACE_MAXSIZE_32BIT,/* maxsegsize */
-			0,			/* flags */
+			BUS_DMA_ALLOCNOW,		/* flags */
+			NULL, NULL,		/* lockfunc, lockarg */
 			&sc->rl_tag);
 	if (error)
 		goto fail;
@@ -1021,7 +1068,7 @@ rl_attach(dev)
 	 * tag we just created.
 	 */
 	error = bus_dmamem_alloc(sc->rl_tag,
-	    (void **)&sc->rl_cdata.rl_rx_buf, BUS_DMA_NOWAIT,
+	    (void **)&sc->rl_cdata.rl_rx_buf, BUS_DMA_NOWAIT | BUS_DMA_ZERO,
 	    &sc->rl_cdata.rl_rx_dmamap);
 
 	if (error) {
@@ -1045,8 +1092,7 @@ rl_attach(dev)
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = unit;
-	ifp->if_name = "rl";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = rl_ioctl;
@@ -1055,9 +1101,11 @@ rl_attach(dev)
 	ifp->if_watchdog = rl_watchdog;
 	ifp->if_init = rl_init;
 	ifp->if_baudrate = 10000000;
+	ifp->if_capabilities = IFCAP_VLAN_MTU;
+	ifp->if_capenable = ifp->if_capabilities;
 	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
 	IFQ_SET_READY(&ifp->if_snd);
-
+	
 	callout_handle_init(&sc->rl_stat_ch);
 
 	/*
@@ -1190,6 +1238,8 @@ rl_rxeof(sc)
 	u_int16_t		limit;
 	u_int16_t		rx_bytes = 0, max_bytes;
 
+	RL_LOCK_ASSERT(sc);
+
 	ifp = &sc->arpcom.ac_if;
 
 	bus_dmamap_sync(sc->rl_tag, sc->rl_cdata.rl_rx_dmamap,
@@ -1290,7 +1340,9 @@ rl_rxeof(sc)
 			continue;
 
 		ifp->if_ipackets++;
+		RL_UNLOCK(sc);
 		(*ifp->if_input)(ifp, m);
+		RL_LOCK(sc);
 	}
 
 	return;
@@ -1613,7 +1665,6 @@ rl_init(xsc)
 	struct rl_softc		*sc = xsc;
 	struct ifnet		*ifp = &sc->arpcom.ac_if;
 	struct mii_data		*mii;
-	int			i;
 	u_int32_t		rxcfg = 0;
 
 	RL_LOCK(sc);
@@ -1624,10 +1675,17 @@ rl_init(xsc)
 	 */
 	rl_stop(sc);
 
-	/* Init our MAC address */
-	for (i = 0; i < ETHER_ADDR_LEN; i++) {
-		CSR_WRITE_1(sc, RL_IDR0 + i, sc->arpcom.ac_enaddr[i]);
-	}
+	/*
+	 * Init our MAC address.  Even though the chipset
+	 * documentation doesn't mention it, we need to enter "Config
+	 * register write enable" mode to modify the ID registers.
+	 */
+	CSR_WRITE_1(sc, RL_EECMD, RL_EEMODE_WRITECFG);
+	CSR_WRITE_STREAM_4(sc, RL_IDR0,
+	    *(u_int32_t *)(&sc->arpcom.ac_enaddr[0]));
+	CSR_WRITE_STREAM_4(sc, RL_IDR4,
+	    *(u_int32_t *)(&sc->arpcom.ac_enaddr[4]));
+	CSR_WRITE_1(sc, RL_EECMD, RL_EEMODE_OFF);
 
 	/* Init the RX buffer pointer register. */
 	bus_dmamap_load(sc->rl_tag, sc->rl_cdata.rl_rx_dmamap,

@@ -1,4 +1,3 @@
-/*	$FreeBSD: src/sys/kern/uipc_mbuf2.c,v 1.19 2003/04/14 20:39:05 rwatson Exp $	*/
 /*	$KAME: uipc_mbuf2.c,v 1.31 2001/11/28 11:08:53 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
@@ -30,7 +29,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 /*
  * Copyright (c) 1982, 1986, 1988, 1991, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -65,6 +63,9 @@
  *
  *	@(#)uipc_mbuf.c	8.4 (Berkeley) 2/14/95
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/uipc_mbuf2.c,v 1.21 2003/10/29 05:40:07 sam Exp $");
 
 /*#define PULLDOWN_DEBUG*/
 
@@ -379,6 +380,23 @@ m_tag_delete_chain(struct mbuf *m, struct m_tag *t)
 	while ((q = SLIST_NEXT(p, m_tag_link)) != NULL)
 		m_tag_delete(m, q);
 	m_tag_delete(m, p);
+}
+
+/*
+ * Strip off all tags that would normally vanish when
+ * passing through a network interface.  Only persistent
+ * tags will exist after this; these are expected to remain
+ * so long as the mbuf chain exists, regardless of the
+ * path the mbufs take.
+ */
+void
+m_tag_delete_nonpersistent(struct mbuf *m)
+{
+	struct m_tag *p, *q;
+
+	SLIST_FOREACH_SAFE(p, &m->m_pkthdr.tags, m_tag_link, q)
+		if ((p->m_tag_id & MTAG_PERSISTENT) == 0)
+			m_tag_delete(m, p);
 }
 
 /* Find a tag, starting from a given position. */

@@ -31,6 +31,9 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/if_pcn.c,v 1.52 2003/11/14 19:00:31 sam Exp $");
+
 /*
  * AMD Am79c972 fast ethernet PCI NIC driver. Datatheets are available
  * from http://www.amd.com.
@@ -48,9 +51,6 @@
  * allows the receive handler to pass packets to the upper protocol
  * layers without copying on both the x86 and alpha platforms).
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_pcn.c,v 1.45 2003/04/21 18:34:04 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -80,8 +80,8 @@ __FBSDID("$FreeBSD: src/sys/pci/if_pcn.c,v 1.45 2003/04/21 18:34:04 imp Exp $");
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #define PCN_USEIOSPACE
 
@@ -136,7 +136,7 @@ static void pcn_miibus_statchg	(device_t);
 
 static void pcn_setfilt		(struct ifnet *);
 static void pcn_setmulti	(struct pcn_softc *);
-static u_int32_t pcn_crc	(caddr_t);
+static u_int32_t pcn_mchash	(caddr_t);
 static void pcn_reset		(struct pcn_softc *);
 static int pcn_list_rx_init	(struct pcn_softc *);
 static int pcn_list_tx_init	(struct pcn_softc *);
@@ -309,10 +309,12 @@ pcn_miibus_statchg(dev)
 #define DC_POLY		0xEDB88320
 
 static u_int32_t
-pcn_crc(addr)
-	caddr_t			addr;
+pcn_mchash(addr)
+	caddr_t		addr;
 {
-	u_int32_t		idx, bit, data, crc;
+	u_int32_t	crc;
+	int		idx, bit;
+	u_int8_t	data;
 
 	/* Compute CRC for the address value. */
 	crc = 0xFFFFFFFF; /* initial value */
@@ -353,7 +355,7 @@ pcn_setmulti(sc)
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = pcn_crc(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = pcn_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
 		hashes[h >> 4] |= 1 << (h & 0xF);
 	}
 
@@ -486,7 +488,6 @@ pcn_probe(dev)
 				break;
 			default:
 				return(ENXIO);
-				break;
 			}
 			device_set_desc(dev, t->pcn_name);
 			return(0);
@@ -516,7 +517,7 @@ pcn_attach(dev)
 	/* Initialize our mutex. */
 	mtx_init(&sc->pcn_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
-
+#ifndef BURN_BRIDGES
 	/*
 	 * Handle power management nonsense.
 	 */
@@ -539,7 +540,7 @@ pcn_attach(dev)
 		pci_write_config(dev, PCN_PCI_LOMEM, membase, 4);
 		pci_write_config(dev, PCN_PCI_INTLINE, irq, 4);
 	}
-
+#endif
 	/*
 	 * Map control/status registers.
 	 */
@@ -600,8 +601,7 @@ pcn_attach(dev)
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = unit;
-	ifp->if_name = "pcn";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = pcn_ioctl;
@@ -727,11 +727,9 @@ static int
 pcn_list_rx_init(sc)
 	struct pcn_softc	*sc;
 {
-	struct pcn_list_data	*ld;
 	struct pcn_ring_data	*cd;
 	int			i;
 
-	ld = sc->pcn_ldata;
 	cd = &sc->pcn_cdata;
 
 	for (i = 0; i < PCN_RX_LIST_CNT; i++) {
@@ -794,11 +792,12 @@ static void
 pcn_rxeof(sc)
 	struct pcn_softc	*sc;
 {
-        struct ether_header	*eh;
         struct mbuf		*m;
         struct ifnet		*ifp;
 	struct pcn_rx_desc	*cur_rx;
 	int			i;
+
+	PCN_LOCK_ASSERT(sc);
 
 	ifp = &sc->arpcom.ac_if;
 	i = sc->pcn_cdata.pcn_rx_prod;
@@ -833,12 +832,13 @@ pcn_rxeof(sc)
 
 		/* No errors; receive the packet. */
 		ifp->if_ipackets++;
-		eh = mtod(m, struct ether_header *);
 		m->m_len = m->m_pkthdr.len =
 		    cur_rx->pcn_rxlen - ETHER_CRC_LEN;
 		m->m_pkthdr.rcvif = ifp;
 
+		PCN_UNLOCK(sc);
 		(*ifp->if_input)(ifp, m);
+		PCN_LOCK(sc);
 	}
 
 	sc->pcn_cdata.pcn_rx_prod = i;

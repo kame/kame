@@ -28,9 +28,10 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/pci/if_sis.c,v 1.75 2003/05/06 02:00:01 cognet Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/if_sis.c,v 1.90.2.1 2003/12/30 10:47:22 phk Exp $");
 
 /*
  * SiS 900/SiS 7016 fast ethernet PCI NIC driver. Datasheets are
@@ -43,7 +44,6 @@
  * Electrical Engineering Department
  * Columbia University, New York City
  */
-
 /*
  * The SiS 900 is a fairly simple chip. It uses bus master DMA with
  * simple TX and RX descriptors of 3 longwords in size. The receiver
@@ -56,9 +56,6 @@
  * The only downside to this chipset is that RX descriptors must be
  * longword aligned.
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_sis.c,v 1.75 2003/05/06 02:00:01 cognet Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -89,8 +86,8 @@ __FBSDID("$FreeBSD: src/sys/pci/if_sis.c,v 1.75 2003/05/06 02:00:01 cognet Exp $
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #define SIS_USEIOSPACE
 
@@ -109,7 +106,7 @@ MODULE_DEPEND(sis, miibus, 1, 1, 1);
 static struct sis_type sis_devs[] = {
 	{ SIS_VENDORID, SIS_DEVICEID_900, "SiS 900 10/100BaseTX" },
 	{ SIS_VENDORID, SIS_DEVICEID_7016, "SiS 7016 10/100BaseTX" },
-	{ NS_VENDORID, NS_DEVICEID_DP83815, "NatSemi DP83815 10/100BaseTX" },
+	{ NS_VENDORID, NS_DEVICEID_DP83815, "NatSemi DP8381[56] 10/100BaseTX" },
 	{ 0, 0, NULL }
 };
 
@@ -120,7 +117,7 @@ static int sis_detach		(device_t);
 static int sis_newbuf		(struct sis_softc *,
 					struct sis_desc *, struct mbuf *);
 static int sis_encap		(struct sis_softc *,
-					struct mbuf *, u_int32_t *);
+					struct mbuf **, u_int32_t *);
 static void sis_rxeof		(struct sis_softc *);
 static void sis_rxeoc		(struct sis_softc *);
 static void sis_txeof		(struct sis_softc *);
@@ -158,7 +155,7 @@ static void sis_miibus_statchg	(device_t);
 
 static void sis_setmulti_sis	(struct sis_softc *);
 static void sis_setmulti_ns	(struct sis_softc *);
-static u_int32_t sis_crc	(struct sis_softc *, caddr_t);
+static u_int32_t sis_mchash	(struct sis_softc *, caddr_t);
 static void sis_reset		(struct sis_softc *);
 static int sis_list_rx_init	(struct sis_softc *);
 static int sis_list_tx_init	(struct sis_softc *);
@@ -840,23 +837,21 @@ sis_miibus_statchg(dev)
 }
 
 static u_int32_t
-sis_crc(sc, addr)
+sis_mchash(sc, addr)
 	struct sis_softc	*sc;
 	caddr_t			addr;
 {
 	u_int32_t		crc, carry; 
-	int			i, j;
-	u_int8_t		c;
+	int			idx, bit;
+	u_int8_t		data;
 
 	/* Compute CRC for the address value. */
 	crc = 0xFFFFFFFF; /* initial value */
 
-	for (i = 0; i < 6; i++) {
-		c = *(addr + i);
-		for (j = 0; j < 8; j++) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (c & 0x01);
+	for (idx = 0; idx < 6; idx++) {
+		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
+			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
 			crc <<= 1;
-			c >>= 1;
 			if (carry)
 				crc = (crc ^ 0x04c11db6) | carry;
 		}
@@ -912,7 +907,8 @@ sis_setmulti_ns(sc)
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = sis_crc(sc, LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = sis_mchash(sc,
+		    LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
 		index = h >> 3;
 		bit = h & 0x1F;
 		CSR_WRITE_4(sc, SIS_RXFILT_CTL, NS_FILTADDR_FMEM_LO + index);
@@ -962,7 +958,7 @@ sis_setmulti_sis(sc)
 		TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 			if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-			h = sis_crc(sc,
+			h = sis_mchash(sc,
 			    LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
 			hashes[h >> 4] |= 1 << (h & 0xf);
 			i++;
@@ -1054,6 +1050,8 @@ sis_attach(dev)
 	sc = device_get_softc(dev);
 	unit = device_get_unit(dev);
 
+	sc->sis_self = dev;
+
 	mtx_init(&sc->sis_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
 
@@ -1065,7 +1063,7 @@ sis_attach(dev)
 		sc->sis_type = SIS_TYPE_83815;
 
 	sc->sis_rev = pci_read_config(dev, PCIR_REVID, 1);
-
+#ifndef BURN_BRIDGES
 	/*
 	 * Handle power management nonsense.
 	 */
@@ -1088,7 +1086,7 @@ sis_attach(dev)
 		pci_write_config(dev, SIS_PCI_LOMEM, membase, 4);
 		pci_write_config(dev, SIS_PCI_INTLINE, irq, 4);
 	}
-
+#endif
 	/*
 	 * Map control/status registers.
 	 */
@@ -1133,6 +1131,18 @@ sis_attach(dev)
 	 */
 	switch (pci_get_vendor(dev)) {
 	case NS_VENDORID:
+		sc->sis_srr = CSR_READ_4(sc, NS_SRR);
+
+		/* We can't update the device description, so spew */
+		if (sc->sis_srr == NS_SRR_15C)
+			device_printf(dev, "Silicon Revision: DP83815C\n");
+		else if (sc->sis_srr == NS_SRR_15D)
+			device_printf(dev, "Silicon Revision: DP83815D\n");
+		else if (sc->sis_srr == NS_SRR_16A)
+			device_printf(dev, "Silicon Revision: DP83816A\n");
+		else
+			device_printf(dev, "Silicon Revision %x\n", sc->sis_srr);
+
 		/*
 		 * Reading the MAC address out of the EEPROM on
 		 * the NatSemi chip takes a bit more work than
@@ -1230,7 +1240,7 @@ sis_attach(dev)
 	printf("sis%d: Ethernet address: %6D\n", unit, eaddr, ":");
 
 	sc->sis_unit = unit;
-	callout_handle_init(&sc->sis_stat_ch);
+	callout_init(&sc->sis_stat_ch, CALLOUT_MPSAFE);
 	bcopy(eaddr, (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
 
 	/*
@@ -1245,6 +1255,7 @@ sis_attach(dev)
 			MAXBSIZE, SIS_NSEG_NEW,	/* maxsize, nsegments */
 			BUS_SPACE_MAXSIZE_32BIT,/* maxsegsize */ 
 			BUS_DMA_ALLOCNOW,	/* flags */
+			NULL, NULL,		/* lockfunc, lockarg */
 			&sc->sis_parent_tag);
 	if (error)
 		goto fail;
@@ -1264,12 +1275,14 @@ sis_attach(dev)
 			SIS_RX_LIST_SZ, 1,	/* maxsize,nsegments */
 			BUS_SPACE_MAXSIZE_32BIT,/* maxsegsize */
 			0,			/* flags */
+			busdma_lock_mutex,	/* lockfunc */
+			&Giant,			/* lockarg */
 			&sc->sis_ldata.sis_rx_tag);
 	if (error)
 		goto fail;
 
 	error = bus_dmamem_alloc(sc->sis_ldata.sis_rx_tag,
-	    (void **)&sc->sis_ldata.sis_rx_list, BUS_DMA_NOWAIT,
+	    (void **)&sc->sis_ldata.sis_rx_list, BUS_DMA_NOWAIT | BUS_DMA_ZERO,
 	    &sc->sis_ldata.sis_rx_dmamap);
 
 	if (error) {
@@ -1301,12 +1314,14 @@ sis_attach(dev)
 			SIS_TX_LIST_SZ, 1,	/* maxsize,nsegments */
 			BUS_SPACE_MAXSIZE_32BIT,/* maxsegsize */
 			0,			/* flags */
+			busdma_lock_mutex,	/* lockfunc */
+			&Giant,			/* lockarg */
 			&sc->sis_ldata.sis_tx_tag);
 	if (error)
 		goto fail;
 
 	error = bus_dmamem_alloc(sc->sis_ldata.sis_tx_tag,
-	    (void **)&sc->sis_ldata.sis_tx_list, BUS_DMA_NOWAIT,
+	    (void **)&sc->sis_ldata.sis_tx_list, BUS_DMA_NOWAIT | BUS_DMA_ZERO,
 	    &sc->sis_ldata.sis_tx_dmamap);
 
 	if (error) {
@@ -1338,12 +1353,11 @@ sis_attach(dev)
 			MCLBYTES, 1,		/* maxsize,nsegments */
 			BUS_SPACE_MAXSIZE_32BIT,/* maxsegsize */
 			0,			/* flags */
+			busdma_lock_mutex,	/* lockfunc */
+			&Giant,			/* lockarg */
 			&sc->sis_tag);
 	if (error)
 		goto fail;
-
-	bzero(sc->sis_ldata.sis_tx_list, SIS_TX_LIST_SZ);
-	bzero(sc->sis_ldata.sis_rx_list, SIS_RX_LIST_SZ);
 
 	/*
 	 * Obtain the physical addresses of the RX and TX
@@ -1352,8 +1366,7 @@ sis_attach(dev)
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = unit;
-	ifp->if_name = "sis";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = sis_ioctl;
@@ -1387,7 +1400,7 @@ sis_attach(dev)
 	ifp->if_capabilities |= IFCAP_VLAN_MTU;
 
 	/* Hook interrupt last to avoid having to lock softc */
-	error = bus_setup_intr(dev, sc->sis_irq, INTR_TYPE_NET,
+	error = bus_setup_intr(dev, sc->sis_irq, INTR_TYPE_NET | INTR_MPSAFE,
 	    sis_intr, sc, &sc->sis_intrhand);
 
 	if (error) {
@@ -1422,7 +1435,7 @@ sis_detach(dev)
 	SIS_LOCK(sc);
 	ifp = &sc->arpcom.ac_if;
 
-	/* These should only be active if attach succeeded */
+	/* These should only be active if attach succeeded. */
 	if (device_is_attached(dev)) {
 		sis_reset(sc);
 		sis_stop(sc);
@@ -1582,6 +1595,8 @@ sis_rxeof(sc)
 	int			i, total_len = 0;
 	u_int32_t		rxstat;
 
+	SIS_LOCK_ASSERT(sc);
+
 	ifp = &sc->arpcom.ac_if;
 	i = sc->sis_cdata.sis_rx_prod;
 
@@ -1649,7 +1664,9 @@ sis_rxeof(sc)
 		ifp->if_ipackets++;
 		m->m_pkthdr.rcvif = ifp;
 
+		SIS_UNLOCK(sc);
 		(*ifp->if_input)(ifp, m);
+		SIS_LOCK(sc);
 	}
 
 	sc->sis_cdata.sis_rx_prod = i;
@@ -1735,6 +1752,7 @@ sis_tick(xsc)
 
 	sc = xsc;
 	SIS_LOCK(sc);
+	sc->in_tick = 1;
 	ifp = &sc->arpcom.ac_if;
 
 	mii = device_get_softc(sc->sis_miibus);
@@ -1747,6 +1765,8 @@ sis_tick(xsc)
 			sis_start(ifp);
 	}
 
+	callout_reset(&sc->sis_stat_ch, hz,  sis_tick, sc);
+	sc->in_tick = 0;
 	SIS_UNLOCK(sc);
 
 	return;
@@ -1877,7 +1897,7 @@ done:
 static int
 sis_encap(sc, m_head, txidx)
 	struct sis_softc	*sc;
-	struct mbuf		*m_head;
+	struct mbuf		**m_head;
 	u_int32_t		*txidx;
 {
 	struct sis_desc		*f = NULL;
@@ -1897,15 +1917,15 @@ sis_encap(sc, m_head, txidx)
 	 * do not use up the entire list, even if they would fit.
 	 */
 
-	for (m = m_head; m != NULL; m = m->m_next)
+	for (m = *m_head; m != NULL; m = m->m_next)
 		chainlen++;
 
 	if ((chainlen > SIS_TX_LIST_CNT / 4) ||
 	    ((SIS_TX_LIST_CNT - (chainlen + sc->sis_cdata.sis_tx_cnt)) < 2)) {
-		m = m_defrag(m_head, M_DONTWAIT);
+		m = m_defrag(*m_head, M_DONTWAIT);
 		if (m == NULL)
 			return (ENOBUFS);
-		m_head = m;
+		*m_head = m;
 	}
 	
 	/*
@@ -1913,10 +1933,9 @@ sis_encap(sc, m_head, txidx)
 	 * the fragment pointers. Stop when we run out
  	 * of fragments or hit the end of the mbuf chain.
 	 */
-	m = m_head;
 	cur = frag = *txidx;
 
-	for (m = m_head; m != NULL; m = m->m_next) {
+	for (m = *m_head; m != NULL; m = m->m_next) {
 		if (m->m_len != 0) {
 			if ((SIS_TX_LIST_CNT -
 			    (sc->sis_cdata.sis_tx_cnt + cnt)) < 2)
@@ -1940,7 +1959,7 @@ sis_encap(sc, m_head, txidx)
 	if (m != NULL)
 		return(ENOBUFS);
 
-	sc->sis_ldata.sis_tx_list[cur].sis_mbuf = m_head;
+	sc->sis_ldata.sis_tx_list[cur].sis_mbuf = *m_head;
 	sc->sis_ldata.sis_tx_list[cur].sis_ctl &= ~SIS_CMDSTS_MORE;
 	sc->sis_ldata.sis_tx_list[*txidx].sis_ctl |= SIS_CMDSTS_OWN;
 	sc->sis_cdata.sis_tx_cnt += cnt;
@@ -1984,7 +2003,7 @@ sis_start(ifp)
 		if (m_head == NULL)
 			break;
 
-		if (sis_encap(sc, m_head, &idx)) {
+		if (sis_encap(sc, &m_head, &idx)) {
 			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
@@ -2028,6 +2047,17 @@ sis_init(xsc)
 	 * Cancel pending I/O and free all RX/TX buffers.
 	 */
 	sis_stop(sc);
+	sc->sis_stopped = 0;
+
+#ifdef notyet
+	if (sc->sis_type == SIS_TYPE_83815 && sc->sis_srr >= NS_SRR_16A) {
+		/*
+		 * Configure 400usec of interrupt holdoff.  This is based
+		 * on emperical tests on a Soekris 4801.
+ 		 */
+		CSR_WRITE_4(sc, NS_IHR, 0x100 | 4);
+	}
+#endif
 
 	mii = device_get_softc(sc->sis_miibus);
 
@@ -2067,6 +2097,28 @@ sis_init(xsc)
 	 * Init tx descriptors.
 	 */
 	sis_list_tx_init(sc);
+
+	/*
+	 * Page 78 of the DP83815 data sheet (september 2002 version)
+	 * recommends the following register settings "for optimum
+	 * performance." for rev 15C.  The driver from NS also sets
+	 * the PHY_CR register for later versions.
+	 */
+	if (sc->sis_type == SIS_TYPE_83815) {
+		CSR_WRITE_4(sc, NS_PHY_PAGE, 0x0001);
+		/* DC speed = 01 */
+		CSR_WRITE_4(sc, NS_PHY_CR, 0x189C);
+		if (sc->sis_srr == NS_SRR_15C) {
+			/* set val for c2 */
+			CSR_WRITE_4(sc, NS_PHY_TDATA, 0x0000);
+			/* load/kill c2 */
+			CSR_WRITE_4(sc, NS_PHY_DSPCFG, 0x5040);
+			/* rais SD off, from 4 to c */
+			CSR_WRITE_4(sc, NS_PHY_SDCFG, 0x008C);
+		}
+		CSR_WRITE_4(sc, NS_PHY_PAGE, 0);
+	}
+
 
 	/*
 	 * For the NatSemi chip, we have to explicitly enable the
@@ -2122,7 +2174,6 @@ sis_init(xsc)
 		CSR_WRITE_4(sc, SIS_RX_CFG, SIS_RXCFG256);
 	}
 
-
 	/* Accept Long Packets for VLAN support */
 	SIS_SETBIT(sc, SIS_RX_CFG, SIS_RXCFG_RX_JABBER);
 
@@ -2142,6 +2193,33 @@ sis_init(xsc)
 		SIS_CLRBIT(sc, SIS_TX_CFG,
 		    (SIS_TXCFG_IGN_HBEAT|SIS_TXCFG_IGN_CARR));
 		SIS_CLRBIT(sc, SIS_RX_CFG, SIS_RXCFG_RX_TXPKTS);
+	}
+
+	if (sc->sis_type == SIS_TYPE_83815 && sc->sis_srr < NS_SRR_16A &&
+	     IFM_SUBTYPE(mii->mii_media_active) == IFM_100_TX) {
+		uint32_t reg;
+
+		/*
+		 * Some DP83815s experience problems when used with short
+		 * (< 30m/100ft) Ethernet cables in 100BaseTX mode.  This
+		 * sequence adjusts the DSP's signal attenuation to fix the
+		 * problem.
+		 */
+		CSR_WRITE_4(sc, NS_PHY_PAGE, 0x0001);
+
+		reg = CSR_READ_4(sc, NS_PHY_DSPCFG);
+		/* Allow coefficient to be read */
+		CSR_WRITE_4(sc, NS_PHY_DSPCFG, (reg & 0xfff) | 0x1000);
+		DELAY(100);
+		reg = CSR_READ_4(sc, NS_PHY_TDATA);
+		if ((reg & 0x0080) == 0 ||
+		     (reg > 0xd8 && reg <= 0xff)) {
+			device_printf(sc->sis_self, "Applying short cable fix (reg=%x)\n", reg);
+			CSR_WRITE_4(sc, NS_PHY_TDATA, 0x00e8);
+			/* Adjust coefficient and prevent change */
+			SIS_SETBIT(sc, NS_PHY_DSPCFG, 0x20);
+		}
+		CSR_WRITE_4(sc, NS_PHY_PAGE, 0);
 	}
 
 	/*
@@ -2167,25 +2245,11 @@ sis_init(xsc)
 	mii_mediachg(mii);
 #endif
 
-	/*
-	 * Page 75 of the DP83815 manual recommends the
-	 * following register settings "for optimum
-	 * performance." Note however that at least three
-	 * of the registers are listed as "reserved" in
-	 * the register map, so who knows what they do.
-	 */
-	if (sc->sis_type == SIS_TYPE_83815) {
-		CSR_WRITE_4(sc, NS_PHY_PAGE, 0x0001);
-		CSR_WRITE_4(sc, NS_PHY_CR, 0x189C);
-		CSR_WRITE_4(sc, NS_PHY_TDATA, 0x0000);
-		CSR_WRITE_4(sc, NS_PHY_DSPCFG, 0x5040);
-		CSR_WRITE_4(sc, NS_PHY_SDCFG, 0x008C);
-	}
-
 	ifp->if_flags |= IFF_RUNNING;
 	ifp->if_flags &= ~IFF_OACTIVE;
 
-	sc->sis_stat_ch = timeout(sis_tick, sc, hz);
+	if (!sc->in_tick)
+		callout_reset(&sc->sis_stat_ch, hz,  sis_tick, sc);
 
 	SIS_UNLOCK(sc);
 
@@ -2319,11 +2383,13 @@ sis_stop(sc)
 	register int		i;
 	struct ifnet		*ifp;
 
+	if (sc->sis_stopped)
+		return;
 	SIS_LOCK(sc);
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_timer = 0;
 
-	untimeout(sis_tick, sc, sc->sis_stat_ch);
+	callout_stop(&sc->sis_stat_ch);
 
 	ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
 #ifdef DEVICE_POLLING
@@ -2371,6 +2437,7 @@ sis_stop(sc)
 	bzero(sc->sis_ldata.sis_tx_list,
 		sizeof(sc->sis_ldata.sis_tx_list));
 
+	sc->sis_stopped = 1;
 	SIS_UNLOCK(sc);
 
 	return;

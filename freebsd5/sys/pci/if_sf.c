@@ -30,6 +30,9 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/pci/if_sf.c,v 1.63 2003/11/14 19:00:31 sam Exp $");
+
 /*
  * Adaptec AIC-6915 "Starfire" PCI fast ethernet driver for FreeBSD.
  * Programming manual is available from:
@@ -39,7 +42,6 @@
  * Department of Electical Engineering
  * Columbia University, New York City
  */
-
 /*
  * The Adaptec AIC-6915 "Starfire" is a 64-bit 10/100 PCI ethernet
  * controller designed with flexibility and reducing CPU load in mind.
@@ -77,9 +79,6 @@
  * registers inside the 256-byte I/O window.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_sf.c,v 1.56 2003/04/21 18:34:04 imp Exp $");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -111,8 +110,8 @@ __FBSDID("$FreeBSD: src/sys/pci/if_sf.c,v 1.56 2003/04/21 18:34:04 imp Exp $");
 /* "controller miibus0" required.  See GENERIC if you get errors here. */
 #include "miibus_if.h"
 
-#include <pci/pcireg.h>
-#include <pci/pcivar.h>
+#include <dev/pci/pcireg.h>
+#include <dev/pci/pcivar.h>
 
 #define SF_USEIOSPACE
 
@@ -160,7 +159,7 @@ static int sf_setvlan		(struct sf_softc *, int, u_int32_t);
 #endif
 
 static u_int8_t sf_read_eeprom	(struct sf_softc *, int);
-static u_int32_t sf_calchash	(caddr_t);
+static u_int32_t sf_mchash	(caddr_t);
 
 static int sf_miibus_readreg	(device_t, int, int);
 static int sf_miibus_writereg	(device_t, int, int, int);
@@ -260,22 +259,20 @@ csr_write_4(sc, reg, val)
 }
 
 static u_int32_t
-sf_calchash(addr)
-	caddr_t			addr;
+sf_mchash(addr)
+	caddr_t		addr;
 {
-	u_int32_t		crc, carry;
-	int			i, j;
-	u_int8_t		c;
+	u_int32_t	crc, carry;
+	int		idx, bit;
+	u_int8_t	data;
 
 	/* Compute CRC for the address value. */
 	crc = 0xFFFFFFFF; /* initial value */
 
-	for (i = 0; i < 6; i++) {
-		c = *(addr + i);
-		for (j = 0; j < 8; j++) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (c & 0x01);
+	for (idx = 0; idx < 6; idx++) {
+		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
+			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
 			crc <<= 1;
-			c >>= 1;
 			if (carry)
 				crc = (crc ^ 0x04c11db6) | carry;
 		}
@@ -332,7 +329,7 @@ sf_sethash(sc, mac, prio)
 	if (mac == NULL)
 		return(EINVAL);
 
-	h = sf_calchash(mac);
+	h = sf_mchash(mac);
 
 	if (prio) {
 		SF_SETBIT(sc, SF_RXFILT_HASH_BASE + SF_RXFILT_HASH_PRIOOFF +
@@ -629,28 +626,23 @@ sf_probe(dev)
 				device_set_desc(dev,
 				    "Adaptec ANA-62011 10/100BaseTX");
 				return(0);
-				break;
 			case AD_SUBSYSID_62022:
 				device_set_desc(dev,
 				    "Adaptec ANA-62022 10/100BaseTX");
 				return(0);
-				break;
 			case AD_SUBSYSID_62044_REV0:
 			case AD_SUBSYSID_62044_REV1:
 				device_set_desc(dev,
 				    "Adaptec ANA-62044 10/100BaseTX");
 				return(0);
-				break;
 			case AD_SUBSYSID_62020:
 				device_set_desc(dev,
 				    "Adaptec ANA-62020 10/100BaseFX");
 				return(0);
-				break;
 			case AD_SUBSYSID_69011:
 				device_set_desc(dev,
 				    "Adaptec ANA-69011 10/100BaseTX");
 				return(0);
-				break;
 			default:
 				device_set_desc(dev, t->sf_name);
 				return(0);
@@ -681,7 +673,7 @@ sf_attach(dev)
 
 	mtx_init(&sc->sf_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
-
+#ifndef BURN_BRIDGES
 	/*
 	 * Handle power management nonsense.
 	 */
@@ -704,7 +696,7 @@ sf_attach(dev)
 		pci_write_config(dev, SF_PCI_LOMEM, membase, 4);
 		pci_write_config(dev, SF_PCI_INTLINE, irq, 4);
 	}
-
+#endif
 	/*
 	 * Map control/status registers.
 	 */
@@ -775,8 +767,7 @@ sf_attach(dev)
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
-	ifp->if_unit = unit;
-	ifp->if_name = "sf";
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = sf_ioctl;
@@ -965,6 +956,8 @@ sf_rxeof(sc)
 	u_int32_t		rxcons, rxprod;
 	int			cmpprodidx, cmpconsidx, bufprodidx;
 
+	SF_LOCK_ASSERT(sc);
+
 	ifp = &sc->arpcom.ac_if;
 
 	rxcons = csr_read_4(sc, SF_CQ_CONSIDX);
@@ -998,7 +991,9 @@ sf_rxeof(sc)
 		m = m0;
 
 		ifp->if_ipackets++;
+		SF_UNLOCK(sc);
 		(*ifp->if_input)(ifp, m);
+		SF_LOCK(sc);
 	}
 
 	csr_write_4(sc, SF_CQ_CONSIDX,

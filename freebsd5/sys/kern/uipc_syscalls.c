@@ -34,8 +34,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_syscalls.c	8.4 (Berkeley) 2/21/94
- * $FreeBSD: src/sys/kern/uipc_syscalls.c,v 1.147 2003/05/29 18:36:26 dwmalone Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/kern/uipc_syscalls.c,v 1.159 2003/12/01 22:12:50 dg Exp $");
 
 #include "opt_compat.h"
 #include "opt_ktrace.h"
@@ -59,6 +61,7 @@
 #include <sys/mount.h>
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
+#include <sys/sf_buf.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/signalvar.h>
@@ -79,9 +82,6 @@
 #include <netinet/sctp_peeloff.h>
 #endif /* SCTP */
 
-static void sf_buf_init(void *arg);
-SYSINIT(sock_sf, SI_SUB_MBUF, SI_ORDER_ANY, sf_buf_init, NULL)
-
 static int sendit(struct thread *td, int s, struct msghdr *mp, int flags);
 static int recvit(struct thread *td, int s, struct msghdr *mp, void *namelenp);
   
@@ -91,17 +91,6 @@ static int getsockname1(struct thread *td, struct getsockname_args *uap,
 			int compat);
 static int getpeername1(struct thread *td, struct getpeername_args *uap,
 			int compat);
-
-/*
- * Expanded sf_freelist head. Really an SLIST_HEAD() in disguise, with the
- * sf_freelist head with the sf_lock mutex.
- */
-static struct {
-	SLIST_HEAD(, sf_buf) sf_head;
-	struct mtx sf_lock;
-} sf_freelist;
-
-static u_int sf_buf_alloc_want;
 
 /*
  * System call interface to the socket abstraction.
@@ -132,7 +121,7 @@ socket(td, uap)
 	error = falloc(td, &fp, &fd);
 	if (error)
 		goto done2;
-	fhold(fp);
+	/* An extra reference on `fp' has been held for us by falloc(). */
 	error = socreate(uap->domain, &so, uap->type, uap->protocol,
 	    td->td_ucred, td);
 	FILEDESC_LOCK(fdp);
@@ -263,17 +252,17 @@ accept1(td, uap, compat)
 	pid_t pgid;
 	int tmp;
 
-	mtx_lock(&Giant);
 	fdp = td->td_proc->p_fd;
 	if (uap->name) {
 		error = copyin(uap->anamelen, &namelen, sizeof (namelen));
 		if(error)
-			goto done2;
+			goto done3;
 		if (namelen < 0) {
 			error = EINVAL;
-			goto done2;
+			goto done3;
 		}
 	}
+	mtx_lock(&Giant);
 	error = fgetsock(td, uap->s, &head, &fflag);
 	if (error)
 		goto done2;
@@ -331,7 +320,7 @@ accept1(td, uap, compat)
 		splx(s);
 		goto done;
 	}
-	fhold(nfp);
+	/* An extra reference on `nfp' has been held for us by falloc(). */
 	td->td_retval[0] = fd;
 
 	/* connection has been removed from the listen queue */
@@ -421,6 +410,7 @@ done:
 	fputsock(head);
 done2:
 	mtx_unlock(&Giant);
+done3:
 	return (error);
 }
 
@@ -482,11 +472,12 @@ kern_connect(td, fd, sa)
 {
 	struct socket *so;
 	int error, s;
+	int interrupted = 0;
 
 	mtx_lock(&Giant);
 	if ((error = fgetsock(td, fd, &so, NULL)) != 0)
 		goto done2;
-	if ((so->so_state & SS_NBIO) && (so->so_state & SS_ISCONNECTING)) {
+	if (so->so_state & SS_ISCONNECTING) {
 		error = EALREADY;
 		goto done1;
 	}
@@ -505,8 +496,11 @@ kern_connect(td, fd, sa)
 	s = splnet();
 	while ((so->so_state & SS_ISCONNECTING) && so->so_error == 0) {
 		error = tsleep(&so->so_timeo, PSOCK | PCATCH, "connec", 0);
-		if (error)
+		if (error) {
+			if (error == EINTR || error == ERESTART)
+				interrupted = 1;
 			break;
+		}
 	}
 	if (error == 0) {
 		error = so->so_error;
@@ -514,7 +508,8 @@ kern_connect(td, fd, sa)
 	}
 	splx(s);
 bad:
-	so->so_state &= ~SS_ISCONNECTING;
+	if (!interrupted)
+		so->so_state &= ~SS_ISCONNECTING;
 	if (error == ERESTART)
 		error = EINTR;
 done1:
@@ -552,16 +547,15 @@ socketpair(td, uap)
 	    td->td_ucred, td);
 	if (error)
 		goto free1;
+	/* On success extra reference to `fp1' and 'fp2' is set by falloc. */
 	error = falloc(td, &fp1, &fd);
 	if (error)
 		goto free2;
-	fhold(fp1);
 	sv[0] = fd;
 	fp1->f_data = so1;	/* so1 already has ref count */
 	error = falloc(td, &fp2, &fd);
 	if (error)
 		goto free3;
-	fhold(fp2);
 	fp2->f_data = so2;	/* so2 already has ref count */
 	sv[1] = fd;
 	error = soconnect2(so1, so2);
@@ -627,7 +621,6 @@ sendit(td, s, mp, flags)
 	struct sockaddr *to;
 	int error;
 
-	mtx_lock(&Giant);
 	if (mp->msg_name != NULL) {
 		error = getsockaddr(&to, mp->msg_name, mp->msg_namelen);
 		if (error) {
@@ -676,7 +669,6 @@ sendit(td, s, mp, flags)
 bad:
 	if (to)
 		FREE(to, M_SONAME);
-	mtx_unlock(&Giant);
 	return (error);
 }
 
@@ -699,6 +691,7 @@ kern_sendit(td, s, mp, flags, control)
 	int iovlen;
 #endif
 
+	mtx_lock(&Giant);
 	if ((error = fgetsock(td, s, &so, NULL)) != 0)
 		goto bad2;
 
@@ -759,6 +752,7 @@ kern_sendit(td, s, mp, flags, control)
 bad:
 	fputsock(so);
 bad2:
+	mtx_unlock(&Giant);
 	return (error);
 }
 
@@ -937,13 +931,17 @@ recvit(td, s, mp, namelenp)
 	int iovlen;
 #endif
 
-	if ((error = fgetsock(td, s, &so, NULL)) != 0)
+	mtx_lock(&Giant);
+	if ((error = fgetsock(td, s, &so, NULL)) != 0) {
+		mtx_unlock(&Giant);
 		return (error);
+	}
 
 #ifdef MAC
 	error = mac_check_socket_receive(td->td_ucred, so);
 	if (error) {
 		fputsock(so);
+		mtx_unlock(&Giant);
 		return (error);
 	}
 #endif
@@ -1067,6 +1065,7 @@ recvit(td, s, mp, namelenp)
 	}
 out:
 	fputsock(so);
+	mtx_unlock(&Giant);
 	if (fromsa)
 		FREE(fromsa, M_SONAME);
 	if (control)
@@ -1093,7 +1092,6 @@ recvfrom(td, uap)
 	struct iovec aiov;
 	int error;
 
-	mtx_lock(&Giant);
 	if (uap->fromlenaddr) {
 		error = copyin(uap->fromlenaddr,
 		    &msg.msg_namelen, sizeof (msg.msg_namelen));
@@ -1111,7 +1109,6 @@ recvfrom(td, uap)
 	msg.msg_flags = uap->flags;
 	error = recvit(td, uap->s, &msg, uap->fromlenaddr);
 done2:
-	mtx_unlock(&Giant);
 	return(error);
 }
 
@@ -1149,7 +1146,6 @@ orecv(td, uap)
 	struct iovec aiov;
 	int error;
 
-	mtx_lock(&Giant);
 	msg.msg_name = 0;
 	msg.msg_namelen = 0;
 	msg.msg_iov = &aiov;
@@ -1159,7 +1155,6 @@ orecv(td, uap)
 	msg.msg_control = 0;
 	msg.msg_flags = uap->flags;
 	error = recvit(td, uap->s, &msg, NULL);
-	mtx_unlock(&Giant);
 	return (error);
 }
 
@@ -1187,7 +1182,6 @@ orecvmsg(td, uap)
 	if (error)
 		return (error);
 
-	mtx_lock(&Giant);
 	if ((u_int)msg.msg_iovlen >= UIO_SMALLIOV) {
 		if ((u_int)msg.msg_iovlen >= UIO_MAXIOV) {
 			error = EMSGSIZE;
@@ -1214,7 +1208,6 @@ done:
 	if (iov != aiov)
 		FREE(iov, M_IOV);
 done2:
-	mtx_unlock(&Giant);
 	return (error);
 }
 #endif
@@ -1235,7 +1228,6 @@ recvmsg(td, uap)
 	struct iovec aiov[UIO_SMALLIOV], *uiov, *iov;
 	register int error;
 
-	mtx_lock(&Giant);
 	error = copyin(uap->msg, &msg, sizeof (msg));
 	if (error)
 		goto done2;
@@ -1270,7 +1262,6 @@ done:
 	if (iov != aiov)
 		FREE(iov, M_IOV);
 done2:
-	mtx_unlock(&Giant);
 	return (error);
 }
 
@@ -1631,91 +1622,6 @@ getsockaddr(namp, uaddr, len)
 }
 
 /*
- * Allocate a pool of sf_bufs (sendfile(2) or "super-fast" if you prefer. :-))
- */
-static void
-sf_buf_init(void *arg)
-{
-	struct sf_buf *sf_bufs;
-	vm_offset_t sf_base;
-	int i;
-
-	mtx_init(&sf_freelist.sf_lock, "sf_bufs list lock", NULL, MTX_DEF);
-	mtx_lock(&sf_freelist.sf_lock);
-	SLIST_INIT(&sf_freelist.sf_head);
-	sf_base = kmem_alloc_pageable(kernel_map, nsfbufs * PAGE_SIZE);
-	sf_bufs = malloc(nsfbufs * sizeof(struct sf_buf), M_TEMP,
-	    M_NOWAIT | M_ZERO);
-	for (i = 0; i < nsfbufs; i++) {
-		sf_bufs[i].kva = sf_base + i * PAGE_SIZE;
-		SLIST_INSERT_HEAD(&sf_freelist.sf_head, &sf_bufs[i], free_list);
-	}
-	sf_buf_alloc_want = 0;
-	mtx_unlock(&sf_freelist.sf_lock);
-}
-
-/*
- * Get an sf_buf from the freelist. Will block if none are available.
- */
-struct sf_buf *
-sf_buf_alloc(struct vm_page *m)
-{
-	struct sf_buf *sf;
-	int error;
-
-	mtx_lock(&sf_freelist.sf_lock);
-	while ((sf = SLIST_FIRST(&sf_freelist.sf_head)) == NULL) {
-		sf_buf_alloc_want++;
-		error = msleep(&sf_freelist, &sf_freelist.sf_lock, PVM|PCATCH,
-		    "sfbufa", 0);
-		sf_buf_alloc_want--;
-
-		/*
-		 * If we got a signal, don't risk going back to sleep. 
-		 */
-		if (error)
-			break;
-	}
-	if (sf != NULL) {
-		SLIST_REMOVE_HEAD(&sf_freelist.sf_head, free_list);
-		sf->m = m;
-		pmap_qenter(sf->kva, &sf->m, 1);
-	}
-	mtx_unlock(&sf_freelist.sf_lock);
-	return (sf);
-}
-
-/*
- * Detatch mapped page and release resources back to the system.
- */
-void
-sf_buf_free(void *addr, void *args)
-{
-	struct sf_buf *sf;
-	struct vm_page *m;
-
-	sf = args;
-	pmap_qremove((vm_offset_t)addr, 1);
-	m = sf->m;
-	vm_page_lock_queues();
-	vm_page_unwire(m, 0);
-	/*
-	 * Check for the object going away on us. This can
-	 * happen since we don't hold a reference to it.
-	 * If so, we're responsible for freeing the page.
-	 */
-	if (m->wire_count == 0 && m->object == NULL)
-		vm_page_free(m);
-	vm_page_unlock_queues();
-	sf->m = NULL;
-	mtx_lock(&sf_freelist.sf_lock);
-	SLIST_INSERT_HEAD(&sf_freelist.sf_head, sf, free_list);
-	if (sf_buf_alloc_want > 0)
-		wakeup_one(&sf_freelist);
-	mtx_unlock(&sf_freelist.sf_lock);
-}
-
-/*
  * sendfile(2)
  *
  * MPSAFE
@@ -1777,10 +1683,13 @@ do_sendfile(struct thread *td, struct sendfile_args *uap, int compat)
 	 */
 	if ((error = fgetvp_read(td, uap->fd, &vp)) != 0)
 		goto done;
+	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 	if (vp->v_type != VREG || VOP_GETVOBJECT(vp, &obj) != 0) {
 		error = EINVAL;
+		VOP_UNLOCK(vp, 0, td);
 		goto done;
 	}
+	VOP_UNLOCK(vp, 0, td);
 	if ((error = fgetsock(td, uap->s, &so, NULL)) != 0)
 		goto done;
 	if (so->so_type != SOCK_STREAM) {
@@ -1843,12 +1752,14 @@ do_sendfile(struct thread *td, struct sendfile_args *uap, int compat)
 		vm_offset_t pgoff;
 
 		pindex = OFF_TO_IDX(off);
+		VM_OBJECT_LOCK(obj);  
 retry_lookup:
 		/*
 		 * Calculate the amount to transfer. Not to exceed a page,
 		 * the EOF, or the passed in nbytes.
 		 */
 		xfsize = obj->un_pager.vnp.vnp_size - off;
+		VM_OBJECT_UNLOCK(obj);
 		if (xfsize > PAGE_SIZE)
 			xfsize = PAGE_SIZE;
 		pgoff = (vm_offset_t)(off & PAGE_MASK);
@@ -1870,6 +1781,7 @@ retry_lookup:
 			sbunlock(&so->so_snd);
 			goto done;
 		}
+		VM_OBJECT_LOCK(obj);  
 		/*
 		 * Attempt to look up the page.  
 		 *
@@ -1883,7 +1795,9 @@ retry_lookup:
 			pg = vm_page_alloc(obj, pindex,
 			    VM_ALLOC_NORMAL | VM_ALLOC_WIRED);
 			if (pg == NULL) {
+				VM_OBJECT_UNLOCK(obj);
 				VM_WAIT;
+				VM_OBJECT_LOCK(obj);  
 				goto retry_lookup;
 			}
 			vm_page_lock_queues();
@@ -1912,6 +1826,7 @@ retry_lookup:
 			 */
 			vm_page_io_start(pg);
 			vm_page_unlock_queues();
+			VM_OBJECT_UNLOCK(obj);
 
 			/*
 			 * Get the page from backing store.
@@ -1928,6 +1843,8 @@ retry_lookup:
 			    IO_VMIO | ((MAXBSIZE / bsize) << 16),
 			    td->td_ucred, NOCRED, &resid, td);
 			VOP_UNLOCK(vp, 0, td);
+			if (error)
+				VM_OBJECT_LOCK(obj);  
 			vm_page_lock_queues();
 			vm_page_flag_clear(pg, PG_ZERO);
 			vm_page_io_finish(pg);
@@ -1945,10 +1862,12 @@ retry_lookup:
 					vm_page_free(pg);
 				}
 				vm_page_unlock_queues();
+				VM_OBJECT_UNLOCK(obj);
 				sbunlock(&so->so_snd);
 				goto done;
 			}
-		}
+		} else
+			VM_OBJECT_UNLOCK(obj);
 		vm_page_unlock_queues();
 
 		/*
@@ -1972,16 +1891,16 @@ retry_lookup:
 		MGETHDR(m, M_TRYWAIT, MT_DATA);
 		if (m == NULL) {
 			error = ENOBUFS;
-			sf_buf_free((void *)sf->kva, sf);
+			sf_buf_free((void *)sf_buf_kva(sf), sf);
 			sbunlock(&so->so_snd);
 			goto done;
 		}
 		/*
 		 * Setup external storage for mbuf.
 		 */
-		MEXTADD(m, sf->kva, PAGE_SIZE, sf_buf_free, sf, M_RDONLY,
+		MEXTADD(m, sf_buf_kva(sf), PAGE_SIZE, sf_buf_free, sf, M_RDONLY,
 		    EXT_SFBUF);
-		m->m_data = (char *) sf->kva + pgoff;
+		m->m_data = (char *)sf_buf_kva(sf) + pgoff;
 		m->m_pkthdr.len = m->m_len = xfsize;
 		/*
 		 * Add the buffer to the socket buffer chain.
@@ -2080,7 +1999,12 @@ done:
 		vrele(vp);
 	if (so)
 		fputsock(so);
+
 	mtx_unlock(&Giant);
+
+	if (error == ERESTART)
+		error = EINTR;
+
 	return (error);
 }
 
