@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.59 2000/08/03 15:16:11 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.60 2000/08/03 15:20:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -143,7 +143,8 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #define ICMP6ECHOLEN	8	/* icmp echo header len excluding time */
 #define ICMP6ECHOTMLEN sizeof(struct timeval)
 #define ICMP6_NIQLEN	(ICMP6ECHOLEN + 8)
-#define ICMP6_NIRLEN	(ICMP6ECHOLEN + 12) /* 64 bits of nonce + 32 bits ttl */
+/* FQDN case, 64 bits of nonce + 32 bits ttl */
+#define ICMP6_NIRLEN	(ICMP6ECHOLEN + 12)
 #define	EXTRA		256	/* for AH and various other headers. weird. */
 #define	DEFDATALEN	ICMP6ECHOTMLEN
 #define MAXDATALEN	MAXPACKETLEN - IP6LEN - ICMP6ECHOLEN
