@@ -1440,6 +1440,8 @@ in_modmulti(ap, ifp, numsrc, ss, mode,
 		++inm->inm_ifma->ifma_refcount;
 
 	} else {
+	    struct sockaddr_in sa;
+
 	    /*
 	     * If there is some sources to be deleted, or if the request is
 	     * join a local group address with some filtered address, return.
@@ -1462,7 +1464,11 @@ in_modmulti(ap, ifp, numsrc, ss, mode,
 		return NULL;
 	    }
 
-	    *error = if_addmulti(ifp, (struct sockaddr *)ap, &ifma);
+	    bzero(&sa, sizeof(sa));
+	    sa.sin_family = AF_INET;
+	    sa.sin_len = sizeof(sa);
+	    sa.sin_addr = *ap;
+	    *error = if_addmulti(ifp, (struct sockaddr *)&sa, &ifma);
 	    if (*error) {
 		splx(s);
 		return NULL;

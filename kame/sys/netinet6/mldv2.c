@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.12 2004/03/24 09:03:29 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.13 2004/03/29 13:04:43 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3285,6 +3285,8 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 			++in6m->in6m_refcount;
 
 	} else {
+		struct sockaddr_in6 sa6;
+
 		/*
 		 * If there is some sources to be deleted, or if the request is
 		 * join a local group address with some filtered address,
@@ -3307,7 +3309,11 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 			splx(s);
 			return NULL;
 		}
-		*error = if_addmulti(ifp, (struct sockaddr *)ap, &ifma);
+		bzero(&sa6, sizeof(sa6));
+		sa6.sin6_family = AF_INET6;
+		sa6.sin6_len = sizeof(struct sockaddr_in6);
+		sa6.sin6_addr = *ap;
+		*error = if_addmulti(ifp, (struct sockaddr *)&sa6, &ifma);
 		if (*error) {
 			free(in6m, M_IPMADDR);
 			splx(s);

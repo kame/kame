@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2574 2004/03/22 05:03:22 jinmei Exp $
+$KAME: CHANGELOG,v 1.2575 2004/03/29 13:06:03 suz Exp $
 
 <200403>
+2004-03-29  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* freebsd[45]/sys/netinet/in.c, kame/sys/netinet6/mldv2.c
+	fixed a kernel crash when an IGMPv3/MLDv2 Advanced-API function
+	is used. (specific to IGMPv3/MLDv2-ready freebsd[45] kernel)
+
 2004-03-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: added experimental support for the lifetime
 	option based on draft-ietf-dhc-lifetime-00.txt.  dhcp6c now
