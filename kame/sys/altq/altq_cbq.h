@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.h,v 1.9 2003/07/10 12:07:47 kjc Exp $	*/
+/*	$KAME: altq_cbq.h,v 1.10 2003/08/20 23:30:23 itojun Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -75,6 +75,7 @@ extern "C" {
 #define	CBQCLF_CLASSMASK	0xf000	/* class mask */
 
 #define	CBQ_MAXQSIZE		200
+#define	CBQ_MAXPRI		RM_MAXPRIO
 
 typedef struct _cbq_class_stats_ {
 	u_int32_t	handle;
