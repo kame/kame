@@ -1413,8 +1413,13 @@ icmp6_redirect_diag(src6, dst6, tgt6)
 	struct in6_addr *tgt6;
 {
 	static char buf[1024];
+#ifndef __OpenBSD__
 	snprintf(buf, sizeof(buf), "(src=%s dst=%s tgt=%s)",
 		ip6_sprintf(src6), ip6_sprintf(dst6), ip6_sprintf(tgt6));
+#else
+	sprintf(buf, "(src=%s dst=%s tgt=%s)",
+		ip6_sprintf(src6), ip6_sprintf(dst6), ip6_sprintf(tgt6));
+#endif
 	return buf;
 }
 
