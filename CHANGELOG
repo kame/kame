@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.880 2000/05/16 00:49:42 itojun Exp $
+$Id: CHANGELOG,v 1.881 2000/05/16 14:08:11 itojun Exp $
 
 <200005>
+Tue May 16 23:05:56 JST 2000  itojun@iijlab.net
+	* kame/route6d/route6d.c: memory leak and bzero() correction.
+	* kame/route6d/route6d.c: correct interface address handling
+	  for global address on p2p interface.  there seem to be two major
+	  models in this arena: cisco (use addr/plen) and gated (advert
+	  dest/128 only, not addr/128).  the code supports both behavior,
+	  switchable at compilation time.  we may need to revisit the code
+	  later.
+
 Tue May 16 09:44:50 JST 2000  itojun@iijlab.net
 	* netbsd/usr.bin/ftp/fetch.c: parse RFC2372 ftp URL correctly.
 	  (the code is different from netbsd-current code - netbsd-current
