@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.60 2002/06/11 06:00:23 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.61 2002/06/11 06:07:39 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1235,10 +1235,9 @@ dhcp6_reset_timer(ev)
 			r = (double)((random() % 2000) - 1000) / 10000;
 
 			if (ev->timeouts == 0) {
-				n = 2 * ev->init_retrans +
-					r * ev->init_retrans;
+				n = ev->init_retrans + r * ev->init_retrans;
 			} else
-				n = ev->retrans + r * ev->retrans;
+				n = 2 * ev->retrans + r * ev->retrans;
 		}
 		if (ev->max_retrans_time && n > ev->max_retrans_time)
 			n = ev->max_retrans_time + r * ev->max_retrans_time;
