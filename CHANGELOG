@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.526 2000/02/05 16:15:04 jinmei Exp $
+$Id: CHANGELOG,v 1.527 2000/02/06 08:57:49 itojun Exp $
 
 <200002>
+Sun Feb  6 17:56:47 JST 2000  itojun@iijlab.net
+	* netbsd/sys/netinet/tcp_output.c: optimize mbuf allocation on output.
+	  allocate cluster only when necessary.
+
 2000-02-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/bgpd/bgp_input.c (bgp_read): 
 	* kame/kame/bgpd/main.c (main_listen_accept):
