@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.107 2000/10/06 04:58:30 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.108 2000/10/24 07:13:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1457,7 +1457,8 @@ in6_ifscrub(ifp, ia, delloop)
 	if ((ia->ia_flags & IFA_ROUTE) == 0)
 		return;
 
-	if (ifp->if_flags & (IFF_LOOPBACK | IFF_POINTOPOINT))
+	if (ifp->if_flags & (IFF_LOOPBACK | IFF_POINTOPOINT) &&
+	    (ia->ia_ifa.ifa_dstaddr != NULL))
 		rtinit(&(ia->ia_ifa), (int)RTM_DELETE, RTF_HOST);
 	else
 		rtinit(&(ia->ia_ifa), (int)RTM_DELETE, 0);
