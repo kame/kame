@@ -1,11 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1015 2000/06/14 15:32:23 itojun Exp $
+$Id: CHANGELOG,v 1.1016 2000/06/14 15:33:16 itojun Exp $
 <200006>
 Wed Jun 14 23:35:03 JST 2000  itojun@iijlab.net
 	* {netbsd,openbsd}/libexec/ftpd: correct STAT command output for LPSV.
 	* libinet6/resolv/res_query.c: change member name for struct res_target.
 	  "class" conflicts with C++ reserved identifier.
+	  From: Graham Wheeler <gram@cequrux.com>
 
 2000-06-14  SUZUKI Shinsuke  <suz@sdl.hitachi.co.jp>
 	* sys/net/if_dummy.c, freebsd4/sys/conf/files:
