@@ -1,4 +1,4 @@
-/*	$KAME: addrconf.c,v 1.2 2005/03/29 13:49:09 jinmei Exp $	*/
+/*	$KAME: addrconf.c,v 1.3 2005/03/29 14:11:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -334,7 +334,7 @@ na_renew_data_free(evd)
 {
 	struct dhcp6_list *ial;
 
-	if (evd->type != DHCP6_EVDATA_IAPD && evd->type != DHCP6_EVDATA_IANA) {
+	if (evd->type != DHCP6_EVDATA_IANA) {
 		dprintf(LOG_ERR, FNAME, "assumption failure");
 		exit(1);
 	}

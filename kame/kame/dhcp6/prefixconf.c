@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.29 2005/03/02 07:20:14 suz Exp $	*/
+/*	$KAME: prefixconf.c,v 1.30 2005/03/29 14:11:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -387,7 +387,7 @@ renew_data_free(evd)
 {
 	struct dhcp6_list *ial;
 
-	if (evd->type != DHCP6_EVDATA_IAPD && evd->type != DHCP6_EVDATA_IANA) {
+	if (evd->type != DHCP6_EVDATA_IAPD) {
 		dprintf(LOG_ERR, FNAME, "assumption failure");
 		exit(1);
 	}
