@@ -2250,6 +2250,7 @@ ip_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		sin_grp = SIN(ss_grp);
 		sin_grp->sin_addr = SIN(&greq->gr_group)->sin_addr;
 		sin_grp->sin_len = sizeof(*sin_grp);
+		sin_grp->sin_family = AF_INET;
 
 		if (!IN_MULTICAST(sin_grp->sin_addr.s_addr)) {
 			error = EINVAL;
@@ -2283,9 +2284,11 @@ ip_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		sin_src = SIN(ss_src);
 		sin_src->sin_addr = mreqsrc->imr_sourceaddr;
 		sin_src->sin_len = sizeof(*sin_src);
+		sin_src->sin_family = AF_INET;
 		sin_grp = SIN(ss_grp);
 		sin_grp->sin_addr = mreqsrc->imr_multiaddr;
 		sin_grp->sin_len = sizeof(*sin_grp);
+		sin_grp->sin_family = AF_INET;
 		sin_ifa.sin_addr = mreqsrc->imr_interface;
 
 		/*
@@ -2345,9 +2348,11 @@ ip_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		sin_src = SIN(ss_src);
 		sin_src->sin_addr = SIN(&gsreq->gsr_source)->sin_addr;
 		sin_src->sin_len = sizeof(*sin_src);
+		sin_src->sin_family = AF_INET;
 		sin_grp = SIN(ss_grp);
 		sin_grp->sin_addr = SIN(&gsreq->gsr_group)->sin_addr;
 		sin_grp->sin_len = sizeof(*sin_grp);
+		sin_grp->sin_family = AF_INET;
 
 		if (!IN_MULTICAST(sin_grp->sin_addr.s_addr) ||
 				IN_LOCAL_GROUP(sin_grp->sin_addr.s_addr)) {
