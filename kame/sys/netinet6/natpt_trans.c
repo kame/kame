@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.26 2001/05/05 12:10:13 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.27 2001/05/07 08:49:16 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -40,6 +40,7 @@
 #include <sys/sysctl.h>
 #include <sys/syslog.h>
 #include <sys/systm.h>
+#include <sys/ctype.h>
 
 #ifdef __FreeBSD__
 # include <sys/kernel.h>
@@ -83,6 +84,27 @@
 #define	recalculateTCP6Checksum		1
 #define	recalculateUDP4Checksum		1
 
+#define	FTP_DATA			20
+#define	FTP_CONTROL			21
+
+#if BYTE_ORDER == BIG_ENDIAN
+#define	FTP6_EPSV			0x45505356
+#else
+#define	FTP6_EPSV			0x56535045
+#endif
+
+#define	FTPMINCMD			"CWD\r\n"
+#define	FTPMINCMDLEN			strlen(FTPMINCMD)
+
+
+struct ftpparam
+{
+    u_long		 cmd;
+    caddr_t		 arg;		/* argument in mbuf if exist	*/
+    caddr_t		 argend;
+    struct sockaddr	*sa;		/* allocated			*/
+};
+
 
 /*
  *
@@ -111,6 +133,20 @@ void		 tr_icmp6TimeExceed		__P((struct _cv *, struct _cv *));
 void		 tr_icmp6ParamProb		__P((struct _cv *, struct _cv *));
 void		 tr_icmp6EchoRequest		__P((struct _cv *, struct _cv *));
 void		 tr_icmp6EchoReply		__P((struct _cv *, struct _cv *));
+
+void		 translatingPYLD4To6		__P((struct _cv *, struct pAddr *));
+int		 translatingFTP4ReplyTo6	__P((struct _cv *, struct pAddr *));
+
+void		 translatingPYLD6To4		__P((struct _cv *, struct pAddr *));
+int		 translatingFTP6CommandTo4	__P((struct _cv *, struct pAddr *));
+
+struct ftpparam *parseFTPdialogue		__P((caddr_t, caddr_t, struct ftpparam *));
+struct sockaddr	*parse227			__P((caddr_t, caddr_t, struct sockaddr_in *));
+int		 rewriteMbuf			__P((struct mbuf *, char *, int , char *,int));
+void		 incrementSeq			__P((struct tcphdr *, int));
+void		 decrementSeq			__P((struct tcphdr *, int));
+void		 incrementAck			__P((struct tcphdr *, int));
+void		 decrementAck			__P((struct tcphdr *, int));
 
 static	void	 _recalculateTCP4Checksum	__P((struct _cv *));
 static	void	 _recalculateUDP4Checksum	__P((struct _cv *));
@@ -789,9 +825,10 @@ translatingTCPv4To6(struct _cv *cv4, struct pAddr *pad)
     bzero(&cv6, sizeof(struct _cv));
     m6 = translatingTCPUDPv4To6(cv4, pad, &cv6);
     cv6.ip_p = cv6.ip_payload = IPPROTO_TCP;
-    cksumOrg = ntohs(cv4->_payload._tcp4->th_sum);
 
     updateTcpStatus(cv4);
+    translatingPYLD4To6(&cv6, pad);
+    cksumOrg = ntohs(cv4->_payload._tcp4->th_sum);
     adjustUpperLayerChecksum(IPPROTO_IPV4, IPPROTO_TCP, &cv6, cv4);
 
 #ifdef recalculateTCP6Checksum
@@ -815,6 +852,92 @@ translatingTCPv4To6(struct _cv *cv4, struct pAddr *pad)
 #endif
 
     return (m6);
+}
+
+
+void
+translatingPYLD4To6(struct _cv *cv6, struct pAddr *pad)
+{
+    int			 delta = 0;
+    struct tcphdr	*th6 = cv6->_payload._tcp6;
+    struct _tcpstate	*ts  = NULL;
+
+    if (cv6->ats && (cv6->ats->session == NATPT_OUTBOUND)
+	&& (htons(cv6->_payload._tcp6->th_sport) == FTP_CONTROL))
+    {
+	if ((delta = translatingFTP4ReplyTo6(cv6, pad)) != 0)
+	{
+	    struct mbuf		*mbf = cv6->m;
+	    struct ip6_hdr	*ip6 = cv6->_ip._ip6;
+
+	    ip6->ip6_plen = htons(ntohs(ip6->ip6_plen) + delta);
+	    mbf->m_len += delta;
+	    if (mbf->m_flags & M_PKTHDR)
+		mbf->m_pkthdr.len += delta;
+	}
+
+	if ((cv6->ats == NULL)
+	    || ((ts = cv6->ats->suit.tcp) == NULL))
+	    return ;
+
+	if (ts->delta[1]
+	    && (cv6->inout == NATPT_INBOUND))
+	    incrementSeq(th6, ts->delta[1]);
+
+	if (ts->delta[0]
+	    && (th6->th_flags & TH_ACK)
+	    && (cv6->inout == NATPT_INBOUND))
+	    decrementAck(th6, ts->delta[1]);
+
+	if ((th6->th_seq != ts->seq[1])
+	    || (th6->th_ack != ts ->ack[1]))
+	{
+	    ts->delta[1] += delta;
+	    ts->seq[1] = th6->th_seq;
+	    ts->ack[1] = th6->th_ack;
+	}
+    }
+}
+
+
+int
+translatingFTP4ReplyTo6(struct _cv *cv6, struct pAddr *pad)
+{
+    int			 delta = 0;
+    caddr_t		 kb, kk;
+    struct ip6_hdr	*ip6 = cv6->_ip._ip6;
+    struct tcphdr	*th6 = cv6->_payload._tcp6;
+    struct _tSlot	*ats;
+    struct _tcpstate	*ts;
+    struct sockaddr_in	 sin;
+    struct ftpparam	 ftp6;
+    char		 Wow[128];
+
+    kb = (caddr_t)th6 + (th6->th_off << 2);
+    kk = (caddr_t)ip6 + sizeof(struct ip6_hdr) + ntohs(ip6->ip6_plen);
+    if ((parseFTPdialogue(kb, kk, &ftp6)) == NULL)
+	return (0);
+
+    ats = cv6->ats;
+    ts  = ats->suit.tcp;
+    switch (ts->ftpstate)
+    {
+      case FTP6_EPSV:
+	if (ftp6.cmd != 227)
+	    return (0);
+
+	/* getting:   227 Entering Passive Mode (h1,h2,h3,h4,p1,p2).	*/
+	/* expecting: 229 Entering Extended Passive Mode (|||6446|)	*/
+
+	if (parse227(ftp6.arg, kk, &sin) == NULL)
+	    return (0);
+	snprintf(Wow, sizeof(Wow), 
+		 "229 Entering Extended Passive Mode (|||%d|)\r\n", sin.sin_port);
+	delta = rewriteMbuf(cv6->m, kb, (kk-kb), Wow, strlen(Wow));
+	break;
+    }
+
+    return (delta);
 }
 
 
@@ -966,6 +1089,7 @@ translatingTCPUDPv4To6(struct _cv *cv4, struct pAddr *pad, struct _cv *cv6)
     }
 
     cv6->ats = cv4->ats;
+    cv6->inout = cv4->inout;
 
     ip4 = mtod(cv4->m, struct ip *);
     ip6->ip6_flow = 0;
@@ -1301,9 +1425,10 @@ translatingTCPv6To4(struct _cv *cv6, struct pAddr *pad)
     bzero(&cv4, sizeof(struct _cv));
     m4 = translatingTCPUDPv6To4(cv6, pad, &cv4);
     cv4.ip_p = cv4.ip_payload = IPPROTO_TCP;
-    cksumOrg = ntohs(cv6->_payload._tcp6->th_sum);
 
-    updateTcpStatus(cv6);
+    updateTcpStatus(&cv4);
+    translatingPYLD6To4(&cv4, pad);
+    cksumOrg = ntohs(cv6->_payload._tcp6->th_sum);
     adjustUpperLayerChecksum(IPPROTO_IPV6, IPPROTO_TCP, cv6, &cv4);
 
 #ifdef recalculateTCP4Checksum
@@ -1311,6 +1436,83 @@ translatingTCPv6To4(struct _cv *cv6, struct pAddr *pad)
 #endif
 
     return (m4);
+}
+
+
+void
+translatingPYLD6To4(struct _cv *cv4, struct pAddr *pad)
+{
+    int			 delta = 0;
+    struct tcphdr	*th4 = cv4->_payload._tcp4;
+    struct _tcpstate	*ts  = NULL;
+
+    if (cv4->ats && (cv4->ats->session == NATPT_OUTBOUND)
+	&& (htons(cv4->_payload._tcp4->th_dport) == FTP_CONTROL))
+    {
+	if ((delta = translatingFTP6CommandTo4(cv4, pad)) != 0)
+	{
+	    struct mbuf		*mbf = cv4->m;
+	    struct ip		*ip4 = cv4->_ip._ip4;
+
+	    ip4->ip_len += delta;
+	    mbf->m_len += delta;
+	    if (mbf->m_flags & M_PKTHDR)
+		mbf->m_pkthdr.len += delta;
+	}
+
+	if ((cv4->ats == NULL)
+	    || ((ts = cv4->ats->suit.tcp) == NULL))
+	    return ;
+
+	if (ts->delta[0]
+	    && (cv4->inout == NATPT_OUTBOUND))
+	    incrementSeq(th4, ts->delta[0]);
+
+	if (ts->delta[1]
+	    && (th4->th_flags & TH_ACK)
+	    && (cv4->inout == NATPT_OUTBOUND))
+	    decrementAck(th4, ts->delta[1]);
+
+	if ((th4->th_seq != ts->seq[0])
+	    || (th4->th_ack != ts->ack[0]))
+	{
+	    ts->delta[0] += delta;
+	    ts->seq[0] = th4->th_seq;
+	    ts->ack[0] = th4->th_ack;
+	}
+    }
+}
+
+
+int
+translatingFTP6CommandTo4(struct _cv *cv4, struct pAddr *pad)
+{
+    int			 delta = 0;
+    char		*tstr;
+    caddr_t		 kb, kk;
+    struct ip		*ip4 = cv4->_ip._ip4;
+    struct tcphdr	*th4 = cv4->_payload._tcp4;
+    struct _tSlot	*ats;
+    struct _tcpstate	*ts;
+    struct ftpparam	 ftp6;
+
+    kb = (caddr_t)th4 + (th4->th_off << 2);
+    kk = (caddr_t)ip4 + ip4->ip_len;
+    if ((parseFTPdialogue(kb, kk, &ftp6)) == NULL)
+	return (NULL);
+
+    ats = cv4->ats;
+    ts  = ats->suit.tcp;
+    switch(ftp6.cmd)
+    {
+      case FTP6_EPSV:
+	ts->ftpstate = FTP6_EPSV;
+	tstr = "PASV\r\n";
+	delta = rewriteMbuf(cv4->m, kb, (kk-kb), tstr, strlen(tstr));
+	break;
+    }
+
+    return (delta);
 }
 
 
@@ -1383,6 +1585,7 @@ translatingTCPUDPv6To4(struct _cv *cv6, struct pAddr *pad, struct _cv *cv4)
     cv4->_payload._caddr = (caddr_t)cv4->_ip._ip4 + sizeof(struct ip);
 
     cv4->ats = cv6->ats;
+    cv4->inout = cv6->inout;
 
     ip4 = mtod(m4, struct ip *);
     ip6 = mtod(cv6->m, struct ip6_hdr *);
@@ -1403,6 +1606,158 @@ translatingTCPUDPv6To4(struct _cv *cv6, struct pAddr *pad, struct _cv *cv4)
     th->th_dport = pad->_dport;
 
     return (m4);
+}
+
+
+struct ftpparam *
+parseFTPdialogue(caddr_t kb, caddr_t kk, struct ftpparam *ftp6)
+{
+    int			 idx;
+    union
+    {
+	char	byte[4];
+	u_long	cmd;
+    }	u;
+
+    if ((kk - kb) < FTPMINCMDLEN)
+	return (NULL);
+
+    while ((kb < kk) && (*kb == ' '))
+	kb++;					/* skip preceding blank	*/
+
+    u.cmd = 0;
+    if (isalpha(*kb))
+    {
+	/* in case FTP command	*/
+	for (idx = 0; idx < 4; idx++)
+	{
+	    if (!isalpha(*kb) && (*kb != ' '))
+		return (NULL);
+
+	    u.byte[idx] = islower(*kb) ? toupper(*kb) : *kb;
+	    if (isalpha(*kb))
+		kb++;
+	}
+    }
+    else if (isdigit(*kb))
+    {
+	/* in case FTP reply	*/
+	for (idx = 0; idx < 3; idx++, kb++)
+	{
+	    if (!isdigit(*kb))
+		return (NULL);
+
+	    u.cmd = u.cmd * 10 + *kb - '0';
+	}
+    }
+    else
+	return (NULL);		/* neither ftp command nor ftp reply	*/
+
+    while ((kb < kk) && (*kb == ' '))
+	kb++;
+
+    if (kb >= kk)
+	return (NULL);		/* no end of line (<CRLF>) found	*/
+
+    bzero(ftp6, sizeof(struct ftpparam));
+    ftp6->cmd = u.cmd;
+    if ((*kb != '\r') && (*kb != '\n'))
+	ftp6->arg = kb;
+
+    return (ftp6);
+}
+
+
+struct sockaddr *
+parse227(caddr_t kb, caddr_t kk, struct sockaddr_in *sin)
+{
+    int				 bite;
+    u_int			 byte[6];
+    u_short			 inport;
+    struct in_addr		 inaddr;
+
+    while ((kb < kk) && (*kb != '(') && !isdigit(*kb))
+	kb++;
+
+    if (*kb == '(')
+	kb++;
+
+    bite = 0;
+    bzero(byte, sizeof(byte));
+    while ((kb < kk) && (isdigit(*kb) || (*kb == ',')))
+    {
+	if (isdigit(*kb))
+	    byte[bite] = byte[bite] * 10 + *kb - '0';
+	else if (*kb == ',')
+	    bite++;
+	else
+	    return (NULL);
+
+	kb++;
+    }
+
+    inaddr.s_addr  = ((byte[0] & 0xff) << 24);
+    inaddr.s_addr |= ((byte[1] & 0xff) << 16);
+    inaddr.s_addr |= ((byte[2] & 0xff) <<  8);
+    inaddr.s_addr |= ((byte[3] & 0xff) <<  0);
+    inport = ((byte[4] & 0xff) << 8) | (byte[5] & 0xff);
+
+    bzero(sin, sizeof(struct sockaddr_in));
+    sin->sin_family = AF_INET;
+    sin->sin_port = inport;
+    sin->sin_addr = inaddr;
+
+    return ((struct sockaddr *)sin);
+}
+
+
+int
+rewriteMbuf(struct mbuf *m, char *pyld, int pyldlen, char *tstr,int tstrlen)
+{
+    int		i;
+    caddr_t	s, d, roome;
+
+    roome = (caddr_t)m + MSIZE;
+    if (m->m_flags & M_EXT)
+	roome = m->m_ext.ext_buf + MCLBYTES;
+
+    if ((roome - pyld) < tstrlen)
+	return (0xdead);				/* no room in mbuf	*/
+
+    s = tstr;
+    d = pyld;
+    for (i = 0; i < tstrlen; i++)
+	*d++ = *s++;
+
+    return (tstrlen - pyldlen);
+}
+
+
+void
+incrementSeq(struct tcphdr *th, int delta)
+{
+    th->th_seq = htonl(ntohl(th->th_seq) + delta);
+}
+
+
+void
+decrementSeq(struct tcphdr *th, int delta)
+{
+    th->th_seq = htonl(ntohl(th->th_seq) - delta);
+}
+
+
+void
+incrementAck(struct tcphdr *th, int delta)
+{
+    th->th_ack = htonl(ntohl(th->th_ack) + delta);
+}
+
+
+void
+decrementAck(struct tcphdr *th, int delta)
+{
+    th->th_ack = htonl(ntohl(th->th_ack) - delta);
 }
 
 

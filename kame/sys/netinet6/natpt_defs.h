@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.13 2001/05/05 11:19:03 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.14 2001/05/07 08:49:16 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -330,17 +330,19 @@ struct	_tSlot					/* sizeof(): 104[byte]	*/
 };
 
 
-struct _tcpstate				/* sizeof():  28[byte]	*/
+struct _tcpstate				/* sizeof():  32[byte]	*/
 {
     short	_state;
     short	_session;
-    u_long	_ip_id[2];	/* IP packet Identification			*/
-				/*    [0]: current packet			*/
-				/*    [1]: just before packet			*/
-    u_short	_port[2];	/* [0]:outGoing srcPort, [1]:inComing dstPort	*/
-/*  u_long	_iss;			initial send sequence number		*/
-    u_long	_delta[3];	/* Sequence delta				*/
-				/*    [0]: current     (cumulative)		*/
-				/*    [1]: just before (cumulative)		*/
-				/*    [2]: (this time)				*/
+
+    int		ftpstate;
+    u_long	delta[2];	/*    [0]: outgoingDelta			*/
+				/*	outgoingSeq	increment		*/
+				/*	incomingAck	decrement		*/
+				/*    [1]: incomingDelta			*/
+				/*	incomingSeq	increment		*/
+				/*	outgoingAck	decrement		*/
+
+    u_int32_t	seq[2];
+    u_int32_t	ack[2];
 };
