@@ -1,4 +1,4 @@
-.\"     $KAME: stf.4,v 1.40 2003/01/08 05:25:56 suz Exp $
+.\"     $KAME: stf.4,v 1.41 2003/01/08 05:31:52 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -347,7 +347,7 @@ and not to use your 6to4 prefix as a source.
 .\"
 .Ss ISATAP
 In this example, the ISATAP router's IPv4 address is 133.4.1.1 and 133.4.1.2.
-
+.Pp
 Here's the host side configuration. Please take care that you have to send
 Router Solicitation periodically by 
 .Dq rtsold
@@ -361,7 +361,7 @@ unsolicited Router Advertisements.
 # ifconfig stf0 inet6 fe80::5efe:133.4.5.6 prefixlen 64
 # rtsold stf0
 .Ed
-
+.Pp
 Here's the router side configuration.
 .Bd -literal
 # ifconfig ne0 inet 133.4.1.1 netmask 0xffffff00
@@ -373,7 +373,6 @@ Here's the router side configuration.
 # rtadvd stf0
 .Ed
 .Pp
-.Ed
 .Sh SEE ALSO
 .Xr gif 4 ,
 .Xr inet 4 ,
