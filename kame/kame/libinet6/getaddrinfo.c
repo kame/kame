@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.152 2003/04/17 13:41:55 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.153 2003/04/17 13:47:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -699,7 +699,7 @@ copyagain:
 		while (cur && cur->ai_next)
 			cur = cur->ai_next;
 	}
-	if (++pass <= 2)
+	if ((pai->ai_flags & AI_PASSIVE) && ++pass <= 2)
 		goto copyagain;
 
 	/* XXX inhibit errors if we have the result */
