@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.923 2000/05/24 05:33:04 sakane Exp $
+$Id: CHANGELOG,v 1.924 2000/05/24 08:36:01 jinmei Exp $
 
 <200005>
+2000-05-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* {bsdi4,openbsd}/sys/netinet6/in6_pcb.c (in6_pcbnotify):
+	corrected the 2nd argument IN6_ARE_ADDR_EQUAL(), which was
+	unintentionally "struct in6_addr **"".
+	This fix is quite important for stability and users of those OSes
+	are recommended to apply it.
+
 Wed May 24 14:32:44 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	supported pre-shared key written by hex string.
