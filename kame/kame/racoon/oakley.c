@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.105 2001/10/23 01:10:46 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.106 2001/10/30 13:53:26 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1226,8 +1226,7 @@ oakley_validate_auth(iph1)
 		case ISAKMP_GETCERT_PAYLOAD:
 			if (iph1->cert_p == NULL) {
 				plog(LLV_ERROR, LOCATION, NULL,
-					"no peer's CERT payload found "
-					"even though CR sent.\n");
+					"no peer's CERT payload found.\n");
 				return ISAKMP_INTERNAL_ERROR;
 			}
 			break;
