@@ -1179,7 +1179,7 @@ pr_pack(buf, cc, mhdr)
 				int32_t ttl;
 				int comma = 0;
 
-				(void)printf(" (");
+				(void)printf(" (");	/*)*/
 
 				switch(ni->ni_code) {
 				case ICMP6_NI_REFUSED:
@@ -1216,6 +1216,14 @@ pr_pack(buf, cc, mhdr)
 						printf(",");
 					printf("03 draft");
 					comma++;
+				} else {
+					cp = (u_char *)ni + ICMP6_NIRLEN;
+					if (cp == end) {
+						if (comma)
+							printf(",");
+						printf("no name");
+						comma++;
+					}
 				}
 
 				if (buf[off + ICMP6_NIRLEN] !=
@@ -1227,6 +1235,7 @@ pr_pack(buf, cc, mhdr)
 						     (u_long)cc - off - ICMP6_NIRLEN - 1);
 					comma++;
 				}
+				/*(*/
 				putchar(')');
 			}
 		 fqdnend:
