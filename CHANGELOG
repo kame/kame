@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2173 2002/05/30 05:56:26 sakane Exp $
+$KAME: CHANGELOG,v 1.2174 2002/05/30 05:57:59 sakane Exp $
 
 <200205>
 Thu May 30 14:54:25 JST 2002 sakane@kame.net
@@ -8,6 +8,7 @@ Thu May 30 14:54:25 JST 2002 sakane@kame.net
 	  the kernel made a sadb_delete message.
 	- the SA type in the sadb_delete message was fixed when the kernel
 	  deleted the SA and made the message to tell it userland programs.
+	these are reported by <shigeru@iij.ad.jp>
 
 2002-05-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_setmtu0): separated from
