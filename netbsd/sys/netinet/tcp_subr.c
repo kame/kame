@@ -519,6 +519,8 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 				m_freem(m);
 				return EINVAL; /* XXX */
 			}
+			nsrc6 = *src6;
+			ndst6 = *dst6;
 			break;
 #endif
 		default:
@@ -583,8 +585,6 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 			ip6->ip6_nxt = IPPROTO_TCP;
 			xchg(ip6->ip6_dst, ip6->ip6_src, struct in6_addr);
 			ip6->ip6_nxt = IPPROTO_TCP;
-			nsrc6 = *dst6;
-			ndst6 = *src6;
 			src6 = &nsrc6;
 			dst6 = &ndst6;
 			break;
