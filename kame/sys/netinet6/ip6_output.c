@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.232 2001/10/18 08:12:13 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.233 2001/10/23 09:47:01 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1256,9 +1256,9 @@ skip_ipsec2:;
 	 * Check with the firewall...
 	 */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
-        if (ip6_fw_enable && ip6_fw_chk_ptr) {
+	if (ip6_fw_enable && ip6_fw_chk_ptr) {
 #else
-        if (ip6_fw_chk_ptr) {
+	if (ip6_fw_chk_ptr) {
 #endif
 		m->m_pkthdr.rcvif = NULL;	/* XXX */
 		/* If ipfw says divert, we have to just drop packet */
@@ -2464,7 +2464,7 @@ do { \
 							  len, privileged);
 #else
 				error = ipsec6_set_policy(in6p, optname, req,
-				                          len, privileged);
+							  len, privileged);
 #endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				m_freem(m);
