@@ -305,12 +305,7 @@ if_simloop(ifp, m, dst, hlen)
 		struct mbuf m0, *n = m;
 		u_int af = dst->sa_family;
 
-#if 0 /* if_loop.c shouldn't touch other interface types */
-		if (ifp->if_bpf->bif_dlt == DLT_NULL)
-#else
-		if (ifp->if_flags & IFF_LOOPBACK)
-#endif
-		{
+		if (ifp->if_bpf->bif_dlt == DLT_NULL) {
 			/*
 			 * We need to prepend the address family as
 			 * a four byte field.  Cons up a dummy header
@@ -322,8 +317,8 @@ if_simloop(ifp, m, dst, hlen)
 			m0.m_len = 4;
 			m0.m_data = (char *)&af;
 			n = &m0;
-			bpf_mtap(ifp, n);
 		}
+		bpf_mtap(ifp, n);
 	}
 #endif
 

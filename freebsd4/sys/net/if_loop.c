@@ -228,7 +228,7 @@ if_simloop(ifp, m, dst, hlen)
 		m->m_data += sizeof(int);
 	}
 
-	if (ifp->if_bpf && (ifp->if_flags & IFF_LOOPBACK)) {
+	if (ifp->if_bpf && ifp->if_bpf->bif_dlt == DLT_NULL) {
 		struct mbuf m0, *n = m;
 		u_int af = dst->sa_family;
 
@@ -243,8 +243,8 @@ if_simloop(ifp, m, dst, hlen)
 		m0.m_len = 4;
 		m0.m_data = (char *)&af;
 		n = &m0;
-		bpf_mtap(ifp, n);
 	}
+	bpf_mtap(ifp, n);
 
 	/* Strip away media header */
 	if (hlen > 0) {
