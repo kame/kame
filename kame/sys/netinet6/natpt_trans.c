@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.159 2002/12/13 05:25:56 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.160 2003/03/28 06:07:30 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -62,6 +62,9 @@
 #include <netinet6/natpt_log.h>
 #include <netinet6/natpt_var.h>
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#include <machine/in_cksum.h>
+#endif
 
 /*
  *

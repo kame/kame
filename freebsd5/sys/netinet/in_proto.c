@@ -106,7 +106,7 @@
 #ifdef NATPT
 void	natpt_init(void);
 int	natpt_ctloutput(int, struct socket *, int, int, struct mbuf **);
-struct pr_usrreqs natpt_usrreqs;
+extern struct pr_usrreqs natpt_usrreqs;
 #endif
 
 extern	struct domain inetdomain;
