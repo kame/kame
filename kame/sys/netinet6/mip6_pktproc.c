@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.40 2002/08/07 10:13:26 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.41 2002/08/08 09:16:27 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -866,7 +866,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	mbu->mbu_state &= ~MIP6_BU_STATE_WAITACK;
 
 	/* update lifetime and refresh time. */
-	lifetime = htons(ip6ma->ip6ma_lifetime) >> 2;	/* units of 4 secs */
+	lifetime = htons(ip6ma->ip6ma_lifetime) << 2;	/* units of 4 secs */
 	if (lifetime < mbu->mbu_lifetime) {
 		mbu->mbu_expire -= (mbu->mbu_lifetime - lifetime);
 		if (mbu->mbu_expire < time_second)

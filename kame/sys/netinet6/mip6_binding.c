@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.116 2002/08/07 10:13:26 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.117 2002/08/08 09:16:27 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -482,6 +482,10 @@ mip6_bu_list_notify_binding_change(sc)
 			 * XXX
 			 * must send bu with ack flag to a previous ar.
 			 */
+			continue;
+		}
+		if (SA6_ARE_ADDR_EQUAL(&mbu->mbu_coa, &hif_coa)) {
+			/* XXX no need */
 			continue;
 		}
 		mbu->mbu_coa = hif_coa;
