@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.226 2001/07/24 02:06:25 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.227 2001/07/24 02:10:44 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -625,7 +625,7 @@ icmp6_input(mp, offp, proto)
 		 * Copy mbuf to send to two data paths: userland socket(s),
 		 * and to the querier (echo reply).
 		 */
-		if ((n = m_copy(m, 0, M_COPYALL)) == NULL) {
+		if ((n = m_copym(m, 0, M_COPYALL, M_DONTWAIT)) == NULL) {
 			/* Give up remote */
 			break;
 		}
@@ -753,7 +753,7 @@ icmp6_input(mp, offp, proto)
 			IP6_EXTHDR_CHECK(m, off, sizeof(struct icmp6_nodeinfo),
 					 IPPROTO_DONE);
 #endif
-			n = m_copy(m, 0, M_COPYALL);
+			n = m_copym(m, 0, M_COPYALL, M_DONTWAIT);
 			if (n)
 				n = ni6_input(n, off);
 			/* XXX meaningless if n == NULL */
