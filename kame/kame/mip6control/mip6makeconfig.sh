@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $Id: mip6makeconfig.sh,v 1.5 2003/09/30 12:48:00 keiichi Exp $
+# $Id: mip6makeconfig.sh,v 1.6 2003/11/04 10:29:03 keiichi Exp $
 
 cat=/bin/cat
 basename=/usr/bin/basename
@@ -46,11 +46,37 @@ node_dir=${ipv6_mobile_config_dir}/${1}
 # set other auto configurable parameters
 #
 if [ "X${transport_protocol}" = 'Xah' ]; then
+	transport_protocol='ah'
+	transport_autharg='-A'
 	transport_esparg=''
 	transport_esp_algorithm=''
 	transport_esp_secret=''
 else
+	transport_protocol='esp'
 	transport_esparg='-E'
+	if [ "X${transport_auth_algorithm}" = 'X' ]; then
+		transport_autharg=''
+		transport_auth_secret=''
+	else
+		transport_autharg='-A'
+	fi
+fi
+
+if [ "X${tunnel_protocol}" = 'Xah' ]; then
+	tunnel_protocol='ah'
+	tunnel_autharg='-A'
+	tunnel_esparg=''
+	tunnel_esp_algorithm=''
+	tunnel_esp_secret=''
+else
+	tunnel_protocol='esp'
+	tunnel_esparg='-E'
+	if [ "X${tunnel_auth_algorithm}" = 'X' ]; then
+		tunnel_autharg=''
+		tunnel_auth_secret=''
+	else
+		tunnel_autharg='-A'
+	fi
 fi
 
 #
@@ -65,24 +91,24 @@ add ${mobile_node} ${home_agent}
 	${transport_protocol} ${transport_spi_mn_to_ha}
 	-m transport
 	${transport_esparg} ${transport_esp_algorithm} ${transport_esp_secret}
-	-A ${transport_auth_algorithm} ${transport_auth_secret};
+	${transport_autharg} ${transport_auth_algorithm} ${transport_auth_secret};
 add ${home_agent} ${mobile_node}
 	${transport_protocol} ${transport_spi_ha_to_mn}
 	-m transport
 	${transport_esparg} ${transport_esp_algorithm} ${transport_esp_secret}
-	-A ${transport_auth_algorithm} ${transport_auth_secret};
+	${transport_autharg}  ${transport_auth_algorithm} ${transport_auth_secret};
 add ${mobile_node} ${home_agent}
-	esp ${tunnel_spi_mn_to_ha}
+	${tunnel_protocol} ${tunnel_spi_mn_to_ha}
 	-m tunnel
 	-u  ${tunnel_uid_mn_to_ha}
-	-E ${tunnel_esp_algorithm} ${tunnel_esp_secret}
-	-A ${tunnel_auth_algorithm} ${tunnel_auth_secret};
+	${tunnel_esparg} ${tunnel_esp_algorithm} ${tunnel_esp_secret}
+	${tunnel_autharg} ${tunnel_auth_algorithm} ${tunnel_auth_secret};
 add ${home_agent} ${mobile_node}
-	esp ${tunnel_spi_ha_to_mn}
+	${tunnel_protocol} ${tunnel_spi_ha_to_mn}
 	-m tunnel
 	-u ${tunnel_uid_ha_to_mn}
-	-E ${tunnel_esp_algorithm} ${tunnel_esp_secret}
-	-A ${tunnel_auth_algorithm} ${tunnel_auth_secret};
+	${tunnel_esparg} ${tunnel_esp_algorithm} ${tunnel_esp_secret}
+	${tunnel_autharg} ${tunnel_auth_algorithm} ${tunnel_auth_secret};
 EOF
 
 #
@@ -94,9 +120,9 @@ delete ${mobile_node} ${home_agent}
 delete ${home_agent} ${mobile_node}
 	${transport_protocol} ${transport_spi_ha_to_mn};
 delete ${mobile_node} ${home_agent}
-	esp ${tunnel_spi_mn_to_ha};
+	${tunnel_protocol} ${tunnel_spi_mn_to_ha};
 delete ${home_agent} ${mobile_node}
-	esp ${tunnel_spi_ha_to_mn};
+	${tunnel_protocol} ${tunnel_spi_ha_to_mn};
 EOF
 
 #
