@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.6 2000/01/10 17:27:15 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.7 2000/01/10 17:53:15 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1146,6 +1146,8 @@ get_transform(prop)
 	tlen = ntohs(prop->h.len)
 		- (sizeof(struct isakmp_pl_p) + prop->spi_size);
 	pbuf = isakmp_parsewoh(ISAKMP_NPTYPE_T, (struct isakmp_gen *)bp, tlen);
+	if (pbuf == NULL)
+		return NULL;
 
 	/* check and get transform for use */
 	for (pa = (struct isakmp_parse_t *)pbuf->v;
