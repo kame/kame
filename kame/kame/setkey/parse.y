@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.16 2000/03/01 09:35:24 sakane Exp $ */
+/* KAME $Id: parse.y,v 1.17 2000/03/06 22:15:55 sakane Exp $ */
 
 %{
 #include <sys/types.h>
@@ -760,7 +760,7 @@ parse_init()
 	p_alg_auth = SADB_AALG_NONE;
 	p_mode = IPSEC_MODE_ANY;
 	p_reqid = 0;
-	p_replay = 4;
+	p_replay = 0;
 	p_key_enc_len = p_key_auth_len = 0;
 	p_key_enc = p_key_auth = 0;
 	p_lt_hard = p_lt_soft = 0;
