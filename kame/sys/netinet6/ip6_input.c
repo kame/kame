@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.275 2002/05/25 12:07:38 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.276 2002/05/27 11:37:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -303,23 +303,6 @@ static void
 ip6_init2(dummy)
 	void *dummy;
 {
-#if defined(__bsdi__) && _BSDI_VERSION < 199802
-	struct ifnet *loifp = &loif;
-#endif
-
-	/*
-	 * XXX: we need the nd_ifinfo structure for lo0 to send packets to
-	 * an address of our own.  The strucutre should typically be
-	 * initialized during the bootstrap procedure, but we intentionally
-	 * make it sure just in case.
-	 */
-#ifdef __bsdi__
-	nd6_ifattach(loifp);
-#elif defined(__OpenBSD__)
-	nd6_ifattach(lo0ifp);
-#else
-	nd6_ifattach(&loif[0]);
-#endif
 
 	/* nd6_timer_init */
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
