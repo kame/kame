@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.4 2002/05/01 10:38:58 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.5 2002/05/01 14:46:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -33,22 +33,19 @@
 
 #include "config.h"
 
-#define cprint if (cfdebug) printf
-
 extern int lineno;
 extern int cfdebug;
 
-static struct cf_iflist *iflist_head; 
+static struct cf_iflist *iflist_head, *piflist_head; 
 
 extern int yylex __P((void));
 static void cleanup __P((void));
-static void cleanup_interface __P((void));
-static void cleanup_ifconf __P((struct cf_ifconf *));
-static void cleanup_declaration __P((struct cf_declaration *));
-static void cleanup_dhcpoption __P((struct cf_dhcpoption *));
+static void cleanup_interface __P((struct cf_iflist *));
+static void cleanup_cflist __P((struct cf_list *));
 %}
 
 %token INTERFACE IFNAME
+%token PREFIX_INTERFACE SLA_ID
 %token SEND
 %token ALLOW
 %token RAPID_COMMIT
@@ -56,15 +53,14 @@ static void cleanup_dhcpoption __P((struct cf_dhcpoption *));
 %token NUMBER SLASH EOS BCL ECL STRING
 
 %union {
-	unsigned long num;
+	int num;
 	char* str;
-	struct cf_declaration *decl;
-	struct cf_dhcpoption *dhcpopt;
+	struct cf_list *list;
 }
 
 %type <str> IFNAME
-%type <decl> declaration declarations
-%type <dhcpopt> dhcpoption
+%type <num> NUMBER
+%type <list> declaration declarations dhcpoption ifparam ifparams
 
 %%
 statements:
@@ -73,23 +69,40 @@ statements:
 	;
 
 statement:
-	interface_statement
+		interface_statement
+	|	prefix_interface_statement
 	;
 
 interface_statement:
 	INTERFACE IFNAME BCL declarations ECL 
 	{
-		struct cf_ifconf *ifc;
+		struct cf_iflist *ifl;
 
-		if ((ifc = (struct cf_ifconf *)malloc(sizeof(*ifc))) == NULL) {
+		if ((ifl = (struct cf_iflist *)malloc(sizeof(*ifl))) == NULL) {
 			yywarn("memory allocation failed");
 			return(-1);
 		}
-		memset(ifc, 0, sizeof(*ifc));
-		ifc->ifname = $2;
-		ifc->decl = $4;
-		ifc->line = lineno;
-		if (add_interface(ifc))
+		memset(ifl, 0, sizeof(*ifl));
+		ifl->ifname = $2;
+		ifl->params = $4;
+		if (add_interface(ifl, &iflist_head))
+			return(-1);
+	}
+	;
+
+prefix_interface_statement:
+	PREFIX_INTERFACE IFNAME BCL ifparams ECL
+	{
+		struct cf_iflist *ifl;
+
+		if ((ifl = (struct cf_iflist *)malloc(sizeof(*ifl))) == NULL) {
+			yywarn("memory allocation failed");
+			return(-1);
+		}
+		memset(ifl, 0, sizeof(*ifl));
+		ifl->ifname = $2;
+		ifl->params = $4;
+		if (add_interface(ifl, &piflist_head))
 			return(-1);
 	}
 	;
@@ -98,9 +111,7 @@ declarations:
 		{ $$ = NULL; }
 	|	declarations declaration
 		{
-			struct cf_declaration *d, *dp, *dhead;
-
-			$2->decl_next = $1; /* XXX reverse order */
+			$2->next = $1; /* XXX reverse order */
 			$$ = $2;
 		}
 	;
@@ -108,90 +119,111 @@ declarations:
 declaration:
 		SEND dhcpoption EOS
 		{
-			struct cf_declaration *d;
+			struct cf_list *l;
 
-			d = (struct cf_declaration *)malloc(sizeof(*d));
-			if (d == NULL) {
+			l = (struct cf_list *)malloc(sizeof(*l));
+			if (l == NULL) {
 				yywarn("can't allocate memory");
 				return(-1);
 			}
-			memset(d, 0, sizeof(*d));
-			d->decl_type = DECL_SEND;
-			d->decl_val = $2;
-			$$ = d;
+			memset(l, 0, sizeof(*l));
+			l->type = DECL_SEND;
+			l->list = $2;
+			$$ = l;
 		}
 	|	INFO_ONLY EOS
 		{
-			struct cf_declaration *d;
+			struct cf_list *l;
 
-			d = (struct cf_declaration *)malloc(sizeof(*d));
-			if (d == NULL) {
+			l = (struct cf_list *)malloc(sizeof(*l));
+			if (l == NULL) {
 				yywarn("can't allocate memory");
 				return(-1);
 			}
-			memset(d, 0, sizeof(*d));
-			d->decl_type = DECL_INFO_ONLY;
-			$$ = d;
+			memset(l, 0, sizeof(*l));
+			l->type = DECL_INFO_ONLY;
+			/* no value */
+			$$ = l;
 		}
 	|	ALLOW dhcpoption EOS
 		{
-			struct cf_declaration *d;
+			struct cf_list *l;
 
-			d = (struct cf_declaration *)malloc(sizeof(*d));
-			if (d == NULL) {
+			l = (struct cf_list *)malloc(sizeof(*l));
+			if (l == NULL) {
 				yywarn("can't allocate memory");
 				return(-1);
 			}
-			memset(d, 0, sizeof(*d));
-			d->decl_type = DECL_ALLOW;
-			d->decl_val = $2;
-			$$ = d;
+			memset(l, 0, sizeof(*l));
+			l->type = DECL_ALLOW;
+			l->list = $2;
+			$$ = l;
 		}
 	;
 
 dhcpoption:
 	RAPID_COMMIT
 	{
-		struct cf_dhcpoption *opt;
-		
-		if ((opt = (struct cf_dhcpoption *)malloc(sizeof(*opt)))
+		struct cf_list *l;
+
+		if ((l = (struct cf_list *)malloc(sizeof(*l)))
 		    == NULL) {
 			yywarn("can't allocate memory");
 			return(-1);
 		}
-		memset(opt, 0, sizeof(*opt));
-		opt->dhcpopt_type = DHCPOPT_RAPID_COMMIT;
-		$$ = opt;
+		memset(l, 0, sizeof(*l));
+		l->type = DHCPOPT_RAPID_COMMIT;
+		/* no value */
+		$$ = l;
+	}
+	;
+
+ifparams:
+		{ $$ = NULL; }
+	|	ifparams ifparam
+		{
+			$2->next = $1; /* XXX reverse order */
+			$$ = $2;
+		}
+	;
+
+ifparam:
+	SLA_ID NUMBER EOS
+	{
+		struct cf_list *l;
+
+		l = (struct cf_list *)malloc(sizeof(*l));
+		if (l == NULL) {
+			yywarn("can't allocate memory");
+			return(-1);
+		}
+		memset(l, 0, sizeof(*l));
+		l->type = IFPARAM_SLA_ID;
+		l->num = $2;
+		$$ = l;
 	}
 	;
 
 %%
 /* supplement routines for configuration */
 static int
-add_interface(conf)
-	struct cf_ifconf *conf;
+add_interface(new, headp)
+	struct cf_iflist *new, **headp;
 {
 	struct cf_iflist *ifp;
 
 	/* check for duplicated configuration */
-	for (ifp = iflist_head; ifp; ifp = ifp->if_next) {
-		if (strcmp(ifp->if_conf->ifname, conf->ifname) == 0) {
-			yywarn("duplicated interface: %s", conf->ifname);
-			cleanup_ifconf(conf);
+	for (ifp = *headp; ifp; ifp = ifp->next) {
+		if (strcmp(ifp->ifname, new->ifname) == 0) {
+			yywarn("duplicated interface: %s (ignored)",
+			       new->ifname);
+			cleanup_interface(new);
 			return(0);
 		}
 	}
 
-	if ((ifp = malloc(sizeof(*ifp))) == NULL) {
-		yywarn("memory allocation failed");
-		return(-1);
-	}
-	memset(ifp, 0, sizeof(*ifp));
-	ifp->if_next = iflist_head;
-	iflist_head = ifp;
-	ifp->if_conf = conf;
-
-	cprint("add interface %s at %d\n", conf->ifname, lineno);
+	new->next = *headp;
+	*headp = new;
 
 	return(0);
 }
@@ -200,72 +232,41 @@ add_interface(conf)
 static void
 cleanup()
 {
-	cleanup_interface();
+	cleanup_interface(iflist_head);
+	cleanup_interface(piflist_head);
 }
 
 static void
-cleanup_interface()
+cleanup_interface(head)
+	struct cf_iflist *head;
 {
 	struct cf_iflist *ifp, *ifp_next;
 
-	for (ifp = iflist_head; ifp; ifp = ifp_next) {
-		ifp_next = ifp->if_next;
-		cleanup_ifconf(ifp->if_conf);
+	for (ifp = head; ifp; ifp = ifp_next) {
+		ifp_next = ifp->next;
+		cleanup_cflist(ifp->params);
+		free(ifp->ifname);
 		free(ifp);
 	}
 }
 
 static void
-cleanup_ifconf(conf)
-	struct cf_ifconf *conf;
+cleanup_cflist(p)
+	struct cf_list *p;
 {
-	if (conf->decl)
-		cleanup_declaration(conf->decl);
-	free(conf->ifname);
-}
+	struct cf_list *n;
 
-static void
-cleanup_declaration(decl)
-	struct cf_declaration *decl;
-{
-	struct cf_declaration *next;
-
-	if (decl == NULL)
+	if (p == NULL)
 		return;
-	next = decl->decl_next;
 
-	switch(decl->decl_type) {
-	case DECL_SEND:
-		cleanup_dhcpoption(decl->decl_val);
-		break;
-	case DECL_INFO_ONLY:	/* no value */
-		break;
-	case DECL_ALLOW:
-		cleanup_dhcpoption(decl->decl_val);
-		break;
-	default:
-		yyerror("cleanup_declaration: unexpected declaration");
-	}
-	free(decl);
+	n = p->next;
+	if (p->ptr)
+		free(p->ptr);
+	if (p->list)
+		cleanup_cflist(p->list);
+	free(p);
 
-	cleanup_declaration(next);	
-}
-
-static void
-cleanup_dhcpoption(opt)
-	struct cf_dhcpoption *opt;
-{
-	struct cf_dhcpoption *next;
-
-	if (opt == NULL)
-		return;
-	next = opt->dhcpopt_next;
-
-	if (opt->dhcpopt_val)
-		free(opt->dhcpopt_val);
-	free(opt);
-
-	cleanup_dhcpoption(next);
+	cleanup_cflist(n);
 }
 
 #define config_fail() \
@@ -275,6 +276,9 @@ int
 cf_post_config()
 {
 	if (configure_interface(iflist_head))
+		config_fail();
+
+	if (configure_prefix_interface(piflist_head))
 		config_fail();
 
 	configure_commit();

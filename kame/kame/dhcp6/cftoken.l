@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.4 2002/05/01 10:30:35 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.5 2002/05/01 14:46:06 jinmei Exp $	*/
 
 %{
 /*
@@ -53,7 +53,9 @@ int lineno = 1;
 static int yy_first_time = 1;
 static int yyerrorcount = 0;
  
-#ifdef CONFIG_DEBUG
+#ifndef NOCONFIG_DEBUG
+#define YYDEBUG 1
+
 int cfdebug = 1;
 #else
 int cfdebug = 0;
@@ -111,6 +113,10 @@ ecl		\}
 <S_CNF>information-only { DECHO; return(INFO_ONLY); }
 
 <S_CNF>allow { DECHO; return(ALLOW); }
+
+	/* interface parameters for delegated prefix configuration */
+<S_CNF>prefix-interface { DECHO; BEGIN S_IFACE; return(PREFIX_INTERFACE); }
+<S_CNF>sla-id { DECHO; return(SLA_ID); }
 
 	/* misc */
 {ws}		{ ; }

@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.3 2002/05/01 10:30:35 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.4 2002/05/01 14:46:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -76,6 +76,17 @@ struct dhcp_ifconf {
 	struct dhcp_optconf *allow_options;
 };
 
+struct prefix_ifconf {
+	struct prefix_ifconf *next;
+
+	char *ifname;
+
+	int sla_len;
+	u_int32_t sla_id;  /* need more than 32bits? */
+	int ifid_len;
+	int ifid_type;
+};
+
 /* DHCP option information */
 struct dhcp_optconf {
 	struct dhcp_optconf *next;
@@ -85,30 +96,24 @@ struct dhcp_optconf {
 };
 
 /* structures and definitions used in the config file parser */
-struct cf_ifconf {
-	char *ifname;
-	struct cf_declaration *decl;
-	int line;
-};
-
 struct cf_iflist {
-	struct cf_iflist *if_next;
-	struct cf_ifconf *if_conf;
+	struct cf_iflist *next;
+	char *ifname;
+	struct cf_list *params;
 };
 
-struct cf_declaration {
-	struct cf_declaration *decl_next;
-	int decl_type;
-	void *decl_val;
-};
+struct cf_list {
+	struct cf_list *next;
+	int type;
 
-struct cf_dhcpoption {
-	struct cf_dhcpoption *dhcpopt_next; /* unused for now */
-	int dhcpopt_type;
-	void *dhcpopt_val;
+	/* type dependent values: */
+	int num;
+	struct cf_list *list;
+	void *ptr;
 };
 
 enum {DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY};
+enum {IFPARAM_SLA_ID};
 enum {DHCPOPT_RAPID_COMMIT};
 
 extern struct dhcp_ifconf *dhcp_iflist;
@@ -119,3 +124,4 @@ extern void configure_cleanup __P((void));
 extern void configure_commit __P((void));
 extern int cfparse __P((char *));
 extern struct dhcp_if *find_ifconf __P((char *));
+extern struct prefix_ifconf *find_prefixifconf __P((char *));

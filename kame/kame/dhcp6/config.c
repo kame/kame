@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.2 2002/05/01 10:30:35 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.3 2002/05/01 14:46:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -41,13 +41,14 @@ extern int errno;
 
 struct dhcp_if *dhcp_if;
 
-/* temporary configuration parameters during parsing */
 static struct dhcp_ifconf *dhcp_ifconflist;
+static struct prefix_ifconf *prefix_ifconflist0, *prefix_ifconflist;
 
 static int add_options __P((struct dhcp_ifconf *, struct dhcp_optconf **,
-			    u_long *, struct cf_dhcpoption *));
+			    u_long *, struct cf_list *));
 
 static void clear_ifconf __P((struct dhcp_ifconf *));
+static void clear_prefixifconf __P((struct prefix_ifconf *));
 static void clear_options __P((struct dhcp_optconf *));
 
 void
@@ -103,8 +104,8 @@ configure_interface(iflist)
 	struct cf_iflist *ifp;
 	struct dhcp_ifconf *ifc;
 
-	for (ifp = iflist; ifp; ifp = ifp->if_next) {
-		struct cf_declaration *dcl;
+	for (ifp = iflist; ifp; ifp = ifp->next) {
+		struct cf_list *cfl;
 
 		if ((ifc = (struct dhcp_ifconf *)malloc(sizeof(*ifc)))
 		    == NULL) {
@@ -115,28 +116,34 @@ configure_interface(iflist)
 		ifc->next = dhcp_ifconflist;
 		dhcp_ifconflist = ifc;
 
-		if ((ifc->ifname = strdup(ifp->if_conf->ifname)) == NULL) {
+		if ((ifc->ifname = strdup(ifp->ifname)) == NULL) {
 			dprintf(LOG_ERR, "failed to copy ifname");
 			goto bad;
 		}
 
-		for (dcl = ifp->if_conf->decl; dcl; dcl = dcl->decl_next) {
-			switch(dcl->decl_type) {
+		for (cfl = ifp->params; cfl; cfl = cfl->next) {
+			switch(cfl->type) {
 			case DECL_SEND:
 				if (add_options(ifc, &ifc->send_options,
 						&ifc->send_flags,
-						(struct cf_dhcpoption *)dcl->decl_val))
+						cfl->list)) {
 					goto bad;
+				}
 				break;
 			case DECL_ALLOW:
 				if (add_options(ifc, &ifc->allow_options,
 						&ifc->allow_flags,
-						(struct cf_dhcpoption *)dcl->decl_val))
+						cfl->list)) {
 					goto bad;
+				}
 				break;
 			case DECL_INFO_ONLY:
 				ifc->send_flags |= DHCIFF_INFO_ONLY;
 				break;
+			default:
+				dprintf(LOG_ERR,
+					"invalid interface configuration");
+				goto bad;
 			}
 		}
 	}
@@ -146,6 +153,58 @@ configure_interface(iflist)
   bad:
 	clear_ifconf(dhcp_ifconflist);
 	dhcp_ifconflist = NULL;
+	return(-1);
+}
+
+int
+configure_prefix_interface(iflist)
+	struct cf_iflist *iflist;
+{
+	struct cf_iflist *ifp;
+	struct prefix_ifconf *pif;
+
+	for (ifp = iflist; ifp; ifp = ifp->next) {
+		struct cf_list *cfl;
+
+		if ((pif = (struct prefix_ifconf *)malloc(sizeof(*pif)))
+		    == NULL) {
+			dprintf(LOG_ERR, "malloc failed");
+			goto bad;
+		}
+		memset(pif, 0, sizeof(*pif));
+		pif->next = prefix_ifconflist0;
+		prefix_ifconflist0 = pif;
+
+		/* validate ifname */
+		if (if_nametoindex(ifp->ifname) == 0) {
+			dprintf(LOG_ERR, "invalid interface (%s): %s",
+				ifp->ifname, strerror(errno));
+			goto bad;
+		}
+
+		if ((pif->ifname = strdup(ifp->ifname)) == NULL) {
+			dprintf(LOG_ERR, "failed to copy ifname");
+			goto bad;
+		}
+
+		for (cfl = ifp->params; cfl; cfl = cfl->next) {
+			switch(cfl->type) {
+			case IFPARAM_SLA_ID:
+				pif->sla_id = (u_int32_t)cfl->num;
+				break;
+			default:
+				dprintf(LOG_ERR, "invalid prefix "
+					"interface configuration");
+				goto bad;
+			}
+		}
+	}
+	
+	return(0);
+
+  bad:
+	clear_prefixifconf(prefix_ifconflist);
+	prefix_ifconflist = NULL;
 	return(-1);
 }
 
@@ -162,6 +221,7 @@ configure_commit()
 	struct dhcp_ifconf *ifc;
 	struct dhcp_if *ifp;
 
+	/* commit interface configuration */
 	for (ifc = dhcp_ifconflist; ifc; ifc = ifc->next) {
 		if ((ifp = find_ifconf(ifc->ifname)) != NULL) {
 			ifp->send_flags = ifc->send_flags;
@@ -172,6 +232,14 @@ configure_commit()
 		}
 	}
 	clear_ifconf(dhcp_ifconflist);
+
+	/* commit prefix configuration */
+	if (prefix_ifconflist) {
+		/* clear previous configuration. (need more work?) */
+		clear_prefixifconf(prefix_ifconflist);
+	}
+	prefix_ifconflist = prefix_ifconflist0;
+	prefix_ifconflist0 = NULL;
 }
 
 static void
@@ -191,6 +259,20 @@ clear_ifconf(iflist)
 }
 
 static void
+clear_prefixifconf(iflist)
+	struct prefix_ifconf *iflist;
+{
+	struct prefix_ifconf *pif, *pif_next;
+
+	for (pif = iflist; pif; pif = pif_next) {
+		pif_next = pif->next;
+
+		free(pif->ifname);
+		free(pif);
+	}
+}
+
+static void
 clear_options(opt0)
 	struct dhcp_optconf *opt0;
 {
@@ -205,36 +287,29 @@ clear_options(opt0)
 }
 
 static int
-add_options(ifc, optp0, flagp, cfopt)
+add_options(ifc, optp0, flagp, cfl0)
 	struct dhcp_ifconf *ifc;
 	struct dhcp_optconf **optp0;
 	u_long *flagp;
-	struct cf_dhcpoption *cfopt;
+	struct cf_list *cfl0;
 {
 	struct dhcp_optconf *opt, **optp;
-	struct cf_dhcpoption *cfo;
+	struct cf_list *cfl;
 
 	optp = optp0;
-	for (cfo = cfopt; cfo; cfo = cfo->dhcpopt_next) {
-		switch(cfo->dhcpopt_type) {
+	for (cfl = cfl0; cfl; cfl = cfl->next) {
+		switch(cfl->type) {
 		case DHCPOPT_RAPID_COMMIT:
 			*flagp |= DHCIFF_RAPID_COMMIT;
 			break;
 		default:
-			if ((opt = (struct dhcp_optconf *)malloc(sizeof(*opt)))
-			    == NULL) {
-				dprintf(LOG_ERR, "malloc failed");
+			dprintf(LOG_ERR, "unknown option type: %d", cfl->type);
 				return(-1);
-			}
-			memset(opt, 0, sizeof(*opt));
-			*optp = opt;
-			optp = &opt->next;
 		}
 	}
 
 	return(0);
 }
-
 
 struct dhcp_if *
 find_ifconf(ifname)
@@ -243,6 +318,20 @@ find_ifconf(ifname)
 	struct dhcp_if *ifp;
 
 	for (ifp = dhcp_if; ifp; ifp = ifp->next) {
+		if (strcmp(ifp->ifname, ifname) == NULL)
+			return(ifp);
+	}
+
+	return(NULL);
+}
+
+struct prefix_ifconf *
+find_prefixifconf(ifname)
+	char *ifname;
+{
+	struct prefix_ifconf *ifp;
+
+	for (ifp = prefix_ifconflist; ifp; ifp = ifp->next) {
 		if (strcmp(ifp->ifname, ifname) == NULL)
 			return(ifp);
 	}
