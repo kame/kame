@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.21 2002/03/12 11:57:54 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.22 2002/03/13 17:00:46 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -77,6 +77,7 @@ t.
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_mip6.h"
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
@@ -1061,11 +1062,53 @@ contiguousfail:
 	}
 
 	/*
-	 * XXX TODO:
-	 *
 	 * if ! link-local, prepend an outer ip header and send it.
 	 * if link-local, discard it.
 	 */
+#ifdef MIP6_BDT
+	{
+		struct sockaddr_in6 *src_sa, *dst_sa;
+		struct mip6_bu *mbu;
+		struct hif_softc *hif = (struct hif_softc *)ifp;
+		struct ip6_hdr *ip6;
+
+		if (ip6_getpktaddrs(m, &src_sa, &dst_sa))
+			goto done;
+
+		if (IN6_IS_ADDR_LINKLOCAL(&src_sa->sin6_addr)
+		    || IN6_IS_ADDR_LINKLOCAL(&dst_sa->sin6_addr)
+		    || IN6_IS_ADDR_SITELOCAL(&src_sa->sin6_addr)
+		    || IN6_IS_ADDR_SITELOCAL(&dst_sa->sin6_addr))
+			goto done;
+
+		mbu = mip6_bu_list_find_home_registration(&hif->hif_bu_list,
+							  src_sa);
+		if (!mbu)
+			goto done;
+
+		M_PREPEND(m, sizeof(struct ip6_hdr), M_DONTWAIT);
+		if (m && m->m_len < sizeof(struct ip6_hdr))
+			m = m_pullup(m, sizeof(struct ip6_hdr));
+		if (m == NULL)
+			return (0);
+
+		ip6 = mtod(m, struct ip6_hdr *);
+		ip6->ip6_flow = 0;
+		ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
+		ip6->ip6_vfc |= IPV6_VERSION;
+		ip6->ip6_plen = htons((u_short)m->m_pkthdr.len - sizeof(*ip6));
+		ip6->ip6_nxt = IPPROTO_IPV6;
+		ip6->ip6_hlim = ip6_defhlim;
+		ip6->ip6_src = mbu->mbu_coa.sin6_addr;
+		ip6->ip6_dst = mbu->mbu_paddr.sin6_addr;
+		if (!ip6_setpktaddrs(m, &mbu->mbu_coa, &mbu->mbu_paddr))
+			goto done;
+		in6_clearscope(&ip6->ip6_src);
+		in6_clearscope(&ip6->ip6_dst);
+		return (ip6_output(m, 0, 0, 0, 0, NULL));
+	}
+ done:
+#endif /* MIP6_BDT */
 
 	m_freem(m);
 	return(0);

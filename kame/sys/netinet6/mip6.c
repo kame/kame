@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.121 2002/03/12 11:57:55 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.122 2002/03/13 17:00:46 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2118,11 +2118,11 @@ mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 	haddr_opt.ip6oh_len = IP6OPT_HALEN;
 
 	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, dst, src);
-#ifdef MIP6_ALLOW_COA_FALLBACK
+#if defined(MIP6_ALLOW_COA_FALLBACK) || defined(MIP6_BDT)
 	if (mbu && ((mbu->mbu_state & MIP6_BU_STATE_MIP6NOTSUPP) != 0)) {
 		return (0);
 	}
-#endif
+#endif /* MIP6_ALLOW_COA_FALLBACK || MIP6_BDT */
 	if (mbu)
 		coa = &mbu->mbu_coa;
 	else

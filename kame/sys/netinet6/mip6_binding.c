@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.95 2002/03/12 11:57:55 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.96 2002/03/13 17:00:47 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -156,6 +156,7 @@ static int mip6_tunnel_control __P((int, void *,
 				    int (*) __P((const struct mbuf *,
 						 int, int, void *)),
 				    const struct encaptab **));
+static int mip6_bdt_delete __P((struct sockaddr_in6 *));
 static int mip6_are_ifid_equal __P((struct in6_addr *, struct in6_addr *,
 				    u_int8_t));
 #if defined(IPSEC) && !defined(__OpenBSD__)
@@ -942,6 +943,12 @@ mip6_bu_list_remove(mbu_list, mbu)
 		return (EINVAL);
 	}
 
+#ifdef MIP6_BDT
+	if ((mbu->mbu_state & MIP6_BU_STATE_MIP6NOTSUPP) != 0) {
+		mip6_bdt_delete(&mbu->mbu_paddr);
+	}
+#endif /* MIP6_BDT */
+
 	LIST_REMOVE(mbu, mbu_entry);
 	FREE(mbu, M_TEMP);
 
@@ -955,6 +962,78 @@ mip6_bu_list_remove(mbu_list, mbu)
 
 	return (0);
 }
+
+#ifdef MIP6_BDT
+int
+mip6_bdt_create(sc, paddr)
+	struct hif_softc *sc;
+	struct sockaddr_in6 *paddr;
+{
+	struct sockaddr_in6 dst, gate, mask;
+	struct rtentry *retrt;
+	struct ifaddr *ia;
+	struct in6_ifaddr *ia6 = NULL;
+	int error = 0;
+
+	(void)mip6_bdt_delete(paddr);
+
+	dst = *paddr;
+	for (ia = TAILQ_FIRST(&sc->hif_if.if_addrhead);
+	     ia;
+	     ia = TAILQ_NEXT(ia, ifa_link)) {
+		if (ia->ifa_addr->sa_family != AF_INET6)
+			continue;
+		ia6 = (struct in6_ifaddr *)ia;
+		if ((ia6->ia6_flags & IN6_IFF_HOME) == 0) {
+			ia6 = NULL;
+			continue;
+		}
+		break;
+	}
+	if (ia6 == NULL)
+		return (EINVAL);
+	gate = ia6->ia_addr;
+        bzero(&mask, sizeof(mask));
+        mask.sin6_family = AF_INET6;
+        mask.sin6_len = sizeof(struct sockaddr_in6);
+        mask.sin6_addr = in6mask128;
+#ifndef SCOPEDROUTING
+	dst.sin6_scope_id = 0;
+	gate.sin6_scope_id = 0;
+	mask.sin6_scope_id = 0;
+#endif /* !SCOPEDROUTING */
+	error = rtrequest(RTM_ADD, &dst, &gate, &mask, RTF_UP|RTF_HOST,
+			  &retrt);
+	if (error == 0) {
+		retrt->rt_refcnt--;
+	}
+
+	return (error);
+}
+
+static int
+mip6_bdt_delete(paddr)
+	struct sockaddr_in6 *paddr;
+{
+	struct rtentry *rt;
+	struct sockaddr_in6 dst, gate, mask;
+	int error = 0;
+
+	dst = *paddr;
+#ifndef SCOPEDROUTING
+	dst.sin6_scope_id = 0;
+#endif /* !SCOPEDROUTING */
+	rt = rtalloc1((struct sockaddr *)&dst, 0, 0UL);
+	if (rt) {
+		error = rtrequest(RTM_DELETE, rt_key(rt),
+				  (struct sockaddr *)0,
+				  rt_mask(rt), 0, (struct rtentry **)0);
+		rt->rt_refcnt--;
+	}
+
+	return (error);
+}
+#endif /* MIP6_BDT */
 
 int
 mip6_bu_list_remove_all(mbu_list)

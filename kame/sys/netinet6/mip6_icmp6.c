@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.39 2002/03/12 11:57:55 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.40 2002/03/13 17:00:47 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -268,7 +268,7 @@ mip6_icmp6_input(m, off, icmp6len)
 				 "%s:%d: a node (%s) doesn't support a home address destopt.\n",
 				 __FILE__, __LINE__,
 				 ip6_sprintf(&paddr.sin6_addr)));
-#ifdef MIP6_ALLOW_COA_FALLBACK
+#if defined(MIP6_ALLOW_COA_FALLBACK) || defined(MIP6_BDT)
 			/*
 			 * as i said above, all IPv6 node must support
 			 * a home address destination option, but ...
@@ -284,9 +284,12 @@ mip6_icmp6_input(m, off, icmp6len)
 						|= MIP6_BU_STATE_BUNOTSUPP;
 					mbu->mbu_state
 						|= MIP6_BU_STATE_MIP6NOTSUPP;
+#ifdef MIP6_BDT
+					(void)mip6_bdt_create(sc, &paddr);
+#endif /* MIP6_BDT */
 				}
 			}
-#endif /* MIP6_ALLOW_COA_FALLBACK */
+#endif /* MIP6_ALLOW_COA_FALLBACK || MIP6_BDT */
 			break;
 		}
 		break;
