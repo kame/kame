@@ -16,4 +16,7 @@ DPADD+= ${.OBJDIR}/../../lib/libinet6/libinet6.a \
 
 .PATH:	${.CURDIR}/../../kame/ping6
 
+# kame scopeid hack
+CFLAGS+=-DKAME_SCOPEID
+
 .include <bsd.prog.mk>
