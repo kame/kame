@@ -750,6 +750,7 @@ bridge_output(ifp, m, sa, rt)
 	struct ether_addr *src, *dst;
 	struct bridge_softc *sc;
 	int s, error, len;
+	short mflags;
 #ifdef ALTQ
 	struct altq_pktattr pktattr;
 #endif
@@ -791,9 +792,9 @@ bridge_output(ifp, m, sa, rt)
 			if ((dst_if->if_flags & IFF_RUNNING) == 0)
 				continue;
 #ifdef ALTQ
-			if (!ALTQ_IS_ENABLED(&p->ifp->if_snd))
+			if (!ALTQ_IS_ENABLED(&dst_if->if_snd))
 #endif
-			if (IF_QFULL(&p->ifp->if_snd)) {
+			if (IF_QFULL(&dst_if->if_snd)) {
 				IF_DROP(&dst_if->if_snd);
 				sc->sc_if.if_oerrors++;
 				continue;
@@ -809,14 +810,13 @@ bridge_output(ifp, m, sa, rt)
 				}
 			}
 			len = mc->m_pkthdr.len;
+			mflags = mc->m_flags;
 #ifdef ALTQ
-			if (ALTQ_IS_ENABLED(&p->ifp->if_snd) &&
-			    ALTQ_NEEDS_CLASSIFY(&p->ifp->if_snd))
-				altq_etherclassify(&p->ifp->if_snd, mc,
-						   &pktattr);
-			IFQ_ENQUEUE(&p->ifp->if_snd, mc, &pktattr, error);
+			if (ALTQ_IS_ENABLED(&dst_if->if_snd))
+				altq_etherclassify(&dst_if->if_snd, mc, &pktattr);
+			IFQ_ENQUEUE(&dst_if->if_snd, mc, &pktattr, error);
 #else
-			IFQ_ENQUEUE(&p->ifp->if_snd, mc, error);
+			IFQ_ENQUEUE(&dst_if->if_snd, mc, error);
 #endif
 			if (error) {
 				sc->sc_if.if_oerrors++;
@@ -826,10 +826,10 @@ bridge_output(ifp, m, sa, rt)
 			sc->sc_if.if_obytes += len;
 			dst_if->if_lastchange = time;
 			dst_if->if_obytes += len;
-			if (mc->m_flags & M_MCAST)
-				ifp->if_omcasts++;
+			if (mflags & M_MCAST)
+				dst_if->if_omcasts++;
 			if ((dst_if->if_flags & IFF_OACTIVE) == 0)
-				(*p->ifp->if_start)(dst_if);
+				(*dst_if->if_start)(dst_if);
 		}
 		if (!used)
 			m_freem(m);
@@ -844,16 +844,15 @@ sendunicast:
 		return (0);
 	}
 	len = m->m_pkthdr.len;
+	mflags = m->m_flags;
 #ifdef ALTQ
-	if (ALTQ_IS_ENABLED(&dst_if->if_snd) &&
-	    ALTQ_NEEDS_CLASSIFY(&dst_if->if_snd))
-	    altq_etherclassify(&dst_if->if_snd, m, &pktattr);
+	if (ALTQ_IS_ENABLED(&dst_if->if_snd))
+		altq_etherclassify(&dst_if->if_snd, m, &pktattr);
 	IFQ_ENQUEUE(&dst_if->if_snd, m, &pktattr, error);
 #else
 	IFQ_ENQUEUE(&dst_if->if_snd, m, error);
 #endif
 	if (error) {
-		IF_DROP(&dst_if->if_snd);
 		sc->sc_if.if_oerrors++;
 		splx(s);
 		return (0);
@@ -862,8 +861,7 @@ sendunicast:
 	sc->sc_if.if_obytes += len;
 	dst_if->if_lastchange = time;
 	dst_if->if_obytes += len;
-	IF_ENQUEUE(&dst_if->if_snd, m);
-	if (m->m_flags & M_MCAST)
+	if (mflags & M_MCAST)
 		dst_if->if_omcasts++;
 	if ((dst_if->if_flags & IFF_OACTIVE) == 0)
 		(*dst_if->if_start)(dst_if);
@@ -916,6 +914,7 @@ bridgeintr_frame(sc, m)
 	struct bridge_iflist *ifl;
 	struct ether_addr *dst, *src;
 	struct ether_header eh;
+	short mflags;
 #ifdef ALTQ
 	struct altq_pktattr pktattr;
 #endif
@@ -1084,11 +1083,11 @@ bridgeintr_frame(sc, m)
 		return;
 	}
 #ifdef ALTQ
-	if (ALTQ_IS_ENABLED(&dst_if->if_snd) &&
-	    ALTQ_NEEDS_CLASSIFY(&dst_if->if_snd))
+	if (ALTQ_IS_ENABLED(&dst_if->if_snd))
 		altq_etherclassify(&dst_if->if_snd, m, &pktattr);
 #endif
 	len = m->m_pkthdr.len;
+	mflags = m->m_flags;
 	s = splimp();
 #ifdef ALTQ
 	IFQ_ENQUEUE(&dst_if->if_snd, m, &pktattr, error);
@@ -1096,7 +1095,6 @@ bridgeintr_frame(sc, m)
 	IFQ_ENQUEUE(&dst_if->if_snd, m, error);
 #endif
 	if (error) {
-		IF_DROP(&dst_if->if_snd);
 		sc->sc_if.if_oerrors++;
 		splx(s);
 		return;
@@ -1105,7 +1103,7 @@ bridgeintr_frame(sc, m)
 	sc->sc_if.if_obytes += len;
 	dst_if->if_lastchange = time;
 	dst_if->if_obytes += len;
-	if (m->m_flags & M_MCAST)
+	if (mflags & M_MCAST)
 		dst_if->if_omcasts++;
 	if ((dst_if->if_flags & IFF_OACTIVE) == 0)
 		(*dst_if->if_start)(dst_if);
@@ -1270,11 +1268,12 @@ bridge_broadcast(sc, ifp, eh, m)
 {
 	struct bridge_iflist *p;
 	struct mbuf *mc;
+	struct ifnet *dst_if;
 	int error, len, used = 0;
+	short mflags;
 #ifdef ALTQ
 	struct altq_pktattr pktattr;
 #endif
-	struct ifnet *dst_if;
 
 	LIST_FOREACH(p, &sc->sc_iflist, next) {
 		/*
@@ -1298,9 +1297,9 @@ bridge_broadcast(sc, ifp, eh, m)
 			continue;
 
 #ifdef ALTQ
-		if (!ALTQ_IS_ENABLED(&p->ifp->if_snd))
+		if (!ALTQ_IS_ENABLED(&dst_if->if_snd))
 #endif
-		if (IF_QFULL(&p->ifp->if_snd)) {
+		if (IF_QFULL(&dst_if->if_snd)) {
 			IF_DROP(&dst_if->if_snd);
 			sc->sc_if.if_oerrors++;
 			continue;
@@ -1327,14 +1326,14 @@ bridge_broadcast(sc, ifp, eh, m)
 			continue;
 		}
 
-		len = m->m_pkthdr.len;
+		len = mc->m_pkthdr.len;
+		mflags = mc->m_flags;
 #ifdef ALTQ
-		if (ALTQ_IS_ENABLED(&p->ifp->if_snd) &&
-		    ALTQ_NEEDS_CLASSIFY(&p->ifp->if_snd))
-		    altq_etherclassify(&p->ifp->if_snd, mc, &pktattr);
-		IFQ_ENQUEUE(&p->ifp->if_snd, mc, &pktattr, error);
+		if (ALTQ_IS_ENABLED(&dst_if->if_snd))
+			altq_etherclassify(&dst_if->if_snd, mc, &pktattr);
+		IFQ_ENQUEUE(&dst_if->if_snd, mc, &pktattr, error);
 #else
-		IFQ_ENQUEUE(&p->ifp->if_snd, mc, error);
+		IFQ_ENQUEUE(&dst_if->if_snd, mc, error);
 #endif
 		if (error) {
 			sc->sc_if.if_oerrors++;
@@ -1342,9 +1341,9 @@ bridge_broadcast(sc, ifp, eh, m)
 		}
 		sc->sc_if.if_opackets++;
 		sc->sc_if.if_obytes += len;
-		dst_if->if_obytes += m->m_pkthdr.len;
+		dst_if->if_obytes += len;
 		dst_if->if_lastchange = time;
-		if (mc->m_flags & M_MCAST)
+		if (mflags & M_MCAST)
 			dst_if->if_omcasts++;
 		if ((dst_if->if_flags & IFF_OACTIVE) == 0)
 			(*dst_if->if_start)(dst_if);
@@ -2101,7 +2100,9 @@ altq_etherclassify(ifq, m, pktattr)
 	}
 	m->m_data += hlen;
 	m->m_len -= hlen;
-	pktattr->pattr_class = (*ifq->altq_classify)(ifq->altq_clfier, m, af);
+	if (ALTQ_NEEDS_CLASSIFY(ifq))
+		pktattr->pattr_class =
+		    (*ifq->altq_classify)(ifq->altq_clfier, m, af);
 	m->m_data -= hlen;
 	m->m_len += hlen;
 
