@@ -118,6 +118,10 @@ extern char *tcpstates[];
 #include <netinet6/udp6_var.h>
 #include <netinet6/pim6_var.h>
 #include <netinet6/raw_ip6.h>
+#ifdef DCCP
+#include <netinet/dccp.h>
+#include <netinet/dccp_var.h>
+#endif
 
 #include <arpa/inet.h>
 #if 0
@@ -138,6 +142,9 @@ struct	tcp6cb tcp6cb;
 #else
 struct	tcpcb tcpcb;
 #endif
+#ifdef DCCP
+struct	dccpcb dccpcb;
+#endif
 struct	socket sockb;
 
 char	*inet6name __P((struct in6_addr *));
@@ -157,11 +164,17 @@ ip6protopr(off, name)
 	struct in6pcb cb;
 	register struct in6pcb *prev, *next;
 	int istcp;
+#ifdef DCCP
+	int isdccp;
+#endif
 	static int first = 1;
 	int width = 22;
 	if (off == 0)
 		return;
 	istcp = strcmp(name, "tcp6") == 0;
+#ifdef DCCP
+	isdccp = strcmp(name, "dccp6") == 0;
+#endif
 	kread(off, (char *)&cb, sizeof (struct in6pcb));
 	in6pcb = cb;
 	prev = (struct in6pcb *)off;
@@ -188,6 +201,12 @@ ip6protopr(off, name)
 			    (char *)&tcpcb, sizeof (tcpcb));
 #endif
 		}
+#ifdef DCCP
+		if (isdccp) {
+			kread((u_long)in6pcb.in6p_ppcb,
+			      (char *)&dccpcb, sizeof (dccpcb));
+		}
+#endif
 		if (first) {
 			printf("Active Internet6 connections");
 			if (aflag)
@@ -205,7 +224,11 @@ ip6protopr(off, name)
 			first = 0;
 		}
 		if (Aflag) {
+#ifdef DCCP
+			if (istcp || isdccp)
+#else
 			if (istcp)
+#endif
 				printf("%8lx ", (u_long) in6pcb.in6p_ppcb);
 			else
 				printf("%8lx ", (u_long) next);
@@ -228,6 +251,14 @@ ip6protopr(off, name)
 				printf(" %s", tcpstates[tcpcb.t_state]);
 #endif
 		}
+#ifdef DCCP
+		if (isdccp) {
+			if (dccpcb.state >= DCCP_NSTATES)
+				printf(" %d", dccpcb.state);
+			else
+				printf(" %s", dccpstates[dccpcb.state]);
+		}
+#endif
 		putchar('\n');
 		prev = next;
 	}
