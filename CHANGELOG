@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1046 2000/06/20 06:15:06 sumikawa Exp $
+$Id: CHANGELOG,v 1.1047 2000/06/20 06:31:27 suz Exp $
 
 <200006>
+2000-06-20  SUZUKI Shinsuke  <suz@sdl.hitachi.co.jp>
+	* kame/kame/ndp/ndp.c (delete, get)
+	supported <link-local_addr>%<link ID> on "ndp -d" and "ndp (addr)".
+	
 Tue Jun 20 14:55:10 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/openssh: upgrade to 2.1.0
 	* freebsd3/ports/bind9: upgrade to 9.0.0b4

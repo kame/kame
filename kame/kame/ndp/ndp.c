@@ -449,6 +449,12 @@ get(host)
 		return;
 	}
 	sin->sin6_addr = ((struct sockaddr_in6 *)res->ai_addr)->sin6_addr;
+#ifdef __KAME__
+	if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr)) {
+		*(u_int16_t *)&sin->sin6_addr.s6_addr[2] =
+			htons(((struct sockaddr_in6 *)res->ai_addr)->sin6_scope_id);
+	}
+#endif
 	dump(&sin->sin6_addr);
 	if (found_entry == 0) {
 		getnameinfo((struct sockaddr *)sin, sin->sin6_len, host_buf,
@@ -484,6 +490,12 @@ delete(host)
 		return 1;
 	}
 	sin->sin6_addr = ((struct sockaddr_in6 *)res->ai_addr)->sin6_addr;
+#ifdef __KAME__
+	if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr)) {
+		*(u_int16_t *)&sin->sin6_addr.s6_addr[2] =
+			htons(((struct sockaddr_in6 *)res->ai_addr)->sin6_scope_id);
+	}
+#endif
 	if (rtmsg(RTM_GET) < 0) {
 		perror(host);
 		return (1);
