@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.23 2000/04/17 03:03:12 itojun Exp $
+$Id: COVERAGE,v 1.24 2000/04/17 07:23:00 itojun Exp $
 
 
 x: supported/integrated
@@ -58,7 +58,8 @@ ndp -s proxy	x	x	-	notyet	notyet	-
 
 ndp -I		x	x	-	notyet	notyet	-
 
-ndp -i		-	-	-	notyet	notyet	-
+NUD on p2p	x	x	-	notyet	notyet	-
+  (nud -i)
 
 CMSG_ALIGN	sysctl	ALIGN	ALIGN	notyet	notyet	ALIGN
 			(*1)	(*2)			(*2)
