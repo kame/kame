@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2178 2002/06/03 00:52:55 itojun Exp $
+$KAME: CHANGELOG,v 1.2179 2002/06/03 13:42:23 jinmei Exp $
 
 <200206>
+2002-06-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/ports/ppp: upgraded to the latest snap kit as of today
+	with KAME-original patches.
+
 Mon Jun  3 09:52:03 JST 2002  itojun@iijlab.net
 	* sys/netinet6/nd6.c: in nd6_setmtu0(), do not hardcode if_mtu
 	  values (let sys/net layer handle them).  special cases are IFT_ARC
