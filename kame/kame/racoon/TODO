@@ -1,4 +1,4 @@
-$Id: TODO,v 1.16 2000/09/20 20:46:17 sakane Exp $
+$Id: TODO,v 1.17 2000/09/20 20:47:37 sakane Exp $
 
 Please send any questions or bug reports to snap-users@kame.net.
 
@@ -99,6 +99,10 @@ o for lifetime and key length, something like this should be useful.
   - propose N
   - accept between X and Y
 o wildcard "accept any proposal" policy should be allowed.
+o replay prevention
+  - limited total number of session
+  - limited session per peer
+  - number of proposal
 
 MAY
 o Effective code.
