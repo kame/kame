@@ -135,10 +135,7 @@ void
 init_mld6()
 {
     struct icmp6_filter filt;
-    int             on,
-                    cmsglen;
-    u_char         *cmsgbuf;
-    struct cmsghdr *cmsgp;
+    int             on;
     u_short         rtalert_code = htons(IP6OPT_RTALERT_MLD);
 
     if (!mld6_recv_buf && (mld6_recv_buf = malloc(RECV_BUF_SIZE)) == NULL)
@@ -239,138 +236,140 @@ mld6_read(i, rfd)
  */
 static void
 accept_mld6(recvlen)
-    int             recvlen;
+int recvlen;
 {
-    struct in6_addr *group,
-                   *dst = NULL;
-    struct mld6_hdr *mldh;
-    struct cmsghdr *cm;
-    struct in6_pktinfo *pi = NULL;
-    int            *hlimp = NULL;
-    int             ifindex = 0;
-    struct sockaddr_in6 *src = (struct sockaddr_in6 *) rcvmh.msg_name;
+	struct in6_addr *group, *dst = NULL;
+	struct mld6_hdr *mldh;
+	struct cmsghdr *cm;
+	struct in6_pktinfo *pi = NULL;
+	int *hlimp = NULL;
+	int ifindex = 0;
+	struct sockaddr_in6 *src = (struct sockaddr_in6 *) rcvmh.msg_name;
 
-
-   if (recvlen == sizeof(struct ip6_hdr) || recvlen > sizeof(struct mld6_hdr))
-    {				/* XXX */
 	/*
-	 * XXX: msg_controllen may have been reset in this case.
+	 * If control length is zero, it must be an upcall from the kernel
+	 * multicast forwarding engine.
+	 * XXX: can we trust it?
 	 */
-	rcvmh.msg_controllen = sizeof(rcvcmsgbuf);
+	if (rcvmh.msg_controllen == 0) {
+		/* XXX: msg_controllen must be reset in this case. */
+		rcvmh.msg_controllen = sizeof(rcvcmsgbuf);
 
-	process_kernel_call();
-	return;
-    }
-
-    if (recvlen < sizeof(struct mld6_hdr))
-    {
-	log(LOG_WARNING, 0,
-	    "received packet too short (%u bytes) for MLD header",
-	    recvlen);
-	return;
-    }
-    mldh = (struct mld6_hdr *) rcvmh.msg_iov[0].iov_base;
-    group = &mldh->mld6_addr;
-
-    /* extract optional information via Advanced API */
-    for (cm = (struct cmsghdr *) CMSG_FIRSTHDR(&rcvmh);
-	 cm;
-	 cm = (struct cmsghdr *) CMSG_NXTHDR(&rcvmh, cm))
-    {
-	if (cm->cmsg_level == IPPROTO_IPV6 &&
-	    cm->cmsg_type == IPV6_PKTINFO &&
-	    cm->cmsg_len == CMSG_LEN(sizeof(struct in6_pktinfo)))
-	{
-	    pi = (struct in6_pktinfo *) (CMSG_DATA(cm));
-	    ifindex = pi->ipi6_ifindex;
-	    dst = &pi->ipi6_addr;
+		process_kernel_call();
+		return;
 	}
-	if (cm->cmsg_level == IPPROTO_IPV6 &&
-	    cm->cmsg_type == IPV6_HOPLIMIT &&
-	    cm->cmsg_len == CMSG_LEN(sizeof(int)))
-	    hlimp = (int *) CMSG_DATA(cm);
-    }
-    if (hlimp == NULL)
-    {
-	log(LOG_WARNING, 0,
-	    "failed to get receiving hop limit");
-	return;
-    }
-    if (*hlimp != 1)
-    {
-	log(LOG_WARNING, 0,
-	    "received an MLD6 message with illegal hop limit(%d) from %s",
-	    *hlimp, inet6_fmt(&src->sin6_addr));
-	/* but accept the packet */
-    }
-    if (ifindex == 0)
-    {
-	log(LOG_WARNING, 0, "failed to get receiving interface");
-	return;
-    }
 
-    /* TODO: too noisy. Remove it? */
+	if (recvlen < sizeof(struct mld6_hdr))
+	{
+		log(LOG_WARNING, 0,
+		    "received packet too short (%u bytes) for MLD header",
+		    recvlen);
+		return;
+	}
+	mldh = (struct mld6_hdr *) rcvmh.msg_iov[0].iov_base;
+	group = &mldh->mld6_addr;
+
+	/* extract optional information via Advanced API */
+	for (cm = (struct cmsghdr *) CMSG_FIRSTHDR(&rcvmh);
+	     cm;
+	     cm = (struct cmsghdr *) CMSG_NXTHDR(&rcvmh, cm))
+	{
+		if (cm->cmsg_level == IPPROTO_IPV6 &&
+		    cm->cmsg_type == IPV6_PKTINFO &&
+		    cm->cmsg_len == CMSG_LEN(sizeof(struct in6_pktinfo)))
+		{
+			pi = (struct in6_pktinfo *) (CMSG_DATA(cm));
+			ifindex = pi->ipi6_ifindex;
+			dst = &pi->ipi6_addr;
+		}
+		if (cm->cmsg_level == IPPROTO_IPV6 &&
+		    cm->cmsg_type == IPV6_HOPLIMIT &&
+		    cm->cmsg_len == CMSG_LEN(sizeof(int)))
+			hlimp = (int *) CMSG_DATA(cm);
+	}
+	if (hlimp == NULL)
+	{
+		log(LOG_WARNING, 0,
+		    "failed to get receiving hop limit");
+		return;
+	}
+
+	/* TODO: too noisy. Remove it? */
 //#define NOSUCHDEF
 #ifdef NOSUCHDEF
-    IF_DEBUG(DEBUG_PKT | debug_kind(IPPROTO_ICMPV6, mldh->mld6_type,
-				    mldh->mld6_code))
-	log(LOG_DEBUG, 0, "RECV %s from %s to %s",
-	    packet_kind(IPPROTO_ICMPV6,
-			mldh->mld6_type, mldh->mld6_code),
-	    inet6_fmt(&src->sin6_addr), inet6_fmt(dst));
+	IF_DEBUG(DEBUG_PKT | debug_kind(IPPROTO_ICMPV6, mldh->mld6_type,
+					mldh->mld6_code))
+		log(LOG_DEBUG, 0, "RECV %s from %s to %s",
+		    packet_kind(IPPROTO_ICMPV6,
+				mldh->mld6_type, mldh->mld6_code),
+		    inet6_fmt(&src->sin6_addr), inet6_fmt(dst));
 #endif				/* NOSUCHDEF */
 
-    /* for an mtrace message, we don't need strict checks */
-    if (mldh->mld6_type == MLD6_MTRACE) {
-	accept_mtrace(src, dst, group, ifindex, (char *)(mldh + 1),
-		      mldh->mld6_code, recvlen - sizeof(struct mld6_hdr));
-	return;
-    }
+	/* for an mtrace message, we don't need strict checks */
+	if (mldh->mld6_type == MLD6_MTRACE) {
+		accept_mtrace(src, dst, group, ifindex, (char *)(mldh + 1),
+			      mldh->mld6_code, recvlen - sizeof(struct mld6_hdr));
+		return;
+	}
 
-    /* scope check */
-    if (IN6_IS_ADDR_MC_NODELOCAL(&mldh->mld6_addr))
-    {
-	log(LOG_INFO, 0,
-	    "RECV %s with an invalid scope: %s from %s",
-	    inet6_fmt(&mldh->mld6_addr),
-	    inet6_fmt(&src->sin6_addr));
-	return;			/* discard */
-    }
+	/* hop limit check */
+	if (*hlimp != 1)
+	{
+		log(LOG_WARNING, 0,
+		    "received an MLD6 message with illegal hop limit(%d) from %s",
+		    *hlimp, inet6_fmt(&src->sin6_addr));
+		/* but accept the packet */
+	}
+	if (ifindex == 0)
+	{
+		log(LOG_WARNING, 0, "failed to get receiving interface");
+		return;
+	}
 
-    /* source address check */
-    if (!IN6_IS_ADDR_LINKLOCAL(&src->sin6_addr))
-    {
-	log(LOG_INFO, 0,
-	    "RECV %s from a non link local address: %s",
-	    packet_kind(IPPROTO_ICMPV6, mldh->mld6_type,
-			mldh->mld6_code),
-	    inet6_fmt(&src->sin6_addr));
-	return;
-    }
+	/* scope check */
+	if (IN6_IS_ADDR_MC_NODELOCAL(&mldh->mld6_addr))
+	{
+		log(LOG_INFO, 0,
+		    "RECV %s with an invalid scope: %s from %s",
+		    inet6_fmt(&mldh->mld6_addr),
+		    inet6_fmt(&src->sin6_addr));
+		return;			/* discard */
+	}
 
-    switch (mldh->mld6_type)
-    {
-    case MLD6_LISTENER_QUERY:
-	accept_listener_query(src, dst, group,
-			      ntohs(mldh->mld6_maxdelay));
-	return;
+	/* source address check */
+	if (!IN6_IS_ADDR_LINKLOCAL(&src->sin6_addr))
+	{
+		log(LOG_INFO, 0,
+		    "RECV %s from a non link local address: %s",
+		    packet_kind(IPPROTO_ICMPV6, mldh->mld6_type,
+				mldh->mld6_code),
+		    inet6_fmt(&src->sin6_addr));
+		return;
+	}
 
-    case MLD6_LISTENER_REPORT:
-	accept_listener_report(src, dst, group);
-	return;
+	switch (mldh->mld6_type)
+	{
+	case MLD6_LISTENER_QUERY:
+		accept_listener_query(src, dst, group,
+				      ntohs(mldh->mld6_maxdelay));
+		return;
 
-    case MLD6_LISTENER_DONE:
-	accept_listener_done(src, dst, group);
-	return;
+	case MLD6_LISTENER_REPORT:
+		accept_listener_report(src, dst, group);
+		return;
 
-    default:
-	/* This must be impossible since we set a type filter */
-	log(LOG_INFO, 0,
-	    "ignoring unknown ICMPV6 message type %x from %s to %s",
-	    mldh->mld6_type, inet6_fmt(&src->sin6_addr),
-	    inet6_fmt(dst));
-	return;
-    }
+	case MLD6_LISTENER_DONE:
+		accept_listener_done(src, dst, group);
+		return;
+
+	default:
+		/* This must be impossible since we set a type filter */
+		log(LOG_INFO, 0,
+		    "ignoring unknown ICMPV6 message type %x from %s to %s",
+		    mldh->mld6_type, inet6_fmt(&src->sin6_addr),
+		    inet6_fmt(dst));
+		return;
+	}
 }
 
 static void
