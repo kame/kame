@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.45 2004/06/15 09:57:00 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.46 2004/06/15 09:58:03 suz Exp $
  */
 
 /*
@@ -113,7 +113,9 @@ query_groupsV2(v)
 	if (v->uv_stquery_cnt)
 		v->uv_stquery_cnt--;
 	if (v->uv_stquery_cnt)
-		v->uv_gq_timer /= 4;	/* Startup Query Interval */
+		v->uv_gq_timer = MLD6_STARTUP_QUERY_INTERVAL;
+	else
+		v->uv_gq_timer = MLD6_QUERY_INTERVAL;
 
 	IF_DEBUG(DEBUG_MLD)
 	    log_msg(LOG_DEBUG, 0,
