@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.59 2000/04/29 05:57:11 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.60 2000/04/29 05:57:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1986,7 +1986,7 @@ nd6_output(ifp, m0, dst, rt0)
 		ln = (struct llinfo_nd6 *)rt->rt_llinfo;
 	else {
 		/*
-		 * Since nd6_is_addr_neighbor() internally calls nd6_lookup,
+		 * Since nd6_is_addr_neighbor() internally calls nd6_lookup(),
 		 * the condition below is not very efficient. But we believe
 		 * it is tolerable, because this should be a rare case.
 		 */
