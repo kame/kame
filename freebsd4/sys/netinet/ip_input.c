@@ -75,6 +75,7 @@
 #include <machine/in_cksum.h>
 
 #ifdef NATPT
+#include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #endif
 
@@ -554,6 +555,7 @@ pass:
 			if (!ip6_setpktaddrs(m1, &sa6_src, &sa6_dst)) {
 				m_freem(m1);
 				return;
+			}
 
 			ip6_forward(m1, 1);
 			break;
