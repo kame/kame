@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.49 2001/05/02 11:07:57 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.50 2001/05/02 11:51:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1152,7 +1152,8 @@ serve(sd, buf, len, from)
 			l = htons((p - replybuf) & 0xffff);
 			(void)write(sd->s, &l, sizeof(l));
 		} else if (p - replybuf > PACKETSZ) {
-			p = replybuf + PACKETSZ;
+			p -= l;
+			hp->ancount = 0;
 			hp->tc = 1;
 		}
 		sendto(sd->s, replybuf, p - replybuf, 0, from, from->sa_len);
