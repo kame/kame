@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.822 2000/04/27 01:36:41 itojun Exp $
+$Id: CHANGELOG,v 1.823 2000/04/27 03:33:44 itojun Exp $
 
 <200004>
+Thu Apr 27 12:32:34 JST 2000  itojun@iijlab.net
+	* freebsd4/lib/libinet6/getaddrinfo.c: getaddrinfo.c obeys
+	  configured resolve order.  From: ume
+
 Thu Apr 27 10:35:47 JST 2000  itojun@iijlab.net
 	* libinet6/resolv/res_send.c: disallow $HOSTALIASES for setuid binary.
 
