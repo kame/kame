@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.79 2001/01/21 03:58:43 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.80 2001/01/21 08:00:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -283,7 +283,7 @@ found:
 	case IFT_STF:
 #endif
 		/*
-		 * mech-06 says: "SHOULD use IPv4 address as ifid source".
+		 * RFC2893 says: "SHOULD use IPv4 address as ifid source".
 		 * however, IPv4 address is not very suitable as unique
 		 * identifier source (can be renumbered).
 		 * we don't do this.
