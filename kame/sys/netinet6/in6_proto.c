@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.119 2002/05/27 21:40:31 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.120 2002/06/07 15:11:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -597,7 +597,7 @@ int	ip6_rr_prune = 5;	/* router renumbering prefix
 #if defined(__NetBSD__)
 int	ip6_v6only = 1;
 #elif defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 2) || (defined(__bsdi__) && _BSDI_VERSION < 199802) || defined(TCP6)
-const int	ip6_v6only = 1;
+const int ip6_v6only = 1;
 #else
 int	ip6_v6only = 0;
 #endif
