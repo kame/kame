@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.51 2000/06/20 20:02:05 itojun Exp $
+	$Id: PORTABILITY,v 1.52 2000/07/07 03:51:09 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -323,3 +323,9 @@ across those possibilities.
 - getopt(3) returns -1 on openbsd, and EOF on other platforms.  This was due
   to POSIX changes.  Since EOF is usually defined to be -1, it is not a major
   issue.
+
+- SECURITY: Never use printf-like functions (including syslog, setproctitle
+  and others) with only a "fmt" argument.  Always use "%s".  Otherwise,
+  your program will be compromised by malicious party.
+	BAD: syslog(foo);
+	GOOD: syslog("%s", foo);
