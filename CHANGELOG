@@ -1,11 +1,20 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2338 2003/02/07 10:42:29 suz Exp $
+$KAME: CHANGELOG,v 1.2339 2003/02/07 11:30:03 jinmei Exp $
 
 <200302>
+2003-02-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_input.c (ip6_getpktaddrs): changed the 2nd
+	and the 3rd arguments from 'sockaddr_in6 **' to 'sockaddr_in6 *'.
+	The change will avoid sharing pointer in an mbuf with the caller
+	of the function, and will be considered as less error-prone.
+	* {*bsd, kame}/sys/netinet[6]/: all the points that called
+	ip6_getpktaddrs() were modified accordingly.  There should be no
+	change on behavior, but we may need some time to stabilize the
+	code.
+
 Fri Feb  7 19:40:36 JST 2003	suz@crl.hitachi.co.jp
 	* kame/kame/pim6sd/{main.c, route_sock.h}: fixed file descriptor
 	  leak by SIGHUP (reported by SUDOH Yoshiaki <sudo@iij.ad.jp>)
-	  
 
 Fri Feb 7 19:17:12 JST 2003	suz@crl.hitachi.co.jp
 	* freebsd5/*, kame/*: KAME for FreeBSD 5-RELEASE. (not supported
