@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.74 2000/06/14 18:31:22 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.75 2000/06/14 18:54:32 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -379,7 +379,11 @@ isakmp_main(msg, remote, local)
 			}
 		}
 
-		/* acceptable check */
+		/*
+		 * Don't delete phase 1 handler when the handler's exchange
+		 * type is not equual to packet's one because of no
+		 * authencication completed.
+		 */
 		if (iph1->etype != isakmp->etype) {
 			plog(logp, LOCATION, iph1->remote,
 				"NOTICE: exchange type is mismatched: "
