@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.43 2000/05/22 15:33:47 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.44 2000/05/24 08:50:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -231,10 +231,10 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
  */
 #ifdef _KERNEL
 #define IN6_ARE_ADDR_EQUAL(a, b)			\
-	(bcmp((a), (b), sizeof(struct in6_addr)) == 0)
+    (bcmp(&(a)->s6_addr[0], &(b)->s6_addr[0], sizeof(struct in6_addr)) == 0)
 #else
 #define IN6_ARE_ADDR_EQUAL(a, b)			\
-	(memcmp((a), (b), sizeof(struct in6_addr)) == 0)
+    (memcmp(&(a)->s6_addr[0], &(b)->s6_addr[0], sizeof(struct in6_addr)) == 0)
 #endif
 
 /*
