@@ -322,7 +322,7 @@ accept_mld6(recvlen)
 
     /* for an mtrace message, we don't need strict checks */
     if (mldh->mld6_type == MLD6_MTRACE) {
-	accept_mtrace(src, dst, group, ifindex, mld6_recv_buf,
+	accept_mtrace(src, dst, group, ifindex, (char *)(mldh + 1),
 		      mldh->mld6_code, recvlen - sizeof(struct mld6_hdr));
 	return;
     }
