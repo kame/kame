@@ -638,7 +638,6 @@ udp4_realinput(src, dst, m, off)
 			 * (No need to send an ICMP Port Unreachable
 			 * for a broadcast or multicast datgram.)
 			 */
-			udpstat.udps_noport++;
 			udpstat.udps_noportbcast++;
 			goto bad;
 		}
@@ -821,11 +820,9 @@ udp6_realinput(af, src, dst, m, off)
 			 */
 			switch (af) {
 			case AF_INET:
-				udpstat.udps_noport++;
 				udpstat.udps_noportbcast++;
 				break;
 			case AF_INET6:
-				udp6stat.udp6s_noport++;
 				udp6stat.udp6s_noportmcast++;
 				break;
 			}
@@ -1074,7 +1071,6 @@ udp_input(m, va_alist)
 			 * (No need to send an ICMP Port Unreachable
 			 * for a broadcast or multicast datgram.)
 			 */
-			udpstat.udps_noport++;
 			udpstat.udps_noportbcast++;
 			goto bad;
 		}
