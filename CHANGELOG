@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.210 1999/10/25 13:25:32 jinmei Exp $
+$Id: CHANGELOG,v 1.211 1999/10/25 13:38:36 sakane Exp $
 
 <199910>
+Mon Oct 25 22:30:47 JST 1999 sakane@ydc.co.jp
+	* kame/sys/netkey/key.c:
+	* kame/kame/libipsec:
+	- Improved to set IP addresses into the ipsec request structure
+	  from PF_KEY msgs.  
+	- Fixed to print IP addresses in ipsec policy request.
+	- Fixed a bit to print protocol name.
+
 Sat Oct 23 17:11:39 PDT 1999  itojun@iijlab.net
 	* {netbsd,freebsd2}/sbin/ifconfig: show IPv6 link-local addresses in
 	  KAME extended IPv6 numeric address format, like fe80::1@ne0
