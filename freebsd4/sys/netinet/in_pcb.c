@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.c	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.59.2.12 2001/03/12 22:10:51 phk Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.59.2.17 2001/08/13 16:26:17 ume Exp $
  */
 
 #include "opt_ipsec.h"
@@ -162,7 +162,7 @@ in_pcballoc(so, pcbinfo, p)
 #endif /*IPSEC*/
 #if defined(INET6)
 	if (INP_SOCKAF(so) == AF_INET6 && !ip6_mapped_addr_on)
- 		inp->inp_flags |= IN6P_IPV6_V6ONLY;
+		inp->inp_flags |= IN6P_IPV6_V6ONLY;
 #endif
 	LIST_INSERT_HEAD(pcbinfo->listhead, inp, inp_list);
 	pcbinfo->ipi_count++;
@@ -321,7 +321,7 @@ in_pcbbind(inp, nam, p)
 			do {
 				if (count-- < 0) {	/* completely used? */
 					inp->inp_laddr.s_addr = INADDR_ANY;
-					return (EAGAIN);
+					return (EADDRNOTAVAIL);
 				}
 				--*lastport;
 				if (*lastport > first || *lastport < last)
@@ -338,7 +338,7 @@ in_pcbbind(inp, nam, p)
 			do {
 				if (count-- < 0) {	/* completely used? */
 					inp->inp_laddr.s_addr = INADDR_ANY;
-					return (EAGAIN);
+					return (EADDRNOTAVAIL);
 				}
 				++*lastport;
 				if (*lastport < first || *lastport > last)
@@ -742,7 +742,6 @@ in_losing(inp)
 	struct rt_addrinfo info;
 
 	if ((rt = inp->inp_route.ro_rt)) {
-		inp->inp_route.ro_rt = 0;
 		bzero((caddr_t)&info, sizeof(info));
 		info.rti_info[RTAX_DST] =
 			(struct sockaddr *)&inp->inp_route.ro_dst;
@@ -753,12 +752,12 @@ in_losing(inp)
 			(void) rtrequest(RTM_DELETE, rt_key(rt),
 				rt->rt_gateway, rt_mask(rt), rt->rt_flags,
 				(struct rtentry **)0);
-		else
+		inp->inp_route.ro_rt = 0;
+		rtfree(rt);
 		/*
 		 * A new route can be allocated
 		 * the next time output is attempted.
 		 */
-			rtfree(rt);
 	}
 }
 

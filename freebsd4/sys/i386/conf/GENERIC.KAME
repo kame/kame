@@ -21,7 +21,7 @@
 # device lines is also present in the ./LINT configuration file. If you are
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-# $FreeBSD: src/sys/i386/conf/GENERIC,v 1.246.2.24 2001/04/05 17:23:10 sos Exp $
+# $FreeBSD: src/sys/i386/conf/GENERIC,v 1.246.2.34 2001/08/12 13:13:46 joerg Exp $
 
 machine		i386
 cpu		I386_CPU
@@ -73,6 +73,10 @@ device		pci
 device		fdc0	at isa? port IO_FD1 irq 6 drq 2
 device		fd0	at fdc0 drive 0
 device		fd1	at fdc0 drive 1
+#
+# If you have a Toshiba Libretto with its Y-E Data PCMCIA floppy,
+# don't use the above line for fdc0 but the following one:
+#device		fdc0
 
 # ATA and ATAPI devices
 device		ata0	at isa? port IO_WD1 irq 14
@@ -172,26 +176,28 @@ device		ppi		# Parallel port interface device
 
 # PCI Ethernet NICs.
 device		de		# DEC/Intel DC21x4x (``Tulip'')
-device		fxp		# Intel EtherExpress PRO/100B (82557, 82558)
-device		tx		# SMC 9432TX (83c170 ``EPIC'')
+device		txp		# 3Com 3cR990 (``Typhoon'')
 device		vx		# 3Com 3c590, 3c595 (``Vortex'')
-device		wx		# Intel Gigabit Ethernet Card (``Wiseman'')
 
 # PCI Ethernet NICs that use the common MII bus controller code.
 # NOTE: Be sure to keep the 'device miibus' line in order to use these NICs!
 device		miibus		# MII bus support
 device		dc		# DEC/Intel 21143 and various workalikes
-device		pcn		# AMD Am79C79x PCI 10/100 NICs
+device		fxp		# Intel EtherExpress PRO/100B (82557, 82558)
+device		pcn		# AMD Am79C97x PCI 10/100 NICs
 device		rl		# RealTek 8129/8139
 device		sf		# Adaptec AIC-6915 (``Starfire'')
 device		sis		# Silicon Integrated Systems SiS 900/SiS 7016
 device		ste		# Sundance ST201 (D-Link DFE-550TX)
 device		tl		# Texas Instruments ThunderLAN
+device		tx		# SMC EtherPower II (83c170 ``EPIC'')
 device		vr		# VIA Rhine, Rhine II
 device		wb		# Winbond W89C840F
+device		wx		# Intel Gigabit Ethernet Card (``Wiseman'')
 device		xl		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
 
 # ISA Ethernet NICs.
+# 'device ed' requires 'device miibus'
 device		ed0	at isa? port 0x280 irq 10 iomem 0xd8000
 device		ex
 device		ep
@@ -225,7 +231,7 @@ pseudo-device	ppp	1	# Kernel PPP
 pseudo-device	tun		# Packet tunnel.
 pseudo-device	pty		# Pseudo-ttys (telnet etc)
 pseudo-device	md		# Memory "disks"
-pseudo-device	gif	4	# IPv6 and IPv4 tunneling
+pseudo-device	gif		# IPv6 and IPv4 tunneling
 pseudo-device	faith	1	# IPv6-to-IPv4 relaying (translation)
 
 # The `bpf' pseudo-device enables the Berkeley Packet Filter.

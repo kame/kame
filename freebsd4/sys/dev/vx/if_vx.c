@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/vx/if_vx.c,v 1.25.2.4 2000/07/17 21:24:28 archie Exp $
+ * $FreeBSD: src/sys/dev/vx/if_vx.c,v 1.25.2.5 2001/07/29 22:48:37 kris Exp $
  *
  */
 
@@ -304,7 +304,7 @@ vxgetlink(sc)
 	if (n > 0) {
 	  printf("/");
 	}
-	printf(conn_tab[k].name);
+	printf("%s", conn_tab[k].name);
 	n++;
       }
     }

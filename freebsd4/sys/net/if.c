@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if.c	8.3 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/net/if.c,v 1.85.2.5 2001/03/29 09:45:04 yar Exp $
+ * $FreeBSD: src/sys/net/if.c,v 1.85.2.9 2001/07/24 19:10:17 brooks Exp $
  */
 
 #include "opt_compat.h"
@@ -55,6 +55,7 @@
 #include <net/if_arp.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
+#include <net/if_var.h>
 #include <net/radix.h>
 #include <net/route.h>
 
@@ -99,6 +100,12 @@ struct	ifnethead ifnet;	/* depend on static init XXX */
  */
 extern void	nd6_setmtu __P((struct ifnet *));
 #endif
+
+struct if_clone *if_clone_lookup __P((const char *, int *));
+int if_clone_list __P((struct if_clonereq *));
+
+LIST_HEAD(, if_clone) if_cloners = LIST_HEAD_INITIALIZER(if_cloners);
+int if_cloners_count;
 
 /*
  * Network interface utility routines.
@@ -358,6 +365,178 @@ if_rtdel(rn, arg)
 	}
 
 	return (0);
+}
+
+/*
+ * Create a clone network interface.
+ */
+int
+if_clone_create(name, len)
+	char *name;
+	int len;
+{
+	struct if_clone *ifc;
+	char *dp;
+	int wildcard;
+	int unit;
+	int err;
+
+	ifc = if_clone_lookup(name, &unit);
+	if (ifc == NULL)
+		return (EINVAL);
+
+	if (ifunit(name) != NULL)
+		return (EEXIST);
+
+	wildcard = (unit < 0);
+
+	err = (*ifc->ifc_create)(ifc, &unit);
+	if (err != 0)
+		return (err);
+
+	/* In the wildcard case, we need to update the name. */
+	if (wildcard) {
+		for (dp = name; *dp != '\0'; dp++);
+		if (snprintf(dp, len - (dp-name), "%d", unit) >
+		    len - (dp-name) - 1) {
+			/*
+			 * This can only be a programmer error and
+			 * there's no straightforward way to recover if
+			 * it happens.
+			 */
+			panic("if_clone_create(): interface name too long");
+		}
+			
+	}
+
+	return (0);
+}
+
+/*
+ * Destroy a clone network interface.
+ */
+int
+if_clone_destroy(name)
+	const char *name;
+{
+	struct if_clone *ifc;
+	struct ifnet *ifp;
+
+	ifc = if_clone_lookup(name, NULL);
+	if (ifc == NULL)
+		return (EINVAL);
+
+	ifp = ifunit(name);
+	if (ifp == NULL)
+		return (ENXIO);
+
+	if (ifc->ifc_destroy == NULL)
+		return (EOPNOTSUPP);
+
+	(*ifc->ifc_destroy)(ifp);
+	return (0);
+}
+
+/*
+ * Look up a network interface cloner.
+ */
+struct if_clone *
+if_clone_lookup(name, unitp)
+	const char *name;
+	int *unitp;
+{
+	struct if_clone *ifc;
+	const char *cp;
+	int i;
+
+	for (ifc = LIST_FIRST(&if_cloners); ifc != NULL;) {
+		for (cp = name, i = 0; i < ifc->ifc_namelen; i++, cp++) {
+			if (ifc->ifc_name[i] != *cp)
+				goto next_ifc;
+		}
+		goto found_name;
+ next_ifc:
+		ifc = LIST_NEXT(ifc, ifc_list);
+	}
+
+	/* No match. */
+	return ((struct if_clone *)NULL);
+
+ found_name:
+	if (*cp == '\0') {
+		i = -1;
+	} else {
+		for (i = 0; *cp != '\0'; cp++) {
+			if (*cp < '0' || *cp > '9') {
+				/* Bogus unit number. */
+				return (NULL);
+			}
+			i = (i * 10) + (*cp - '0');
+		}
+	}
+
+	if (unitp != NULL)
+		*unitp = i;
+	return (ifc);
+}
+
+/*
+ * Register a network interface cloner.
+ */
+void
+if_clone_attach(ifc)
+	struct if_clone *ifc;
+{
+
+	LIST_INSERT_HEAD(&if_cloners, ifc, ifc_list);
+	if_cloners_count++;
+}
+
+/*
+ * Unregister a network interface cloner.
+ */
+void
+if_clone_detach(ifc)
+	struct if_clone *ifc;
+{
+
+	LIST_REMOVE(ifc, ifc_list);
+	if_cloners_count--;
+}
+
+/*
+ * Provide list of interface cloners to userspace.
+ */
+int
+if_clone_list(ifcr)
+	struct if_clonereq *ifcr;
+{
+	char outbuf[IFNAMSIZ], *dst;
+	struct if_clone *ifc;
+	int count, error = 0;
+
+	ifcr->ifcr_total = if_cloners_count;
+	if ((dst = ifcr->ifcr_buffer) == NULL) {
+		/* Just asking how many there are. */
+		return (0);
+	}
+
+	if (ifcr->ifcr_count < 0)
+		return (EINVAL);
+
+	count = (if_cloners_count < ifcr->ifcr_count) ?
+	    if_cloners_count : ifcr->ifcr_count;
+
+	for (ifc = LIST_FIRST(&if_cloners); ifc != NULL && count != 0;
+	     ifc = LIST_NEXT(ifc, ifc_list), count--, dst += IFNAMSIZ) {
+		strncpy(outbuf, ifc->ifc_name, IFNAMSIZ);
+		outbuf[IFNAMSIZ - 1] = '\0';	/* sanity */
+		error = copyout(outbuf, dst, IFNAMSIZ);
+		if (error)
+			break;
+	}
+
+	return (error);
 }
 
 /*
@@ -710,10 +889,10 @@ if_slowtimo(arg)
  * interface structure pointer.
  */
 struct ifnet *
-ifunit(char *name)
+ifunit(const char *name)
 {
 	char namebuf[IFNAMSIZ + 1];
-	char *cp;
+	const char *cp;
 	struct ifnet *ifp;
 	int unit;
 	unsigned len, m;
@@ -804,6 +983,20 @@ ifioctl(so, cmd, data, p)
 		return (ifconf(cmd, data));
 	}
 	ifr = (struct ifreq *)data;
+
+	switch (cmd) {
+	case SIOCIFCREATE:
+	case SIOCIFDESTROY:
+		if ((error = suser(p)) != 0)
+			return (error);
+		return ((cmd == SIOCIFCREATE) ?
+			if_clone_create(ifr->ifr_name, sizeof(ifr->ifr_name)) :
+			if_clone_destroy(ifr->ifr_name));
+	
+	case SIOCIFGCLONERS:
+		return (if_clone_list((struct if_clonereq *)data));
+	}
+
 	ifp = ifunit(ifr->ifr_name);
 	if (ifp == 0)
 		return (ENXIO);
@@ -1048,7 +1241,9 @@ ifpromisc(ifp, pswitch)
 {
 	struct ifreq ifr;
 	int error;
+	int oldflags;
 
+	oldflags = ifp->if_flags;
 	if (pswitch) {
 		/*
 		 * If the device is not configured up, we cannot put it in
@@ -1072,6 +1267,8 @@ ifpromisc(ifp, pswitch)
 	error = (*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 	if (error == 0)
 		rt_ifmsg(ifp);
+	else
+		ifp->if_flags = oldflags;
 	return error;
 }
 
@@ -1388,7 +1585,7 @@ if_setlladdr(struct ifnet *ifp, const u_char *lladdr, int len)
 	case IFT_FDDI:
 	case IFT_XETHER:
 	case IFT_ISO88025:
-	case IFT_PROPVIRTUAL:		/* XXX waiting for IFT_8021_VLAN */
+	case IFT_L2VLAN:
 		bcopy(lladdr, ((struct arpcom *)ifp->if_softc)->ac_enaddr, len);
 		bcopy(lladdr, LLADDR(sdl), len);
 		break;

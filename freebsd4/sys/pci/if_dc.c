@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.20 2001/03/20 22:38:29 mckay Exp $
+ * $FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.22 2001/07/20 02:01:26 brooks Exp $
  */
 
 /*
@@ -130,7 +130,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.20 2001/03/20 22:38:29 mckay Exp $";
+  "$FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.22 2001/07/20 02:01:26 brooks Exp $";
 #endif
 
 /*
@@ -1912,8 +1912,7 @@ static int dc_attach(dev)
 	ifp->if_watchdog = dc_watchdog;
 	ifp->if_init = dc_init;
 	ifp->if_baudrate = 10000000;
-	IFQ_SET_MAXLEN(&ifp->if_snd, DC_TX_LIST_CNT - 1);
-	IFQ_SET_READY(&ifp->if_snd);
+	ifp->if_snd.ifq_maxlen = DC_TX_LIST_CNT - 1;
 
 	/*
 	 * Do MII setup. If this is a 21143, check for a PHY on the
@@ -2541,7 +2540,7 @@ static void dc_tick(xsc)
 		if (mii->mii_media_status & IFM_ACTIVE &&
 		    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE) {
 			sc->dc_link++;
-			if (!IFQ_IS_EMPTY(&ifp->if_snd))
+			if (ifp->if_snd.ifq_head != NULL)
 				dc_start(ifp);
 		}
 	}
@@ -2679,7 +2678,7 @@ static void dc_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, DC_IMR, DC_INTRS);
 
-	if (!IFQ_IS_EMPTY(&ifp->if_snd))
+	if (ifp->if_snd.ifq_head != NULL)
 		dc_start(ifp);
 
 	return;
@@ -2803,7 +2802,7 @@ static void dc_start(ifp)
 
 	sc = ifp->if_softc;
 
-	if (!sc->dc_link)
+	if (!sc->dc_link && ifp->if_snd.ifq_len < 10)
 		return;
 
 	if (ifp->if_flags & IFF_OACTIVE)
@@ -2812,7 +2811,7 @@ static void dc_start(ifp)
 	idx = sc->dc_cdata.dc_tx_prod;
 
 	while(sc->dc_cdata.dc_tx_chain[idx] == NULL) {
-		IFQ_POLL(&ifp->if_snd, m_head);
+		IF_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -2824,21 +2823,17 @@ static void dc_start(ifp)
 #endif
 			IFQ_DEQUEUE(&ifp->if_snd, m_head);
 			if (dc_coal(sc, &m_head)) {
+				IF_PREPEND(&ifp->if_snd, m_head);
 				ifp->if_flags |= IFF_OACTIVE;
 				break;
 			}
 		}
 
 		if (dc_encap(sc, m_head, &idx)) {
+			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
-
-		/* now we are committed to transmit the packet */
-		if (sc->dc_flags & DC_TX_COALESCE) {
-			/* if mbuf is coalesced, it is already dequeued */
-		} else
-			IFQ_DEQUEUE(&ifp->if_snd, m_head);
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -2852,8 +2847,6 @@ static void dc_start(ifp)
 			break;
 		}
 	}
-	if (idx == sc->dc_cdata.dc_tx_prod)
-		return;
 
 	/* Transmit */
 	sc->dc_cdata.dc_tx_prod = idx;
@@ -3160,7 +3153,7 @@ static void dc_watchdog(ifp)
 	dc_reset(sc);
 	dc_init(sc);
 
-	if (!IFQ_IS_EMPTY(&ifp->if_snd))
+	if (ifp->if_snd.ifq_head != NULL)
 		dc_start(ifp);
 
 	return;

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)udp_usrreq.c	8.6 (Berkeley) 5/23/95
- * $FreeBSD: src/sys/netinet/udp_usrreq.c,v 1.64.2.9 2001/03/05 13:09:03 obrien Exp $
+ * $FreeBSD: src/sys/netinet/udp_usrreq.c,v 1.64.2.13 2001/08/08 18:59:54 ghelmer Exp $
  */
 
 #include "opt_ipsec.h"
@@ -238,7 +238,8 @@ udp_input(m, off)
 			m_freem(m);
 			return;
 		}
-	}
+	} else
+		udpstat.udps_nosum++;
 
 	if (IN_MULTICAST(ntohl(ip->ip_dst.s_addr)) ||
 	    in_broadcast(ip->ip_dst, m->m_pkthdr.rcvif)) {
@@ -853,10 +854,15 @@ udp_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 		return EINVAL;
 	if (inp->inp_faddr.s_addr != INADDR_ANY)
 		return EISCONN;
+	error = 0;
 	s = splnet();
-	sin = (struct sockaddr_in *)nam;
-	prison_remote_ip(p, 0, &sin->sin_addr.s_addr);
-	error = in_pcbconnect(inp, nam, p);
+	if (inp->inp_laddr.s_addr == INADDR_ANY && p->p_prison != NULL)
+		error = in_pcbbind(inp, NULL, p);
+	if (error == 0) {
+		sin = (struct sockaddr_in *)nam;
+		prison_remote_ip(p, 0, &sin->sin_addr.s_addr);
+		error = in_pcbconnect(inp, nam, p);
+	}
 	splx(s);
 	if (error == 0)
 		soisconnected(so);

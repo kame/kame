@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)route.c	8.2 (Berkeley) 11/15/93
- * $FreeBSD: src/sys/net/route.c,v 1.59.2.1 2000/05/03 19:17:12 wollman Exp $
+ * $FreeBSD: src/sys/net/route.c,v 1.59.2.3 2001/07/29 19:18:02 ume Exp $
  */
 
 #include "opt_inet.h"
@@ -498,8 +498,9 @@ rtrequest(req, dst, gateway, netmask, flags, ret_nrt)
 		 * Now search what's left of the subtree for any cloned
 		 * routes which might have been formed from this node.
 		 */
-		if ((rt->rt_flags & RTF_PRCLONING) && netmask) {
-			rnh->rnh_walktree_from(rnh, dst, netmask,
+		if ((rt->rt_flags & (RTF_CLONING | RTF_PRCLONING)) &&
+		    rt_mask(rt)) {
+			rnh->rnh_walktree_from(rnh, dst, rt_mask(rt),
 					       rt_fixdelete, rt);
 		}
 
@@ -656,7 +657,7 @@ rtrequest(req, dst, gateway, netmask, flags, ret_nrt)
 		 */
 		if (req == RTM_RESOLVE) {
 			rt->rt_rmx = (*ret_nrt)->rt_rmx; /* copy metrics */
-			if ((*ret_nrt)->rt_flags & RTF_PRCLONING) {
+			if ((*ret_nrt)->rt_flags & (RTF_CLONING | RTF_PRCLONING)) {
 				rt->rt_parent = (*ret_nrt);
 				(*ret_nrt)->rt_refcnt++;
 			}
@@ -727,9 +728,7 @@ rt_fixdelete(rn, vp)
  * network route and (cloned) host routes.  For this reason, a simple check
  * of rt->rt_parent is insufficient; each candidate route must be tested
  * against the (mask, value) of the new route (passed as before in vp)
- * to see if the new route matches it.  Unfortunately, this has the obnoxious
- * property of also triggering for insertion /above/ a pre-existing network
- * route and clones.  Sigh.  This may be fixed some day.
+ * to see if the new route matches it.
  *
  * XXX - it may be possible to do fixdelete() for changes and reserve this
  * routine just for adds.  I'm not sure why I thought it was necessary to do
@@ -748,8 +747,8 @@ rt_fixchange(rn, vp)
 	struct rtfc_arg *ap = vp;
 	struct rtentry *rt0 = ap->rt0;
 	struct radix_node_head *rnh = ap->rnh;
-	u_char *xk1, *xm1, *xk2;
-	int i, len;
+	u_char *xk1, *xm1, *xk2, *xmp;
+	int i, len, mlen;
 
 #ifdef DEBUG
 	if (rtfcdebug)
@@ -782,6 +781,28 @@ rt_fixchange(rn, vp)
 	xk1 = (u_char *)rt_key(rt0);
 	xm1 = (u_char *)rt_mask(rt0);
 	xk2 = (u_char *)rt_key(rt);
+
+	/* avoid applying a less specific route */
+	xmp = (u_char *)rt_mask(rt->rt_parent);
+	mlen = ((struct sockaddr *)rt_key(rt->rt_parent))->sa_len;
+	if (mlen > ((struct sockaddr *)rt_key(rt0))->sa_len) {
+#ifdef DEBUG
+		if (rtfcdebug)
+			printf("rt_fixchange: inserting a less "
+			       "specific route\n");
+#endif
+		return 0;
+	}
+	for (i = rnh->rnh_treetop->rn_offset; i < mlen; i++) {
+		if ((xmp[i] & ~(xmp[i] ^ xm1[i])) != xmp[i]) {
+#ifdef DEBUG
+			if (rtfcdebug)
+				printf("rt_fixchange: inserting a less "
+				       "specific route\n");
+#endif
+			return 0;
+		}
+	}
 
 	for (i = rnh->rnh_treetop->rn_offset; i < len; i++) {
 		if ((xk2[i] & xm1[i]) != xk1[i]) {

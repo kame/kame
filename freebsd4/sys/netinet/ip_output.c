@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_output.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/netinet/ip_output.c,v 1.99.2.13 2001/03/11 22:18:00 iedowse Exp $
+ * $FreeBSD: src/sys/netinet/ip_output.c,v 1.99.2.16 2001/07/19 06:37:26 kris Exp $
  */
 
 #define _IP_VHL
@@ -41,6 +41,7 @@
 #include "opt_ipdivert.h"
 #include "opt_ipfilter.h"
 #include "opt_ipsec.h"
+#include "opt_random_ip_id.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -209,7 +210,11 @@ ip_output(m0, opt, ro, flags, imo)
 	if ((flags & (IP_FORWARDING|IP_RAWOUTPUT)) == 0) {
 		ip->ip_vhl = IP_MAKE_VHL(IPVERSION, hlen >> 2);
 		ip->ip_off &= IP_DF;
+#ifdef RANDOM_IP_ID
+		ip->ip_id = ip_randomid();
+#else
 		ip->ip_id = htons(ip_id++);
+#endif
 		ipstat.ips_localout++;
 	} else {
 		hlen = IP_VHL_HL(ip->ip_vhl) << 2;
@@ -770,13 +775,13 @@ skip_ipsec:
 	}
 
 pass:
-	sw_csum = m->m_pkthdr.csum_flags | CSUM_IP;
-	m->m_pkthdr.csum_flags = sw_csum & ifp->if_hwassist;
-	sw_csum &= ~ifp->if_hwassist;
+	m->m_pkthdr.csum_flags |= CSUM_IP;
+	sw_csum = m->m_pkthdr.csum_flags & ~ifp->if_hwassist;
 	if (sw_csum & CSUM_DELAY_DATA) {
 		in_delayed_cksum(m);
 		sw_csum &= ~CSUM_DELAY_DATA;
 	}
+	m->m_pkthdr.csum_flags &= ifp->if_hwassist;
 
 	/*
 	 * If small enough for interface, or the interface will take
@@ -981,6 +986,8 @@ in_delayed_cksum(struct mbuf *m)
 	ip = mtod(m, struct ip *);
 	offset = IP_VHL_HL(ip->ip_vhl) << 2 ;
 	csum = in_cksum_skip(m, ip->ip_len, offset);
+	if (m->m_pkthdr.csum_flags & CSUM_UDP && csum == 0)
+		csum = 0xffff;
 	offset += m->m_pkthdr.csum_data;	/* checksum offset */
 
 	if (offset + sizeof(u_short) > m->m_len) {
@@ -1517,8 +1524,8 @@ ip_setmoptions(sopt, imop)
 	struct ip_moptions *imo = *imop;
 	struct route ro;
 	struct sockaddr_in *dst;
-	int s;
 	int ifindex;
+	int s;
 
 	if (imo == NULL) {
 		/*

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_types.h	8.2 (Berkeley) 4/20/94
- * $FreeBSD: src/sys/net/if_types.h,v 1.8.2.1 2000/07/15 07:14:29 kris Exp $
+ * $FreeBSD: src/sys/net/if_types.h,v 1.8.2.3 2001/07/03 11:01:41 ume Exp $
  */
 
 #ifndef _NET_IF_TYPES_H_
@@ -99,14 +99,18 @@
 #define	IFT_SMDSICIP	0x34		/* SMDS InterCarrier Interface */
 #define	IFT_PROPVIRTUAL	0x35		/* Proprietary Virtual/internal */
 #define	IFT_PROPMUX	0x36		/* Proprietary Multiplexing */
+#define	IFT_GIF		0x37		/*0xf0*/
+#define	IFT_FAITH	0x38		/*0xf2*/
+#define	IFT_STF		0x39		/*0xf3*/
+#define IFT_L2VLAN	0x87		/* Layer 2 Virtual LAN using 802.1Q */
 
 #define IFT_IEEE1394	0x90		/* IEEE1394 High Performance SerialBus*/
 
 /* not based on IANA assignments */
-#define	IFT_GIF		0xf0
+/* #define	IFT_GIF		0xf0 */
 #define	IFT_PVC		0xf1
-#define	IFT_FAITH	0xf2
-#define	IFT_STF		0xf3
+/* #define	IFT_FAITH	0xf2 */
+/* #define	IFT_STF		0xf3 */
 #define IFT_DUMMY       0xf4
 #define IFT_HIF         0xf5
 

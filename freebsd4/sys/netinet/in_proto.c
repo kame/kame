@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_proto.c	8.2 (Berkeley) 2/9/95
- * $FreeBSD: src/sys/netinet/in_proto.c,v 1.53.2.2 2000/08/16 20:07:46 archie Exp $
+ * $FreeBSD: src/sys/netinet/in_proto.c,v 1.53.2.4 2001/07/24 19:10:18 brooks Exp $
  */
 
 #include "opt_ipdivert.h"
@@ -234,7 +234,7 @@ struct protosw in_gif_protosw =
   0,            0,              0,              0,
   &rip_usrreqs
 };
-#endif /*NGIF*/
+#endif
 
 #if NSTF > 0
 struct protosw in_stf_protosw =
@@ -244,7 +244,7 @@ struct protosw in_stf_protosw =
   0,            0,              0,              0,
   &rip_usrreqs
 };
-#endif /*NSTF*/
+#endif
 
 extern int in_inithead __P((void **, int));
 

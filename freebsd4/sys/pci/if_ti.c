@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_ti.c,v 1.25.2.7 2000/08/24 00:07:58 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_ti.c,v 1.25.2.10 2001/08/01 01:08:25 fenner Exp $
  */
 
 /*
@@ -138,7 +138,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_ti.c,v 1.25.2.7 2000/08/24 00:07:58 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_ti.c,v 1.25.2.10 2001/08/01 01:08:25 fenner Exp $";
 #endif
 
 /*
@@ -1253,7 +1253,7 @@ static int ti_chipinit(sc)
 	/* Do special setup for Tigon 2. */
 	if (sc->ti_hwrev == TI_HWREV_TIGON_II) {
 		TI_SETBIT(sc, TI_CPU_CTL_B, TI_CPUSTATE_HALT);
-		TI_SETBIT(sc, TI_MISC_LOCAL_CTL, TI_MLC_SRAM_BANK_256K);
+		TI_SETBIT(sc, TI_MISC_LOCAL_CTL, TI_MLC_SRAM_BANK_512K);
 		TI_SETBIT(sc, TI_MISC_CONF, TI_MCR_SRAM_SYNCHRONOUS);
 	}
 
@@ -1739,8 +1739,7 @@ static int ti_attach(dev)
 	ifp->if_watchdog = ti_watchdog;
 	ifp->if_init = ti_init;
 	ifp->if_mtu = ETHERMTU;
-	IFQ_SET_MAXLEN(&ifp->if_snd, TI_TX_RING_CNT - 1);
-	IFQ_SET_READY(&ifp->if_snd);
+	ifp->if_snd.ifq_maxlen = TI_TX_RING_CNT - 1;
 
 	/* Set up ifmedia support. */
 	ifmedia_init(&sc->ifmedia, IFM_IMASK, ti_ifmedia_upd, ti_ifmedia_sts);
@@ -1847,7 +1846,7 @@ static void ti_rxeof(sc)
 #if NVLAN > 0
 		if (cur_rx->ti_flags & TI_BDFLAG_VLAN_TAG) {
 			have_tag = 1;
-			vlan_tag = cur_rx->ti_vlan_tag;
+			vlan_tag = cur_rx->ti_vlan_tag & 0xfff;
 		}
 #endif
 
@@ -2018,7 +2017,7 @@ static void ti_intr(xsc)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, TI_MB_HOSTINTR, 0);
 
-	if (ifp->if_flags & IFF_RUNNING && !IFQ_IS_EMPTY(&ifp->if_snd))
+	if (ifp->if_flags & IFF_RUNNING && ifp->if_snd.ifq_head != NULL)
 		ti_start(ifp);
 
 	return;
@@ -2059,7 +2058,7 @@ static int ti_encap(sc, m_head, txidx)
 
 	if ((m_head->m_flags & (M_PROTO1|M_PKTHDR)) == (M_PROTO1|M_PKTHDR) &&
 	    m_head->m_pkthdr.rcvif != NULL &&
-	    m_head->m_pkthdr.rcvif->if_type == IFT_8021_VLAN)
+	    m_head->m_pkthdr.rcvif->if_type == IFT_L2VLAN)
 		ifv = m_head->m_pkthdr.rcvif->if_softc;
 #endif
 
@@ -2107,7 +2106,7 @@ static int ti_encap(sc, m_head, txidx)
 #if NVLAN > 0
 			if (ifv != NULL) {
 				f->ti_flags |= TI_BDFLAG_VLAN_TAG;
-				f->ti_vlan_tag = ifv->ifv_tag;
+				f->ti_vlan_tag = ifv->ifv_tag & 0xfff;
 			} else {
 				f->ti_vlan_tag = 0;
 			}
@@ -2153,14 +2152,13 @@ static void ti_start(ifp)
 	struct ti_softc		*sc;
 	struct mbuf		*m_head = NULL;
 	u_int32_t		prodidx = 0;
-	int			pkts = 0;
 
 	sc = ifp->if_softc;
 
 	prodidx = CSR_READ_4(sc, TI_MB_SENDPROD_IDX);
 
 	while(sc->ti_cdata.ti_tx_chain[prodidx] == NULL) {
-		IFQ_POLL(&ifp->if_snd, m_head);
+		IF_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -2176,6 +2174,7 @@ static void ti_start(ifp)
 		    m_head->m_pkthdr.csum_flags & (CSUM_DELAY_DATA)) {
 			if ((TI_TX_RING_CNT - sc->ti_txcnt) <
 			    m_head->m_pkthdr.csum_data + 16) {
+				IF_PREPEND(&ifp->if_snd, m_head);
 				ifp->if_flags |= IFF_OACTIVE;
 				break;
 			}
@@ -2187,13 +2186,10 @@ static void ti_start(ifp)
 		 * for the NIC to drain the ring.
 		 */
 		if (ti_encap(sc, m_head, &prodidx)) {
+			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
-
-		/* now we are committed to transmit the packet */
-		IFQ_DEQUEUE(&ifp->if_snd, m_head);
-		pkts++;
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -2202,8 +2198,6 @@ static void ti_start(ifp)
 		if (ifp->if_bpf)
 			bpf_mtap(ifp, m_head);
 	}
-	if (pkts == 0)
-		return;
 
 	/* Transmit */
 	CSR_WRITE_4(sc, TI_MB_SENDPROD_IDX, prodidx);

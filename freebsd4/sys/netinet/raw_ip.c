@@ -31,11 +31,12 @@
  * SUCH DAMAGE.
  *
  *	@(#)raw_ip.c	8.7 (Berkeley) 5/15/95
- * $FreeBSD: src/sys/netinet/raw_ip.c,v 1.64.2.3 2000/10/17 13:44:57 ru Exp $
+ * $FreeBSD: src/sys/netinet/raw_ip.c,v 1.64.2.8 2001/07/29 19:32:40 ume Exp $
  */
 
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
+#include "opt_random_ip_id.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -217,13 +218,13 @@ rip_output(m, so, dst)
 		}
 		M_PREPEND(m, sizeof(struct ip), M_WAIT);
 		ip = mtod(m, struct ip *);
-		ip->ip_tos = 0;
+		ip->ip_tos = inp->inp_ip_tos;
 		ip->ip_off = 0;
 		ip->ip_p = inp->inp_ip_p;
 		ip->ip_len = m->m_pkthdr.len;
 		ip->ip_src = inp->inp_laddr;
 		ip->ip_dst.s_addr = dst;
-		ip->ip_ttl = MAXTTL;
+		ip->ip_ttl = inp->inp_ip_ttl;
 	} else {
 		if (m->m_pkthdr.len > IP_MAXPACKET) {
 			m_freem(m);
@@ -240,7 +241,11 @@ rip_output(m, so, dst)
 			return EINVAL;
 		}
 		if (ip->ip_id == 0)
+#ifdef RANDOM_IP_ID
+			ip->ip_id = ip_randomid();
+#else
 			ip->ip_id = htons(ip_id++);
+#endif
 		/* XXX prevent ip_output from overwriting header fields */
 		flags |= IP_RAWOUTPUT;
 		ipstat.ips_rawout++;
@@ -422,7 +427,7 @@ rip_ctlinput(cmd, sa, vip)
 				 * thing to do, but at least if we are running
 				 * a routing process they will come back.
 				 */
-				in_ifadown(&ia->ia_ifa);
+				in_ifadown(&ia->ia_ifa, 0);
 				break;
 			}
 		}
@@ -481,6 +486,7 @@ rip_attach(struct socket *so, int proto, struct proc *p)
 	inp = (struct inpcb *)so->so_pcb;
 	inp->inp_vflag |= INP_IPV4;
 	inp->inp_ip_p = proto;
+	inp->inp_ip_ttl = ip_defttl;
 	return 0;
 }
 

@@ -1,5 +1,5 @@
 /*	$OpenBSD: if_tx.c,v 1.9.2.1 2000/02/21 22:29:13 niklas Exp $	*/
-/* $FreeBSD: src/sys/pci/if_tx.c,v 1.34.2.4 2000/11/11 01:34:17 pb Exp $ */
+/* $FreeBSD: src/sys/pci/if_tx.c,v 1.34.2.8 2001/09/01 07:21:56 semenu Exp $ */
 
 /*-
  * Copyright (c) 1997 Semen Ustimenko (semen@iclub.nsu.ru)
@@ -54,12 +54,18 @@
 #if defined(__FreeBSD__)
 #define NBPFILTER	1
 
+#include "vlan.h"
+
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <net/ethernet.h>
 #include <net/if_media.h>
 
 #include <net/bpf.h>
+
+#if NVLAN > 0
+#include <net/if_vlan_var.h>
+#endif
 
 #include <vm/vm.h>              /* for vtophys */
 #include <vm/pmap.h>            /* for vtophys */
@@ -76,12 +82,17 @@
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
+#include <dev/mii/miidevs.h>
+
+#include <dev/mii/lxtphyreg.h>
 
 #include "miibus_if.h"
 
 #include <pci/if_txvar.h>
 #else /* __OpenBSD__ */
 #include "bpfilter.h"
+
+#define	NVLAN	0	/* not sure if/how OpenBSD supports VLANs */
 
 #include <sys/device.h>
 
@@ -117,6 +128,8 @@
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
+#include <dev/mii/miidevs.h>
+#include <dev/mii/lxtphyreg.h>
 
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
@@ -447,8 +460,7 @@ epic_freebsd_attach(dev)
 	ifp->if_init = (if_init_f_t*)epic_init;
 	ifp->if_timer = 0;
 	ifp->if_baudrate = 10000000;
-	IFQ_SET_MAXLEN(&ifp->if_snd, TX_RING_SIZE - 1);
-	IFQ_SET_READY(&ifp->if_snd);
+	ifp->if_snd.ifq_maxlen =  TX_RING_SIZE - 1;
 
 	/* Enable ports, memory and busmastering */
 	command = pci_read_config(dev, PCIR_COMMAND, 4);
@@ -512,12 +524,9 @@ epic_freebsd_attach(dev)
 	/* Workaround for Application Note 7-15 */
 	for (i=0; i<16; i++) CSR_WRITE_4(sc, TEST1, TEST1_CLOCK_TEST);
 
-	/*
-	 * Do ifmedia setup.
-	 */
-	if (mii_phy_probe(dev, &sc->miibus,
-	    epic_ifmedia_upd, epic_ifmedia_sts)) {
-		device_printf(dev, "MII without any PHY!?\n");
+	/* Do OS independent part, including chip wakeup and reset */
+	if (epic_common_attach(sc)) {
+		device_printf(dev, "memory distribution error\n");
 		bus_teardown_intr(dev, sc->irq, sc->sc_ih);
 		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->irq);
 		bus_release_resource(dev, EPIC_RES, EPIC_RID, sc->res);
@@ -525,9 +534,10 @@ epic_freebsd_attach(dev)
 		goto fail;
 	}
 
-	/* Do OS independent part, including chip wakeup and reset */
-	if (epic_common_attach(sc)) {
-		device_printf(dev, "memory distribution error\n");
+	/* Do ifmedia setup */
+	if (mii_phy_probe(dev, &sc->miibus,
+	    epic_ifmedia_upd, epic_ifmedia_sts)) {
+		device_printf(dev, "MII without any PHY!?\n");
 		bus_teardown_intr(dev, sc->irq, sc->sc_ih);
 		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->irq);
 		bus_release_resource(dev, EPIC_RES, EPIC_RID, sc->res);
@@ -548,10 +558,13 @@ epic_freebsd_attach(dev)
 		if( ' ' == (u_int8_t)tmp ) break;
 		printf("%c",(u_int8_t)tmp);
 	}
-	printf ("\n");
+	printf("\n");
 
 	/* Attach to OS's managers */
 	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
+#if NVLAN > 0
+	ifp->if_hdrlen = sizeof(struct ether_vlan_header);
+#endif
 	callout_handle_init(&sc->stat_ch);
 
 fail:
@@ -639,8 +652,24 @@ epic_ifioctl(ifp, command, data)
 #if defined(__FreeBSD__)
 	case SIOCSIFADDR:
 	case SIOCGIFADDR:
-	case SIOCSIFMTU:
 		error = ether_ioctl(ifp, command, data);
+		break;
+	case SIOCSIFMTU:
+		if (ifp->if_mtu == ifr->ifr_mtu) 
+			break;
+
+		/* XXX Though the datasheet doesn't imply any 
+		 * limitations on RX and TX sizes beside max 64Kb
+		 * DMA transfer, seems we can't send more then 1600
+		 * data bytes per ethernet packet. (Transmitter hangs
+		 * up if more data is sent)
+		 */
+		if (ifr->ifr_mtu + ifp->if_hdrlen <= EPIC_MAX_MTU) {
+			ifp->if_mtu = ifr->ifr_mtu;
+			epic_stop(sc);
+			epic_init(sc);
+		} else
+			error = EINVAL;
 		break;
 #else /* __OpenBSD__ */
 	case SIOCSIFADDR: {
@@ -749,13 +778,12 @@ epic_common_attach(sc)
 	i = sizeof(struct epic_frag_list)*TX_RING_SIZE +
 	    sizeof(struct epic_rx_desc)*RX_RING_SIZE + 
 	    sizeof(struct epic_tx_desc)*TX_RING_SIZE + PAGE_SIZE,
-	sc->pool = (epic_softc_t *) malloc( i, M_DEVBUF, M_NOWAIT);
+	sc->pool = (epic_softc_t *) malloc(i, M_DEVBUF, M_NOWAIT | M_ZERO);
 
 	if (sc->pool == NULL) {
 		printf(": can't allocate memory for buffers\n");
 		return -1;
 	}
-	bzero(sc->pool, i);
 
 	/* Align pool on PAGE_SIZE */
 	pool = (caddr_t)sc->pool;
@@ -779,17 +807,30 @@ epic_common_attach(sc)
 	for (i = 0; i < ETHER_ADDR_LEN / sizeof(u_int16_t); i++)
 		((u_int16_t *)sc->sc_macaddr)[i] = epic_read_eeprom(sc,i);
 
+	/* Set Non-Volatile Control Register from EEPROM */
+	CSR_WRITE_4(sc, NVCTL, epic_read_eeprom(sc, EEPROM_NVCTL) & 0x1F);
+
 	/* Set defaults */
 	sc->tx_threshold = TRANSMIT_THRESHOLD;
 	sc->txcon = TXCON_DEFAULT;
+	sc->miicfg = MIICFG_SMI_ENABLE;
+	sc->phyid = EPIC_UNKN_PHY;
+	sc->serinst = -1;
+
+	/* Fetch card id */
+	sc->cardvend = pci_read_config(sc->dev, PCIR_SUBVEND_0, 2);
+	sc->cardid = pci_read_config(sc->dev, PCIR_SUBDEV_0, 2);
+
+	if (sc->cardvend != SMC_VENDORID) 
+		printf(EPIC_FORMAT ": unknown card vendor 0x%04x\n", EPIC_ARGS(sc), sc->cardvend);
 
 	return 0;
 }
 
 /*
  * This is if_start handler. It takes mbufs from if_snd queue
- * and quque them for transmit, one by one, until TX ring become full
- * or quque become empty.
+ * and queue them for transmit, one by one, until TX ring become full
+ * or queue become empty.
  */
 static void
 epic_ifstart(ifp)
@@ -1025,7 +1066,7 @@ epic_intr(arg)
         if( status & (INTSTAT_TXC|INTSTAT_TCC|INTSTAT_TQE) ) {
             epic_tx_done( sc );
 	    if(!(sc->sc_if.if_flags & IFF_OACTIVE) &&
-		!IFQ_IS_EMPTY( &sc->sc_if.if_snd ))
+	        sc->sc_if.if_snd.ifq_head )
 		    epic_ifstart( &sc->sc_if );
 	}
 
@@ -1115,7 +1156,7 @@ epic_ifwatchdog(ifp)
 		printf("seems we can continue normaly\n");
 
 	/* Start output */
-	if( !IFQ_IS_EMPTY( &ifp->if_snd ) ) epic_ifstart( ifp );
+	if( ifp->if_snd.ifq_head ) epic_ifstart( ifp );
 
 	splx(x);
 }
@@ -1130,39 +1171,124 @@ epic_ifmedia_upd(ifp)
 	epic_softc_t *sc;
 	struct mii_data *mii;
 	struct ifmedia *ifm;
+	struct mii_softc *miisc;
+	int cfg, media;
 
 	sc = ifp->if_softc;
 	mii = device_get_softc(sc->miibus);
 	ifm = &mii->mii_media;
+	media = ifm->ifm_cur->ifm_media;
 
 	/* Do not do anything if interface is not up */
 	if(!(ifp->if_flags & IFF_UP))
 		return (0);
 
-	if((IFM_INST(ifm->ifm_cur->ifm_media) == mii->mii_instance) &&
-	   (IFM_SUBTYPE(ifm->ifm_cur->ifm_media) == IFM_10_2)) {
-		/* Call this, to isolate (and powerdown ?) all PHYs */
-		mii_mediachg(mii);
+	/*
+	 * Lookup current selected PHY
+	 */
+	if (IFM_INST(media) == sc->serinst) {
+		sc->phyid = EPIC_SERIAL;
+		sc->physc = NULL;
+	} else {
+		/* If we're not selecting serial interface, select MII mode */
+		sc->miicfg &= ~MIICFG_SERIAL_ENABLE;
+		CSR_WRITE_4(sc, MIICFG, sc->miicfg);
 
-		/* Select BNC */
-		CSR_WRITE_4(sc, MIICFG, MIICFG_SERIAL_ENABLE |
-					MIICFG_694_ENABLE | MIICFG_SMI_ENABLE);
+		dprintf((EPIC_FORMAT ": MII selected\n", EPIC_ARGS(sc)));
 
-		/* Update txcon register */
-		epic_miibus_statchg(sc->dev);
+		/* Default to unknown PHY */
+		sc->phyid = EPIC_UNKN_PHY;
 
-		return (0);
-	} else if(IFM_INST(ifm->ifm_cur->ifm_media) < mii->mii_instance) {
-		/* Select MII */
-		CSR_WRITE_4(sc, MIICFG, MIICFG_SMI_ENABLE);
+		/* Lookup selected PHY */
+		for (miisc = LIST_FIRST(&mii->mii_phys); miisc != NULL;
+		     miisc = LIST_NEXT(miisc, mii_list)) {
+			if (IFM_INST(media) == miisc->mii_inst) {
+				sc->physc = miisc;
+				break;
+			}
+		}
 
-		/* Give it to miibus... */
-		mii_mediachg(mii);
+		/* Identify selected PHY */
+		if (sc->physc) {
+			int id1, id2, model, oui;
 
-		return (0);
+			id1 = PHY_READ(sc->physc, MII_PHYIDR1);
+			id2 = PHY_READ(sc->physc, MII_PHYIDR2);
+
+			oui = MII_OUI(id1, id2);
+			model = MII_MODEL(id2);
+			switch (oui) {
+			case MII_OUI_QUALSEMI:
+				if (model == MII_MODEL_QUALSEMI_QS6612)
+					sc->phyid = EPIC_QS6612_PHY;
+				break;
+			case MII_OUI_xxALTIMA:
+				if (model == MII_MODEL_xxALTIMA_AC101)
+					sc->phyid = EPIC_AC101_PHY;
+				break;
+			case MII_OUI_xxLEVEL1:
+				if (model == MII_MODEL_xxLEVEL1_LXT970)
+					sc->phyid = EPIC_LXT970_PHY;
+				break;
+			}
+		}
 	}
 
-	return(EINVAL);
+	/*
+	 * Do PHY specific card setup
+	 */
+
+	/* Call this, to isolate all not selected PHYs and
+	 * set up selected
+	 */
+	mii_mediachg(mii);
+
+	/* Do our own setup */
+	switch (sc->phyid) {
+	case EPIC_QS6612_PHY:
+		break;
+	case EPIC_AC101_PHY:
+		/* We have to powerup fiber tranceivers */
+		if (IFM_SUBTYPE(media) == IFM_100_FX)
+			sc->miicfg |= MIICFG_694_ENABLE;
+		else
+			sc->miicfg &= ~MIICFG_694_ENABLE;
+		CSR_WRITE_4(sc, MIICFG, sc->miicfg);
+	
+		break;
+	case EPIC_LXT970_PHY:
+		/* We have to powerup fiber tranceivers */
+		cfg = PHY_READ(sc->physc, MII_LXTPHY_CONFIG);
+		if (IFM_SUBTYPE(media) == IFM_100_FX)
+			cfg |= CONFIG_LEDC1 | CONFIG_LEDC0;
+		else
+			cfg &= ~(CONFIG_LEDC1 | CONFIG_LEDC0);
+		PHY_WRITE(sc->physc, MII_LXTPHY_CONFIG, cfg);
+
+		break;
+	case EPIC_SERIAL:
+		/* Select serial PHY, (10base2/BNC usually) */
+		sc->miicfg |= MIICFG_694_ENABLE | MIICFG_SERIAL_ENABLE;
+		CSR_WRITE_4(sc, MIICFG, sc->miicfg);
+
+		/* There is no driver to fill this */
+		mii->mii_media_active = media;
+		mii->mii_media_status = 0;
+
+		/* We need to call this manualy as i wasn't called
+		 * in mii_mediachg()
+		 */
+		epic_miibus_statchg(sc->dev);
+
+		dprintf((EPIC_FORMAT ": SERIAL selected\n", EPIC_ARGS(sc)));
+
+		break;
+	default:
+		printf(EPIC_FORMAT ": ERROR! Unknown PHY selected\n", EPIC_ARGS(sc));
+		return (EINVAL);
+	}
+
+	return(0);
 }
 
 /*
@@ -1181,6 +1307,7 @@ epic_ifmedia_sts(ifp, ifmr)
 	mii = device_get_softc(sc->miibus);
 	ifm = &mii->mii_media;
 
+	/* Nothing should be selected if interface is down */
 	if(!(ifp->if_flags & IFF_UP)) {
 		ifmr->ifm_active = IFM_NONE;
 		ifmr->ifm_status = 0;
@@ -1188,18 +1315,13 @@ epic_ifmedia_sts(ifp, ifmr)
 		return;
 	}
 
-	if((IFM_INST(ifm->ifm_cur->ifm_media) == mii->mii_instance) &&
-	   (IFM_SUBTYPE(ifm->ifm_cur->ifm_media) == IFM_10_2)) {
-		ifmr->ifm_active = ifm->ifm_cur->ifm_media;
-		ifmr->ifm_status = 0;
-	} else if(IFM_INST(ifm->ifm_cur->ifm_media) < mii->mii_instance) {
+	/* Call underlying pollstat, if not serial PHY */
+	if (sc->phyid != EPIC_SERIAL)
 		mii_pollstat(mii);
-		ifmr->ifm_active = mii->mii_media_active;
-		ifmr->ifm_status = mii->mii_media_status;
-	} else {
-		ifmr->ifm_active = IFM_NONE;
-		ifmr->ifm_status = 0;
-	}
+
+	/* Simply copy media info */
+	ifmr->ifm_active = mii->mii_media_active;
+	ifmr->ifm_status = mii->mii_media_status;
 
 	return;
 }
@@ -1213,20 +1335,34 @@ epic_miibus_statchg(dev)
 {
 	epic_softc_t *sc;
 	struct mii_data *mii;
+	int media;
 
 	sc = device_get_softc(dev);
 	mii = device_get_softc(sc->miibus);
+	media = mii->mii_media_active;
 
 	sc->txcon &= ~(TXCON_LOOPBACK_MODE | TXCON_FULL_DUPLEX);
 
-	/*
-	 * If we are in full-duplex mode or loopback operation,
+	/* If we are in full-duplex mode or loopback operation,
 	 * we need to decouple receiver and transmitter.
 	 */
-	if (mii->mii_media_active & (IFM_FDX | IFM_LOOP))
+	if (IFM_OPTIONS(media) & (IFM_FDX | IFM_LOOP))
  		sc->txcon |= TXCON_FULL_DUPLEX;
 
-	if (IFM_SUBTYPE(mii->mii_media_active) == IFM_100_TX)
+	/* On some cards we need manualy set fullduplex led */
+	if (sc->cardid == SMC9432FTX ||
+	    sc->cardid == SMC9432FTX_SC) {
+		if (IFM_OPTIONS(media) & IFM_FDX) 
+			sc->miicfg |= MIICFG_694_ENABLE;
+		else
+			sc->miicfg &= ~MIICFG_694_ENABLE;
+
+		CSR_WRITE_4(sc, MIICFG, sc->miicfg);
+	}
+
+	/* Update baudrate */
+	if (IFM_SUBTYPE(media) == IFM_100_TX &&
+	    IFM_SUBTYPE(media) == IFM_100_FX)
 		sc->sc_if.if_baudrate = 100000000;
 	else
 		sc->sc_if.if_baudrate = 10000000;
@@ -1236,22 +1372,32 @@ epic_miibus_statchg(dev)
 	return;
 }
 
-static void epic_miibus_mediainit(dev)
+static void
+epic_miibus_mediainit(dev)
 	device_t dev;
 {
         epic_softc_t *sc;
         struct mii_data *mii;
 	struct ifmedia *ifm;
 	int media;
-	
+
 	sc = device_get_softc(dev);
 	mii = device_get_softc(sc->miibus);
 	ifm = &mii->mii_media;
 
+	/* Add Serial Media Interface if present, this applies to
+	 * SMC9432BTX serie
+	 */
 	if(CSR_READ_4(sc, MIICFG) & MIICFG_PHY_PRESENT) {
-		media = IFM_MAKEWORD(IFM_ETHER, IFM_10_2, 0, mii->mii_instance);
-		printf(EPIC_FORMAT ": serial PHY detected (10Base2/BNC)\n",EPIC_ARGS(sc));
+		/* Store its instance */
+		sc->serinst = mii->mii_instance++;
+
+		/* Add as 10base2/BNC media */
+		media = IFM_MAKEWORD(IFM_ETHER, IFM_10_2, 0, sc->serinst);
 		ifmedia_add(ifm, media, 0, NULL);
+
+		/* Report to user */
+		printf(EPIC_FORMAT ": serial PHY detected (10Base2/BNC)\n",EPIC_ARGS(sc));
 	}
 
 	return;
@@ -1320,9 +1466,12 @@ epic_init(sc)
 
 	/* Enable interrupts by setting the interrupt mask. */
 	CSR_WRITE_4( sc, INTMASK,
-		INTSTAT_RCC | INTSTAT_RQE | INTSTAT_OVW | INTSTAT_RXE |
-		INTSTAT_TXC | INTSTAT_TCC | INTSTAT_TQE | INTSTAT_TXU |
+		INTSTAT_RCC  | /* INTSTAT_RQE | INTSTAT_OVW | INTSTAT_RXE | */
+		/* INTSTAT_TXC | */ INTSTAT_TCC | INTSTAT_TQE | INTSTAT_TXU |
 		INTSTAT_FATAL);
+
+	/* Acknowledge all pending interrupts */
+	CSR_WRITE_4(sc, INTSTAT, CSR_READ_4(sc, INTSTAT));
 
 	/* Enable interrupts,  set for PCI read multiple and etc */
 	CSR_WRITE_4( sc, GENCTL,
@@ -1343,8 +1492,7 @@ epic_init(sc)
 	mii = device_get_softc(sc->miibus);
         if (mii->mii_instance) {
 		struct mii_softc	*miisc;
-		for (miisc = LIST_FIRST(&mii->mii_phys); miisc != NULL;
-		     miisc = LIST_NEXT(miisc, mii_list))
+		LIST_FOREACH(miisc, &mii->mii_phys, mii_list)
 			mii_phy_reset(miisc);
 	}
 
@@ -1624,9 +1772,8 @@ epic_init_rings(sc)
 		}
 		desc->bufaddr = vtophys( mtod(buf->mbuf,caddr_t) );
 
-		desc->buflength = ETHER_MAX_FRAME_LEN;
-		desc->status = 0x8000;			/* Give to EPIC */
-
+		desc->buflength = MCLBYTES;	/* Max RX buffer length */
+		desc->status = 0x8000;		/* Set owner bit to NIC */
 	}
 
 	for (i = 0; i < TX_RING_SIZE; i++) {

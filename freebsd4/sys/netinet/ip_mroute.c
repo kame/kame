@@ -9,10 +9,11 @@
  * Modified by Bill Fenner, PARC, April 1995
  *
  * MROUTING Revision: 3.5
- * $FreeBSD: src/sys/netinet/ip_mroute.c,v 1.56.2.1 2000/09/21 12:08:13 kjc Exp $
+ * $FreeBSD: src/sys/netinet/ip_mroute.c,v 1.56.2.2 2001/07/19 06:37:26 kris Exp $
  */
 
 #include "opt_mrouting.h"
+#include "opt_random_ip_id.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -1580,7 +1581,11 @@ encap_send(ip, vifp, m)
      */
     ip_copy = mtod(mb_copy, struct ip *);
     *ip_copy = multicast_encap_iphdr;
+#ifdef RANDOM_IP_ID
+    ip_copy->ip_id = ip_randomid();
+#else
     ip_copy->ip_id = htons(ip_id++);
+#endif
     ip_copy->ip_len += len;
     ip_copy->ip_src = vifp->v_lcl_addr;
     ip_copy->ip_dst = vifp->v_rmt_addr;

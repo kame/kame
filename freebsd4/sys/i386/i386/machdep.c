@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
- * $FreeBSD: src/sys/i386/i386/machdep.c,v 1.385.2.11 2001/03/05 13:08:59 obrien Exp $
+ * $FreeBSD: src/sys/i386/i386/machdep.c,v 1.385.2.16 2001/08/15 01:23:50 peter Exp $
  */
 
 #include "apm.h"
@@ -104,6 +104,7 @@
 #ifdef PERFMON
 #include <machine/perfmon.h>
 #endif
+#include <machine/cputypes.h>
 
 #ifdef OLD_BUS_ARCH
 #include <i386/isa/isa_device.h>
@@ -125,6 +126,10 @@ extern void panicifcpuunsupported(void);
 extern void initializecpu(void);
 
 static void cpu_startup __P((void *));
+#ifdef CPU_ENABLE_SSE
+static void set_fpregs_xmm __P((struct save87 *, struct savexmm *));
+static void fill_fpregs_xmm __P((struct savexmm *, struct save87 *));
+#endif /* CPU_ENABLE_SSE */
 SYSINIT(cpu, SI_SUB_CPU, SI_ORDER_FIRST, cpu_startup, NULL)
 
 static MALLOC_DEFINE(M_MBUF, "mbuf", "mbuf");
@@ -235,6 +240,7 @@ vm_offset_t phys_avail[10];
 static vm_offset_t buffer_sva, buffer_eva;
 vm_offset_t clean_sva, clean_eva;
 static vm_offset_t pager_sva, pager_eva;
+static struct trapframe proc0_tf;
 
 static void
 cpu_startup(dummy)
@@ -428,6 +434,7 @@ again:
 	mp_start();			/* fire up the APs and APICs */
 	mp_announce();
 #endif  /* SMP */
+	cpu_setregs();
 }
 
 int
@@ -1078,6 +1085,22 @@ setregs(p, entry, stack, ps_strings)
       p->p_retval[1] = 0;
 }
 
+void
+cpu_setregs(void)
+{
+	unsigned int cr0;
+
+	cr0 = rcr0();
+	cr0 |= CR0_NE;			/* Done by npxinit() */
+	cr0 |= CR0_MP | CR0_TS;		/* Done at every execve() too. */
+#ifdef I386_CPU
+	if (cpu_class != CPUCLASS_386)
+#endif
+		cr0 |= CR0_WP | CR0_AM;
+	load_cr0(cr0);
+	load_gs(_udatasel);
+}
+
 static int
 sysctl_machdep_adjkerntz(SYSCTL_HANDLER_ARGS)
 {
@@ -1359,7 +1382,7 @@ extern inthand_t
 	IDTVEC(bnd), IDTVEC(ill), IDTVEC(dna), IDTVEC(fpusegm),
 	IDTVEC(tss), IDTVEC(missing), IDTVEC(stk), IDTVEC(prot),
 	IDTVEC(page), IDTVEC(mchk), IDTVEC(rsvd), IDTVEC(fpu), IDTVEC(align),
-	IDTVEC(syscall), IDTVEC(int0x80_syscall);
+	IDTVEC(xmm), IDTVEC(syscall), IDTVEC(int0x80_syscall);
 
 void
 sdtossd(sd, ssd)
@@ -1800,6 +1823,9 @@ init386(first)
 	if (bootinfo.bi_envp)
 		kern_envp = (caddr_t)bootinfo.bi_envp + KERNBASE;
 
+	/* Init basic tunables, hz etc */
+	init_param();
+
 	/*
 	 * make gdt memory segments, the code segment goes up to end of the
 	 * page with etext in it, the data segment goes to the end of
@@ -1888,6 +1914,7 @@ init386(first)
 	setidt(16, &IDTVEC(fpu),  SDT_SYS386TGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
 	setidt(17, &IDTVEC(align), SDT_SYS386TGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
 	setidt(18, &IDTVEC(mchk),  SDT_SYS386TGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
+	setidt(19, &IDTVEC(xmm), SDT_SYS386TGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
  	setidt(0x80, &IDTVEC(int0x80_syscall),
 			SDT_SYS386TGT, SEL_UPL, GSEL(GCODE_SEL, SEL_KPL));
 
@@ -1979,6 +2006,7 @@ init386(first)
 	proc0.p_addr->u_pcb.pcb_mpnest = 1;
 #endif
 	proc0.p_addr->u_pcb.pcb_ext = 0;
+	proc0.p_md.md_regs = &proc0_tf;
 }
 
 #if defined(I586_CPU) && !defined(NO_F00F_HACK)
@@ -2081,8 +2109,8 @@ int ptrace_write_u(p, off, data)
 		*(int*)((char *)p->p_addr + off) = data;
 		return (0);
 	}
-	min = offsetof(struct user, u_pcb) + offsetof(struct pcb, pcb_savefpu);
-	if (off >= min && off <= min + sizeof(struct save87) - sizeof(int)) {
+	min = offsetof(struct user, u_pcb) + offsetof(struct pcb, pcb_save);
+	if (off >= min && off <= min + sizeof(union savefpu) - sizeof(int)) {
 		*(int*)((char *)p->p_addr + off) = data;
 		return (0);
 	}
@@ -2150,12 +2178,73 @@ set_regs(p, regs)
 	return (0);
 }
 
+#ifdef CPU_ENABLE_SSE
+static void
+fill_fpregs_xmm(sv_xmm, sv_87)
+	struct savexmm *sv_xmm;
+	struct save87 *sv_87;
+{
+	register struct env87 *penv_87 = &sv_87->sv_env;
+	register struct envxmm *penv_xmm = &sv_xmm->sv_env;
+	int i;
+
+	/* FPU control/status */
+	penv_87->en_cw = penv_xmm->en_cw;
+	penv_87->en_sw = penv_xmm->en_sw;
+	penv_87->en_tw = penv_xmm->en_tw;
+	penv_87->en_fip = penv_xmm->en_fip;
+	penv_87->en_fcs = penv_xmm->en_fcs;
+	penv_87->en_opcode = penv_xmm->en_opcode;
+	penv_87->en_foo = penv_xmm->en_foo;
+	penv_87->en_fos = penv_xmm->en_fos;
+
+	/* FPU registers */
+	for (i = 0; i < 8; ++i)
+		sv_87->sv_ac[i] = sv_xmm->sv_fp[i].fp_acc;
+
+	sv_87->sv_ex_sw = sv_xmm->sv_ex_sw;
+}
+
+static void
+set_fpregs_xmm(sv_87, sv_xmm)
+	struct save87 *sv_87;
+	struct savexmm *sv_xmm;
+{
+	register struct env87 *penv_87 = &sv_87->sv_env;
+	register struct envxmm *penv_xmm = &sv_xmm->sv_env;
+	int i;
+
+	/* FPU control/status */
+	penv_xmm->en_cw = penv_87->en_cw;
+	penv_xmm->en_sw = penv_87->en_sw;
+	penv_xmm->en_tw = penv_87->en_tw;
+	penv_xmm->en_fip = penv_87->en_fip;
+	penv_xmm->en_fcs = penv_87->en_fcs;
+	penv_xmm->en_opcode = penv_87->en_opcode;
+	penv_xmm->en_foo = penv_87->en_foo;
+	penv_xmm->en_fos = penv_87->en_fos;
+
+	/* FPU registers */
+	for (i = 0; i < 8; ++i)
+		sv_xmm->sv_fp[i].fp_acc = sv_87->sv_ac[i];
+
+	sv_xmm->sv_ex_sw = sv_87->sv_ex_sw;
+}
+#endif /* CPU_ENABLE_SSE */
+
 int
 fill_fpregs(p, fpregs)
 	struct proc *p;
 	struct fpreg *fpregs;
 {
-	bcopy(&p->p_addr->u_pcb.pcb_savefpu, fpregs, sizeof *fpregs);
+#ifdef CPU_ENABLE_SSE
+	if (cpu_fxsr) {
+		fill_fpregs_xmm(&p->p_addr->u_pcb.pcb_save.sv_xmm,
+						(struct save87 *)fpregs);
+		return (0);
+	}
+#endif /* CPU_ENABLE_SSE */
+	bcopy(&p->p_addr->u_pcb.pcb_save.sv_87, fpregs, sizeof *fpregs);
 	return (0);
 }
 
@@ -2164,7 +2253,14 @@ set_fpregs(p, fpregs)
 	struct proc *p;
 	struct fpreg *fpregs;
 {
-	bcopy(fpregs, &p->p_addr->u_pcb.pcb_savefpu, sizeof *fpregs);
+#ifdef CPU_ENABLE_SSE
+	if (cpu_fxsr) {
+		set_fpregs_xmm((struct save87 *)fpregs,
+					   &p->p_addr->u_pcb.pcb_save.sv_xmm);
+		return (0);
+	}
+#endif /* CPU_ENABLE_SSE */
+	bcopy(fpregs, &p->p_addr->u_pcb.pcb_save.sv_87, sizeof *fpregs);
 	return (0);
 }
 
@@ -2175,15 +2271,27 @@ fill_dbregs(p, dbregs)
 {
 	struct pcb *pcb;
 
-	pcb = &p->p_addr->u_pcb;
-	dbregs->dr0 = pcb->pcb_dr0;
-	dbregs->dr1 = pcb->pcb_dr1;
-	dbregs->dr2 = pcb->pcb_dr2;
-	dbregs->dr3 = pcb->pcb_dr3;
-	dbregs->dr4 = 0;
-	dbregs->dr5 = 0;
-	dbregs->dr6 = pcb->pcb_dr6;
-	dbregs->dr7 = pcb->pcb_dr7;
+        if (p == NULL) {
+                dbregs->dr0 = rdr0();
+                dbregs->dr1 = rdr1();
+                dbregs->dr2 = rdr2();
+                dbregs->dr3 = rdr3();
+                dbregs->dr4 = rdr4();
+                dbregs->dr5 = rdr5();
+                dbregs->dr6 = rdr6();
+                dbregs->dr7 = rdr7();
+        }
+        else {
+                pcb = &p->p_addr->u_pcb;
+                dbregs->dr0 = pcb->pcb_dr0;
+                dbregs->dr1 = pcb->pcb_dr1;
+                dbregs->dr2 = pcb->pcb_dr2;
+                dbregs->dr3 = pcb->pcb_dr3;
+                dbregs->dr4 = 0;
+                dbregs->dr5 = 0;
+                dbregs->dr6 = pcb->pcb_dr6;
+                dbregs->dr7 = pcb->pcb_dr7;
+        }
 	return (0);
 }
 
@@ -2196,73 +2304,80 @@ set_dbregs(p, dbregs)
 	int i;
 	u_int32_t mask1, mask2;
 
-	/*
-	 * Don't let an illegal value for dr7 get set.  Specifically,
-	 * check for undefined settings.  Setting these bit patterns
-	 * result in undefined behaviour and can lead to an unexpected
-	 * TRCTRAP.
-	 */
-	for (i = 0, mask1 = 0x3<<16, mask2 = 0x2<<16; i < 8; 
-	     i++, mask1 <<= 2, mask2 <<= 2)
-		if ((dbregs->dr7 & mask1) == mask2)
-			return (EINVAL);
-
-	if (dbregs->dr7 & 0x0000fc00)
-		return (EINVAL);
-
-
-
-	pcb = &p->p_addr->u_pcb;
-
-	/*
-	 * Don't let a process set a breakpoint that is not within the
-	 * process's address space.  If a process could do this, it
-	 * could halt the system by setting a breakpoint in the kernel
-	 * (if ddb was enabled).  Thus, we need to check to make sure
-	 * that no breakpoints are being enabled for addresses outside
-	 * process's address space, unless, perhaps, we were called by
-	 * uid 0.
-	 *
-	 * XXX - what about when the watched area of the user's
-	 * address space is written into from within the kernel
-	 * ... wouldn't that still cause a breakpoint to be generated
-	 * from within kernel mode?
-	 */
-
-	if (p->p_ucred->cr_uid != 0) {
-		if (dbregs->dr7 & 0x3) {
-			/* dr0 is enabled */
-			if (dbregs->dr0 >= VM_MAXUSER_ADDRESS)
-				return (EINVAL);
-		}
-
-		if (dbregs->dr7 & (0x3<<2)) {
-			/* dr1 is enabled */
-			if (dbregs->dr1 >= VM_MAXUSER_ADDRESS)
-				return (EINVAL);
-		}
-
-		if (dbregs->dr7 & (0x3<<4)) {
-			/* dr2 is enabled */
-			if (dbregs->dr2 >= VM_MAXUSER_ADDRESS)
-       				return (EINVAL);
-		}
-
-		if (dbregs->dr7 & (0x3<<6)) {
-			/* dr3 is enabled */
-			if (dbregs->dr3 >= VM_MAXUSER_ADDRESS)
-				return (EINVAL);
-		}
+	if (p == NULL) {
+		load_dr0(dbregs->dr0);
+		load_dr1(dbregs->dr1);
+		load_dr2(dbregs->dr2);
+		load_dr3(dbregs->dr3);
+		load_dr4(dbregs->dr4);
+		load_dr5(dbregs->dr5);
+		load_dr6(dbregs->dr6);
+		load_dr7(dbregs->dr7);
 	}
-
-	pcb->pcb_dr0 = dbregs->dr0;
-	pcb->pcb_dr1 = dbregs->dr1;
-	pcb->pcb_dr2 = dbregs->dr2;
-	pcb->pcb_dr3 = dbregs->dr3;
-	pcb->pcb_dr6 = dbregs->dr6;
-	pcb->pcb_dr7 = dbregs->dr7;
-
-	pcb->pcb_flags |= PCB_DBREGS;
+	else {
+		/*
+		 * Don't let an illegal value for dr7 get set.	Specifically,
+		 * check for undefined settings.  Setting these bit patterns
+		 * result in undefined behaviour and can lead to an unexpected
+		 * TRCTRAP.
+		 */
+		for (i = 0, mask1 = 0x3<<16, mask2 = 0x2<<16; i < 8; 
+		     i++, mask1 <<= 2, mask2 <<= 2)
+			if ((dbregs->dr7 & mask1) == mask2)
+				return (EINVAL);
+		
+		pcb = &p->p_addr->u_pcb;
+		
+		/*
+		 * Don't let a process set a breakpoint that is not within the
+		 * process's address space.  If a process could do this, it
+		 * could halt the system by setting a breakpoint in the kernel
+		 * (if ddb was enabled).  Thus, we need to check to make sure
+		 * that no breakpoints are being enabled for addresses outside
+		 * process's address space, unless, perhaps, we were called by
+		 * uid 0.
+		 *
+		 * XXX - what about when the watched area of the user's
+		 * address space is written into from within the kernel
+		 * ... wouldn't that still cause a breakpoint to be generated
+		 * from within kernel mode?
+		 */
+		
+		if (suser(p) != 0) {
+			if (dbregs->dr7 & 0x3) {
+				/* dr0 is enabled */
+				if (dbregs->dr0 >= VM_MAXUSER_ADDRESS)
+					return (EINVAL);
+			}
+			
+			if (dbregs->dr7 & (0x3<<2)) {
+				/* dr1 is enabled */
+				if (dbregs->dr1 >= VM_MAXUSER_ADDRESS)
+					return (EINVAL);
+			}
+			
+			if (dbregs->dr7 & (0x3<<4)) {
+				/* dr2 is enabled */
+				if (dbregs->dr2 >= VM_MAXUSER_ADDRESS)
+					return (EINVAL);
+			}
+			
+			if (dbregs->dr7 & (0x3<<6)) {
+				/* dr3 is enabled */
+				if (dbregs->dr3 >= VM_MAXUSER_ADDRESS)
+					return (EINVAL);
+			}
+		}
+		
+		pcb->pcb_dr0 = dbregs->dr0;
+		pcb->pcb_dr1 = dbregs->dr1;
+		pcb->pcb_dr2 = dbregs->dr2;
+		pcb->pcb_dr3 = dbregs->dr3;
+		pcb->pcb_dr6 = dbregs->dr6;
+		pcb->pcb_dr7 = dbregs->dr7;
+		
+		pcb->pcb_flags |= PCB_DBREGS;
+	}
 
 	return (0);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.223 2001/09/25 07:08:30 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.224 2001/09/26 06:13:02 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2484,6 +2484,7 @@ ip6_lasthdr(m, off, proto, nxtp)
 	}
 }
 
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 void
 pfctlinput2(cmd, sa, ctlparam)
 	int cmd;
@@ -2509,6 +2510,7 @@ pfctlinput2(cmd, sa, ctlparam)
 				(*pr->pr_ctlinput)(cmd, sa, ctlparam);
 	}
 }
+#endif
 
 struct mbuf *
 ip6_addaux(m)

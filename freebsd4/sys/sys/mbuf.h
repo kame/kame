@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mbuf.h	8.5 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/mbuf.h,v 1.44.2.8 2001/02/04 14:49:59 dwmalone Exp $
+ * $FreeBSD: src/sys/sys/mbuf.h,v 1.44.2.10 2001/07/03 11:02:01 ume Exp $
  */
 
 #ifndef _SYS_MBUF_H_
@@ -594,6 +594,7 @@ void	m_freem __P((struct mbuf *));
 struct	mbuf *m_get __P((int, int));
 struct	mbuf *m_getclr __P((int, int));
 struct	mbuf *m_gethdr __P((int, int));
+struct	mbuf *m_getm __P((struct mbuf *, int, int, int));
 int	m_mballoc __P((int, int));
 struct	mbuf *m_mballoc_wait __P((int, int));
 struct	mbuf *m_prepend __P((struct mbuf *,int,int));

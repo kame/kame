@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sf.c,v 1.18.2.5 2001/01/22 19:13:16 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_sf.c,v 1.18.2.7 2001/08/16 20:35:04 wpaul Exp $
  */
 
 /*
@@ -120,7 +120,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_sf.c,v 1.18.2.5 2001/01/22 19:13:16 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_sf.c,v 1.18.2.7 2001/08/16 20:35:04 wpaul Exp $";
 #endif
 
 static struct sf_type sf_devs[] = {
@@ -169,6 +169,7 @@ static void sf_miibus_statchg	__P((device_t));
 
 static u_int32_t csr_read_4	__P((struct sf_softc *, int));
 static void csr_write_4		__P((struct sf_softc *, int, u_int32_t));
+static void sf_txthresh_adjust	__P((struct sf_softc *));
 
 #ifdef SF_USEIOSPACE
 #define SF_RES			SYS_RES_IOPORT
@@ -824,8 +825,7 @@ static int sf_attach(dev)
 	ifp->if_watchdog = sf_watchdog;
 	ifp->if_init = sf_init;
 	ifp->if_baudrate = 10000000;
-	IFQ_SET_MAXLEN(&ifp->if_snd, SF_TX_DLIST_CNT - 1);
-	IFQ_SET_READY(&ifp->if_snd);
+	ifp->if_snd.ifq_maxlen = SF_TX_DLIST_CNT - 1;
 
 	/*
 	 * Call MI attach routine.
@@ -1053,18 +1053,22 @@ static void sf_txeof(sc)
 	while (cmpconsidx != cmpprodidx) {
 		cur_cmp = &sc->sf_ldata->sf_tx_clist[cmpconsidx];
 		cur_tx = &sc->sf_ldata->sf_tx_dlist[cur_cmp->sf_index >> 7];
-		SF_INC(cmpconsidx, SF_TX_CLIST_CNT);
 
 		if (cur_cmp->sf_txstat & SF_TXSTAT_TX_OK)
 			ifp->if_opackets++;
-		else
+		else {
+			if (cur_cmp->sf_txstat & SF_TXSTAT_TX_UNDERRUN)
+				sf_txthresh_adjust(sc);
 			ifp->if_oerrors++;
+		}
 
 		sc->sf_tx_cnt--;
 		if (cur_tx->sf_mbuf != NULL) {
 			m_freem(cur_tx->sf_mbuf);
 			cur_tx->sf_mbuf = NULL;
-		}
+		} else
+			break;
+		SF_INC(cmpconsidx, SF_TX_CLIST_CNT);
 	}
 
 	ifp->if_timer = 0;
@@ -1073,6 +1077,29 @@ static void sf_txeof(sc)
 	csr_write_4(sc, SF_CQ_CONSIDX,
 	    (txcons & ~SF_CQ_CONSIDX_TXQ) |
 	    ((cmpconsidx << 16) & 0xFFFF0000));
+
+	return;
+}
+
+static void sf_txthresh_adjust(sc)
+	struct sf_softc		*sc;
+{
+	u_int32_t		txfctl;
+	u_int8_t		txthresh;
+
+	txfctl = csr_read_4(sc, SF_TX_FRAMCTL);
+	txthresh = txfctl & SF_TXFRMCTL_TXTHRESH;
+	if (txthresh < 0xFF) {
+		txthresh++;
+		txfctl &= ~SF_TXFRMCTL_TXTHRESH;
+		txfctl |= txthresh;
+#ifdef DIAGNOSTIC
+		printf("sf%d: tx underrun, increasing "
+		    "tx threshold to %d bytes\n",
+		    sc->sf_unit, txthresh * 4);
+#endif
+		csr_write_4(sc, SF_TX_FRAMCTL, txfctl);
+	}
 
 	return;
 }
@@ -1104,8 +1131,13 @@ static void sf_intr(arg)
 		if (status & SF_ISR_RXDQ1_DMADONE)
 			sf_rxeof(sc);
 
-		if (status & SF_ISR_TX_TXDONE)
+		if (status & SF_ISR_TX_TXDONE ||
+		    status & SF_ISR_TX_DMADONE ||
+		    status & SF_ISR_TX_QUEUEDONE)
 			sf_txeof(sc);
+
+		if (status & SF_ISR_TX_LOFIFO)
+			sf_txthresh_adjust(sc);
 
 		if (status & SF_ISR_ABNORMALINTR) {
 			if (status & SF_ISR_STATSOFLOW) {
@@ -1120,7 +1152,7 @@ static void sf_intr(arg)
 	/* Re-enable interrupts. */
 	csr_write_4(sc, SF_IMR, SF_INTRS);
 
-	if (!IFQ_IS_EMPTY(&ifp->if_snd))
+	if (ifp->if_snd.ifq_head != NULL)
 		sf_start(ifp);
 
 	return;
@@ -1314,7 +1346,7 @@ static void sf_start(ifp)
 
 	sc = ifp->if_softc;
 
-	if (!sc->sf_link)
+	if (!sc->sf_link && ifp->if_snd.ifq_len < 10)
 		return;
 
 	if (ifp->if_flags & IFF_OACTIVE)
@@ -1323,25 +1355,30 @@ static void sf_start(ifp)
 	txprod = csr_read_4(sc, SF_TXDQ_PRODIDX);
 	i = SF_IDX_HI(txprod) >> 4;
 
+	if (sc->sf_ldata->sf_tx_dlist[i].sf_mbuf != NULL) {
+		printf("sf%d: TX ring full, resetting\n", sc->sf_unit);
+		sf_init(sc);
+		txprod = csr_read_4(sc, SF_TXDQ_PRODIDX);
+		i = SF_IDX_HI(txprod) >> 4;
+	}
+
 	while(sc->sf_ldata->sf_tx_dlist[i].sf_mbuf == NULL) {
-		if (sc->sf_tx_cnt == (SF_TX_DLIST_CNT - 2)) {
+		if (sc->sf_tx_cnt >= (SF_TX_DLIST_CNT - 5)) {
 			ifp->if_flags |= IFF_OACTIVE;
 			cur_tx = NULL;
 			break;
 		}
-		IFQ_POLL(&ifp->if_snd, m_head);
+		IF_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
 		cur_tx = &sc->sf_ldata->sf_tx_dlist[i];
 		if (sf_encap(sc, cur_tx, m_head)) {
+			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			cur_tx = NULL;
 			break;
 		}
-
-		/* now we are committed to transmit the packet */
-		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -1352,6 +1389,11 @@ static void sf_start(ifp)
 
 		SF_INC(i, SF_TX_DLIST_CNT);
 		sc->sf_tx_cnt++;
+		/*
+		 * Don't get the TX DMA queue get too full.
+		 */
+		if (sc->sf_tx_cnt > 64)
+			break;
 	}
 
 	if (cur_tx == NULL)
@@ -1450,7 +1492,8 @@ static void sf_stats_update(xsc)
 		if (mii->mii_media_status & IFM_ACTIVE &&
 		    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE)
 			sc->sf_link++;
-			if (!IFQ_IS_EMPTY(&ifp->if_snd))
+			/* XXX strange indentation.  bug?? */
+			if (ifp->if_snd.ifq_head != NULL)
 				sf_start(ifp);
 	}
 
@@ -1475,7 +1518,7 @@ static void sf_watchdog(ifp)
 	sf_reset(sc);
 	sf_init(sc);
 
-	if (!IFQ_IS_EMPTY(&ifp->if_snd))
+	if (ifp->if_snd.ifq_head != NULL)
 		sf_start(ifp);
 
 	return;

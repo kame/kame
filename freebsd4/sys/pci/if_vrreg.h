@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_vrreg.h,v 1.7.2.1 2000/07/05 21:43:59 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_vrreg.h,v 1.7.2.2 2001/05/14 19:13:43 wpaul Exp $
  */
 
 /*
@@ -79,6 +79,7 @@
 #define VR_CONFIG		0x78
 #define VR_MPA_CNT		0x7C
 #define VR_CRC_CNT		0x7E
+#define VR_STICKHW		0x83
 
 /*
  * RX config bits.
@@ -268,6 +269,13 @@
 #define VR_CFG_PCIREADLINE	0x20000000
 #define VR_CFG_DIAG		0x40000000
 #define VR_CFG_GPIOEN		0x80000000
+
+/* Sticky HW bits */
+#define VR_STICKHW_DS0		0x01
+#define VR_STICKHW_DS1		0x02
+#define VR_STICKHW_WOL_ENB	0x04
+#define VR_STICKHW_WOL_STS	0x08
+#define VR_STICKHW_LEGWOL_ENB	0x80
 
 /*
  * Rhine TX/RX list structure.

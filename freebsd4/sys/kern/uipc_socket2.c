@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_socket2.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/kern/uipc_socket2.c,v 1.55.2.8 2001/02/04 14:49:45 dwmalone Exp $
+ * $FreeBSD: src/sys/kern/uipc_socket2.c,v 1.55.2.9 2001/07/26 18:53:02 peter Exp $
  */
 
 #include "opt_param.h"
@@ -1010,7 +1010,7 @@ SYSCTL_INT(_kern_ipc, KIPC_SOCKBUF_WASTE, sockbuf_waste_factor, CTLFLAG_RW,
  */
 static void init_maxsockets(void *ignored)
 {
-    TUNABLE_INT_FETCH("kern.ipc.maxsockets", 0, maxsockets);
+    TUNABLE_INT_FETCH("kern.ipc.maxsockets", &maxsockets);
     maxsockets = imax(maxsockets, imax(maxfiles, nmbclusters));
 }
 SYSINIT(param, SI_SUB_TUNABLES, SI_ORDER_ANY, init_maxsockets, NULL);

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)tcp_usrreq.c	8.2 (Berkeley) 1/3/94
- * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.51.2.3 2001/04/18 17:55:24 kris Exp $
+ * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.51.2.9 2001/08/22 00:59:12 silby Exp $
  */
 
 #include "opt_ipsec.h"
@@ -746,12 +746,6 @@ tcp_connect(tp, nam, p)
 	inp->inp_fport = sin->sin_port;
 	in_pcbrehash(inp);
 
-	tp->t_template = tcp_template(tp);
-	if (tp->t_template == 0) {
-		in_pcbdisconnect(inp);
-		return ENOBUFS;
-	}
-
 	/* Compute window scaling to request.  */
 	while (tp->request_r_scale < TCP_MAX_WINSHIFT &&
 	    (TCP_MAXWIN << tp->request_r_scale) < so->so_rcv.sb_hiwat)
@@ -761,12 +755,7 @@ tcp_connect(tp, nam, p)
 	tcpstat.tcps_connattempt++;
 	tp->t_state = TCPS_SYN_SENT;
 	callout_reset(tp->tt_keep, tcp_keepinit, tcp_timer_keep, tp);
-#ifdef TCP_COMPAT_42
-	tp->iss = tcp_iss;
-	tcp_iss += TCP_ISSINCR/2;
-#else  /* TCP_COMPAT_42 */
-	tp->iss = tcp_rndiss_next();
-#endif /* !TCP_COMPAT_42 */
+	tp->iss = tcp_new_isn(tp);
 	tcp_sendseqinit(tp);
 
 	/*
@@ -843,12 +832,6 @@ tcp6_connect(tp, nam, p)
 		inp->in6p_flowinfo = sin6->sin6_flowinfo;
 	in_pcbrehash(inp);
 
-	tp->t_template = tcp_template(tp);
-	if (tp->t_template == 0) {
-		in6_pcbdisconnect(inp);
-		return ENOBUFS;
-	}
-
 	/* Compute window scaling to request.  */
 	while (tp->request_r_scale < TCP_MAX_WINSHIFT &&
 	    (TCP_MAXWIN << tp->request_r_scale) < so->so_rcv.sb_hiwat)
@@ -858,11 +841,7 @@ tcp6_connect(tp, nam, p)
 	tcpstat.tcps_connattempt++;
 	tp->t_state = TCPS_SYN_SENT;
 	callout_reset(tp->tt_keep, tcp_keepinit, tcp_timer_keep, tp);
-#ifdef TCP_COMPAT_42
-	tp->iss = tcp_iss; tcp_iss += TCP_ISSINCR/2;
-#else
-	tp->iss = tcp_rndiss_next();
-#endif /* TCP_COMPAT_42 */
+	tp->iss = tcp_new_isn(tp);
 	tcp_sendseqinit(tp);
 
 	/*

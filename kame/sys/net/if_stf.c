@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.64 2001/08/30 10:06:09 keiichi Exp $	*/
+/*	$KAME: if_stf.c,v 1.65 2001/09/26 06:13:02 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -76,6 +76,7 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_global.h"
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
@@ -128,11 +129,12 @@
 
 #include <net/net_osdep.h>
 
+#ifndef __FreeBSD__
+#include "bpfilter.h"
+#endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 #include "bpf.h"
 #define NBPFILTER	NBPF
-#else
-#include "bpfilter.h"
 #endif
 #include "stf.h"
 #include "gif.h"	/*XXX*/
@@ -176,7 +178,11 @@ static int ip_gif_ttl = 40;	/*XXX*/
 
 extern struct protosw in_stf_protosw;
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+static int stfmodevent __P((module_t, int, void *));
+
+static MALLOC_DEFINE(M_STF, "stf", "6to4 Tunnel Interface");
+#elif defined(__FreeBSD__) && __FreeBSD < 4
 void stfattach __P((void *));
 #else
 void stfattach __P((int));
@@ -200,6 +206,71 @@ static int stf_ioctl __P((struct ifnet *, int, caddr_t));
 static int stf_ioctl __P((struct ifnet *, u_long, caddr_t));
 #endif
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+static int
+stfmodevent(mod, type, data)
+	module_t mod;
+	int type;
+	void *data;
+{
+	struct stf_softc *sc;
+	int err;
+	const struct encaptab *p;
+
+	switch (type) {
+	case MOD_LOAD:
+		stf = malloc(sizeof(struct stf_softc), M_STF, M_WAITOK);
+		bzero(stf, sizeof(struct stf_softc));
+		sc = stf;
+
+		bzero(sc, sizeof(*sc));
+		sc->sc_if.if_name = "stf";
+		sc->sc_if.if_unit = 0;
+
+		p = encap_attach_func(AF_INET, IPPROTO_IPV6, stf_encapcheck,
+		    &in_stf_protosw, sc);
+		if (p == NULL) {
+			printf("%s: attach failed\n", if_name(&sc->sc_if));
+			return (ENOMEM);
+		}
+		sc->encap_cookie = p;
+
+		sc->sc_if.if_mtu    = IPV6_MMTU;
+		sc->sc_if.if_flags  = 0;
+		sc->sc_if.if_ioctl  = stf_ioctl;
+		sc->sc_if.if_output = stf_output;
+		sc->sc_if.if_type   = IFT_STF;
+#if 0
+		/* turn off ingress filter */
+		sc->sc_if.if_flags  |= IFF_LINK2;
+#endif
+		sc->sc_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
+		if_attach(&sc->sc_if);
+#ifdef HAVE_OLD_BPF
+		bpfattach(&sc->sc_if, DLT_NULL, sizeof(u_int));
+#else
+		bpfattach(&sc->sc_if.if_bpf, &sc->sc_if, DLT_NULL, sizeof(u_int));
+#endif
+		break;
+	case MOD_UNLOAD:
+		sc = stf;
+		bpfdetach(&sc->sc_if);
+		if_detach(&sc->sc_if);
+		err = encap_detach(sc->encap_cookie);
+		KASSERT(err == 0, ("Unexpected error detaching encap_cookie"));
+		free(sc, M_STF);
+		break;
+	}
+
+	return (0);
+}
+
+static moduledata_t stf_mod = {
+	"if_stf",
+	stfmodevent,
+	0
+};
+#else
 void
 stfattach(dummy)
 #ifdef __FreeBSD__
@@ -261,9 +332,14 @@ stfattach(dummy)
 #endif
 	}
 }
+#endif
 
 #ifdef __FreeBSD__
+#if __FreeBSD__ >= 4
+DECLARE_MODULE(if_stf, stf_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
+#else
 PSEUDO_SET(stfattach, if_stf);
+#endif
 #endif
 
 static int

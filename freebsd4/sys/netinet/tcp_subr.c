@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_subr.c	8.2 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_subr.c,v 1.73.2.13 2001/04/18 17:55:23 kris Exp $
+ * $FreeBSD: src/sys/netinet/tcp_subr.c,v 1.73.2.22 2001/08/22 00:59:12 silby Exp $
  */
 
 #include "opt_compat.h"
@@ -95,6 +95,7 @@
 #endif /*IPSEC*/
 
 #include <machine/in_cksum.h>
+#include <sys/md5.h>
 
 int 	tcp_mssdflt = TCP_MSS;
 SYSCTL_INT(_net_inet_tcp, TCPCTL_MSSDFLT, mssdflt, CTLFLAG_RW, 
@@ -135,6 +136,14 @@ SYSCTL_INT(_net_inet_tcp, OID_AUTO, pcbcount, CTLFLAG_RD,
 static int	icmp_may_rst = 1;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, icmp_may_rst, CTLFLAG_RW, &icmp_may_rst, 0, 
     "Certain ICMP unreachable messages may abort connections in SYN_SENT");
+
+static int	tcp_strict_rfc1948 = 0;
+SYSCTL_INT(_net_inet_tcp, OID_AUTO, strict_rfc1948, CTLFLAG_RW,
+    &tcp_strict_rfc1948, 0, "Determines if RFC1948 is followed exactly");
+
+static int	tcp_isn_reseed_interval = 0;
+SYSCTL_INT(_net_inet_tcp, OID_AUTO, isn_reseed_interval, CTLFLAG_RW,
+    &tcp_isn_reseed_interval, 0, "Seconds between reseeding of ISN secret");
 
 static void	tcp_cleartaocache __P((void));
 static void	tcp_notify __P((struct inpcb *, int));
@@ -177,11 +186,8 @@ struct	inp_tp {
 void
 tcp_init()
 {
-	int hashsize;
+	int hashsize = TCBHASHSIZE;
 	
-#ifdef TCP_COMPAT_42
-	tcp_iss = 1;		/* wrong */
-#endif /* TCP_COMPAT_42 */
 	tcp_ccgen = 1;
 	tcp_cleartaocache();
 
@@ -194,7 +200,7 @@ tcp_init()
 
 	LIST_INIT(&tcb);
 	tcbinfo.listhead = &tcb;
-	TUNABLE_INT_FETCH("net.inet.tcp.tcbhashsize", TCBHASHSIZE, hashsize);
+	TUNABLE_INT_FETCH("net.inet.tcp.tcbhashsize", &hashsize);
 	if (!powerof2(hashsize)) {
 		printf("WARNING: TCB hash size not a power of 2\n");
 		hashsize = 512; /* safe default */
@@ -218,31 +224,24 @@ tcp_init()
 }
 
 /*
- * Create template to be used to send tcp packets on a connection.
- * Call after host entry created, allocates an mbuf and fills
- * in a skeletal tcp/ip header, minimizing the amount of work
- * necessary when the connection is used.
+ * Fill in the IP and TCP headers for an outgoing packet, given the tcpcb.
+ * tcp_template used to store this data in mbufs, but we now recopy it out
+ * of the tcpcb each time to conserve mbufs.
  */
-struct tcptemp *
-tcp_template(tp)
+void
+tcp_fillheaders(tp, ip_ptr, tcp_ptr)
 	struct tcpcb *tp;
+	void *ip_ptr;
+	void *tcp_ptr;
 {
-	register struct inpcb *inp = tp->t_inpcb;
-	register struct mbuf *m;
-	register struct tcptemp *n;
+	struct inpcb *inp = tp->t_inpcb;
+	struct tcphdr *tcp_hdr = (struct tcphdr *)tcp_ptr;
 
-	if ((n = tp->t_template) == 0) {
-		m = m_get(M_DONTWAIT, MT_HEADER);
-		if (m == NULL)
-			return (0);
-		m->m_len = sizeof (struct tcptemp);
-		n = mtod(m, struct tcptemp *);
-	}
 #ifdef INET6
 	if ((inp->inp_vflag & INP_IPV6) != 0) {
-		register struct ip6_hdr *ip6;
+		struct ip6_hdr *ip6;
 
-		ip6 = (struct ip6_hdr *)n->tt_ipgen;
+		ip6 = (struct ip6_hdr *)ip_ptr;
 		ip6->ip6_flow = (ip6->ip6_flow & ~IPV6_FLOWINFO_MASK) |
 			(inp->in6p_flowinfo & IPV6_FLOWINFO_MASK);
 		ip6->ip6_vfc = (ip6->ip6_vfc & ~IPV6_VERSION_MASK) |
@@ -251,29 +250,56 @@ tcp_template(tp)
 		ip6->ip6_plen = sizeof(struct tcphdr);
 		ip6->ip6_src = inp->in6p_laddr;
 		ip6->ip6_dst = inp->in6p_faddr;
-		n->tt_t.th_sum = 0;
+		tcp_hdr->th_sum = 0;
 	} else
 #endif
-      {
-	struct ip *ip = (struct ip *)n->tt_ipgen;
+	{
+	struct ip *ip = (struct ip *) ip_ptr;
 
-	bzero(ip, sizeof(struct ip));		/* XXX overkill? */
 	ip->ip_vhl = IP_VHL_BORING;
+	ip->ip_tos = 0;
+	ip->ip_len = 0;
+	ip->ip_id = 0;
+	ip->ip_off = 0;
+	ip->ip_ttl = 0;
+	ip->ip_sum = 0;
 	ip->ip_p = IPPROTO_TCP;
 	ip->ip_src = inp->inp_laddr;
 	ip->ip_dst = inp->inp_faddr;
-	n->tt_t.th_sum = in_pseudo(ip->ip_src.s_addr, ip->ip_dst.s_addr,
-	    htons(sizeof(struct tcphdr) + IPPROTO_TCP));
-      }
-	n->tt_t.th_sport = inp->inp_lport;
-	n->tt_t.th_dport = inp->inp_fport;
-	n->tt_t.th_seq = 0;
-	n->tt_t.th_ack = 0;
-	n->tt_t.th_x2 = 0;
-	n->tt_t.th_off = 5;
-	n->tt_t.th_flags = 0;
-	n->tt_t.th_win = 0;
-	n->tt_t.th_urp = 0;
+	tcp_hdr->th_sum = in_pseudo(ip->ip_src.s_addr, ip->ip_dst.s_addr,
+		htons(sizeof(struct tcphdr) + IPPROTO_TCP));
+	}
+
+	tcp_hdr->th_sport = inp->inp_lport;
+	tcp_hdr->th_dport = inp->inp_fport;
+	tcp_hdr->th_seq = 0;
+	tcp_hdr->th_ack = 0;
+	tcp_hdr->th_x2 = 0;
+	tcp_hdr->th_off = 5;
+	tcp_hdr->th_flags = 0;
+	tcp_hdr->th_win = 0;
+	tcp_hdr->th_urp = 0;
+}
+
+/*
+ * Create template to be used to send tcp packets on a connection.
+ * Allocates an mbuf and fills in a skeletal tcp/ip header.  The only
+ * use for this function is in keepalives, which use tcp_respond.
+ */
+struct tcptemp *
+tcp_maketemplate(tp)
+	struct tcpcb *tp;
+{
+	struct mbuf *m;
+	struct tcptemp *n;
+
+	m = m_get(M_DONTWAIT, MT_HEADER);
+	if (m == NULL)
+		return (0);
+	m->m_len = sizeof(struct tcptemp);
+	n = mtod(m, struct tcptemp *);
+
+	tcp_fillheaders(tp, (void *)&n->tt_ipgen, (void *)&n->tt_t);
 	return (n);
 }
 
@@ -282,10 +308,9 @@ tcp_template(tp)
  * the given TCP/IP header.  If m == 0, then we make a copy
  * of the tcpiphdr at ti and send directly to the addressed host.
  * This is used to force keep alive messages out using the TCP
- * template for a connection tp->t_template.  If flags are given
- * then we send a message back to the TCP which originated the
- * segment ti, and discard the mbuf containing it and any other
- * attached mbufs.
+ * template for a connection.  If flags are given then we send
+ * a message back to the TCP which originated the * segment ti,
+ * and discard the mbuf containing it and any other attached mbufs.
  *
  * In any case the ack and sequence number of the transmitted
  * segment are as specified by the parameters.
@@ -354,11 +379,7 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 		m = m_gethdr(M_DONTWAIT, MT_HEADER);
 		if (m == NULL)
 			return;
-#ifdef TCP_COMPAT_42
-		tlen = 1;
-#else
 		tlen = 0;
-#endif
 		m->m_data += max_linkhdr;
 #ifdef INET6
 		if (isipv6) {
@@ -710,8 +731,6 @@ tcp_close(tp)
 		m_freem(q->tqe_m);
 		FREE(q, M_TSEGQ);
 	}
-	if (tp->t_template)
-		(void) m_free(dtom(tp->t_template));
 	inp->inp_ppcb = NULL;
 	soisdisconnected(so);
 #ifdef INET6
@@ -1083,62 +1102,100 @@ tcp6_ctlinput(cmd, sa, d)
 }
 #endif /* INET6 */
 
-#define TCP_RNDISS_ROUNDS	16
-#define TCP_RNDISS_OUT	7200
-#define TCP_RNDISS_MAX	30000
+/*
+ * Following is where TCP initial sequence number generation occurs.
+ *
+ * There are two places where we must use initial sequence numbers:
+ * 1.  In SYN-ACK packets.
+ * 2.  In SYN packets.
+ *
+ * The ISNs in SYN-ACK packets have no monotonicity requirement, 
+ * and should be as unpredictable as possible to avoid the possibility
+ * of spoofing and/or connection hijacking.  To satisfy this
+ * requirement, SYN-ACK ISNs are generated via the arc4random()
+ * function.  If exact RFC 1948 compliance is requested via sysctl,
+ * these ISNs will be generated just like those in SYN packets.
+ *
+ * The ISNs in SYN packets must be monotonic; TIME_WAIT recycling
+ * depends on this property.  In addition, these ISNs should be
+ * unguessable so as to prevent connection hijacking.  To satisfy
+ * the requirements of this situation, the algorithm outlined in
+ * RFC 1948 is used to generate sequence numbers.
+ *
+ * For more information on the theory of operation, please see
+ * RFC 1948.
+ *
+ * Implementation details:
+ *
+ * Time is based off the system timer, and is corrected so that it
+ * increases by one megabyte per second.  This allows for proper
+ * recycling on high speed LANs while still leaving over an hour
+ * before rollover.
+ *
+ * Two sysctls control the generation of ISNs:
+ *
+ * net.inet.tcp.isn_reseed_interval controls the number of seconds
+ * between seeding of isn_secret.  This is normally set to zero,
+ * as reseeding should not be necessary.
+ *
+ * net.inet.tcp.strict_rfc1948 controls whether RFC 1948 is followed
+ * strictly.  When strict compliance is requested, reseeding is
+ * disabled and SYN-ACKs will be generated in the same manner as
+ * SYNs.  Strict mode is disabled by default.
+ *
+ */
 
-u_int8_t tcp_rndiss_sbox[128];
-u_int16_t tcp_rndiss_msb;
-u_int16_t tcp_rndiss_cnt;
-long tcp_rndiss_reseed;
+#define ISN_BYTES_PER_SECOND 1048576
 
-u_int16_t
-tcp_rndiss_encrypt(val)
-	u_int16_t val;
-{
-	u_int16_t sum = 0, i;
-  
-	for (i = 0; i < TCP_RNDISS_ROUNDS; i++) {
-		sum += 0x79b9;
-		val ^= ((u_int16_t)tcp_rndiss_sbox[(val^sum) & 0x7f]) << 7;
-		val = ((val & 0xff) << 7) | (val >> 8);
-	}
-
-	return val;
-}
-
-void
-tcp_rndiss_init()
-{
-	struct timeval time;
-
-	getmicrotime(&time);
-	read_random_unlimited(tcp_rndiss_sbox, sizeof(tcp_rndiss_sbox));
-
-	tcp_rndiss_reseed = time.tv_sec + TCP_RNDISS_OUT;
-	tcp_rndiss_msb = tcp_rndiss_msb == 0x8000 ? 0 : 0x8000; 
-	tcp_rndiss_cnt = 0;
-}
+u_char isn_secret[32];
+int isn_last_reseed;
+MD5_CTX isn_ctx;
 
 tcp_seq
-tcp_rndiss_next()
+tcp_new_isn(tp)
+	struct tcpcb *tp;
 {
-	u_int32_t tmp;
-	struct timeval time;
+	u_int32_t md5_buffer[4];
+	tcp_seq new_isn;
 
-	getmicrotime(&time);
+	/* Use arc4random for SYN-ACKs when not in exact RFC1948 mode. */
+	if (((tp->t_state == TCPS_LISTEN) || (tp->t_state == TCPS_TIME_WAIT))
+	   && tcp_strict_rfc1948 == 0)
+		return arc4random();
 
-        if (tcp_rndiss_cnt >= TCP_RNDISS_MAX ||
-	    time.tv_sec > tcp_rndiss_reseed)
-                tcp_rndiss_init();
-	
-	tmp = arc4random();
-
-	/* (tmp & 0x7fff) ensures a 32768 byte gap between ISS */
-	return ((tcp_rndiss_encrypt(tcp_rndiss_cnt++) | tcp_rndiss_msb) <<16) |
-		(tmp & 0x7fff);
+	/* Seed if this is the first use, reseed if requested. */
+	if ((isn_last_reseed == 0) ||
+	    ((tcp_strict_rfc1948 == 0) && (tcp_isn_reseed_interval > 0) &&
+	     (((u_int)isn_last_reseed + (u_int)tcp_isn_reseed_interval*hz)
+		< (u_int)ticks))) {
+		read_random_unlimited(&isn_secret, sizeof(isn_secret));
+		isn_last_reseed = ticks;
+	}
+		
+	/* Compute the md5 hash and return the ISN. */
+	MD5Init(&isn_ctx);
+	MD5Update(&isn_ctx, (u_char *) &tp->t_inpcb->inp_fport, sizeof(u_short));
+	MD5Update(&isn_ctx, (u_char *) &tp->t_inpcb->inp_lport, sizeof(u_short));
+#ifdef INET6
+	if ((tp->t_inpcb->inp_vflag & INP_IPV6) != 0) {
+		MD5Update(&isn_ctx, (u_char *) &tp->t_inpcb->in6p_faddr,
+			  sizeof(struct in6_addr));
+		MD5Update(&isn_ctx, (u_char *) &tp->t_inpcb->in6p_laddr,
+			  sizeof(struct in6_addr));
+	} else
+#endif
+	{
+		MD5Update(&isn_ctx, (u_char *) &tp->t_inpcb->inp_faddr,
+			  sizeof(struct in_addr));
+		MD5Update(&isn_ctx, (u_char *) &tp->t_inpcb->inp_laddr,
+			  sizeof(struct in_addr));
+	}
+	MD5Update(&isn_ctx, (u_char *) &isn_secret, sizeof(isn_secret));
+	MD5Final((u_char *) &md5_buffer, &isn_ctx);
+	new_isn = (tcp_seq) md5_buffer[0];
+	new_isn += ticks * (ISN_BYTES_PER_SECOND / hz);
+	return new_isn;
 }
-
 
 /*
  * When a source quench is received, close congestion window
@@ -1343,7 +1400,7 @@ ipsec_hdrsiz_tcp(tp)
 #endif /* INET6 */
 	struct tcphdr *th;
 
-	if (!tp || !tp->t_template || !(inp = tp->t_inpcb))
+	if ((tp == NULL) || ((inp = tp->t_inpcb) == NULL))
 		return 0;
 	MGETHDR(m, M_DONTWAIT, MT_DATA);
 	if (!m)
@@ -1355,10 +1412,7 @@ ipsec_hdrsiz_tcp(tp)
 		th = (struct tcphdr *)(ip6 + 1);
 		m->m_pkthdr.len = m->m_len =
 			sizeof(struct ip6_hdr) + sizeof(struct tcphdr);
-		bcopy((caddr_t)tp->t_template->tt_ipgen, (caddr_t)ip6,
-		      sizeof(struct ip6_hdr));
-		bcopy((caddr_t)&tp->t_template->tt_t, (caddr_t)th,
-		      sizeof(struct tcphdr));
+		tcp_fillheaders(tp, ip6, th);
 		hdrsiz = ipsec6_hdrsiz(m, IPSEC_DIR_OUTBOUND, inp);
 	} else
 #endif /* INET6 */
@@ -1366,11 +1420,7 @@ ipsec_hdrsiz_tcp(tp)
 	ip = mtod(m, struct ip *);
 	th = (struct tcphdr *)(ip + 1);
 	m->m_pkthdr.len = m->m_len = sizeof(struct tcpiphdr);
-	bcopy((caddr_t)tp->t_template->tt_ipgen, (caddr_t)ip,
-	      sizeof(struct ip));
-	bcopy((caddr_t)&tp->t_template->tt_t, (caddr_t)th,
-	      sizeof(struct tcphdr));
-	ip->ip_vhl = IP_VHL_BORING;
+	tcp_fillheaders(tp, ip, th);
 	hdrsiz = ipsec4_hdrsiz(m, IPSEC_DIR_OUTBOUND, inp);
       }
 

@@ -31,11 +31,13 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_var.h	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/ip_var.h,v 1.50.2.2 2000/07/15 07:14:31 kris Exp $
+ * $FreeBSD: src/sys/netinet/ip_var.h,v 1.50.2.4 2001/07/19 06:37:26 kris Exp $
  */
 
 #ifndef _NETINET_IP_VAR_H_
 #define	_NETINET_IP_VAR_H_
+
+#include <sys/queue.h>
 
 /*
  * Overlay for ip header used by other protocols (tcp, udp).
@@ -140,7 +142,9 @@ struct route;
 struct sockopt;
 
 extern struct	ipstat	ipstat;
+#ifndef RANDOM_IP_ID
 extern u_short	ip_id;				/* ip packet ctr, for ids */
+#endif
 extern int	ip_defttl;			/* default IP ttl */
 extern int	ipforwarding;			/* ip forwarding */
 extern u_char	ip_protox[];
@@ -165,6 +169,10 @@ void	 ip_slowtimo __P((void));
 struct mbuf *
 	 ip_srcroute __P((void));
 void	 ip_stripoptions __P((struct mbuf *, struct mbuf *));
+#ifdef RANDOM_IP_ID
+u_int16_t	
+	 ip_randomid __P((void));
+#endif
 int	 rip_ctloutput __P((struct socket *, struct sockopt *));
 void	 rip_ctlinput __P((int, struct sockaddr *, void *));
 void	 rip_init __P((void));

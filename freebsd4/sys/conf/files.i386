@@ -1,7 +1,7 @@
 # This file tells config what files go into building a kernel,
 # files marked standard are always included.
 #
-# $FreeBSD: src/sys/conf/files.i386,v 1.307.2.9 2001/01/25 20:13:51 imp Exp $
+# $FreeBSD: src/sys/conf/files.i386,v 1.307.2.14 2001/08/25 00:48:24 nsayer Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -70,14 +70,16 @@ trlld.o				optional	oltr			\
 contrib/dev/oltr/trlldbm.c	optional	oltr
 contrib/dev/oltr/trlldhm.c	optional	oltr
 contrib/dev/oltr/trlldmac.c	optional	oltr
+crypto/des/des_ecb.c		optional	netsmbcrypto
+crypto/des/des_setkey.c		optional	netsmbcrypto
 dev/advansys/adv_isa.c		optional	adv isa
 dev/aic/aic_isa.c		optional	aic isa
-dev/ata/ata-all.c		optional	ata 
-dev/ata/ata-dma.c		optional	ata 
+dev/ata/ata-all.c		optional	ata
+dev/ata/ata-dma.c		optional	ata
 dev/ata/ata-disk.c		optional	atadisk
 dev/ata/ata-raid.c		optional	atadisk
-dev/ata/atapi-all.c		optional	atapicd 
-dev/ata/atapi-all.c		optional	atapifd 
+dev/ata/atapi-all.c		optional	atapicd
+dev/ata/atapi-all.c		optional	atapifd
 dev/ata/atapi-all.c		optional	atapist
 dev/ata/atapi-cd.c		optional	atapicd
 dev/ata/atapi-fd.c		optional	atapifd
@@ -109,6 +111,12 @@ dev/syscons/scvidctl.c		optional	sc
 dev/syscons/scvtb.c		optional	sc
 dev/syscons/syscons.c		optional	sc
 dev/syscons/sysmouse.c		optional	sc
+fs/smbfs/smbfs_io.c		optional	smbfs
+fs/smbfs/smbfs_node.c		optional	smbfs
+fs/smbfs/smbfs_smb.c		optional	smbfs
+fs/smbfs/smbfs_subr.c		optional	smbfs
+fs/smbfs/smbfs_vfsops.c		optional	smbfs
+fs/smbfs/smbfs_vnops.c		optional	smbfs
 gnu/i386/fpemul/div_small.s	optional	gpl_math_emulate
 gnu/i386/fpemul/errors.c	optional	gpl_math_emulate
 gnu/i386/fpemul/fpu_arith.c	optional	gpl_math_emulate
@@ -225,7 +233,7 @@ i386/isa/if_le.c		optional	le
 i386/isa/if_lnc.c		optional	lnc
 i386/isa/if_rdp.c		optional	rdp
 i386/isa/if_sr.c		optional	sr
-i386/isa/if_wi.c		optional	wi card
+i386/isa/if_wi.c		optional	wi
 i386/isa/if_wl.c		optional	wl
 i386/isa/if_wlp.c		optional	wlp
 i386/isa/intr_machdep.c		standard
@@ -244,6 +252,7 @@ i386/isa/mse.c			optional	mse
 i386/isa/npx.c			mandatory	npx
 i386/isa/pcaudio.c		optional	pca
 i386/isa/pcf.c			optional	pcf
+i386/isa/pci_cfgreg.c		optional	pci
 i386/isa/pcibus.c		optional	pci
 i386/isa/pcvt/pcvt_drv.c	optional	vt
 i386/isa/pcvt/pcvt_ext.c	optional	vt
@@ -360,33 +369,84 @@ svr4/svr4_ttold.c		optional	compat_svr4
 i386/svr4/svr4_locore.s		optional	compat_svr4		   \
 	dependency	"svr4_assym.h"
 i386/svr4/svr4_machdep.c	optional	compat_svr4
-i4b/layer1/i4b_asuscom_ipac.c	optional	isic
-i4b/layer1/i4b_avm_a1.c		optional	isic
-i4b/layer1/i4b_avm_fritz_pci.c	optional	isic
-#i4b/layer1/i4b_avm_fritz_pcmcia.c optional	isic
-#i4b/layer1/i4b_avm_fritz_pnp.c	optional	isic
-i4b/layer1/i4b_bchan.c		optional	isic
-i4b/layer1/i4b_ctx_s0P.c	optional	isic
-i4b/layer1/i4b_drn_ngo.c	optional	isic
-#i4b/layer1/i4b_dynalink.c	optional	isic
-i4b/layer1/i4b_elsa_qs1i.c	optional	isic
-i4b/layer1/i4b_elsa_qs1p.c	optional	isic
-i4b/layer1/i4b_elsa_pcc16.c	optional	isic
-i4b/layer1/i4b_hscx.c		optional	isic
-i4b/layer1/i4b_isac.c		optional	isic
-i4b/layer1/i4b_isic.c		optional	isic
-i4b/layer1/i4b_isic_isa.c	optional	isic
-#i4b/layer1/i4b_isic_pcmcia.c	optional	isic
-i4b/layer1/i4b_isic_pnp.c	optional	isic
-#i4b/layer1/i4b_itk_ix1.c	optional	isic
-i4b/layer1/i4b_l1.c		optional	isic
-i4b/layer1/i4b_l1fsm.c		optional	isic
-i4b/layer1/i4b_siemens_isurf.c	optional	isic
-i4b/layer1/i4b_sws.c		optional	isic
-i4b/layer1/i4b_tel_s016.c	optional	isic
-i4b/layer1/i4b_tel_s0163.c	optional	isic
-i4b/layer1/i4b_tel_s08.c	optional	isic
-i4b/layer1/i4b_usr_sti.c	optional	isic
+#
+# isdn4bsd, needed for isic | iwic | ifpi | ihfc | ifpnp | itjc
+#
+i4b/layer1/i4b_l1dmux.c         	optional        isic
+i4b/layer1/i4b_l1lib.c          	optional        isic
+i4b/layer1/i4b_l1dmux.c         	optional        iwic
+i4b/layer1/i4b_l1lib.c          	optional        iwic
+i4b/layer1/i4b_l1dmux.c         	optional        ifpi
+i4b/layer1/i4b_l1lib.c          	optional        ifpi
+i4b/layer1/i4b_l1dmux.c         	optional        ihfc
+i4b/layer1/i4b_l1lib.c          	optional        ihfc
+i4b/layer1/i4b_l1dmux.c         	optional        ifpnp
+i4b/layer1/i4b_l1lib.c          	optional        ifpnp
+i4b/layer1/i4b_l1dmux.c         	optional        itjc
+i4b/layer1/i4b_l1lib.c          	optional        itjc
+#
+# isdn4bsd, isic
+#
+i4b/layer1/isic/i4b_asuscom_ipac.c	optional	isic
+i4b/layer1/isic/i4b_avm_a1.c		optional	isic
+i4b/layer1/isic/i4b_bchan.c		optional	isic
+i4b/layer1/isic/i4b_ctx_s0P.c		optional	isic
+i4b/layer1/isic/i4b_drn_ngo.c		optional	isic
+i4b/layer1/isic/i4b_dynalink.c		optional	isic
+i4b/layer1/isic/i4b_elsa_qs1i.c		optional	isic
+i4b/layer1/isic/i4b_elsa_qs1p.c		optional	isic
+i4b/layer1/isic/i4b_elsa_pcc16.c	optional	isic
+i4b/layer1/isic/i4b_hscx.c		optional	isic
+i4b/layer1/isic/i4b_isac.c		optional	isic
+i4b/layer1/isic/i4b_isic.c		optional	isic
+i4b/layer1/isic/i4b_isic_isa.c		optional	isic
+i4b/layer1/isic/i4b_isic_pnp.c		optional	isic
+i4b/layer1/isic/i4b_itk_ix1.c		optional	isic
+i4b/layer1/isic/i4b_l1.c		optional	isic
+i4b/layer1/isic/i4b_l1fsm.c		optional	isic
+i4b/layer1/isic/i4b_siemens_isurf.c	optional	isic
+i4b/layer1/isic/i4b_sws.c		optional	isic
+i4b/layer1/isic/i4b_tel_s016.c		optional	isic
+i4b/layer1/isic/i4b_tel_s0163.c		optional	isic
+i4b/layer1/isic/i4b_tel_s08.c		optional	isic
+i4b/layer1/isic/i4b_usr_sti.c		optional	isic
+i4b/layer1/isic/i4b_diva.c		optional	isic
+#
+# isdn4bsd, iwic
+#
+i4b/layer1/iwic/i4b_iwic_pci.c		optional	iwic
+i4b/layer1/iwic/i4b_iwic_dchan.c	optional	iwic
+i4b/layer1/iwic/i4b_iwic_bchan.c	optional	iwic
+i4b/layer1/iwic/i4b_iwic_fsm.c		optional	iwic
+i4b/layer1/iwic/i4b_iwic_l1if.c		optional	iwic
+#
+# isdn4bsd, ifpi
+#
+i4b/layer1/ifpi/i4b_ifpi_pci.c		optional	ifpi
+i4b/layer1/ifpi/i4b_ifpi_isac.c		optional	ifpi
+i4b/layer1/ifpi/i4b_ifpi_l1.c		optional	ifpi
+i4b/layer1/ifpi/i4b_ifpi_l1fsm.c	optional	ifpi
+#
+# isdn4bsd, ifpnp
+#
+i4b/layer1/ifpnp/i4b_ifpnp_avm.c	optional	ifpnp
+i4b/layer1/ifpnp/i4b_ifpnp_isac.c	optional	ifpnp
+i4b/layer1/ifpnp/i4b_ifpnp_l1.c		optional	ifpnp
+i4b/layer1/ifpnp/i4b_ifpnp_l1fsm.c	optional	ifpnp
+#
+# isdn4bsd, ihfc
+#
+i4b/layer1/ihfc/i4b_ihfc_l1if.c		optional	ihfc
+i4b/layer1/ihfc/i4b_ihfc_pnp.c		optional	ihfc
+i4b/layer1/ihfc/i4b_ihfc_drv.c		optional	ihfc
+#
+# isdn4bsd, itjc
+#
+i4b/layer1/itjc/i4b_itjc_pci.c		optional	itjc
+i4b/layer1/itjc/i4b_itjc_isac.c		optional	itjc
+i4b/layer1/itjc/i4b_itjc_l1.c		optional	itjc
+i4b/layer1/itjc/i4b_itjc_l1fsm.c	optional	itjc
+#
 isa/atkbd_isa.c			optional	atkbd
 isa/atkbdc_isa.c		optional	atkbdc
 isa/ppc.c			optional	ppc
@@ -394,10 +454,20 @@ isa/psm.c			optional	psm
 isa/sio.c			optional	sio
 isa/syscons_isa.c		optional	sc
 isa/vga_isa.c			optional	vga
+kern/md4c.c			optional	netsmb
 kern/subr_diskmbr.c		standard
 libkern/divdi3.c		standard
 libkern/moddi3.c		standard
 libkern/qdivrem.c		standard
 libkern/udivdi3.c		standard
 libkern/umoddi3.c		standard
+netsmb/smb_conn.c		optional	netsmb
+netsmb/smb_crypt.c		optional	netsmb
+netsmb/smb_dev.c		optional	netsmb
+netsmb/smb_iod.c		optional	netsmb
+netsmb/smb_rq.c			optional	netsmb
+netsmb/smb_smb.c		optional	netsmb
+netsmb/smb_subr.c		optional	netsmb
+netsmb/smb_trantcp.c		optional	netsmb
+netsmb/smb_usr.c		optional	netsmb
 pci/ide_pci.c			optional	wdc pci

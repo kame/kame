@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.78 2001/08/30 08:56:16 keiichi Exp $	*/
+/*	$KAME: if_gif.c,v 1.79 2001/09/26 06:13:02 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -56,6 +56,10 @@
 #include <sys/time.h>
 #include <sys/syslog.h>
 #include <sys/protosw.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#include <machine/bus.h>	/* XXX: Shouldn't really be required! */
+#include <sys/rman.h>
+#endif
 #include <machine/cpu.h>
 #ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
 #include <machine/intr.h>
@@ -109,7 +113,25 @@
 
 #if NGIF > 0
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#define GIFNAME		"gif"
+#define GIFDEV		"if_gif"
+#define GIF_MAXUNIT	0x7fff	/* ifp->if_unit is only 15 bits */
+
+static MALLOC_DEFINE(M_GIF, "gif", "Generic Tunnel Interface");
+static struct rman gifunits[1];
+TAILQ_HEAD(gifhead, gif_softc) gifs = TAILQ_HEAD_INITIALIZER(gifs);
+
+int	gif_clone_create __P((struct if_clone *, int *));
+void	gif_clone_destroy __P((struct ifnet *));
+
+struct if_clone gif_cloner =
+    IF_CLONE_INITIALIZER("gif", gif_clone_create, gif_clone_destroy);
+
+static int gifmodevent __P((module_t, int, void *));
+extern struct protosw in_gif_protosw;
+extern struct protosw in6_gif_protosw;
+#elif defined(__FreeBSD__) && __FreeBSD__ < 4
 void gifattach __P((void *));
 #else
 void gifattach __P((int));
@@ -142,6 +164,158 @@ struct gif_softc *gif_softc = NULL;
 #endif
 static int max_gif_nesting = MAX_GIF_NEST;
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+int
+gif_clone_create(ifc, unit)
+	struct if_clone *ifc;
+	int *unit;
+{
+	struct resource *r;
+	struct gif_softc *sc;
+
+	if (*unit > GIF_MAXUNIT)
+		return (ENXIO);
+
+	if (*unit < 0) {
+		r = rman_reserve_resource(gifunits, 0, GIF_MAXUNIT, 1,
+		    RF_ALLOCATED | RF_ACTIVE, NULL);
+		if (r == NULL)
+			return (ENOSPC);
+		*unit = rman_get_start(r);
+	} else {
+		r = rman_reserve_resource(gifunits, *unit, *unit, 1,
+		    RF_ALLOCATED | RF_ACTIVE, NULL);
+		if (r == NULL)
+			return (EEXIST);
+	}
+
+	sc = malloc (sizeof(struct gif_softc), M_GIF, M_WAITOK);
+	bzero(sc, sizeof(struct gif_softc));
+
+	sc->gif_if.if_softc = sc;
+	sc->gif_if.if_name = GIFNAME;
+	sc->gif_if.if_unit = *unit;
+	sc->r_unit = r;
+
+	sc->encap_cookie4 = sc->encap_cookie6 = NULL;
+#ifdef INET
+	sc->encap_cookie4 = encap_attach_func(AF_INET, -1,
+	    gif_encapcheck, (struct protosw*)&in_gif_protosw, sc);
+	if (sc->encap_cookie4 == NULL) {
+		printf("%s: unable to attach encap4\n", if_name(&sc->gif_if));
+		free(sc, M_GIF);
+		return (EIO);	/* XXX */
+	}
+#endif
+#ifdef INET6
+	sc->encap_cookie6 = encap_attach_func(AF_INET6, -1,
+	    gif_encapcheck, (struct protosw *)&in6_gif_protosw, sc);
+	if (sc->encap_cookie6 == NULL) {
+		if (sc->encap_cookie4) {
+			encap_detach(sc->encap_cookie4);
+			sc->encap_cookie4 = NULL;
+		}
+		printf("%s: unable to attach encap6\n", if_name(&sc->gif_if));
+		free(sc, M_GIF);
+		return (EIO);	/* XXX */
+	}
+#endif
+
+	sc->gif_if.if_mtu    = GIF_MTU;
+	sc->gif_if.if_flags  = IFF_POINTOPOINT | IFF_MULTICAST;
+#if 0
+	/* turn off ingress filter */
+	sc->gif_if.if_flags  |= IFF_LINK2;
+#endif
+	sc->gif_if.if_ioctl  = gif_ioctl;
+	sc->gif_if.if_output = gif_output;
+	sc->gif_if.if_type   = IFT_GIF;
+	sc->gif_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
+	if_attach(&sc->gif_if);
+	bpfattach(&sc->gif_if, DLT_NULL, sizeof(u_int));
+	TAILQ_INSERT_TAIL(&gifs, sc, gif_link);
+	return (0);
+}
+
+void
+gif_clone_destroy(ifp)
+	struct ifnet *ifp;
+{
+	int err;
+	struct gif_softc *sc = ifp->if_softc;
+
+	gif_delete_tunnel(sc);
+	TAILQ_REMOVE(&gifs, sc, gif_link);
+	if (sc->encap_cookie4 != NULL) {
+		err = encap_detach(sc->encap_cookie4);
+		KASSERT(err == 0, ("Unexpected error detaching encap_cookie4"));
+	}
+	if (sc->encap_cookie6 != NULL) {
+		err = encap_detach(sc->encap_cookie6);
+		KASSERT(err == 0, ("Unexpected error detaching encap_cookie6"));
+	}
+
+	bpfdetach(ifp);
+	if_detach(ifp);
+
+	err = rman_release_resource(sc->r_unit);
+	KASSERT(err == 0, ("Unexpected error freeing resource"));
+
+	free(sc, M_GIF);
+}
+
+static int
+gifmodevent(mod, type, data)
+	module_t mod;
+	int type;
+	void *data;
+{
+	int err;
+
+	switch (type) {
+	case MOD_LOAD:
+		gifunits->rm_type = RMAN_ARRAY;
+		gifunits->rm_descr = "configurable if_gif units";
+		err = rman_init(gifunits);
+		if (err != 0)
+			return (err);
+		err = rman_manage_region(gifunits, 0, GIF_MAXUNIT);
+		if (err != 0) {
+			printf("%s: gifunits: rman_manage_region: Failed %d\n",
+			    GIFNAME, err);
+			rman_fini(gifunits);
+			return (err);
+		}
+		if_clone_attach(&gif_cloner);
+
+#ifdef INET6
+		ip6_gif_hlim = GIF_HLIM;
+#endif
+
+		break;
+	case MOD_UNLOAD:
+		if_clone_detach(&gif_cloner);
+
+		while (!TAILQ_EMPTY(&gifs))
+			gif_clone_destroy(&TAILQ_FIRST(&gifs)->gif_if);
+
+		err = rman_fini(gifunits);
+		if (err != 0)
+			return (err);
+#ifdef INET6
+		ip6_gif_hlim = 0;
+#endif
+		break;
+	}
+	return 0;
+}
+
+static moduledata_t gif_mod = {
+	"if_gif",
+	gifmodevent,
+	0
+};
+#else
 void
 gifattach(dummy)
 #ifdef __FreeBSD__
@@ -203,9 +377,14 @@ gifattach0(sc)
 #endif
 #endif
 }
+#endif
 
 #ifdef __FreeBSD__
+#if __FreeBSD__ >= 4
+DECLARE_MODULE(if_gif, gif_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
+#else
 PSEUDO_SET(gifattach, if_gif);
+#endif
 #endif
 
 #ifdef __OpenBSD__

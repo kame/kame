@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_xl.c,v 1.72.2.4 2000/08/30 05:46:21 dec Exp $
+ * $FreeBSD: src/sys/pci/if_xl.c,v 1.72.2.6 2001/07/27 20:56:41 wpaul Exp $
  */
 
 /*
@@ -145,7 +145,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_xl.c,v 1.72.2.4 2000/08/30 05:46:21 dec Exp $";
+  "$FreeBSD: src/sys/pci/if_xl.c,v 1.72.2.6 2001/07/27 20:56:41 wpaul Exp $";
 #endif
 
 /*
@@ -854,7 +854,6 @@ static void xl_testpacket(sc)
 {
 	struct mbuf		*m;
 	struct ifnet		*ifp;
-	int			error;
 
 	ifp = &sc->arpcom.ac_if;
 
@@ -1016,10 +1015,15 @@ static void xl_reset(sc)
 	if (i == XL_TIMEOUT)
 		printf("xl%d: reset didn't complete\n", sc->xl_unit);
 
-	DELAY(100000);
-
 	/* Reset TX and RX. */
+	/* Note: the RX reset takes an absurd amount of time
+	 * on newer versions of the Tornado chips such as those
+	 * on the 3c905CX and newer 3c908C cards. We wait an    
+	 * extra amount of time so that xl_wait() doesn't complain
+	 * and annoy the users.
+	 */
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_RX_RESET);
+	DELAY(100000);
 	xl_wait(sc);
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_TX_RESET);
 	xl_wait(sc);
@@ -1414,8 +1418,7 @@ static int xl_attach(dev)
 	ifp->if_watchdog = xl_watchdog;
 	ifp->if_init = xl_init;
 	ifp->if_baudrate = 10000000;
-	IFQ_SET_MAXLEN(&ifp->if_snd, XL_TX_LIST_CNT - 1);
-	IFQ_SET_READY(&ifp->if_snd);
+	ifp->if_snd.ifq_maxlen = XL_TX_LIST_CNT - 1;
 
 	/*
 	 * Now we have to see what sort of media we have.
@@ -2070,7 +2073,7 @@ static void xl_intr(arg)
 		}
 	}
 
-	if (!IFQ_IS_EMPTY(&ifp->if_snd))
+	if (ifp->if_snd.ifq_head != NULL)
 		(*ifp->if_start)(ifp);
 
 	return;
@@ -2599,6 +2602,9 @@ static void xl_init(xsc)
 	else
 		CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_COAX_STOP);
 
+	/* increase packet size to allow reception of 802.1q or ISL packets */
+	 if (sc->xl_type == XL_TYPE_905B) 
+		CSR_WRITE_2(sc, XL_W3_MAXPKTSIZE, XL_PACKET_SIZE);
 	/* Clear out the stats counters. */
 	CSR_WRITE_2(sc, XL_COMMAND, XL_CMD_STATS_DISABLE);
 	sc->xl_stats_no_timeout = 1;
@@ -2846,7 +2852,7 @@ static void xl_watchdog(ifp)
 	xl_reset(sc);
 	xl_init(sc);
 
-	if (!IFQ_IS_EMPTY(&ifp->if_snd))
+	if (ifp->if_snd.ifq_head != NULL)
 		(*ifp->if_start)(ifp);
 
 	return;

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.6 2000/11/02 00:04:27 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.7 2001/07/19 18:33:07 wpaul Exp $
  */
 
 /*
@@ -132,7 +132,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.6 2000/11/02 00:04:27 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.7 2001/07/19 18:33:07 wpaul Exp $";
 #endif
 
 /*
@@ -149,6 +149,8 @@ static struct rl_type rl_devs[] = {
 		"Delta Electronics 8139 10/100BaseTX" },
 	{ ADDTRON_VENDORID, ADDTRON_DEVICEID_8139,
 		"Addtron Technolgy 8139 10/100BaseTX" },
+	{ DLINK_VENDORID, DLINK_DEVICEID_530TXPLUS,
+		"D-Link DFE-530TX+ 10/100BaseTX" },
 	{ 0, 0, NULL }
 };
 
@@ -898,7 +900,8 @@ static int rl_attach(dev)
 	rl_read_eeprom(sc, (caddr_t)&rl_did, RL_EE_PCI_DID, 1, 0);
 
 	if (rl_did == RT_DEVICEID_8139 || rl_did == ACCTON_DEVICEID_5030 ||
-	    rl_did == DELTA_DEVICEID_8139 || rl_did == ADDTRON_DEVICEID_8139)
+	    rl_did == DELTA_DEVICEID_8139 || rl_did == ADDTRON_DEVICEID_8139 ||
+	    rl_did == DLINK_DEVICEID_530TXPLUS)
 		sc->rl_type = RL_8139;
 	else if (rl_did == RT_DEVICEID_8129)
 		sc->rl_type = RL_8129;
@@ -951,8 +954,7 @@ static int rl_attach(dev)
 	ifp->if_watchdog = rl_watchdog;
 	ifp->if_init = rl_init;
 	ifp->if_baudrate = 10000000;
-	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
-	IFQ_SET_READY(&ifp->if_snd);
+	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 
 	/*
 	 * Call MI attach routine.
@@ -1287,7 +1289,7 @@ static void rl_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_2(sc, RL_IMR, RL_INTRS);
 
-	if (!IFQ_IS_EMPTY(&ifp->if_snd))
+	if (ifp->if_snd.ifq_head != NULL)
 		rl_start(ifp);
 
 	return;
@@ -1357,23 +1359,19 @@ static void rl_start(ifp)
 {
 	struct rl_softc		*sc;
 	struct mbuf		*m_head = NULL;
-	int			pkts = 0;
 
 	sc = ifp->if_softc;
 
 	while(RL_CUR_TXMBUF(sc) == NULL) {
-		IFQ_POLL(&ifp->if_snd, m_head);
+		IF_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
 		if (rl_encap(sc, m_head)) {
+			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
-
-		/* now we are committed to transmit the packet */
-		IFQ_DEQUEUE(&ifp->if_snd, m_head);
-		pkts++;
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -1393,8 +1391,6 @@ static void rl_start(ifp)
 
 		RL_INC(sc->rl_cdata.cur_tx);
 	}
-	if (pkts == 0)
-		return;
 
 	/*
 	 * We broke out of the loop because all our TX slots are

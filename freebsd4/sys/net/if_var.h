@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)if.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_var.h,v 1.18.2.6 2001/03/04 21:09:45 joe Exp $
+ * $FreeBSD: src/sys/net/if_var.h,v 1.18.2.7 2001/07/24 19:10:18 brooks Exp $
  */
 
 #ifndef	_NET_IF_VAR_H_
@@ -473,7 +473,7 @@ void	if_up __P((struct ifnet *));
 /*void	ifinit __P((void));*/ /* declared in systm.h for main() */
 int	ifioctl __P((struct socket *, u_long, caddr_t, struct proc *));
 int	ifpromisc __P((struct ifnet *, int));
-struct	ifnet *ifunit __P((char *));
+struct	ifnet *ifunit __P((const char *));
 struct	ifnet *if_withname __P((struct sockaddr *));
 
 int	if_poll_recv_slow __P((struct ifnet *ifp, int *quotap));
@@ -494,6 +494,12 @@ void	ifafree __P((struct ifaddr *));
 struct	ifmultiaddr *ifmaof_ifpforaddr __P((struct sockaddr *,
 					    struct ifnet *));
 int	if_simloop __P((struct ifnet *ifp, struct mbuf *m, int af, int hlen));
+
+void	if_clone_attach __P((struct if_clone *));
+void	if_clone_detach __P((struct if_clone *));
+
+int	if_clone_create __P((char *, int));
+int	if_clone_destroy __P((const char *));
 
 #endif /* _KERNEL */
 
