@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.91 2000/07/17 09:05:33 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.92 2000/07/18 01:26:14 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -3151,11 +3151,11 @@ ipsecdoi_sockaddr2id(saddr, prefixlen, ul_proto)
  * see, RFC2407 4.6.2.1
  */
 int
-ipsecdoi_id2sockaddr(
-	vchar_t *buf,
-	struct sockaddr *saddr,
-	u_int8_t *prefixlen,
-	u_int16_t *ul_proto)
+ipsecdoi_id2sockaddr(buf, saddr, prefixlen, ul_proto)
+	vchar_t *buf;
+	struct sockaddr *saddr;
+	u_int8_t *prefixlen;
+	u_int16_t *ul_proto;
 {
 	struct ipsecdoi_id_b *id_b = (struct ipsecdoi_id_b *)buf->v;
 	u_int plen = 0;
