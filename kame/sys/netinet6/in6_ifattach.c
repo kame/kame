@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.116 2001/02/23 09:21:55 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.117 2001/04/24 15:50:03 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -936,7 +936,7 @@ in6_ifattach(ifp, altifp)
 			if (in6_ifattach_linklocal(ifp, altifp) == 0) {
 				/* linklocal address assigned */
 			} else {
-				/* failed to assign linklocal address.  bark? */
+				/* failed to assign linklocal address. bark? */
 			}
 		}
 	}
