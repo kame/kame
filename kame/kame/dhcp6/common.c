@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.76 2003/01/22 16:51:39 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.77 2003/01/27 13:21:52 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -108,6 +108,18 @@ dhcp6_copy_list(dst, src)
   fail:
 	dhcp6_clear_list(dst);
 	return (-1);
+}
+
+void
+dhcp6_move_list(dst, src)
+	struct dhcp6_list *dst, *src;
+{
+	struct dhcp6_listval *v;
+
+	while ((v = TAILQ_FIRST(src)) != NULL) {
+		TAILQ_REMOVE(src, v, link);
+		TAILQ_INSERT_TAIL(dst, v, link);
+	}
 }
 
 void
@@ -278,19 +290,12 @@ void
 dhcp6_remove_event(ev)
 	struct dhcp6_event *ev;
 {
-	struct dhcp6_eventdata *evd, *evd_next;
+	struct dhcp6_serverinfo *sp, *sp_next;
 
 	dprintf(LOG_DEBUG, "%s" "removing an event on %s, state=%s", FNAME,
 		ev->ifp->ifname, dhcp6_event_statestr(ev));
 
-	for (evd = TAILQ_FIRST(&ev->data_list); evd; evd = evd_next) {
-		evd_next = TAILQ_NEXT(evd, link);
-		TAILQ_REMOVE(&ev->data_list, evd, link);
-		if (evd->destructor)
-			(*evd->destructor)(evd);
-		else
-			free(evd);
-	}
+	dhcp6_remove_evdata(ev);
 
 	duidfree(&ev->serverid);
 
@@ -298,7 +303,31 @@ dhcp6_remove_event(ev)
 		dhcp6_remove_timer(&ev->timer);
 	TAILQ_REMOVE(&ev->ifp->event_list, ev, link);
 
+	for (sp = ev->servers; sp; sp = sp_next) {
+		sp_next = sp->next;
+
+		dprintf(LOG_DEBUG, "%s" "removing server (ID: %s)",
+		    FNAME, duidstr(&sp->optinfo.serverID));
+		dhcp6_clear_options(&sp->optinfo);
+		free(sp);
+	}
+
 	free(ev);
+}
+
+void
+dhcp6_remove_evdata(ev)
+	struct dhcp6_event *ev;
+{
+	struct dhcp6_eventdata *evd, *evd_next;
+
+	while ((evd = TAILQ_FIRST(&ev->data_list)) != NULL) {
+		TAILQ_REMOVE(&ev->data_list, evd, link);
+		if (evd->destructor)
+			(*evd->destructor)(evd);
+		else
+			free(evd);
+	}
 }
 
 #if 0

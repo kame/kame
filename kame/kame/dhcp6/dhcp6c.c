@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.109 2003/01/23 07:43:59 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.110 2003/01/27 13:21:52 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -98,9 +98,9 @@ static void free_resources __P((void));
 static void client6_mainloop __P((void));
 static void check_exit __P((void));
 static void process_signals __P((void));
-static struct dhcp6_serverinfo *find_server __P((struct dhcp6_if *,
+static struct dhcp6_serverinfo *find_server __P((struct dhcp6_event *,
 						 struct duid *));
-static struct dhcp6_serverinfo *select_server __P((struct dhcp6_if *));
+static struct dhcp6_serverinfo *select_server __P((struct dhcp6_event *));
 static void client6_recv __P((void));
 static int client6_recvadvert __P((struct dhcp6_if *, struct dhcp6 *,
 				   ssize_t, struct dhcp6_optinfo *));
@@ -109,6 +109,10 @@ static int client6_recvreply __P((struct dhcp6_if *, struct dhcp6 *,
 static void client6_signal __P((int));
 static struct dhcp6_event *find_event_withid __P((struct dhcp6_if *,
 						  u_int32_t));
+static int construct_confdata __P((struct dhcp6_if *, struct dhcp6_event *));
+static int construct_reqdata __P((struct dhcp6_if *, struct dhcp6_optinfo *,
+    struct dhcp6_event *));
+static void destruct_iadata __P((struct dhcp6_eventdata *));
 static void tv_sub __P((struct timeval *, struct timeval *, struct timeval *));
 #if 0
 static int sa2plen __P((struct sockaddr_in6 *));
@@ -376,8 +380,6 @@ client6_init()
 	}
 	ifp->outsock = outsock;
 
-	init_ia();
-
 	if (signal(SIGHUP, client6_signal) == SIG_ERR) {
 		dprintf(LOG_WARNING, "%s" "failed to set signal: %s",
 			FNAME, strerror(errno));
@@ -429,12 +431,11 @@ free_resources()
 {
 	struct dhcp6_if *ifp;
 
-	/* release all IAs as well as send RELEASE message(s) */
-	release_all_ia();
-
 	for (ifp = dhcp6_if; ifp; ifp = ifp->next) {
 		struct dhcp6_event *ev, *ev_next;
-		struct dhcp6_serverinfo *sp, *sp_next;
+
+		/* release all IAs as well as send RELEASE message(s) */
+		release_all_ia(ifp);
 
 		/*
 		 * Cancel all outstanding events for each interface except
@@ -448,18 +449,6 @@ free_resources()
 
 			dhcp6_remove_event(ev);
 		}
-
-		/* free all servers we've seen so far */
-		for (sp = ifp->servers; sp; sp = sp_next) {
-			sp_next = sp->next;
-
-			dprintf(LOG_DEBUG, "%s" "removing server (ID: %s)",
-			    FNAME, duidstr(&sp->optinfo.serverID));
-			dhcp6_clear_options(&sp->optinfo);
-			free(sp);
-		}
-		ifp->servers = NULL;
-		ifp->current_server = NULL;
 	}
 }
 
@@ -563,11 +552,18 @@ client6_timo(arg)
 		ev->timeouts = 0; /* indicate to generate a new XID. */
 		if ((ifp->send_flags & DHCIFF_INFO_ONLY))
 			ev->state = DHCP6S_INFOREQ;
-		else
+		else {
 			ev->state = DHCP6S_SOLICIT;
+			if (construct_confdata(ifp, ev)) {
+				dprintf(LOG_ERR, "%s" "can't send solicit",
+				    FNAME);
+				exit(1); /* XXX */
+			}
+		}
 		dhcp6_set_timeoparam(ev); /* XXX */
 		/* fall through */
 	case DHCP6S_REQUEST:
+	case DHCP6S_RELEASE:
 	case DHCP6S_INFOREQ:
 		client6_send(ev);
 		break;
@@ -584,7 +580,7 @@ client6_timo(arg)
 		}
 		break;
 	case DHCP6S_SOLICIT:
-		if (ifp->servers) {
+		if (ev->servers) {
 			/*
 			 * Send a Request to the best server.
 			 * Note that when we set Rapid-commit in Solicit,
@@ -593,15 +589,15 @@ client6_timo(arg)
 			 * transaction ID) will invalidate the reply even if it
 			 * ever arrives.
 			 */
-			ifp->current_server = select_server(ifp);
-			if (ifp->current_server == NULL) {
+			ev->current_server = select_server(ev);
+			if (ev->current_server == NULL) {
 				/* this should not happen! */
 				dprintf(LOG_NOTICE, "%s" "can't find a server"
 					FNAME);
 				exit(1); /* XXX */
 			}
 			if (duidcpy(&ev->serverid,
-			    &ifp->current_server->optinfo.serverID)) {
+			    &ev->current_server->optinfo.serverID)) {
 				dprintf(LOG_NOTICE, "%s"
 				    "can't copy server ID", FNAME);
 				return (NULL); /* XXX: better recovery? */
@@ -609,6 +605,13 @@ client6_timo(arg)
 			ev->timeouts = 0;
 			ev->state = DHCP6S_REQUEST;
 			dhcp6_set_timeoparam(ev);
+
+			if (construct_reqdata(ifp,
+			    &ev->current_server->optinfo, ev)) {
+				dprintf(LOG_NOTICE, "%s" "failed to construct"
+				    " request data", FNAME);
+				break;
+			}
 		}
 		client6_send(ev);
 		break;
@@ -619,9 +622,166 @@ client6_timo(arg)
 	return (ev->timer);
 }
 
-static struct dhcp6_serverinfo *
-select_server(ifp)
+static int
+construct_confdata(ifp, ev)
 	struct dhcp6_if *ifp;
+	struct dhcp6_event *ev;
+{
+	struct ia_conf *iac;
+	struct dhcp6_eventdata *evd = NULL;
+	struct dhcp6_list *ial = NULL, pl;
+	struct dhcp6_ia iaparam;
+
+	TAILQ_INIT(&pl);	/* for safety */
+
+	for (iac = TAILQ_FIRST(&ifp->iaconf_list); iac;
+	    iac = TAILQ_NEXT(iac, link)) {
+		/* ignore IA config currently used */
+		if (!TAILQ_EMPTY(&iac->iadata))
+			continue;
+
+		evd = NULL;
+		if ((evd = malloc(sizeof(*evd))) == NULL) {
+			dprintf(LOG_NOTICE, "%s"
+			    "failed to create a new event data", FNAME);
+			goto fail;
+		}
+		memset(evd, 0, sizeof(evd));
+
+		memset(&iaparam, 0, sizeof(iaparam));
+		iaparam.iaid = iac->iaid;
+		switch (iac->type) {
+		case IATYPE_PD:
+			ial = NULL;
+			if ((ial = malloc(sizeof(*ial))) == NULL)
+				goto fail;
+			TAILQ_INIT(ial);
+
+			TAILQ_INIT(&pl);
+			dhcp6_copy_list(&pl,
+			    &((struct iapd_conf *)iac)->iapd_prefix_list);
+			if (dhcp6_add_listval(ial, DHCP6_LISTVAL_IAPD,
+			    &iaparam, &pl) == NULL) {
+				goto fail;
+			}
+			dhcp6_clear_list(&pl);
+
+			evd->type = DHCP6_EVDATA_IAPD;
+			evd->data = ial;
+			evd->event = ev;
+			evd->destructor = destruct_iadata;
+			TAILQ_INSERT_TAIL(&ev->data_list, evd, link);
+			break;
+		default:
+			dprintf(LOG_ERR, "%s" "internal error", FNAME);
+			exit(1);
+		}
+	}
+
+	return (0);
+
+  fail:
+	if (evd)
+		free(evd);
+	if (ial)
+		free(ial);
+	dhcp6_remove_event(ev);	/* XXX */
+	
+	return (-1);
+}
+
+static int
+construct_reqdata(ifp, optinfo, ev)
+	struct dhcp6_if *ifp;
+	struct dhcp6_optinfo *optinfo;
+	struct dhcp6_event *ev;
+{
+	struct ia_conf *iac;
+	struct dhcp6_eventdata *evd = NULL;
+	struct dhcp6_list *ial = NULL;
+	struct dhcp6_ia iaparam;
+
+	/* discard previous event data */
+	dhcp6_remove_evdata(ev);
+
+	if (optinfo == NULL)
+		return (0);
+
+	for (iac = TAILQ_FIRST(&ifp->iaconf_list); iac;
+	    iac = TAILQ_NEXT(iac, link)) {
+		struct dhcp6_listval *v;
+
+		/* ignore IA config currently used */
+		if (!TAILQ_EMPTY(&iac->iadata))
+			continue;
+
+		memset(&iaparam, 0, sizeof(iaparam));
+		iaparam.iaid = iac->iaid;
+
+		ial = NULL;
+		evd = NULL;
+
+		switch (iac->type) {
+		case IATYPE_PD:
+			if ((v = dhcp6_find_listval(&optinfo->iapd_list,
+			    DHCP6_LISTVAL_IAPD, &iaparam, 0)) == NULL)
+				continue;
+
+			if ((ial = malloc(sizeof(*ial))) == NULL)
+				goto fail;
+
+			TAILQ_INIT(ial);
+			if (dhcp6_add_listval(ial, DHCP6_LISTVAL_IAPD,
+			    &iaparam, &v->sublist) == NULL) {
+				goto fail;
+			}
+
+			if ((evd = malloc(sizeof(*evd))) == NULL)
+				goto fail;
+			memset(evd, 0, sizeof(*evd));
+			evd->type = DHCP6_EVDATA_IAPD;
+			evd->data = ial;
+			evd->event = ev;
+			evd->destructor = destruct_iadata;
+			TAILQ_INSERT_TAIL(&ev->data_list, evd, link);
+			break;
+		default:
+			dprintf(LOG_ERR, "%s" "internal error", FNAME);
+			exit(1);
+		}
+	}
+
+	return (0);
+
+  fail:
+	if (evd)
+		free(evd);
+	if (ial)
+		free(ial);
+	dhcp6_remove_event(ev);	/* XXX */
+	
+	return (-1);
+}
+
+static void
+destruct_iadata(evd)
+	struct dhcp6_eventdata *evd;
+{
+	struct dhcp6_list *ial;
+
+	if (evd->type != DHCP6_EVDATA_IAPD) {
+		dprintf(LOG_ERR, "%s" "assumption failure", FNAME);
+		exit(1);
+	}
+
+	ial = (struct dhcp6_list *)evd->data;
+	dhcp6_clear_list(ial);
+	free(ial);
+}
+
+static struct dhcp6_serverinfo *
+select_server(ev)
+	struct dhcp6_event *ev;
 {
 	struct dhcp6_serverinfo *s;
 
@@ -630,7 +790,7 @@ select_server(ifp)
 	 * XXX: we currently just choose the one that is active and has the
 	 * highest preference.
 	 */
-	for (s = ifp->servers; s; s = s->next) {
+	for (s = ev->servers; s; s = s->next) {
 		if (s->active) {
 			dprintf(LOG_DEBUG, "%s" "picked a server (ID: %s)",
 				FNAME, duidstr(&s->optinfo.serverID));
@@ -812,44 +972,6 @@ client6_send(ev)
 		    tv_diff.tv_sec * 100 + tv_diff.tv_usec / 10000;
 	}
 
-	/* IA_PD */
-	switch (ev->state) {
-	case DHCP6S_SOLICIT:
-		if (dhcp6_copy_list(&optinfo.iapd_list, &ifp->iapd_list)) {
-			dprintf(LOG_NOTICE, "%s"
-			    "failed to copy options to be sent",
-			    FNAME);
-			goto end;
-		}
-		break;
-	case DHCP6S_REQUEST:
-		/*
-		 * First check the IA_PD given in the advertise.
-		 * If the server has given an IA_PD for a local IA, include
-		 * the given IA.  Otherwise, include locally configured IA
-		 * anyway.
-		 * (Specification is not clear on this policy.)
-		 */
-		for (iapd = TAILQ_FIRST(&ifp->iapd_list); iapd;
-		    iapd = TAILQ_NEXT(iapd, link)) {
-			struct dhcp6_listval *v;
-
-			if ((v = dhcp6_find_listval(
-			    &ifp->current_server->optinfo.iapd_list,
-			    DHCP6_LISTVAL_IAPD, &iapd->uv, 0)) == NULL)
-				v = iapd;
-
-			if (dhcp6_add_listval(&optinfo.iapd_list,
-			    DHCP6_LISTVAL_IAPD, &v->uv, &v->sublist) == NULL) {
-				dprintf(LOG_NOTICE, "%s"
-				    "failed to construct IA_PD for request",
-				    FNAME);
-				goto end;
-			}
-		}
-		break;
-	}
-
 	/* option request options */
 	if (ev->state != DHCP6S_RELEASE &&
 	    dhcp6_copy_list(&optinfo.reqopt_list, &ifp->reqopt_list)) {
@@ -857,17 +979,6 @@ client6_send(ev)
 		    "failed to copy requested options",
 		    FNAME);
 		goto end;
-	}
-
-	/* configuration information provided by the server (request only) */
-	if (ev->state == DHCP6S_REQUEST) {
-		/* do we have to check if we wanted prefixes? */
-		if (dhcp6_copy_list(&optinfo.prefix_list,
-		    &ifp->current_server->optinfo.prefix_list)) {
-			dprintf(LOG_ERR, "%s" "failed to copy prefixes",
-			    FNAME);
-			goto end;
-		}
 	}
 
 	/* configuration information specified as event data */
@@ -1043,6 +1154,7 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 {
 	struct dhcp6_serverinfo *newserver, **sp;
 	struct dhcp6_event *ev;
+	struct dhcp6_eventdata *evd;
 
 	/* find the corresponding event based on the received xid */
 	ev = find_event_withid(ifp, ntohl(dh6->dh6_xid) & DH6_XIDMASK);
@@ -1075,7 +1187,12 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 	 * [dhc-dhcpv6-opt-prefix-delegation-01 Section 10.1].
 	 * We only apply this when we are requiring prefixes to be delegated.
 	 */
-	if (!TAILQ_EMPTY(&ifp->iapd_list)) {
+	for (evd = TAILQ_FIRST(&ev->data_list); evd;
+	    evd = TAILQ_NEXT(evd, link)) {
+		if (evd->type == DHCP6_EVDATA_IAPD)
+			break;
+	}
+	if (evd) {
 		u_int16_t stcode = DH6OPT_STCODE_NOPREFIXAVAIL;
 
 		if (dhcp6_find_listval(&optinfo0->stcode_list,
@@ -1108,7 +1225,7 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 	}
 
 	/* ignore the server if it is known */
-	if (find_server(ifp, &optinfo0->serverID)) {
+	if (find_server(ev, &optinfo0->serverID)) {
 		dprintf(LOG_INFO, "%s" "duplicated server (ID: %s)",
 			FNAME, duidstr(&optinfo0->serverID));
 		return (-1);
@@ -1130,7 +1247,7 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 	if (optinfo0->pref != DH6OPT_PREF_UNDEF)
 		newserver->pref = optinfo0->pref;
 	newserver->active = 1;
-	for (sp = &ifp->servers; *sp; sp = &(*sp)->next) {
+	for (sp = &ev->servers; *sp; sp = &(*sp)->next) {
 		if ((*sp)->pref != DH6OPT_PREF_MAX &&
 		    (*sp)->pref < newserver->pref) {
 			break;
@@ -1146,15 +1263,28 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 		 * immediately begins a client-initiated message exchange.
 		 * [dhcpv6-28, Section 17.1.2]
 		 */
+		ev->current_server = newserver;
+		if (duidcpy(&ev->serverid,
+		    &ev->current_server->optinfo.serverID)) {
+			dprintf(LOG_NOTICE, "%s"
+			    "can't copy server ID", FNAME);
+			return (-1); /* XXX: better recovery? */
+		}
+		if (construct_reqdata(ifp,
+		    &ev->current_server->optinfo, ev)) {
+			dprintf(LOG_NOTICE, "%s" "failed to construct"
+			    " request data", FNAME);
+			return (-1); /* XXX */
+		}
+
 		ev->timeouts = 0;
 		ev->state = DHCP6S_REQUEST;
-		ifp->current_server = newserver;
 
 		client6_send(ev);
 
 		dhcp6_set_timeoparam(ev);
 		dhcp6_reset_timer(ev);
-	} else if (ifp->servers->next == NULL) {
+	} else if (ev->servers->next == NULL) {
 		struct timeval *rest, elapsed, tv_rt, tv_irt, timo;
 
 		/*
@@ -1185,13 +1315,13 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 }
 
 static struct dhcp6_serverinfo *
-find_server(ifp, duid)
-	struct dhcp6_if *ifp;
+find_server(ev, duid)
+	struct dhcp6_event *ev;
 	struct duid *duid;
 {
 	struct dhcp6_serverinfo *s;
 
-	for (s = ifp->servers; s; s = s->next) {
+	for (s = ev->servers; s; s = s->next) {
 		if (duidcmp(&s->optinfo.serverID, duid) == 0)
 			return (s);
 	}

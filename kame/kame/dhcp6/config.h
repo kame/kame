@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.22 2003/01/22 16:51:39 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.23 2003/01/27 13:21:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -29,6 +29,10 @@
  * SUCH DAMAGE.
  */
 
+/* definitions of tail-queue types */
+TAILQ_HEAD(ia_conflist, ia_conf);
+TAILQ_HEAD(pifc_list, prefix_ifconf);
+
 /* per-interface information */
 struct dhcp6_if {
 	struct dhcp6_if *next;
@@ -54,11 +58,8 @@ struct dhcp6_if {
 
 	int server_pref;	/* server preference (server only) */
 
-	struct dhcp6_list iapd_list;
 	struct dhcp6_list reqopt_list;
-
-	struct dhcp6_serverinfo *current_server;
-	struct dhcp6_serverinfo *servers;
+	struct ia_conflist iaconf_list;
 };
 
 struct dhcp6_event {
@@ -81,6 +82,10 @@ struct dhcp6_event {
 
 	u_int32_t xid;		/* current transaction ID */
 	int state;
+
+	/* list of known servers */
+	struct dhcp6_serverinfo *current_server;
+	struct dhcp6_serverinfo *servers;
 
 	TAILQ_HEAD(, dhcp6_eventdata) data_list;
 };
@@ -126,16 +131,18 @@ struct prefix_ifconf {
 #define IFID_LEN_DEFAULT 64
 #define SLA_LEN_DEFAULT 16
 
+typedef enum { IATYPE_PD } iatype_t;
 struct ia_conf {
-	struct ia_conf *next;
-	int type;
+	TAILQ_ENTRY(ia_conf) link;
+	/*struct ia_conf *next;*/
+	iatype_t type;
 	u_int32_t iaid;
+
+	TAILQ_HEAD(, ia) iadata; /* struct ia is an opaque type */
 
 	/* type dependent values follow */
 };
-typedef enum {IATYPE_PD} iatype_t;
 
-TAILQ_HEAD(pifc_list, prefix_ifconf);
 struct iapd_conf {
 	struct ia_conf iapd_ia;
 
@@ -213,4 +220,4 @@ extern struct prefix_ifconf *find_prefixifconf __P((char *));
 extern struct host_conf *find_hostconf __P((struct duid *));
 extern struct dhcp6_prefix *find_prefix6 __P((struct dhcp6_list *,
 					      struct dhcp6_prefix *));
-extern struct ia_conf *find_iaconf __P((int, u_int32_t));
+extern struct ia_conf *find_iaconf __P((struct ia_conflist *, int, u_int32_t));

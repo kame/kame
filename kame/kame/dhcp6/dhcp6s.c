@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.99 2003/01/23 05:53:40 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.100 2003/01/27 13:21:52 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -180,6 +180,7 @@ main(argc, argv)
 		progname++;
 
 	TAILQ_INIT(&arg_dnslist);
+	TAILQ_INIT(&dnslist);
 
 	srandom(time(NULL) & getpid());
 	while ((ch = getopt(argc, argv, "c:dDfn:")) != -1) {
@@ -246,7 +247,7 @@ main(argc, argv)
 			    FNAME);
 			exit(1);
 		}
-		dnslist = arg_dnslist;
+		dhcp6_move_list(&dnslist, &arg_dnslist);
 		TAILQ_INIT(&arg_dnslist);
 	}
 

@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.25 2003/01/22 16:51:39 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.26 2003/01/27 13:21:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -51,11 +51,10 @@ extern int errno;
 
 struct dhcp6_if *dhcp6_if;
 struct prefix_ifconf *prefix_ifconflist;
-struct iapd_conf *iapd_conflist;
 struct dhcp6_list dnslist;
 
 static struct dhcp6_ifconf *dhcp6_ifconflist;
-static struct iapd_conf *iapd_conflist0;
+struct ia_conflist ia_conflist0;
 static struct host_conf *host_conflist0, *host_conflist;
 static struct dhcp6_list dnslist0; 
 
@@ -73,8 +72,8 @@ struct dhcp6_ifconf {
 
 	int server_pref;	/* server preference (server only) */
 
-	struct dhcp6_list iapd_list;
 	struct dhcp6_list reqopt_list;
+	struct ia_conflist iaconf_list;
 };
 
 extern struct cf_list *cf_dns_list;
@@ -86,11 +85,12 @@ static int add_prefix __P((struct dhcp6_list *, char *,
     struct dhcp6_prefix *));
 static void clear_pd_pif __P((struct iapd_conf *));
 static void clear_ifconf __P((struct dhcp6_ifconf *));
-static void clear_iaconf __P((struct ia_conf *));
+static void clear_iaconf __P((struct ia_conflist *));
 static void clear_hostconf __P((struct host_conf *));
 static int configure_duid __P((char *, struct duid *));
 static int get_default_ifid __P((struct prefix_ifconf *));
-static struct ia_conf *find_iaconf_fromhead __P((struct ia_conf *, u_int32_t));
+static struct ia_conf *find_iaconf_fromhead __P((struct ia_conflist *,
+    int, u_int32_t));
 
 void
 ifinit(ifname)
@@ -132,6 +132,9 @@ ifinit(ifname)
 	ifp->linkid = ifp->ifid; /* XXX */
 #endif
 
+	TAILQ_INIT(&ifp->reqopt_list);
+	TAILQ_INIT(&ifp->iaconf_list);
+
 	ifp->next = dhcp6_if;
 	dhcp6_if = ifp;
 	return;
@@ -166,8 +169,8 @@ configure_interface(iflist)
 		}
 
 		ifc->server_pref = DH6OPT_PREF_UNDEF;
-		TAILQ_INIT(&ifc->iapd_list);
 		TAILQ_INIT(&ifc->reqopt_list);
+		TAILQ_INIT(&ifc->iaconf_list);
 
 		for (cfl = ifp->params; cfl; cfl = cfl->next) {
 			switch(cfl->type) {
@@ -247,13 +250,14 @@ configure_ia(ialist, iatype)
 	iatype_t iatype;
 {
 	struct cf_namelist *iap;
-	struct ia_conf *iac = NULL, **iac_head;
+	struct ia_conf *iac = NULL;
 	size_t confsize;
+
+	TAILQ_INIT(&ia_conflist0);
 
 	switch(iatype) {
 	case IATYPE_PD:
 		confsize = sizeof(struct iapd_conf);
-		iac_head = (struct ia_conf **)&iapd_conflist0;
 		break;
 	default:
 		dprintf(LOG_ERR, "%s" "internal error", FNAME);
@@ -272,10 +276,10 @@ configure_ia(ialist, iatype)
 		memset(iac, 0, confsize);
 
 		/* common initialization */
-		iac->next = *iac_head;
-		*iac_head = iac;
 		iac->type = iatype;
 		iac->iaid = (u_int32_t)atoi(iap->name);
+		TAILQ_INIT(&iac->iadata);
+		TAILQ_INSERT_TAIL(&ia_conflist0, iac, link);
 
 		/* IA-type specific initialization */
 		switch(iatype) {
@@ -639,8 +643,7 @@ get_default_ifid(pif)
 void
 configure_cleanup()
 {
-	clear_iaconf((struct ia_conf *)iapd_conflist0);
-	iapd_conflist0 = NULL;
+	clear_iaconf(&ia_conflist0);
 	clear_ifconf(dhcp6_ifconflist);
 	dhcp6_ifconflist = NULL;
 	clear_hostconf(host_conflist0);
@@ -654,6 +657,7 @@ configure_commit()
 {
 	struct dhcp6_ifconf *ifc;
 	struct dhcp6_if *ifp;
+	struct ia_conf *iac;
 
 	/* commit interface configuration */
 	for (ifc = dhcp6_ifconflist; ifc; ifc = ifc->next) {
@@ -662,41 +666,38 @@ configure_commit()
 
 			ifp->allow_flags = ifc->allow_flags;
 
-			dhcp6_clear_list(&ifp->iapd_list);
-			ifp->iapd_list = ifc->iapd_list;
-			TAILQ_INIT(&ifc->iapd_list);
-
 			dhcp6_clear_list(&ifp->reqopt_list);
-			ifp->reqopt_list = ifc->reqopt_list;
-			TAILQ_INIT(&ifc->reqopt_list);
+			dhcp6_move_list(&ifp->reqopt_list, &ifc->reqopt_list);
+
+			clear_iaconf(&ifp->iaconf_list);
+			while ((iac = TAILQ_FIRST(&ifc->iaconf_list))
+			    != NULL) {
+				TAILQ_REMOVE(&ia_conflist0, iac, link);
+				TAILQ_INSERT_TAIL(&ifp->iaconf_list,
+				    iac, link);
+			}
 
 			ifp->server_pref = ifc->server_pref;
 		}
 	}
 	clear_ifconf(dhcp6_ifconflist);
+	dhcp6_ifconflist = NULL;
 
-	/* commit IA_PD configuration */
-	if (iapd_conflist) {
-		/* clear previous configuration. (need more work?) */
-		clear_pd_pif(iapd_conflist);
+	/* clear unused IA configuration */
+	if (!TAILQ_EMPTY(&ia_conflist0)) {
+		dprintf(LOG_INFO, "%s" "some IA configuration defined "
+		    "but not used", FNAME);
 	}
-	iapd_conflist = iapd_conflist0;
-	iapd_conflist0 = NULL;
+	clear_iaconf(&ia_conflist0);
 
-	/* commit prefix configuration */
-	if (host_conflist) {
-		/* clear previous configuration. (need more work?) */
-		clear_hostconf(host_conflist);
-	}
+	/* commit per-host configuration */
+	clear_hostconf(host_conflist);
 	host_conflist = host_conflist0;
 	host_conflist0 = NULL;
 
 	/* commit DNS addresses */
-	if (!TAILQ_EMPTY(&dnslist)) {
-		dhcp6_clear_list(&dnslist);
-	}
-	dnslist = dnslist0;
-	TAILQ_INIT(&dnslist0);
+	dhcp6_clear_list(&dnslist);
+	dhcp6_move_list(&dnslist, &dnslist0);
 }
 
 static void
@@ -709,8 +710,9 @@ clear_ifconf(iflist)
 		ifc_next = ifc->next;
 
 		free(ifc->ifname);
-		dhcp6_clear_list(&ifc->iapd_list);
 		dhcp6_clear_list(&ifc->reqopt_list);
+
+		clear_iaconf(&ifc->iaconf_list);
 
 		free(ifc);
 	}
@@ -734,12 +736,17 @@ clear_pd_pif(iapdc)
 
 static void
 clear_iaconf(ialist)
-	struct ia_conf *ialist;
+	struct ia_conflist *ialist;
 {
-	struct ia_conf *iac, *iac_next;
+	struct ia_conf *iac;
 
-	for (iac = ialist; iac; iac = iac_next) {
-		iac_next = iac->next;
+	while ((iac = TAILQ_FIRST(ialist)) != NULL) {
+		TAILQ_REMOVE(ialist, iac, link);
+
+		if (!TAILQ_EMPTY(&iac->iadata)) {
+			dprintf(LOG_ERR, "%s" "assumption failure", FNAME);
+			exit(1);
+		}
 
 		switch(iac->type) {
 		case IATYPE_PD:
@@ -777,8 +784,7 @@ add_options(opcode, ifc, cfl0)
 	struct dhcp6_listval *opt;
 	struct cf_list *cfl;
 	int opttype;
-	struct dhcp6_ia ia;
-	struct iapd_conf *iapdc;
+	struct ia_conf *iac;
 
 	for (cfl = cfl0; cfl; cfl = cfl->next) {
 		if (opcode ==  DHCPOPTCODE_REQUEST) {
@@ -813,10 +819,9 @@ add_options(opcode, ifc, cfl0)
 		case DHCPOPT_IA_PD:
 			switch(opcode) {
 			case DHCPOPTCODE_SEND:
-				iapdc = (struct iapd_conf *)find_iaconf_fromhead(
-				    (struct ia_conf *)iapd_conflist0,
+				iac = find_iaconf(&ia_conflist0, IATYPE_PD,
 				    (u_int32_t)cfl->num);
-				if (iapdc == NULL) {
+				if (iac == NULL) {
 					dprintf(LOG_ERR, "%s" "%s:%d "
 					    "IA_PD (%lu) is not defined",
 					    FNAME, configfilename, cfl->line,
@@ -824,24 +829,10 @@ add_options(opcode, ifc, cfl0)
 					return (-1);
 				}
 
-				/*
-				 * Set up IA parameters.  Currently only
-				 * IAID is configurable.
-				 */
-				memset(&ia, 0, sizeof(ia));
-				ia.iaid = (u_int32_t)cfl->num;
+				TAILQ_REMOVE(&ia_conflist0, iac, link);
+				TAILQ_INSERT_TAIL(&ifc->iaconf_list,
+				    iac, link);
 
-				/*
-				 * add the option information to the local
-				 * configuration.
-				 */
-				if (dhcp6_add_listval(&ifc->iapd_list,
-				    DHCP6_LISTVAL_IAPD,
-				    &ia, &iapdc->iapd_prefix_list) == NULL) {
-					dprintf(LOG_ERR, "%s" "failed to "
-					    "configure an option", FNAME);
-					return (-1);
-				}
 				break;
 			default:
 				dprintf(LOG_ERR, "%s" "invalid operation (%d) "
@@ -992,38 +983,31 @@ find_ifconfbyid(id)
 	return (NULL);
 }
 
-static struct ia_conf *
-find_iaconf_fromhead(head, iaid)
-	struct ia_conf *head;
+struct ia_conf *
+find_iaconf(head, type, iaid)
+	struct ia_conflist *head;
+	int type;
 	u_int32_t iaid;
 {
 	struct ia_conf *iac;
 
-	for (iac = head; iac; iac = iac->next) {
-		if (iac->iaid == iaid)
+	for (iac = TAILQ_FIRST(head); iac; iac = TAILQ_NEXT(iac, link)) {
+		if (iac->type == type && iac->iaid == iaid)
 			return (iac);
 	}
 
 	return (NULL);
 }
 
+#if 0
 struct ia_conf *
 find_iaconf(type, iaid)
 	int type;
 	u_int32_t iaid;
 {
-	struct ia_conf *iac_head;
-
-	switch(type) {
-	case IATYPE_PD:
-		iac_head = (struct ia_conf *)iapd_conflist;
-		break;
-	default:
-		return (NULL);
-	}
-
-	return (find_iaconf_fromhead(iac_head, iaid));
+	return (find_iaconf_fromhead(ia_conflist, type, iaid));
 }
+#endif
 
 struct host_conf *
 find_hostconf(duid)

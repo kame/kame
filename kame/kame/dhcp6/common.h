@@ -1,4 +1,4 @@
-/*	$KAME: common.h,v 1.31 2003/01/21 12:05:36 jinmei Exp $	*/
+/*	$KAME: common.h,v 1.32 2003/01/27 13:21:52 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -48,6 +48,7 @@ extern char *device;
 
 /* common.c */
 extern int dhcp6_copy_list __P((struct dhcp6_list *, struct dhcp6_list *));
+extern void dhcp6_move_list __P((struct dhcp6_list *, struct dhcp6_list *));
 extern void dhcp6_clear_list __P((struct dhcp6_list *));
 extern void dhcp6_clear_listval __P((struct dhcp6_listval *));
 extern struct dhcp6_listval *dhcp6_find_listval __P((struct dhcp6_list *,
@@ -56,6 +57,7 @@ extern struct dhcp6_listval *dhcp6_add_listval __P((struct dhcp6_list *,
     dhcp6_listval_type_t, void *, struct dhcp6_list *));
 extern struct dhcp6_event *dhcp6_create_event __P((struct dhcp6_if *, int));
 extern void dhcp6_remove_event __P((struct dhcp6_event *));
+extern void dhcp6_remove_evdata __P((struct dhcp6_event *));
 extern int getifaddr __P((struct in6_addr *, char *, struct in6_addr *,
 			  int, int, int));
 extern int transmit_sa __P((int, struct sockaddr *, char *, size_t));

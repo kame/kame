@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.8 2003/01/23 05:08:59 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.9 2003/01/27 13:21:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -51,6 +51,9 @@ typedef enum {IAS_ACTIVE, IAS_RENEW, IAS_REBIND} iastate_t;
 struct ia {
 	TAILQ_ENTRY(ia) link;
 
+	/* back pointer to configuration */
+	struct ia_conf *conf;
+
 	/* identifier of this IA */
 	iatype_t iatype;
 	u_int32_t iaid;
@@ -68,27 +71,20 @@ struct ia {
 	struct dhcp6_if *ifp;	/* DHCP interface */
 	struct duid serverid;	/* the server ID that provided this IA */
 
-	/* control information shared with each particular config routines */
+	/* control information shared with each particular config routine */
 	struct iactl *ctl;
 };
-static TAILQ_HEAD(, ia) ia_listhead;
 
 static void callback __P((struct ia *));
 static int release_ia __P((struct ia *));
 static void remove_ia __P((struct ia *));
-static struct ia *get_ia __P((iatype_t, struct dhcp6_if *,
+static struct ia *get_ia __P((iatype_t, struct dhcp6_if *, struct ia_conf *,
     struct dhcp6_listval *, struct duid *));
-static struct ia *find_ia __P((iatype_t, u_int32_t));
+static struct ia *find_ia __P((struct ia_conf *, iatype_t, u_int32_t));
 static struct dhcp6_timer *ia_timo __P((void *));
 
 static char *iastr __P((iatype_t));
 static char *statestr __P((iastate_t));
-
-void
-init_ia()
-{
-	TAILQ_INIT(&ia_listhead);
-}
 
 void
 update_ia(iatype, ialist, ifp, serverid)
@@ -106,8 +102,10 @@ update_ia(iatype, ialist, ifp, serverid)
 
 	for (iav = TAILQ_FIRST(ialist); iav; iav = TAILQ_NEXT(iav, link)) {
 		/* if we're not interested in this IA, ignore it. */
-		if ((iac = find_iaconf(iatype, iav->val_ia.iaid)) == NULL)
+		if ((iac = find_iaconf(&ifp->iaconf_list, iatype,
+		    iav->val_ia.iaid)) == NULL) {
 			continue;
+		}
 
 		/* validate parameters */
 		if (iav->val_ia.t2 != 0 && iav->val_ia.t1 > iav->val_ia.t2) {
@@ -117,7 +115,7 @@ update_ia(iatype, ialist, ifp, serverid)
 		}
 
 		/* locate or make the local IA */
-		ia = get_ia(iatype, ifp, iav, serverid);
+		ia = get_ia(iatype, ifp, iac, iav, serverid);
 
 		/* update IA configuration information */
 		for (siav = TAILQ_FIRST(&iav->sublist); siav;
@@ -231,35 +229,36 @@ static void
 callback(ia)
 	struct ia *ia;
 {
-	struct dhcp6_if *ifp;
-
 	/* see if this IA is still valid.  if not, remove it. */
 	if (ia->ctl == NULL || !(*ia->ctl->isvalid)(ia->ctl)) {
 		dprintf(LOG_DEBUG, "%s" "IA %s-%lu is invalidated",
 		    FNAME, iastr(ia->iatype), ia->iaid);
-		ifp = ia->ifp;
 		remove_ia(ia);
-
-		(void)client6_ifinit(ifp);
 	}
 }
 
 void
-release_all_ia()
+release_all_ia(ifp)
+	struct dhcp6_if *ifp;
 {
+	struct ia_conf *iac;
 	struct ia *ia, *ia_next;
 
-	for (ia = TAILQ_FIRST(&ia_listhead); ia; ia = ia_next) {
-		ia_next = TAILQ_NEXT(ia, link);
+	for (iac = TAILQ_FIRST(&ifp->iaconf_list); iac;
+	    iac = TAILQ_NEXT(iac, link)) {
+		for (ia = TAILQ_FIRST(&iac->iadata); ia; ia = ia_next) {
+			ia_next = TAILQ_NEXT(ia, link);
 
-		(void)release_ia(ia);
+			(void)release_ia(ia);
 
-		/*
-		 * The client MUST stop using all of the addresses being
-		 * released as soon as the client begins the Release message
-		 * exchange process.
-		 */
-		remove_ia(ia);
+			/*
+			 * The client MUST stop using all of the addresses
+			 * being released as soon as the client begins the
+			 * Release message exchange process.
+			 * [dhcpv6-28 Section 18.1.6]
+			 */
+			remove_ia(ia);
+		}
 	}
 }
 
@@ -333,10 +332,13 @@ static void
 remove_ia(ia)
 	struct ia *ia;
 {
+	struct ia_conf *iac = ia->conf;
+	struct dhcp6_if *ifp = ia->ifp;
+
 	dprintf(LOG_DEBUG, "%s" "remove an IA: %s-%lu", FNAME,
 	    iastr(ia->iatype), ia->iaid);
 
-	TAILQ_REMOVE(&ia_listhead, ia, link);
+	TAILQ_REMOVE(&iac->iadata, ia, link);
 
 	duidfree(&ia->serverid);
 
@@ -356,6 +358,8 @@ remove_ia(ia)
 		(*ia->ctl->cleanup)(ia->ctl);
 
 	free(ia);
+
+	(void)client6_ifinit(ifp);
 }
 
 static struct dhcp6_timer *
@@ -488,9 +492,10 @@ ia_timo(arg)
 }
 
 static struct ia *
-get_ia(type, ifp, iaparam, serverid)
+get_ia(type, ifp, iac, iaparam, serverid)
 	iatype_t type;
 	struct dhcp6_if *ifp;
+	struct ia_conf *iac;
 	struct dhcp6_listval *iaparam;
 	struct duid *serverid;
 {
@@ -504,7 +509,7 @@ get_ia(type, ifp, iaparam, serverid)
 		return (NULL);
 	}
 
-	if ((ia = find_ia(type, iaparam->val_ia.iaid)) == NULL) {
+	if ((ia = find_ia(iac, type, iaparam->val_ia.iaid)) == NULL) {
 		if ((ia = malloc(sizeof(*ia))) == NULL) {
 			dprintf(LOG_NOTICE, "%s" "memory allocation failed"
 			    FNAME);
@@ -516,7 +521,8 @@ get_ia(type, ifp, iaparam, serverid)
 		ia->iaid = iaparam->val_ia.iaid;
 		ia->state = IAS_ACTIVE;
 
-		TAILQ_INSERT_TAIL(&ia_listhead, ia, link);
+		TAILQ_INSERT_TAIL(&iac->iadata, ia, link);
+		ia->conf = iac;
 
 		create = 1;
 	} else
@@ -534,13 +540,14 @@ get_ia(type, ifp, iaparam, serverid)
 }
 
 static struct ia *
-find_ia(type, iaid)
+find_ia(iac, type, iaid)
+	struct ia_conf *iac;
 	iatype_t type;
 	u_int32_t iaid;
 {
 	struct ia *ia;
 
-	for (ia = TAILQ_FIRST(&ia_listhead); ia;
+	for (ia = TAILQ_FIRST(&iac->iadata); ia;
 	    ia = TAILQ_NEXT(ia, link)) {
 		if (ia->iatype == type && ia->iaid == iaid)
 			return (ia);
