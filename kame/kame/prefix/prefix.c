@@ -43,6 +43,9 @@
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
+
+#include <netinet6/nd6.h>	/* just for ND6_INFINITE_LIFETIME */
+
 #include <arpa/inet.h>
 #include <netdb.h>
 
@@ -58,28 +61,45 @@
 #define DEF_ADVVALIDLIFETIME 2592000
 #define DEF_ADVPREFERREDLIFETIME 604800
 struct	in6_prefixreq	prereq = {{NULL}, /* interface name */
-				      PR_ORIG_STATIC,
-				      64, /* default plen */
-				      2592000, /* vltime=30days */
-				      604800, /* pltime=7days */
-				      /* ra onlink=1 autonomous=1 */
-				      {{1,1,0}},
-				      {NULL}};  /* prefix */
+				  PR_ORIG_STATIC,
+				  64, /* default plen */
+#if 0
+				  /*
+				   * XXX: if we used finite values, the prefix
+				   * command would make the lifetimes of the
+				   * routers' addresses finite, which would never
+				   * increment and be invalidated in the future.
+				   */
+				  2592000, /* vltime=30days */
+				  604800, /* pltime=7days */
+#else
+				  ND6_INFINITE_LIFETIME, /* vltime=inf. */
+				  ND6_INFINITE_LIFETIME, /* pltime=inf. */
+#endif
+				  /* ra onlink=1 autonomous=1 */
+				  {{1,1,0}},
+				  {NULL}};  /* prefix */
 struct	in6_rrenumreq	rrreq = {{NULL}, /* interface name */
-					 PR_ORIG_STATIC, /* default origin */
-					 64, /* default match len */
-					 0, /* default min match len */
-					 128, /* default max match len */
-					 0, /* default uselen */
-					 0, /* default keeplen */
-				         {1,1,0}, /* default raflag mask */
-					 2592000, /* vltime=30days */
-					 604800, /* pltime=7days */
-					 /* ra onlink=1 autonomous=1 */
-					 {{1,1,0}},
-					 {NULL}, /* match prefix */
-					 {NULL} /* use prefix */
-					 };
+				 PR_ORIG_STATIC, /* default origin */
+				 64, /* default match len */
+				 0, /* default min match len */
+				 128, /* default max match len */
+				 0, /* default uselen */
+				 0, /* default keeplen */
+				 {1,1,0}, /* default raflag mask */
+#if 0
+				 /* XXX: see above */
+				 2592000, /* vltime=30days */
+				 604800, /* pltime=7days */
+#else
+				 ND6_INFINITE_LIFETIME, /* vltime=inf. */
+				 ND6_INFINITE_LIFETIME, /* pltime=inf. */
+#endif
+				 /* ra onlink=1 autonomous=1 */
+				 {{1,1,0}},
+				 {NULL}, /* match prefix */
+				 {NULL} /* use prefix */
+};
 
 #define C(x) ((caddr_t) &x)
 
