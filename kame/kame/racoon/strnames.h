@@ -26,24 +26,35 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: strnames.h,v 1.6 2000/07/04 14:15:22 sakane Exp $ */
+/* YIPS @(#)$Id: strnames.h,v 1.7 2000/08/31 10:20:05 sakane Exp $ */
 
-extern char *s_ipsecdoi_proto __P((int));
-extern char *s_ipsecdoi_trns __P((int, int));
-extern char *s_oakley_attr __P((int));
-extern char *s_oakley_attr_v __P((int, int));
-extern char *s_oakley_attr_method __P((int));
 extern char *s_isakmp_certtype __P((int));
-extern char *s_ipsec_level __P((int));
+extern char *s_isakmp_etype __P((int));
+extern char *s_isakmp_notify_msg __P((int));
+extern char *s_isakmp_nptype __P((int));
+extern char *s_ipsecdoi_proto __P((int));
+extern char *s_ipsecdoi_trns_isakmp __P((int));
+extern char *s_ipsecdoi_trns_ah __P((int));
+extern char *s_ipsecdoi_trns_esp __P((int));
+extern char *s_ipsecdoi_trns_ipcomp __P((int));
+extern char *s_ipsecdoi_trns __P((int, int));
 extern char *s_ipsecdoi_attr __P((int));
+extern char *s_ipsecdoi_ltype __P((int));
 extern char *s_ipsecdoi_encmode __P((int));
+extern char *s_ipsecdoi_auth __P((int));
 extern char *s_ipsecdoi_attr_v __P((int, int));
-extern char *s_algclass __P((int));
-extern char *s_algstrength __P((int));
-extern char *s_algtype __P((int, int));
 extern char *s_ipsecdoi_ident __P((int));
-extern char *s_isakmp_etype __P((u_int8_t));
-extern char *s_pfkey_type __P((u_int8_t));
-extern char *s_pfkey_satype __P((u_int8_t));
-extern char *s_isakmp_notify_msg __P((u_int16_t));
-extern char *s_isakmp_nptype __P((u_int8_t));
+extern char *s_oakley_attr __P((int));
+extern char *s_attr_isakmp_enc __P((int));
+extern char *s_attr_isakmp_hash __P((int));
+extern char *s_oakley_attr_method __P((int));
+extern char *s_attr_isakmp_desc __P((int));
+extern char *s_attr_isakmp_group __P((int));
+extern char *s_attr_isakmp_ltype __P((int));
+extern char *s_oakley_attr_v __P((int, int));
+extern char *s_ipsec_level __P((int));
+extern char *s_algstrength __P((int));
+extern char *s_algclass __P((int));
+extern char *s_algtype __P((int, int));
+extern char *s_pfkey_type __P((int));
+extern char *s_pfkey_satype __P((int));
