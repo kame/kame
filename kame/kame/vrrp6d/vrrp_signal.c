@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_signal.c,v 1.4 2002/07/10 07:41:46 ono Exp $	*/
+/*	$KAME: vrrp_signal.c,v 1.5 2003/04/16 10:08:50 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -84,11 +84,16 @@ void
 vrrp_signal_quit(int sig)
 {
 	int             cpt = 0;
-//	int             cpt2 = 0;
 	struct ether_addr *ethaddr;
 
 	while (vr_ptr[cpt]) {
+		if (vr_ptr[cpt]->state == VRRP_STATE_MASTER) {
+			vr_ptr[cpt]->priority = 0;
+			vrrp_network_send_advertisement(vr_ptr[cpt]);
+		}
+#if 0
 		ethaddr = &vr_ptr[cpt]->vr_if->ethaddr;
+#endif
 		vrrp_interface_vripaddr_delete(vr_ptr[cpt]);
 #if 0 /* XXX*/
 		while (vr_ptr[cpt]->vr_if->ip_addrs[cpt2].s_addr) {
