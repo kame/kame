@@ -82,7 +82,7 @@ Turn on debugging.
 Turn on logging.
 .It Fl w
 Turn on TCP Wrapping for external services. See the
-.Sx "IMPLEMENTATION NOTES"
+.Sx "Implementation notes"
 section for more information on TCP Wrappers support.
 .It Fl W
 Turn on TCP Wrapping for internal services which are built in to
@@ -444,7 +444,7 @@ Except when started in debugging mode,
 records its process ID in the file
 .Pa /var/run/inet46d.pid
 to assist in reconfiguration.
-.Sh IMPLEMENTATION NOTES
+.Ss Implementation notes
 When given the
 .Fl w
 option,
@@ -491,7 +491,7 @@ as specified in
 should be used as the daemon name for
 .Dq internal
 services.
-.Sh TCPMUX
+.Ss TCPMUX
 .Pp
 .Tn RFC 1078 
 describes the TCPMUX protocol:
@@ -517,7 +517,7 @@ causes
 .Nm
 to list TCPMUX services in
 .Pa inet6d.conf .
-.Sh IPSEC
+.Ss IPsec
 The implementation includes tiny hack to support IPsec policy setting for
 each of the socket.
 A special form of comment line, starting with
