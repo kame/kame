@@ -716,6 +716,12 @@ nofilt:;
 			ipstat.ips_cantforward++;
 			return;
 		}
+#ifdef IPSEC
+		if (ipsec4_in_reject(m, NULL)) {
+			ipsecstat.in_polvio++;
+			goto bad;
+		}
+#endif
 		ip_forward(m, 0);
 	}
 	return;

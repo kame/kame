@@ -699,8 +699,15 @@ checkaddresses:;
 	if (ipforwarding == 0) {
 		ipstat.ips_cantforward++;
 		m_freem(m);
-	} else
+	} else {
+#ifdef IPSEC
+		if (ipsec4_in_reject(m, NULL)) {
+			ipsecstat.in_polvio++;
+			goto bad;
+		}
+#endif
 		ip_forward(m, 0);
+	}
 #ifdef IPFIREWALL_FORWARD
 	ip_fw_fwd_addr = NULL;
 #endif
