@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2608 2004/05/19 15:41:34 suz Exp $
+$KAME: CHANGELOG,v 1.2609 2004/05/20 09:39:52 suz Exp $
 
 <200405>
+2004-05-20  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
+	* freebsd5: sync with FreeBSD 5.2.1-RELEASE.
+	  ToDo: 
+		- reflect changes by FreeBSD community into KAME repository
+		- test ...
+		- additional features like ALTQ, MIP6, SSM, ...
+
 2004-05-19  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
 	* kame/kame/pim6sd/route.c: fixed a bug that (*,G) entry is not 
 	created at RP router when the RP address is specified in static-rp 
