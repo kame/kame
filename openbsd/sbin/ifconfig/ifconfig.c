@@ -1645,8 +1645,8 @@ in_getaddr(s, which)
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_RAW;
-	error = getaddrinfo(s, "NULL", &hints, &res);
+	hints.ai_socktype = SOCK_DGRAM;	/*dummy*/
+	error = getaddrinfo(s, "0", &hints, &res);
 	if (error) {
 #if 0	/* incompatible behavior! */
 		if ((np = getnetbyname(s)) != NULL) {
@@ -1712,14 +1712,40 @@ in6_getaddr(s, which)
 	char *s;
 	int which;
 {
-	struct sockaddr_in6 *sin = sin6tab[which];
+#ifndef KAME_SCOPEID
+	struct sockaddr_in6 *sin6 = sin6tab[which];
 
-	sin->sin6_len = sizeof(*sin);
+	sin->sin6_len = sizeof(*sin6);
 	if (which != MASK)
-		sin->sin6_family = AF_INET6;
+		sin6->sin6_family = AF_INET6;
 
-	if (inet_pton(AF_INET6, s, &sin->sin6_addr) != 1)
+	if (inet_pton(AF_INET6, s, &sin6->sin6_addr) != 1)
 		errx(1, "%s: bad value", s);
+#else
+	struct sockaddr_in6 *sin6 = sin6tab[which];
+	struct addrinfo hints, *res;
+	int error;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = SOCK_DGRAM;	/*dummy*/
+	error = getaddrinfo(s, "0", &hints, &res);
+	if (error)
+		errx(1, "%s: %s", s, gai_strerror(error));
+	if (res->ai_addrlen != sizeof(struct sockaddr_in6))
+		errx(1, "%s: bad value", s);
+	memcpy(sin6, res->ai_addr, res->ai_addrlen);
+#ifdef __KAME__
+	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr) &&
+	    *(u_int16_t *)&sin6->sin6_addr.s6_addr[2] == 0 &&
+	    sin6->sin6_scope_id) {
+		*(u_int16_t *)&sin6->sin6_addr.s6_addr[2] = 
+		    htons(sin6->sin6_scope_id & 0xffff);
+		sin6->sin6_scope_id = 0;
+	}
+#endif
+	freeaddrinfo(res);
+#endif
 }
 
 void
