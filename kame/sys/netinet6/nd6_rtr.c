@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.144 2001/07/22 01:13:11 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.145 2001/07/22 01:30:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -771,10 +771,43 @@ defrouter_select()
 	installcount = 0;
 
 	/*
-	 * If default router list is empty, no need to chase the chain
+	 * Let's handle easy case (3) first:
+	 * If default router list is empty, we should probably install
+	 * an interface route and assume that all destinations are on-link.
+	 *
+	 * Otherwise, make sure we don't have the last-resort interface route.
 	 */
-	if (!TAILQ_FIRST(&nd_defrouter))
-		goto empty;
+	if (!TAILQ_FIRST(&nd_defrouter)) {
+		/*
+		 * XXX: The specification does not say this mechanism should
+		 * be restricted to hosts, but this would be not useful
+		 * (even harmful) for routers.
+		 * This test is meaningless due to a test at the beginning of
+		 * the function, but we intentionally keep it to make the note
+		 * clear.
+		 */
+		if (!ip6_forwarding) {
+			if (nd6_defifp) {
+				/*
+				 * Install a route to the default interface
+				 * as default route.
+				 */
+				defrouter_addifreq(nd6_defifp);
+			} else {
+				nd6log((LOG_INFO, "defrouter_select: "
+				    "there's no default router and no default"
+				    " interface\n"));
+			}
+		}
+		splx(s);
+		return;
+	}
+
+	/*
+	 * Make sure we do not have a default route for default
+	 * interface, we have one from default router list entries
+	 */
+	defrouter_delifreq();
 
 	/*
 	 * Search for a (probably) reachable router from the list.
@@ -827,43 +860,6 @@ defrouter_select()
 			if (dr->installed)
 				installcount++;
 		}
-	}
-
-	/*
-	 * If no default route was installed, we should probably install
-	 * an interface route and assume that all destinations are on-link.
-	 *
-	 * Otherwise, make sure we don't have the last-resort interface route.
-	 */
- empty:
-	if (installcount == 0) {
-		/*
-		 * XXX: The specification does not say this mechanism should
-		 * be restricted to hosts, but this would be not useful
-		 * (even harmful) for routers.
-		 * This test is meaningless due to a test at the beginning of
-		 * the function, but we intentionally keep it to make the note
-		 * clear.
-		 */
-		if (!ip6_forwarding) {
-			if (nd6_defifp) {
-				/*
-				 * Install a route to the default interface
-				 * as default route.
-				 */
-				defrouter_addifreq(nd6_defifp);
-			} else {
-				nd6log((LOG_INFO, "defrouter_select: "
-				    "there's no default router and no default"
-				    " interface\n"));
-			}
-		}
-	} else {
-		/*
-		 * Make sure we do not have a default route for default
-		 * interface, we have one from default router list entries
-		 */
-		defrouter_delifreq();
 	}
 
 	splx(s);
