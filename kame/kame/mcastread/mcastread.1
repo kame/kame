@@ -35,7 +35,7 @@
 .\"
 .Sh SYNOPSIS
 .Nm
-.Op Fl v
+.Op Fl v46
 .Ar interface
 .Ar address
 .Ar port
@@ -64,6 +64,15 @@ With
 .Fl v ,
 .Nm
 generates more messages.
+.Pp
+With
+.Fl 4
+and
+.Fl 6 ,
+you can use either IPv4 or IPv6.
+By default,
+.Nm
+uses IPv6.
 .\"
 .Sh RETURN VALUES
 .Nm
@@ -76,6 +85,3 @@ will exit with positive value on errors.
 The
 .Nm
 command first appeared in WIDE/KAME IPv6 protocol stack kit.
-.\"
-.Sh BUGS
-IPv4 is not supported.

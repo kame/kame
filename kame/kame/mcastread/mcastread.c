@@ -46,7 +46,7 @@
 FILE *outfp;
 int recvsock;
 int vflag = 0;
-int af = AF_INET;
+int af = AF_INET6;
 
 void recvloop __P((void));
 int get_socket __P((struct addrinfo *, char *, struct addrinfo **));
