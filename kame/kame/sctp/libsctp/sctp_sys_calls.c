@@ -1,7 +1,7 @@
-/*	$Header: /usr/home/sumikawa/kame/kame/kame/kame/sctp/libsctp/sctp_sys_calls.c,v 1.8 2004/06/14 05:33:30 itojun Exp $ */
+/*	$KAME: sctp_sys_calls.c,v 1.9 2004/08/17 06:08:53 itojun Exp $ */
 
 /*
- * Copyright (C) 2002 Cisco Systems Inc,
+ * Copyright (C) 2002, 2003, 2004 Cisco Systems Inc,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,26 +30,29 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/errno.h>
+#include <sys/syscall.h>
+#include <sys/uio.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <netinet/sctp_uio.h>
 #include <netinet/sctp.h>
-#include <stdlib.h>
-#include <arpa/inet.h>
-#include <sys/syscall.h>
-#include <unistd.h>
-#include <sys/uio.h>
 
 int
 sctp_connectx(int fd, struct sockaddr *addrs, int addrcnt)
 {
-	int i,len,ret,cnt;
+	int i,len,ret,cnt,*aa;
+	char *buf;
 	struct sockaddr *at;
 	len = sizeof(int);
 	at = addrs;
+	cnt = 0;
 	/* validate all the addresses and get the size */
 	for (i=0; i < addrcnt; i++) {
 		if ((at->sa_family != AF_INET) &&
@@ -58,7 +61,7 @@ sctp_connectx(int fd, struct sockaddr *addrs, int addrcnt)
 			return (-1);
 		}
 		len += at->sa_len;
-		at = (struct sockaddr *)((u_int8_t *)at + at->sa_len);
+		at = (struct sockaddr *)((caddr_t)at + at->sa_len);
 		cnt++;
 	}
 	/* do we have any? */
@@ -66,7 +69,16 @@ sctp_connectx(int fd, struct sockaddr *addrs, int addrcnt)
 		errno = EINVAL;
 		return(-1);
 	}
-	ret = setsockopt(fd, IPPROTO_SCTP, SCTP_CONNECT_X, (void *)addrs, (unsigned int)len);
+	buf = malloc(len);
+	if(buf == NULL) {
+		return(ENOMEM);
+	}
+	aa = (int *)buf;
+	*aa = cnt;
+	aa++;
+	memcpy((caddr_t)aa,addrs,(len-sizeof(int)));
+	ret = setsockopt(fd, IPPROTO_SCTP, SCTP_CONNECT_X, (void *)buf,
+			 (unsigned int)len);
 	return (ret);
 }
 
@@ -125,7 +137,7 @@ sctp_opt_info(int fd, sctp_assoc_t id, int opt, void *arg, size_t *size)
 	    (opt == SCTP_STATUS) || 
 	    (opt == SCTP_GET_PEER_ADDR_INFO)) { 
 		*(sctp_assoc_t *)arg = id;
-		return(getsockopt(fd, IPPROTO_SCTP, opt, arg, size));
+		return(getsockopt(fd, IPPROTO_SCTP, opt, arg, (int *)size));
 	}else{
 		errno = EOPNOTSUPP;
 		return(-1);
@@ -257,33 +269,53 @@ void sctp_freeladdrs(struct sockaddr *addrs)
 
 int
 sctp_sendmsg(int s, 
-	     void *data, 
+	     const void *data, 
 	     size_t len,
-	     struct sockaddr *to,
+	     const struct sockaddr *to,
 	     socklen_t tolen,
-	     uint32_t ppid,
-	     uint32_t flags,
-	     uint16_t stream_no,
-	     uint32_t timetolive,
-	     uint32_t context)
+	     u_int32_t ppid,
+	     u_int32_t flags,
+	     u_int16_t stream_no,
+	     u_int32_t timetolive,
+	     u_int32_t context)
 {
 	int sz;
 	struct msghdr msg;
 	struct iovec iov[2];
 	char controlVector[256];
+	char whoset=0;
 	struct sctp_sndrcvinfo *s_info;
 	struct cmsghdr *cmsg;
+	struct sockaddr *who=NULL;
+	struct sockaddr_in in;
+	struct sockaddr_in6 in6;
 
-	iov[0].iov_base = data;
+	if (to->sa_len == 0) {
+		/* For the lazy app, that did not
+		 * set sa_len, we attempt to set for them.
+		 */
+ 		if(to->sa_family == AF_INET){
+			memcpy(&in,to,sizeof(in));
+			in.sin_len = sizeof(in);
+			who = (struct sockaddr *)&in;
+			whoset = 1;
+		}else if(to->sa_family == AF_INET6){
+			memcpy(&in6,to,sizeof(in6));
+			in6.sin6_len = sizeof(in6);
+			who = (struct sockaddr *)&in6;
+			whoset = 1;
+		}
+	}
+	iov[0].iov_base = (char *)data;
 	iov[0].iov_len = len;
 	iov[1].iov_base = NULL;
 	iov[1].iov_len = 0;
 
-	/* set the length if the caller has not */
-	to->sa_len = tolen;
-
-	msg.msg_name = (caddr_t)to;
-	msg.msg_namelen = to->sa_len;
+	if(whoset)
+		msg.msg_name = (caddr_t)who;
+	else
+		msg.msg_name = (caddr_t)to;
+	msg.msg_namelen = in.sin_len;
 	msg.msg_iov = iov;
 	msg.msg_iovlen = 1;
 	msg.msg_control = (caddr_t)controlVector;
@@ -309,6 +341,44 @@ sctp_sendmsg(int s,
 }
 
 ssize_t
+sctp_send(int sd, const void *data, size_t len,
+	  const struct sctp_sndrcvinfo *sinfo,
+	  int flags)
+{
+	int sz;
+	struct msghdr msg;
+	struct iovec iov[2];
+	struct sctp_sndrcvinfo *s_info;
+	char controlVector[256];
+	struct cmsghdr *cmsg;
+
+	iov[0].iov_base = (char *)data;
+	iov[0].iov_len = len;
+	iov[1].iov_base = NULL;
+	iov[1].iov_len = 0;
+
+	msg.msg_name = 0;
+	msg.msg_namelen = 0;
+	msg.msg_iov = iov;
+	msg.msg_iovlen = 1;
+	msg.msg_control = (caddr_t)controlVector;
+  
+	cmsg = (struct cmsghdr *)controlVector;
+
+	cmsg->cmsg_level = IPPROTO_SCTP;
+	cmsg->cmsg_type = SCTP_SNDRCV;
+	cmsg->cmsg_len = CMSG_LEN (sizeof(struct sctp_sndrcvinfo) );
+	s_info = (struct sctp_sndrcvinfo *)CMSG_DATA(cmsg);
+	/* copy in the data */
+	*s_info = *sinfo;
+	errno = 0;
+	msg.msg_controllen = cmsg->cmsg_len;
+	sz = sendmsg(sd, &msg, flags);
+	return(sz);
+}
+
+
+ssize_t
 sctp_recvmsg (int s, 
 	      void *dbuf, 
 	      size_t len,
@@ -321,10 +391,8 @@ sctp_recvmsg (int s,
 	ssize_t sz;
 	struct msghdr msg;
 	struct iovec iov[2];
-	char controlVector[65535];
+	char controlVector[2048];
 	struct cmsghdr *cmsg;
-
-	
 	iov[0].iov_base = dbuf;
 	iov[0].iov_len = len;
 	iov[1].iov_base = NULL;
@@ -337,7 +405,9 @@ sctp_recvmsg (int s,
 	msg.msg_controllen = sizeof(controlVector);
 	errno = 0;
 	sz = recvmsg(s,&msg,0);
+
 	s_info = NULL;
+	len = sz;
 	*msg_flags = msg.msg_flags;
 	*fromlen = msg.msg_namelen;
 	if ((msg.msg_controllen) && sinfo) {
