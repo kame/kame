@@ -505,6 +505,9 @@ wlattach(struct isa_device *id)
        ifp->if_done
        ifp->if_reset
        */
+#ifdef ALTQ
+    ifp->if_altqflags |= ALTQF_READY;
+#endif
     if_attach(ifp);
     ether_ifattach(ifp);
 
@@ -889,6 +892,12 @@ wlstart(struct ifnet *ifp)
 
     /* get ourselves some data */
     ifp = &(sc->wl_if);
+#ifdef ALTQ
+    if (ALTQ_IS_ON(ifp)) {
+	    m = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+    }
+    else
+#endif
     IF_DEQUEUE(&ifp->if_snd, m);
     if (m != (struct mbuf *)0) {
 	/* let BPF see it before we commit it */

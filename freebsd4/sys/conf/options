@@ -225,6 +225,28 @@ DFLDSIZ			opt_rlimit.h
 MAXDSIZ			opt_rlimit.h
 
 # Net stuff.
+# altq stuff
+ALTQ			opt_global.h
+ALTQ_ECN		opt_global.h
+CBQ			opt_altq.h
+WFQ			opt_altq.h
+AFMAP			opt_altq.h
+FIFOQ			opt_altq.h
+RED			opt_altq.h
+FLOWVALVE		opt_altq.h
+CBQ_RED			opt_altq.h
+RIO			opt_altq.h
+CBQ_RIO			opt_altq.h
+ALTQ_ACCOUNT		opt_altq.h
+ALTQ_IPSEC		opt_altq.h
+LOCALQ			opt_altq.h
+HFSC			opt_altq.h
+HFSC_RED		opt_altq.h
+HFSC_RIO		opt_altq.h
+CDNR			opt_altq.h
+BLUE			opt_altq.h
+ALTQ_DEBUG		opt_altq.h
+ 
 BOOTP			opt_bootp.h
 BOOTP_COMPAT		opt_bootp.h
 BOOTP_NFSROOT		opt_bootp.h

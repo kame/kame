@@ -1146,6 +1146,9 @@ struct ti_softc {
 	u_int32_t		ti_tx_buf_ratio;
 	int			ti_if_flags;
 	int			ti_txcnt;
+#ifdef ALTQ
+	int			ti_tx_queued;	/* # of active tx packets */
+#endif
 };
 
 /*

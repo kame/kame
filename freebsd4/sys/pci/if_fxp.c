@@ -266,6 +266,18 @@ static int tx_threshold = 64;
  */
 #define FXP_TXCB_MASK	(FXP_NTXCB - 1)
 
+#ifdef ALTQ
+/*
+ * device dependent tweak for ALTQ:  if a driver is designed to dequeue
+ * too many packets at a time, we have to modify the driver to limit the
+ * number of packets buffered in the device.  This modification
+ * often needs to change handling of tx complete interrupts as well.
+ * the fxp driver can pull as many as 128 packets (when FXP_NTXCB is 128).
+ * TXBUF_THRESH4ALTQ limits buffered packets up to 8.
+ */
+#define TXBUF_THRESH4ALTQ	8
+#endif
+
 /*
  * Number of receive frame area buffers. These are large so chose
  * wisely.
@@ -406,6 +418,9 @@ fxp_attach(parent, self, aux)
 	ifp->if_ioctl = fxp_ioctl;
 	ifp->if_start = fxp_start;
 	ifp->if_watchdog = fxp_watchdog;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 	/*
 	 * Attach the interface.
@@ -590,6 +605,9 @@ fxp_attach(device_t dev)
 	ifp->if_ioctl = fxp_ioctl;
 	ifp->if_start = fxp_start;
 	ifp->if_watchdog = fxp_watchdog;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 	/*
 	 * Attach the interface.
@@ -898,14 +916,40 @@ fxp_start(ifp)
 	 * NOTE: One TxCB is reserved to guarantee that fxp_mc_setup() can add
 	 *       a NOP command when needed.
 	 */
+#ifdef ALTQ
+	while (sc->tx_queued < FXP_NTXCB - 1) {
+#else
 	while (ifp->if_snd.ifq_head != NULL && sc->tx_queued < FXP_NTXCB - 1) {
+#endif
 		struct mbuf *m, *mb_head;
 		int segment;
 
 		/*
 		 * Grab a packet to transmit.
 		 */
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+			if (sc->tx_queued >= TXBUF_THRESH4ALTQ) {
+				/*
+				 * stop filling tx buffer if we already have
+				 * enough packets to transmit.
+				 * we need an interrupt upon tx complete
+				 * to continue sending.
+				 */
+				if (txp != NULL)
+					txp->cb_command |= FXP_CB_COMMAND_I;
+				break;
+			}
+
+			mb_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		}
+		else
+			IF_DEQUEUE(&ifp->if_snd, mb_head);
+		if (mb_head == NULL)
+			break;
+#else
 		IF_DEQUEUE(&ifp->if_snd, mb_head);
+#endif
 
 		/*
 		 * Get pointer to next available tx desc.
@@ -1053,6 +1097,11 @@ fxp_intr(arg)
 			/*
 			 * Try to start more packets transmitting.
 			 */
+#ifdef ALTQ
+			if (ALTQ_IS_ON(ifp))
+			        fxp_start(ifp);
+			else
+#endif
 			if (ifp->if_snd.ifq_head != NULL)
 				fxp_start(ifp);
 		}

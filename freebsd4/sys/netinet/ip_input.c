@@ -182,6 +182,9 @@ ip_dn_ctl_t *ip_dn_ctl_ptr;
 
 int (*fr_checkp) __P((struct ip *, int, struct ifnet *, int, struct mbuf **)) = NULL;
 
+#ifdef ALTQ
+int (*altq_input) __P((struct mbuf *, int)) = NULL;
+#endif
 
 /*
  * We need to save the IP options in case a protocol wants to respond
@@ -334,6 +337,11 @@ ip_input(struct mbuf *m)
 		goto bad;
 	}
 
+#ifdef ALTQ
+	if (altq_input != NULL && (*altq_input)(m, AF_INET) == 0)
+		/* packet is dropped by traffic conditioner */
+		return;
+#endif
 	/*
 	 * Convert fields to host representation.
 	 */
@@ -1631,9 +1639,19 @@ ip_forward(m, srcrt)
 		break;
 
 	case ENOBUFS:
+#ifdef ALTQ
+		/*
+		 * don't generate ICMP_SOURCEQUENCH
+		 * (RFC1812 Requirements for IP Version 4 Routers)
+		 */
+		if (mcopy)
+			m_freem(mcopy);
+		return;
+#else
 		type = ICMP_SOURCEQUENCH;
 		code = 0;
 		break;
+#endif
 	}
 	icmp_error(mcopy, type, code, dest, destifp);
 }

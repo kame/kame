@@ -403,6 +403,12 @@ ip_output(m0, opt, ro, flags, imo)
 #endif /* IPFIREWALL_FORWARD */
 	}
 #endif /* notdef */
+#ifdef ALTQ
+	/*
+	 * disable packet drop hack.
+	 * packetdrop should be done by queueing.
+	 */
+#else /* !ALTQ */
 	/*
 	 * Verify that we have any chance at all of being able to queue
 	 *      the packet or packet fragments
@@ -412,6 +418,7 @@ ip_output(m0, opt, ro, flags, imo)
 			error = ENOBUFS;
 			goto bad;
 	}
+#endif /* !ALTQ */
 
 	/*
 	 * Look for broadcast address and

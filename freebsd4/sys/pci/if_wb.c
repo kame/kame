@@ -954,6 +954,9 @@ static int wb_attach(dev)
 	ifp->if_init = wb_init;
 	ifp->if_baudrate = 10000000;
 	ifp->if_snd.ifq_maxlen = WB_TX_LIST_CNT - 1;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 	/*
 	 * Do MII setup.
@@ -1412,6 +1415,12 @@ static void wb_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, WB_IMR, WB_INTRS);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+		wb_start(ifp);
+	}
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL) {
 		wb_start(ifp);
 	}
@@ -1563,6 +1572,12 @@ static void wb_start(ifp)
 	start_tx = sc->wb_cdata.wb_tx_free;
 
 	while(sc->wb_cdata.wb_tx_free->wb_mbuf == NULL) {
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		}
+		else
+#endif
 		IF_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
@@ -1852,6 +1867,11 @@ static void wb_watchdog(ifp)
 	wb_reset(sc);
 	wb_init(sc);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp))
+		wb_start(ifp);
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL)
 		wb_start(ifp);
 

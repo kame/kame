@@ -131,6 +131,21 @@ static const char rcsid[] =
   "$FreeBSD: src/sys/pci/if_ti.c,v 1.25 2000/01/18 00:26:29 wpaul Exp $";
 #endif
 
+#ifdef ALTQ
+/*
+ * device dependent tweak for ALTQ:  if a driver is designed to dequeue
+ * too many packets at a time, we have to modify the driver to limit the
+ * number of packets buffered in the device.  This modification
+ * often needs to change handling of tx complete interrupts as well.
+ * the ti driver can pull as many as 512 packets (when TI_TX_RING_CNT is 512).
+ * TXBUF_THRESH4ALTQ limits buffered packets up to 64.
+ *
+ * note: tigon cards can drain packets much faster than CPU can fill the
+ * queue.  so, it isn't effective at this moment.
+ */
+#define TXBUF_THRESH4ALTQ	64
+#endif
+
 /*
  * Various supported device vendors/types and their names.
  */
@@ -1038,6 +1053,9 @@ static int ti_init_tx_ring(sc)
 	sc->ti_txcnt = 0;
 	sc->ti_tx_saved_considx = 0;
 	CSR_WRITE_4(sc, TI_MB_SENDPROD_IDX, 0);
+#ifdef ALTQ
+	sc->ti_tx_queued = 0;
+#endif
 	return(0);
 }
 
@@ -1709,6 +1727,9 @@ static int ti_attach(dev)
 	ifp->if_init = ti_init;
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_snd.ifq_maxlen = TI_TX_RING_CNT - 1;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 	/* Set up ifmedia support. */
 	ifmedia_init(&sc->ifmedia, IFM_IMASK, ti_ifmedia_upd, ti_ifmedia_sts);
@@ -1946,6 +1967,9 @@ static void ti_txeof(sc)
 		if (sc->ti_cdata.ti_tx_chain[idx] != NULL) {
 			m_freem(sc->ti_cdata.ti_tx_chain[idx]);
 			sc->ti_cdata.ti_tx_chain[idx] = NULL;
+#ifdef ALTQ
+			sc->ti_tx_queued--;
+#endif
 		}
 		sc->ti_txcnt--;
 		TI_INC(sc->ti_tx_saved_considx, TI_TX_RING_CNT);
@@ -1990,6 +2014,13 @@ static void ti_intr(xsc)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, TI_MB_HOSTINTR, 0);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+		if (ifp->if_flags & IFF_RUNNING)
+			ti_start(ifp);
+	}
+	else
+#endif
 	if (ifp->if_flags & IFF_RUNNING && ifp->if_snd.ifq_head != NULL)
 		ti_start(ifp);
 
@@ -2114,12 +2145,29 @@ static void ti_start(ifp)
 	struct ti_softc		*sc;
 	struct mbuf		*m_head = NULL;
 	u_int32_t		prodidx = 0;
+#ifdef ALTQ
+	int			pkts = 0;
+#endif
 
 	sc = ifp->if_softc;
 
 	prodidx = CSR_READ_4(sc, TI_MB_SENDPROD_IDX);
 
 	while(sc->ti_cdata.ti_tx_chain[prodidx] == NULL) {
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+			if (sc->ti_tx_queued >= TXBUF_THRESH4ALTQ) {
+				/*
+				 * stop filling tx buffer if we already have
+				 * enough packets to transmit.
+				 */
+				break;
+			}
+
+			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK);
+		}
+		else
+#endif
 		IF_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
@@ -2130,10 +2178,21 @@ static void ti_start(ifp)
 		 * for the NIC to drain the ring.
 		 */
 		if (ti_encap(sc, m_head, &prodidx)) {
+#ifdef ALTQ
+			if (!ALTQ_IS_ON(ifp))
+#endif
 			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
+
+#ifdef ALTQ
+		/* now we are committed to transmit the packet */
+		if (ALTQ_IS_ON(ifp))
+			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		sc->ti_tx_queued++;
+		pkts++;
+#endif
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -2142,6 +2201,11 @@ static void ti_start(ifp)
 		if (ifp->if_bpf)
 			bpf_mtap(ifp, m_head);
 	}
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp) && pkts == 0)
+		/* no packet to send */
+		return;
+#endif
 
 	/* Transmit */
 	CSR_WRITE_4(sc, TI_MB_SENDPROD_IDX, prodidx);

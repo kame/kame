@@ -29,6 +29,7 @@
 #include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
+#include <netinet/in_pcb.h>
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
 #include <netinet/in_var.h>
@@ -2131,6 +2132,12 @@ rsvp_input(m, off, proto)
     static struct sockaddr_in rsvp_src = { sizeof rsvp_src, AF_INET };
     register int s;
     struct ifnet *ifp;
+#ifdef ALTQ
+    /* support IP_RECVIF used by rsvpd rel4.2a1 */
+    struct inpcb *inp;
+    struct socket *so;
+    struct mbuf *opts;
+#endif
 
     if (rsvpdebug)
 	printf("rsvp_input: rsvp_on %d\n",rsvp_on);
@@ -2183,7 +2190,11 @@ rsvp_input(m, off, proto)
     if (rsvpdebug)
 	printf("rsvp_input: check socket\n");
 
+#ifdef ALTQ
+    if ((so = viftable[vifi].v_rsvpd) == NULL) {
+#else
     if (viftable[vifi].v_rsvpd == NULL) {
+#endif
 	/* drop packet, since there is no specific socket for this
 	 * interface */
 	    if (rsvpdebug)
@@ -2198,6 +2209,26 @@ rsvp_input(m, off, proto)
 	printf("rsvp_input: m->m_len = %d, sbspace() = %ld\n",
 	       m->m_len,sbspace(&(viftable[vifi].v_rsvpd->so_rcv)));
 
+#ifdef ALTQ
+    opts = NULL;
+    inp = (struct inpcb *)so->so_pcb;
+    if (inp->inp_flags & INP_CONTROLOPTS ||
+	inp->inp_socket->so_options & SO_TIMESTAMP)
+	ip_savecontrol(inp, &opts, ip, m);
+    if (sbappendaddr(&so->so_rcv,
+		     (struct sockaddr *)&rsvp_src,m, opts) == 0) {
+	m_freem(m);
+	if (opts)
+	    m_freem(opts);
+	if (rsvpdebug)
+	    printf("rsvp_input: Failed to append to socket\n");
+    }
+    else {
+	sorwakeup(so);
+	if (rsvpdebug)
+	    printf("rsvp_input: send packet up\n");
+    }
+#else /* !ALTQ */
     if (socket_send(viftable[vifi].v_rsvpd, m, &rsvp_src) < 0) {
 	if (rsvpdebug)
 	    printf("rsvp_input: Failed to append to socket\n");
@@ -2205,6 +2236,7 @@ rsvp_input(m, off, proto)
 	if (rsvpdebug)
 	    printf("rsvp_input: send packet up\n");
     }
+#endif /* !ALTQ */
 
     splx(s);
 }

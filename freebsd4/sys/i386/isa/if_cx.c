@@ -273,6 +273,9 @@ cxattach (struct isa_device *id)
 			c->ifp->if_ioctl = cxsioctl;
 			c->ifp->if_start = (start_func_t) cxstart;
 			c->ifp->if_watchdog = (watchdog_func_t) cxwatchdog;
+#ifdef ALTQ
+			c->ifp->if_altqflags |= ALTQF_READY;
+#endif
 			/* Init routine is never called by upper level? */
 			sppp_attach (c->ifp);
 			if_attach (c->ifp);

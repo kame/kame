@@ -14,6 +14,8 @@ SUBDIR+=bktr coff fpu gnufpu ibcs2 linux splash streams \
 	svr4 syscons vesa vinum wi
 .endif
 
+SUBDIR+=altq
+
 .if ${MACHINE_ARCH} == "alpha"
 SUBDIR+=osf1
 .endif

@@ -117,6 +117,18 @@
 
 #include <pci/if_devar.h>
 
+#ifdef ALTQ
+/*
+ * device dependent tweak for ALTQ:  if a driver is designed to dequeue
+ * too many packets at a time, we have to modify the driver to limit the
+ * number of packets buffered in the device.  This modification
+ * often needs to change handling of tx complete interrupts as well.
+ * the de driver can pull as many as 128 packets (when TULIP_TXDESCS is 128).
+ * TXBUF_THRESH4ALTQ limits buffered packets up to 8.
+ */
+#define TXBUF_THRESH4ALTQ	8
+#endif
+
 /*
  * This module supports
  *	the DEC 21040 PCI Ethernet Controller.
@@ -4158,6 +4170,11 @@ tulip_txput(
 #else
     struct mbuf *m0;
 #endif
+#ifdef ALTQ
+    struct ifnet *ifp = &sc->tulip_if;
+    struct mbuf *ombuf = m;
+    int compressed = 0;
+#endif
 
 #if defined(TULIP_DEBUG)
     if ((sc->tulip_cmdmode & TULIP_CMD_TXRUN) == 0) {
@@ -4170,6 +4187,23 @@ tulip_txput(
     }
 #endif
 
+#ifdef ALTQ
+    if (ALTQ_IS_ON(ifp)) {
+	if (sc->tulip_txq.ifq_len >= TXBUF_THRESH4ALTQ) {
+	    /*
+	     * stop filling tx buffer if we already have enough packets
+	     * to transmit.
+	     * we need to call tulip_tx_intr to release completed packets
+	     * from txq, and check the queue length again.
+	     */
+	    (void)tulip_tx_intr(sc);
+	    if (sc->tulip_txq.ifq_len >= TXBUF_THRESH4ALTQ) {
+		sc->tulip_flags |= TULIP_WANTTXSTART;
+		goto finish;
+	    }
+	}
+    }
+#endif
     /*
      * Now we try to fill in our transmit descriptors.  This is
      * a bit reminiscent of going on the Ark two by two
@@ -4308,6 +4342,28 @@ tulip_txput(
 		 * entries that we can use for one packet, so we have
 		 * recopy it into one mbuf and then try again.
 		 */
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+		    struct mbuf *tmp;
+		    /*
+		     * tulip_mbuf_compress() frees the original mbuf.
+		     * thus, we have to remove the mbuf from the queue
+		     * before calling it.
+		     * we don't have to worry about space shortage
+		     * after compressing the mbuf since the compressed
+		     * mbuf will take only two segs.
+		     */
+		    if (compressed) {
+			/* should not happen */
+			printf("tulip_txput: compress called twice!\n");
+			goto finish;
+		    }
+		    tmp = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		    if (tmp != ombuf)
+			panic("tulip_txput: different mbuf dequeued!");
+		    compressed = 1;
+		}
+#endif
 		m = tulip_mbuf_compress(m);
 		if (m == NULL)
 		    goto finish;
@@ -4363,6 +4419,18 @@ tulip_txput(
      * The descriptors have been filled in.  Now get ready
      * to transmit.
      */
+#ifdef ALTQ
+    if (ALTQ_IS_ON(ifp)) {
+	if (!compressed && (sc->tulip_flags & TULIP_TXPROBE_ACTIVE) == 0) {
+	    /* remove the mbuf from the queue */
+	    struct mbuf *tmp;
+	    tmp = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+	    if (tmp != ombuf)
+		panic("tulip_txput: different mbuf dequeued!");
+	}
+    }
+#endif
+
     IF_ENQUEUE(&sc->tulip_txq, m);
     m = NULL;
 
@@ -4710,6 +4778,14 @@ tulip_ifioctl(
     return error;
 }
 
+#ifdef ALTQ
+/*
+ * the original dequeueing policy is dequeue-and-prepend if something
+ * goes wrong.  when altq is used, it is changed to peek-and-dequeue.
+ * the modification becomes a bit complicated since tulip_txput() might
+ * copy and modify the mbuf passed.
+ */
+#endif
 /*
  * These routines gets called at device spl (from ether_output).  This might
  * pose a problem for TULIP_USE_SOFTINTR if ether_output is called at
@@ -4728,6 +4804,21 @@ tulip_ifstart(
 	if ((sc->tulip_flags & (TULIP_WANTSETUP|TULIP_TXPROBE_ACTIVE)) == TULIP_WANTSETUP)
 	    tulip_txput_setup(sc);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+	    struct mbuf *m, *m0;
+	    while ((m = (*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK)) != NULL) {
+		if ((m0 = tulip_txput(sc, m)) != NULL) {
+		    /* txput failed */
+		    if (m0 != m)
+			/* should not happen */
+			printf("tulip_if_start: bad mbuf dequeued!\n");
+		    break;
+		}
+	    }
+	}
+	else {
+#endif /* ALTQ */
 	while (sc->tulip_if.if_snd.ifq_head != NULL) {
 	    struct mbuf *m;
 	    IF_DEQUEUE(&sc->tulip_if.if_snd, m);
@@ -4738,6 +4829,9 @@ tulip_ifstart(
 	}
 	if (sc->tulip_if.if_snd.ifq_head == NULL)
 	    sc->tulip_if.if_start = tulip_ifstart_one;
+#ifdef ALTQ
+	}
+#endif
     }
 
     TULIP_PERFEND(ifstart);
@@ -4750,6 +4844,21 @@ tulip_ifstart_one(
     TULIP_PERFSTART(ifstart_one)
     tulip_softc_t * const sc = (tulip_softc_t *)ifp->if_softc;
 
+#ifdef ALTQ
+    if (ALTQ_IS_ON(ifp)) {
+	struct mbuf *m, *m0;
+	if ((sc->tulip_if.if_flags & IFF_RUNNING)
+	        && ((m = (*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK)) != NULL)) {
+	    if ((m0 = tulip_txput(sc, m)) != NULL) {
+		/* txput failed */
+		if (m0 != m)
+		    /* should not happen */
+		    printf("tulip_if_start: bad mbuf dequeued!\n");
+	    }
+	}
+    }
+    else
+#endif /* !ALTQ */
     if ((sc->tulip_if.if_flags & IFF_RUNNING)
 	    && sc->tulip_if.if_snd.ifq_head != NULL) {
 	struct mbuf *m;
@@ -4861,7 +4970,10 @@ tulip_attach(
     ifp->if_watchdog = tulip_ifwatchdog;
     ifp->if_timer = 1;
     ifp->if_output = ether_output;
-  
+#ifdef ALTQ
+    ifp->if_altqflags |= ALTQF_READY;
+#endif
+
     printf("%s%d: %s%s pass %d.%d%s\n",
 	   sc->tulip_name, sc->tulip_unit,
 	   sc->tulip_boardid,

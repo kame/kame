@@ -298,6 +298,9 @@ ep_attach(sc)
 	ifp->if_watchdog = ep_if_watchdog;
 	ifp->if_init = ep_if_init;
 	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 	if (!sc->epb.mii_trans) {
 		ifmedia_init(&sc->ifmedia, 0, ep_ifmedia_upd, ep_ifmedia_sts);
@@ -456,6 +459,11 @@ ep_if_start(ifp)
 
 startagain:
     /* Sneak a peek at the next packet */
+#ifdef ALTQ
+    if (ALTQ_IS_ON(ifp))
+	m = (*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK);
+    else
+#endif
     m = ifp->if_snd.ifq_head;
     if (m == 0) {
 	return;
@@ -473,6 +481,14 @@ startagain:
     if (len + pad > ETHER_MAX_LEN) {
 	/* packet is obviously too large: toss it */
 	++ifp->if_oerrors;
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+	    m = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+	    if (m != top)
+		panic("epstart: different mbuf dequeued!");
+	}
+	else
+#endif
 	IF_DEQUEUE(&ifp->if_snd, m);
 	m_freem(m);
 	goto readcheck;
@@ -489,6 +505,14 @@ startagain:
 	outw(BASE + EP_COMMAND, SET_TX_AVAIL_THRESH | EP_THRESH_DISABLE);
     }
 
+#ifdef ALTQ
+    if (ALTQ_IS_ON(ifp)) {
+	m = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+	if (m != top)
+	    panic("epstart: different mbuf dequeued!");
+    }
+    else
+#endif
     IF_DEQUEUE(&ifp->if_snd, m);
 
     s = splhigh();
@@ -537,6 +561,13 @@ readcheck:
 	 * we check if we have packets left, in that case we prepare to come
 	 * back later
 	 */
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+	    if ((*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK) != NULL)
+		outw(BASE + EP_COMMAND, SET_TX_AVAIL_THRESH | 8);
+	}
+	else
+#endif
 	if (ifp->if_snd.ifq_head) {
 	    outw(BASE + EP_COMMAND, SET_TX_AVAIL_THRESH | 8);
 	}
@@ -635,6 +666,13 @@ rescan:
 		     * To have a tx_avail_int but giving the chance to the
 		     * Reception
 		     */
+#ifdef ALTQ
+		    if (ALTQ_IS_ON(ifp)) {
+			if ((*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK) != NULL)
+			    outw(BASE + EP_COMMAND, SET_TX_AVAIL_THRESH | 8);
+		    }
+		    else
+#endif
 		    if (ifp->if_snd.ifq_head) {
 			outw(BASE + EP_COMMAND, SET_TX_AVAIL_THRESH | 8);
 		    }

@@ -658,6 +658,9 @@ struct dc_softc {
 #ifdef __alpha__
 	int			dc_srm_media;
 #endif
+#ifdef ALTQ
+	int			dc_tx_queued;	/* # of active tx packets */
+#endif
 };
 
 #define DC_TX_POLL		0x00000001

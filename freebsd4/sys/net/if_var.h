@@ -74,6 +74,9 @@ struct	ether_header;
 #endif
 
 #include <sys/queue.h>		/* get TAILQ macros */
+#if 1 /* ALTQ */
+#include <altq/if_altq.h>
+#endif
 
 TAILQ_HEAD(ifnethead, ifnet);	/* we use TAILQs so that the order of */
 TAILQ_HEAD(ifaddrhead, ifaddr);	/* instantiation is preserved in the list */
@@ -140,6 +143,17 @@ struct ifnet {
 	struct	ifqueue if_snd;		/* output queue */
 	struct	ifqueue *if_poll_slowq;	/* input queue for slow devices */
 	struct	ifprefixhead if_prefixhead; /* list of prefixes per if */
+#if 1 /* ALTQ */
+	/* alternate queueing related stuff */
+	int	if_altqtype;		/* queueing scheme id */
+	int	if_altqflags;		/* altq flags (e.g. ready, in-use) */
+	void	*if_altqp;		/* queue state */
+	int	(*if_altqenqueue)
+		__P((struct ifnet *, struct mbuf *, struct pr_hdr *, int));
+	struct mbuf *(*if_altqdequeue)
+		__P((struct ifnet *, int));
+	void	*if_altqcdnr;		/* input traffic conditioner */
+#endif /* ALTQ */
 };
 typedef void if_init_f_t __P((void *));
 

@@ -83,6 +83,9 @@
 
 #include <net/if.h>
 #include <net/if_types.h>
+#ifdef ALTQ
+#include <net/if_llc.h>
+#endif
 
 #include <netinet/in.h> /* for struct arpcom */
 #include <netinet/in_systm.h>
@@ -122,6 +125,9 @@ static void bdginit(void *);
 static void flush_table(void);
 static void bdg_promisc_on(void);
 static void parse_bdg_cfg(void);
+#ifdef ALTQ
+static int make_ether_prhdr __P((struct mbuf *, struct pr_hdr *));
+#endif
 
 static int bdg_ipfw = 0 ;
 int do_bridge = 0;
@@ -799,6 +805,34 @@ forward:
 	     * output if interface not yet active.
 	     */
 	    s = splimp();
+#ifdef ALTQ
+	    if (ALTQ_IS_ON(ifp)) {
+		    struct pr_hdr pr_hdr;
+		    int len, mcast;
+		    
+		    /*
+		     * if_altqenqueue frees mbuf even when it fails.
+		     * it also calls if_start if necessary.
+		     */
+		    if (m == *m0)
+			    *m0 = NULL ; /* original is gone... */
+		    len = m->m_pkthdr.len;
+		    mcast = m->m_flags & M_MCAST;
+		    make_ether_prhdr(m, &pr_hdr);
+		    error = (*ifp->if_altqenqueue)(ifp, m, &pr_hdr,
+						   ALTEQ_NORMAL);
+		    if (error) {
+			    IF_DROP(&ifp->if_snd);
+		    }
+		    else {
+			    ifp->if_obytes += len;
+			    if (mcast)
+				    ifp->if_omcasts++;
+		    }
+		    splx(s);
+	    }
+	    else {
+#endif /* ALTQ */
 	    if (IF_QFULL(&last->if_snd)) {
 		IF_DROP(&last->if_snd);
 #if 0
@@ -816,6 +850,9 @@ forward:
 		    (*last->if_start)(last);
 		splx(s);
 	    }
+#ifdef ALTQ
+	    }
+#endif
 	    BDG_STAT(last, BDG_OUT);
 	    last = NULL ;
 	    if (once)
@@ -837,3 +874,54 @@ forward:
 
     return error ;
 }
+
+#ifdef ALTQ
+/*
+ * get the protocol type (address family) and a pointer to the
+ * network layer header
+ */
+static int
+make_ether_prhdr(m, pr_hdr)
+	struct mbuf *m;
+	struct pr_hdr *pr_hdr;
+{
+	struct ether_header *eh;
+	u_short	ether_type;
+	int	hsize;
+
+	hsize = sizeof(struct ether_header);
+	eh = mtod(m, struct ether_header *);
+
+	ether_type = ntohs(eh->ether_type);
+	if (ether_type < ETHERMTU) {
+		/* ick! LLC/SNAP */
+		struct llc *llc = (struct llc *)(eh + 1);
+		hsize += 8;
+
+		if (m->m_len < hsize ||
+		    llc->llc_dsap != LLC_SNAP_LSAP ||
+		    llc->llc_ssap != LLC_SNAP_LSAP ||
+		    llc->llc_control != LLC_UI)
+			/* not snap! */
+			return (0);
+
+		ether_type = ntohs(llc->llc_un.type_snap.ether_type);
+	}
+
+	if (ether_type == ETHERTYPE_IP)
+		pr_hdr->ph_family = AF_INET;
+#ifdef INET6
+	else if (ether_type == ETHERTYPE_IPV6)
+		pr_hdr->ph_family = AF_INET6;
+#endif
+	else
+		pr_hdr->ph_family = AF_UNSPEC;
+
+	while (m->m_len <= hsize) {
+		hsize -= m->m_len;
+		m = m->m_next;
+	}
+	pr_hdr->ph_hdr = m->m_data + hsize;
+	return (1);
+}
+#endif /* ALTQ */

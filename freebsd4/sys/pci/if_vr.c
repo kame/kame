@@ -233,6 +233,18 @@ DRIVER_MODULE(miibus, vr, miibus_driver, miibus_devclass, 0, 0);
 	CSR_WRITE_1(sc, VR_MIICMD,			\
 		CSR_READ_1(sc, VR_MIICMD) & ~x)
 
+#ifdef ALTQ
+/*
+ * device dependent tweak for ALTQ:  if a driver is designed to dequeue
+ * too many packets at a time, we have to modify the driver to limit the
+ * number of packets buffered in the device.  This modification
+ * often needs to change handling of tx complete interrupts as well.
+ * the vr driver can pull as many as 128 packets (when VR_TX_LIST_CNT is 128).
+ * TXBUF_THRESH4ALTQ limits buffered packets up to 8.
+ */
+#define TXBUF_THRESH4ALTQ	8
+#endif
+
 /*
  * Sync the PHYs by setting data bit and strobing the clock 32 times.
  */
@@ -782,6 +794,9 @@ static int vr_attach(dev)
 	ifp->if_init = vr_init;
 	ifp->if_baudrate = 10000000;
 	ifp->if_snd.ifq_maxlen = VR_TX_LIST_CNT - 1;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 	/*
 	 * Do MII setup.
@@ -866,6 +881,9 @@ static int vr_list_tx_init(sc)
 
 	cd->vr_tx_free = &cd->vr_tx_chain[0];
 	cd->vr_tx_tail = cd->vr_tx_head = NULL;
+#ifdef ALTQ
+	sc->vr_cdata.vr_tx_queued = 0;
+#endif
 
 	return(0);
 }
@@ -1142,6 +1160,9 @@ static void vr_txeof(sc)
 		if (cur_tx->vr_mbuf != NULL) {
 			m_freem(cur_tx->vr_mbuf);
 			cur_tx->vr_mbuf = NULL;
+#ifdef ALTQ
+			sc->vr_cdata.vr_tx_queued--;
+#endif
 		}
 
 		if (sc->vr_cdata.vr_tx_head == sc->vr_cdata.vr_tx_tail) {
@@ -1257,6 +1278,12 @@ static void vr_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_2(sc, VR_IMR, VR_INTRS);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+		vr_start(ifp);
+	}
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL) {
 		vr_start(ifp);
 	}
@@ -1364,6 +1391,20 @@ static void vr_start(ifp)
 	start_tx = sc->vr_cdata.vr_tx_free;
 
 	while(sc->vr_cdata.vr_tx_free->vr_mbuf == NULL) {
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+			if (sc->vr_cdata.vr_tx_queued >= TXBUF_THRESH4ALTQ) {
+				/*
+				 * stop filling tx buffer if we already have
+				 * enough packets to transmit.
+				 */
+				break;
+			}
+
+			m_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		}
+		else
+#endif
 		IF_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
@@ -1371,6 +1412,9 @@ static void vr_start(ifp)
 		/* Pick a descriptor off the free list. */
 		cur_tx = sc->vr_cdata.vr_tx_free;
 		sc->vr_cdata.vr_tx_free = cur_tx->vr_nextdesc;
+#ifdef ALTQ
+		sc->vr_cdata.vr_tx_queued++;
+#endif
 
 		/* Pack the data into the descriptor. */
 		vr_encap(sc, cur_tx, m_head);
@@ -1589,6 +1633,11 @@ static void vr_watchdog(ifp)
 	vr_reset(sc);
 	vr_init(sc);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp))
+		vr_start(ifp);
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL)
 		vr_start(ifp);
 

@@ -33,6 +33,9 @@
  *	@(#)if_ethersubr.c	8.1 (Berkeley) 6/10/93
  * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.70 2000/02/13 03:31:55 peter Exp $
  */
+#ifdef ALTQ
+#include "opt_altq.h"
+#endif
 
 #include "opt_atalk.h"
 #include "opt_inet.h"
@@ -168,6 +171,9 @@ ether_output(ifp, m, dst, rt0)
 	int off, len = m->m_pkthdr.len, loop_copy = 0;
 	int hlen;	/* link layer header lenght */
 	struct arpcom *ac = IFP2AC(ifp);
+#ifdef ALTQ
+	struct pr_hdr pr_hdr;
+#endif
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
@@ -196,6 +202,15 @@ ether_output(ifp, m, dst, rt0)
 			    time_second < rt->rt_rmx.rmx_expire)
 				senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
 	}
+#ifdef ALTQ
+	/*
+	 * save a pointer to the protocol level header before adding
+	 * link headers.
+	 */
+	pr_hdr.ph_family = dst->sa_family;
+	pr_hdr.ph_hdr = mtod(m, caddr_t);
+#endif /* ALTQ */
+
 	hlen = ETHER_HDR_LEN;
 	switch (dst->sa_family) {
 #ifdef INET
@@ -380,6 +395,22 @@ ether_output(ifp, m, dst, rt0)
 		return (0);
 	}
 #endif
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+	        s = splimp();
+		error = (*ifp->if_altqenqueue)(ifp, m, &pr_hdr, ALTEQ_NORMAL);
+		splx(s);
+		if (error) {
+			IF_DROP(&ifp->if_snd);
+		}
+		else {
+		    ifp->if_obytes += len + sizeof (struct ether_header);
+		    if (m->m_flags & M_MCAST)
+		    	ifp->if_omcasts++;
+		}
+		return (error);
+	}
+#endif /* ALTQ */
 	s = splimp();
 	/*
 	 * Queue message on interface, and start output if interface
@@ -387,10 +418,16 @@ ether_output(ifp, m, dst, rt0)
 	 */
 	if (IF_QFULL(&ifp->if_snd)) {
 		IF_DROP(&ifp->if_snd);
+#ifdef ALTQ_ACCOUNT
+		ALTQ_ACCOUNTING(ifp, m, &pr_hdr, ALTEQ_ACCDROP);
+#endif
 		splx(s);
 		senderr(ENOBUFS);
 	}
 	IF_ENQUEUE(&ifp->if_snd, m);
+#ifdef ALTQ_ACCOUNT
+	ALTQ_ACCOUNTING(ifp, m, &pr_hdr, ALTEQ_ACCOK);
+#endif
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);
