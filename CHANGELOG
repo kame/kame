@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2120 2002/04/09 13:19:35 jinmei Exp $
+$KAME: CHANGELOG,v 1.2121 2002/04/10 12:50:51 jinmei Exp $
 
 <200204>
+2002-04-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet/if_ether.c (arp_rtdrain):
+	* kame/sys/netinet6/nd6.c (nd6_rtdrain):
+	allowed the case where these functions received a NULL llinfo in
+	order to avoid kernel panic in some situations.
+
 2002-04-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/netinet/if_ether.c (arp_rtdrain): newly added as
 	the hook for arp entries in the route cache queue.  Since arp does
