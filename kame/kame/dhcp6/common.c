@@ -102,13 +102,14 @@ getifaddr(addr, ifnam, prefix, plen)
 			continue;
 		if (ifa->ifa_addr->sa_len > sizeof(sin6))
 			continue;
-		memcpy(&sin6, &ifa->ifa_addr, ifa->ifa_addr->sa_len);
+		memcpy(&sin6, ifa->ifa_addr, ifa->ifa_addr->sa_len);
 		if (plen % 8 == 0) {
 			if (memcmp(&sin6.sin6_addr, prefix, plen / 8) != 0)
 				continue;
 		} else {
 			struct in6_addr a, m;
 			int i;
+
 			memcpy(&a, &sin6.sin6_addr, sizeof(sin6.sin6_addr));
 			memset(&m, 0, sizeof(m));
 			memset(&m, 0xff, plen / 8);
