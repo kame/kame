@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.20 2005/01/20 05:06:04 itojun Exp $	*/
+/*	$KAME: dccp_var.h,v 1.21 2005/02/10 04:25:38 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -148,21 +148,6 @@ struct	dccpstat {
 	u_long	dccps_badlen;		/* Bad length */
 	u_long	dccps_badseq;		/* Sequence number not inside loss_window  */
 	u_long	dccps_noport;		/* No socket on port */
-
-	/* TFRC Sender */
-	u_long	tfrcs_send_conn;	/* Number of conn used TFRC sender */
-	u_long	tfrcs_send_noopt;	/* No options on feedback packet */
-	u_long	tfrcs_send_nomem;	/* Send refused: No mem for history */
-	u_long	tfrcs_send_fbacks;	/* Correct feedback packets received */
-	u_long	tfrcs_send_erropt;	/* Err add option on data */
-  
-	/* TFRC Receiver */
-	u_long	tfrcs_recv_conn;	/* Number of conn used TFRC receiver */
-	u_long	tfrcs_recv_noopt;	/* Packet lost: No options on packet */
-	u_long	tfrcs_recv_nomem;	/* Packet lost: No mem for history */
-	u_long	tfrcs_recv_losts;	/* Detected lost packets */
-	u_long	tfrcs_recv_fbacks;	/* Feedback packets sent */
-	u_long	tfrcs_recv_erropt;	/* Err add option on feedback */      
 
 	/* TCPlike Sender */
 	u_long	tcplikes_send_conn;	/* Connections established */

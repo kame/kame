@@ -1,4 +1,4 @@
-/*	$KAME: dccp_cc_sw.h,v 1.5 2003/10/22 08:54:15 itojun Exp $	*/
+/*	$KAME: dccp_cc_sw.h,v 1.6 2005/02/10 04:25:38 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
@@ -80,7 +80,6 @@ typedef void   cc_recv_free_t   (void *);
  */
 typedef void   cc_recv_packet_recv_t (void *, char *, int);
 
-
 struct dccp_cc_sw {
 	/* Sender side */
 	cc_send_init_t   *cc_send_init;
@@ -96,10 +95,6 @@ struct dccp_cc_sw {
 };
 
 /* Max ccid (i.e. cc_sw has DCCP_CC_MAX_CCID+2 elements) */
-#ifdef DCCP_TFRC
-#define DCCP_CC_MAX_CCID 3
-#else
 #define DCCP_CC_MAX_CCID 2
-#endif
 
 #endif

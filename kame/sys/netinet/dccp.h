@@ -1,4 +1,4 @@
-/*	$KAME: dccp.h,v 1.4 2004/12/16 11:12:14 itojun Exp $	*/
+/*	$KAME: dccp.h,v 1.5 2005/02/10 04:25:38 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -144,8 +144,7 @@ struct dccp_resethdr {
 
 #define DCCP_CCID		0x01
 #define DCCP_CSLEN		0x02
-#define DCCP_TFRC_AVGPSIZE	0x04
-#define DCCP_MAXSEG		0x08
+#define DCCP_MAXSEG		0x04
 
 #define DCCP_NDP_LIMIT          16
 #define DCCP_SEQ_NUM_LIMIT      16777216

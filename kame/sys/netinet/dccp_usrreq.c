@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.46 2005/02/02 01:48:03 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.47 2005/02/10 04:25:38 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -1207,7 +1207,6 @@ dccp_optsset(struct dccpcb *dp, int opt, struct mbuf **mp)
 	switch (opt) {
 	case DCCP_CCID:
 	case DCCP_CSLEN:
-	case DCCP_TFRC_AVGPSIZE:
 	case DCCP_MAXSEG:
 		
 		if (m->m_len < sizeof(int)) {
@@ -1229,13 +1228,6 @@ dccp_optsset(struct dccpcb *dp, int opt, struct mbuf **mp)
 				error = EINVAL;
 			} else {
 				dp->cslen = optval;
-			}
-			break;
-		case DCCP_TFRC_AVGPSIZE:
-			if (optval > 65536 || optval < 0) {
-				error = EINVAL;
-			} else {
-				dp->avgpsize = optval;
 			}
 			break;
 		case DCCP_MAXSEG:
@@ -1276,9 +1268,6 @@ dccp_optsget(struct dccpcb *dp, int opt, struct mbuf **mp)
 		break;
 	case DCCP_CSLEN:
 		optval = dp->cslen;
-		break;
-	case DCCP_TFRC_AVGPSIZE:
-		optval = dp->avgpsize;
 		break;
 	case DCCP_MAXSEG:
 		optval = dp->d_maxseg;

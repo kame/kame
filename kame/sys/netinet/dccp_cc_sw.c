@@ -1,4 +1,4 @@
-/*	$KAME: dccp_cc_sw.c,v 1.6 2003/11/18 04:55:42 ono Exp $	*/
+/*	$KAME: dccp_cc_sw.c,v 1.7 2005/02/10 04:25:38 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
@@ -68,9 +68,6 @@
 
 #include <netinet/dccp.h>
 #include <netinet/dccp_var.h>
-#ifdef DCCP_TFRC
-#include <netinet/dccp_tfrc.h>
-#endif
 #include <netinet/dccp_tcplike.h>
 #include <netinet/dccp_cc_sw.h>
 
@@ -82,9 +79,4 @@ struct dccp_cc_sw cc_sw[] = {
   {tcplike_send_init,tcplike_send_free,tcplike_send_packet,tcplike_send_packet_sent,
    tcplike_send_packet_recv,
    tcplike_recv_init,tcplike_recv_free,tcplike_recv_packet_recv},
-#ifdef DCCP_TFRC
-  {tfrc_send_init,tfrc_send_free,tfrc_send_packet,tfrc_send_packet_sent,
-   tfrc_send_packet_recv,
-   tfrc_recv_init,tfrc_recv_free,tfrc_recv_packet_recv}
-#endif
 };
