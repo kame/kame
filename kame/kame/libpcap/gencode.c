@@ -21,7 +21,7 @@
  */
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/gencode.c,v 1.10 2000/03/01 03:38:07 itojun Exp $ (LBL)";
+    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/gencode.c,v 1.11 2000/03/01 14:06:48 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/types.h>
@@ -2005,8 +2005,12 @@ gen_scode(name, q)
 				b = tmp;
 			}
 			freeaddrinfo(res0);
-			if (b == NULL)
-				bpf_error("unknown host '%s'", name);
+			if (b == NULL) {
+				bpf_error("unknown host '%s'%s", name,
+				    (proto == Q_DEFAULT)
+					? ""
+					: " for specified address family");
+			}
 			return b;
 #endif /*INET6*/
 		}
