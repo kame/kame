@@ -1,4 +1,4 @@
-dnl @(#) $Header: configure.in,v 1.71 97/07/27 22:17:59 leres Exp $ (LBL)
+dnl @(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/configure.in,v 1.1.1.1 1999/08/08 23:31:56 itojun Exp $ (LBL)
 dnl
 dnl Copyright (c) 1994, 1995, 1996, 1997
 dnl	The Regents of the University of California.  All rights reserved.
@@ -45,7 +45,7 @@ AC_ARG_ENABLE(ipv6, [  --enable-ipv6           build IPv6-capable version])
 AC_MSG_RESULT(${enable_ipv6-no})
 if test "$enable_ipv6" = "yes"; then
 	AC_DEFINE(INET6)
-	LOCALSRC="print-ip6.c print-ip6opts.c print-ripng.c print-icmp6.c print-frag6.c print-rt6.c print-ospf6.c $LOCALSRC"
+	LOCALSRC="print-ip6.c print-ip6opts.c print-ripng.c print-icmp6.c print-frag6.c print-rt6.c print-ospf6.c print-dhcp6.c $LOCALSRC"
 	LIBS="$LIBS -L../libinet6 -L../libinet6/obj -L/usr/local/v6/lib"
 	AC_CHECK_FUNCS(getaddrinfo,, AC_CHECK_LIB(inet6, getaddrinfo))
 fi

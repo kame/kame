@@ -1311,7 +1311,7 @@ if test "$enable_ipv6" = "yes"; then
 #define INET6 1
 EOF
 
-	LOCALSRC="print-ip6.c print-ip6opts.c print-ripng.c print-icmp6.c print-frag6.c print-rt6.c print-ospf6.c $LOCALSRC"
+	LOCALSRC="print-ip6.c print-ip6opts.c print-ripng.c print-icmp6.c print-frag6.c print-rt6.c print-ospf6.c print-dhcp6.c $LOCALSRC"
 	LIBS="$LIBS -L../libinet6 -L../libinet6/obj -L/usr/local/v6/lib"
 	for ac_func in getaddrinfo
 do
