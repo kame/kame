@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.649 2000/03/02 12:38:14 sumikawa Exp $
+$Id: CHANGELOG,v 1.650 2000/03/02 15:37:38 itojun Exp $
 
 <200003>
+Fri Mar  3 00:36:58 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/www/w3m: upgrade to 0.1.6.
+
 Thu Mar  2 21:30:50 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/usr.bin/{fstat, sockstat}: support AF_INET6.
 	* freebsd3/ports/{v6eval, ct}: upgrade to 0.6 but this port is now
