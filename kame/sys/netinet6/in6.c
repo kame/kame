@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.173 2001/02/08 15:48:51 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.174 2001/02/09 21:44:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -297,11 +297,11 @@ in6_ifremloop(struct ifaddr *ifa)
 	int ia_count = 0;
 
 	/*
-	 * All BSD variants except BSD/OS do not remove cloned routes
+	 * Some of BSD variants do not remove cloned routes
 	 * from an interface direct route, when removing the direct route
-	 * (see comments in net/net_osdep.h). Even BSD/OS could fail to remove
-	 * the cloned routes when we handle multple addresses that share a
-	 * common prefix.
+	 * (see comments in net/net_osdep.h).  Even for variants that do remove
+	 * cloned routes, they could fail to remove the cloned routes when
+	 * we handle multple addresses that share a common prefix.
 	 * So, we should remove the route corresponding to the deleted address
 	 * regardless of the result of in6_is_ifloop_auto().
 	 */
