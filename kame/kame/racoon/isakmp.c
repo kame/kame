@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.157 2001/09/11 14:55:56 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.158 2001/10/02 03:34:51 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -343,7 +343,7 @@ isakmp_main(msg, remote, local)
 	iph1 = getph1byindex(index);
 	if (iph1 != NULL) {
 		/* must be same addresses in one stream of a phase at least. */
-		if (cmpsaddrwild(iph1->remote, remote) != 0) {
+		if (cmpsaddrstrict(iph1->remote, remote) != 0) {
 			char *saddr_db, *saddr_act;
 
 			saddr_db = strdup(saddr2str(iph1->remote));
