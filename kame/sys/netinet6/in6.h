@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.68 2000/11/27 14:18:52 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.69 2000/11/30 11:13:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -162,6 +162,8 @@ struct sockaddr_in6 {
 #endif
 
 #ifdef _KERNEL
+extern const struct sockaddr_in6 sa6_any;
+
 extern const struct in6_addr in6mask0;
 extern const struct in6_addr in6mask32;
 extern const struct in6_addr in6mask64;

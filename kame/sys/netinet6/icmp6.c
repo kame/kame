@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.163 2000/11/30 09:06:02 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.164 2000/11/30 11:13:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -960,6 +960,7 @@ icmp6_notify_error(m, off, icmp6len, code)
 		return(-1);
 	}
 #endif
+	eip6 = (struct ip6_hdr *)(icmp6 + 1);
 
 	/* Detect the upper level protocol */
 	{
@@ -975,7 +976,6 @@ icmp6_notify_error(m, off, icmp6len, code)
 		struct ip6_rthdr0 *rth0;
 		int rthlen;
 
-		eip6 = (struct ip6_hdr *)(icmp6 + 1);
 		while (1) { /* XXX: should avoid inf. loop explicitly? */
 			struct ip6_ext *eh;
 

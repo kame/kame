@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.42 2000/11/30 09:06:02 jinmei Exp $	*/
+/*	$KAME: esp_input.c,v 1.43 2000/11/30 11:13:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -960,7 +960,7 @@ esp6_ctlinput(cmd, sa, d)
 {
 	const struct newesp *espp;
 	struct newesp esp;
-	struct ip6ctlparam *ip6cp = NULL;
+	struct ip6ctlparam *ip6cp = NULL, ip6cp1;
 	struct secasvar *sav;
 	struct ip6_hdr *ip6;
 	struct mbuf *m;
@@ -1034,8 +1034,22 @@ esp6_ctlinput(cmd, sa, d)
 			icmp6_mtudisc_update((struct ip6ctlparam *)d);
 		}
 
-		/* we normally notify single pcb here */
-		/* pfctlinput2(cmd, ); */
+		/*
+		 * Notify the error to all possible sockets via pfctlinput2.
+		 * Since the upper layer information (such as protocol type,
+		 * source and destination ports) is embedded in the encrypted
+		 * data and might have been cut, we can't directly call
+		 * an upper layer ctlinput function. However, the pcbnotify
+		 * function will consider source and destination addresses
+		 * as well as the flow info value, and may be able to find
+		 * some PCB that should be notified.
+		 * Although pfctlinput2 will call esp6_ctlinput(), there is
+		 * no possibility of an infinite loop of function calls,
+		 * because we don't pass the inner IPv6 header.
+		 */
+		bzero(&ip6cp1, sizeof(ip6cp1));
+		ip6cp1.ip6c_src = ip6cp->ip6c_src;
+		pfctlinput2(cmd, sa, (void *)ip6cp);
 	} else {
 		/* we normally notify any pcb here */
 	}

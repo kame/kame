@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.112 2000/11/11 00:00:15 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.113 2000/11/30 11:13:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -145,6 +145,9 @@ const struct in6_addr in6mask32 = IN6MASK32;
 const struct in6_addr in6mask64 = IN6MASK64;
 const struct in6_addr in6mask96 = IN6MASK96;
 const struct in6_addr in6mask128 = IN6MASK128;
+
+const struct sockaddr_in6 sa6_any = {sizeof(sa6_any), AF_INET6,
+				     0, 0, IN6ADDR_ANY_INIT, 0};
 
 #if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 static int in6_lifaddr_ioctl __P((struct socket *, u_long, caddr_t,
