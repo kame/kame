@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_multicast.h,v 1.4 2002/07/10 07:41:46 ono Exp $	*/
+/*	$KAME: vrrp_multicast.h,v 1.5 2003/02/19 10:10:01 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -71,6 +71,7 @@
 #include <unistd.h>
 #include <varargs.h>
 #include <netdb.h>
+#include <errno.h>
 #include "vrrp_define.h"
 #include "vrrp_proto.h"
 #include "vrrp_functions.h"

@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_main.h,v 1.4 2002/07/10 07:41:45 ono Exp $	*/
+/*	$KAME: vrrp_main.h,v 1.5 2003/02/19 10:10:01 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -64,7 +64,6 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <pthread.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>

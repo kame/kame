@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_interface.h,v 1.4 2002/07/10 07:41:45 ono Exp $	*/
+/*	$KAME: vrrp_interface.h,v 1.5 2003/02/19 10:10:01 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -63,9 +63,14 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
-#include <net/ethernet.h>
 #include <net/if.h>
+#ifdef __FreeBSD__
 #include <net/if_var.h>
+#include <net/ethernet.h>
+#else
+#include <net/if_ether.h>
+#endif
+#include <net/if_dl.h>
 #include <net/if_vrrp_var.h>
 #include <netinet/in.h>
 #include <netinet/in_var.h>

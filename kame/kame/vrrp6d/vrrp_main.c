@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_main.c,v 1.4 2002/07/10 07:41:45 ono Exp $	*/
+/*	$KAME: vrrp_main.c,v 1.5 2003/02/19 10:10:01 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -65,7 +65,6 @@
 void
 vrrp_main_pre_init(struct vrrp_vr * vr)
 {
-	vrrp_signal_initialize();
 	bzero(vr, sizeof(*vr));
 	vr->priority = 100;
 	vr->adv_int = VRRP_DEFAULT_ADV_INT;
@@ -74,23 +73,29 @@ vrrp_main_pre_init(struct vrrp_vr * vr)
 	return;
 }
 
-void
+char
 vrrp_main_post_init(struct vrrp_vr * vr)
 {
 	int             size = MAX_IP_ALIAS;
+	struct ether_addr *ethaddr;
+	char macaddr[18];
+	
+	snprintf(macaddr, 18, "00:00:5e:00:01:%02d", vr->vr_id);
+	macaddr[17] = '\0';
+	
+	if ((ethaddr = ether_aton(macaddr)) == NULL) {
+		syslog(LOG_WARNING, "mac address incorrect");
+		return -1;
+	}
 
-	vr->ethaddr.octet[0] = 0x00;
-	vr->ethaddr.octet[1] = 0x00;
-	vr->ethaddr.octet[2] = 0x5E;
-	vr->ethaddr.octet[3] = 0x00;
-	vr->ethaddr.octet[4] = 0x01;
-	vr->ethaddr.octet[5] = vr->vr_id;
+	bcopy(ethaddr, &vr->ethaddr, ETHER_ADDR_LEN);
+
 	vr->skew_time = (256 - vr->priority) / 256;
 	vr->master_down_int = (3 * vr->adv_int) + vr->skew_time;
 	vrrp_misc_get_if_infos(vr->vr_if->if_name, &vr->vr_if->ethaddr, vr->vr_if->ip_addrs, &size);
 	vr->vr_if->nb_ip = size;
 
-	return;
+	return 0;
 }
 
 void
@@ -101,7 +106,7 @@ vrrp_main_print_struct(struct vrrp_vr * vr)
 
 	fprintf(stderr, "VServer ID\t\t: %u\n", vr->vr_id);
 	fprintf(stderr, "VServer PRIO\t\t: %u\n", vr->priority);
-	fprintf(stderr, "VServer ETHADDR\t\t: %.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n", vr->ethaddr.octet[0], vr->ethaddr.octet[1], vr->ethaddr.octet[2], vr->ethaddr.octet[3], vr->ethaddr.octet[4], vr->ethaddr.octet[5]);
+	fprintf(stderr, "VServer ETHADDR\t\t: %s\n", ether_ntoa(&vr->ethaddr));
 	fprintf(stderr, "VServer IPs\t\t: %s\n", inet_ntop(AF_INET6, &vr->vr_ip[0].addr, &addr[0], sizeof(addr)) ? addr : "<NULL>");
 	fprintf(stderr, "VServer ADV_INT\t\t: %u\n", vr->adv_int);
 	fprintf(stderr, "VServer MASTER_DW_TM\t: %u\n", vr->master_down_int);
@@ -113,7 +118,7 @@ vrrp_main_print_struct(struct vrrp_vr * vr)
 	fprintf(stderr, "Server IPs\t\t:\n");
 	for (cpt = 0; cpt < vr->vr_if->nb_ip; cpt++)
 	  fprintf(stderr, "\t%s\n", inet_ntop(AF_INET6, &vr->vr_if->ip_addrs[cpt], &addr[0], sizeof(addr)) ? addr : "<NULL>");
-	fprintf(stderr, "Server ETHADDR\t\t: %.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n", vr->vr_if->ethaddr.octet[0], vr->vr_if->ethaddr.octet[1], vr->vr_if->ethaddr.octet[2], vr->vr_if->ethaddr.octet[3], vr->vr_if->ethaddr.octet[4], vr->vr_if->ethaddr.octet[5]);
+	fprintf(stderr, "Server ETHADDR\t\t: %s\n", ether_ntoa(&vr->vr_if->ethaddr));
 
 	return;
 }
@@ -180,9 +185,12 @@ main(int argc, char **argv)
 		return -1;
 	/* Initialisation of struct vrrp_vr * adresses table */
 	bzero(&vr_ptr, sizeof(vr_ptr));
-	syslog(LOG_NOTICE, "initializing threads and all VRID");
-	vrrp_thread_initialize();
+	syslog(LOG_NOTICE, "initializing timers");
+	vrrp_timer_init();
 	syslog(LOG_NOTICE, "reading configuration file %s", VRRP_CONF_FILE_NAME);
+
+	vrrp_signal_initialize();
+
 	while (!coderet) {
 		vr = (struct vrrp_vr *) malloc(sizeof(struct vrrp_vr));
 		bzero(vr, sizeof(*vr));
@@ -190,7 +198,9 @@ main(int argc, char **argv)
 		coderet = vrrp_conf_lecture_fichier(vr, stream);
 		if (coderet < 0)
 			return coderet;
-		vrrp_main_post_init(vr);
+		if (vrrp_main_post_init(vr) < 0) {
+			return -1;
+		}
 		/*
 		 * Don't need ethaddr list anyway see vrrp_proto.h if
 		 * (vr->vr_if->p == NULL || vr->vr_if->d == NULL) if
@@ -208,14 +218,22 @@ main(int argc, char **argv)
 		vr->sd_bpf = sd_bpf;
 		if (vrrp_multicast_open_socket(vr) == -1)
 			return -1;
-		vrrp_interface_ethaddr_set(vr->vrrpif_name, &vr->ethaddr);
 		vrrp_main_print_struct(vr);
-		if (vrrp_thread_create_vrid(vr) == -1)
-			return -1;
+
+		if (vr_ptr_pos == 255) {
+			syslog(LOG_ERR, "cannot configure more than 255 VRID... exiting\n");
+			exit(-1);
+		}
+		vr_ptr[vr_ptr_pos++] = vr;
 	}
+
+	if (vrrp_state_initialize_all() == -1)
+		return -1;
+
 	if (!optflag_f)
 		syslog(LOG_NOTICE, "launching in background into daemon mode");
-	pthread_exit(NULL);
+
+	vrrp_state_start();
 
 	return 0;
 }

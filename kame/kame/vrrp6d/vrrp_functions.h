@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_functions.h,v 1.4 2002/07/10 07:41:45 ono Exp $	*/
+/*	$KAME: vrrp_functions.h,v 1.5 2003/02/19 10:10:01 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -65,11 +65,13 @@
 
 /* vrrp_state.c functions */
 char            vrrp_state_initialize(struct vrrp_vr *);
+char            vrrp_state_initialize_all(void);
 char            vrrp_state_set_master(struct vrrp_vr *);
 char            vrrp_state_set_backup(struct vrrp_vr *);
 char            vrrp_state_check_priority(struct vrrp_hdr *, struct vrrp_vr *, struct in6_addr *);
 char            vrrp_state_master(struct vrrp_vr *);
 char            vrrp_state_backup(struct vrrp_vr *);
+void            vrrp_state_start(void);
 
 /* vrrp_interface.c functions */
 void            vrrp_interface_owner_verify(struct vrrp_vr *);
@@ -137,15 +139,14 @@ char            vrrp_list_delete(struct vrrp_vr *, struct ether_addr);
 struct ether_addr vrrp_list_get_last(struct vrrp_vr *);
 struct ether_addr vrrp_list_get_first(struct vrrp_vr *);
 
-/* vrrp_thread.c functions */
-void            vrrp_thread_mutex_lock(void);
-void            vrrp_thread_mutex_unlock(void);
-void            vrrp_thread_mutex_lock_bpf(void);
-void            vrrp_thread_mutex_unlock_bpf(void);
-void            vrrp_thread_launch_vrrprouter(void *);
-char            vrrp_thread_initialize(void);
-char            vrrp_thread_create_vrid(struct vrrp_vr *);
-
+/* vrrp_timer.c functions */
+void vrrp_timer_init(void);
+struct vrrp_timer *vrrp_add_timer(struct vrrp_timer *(*) (void *),
+		void (*) (void *, struct timeval *), void *, void *);
+void vrrp_set_timer(u_int, struct vrrp_timer *);
+void vrrp_remove_timer(struct vrrp_timer **);
+struct timeval * vrrp_check_timer(void);
+struct timeval * vrrp_timer_rest(struct vrrp_timer *);
 
 /* vrrp_main.c */
 extern int optflag_f;

@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_state.c,v 1.4 2002/07/10 07:41:46 ono Exp $	*/
+/*	$KAME: vrrp_state.c,v 1.5 2003/02/19 10:10:01 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -62,10 +62,18 @@
 
 #include "vrrp_state.h"
 
+struct vrrp_timer *vrrp_state_master_expire(void *data);
+void vrrp_state_master_update(void *data, struct timeval *tm);
+struct vrrp_timer *vrrp_state_backup_expire(void *data);
+
+/* addresses table of all struct vrrp_vr */
+struct vrrp_vr *vr_ptr[VRRP_PROTOCOL_MAX_VRID];
+/* actual position on this table */
+u_char vr_ptr_pos = 0;
+
 char 
 vrrp_state_initialize(struct vrrp_vr * vr)
 {
-	syslog(LOG_NOTICE, "server state vrid %d: initialize", vr->vr_id);
 	if (vr->priority == 255) {
 		if (vrrp_state_set_master(vr) == -1)
 			return -1;
@@ -76,18 +84,31 @@ vrrp_state_initialize(struct vrrp_vr * vr)
 }
 
 char 
+vrrp_state_initialize_all(void)
+{
+	int i;
+	
+	for (i = 0; i < vr_ptr_pos; i++) {
+		if (vrrp_state_initialize(vr_ptr[i]) != 0)
+			return -1;
+	}
+}
+
+char 
 vrrp_state_set_master(struct vrrp_vr * vr)
 {
+	if (vr->tm)
+		vrrp_remove_timer(&vr->tm);
 	vrrp_interface_up(vr->vrrpif_name);
 	vrrp_network_send_advertisement(vr);
-	vrrp_thread_mutex_lock();
 	if (vrrp_interface_vripaddr_set(vr) == -1)
 		return -1;
-	vrrp_thread_mutex_unlock();
 	if (vrrp_network_send_neighbor_advertisement(vr) == -1)
 	    return -1;
-	if (vrrp_misc_calcul_tminterval(&vr->tm.adv_tm, vr->adv_int) == -1)
-		return -1;
+	vr->tm = vrrp_add_timer(vrrp_state_master_expire,
+	    vrrp_state_master_update, vr, vr);
+	vrrp_set_timer(vr->adv_int, vr->tm);
+
 	vr->state = VRRP_STATE_MASTER;
 	syslog(LOG_NOTICE, "server state vrid %d: master", vr->vr_id);
 
@@ -97,14 +118,18 @@ vrrp_state_set_master(struct vrrp_vr * vr)
 char 
 vrrp_state_set_backup(struct vrrp_vr * vr)
 {
+	if (vr->tm)
+		vrrp_remove_timer(&vr->tm);
+
 	vrrp_interface_down(vr->vrrpif_name);
-	vrrp_thread_mutex_lock();
 	vrrp_interface_vripaddr_delete(vr);
-	vrrp_thread_mutex_unlock();
 	vr->skew_time = (256 - vr->priority) / 256;
 	vr->master_down_int = (3 * vr->adv_int) + vr->skew_time;
-	if (vrrp_misc_calcul_tminterval(&vr->tm.master_down_tm, vr->master_down_int) == -1)
-		return -1;
+
+	vr->tm = vrrp_add_timer(vrrp_state_backup_expire,
+	    NULL, vr, NULL);
+	vrrp_set_timer(vr->master_down_int, vr->tm);
+	
 	vr->state = VRRP_STATE_BACKUP;
 	syslog(LOG_NOTICE, "server state vrid %d: backup", vr->vr_id);
 
@@ -204,6 +229,7 @@ vrrp_state_get_packet(struct vrrp_vr *vr,
 	return 0;
 }
 
+#if 0
 /* Operation a effectuer durant l'etat master */
 char 
 vrrp_state_master(struct vrrp_vr * vr)
@@ -216,7 +242,7 @@ vrrp_state_master(struct vrrp_vr * vr)
 	int hlim;
 
 	for (;;) {
-		if (vrrp_misc_calcul_tmrelease(&vr->tm.adv_tm, &interval) == -1)
+		if (vrrp_misc_calcul_tmrelease(vr->adv_tm, &interval) == -1)
 			return -1;
 		coderet = vrrp_state_select(vr, &interval);
 		if (coderet > 0) {
@@ -300,6 +326,7 @@ vrrp_state_backup(struct vrrp_vr * vr)
 	/* Normally never executed */
 	return 0;
 }
+#endif
 
 char 
 vrrp_state_check_priority(struct vrrp_hdr * vrrph, struct vrrp_vr * vr, struct in6_addr *addr)
@@ -310,4 +337,106 @@ vrrp_state_check_priority(struct vrrp_hdr * vrrph, struct vrrp_vr * vr, struct i
 		return 1;
 
 	return 0;
+}
+
+char
+vrrp_state_proc_packet(struct vrrp_vr *vr)
+{
+	static u_char packet[4096];
+	struct vrrp_hdr *vrrph = (struct vrrp_hdr *) packet;
+	struct ip6_pseudohdr phdr;
+	int hlim;
+
+	bzero(&phdr, sizeof(phdr));
+	if (vrrp_state_get_packet(vr,packet, sizeof(packet), &hlim, &phdr) != 0)
+		return 0;
+	if (vrrp_misc_check_vrrp_packet(vr, packet, &phdr, hlim) == -1)
+		return 0;
+	switch (vr->state)
+	{
+	case VRRP_STATE_MASTER:
+		if (vrrph->priority == 0) {
+			if (vr->sd_bpf == -1)
+				return -1;
+			vrrp_network_send_advertisement(vr);
+			vrrp_set_timer(vr->adv_int, vr->tm);
+			return 0;
+		}
+		if (vrrp_state_check_priority(vrrph, vr, &phdr.ph6_src)) {
+			if (vrrp_state_set_backup(vr) == -1)
+				return -1;
+		}
+		break;
+	case VRRP_STATE_BACKUP:
+		if (vrrph->priority == 0)
+			vrrp_set_timer(vr->skew_time, vr->tm);
+		else if (vr->preempt_mode == 0 || vrrph->priority >= vr->priority)
+			vrrp_set_timer(vr->master_down_int, vr->tm);
+		break;
+	}
+	return 0;
+}
+
+void
+vrrp_state_start()
+{
+	struct timeval *timeout;
+	fd_set rfds, readers;
+	int i, nfds, n;
+
+	FD_ZERO(&readers);
+	for (i = 0; i < vr_ptr_pos; i++){
+		FD_SET(vr_ptr[i]->sd, &readers);
+		nfds = vr_ptr[i]->sd + 1;
+	}
+	
+	for (;;) {
+		bcopy((char *) &readers, (char *) &rfds, sizeof(rfds));
+
+		timeout = vrrp_check_timer();
+		if ((n = select(nfds, &rfds, NULL, NULL, timeout)) < 0)
+		{
+			if (errno != EINTR)
+				syslog(LOG_WARNING, "select failed %d", errno);
+			continue;
+		}
+		
+		if (n > 0) {
+			for (i = 0; i < vr_ptr_pos; i++)
+			{
+				if (FD_ISSET(vr_ptr[i]->sd, &rfds))
+				{
+					vrrp_state_proc_packet(vr_ptr[i]);
+				}
+			}
+		}
+	}
+}
+
+struct vrrp_timer *
+vrrp_state_master_expire(void *data)
+{
+	struct vrrp_vr *vr = (struct vrrp_vr *) data;
+#ifdef VRRP_DEBUG
+	printf("master expire %s\n", vr->vrrpif_name);
+#endif
+	vrrp_network_send_advertisement(vr);
+}
+
+void
+vrrp_state_master_update(void *data, struct timeval *tm)
+{
+	struct vrrp_vr *vr = (struct vrrp_vr *) data;
+	tm->tv_usec = 0;
+	tm->tv_sec = vr->adv_int;
+}
+
+struct vrrp_timer *
+vrrp_state_backup_expire(void *data)
+{
+	struct vrrp_vr *vr = (struct vrrp_vr *) data;
+#ifdef VRRP_DEBUG
+	printf("backup expire %s\n", vr->vrrpif_name);
+#endif
+	vrrp_state_set_master(vr);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_interface.c,v 1.5 2002/08/23 12:29:37 ono Exp $	*/
+/*	$KAME: vrrp_interface.c,v 1.6 2003/02/19 10:10:01 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -95,30 +95,68 @@ vrrp_interface_ethaddr_set(char *if_name, struct ether_addr * ethaddr)
 	ifr.ifr_addr.sa_len = ETHER_ADDR_LEN;
 	ifr.ifr_addr.sa_family = AF_LINK;
 	bcopy(ethaddr, ifr.ifr_addr.sa_data, ETHER_ADDR_LEN);
+#ifdef __FreeBSD__
 	if (ioctl(sd, SIOCSIFLLADDR, (caddr_t) & ifr) == -1) {
 		syslog(LOG_ERR, "cannot set mac address for interface %s (ioctl): %m", if_name);
 		close(sd);
 		return -1;
 	}
+#else
+	/* XXXX for NetBSD */
+#endif
 	close(sd);
 
 	return 0;
 }
 
+static int link_getaddr(addr, sa)
+	const char *addr;
+	struct sockaddr *sa;
+{
+	char *temp;
+	struct sockaddr_dl sdl;
+
+	if ((temp = (char *) malloc(strlen(addr) + 1)) == NULL) {
+		syslog(LOG_ERR, "malloc failed");
+		return -1;
+	}
+	
+	temp[0] = ':';
+	strcpy(temp + 1, addr);
+	sdl.sdl_len = sizeof(sdl);
+	link_addr(temp, &sdl);
+	free(temp);
+	if (sdl.sdl_alen > sizeof(sa->sa_data)) {
+		syslog(LOG_ERR, "malformed link-level address");
+		return -1;
+	}
+	sa->sa_family = AF_LINK;
+	sa->sa_len = sdl.sdl_alen;
+	bcopy(LLADDR(&sdl), sa->sa_data, sdl.sdl_alen);
+	return 0;
+}
+
 char 
-vrrp_interface_vrrif_set(char *if_name, u_int parent_index)
+vrrp_interface_vrrif_set(char *if_name, u_int parent_index, struct ether_addr *lladdr)
 {
 	int             sd;
 	struct ifreq    ifr;
+	struct vrrpreq  vrreq;
 
 	bzero(&ifr, sizeof(ifr));
+	bzero(&vrreq, sizeof(vrreq));
+
 	sd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (sd == -1) {
 		syslog(LOG_WARNING, "cannot open socket for changing ip address of interface %s: %m", if_name);
 		return -1;
 	}
 	strncpy(ifr.ifr_name, if_name, sizeof(ifr.ifr_name));
-	ifr.ifr_data = (caddr_t)&parent_index;
+	ifr.ifr_data = (caddr_t)&vrreq;
+	vrreq.vr_parent_index = parent_index;
+	vrreq.vr_lladdr.sa_family = AF_LINK;
+	vrreq.vr_lladdr.sa_len = ETHER_ADDR_LEN;
+	bcopy(lladdr, vrreq.vr_lladdr.sa_data, ETHER_ADDR_LEN);
 	
 	if (ioctl(sd, SIOCSETVRRP, (caddr_t) &ifr) == -1) {
 		syslog(LOG_ERR, "cannot set vrrp parent interface %s (ioctl): %m", if_name);
@@ -127,7 +165,6 @@ vrrp_interface_vrrif_set(char *if_name, u_int parent_index)
 	}
 
 	close(sd);
-
 	return 0;
 }
 
@@ -136,9 +173,10 @@ vrrp_interface_vrrif_delete(char *if_name)
 {
 	int             sd;
 	struct ifreq    ifr;
-	u_int ifindex;
+	struct vrrpreq vrreq;
 
 	bzero(&ifr, sizeof(ifr));
+	bzero(&vrreq, sizeof(vrreq));
 	sd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (sd == -1) {
 		syslog(LOG_WARNING, "cannot open socket for changing ip address of interface %s: %m", if_name);
@@ -148,7 +186,7 @@ vrrp_interface_vrrif_delete(char *if_name)
 	ifr.ifr_addr.sa_len = ETHER_ADDR_LEN;
 	ifr.ifr_addr.sa_family = AF_LINK;
 
-	ifr.ifr_data = (caddr_t)&ifindex;
+	ifr.ifr_data = (caddr_t)&vrreq;
 	
 	if (ioctl(sd, SIOCSETVRRP, (caddr_t) &ifr) == -1) {
 		syslog(LOG_ERR, "cannot delete vrrp parent interface %s (ioctl): %m", if_name);
@@ -255,7 +293,7 @@ vrrp_interface_vripaddr_set(struct vrrp_vr * vr)
 
 	for (cpt = 0; cpt < vr->cnt_ip; cpt++) {
 		if (vr->vr_ip[cpt].owner != VRRP_INTERFACE_IPADDR_OWNER) {
-			vrrp_interface_vrrif_set(vr->vrrpif_name,vr->vr_if->if_index);
+			vrrp_interface_vrrif_set(vr->vrrpif_name,vr->vr_if->if_index, &vr->ethaddr);
 			vrrp_interface_compute_netmask(vr->vr_netmask[cpt],&mask);
 			if (vrrp_interface_ipaddr_set(vr->vrrpif_name, &vr->vr_ip[cpt].addr, &mask) == -1) {
 				if (errno != EEXIST) {

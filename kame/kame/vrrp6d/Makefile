@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.3 2002/07/10 04:54:15 itojun Exp $
+#	$KAME: Makefile,v 1.4 2003/02/19 10:10:00 ono Exp $
 
 .if exists(${.CURDIR}/../Makefile.opsys)
 .include "${.CURDIR}/../Makefile.opsys"
@@ -6,9 +6,9 @@
 
 .if (${OPSYS} == "FreeBSD")
 PROG=	vrrp6d
-SRCS=	vrrp_misc.c vrrp_multicast.c vrrp_main.c vrrp_thread.c \
+SRCS=	vrrp_misc.c vrrp_multicast.c vrrp_main.c vrrp_timer.c \
 	vrrp_state.c vrrp_network.c vrrp_interface.c vrrp_conf.c \
-	vrrp_signal.c  
+	vrrp_signal.c
 BINDIR=	$(PREFIX)/sbin
 ETCDIR= $(PREFIX)/etc
 CFLAGS+=-D_REENTRANT -Wall -DINET6 -g -DVRRP_CONF_FILE_NAME=\"${ETCDIR}/vrrp6d.conf\"

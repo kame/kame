@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_conf.h,v 1.3 2002/07/10 04:54:15 itojun Exp $	*/
+/*	$KAME: vrrp_conf.h,v 1.4 2003/02/19 10:10:00 ono Exp $	*/
 
 /*
  * Copyright (c) 2001,2002 Sebastien Petit <spe@bsdfr.org>
@@ -38,7 +38,9 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <net/if.h>
+#ifdef __FreeBSD__
 #include <net/if_mib.h>
+#endif
 #include <stdio.h>
 #include <fcntl.h>
 #include <syslog.h>

@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_network.c,v 1.5 2002/08/23 12:25:47 ono Exp $	*/
+/*	$KAME: vrrp_network.c,v 1.6 2003/02/19 10:10:01 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -170,11 +170,9 @@ vrrp_network_send_packet(char *buffer, int sizebuf, int sd_bpf)
 	/* struct sockaddr_in addr; */
 	size_t          octets;
 
-	vrrp_thread_mutex_lock_bpf();
 	vrrp_network_flush_bpf(sd_bpf);
 	octets = write(sd_bpf, buffer, sizebuf);
 	vrrp_network_flush_bpf(sd_bpf);
-	vrrp_thread_mutex_unlock_bpf();
 	if (octets == -1) {
 		syslog(LOG_ERR, "can't write to bpf socket descriptor (pseudo_device bpf not activated in kernel ?)");
 		return -1;
@@ -407,7 +405,11 @@ vrrp_network_delete_local_route(struct in6_addr *addr)
 	bzero(&rtmsg, sizeof(rtmsg));
 	rtm.rtm_type = RTM_DELETE;
 	rtm.rtm_version = RTM_VERSION;
+#ifdef __FreeBSD__
 	rtm.rtm_flags = RTF_UP | RTF_HOST | RTF_LOCAL | RTF_WASCLONED;
+#else
+	rtm.rtm_flags = RTF_UP | RTF_HOST;
+#endif
 	rtm.rtm_addrs = RTA_DST;
 	rtm.rtm_msglen = sizeof(rtmsg);
 	rtmsg.addr.sin6_len = sizeof(rtmsg.addr);

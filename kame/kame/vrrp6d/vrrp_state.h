@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_state.h,v 1.4 2002/07/10 07:41:46 ono Exp $	*/
+/*	$KAME: vrrp_state.h,v 1.5 2003/02/19 10:10:01 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -60,6 +60,7 @@
  * SUCH DAMAGE.
  */
 
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/ioctl.h>

@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_proto.h,v 1.4 2002/07/10 07:41:46 ono Exp $	*/
+/*	$KAME: vrrp_proto.h,v 1.5 2003/02/19 10:10:01 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -63,7 +63,11 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <net/if.h>
+#ifdef __FreeBSD__
 #include <net/ethernet.h>
+#else
+#include <net/if_ether.h>
+#endif
 #include <netinet/in.h>
 #include "vrrp_define.h"
 
@@ -110,12 +114,6 @@ struct vrrp_vip {
 	u_char          owner;
 };
 
-/* Timers RFC2338-6.2 */
-struct vrrp_timer {
-	struct timeval  master_down_tm;
-	struct timeval  adv_tm;
-};
-
 /*
  * Parameters per Virtual Router RFC2338-6.1.2 and
  * draft-ietf-vrrp-spec-v2-05.txt
@@ -129,10 +127,10 @@ struct vrrp_vr {
 	u_char          cnt_ip;
 	struct vrrp_vip *vr_ip;
 	u_int          *vr_netmask;
-	u_char          adv_int;
+	u_int           adv_int;
 	u_int           master_down_int;
 	u_int           skew_time;
-	struct vrrp_timer tm;
+	struct vrrp_timer *tm;
 	u_char          preempt_mode;	/* False = 0, True = 1 */
 	u_char          state;	/* 0 = INITIALIZE, 1 = MASTER, 2 = BACKUP */
 	u_char          auth_type;
