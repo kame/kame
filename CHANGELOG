@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1652 2001/04/20 15:01:08 itojun Exp $
+$KAME: CHANGELOG,v 1.1653 2001/04/24 06:30:24 sumikawa Exp $
 
 <200104>
+Tue Apr 24 15:29:51 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd4: sync with 4.3-RELEASE
+
 Fri Apr 20 23:59:21 JST 2001  itojun@iijlab.net
 	* sys/netinet6/in6_pcb.c: (netbsd): fix #if clause with NOIPPRIVPORTS.
 	  the old code mistakenly allowed bind(2) from non-privileged user
