@@ -35,7 +35,10 @@
  * - Return values.  There are nonstandard return values defined and used
  *   in the source code.  This is because RFC2553 is silent about which error
  *   code must be returned for which situation.
- * - PF_UNSPEC case would be handled in getipnodebyname() with the AI_ALL flag.
+ * Note:
+ * - We use getipnodebyname() just for thread-safeness.  There's no intent
+ *   to let it do PF_UNSPEC (actually we never pass PF_UNSPEC to
+ *   getipnodebyname().
  */
 
 #ifdef HAVE_CONFIG_H
