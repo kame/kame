@@ -45,6 +45,7 @@ int bpf_open __P((char *));
 static int linkhdrlen __P((int, char *));
 static void form __P((int, char *));
 static void form_ether __P((void));
+static void form_null __P((void));
 
 static void
 usage()
@@ -184,7 +185,7 @@ linkhdrlen(fd, iface)
 	case DLT_EN10MB:
 		return sizeof(struct ether_header);
 	case DLT_NULL:
-		return 0;
+		return sizeof(u_int);
 	}
 
 	return -1;
@@ -209,6 +210,7 @@ form(fd, iface)
 		form_ether();
 		break;
 	case DLT_NULL:
+		form_null();
 		break;
 	}
 }
@@ -247,4 +249,13 @@ form_ether()
 	}		
 
 	cksum6();
+}
+
+static void
+form_null()
+{
+	u_int *af;
+
+	af = (u_int *)buf;
+	*af = AF_INET6;
 }
