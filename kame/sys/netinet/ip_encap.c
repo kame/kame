@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.43 2001/06/22 15:01:01 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.44 2001/06/22 15:17:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -543,6 +543,11 @@ fail:
 /* XXX encap4_ctlinput() is necessary if we set DF=1 on outer IPv4 header */
 
 #ifdef INET6
+#ifdef HAVE_NRL_INPCB
+#define in6_rtchange	in_rtchange
+#define in6pcb		inpcb
+#endif
+
 void
 encap6_ctlinput(cmd, sa, d)
 	int cmd;
