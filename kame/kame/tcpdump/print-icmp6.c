@@ -228,7 +228,8 @@ icmp6_print(register const u_char *bp, register const u_char *bp2)
 				printf("M");
 			if (p->nd_ra_flags_reserved & ND_RA_FLAG_OTHER)
 				printf("O");
-			printf(" ");
+			if (p->nd_ra_flags_reserved != 0)
+				printf(" ");
 			printf("router_ltime=%d, ", ntohs(p->nd_ra_router_lifetime));
 			printf("reachable_time=%u, ",
 				(u_int32_t)ntohl(p->nd_ra_reachable));
@@ -487,7 +488,8 @@ icmp6_opt_print(register const u_char *bp, int resid)
 		       printf("L");
 		if (opp->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_AUTO)
 		       printf("A");
-		printf(" ");
+		if (opp->nd_opt_pi_flags_reserved)
+			printf(" ");
 		printf("valid_ltime=");
 		if ((u_int32_t)ntohl(opp->nd_opt_pi_valid_time) == ~0U)
 			printf("infinity");

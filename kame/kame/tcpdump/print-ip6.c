@@ -206,10 +206,14 @@ ip6_print(register const u_char *bp, register int length)
 		(void)printf(" [flowlabel 0x%x]", flow & 0x000fffff);
 #endif
 
+	if (ip6->ip6_hlim <= 1)
+		(void)printf(" [hlim %d]", (int)ip6->ip6_hlim);
+
 	if (vflag) {
 		printf(" (");
 		(void)printf("len %d", len);
-		(void)printf(", hlim %d", (int)ip6->ip6_hlim);
+		if (ip6->ip6_hlim > 1)
+			(void)printf(", hlim %d", (int)ip6->ip6_hlim);
 		printf(")");
 	}
 }
