@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.40 2004/06/08 07:27:59 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.41 2004/06/08 09:22:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -486,12 +486,11 @@ configure_keys(keylist)
 {
 	struct cf_namelist *key;
 	char *secretstr;
-	size_t secretstrlen;
 	char secret[1024];
 	int secretlen;
 	struct keyinfo *kinfo;
 	long long keyid;
-	char *expire;
+	char *expire = NULL;
 
 	for (key = keylist; key; key = key->next) {
 		struct cf_list *cfl;
@@ -745,7 +744,7 @@ configure_authinfo(authlist)
 		}
 		if (ainfo->algorithm == DHCP6_AUTHALG_UNDEF)
 			ainfo->algorithm = DHCP6_AUTHALG_HMACMD5;
-		if (ainfo->rdm = DHCP6_AUTHRDM_UNDEF)
+		if (ainfo->rdm == DHCP6_AUTHRDM_UNDEF)
 			ainfo->rdm = DHCP6_AUTHRDM_MONOCOUNTER;
 	}
 
