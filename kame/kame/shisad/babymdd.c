@@ -1,4 +1,4 @@
-/*      $Id: babymdd.c,v 1.1 2005/03/01 01:58:52 ryuji Exp $  */
+/*      $Id: babymdd.c,v 1.2 2005/03/01 02:26:35 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -65,30 +65,30 @@
 #define storage2sin6(x) ((struct sockaddr_in6 *)(x))
 
 /* base functions */
-static void mdd_initif();
+static void baby_initif();
 static void init_hoa(u_int16_t);
 static struct if_info *init_if(char *);
 static void print_debug();
-static void mdd_terminate();
-static void mdd_reset();
+static void baby_terminate();
+static void baby_reset();
 
-void mdd_getifinfo(struct if_info *);
-void mdd_selection();
-int mdd_checklink();
-int mdd_rtmsg(struct rt_msghdr *, int);
-int mdd_mipmsg(struct mip_msghdr *, int);
+void baby_getifinfo(struct if_info *);
+void baby_selection();
+int baby_checklink();
+int baby_rtmsg(struct rt_msghdr *, int);
+int baby_mipmsg(struct mip_msghdr *, int);
 
 /* MIPsocket commands */
-static int mdd_md_scan(struct if_info *);
-static int mdd_md_reg(struct sockaddr_in6 *, u_int16_t);
-static void mdd_md_home(struct sockaddr_in6 *, struct sockaddr_in6 *, int);
+static int baby_md_scan(struct if_info *);
+static int baby_md_reg(struct sockaddr_in6 *, u_int16_t);
+static void baby_md_home(struct sockaddr_in6 *, struct sockaddr_in6 *, int);
 static void get_rtaddrs(int, struct sockaddr *, struct sockaddr **);
 
 /* utilities */
-static int mdd_coa_equal(struct if_info *);
+static int baby_coa_equal(struct if_info *);
 static int is_hoa_ornot(struct in6_addr *);
 static int in6_addrscope(struct in6_addr *);
-static struct if_info *mdd_ifindex2ifinfo(u_int16_t);
+static struct if_info *baby_ifindex2ifinfo(u_int16_t);
 static int send_rs(struct if_info  *);
 
 struct mdd_info babyinfo;
@@ -98,12 +98,11 @@ struct mdd_info babyinfo;
 void
 baby_usage()
 {
-        fprintf(stderr, "babymdd [options] [-h mipif] interfaces\n");
+        fprintf(stderr, "babymdd [options] -h mipif interfaces..\n");
 	fprintf(stderr, "Options\n");
-        fprintf(stderr, "\t[-d]            Turn on debug mode\n");
-        fprintf(stderr, "\t[-D]            Turn on verbose debug mode\n");
-        fprintf(stderr, "\t[-n]            Resolve names for IP addresses\n");
-        fprintf(stderr, "\t[-p interval]   polling link status per interval(sec)\n");
+        fprintf(stderr, "\t-d            Turn on debug mode\n");
+        fprintf(stderr, "\t-D            Turn on verbose debug mode\n");
+        fprintf(stderr, "\t-p interval   polling link status per interval(sec)\n");
 }
 
 
@@ -237,28 +236,27 @@ main (argc, argv)
 	} 
 
 	/* each interface is initialized here */
-	mdd_initif();
+	baby_initif();
 
 	/* dump Configuration */
  	if (DEBUGHIGH) {
 		print_debug();
 	}
 
-        signal(SIGHUP, mdd_terminate);
-        signal(SIGINT, mdd_terminate);
-        signal(SIGKILL, mdd_terminate);
-        signal(SIGTERM, mdd_terminate);
+        signal(SIGHUP, baby_terminate);
+        signal(SIGINT, baby_terminate);
+        signal(SIGKILL, baby_terminate);
+        signal(SIGTERM, baby_terminate);
 
         if (!babyinfo.nondaemon) {
                 if (daemon(0, 0) < 0) {
                         perror("daemon");
-			mdd_terminate();
+			baby_terminate();
                         exit(-1);
                 }
         }
 
-printf("mdd_selection\n");
-	mdd_selection();
+	baby_selection();
 
 	if (DEBUGHIGH) {
 		syslog(LOG_INFO, "<Interface Status>\n");
@@ -287,8 +285,8 @@ printf("mdd_selection\n");
                         if (n < 0) 
                                 continue;
 
-			if (mdd_rtmsg((struct rt_msghdr *)buf, n))
-				mdd_selection();
+			if (baby_rtmsg((struct rt_msghdr *)buf, n))
+				baby_selection();
 		}
 
                 if (FD_ISSET(babyinfo.mipsock, &fds)) {
@@ -296,15 +294,15 @@ printf("mdd_selection\n");
                         if (n < 0) 
                                 continue;
 
-			if (mdd_mipmsg((struct mip_msghdr *)buf, n))
-				mdd_selection();
+			if (baby_mipmsg((struct mip_msghdr *)buf, n))
+				baby_selection();
 		}
 
 		/* link status check */
 		now = time(0);
 		if ((now - lastlinkcheck) > babyinfo.linkpoll) {
-			if (mdd_checklink())
-				mdd_selection();
+			if (baby_checklink())
+				baby_selection();
 			lastlinkcheck = time(0);
 
 		}
@@ -315,7 +313,7 @@ printf("mdd_selection\n");
 
 /* check link status */
 int
-mdd_checklink() {
+baby_checklink() {
         struct ifmediareq ifmr;
 	struct if_info *ifinfo, *ifinfo_next;
 
@@ -347,7 +345,7 @@ mdd_checklink() {
 				if (DEBUGHIGH)
 					syslog(LOG_INFO, 
 					       "%s link failed\n", ifinfo->ifname); 
-				mdd_md_scan(ifinfo);
+				baby_md_scan(ifinfo);
 				send_rs(ifinfo);
 
 			}
@@ -366,7 +364,7 @@ mdd_checklink() {
 				if (DEBUGHIGH)
 					syslog(LOG_INFO, 
 					       "%s link failed\n", ifinfo->ifname); 
-				mdd_md_scan(ifinfo);
+				baby_md_scan(ifinfo);
 				send_rs(ifinfo);
 
 			}
@@ -380,7 +378,7 @@ mdd_checklink() {
 
 /* reset router lifetime of NDP, 0 = success, -1 = error */
 static int
-mdd_md_scan(struct if_info *ifinfo) {
+baby_md_scan(struct if_info *ifinfo) {
 	struct mipm_md_info mdinfo;
 	
 	if (!ifinfo)
@@ -405,7 +403,7 @@ mdd_md_scan(struct if_info *ifinfo) {
 }
 
 static int
-mdd_md_reg(coa, bid) 
+baby_md_reg(coa, bid) 
 	struct sockaddr_in6 *coa;
 	u_int16_t bid;
 {
@@ -461,7 +459,7 @@ mdd_md_reg(coa, bid)
 
 /* 0 return means no changes, 1 return means changes occured */
 int
-mdd_mipmsg(mipm, msglen)
+baby_mipmsg(mipm, msglen)
 	struct mip_msghdr *mipm;
 	int msglen;
 {
@@ -474,7 +472,7 @@ mdd_mipmsg(mipm, msglen)
 	case MIPM_HOME_HINT:
 		miphome = (struct mipm_home_hint *)mipm;
 
-		ifinfo = mdd_ifindex2ifinfo(miphome->mipmhh_ifindex);
+		ifinfo = baby_ifindex2ifinfo(miphome->mipmhh_ifindex);
 		if (ifinfo == NULL)                        
 			break;
 		
@@ -510,7 +508,7 @@ mdd_mipmsg(mipm, msglen)
                 mipmd = (struct mipm_md_info *)mipm;
                 if (mipmd->mipm_md_command == MIPM_MD_SCAN) {
 
-			ifinfo = mdd_ifindex2ifinfo(mipmd->mipm_md_ifindex);
+			ifinfo = baby_ifindex2ifinfo(mipmd->mipm_md_ifindex);
 			if (ifinfo != NULL)                        
 				send_rs(ifinfo);
                 } 
@@ -525,7 +523,7 @@ mdd_mipmsg(mipm, msglen)
 
 /* 0 return means no changes, 1 return means changes occured */
 int
-mdd_rtmsg(rtm, msglen)
+baby_rtmsg(rtm, msglen)
 	struct rt_msghdr *rtm;
 	int msglen;
 {
@@ -550,11 +548,11 @@ mdd_rtmsg(rtm, msglen)
 		ifam = (struct ifa_msghdr *)rtm;
 
 		/* find appropriate ifinfo */
-		ifinfo = mdd_ifindex2ifinfo(ifam->ifam_index);
+		ifinfo = baby_ifindex2ifinfo(ifam->ifam_index);
 		if (ifinfo == NULL)
 			break;
 
-		mdd_getifinfo(ifinfo); 	
+		baby_getifinfo(ifinfo); 	
 		
 		return (1);
 
@@ -564,7 +562,7 @@ mdd_rtmsg(rtm, msglen)
 		ifam = (struct ifa_msghdr *)rtm;
 
 		/* find appropriate ifinfo */
-		ifinfo = mdd_ifindex2ifinfo(ifam->ifam_index);
+		ifinfo = baby_ifindex2ifinfo(ifam->ifam_index);
 		if (ifinfo == NULL)
 			return (0);
 		
@@ -618,11 +616,11 @@ mdd_rtmsg(rtm, msglen)
 				    IN6_ARE_ADDR_EQUAL(&storage2sin6(&ifinfo->coa)->sin6_addr,
 						       &sin6->sin6_addr)) {
 					
-					mdd_getifinfo(ifinfo); 	
+					baby_getifinfo(ifinfo); 	
 				} 
 			} else {
 				memset(&ifinfo->coa, 0, sizeof(ifinfo->coa));
-				mdd_getifinfo(ifinfo); 	
+				baby_getifinfo(ifinfo); 	
 			}
 		}
 
@@ -632,7 +630,7 @@ mdd_rtmsg(rtm, msglen)
 		ifam = (struct ifa_msghdr *)rtm;
 
 		/* find appropriate ifinfo */
-		ifinfo = mdd_ifindex2ifinfo(ifam->ifam_index);
+		ifinfo = baby_ifindex2ifinfo(ifam->ifam_index);
 		if (ifinfo == NULL)
 			break;
 
@@ -683,7 +681,7 @@ mdd_rtmsg(rtm, msglen)
 				       sizeof(ifinfo->coa));
 				babyinfo.whereami = 0; /* reset */
 				
-				mdd_getifinfo(ifinfo);
+				baby_getifinfo(ifinfo);
 
 				return (1);
 			}
@@ -867,7 +865,7 @@ print_debug () {
 
 
 void
-mdd_reset() {
+baby_reset() {
 	struct if_info *ifinfo, *ifinfo_next;
 	struct hoa_info *hoainfo, *hoainfo_next;
 
@@ -897,14 +895,14 @@ mdd_reset() {
 
 
 static void 
-mdd_terminate() {
+baby_terminate() {
 
-	mdd_reset();
+	baby_reset();
 	exit(0);
 }
 
 static void
-mdd_initif() {
+baby_initif() {
 	struct if_info *ifinfo, *ifinfo_next;
 
 	/* Sorting by priority  */
@@ -927,7 +925,7 @@ mdd_initif() {
 	     ifinfo = ifinfo_next) {
 		ifinfo_next = LIST_NEXT(ifinfo, ifinfo_entry);
 
-		mdd_getifinfo(ifinfo); 
+		baby_getifinfo(ifinfo); 
 	}
 
 	return;
@@ -1028,7 +1026,7 @@ get_rtaddrs(addrs, sa, rti_info)
 }
 
 void
-mdd_getifinfo(ifinfo) 
+baby_getifinfo(ifinfo) 
 	struct if_info *ifinfo;
 {
 	int mib[6];
@@ -1116,7 +1114,7 @@ mdd_getifinfo(ifinfo)
 
 /* detrmin which CoAs are passed to mobile network daemon */
 void
-mdd_selection() {
+baby_selection() {
 	struct if_info *ifinfo, *ifinfo_next;
 
 	if (babyinfo.whereami == IAMHOME) {
@@ -1128,7 +1126,7 @@ mdd_selection() {
 		 * home address (ex. an address auto-configured at the
 		 * home link), but it does not matter whether coa is
 		 * the home address or not. Only when the home address
-		 * is detached/deleted, mdd_selection() starts to
+		 * is detached/deleted, baby_selection() starts to
 		 * select other address as a primary CoA and marks
 		 * foreign. 
 		 */
@@ -1147,7 +1145,7 @@ mdd_selection() {
 			     hoainfo; hoainfo = hoainfo_next) {
 				hoainfo_next = LIST_NEXT(hoainfo, hoainfo_entry); 
 				
-				mdd_md_home(storage2sin6(&hoainfo->hoa), 
+				baby_md_home(storage2sin6(&hoainfo->hoa), 
 				    storage2sin6(&ifinfo->coa), 
 				    ifinfo->ifindex);
 			}
@@ -1174,10 +1172,10 @@ mdd_selection() {
 		if (((babyinfo.coaif == NULL) || 
 		     (babyinfo.coaif && 
 		      babyinfo.coaif->priority <= ifinfo->priority)) 
-		    && !mdd_coa_equal(ifinfo)) {
+		    && !baby_coa_equal(ifinfo)) {
 			
 			fprintf(stderr,"sending reg info\n");
-			mdd_md_reg((struct sockaddr_in6 *)&ifinfo->coa, 0); 
+			baby_md_reg((struct sockaddr_in6 *)&ifinfo->coa, 0); 
 			memcpy(&ifinfo->pcoa, &ifinfo->coa, 
 			       sizeof(ifinfo->coa));
 			
@@ -1193,7 +1191,7 @@ mdd_selection() {
 
 
 static int
-mdd_coa_equal(struct if_info *ifinfo) {
+baby_coa_equal(struct if_info *ifinfo) {
 
 	if ((ifinfo->coa.ss_family != 0) && 
 	    (ifinfo->coa.ss_family != ifinfo->pcoa.ss_family)) 
@@ -1292,7 +1290,7 @@ send_rs(struct if_info  *ifinfo) {
 
 
 static void
-mdd_md_home(hoa, coa, ifindex)
+baby_md_home(hoa, coa, ifindex)
         struct sockaddr_in6 *hoa;
         struct sockaddr_in6 *coa;
         int ifindex;
@@ -1336,7 +1334,7 @@ mdd_md_home(hoa, coa, ifindex)
 }
 
 static struct if_info *
-mdd_ifindex2ifinfo(u_int16_t ifindex) {
+baby_ifindex2ifinfo(u_int16_t ifindex) {
 	struct if_info *ifinfo = NULL, *ifinfo_next = NULL;
 
 	for (ifinfo = LIST_FIRST(&babyinfo.ifinfo_head); ifinfo; 
