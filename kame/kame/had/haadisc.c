@@ -1,4 +1,4 @@
-/*	$KAME: haadisc.c,v 1.12 2003/08/07 02:05:27 t-momose Exp $	*/
+/*	$KAME: haadisc.c,v 1.13 2003/11/20 08:43:03 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: haadisc.c,v 1.12 2003/08/07 02:05:27 t-momose Exp $
+ * $Id: haadisc.c,v 1.13 2003/11/20 08:43:03 keiichi Exp $
  */
 
 /*
@@ -750,9 +750,11 @@ ra_input(len, ra, pinfo, from)
 	/* replace home agent global address list to new one */
 	if (newgaddrs.hagent_next_gaddr == NULL) goto done;
 	hal_gaddr_last(halp, newgaddrs.hagent_next_gaddr);
-	
+
+#if 0	
 	/* send Mobile Prefix Advertisement */
 	mpi_advert_output_All(&(pinfo->ipi6_addr), haif);
+#endif
     }
 done:
 }
