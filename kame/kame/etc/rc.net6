@@ -90,9 +90,9 @@ $route add -inet6 ::255.0.0.0 -prefixlen 104 ::1 -reject
 
 # disallow packets to malicious 6to4 prefix.
 $route add -inet6 2002:e000:: -prefixlen 20 ::1 -reject
-$route add -inet6 2002:7f00:0000:: -prefixlen 24 ::1 -reject
-$route add -inet6 2002:0000:0000:: -prefixlen 24 ::1 -reject
-$route add -inet6 2002:ff00:0000:: -prefixlen 24 ::1 -reject
+$route add -inet6 2002:7f00:: -prefixlen 24 ::1 -reject
+$route add -inet6 2002:0000:: -prefixlen 24 ::1 -reject
+$route add -inet6 2002:ff00:: -prefixlen 24 ::1 -reject
 
 # Completely disallow packets to IPv4 compatible prefix.
 # This may conflict with RFC1933 under following circumstances:
