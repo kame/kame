@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.256 2002/01/20 11:36:56 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.257 2002/01/20 11:56:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1077,9 +1077,16 @@ ip6_input(m)
 		case IPPROTO_IPV4:
 			ip_forward(m1, 0);
 			break;
+#ifdef notyet
+		/*
+		 * do not forget to record src/dst sockaddr_in6 when
+		 * supporting this case.
+		 */
 		case IPPROTO_IPV6:
+
 			ip6_forward(m1, 0);
 			break;
+#endif
 		case IPPROTO_MAX:		/* discard this packet	*/
 		default:
 			break;
