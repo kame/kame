@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.70 2001/07/24 02:35:07 sumikawa Exp $	*/
+/*	$KAME: ndp.c,v 1.71 2001/07/24 02:40:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -643,8 +643,11 @@ again:;
 			    sizeof(host_buf), NULL, 0,
 			    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
 		if (cflag == 1) {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef RTF_WASCLONED
 			if (rtm->rtm_flags & RTF_WASCLONED)
+				delete(host_buf);
+#elif defined(RTF_CLONED)
+			if (rtm->rtm_flags & RTF_CLONED)
 				delete(host_buf);
 #else
 			delete(host_buf);
