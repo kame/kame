@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.282 2002/02/02 07:06:12 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.283 2002/02/03 08:44:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -245,7 +245,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	struct ifnet **ifpp;		/* XXX: just for statistics */
 {
 	struct ip6_hdr *ip6, *mhip6;
-	struct ifnet *ifp, *origifp;
+	struct ifnet *ifp, *origifp = NULL;
 	struct mbuf *m = m0;
 	int hlen, tlen, len, off;
 #ifdef NEW_STRUCT_ROUTE
@@ -1000,10 +1000,8 @@ skip_ipsec2:;
 		 * XXX: using a block just to define a local variables is not
 		 * a good style....
 		 */
-		struct ifnet *ifp0 = NULL;
 		int clone = 0;
 		u_int32_t zone;
-
 
 #if defined(__bsdi__) || defined(__FreeBSD__)
 		if (ro != &ip6route && !IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
@@ -1050,26 +1048,26 @@ skip_ipsec2:;
 		 * case of sending packets to an address of our own.
 		 */
 		if (ia != NULL && ia->ia_ifp)
-			ifp0 = ia->ia_ifp;
+			origifp = ia->ia_ifp;
 		else
-			ifp0 = ifp;
-		if (in6_addr2zoneid(ifp0, &src_sa->sin6_addr, &zone) ||
+			origifp = ifp;
+		if (in6_addr2zoneid(origifp, &src_sa->sin6_addr, &zone) ||
 		    zone != src_sa->sin6_scope_id) {
 #ifdef SCOPEDEBUG		/* will be removed shortly */
 			printf("ip6 output: bad source scope %s%%%d for %s%%%d on %s\n",
 			       ip6_sprintf(&src_sa->sin6_addr),
 			       src_sa->sin6_scope_id,
 			       ip6_sprintf(&dst_sa->sin6_addr),
-			       dst_sa->sin6_scope_id, if_name(ifp0));
+			       dst_sa->sin6_scope_id, if_name(origifp));
 #endif
 			goto badscope;
 		}
-		if (in6_addr2zoneid(ifp0, &dst_sa->sin6_addr, &zone) ||
+		if (in6_addr2zoneid(origifp, &dst_sa->sin6_addr, &zone) ||
 		    zone != dst_sa->sin6_scope_id) {
 #ifdef SCOPEDEBUG		/* will be removed shortly */
 			printf("ip6 output: bad dst scope %s%%%d on %s\n",
 			       ip6_sprintf(&dst_sa->sin6_addr),
-			       dst_sa->sin6_scope_id, if_name(ifp0));
+			       dst_sa->sin6_scope_id, if_name(origifp));
 #endif
 			goto badscope;
 		}
@@ -1079,7 +1077,7 @@ skip_ipsec2:;
 
 	  badscope:
 		ip6stat.ip6s_badscope++;
-		in6_ifstat_inc(ifp0, ifs6_out_discard);
+		in6_ifstat_inc(origifp, ifs6_out_discard);
 		if (error == 0)
 			error = EHOSTUNREACH; /* XXX */
 		goto bad;
@@ -1174,7 +1172,7 @@ skip_ipsec2:;
 	 * to increment per-interface statistics.
 	 */
 	if (ifpp)
-		*ifpp = ifp;
+		*ifpp = origifp;
 
 	/*
 	 * Upper-layer reachability confirmation
@@ -1196,60 +1194,6 @@ skip_ipsec2:;
 		mtu = IPV6_MMTU;
 	}
 
-	/* Fake scoped addresses */
-	if ((ifp->if_flags & IFF_LOOPBACK) != 0) {
-		/*
-		 * If source or destination address is a scoped address, and
-		 * the packet is going to be sent to a loopback interface,
-		 * we should keep the original interface.
-		 */
-
-		/*
-		 * XXX: this is a very experimental and temporary solution.
-		 * We eventually have sockaddr_in6 and use the sin6_scope_id
-		 * field of the structure here.
-		 * We rely on the consistency between two scope zone ids
-		 * of source and destination, which should already be assured.
-		 * Larger scopes than link will be supported in the future. 
-		 */
-		origifp = NULL;
-		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src)) {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
-			origifp = ifnet_byindex(ntohs(src_sa->sin6_addr.s6_addr16[1]));
-#else
-			origifp = ifindex2ifnet[ntohs(src_sa->sin6_addr.s6_addr16[1])];
-#endif
-		} else if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst)) {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
-			origifp = ifnet_byindex(ntohs(dst_sa->sin6_addr.s6_addr16[1]));
-#else
-			origifp = ifindex2ifnet[ntohs(dst_sa->sin6_addr.s6_addr16[1])];
-#endif
-		} else if (IN6_IS_ADDR_MC_INTFACELOCAL(&ip6->ip6_dst)) {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
-			origifp = ifnet_byindex(ntohs(dst_sa->sin6_addr.s6_addr16[1]));
-#else
-			origifp = ifindex2ifnet[ntohs(dst_sa->sin6_addr.s6_addr16[1])];
-#endif
-		}
-
-		/*
-		 * XXX: origifp can be NULL even in those two cases above.
-		 * For example, if we remove the (only) link-local address
-		 * from the loopback interface, and try to send a link-local
-		 * address without link-id information.  Then the source
-		 * address is ::1, and the destination address is the
-		 * link-local address with its s6_addr16[1] being zero.
-		 * What is worse, if the packet goes to the loopback interface
-		 * by a default rejected route, the null pointer would be
-		 * passed to looutput, and the kernel would hang.
-		 * The following last resort would prevent such disaster.
-		 */
-		if (origifp == NULL)
-			origifp = ifp;
-	}
-	else
-		origifp = ifp;
 #ifndef SCOPEDROUTING
 	/*
 	 * clear embedded scope identifiers if necessary.
