@@ -54,7 +54,7 @@ struct relay {
 	struct connection w;
 };
 
-static char *configfile = _PATH_PREFIX_CONF;
+static char *configfile = NULL;
 
 #define MAXSOCK	100
 
@@ -77,9 +77,13 @@ main(argc, argv)
 	int error;
 	int i;
 	const int yes = 1;
+	int foreground = 0;
 
-	while ((ch = getopt(argc, argv, "f:")) != -1) {
+	while ((ch = getopt(argc, argv, "Df:")) != -1) {
 		switch (ch) {
+		case 'D':
+			foreground = 1;
+			break;
 		case 'f':
 			configfile = optarg;
 			break;
@@ -97,8 +101,8 @@ main(argc, argv)
 		exit(1);
 	}
 
-	if (config_load(configfile) < 0) {
-		err(1, "%s", configfile);
+	if (config_load(configfile) < 0 && configfile) {
+		errx(1, "%s", configfile);
 		/*NOTREACHED*/
 	}
 
@@ -143,14 +147,14 @@ main(argc, argv)
 		/*NOTREACHED*/
 	}
 
-	if (daemon(0, 0) < 0) {
-		err(1, "daemon");
-		/*NOTREACHED*/
-	}
+	if (!foreground)
+		if (daemon(0, 0) < 0) {
+			err(1, "daemon");
+			/*NOTREACHED*/
+		}
 
 	event_init();
 	for (i = 0; i < smax; i++) {
-		event_set(&event[i], s[i], EV_EXCEPT, doaccept, &event[i]);
 		event_set(&event[i], s[i], EV_READ, doaccept, &event[i]);
 		event_add(&event[i], NULL);
 	}
@@ -160,7 +164,7 @@ main(argc, argv)
 static void
 usage()
 {
-	fprintf(stderr, "usage: faithd port...\n");
+	fprintf(stderr, "usage: faithd [-D] [-f configfile] port...\n");
 }
 
 static void
