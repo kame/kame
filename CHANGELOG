@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1582 2001/03/02 11:06:47 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1583 2001/03/02 15:07:12 jinmei Exp $
 
 <200103>
+2001-03-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (prelist_update): clarified the
+	update routine for an existing prefix.  It now tries to update
+	some parameters even if the L bit is zero.  This would be
+	necessary for the case where a router first advertises the prefix
+	without the L bit being set, and next the same prefix with the bit
+	being set.
+
 Fri Mar  2 20:05:23 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* netbsd/usr.bin/tftp/main.c: port checking fix.
 	  from h-yamamo@db3.so-net.ne.jp.
