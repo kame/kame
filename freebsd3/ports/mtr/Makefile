@@ -11,14 +11,14 @@ CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.bitwizard.nl/mtr/ \
 		http://www.giovannelli.it/~gmarco/files/
 
-PATCHFILES=	mtr-041-v6-19990903a.diff.gz
+PATCHFILES=	mtr-041-v6-19990903b.diff.gz
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@kame.net
 
 GNU_CONFIGURE=	yes
-CONFIGURE_ARGS=	--enable-ipv6
+CONFIGURE_ARGS+=--enable-ipv6
 
 MAN8=	mtr.8
 
@@ -28,7 +28,7 @@ pre-patch:
 	@${ECHO} "If you want to compile with GTK support,"
 	@${ECHO} "hit Ctrl-C right now and use \"make USE_GTK=yes\" "
 	@${ECHO} ""
-CONFIGURE_ARGS=--with-gtk-prefix=/nopath
+CONFIGURE_ARGS+=--with-gtk-prefix=/nopath
 .else
 USE_XLIB=	yes
 LIB_DEPENDS=    gtk12.2:${PORTSDIR}/x11-toolkits/gtk12
