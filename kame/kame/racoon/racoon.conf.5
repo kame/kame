@@ -325,6 +325,12 @@ RFC 2393.
 .Pp
 .Bl -tag -width Ds -compact
 .\"
+.It Ic encryption_algorithm Ar algorithm ;
+.Ic des , 3des , des_iv64 , des_iv32 ,
+.Ic rc5 , rc4 , idea , 3idea ,
+.Ic cast128 , blowfish , null_enc
+for esp.
+.\"
 .It Ic authentication_algorithm Ar algorithm ;
 .Ic hmac_md5, hmac_sha1, none
 for esp and ah.
