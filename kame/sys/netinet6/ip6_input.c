@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.93 2000/06/11 14:59:20 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.94 2000/06/13 10:06:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -563,11 +563,13 @@ ip6_input(m)
 	 *  Unicast check
 	 */
 	if (ip6_forward_rt.ro_rt != NULL &&
+	    (ip6_forward_rt.ro_rt->rt_flags & RTF_UP) != 0 && 
 	    IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst,
 			       &ip6_forward_rt.ro_dst.sin6_addr))
 		ip6stat.ip6s_forward_cachehit++;
 	else {
 		if (ip6_forward_rt.ro_rt) {
+			/* route is down or destination is different */
 			ip6stat.ip6s_forward_cachemiss++;
 			RTFREE(ip6_forward_rt.ro_rt);
 			ip6_forward_rt.ro_rt = 0;
