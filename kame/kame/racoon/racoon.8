@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.8,v 1.17 2000/11/19 01:23:44 sakane Exp $
+.\"	$KAME: racoon.8,v 1.18 2000/11/20 00:51:52 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -57,6 +57,8 @@
 .Nm
 speaks IKE (ISAKMP/Oakley) key management protocol, to establish
 security association with other hosts.
+SPD in the kernel usually trigger to start
+.Nm racoon .
 .Bl -tag -width Ds
 .It Fl f Ar configfile
 Use alternate configuration file.
@@ -99,7 +101,8 @@ The command exits with 0 on success, and non-zero on errors.
 .\"
 .Sh SEE ALSO
 .Xr ipsec 4 ,
-.Xr racoon.conf 5
+.Xr racoon.conf 5 ,
+.Xr setkey 8
 .\"
 .Sh HISTORY
 The
