@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.120 2004/11/28 11:29:36 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.121 2004/11/28 11:43:35 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1479,6 +1479,19 @@ dhcp6_get_options(p, ep, optinfo)
 			val32 = ntohl(val32);
 			dprintf(LOG_DEBUG, "",
 			    "   information refresh time: %lu", val32);
+			if (val32 < DHCP6_IRT_MINIMUM) {
+				/*
+				 * A client MUST use the refresh time
+				 * IRT_MINIMUM if it receives the option with a
+				 * value less than IRT_MINIMUM.
+				 * [draft-ietf-dhc-lifetime-02.txt,
+				 *  Section 3.2]
+				 */
+				dprintf(LOG_INFO, FNAME,
+				    "refresh time is too small (%d), adjusted",
+				    val32);
+				val32 = DHCP6_IRT_MINIMUM;
+			}
 			if (optinfo->refreshtime != DH6OPT_REFRESHTIME_UNDEF) {
 				dprintf(LOG_INFO, FNAME,
 				    "duplicated refresh time option");
