@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.39 2003/07/16 14:46:36 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.40 2003/07/16 15:24:26 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -77,7 +77,7 @@ static struct in6_pktinfo *spktinfo;
 
 static int mhops = DHCP6_RELAY_MULTICAST_HOPS;
 
-static struct sockaddr_in6 sa6_all_servers, sa6_client;
+static struct sockaddr_in6 sa6_server, sa6_client;
 
 struct prefix_list {
 	TAILQ_ENTRY(prefix_list) plink;
@@ -276,7 +276,7 @@ relay6_init()
 		goto failexit;
 	}
 	if (res->ai_family != PF_INET6 ||
-	    res->ai_addrlen < sizeof (sa6_all_servers)) {
+	    res->ai_addrlen < sizeof (sa6_server)) {
 		/* this should be impossible, but check for safety */
 		dprintf(LOG_ERR, FNAME,
 		    "getaddrinfo returned a bogus address: %s",
@@ -284,7 +284,7 @@ relay6_init()
 		goto failexit;
 	}
 	/* XXX: assume only one DHCPv6 server address */
-	memcpy(&sa6_all_servers, res->ai_addr, sizeof (sa6_all_servers));
+	memcpy(&sa6_server, res->ai_addr, sizeof (sa6_server));
 	freeaddrinfo(res);
 
 	/* initialize send/receive buffer */
@@ -439,7 +439,7 @@ relay6_init()
 	}
 	freeaddrinfo(res);
 
-	if (IN6_IS_ADDR_MULTICAST(&sa6_all_servers.sin6_addr)) {
+	if (IN6_IS_ADDR_MULTICAST(&sa6_server.sin6_addr)) {
 		if (setsockopt(ssock, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &mhops,
 		    sizeof (mhops)) < 0) {
 			dprintf(LOG_ERR, FNAME,
@@ -732,9 +732,9 @@ relay_to_server(dh6, len, from, ifname, ifid)
 	/*
 	 * Forward the message.
 	 */
-	next_agent = sa6_all_servers; /* XXX: fixed for now */
+	next_agent = sa6_server;
 	if ((cc = sendto(ssock, relaybuf, relaylen, 0,
-	    (struct sockaddr *)&next_agent, sizeof (sa6_all_servers))) < 0) {
+	    (struct sockaddr *)&next_agent, sizeof (sa6_server))) < 0) {
 		dprintf(LOG_WARNING, FNAME,
 		    "sendto %s failed: %s",
 		    addr2str((struct sockaddr *)&next_agent), strerror(errno));
