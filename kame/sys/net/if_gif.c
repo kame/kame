@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.69 2001/08/16 16:28:25 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.70 2001/08/16 16:30:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -413,7 +413,7 @@ gif_input(m, af, ifp)
 	struct ifnet *ifp;
 {
 	int s, isr;
-	struct ifqueue *ifq = 0;
+	struct ifqueue *ifq = NULL;
 
 	if (ifp == NULL) {
 		/* just in case */
