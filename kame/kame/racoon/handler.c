@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.9 2000/01/10 00:39:35 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.10 2000/01/10 21:08:06 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -379,6 +379,16 @@ void
 initph2(iph2)
 	struct ph2handle *iph2;
 {
+	if (iph2->id)
+		vfree(iph2->id);
+	if (iph2->id_p)
+		vfree(iph2->id_p);
+	if (iph2->nonce_p)
+		vfree(iph2->nonce_p);
+	if (iph2->dhpub_p)
+		vfree(iph2->dhpub_p);
+	if (iph2->dhgxy)
+		vfree(iph2->dhgxy);
 	if (iph2->ivm)
 		oakley_delivm(iph2->ivm);
 	if (iph2->sce)
@@ -395,12 +405,7 @@ void
 delph2(iph2)
 	struct ph2handle *iph2;
 {
-	if (iph2->ivm)
-		oakley_delivm(iph2->ivm);
-	if (iph2->sce)
-		SCHED_KILL(iph2->sce);
-	if (iph2->scr)
-		SCHED_KILL(iph2->scr);
+	initph2(iph2);
 	/* XXX do more free parameters */
 
 	free(iph2);

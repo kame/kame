@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.h,v 1.6 2000/01/09 01:31:24 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.h,v 1.7 2000/01/10 21:08:07 sakane Exp $ */
 
 /* refer to RFC 2408 */
 
@@ -301,6 +301,9 @@ struct isakmp_pl_n {
 #define ISAKMP_NTYPE_CONNECTED                   16384
 /* using only to log */
 #define ISAKMP_LOG_RETRY_LIMIT_REACHED           65530
+
+/* XXX means internal error but it's not reserved by any drafts... */
+#define ISAKMP_INTERNAL_ERROR			-1
 
 /* 3.15 Delete Payload */
 struct isakmp_pl_d {

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.10 2000/01/10 19:43:44 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.11 2000/01/10 21:08:07 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2835,7 +2835,7 @@ ipsecdoi_id2sockaddr(
 	default:
 		plog(logp, LOCATION, NULL,
 			"unsupported ID type %d\n", id_b->type);
-		return -1;
+		return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 	}
 
 	/* get prefix length */
@@ -2884,7 +2884,7 @@ ipsecdoi_id2sockaddr(
 		break;
 	default:
 		plog(logp, LOCATION, NULL, "unsupported ID type.\n");
-		return -1;
+		return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 	}
 
 	saddr->sa_len = _SALENBYAF(family);

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.20 2000/01/10 19:52:11 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.21 2000/01/10 21:08:07 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -221,6 +221,7 @@ isakmp_main(msg, remote, local)
 	isakmp_index *index = (isakmp_index *)isakmp;
 	u_int32_t msgid = isakmp->msgid;
 	struct ph1handle *iph1;
+	int error;
 
 #ifdef HAVE_PRINT_ISAKMP_C
 	isakmp_printpacket(msg, remote, local, 0);
@@ -460,12 +461,17 @@ isakmp_main(msg, remote, local)
 
 		/* receive */
 		YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
-		if ((ph2exchange[etypesw(isakmp->etype)]
-		                [iph2->side]
-		                [iph2->status])(iph2, msg) < 0) {
+		error = (ph2exchange[etypesw(isakmp->etype)]
+		                   [iph2->side]
+		                   [iph2->status])(iph2, msg);
+		if (error != 0) {
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, remote,
 					"failed to pre-process packet.\n"));
+			if (error != ISAKMP_INTERNAL_ERROR) {
+				isakmp_info_send_nx(isakmp, remote, local,
+					error, NULL);
+			}
 			/* don't release handler */
 			return -1;
 		}
@@ -677,6 +683,7 @@ isakmp_ph2begin_r(iph1, msg)
 {
 	struct isakmp *isakmp = (struct isakmp *)msg->v;
 	struct ph2handle *iph2 = 0;
+	int error;
 
 	iph2 = newph2();
 	if (iph2 == NULL)
@@ -708,10 +715,26 @@ isakmp_ph2begin_r(iph1, msg)
 	bindph12(iph1, iph2);
 
 	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
-	if ((ph2exchange[etypesw(ISAKMP_ETYPE_QUICK)]
-	                [iph2->side]
-	                [iph2->status])(iph2, msg) < 0)
+	error = (ph2exchange[etypesw(ISAKMP_ETYPE_QUICK)]
+	                   [iph2->side]
+	                   [iph2->status])(iph2, msg);
+	if (error != 0) {
+		YIPSDEBUG(DEBUG_NOTIFY,
+			plog(logp, LOCATION, iph1->remote,
+				"failed to pre-process packet.\n"));
+		if (error != ISAKMP_INTERNAL_ERROR) {
+			isakmp_info_send_nx(isakmp, iph1->remote, iph1->local,
+				error, NULL);
+		}
+		/*
+		 * release handler because it's wrong that ph2handle is kept
+		 * after failed to check message for responder's.
+		 */
+		unbindph12(iph2);
+		remph2(iph2);
+		delph2(iph2);
 		return -1;
+	}
 
 	/* send */
 	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));

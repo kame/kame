@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.4 2000/01/10 01:23:28 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.5 2000/01/10 21:08:08 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -804,7 +804,7 @@ quick_r1recv(iph2, msg0)
 	char *p;
 	int tlen;
 	int f_id_order;	/* for ID payload detection */
-	int error = -1;
+	int error = ISAKMP_INTERNAL_ERROR;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -819,6 +819,7 @@ quick_r1recv(iph2, msg0)
 	if (!ISSET(((struct isakmp *)msg0->v)->flags, ISAKMP_FLAG_E)) {
 		plog(logp, LOCATION, iph2->ph1->remote,
 			"Packet wasn't encrypted.\n");
+		error = ISAKMP_NTYPE_PAYLOAD_MALFORMED;
 		goto end;
 	}
 	/* decrypt packet */
@@ -850,7 +851,7 @@ quick_r1recv(iph2, msg0)
 			"received invalid next payload type %d, "
 			"expecting %d.\n",
 			pa->type, ISAKMP_NPTYPE_HASH);
-		vfree(pbuf);
+		error = ISAKMP_NTYPE_BAD_PROPOSAL_SYNTAX;
 		goto end;
 	}
 	hash = (struct isakmp_pl_hash *)pa->ptr;
@@ -868,7 +869,7 @@ quick_r1recv(iph2, msg0)
 			"received invalid next payload type %d, "
 			"expecting %d.\n",
 			pa->type, ISAKMP_NPTYPE_HASH);
-		vfree(pbuf);
+		error = ISAKMP_NTYPE_BAD_PROPOSAL_SYNTAX;
 		goto end;
 	}
 #endif
@@ -879,7 +880,6 @@ quick_r1recv(iph2, msg0)
 	if (hbuf == NULL) {
 		plog(logp, LOCATION, NULL,
 			"vmalloc (%s)\n", strerror(errno));
-		vfree(pbuf);
 		goto end;
 	}
 	p = hbuf->v;
@@ -916,7 +916,7 @@ quick_r1recv(iph2, msg0)
 			if (sa_tmp != NULL) {
 				plog(logp, LOCATION, NULL,
 					"Multi SAs isn't supported.\n");
-				goto err;
+				goto end;
 			}
 			sa_tmp = (struct ipsecdoi_pl_sa *)pa->ptr;
 			break;
@@ -964,7 +964,8 @@ quick_r1recv(iph2, msg0)
 					plog(logp, LOCATION, NULL,
 						"received too many ID payloads.\n");
 					PVDUMP(iph2->id));
-					goto err;
+				error = ISAKMP_NTYPE_INVALID_ID_INFORMATION;
+				goto end;
 			}
 			break;
 
@@ -975,13 +976,13 @@ quick_r1recv(iph2, msg0)
 			break;
 
 		default:
-			/* don't send information, see ident_r1recv() */
 			error = 0;
 			plog(logp, LOCATION, iph2->ph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
-			goto err;
+			error = ISAKMP_NTYPE_PAYLOAD_MALFORMED;
+			goto end;
 		}
 
 		p += pa->len;
@@ -994,7 +995,8 @@ quick_r1recv(iph2, msg0)
 	if (hash == NULL || sa_tmp == NULL || iph2->nonce_p == NULL) {
 		plog(logp, LOCATION, iph2->ph1->remote,
 			"few isakmp message received.\n");
-		goto err;
+		error = ISAKMP_NTYPE_PAYLOAD_MALFORMED;
+		goto end;
 	}
 
 	/* adjust buffer length for HASH */
@@ -1014,7 +1016,7 @@ quick_r1recv(iph2, msg0)
 
 	my_hash = oakley_compute_hash1(iph2->ph1, iph2->msgid, hbuf);
 	if (my_hash == NULL)
-		goto err;
+		goto end;
 
 	result = memcmp(my_hash->v, r_hash, my_hash->l);
 	vfree(my_hash);
@@ -1024,7 +1026,8 @@ quick_r1recv(iph2, msg0)
 		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL, iph2->ph1->flags);
 #endif
 		plog(logp, LOCATION, iph2->ph1->remote, "HASH(1) mismatch.\n");
-		goto err;
+		error = ISAKMP_NTYPE_INVALID_HASH_INFORMATION;
+		goto end;
 	}
     }
 
@@ -1034,7 +1037,8 @@ quick_r1recv(iph2, msg0)
 		/* XXX send information */
 		plog(logp, LOCATION, NULL,
 			"Both ID wasn't found in payload.\n");
-		goto err;
+		error = ISAKMP_NTYPE_INVALID_ID_INFORMATION;
+		goto end;
 	}
 
 	/* create policy index to get policy */
@@ -1050,15 +1054,17 @@ quick_r1recv(iph2, msg0)
 	/* make both src and dst address */
 	if (iph2->id_p != NULL && iph2->id != NULL) {
 		/* from ID payload */
-		if (ipsecdoi_id2sockaddr(iph2->id,
+		error = ipsecdoi_id2sockaddr(iph2->id,
 				(struct sockaddr *)&spidxtmp.src,
-				&spidxtmp.prefs, &spidxtmp.ul_proto) < 0)
-			goto err;
+				&spidxtmp.prefs, &spidxtmp.ul_proto);
+		if (error != 0)
+			goto end;
 
-		if (ipsecdoi_id2sockaddr(iph2->id_p,
+		error = ipsecdoi_id2sockaddr(iph2->id_p,
 				(struct sockaddr *)&spidxtmp.dst,
-				&spidxtmp.prefd, &spidxtmp.ul_proto) < 0)
-			goto err;
+				&spidxtmp.prefd, &spidxtmp.ul_proto);
+		if (error != 0)
+			goto end;
 	} else {
 		YIPSDEBUG(DEBUG_STAMP,
 			plog(logp, LOCATION, NULL,
@@ -1084,7 +1090,8 @@ quick_r1recv(iph2, msg0)
 	if (iph2->spidx == NULL) {
 		plog(logp, LOCATION, NULL,
 			"no policy found %s.\n", spidx2str(&spidxtmp));
-		goto err;
+		error = ISAKMP_NTYPE_NO_PROPOSAL_CHOSEN;
+		goto end;
 	}
 	iph2->spidx->ph2 = iph2;
 
@@ -1092,7 +1099,8 @@ quick_r1recv(iph2, msg0)
 	if (iph2->spidx->policy == NULL) {
 		plog(logp, LOCATION, NULL,
 			"no proposal found %s\n", spidx2str(iph2->spidx));
-		goto err;
+		error = ISAKMP_NTYPE_NO_PROPOSAL_CHOSEN;
+		goto end;
 	}
     }
 
@@ -1100,13 +1108,14 @@ quick_r1recv(iph2, msg0)
 	if (iph2->dhpub_p != NULL && iph2->spidx->policy->pfs_group == 0) {
 		plog(logp, LOCATION, NULL,
 			"responder is not ready to do PFS.\n");
-		goto err;
+		error = ISAKMP_NTYPE_NO_PROPOSAL_CHOSEN;
+		goto end;
 	}
 
 	/* check SA payload and set approval SA for use */
 	if (ipsecdoi_checkph2proposal(sa_tmp, iph2) < 0) {
-		/* XXX send information */
-		goto err;
+		error = ISAKMP_NTYPE_NO_PROPOSAL_CHOSEN;
+		goto end;
 	}
 
 	/* change status of isakmp status entry */
@@ -1123,26 +1132,6 @@ end:
 		vfree(pbuf);
 
 	return error;
-err:
-	/* for preparing to receive next valid message */
-	if (iph2->nonce_p != NULL) {
-		vfree(iph2->nonce_p);
-		iph2->nonce_p = NULL;
-	}
-	if (iph2->dhpub_p != NULL) {
-		vfree(iph2->dhpub_p);
-		iph2->dhpub_p = NULL;
-	}
-	if (iph2->id != NULL) {
-		vfree(iph2->id);
-		iph2->id = NULL;
-	}
-	if (iph2->id_p != NULL) {
-		vfree(iph2->id_p);
-		iph2->id_p = NULL;
-	}
-
-	goto end;
 }
 
 /*

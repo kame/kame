@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.10 2000/01/10 01:23:28 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.11 2000/01/10 21:08:08 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -527,7 +527,6 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	int flags;
 {
 	struct ph2handle *iph2 = NULL;
-	vchar_t *buf = NULL;
 	vchar_t *hash = NULL;
 	struct isakmp *isakmp;
 	struct isakmp_gen *gen;
@@ -545,7 +544,7 @@ isakmp_info_send_common(iph1, payload, np, flags)
 
 	iph2->ph1 = iph1;
 	iph2->side = INITIATOR;
-	/* XXX iph2->status = ? */
+	iph2->status = PHASE2ST_START;
 	iph2->msgid = isakmp_newmsgid2(iph1);
 
 	/* get IV and HASH(1) if skeyid_a was generated. */
@@ -558,8 +557,10 @@ isakmp_info_send_common(iph1, payload, np, flags)
 
 		/* generate HASH(1) */
 		hash = oakley_compute_hash1(iph2->ph1, msgid, payload);
-		if (hash == NULL)
+		if (hash == NULL) {
+			delph2(iph2);
 			goto end;
+		}
 
 		/* initialized total buffer length */
 		tlen = hash->l;
@@ -572,18 +573,24 @@ isakmp_info_send_common(iph1, payload, np, flags)
 		tlen = 0;
 	}
 
+	insph2(iph2);
+	bindph12(iph1, iph2);
+
 	tlen += sizeof(*isakmp) + payload->l;
 
 	/* create buffer for isakmp payload */
-	buf = vmalloc(tlen);
-	if (buf == NULL) { 
+	iph2->sendbuf = vmalloc(tlen);
+	if (iph2->sendbuf == NULL) { 
 		plog(logp, LOCATION, NULL,
 			"vmalloc (%s)\n", strerror(errno));
+		unbindph12(iph2);
+		remph2(iph2);
+		delph2(iph2);
 		goto end;
 	}
 
 	/* create isakmp header */
-	isakmp = (struct isakmp *)buf->v;
+	isakmp = (struct isakmp *)iph2->sendbuf->v;
 	memcpy(&isakmp->i_ck, &iph1->index.i_ck, sizeof(cookie_t));
 	memcpy(&isakmp->r_ck, &iph1->index.r_ck, sizeof(cookie_t));
 	isakmp->np = hash == NULL ? (np & 0xff) : ISAKMP_NPTYPE_HASH;
@@ -612,25 +619,34 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	p += payload->l;
 
 #ifdef HAVE_PRINT_ISAKMP_C
-	isakmp_printpacket(buf, iph1->local, iph1->remote, 1);
+	isakmp_printpacket(iph2->sendbuf, iph1->local, iph1->remote, 1);
 #endif
 
 	/* encoding */
 	if ((flags & ISAKMP_FLAG_E) != 0) {
 		vchar_t *tmp;
 
-		tmp = oakley_do_encrypt(iph2->ph1, buf, iph2->ivm->ive,
+		tmp = oakley_do_encrypt(iph2->ph1, iph2->sendbuf, iph2->ivm->ive,
 				iph2->ivm->iv);
 		if (tmp == NULL) {
+			unbindph12(iph2);
+			remph2(iph2);
+			delph2(iph2);
+			vfree(iph2->sendbuf);
 			goto end;
 		}
-		vfree(buf);
-		buf = tmp;
+		vfree(iph2->sendbuf);
+		iph2->sendbuf = tmp;
 	}
 
 	/* HDR*, HASH(1), N */
-	if (isakmp_send(iph2->ph1, buf) < 0)
+	if (isakmp_send(iph2->ph1, iph2->sendbuf) < 0) {
+		unbindph12(iph2);
+		remph2(iph2);
+		delph2(iph2);
+		vfree(iph2->sendbuf);
 		goto end;
+	}
 
 	YIPSDEBUG(DEBUG_STAMP,
 		plog(logp, LOCATION, NULL, "sendto Information (%d).\n", np));
@@ -644,10 +660,6 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	error = 0;
 
 end:
-	if (error) {
-		if (buf)
-			vfree(buf);
-	}
 
 	return(error);
 }
