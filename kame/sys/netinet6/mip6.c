@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.106 2002/01/21 11:37:50 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.107 2002/01/22 08:46:25 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1687,7 +1687,7 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		 */
 		return (0);
 	}
-	if ((mbu->mbu_flags & MIP6_BU_STATE_BUNOTSUPP) != 0) {
+	if ((mbu->mbu_state & MIP6_BU_STATE_BUNOTSUPP) != 0) {
 		/*
 		 * MIP6_BU_STATE_NOBUSUPPORT is set when we receive
 		 * ICMP6_PARAM_PROB against the binding update sent
