@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.34 2000/05/12 23:50:44 itojun Exp $
+$Id: COVERAGE,v 1.35 2000/05/15 11:39:07 itojun Exp $
 
 
 x: supported/integrated
@@ -55,7 +55,7 @@ advanced API	2292bis	2292	2292	2292	notyet	notyet	2292
 
 getifaddrs	x	x	x	-	notyet	notyet	-
 
-icmp6 nodeinfo	05	05	05	05	notyet	notyet	05
+icmp6 nodeinfo	05	05-	05-	05-	notyet	notyet	05-
     (all) spec conformance is still low.
 
 nd6_proxyall	-	-	-	x	notyet	notyet	x
@@ -79,6 +79,9 @@ getaddrinfo obeys configured resolv order
 
 getnameinfo uses addr%numeric for scopeid > maxifindex
 		x	x	x	-	notyet	notyet	-
+
+getnameinfo, 2nd arg type is socklen_t
+		x	-	x	-	notyet	notyet	-
 
 ALTQ		(+)	-	-	-	notyet	notyet	-
 
