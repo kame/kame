@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2720 2005/01/31 09:42:56 t-momose Exp $
+$KAME: CHANGELOG,v 1.2721 2005/02/07 03:07:17 keiichi Exp $
 
 <200501>
+Mon Feb  7 12:02:16 JST 2005	keiichi@iijlab.net
+	* freebsd4: Upgrade to 4.11-RELEASE
+
 2005-01-31  Tsuyoshi MOMOSE  <momose@az.jp.nec.com>
 	* kame/sys/netinet6/mip6.c: stop proxy ND on a home agent when 
 	the home agent daemon was terminated.
