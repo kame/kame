@@ -267,7 +267,6 @@ AC_DEFUN(AC_STRUCT_RES_STATE_EXT, [
 	AC_TRY_COMPILE([
 #		include <sys/types.h>
 #		include <netinet/in.h>
-#		include <netinet6/in6.h>
 #		include <resolv.h>],
 		[struct __res_state_ext e],
 		$1=yes,
@@ -286,7 +285,6 @@ AC_DEFUN(AC_STRUCT_RES_STATE, [
 	AC_TRY_COMPILE([
 #		include <sys/types.h>
 #		include <netinet/in.h>
-#		include <netinet6/in6.h>
 #		include <resolv.h>],
 		[struct __res_state e; e.nsort = 0],
 		$1=yes,
@@ -321,6 +319,7 @@ AC_DEFUN(AC_STRUCT_IF_NAMEINDEX, [
 	AC_CACHE_VAL($1,
 	AC_TRY_COMPILE([
 #		include <sys/types.h>
+#		include <sys/socket.h>
 #		include <net/if.h>],
 		[struct if_nameindex e; e.if_index = 0],
 		$1=yes,

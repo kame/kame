@@ -26,7 +26,7 @@ OBJS+=	res_init.o res_mkquery.o res_query.o
 OBJS+=	res_send.o
 OBJS+=	inet_pton.o inet_addr.o
 OBJS+=	bindresvport.o
-OBJS+=	getifadddrs.o
+OBJS+=	getifaddrs.o
 
 MAN3=	getaddrinfo.3 getnameinfo.3 gethostbyname.3 resolver.3 \
 	rresvport_af.3 if_indextoname.3 getipnodebyname.3 inet6_option_space.3 \
