@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.167 2002/09/18 08:06:04 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.168 2002/09/18 08:55:45 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1673,6 +1673,11 @@ mip6_exthdr_create(m, opt, mip6opt)
 	 * The CoT message is always sent with the Destnation Address set to
 	 * the care-of address of the mobile node; it is sent directly to the
 	 * mobile node.
+	 *
+	 * when a mobile node is on its home link and send CoTI (this
+	 * situation happens if the mobile node want to remove the
+	 * binding cache entry created on the correspondent node), the
+	 * source address of CoTI and the home address are same.
 	 */
 	if ((opt != NULL) && (opt->ip6po_mobility != NULL)) {
 		if (opt->ip6po_mobility->ip6m_type == IP6M_HOME_TEST ||
