@@ -135,7 +135,7 @@ static void ah_hmac_sha1_loop __P((struct ah_algorithm_state *, caddr_t,
 static void ah_hmac_sha1_result __P((struct ah_algorithm_state *, caddr_t));
 
 /* checksum algorithms */
-/* NOTE: The order depends on SADB_AALG_x in netkey/keyv2.h */
+/* NOTE: The order depends on SADB_AALG_x in net/pfkeyv2.h */
 struct ah_algorithm ah_algorithms[] = {
 	{ 0, 0, 0, 0, 0, 0, },
 	{ ah_sumsiz_1216, ah_hmac_md5_mature, 128, 128,
