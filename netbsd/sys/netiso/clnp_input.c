@@ -121,15 +121,6 @@ void
 clnp_init()
 {
 	register struct protosw *pr;
-#ifdef NEW_STRUCT_ROUTE
-#ifdef DIAGNOSTIC
-	struct route ro;
-
-	/* check for new assumption on struct route */
-	if (sizeof(ro.ro_dst) > sizeof(struct sockaddr_iso))
-		panic("sizeof(ro.ro_dst) insufficient");
-#endif
-#endif
 
 	/*
 	 * CLNP protox initialization
