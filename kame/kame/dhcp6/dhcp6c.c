@@ -485,7 +485,10 @@ client6_sendsolicit(s)
 	len = sizeof(*dh6s);
 	memset(dh6s, 0, sizeof(*dh6s));
 	dh6s->dh6sol_msgtype = DH6_SOLICIT;
-	inet_pton(AF_INET6, "fe80::", &target, sizeof(target));
+	if (inet_pton(AF_INET6, "fe80::", &target, sizeof(target)) != 1) {
+		errx(1, "inet_pton failed");
+		/*NOTREACHED*/
+	}
 	if (getifaddr(&dh6s->dh6sol_cliaddr, device, &target, 10) != 0) {
 		errx(1, "getifaddr failed");
 		/*NOTREACHED*/
@@ -574,7 +577,10 @@ client6_sendrequest(s, p)
 	dh6r->dh6req_msgtype = DH6_REQUEST;
 	dh6r->dh6req_flags = DH6REQ_CLOSE | DH6REQ_REBOOT;
 	dh6r->dh6req_xid = p->st_xid;
-	inet_pton(AF_INET6, "fe80::", &target, sizeof(target));
+	if (inet_pton(AF_INET6, "fe80::", &target, sizeof(target)) != 1) {
+		errx(1, "inet_pton failed");
+		/*NOTREACHED*/
+	}
 	if (getifaddr(&dh6r->dh6req_cliaddr, device, &target, 10) != 0) {
 		errx(1, "getifaddr failed");
 		/*NOTREACHED*/
@@ -602,9 +608,15 @@ client6_sendrequest(s, p)
 
 		/* is it possible to transmit packets to offlink dst? */
 		offlink = 1;
-		inet_pton(AF_INET6, "2000::", &target, sizeof(target));
+		if (inet_pton(AF_INET6, "2000::", &target, sizeof(target)) != 1) {
+			errx(1, "inet_pton failed");
+			/*NOTREACHED*/
+		}
 		if (getifaddr(&myaddr, device, &target, 3) != 0) {
-			inet_pton(AF_INET6, "fec0::", &target, sizeof(target));
+			if (inet_pton(AF_INET6, "fec0::", &target, sizeof(target)) != 1) {
+				errx(1, "inet_pton failed");
+				/*NOTREACHED*/
+			}
 			if (getifaddr(&myaddr, device, &target, 10) != 0)
 				offlink = 0;
 		}
@@ -613,7 +625,10 @@ client6_sendrequest(s, p)
 		offlinkserv = 0;
 	}
 	if (!offlink) {
-		inet_pton(AF_INET6, "fe80::", &target, sizeof(target));
+		if (inet_pton(AF_INET6, "fe80::", &target, sizeof(target)) != 1) {
+			errx(1, "inet_pton failed");
+			/*NOTREACHED*/
+		}
 		if (getifaddr(&myaddr, device, &target, 10) != 0) {
 			errx(1, "getifaddr failed");
 			/*NOTREACHED*/
