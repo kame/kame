@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.354 2003/09/16 23:46:24 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.355 2003/09/24 23:44:16 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1845,8 +1845,7 @@ The IPsec code in the kernel conforms (or, tries to conform) to the
 following standards:
     "old IPsec" specification documented in rfc182[5-9].txt
     "new IPsec" specification documented in:
-	rfc240[1-6].txt rfc241[01].txt rfc2451.txt
-	draft-ietf-ipsec-ciph-aes-cbc-01.txt
+	rfc240[1-6].txt rfc241[01].txt rfc2451.txt rfc3602.txt
     IPComp:
 	RFC3173: IP Payload Compression Protocol (IPComp)
 IKE specifications (rfc240[7-9].txt) are implemented in userland
@@ -1886,8 +1885,7 @@ Currently supported algorithms are:
 	3DES-CBC with explicit IV (rfc2451.txt)
 	BLOWFISH CBC (rfc2451.txt)
 	CAST128 CBC (rfc2451.txt)
-	RIJNDAEL/AES CBC (draft-ietf-ipsec-ciph-aes-cbc-01.txt,
-		uses IANA-assigned protocol number)
+	RIJNDAEL/AES CBC (rfc3602.txt)
 	TWOFISH CBC (draft-ietf-ipsec-ciph-aes-cbc-01.txt)
 	AES counter mode (draft-ietf-ipsec-ciph-aes-ctr-03.txt)
 
