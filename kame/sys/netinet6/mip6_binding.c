@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.161 2002/12/17 22:33:26 t-momose Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.162 2003/01/16 03:31:25 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1322,8 +1322,6 @@ mip6_process_hrbu(bi)
 					     bi->mbc_seqno, bi->mbc_lifetime, hifp);
 			if (mbc == NULL)
 				return (-1);
-			if (mip6_bc_list_insert(&mip6_bc_list, mbc))
-				return (-1);
 
 			if ((bi->mbc_flags & IP6MU_DAD)) {
 				mbc->mbc_state |= MIP6_BC_STATE_DAD_WAIT;
@@ -1399,8 +1397,6 @@ mip6_process_hrbu(bi)
 						     hifp);
 				if (mbc == NULL)
 					return (-1);
-				if (mip6_bc_list_insert(&mip6_bc_list, mbc))
-					return (-1);
 
 				if ((bi->mbc_flags & IP6MU_DAD) != 0) {
 					mbc->mbc_state |= MIP6_BC_STATE_DAD_WAIT;
@@ -1470,11 +1466,6 @@ mip6_process_hrbu(bi)
 					     hifp);
 			if (mbc == NULL) {
 				/* XXX STATUS_RESOUCE */
-				return (-1);
-			}
-
-			if (mip6_bc_list_insert(&mip6_bc_list, mbc)) {
-				/* XXX STATUS_UNSPECIFIED */
 				return (-1);
 			}
 
@@ -2154,7 +2145,7 @@ mip6_bc_register(hoa_sa, coa_sa, dst_sa, flags, seqno, lifetime)
 		return (ENOMEM);
 	}
 
-	return (mip6_bc_list_insert(&mip6_bc_list, mbc));
+	return (0);
 }
 
 int
@@ -2250,6 +2241,11 @@ mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
 #endif /* MIP6_CALLOUTTEST */
 	mbc->mbc_state = 0;
 	mbc->mbc_ifp = ifp;
+
+	if (mip6_bc_list_insert(&mip6_bc_list, mbc)) {
+		FREE(mbc, M_TEMP);
+		return (NULL);
+	}
 
 	return (mbc);
 }
