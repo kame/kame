@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.157 2004/05/26 10:08:39 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.158 2004/07/22 05:20:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -541,8 +541,9 @@ rip6_output(m, va_alist)
 
 	if (so->so_proto->pr_protocol == IPPROTO_ICMPV6 ||
 	    in6p->in6p_cksum != -1) {
+		struct mbuf *n;
 		int off;
-		u_int16_t sum;
+		u_int16_t *sump;
 
 #ifndef offsetof
 #define	offsetof(type, member)	((size_t)(&((type *)0)->member)) /* XXX */
@@ -559,10 +560,15 @@ rip6_output(m, va_alist)
 		}
 		off += sizeof(struct ip6_hdr);
 
-		sum = 0;
-		m_copyback(m, off, sizeof(sum), (caddr_t)&sum);
-		sum = in6_cksum(m, ip6->ip6_nxt, sizeof(*ip6), plen);
-		m_copyback(m, off, sizeof(sum), (caddr_t)&sum);
+		n = m_pulldown(m, off, sizeof(*sump), &sumoff);
+		if (n == NULL) {
+			m = NULL;
+			error = ENOBUFS;
+			goto bad;
+		}
+		sump = (u_int16_t *)(mtod(n, caddr_t) + sumoff);
+		*sump = 0;
+		*sump = in6_cksum(m, ip6->ip6_nxt, sizeof(*ip6), plen);
 	}
 
 #ifdef IPSEC
