@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.53 2000/07/24 00:16:18 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.54 2000/07/24 11:01:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -445,7 +445,7 @@ struct route_in6 {
 #define IPV6_DSTOPTS		50 /* ip6_dest; send dst option befor rthdr */
 #define IPV6_RTHDR		51 /* ip6_rthdr; send routing header */
 #if 0
-#define IPV6_PKTOPTIONS		25 /* buf/cmsghdr; set/get IPv6 options */
+#define IPV6_PKTOPTIONS		52 /* buf/cmsghdr; set/get IPv6 options */
 				   /* obsoleted by 2292bis */
 #endif
 
