@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.7.2.2 1999/06/26 23:37:23 cgd Exp $
+#	$NetBSD: Makefile,v 1.11.4.2 2000/11/13 19:18:13 tv Exp $
 
 TOP=		${.CURDIR}/..
 
@@ -24,7 +24,7 @@ CRUNCHCONF=	${CBIN}.conf
 MTREE=		mtree.conf
 
 DISKTYPE=	install-ramdisk
-RDSIZE=		3400
+RDSIZE=		3800
 
 install.sh: install.tmpl
 	sed "s/@@VERSION@@/${VER}/" < ${.ALLSRC} > ${.TARGET}
@@ -43,17 +43,19 @@ all: ${AUXTARGETS} ${CBIN}
 	mount ${VND_DEV} ${MOUNT_POINT}
 	mtree -def ${.CURDIR}/${MTREE} -p ${MOUNT_POINT}/ -u
 	TOPDIR=${TOP} CURDIR=${.CURDIR} OBJDIR=${.OBJDIR} \
+	    KERNOBJDIR=${KERNOBJDIR} \
 	    TARGDIR=${MOUNT_POINT} sh ${.CURDIR}/runlist.sh ${.CURDIR}/${LISTS}
 	@echo ""
 	@df -i ${MOUNT_POINT}
 	@echo ""
 	umount ${MOUNT_POINT}
 	vnconfig -u ${VND_CDEV}
+	gzip -c9 ${IMAGE} > ${IMAGE}.gz
 
 unconfig:
 	-umount -f ${MOUNT_POINT}
 	-vnconfig -u ${VND_CDEV}
-	-/bin/rm -f ${IMAGE}
+	-/bin/rm -f ${IMAGE} ${IMAGE}.gz
 
 ${CBIN}.mk ${CBIN}.cache ${CBIN}.c: ${CRUNCHCONF}
 	crunchgen -D ${TOP}/../.. -L ${DESTDIR}/usr/lib ${.ALLSRC}
@@ -62,7 +64,7 @@ ${CBIN}: ${CBIN}.mk ${CBIN}.cache ${CBIN}.c
 	make -f ${CBIN}.mk all
 
 clean cleandir distclean:
-	/bin/rm -f ${AUXCLEAN} *.core ${IMAGE} ${CBIN} ${CBIN}.mk ${CBIN}.cache *.o *.lo *.c
+	/bin/rm -f ${AUXCLEAN} *.core ${IMAGE} ${IMAGE}.gz ${CBIN} ${CBIN}.mk ${CBIN}.cache *.o *.cro *.c
 
 .include <bsd.obj.mk>
 .include <bsd.subdir.mk>

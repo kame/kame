@@ -1,5 +1,20 @@
-#	$NetBSD: Makefile,v 1.9.2.1 1999/07/06 23:50:32 perry Exp $
+#	$NetBSD: Makefile,v 1.19.2.1 2000/10/09 13:43:27 fvdl Exp $
 
-SUBDIR=	ramdisk fdset bootfloppy bootfloppy-big bootfloppy-tiny
+SUBDIR=		ramdisk-big
+SUBDIR+=	ramdisk-tiny
+SUBDIR+=	ramdisk-small
+SUBDIR+=	kernel-ramdisk
+SUBDIR+=	fdset
+SUBDIR+=	fdset-laptop
+SUBDIR+=	bootfloppy-big
+SUBDIR+=	bootfloppy-tiny
+SUBDIR+=	bootfloppy-small
+
+SUBDIR+=	ramdisk-rescuesmall
+SUBDIR+=	ramdisk-rescuetiny
+SUBDIR+=	kernel-rescue
+SUBDIR+=	rescue-small rescue-tiny
+
+TARGETS+=release
 
 .include <bsd.subdir.mk>

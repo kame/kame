@@ -1,8 +1,10 @@
-#	$NetBSD: Makefile,v 1.19 1998/11/16 23:43:58 jonathan Exp $
+#	$NetBSD: Makefile,v 1.32 2000/05/18 02:12:45 matt Exp $
 
+.include "../../Makefile.inc"
 .include <bsd.own.mk>
+.include <bsd.kernobj.mk>
 
-REV!=sh ${BSDSRCDIR}/sys/conf/osrelease.sh -s
+REV!=sh ${.CURDIR}/../../sys/conf/osrelease.sh -s
 
 CBIN=		instbin
 ARCHDIR=	${.CURDIR}/../${MACHINE}/miniroot
@@ -15,8 +17,8 @@ VND?=		vnd0c
 VND_DEV=	/dev/${VND}
 VND_RDEV=	/dev/r${VND}
 VND_GEOM?=
-IMAGE?=		miniroot-${REV}.fs
-IMAGESIZE?=	12288 # 6MB in 512 byte blocks
+IMAGE?=		miniroot.fs
+IMAGESIZE?=	14336 # 7MB in 512 byte blocks
 NEWFSOPTS?=
 MOUNT_POINT?=	/mnt
 BOOTINSTALL?=	true
@@ -29,10 +31,12 @@ DISKTYPEARG=	-t ${DISKTYPE}
 LISTS=		${.CURDIR}/list ${ARCHDIR}/list
 CRUNCHCONF=	${CBIN}.conf
 MTREE=		${.CURDIR}/mtree.conf
+ICMD=		${INSTALL} ${RENAME} ${PRESERVE} ${COPY}	\
+			-o root -g wheel -m ${NONBINMODE} 
 
 .ifndef DESTDIR
 all:
-	@echo setenv DESTDIR before makeing a miniroot!
+	@echo setenv DESTDIR before making a miniroot!
 	@false
 .else
 
@@ -42,10 +46,11 @@ all: ${CBIN}
 	${PRELABEL}
 	-newfs -m 0 -o space ${NEWFSOPTS} ${VND_RDEV} ${DISKTYPE}
 	${BOOTINSTALL}
-	mount ${VND_DEV} ${MOUNT_POINT}
+	mount -o async ${VND_DEV} ${MOUNT_POINT}
 	mtree -def ${MTREE} -p ${MOUNT_POINT}/ -u
 	REV=${REV} CURDIR=${.CURDIR} OBJDIR=${.OBJDIR} ARCHDIR=${ARCHDIR} \
 	    TARGDIR=${MOUNT_POINT} VND_RDEV=${VND_RDEV} \
+	    KERNOBJDIR=${KERNOBJDIR} \
 	    sh ${.CURDIR}/runlist.sh ${LISTS}
 	@echo ""
 	@df -i ${MOUNT_POINT}
@@ -67,10 +72,24 @@ ${CBIN}.mk ${CBIN}.cache ${CBIN}.c: ${CRUNCHCONF}
 ${CBIN}: ${CBIN}.mk ${CBIN}.cache ${CBIN}.c
 	make -f ${CBIN}.mk all
 
+.ifndef RELEASEDIR
+release:
+	@echo setenv RELEASEDIR first
+	@false
+.else
+release: ${IMAGE}
+	mkdir -p ${RELEASEDIR}/installation/miniroot
+	gzip -c -9 < ${.OBJDIR}/miniroot.fs \
+		> ${RELEASEDIR}/installation/miniroot/miniroot.fs.gz
+	${.CURDIR}/../sets/makesums \
+		-t ${RELEASEDIR}/installation/miniroot miniroot.fs.gz
+
+.endif	# RELEASEDIR check
+.endif	# DESTDIR check
+
 clean cleandir distclean:
 	/bin/rm -f core ${IMAGE} ${CBIN} ${CBIN}.mk ${CBIN}.cache \
-	${CBIN}.conf *.o *.lo *.c
+	${CBIN}.conf *.o *.cro *.c
 
-.endif	# DESTDIR check
 .include <bsd.obj.mk>
 .include <bsd.subdir.mk>

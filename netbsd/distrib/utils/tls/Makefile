@@ -1,8 +1,10 @@
-# $NetBSD: Makefile,v 1.2 1999/02/13 02:54:18 lukem Exp $
+# $NetBSD: Makefile,v 1.4 2000/05/18 01:10:26 matt Exp $
 # Tiny ls  (i.e. for boot media)
 
 PROG=	tls
 MKMAN=	no
+COPTS+= -Os
+LDSTATIC?=-static
 
 all: ${PROG}
 

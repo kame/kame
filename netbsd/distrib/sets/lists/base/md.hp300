@@ -1,5 +1,4 @@
-./usr/lkm/coda.o
-./usr/lkm/ext2fs.o
+# $NetBSD: md.hp300,v 1.34 1999/05/18 23:14:35 tron Exp $
 ./usr/mdec/bootct
 ./usr/mdec/bootrd
 ./usr/mdec/bootsd

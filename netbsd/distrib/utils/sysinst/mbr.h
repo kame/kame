@@ -1,4 +1,4 @@
-/*	$NetBSD: mbr.h,v 1.4.2.5 1999/07/12 19:30:24 perry Exp $	*/
+/*	$NetBSD: mbr.h,v 1.8 1999/07/10 23:07:15 fvdl Exp $	*/
 
 /*
  * Copyright 1997, 1988 Piermont Information Systems Inc.

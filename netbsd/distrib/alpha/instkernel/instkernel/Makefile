@@ -1,19 +1,32 @@
-#	$NetBSD: Makefile,v 1.4 1998/10/29 00:37:07 ross Exp $
+#	$NetBSD: Makefile,v 1.11.4.1 2000/09/30 19:57:46 jhawk Exp $
+
+.include "../../../../Makefile.inc"
 
 RAMDISK!=cd ${.CURDIR}/../ramdisk; \
 	printf "xxx: .MAKE\n\t@echo \$${.OBJDIR}/ramdisk.fs\n" | \
 	${MAKE} -s -f-
 
-KERNEL=${.CURDIR}/../../../../sys/arch/alpha/compile/INSTALL/netbsd
+KERNEL?=${KERNOBJDIR}/INSTALL/netbsd
+STRIP?=		strip		# make STRIP=echo can be useful
 
 all:
 	cp ${KERNEL} netbsd
 	mdsetimage -v netbsd ${RAMDISK}
-	strip netbsd
+	nm netbsd > netbsd.symbols
+	${STRIP} netbsd
 	gzip -9f netbsd
 
 clean cleandir distclean:
-	rm -f netbsd
+	rm -f netbsd netbsd.gz netbsd.symbols
 
+release:
+	-mkdir -p ${RELEASEDIR}/binary/kernel
+	cp -p netbsd.gz ${RELEASEDIR}/binary/kernel/netbsd.INSTALL.gz
+	cp netbsd.symbols ${RELEASEDIR}/binary/kernel/netbsd.symbols
+
+# nothing to do here
+depend includes lint regress tags:
+
+.include <bsd.kernobj.mk>
 .include <bsd.own.mk>
 .include <bsd.obj.mk>

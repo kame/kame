@@ -1,3 +1,4 @@
+# $NetBSD: mi,v 1.22.4.1 2000/08/17 18:49:23 abs Exp $
 ./usr/games/adventure
 ./usr/games/arithmetic
 ./usr/games/atc
@@ -77,6 +78,7 @@
 ./usr/games/wargames
 ./usr/games/worm
 ./usr/games/worms
+./usr/games/wtf
 ./usr/games/wump
 ./usr/share/games/atc/Atlantis
 ./usr/share/games/atc/Game_List
@@ -109,9 +111,17 @@
 ./usr/share/games/fortune/fortunes2-o.dat
 ./usr/share/games/fortune/fortunes2.dat
 ./usr/share/games/fortune/limerick
+./usr/share/games/fortune/limerick-o
+./usr/share/games/fortune/limerick-o.dat
 ./usr/share/games/fortune/limerick.dat
+./usr/share/games/fortune/netbsd
+./usr/share/games/fortune/netbsd-o
+./usr/share/games/fortune/netbsd-o.dat
+./usr/share/games/fortune/netbsd.dat
 ./usr/share/games/fortune/startrek
 ./usr/share/games/fortune/startrek.dat
+./usr/share/games/fortune/unamerican-o
+./usr/share/games/fortune/unamerican-o.dat
 ./usr/share/games/fortune/zippy
 ./usr/share/games/fortune/zippy.dat
 ./usr/share/games/larn/larn.help
@@ -193,8 +203,10 @@
 ./usr/share/man/cat6/snake.0
 ./usr/share/man/cat6/tetris.0
 ./usr/share/man/cat6/trek.0
+./usr/share/man/cat6/wargames.0
 ./usr/share/man/cat6/worm.0
 ./usr/share/man/cat6/worms.0
+./usr/share/man/cat6/wtf.0
 ./usr/share/man/cat6/wump.0
 ./usr/share/man/man6/adventure.6
 ./usr/share/man/man6/arithmetic.6
@@ -237,8 +249,10 @@
 ./usr/share/man/man6/snake.6
 ./usr/share/man/man6/tetris.6
 ./usr/share/man/man6/trek.6
+./usr/share/man/man6/wargames.6
 ./usr/share/man/man6/worm.6
 ./usr/share/man/man6/worms.6
+./usr/share/man/man6/wtf.6
 ./usr/share/man/man6/wump.6
 ./var/games/hackdir/data
 ./var/games/hackdir/help
@@ -250,3 +264,4 @@
 ./var/games/phantasia/monsters
 ./var/games/phantasia/motd
 ./var/games/phantasia/void
+./var/games/sail

@@ -1,4 +1,4 @@
-#	$NetBSD: install.md,v 1.9.2.2 1999/07/02 18:08:33 perry Exp $
+#	$NetBSD: install.md,v 1.11.8.3 2000/11/15 19:49:14 tv Exp $
 #
 #
 # Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -41,7 +41,7 @@
 #
 
 # Machine-dependent install sets
-MDSETS="xbase xcomp xcontrib xfont xserver"
+MDSETS="kern xbase xcomp xcontrib xfont xserver"
 
 md_set_term() {
 	if [ ! -z "$TERM" ]; then
@@ -102,7 +102,7 @@ md_installboot() {
 				chroot /mnt /usr/mdec/installboot /usr/mdec/xxboot /dev/r${1}a
 				;;
 			*)
-				echo "No bootblock installed..."
+				echo "No bootblock installed."
 				;;
 		esac
 	elif [ "$MODE" = "install" ]; then
@@ -239,6 +239,20 @@ md_copy_kernel() {
 	fi
 
 	if [ -e /netbsd ]; then
+		if [ -e /mnt/netbsd ]; then
+			echo "On the installation filesystem there is this kernel: "
+			ls -l /netbsd
+			echo "The already installed kernel is: "
+			ls -l /mnt/netbsd
+			echo	"Do you want to replace the already installed kernel by the kernel"
+			echo -n "on the installation filesystem? (y/n) [n] "
+			resp="n"
+			getresp ""
+			if [ "${resp}" != "y" -a "${resp}" != "Y" ]; then
+				return
+			fi
+		fi
+
 		echo -n "Copying kernel..."
 		cp -p /netbsd /mnt/netbsd
 		echo "done."

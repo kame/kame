@@ -1,4 +1,4 @@
-/*	$NetBSD: md.c,v 1.14.2.3 1999/06/24 22:52:38 cgd Exp $	*/
+/*	$NetBSD: md.c,v 1.19.4.1 2000/10/18 17:51:23 tv Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -142,7 +142,7 @@ int md_make_bsd_partitions (void)
 	process_menu (MENU_layout);
 
 	if (layoutkind == 3) {
-		ask_sizemult();
+		ask_sizemult(dlcylsize);
 	} else {
 		multname = msg_string(MSG_megname);
 	}
@@ -206,7 +206,7 @@ int md_make_bsd_partitions (void)
 		break;
 
 	case 3: /* custom: ask user for all sizes */
-		ask_sizemult();
+		ask_sizemult(dlcylsize);
 		remain = fsdsize;
 
 		/* root */
@@ -240,20 +240,22 @@ int md_make_bsd_partitions (void)
 		
 		/* /usr */
 		remain = fsdsize - partstart;
-		partsize = fsdsize - partstart;
-		snprintf (isize, SSTRSIZE, "%d", partsize/sizemult);
-		msg_prompt_add (MSG_askfsusr, isize, isize, SSTRSIZE,
-			    remain/sizemult, multname);
-		partsize = NUMSEC(atoi(isize),sizemult, dlcylsize);
-		if (remain - partsize < sizemult)
-			partsize = remain;
-		bsdlabel[E].pi_fstype = FS_BSDFFS;
-		bsdlabel[E].pi_offset = partstart;
-		bsdlabel[E].pi_size = partsize;
-		bsdlabel[E].pi_bsize = 8192;
-		bsdlabel[E].pi_fsize = 1024;
-		strcpy (fsmount[E], "/usr");
-		partstart += partsize;
+		if (remain > 0) {
+			partsize = fsdsize - partstart;
+			snprintf (isize, SSTRSIZE, "%d", partsize/sizemult);
+			msg_prompt_add (MSG_askfsusr, isize, isize, SSTRSIZE,
+				    remain/sizemult, multname);
+			partsize = NUMSEC(atoi(isize),sizemult, dlcylsize);
+			if (remain - partsize < sizemult)
+				partsize = remain;
+			bsdlabel[E].pi_fstype = FS_BSDFFS;
+			bsdlabel[E].pi_offset = partstart;
+			bsdlabel[E].pi_size = partsize;
+			bsdlabel[E].pi_bsize = 8192;
+			bsdlabel[E].pi_fsize = 1024;
+			strcpy (fsmount[E], "/usr");
+			partstart += partsize;
+		}
 
 		/* Others ... */
 		remain = fsdsize - partstart;
@@ -267,7 +269,7 @@ int md_make_bsd_partitions (void)
 					  partsize/sizemult);
 				msg_prompt_add (MSG_askfspart, isize, isize,
 						SSTRSIZE, diskdev,
-						partname[part],
+						partition_name(part),
 						remain/sizemult, multname);
 				partsize = NUMSEC(atoi(isize), sizemult,
 						  dlcylsize);
@@ -320,5 +322,16 @@ md_update(void)
 
 void
 md_cleanup_install(void)
+{
+}
+
+int
+md_pre_update()
+{
+	return 1;
+}
+
+void
+md_init()
 {
 }

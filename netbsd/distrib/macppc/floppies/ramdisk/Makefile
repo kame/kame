@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.4 1999/03/04 20:32:20 wrstuden Exp $
+#	$NetBSD: Makefile,v 1.10.4.1 2001/05/02 23:06:35 he Exp $
 
 TOP=		${.CURDIR}/..
 
@@ -8,41 +8,38 @@ IMAGE=		ramdisk.fs
 CBIN=		ramdiskbin
 
 MOUNT_POINT?=	/mnt
-# DEV/RDEV file system device, CDEV/RDEV vnconfig device
 VND?=		vnd1
 VND_DEV=	/dev/${VND}a
 VND_RDEV=	/dev/r${VND}a
-VND_CDEV=	/dev/${VND}c
-VND_CRDEV=	/dev/r${VND}c
 MDEC=		${DESTDIR}/usr/mdec
 
 LISTS=		list
 CRUNCHCONF=	${CBIN}.conf
 MTREE=		mtree.conf
 
-SIZE=		1536k
-GEOM=		512/16/2/96
+SIZE=		2048k
 DISKTYPE=	floppyinstfs
 
 all: ${CBIN} 
 	dd if=/dev/zero of=${IMAGE} bs=${SIZE} count=1
-	vnconfig -t ${DISKTYPE} -v -c ${VND_CDEV} ${IMAGE}
-	disklabel -rw ${VND_CDEV} ${DISKTYPE}
-	newfs -B be -m 0 -o space -i 4096 -c 80 ${VND_RDEV}
+	vnconfig -t ${DISKTYPE} -v -c ${VND} ${IMAGE}
+	disklabel -f ${.CURDIR}/disktab -rw ${VND} ${DISKTYPE}
+	newfs -B be -m 0 -o space -i 6144 -c 128 ${VND_RDEV}
 	mount ${VND_DEV} ${MOUNT_POINT}
 	mtree -def ${.CURDIR}/${MTREE} -p ${MOUNT_POINT}/ -u
 	TOPDIR=${TOP} CURDIR=${.CURDIR} OBJDIR=${.OBJDIR} \
+	    KERNOBJDIR=${KERNOBJDIR} \
 	    TARGDIR=${MOUNT_POINT} sh ${TOP}/runlist.sh ${.CURDIR}/${LISTS}
 	@echo ""
 	@df -i ${MOUNT_POINT}
 	@echo ""
 	umount ${MOUNT_POINT}
-	vnconfig -u ${VND_CDEV}
+	vnconfig -u ${VND}
 
 unconfig:
 	-umount -f ${MOUNT_POINT}
-	-vnconfig -u ${VND_DEV}
-	-/bin/rm -f ${IMAGE}
+	-vnconfig -u ${VND}
+	-rm -f ${IMAGE}
 
 ${CBIN}.mk ${CBIN}.cache ${CBIN}.c: ${CRUNCHCONF}
 	crunchgen -D ${TOP}/../../.. -L ${DESTDIR}/usr/lib ${.ALLSRC}
@@ -52,10 +49,12 @@ ${CBIN}: ${CBIN}.mk ${CBIN}.cache ${CBIN}.c libhack.o
 
 HACKSRC=${TOP}/../../utils/libhack
 .include "${HACKSRC}/Makefile.inc"
+HACKOBJS= gethost.o getnet.o getpwent.o localeconv.o perror.o \
+	setlocale.o strerror.o strsignal.o utmp.o yplib.o
 
 clean cleandir distclean:
-	/bin/rm -f *.core ${IMAGE} ${CBIN} ${CBIN}.mk ${CBIN}.cache *.o *.lo *.c
+	rm -f ${IMAGE} ${CBIN} ${CBIN}.mk ${CBIN}.cache
+	rm -f *.core *.o *.cro *.c
 
 .include <bsd.obj.mk>
 .include <bsd.subdir.mk>
-

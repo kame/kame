@@ -1,4 +1,4 @@
-/*	$NetBSD: md.c,v 1.9.2.3 1999/06/24 22:44:28 cgd Exp $	*/
+/*	$NetBSD: md.c,v 1.19.4.1 2000/10/18 17:51:18 tv Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -125,7 +125,7 @@ int	md_post_disklabel (void)
 /*
  * MD hook called after upgrade() or install() has finished setting
  * up the target disk but immediately before the user is given the
- * ``disks are now set up'' message that, if power fails, they can
+ * ``disks are now set up'' message, so that if power fails, they can
  * continue installation by booting the target disk and doing an
  * `upgrade'.
  *
@@ -135,7 +135,7 @@ int	md_post_newfs (void)
 {
 	printf (msg_string(MSG_dobootblks), diskdev);
 	cp_to_target("/usr/mdec/boot", "/boot");
-	run_prog(0, 1, "Warning: disk is probably not bootable",
+	run_prog(RUN_DISPLAY, "Warning: disk is probably not bootable",
 		"/usr/mdec/installboot /dev/r%sc /usr/mdec/bootxx_ffs", diskdev);
 	return 0;
 }
@@ -169,7 +169,7 @@ int md_make_bsd_partitions (void)
 	process_menu (MENU_layout);
 
 	if (layoutkind == 3) {
-		ask_sizemult();
+		ask_sizemult(dlcylsize);
 	} else {
 		sizemult = MEG / sectorsize;
 		multname = msg_string(MSG_megname);
@@ -232,7 +232,7 @@ int md_make_bsd_partitions (void)
 		break;
 
 	case 3: /* custom: ask user for all sizes */
-		ask_sizemult();
+		ask_sizemult(dlcylsize);
 		/* root */
 		partstart = ptstart;
 		remain = fsdsize - partstart;
@@ -265,20 +265,22 @@ int md_make_bsd_partitions (void)
 		
 		/* /usr */
 		remain = fsdsize - partstart;
-		partsize = fsdsize - partstart;
-		snprintf (isize, 20, "%d", partsize/sizemult);
-		msg_prompt_add (MSG_askfsusr, isize, isize, 20,
-			    remain/sizemult, multname);
-		partsize = NUMSEC(atoi(isize),sizemult, dlcylsize);
-		if (remain - partsize < sizemult)
-			partsize = remain;
-		bsdlabel[PART_USR].pi_fstype = FS_BSDFFS;
-		bsdlabel[PART_USR].pi_offset = partstart;
-		bsdlabel[PART_USR].pi_size = partsize;
-		bsdlabel[PART_USR].pi_bsize = 8192;
-		bsdlabel[PART_USR].pi_fsize = 1024;
-		strcpy (fsmount[PART_USR], "/usr");
-		partstart += partsize;
+		if (remain > 0) {
+			partsize = fsdsize - partstart;
+			snprintf (isize, 20, "%d", partsize/sizemult);
+			msg_prompt_add (MSG_askfsusr, isize, isize, 20,
+				    remain/sizemult, multname);
+			partsize = NUMSEC(atoi(isize),sizemult, dlcylsize);
+			if (remain - partsize < sizemult)
+				partsize = remain;
+			bsdlabel[PART_USR].pi_fstype = FS_BSDFFS;
+			bsdlabel[PART_USR].pi_offset = partstart;
+			bsdlabel[PART_USR].pi_size = partsize;
+			bsdlabel[PART_USR].pi_bsize = 8192;
+			bsdlabel[PART_USR].pi_fsize = 1024;
+			strcpy (fsmount[PART_USR], "/usr");
+			partstart += partsize;
+		}
 
 		/* Others ... */
 		remain = fsdsize - partstart;
@@ -289,7 +291,7 @@ int md_make_bsd_partitions (void)
 			partsize = fsdsize - partstart;
 			snprintf (isize, 20, "%d", partsize/sizemult);
 			msg_prompt_add (MSG_askfspart, isize, isize, 20,
-					diskdev, partname[part],
+					diskdev, partition_name(part),
 					remain/sizemult, multname);
 			partsize = NUMSEC(atoi(isize),sizemult, dlcylsize);
 			if (remain - partsize < sizemult)
@@ -345,5 +347,16 @@ md_update(void)
 
 void
 md_cleanup_install(void)
+{
+}
+
+int
+md_pre_update()
+{
+	return 1;
+}
+
+void
+md_init()
 {
 }

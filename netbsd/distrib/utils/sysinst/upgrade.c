@@ -1,4 +1,4 @@
-/*	$NetBSD: upgrade.c,v 1.16.2.2 1999/06/24 23:02:02 cgd Exp $	*/
+/*	$NetBSD: upgrade.c,v 1.20.10.3 2000/10/18 17:51:16 tv Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -51,6 +51,8 @@
 void 	check_prereqs __P((void));
 int	save_etc __P((void));
 int	merge_etc __P((void));
+int	save_X __P((void));
+int	merge_X __P((void));
 
 /*
  * Do the system upgrade.
@@ -58,7 +60,6 @@ int	merge_etc __P((void));
 void
 do_upgrade()
 {
-
 	doingwhat = msg_string(MSG_upgrade);
 
 	msg_display(MSG_upgradeusure);
@@ -71,6 +72,9 @@ do_upgrade()
 	if (find_disks() < 0)
 		return;
 
+	if (md_pre_update() < 0)
+		return;
+
 	/* if we need the user to mount root, ask them to. */
 	if (must_mount_root()) {
 		msg_display(MSG_pleasemountroot, diskdev, diskdev, diskdev);
@@ -81,13 +85,21 @@ do_upgrade()
 	if (!fsck_disks())
 		return;
 
+
+	/*
+	 * Save X symlink, ...
+	 */
+	if (save_X())
+		return;
+
 	/*
 	 * Move target /etc -> target /etc.old so existing configuration
 	 * isn't overwritten by upgrade.
 	 */
-	if (save_etc())
+	if (save_etc()) {
+		merge_X();
 		return;
-
+	}
 
 	/* Do any md updating of the file systems ... e.g. bootblocks,
 	   copy file systems ... */
@@ -106,6 +118,7 @@ do_upgrade()
 
 	/* Copy back any files we should restore after the upgrade.*/
 	merge_etc();
+	merge_X();
 
 	sanity_check();
 }
@@ -169,6 +182,32 @@ save_etc()
 }
 
 /*
+ * Save X symlink to X.old so it can be recovered later
+ */
+int
+save_X()
+{
+	/* Only care for X if it's a symlink */
+	if (target_symlink_exists_p("/usr/X11R6/bin/X")) {
+		if (target_symlink_exists_p("/usr/X11R6/bin/X.old")) {
+			msg_display(MSG_X_oldexists);
+			process_menu(MENU_ok);
+			return EEXIST;
+		}
+
+#ifdef DEBUG
+		printf("saving /usr/X11R6/bin/X as .../X.old ...");
+#endif
+
+		/* Move target .../X to .../X.old.  Abort on error. */
+		mv_within_target_or_die("/usr/X11R6/bin/X",
+					"/usr/X11R6/bin/X.old");
+	}
+
+	return 0;
+}
+
+/*
  * Merge back saved target /etc files after unpacking the new
  * sets has completed.
  */
@@ -178,6 +217,23 @@ merge_etc()
 
 	/* just move back fstab, so we can boot cleanly.  */
 	cp_within_target("/etc.old/fstab", "/etc/");
+
+	return 0;	
+}
+
+/*
+ * Merge back saved target X files after unpacking the new
+ * sets has completed.
+ */
+int
+merge_X()
+{
+	if (target_symlink_exists_p("/usr/X11R6/bin/X.old")) {
+		/* Only move back X if it's a symlink - we don't want
+		 * to restore old binaries */
+		mv_within_target_or_die("/usr/X11R6/bin/X.old",
+					"/usr/X11R6/bin/X");
+	}
 
 	return 0;	
 }
@@ -211,6 +267,7 @@ do_reinstall_sets()
 
 	fflush(stdout);
 	puts(CL);		/* XXX */
+	touchwin(stdscr);
 	wclear(stdscr);
 	wrefresh(stdscr);
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: util.c,v 1.34.2.2 1999/06/24 23:02:09 cgd Exp $	*/
+/*	$NetBSD: util.c,v 1.51.2.4 2000/12/26 06:35:43 jhawk Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -47,6 +47,7 @@
 #include <sys/stat.h>
 #include <curses.h>
 #include <errno.h>
+#include <fts.h>
 #include "defs.h"
 #include "md.h"
 #include "msg_defs.h"
@@ -68,29 +69,30 @@ int	extract_file __P((char *path));
 int	extract_dist __P((void));
 int	cleanup_dist __P((const char *path));
 int	distribution_sets_exist_p __P((const char *path));
-static int check_for __P((const char *type, const char *pathname));
+static int check_for __P((unsigned int mode, const char *pathname));
 
-/*
- * XXX these are WAY bogus!
- */
 int
 dir_exists_p(path)
 	const char *path;
 {
-	register int result;
-
-	result = (run_prog(0, 0, NULL, "test -d %s", path) == 0);
-	return (result);
+	return file_mode_match(path, S_IFDIR);
 }
 
 int
 file_exists_p(path)
 	const char *path;
 {
-	register int result;
+	return file_mode_match(path, S_IFREG);
+}
 
-	result = (run_prog(0, 0, NULL, "test -f %s", path) == 0);
-	return (result);
+int
+file_mode_match(path, mode)
+	const char *path;
+	unsigned int mode;
+{
+	struct stat st;
+
+	return (stat(path, &st) == 0 && (st.st_mode & mode) != 0);
 }
 
 int
@@ -105,6 +107,9 @@ distribution_sets_exist_p(path)
 	result = result && file_exists_p(buf);
 
 	snprintf(buf, STRSIZE, "%s/%s", path, "etc.tgz");
+	result = result && file_exists_p(buf);
+
+	snprintf(buf, STRSIZE, "%s/%s", path, "base.tgz");
 	result = result && file_exists_p(buf);
 
 	return(result);
@@ -126,22 +131,25 @@ get_ramsize()
 static int asked = 0;
 
 void
-ask_sizemult()
+ask_sizemult(cylsize)
+	int cylsize;
 {
+	current_cylsize = cylsize;	/* XXX */
 
 	if (!asked) {
-		msg_display(MSG_sizechoice, dlcylsize);
+		msg_display(MSG_sizechoice);
 		process_menu(MENU_sizechoice);
 	}
 	asked = 1;
 }
 
 void
-reask_sizemult()
+reask_sizemult(cylsize)
+	int cylsize;
 {
 
 	asked = 0;
-	ask_sizemult();
+	ask_sizemult(cylsize);
 }
 
 void
@@ -159,7 +167,7 @@ run_makedev()
 	/* make /dev, in case the user  didn't extract it. */
 	make_target_dir("/dev");
 	target_chdir_or_die("/dev");
-	run_prog(0, 0, NULL, "/bin/sh MAKEDEV all");
+	run_prog(0, NULL, "/bin/sh MAKEDEV all");
 
 	chdir(owd);
 	free(owd);
@@ -197,7 +205,7 @@ get_via_floppy()
 			first = 1;
 			while (!mounted || stat(fullname, &sb)) {
  				if (mounted) 
-				  run_prog(0, 0, NULL, "/sbin/umount /mnt2");
+				  run_prog(0, NULL, "/sbin/umount /mnt2");
 				if (first)
 					msg_display(MSG_fdmount, fname);
 				else
@@ -205,7 +213,7 @@ get_via_floppy()
 				process_menu(MENU_fdok);
 				if (!yesno)
 					return 0;
-				while (run_prog(0, 0, NULL, 
+				while (run_prog(0, NULL, 
 				    "/sbin/mount -r -t %s %s /mnt2",
 				    fdtype, fddev)) {
 					msg_display(MSG_fdremount, fname);
@@ -228,7 +236,7 @@ get_via_floppy()
 			else
 				post[2] = 'a', post[1]++;
 		}
-		run_prog(0, 0, NULL, "/sbin/umount /mnt2");
+		run_prog(0, NULL, "/sbin/umount /mnt2");
 		mounted = 0;
 		list++;
 	}
@@ -258,10 +266,10 @@ get_via_cdrom()
 	process_menu(MENU_cdromsource);
 
 again:
-	run_prog(0, 0, NULL, "/sbin/umount /mnt2");
+	run_prog(0, NULL, "/sbin/umount /mnt2");
 
 	/* Mount it */
-	if (run_prog(0, 0, NULL,
+	if (run_prog(0, NULL,
 	    "/sbin/mount -rt cd9660 /dev/%sa /mnt2", cdrom_dev)) {
 		msg_display(MSG_badsetdir, cdrom_dev);
 		process_menu(MENU_cdrombadmount);
@@ -304,10 +312,10 @@ get_via_localfs()
 	process_menu (MENU_localfssource);
 
 again:
-	run_prog(0, 0, NULL, "/sbin/umount /mnt2");
+	run_prog(0, NULL, "/sbin/umount /mnt2");
 
 	/* Mount it */
-	if (run_prog(0, 0, NULL, "/sbin/mount -rt %s /dev/%s /mnt2",
+	if (run_prog(0, NULL, "/sbin/mount -rt %s /dev/%s /mnt2",
 	    localfs_fs, localfs_dev)) {
 
 		msg_display(MSG_localfsbadmount, localfs_dir, localfs_dev); 
@@ -416,9 +424,10 @@ show_cur_distsets()
 	distinfo *list;
 
 	msg_display(MSG_cur_distsets);
+	msg_table_add(MSG_cur_distsets_header);
 	list = dist_list;
 	while (list->name) {
-		msg_printf_add("%s%s\n", list->desc,
+		msg_table_add(MSG_cur_distsets_row, list->desc,
 		    list->getit ? msg_string(MSG_yes) : msg_string(MSG_no));
 		list++;
 	}
@@ -463,7 +472,7 @@ extract_file(path)
 	target_chdir_or_die("/");	
 
 	/* now extract set files files into "./". */
-	tarexit = run_prog(0, 1, NULL,
+	tarexit = run_prog(RUN_DISPLAY, NULL,
 	    "pax -zr%spe -f %s", verbose ? "v" : "", path);
 
 	/* Check tarexit for errors and give warning. */
@@ -633,13 +642,17 @@ cleanup_dist(name)
 	/* XXX doesn't work, too many files printed ! */
 	msg_display(MSG_deleting_files);
 	for (current = head; current != NULL; current = current->next) {
-		if (current->type != S_IFDIR)
+		if (current->type != S_IFDIR) {
+			/* XXX msg_printf_add going/gone away */
 			msg_printf_add("%s ", current->name);
+		}
 	}
 	msg_display_add(MSG_deleting_dirs);
 	for (current = head; current != NULL; current = current->next) {
-		if (current->type == S_IFDIR)
+		if (current->type == S_IFDIR) {
+			/* XXX msg_printf_add going/gone away */
 			msg_printf_add("%s ", current->name);
+		}
 	}
 	process_menu(MENU_ok);
 #endif
@@ -651,6 +664,9 @@ cleanup_dist(name)
 			(void)fprintf(script, "rm %s\n", current->name);
 		if (unlink(current->name) != 0) {
 			saved_errno = errno;
+			if (saved_errno == ENOENT)
+				continue;	/* don't worry about
+						   non-existing files */
 			if (logging)
 				fprintf(log, "rm %s failed: %s\n",
 				    current->name, strerror(saved_errno));
@@ -696,6 +712,11 @@ cleanup_dist(name)
 			msg_display_add(MSG_renamed_dir, current->name,
 			    file_path);
 		} else { /* rmdir error */
+			/*
+			 * Don't worry about non-existing directories.
+			 */
+			if (saved_errno == ENOENT)
+				continue;
 			if (logging)
 				fprintf(log, "rm %s failed: %s\n",
 				    current->name, strerror(saved_errno));
@@ -718,8 +739,8 @@ cleanup_dist(name)
  */
 int
 get_and_unpack_sets(success_msg, failure_msg)
-	int success_msg;
-	int failure_msg;
+	msg success_msg;
+	msg failure_msg;
 {
 
 	/* Ensure mountpoint for distribution files exists in current root. */
@@ -758,11 +779,11 @@ get_and_unpack_sets(success_msg, failure_msg)
 		
 		/* Clean up dist dir (use absolute path name) */
 		if (clean_dist_dir)
-			run_prog(0, 0, NULL, "/bin/rm -rf %s", ext_dir);
+			run_prog(0, NULL, "/bin/rm -rf %s", ext_dir);
 
 		/* Mounted dist dir? */
 		if (mnt2_mounted)
-			run_prog(0, 0, NULL, "/sbin/umount /mnt2");
+			run_prog(0, NULL, "/sbin/umount /mnt2");
 
 		/* Install/Upgrade complete ... reboot or exit to script */
 		msg_display(success_msg);
@@ -784,26 +805,26 @@ get_and_unpack_sets(success_msg, failure_msg)
  */
 
 /* test flag and pathname to check for after unpacking. */
-struct check_table { const char *testarg; const char *path;} checks[] = {
-  { "-f", "/netbsd" },
-  { "-d", "/etc" },
-  { "-f", "/etc/fstab" },
-  { "-f", "/sbin/init" },
-  { "-f", "/bin/sh" },
-  { "-f", "/etc/rc" },
-  { "-f", "/etc/rc.subr" },
-  { "-f", "/etc/rc.conf" },
-  { "-d" "/dev" },
-  { "-c", "/dev/console" },
+struct check_table { unsigned int mode; const char *path;} checks[] = {
+  { S_IFREG, "/netbsd" },
+  { S_IFDIR, "/etc" },
+  { S_IFREG, "/etc/fstab" },
+  { S_IFREG, "/sbin/init" },
+  { S_IFREG, "/bin/sh" },
+  { S_IFREG, "/etc/rc" },
+  { S_IFREG, "/etc/rc.subr" },
+  { S_IFREG, "/etc/rc.conf" },
+  { S_IFDIR, "/dev" },
+  { S_IFCHR, "/dev/console" },
 /* XXX check for rootdev in target /dev? */
-  { "-f", "/etc/fstab" },
-  { "-f", "/sbin/fsck" },
-  { "-f", "/sbin/fsck_ffs" },
-  { "-f", "/sbin/mount" },
-  { "-f", "/sbin/mount_ffs" },
-  { "-f", "/sbin/mount_nfs" },
+  { S_IFREG, "/etc/fstab" },
+  { S_IFREG, "/sbin/fsck" },
+  { S_IFREG, "/sbin/fsck_ffs" },
+  { S_IFREG, "/sbin/mount" },
+  { S_IFREG, "/sbin/mount_ffs" },
+  { S_IFREG, "/sbin/mount_nfs" },
 #if defined(DEBUG) || defined(DEBUG_CHECK)
-  { "-f", "/foo/bar" },		/* bad entry to exercise warning */
+  { S_IFREG, "/foo/bar" },		/* bad entry to exercise warning */
 #endif
   { 0, 0 }
   
@@ -813,13 +834,13 @@ struct check_table { const char *testarg; const char *path;} checks[] = {
  * Check target for a single file.
  */
 static int
-check_for(type, pathname)
-	const char *type;
+check_for(mode, pathname)
+	unsigned int mode;
 	const char *pathname;
 {
 	int found; 
 
-	found = (target_test(type, pathname) == 0);
+	found = (target_test(mode, pathname) == 0);
 	if (found == 0) 
 		msg_display(MSG_rootmissing, pathname);
 	return found;
@@ -836,7 +857,7 @@ sanity_check()
 	struct check_table *p;
 
 	for (p = checks; p->path; p++) {
-		target_ok = target_ok && check_for(p->testarg, p->path);
+		target_ok = target_ok && check_for(p->mode, p->path);
 	}
 	if (target_ok)
 		return 0;	    
@@ -887,4 +908,164 @@ int askyesno(int reverse)
 	delwin(yesnowin);
 	refresh();
 	return(found);
+}
+
+/*
+ * Some globals to pass things back from callbacks
+ */
+static char zoneinfo_dir[STRSIZE];
+static char *tz_selected;	/* timezonename (relative to share/zoneinfo */
+static char *tz_default;	/* UTC, or whatever /etc/localtime points to */
+static char tz_env[STRSIZE];
+
+/*
+ * Callback from timezone menu
+ */
+static int
+set_timezone_select(menudesc *m)
+{
+	time_t t;
+
+	if (m)
+		tz_selected = m->opts[m->cursel].opt_name;
+	snprintf(tz_env, sizeof(tz_env), "%s/%s",
+		 zoneinfo_dir, tz_selected);
+	setenv("TZ", tz_env, 1);
+	t = time(NULL);
+	msg_display(MSG_choose_timezone, 
+		    tz_default, tz_selected, ctime(&t), localtime(&t)->tm_zone);
+	return 0;
+}
+
+/*
+ * Alarm-handler to update example-display
+ */
+static void
+timezone_sig(int sig)
+{
+	set_timezone_select(NULL);
+	alarm(1);
+}
+
+/*
+ * Choose from the files in usr/share/zoneinfo and set etc/localtime
+ */
+int
+set_timezone()
+{
+	char localtime_link[STRSIZE];
+	char localtime_target[STRSIZE];
+	int rc;
+	time_t t;
+	sig_t oldalrm;
+	FTS *tree;
+	FTSENT *entry;
+	int rval;
+	char *argv[2];
+	int skip;
+	struct stat sb;
+	int nfiles, n;
+	int menu_no;
+	menu_ent *tz_menu;
+
+	oldalrm=signal(SIGALRM, timezone_sig);
+	alarm(1);
+       
+	strncpy(zoneinfo_dir, target_expand("/usr/share/zoneinfo"), STRSIZE);
+	strncpy(localtime_link, target_expand("/etc/localtime"), STRSIZE);
+
+	/* Add sanity check that /mnt/usr/share/zoneinfo contains
+	 * something useful */
+
+	rc = readlink(localtime_link, localtime_target,
+		      sizeof(localtime_target));
+	if (rc < 0) {
+		/* error, default to UTC */
+		tz_default = "UTC";
+	} else {
+		localtime_target[rc] = '\0';
+		tz_default = strchr(strstr(localtime_target, "zoneinfo"), '/')+1;
+	}
+
+	tz_selected=tz_default;
+	snprintf(tz_env, sizeof(tz_env), "%s/%s",
+		 zoneinfo_dir, tz_selected);
+	setenv("TZ", tz_env, 1);
+	t = time(NULL);
+	msg_display(MSG_choose_timezone, 
+		    tz_default, tz_selected, ctime(&t), localtime(&t)->tm_zone);
+
+	skip = strlen(zoneinfo_dir);
+	argv[0] = zoneinfo_dir;
+	argv[1] = NULL;
+	if (!(tree = fts_open(argv, FTS_LOGICAL, NULL))) {
+		return 1;	/* error - skip timezone setting */
+	}
+	for (nfiles = 0; (entry = fts_read(tree)) != NULL;) {
+		stat(entry->fts_accpath, &sb);
+		if (S_ISREG(sb.st_mode))
+			nfiles++;
+	}
+	if (errno) {
+		return 1;	/* error - skip timezone setting */
+	}
+	(void)fts_close(tree);
+	
+	tz_menu = malloc(nfiles * sizeof(struct menu_ent));
+	if (tz_menu == NULL) {
+		return 1;	/* error - skip timezone setting */
+	}
+	
+	if (!(tree = fts_open(argv, FTS_LOGICAL, NULL))) {
+		return 1;	/* error - skip timezone setting */
+	}
+	n=0;
+	for (rval=0; (entry = fts_read(tree)) != NULL; ) {
+
+		stat(entry->fts_accpath, &sb);
+		if (S_ISREG(sb.st_mode)) {
+			tz_menu[n].opt_name = strdup(entry->fts_accpath+skip+1);
+			tz_menu[n].opt_menu = OPT_NOMENU;
+			tz_menu[n].opt_flags = 0;
+			tz_menu[n].opt_action = set_timezone_select;
+
+			n++;
+		}
+	}
+	if (errno) {
+		return 1;	/* error - skip timezone setting */
+	}
+	(void)fts_close(tree);  
+	
+	menu_no = new_menu(NULL, tz_menu, nfiles, 23, 9,
+			   12, 32, MC_SCROLL|MC_NOSHORTCUT, NULL, NULL,
+			   "\nPlease consult the install documents.");
+	if (menu_no < 0) {
+		return 1;	/* error - skip timezone setting */
+	}
+	process_menu(menu_no);
+
+	free_menu(menu_no);
+	for(n=0; n < nfiles; n++)
+		free(tz_menu[n].opt_name);
+	free(tz_menu);
+
+	signal(SIGALRM, SIG_IGN);
+
+	snprintf(localtime_target, sizeof(localtime_target),
+		 "/usr/share/zoneinfo/%s", tz_selected);
+	unlink(localtime_link);
+	symlink(localtime_target, localtime_link);
+	
+	return 1;
+}
+
+int
+set_root_password()
+{
+	msg_display(MSG_rootpw);
+	process_menu(MENU_yesno);
+	if (yesno)
+		run_prog(RUN_DISPLAY|RUN_CHROOT, NULL, "passwd -l root");
+	return 0;
 }

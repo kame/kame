@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.12.2.1 1999/06/21 03:16:53 perry Exp $
+#	$NetBSD: Makefile,v 1.18.2.1 2001/04/21 18:37:29 he Exp $
 
 TOP=		${.CURDIR}/..
 
@@ -18,39 +18,49 @@ KERNEL3  = ${KERNOBJDIR}/INSTALL/netbsd
 KERNEL3X = ${KERNOBJDIR}/INSTALL3X/netbsd
 
 MOUNT_POINT?=	/mnt
-BDEV?=		/dev/sd1b
-CDEV?=		/dev/rsd1b
+VND?=		vnd1
+VND_DEV?=	/dev/${VND}a
+VND_RDEV?=	/dev/r${VND}a
+VND_CRDEV?=	/dev/r${VND}c
 
-# These are all the parameters for the miniroot: (8MB)
+# These are all the parameters for the miniroot: (12MB)
 DISKTYPE=	miniroot
-NBLKS=		20480
-# bigendian, old format, minfree, opt, b/i  trks, sects, cpg
-NEWFSARGS= -B be -O -m 0 -o space -i 8192 -t 8 -u 32 -c 16
+SIZE=		12
+# bigendian, old format, minfree, opt, b/i, cpg
+NEWFSARGS= -B be -O -m 0 -o space -i 8192 -c 16
 
-CLEANFILES= ${IMAGE}.gz install.sub
+CLEANFILES= ${IMAGE}.gz ${IMAGE} ${IMAGE}.tmp install.sub
 
 all: ${IMAGE}.gz
 
 ${IMAGE}.gz: ${TREE} ${LISTS} install.sub
-	-newfs ${NEWFSARGS} -s ${NBLKS} ${CDEV} ${DISKTYPE}
-	mount ${BDEV} ${MOUNT_POINT}
+	dd if=/dev/zero of=${IMAGE} bs=1024k count=${SIZE}
+	vnconfig -t ${DISKTYPE} -v -c ${VND} ${IMAGE}
+	disklabel -f ${.CURDIR}/disktab -rw ${VND} ${DISKTYPE}
+	newfs ${NEWFSARGS} ${VND_RDEV}
+	mount ${VND_DEV} ${MOUNT_POINT}
 	mtree -def ${TREE} -p ${MOUNT_POINT}/ -u
 	cp ${KERNEL3}  ${MOUNT_POINT}/netbsd.sun3
 	cp ${KERNEL3X} ${MOUNT_POINT}/netbsd.sun3x
-	TOPDIR=${TOP} CURDIR=${.CURDIR} \
+	TOPDIR=${TOP} CURDIR=${.CURDIR} DESTDIR=${DESTDIR} \
 	  OBJDIR=${.OBJDIR} TARGDIR=${MOUNT_POINT} \
 	  sh ${TOP}/common/RunList.sh ${LISTS}
 	sync ; sleep 1 ; sync
 	cd ${MOUNT_POINT} ;\
-	  usr/mdec/installboot -v ufsboot usr/mdec/bootxx ${CDEV}
+	  usr/mdec/installboot -v ufsboot usr/mdec/bootxx ${VND_CRDEV}
 	sync
 	@echo ""
 	@df -i ${MOUNT_POINT}
 	@echo ""
 	-umount ${MOUNT_POINT}
-	dd if=${CDEV} bs=16b count=`expr ${NBLKS} / 16` |\
-	  gzip > ${IMAGE}.tmp
+	vnconfig -u ${VND}
+	gzip -9 -c ${IMAGE} > ${IMAGE}.tmp
 	-mv -f ${IMAGE}.tmp ${IMAGE}.gz
+
+unconfig:
+	-umount -f ${MOUNT_POINT}
+	-vnconfig -u ${VND_DEV}
+	-/bin/rm -f ${IMAGE} ${IMAGE}.tmp
 
 # Do not delete this if I change my mind and kill make...
 .PRECIOUS: ${IMAGE}.gz
@@ -62,15 +72,17 @@ clean cleandir distclean:
 	-rm -f a.out core *.core *.o
 	-rm -f ${CLEANFILES}
 
-# Standard rules needed by the above...
-.include <bsd.obj.mk>
-
 .if !defined(RELEASEDIR)
 release:
 	@echo setenv RELEASEDIR before doing that!
 	@false
 .else	# RELEASEDIR
 release: ${IMAGE}.gz
+	-mkdir -p ${RELEASEDIR}/installation/miniroot
 	cp -p ${IMAGE}.gz \
 	 ${RELEASEDIR}/installation/miniroot/${IMAGE}.gz
 .endif	# RELEASEDIR
+
+# Standard rules needed by the above...
+.include <bsd.obj.mk>
+.include <bsd.subdir.mk>

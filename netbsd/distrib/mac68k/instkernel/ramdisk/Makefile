@@ -1,4 +1,8 @@
-#	$NetBSD: Makefile,v 1.1 1999/03/26 08:34:37 ender Exp $
+#	$NetBSD: Makefile,v 1.6 2000/06/11 11:06:24 fredb Exp $
+
+.ifndef NOTESOBJDIR
+NOTESOBJDIR!=cd ${.CURDIR}/../../../notes/mac68k; ${MAKE} ${MAKEFLAGS} -V .OBJDIR
+.endif
 
 TOP=		${.CURDIR}/..
 
@@ -20,7 +24,7 @@ LISTS=		list
 CRUNCHCONF=	${CBIN}.conf
 MTREE=		mtree.conf
 
-all: ${CBIN} 
+all: notes ${CBIN} 
 	dd if=/dev/zero of=${IMAGE} count=5120
 	vnconfig -v -c ${VND_CDEV} ${IMAGE}
 #	disklabel -rw ${VND_CDEV} ${DISKTYPE}
@@ -28,6 +32,7 @@ all: ${CBIN}
 	mount ${VND_DEV} ${MOUNT_POINT}
 	mtree -def ${.CURDIR}/${MTREE} -p ${MOUNT_POINT}/ -u
 	TOPDIR=${TOP} CURDIR=${.CURDIR} OBJDIR=${.OBJDIR} \
+	    KERNOBJDIR=${KERNOBJDIR} \
 	    TARGDIR=${MOUNT_POINT} sh ${TOP}/src/runlist.sh ${.CURDIR}/${LISTS}
 	@echo ""
 	@df -i ${MOUNT_POINT}
@@ -40,6 +45,10 @@ unconfig:
 	-vnconfig -u ${VND_DEV}
 	-/bin/rm -f ${IMAGE}
 
+notes:
+	cd ${.CURDIR}/../../../notes/mac68k; ${MAKE} ${MAKEFLAGS} INSTALL.more && \
+	    cp ${NOTESOBJDIR}/INSTALL.more ${.OBJDIR}
+
 ${CBIN}.mk ${CBIN}.cache ${CBIN}.c: ${CRUNCHCONF}
 	crunchgen -D ${TOP}/../../.. -L ${DESTDIR}/usr/lib ${.ALLSRC}
 
@@ -47,7 +56,10 @@ ${CBIN}: ${CBIN}.mk ${CBIN}.cache ${CBIN}.c
 	make -f ${CBIN}.mk all
 
 clean cleandir distclean:
-	/bin/rm -f *.core ${IMAGE} ${CBIN} ${CBIN}.mk ${CBIN}.cache *.o *.lo *.c
+	/bin/rm -f *.core ${IMAGE} ${CBIN} ${CBIN}.mk ${CBIN}.cache \
+	    *.o *.cro *.c INSTALL.more
+
+.INTERRUPT: unconfig
 
 .include <bsd.own.mk>
 .include <bsd.obj.mk>

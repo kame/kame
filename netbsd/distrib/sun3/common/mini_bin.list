@@ -1,5 +1,5 @@
 #
-# $NetBSD: mini_bin.list,v 1.4.2.1 1999/06/21 03:06:45 perry Exp $
+# $NetBSD: mini_bin.list,v 1.5 1999/05/16 08:21:53 gwr Exp $
 #
 # miniroot files from /bin:
 # Extras not in ../../miniroot/list:

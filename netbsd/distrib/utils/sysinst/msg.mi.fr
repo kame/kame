@@ -1,4 +1,4 @@
-/*	$NetBSD: msg.mi.fr,v 1.12.2.4 1999/06/24 23:01:22 cgd Exp $	*/
+/*	$NetBSD: msg.mi.fr,v 1.34.2.3 2000/12/26 06:36:29 jhawk Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -25,13 +25,13 @@
  * THIS SOFTWARE IS PROVIDED BY PIERMONT INFORMATION SYSTEMS INC. ``AS IS''
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL PIERMONT INFORMATION SYSTEMS INC. BE 
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
+ * ARE DISCLAIMED. IN NO EVENT SHALL PIERMONT INFORMATION SYSTEMS INC. BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF 
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
@@ -39,8 +39,10 @@
 /* MI Message catalog -- french, machine independent */
 
 message usage
-{utilisation : sysinst [-r version]
+{utilisation : sysinst [-r version] [-f fichier de definition]
 }
+
+message newline {\n}
 
 message yes {Oui}
 
@@ -72,12 +74,12 @@ message installusure
 {Vous avez choisi d'installer NetBSD sur votre disque dur. Ceci va changer les
 informations contenues sur votre disque dur. Vous devriez faire une sauvegarde
 complète de celui ci avant de continuer la procédure d'installation. Cette
-procédure va réaliser les actions suivantes :
-      a) Partitionner votre disque dur.
-      b) Créer de nouveaux systèmes de fichier BSD.
-      c) Installer les différents composants.
+procédure va réaliser les actions suivantes : 
+	a) Partitionner votre disque dur. 
+	b) Créer de nouveaux systèmes de fichier BSD. 
+	c) Installer les différents composants.
 
-(Après avoir indiqué les informations sur les partitions mais avant de 
+(Après avoir indiqué les informations sur les partitions mais avant de
 modifier votre disque, vous aurez la possibilité de quitter cette procédure.)
 On continue ?
 }
@@ -85,9 +87,9 @@ On continue ?
 message upgradeusure
 {D'accord, mettons à jour NetBSD sur votre disque dur. Comme d'habitude, cela
 va changer les informations contenues sur votre disque dur. Vous devriez faire
-une sauvegarde complète de celui ci avant de continuer la procédure de mise à 
+une sauvegarde complète de celui ci avant de continuer la procédure de mise à
 jour. Voulez vous vraiment mettre à jour NetBSD ?
-(Ceci est le dernier avertissement avant que cette procédure ne commence à 
+(Ceci est le dernier avertissement avant que cette procédure ne commence à
 modifier votre disque.)
 }
 
@@ -134,8 +136,8 @@ message pleasemountroot
 {Le système de fichiers racine n'est pas monté. SVP, montez le.
 
 Votre disque de destination %s contient aussi le système de fichiers racine.
-J'ai besoin de savoir si je suis entrain de m'exécuter hors de la racine de 
-destination (%sa), ou hors d'une racine alternative (disons %sb, 
+J'ai besoin de savoir si je suis entrain de m'exécuter hors de la racine de
+destination (%sa), ou hors d'une racine alternative (disons %sb,
 votre partition de swap).
 Je ne peux pas le savoir tant que vous ne montez pas la racine de destination.
 
@@ -181,13 +183,13 @@ message megname
 message layout
 {NetBSD utilise un disklabel BSD pour séparer la portion du disque réservée à
 NetBSD en de multiples partitions BSD. Vous devez maintenant paramétrer le
-disklabel BSD. Vous avez différent choix:
--- Standard : les partitions sont calculées par ce programme.
--- Standard avec X : le double de swap plus la taille des binaires X.
+disklabel BSD. Vous avez différent choix: 
+-- Standard : les partitions sont calculées par ce programme. 
+-- Standard avec X : le double de swap plus la taille des binaires X. 
 -- Personnalisée : vous choisissez la taille des partitions.
 
-La taille allouée pour NetBSD sur votre disque est de %.2f Megaoctets.
-L'installation standard requière au moins %.2f Megaoctets.
+La taille allouée pour NetBSD sur votre disque est de %.2f Megaoctets. 
+L'installation standard requière au moins %.2f Megaoctets. 
 L'installation standard avec X requière au moins %.2f Megaoctets.
 }
 
@@ -200,7 +202,7 @@ secteur, vous pourrez plus précisément choisir les tailles. Sur les disques
 modernes, la taille réelle des cylindres est variable et il y a peu d'intéret
 à aligner les partitions sur les cylindres. Pour les disques plus ancien, il
 est plus efficace de choisir des tailles de partitions multiples de la
-taille d'un cylindre, qui est %d secteurs.
+taille d'un cylindre.
 }
 
 message defaultunit
@@ -219,12 +221,25 @@ La taille de la partition a été tronquée à %d %s.
 
 message fspart
 {Vos partitions NetBSD sont les suivantes (taille et offset en %s) :
+
 }
 
-message fspart_head
-{id:      Size    Offset       End FStype Bsize Fsize Mount point
----      ----    ------       --- ------ ----- ----- -----------
+message fspart_header
+{   Size      Offset    End       FStype Bsize Fsize Mount point
+   --------- --------- --------- ------ ----- ----- -----------
 }
+
+message fspart_row_start
+{%c: %-9d %-9d %-9d %-6s }
+
+message fspart_row_end_bsd
+{%-5d %-5d %s\n}
+
+message fspart_row_end_msdos
+{            %s\n}
+
+message fspart_row_end_other
+{\n}
 
 
 message edfspart
@@ -243,8 +258,8 @@ message packname
 {SVP donnez un nom à votre disque NetBSD.}
 
 message lastchance
-{Bon, nous sommes prêt à installer NetBSD sur votre disque. Rien n'a été écrit
-pour l'instant. C'est votre dernière chance de quitter cette procédure en
+{Bon, nous sommes prêt à installer NetBSD sur votre disque (%s). Rien n'a été
+écrit pour l'instant. C'est votre dernière chance de quitter cette procédure en
 laissant votre disque intact. On continue ?
 }
 
@@ -363,10 +378,11 @@ message ftpsource
 le mot de passe prêt à l'emplois actuellement. Si l'utilisateur est ftp, alors
 le mot de passe n'est pas nécessaire.
 
-serveur:      %s
-répertoire:   %s
-utilisateur:  %s
-mot de passe:  }
+serveur:	%s
+répertoire:	%s
+utilisateur:	%s
+mot de passe:	%s
+}
 
 message host
 {serveur}
@@ -391,8 +407,8 @@ message nfssource
 les composants. Rappelez vous que le répertoire doit contenir les
 fichiers .tgz et qu'il doit être accessible par nfs.
 
-serveur:    %s
-répertoire: %s
+serveur:	%s
+répertoire:	%s
 }
 
 message nfsbadmount
@@ -403,8 +419,8 @@ message cdromsource
 contenant les composants. Rappelez vous que le répertoire doit contenir les
 fichiers .tgz .
 
-device:    %s
-répertoire: %s
+device:		%s
+répertoire:	%s
 }
 
 
@@ -413,16 +429,16 @@ message localfssource
 contenant les composants. Rappelez vous que le répertoire doit contenir les
 fichiers .tgz .
 
-device:               %s
-système de fichiers : %s
-répertoire:           %s
+device:			%s
+système de fichiers:	%s
+répertoire:		%s
 }
 
 message localdir
 {Entrez le répertoire local (déjà monté) ou se trouve la distribution.
 Rapellez vous que ce répertoire doit contenir les fichiers .tgz.
 
-Répertoie: %s
+Répertoire:	%s
 }
 
 message filesys
@@ -438,8 +454,8 @@ message badlocalsetdir
 {%s n'est pas un répertoire}
 
 message badsetdir
-{%s ne contient pas les composants indispensables base.tgz et kern.tgz.
-Etes-vous sur que c'est le bon répertoire ?}
+{%s ne contient pas les composants indispensables etc.tgz, base.tgz
+et kern.tgz.  Etes-vous sur que c'est le bon répertoire ?}
 
 message nonet
 {Je ne peux trouver aucune interface réseau utilisable par NetBSD. Vous allez
@@ -468,17 +484,23 @@ message net_domain
 message net_host
 {Votre nom de machine}
 
+message net_ip6autoconf
+{IPv6 autoconfiguration}
+
 message net_ip
-{Votre numéro IP}
+{Votre numéro IPv4}
 
 message net_mask
-{Votre masque de réseau (netmask)}
+{Votre masque de réseau (IPv4 netmask)}
+
+message net_namesrv6
+{L'adresse IPv6 de votre serveur de nom}
 
 message net_namesrv
-{L'adresse IP de votre serveur de nom}
+{L'adresse IPv4 de votre serveur de nom}
 
 message net_defroute
-{L'adresee IP de votre passerelle ("gateway")}
+{L'adresee IPv4 de votre passerelle ("gateway")}
 
 message net_media
 {Type de réseau (media)}
@@ -486,13 +508,15 @@ message net_media
 message netok
 {Vous avez spécifié les valeurs suivantes. Sont elles exactes?
 
-Domaine (DNS):              %s
-Nom de machine:             %s
-Adresse IP:                 %s
-Masque de réseau (Netmask): %s
-Adresse du serveur de noms: %s
-Adresse de la paserelle:    %s
-Type de réseau (media):     %s
+Domaine (DNS):			 %s 
+Nom de machine:			 %s 
+Adresse IP:			 %s 
+Masque de réseau (Netmask):	 %s 
+Adresse du serveur de noms:	 %s 
+Adresse de la paserelle:	 %s 
+Type de réseau (media):		 %s 
+Autoconfiguration IPv6:		 %s 
+Adresse du serveur de noms IPv6: %s 
 }
 
 message netagain
@@ -521,7 +545,7 @@ message distdir
 message verboseextract
 {Pendant la procédure d'extraction des fichiers, voulez vous voir leur
 nom apparaître au fur et à mesure qu'ils seront extraits ?
-} 
+}
 
 message badls
 {Impossible d'exécuter /bin/ls. Cette erreur n'aurait pas du arriver.
@@ -600,7 +624,7 @@ message createfstab
 }
 
 message noetcfstab
-{A l'aide! Il n'y a pas de /etc/fstab sur le disque cible %s.
+{A l'aide! Il n'y a pas de fichier /etc/fstab sur le disque cible %s.
 Arrêt de la mise à jour.
 }
 
@@ -670,19 +694,29 @@ disquette contenant ce fichier.
 
 message fdremount
 {La disquette n'a pas été montée correctement. Vous devez :
-    Réessayer en inserrant la disquette contenant le fichier %s.
-    Ne plus charger d'autre fichiers depuis la disquette et interrompre le 
-    processus
+
+Réessayer en inserrant la disquette contenant le fichier %s.
+
+Ne plus charger d'autre fichiers depuis la disquette et interrompre le
+processus
 }
 
 message mntnetconfig
-{Est ce que les informations réseau correspondent bien à cette machine en 
+{Est ce que les informations réseau correspondent bien à cette machine en
 utilisation normale et désirez vous l'enregistrer sous /etc ?}
 
 message cur_distsets
 {Vous trouverez ci dessous la liste des composants qui seront installées.
 
 }
+
+message cur_distsets_header
+{  Composant        Installe?
+------------------ ---------
+}
+
+message cur_distsets_row
+{%-18s %s\n}
 
 message tarerror
 {Il y a eu des erreurs lors de l'extraction du fichier %s.
@@ -725,7 +759,7 @@ la géométrie utilisée par le BIOS est %d cylindres %d secteurs %d têtes\n}
 
 message cmdfail
 {La commande
-        %s
+	%s
 ne s'est pas executée correctement. Impossible de continuer.}
 
 message noactivepart
@@ -736,3 +770,6 @@ message upgradeparttype
 {La seule partition disponible pour installer NetBSD est de l'ancien type
 NetBSD/386BSD/FreeBSD. Voulez-vous le changer pour le nouveau type
 dédié à NetBSD ?}
+
+message continue
+{Continuez?}

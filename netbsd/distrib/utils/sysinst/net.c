@@ -1,4 +1,4 @@
-/*	$NetBSD: net.c,v 1.38.2.4 1999/07/06 23:56:51 perry Exp $	*/
+/*	$NetBSD: net.c,v 1.58.2.4 2000/10/18 17:51:15 tv Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -45,6 +45,13 @@
 #include <time.h>
 #include <unistd.h>
 #include <sys/param.h>
+#include <sys/stat.h>
+#ifdef INET6
+#include <sys/sysctl.h>
+#endif
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include "defs.h"
 #include "md.h"
 #include "msg_defs.h"
@@ -66,6 +73,17 @@ static void get_ifinterface_info __P((void));
 
 static void write_etc_hosts(FILE *f);
 
+#define DHCLIENT_EX "/sbin/dhclient"
+#include <signal.h>
+static int config_dhcp __P((char *));
+static void get_command_out __P((char *, int, char *, char *));
+static void get_dhcp_value __P(( char *, char *));
+
+#ifdef INET6
+static int is_v6kernel __P((void));
+static void init_v6kernel __P((int));
+static int get_v6wait __P((void));
+#endif
 
 /*
  * URL encode unsafe characters.  See RFC 1738.
@@ -171,6 +189,8 @@ static const char *ignored_if_names[] = {
 	"eon",			/* netiso */
 	"gre",			/* net */
 	"ipip",			/* netinet */
+	"gif",			/* netinet6 */
+	"faith",		/* netinet6 */
 	"lo",			/* net */
 #if 0
 	"mdecap",		/* netinet -- never in IF list (?) XXX */
@@ -233,10 +253,12 @@ get_ifinterface_info()
 	int textsize;
 	char *t;
 	char hostname[MAXHOSTNAMELEN + 1];
+	int max_len;
+	char *dot;
 
 	/* First look to see if the selected interface is already configured. */
-	textsize = collect(T_OUTPUT, &textbuf, "/sbin/ifconfig %s 2>/dev/null",
-	    net_dev);
+	textsize = collect(T_OUTPUT, &textbuf,
+	    "/sbin/ifconfig %s inet 2>/dev/null", net_dev);
 	if (textsize >= 0) {
 		(void)strtok(textbuf, " \t\n"); /* ignore interface name */
 		while ((t = strtok(NULL, " \t\n")) != NULL) {
@@ -259,13 +281,107 @@ get_ifinterface_info()
 			}
 		}
 	}
+#ifdef INET6
+	textsize = collect(T_OUTPUT, &textbuf,
+	    "/sbin/ifconfig %s inet6 2>/dev/null", net_dev);
+	if (textsize >= 0) {
+		char *p;
+
+		(void)strtok(textbuf, "\n"); /* ignore first line */
+		while ((t = strtok(NULL, "\n")) != NULL) {
+			if (strncmp(t, "\tinet6 ", 7) != 0)
+				continue;
+			t += 7;
+			if (strstr(t, "tentative") || strstr(t, "duplicated"))
+				continue;
+			if (strncmp(t, "fe80:", 5) == 0)
+				continue;
+
+			p = t;
+			while (*p && *p != ' ' && *p != '\n')
+				p++;
+			*p = '\0';
+			strcpy(net_ip6, t);
+			break;
+		}
+	}
+#endif
 
 	/* Check host (and domain?) name */
 	if (gethostname(hostname, sizeof(hostname)) == 0) {
 		hostname[sizeof(hostname) - 1] = '\0';
-		strncpy(net_host, hostname, sizeof(net_host));
+		/* check for a . */
+		dot = strchr(hostname, '.');
+		if ( dot == NULL ) {
+			/* if not found its just a host, punt on domain */
+			strncpy(net_host, hostname, sizeof(net_host));
+		} else {
+			/* split hostname into host/domain parts */
+			max_len = dot - hostname;
+			max_len = (sizeof(net_host)<max_len)?sizeof(net_host):max_len;
+			*dot = '\0';
+			dot++;
+			strncpy(net_host, hostname, max_len);
+			max_len = strlen(dot);
+			max_len = (sizeof(net_host)<max_len)?sizeof(net_host):max_len;
+			strncpy(net_domain, dot, max_len);
+		}
 	}
 }
+
+#ifdef INET6
+static int
+is_v6kernel()
+{
+	int s;
+
+	s = socket(PF_INET6, SOCK_DGRAM, 0);
+	if (s < 0)
+		return 0;
+	else {
+		close(s);
+		return 1;
+	}
+}
+
+/*
+ * initialize as v6 client.
+ * we are sure that we will never become router with boot floppy :-)
+ * (include and use sysctl(8) if you are willing to)
+ */
+static void
+init_v6kernel(autoconf)
+	int autoconf;
+{
+	int v;
+	int mib[4] = {CTL_NET, PF_INET6, IPPROTO_IPV6, 0};
+
+	mib[3] = IPV6CTL_FORWARDING;
+	v = 0;
+	if (sysctl(mib, 4, NULL, NULL, (void *)&v, sizeof(v)) < 0)
+		; /* warn("sysctl(net.inet6.ip6.fowarding"); */
+
+	mib[3] = IPV6CTL_ACCEPT_RTADV;
+	v = autoconf ? 1 : 0;
+	if (sysctl(mib, 4, NULL, NULL, (void *)&v, sizeof(v)) < 0)
+		; /* warn("sysctl(net.inet6.ip6.accept_rtadv"); */
+}
+
+static int
+get_v6wait()
+{
+	long len = sizeof(int);
+	int v;
+	int mib[4] = {CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_DAD_COUNT};
+
+	len = sizeof(v);
+	if (sysctl(mib, 4, (void *)&v, (size_t *)&len, NULL, 0) < 0) {
+		/* warn("sysctl(net.inet6.ip6.dadcount)"); */
+		return 1;	/* guess */
+	}
+	return v;
+}
+#endif
 
 /*
  * Get the information to configure the network, configure it and
@@ -276,7 +392,7 @@ config_network()
 {	char *tp;
 	char defname[255];
 	int  octet0;
-	int  pass, needmedia;
+	int  pass, v6config, dhcp_config;
 
 	FILE *f;
 	time_t now;
@@ -313,16 +429,56 @@ config_network()
 	/* Remove that space we added. */
 	net_dev[strlen(net_dev) - 1] = 0;
 
+again:
+
+#ifdef INET6
+	v6config = 1;
+#else
+	v6config = 0;
+#endif
+
 	/* Preload any defaults we can find */
 	get_ifinterface_info();
 	pass = strlen(net_mask) == 0 ? 0 : 1;
-	needmedia = strlen(net_media) == 0 ? 0 : 1;
-	
-	/* Get other net information */
+
+	/* domain and host */
 	msg_display(MSG_netinfo);
-	do {
-		msg_prompt_add(MSG_net_domain, net_domain, net_domain, STRSIZE);
-		msg_prompt_add(MSG_net_host, net_host, net_host, STRSIZE);
+
+	/* ethernet medium */
+	if (strlen(net_media) == 0)
+		msg_prompt_add(MSG_net_media, net_media, net_media, STRSIZE);
+
+	/* try a dhcp configuration */
+	dhcp_config = config_dhcp(net_dev);
+	if (dhcp_config) {
+		net_dhcpconf |= DHCPCONF_IPADDR;
+
+		/* run route show and extract data */
+		get_command_out(net_defroute, AF_INET,
+		    "/sbin/route -n show -inet 2>/dev/null", "default");
+
+		/* pull nameserver info out of /etc/resolv.conf */
+		get_command_out(net_namesvr, AF_INET,
+		    "cat /etc/resolv.conf 2> /dev/null", "nameserver");
+		if (strlen(net_namesvr) != 0)
+			net_dhcpconf |= DHCPCONF_NAMESVR;
+
+		/* pull domainname out of leases file */
+		get_dhcp_value(net_domain, "domain-name");
+		if (strlen(net_domain) != 0)
+			net_dhcpconf |= DHCPCONF_DOMAIN;
+
+		/* pull hostname out of leases file */
+		get_dhcp_value(net_host, "hostname");
+		if (strlen(net_host) != 0)
+			net_dhcpconf |= DHCPCONF_HOST;
+	}
+
+	msg_prompt_add(MSG_net_domain, net_domain, net_domain, STRSIZE);
+	msg_prompt_add(MSG_net_host, net_host, net_host, STRSIZE);
+
+	if (!dhcp_config) {
+		/* Manually configure IPv4 */
 		msg_prompt_add(MSG_net_ip, net_ip, net_ip, STRSIZE);
 		octet0 = atoi(net_ip);
 		if (!pass) {
@@ -335,25 +491,62 @@ config_network()
 		}
 		msg_prompt_add(MSG_net_mask, net_mask, net_mask, STRSIZE);
 		msg_prompt_add(MSG_net_defroute, net_defroute, net_defroute,
-				STRSIZE);
+		    STRSIZE);
 		msg_prompt_add(MSG_net_namesrv, net_namesvr, net_namesvr,
-				STRSIZE);
-		if (needmedia)
-			msg_prompt_add(MSG_net_media, net_media, net_media,
-				       STRSIZE);
+		    STRSIZE);
+	}
 
-		msg_display(MSG_netok, net_domain, net_host, net_ip, net_mask,
-			     *net_namesvr == '\0' ? "<none>" : net_namesvr,
-			     *net_defroute == '\0' ? "<none>" : net_defroute,
-			     *net_media == '\0' ? "<default>" : net_media);
-		process_menu(MENU_yesno);
+#ifdef INET6
+	/* IPv6 autoconfiguration */
+	if (!is_v6kernel())
+		v6config = 0;
+	else if (v6config) {  /* dhcp config will disable this */
+		process_menu(MENU_ip6autoconf);
+		v6config = yesno ? 1 : 0;
+	}
+
+	if (v6config) {
+		process_menu(MENU_namesrv6);
 		if (!yesno)
-			msg_display(MSG_netagain);
-		pass++;
-	} while (!yesno);
+			msg_prompt_add(MSG_net_namesrv6, net_namesvr6,
+			    net_namesvr6, STRSIZE);
+	}
+#endif
+
+	/* confirm the setting */
+	msg_display(MSG_netok, net_domain, net_host,
+		     *net_ip == '\0' ? "<none>" : net_ip,
+		     *net_mask == '\0' ? "<none>" : net_mask,
+		     *net_namesvr == '\0' ? "<none>" : net_namesvr,
+		     *net_defroute == '\0' ? "<none>" : net_defroute,
+		     *net_media == '\0' ? "<default>" : net_media,
+#ifdef INET6
+		     !is_v6kernel() ? "<not supported>" :
+			(v6config ? "yes" : "no"),
+		     *net_namesvr6 == '\0' ? "<none>" : net_namesvr6
+#else
+		     "<not supported>",
+		     "<not supported>"
+#endif
+		     );
+	process_menu(MENU_yesno);
+	if (!yesno)
+		msg_display(MSG_netagain);
+	pass++;
+	if (!yesno)
+		goto again;
+
+	/*
+	 * we may want to perform checks against inconsistent configuration,
+	 * like IPv4 DNS server without IPv4 configuration.
+	 */
 
 	/* Create /etc/resolv.conf if a nameserver was given */
-	if (strcmp(net_namesvr, "") != 0) {
+	if (strcmp(net_namesvr, "") != 0
+#ifdef INET6
+	 || strcmp(net_namesvr6, "") != 0
+#endif
+		) {
 #ifdef DEBUG
 		f = fopen("/tmp/resolv.conf", "w");
 #else
@@ -371,21 +564,31 @@ config_network()
 		/* NB: ctime() returns a string ending in  '\n' */
 		(void)fprintf(f, ";\n; BIND data file\n; %s %s;\n", 
 		    "Created by NetBSD sysinst on", ctime(&now)); 
-		(void)fprintf (f,
-		    "nameserver %s\nlookup file bind\nsearch %s\n",
-		    net_namesvr, net_domain);
+		if (strcmp(net_namesvr, "") != 0)
+			(void)fprintf(f, "nameserver %s\n", net_namesvr);
+#ifdef INET6
+		if (strcmp(net_namesvr6, "") != 0)
+			(void)fprintf(f, "nameserver %s\n", net_namesvr6);
+#endif
+		(void)fprintf(f, "search %s\n", net_domain);
 		if (scripting) {
 			(void)fprintf(script, ";\n; BIND data file\n; %s %s;\n", 
 			    "Created by NetBSD sysinst on", ctime(&now)); 
-			(void)fprintf (script,
-			    "nameserver %s\nlookup file bind\nsearch %s\n",
-			    net_namesvr, net_domain);
+			if (strcmp(net_namesvr, "") != 0)
+				(void)fprintf(script, "nameserver %s\n",
+				    net_namesvr);
+#ifdef INET6
+			if (strcmp(net_namesvr6, "") != 0)
+				(void)fprintf(script, "nameserver %s\n",
+				    net_namesvr6);
+#endif
+			(void)fprintf(script, "search %s\n", net_domain);
 		}
 		fflush(NULL);
 		fclose(f);
 	}
 
-	run_prog(0, 0, NULL, "/sbin/ifconfig lo0 127.0.0.1");
+	run_prog(0, NULL, "/sbin/ifconfig lo0 127.0.0.1");
 
 	/*
 	 * ifconfig does not allow media specifiers on IFM_MANUAL interfaces.
@@ -405,13 +608,29 @@ config_network()
 	}
 
 	if (*net_media != '\0')
-		run_prog(0, 0, NULL,
-		    "/sbin/ifconfig %s inet %s netmask %s media %s",
-			  net_dev, net_ip, net_mask, net_media);
-	else
-		run_prog(0, 0, NULL, 
-		    "/sbin/ifconfig %s inet %s netmask %s", net_dev,
-			  net_ip, net_mask);
+		run_prog(0, NULL, "/sbin/ifconfig %s media %s",
+		    net_dev, net_media);
+
+#ifdef INET6
+	if (v6config) {
+		init_v6kernel(1);
+		run_prog(0, NULL, "/sbin/ifconfig %s up", net_dev);
+		sleep(get_v6wait() + 1);
+		run_prog(RUN_DISPLAY, NULL, "/sbin/rtsol -D %s", net_dev);
+		sleep(get_v6wait() + 1);
+	}
+#endif
+
+	if (strcmp(net_ip, "") != 0) {
+		if (strcmp(net_mask, "") != 0) {
+			run_prog(0, NULL, 
+			    "/sbin/ifconfig %s inet %s netmask %s",
+			    net_dev, net_ip, net_mask);
+		} else {
+			run_prog(0, NULL, 
+			    "/sbin/ifconfig %s inet %s", net_dev, net_ip);
+		}
+	}
 
 	/* Set host name */
 	if (strcmp(net_host, "") != 0)
@@ -419,9 +638,9 @@ config_network()
 
 	/* Set a default route if one was given */
 	if (strcmp(net_defroute, "") != 0) {
-		run_prog(0, 0, NULL, 
-		    "/sbin/route -n flush");
-		run_prog(0, 0, NULL, 
+		run_prog(0, NULL, 
+		    "/sbin/route -n flush -inet");
+		run_prog(0, NULL, 
 		    "/sbin/route -n add default %s",
 			  net_defroute);
 	}
@@ -431,13 +650,24 @@ config_network()
 	 * of a network failure.
 	 */
 
+#ifdef INET6
+	if (v6config && network_up) {
+		network_up = !run_prog(0, NULL, 
+		    "/sbin/ping6 -v -c 3 -n -I %s ff02::2", net_dev);
+
+		if (strcmp(net_namesvr6, "") != 0)
+			network_up = !run_prog(RUN_DISPLAY, NULL, 
+			    "/sbin/ping6 -v -c 3 -n %s", net_namesvr6);
+	}
+#endif
+
 	if (strcmp(net_namesvr, "") != 0 && network_up)
-		network_up = !run_prog(0, 1, NULL, 
+		network_up = !run_prog(0, NULL, 
 		    "/sbin/ping -v -c 5 -w 5 -o -n %s",
 					net_namesvr);
 
 	if (strcmp(net_defroute, "") != 0 && network_up)
-		network_up = !run_prog(0, 1, NULL, 
+		network_up = !run_prog(0, NULL, 
 		    "/sbin/ping -v -c 5 -w 5 -o -n %s",
 					net_defroute);
 	fflush(NULL);
@@ -492,14 +722,14 @@ get_via_ftp()
 		 * unsafe by a strict reading of RFC 1738).
 		 */
 		if (strcmp ("ftp", ftp_user) == 0)
-			ret = run_prog(0, 1, NULL, 
+			ret = run_prog(RUN_DISPLAY, NULL, 
 			    "/usr/bin/ftp -a ftp://%s/%s/%s",
 			    ftp_host,
 			    url_encode(ftp_dir_encoded, ftp_dir, STRSIZE,
 					RFC1738_SAFE_LESS_SHELL_PLUS_SLASH, 1),
 			    filename);
 		else {
-			ret = run_prog(0, 1, NULL, 
+			ret = run_prog(RUN_DISPLAY, NULL, 
 			    "/usr/bin/ftp ftp://%s:%s@%s/%s/%s",
 			    url_encode(ftp_user_encoded, ftp_user, STRSIZE,
 					RFC1738_SAFE_LESS_SHELL, 0),
@@ -515,6 +745,7 @@ get_via_ftp()
 			msg_display(MSG_ftperror_cont);
 			getchar();
 			puts(CL);		/* XXX */
+			touchwin(stdscr);
 			wclear(stdscr);
 			wrefresh(stdscr);
 			msg_display(MSG_ftperror);
@@ -528,6 +759,7 @@ get_via_ftp()
 
 	}
 	puts(CL);		/* XXX */
+	touchwin(stdscr);
 	wclear(stdscr);
 	wrefresh(stdscr);
 #ifndef DEBUG
@@ -554,11 +786,11 @@ get_via_nfs()
 	process_menu(MENU_nfssource);
 again:
 
-	run_prog(0, 0, NULL, 
+	run_prog(0, NULL, 
 	    "/sbin/umount /mnt2");
 	
 	/* Mount it */
-	if (run_prog(0, 0, NULL, 
+	if (run_prog(0, NULL, 
 	    "/sbin/mount -r -o -i,-r=1024 -t nfs %s:%s /mnt2",
 	    nfs_host, nfs_dir)) {
 		msg_display(MSG_nfsbadmount, nfs_host, nfs_dir);
@@ -626,67 +858,200 @@ mnt_net_config(void)
 	char ifconfig_fn [STRSIZE];
 	FILE *f;
 
-	if (network_up) {
-		msg_prompt(MSG_mntnetconfig, ans, ans, 5);
-		if (*ans == 'y') {
+	if (!network_up)
+		return;
+	msg_prompt(MSG_mntnetconfig, ans, ans, 5);
+	if (*ans != 'y')
+		return;
 
-			/* Write hostname to /etc/myname */
-		        f = target_fopen("/etc/myname", "w");
-			if (f != 0) {
-			  	(void)fprintf(f, "%s\n", net_host);
-				if (scripting)
-				  	(void)fprintf(script, "echo \"%s\" >%s/etc/myname\n", net_host, target_prefix());
-				(void)fclose(f);
+	/* Write hostname to /etc/myname */
+	if ((net_dhcpconf & DHCPCONF_HOST) == 0) {
+		f = target_fopen("/etc/myname", "w");
+		if (f != 0) {
+			(void)fprintf(f, "%s\n", net_host);
+			if (scripting) {
+				(void)fprintf(script,
+				    "echo \"%s\" >%s/etc/myname\n",
+				    net_host, target_prefix());
 			}
-
-			/* If not running in target, copy resolv.conf there. */
-			if (strcmp(net_namesvr, "") != 0)
-				dup_file_into_target("/etc/resolv.conf");
-			/* 
-			 * Add IPaddr/hostname to  /etc/hosts.
-			 * Be careful not to clobber any existing contents.
-			 * Relies on ordered seach of /etc/hosts. XXX YP?
-			 */
-			f = target_fopen("/etc/hosts", "a");
-			if (f != 0) {
-				write_etc_hosts(f);
-				(void)fclose(f);
-				if (scripting) {
-					(void)fprintf(script, "cat <<EOF >>%s/etc/hosts\n", target_prefix());
-					write_etc_hosts(script);
-					(void)fprintf(script, "EOF\n");
-				}
-			}
-
-			/* Write IPaddr and netmask to /etc/ifconfig.if[0-9] */
-			snprintf(ifconfig_fn, STRSIZE, "/etc/ifconfig.%s",
-			    net_dev);
-			f = target_fopen(ifconfig_fn, "w");
-			if (f != 0) {
-				if (*net_media != '\0') {
-					fprintf(f, "%s netmask %s media %s\n",
-						net_ip, net_mask, net_media);
-					if (scripting)
-						fprintf(script, "echo \"%s netmask %s media %s\">%s%s\n",
-							net_ip, net_mask, net_media, target_prefix(), ifconfig_fn);
-				} else {
-					fprintf(f, "%s netmask %s\n",
-						net_ip, net_mask);
-					if (scripting)
-						fprintf(script, "echo \"%s netmask %s\">%s%s\n",
-							net_ip, net_mask, target_prefix(), ifconfig_fn);
-				}
-				fclose(f);
-			}
-
-			f = target_fopen("/etc/mygate", "w");
-			if (f != 0) {
-				fprintf(f, "%s\n", net_defroute);
-				if (scripting)
-					fprintf(script, "echo \"%s\" >%s/etc/mygate\n", net_defroute, target_prefix());
-				fclose(f);
-			}
-			fflush(NULL);
+			(void)fclose(f);
 		}
 	}
+
+	/* If not running in target, copy resolv.conf there. */
+	if ((net_dhcpconf & DHCPCONF_NAMESVR) == 0) {
+		if (strcmp(net_namesvr, "") != 0)
+			dup_file_into_target("/etc/resolv.conf");
+	}
+
+	if ((net_dhcpconf & DHCPCONF_IPADDR) == 0) {
+		/* 
+		 * Add IPaddr/hostname to  /etc/hosts.
+		 * Be careful not to clobber any existing contents.
+		 * Relies on ordered seach of /etc/hosts. XXX YP?
+		 */
+		f = target_fopen("/etc/hosts", "a");
+		if (f != 0) {
+			write_etc_hosts(f);
+			(void)fclose(f);
+			if (scripting) {
+				(void)fprintf(script,
+				    "cat <<EOF >>%s/etc/hosts\n",
+				    target_prefix());
+				write_etc_hosts(script);
+				(void)fprintf(script, "EOF\n");
+			}
+		}
+
+		/* Write IPaddr and netmask to /etc/ifconfig.if[0-9] */
+		snprintf(ifconfig_fn, STRSIZE, "/etc/ifconfig.%s",
+		    net_dev);
+		f = target_fopen(ifconfig_fn, "w");
+		if (f != 0) {
+			if (*net_media != '\0') {
+				fprintf(f, "%s netmask %s media %s\n",
+					net_ip, net_mask, net_media);
+				if (scripting) {
+					fprintf(script,
+					    "echo \"%s netmask %s media %s\">%s%s\n",
+					    net_ip, net_mask, net_media,
+					    target_prefix(), ifconfig_fn);
+				}
+			} else {
+				fprintf(f, "%s netmask %s\n",
+					net_ip, net_mask);
+				if (scripting) {
+					fprintf(script,
+					    "echo \"%s netmask %s\">%s%s\n",
+					    net_ip, net_mask, target_prefix(),
+					    ifconfig_fn);
+				}
+			}
+			fclose(f);
+		}
+
+		f = target_fopen("/etc/mygate", "w");
+		if (f != 0) {
+			fprintf(f, "%s\n", net_defroute);
+			if (scripting) {
+				fprintf(script,
+				    "echo \"%s\" >%s/etc/mygate\n",
+				    net_defroute, target_prefix());
+			}
+			fclose(f);
+		}
+	}
+
+	fflush(NULL);
+}
+
+int
+config_dhcp(inter)
+char *inter;
+{
+	int dhcpautoconf;
+	int result;
+	char *textbuf;
+	int pid;
+
+	/* check if dhclient is running, if so, kill it */
+	result = collect(T_FILE, &textbuf, "/tmp/dhclient.pid");
+	if (result >=0) {
+		pid = atoi(textbuf);
+		if (pid > 0) {
+			kill(pid,15);
+			sleep(1);
+			kill(pid,9);
+		}
+	}
+
+	if (!file_mode_match(DHCLIENT_EX, S_IFREG))
+		return 0;
+	process_menu(MENU_dhcpautoconf);
+	if (yesno) {
+		/* spawn off dhclient and wait for parent to exit */
+		dhcpautoconf = run_prog(RUN_DISPLAY, NULL, "%s -pf /tmp/dhclient.pid -lf /tmp/dhclient.leases %s", DHCLIENT_EX,inter);
+		return dhcpautoconf?0:1;
+	}
+	return 0;
+}
+
+static void
+get_command_out(targ, af, command, search)
+char *targ;
+int af;
+char *command;
+char *search;
+{
+	int textsize;
+	char *textbuf;
+	char *t;
+#ifndef INET6
+	struct in_addr in;
+#else
+	struct in6_addr in;
+#endif
+
+	textsize = collect(T_OUTPUT, &textbuf, command);
+	if (textsize < 0) {
+		if (logging)
+			(void)fprintf(log, "Aborting: Could not run %s.\n", command);
+		(void)fprintf(stderr, "Could not run ifconfig.");
+		exit(1);
+	}
+	if (textsize >= 0) {
+		(void)strtok(textbuf, " \t\n"); /* ignore interface name */
+		while ((t = strtok(NULL, " \t\n")) != NULL) {
+			if (strcmp(t, search) == 0) {
+				t = strtok(NULL, " \t\n");
+				if (inet_pton(af, t, &in) == 1 &&
+				    strcmp(t, "0.0.0.0") != 0) {
+					strcpy(targ, t);
+				}
+			}
+		}
+	}
+	return;
+}
+
+static void
+get_dhcp_value(targ, line)
+char *targ;
+char *line;
+{
+	int textsize;
+	char *textbuf;
+	char *t;
+	char *walk;
+
+	textsize = collect(T_FILE, &textbuf, "/tmp/dhclient.leases");
+	if (textsize < 0) {
+		if (logging)
+			(void)fprintf(log, "Could not open file /tmp/dhclient.leases.\n");
+		(void)fprintf(stderr, "Could not open /tmp/dhclient.leases\n");
+		/* not fatal, just assume value not found */
+	}
+	if (textsize >= 0) {
+		(void)strtok(textbuf, " \t\n"); /* jump past 'lease' */
+		while ((t=strtok(NULL, " \t\n")) !=NULL) {
+			if (strcmp(t, line) == 0) {
+				t = strtok(NULL, " \t\n");
+				/* found the tag, extract the value */
+				/* last char should be a ';' */
+				walk = strrchr(t,';');
+				if (walk != NULL ) {
+					*walk = '\0';
+				}
+				/* strip any " from the string */
+				walk = strrchr(t,'"');
+				if (walk != NULL ) {
+					*walk = '\0';
+					t++;
+				}
+				strcpy(targ, t);
+				return;
+			}
+		}
+	}
+	return;
 }

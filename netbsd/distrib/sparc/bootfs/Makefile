@@ -1,11 +1,21 @@
-#	$NetBSD: Makefile,v 1.10.2.1 1999/04/08 21:18:03 pk Exp $
+#	$NetBSD: Makefile,v 1.21.2.2 2000/11/01 03:09:20 tv Exp $
+#
+# boot.fs is the image for disk 1 of the two-set floppy based installation
+# method.
+#
+# It is constructed by injecting the microroot filesystem `ramdisk.fs'
+# into the md based kernel built from the INSTALL kernel configuration file.
+#
 
 TOP=		${.CURDIR}/..
 MINIROOT=	${.CURDIR}/../../miniroot
 
 .include "${TOP}/Makefile.inc"
 
-KERN=		${TOP}/../../sys/arch/sparc/compile/INSTALL/netbsd
+.include <bsd.own.mk>	# So we use /etc/mk.conf.
+.include <bsd.kernobj.mk>
+
+KERN?=		${KERNOBJDIR}/INSTALL/netbsd
 
 MOUNT_POINT?=	/mnt
 VND?=		vnd0
@@ -15,15 +25,13 @@ VND_CDEV=	/dev/${VND}c
 VND_CRDEV=	/dev/r${VND}c
 FD?=		fd0
 FD_RDEV=	/dev/r${FD}a
-IMAGE?=		boot-${REV}.fs
+IMAGE?=		boot.fs
 MDEC=		${DESTDIR}/usr/mdec
 
 LISTS=		${.CURDIR}/list
 RAMDISK!=	cd ${TOP}/ramdisk/; \
-		printf "xxx: .MAKE\n\t@echo \$${.OBJDIR}/ramdisk-${REV}.fs\n" |\
+		printf "xxx: .MAKE\n\t@echo \$${.OBJDIR}/ramdisk.fs\n" |\
 		${MAKE} -s -f-
-
-DISKTYPE=	floppy
 
 # Some reasonable values for the -i parameter to newfs are:
 #
@@ -32,23 +40,27 @@ DISKTYPE=	floppy
 # 204800	1167k,  29 inodes free
 INO_BYTES=	204800
 
-CLEANFILES+=	netbsd.ram.gz netbsd.tmp
+BLOCKSIZE=512
+FSSIZE!= expr ${BLOCKSIZE} \* 18 \* 2 \* 80
 
-all:	netbsd.ram.gz
-	dd if=/dev/zero of=${IMAGE} bs=1440k count=1
-	vnconfig -t ${DISKTYPE} -v -c ${VND_CDEV} ${IMAGE}
-	disklabel -rw ${VND_CDEV} ${DISKTYPE}
-	disklabel -W ${VND_CDEV}
+GEOM=${BLOCKSIZE}/18/2/80
+
+CLEANFILES+=	netbsd.ram netbsd.ram.aout netbsd.tmp
+
+.MAIN: all
+
+all:	netbsd.ram netbsd.ram.aout
+	dd if=/dev/zero of=${IMAGE} bs=${FSSIZE} count=1
+	vnconfig -v -c ${VND_CDEV} ${IMAGE} ${GEOM}
 	newfs -B be -m 0 -o space -i ${INO_BYTES} -c 80 ${VND_RDEV}
 	mount ${VND_DEV} ${MOUNT_POINT}
-	TOPDIR=${TOP} CURDIR=${MINIROOT} OBJDIR=${.OBJDIR} \
-	    TARGDIR=${MOUNT_POINT} sh ${MINIROOT}/runlist.sh ${LISTS}
+	gzip -9 < netbsd.ram > ${MOUNT_POINT}/netbsd
 	@echo ""
 	@df -i ${MOUNT_POINT}
 	@echo ""
 	@echo "installing new bootblocks"
 	-rm -f ${MOUNT_POINT}/boot
-	/usr/mdec/binstall -v ffs ${MOUNT_POINT}
+	${MDEC}/binstall -m ${MDEC} -v ffs ${MOUNT_POINT}
 	umount ${MOUNT_POINT}
 	vnconfig -u ${VND_CDEV}
 
@@ -56,11 +68,21 @@ unconfig:
 	-umount -f ${MOUNT_POINT}
 	-vnconfig -u ${VND_DEV}
 
-netbsd.ram.gz: ${KERN} ${RAMDISK}
+netbsd.ram: ${KERN} ${RAMDISK}
 	cp ${KERN} netbsd.tmp
 	mdsetimage -v netbsd.tmp ${RAMDISK}
-	gzip netbsd.tmp
-	mv netbsd.tmp.gz ${.TARGET}
+	strip netbsd.tmp
+	mv netbsd.tmp ${.TARGET}
+
+
+# conjure up a magic header that is accepted by all Sun PROMS;
+# see sys/arch/sparc/stand/installboot/installboot.c for details.
+SUN_MAGIC_HEADER='\01\03\01\07\060\200\0\07\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0'
+
+netbsd.ram.aout: netbsd.ram
+	objcopy -O binary ${.ALLSRC} netbsd.ram.raw
+	(printf ${SUN_MAGIC_HEADER}; cat netbsd.ram.raw)  > ${.TARGET}
+	rm -f netbsd.ram.raw
 
 clean cleandir distclean:
 	/bin/rm -f *.core ${IMAGE} ${CLEANFILES}
@@ -69,5 +91,17 @@ depend install:
 
 real-floppy:
 	dd if=${IMAGE} of=${FD_RDEV} bs=32k
+
+.ifndef RELEASEDIR
+release:
+	@echo setenv RELEASEDIR first
+	@false
+.else
+release: $(IMAGE)
+	gzip -c -9 < $(.OBJDIR)/boot.fs \
+		> $(RELEASEDIR)/installation/bootfs/boot.fs.gz
+	gzip -c -9 < $(.OBJDIR)/netbsd.ram.aout \
+		> $(RELEASEDIR)/installation/bootfs/netbsd.ram.aout.gz
+.endif	# RELEASEDIR check
 
 .include <bsd.obj.mk>

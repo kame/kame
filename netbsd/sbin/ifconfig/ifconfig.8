@@ -1,4 +1,4 @@
-.\"	$NetBSD: ifconfig.8,v 1.32.4.7 2000/08/13 17:52:42 wiz Exp $
+.\"	$NetBSD: ifconfig.8,v 1.32.4.10 2001/05/01 11:07:30 he Exp $
 .\"
 .\" Copyright (c) 1983, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -48,13 +48,11 @@
 .Oc
 .Op Ar parameters
 .Nm ""
-.Op Fl A
 .Op Fl mL
 .Ar interface
 .Op Ar protocol_family
 .Nm ""
 .Fl a
-.Op Fl A
 .Op Fl mL
 .Op Fl b
 .Op Fl d
@@ -70,6 +68,8 @@
 .Nm ""
 .Fl s
 .Ar interface
+.Nm ""
+.Fl C
 .Sh DESCRIPTION
 .Nm
 is used to assign an address
@@ -343,6 +343,10 @@ IPv4/IPv6 header.
 Unconfigure the physical source and destination address for IP tunnel
 interfaces previously configured with
 .Cm tunnel .
+.It Cm create
+Create the specified network pseudo-device.
+.It Cm destroy
+Destroy the specified network pseudo-device.
 .It Cm pltime Ar n
 (inet6 only)
 Set preferred lifetime for the address.
@@ -373,6 +377,46 @@ This may be used to enable an interface after an ``ifconfig down.''
 It happens automatically when setting the first address on an interface.
 If the interface was reset when previously marked down,
 the hardware will be re-initialized.
+.It Cm vlan Ar tag
+If the interface is a
+.Xr vlan 4
+pseudo-interface, set the VLAN tag to
+.Ar tag .
+This is a 16-bit number which is used to create an 802.1Q VLAN header for
+packets sent from the
+.Xr vlan 4
+interface.  Note that
+.Cm vlan
+and
+.Cm vlanif
+must be set at the same time.
+.It Cm vlanif Ar iface
+If the interface is a
+.Xr vlan 4
+pseudo-interface, associate the physical interface
+.Ar iface
+with it.  Packets transmitted through the 
+.Xr vlan 4
+interface will be diverted to the specified physical interface
+.Ar iface
+with 802.1Q VLAN encapsulation.  Packets with 802.1Q encapsulation received
+by the physical interface with the correct VLAN tag will be diverted to the 
+associated
+.Xr vlan 4
+pseudo-interface.  The VLAN interface is assigned a copy of the physical
+interface's flags and
+.Tn Ethernet
+address.
+If the
+.Xr vlan 4
+interface already has a physical interface associated with it, this command
+will fail.  To change the association to another physical interface, the
+existing association must be cleared first.
+Note that
+.Cm vlanif
+and
+.Cm vlan
+must be set at the same time.
 .It Cm vltime Ar n
 (inet6 only)
 Set valid lifetime for the address.
@@ -422,11 +466,6 @@ limits this to broadcast interfaces, and
 .Fl s
 omits interfaces which appear not to be connected to a network.
 .Pp
-If the
-.Fl A
-flag is also specified, any relevant interface alias information is also
-displayed.
-.Pp
 The
 .Fl l
 flag may be used to list all available interfaces on the system, with
@@ -440,6 +479,12 @@ with all other flags and commands, except for
 (only list interfaces that may be connected),
 .Fl b
 (only list broadcast interfaces).
+.Pp
+The
+.Fl C
+flag may be used to list all of the interface cloners available on
+the system, with no additional information.  Use of this flag is
+mutually exclusive with all other flags and commands.
 .Pp
 Only the super-user may modify the configuration of a network interface.
 .Sh DIAGNOSTICS

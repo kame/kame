@@ -1,4 +1,4 @@
-/*	$NetBSD: md.h,v 1.6.2.1 1999/06/24 22:52:44 cgd Exp $	*/
+/*	$NetBSD: md.h,v 1.9.4.1 2000/08/31 15:16:46 minoura Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.

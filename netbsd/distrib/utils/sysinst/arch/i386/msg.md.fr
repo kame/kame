@@ -1,4 +1,4 @@
-/*	$NetBSD: msg.md.fr,v 1.5.2.4 1999/06/24 22:51:32 cgd Exp $	*/
+/*	$NetBSD: msg.md.fr,v 1.14 2000/05/11 02:27:25 hubertf Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -25,13 +25,13 @@
  * THIS SOFTWARE IS PROVIDED BY PIERMONT INFORMATION SYSTEMS INC. ``AS IS''
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL PIERMONT INFORMATION SYSTEMS INC. BE 
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
+ * ARE DISCLAIMED. IN NO EVENT SHALL PIERMONT INFORMATION SYSTEMS INC. BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF 
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
@@ -64,12 +64,24 @@ message dlgeom
 {Votre disque a déjà un label BSD. Ce label montre une géométrie différente
 de la géométrie réelle du disque. Les deux géométrie sont :
 
-disklabel:   %d cylindres, %d têtes, %d secteurs
-géom réelle: %d cylindres, %d têtes, %d secteurs
+disklabel:	%d cylindres, %d têtes, %d secteurs 
+géom réelle:	%d cylindres, %d têtes, %d secteurs 
 }
 
-message part_head
-{Part Début(%s)  Taille(%s)      Fin(%s) Type\n}
+/* the %s's will expand into three character strings */
+message part_header
+{   Début(%3s) Taille(%3s) Fin(%3s)   Type
+   ---------- ----------- ---------- ----
+}
+
+message part_row_start_unused
+{%-1d:                                  }
+
+message part_row_start_used
+{%-1d: %-10d %-11d %-10d}
+
+message part_row_end
+{ %s\n}
 
 message setbiosgeom
 {On va vous demander la géométrie. SVP entrer les valeur que vous désirez.
@@ -193,12 +205,28 @@ en dessous de cette limite. Vous pouvez: }
 message onebiosmatch
 {Ce disque correspond au disque du BIOS suivant:
 
-BIOS #  cylinders  heads  sectors\n}
+}
+
+message onebiosmatch_header
+{BIOS # cylinders  heads   sectors
+------ ---------- ------- -------
+}
+
+message onebiosmatch_row
+{%-6x %-10d %-7d %-10d\n}
 
 message biosmultmatch
 {Ce disque correspond aux disques du BIOS suivants:
 
-  BIOS #  cylinders  heads  sectors\n}
+}
+
+message biosmultmatch_header
+{   BIOS # cylinders  heads   sectors
+   ------ ---------- ------- -------
+}
+
+message biosmultmatch_row
+{%-1d: %-6x %-10d %-7d %d\n}
 
 message pickdisk
 {Choisissez un disque: }
@@ -229,7 +257,7 @@ le programme d'amorcage existant, comme un selecteur de boot.}
 message configbootsel
 {Configurez les differents choix du selecteur de boot. Vous pouvez changer
 le menu proposé pour chaque partition lorsque le système demarre.
-Vous pouvez également préciser le choix par defaut et le temps d'attente.
+Vous pouvez également préciser le choix par defaut et le temps d'attente.\n
 }
 
 message bootseltimeout
@@ -239,7 +267,7 @@ message defbootselopt
 {Action par defaut: }
 
 message defbootseloptactive
-{Démarrer la première partition active.}
+{Démarrer la première partition active.\n}
 
 message defbootseloptpart
 {Démarrer depuis la partition %d.\n}
@@ -253,5 +281,10 @@ message bootselitemname
 message bootseltimeoutval
 {Temps d'attente en secondes (0-3600)}
 
-message bootselheader
-{Numéro      Type                                 Nom\n}
+message bootsel_header
+{Numéro Type                             Nom
+------ -------------------------------- ---
+}
+
+message bootsel_row
+{%-6d %-32s %s\n}

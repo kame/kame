@@ -1,4 +1,4 @@
-/*	$NetBSD: opendir.c,v 1.1.2.1 1999/06/21 13:38:00 perry Exp $	*/
+/*	$NetBSD: opendir.c,v 1.2 1999/05/23 22:08:17 gwr Exp $	*/
 
 /*
  * Copyright (c) 1983, 1993

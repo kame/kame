@@ -1,26 +1,31 @@
-#	$NetBSD: Makefile.inc,v 1.4.2.1 1999/04/29 20:14:55 perry Exp $
+#	$NetBSD: Makefile.inc,v 1.11.4.2 2000/11/01 03:44:33 tv Exp $
+#
 
 # Ross Harvey <ross@netbsd.org>
+
+.include <bsd.obj.mk>	# So we get /etc/mk.conf vars.
 
 M?=	${.CURDIR:T}
 V!=	/bin/sh ${.CURDIR}/../../../sys/conf/osrelease.sh
 V_S!=	/bin/sh ${.CURDIR}/../../../sys/conf/osrelease.sh -s
 
-MAIN=	${.CURDIR}/../common/main ${EXTRA}
+MAIN=	${.CURDIR}/../common/main ${.CURDIR}/../common/macros ${EXTRA}
 TARG=	INSTALL
 TARGS=	${TARG}.ps ${TARG}.txt ${TARG}.html ${TARG}.more
-SRCS=	${MAIN} mirrors whatis contents hardware xfer prep install\
+SRCS=	${MAIN} whatis contents hardware xfer prep install\
 	upgrade donations legal.common legal postinstall ../Makefile.inc\
 	${MERGED_SRCS}
+ICMD=	${INSTALL} ${RENAME} ${PRESERVE} ${COPY}	\
+	-o root -g wheel -m ${NONBINMODE} 
 
-PRESET=	${GFLAGS} -dV=$V -dV_S=${V_S} -dMACHINE=$M -d.CURDIR=${.CURDIR} -r$M=1 
+PRESET=	${GFLAGS} -dM=${M} -dV=${V} -d.CURDIR=${.CURDIR} -r${M}=1
 
-POST_PLAIN= -P-b -P-u -P-o -Tascii
+POST_PLAIN= -P-b -P-u -P-o
 
 ARGS_PS=	${PRESET} -dformat=PostScript
-ARGS_TXT=	${PRESET} -dformat=ASCII ${POST_PLAIN}
-ARGS_HTML=	${PRESET} -dformat=HTML  ${POST_PLAIN} -ww
-ARGS_MORE=	${PRESET} -dformat=more -P-h -Tascii
+ARGS_TXT=	${PRESET} -dformat=ASCII ${POST_PLAIN} -Tascii -mtty-char
+ARGS_HTML=	${PRESET} -dformat=HTML ${POST_PLAIN} -Tlatin1 -ww
+ARGS_MORE=	${PRESET} -dformat=more -P-h -Tascii -mtty-char
 
 #
 # For example...
@@ -38,6 +43,9 @@ all: ${TARG}.$i
 ${TARG}.ps: ${SRCS}
 	groff ${ARGS_PS}   -mdoc      ${MAIN} > $@
 
+${TARG}.pdf: ${TARG}.ps
+	ps2pdf ${TARG}.ps $@
+
 ${TARG}.txt: ${SRCS}
 	groff ${ARGS_TXT}  -mdoc      ${MAIN} > $@
 
@@ -52,6 +60,17 @@ echosrcs! ${SRCS}
 
 echomore!
 	@echo ${.OBJDIR}/${TARG}.more
+
+.ifndef RELEASEDIR
+release:
+	@echo setenv RELEASEDIR first
+	@false
+.else
+release:
+.for i in ${TARGS}
+	${ICMD} ${i} ${RELEASEDIR}/.
+.endfor
+.endif
 
 .PATH: ${.CURDIR}/../common
 

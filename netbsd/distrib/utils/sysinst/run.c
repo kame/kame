@@ -1,4 +1,4 @@
-/*	$NetBSD: run.c,v 1.11.2.3 1999/07/15 03:04:43 perry Exp $	*/
+/*	$NetBSD: run.c,v 1.30.4.2 2000/10/18 17:51:15 tv Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -67,15 +67,13 @@
 #define Xsystem(y) system(y)
 #endif
 
-extern int errno;
-
 /*
  * local prototypes 
  */
-char* va_prog_cmdstr __P((char *cmd, va_list ap));
-int launch_subwin __P((WINDOW *actionwin, char **args, struct winsize win, int display));
-int log_flip __P((void));
-int script_flip __P((void));
+char* va_prog_cmdstr __P((const char *cmd, va_list ap));
+int launch_subwin __P((WINDOW *actionwin, char **args, struct winsize *win, int display));
+int log_flip __P((menudesc *));
+int script_flip __P((menudesc *));
 
 #define BUFSIZE 4096
 
@@ -105,7 +103,7 @@ do_logging(void)
 }
 
 int
-log_flip(void)
+log_flip(menudesc *m)
 {
 	time_t tloc;
 
@@ -117,17 +115,21 @@ log_flip(void)
 		fflush(log);
 		fclose(log);
 	} else {
-		sprintf(log_text[0], "Logging: On");
-		logging = 1;
 		log = fopen("sysinst.log", "a");
-		fprintf(log, "Log started at: %s\n", asctime(localtime(&tloc)));
-		fflush(log);		
+		if (log != NULL) {
+			sprintf(log_text[0], "Logging: On");
+			logging = 1;
+			fprintf(log, "Log started at: %s\n", asctime(localtime(&tloc)));
+			fflush(log);		
+		} else {
+			msg_display(MSG_openfail, "log file", strerror(errno));
+		}
 	}
 	return(0);
 }
 
 int
-script_flip(void)
+script_flip(menudesc *m)
 {
 	time_t tloc;
 
@@ -139,12 +141,17 @@ script_flip(void)
 		fflush(script);
 		fclose(script);
 	} else {
-		sprintf(log_text[1], "Scripting: On");
-		scripting = 1;
 		script = fopen("sysinst.sh", "w");
-		fprintf(script, "#!/bin/sh\n");
-		fprintf(script, "# Script started at: %s\n", asctime(localtime(&tloc)));
-		fflush(script);		
+		if (script != NULL) {
+			sprintf(log_text[1], "Scripting: On");
+			scripting = 1;
+			fprintf(script, "#!/bin/sh\n");
+			fprintf(script, "# Script started at: %s\n",
+			    asctime(localtime(&tloc)));
+			fflush(script);		
+		} else {
+			msg_display(MSG_openfail, "script file", strerror(errno));
+		}
 	}
 	return(0);
 }
@@ -237,7 +244,7 @@ do_system(execstr)
  *  XXX return result is in a static buffer.
  */
 char *
-va_prog_cmdstr(char *cmd, va_list ap)
+va_prog_cmdstr(const char *cmd, va_list ap)
 {
 	static char command[STRSIZE];
 
@@ -252,11 +259,11 @@ va_prog_cmdstr(char *cmd, va_list ap)
  */
 
 int
-launch_subwin(actionwin, args, win, display)
+launch_subwin(actionwin, args, win, flags)
 	WINDOW *actionwin;
 	char **args;
-	struct winsize win;
-	int display;
+	struct winsize *win;
+	int flags;
 {
 	int xcor,ycor;
 	int n, i, j;
@@ -267,6 +274,7 @@ launch_subwin(actionwin, args, win, display)
 	pid_t child, subchild, pid;
 	char ibuf[MAXBUF], obuf[MAXBUF];
 	char *command, *p, *argzero, **origargs;
+	char pktdata;
 	struct termios rtt;
 	struct termios tt;
 
@@ -281,20 +289,25 @@ launch_subwin(actionwin, args, win, display)
 		strcat(command, " ");
 	}
 	(void)tcgetattr(STDIN_FILENO, &tt);
-	if (openpty(&master, &slave, NULL, &tt, &win) == -1)
+	if (openpty(&master, &slave, NULL, &tt, win) == -1)
 		return(1);
+#if 0
 	rtt = tt;
-	rtt.c_lflag &= ~ECHO; 
+	rtt.c_lflag |= (ICANON|ECHO); 
 	(void)tcsetattr(STDIN_FILENO, TCSAFLUSH, &rtt);
+#endif
+	rtt = tt;
 
 	/* ignore tty signals until we're done with subprocess setup */
+	endwin();
 	ttysig_ignore = 1;
+	ioctl(master, TIOCPKT, &ttysig_ignore);
 
 	switch(child=fork()) {
 	case -1:
 		ttysig_ignore = 0;
+		refresh();
 		return -1;
-		break;
 	case 0:
 		(void)close(STDIN_FILENO);
 		subchild = fork();
@@ -306,12 +319,14 @@ launch_subwin(actionwin, args, win, display)
 					break;
 				write(dataflow[1], obuf, n);
 			} /* while spinning */
-			nonl();
 			_exit(EXIT_SUCCESS);
 		} /* subchild, child forks */
 		(void)close(master);
 		close(dataflow[1]);
 		close(dataflow[0]);
+		rtt = tt;
+		rtt.c_lflag |= (ICANON|ECHO); 
+		(void)tcsetattr(slave, TCSANOW, &rtt);
 		login_tty(slave);
 		if (logging) {
 			fprintf(log, "executing: %s\n", command);
@@ -323,6 +338,12 @@ launch_subwin(actionwin, args, win, display)
 			fflush(script);
 			fclose(script);
 		}
+		/*
+		 * If target_prefix == "", the chroot will fail, but
+		 * that's ok, since we don't need it then.
+		 */
+		if ((flags & RUN_CHROOT) != 0)
+			chroot(target_prefix());
 		execvp(argzero, origargs);
 		/* the parent will see this as the output from the
 		   child */
@@ -335,6 +356,7 @@ launch_subwin(actionwin, args, win, display)
 		 */
 		ttysig_forward = child;
 		ttysig_ignore = 0;
+		refresh();
 		break;
 	}
 	close(dataflow[1]);
@@ -360,31 +382,50 @@ launch_subwin(actionwin, args, win, display)
 		} else for (i = 0; i < FD_SETSIZE; ++i) {
 			if (FD_ISSET (i, &read_fd_set)) {
 				n = read(i, ibuf, MAXBUF);
-				if (i == STDIN_FILENO)
+				if (i == STDIN_FILENO) {
 					(void)write(master, ibuf, n);
-				for (j=0; j < n; j++) {
-					if (display) {
-						getyx(actionwin, ycor, xcor);
-						if (ibuf[j] == '\n') {
+					if ((rtt.c_lflag & ECHO) == 0)
+						goto enddisp;
+				}
+				pktdata = ibuf[0];
+				if (pktdata != 0 && i != STDIN_FILENO) {
+					if (pktdata & TIOCPKT_IOCTL)
+						rtt = *(struct termios *)ibuf;
+					goto enddisp;
+				}
+				for (j=1; j < n; j++) {
+					if ((flags & RUN_DISPLAY) != 0) {
+						switch (ibuf[j]) {
+						case '\n':
 							getyx(actionwin, ycor, xcor);
-							if (ycor + 1 >= actionwin->maxy) {
+							if (ycor + 1 >= getmaxy(actionwin)) {
 								scroll(actionwin);
-								wmove(actionwin, actionwin->maxy - 1, 0);
+								wmove(actionwin, getmaxy(actionwin) - 1, 0);
 							} else
 								wmove(actionwin, ycor + 1, 0);
-						} else if (ibuf[j] == '\r') {
+							break;
+						case '\r':
 							getyx(actionwin, ycor, xcor);
 							wmove(actionwin, ycor, 0);
-						} else
+							break;
+						case '\b':
+							getyx(actionwin, ycor, xcor);
+							if (xcor > 0)
+								wmove(actionwin, ycor, xcor - 1);
+							break;
+						default:
 							waddch(actionwin, ibuf[j]);
+							break;
+						}
 						if (logging)
 							putc(ibuf[j], log);
 					}
-					if (display)
-						wrefresh(actionwin);
-					if (logging)
-						fflush(log);
 				}
+enddisp:
+				if ((flags & RUN_DISPLAY) != 0)
+					wrefresh(actionwin);
+				if (logging)
+					fflush(log);
 			}
 		}
 loop:
@@ -418,7 +459,7 @@ loop:
  */
 
 int
-run_prog(int fatal, int display, char *errmsg, char *cmd, ...)
+run_prog(int flags, msg errmsg, const char *cmd, ...)
 {
 	va_list ap;
 	struct winsize win;
@@ -444,49 +485,55 @@ run_prog(int fatal, int display, char *errmsg, char *cmd, ...)
 	if (win.ws_col == 0)
 		win.ws_col = 80;
 
-	if (display) {
-		wclear(stdscr); /* XXX shouldn't be needed */
-		wrefresh(stdscr);
-		statuswin = subwin(stdscr, win.ws_row, win.ws_col, 0, 0);
+	if ((flags & RUN_SYSTEM) != 0) {
+		if ((flags & RUN_CHROOT) != 0)
+			chroot(target_prefix());
+		ret = system(command);
+	} else if ((flags & RUN_DISPLAY) != 0) {
+		wclear(stdscr);
+		clearok(stdscr, 1);
+		touchwin(stdscr);
+		refresh();
+
+		if ((flags & RUN_FULLSCREEN) != 0) {
+			ret = launch_subwin(stdscr, args, &win, flags);
+			if (ret != 0) {
+				waddstr(stdscr, "Press any key to continue");
+				wrefresh(stdscr);
+				getchar();
+			}
+			goto done;
+		}
+
+		statuswin = subwin(stdscr, 3, win.ws_col, 0, 0);
 		if (statuswin == NULL) {
 			fprintf(stderr, "sysinst: failed to allocate"
 			    " status window.\n");
 			exit(1);
 		}
-		boxwin = subwin(statuswin, win.ws_row - 3, win.ws_col, 3, 0);
+
+		boxwin = subwin(stdscr, 1, win.ws_col, 3, 0);
 		if (boxwin == NULL) {
 			fprintf(stderr, "sysinst: failed to allocate"
 			    " status box.\n");
 			exit(1);
 		}
-		actionwin = subwin(statuswin, win.ws_row - 5, win.ws_col - 2,
-		   4, 1);
+
+		actionwin = subwin(stdscr, win.ws_row - 4, win.ws_col, 4, 0);
 		if (actionwin == NULL) {
 			fprintf(stderr, "sysinst: failed to allocate"
-			    " output window.\n");
+				    " output window.\n");
 			exit(1);
 		}
 		scrollok(actionwin, TRUE);
 
-		win.ws_col -= 2;
-		win.ws_row -= 5;
+		win.ws_row -= 4;
 
-		wclear(statuswin);
-		wrefresh(statuswin);
-
-		wclear(boxwin);
-		box(boxwin, 124, 45);
-		wrefresh(boxwin);
-
-		wclear(actionwin);
-		wrefresh(actionwin);
-
-		wmove(statuswin, 0 , 5);
+		wmove(statuswin, 0, 5);
 		waddstr(statuswin, "Status: ");
 		wstandout(statuswin);
 		waddstr(statuswin, "Running");
 		wstandend(statuswin);
-
 		wmove(statuswin, 1, 4);
 		waddstr(statuswin, "Command: ");
 		wstandout(statuswin);
@@ -494,17 +541,24 @@ run_prog(int fatal, int display, char *errmsg, char *cmd, ...)
 		wstandend(statuswin);
 		wrefresh(statuswin);
 
-		ret = launch_subwin(actionwin, args, win, 1);
+		wmove(boxwin, 0, 0);
+		{
+			int n, m;
+			for (n = win.ws_col; (m = min(n, 30)) > 0; n -= m)
+				waddstr(boxwin,
+				    "------------------------------" + 30 - m);
+		}
+		wrefresh(boxwin);
+
+		wrefresh(actionwin);
+
+		ret = launch_subwin(actionwin, args, &win, flags);
 
 		wmove(statuswin, 0, 13);
-		waddstr(statuswin, "          ");
-		wmove(statuswin, 0, 13);
 		wstandout(statuswin);
-		if (ret != 0)
-			waddstr(statuswin, "Failed");
-		else
-			waddstr(statuswin, "Finished");
+		waddstr(statuswin, ret ? "Failed" : "Finished");
 		wstandend(statuswin);
+		waddstr(statuswin, "  ");
 		wmove(statuswin, 2, 5);
 		if (ret != 0)
 			waddstr(statuswin, "Press any key to continue");
@@ -513,24 +567,22 @@ run_prog(int fatal, int display, char *errmsg, char *cmd, ...)
 			(void)getchar();
 
 		/* clean things up */
-		wclear(actionwin);
-		wrefresh(actionwin);
 		delwin(actionwin);
-		wclear(boxwin);
-		wrefresh(boxwin);
 		delwin(boxwin);
-		wclear(statuswin);
-		wrefresh(statuswin);
 		delwin(statuswin);
+done:
+		wclear(stdscr);
+		touchwin(stdscr);
+		clearok(stdscr, 1);
 		refresh();
 	} else { /* display */
-		ret = launch_subwin(NULL, args, win, 0);
+		ret = launch_subwin(NULL, args, &win, flags);
 	}
 	va_end(ap);
-	if (fatal && ret != 0)
+	if ((flags & RUN_FATAL) != 0 && ret != 0)
 		exit(ret);
-	if (ret && errmsg) {
-		msg_printf(errmsg, command);
+	if (ret && errmsg != MSG_NONE) {
+		msg_display(errmsg, command);
 		process_menu(MENU_ok);
 	}
 	return(ret);

@@ -1,4 +1,4 @@
-/*	$NetBSD: md.c,v 1.7.2.3 1999/07/12 19:36:50 perry Exp $ */
+/*	$NetBSD: md.c,v 1.15.4.2 2001/04/22 18:33:45 he Exp $ */
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -38,6 +38,8 @@
 
 /* md.c -- Machine specific code for bebox */
 
+#include <sys/param.h>
+#include <sys/sysctl.h>
 #include <stdio.h>
 #include <util.h>
 #include "defs.h"
@@ -48,7 +50,6 @@
 
 int mbr_present;
 int c1024_resp;
-
 char mbr[512];
 
 /* prototypes */
@@ -59,7 +60,7 @@ int md_get_info()
 
 	read_mbr(diskdev, mbr, sizeof mbr);
 	md_bios_info(diskdev);
-	return edit_mbr();
+	return edit_mbr((struct mbr_partition *) &mbr[MBR_PARTOFF]);
 }
 
 int md_pre_disklabel()
@@ -80,7 +81,8 @@ int md_post_disklabel(void)
 	/* Sector forwarding / badblocks ... */
 	if (*doessf) {
 		printf ("%s", msg_string (MSG_dobad144));
-		return run_prog(0, 1, NULL, "/usr/sbin/bad144 %s 0", diskdev);
+		return run_prog(RUN_DISPLAY, NULL, "/usr/sbin/bad144 %s 0",
+		    diskdev);
 	}
 	return 0;
 }
@@ -89,7 +91,8 @@ int md_post_newfs(void)
 {
 	/* boot blocks ... */
 	printf (msg_string(MSG_dobootblks), diskdev);
-	run_prog (0, 1, NULL, "/usr/mdec/installboot -v /usr/mdec/biosboot.sym "
+	run_prog (RUN_DISPLAY, NULL,
+	    "/usr/mdec/installboot -v /usr/mdec/biosboot.sym "
 		  "/dev/r%sa", diskdev);
 	return 0;
 }
@@ -102,7 +105,7 @@ int md_copy_filesystem (void)
 
 	/* Copy the instbin(s) to the disk */
 	printf ("%s", msg_string(MSG_dotar));
-	if (run_prog (0, 1, NULL, "pax -X -r -w -pe / /mnt") != 0)
+	if (run_prog (RUN_DISPLAY, NULL, "pax -X -r -w -pe / /mnt") != 0)
 		return 1;
 
 	/* Copy next-stage install profile into target /.profile. */
@@ -131,7 +134,7 @@ editlab:
 	process_menu (MENU_layout);
 
 	if (layoutkind == 3) {
-		ask_sizemult();
+		ask_sizemult(dlcylsize);
 	} else {
 		sizemult = MEG / sectorsize;
 		multname = msg_string(MSG_megname);
@@ -195,7 +198,7 @@ editlab:
 		break;
 
 	case 3: /* custom: ask user for all sizes */
-		ask_sizemult();
+		ask_sizemult(dlcylsize);
 		partstart = ptstart;
 		remain = fsptsize;
 
@@ -237,7 +240,7 @@ editlab:
 			partsize = remain;
 			snprintf (isize, 20, "%d", partsize/sizemult);
 			msg_prompt_add (MSG_askfspart, isize, isize, 20,
-					diskdev, partname[part],
+					diskdev, partition_name(part),
 					remain/sizemult, multname);
 			partsize = NUMSEC(atoi(isize),sizemult, dlcylsize);
 			if (partsize > 0) {
@@ -275,7 +278,7 @@ editlab:
 		/* XXX UGH! need arguments to process_menu */
 		switch (c1024_resp) {
 		case 1:
-			edit_mbr();
+			edit_mbr((struct mbr_partition *) &mbr[MBR_PARTOFF]);
 			/*FALLTHROUGH*/
 		case 2:
 			goto editlab;
@@ -288,7 +291,7 @@ editlab:
 	msg_prompt (MSG_packname, "mydisk", bsddiskname, DISKNAME_SIZE);
 
 	/* Create the disktab.preinstall */
-	run_prog (0, 0, NULL, "cp /etc/disktab.preinstall /etc/disktab");
+	run_prog (0, NULL, "cp /etc/disktab.preinstall /etc/disktab");
 #ifdef DEBUG
 	f = fopen ("/tmp/disktab", "a");
 #else
@@ -308,7 +311,7 @@ editlab:
 		(void)fprintf (f, "\t:p%c#%d:o%c#%d:t%c=%s:",
 			       'a'+i, bsdlabel[i].pi_size,
 			       'a'+i, bsdlabel[i].pi_offset,
-			       'a'+i, fstype[bsdlabel[i].pi_fstype]);
+			       'a'+i, fstypenames[bsdlabel[i].pi_fstype]);
 		if (bsdlabel[i].pi_fstype == FS_BSDFFS)
 			(void)fprintf (f, "b%c#%d:f%c#%d",
 				       'a'+i, bsdlabel[i].pi_bsize,
@@ -355,8 +358,37 @@ md_cleanup_install(void)
 		(void)fprintf(script, "%s\n", sedcmd);
 	do_system(sedcmd);
 
-	run_prog(1, 0, NULL, "mv -f %s %s", realto, realfrom);
-	run_prog(0, 0, NULL, "rm -f %s", target_expand("/sysinst"));
-	run_prog(0, 0, NULL, "rm -f %s", target_expand("/.termcap"));
-	run_prog(0, 0, NULL, "rm -f %s", target_expand("/.profile"));
+	run_prog(RUN_FATAL, NULL, "mv -f %s %s", realto, realfrom);
+	run_prog(0, NULL, "rm -f %s", target_expand("/sysinst"));
+	run_prog(0, NULL, "rm -f %s", target_expand("/.termcap"));
+	run_prog(0, NULL, "rm -f %s", target_expand("/.profile"));
+}
+
+int
+md_pre_update()
+{
+	return 1;
+}
+
+int
+md_bios_info(dev)
+	char *dev;
+{
+	int cyl, head, sec;
+
+	msg_display(MSG_nobiosgeom, dlcyl, dlhead, dlsec);
+	if (guess_biosgeom_from_mbr(mbr, &cyl, &head, &sec) >= 0) {
+		msg_display_add(MSG_biosguess, cyl, head, sec);
+		set_bios_geom(cyl, head, sec);
+	} else
+		set_bios_geom(dlcyl, dlhead, dlsec);
+	bsize = bcyl * bhead * bsec;
+	bcylsize = bhead * bsec;
+	return 0;
+}
+
+
+void
+md_init()
+{
 }

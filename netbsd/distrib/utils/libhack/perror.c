@@ -1,4 +1,4 @@
-/*	$NetBSD: perror.c,v 1.1.2.1 1999/06/21 13:39:35 perry Exp $	*/
+/*	$NetBSD: perror.c,v 1.2 1999/05/27 05:41:15 gwr Exp $	*/
 
 /*
  * Copyright (c) 1988, 1993

@@ -1,6 +1,6 @@
-.\"	$NetBSD: donations,v 1.4.2.2 1999/05/05 21:00:50 perry Exp $	
+.\"	$NetBSD: donations,v 1.13.4.5 2001/05/21 02:34:48 jhawk Exp $
 .\"
-.\" Copyright (c) 1999 The NetBSD Foundation, Inc.
+.\" Copyright (c) 1999, 2000 The NetBSD Foundation, Inc.
 .\" All rights reserved.
 .\"
 .\" Redistribution and use in source and binary forms, with or without
@@ -31,11 +31,12 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 .\" POSSIBILITY OF SUCH DAMAGE.
 .\"
-
-
 .Bd -unfilled -offset indent
+Steve Allen
 Jason Birnschein
+Mason Loring Bliss
 Jason Brazile
+Mark Brinicombe
 David Brownlee
 Simon Burge
 Dave Burgess
@@ -49,35 +50,59 @@ Charles D. Cranor
 Christopher G. Demetriou
 Scott Ellis
 Hubert Feyrer
+Castor Fu
 Greg Gingerich
+William Gnadt
+Michael Graff
 Guenther Grau
 Ross Harvey
 Charles M. Hannum
 Michael L. Hitch
+Kenneth Alan Hornstein
 Jordan K. Hubbard
+S\(/oren J\(/orvang
 Scott Kaplan
 Noah M. Keiserman
+Harald Koerfgen
+John Kohl
 Chris Legrow
+Ted Lemon
+Norman R. McBride
 Neil J. McRae
 Perry E. Metzger
+Toru Nishimura
 Herb Peyerl
 Mike Price
+Dave Rand
+Michael Richardson
+Heiko W. Rupp
+Brad Salai
+Chuck Silvers
 Thor Lancelot Simon
 Bill Sommerfeld
 Paul Southworth
+Eric and Rosemary Spahr
 Ted Spradley
 Kimmo Suominen
 Jason R. Thorpe
 Steve Wadlow
+Krister Walfridsson
+Jim Wise
+Reinoud Zandijk
+Christos Zoulas
 .Ed
-
+.Pp
 .Bd -unfilled -offset indent
+AboveNet Communications, Inc.
 Advanced System Products, Inc.
 Avalon Computer Systems
 Bay Area Internet Solutions
+Brains Corporation, Japan
 Canada Connect Corporation
+Co-operative Research Centre for Enterprise Distributed Systems Technology
 Demon Internet, UK
 Digital Equipment Corporation
+Distributed Processing Technology
 Easynet, UK
 Free Hardware Foundation
 Innovation Development Enterprises of America
@@ -85,5 +110,9 @@ Internet Software Consortium
 MS Macro System GmbH, Germany
 Numerical Aerospace Simulation Facility, NASA Ames Research Center
 Piermont Information Systems Inc.
+Precedence Technologies Ltd
+Salient Systems Inc.
 VMC Harald Frank, Germany
+Warped Communications, Inc.
+Whitecross Database Systems Ltd.
 .Ed

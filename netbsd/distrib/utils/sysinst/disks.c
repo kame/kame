@@ -1,4 +1,4 @@
-/*	$NetBSD: disks.c,v 1.23.2.2 1999/06/24 22:58:09 cgd Exp $ */
+/*	$NetBSD: disks.c,v 1.31.4.3 2000/11/14 16:13:07 tv Exp $ */
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -187,7 +187,7 @@ void disp_cur_fspart(int disp, int showall)
 		stop = disp+1;
 	}
 
-	msg_display_add (MSG_fspart_head);
+	msg_table_add (MSG_fspart_header);
 	for (i = start; i < stop; i++) {
 		if (showall || bsdlabel[i].pi_size > 0) {
 			poffset = bsdlabel[i].pi_offset / sizemult;
@@ -197,20 +197,22 @@ void disp_cur_fspart(int disp, int showall)
 			else
 				pend = (bsdlabel[i].pi_offset +
 				bsdlabel[i].pi_size) / sizemult - 1;
-			msg_printf_add(" %c: %9d %9d %9d %6s",
+			msg_table_add(MSG_fspart_row_start,
 					'a'+i, psize, poffset, pend,
 					fstypenames[bsdlabel[i].pi_fstype]);
 			if (bsdlabel[i].pi_fstype == FS_BSDFFS)
-				msg_printf_add("%6d%6d %s",
+				msg_table_add(MSG_fspart_row_end_bsd,
 						bsdlabel[i].pi_bsize,
 						bsdlabel[i].pi_fsize,
 						fsmount[i]);
 			else if (bsdlabel[i].pi_fstype == FS_MSDOS)
-				msg_printf_add("%12s %s", "", fsmount[i]);
-			msg_printf_add("\n");
+				msg_table_add(MSG_fspart_row_end_msdos,
+						fsmount[i]);
+			else
+				msg_table_add(MSG_fspart_row_end_other);
 		}
 	}
-	msg_printf_add("\n");
+	msg_display_add(MSG_newline);
 }
 
 
@@ -230,7 +232,7 @@ int write_disklabel (void)
 
 #ifdef DISKLABEL_CMD
 	/* disklabel the disk */
-	return run_prog(0, 1, msg_string(MSG_cmdfail),
+	return run_prog(RUN_DISPLAY, MSG_cmdfail,
 	    "%s %s %s", DISKLABEL_CMD, diskdev, bsddiskname);
 #endif
 	return 0;
@@ -269,7 +271,7 @@ do_ffs_newfs(const char *partname, int partno, const char *mountpoint)
 	char devname[STRSIZE];
 	int error;
 
-	error = run_prog(0, 1, msg_string(MSG_cmdfail), 
+	error = run_prog(RUN_DISPLAY, MSG_cmdfail,
 	    "/sbin/newfs /dev/r%s", partname);
 	if (*mountpoint && error == 0) { 
 		snprintf(devname, STRSIZE, "/dev/%s", partname);
@@ -354,8 +356,8 @@ int make_fstab(void)
 
 
 static struct lookfor fstabbuf[] = {
-	{"/dev/", "/dev/%s %s ffs", "c", NULL, 0, 0, foundffs},
-	{"/dev/", "/dev/%s %s ufs", "c", NULL, 0, 0, foundffs},
+	{"/dev/", "/dev/%s %s ffs %s", "c", NULL, 0, 0, foundffs},
+	{"/dev/", "/dev/%s %s ufs %s", "c", NULL, 0, 0, foundffs},
 };
 static int numfstabbuf = sizeof(fstabbuf) / sizeof(struct lookfor);
 
@@ -368,7 +370,8 @@ static int  devcnt = 0;
 static void
 foundffs(struct data *list, int num)
 {
-	if (strcmp(list[1].u.s_val, "/") != 0) {
+	if (strcmp(list[1].u.s_val, "/") != 0 &&
+	    strstr(list[2].u.s_val, "noauto") == NULL) {
 		strncpy(dev[devcnt], list[0].u.s_val, SSTRSIZE);
 		strncpy(mnt[devcnt], list[1].u.s_val, STRSIZE);
 		devcnt++;
@@ -434,14 +437,14 @@ do_fsck(const char *diskpart)
 		msg_display(MSG_upgrinode, raw);
 		process_menu(MENU_yesno);
 		if (yesno)
-			upgr = "-c ";
+			upgr = "-c 3 ";
 	}
 
 	/*endwin();*/
-#ifdef	DEBUG_SETS
-	err = run_prog(0, 1, NULL, "/sbin/fsck_ffs %s%s", upgr, raw);
+#ifndef	DEBUG_SETS
+	err = run_prog(RUN_DISPLAY, NULL, "/sbin/fsck_ffs %s%s", upgr, raw);
 #else
-	err = run_prog(0, 1, NULL, "/sbin/fsck_ffs -f %s%s", upgr, raw);
+	err = run_prog(RUN_DISPLAY, NULL, "/sbin/fsck_ffs -f %s%s", upgr, raw);
 #endif	
 		wrefresh(stdscr);
 	return err;
@@ -586,4 +589,38 @@ fsck_disks(void)
 	}
 	
 	return 1;
+}
+
+int
+set_swap(dev, pp, enable)
+	const char *dev;
+	partinfo *pp;
+{
+	partinfo parts[16];
+	int i, maxpart;
+
+	if (pp == NULL) {
+		emptylabel(parts);
+		if (incorelabel(dev, parts) < 0)
+			return -1;
+		pp = parts;
+	}
+
+	maxpart = getmaxpartitions();
+
+	for (i = 0; i < maxpart; i++) {
+		if (pp[i].pi_fstype == FS_SWAP) {
+			if (run_prog(0, NULL,
+			    "/sbin/swapctl -%c /dev/%s%c",
+			    enable ? 'a' : 'd', dev, 'a' + i) != 0)
+				return -1;
+			if (enable)
+				strcpy(swapdev, dev);
+			else
+				swapdev[0] = '\0';
+			break;
+		}
+	}
+
+	return 0;
 }

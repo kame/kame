@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.4 1999/03/04 20:32:20 wrstuden Exp $
+#	$NetBSD: Makefile,v 1.6.4.1 2001/06/25 18:41:00 he Exp $
 
 TOP=		${.CURDIR}/..
 
@@ -12,7 +12,7 @@ TREE=		mtree.conf
 LISTS=		list
 CRUNCHCONF=	${CBIN}.conf
 
-KERNEL=		${SRCSYSDIR}/arch/mvme68k/compile/RAMDISK/netbsd
+KERNEL=		${KERNOBJDIR}/RAMDISK/netbsd
 
 MOUNT_POINT?=   /mnt
 # DEV/RDEV file system device, CDEV/RDEV vnconfig device
@@ -20,11 +20,11 @@ VND?=           vnd0
 VND_CDEV=       /dev/${VND}c
 VND_CRDEV=      /dev/r${VND}c
 
-# These are all the parameters for the root fs: (384K)
+# These are all the parameters for the root fs: (512K)
 # NOTE: If you change NBLKS, you *must* also edit the
 #       rdroot entry in /etc/disktab
 DISKTYPE=	rdroot
-NBLKS=		768
+NBLKS=		1024
 
 CLEANFILES=	netbsd-rd ${IMAGE}
 
@@ -40,6 +40,7 @@ ${IMAGE}:	${TREE} ${LISTS} ${CBIN}
 	mount ${VND_CDEV} ${MOUNT_POINT}
 	mtree -def ${.CURDIR}/${TREE} -p ${MOUNT_POINT}/ -u
 	TOPDIR=${TOP} CURDIR=${.CURDIR} OBJDIR=${.OBJDIR} \
+	    KERNOBJDIR=${KERNOBJDIR} \
 	    TARGDIR=${MOUNT_POINT} sh ${.CURDIR}/runlist.sh ${.CURDIR}/${LISTS}
 	@echo ""
 	@df -i ${MOUNT_POINT}
@@ -56,7 +57,7 @@ unconfig:
 .PRECIOUS: ${IMAGE}
 
 CLEANFILES+= ${CBIN} ${CBIN}.c ${CBIN}.cache ${CBIN}.mk ${CBIN}.syms
-CLEANFILES+= *.lo *_stub.o *_stub.c
+CLEANFILES+= *.cro *_stub.o *_stub.c
 
 ${CBIN}.mk ${CBIN}.cache ${CBIN}.c: ${CRUNCHCONF}
 	crunchgen -D ${BSDSRCDIR} -L ${DESTDIR}/usr/lib ${CRUNCHCONF}
@@ -76,4 +77,5 @@ clean cleandir distclean:
 	-rm -f ${CLEANFILES}
 
 # Standard rules needed by the above...
+.include <bsd.kernobj.mk>
 .include <bsd.obj.mk>

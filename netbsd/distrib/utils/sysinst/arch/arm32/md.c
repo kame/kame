@@ -1,4 +1,4 @@
-/*	$NetBSD: md.c,v 1.15.2.3 1999/06/27 00:24:22 cgd Exp $	*/
+/*	$NetBSD: md.c,v 1.23.4.1 2000/10/18 17:51:19 tv Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -283,7 +283,7 @@ int	md_post_newfs (void)
 #if 0
 	/* XXX boot blocks ... */
 	printf(msg_string(MSG_dobootblks), diskdev);
-	run_prog(0, 1, NULL, "/sbin/disklabel -B %s /dev/r%sc",
+	run_prog(RUN_DISPLAY, NULL, "/sbin/disklabel -B %s /dev/r%sc",
 	    "-b /usr/mdec/rzboot -s /usr/mdec/bootrz", diskdev);
 #endif
 	return 0;
@@ -326,7 +326,7 @@ int md_make_bsd_partitions (void)
 	process_menu(MENU_layout);
 
 	if (layoutkind == 3) {
-		ask_sizemult();
+		ask_sizemult(dlcylsize);
 	} else {
 		sizemult = MEG / sectorsize;
 		multname = msg_string(MSG_megname);
@@ -393,7 +393,7 @@ int md_make_bsd_partitions (void)
 		break;
 
 	case 3: /* custom: ask user for all sizes */
-		ask_sizemult();
+		ask_sizemult(dlcylsize);
 		partstart = ptstart;
 		remain = fsptsize;
 
@@ -435,7 +435,7 @@ int md_make_bsd_partitions (void)
 			partsize = remain;
 			snprintf (isize, 20, "%d", partsize/sizemult);
 			msg_prompt_add(MSG_askfspart, isize, isize, 20,
-			    diskdev, partname[part], remain/sizemult, multname);
+			    diskdev, partition_name(part), remain/sizemult, multname);
 			partsize = NUMSEC(atoi(isize),sizemult, dlcylsize);
 			if (partsize > 0) {
 				if (remain - partsize < sizemult)
@@ -509,9 +509,20 @@ md_cleanup_install(void)
 	if (scripting)
 		(void)fprintf(script, "%s\n", sedcmd);
 	do_system(sedcmd);
-	run_prog(1, 0, NULL, "mv -f %s %s", realto, realfrom);
-	run_prog(0, 0, NULL, "rm -f %s", target_expand("/sysinst"));
-	run_prog(0, 0, NULL, "rm -f %s", target_expand("/.termcap"));
-	run_prog(0, 0, NULL, "rm -f %s", target_expand("/.profile"));
+	run_prog(RUN_FATAL, NULL, "mv -f %s %s", realto, realfrom);
+	run_prog(0, NULL, "rm -f %s", target_expand("/sysinst"));
+	run_prog(0, NULL, "rm -f %s", target_expand("/.termcap"));
+	run_prog(0, NULL, "rm -f %s", target_expand("/.profile"));
 #endif
+}
+
+int
+md_pre_update()
+{
+	return 1;
+}
+
+void
+md_init()
+{
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: ping.c,v 1.47.2.1 1999/06/24 16:23:03 perry Exp $	*/
+/*	$NetBSD: ping.c,v 1.55.4.2 2000/10/18 02:04:49 tv Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -62,7 +62,7 @@
 
 #include <sys/cdefs.h>
 #ifndef lint
-__RCSID("$NetBSD: ping.c,v 1.47.2.1 1999/06/24 16:23:03 perry Exp $");
+__RCSID("$NetBSD: ping.c,v 1.55.4.2 2000/10/18 02:04:49 tv Exp $");
 #endif
 
 #include <stdio.h>
@@ -103,6 +103,10 @@ __RCSID("$NetBSD: ping.c,v 1.47.2.1 1999/06/24 16:23:03 perry Exp $");
 #include <ctype.h>
 #include <netdb.h>
 
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#endif /*IPSEC*/
+
 #define FLOOD_INTVL	0.01		/* default flood output interval */
 #define	MAXPACKET	(65536-60-8)	/* max packet size */
 
@@ -122,6 +126,14 @@ __RCSID("$NetBSD: ping.c,v 1.47.2.1 1999/06/24 16:23:03 perry Exp $");
 #define F_MCAST		0x2000		/* multicast target */
 #define F_MCAST_NOLOOP	0x4000		/* no multicast loopback */
 #define F_AUDIBLE	0x8000		/* audible output */
+#ifdef IPSEC
+#ifdef IPSEC_POLICY_IPSEC
+#define F_POLICY	0x10000
+#else
+#define	F_AUTHHDR	0x10000
+#define	F_ENCRYPT	0x20000
+#endif /*IPSEC_POLICY_IPSEC*/
+#endif /*IPSEC*/
 
 
 /* MAX_DUP_CHK is the number of bits in received table, the
@@ -145,6 +157,7 @@ int	pingflags = 0, options;
 char	*fill_pat;
 
 int s;					/* Socket file descriptor */
+int sloop;				/* Socket file descriptor/loopback */
 
 #define PHDR_LEN sizeof(struct timeval)	/* size of timestamp header */
 struct sockaddr_in whereto, send_addr;	/* Who to ping */
@@ -218,7 +231,7 @@ static void sec_to_timeval(const double, struct timeval *);
 static double timeval_to_sec(const struct timeval *);
 static void pr_pack(u_char *, int, struct sockaddr_in *);
 static u_short in_cksum(u_short *, u_int);
-static void pr_saddr(char *, u_char *);
+static void pr_saddr(u_char *);
 static char *pr_addr(struct in_addr *);
 static void pr_iph(struct icmp *, int);
 static void pr_retip(struct icmp *, int);
@@ -240,13 +253,29 @@ main(int argc, char *argv[])
 #ifdef SIGINFO
 	struct termios ts;
 #endif
+#ifdef IPSEC
+#ifdef IPSEC_POLICY_IPSEC
+	char *policy_in = NULL;
+	char *policy_out = NULL;
+#endif
+#endif
   
 
 #ifdef sgi
 	__progname = argv[0];
 #endif
+#ifndef IPSEC
+#define IPSECOPT
+#else
+#ifdef IPSEC_POLICY_IPSEC
+#define IPSECOPT	"E:"
+#else
+#define IPSECOPT	"AE"
+#endif /*IPSEC_POLICY_IPSEC*/
+#endif
 	while ((c = getopt(argc, argv,
-			   "ac:dDfg:h:i:I:l:Lnop:PqQrRs:t:T:vw:")) != -1) {
+			   "ac:dDfg:h:i:I:l:Lnop:PqQrRs:t:T:vw:" IPSECOPT)) != -1) {
+#undef IPSECOPT
 		switch (c) {
 		case 'a':
 			pingflags |= F_AUDIBLE;
@@ -345,6 +374,26 @@ main(int argc, char *argv[])
 			if (*p != '\0' || maxwait <= 0)
 				errx(1, "Bad/invalid maxwait time %s", optarg);
 			break;
+#ifdef IPSEC
+#ifdef IPSEC_POLICY_IPSEC
+		case 'E':
+			pingflags |= F_POLICY;
+			if (!strncmp("in", optarg, 2))
+				policy_in = strdup(optarg);
+			else if (!strncmp("out", optarg, 3))
+				policy_out = strdup(optarg);
+			else
+				errx(1, "invalid security policy");
+			break;
+#else
+		case 'A':
+			pingflags |= F_AUTHHDR;
+			break;
+		case 'E':
+			pingflags |= F_ENCRYPT;
+			break;
+#endif /*IPSEC_POLICY_IPSEC*/
+#endif /*IPSEC*/
 		default:
 			usage();
 			break;
@@ -420,6 +469,19 @@ main(int argc, char *argv[])
 			warn("SO_DONTROUTE");
 	}
 
+	if ((sloop = cap_socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) < 0)
+		err(1, "Cannot create socket");
+	if (options & SO_DEBUG) {
+		if (setsockopt(sloop, SOL_SOCKET, SO_DEBUG,
+			       (char *)&on, sizeof(on)) == -1)
+			warn("Can't turn on socket debugging");
+	}
+	if (options & SO_DONTROUTE) {
+		if (setsockopt(sloop, SOL_SOCKET, SO_DONTROUTE,
+			       (char *)&on, sizeof(on)) == -1)
+			warn("SO_DONTROUTE");
+	}
+
 	if (pingflags & F_SOURCE_ROUTE) {
 		optspace[IPOPT_OPTVAL] = IPOPT_LSRR;
 		optspace[IPOPT_OLEN] = optlen = 7;
@@ -477,6 +539,76 @@ main(int argc, char *argv[])
 			       sizeof(src_addr.sin_addr)) < 0)
 			err(1, "Can't set source interface/address");
 	}
+#ifdef IPSEC
+#ifdef IPSEC_POLICY_IPSEC
+    {
+	char *buf;
+	if (pingflags & F_POLICY) {
+		if (policy_in != NULL) {
+			buf = ipsec_set_policy(policy_in, strlen(policy_in));
+			if (buf == NULL)
+				errx(1, "%s", ipsec_strerror());
+			if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY,
+					buf, ipsec_get_policylen(buf)) < 0) {
+				err(1, "ipsec policy cannot be configured");
+			}
+			free(buf);
+		}
+		if (policy_out != NULL) {
+			buf = ipsec_set_policy(policy_out, strlen(policy_out));
+			if (buf == NULL)
+				errx(1, "%s", ipsec_strerror());
+			if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY,
+					buf, ipsec_get_policylen(buf)) < 0) {
+				err(1, "ipsec policy cannot be configured");
+			}
+			free(buf);
+		}
+	}
+	buf = ipsec_set_policy("out bypass", strlen("out bypass"));
+	if (buf == NULL)
+		errx(1, "%s", ipsec_strerror());
+	if (setsockopt(sloop, IPPROTO_IP, IP_IPSEC_POLICY,
+			buf, ipsec_get_policylen(buf)) < 0) {
+#if 0
+		warnx("ipsec is not configured");
+#else
+		/* ignore it, should be okay */
+#endif
+	}
+	free(buf);
+    }
+#else
+    {
+	int optval;
+	if (pingflags & F_AUTHHDR) {
+		optval = IPSEC_LEVEL_REQUIRE;
+#ifdef IP_AUTH_TRANS_LEVEL
+		(void)setsockopt(s, IPPROTO_IP, IP_AUTH_TRANS_LEVEL,
+			(char *)&optval, sizeof(optval));
+#else
+		(void)setsockopt(s, IPPROTO_IP, IP_AUTH_LEVEL,
+			(char *)&optval, sizeof(optval));
+#endif
+	}
+	if (pingflags & F_ENCRYPT) {
+		optval = IPSEC_LEVEL_REQUIRE;
+		(void)setsockopt(s, IPPROTO_IP, IP_ESP_TRANS_LEVEL,
+			(char *)&optval, sizeof(optval));
+	}
+	optval = IPSEC_LEVEL_BYPASS;
+#ifdef IP_AUTH_TRANS_LEVEL
+	(void)setsockopt(sloop, IPPROTO_IP, IP_AUTH_TRANS_LEVEL,
+		(char *)&optval, sizeof(optval));
+#else
+	(void)setsockopt(sloop, IPPROTO_IP, IP_AUTH_LEVEL,
+		(char *)&optval, sizeof(optval));
+#endif
+	(void)setsockopt(sloop, IPPROTO_IP, IP_ESP_TRANS_LEVEL,
+		(char *)&optval, sizeof(optval));
+    }
+#endif /*IPSEC_POLICY_IPSEC*/
+#endif /*IPSEC*/
 
 	(void)printf("PING %s (%s): %d data bytes\n", hostname,
 		     inet_ntoa(whereto.sin_addr), datalen);
@@ -504,7 +636,7 @@ main(int argc, char *argv[])
 	if (tcgetattr (0, &ts) != -1) {
 		reset_kerninfo = !(ts.c_lflag & NOKERNINFO);
 		ts.c_lflag |= NOKERNINFO;
-		tcsetattr (0, TCSANOW, &ts);
+		tcsetattr (STDIN_FILENO, TCSANOW, &ts);
 	}
 #endif
 
@@ -534,8 +666,8 @@ doit(void)
 	int fromlen;
 	double sec, last, d_last;
 	struct timeval timeout;
-	fd_set fdmask;
-
+	fd_set *fdmaskp;
+	size_t nfdmask;
 
 	(void)gettimeofday(&clear_cache,0);
 	if (maxwait != 0) {
@@ -546,7 +678,10 @@ doit(void)
 		d_last = 365*24*60*60;
 	}
 
-	FD_ZERO(&fdmask);
+	nfdmask = howmany(s + 1, NFDBITS);
+	if ((fdmaskp = malloc(nfdmask)) == NULL)
+		err(1, "malloc");
+	memset(fdmaskp, 0, nfdmask);
 	do {
 		(void)gettimeofday(&now,0);
 
@@ -581,8 +716,8 @@ doit(void)
 
 		sec_to_timeval(sec, &timeout);
 
-		FD_SET(s, &fdmask);
-		cc = select(s+1, &fdmask, 0, 0, &timeout);
+		FD_SET(s, fdmaskp);
+		cc = select(s+1, fdmaskp, 0, 0, &timeout);
 		if (cc <= 0) {
 			if (cc < 0) {
 				if (errno == EINTR)
@@ -610,6 +745,7 @@ doit(void)
 
 	} while (nreceived < npackets
 		 && (nreceived == 0 || !(pingflags & F_ONCE)));
+	free(fdmaskp);
 
 	finish(0);
 }
@@ -702,10 +838,10 @@ pinger(void)
 		opack_icmp.icmp_cksum = in_cksum((u_short*)&opack_icmp,
 						 PHDR_LEN);
 		sw = 0;
-		if (setsockopt(s,IPPROTO_IP,IP_HDRINCL,
+		if (setsockopt(sloop,IPPROTO_IP,IP_HDRINCL,
 			       (char *)&sw,sizeof(sw)) < 0)
 			err(1, "Can't turn off special IP header");
-		if (sendto(s, (char *) &opack_icmp, PHDR_LEN, MSG_DONTROUTE,
+		if (sendto(sloop, (char *) &opack_icmp, PHDR_LEN, MSG_DONTROUTE,
 			   (struct sockaddr *)&loc_addr,
 			   sizeof(struct sockaddr_in)) < 0) {
 			/*
@@ -718,7 +854,7 @@ pinger(void)
 				warn("failed to clear cached route");
 		}
 		sw = 1;
-		if (setsockopt(s,IPPROTO_IP,IP_HDRINCL,
+		if (setsockopt(sloop,IPPROTO_IP,IP_HDRINCL,
 			       (char *)&sw, sizeof(sw)) < 0)
 			err(1, "Can't set special IP header");
 		
@@ -894,14 +1030,14 @@ pr_pack(u_char *buf,
 			    &opack_icmp.icmp_data[PHDR_LEN],
 			    datalen-PHDR_LEN)) {
 			for (i=PHDR_LEN; i<datalen; i++) {
-				if (icp->icmp_data[PHDR_LEN+i]
-				    != opack_icmp.icmp_data[PHDR_LEN+i])
+				if (icp->icmp_data[i] !=
+				    opack_icmp.icmp_data[i])
 					break;
 			}
 			PR_PACK_SUB();
 			(void)printf("\nwrong data byte #%d should have been"
-				     " %#x but was %#x",
-				     i, (u_char)opack_icmp.icmp_data[i],
+				     " %#x but was %#x", i,
+				     (u_char)opack_icmp.icmp_data[i],
 				     (u_char)icp->icmp_data[i]);
 			for (i=PHDR_LEN; i<datalen; i++) {
 				if ((i%16) == PHDR_LEN)
@@ -939,7 +1075,7 @@ pr_pack(u_char *buf,
 			PR_PACK_SUB();
 			(void)printf("\nLSRR: ");
 			for (;;) {
-				pr_saddr("\t%s", cp);
+				pr_saddr(cp);
 				cp += 4;
 				hlen -= 4;
 				j -= 4;
@@ -978,7 +1114,7 @@ pr_pack(u_char *buf,
 				(void)printf("\nRR: ");
 			}
 			for (;;) {
-				pr_saddr("\t%s", cp);
+				pr_saddr(cp);
 				cp += 4;
 				hlen -= 4;
 				i -= 4;
@@ -1195,7 +1331,7 @@ finish(int s)
 
 	if (reset_kerninfo && tcgetattr (0, &ts) != -1) {
 		ts.c_lflag &= ~NOKERNINFO;
-		tcsetattr (0, TCSANOW, &ts);
+		tcsetattr (STDIN_FILENO, TCSANOW, &ts);
 	}
 	(void)signal(SIGINFO, SIG_IGN);
 #else
@@ -1495,8 +1631,7 @@ pr_iph(struct icmp *icp,
  * Print an ASCII host address starting from a string of bytes.
  */
 static void
-pr_saddr(char *pat,
-	 u_char *cp)
+pr_saddr(u_char *cp)
 {
 	n_long l;
 	struct in_addr addr;
@@ -1506,7 +1641,7 @@ pr_saddr(char *pat,
 	l = (l<<8) + (u_char)*++cp;
 	l = (l<<8) + (u_char)*++cp;
 	addr.s_addr = htonl(l);
-	(void)printf(pat, (l == 0) ? "0.0.0.0" : pr_addr(&addr));
+	(void)printf("\t%s", (l == 0) ? "0.0.0.0" : pr_addr(&addr));
 }
 
 
@@ -1677,12 +1812,21 @@ gethost(const char *arg,
 static void
 usage(void)
 {
+#ifdef IPSEC
+#ifdef IPSEC_POLICY_IPSEC
+#define IPSECOPT	"\n     [-E policy] "
+#else
+#define IPSECOPT	"\n     [-AE] "
+#endif /*IPSEC_POLICY_IPSEC*/
+#else
+#define IPSECOPT	""
+#endif /*IPSEC*/
 
 	(void)fprintf(stderr, "Usage: \n"
 	    "%s [-dDfLnoPqQrRv] [-c count] [-g gateway] [-h host]"
 	    " [-i interval] [-I addr]\n"
 	    "     [-l preload] [-p pattern] [-s size] [-t tos] [-T ttl]"
-	    " [-w maxwait] host\n",
+	    " [-w maxwait] " IPSECOPT "host\n",
 	    __progname);
 	exit(1);
 }

@@ -1,7 +1,10 @@
+# $NetBSD: md.sparc,v 1.50.2.4 2001/04/22 18:32:08 he Exp $
+./dev/apm
 ./sbin/edlabel
 ./sbin/ldconfig
 ./usr/bin/fdformat
 ./usr/libexec/ld.so
+./usr/lkm/adosfs.o
 ./usr/lkm/cd9660.o
 ./usr/lkm/coda.o
 ./usr/lkm/ext2fs.o
@@ -10,13 +13,18 @@
 ./usr/lkm/kernfs.o
 ./usr/lkm/mfs.o
 ./usr/lkm/msdosfs.o
+./usr/lkm/ntfs.o
 ./usr/lkm/nullfs.o
+./usr/lkm/overlay.o
 ./usr/lkm/portal.o
 ./usr/lkm/procfs.o
 ./usr/lkm/umapfs.o
 ./usr/mdec/binstall
 ./usr/mdec/boot
+./usr/mdec/boot.388000
 ./usr/mdec/boot.net
 ./usr/mdec/bootxx
 ./usr/mdec/installboot
+./usr/sbin/apmd
 ./usr/sbin/eeprom
+./usr/sbin/tadpolectl

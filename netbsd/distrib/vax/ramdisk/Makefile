@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.1 1999/03/12 18:36:52 ragge Exp $
+#	$NetBSD: Makefile,v 1.5 2000/05/18 02:12:45 matt Exp $
 
 TOP=		${.CURDIR}/..
 
@@ -24,7 +24,8 @@ LISTS=		list
 CRUNCHCONF=	${CBIN}.conf
 MTREE=		mtree.conf
 
-DISKTYPE=	rx33
+DISKTYPE=	ramdisk
+DISKSIZE=	2276
 
 install.sh: install.tmpl
 	sed "s/@@VERSION@@/${VER}/" < ${.ALLSRC} > ${.TARGET}
@@ -36,13 +37,14 @@ start.sh: start.tmpl
 	sed "s/@@VERSION@@/${VER}/" < ${.ALLSRC} > ${.TARGET}
 
 all: ${AUXTARGETS} ${CBIN} 
-	dd if=/dev/zero of=${IMAGE} count=2400
+	dd if=/dev/zero of=${IMAGE} count=${DISKSIZE}
 	vnconfig -t ${DISKTYPE} -v -c ${VND_CDEV} ${IMAGE}
 	disklabel -rw ${VND_CDEV} ${DISKTYPE}
-	newfs -m 0 -o space -c 80 ${VND_RDEV} ${DISKTYPE}
+	newfs -B le -m 0 -o space -i 3228 -c 2 ${VND_RDEV} ${DISKTYPE}
 	mount ${VND_DEV} ${MOUNT_POINT}
 	mtree -def ${.CURDIR}/${MTREE} -p ${MOUNT_POINT}/ -u
 	TOPDIR=${TOP} CURDIR=${.CURDIR} OBJDIR=${.OBJDIR} \
+	    KERNOBJDIR=${KERNOBJDIR} \
 	    TARGDIR=${MOUNT_POINT} sh ${TOP}/runlist.sh ${.CURDIR}/${LISTS}
 	@echo ""
 	@df -i ${MOUNT_POINT}
@@ -62,7 +64,7 @@ ${CBIN}: ${CBIN}.mk ${CBIN}.cache ${CBIN}.c
 	make -f ${CBIN}.mk all
 
 clean cleandir distclean:
-	/bin/rm -f ${AUXCLEAN} *.core ${IMAGE} ${CBIN} ${CBIN}.mk ${CBIN}.cache *.o *.lo *.c
+	/bin/rm -f ${AUXCLEAN} *.core ${IMAGE} ${CBIN} ${CBIN}.mk ${CBIN}.cache *.o *.cro *.c
 
 .include <bsd.obj.mk>
 .include <bsd.subdir.mk>

@@ -1,4 +1,7 @@
-#	$NetBSD: Makefile,v 1.4.2.1 1999/04/07 06:51:26 cgd Exp $
+#	$NetBSD: Makefile,v 1.11 2000/05/02 16:06:45 sjg Exp $
+
+.include "../../../Makefile.inc"
+.include <bsd.kernobj.mk>
 
 MOUNT_POINT?=	/mnt
 VND?=		vnd0
@@ -6,8 +9,9 @@ VND_DEV=	/dev/${VND}a
 VND_RDEV=	/dev/r${VND}a
 VND_CDEV=	/dev/${VND}c
 VND_CRDEV=	/dev/r${VND}c
-MDEC=		${DESTDIR}/usr/mdec
-KERNEL=		${.CURDIR}/../../../sys/arch/alpha/compile/GENERIC/netbsd
+MDEC?=		${DESTDIR}/usr/mdec
+KERNEL?=	${KERNOBJDIR}/GENERIC/netbsd
+STRIP?=		strip
 
 GZKERNEL=	netbsd
 IMAGE=		GENERIC.fs
@@ -40,15 +44,21 @@ GENERIC.fs: ${GZKERNEL} ${MDEC}/boot ${MDEC}/bootxx.old
 
 ${GZKERNEL}: ${KERNEL}
 	cp ${KERNEL} ${.TARGET}
-	strip ${.TARGET}
+	${STRIP} ${.TARGET}
 	gzip -9 ${.TARGET}
 	mv ${.TARGET}.gz ${.TARGET}
 
 unconfig:
 	-vnconfig -u ${VND_CDEV}
 
+disk: all
+	dd if=GENERIC.fs bs=18k of=/dev/rfd0a
+
 clean cleandir distclean:
 	/bin/rm -f *.core ${CLEANFILES} ${GZKERNEL} ${GZKERNEL}.gz *.tmp
+
+# nothing to do here
+depend includes lint regress tags:
 
 .include <bsd.own.mk>
 .include <bsd.obj.mk>

@@ -1,4 +1,4 @@
-#	$NetBSD: install.md,v 1.7.2.1 1999/04/22 14:25:36 perry Exp $
+#	$NetBSD: install.md,v 1.8 1999/04/22 04:29:49 gwr Exp $
 #
 #
 # Copyright (c) 1996 The NetBSD Foundation, Inc.

@@ -1,5 +1,5 @@
 #
-#	$NetBSD: mr.disktab,v 1.1.1.1.8.1 1999/06/21 03:11:59 perry Exp $
+#	$NetBSD: mr.disktab,v 1.2 1999/05/18 07:40:51 gwr Exp $
 #
 # Disk geometry and partition layout tables. 
 # (empty on the miniroot)

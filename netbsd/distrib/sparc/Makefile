@@ -1,5 +1,5 @@
-#	$NetBSD: Makefile,v 1.2.4.1 1999/04/30 15:18:42 perry Exp $
+#	$NetBSD: Makefile,v 1.3.8.1 2000/10/19 14:24:18 tv Exp $
 
-SUBDIR=	ramdisk bootfs ramdisk.sysinst bootfs.sysinst
+SUBDIR=	ramdisk bootfs instfs
 
 .include <bsd.subdir.mk>

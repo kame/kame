@@ -1,4 +1,4 @@
-/*	$NetBSD: md.h,v 1.12.2.3 1999/06/24 22:46:23 cgd Exp $	*/
+/*	$NetBSD: md.h,v 1.17.4.5 2000/11/28 18:54:23 tv Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -70,22 +70,30 @@
 EXTERN distinfo dist_list[]
 #ifdef MAIN
 = {
-    {"kern",	1, "ag", "Kernel       : "},
-    {"base",	1, "bw", "Base         : "},
-    {"etc",	1, "aa", "System (/etc): "},
-    {"comp",	1, "bl", "Compiler     : "},
-    {"games",	1, "am", "Games        : "},
-    {"man",	1, "ar", "Manuals      : "},
-    {"misc",	1, "aj", "Miscellaneous: "},
-    {"text",	1, "af", "Text tools   : "},
-
-    /* XXX no X11 on floppies, what sets are they?*/
-    {"xbase",	1, "al", "X11 clients  : "},
-    {"xfont",	1, "az", "X11 fonts    : "},
-    {"xserver",	1, "cr", "X11 servers  : "},
-    {"xcontrib",1, "aa", "X11 contrib  : "},
-    {"xcomp",	1, "ah", "X programming: "},
+    {"kern",	1, "aj", "Generic Kernel: "},
+    {"base",	1, "cr", "Base          : "},
+    {"etc",	1, "aa", "System (/etc) : "},
+    {"comp",	1, "ca", "Compiler      : "},
+    {"games",	1, "am", "Games         : "},
+    {"man",	1, "ax", "Manuals       : "},
+    {"misc",	1, "aj", "Miscellaneous : "},
+    {"text",	1, "af", "Text tools    : "},
+    {"xbase",	1, "al", "X11 clients   : "},
+    {"xfont",	1, "az", "X11 fonts     : "},
+    {"xserver",	1, "ck", "X11 servers   : "},
+    {"xcontrib",1, "aa", "X11 contrib   : "},
+    {"xcomp",	1, "ah", "X programming : "},
+    {"xmisc",	1, "aa", "X11 Misc.     : "},
     {NULL, 0, NULL, NULL }
+}
+#endif
+;
+
+EXTERN distinfo special_kernel_list[]
+#ifdef MAIN
+= {
+    {"kern-laptop",	1, "ah", "Laptop Kernel : "},
+    {"kern-tiny",	1, "ac", "Small Kernel  : "},
 }
 #endif
 ;
@@ -93,11 +101,11 @@ EXTERN distinfo dist_list[]
 /*
  * Disk names accepted as valid targets for a from-scratch installation.
  *
- * On  i386, we allow "wd"  ST-506/IDE disks and  "sd" scsi disks.
+ * On  i386, we allow "wd"  ST-506/IDE disks,  "sd" scsi disks, "ca" arrays.
  */
 EXTERN	char *disk_names[]
 #ifdef MAIN
-= {"wd", "sd", NULL}
+= {"wd", "sd", "ca", NULL}
 #endif
 ;
 
@@ -107,9 +115,9 @@ EXTERN	char *disk_names[]
  * this must return 1 for a character that matches the first
  * characters of each member of disk_names.
  *
- * On  i386, that means matching 'w' for st-506/ide and 's' for sd.
+ * On  i386, that means matching 'w' for st-506/ide, 's' for sd and 'c' for ca.
  */
-#define ISDISKSTART(dn)	(dn == 'w' || dn == 's')
+#define ISDISKSTART(dn)	(dn == 'w' || dn == 's' || dn == 'c')
 
 /*
  * Machine-specific command to write a new label to a disk.
@@ -153,6 +161,9 @@ extern struct mbr_bootsel *mbs;
  
 #define SCAN_ENTER      0x1c
 #define SCAN_F1         0x3b
+
+#define LIB_COUNT	0
+#define LIB_MOVE	1
  
 #define MBR_BOOTSELOFF  (MBR_PARTOFF - sizeof (struct mbr_bootsel))
 

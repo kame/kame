@@ -1,4 +1,4 @@
-/*	$NetBSD: factor.c,v 1.9.2.1 1999/06/24 22:58:15 cgd Exp $ */
+/*	$NetBSD: factor.c,v 1.10 1999/06/20 06:08:14 cgd Exp $ */
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.

@@ -1,4 +1,4 @@
-/*	$NetBSD: txtwalk.h,v 1.4.2.1 1999/06/24 23:01:56 cgd Exp $	*/
+/*	$NetBSD: txtwalk.h,v 1.5 1999/06/20 06:08:15 cgd Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.

@@ -1,4 +1,4 @@
-/*	$NetBSD: menus.mi.fr,v 1.12.2.3 1999/06/24 23:00:16 cgd Exp $	*/
+/*	$NetBSD: menus.mi.fr,v 1.28.2.2 2000/10/18 17:51:15 tv Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -69,12 +69,12 @@ menu netbsd, title "NetBSD-@@VERSION@@ Programme d'installation",
 	option "Réinstaller ou installer de nouveaux composants",
 		action { do_reinstall_sets(); };
 	option "Redémarrer l'ordinateur", exit,
-		action (endwin) { run_prog(0, 0, NULL, "/sbin/reboot"); };
+		action (endwin) { run_prog(0, NULL, "/sbin/reboot"); };
 	option "Menu utilitaire", sub menu utility;
 
 menu utility, title "Utilitaires NetBSD-@@VERSION@@", exit;
-	/* option "test", action { run_prog(0, 1, NULL, "/bin/pwd"); }; */
-	/* option "testfalse", action { run_prog(0, 0, "%s: kaput", "/bin/false"); }; */
+	/* option "test", action { run_prog(RUN_DISPLAY, NULL, "/bin/pwd"); }; */
+	/* option "testfalse", action { run_prog(0, "%s: kaput", "/bin/false"); }; */
 	option "Exécuter /bin/sh",
 		action (endwin) { system("/bin/sh"); };
 	option "Configuration du réseau",
@@ -87,7 +87,7 @@ menu utility, title "Utilitaires NetBSD-@@VERSION@@", exit;
 /*	option "Partitioner un disque"; XXX add later.  */
 	option "Traces", action { do_logging(); };
 	option "Arrêter le système", exit,
-		action (endwin) { run_prog(0, 0, NULL, "/sbin/halt"); };
+		action (endwin) { run_prog(0, NULL, "/sbin/halt"); };
 
 menu yesno, title "oui ou non?";
 	option "Oui", exit, action  {yesno = 1;};
@@ -111,7 +111,7 @@ menu sizechoice, title  "Choisissez votre unité d'espace disque";
 		  multname = msg_string(MSG_megname);
 		};
 	option "Cylindres", exit, action 
-		{ sizemult = dlcylsize; 
+		{ sizemult = current_cylsize; 
 		  multname = msg_string(MSG_cylname);
 		};
 	option "Secteurs", exit, action 
@@ -223,11 +223,10 @@ menu distset, title "Sélection de la distribution";
 
 menu ftpsource, title "Changer";
 	display action
-		{ msg_display (MSG_ftpsource, ftp_host, ftp_dir, ftp_user);
-		  if (strcmp(ftp_user, "ftp") == 0)
-			msg_printf_add ("%s", ftp_pass);
-		  else if (strlen(ftp_pass) != 0)
-			msg_printf_add ("** caché **", ftp_pass);
+		{ msg_clear();
+		  msg_table_add (MSG_ftpsource, ftp_host, ftp_dir, ftp_user,
+		     strcmp(ftp_user, "ftp") == 0 ? ftp_pass :
+		       strlen(ftp_pass) != 0 ? "** caché **" : "");
 		};
 	option "Serveur ftp", action
 		{ msg_prompt (MSG_host, ftp_host, ftp_host, 255); };
@@ -239,9 +238,7 @@ menu ftpsource, title "Changer";
 		{ if (strcmp(ftp_user, "ftp") == 0)
 			msg_prompt (MSG_email, ftp_pass, ftp_pass, 255);
 		  else {
-			msg_noecho ();
-			msg_prompt (MSG_passwd, "", ftp_pass, 255);
-			msg_echo ();
+			msg_prompt_noecho (MSG_passwd, "", ftp_pass, 255);
 		  }
 		};
 	option "Récupérer la Distribution", exit;
@@ -326,3 +323,75 @@ menu localdirbad, title "Que voulez vous faire?";
 		{ yesno = 0; ignorerror = 0; };
 	option "Ignorer les erreurs, continuer quand même", exit, action
 		{ yesno = 1; ignorerror = 1; };
+
+menu namesrv6, title "  Choisissez un serveur de noms IPv6 :";
+	option "paradise.v6.kame.net", exit, action
+		{
+#ifdef INET6
+		  strncpy(net_namesvr6, "3ffe:501:4819::42",
+		      sizeof(net_namesvr6));
+		  yesno = 1;
+#else
+		  yesno = 0;
+#endif
+		}; 
+	option "kiwi.itojun.org", exit, action
+		{
+#ifdef INET6
+		  strncpy(net_namesvr6, "3ffe:501:410:100:5254:ff:feda:48bf",
+		      sizeof(net_namesvr6));
+		  yesno = 1;
+#else
+		  yesno = 0;
+#endif
+		}; 
+	option "sh1.iijlab.net", exit, action
+		{
+#ifdef INET6
+		  strncpy(net_namesvr6, "3ffe:507:0:1:260:97ff:fe07:69ea",
+		      sizeof(net_namesvr6));
+		  yesno = 1;
+#else
+		  yesno = 0;
+#endif
+		}; 
+	option "ns1.v6.intec.co.jp", exit, action 
+		{
+#ifdef INET6
+		  strncpy(net_namesvr6, "3ffe:508:0:1::53",
+		      sizeof(net_namesvr6));
+		  yesno = 1;
+#else
+		  yesno = 0;
+#endif
+		}; 
+	option "nttv6.net", exit, action
+		{
+#ifdef INET6
+		  strncpy(net_namesvr6, "3ffe:1800:1000::1",
+		      sizeof(net_namesvr6));
+		  yesno = 1;
+#else
+		  yesno = 0;
+#endif
+		}; 
+	option "light.imasy.or.jp", exit, action
+		{
+#ifdef INET6
+		  strncpy(net_namesvr6, "3ffe:505:0:1:2a0:c9ff:fe61:6521",
+		      sizeof(net_namesvr6));
+		  yesno = 1;
+#else
+		  yesno = 0;
+#endif
+		}; 
+	option "other ", exit, action
+		{ yesno = 0; };
+
+menu ip6autoconf, title "Faire la configuration automatique IPv6 ?";
+	option "Yes", exit, action  {yesno = 1;};
+	option "No",  exit, action  {yesno = 0;};
+
+menu dhcpautoconf, title "Exécutez la configuration automatique de DHCP?";
+        option "Yes", exit, action  {yesno = 1;};
+        option "No",  exit, action  {yesno = 0;};

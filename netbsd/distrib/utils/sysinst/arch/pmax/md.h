@@ -1,4 +1,4 @@
-/*	$NetBSD: md.h,v 1.10.2.1 1999/06/24 22:55:58 cgd Exp $	*/
+/*	$NetBSD: md.h,v 1.14.4.3 2000/11/01 02:09:30 tv Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -41,12 +41,18 @@
 /* Constants and defines */
 
 /*
- * Megabytes of disk required for a full X installation. 
- * XXX is this swap space or  additional space in /usr required
- *     to  hold X binaries?
- * For now, we set it to 100 on the pmax.
+ * Symbolic names for disk partitions.
  */
-#define XNEEDMB 100
+#define PART_ROOT	A
+#define PART_SWAP	B
+#define PART_RAW	C
+#define PART_USR	D	/* Can be after PART_FIRST_FREE */
+#define PART_FIRST_FREE	E
+
+#define DEFSWAPRAM	32	/* Assume at least this RAM for swap calc */
+#define DEFROOTSIZE	64	/* Default root size */
+#define STDNEEDMB	140	/* Min space for non X install */
+#define XNEEDMB		100	/* Extra megs for full X installation */
 
 /*
  * Disk names accepted as valid targets for a from-scratch installation.
@@ -70,15 +76,8 @@ EXTERN	char *disk_names[]
 
 /*
  * Machine-specific command to write a new label to a disk.
- * For example, i386  uses "/sbin/disklabel -w -r", just like i386
- * miniroot scripts, though this may leave a bogus incore label.
- * Sun ports should probably use  DISKLABEL_CMD "/sbin/disklabel -w"
- * to get incore  to ondisk inode translation for the Sun proms.
  * If not defined, we assume the port does not support disklabels and
  * hand-edited disklabel will NOT be written by MI code.
- *
- * On  pmax, we just use do the same as the i386 until we find
- * a reason to switch to disklabel -w -r.
  */
 #define DISKLABEL_CMD "disklabel -w -r"
 
@@ -100,11 +99,13 @@ EXTERN distinfo dist_list[]
     {"man",	1, NULL, "Manuals      : "},
     {"misc",	1, NULL, "Miscellaneous: "},
     {"text",	1, NULL, "Text tools   : "},
+
     {"xbase",	1, NULL, "X11 clients  : "},
     {"xfont",	1, NULL, "X11 fonts    : "},
     {"xserver",	1, NULL, "X11 servers  : "},
     {"xcontrib",1, NULL, "X11 contrib  : "},
     {"xcomp",	1, NULL, "X programming: "},
+    {"xmisc",	1, NULL, "X11 Misc.    : "},
     {NULL, 0, NULL, NULL }
 }
 #endif

@@ -1,4 +1,4 @@
-/*	$NetBSD: mbr.c,v 1.11.2.5 1999/07/12 19:29:37 perry Exp $ */
+/*	$NetBSD: mbr.c,v 1.22.2.2 2000/12/26 02:08:26 jhawk Exp $ */
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -86,13 +86,18 @@ struct part_id {
 	char *name;
 } part_ids[] = {
 	{0, "unused"},
-	{MBR_PTYPE_FAT12, "Primary DOS, 12 bit FAT"},
-	{MBR_PTYPE_FAT16S, "Primary DOS, 16 bit FAT <32M"},
-	{MBR_PTYPE_EXT, "Extended DOS"},
-	{MBR_PTYPE_FAT16B, "Primary DOS, 16-bit FAT >32MB"},
+	{MBR_PTYPE_FAT12, "DOS FAT12"},
+	{MBR_PTYPE_FAT16S, "DOS FAT16, <32M"},
+	{MBR_PTYPE_EXT, "Extended partition"},
+	{MBR_PTYPE_FAT16B, "DOS FAT16, >32M"},
 	{MBR_PTYPE_NTFS, "NTFS"},
+	{MBR_PTYPE_FAT32, "Windows FAT32"},
+	{MBR_PTYPE_FAT32L, "Windows FAT32, LBA"},
+	{MBR_PTYPE_FAT16L, "Windows FAT16, LBA"},
+	{MBR_PTYPE_EXT_LBA, "Extended partition, LBA"},
 	{MBR_PTYPE_LNXSWAP, "Linux swap"},
 	{MBR_PTYPE_LNXEXT2, "Linux native"},
+	{MBR_PTYPE_NTFSVOL, "NTFS volume set"},
 	{MBR_PTYPE_386BSD, "old NetBSD/FreeBSD/386BSD"},
 	{MBR_PTYPE_NETBSD, "NetBSD"},
 	{-1, "Unknown"},
@@ -231,7 +236,7 @@ edit_mbr(partition)
 		int numfreebsd, freebsdpart;	/* dual-boot */
 
 		/* Ask for sizes, which partitions, ... */
-		ask_sizemult();
+		ask_sizemult(bcylsize);
 		bsdpart = freebsdpart = -1;
 		activepart = -1;
 		for (i = 0; i<4; i++)
@@ -366,23 +371,25 @@ disp_cur_part(part, sel, disp)
 		start = 0, stop = 4;
 	else
 		start = disp, stop = disp+1;
-	msg_display_add(MSG_part_head, multname, multname, multname);
+	msg_table_add(MSG_part_header, dlsize/sizemult, multname, multname,
+	    multname, multname);
 	for (i = start; i < stop; i++) {
 		if (sel == i)
 			msg_standout();
-		if (part[i].mbrp_size == 0 && part[i].mbrp_start == 0)
-			msg_printf_add("%d %36s  ", i, "");
+		if (part[i].mbrp_typ == 0 ||
+		    (part[i].mbrp_size == 0 && part[i].mbrp_start == 0))
+			msg_table_add(MSG_part_row_start_unused, i);
 		else {
 			rsize = part[i].mbrp_size / sizemult;
 			if (part[i].mbrp_size % sizemult)
 				rsize++;
 			rend = (part[i].mbrp_start + part[i].mbrp_size) / sizemult;
-			if ((part[i].mbrp_size + part[i].mbrp_size) % sizemult)
+			if ((part[i].mbrp_start + part[i].mbrp_size) % sizemult)
 				rend++;
-			msg_printf_add("%d %12d%12d%12d  ", i,
+			msg_table_add(MSG_part_row_start_used, i,
 			    part[i].mbrp_start / sizemult, rsize, rend);
 		}
-		msg_printf_add("%s\n", get_partname(i));
+		msg_table_add(MSG_part_row_end, get_partname(i));
 		if (sel == i)
 			msg_standend();
 	}
@@ -469,7 +476,7 @@ write_mbr(disk, buf, len, convert)
 				    &mbrp[i].mbrp_ssect, pstart);
 				convert_mbr_chs(bcyl, bhead, bsec,
 				    &mbrp[i].mbrp_ecyl, &mbrp[i].mbrp_ehd,
-				    &mbrp[i].mbrp_esect, pstart + psize);
+				    &mbrp[i].mbrp_esect, pstart + psize - 1);
 			}
 		}
 	}
@@ -500,13 +507,12 @@ convert_mbr_chs(cyl, head, sec, cylp, headp, secp, relsecs)
 {
 	unsigned int tcyl, temp, thead, tsec;
 
+	temp = cyl * head * sec - 1;
+	if (relsecs >= temp)
+		relsecs = temp;
+
 	temp = head * sec;
 	tcyl = relsecs / temp;
-
-	if (tcyl >= 1024) {
-		*cylp = *headp = *secp = 0xff;
-		return;
-	}
 
 	relsecs %= temp;
 	thead = relsecs / sec;

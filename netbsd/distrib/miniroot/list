@@ -1,4 +1,4 @@
-#	$NetBSD: list,v 1.11 1999/03/25 15:51:15 leo Exp $
+#	$NetBSD: list,v 1.14.2.1 2000/08/29 11:31:18 leo Exp $
 
 SRCDIRS distrib/utils usr.bin bin sbin usr.sbin gnu/usr.bin
 
@@ -9,7 +9,7 @@ LINK	instbin			bin/chmod
 LINK	instbin			bin/cp
 LINK	instbin			bin/x_dd bin/dd
 LINK	instbin			bin/df
-LINK	instbin			bin/ed
+LINK	instbin			bin/x_ed bin/ed
 LINK	instbin			bin/expr
 LINK	instbin			bin/hostname
 LINK	instbin			bin/ln
@@ -36,8 +36,8 @@ LINK	instbin			sbin/mount_cd9660
 LINK	instbin			sbin/mount_ffs
 LINK	instbin			sbin/mount_nfs
 LINK	instbin			sbin/newfs sbin/mount_mfs
-LINK	instbin			sbin/ping
-LINK	instbin			sbin/route
+LINK	instbin			sbin/x_ping sbin/ping
+LINK	instbin			sbin/x_route sbin/route
 LINK	instbin			sbin/shutdown
 LINK	instbin			sbin/slattach
 LINK	instbin			sbin/umount
@@ -49,7 +49,6 @@ LINK	instbin			usr/bin/gzip usr/bin/gunzip usr/bin/gzcat
 LINK	instbin			usr/bin/sed
 LINK	instbin			usr/bin/sort
 LINK	instbin			usr/bin/tip
-LINK	instbin			usr/sbin/update
 
 # `internal' crunchgen links
 ARGVLINK mount_ffs	ffs
@@ -62,6 +61,7 @@ COPY	${DESTDIR}/etc/group		etc/group
 COPY	${DESTDIR}/etc/master.passwd	etc/master.passwd
 COPY	${DESTDIR}/etc/passwd		etc/passwd
 COPY	${DESTDIR}/etc/protocols	etc/protocols
+COPY	${DESTDIR}/etc/netconfig	etc/netconfig
 COPY	${DESTDIR}/etc/services		etc/services
 
 # and the installation scripts

@@ -1,4 +1,4 @@
-/*	$NetBSD: md.h,v 1.1.2.1 1999/06/24 22:57:14 cgd Exp $	*/
+/*	$NetBSD: md.h,v 1.4.4.2 2000/11/01 02:06:55 tv Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -41,8 +41,19 @@
 
 /* Constants and defines */
 
-/* Megs required for a full X installation. */
-#define XNEEDMB 35	/* XXXTHORPEJ */
+/*
+ * Symbolic names for disk partitions.
+ */
+#define PART_ROOT	A
+#define PART_SWAP	B
+#define PART_RAW	C
+#define PART_USR	D	/* Can be after PART_FIRST_FREE */
+#define PART_FIRST_FREE	E
+
+#define DEFSWAPRAM	16	/* Assume at least this RAM for swap calc */
+#define DEFROOTSIZE	32	/* Default root size */
+#define STDNEEDMB	80	/* Min space for non X install */
+#define XNEEDMB		35	/* Extra megs for full X installation */
 
 /*
  * Default filesets to fetch and install during installation
@@ -59,11 +70,13 @@ EXTERN distinfo dist_list[]
     {"man",	1, NULL, "Manuals      : "},
     {"misc",	1, NULL, "Miscellaneous: "},
     {"text",	1, NULL, "Text tools   : "},
+
     {"xbase",	1, NULL, "X11 clients  : "},
     {"xfont",	1, NULL, "X11 fonts    : "},
     {"xserver",	1, NULL, "X11 servers  : "},
     {"xcontrib",1, NULL, "X11 contrib  : "},
     {"xcomp",	1, NULL, "X programming: "},
+    {"xmisc",	1, NULL, "X11 Misc.    : "},
     {NULL, 0, NULL, NULL }
 }
 #endif

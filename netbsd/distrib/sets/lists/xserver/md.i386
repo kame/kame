@@ -1,3 +1,4 @@
+# $NetBSD: md.i386,v 1.13 2000/01/11 14:20:44 tron Exp $
 ./usr/X11R6/bin/SuperProbe
 ./usr/X11R6/bin/X
 ./usr/X11R6/bin/XF86_3DLabs
@@ -52,8 +53,10 @@
 ./usr/X11R6/lib/X11/doc/README.clkprog
 ./usr/X11R6/lib/X11/doc/README.cyrix
 ./usr/X11R6/lib/X11/doc/README.epson
+./usr/X11R6/lib/X11/doc/README.i740
 ./usr/X11R6/lib/X11/doc/README.mouse
 ./usr/X11R6/lib/X11/doc/README.neo
+./usr/X11R6/lib/X11/doc/README.r128
 ./usr/X11R6/lib/X11/doc/README.rendition
 ./usr/X11R6/lib/X11/doc/README.trident
 ./usr/X11R6/lib/X11/doc/README.tseng
@@ -66,10 +69,13 @@
 ./usr/X11R6/lib/modules
 ./usr/X11R6/lib/modules/pex5.so
 ./usr/X11R6/lib/modules/xf86AceCad.so
+./usr/X11R6/lib/modules/xf86Calcomp.so
 ./usr/X11R6/lib/modules/xf86Dial.so
+./usr/X11R6/lib/modules/xf86Dyna.so
 ./usr/X11R6/lib/modules/xf86Elo.so
 ./usr/X11R6/lib/modules/xf86MuTouch.so
 ./usr/X11R6/lib/modules/xf86Summa.so
+./usr/X11R6/lib/modules/xf86USBtablet.so
 ./usr/X11R6/lib/modules/xf86Wacom.so
 ./usr/X11R6/lib/modules/xie.so
 ./usr/X11R6/man/cat1/SuperProbe.0

@@ -1,4 +1,4 @@
-/*	$NetBSD: defs.h,v 1.36.2.3 1999/06/24 22:58:02 cgd Exp $	*/
+/*	$NetBSD: defs.h,v 1.53.2.5 2000/10/18 17:51:13 tv Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -43,6 +43,11 @@
 #define FSTYPENAMES
 #include <sys/disklabel.h>
 
+#include "msg_defs.h"
+
+#define	min(a,b)	(a < b ? a : b)
+#define	max(a,b)	(a > b ? a : b)
+
 /* Define for external varible use */ 
 #ifdef MAIN
 #define EXTERN 
@@ -60,6 +65,13 @@
 /* For run.c: collect() */
 #define T_FILE 0
 #define T_OUTPUT 1
+
+/* run_prog flags */
+#define RUN_DISPLAY	0x0001		/* run in subwindow */
+#define RUN_FATAL	0x0002		/* errors are fatal */
+#define RUN_CHROOT	0x0004		/* chroot to target disk */
+#define RUN_FULLSCREEN	0x0008		/* fullscreen (use with RUN_DISPLAY) */
+#define RUN_SYSTEM	0x0010		/* just use system(3) */
 
 /* Macros */
 
@@ -86,6 +98,8 @@ typedef struct _partinfo {
 
 /* variables */
 
+EXTERN char m_continue[STRSIZE] INIT("");
+
 EXTERN char rel[SSTRSIZE] INIT(REL);
 EXTERN char machine[SSTRSIZE] INIT(MACH);
 
@@ -95,8 +109,8 @@ EXTERN int ttysig_ignore;
 EXTERN pid_t ttysig_forward;
 EXTERN int layoutkind;
 EXTERN int sizemult INIT(1);
-EXTERN char *multname; 
-EXTERN char *doingwhat;
+EXTERN const char *multname; 
+EXTERN const char *doingwhat;
 
 /* loging variables */
 
@@ -133,10 +147,11 @@ EXTERN struct disk_desc *disk;
 EXTERN int sectorsize;
 
 /* Actual name of the disk. */
-EXTERN char diskdev[SSTRSIZE];
+EXTERN char diskdev[SSTRSIZE] INIT("");
 EXTERN char disknames[STRSIZE];
 EXTERN int  numdisks;
 EXTERN char *disktype;		/* ST506, SCSI, ... */
+EXTERN char swapdev[SSTRSIZE] INIT("");
 
 /* Used in editing partitions ... BSD disklabel and others */
 EXTERN int editpart;
@@ -156,9 +171,10 @@ EXTERN int partsize;
 
 /* set by md_get_info() */
 EXTERN int dlcyl, dlhead, dlsec, dlsize, dlcylsize;
+EXTERN int current_cylsize;
 /* Information for the NetBSD disklabel */
-enum DLTR {A,B,C,D,E,F,G,H};
-EXTERN char partname[] INIT("abcdefgh");
+enum DLTR {A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S,T,U,V,W,X,Y,Z};
+#define partition_name(x)	('a' + (x))
 EXTERN partinfo bsdlabel[16];
 EXTERN char fsmount[16][20] INIT({""});
 #define DISKNAME_SIZE 80
@@ -173,9 +189,19 @@ EXTERN char dist_dir[STRSIZE] INIT("/usr/INSTALL");
 EXTERN int  clean_dist_dir INIT(0);
 /* Absolute path name where the distribution should be extracted from. */
 
+#if !defined(FTP_HOST)
+#define	FTP_HOST	ftp.netbsd.org
+#endif
+
+#if !defined(FTP_DIR)
+#define	FTP_DIR		pub/NetBSD/NetBSD-
+#endif
+
+#define	STRING(x)	__STRING(x)
+
 EXTERN char ext_dir[STRSIZE] INIT("");
-EXTERN char ftp_host[STRSIZE] INIT("ftp.netbsd.org");
-EXTERN char ftp_dir[STRSIZE]  INIT("pub/NetBSD/NetBSD-");
+EXTERN char ftp_host[STRSIZE] INIT(STRING(FTP_HOST));
+EXTERN char ftp_dir[STRSIZE]  INIT(STRING(FTP_DIR));
 EXTERN char ftp_prefix[STRSIZE] INIT("/binary/sets");
 EXTERN char ftp_user[STRSIZE] INIT("ftp");
 EXTERN char ftp_pass[STRSIZE] INIT("");
@@ -201,7 +227,7 @@ EXTERN char dist_postfix[STRSIZE] INIT(".tgz");
 EXTERN char command[STRSIZE];
 
 /* Access to network information */
-EXTERN char net_devices [STRSIZE] INIT("");
+EXTERN char net_devices[STRSIZE] INIT("");
 EXTERN char net_dev[STRSIZE] INIT("");
 EXTERN char net_domain[STRSIZE] INIT("");
 EXTERN char net_host[STRSIZE] INIT("");
@@ -210,6 +236,15 @@ EXTERN char net_mask[STRSIZE] INIT("");
 EXTERN char net_namesvr[STRSIZE] INIT("");
 EXTERN char net_defroute[STRSIZE] INIT("");
 EXTERN char net_media[STRSIZE] INIT("");
+EXTERN int net_dhcpconf INIT(0);
+#define DHCPCONF_IPADDR		0x01
+#define DHCPCONF_NAMESVR	0x02
+#define DHCPCONF_HOST		0x04
+#define DHCPCONF_DOMAIN		0x08
+#ifdef INET6
+EXTERN char net_ip6[STRSIZE] INIT("");
+EXTERN char net_namesvr6[STRSIZE] INIT("");
+#endif
 
 /* Variables for upgrade. */
 #if 0
@@ -221,14 +256,17 @@ EXTERN char fs_mount[MAXFS][STRSIZE];
 /* needed prototypes */
 
 /* Machine dependent functions .... */
+int	md_check_partitions __P((void));
+void	md_cleanup_install __P((void));
+int	md_copy_filesystem __P((void));
 int	md_get_info __P((void));
-int	md_pre_disklabel __P((void));
+int	md_make_bsd_partitions __P((void));
 int	md_post_disklabel __P((void));
 int	md_post_newfs __P((void));
-int	md_copy_filesystem __P((void));
-int	md_make_bsd_partitions __P((void));
+int	md_pre_disklabel __P((void));
+int	md_pre_update __P((void));
 int	md_update __P((void));
-void	md_cleanup_install __P((void));
+void	md_init __P((void));
 
 /* from main.c */
 void toplevel __P((void));
@@ -240,6 +278,7 @@ int	write_disklabel __P((void));
 int	make_filesystems __P((void));
 int	make_fstab __P((void));
 int	fsck_disks __P((void));
+int	set_swap __P((const char *, partinfo *, int));
 
 /* from label.c */
 
@@ -248,8 +287,8 @@ int	savenewlabel __P((partinfo *lp, int nparts));
 int	incorelabel __P((const char *dkname, partinfo *lp));
 int	edit_and_check_label __P((partinfo *lp, int nparts,
 				  int rawpart, int bsdpart));
-int	getpartoff __P((int msg_no, int partstart));
-int	getpartsize __P((int msg_no, int partstart, int defpartsize));
+int	getpartoff __P((msg msg_no, int partstart));
+int	getpartsize __P((msg msg_no, int partstart, int defpartsize));
 
 /* from install.c */
 void	do_install __P((void));
@@ -272,7 +311,7 @@ void	mnt_net_config __P((void));
 
 /* From run.c */
 int	collect __P((int kind, char **buffer, const char *name, ...));
-int	run_prog __P((int, int, char *, char *, ...));
+int	run_prog __P((int, msg, const char *, ...));
 void	do_logging __P((void));
 int	do_system __P((const char *));
 
@@ -284,10 +323,11 @@ void	do_reinstall_sets __P((void));
 int	askyesno __P((int reverse));
 int	dir_exists_p(const char *path);
 int	file_exists_p(const char *path);
+int	file_mode_match(const char *path, unsigned int mode);
 int	distribution_sets_exist_p __P((const char *path));
 void	get_ramsize __P((void));
-void	ask_sizemult __P((void));
-void	reask_sizemult __P((void));
+void	ask_sizemult __P((int));
+void	reask_sizemult __P((int));
 void	run_makedev __P((void));
 int	get_via_floppy __P((void));
 int	get_via_cdrom __P((void));
@@ -298,11 +338,15 @@ void	toggle_getit __P((int));
 void	show_cur_distsets __P((void));
 void	make_ramdisk_dir __P((const char *path));
 void	ask_verbose_dist __P((void));
-int 	get_and_unpack_sets(int success_msg, int failure_msg);
+int 	get_and_unpack_sets(msg success_msg, msg failure_msg);
 int	sanity_check __P((void));
+int	set_timezone __P((void));
+int	set_root_password __P((void));
 
 /* from target.c */
 int	must_mount_root __P((void));
+const	char* concat_paths __P((const char *prefix, const char *suffix));
+char	*target_realpath __P((const char *path, char *resolved));
 const	char * target_expand __P((const char *pathname));
 void	make_target_dir __P((const char *path));
 void	append_to_target_file __P((const char *path, const char *string));
@@ -321,8 +365,9 @@ void	dup_file_into_target __P((const char *filename));
 void	mv_within_target_or_die __P((const char *from, const char *to));
 int	cp_within_target __P((const char *frompath, const char *topath));
 int	target_mount __P((const char *fstype, const char *from, const char* on));
-int	target_test __P((const char*, const char*));
+int	target_test __P((unsigned int, const char*));
 int	target_dir_exists_p __P((const char *path));
 int	target_file_exists_p __P((const char *path));
+int	target_symlink_exists_p __P((const char *path));
 void	unwind_mounts __P((void));
 

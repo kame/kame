@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.7.2.1 1999/06/21 03:19:34 perry Exp $
+#	$NetBSD: Makefile,v 1.14 2000/06/19 23:46:08 tsutsui Exp $
 
 TOP=		${.CURDIR}/..
 
@@ -17,47 +17,47 @@ KERNEL3  = ${KERNOBJDIR}/RAMDISK/netbsd
 KERNEL3X = ${KERNOBJDIR}/RAMDISK3X/netbsd
 
 MOUNT_POINT?=	/mnt
-BDEV?=		/dev/sd1b
-CDEV?=		/dev/rsd1b
+VND?=		vnd1
+VND_DEV?=	/dev/${VND}a
+VND_RDEV?=	/dev/r${VND}a
 
-# These are all the parameters for the root fs: (320K)
+# These are all the parameters for the root fs:
 DISKTYPE=	rdroot
-NBLKS=		640
-# bigendian, old format, minfree, opt, b/i  trks, sects, cpg
-NEWFSARGS= -B be -O -m 0 -o space -i 2048 -t 2 -u 16 -c 16
+SIZE=		400k
+# bigendian, minfree, opt, b/i , cpg
+NEWFSARGS= -B be -m 0 -o space -i 4096 -c 20
 
-KERNELS= netbsd-RAMDISK netbsd-RAMDISK3X
-CLEANFILES= $(KERNELS) rdsetroot ${IMAGE}.fs
+KERNELS= netbsd.RAMDISK netbsd.RAMDISK3X
+CLEANFILES= $(KERNELS) ${IMAGE}.fs netbsd-tmp
 
 all: $(KERNELS)
 
-netbsd-RAMDISK : rdsetroot ${IMAGE}.fs
+netbsd.RAMDISK : ${IMAGE}.fs
 	cp ${KERNEL3} netbsd-tmp
-	./rdsetroot  netbsd-tmp < ${IMAGE}.fs
+	mdsetimage -v netbsd-tmp ${IMAGE}.fs
 	-mv -f netbsd-tmp $@
 
-netbsd-RAMDISK3X : rdsetroot ${IMAGE}.fs
+netbsd.RAMDISK3X : ${IMAGE}.fs
 	cp ${KERNEL3X} netbsd-tmp
-	./rdsetroot  netbsd-tmp < ${IMAGE}.fs
+	mdsetimage -v netbsd-tmp ${IMAGE}.fs
 	-mv -f netbsd-tmp $@
-
-rdsetroot: ${TOP}/common/rdsetroot.c
-	$(CC) -o $@ -DDEBUG ${TOP}/common/rdsetroot.c
 
 ${IMAGE}.fs: ${TREE} ${LISTS} ${CBIN}
-	-newfs ${NEWFSARGS} -s ${NBLKS} ${CDEV} ${DISKTYPE}
-	mount ${BDEV} ${MOUNT_POINT}
+	dd if=/dev/zero of=${IMAGE}.fs bs=${SIZE} count=1
+	vnconfig -t ${DISKTYPE} -v -c ${VND} ${IMAGE}.fs
+	disklabel -rw ${VND} ${DISKTYPE}
+	newfs ${NEWFSARGS} ${VND_RDEV}
+	mount ${VND_DEV} ${MOUNT_POINT}
 	mtree -def ${TREE} -p ${MOUNT_POINT}/ -u
-	TOPDIR=${TOP} CURDIR=${.CURDIR} \
+	TOPDIR=${TOP} CURDIR=${.CURDIR} DESTDIR=${DESTDIR} \
 	  OBJDIR=${.OBJDIR} TARGDIR=${MOUNT_POINT} \
 	  sh ${TOP}/common/RunList.sh ${LISTS}
 	sync
 	@echo ""
 	@df -i ${MOUNT_POINT}
 	@echo ""
-	-umount ${MOUNT_POINT}
-	dd if=${CDEV} of=$@ bs=16b \
-	  count=`expr ${NBLKS} / 16`
+	umount ${MOUNT_POINT}
+	vnconfig -u ${VND}
 
 # Do not delete this if I change my mind and kill make...
 .PRECIOUS: ${IMAGE}.fs
@@ -73,11 +73,8 @@ HACKSRC=${TOP}/../utils/libhack
 .include "${HACKSRC}/Makefile.inc"
 
 clean cleandir distclean:
-	-rm -f a.out core *.core *.o
+	-rm -f a.out core *.core *.o *.cro *.c
 	-rm -f ${CLEANFILES}
-
-# Standard rules needed by the above...
-.include <bsd.obj.mk>
 
 .if !defined(RELEASEDIR)
 release:
@@ -90,3 +87,7 @@ release: $(KERNELS)
 	 ${RELEASEDIR}/binary/kernel/${x}.gz
 .endfor # KERNELS
 .endif	# RELEASEDIR
+
+# Standard rules needed by the above...
+.include <bsd.obj.mk>
+.include <bsd.subdir.mk>

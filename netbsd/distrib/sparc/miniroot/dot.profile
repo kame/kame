@@ -1,4 +1,4 @@
-#	$NetBSD: dot.profile,v 1.2.2.1 1999/06/26 23:56:36 cgd Exp $
+# $NetBSD: dot.profile,v 1.6.2.2 2000/11/01 03:15:43 tv Exp $
 #
 # Copyright (c) 1995 Jason R. Thorpe
 # Copyright (c) 1994 Christopher G. Demetriou
@@ -14,10 +14,12 @@
 #    documentation and/or other materials provided with the distribution.
 # 3. All advertising materials mentioning features or use of this software
 #    must display the following acknowledgement:
-#	This product includes software developed by Christopher G. Demetriou.
+#          This product includes software developed for the
+#          NetBSD Project.  See http://www.netbsd.org/ for
+#          information about NetBSD.
 # 4. The name of the author may not be used to endorse or promote products
-#    derived from this software without specific prior written permission
-#
+#    derived from this software without specific prior written permission.
+# 
 # THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
 # IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
 # OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
@@ -28,7 +30,8 @@
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 # THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
+# 
+# <<Id: LICENSE,v 1.2 2000/06/14 15:57:33 cgd Exp>>
 
 PATH=/sbin:/bin:/usr/bin:/usr/sbin:/
 export PATH
@@ -47,9 +50,6 @@ if [ "X${DONEPROFILE}" = "X" ]; then
 	echo 'erase ^H, werase ^W, kill ^U, intr ^C'
 	stty newcrt werase ^W intr ^C kill ^U erase ^H 9600
 
-	# run update, so that installed software is written as it goes.
-	update
-
 	# get the terminal type
 	_forceloop=""
 	while [ "X${_forceloop}" = X"" ]; do
@@ -62,7 +62,13 @@ if [ "X${DONEPROFILE}" = "X" ]; then
 	# Installing or upgrading?
 	_forceloop=""
 	while [ "X${_forceloop}" = X"" ]; do
-		echo -n '(I)nstall or (U)pgrade? '
+		cat <<'EOF'
+
+This distribution contains the experimental `sysinst' installation tool.
+If you feel like trying it out, choose option (X) below.
+
+EOF
+		echo -n '(I)nstall, (U)pgrade, (H)alt or (S)hell or (X)? '
 		read _forceloop
 		case "$_forceloop" in
 			i*|I*)
@@ -71,6 +77,30 @@ if [ "X${DONEPROFILE}" = "X" ]; then
 
 			u*|U*)
 				/upgrade
+				;;
+
+			h*|H*)
+				#
+				# XXX - if we're piggybacking a microroot, then
+				# exit from this (chroot) environment: the
+				# microroot's .profile will halt the machine.
+				#
+				if [ "$BOOTFS_DONEPROFILE" = YES ]; then
+					exit
+				else
+					/sbin/halt
+				fi
+				;;
+
+			s*|S*)
+				/bin/sh
+				continue
+				;;
+
+			x*|X*)
+				# setup a writable /tmp directory
+				mount_mfs swap /tmp || continue
+				/sysinst
 				;;
 
 			*)

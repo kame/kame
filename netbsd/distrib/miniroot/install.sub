@@ -1,5 +1,5 @@
 #!/bin/sh
-#	$NetBSD: install.sub,v 1.25.2.4 1999/07/02 16:40:06 perry Exp $
+#	$NetBSD: install.sub,v 1.35.4.3 2000/11/15 18:41:53 tv Exp $
 #
 # Copyright (c) 1996 The NetBSD Foundation, Inc.
 # All rights reserved.
@@ -187,6 +187,13 @@ get_localdir() {
 	_mp=$1
 	_dir=
 	while : ; do
+	    if [ X$_mp != X ]; then
+		cat << __get_localdir_1
+Note: your filesystems are mounted under the temporary mount point \"$_mp\".
+The pathname you are requested to enter below should NOT include the \"$_mp\"
+prefix.
+__get_localdir_1
+	    fi
 	    echo -n "Enter the pathname where the sets are stored [$_dir] "
 	    getresp "$_dir"
 	    _dir=$resp
@@ -210,10 +217,10 @@ get_localdir() {
 		local_sets_dir="$_mp/$_dir"
 		break
 	    else
-		cat << __get_reldir_1
-The directory \"$local_sets_dir\" does not exist, or does not hold any of the
+		cat << __get_localdir_2
+The directory \"$_mp/$_dir\" does not exist, or does not hold any of the
 upgrade sets.
-__get_reldir_1
+__get_localdir_2
 		echo -n "Re-enter pathname? [y] "
 		getresp "y"
 		case "$resp" in
@@ -264,7 +271,7 @@ __labelmoredisks_1
 	echo -n	"Label which disk? [done] "
 	getresp "done"
 	case "$resp" in
-		done)
+		"done")
 			;;
 
 		*)
@@ -282,6 +289,8 @@ addhostent() {
 	# $1 - IP address
 	# $2 - symbolic name
 
+	local fqdn
+
 	# Create an entry in the hosts table.  If no host table
 	# exists, create one.  If the IP address already exists,
 	# replace it's entry.
@@ -292,7 +301,10 @@ addhostent() {
 	sed "/^$1 /d" < /tmp/hosts > /tmp/hosts.new
 	mv /tmp/hosts.new /tmp/hosts
 
-	echo "$1 $2 $2.$FQDN" >> /tmp/hosts
+	if [ X${FQDN} != X ]; then
+		fqdn=$2.$FQDN
+	fi
+	echo "$1 $2 $fqdn" >> /tmp/hosts
 }
 
 addifconfig() {
@@ -300,16 +312,12 @@ addifconfig() {
 	# $2 - interface symbolic name
 	# $3 - interface IP address
 	# $4 - interface netmask
-	# $5 - (optional) interface link-layer medium
+	# $5 - (optional) interface link-layer medium, preceded by "media ", else ""
 	# $6 - (optional) interface link-layer directives
 	local _m
 
-	_m=""
-	if [ "$5" != "" ]; then
-		_m="media $5"
-	fi
 	# Create a ifconfig.* file for the interface.
-	echo "inet $2 netmask $4 $_m $6" > /tmp/ifconfig.$1
+	echo "inet $2 netmask $4 $5 $6" > /tmp/ifconfig.$1
 
 	addhostent $3 $2
 }
@@ -466,7 +474,7 @@ configure_ifs() {
 			    "${_interface_symname}" \
 			    "${_interface_ip}" \
 			    "${_interface_mask}" \
-			    "${_interface_mediumtype}" \
+			    "${_m}" \
 			    "${_interface_extra}"
 			return 0
 		fi
@@ -478,13 +486,13 @@ configure_ifs() {
 		    "${_interface_symname}" \
 		    "${_interface_ip}" \
 		    "${_interface_mask}" \
-		    "${_interface_mediumtype}" \
+		    "${_m}" \
 		    "${_interface_extra}"
 	fi
 	return 1
 }
 
-# Much of this is gratuitously stolen from /etc/netstart.
+# Much of this is gratuitously stolen from /etc/rc.d/network.
 enable_network() {
 
 	# Set up the hostname.
@@ -693,7 +701,7 @@ __install_ftp_2
 		# Make a copy of this script that lists the directory
 		# contents, and use that to determine the files to get.
 		cat /tmp/ftp-script.sh	>  /tmp/ftp-dir.sh
-		echo "ls"		>> /tmp/ftp-dir.sh
+		echo "nlist"		>> /tmp/ftp-dir.sh
 		echo "quit"		>> /tmp/ftp-dir.sh
 		echo "__end_commands"	>> /tmp/ftp-dir.sh
 
@@ -707,7 +715,7 @@ __install_ftp_2
 
 	while : ; do
 		echo "The following sets are available for extraction:"
-		echo "(marked sets have already been extracted)"
+		echo "(marked sets are already on the extraction list)"
 		echo ""
 
 		_next=""
@@ -735,7 +743,7 @@ __install_ftp_2
 		echo -n "File name [$_next]? "
 		getresp "$_next"
 		if isin $resp $_sets; then
-			echo "get $resp |\"pax -zrvpe\"" >> \
+			echo "get $resp |\"pax -zr${verbose_flag}pe\"" >> \
 					/tmp/ftp-script.sh
 			_setsdone="$resp $_setsdone"
 		else
@@ -764,37 +772,41 @@ install_from_mounted_fs() {
 	_dirname=$1
 	_sets=""
 
-	echo ""
-	echo "The directory at the mount point, \"${_dirname}\", contains: "
-	echo ""
-	ls -F ${_dirname}
-	echo ""
-	echo    "Enter the subdirectory relative to the mountpoint, that"
-	echo -n "contains the savesets: [try this directory] "
-	getresp ""
-	if [ "X${resp}" != "X" ]; then
-		_dirname=${_dirname}/$resp
-	fi
+	if ! dir_has_sets ${_dirname} $THESETS
+	then
 
-	while ! dir_has_sets ${_dirname} $THESETS; do
 		echo ""
-		echo -n "There are no NetBSD install sets available in "
-		echo "\"${_dirname}\"."
-		echo "\"${_dirname}\" contains: "
+		echo "The directory at the mount point, \"${_dirname}\", contains: "
 		echo ""
 		ls -F ${_dirname}
 		echo ""
-		echo -n "Enter subdirectory: [try other install media] "
+		echo    "Enter the subdirectory relative to the mountpoint, that"
+		echo -n "contains the savesets: [try this directory] "
 		getresp ""
-		if [ "X${resp}" = "X" ]; then
-			return
-		fi
-		if [ ! -d ${_dirname}/${resp} ]; then
-			echo "\"${resp}\" is no directory; try again."
-		else
+		if [ "X${resp}" != "X" ]; then
 			_dirname=${_dirname}/$resp
 		fi
-	done
+
+		while ! dir_has_sets ${_dirname} $THESETS; do
+			echo ""
+			echo -n "There are no NetBSD install sets available in "
+			echo "\"${_dirname}\"."
+			echo "\"${_dirname}\" contains: "
+			echo ""
+			ls -F ${_dirname}
+			echo ""
+			echo -n "Enter subdirectory: [try other install media] "
+			getresp ""
+			if [ "X${resp}" = "X" ]; then
+				return
+			fi
+			if [ ! -d ${_dirname}/${resp} ]; then
+				echo "\"${resp}\" is no directory; try again."
+			else
+				_dirname=${_dirname}/$resp
+			fi
+		done
+	fi
 
 	for _f in $THESETS ; do
 		if [ -f ${_dirname}/${_f}.tar.gz ]; then
@@ -829,7 +841,11 @@ install_from_mounted_fs() {
 		echo ""
 
 		# Get the name of the file.
-		if [ "X$_next" = "X" ]; then resp=n; else resp=y; fi
+		if [ "X$_next" = "X" ]; then
+			resp=n
+		else
+			resp=y
+		fi
 		echo -n "Continue extraction [$resp]?"
 		getresp "$resp"
 		if [ "$resp" = "n" ]; then
@@ -858,7 +874,7 @@ install_from_mounted_fs() {
 
 			# Extract file
 			echo "Extracting the $_f set:"
-			cat $_filename | (cd /mnt; pax -zrvpe)
+			cat $_filename | (cd /mnt; pax -zr${verbose_flag}pe)
 			echo "Extraction complete."
 			_setsdone="$_f $_setsdone"
 		done
@@ -1212,11 +1228,11 @@ __install_tape_2
 		getresp "1"
 		case "$resp" in
 		1)
-			_xcmd="pax -zrvpe"
+			_xcmd="pax -zr${verbose_flag}pe"
 			;;
 
 		2)
-			_xcmd="tar -rvpe"
+			_xcmd="pax -r${verbose_flag}pe"
 			;;
 
 		*)
@@ -1308,14 +1324,35 @@ install_sets()
 	_yup="FALSE"
 
 	# Ask the user which media to load the distribution from.
+	# Ask the user if they want verbose extraction.  They might not want
+	# it on, eg, SPARC frame buffer console.
 	cat << \__install_sets_1
 
 It is now time to extract the installation sets onto the hard disk.
 Make sure the sets are either on a local device (i.e. tape, CD-ROM) or on a
 network server.
 
+Would you like to see each file listed during extraction (verbose) mode?
+On some console hardware, such as serial consoles and Sun frame buffers,
+this can extend the total extraction time.
 __install_sets_1
+	echo -n "Use verbose listing for extractions? [y] "
+	getresp "y"
+	case "$resp" in
+	y*|Y*)
+		verbose_flag=v
+		;;
+	*)
+		echo "Not using verbose listing."
+		verbose_flag=""
+		;;
+	esac
 
+	if [ -d ${Default_sets_dir:-/dev/null} ]; then
+		if dir_has_sets $Default_sets_dir $THESETS; then
+			local_sets_dir=$Default_sets_dir
+		fi
+	fi
 	if [ "X$local_sets_dir" != "X" ]; then
 		install_from_mounted_fs ${local_sets_dir}
 		if [ X"$_setsdone" != X ]; then

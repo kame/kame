@@ -1,4 +1,4 @@
-#	$NetBSD: list,v 1.9.2.1 1999/04/12 23:02:41 simonb Exp $
+#	$NetBSD: list,v 1.13.2.1 2000/11/16 17:21:17 tv Exp $
 
 # copy the MAKEDEV script and make some devices
 COPY	${DESTDIR}/dev/MAKEDEV	dev/MAKEDEV
@@ -12,6 +12,7 @@ COPY	${DESTDIR}/usr/mdec/*	usr/mdec
 COPY	${TOPDIR}/../../../etc/group		etc
 COPY	${TOPDIR}/../../../etc/master.passwd	etc
 COPY	${TOPDIR}/../../../etc/protocols	etc
+COPY	${TOPDIR}/../../../etc/netconfig	etc
 COPY	${TOPDIR}/../../../etc/services		etc
 SPECIAL	>etc/ppp/options
 SPECIAL	pwd_mkdb -p -d ./ etc/master.passwd
@@ -66,7 +67,7 @@ LINK	instbin			sbin/restore
 LINK	instbin			sbin/route
 LINK	instbin			sbin/rrestore
 LINK	instbin			sbin/slattach
-LINK	instbin			sbin/sysinst
+#LINK	instbin			sbin/sysinst
 LINK	instbin			sbin/swapon
 LINK	instbin			sbin/umount
 SYMLINK	/instbin		usr/bin/basename
@@ -97,7 +98,6 @@ SYMLINK	/instbin		usr/sbin/pppd
 SYMLINK	/instbin		usr/sbin/pppstats
 SYMLINK	/instbin		usr/sbin/sysctl
 SYMLINK	/instbin		usr/sbin/traceroute
-SYMLINK	/instbin		usr/sbin/update
 SYMLINK /instbin		usr/local/bin/download
 
 #SPECIAL	/bin/rm instbin
@@ -105,3 +105,6 @@ SYMLINK /instbin		usr/local/bin/download
 # and the common installation tools
 COPY	${TOPDIR}/inst-common/dot.commonutils	.commonutils
 COPY	${TOPDIR}/inst-common/termcap.vt100	usr/share/misc/termcap
+
+#the lists of obsolete files used by sysinst  
+SPECIAL sh ${CURDIR}/../../../../distrib/sets/makeobsolete -b -s ${CURDIR}/../../../../distrib/sets -t ./dist

@@ -1,4 +1,4 @@
-/*	$NetBSD: ifconfig.c,v 1.79.4.3 2000/07/21 18:55:56 onoe Exp $	*/
+/*	$NetBSD: ifconfig.c,v 1.79.4.7 2001/05/01 11:06:43 he Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 2000 The NetBSD Foundation, Inc.
@@ -80,7 +80,7 @@ __COPYRIGHT("@(#) Copyright (c) 1983, 1993\n\
 #if 0
 static char sccsid[] = "@(#)ifconfig.c	8.2 (Berkeley) 2/16/94";
 #else
-__RCSID("$NetBSD: ifconfig.c,v 1.79.4.3 2000/07/21 18:55:56 onoe Exp $");
+__RCSID("$NetBSD: ifconfig.c,v 1.79.4.7 2001/05/01 11:06:43 he Exp $");
 #endif
 #endif /* not lint */
 
@@ -93,6 +93,7 @@ __RCSID("$NetBSD: ifconfig.c,v 1.79.4.3 2000/07/21 18:55:56 onoe Exp $");
 #include <net/if_media.h>
 #include <net/if_ether.h>
 #include <net/if_ieee80211.h>
+#include <net/if_vlanvar.h>
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #ifdef INET6
@@ -142,12 +143,13 @@ int	clearaddr, s;
 int	newaddr = -1;
 int	nsellength = 1;
 int	af;
-int	Aflag, aflag, bflag, dflag, lflag, mflag, sflag, uflag;
+int	aflag, bflag, Cflag, dflag, lflag, mflag, sflag, uflag;
 #ifdef INET6
 int	Lflag;
 #endif
 int	reset_if_flags;
 int	explicit_prefix = 0;
+u_int	vlan_tag = (u_int)-1;
 
 void 	notealias __P((const char *, int));
 void 	notrailers __P((const char *, int));
@@ -179,7 +181,12 @@ void	setmedia __P((const char *, int));
 void	setmediaopt __P((const char *, int));
 void	unsetmediaopt __P((const char *, int));
 void	setmediainst __P((const char *, int));
+void	clone_create __P((const char *, int));
+void	clone_destroy __P((const char *, int));
 void	fixnsel __P((struct sockaddr_iso *));
+void	setvlan __P((const char *, int));
+void	setvlanif __P((const char *, int));
+void	unsetvlanif __P((const char *, int));
 int	main __P((int, char *[]));
 
 /*
@@ -253,6 +260,15 @@ const struct cmd {
 	{ "tunnel",	NEXTARG2,	0,		NULL,
 							settunnel } ,
 	{ "deletetunnel", 0,		0,		deletetunnel },
+	{ "vlan",	NEXTARG,	0,		setvlan } ,
+	{ "vlanif",	NEXTARG,	0,		setvlanif } ,
+	{ "-vlanif",	0,		0,		unsetvlanif } ,
+	{ "deletetunnel", 0,		0,		deletetunnel },
+#if 0
+	/* XXX `create' special-cased below */
+	{ "create",	0,		0,		clone_create } ,
+#endif
+	{ "destroy",	0,		0,		clone_destroy } ,
 	{ "link0",	IFF_LINK0,	0,		setifflags } ,
 	{ "-link0",	-IFF_LINK0,	0,		setifflags } ,
 	{ "link1",	IFF_LINK1,	0,		setifflags } ,
@@ -272,7 +288,8 @@ void 	adjust_nsellength __P((void));
 int	getinfo __P((struct ifreq *));
 int	carrier __P((void));
 void	getsock __P((int));
-void	printall __P((void));
+void	printall __P((const char *));
+void	list_cloners __P((void));
 void 	printb __P((const char *, unsigned short, const char *));
 int	prefix __P((void *, int));
 void 	status __P((const u_int8_t *, int));
@@ -314,6 +331,7 @@ void 	iso_getaddr __P((const char *, int));
 
 void	ieee80211_status __P((void));
 void	tunnel_status __P((void));
+void	vlan_status __P((void));
 
 /* Known address families */
 struct afswtch {
@@ -367,14 +385,14 @@ main(argc, argv)
 
 	/* Parse command-line options */
 	aflag = mflag = 0;
-	while ((ch = getopt(argc, argv, "Aabdlmsu"
+	while ((ch = getopt(argc, argv, "AabCdlmsu"
 #ifdef INET6
 					"L"
 #endif
 			)) != -1) {
 		switch (ch) {
 		case 'A':
-			Aflag = 1;
+			warnx("-A is deprecated");
 			break;
 
 		case 'a':
@@ -385,6 +403,11 @@ main(argc, argv)
 			bflag = 1;
 			break;
 			
+
+		case 'C':
+			Cflag = 1;
+			break;
+
 		case 'd':
 			dflag = 1;
 			break;
@@ -424,14 +447,25 @@ main(argc, argv)
 	 * -l means "list all interfaces", and is mutally exclusive with
 	 * all other flags/commands.
 	 *
+	 * -C means "list all names of cloners", and it mutually exclusive
+	 * with all other flags/commands.
+	 *
 	 * -a means "print status of all interfaces".
 	 */
-	if (lflag && (aflag || mflag || Aflag || argc))
+	if ((lflag || Cflag) && (aflag || mflag || argc))
 		usage();
 #ifdef INET6
-	if (lflag && Lflag)
+	if ((lflag || Cflag) && Lflag)
 		usage();
 #endif
+	if (lflag && Cflag)
+		usage();
+	if (Cflag) {
+		if (argc)
+			usage();
+		list_cloners();
+		exit(0);
+	}
 	if (aflag || lflag) {
 		if (argc > 1)
 			usage();
@@ -444,7 +478,7 @@ main(argc, argv)
 			af = ifr.ifr_addr.sa_family = afp->af_af;
 		else
 			af = ifr.ifr_addr.sa_family = afs[0].af_af;
-		printall();
+		printall(NULL);
 		exit(0);
 	}
 
@@ -453,6 +487,17 @@ main(argc, argv)
 		usage();
 	(void) strncpy(name, argv[0], sizeof(name));
 	argc--; argv++;
+
+	/*
+	 * NOTE:  We must special-case the `create' command right
+	 * here as we would otherwise fail in getinfo().
+	 */
+	if (argc > 0 && strcmp(argv[0], "create") == 0) {
+		clone_create(argv[0], 0);
+		argc--, argv++;
+		if (argc == 0)
+			exit(0);
+	}
 
 	/* Check for address family. */
 	afp = NULL;
@@ -484,7 +529,7 @@ main(argc, argv)
 
 	/* No more arguments means interface status. */
 	if (argc == 0) {
-		status(NULL, 0);
+		printall(name);
 		exit(0);
 	}
 
@@ -641,12 +686,13 @@ getinfo(ifr)
 }
 
 void
-printall()
+printall(ifname)
+	const char *ifname;
 {
 #ifdef HAVE_IFADDRS_H
 	struct ifaddrs *ifap, *ifa;
 	struct ifreq ifr;
-	const struct sockaddr_dl *sdl;
+	const struct sockaddr_dl *sdl = NULL;
 	int idx;
 	char *p;
 
@@ -662,6 +708,8 @@ printall()
 			    ifa->ifa_addr->sa_len);
 		}
 
+		if (ifname && strcmp(ifname, ifa->ifa_name) != 0)
+			continue;
 		if (ifa->ifa_addr->sa_family == AF_LINK)
 			sdl = (const struct sockaddr_dl *) ifa->ifa_addr;
 		if (p && strcmp(p, ifa->ifa_name) == 0)
@@ -736,6 +784,9 @@ printall()
 			errx(1, "ifr too big");
 		memcpy(ifrbuf, cp, siz);
 
+		if (ifname && strncmp(ifname, ifr->ifr_name,
+		    sizeof(ifr->ifr_name)))
+			continue;
 		if (ifr->ifr_addr.sa_family == AF_LINK)
 			sdl = (const struct sockaddr_dl *) &ifr->ifr_addr;
 		if (!strncmp(ifreq.ifr_name, ifr->ifr_name,
@@ -776,6 +827,74 @@ printall()
 	if (lflag)
 		putchar('\n');
 #endif
+}
+
+void
+list_cloners(void)
+{
+	struct if_clonereq ifcr;
+	char *cp, *buf;
+	int idx;
+
+	memset(&ifcr, 0, sizeof(ifcr));
+
+	getsock(AF_INET);
+
+	if (ioctl(s, SIOCIFGCLONERS, &ifcr) < 0)
+		err(1, "SIOCIFGCLONERS for count");
+
+	buf = malloc(ifcr.ifcr_total * IFNAMSIZ);
+	if (buf == NULL)
+		err(1, "unable to allocate cloner name buffer");
+
+	ifcr.ifcr_count = ifcr.ifcr_total;
+	ifcr.ifcr_buffer = buf;
+
+	if (ioctl(s, SIOCIFGCLONERS, &ifcr) < 0)
+		err(1, "SIOCIFGCLONERS for names");
+
+	/*
+	 * In case some disappeared in the mean time, clamp it down.
+	 */
+	if (ifcr.ifcr_count > ifcr.ifcr_total)
+		ifcr.ifcr_count = ifcr.ifcr_total;
+
+	for (cp = buf, idx = 0; idx < ifcr.ifcr_count; idx++, cp += IFNAMSIZ) {
+		if (idx > 0)
+			putchar(' ');
+		printf("%s", cp);
+	}
+
+	putchar('\n');
+	free(buf);
+	return;
+}
+
+/*ARGSUSED*/
+void
+clone_create(addr, param)
+	const char *addr;
+	int param;
+{
+
+	/* We're called early... */
+	getsock(AF_INET);
+
+	(void) strncpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
+	if (ioctl(s, SIOCIFCREATE, &ifr) < 0)
+		err(1, "SIOCIFCREATE");
+}
+
+/*ARGSUSED*/
+void
+clone_destroy(addr, param)
+	const char *addr;
+	int param;
+{
+
+	(void) strncpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
+	if (ioctl(s, SIOCIFDESTROY, &ifr) < 0)
+		err(1, "SIOCIFDESTROY");
 }
 
 #define RIDADDR 0
@@ -885,6 +1004,83 @@ deletetunnel(vname, param)
 
 	if (ioctl(s, SIOCDIFPHYADDR, &ifr) < 0)
 		err(1, "SIOCDIFPHYADDR");
+}
+
+void setvlan(val, d)
+	const char *val;
+	int d;
+{
+	struct vlanreq vlr;
+
+	if (strncmp(ifr.ifr_name, "vlan", 4) != 0 ||
+	    !isdigit(ifr.ifr_name[4]))
+		errx(EXIT_FAILURE,
+		    "``vlan'' valid only with vlan(4) interfaces");
+
+	vlan_tag = atoi(val);
+
+	memset(&vlr, 0, sizeof(vlr));
+	ifr.ifr_data = (caddr_t)&vlr;
+
+	if (ioctl(s, SIOCGETVLAN, (caddr_t)&ifr) == -1)
+		err(EXIT_FAILURE, "SIOCGETVLAN");
+
+	vlr.vlr_tag = vlan_tag;
+
+	if (ioctl(s, SIOCSETVLAN, (caddr_t)&ifr) == -1)
+		err(EXIT_FAILURE, "SIOCSETVLAN");
+}
+
+void setvlanif(val, d)
+	const char *val;
+	int d;
+{
+	struct vlanreq vlr;
+
+	if (strncmp(ifr.ifr_name, "vlan", 4) != 0 ||
+	    !isdigit(ifr.ifr_name[4]))
+		errx(EXIT_FAILURE,
+		    "``vlanif'' valid only with vlan(4) interfaces");
+
+	if (vlan_tag == (u_int)-1)
+		errx(EXIT_FAILURE,
+		    "must specify both ``vlan'' and ``vlanif''");
+
+	memset(&vlr, 0, sizeof(vlr));
+	ifr.ifr_data = (caddr_t)&vlr;
+
+	if (ioctl(s, SIOCGETVLAN, (caddr_t)&ifr) == -1)
+		err(EXIT_FAILURE, "SIOCGETVLAN");
+
+	strlcpy(vlr.vlr_parent, val, sizeof(vlr.vlr_parent));
+	vlr.vlr_tag = vlan_tag;
+
+	if (ioctl(s, SIOCSETVLAN, (caddr_t)&ifr) == -1)
+		err(EXIT_FAILURE, "SIOCSETVLAN");
+}
+
+void unsetvlanif(val, d)
+	const char *val;
+	int d;
+{
+	struct vlanreq vlr;
+
+	if (strncmp(ifr.ifr_name, "vlan", 4) != 0 ||
+	    !isdigit(ifr.ifr_name[4]))
+		errx(EXIT_FAILURE,
+		    "``vlanif'' valid only with vlan(4) interfaces");
+
+	memset(&vlr, 0, sizeof(vlr));
+	ifr.ifr_data = (caddr_t)&vlr;
+
+	if (ioctl(s, SIOCGETVLAN, (caddr_t)&ifr) == -1)
+		err(EXIT_FAILURE, "SIOCGETVLAN");
+
+	vlr.vlr_parent[0] = '\0';
+	vlr.vlr_tag = 0;
+
+	if (ioctl(s, SIOCSETVLAN, (caddr_t)&ifr) == -1)
+		err(EXIT_FAILURE, "SIOCSETVLAN");
 }
 
 void
@@ -1611,6 +1807,7 @@ status(ap, alen)
 	putchar('\n');
 
 	ieee80211_status();
+	vlan_status();
 	tunnel_status();
 
 	if (ap && alen > 0) {
@@ -1781,6 +1978,27 @@ tunnel_status()
 }
 
 void
+vlan_status()
+{
+	struct vlanreq vlr;
+
+	if (strncmp(ifr.ifr_name, "vlan", 4) != 0 ||
+	    !isdigit(ifr.ifr_name[4]))
+		return;
+
+	memset(&vlr, 0, sizeof(vlr));
+	ifr.ifr_data = (caddr_t)&vlr;
+
+	if (ioctl(s, SIOCGETVLAN, (caddr_t)&ifr) == -1)
+		return;
+
+	if (vlr.vlr_tag || vlr.vlr_parent[0] != '\0')
+		printf("\tvlan: %d parent: %s\n",
+		    vlr.vlr_tag, vlr.vlr_parent[0] == '\0' ?
+		    "<none>" : vlr.vlr_parent);
+}
+
+void
 in_alias(creq)
 	struct ifreq *creq;
 {
@@ -1811,9 +2029,6 @@ in_alias(creq)
 	if (memcmp(&ifr.ifr_addr, &creq->ifr_addr,
 		   sizeof(creq->ifr_addr)) == 0)
 		alias = 0;
-	/* we print aliases only with -A */
-	if (alias && !Aflag)
-		return;
 	(void) memset(&addreq, 0, sizeof(addreq));
 	(void) strncpy(addreq.ifra_name, name, sizeof(addreq.ifra_name));
 	addreq.ifra_addr = creq->ifr_addr;
@@ -2606,7 +2821,7 @@ usage()
 	extern const char *__progname;
 
 	fprintf(stderr,
-	    "usage: %s [ -m ] [ -A ] "
+	    "usage: %s [ -m ] "
 #ifdef INET6
 		"[ -L ] "
 #endif
@@ -2624,10 +2839,13 @@ usage()
 		"\t[ mediaopt mopts ]\n"
 		"\t[ -mediaopt mopts ]\n"
 		"\t[ instance minst ]\n"
+		"\t[ vlan n vlanif i ]\n"
 		"\t[ link0 | -link0 ] [ link1 | -link1 ] [ link2 | -link2 ]\n"
-		"       %s -a [ -A ] [ -m ] [ -d ] [ -u ] [ af ]\n"
-		"       %s -l [ -d ] [ -u ]\n",
-		__progname, __progname, __progname);
+		"       %s -a [ -m ] [ -d ] [ -u ] [ af ]\n"
+		"       %s -l [ -d ] [ -u ]\n"
+		"       %s interface create\n"
+		"       %s interface destroy\n",
+		__progname, __progname, __progname, __progname, __progname);
 	exit(1);
 }
 

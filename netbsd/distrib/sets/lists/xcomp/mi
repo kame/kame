@@ -1,3 +1,4 @@
+# $NetBSD: mi,v 1.8.8.1 2001/05/09 20:52:23 he Exp $
 ./usr/X11R6/bin/gccmakedep
 ./usr/X11R6/bin/imake
 ./usr/X11R6/bin/lndir
@@ -225,6 +226,8 @@
 ./usr/X11R6/lib/X11/config/NetBSD.cf
 ./usr/X11R6/lib/X11/config/Oki.cf
 ./usr/X11R6/lib/X11/config/OpenBSD.cf
+./usr/X11R6/lib/X11/config/QNX.cf
+./usr/X11R6/lib/X11/config/QNX.rules
 ./usr/X11R6/lib/X11/config/Server.tmpl
 ./usr/X11R6/lib/X11/config/ServerLib.tmpl
 ./usr/X11R6/lib/X11/config/Threads.tmpl
@@ -271,6 +274,8 @@
 ./usr/X11R6/lib/X11/config/necLib.rules
 ./usr/X11R6/lib/X11/config/necLib.tmpl
 ./usr/X11R6/lib/X11/config/noop.rules
+./usr/X11R6/lib/X11/config/nto.cf
+./usr/X11R6/lib/X11/config/nto.rules
 ./usr/X11R6/lib/X11/config/oldlib.rules
 ./usr/X11R6/lib/X11/config/os2.cf
 ./usr/X11R6/lib/X11/config/os2.rules
@@ -397,7 +402,6 @@
 ./usr/X11R6/man/cat3/WhitePixelOfScreen.0
 ./usr/X11R6/man/cat3/WidthMMOfScreen.0
 ./usr/X11R6/man/cat3/WidthOfScreen.0
-./usr/X11R6/man/cat3/X.0
 ./usr/X11R6/man/cat3/XActivateScreenSaver.0
 ./usr/X11R6/man/cat3/XAddConnectionWatch.0
 ./usr/X11R6/man/cat3/XAddHost.0
@@ -462,7 +466,6 @@
 ./usr/X11R6/man/cat3/XConfigureEvent.0
 ./usr/X11R6/man/cat3/XConfigureRequestEvent.0
 ./usr/X11R6/man/cat3/XConfigureWindow.0
-./usr/X11R6/man/cat3/XConsortium.0
 ./usr/X11R6/man/cat3/XContextDependentDrawing.0
 ./usr/X11R6/man/cat3/XContextualDrawing.0
 ./usr/X11R6/man/cat3/XConvertCase.0
@@ -829,7 +832,6 @@
 ./usr/X11R6/man/cat3/XShrinkRegion.0
 ./usr/X11R6/man/cat3/XSizeHints.0
 ./usr/X11R6/man/cat3/XStandardColormap.0
-./usr/X11R6/man/cat3/XStandards.0
 ./usr/X11R6/man/cat3/XStoreBuffer.0
 ./usr/X11R6/man/cat3/XStoreBytes.0
 ./usr/X11R6/man/cat3/XStoreColor.0
@@ -1000,7 +1002,6 @@
 ./usr/X11R6/man/cat3/XrmStringToQuarkList.0
 ./usr/X11R6/man/cat3/XrmUniqueQuark.0
 ./usr/X11R6/man/cat3/XrmValue.0
-./usr/X11R6/man/cat3/Xsecurity.0
 ./usr/X11R6/man/cat3/XtAddActions.0
 ./usr/X11R6/man/cat3/XtAddCallback.0
 ./usr/X11R6/man/cat3/XtAddCallbacks.0

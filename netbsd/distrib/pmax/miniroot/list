@@ -1,4 +1,4 @@
-#	$NetBSD: list,v 1.6.4.1 1999/04/17 11:06:43 simonb Exp $
+#	$NetBSD: list,v 1.12 2000/05/02 16:06:54 sjg Exp $
 
 # pmax extra's: mountpoint for kernfs
 SPECIAL mkdir			kern
@@ -20,6 +20,9 @@ SYMLINK	../../instbin		usr/bin/netstat
 SYMLINK	../../instbin		usr/bin/rsh
 SYMLINK ../../instbin		usr/bin/tset usr/bin/reset
 SYMLINK	../../instbin		usr/bin/vi
+
+# extras in /usr/mdec
+SYMLINK ../../instbin		usr/mdec/installboot
 
 # OK, now do everything in /usr all over all again in usr.install,
 # in case we try and install directly into the miniroot (mounting over /usr).
@@ -45,7 +48,6 @@ SPECIAL	ln -s ../../instbin	usr.install/bin/vi
 # local usr.sbin
 SPECIAL	ln -s ../../instbin	usr.install/sbin/chroot
 SPECIAL	ln -s ../../instbin	usr.install/sbin/chown
-SPECIAL	ln -s ../../instbin	usr.install/sbin/update
 
 
 # crunchgen source directory specials: progs built in nonstandard places
@@ -65,8 +67,8 @@ SPECIAL	/bin/rm dev/MAKEDEV dev/MAKEDEV.local
 
 # we need the contents of /usr/mdec
 COPYDIR	${DESTDIR}/usr/mdec	usr/mdec
-# and /boot
-COPY	${DESTDIR}/boot		boot
+# and /boot.pmax
+COPY	${DESTDIR}/boot.pmax	boot.pmax
 
 
 # the zoneinfo (dont use)
@@ -76,9 +78,9 @@ COPY	${DESTDIR}/boot		boot
 COPY	${ARCHDIR}/termcap.rcons usr/share/misc/termcap
 
 # copy the kernel(s)
-COPY	${CURDIR}/../../sys/arch/pmax/compile/GENERIC/netbsd.aout  netbsd
-COPY	${CURDIR}/../../sys/arch/pmax/compile/GENERIC/netbsd.ecoff netbsd.ecoff
-COPY	${CURDIR}/../../sys/arch/pmax/compile/INSTALL/nfsnetbsd.ecoff nfsnetbsd.ecoff
+COPY	${KERNOBJDIR:-${CURDIR}/../../sys/arch/pmax/compile}/GENERIC/netbsd.aout  netbsd
+COPY	${KERNOBJDIR:-${CURDIR}/../../sys/arch/pmax/compile}/GENERIC/netbsd.ecoff netbsd.ecoff
+COPY	${KERNOBJDIR:-${CURDIR}/../../sys/arch/pmax/compile}/INSTALL/nfsnetbsd.ecoff nfsnetbsd.ecoff
 
 # various files that we need in /etc for the install
 #COPY	${DESTDIR}/etc/disktab		etc/disktab.shadow
@@ -96,3 +98,6 @@ LINK	instbin				sbin/sysinst
 
 # and a spare .profile
 COPY	${DESTDIR}/.profile		tmp/.hdprofile
+
+#the lists of obsolete files used by sysinst  
+SPECIAL sh ${CURDIR}/../../../../distrib/sets/makeobsolete -b -s ${CURDIR}/../../../distrib/sets -t ./dist

@@ -1,4 +1,4 @@
-/*	$NetBSD: msg.md.en,v 1.5.4.1 1999/06/24 22:46:04 cgd Exp $	*/
+/*	$NetBSD: msg.md.en,v 1.8.8.2 2001/04/22 18:33:59 he Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -25,13 +25,13 @@
  * THIS SOFTWARE IS PROVIDED BY PIERMONT INFORMATION SYSTEMS INC. ``AS IS''
  * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL PIERMONT INFORMATION SYSTEMS INC. BE 
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR 
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF 
+ * ARE DISCLAIMED. IN NO EVENT SHALL PIERMONT INFORMATION SYSTEMS INC. BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF 
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
@@ -59,30 +59,12 @@ message sectforward
 {Does your disk do AUTOMATIC sector forwarding?}
 
 message dlgeom
-{It appears that your disk, %s, has already been labeled with a BSD 
+{It appears that your disk, %s, has already been labeled with a BSD
 disklabel and the disklabel reports geometry that is different from
 the real geometry.  The two geometries are:
 
-disklabel: %d cylinders, %d heads, %d sectors
-real geom: %d cylinders, %d heads, %d sectors
-}
-
-message nobiosgeom
-{It appears that your disk, %s, did not have a valid Master Boot
-Record (MBR). This program gets the BIOS geometry of your disk by
-reading the MBR, so the BIOS geometry of your disk could not
-be determined in this case.  Your options are:
-    -- Abort the install. You can determine the actual BIOS
-       geometry in your BIOS setup and then come back and
-       enter the values. Or you can use another setup program to
-       initialize the MBR first.
-    -- Enter the BIOS geometry values yourself. Sysinst will initialize
-       the MBR for you.
-
-WARNING: Entering a new geometry will cause this program to initialize
-your master boot record (MBR) and destroy any boot program you may
-have installed.
-
+disklabel:	%d cylinders, %d heads, %d sectors 
+real geometry:	%d cylinders, %d heads, %d sectors 
 }
 
 message diagcyl
@@ -99,8 +81,22 @@ Do you wish to exclude the last cylinder?
 
 }
 
-message part_head
-{No   Start(%s)   Size(%s)   End(%s)  Kind\n}
+/* the %s's will expand into three character strings */
+message part_header
+{   Total disksize %d sectors
+
+   Start(%3s) Size(%3s)  End(%3s)   Kind
+   ---------- ---------- ---------- ----
+}
+
+message part_row_start_unused
+{%-1d:                                 }
+
+message part_row_start_used
+{%-1d: %-10d %-10d %-10d}
+
+message part_row_end
+{ %s\n}
 
 message setbiosgeom
 {You will be prompted for the geometry.  Please enter the values you
@@ -158,7 +154,7 @@ active partition.   The partition table currently looks like:
 }
 
 message reeditpart
-{There are overlapping MBR partitions or there is not exactly one NetBSD 
+{There are overlapping MBR partitions or there is not exactly one NetBSD
 partition. You should reedit the MBR partition table.
 
 Do you want to reedit it?

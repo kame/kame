@@ -1,4 +1,4 @@
-# $NetBSD: Makefile,v 1.3.2.1 1999/06/25 01:21:52 cgd Exp $
+# $NetBSD: Makefile,v 1.9.4.1 2000/09/07 01:36:31 minoura Exp $
 # Build a smaller ftp (i.e. for boot media)
 
 PROG=	ftp
@@ -14,6 +14,11 @@ SRCS=	cmds.c cmdtab.c complete.c domacro.c fetch.c ftp.c main.c ruserpass.c \
 	util.c
 
 CPPFLAGS+= -DNO_EDITCOMPLETE -DNO_ABOUT -I${SRCDIR}
+.if (${MACHINE} == "i386" || ${MACHINE} == "hpcmips" || ${MACHINE} == "x68k")
+CPPFLAGS+= -DINET6
+.endif
+COPTS+= -Os
+LDSTATIC?=-static
 
 all: ${PROG}
 

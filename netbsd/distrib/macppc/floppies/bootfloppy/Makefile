@@ -1,23 +1,24 @@
-#	$NetBSD: Makefile,v 1.3 1999/03/04 20:32:20 wrstuden Exp $
+#	$NetBSD: Makefile,v 1.8.2.2 2000/11/10 03:35:41 tv Exp $
 
 TOP=		${.CURDIR}/..
 
 .include "${TOP}/Makefile.inc"
+.include <bsd.kernobj.mk>
+.include <bsd.own.mk>
 
 IMAGE=		boot.fs
-KERN=		${.CURDIR}/../../../../sys/arch/macppc/compile/INSTALL/netbsd
+KERN=		${KERNOBJDIR}/INSTALL/netbsd
 
 MOUNT_POINT?=	/mnt
 VND?=		vnd0
 VND_DEV=	/dev/${VND}a
 VND_RDEV=	/dev/r${VND}a
-VND_CDEV=	/dev/${VND}c
-VND_CRDEV=	/dev/r${VND}c
+VND_RDEVC=	/dev/r${VND}c
 FD?=		fd0
 FD_RDEV=	/dev/r${FD}a
-IMAGE?=		xxx.fs
-KERN?=		netbsd-xxx
 MDEC=		${DESTDIR}/usr/mdec
+
+STRIP?=		strip
 
 LISTS=		${.CURDIR}/list
 RAMDISK!=	cd $(.CURDIR)/../ramdisk/; \
@@ -37,13 +38,14 @@ CLEANFILES+=	netbsd.ram.gz netbsd.tmp
 
 all:	netbsd.ram.gz
 	dd if=/dev/zero of=${IMAGE} bs=1440k count=1
-	# vnconfig -v -c ${VND_CDEV} ${IMAGE}
-	vnconfig -t ${DISKTYPE} -v -c ${VND_CDEV} ${IMAGE}
-	disklabel -rw ${VND_CDEV} ${DISKTYPE}
-	newfs -B be -m 0 -o space -i ${INO_BYTES} -c 80 \
-	    -f 1024 -b 8192 ${VND_RDEV}
+	# vnconfig -v -c ${VND} ${IMAGE}
+	vnconfig -t ${DISKTYPE} -v -c ${VND} ${IMAGE}
+	disklabel -f ${DESTDIR}/etc/disktab -rw ${VND} ${DISKTYPE}
+	newfs -B be -m 0 -o space -i ${INO_BYTES} -c 4 -t 5 -u 144 \
+	    -f 512 -b 4096 ${VND_RDEV}
 	mount ${VND_DEV} ${MOUNT_POINT}
 	TOPDIR=${TOP} CURDIR=${.CURDIR} OBJDIR=${.OBJDIR} \
+	    KERNOBJDIR=${KERNOBJDIR} \
 	    TARGDIR=${MOUNT_POINT} sh ${TOP}/runlist.sh ${LISTS}
 	@echo ""
 	@df -i ${MOUNT_POINT}
@@ -52,18 +54,19 @@ all:	netbsd.ram.gz
 	-rm -f ${MOUNT_POINT}/boot
 	cp ${MDEC}/ofwboot ${MOUNT_POINT}/boot
 	sync
-	${MDEC}/installboot -v ${MOUNT_POINT}/boot ${MDEC}/bootxx ${VND_RDEV}
+	${MDEC}/installboot -v ${MOUNT_POINT}/boot ${MDEC}/bootxx ${VND_RDEVC}
 	umount ${MOUNT_POINT}
-	vnconfig -u ${VND_CDEV}
+	vnconfig -u ${VND}
 
 unconfig:
 	-umount -f ${MOUNT_POINT}
-	-vnconfig -u ${VND_DEV}
+	-vnconfig -u ${VND}
 
 netbsd.ram.gz: ${KERN} ${RAMDISK}
 	cp ${KERN} netbsd.tmp
 	mdsetimage -v netbsd.tmp ${RAMDISK}
-	gzip netbsd.tmp
+	${STRIP} netbsd.tmp
+	gzip -9 netbsd.tmp
 	mv netbsd.tmp.gz ${.TARGET}
 
 clean cleandir distclean:

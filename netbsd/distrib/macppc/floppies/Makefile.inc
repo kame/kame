@@ -1,6 +1,9 @@
-#	$NetBSD: Makefile.inc,v 1.1 1998/07/03 11:20:08 tsubai Exp $
+#	$NetBSD: Makefile.inc,v 1.3 2000/06/01 06:56:12 matt Exp $
+
+.include "../../../Makefile.inc"
+.include <bsd.own.mk>
 
 # REV is revision without dots, as in "12C"
 # VER is revision with dots, as in "1.2C"
-REV!=sh ${.CURDIR}/../../../../sys/conf/osrelease.sh -s
-VER!=sh ${.CURDIR}/../../../../sys/conf/osrelease.sh 
+REV!=sh ${BSDSRCDIR}/sys/conf/osrelease.sh -s
+VER!=sh ${BSDSRCDIR}/sys/conf/osrelease.sh 

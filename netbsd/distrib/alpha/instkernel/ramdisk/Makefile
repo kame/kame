@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.4.2.1 1999/04/29 20:11:09 perry Exp $
+#	$NetBSD: Makefile,v 1.8 2000/05/02 16:06:46 sjg Exp $
 
 TOP=		${.CURDIR}/..
 
@@ -22,13 +22,14 @@ CRUNCHCONF=	${CBIN}.conf
 MTREE=		mtree.conf
 
 all: ${CBIN} 
-	dd if=/dev/zero of=${IMAGE} count=6144
+	dd if=/dev/zero of=${IMAGE} count=9000
 	vnconfig -v -c ${VND_CDEV} ${IMAGE}
 #	disklabel -rw ${VND_CDEV} ${DISKTYPE}
-	newfs -B le -m 0 -o space -i 5120 ${VND_RDEV}
+	newfs -B le -m 0 -o space -i 5120 -c 20 ${VND_RDEV}
 	mount ${VND_DEV} ${MOUNT_POINT}
 	mtree -def ${.CURDIR}/${MTREE} -p ${MOUNT_POINT}/ -u
 	TOPDIR=${TOP} CURDIR=${.CURDIR} OBJDIR=${.OBJDIR} \
+	    KERNOBJDIR=${KERNOBJDIR} \
 	    TARGDIR=${MOUNT_POINT} sh ${TOP}/src/runlist.sh ${.CURDIR}/${LISTS}
 	@echo chdir '$${.CURDIR}/../../../notes/alpha; make INSTALL.more'
 	@chdir ${.CURDIR}/../../../notes/alpha; make INSTALL.more
@@ -52,7 +53,7 @@ ${CBIN}: ${CBIN}.mk ${CBIN}.cache ${CBIN}.c
 	make -f ${CBIN}.mk all
 
 clean cleandir distclean:
-	/bin/rm -f *.core ${IMAGE} ${CBIN} ${CBIN}.mk ${CBIN}.cache *.o *.lo *.c
+	/bin/rm -f *.core ${IMAGE} ${CBIN} ${CBIN}.mk ${CBIN}.cache *.o *.cro *.c
 
 .include <bsd.own.mk>
 .include <bsd.obj.mk>

@@ -1,10 +1,13 @@
-#	$NetBSD: Makefile.inc,v 1.4.2.1 1999/06/24 22:44:05 cgd Exp $
+#	$NetBSD: Makefile.inc,v 1.8.4.1 2000/08/11 19:46:31 jdolecek Exp $
 #
 # Makefile for install
+
+.include <bsd.own.mk>		# for mk.conf
 
 PROG=sysinst
 
 LDADD=-lcurses -ltermcap -lutil
+LDSTATIC?=-static
 
 .if exists(${.CURDIR}/../../../../sys/conf/osrelease.sh)
 VER != sh ${.CURDIR}/../../../../sys/conf/osrelease.sh
@@ -17,18 +20,26 @@ VER != sh ${.CURDIR}/../../../../../sys/conf/osrelease.sh
 CPPFLAGS+= -I. -I${.CURDIR}/../.. -I${.CURDIR} \
 	 -DREL=\"${VER}\" -DMACH=\"${MACHINE}\"
 
+.if defined(SYSINST_FTP_HOST)
+CPPFLAGS+=-DFTP_HOST="${SYSINST_FTP_HOST}"
+.endif
+
+.if defined(SYSINST_FTP_DIR)
+CPPFLAGS+=-DFTP_DIR="${SYSINST_FTP_DIR}"
+.endif
+
 MKMAN=no
 
 WARNS=1
 
 CLEANFILES= menu_defs.c menu_defs.h menus.def msg_defs.c msg_defs.h msg.def
 
-LANG?=en
+SYSINSTLANG?=en
 
 .PATH: ${.CURDIR}/../..
 
-MENUC=menuc
-MSGC=msgc
+MENUC?=menuc
+MSGC?=msgc
 
 .include <bsd.prog.mk>
 
@@ -38,10 +49,10 @@ menu_defs.c menu_defs.h: menus.def
 msg_defs.c msg_defs.h: msg.def
 	${MSGC} msg.def
 
-msg.def: msg.mi.${LANG} msg.md.${LANG}
+msg.def: msg.mi.${SYSINSTLANG} msg.md.${SYSINSTLANG}
 	sed "s/@@VERSION@@/${VER}/" ${.ALLSRC} > ${.TARGET}
 
-menus.def: menus.mi.${LANG} menus.md.${LANG}
+menus.def: menus.mi.${SYSINSTLANG} menus.md.${SYSINSTLANG}
 	sed "s/@@VERSION@@/${VER}/" ${.ALLSRC} > ${.TARGET}
 
 menu_defs.c: msg_defs.h

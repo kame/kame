@@ -1,4 +1,4 @@
-/*	$NetBSD: menus.md.en,v 1.7.4.1 1999/06/24 22:45:46 cgd Exp $	*/
+/*	$NetBSD: menus.md.en,v 1.11.4.1 2000/08/31 15:16:44 minoura Exp $	*/
 
 /*
  * Copyright 1997 Piermont Information Systems Inc.
@@ -88,13 +88,13 @@ menu editparttable, title  "Choose your partition", exit;
 	option "Edit partition 3",  sub menu editpart,
 		action  { editpart = 3; };
 	option "Reselect size specification",
-		action  { reask_sizemult(); }; 
+		action  { reask_sizemult(bcylsize); }; 
 
 menu editpart, title  "Select to change";
 	display action { msg_display (MSG_editpart, editpart);
 			   disp_cur_part((struct mbr_partition *)&mbr[MBR_PARTOFF
 ], activepart,editpart);
-			   msg_printf_add ("\n");
+			   msg_display_add(MSG_newline);
 			};
 	option "Kind", sub menu chooseid;
 	option "Start and size", action 
@@ -163,7 +163,7 @@ menu cyl1024;
 
 menu editfsparts, y=12, exit;
 	display action  {
-			ask_sizemult();
+			ask_sizemult(dlcylsize);
 			msg_display(MSG_fspart, multname);
 			disp_cur_fspart(-1, 1);
 		};
@@ -175,11 +175,14 @@ menu editfsparts, y=12, exit;
 	option "Change f", action { editpart = F;}, sub menu edfspart;
 	option "Change g", action { editpart = G;}, sub menu edfspart;
 	option "Change h", action { editpart = H;}, sub menu edfspart;
-	option "Set new allocation size", action { reask_sizemult(); };
+	option "Set new allocation size", action { reask_sizemult(dlcylsize); };
  
 
-menu md_distcustom, y=3, exit, title "Selection toggles inclusion";
+menu md_distcustom, x=26, y=5, exit, title "Selection toggles inclusion";
 	display action { show_cur_distsets (); };
+	option	"Kernel",		 action { toggle_getit (0); };
+	option	"Base",			 action { toggle_getit (1); };
+	option	"System (/etc)",	 action { toggle_getit (2); };
 	option  "Compiler Tools", 	 action { toggle_getit (3); };
 	option  "Games", 		 action { toggle_getit (4); };
 	option  "Online Manual Pages", 	 action { toggle_getit (5); };

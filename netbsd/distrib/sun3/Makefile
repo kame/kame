@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.2.8.1 1999/06/21 03:47:38 perry Exp $
+#	$NetBSD: Makefile,v 1.3 1999/05/21 04:06:20 gwr Exp $
 
 SUBDIR= ramdisk miniroot
 TARGETS= all release
