@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.54 1999/08/24 10:10:27 jinmei Exp $
+$Id: CHANGELOG,v 1.55 1999/08/24 12:56:36 jinmei Exp $
 
 <199908>
 1999-08-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -55,6 +55,9 @@ Tue Aug 24 02:11:54 JST 1999  itojun@iijlab.net
 1999-08-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6: implemented per-interface ICMPv6 statistics
 	based on RFC2466. ioctl(SIOCGIFSTAT_ICMP6) is available as API.
+	Note that this changes affect the size of struct in6_ifreq,
+	which means you have to recompile some applications using the
+	structure like ifconfig.
 
 1999-08-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* sys/netinet6/udp6_usrreq.c (udp6_output): now got rid of
