@@ -660,9 +660,11 @@ to the super-user only when binding addresses to sockets.
 .Nm
 may have trouble handling connections from scoped IPv6 addresses, or
 IPv4 mapped addresses
-.Pq IPv4 connection on
+.Po
+IPv4 connection on
 .Dv AF_INET6
-socket .
+socket
+.Pc .
 For the latter case, running daemons,
 one for IPv4 and one for IPv6, will avoid the problem.
 .Sh SECURITY CONSIDERATIONS
