@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.267 2002/05/29 07:44:29 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.268 2002/05/29 12:59:36 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1652,7 +1652,6 @@ nd6_ioctl(cmd, data, ifp)
 		ndi->ndi.flags = ND_IFINFO(ifp)->flags;
 		ndi->ndi.recalctm = ND_IFINFO(ifp)->recalctm;
 		ndi->ndi.chlim = ND_IFINFO(ifp)->chlim;
-		ndi->ndi.receivedra = ND_IFINFO(ifp)->receivedra;
 		break;
 	case SIOCGIFINFO_IN6:
 		ndi->ndi = *ND_IFINFO(ifp);
