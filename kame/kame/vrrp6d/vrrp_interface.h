@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_interface.h,v 1.5 2003/02/19 10:10:01 ono Exp $	*/
+/*	$KAME: vrrp_interface.h,v 1.6 2003/02/25 09:29:25 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -79,6 +79,7 @@
 #include <errno.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
 #include <unistd.h>

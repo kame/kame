@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_state.c,v 1.5 2003/02/19 10:10:01 ono Exp $	*/
+/*	$KAME: vrrp_state.c,v 1.6 2003/02/25 09:29:25 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -92,6 +92,8 @@ vrrp_state_initialize_all(void)
 		if (vrrp_state_initialize(vr_ptr[i]) != 0)
 			return -1;
 	}
+
+	return 0;
 }
 
 char 
@@ -385,6 +387,7 @@ vrrp_state_start()
 	int i, nfds, n;
 
 	FD_ZERO(&readers);
+	nfds = 0;
 	for (i = 0; i < vr_ptr_pos; i++){
 		FD_SET(vr_ptr[i]->sd, &readers);
 		nfds = vr_ptr[i]->sd + 1;
@@ -421,6 +424,8 @@ vrrp_state_master_expire(void *data)
 	printf("master expire %s\n", vr->vrrpif_name);
 #endif
 	vrrp_network_send_advertisement(vr);
+
+	return vr->tm;
 }
 
 void
@@ -439,4 +444,6 @@ vrrp_state_backup_expire(void *data)
 	printf("backup expire %s\n", vr->vrrpif_name);
 #endif
 	vrrp_state_set_master(vr);
+
+	return NULL;
 }

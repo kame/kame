@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_timer.h,v 1.1 2003/02/19 10:10:02 ono Exp $	*/
+/*	$KAME: vrrp_timer.h,v 1.2 2003/02/25 09:29:25 ono Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -32,20 +32,26 @@
 #include "vrrp_define.h"
 #include "vrrp_proto.h"
 #include "vrrp_functions.h"
+#ifdef __FreeBSD__
+#include <sys/queue.h>
+#endif
 
 /* a < b */
-#define TIMEVAL_LT(a, b) (((a).tv_sec < (b).tv_sec) ||\
-			  (((a).tv_sec == (b).tv_sec) && \
-			    ((a).tv_usec < (b).tv_usec)))
+#define TIMEVAL_LT(a, b) (((a)->tv_sec < (b)->tv_sec) ||\
+			  (((a)->tv_sec == (b)->tv_sec) && \
+			    ((a)->tv_usec < (b)->tv_usec)))
 
 /* a <= b */
-#define TIMEVAL_LEQ(a, b) (((a).tv_sec < (b).tv_sec) ||\
-			   (((a).tv_sec == (b).tv_sec) &&\
- 			    ((a).tv_usec <= (b).tv_usec)))
+#define TIMEVAL_LEQ(a, b) (((a)->tv_sec < (b)->tv_sec) ||\
+			   (((a)->tv_sec == (b)->tv_sec) &&\
+ 			    ((a)->tv_usec <= (b)->tv_usec)))
+
+/* a == b */
+#define TIMEVAL_EQUAL(a,b) ((a)->tv_sec == (b)->tv_sec &&\
+                            (a)->tv_usec == (b)->tv_usec)
 
 struct vrrp_timer {
-	struct vrrp_timer *next;
-	struct vrrp_timer *prev;
+	TAILQ_ENTRY(vrrp_timer) timer_link;
 	struct timeval tm;
 
 	struct vrrp_timer *(*expire) __P((void *)); /* expiration function */

@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_timer.c,v 1.1 2003/02/19 10:10:02 ono Exp $	*/
+/*	$KAME: vrrp_timer.c,v 1.2 2003/02/25 09:29:25 ono Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -41,21 +41,18 @@
 
 #include "vrrp_timer.h"
 
-static struct vrrp_timer timer_head;
+static TAILQ_HEAD(_vrrptimer, vrrp_timer) timer_head;
+static struct timeval timer_min;
 
 #define MILLION 1000000
-#define TIMEVAL_EQUAL(t1,t2) ((t1)->tv_sec == (t2)->tv_sec &&\
- (t1)->tv_usec == (t2)->tv_usec)
 
 static struct timeval tm_max = {0x7fffffff, 0x7fffffff};
 
 void
 vrrp_timer_init()
 {
-	memset(&timer_head, 0, sizeof(timer_head));
-
-	timer_head.next = timer_head.prev = &timer_head;
-	timer_head.tm = tm_max;
+	TAILQ_INIT(&timer_head);
+	timer_min = tm_max;
 }
 
 struct vrrp_timer *
@@ -85,7 +82,7 @@ vrrp_add_timer(struct vrrp_timer *(*timeout) __P((void *)),
 	newtimer->tm = tm_max;
 
 	/* link into chain */
-	insque(newtimer, &timer_head);
+	TAILQ_INSERT_HEAD(&timer_head, newtimer, timer_link);
 
 	return(newtimer);
 }
@@ -93,7 +90,7 @@ vrrp_add_timer(struct vrrp_timer *(*timeout) __P((void *)),
 void
 vrrp_remove_timer(struct vrrp_timer **timer)
 {
-	remque(*timer);
+	TAILQ_REMOVE(&timer_head, *timer, timer_link);
 	free(*timer);
 	*timer = NULL;
 }
@@ -109,8 +106,8 @@ vrrp_set_timer(u_int interval, struct vrrp_timer *timer)
 	TIMEVAL_ADD_INT(&now, interval, &timer->tm);
 
 	/* update the next expiration time */
-	if (TIMEVAL_LT(timer->tm, timer_head.tm))
-		timer_head.tm = timer->tm;
+	if (TIMEVAL_LT(&timer->tm, &timer_min))
+		timer_min = timer->tm;
 
 	return;
 }
@@ -125,16 +122,17 @@ vrrp_check_timer()
 {
 	static struct timeval returnval;
 	struct timeval now;
-	struct vrrp_timer *tm = timer_head.next, *tm_next;
+	struct vrrp_timer *tm, *tm_next;
 
 	gettimeofday(&now, NULL);
 
-	timer_head.tm = tm_max;
+	timer_min = tm_max;
 
-	for (tm = timer_head.next; tm != &timer_head; tm = tm_next) {
-		tm_next = tm->next;
+	for (tm = TAILQ_FIRST(&timer_head); tm; tm = tm_next)
+	{
+		tm_next = TAILQ_NEXT(tm, timer_link);
 
-		if (TIMEVAL_LEQ(tm->tm, now)) {
+		if (TIMEVAL_LEQ(&tm->tm, &now)) {
 			if (((*tm->expire)(tm->expire_data) == NULL))
 				continue; /* the timer was removed */
 			if (tm->update)
@@ -142,18 +140,18 @@ vrrp_check_timer()
 			TIMEVAL_ADD(&tm->tm, &now, &tm->tm);
 		}
 
-		if (TIMEVAL_LT(tm->tm, timer_head.tm))
-			timer_head.tm = tm->tm;
+		if (TIMEVAL_LT(&tm->tm, &timer_min))
+			timer_min = tm->tm;
 	}
 
-	if (TIMEVAL_EQUAL(&tm_max, &timer_head.tm)) {
+	if (TIMEVAL_EQUAL(&tm_max, &timer_min)) {
 		/* no need to timeout */
 		return(NULL);
-	} else if (TIMEVAL_LT(timer_head.tm, now)) {
+	} else if (TIMEVAL_LT(&timer_min, &now)) {
 		/* this may occur when the interval is too small */
 		returnval.tv_sec = returnval.tv_usec = 0;
 	} else
-		TIMEVAL_SUB(&timer_head.tm, &now, &returnval);
+		TIMEVAL_SUB(&timer_min, &now, &returnval);
 	return(&returnval);
 }
 
@@ -163,7 +161,7 @@ vrrp_timer_rest(struct vrrp_timer *timer)
 	static struct timeval returnval, now;
 
 	gettimeofday(&now, NULL);
-	if (TIMEVAL_LEQ(timer->tm, now)) {
+	if (TIMEVAL_LEQ(&timer->tm, &now)) {
 		syslog(LOG_DEBUG,
 		       "<%s> a timer must be expired, but not yet",
 		       __func__);

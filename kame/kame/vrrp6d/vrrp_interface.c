@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_interface.c,v 1.6 2003/02/19 10:10:01 ono Exp $	*/
+/*	$KAME: vrrp_interface.c,v 1.7 2003/02/25 09:29:25 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -106,33 +106,6 @@ vrrp_interface_ethaddr_set(char *if_name, struct ether_addr * ethaddr)
 #endif
 	close(sd);
 
-	return 0;
-}
-
-static int link_getaddr(addr, sa)
-	const char *addr;
-	struct sockaddr *sa;
-{
-	char *temp;
-	struct sockaddr_dl sdl;
-
-	if ((temp = (char *) malloc(strlen(addr) + 1)) == NULL) {
-		syslog(LOG_ERR, "malloc failed");
-		return -1;
-	}
-	
-	temp[0] = ':';
-	strcpy(temp + 1, addr);
-	sdl.sdl_len = sizeof(sdl);
-	link_addr(temp, &sdl);
-	free(temp);
-	if (sdl.sdl_alen > sizeof(sa->sa_data)) {
-		syslog(LOG_ERR, "malformed link-level address");
-		return -1;
-	}
-	sa->sa_family = AF_LINK;
-	sa->sa_len = sdl.sdl_alen;
-	bcopy(LLADDR(&sdl), sa->sa_data, sdl.sdl_alen);
 	return 0;
 }
 
