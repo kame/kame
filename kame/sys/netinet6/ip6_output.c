@@ -104,6 +104,10 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
 
+#ifdef __OpenBSD__ /*KAME IPSEC*/
+#undef IPSEC
+#endif
+
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>

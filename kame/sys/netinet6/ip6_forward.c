@@ -53,6 +53,10 @@
 #include <netinet6/icmp6.h>
 #include <netinet6/nd6.h>
 
+#ifdef __OpenBSD__ /*KAME IPSEC*/
+#undef IPSEC
+#endif
+
 #ifdef IPSEC_IPV6FWD
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>

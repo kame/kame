@@ -72,7 +72,7 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet/ip_var.h>
 #include <netinet/icmp_var.h>
 
-#ifdef IPSEC
+#if 0 /*KAME IPSEC*/
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
 #include <netkey/key_debug.h>
@@ -277,7 +277,7 @@ icmp_input(m, va_alist)
 		printf("icmp_input, type %d code %d\n", icp->icmp_type,
 		    icp->icmp_code);
 #endif
-#ifdef IPSEC
+#if 0 /*KAME IPSEC*/
 	/* drop it if it does not match the policy */
 	if (ipsec4_in_reject(m, NULL)) {
 		ipsecstat.in_polvio++;
@@ -505,7 +505,7 @@ reflect:
 		    (struct sockaddr *)0, RTF_GATEWAY | RTF_HOST,
 		    sintosa(&icmpgw), (struct rtentry **)0);
 		pfctlinput(PRC_REDIRECT_HOST, sintosa(&icmpsrc));
-#ifdef IPSEC
+#if 0 /*KAME IPSEC*/
 		key_sa_routechange((struct sockaddr *)&icmpsrc);
 #endif
 		break;
@@ -685,7 +685,7 @@ icmp_send(m, opts)
 		    buf, inet_ntoa(ip->ip_src));
 	}
 #endif
-#ifdef IPSEC
+#if 0 /*KAME IPSEC*/
 	m->m_pkthdr.rcvif = NULL;
 #endif /*IPSEC*/
 	(void) ip_output(m, opts, NULL, 0, NULL, NULL);

@@ -140,6 +140,10 @@
 #include <netinet6/in6_prefix.h>
 #endif
 
+#ifdef __OpenBSD__ /*KAME IPSEC*/
+#undef IPSEC
+#endif
+
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #include <netinet6/ah.h>

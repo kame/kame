@@ -82,7 +82,7 @@ extern u_int8_t get_sa_require  __P((struct inpcb *));
 
 #endif
 
-#ifdef IPSEC
+#if 0 /*KAME IPSEC*/
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
 #include <netkey/key_debug.h>
@@ -150,7 +150,7 @@ ip_output(m0, va_alist)
 
 
 
-#ifdef IPSEC
+#if 0 /*KAME IPSEC*/
 	m->m_pkthdr.rcvif = NULL;
 #endif /*IPSEC*/
 
@@ -916,11 +916,6 @@ ip_ctloutput(op, so, level, optname, mp)
 	struct proc *p = curproc; /* XXX */
 #endif
 	int error = 0;
-#ifdef IPSEC
-#ifdef __NetBSD__
-	struct proc *p = curproc;	/*XXX*/
-#endif
-#endif
 
 	if (level != IPPROTO_IP) {
 		error = EINVAL;
@@ -1090,7 +1085,7 @@ ip_ctloutput(op, so, level, optname, mp)
 #endif
 			break;
 
-#ifdef IPSEC
+#if 0 /*KAME IPSEC*/
 		case IP_IPSEC_POLICY:
 		    {
 			caddr_t req = NULL;
@@ -1169,7 +1164,7 @@ ip_ctloutput(op, so, level, optname, mp)
 			*mtod(m, int *) = optval;
 			break;
 
-#ifdef IPSEC
+#if 0 /*KAME IPSEC*/
 		case IP_IPSEC_POLICY:
 			error = ipsec_get_policy(inp->inp_sp, mp);
 			break;

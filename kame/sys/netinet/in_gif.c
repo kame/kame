@@ -224,7 +224,9 @@ in_gif_output(ifp, family, m, rt)
 	}
 	
 #ifdef IPSEC
+#ifndef __OpenBSD__	/*KAME IPSEC*/
 	m->m_pkthdr.rcvif = NULL;
+#endif
 #endif /*IPSEC*/
 	error = ip_output(m, 0, &sc->gif_ro, 0, 0);
 	return(error);

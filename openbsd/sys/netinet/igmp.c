@@ -555,7 +555,7 @@ igmp_sendpkt(inm, type)
 	imo.imo_multicast_loop = 0;
 #endif /* MROUTING */
 
-#ifdef IPSEC
+#if 0 /*KAME IPSEC*/
 	m->m_pkthdr.rcvif = NULL;
 #endif /*IPSEC*/
 	ip_output(m, (struct mbuf *)0, (struct route *)0, IP_MULTICASTOPTS,

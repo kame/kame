@@ -1251,7 +1251,7 @@ ip_forward(m, srcrt)
 	struct mbuf *mcopy;
 	n_long dest;
 	struct ifnet *destifp;
-#ifdef IPSEC
+#if 0 /*KAME IPSEC*/
 	struct ifnet dummyifp;
 #endif
 
@@ -1334,7 +1334,7 @@ ip_forward(m, srcrt)
 		}
 	}
 
-#ifdef IPSEC
+#if 0 /*KAME IPSEC*/
 	m->m_pkthdr.rcvif = NULL;
 #endif /*IPSEC*/
 	error = ip_output(m, (struct mbuf *)0, &ipforward_rt,
@@ -1374,7 +1374,7 @@ ip_forward(m, srcrt)
 	case EMSGSIZE:
 		type = ICMP_UNREACH;
 		code = ICMP_UNREACH_NEEDFRAG;
-#ifndef IPSEC
+#if 1 /*KAME IPSEC*/
 		if (ipforward_rt.ro_rt)
 			destifp = ipforward_rt.ro_rt->rt_ifp;
 #else

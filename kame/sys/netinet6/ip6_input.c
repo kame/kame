@@ -131,6 +131,10 @@
 
 #include <net/net_osdep.h>
 
+#ifdef __OpenBSD__ /*KAME IPSEC*/
+#undef IPSEC
+#endif
+
 extern struct domain inet6domain;
 extern struct ip6protosw inet6sw[];
 #if defined(__bsdi__) || defined(__OpenBSD__)

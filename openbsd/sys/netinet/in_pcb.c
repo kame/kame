@@ -82,7 +82,7 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 extern int	check_ipsec_policy  __P((struct inpcb *, u_int32_t));
 #endif
 
-#ifdef IPSEC
+#if 0 /*KAME IPSEC*/
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
 #include <netkey/key_debug.h>
@@ -533,7 +533,7 @@ in_pcbdetach(v)
 	struct socket *so = inp->inp_socket;
 	int s;
 
-#ifdef IPSEC
+#if 0 /*KAME IPSEC*/
 	if (so->so_pcb) {
 		KEYDEBUG(KEYDEBUG_KEY_STAMP,
 			printf("DP call free SO=%p from in_pcbdetach\n", so));

@@ -115,7 +115,7 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
  * TCP/IP protocol family: IP, ICMP, UDP, TCP.
  */
 
-#ifdef IPSEC
+#if 0 /*KAME IPSEC*/
 #include <netinet6/ah.h>
 #ifdef IPSEC_ESP
 #include <netinet6/esp.h>
