@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.183 2001/03/22 08:09:32 itojun Exp $	*/
+/*	$KAME: key.c,v 1.184 2001/03/23 08:08:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -587,6 +587,7 @@ key_gettunnel(osrc, odst, isrc, idst)
 	int s;
 	struct ipsecrequest *r1, *r2, *p;
 	struct sockaddr *os, *od, *is, *id;
+	struct secpolicyindex spidx;
 
 	r1 = r2 = NULL;
 #ifdef __NetBSD__
@@ -598,29 +599,35 @@ key_gettunnel(osrc, odst, isrc, idst)
 		if (sp->state == IPSEC_SPSTATE_DEAD)
 			continue;
 
-		p = sp->req;
-		while (p) {
-			if (p->saidx.mode != IPSEC_MODE_TUNNEL) {
-				p = p->next;
+		for (p = sp->req; p; p = p->next) {
+			if (p->saidx.mode != IPSEC_MODE_TUNNEL)
 				continue;
-			}
+
 			r1 = r2;
 			r2 = p;
 
 			if (!r1) {
-				is = (struct sockaddr *)&sp->spidx.src;
-				id = (struct sockaddr *)&sp->spidx.dst;
+				/* here we look at address matches only */
+				spidx = sp->spidx;
+				if (isrc->sa_len > sizeof(spidx.src) ||
+				    idst->sa_len > sizeof(spidx.dst))
+					continue;
+				bcopy(isrc, &spidx.src, isrc->sa_len);
+				bcopy(idst, &spidx.dst, idst->sa_len);
+				if (!key_cmpspidx_withmask(&sp->spidx, &spidx))
+					continue;
 			} else {
 				is = (struct sockaddr *)&r1->saidx.src;
 				id = (struct sockaddr *)&r1->saidx.dst;
+				if (key_sockaddrcmp(is, isrc, 0) ||
+				    key_sockaddrcmp(id, idst, 0))
+					continue;
 			}
+
 			os = (struct sockaddr *)&r2->saidx.src;
 			od = (struct sockaddr *)&r2->saidx.dst;
-
 			if (key_sockaddrcmp(os, osrc, 0) ||
-			    key_sockaddrcmp(od, odst, 0) ||
-			    key_sockaddrcmp(is, isrc, 0) ||
-			    key_sockaddrcmp(id, idst, 0))
+			    key_sockaddrcmp(od, odst, 0))
 				continue;
 
 			goto found;

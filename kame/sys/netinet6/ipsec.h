@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.43 2001/02/28 13:32:00 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.44 2001/03/23 08:08:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -448,9 +448,10 @@ extern int ipsec6_output_trans __P((struct ipsec_output_state *, u_char *,
 extern int ipsec6_output_tunnel __P((struct ipsec_output_state *,
 	struct secpolicy *, int));
 #endif
-extern int ipsec4_tunnel_validate __P((struct ip *, u_int, struct secasvar *));
+extern int ipsec4_tunnel_validate __P((struct mbuf *, int, u_int,
+	struct secasvar *));
 #ifdef INET6
-extern int ipsec6_tunnel_validate __P((struct ip6_hdr *, u_int,
+extern int ipsec6_tunnel_validate __P((struct mbuf *, int, u_int,
 	struct secasvar *));
 #endif
 extern struct mbuf *ipsec_copypkt __P((struct mbuf *));

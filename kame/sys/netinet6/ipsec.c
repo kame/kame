@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.97 2001/02/28 15:41:44 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.98 2001/03/23 08:08:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -118,6 +118,10 @@
 int ipsec_debug = 1;
 #else
 int ipsec_debug = 0;
+#endif
+
+#ifndef offsetof		/* XXX */
+#define	offsetof(type, member)	((size_t)(&((type *)0)->member))
 #endif
 
 struct ipsecstat ipsecstat;
@@ -3174,41 +3178,68 @@ ipsec6_splithdr(m)
 
 /* validate inbound IPsec tunnel packet. */
 int
-ipsec4_tunnel_validate(ip, nxt0, sav)
-	struct ip *ip;
+ipsec4_tunnel_validate(m, off, nxt0, sav)
+	struct mbuf *m;		/* no pullup permitted, m->m_len >= ip */
+	int off;
 	u_int nxt0;
 	struct secasvar *sav;
 {
 	u_int8_t nxt = nxt0 & 0xff;
 	struct sockaddr_in *sin;
+	struct sockaddr_in osrc, odst, isrc, idst;
 	int hlen;
+	struct secpolicy *sp;
+	struct ip *oip;
 
+#ifdef DIAGNOSTIC
+	if (m->m_len < sizeof(struct ip))
+		panic("too short mbuf on ipsec4_tunnel_validate");
+#endif
 	if (nxt != IPPROTO_IPV4)
+		return 0;
+	if (m->m_pkthdr.len < off + sizeof(struct ip))
 		return 0;
 	/* do not decapsulate if the SA is for transport mode only */
 	if (sav->sah->saidx.mode == IPSEC_MODE_TRANSPORT)
 		return 0;
+
+	oip = mtod(m, struct ip *);
 #ifdef _IP_VHL
-	hlen = _IP_VHL_HL(ip->ip_vhl) << 2;
+	hlen = _IP_VHL_HL(oip->ip_vhl) << 2;
 #else
-	hlen = ip->ip_hl << 2;
+	hlen = oip->ip_hl << 2;
 #endif
 	if (hlen != sizeof(struct ip))
 		return 0;
-	switch (((struct sockaddr *)&sav->sah->saidx.dst)->sa_family) {
-	case AF_INET:
-		sin = (struct sockaddr_in *)&sav->sah->saidx.dst;
-		if (bcmp(&ip->ip_dst, &sin->sin_addr, sizeof(ip->ip_dst)) != 0)
-			return 0;
-		break;
-#ifdef INET6
-	case AF_INET6:
-		/* should be supported, but at this moment we don't. */
-		/*FALLTHROUGH*/
-#endif
-	default:
+
+	/* AF_INET6 should be supported, but at this moment we don't. */
+	sin = (struct sockaddr_in *)&sav->sah->saidx.dst;
+	if (sin->sin_family != AF_INET)
 		return 0;
-	}
+	if (bcmp(&oip->ip_dst, &sin->sin_addr, sizeof(oip->ip_dst)) != 0)
+		return 0;
+
+	/* XXX slow */
+	bzero(&osrc, sizeof(osrc));
+	bzero(&odst, sizeof(odst));
+	bzero(&isrc, sizeof(isrc));
+	bzero(&idst, sizeof(idst));
+	osrc.sin_family = odst.sin_family = isrc.sin_family = idst.sin_family = 
+	    AF_INET;
+	osrc.sin_len = odst.sin_len = isrc.sin_len = idst.sin_len = 
+	    sizeof(struct sockaddr_in);
+	osrc.sin_addr = oip->ip_src;
+	odst.sin_addr = oip->ip_dst;
+	m_copydata(m, off + offsetof(struct ip, ip_src), sizeof(isrc.sin_addr),
+	    (caddr_t)&isrc.sin_addr);
+	m_copydata(m, off + offsetof(struct ip, ip_dst), sizeof(idst.sin_addr),
+	    (caddr_t)&idst.sin_addr);
+
+	sp = key_gettunnel((struct sockaddr *)&osrc, (struct sockaddr *)&odst,
+	    (struct sockaddr *)&isrc, (struct sockaddr *)&idst);
+	if (!sp)
+		return 0;
+	key_freesp(sp);
 
 	return 1;
 }
@@ -3216,31 +3247,59 @@ ipsec4_tunnel_validate(ip, nxt0, sav)
 #ifdef INET6
 /* validate inbound IPsec tunnel packet. */
 int
-ipsec6_tunnel_validate(ip6, nxt0, sav)
-	struct ip6_hdr *ip6;
+ipsec6_tunnel_validate(m, off, nxt0, sav)
+	struct mbuf *m;		/* no pullup permitted, m->m_len >= ip */
+	int off;
 	u_int nxt0;
 	struct secasvar *sav;
 {
 	u_int8_t nxt = nxt0 & 0xff;
 	struct sockaddr_in6 *sin6;
+	struct sockaddr_in6 osrc, odst, isrc, idst;
+	struct secpolicy *sp;
+	struct ip6_hdr *oip6;
 
+#ifdef DIAGNOSTIC
+	if (m->m_len < sizeof(struct ip6_hdr))
+		panic("too short mbuf on ipsec6_tunnel_validate");
+#endif
 	if (nxt != IPPROTO_IPV6)
+		return 0;
+	if (m->m_pkthdr.len < off + sizeof(struct ip6_hdr))
 		return 0;
 	/* do not decapsulate if the SA is for transport mode only */
 	if (sav->sah->saidx.mode == IPSEC_MODE_TRANSPORT)
 		return 0;
-	switch (((struct sockaddr *)&sav->sah->saidx.dst)->sa_family) {
-	case AF_INET6:
-		sin6 = ((struct sockaddr_in6 *)&sav->sah->saidx.dst);
-		if (!IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &sin6->sin6_addr))
-			return 0;
-		break;
-	case AF_INET:
-		/* should be supported, but at this moment we don't. */
-		/*FALLTHROUGH*/
-	default:
+
+	oip6 = mtod(m, struct ip6_hdr *);
+	/* AF_INET should be supported, but at this moment we don't. */
+	sin6 = (struct sockaddr_in6 *)&sav->sah->saidx.dst;
+	if (sin6->sin6_family != AF_INET6)
 		return 0;
-	}
+	if (!IN6_ARE_ADDR_EQUAL(&oip6->ip6_dst, &sin6->sin6_addr))
+		return 0;
+
+	/* XXX slow */
+	bzero(&osrc, sizeof(osrc));
+	bzero(&odst, sizeof(odst));
+	bzero(&isrc, sizeof(isrc));
+	bzero(&idst, sizeof(idst));
+	osrc.sin6_family = odst.sin6_family = isrc.sin6_family =
+	    idst.sin6_family = AF_INET6;
+	osrc.sin6_len = odst.sin6_len = isrc.sin6_len = idst.sin6_len = 
+	    sizeof(struct sockaddr_in6);
+	osrc.sin6_addr = oip6->ip6_src;
+	odst.sin6_addr = oip6->ip6_dst;
+	m_copydata(m, off + offsetof(struct ip6_hdr, ip6_src),
+	    sizeof(isrc.sin6_addr), (caddr_t)&isrc.sin6_addr);
+	m_copydata(m, off + offsetof(struct ip6_hdr, ip6_dst),
+	    sizeof(idst.sin6_addr), (caddr_t)&idst.sin6_addr);
+
+	sp = key_gettunnel((struct sockaddr *)&osrc, (struct sockaddr *)&odst,
+	    (struct sockaddr *)&isrc, (struct sockaddr *)&idst);
+	if (!sp)
+		return 0;
+	key_freesp(sp);
 
 	return 1;
 }

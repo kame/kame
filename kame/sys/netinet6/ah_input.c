@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.53 2001/03/01 09:12:08 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.54 2001/03/23 08:08:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -128,6 +128,7 @@ ah4_input(m, va_alist)
 	int s;
 	int off, proto;
 	va_list ap;
+	size_t stripsiz = 0;
 
 	va_start(ap, m);
 	off = va_arg(ap, int);
@@ -422,7 +423,14 @@ ah4_input(m, va_alist)
 	}
 
 	/* was it transmitted over the IPsec tunnel SA? */
-	if (ipsec4_tunnel_validate(ip, nxt, sav)) {
+	if (sav->flags & SADB_X_EXT_OLD) {
+		/* RFC 1826 */
+		stripsiz = sizeof(struct ah) + siz1;
+	} else {
+		/* RFC 2402 */
+		stripsiz = sizeof(struct newah) + siz1;
+	}
+	if (ipsec4_tunnel_validate(m, off + stripsiz, nxt, sav)) {
 		/*
 		 * strip off all the headers that precedes AH.
 		 *	IP xx AH IP' payload -> IP' payload
@@ -430,17 +438,9 @@ ah4_input(m, va_alist)
 		 * XXX more sanity checks
 		 * XXX relationship with gif?
 		 */
-		size_t stripsiz = 0;
 		u_int8_t tos;
 
 		tos = ip->ip_tos;
-		if (sav->flags & SADB_X_EXT_OLD) {
-			/* RFC 1826 */
-			stripsiz = sizeof(struct ah) + siz1;
-		} else {
-			/* RFC 2402 */
-			stripsiz = sizeof(struct newah) + siz1;
-		}
 		m_adj(m, off + stripsiz);
 		if (m->m_len < sizeof(*ip)) {
 			m = m_pullup(m, sizeof(*ip));
@@ -515,15 +515,6 @@ ah4_input(m, va_alist)
 		/*
 		 * strip off AH.
 		 */
-		size_t stripsiz = 0;
-
-		if (sav->flags & SADB_X_EXT_OLD) {
-			/* RFC 1826 */
-			stripsiz = sizeof(struct ah) + siz1;
-		} else {
-			/* RFC 2402 */
-			stripsiz = sizeof(struct newah) + siz1;
-		}
 
 		ip = mtod(m, struct ip *);
 #ifndef PULLDOWN_TEST
@@ -692,6 +683,7 @@ ah6_input(mp, offp, proto)
 	struct secasvar *sav = NULL;
 	u_int16_t nxt;
 	int s;
+	size_t stripsiz = 0;
 
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, sizeof(struct ah), IPPROTO_DONE);
@@ -907,7 +899,14 @@ ah6_input(mp, offp, proto)
 	}
 
 	/* was it transmitted over the IPsec tunnel SA? */
-	if (ipsec6_tunnel_validate(ip6, nxt, sav)) {
+	if (sav->flags & SADB_X_EXT_OLD) {
+		/* RFC 1826 */
+		stripsiz = sizeof(struct ah) + siz1;
+	} else {
+		/* RFC 2402 */
+		stripsiz = sizeof(struct newah) + siz1;
+	}
+	if (ipsec6_tunnel_validate(m, off + stripsiz, nxt, sav)) {
 		/*
 		 * strip off all the headers that precedes AH.
 		 *	IP6 xx AH IP6' payload -> IP6' payload
@@ -915,17 +914,9 @@ ah6_input(mp, offp, proto)
 		 * XXX more sanity checks
 		 * XXX relationship with gif?
 		 */
-		size_t stripsiz = 0;
 		u_int32_t flowinfo;	/*net endian*/
 
 		flowinfo = ip6->ip6_flow;
-		if (sav->flags & SADB_X_EXT_OLD) {
-			/* RFC 1826 */
-			stripsiz = sizeof(struct ah) + siz1;
-		} else {
-			/* RFC 2402 */
-			stripsiz = sizeof(struct newah) + siz1;
-		}
 		m_adj(m, off + stripsiz);
 		if (m->m_len < sizeof(*ip6)) {
 			/*
@@ -990,7 +981,6 @@ ah6_input(mp, offp, proto)
 		/*
 		 * strip off AH.
 		 */
-		size_t stripsiz = 0;
 		char *prvnxtp;
 
 		/*
@@ -1000,14 +990,6 @@ ah6_input(mp, offp, proto)
 		 */
 		prvnxtp = ip6_get_prevhdr(m, off); /* XXX */
 		*prvnxtp = nxt;
-
-		if (sav->flags & SADB_X_EXT_OLD) {
-			/* RFC 1826 */
-			stripsiz = sizeof(struct ah) + siz1;
-		} else {
-			/* RFC 2402 */
-			stripsiz = sizeof(struct newah) + siz1;
-		}
 
 		ip6 = mtod(m, struct ip6_hdr *);
 #ifndef PULLDOWN_TEST

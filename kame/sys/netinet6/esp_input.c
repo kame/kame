@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.54 2001/03/01 09:12:08 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.55 2001/03/23 08:08:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -368,7 +368,7 @@ noreplaycheck:
 #endif
 
 	/* was it transmitted over the IPsec tunnel SA? */
-	if (ipsec4_tunnel_validate(ip, nxt, sav)) {
+	if (ipsec4_tunnel_validate(m, off + esplen + ivlen, nxt, sav)) {
 		/*
 		 * strip off all the headers that precedes ESP header.
 		 *	IP4 xx ESP IP4' payload -> IP4' payload
@@ -786,7 +786,7 @@ noreplaycheck:
 	ip6->ip6_plen = htons(ntohs(ip6->ip6_plen) - taillen);
 
 	/* was it transmitted over the IPsec tunnel SA? */
-	if (ipsec6_tunnel_validate(ip6, nxt, sav)) {
+	if (ipsec6_tunnel_validate(m, off + esplen + ivlen, nxt, sav)) {
 		/*
 		 * strip off all the headers that precedes ESP header.
 		 *	IP6 xx ESP IP6' payload -> IP6' payload
