@@ -264,7 +264,7 @@ void		setservent __P((int));
 int		getaddrinfo __P((const char *name, const char *service,
 		    const struct addrinfo *req, struct addrinfo **pai));
 void		freeaddrinfo __P((struct addrinfo *ai));
-int		getnameinfo __P((const struct sockaddr *sa, size_t addrlen,
+int		getnameinfo __P((const struct sockaddr *sa, socklen_t addrlen,
 		    char *host, size_t hostlen, char *serv, size_t servlen,
 		    int flags));
 char		*gai_strerror __P((int ecode));
