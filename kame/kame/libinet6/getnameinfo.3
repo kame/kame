@@ -1,4 +1,4 @@
-.\"	$KAME: getnameinfo.3,v 1.31 2003/08/28 01:47:03 itojun Exp $
+.\"	$KAME: getnameinfo.3,v 1.32 2003/08/28 01:49:51 itojun Exp $
 .\"
 .\" Copyright (c) 1983, 1987, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -347,7 +347,7 @@ if (error == 0) {
 } else {
 	/* addr is numeric string */
 	error = getnameinfo(sa, salen, addr, sizeof(addr),
-	    NULL, 0, 0);
+	    NULL, 0, NI_NUMERICHOST);
 }
 .Ed
 .\"
