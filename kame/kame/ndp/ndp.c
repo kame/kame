@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.102 2003/01/20 13:46:42 jinmei Exp $	*/
+/*	$KAME: ndp.c,v 1.103 2003/05/17 01:01:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -345,8 +345,8 @@ file(name)
 	args[4] = &arg[4][0];
 	retval = 0;
 	while (fgets(line, 100, fp) != NULL) {
-		i = sscanf(line, "%s %s %s %s %s", arg[0], arg[1], arg[2],
-		    arg[3], arg[4]);
+		i = sscanf(line, "%49s %49s %49s %49s %49s",
+		    arg[0], arg[1], arg[2], arg[3], arg[4]);
 		if (i < 2) {
 			fprintf(stderr, "ndp: bad line: %s\n", line);
 			retval = 1;
