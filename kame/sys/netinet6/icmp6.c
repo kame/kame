@@ -1043,8 +1043,19 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 				continue;
 			ifa6 = (struct in6_ifaddr *)ifa;
 
-			if (ifa6->ia6_flags & IN6_IFF_ANYCAST)
-				continue; /* we need only unicast addresses */
+			if (ifa6->ia6_flags & IN6_IFF_ANYCAST) {
+				/* just experimental. not in the spec. */
+				if (ni6->ni_flags & NI_NODEADDR_FLAG_ANYCAST)
+					docopy = 1;
+				else
+					continue;
+			}
+			else {	/* unicast address */
+				if (ni6->ni_flags & NI_NODEADDR_FLAG_ANYCAST)
+					continue;
+				else
+					docopy = 1;
+			}
 
 			/* What do we have to do about ::1? */
 			switch(in6_addrscope(&ifa6->ia_addr.sin6_addr)) {

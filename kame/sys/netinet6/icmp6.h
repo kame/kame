@@ -323,6 +323,7 @@ struct icmp6_nodeinfo {
 #define NI_NODEADDR_FLAG_GLOBAL		0x4
 #define NI_NODEADDR_FLAG_ALL		0x8
 #define NI_NODEADDR_FLAG_TRUNCATE	0x10
+#define NI_NODEADDR_FLAG_ANYCAST	0x20 /* just experimental. not in spec */
 #elif BYTE_ORDER == LITTLE_ENDIAN
 #define NI_SUPTYPE_FLAG_COMPRESS	0x0100
 #define NI_FQDN_FLAG_VALIDTTL		0x0100
@@ -331,6 +332,7 @@ struct icmp6_nodeinfo {
 #define NI_NODEADDR_FLAG_GLOBAL		0x0400
 #define NI_NODEADDR_FLAG_ALL		0x0800
 #define NI_NODEADDR_FLAG_TRUNCATE	0x1000
+#define NI_NODEADDR_FLAG_ANYCAST	0x2000 /* just experimental. not in spec */
 #endif
 
 struct ni_reply_fqdn {
