@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.29 2000/08/22 11:34:47 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.30 2000/08/24 00:16:22 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -96,7 +96,7 @@ static int cb_check_cert __P((int, X509_STORE_CTX *));
 int
 eay_check_x509cert(cert, CApath)
 	vchar_t *cert;
-	vchar_t *CApath;
+	char *CApath;
 {
 	X509_STORE *cert_ctx = NULL;
 	X509_LOOKUP *lookup = NULL;
@@ -124,7 +124,7 @@ eay_check_x509cert(cert, CApath)
 	lookup = X509_STORE_add_lookup(cert_ctx, X509_LOOKUP_hash_dir());
 	if (lookup == NULL)
 		goto end;
-	error = X509_LOOKUP_add_dir(lookup, CApath->v, X509_FILETYPE_PEM);
+	error = X509_LOOKUP_add_dir(lookup, CApath, X509_FILETYPE_PEM);
 	if(!error) {
 		error = -1;
 		goto end;
@@ -233,6 +233,47 @@ cb_check_cert(ok, ctx)
 	ERR_clear_error();
 
 	return ok;
+}
+
+/*
+ * get a subjectAltName from X509 certificate.
+ */
+vchar_t *
+eay_get_x509subjectaltname(cert)
+	vchar_t *cert;
+{
+return NULL;
+#if 0
+	char *bp;
+	X509_EXTENSION *ext;
+	int i;
+
+	bp = cert->v;
+
+	x509 = d2i_X509(NULL, &bp, cert->l);
+	if (x509 == NULL)
+		return -1;
+
+        i = X509_get_ext_by_NID(x509, NID_subject_alt_name, -1);
+        if (i < 0)
+		return -1;
+        ext = X509_get_ext(x509, i);
+        if(!(ext = X509_get_ext(x509, i)) ||
+                        !(ialt = X509V3_EXT_d2i(ext)) ) {
+                X509V3err(X509V3_F_COPY_ISSUER,X509V3_R_ISSUER_DECODE_ERROR);
+                goto err;
+        }
+#endif
+}
+
+/*
+ * decode a X509 certificate and make a readable text.
+ */
+vchar_t *
+eay_get_x509text(cert)
+	vchar_t *cert;
+{
+return NULL;
 }
 
 /*
