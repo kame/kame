@@ -2480,7 +2480,7 @@ ipsec4_output(state, sp, flags)
 			continue;
 #endif
 
-		/* make SA idnex for search proper SA */
+		/* make SA index for search proper SA */
 		ip = mtod(state->m, struct ip *);
 		bcopy(&isr->saidx, &saidx, sizeof(saidx));
 		sa = (struct sockaddr *)&saidx.src;
@@ -2713,7 +2713,7 @@ ipsec6_output_trans(state, nexthdrp, mprev, sp, flags, tun)
 			break;
 		}
 
-		/* make SA idnex for search proper SA */
+		/* make SA index for search proper SA */
 		ip6 = mtod(state->m, struct ip6_hdr *);
 		bcopy(&isr->saidx, &saidx, sizeof(saidx));
 		sa = (struct sockaddr *)&saidx.src;
