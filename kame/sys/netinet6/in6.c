@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.324 2002/10/22 06:26:42 suz Exp $	*/
+/*	$KAME: in6.c,v 1.325 2002/10/28 04:07:46 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2296,7 +2296,7 @@ in6_addmulti(maddr6, ifp, errorp)
 				/* State-Change Report will not be sent.
 				 * Just return immediately. */
 				/* Each ias linked from newhead is used by new
-				 * curnead, so only newhead is freed. */
+				 * curhead, so only newhead is freed. */
 				FREE(newhead, M_MSFILTER);
 				*errorp = 0; /* to make caller behave as
 					      * normal */
@@ -2452,7 +2452,7 @@ in6_addmulti(maddr6, ifp, errorp)
 	}
 #ifdef MLDV2
 	if (newhead != NULL)
-		/* Each ias is linked from new curnead, so only newhead
+		/* Each ias is linked from new curhead, so only newhead
 		 * is freed */
 		FREE(newhead, M_MSFILTER);
 #endif
@@ -3026,7 +3026,7 @@ in6_addmulti(maddr6, ifp, errorp)
 				 * State-Change Report will not be sent. Just 
 				 * return immediately. 
 				 * Each ias linked from newhead is used by new 
-				 * curnead, so only newhead is freed. 
+				 * curhead, so only newhead is freed. 
 				 */
 				FREE(newhead, M_MSFILTER);
 				*errorp = 0; /* to make caller behave as normal */
@@ -3173,7 +3173,7 @@ in6_addmulti(maddr6, ifp, errorp)
 #endif
 #ifdef MLDV2
 	if (newhead != NULL)
-	    /* Each i6as is linked from new curnead, so only newhead (not
+	    /* Each i6as is linked from new curhead, so only newhead (not
 	     * ias_list) is freed */
 	    FREE(newhead, M_MSFILTER);
 #endif	
