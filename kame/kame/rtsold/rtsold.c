@@ -113,7 +113,7 @@ main(argc, argv)
 	argv0 = argv[0];
 
 	/* get option */
-	if (strcmp(argv0, "rtsol") == 0) {
+	if (argv0 && argv0[strlen(argv0) - 1] != 'd') {
 		fflag = 1;
 		once = 1;
 		opts = "dD";
@@ -530,7 +530,7 @@ TIMEVAL_SUB(struct timeval *a, struct timeval *b, struct timeval *result)
 static void
 usage(char *progname)
 {
-	if (strcmp(progname, "rtsol") == 0)
+	if (progname && progname[strlen(progname) - 1] != 'd')
 		fprintf(stderr, "usage: rtsol [-dD] interfaces\n");
 	else
 		fprintf(stderr, "usage: rtsold [-dDfm1] interfaces\n");
