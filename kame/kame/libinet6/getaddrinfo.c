@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.155 2003/04/22 05:40:27 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.156 2003/04/22 05:48:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -194,10 +194,10 @@ static const struct explore explore[] = {
 #if 0	/*???*/
 	{ PF_INET6, SOCK_DGRAM, IPPROTO_SCTP, "sctp", 0x1f },
 #endif
-	{ PF_INET6, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x0f },
-	{ PF_INET6, SOCK_STREAM, IPPROTO_TCP, "sctp", 0x0f },
-	{ PF_INET6, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x17 },
-	{ PF_INET6, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x17 },
+	{ PF_INET6, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x0f },	/* !PASSIVE */
+	{ PF_INET6, SOCK_STREAM, IPPROTO_TCP, "sctp", 0x0f },	/* !PASSIVE */
+	{ PF_INET6, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x17 },	/* PASSIVE */
+	{ PF_INET6, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x17 },	/* PASSIVE */
 	{ PF_INET6, SOCK_SEQPACKET, IPPROTO_SCTP, "sctp", 0x1f },
 	{ PF_INET6, SOCK_RAW, ANY, NULL, 0x1d },
 #endif
@@ -205,10 +205,10 @@ static const struct explore explore[] = {
 #if 0	/*???*/
 	{ PF_INET, SOCK_DGRAM, IPPROTO_SCTP, "sctp", 0x1f },
 #endif
-	{ PF_INET, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x0f },
-	{ PF_INET, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x0f },
-	{ PF_INET, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x17 },
-	{ PF_INET, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x17 },
+	{ PF_INET, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x0f },	/* !PASSIVE */
+	{ PF_INET, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x0f },	/* !PASSIVE */
+	{ PF_INET, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x17 },	/* PASSIVE */
+	{ PF_INET, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x17 },	/* PASSIVE */
 	{ PF_INET, SOCK_SEQPACKET, IPPROTO_SCTP, "sctp", 0x1f },
 	{ PF_INET, SOCK_RAW, ANY, NULL, 0x1d },
 	{ -1, 0, 0, NULL, 0 },
