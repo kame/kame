@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.58 2004/06/03 04:16:32 itojun Exp $	*/
+/*	$KAME: ip6.h,v 1.59 2004/07/09 09:15:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -286,10 +286,10 @@ struct ip6_frag {
 /*
  * Internet implementation parameters.
  */
-#define IPV6_MAXHLIM	255	/* maximun hoplimit */
+#define IPV6_MAXHLIM	255	/* maximum hoplimit */
 #define IPV6_DEFHLIM	64	/* default hlim */
 #define IPV6_FRAGTTL	120	/* ttl for fragment packets, in slowtimo tick */
-#define IPV6_HLIMDEC	1	/* subtracted when forwaeding */
+#define IPV6_HLIMDEC	1	/* subtracted when forwarding */
 
 #define IPV6_MMTU	1280	/* minimal MTU and reassembly. 1024 + 256 */
 #define IPV6_MAXPACKET	65535	/* ip6 max packet size without Jumbo payload*/
