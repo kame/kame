@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.129 2002/06/09 16:16:00 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.130 2002/06/17 02:03:42 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2018,7 +2018,6 @@ mip6_getpolicybyaddr(src, dst, dir)
 
 	bzero(&spidx, sizeof(spidx));
 
-	spidx.dir = dir;
 	*(struct sockaddr_in6 *)&spidx.src = *src;
 	spidx.prefs = sizeof(struct in6_addr) << 3;
 	*(struct sockaddr_in6 *)&spidx.dst = *dst;
