@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.333 2003/05/07 11:27:31 kjc Exp $
+	$KAME: IMPLEMENTATION,v 1.334 2003/06/02 06:31:06 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -115,7 +115,7 @@ RFC2283: Multiprotocol Extensions for BGP-4
     * so-called "BGP4+".
     * KAME-supplied bgpd supports this.
 RFC2292: Advanced Sockets API for IPv6
-    * For supported library functions/kernel APIs, see sys/netinet6/ADVAPI.
+    * see RFC3542
 RFC2362: Protocol Independent Multicast-Sparse Mode (PIM-SM)
     * RFC2362 defines the packet formats and the protcol of PIM-SM.
 RFC2373: IPv6 Addressing Architecture
@@ -203,6 +203,10 @@ RFC3493: Basic Socket Interface Extensions for IPv6
 	- supported but turned off by default on KAME/NetBSD and KAME/FreeBSD5,
 	- not supported on KAME/FreeBSD228, KAME/OpenBSD and KAME/BSDI3.
       see 1.12 in this document for details.
+RFC3542: Advanced Sockets API for IPv6 (revised)
+    * For supported library functions/kernel APIs, see sys/netinet6/ADVAPI.
+    * Some of the updates in the draft are not implemented yet.  See
+      TODO.2292bis for more details.
 draft-ietf-ipngwg-icmp-name-lookups-09: IPv6 Name Lookups Through ICMP
 draft-ietf-dhc-dhcpv6-28.txt: DHCPv6
 draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
@@ -213,10 +217,6 @@ draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
       (and extensions can appear unaligned).  our code follows the comment.
     * Some parts of the 24 draft, especially the relay agent function,
       have not been implemented.
-draft-ietf-ipngwg-rfc2292bis-09.txt:
-	Advanced Sockets API for IPv6 (revised)
-    * Some of the updates in the draft are not implemented yet.  See
-      TODO.2292bis for more details.
 draft-ietf-mobileip-ipv6-20.txt: Mobility Support in IPv6
     * See section 6.
 draft-ietf-ipngwg-router-selection-01.txt:
