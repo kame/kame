@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.57 2000/09/19 17:05:50 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.58 2000/09/22 06:24:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.57 2000/09/19 17:05:50 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.58 2000/09/22 06:24:23 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -770,6 +770,10 @@ quick_i3recv(iph2, msg0)
 end:
 	if (msg != NULL)
 		vfree(msg);
+	if (pbuf != NULL)
+		vfree(pbuf);
+	if (notify != NULL)
+		vfree(notify);
 
 	return error;
 }
