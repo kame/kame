@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/27 00:18:59 $
+		     $Date: 2000/05/02 01:32:22 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -78,5 +78,7 @@ Many of old ones have been solved.
   you want IPv6-ready tcpdump/libpcap, download them from tcpdump.org.
   We supply ports/pkgsrc for easier installation on kame/freebsd[23]
   and kame/netbsd.
+
+- libinet6 resolver code does not support NIS lookup.
 
 							<end of RELNOTES>
