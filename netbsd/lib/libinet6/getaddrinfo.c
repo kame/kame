@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.41 2001/01/05 16:35:46 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.42 2001/01/05 16:38:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -668,7 +668,7 @@ explore_fqdn(pai, hostname, servname, res)
 		error = 0;
 		for (cur = result; cur; cur = cur->ai_next) {
 			GET_PORT(cur, servname);
-			/* canonname should be filled already */
+			/* canonname should already be filled. */
 		}
 		break;
 	}
