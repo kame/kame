@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.118 2001/07/18 15:09:29 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.119 2001/07/20 01:25:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -685,6 +685,8 @@ globcopy:
 #endif
 				if (!numeric)
 					n = reorder(&sentinel);
+				else
+					n = 0;
 #ifdef USE_LOG_REORDER
 				gettimeofday(&end, NULL);
 				log_reorder(&start, &end, numeric, n);
