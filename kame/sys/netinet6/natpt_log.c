@@ -1,4 +1,4 @@
-/*	$KAME: natpt_log.c,v 1.14 2002/04/15 05:34:16 fujisawa Exp $	*/
+/*	$KAME: natpt_log.c,v 1.15 2002/05/28 09:09:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -208,6 +208,9 @@ natpt_lbuf(int type, int priorities, size_t size)
 	struct	mbuf	*m;
 	struct	lbuf	*p;
 	int		 maxlen;
+#ifdef __FreeBSD__
+	struct timeval mono_time;
+#endif
 
 	if (size + sizeof(struct l_hdr) > MCLBYTES)
 		return (NULL);
@@ -232,7 +235,11 @@ natpt_lbuf(int type, int priorities, size_t size)
 	p->l_hdr.lh_type = type;
 	p->l_hdr.lh_pri	 = priorities;
 	p->l_hdr.lh_size = size;
-	microtime((struct timeval *)&p->l_hdr.lh_sec);
+#ifdef __FreeBSD__
+	microtime(&mono_time);
+#endif
+	p->l_hdr.lh_sec = mono_time.tv_sec;
+	p->l_hdr.lh_usec = mono_time.tv_usec;
 
 	return (m);
 }
