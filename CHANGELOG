@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2070 2002/02/03 07:14:09 jinmei Exp $
+$KAME: CHANGELOG,v 1.2071 2002/02/04 03:24:56 jinmei Exp $
 
 <200202>
+2002-02-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ping6: supported a new option '-g gateway' to allow a
+	specific next hop.
+
 2002-02-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sbin/sysctl/sysctl.c (sysctl_key): supported net.key.*
 	sysctls.
