@@ -115,11 +115,9 @@ AC_ARG_ENABLE(pedant, [  --enable-pedant         pedantic compilation],
 AC_MSG_RESULT($enableval);
 
 dnl Checks predeclared identifers of function names
-dnl We use the identifier with string concatenation on which some gcc variants
-dnl seem to have a bug.  We eliminate the buggy case here.
 AC_MSG_CHECKING(ANSI predeclared __func__)
 AC_TRY_COMPILE([],
-[void func(void) {printf("%s\n", __func__ "");}],
+[void func(void) {printf("%s\n", __func__);}],
 	[AC_MSG_RESULT(yes)
 	 pred_func_id=ansi],
 	[AC_MSG_RESULT(no)
