@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.960 2000/05/31 05:05:45 jinmei Exp $
+$Id: CHANGELOG,v 1.961 2000/05/31 17:46:53 itojun Exp $
 
 <200005>
+Thu Jun  1 02:43:31 JST 2000  itojun@iijlab.net
+	* kame/mdnsd: multicast DNS resolver, as specified in
+	  draft-aboba-dnsext-mdns-00.txt.  Note that spec conformance is
+	  still very low.
+	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 5/29 weekly snap.
+
 2000-05-31  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_mloopback): make a deep copy
 	of the IPv6 header only in an M_EXT case. Practically, we'll
