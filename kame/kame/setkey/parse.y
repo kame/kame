@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.23 2000/05/24 16:19:24 sakane Exp $ */
+/* KAME $Id: parse.y,v 1.24 2000/05/25 02:30:36 itojun Exp $ */
 
 %{
 #include <sys/types.h>
@@ -502,7 +502,7 @@ ipaddress
 			}
 			pp_addr = (struct sockaddr *)malloc(res->ai_addrlen);
 			if (!pp_addr) {
-				yyerror(ipsec_strerror());
+				yyerror("not enough core");
 				goto end;
 			}
 
