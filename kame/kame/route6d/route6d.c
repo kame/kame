@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.96 2003/04/15 07:12:47 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.97 2003/04/22 09:55:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.96 2003/04/15 07:12:47 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.97 2003/04/22 09:55:37 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -612,7 +612,7 @@ init()
 	nifc = 0;
 	nindex2ifc = 0;	/*initial guess*/
 	index2ifc = NULL;
-	snprintf(port, sizeof(port), "%d", RIP6_PORT);
+	snprintf(port, sizeof(port), "%u", RIP6_PORT);
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_INET6;
@@ -1133,7 +1133,7 @@ riprecv()
 	rp = (struct rip6 *)buf;
 	np = rp->rip6_nets;
 
-	if (rp->rip6_vers !=  RIP6_VERSION) {
+	if (rp->rip6_vers != RIP6_VERSION) {
 		trace(1, "Incorrect RIP version %d\n", rp->rip6_vers);
 		return;
 	}
