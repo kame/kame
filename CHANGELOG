@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2291 2002/12/15 04:25:55 suz Exp $
+$KAME: CHANGELOG,v 1.2292 2002/12/15 16:12:40 fujisawa Exp $
 
 <200212>
+2002-12-16  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_trans.c: FTP connection from v4 client
+	  to v6 server with port redirection mode was supported.  Passive
+	  and non-passive mode are both available.
+
 Sun Dec 15 13:24:25 JST 2002	suz@crl.hitachi.co.jp
 	* kame/kame/pim6sd: pim6sd works on kernel with more than MAXMIFS 
 	interfaces, unless the number of PIM-enabled interfaces exceeds 
