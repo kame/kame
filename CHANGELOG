@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2334 2003/02/06 07:09:11 jinmei Exp $
+$KAME: CHANGELOG,v 1.2335 2003/02/06 12:59:16 jinmei Exp $
 
 <200302>
 2003-02-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -12,9 +12,9 @@ Thu Feb  6 01:36:12 JST 2003	suz@crl.hitachi.co.jp
 	(reported by SUDOH Yoshiaki <sudo@iij.ad.jp>)
 
 Wed Feb  5 20:25:32 JST 2003	keiichi@iij.ad.jp
-	* kame/sys/netinet/icmp6.h,ip6.h 
-	* kame/sys/netinet6/mip6_binding.c,mip6_pktproc.c 
-	* kame/kame/mip6control/mip6control.c 
+	* kame/sys/netinet/icmp6.h,ip6.h
+	* kame/sys/netinet6/mip6_binding.c,mip6_pktproc.c
+	* kame/kame/mip6control/mip6control.c
 	- support for the MIP6 ID20 draft has been added.
 
 2003-02-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
