@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.42 2000/03/06 04:39:09 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.43 2000/03/07 09:50:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -163,7 +163,9 @@
 #include <netinet6/in6_gif.h>
 #endif
 
+#ifdef __NetBSD__		/* XXX */
 #include "stf.h"
+#endif
 #if NSTF > 0
 #include <net/if_stf.h>
 #endif
