@@ -861,7 +861,6 @@ getaddr(which, s, hpp)
 			ifconf.ifc_len = sizeof(iflist);
 			if (ioctl(sock, SIOCGIFCONF, &ifconf) < 0)
 				err(1, "ioctl(SIOCGIFCONF)");
-			close(sock);
 
 			/* Look for this interface in the list */
 			for (ifr = ifconf.ifc_req,
@@ -886,6 +885,7 @@ getaddr(which, s, hpp)
 					}
 				}
 			}
+			close(sock);
 
 			/* If we found it, then use it */
 			if (sdl) {
