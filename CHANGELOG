@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2125 2002/04/18 04:47:07 jinmei Exp $
+$KAME: CHANGELOG,v 1.2126 2002/04/19 07:11:24 suz Exp $
 
 <200204>
+2002-04-19  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/kame/pim6sd/mld6.c
+	does not log warning againt MLD message from ::.
+	(sync with the change of kame/sys/netinet6/nd6_nbr.c at Rev 1.76)
+
 2002-04-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/netinet/ip_output.c (ip_output): always freed
 	the route entry stored in iproute (if it was used) regardless of

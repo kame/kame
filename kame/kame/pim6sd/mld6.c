@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.41 2002/04/03 02:47:04 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.42 2002/04/19 07:11:24 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -397,7 +397,8 @@ int recvlen;
 	}
 
 	/* source address check */
-	if (!IN6_IS_ADDR_LINKLOCAL(&src->sin6_addr))
+	if (!IN6_IS_ADDR_LINKLOCAL(&src->sin6_addr) &&
+	    !IN6_IS_ADDR_UNSPECIFIED(&src->sin6_addr))
 	{
 		log(LOG_INFO, 0,
 		    "RECV %s from a non link local address: %s",
