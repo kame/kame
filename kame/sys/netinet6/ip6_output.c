@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.148 2001/01/23 04:42:29 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.149 2001/01/23 04:43:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1203,7 +1203,7 @@ skip_ipsec2:;
 				m->m_pkthdr.len;
 		}
 #endif
-#ifdef IPSEC
+#if defined(IPSEC) && !defined(__OpenBSD__)
 		/* clean ipsec history once it goes out of the node */
 		ipsec_delaux(m);
 #endif
@@ -1353,7 +1353,7 @@ sendorfree:
 					m->m_pkthdr.len;
 			}
 #endif
-#ifdef IPSEC
+#if defined(IPSEC) && !defined(__OpenBSD__)
 			/* clean ipsec history once it goes out of the node */
 			ipsec_delaux(m);
 #endif
