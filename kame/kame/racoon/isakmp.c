@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.163 2001/11/22 08:00:11 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.164 2001/11/26 16:34:46 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -342,6 +342,15 @@ isakmp_main(msg, remote, local)
 
 	iph1 = getph1byindex(index);
 	if (iph1 != NULL) {
+		/* validity check */
+		if (memcmp(&isakmp->r_ck, r_ck0, sizeof(cookie_t)) == 0 &&
+		    iph1->side == INITIATOR) {
+			plog(LLV_DEBUG, LOCATION, remote,
+				"malformed cookie received or "
+				"the initiator's cookies collide.\n");
+			return -1;
+		}
+
 		/* must be same addresses in one stream of a phase at least. */
 		if (cmpsaddrstrict(iph1->remote, remote) != 0) {
 			char *saddr_db, *saddr_act;
@@ -378,16 +387,14 @@ isakmp_main(msg, remote, local)
 		/* search for isakmp status record of phase 1 */
 		if (iph1 == NULL) {
 			/*
-			 * it packet may be responder's 1st or initiator's
-			 * 2nd exchange.
+			 * the packet must be the 1st message from a initiator
+			 * or the 2nd message from the responder.
 			 */
 
 			/* search for phase1 handle by index without r_ck */
 			iph1 = getph1byindex0(index);
 			if (iph1 == NULL) {
-				/* it may be responder's 1st exchange. */
-
-				/* validity check */
+				/*it must be the 1st message from a initiator.*/
 				if (memcmp(&isakmp->r_ck, r_ck0,
 					sizeof(cookie_t)) != 0) {
 
@@ -404,6 +411,15 @@ isakmp_main(msg, remote, local)
 				break;
 
 				/*NOTREACHED*/
+			}
+
+			/* it must be the 2nd message from the responder. */
+			if (iph1->side != INITIATOR) {
+				plog(LLV_DEBUG, LOCATION, remote,
+					"malformed cookie received. "
+					"it has to be as the initiator.  %s\n",
+					isakmp_pindex(&iph1->index, 0));
+				return -1;
 			}
 		}
 
