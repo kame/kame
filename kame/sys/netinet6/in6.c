@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.245 2001/11/06 08:40:51 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.246 2001/11/07 14:14:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -775,6 +775,14 @@ in6_control(so, cmd, data, ifp)
 		 */
 		if ((error = in6_update_ifa(ifp, ifra, ia)) != 0)
 			return(error);
+		if ((ia = in6ifa_ifpwithaddr(ifp, &ifra->ifra_addr.sin6_addr))
+		    == NULL) {
+		    	/*
+			 * this can happen when the user specify the 0 valid
+			 * lifetime.
+			 */
+			break;
+		}
 
 		/*
 		 * then, make the prefix on-link on the interface.
@@ -827,32 +835,23 @@ in6_control(so, cmd, data, ifp)
 				return(EINVAL); /* XXX panic here? */
 			}
 		}
-		if ((ia = in6ifa_ifpwithaddr(ifp, &ifra->ifra_addr.sin6_addr))
-		    == NULL) {
-		    	/* XXX: this should not happen! */
-			log(LOG_ERR, "in6_control: addition succeeded, but"
-			    " no ifaddr\n");
-		} else {
-			if ((ia->ia6_flags & IN6_IFF_AUTOCONF) != 0 &&
-			    ia->ia6_ndpr == NULL) { /* new autoconfed addr */
-				ia->ia6_ndpr = pr;
-				pr->ndpr_refcnt++;
+		if ((ia->ia6_flags & IN6_IFF_AUTOCONF) &&
+		    ia->ia6_ndpr == NULL) { /* new autoconfed addr */
+			ia->ia6_ndpr = pr;
+			pr->ndpr_refcnt++;
 
-				/*
-				 * If this is the first autoconf address from
-				 * the prefix, create a temporary address
-				 * as well (when specified).
-				 */
-				if (ip6_use_tempaddr &&
-				    pr->ndpr_refcnt == 1) {
-					int e;
-					if ((e = in6_tmpifadd(ia, 1)) != 0) {
-						log(LOG_NOTICE, "in6_control: "
-						    "failed to create a "
-						    "temporary address, "
-						    "errno=%d\n",
-						    e);
-					}
+			/*
+			 * If this is the first autoconf address from
+			 * the prefix, create a temporary address
+			 * as well (when specified).
+			 */
+			if (ip6_use_tempaddr && pr->ndpr_refcnt == 1) {
+				int e;
+				if ((e = in6_tmpifadd(ia, 1)) != 0) {
+					log(LOG_NOTICE, "in6_control: failed "
+					    "to create a temporary address, "
+					    "errno=%d\n",
+					    e);
 				}
 			}
 
@@ -1069,6 +1068,9 @@ in6_update_ifa(ifp, ifra, ia)
 		log(LOG_INFO,
 		    "in6_update_ifa: valid lifetime is 0 for %s\n",
 		    ip6_sprintf(&ifra->ifra_addr.sin6_addr));
+
+		if (ia == NULL)
+			return(0); /* there's nothing to do */
 	}
 
 	/*
