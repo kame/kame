@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.343 2003/04/02 10:18:31 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.344 2003/04/08 06:56:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2368,11 +2368,11 @@ icmp6_rip6_input(mp, off, src, dst)
 			/*
 			 * Recent network drivers tend to allocate a single
 			 * mbuf cluster, rather than to make a couple of
-			 * mbufs without clusters.  Also, the IPv6 code path
-			 * tries to avoid m_pullup(), it is highly to probable
-			 * that we still have an mbuf cluster here even though
-			 * the necessary length can be stored in an mbuf's
-			 * internal buffer.
+			 * mbufs without clusters.  Also, since the IPv6 code
+			 * path tries to avoid m_pullup(), it is highly
+			 * probable that we still have an mbuf cluster here
+			 * even though the necessary length can be stored in an
+			 * mbuf's internal buffer.
 			 * Meanwhile, the default size of the receive socket
 			 * buffer for raw sockets is not so large.  This means
 			 * the possibility of packet loss is relatively higher
