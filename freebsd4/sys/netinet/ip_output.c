@@ -658,8 +658,10 @@ sendit:
 		if (state.encap) {
 			ia = ifatoia(ro->ro_rt->rt_ifa);
 			ifp = ro->ro_rt->rt_ifp;
+#if 0
 			if ((mtu = ro->ro_rt->rt_rmx.rmx_mtu) == 0)
 				mtu = ifp->if_mtu;
+#endif
 		}
 	}
     }
