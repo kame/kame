@@ -1,4 +1,4 @@
-$Id: TODO,v 1.25 2000/09/22 06:11:35 itojun Exp $
+$Id: TODO,v 1.26 2000/09/22 20:23:31 itojun Exp $
 
 Please send any questions or bug reports to snap-users@kame.net.
 
@@ -9,8 +9,15 @@ o The documents for users convenience.
 o split log file based on client.  printf-like config directive, i.e.
   "logfile racoon.%s.log", should be useful here.
 o fix flag for logging
-o IPComp SA with wellknown CPI in CPI field.  how to handle it?
-  if wellknown CPI is used in IKE negotiation, we will end up installing it.
+o save decrypted IKE packet in tcpdump format (how to integrate?)
+o IPComp SA with wellknown CPI in CPI field.  how to handle it?  with the
+  current code, if wellknown CPI is used in IKE negotiation, we will end up
+  installing it,
+  but it looks wrong...  there could be couple of stragegies:
+  (1) do not install IPComp SA if we negotiated it with wellknown CPI
+      no trigger for rekey.
+  (2) install IPComp SA with fabricated CPI, and RAWCPI option flag.
+      confusing...
 
 MUST
 o Certificate type handling.  e.g. CRL, CR, PGP...
