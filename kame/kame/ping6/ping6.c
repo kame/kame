@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.78 2000/08/14 13:30:36 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.79 2000/08/16 08:08:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -264,7 +264,7 @@ void	 pr_pack __P((u_char *, int, struct msghdr *));
 void	 pr_exthdrs __P((struct msghdr *));
 void	 pr_ip6opt __P((void *));
 void	 pr_rthdr __P((void *));
-void	 pr_bitrange __P((u_int32_t, int));
+int	 pr_bitrange __P((u_int32_t, int, int));
 void	 pr_retip __P((struct ip6_hdr *, u_char *));
 void	 summary __P((void));
 void	 tvsub __P((struct timeval *, struct timeval *));
@@ -1603,10 +1603,11 @@ pr_rthdr(void *extbuf)
 }
 #endif /* USE_RFC2292BIS */
 
-void
-pr_bitrange(v, s)
+int
+pr_bitrange(v, s, ii)
 	u_int32_t v;
 	int s;
+	int ii;
 {
 	int off;
 	int i;
@@ -1615,6 +1616,9 @@ pr_bitrange(v, s)
 	while (off < 32) {
 		/* shift till we have 0x01 */
 		if ((v & 0x01) == 0) {
+			if (ii > 1)
+				printf("-%u", s + off - 1);
+			ii = 0;
 			switch (v & 0x0f) {
 			case 0x00:
 				v >>= 4; off += 4; continue;
@@ -1632,12 +1636,12 @@ pr_bitrange(v, s)
 			if ((v & (0x01 << i)) == 0)
 				break;
 		}
-		if (i == 1)
+		if (!ii)
 			printf(" %u", s + off);
-		else
-			printf(" %u-%u", s + off, s + off + i - 1);
+		ii += i;
 		v >>= i; off += i;
 	}
+	return ii;
 }
 
 void
@@ -1655,10 +1659,12 @@ pr_suptypes(ni, nilen)
 	} cbit;
 #define MAXQTYPES	(1 << 16)
 	size_t off;
+	int b;
 
 	cp = (u_char *)(ni + 1);
 	end = ((u_char *)ni) + nilen;
 	cur = 0;
+	b = 0;
 
 	printf("NodeInfo Supported Qtypes");
 	if (options & F_VERBOSE) {
@@ -1691,8 +1697,10 @@ pr_suptypes(ni, nilen)
 		for (off = 0; off < clen; off += sizeof(v)) {
 			memcpy(&v, cp + off, sizeof(v));
 			v = (u_int32_t)ntohl(v);
-			pr_bitrange(v, (int)(cur + off * 8));
+			b = pr_bitrange(v, (int)(cur + off * 8), b);
 		}
+		/* flush the remaining bits */
+		b = pr_bitrange(0, (int)(cur + off * 8), b);
 
 		cp += clen;
 		cur += clen * 8;
