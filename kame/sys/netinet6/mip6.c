@@ -33,7 +33,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6.c,v 1.10 2000/02/19 13:52:04 itojun Exp $
+ * $Id: mip6.c,v 1.11 2000/02/19 13:54:04 itojun Exp $
  *
  */
 
@@ -1948,7 +1948,7 @@ mip6_tunnel_input(mp, offp, proto)
 		}
 		IF_ENQUEUE(&ip6intrq, m);
 #if 0
-		/* we need schednetisr since the address family may change */
+		/* we don't need it as we tunnel IPv6 in IPv6 only. */
 		schednetisr(NETISR_IPV6);
 #endif
 		splx(s);
