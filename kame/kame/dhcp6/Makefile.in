@@ -1,5 +1,5 @@
 #
-# $Id: Makefile.in,v 1.22 2003/07/31 21:44:10 jinmei Exp $
+# $Id: Makefile.in,v 1.23 2003/08/01 06:46:09 sakane Exp $
 #
 
 srcdir=	@srcdir@
@@ -34,6 +34,7 @@ CLIENTOBJS=	dhcp6c.o common.o config.o prefixconf.o dhcp6c_ia.o timer.o \
 	dhcp6c_script.o $(GENSRCS:%.c=%.o)
 SERVOBJS=	dhcp6s.o common.o config.o timer.o $(GENSRCS:%.c=%.o)
 RELAYOBJS =	dhcp6relay.o common.o timer.o
+CLEANFILES+=	y.tab.h
 
 all:	$(TARGET) 
 dhcp6c:	$(CLIENTOBJS) $(LIBOBJS)
