@@ -37,7 +37,7 @@
  *       like Binding cache, HA list, BU list. Other functions should be
  *       moved to config program.
  *
- * $Id: mip6stat.c,v 1.2 2000/02/07 17:48:26 itojun Exp $
+ * $Id: mip6stat.c,v 1.3 2000/02/07 17:50:56 itojun Exp $
  *
  */
 
@@ -273,8 +273,7 @@ int main(int argc,
 
     if(aflag + cflag + fflag + mflag + pflag + uflag > 0) {
         if((kd = kvm_openfiles(NULL, NULL, NULL, O_RDONLY, buf)) == NULL) {
-            printf(PROGNAME "error opening kernel: %s\n", buf);
-            exit(1);
+            errx(1, "error opening kernel: %s\n", buf);
         }
         if (kvm_nlist(kd, namelist) == -1) {
             fprintf(stderr, "kvm_nlist: %s", kvm_geterr(kd));

@@ -4,15 +4,13 @@
  *
  * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>
  *
- * $Id: mip6stat.h,v 1.1 2000/02/07 17:27:10 itojun Exp $
+ * $Id: mip6stat.h,v 1.2 2000/02/07 17:50:57 itojun Exp $
  *
  */
 
 #include <netinet6/in6.h>
 #include <kvm.h>
 #include <fcntl.h>
-
-#define PROGNAME "mip6stat: " /* name of the program */
 
 #define kget(p, d)  (kread((u_long)(p), (char *)&(d), sizeof (d)))
 #define kgetp(p, d) (kread((u_long)(p), (char *) (d), sizeof (d)))
