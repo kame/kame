@@ -288,19 +288,12 @@ nd6_ra_input(m, off, icmp6len)
 			pr.ndpr_prefix.sin6_family = AF_INET6;
 			pr.ndpr_prefix.sin6_len = sizeof(pr.ndpr_prefix);
 			pr.ndpr_prefix.sin6_addr = pi->nd_opt_pi_prefix;
-			pr.ndpr_ifpr.ifpr_prefix =
-				(struct sockaddr *)&pr.ndpr_prefix;
-			/* TODO: link into interface prefix list */
-
 			pr.ndpr_ifp = (struct ifnet *)m->m_pkthdr.rcvif;
 
 			pr.ndpr_raf_onlink = (pi->nd_opt_pi_flags_reserved &
 					      ND_OPT_PI_FLAG_ONLINK) ? 1 : 0;
 			pr.ndpr_raf_auto = (pi->nd_opt_pi_flags_reserved &
 					    ND_OPT_PI_FLAG_AUTO) ? 1 : 0;
-			pr.ndpr_rrf_decrvalid = 1;
-			pr.ndpr_rrf_decrprefd = 1;
-			pr.ndpr_origin = PR_ORIG_RA;
 			pr.ndpr_plen = pi->nd_opt_pi_prefix_len;
 			pr.ndpr_vltime = ntohl(pi->nd_opt_pi_valid_time);
 			pr.ndpr_pltime =
@@ -673,8 +666,6 @@ prelist_add(pr, dr)
 		return ENOMEM;
 	bzero(new, sizeof(*new));
 	*new = *pr;
-	/* let ndpr_ifpr.ifpr_prefix point ndpr_prefix. */
-	new->ndpr_ifpr.ifpr_prefix = (struct sockaddr *)&new->ndpr_prefix;
 
 	/* initilization */
 	new->ndpr_statef_onlink = pr->ndpr_statef_onlink;
@@ -692,19 +683,6 @@ prelist_add(pr, dr)
 #else
 	s = splnet();
 #endif
-	/* link ndpr_entry to if_prefixlist */
-	{
-		struct ifnet *ifp = new->ndpr_ifp;
-		struct ifprefix *ifpr;
-
-		if ((ifpr = ifp->if_prefixlist) != NULL) {
-			for ( ; ifpr->ifpr_next; ifpr = ifpr->ifpr_next)
-				continue;
-			ifpr->ifpr_next = ndpr2ifpr(new);
-		}
-		else
-			ifp->if_prefixlist = ndpr2ifpr(new);
-	}
 	/* link ndpr_entry to nd_prefix list */
 	LIST_INSERT_HEAD(&nd_prefix, new, ndpr_entry);
 	splx(s);
@@ -727,23 +705,6 @@ prelist_remove(pr)
 #else
 	s = splnet();
 #endif
-	/* unlink ndpr_entry from if_prefixlist */
-	{
-		struct ifnet *ifp = pr->ndpr_ifp;
-		struct ifprefix *ifpr;
-
-		if ((ifpr = ifp->if_prefixlist) == ndpr2ifpr(pr))
-			ifp->if_prefixlist = ifpr->ifpr_next;
-		else {
-			while (ifpr->ifpr_next &&
-			       (ifpr->ifpr_next != ndpr2ifpr(pr)))
-				ifpr = ifpr->ifpr_next;
-			if (ifpr->ifpr_next)
-				ifpr->ifpr_next = ndpr2ifpr(pr)->ifpr_next;
-			else
-				printf("Couldn't unlink nd_prefix from ifp\n");
-		}
-	}
 	/* unlink ndpr_entry from nd_prefix list */
 	LIST_REMOVE(pr, ndpr_entry);
 	splx(s);
@@ -797,25 +758,12 @@ prelist_update(new, dr, m)
 			error = EADDRNOTAVAIL;
 			goto end;
 		}
-
-		/*
-		 * If the origin of the already-installed prefix is more
-		 * preferable than the new one, ignore installation request.
-		 */
-		if (pr->ndpr_origin > new->ndpr_origin) {
-			error = EPERM;
-			goto end;
-		}
-
 		/* update prefix information */
-		pr->ndpr_flags.prf_ra = new->ndpr_flags.prf_ra;
-		if (pr->ndpr_origin >= PR_ORIG_RR)
-			pr->ndpr_flags.prf_rr = new->ndpr_flags.prf_rr;
+		pr->ndpr_flags = new->ndpr_flags;
 		pr->ndpr_vltime = new->ndpr_vltime;
 		pr->ndpr_pltime = new->ndpr_pltime;
 		pr->ndpr_preferred = new->ndpr_preferred;
 		pr->ndpr_expire = new->ndpr_expire;
-		pr->ndpr_statef_delmark = 0; /* cancel deletion */
 
 		/*
 		 * RFC 2462 5.5.3 (d) or (e)
@@ -1066,7 +1014,7 @@ nd6_detach_prefix(pr)
 			    "nd6_detach_prefix: failed to delete route: "
 			    "%s/%d (errno = %d)\n",
 			    ip6_sprintf(&sa6.sin6_addr),
-			    pr->ndpr_ifpr.ifpr_plen,
+			    pr->ndpr_plen,
 			    e);
 		}
 	}
@@ -1402,13 +1350,11 @@ in6_init_prefix_ltimes(struct nd_prefix *ndpr)
 		    (u_int)ndpr->ndpr_pltime, (u_int)ndpr->ndpr_vltime);
 		return (EINVAL);
 	}
-	if (ndpr->ndpr_pltime == ND6_INFINITE_LIFETIME ||
-	    ndpr->ndpr_rrf_decrprefd == 0)
+	if (ndpr->ndpr_pltime == ND6_INFINITE_LIFETIME)
 		ndpr->ndpr_preferred = 0;
 	else
 		ndpr->ndpr_preferred = time_second + ndpr->ndpr_pltime;
-	if (ndpr->ndpr_vltime == ND6_INFINITE_LIFETIME ||
-	    ndpr->ndpr_rrf_decrvalid == 0)
+	if (ndpr->ndpr_vltime == ND6_INFINITE_LIFETIME)
 		ndpr->ndpr_expire = 0;
 	else
 		ndpr->ndpr_expire = time_second + ndpr->ndpr_vltime;
@@ -1424,16 +1370,14 @@ in6_init_address_ltimes(struct nd_prefix *new, struct in6_addrlifetime *lt6)
 #endif
 
 	/* init ia6t_expire */
-	if (lt6->ia6t_vltime == ND6_INFINITE_LIFETIME ||
-	    (new->ndpr_origin >= PR_ORIG_RR && new->ndpr_rrf_decrvalid == 0))
+	if (lt6->ia6t_vltime == ND6_INFINITE_LIFETIME)
 		lt6->ia6t_expire = 0;
 	else {
 		lt6->ia6t_expire = time_second;
 		lt6->ia6t_expire += lt6->ia6t_vltime;
 	}
 	/* init ia6t_preferred */
-	if (lt6->ia6t_pltime == ND6_INFINITE_LIFETIME ||
-	    (new->ndpr_origin >= PR_ORIG_RR && new->ndpr_rrf_decrprefd == 0))
+	if (lt6->ia6t_pltime == ND6_INFINITE_LIFETIME)
 		lt6->ia6t_preferred = 0;
 	else {
 		lt6->ia6t_preferred = time_second;

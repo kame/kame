@@ -133,7 +133,7 @@ struct	nd_defrouter {
 };
 
 struct nd_prefix {
-	struct ifprefix	ndpr_ifpr;
+	struct ifnet *ndpr_ifp;
 	LIST_ENTRY(nd_prefix) ndpr_entry;
 	struct sockaddr_in6 ndpr_prefix;	/* prefix */
 	struct in6_addr ndpr_mask; /* netmask derived from the prefix */
@@ -142,34 +142,24 @@ struct nd_prefix {
 	u_int32_t ndpr_pltime;	/* advertised preferred lifetime */
 	time_t ndpr_expire;	/* expiration time of the prefix */
 	time_t ndpr_preferred;	/* preferred time of the prefix */
-	struct in6_prflags ndpr_flags;
+	struct prf_ra ndpr_flags;
 	/* list of routers that advertise the prefix: */
 	LIST_HEAD(pr_rtrhead, nd_pfxrouter) ndpr_advrtrs;
-	u_char	ndpr_origin; /* from where this prefix info is obtained */
+	u_char	ndpr_plen;
 	struct	ndpr_stateflags {
 		/* if this prefix can be regarded as on-link */
 		u_char onlink : 1;
-		/* if some prefix should be added to this prefix */
-		u_char addmark : 1;
-		u_char delmark : 1; /* if this prefix will be deleted */
 	} ndpr_stateflags;
 };
 
 #define ndpr_next		ndpr_entry.le_next
-#define ndpr_ifp		ndpr_ifpr.ifpr_ifp
-#define ndpr_plen		ndpr_ifpr.ifpr_plen
 
-#define ndpr_raf		ndpr_flags.prf_ra
-#define ndpr_raf_onlink		ndpr_flags.prf_ra.onlink
-#define ndpr_raf_auto		ndpr_flags.prf_ra.autonomous
+#define ndpr_raf		ndpr_flags
+#define ndpr_raf_onlink		ndpr_flags.onlink
+#define ndpr_raf_auto		ndpr_flags.autonomous
 
 #define ndpr_statef_onlink	ndpr_stateflags.onlink
 #define ndpr_statef_addmark	ndpr_stateflags.addmark
-#define ndpr_statef_delmark	ndpr_stateflags.delmark
-
-#define ndpr_rrf		ndpr_flags.prf_rr
-#define ndpr_rrf_decrvalid	ndpr_flags.prf_rr.decrvalid
-#define ndpr_rrf_decrprefd	ndpr_flags.prf_rr.decrprefd
 
 /*
  * We keep expired prefix for certain amount of time, for validation purposes.

@@ -74,6 +74,7 @@
 #include <netinet6/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
+#include <netinet6/in6_prefix.h>
 #include <netinet6/icmp6.h>
 
 #ifndef __bsdi__
@@ -1205,6 +1206,24 @@ nd6_ioctl(cmd, data, ifp)
 			pr = pr->ndpr_next;
 		}
 		splx(s);
+	      {
+		struct rr_prefix *rpp;
+
+		LIST_FOREACH(rpp, &rr_prefix, rp_entry) {
+			if (i >= PRLSTSIZ)
+				break;
+			prl->prefix[i].prefix = rpp->rp_prefix.sin6_addr;
+			prl->prefix[i].raflags = rpp->rp_raf;
+			prl->prefix[i].prefixlen = rpp->rp_plen;
+			prl->prefix[i].vltime = rpp->rp_vltime;
+			prl->prefix[i].pltime = rpp->rp_pltime;
+			prl->prefix[i].if_index = rpp->rp_ifp->if_index;
+			prl->prefix[i].expire = rpp->rp_expire;
+			prl->prefix[i].advrtrs = 0;
+			i++;
+		}
+	      }
+
 		break;
 	case SIOCGIFINFO_IN6:
 		ndi->ndi = nd_ifinfo[ifp->if_index];
