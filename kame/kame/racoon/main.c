@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.22 2000/12/17 20:21:50 itojun Exp $	*/
+/*	$KAME: main.c,v 1.23 2001/01/10 02:30:20 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -71,6 +71,9 @@ static char version[] = "@(#)racoon 20001216 sakane@ydc.co.jp";
 int main __P((int, char **));
 static void Usage __P((void));
 static void parse __P((int, char **));
+static void restore_params __P((void));
+static void save_params __P((void));
+static void saverestore_params __P((int));
 
 void
 Usage()
@@ -130,16 +133,18 @@ main(ac, av)
 	if (pfkey_init() < 0)
 		exit(1);
 
+	/*
+	 * in order to prefer the parameters by command line,
+	 * saving some parameters before parsing configuration file.
+	 */
+	save_params();
 	error = cfparse();
 	if (error != 0) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to parse configuration file.\n");
 		exit(1);
 	}
-
-	/* re-parse to prefer to command line parameters. */
-	loglevel = 4;
-	parse(ac, av);
+	restore_params();
 
 	if (f_foreground)
 		close(0);
@@ -271,4 +276,39 @@ parse(ac, av)
 	optarg = 0;
 
 	return;
+}
+
+static void
+restore_params()
+{
+	saverestore_params(1);
+}
+
+static void
+save_params()
+{
+	saverestore_params(0);
+}
+
+static void
+saverestore_params(f)
+	int f;
+{
+	static u_int16_t s_port_isakmp;
+#ifdef ENABLE_ADMINPORT
+	static u_int16_t s_port_admin;
+#endif
+
+	/* 0: save, 1: restore */
+	if (f) {
+		lcconf->port_isakmp = s_port_isakmp;
+#ifdef ENABLE_ADMINPORT
+		lcconf->port_admin = s_port_admin;
+#endif
+	} else {
+		s_port_isakmp = lcconf->port_isakmp;
+#ifdef ENABLE_ADMINPORT
+		s_port_admin = lcconf->port_admin;
+#endif
+	}
 }
