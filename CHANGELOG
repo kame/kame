@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1058 2000/06/23 06:46:05 itojun Exp $
+$Id: CHANGELOG,v 1.1059 2000/06/23 10:51:33 sumikawa Exp $
 
 <200006>
+Fri Jun 23 19:49:28 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/gbatnav: new port: a battleship game
+	* freebsd3/ports/mmosaic: upgrade to 3.6.2.
+
 Thu Jun 22 17:40:37 JST 2000 sakane@ydc.co.jp
 	* kame/sys/netkey:
 	delete sadb_x_ident_id_addr.  don't send a pair of addresses
