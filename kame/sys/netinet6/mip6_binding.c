@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.117 2002/08/08 09:16:27 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.118 2002/08/13 05:31:59 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -385,7 +385,7 @@ mip6_home_registration(sc)
 				}
 
 				mbu = mip6_bu_create(haaddr, mpfx, &hif_coa,
-						     IP6MU_ACK|IP6MU_HOME|IP6MU_DAD|IP6MU_SINGLE,
+						     IP6MU_ACK|IP6MU_HOME|IP6MU_DAD|IP6MU_SINGLE|IP6MU_LINK,
 						     sc);
 				if (mbu == NULL)
 					return (ENOMEM);
@@ -917,53 +917,7 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 		return (0); /* XXX is 0 OK? */
 	}
 
-	if (flags & IP6MU_SINGLE) {
-		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
-						   haddr0);
-		if (mbc == NULL) {
-			/* XXX NOT_HOME_AGENT */
-			mip6_bc_send_ba(haaddr, haddr0, coa,
-					IP6MA_STATUS_NOT_HOME_AGENT,
-					seqno,
-					0,
-					0);
-			return (0);
-		}
-		if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
-			mip6_dad_stop(mbc);
-		}
-		else {
-			/* remove rtable for proxy ND */
-			if (mip6_bc_proxy_control(haddr0, haaddr, RTM_DELETE)) {
-				/* XXX UNSPECIFIED */
-				return (-1);
-			}
-
-			/* remove encapsulation entry */
-			if (mip6_tunnel_control(MIP6_TUNNEL_DELETE,
-						mbc,
-						mip6_bc_encapcheck,
-						&mbc->mbc_encap)) {
-				/* XXX UNSPECIFIED */
-				return (-1);
-			}
-		}
-
-		/* remove a BC entry. */
-		error = mip6_bc_list_remove(&mip6_bc_list, mbc);
-		if (error) {
-			mip6log((LOG_ERR,
-				 "%s:%d: can't remove BC.\n",
-				 __FILE__, __LINE__));
-			mip6_bc_send_ba(haaddr, haddr0, coa,
-					IP6MA_STATUS_UNSPECIFIED,
-					seqno,
-					0,
-					0);
-			return (error);
-		}
-	}
-	else {
+	if ((flags & IP6MU_SINGLE) == 0) {
 		int found = 0;
 
 		for(mbc = LIST_FIRST(&mip6_bc_list);
@@ -972,6 +926,9 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 			mbc_next = LIST_NEXT(mbc, mbc_entry);
 
 			if (mbc->mbc_ifp != hifp)
+				continue;
+
+			if (IN6_IS_ADDR_LINKLOCAL(&mbc->mbc_phaddr.sin6_addr))
 				continue;
 
 			if (!mip6_are_ifid_equal(&mbc->mbc_phaddr.sin6_addr,
@@ -1017,13 +974,96 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 				return (error);
 			}
 		}
-		if (found == 0) {
+	}
+	else if ((flags & IP6MU_LINK) == 0 ||
+		 !IN6_IS_ADDR_LINKLOCAL(&haddr0->sin6_addr)) {
+		/*
+		 * S=1
+		 */
+		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
+						   haddr0);
+		if (mbc == NULL) {
+			/* XXX panic */
+			return (0);
+		}
+		if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
+			mip6_dad_stop(mbc);
+		}
+		else {
+			/* remove rtable for proxy ND */
+			if (mip6_bc_proxy_control(haddr0, haaddr, RTM_DELETE)) {
+				/* XXX UNSPECIFIED */
+				return (-1);
+			}
+
+			/* remove encapsulation entry */
+			if (mip6_tunnel_control(MIP6_TUNNEL_DELETE,
+						mbc,
+						mip6_bc_encapcheck,
+						&mbc->mbc_encap)) {
+				/* XXX UNSPECIFIED */
+				return (-1);
+			}
+		}
+
+		/* remove a BC entry. */
+		error = mip6_bc_list_remove(&mip6_bc_list, mbc);
+		if (error) {
+			mip6log((LOG_ERR,
+				 "%s:%d: can't remove BC.\n",
+				 __FILE__, __LINE__));
 			mip6_bc_send_ba(haaddr, haddr0, coa,
-					IP6MA_STATUS_NOT_HOME_AGENT,
+					IP6MA_STATUS_UNSPECIFIED,
 					seqno,
 					0,
 					0);
-			return (0);
+			return (error);
+		}
+	}
+	for(mbc = LIST_FIRST(&mip6_bc_list);
+	    mbc;
+	    mbc = mbc_next) {
+		mbc_next = LIST_NEXT(mbc, mbc_entry);
+
+		if (mbc->mbc_ifp != hifp)
+			continue;
+
+		if (IN6_IS_ADDR_LINKLOCAL(&mbc->mbc_phaddr.sin6_addr))
+			break;
+	}
+	if ((flags & IP6MU_LINK) != 0 && mbc != NULL) {
+		if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
+			mip6_dad_stop(mbc);
+		}
+		else {
+			/* remove rtable for proxy ND */
+			if (mip6_bc_proxy_control(haddr0, haaddr, RTM_DELETE)) {
+				/* XXX UNSPECIFIED */
+				return (-1);
+			}
+
+			/* remove encapsulation entry */
+			if (mip6_tunnel_control(MIP6_TUNNEL_DELETE,
+						mbc,
+						mip6_bc_encapcheck,
+						&mbc->mbc_encap)) {
+				/* XXX UNSPECIFIED */
+				return (-1);
+			}
+		}
+
+		/* remove a BC entry. */
+		error = mip6_bc_list_remove(&mip6_bc_list, mbc);
+		if (error) {
+			mip6log((LOG_ERR,
+				 "%s:%d: can't remove BC.\n",
+				 __FILE__, __LINE__));
+			mip6_bc_send_ba(haaddr, haddr0, coa,
+					IP6MA_STATUS_UNSPECIFIED,
+					seqno,
+					0,
+					0);
+			return (error);
 		}
 	}
 
@@ -1088,7 +1128,7 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 	u_int32_t lifetime;
 	struct sockaddr_in6 *haaddr;
 {
-	struct nd_prefix *pr;
+	struct nd_prefix *pr, *llpr = NULL;
 	struct ifnet *hifp = NULL;
 	struct sockaddr_in6 haddr;
 	struct mip6_bc *mbc = NULL;
@@ -1107,6 +1147,9 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 					 pr->ndpr_plen)) {
 			hifp = pr->ndpr_ifp; /* home ifp. */
 		}
+		/* save linklocal prefix */
+		if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix.sin6_addr))
+			llpr = pr;
 	}
 	/* XXX really stupid to loop twice? */
 	prlifetime = 0xffffffff;
@@ -1145,9 +1188,93 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 	if (lifetime > prlifetime)
 		lifetime = prlifetime;
 
-	if ((flags & IP6MU_SINGLE) != 0) {
+	/*
+	 * -  S=0 & L=0:  Defend all non link-local unicast addresses possible
+	 *    on link.
+	 * -  S=0 & L=1:  Defend all non link-local unicast addresses possible
+	 *    on link and the derived link-local.
+	 * -  S=1 & L=0:  Defend the given address.
+	 * -  S=1 & L=1:  Defend both the given non link-local unicast (home)
+	 *    address and the derived link-local.
+	 */
+
+	if ((flags & IP6MU_SINGLE) == 0) {
 		/*
-		 * if prefixlen == 0, create a binding cache exactly
+		 * create/update binding cache entries for each
+		 * address derived from all the routing prefixes on
+		 * this router.
+		 */
+		for(pr = nd_prefix.lh_first;
+		    pr;
+		    pr = pr->ndpr_next) {
+			if (!pr->ndpr_raf_onlink)
+				continue;
+			if (pr->ndpr_ifp != hifp)
+				continue;
+			if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix.sin6_addr))
+				continue;
+			mip6_create_addr(&haddr,
+					 (const struct sockaddr_in6 *)haddr0,
+					 pr);
+			mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
+							   &haddr);
+			if (mbc == NULL) {
+				/* create a BC entry. */
+				mbc = mip6_bc_create(&haddr,
+						     coa,
+						     haaddr,
+						     flags,
+						     seqno,
+						     lifetime,
+						     hifp);
+				if (mip6_bc_list_insert(&mip6_bc_list, mbc))
+					return (-1);
+
+				if ((flags & IP6MU_DAD) != 0) {
+					mbc->mbc_state |= MIP6_BC_STATE_DAD_WAIT;
+					if (SA6_ARE_ADDR_EQUAL(&haddr, haddr0))
+						dad_mbc = mbc;
+				} else {
+					/* create encapsulation entry */
+					/* XXX */
+					mip6_tunnel_control(MIP6_TUNNEL_ADD,
+							    mbc,
+							    mip6_bc_encapcheck,
+							    &mbc->mbc_encap);
+
+					/* add rtable for proxy ND */
+					mip6_bc_proxy_control(&haddr, haaddr,
+							      RTM_ADD);
+				}
+			} else {
+				/* update a BC entry. */
+				mbc->mbc_pcoa = *coa;
+				mbc->mbc_flags = flags;
+				mbc->mbc_seqno = seqno;
+				mbc->mbc_lifetime = lifetime;
+				mbc->mbc_expire
+					= time_second + mbc->mbc_lifetime;
+				/* sanity check for overflow */
+				if (mbc->mbc_expire < time_second)
+					mbc->mbc_expire = 0x7fffffff;
+				mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
+				/* modify encapsulation entry */
+				/* XXX */
+				mip6_tunnel_control(MIP6_TUNNEL_ADD,
+						    mbc,
+						    mip6_bc_encapcheck,
+						    &mbc->mbc_encap);
+			}
+			if (!SA6_ARE_ADDR_EQUAL(&haddr, haddr0))
+				mbc->mbc_flags |= IP6MU_CLONED;
+
+		}
+	}
+	else if ((flags & IP6MU_LINK) == 0 || llpr == NULL ||
+		 !IN6_IS_ADDR_LINKLOCAL(&haddr0->sin6_addr)) {
+		/*
+		 * if S=1 & L=0(or S=1 & L=1 & !linklocal),
+		 * create a binding cache exactly
 		 * for the only address specified by the sender.
 		 */
 		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
@@ -1210,50 +1337,25 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 			}
 		}
 	}
-	else {
-		/*
-		 * create/update binding cache entries for each
-		 * address derived from all the routing prefixes on
-		 * this router.
-		 */
-		for(pr = nd_prefix.lh_first;
-		    pr;
-		    pr = pr->ndpr_next) {
-			if (!pr->ndpr_raf_onlink)
-				continue;
-			if (pr->ndpr_ifp != hifp)
-				continue;
+	if ((flags & IP6MU_LINK) != 0 && llpr != NULL) {
+		mip6_create_addr(&haddr,
+				 (const struct sockaddr_in6 *)haddr0,
+				 llpr);
+		lladdr = haddr.sin6_addr;
+		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &haddr);
+		if (mbc == NULL) {
+			/* create a BC entry. */
+			mbc = mip6_bc_create(&haddr, coa, haaddr, flags,
+					     seqno, lifetime, hifp);
+			if (mip6_bc_list_insert(&mip6_bc_list, mbc))
+				return (-1);
 
-			mip6_create_addr(&haddr,
-					 (const struct sockaddr_in6 *)haddr0,
-					 pr);
-
-			if (IN6_IS_ADDR_LINKLOCAL(&haddr.sin6_addr))
-				lladdr = haddr.sin6_addr;
-
-			mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
-							   &haddr);
-			if (mbc == NULL) {
-				/* create a BC entry. */
-				mbc = mip6_bc_create(&haddr,
-						     coa,
-						     haaddr,
-						     flags,
-						     seqno,
-						     lifetime,
-						     hifp);
-				if (mip6_bc_list_insert(&mip6_bc_list, mbc))
-					return (-1);
-
-				if ((flags & IP6MU_DAD)) {
-					mbc->mbc_state |= MIP6_BC_STATE_DAD_WAIT;
-					if (SA6_ARE_ADDR_EQUAL(&haddr, haddr0))
-						dad_mbc = mbc;
-					continue;
-				}
-
+			if ((flags & IP6MU_DAD)) {
+				mbc->mbc_state |= MIP6_BC_STATE_DAD_WAIT;
+				if (SA6_ARE_ADDR_EQUAL(&haddr, haddr0))
+					dad_mbc = mbc;
+			} else {
 				/* create encapsulation entry */
-				/* XXX */
 				mip6_tunnel_control(MIP6_TUNNEL_ADD,
 						    mbc,
 						    mip6_bc_encapcheck,
@@ -1261,30 +1363,27 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 
 				/* add rtable for proxy ND */
 				mip6_bc_proxy_control(&haddr, haaddr, RTM_ADD);
-			} else {
-				/* update a BC entry. */
-				mbc->mbc_pcoa = *coa;
-				mbc->mbc_flags = flags;
-				mbc->mbc_seqno = seqno;
-				mbc->mbc_lifetime = lifetime;
-				mbc->mbc_expire
-					= time_second + mbc->mbc_lifetime;
-				/* sanity check for overflow */
-				if (mbc->mbc_expire < time_second)
-					mbc->mbc_expire = 0x7fffffff;
-				mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
-
-				if (IN6_IS_ADDR_LINKLOCAL(&haddr.sin6_addr))
-					continue;
-
-				/* modify encapsulation entry */
-				/* XXX */
-				mip6_tunnel_control(MIP6_TUNNEL_ADD,
-						    mbc,
-						    mip6_bc_encapcheck,
-						    &mbc->mbc_encap);
 			}
+		} else {
+			/* update a BC entry. */
+			mbc->mbc_pcoa = *coa;
+			mbc->mbc_flags = flags;
+			mbc->mbc_seqno = seqno;
+			mbc->mbc_lifetime = lifetime;
+			mbc->mbc_expire
+				= time_second + mbc->mbc_lifetime;
+			/* sanity check for overflow */
+			if (mbc->mbc_expire < time_second)
+				mbc->mbc_expire = 0x7fffffff;
+			mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
+			/* modify encapsulation entry */
+			/* XXX */
+			mip6_tunnel_control(MIP6_TUNNEL_ADD,
+					    mbc,
+					    mip6_bc_encapcheck,
+					    &mbc->mbc_encap);
 		}
+		mbc->mbc_flags |= IP6MU_CLONED;
 	}
 
 	if (dad_mbc) {

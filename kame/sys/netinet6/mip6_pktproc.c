@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.41 2002/08/08 09:16:27 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.42 2002/08/13 05:31:59 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -658,6 +658,12 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 			lifetime = mip6_config.mcfg_hrbc_lifetime_limit;
 
 		if (IS_REQUEST_TO_CACHE(lifetime, &hoa_sa, &coa_sa)) {
+			if (mbc != NULL && (mbc->mbc_flags & IP6MU_CLONED)) {
+				mip6log((LOG_ERR,
+					 "%s:%d: invalied home re-registration\n",
+					 __FILE__, __LINE__));
+				/* XXX */
+			}
 			error = mip6_process_hrbu(&hoa_sa,
 						  &coa_sa,
 						  ip6mu->ip6mu_flags,
@@ -671,9 +677,19 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 				/* continue. */
 			}
 		} else {
+			if (mbc == NULL || (mbc->mbc_flags & IP6MU_CLONED)) {
+				mip6_bc_send_ba(dst_sa, src_sa, &coa_sa,
+						IP6MA_STATUS_NOT_HOME_AGENT,
+						seqno, 0, 0);
+				return (0);
+			}
+			/*
+			 * ignore 'S' bit (issue #66)
+			 * XXX 'L'?
+			 */
 			error = mip6_process_hurbu(&hoa_sa,
 						   &coa_sa,
-						   ip6mu->ip6mu_flags,
+						   mbc->mbc_flags,
 						   seqno,
 						   lifetime,
 						   dst_sa);
