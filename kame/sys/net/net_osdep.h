@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.14 2000/04/26 08:01:38 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.15 2000/04/26 08:04:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -129,6 +129,12 @@
  * - protosw for IPv4 (sys/netinet)
  *	FreeBSD4: struct ipprotosw in netinet/ipprotosw.h
  *	others: struct protosw in sys/protosw.h
+ *
+ * - header files with defopt (opt_xx.h)
+ *	FreeBSD3: opt_{inet,ipsec,ip6fw,altq}.h
+ *	FreeBSD4: opt_{inet,inet6,ipsec,ip6fw,altq}.h
+ *	NetBSD: opt_{inet,ipsec,altq}.h
+ *	others: does not use defopt
  */
 
 #ifndef __NET_NET_OSDEP_H_DEFINED_
