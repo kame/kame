@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.31 2004/06/10 07:28:28 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.32 2004/06/10 10:42:58 jinmei Exp $	*/
 
 %{
 /*
@@ -191,8 +191,8 @@ ecl		\}
 	/* duration */
 <S_CNF>infinity { DECHO; return (INFINITY); }
 
-	/* authentication information */
-<S_CNF>authinfo { DECHO; BEGIN S_AUTH; return (AUTHINFO); }
+	/* authentication option */
+<S_CNF>authentication { DECHO; BEGIN S_AUTH; return (AUTHENTICATION); }
 <S_AUTH>{string} {
 	DECHO;
 	yylval.str = strdup(yytext);

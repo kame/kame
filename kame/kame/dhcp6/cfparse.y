@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.29 2004/06/10 07:28:28 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.30 2004/06/10 10:42:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -102,7 +102,7 @@ static void cleanup_cflist __P((struct cf_list *));
 %token SIP_SERVERS SIP_NAME
 %token INFO_ONLY
 %token SCRIPT DELAYEDKEY
-%token AUTHINFO PROTOCOL ALGORITHM DELAYED RECONFIG HMACMD5 MONOCOUNTER
+%token AUTHENTICATION PROTOCOL ALGORITHM DELAYED RECONFIG HMACMD5 MONOCOUNTER
 %token AUTHNAME RDM KEY
 %token KEYINFO REALM KEYID SECRET KEYNAME EXPIRE
 
@@ -136,7 +136,7 @@ statement:
 	|	host_statement
 	|	option_statement
 	|	ia_statement
-	|	authinfo_statement
+	|	authentication_statement
 	|	key_statement
 	;
 
@@ -267,8 +267,8 @@ ia_statement:
 		}
 	;
 
-authinfo_statement:
-	AUTHINFO AUTHNAME BCL authparam_list ECL EOS
+authentication_statement:
+	AUTHENTICATION AUTHNAME BCL authparam_list ECL EOS
 	{
 		struct cf_namelist *authinfo;
 
@@ -449,7 +449,7 @@ dhcpoption:
 			/* no value */
 			$$ = l;
 		}
-	|	AUTHINFO AUTHNAME
+	|	AUTHENTICATION AUTHNAME
 		{
 			struct cf_list *l;
 
