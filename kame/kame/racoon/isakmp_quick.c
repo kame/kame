@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.73 2001/02/02 05:44:04 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.74 2001/03/21 16:21:02 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -256,11 +256,11 @@ quick_i1send(iph2, msg)
 
 	/* IDci */
 	np = (idcr) ? ISAKMP_NPTYPE_ID : ISAKMP_NPTYPE_NONE;
-	if (iph2->id)
+	if (idci)
 		p = set_isakmp_payload(p, iph2->id, np);
 
 	/* IDcr */
-	if (iph2->id_p)
+	if (idcr)
 		p = set_isakmp_payload(p, iph2->id_p, ISAKMP_NPTYPE_NONE);
 
 	/* generate HASH(1) */
