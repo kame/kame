@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.64 2000/08/03 16:42:56 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.65 2000/08/09 13:29:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -115,6 +115,7 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 #include <arpa/inet.h>
+#include <arpa/nameser.h>
 #include <netdb.h>
 
 #include <ctype.h>
@@ -250,6 +251,8 @@ void	 pr_iph __P((struct ip6_hdr *));
 void	 pr_nodeaddr __P((struct icmp6_nodeinfo *, int));
 int	 myechoreply __P((const struct icmp6_hdr *));
 int	 mynireply __P((const struct icmp6_nodeinfo *));
+char *dnsdecode __P((const u_char **, const u_char *, const u_char *,
+	u_char *, size_t));
 void	 pr_pack __P((u_char *, int, struct msghdr *));
 void	 pr_exthdrs __P((struct msghdr *));
 void	 pr_ip6opt __P((void *));
@@ -1105,6 +1108,76 @@ mynireply(nip)
 		return 0;
 }
 
+char *
+dnsdecode(sp, ep, base, buf, bufsiz)
+	const u_char **sp;
+	const u_char *ep;
+	const u_char *base;	/*base for compressed name*/
+	u_char *buf;
+	size_t bufsiz;
+{
+	int i, l;
+	const u_char *cp;
+	char *q;
+	const char *eq;
+	char cresult[MAXDNAME + 1];
+	const u_char *comp;
+
+	cp = *sp;
+	q = buf;
+	eq = buf + bufsiz;
+
+	if (cp >= ep)
+		return NULL;
+	while (cp < ep) {
+		i = *cp;
+		if (i == 0 || cp != *sp) {
+			if (q >= eq - 1)
+				return NULL;	/*result overrun*/
+			*q++ = '.';
+		}
+		if (i == 0)
+			break;
+		cp++;
+
+		if ((i & 0xc0) == 0xc0 && cp - base > (i & 0x3f)) {
+			/* DNS compression */
+			if (!base)
+				return NULL;
+
+			comp = base + (i & 0x3f);
+			if (dnsdecode(&comp, cp, base, cresult,
+			    sizeof(cresult)) == NULL)
+				return NULL;
+			if (eq - q < strlen(cresult) + 1)
+				return NULL;	/*result overrun*/
+			strcpy(q, cresult);	/*XXX should be strlcpy*/
+			q += strlen(q);
+			break;
+		} else if ((i & 0x3f) == i) {
+			if (i > ep - cp)
+				return NULL;	/*source overrun*/
+			while (i-- > 0 && cp < ep) {
+				if (eq - q < (isprint(*cp) ? 2 : 5))
+					return NULL;	/*result overrun*/
+				l = snprintf(q, eq - q,
+				    isprint(*cp) ? "%c" : "\\%03o", *cp & 0xff);
+				cp++;
+				q += l;
+			}
+		} else
+			return NULL;	/*invalid label*/
+	}
+	if (q >= eq)
+		return NULL;	/*result overrun*/
+	if (i != 0)
+		return NULL;	/*not terminated*/
+	cp++;
+	*q = '\0';
+	*sp = cp;
+	return buf;
+}
+
 /*
  * pr_pack --
  *	Print out the packet, if it came from us.  This logic is necessary
@@ -1132,6 +1205,7 @@ pr_pack(buf, cc, mhdr)
 	size_t off;
 	int oldfqdn;
 	u_int16_t seq;
+	char dnsname[MAXDNAME + 1];
 
 	(void)gettimeofday(&tv, NULL);
 
@@ -1223,8 +1297,25 @@ pr_pack(buf, cc, mhdr)
 			dupflag = 0;
 		}
 
-		(void)printf("%d bytes from %s: ", cc,
-			     pr_addr(from));
+		if (options & F_QUIET)
+			return;
+
+		(void)printf("%d bytes from %s: ", cc, pr_addr(from));
+
+		switch (ntohs(ni->ni_code)) {
+		case ICMP6_NI_SUCCESS:
+			break;
+		case ICMP6_NI_REFUSED:
+			printf("refused, type 0x%x", ntohs(ni->ni_type));
+			goto fqdnend;
+		case ICMP6_NI_UNKNOWN:
+			printf("unknown, type 0x%x", ntohs(ni->ni_type));
+			goto fqdnend;
+		default:
+			printf("unknown code 0x%x, type 0x%x",
+			    ntohs(ni->ni_code), ntohs(ni->ni_type));
+			goto fqdnend;
+		}
 
 		switch (ntohs(ni->ni_qtype)) {
 		case NI_QTYPE_NOOP:
@@ -1255,38 +1346,31 @@ pr_pack(buf, cc, mhdr)
 			else
 				oldfqdn = 0;
 			if (oldfqdn) {
-				cp++;
+				cp++;	/* skip length */
 				while (cp < end) {
 					safeputc(*cp & 0xff);
 					cp++;
 				}
 			} else {
+				i = 0;
 				while (cp < end) {
-					i = *cp++;
-					if (i) {
-						if (i > end - cp) {
-							printf("???");
-							break;
-						}
-						while (i-- && cp < end) {
-							safeputc(*cp & 0xff);
-							cp++;
-						}
-						if (cp + 1 < end && *cp)
-							printf(".");
-					} else {
-						if (cp == end) {
-							/* FQDN */
-							printf(".");
-						} else if (cp + 1 == end &&
-							   *cp == '\0') {
-							/* truncated */
-						} else {
-							/* invalid */
-							printf("???");
-						}
+					if (dnsdecode((const u_char **)&cp, end,
+					    (const u_char *)(ni + 1), dnsname,
+					    sizeof(dnsname)) == NULL) {
+						printf("???");
 						break;
 					}
+					/*
+					 * name-lookup special handling for
+					 * truncated name
+					 */
+					if (cp + 1 < end && !*cp &&
+					    strlen(dnsname) > 0) {
+						dnsname[strlen(dnsname) - 1] = '\0';
+						cp++;
+					}
+					printf("%s%s", i > 0 ? "," : "",
+					    dnsname);
 				}
 			}
 			if (options & F_VERBOSE) {
@@ -1664,6 +1748,19 @@ static char *ttab[] = {
 };
 #endif
 
+/*subject type*/
+static char *niqcode[] = {
+	"IPv6 address",
+	"DNS label",	/*or empty*/
+	"IPv4 address",
+};
+
+/*result code*/
+static char *nircode[] = {
+	"Success", "Refused", "Unknown",
+};
+
+
 /*
  * pr_icmph --
  *	Print a descriptive string about an ICMP header.
@@ -1674,6 +1771,11 @@ pr_icmph(icp, end)
 	u_char *end;
 {
 	char ntop_buf[INET6_ADDRSTRLEN];
+	struct nd_redirect *red;
+	struct icmp6_nodeinfo *ni;
+	char dnsname[MAXDNAME + 1];
+	const u_char *cp;
+	size_t l;
 
 	switch (icp->icmp6_type) {
 	case ICMP6_DST_UNREACH:
@@ -1772,9 +1874,7 @@ pr_icmph(icp, end)
 		(void)printf("Neighbor Advertisement");
 		break;
 	case ND_REDIRECT:
-	{
-		struct nd_redirect *red = (struct nd_redirect *)icp;
-
+		red = (struct nd_redirect *)icp;
 		(void)printf("Redirect\n");
 		(void)printf("Destination: %s",
 			     inet_ntop(AF_INET6, &red->nd_rd_dst,
@@ -1783,14 +1883,105 @@ pr_icmph(icp, end)
 			     inet_ntop(AF_INET6, &red->nd_rd_target,
 				       ntop_buf, sizeof(ntop_buf)));
 		break;
-	}
 	case ICMP6_NI_QUERY:
 		(void)printf("Node Information Query");
 		/* XXX ID + Seq + Data */
+		ni = (struct icmp6_nodeinfo *)icp;
+		l = end - (u_char *)(ni + 1);
+		printf(", ");
+		switch (ntohs(ni->ni_qtype)) {
+		case NI_QTYPE_NOOP:
+			(void)printf("NOOP");
+			break;
+		case NI_QTYPE_SUPTYPES:
+			(void)printf("Supported qtypes");
+			break;
+		case NI_QTYPE_FQDN:
+			(void)printf("DNS name");
+			break;
+		case NI_QTYPE_NODEADDR:
+			(void)printf("nodeaddr");
+			break;
+		case NI_QTYPE_IPV4ADDR:
+			(void)printf("IPv4 nodeaddr");
+			break;
+		default:
+			(void)printf("unknown qtype");
+			break;
+		}
+		if (options & F_VERBOSE) {
+			switch (ni->ni_code) {
+			case ICMP6_NI_SUBJ_IPV6:
+				if (l == sizeof(struct in6_addr) &&
+				    inet_ntop(AF_INET6, ni + 1, ntop_buf, sizeof(ntop_buf)) != NULL) {
+					(void)printf(", subject=%s(%s)",
+					    niqcode[ni->ni_code], ntop_buf);
+				} else {
+#if 1
+					/* backward compat to -W */
+					(void)printf(", oldfqdn");
+#else
+					(void)printf(", invalid");
+#endif
+				}
+				break;
+			case ICMP6_NI_SUBJ_FQDN:
+				if (end == (u_char *)(ni + 1)) {
+					(void)printf(", no subject");
+					break;
+				}
+				printf(", subject=%s", niqcode[ni->ni_code]);
+				cp = (const u_char *)(ni + 1);
+				if (dnsdecode(&cp, end, NULL, dnsname, sizeof(dnsname)) != NULL)
+					printf("(%s)", dnsname);
+				else
+					printf("(invalid)");
+				break;
+			case ICMP6_NI_SUBJ_IPV4:
+				if (l == sizeof(struct in_addr) &&
+				    inet_ntop(AF_INET, ni + 1, ntop_buf, sizeof(ntop_buf)) != NULL) {
+					(void)printf(", subject=%s(%s)",
+					    niqcode[ni->ni_code], ntop_buf);
+				} else
+					(void)printf(", invalid");
+				break;
+			default:
+				(void)printf(", invalid");
+				break;
+			}
+		}
 		break;
 	case ICMP6_NI_REPLY:
 		(void)printf("Node Information Reply");
 		/* XXX ID + Seq + Data */
+		ni = (struct icmp6_nodeinfo *)icp;
+		printf(", ");
+		switch (ntohs(ni->ni_qtype)) {
+		case NI_QTYPE_NOOP:
+			(void)printf("NOOP");
+			break;
+		case NI_QTYPE_SUPTYPES:
+			(void)printf("Supported qtypes");
+			break;
+		case NI_QTYPE_FQDN:
+			(void)printf("DNS name");
+			break;
+		case NI_QTYPE_NODEADDR:
+			(void)printf("nodeaddr");
+			break;
+		case NI_QTYPE_IPV4ADDR:
+			(void)printf("IPv4 nodeaddr");
+			break;
+		default:
+			(void)printf("unknown qtype");
+			break;
+		}
+		if (options & F_VERBOSE) {
+			if (ni->ni_code > sizeof(nircode) / sizeof(nircode[0]))
+				printf(", invalid");
+			else
+				printf(", %s", nircode[ni->ni_code]);
+		}
 		break;
 	default:
 		(void)printf("Bad ICMP type: %d", icp->icmp6_type);
