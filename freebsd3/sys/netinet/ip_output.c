@@ -107,6 +107,7 @@ static MALLOC_DEFINE(M_IPMOPTS, "ip_moptions", "internet multicast options");
 u_short ip_id;
 
 static struct mbuf *ip_insertoptions __P((struct mbuf *, struct mbuf *, int *));
+static struct ifnet *ip_multicast_if __P((struct in_addr *));
 static void	ip_mloopback
 	__P((struct ifnet *, struct mbuf *, struct sockaddr_in *, int));
 static int	ip_getmoptions
@@ -1389,6 +1390,26 @@ bad:
  * standard option (IP_TTL).
  */
 /*
+ * following RFC1724 section 3.3, 0.0.0.0/8 is interpreted as interface index.
+ */
+static struct ifnet *
+ip_multicast_if(a)
+	struct in_addr *a;
+{
+	int ifindex;
+	struct ifnet *ifp;
+
+	if (ntohl(a->s_addr) >> 24 == 0) {
+		ifindex = ntohl(a->s_addr) & 0xffffff;
+		if (ifindex < 0 || if_index < ifindex)
+			return NULL;
+		ifp = ifindex2ifnet[ifindex];
+	} else
+		INADDR_TO_IFP(*a, ifp);
+	return ifp;
+}
+
+/*
  * Set the IP multicast options in response to user setsockopt().
  */
 static int
@@ -1463,13 +1484,14 @@ ip_setmoptions(sopt, imop)
 		 * it supports multicasting.
 		 */
 		s = splimp();
-		INADDR_TO_IFP(addr, ifp);
+		ifp = ip_multicast_if(&addr);
 		if (ifp == NULL || (ifp->if_flags & IFF_MULTICAST) == 0) {
 			splx(s);
 			error = EADDRNOTAVAIL;
 			break;
 		}
 		imo->imo_multicast_ifp = ifp;
+		imo->imo_multicast_addr.s_addr = INADDR_ANY;
 		splx(s);
 		break;
 
@@ -1556,7 +1578,7 @@ ip_setmoptions(sopt, imop)
 			rtfree(ro.ro_rt);
 		}
 		else {
-			INADDR_TO_IFP(mreq.imr_interface, ifp);
+			ifp = ip_multicast_if(&mreq->imr_interface);
 		}
 
 		/*
@@ -1624,7 +1646,7 @@ ip_setmoptions(sopt, imop)
 		if (mreq.imr_interface.s_addr == INADDR_ANY)
 			ifp = NULL;
 		else {
-			INADDR_TO_IFP(mreq.imr_interface, ifp);
+			ifp = ip_multicast_if(&mreq->imr_interface);
 			if (ifp == NULL) {
 				error = EADDRNOTAVAIL;
 				splx(s);
@@ -1689,7 +1711,6 @@ ip_getmoptions(sopt, imo)
 	register struct ip_moptions *imo;
 {
 	struct in_addr addr;
-	struct in_ifaddr *ia;
 	int error, optval;
 	u_char coptval;
 
@@ -1707,9 +1728,8 @@ ip_getmoptions(sopt, imo)
 		if (imo == NULL || imo->imo_multicast_ifp == NULL)
 			addr.s_addr = INADDR_ANY;
 		else {
-			IFP_TO_IA(imo->imo_multicast_ifp, ia);
-			addr.s_addr = (ia == NULL) ? INADDR_ANY
-				: IA_SIN(ia)->sin_addr.s_addr;
+			/* return the value user has set */
+			*addr = imo->imo_multicast_addr;
 		}
 		error = sooptcopyout(sopt, &addr, sizeof addr);
 		break;
