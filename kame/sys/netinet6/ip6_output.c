@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.359 2003/02/13 17:50:47 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.360 2003/02/18 14:24:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4939,7 +4939,7 @@ ip6_splithdr(m, exthdrs)
 			m_freem(m);
 			return ENOBUFS;
 		}
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ < 5)
 		M_MOVE_PKTHDR(mh, m);
 #else
 		M_COPY_PKTHDR(mh, m);
