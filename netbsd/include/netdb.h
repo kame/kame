@@ -232,6 +232,7 @@ struct addrinfo {
 #define	NI_NUMERICSERV	0x00000008
 #define	NI_DGRAM	0x00000010
 #define NI_WITHSCOPEID	0x00000020
+#define NI_NUMERICSCOPE	0x00000040
 
 /*
  * Scope delimit character
