@@ -1,4 +1,4 @@
-$KAME: README,v 1.22 2001/03/02 06:00:29 sumikawa Exp $
+$KAME: README,v 1.23 2001/03/05 10:54:03 sumikawa Exp $
 
 This directory contains kame related ports only. Generic IPv6-enable
 ports are distributed by original FreeBSD ports.
@@ -12,7 +12,7 @@ kernel/application from different versions. You need to use
 ports-current at your own risk and you may require some knowledge to
 mix them.
 
-ports merging status at $Date: 2001/03/02 06:00:29 $
+ports merging status at $Date: 2001/03/05 10:54:03 $
 	KAME/FreeBSD3	ports-current
         -----------------------------
 	XFree86		not yet(based version in KAME ports is old
@@ -95,7 +95,7 @@ ports merging status at $Date: 2001/03/02 06:00:29 $
 	wget		merged as ftp/wget (pretty old?)
 	wu-ftpd		not yet
 	wwwoffle	merged as www/wwwoffle
-	wyvern		not yet
+	wyvern		merged as www/wyvern
 	xemacs21	not yet
 	xmms		not yet
 	xtris		merged as games/xtris
