@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.20 2003/11/05 09:18:02 ono Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.21 2003/11/05 09:27:15 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -415,8 +415,7 @@ dccp_input(struct mbuf *m, ...)
 			/* DCCP_DEBUG((LOG_INFO, "Bad checksum, not dropping packet!, dh->dh_sum = 0x%04x\n", dh->dh_sum)); */
 			DCCP_DEBUG((LOG_INFO, "Bad checksum, dropping packet!, dh->dh_sum = 0x%04x\n", dh->dh_sum));
 			dccpstat.dccps_badsum++;
-			m_freem(m);
-			return;
+			goto badunlocked;
 		}
 	}
 
@@ -506,7 +505,7 @@ dccp_input(struct mbuf *m, ...)
 	 */
 
 		INP_INFO_WUNLOCK(&dccpbinfo);
-		return;
+		goto badunlocked;
 	}
 	INP_LOCK(inp);
 
@@ -835,10 +834,12 @@ dccp_input(struct mbuf *m, ...)
 				(*cc_sw[dp->cc_in_use[1]].cc_recv_packet_recv)(dp->cc_state[1], options, optlen); 
 			}
 			break;
+
 		case DCCP_TYPE_CLOSE:
 			dccp_output(dp, DCCP_TYPE_CLOSE + 1);
 			dp = dccp_close(dp);
-			return;
+			goto badunlocked;
+
 		case DCCP_TYPE_RESET:
 			dp->state = DCCPS_TIME_WAIT;
 			callout_stop(&dp->retrans_timer);
@@ -921,7 +922,8 @@ dccp_input(struct mbuf *m, ...)
 			callout_stop(&dp->retrans_timer);
 			dccp_output(dp, DCCP_TYPE_RESET + 2);
 			dp = dccp_close(dp);
-			return;
+			goto badunlocked;
+
 		case DCCP_TYPE_RESET:
 			DCCP_DEBUG((LOG_INFO, "Got DCCP RESET\n"));
 			callout_stop(&dp->retrans_timer);
