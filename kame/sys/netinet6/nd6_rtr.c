@@ -409,15 +409,6 @@ defrouter_addreq(new)
 {
 	struct sockaddr_in6 def, mask, gate;
 	int s;
-#if 0
-	register struct radix_node *rn;
-	register struct radix_node_head *rnh;
-	struct sockaddr *ndst;
-	struct ifnet *ifp = new->ifp;
-	struct ifaddr *ifa;
-	struct rtentry *rt;
-	extern struct pool rtentry_pool;
-#endif
 
 	Bzero(&def, sizeof(def));
 	Bzero(&mask, sizeof(mask));
@@ -428,7 +419,6 @@ defrouter_addreq(new)
 	def.sin6_family = mask.sin6_family = gate.sin6_family = AF_INET6;
 	gate.sin6_addr = new->rtaddr;
 
-#if 1
 #ifdef __NetBSD__
 	s = splsoftnet();
 #else
@@ -439,51 +429,6 @@ defrouter_addreq(new)
 		RTF_GATEWAY, NULL);
 	splx(s);
 	return;
-#else
-	ifa = (struct ifaddr *)in6ifa_ifpforlinklocal(ifp);
-	if (!ifa)
-		return;
-	if ((rnh = rt_tables[AF_INET6]) == 0)
-		return;
-
-#ifdef __NetBSD__
-	s = splsoftnet();
-#else
-	s = splnet();
-#endif
-#ifdef __NetBSD__
-	rt = pool_get(&rtentry_pool, PR_NOWAIT);
-#else
-	R_Malloc(rt, struct rtentry *, sizeof(*rt));
-#endif
-	if (!rt)
-		goto bad;
-	Bzero(rt, sizeof(*rt));
-	rt->rt_flags = RTF_UP | RTF_GATEWAY;
-	if (rt_setgate(rt, (struct sockaddr *)&def, (struct sockaddr *)&gate)){
-		Free(rt);
-		goto bad;
-	}
-	ndst = rt_key(rt);
-	Bcopy(&def, ndst, sizeof(def));
-	rn = rnh->rnh_addaddr((caddr_t)ndst, (caddr_t)&mask,
-			      rnh, rt->rt_nodes);
-	if (rn == 0) {
-		Free(rt_key(rt));
-		Free(rt);
-		goto bad;
-	}
-	ifa->ifa_refcnt++;
-	rt->rt_ifa = ifa;
-	rt->rt_ifp = ifp;
-	rt->rt_rmx.rmx_mtu = ifa->ifa_ifp->if_mtu;
-	/* xxx
-	 * many codes should be stolen from route.c
-	 */
-bad:
-	splx(s);
-	return;
-#endif
 }
 
 /* Add a route to a given interface as default */
