@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.115 2001/09/15 00:26:46 itojun Exp $
+$KAME: COVERAGE,v 1.116 2001/09/20 07:27:27 itojun Exp $
 
 
 x: supported/integrated
@@ -18,6 +18,10 @@ IPsec		x	(*1)	x	x	x	x	x
     (*1) OpenBSD IPsec is available for both IPv4/IPv6.  Not really tested.
 	 If you would like to use OpenBSD IPsec for production system,
 	 use unpatched (non-KAME) OpenBSD.
+
+KAME mobile-ip6
+		-	-	-	-	(*1)	-	-
+    (*1) being worked on
 
 NAT/PT		-	-	x	(*1)	x	(*1)	?
     (*1) compilable but not tested
@@ -203,7 +207,8 @@ ALTQ		(+)	x	-	-	-	-	-	-
 
 NAT/PT		(+)	-	-	-	-	-	-	-
 
-mobile-ip6	(+)	-	-	-	-	-	-	x
+mobile-ip6	(+)	-	-	-	-	-	-	(*1)
+    (*1) old Ericsson mobile-ip6
 
 IPv6 RPC	-	x	-	-	x	-	-	-
 
