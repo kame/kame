@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.126 2000/10/11 08:25:05 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.127 2000/10/23 03:44:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -988,14 +988,12 @@ skip_ipsec2:;
 	    )
 	{
 #if defined(__NetBSD__) && defined(IFA_STATS)
-		if (IFA_STATS) {
-			struct in6_ifaddr *ia6;
-			ip6 = mtod(m, struct ip6_hdr *);
-			ia6 = in6_ifawithifp(ifp, &ip6->ip6_src);
-			if (ia6) {
-				ia->ia_ifa.ifa_data.ifad_outbytes +=
-					m->m_pkthdr.len;
-			}
+		struct in6_ifaddr *ia6;
+		ip6 = mtod(m, struct ip6_hdr *);
+		ia6 = in6_ifawithifp(ifp, &ip6->ip6_src);
+		if (ia6) {
+			ia6->ia_ifa.ifa_data.ifad_outbytes +=
+				m->m_pkthdr.len;
 		}
 #endif
 #ifdef OLDIP6OUTPUT
@@ -1120,14 +1118,12 @@ sendorfree:
 		m->m_nextpkt = 0;
 		if (error == 0) {
 #if defined(__NetBSD__) && defined(IFA_STATS)
-			if (IFA_STATS) {
-				struct in6_ifaddr *ia6;
-				ip6 = mtod(m, struct ip6_hdr *);
-				ia6 = in6_ifawithifp(ifp, &ip6->ip6_src);
-				if (ia6) {
-					ia->ia_ifa.ifa_data.ifad_outbytes +=
-						m->m_pkthdr.len;
-				}
+			struct in6_ifaddr *ia6;
+			ip6 = mtod(m, struct ip6_hdr *);
+			ia6 = in6_ifawithifp(ifp, &ip6->ip6_src);
+			if (ia6) {
+				ia6->ia_ifa.ifa_data.ifad_outbytes +=
+					m->m_pkthdr.len;
 			}
 #endif
 #ifdef OLDIP6OUTPUT

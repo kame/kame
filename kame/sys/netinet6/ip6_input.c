@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.123 2000/10/02 08:42:44 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.124 2000/10/23 03:44:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -969,7 +969,7 @@ ip6_input(m)
 	 * Tell launch routine the next header
 	 */
 #if defined(__NetBSD__) && defined(IFA_STATS)
-	if (IFA_STATS && deliverifp != NULL) {
+	if (deliverifp != NULL) {
 		struct in6_ifaddr *ia6;
 		ia6 = in6_ifawithifp(deliverifp, &ip6->ip6_dst);
 		if (ia6)
