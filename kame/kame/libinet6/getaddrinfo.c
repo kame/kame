@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.146 2003/04/14 03:04:09 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.147 2003/04/15 09:14:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1647,14 +1647,14 @@ get_port(ai, servname, matchonly)
 			return EAI_SERVICE;
 		port = htons(port);
 	} else {
-		switch (ai->ai_socktype) {
-		case SOCK_DGRAM:
+		switch (ai->ai_protocol) {
+		case IPPROTO_UDP:
 			proto = "udp";
 			break;
-		case SOCK_STREAM:
-			proto = "tcp";	/*XXX sctp?*/
+		case IPPROTO_TCP:
+			proto = "tcp";
 			break;
-		case SOCK_SEQPACKET:
+		case IPPROTO_SCTP:
 			proto = "sctp";
 			break;
 		default:
