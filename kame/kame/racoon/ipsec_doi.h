@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.h,v 1.26 2000/09/22 08:59:33 itojun Exp $	*/
+/*	$KAME: ipsec_doi.h,v 1.27 2000/09/29 20:58:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.26 2000/09/22 08:59:33 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.27 2000/09/29 20:58:02 itojun Exp $ */
 
 /* refered to RFC2407 */
 
@@ -126,13 +126,13 @@ struct ipsecdoi_pl_sa {
 		u_int32_t sit; /* Situation */
 	} b;
 	/* followed by Leveled Domain Identifier and so on. */
-};
+} __attribute__((__packed__));
 
 struct ipsecdoi_secrecy_h {
 	u_int16_t len;
 	u_int16_t reserved;
 	/* followed by the value */
-};
+} __attribute__((__packed__));
 
 /* 4.6.2 Identification Payload Content */
 struct ipsecdoi_pl_id {
@@ -143,7 +143,7 @@ struct ipsecdoi_pl_id {
 		u_int16_t port;		/* Port */
 	} b;
 	/* followed by Identification Data */
-};
+} __attribute__((__packed__));
 
 #define IPSECDOI_ID_IPV4_ADDR                        1
 #define IPSECDOI_ID_FQDN                             2
