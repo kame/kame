@@ -1,11 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2270 2002/11/04 06:29:53 suz Exp $
+$KAME: CHANGELOG,v 1.2271 2002/11/04 06:34:58 suz Exp $
 
 Mon Nov  4 15:27:40 JST 2002	suz@crl.hitachi.co.jp
 	* kame/sys/{netinet6/in6.c, netinet6/mld6.c, netinet/in_msf.h}:
 	  announces linklocal multicast join by MLDv2 on MLDv2-ready kernel.
 
 Mon Nov  4 13:28:42 JST 2002	suz@crl.hitachi.co.jp
+	* {freebsd4,netbsd,openbsd}/sys/netinet/igmp.c: IGMPv2-compat-mode
+	  implementation for host side
 	* kame/sys/netinet6/mld6.c, icmp6.c: MLDv1-compat-mode 
 	  implementation for host side
 
