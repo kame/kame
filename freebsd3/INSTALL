@@ -1,6 +1,6 @@
-Installation procedure - FreeBSD 2.2.8
+Installation procedure - FreeBSD 3.2
 KAME project
-$Id: INSTALL,v 1.7.2.2 1999/10/06 06:49:44 k-sugyou Exp $
+$Id: INSTALL,v 1.7.2.1 1999/10/06 06:49:52 k-sugyou Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -82,31 +82,16 @@ E-1. Most of configuration files are placed in /usr/local/v6/etc.
 		sh /usr/local/v6/etc/rc.net6
 	fi
 
-E-2. If you would like to use IPv6-ready inetd, you will need to stop using
-     /usr/sbin/inetd and switch to /usr/local/v6/sbin/inetd.
-     To do this, please replace the following section of /etc/rc:
-
->if [ "X${inetd_enable}" != X"NO" ]; then
->	echo -n ' inetd'
->	inetd ${inetd_flags}
->fi
-
-     with this:
-
->if [ "X${inetd_enable}" != X"NO" ]; then
->	echo -n ' inetd'
->	if [ -x /usr/local/v6/sbin/inetd ]; then
->		/usr/local/v6/sbin/inetd ${inetd_flags}
->	else
->		inetd ${inetd_flags}
->	fi
->fi
-
-     Configuration file is placed in /etc/inetd.conf, but with enhanced syntax
-     (it is backward compatible so do not be afraid).  Consult manpages
-     for details.  You only need add lines for IPv6-ready daemons with "tcp6"
-     or "udp6", like below:
->ftp	stream	tcp6	nowait	root	/usr/local/v6/libexec/ftpd	ftpd -l
+E-2. If you would like to use IPv6-ready inetd, you will need to also invoke
+     /usr/local/v6/sbin/inet46d.
+     It can coexist with original /usr/sbin/inetd, but when each of them is
+     invoked, IPv4 connection accept is always treated by /usr/sbin/inetd.
+     When only /usr/local/v6/sbin/inet46d is invoked, it accept each of
+     IPv4 and IPv6 connection request.
+     Configuration file is placed in /usr/local/v6/etc/inet6d.conf, but with
+     enhanced syntax. Inet46d accepts either of IPv4 and IPv6 connection by 
+     default, but you can configure it to accept only one of those protocols
+     by each daemon basis. Consult manpages for details.
 
 E-3. Commands modified by KAME project are placed in /usr/local/v6/{bin,sbin}.
      For daily use, you will need to add both of (or either of) them
@@ -120,14 +105,14 @@ E-4. There are batch of documents installed into /usr/local/v6/man
      If you wish to develop your own programs, we suggest you to read through
      supplied documents, RFCs, and other documents to learn how.
 
-F. PAO issues
+F. PAO3 issues
 =============
-Many of FreeBSD228 users install PAO PCMCIA support code.  If you would like
-to use both PAO and KAME, you'll need to apply PAO patches onto KAME tree.
+Many of FreeBSD32 users install PAO3 PCMCIA support code.  If you would like
+to use both PAO3 and KAME, you'll need to apply PAO3 patches onto KAME tree.
 However, there are tricky things:
-- KAME code is based on FreeBSD 2.2.8-RELEASE, and it has several ALTQ
+- KAME code is based on FreeBSD 3.2-RELEASE, and it has several ALTQ
   related patch in driver code.
-- PAO code is based on FreeBSD 2.2.8-STABLE on some specific date,
+- PAO code is based on FreeBSD 3.2-STABLE on some specific date,
   and it has bunch of driver fixes.
 As both parties try to modify driver code, and they use different codebase
 as starting point, there can be conflicts during patch operation.
