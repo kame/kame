@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.217 2001/07/24 09:37:21 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.218 2001/07/24 09:51:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -303,7 +303,7 @@ in6_ifremloop(struct ifaddr *ifa)
 	 */
 
 	/*
-	 * Delete the entry only if exact one ifa exists. More than one ifa
+	 * Delete the entry only if exact one ifa exists.  More than one ifa
 	 * can exist if we assign a same single address to multiple
 	 * (probably p2p) interfaces.
 	 * XXX: we should avoid such a configuration in IPv6...
@@ -319,9 +319,9 @@ in6_ifremloop(struct ifaddr *ifa)
 	if (ia_count == 1) {
 		/*
 		 * Before deleting, check if a corresponding loopbacked host
-		 * route surely exists. With this check, we can avoid to
+		 * route surely exists.  With this check, we can avoid to
 		 * delete an interface direct route whose destination is same
-		 * as the address being removed. This can happen when remofing
+		 * as the address being removed.  This can happen when remofing
 		 * a subnet-router anycast address on an interface attahced
 		 * to a shared medium.
 		 */
@@ -929,7 +929,7 @@ in6_update_ifa(ifp, ifra, ia)
 	}
 	else {
 		/*
-		 * In this case, ia must not be NULL. We just use its prefix
+		 * In this case, ia must not be NULL.  We just use its prefix
 		 * length.
 		 */
 		plen = in6_mask2len(&ia->ia_prefixmask.sin6_addr, NULL);
@@ -2665,8 +2665,8 @@ in6_ifawithscope(oifp, dst)
 			 * Also, we do not have to consider a case where
 			 * the scope of ifa_best is larger(smaller) than dst
 			 * and the scope of the current address is smaller
-			 * (larger) than dst. Such a case has already been
-			 * covered. Tiebreaking is done according to the
+			 * (larger) than dst.  Such a case has already been
+			 * covered.  Tiebreaking is done according to the
 			 * following items:
 			 * - the scope comparison between the address and
 			 *   dst (dscopecmp)
@@ -2677,8 +2677,8 @@ in6_ifawithscope(oifp, dst)
 			 * - if the address is on the outgoing I/F (outI/F)
 			 *
 			 * Roughly speaking, the selection policy is
-			 * - the most important item is scope. The same scope
-			 *   is best. Then search for a larger scope.
+			 * - the most important item is scope.  The same scope
+			 *   is best.  Then search for a larger scope.
 			 *   Smaller scopes are the last resort.
 			 * - A deprecated address is chosen only when we have
 			 *   no address that has an enough scope, but is
@@ -2967,7 +2967,7 @@ in6_setmaxmtu()
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 /*
- * Convert sockaddr_in6 to sockaddr_in. Original sockaddr_in6 must be
+ * Convert sockaddr_in6 to sockaddr_in.  Original sockaddr_in6 must be
  * v4 mapped addr or v4 compat addr
  */
 void
