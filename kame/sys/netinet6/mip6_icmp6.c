@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.42 2002/04/04 07:08:44 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.43 2002/04/08 06:35:13 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -70,9 +70,10 @@
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
 #include <netinet6/nd6.h>
-#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include <netinet/in_pcb.h>
+#include <netinet6/in6_pcb.h>
+#elif defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <netinet/in_pcb.h>
 #else
 #include <netinet6/in6_pcb.h>
@@ -306,7 +307,8 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	int icmp6len;
 {
 	struct mbuf *n;
-	struct ip6_hdr *ip6, otip6, oip6, *nip6;
+	struct ip6_hdr *ip6, *otip6, oip6, *nip6;
+	int otip6off, nxt;
 	struct sockaddr_in6 oip6dst;
 	struct icmp6_hdr *icmp6, *nicmp6;
 	struct mip6_bc *mbc;
@@ -315,22 +317,21 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	if (!MIP6_IS_HA) {
 		/*
 		 * this check is needed only for a node that is acting
-		 * a home agent.
+		 * as a homeagent.
 		 */
 		return (0);
 	}
 	
-	/* check if we have a enough length icmp payload. */
-	if (icmp6len < sizeof(otip6) + sizeof(oip6)) {
+	/* check if we have enough icmp payload size. */
+	if (icmp6len < sizeof(*otip6) + sizeof(oip6)) {
 		/*
-		 * we don't have enough length of icmp payload.  to
+		 * we don't have enough size of icmp payload.  to
 		 * determine that this icmp is against the tunneled
 		 * ip, we at least have two ip header, one is for
 		 * tunneling from the home agent to the correspondent
 		 * node and the other is the original header from the
 		 * mobile node to the correspondent node.
 		 */
-		/* XXX: TODO extention header. */
 		return (0);
 	}
 
@@ -344,7 +345,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	 * as follows.
 	 *
 	 *   ip(src=??,dst=ha)
-	 *     |icmp|ip(src=ha,dst=mnhoa)|ip(src=cn,dst=mnhoa)|payload
+	 *     |icmp|ip(src=ha,dst=mncoa)|ip(src=cn,dst=mnhoa)|payload
 	 */
 	ip6 = mtod(m, struct ip6_hdr *);
 	icmp6 = (struct icmp6_hdr *)((caddr_t)ip6 + off);
@@ -355,30 +356,44 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 		 */
 		return (0);
 	} 
-	/* the ip6_hdr for encapsulating may not be contiguous. */
-	m_copydata(m, off + sizeof(*icmp6), sizeof(otip6), (caddr_t)&otip6);
 
-	/*
-	 * XXX: TODO
-	 *
-	 * encapsulating ip packet may have some extension headers.
-	 * we should check them and calculate the offset.
-	 */
-	if (otip6.ip6_nxt != IPPROTO_IPV6) {
-		/* this packet is not encapsulated. */
-		/* XXX we must chase extension haeders... */
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off + sizeof(*icmp6), sizeof(*otip6), -1);
+	otip6 = (struct ip6_hdr *)(mtod(m, caddr_t) + off + sizeof(*icmp6));
+#else
+	IP6_EXTHDR_GET(otip6, struct ip6_hdr *, m, off + sizeof(*icmp6),
+		       sizeof(*otip6));
+	if (otip6 == NULL)
+		return (-1);
+#endif
+	otip6off = off + sizeof(*icmp6) + sizeof(*otip6);
+	nxt = otip6->ip6_nxt;
+	while(nxt != IPPROTO_IPV6) {
+		int off;
+
+		off = otip6off;
+		otip6off = ip6_nexthdr(m, off, nxt, &nxt);
+		if ((otip6off < 0) ||
+		    (otip6off < off) ||
+		    (otip6off == off)) {
+			/* too short or there is no ip hdr in this
+			 * icmp payload. */
+			return (0);
+		}
+		off = otip6off;
+	}
+	if (m->m_pkthdr.len < otip6off + sizeof(oip6)) {
+		/* too short icmp packet. */
 		return (0);
 	}
-
-	/* length check has been already done.  we can copy immediately. */
-	m_copydata(m, off + sizeof(*icmp6) + sizeof(otip6),
-		   sizeof(oip6), (caddr_t)&oip6);
+	m_copydata(m, otip6off, sizeof(oip6), (caddr_t)&oip6);
 	oip6dst.sin6_len = sizeof(oip6dst);
 	oip6dst.sin6_family = AF_INET6;
 	oip6dst.sin6_addr = oip6.ip6_dst;
 	if(in6_addr2zoneid(m->m_pkthdr.rcvif, &oip6dst.sin6_addr,
 			   &oip6dst.sin6_scope_id))
 		return (0); /* XXX */
+
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &oip6dst);
 	if (mbc == NULL) {
 		/* we are not a home agent of this mobile node ?? */
@@ -393,7 +408,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 		/* continue, anyway. */
 		return (0);
 	}
-	m_adj(n, off + sizeof(*icmp6) + sizeof(otip6));
+	m_adj(n, otip6off);
 	M_PREPEND(n, sizeof(struct ip6_hdr) + sizeof(struct icmp6_hdr),
 		  M_DONTWAIT);
 	if (n == NULL) {
