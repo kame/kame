@@ -1,14 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2216 2002/08/19 23:26:13 itojun Exp $
+$KAME: CHANGELOG,v 1.2217 2002/08/20 21:56:40 itojun Exp $
 
 <200208>
 Tue Aug 20 08:25:37 JST 2002  itojun@iijlab.net
 	* sys/netinet6/nd6.c: correct sysctl for ndp -p/-r to use proper
 	  copyout() logic.
-
-Sun Aug 18 07:17:00 JST 2002  itojun@iijlab.net
-	* sys/netinet6/in6_proto.c: set default value for use_deprecated to 0,
-	  to avoid consequences with ftpd.
 
 Fri Aug  9 17:45:30 JST 2002  itojun@iijlab.net
 	* sys/netinet6/esp_output.c: make a correct guess of ESP header size.
