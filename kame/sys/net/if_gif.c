@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.37 2000/12/03 00:39:27 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.38 2001/01/22 17:58:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -640,7 +640,7 @@ gif_ioctl(ifp, cmd, data)
 		bcopy((caddr_t)dst, (caddr_t)sa, dst->sa_len);
 		sc->gif_pdst = sa;
 
-		ifp->if_flags |= IFF_UP;
+		ifp->if_flags |= (IFF_UP | IFF_RUNNING);
 		if_up(ifp);		/* send up RTM_IFINFO */
 
 		error = 0;
@@ -656,7 +656,7 @@ gif_ioctl(ifp, cmd, data)
 			free((caddr_t)sc->gif_pdst, M_IFADDR);
 			sc->gif_pdst = NULL;
 		}
-		/* change the IFF_UP flag as well? */
+		/* change the IFF_{UP, RUNNING} flag as well? */
 		break;
 #endif
 			
