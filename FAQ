@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.80 2003/02/07 10:41:08 sumikawa Exp $
+$KAME: FAQ,v 1.81 2004/02/20 02:48:56 jinmei Exp $
 
 
 GENERAL
@@ -433,11 +433,11 @@ users only, like www.kame.net?)
 		}
 
 Q: Won't you release new IPv6 patch for apache1.3.x?
-	We are focused to develop/enhance apache2.x.  Our IPv6 patch never be
-	merged into apache1.3.x original distribution since some include
-	files for mod_xxx are highly depend on IPv4 so our IPv6 patch
-	is strongly influence 3rd party's modules.  Apache2.x already
-	supports IPv6 and changes its APIs.
+	We focuse on developing/enhancing apache2.x.  Our IPv6 patch
+	will never be merged into the apache1.3.x original distribution
+	since some include files for mod_xxx highly depend on IPv4
+	and our IPv6 patch strongly affects modules from 3rd parties.
+	Apache2.x already supports IPv6 and changes its APIs.
 
 	martti.kuparinen@iki.fi takes over the maintainance. Latest
 	IPv6 patch are available at ftp://ftp.piuha.net/pub/misc/.
