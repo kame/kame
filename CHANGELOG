@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.794 2000/04/19 08:34:36 fujisawa Exp $
+$Id: CHANGELOG,v 1.795 2000/04/19 14:14:52 jinmei Exp $
 
 <200004>
+2000-04-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/netinet6/raw_ipv6.c (rip6_ctloutput): 
+	- just (implicitly) call ip6_ctloutput for IPV6_CHECKSUM.
+	- added multicast routing socket options.
+	
 Wed Apr 19 17:18:25 2000  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* v4NAT in NATPT works.
 	  - v4 traceroute does not work yet.  I will fix it soon.
