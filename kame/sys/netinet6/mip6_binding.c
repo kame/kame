@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.151 2002/11/22 06:18:35 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.152 2002/11/27 12:05:39 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -383,7 +383,9 @@ mip6_home_registration(sc)
 				}
 
 				mbu = mip6_bu_create(haaddr, mpfx, &hif_coa,
-						     IP6MU_ACK|IP6MU_HOME|IP6MU_DAD|IP6MU_SINGLE
+						     IP6MU_ACK|IP6MU_HOME|
+						     IP6MU_DAD|IP6MU_SINGLE
+
 #ifndef MIP6_STATIC_HADDR
 						     |IP6MU_LINK
 #endif
@@ -923,13 +925,14 @@ mip6_bdt_delete(paddr)
 #else
 	rt = rtalloc1((struct sockaddr *)&dst, 0);
 #endif /* __FreeBSD__ */
+	if (rt)
+		rt->rt_refcnt--;
 	if (rt
 	    && ((rt->rt_flags & RTF_HOST) != 0)
 	    && (SA6_ARE_ADDR_EQUAL(&dst, (struct sockaddr_in6 *)rt_key(rt)))) {
 		error = rtrequest(RTM_DELETE, rt_key(rt),
 				  (struct sockaddr *)0,
 				  rt_mask(rt), 0, (struct rtentry **)0);
-		rt->rt_refcnt--;
 	}
 
 	return (error);
@@ -1209,10 +1212,12 @@ mip6_process_hrbu(bi)
 	struct sockaddr_in6 haddr;
 	struct mip6_bc *mbc = NULL;
 	struct mip6_bc *prim_mbc = NULL;
-	u_int32_t prlifetime;
+	u_int32_t prlifetime = 0;
+	int busy = 0;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
+
 	/* find the home ifp of this homeaddress. */
 	for (pr = nd_prefix.lh_first;
 	    pr;
@@ -1223,9 +1228,6 @@ mip6_process_hrbu(bi)
 			hifp = pr->ndpr_ifp; /* home ifp. */
 			prlifetime = pr->ndpr_vltime;
 		}
-		/* save linklocal prefix */
-		if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix.sin6_addr))
-			llpr = pr;
 	}
 	if (hifp == NULL) {
 		/*
@@ -1237,26 +1239,30 @@ mip6_process_hrbu(bi)
 		return (0); /* XXX is 0 OK? */
 	}
 
-	if ((bi->mbc_flags & IP6MU_SINGLE) == 0) {
-		/* 10.2.
-		 * - However, if the `S' it field in the Binding Update is zero, the
-		     lifetime for each Binding Cache entry MUST NOT be greater
-		     then the minimum remaining valid lifetime for all subnet prefixes
-		     on the mobile node's home link.
-		 */
-		/* XXX really stupid to loop twice? */
+	if ((bi->mbc_flags & (IP6MU_SINGLE|IP6MU_LINK)) != 0) {
 		for (pr = nd_prefix.lh_first;
-		    pr;
-		    pr = pr->ndpr_next) {
-			if (pr->ndpr_ifp != hifp) {
+		     pr;
+		     pr = pr->ndpr_next) {
+			if (hifp != pr->ndpr_ifp) {
 				/* this prefix is not a home prefix. */
 				continue;
 			}
-			if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix.sin6_addr))
+			/* save linklocal prefix */
+			if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix.sin6_addr)) {
+				llpr = pr;
 				continue;
-			/* save minimum prefix lifetime for later use. */
-			if (prlifetime > pr->ndpr_vltime)
-				prlifetime = pr->ndpr_vltime;
+			}
+			/* 10.2.
+			 * - However, if the `S' it field in the Binding Update is zero, the
+			     lifetime for each Binding Cache entry MUST NOT be greater
+			     then the minimum remaining valid lifetime for all subnet prefixes
+			     on the mobile node's home link.
+			 */
+			if ((bi->mbc_flags & IP6MU_SINGLE) == 0) {
+				/* save minimum prefix lifetime for later use. */
+				if (prlifetime > pr->ndpr_vltime)
+					prlifetime = pr->ndpr_vltime;
+			}
 		}
 	}
 
@@ -1324,6 +1330,10 @@ mip6_process_hrbu(bi)
 				/* add rtable for proxy ND */
 				mip6_bc_proxy_control(&haddr, &bi->mbc_addr, RTM_ADD);
 			}
+		} else if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
+			mbc->mbc_pcoa = bi->mbc_pcoa;
+			mbc->mbc_seqno = bi->mbc_seqno;
+			busy++;
 		} else {
 			/* update a BC entry. */
 			mbc->mbc_pcoa = bi->mbc_pcoa;
@@ -1402,6 +1412,10 @@ mip6_process_hrbu(bi)
 					mip6_bc_proxy_control(&haddr, &bi->mbc_addr,
 							      RTM_ADD);
 				}
+			} else if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
+				mbc->mbc_pcoa = bi->mbc_pcoa;
+				mbc->mbc_seqno = bi->mbc_seqno;
+				busy++;
 			} else {
 				/* update a BC entry. */
 				mbc->mbc_pcoa = bi->mbc_pcoa;
@@ -1473,6 +1487,10 @@ mip6_process_hrbu(bi)
 				/* add rtable for proxy ND */
 				mip6_bc_proxy_control(&bi->mbc_phaddr, &bi->mbc_addr, RTM_ADD);
 			}
+		} else if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
+			mbc->mbc_pcoa = bi->mbc_pcoa;
+			mbc->mbc_seqno = bi->mbc_seqno;
+			busy++;
 		} else {
 			/* update a BC entry. */
 			mbc->mbc_pcoa = bi->mbc_pcoa;
@@ -1500,9 +1518,15 @@ mip6_process_hrbu(bi)
 		}
 	}
 
+	if (busy) {
+		mip6log((LOG_INFO, "%s:%d: DAD INCOMPLETE\n",
+			 __FILE__, __LINE__));
+		return(0);
+	}
+
 	if (prim_mbc) {	/* D=1 and new entry */
 		/* start DAD */
-		mip6_dad_start(mbc);
+		mip6_dad_start(prim_mbc);
 	} else {	/* D=0 or update */
 		/* return BA */
 		bi->mbc_refresh = bi->mbc_lifetime * MIP6_REFRESH_LIFETIME_RATE / 100;
@@ -1582,7 +1606,7 @@ mip6_dad_success(ifa)
 	mbc->mbc_dad = NULL;
 	mbc->mbc_state &= ~MIP6_BC_STATE_DAD_WAIT;
 	/* create encapsulation entry */
-	mip6_tunnel_control(MIP6_TUNNEL_ADD,	/* XXX or MIP6_TUNNEL_CHANGE */
+	mip6_tunnel_control(MIP6_TUNNEL_ADD,
 			    mbc,
 			    mip6_bc_encapcheck,
 			    &mbc->mbc_encap);
@@ -1734,36 +1758,57 @@ mip6_bc_proxy_control(target, local, cmd)
 	int cmd;
 {
 	struct sockaddr_in6 mask; /* = {sizeof(mask), AF_INET6 } */
-	struct sockaddr_in6 sa6;
+	struct sockaddr_in6 taddr, sa6;
 	struct sockaddr_dl *sdl;
         struct rtentry *rt, *nrt;
 	struct ifaddr *ifa;
 	struct ifnet *ifp;
 	int flags, error = 0;
 
-	switch (cmd) {
-	case RTM_DELETE:
-		bzero(&sa6, sizeof(struct sockaddr_in6));
-		sa6 = *target;
+	/* Create sa6 */
+	bzero(&sa6, sizeof(sa6));
+	sa6 = *local;
 #ifndef SCOPEDROUTING
-		sa6.sin6_scope_id = 0;
+	sa6.sin6_scope_id = 0;
+#endif
+	ifa = ifa_ifwithaddr((struct sockaddr *)&sa6);
+	if (ifa == NULL)
+		return (EINVAL);
+	ifp = ifa->ifa_ifp;
+
+	bzero(&taddr, sizeof(taddr));
+	taddr = *target;
+	if (in6_addr2zoneid(ifp, &taddr.sin6_addr,
+			    &taddr.sin6_scope_id)) {
+		mip6log((LOG_ERR,
+			 "%s:%d: in6_addr2zoneid failed\n",
+			 __FILE__, __LINE__));
+		return(EIO);
+	}
+	error = in6_embedscope(&taddr.sin6_addr, &taddr);
+	if (error != 0) {
+		return(error);
+	}
+#ifndef SCOPEDROUTING
+	taddr.sin6_scope_id = 0;
 #endif
 
+	switch (cmd) {
+	case RTM_DELETE:
 #ifdef __FreeBSD__
-		rt = rtalloc1((struct sockaddr *)&sa6, 1, 0UL);
+		rt = rtalloc1((struct sockaddr *)&taddr, 0, 0UL);
 #else /* __FreeBSD__ */
-		rt = rtalloc1((struct sockaddr *)&sa6, 1);
+		rt = rtalloc1((struct sockaddr *)&taddr, 0);
 #endif /* __FreeBSD__ */
-		if (rt == NULL || (rt->rt_flags & RTF_ANNOUNCE) == 0) {
-			if (rt)
-				rt->rt_refcnt--;
+		if (rt)
+			rt->rt_refcnt--;
+		if (rt == NULL ||
+		    (rt->rt_flags & RTF_HOST) == 0 ||
+		    (rt->rt_flags & RTF_ANNOUNCE) == 0) {
 			return 0; /* EHOSTUNREACH */
 		}
-
 		error = rtrequest(RTM_DELETE, rt_key(rt), (struct sockaddr *)0,
 				  rt_mask(rt), 0, (struct rtentry **)0);
-		rt->rt_refcnt--;
-		rt = NULL;
 		if (error) {
 			mip6log((LOG_ERR,
 				 "%s:%d: RTM_DELETE for %s returned "
@@ -1771,22 +1816,19 @@ mip6_bc_proxy_control(target, local, cmd)
 				 __FILE__, __LINE__,
 				 ip6_sprintf(&target->sin6_addr), error));
 		}
+		rt = NULL;
 
 		break;
 
 	case RTM_ADD:
-		bzero(&sa6, sizeof(struct sockaddr_in6));
-		sa6 = *target;
-#ifndef SCOPEDROUTING
-		sa6.sin6_scope_id = 0;
-#endif
-
 #ifdef __FreeBSD__
-		rt = rtalloc1((struct sockaddr *)&sa6, 0, 0UL);
+		rt = rtalloc1((struct sockaddr *)&taddr, 0, 0UL);
 #else /* __FreeBSD__ */
-		rt = rtalloc1((struct sockaddr *)&sa6, 0);
+		rt = rtalloc1((struct sockaddr *)&taddr, 0);
 #endif /* __FreeBSD__ */
-		if (rt) {
+		if (rt)
+			rt->rt_refcnt--;
+		if (rt && (rt->rt_flags & RTF_HOST) != 0) {
 			if ((rt->rt_flags & RTF_ANNOUNCE) != 0 &&
 			    rt->rt_gateway->sa_family == AF_LINK) {
 				mip6log((LOG_NOTICE,
@@ -1795,56 +1837,50 @@ mip6_bc_proxy_control(target, local, cmd)
 					 ip6_sprintf(&target->sin6_addr)));
 				return (EEXIST);
 			}
-			if ((rt->rt_flags & RTF_LLINFO) != 0) {
+#if 0
+			if ((rt->rt_flags & (RTF_LLINFO | RTF_CLONING |
+#ifdef __FreeBSD__
+					     RTF_PRCLONING |
+#endif
+					     RTF_CACHE)) != 0) {
 				/* nd cache exist */
 				rtrequest(RTM_DELETE, rt_key(rt),
 					  (struct sockaddr *)0,
 					  rt_mask(rt), 0, (struct rtentry **)0);
-			} else {
+				rt = NULL;
+			} else
+#endif /* 0 */
+			{
 				/* XXX Path MTU entry? */
 				mip6log((LOG_ERR,
 					 "%s:%d: entry exist %s: rt_flags=0x%x\n",
 					 __FILE__, __LINE__,
 					 ip6_sprintf(&target->sin6_addr),
-					 rt->rt_flags));
+					 (int)rt->rt_flags));
 			}
-			rt->rt_refcnt--;
 		}
 
-		/* Create sa6 */
-		bzero(&sa6, sizeof(sa6));
-		sa6 = *local;
-#ifndef SCOPEDROUTING
-		sa6.sin6_scope_id = 0;
-#endif
-
-		ifa = ifa_ifwithaddr((struct sockaddr *)&sa6);
-		if (ifa == NULL)
-			return (EINVAL);
-		sa6  = *target;
-#ifndef SCOPEDROUTING
-		sa6.sin6_scope_id = 0;
-#endif
-
-		/* Create sdl */
-		ifp = ifa->ifa_ifp;
+#ifdef __NetBSD__
+		sdl = ifp->if_sadl;
+#else
+		/* sdl search */
+	{
+		struct ifaddr *ifa_dl;
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
+		for (ifa_dl = ifp->if_addrlist; ifa_dl; ifa_dl = ifa->ifa_next)
 #else
-		for (ifa = ifp->if_addrlist.tqh_first; ifa;
-		     ifa = ifa->ifa_list.tqe_next)
+		for (ifa_dl = ifp->if_addrlist.tqh_first; ifa_dl;
+		     ifa_dl = ifa_dl->ifa_list.tqe_next)
 #endif
-			if (ifa->ifa_addr->sa_family == AF_LINK) break;
+			if (ifa_dl->ifa_addr->sa_family == AF_LINK) break;
 
-		if (!ifa)
+		if (!ifa_dl)
 			return EINVAL;
 
-		MALLOC(sdl, struct sockaddr_dl *, ifa->ifa_addr->sa_len,
-		       M_IFMADDR, M_NOWAIT);
-		if (sdl == NULL)
-			return EINVAL;
-		bcopy((struct sockaddr_dl *)ifa->ifa_addr, sdl, ifa->ifa_addr->sa_len);
+		sdl = (struct sockaddr_dl *)ifa_dl->ifa_addr;
+	}
+#endif /* __NetBSD__ */
 
 		/* Create mask */
 		bzero(&mask, sizeof(mask));
@@ -1852,9 +1888,9 @@ mip6_bc_proxy_control(target, local, cmd)
 		mask.sin6_len = sizeof(mask);
 
 		in6_prefixlen2mask(&mask.sin6_addr, 128);
-		flags = (RTF_STATIC | RTF_ANNOUNCE | RTA_NETMASK);
+		flags = (RTF_STATIC | RTF_HOST | RTF_ANNOUNCE);
 
-		error = rtrequest(RTM_ADD, (struct sockaddr *)&sa6,
+		error = rtrequest(RTM_ADD, (struct sockaddr *)&taddr,
 				  (struct sockaddr *)sdl,
 				  (struct sockaddr *)&mask, flags, &nrt);
 
@@ -1862,7 +1898,6 @@ mip6_bc_proxy_control(target, local, cmd)
 			/* Avoid expiration */
 			if (nrt) {
 				nrt->rt_rmx.rmx_expire = 0;
-				nrt->rt_genmask = NULL;
 				nrt->rt_refcnt--;
 			} else
 				error = EINVAL;
@@ -1876,16 +1911,12 @@ mip6_bc_proxy_control(target, local, cmd)
 
 		{
 			/* very XXX */
-			struct sockaddr_in6 daddr, taddr;
+			struct sockaddr_in6 daddr;
 
 			bzero(&daddr, sizeof(daddr));
 			daddr.sin6_family = AF_INET6;
 			daddr.sin6_len = sizeof(daddr);
 			daddr.sin6_addr = in6addr_linklocal_allnodes;
-			bzero(&taddr, sizeof(taddr));
-			taddr.sin6_family = AF_INET6;
-			taddr.sin6_len = sizeof(taddr);
-			sa6_copy_addr(target, &taddr);
 			if (in6_addr2zoneid(ifp, &daddr.sin6_addr,
 					    &daddr.sin6_scope_id)) {
 				/* XXX: should not happen */
@@ -1905,8 +1936,6 @@ mip6_bc_proxy_control(target, local, cmd)
 					      (struct sockaddr *)sdl);
 			}
 		}
-
-		FREE(sdl, M_IFMADDR);
 
 		break;
 
@@ -2353,6 +2382,8 @@ mip6_bc_list_remove(mbc_list, mbc)
 	if ((mbc_list == NULL) || (mbc == NULL)) {
 		return (EINVAL);
 	}
+	if (mbc->mbc_dad != NULL)
+		panic("mbc->mbc_dad is !NULL\n");
 
 	id = MIP6_BC_HASH_ID(&mbc->mbc_phaddr.sin6_addr);
 	if (mip6_bc_hash[id] == mbc) {
@@ -2371,13 +2402,24 @@ mip6_bc_list_remove(mbc_list, mbc)
 #endif
 	LIST_REMOVE(mbc, mbc_entry);
 	if (mbc->mbc_flags & IP6MU_HOME) {
-		error = mip6_bc_proxy_control(&mbc->mbc_phaddr, NULL,
+		error = mip6_bc_proxy_control(&mbc->mbc_phaddr, &mbc->mbc_addr,
 					      RTM_DELETE);
 		if (error) {
 			mip6log((LOG_ERR,
 				 "%s:%d: can't delete a proxy ND entry "
 				 "for %s.\n",
 				 __FILE__, __LINE__,
+				 ip6_sprintf(&mbc->mbc_phaddr.sin6_addr)));
+		}
+		error = mip6_tunnel_control(MIP6_TUNNEL_DELETE,
+				    mbc,
+				    mip6_bc_encapcheck,
+				    &mbc->mbc_encap);
+		if (error) {
+			mip6log((LOG_ERR,
+				 "%s:%d: tunnel control error (%d)"
+				 "for %s.\n",
+				 __FILE__, __LINE__, error,
 				 ip6_sprintf(&mbc->mbc_phaddr.sin6_addr)));
 		}
 	}
@@ -2495,7 +2537,8 @@ mip6_bc_timeout(dummy)
 	}
 #endif
 
-	mip6_bc_starttimer();
+	if (mip6_bc_count != 0)
+		mip6_bc_starttimer();
 
 	splx(s);
 }
@@ -2539,7 +2582,7 @@ mip6_tunnel_control(action, entry, func, ep)
 	int (*func) __P((const struct mbuf *, int, int, void *));
 	const struct encaptab **ep;
 {
-	if ((entry == NULL) || (ep == NULL)) {
+	if ((entry == NULL) && (ep == NULL)) {
 		return (EINVAL);
 	}
 

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.116 2002/09/23 13:16:30 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.117 2002/11/27 12:05:39 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1312,10 +1312,10 @@ nd6_dad_start(ifa, tick)
 		return;
 	}
 	if (!ip6_dad_count) {
+		ia->ia6_flags &= ~IN6_IFF_TENTATIVE;
 #ifdef MIP6
 		mip6_dad_success(ifa);
 #endif
-		ia->ia6_flags &= ~IN6_IFF_TENTATIVE;
 		return;
 	}
 	if (!ifa->ifa_ifp)
@@ -1461,6 +1461,9 @@ nd6_dad_timer(ifa)
 		TAILQ_REMOVE(&dadq, (struct dadq *)dp, dad_list);
 		free(dp, M_IP6NDP);
 		dp = NULL;
+#ifdef MIP6
+		if (mip6_dad_success(ifa) == ENOENT)
+#endif /* MIP6 */
 		IFAFREE(ifa);
 		goto done;
 	}
