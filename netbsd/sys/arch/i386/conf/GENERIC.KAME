@@ -16,6 +16,9 @@ options 	NEW_STRUCT_ROUTE		# mandatory
 #options 	IPV6FIREWALL_VERBOSE
 #options 	IPV6FIREWALL_DEFAULT_TO_ACCEPT
 
+# Router Preference on host side
+#options 	RTPREF
+
 # a pseudo device needed for ALTQ
 pseudo-device	altq			# altq pseudo-device
 
