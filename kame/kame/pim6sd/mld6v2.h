@@ -46,7 +46,7 @@
  * XXX: this portion will be merged into system include file
  */
 struct mld6v2_hdr {	/* MLDv2 Header */
-    struct icmp6_hdr mld6_hdr;	/* Standard ICMP header */
+    struct icmp6_hdr mld6_icmp6_hdr;	/* Standard ICMP header */
     struct in6_addr mld6_addr;	/* Multicast Address */
     u_int8          mld6_misc;	/* Resv+S+QRV */
     u_int8          mld6_qqi;	/* QQIC */
