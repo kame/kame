@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/25 07:21:54 $
+		     $Date: 2000/04/26 03:42:11 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -16,6 +16,15 @@ between different version of KAME kits.  This means that you MUST
 recompile everything every time you upgrade KAME kit, to ensure it
 works.  We are not ignoring backward compatibility issues, however, we
 are sometimes unable to maintain backward compatibility.
+
+For this reason, the following act can raise troubles like kernel panic,
+abnormal program termination and other things:
+- try to make shared library from KAME-supplied library and override
+  normal ones
+- mix LKM binary and kernel binary from different origin
+  (like FreeBSD-origin LKM binary and KAME kernel)
+- mix dynamic linked modules for non-IPv6 ready program, with IPv6-ready
+  parent program (like non-IPv6 apache modules and IPv6-ready apache)
 
 The caveat does not apply to KAME code merged into *BSD - merged code
 will maintain the backward compatibility policy decided by *BSD team.
