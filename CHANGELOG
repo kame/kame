@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2557 2004/03/10 12:03:48 jinmei Exp $
+$KAME: CHANGELOG,v 1.2558 2004/03/10 12:27:25 jinmei Exp $
 
 <200403>
 2004-03-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -9,8 +9,9 @@ $KAME: CHANGELOG,v 1.2557 2004/03/10 12:03:48 jinmei Exp $
 2004-03-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/icmp6.c (icmp6_reflect): made sure to provide
 	a valid sockaddr_in6 structure with regards to scope zone.  With
-	the previous code, a forwarding node could not return an ICMPv6
-	error if the source of the erroneous packet was link-local.
+	the previous code, multicasted echo requests were not properly
+	responded.  Additionally, a forwarding node could not return an
+	ICMPv6 error if the source of the erroneous packet was link-local.
 
 2004-03-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_forward.c (ip6_forward): recovered scope
