@@ -1,12 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.664 2000/03/09 00:46:28 itojun Exp $
+$Id: CHANGELOG,v 1.665 2000/03/09 01:07:41 jinmei Exp $
 
 <200003>
 Thu Mar  9 09:41:53 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ah_core.c: treat AH checksum as immutable, if there are
 	  multiple AH present on a packet.
-	* bgpd/parse.y: fix endian issue.  found by tahi team.
+	* bgpd/cfparse.y: fix endian issue.  found by tahi team.
 
 2000-03-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/scopedaddrtest: was added to check the precise
