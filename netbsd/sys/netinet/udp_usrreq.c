@@ -565,15 +565,14 @@ udp4_sendup(m, off, src, so)
 #endif /*IPSEC*/
 
 	if ((n = m_copy(m, 0, M_COPYALL)) != NULL) {
-		if (inp && (inp->inp_flags & INP_CONTROLOPTS
-			 || so->so_options & SO_TIMESTAMP)) {
+		if (inp && (inp->inp_flags & INP_CONTROLOPTS ||
+		    so->so_options & SO_TIMESTAMP)) {
 			struct ip *ip = mtod(n, struct ip *);
 			ip_savecontrol(inp, &opts, ip, n);
 		}
 
 		m_adj(n, off);
-		if (sbappendaddr(&so->so_rcv, src, n,
-				opts) == 0) {
+		if (sbappendaddr(&so->so_rcv, src, n, opts) == 0) {
 			m_freem(n);
 			if (opts)
 				m_freem(opts);
@@ -902,8 +901,7 @@ udp6_realinput(af, src, dst, m, off)
 					continue;
 			}
 			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
-				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa,
-							src) ||
+				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, src) ||
 				    in6p->in6p_fport != sport) {
 					continue;
 				}
@@ -1081,8 +1079,8 @@ udp_ctlinput(cmd, sa, v)
 	void (*notify) __P((struct inpcb *, int)) = udp_notify;
 	int errno;
 
-	if (sa->sa_family != AF_INET
-	 || sa->sa_len != sizeof(struct sockaddr_in))
+	if (sa->sa_family != AF_INET ||
+	    sa->sa_len != sizeof(struct sockaddr_in))
 		return NULL;
 	if ((unsigned)cmd >= PRC_NCMDS)
 		return NULL;
