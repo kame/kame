@@ -1,4 +1,4 @@
-$Id: TODO,v 1.29 2000/09/23 05:32:09 itojun Exp $
+$Id: TODO,v 1.30 2000/09/23 15:20:46 itojun Exp $
 
 Please send any questions or bug reports to snap-users@kame.net.
 
@@ -8,10 +8,13 @@ URGENT
 o The documents for users convenience.
 o split log file based on client.  printf-like config directive, i.e.
   "logfile racoon.%s.log", should be useful here.
+  -> beware of possible security issue, don't use sprintf() directly!
+     make validation before giving a string to sprintf().
 o fix flag for logging
-o save decrypted IKE packet in tcpdump format (how to integrate?)
+o save decrypted IKE packet in tcpdump format
 o IPComp SA with wellknown CPI in CPI field.  how to handle it?
 o hunt for memory leaks
+o better rekey
 
 MUST
 o Certificate type handling.  e.g. CRL, CR, PGP...
@@ -24,6 +27,24 @@ o kmstat should be improved.
 o aggressive mode DH group checks/handling on responder side.
 o Informational Exchange processing properly.
 o mandatory configuration check.
+o require less configuration.  phase 2 is easier (as kernel presents racoon
+  some hints), phase 1 is harder.  for example,
+  - grab phase 2 lifetime and algorith configuration from sadb_comb payloads in
+    ACQUIRE message.
+  - give reasonable default behavior when no configuration file is present.
+  - difficult items:
+	how to guess a reasonable phase 1 SA lifetime
+		(hardcoded default?  guess from phase 2 lifetime?)
+	guess what kind of ID payload to use
+	guess what kind of authentication to be used
+	guess phase 1 DH group (for aggressive mode, we cannot negotiate it)
+	guess if we need phase 2 PFS or not (we cannot negotiate it. so
+		we may need to pick from "no PFS" or "same as phase 1 DH group")
+	guess how we should negotiate lifetime
+		(is "strict" a reasonable default?)
+	guess which mode to use for negotiation (is main mode useful?
+		is base mode popular enough?)
+o psk.txt should be a database? (psk.db?)  psk_mkdb?
 
 SHOULD
 o how to support multi interfaces ?
