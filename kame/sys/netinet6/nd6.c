@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.193 2001/09/13 13:37:18 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.194 2001/09/13 13:39:08 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -589,13 +589,12 @@ nd6_timer(ignored_arg)
 					} else {
 						bzero(&sin6_in,
 						      sizeof(sin6_in));
-						sin6_in.sin6_addr = *ip6_in;
+						sin6_in.sin6_addr = ip6_in->ip6_dst;
 						sin6_in.sin6_scope_id = zoneid;
 #ifndef SCOPEDROUTING
 						in6_embedscope(&ip6_in->ip6_dst,
 							       &sin6_in,
-							       NULL,
-							       rt->rt_ifp);
+							       NULL, NULL);
 #endif
 						icmp6_error(m,
 							    ICMP6_DST_UNREACH,
