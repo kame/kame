@@ -1,4 +1,4 @@
-/*	$KAME: ip_ecn.c,v 1.9 2000/10/01 12:44:48 itojun Exp $	*/
+/*	$KAME: ip_ecn.c,v 1.10 2001/05/03 14:51:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -59,17 +59,17 @@
 
 /*
  * modify outer ECN (TOS) field on ingress operation (tunnel encapsulation).
- * call it after you've done the default initialization/copy for the outer.
  */
 void
 ip_ecn_ingress(mode, outer, inner)
 	int mode;
 	u_int8_t *outer;
-	u_int8_t *inner;
+	const u_int8_t *inner;
 {
 	if (!outer || !inner)
 		panic("NULL pointer passed to ip_ecn_ingress");
 
+	*outer = *inner;
 	switch (mode) {
 	case ECN_ALLOWED:		/* ECN allowed */
 		*outer &= ~IPTOS_CE;
@@ -89,7 +89,7 @@ ip_ecn_ingress(mode, outer, inner)
 void
 ip_ecn_egress(mode, outer, inner)
 	int mode;
-	u_int8_t *outer;
+	const u_int8_t *outer;
 	u_int8_t *inner;
 {
 	if (!outer || !inner)
@@ -111,14 +111,13 @@ void
 ip6_ecn_ingress(mode, outer, inner)
 	int mode;
 	u_int32_t *outer;
-	u_int32_t *inner;
+	const u_int32_t *inner;
 {
 	u_int8_t outer8, inner8;
 
 	if (!outer || !inner)
 		panic("NULL pointer passed to ip6_ecn_ingress");
 
-	outer8 = (ntohl(*outer) >> 20) & 0xff;
 	inner8 = (ntohl(*inner) >> 20) & 0xff;
 	ip_ecn_ingress(mode, &outer8, &inner8);
 	*outer &= ~htonl(0xff << 20);
@@ -128,7 +127,7 @@ ip6_ecn_ingress(mode, outer, inner)
 void
 ip6_ecn_egress(mode, outer, inner)
 	int mode;
-	u_int32_t *outer;
+	const u_int32_t *outer;
 	u_int32_t *inner;
 {
 	u_int8_t outer8, inner8;
@@ -137,7 +136,6 @@ ip6_ecn_egress(mode, outer, inner)
 		panic("NULL pointer passed to ip6_ecn_egress");
 
 	outer8 = (ntohl(*outer) >> 20) & 0xff;
-	inner8 = (ntohl(*inner) >> 20) & 0xff;
 	ip_ecn_egress(mode, &outer8, &inner8);
 	*inner &= ~htonl(0xff << 20);
 	*inner |= htonl((u_int32_t)inner8 << 20);

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.61 2001/03/29 05:59:38 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.62 2001/05/03 14:51:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -259,6 +259,7 @@ struct ip6aux {
 #define IP6A_SWAP	0x01		/* swapped home/care-of on packet */
 #define IP6A_HASEEN	0x02		/* HA was present */
 #define IP6A_BRUID	0x04		/* BR Unique Identifier was present */
+#define IP6A_RTALERTSEEN 0x08		/* rtalert present */
 
 	/* ip6.ip6_src */
 	struct in6_addr ip6a_careof;	/* care-of address of the peer */
@@ -267,6 +268,9 @@ struct ip6aux {
 
 	/* ip6.ip6_dst */
 	struct in6_ifaddr *ip6a_dstia6;	/* my ifaddr that matches ip6_dst */
+
+	/* rtalert */
+	u_int16_t ip6a_rtalert;		/* rtalert option value */
 
 	/*
 	 * decapsulation history will be here.

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mn.c,v 1.24 2001/04/04 05:17:30 itojun Exp $	*/
+/*	$KAME: mip6_mn.c,v 1.25 2001/05/03 14:51:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -3114,11 +3114,12 @@ mip6_tunneled_rs_output(src, dst)
 	}
 */
 /*
-	if (ifp->if_flags & IFF_LINK1) {
-		otos = 0;
+	if (ifp->if_flags & IFF_LINK1)
 		ip_ecn_ingress(ECN_ALLOWED, &otos, &itos);
-		ip6->ip6_flow |= htonl((u_int32_t)otos << 20);
-	}
+	else
+		ip_ecn_ingress(ECN_NOCARE, &otos, &itos);
+	ip6->ip6_flow &= ~htonl(0x0ff00000);
+	ip6->ip6_flow |= htonl((u_int32_t)otos << 20);
 */
 /*	if (dst->sin6_family != sin6_dst->sin6_family ||
 	     !IN6_ARE_ADDR_EQUAL(&dst->sin6_addr, &sin6_dst->sin6_addr)) {
