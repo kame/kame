@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.63 1999/03/29 03:07:39 rahnds Exp $
+#	$OpenBSD: Makefile,v 1.75 1999/10/05 22:29:36 beck Exp $
 #	$NetBSD: Makefile,v 1.59 1996/05/15 21:36:43 jtc Exp $
 
 #	@(#)Makefile	5.45.1.1 (Berkeley) 5/6/91
@@ -15,7 +15,7 @@ FILES=	a.out.h ar.h assert.h bitstring.h blf.h bm.h cast.h cpio.h ctype.h \
 	memory.h mpool.h ndbm.h netdb.h netgroup.h nlist.h nl_types.h \
 	olf_abi.h paths.h poll.h pwd.h ranlib.h re_comp.h regex.h resolv.h \
 	rmd160.h search.h setjmp.h sgtty.h sha1.h skipjack.h signal.h stab.h \
-	stddef.h stdio.h stdlib.h string.h strings.h struct.h sysexits.h \
+	stdbool.h stddef.h stdio.h stdlib.h string.h strings.h struct.h sysexits.h \
 	tar.h time.h ttyent.h tzfile.h unistd.h utime.h utmp.h vis.h
 
 .if (${MACHINE_ARCH} != "alpha") && (${MACHINE_ARCH} != "mips") && \
@@ -31,30 +31,30 @@ MFILES+= link.h dlfcn.h
 .endif
 
 DIRS=	arpa protocols rpc rpcsvc
-LDIRS=	dev net netinet netinet6 netccitt netiso netns netipx nfs sys ufs vm ddb \
-	scsi netatalk isofs xfs
+LDIRS=	dev net netinet netinet6 netccitt netiso netns netipx nfs sys ufs vm \
+	ddb scsi netatalk isofs xfs uvm miscfs
 
 # Directories with an includes target
-#RDIRS=	../lib/libc_r ../lib/libcom_err ../lib/libcompat ../lib/libcurses \
-#        ../lib/libform ../lib/libmenu ../lib/libocurses ../lib/libossaudio \
-#	../lib/libpanel ../lib/librpcsvc ../lib/libskey ../lib/libedit \
-#	../lib/libpcap ../lib/libutil ../lib/libwrap ../lib/libz \
-#	../sys/arch/${MACHINE}
 RDIRS=
+#RDIRS=	../lib/libc_r ../lib/libcom_err ../lib/libcompat ../lib/libcurses \
+#	../lib/libcurses++ ../lib/libform ../lib/libmenu ../lib/libocurses \
+#	../lib/libossaudio ../lib/libpanel ../lib/librpcsvc ../lib/libskey \
+#	../lib/libedit ../lib/libpcap ../lib/libutil ../lib/libwrap \
+#	../lib/libz ../lib/libkeynote ../sys/arch/${MACHINE}
 
 # Places using Makefile that needs a prerequisite target met before includes
 PRDIRS=
 
 # Directories with an includes target that use Makefile.bsd-wrapper
-#WDIRS=	../lib/libssl ../gnu/lib/libg++/libg++ ../gnu/lib/libg++/libio \
-#	../gnu/lib/libg++/librx ../gnu/lib/libg++/libstdc++ \
-#	../gnu/usr.bin/gcc ../gnu/lib/libgmp
 WDIRS=
+#WDIRS=	../lib/libssl ../gnu/lib/libgmp ../usr.sbin/httpd
+#WDIRS+= ../gnu/egcs/libio ../gnu/egcs/libstdc++ ../gnu/egcs/libf2c \
+#	../gnu/egcs/libobjc ../gnu/egcs/gcc
 
 # Places using Makefile.bsd-wrapper that needs a prerequisite target met
 # before includes
-#PWDIRS=	../lib/libssl
 PWDIRS=
+#PWDIRS=	../lib/libssl ../usr.sbin/httpd
 
 NOOBJ=	noobj
 
@@ -91,6 +91,8 @@ includes:
 			${INSTALL} ${INSTALL_COPY} -m 444 $$j ${DESTDIR}/usr/include/$$i/$$j; \
 		done); \
 	done
+	@rm -f ${DESTDIR}/usr/include/openssl
+	@ln -sf ssl ${DESTDIR}/usr/include/openssl
 	@echo installing ${LFILES}
 	@-for i in ${LFILES}; do \
 		rm -f ${DESTDIR}/usr/include/$$i; \
@@ -126,13 +128,12 @@ copies:
 	pax -rw -pa -L \
 	    `find ${LDIRS} -follow -type f -name '*.h' '!' -path \
 	    'netiso/xebec/*' -print` ${DESTDIR}/usr/include
-	rm -rf ${DESTDIR}/usr/include/machine
+	cd ${DESTDIR}/usr/include && rm -rf ${MACHINE} ${MACHINE_ARCH} machine
 	${INSTALL} -d -o ${BINOWN} -g ${BINGRP} -m 755 \
-		${DESTDIR}/usr/include/machine
+		${DESTDIR}/usr/include/${MACHINE}
 	pax -rw -pa -s "|\.\./sys/arch/${MACHINE}/include||" \
 	    ../sys/arch/${MACHINE}/include/*.h \
-	    ${DESTDIR}/usr/include/machine   
-	rm -rf ${DESTDIR}/usr/include/${MACHINE_ARCH}
+	    ${DESTDIR}/usr/include/${MACHINE}
 	if test ${MACHINE} != ${MACHINE_ARCH} -a \
 	    -d ../sys/arch/${MACHINE_ARCH}/include; then \
 		${INSTALL} -d -o ${BINOWN} -g ${BINGRP} -m 755 \
@@ -140,9 +141,8 @@ copies:
 		pax -rw -pa -s "|\.\./sys/arch/${MACHINE_ARCH}/include||" \
 		    ../sys/arch/${MACHINE_ARCH}/include/*.h \
 		    ${DESTDIR}/usr/include/${MACHINE_ARCH}; \
-	else \
-		ln -s machine ${DESTDIR}/usr/include/${MACHINE_ARCH}; \
 	fi
+	ln -sf ${MACHINE} ${DESTDIR}/usr/include/machine; \
 
 symlinks:
 	@echo symlinks: ${LDIRS}
@@ -150,16 +150,14 @@ symlinks:
 		rm -rf ${DESTDIR}/usr/include/$$i; \
 		ln -s /sys/$$i ${DESTDIR}/usr/include/$$i; \
 	done
-	rm -rf ${DESTDIR}/usr/include/machine
-	ln -s /sys/arch/${MACHINE}/include ${DESTDIR}/usr/include/machine
-	rm -rf ${DESTDIR}/usr/include/${MACHINE_ARCH}
+	cd ${DESTDIR}/usr/include && rm -rf ${MACHINE} ${MACHINE_ARCH} machine
+	ln -s /sys/arch/${MACHINE}/include ${DESTDIR}/usr/include/${MACHINE}
 	if test ${MACHINE} != ${MACHINE_ARCH} -a \
 	    -d ../sys/arch/${MACHINE_ARCH}/include ; then \
 		ln -s /sys/arch/${MACHINE_ARCH}/include \
 		    ${DESTDIR}/usr/include/${MACHINE_ARCH} ; \
-	else \
-		ln -s machine ${DESTDIR}/usr/include/${MACHINE_ARCH} ; \
 	fi
+	ln -sf ${MACHINE} ${DESTDIR}/usr/include/machine ; \
 
 includes: ${SYS_INCLUDE}
 
