@@ -644,17 +644,19 @@ again:;
 		 * other flags. R: router, P: proxy, W: ??
 		 */
 		if ((rtm->rtm_addrs & RTA_NETMASK) == 0) {
-			snprintf(flgbuf, sizeof(flgbuf), "%s",
-				isrouter ? "R" : "");
+			snprintf(flgbuf, sizeof(flgbuf), "%s%s",
+				isrouter ? "R" : "",
+				(rtm->rtm_flags & RTF_ANNOUNCE) ? "p" : "");
 		} else {
 			sin = (struct sockaddr_in6 *)
 				(sdl->sdl_len + (char *)sdl);
-			snprintf(flgbuf, sizeof(flgbuf), "%s%s%s",
+			snprintf(flgbuf, sizeof(flgbuf), "%s%s%s%s",
 				isrouter ? "R" : "",
 				!IN6_IS_ADDR_UNSPECIFIED(&sin->sin6_addr)
 					? "P" : "",
 				(sin->sin6_len != sizeof(struct sockaddr_in6))
-					? "W" : "");
+					? "W" : "",
+				(rtm->rtm_flags & RTF_ANNOUNCE) ? "p" : "");
 		}
 		printf(" %-4.4s", flgbuf);
 
