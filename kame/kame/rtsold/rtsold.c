@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.70 2003/10/05 00:16:51 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.71 2003/10/06 02:28:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -132,6 +132,7 @@ main(int argc, char **argv)
 #ifdef USE_RTSOCK
 	int rtsock;
 #endif
+	struct passwd *pw;
 
 	/*
 	 * Initialization
@@ -312,8 +313,11 @@ main(int argc, char **argv)
 	}
 
 	/* revoke privilege */
-	seteuid(getuid());
-	setuid(getuid());
+	pw = getpwnam("nobody");
+	if (pw) {
+		seteuid(pw->pw_uid);
+		setuid(pw->pw_uid);
+	}
 
 #ifndef HAVE_POLL_H
 	memset(fdsetp, 0, fdmasks);
