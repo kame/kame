@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.88 2004/01/26 09:37:46 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.89 2004/01/26 10:11:40 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -600,7 +600,7 @@ mldv1_query:
 
 		/*
 		 * XXX: System timer resolution is too low to handle Max
-		 * Response Delay, so set 1 to the internal timer even if
+		 * Response Delay, so set the internal timer to 1 even if
 		 * the calculated value equals to zero when Max Response
 		 * Delay is positive.
 		 */
