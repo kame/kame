@@ -340,9 +340,10 @@ in6_multientry(mc)
 	struct in6_multi multi;
 
 	KREAD(mc, &multi, struct in6_multi);
-	printf("\t\tgroup %s\n", inet_ntop(AF_INET6,
+	printf("\t\tgroup %s", inet_ntop(AF_INET6,
 					   (const void *)&multi.in6m_addr,
 					   mcbuf, sizeof(mcbuf)));
+	printf(" refcnt %u\n", multi.in6m_refcount);
 	return(multi.in6m_entry.le_next);
 }
 
