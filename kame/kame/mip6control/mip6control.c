@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.56 2003/09/04 13:00:15 t-momose Exp $	*/
+/*	$KAME: mip6control.c,v 1.57 2003/09/06 09:36:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -95,18 +95,22 @@ static const char *ipaddr_fmt[] = {
 };
 
 struct nlist nl[] = {
-	{ "_mip6_config" },
-#define N_MIP6_CONFIG 0
+	{ "_mip6ctl_nodetype" },
+#define N_MIP6CTL_NODETYPE 0
+	{ "_mip6ctl_use_ipsec" },
+#define N_MIP6CTL_USE_IPSEC 1
+	{ "_mip6ctl_debug" },
+#define N_MIP6CTL_DEBUG 2
 	{ "_hif_softc_list" },
-#define N_HIF_SOFTC_LIST 1
+#define N_HIF_SOFTC_LIST 3
 	{ "_mip6_bc_list" },
-#define N_MIP6_BC_LIST 2
+#define N_MIP6_BC_LIST 4
 	{ "_mip6_prefix_list" },
-#define N_MIP6_PREFIX_LIST 3
+#define N_MIP6_PREFIX_LIST 5
 	{ "_mip6_unuse_hoa" },
-#define N_MIP6_UNUSE_HOA 4
+#define N_MIP6_UNUSE_HOA 6
 	{ "_mip6_preferred_ifnames" },
-#define N_MIP6_PREFERRED_IFNAMES 5
+#define N_MIP6_PREFERRED_IFNAMES 7
 	{ "" },
 };
 
@@ -277,35 +281,40 @@ main(argc, argv)
 	}
 
 	if (optind <= 1) {
-		struct mip6_config mip6_config;
+		int mip6ctl_nodetype, mip6ctl_use_ipsec, mip6ctl_debug;
 		struct mip6_preferred_ifnames preferred;
 		char *type = "corresponding node";
 		int i;
 
-		if (nl[N_MIP6_CONFIG].n_value == 0) {
+		if (nl[N_MIP6CTL_NODETYPE].n_value == 0) {
 			fprintf(stderr, "mip6 not found\n");
 			exit(1);
 		}
-		KREAD(nl[N_MIP6_CONFIG].n_value, &mip6_config, mip6_config);
-		switch (mip6_config.mcfg_type) {
-		case MIP6_CONFIG_TYPE_MOBILENODE:
+		KREAD(nl[N_MIP6CTL_NODETYPE].n_value, &mip6ctl_nodetype,
+		    mip6ctl_nodetype);
+		KREAD(nl[N_MIP6CTL_USE_IPSEC].n_value, &mip6ctl_use_ipsec,
+		    mip6ctl_use_ipsec);
+		KREAD(nl[N_MIP6CTL_DEBUG].n_value, &mip6ctl_debug,
+		    mip6ctl_debug);
+		switch (mip6ctl_nodetype) {
+		case MIP6_NODETYPE_MOBILE_NODE:
 			KREAD(nl[N_MIP6_PREFERRED_IFNAMES].n_value,
 			      &preferred, struct mip6_preferred_ifnames);
 			type = "mobile node";
 			break;
-		case MIP6_CONFIG_TYPE_HOMEAGENT:
+		case MIP6_NODETYPE_HOME_AGENT:
 			type = "home agent";
 			break;
 		default:
-			if (mip6_config.mcfg_type)
+			if (mip6ctl_nodetype)
 				printf("unknown type %d\n",
-				       mip6_config.mcfg_type);
+				       mip6ctl_nodetype);
 			break;
 		}
 		printf("node type: %s\n", type);
 		printf("IPsec protection: %s\n",
-		       mip6_config.mcfg_use_ipsec ? "enable" : "disable");
-		if (mip6_config.mcfg_type == MIP6_CONFIG_TYPE_MOBILENODE) {
+		       mip6ctl_use_ipsec ? "enable" : "disable");
+		if (mip6ctl_nodetype == MIP6_NODETYPE_MOBILE_NODE) {
 			printf("preferred IF names: ");
 			for (i = 0; i < 3; i++) {
 				if (preferred.mip6pi_ifname[i][0] == '\0')
@@ -316,7 +325,7 @@ main(argc, argv)
 			printf("\n");
 		}
 		printf("debug: %s\n",
-		       mip6_config.mcfg_debug ? "enable" : "disable");
+		       mip6ctl_debug ? "enable" : "disable");
 	}
 
 	if (debug && debugarg) {
@@ -490,7 +499,9 @@ main(argc, argv)
 			KREAD(hpfx, &hif_prefix, hif_prefix);
 			hpfx = &hif_prefix;
 			KREAD(hpfx->hpfx_mpfx, &mip6_prefix, mip6_prefix);
-			printf("%s\n", ip6_sprintf(&mip6_prefix.mpfx_prefix));
+			printf("%s/%d (home)\n",
+			    ip6_sprintf(&mip6_prefix.mpfx_prefix),
+			    mip6_prefix.mpfx_prefixlen);
 			for (mpfxha = LIST_FIRST(&mip6_prefix.mpfx_ha_list);
 			    mpfxha; mpfxha = LIST_NEXT(mpfxha, mpfxha_entry)) {
 				KREAD(mpfxha, &mip6_prefix_ha, mip6_prefix_ha);
@@ -511,7 +522,9 @@ main(argc, argv)
 			KREAD(hpfx, &hif_prefix, hif_prefix);
 			hpfx = &hif_prefix;
 			KREAD(hpfx->hpfx_mpfx, &mip6_prefix, mip6_prefix);
-			printf("%s\n", ip6_sprintf(&mip6_prefix.mpfx_prefix));
+			printf("%s/%d (foreign)\n",
+			    ip6_sprintf(&mip6_prefix.mpfx_prefix),
+			    mip6_prefix.mpfx_prefixlen);
 			for (mpfxha = LIST_FIRST(&mip6_prefix.mpfx_ha_list);
 			    mpfxha; mpfxha = LIST_NEXT(mpfxha, mpfxha_entry)) {
 				KREAD(mpfxha, &mip6_prefix_ha, mip6_prefix_ha);
