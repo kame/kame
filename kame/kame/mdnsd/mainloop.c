@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.90 2001/11/16 08:39:04 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.91 2001/11/21 07:59:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -336,7 +336,7 @@ mainloop()
 	while (1) {
 		FD_ZERO(&rfds);
 		FD_ZERO(&wfds);
-		fdmax =  -1;
+		fdmax = -1;
 		for (sd = LIST_FIRST(&sockdb); sd; sd = LIST_NEXT(sd, link)) {
 			FD_SET(sd->s, &rfds);
 			if (sd->s > fdmax)
