@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.57 2001/04/27 09:46:21 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.58 2001/04/29 03:29:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -432,10 +432,8 @@ stf_output(ifp, m, dst, rt)
 	ip6 = mtod(m, struct ip6_hdr *);
 
 	/*
-	 * Pickup the right dst addr from the list of candidates.  We have the
-	 * check for the gateway address (dst6) since we can have a routing
-	 * table configurations like this:
-	 * # route add -inet6 2002:: -prefixlen 16 ::1 -ifp stf0
+	 * Pickup the right outer dst addr from the list of candidates.
+	 * ip6_dst has priority as it may be able to give us shorter IPv4 hops.
 	 */
 	if (IN6_IS_ADDR_6TO4(&ip6->ip6_dst))
 		in4 = GET_V4(&ip6->ip6_dst);
@@ -519,10 +517,8 @@ stf_output(ifp, m, dst, rt)
 	tos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
 
 	/*
-	 * Pickup the right dst addr from the list of candidates.  We have the
-	 * check for the gateway address (dst6) since we can have a routing
-	 * table configurations like this:
-	 * # route add -inet6 2002:: -prefixlen 16 ::1 -ifp stf0
+	 * Pickup the right outer dst addr from the list of candidates.
+	 * ip6_dst has priority as it may be able to give us shorter IPv4 hops.
 	 */
 	if (IN6_IS_ADDR_6TO4(&ip6->ip6_dst))
 		in4 = GET_V4(&ip6->ip6_dst);
