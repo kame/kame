@@ -1,4 +1,4 @@
-/*	$KAME: des_locl.h,v 1.3 2000/03/27 04:36:33 sumikawa Exp $	*/
+/*	$KAME: des_locl.h,v 1.4 2000/03/27 04:43:46 sumikawa Exp $	*/
 
 /* lib/des/des_locl.h */
 /* Copyright (C) 1995-1996 Eric Young (eay@mincom.oz.au)
@@ -94,7 +94,7 @@
 #undef NOPROTO
 #endif
 
-#if !defined(KERNEL) && (defined(__STDC__) || defined(VMS) || defined(M_XENIX) || defined(MSDOS))
+#if !defined(_KERNEL) && (defined(__STDC__) || defined(VMS) || defined(M_XENIX) || defined(MSDOS))
 #ifndef __NetBSD__
 #include <string.h>
 #endif
