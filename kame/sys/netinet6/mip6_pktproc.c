@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.104 2003/02/05 10:23:33 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.105 2003/02/05 12:41:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -547,7 +547,13 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	mip6stat.mip6s_bu++;
 	bzero(&bi, sizeof(bi));
 	bi.mbc_status = IP6MA_STATUS_ACCEPTED;
-	bi.mbc_send_ba = ip6mu->ip6mu_flags & IP6MU_ACK;
+	/*
+	 * we send a binding ack immediately when this binding update
+	 * is not a request for home registration and has an ACK bit
+	 * on.
+	 */
+	bi.mbc_send_ba = ((ip6mu->ip6mu_flags & IP6MU_ACK)
+	    && !(ip6mu->ip6mu_flags & IP6MU_HOME));
 
 #ifdef IPSEC
 	/*
