@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.61 2001/02/07 06:46:41 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.62 2001/02/07 07:14:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -300,6 +300,7 @@ rip6_ctlinput(cmd, sa, d)
 	const struct sockaddr_in6 *sa6_src = NULL;
 	void *cmdarg;
 	void (*notify) __P((struct in6pcb *, int)) = in6_rtchange;
+	int nxt;
 
 	if (sa->sa_family != AF_INET6 ||
 	    sa->sa_len != sizeof(struct sockaddr_in6))
@@ -326,11 +327,13 @@ rip6_ctlinput(cmd, sa, d)
 		off = ip6cp->ip6c_off;
 		cmdarg = ip6cp->ip6c_cmdarg;
 		sa6_src = ip6cp->ip6c_src;
+		nxt = ip6cp->ip6c_nxt;
 	} else {
 		m = NULL;
 		ip6 = NULL;
 		cmdarg = NULL;
 		sa6_src = &sa6_any;
+		nxt = -1;
 	}
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -376,7 +379,7 @@ rip6_ctlinput(cmd, sa, d)
 #endif
 
 		if (in6p && in6p->in6p_ip6.ip6_nxt &&
-		    in6p->in6p_ip6.ip6_nxt == ip6->ip6_nxt)
+		    in6p->in6p_ip6.ip6_nxt == nxt)
 			valid = 1;
 
 		/*

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.189 2001/02/06 04:35:29 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.190 2001/02/07 07:14:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1193,6 +1193,7 @@ icmp6_notify_error(m, off, icmp6len, code)
 		ip6cp.ip6c_off = eoff;
 		ip6cp.ip6c_finaldst = finaldst;
 		ip6cp.ip6c_src = &icmp6src;
+		ip6cp.ip6c_nxt = nxt;
 
 		if (icmp6type == ICMP6_PACKET_TOO_BIG) {
 			notifymtu = ntohl(icmp6->icmp6_mtu);

@@ -1,4 +1,4 @@
-/*	$KAME: ip6protosw.h,v 1.20 2000/12/02 16:09:00 itojun Exp $	*/
+/*	$KAME: ip6protosw.h,v 1.21 2001/02/07 07:14:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -120,6 +120,7 @@ struct ip6ctlparam {
 	struct sockaddr_in6 *ip6c_dst;	/* (final) dstaddr w/ additional info */
 	struct in6_addr *ip6c_finaldst;	/* final destination address */
 	void *ip6c_cmdarg;		/* control command dependent data */
+	u_int8_t ip6c_nxt;		/* final next header field */
 };
 
 struct ip6protosw {
