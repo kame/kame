@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.21 2001/10/18 08:16:47 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.22 2001/10/22 09:27:53 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -341,8 +341,11 @@ mip6_home_registration(sc)
 		if (mbu == NULL)
 			return (ENOMEM);
 
+#ifdef BUOLDTIMER
 		LIST_INSERT_HEAD(&sc->hif_bu_list, mbu, mbu_entry);
-		/* XXX mip6_bu_list_insert(&sc->hif_bu_list, mbu); */
+#else
+		mip6_bu_list_insert(&sc->hif_bu_list, mbu);
+#endif
 	} else {
 		int32_t coa_lifetime, prefix_lifetime;
 
@@ -383,8 +386,10 @@ mip6_home_registration(sc)
 	 * register to a previous ar.
 	 */
 
+#ifdef BUOLDTIMER
 	/* start BU timer if it hasn't started already */
 	mip6_bu_starttimer();
+#endif
 
 	return (0);
 }
@@ -577,10 +582,11 @@ mip6_bu_list_notify_binding_change(sc)
 		/* mbu->mbu_ackremain = mbu->mbu_acktimeout; */
 		mbu->mbu_seqno++;
 		mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
+		mip6_bu_send_bu(mbu);
 	}
 
 	/* start BU timer if it hasn't started already */
-	mip6_bu_starttimer();
+	/* mip6_bu_starttimer(); */
 
 	return (0);
 }
@@ -1903,9 +1909,18 @@ mip6_process_ba(m, opt)
 
 		if ((mbu->mbu_reg_state == MIP6_BU_REG_STATE_REG)
 		    || (mbu->mbu_reg_state == MIP6_BU_REG_STATE_DEREGWAITACK)) {
-			/* home unregsitration completed */
+			/* home unregsitration has completed. */
 
-			/* delete BU entry for HA */
+			/* notify all the CNs that we are home. */
+			error = mip6_bu_list_notify_binding_change(sc);
+			if (error) {
+				mip6log((LOG_ERR,
+					 "%s:%d: removing the bining cache entries of all CNs failed.\n",
+					 __FILE__, __LINE__));
+				return (error);
+			}
+
+			/* remove a binding update entry for our homeagent. */
 			error = mip6_bu_list_remove(&sc->hif_bu_list, mbu);
 			if (error) {
 				mip6log((LOG_ERR,
@@ -1914,7 +1929,7 @@ mip6_process_ba(m, opt)
 				return (error);
 			}
 
-			/* remove tunnel to HA */
+			/* remove a tunnel to our homeagent. */
 			error = mip6_tunnel_control(MIP6_TUNNEL_DELETE,
 						   mbu,
 						   mip6_bu_encapcheck,
@@ -1926,15 +1941,10 @@ mip6_process_ba(m, opt)
 				return (error);
 			}
 
-			/* notify all the CNs that we are home. */
-			if (mip6_bu_list_notify_binding_change(sc)) {
-				return (-1);
-			}
-
 			error = mip6_bu_list_remove_all(&sc->hif_bu_list);
 			if (error) {
 				mip6log((LOG_ERR,
-					 "%s:%d: BC remove all failed.\n",
+					 "%s:%d: BU remove all failed.\n",
 					 __FILE__, __LINE__));
 				return (error);
 			}
@@ -1955,8 +1965,12 @@ mip6_process_ba(m, opt)
 			}
 
 			/* notify all the CNs that we have a new coa. */
-			if (mip6_bu_list_notify_binding_change(sc)) {
-				return (-1);
+			error = mip6_bu_list_notify_binding_change(sc);
+			if (error) {
+				mip6log((LOG_ERR,
+					 "%s:%d: updating the bining cache entries of all CNs failed.\n",
+					 __FILE__, __LINE__));
+				return (error);
 			}
 		}
 	}
@@ -2400,18 +2414,15 @@ mip6_tunnel_input(mp, offp, proto)
 {
 	struct mbuf *m = *mp;
 	struct ip6_hdr *ip6;
-	int s, af = 0;
-	u_int32_t otos;
+	int s;
 
 	ip6 = mtod(m, struct ip6_hdr *);
-	otos = ip6->ip6_flow;
 	m_adj(m, *offp);
 
 	switch (proto) {
 	case IPPROTO_IPV6:
 	{
 		struct ip6_hdr *ip6;
-		af = AF_INET6;
 		if (m->m_len < sizeof(*ip6)) {
 			m = m_pullup(m, sizeof(*ip6));
 			if (!m)
@@ -2450,18 +2461,15 @@ mip6_tunnel_input(mp, offp, proto)
 }
 
 /*
- ******************************************************************************
- * Function:    mip6_tunnel_output
- * Description: Encapsulates packet in an outer header which is determined
- *		of the Binding Cache entry provided.  Note that packet is
- *		(currently) not sent here, but should be sent by the caller.
- * Ret value:   != 0 if failure.  It's up to the caller to free the mbuf chain.
- ******************************************************************************
+ * encapsulate the packet from the correspondent node to the mobile
+ * node that is communicating.  the encap_src is to be a home agent's
+ * address and the encap_dst is to be a mobile node coa, according to
+ * the binding cache entry for the destined mobile node.
  */
 int
 mip6_tunnel_output(mp, mbc)
-	struct mbuf **mp;
-	struct mip6_bc *mbc;
+	struct mbuf **mp;    /* the original ipv6 packet */
+	struct mip6_bc *mbc; /* the bc entry for the dst of the pkt */
 {
 	struct sockaddr_in6 dst;
 	const struct encaptab *ep = mbc->mbc_encap;
@@ -2469,7 +2477,6 @@ mip6_tunnel_output(mp, mbc)
 	struct in6_addr *encap_src = &mbc->mbc_addr;
 	struct in6_addr *encap_dst = &mbc->mbc_pcoa;
 	struct ip6_hdr *ip6;
-	u_int8_t itos;
 	int len;
 
 	bzero(&dst, sizeof(dst));
@@ -2478,15 +2485,14 @@ mip6_tunnel_output(mp, mbc)
 	dst.sin6_addr = mbc->mbc_pcoa;
 
 	if (ep->af != AF_INET6)
-		return EFAULT;
+		return (EFAULT);
 
 	/* Recursion problems? */
 
-	if (IN6_IS_ADDR_UNSPECIFIED(encap_src)) {
-		return EFAULT;
-	}
+	if (IN6_IS_ADDR_UNSPECIFIED(encap_src))
+		return (EFAULT);
 
-	len = m->m_pkthdr.len;
+	len = m->m_pkthdr.len; /* payload length */
 
 	if (m->m_len < sizeof(*ip6)) {
 		m = m_pullup(m, sizeof(*ip6));
@@ -2494,10 +2500,8 @@ mip6_tunnel_output(mp, mbc)
 			return (ENOBUFS);
 	}
 	ip6 = mtod(m, struct ip6_hdr *);
-	itos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
 
-
-	/* prepend new IP header */
+	/* prepend new, outer ipv6 header */
 	M_PREPEND(m, sizeof(struct ip6_hdr), M_DONTWAIT);
 	if (m && m->m_len < sizeof(struct ip6_hdr))
 		m = m_pullup(m, sizeof(struct ip6_hdr));
@@ -2508,13 +2512,14 @@ mip6_tunnel_output(mp, mbc)
 		return (ENOBUFS);
 	}
 
+	/* fill the outer header */
 	ip6 = mtod(m, struct ip6_hdr *);
 	ip6->ip6_flow	= 0;
 	ip6->ip6_vfc	&= ~IPV6_VERSION_MASK;
 	ip6->ip6_vfc	|= IPV6_VERSION;
 	ip6->ip6_plen	= htons((u_short)len);
 	ip6->ip6_nxt	= IPPROTO_IPV6;
-	ip6->ip6_hlim	= IPV6_DEFHLIM;
+	ip6->ip6_hlim	= ip6_defhlim;
 	ip6->ip6_src	= *encap_src;
 
 	/* bidirectional configured tunnel mode */
