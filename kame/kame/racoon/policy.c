@@ -1,4 +1,4 @@
-/*	$KAME: policy.c,v 1.41 2001/08/16 14:37:29 itojun Exp $	*/
+/*	$KAME: policy.c,v 1.42 2001/08/20 06:46:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -421,6 +421,8 @@ spidx2str(spidx)
 			break;
 		}
 	i = snprintf(p, blen, "%s/%d[%s ", a, spidx->prefs, b);
+	if (i < 0 || i >= blen)
+		return NULL;
 	p += i;
 	blen -= i;
 
@@ -432,6 +434,8 @@ spidx2str(spidx)
 			break;
 		}
 	i = snprintf(p, blen, "%s/%d[%s ", a, spidx->prefd, b);
+	if (i < 0 || i >= blen)
+		return NULL;
 	p += i;
 	blen -= i;
 

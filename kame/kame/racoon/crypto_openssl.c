@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.67 2001/08/17 17:29:59 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.68 2001/08/20 06:46:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -939,7 +939,7 @@ char *
 eay_strerror()
 {
 	static char ebuf[512];
-	int len = 0;
+	int len = 0, n;
 	unsigned long l;
 	char buf[200];
 #if OPENSSL_VERSION_NUMBER >= 0x00904100L
@@ -953,10 +953,13 @@ eay_strerror()
 	es = CRYPTO_thread_id();
 
 	while ((l = ERR_get_error_line_data(&file, &line, &data, &flags)) != 0){
-		len += snprintf(ebuf + len, sizeof(ebuf) - len,
+		n = snprintf(ebuf + len, sizeof(ebuf) - len,
 				"%lu:%s:%s:%d:%s ",
 				es, ERR_error_string(l, buf), file, line,
 				(flags & ERR_TXT_STRING) ? data : "");
+		if (n < 0 || n >= sizeof(ebuf) - len)
+			break;
+		len += n;
 		if (sizeof(ebuf) < len)
 			break;
 	}

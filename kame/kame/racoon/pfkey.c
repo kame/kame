@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.127 2001/08/17 10:52:37 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.128 2001/08/20 06:46:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2510,18 +2510,24 @@ sadbsecas2str(src, dst, proto, spi, mode)
 		s_ipsecdoi_proto(doi_proto),
 		mode ? "/" : "",
 		mode ? s_ipsecdoi_encmode(doi_mode) : "");
+	if (i < 0 || i >= blen)
+		return NULL;
 	p += i;
 	blen -= i;
 
 	i = snprintf(p, blen, "%s->", saddrwop2str(src));
+	if (i < 0 || i >= blen)
+		return NULL;
 	p += i;
 	blen -= i;
 
 	i = snprintf(p, blen, "%s ", saddrwop2str(dst));
+	if (i < 0 || i >= blen)
+		return NULL;
+	p += i;
+	blen -= i;
 
 	if (spi) {
-		p += i;
-		blen -= i;
 		snprintf(p, blen, "spi=%lu(0x%lx)", (unsigned long)ntohl(spi),
 		    (unsigned long)ntohl(spi));
 	}
