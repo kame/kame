@@ -1,4 +1,4 @@
-.\"	$KAME: inet6_opt_init.3,v 1.4 2001/12/25 03:23:26 jinmei Exp $
+.\"	$KAME: inet6_opt_init.3,v 1.5 2002/10/17 14:13:47 jinmei Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -38,29 +38,29 @@
 .Nm inet6_opt_set_val ,
 .Nm inet6_opt_next ,
 .Nm inet6_opt_find ,
-.Nm inet6_opt_get_val ,
+.Nm inet6_opt_get_val
 .Nd IPv6 Hop-by-Hop and Destination Options manipulation
 .\"
 .Sh SYNOPSIS
 .Fd #include <netinet/in.h>
 .Ft "int"
-.Fn inet6_opt_init "void *extbuf" "size_t extlen"
+.Fn inet6_opt_init "void *extbuf" "socklen_t extlen"
 .Ft "int"
-.Fn inet6_opt_append "void *extbuf" "size_t extlen" "int prevlen" "u_int8_t type" "size_t len" "u_int8_t align" "void **databufp"
+.Fn inet6_opt_append "void *extbuf" "socklen_t extlen" "int offset" "u_int8_t type" "socklen_t len" "u_int8_t align" "void **databufp"
 .Ft "int"
-.Fn inet6_opt_finish "void *extbuf" "size_t extlen" "int prevlen"
+.Fn inet6_opt_finish "void *extbuf" "socklen_t extlen" "int offset"
 .Ft "int"
-.Fn inet6_opt_set_val "void *databuf" "size_t offset" "void *val" "int vallen"
+.Fn inet6_opt_set_val "void *databuf" "int offset" "void *val" "socklen_t vallen"
 .Ft "int"
-.Fn inet6_opt_next "void *extbuf" "size_t extlen" "int prevlen" "u_int8_t *typep" "size_t *lenp" "void **databufp"
+.Fn inet6_opt_next "void *extbuf" "socklen_t extlen" "int offset" "u_int8_t *typep" "socklen_t *lenp" "void **databufp"
 .Ft "int"
-.Fn inet6_opt_find "void *extbuf" "size_t extlen" "int prevlen" "u_int8_t type" "size_t *lenp" "void **databufp"
+.Fn inet6_opt_find "void *extbuf" "socklen_t extlen" "int offset" "u_int8_t type" "socklen_t *lenp" "void **databufp"
 .Ft "int"
-.Fn inet6_opt_get_val "void *databuf" "size_t offset" "void *val" "int vallen"
+.Fn inet6_opt_get_val "void *databuf" "socklen_t offset" "void *val" "socklen_t vallen"
 .\"
 .Sh DESCRIPTION
 Building and parsing the Hop-by-Hop and Destination options is
-complicated for the reasons given earlier.
+complicated.
 The advanced API therefore defines a set
 of functions to help applications.
 These functions assume the
@@ -77,11 +77,10 @@ returns the number of bytes needed for the empty
 extension header i.e. without any options.
 If
 .Li extbuf
-is not NULL it also initializes the extension header to have the
-correct length field.
-If the
-.Li extlen
-value is not a positive
+is not NULL it also initializes the extension header to have the correct length
+field.
+In that case if the
+.Li extlen value is not a positive
 .Po
 i.e., non-zero
 .Pc
@@ -94,7 +93,7 @@ adding an option with length
 .Li len
 and alignment
 .Li align .
-.Li Prevlen
+.Li Offset
 should be the length returned by
 .Fn inet6_opt_init
 or a previous
@@ -143,7 +142,7 @@ The align value can not exceed the value of
 returns the updated total length
 taking into account the final padding of the extension header to make
 it a multiple of 8 bytes.
-.Li Prevlen
+.Li Offset
 should be the length returned by
 .Fn inet6_opt_init
 or
@@ -159,10 +158,7 @@ function returns -1.
 .\"
 .Ss inet6_opt_set_val
 .Fn inet6_opt_set_val
-inserts data items of various sizesm
-.Po
-1, 2, 4, or 8 bytes
-.Pc in the data portion of the option.
+inserts data items of various sizes in the data portion of the option.
 .Li Databuf
 should be a pointer returned by
 .Fn inet6_opt_append .
@@ -173,6 +169,12 @@ inserted.
 specifies where in the data portion of the option
 the value should be inserted; the first byte after the option type
 and length is accessed by specifying an offset of zero.
+.Pp
+The caller should ensure that each field is aligned on its natural
+boundaries as described in Appendix B of RFC2460, but the function
+must not rely on the caller's behavior.
+Even when the alignment requirement is not satisfied,
+the function should just copy the data as required.
 .Pp
 The function returns the offset for the next field
 .Po
@@ -191,7 +193,7 @@ option.
 and
 .Li extlen
 specifies the extension header.
-.Li Prevlen
+.Li Offset
 should either be zero (for the first option) or the length returned
 by a previous call to
 .Fn inet6_opt_next
@@ -218,9 +220,6 @@ When there are no more options the return value is -1.
 .Ss inet6_opt_get_val
 .Fn inet6_opt_get_val
 This function extracts data items of various sizes
-.Po
-1, 2, 4, or 8 bytes
-.Pc
 in the data portion of the option.
 .Li Databuf
 should be a pointer returned by
@@ -233,6 +232,10 @@ should point to the destination for the extracted data.
 specifies from where in the data portion of the option the value should be
 extracted; the first byte after the option type and length is
 accessed by specifying an offset of zero.
+.Pp
+It is expected that each field is aligned on its natural boundaries
+as described in Appendix B of RFC2460, but the function must not
+rely on the alignment.
 .Pp
 The function returns the offset for the next field
 .Po
@@ -252,19 +255,20 @@ All the functions ruturn
 on an error.
 .\"
 .Sh EXAMPLES
-draft-ietf-ipngwg-rfc2292bis-01.txt
-gives comprehensive examples in Section 24.
+draft-ietf-ipngwg-rfc2292bis-08.txt
+gives comprehensive examples in Section 23.
 .Pp
-KAME also provides examples in the advapi directry of its kit.
+KAME also provides examples in the advapitest directry of its kit.
 .\"
 .Sh SEE ALSO
 .Rs
 .%A W. Stevens
 .%A M. Thomas
 .%A E. Nordmark
+.%A T. Jinmei
 .%T "Advanced Sockets API for IPv6"
-.%N draft-ietf-ipngwg-rfc2292bis-01
-.%D October 1999
+.%N draft-ietf-ipngwg-rfc2292bis-08
+.%D October 2002
 .Re
 .Rs
 .%A S. Deering
@@ -279,7 +283,7 @@ The implementation first appeared in KAME advanced networking kit.
 The functions
 are documented in
 .Dq Advanced Sockets API for IPv6
-.Pq draft-ietf-ipngwg-rfc2292bis-01.txt .
+.Pq draft-ietf-ipngwg-rfc2292bis-08.txt .
 .\"
 .Sh BUGS
 RFC2292bis is still under standardization procedure.

@@ -1,4 +1,4 @@
-.\"	$KAME: inet6_rth_space.3,v 1.3 2000/05/17 14:30:15 itojun Exp $
+.\"	$KAME: inet6_rth_space.3,v 1.4 2002/10/17 14:13:48 jinmei Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -42,10 +42,10 @@
 .\"
 .Sh SYNOPSIS
 .Fd #include <netinet/in.h>
-.Ft size_t
+.Ft socklen_t
 .Fn inet6_rth_space "int" "int"
 .Ft "void *"
-.Fn inet6_rth_init "void *" "int" "int" "int"
+.Fn inet6_rth_init "void *" "socklen_t" "int" "int"
 .Ft int
 .Fn inet6_rth_add "void *" "const struct in6_addr *"
 .Ft int
@@ -129,7 +129,7 @@ parameter.
 .Li bp_len
 is only used to verify that the buffer is
 large enough.
-The ip6r0_segleft field is set to zero;
+The ip6r_segleft field is set to zero;
 .Fn inet6_rth_add
 will increment it.
 .Pp
@@ -217,19 +217,20 @@ and
 return0 on success, or -1 upon an error.
 .\"
 .Sh EXAMPLES
-draft-ietf-ipngwg-rfc2292bis-01.txt
-gives comprehensive examples in Section 23.
+draft-ietf-ipngwg-rfc2292bis-08.txt
+gives comprehensive examples in Section 22.
 .Pp
-KAME also provides examples in the advapi directry of its kit.
+KAME also provides examples in the advapitest directry of its kit.
 .\"
 .Sh SEE ALSO
 .Rs
 .%A W. Stevens
 .%A M. Thomas
 .%A E. Nordmark
+.%A E. Jinmei
 .%T "Advanced Sockets API for IPv6"
-.%N draft-ietf-ipngwg-rfc2292bis-01
-.%D October 1999
+.%N draft-ietf-ipngwg-rfc2292bis-08
+.%D October 2002
 .Re
 .Rs
 .%A S. Deering
@@ -244,7 +245,7 @@ The implementation first appeared in KAME advanced networking kit.
 The functions
 are documented in
 .Dq Advanced Sockets API for IPv6
-.Pq draft-ietf-ipngwg-rfc2292bis-01.txt .
+.Pq draft-ietf-ipngwg-rfc2292bis-08.txt .
 .\"
 .Sh BUGS
 RFC2292bis is still under standardization procedure.

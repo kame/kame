@@ -1,4 +1,4 @@
-/*	$KAME: ip6opt.c,v 1.11 2001/12/25 04:17:03 jinmei Exp $	*/
+/*	$KAME: ip6opt.c,v 1.12 2002/10/17 14:13:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -392,17 +392,8 @@ inet6_insert_padopt(u_char *p, int len)
  * rfc2292bis.
  */
 
-/*
- * This function returns the number of bytes needed for the empty
- * extension header i.e. without any options.  If extbuf is not NULL it
- * also initializes the extension header to have the correct length
- * field.  If the extlen value is not a positive (i.e., non-zero)
- * multiple of 8 the function fails and returns -1.
- *
- * [rfc2292bis-01, 10.1]
- */
 int
-inet6_opt_init(void *extbuf, size_t extlen)
+inet6_opt_init(void *extbuf, socklen_t extlen)
 {
 	struct ip6_ext *ext = (struct ip6_ext *)extbuf;
 
@@ -418,21 +409,11 @@ inet6_opt_init(void *extbuf, size_t extlen)
 	return(2);		/* sizeof the next and the length fields */
 }
 
-/*
- * This function returns the updated total length taking into account
- * adding an option with length 'len' and alignment 'align'.
- * If extbuf is not NULL then, in addition to returning the length,
- * the function inserts any needed pad option, initializes the option
- * (setting the type and length fields) and returns a pointer to the
- * location for the option content in databufp.
- *
- * [rfc2292bis-01, 10.2]
- */
 int
-inet6_opt_append(void *extbuf, size_t extlen, int prevlen, u_int8_t type,
-		 size_t len, u_int8_t align, void **databufp)
+inet6_opt_append(void *extbuf, socklen_t extlen, int offset, u_int8_t type,
+		 socklen_t len, u_int8_t align, void **databufp)
 {
-	int currentlen = prevlen, padlen = 0;
+	int currentlen = offset, padlen = 0;
 
 	/*
 	 * The option type must have a value from 2 to 255, inclusive.
@@ -469,7 +450,7 @@ inet6_opt_append(void *extbuf, size_t extlen, int prevlen, u_int8_t type,
 		return(-1);
 
 	if (extbuf) {
-		u_int8_t *optp = (u_int8_t *)extbuf + prevlen;
+		u_int8_t *optp = (u_int8_t *)extbuf + offset;
 
 		if (padlen == 1) {
 			/* insert a Pad1 option */
@@ -493,32 +474,19 @@ inet6_opt_append(void *extbuf, size_t extlen, int prevlen, u_int8_t type,
 	return(currentlen);
 }
 
-/*
- * Prevlen should be the length returned by inet6_opt_init() or
- * inet6_opt_append().  This function returns the updated total length
- * taking into account the final padding of the extension header to make
- * it a multiple of 8 bytes.  If extbuf is not NULL the function also
- * initializes the option by inserting a Pad1 or PadN option of the
- * proper length.
- *
- * If the necessary pad does not fit in the extension header buffer the
- * function returns -1.
- *
- * [rfc2292bis-01, 10.3]
- */
 int
-inet6_opt_finish(void *extbuf, size_t extlen, int prevlen)
+inet6_opt_finish(void *extbuf, socklen_t extlen, int offset)
 {
-	int updatelen = prevlen > 0 ? (1 + ((prevlen - 1) | 7)) : 0;;
+	int updatelen = offset > 0 ? (1 + ((offset - 1) | 7)) : 0;;
 
 	if (extbuf) {
 		u_int8_t *padp;
-		int padlen = updatelen - prevlen;
+		int padlen = updatelen - offset;
 
 		if (updatelen > extlen)
 			return(-1);
 
-		padp = (u_int8_t *)extbuf + prevlen;
+		padp = (u_int8_t *)extbuf + offset;
 		if (padlen == 1)
 			*padp = IP6OPT_PAD1;
 		else if (padlen > 0) {
@@ -531,47 +499,16 @@ inet6_opt_finish(void *extbuf, size_t extlen, int prevlen)
 	return(updatelen);
 }
 
-/*
- * Databuf should be a pointer returned by inet6_opt_append().  This
- * function inserts data items of various sizes (1, 2, 4, or 8 bytes) in
- * the data portion of the option. val should point to the data to be
- * inserted.  Offset specifies where in the data portion of the option
- * the value should be inserted; the first byte after the option type
- * and length is accessed by specifying an offset of zero.
- *
- * The function returns the offset for the next field (i.e., offset +
- * vallen) which can be used when composing option content with multiple
- * fields.
- *
- * [rfc2292bis-01, 10.4]
- */
 int
-inet6_opt_set_val(void *databuf, size_t offset, void *val, int vallen)
+inet6_opt_set_val(void *databuf, int offset, void *val, socklen_t vallen)
 {
 
 	memcpy((u_int8_t *)databuf + offset, val, vallen);
 	return(offset + vallen);
 }
 
-
-
-/*
- * This function parses received IPv6 options headers returning the next
- * option.  Extbuf and extlen specifies the options header.  Prevlen
- * should either be zero (for the first option) or the length returned
- * by a previous call to inet6_opt_next() or inet6_opt_find().  It
- * specifies the position where to continue scanning the extension
- * buffer.  The next option is returned by updating typep, lenp, and
- * databufp.  This function returns the updated "previous" length
- * computed by advancing past the option that was returned.  This
- * returned "previous" length can then be passed to subsequent calls to
- * inet6_opt_next().  This function does not return any PAD1 or PADN
- * options.  When there are no more options the return value is -1.
- *
- * [rfc2292bis-01, 10.5]
- */
 int
-inet6_opt_next(void *extbuf, size_t extlen, int prevlen, u_int8_t *typep,
+inet6_opt_next(void *extbuf, socklen_t extlen, int offset, u_int8_t *typep,
 	       size_t *lenp, void **databufp)
 {
 	u_int8_t *optp, *lim;
@@ -587,11 +524,11 @@ inet6_opt_next(void *extbuf, size_t extlen, int prevlen, u_int8_t *typep,
 	 * header, simply return the 1st option.
 	 * Otherwise, search the option list for the next option.
 	 */
-	if (prevlen == 0) {
+	if (offset == 0) {
 		optp = (u_int8_t *)((struct ip6_hbh *)extbuf + 1);
 	}
 	else
-		optp = (u_int8_t *)extbuf + prevlen;
+		optp = (u_int8_t *)extbuf + offset;
 
 	/* Find the next option skipping any padding options. */
 	while(optp < lim) {
@@ -619,26 +556,9 @@ inet6_opt_next(void *extbuf, size_t extlen, int prevlen, u_int8_t *typep,
 	return(-1);
 }
 
-/*
- * This function is similar to the inet6_opt_next() function, except
- * this function lets the caller specify the option type to be searched for,
- * instead of always returning the next option in the extension header.
- *
- * If an option of the specified type is located, the function returns
- * the updated "previous" total length computed by advancing past the
- * option that was returned and past any options that didn't match the
- * type.  This returned "previous" length can then be passed to
- * subsequent calls to inet6_opt_find() for finding the next occurance
- * of the same option type.
- *
- * If an option of the specified type is not located, the return value
- * is -1.  If an error occurs, the return value is -1.
- *
- * [rfc2292bis-01, 10.6]
- */
 int
-inet6_opt_find(void *extbuf, size_t extlen, int prevlen, u_int8_t type,
-	       size_t *lenp, void **databufp)
+inet6_opt_find(void *extbuf, socklen_t extlen, int offset, u_int8_t type,
+	       socklen_t *lenp, void **databufp)
 {
 	u_int8_t *optp, *lim;
 	int optlen;
@@ -653,11 +573,11 @@ inet6_opt_find(void *extbuf, size_t extlen, int prevlen, u_int8_t type,
 	 * header, simply return the 1st option.
 	 * Otherwise, search the option list for the next option.
 	 */
-	if (prevlen == 0) {
+	if (offset == 0) {
 		optp = (u_int8_t *)((struct ip6_hbh *)extbuf + 1);
 	}
 	else
-		optp = (u_int8_t *)extbuf + prevlen;
+		optp = (u_int8_t *)extbuf + offset;
 
 	/* Find the specified option */
 	while(optp < lim) {
@@ -678,23 +598,8 @@ inet6_opt_find(void *extbuf, size_t extlen, int prevlen, u_int8_t type,
 	return(-1);
 }
 
-/*
- * Databuf should be a pointer returned by inet6_opt_next() or
- * inet6_opt_find().  This function extracts data items of various sizes
- * (1, 2, 4, or 8 bytes) in the data portion of the option. Val should
- * point to the destination for the extracted data.  Offset specifies
- * from where in the data portion of the option the value should be
- * extracted; the first byte after the option type and length is
- * accessed by specifying an offset of zero.
- * 
- * The function returns the offset for the next field (i.e., offset +
- * vallen) which can be used when extracting option content with
- * multiple fields.
- *
- * [rfc2292bis-01, 10.7]
- */
 int
-inet6_opt_get_val(void *databuf, size_t offset, void *val, int vallen)
+inet6_opt_get_val(void *databuf, int offset, void *val, socklen_t vallen)
 {
 
 	/* we can't assume alignment here */

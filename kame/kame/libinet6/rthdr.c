@@ -1,4 +1,4 @@
-/*	$KAME: rthdr.c,v 1.9 2002/06/27 09:34:30 itojun Exp $	*/
+/*	$KAME: rthdr.c,v 1.10 2002/10/17 14:13:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -337,15 +337,7 @@ inet6_rthdr_getflags(cmsg, idx)
  * rfc2292bis.
  */
 
-/*
- * This function returns the number of bytes required to hold a Routing
- * header of the specified type containing the specified number of
- * segments (addresses).
- * If the return value is 0, then either the type of the Routing header
- * is not supported by this implementation or the number of segments is
- * invalid for this type of Routing header.
- */
-size_t
+socklen_t
 inet6_rth_space(int type, int segments)
 {
 	switch(type) {
@@ -356,18 +348,8 @@ inet6_rth_space(int type, int segments)
 	}
 }
 
-/*
- * This function initializes the buffer pointed to by bp to contain a
- * Routing header of the specified type and sets ip6r_len based on the
- * segments parameter. bp_len is only used to verify that the buffer is
- * large enough.  The ip6r_segleft field is set to zero;
- * inet6_rth_add() will increment it.
- * Upon success the return value is the pointer to the buffer (bp), and
- * this is then used as the first argument to inet6_rth_add() function.
- * Upon an error the return value is NULL.
- */
 void *
-inet6_rth_init(void *bp, int bp_len, int type, int segments)
+inet6_rth_init(void *bp, socklen_t bp_len, int type, int segments)
 {
 	struct ip6_rthdr *rth = (struct ip6_rthdr *)bp;
 	struct ip6_rthdr0 *rth0;
@@ -392,14 +374,6 @@ inet6_rth_init(void *bp, int bp_len, int type, int segments)
 	return(bp);
 }
 
-/*
- * This function adds the IPv6 address pointed to by addr to the end of
- * the Routing header being constructed.
- * If successful, the segleft member of the Routing Header is updated to
- * account for the new address in the Routing header and the return
- * value of the function is 0.  Upon an error the return value of the
- * function is -1.
- */
 int
 inet6_rth_add(void *bp, const struct in6_addr *addr)
 {
@@ -421,15 +395,6 @@ inet6_rth_add(void *bp, const struct in6_addr *addr)
 	return(0);
 }
 
-/*
- * This function takes a Routing header extension header (pointed to by
- * the first argument) and writes a new Routing header that sends
- * datagrams along the reverse of that route.  Both arguments are
- * allowed to point to the same buffer (that is, the reversal can occur
- * in place).
- * The return value of the function is 0 on success, or -1 upon an
- * error.
- */
 int
 inet6_rth_reverse(const void *in, void *out)
 {
@@ -472,12 +437,6 @@ inet6_rth_reverse(const void *in, void *out)
 	return(0);
 }
 
-/*
- * This function returns the number of segments (addresses) contained in
- * the Routing header described by bp.  On success the return value is
- * zero or greater.  The return value of the function is -1 upon an
- * error.
- */
 int
 inet6_rth_segments(const void *bp)
 {
@@ -503,15 +462,6 @@ inet6_rth_segments(const void *bp)
 	}
 }
 
-/*
- * This function returns a pointer to the IPv6 address specified by
- * idx (which must have a value between 0 and one less than the value
- * returned by inet6_rth_segments()) in the Routing header described by
- * bp. An application should first call inet6_rth_segments() to obtain
- * the number of segments in the Routing header.
- *
- * Upon an error the return value of the function is NULL.
- */
 struct in6_addr *
 inet6_rth_getaddr(const void *bp, int idx)
 {
