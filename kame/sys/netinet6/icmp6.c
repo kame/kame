@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.97 2000/05/17 11:39:41 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.98 2000/05/17 14:03:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1249,7 +1249,7 @@ ni6_input(m, off)
 			 *   truncated hostname.
 			 */
 			n = ni6_nametodns(hostname, hostnamelen, 0);
-			if (!n || n->m_next)
+			if (!n || n->m_next || n->m_len == 0)
 				goto bad;
 			IP6_EXTHDR_GET(subj, char *, m,
 			    off + sizeof(struct icmp6_nodeinfo), subjlen);
@@ -1401,6 +1401,10 @@ ni6_nametodns(name, namelen, old)
 		m->m_len = 0;
 		cp = mtod(m, char *);
 		ep = mtod(m, char *) + M_TRAILINGSPACE(m);
+
+		/* if not certain about my name, return empty buffer */
+		if (namelen == 0)
+			return m;
 
 		/*
 		 * guess if it looks like shortened hostname, or FQDN.
