@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.182 2002/11/22 06:18:35 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.183 2002/11/29 09:42:43 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1747,20 +1747,6 @@ mip6_exthdr_create(m, opt, mip6opt)
 	}
  skip_rthdr2:
 
-#ifdef MIP6XXX
-	/XXX check nxt == IPPROTO_NONE *//* not supported piggyback */
-	/*
-	 * insert BA/BR if pending BA/BR exist.
-	 */
-	error = mip6_babr_destopt_create(&mip6opt->mip6po_dest2, dst, opt);
-	if (error) {
-		mip6log((LOG_ERR,
-			 "%s:%d: BA/BR destopt insertion failed.\n",
-			 __FILE__, __LINE__));
-		goto bad;
-	}
-#endif /* MIP6XXX */
-
 	/* following stuff is applied only for MN. */
 	if (!MIP6_IS_MN) {
 		goto noneed;
@@ -1793,6 +1779,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 		    opt->ip6po_mobility->ip6m_type == IP6M_CAREOF_TEST_INIT)
 			goto noneed;
 	}
+#if 0 /* we do not send a null packet for a BU creation. */
 	else if (ip6->ip6_nxt == IPPROTO_NONE) {
 		/* create a binding update mobility header. */
 		error = mip6_ip6mu_create(&mip6opt->mip6po_mobility,
@@ -1807,6 +1794,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 		if (mip6opt->mip6po_mobility != NULL)
 			need_hao = 1;
 	}
+#endif
 	if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
 		/* to my home agent. */
 		if (!need_hao &&

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.152 2002/11/27 12:05:39 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.153 2002/11/29 09:42:43 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -775,7 +775,7 @@ mip6_bu_send_bu(mbu)
 		error = EINVAL;
 		goto free_ip6pktopts;
 	}
-	error = ip6_output(m, NULL, NULL, 0, NULL, NULL);
+	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
 	if (error) {
 		mip6log((LOG_ERR,
 			 "%s:%d: ip6_output returns error (%d) "
