@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.25 2000/03/25 07:23:33 sumikawa Exp $	*/
+/*	$KAME: if_stf.c,v 1.26 2000/03/28 14:04:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -474,12 +474,13 @@ stf_checkaddr4(in, ifp)
 #else
 		rt = rtalloc1((struct sockaddr *)&sin, 0);
 #endif
-		if (rt && rt->rt_ifp != ifp) {
+		if (!rt)
+			return -1;
+		if (rt->rt_ifp != ifp) {
 			rtfree(rt);
 			return -1;
 		}
-		if (rt)
-			rtfree(rt);
+		rtfree(rt);
 	}
 
 	return 0;
