@@ -384,3 +384,163 @@ inet6_insert_padopt(u_char *p, int len)
 		 return;
 	}
 }
+
+/*
+ * The following functions are defined in a successor of RFC2292, aka
+ * rfc2292bis.
+ */
+
+/*
+ * This function parses received IPv6 options headers returning the next
+ * option.  Extbuf and extlen specifies the options header.  Prevlen
+ * should either be zero (for the first option) or the length returned
+ * by a previous call to inet6_opt_next() or inet6_opt_find().  It
+ * specifies the position where to continue scanning the extension
+ * buffer.  The next option is returned by updating typep, lenp, and
+ * databufp.  This function returns the updated "previous" length
+ * computed by advancing past the option that was returned.  This
+ * returned "previous" length can then be passed to subsequent calls to
+ * inet6_opt_next().  This function does not return any PAD1 or PADN
+ * options.  When there are no more options the return value is -1.
+ *
+ * [rfc2292bis-01, 10.5]
+ */
+int
+inet6_opt_next(void *extbuf, size_t extlen, int prevlen, u_int8_t *typep,
+	       size_t *lenp, void **databufp)
+{
+	u_int8_t *optp, *lim;
+	int optlen;
+
+	/* Validate extlen. XXX: is the variable really necessary?? */
+	if (extlen == 0 || (extlen % 8))
+		return(-1);
+	lim = (u_int8_t *)extbuf + extlen;
+
+	/*
+	 * If this is the first time this function called for this options
+	 * header, simply return the 1st option.
+	 * Otherwise, search the option list for the next option.
+	 */
+	if (prevlen == 0) {
+		optp = (u_int8_t *)((struct ip6_hbh *)extbuf + 1);
+	}
+	else {
+		optp = (u_int8_t *)extbuf + prevlen;
+		if ((optlen = ip6optlen(optp, lim)) == 0)
+			goto optend;
+		optp += optlen;
+	}
+
+	/* Find the next option skipping any padding options. */
+	while(optp < lim) {
+		switch(*optp) {
+		case IP6OPT_PAD1:
+			optp++;
+			break;
+		case IP6OPT_PADN:
+			if ((optlen = ip6optlen(optp, lim)) == 0)
+				goto optend;
+			optp += optlen;
+			break;
+		default:	/* found */
+			if ((optlen = ip6optlen(optp, lim)) == 0)
+				goto optend;
+			*typep = *optp;
+			*lenp = optlen;
+			*databufp = optp + 2;
+			return(optp - (u_int8_t *)extbuf);
+		}
+	}
+
+  optend:
+	*databufp = NULL; /* for safety */
+	return(-1);
+}
+
+/*
+ * This function is similar to the inet6_opt_next() function, except
+ * this function lets the caller specify the option type to be searched for,
+ * instead of always returning the next option in the extension header.
+ *
+ * If an option of the specified type is located, the function returns
+ * the updated "previous" total length computed by advancing past the
+ * option that was returned and past any options that didn't match the
+ * type.  This returned "previous" length can then be passed to
+ * subsequent calls to inet6_opt_find() for finding the next occurance
+ * of the same option type.
+ *
+ * If an option of the specified type is not located, the return value
+ * is -1.  If an error occurs, the return value is -1.
+ *
+ * [rfc2292bis-01, 10.6]
+ */
+int
+inet6_opt_find(void *extbuf, size_t extlen, int prevlen, u_int8_t type,
+	       size_t *lenp, void **databufp)
+{
+	u_int8_t *optp, *lim;
+	int optlen;
+
+	/* Validate extlen. XXX: is the variable really necessary?? */
+	if (extlen == 0 || (extlen % 8))
+		return(-1);
+	lim = (u_int8_t *)extbuf + extlen;
+
+	/*
+	 * If this is the first time this function called for this options
+	 * header, simply return the 1st option.
+	 * Otherwise, search the option list for the next option.
+	 */
+	if (prevlen == 0) {
+		optp = (u_int8_t *)((struct ip6_hbh *)extbuf + 1);
+	}
+	else {
+		optp = (u_int8_t *)extbuf + prevlen;
+		if ((optlen = ip6optlen(optp, lim)) == 0)
+			goto optend;
+		optp += optlen;
+	}
+
+	/* Find the specified option */
+	while(optp < lim) {
+		if ((optlen = ip6optlen(optp, lim)) == 0)
+			goto optend;
+
+		if (*optp == type) { /* found */
+			*lenp = optlen;
+			*databufp = optp + 2;
+			return(optp - (u_int8_t *)extbuf);
+		}
+
+		optp += optlen;
+	}
+
+  optend:
+	*databufp = NULL; /* for safety */
+	return(-1);
+}
+
+/*
+ * Databuf should be a pointer returned by inet6_opt_next() or
+ * inet6_opt_find().  This function extracts data items of various sizes
+ * (1, 2, 4, or 8 bytes) in the data portion of the option. Val should
+ * point to the destination for the extracted data.  Offset specifies
+ * from where in the data portion of the option the value should be
+ * extracted; the first byte after the option type and length is
+ * accessed by specifying an offset of zero.
+ * 
+ * The function returns the offset for the next field (i.e., offset +
+ * vallen) which can be used when extracting option content with
+ * multiple fields.
+ *
+ * [rfc2292bis-01, 10.7]
+ */
+int
+inet6_opt_get_val(void *databuf, size_t offset, void *val, int vallen)
+{
+	/* we can't assume alignment here */
+	memcpy(val, databuf + offset, vallen);
+
+	return(offset + vallen);
+}
