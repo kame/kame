@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.124 2004/03/10 11:55:12 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.125 2004/03/10 12:14:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1173,6 +1173,11 @@ socket_send(s, mm, src)
 	struct mbuf *mm;
 	struct sockaddr_in6 *src;
 {
+	/*
+	 * XXX: src may be an invalid address wrt the scope zone.  However,
+	 * this doesn't actually matter because pim6[sd]d don't care about
+	 * the "dummy" source address. 
+	 */
 	if (s) {
 		if (sbappendaddr(&s->so_rcv,
 				 (struct sockaddr *)src,
