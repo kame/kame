@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.238 2003/10/10 02:17:55 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.239 2003/10/13 06:27:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -546,9 +546,6 @@ nd6_rtmsg(cmd, rt)
 	struct rtentry *rt;
 {
 	struct rt_addrinfo info;
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
-	struct ifaddr *ifa;
-#endif
 
 	bzero((caddr_t)&info, sizeof(info));
 #if (defined(__bsdi__) && _BSDI_VERSION >= 199802) /* BSDI4 */
@@ -558,19 +555,16 @@ nd6_rtmsg(cmd, rt)
 	info.rti_info[RTAX_DST] = rt_key(rt);
 	info.rti_info[RTAX_GATEWAY] = rt->rt_gateway;
 	info.rti_info[RTAX_NETMASK] = rt_mask(rt);
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	if (rt->rt_ifp) {
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 		info.rti_info[RTAX_IFP] =
 		    rt->rt_ifp->if_addrlist->ifa_addr;
+#else
+		info.rti_info[RTAX_IFP] =
+		    TAILQ_FIRST(&rt->rt_ifp->if_addrlist)->ifa_addr;
+#endif
 		info.rti_info[RTAX_IFA] = rt->rt_ifa->ifa_addr;
 	}
-#else
-	if (rt->rt_ifp &&
-	    (ifa = TAILQ_FIRST(&rt->rt_ifp->if_addrlist)) != NULL)
-		info.rti_info[RTAX_IFP] = ifa->ifa_addr;
-	if (rt->rt_ifa)
-		info.rti_info[RTAX_IFA] = rt->rt_ifa->ifa_addr;
-#endif
 
 	rt_missmsg(cmd, &info, rt->rt_flags, 0);
 }
