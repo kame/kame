@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.324 2003/06/25 06:10:46 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.325 2003/06/25 06:15:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -55,7 +55,6 @@
 #include <sys/errno.h>
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/ioctl.h>
-#include <machine/limits.h>
 #endif
 #include <sys/syslog.h>
 #include <sys/queue.h>
@@ -108,6 +107,10 @@
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
 #endif /* MIP6 */
+
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#include <machine/limits.h>
+#endif
 
 #if !defined(__bsdi__) && !defined(__OpenBSD__)
 #include "loop.h"
