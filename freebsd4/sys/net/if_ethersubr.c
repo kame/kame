@@ -542,7 +542,15 @@ ether_demux(ifp, eh, m)
 			struct sockaddr_dl *sdl = NULL;
 
 			/* find link-layer address */
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+			TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
+#elif defined(__NetBSD__) || defined(__OpenBSD__)
+			for (ifa = ifp->if_addrlist.tqh_first;
+			     ifa;
+			     ifa = ifa->ifa_list.tqe_next)
+#else
 			for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
+#endif
 				if ((sdl = (struct sockaddr_dl *)ifa->ifa_addr) &&
 				    sdl->sdl_family == AF_LINK)
 					break;
