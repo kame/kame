@@ -1,0 +1,22 @@
+how to use mdnsd to talk with Jaguar
+Jun-ichiro itojun Hagino
+$KAME: README.jaguar,v 1.1 2002/09/10 03:34:12 itojun Exp $
+
+
+on Jaguar side:
+
+1. configure "Rendezvous name" under "Sharing" system preferences to some
+   name, like "gozilla.local".
+
+on BSD side:
+
+1. compile mdnsd.
+2. run it, giving your unicast DNS server as argument.
+	# mdnsd -i wi0 <your unicast DNS server>
+3. configure /etc/resolv.conf to use name server on the local host.
+	nameserver 0.0.0.0
+4. try whatever application with "gozilla.local".  note that AAAA name
+   resolution does not work (Jaguar does not respond to AAAA queries) so
+   you will want to specify -4 with ssh.
+	% ping gozilla.local
+	% ssh -4 gozilla.local
