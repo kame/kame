@@ -1,7 +1,20 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2134 2002/04/22 12:31:52 jinmei Exp $
+$KAME: CHANGELOG,v 1.2135 2002/04/24 02:37:56 jinmei Exp $
 
 <200204>
+2002-04-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ndp/ndp.c (ifinfo): used the new member of the
+	nd_ifinfo structure (see the next log entry) to see if the
+	structure had been initialized.
+
+2002-04-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_ifattach): obsoleted the usage of
+	nd_ifinfo.linkmtu as the flag if the structure had been
+	initialized.  Introduced a new member "initialized" for this
+	specific purpose instead.
+	Note: this change had broken binary compatibility to ndp(8) with
+	the -i option.  Be sure to upgrade the application as well.
+
 2002-04-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_setmtu): warned if configured (or
 	detected) interface MTU is smaller than IPv6 minimum link MTU.
