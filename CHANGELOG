@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2364 2003/03/26 10:45:13 suz Exp $
+$KAME: CHANGELOG,v 1.2365 2003/03/28 05:29:21 suz Exp $
 
 <200303>
+Fri Mar 28 14:27:07 JST 2003	suz@crl.hitachi.co.jp
+	* freebsd5/sys/sys/kernel.h, freebsd5/sys/net/if_var.h,
+	  kame/sys/net/if_{dummy,gif,stf}.c: KAME-origined 
+	  logical-interfaces(gif, dummy, and stf for the time being) 
+	  are now recognized on freebsd5.
+
 Wed Mar 26 19:43:16 JST 2003	suz@crl.hitachi.co.jp
 	* freebsd[45]/sys/conf/options:
 	supported LARGE_LOMTU kernel configuration option for 

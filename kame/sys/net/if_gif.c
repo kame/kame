@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.101 2003/02/09 09:26:38 suz Exp $	*/
+/*	$KAME: if_gif.c,v 1.102 2003/03/28 05:29:21 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -204,9 +204,7 @@ gifattach0(sc)
 }
 
 #ifdef __FreeBSD__
-#if !(__FreeBSD_version >= 500000)
 PSEUDO_SET(gifattach, if_gif);
-#endif
 #endif
 
 #ifdef __OpenBSD__
@@ -595,32 +593,34 @@ gif_input(m, af, ifp)
 		return;
 	}
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	IFQ_HANDOFF(ifp, m, NULL, error);
+	if (error)
+		return;
+#else
 #ifdef __NetBSD__
 	s = splnet();
-#elif !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#else
 	s = splimp();
 #endif
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-	/*
-	 * Queue message on interface, update output statistics if
-	 * successful, and start output if interface not yet active.
-	 */
-	IFQ_HANDOFF(ifp, m, NULL, error);
-	return;
-#else
 	if (IF_QFULL(ifq)) {
 		IF_DROP(ifq);	/* update statistics */
 		m_freem(m);
 		splx(s);
 		return;
 	}
+	IF_ENQUEUE(ifq, m);
+#endif
+
 	ifp->if_ipackets++;
 	ifp->if_ibytes += m->m_pkthdr.len;
-	IF_ENQUEUE(ifq, m);
 	/* we need schednetisr since the address family may change */
 	schednetisr(isr);
+
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	splx(s);
 #endif
+	return;
 }
 #endif /*!OpenBSD*/
 

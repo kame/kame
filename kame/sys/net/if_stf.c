@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.105 2003/02/08 19:20:05 kjc Exp $	*/
+/*	$KAME: if_stf.c,v 1.106 2003/03/28 05:29:21 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -318,9 +318,7 @@ stfattach(dummy)
 }
 
 #ifdef __FreeBSD__
-#if !(__FreeBSD_version >= 500000)
 PSEUDO_SET(stfattach, if_stf);
-#endif
 #endif
 
 static int
@@ -1151,19 +1149,16 @@ in_stf_input(m, va_alist)
 	ifq = &ip6intrq;
 	isr = NETISR_IPV6;
 
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+	IFQ_HANDOFF(ifp, m, NULL, error);
+	if (error)
+		return;
+#else
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splnet();
-#elif !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#else
 	s = splimp();
 #endif
-
-#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
-	/*
-	 * Queue message on interface, update output statistics if
-	 * successful, and start output if interface not yet active.
-	 */
-	IFQ_HANDOFF(ifp, m, NULL, error);
-#else
 	if (IF_QFULL(ifq)) {
 		IF_DROP(ifq);	/* update statistics */
 		m_freem(m);
@@ -1171,9 +1166,12 @@ in_stf_input(m, va_alist)
 		return;
 	}
 	IF_ENQUEUE(ifq, m);
+#endif
+
 	schednetisr(isr);
 	ifp->if_ipackets++;
 	ifp->if_ibytes += m->m_pkthdr.len;
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	splx(s);
 #endif
 }

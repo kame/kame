@@ -1,4 +1,4 @@
-/*	$KAME: if_dummy.c,v 1.23 2003/02/09 09:26:38 suz Exp $	*/
+/*	$KAME: if_dummy.c,v 1.24 2003/03/28 05:29:21 suz Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -133,9 +133,7 @@ static void dummyrtrequest __P((int, struct rtentry *, struct sockaddr *));
 
 #ifdef __FreeBSD__
 void dummyattach __P((void *));
-#if !(__FreeBSD_version >= 500000)
 PSEUDO_SET(dummyattach, if_dummy);
-#endif
 #else
 void dummyattach __P((int));
 #endif
@@ -300,20 +298,17 @@ dummyoutput(ifp, m, dst, rt)
 		m_freem(m);
 		return (EAFNOSUPPORT);
 	}
-#ifdef __NetBSD__
-	s = splnet();
-#elif !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
-	s = splimp();
-#endif
 
 #if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
-	/*
-	 * Queue message on interface, update output statistics if
-	 * successful, and start output if interface not yet active.
-	 */
 	IFQ_HANDOFF(ifp, m, NULL, error);
-	return error;
+	if (error)
+		return (error);
 #else
+#ifdef __NetBSD__
+	s = splnet();
+#else
+	s = splimp();
+#endif
 	if (IF_QFULL(ifq)) {
 		IF_DROP(ifq);
 		m_freem(m);
@@ -321,12 +316,15 @@ dummyoutput(ifp, m, dst, rt)
 		return (ENOBUFS);
 	}
 	IF_ENQUEUE(ifq, m);
+#endif /* !FreeBSD5 */
+
 	schednetisr(isr);
 	ifp->if_ipackets++;
 	ifp->if_ibytes += m->m_pkthdr.len;
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	splx(s);
-	return (0);
 #endif
+	return (0);
 }
 
 /* ARGSUSED */

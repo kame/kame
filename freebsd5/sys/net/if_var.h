@@ -463,7 +463,8 @@ do {									\
 		(ifp)->if_obytes += len;				\
 		if (mflags & M_MCAST)					\
 			(ifp)->if_omcasts++;				\
-		if (((ifp)->if_flags & IFF_OACTIVE) == 0)		\
+		if (((ifp)->if_flags & IFF_OACTIVE) == 0 &&		\
+		    (ifp)->if_start != NULL)				\
 			(*(ifp)->if_start)(ifp);			\
 	}								\
 } while (0)
