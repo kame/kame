@@ -1,18 +1,17 @@
 Platforms and base versions
 KAME project
-$Id: VERSION,v 1.12 2000/03/30 14:43:24 itojun Exp $
+$Id: VERSION,v 1.13 2000/04/20 01:56:32 itojun Exp $
 
 
-platform	base version		webpage
----		---			---
-netbsd		NetBSD 1.4.2		http://www.netbsd.org/
-freebsd2	FreeBSD 2.2.8-RELEASE	http://www.freebsd.org/
-bsdi3		BSDI BSD/OS		http://www.bsdi.com/
+platform	base version			webpage
+---		---				---
+netbsd		NetBSD 1.4.2			http://www.netbsd.org/
+freebsd2	FreeBSD 2.2.8-RELEASE		http://www.freebsd.org/
+bsdi3		BSDI BSD/OS			http://www.bsdi.com/
 		kernel: BSD/OS 3.1 patchlevel 0
 		userland: BSD/OS 3.0 patchlevel 0
 		include: BSD/OS 3.0 patchlevel 0 + ISC BIND 4.9.7
-freebsd3	FreeBSD 3.4-RELEASE	http://www.freebsd.org/
-openbsd		OpenBSD 2.6		http://www.openbsd.org/
-bsdi4		BSDI BSD/OS		http://www.bsdi.com/
-			4.1 patchlevel 0
-freebsd4	FreeBSD 4.0-RELEASE	http://www.freebsd.org/
+freebsd3	FreeBSD 3.4-RELEASE		http://www.freebsd.org/
+openbsd		OpenBSD 2.6			http://www.openbsd.org/
+bsdi4		BSDI BSD/OS 4.1 patchlevel 0	http://www.bsdi.com/
+freebsd4	FreeBSD 4.0-RELEASE		http://www.freebsd.org/
