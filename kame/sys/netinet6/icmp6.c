@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.400 2005/04/01 07:31:01 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.401 2005/04/01 09:25:02 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3819,7 +3819,7 @@ SYSCTL_SETUP(sysctl_net_inet6_icmp6_setup,
 		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
 		       CTLTYPE_INT, "maxqueuelen",
 		       SYSCTL_DESCR("max packet queue len for a unresolved ND"),
-		       NULL, 1, &ip6_forwarding, 0,
+		       NULL, 1, &nd6_maxqueuelen, 0,
 		       CTL_NET, PF_INET6, IPPROTO_ICMPV6,
 		       ICMPV6CTL_ND6_MAXQLEN, CTL_EOL);
 

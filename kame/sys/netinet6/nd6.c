@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.373 2005/04/01 07:31:01 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.374 2005/04/01 09:25:02 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -59,9 +59,7 @@
 #endif
 #include <sys/syslog.h>
 #include <sys/queue.h>
-#ifdef __FreeBSD__
 #include <sys/sysctl.h>
-#endif
 #ifdef __OpenBSD__
 #include <dev/rndvar.h>
 #endif
@@ -2806,8 +2804,10 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 		break;
 
 	case ICMPV6CTL_ND6_MAXQLEN:
+#ifndef __NetBSD__
 		error = sysctl_int(oldp, oldlenp, newp, newlen,
-		    &nd6_maxqueulen);
+		    &nd6_maxqueuelen);
+#endif
 		break;
 
 	default:
