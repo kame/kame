@@ -367,7 +367,7 @@ pfkey_spdump(m)
 		(u_long)m->sadb_msg_pid);
 
 	/* XXX TEST */
-	printf("\trefcnt=%u\n", m->sadb_msg_reserved2);
+	printf("\tspid=%u\n", m->sadb_msg_reserved2);
 
 	return;
 }
