@@ -30,7 +30,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     From: @(#)gethostbyname.3	8.4 (Berkeley) 5/25/95
-.\"     $Id: getnameinfo.3,v 1.3 1999/12/10 03:12:39 itojun Exp $
+.\"     $Id: getnameinfo.3,v 1.4 1999/12/10 04:04:31 itojun Exp $
 .\"
 .Dd May 25, 1995
 .Dt GETNAMEINFO 3
@@ -67,16 +67,16 @@ a non-zero return value indicates failure.
 The first argument,
 .Fa sa ,
 points to either a
-.Fa sockaddr_in
+.Li sockaddr_in
 structure (for IPv4) or a
-.Fa sockaddr_in6
+.Li sockaddr_in6
 structure (for IPv6) that holds the IP address and port number.
 The
 .Fa salen
 argument gives the length of the
-.Fa sockaddr_in
+.Li sockaddr_in
 or
-.Fa sockaddr_in6
+.Li sockaddr_in6
 structure.
 .Pp
 The function returns the nodename associated with the IP address in
@@ -105,7 +105,7 @@ Unfortunately most systems do not provide constants that specify the
 maximum size of either a fully-qualified domain name or a service name.
 Therefore to aid the application in allocating buffers for these two
 returned strings the following constants are defined in
-.Li <netdb.h> :
+.Aq Pa netdb.h :
 .Bd -literal -offset
 #define NI_MAXHOST  1025
 #define NI_MAXSERV    32
@@ -114,7 +114,7 @@ returned strings the following constants are defined in
 The first value is actually defined as the constant
 .Dv MAXDNAME
 in recent versions of BIND's
-.Li <arpa/nameser.h>
+.Aq Pa arpa/nameser.h
 header
 .Po
 older versions of BIND define this constant to be 256
@@ -157,21 +157,24 @@ instead of its name.
 The two
 .Dv NI_NUMERICxxx
 flags are required to support the
-.Li "-n"
+.Fl n
 flag that many commands provide.
 .Pp
 A fifth flag bit,
 .Dv NI_DGRAM ,
 specifies that the service is a datagram service, and causes
 .Fn getservbyport
-to be called with a second argument of "udp" instead of its default of "tcp".
+to be called with a second argument of
+.Dq udp
+instead of its default of
+.Dq tcp .
 This is required for the few ports (512-514)
 that have different services for UDP and TCP.
 .Pp
 These
 .Dv NI_xxx
 flags are defined in
-.Li <netdb.h> .
+.Aq Pa netdb.h .
 .\"
 .Sh EXTENSION
 The implementation allows experimental numeric IPv6 address notation with

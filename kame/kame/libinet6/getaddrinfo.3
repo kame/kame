@@ -30,14 +30,14 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     From: @(#)gethostbyname.3	8.4 (Berkeley) 5/25/95
-.\"     $Id: getaddrinfo.3,v 1.4 1999/12/10 03:12:38 itojun Exp $
+.\"     $Id: getaddrinfo.3,v 1.5 1999/12/10 04:04:30 itojun Exp $
 .\"
 .Dd May 25, 1995
 .Dt GETADDRINFO 3
 .Os KAME
 .\"
 .Sh NAME
-.Nm getaddrinfo
+.Nm getaddrinfo ,
 .Nm freeaddrinfo ,
 .Nm gai_strerror
 .Nd nodename-to-address translation in protocol-independent manner
@@ -63,8 +63,10 @@ and
 .Xr getservbyname 3 ,
 in more sophisticated manner.
 .Pp
-The addrinfo structure is defined as a result of including the
-.Li <netdb.h>
+The
+.Li addrinfo
+structure is defined as a result of including the
+.Aq Pa netdb.h
 header:
 .Bd -literal -offset
 struct addrinfo {                                                  *
@@ -158,7 +160,8 @@ pointer, this is the same as if the caller had filled in an
 .Li addrinfo
 structure initialized to zero with
 .Fa ai_family
-set to PF_UNSPEC.
+set to
+.Dv PF_UNSPEC .
 .Pp
 Upon successful return a pointer to a linked list of one or more
 .Li addrinfo
@@ -221,7 +224,8 @@ call to
 .Pq for a connection-oriented protocol
 or either
 .Fn connect ,
-.Fn sendto , or
+.Fn sendto ,
+or
 .Fn sendmsg
 .Pq for a connectionless protocol .
 In this case, if the
@@ -266,7 +270,7 @@ All of the information returned by
 is dynamically allocated:
 the
 .Li addrinfo
-structures, and the socket address structures and canonical node name
+structures, the socket address structures, and canonical node name
 strings pointed to by the addrinfo structures.
 To return this information to the system the function
 .Fn freeaddrinfo
@@ -338,32 +342,44 @@ Error return status from
 .Fn getaddrinfo
 is zero on success and non-zero on errors.
 Non-zero error codes are defined in
-.Li <netdb.h> ,
+.Aq Pa netdb.h ,
 and as follows:
 .Pp
 .Bl -tag -width EAI_ADDRFAMILY -compact
 .It Dv EAI_ADDRFAMILY 
-address family for nodename not supported
+address family for
+.Fa nodename
+not supported
 .It Dv EAI_AGAIN
 temporary failure in name resolution
 .It Dv EAI_BADFLAGS
-invalid value for ai_flags
+invalid value for
+.Fa ai_flags
 .It Dv EAI_FAIL
 non-recoverable failure in name resolution
 .It Dv EAI_FAMILY
-ai_family not supported
+.Fa ai_family
+not supported
 .It Dv EAI_MEMORY
 memory allocation failure
 .It Dv EAI_NODATA
-no address associated with nodename
+no address associated with
+.Fa nodename
 .It Dv EAI_NONAME
-nodename nor servname provided, or not known
+.Fa nodename
+nor
+.Fa servname
+provided, or not known
 .It Dv EAI_SERVICE
-servname not supported for ai_socktype
+.Fa servname
+not supported for
+.Fa ai_socktype
 .It Dv EAI_SOCKTYPE
-ai_socktype not supported
+.Fa ai_socktype
+not supported
 .It Dv EAI_SYSTEM
-system error returned in errno
+system error returned in
+.Va errno
 .El
 .Pp
 If called with proper argument,

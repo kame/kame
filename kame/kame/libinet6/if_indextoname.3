@@ -30,7 +30,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     From: @(#)rcmd.3	8.1 (Berkeley) 6/4/93
-.\"	$Id: if_indextoname.3,v 1.2 1999/12/10 03:12:39 itojun Exp $
+.\"	$Id: if_indextoname.3,v 1.3 1999/12/10 04:04:32 itojun Exp $
 .\"
 .Dd May 21, 1998
 .Dt IF_NAMETOINDEX 3
@@ -75,7 +75,7 @@ returned.
 .Po
 .Dv IF_NAMESIZE
 is also defined in
-.Li <net/if.h>
+.Aq Li net/if.h
 and its value includes a terminating null byte at the end of the
 interface name.
 .Pc
@@ -90,7 +90,7 @@ returns an array of
 structures.
 .Fa if_nametoindex
 is also defined in
-.Li <net/if.h> ,
+.Aq Li net/if.h ,
 and is as follows:
 .Bd -literal -offset
 struct if_nameindex {
