@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.262 2001/12/24 17:55:17 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.263 2001/12/24 18:23:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3837,7 +3837,8 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 			continue;
 
 		error = ip6_setpktoption(cm->cmsg_type, CMSG_DATA(cm),
-					 cm->cmsg_len, opt, priv, needcopy, 1);
+					 cm->cmsg_len - CMSG_LEN(0),
+					 opt, priv, needcopy, 1);
 		if (error)
 			return(error);
 	}
@@ -3916,10 +3917,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 			break;
 		}
 
-		if (cmsg) {
-			if (len != CMSG_LEN(sizeof(struct in6_pktinfo)))
-				return(EINVAL);
-		} else if (len != sizeof(struct in6_pktinfo))
+		if (len != sizeof(struct in6_pktinfo))
 			return(EINVAL);
 
 		pktinfo = (struct in6_pktinfo *)buf;
@@ -3980,10 +3978,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 	{
 		int *hlimp;
 
-		if (cmsg) {
-			if (len != CMSG_LEN(sizeof(int)))
-				return(EINVAL);
-		} else if (len != sizeof(int))
+		if (len != sizeof(int))
 			return(EINVAL);
 		hlimp = (int *)buf;
 		if (*hlimp < -1 || *hlimp > 255)
@@ -3994,10 +3989,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 	}
 
 	case IPV6_OTCLASS:
-		if (cmsg) {
-			if (len != CMSG_LEN(sizeof(u_int8_t)))
-				return(EINVAL);
-		} else if (len != sizeof(u_int8_t))
+		if (len != sizeof(u_int8_t))
 			return(EINVAL);
 
 		opt->ip6po_tclass = *(u_int8_t *)buf;
@@ -4007,10 +3999,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 	{
 		int tclass;
 
-		if (cmsg) {
-			if (len != CMSG_LEN(sizeof(int)))
-				return(EINVAL);
-		} else if (len != sizeof(int))
+		if (len != sizeof(int))
 			return(EINVAL);
 		tclass = *(int *)buf;
 		if (tclass < -1 || tclass > 255)
@@ -4031,12 +4020,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		}
 
 		/* check if cmsg_len is large enough for sa_len */
-		if (cmsg) {
-			if (len < CMSG_LEN(sizeof(struct sockaddr)) ||
-			    len < CMSG_LEN(*buf)) {
-				return(EINVAL);
-			}
-		} else if (len < sizeof(struct sockaddr) || len < *buf)
+		if (len < sizeof(struct sockaddr) || len < *buf)
 			return(EINVAL);
 
 		switch (((struct sockaddr *)buf)->sa_family) {
@@ -4066,10 +4050,9 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 			return(EAFNOSUPPORT);
 		}
 
-		/* turn off the previous option */
+		/* turn off the previous option, then set the new option. */
+		ip6_clearpktopts(opt, IPV6_NEXTHOP);
 		if (sticky) {
-			ip6_clearpktopts(opt, IPV6_NEXTHOP);
-
 			opt->ip6po_nexthop = malloc(*buf, M_IP6OPT, M_WAITOK);
 			bcopy(buf, opt->ip6po_nexthop, *buf);
 		} else
@@ -4096,23 +4079,16 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		}
 
 		/* message length validation */
-		if (cmsg) {
-			if (len < CMSG_LEN(sizeof(struct ip6_hbh)))
-				return(EINVAL);
-		} else if (len < sizeof(struct ip6_hbh))
+		if (len < sizeof(struct ip6_hbh))
 			return(EINVAL);
 		hbh = (struct ip6_hbh *)buf;
 		hbhlen = (hbh->ip6h_len + 1) << 3;
-		if (cmsg) {
-			if (len != CMSG_LEN(hbhlen))
-				return(EINVAL);
-		} else if (len != hbhlen)
+		if (len != hbhlen)
 			return(EINVAL);
 
+		/* turn off the previous option, then set the new option. */
+		ip6_clearpktopts(opt, IPV6_HOPOPTS);
 		if (sticky) {
-			/* turn off the previous option */
-			ip6_clearpktopts(opt, IPV6_HOPOPTS);
-		
 			opt->ip6po_hbh = malloc(hbhlen, M_IP6OPT, M_WAITOK);
 			bcopy(hbh, opt->ip6po_hbh, hbhlen);
 		} else
@@ -4137,18 +4113,11 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		}
 
 		/* message length validation */
-		if (cmsg) {
-			if (len < CMSG_LEN(sizeof(struct ip6_dest)))
-				return(EINVAL);
-		}
-		else if (len < sizeof(struct ip6_dest))
+		if (len < sizeof(struct ip6_dest))
 			return(EINVAL);
 		dest = (struct ip6_dest *)buf;
 		destlen = (dest->ip6d_len + 1) << 3;
-		if (cmsg) {
-			if (len != CMSG_LEN(destlen))
-				return(EINVAL);
-		} else if (len != destlen)
+		if (len != destlen)
 			return(EINVAL);
 
 		/*
@@ -4182,10 +4151,9 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 			break;
 		}
 
+		/* turn off the previous option, then set the new option. */
+		ip6_clearpktopts(opt, optname);
 		if (sticky) {
-			/* turn off the previous option */
-			ip6_clearpktopts(opt, optname);
-		
 			*newdest = malloc(destlen, M_IP6OPT, M_WAITOK);
 			bcopy(dest, *newdest, destlen);
 		} else
@@ -4206,18 +4174,11 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		}
 
 		/* message length validation */
-		if (cmsg) {
-			if (len < CMSG_LEN(sizeof(struct ip6_rthdr)))
-				return(EINVAL);
-		}
-		else if (len < sizeof(struct ip6_rthdr))
+		if (len < sizeof(struct ip6_rthdr))
 			return(EINVAL);
 		rth = (struct ip6_rthdr *)buf;
 		rthlen = (rth->ip6r_len + 1) << 3;
-		if (cmsg) {
-			if (len != CMSG_LEN(rthlen))
-				return(EINVAL);
-		} else if (len != rthlen)
+		if (len != rthlen)
 			return(EINVAL);
 
 		switch (rth->ip6r_type) {
@@ -4233,10 +4194,9 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 			return(EINVAL);	/* not supported */
 		}
 
+		/* turn off the previous option */
+		ip6_clearpktopts(opt, IPV6_RTHDR);
 		if (sticky) {
-			/* turn off the previous option */
-			ip6_clearpktopts(opt, IPV6_RTHDR);
-
 			opt->ip6po_rthdr = malloc(rthlen, M_IP6OPT, M_WAITOK);
 			bcopy(rth, opt->ip6po_rthdr, rthlen);
 		} else
@@ -4263,7 +4223,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		 * conformation by using ln->ln_byhint.
 		 */
 #endif
-		if (len != CMSG_LEN(0))
+		if (len)
 			return(EINVAL);
 		opt->ip6po_flags |= IP6PO_REACHCONF;
 		break;
@@ -4273,10 +4233,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 	{
 		int on, flag = 0;
 
-		if (cmsg) {
-			if (len != CMSG_LEN(sizeof(int)))
-				return(EINVAL);
-		}  else if (len != sizeof(int))
+		if (len != sizeof(int))
 			return(EINVAL);
 		on = *(int *)buf;
 
