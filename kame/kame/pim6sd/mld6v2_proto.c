@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.19 2003/09/02 09:48:45 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.20 2004/05/14 02:37:20 suz Exp $
  */
 
 /*
@@ -728,11 +728,7 @@ strip_source_in_multicast_record(vifi, mard, src, grp)
 		break;
 
 	case CHANGE_TO_EXCLUDE_MODE:
-		if (numsrc == 0) {
-			goto regard_as_done;
-		} else {
-			goto regard_as_report;
-		}
+		goto regard_as_report;
 		break;
 
 	default:
