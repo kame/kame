@@ -82,12 +82,12 @@ ieee802_to_eui64(dst, src)
 	dst[5] = src[3];
 	dst[6] = src[4];
 	dst[7] = src[5];
-	/* invert u bit */
-	dst[0] ^= 0x02;
 }
 
 /*
- * find first ifid on list of interfaces.
+ * Find first ifid on list of interfaces.
+ * This is assumed that ifp0's interface token (for example, IEEE802 MAC)
+ * is globally unique.  We may need to have a flag parameter in the future.
  */
 int
 in6_ifattach_getifid(ifp0)
@@ -165,6 +165,10 @@ found:
 			first_ifid[2] & 0xff, first_ifid[3] & 0xff,
 			first_ifid[4] & 0xff, first_ifid[5] & 0xff,
 			first_ifid[6] & 0xff, first_ifid[7] & 0xff);
+
+		/* invert u bit, as suggested in RFC2373. */
+		first_ifid[0] ^= 0x02;
+
 		return 0;
 	} else {
 #ifdef DEBUG
