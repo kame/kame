@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.21 2004/01/16 09:56:01 itojun Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.22 2004/01/19 03:52:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -387,11 +387,11 @@ sctp_mark_all_for_resend(struct sctp_tcb *tcb,
 	 */
 	struct sctp_tmit_chunk *chk,*tp2;
 	struct sctp_nets *lnets;
-	struct timeval now, min_wait;
+	struct timeval now, min_wait, tv;
 	int cur_rto;
-
 	int win_probes, non_win_probes, orig_rwnd, orig_flight, audit_tf, cnt_mk, num_mk, fir;
 	u_int32_t tsnlast, tsnfirst;
+
 	/* none in flight now */
 	audit_tf = 0;
 	fir=0;
@@ -408,33 +408,18 @@ sctp_mark_all_for_resend(struct sctp_tcb *tcb,
 #ifdef SCTP_FR_LOGGING
 	sctp_log_fr(cur_rto,0,0, SCTP_FR_T3_MARK_TIME);
 #endif
-	if (cur_rto > now.tv_usec) {
-		uint32_t tmp_usec;
-		min_wait.tv_sec = now.tv_sec;
-		tmp_usec = now.tv_usec;
-		while (cur_rto > tmp_usec) {
-			min_wait.tv_sec--;
-			tmp_usec += 1000000;
-			if (min_wait.tv_sec == 0) {
-				break;
-			}
-		}
-		if (cur_rto <= tmp_usec) {
-			min_wait.tv_usec = tmp_usec - cur_rto; 
-		} else {
-			/* if we hit the else, we don't
-			 * have enough seconds on the clock to account
-			 * for the RTO. We just let the lower seconds
-			 * be the bounds and don't worry about it. This
-			 * may mean we will mark a lot more than we should.
-			 */
-			min_wait.tv_usec = 0;
-		}
-		
-	} else {
-		/* easy way to figure */
-		min_wait.tv_sec = now.tv_sec;
-		min_wait.tv_usec = now.tv_usec - cur_rto;
+	tv.tv_sec = cur_rto / 1000000;
+	tv.tv_usec = cur_rto % 1000000;
+	timersub(&now, &tv, &min_wait);
+	if (min_wait.tv_sec < 0 || min_wait.tv_usec < 0) {
+		/*
+		 * if we hit here, we don't
+		 * have enough seconds on the clock to account
+		 * for the RTO. We just let the lower seconds
+		 * be the bounds and don't worry about it. This
+		 * may mean we will mark a lot more than we should.
+		 */
+		min_wait.tv_sec = min_wait.tv_usec = 0;
 	}
 #ifdef SCTP_FR_LOGGING
 	sctp_log_fr(cur_rto, now.tv_sec, now.tv_usec, SCTP_FR_T3_MARK_TIME);

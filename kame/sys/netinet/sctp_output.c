@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.34 2004/01/16 09:56:00 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.35 2004/01/19 03:52:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -3681,18 +3681,13 @@ sctp_prepare_chunk(struct sctp_tmit_chunk *template,
 			 */
 			template->rec.data.timetodrop.tv_sec = srcv->sinfo_timetolive;
 		} else {
-			u_int32_t sec, usec;
+			struct timeval tv;
+
 			SCTP_GETTIME_TIMEVAL(&template->rec.data.timetodrop);
-			sec = (srcv->sinfo_timetolive/1000);
-			template->rec.data.timetodrop.tv_sec += sec;
-			/* Add in the milliseconds in to the usec's */
-			usec = ((srcv->sinfo_timetolive * 1000) % 1000000);
-			template->rec.data.timetodrop.tv_usec += usec;
-			if (template->rec.data.timetodrop.tv_usec > 1000000) {
-				/* add in the carry over */
-				template->rec.data.timetodrop.tv_usec -= 1000000;
-				template->rec.data.timetodrop.tv_sec++;
-				}
+			tv.tv_sec = srcv->sinfo_timetolive / 1000;
+			tv.tv_usec = (srcv->sinfo_timetolive * 1000) % 1000000;
+			timeradd(&template->rec.data.timetodrop, &tv,
+			    &template->rec.data.timetodrop);
 		}
 	}
 	if ((srcv->sinfo_flags & MSG_UNORDERED) == 0) {

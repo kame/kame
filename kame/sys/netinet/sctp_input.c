@@ -1,4 +1,4 @@
-/*	$KAME: sctp_input.c,v 1.19 2004/01/16 09:56:00 itojun Exp $	*/
+/*	$KAME: sctp_input.c,v 1.20 2004/01/19 03:52:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -121,6 +121,8 @@
 #undef IPSEC
 #endif
 #endif /*IPSEC*/
+
+#include <net/net_osdep.h>
 
 #ifdef SCTP_DEBUG
 extern u_int32_t sctp_debug_on;

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.29 2004/01/16 09:56:00 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.30 2004/01/19 03:52:08 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -2823,8 +2823,8 @@ sctp_add_vtag_to_timewait(struct sctp_inpcb *m, u_int32_t tag)
 			for (i = 0; i < SCTP_NUMBER_IN_VTAG_BLOCK; i++) {
 				if ((twait_block->vtag_block[i].v_tag == 0) &&
 				    !set) {
-					twait_block->vtag_block[0].tv_sec_at_expire = now.tv_sec +
-						SCTP_TIME_WAIT;
+					twait_block->vtag_block[0].tv_sec_at_expire =
+					    now.tv_sec + SCTP_TIME_WAIT;
 					twait_block->vtag_block[0].v_tag = tag;
 					set = 1;
 				} else if ((twait_block->vtag_block[i].v_tag) &&
@@ -2859,7 +2859,7 @@ sctp_add_vtag_to_timewait(struct sctp_inpcb *m, u_int32_t tag)
 		memset(twait_block, 0, sizeof(struct sctp_timewait));
 		LIST_INSERT_HEAD(chain, twait_block, sctp_nxt_tagblock);
 		twait_block->vtag_block[0].tv_sec_at_expire = now.tv_sec +
-			SCTP_TIME_WAIT;
+		    SCTP_TIME_WAIT;
 		twait_block->vtag_block[0].v_tag = tag;
 	}
 }
@@ -4291,11 +4291,13 @@ sctp_is_vtag_good(struct sctp_inpcb *m, u_int32_t tag, struct timeval *now)
 				if (twait_block->vtag_block[i].v_tag == 0) {
 					/* not used */
 					continue;
-				} else if (twait_block->vtag_block[i].tv_sec_at_expire > now->tv_sec) {
+				} else if (twait_block->vtag_block[i].tv_sec_at_expire >
+				    now->tv_sec) {
 					/* Audit expires this guy */
 					twait_block->vtag_block[i].tv_sec_at_expire = 0;
 					twait_block->vtag_block[i].v_tag = 0;
-				} else if (twait_block->vtag_block[i].v_tag == tag) {
+				} else if (twait_block->vtag_block[i].v_tag ==
+				    tag) {
 					/* Bad tag, sorry :< */
 					return (0);
 				}
