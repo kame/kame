@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.49 2004/08/24 06:52:41 sakane Exp $	*/
+/*	$KAME: main.c,v 1.50 2004/08/25 08:07:31 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -227,9 +227,9 @@ main(ac, av)
 		if (fp) {
 			if (fchmod(fileno(fp),
 			    S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH) == -1) {
+				error = errno;
 				fclose(fp);
-				exit(1);
-				exit_program(1, "%s", strerror(errno));
+				exit_program(1, "%s", strerror(error));
 			}
 			fprintf(fp, "%ld\n", (long)racoon_pid);
 			fclose(fp);
@@ -247,7 +247,7 @@ main(ac, av)
 		}
 	}
 
-	session();
+	(void)session();
 
 	exit_program(0, NULL);
 }
