@@ -3,6 +3,9 @@
 PROG=	ifconfig
 MAN=	ifconfig.8
 
+#XXX set empty strings to LDSTATIC to avoid conflict between libc and lbinet6.
+LDSTATIC=
+
 CPPFLAGS+=-DINET6
 CPPFLAGS+=-DHAVE_IFADDRS_H
 
