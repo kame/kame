@@ -1,17 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1062 2000/06/24 14:44:59 itojun Exp $
+$Id: CHANGELOG,v 1.1063 2000/06/24 15:09:18 itojun Exp $
 
 <200006>
 Sat Jun 24 23:41:31 JST 2000  itojun@iijlab.net
 	* freebsd4/lib/libinet6/getnameinfo.c: correct NIS lookup.  from ume.
 
 Sat Jun 24 16:43:58 JST 2000  itojun@iijlab.net
-	* netbsd/sys/arch/*/conf/GENERIC.v6: enable PULLDOWN_TEST for all
-	  architectures.  this is done because mbuf pullup code in
-	  sys/net/if_loop.c has been found to be a source of performance hit,
-	  and PULLDOWN_TEST code is found to be stable enough.
-	* netbsd/sys/sys/mbuf.h: recover 4.4BSD MINCLSIZE.
 	* netbsd/pkgsrc/net/{libpcap,tcpdump}: upgrade to 6/19.
 
 Sat Jun 24 02:20:33 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
