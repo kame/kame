@@ -545,7 +545,6 @@ pfkey_send_promisc_toggle(so, flag)
 
 /*
  * sending SADB_X_SPDADD message to the kernel.
- * The length of key material is a_keylen + e_keylen.
  * OUT:
  *	positive: success and return length sent.
  *	-1	: error occured, and set errno.
@@ -571,7 +570,6 @@ pfkey_send_spdadd(so, src, prefs, dst, prefd, proto, policy, policylen, seq)
 
 /*
  * sending SADB_X_SPDDELETE message to the kernel.
- * The length of key material is a_keylen + e_keylen.
  * OUT:
  *	positive: success and return length sent.
  *	-1	: error occured, and set errno.
