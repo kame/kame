@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.283 2002/06/08 00:21:02 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.284 2002/06/08 00:55:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -805,7 +805,7 @@ in6_control(so, cmd, data, ifp)
 		bzero(&pr0, sizeof(pr0));
 		pr0.ndpr_ifp = ifp;
 		pr0.ndpr_plen = in6_mask2len(&ifra->ifra_prefixmask.sin6_addr,
-					     NULL);
+		    NULL);
 		if (pr0.ndpr_plen == 128) {
 #ifdef MIP6
 			if (MIP6_IS_MN)
@@ -1911,8 +1911,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 				bzero(&iflr->dstaddr, sizeof(iflr->dstaddr));
 
 			iflr->prefixlen =
-				in6_mask2len(&ia->ia_prefixmask.sin6_addr,
-					     NULL);
+			    in6_mask2len(&ia->ia_prefixmask.sin6_addr, NULL);
 
 			iflr->flags = ia->ia6_flags;	/* XXX */
 
