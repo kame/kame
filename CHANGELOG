@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1045.2.6 2000/06/21 18:55:44 itojun Exp $
+$Id: CHANGELOG,v 1.1045.2.7 2000/06/27 16:18:30 itojun Exp $
 
 <200006>
+Wed Jun 28 01:12:59 JST 2000  itojun@iijlab.net
+	* libinet6/name6.c: correct error handling in DNS name lookups.
+
 Thu Jun 22 03:45:41 JST 2000  itojun@iijlab.net
 	* {bsdi4,openbsd}/sys/netinet6/raw_ipv6.c:
 	  correct multicast RFC2292bis interface selection support for
