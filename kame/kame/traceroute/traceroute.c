@@ -24,7 +24,7 @@ static const char copyright[] =
     "@(#) Copyright (c) 1988, 1989, 1991, 1994, 1995, 1996, 1997\n\
 The Regents of the University of California.  All rights reserved.\n";
 static const char rcsid[] =
-    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.10 1999/11/02 17:13:03 itojun Exp $ (LBL)";
+    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.11 2000/01/27 20:00:53 itojun Exp $ (LBL)";
 #endif
 
 /*
@@ -331,7 +331,11 @@ int	str2val(const char *, const char *, int, int);
 void	tvsub(struct timeval *, struct timeval *);
 __dead	void usage(void);
 int	wait_for_reply(int, struct sockaddr_in *, struct timeval *);
+#ifdef IPSEC
+#ifdef IPSEC_POLICY_IPSEC
 int	setpolicy(int so, char *policy);
+#endif
+#endif
 
 int
 main(int argc, char **argv)
