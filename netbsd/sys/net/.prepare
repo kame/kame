@@ -1,1 +1,7 @@
 exclude if_dummy.c
+exclude pf.c
+exclude pf_ioctl.c
+exclude pf_norm.c
+exclude pf_osfp.c
+exclude pf_table.c
+exclude pfvar.h
