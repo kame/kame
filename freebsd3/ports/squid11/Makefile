@@ -2,7 +2,7 @@
 # Date created:		Thu Nov  7 00:53:18 WST 1996
 # Whom:			Peter Wemm <peter@freebsd.org>
 #
-# $KAME: Makefile,v 1.5 2000/08/23 04:03:38 sumikawa Exp $
+# $KAME: Makefile,v 1.6 2000/10/12 17:34:38 sumikawa Exp $
 #
 
 PORTNAME=	squid
@@ -16,7 +16,7 @@ MASTER_SITES=  \
 EXTRACT_SUFX=	-src.tar.gz
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	squid-1.1.22-v6-20000823.diff.gz
+PATCHFILES=	squid-1.1.22-v6-20001013.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	k-sugyou@kame.net
