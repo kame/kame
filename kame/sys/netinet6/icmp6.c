@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.331 2002/12/02 14:28:57 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.332 2003/01/21 08:00:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -338,7 +338,7 @@ icmp6_error(m, type, code, param)
 {
 	struct ip6_hdr *oip6, *nip6;
 	struct icmp6_hdr *icmp6;
-	struct mbuf *n;
+	struct m_tag *mtag;
 	struct ip6aux *ip6a;
 	struct sockaddr_in6 *src_sa, *dst_sa;
 	u_int preplen;
@@ -469,9 +469,9 @@ icmp6_error(m, type, code, param)
 	 * icmp6 error packet correct in order to not swap ip6_src and
 	 * homeaddr in the dest6 processing.
 	 */
-	n = ip6_findaux(m);
-	if (n != NULL) {
-		ip6a = mtod(n, struct ip6aux *);
+	mtag = ip6_findaux(m);
+	if (mtag != NULL) {
+		ip6a = (struct ip6aux *)(mtag + 1);
 		if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0 &&
 		    (ip6a->ip6a_flags & IP6A_SWAP) != 0) {
 			if (icmp6_recover_src(m)) {

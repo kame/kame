@@ -640,6 +640,9 @@ struct m_tag *m_tag_next(struct mbuf *, struct m_tag *);
 #define PACKET_TAG_PF_GENERATED			11 /* PF generated, pass always */
 #define PACKET_TAG_PF_ROUTED			12 /* PF routed, no route loops */
 #define PACKET_TAG_PF_FRAGCACHE			13 /* PF fragment cached */
+#define PACKET_TAG_PF_FRAGCACHE			13 /* PF fragment cached */
+#define PACKET_TAG_ENCAP			14 /* encapsulation data */
+#define PACKET_TAG_INET6			15 /* IPv6 info */
 
 #ifdef MBTYPES
 int mbtypes[] = {				/* XXX */
