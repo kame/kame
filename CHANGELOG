@@ -1,6 +1,10 @@
-$Id: CHANGELOG,v 1.483 2000/01/25 21:13:04 sumikawa Exp $
+$Id: CHANGELOG,v 1.484 2000/01/26 03:05:39 itojun Exp $
 
 <200001>
+Wed Jan 26 12:04:42 JST 2000  itojun@iijlab.net
+	* kame/libinet6/bindresvport.c: remove bindresvport_af(), implement
+	  bindresvport_sa().
+
 Wed Jan 26 06:12:38 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/irssi: upgrade to 0.7.23.
 
