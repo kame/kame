@@ -797,7 +797,7 @@ sca_output(ifp, m, dst, rt0)
 	struct hdlc_llc_header *llc;
 #endif
 	struct hdlc_header *hdlc;
-#ifdef ALTQ	/*XXX*/
+#if 1 /*XXX*/
 	struct ifaltq *ifq;
 #else
 	struct ifqueue *ifq;
