@@ -67,7 +67,7 @@ esac
 AC_REPLACE_FUNCS(getaddrinfo)
 AC_REPLACE_FUNCS(getnameinfo)
 AC_REPLACE_FUNCS(getifaddrs)
-AC_CHECK_FUNCS(if_nametoindex arc4random)
+AC_CHECK_FUNCS(if_nametoindex)
 
 dnl Checks for header files.
 AC_HEADER_STDC
@@ -92,7 +92,7 @@ AC_FUNC_GETPGRP
 AC_PROG_GCC_TRADITIONAL
 AC_FUNC_SETPGRP
 AC_TYPE_SIGNAL
-AC_CHECK_FUNCS(mktime select socket)
+AC_CHECK_FUNCS(mktime select socket arc4random)
 
 AC_MSG_CHECKING(for IPv6 resolver type)
 AC_TRY_COMPILE(dnl
