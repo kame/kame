@@ -67,9 +67,7 @@
 #include <sys/ioctl.h>
 #endif
 #include <sys/malloc.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <sys/kernel.h>
-#endif
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/sockio.h>
@@ -360,7 +358,7 @@ rr_are_ifid_equal(struct in6_addr *ii1, struct in6_addr *ii2, int ii_len)
 		 ii_bytelen))
 		return(0);
 	if (((ii1->s6_addr[p_bytelen] << p_bitlen) & 0xff) !=
-	    ((ii2->s6_addr[p_bytelen] << p_bitlen)) & 0xff)
+	    ((ii2->s6_addr[p_bytelen] << p_bitlen) & 0xff))
 		return(0);
 
 	return(1);
@@ -468,7 +466,7 @@ add_each_addr(struct socket *so, struct rr_prefix *rpp, struct rp_addr *rap)
 
 	/* init ifra */
 	bzero(&ifra, sizeof(ifra));
-	bcopy(rpp->rp_ifp->if_name, ifra.ifra_name, sizeof(ifra.ifra_name));
+	bcopy(if_name(rpp->rp_ifp), ifra.ifra_name, sizeof(ifra.ifra_name));
 	ifra.ifra_addr.sin6_family = ifra.ifra_prefixmask.sin6_family =
 		AF_INET6;
 	ifra.ifra_addr.sin6_len = ifra.ifra_prefixmask.sin6_len =
@@ -516,7 +514,7 @@ add_each_addr(struct socket *so, struct rr_prefix *rpp, struct rp_addr *rap)
 		return;
 	}
 	error = in6_control(so, SIOCAIFADDR_IN6, (caddr_t)&ifra, rpp->rp_ifp
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 			    , 0
 #endif
 			    );
@@ -872,7 +870,7 @@ delete_each_prefix(struct socket *so, struct rr_prefix *rpp, u_char origin)
 		rap->ra_addr->ia6_ifpr = NULL;
 
 		bzero(&ifra, sizeof(ifra));
-		bcopy(rpp->rp_ifp->if_name, ifra.ifra_name,
+		bcopy(if_name(rpp->rp_ifp), ifra.ifra_name,
 		      sizeof(ifra.ifra_name));
 		ifra.ifra_addr = rap->ra_addr->ia_addr;
 		ifra.ifra_dstaddr = rap->ra_addr->ia_dstaddr;
@@ -880,7 +878,7 @@ delete_each_prefix(struct socket *so, struct rr_prefix *rpp, u_char origin)
 
 		error = in6_control(so, SIOCDIFADDR_IN6, (caddr_t)&ifra,
 				    rpp->rp_ifp
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 				    , 0
 #endif
 				    );
@@ -1093,7 +1091,7 @@ in6_rr_timer(void *ignored_arg)
 
 			/* XXX: init dummy so */
 			bzero(&so, sizeof(so));
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__NetBSD__)
 			so.so_state |= SS_PRIV;
 #endif
 

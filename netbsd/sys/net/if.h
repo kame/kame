@@ -263,7 +263,7 @@ struct ifaddr {
 /*
  * The prefix structure contains information about one prefix
  * of an interface.  They are maintained by the different address families,
- * are allocated and attached when an prefix or an address is set, 
+ * are allocated and attached when an prefix or an address is set,
  * and are linked together so all prfefixes for an interface can be located.
  */
 struct ifprefix {
@@ -271,6 +271,7 @@ struct ifprefix {
 	struct	ifnet *ifpr_ifp;	/* back-pointer to interface */
 	struct ifprefix *ifpr_next;
 	u_char	ifpr_plen;		/* prefix length in bits */
+	u_char	ifpr_type;		/* protocol dependent prefix type */
 };
 
 /*
