@@ -857,9 +857,10 @@ in_selectsrc(sin, ro, soopts, mopts, errorp)
 			for (ia = in_ifaddr; ia; ia = ia->ia_next)
 				if (ia->ia_ifp == ifp)
 					break;
-			if (ia == 0)
+			if (ia == 0) {
 				*errorp = EADDRNOTAVAIL;
 				return NULL;
+			}
 		}
 	}
 
