@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/02/01 04:28:15 $
+			$Date: 2000/02/03 09:41:58 $
 
 1. IPv6
 
@@ -1199,7 +1199,7 @@ following standards:
     "new IPsec" specification documented in rfc240[1-6].txt, rfc241[01].txt,
 	rfc2451.txt and draft-mcdonald-simple-ipsec-api-01.txt (draft expired,
 	but you can take from ftp://ftp.kame.net/pub/internet-drafts/).
-	(NOTE: IKE specifications, rfc241[7-9].txt are implemented in userland,
+	(NOTE: IKE specifications, rfc240[7-9].txt are implemented in userland,
 	as "racoon" IKE daemon)
     IPComp:
 	RFC2393: IP Payload Compression Protocol (IPComp)
