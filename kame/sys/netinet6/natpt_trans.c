@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.47 2001/09/19 10:08:33 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.48 2001/09/21 04:05:51 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -768,6 +768,10 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 
 	ip6->ip6_nxt  = IPPROTO_ICMPV6;
 	natpt_composeIPv6Hdr(ip4, pad, ip6);
+	ip6->ip6_src.s6_addr32[0] = natpt_prefix.s6_addr32[0];
+	ip6->ip6_src.s6_addr32[1] = natpt_prefix.s6_addr32[1];
+	ip6->ip6_src.s6_addr32[2] = natpt_prefix.s6_addr32[2];
+	ip6->ip6_src.s6_addr32[3] = ip4->ip_src.s_addr;
 
 	switch (cv4->pyld.icmp4->icmp_type) {
 	case ICMP_ECHOREPLY:
@@ -1031,8 +1035,6 @@ natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 
 			icmpudp6 = (struct udphdr *)((caddr_t)icmpip6 +
 						     sizeof(struct ip6_hdr));
-			icmpip6->ip6_src = pad->in6src;
-			icmpip6->ip6_dst = pad->in6dst;
 			icmpudp6->uh_sport = pad->port[0];
 			icmpudp6->uh_dport = pad->port[1];
 		}
