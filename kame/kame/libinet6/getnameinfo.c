@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.64 2004/05/16 02:04:56 jinmei Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.65 2004/05/16 02:13:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -210,34 +210,11 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 		 * means that the caller does not want the result.
 		 */
 	} else if (flags & NI_NUMERICHOST) {
-		int numaddrlen;
-
 		/* NUMERICHOST and NAMEREQD conflicts with each other */
 		if (flags & NI_NAMEREQD)
 			return EAI_NONAME;
 
-		switch(afd->a_af) {
-#ifdef INET6
-		case AF_INET6:
-		{
-			int error;
-
-			if ((error = ip6_parsenumeric(sa, addr, host,
-						      hostlen, flags)) != 0)
-				return(error);
-			break;
-		}
-#endif
-		default:
-			if (inet_ntop(afd->a_af, addr, numaddr, sizeof(numaddr))
-			    == NULL)
-				return EAI_SYSTEM;
-			numaddrlen = strlen(numaddr);
-			if (numaddrlen + 1 > hostlen) /* don't forget terminator */
-				return EAI_MEMORY;
-			strlcpy(host, numaddr, hostlen);
-			break;
-		}
+		goto numeric;
 	} else {
 #ifdef USE_GETIPNODEBY
 		hp = getipnodebyaddr(addr, afd->a_addrlen, afd->a_af, &h_error);
@@ -276,6 +253,8 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 		} else {
 			if (flags & NI_NAMEREQD)
 				return EAI_NONAME;
+
+		  numeric:
 			switch(afd->a_af) {
 #ifdef INET6
 			case AF_INET6:
