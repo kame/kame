@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.29 2002/06/28 02:17:26 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.30 2002/07/01 04:57:41 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -392,7 +392,8 @@ makeTSlotLine(char *wow, int size, struct tSlot *tsl,
 			break;
 
 		if (ts->state < TCP_NSTATES) {
-			if (type == XLATE_SHORT)
+			if ((type == XLATE_TRACE)
+			    || (type == XLATE_SHORT))
 				concat(&lmsg, "%s ", tcpstatesshort[ts->state]);
 			else
 				concat(&lmsg, "%s ", tcpstates[ts->state]);
