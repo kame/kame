@@ -10,14 +10,14 @@ CFLAGS+=-DINET6 -DUSE_GETIPNODEBY -DHAVE_SOCKADDR_SA_LEN \
 	-DHAVE_IF_NAMEINDEX -DFILTER_V4MAPPED -DHAVE_SOCKLEN_T
 CFLAGS+=-DMIP6
 
-#SRCS=	getaddrinfo.c
-SRCS=	getnameinfo.c vars.c rresvport_af.c rcmd.c
+SRCS=	getaddrinfo.c getnameinfo.c vars.c rresvport_af.c rcmd.c
 SRCS+=	if_indextoname.c if_nameindex.c if_nametoindex.c
 SRCS+=	rthdr.c ip6opt.c
 SRCS+=	name6.c
 SRCS+=	base64.c herror.c nsap_addr.c 
 #SRCS+=	res_comp.c res_data.c res_debug.c
 #SRCS+=	res_init.c res_mkquery.c res_query.c 
+SRCS+=	res_init.c
 SRCS+=	res_send.c
 SRCS+=	inet_pton.c
 SRCS+=	bindresvport.c
