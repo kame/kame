@@ -217,7 +217,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 		if (strlen(numaddr) > hostlen)
 			return ENI_MEMORY;
 		strcpy(host, numaddr);
-#ifdef INET6
+#if defined(INET6) && defined(NI_WITHSCOPEID)
 		if (afd->a_af == AF_INET6 &&
 		    (IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)addr) ||
 		     IN6_IS_ADDR_MULTICAST((struct in6_addr *)addr)) &&
