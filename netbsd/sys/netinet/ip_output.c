@@ -633,8 +633,11 @@ sendit:
 		}
 	} else {
 		/* nobody uses ia beyond here */
-		if (state.encap)
+		if (state.encap) {
 			ifp = ro->ro_rt->rt_ifp;
+			if ((mtu = ro->ro_rt->rt_rmx.rmx_mtu) == 0)
+				mtu = ifp->if_mtu;
+		}
 	}
     }
 
