@@ -346,14 +346,6 @@ rip6_output(m, so, dstsock, control)
 	M_PREPEND(m, sizeof(*ip6), M_WAIT);
 	ip6 = mtod(m, struct ip6_hdr *);
 
-	/* KAME hack: embed scopeid */
-	if (ip6_use_defzone && dstsock->sin6_scope_id == 0) {
-		dstsock->sin6_scope_id =
-			scope6_addr2default(&dstsock->sin6_addr);
-	}
-	if ((error = in6_embedscope(dst, dstsock)) != 0)
-		goto bad;
-
 	/*
 	 * Source address selection.
 	 */
@@ -667,6 +659,7 @@ static int
 rip6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 	 struct mbuf *control, struct proc *p)
 {
+	int error = 0;
 	struct inpcb *inp = sotoinpcb(so);
 	struct sockaddr_in6 tmp;
 	struct sockaddr_in6 *dst;
@@ -689,12 +682,19 @@ rip6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 			m_freem(m);
 			return ENOTCONN;
 		}
-		if (nam->sin6_len != sizeof(*nam))
+		if (nam->sa_len != sizeof(struct sockaddr_in6))
 			return(EINVAL);
-		if (nam->sin6_family != AF_INET6)
-			return(EAFNOSUPPORT);
 		tmp = *(struct sockaddr_in6 *)nam;
 		dst = &tmp;
+		if (dst->sin6_family != AF_INET6)
+			return(EAFNOSUPPORT);
+		/* KAME hack: embed scopeid */
+		if (ip6_use_defzone && dst->sin6_scope_id == 0) {
+			dst->sin6_scope_id =
+				scope6_addr2default(&dst->sin6_addr);
+		}
+		if ((error = in6_embedscope(&dst->sin6_addr, dst)) != 0)
+			return(error);
 	}
 	return rip6_output(m, so, dst, control);
 }
