@@ -1,4 +1,4 @@
-.\"	$KAME: mip6control.8,v 1.12 2002/10/16 01:46:07 keiichi Exp $
+.\"	$KAME: mip6control.8,v 1.13 2004/01/23 10:18:25 t-momose Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001 WIDE Project.
 .\" All rights reserved.
@@ -127,6 +127,9 @@ When set to 0, the IPsec protection check of the incoming binding updates
 and binding acks will not be performed (always pass the check).
 .It Fl D Ar 0|1
 When set to 0, no debug messages are printed.
+.It Fl N
+Show the list of nonces that this host maintains as a correspondent node.
+The first column is the number of nonce index and the second is a nonce value.
 .El
 .\"
 .Sh EXAMPLES
