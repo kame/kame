@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.41 2000/07/04 09:23:39 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.42 2000/07/14 11:21:26 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -405,9 +405,9 @@ quick_i2recv(iph2, msg0)
 
 			if (memcmp(vp->v, (caddr_t)pa->ptr + sizeof(struct isakmp_gen), vp->l)) {
 
-				isakmp_info_send_n2(iph2, ISAKMP_NTYPE_ATTRIBUTES_NOT_SUPPORTED, NULL);
 				plog(logp, LOCATION, NULL,
 					"mismatched ID was returned.\n");
+				error = ISAKMP_NTYPE_ATTRIBUTES_NOT_SUPPORTED;
 				goto end;
 			}
 		    }
@@ -471,7 +471,7 @@ quick_i2recv(iph2, msg0)
 
 	if (result) {
 		plog(logp, LOCATION, iph2->ph1->remote, "HASH(2) mismatch.\n");
-		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL);
+		error = ISAKMP_NTYPE_INVALID_HASH_INFORMATION;
 		goto end;
 	}
     }
@@ -731,7 +731,7 @@ quick_i3recv(iph2, msg0)
 
 	if (result) {
 		plog(logp, LOCATION, iph2->ph1->remote, "HASH(4) mismatch.\n");
-		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL);
+		error = ISAKMP_NTYPE_INVALID_HASH_INFORMATION;
 		goto end;
 	}
     }
@@ -1003,7 +1003,7 @@ quick_r1recv(iph2, msg0)
 
 	if (result) {
 #if 0	/* XXX can't get SA's values because before checking SA */
-		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL);
+		error = ISAKMP_NTYPE_INVALID_HASH_INFORMATION;
 #endif
 		plog(logp, LOCATION, iph2->ph1->remote, "HASH(1) mismatch.\n");
 		error = ISAKMP_NTYPE_INVALID_HASH_INFORMATION;
@@ -1354,7 +1354,7 @@ quick_r3recv(iph2, msg0)
 
 	if (result) {
 		plog(logp, LOCATION, iph2->ph1->remote, "HASH(3) mismatch.\n");
-		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL);
+		error = ISAKMP_NTYPE_INVALID_HASH_INFORMATION;
 		goto end;
 	}
     }
