@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.67 2004/05/16 05:35:41 jinmei Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.68 2004/05/16 05:46:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -34,13 +34,13 @@
  * - Thread safe-ness must be checked
  * - RFC2553 says that we should raise error on short buffer.  X/Open says
  *   we need to truncate the result.  We obey RFC2553 (and X/Open should be
- *   modified).  ipngwg rough consensus seems to follow RFC2553.
- * - What is "local" in NI_FQDN?
+ *   modified).  ipngwg rough consensus seems to follow RFC2553.  RFC3493 says
+ *   nothing about it, but defines a new error code EAI_OVERFLOW which seems
+ *   to be intended the code for this case.
+ * - What is "local" in NI_NOFQDN?  (see comments in the code)
  * - NI_NAMEREQD and NI_NUMERICHOST conflict with each other.
  * - (KAME extension) always attach textual scopeid (fe80::1%lo0), if
  *   sin6_scope_id is filled - standardization status?
- *   XXX breaks backward compat for code that expects no scopeid.
- *   beware on merge.
  * - what should we do if we should do getservbyport("sctp")?
  */
 
