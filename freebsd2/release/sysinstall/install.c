@@ -464,6 +464,7 @@ installExpress(dialogMenuItem *self)
 	i |= DITEM_LEAVE_MENU;
 	/* Give user the option of one last configuration spree */
 	/* fetchKameKit(); */
+	mediaDevice->shutdown(mediaDevice);
 	installKameCommit(NULL);
 	installConfigure();
     }
@@ -535,7 +536,7 @@ nodisks:
 	    dialog_clear_norefresh();
 	    tmp = tcpDeviceSelect();
 	    dialog_clear_norefresh();
-	    if (tmp && !msgYesNo("Would you like to bring the %s interface up right now?", tmp->name))
+	    if (tmp && !((DevInfo *)tmp->private)->use_dhcp && !msgYesNo("Would you like to bring the %s interface up right now?", tmp->name))
 		if (!tmp->init(tmp))
 		    msgConfirm("Initialization of %s device failed.", tmp->name);
 	}
@@ -636,6 +637,7 @@ nodisks:
 
     /* Give user the option of one last configuration spree */
     /* fetchKameKit(); */
+    mediaDevice->shutdown(mediaDevice);
     installKameCommit(NULL);
     installConfigure();
 
@@ -653,6 +655,7 @@ installCustomCommit(dialogMenuItem *self)
     if (DITEM_STATUS(i) == DITEM_SUCCESS) {
 	/* Give user the option of one last configuration spree */
 	/* fetchKameKit(); */
+	mediaDevice->shutdown(mediaDevice);
 	installKameCommit(NULL);
 	installConfigure();
 	return i;
@@ -877,6 +880,7 @@ installFixupBin(dialogMenuItem *self)
 	    msgConfirm("MAKEDEV returned non-zero status");
 	    return DITEM_FAILURE;
 	}
+	vsystem("cd /dev; sh MAKEDEV bpf1 bpf2 bpf3");
 
 	msgNotify("Resurrecting /dev entries for slices..");
 	devs = deviceFind(NULL, DEVICE_TYPE_DISK);
@@ -1142,6 +1146,7 @@ installVarDefaults(dialogMenuItem *self)
     variable_set2(VAR_TAPE_BLOCKSIZE,		DEFAULT_TAPE_BLOCKSIZE);
     variable_set2(VAR_INSTALL_ROOT,		"/");
     variable_set2(VAR_INSTALL_CFG,		"install.cfg");
+    variable_set2(VAR_TRY_DHCP,			"NO");
     cp = getenv("EDITOR");
     if (!cp)
 	cp = "/usr/bin/ee";

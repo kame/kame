@@ -125,12 +125,14 @@ mediaInitNetwork(Device *dev)
 		   "in the Networking configuration menu before proceeding.", dev->name);
 	return FALSE;
     }
+    else if (cp && !strcmp(cp, "DHCP"))
+	goto success;
     if (cp2) {
+	msgNotify("rtsol -d %s", dev->name);
 	vsystem("sysctl -w net.inet6.ip6.accept_rtadv=1");
 	vsystem("ifconfig %s up", dev->name);
 	vsystem("ifconfig %s", dev->name);
 	sleep(5);
-	msgNotify("rtsol -d %s", dev->name);
 	i = vsystem("rtsol -d %s", dev->name);
 	sleep(5);
 	if (i) {

@@ -506,8 +506,13 @@ release.8: write_mfs_in_kernel dumpnlist
 	( cd ${RD}/trees/bin/dev && \
 	ls card[0123] | \
 	cpio -dump ${RD}/mfsfd/dev )
+	( cd ${RD}/trees/bin/dev && \
+	ls bpf[0123] | \
+	cpio -dump ${RD}/mfsfd/dev )
 .endif
 	( cd ${RD}/mfsfd/dev && rm -f *[swo]d*[bdefgh] )
+	( cd ${RD}/mfsfd && mkdir -p bin sbin && ln -s /stand/sh bin/sh )
+	cp /usr/src/contrib/isc-dhcp/client/scripts/freebsd ${RD}/mfsfd/sbin/dhclient-script
 	cd ${RD}/trees/bin && ls ${BOOT1} | cpio -dump ${RD}/mfsfd/stand
 	echo "nameserver      42/tcp name"	> ${RD}/mfsfd/stand/etc/services
 	echo "ftp             21/tcp"		>> ${RD}/mfsfd/stand/etc/services
@@ -515,8 +520,8 @@ release.8: write_mfs_in_kernel dumpnlist
 	echo "domain          53/udp          nameserver" >> ${RD}/mfsfd/stand/etc/services
 	echo "cmd             514/tcp    shell" >> ${RD}/mfsfd/stand/etc/services
 	gzip -c /usr/src/COPYRIGHT > ${RD}/mfsfd/stand/help/COPYRIGHT.hlp.gz
-	gzip -c ${.CURDIR}/../kame/COPYRIGHT > ${RD}/mfsfd/stand/KAME/COPYRIGHT.v6.hlp.gz
-	gzip -c ${.CURDIR}/../kame/INSTALL > ${RD}/mfsfd/stand/KAME/INSTALL.v6.hlp.gz
+	gzip -c ${.CURDIR}/../../../kame/COPYRIGHT > ${RD}/mfsfd/stand/KAME/COPYRIGHT.v6.hlp.gz
+	gzip -c ${.CURDIR}/../../../kame/INSTALL > ${RD}/mfsfd/stand/KAME/INSTALL.v6.hlp.gz
 	cp ${.CURDIR}/GENERIC.PAO.v6 ${RD}/mfsfd/stand/KAME
 	for i in include-backup.sh sys-backup.sh \
 		kame-kernel-make.sh kame-include-make.sh kame-kit-make.sh; do \

@@ -117,6 +117,8 @@ static Option Options[] = {
       OPT_IS_VAR,	NULL,			VAR_NO_WARN,		varCheck	},
 { "Yes to All",		"Assume \"Yes\" answers to all non-critical dialogs",
       OPT_IS_VAR,	NULL,			VAR_NO_CONFIRM,		varCheck	},
+{ "DHCP",		"Attempt automatic DHCP configuration of interfaces",
+      OPT_IS_VAR,	NULL,			VAR_TRY_DHCP,		varCheck	},
 { "FTP username",	"Username and password to use instead of anonymous",
       OPT_IS_FUNC,	mediaSetFTPUserPass,	VAR_FTP_USER,		varCheck	},
 { "FAITH prefix",	"IPv6 address translation prefix",

@@ -1,4 +1,4 @@
-#	$Id: boot_crunch.conf.skel,v 1.1 1999/09/13 08:49:56 itojun Exp $
+#	$Id: boot_crunch.conf.skel,v 1.2 1999/11/05 15:01:25 itojun Exp $
 
 srcdirs %%KAMETREE%%/kame/freebsd2
 srcdirs %%KAMETREE%%/kame/freebsd2/sbin %%KAMETREE%%/kame/freebsd2/usr.bin %%KAMETREE%%/kame/freebsd2/usr.sbin
@@ -14,10 +14,12 @@ progs sysinstall newfs gzip cpio bad144 fsck ifconfig route
 #progs mount_nfs
 progs rtsol
 progs sysctl
+progs test dhclient
 
 ln gzip gunzip
 ln gzip zcat
 ln sh -sh
+ln test [
 
 libs -ll -ledit -L%%KAMETREE%%/kame/freebsd2/lib/libutil -lutil -lkvm -lmd -lcrypt -z
 libs -L%%KAMETREE%%/kame/freebsd2/lib/libftpio -lftpio -lz

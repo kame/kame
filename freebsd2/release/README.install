@@ -1,0 +1,264 @@
+
+                     How to install FreeBSD 2.2.8+PAO+KAME
+                                       
+   Mr. Fukuhara(ichiro@ichiro.org) of [1]IMASY has created very neat
+   install floppy for FreeBSD 2.2.8+PAO+KAME. So you can install FreeBSD
+   2.2.8+PAO+KAME with almost the same way of Generic FreeBSD. Also, if
+   you use ftp install method, you can install using IPv6!
+   
+   Note that this document considers almost nothing if it is the same
+   with Generic FreeBSD install. The target of this document is people
+   who has experience with Generic FreeBSD install. Also, target machine
+   will be basically NotePC because of PAO+KAME, and there is a router
+   machine for target machine.
+     _________________________________________________________________
+   
+Contents
+
+     * [2]Preparation
+     * [3]General flow of installation
+     * [4]Installation procedure
+     * [5]Minor Configurations
+     * [6]other userland(KAME ports)
+     * [7]When you need help...
+     * [8]Appendix:In case you want to use local ftp server
+     _________________________________________________________________
+   
+Preparation
+
+     * Target PC to install:-)
+       The main target will be NotePC because of PAO+KAME, but of course
+       you can use Desktop machine:-)
+     * Media to install
+       If you can use ftp install, it is the best way
+       PAO+KAME part can only install via ftp:-)
+     * Installation floppy
+       You can get floppy image from anonymous ftp site below
+          + [9]ftp.itjit.ad.jp
+          + [10]ftp.kame.net
+          + [11]ftp.nttv6.net
+          + [12]ftp.imasy.or.jp
+     _________________________________________________________________
+   
+General flow of installation
+
+   On this install floppy, first install generic part and then install
+   PAO+KAME specific part. So, general flow of installation will be as
+   follows.
+     * boot from install floppy
+     * generic part of OS installation
+     * PAO+KAME part installation
+     * configuration within installer
+     * boot from installed OS
+     * configuration which cannot do within installer
+     * (Optional)kernel rebuild
+     _________________________________________________________________
+   
+Installation procedure
+
+     * boot from install floppy
+       Enable/disable of device driver, I/O & IRQ configuration of pccard
+       controller has to be done with the same way of generic
+       installation.
+     * Configuring Partition/Slice/Distribution
+       Do as generic installation.
+     * Media selection
+       First, generic part of OS will be installed, so if you don't have
+       rich network environment, install from CDROM for generic part will
+       be better. But, in this document, we will assume that you selected
+       ftp for install media.
+          + Selection of server
+            In the next screen, there will be IPv4/IPv6 dual stack sites
+            which can use ftp server for installation. If you have rich
+            network environment, you can select from these sites. If you
+            want to use local ftp server, you must select "URL" and input
+            the URL of ftp server.
+          + Selection of stack
+            After selection of device in the next screen, you must select
+            which stack do you use from IPv4/IPv6. If you want to use
+            IPv4, you must select "INET", and if you want to use IPv6,
+            you must select "INET6". But, IPv6 can be used when target
+            machine is connected to LAN where there is a representative
+            router of IPv6, you have connectivity to internet via IPv6,
+            and you know at least one name server's address who can speak
+            IPv6. If you use IPv4, you can get address and other
+            informations from dhcp. Of course you can configure it by
+            hands.
+          + host configuration
+            Host,Domain,Extra options to ifconfig must be configured as
+            the same way to IPv4. Of course, you must specify IPv6
+            address for name server who can speak IPv6. If you use IPv6,
+            IP address/default gateway will be set by autoconfiguration,
+            so you don't have to specify by hand.
+     * commit
+       When you commit, installation will be done as the normal way, so
+       you must wait for it.
+     * installation of PAO+KAME
+       At the end of commit, installation screen for PAO+KAME will be
+       there. On selection of distribution set, you must select kernel,
+       bin, and PAObin because these are core part. If you want
+       reconfigure kernel or compile v6 userland, you must select src
+       distribution. Then, the screen goes to selection of Install Media,
+       you must go through Media selection and server selection as the
+       same as generic installation. Next, you will be asked "You've
+       already done the network configuration once, would you like to
+       skip over it now?", so usually select "Yes". Then the selected
+       distribution will be installed.
+       Note that if you skip PAO+KAME install here, you can install it
+       from general configuration menu. In this case, go to general
+       configuration menu, and select "K PAO+KAME Kit". After you went
+       through the documantation, select "4 Get PAO+KAME Kit" and then
+       select distribution set as described above, and install them.
+       Also note that "5 Compile PAO+KAME Kit" of PAO+KAME Menu can be
+       used after the installation and invoked from /stand/sysinstall.
+     * Configuration to enable PAO function
+       After the installation has done, go to general configuration menu.
+       Go to "7 Setup" and hit space on the "APM" menu and "pccard" menu
+       to enable PAO function.
+     * Other configuration
+       Do the generic configuration such as "Time Zone", "Root Password",
+       etc.
+     * reboot
+       That's all for those which can configure from installer. You must
+       exit from install and reboot the system from HD.
+     * IPv6 ready
+       After the reboot, and when system comes up, it is already IPv6
+       ready. You can see messages like "starting DAD for ..." or "DAD
+       complete for ..." when booting, this is a message that the system
+       is investigating where there is duplication of address or not to
+       configure IPv6 address automatically. You can confirm IPv6 setup
+       by using /usr/local/v6/sbin/ifconfig -a or
+       /usr/local/v6/bin/netstat -rn as the root account. You can also
+       perform /usr/local/v6/sbin/ping6 or
+       /usr/local/v6/sbin/traceroute6.
+     * configuration of inetd
+       At this point, you may notice that inetd complains "Address
+       already in use". This is because that OS default (IPv4 only) inetd
+       is already there, and KAME (IPv4/IPv6 dualstack) inetd will start
+       up after that. So you must stop OS default inetd by editing
+       /etc/rc.conf. You must change line 44 of /etc/rc.conf like
+inetd_enable="YES"
+       to
+inetd_enable="NO"
+       Also, you can do inetd as IPv4/IPv6 ready by editing
+       /etc/inetd.conf. In case of telnetd, change line
+telnet  stream  tcp     nowait  root    /usr/libexec/telnetd    telnetd
+       to
+telnet  stream  tcp4    nowait  root    /usr/local/v6/libexec/telnetd   telnetd
+telnet  stream  tcp6    nowait  root    /usr/local/v6/libexec/telnetd   telnetd
+       will be fine. Also, if there is a daemon in /usr/local/v6/libexec
+       like ftpd, you can do all of them to dualstack by changing
+       /etc/inetd.conf like this.
+     * kernel rebuild
+       If you want rebuild kernel, you must install src distribution from
+       "PAO+KAME" menu of installer. if you installed it, kernel can be
+       rebult from top menu -> "c Configure" -> "K PAO+KAME Kit" -> "5
+       Compile PAO+KAME Kit" from /stand/sysinstall. If you want to
+       rebuild by hand, /stand/KAME/GENERIC.PAO.v6 is the generic config
+       file and kernel source is at /usr/src/kame/freebsd2/sys, so copy
+       the config file to /usr/src/kame/freebsd2/sys/i386/conf and edit
+       it. After that, you can rebuild your kernel as the general config,
+       make depend, make procedure.
+     _________________________________________________________________
+   
+Minor Configuration
+
+   Thats all for the besic configuration. The rests are the minor
+   configuration to keep you happy.
+     * Configuration of IPv4:-)
+       If you use IPv4 for the installation, there will be a configration
+       used for installation, but if you use IPv6, it will be configured
+       to use dhcp for IPv4. If you don't prefer it, edit /etc/rc.conf
+       and use fixed IPv4 address.
+     * Configuration of command search path
+       Commands/files related to IPv6 is installed in /usr/local/v6
+       tree(except for source files). Most of these commands are
+       IPv4/IPv6 dualstack. So, if you can connect via IPv6 use IPv6, and
+       can only connect via IPv4 use IPv4 instead. So you don't have to
+       switch through /usr/bin/telnet and /usr/local/v6/bin/telnet. So,
+       if you edit PATH Environment variable as /usr/local/v6/bin or
+       /usr/local/v6/sbin before /usr/bin or /usr/sbin, you can use
+       dualstack binary without your notice.
+     * Configuration of manpath.config
+       As above, man files of KAME is installed in /usr/local/v6/man
+       tree. So you want to edit /etc/manpath.config to read KAME man
+       files with man command.
+     * Configuration of rtsol
+       This installer is aimed to be IPv6 ready after the installer, so
+       it is configured to perform rtsol(the way to get global IPv6
+       address from representative router) to multiple network device.
+       But, this is somewhat nasty way, so you may change to perform
+       rtsol on one specific network device. To do this, edit line below
+       of /usr/local/v6/etc/rc.net6
+iface="ed0 ep0 fe0 sn0"
+       to like
+iface="ep0"
+       to specify only one network device.
+     _________________________________________________________________
+   
+other userland(KAME ports)
+
+   There are some basic userland like telnet/ftp in KAME distributions,
+   but there is no other applications. But, there is a ports on KAME like
+   FreeBSD's ports system, and there are many(almost all) IPv6 ready
+   applications in it. Like FreeBSD ports, you can make at the directory
+   /usr/src/kame/freebsd2/ports below and you can use them.
+     _________________________________________________________________
+   
+When you need help...
+
+   Sorry, there is no ML supporting this installer. About KAME project,
+   you can go to [13]KAME project and this page will be helpful.
+     _________________________________________________________________
+   
+Appendix:In case you want to use local ftp server
+
+   You may want to use your local ftp server as the install server when
+   you are far from registered ftp server or unreachable. This section
+   describes how to set up ftp server and what to specify URL for it.
+     * Configuration for generic part
+       This is done as general FreeBSD installation. Select a directory
+       as you like, and create '2.2.8-RELEASE' directory in it and copy
+       needed files for installation. Or mount Walnut Creek CDROM on your
+       sever and create symbolic link named '2.2.8-RELEASE' to the CDROM.
+       You can specify URL like
+       "ftp://[hostname of ftp server]/[directory where 2.2.8-RELESE
+       resides]"
+     * Configuration for PAO+KAME part
+       Select a directory as above, and create snap directory in it. Copy
+       contents from
+       [14]ftp://ftp.itjit.ad.jp/pub/IPv6/installer/FreeBSD-IPv6/snap/.
+       The same contents can get from these sites listed below.
+          + [15]ftp.kame.net
+          + [16]ftp.nttv6.net
+          + [17]ftp.imasy.or.jp
+       You can specify URL like
+       "ftp://[hostname of ftp server]/[directory where snap resides]"
+       
+   You can use local ftp server as configured above.
+     _________________________________________________________________
+   
+   $Date: 1999/11/05 15:01:25 $
+   
+   
+    yugawa@itjit.ad.jp
+
+References
+
+   1. http://www.imasy.or.jp/
+   2. http://www.itv6.org/v6inst/paokame2-e.shtml#prepare
+   3. http://www.itv6.org/v6inst/paokame2-e.shtml#flow
+   4. http://www.itv6.org/v6inst/paokame2-e.shtml#install
+   5. http://www.itv6.org/v6inst/paokame2-e.shtml#config
+   6. http://www.itv6.org/v6inst/paokame2-e.shtml#kameports
+   7. http://www.itv6.org/v6inst/paokame2-e.shtml#help
+   8. http://www.itv6.org/v6inst/paokame2-e.shtml#ftp
+   9. ftp://ftp.itjit.ad.jp/pub/IPv6/installer/FreeBSD-IPv6/installer/paokame.flp
+  10. ftp://ftp.kame.net/pub/kame/installer-imasy/FreeBSD-IPv6/installer/paokame.flp
+  11. ftp://ftp.nttv6.net/ipv6/IPv6_installer/FreeBSD-IPv6/installer/paokame.flp
+  12. ftp://ftp.imasy.or.jp/installer/FreeBSD-IPv6/installer/paokame.flp
+  13. http://www.kame.net/
+  14. ftp://ftp.itjit.ad.jp/pub/IPv6/installer/FreeBSD-IPv6/snap/
+  15. ftp://ftp.kame.net/pub/kame/installer-imasy/FreeBSD-IPv6/snap/
+  16. ftp://ftp.nttv6.net/ipv6/IPv6_installer/FreeBSD-IPv6/snap/
+  17. ftp://ftp.imasy.or.jp/installer/FreeBSD-IPv6/snap/

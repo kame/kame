@@ -41,6 +41,7 @@
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet6/in6.h>
 
 /* The help file for the TCP/IP setup screen */
 #define TCP_HELPFILE		"tcp"
@@ -186,14 +187,61 @@ verifySettings(void)
     return 0;
 }
 
+static void
+dhcpGetInfo(Device *devp)
+{
+    /* If it fails, do it the old-fashioned way */
+    if (dhcpParseLeases("/var/db/dhclient.leases", hostname, domainname,
+			 nameserver, ipaddr, gateway, netmask) == -1) {
+	FILE *ifp;
+	char *cp, cmd[256], data[2048];
+	int i, j;
+
+	/* Bah, now we have to kludge getting the information from ifconfig */
+	snprintf(cmd, sizeof cmd, "ifconfig %s", devp->name);
+	ifp = popen(cmd, "r");
+	if (ifp) {
+	    j = fread(data, 1, sizeof(data), ifp);
+	    fclose(ifp);
+	    if (j < 0)	/* paranoia */
+		j = 0;
+	    data[j] = '\0';
+	    if (isDebug())
+		msgDebug("DHCP configured interface returns %s\n", data);
+	    /* XXX This is gross as it assumes a certain ordering to
+	       ifconfig's output! XXX */
+	    if ((cp = strstr(data, "inet")) != NULL) {
+		i = 0;
+		cp += 5;	/* move over keyword */
+		while (*cp != ' ')
+		    ipaddr[i++] = *(cp++);
+		ipaddr[i] = '\0';
+		if (!strncmp(++cp, "netmask", 7)) {
+		    i = 0;
+		    cp += 8;
+		    while (*cp != ' ')
+			netmask[i++] = *(cp++);
+		    netmask[i] = '\0';
+		}
+	    }
+	}
+    }
+    /* If we didn't get a name server value, hunt for it in resolv.conf */
+    if (!nameserver[0] && file_readable("/etc/resolv.conf"))
+	configEnvironmentResolv("/etc/resolv.conf");
+    if (hostname[0])
+	variable_set2(VAR_HOSTNAME, hostname);
+}
+
 /* This is it - how to get TCP setup values */
 int
 tcpOpenDialog4(Device *devp)
 {
     WINDOW              *ds_win, *save = NULL;
     ComposeObj          *obj = NULL;
-    int                 n = 0, cancel = FALSE;
+    int                 n = 0, filled = 0, cancel = FALSE;
     int			max, ret = DITEM_SUCCESS;
+    int			use_dhcp = FALSE;
     char                *tmp;
     char		title[80];
 
@@ -204,22 +252,51 @@ tcpOpenDialog4(Device *devp)
 	SAFE_STRCPY(ipaddr, di->ipaddr);
 	SAFE_STRCPY(netmask, di->netmask);
 	SAFE_STRCPY(extras, di->extras);
+	use_dhcp = di->use_dhcp;
     }
     else { /* See if there are any defaults */
 	char *cp;
 
+	/* First try a DHCP scan if such behavior is desired */
+	if (!variable_cmp(VAR_TRY_DHCP, "YES") || !msgYesNo("Do you want to try DHCP configuration of the interface?")) {
+	    int k;
+
+	    Mkdir("/var/db");
+	    Mkdir("/var/run");
+	    Mkdir("/tmp");
+	    msgNotify("Scanning for DHCP servers...");
+	    if (0 == vsystem("dhclient -1 %s", devp->name)) {
+		dhcpGetInfo(devp);
+		use_dhcp = TRUE;
+	    }
+	    else {
+		msgConfirm("Could not get network information from DHCP.\n"
+			   "Please Configure network information by hand.\n");
+		use_dhcp = FALSE;
+	    }
+	}
+
+	/* Special hack so it doesn't show up oddly in the tcpip setup menu */
+	if (!strcmp(gateway, "NO"))
+	    gateway[0] = '\0';
+
+	/* Get old IP address from variable space, if available */
 	if (!ipaddr[0]) {
 	    if ((cp = variable_get(VAR_IPADDR)) != NULL)
 		SAFE_STRCPY(ipaddr, cp);
 	    else if ((cp = variable_get(string_concat3(devp->name, "_", VAR_IPADDR))) != NULL)
 		SAFE_STRCPY(ipaddr, cp);
 	}
+
+	/* Get old netmask from variable space, if available */
 	if (!netmask[0]) {
 	    if ((cp = variable_get(VAR_NETMASK)) != NULL)
 		SAFE_STRCPY(netmask, cp);
 	    else if ((cp = variable_get(string_concat3(devp->name, "_", VAR_NETMASK))) != NULL)
 		SAFE_STRCPY(netmask, cp);
 	}
+
+	/* Get old extras string from variable space, if available */
 	if (!extras[0]) {
 	    if ((cp = variable_get(VAR_EXTRAS)) != NULL)
 		SAFE_STRCPY(extras, cp);
@@ -229,26 +306,26 @@ tcpOpenDialog4(Device *devp)
     }
 
     /* Look up values already recorded with the system, or blank the string variables ready to accept some new data */
-    tmp = variable_get(VAR_HOSTNAME);
-    if (tmp)
-	SAFE_STRCPY(hostname, tmp);
-    else
-	bzero(hostname, sizeof(hostname));
-    tmp = variable_get(VAR_DOMAINNAME);
-    if (tmp)
-	SAFE_STRCPY(domainname, tmp);
-    else
-	bzero(domainname, sizeof(domainname));
-    tmp = variable_get(VAR_GATEWAY);
-    if (tmp)
-	SAFE_STRCPY(gateway, tmp);
-    else
-	bzero(gateway, sizeof(gateway));
-    tmp = variable_get(VAR_NAMESERVER);
-    if (tmp)
-	SAFE_STRCPY(nameserver, tmp);
-    else
-	bzero(nameserver, sizeof(nameserver));
+    if (!hostname[0]) {
+	tmp = variable_get(VAR_HOSTNAME);
+	if (tmp)
+	    SAFE_STRCPY(hostname, tmp);
+    }
+    if (!domainname[0]) {
+	tmp = variable_get(VAR_DOMAINNAME);
+	if (tmp)
+	    SAFE_STRCPY(domainname, tmp);
+    }
+    if (!gateway[0]) {
+	tmp = variable_get(VAR_GATEWAY);
+	if (tmp && strcmp(tmp, "NO"))
+	    SAFE_STRCPY(gateway, tmp);
+    }
+    if (!nameserver[0]) {
+	tmp = variable_get(VAR_NAMESERVER);
+	if (tmp)
+	    SAFE_STRCPY(nameserver, tmp);
+    }
 
     save = savescr();
     /* If non-interactive, jump straight over the dialog crap and into config section */
@@ -287,24 +364,30 @@ tcpOpenDialog4(Device *devp)
 reenter:
     cancelbutton = okbutton = 0;
     while (layoutDialogLoop(ds_win, layout, &obj, &n, max, &cancelbutton, &cancel)) {
-	/* Insert a default value for the netmask, 0xffffff00 is
-	   the most appropriate one (entire class C, or subnetted
-	   class A/B network). */
-	if (netmask[0] == '\0') {
-	    strcpy(netmask, "255.255.255.0");
-	    RefreshStringObj(layout[LAYOUT_NETMASK].obj);
-	}
-	if (!index(hostname, '.') && domainname[0]) {
-	    strcat(hostname, ".");
-	    strcat(hostname, domainname);
-	    RefreshStringObj(layout[LAYOUT_HOSTNAME].obj);
-	}
-	else if (((tmp = index(hostname, '.')) != NULL) && !domainname[0]) {
-	    SAFE_STRCPY(domainname, tmp + 1);
-	    RefreshStringObj(layout[LAYOUT_DOMAINNAME].obj);
+	/* Prevent this from being irritating if user really means NO */
+	if (filled < 3) {
+	    /* Insert a default value for the netmask, 0xffffff00 is
+	     * the most appropriate one (entire class C, or subnetted
+	     * class A/B network).
+	     */
+	    if (!netmask[0]) {
+		strcpy(netmask, "255.255.255.0");
+		RefreshStringObj(layout[LAYOUT_NETMASK].obj);
+		++filled;
+	    }
+	    if (!index(hostname, '.') && domainname[0]) {
+		strcat(hostname, ".");
+		strcat(hostname, domainname);
+		RefreshStringObj(layout[LAYOUT_HOSTNAME].obj);
+		++filled;
+	    }
+	    else if (((tmp = index(hostname, '.')) != NULL) && !domainname[0]) {
+		SAFE_STRCPY(domainname, tmp + 1);
+		RefreshStringObj(layout[LAYOUT_DOMAINNAME].obj);
+		++filled;
+	    }
 	}
     }
-    
     if (!cancel && !verifySettings())
 	goto reenter;
 
@@ -323,14 +406,18 @@ netconfig:
 	char temp[512], ifn[255];
 	char *ifaces;
 
-	variable_set2(VAR_HOSTNAME, hostname);
-	sethostname(hostname, strlen(hostname));
+	if (hostname[0]) {
+	    variable_set2(VAR_HOSTNAME, hostname);
+	    sethostname(hostname, strlen(hostname));
+	}
 	if (domainname[0])
 	    variable_set2(VAR_DOMAINNAME, domainname);
 	if (gateway[0])
 	    variable_set2(VAR_GATEWAY, gateway);
 	if (nameserver[0])
 	    variable_set2(VAR_NAMESERVER, nameserver);
+	if (ipaddr[0])
+	    variable_set2(VAR_IPADDR, ipaddr);
 
 	if (!devp->private)
 	    devp->private = (DevInfo *)safe_malloc(sizeof(DevInfo));
@@ -338,9 +425,13 @@ netconfig:
 	SAFE_STRCPY(di->ipaddr, ipaddr);
 	SAFE_STRCPY(di->netmask, netmask);
 	SAFE_STRCPY(di->extras, extras);
+	di->use_dhcp = use_dhcp;
 
-	sprintf(temp, "inet %s %s netmask %s", ipaddr, extras, netmask);
 	sprintf(ifn, "%s%s", VAR_IFCONFIG, devp->name);
+	if (use_dhcp)
+	    sprintf(temp, "DHCP");
+	else
+	    sprintf(temp, "inet %s %s netmask %s", ipaddr, extras, netmask);
 	variable_set2(ifn, temp);
 	ifaces = variable_get(VAR_INTERFACES);
 	if (!ifaces)
@@ -350,9 +441,8 @@ netconfig:
 	    sprintf(ifn, "%s %s", devp->name, ifaces);
 	    variable_set2(VAR_INTERFACES, ifn);
 	}
-	if (ipaddr[0])
-	    variable_set2(VAR_IPADDR, ipaddr);
-	configResolv(NULL);	/* XXX this will do it on the MFS copy XXX */
+	if (!use_dhcp)
+	    configResolv(NULL);	/* XXX this will do it on the MFS copy XXX */
 	ret = DITEM_SUCCESS;
     }
     else
@@ -615,7 +705,7 @@ tcpMenuSelect(dialogMenuItem *self)
     Device *tmp;
 
     tmp = tcpDeviceSelect();
-    if (tmp && !msgYesNo("Would you like to bring the %s interface up right now?", tmp->name))
+    if (tmp && !((DevInfo *)tmp->private)->use_dhcp && !msgYesNo("Would you like to bring the %s interface up right now?", tmp->name))
 	if (!tmp->init(tmp))
 	    msgConfirm("Initialization of %s device failed.", tmp->name);
     return DITEM_SUCCESS | DITEM_RESTORE;

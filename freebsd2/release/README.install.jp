@@ -1,0 +1,265 @@
+
+                   FreeBSD 2.2.8+PAO+KAMEのインストール方法
+                                       
+   [1]IMASYの福原さん (ichiro@ichiro.org)の作ってくれたインストールフロッ
+   ピー のおかげでFreeBSD 2.2.8+PAO+KAMEのインストールは素のFreeBSDとほと
+   んど 同じ手間で非常に簡単にインストールすることができます。また、ftpイ
+   ンストール の場合は、インストールの時点でIPv6を用いてインストールするこ
+   とも可能です。
+   
+   なお、本ドキュメントでは、普通のFreeBSDをインストール場合と同等な点に
+   ついてはほとんど触れません。基本的にFreeBSDのインストールを経験している
+   人を対象にしています。また、PAO+KAMEということで基本的にはNotePCで、
+   end hostとなる(外部との通信のためのrouterは別にいる)マシンを構築するこ
+   とを 前提としています。
+     _________________________________________________________________
+   
+もくじ
+
+     * [2]準備するもの
+     * [3]インストールの大まかな流れ
+     * [4]インストール作業
+     * [5]細部の設定
+     * [6]other userland(KAME ports)
+     * [7]困った時は...
+     * [8]おまけ:手元のftp serverからインストールする場合
+     _________________________________________________________________
+   
+準備するもの
+
+     * インストールするPC:-)
+       PAO+KAMEですからNotePCを主な対象にしてますが、Desktopでも構いません
+       :-)
+     * インストールメディア
+       ftpインストールが可能ならばそれが一番良いでしょう
+       っていうか、ftpインストールじゃないとPAO+KAMEの部分が入りません:-)
+     * インストールフロッピー
+       以下のanonymous ftpサイトから入手できます。
+          + [9]ftp.itjit.ad.jp
+          + [10]ftp.kame.net
+          + [11]ftp.nttv6.net
+          + [12]ftp.imasy.or.jp
+     _________________________________________________________________
+   
+インストールの大まかな流れ
+
+   インストールフロッピーでは、基本部分のインストールを行った後、
+   PAO+KAME specificなファイルをインストールする、という方法を用いています
+   。 したがって、大まかな流れは以下の様になります。
+     * インストールフロッピーによる起動
+     * OSの基本部分のインストール
+     * PAO+KAME部分のインストール
+     * インストーラから出来る部分の設定
+     * インストールしたOSから起動
+     * インストーラから出来ない部分の設定
+     * (Optional)kernel再構築
+     _________________________________________________________________
+   
+インストール作業
+
+     * インストールフロッピーにてboot
+       デバイスドライバの設定変更／無効化、pccardコントローラのI/O,IRQの設
+       定は 通常の方法と同様に行います。
+     * Partition/Slice/Distributionの設定
+       通常のインストールと同様に設定します。
+     * Mediaの選択
+       最初にインストールする部分は通常にインストールされる物と同じなので
+       、 潤沢なネットワーク環境の無い人は基本部分だけCDROMからインストー
+       ル するのも良いでしょう。が、ここでは、Mediaにftpを選択した場合につ
+       いて 解説します。
+          + serverの選択
+            次の画面では、インストール時に使用するftp serverとして、
+            IPv4/IPv6 dual stackなサイトがメニューに表示されます。ネットワ
+            ーク的に問題無ければ この中から選択し、例えば手元のftp server
+            を用いる場合は、"URL"を選択し、 URLを入力します。
+          + stackの選択
+            次の画面でdeviceを選択したら、いよいよIPv4/IPv6のどちらを使う
+            かを 選択します。IPv4の場合はINETを、IPv6の場合はINET6を選択し
+            ます。 ただし、IPv6はインストールするマシンが継っているLANに
+            IPv6的代表ルータが いて、IPv6的に外部とのconnectivityがある事
+            、IPv6が話せるname serverを 知っている事が必要になります。
+            IPv4を使用する場合、dhcpでアドレスその他 の情報を得る事も可能
+            です。もちろん手動で設定する事も可能です。
+          + hostの設定
+            Host、Domain、Extra options to ifconfigはIPv4の時と同様に設定
+            します。 また、Name serverには、当然の事ながらIPv6を喋れるサー
+            バのIPv6アドレスを 指定します。 IPv6を使用する場合、IP
+            address/default gateway等はautoconfigurationにより 設定されま
+            すので、設定の必要はありません。なんて便利だ！
+     * commit
+       commitすると、普通にインストールが始まりますのでしばらく待ちます。
+     * PAO+KAMEのインストール
+       commitの最後にPAO+KAMEのインストール画面が表示されます。
+       distribution set の選択では、kernel, bin, PAObinは必須なので、これ
+       らは必ず選択します。 kernelの再構築やv6 userlandのコンパイルを行い
+       たい場合は、src distribution も選択します。 引続き、Install Mediaの
+       選択画面に移るので、基本部分のインストールと 同様にMediaの選択→
+       serverの選択と続きます。次に「既にネットワークの 設定が済んでるから
+       そのまま次へ行って良いか？」と(英語で)聞いて来るので、 普通はそのま
+       まYesを選択します。これで選択したdistributionがインストール されま
+       す。
+       なお、ここで、PAO+KAMEのインストールをしなくても、general
+       configuration menuからインストールすることもできます。その場合、
+       general configuration menuに進み、"K PAO+KAME Kit"を選択します。 次
+       にドキュメントを読んだら、"4 Get PAO+KAME Kit"を選択します。
+       distribution setを上記と同様に選択し、インストールします。
+       ちなみにPAO+KAME Menuの"5 Compile PAO+KAME Kit"メニューはインストー
+       ル 終了後にbootして/stand/sysinstallで起動した時にしか機能しません
+       。
+     * PAO機能有効化の設定
+       インストールが終了したら、そのままgeneral configuration menuに進み
+       ます。 PAO機能を有効にするためにもう一つ設定すべき点があります。
+       general configuration menuから"7 Startup"を選択し、一番上のAPMと2番
+       目のpccard の項目でスペースを叩いて有効にします。これをやらないと
+       PAO機能が 動きません。
+     * その他の設定
+       その他のTime ZoneとかRoot Passwordとかの設定は通常のインストールと
+       同様に行います。
+     * reboot
+       以上でインストーラから設定／操作できる部分は終了です。インストーラ
+       を 終了して、HDから起動しましょう。
+     * 一応IPv6 ready
+       rebootして、通常に立ち上がって来れば既に(一応)IPv6 readyになってい
+       ます。 boot中にstarting DAD for...とかDAD complete for...とかのメッ
+       セージが 表示されるはずですが、これは、IPv6 addressを自動設定するた
+       めにアドレスが 重複していないかどうかを調査しているメッセージです。
+       rootでloginして /usr/local/v6/sbin/ifconfig -aとか
+       /usr/local/v6/bin/netstat -rnとか してみると良いでしょう。また、
+       /usr/local/v6/sbin/ping6とか /usr/local/v6/sbin/traceroute6とかで遊
+       んで見る事もできます。
+     * inetdの設定
+       ここで、consoleにinetdがAddress already in useと文句を言っているの
+       に 気付く人も多いでしょう(笑)。これは、OS defaultの(IPv4 onlyな
+       )inetdが 起動している所にKAMEの(IPv4/IPv6 dualstackな)inetdを起動し
+       ているため です。そこで、/etc/rc.confの44行目付近の
+inetd_enable="YES"
+       となっている行を
+inetd_enable="NO"
+       に書き換えます。ついでに、/etc/inetd.confも書き換えて、IPv4/IPv6
+       ready にしてしまいましょう。telnetdの例で書くと、
+telnet  stream  tcp     nowait  root    /usr/libexec/telnetd    telnetd
+       となっている行を
+telnet  stream  tcp4    nowait  root    /usr/local/v6/libexec/telnetd   telnetd
+telnet  stream  tcp6    nowait  root    /usr/local/v6/libexec/telnetd   telnetd
+       と変更します。その他、ftpd等/usr/local/v6/libexecにdeamonがある物は
+       すべて同様に変更する事でdualstackにする事が出来ます。
+     * kernel再構築
+       kernel再構築のためには、インストーラのPAO+KAMEメニューでsrc
+       distribution をインストールしておく必要があります。そうすれば、
+       /stand/sysinstallで top menu→"c Configure"→"K PAO+KAME Kit"→"5
+       Compile PAO+KAME Kit"で 再構築が出来ます。また、手動で再構築したい
+       場合は、genericなconfig file が/stand/KAME/GENERIC.PAO.v6にあり、
+       kernel sourceが/usr/src/kame/freebsd2/sys 以下に展開されているので
+       、/stand/KAME/GENERIC.PAO.v6を/usr/src/kame/freebsd2/sys/i386/conf
+       に適当な名前でコピー、編集し、通常通りconfig,make depend,make を実
+       行すれば可能です。
+     _________________________________________________________________
+   
+細部の設定
+
+   以上で基本的な設定は完了です。あとは幸せに過ごすために細かい設定をちょ
+   っとだけ しましょう。
+     * IPv4の設定:-)
+       インストール時にIPv4を使用した人は、インストール時の設定が生きてい
+       る はずですが、IPv6を使用した人は、dhcpを使う設定になっているはずで
+       す。 これが嫌ならば、/etc/rc.confを編集して固定のIPv4 addressが振ら
+       れるように 変更してください。
+     * command search pathの設定
+       IPv6関連のファイルは(ソースを除いて)全て/usr/local/v6以下のディレク
+       トリに インストールされます。このインストールされるコマンドは多くの
+       場合IPv4/IPv6 dualstackになっています。つまり、IPv6で接続可能なら
+       IPv6で接続し、IPv4のみ ならIPv4で接続しようとします。つまり、
+       /usr/bin/telnetと/usr/local/v6/bin/tel net を場合によって使い分ける
+       必要は無い訳です。ので、環境変数PATHを編集して、 PATHの前の方に
+       /usr/local/v6/binとか/usr/local/v6/sbinとかをいれておけば だいぶ快
+       適になります。
+     * manpath.configの設定
+       上記と同様に、KAME関連のman fileは、/usr/local/v6/manの下にインスト
+       ール されています。ので、/etc/manpath.configを適切に書き換えれば、
+       manコマンド で、KAME関連のmanを読む事が出来るようになります。
+     * rtsolの設定
+       このインストーラはrebootしたら既にIPv6 readyを目指しているので、複
+       数の network deviceに対してrtsol(代表ルータからglobalなIPv6
+       addressを貰う仕組み) を実行するように設定されています。が、ほんとは
+       これはお行儀が良くないので、 自分の使うnetwork deviceのみにrtsolす
+       るように変更した方が良いでしょう。 そのためには、
+       /usr/local/v6/etc/rc.net6の
+iface="ed0 ep0 fe0 sn0"
+       となっている行を
+iface="ep0"
+       のように自分の使っているnetwork deviceのみに書き換えればOKです。
+     _________________________________________________________________
+   
+other userland(KAME ports)
+
+   KAMEの配布キットにはtelnet/ftpのようなごく基本的なuserlandは含まれてい
+   ますが、 他のapplicationは含まれていません。が、KAMEにはFreeBSDのports
+   と同じ仕組みの portsが含まれていて、多くの(通常使うほとんど全ての)IPv6
+   readyなapplicationが 網羅されています。FreeBSD portsと同様に、
+   /usr/src/kame/freebsd2/portsの目的の ディレクトリでmakeすれば、利用する
+   事が出来ます。
+     _________________________________________________________________
+   
+困った時は...
+
+   このインストーラのサポート用のML等は存在しませんが、FreeBSD上のIPv6全般
+   については[13] IPv6-jp@jp.FreeBSD.orgというメーリングリストがあります。
+   また、KAMEに ついては、[14]KAME projectのページが 多いに役立つでしょう
+   。
+     _________________________________________________________________
+   
+おまけ:手元のftp serverからインストールする場合
+
+   インストーラに登録されているftp serverがネットワーク的に遠かったり そも
+   そもreachabilityがないけど、手元のネットワークにはftp serverに出来る マ
+   シンが継っていればそこからftp installしたいと考える人も多いでしょう。
+   そこで、そのような場合にftp serverにどのようにコンテンツを置き、 URLに
+   何を指定すれば良いかを示します。
+     * 基本部分の設定
+       これは、通常のFreeBSDとおんなじで、適当にディレクトリを決めてそこに
+       2.2.8-RELEASEというディレクトリを作成し、その中にインストール時に
+       必要になるファイルをコピーするなり、Walnut CreekのCD ROMへのシンボ
+       リック リンクを作成するなりすればOKです。URLは、
+       "ftp://[ftpサーバのホスト名]/[2.2.8-RELEASEディレクトリのあるディレ
+       クトリ]"
+       を指定します。
+     * PAO+KAME部分の設定
+       同様に適当にディレクトリを決めてそこにsnapというディレクトリを作成
+       し、 その中に、例えば、
+       [15]ftp://ftp.itjit.ad.jp/pub/IPv6/installer/FreeBSD-IPv6/snap/の中
+       身を コピーします。同じ物は、
+          + [16]ftp.kame.net
+          + [17]ftp.nttv6.net
+          + [18]ftp.imasy.or.jp
+       からも入手できます。URLは、
+       "ftp://[ftpサーバのホスト名]/[snapディレクトリのあるディレクトリ]"
+       を指定します。
+       
+   以上の方法で、手元のftp serverからftpインストールする事が可能です。
+     _________________________________________________________________
+   
+   $Date: 1999/11/05 15:01:25 $
+   
+   
+    yugawa@itjit.ad.jp
+
+References
+
+   1. http://www.imasy.or.jp/
+   2. http://www.itv6.org/v6inst/paokame2.shtml#prepare
+   3. http://www.itv6.org/v6inst/paokame2.shtml#flow
+   4. http://www.itv6.org/v6inst/paokame2.shtml#install
+   5. http://www.itv6.org/v6inst/paokame2.shtml#config
+   6. http://www.itv6.org/v6inst/paokame2.shtml#kameports
+   7. http://www.itv6.org/v6inst/paokame2.shtml#help
+   8. http://www.itv6.org/v6inst/paokame2.shtml#ftp
+   9. ftp://ftp.itjit.ad.jp/pub/IPv6/installer/FreeBSD-IPv6/installer/paokame.flp
+  10. ftp://ftp.kame.net/pub/kame/installer-imasy/FreeBSD-IPv6/installer/paokame.flp
+  11. ftp://ftp.nttv6.net/ipv6/IPv6_installer/FreeBSD-IPv6/installer/paokame.flp
+  12. ftp://ftp.imasy.or.jp/installer/FreeBSD-IPv6/installer/paokame.flp
+  13. http://www.jp.freebsd.org/ml.html#IPv6-jp
+  14. http://www.kame.net/
+  15. ftp://ftp.itjit.ad.jp/pub/IPv6/installer/FreeBSD-IPv6/snap/
+  16. ftp://ftp.kame.net/pub/kame/installer-imasy/FreeBSD-IPv6/snap/
+  17. ftp://ftp.nttv6.net/ipv6/IPv6_installer/FreeBSD-IPv6/snap/
+  18. ftp://ftp.imasy.or.jp/installer/FreeBSD-IPv6/snap/

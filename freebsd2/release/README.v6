@@ -1,21 +1,31 @@
-$Id: README.v6,v 1.1 1999/09/13 08:49:55 itojun Exp $
+1. Prepare
+   To compile PAO+KAME install floppy, you must first install at lease these
+sources.
 
-	(1) Checkout the kame-tree 
-	(2) make target
-	(3) install include files
-	(4) extracting PAO package
-	(5) apply /usr/src/PAO/sys-pao.diff
-	(6) update include files
-	(7) makeing the KAME userland tools
-	(8) makeing /usr/obj directory
-	(9) makeing /R directory
-	(10) makeing boot.flp and fixit.flp
+    sbase, sbin, scontrib, setc, sgnu, ssbin, sshare, ssys, subin, susbin
 
-	require sources:
-		sbase, sbin, scontrib, setc, sgnu, ssbin, sshare,
-		ssys, subin, susbin
+   Also, it requires /usr/src/contrib/isc-dhcp & /usr/src/sbin/dhclient
+source tree imported from 3.3-RELEASE source tree. Of course, you must add
+'dhclient' to SUBDIR of /usr/src/sbin/Makefile.
 
-(1) Checkout the kame-tree 
+   To compile install floppy, you need pseudo-device vn in your kernel
+configuration. If not, add
+
+	pseudo-device vn 1
+
+to you kernel configuration, rebuild & install kernel, and reboot your system.
+
+2. Getting PAO+KAME integrated source tree
+    There are two ways to get PAO+KAME integrrated source tree.
+One is to get kame-tree by cvs or cvsup and apply PAO patch by hand.
+The other is to get PAO+KAME integrated tree by cvsup.
+
+2.1 Get kame-tree and apply PAO patch
+    To get kame-tree by cvs or cvsup and apply PAO patch, follow the
+instructions below
+
+    (1) Checkout the kame-tree
+
 # cd $somewhere (replace $somewhere with your working directory)
 	Default of "$somewhere" is /usr/src.
 	If you checkout the kame-tree in other place, must change $KAMETREE in Makefile.
@@ -25,38 +35,94 @@ $Id: README.v6,v 1.1 1999/09/13 08:49:55 itojun Exp $
 # cd kame
 # make TARGET=freebsd2 tree
 
-(2) make target
+    You can also get kame-tree by cvsup. Please visit http://www.kame.net/
+for the details.
+
+    (2) make target
+  
 # ln -s $somewhere/kame/freebsd2/sys /usr/src/sys
 # cd $somewhere/kame
 # make TARGET=freebsd2 prepare  
 
-(3) install include files
-# cd $somewhere/kame/freebsd2
-# make includes
-# make install-includes
+    (3) extract PAO package
 
-(4) extracting PAO package in /usr/src directory
 # cd $somewhere (replace $somewhere with your working directory)
 	Default of "$somewhere" is /usr/src.
 	If you extract PAO-archive in other place, must change $PAOTREE in Makefile.
 # gzip -c -d PAO-19990405.tgz | tar -xvf -
 # ln -s PAO-19990405 PAO
 
-(5) apply $somewhere/PAO/release/sys-pao.diff
+    (4) apply /usr/src/PAO/sys-pao.diff
+
 # cd /usr/src/sys
 # patch -p2 < $somewhere/PAO/release/sys-pao.diff
 
-(6) update include files
+    (5) Create symbolic link to release directory
+
+# ln -s /usr/src/kame/freebsd2/release /usr/src/release
+
+2.2 Get PAO+KAME integrated tree
+   To get PAO+KAME integrated source tree by cvsup follow the instructions 
+below.
+
+    (1) install cvsup on your system
+    You can install it by ports or packages.
+
+    (2) cvsup PAO+KAME source tree
+
+    Create the supfile as follows. Suppose that the file name is 
+    "/usr/src/PAOKAME.supfile".
+
+-----
+*default host=cvsup.imasy.org
+*default base=/usr/src
+*default prefix=/usr/src
+*default release=cvs tag=.
+*default delete use-rel-suffix
+
+#collections
+imasy-pao+kame2
+-----
+
+    Then run cvusp as follows.
+
+# cvsup -g -L 2 /usr/src/PAOKAME.supfile
+
+    This will create PAO+KAME tree in /usr/src/kame directory.
+
+    (3) Create some symbolic links
+
+# ln -s /usr/src/kame/pao2/kit /usr/src/PAO
+# ln -s /usr/src/kame/pao2/release /usr/src/release
+# ln -s /usr/src/kame/pao2/sys /usr/src/sys
+# ln -s /usr/src/kame/pao2 /usr/src/kame/freebsd2
+
+    (4) prepare to make kernels
+
+# cd /usr/src/kame; make TARGET=pao2 prepare
+
+3. Create install floppy image
+
+    (1) install KAME-based include files
+
+# cd $somewhere/kame/freebsd2
+# make includes
+# make install-includes
+
+    (2) install PAO-based include files
+
 # cd /usr/src/sys/i386/include
 # cp apm_bios.h if_cnwioctl.h clock.h cpu.h scc.h wavelan.h /usr/include/machine
 # cp /usr/src/sys/pccard/*.h /usr/include/pccard
 
-(7) makeing the userland tools
+    (3) make KAME userland tools
+
 # cd $somewhere/kame/freebsd2
 # make
 # make install
 
-(8) makeing /usr/obj directory
+    (4) make /usr/obj directory
+
 # cd /usr/src/bin ; make obj
 # cd /usr/src/usr.bin ; make obj
 # cd /usr/src/usr.sbin ; make obj
@@ -64,15 +130,56 @@ $Id: README.v6,v 1.1 1999/09/13 08:49:55 itojun Exp $
 # cd /usr/src/gnu/usr.bin ; make obj
 # cd /usr/src/release ; make obj
 
+    (5) make /R directory
 
-(9) makeing /R directory
 # cd /usr/src/release ; make release.1
 # cd /usr/src/etc ; make distribute DISTDIR=/R/stage/trees
 # cd /usr/src/sys/i386/boot ; make ; make distribute DISTDIR=/R/stage/trees
 # cd /usr/src/share/misc ; make distribute DISTDIR=/R/stage/trees
 
+    (6) make boot.flp and fixit.flp
 
-(10) makeing boot.flp and fixit.flp
 # cd /usr/src/release
 # cp BOOTFLP_PAO.v6 /usr/src/sys/i386/conf/BOOTFLP_PAO
 # make boot.flp 
+
+   The created boot floppy image will be at /R/stage/floppies/boot.flp
+
+4. Create tarballs
+   In the instructions below, meta character '*' is defined at
+/usr/src/release/sysinstall/kame_version.h.
+
+    (1) pkernel-*-fbsd228.tgz
+
+# cp /usr/src/release/GENERIC.PAO.v6  /usr/src/sys/i386/conf
+# cd /usr/src/sys/i386/conf; config GENERIC.PAO.v6
+# cd /usr/src/sys/compile/GENERIC.PAO.v6; make depend; make
+# tar zcvf pkernel-*-fbsd228.tgz kernel
+
+    (2) pv6-*-fbsd228.tgz
+
+# cd /usr/local; mv v6; v6.tmp
+# cd /usr/src/kame/freebsd2
+# make install
+# cd /usr/local; tar zcvf pv6-*-fbsd228.tgz v6
+# mv v6.tmp v6
+
+    (3) pkame-*-fbsd228-snap.tgz
+
+prepare 'clean' KAME-tree to, say, /usr/dist/kame
+
+# cd /usr/dist/kame
+# make TARGET=freebsd2 prepare
+# cd /usr/dist
+# tar zcvf pkame-*-fbsd228-snap.tgz kame
+
+    (4) paobin-*-fbsd228.tgz
+
+gunzip & untar current taball to, say, /usr/dist/paobin
+
+# cd /usr/dist/paobin; tar zxvf $somewhere/paobin-[current]-fbsd228.tgz
+
+modify/update generated files and create tarball
+
+# cd /usr/dist/paobin; tar zcvf ../paobin-*-fbsd228.tgz *
+
