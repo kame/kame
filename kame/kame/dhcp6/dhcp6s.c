@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.132 2004/07/29 23:39:26 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.133 2004/07/30 16:42:41 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -2919,6 +2919,7 @@ process_auth(dh6, len, client_conf, optinfo, roptinfo)
 		}
 
 		roptinfo->delayedauth_keyid = key->keyid;
+		roptinfo->delayedauth_realmlen = key->realmlen;
 		roptinfo->delayedauth_realmval =
 		    malloc(roptinfo->delayedauth_realmlen);
 		if (roptinfo->delayedauth_realmval == NULL) {
@@ -2927,7 +2928,6 @@ process_auth(dh6, len, client_conf, optinfo, roptinfo)
 			    clientstr(client_conf, &optinfo->clientID));
 			break;
 		}
-		roptinfo->delayedauth_realmlen = key->realmlen;
 		memcpy(roptinfo->delayedauth_realmval, key->realm,
 		    roptinfo->delayedauth_realmlen);
 
