@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.56 2002/06/09 14:43:57 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.57 2002/08/09 08:49:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -183,18 +183,36 @@ esp_algorithm_lookup(idx)
 }
 
 int
+esp_max_padbonud()
+{
+	int idx;
+	static int padbound = 0;
+
+	if (padbound)
+		return padbound;
+
+	for (idx = 0; idx < sizeof(esp_algorithms)/sizeof(esp_algorithms[0]);
+	     idx++) {
+		if (esp_algorithms[idx].padbound > padbound)
+			padbound = esp_algorithms[idx].padbound;
+	}
+	return padbound;
+}
+
+int
 esp_max_ivlen()
 {
 	int idx;
-	int ivlen;
+	static int ivlen = 0;
 
-	ivlen = 0;
+	if (ivlen)
+		return ivlen;
+
 	for (idx = 0; idx < sizeof(esp_algorithms)/sizeof(esp_algorithms[0]);
 	     idx++) {
 		if (esp_algorithms[idx].ivlenval > ivlen)
 			ivlen = esp_algorithms[idx].ivlenval;
 	}
-
 	return ivlen;
 }
 

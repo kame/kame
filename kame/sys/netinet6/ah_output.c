@@ -1,4 +1,4 @@
-/*	$KAME: ah_output.c,v 1.32 2002/06/09 14:43:57 itojun Exp $	*/
+/*	$KAME: ah_output.c,v 1.33 2002/08/09 08:49:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -132,9 +132,9 @@ ah_hdrsiz(isr)
     estimate:
 	/* ASSUMING:
 	 *	sizeof(struct newah) > sizeof(struct ah).
-	 *	16 = (16 + 3) & ~(4 - 1).
+	 *	AH_MAXSUMSIZE is multiple of 4.
 	 */
-	return sizeof(struct newah) + 16;
+	return sizeof(struct newah) + AH_MAXSUMSIZE;
 }
 
 #ifdef INET
