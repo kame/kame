@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.20 2000/05/23 16:25:09 sakane Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.21 2000/05/24 02:55:36 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -183,9 +183,8 @@ cmpspidx(a, b)
 	struct policyindex *a, *b;
 {
 	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL, "comparing %p and %p\n");
-		plog(logp, LOCATION, NULL, "%p: %s\n", a, spidx2str(a));
-		plog(logp, LOCATION, NULL, "%p: %s\n", b, spidx2str(b)););
+		plog(logp, LOCATION, NULL, "sub:%p: %s\n", a, spidx2str(a));
+		plog(logp, LOCATION, NULL, "db :%p: %s\n", b, spidx2str(b)););
 
 	/* XXX don't check direction now, but it's to be checked carefully. */
 	if (a->prefs != b->prefs
@@ -214,9 +213,8 @@ cmpspidx_wild(a, b)
 	struct sockaddr_storage sa1, sa2;
 
 	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL, "comparing %p and %p\n");
-		plog(logp, LOCATION, NULL, "%p: %s\n", a, spidx2str(a));
-		plog(logp, LOCATION, NULL, "%p: %s\n", b, spidx2str(b)););
+		plog(logp, LOCATION, NULL, "sub:%p: %s\n", a, spidx2str(a));
+		plog(logp, LOCATION, NULL, "db: %p: %s\n", b, spidx2str(b)););
 
 	if (!(a->dir == IPSEC_DIR_ANY || a->dir == b->dir))
 		return 1;

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.37 2000/05/23 16:25:09 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.38 2000/05/24 02:55:35 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1335,6 +1335,9 @@ pk_recvacquire(mhp)
 			"no policy found %s.\n", spidx2str(&spidxtmp));
 		return -1;
 	}
+	YIPSDEBUG(DEBUG_PFKEY,
+		plog(logp, LOCATION, NULL,
+			"polic found: %s.\n", spidx2str(&spidxtmp)));
 
 	memset(iph2, 0, MAXNESTEDSA);
 
