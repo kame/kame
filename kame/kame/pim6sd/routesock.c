@@ -363,8 +363,15 @@ getmsg(rtm, msglen, rpfinfop)
 	 */
 	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
 	{
+#if 0
 	    rpfinfop->rpfneighbor.sin6_scope_id =
 		ntohs(*(u_int16_t *)&sin6->sin6_addr.s6_addr[2]);
+#endif
+	    rpfinfop->rpfneighbor.sin6_scope_id = ifp->sdl_index;
+	    /*
+	     * XXX: KAME kernel embeds the interface index to the address.
+	     * Clear the index for safety.
+	     */
 	    rpfinfop->rpfneighbor.sin6_addr.s6_addr[2] = 0;
 	    rpfinfop->rpfneighbor.sin6_addr.s6_addr[3] = 0;
 	}
