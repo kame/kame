@@ -2,47 +2,26 @@ SRCDIR=	${.CURDIR}/../../../kame/racoon
 
 CFLAGS=	-g -O2
 OPTFLAG+=-DHAVE_PFKEYV2 -DYIPS_DEBUG
-CPPFLAGS+=-DINET6 -DHAVE_FUNCTION_MACRO=1 -DHAVE_LIBCRYPTO=1 -DHAVE_LIBL=1 -DHAVE_LIBY=1 -DENABLE_IPV6=1 -DADVAPI=1 -DHAVE_GETADDRINFO=1 -DHAVE_GETNAMEINFO=1 -DSTDC_HEADERS=1 -DHAVE_SYS_WAIT_H=1 -DHAVE_LIMITS_H=1 -DHAVE_SYS_TIME_H=1 -DHAVE_UNISTD_H=1 -DHAVE_STDARG_H=1 -DHAVE_VARARGS_H=1 -DTIME_WITH_SYS_TIME=1 -DRETSIGTYPE=void -DHAVE_VPRINTF=1 -DHAVE_GETTIMEOFDAY=1 -DHAVE_SELECT=1 -DHAVE_SOCKET=1 -DHAVE_STRERROR=1 -DHAVE_STRTOL=1 -DHAVE_STRTOUL=1 -DHAVE_STRDUP=1  $(OPTFLAG) -DIPSEC -I. -I$(SRCDIR) -Dss_family=__ss_family -Dss_len=__ss_len -DSYSCONFDIR=\"$(ETCDIR)\"
+CPPFLAGS+=-DINET6 -DHAVE_FUNCTION_MACRO=1 -DHAVE_LIBCRYPTO=1 -DHAVE_LIBL=1 -DHAVE_LIBY=1 -DENABLE_IPV6=1 -DADVAPI=1 -DHAVE_GETADDRINFO=1 -DHAVE_GETNAMEINFO=1 -DSTDC_HEADERS=1 -DHAVE_SYS_WAIT_H=1 -DHAVE_LIMITS_H=1 -DHAVE_SYS_TIME_H=1 -DHAVE_UNISTD_H=1 -DHAVE_STDARG_H=1 -DHAVE_VARARGS_H=1 -DTIME_WITH_SYS_TIME=1 -DRETSIGTYPE=void -DHAVE_VPRINTF=1 -DHAVE_GETTIMEOFDAY=1 -DHAVE_SELECT=1 -DHAVE_SOCKET=1 -DHAVE_STRERROR=1 -DHAVE_STRTOL=1 -DHAVE_STRTOUL=1 -DHAVE_STRDUP=1  $(OPTFLAG) -DIPSEC -I. -I$(SRCDIR) -Dss_family=__ss_family -Dss_len=__ss_len -DSYSCONFDIR=\"$(ETCDIR)\" -DINCLUDE_PATH_OPENSSL=1
 CPPFLAGS+=-DYY_NO_UNPUT
-.if exists(/usr/pkg/include/ssleay/des.h)
-CPPFLAGS+=-I/usr/pkg/include/ssleay 
+.if exists(/usr/local/ssl/include/openssl/des.h)
+CPPFLAGS+=-I/usr/local/ssl/include
 .elif exists(/usr/pkg/include/openssl/des.h)
-CPPFLAGS+=-I/usr/pkg/include/openssl 
+CPPFLAGS+=-I/usr/pkg/include
 .endif
 YFLAGS+=-d
 
-.if exists(/usr/pkg/include/ssleay/rc5.h) || exists(/usr/pkg/include/openssl/rc5.h)
-CPPFLAGS+=-DHAVE_RC5_H=1
+.if exists(/usr/local/ssl/include/openssl/rc5.h) || exists(/usr/pkg/include/openssl/rc5.h)
+CPPFLAGS+=-DHAVE_OPENSSL_RC5_H=1
 .endif
-.if exists(/usr/pkg/include/ssleay/idea.h) || exists(/usr/pkg/include/openssl/idea.h)
-CPPFLAGS+=-DHAVE_IDEA_H=1
+.if exists(/usr/local/ssl/include/openssl/idea.h) || exists(/usr/pkg/include/openssl/idea.h)
+CPPFLAGS+=-DHAVE_OPENSSL_IDEA_H=1
 .endif
-.if exists(/usr/pkg/include/ssleay/cversion.h) || exists(/usr/pkg/include/openssl/cversion.h)
-CPPFLAGS+=-DHAVE_CVERSION_H=1
+.if exists(/usr/local/ssl/include/poenssl/cversion.h) || exists(/usr/pkg/include/openssl/cversion.h)
+CPPFLAGS+=-DHAVE_OPENSSL_CVERSION_H=1
 .endif
 .if exists(/usr/pkg/include/ssleay/opensslv.h) || exists(/usr/pkg/include/openssl/opensslv.h) || exists(/usr/local/ssl/include/openssl/opensslv.h)
-CPPFLAGS+=-DHAVE_OPENSSLV_H=1
-.endif
-.if exists(/usr/local/ssl/include/openssl)
-CFLAGS+=-I/usr/local/ssl/include/openssl -I/usr/local/ssl/include
-.elif exists(/usr/pkg/include/ssleay)
-CFLAGS+=-I/usr/pkg/include/ssleay
-.endif
-
-.if exists(/usr/local/ssl/bin/openssl)
-ssleay_cmd=/usr/local/ssl/bin/openssl
-.elif exists(/usr/pkg/ssl/bin/openssl)
-ssleay_cmd=/usr/pkg/ssl/bin/openssl
-.elif exists(/usr/local/bin/openssl)
-ssleay_cmd=/usr/local/bin/openssl
-.elif exists(/usr/local/ssl/bin/ssleay)
-ssleay_cmd=/usr/local/ssl/bin/ssleay
-.elif exists(/usr/pkg/ssl/bin/ssleay)
-ssleay_cmd=/usr/pkg/ssl/bin/ssleay
-.elif exists(/usr/local/bin/ssleay)
-ssleay_cmd=/usr/local/bin/ssleay
-.else
-ssleay_cmd=openssl
+CPPFLAGS+=-DHAVE_OPENSSL_OPENSSLV_H=1
 .endif
 
 LDADD+=	-ly -ll
