@@ -377,9 +377,6 @@ main(argc, argv)
 		case 'q':
 			options |= F_QUIET;
 			break;
-		case 'R':
-			options |= F_RROUTE;
-			break;
 		case 'S':
 			/* XXX: use getaddrinfo? */
 			if (inet_pton(AF_INET6, optarg, (void *)&srcaddr) != 1)
@@ -582,9 +579,6 @@ main(argc, argv)
 			       &optval, sizeof(optval)) == -1)
 			err(1, "IPV6_MULTICAST_LOOP");
 */
-	/* record route option */
-	if (options & F_RROUTE)
-		errx(1, "record route not available in this implementation");
 
 	/* Specify the outgoing interface and/or the source address */
 	if (usepktinfo)
@@ -1722,7 +1716,7 @@ void
 usage()
 {
 	(void)fprintf(stderr,
-"usage: ping6 [-dfnqRrvwW"
+"usage: ping6 [-dfnqrvwW"
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
 		      "] [-P policy"
