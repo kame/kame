@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.245 2001/10/15 10:39:38 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.246 2001/10/15 10:52:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -791,7 +791,7 @@ icmp6_input(mp, offp, proto)
 
 	case MLD6_MTRACE_RESP:
 	case MLD6_MTRACE:
-		/* XXX: these two are experimental.  not officially defind. */
+		/* XXX: these two are experimental.  not officially defined. */
 		/* XXX: per-interface statistics? */
 		break;		/* just pass it to applications */
 
