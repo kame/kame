@@ -1,0 +1,1416 @@
+			CHANGELOG for KAME kit
+$KAME: CHANGELOG.2002,v 1.1 2003/01/17 03:17:58 suz Exp $
+
+<200212>
+Tue Dec 24 13:43:12 JST 2002	suz@crl.hitachi.co.jp
+	* kame/kame/pim6sd: fixed a pim6sd crash when it's located at
+	  first-hop router.
+
+2002-12-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (pfxlist_onlink_check): checked
+	whether there is a router that does not advertise any prefixes
+	even if there's no prefix with a reachable router.  The change
+	addressed the case that we've received a prefix but the
+	advertising router(s) has been unreachable.
+
+2002-12-16 Keiichi SHIMA <keiichi@iij.ad.jp>
+	The ID-19 based Mobile IPv6 code is announced.
+
+2002-12-16  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_trans.c: FTP connection from v4 client
+	  to v6 server with port redirection mode was supported.  Passive
+	  and non-passive mode are both available.
+
+Sun Dec 15 13:24:25 JST 2002	suz@crl.hitachi.co.jp
+	* kame/kame/pim6sd: pim6sd works on kernel with more than MAXMIFS 
+	interfaces, unless the number of PIM-enabled interfaces exceeds 
+	MAXMIFS.
+
+2002-12-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/raw_ip6.c (rip6_input): cleared link zone
+	identifiers embedded in "from" addresses.  Without this fix,
+	applications would see the embedded values when calling recvfrom()
+	or recvmsg() on an IPv6 raw socket.  The previous code would also
+	prevent pim6sd from working correctly.
+
+Fri Dec  6 15:18:08 JST 2002	suz@crl.hitachi.co.jp
+	* kame/kame/pim6sd: introduced a configuration option 
+	"default_phyint_status" to disable multicast routing on all
+	interfaces except explicitly enabled ones.
+
+2002-12-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_unlink_ifa): always decremented the
+	reference count of the associated prefix.  Otherwise, the prefix
+	would never be purged after a manually configured address expires.
+
+2002-12-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_control): initialized the lifetimes
+	of a manually configured prefix correctly.
+
+2002-12-04  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_trans.c: Support FTP connection from v4
+	  client to v6 server with non-passive mode.
+	* kame/sys/netinet6/natpt_{defs,trans,tslot}.[ch]: Support packet
+	  retransmission of when TCP payload was modified in FTP
+	  translation.
+
+2002-12-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/usr.bin/netstat/inet[6].c: replaced inet6print() and
+	inet6name() with a new function "sa_print()" using getnameinfo()
+	for a better support of IPv6 scoped addresses.
+
+<200211>
+2002-11-29  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_dispatch.c: Changed a way of cv6->plen
+	  calculation.  There is a case m->m_len is greater than real
+	  packet size calculated from ipv6 header.
+	* kame/sys/netinet6/natpt_trans.c: Support FTP connection from v4
+	  client to v6 server with passive mode.
+
+Mon Nov 18 01:31:07 JST 2002  itojun@iijlab.net
+	* sys/net/if_stf.c: more strict sanity check based on suggestions in
+	  draft-savola-v6ops-6to4-security-00.txt.
+
+Mon Nov 11 20:40:22 JST 2002	suz@crl.hitachi.co.jp
+	* kame/sys/netinet6/mld6.c: fixed an MLDv2-kernel crash by MLDv2 Query
+	  packet with small maximum-response-code.
+
+Mon Nov 11 14:49:20 JST 2002	suz@crl.hitachi.co.jp
+	* kame/sys/netinet6/in6.c: deletes MLDv2 info created automatically
+	  within kernel, if it is of no use.
+
+Mon Nov 11 12:14:53 JST 2002	suz@crl.hitachi.co.jp
+	* openbsd/sys/netinet/udp_usrreq.c, kame/sys/netinet6/icmp6.c,
+	  openbsd/usr.sbin/ifmcstat/Makefile: supported MLDv2 on OpenBSD
+	
+2002-11-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet/tcp_usrreq.c (tcp6_connect): made the way
+	to fill in flowinfo consistent with in6_pcbconnect(); use an
+	automatically generated value or 0, and always ignore
+	the sin6_flowinfo value given by the application.
+
+Fri Nov  8 17:52:07 JST 2002	suz@crl.hitachi.co.jp
+	* openbsd/sys/netinet/udp_usrreq.c: fixed a kernel crash by IPv6 
+	  UDP packet arrival (e.g. DNS response).  OpenBSD-KAME users
+	  are strongly recommended to update the kernel.
+
+Fri Nov  8 15:37:51 JST 2002	kjc@csl.sony.co.jp
+	* a major rework of HFSC in ALTQ.
+	 - extend HFSC to support upper-limit.
+	   a class can have guaranteed and upper-limit bandwidth, e.g.,
+		class hfsc fxp0 http_class tcp_class bandwidth 25M ulimit 40M
+	 - various improvements of the algorithms and implementations.
+	based on work by Oleg Cherevko <olwi@aq.l.org.ua>
+
+Thu Nov  7 12:57:55 JST 2002
+	* sctp changes from randall:
+	  - in_proto's need to NOT have PR_ATOMIC for SCTP
+	  - asconf (addip) would incorrectly add back addresses
+	  - clock granularity in wrong units
+	  - Incorrect data notification.
+	  - recepit of duplicate detected earlier when it is the same
+	    as the last TSN.
+	  - removal of some no longer used cwnd debugging variables
+	  - removal of debugging sockopts always slated to be removed
+	  - addition of setsockopt variable to control auto-asconf behavior
+	  - Fix of failed data notification so that it is correctly formed
+	    in the socket buffer.
+	  - honor so_linger
+
+Tue Nov  5 14:44:14 JST 2002  itojun@iijlab.net
+	* openbsd: synchronize to 3.2.  still needs testing.
+
+Mon Nov  4 15:27:40 JST 2002	suz@crl.hitachi.co.jp
+	* kame/sys/{netinet6/in6.c, netinet6/mld6.c, netinet/in_msf.h}:
+	  announces linklocal multicast join by MLDv2 on MLDv2-ready kernel.
+
+Mon Nov  4 13:28:42 JST 2002	suz@crl.hitachi.co.jp
+	* {freebsd4,netbsd,openbsd}/sys/netinet/igmp.c: IGMPv2-compat-mode
+	  implementation for host side
+	* kame/sys/netinet6/mld6.c, icmp6.c: MLDv1-compat-mode 
+	  implementation for host side
+
+<200210>
+2002-10-31  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_pcbopts, ip6_copypktopts): 
+	plugged memory leaks in some erroneous cases.
+	From: "Sam Leffler" <sam@errno.com>
+
+Thu Oct 31 13:23:47 JST 2002	suz@crl.hitachi.co.jp
+	* kame/kame/ifmcstat: added options to filter its output 
+	by address-family or interface.
+
+Wed Oct 30 15:27:31 JST 2002	suz@crl.hitachi.co.jp
+	* kame/kame/pim6sd/mld6*.[ch], vif.h: implements MLDv1-compat-mode
+	for router side.
+
+2002-10-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_forward.c: added a destination scope
+	check: if a packet is going to break the scope zone of packet's
+	destination address, be sure to discard it.
+
+Tue Oct 29 05:49:34 JST 2002  itojun@iijlab.net
+	* kame/sys/net/radix_mpath.c: add random jitter to hash value passed
+	  to rtalloc_mpath(), to avoid synchronization between routers.
+
+2002-10-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (nd6_ra_input): treated "reserved"
+	router preference value as if the router had 0 lifetime, according
+	to the specification.
+	Reported by: Hiroshi MIYATA <H.Miyata@jp.yokogawa.com>
+
+Sun Oct 27 13:33:01 JST 2002  itojun@iijlab.net
+	* sys/net/if_sec.c: obsolete "pseudo-device sec" support.  the design
+	  does only half of what i intended to accomplish.
+
+Sat Oct 26 16:14:22 JST 2002	kjc@csl.sony.co.jp
+	* add a new queueing discipline, JoBS, to ALTQ
+	JoBS is contributed by Nicolas Christin <nicolas@cs.virginia.edu>
+	and has been in the altq distribution since altq-3.1
+
+Thu Oct 24 19:14:11 JST 2002	suz@crl.hitachi.co.jp
+	* freebsd4: sync with FreeBSD 4.7-RELEASE.
+
+Tue Oct 22 13:19:54 JST 2002	suz@crl.hitachi.co.jp
+	* freebsd4/sys/netinet/in.c: fixed a kernel crash in FreeBSD-4
+	  by "ifconfig stf0 inet 1.2.3.4"
+
+Tue Oct 22 10:54:38 JST 2002	suz@crl.hitachi.co.jp
+	* kame/sys/netinet6/in6_msf.[ch], ip6_output.c: fixed a kernel crash
+	occuring when specifying multiple source addresses in MLDv2-API
+
+Fri Oct 18 18:57:42 JST 2002	suz@crl.hitachi.co.jp
+	* kame/freebsd4/ports/{ct,v6eval}: updated to ver 2.0.
+
+2002-10-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/{ip6opt.c, rthdr.c}: synchronized with
+	rfc2292bis-08.  Many size_t values changed to socklen_t.  Man
+	pages were also updated.
+	* kame/sys/netinet6/in6.h: updated prototypes of rfc2292bis
+	library functions accordingly.
+
+2002-10-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* *bsd/sbin/ifconfig/ifconfig.c: made the IN6_IFF_DEPRECATED flag
+	obsolete, since it was not effectively used in the kernel any
+	more.
+	- "ifconfig ADDR deprecate" is now equivalent to
+	  "ifconfig ADDR pltime 0".
+	- "ifconfig [ifname]" prints "deprecated" when pltime is 0,
+	  regardless of the flag value.
+	(Note: there should be no difference on the behavior for users.)
+	
+2002-10-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* netbsd/sys/net/route.h: used padding in the route structure
+	instead of using sockaddr_storage.  (See the change on Oct 7 below.)
+
+2002-10-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_control): do not differentiate
+	manually configured address from autoconfigured ones with regard
+	to prefix management.  This should fix the problem that the direct
+	route to a prefix was removed when one of the addresses sharing the
+	prefix was removed.
+	(In response to a report from Thierry Legras
+	<Thierry.Legras@alcatel.fr>)
+
+Wed Oct 16 16:56:06 JST 2002	suz@crl.hitachi.co.jp
+	* kame/sys/netinet/in_msf.c: fixed a kernel crash caused by the 
+	IGMPv3/MLDv2 operation adding new source address to the existing 
+	source address list.
+
+Mon Oct 14 15:10:29 JST 2002	suz@crl.hitachi.co.jp
+	* kame/sys/netinet6/in6.c: fixed a kernel crash with MLDv2 advanced API.
+
+Fri Oct 11 23:26:35 JST 2002	suz@crl.hitachi.co.jp
+	* kame/kame/pim6sd/vif.[ch], mld6_proto.[ch]: implements MLDv1 Startup
+	  Query as in RFC2710 section 7.6-7.7.
+
+Thu Oct 10 02:59:43 JST 2002  itojun@iijlab.net
+	* sys/netinet/sctp*: new kit from randall.  fixes to TCP model support
+	  and such.
+
+Tue Oct  8 17:05:56 JST 2002  itojun@iijlab.net
+	* sys/net/if_*.c: drop support for cloning interfaces, to free us from
+	  coping with *BSD differences.  it is not our goal to cope with *BSD
+	  differences, our goal is to provide high-quality networking code.
+	  it's pity that *BSDs have a lot of differences...
+
+2002-10-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/net/route.h: experimentally added a trailing pad in
+	the route structure instead of having the sockaddr_storage
+	structure in order to
+	1. keep it as small as possible, and
+	2. avoid redefining "ro_dst" that caused a compatibility issue.
+
+Wed Oct  2 20:20:17 JST 2002	suz@crl.hitachi.co.jp
+	* kame/sys/netinet6/mld6.c, mld6_var.h: fixed MLDv2-related timer
+	  calculation bug.
+
+Tue Oct  1 16:01:57 JST 2002	suz@crl.hitachi.co.jp
+	* kame/sys/netinet6/ip6_mroute.c: fixed kernel crash when stopping
+	  a multicast daemon.
+
+<200209>
+Thu Sep 26 16:11:08 JST 2002  itojun@iijlab.net
+	* netbsd: switch to 1.6.  note:
+	  - NATPT and IP6FW are dropped from support list
+	  - syscall # for sctp_peeloff have changed
+	  - "pseudo-device altq" went away
+	  - of course, need some more testing
+
+Mon Sep 23 22:21:41 JST 2002  itojun@iijlab.net
+	* sys/netinet6/ip6_output.c: pad length for PADN option header before
+	  jumbo payload option was incorrect.  from wang.zhong3@zte.com.cn
+
+Sun Sep 22 JST 2002  itojun@iijlab.net
+	* sys/netinet6/{in6,nd6}.c: a better fix to "deprecated" address
+	  configuration.
+
+2002-09-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_timer): backed out a change
+	committed on September 4th, because it did not solve the actual
+	problem and had a bad effect to other parts.
+	("deprecated" address configuration)
+
+Thu Sep 19 13:53:18 JST 2002	suz@crl.hitachi.co.jp
+	* kame/sys/netinet/in_msf.[ch]: fixed a bug in SS_CMP() macro
+
+Wed Sep 18 23:54:08 JST 2002  itojun@iijlab.net
+	* lib/libsctp: library for additional SCTP system calls.
+
+Wed Sep 18 10:34:34 JST 2002  itojun@iijlab.net
+	* sys/netinet*/sctp*.c: result of sctp bakeoff from randall and folks.
+	  remove PR_ATOMIC from SOCK_STREAM model, to make it more compatible
+	  with TCP.
+
+Mon Sep 16 14:30:19 JST 2002	suz@crl.hitachi.co.jp
+	* freebsd4/sys/netinet/ip_output.c, igmp.c: fixed a bug that 
+	  IGMPv3 report is not sometimes advertised when an application 
+	  stopped listening.
+
+Sun Sep 15 16:26:04 JST 2002	suz@crl.hitachi.co.jp
+	* kame/sys/netinet6/ip6_mroute.c: fixed a kernel crash when forwarding 
+	  an incoming PIM Register packet to outgoing interfaces.
+	  From: Alain Ritoux <alain.ritoux@6wind.com>
+
+Thu Sep 12 17:31:43 JST 2002	suz@crl.hitachi.co.jp
+
+	* kame/sys/netinet6/in6.h: use ff02::16 for all-mldv2-routers linklocal 
+	multicast (just in sync with IGMPv3's 224.0.0.22)
+
+Wed Sep 11 12:55:40 JST 2002  itojun@iijlab.net
+	* sys/netinet{,6}/*: correct signedness mixups in pointer passing.
+
+Tue Sep 10 20:04:25 JST 2002	suz@crl.hitachi.co.jp
+	* kame/sys/netinet6/in6.c, in6_ifattach.c, in6_pcb.c,
+	  ip6_output.c
+	fixed a kernel-hangup with MLDV2 option, when an IPv6 prefix is removed
+
+Tue Sep 10 11:28:12 JST 2002  itojun@iijlab.net
+	* mdnsd: make it compatible with Rendezvous in Apple Jaguar.
+	  (use port 5353 for multicast, attach "local" at the end of local
+	  names)
+
+Mon Sep  9 16:56:45 JST 2002  itojun@iijlab.net
+	* */sys/netinet*/tcp*input.c: always respect shutdown(s, SHUT_RD).
+	  previous (4.4BSD) code did not check it in certain cases, resulting
+	  in unexpected kernel memory waste.
+
+2002-09-09  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_*.c:
+	- Does not process a IPv4 multicast packet.
+	  This packet is processed with code in ip_input().
+	- Drop fragmented ICMPv4 packet.
+	  We can not re-calculate ICMP checksum because translator does not
+	  re-assemble this fragmented packet so we can not get an ICMP length
+	  information.
+	- Fix a problem that data transfer fails when connect from v6
+	  client to v4 FTP server, and FTP server does not use 20 as
+	  source port number in data transfer with non-passive mode.
+	- Change the expiration time of translation slot entry.
+
+Thu Sep  5 17:00:00 JST 2002	suz@crl.hitachi.co.jp
+	* freebsd4/sys/conf/{files,options}, freebsd4/sys/i386/conf/GENERIC.KAME,
+	  freebsd4/sys/netinet/{in.c,in_pcb.c,ip_output.c},
+	  freebsd4/sys/netinet6/{in6_pcb.c,udp6_usrreq.c},
+	  netbsd/sys/conf/files, netbsd/sys/arch/i386/conf/GENERIC.KAME,
+	  netbsd/sys/netinet/{in_pcb.c,ip_output.c,udp_usrreq.c},
+	  netbsd/sys/netinet6/Makefile,
+	  kame/sys/netinet/{icmp6.h, in_msf.[ch]},
+	  kame/sys/netinet6/{in6.[ch], in6_ifattach.c, in6_msf.[ch], in6_pcb.c,
+	  in6_var.h, ip6_input.c, ip6_mroute.c, ip6_output.c, ip6_var.h, mld6.c,
+	  mld6_var.h, nd6.c}
+	  MLDv2 host-side implementation for NetBSD and FreeBSD-4.
+
+	* kame/kame/kame/ifmcstat: displays MLDv2 info
+
+	* kame/kame/kame/pim6sd: changes the names of MLDv2-related 
+	structures or members to sync with MLDv2 host-side implementation
+
+Wed Sep  4 16:30:49 JST 2002  itojun@iijlab.net
+	* sys/netinet6/nd6.c: allow "deprecated" bit be specified via userland
+	  like ifconfig(8).   NetBSD PR 18163
+
+Tue Sep  3 22:03:08 JST 2002	suz@crl.hitachi.co.jp
+	* {freebsd/netbsd/openbsd}/sys/netinet/in.h: protocol-independent 
+	  multicast API sockopts (MCAST_*) number should not be 
+	  duplicated with IPv6-level sockopts.
+	 
+<200208>
+Sat Aug 31 06:20:11 JST 2002	suz@crl.hitachi.co.jp
+	* openbsd/sys, openbsd/sbin/sysctl, openbsd/usr.bin/netstat,
+	  kame/sys/netinet/in_msf.[ch]:
+	 ported NetBSD IGMPv3 implementation into OpenBSD.
+
+2002-08-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* {freebsd4, netbsd}/sys/net/route.h (RTUSE, RTREUSE, RTRELEASE):
+	avoided overriding invalid memory space by these macros when the
+	system clock was rewinded.  This could really happen for FreeBSD,
+	so the fix should apply to FreeBSD.
+	As reported by Larry Baird <lab@gta.com> in KAME PR 439.
+
+Fri Aug 23 14:39:48 JST 2002	suz@crl.hitachi.co.jp
+	* freebsd4/sys/*: sync with FreeBSD 4.6.2-RELEASE
+
+Thu Aug 22 08:28:34 JST 2002  itojun@iijlab.net
+	* sys/netinet6/esp_input.c: check packet length before fetching
+	  ESP authentication data.
+
+Tue Aug 20 08:25:37 JST 2002  itojun@iijlab.net
+	* sys/netinet6/nd6.c: correct sysctl for ndp -p/-r to use proper
+	  copyout() logic.
+
+Fri Aug  9 17:45:30 JST 2002  itojun@iijlab.net
+	* sys/netinet6/esp_output.c: make a correct guess of ESP header size.
+	  it caused PMTUD problem on netbsd (we need to check esp4_ctlinput).
+
+Mon Aug  5 15:12:34 JST 2002	suz@crl.hitachi.co.jp
+	* kame/kame/ifmcstat: displays IGMPv2 and v3 multicast info
+
+Fri Aug  2 17:18:54 JST 2002  k-sugyou@kame.net
+	* sys/netinet6/dest6.c: disable home address destination option
+	  in default KAME(support MIP6 kernel only)
+
+<200207>
+Wed Jul 31 19:28:52 JST 2002  itojun@iijlab.net
+	* netbsd: use NetBSD 1.5.3 as base.  beware: NetBSD 1.5.3 is shipped
+	  with vulnerable openssl.
+
+Tue Jul 30 17:12:19 JST 2002  itojun@iijlab.net
+	* sys/netinet/sctp*: new sctp patch from randall.
+	* faithd.libevent: support PORT response without paren.
+
+2002-07-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/: added a new socket option/cmsg type
+	"IPV6_PREFER_TEMPADDR" to control source address selection wrt
+	temporary addresses per socket/packet.
+
+Fri Jul 26 17:20:25 JST 2002 suz@crl.hitachi.co.jp
+	* freebsd4/sys/netinet/{ip_output.c, udp_usrreq.c}: IPv4 multicast 
+	packet is accepted/rejected properly as specified in IGMPv2/v3.
+	* kame/kame/mcastread: makes it SSM-ready.
+
+2002-07-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/getifaddrs.c (getifaddrs): tried
+	sysctl(NET_RT_IFLIST) up to several (currently 5) times.
+	This will make the behavior more robust if many addresses are added
+	after the size estimation of storage at the first sysctl.
+	From: Hajimu UMEMOTO <ume@mahoroba.org>
+
+Thu Jul 18 21:08:27 JST 2002 suz@crl.hitachi.co.jp
+	* netbsd, kame/sys/netinet/in_msf.[ch]: merged NetBSD IGMPv3 code 
+	  written by Hitoshi Asaeda@INRIA.
+	* freebsd4: ported the above implementation into FreeBSD-4.
+
+Thu Jul 18 08:53:47 JST 2002 sakane@kame.net
+	* sys/netinet6/esp_input:
+	fixed re-making mbuf chain after decrypting ipv6 esp packet
+	in case of a kernel without PULLDOWN_TEST.
+	that was only kame-snap on both fbsd3 and fbsd4 had this problem.
+
+Wed Jul 17 23:07:36 JST 2002  itojun@iijlab.net
+	* ndp: update message for per-interface ND flags (-i) to be in sync
+	  with command line args.
+
+Mon Jul  8 18:40:07 JST 2002 sakane@kame.net
+	* sys/netkey/key_debug.c:
+	debugging with "setkey -x" probably becomes easier.
+	this patch is from <archie@packetdesign.com>.
+
+Mon Jul  8 18:33:54 JST 2002 sakane@kame.net
+	* sys/netkey/key.c:
+	the order of searching SA table for packets is fixed.
+	the kernel might select dying SAs when the kernel needed newest SA.
+
+Thu Jul  4 11:00:56 JST 2002  itojun@iijlab.net
+	* sys/netinet/sctp*: new sctp patch from randall.  uses RADIX_MPATH
+	  codepath for freebsd4.
+
+2002-07-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/contrib/bind/src/lib/irs/dns_ho.c (gethostans,
+	map_v4v6_hostent): synchronized with a recent security fix of the
+	resolver library.  It is highly recommended to upgrade the KAME
+	kit to the latest version and rebuild all applications.
+
+<200206>
+Sun Jun 30 JST 2002  itojun@iijlab.net
+	* rtadvd: deprecate addrs#n and routes#n from rtadvd.conf, as it was
+	  difficult for users to keep consistency between addrs#n and addrN,
+	  and addrs#n were not really needed.
+
+Wed Jun 26 JST 2002  itojun@iijlab.net
+	* libinet6: correct resolver buffer overrun, as documented in
+	  http://www.kb.cert.org/vuls/id/803539
+	  NOTE: bsdi4 resolver (contrib/bind) is NOT fixed yet.
+
+Tue Jun 25 01:26:45 JST 2002  itojun@iijlab.net
+	* faithd.libevent: faithd re-implementation using libevent (by niels
+	  provos - a great library!).  it does not fork(2) at all.  supports
+	  ftp protocol translation (EPSV only).
+
+Mon Jun 24 22:02:16 JST 2002  itojun@iijlab.net
+	* sys/netinet/ip_output.c (except bsdi3/bsdi4/freebsd4):
+	  skip routing table lookup if outgoing interface is specified via
+	  setsockopt().
+	  
+Sun Jun 23 23:42:56 JST 2002  itojun@iijlab.net
+	* faithd: correct ftp relay.
+
+2002-06-23 Shin'ichi Fujisawa <fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_*.c:
+	- Fix a bug that port number does not changed when translator
+	  has a lots of TCP/UDP sessions and use one IPv4 source
+	  address for outgoing packet with IPv6->IPv4 translation.
+	- Re-calculate TCP checksum when TCP payload was modified with
+	  IPv6->IPv4 translation.
+	- Change IPv6 MTU which looked from IPv4 in 1260[octet] from
+	  1280[octet].
+
+Fri Jun 21 21:07:40 JST 2002	suz@crl.hitachi.co.jp
+	* freebsd4: sync with FreeBSD-4.6 RELEASE
+
+2002-06-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6c: improved signal handling; the client now
+	released all stateful resources when receiving SIGHUP or SIGTERM.
+	In the former case dhcp6c would then restart.
+	A bug that could produce dangling pointers was fixed, too.  It is
+	recommended to upgrade the client to the latest version.
+
+Thu Jun 20 16:37:57 JST 2002  itojun@iijlab.net
+	* sys/net/if_stf.c: reject packets with private IPv4 address
+	  (or 6to4 address derived from private IPv4 address).  from hitachi
+
+Sat Jun 15 09:11:47 JST 2002  itojun@iijlab.net
+	* sys/netinet6/ipsec.c: use per-socket policy cache even more.
+
+2002-06-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6:
+	- caught up some changes in dhcpv6-26.
+	- corrected configuration parser against multiple DNS addresses in
+	  a single line.
+	- sync the parser with the man page about infinite duration
+	- bind client well-known port to the outgoing socket for better
+	interoperability
+
+Wed Jun 12 10:17:50 JST 2002  itojun@iijlab.net
+	* sys/netinet6/ipsec.c: avoid copying per-socket policy.  saves memory
+	  when a lot of pcbs are present (like busy webservers).  requested
+	  by markus@openbsd.org.
+
+2002-06-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/ports/ppp/: made the interface ID selection more
+	compliant to RFC 2472;
+	- first IEEE EUI-48/64 identifiers are checked
+	- use the full 64 bits when generating a random ID
+
+Fri Jun  7 22:44:34 JST 2002  itojun@iijlab.net
+	* sys/netinet/ip_input.c: look at rmx_mtu on IPsec tunnel MTU
+	  computation.  From: David Waitzman <djw@bbn.com>
+
+2002-06-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtadvd: when an advertised prefix configured from the
+	kernel has been added or invalidated, notice the change in a short
+	delay.
+
+2002-06-06 Shin'ichi Fujisawa <fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_*.[ch]:
+	* kame/kame/natptconfig/*.[chly]:
+	  Picked up a modification minute of April and May, because I
+	  forgot to change this CHANGELOG.
+	  - Revise the following conformity with rfc2765 and rfc2766.
+	    - ICMPv[46] header incorrectness.
+	    - IPv[46] header incorrectness which is inside of the
+	      ICMPv[46] payload.
+	    - Support unknown protocol translation.
+	    - Fragmentation-related incorrectness.
+	  - Changed the expiration time of translation slot entry
+	    (icmp=10, udp=10, tcp=1800).
+	  - "natptconfig" command does not read kernel symbol table
+	    any more. "show rules" and "show xlate" subcommand read
+	    '/dev/kmem' as before.
+
+2002-06-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/ports/ppp: upgraded to the latest snap kit as of today
+	with KAME-original patches.
+
+Mon Jun  3 09:52:03 JST 2002  itojun@iijlab.net
+	* sys/netinet6/nd6.c: in nd6_setmtu0(), do not hardcode if_mtu
+	  values (let sys/net layer handle them).  special cases are IFT_ARC
+	  and IFT_FDDI, which needs special handling in L3.
+
+<200205>
+2002-05-31  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtadvd: changed the behavior when an interface-direct
+	prefix being advertised was removed from the kernel;
+	rtadvd will continue to advertise the prefix with zero lifetimes
+	rather than to stop advertising the prefix.
+	This will help a receiving host renumber by deprecating the
+	address derived from the old prefix.
+
+Fri May 31 12:56:52 JST 2002  itojun@iijlab.net
+	* sys/netinet6/ip6_output.c: implement RFC2460 section 5, last
+	  paragraph (ICMPv6 too big with < 1280).
+
+Thu May 30 14:54:25 JST 2002 sakane@kame.net
+	* kame/sys/netkey/key.c:
+	- the memory leak was fixed when an error happened during
+	  the kernel made a sadb_delete message.
+	- the SA type in the sadb_delete message was fixed when the kernel
+	  deleted the SA and made the message to tell it userland programs.
+	these are reported by <shigeru@iij.ad.jp>
+
+2002-05-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_setmtu0): separated from
+	nd6_setmtu() to handle two different cases; interface (and its MTU)
+	initialization and changing the MTU of an interface.
+	This change also fixed a bug that could destroy kernel stack
+	(when changing the interface MTU by hand) introduced yesterday.
+
+2002-05-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: [dhcp6c] added an ability to specify the SLA
+	length in the configuration file.
+
+Wed May 29 21:02:59 JST 2002  suz@crl.hitachi.co.jp
+	* kame/kame/pim6sd/config.c,vif.[ch],routesock.c: fixed RPF
+	algorithm bugs for P2P connected routes and static interface
+	routes (reported from pekkas@netcore.fi)
+
+Tue May 28 19:26:52 JST 2002  itojun@iijlab.net
+	* netbsd/freebsd2: provide arc4random(9) and use it.
+
+Tue May 28 07:38:29 JST 2002  itojun@iijlab.net
+	* sys/netinet/tcp_subr.c: PMTUD blackhole detection.  sync w/netbsd-
+	  current.
+
+Tue May 28 06:46:23 JST 2002  itojun@iijlab.net
+	* sys/netinet6/frag6.c: enforce max # of fragments (not fragment
+	  queues) to defend against DoS.  similar logic should be incorporated
+	  into IPv4 reassembly code (openbsd has one already).
+
+Tue May 28 00:08:08 JST 2002  itojun@iijlab.net
+	* sys/netinet6/in6_ifattach.c: attach per-interface data structure
+	  to if_afdata[AF_INET6] member via dom_ifattach framework.
+
+Mon May 27 07:22:51 JST 2002  itojun@iijlab.net
+	* sys/sys/if.h: add framework to have per-domain/af data onto
+	  struct ifnet.  as discussed on bsd-api-discuss.
+
+2002-05-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/scope6.c (scope6_init): newly added to
+	inialize scope zone IDs for as many interfaces as possible.
+	This is important when an interface is somehow used for IPv6
+	before activating (i.e. making it up) the interface.
+	TODO: we'll still need to handle the case where an interface is
+	dynamically attached.
+
+2002-05-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6[cs].conf.5: provided man pages for
+	configuration files of DHCPv6 client and server.
+
+2002-05-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: supported renewal and rebinding of delegated
+	prefixes.
+
+Wed May 22 19:23:40 JST 2002  itojun@iijlab.net
+	* kame/revlookupd: a daemon to translate DNS reverse lookup (PTR query)
+	  into ICMPv6 node information query.  internet draft for this
+	  will be issued shortly.
+
+Tue May 21 21:19:30 PDT 2002  itojun@iijlab.net
+	* openbsd: upgrade to 3.1.  NOTE: sctp does not work yet.
+
+Mon May 20 14:48:02 JST 2002  itojun@iijlab.net
+	* sys/netinet/sctp_usrreq.c (and other sctp related code):
+	  upgraded to latest shipment from randall and folks.
+
+2002-05-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6c: when constructing a reply message,
+	included prefixes given in the corresponding advertisement message.
+	* kame/kame/dhcp6/dhcp6s.c (server6_react_request): chose
+	delegated prefixes based on the ones specified in the request
+	message.
+
+2002-05-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6.h: changed option type values that have
+	not been officially assigned to the values documented in NTTC's
+	service specification (as of today).
+	Note: the current version has lost interoperability with former
+	versions of KAME's dhcp6.  Please upgrade all clients and servers
+	to the latest version.
+	Note: we'll change the temporary values if different type values
+	are officially assigned.
+
+2002-05-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: supported the preference option; servers can
+	specify the preference value for a particular interface.  Clients
+	can parse the preference option and take it into account for
+	choosing the best server.
+
+2002-05-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: supported the "normal" sequence of
+	client-server exchange; solicit, advertise(s), request, and then
+	reply.  There are still some restrictions; unicasted requests are
+	not supported.  Address allocation is not supported (nor will be.)
+	When the client received multiple advertisements, it would just
+	pick the server that had the highest preference (though preference
+	option is not supported).
+
+2002-05-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: implemented a limited support of prefix
+	delegation based on draft-troan-dhcpv6-opt-prefix-delegation-01.txt.
+	A client sends a solicit with a rapid commit option and an option
+	request option specifying a prefix delegation option.  A server
+	responds to the solicit with a reply containing a prefix
+	delegation option.  The client accepts the reply and configure an
+	address on specified interfaces using the delegated prefix.
+
+Thu May  9 18:41:28 JST 2002  itojun@iijlab.net
+	* faithd: drop rsh/rlogin protocol support.
+
+Tue May  7 18:37:13 JST 2002 sakane@kame.net
+	* kame/racoon:
+	fixed the behavior when
+	- when the "unique" level policy was used, racoon in the responder side
+	mis-configured the SAs.  <yvan.vanhullebus@netasq.com> reported and
+	donated the patch.
+
+2002-05-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.h: declared sockaddr in all supported OSes
+	(KAME PR 418).
+
+2002-05-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6s.c: added an ability to respond to a
+	solicit message with a rapid commit option.
+
+2002-05-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6c.c (client6_send): ensured that the
+	transaction-ID unchanged in retransmissions of a message according
+	to Section 15.1 of dhcpv6-24.
+
+<200204>
+2002-04-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: added an ability to send solicit messages with
+	a rapid commit option.  A configuration file for dhcp6c was
+	introduced to include the option.
+
+2002-04-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtadvd/config.c (getconfig): if "addrs" was explicitly
+	set to 0, enabled prefix autoconfiguration from the kernel.
+	* kame/kame/rtadvd/rtadvd.c (main): set LOG_PERROR for openlog()
+	when running in the foreground.
+	Suggested by: Andrew White <awhite@arc.corp.mot.com>
+
+Thu Apr 25 19:03:16 JST 2002 sakane@kame.net
+	* kame/kame/racoon:
+	fixed the key length of the null encryption for phase 2.
+	racoon configured incorrect key length of the null encryption
+	to the kernel.
+
+2002-04-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6c.c (client6_recvreply):
+	tightened DUID validation.
+	* kame/kame/dhcp6/dhcp6s.c (server6_react_informreq):
+	processed server and client DUID correctly.
+
+2002-04-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/common.c (get_dhcp6_option): newly added as a
+	shared routine to parse DHCPv6 options.
+
+2002-04-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6c.c: corrected handling DUID for the client
+	side according to dhcpv6-24.
+
+Wed Apr 24 21:23:43 JST 2002  itojun@iijlab.net
+	* faithd: correct connect(2) error handling.
+	  From: Yukiyo Akisada <Yukiyo.Akisada@jp.yokogawa.com>
+	  handle ECONNABORTED on accept(2).
+	  From: morito@double-fault.net
+
+2002-04-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6.h: removed the "dh6_servaddr" member from
+	the dhcp6{} structure, which had been removed from the
+	specification.
+	Note that interoperability with implementations in older KAME
+	snaps had been lost by this change.
+
+2002-04-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ping6/ping6.c (main): changed the behaivor of the -m
+	option as follows:
+	  - when the option is specified once, the default behavior (send
+	    packets at the minimum MTU) will be disabled for unicast
+	    packets.
+	  - when the option is more than once, it will be disabled for both
+	    unicast and multicast packets.
+
+2002-04-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ndp/ndp.c (ifinfo): used the new member of the
+	nd_ifinfo structure (see the next log entry) to see if the
+	structure had been initialized.
+
+2002-04-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_ifattach): obsoleted the usage of
+	nd_ifinfo.linkmtu as the flag if the structure had been
+	initialized.  Introduced a new member "initialized" for this
+	specific purpose instead.
+	Note: this change had broken binary compatibility to ndp(8) with
+	the -i option.  Be sure to upgrade the application as well.
+
+2002-04-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_setmtu): warned if configured (or
+	detected) interface MTU is smaller than IPv6 minimum link MTU.
+
+2002-04-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_ifattach.c (in6_ifattach): do not update
+	in6_maxmtu in this function, in order to avoid using the MTU for a
+	loopback MTU mistakenly.
+
+2002-04-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_ifattach): do not synchronize an ND
+	link MTU with the corresponding interface MTU, since this
+	synchronization had a bad side effect when increasing the
+	interface MTU.  Instead, when detecting the link's "real" MTU
+	always consider those two values, and take the smaller one.
+	(many code points, such as ip6_output(), that relied on the
+	previous behavior were rewritten accordingly.)
+
+2002-04-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_output): if there has been no NS
+	for a neighbor after entering the INCOMPLETE state, send the
+	first solicitation in nd6_output(), regardless of the timer value.
+	This change will effectively improve the response time to the
+	first NS.
+
+2002-04-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet/tcp_subr.c (tcp_respond): if
+	IPV6_USE_MIN_MTU is specified for the option tell ip6_output to
+	fragment the packet at the minimum MTU.
+
+2002-04-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c: changed the policy about
+	performing path MTU discovery; from now on multicast packets will
+	be sent at the IPv6 minimum link MTU by default.  The semantics of
+	IPV6_USE_MIN_MTU was changed accordingly, as will be described in
+	the forthcoming rfc2292bis-07.
+
+2002-04-19  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/kame/pim6sd/mld6.c
+	does not log warning againt MLD message from ::.
+	(sync with the change of kame/sys/netinet6/nd6_nbr.c at Rev 1.76)
+
+2002-04-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet/ip_output.c (ip_output): always freed
+	the route entry stored in iproute (if it was used) regardless of
+	the IPSEC kernel compilation option.
+	This should be a better fix to FreeBSD-SA-02:21.tcpip, and should
+	apply the kernel without the IPSEC option.
+
+2002-04-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/{icmp6.c, nd6.c}:
+	* netbsd/sys/netinet/if_arp.c (arp_rtdrain):
+	* netbsd/sys/net/route.c:
+	ported the cached route management routines from freebsd4.
+	
+2002-04-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/: use nd_ifinfo.linkmtu instead of
+	ifp->if_mtu to handle link MTU issues wrt IPv6, whenever possible.
+	Some OS dependent code for freebsd4 and bsdi4 was also modified in
+	this manner.  Some for netbsd and openbsd was untouched.
+
+2002-04-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet/if_ether.c (arp_rtdrain):
+	* kame/sys/netinet6/nd6.c (nd6_rtdrain):
+	allowed the case where these functions received a NULL llinfo in
+	order to avoid kernel panic in some situations.
+
+2002-04-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet/if_ether.c (arp_rtdrain): newly added as
+	the hook for arp entries in the route cache queue.  Since arp does
+	not have much state, the detection algorithm cannot be very smart;
+	we only keep entries that have already been resolved.
+	(see also: nd6_rtdrain below)
+
+2002-04-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_input, icmp6_mtudisc_update):
+	dropped icmp6 too big messages that reported an MTU less than the
+	minimum MTU (i.e., 1280 bytes).  We believe such an error is only
+	meaningful when we're acting as an SIIT(-like) client, which we do
+	not support.
+
+2002-04-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_proto.c: added a new sysctl knob
+	"net.inet6.ip6.pmtu_expire" to configure the timer value (in
+	seconds).
+	(only available in freebsd4)
+
+2002-04-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_mtudisc_timeout): enabled the
+	function for FreeBSD to purge stale path MTU information.
+
+2002-04-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_mtudisc_update): revised the
+	case that the reported path MTU is less than the minimum MTU so
+	that the minimum MTU would be used instead.  The former behavior,
+	which disabled path MTU discovery, was probably just derived from
+	the IPv4 code, and was meaningless for IPv6, because IPv6 does not
+	have the "don't fragment" bit.  The previous behavior may even be
+	exploited by some DoS attacks that intentionally send a too big
+	message with an MTU less than the minimum.
+
+2002-04-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_lookup): specified RTF_CACHE for a
+	newly created route so that the route entry would be subject to
+	cached route management.
+
+2002-04-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_rtdrain): added as the callback
+	function for each ND entry as a cached route, and decides
+	whether the entry should really be removed based on the ND state.
+	Entries which are reachable, delay or probe will not be removed.
+	An ND cache to a default route will not be removed either.
+	[FreeBSD4 only]
+
+2002-04-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/net/route.c (rtredirect): set RTF_CACHE before
+	calling rtrequest() so that routes created by redirect will be
+	subject to management of cached routes.
+
+2002-04-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/net/route.c: made cached route management more
+	refined:
+	- we now have 3 parameters to limit the cache; max, hiwat, and
+	  lowat, all of which are configured automatically based on the
+	  kernel memory limit.
+	- rt_draincache() is called when the number of entries are being
+	  beyond "hiwat", and the function tries to keep the entries
+	  between "lowat" and "hiwat".
+	- do not regard static routes as cache.
+	- allow ifa_rtrequest() functions to add a timer entry so that
+	  they can set a refined cleanup function.
+	
+2002-04-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/net/route.c: added cached routes management (see
+	below).
+
+2002-04-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_lookup): checked if rt_llinfo is
+	non-NULL to avoid returning an entry that has the LLINFO flag but
+	is not a neighbor cache entry.
+	* kame/sys/netinet6/nd6.c (nd6_is_addr_neighbor): removed the
+	check for the pointer, because the check is now done in nd6_lookup().
+
+<200203>
+2002-03-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* {freebsd4, netbsd, openbsd}/sys/net/route.c: added an ability to
+	manage the number of route entries that can be regarded as cache,
+	in order to prevent local/remote DoS.  This is a preliminary and
+	experimental support, which will need more work.  The same
+	function for bsdi will be committed next week.
+
+2002-03-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/net/route.c: ported routing entry timer from
+	NetBSD (which was originally derived from BSD/OS).
+
+2002-03-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6sd/mld6v2.c (make_mld6v2_msg):
+	* kame/kame/pim6sd/mld6.c (make_mld6_msg):
+	* kame/kame/pim6dd/mld6.c (make_mld6_msg):
+	always initialized destination address structures.
+	Otherwise, the strucuture may contain garbages in sin6_scope_id,
+	which might be rejected in recent versions of kernel.
+
+2002-03-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (defrouter_addifreq): set
+	RTF_CLONING when installing a default route to an interface
+	in order to perform ND correctly.  Previously this flag was
+	implicitly set from the corresponding ifa_flags, which was dropped
+	by a fix on 2002-02-26.  We could revert the former change, but I
+	belive we should set the flag explicitly.
+
+2002-03-27 Shin'ichi Fujisawa <fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_*.[ch]:
+	- Fix some fragmentation related bugs.
+	- Revise the following fragmentation related nonconformance
+	  to RFC2765.
+	  - Set DF flag when IPv6->IPv4 translation and there is no
+	    IPv6 fragment header.  According to RFC2765 4.1.
+	  - Add fragment header when IPv4 packet does not set DF flag
+	    (Tested ICMPv4->ICMPv6 translation only).  According to
+	    RFC2765 3.1.
+	  - Translate IPv4 packet (ICMP Echo/Echoreply) which DF flag
+	    is not set and larger than 1232 bytes (excluding IPv4
+	    header) into two IPv6 packet.
+
+2002-03-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_purge): zero-cleard the
+	corresponding ND info.  Otherwise, parameters for removed
+	interfaces could be reused for a newly-created interface.
+
+2002-03-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ah_input.c (ah6_ctlinput):
+	* kame/sys/netinet6/esp_input.c (esp6_ctlinput):
+	corrected arguments to key_allocsa().  This fix is very important
+	if you use IPsec, because key_allocsa() in recent snaps has a
+	strong validation check which will cause kernel panic against
+	bogus values.
+
+2002-03-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_output): do not update the
+	"dst" address, which is the next-hop address, for multicast
+	destinations.  Otherwise, the layer 2 destination address would be
+	bogus.
+
+2002-03-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet6/udp6_usrreq.c (udp6_input): corrected
+	address matching rules for incoming multicast packets, as
+	suggested by Konstantin KABASSANOV <Konstantin.Kabassanov@lip6.fr>
+	Without the change, multicast applications that binds the
+	receiving socket with the multicast address would fail to accept
+	incoming packets.
+
+Fri Mar 15 19:45:40 JST 2002  itojun@iijlab.net
+	* sys/netinet6/frag6.c: implement real lock around IPv6 reassembly
+	code.
+	(netbsd/openbsd only)
+
+Fri Mar 15 18:28:20 JST 2002  itojun@iijlab.net
+	* netbsd/sys/netinet/tcp_subr.c: have tcp6_drain().
+
+2002-03-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_mroute.c:
+	- made sure to attach packet addresses to every mbuf even after
+	  m_copy().
+	- added a supplement function m_copy_withpktaddrs() for this
+	  purpose.
+	Thanks to: "Konstantin KABASSANOV" <Konstantin.Kabassanov@lip6.fr>
+	for finding the problem and testing patches.
+
+2002-03-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/wru: added the -z option to specify the zone of the
+	destination, particularly for the default destination, ff02::1.
+
+2002-03-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/netinet/tcp_subr.c (tcp6_ctlinput): loosened the
+	assertion check for the "inner" source.  The check was so strong
+	that it caused kernel panic when the function called from
+	ip6_output() via pfctlinput2().
+	bsdi4 KAME snap users are recommended to apply this fix.
+
+Sun Mar  3 01:51:54 JST 2002 Keiichi SHIMA <keiichi@iij.ad.jp>
+	* kame/sys/netinet6/{in6.c|mip6.c|mip_var.h|nd6_rtr.c}
+	check the CoA when p2p address (like gif) is set.  this enables
+	you to use MIP6 with molec.
+
+2002-03-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_ctloutput, and related
+	functions):
+	- applied recent clarifications in rfc2292bis:
+	  + ignored IPV6_DONTFRAG and IPV6_RECVPATHMTU for TCP sockets
+	  + disallowed to set non-unspecified address by IPV6_PKTINFO for
+	    TCP sockets
+	- corrected the return value from getsocketopt for IPV6_DONTFRAG and
+	  IPV6_USE_MIN_MTU
+
+2002-03-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_redirect_output): included
+	a target link layer address option in the redirect message for an
+	on-link destination as well as for a better router.  This behavior
+	should be correct according to the specification.
+
+<200202>
+Tue Feb 26 16:05:53 2002  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd4/ports/ppp: awkhulhak ppp
+
+2002-02-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet6/in6_pcb.c (in6_mapped_sockaddr,
+	in6_mapped_peeraddr): do not convert the unspecified address (::)
+	to the mapped address form.  Otherwise, get{peer, sock}name(2) for
+	an AF_INET6 wildcard address would return ::ffff:0.0.0.0.
+
+2002-02-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet/tcp_syncache.c (syncache_socket): when
+	making a PCB entry from a syn cache, do not forget to copy
+	inc_isipv6.
+	* freebsd4/sys/netinet/tcp_usrreq.c (tcp6_usr_connect): set
+	inc_isipv6 when connecting to a non-mapped AF_INET6 address.
+
+	All FreeBSD users are recommended to apply this fix.   Without
+	these changes, we would fail to update a stale cached route.
+
+2002-02-25 SUZUKI, Shinsuke <suz@sdl.hitachi.co.jp>
+	* sys/netinet6/in6_src.c (in6_selectsrc):
+	fixed a bug that sendmsg() on raw socket sometimes fails by ENXIO,
+	due to the inconsistency between embedded zone-id and the calculated
+	outgoing interface-id.
+
+Mon Feb 25 10:58:09 JST 2002  itojun@iijlab.net
+	* sys/netinet/ip_input.c: enforce ipsec policy checking on forwarding
+	  case (the portion was lost during transition to PR_LASTHDR).
+	  From: Greg Troxel <gdt@ir.bbn.com>
+
+2002-02-24  SUZUKI, Shinsuke <suz@sdl.hitachi.co.jp>
+	* kame/route6d/route6d.c:
+	not remove global addresses on loopback interface from routing
+	table by route aging.
+
+2002-02-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_rtrequest): rejected the process of
+	RESOLVE when the interface does not need neighbor caches.
+	Otherwise, this function would mistakenly try to make a neighbor
+	cache for an stf interface.
+	Based on a report from Ross Finlayson <finlayson@live.com> at the
+	freebsd-net ML.
+
+2002-02-23  SUZUKI, Shinsuke <suz@sdl.hitachi.co.jp>
+	* kame/pim6sd/{pim6_proto.c, route.c}:
+	pim6sd doesn't crash now when receiving (*,*,RP) entry.
+
+Thu Feb 21 23:48:38 JST 2002 sakane@kame.net
+	* kame/kame/racoon:
+	to specify the identifier in "sainfo" directive is deprecated.
+	the identifier should be always made from SPD.
+
+2002-02-20  SUZUKI, Shinsuke <suz@sdl.hitachi.co.jp>
+	* freebsd4/sys/net/if.c (): 
+	fixed a kernel crash that occurs when you enable IPv6 Multicast 
+	on VLAN interface.
+
+2002-02-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_setmoptions): fixed kernel
+	panic in the case of IPV6_LEAVE_GROUP without an interface.
+	The kernel would choose the group based on the address only with
+	fix.
+	Note, however, that ambiguity on the scope zone of the address
+	would not be allowed by default.  This particularly means that you
+	should always specify the interface for interface or link local
+	groups.
+	Based on: a report from Tomomi Suzuki <stomomi@ebina.hitachi.co.jp>
+
+2002-02-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/tcp6_subr.c (tcp6_respond): called
+	ip6_getpktaddrs() correctly.  NULL pointers would be referred to
+	without this fix.
+	Based on: a report from Tomomi Suzuki <stomomi@ebina.hitachi.co.jp>
+
+2002-02-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_input.c (ip6_init2): called nd6_ifattach()
+	for the loopback interface, in order to make sure to initialize
+	the nd_ifinfo structure for the interface.
+
+2002/02/19 16:05:42 JST	kjc@csl.sony.co.jp
+	* reduce differences from netbsd-current and openbsd-3.0:
+	 - use ALTQ_DECL() for altq only variables.
+	 - make IFQ_ENQUEUE() take 4 args even for the non-altq case
+	 - the return type of altq_etherclassify() is changed from
+	   int to void.
+	   the function prototype is moved to if_altq.h.
+	* add more altq supported drivers and link types.
+	  most of the remaining drivers are supported by now.
+
+2002-02-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.h: stopped defining the route_in6{}
+	structure for bsdi4 regardless of local configuration options.
+	We'll never need this because BSD/OS has merged the "new" route{}
+	structure, which can store all socket addresses.
+	* kame/sys/netinet6/{mld6.c, route6.h}: always included route.h
+	based on the change above.
+
+2002-02-18 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_*.[ch]:
+	* kame/kame/natptconfig/*.[chly58]:
+	- About natptcofig command
+	  - Add "-q" option to suppress error message.
+	  - Change it to return non ZERO value when detects syntax error.
+	- NAT-PT rule has rule number.
+	  You can omit rule number when setting NAT-PT.  In this case,
+	  behaviour of natptconfig command is same as previous.
+	  Rules can be deleted individually; Rule number can be
+	  renumbered;
+	- see natptconfig(8) and natpt.conf(5) for more detail.
+
+2002-02-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_input.c (ip6_input): cleanup; removed a
+	duplicated check for mapped source or destination addresses.
+
+2002-02-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/mld6.c (mld6_start_listening): added an
+	assertion in the case of this function was called before
+	mld6_init().
+
+2002-02-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_input.c (ip6_init2): stopped calling
+	in6_ifattach(lo0).  We in fact do not need to call in6_ifattach()
+	at this stage.  Additionally, in6_ifattach() has a bad effect of
+	sending packets even though some parts of the kernel are not ready
+	for sending.
+
+2002-02-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/{netinet6, netkey}/: changed the definition of
+	in6_multi{} to contain a full sockaddr_in6 of the multicast
+	address.  Related functions were also modified accordingly.
+
+	* kame/kame/ifmcstat/ifmcstat.c (in6_multientry):
+	* {netbsd, openbsd}/usr.bin/netstat/if.c (intpr):
+	Modified according to the change above.  These tools should
+	be rebuilt as well as the kernel.
+
+Mon Feb  8 JST 2002 sakane@kame.net
+	* freebsd4: sync with 4.5-RELEASE
+
+2002-02-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/netinet6/in6_pcb.c (in6_pcbbind): correctly separated
+	IPv4-mapped address case in in6_pcbbind().  Reported from bsdi.
+
+2002-02-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ping6: supported a new option '-g gateway' to allow a
+	specific next hop.
+
+2002-02-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sbin/sysctl/sysctl.c (sysctl_key): supported net.key.*
+	sysctls.
+
+2002-02-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet6/udp6_usrreq.c (udp6_ctlinput):
+	* openbsd/sys/netinet/udp_usrreq.c (udp6_ctlinput):
+	* bsdi4/sys/netinet/udp_usrreq.c (udp6_ctlinput):
+	corrected arguments to ip6_pcbnotify().
+
+2002-02-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet/tcp_subr.c (tcp_respond): correctly reset
+	returned IPv6 header.  This is essential when the original packet
+	contains an IPv6 extension header.
+
+2002-02-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/usr.sbin/netstat/inet.c (ipsec6_stats): supported printing
+	statistics for IPsec over IPv6.
+
+2002-02-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* many kernel files: totally revised IPv6 scoped address
+	architecture in the kernel.
+	- sticked to use sockaddr_in6, not in6_addr, as much as possible
+	- did not refer to ip6_src/ip6_dst (which may have ambiguity on
+	  scope zones), but used full sockaddr_in6 structures attached to
+	  the packet
+	- replaced special cases for link-local addresses with code that
+	  used generic functions such as in6_addr2zoneid()
+        - additional cleanups mainly for scoped address handling
+
+	The change is so big and we'll need some more time to stabilize
+	the code.  It is not recommended to use the latest code for
+	purposes that need stable behavior.
+
+<200201>
+2002-01-29 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_{defs,rule,soctl,usrreq}.[ch]:
+	* kame/kame/natptconfig/misc.c:
+	- Change NATPT related ioctl macro name which begin with
+	  "SIOC" to name which begin with "NATPT".  "SIOC" as ioctl
+	  macro name prefix is too general.
+
+Mon Jan 28 17:19:19 JST 2002 keiichi@iij.ad.jp
+	* kame/sys/netnet6/{mip6.c,mip6_binding.c,mip6.h}
+	- fix a bug in the processing routine of the authentication data
+	  sub-option.
+	- change the default security policy for protecting bu/ba.
+	  if compiled for ID-15, IPsec = 0 and authdata = 1.
+	  if compiled for ID-13, IPsec = 1.
+
+Mon Jan 28 14:09:21 JST 2002  itojun@iijlab.net
+	* bsdi4: upgrade base version to BSD/OS 4.3.
+
+2002-01-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_ctloutput): handled
+	getsockopt(IPV6_RTHDR) correctly.
+	In response to: KAME PR 403 from ylg@logique.jussieu.fr
+
+Sat Jan 26 11:50:54 JST 2002 sakane@kame.net
+	* kame/kame/racoon:
+	the port number in the phase1 identifier is set 500
+	when the identifier type is the ip address
+	although it is described ambiguity in RFC2407 4.6.2.
+
+2002-01-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_output): checked the
+	IPV6_MINMTU flag in ip6_output as well as the IP6PO_MINMTU flag in
+	the outgoing packet options.  The former can still be set by
+	icmp6_reflect or gif_output.
+
+Mon Jan 21 21:07:25 JST 2002 keiichi@iij.ad.jp
+	* kame/sys/netinet6/mip6*,kame/kame/mip6control/
+	add swithces to enable/disable
+	- the check code of bu/ba if they are protected by the ipsec.
+	- the check code of bu/ba if they are protected by the authdata.
+	to enable/disable those switches, use mip6cotrol.
+	
+2002-01-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_pcb.h:
+	* {bsdi4, freebsd, openbsd}/sys/netinet/in_pcb.h:
+	- added foreign/local socket address structures to in[6]pcb{} in order
+	  to have scope zone information of IPv6 addresses
+	- changed [fl]addr and [fl]port as shortcut macro
+	* kame/sys/netinet6/in6_pcb.c (in6_pcballoc): 
+	* {bsdi4, freebsd, openbsd}/sys/netinet/in_pcb.c (in_pcballoc):
+	- set sin6_family and sin6_len when allocating an AF_INET6 pcb
+
+	Note: this change implicitly affected applications that referred
+	to the in[6]pcb structure (e.g. netstat).  Be sure to update
+	header files and recompile all KAME applications.
+
+2002-01-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/wru: allowed the user to omit the hostname, in which
+	case the command used ff02::1 disambiguating the link zone using
+	the default interface.
+
+2002-01-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/route6.c (ip6_rthdr0): made the source routing
+	code more scope-aware:
+	- it now considers all type of scopes (i.e. not only link-local
+	  addresses).
+	- it conforms to the forwarding rule described in the scoping arch
+	  draft.
+
+2002-01-21 SUZUKI, Shinsuke <suz@sdl.hitachi.co.jp>
+	* kame/kame/pim6sd/mldv2_proto.c:
+	- fixed a bug that MLDv2 Report crashes pim6sd.
+
+2002-01-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	improved the support of IPv6 scoped addresses:
+	* kame/sys/netinet6/ip6_var.h: added sockaddr_in6 structures to
+	record source and destinaion addresses with scope information.
+	* kame/sys/netinet6/ip6_input.c (ip6_input): recorded the
+	addresses.
+	* kame/sys/netinet6/ip6_forward.c(ip6_forward): used the recorded
+	addresses to check scope breakage and to get a route.
+
+2002-01-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/udp6_output.c (udp6_output): corrected the
+	length argument to in_cksum (bsdi4 only).
+
+2002-01-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet/in_pcb.c (in_pcbladdr):
+	* {freebsd4, netbsd, openbsd}/sys/netinet/ip_output.c (ip_output):
+	* {netbsd, openbsd}/sys/netinet/in_pcb.c (in_selectsrc):
+	- check the address family of the destination cached in a PCB.
+	- clear the cached destination before getting another cached
+	  route.  Otherwise, garbage in the padding space (which might be
+	  filled in if it was used for IPv6) could annoy rtalloc.
+
+	Note for OpenBSD: though Openbsd actually does not need these
+	fixes since it does not support IPv4-mapped IPv6 addresses, the
+	fixes are at least not harmful and will avoid possible bugs in the
+	future if it will ever support mapped addresses.
+
+2002-01-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_src.c (in6_selectroute): checked the
+	address family of a cached destination, in case of sharing the
+	cache with IPv4.
+	In response to: a bug report from Vineet Goel in the snap-users
+	ML.
+
+2002-01-20 SUZUKI, Shinsuke <suz@sdl.hitachi.co.jp>
+	* kame/kame/pim6{dd,sd}/mld6.c:
+	fixed a bug that (*,G) entry diminishes due to a failure of
+	MLD Query advertisement.
+
+2002-01-18 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_*.[chly]:
+	  kame/kame/natptconfig/natpt_{defs,dispatch}.[ch]:
+	- Change a method of modification or reference of NAT-PT local
+	  variable.  Natptconfig show subcommand does not read
+	  /dev/kmem any more when refer to variable.
+
+2002-01-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_rip6_input): if the received
+	data is small enough but in an mbuf cluster, copy the data to a
+	separate mbuf that does not use a cluster.
+	This change will reduce the possiblity of packet loss in the
+	socket layer.
+
+2002-01-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/wru: was added as a separate command for ICMPv6 node
+	information queries.  The first motivation of this command is to
+	provide the ability to handle the queries and responses with
+	platforms that do not support 'ping6 -w'.  Though this command is
+	just a subset of 'ping6 -w' at this moment, it has some useful
+	properties comparing to the existing command.  For example, wru
+	only sends a single query even for a multicast destination.  In
+	this case, it collects replies during a certain amount of period,
+	prints the result, and then exits.
+
+2002-01-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_src.c (in6_selectif): do not use a
+	rejected or black hole route to pick the outgoing interface.
+	Otherwise, we could disambiguate a scoped destination with the
+	invalid route and would see some confusing results.
+
+2002-01-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_input.c (ip6_input): do not accept packets
+	to a destination that has a rejected or blackhole host route.
+
+2002-01-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* (many kernel files): cleaned up the code to receive extension
+	headers (and other optional information) on TCP sockets.  As a
+	result, the kernel TCP stack does not pass the information to
+	applications. All related functions were removed with this change,
+	while the "imputopts" member in the PCB structure was remained
+	just in case.
+
+2002-01-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_clearpktopts): avoided NULL
+	pointer reference.  The reference should have occurred in very
+	rare cases, but it is recommended to upgrade the kernel the
+	20011231 snap and later.
+
+2002-01-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_input.c (ip6_savecontrol): do not compare
+	the previous value of each option to decide if the option should
+	be passed to application.  This part has been removed from the
+	advanced API spec.
+
+2002/01/07 21:26:21 JST kjc@csl.sony.co.jp
+	add ECN (Explicit Congestion Notification) support (RFC3168).
+	the ECN implementation consists of 3 independent components:
+	  - marking mechanism in ALTQ
+	  - tunnel-egress and fragment reassenbly rules in layer-3
+	  - TCP mechanisms
+
+	to enable ECN support in TCP, build a kernel with TCP_ECN
+	and turn it on by sysctl -w net.inet.tcp.ecn=1
+	netstat(1) shows the ECN related statistics.
+
+	a simple example setup for ALTQ to mark packets on interface xl0:
+		interface xl0 bandwidth 3M red ecn
+
+2002-01-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/netinet/ip_icmp.c (icmp_input): passed applications
+	icmp6 error packets that contained ipv6 over ipv4 packets,
+	even if the error packet did not have enough length to store the
+	whole IPv6 packets.  traceroute -6 in fact needed this behavior.
+
+2002-01-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/traceroute: added a new option "-6" to send IPv6 over
+	IPv4 probe packets.  This option will specifically be useful to
+	see if an intermediate router rejects the tunneled packets.
+
+2002-01-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.h: restricted the use of
+	IPV6_RECVRTHDRDSTOPTS in the kernel.  This option was obsoleted in
+	rfc2292bis-03.
