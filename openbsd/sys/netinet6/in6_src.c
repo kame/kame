@@ -316,3 +316,23 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	*errorp = EADDRNOTAVAIL;
 	return(0);
 }
+
+/*
+ * Default hop limit selection. The precedence is as follows:
+ * 1. Hoplimit valued specified via ioctl.
+ * 2. (If the outgoing interface is detected) the current
+ *     hop limit of the interface specified by router advertisement.
+ * 3. The system default hoplimit.
+*/
+int
+in6_selecthlim(inp, ifp)
+	struct inpcb *inp;
+	struct ifnet *ifp;
+{
+	if (inp && inp->inp_hops >= 0)
+		return(inp->inp_hops);
+	else if (ifp)
+		return(nd_ifinfo[ifp->if_index].chlim);
+	else
+		return(ip6_defhlim);
+}

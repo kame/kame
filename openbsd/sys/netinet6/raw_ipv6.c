@@ -491,7 +491,6 @@ rip6_output(m, so, dst, control)
       ip6->ip6_flow = 0;  /* Or possibly user flow label, in host order. */
       ip6->ip6_vfc = IPV6_VERSION;
       ip6->ip6_nxt = inp->inp_ipv6.ip6_nxt;
-      ip6->ip6_hlim = 255;	/*XXX*/
       bcopy(in6a, &ip6->ip6_src, sizeof(*in6a));
       ip6->ip6_dst = dst->sin6_addr;
       /*
@@ -536,22 +535,13 @@ rip6_output(m, so, dst, control)
 		}
 	}
 
+	ip6->ip6_hlim = in6_selecthlim(inp, oifp);
+
   {
     int payload = sizeof(struct ip6_hdr);
     int nexthdr = mtod(m, struct ip6_hdr *)->ip6_nxt;
 #if 0
     int error;
-#endif
-
-#if 0
-    if (control) {
-      if ((error = ip6_setpktoptions(control, &opt, 1))) {
-        m_freem(m);
-        return error;
-      } else
-	optp = &opt;
-    } else
-      optp = inp->inp_outputopts;
 #endif
 
     if (inp->inp_csumoffset >= 0) {
@@ -570,7 +560,7 @@ rip6_output(m, so, dst, control)
     };
   };
 
-  return ip6_output(m, NULL/*XXX*/, &inp->inp_route6, flags, inp->inp_moptions6, NULL /*XXX*/);
+  return ip6_output(m, optp, &inp->inp_route6, flags, inp->inp_moptions6, &oifp);
 
 bad:
   if (m)

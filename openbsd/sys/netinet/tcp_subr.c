@@ -193,7 +193,7 @@ tcp_template(tp)
 						  
 		ipv6->ip6_nxt = IPPROTO_TCP;
 		ipv6->ip6_plen = htons(sizeof(struct tcphdr)); /*XXX*/
-		ipv6->ip6_hlim = inp->inp_ipv6.ip6_hlim;
+		ipv6->ip6_hlim = in6_selecthlim(inp, NULL);	/*XXX*/
 	} else
 #endif /* INET6 */
 	{
@@ -344,7 +344,8 @@ tcp_respond(tp, ti, m, ack, seq, flags)
 	if (is_ipv6) {
 		((struct ip6_hdr *)ti)->ip6_flow   = htonl(0x60000000);
 		((struct ip6_hdr *)ti)->ip6_nxt  = IPPROTO_TCP;
-		((struct ip6_hdr *)ti)->ip6_hlim = ip6_defhlim;
+		((struct ip6_hdr *)ti)->ip6_hlim =
+			in6_selecthlim(tp->t_inpcb, NULL);	/*XXX*/
 		((struct ip6_hdr *)ti)->ip6_plen = tlen - sizeof(struct ip6_hdr);
 		th->th_sum = 0;
 		th->th_sum = in6_cksum(m, IPPROTO_TCP,

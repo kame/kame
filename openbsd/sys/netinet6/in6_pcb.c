@@ -1283,11 +1283,7 @@ in6_pcbconnect(inp, nam)
 	if (inp->inp_route6.ro_rt)
 		ifp = inp->inp_route6.ro_rt->rt_ifp;
 
-#if 0
 	inp->inp_ipv6.ip6_hlim = (u_int8_t)in6_selecthlim(inp, ifp);
-#else
-	inp->inp_ipv6.ip6_hlim = ip6_defhlim;
-#endif
 
 	if (in_pcblookup(inp->inp_table,
 			 &sin6->sin6_addr,

@@ -867,11 +867,13 @@ send:
 	if (tp->pf == PF_INET6) {
 	  ((struct ip6_hdr *)ti6)->ip6_plen = m->m_pkthdr.len - sizeof(struct ip6_hdr);
 
+#if 0
 	  /* Following fields are already grabbed from the tcp_template. */
-	  /* ((struct ip6_hdr *)ti6)->ip6_flow   = ntohl(0x60000000);
+	  ((struct ip6_hdr *)ti6)->ip6_flow   = ntohl(0x60000000);
 	  ((struct ip6_hdr *)ti6)->ipv6_nexthdr  = IPPROTO_TCP;
-	  ((struct ip6_hdr *)ti6)->ip6_hlim = 
-	    tp->t_inpcb->inp_ipv6.ip6_hlim;*/
+#endif
+	  ((struct ip6_hdr *)ti6)->ip6_hlim = in6_selecthlim(tp->t_inpcb, NULL);
+	  /*XXX*/
 
 	  error = ip6_output(m, tp->t_inpcb->inp_outputopts6, &tp->t_inpcb->inp_route6, (so->so_options & SO_DONTROUTE), NULL, NULL);
 	} else

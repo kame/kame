@@ -873,11 +873,11 @@ udp_output(m, va_alist)
 		int payload = sizeof(struct ip6_hdr);
 		struct in6_addr *faddr;
 		struct in6_addr *laddr;
+		struct ifnet *oifp = NULL;
 
 		ipv6->ip6_flow = htonl(0x60000000) |
 		    (inp->inp_ipv6.ip6_flow & htonl(0x0fffffff)); 
 	  
-		ipv6->ip6_hlim = inp->inp_ipv6.ip6_hlim;
 		ipv6->ip6_nxt = IPPROTO_UDP;
 		ipv6->ip6_dst = inp->inp_faddr6;
 		/*
@@ -892,7 +892,6 @@ udp_output(m, va_alist)
 		    IN6_IS_ADDR_MC_LINKLOCAL(faddr)) {
 			struct ip6_pktopts *optp = inp->inp_outputopts6;
 			struct in6_pktinfo *pi = NULL;
-			struct ifnet *oifp = NULL;
 			struct ip6_moptions *mopt = NULL;
 
 			/*
@@ -921,6 +920,7 @@ udp_output(m, va_alist)
 					htons(sin6->sin6_scope_id & 0xffff);
 			}
 		}
+		ipv6->ip6_hlim = in6_selecthlim(inp, oifp);
 		laddr = in6_selectsrc(sin6, inp->inp_outputopts6,
 				      inp->inp_moptions6,
 				      &inp->inp_route6,
