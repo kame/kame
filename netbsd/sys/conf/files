@@ -902,6 +902,7 @@ file netinet6/esp_core.c		ipsec & ipsec_esp
 file netinet6/esp_output.c		ipsec & ipsec_esp
 file netinet6/esp_input.c		ipsec & ipsec_esp
 file netinet6/esp_rijndael.c		ipsec & ipsec_esp
+file netinet6/esp_twofish.c		ipsec & ipsec_esp
 file netinet6/frag6.c			inet6
 file netinet6/icmp6.c			inet6
 file netinet6/in6.c			inet6
