@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.62 2001/02/06 04:08:18 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.63 2001/02/06 04:42:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -572,8 +572,8 @@ ip6_forward(m, srcrt)
 	 * destinaion can appear, if the originating node just sends the
 	 * packet to us (without address resolution for the destination).
 	 * Since both icmp6_error and icmp6_redirect_output fill the embedded
-	 * link identifiers, we can do this stuff after make a copy for
-	 * returning error.
+	 * link identifiers, we can do this stuff after making a copy for
+	 * returning an error.
 	 */
 	if ((rt->rt_ifp->if_flags & IFF_LOOPBACK) != 0) {
 		/*
@@ -599,19 +599,19 @@ ip6_forward(m, srcrt)
 			       if_name(rt->rt_ifp));
 		}
 
-		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))
-			origifp = ifindex2ifnet[ntohs(ip6->ip6_src.s6_addr16[1])];
-		else if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst))
-			origifp = ifindex2ifnet[ntohs(ip6->ip6_dst.s6_addr16[1])];
-		else
-			origifp = rt->rt_ifp;
+		/* we can just use rcvif in forwarding. */
+		origifp = m->m_pkthdr.rcvif;
 	}
 	else
 		origifp = rt->rt_ifp;
-	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))
-		ip6->ip6_src.s6_addr16[1] = 0;
-	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst))
-		ip6->ip6_dst.s6_addr16[1] = 0;
+#ifndef SCOPEDROUTING
+	/*
+	 * clear embedded scope identifiers if necessary.
+	 * in6_clearscope will touch the addresses only when necessary.
+	 */
+	in6_clearscope(ip6->ip6_src);
+	in6_clearscope(ip6->ip6_dst);
+#endif
 
 #ifdef OLDIP6OUTPUT
 	error = (*rt->rt_ifp->if_output)(rt->rt_ifp, m,
