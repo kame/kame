@@ -157,6 +157,12 @@ struct igmpstat {
 extern	struct igmpstat igmpstat;
 extern	struct router_info *rti_head;
 
+#ifdef IGMPV3_DEBUG
+#define igmplog(x)	do { if (1) log x; } while (/*CONSTCOND*/ 0)
+#else
+#define igmplog(x)	/* empty */
+#endif
+
 /*
  * Macro to compute a random timer value between 1 and (IGMP_MAX_REPORTING_
  * DELAY * countdown frequency).  We assume that the routine random()

@@ -159,6 +159,12 @@ struct igmpstat {
 
 extern	struct router_info *Head;
 
+#ifdef IGMPV3_DEBUG
+#define igmplog(x)	do { if (1) log x; } while (/*CONSTCOND*/ 0)
+#else
+#define igmplog(x)	/* empty */
+#endif
+
 void	igmp_init __P((void));
 struct	router_info * rti_init __P((struct ifnet *));
 void	igmp_input __P((struct mbuf *, int));
