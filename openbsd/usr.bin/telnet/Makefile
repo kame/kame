@@ -39,9 +39,12 @@ PROG=	telnet
 CFLAGS+=-DTERMCAP -DKLUDGELINEMODE -DUSE_TERMIO -DSKEY -Dunix
 CFLAGS+=-DENV_HACK -D_USE_OLD_CURSES_
 CFLAGS+=-DHAVE_GETHOSTBYNAME2 -DHAVE_STRUCT_SOCKADDR_IN6
-CFLAGS+=-I${.CURDIR}/../../lib
+CFLAGS+=-I${.CURDIR}/../../lib -g
 LDADD+=	-locurses -ltelnet
 DPADD=	${LIBOLDCURSES} ${LIBTELNET}
+
+LDADD+=	-L/usr/local/v6/lib -L${.CURDIR}/../../lib/libinet6 -linet6
+DPADD+=	/usr/local/v6/lib/libinet6.a ${.CURDIR}/../../lib/libinet6/libinet6.a
 
 SRCS=	authenc.c commands.c main.c network.c ring.c sys_bsd.c telnet.c \
 	terminal.c tn3270.c utilities.c
