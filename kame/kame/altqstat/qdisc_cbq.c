@@ -1,4 +1,4 @@
-/*	$KAME: qdisc_cbq.c,v 1.4 2001/08/15 12:51:58 kjc Exp $	*/
+/*	$KAME: qdisc_cbq.c,v 1.5 2001/11/07 04:56:08 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -134,7 +134,7 @@ cbq_stat_loop(int fd, const char *ifname, int count, int interval)
 			printf("\tborrows: %u,\tdelays: %u\n",
 			       sp->borrows, sp->delays);
 			printf("\tdrops: %llu,\tdrop_bytes: %llu\n",
-			       (ull)sp->drop_cnt.bytes,
+			       (ull)sp->drop_cnt.packets,
 			       (ull)sp->drop_cnt.bytes);
 			if (sp->qtype == Q_RED)
 				print_redstats(sp->red);
