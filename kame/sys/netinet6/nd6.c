@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.288 2002/07/15 14:22:04 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.289 2002/07/15 14:48:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2416,7 +2416,11 @@ nd6_drain()
 	struct mbuf *mold;
 	int s;
 	
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
+#else
+	s = splnet();
+#endif
 	
 	for (ln = llinfo_nd6.ln_next; ln; ln = nln) {
 		nln = ln->ln_next;
