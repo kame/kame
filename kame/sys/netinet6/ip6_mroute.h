@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.h,v 1.24 2003/07/08 10:16:53 itojun Exp $	*/
+/*	$KAME: ip6_mroute.h,v 1.25 2003/12/08 14:34:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -207,21 +207,15 @@ struct sioc_mif_req6 {
  */
 struct mif6 {
         u_char   	m6_flags;     	/* MIFF_ flags defined above         */
-	u_int      	m6_rate_limit; 	/* max rate			     */
 #ifdef notyet
+	u_int      	m6_rate_limit; 	/* max rate			     */
 	struct tbf      *m6_tbf;      	/* token bucket structure at intf.   */
 #endif
-	struct in6_addr	m6_lcl_addr;   	/* local interface address           */
 	struct ifnet    *m6_ifp;     	/* pointer to interface              */
 	u_quad_t	m6_pkt_in;	/* # pkts in on interface            */
 	u_quad_t	m6_pkt_out;	/* # pkts out on interface           */
 	u_quad_t	m6_bytes_in;	/* # bytes in on interface	     */
 	u_quad_t	m6_bytes_out;	/* # bytes out on interface	     */
-#if defined(NEW_STRUCT_ROUTE) || defined(__FreeBSD__)
-	struct route m6_route;/* cached route if this is a tunnel */
-#else
-	struct route_in6 m6_route;/* cached route if this is a tunnel */
-#endif
 #ifdef notyet
 	u_int		m6_rsvp_on;	/* RSVP listening on this vif */
 	struct socket   *m6_rsvpd;	/* RSVP daemon socket */
