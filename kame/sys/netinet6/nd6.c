@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.140 2001/04/27 15:09:49 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.141 2001/04/27 23:10:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2555,15 +2555,27 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 	return error;
 }
 #else
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+static int nd6_sysctl_drlist(SYSCTL_HANDLER_ARGS);
+static int nd6_sysctl_prlist(SYSCTL_HANDLER_ARGS);
+#else
 static int nd6_sysctl_drlist SYSCTL_HANDLER_ARGS;
 static int nd6_sysctl_prlist SYSCTL_HANDLER_ARGS;
+#endif
+#ifdef SYSCTL_DECL
+SYSCTL_DECL(_net_inet6_icmp6);
+#endif
 SYSCTL_NODE(_net_inet6_icmp6, ICMPV6CTL_ND6_DRLIST, nd6_drlist,
 	CTLFLAG_RD, nd6_sysctl_drlist, "");
 SYSCTL_NODE(_net_inet6_icmp6, ICMPV6CTL_ND6_PRLIST, nd6_prlist,
 	CTLFLAG_RD, nd6_sysctl_prlist, "");
 
 static int
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+nd6_sysctl_drlist(SYSCTL_HANDLER_ARGS)
+#else
 nd6_sysctl_drlist SYSCTL_HANDLER_ARGS
+#endif
 {
 	int error;
 	char buf[1024];
@@ -2605,7 +2617,11 @@ nd6_sysctl_drlist SYSCTL_HANDLER_ARGS
 }
 
 static int
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+nd6_sysctl_prlist(SYSCTL_HANDLER_ARGS)
+#else
 nd6_sysctl_prlist SYSCTL_HANDLER_ARGS
+#endif
 {
 	int error;
 	char buf[1024];
