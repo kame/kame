@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.290 2002/06/08 19:18:58 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.291 2002/06/08 21:42:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1532,7 +1532,7 @@ in6_unlink_ifa(ia, ifp)
 	struct ifnet *ifp;
 {
 	struct in6_ifaddr *oia;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	int	s = splsoftnet();
 #else
 	int	s = splnet();
@@ -2163,7 +2163,7 @@ in6_addmulti(maddr6, ifp, errorp)
 	struct	in6_ifaddr *ia;
 	struct	in6_ifreq ifr;
 	struct	in6_multi *in6m;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	int	s = splsoftnet();
 #else
 	int	s = splnet();
@@ -2241,7 +2241,7 @@ in6_delmulti(in6m)
 	struct in6_multi *in6m;
 {
 	struct	in6_ifreq ifr;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	int	s = splsoftnet();
 #else
 	int	s = splnet();

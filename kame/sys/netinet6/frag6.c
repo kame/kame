@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.42 2002/05/30 04:08:40 itojun Exp $	*/
+/*	$KAME: frag6.c,v 1.43 2002/06/08 21:42:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -761,7 +761,7 @@ void
 frag6_slowtimo()
 {
 	struct ip6q *q6;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
 #else
 	int s = splnet();

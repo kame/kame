@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.165 2002/05/29 06:26:42 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.166 2002/06/08 21:42:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1158,7 +1158,7 @@ in6_tmpaddrtimer(ignored_arg)
 	struct nd_ifinfo *ndi;
 	u_int8_t nullbuf[8];
 	struct ifnet *ifp;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
 #else
 	int s = splnet();

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.22 2002/05/14 13:31:34 keiichi Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.23 2002/06/08 21:42:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -579,7 +579,7 @@ mip6_subnet_timeout(arg)
 
 	mip6_subnet_starttimer();
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();

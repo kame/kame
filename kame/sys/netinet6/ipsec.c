@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.138 2002/05/30 15:05:46 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.139 2002/06/08 21:42:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2821,7 +2821,7 @@ ipsec4_output(state, sp, flags)
 		 * There may be the case that SA status will be changed when
 		 * we are refering to one. So calling splsoftnet().
 		 */
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
 #else
 		s = splnet();
@@ -3212,7 +3212,7 @@ ipsec6_output_tunnel(state, sp, flags)
 		 * There may be the case that SA status will be changed when
 		 * we are refering to one. So calling splsoftnet().
 		 */
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
 #else
 		s = splnet();

@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.114 2002/06/08 19:52:07 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.115 2002/06/08 21:42:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1326,7 +1326,7 @@ in6_src_sysctl(oldp, oldlenp, newp, newlen)
 	int error = 0;
 	int s;
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();

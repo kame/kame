@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.126 2002/05/24 12:32:51 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.127 2002/06/08 21:42:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1289,7 +1289,7 @@ mip6_ioctl(cmd, data)
 	struct mip6_req *mr = (struct mip6_req *)data;
 	int s;
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 			s = splsoftnet();
 #else
 			s = splnet();
@@ -1566,7 +1566,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 	if (ip6_getpktaddrs(m, &src, &dst))
 		return (EINVAL);
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();

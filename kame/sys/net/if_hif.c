@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.27 2002/05/22 02:23:53 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.28 2002/06/08 21:42:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -248,7 +248,7 @@ hif_ioctl(ifp, cmd, data)
 	struct ifreq *ifr = (struct ifreq *)data;
 	int error = 0;
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();

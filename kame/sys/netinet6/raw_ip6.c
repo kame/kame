@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.126 2002/06/07 22:09:02 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.127 2002/06/08 21:42:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -751,7 +751,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 			error = EACCES;
 			break;
 		}
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
 #else
 		s = splnet();

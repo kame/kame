@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_usrreq.c,v 1.20 2002/02/02 08:42:52 jinmei Exp $	*/
+/*	$KAME: tcp6_usrreq.c,v 1.21 2002/06/08 21:42:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -163,7 +163,7 @@ tcp6_usrreq(so, req, m, nam, control)
 		return (EINVAL);
 	}
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
@@ -451,7 +451,7 @@ tcp6_ctloutput(op, so, level, optname, mp)
 	struct mbuf *m;
 	int i;
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.102 2002/05/14 13:31:34 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.103 2002/06/08 21:42:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -545,7 +545,7 @@ mip6_bu_timeout(arg)
 	long time_second = time.tv_sec;
 #endif
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
@@ -2075,7 +2075,7 @@ mip6_bc_timeout(dummy)
 	long time_second = time.tv_sec;
 #endif
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();

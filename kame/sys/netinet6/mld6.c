@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.45 2002/06/08 11:16:51 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.46 2002/06/08 21:42:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -161,7 +161,7 @@ mld6_start_listening(in6m)
 	struct in6_multi *in6m;
 {
 	struct sockaddr_in6 all_sa;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
 #else
 	int s = splnet();
@@ -444,7 +444,7 @@ mld6_fasttimeo()
 	if (!mld6_timers_are_running)
 		return;
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();

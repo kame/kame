@@ -1,4 +1,4 @@
-/*	$KAME: sctp_asconf.c,v 1.3 2002/05/24 07:40:23 itojun Exp $	*/
+/*	$KAME: sctp_asconf.c,v 1.4 2002/06/08 21:42:38 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_asconf.c,v 1.72 2002/04/04 15:40:35 randall Exp	*/
 
 /*
@@ -1803,7 +1803,7 @@ sctp_addr_mgmt_ep(struct sctp_inpcb *ep, struct ifaddr *ifa, uint16_t type) {
 		}
 	}
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
@@ -1832,7 +1832,7 @@ sctp_addr_mgmt_restrict_ep(struct sctp_inpcb *ep, struct ifaddr *ifa) {
 		return;
 	}
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();

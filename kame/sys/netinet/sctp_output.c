@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.8 2002/06/07 01:41:07 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.9 2002/06/08 21:42:38 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.c,v 1.308 2002/04/04 18:47:03 randall Exp	*/
 
 /*
@@ -5852,7 +5852,7 @@ sctp_output(inp, m, addr, control, p)
 	t_inp = inp;
 	/*  struct route ro;*/
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();

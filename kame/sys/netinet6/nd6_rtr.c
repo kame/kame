@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.206 2002/06/08 19:52:07 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.207 2002/06/08 21:42:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -566,7 +566,7 @@ defrouter_addreq(new)
 	gate.sin6_scope_id = 0;	/* XXX */
 #endif
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
@@ -841,7 +841,7 @@ defrouter_reset()
 void
 defrouter_select()
 {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
 #else
 	int s = splnet();
@@ -1001,7 +1001,7 @@ defrtrlist_update(new)
 	struct nd_defrouter *new;
 {
 	struct nd_defrouter *dr, *n;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
 #else
 	int s = splnet();
@@ -1169,7 +1169,7 @@ nd6_prelist_add(pr, dr, newp)
 		new->ndpr_prefix.sin6_addr.s6_addr32[i] &=
 		    new->ndpr_mask.s6_addr32[i];
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
@@ -1227,7 +1227,7 @@ prelist_remove(pr)
 	if (pr->ndpr_refcnt > 0)
 		return;		/* notice here? */
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
@@ -1259,7 +1259,7 @@ prelist_update(new, dr, m)
 	struct ifaddr *ifa;
 	struct ifnet *ifp = new->ndpr_ifp;
 	struct nd_prefix *pr;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
 #else
 	int s = splnet();
@@ -2287,7 +2287,7 @@ rt6_flush(gateway, ifp)
 	struct ifnet *ifp;
 {
 	struct radix_node_head *rnh = rt_tables[AF_INET6];
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
 #else
 	int s = splnet();

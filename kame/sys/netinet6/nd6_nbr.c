@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.109 2002/06/08 21:29:17 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.110 2002/06/08 21:42:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -935,7 +935,7 @@ nd6_na_input(m, off, icmp6len)
 			 * is only called under the network software interrupt
 			 * context.  However, we keep it just for safety.
 			 */
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 			s = splsoftnet();
 #else
 			s = splnet();
@@ -1404,7 +1404,7 @@ nd6_dad_timer(ifa)
 	struct in6_ifaddr *ia = (struct in6_ifaddr *)ifa;
 	struct dadq *dp;
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();	/* XXX */
 #else
 	s = splnet();		/* XXX */

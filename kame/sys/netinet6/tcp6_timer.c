@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_timer.c,v 1.10 2000/12/03 00:54:00 itojun Exp $	*/
+/*	$KAME: tcp6_timer.c,v 1.11 2002/06/08 21:42:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -117,7 +117,7 @@ void
 tcp6_fasttimo()
 {
 	struct tcp6cb *t6p, *t6pnext;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
 #else
 	int s = splnet();
@@ -143,7 +143,7 @@ tcp6_slowtimo()
 {
 	struct in6pcb *ip6, *ip6nxt;
 	struct tcp6cb *t6p = (struct tcp6cb *)NULL;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
 #else
 	int s = splnet();

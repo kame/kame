@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.104 2002/02/04 06:20:31 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.105 2002/06/08 21:42:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -670,7 +670,7 @@ udp6_usrreq(so, req, m, addr6, control)
 			error = EINVAL;
 			break;
 		}
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
 #else
 		s = splnet();
@@ -691,7 +691,7 @@ udp6_usrreq(so, req, m, addr6, control)
 		break;
 
 	case PRU_BIND:
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
 		error = in6_pcbbind(in6p, addr6, p);
 #else
@@ -710,7 +710,7 @@ udp6_usrreq(so, req, m, addr6, control)
 			error = EISCONN;
 			break;
 		}
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
 #else
 		s = splnet();
@@ -734,7 +734,7 @@ udp6_usrreq(so, req, m, addr6, control)
 			error = ENOTCONN;
 			break;
 		}
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
 #else
 		s = splnet();
@@ -803,7 +803,7 @@ static void
 udp6_detach(in6p)
 	struct in6pcb *in6p;
 {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
 #else
 	int s = splnet();

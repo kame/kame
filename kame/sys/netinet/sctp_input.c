@@ -1,4 +1,4 @@
-/*	$KAME: sctp_input.c,v 1.3 2002/05/24 07:40:23 itojun Exp $	*/
+/*	$KAME: sctp_input.c,v 1.4 2002/06/08 21:42:38 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_input.c,v 1.189 2002/04/04 18:37:12 randall Exp	*/
 
 /*
@@ -3224,7 +3224,7 @@ sctp_input(m, va_alist)
 	offset -= sizeof(struct sctp_chunkhdr);
 	
 	ecn_bits = ip->ip_tos;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();

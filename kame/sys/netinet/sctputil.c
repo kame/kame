@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.4 2002/06/07 01:41:08 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.5 2002/06/08 21:42:39 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctputil.c,v 1.153 2002/04/04 16:59:01 randall Exp	*/
 
 /*
@@ -370,7 +370,7 @@ sctp_timeout_handler(void *t)
 	tcb = (struct sctp_tcb *)tmr->tcb;
 	net = (struct sctp_nets *)tmr->net;
 	did_output = 1;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();

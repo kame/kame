@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.72 2002/06/08 19:52:07 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.73 2002/06/08 21:42:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -419,7 +419,7 @@ get_sg_cnt(req)
 	struct mf6c *rt;
 	int s;
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
@@ -560,7 +560,7 @@ ip6_mrouter_done()
 	struct rtdetq *rte;
 	int s;
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
@@ -710,7 +710,7 @@ add_m6if(mifcp)
 		if ((ifp->if_flags & IFF_MULTICAST) == 0)
 			return EOPNOTSUPP;
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
 #else
 		s = splnet();
@@ -731,7 +731,7 @@ add_m6if(mifcp)
 			return error;
 	}
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
@@ -784,7 +784,7 @@ del_m6if(mifip)
 	if (mifp->m6_ifp == NULL)
 		return EINVAL;
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
@@ -854,7 +854,7 @@ add_m6fc(mfccp)
 			    mfccp->mf6cc_parent);
 #endif
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
 #else
 		s = splnet();
@@ -868,7 +868,7 @@ add_m6fc(mfccp)
 	/*
 	 * Find the entry for which the upcall was made and update
 	 */
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
@@ -1043,7 +1043,7 @@ del_m6fc(mfccp)
 		    ip6_sprintf(&mcastgrp.sin6_addr));
 #endif
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
@@ -1159,7 +1159,7 @@ ip6_mforward(ip6, ifp, m)
 	/*
 	 * Determine forwarding mifs from the forwarding cache table
 	 */
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
@@ -1386,7 +1386,7 @@ expire_upcalls(unused)
 	int i;
 	int s;
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
@@ -1640,7 +1640,7 @@ phyint_send(ip6, mifp, m, src, dst)
 	struct mbuf *mb_copy;
 	struct ifnet *ifp = mifp->m6_ifp;
 	int error = 0;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();	/* needs to protect static "ro" below. */
 #else
 	int s = splnet();	/* needs to protect static "ro" below. */

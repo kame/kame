@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.35 2002/05/29 03:08:05 itojun Exp $	*/
+/*	$KAME: scope6.c,v 1.36 2002/06/08 21:42:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -65,7 +65,7 @@ struct scope6_id *
 scope6_ifattach(ifp)
 	struct ifnet *ifp;
 {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
 #else
 	int s = splnet();
@@ -121,7 +121,7 @@ scope6_set(ifp, idlist)
 	 * interface addresses, routing table entries, PCB entries... 
 	 */
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();

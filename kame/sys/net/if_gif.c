@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.90 2002/02/19 06:37:39 kjc Exp $	*/
+/*	$KAME: if_gif.c,v 1.91 2002/06/08 21:42:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1004,7 +1004,7 @@ gif_set_tunnel(ifp, src, dst)
 	int s;
 	int error = 0; 
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
@@ -1130,7 +1130,7 @@ gif_delete_tunnel(ifp)
 	struct gif_softc *sc = (struct gif_softc *)ifp;
 	int s;
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.282 2002/06/08 20:16:48 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.283 2002/06/08 21:42:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -474,7 +474,7 @@ nd6_timer(ignored_arg)
 	struct in6_ifaddr *ia6, *nia6;
 	struct in6_addrlifetime *lt6;
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
@@ -1038,7 +1038,7 @@ nd6_free(rt, gc)
 
 	if (!ip6_forwarding && ip6_accept_rtadv) { /* XXX: too restrictive? */
 		int s;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
 #else
 		s = splnet();
@@ -1553,7 +1553,7 @@ nd6_ioctl(cmd, data, ifp)
 		 * obsolete API, use sysctl under net.inet6.icmp6
 		 */
 		bzero(drl, sizeof(*drl));
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
 #else
 		s = splnet();
@@ -1585,7 +1585,7 @@ nd6_ioctl(cmd, data, ifp)
 		 * how about separating ioctls into two?
 		 */
 		bzero(oprl, sizeof(*oprl));
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
 #else
 		s = splnet();
@@ -1667,7 +1667,7 @@ nd6_ioctl(cmd, data, ifp)
 		/* flush all the prefix advertised by routers */
 		struct nd_prefix *pr, *next;
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
 #else
 		s = splnet();
@@ -1701,7 +1701,7 @@ nd6_ioctl(cmd, data, ifp)
 		/* flush all the default routers */
 		struct nd_defrouter *dr, *next;
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
 #else
 		s = splnet();
@@ -1733,7 +1733,7 @@ nd6_ioctl(cmd, data, ifp)
 			return(error);
 		}
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
 #else
 		s = splnet();
@@ -2003,7 +2003,7 @@ static void
 nd6_slowtimo(ignored_arg)
     void *ignored_arg;
 {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	int s = splsoftnet();
 #else
 	int s = splnet();
@@ -2476,7 +2476,7 @@ fill_drlist(req)
 	size_t l;
 #endif
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
@@ -2558,7 +2558,7 @@ fill_prlist(req)
 	size_t l;
 #endif
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();

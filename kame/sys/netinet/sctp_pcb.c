@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.6 2002/06/07 01:41:07 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.7 2002/06/08 21:42:38 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.c,v 1.207 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -1690,7 +1690,7 @@ sctp_inpcb_free(struct sctp_inpcb *ep,int immediate)
 	struct socket *so;
 	struct rtentry *rt;
 	int s;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
@@ -2422,7 +2422,7 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 	int s;
 
 	/* first, lets purge the  entry from the hash table. */
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
