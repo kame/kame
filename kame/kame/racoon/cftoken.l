@@ -347,6 +347,8 @@ rsarev		{ YYD; yylval.num = algtype_rsarev;	return(ALGORITHMTYPE); }
 vendor_id	{ YYD; return(VENDORID); }
 user_fqdn	{ YYD; yylval.num = LC_IDENTTYPE_USERFQDN; return(IDENTIFIERTYPE); }
 fqdn		{ YYD; yylval.num = LC_IDENTTYPE_FQDN; return(IDENTIFIERTYPE); }
+cert		{ YYD; yylval.num = LC_IDENTTYPE_CERT; return(IDENTIFIERTYPE); }
+secret		{ YYD; yylval.num = LC_IDENTTYPE_SECRET; return(IDENTIFIERTYPE); }
 keyid		{ YYD; yylval.num = LC_IDENTTYPE_KEYID; return(IDENTIFIERTYPE); }
 address		{ YYD; yylval.num = LC_IDENTTYPE_ADDRESS; return(IDENTIFIERTYPE); }
 	/* units */
