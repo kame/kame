@@ -1,4 +1,4 @@
-/*	$KAME: rijndael-api-fst.c,v 1.3 2002/05/25 22:39:49 itojun Exp $	*/
+/*	$KAME: rijndael-api-fst.c,v 1.4 2002/10/03 03:26:55 itojun Exp $	*/
 
 /*
  * rijndael-api-fst.c   v2.3   April '2000
@@ -112,7 +112,7 @@ int rijndael_blockEncrypt(cipherInstance *cipher, keyInstance *key,
 		break;
 		
 	case MODE_CBC:
-#if 0 /*STRICT_ALIGN*/
+#if 1 /*STRICT_ALIGN*/
 		bcopy(cipher->IV, block, 16);
 		bcopy(input, iv, 16);
 		((word32*)block)[0] ^= ((word32*)iv)[0];
@@ -128,7 +128,7 @@ int rijndael_blockEncrypt(cipherInstance *cipher, keyInstance *key,
 		rijndaelEncrypt(block, outBuffer, key->keySched, key->ROUNDS);
 		input += 16;
 		for (i = numBlocks - 1; i > 0; i--) {
-#if 0 /*STRICT_ALIGN*/
+#if 1 /*STRICT_ALIGN*/
 			bcopy(outBuffer, block, 16);
 			bcopy(input, iv, 16);
 			((word32*)block)[0] ^= ((word32*)iv)[0];
@@ -148,7 +148,7 @@ int rijndael_blockEncrypt(cipherInstance *cipher, keyInstance *key,
 		break;
 	
 	case MODE_CFB1:
-#if 0 /*STRICT_ALIGN*/
+#if 1 /*STRICT_ALIGN*/
 		bcopy(cipher->IV, iv, 16); 
 #else  /* !STRICT_ALIGN */
 		*((word32*)iv[0]) = *((word32*)(cipher->IV   ));
@@ -295,7 +295,7 @@ int rijndael_blockDecrypt(cipherInstance *cipher, keyInstance *key,
 		break;
 		
 	case MODE_CBC:
-#if 0 /*STRICT_ALIGN */
+#if 1 /*STRICT_ALIGN */
 		bcopy(cipher->IV, iv, 16); 
 #else
 		*((word32*)iv[0]) = *((word32*)(cipher->IV   ));
@@ -309,7 +309,7 @@ int rijndael_blockDecrypt(cipherInstance *cipher, keyInstance *key,
 			((word32*)block)[1] ^= *((word32*)iv[1]);
 			((word32*)block)[2] ^= *((word32*)iv[2]);
 			((word32*)block)[3] ^= *((word32*)iv[3]);
-#if 0 /*STRICT_ALIGN*/
+#if 1 /*STRICT_ALIGN*/
 			bcopy(input, iv, 16);
 			bcopy(block, outBuffer, 16);
 #else
@@ -324,7 +324,7 @@ int rijndael_blockDecrypt(cipherInstance *cipher, keyInstance *key,
 		break;
 	
 	case MODE_CFB1:
-#if 0 /*STRICT_ALIGN */
+#if 1 /*STRICT_ALIGN */
 		bcopy(cipher->IV, iv, 16); 
 #else
 		*((word32*)iv[0]) = *((word32*)(cipher->IV));
