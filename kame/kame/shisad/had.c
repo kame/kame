@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.5 2005/01/31 08:25:28 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.6 2005/02/05 10:04:45 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -186,6 +186,11 @@ main(argc, argv)
 	argc -= optind;
 	argv += optind;
 
+	if (arg_ifname == NULL) {
+		fprintf(stderr, "you have to specify interfacename\n"); 
+		exit(1);
+	}
+
 	/* open syslog infomation. */
 	openlog("shisad(had)", 0, LOG_DAEMON);
 	syslog(LOG_INFO, "Start HA daemon at %s\n", arg_ifname);
@@ -197,7 +202,7 @@ main(argc, argv)
 	fdlist_init();
 	command_init("ha> ", command_table,
 		sizeof(command_table) / sizeof(struct command_table), 7778);
-	mip6_flush_kernel_bc();
+	mip6_bc_init();
 
 	/* dump current PID */
 	pid = getpid();
@@ -729,7 +734,7 @@ send_mpa(dst, mps_id, ifindex)
 	/*        struct home_agent_list *hal = NULL, *haln = NULL;*/
 
         memset(&to, 0, sizeof(to));
-	memcpy(&to.sin6_addr, dst, sizeof(struct in6_addr)); /* fill the prefix part */
+	memcpy(&to.sin6_addr, dst, sizeof(struct in6_addr));
 	to.sin6_family = AF_INET6;
 	to.sin6_port = 0;
 	to.sin6_scope_id = 0;
@@ -758,8 +763,8 @@ send_mpa(dst, mps_id, ifindex)
 
 	mpa = (struct mip6_prefix_advert *)buf;
 	mpa->mip6_pa_type = MIP6_PREFIX_ADVERT;
-	mpa->mip6_pa_code = 0; 
-	mpa->mip6_pa_cksum = 0; 
+	mpa->mip6_pa_code = 0;
+	mpa->mip6_pa_cksum = 0;
 	mpa->mip6_pa_id = mps_id;
 
 	ndopt_pi = (struct nd_opt_prefix_info *)(mpa + 1);
@@ -769,7 +774,8 @@ send_mpa(dst, mps_id, ifindex)
 		ndopt_pi->nd_opt_pi_type = ND_OPT_PREFIX_INFORMATION;
 		ndopt_pi->nd_opt_pi_len = 4;
 		ndopt_pi->nd_opt_pi_prefix_len = hpfx->hpfx_prefixlen;
-		ndopt_pi->nd_opt_pi_flags_reserved = 0;
+		ndopt_pi->nd_opt_pi_flags_reserved =
+			ND_OPT_PI_FLAG_ONLINK | ND_OPT_PI_FLAG_AUTO;
 		ndopt_pi->nd_opt_pi_valid_time = htonl(hpfx->hpfx_vltime);
 		ndopt_pi->nd_opt_pi_preferred_time = htonl(hpfx->hpfx_pltime);
 		ndopt_pi->nd_opt_pi_reserved2 = 0;
@@ -792,12 +798,4 @@ send_mpa(dst, mps_id, ifindex)
 		mip6stat.mip6s_ompa++;
 
 	return (errno);
-}
-
-
-int
-filling_pi(struct nd_opt_prefix_info *pi)
-{
-	/* XXX */
-	return (0);
 }
