@@ -115,16 +115,24 @@ make_ip6(char *name)
 	struct ip6_hdr *ip6 = (struct ip6_hdr *)pbp;
 	char val8;
 	short val16;
+	long val32;		/* XXX */
 	extern char *optsrc, *optdst;
 	extern struct in6_addr *optsrcn, *optdstn;
 
-	if (tgetent(ip6buf, name) <= 0) {
-		fprintf(stderr, "v6test: unknown header %s\n", name);
-		exit(1);
-	}
+	if (tgetent(ip6buf, name) <= 0)
+		errx(1, "unknown header %s\n", name);
 	MUSTHAVE(ip6->ip6_flow, "ip6_flow", ip6buf);
 	HTONL(ip6->ip6_flow);
-	ip6->ip6_vfc = 0x60;
+	MAYHAVE(val16, "ip6_ver", 6, ip6buf);
+	if (val16 < 0 || val16 > 15)
+		errx(1, "IPv6 version field must be between 0 and 15"); 
+	ip6->ip6_vfc = (val16 << 4) & 0xf0;
+	MAYHAVE(val32, "ip6_tc", 0, ip6buf);
+	if (val32 < 0 || val32 > 255)
+		errx(1,
+		     "IPv6 version traffic class must be between 0 and 255");
+	ip6->ip6_vfc |= (val32 >> 4) & 0x0f;
+	*(&ip6->ip6_vfc + 1) |= (val32 & 0x0f) << 4; /* XXX: ugly... */
 	if ((val16 = tgetnum("ip6_plen", ip6buf)) < 0) {
 		if ((addr = tgetstr("ip6_plen", &bp, ip6buf)) &&
 		    strcmp(addr, "auto") == 0)
