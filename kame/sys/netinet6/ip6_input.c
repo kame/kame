@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.323 2003/08/09 17:06:40 suz Exp $	*/
+/*	$KAME: ip6_input.c,v 1.324 2003/08/27 18:23:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1736,8 +1736,8 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 		 * Check if a hop-by-hop options header is contatined in the
 		 * received packet, and if so, store the options as ancillary
 		 * data. Note that a hop-by-hop options header must be
-		 * just after the IPv6 header, which fact is assured through
-		 * the IPv6 input processing.
+		 * just after the IPv6 header, which is assured through the
+		 * IPv6 input processing.
 		 */
 		struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 		if (ip6->ip6_nxt == IPPROTO_HOPOPTS) {
