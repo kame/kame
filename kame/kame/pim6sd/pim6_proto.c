@@ -373,13 +373,11 @@ delete_pim6_nbr(nbr_delete)
     else
     {
 	if  (inet6_greaterthan(&v->uv_linklocal->pa_addr, 
-	    &v->uv_pim_neighbors->address)) 
-
+			       &v->uv_pim_neighbors->address)) 
 	    /*
 	     * The first address is the new potential remote DR address, but
 	     * the local address is the winner.
 	     */
-
 	    v->uv_flags |= VIFF_DR;
    	    v->uv_flags |= VIFF_QUERIER; 
     }
