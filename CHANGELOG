@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1189 2000/08/11 17:28:21 jinmei Exp $
+$KAME: CHANGELOG,v 1.1190 2000/08/12 03:41:54 jinmei Exp $
 
 <200007>
+2000-08-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6sd/main.c (cleanup): upon receipt of SIGTERM,
+	inform all neighbors the termination by sending a hello message
+	with 0 holdtime.
+
 2000-08-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd3/usr.bin/netstat/if.c (intpr): supported IPv6 scoped
 	addresses format.
