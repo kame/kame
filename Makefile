@@ -40,7 +40,7 @@ update-all: update-doc
 		fi \
 	done)
 
-# % cvs co kame/Makefile
+# % cvs co kame/Makefile kame/Makefile.inc
 # % cd kame
 # % make TARGET=foo tree
 tree:

@@ -1,6 +1,6 @@
 Installation procedure - grabbing tree via anoncvs
 KAME project
-$Id: INSTALL.anoncvs,v 1.5 1999/12/12 10:23:53 itojun Exp $
+$Id: INSTALL.anoncvs,v 1.6 2000/01/02 13:07:23 itojun Exp $
 
 
 NOTE: The following description applies only to KAME SNAP kits.
@@ -33,7 +33,7 @@ A-3. Checkout the tree (replace $somewhere with your working directory).
      you can do the following, but not recommended:
 	% cd $somewhere
 	% cvs -d :pserver:anoncvs@cvs.kame.net:/cvsroot/kame co -P \
-		kame/Makefile
+		kame/Makefile kame/Makefile.inc
 	% cd kame
 	% make TARGET=netbsd tree
 
