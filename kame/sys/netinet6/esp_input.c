@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.81 2003/07/04 00:48:04 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.82 2003/07/09 04:02:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -832,14 +832,6 @@ noreplaycheck:
 		flowinfo = ip6->ip6_flow;
 		m_adj(m, off + esplen + ivlen);
 		if (m->m_len < sizeof(*ip6)) {
-#ifndef PULLDOWN_TEST
-			/*
-			 * m_pullup is prohibited in KAME IPv6 input processing
-			 * but there's no other way!
-			 */
-#else
-			/* okay to pullup in m_pulldown style */
-#endif
 			m = m_pullup(m, sizeof(*ip6));
 			if (!m) {
 				ipsec6stat.in_inval++;

@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.81 2003/02/07 12:42:47 t-momose Exp $	*/
+/*	$KAME: ah_input.c,v 1.82 2003/07/09 04:02:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -935,10 +935,6 @@ ah6_input(mp, offp, proto)
 		flowinfo = ip6->ip6_flow;
 		m_adj(m, off + stripsiz);
 		if (m->m_len < sizeof(*ip6)) {
-			/*
-			 * m_pullup is prohibited in KAME IPv6 input processing
-			 * but there's no other way!
-			 */
 			m = m_pullup(m, sizeof(*ip6));
 			if (!m) {
 				ipsec6stat.in_inval++;
