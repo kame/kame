@@ -1,4 +1,4 @@
-/*	$KAME: yylex.c,v 1.8 2001/09/06 09:46:05 fujisawa Exp $	*/
+/*	$KAME: yylex.c,v 1.9 2001/09/21 08:27:52 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -156,8 +156,7 @@ SNAMEorKeyword(char *yytext)
 	int	iter;
 
 	for (iter = 0; keyTable[iter].word; iter++)
-		if (strncasecmp(keyTable[iter].word, yytext,
-				strlen(keyTable[iter].word)) == 0)
+		if (strcasecmp(keyTable[iter].word, yytext) == 0)
 			return (keyTable[iter].token);
 
 	return (SNAME);
