@@ -1,4 +1,4 @@
-/*	$OpenBSD: pfctl_parser.c,v 1.165 2003/07/03 09:13:06 cedric Exp $ */
+/*	$OpenBSD: pfctl_parser.c,v 1.167 2003/07/04 11:05:44 henning Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -577,8 +577,11 @@ print_rule(struct pf_rule *r, int verbose)
 		printf("action(%d) ", r->action);
 	else if (r->anchorname[0])
 		printf("%s %s ", anchortypes[r->action], r->anchorname);
-	else
+	else {
 		printf("%s ", actiontypes[r->action]);
+		if (r->natpass)
+			printf("pass ");
+	}
 	if (r->action == PF_DROP) {
 		if (r->rule_flag & PFRULE_RETURN)
 			printf("return ");
@@ -1196,7 +1199,7 @@ host_dns(const char *s, int v4mask, int v6mask)
  *	if set to 1, only simple addresses are accepted (no netblock, no "!").
  */
 int
-append_addr(struct pfr_buffer *b, char *s, int test) 
+append_addr(struct pfr_buffer *b, char *s, int test)
 {
 	return append_addr_not(b, s, test, 0);
 }
