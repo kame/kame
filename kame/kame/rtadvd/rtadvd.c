@@ -487,7 +487,7 @@ rtadvd_input()
 		 /*
 		  * Message verification - RFC-2461 6.1.1
 		  * XXX: these checks must be done in the kernel as well,
-		  *      but we can't complete rely on it.
+		  *      but we can't completely rely on them.
 		  */
 		 if (*hlimp != 255) {
 			 syslog(LOG_NOTICE,
