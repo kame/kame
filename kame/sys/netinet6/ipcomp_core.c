@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_core.c,v 1.28 2004/06/02 05:53:15 itojun Exp $	*/
+/*	$KAME: ipcomp_core.c,v 1.29 2004/12/18 02:38:39 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -58,6 +58,7 @@
 
 #include <net/if.h>
 #include <net/route.h>
+#include <netinet/in.h>
 #include <net/netisr.h>
 #include <net/zlib.h>
 #include <machine/cpu.h>
