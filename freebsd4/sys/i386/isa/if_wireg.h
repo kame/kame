@@ -151,9 +151,6 @@ struct wi_softc	{
 #define WI_PCI_LOCALRES	0x14	/* The PLX chip's local registers */
 #define WI_PCI_MEMRES	0x18	/* The PCCard's attribute memory */
 #define WI_PCI_IORES	0x1C	/* The PCCard's I/O space */
-#define WI_PCI_CBMA	0x10	/* Configuration Base Memory Address */
-#define WI_PCI_COR	0x4C
-#define WI_PCI_SOFT_RESET	(1 << 7)
 
 #define WI_LOCAL_INTCSR			0x4c
 #define WI_LOCAL_INTEN			0x40 /* poke this into INTCSR */
@@ -191,23 +188,18 @@ struct wi_softc	{
  * register space access macros
  */
 #define CSR_WRITE_4(sc, reg, val)	\
-	bus_space_write_4(sc->wi_btag, sc->wi_bhandle,	\
-			  (sc->wi_prism2 == 2 ? reg * 2 : reg), val)
+	bus_space_write_4(sc->wi_btag, sc->wi_bhandle, reg, val)
 #define CSR_WRITE_2(sc, reg, val)	\
-	bus_space_write_2(sc->wi_btag, sc->wi_bhandle,	\
-			  (sc->wi_prism2 == 2 ? reg * 2 : reg), val)
+	bus_space_write_2(sc->wi_btag, sc->wi_bhandle, reg, val)
 #define CSR_WRITE_1(sc, reg, val)	\
-	bus_space_write_1(sc->wi_btag, sc->wi_bhandle,	\
-			  (sc->wi_prism2 == 2 ? reg * 2 : reg), val)
+	bus_space_write_1(sc->wi_btag, sc->wi_bhandle, reg, val)
+
 #define CSR_READ_4(sc, reg)		\
-	bus_space_read_4(sc->wi_btag, sc->wi_bhandle,	\
-			 (sc->wi_prism2 == 2 ? reg * 2 : reg))
+	bus_space_read_4(sc->wi_btag, sc->wi_bhandle, reg)
 #define CSR_READ_2(sc, reg)		\
-	bus_space_read_2(sc->wi_btag, sc->wi_bhandle,	\
-			 (sc->wi_prism2 == 2 ? reg * 2 : reg))
+	bus_space_read_2(sc->wi_btag, sc->wi_bhandle, reg)
 #define CSR_READ_1(sc, reg)		\
-	bus_space_read_1(sc->wi_btag, sc->wi_bhandle,	\
-			 (sc->wi_prism2 == 2 ? reg * 2 : reg))
+	bus_space_read_1(sc->wi_btag, sc->wi_bhandle, reg)
 
 #define CSM_WRITE_1(sc, off, val)	\
 	bus_space_write_1(sc->wi_bmemtag, sc->wi_bmemhandle, off, val)
