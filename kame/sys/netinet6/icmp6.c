@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.111 2000/06/11 17:24:31 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.112 2000/06/12 05:03:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -239,7 +239,7 @@ icmp6_errcount(stat, type, code)
 		break;
 	case ND_REDIRECT:
 		stat->icp6errs_redirect++;
-		break;
+		return;
 	}
 	stat->icp6errs_unknown++;
 }
