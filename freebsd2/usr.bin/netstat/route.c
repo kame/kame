@@ -759,13 +759,17 @@ netname6(sa6, mask)
 	struct sockaddr_in6 *sa6;
 	struct in6_addr *mask;
 {
+	struct sockaddr_in6 sin6 = *sa6;
 	static char line[MAXHOSTNAMELEN + 1];
 	u_char *p = (u_char *)mask;
+	u_char *q = (u_char *)&sin6.sin6_addr;
 	u_char *lim;
 	int masklen, illegal = 0, flag = NI_WITHSCOPEID;
 
 	if (mask) {
-		for (masklen = 0, lim = p + 16; p < lim; p++) {
+		masklen = 0;
+		lim = p + 16;
+		for (/*nothing*/; p < lim; p++, q++) {
 			switch (*p) {
 			 case 0xff:
 				 masklen += 8;
@@ -797,6 +801,11 @@ netname6(sa6, mask)
 				 illegal ++;
 				 break;
 			}
+
+			if (!illegal)
+				*q &= *p;
+			else
+				*q = 0;
 		}
 		if (illegal)
 			fprintf(stderr, "illegal prefixlen\n");
@@ -804,12 +813,12 @@ netname6(sa6, mask)
 	else
 		masklen = 128;
 
-	if (masklen == 0 && IN6_IS_ADDR_UNSPECIFIED(&sa6->sin6_addr))
+	if (masklen == 0 && IN6_IS_ADDR_UNSPECIFIED(&sin6.sin6_addr))
 		return("default");
 
 	if (nflag)
 		flag |= NI_NUMERICHOST;
-	getnameinfo((struct sockaddr *)sa6, sa6->sin6_len, line, sizeof(line),
+	getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len, line, sizeof(line),
 		    NULL, 0, flag);
 
 	if (nflag)
