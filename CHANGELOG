@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.525 2000/02/05 16:08:06 jinmei Exp $
+$Id: CHANGELOG,v 1.526 2000/02/05 16:15:04 jinmei Exp $
 
 <200002>
+2000-02-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/bgpd/bgp_input.c (bgp_read): 
+	* kame/kame/bgpd/main.c (main_listen_accept):
+	Prevented blocking on a socket for a BGP4+ connection caused by
+	ancillary data.
+	Note: this fix needs the latest kernel. Older kernel might panic
+	with the latest bgpd.
+
 Sun Feb  6 00:27:25 JST 2000  itojun@iijlab.net
 	* sys/netinet6/esp_input.c: remove too-strong assumption about mbuf
 	  alignment.
