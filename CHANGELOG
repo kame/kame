@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2101 2002/03/15 10:47:25 itojun Exp $
+$KAME: CHANGELOG,v 1.2102 2002/03/16 18:34:07 jinmei Exp $
 
 <200203>
+2002-03-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet6/udp6_usrreq.c (udp6_input): corrected
+	address matching rules for incoming multicast packets, as
+	suggested by Konstantin KABASSANOV <Konstantin.Kabassanov@lip6.fr>
+	Without the change, multicast applications that binds the
+	receiving socket with the multicast address would fail to accept
+	incoming packets.
+
 Fri Mar 15 19:45:40 JST 2002  itojun@iijlab.net
 	* sys/netinet6/frag6.c: implement real lock around IPv6 reassembly code.
 	  (netbsd/openbsd only)
