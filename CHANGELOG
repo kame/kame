@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1228 2000/08/23 13:42:47 sakane Exp $
+$KAME: CHANGELOG,v 1.1229 2000/08/24 00:29:40 itojun Exp $
 
 <200008>
 Wed Aug 23 22:42:19 JST 2000 sakane@ydc.co.jp
@@ -20,6 +20,10 @@ Wed Aug 23 15:20:59 JST 2000 sakane@ydc.co.jp
 	responder define it, the responder will reject the proposal if each
 	lifetime/lifebytes/pfs are not same between the initiator and the
 	responder.
+
+Wed Aug 23 14:18:44 JST 2000  itojun@iijlab.net
+	* netbsd/sbin/ping6: provide stddev value at the end, to follow 
+	  practice in netbsd ping(8).
 
 Wed Aug 23 13:19:59 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/freebsd3/ports/squid11: use latest IPv6 patch.
