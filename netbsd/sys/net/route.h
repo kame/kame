@@ -1,4 +1,4 @@
-/*	$NetBSD: route.h,v 1.22 2000/05/04 17:33:03 ragge Exp $	*/
+/*	$NetBSD: route.h,v 1.23 2000/12/09 01:29:45 itojun Exp $	*/
 
 /*
  * Copyright (c) 1980, 1986, 1993
@@ -104,6 +104,9 @@ struct rt_metrics {
  */
 #ifndef RNF_NORMAL
 #include <net/radix.h>
+#if 0	/*RADIX_ART*/
+#include <net/radix_art.h>
+#endif
 #endif
 struct rtentry {
 	struct	radix_node rt_nodes[2];	/* tree glue, and other values */
