@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.117 2001/05/31 21:05:01 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.118 2001/05/31 22:20:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -849,7 +849,11 @@ defrouter_select()
 
 	/*
 	 * Search for a (probably) reachable router from the list.
+	 * XXX: nd_defrouter_primary is initialized to point to the first entry
+	 * of the list, in case of all the entries are not
+	 * "probably reachable".
 	 */
+	nd_defrouter_primary = TAILQ_FIRST(&nd_defrouter);
 	for (dr = TAILQ_FIRST(&nd_defrouter); dr;
 	     dr = TAILQ_NEXT(dr, dr_entry)) {
 		if ((rt = nd6_lookup(&dr->rtaddr, 0, dr->ifp)) &&
@@ -866,7 +870,7 @@ defrouter_select()
 		}
 	}
 
-	if ((dr = nd_defrouter_primary)) {
+	if ((dr = nd_defrouter_primary) != NULL) {
 		/*
 		 * De-install the previous default gateway and install
 		 * a new one.
