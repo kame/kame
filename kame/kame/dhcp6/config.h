@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.20 2003/01/21 12:05:37 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.21 2003/01/22 07:24:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -68,6 +68,8 @@ struct dhcp6_event {
 	struct dhcp6_timer *timer;
 
 	struct duid serverid;
+
+	struct timeval tv_start; /* timestamp when the 1st msg is sent */
 
 	/* internal timer parameters */
 	long retrans;

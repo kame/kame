@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.17 2003/01/05 17:12:12 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.18 2003/01/22 07:24:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -32,6 +32,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/queue.h>
+#include <sys/time.h>
 
 #include <netinet/in.h>
 

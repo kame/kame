@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.73 2003/01/22 05:37:37 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.74 2003/01/22 07:24:15 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1327,6 +1327,13 @@ dhcp6_set_options(bp, ep, optinfo)
 		u_int8_t p8 = (u_int8_t)optinfo->pref;
 
 		COPY_OPTION(DH6OPT_PREFERENCE, sizeof(p8), &p8, p);
+	}
+
+	if (optinfo->elapsed_time != DH6OPT_ELAPSED_TIME_UNDEF) {
+		u_int16_t p16 = (u_int16_t)optinfo->elapsed_time;
+
+		p16 = htons(p16);
+		COPY_OPTION(DH6OPT_ELAPSED_TIME, sizeof(p16), &p16, p);
 	}
 
 	for (stcode = TAILQ_FIRST(&optinfo->stcode_list); stcode;

@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.16 2003/01/05 17:12:12 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.17 2003/01/22 07:24:15 jinmei Exp $	*/
 
 %{
 /*
@@ -32,6 +32,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/queue.h>
+#include <sys/time.h>
 
 #include <netinet/in.h>
 

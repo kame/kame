@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.103 2003/01/21 12:55:09 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.104 2003/01/22 07:24:15 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -109,6 +109,7 @@ static int client6_recvreply __P((struct dhcp6_if *, struct dhcp6 *,
 static void client6_signal __P((int));
 static struct dhcp6_event *find_event_withid __P((struct dhcp6_if *,
 						  u_int32_t));
+static void tv_sub __P((struct timeval *, struct timeval *, struct timeval *));
 #if 0
 static int sa2plen __P((struct sockaddr_in6 *));
 #endif
@@ -770,6 +771,20 @@ client6_send(ev)
 		optinfo.rapidcommit = 1;
 	}
 
+	/* elapsed time */
+	if (ev->timeouts == 0) {
+		gettimeofday(&ev->tv_start, NULL);
+		optinfo.elapsed_time = 0;
+	} else {
+		struct timeval now, tv_diff;
+
+		gettimeofday(&now, NULL);
+		tv_sub(&now, &ev->tv_start, &tv_diff);
+
+		optinfo.elapsed_time =
+		    tv_diff.tv_sec * 100 + tv_diff.tv_usec / 10000;
+	}
+
 	/* IA_PD */
 	switch (ev->state) {
 	case DHCP6S_SOLICIT:
@@ -906,6 +921,20 @@ client6_send_renew(ev)
 		goto end;
 	}
 
+	/* elapsed time */
+	if (ev->timeouts == 0) {
+		gettimeofday(&ev->tv_start, NULL);
+		optinfo.elapsed_time = 0;
+	} else {
+		struct timeval now, tv_diff;
+
+		gettimeofday(&now, NULL);
+		tv_sub(&now, &ev->tv_start, &tv_diff);
+
+		optinfo.elapsed_time =
+		    tv_diff.tv_sec * 100 + tv_diff.tv_usec / 10000;
+	}
+
 	/* configuration information to be renewed */
 	for (evd = TAILQ_FIRST(&ev->data_list); evd;
 	     evd = TAILQ_NEXT(evd, link)) {
@@ -998,6 +1027,20 @@ client6_send_rebind(ev)
 	if (duidcpy(&optinfo.clientID, &client_duid)) {
 		dprintf(LOG_ERR, "%s" "failed to copy client ID", FNAME);
 		goto end;
+	}
+
+	/* elapsed time */
+	if (ev->timeouts == 0) {
+		gettimeofday(&ev->tv_start, NULL);
+		optinfo.elapsed_time = 0;
+	} else {
+		struct timeval now, tv_diff;
+
+		gettimeofday(&now, NULL);
+		tv_sub(&now, &ev->tv_start, &tv_diff);
+
+		optinfo.elapsed_time =
+		    tv_diff.tv_sec * 100 + tv_diff.tv_usec / 10000;
 	}
 
 	/* configuration information to be rebound */
@@ -1099,6 +1142,20 @@ client6_send_release(ev)
 	if (duidcpy(&optinfo.clientID, &client_duid)) {
 		dprintf(LOG_ERR, "%s" "failed to copy client ID", FNAME);
 		goto end;
+	}
+
+	/* elapsed time */
+	if (ev->timeouts == 0) {
+		gettimeofday(&ev->tv_start, NULL);
+		optinfo.elapsed_time = 0;
+	} else {
+		struct timeval now, tv_diff;
+
+		gettimeofday(&now, NULL);
+		tv_sub(&now, &ev->tv_start, &tv_diff);
+
+		optinfo.elapsed_time =
+		    tv_diff.tv_sec * 100 + tv_diff.tv_usec / 10000;
 	}
 
 	/* configuration information to be released */
@@ -1525,4 +1582,27 @@ find_event_withid(ifp, xid)
 	}
 
 	return (NULL);
+}
+
+/* result will be a - b */
+static void
+tv_sub(a, b, result)
+	struct timeval *a, *b, *result;
+{
+	if (a->tv_sec < b->tv_sec ||
+	    (a->tv_sec == b->tv_sec && a->tv_usec < b->tv_usec)) {
+		result->tv_sec = 0;
+		result->tv_usec = 0;
+
+		return;
+	}
+
+	result->tv_sec = a->tv_sec - b->tv_sec;
+	if (a->tv_usec < b->tv_usec) {
+		result->tv_usec = a->tv_usec + 1000000 - b->tv_usec;
+		result->tv_sec -= 1;
+	} else
+		result->tv_usec = a->tv_usec - b->tv_usec;
+
+	return;
 }
