@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.404 2000/01/05 04:28:24 itojun Exp $
+$Id: CHANGELOG,v 1.405 2000/01/05 10:44:32 itojun Exp $
 
 <200001>
+Wed Jan  5 19:44:12 JST 2000  itojun@iijlab.net
+	* netbsd/usr.bin/systat, openbsd/usr.bin/systat:
+	  make systat IPv6 ready.  "netstat" subcommand is changed for this.
+
 Wed Jan  5 13:27:43 JST 2000  itojun@iijlab.net
 	* kame/libinet6/getnameinfo.c: allow reverse lookup for v4 loopback
 	  network (127.0.0.0/8).
