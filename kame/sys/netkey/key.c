@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.40 2000/01/10 01:32:05 itojun Exp $ */
+/* KAME $Id: key.c,v 1.41 2000/01/10 19:42:56 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -1948,7 +1948,7 @@ key_checkspidup(saidx, spi)
 	struct secasvar *sav;
 
 	/* check address family */
-	if (saidx->src.ss_family != saidx->src.ss_family) {
+	if (saidx->src.ss_family != saidx->dst.ss_family) {
 		printf("key_checkspidup: address family mismatched.\n");
 		return NULL;
 	}
