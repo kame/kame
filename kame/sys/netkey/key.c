@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.240 2002/05/30 05:48:52 sakane Exp $	*/
+/*	$KAME: key.c,v 1.241 2002/06/08 07:05:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2317,7 +2317,7 @@ key_spdacquire(sp)
 	if (sp->policy != IPSEC_POLICY_IPSEC)
 		panic("key_spdacquire: policy mismathed. IPsec is expected.\n");
 
-	/* get a entry to check whether sent message or not. */
+	/* get an entry to check whether sent message or not. */
 	if ((newspacq = key_getspacq(&sp->spidx)) != NULL) {
 		if (key_blockacq_count < newspacq->count) {
 			/* reset counter and do send message. */
