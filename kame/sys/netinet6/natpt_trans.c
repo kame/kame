@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.122 2002/06/14 03:50:21 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.123 2002/06/14 12:14:39 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -326,7 +326,18 @@ natpt_translateICMPv6To4(struct pcv *cv6, struct pAddr *pad)
 		if (icmp6->icmp6_code == ICMP6_PARAMPROB_NEXTHEADER) {
 			icmp4->icmp_type = ICMP_UNREACH;
 			icmp4->icmp_code = ICMP_UNREACH_PROTOCOL;
+		} else {
+			HTONL(icmp6->icmp6_pptr);
+			icmp4->icmp_pptr
+				= (icmp6->icmp6_pptr == 0) ? 0	/* version */
+				: (icmp6->icmp6_pptr == 4) ? 2	/* payload length */
+				: (icmp6->icmp6_pptr == 6) ? 9	/* next header */
+				: (icmp6->icmp6_pptr == 7) ? 8	/* ttl */
+				: (icmp6->icmp6_pptr == 8) ? 12	/* source address */
+				: (icmp6->icmp6_pptr == 24) ? 16 /* destination address */
+				: 0xff; /* XXX */
 		}
+		
 		natpt_icmp6MimicPayload(cv6, &cv4, pad);
 		break;
 
@@ -530,30 +541,13 @@ natpt_icmp6MimicPayload(struct pcv *cv6, struct pcv *cv4, struct pAddr *pad)
 	ip4->ip_len = sizeof(struct ip) + ICMP_MINLEN + sizeof(struct ip) + dgramlen;
 	cv4->m->m_pkthdr.len = cv4->m->m_len = ip4->ip_len;
 
-	switch (icmp6->icmp6_type) {
-	case ICMP6_DST_UNREACH:
-	case ICMP6_TIME_EXCEEDED:
+	if ((icmpip6->ip6_nxt == IPPROTO_TCP)
+	    || (icmpip6->ip6_nxt == IPPROTO_UDP)) {
 		udp4 = (struct udphdr *)icmpip4pyld;
 		if ((pad->port[1] != 0) || (pad->port[0] != 0)) {
 			udp4->uh_sport = pad->port[0];
 			udp4->uh_dport = pad->port[1];
 		}
-		break;
-
-	case ICMP6_PARAM_PROB:
-		if (icmp6->icmp6_code == ICMP6_PARAMPROB_NEXTHEADER)
-			break;
-
-		HTONL(icmp6->icmp6_pptr);
-		icmp4->icmp_pptr
-			= (icmp6->icmp6_pptr == 0) ? 0	/* version */
-			: (icmp6->icmp6_pptr == 4) ? 2	/* payload length */
-			: (icmp6->icmp6_pptr == 6) ? 9	/* next header */
-			: (icmp6->icmp6_pptr == 7) ? 8	/* ttl */
-			: (icmp6->icmp6_pptr == 8) ? 12	/* source address */
-			: (icmp6->icmp6_pptr == 24) ? 16 /* destination address */
-			: 0xff; /* XXX */
-		break;
 	}
 
 	/* recalculate UDP checksum which is inside the ICMPv6 payload */
