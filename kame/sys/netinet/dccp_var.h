@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.14 2003/11/18 08:07:52 ono Exp $	*/
+/*	$KAME: dccp_var.h,v 1.15 2004/05/26 10:08:00 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -33,7 +33,7 @@
 #ifndef _NETINET_DCCP_VAR_H_
 #define _NETINET_DCCP_VAR_H_
 
-#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__OpenBSD__) || defined(__FreeBSD__)
 #ifndef in6pcb
 #define in6pcb		inpcb
 #endif
@@ -237,7 +237,7 @@ extern const char *dccpstates[];
 
 #ifdef _KERNEL
 
-#if defined(DCCP_DEBUG_ON)
+#ifdef DCCP_DEBUG_ON
 #ifdef __FreeBSD__
 #define DCCP_DEBUG(args) log args
 #else

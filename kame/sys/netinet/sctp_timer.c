@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.26 2004/02/24 21:52:27 itojun Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.27 2004/05/26 10:08:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003, 2004 Cisco Systems Inc,
@@ -31,12 +31,12 @@
 #ifndef __OpenBSD__
 #include "opt_ipsec.h"
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_compat.h"
 #include "opt_inet6.h"
 #include "opt_inet.h"
 #endif
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 #include "opt_inet.h"
 #endif
 #ifndef __OpenBSD__
@@ -71,7 +71,7 @@
 #include <machine/limits.h>
 #endif
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 #include <vm/uma.h>
 #else
@@ -480,7 +480,7 @@ sctp_mark_all_for_resend(struct sctp_tcb *tcb,
 			if ((int)sctppcbinfo.ipi_count_chunk < 0) {
 				panic("Chunk count is going negative");
 			}
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
 #else

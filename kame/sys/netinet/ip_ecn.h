@@ -1,4 +1,4 @@
-/*	$KAME: ip_ecn.h,v 1.8 2002/01/07 11:34:47 kjc Exp $	*/
+/*	$KAME: ip_ecn.h,v 1.9 2004/05/26 10:08:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -37,7 +37,7 @@
 #ifndef _NETINET_IP_ECN_H_
 #define _NETINET_IP_ECN_H_
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 #if defined(_KERNEL) && !defined(_LKM)
 #include "opt_inet.h"
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.95 2004/05/26 07:51:28 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.96 2004/05/26 10:08:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -71,7 +71,7 @@
 #define USE_RADIX
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_mrouting.h"
 #include "opt_inet.h"
 #include "opt_inet6.h"
@@ -379,7 +379,7 @@ encap4_input(m, va_alist)
 	}
 
 	/* for backward compatibility - messy... */
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 	/* last resort: inject to raw socket */
 	rip_input(m, off, proto);
 #elif defined(__OpenBSD__)

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_indata.c,v 1.33 2004/02/24 21:52:26 itojun Exp $	*/
+/*	$KAME: sctp_indata.c,v 1.34 2004/05/26 10:08:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003, 2004 Cisco Systems Inc,
@@ -32,11 +32,11 @@
 #ifndef __OpenBSD__
 #include "opt_ipsec.h"
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet6.h"
 #include "opt_inet.h"
 #endif
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 #include "opt_inet.h"
 #endif
 
@@ -61,7 +61,7 @@
 #endif
 #include <machine/cpu.h>
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 #include <vm/uma.h>
 #else
@@ -329,7 +329,7 @@ sctp_deliver_data(struct sctp_tcb *stcb, struct sctp_association *asoc,
 				m_freem(chk->data);
 			chk->data = NULL;
 			sctp_free_remote_addr(chk->whoTo);
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
 #else
@@ -356,7 +356,7 @@ sctp_deliver_data(struct sctp_tcb *stcb, struct sctp_association *asoc,
 			chk->data = NULL;
 			/* Now free the address and data */
 			sctp_free_remote_addr(chk->whoTo);
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
 #else
@@ -514,7 +514,7 @@ sctp_deliver_data(struct sctp_tcb *stcb, struct sctp_association *asoc,
 		chk->data = NULL;
 		/* Now free the address and data */
 		sctp_free_remote_addr(chk->whoTo);
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 		uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
 #else
@@ -567,7 +567,7 @@ sctp_service_reassembly(struct sctp_tcb *stcb, struct sctp_association *asoc)
 			chk->data = NULL;
 			/* Now free the address and data */
 			sctp_free_remote_addr(chk->whoTo);
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
 #else
@@ -728,7 +728,7 @@ sctp_service_reassembly(struct sctp_tcb *stcb, struct sctp_association *asoc)
 		/* free up the chk */
 		sctp_free_remote_addr(chk->whoTo);
 		chk->data = NULL;
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 		uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
 #else
@@ -969,7 +969,7 @@ sctp_queue_data_to_stream(struct sctp_tcb *stcb, struct sctp_association *asoc,
 					asoc->cnt_on_all_streams--;
 					sctp_pegs[SCTP_DUP_SSN_RCVD]++;
 					sctp_free_remote_addr(chk->whoTo);
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 					uma_zfree(sctppcbinfo.ipi_zone_chunk,
 					    chk);
@@ -1249,7 +1249,7 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb, struct sctp_association *asoc,
 				m_freem(chk->data);
 			chk->data = NULL;
 			sctp_free_remote_addr(chk->whoTo);
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
 #else
@@ -2025,7 +2025,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb, struct sctp_association *asoc,
 	   
  failed_express_del:
 	/* If we reach here this is a new chunk */
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 	chk = (struct sctp_tmit_chunk *)uma_zalloc(sctppcbinfo.ipi_zone_chunk,
 	    M_NOWAIT);
@@ -3801,7 +3801,7 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 		if ((int)sctppcbinfo.ipi_count_chunk < 0) {
 			panic("Chunk count is going negative");
 		}
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 		uma_zfree(sctppcbinfo.ipi_zone_chunk, tp1);
 #else
@@ -4451,7 +4451,7 @@ sctp_handle_forward_tsn(struct sctp_tcb *stcb,
 					chk->data = NULL;
 				}
 				sctp_free_remote_addr(chk->whoTo);
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 				uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
 #else

@@ -1,4 +1,4 @@
-/*	$KAME: ip_ecn.c,v 1.12 2002/01/07 11:34:47 kjc Exp $	*/
+/*	$KAME: ip_ecn.c,v 1.13 2004/05/26 10:08:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -34,7 +34,7 @@
  * http://www.aciri.org/floyd/papers/draft-ipsec-ecn-00.txt
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.29 2004/05/26 07:51:28 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.30 2004/05/26 10:08:01 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -35,13 +35,13 @@
 #ifndef __OpenBSD__
 #include "opt_ipsec.h"
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_compat.h"
 #include "opt_inet6.h"
 #include "opt_inet.h"
 #include "opt_mpath.h"
 #endif
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 #include "opt_inet.h"
 #endif
 #ifndef __OpenBSD__
@@ -80,7 +80,7 @@
 #include <machine/limits.h>
 #endif
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 #include <vm/uma.h>
 #else
@@ -723,7 +723,7 @@ sctp_init_asoc(struct sctp_inpcb *m, struct sctp_association *asoc,
 		asoc->ipv6_addr_legal = 1;
 		/* Now look at the binding flag to see if V4 will be legal */
 	if (
-#if defined(__OpenBSD__)
+#ifdef __OpenBSD__
 		(0) /* we always do dual bind */
 #elif defined (__NetBSD__)
 		(inp6->in6p_flags & IN6P_IPV6_V6ONLY)
@@ -1450,7 +1450,7 @@ unsigned int update_adler32(u_int32_t adler,
 
 #endif
 
-#if defined(SCTP_WITH_NO_CSUM)
+#ifdef SCTP_WITH_NO_CSUM
 
 u_int32_t
 sctp_calculate_sum(m, pktlen, offset)
@@ -2457,7 +2457,7 @@ sctp_report_all_outbound(struct sctp_tcb *stcb)
 			chk->whoTo = NULL;
 			chk->asoc = NULL;
 			/* Free the chunk */
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
 #else
@@ -2488,7 +2488,7 @@ sctp_report_all_outbound(struct sctp_tcb *stcb)
 			if (chk->whoTo)
 				sctp_free_remote_addr(chk->whoTo);
 			chk->whoTo = NULL;
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
 #else
@@ -2520,7 +2520,7 @@ sctp_report_all_outbound(struct sctp_tcb *stcb)
 			if (chk->whoTo)
 				sctp_free_remote_addr(chk->whoTo);
 			chk->whoTo = NULL;
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 			uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
 #else

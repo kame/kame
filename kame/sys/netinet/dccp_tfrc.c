@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tfrc.c,v 1.9 2004/05/21 08:35:48 itojun Exp $	*/
+/*	$KAME: dccp_tfrc.c,v 1.10 2004/05/26 10:07:59 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson
@@ -260,7 +260,7 @@ tfrc_time_send(void *ccb)
 	INP_LOCK(inp);
 	INP_INFO_RUNLOCK(&dccpbinfo);
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_stop(&cb->ch_stimer);
 #else
 	timeout_del(&cb->ch_stimer);
@@ -301,7 +301,7 @@ tfrc_set_send_timer(struct tfrc_send_ccb * cb, struct timeval t_now)
 	TFRC_DEBUG_TIME((LOG_INFO,
 	    "TFRC scheduled send timer to expire in %ld ticks (hz=%lu)\n",
 	     t_ticks, (unsigned long)hz));
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_reset(&cb->ch_stimer, t_ticks, tfrc_time_send, cb);
 #else
 	timeout_set(&cb->ch_stimer, tfrc_time_send, cb);
@@ -596,14 +596,14 @@ tfrc_send_free(void *ccb)
 	cb->state = TFRC_SSTATE_TERM;
 	/* unschedule timers */
 	if (cb->ch_stimer) {
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 		callout_stop(&cb->ch_stimer);
 #else
 		timeout_del(&cb->ch_stimer);
 #endif
 	}
 	if (cb->ch_nftimer) {
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 		callout_stop(&cb->ch_nftimer);
 #else
 		timeout_del(&cb->ch_nftimer);

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_var.h,v 1.19 2004/02/24 21:52:27 itojun Exp $	*/
+/*	$KAME: sctp_var.h,v 1.20 2004/05/26 10:08:01 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -66,7 +66,7 @@ extern struct	pr_usrreqs sctp_usrreqs;
 
 #else /* to __FreeBSD__ */
 
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 int sctp_usrreq __P((struct socket *, int, struct mbuf *, struct mbuf *,
 		      struct mbuf *, struct proc *));
 #else /* to __NetBSD__ */
@@ -87,10 +87,10 @@ struct sctp_inpcb;
 struct sctp_tcb;
 struct sctphdr;
 
-#if defined(__OpenBSD__)
+#ifdef __OpenBSD__
 void sctp_fasttim(void);
 #endif
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 void	sctp_ctlinput __P((int, struct sockaddr *, void *));
 int	sctp_ctloutput __P((struct socket *, struct sockopt *));
 void	sctp_input __P((struct mbuf *, int));
@@ -119,7 +119,7 @@ int sctp_bindx(struct socket *, int, struct sockaddr_storage *,
 int sctp_peeloff(struct socket *, struct socket *, int, caddr_t, int *);
 
 int sctp_ingetaddr(struct socket *,
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 		   struct sockaddr **
 #else
 		   struct mbuf *
@@ -127,7 +127,7 @@ int sctp_ingetaddr(struct socket *,
 );
 
 int sctp_peeraddr(struct socket *,
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 		  struct sockaddr **
 #else
 		  struct mbuf *
@@ -141,7 +141,7 @@ int sctp_listen(struct socket *, struct proc *);
 #endif
 
 int sctp_accept(struct socket *,
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 		struct sockaddr **
 #else
 		struct sockaddr *

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_peeloff.c,v 1.10 2003/11/25 06:40:53 ono Exp $	*/
+/*	$KAME: sctp_peeloff.c,v 1.11 2004/05/26 10:08:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -31,11 +31,11 @@
 #ifndef __OpenBSD__
 #include "opt_ipsec.h"
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet6.h"
 #include "opt_inet.h"
 #endif
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 #include "opt_inet.h"
 #endif
 

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_input.c,v 1.24 2004/02/24 21:52:26 itojun Exp $	*/
+/*	$KAME: sctp_input.c,v 1.25 2004/05/26 10:08:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003, 2004 Cisco Systems Inc,
@@ -32,12 +32,12 @@
 #ifndef __OpenBSD__
 #include "opt_ipsec.h"
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_compat.h"
 #include "opt_inet6.h"
 #include "opt_inet.h"
 #endif
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 #include "opt_inet.h"
 #endif
 #ifndef __OpenBSD__
@@ -69,7 +69,7 @@
 #endif
 #include <machine/cpu.h>
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 #include <vm/uma.h>
 #else
@@ -263,7 +263,7 @@ sctp_process_init(struct sctp_init_chunk *cp, struct sctp_tcb *stcb,
 					chk->whoTo = NULL;
 					chk->asoc = NULL;
 					/* Free the chunk */
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 					uma_zfree(sctppcbinfo.ipi_zone_chunk, chk);
 #else
@@ -3914,7 +3914,7 @@ sctp_common_input_processing(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 	return (0);
 }
 
-#if defined(__OpenBSD__)
+#ifdef __OpenBSD__
 static void
 sctp_saveopt(struct sctp_inpcb *inp, struct mbuf **mp, struct ip *ip,
     struct mbuf *m)
@@ -3928,7 +3928,7 @@ sctp_saveopt(struct sctp_inpcb *inp, struct mbuf **mp, struct ip *ip,
 }
 #endif
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 void
 sctp_input(m, off)
 	struct mbuf *m;

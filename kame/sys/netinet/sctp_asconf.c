@@ -1,4 +1,4 @@
-/*	$KAME: sctp_asconf.c,v 1.20 2004/05/26 07:51:28 itojun Exp $	*/
+/*	$KAME: sctp_asconf.c,v 1.21 2004/05/26 10:08:00 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -31,12 +31,12 @@
 #ifndef __OpenBSD__
 #include "opt_ipsec.h"
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_compat.h"
 #include "opt_inet6.h"
 #include "opt_inet.h"
 #endif
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 #include "opt_inet.h"
 #endif
 
@@ -1779,7 +1779,7 @@ sctp_addr_mgmt_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tcb,
 		inp6 = (struct in6pcb *)&ep->ip_inp.inp;
 		/* invalid if we are a v6 only endpoint */
 		if ((ep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) &&
-#if defined(__OpenBSD__)
+#ifdef __OpenBSD__
 		    (0) /* we always do dual bind */
 #elif defined (__NetBSD__)
 		    (inp6->in6p_flags & IN6P_IPV6_V6ONLY)
@@ -1879,7 +1879,7 @@ sctp_addr_mgmt_ep(struct sctp_inpcb *ep, struct ifaddr *ifa, uint16_t type)
 		inp6 = (struct in6pcb *)&ep->ip_inp.inp;
 
 		if ((ep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) &&
-#if defined(__OpenBSD__)
+#ifdef __OpenBSD__
 		    (0) /* we always do dual bind */
 #elif defined (__NetBSD__)
 		    (inp6->in6p_flags & IN6P_IPV6_V6ONLY)

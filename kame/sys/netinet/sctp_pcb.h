@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.h,v 1.16 2004/05/26 07:51:28 itojun Exp $	*/
+/*	$KAME: sctp_pcb.h,v 1.17 2004/05/26 10:08:01 itojun Exp $	*/
 
 #ifndef __sctp_pcb_h__
 #define __sctp_pcb_h__
@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__OpenBSD__)
+#ifdef __OpenBSD__
 #include <netinet/sctp_callout.h>
 #else
 #include <sys/callout.h>
@@ -160,7 +160,7 @@ struct sctp_epinfo {
 	struct sctppcbhead listhead;
 
 	/* ep zone info */
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 	struct uma_zone *ipi_zone_ep;
 	struct uma_zone *ipi_zone_asoc;

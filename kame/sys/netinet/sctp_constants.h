@@ -1,4 +1,4 @@
-/*	$KAME: sctp_constants.h,v 1.14 2004/02/24 21:52:26 itojun Exp $	*/
+/*	$KAME: sctp_constants.h,v 1.15 2004/05/26 10:08:00 itojun Exp $	*/
 
 #ifndef __sctp_constants_h__
 #define __sctp_constants_h__
@@ -763,7 +763,7 @@
 /* for FreeBSD, NetBSD, and OpenBSD */
 #ifdef _KERNEL
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #define SCTP_GETTIME_TIMEVAL(x)	(microuptime(x))
 #define SCTP_GETTIME_TIMESPEC(x) (nanouptime(x))
 #else

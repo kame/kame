@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.h,v 1.13 2003/01/21 06:33:03 itojun Exp $	*/
+/*	$KAME: ip_encap.h,v 1.14 2004/05/26 10:08:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -55,11 +55,11 @@ struct encaptab {
 };
 
 void	encap_init __P((void));
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifdef __FreeBSD__
 void	encap4_input __P((struct mbuf *, int));
 #else
 void	encap4_input __P((struct mbuf *, ...));
-#endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
+#endif
 int	encap6_input __P((struct mbuf **, int *, int));
 const struct encaptab *encap_attach __P((int, int, const struct sockaddr *,
 	const struct sockaddr *, const struct sockaddr *,

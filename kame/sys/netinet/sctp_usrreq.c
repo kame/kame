@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.38 2004/02/24 21:52:27 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.39 2004/05/26 10:08:01 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -34,11 +34,11 @@
 #ifndef __OpenBSD__
 #include "opt_ipsec.h"
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet6.h"
 #include "opt_inet.h"
 #endif
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 #include "opt_inet.h"
 #endif
 
@@ -71,7 +71,7 @@
 #include <netinet6/in6_var.h>
 #include <net/if.h>
 #include <net/if_types.h>
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #include <net/if_var.h>
 #endif
 
@@ -97,7 +97,7 @@
 
 #include <net/net_osdep.h>
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 #include <vm/uma.h>
 #else
@@ -200,7 +200,7 @@ sctp_split_chunks(struct sctp_association *asoc,
 
 	/* First we need a chunk.
 	 */
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 	new_chk = (struct sctp_tmit_chunk *)uma_zalloc(sctppcbinfo.ipi_zone_chunk, M_NOWAIT);
 #else
@@ -224,7 +224,7 @@ sctp_split_chunks(struct sctp_association *asoc,
 	if (new_chk->data == NULL) {
 		/* Can't split */
 		chk->flags |= CHUNK_FLAGS_FRAGMENT_OK;
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 		uma_zfree(sctppcbinfo.ipi_zone_chunk, new_chk);
 #else
@@ -440,7 +440,7 @@ sctp_notify(struct sctp_inpcb *inp,
 	}
 }
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 void
 #else
 void *
@@ -457,7 +457,7 @@ sctp_ctlinput(cmd, sa, vip)
 
 	if (sa->sa_family != AF_INET ||
 	    ((struct sockaddr_in *)sa)->sin_addr.s_addr == INADDR_ANY) {
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 		return;
 #else
 		return (NULL);
@@ -467,7 +467,7 @@ sctp_ctlinput(cmd, sa, vip)
 	if (PRC_IS_REDIRECT(cmd)) {
 		ip = 0;
 	} else if ((unsigned)cmd >= PRC_NCMDS || inetctlerrmap[cmd] == 0) {
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 		return;
 #else
 		return (NULL);
@@ -530,14 +530,14 @@ sctp_ctlinput(cmd, sa, vip)
 		}
 		splx(s);
 	}
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 	return;
 #else
 	return (NULL);
 #endif
 }
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 static int
 sctp_getcred(SYSCTL_HANDLER_ARGS)
 {
@@ -579,13 +579,13 @@ SYSCTL_PROC(_net_inet_sctp, OID_AUTO, getcred, CTLTYPE_OPAQUE|CTLFLAG_RW,
 #endif /* #if defined(__FreeBSD__) */
 
 /* 64 1K datagrams */
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 SYSCTL_INT(_net_inet_sctp, SCTPCTL_MAXDGRAM, maxdgram, CTLFLAG_RW,
 	   &sctp_sendspace, 0, "Maximum outgoing SCTP datagram size");
 #endif
 
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 SYSCTL_INT(_net_inet_sctp, SCTPCTL_RECVSPACE, recvspace, CTLFLAG_RW,
 	   &sctp_recvspace, 0,"Maximum incoming SCTP datagram size");
 #endif
@@ -665,7 +665,7 @@ sctp_attach(struct socket *so, int proto, struct proc *p)
 #endif
 #endif /*IPSEC*/
 
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 	so->so_send = sctp_sosend;
 #endif
 	splx(s);
@@ -1084,7 +1084,7 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) {
 		ipv6_addr_legal = 1;
 		if (
-#if defined(__OpenBSD__)
+#ifdef __OpenBSD__
 		(0) /* we always do dual bind */
 #elif defined (__NetBSD__)
 		(((struct in6pcb *)inp)->in6p_flags & IN6P_IPV6_V6ONLY)
@@ -1361,7 +1361,7 @@ sctp_do_connect_x(struct socket *so,
 		struct in6pcb *inp6;
 		inp6 = (struct in6pcb *)inp;
 		if (
-#if defined(__OpenBSD__)
+#ifdef __OpenBSD__
 			(0) /* we always do dual bind */
 #elif defined (__NetBSD__)
 			(inp6->in6p_flags & IN6P_IPV6_V6ONLY)
@@ -2885,7 +2885,7 @@ sctp_optsset(struct socket *so,
 }
 
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 
 int
 sctp_ctloutput(struct socket *so, struct sockopt *sopt)
@@ -3299,7 +3299,7 @@ sctp_listen(struct socket *so, struct proc *p)
 
 int
 sctp_accept(struct socket *so,
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 	    struct sockaddr **nam
 #else
 	    struct sockaddr *nam
@@ -3338,7 +3338,7 @@ sctp_accept(struct socket *so,
 	prim = (struct sockaddr *)&tcb->asoc.primary_destination->ra._l_addr;
 	if (prim->sa_family == AF_INET) {
 		struct sockaddr_in *sin;
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 		MALLOC(sin, struct sockaddr_in *, sizeof *sin, M_SONAME,
 		       M_WAITOK | M_ZERO);
 #else
@@ -3349,12 +3349,12 @@ sctp_accept(struct socket *so,
 		sin->sin_len = sizeof(*sin);
 		sin->sin_port = ((struct sockaddr_in *)prim)->sin_port;
 		sin->sin_addr = ((struct sockaddr_in *)prim)->sin_addr;
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 		*nam = (struct sockaddr *)sin;
 #endif
 	} else {
 		struct sockaddr_in6 *sin6;
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 		MALLOC(sin6, struct sockaddr_in6 *, sizeof *sin6, M_SONAME,
 		       M_WAITOK | M_ZERO);
 #else
@@ -3371,7 +3371,7 @@ sctp_accept(struct socket *so,
 			in6_recoverscope(sin6, &sin6->sin6_addr, NULL);  /* skip ifp check */
 		else
 			sin6->sin6_scope_id = 0;	/*XXX*/
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 		*nam = (struct sockaddr *)sin6;
 #endif
 	}
@@ -3400,7 +3400,7 @@ sctp_accept(struct socket *so,
 
 int
 sctp_ingetaddr(struct socket *so,
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 	       struct sockaddr **nam
 #else
 	       struct mbuf *nam
@@ -3413,7 +3413,7 @@ sctp_ingetaddr(struct socket *so,
 	/*
 	 * Do the malloc first in case it blocks.
 	 */
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 	MALLOC(sin, struct sockaddr_in *, sizeof *sin, M_SONAME, M_WAITOK |
 	       M_ZERO);
 #else
@@ -3431,7 +3431,7 @@ sctp_ingetaddr(struct socket *so,
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (!inp) {
 		splx(s);
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 		free(sin, M_SONAME);
 #endif
 		return ECONNRESET;
@@ -3489,14 +3489,14 @@ sctp_ingetaddr(struct socket *so,
 		}
 		if (!fnd) {
 			splx(s);
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 			free(sin, M_SONAME);
 #endif
 			return ENOENT;
 		}
 	}
 	splx(s);
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 	*nam = (struct sockaddr *)sin;
 #endif
 	return (0);
@@ -3504,7 +3504,7 @@ sctp_ingetaddr(struct socket *so,
 
 int
 sctp_peeraddr(struct socket *so,
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 	      struct sockaddr **nam
 #else
 	      struct mbuf *nam
@@ -3529,7 +3529,7 @@ sctp_peeraddr(struct socket *so,
 	s = splnet();
 #endif
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 	MALLOC(sin, struct sockaddr_in *, sizeof *sin, M_SONAME, M_WAITOK |
 	       M_ZERO);
 #else
@@ -3544,7 +3544,7 @@ sctp_peeraddr(struct socket *so,
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (!inp) {
 		splx(s);
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 		free(sin, M_SONAME);
 #endif
 		return ECONNRESET;
@@ -3552,7 +3552,7 @@ sctp_peeraddr(struct socket *so,
 	tcb = LIST_FIRST(&inp->sctp_asoc_list);
 	if (tcb == NULL) {
 		splx(s);
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 		free(sin, M_SONAME);
 #endif
 		return ECONNRESET;
@@ -3570,19 +3570,19 @@ sctp_peeraddr(struct socket *so,
 	if (!fnd) {
 		/* No IPv4 address */
 		splx(s);
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 		free(sin, M_SONAME);
 #endif
 		return ENOENT;
 	}
 	splx(s);
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 	*nam = (struct sockaddr *)sin;
 #endif
 	return (0);
 }
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 struct pr_usrreqs sctp_usrreqs = {
 	sctp_abort, sctp_accept, sctp_attach, sctp_bind, sctp_connect,
 	pru_connect2_notsupp, in_control, sctp_detach, sctp_disconnect,
@@ -3592,7 +3592,7 @@ struct pr_usrreqs sctp_usrreqs = {
 };
 
 #else
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 int
 sctp_usrreq(so, req, m, nam, control, p)
      struct socket *so;
@@ -3623,7 +3623,7 @@ sctp_usrreq(so, req, m, nam, control)
 		case PF_INET:
 			error = in_control(so, (long)m, (caddr_t)nam,
 			    (struct ifnet *)control
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 			    , p
 #endif
 			    );
@@ -3632,7 +3632,7 @@ sctp_usrreq(so, req, m, nam, control)
 		case PF_INET6:
 			error = in6_control(so, (long)m, (caddr_t)nam,
 			    (struct ifnet *)control
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 			     , p
 #else
 			     , (struct proc *)0
@@ -3676,7 +3676,7 @@ sctp_usrreq(so, req, m, nam, control)
 	switch (req) {
 	case PRU_ATTACH:
 		error = sctp_attach(so, family
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 				    , p
 #else
 				    , (struct proc *)NULL
@@ -3696,7 +3696,7 @@ sctp_usrreq(so, req, m, nam, control)
 			return (EINVAL);
 		}
 		error  = sctp_bind(so, name
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 				   , p
 #else
 				   , (struct proc *)NULL
@@ -3706,7 +3706,7 @@ sctp_usrreq(so, req, m, nam, control)
 	break;
 	case PRU_LISTEN:
 		error = sctp_listen(so
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 				    , p
 #else
 				    , (struct proc *)NULL
@@ -3723,7 +3723,7 @@ sctp_usrreq(so, req, m, nam, control)
 			return (EINVAL);
 		}
 		error = sctp_connect(so, name
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 				     , p
 #else
 				     , (struct proc *)NULL
@@ -3774,7 +3774,7 @@ sctp_usrreq(so, req, m, nam, control)
 		}
 #endif
 		error = sctp_send(so, 0, m, name, control
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 				  , p
 #else
 				  , (struct proc *)NULL

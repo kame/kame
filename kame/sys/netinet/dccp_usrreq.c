@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.30 2004/02/11 21:40:59 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.31 2004/05/26 10:07:59 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -100,7 +100,7 @@
 #include <sys/syslog.h>
 #include <sys/queue.h>
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #if __FreeBSD_version >= 500000
 #include <vm/uma.h>
 #else
@@ -3437,8 +3437,8 @@ dccp_usrreq(so, req, m, nam, control)
 #endif
 {
 	struct inpcb *inp;
-#if defined(INET6)
-#if defined(__NetBSD__)
+#ifdef INET6
+#ifdef __NetBSD__
 	struct in6pcb *in6p;
 #else
 	struct inpcb *in6p;
@@ -3503,11 +3503,11 @@ dccp_usrreq(so, req, m, nam, control)
 	switch (family) {
 	case PF_INET:
 		inp = sotoinpcb(so);
-#if defined(INET6)
+#ifdef INET6
 		in6p = NULL;
 #endif
 		break;
-#if defined(INET6)
+#ifdef INET6
 	case PF_INET6:
 		inp = NULL;
 		in6p = sotoin6pcb(so);
@@ -3518,7 +3518,7 @@ dccp_usrreq(so, req, m, nam, control)
 		return EAFNOSUPPORT;
 	}
 
-#if defined(INET6)
+#ifdef INET6
 	if ((inp == 0 && in6p == 0) && req != PRU_ATTACH)
 #else
 	if (inp == 0 && req != PRU_ATTACH)
@@ -3542,7 +3542,7 @@ dccp_usrreq(so, req, m, nam, control)
 		}
 		if (inp)
 			error  = dccp_bind(so, nam, p);
-#if defined(INET6)
+#ifdef INET6
 		if (in6p)
 			error  = dccp6_bind(so, nam, p);
 #endif
@@ -3550,7 +3550,7 @@ dccp_usrreq(so, req, m, nam, control)
 	case PRU_LISTEN:
 		if (inp)
 			error = dccp_listen(so, p);
-#if defined(INET6)
+#ifdef INET6
 		if (in6p)
 			error = dccp6_listen(so, p);
 #endif
@@ -3562,7 +3562,7 @@ dccp_usrreq(so, req, m, nam, control)
 		}
 		if (inp)
 			error = dccp_connect(so, nam, p);
-#if defined(INET6)
+#ifdef INET6
 		if (in6p)
 			error = dccp6_connect(so, nam, p);
 #endif
@@ -3577,7 +3577,7 @@ dccp_usrreq(so, req, m, nam, control)
 		}
 		if (inp)
 			error = dccp_accept(so, nam);
-#if defined(INET6)
+#ifdef INET6
 		if (in6p)
 			error = dccp6_accept(so, nam);
 #endif
@@ -3619,7 +3619,7 @@ dccp_usrreq(so, req, m, nam, control)
 		}
 		if (inp)
 			in_setpeeraddr(inp, nam);
-#if defined(INET6)
+#ifdef INET6
 		if (in6p)
 			in6_setpeeraddr(in6p, nam);
 #endif
@@ -3631,7 +3631,7 @@ dccp_usrreq(so, req, m, nam, control)
 		}
 		if (inp)
 			in_setsockaddr(inp, nam);
-#if defined(INET6)
+#ifdef INET6
 		if (in6p)
 			in6_setsockaddr(in6p, nam);
 #endif

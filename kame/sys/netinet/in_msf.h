@@ -1,4 +1,4 @@
-/* $KAME: in_msf.h,v 1.14 2004/04/02 11:02:11 suz Exp $	*/
+/* $KAME: in_msf.h,v 1.15 2004/05/26 10:08:00 itojun Exp $	*/
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.
@@ -74,7 +74,7 @@
  */
 LIST_HEAD(ias_head, in_addr_source);
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_MSFILTER);
 MALLOC_DECLARE(M_IPMOPTS);
