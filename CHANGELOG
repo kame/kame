@@ -1,8 +1,33 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.421 2000/01/08 22:39:21 sumikawa Exp $
+$Id: CHANGELOG,v 1.422 2000/01/09 01:34:34 itojun Exp $
 
 <200001>
+Sun Jan  9 10:32:59 JST 2000  sakane@kame.net
+	massive clarification to racoon ISAKMP daemon.
+	- Merged Eric Lemiere's code for limited certificate support.
+	- There are two management hander.
+		"Phase 1 handler" is to manage ISAKMP SA.  It is created when
+		phase 1 exchange on both initiator and responder side will be
+		started.
+		"Phase 2 handler" is to manage IPsec SAs.  It is created when
+		pfkey acquire message will be received, and when 1st message
+		in phase 2 will be received on responder side.
+	- Vendor id will be sent after negotiating hasn algorithm.
+	  When we receive vendor id before negotiating it, we use default hash
+	  algorithm MD5 to check.
+	- Post command deleted.
+	- msgid_t delted.
+	- don't release management handler.  do it only if retry will be
+	  timed up.
+	- separate the function of isakmp exchange.  one is to check received
+	  data.  other is to reply.  the reason is for handling to resend.
+	- change name "dir" to "side" in order to distinguish from policy
+	  direction.
+	- If initiator request PFS, but responder is not ready to do that,
+	  responder stops the negotiation.  If initiator don't request PFS,
+	  but responder require it, also responder stops the negotiation.
+
 Sun Jan  9 03:03:39 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/heimdal: upgrade to 0.2l.
 	* freebsd3/usr.sbin/inetd: support IDENT.
