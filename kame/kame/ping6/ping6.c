@@ -270,7 +270,7 @@ main(argc, argv)
 		switch(ch) {
 		 case 'a':
 		 {
-			 u_char *cp;
+			 char *cp;
 
 			 options |= F_NODEADDR;
 			 datalen = 2048; /* XXX: enough? */
