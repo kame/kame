@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.158 2001/02/03 18:25:55 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.159 2001/02/03 18:40:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2476,9 +2476,7 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	void *newp;
 	size_t newlen;
 {
-#ifdef __NetBSD__	/*IPV6CTL_ANONPORT{MIN,MAX}, IPV6CTL_LOWPORT{MIN,MAX}*/
 	int old, error;
-#endif
 
 	/* All sysctl names at this level are terminal. */
 	if (namelen != 1)
@@ -2546,7 +2544,7 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 			return (EINVAL);
 		}
 		return (error);
-#endif
+#endif /* IPV6CTL_ANONPORTMIN */
 #ifdef IPV6CTL_ANONPORTMAX
 	case IPV6CTL_ANONPORTMAX:
 		old = ip6_anonportmax;
@@ -2562,7 +2560,7 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 			return (EINVAL);
 		}
 		return (error);
-#endif
+#endif /* IPV6CTL_ANONPORTMAX */
 #ifndef IPNOPRIVPORTS
 #ifdef IPV6CTL_LOWPORTMIN
 	case IPV6CTL_LOWPORTMIN:
@@ -2576,7 +2574,7 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 			return (EINVAL);
 		}
 		return (error);
-#endif
+#endif /* IPV6CTL_LOWPORTMIN */
 #ifdef IPV6CTL_LOWPORTMAX
 	case IPV6CTL_LOWPORTMAX:
 		old = ip6_lowportmax;
@@ -2589,7 +2587,7 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 			return (EINVAL);
 		}
 		return (error);
-#endif
+#endif /* IPV6CTL_LOWPORTMAX */
 #endif /* !IPNOPRIVPORTS */
 	case IPV6CTL_USETEMPADDR:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
