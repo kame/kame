@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1238 2000/08/29 04:00:40 jinmei Exp $
+$KAME: CHANGELOG,v 1.1239 2000/08/29 07:30:01 itojun Exp $
 
 <200008>
+Tue Aug 29 16:29:49 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 2000/8/28 weekly snap
+	  from tcpdump.org.
+	* freebsd2/ports/{libpcap,tcpdump}: use 2000/8/28 weekly snap
+	  from tcpdump.org.
+
 2000-08-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_rtr.c (prelist_update): clarification
 	about the "two-hour" rule in RFC 2462 (currently disabled,
