@@ -115,7 +115,8 @@ mroute6pr(u_long mfcaddr, u_long mifaddr)
 	saved_numeric_addr = numeric_addr;
 	numeric_addr = 1;
 
-	kread(mifaddr, (char *)&mif6table, sizeof(mif6table));
+	if (kread(mifaddr, (char *)&mif6table, sizeof(mif6table)))
+		return;
 	banner_printed = 0;
 	for (mifi = 0, mifp = mif6table; mifi < MAXMIFS; ++mifi, ++mifp) {
 		struct ifnet ifnet;
@@ -124,7 +125,8 @@ mroute6pr(u_long mfcaddr, u_long mifaddr)
 		if (mifp->m6_ifp == NULL)
 			continue;
 
-		kread((u_long)mifp->m6_ifp, (char *)&ifnet, sizeof(ifnet));
+		if (kread((u_long)mifp->m6_ifp, (char *)&ifnet, sizeof(ifnet)))
+			return;
 		maxmif = mifi;
 		if (!banner_printed) {
 			printf("\nIPv6 Multicast Interface Table\n"
@@ -144,12 +146,14 @@ mroute6pr(u_long mfcaddr, u_long mifaddr)
 	if (!banner_printed)
 		printf("\nIPv6 Multicast Interface Table is empty\n");
 
-	kread(mfcaddr, (char *)&mf6ctable, sizeof(mf6ctable));
+	if (kread(mfcaddr, (char *)&mf6ctable, sizeof(mf6ctable)))
+		return;
 	banner_printed = 0;
 	for (i = 0; i < MF6CTBLSIZ; ++i) {
 		mfcp = mf6ctable[i];
 		while(mfcp) {
-			kread((u_long)mfcp, (char *)&mfc, sizeof(mfc));
+			if (kread((u_long)mfcp, (char *)&mfc, sizeof(mfc)))
+				return;
 			if (!banner_printed) {
 				printf ("\nIPv6 Multicast Forwarding Cache\n");
 				printf(" %-*.*s %-*.*s %s",
@@ -167,7 +171,8 @@ mroute6pr(u_long mfcaddr, u_long mifaddr)
 
 			for (waitings = 0, rtep = mfc.mf6c_stall; rtep; ) {
 				waitings++;
-				kread((u_long)rtep, (char *)&rte, sizeof(rte));
+				if (kread((u_long)rtep, (char *)&rte, sizeof(rte)))
+					return;
 				rtep = rte.next;
 			}
 			printf("   %3ld", waitings);
@@ -203,7 +208,8 @@ mrt6_stats(u_long mstaddr)
 		return;
 	}
 
-	kread(mstaddr, (char *)&mrtstat, sizeof(mrtstat));
+	if (kread(mstaddr, (char *)&mrtstat, sizeof(mrtstat)))
+		return;
 	printf("IPv6 multicast forwarding:\n");
 
 #define	p(f, m) if (mrtstat.f || sflag <= 1) \
