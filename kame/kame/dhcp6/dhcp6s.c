@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.155 2005/03/29 12:34:32 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.156 2005/03/31 12:44:09 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -175,7 +175,7 @@ static int server6_send __P((int, struct dhcp6_if *, struct dhcp6 *,
     struct relayinfolist *, struct host_conf *));
 static int make_ia_stcode __P((int, u_int32_t, u_int16_t,
     struct dhcp6_list *));
-static int make_binding_ia __P((int, struct dhcp6_listval *,
+static int update_ia __P((int, struct dhcp6_listval *,
     struct dhcp6_list *, struct dhcp6_optinfo *));
 static int release_binding_ia __P((struct dhcp6_listval *, struct dhcp6_list *,
     struct dhcp6_optinfo *));
@@ -1607,17 +1607,13 @@ react_renew(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 	 */
 	for (ia = TAILQ_FIRST(&optinfo->iapd_list); ia;
 	    ia = TAILQ_NEXT(ia, link)) {
-		if (make_binding_ia(DH6_RENEW, ia, &roptinfo.iapd_list,
-		    optinfo)) {
+		if (update_ia(DH6_RENEW, ia, &roptinfo.iapd_list, optinfo))
 			goto fail;
-		}
 	}
 	for (ia = TAILQ_FIRST(&optinfo->iana_list); ia;
 	    ia = TAILQ_NEXT(ia, link)) {
-		if (make_binding_ia(DH6_RENEW, ia, &roptinfo.iana_list,
-		    optinfo)) {
+		if (update_ia(DH6_RENEW, ia, &roptinfo.iana_list, optinfo))
 			goto fail;
-		}
 	}
 
 	/* add other configuration information */
@@ -1704,17 +1700,13 @@ react_rebind(ifp, dh6, len, optinfo, from, fromlen, relayinfohead)
 	 */
 	for (ia = TAILQ_FIRST(&optinfo->iapd_list); ia;
 	    ia = TAILQ_NEXT(ia, link)) {
-		if (make_binding_ia(DH6_REBIND, ia, &roptinfo.iapd_list,
-		    optinfo)) {
+		if (update_ia(DH6_REBIND, ia, &roptinfo.iapd_list, optinfo))
 			goto fail;
-		}
 	}
 	for (ia = TAILQ_FIRST(&optinfo->iana_list); ia;
 	    ia = TAILQ_NEXT(ia, link)) {
-		if (make_binding_ia(DH6_REBIND, ia, &roptinfo.iana_list,
-		    optinfo)) {
+		if (update_ia(DH6_REBIND, ia, &roptinfo.iana_list, optinfo))
 			goto fail;
-		}
 	}
 
 	/*
@@ -1951,7 +1943,7 @@ react_informreq(ifp, dh6, len, optinfo, from, fromlen, relayinfohead)
 }
 
 static int
-make_binding_ia(msgtype, iap, retlist, optinfo)
+update_ia(msgtype, iap, retlist, optinfo)
 	int msgtype;
 	struct dhcp6_listval *iap;
 	struct dhcp6_list *retlist;
