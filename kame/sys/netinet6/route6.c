@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.23 2001/03/13 02:15:11 k-sugyou Exp $	*/
+/*	$KAME: route6.c,v 1.24 2001/03/14 03:07:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,6 +80,7 @@ route6_input(mp, offp, proto)
 		/* XXX reject home-address option before rthdr */
 		if (ip6a->ip6a_flags & IP6A_SWAP) {
 			ip6stat.ip6s_badoptions++;
+			m_freem(m);
 			return IPPROTO_DONE;
 		}
 	}
