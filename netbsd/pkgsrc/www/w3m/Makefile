@@ -1,4 +1,4 @@
-# $NetBSD: Makefile,v 1.14 2000/07/15 00:36:28 itojun Exp $
+# $NetBSD: Makefile,v 1.17 2000/08/15 04:16:20 itojun Exp $
 
 DISTNAME=	w3m-0.1.10
 CATEGORIES=	www
@@ -32,7 +32,42 @@ W3M_USE_JAPANESE?=	YES
 W3M_USE_JAPANESE_SYMBOL?=NO
 # Set this to YES to use lynx like key binding.
 W3M_USE_LYNX_KEY?=	NO
+# set this to YES if you want HTTPS support.
+W3M_USE_SSL?=		YES
+# set this to YES if you want HTTP cookie support.
+W3M_USE_COOKIE?=	YES
+# set this to YES if you want mouse support.
+W3M_USE_MOUSE?=		NO
+# set this to YES if you want color support.
+W3M_USE_COLOR?=		NO
 
+.if defined(W3M_USE_COLOR) && ${W3M_USE_COLOR} == YES
+CONFIGURE_ENV+=	use_color=y
+.else
+CONFIGURE_ENV+=	use_color=n
+.endif
+.if defined(W3M_USE_MOUSE) && ${W3M_USE_MOUSE} == YES
+CONFIGURE_ENV+=	use_mouse=y
+.else
+CONFIGURE_ENV+=	use_mouse=n
+.endif
+.if defined(W3M_USE_COOKIE) && ${W3M_USE_COOKIE} == YES
+CONFIGURE_ENV+=	use_cookie=y
+.else
+CONFIGURE_ENV+=	use_cookie=n
+.endif
+.if defined(W3M_USE_SSL) && ${W3M_USE_SSL} == YES
+.if !defined(PATENTEDOPENSSLSRC) && !exists(/usr/include/openssl/rsa.h)
+# openssl is necessary for HTTPS support.
+# if PATENTEDOPENSSLSRC is defined, then we assume that
+# RSA already exists in the OpenSSL built as part of the
+# base distribution.
+DEPENDS+=	openssl-0.9.*:../../security/openssl
+.endif
+CONFIGURE_ENV+=	use_ssl=y use_ssl_verify=n
+.else
+CONFIGURE_ENV+=	use_ssl=n use_ssl_verify=n
+.endif
 .if defined(W3M_USE_JAPANESE) && ${W3M_USE_JAPANESE} == YES
 CONFIGURE_ENV+=	def_lg=1
 CONFIGURE_ENV+=	def_dcode=n
@@ -56,18 +91,20 @@ HELP_W3M=	-w3m
 CONFIGURE_ENV+=	def_bindir=${LOCALBASE}/bin
 CONFIGURE_ENV+=	def_libdir=${LOCALBASE}/${HELPERDIR}
 CONFIGURE_ENV+=	def_helpdir=${LOCALBASE}/${HELPDIR}
-CONFIGURE_ENV+=	use_color=n use_mouse=n
 CONFIGURE_ENV+=	use_menu=n use_matrix=n
-CONFIGURE_ENV+=	use_cookie=n use_ssl=n
 CONFIGURE_ENV+=	ded=vi dmail=Mail dbrowser=
 CONFIGURE_ENV+=	dcc="${CC}" dtermlib="-ltermcap"
 CONFIGURE_ENV+=	dldflags="-Wl,-rpath,${LOCALBASE}/lib -L${LOCALBASE}/lib -L/usr/local/v6/lib -linet6"
-CONFIGURE_ENV+=	dmodel=1
+CONFIGURE_ENV+=	dmodel=6
 CONFIGURE_ENV+=	LOCALBASE="${LOCALBASE}"
 
 post-extract:
 	@(cd ${WRKSRC}/doc; ${RM} -fr CVS)
 	@(cd ${WRKSRC}/doc-jp; ${RM} -fr CVS)
+
+# do not look at previous configuration
+pre-configure:
+	${RM} ${WRKSRC}/config.param
 
 do-configure:
 	@yes '' | (cd ${WRKSRC} && CC="${CC}" ac_cv_path_CC="${CC}" \
