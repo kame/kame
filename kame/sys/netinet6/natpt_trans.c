@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.37 2001/06/13 04:38:10 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.38 2001/06/18 14:28:10 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -671,7 +671,7 @@ translatingICMPv4To6(struct _cv *cv4, struct pAddr *pad)
     ip6->ip6_vfc |=  IPV6_VERSION;
     ip6->ip6_plen = 0;						/* XXX */
     ip6->ip6_nxt  = IPPROTO_ICMPV6;
-    ip6->ip6_hlim = ip4->ip_ttl -1;
+    ip6->ip6_hlim = ip4->ip_ttl;
     ip6->ip6_dst  = pad->in6dst;
     ip6->ip6_src  = pad->in6src;
     if (natpt_prefix.s6_addr32[0] != 0)
