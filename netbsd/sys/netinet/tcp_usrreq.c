@@ -730,12 +730,20 @@ tcp_attach(so)
 		return EAFNOSUPPORT;
 	}
 #ifdef IPSEC
-	if (inp && (error = ipsec_init_policy(&inp->inp_sp)) != 0) {
+	if (inp && (error = ipsec_init_policy(&inp->inp_sp_in)) != 0) {
+		in_pcbdetach(inp);
+		return (error);
+	}
+	if (inp && (error = ipsec_init_policy(&inp->inp_sp_out)) != 0) {
 		in_pcbdetach(inp);
 		return (error);
 	}
 #ifdef INET6
-	else if (in6p && (error = ipsec_init_policy(&in6p->in6p_sp)) != 0) {
+	else if (in6p && (error = ipsec_init_policy(&in6p->in6p_sp_in)) != 0) {
+		in6_pcbdetach(in6p);
+		return (error);
+	}
+	else if (in6p && (error = ipsec_init_policy(&in6p->in6p_sp_out)) != 0) {
 		in6_pcbdetach(in6p);
 		return (error);
 	}

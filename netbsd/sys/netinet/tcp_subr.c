@@ -1612,7 +1612,8 @@ ipsec4_hdrsiz_tcp(tp)
 		return 0;
 	switch (tp->t_family) {
 	case AF_INET:
-		hdrsiz = ipsec4_hdrsiz(tp->t_template, inp);
+		/* XXX: should use currect direction. */
+		hdrsiz = ipsec4_hdrsiz(tp->t_template, IPSEC_DIR_OUTBOUND, inp);
 		break;
 	default:
 		hdrsiz = 0;
@@ -1634,7 +1635,8 @@ ipsec6_hdrsiz_tcp(tp)
 		return 0;
 	switch (tp->t_family) {
 	case AF_INET6:
-		hdrsiz = ipsec6_hdrsiz(tp->t_template, in6p);
+		/* XXX: should use currect direction. */
+		hdrsiz = ipsec6_hdrsiz(tp->t_template, IPSEC_DIR_OUTBOUND, in6p);
 		break;
 	case AF_INET:
 		/* mapped address case - tricky */

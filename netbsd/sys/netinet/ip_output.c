@@ -418,9 +418,9 @@ sendit:
 #ifdef IPSEC
 	/* get SP for this packet */
 	if (so == NULL)
-		sp = ipsec4_getpolicybyaddr(m, flags, &error);
+		sp = ipsec4_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND, flags, &error);
 	else
-		sp = ipsec4_getpolicybysock(m, so, &error);
+		sp = ipsec4_getpolicybysock(m, IPSEC_DIR_OUTBOUND, so, &error);
 
 	if (sp == NULL) {
 		ipsecstat.out_inval++;
@@ -907,11 +907,13 @@ ip_ctloutput(op, so, level, optname, mp)
 			break;
 
 #ifdef IPSEC
-		case IP_IPSEC_POLICY:
+		case IP_IPSEC_POLICY_IN:
+		case IP_IPSEC_POLICY_OUT:
 		    {
 			caddr_t req = NULL;
 			int len = 0;
 			int priv = 0;
+			struct secpolicy **spp;
 #ifdef __NetBSD__
 			if (p == 0 || suser(p->p_ucred, &p->p_acflag))
 				priv = 0;
@@ -924,8 +926,15 @@ ip_ctloutput(op, so, level, optname, mp)
 				req = mtod(m, caddr_t);
 				len = m->m_len;
 			}
-			error = ipsec_set_policy(&inp->inp_sp,
-			                         optname, req, len, priv);
+			switch (optname) {
+			case IP_IPSEC_POLICY_IN:
+				spp = &inp->inp_sp_in;
+				break;
+			case IP_IPSEC_POLICY_OUT:
+				spp = &inp->inp_sp_out;
+				break;
+			}
+			error = ipsec_set_policy(spp, optname, req, len, priv);
 			break;
 		    }
 #endif /*IPSEC*/
@@ -996,8 +1005,11 @@ ip_ctloutput(op, so, level, optname, mp)
 			break;
 
 #ifdef IPSEC
-		case IP_IPSEC_POLICY:
-			error = ipsec_get_policy(inp->inp_sp, mp);
+		case IP_IPSEC_POLICY_IN:
+			error = ipsec_get_policy(inp->inp_sp_in, mp);
+			break;
+		case IP_IPSEC_POLICY_OUT:
+			error = ipsec_get_policy(inp->inp_sp_out, mp);
 			break;
 #endif /*IPSEC*/
 

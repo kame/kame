@@ -457,7 +457,12 @@ rip_usrreq(so, req, m, nam, control, p)
 		inp = sotoinpcb(so);
 		inp->inp_ip.ip_p = (long)nam;
 #ifdef IPSEC
-		error = ipsec_init_policy(&inp->inp_sp);
+		error = ipsec_init_policy(&inp->inp_sp_in);
+		if (error)
+			break;
+		error = ipsec_init_policy(&inp->inp_sp_out);
+		if (error)
+			break;
 #endif /*IPSEC*/
 		break;
 
