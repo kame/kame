@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.42 2003/02/05 10:23:33 keiichi Exp $	*/
+/*	$KAME: ip6.h,v 1.43 2003/02/14 08:02:40 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -413,11 +413,10 @@ struct ip6m_opt {
 /* Mobility option type */
 #define IP6MOPT_PAD1		0	/* Pad1 */
 #define IP6MOPT_PADN		1	/* PadN */
-			/*	2	   (reserved) */
+#define IP6MOPT_REFRESH		2	/* Binding Refresh Advice */
 #define IP6MOPT_ALTCOA		3	/* Alternate Care-of Address */
 #define IP6MOPT_NONCE		4	/* Nonce Indices */
 #define IP6MOPT_AUTHDATA	5	/* Binding Authorization Data */
-#define IP6MOPT_REFRESH		6	/* Binding Refresh Advice */
 
 /* Alternate Care-of Address */
 struct ip6m_opt_altcoa {
