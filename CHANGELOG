@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2184 2002/06/12 01:21:27 itojun Exp $
+$KAME: CHANGELOG,v 1.2185 2002/06/14 15:36:40 jinmei Exp $
 
 <200206>
+2002-06-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6:
+	- caught up some changes in dhcpv6-26.
+	- corrected configuration parser against multiple DNS addresses in
+	  a single line.
+	- sync the parser with the man page about infinite duration
+	- bind client well-known port to the outgoing socket for better
+	interoperability
+
 Wed Jun 12 10:17:50 JST 2002  itojun@iijlab.net
 	* sys/netinet6/ipsec.c: avoid copying per-socket policy.  saves memory
 	  when a lot of pcbs are present (like busy webservers).  requested
