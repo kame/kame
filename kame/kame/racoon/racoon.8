@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.8,v 1.21 2000/12/16 14:50:35 sakane Exp $
+.\"	$KAME: racoon.8,v 1.22 2000/12/16 15:17:36 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -38,19 +38,16 @@
 .Sh SYNOPSIS
 .Nm racoon
 .Bk -words
-.Op Fl Fv
+.Op Fl dFv
 .Ek
 .Bk -words
 .Op Fl f Ar configfile
 .Ek
 .Bk -words
-.Op Fl p Ar isakmp-port
-.Ek
-.Bk -words
 .Op Fl l Ar logfile
 .Ek
 .Bk -words
-.Op Fl d
+.Op Fl p Ar isakmp-port
 .Ek
 .\"
 .Sh DESCRIPTION
@@ -60,24 +57,24 @@ security association with other hosts.
 SPD in the kernel usually trigger to start
 .Nm racoon .
 .Bl -tag -width Ds
+.It Fl d
+increase the debug level.
 .It Fl f Ar configfile
 use
 .Ar configfile
 as the configuration file instead of the default.
-.It Fl p Ar isakmp-port
-listen for ISAKMP key exchange on port
-.Ar isakmp-port
-instead of the default port number, 500.
-.It Fl l Ar logfile
-use
-.Ar logfile
-as the logging file.
 .It Fl F
 run
 .Nm racoon
 in the foreground.
-.It Fl d
-increase the debug level.
+.It Fl l Ar logfile
+use
+.Ar logfile
+as the logging file.
+.It Fl p Ar isakmp-port
+listen for ISAKMP key exchange on port
+.Ar isakmp-port
+instead of the default port number, 500.
 .It Fl v
 causes a packet dump verbose when using high debugging level.
 .El
