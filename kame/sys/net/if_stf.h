@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.h,v 1.3 2000/03/25 07:23:33 sumikawa Exp $	*/
+/*	$KAME: if_stf.h,v 1.4 2001/08/30 10:06:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -32,6 +32,10 @@
 #ifndef _NET_IF_STF_H_
 #define _NET_IF_STF_H_
 
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+void in_stf_input __P((struct mbuf *, int, int));
+#else
 void in_stf_input __P((struct mbuf *, ...));
+#endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 
 #endif /* _NET_IF_STF_H_ */

@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.63 2001/07/28 01:12:11 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.64 2001/08/30 10:06:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -720,14 +720,23 @@ stf_checkaddr6(sc, in6, inifp)
 }
 
 void
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+in_stf_input(m, off, proto)
+	struct mbuf *m;
+	int off, proto;
+#else
 #if __STDC__
 in_stf_input(struct mbuf *m, ...)
 #else
 in_stf_input(m, va_alist)
 	struct mbuf *m;
 #endif
+#endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 {
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	int off, proto;
+	va_list ap;
+#endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 	struct stf_softc *sc;
 	struct ip *ip;
 	struct ip6_hdr *ip6;
@@ -735,12 +744,13 @@ in_stf_input(m, va_alist)
 	int s, isr;
 	struct ifqueue *ifq = NULL;
 	struct ifnet *ifp;
-	va_list ap;
 
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	va_start(ap, m);
 	off = va_arg(ap, int);
 	proto = va_arg(ap, int);
 	va_end(ap);
+#endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 
 	if (proto != IPPROTO_IPV6) {
 		m_freem(m);
