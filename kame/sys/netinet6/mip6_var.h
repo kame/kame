@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.5 2001/10/03 08:19:17 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.6 2001/10/05 06:50:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -165,9 +165,10 @@ struct mip6_config {
 
 /* Buffer for storing a consequtive sequence of sub-options */
 struct mip6_buffer {
-	int        off;          /* Offset in buffer */
-	u_int8_t   buf[2048];    /* Must be at least IPV6_MMTU */
+	int      off;  /* Offset in buffer */
+	u_int8_t *buf; /* Must be at least IPV6_MMTU */
 };
+#define MIP6_BUFFER_SIZE 1500 /* XXX 1500 ? */
 
 /* Definition of length for different destination options */
 #define IP6OPT_BULEN  12 /* Length of BU option */

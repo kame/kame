@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.57 2001/10/03 08:19:17 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.58 2001/10/05 06:50:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1351,7 +1351,7 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 	struct hif_softc *sc;
 {
 	struct ip6_opt_binding_update bu_opt;
-	struct mip6_buffer *optbuf;
+	struct mip6_buffer optbuf;
 	struct mip6_bu *mbu;
 	int size;
 
@@ -1395,13 +1395,13 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		return (0);
 	}
 
-	size = sizeof(struct mip6_buffer);
-	optbuf = (struct mip6_buffer *)malloc(size, M_TEMP, M_NOWAIT);
-	if (optbuf == NULL) {
-		return (-1);
+	/* XXX IPV6_MIMMTU is OK?? */
+	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_TEMP, M_NOWAIT);
+	if (optbuf.buf == NULL) {
+		return (ENOMEM);
 	}
-	bzero(optbuf, size);
-	optbuf->off = 2;
+	bzero(optbuf.buf, MIP6_BUFFER_SIZE);
+	optbuf.off = 2;
 
 	bzero(&bu_opt, sizeof(struct ip6_opt_binding_update));
 	bu_opt.ip6ou_type = IP6OPT_BINDING_UPDATE;
@@ -1446,16 +1446,16 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 	if (opts && opts->ip6po_dest2) {
 		/* Destination header 2 already exists.  merge them. */
 		size = (opts->ip6po_dest2->ip6d_len + 1) << 3;
-		bcopy((caddr_t)opts->ip6po_dest2, (caddr_t)optbuf->buf, size);
-		optbuf->off = size;
-		mip6_find_offset(optbuf);
+		bcopy((caddr_t)opts->ip6po_dest2, (caddr_t)optbuf.buf, size);
+		optbuf.off = size;
+		mip6_find_offset(&optbuf);
 	}
 
 	/* add BU option (and other user specified optiosn if any) */
-	mip6_add_opt2dh((u_int8_t *)&bu_opt, optbuf);
-	mip6_align_destopt(optbuf);
+	mip6_add_opt2dh((u_int8_t *)&bu_opt, &optbuf);
+	mip6_align_destopt(&optbuf);
 
-	*pktopt_mip6dest2 = (struct ip6_dest *)optbuf->buf;
+	*pktopt_mip6dest2 = (struct ip6_dest *)optbuf.buf;
 
 	return (0);
 }
@@ -1468,7 +1468,7 @@ mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 	struct hif_softc *sc;
 {
 	struct ip6_opt_home_address haddr_opt;
-	struct mip6_buffer *optbuf;
+	struct mip6_buffer optbuf;
 	int size;
 	struct mip6_bu *mbu;
 	struct in6_addr *coa;
@@ -1478,11 +1478,10 @@ mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 		return (0);
 	}
 	
-	size = sizeof(struct mip6_buffer);
-	optbuf = (struct mip6_buffer *)malloc(size, M_TEMP, M_NOWAIT);
-	if (optbuf == NULL)
+	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_TEMP, M_NOWAIT);
+	if (optbuf.buf == NULL)
 		return (ENOMEM);
-	bzero((caddr_t)optbuf, size);
+	bzero((caddr_t)optbuf.buf, MIP6_BUFFER_SIZE);
 
 	bzero(&haddr_opt, sizeof(struct ip6_opt_home_address));
 	haddr_opt.ip6oh_type = IP6OPT_HOME_ADDRESS;
@@ -1497,10 +1496,10 @@ mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 	bcopy((caddr_t)coa, haddr_opt.ip6oh_addr, size);
 
 	/* Add Home Address option  */
-	mip6_add_opt2dh((u_int8_t *)&haddr_opt, optbuf);
-	mip6_align_destopt(optbuf);
+	mip6_add_opt2dh((u_int8_t *)&haddr_opt, &optbuf);
+	mip6_align_destopt(&optbuf);
 
-	*pktopt_haddr = (struct ip6_dest *)optbuf->buf;
+	*pktopt_haddr = (struct ip6_dest *)optbuf.buf;
 
 	return (0);
 }
@@ -1532,16 +1531,14 @@ mip6_ba_destopt_create(pktopt_badest2, status, seqno, lifetime, refresh)
 	u_int32_t refresh;
 {
 	struct ip6_opt_binding_ack ba_opt;
-	struct mip6_buffer *optbuf;
-	size_t size;
+	struct mip6_buffer optbuf;
 
-	size = sizeof(struct mip6_buffer);
-	optbuf = (struct mip6_buffer *)malloc(size, M_TEMP, M_NOWAIT);
-	if (optbuf == NULL) {
-		return (-1);
+	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_TEMP, M_NOWAIT);
+	if (optbuf.buf == NULL) {
+		return (ENOMEM);
 	}
-	bzero(optbuf, size);
-	optbuf->off = 3;
+	bzero(optbuf.buf, MIP6_BUFFER_SIZE);
+	optbuf.off = 3;
 
 	bzero(&ba_opt, sizeof(struct ip6_opt_binding_ack));
 	ba_opt.ip6oa_type = IP6OPT_BINDING_ACK;
@@ -1554,10 +1551,10 @@ mip6_ba_destopt_create(pktopt_badest2, status, seqno, lifetime, refresh)
 	      sizeof(refresh));
 
 	/* add BU option (and other user specified optiosn if any) */
-	mip6_add_opt2dh((u_int8_t *)&ba_opt, optbuf);
-	mip6_align_destopt(optbuf);
+	mip6_add_opt2dh((u_int8_t *)&ba_opt, &optbuf);
+	mip6_align_destopt(&optbuf);
 
-	*pktopt_badest2 = (struct ip6_dest *)optbuf->buf;
+	*pktopt_badest2 = (struct ip6_dest *)optbuf.buf;
 
 	return (0);
 	
