@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1104 2000/07/05 08:18:24 suz Exp $
+$Id: CHANGELOG,v 1.1105 2000/07/06 08:24:30 jinmei Exp $
 
 <200006>
+2000-07-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtadvd/if.c (if_getflags): made sure to close a
+	temporary socket to avoid making garbage sockets.
+
 Wed Jul  5 12:08:16 JST 2000  suz@kame.net
 	* bsdi3/sys/conf/files.i386, bsdi3/sys/conf/GENERIC.KAME,
 	  bsdi3/sys/i386/isa/{if_wi.c,if_wireg.h,wiioctl.h}
