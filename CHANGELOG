@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2390 2003/04/28 06:38:03 suz Exp $
+$KAME: CHANGELOG,v 1.2391 2003/04/30 05:12:50 suz Exp $
 
 <200304>
+Wed Apr 30 14:08:18 JST 2003	suz@crl.hitachi.co.jp
+	* kame/pim6sd/{cfparse.y cftoken.l pim6_proto.c, pim6sd.conf.5,
+	  rp.[ch] timer.h}: implemented static group-to-RP mapping 
+	  configuration.
+
+	* kame/pim6sd/{rp.c, pim6_proto.c}: sync with draft-ietf-pim-sm-bsr-03.txt
+		- BSR message's Randomized Override Interval 
+		- BSR message is advertised to the incoming interface, too
+
 Mon Apr 28 14:46:47 JST 2003	suz@crl.hitachi.co.jp
 	* kame/sys/netinet/in_msf.h, kame/sys/netinet6/{in6.c, in6_ifattach.c,
 	  ip6_input.c , ip6_output.c, mld6.c, nd6.c} 
