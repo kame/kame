@@ -1,6 +1,6 @@
 	Installation procedure - preparation of the tree
 	KAME project
-	$Id: INSTALL,v 1.13 2000/01/31 05:12:25 itojun Exp $
+	$Id: INSTALL,v 1.14 2000/02/05 05:35:02 itojun Exp $
 
 Let's call the entire file-tree under this directory "the KAME tree".
 
@@ -40,7 +40,7 @@ perform "make obj" unless you are ready to tackle those troubles.
    KAME tar.gz file, and you need to
    - copy/untar fresh tree from CD-ROM/whatever
    - apply patch included in KAME kit
-   Please read the documents under your target directory for more information,
+   Please read the documents like bsdi[34]/INSTALL before proceed further,
    if you are using bsdi[34].
 
 3. Invoke the following:
