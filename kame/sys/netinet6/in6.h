@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.70 2000/12/06 23:29:27 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.71 2000/12/12 23:46:08 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -497,7 +497,7 @@ struct in6_pktinfo {
  * Control structure for IPV6_RECVPATHMTU socket option.
  * Note that this structure is not fully conformant to rfc2292bis-02.
  * However, since how to tell the destination of the path (or the path itself)
- * to the application is not determined, we use this our original structure.  
+ * to the application is not determined, we use our original structure.  
  */
 struct ip6_mtuinfo {
 	struct sockaddr_in6 ip6m_addr;	/* or sockaddr_storage? */
