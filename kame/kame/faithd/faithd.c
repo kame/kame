@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.66 2003/09/02 23:32:46 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.67 2003/10/16 05:26:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -394,7 +394,7 @@ again:
 #endif
 
 #ifdef HAVE_POLL_H
-	error = poll(pfd, sizeof(pfd)/sizeof(pfd[0]), 0);
+	error = poll(pfd, sizeof(pfd)/sizeof(pfd[0]), INFTIM);
 #else
 	error = select(maxfd + 1, &rfds, NULL, NULL, NULL);
 #endif
