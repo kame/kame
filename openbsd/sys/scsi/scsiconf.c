@@ -1,4 +1,4 @@
-/*	$OpenBSD: scsiconf.c,v 1.42 1999/02/24 07:36:02 downsj Exp $	*/
+/*	$OpenBSD: scsiconf.c,v 1.45 1999/07/24 23:56:43 deraadt Exp $	*/
 /*	$NetBSD: scsiconf.c,v 1.57 1996/05/02 01:09:01 neil Exp $	*/
 
 /*
@@ -305,7 +305,7 @@ scsi_strvis(dst, src, len)
 
 struct scsi_quirk_inquiry_pattern {
 	struct scsi_inquiry_pattern pattern;
-	u_int8_t quirks;
+	u_int16_t quirks;
 };
 
 struct scsi_quirk_inquiry_pattern scsi_quirk_patterns[] = {
@@ -447,7 +447,7 @@ struct scsi_quirk_inquiry_pattern scsi_quirk_patterns[] = {
 	{{T_DIRECT, T_FIXED,
 	 "SEAGATE ", "ST296N          ", ""},     SDEV_NOLUNS},
 	{{T_DIRECT, T_FIXED,
-	 "SEAGATE ", "ST19171FC", ""},            SDEV_NOMODESENSE},
+	 "SEAGATE ", "ST19171FC",	 ""},	  SDEV_NOMODESENSE},
 	{{T_DIRECT, T_FIXED,
 	 "SEAGATE ", "ST34501FC       ", ""},     SDEV_NOMODESENSE},
         {{T_DIRECT, T_FIXED,
@@ -458,13 +458,15 @@ struct scsi_quirk_inquiry_pattern scsi_quirk_patterns[] = {
 	 "IOMEGA", "ZIP 100",		 ""},	  SDEV_NOMODESENSE},
 	{{T_DIRECT, T_REMOV,
 	 "IOMEGA", "ZIP 250",		 ""},	  SDEV_NOMODESENSE},
+	{{T_DIRECT, T_REMOV,
+	 "MATSHITA", "LS-120 VER5   00", ""},	  SDEV_NOMODESENSE},
 	{{T_DIRECT, T_FIXED,
 	 "IBM", "0661467",               "G"},    SDEV_NOMODESENSE},
 	/* Letting the motor run kills floppy drives and disks quit fast. */
 	{{T_DIRECT, T_REMOV,
 	 "TEAC", "FC-1",                 ""},     SDEV_NOSTARTUNIT},
 	{{T_DIRECT, T_FIXED,
-	 "NEC ", "SD120S-200      ", "0001"},     SDEV_NOLUNS},
+	 "NEC ", "SD120S-200      ",	 "0001"}, SDEV_NOLUNS},
 
 	/* XXX: QIC-36 tape behind Emulex adapter.  Very broken. */
 	{{T_SEQUENTIAL, T_REMOV,
@@ -512,7 +514,44 @@ struct scsi_quirk_inquiry_pattern scsi_quirk_patterns[] = {
 	 "ULTIMA  ", "AT3     1.60    ", ""},     SDEV_NOLUNS},
 	{{T_SCANNER, T_FIXED,
 	 "UMAX    ", "SuperVista S-12 ", "V1.9"}, SDEV_NOLUNS},
+
+	/* ATAPI device quirks */
+        {{T_CDROM, T_REMOV,
+         "ALPS ELECTRIC CO.,LTD. DC544C", "", "SW03D"}, ADEV_NOTUR},
+        {{T_CDROM, T_REMOV,
+         "BCD-16X 1997-04-25", "", "VER 2.2"},  SDEV_NOSTARTUNIT},
+        {{T_CDROM, T_REMOV,
+         "BCD-24X 1997-06-27", "", "VER 2.0"},  SDEV_NOSTARTUNIT},
+        {{T_CDROM, T_REMOV,
+         "CR-2801TE", "", "1.07"},              ADEV_NOSENSE},
+        {{T_CDROM, T_REMOV,
+         "CREATIVECD3630E", "", "AC101"},       ADEV_NOSENSE},
+        {{T_CDROM, T_REMOV,
+         "FX320S", "", "q01"},                  ADEV_NOSENSE},
+        {{T_CDROM, T_REMOV,
+         "GCD-R580B", "", "1.00"},              ADEV_LITTLETOC},
+        {{T_CDROM, T_REMOV,
+         "MATSHITA CR-574", "", "1.02"},        ADEV_NOCAPACITY},
+        {{T_CDROM, T_REMOV,
+         "MATSHITA CR-574", "", "1.06"},        ADEV_NOCAPACITY},
+        {{T_CDROM, T_REMOV,
+         "Memorex CRW-2642", "", "1.0g"},       ADEV_NOSENSE},
+        {{T_CDROM, T_REMOV,
+         "NEC                 CD-ROM DRIVE:273", "", "4.21"}, ADEV_NOTUR},
+        {{T_CDROM, T_REMOV,
+         "SANYO CRD-256P", "", "1.02"},         ADEV_NOCAPACITY},
+        {{T_CDROM, T_REMOV,
+         "SANYO CRD-254P", "", "1.02"},         ADEV_NOCAPACITY},
+        {{T_CDROM, T_REMOV,
+         "SANYO CRD-S54P", "", "1.08"},         ADEV_NOCAPACITY},
+        {{T_CDROM, T_REMOV,
+         "CD-ROM  CDR-S1", "", "1.70"},         ADEV_NOCAPACITY}, /* Sanyo */
+        {{T_CDROM, T_REMOV,
+         "CD-ROM  CDR-N16", "", "1.25"},        ADEV_NOCAPACITY}, /* Sanyo */
+        {{T_CDROM, T_REMOV,
+         "UJDCD8730", "", "1.14"},              ADEV_NODOORLOCK}, /* Acer */
 };
+
 
 /*
  * Print out autoconfiguration information for a subdevice.

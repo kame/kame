@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ethersubr.c,v 1.28 1999/02/26 17:01:32 jason Exp $	*/
+/*	$OpenBSD: if_ethersubr.c,v 1.31 1999/09/01 21:38:48 jason Exp $	*/
 /*	$NetBSD: if_ethersubr.c,v 1.19 1996/05/07 02:40:30 thorpej Exp $	*/
 
 /*
@@ -537,6 +537,8 @@ ether_input(ifp, eh, m)
 		m = bridge_input(ifp, eh, m);
 		if (m == NULL)
 			return;
+		/* The bridge has determined it's for us. */
+		goto decapsulate;
 	}
 #endif
 	/*
@@ -806,6 +808,20 @@ ether_ifattach(ifp)
 			break;
 		}
 	LIST_INIT(&((struct arpcom *)ifp)->ac_multiaddrs);
+}
+
+void
+ether_ifdetach(ifp)
+	struct ifnet *ifp;
+{
+	struct arpcom *ac = (struct arpcom *)ifp;
+	struct ether_multi *enm;
+
+	for (enm = LIST_FIRST(&ac->ac_multiaddrs); enm;
+	    enm = LIST_FIRST(&ac->ac_multiaddrs)) {
+		LIST_REMOVE(enm, enm_list);
+		free(enm, M_IFMADDR);
+	}
 }
 
 u_char	ether_ipmulticast_min[6] = { 0x01, 0x00, 0x5e, 0x00, 0x00, 0x00 };

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_bridge.h,v 1.6 1999/03/19 22:47:33 jason Exp $	*/
+/*	$OpenBSD: if_bridge.h,v 1.10 1999/09/03 12:47:12 jason Exp $	*/
 
 /*
  * Copyright (c) 1999 Jason L. Wright (jason@thought.net)
@@ -37,11 +37,14 @@
 struct ifbreq {
 	char		ifbr_name[IFNAMSIZ];	/* bridge ifs name */
 	char		ifbr_ifsname[IFNAMSIZ];	/* member ifs name */
-	u_int32_t	ifbr_ifsflags;		/* memver ifs flags */
+	u_int32_t	ifbr_ifsflags;		/* member ifs flags */
 };
-
+/* SIOCBRDGIFFLGS, SIOCBRDGIFFLGS */
 #define	IFBIF_LEARNING	0x1	/* ifs can learn */
 #define	IFBIF_DISCOVER	0x2	/* ifs sends packets w/unknown dest */
+/* SIOCBRDGFLUSH */
+#define	IFBF_FLUSHDYN	0x0	/* flush dynamic addresses only */
+#define	IFBF_FLUSHALL	0x1	/* flush all addresses from cache */
 
 /*
  * Interface list structure
@@ -101,8 +104,9 @@ struct ifbcachetoreq {
 
 
 #ifdef _KERNEL
-struct mbuf *	bridge_input	__P((struct ifnet *, struct ether_header *,
+void	bridge_ifdetach __P((struct ifnet *));
+struct mbuf *bridge_input __P((struct ifnet *, struct ether_header *,
     struct mbuf *));
-int		bridge_output	__P((struct ifnet *, struct mbuf *,
-    struct sockaddr *, struct rtentry *rt));
+int	bridge_output __P((struct ifnet *, struct mbuf *, struct sockaddr *,
+    struct rtentry *rt));
 #endif /* _KERNEL */

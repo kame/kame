@@ -1,10 +1,5 @@
-/*	$OpenBSD: uvm_page.c,v 1.2 1999/02/26 05:32:07 art Exp $	*/
-/*	$NetBSD: uvm_page.c,v 1.15 1998/10/18 23:50:00 chs Exp $	*/
+/*	$NetBSD: uvm_page.c,v 1.19 1999/05/20 20:07:55 thorpej Exp $	*/
 
-/*
- * XXXCDC: "ROUGH DRAFT" QUALITY UVM PRE-RELEASE FILE!
- *         >>>USE AT YOUR OWN RISK, WORK IS NOT FINISHED<<<
- */
 /* 
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
  * Copyright (c) 1991, 1993, The Regents of the University of California.  
@@ -388,6 +383,7 @@ uvm_pageboot_alloc(size)
 
 #else /* !PMAP_STEAL_MEMORY */
 
+	static boolean_t initialized = FALSE;
 	vaddr_t addr, vaddr;
 	paddr_t paddr;
 
@@ -395,23 +391,39 @@ uvm_pageboot_alloc(size)
 	size = round_page(size);
 
 	/*
-	 * on first call to this function init ourselves.   we detect this
-	 * by checking virtual_space_start/end which are in the zero'd BSS area.
+	 * on first call to this function, initialize ourselves.
 	 */
-
-	if (virtual_space_start == virtual_space_end) {
+	if (initialized == FALSE) {
 		pmap_virtual_space(&virtual_space_start, &virtual_space_end);
 
 		/* round it the way we like it */
 		virtual_space_start = round_page(virtual_space_start);
 		virtual_space_end = trunc_page(virtual_space_end);
+
+		initialized = TRUE;
 	}
 
 	/*
 	 * allocate virtual memory for this request
 	 */
+	if (virtual_space_start == virtual_space_end ||
+	    (virtual_space_end - virtual_space_start) < size)
+		panic("uvm_pageboot_alloc: out of virtual space");
 
 	addr = virtual_space_start;
+
+#ifdef PMAP_GROWKERNEL
+	/*
+	 * If the kernel pmap can't map the requested space,
+	 * then allocate more resources for it.
+	 */
+	if (uvm_maxkaddr < (addr + size)) {
+		uvm_maxkaddr = pmap_growkernel(addr + size);
+		if (uvm_maxkaddr < (addr + size))
+			panic("uvm_pageboot_alloc: pmap_growkernel() failed");
+	}
+#endif
+
 	virtual_space_start += size;
 
 	/*
@@ -426,10 +438,15 @@ uvm_pageboot_alloc(size)
 
 		/* XXX: should be wired, but some pmaps don't like that ... */
 #if defined(PMAP_NEW)
+		/*
+		 * Note this memory is no longer managed, so using
+		 * pmap_kenter is safe.
+		 */
 		pmap_kenter_pa(vaddr, paddr, VM_PROT_READ|VM_PROT_WRITE);
 #else
 		pmap_enter(pmap_kernel(), vaddr, paddr,
-		    VM_PROT_READ|VM_PROT_WRITE, FALSE);
+		    VM_PROT_READ|VM_PROT_WRITE, FALSE,
+		    VM_PROT_READ|VM_PROT_WRITE);
 #endif
 
 	}
@@ -812,15 +829,17 @@ uvm_page_physdump()
  */
 
 struct vm_page *
-uvm_pagealloc_strat(obj, off, anon, strat, free_list)
+uvm_pagealloc_strat(obj, off, anon, flags, strat, free_list)
 	struct uvm_object *obj;
 	vaddr_t off;
+	int flags;
 	struct vm_anon *anon;
 	int strat, free_list;
 {
 	int lcv, s;
 	struct vm_page *pg;
 	struct pglist *freeq;
+	boolean_t use_reserve;
 
 #ifdef DIAGNOSTIC
 	/* sanity check */
@@ -850,10 +869,11 @@ uvm_pagealloc_strat(obj, off, anon, strat, free_list)
 	 *        the requestor isn't the pagedaemon.
 	 */
 
-	if ((uvmexp.free <= uvmexp.reserve_kernel &&
-	     !(obj && obj->uo_refs == UVM_OBJ_KERN)) ||
+	use_reserve = (flags & UVM_PGA_USERESERVE) ||
+		(obj && obj->uo_refs == UVM_OBJ_KERN);
+	if ((uvmexp.free <= uvmexp.reserve_kernel && !use_reserve) ||
 	    (uvmexp.free <= uvmexp.reserve_pagedaemon &&
-	     !(obj == uvmexp.kmem_object && curproc == uvm.pagedaemon_proc)))
+	     !(use_reserve && curproc == uvm.pagedaemon_proc)))
 		goto fail;
 
  again:
@@ -928,6 +948,55 @@ uvm_pagealloc_strat(obj, off, anon, strat, free_list)
 	uvm_unlock_fpageq();
 	splx(s);
 	return (NULL);
+}
+
+/* 
+ * uvm_pagealloc_contig: allocate contiguous memory. 
+ *
+ * XXX - fix comment.
+ */
+
+vaddr_t
+uvm_pagealloc_contig(size, low, high, alignment)
+	vaddr_t size;
+	vaddr_t low, high;
+	vaddr_t alignment;
+{
+	struct pglist pglist; 
+	struct vm_page *pg;
+	vaddr_t addr, temp_addr;
+
+	size = round_page(size);
+
+	TAILQ_INIT(&pglist);
+	if (uvm_pglistalloc(size, low, high, alignment, 0,
+			    &pglist, 1, FALSE))
+		return 0;
+	addr = vm_map_min(kernel_map);
+	if (uvm_map(kernel_map, &addr, size, NULL, UVM_UNKNOWN_OFFSET,
+		    UVM_MAPFLAG(UVM_PROT_ALL, UVM_PROT_ALL, UVM_INH_NONE,
+				UVM_ADV_RANDOM, 0)) != KERN_SUCCESS) {
+		uvm_pglistfree(&pglist);
+		return 0;
+	}
+	temp_addr = addr;
+	for (pg = TAILQ_FIRST(&pglist); pg != NULL; 
+	     pg = TAILQ_NEXT(pg, pageq)) {
+	        pg->uobject = uvm.kernel_object;
+		pg->offset = temp_addr - vm_map_min(kernel_map);
+		uvm_pageinsert(pg);
+		uvm_pagewire(pg);
+#if defined(PMAP_NEW)
+		pmap_kenter_pa(temp_addr, VM_PAGE_TO_PHYS(pg), 
+			       VM_PROT_READ|VM_PROT_WRITE);
+#else
+		pmap_enter(pmap_kernel(), temp_addr, VM_PAGE_TO_PHYS(pg),
+			   VM_PROT_READ|VM_PROT_WRITE, TRUE,
+			   VM_PROT_READ|VM_PROT_WRITE);
+#endif
+		temp_addr += PAGE_SIZE;
+	}
+	return addr;
 }
 
 /*

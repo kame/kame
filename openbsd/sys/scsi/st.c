@@ -1,4 +1,4 @@
-/*	$OpenBSD: st.c,v 1.25 1998/07/23 09:11:09 deraadt Exp $	*/
+/*	$OpenBSD: st.c,v 1.27 1999/09/05 20:58:03 niklas Exp $	*/
 /*	$NetBSD: st.c,v 1.71 1997/02/21 23:03:49 thorpej Exp $	*/
 
 /*
@@ -671,8 +671,11 @@ st_mount_tape(dev, flags)
 	 * Load the physical device parameters
 	 * loads: blkmin, blkmax
 	 */
-	if ((error = st_read_block_limits(st, 0)) != 0)
+	if (!(sc_link->flags & SDEV_ATAPI) &&
+	    (error = st_read_block_limits(st, 0)) != 0) {
 		return error;
+	}
+
 	/*
 	 * Load the media dependent parameters
 	 * includes: media_blksize,media_density,numblks
@@ -681,6 +684,7 @@ st_mount_tape(dev, flags)
 	 */
 	if ((error = st_mode_sense(st, 0)) != 0)
 		return error;
+
 	/*
 	 * If we have gained a permanent density from somewhere,
 	 * then use it in preference to the one supplied by
@@ -755,11 +759,19 @@ st_decide_mode(st, first_read)
 	struct st_softc *st;
 	boolean	first_read;
 {
-#ifdef SCSIDEBUG
 	struct scsi_link *sc_link = st->sc_link;
-#endif
 
 	SC_DEBUG(sc_link, SDEV_DB2, ("starting block mode decision\n"));
+
+	/* ATAPI tapes are always fixed blocksize. */
+	if (sc_link->flags & SDEV_ATAPI) {
+		st->flags |= ST_FIXEDBLOCKS;
+		if (st->media_blksize > 0)
+			st->blksize = st->media_blksize;
+		else
+			st->blksize = DEF_FIXED_BSIZE;
+		goto done;
+	}
 
 	/*
 	 * If the drive can only handle fixed-length blocks and only at
@@ -1488,6 +1500,9 @@ st_mode_select(st, flags)
 		return 0;
 	}
 
+	if (sc_link->flags & SDEV_ATAPI)
+		return 0;
+
 	/*
 	 * Set up for a mode select
 	 */
@@ -1794,7 +1809,7 @@ st_interpret_sense(xs)
 	else
 		info = xs->datalen;	/* bad choice if fixed blocks */
 	if ((sense->error_code & SSD_ERRCODE) != 0x70)
-		return -1;	/* let the generic code handle it */
+		return SCSIRET_CONTINUE; /* let the generic code handle it */
 	if (st->flags & ST_FIXEDBLOCKS) {
 		xs->resid = info * st->blksize;
 		if (sense->flags & SSD_EOM) {
@@ -1899,7 +1914,7 @@ st_interpret_sense(xs)
 			return 0;
 		}
 	}
-	return -1;		/* let the default/generic handler handle it */
+	return SCSIRET_CONTINUE;
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm_glue.c,v 1.31 1999/02/19 19:21:40 art Exp $    */
+/*	$OpenBSD: vm_glue.c,v 1.35 1999/09/03 18:02:27 art Exp $    */
 /*	$NetBSD: vm_glue.c,v 1.55.4.1 1996/06/13 17:25:45 cgd Exp $	*/
 
 /* 
@@ -169,7 +169,7 @@ chgkprot(addr, len, rw)
 		pa = pmap_extract(pmap_kernel(), sva|1);
 		if (pa == 0)
 			panic("chgkprot: invalid page");
-		pmap_enter(pmap_kernel(), sva, pa&~1, prot, TRUE);
+		pmap_enter(pmap_kernel(), sva, pa&~1, prot, TRUE, 0);
 	}
 }
 #endif
@@ -211,8 +211,10 @@ int
 #else
 void
 #endif
-vm_fork(p1, p2)
+vm_fork(p1, p2, stack, stacksize)
 	register struct proc *p1, *p2;
+	void *stack;
+	size_t stacksize;
 {
 	register struct user *up = p2->p_addr;
 
@@ -228,7 +230,7 @@ vm_fork(p1, p2)
 
 #ifdef SYSVSHM
 	if (p1->p_vmspace->vm_shm)
-		shmfork(p1, p2);
+		shmfork(p1->p_vmspace, p2->p_vmspace);
 #endif
 
 	vm_map_pageable(kernel_map, (vm_offset_t)up,
@@ -271,7 +273,7 @@ vm_fork(p1, p2)
 	 * It returns twice, once in the parent process and
 	 * once in the child.
 	 */
-	return (cpu_fork(p1, p2));
+	return (cpu_fork(p1, p2, stack, stacksize));
 #else
 	/*
 	 * cpu_fork will copy and update the kernel stack and pcb,
@@ -279,7 +281,7 @@ vm_fork(p1, p2)
 	 * directly to user mode on its first time slice, and will
 	 * not return here.
 	 */
-	cpu_fork(p1, p2);
+	cpu_fork(p1, p2, stack, stacksize);
 #endif
 }
 

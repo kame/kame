@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_ip4.c,v 1.28 1999/04/09 23:28:45 niklas Exp $	*/
+/*	$OpenBSD: ip_ip4.c,v 1.31 1999/05/16 22:31:40 niklas Exp $	*/
 
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
@@ -65,6 +65,10 @@
 #include <netinet/ip_var.h>
 #include <netinet/ip_icmp.h>
 
+#ifdef MROUTING
+#include <netinet/ip_mroute.h>
+#endif
+
 #include <sys/socketvar.h>
 #include <net/raw_cb.h>
 
@@ -80,9 +84,10 @@
 
 /*
  * We can control the acceptance of IP4 packets by altering the sysctl
- * net.inet.ip4.allow value.  Zero means drop them, all ilse is acceptance.
+ * net.inet.ip4.allow value.  Zero means drop them, all else is acceptance.
  */
 int ip4_allow = 0;
+
 struct ip4stat ip4stat;
 
 /*
@@ -115,6 +120,15 @@ ip4_input(m, va_alist)
     va_end(ap);
 
     ip4stat.ip4s_ipackets++;
+
+#ifdef MROUTING
+    ipo = mtod(m, struct ip *);
+    if (IN_MULTICAST(((struct ip *)((char *)ipo + iphlen))->ip_dst.s_addr))
+    {
+	ipip_input (m, iphlen);
+	return;
+    }
+#endif MROUTING
 
     /* If we do not accept IP4 explicitly, drop.  */
     if (!ip4_allow && (m->m_flags & (M_AUTH|M_CONF)) == 0)
@@ -173,40 +187,45 @@ ip4_input(m, va_alist)
 	return;
     }
 
-     /*
-      * If we do not accept IP4 other than part of ESP & AH, we should
-      * not accept a packet with double ip4 headers neither.
-      */
+    /*
+     * If we do not accept IP4 other than part of ESP & AH, we should
+     * not accept a packet with double ip4 headers neither.
+     */
  
-     if (!ip4_allow && ipi->ip_p == IPPROTO_IPIP)
-     {
+    if (!ip4_allow && ipi->ip_p == IPPROTO_IPIP)
+    {
  	DPRINTF(("ip4_input(): dropped due to policy\n"));
  	ip4stat.ip4s_pdrops++;
  	m_freem(m);
  	return;
-     }
- 
+    }
+
     /*
-     * Check for local address spoofing.
+     * Check remote packets for local address spoofing.
      */
-    for (ifp = ifnet.tqh_first; ifp != 0; ifp = ifp->if_list.tqe_next)
-      for (ifa = ifp->if_addrlist.tqh_first;
-	   ifa != 0;
-	   ifa = ifa->ifa_list.tqe_next)
-      {
-	  if (ifa->ifa_addr->sa_family != AF_INET)
-	    continue;
 
-	  sin = (struct sockaddr_in *) ifa->ifa_addr;
-
-	  if (sin->sin_addr.s_addr == ipi->ip_src.s_addr)
+    if (m->m_pkthdr.rcvif == NULL ||
+	!(m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK))
+    {
+        for (ifp = ifnet.tqh_first; ifp != 0; ifp = ifp->if_list.tqe_next)
+	  for (ifa = ifp->if_addrlist.tqh_first;
+	       ifa != 0;
+	       ifa = ifa->ifa_list.tqe_next)
 	  {
-	      DPRINTF(("ip_input(): possible local address spoofing detected on packet from %s to %s (%s->%s)\n", inet_ntoa4(ipo->ip_src), inet_ntoa4(ipo->ip_dst), inet_ntoa4(ipi->ip_src), inet_ntoa4(ipi->ip_dst)));
- 	      ip4stat.ip4s_spoof++;
-	      m_freem(m);
-	      return;
+	      if (ifa->ifa_addr->sa_family != AF_INET)
+		continue;
+
+	      sin = (struct sockaddr_in *) ifa->ifa_addr;
+
+	      if (sin->sin_addr.s_addr == ipi->ip_src.s_addr)
+	      {
+		  DPRINTF(("ip_input(): possible local address spoofing detected on packet from %s to %s (%s->%s)\n", inet_ntoa4(ipo->ip_src), inet_ntoa4(ipo->ip_dst), inet_ntoa4(ipi->ip_src), inet_ntoa4(ipi->ip_dst)));
+		  ip4stat.ip4s_spoof++;
+		  m_freem(m);
+		  return;
+	      }
 	  }
-      }
+    }
     
     /* Statistics */
     ip4stat.ip4s_ibytes += ntohs(ipi->ip_len);
@@ -252,6 +271,7 @@ ip4_input(m, va_alist)
     return;
 }
 
+#ifdef IPSEC
 int
 ipe4_output(struct mbuf *m, struct sockaddr_encap *gw, struct tdb *tdb, 
 	    struct mbuf **mp)
@@ -269,7 +289,7 @@ ipe4_output(struct mbuf *m, struct sockaddr_encap *gw, struct tdb *tdb,
     }
 
     /* Check that the destination address is AF_INET */
-    if (tdb->tdb_src.sa.sa_family != AF_INET)
+    if (tdb->tdb_dst.sa.sa_family != AF_INET)
     {
 	DPRINTF(("ipe4_output(): IP in protocol-family <%d> attempted, aborting", tdb->tdb_dst.sa.sa_family));
 	m_freem(m);
@@ -346,6 +366,7 @@ ipe4_input(struct mbuf *m, ...)
     if (m)
       m_freem(m);
 }
+#endif	/* IPSEC */
 
 int
 ip4_sysctl(name, namelen, oldp, oldlenp, newp, newlen)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ether.c,v 1.13 1999/03/13 21:15:16 deraadt Exp $	*/
+/*	$OpenBSD: if_ether.c,v 1.18 1999/08/08 02:42:59 niklas Exp $	*/
 /*	$NetBSD: if_ether.c,v 1.31 1996/05/11 12:59:58 mycroft Exp $	*/
 
 /*
@@ -98,10 +98,10 @@ int	useloopback = 1;	/* use loopback interface for local traffic */
 int	arpinit_done = 0;
 
 /* revarp state */
-static struct	in_addr myip, srv_ip;
-static int	myip_initialized = 0;
-static int	revarp_in_progress = 0;
-static struct	ifnet *myip_ifp = NULL;
+static struct in_addr myip, srv_ip;
+static int myip_initialized = 0;
+static int revarp_in_progress = 0;
+struct ifnet *myip_ifp = NULL;
 
 static void arptimer __P((void *));
 static void arprequest __P((struct arpcom *, u_int32_t *, u_int32_t *,
@@ -431,7 +431,7 @@ arpintr()
 }
 
 /*
- * ARP for Internet protocols on 10 Mb/s Ethernet.
+ * ARP for Internet protocols on Ethernet.
  * Algorithm is that given in RFC 826.
  * In addition, a sanity check is performed on the sender
  * protocol address, to catch impersonators.
@@ -464,7 +464,9 @@ in_arpinput(m)
 	bcopy((caddr_t)ea->arp_spa, (caddr_t)&isaddr, sizeof (isaddr));
 	bcopy((caddr_t)ea->arp_tpa, (caddr_t)&itaddr, sizeof (itaddr));
 	for (ia = in_ifaddr.tqh_first; ia != 0; ia = ia->ia_list.tqe_next)
-		if (ia->ia_ifp == &ac->ac_if) {
+		if (ia->ia_ifp == &ac->ac_if ||
+		    (ia->ia_ifp->if_bridge &&
+		    ia->ia_ifp->if_bridge == ac->ac_if.if_bridge)) {
 			maybe_ia = ia;
 			if (itaddr.s_addr == ia->ia_addr.sin_addr.s_addr ||
 			    isaddr.s_addr == ia->ia_addr.sin_addr.s_addr)
@@ -493,9 +495,32 @@ in_arpinput(m)
 	la = arplookup(isaddr.s_addr, itaddr.s_addr == myaddr.s_addr, 0);
 	if (la && (rt = la->la_rt) && (sdl = SDL(rt->rt_gateway))) {
 		if (sdl->sdl_alen &&
-		    bcmp((caddr_t)ea->arp_sha, LLADDR(sdl), sdl->sdl_alen))
-			log(LOG_INFO, "arp info overwritten for %s by %s\n",
-			    inet_ntoa(isaddr), ether_sprintf(ea->arp_sha));
+		    bcmp((caddr_t)ea->arp_sha, LLADDR(sdl), sdl->sdl_alen)) {
+		  	if (rt->rt_flags & RTF_PERMANENT_ARP) {
+				log(LOG_WARNING,
+				   "arp: attempt to overwrite permanent "
+				   "entry for %s by %s on %s\n", 
+				   inet_ntoa(isaddr),
+				   ether_sprintf(ea->arp_sha),
+				   (&ac->ac_if)->if_xname);
+				goto out;
+			} else if (rt->rt_ifp != &ac->ac_if) {
+			        log(LOG_WARNING,
+				   "arp: attemt to overwrite entry for %s "
+				   "on %s by %s on %s\n",
+				   inet_ntoa(isaddr), rt->rt_ifp->if_xname,
+				   ether_sprintf(ea->arp_sha),
+				   (&ac->ac_if)->if_xname);
+				goto out;
+			} else {
+				log(LOG_INFO,
+				   "arp info overwritten for %s by %s on %s\n",
+			    	   inet_ntoa(isaddr), 
+				   ether_sprintf(ea->arp_sha),
+				   (&ac->ac_if)->if_xname);
+				rt->rt_expire = 1; /* no longer static */
+			}
+		}
 		bcopy((caddr_t)ea->arp_sha, LLADDR(sdl),
 		    sdl->sdl_alen = sizeof(ea->arp_sha));
 		if (rt->rt_expire)
@@ -625,7 +650,7 @@ arp_ifinit(ac, ifa)
 }
 
 /*
- * Called from 10 Mb/s Ethernet interrupt handlers
+ * Called from Ethernet interrupt handlers
  * when ether packet type ETHERTYPE_REVARP
  * is received.  Common length and type checks are done here,
  * then the protocol-specific routine is called.
@@ -658,7 +683,7 @@ out:
 }
 
 /*
- * RARP for Internet protocols on 10 Mb/s Ethernet.
+ * RARP for Internet protocols on Ethernet.
  * Algorithm is that given in RFC 903.
  * We are only using for bootstrap purposes to get an ip address for one of
  * our interfaces.  Thus we support no user-interface.

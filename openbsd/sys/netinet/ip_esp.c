@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_esp.c,v 1.21 1999/04/11 19:41:37 niklas Exp $	*/
+/*	$OpenBSD: ip_esp.c,v 1.24 1999/07/05 20:17:06 deraadt Exp $	*/
 
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
@@ -75,7 +75,7 @@
 
 #include "bpfilter.h"
 
-extern struct ifnet enc_softc;
+extern struct ifnet encif;
 
 #ifdef ENCDEBUG
 #define DPRINTF(x)	if (encdebug) printf x
@@ -100,7 +100,6 @@ esp_input(m, va_alist)
     int iphlen;
     union sockaddr_union sunion;
     struct ifqueue *ifq = NULL;
-    struct expiration *exp;
     struct ip *ipo, ipn;
     struct tdb *tdbp;
     u_int32_t spi;
@@ -173,33 +172,13 @@ esp_input(m, va_alist)
 	return;
     }
 
-    m->m_pkthdr.rcvif = &enc_softc;
+    m->m_pkthdr.rcvif = &encif;
 
     /* Register first use, setup expiration timer */
     if (tdbp->tdb_first_use == 0)
     {
 	tdbp->tdb_first_use = time.tv_sec;
-
-	if (tdbp->tdb_flags & TDBF_FIRSTUSE)
-	{
-	    exp = get_expiration();
-	    bcopy(&tdbp->tdb_dst, &exp->exp_dst, SA_LEN(&tdbp->tdb_dst.sa));
-	    exp->exp_spi = tdbp->tdb_spi;
-	    exp->exp_sproto = tdbp->tdb_sproto;
-	    exp->exp_timeout = tdbp->tdb_first_use + tdbp->tdb_exp_first_use;
-	    put_expiration(exp);
-	}
-
-	if ((tdbp->tdb_flags & TDBF_SOFT_FIRSTUSE) &&
-	    (tdbp->tdb_soft_first_use <= tdbp->tdb_exp_first_use))
-	{
-	    exp = get_expiration();
-	    bcopy(&tdbp->tdb_dst, &exp->exp_dst, SA_LEN(&tdbp->tdb_dst.sa));
-	    exp->exp_spi = tdbp->tdb_spi;
-	    exp->exp_sproto = tdbp->tdb_sproto;
-	    exp->exp_timeout = tdbp->tdb_first_use + tdbp->tdb_soft_first_use;
-	    put_expiration(exp);
-	}
+	tdb_expiration(tdbp, TDBEXP_TIMEOUT);
     }
     
     ipn = *ipo;
@@ -259,6 +238,8 @@ esp_input(m, va_alist)
     if (ipo->ip_p == IPPROTO_TCP || ipo->ip_p == IPPROTO_UDP)
     {
 	struct tdb_ident *tdbi = NULL;
+	int s = spltdb();
+
 	if (tdbp->tdb_bind_out)
 	{
 	    tdbi = m->m_pkthdr.tdbi;
@@ -279,6 +260,7 @@ esp_input(m, va_alist)
 
     no_mem:
 	m->m_pkthdr.tdbi = tdbi;
+	splx(s);
     } else
         m->m_pkthdr.tdbi = NULL;
 
@@ -286,7 +268,7 @@ esp_input(m, va_alist)
     m->m_flags |= M_CONF;
 
 #if NBPFILTER > 0
-    if (enc_softc.if_bpf) 
+    if (encif.if_bpf) 
     {
         /*
          * We need to prepend the address family as
@@ -306,7 +288,7 @@ esp_input(m, va_alist)
         m0.m_len = ENC_HDRLEN;
         m0.m_data = (char *) &hdr;
         
-        bpf_mtap(enc_softc.if_bpf, &m0);
+        bpf_mtap(encif.if_bpf, &m0);
     }
 #endif
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_var.h,v 1.19 1999/03/27 21:04:21 provos Exp $	*/
+/*	$OpenBSD: tcp_var.h,v 1.24 1999/08/06 18:17:38 deraadt Exp $	*/
 /*	$NetBSD: tcp_var.h,v 1.17 1996/02/13 23:44:24 christos Exp $	*/
 
 /*
@@ -76,9 +76,9 @@ struct tcpcb {
 #define	TF_REQ_TSTMP	0x0080		/* have/will request timestamps */
 #define	TF_RCVD_TSTMP	0x0100		/* a timestamp was received in SYN */
 #define	TF_SACK_PERMIT	0x0200		/* other side said I could SACK */
+#define	TF_SIGNATURE	0x0400		/* require TCP MD5 signature */
 
-	struct	tcpiphdr *t_template;	/* skeletal packet for transmit, will
-					 * be either tcpiphdr or tcpipv6hdr */
+	struct	mbuf *t_template;	/* skeletal packet for transmit */
 	struct	inpcb *t_inpcb;		/* back pointer to internet pcb */
 /*
  * The following fields are used as in the protocol specification.
@@ -268,6 +268,9 @@ struct	tcpstat {
 	u_int32_t tcps_pcbhashmiss;	/* input packets missing pcb hash */
 	u_int32_t tcps_noport;		/* no socket on port */
 	u_int32_t tcps_badsyn;		/* SYN packet with src==dst rcv'ed */
+
+	u_int32_t tcps_rcvbadsig;	/* rcvd bad/missing TCP signatures */
+	u_int64_t tcps_rcvgoodsig;	/* rcvd good TCP signatures */
 };
 
 /*
@@ -327,8 +330,8 @@ struct tcpcb *
 	 tcp_disconnect __P((struct tcpcb *));
 struct tcpcb *
 	 tcp_drop __P((struct tcpcb *, int));
-void	 tcp_dooptions __P((struct tcpcb *,
-	    u_char *, int, struct tcphdr *, int *, u_int32_t *, u_int32_t *));
+void	 tcp_dooptions __P((struct tcpcb *, u_char *, int, struct tcphdr *,
+		int *, u_int32_t *, u_int32_t *)); 
 void	 tcp_drain __P((void));
 void	 tcp_fasttimo __P((void));
 void	 tcp_init __P((void));
@@ -341,15 +344,15 @@ int	 tcp_output __P((struct tcpcb *));
 void	 tcp_pulloutofband __P((struct socket *, u_int, struct mbuf *));
 void	 tcp_quench __P((struct inpcb *, int));
 int	 tcp_reass __P((struct tcpcb *, struct tcphdr *, struct mbuf *, int *));
-void	 tcp_respond __P((struct tcpcb *,
-	    struct tcpiphdr *, struct mbuf *, tcp_seq, tcp_seq, int));
+void	 tcp_respond __P((struct tcpcb *, caddr_t, struct mbuf *, tcp_seq,
+		tcp_seq, int));
 void	 tcp_setpersist __P((struct tcpcb *));
 void	 tcp_slowtimo __P((void));
-struct tcpiphdr *
+struct mbuf *
 	 tcp_template __P((struct tcpcb *));
 struct tcpcb *
 	 tcp_timers __P((struct tcpcb *, int));
-void	 tcp_trace __P((int, int, struct tcpcb *, struct tcpiphdr *, int, int));
+void	 tcp_trace __P((int, int, struct tcpcb *, caddr_t, int, int));
 struct tcpcb *
 	 tcp_usrclosed __P((struct tcpcb *));
 int	 tcp_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
@@ -374,5 +377,8 @@ void	 tcp_print_holes __P((struct tcpcb *tp));
 int	 tcp_newreno __P((struct tcpcb *, struct tcphdr *));
 u_long	 tcp_seq_subtract  __P((u_long, u_long )); 
 #endif /* TCP_NEWRENO || TCP_SACK */
+#ifdef TCP_SIGNATURE
+int	tcp_signature_apply __P((caddr_t, caddr_t, unsigned int));
+#endif /* TCP_SIGNATURE */
 
 #endif /* _KERNEL */

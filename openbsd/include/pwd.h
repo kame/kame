@@ -1,4 +1,4 @@
-/*	$OpenBSD: pwd.h,v 1.6 1998/07/15 00:50:40 millert Exp $	*/
+/*	$OpenBSD: pwd.h,v 1.8 1999/09/03 18:13:37 deraadt Exp $	*/
 /*	$NetBSD: pwd.h,v 1.9 1996/05/15 21:36:45 jtc Exp $	*/
 
 /*-
@@ -98,6 +98,7 @@ struct passwd	*getpwent __P((void));
 #ifndef _XOPEN_SOURCE
 int		 setpassent __P((int));
 char		*user_from_uid __P((uid_t, int));
+char		*bcrypt_gensalt __P((u_int8_t));
 #endif
 void		 setpwent __P((void));
 void		 endpwent __P((void));

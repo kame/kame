@@ -1,4 +1,4 @@
-/*       $OpenBSD: ip_nat.c,v 1.20 1999/02/05 05:58:52 deraadt Exp $       */
+/*       $OpenBSD: ip_nat.c,v 1.22 1999/08/08 00:43:00 niklas Exp $       */
 /*
  * Copyright (C) 1995-1998 by Darren Reed.
  *
@@ -10,7 +10,7 @@
  */
 #if !defined(lint)
 static const char sccsid[] = "@(#)ip_nat.c	1.11 6/5/96 (C) 1995 Darren Reed";
-static const char rcsid[] = "@(#)$Id: ip_nat.c,v 1.20 1999/02/05 05:58:52 deraadt Exp $";
+static const char rcsid[] = "@(#)$Id: ip_nat.c,v 1.22 1999/08/08 00:43:00 niklas Exp $";
 #endif
 
 #if defined(__FreeBSD__) && defined(KERNEL) && !defined(_KERNEL)
@@ -161,11 +161,7 @@ u_32_t n;
 
 	if (!n)
 		return;
-#ifdef sparc
-	sum1 = (~(*sp)) & 0xffff;
-#else
 	sum1 = (~ntohs(*sp)) & 0xffff;
-#endif
 	sum1 += ~(n) & 0xffff;
 	sum1 = (sum1 >> 16) + (sum1 & 0xffff);
 	/* Again */
@@ -417,6 +413,26 @@ struct nat *natd;
 	KFREE(natd);
 }
 
+void
+nat_ifdetach(ifp)
+	struct ifnet *ifp;
+{
+	ipnat_t *n, **np;
+
+	for (np = &nat_list; (n = *np) != NULL; np = &n->in_next) {
+		*np = n->in_next;
+		if (!n->in_use) {
+			if (n->in_apr)
+				ap_free(n->in_apr);
+			KFREE(n);
+			nat_stats.ns_rules--;
+		} else {
+			n->in_flags |= IPN_DELETE;
+			n->in_next = NULL;
+		}
+		n = NULL;
+	}
+}
 
 /*
  * nat_flushtable - clear the NAT table of all mapping entries.

@@ -1,4 +1,4 @@
-/*	$OpenBSD: mfs_vfsops.c,v 1.7 1999/03/09 00:17:05 art Exp $	*/
+/*	$OpenBSD: mfs_vfsops.c,v 1.10 1999/10/15 15:16:13 art Exp $	*/
 /*	$NetBSD: mfs_vfsops.c,v 1.10 1996/02/09 22:31:28 christos Exp $	*/
 
 /*
@@ -46,6 +46,7 @@
 #include <sys/signalvar.h>
 #include <sys/vnode.h>
 #include <sys/malloc.h>
+#include <sys/kthread.h>
 
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
@@ -64,6 +65,9 @@ u_long	mfs_rootsize;	/* size of mini-root in bytes */
 static	int mfs_minor;	/* used for building internal dev_t */
 
 extern int (**mfs_vnodeop_p) __P((void *));
+
+int	mfs_dounmount __P((struct mount *));
+void	mfs_dounmount1 __P((void *));
 
 /*
  * mfs vfs operations.
@@ -230,6 +234,7 @@ mfs_mount(mp, path, data, ndp, p)
 	(void) copyinstr(args.fspec, mp->mnt_stat.f_mntfromname, MNAMELEN - 1,
 	    &size);
 	bzero(mp->mnt_stat.f_mntfromname + size, MNAMELEN - size);
+	bcopy(&args, &mp->mnt_stat.mount_info.mfs_args, sizeof(args));
 	return (0);
 }
 
@@ -271,16 +276,8 @@ mfs_start(mp, flags, p)
 		 * EINTR/ERESTART.
 		 */
 		if (tsleep((caddr_t)vp, mfs_pri, "mfsidl", 0)) {
-			/*
-			 * Don't attempt to unmount when MNT_UNMOUNT is set,
-			 * that means that someone is waiting for us to
-			 * finish our operations and it also means that
-			 * we will sleep until he is finished. deadlock.
-			 * XXX - there is a multiprocessor race here.
-			 */
-			if ((mp->mnt_flag & MNT_UNMOUNT) ||
-			    dounmount(mp, 0, p) != 0)
-				CLRSIG(p, CURSIG(p));
+			mfs_dounmount(mp);
+			CLRSIG(p, CURSIG(p));
 		}
 	}
 	return (0);
@@ -298,11 +295,40 @@ mfs_statfs(mp, sbp, p)
 	int error;
 
 	error = ffs_statfs(mp, sbp, p);
-#ifdef COMPAT_09
-	sbp->f_type = mp->mnt_vfc->vfc_typenum;
-#else
-	sbp->f_type = 0;
-#endif
 	strncpy(&sbp->f_fstypename[0], mp->mnt_vfc->vfc_name, MFSNAMELEN);
+	if (sbp != &mp->mnt_stat)
+		bcopy(&mp->mnt_stat.mount_info.mfs_args,
+		    &sbp->mount_info.mfs_args, sizeof(struct mfs_args));
 	return (error);
+}
+
+/*
+ * Spawn off a kernel thread to do the unmounting to avoid all deadlocks.
+ * XXX - this is horrible, but it was the only sane thing to do.
+ */
+int
+mfs_dounmount(mp)
+	struct mount *mp;
+{
+	if (kthread_create(mfs_dounmount1, (void *)mp, NULL, "mfs_unmount"))
+		return 1;
+
+	return 0;
+}
+
+void
+mfs_dounmount1(v)
+	void *v;
+{
+	struct mount *mp = v;
+
+	/*
+	 * Don't try to do the unmount if someone else is trying to do that.
+	 * XXX - should be done with vfs_busy, but the problem is that
+	 *       we can't pass a locked mp into dounmount.
+	 */
+	if (!(mp->mnt_flag & MNT_UNMOUNT))
+		dounmount(mp, 0, curproc);
+
+	kthread_exit(0);
 }

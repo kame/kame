@@ -1,10 +1,5 @@
-/*	$OpenBSD: uvm_vnode.c,v 1.2 1999/02/26 05:32:08 art Exp $	*/
-/*	$NetBSD: uvm_vnode.c,v 1.18 1999/01/29 12:56:17 bouyer Exp $	*/
+/*	$NetBSD: uvm_vnode.c,v 1.22 1999/03/25 18:48:56 mrg Exp $	*/
 
-/*
- * XXXCDC: "ROUGH DRAFT" QUALITY UVM PRE-RELEASE FILE!   
- *         >>>USE AT YOUR OWN RISK, WORK IS NOT FINISHED<<<
- */
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
  * Copyright (c) 1991, 1993
@@ -118,7 +113,6 @@ static boolean_t	   uvn_releasepg __P((struct vm_page *,
 
 struct uvm_pagerops uvm_vnodeops = {
 	uvn_init,
-	uvn_attach,
 	uvn_reference,
 	uvn_detach,
 	NULL,			/* no specialized fault routine required */
@@ -292,12 +286,12 @@ uvn_attach(arg, accessprot)
 	 */
 #ifdef DEBUG
 	if (vp->v_type == VBLK)
-		printf("used_vnode_size = %qu\n", used_vnode_size);
+		printf("used_vnode_size = %qu\n", (long long)used_vnode_size);
 #endif
 	if (used_vnode_size > (vaddr_t) -PAGE_SIZE) {
 #ifdef DEBUG
 		printf("uvn_attach: vn %p size truncated %qx->%x\n", vp,
-		    used_vnode_size, -PAGE_SIZE);
+		    (long long)used_vnode_size, -PAGE_SIZE);
 #endif    
 		used_vnode_size = (vaddr_t) -PAGE_SIZE;
 	}
@@ -1458,7 +1452,7 @@ uvn_get(uobj, offset, pps, npagesp, centeridx, access_type, advice, flags)
 			if (ptmp == NULL) {
 
 				ptmp = uvm_pagealloc(uobj, current_offset,
-				    NULL);	/* alloc */
+				    NULL, 0);
 
 				/* out of RAM? */
 				if (ptmp == NULL) {
@@ -1699,17 +1693,31 @@ uvn_io(uvn, pps, npages, flags, rw)
 
 	UVMHIST_LOG(maphist, "calling VOP",0,0,0,0);
 
+	/*
+	 * This process may already have this vnode locked, if we faulted in
+	 * copyin() or copyout() on a region backed by this vnode
+	 * while doing I/O to the vnode.  If this is the case, don't
+	 * panic.. instead, return the error to the user.
+	 *
+	 * XXX this is a stopgap to prevent a panic.
+	 * Ideally, this kind of operation *should* work.
+	 */
+	result = 0;
 	if ((uvn->u_flags & UVM_VNODE_VNISLOCKED) == 0)
-		vn_lock(vn, LK_EXCLUSIVE | LK_RETRY, curproc /*XXX*/);
-	/* NOTE: vnode now locked! */
+		result = vn_lock(vn, LK_EXCLUSIVE | LK_RETRY, curproc /*XXX*/);
 
-	if (rw == UIO_READ)
-		result = VOP_READ(vn, &uio, 0, curproc->p_ucred);
-	else
-		result = VOP_WRITE(vn, &uio, 0, curproc->p_ucred);
+	if (result == 0) {
+		/* NOTE: vnode now locked! */
 
-	if ((uvn->u_flags & UVM_VNODE_VNISLOCKED) == 0)
-		VOP_UNLOCK(vn, 0, curproc /*XXX*/);
+		if (rw == UIO_READ)
+			result = VOP_READ(vn, &uio, 0, curproc->p_ucred);
+		else
+			result = VOP_WRITE(vn, &uio, 0, curproc->p_ucred);
+
+		if ((uvn->u_flags & UVM_VNODE_VNISLOCKED) == 0)
+			VOP_UNLOCK(vn, 0, curproc /*XXX*/);
+	}
+	
 	/* NOTE: vnode now unlocked (unless vnislocked) */
 
 	UVMHIST_LOG(maphist, "done calling VOP",0,0,0,0);
@@ -1842,7 +1850,7 @@ uvm_vnp_uncache(vp)
 	 */
 	if (!VOP_ISLOCKED(vp)) {
 		boolean_t is_ok_anyway = FALSE;
-#ifdef NFS
+#if defined(NFSSERVER) || defined(NFSCLIENT)
 		extern int (**nfsv2_vnodeop_p) __P((void *));
 		extern int (**spec_nfsv2nodeop_p) __P((void *));
 		extern int (**fifo_nfsv2nodeop_p) __P((void *));
@@ -1855,7 +1863,7 @@ uvm_vnp_uncache(vp)
 		if (vp->v_op == fifo_nfsv2nodeop_p) {
 			is_ok_anyway = TRUE;
 		}
-#endif	/* NFS */
+#endif	/* defined(NFSSERVER) || defined(NFSCLIENT) */
 		if (!is_ok_anyway)
 			panic("uvm_vnp_uncache: vnode not locked!");
 	}
@@ -1921,7 +1929,8 @@ uvm_vnp_setsize(vp, newsize)
 		if (newsize > (vaddr_t) -PAGE_SIZE) {
 #ifdef DEBUG
 			printf("uvm_vnp_setsize: vn %p size truncated "
-			    "%qx->%lx\n", vp, newsize, (vaddr_t)-PAGE_SIZE);
+			       "%qx->%lx\n", vp, (long long)newsize,
+			       (vaddr_t)-PAGE_SIZE);
 #endif
 			newsize = (vaddr_t)-PAGE_SIZE;
 		}

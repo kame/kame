@@ -1,4 +1,4 @@
-/*	$OpenBSD: ss.c,v 1.36 1998/09/16 15:53:24 kstailey Exp $	*/
+/*	$OpenBSD: ss.c,v 1.40 1999/05/11 23:57:44 kstailey Exp $	*/
 /*	$NetBSD: ss.c,v 1.10 1996/05/05 19:52:55 christos Exp $	*/
 
 /*
@@ -111,7 +111,11 @@ struct ss_quirk_inquiry_pattern {
 	struct quirkdata quirkdata;
 };
 
-struct  quirkdata ss_gen_quirks;
+struct  quirkdata ss_gen_quirks = {
+	"generic", 0, 0, 0, 0, 0,
+	{0, 0}, 0, 0, GENERIC_SCSI2,
+	NULL, NULL, NULL
+};
 
 void    ssstrategy __P((struct buf *));
 void    ssstart __P((void *));
@@ -374,9 +378,6 @@ ss_identify_scanner(ss, inqbuf)
 	} else {
 		printf("\n%s: generic scanner\n", ss->sc_dev.dv_xname);
 		bzero(&ss_gen_quirks, sizeof(ss_gen_quirks));
-#if 0
-		ss_gen_quirks.name = "generic";
-#endif
 		ss->quirkdata = &ss_gen_quirks;
 		ss->sio.scan_scanner_type = GENERIC_SCSI2;
 	}
@@ -525,7 +526,13 @@ ssread(dev, uio, flag)
 			if (error)
 				return (error);
 		} else {
-			/* XXX addd code for generic trigger */
+			struct scsi_start_stop trigger_cmd;
+			bzero(&trigger_cmd, sizeof(trigger_cmd));
+			trigger_cmd.opcode = START_STOP;
+			trigger_cmd.how = SSS_START;
+			scsi_scsi_cmd(ss->sc_link,
+				(struct scsi_generic *)&trigger_cmd,
+				sizeof(trigger_cmd), 0, 0, 4, 5000, NULL, 0);
 		}
 		ss->flags |= SSF_TRIGGERED;
 	}
@@ -735,7 +742,7 @@ ss_set_window(ss, sio)
 	} wd;
 #define window_data   wd.window_data
 #define vendor_unique wd.vendor_unique
-	struct scsi_link	*sc_link = ss->sc_link;;
+	struct scsi_link	*sc_link = ss->sc_link;
 
 	/*
 	 * The CDB for SET WINDOW goes in here.
@@ -840,7 +847,9 @@ ss_set_window(ss, sio)
 		return (scsi_scsi_cmd(sc_link,
 		        (struct scsi_generic *)&window_cmd,
 			sizeof(window_cmd), (u_char *) &wd.window_data,
-			sizeof(wd.window_data), 4, 5000, NULL, SCSI_DATA_OUT));
+			(ss->quirkdata->quirks & SS_Q_WINDOW_DESC_LEN) ?
+			ss->quirkdata->window_descriptor_length : 40,
+			4, 5000, NULL, SCSI_DATA_OUT));
 }
 
 int

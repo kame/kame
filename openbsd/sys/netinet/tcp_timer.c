@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_timer.c,v 1.11 1999/01/27 16:47:29 provos Exp $	*/
+/*	$OpenBSD: tcp_timer.c,v 1.14 1999/09/01 21:38:21 provos Exp $	*/
 /*	$NetBSD: tcp_timer.c,v 1.14 1996/02/13 23:44:09 christos Exp $	*/
 
 /*
@@ -144,7 +144,7 @@ tpgone:
 	if ((int)tcp_iss < 0)
 		tcp_iss = 0;				/* XXX */
 #else /* TCP_COMPAT_42 */
-	tcp_iss += arc4random() % (TCP_ISSINCR / PR_SLOWHZ) + 1; /* increment iss */
+	tcp_iss += arc4random() % (2 * TCP_ISSINCR / PR_SLOWHZ) + 1; /* increment iss */
 #endif /* !TCP_COMPAT_42 */
 	tcp_now++;					/* for timestamps */
 	splx(s);
@@ -247,6 +247,13 @@ tcp_timers(tp, timer)
 			tp->t_srtt = 0;
 		}
 		tp->snd_nxt = tp->snd_una;
+#if defined(TCP_SACK) || defined(TCP_NEWRENO)
+		/*
+		 * Note:  We overload snd_last to function also as the
+		 * snd_last variable described in RFC 2582
+		 */
+		tp->snd_last = tp->snd_max;
+#endif /* TCP_SACK or TCP_NEWRENO */
 		/*
 		 * If timing a segment in this window, stop the timer.
 		 */
@@ -342,11 +349,15 @@ tcp_timers(tp, timer)
 			 * The keepalive packet must have nonzero length
 			 * to get a 4.2 host to respond.
 			 */
-			tcp_respond(tp, tp->t_template, (struct mbuf *)NULL,
-			    tp->rcv_nxt - 1, tp->snd_una - 1, 0);
+			tcp_respond(tp,
+				mtod(tp->t_template, caddr_t),
+				(struct mbuf *)NULL,
+				tp->rcv_nxt - 1, tp->snd_una - 1, 0);
 #else
-			tcp_respond(tp, tp->t_template, (struct mbuf *)NULL,
-			    tp->rcv_nxt, tp->snd_una - 1, 0);
+			tcp_respond(tp,
+				mtod(tp->t_template, caddr_t),
+				(struct mbuf *)NULL,
+				tp->rcv_nxt, tp->snd_una - 1, 0);
 #endif
 			tp->t_timer[TCPT_KEEP] = tcp_keepintvl;
 		} else

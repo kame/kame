@@ -1,4 +1,4 @@
-/*	$OpenBSD: device.h,v 1.13 1998/05/11 09:59:37 niklas Exp $	*/
+/*	$OpenBSD: device.h,v 1.17 1999/08/08 00:37:09 niklas Exp $	*/
 /*	$NetBSD: device.h,v 1.15 1996/04/09 20:55:24 cgd Exp $	*/
 
 /*
@@ -63,6 +63,14 @@ enum devclass {
 	DV_TTY			/* serial line interface (???) */
 };
 
+/*
+ * Actions for ca_activate.
+ */
+enum devact {
+	DVACT_ACTIVATE,		/* activate the device */
+	DVACT_DEACTIVATE,	/* deactivate the device */
+};
+
 struct device {
 	enum	devclass dv_class;	/* this device's classification */
 	TAILQ_ENTRY(device) dv_list;	/* entry on list of all devices */
@@ -70,7 +78,12 @@ struct device {
 	int	dv_unit;		/* device unit number */
 	char	dv_xname[16];		/* external name (name + unit) */
 	struct	device *dv_parent;	/* pointer to parent device */
+	int	dv_flags;		/* misc. flags; see below */
 };
+
+/* dv_flags */
+#define	DVF_ACTIVE	0x0001		/* device is activated */
+
 TAILQ_HEAD(devicelist, device);
 
 /* `event' counters (use zero or more per device instance, as needed) */
@@ -127,9 +140,13 @@ struct cfattach {
 	size_t	  ca_devsize;		/* size of dev data (for malloc) */
 	cfmatch_t ca_match;		/* returns a match level */
 	void	(*ca_attach) __P((struct device *, struct device *, void *));
-	int	(*ca_detach) __P((struct device*));
-	int	(*ca_reprobe) __P((struct device*, struct cfdata*));
+	int	(*ca_detach) __P((struct device *, int));
+	int	(*ca_activate) __P((struct device *, enum devact));
 };
+
+/* Flags given to config_detach(), and the ca_detach function. */
+#define	DETACH_FORCE	0x01		/* force detachment; hardware gone */
+#define	DETACH_QUIET	0x02		/* don't print a notice */
 
 struct cfdriver {
 	void	**cd_devs;		/* devices found */
@@ -168,6 +185,8 @@ TAILQ_HEAD(cftable_head, cftable);
 extern struct devicelist alldevs;	/* list of all devices */
 extern struct evcntlist allevents;	/* list of all event counters */
 
+extern int autoconf_verbose;
+
 void config_init __P((void));
 void config_edit __P((void));
 void *config_search __P((cfmatch_t, struct device *, void *));
@@ -177,19 +196,20 @@ struct device *config_found_sm __P((struct device *, void *, cfprint_t,
 struct device *config_rootfound __P((char *, void *));
 void config_scan __P((cfscan_t, struct device *));
 struct device *config_attach __P((struct device *, void *, void *, cfprint_t));
+int config_detach __P((struct device *, int));
+int config_activate __P((struct device *));
+int config_deactivate __P((struct device *));
 struct device *config_make_softc __P((struct device *parent,
     struct cfdata *cf));
+void config_defer __P((struct device *, void (*)(struct device *)));
 void evcnt_attach __P((struct device *, const char *, struct evcnt *));
 
 /* compatibility definitions */
 #define config_found(d, a, p)	config_found_sm((d), (a), (p), NULL)
+#if 0
 extern int attach_loadable __P((char *, int, struct cftable *));
 extern int detach_loadable __P((struct cftable *));
-typedef void (*config_detach_callback_t) __P((struct device *, void *));
-extern int config_detach __P((struct cfdata *, config_detach_callback_t,
-	    void *));
-extern int config_detach_children __P((struct cfdata *,
-	    config_detach_callback_t, void *));
+#endif
 
 #endif /* _KERNEL */
 

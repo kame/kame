@@ -1,10 +1,5 @@
-/*	$OpenBSD: uvm_pager.c,v 1.2 1999/02/26 05:32:08 art Exp $	*/
-/*	$NetBSD: uvm_pager.c,v 1.14 1999/01/22 08:00:35 chs Exp $	*/
+/*	$NetBSD: uvm_pager.c,v 1.15 1999/03/25 18:48:55 mrg Exp $	*/
 
-/*
- * XXXCDC: "ROUGH DRAFT" QUALITY UVM PRE-RELEASE FILE!   
- *	   >>>USE AT YOUR OWN RISK, WORK IS NOT FINISHED<<<
- */
 /*
  *
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -130,10 +125,8 @@ uvm_pagermapin(pps, npages, aiop, waitf)
 	vsize_t size;
 	vaddr_t kva;
 	struct uvm_aiodesc *aio;
-#if !defined(PMAP_NEW)
 	vaddr_t cva;
 	struct vm_page *pp;
-#endif
 	UVMHIST_FUNC("uvm_pagermapin"); UVMHIST_CALLED(maphist);
 
 	UVMHIST_LOG(maphist,"(pps=0x%x, npages=%d, aiop=0x%x, waitf=%d)",
@@ -168,16 +161,6 @@ ReStart:
 		goto ReStart;
 	}
 
-#if defined(PMAP_NEW)
-	/*
-	 * XXX: (ab)using the pmap module to store state info for us.
-	 * (pmap stores the PAs... we fetch them back later and convert back
-	 * to pages with PHYS_TO_VM_PAGE).
-	 */
-	pmap_kenter_pgs(kva, pps, npages);
-
-#else /* PMAP_NEW */
-
 	/* got it */
 	for (cva = kva ; size != 0 ; size -= PAGE_SIZE, cva += PAGE_SIZE) {
 		pp = *pps++;
@@ -187,10 +170,9 @@ ReStart:
 #endif
 
 		pmap_enter(vm_map_pmap(pager_map), cva, VM_PAGE_TO_PHYS(pp),
-		    VM_PROT_DEFAULT, TRUE);
+		    VM_PROT_DEFAULT, TRUE,
+		    VM_PROT_READ | VM_PROT_WRITE);
 	}
-
-#endif /* PMAP_NEW */
 
 	UVMHIST_LOG(maphist, "<- done (KVA=0x%x)", kva,0,0,0);
 	return(kva);

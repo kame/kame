@@ -1,10 +1,5 @@
-/*	$OpenBSD: uvm_glue.c,v 1.2 1999/02/26 05:32:06 art Exp $	*/
-/*	$NetBSD: uvm_glue.c,v 1.15 1998/10/19 22:21:19 tron Exp $	*/
+/*	$NetBSD: uvm_glue.c,v 1.19 1999/04/30 21:23:50 thorpej Exp $	*/
 
-/*
- * XXXCDC: "ROUGH DRAFT" QUALITY UVM PRE-RELEASE FILE!
- *         >>>USE AT YOUR OWN RISK, WORK IS NOT FINISHED<<<
- */
 /* 
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
  * Copyright (c) 1991, 1993, The Regents of the University of California.  
@@ -213,7 +208,7 @@ uvm_chgkprot(addr, len, rw)
 		pa = pmap_extract(pmap_kernel(), sva|1);
 		if (pa == 0)
 			panic("chgkprot: invalid page");
-		pmap_enter(pmap_kernel(), sva, pa&~1, prot, TRUE);
+		pmap_enter(pmap_kernel(), sva, pa&~1, prot, TRUE, 0);
 	}
 }
 #endif
@@ -258,6 +253,8 @@ uvm_vsunlock(p, addr, len)
  * - the address space is copied as per parent map's inherit values
  * - a new "user" structure is allocated for the child process
  *	[filled in by MD layer...]
+ * - if specified, the child gets a new user stack described by
+ *	stack and stacksize
  * - NOTE: the kernel stack may be at a different location in the child
  *	process, and thus addresses of automatic variables may be invalid
  *	after cpu_fork returns in the child process.  We do nothing here
@@ -266,9 +263,11 @@ uvm_vsunlock(p, addr, len)
  *   than just hang
  */
 void
-uvm_fork(p1, p2, shared)
+uvm_fork(p1, p2, shared, stack, stacksize)
 	struct proc *p1, *p2;
 	boolean_t shared;
+	void *stack;
+	size_t stacksize;
 {
 	struct user *up = p2->p_addr;
 	int rv;
@@ -304,12 +303,12 @@ uvm_fork(p1, p2, shared)
 	((caddr_t)&up->u_stats.pstat_endcopy -
 	 (caddr_t)&up->u_stats.pstat_startcopy));
 	
-/*
+	/*
 	 * cpu_fork will copy and update the kernel stack and pcb, and make
 	 * the child ready to run.  The child will exit directly to user
 	 * mode on its first time slice, and will not return here.
 	 */
-	cpu_fork(p1, p2);
+	cpu_fork(p1, p2, stack, stacksize);
 }
 
 /*
@@ -464,8 +463,6 @@ loop:
 		printf("scheduler: no room for pid %d(%s), free %d\n",
 	   p->p_pid, p->p_comm, uvmexp.free);
 #endif
-	printf("scheduler: no room for pid %d(%s), free %d\n",
-	   p->p_pid, p->p_comm, uvmexp.free);/*XXXCDC: HIGHLY BOGUS */
 	(void) splhigh();
 	uvm_wait("schedpwait");
 	(void) spl0();

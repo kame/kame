@@ -1,9 +1,10 @@
-/*	$OpenBSD: ip_ipsp.h,v 1.29 1999/04/11 19:41:39 niklas Exp $	*/
+/*	$OpenBSD: ip_ipsp.h,v 1.42 1999/09/29 09:11:21 niklas Exp $	*/
 
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
- * Angelos D. Keromytis (kermit@csd.uch.gr) and 
- * Niels Provos (provos@physnet.uni-hamburg.de).
+ * Angelos D. Keromytis (kermit@csd.uch.gr),
+ * Niels Provos (provos@physnet.uni-hamburg.de) and
+ * Niklas Hallqvist (niklas@appli.se).
  *
  * This code was written by John Ioannidis for BSD/OS in Athens, Greece, 
  * in November 1995.
@@ -14,11 +15,12 @@
  * Additional transforms and features in 1997 and 1998 by Angelos D. Keromytis
  * and Niels Provos.
  *
- * Additional features in 1999 by Angelos D. Keromytis.
+ * Additional features in 1999 by Angelos D. Keromytis and Niklas Hallqvist.
  *
- * Copyright (C) 1995, 1996, 1997, 1998, 1999 by John Ioannidis,
+ * Copyright (c) 1995, 1996, 1997, 1998, 1999 by John Ioannidis,
  * Angelos D. Keromytis and Niels Provos.
- *	
+ * Copyright (c) 1999 Niklas Hallqvist.
+ *
  * Permission to use, copy, and modify this software without fee
  * is hereby granted, provided that this entire notice is included in
  * all copies of any software which is or includes a copy or
@@ -57,7 +59,6 @@ union sockaddr_union
     struct sockaddr     sa;
     struct sockaddr_in  sin;
     struct sockaddr_in6 sin6;
-    char  __maxsize[128];
 };
 
 /* HMAC key sizes */
@@ -97,6 +98,11 @@ union sockaddr_union
 #define AH_SHA1_ALEN		20
 #define AH_RMD160_ALEN		20
 #define AH_ALEN_MAX		20 	/* Keep updated */
+
+/* Reserved SPI numbers */
+#define SPI_LOCAL_USE		0
+#define SPI_RESERVED_MIN	1
+#define SPI_RESERVED_MAX	255
 
 struct sockaddr_encap
 {
@@ -181,21 +187,11 @@ struct route_enc {
     struct sockaddr_encap re_dst;
 };
 
-struct expiration
-{
-    u_int32_t             exp_timeout;
-    union sockaddr_union  exp_dst;
-    u_int32_t             exp_spi;
-    u_int8_t              exp_sproto;
-    struct expiration    *exp_next;
-    struct expiration    *exp_prev;
-};
-
 struct flow
 {
-    struct flow           *flow_next;	/* Next in flow chain */
-    struct flow           *flow_prev;	/* Previous in flow chain */
-    struct tdb            *flow_sa;	/* Pointer to the SA */
+    struct flow          *flow_next;	/* Next in flow chain */
+    struct flow          *flow_prev;	/* Previous in flow chain */
+    struct tdb           *flow_sa;	/* Pointer to the SA */
     union sockaddr_union  flow_src;   	/* Source address */
     union sockaddr_union  flow_srcmask; /* Source netmask */
     union sockaddr_union  flow_dst;	/* Destination address */
@@ -229,6 +225,9 @@ struct tdb				/* tunnel descriptor block */
 #define TDBF_TUNNELING        0x01000	/* Force IP-IP encapsulation */
     u_int32_t	      tdb_flags;  	/* Flags related to this TDB */
 
+    TAILQ_ENTRY(tdb)  tdb_expnext;	/* Expiration cluster list link */
+    TAILQ_ENTRY(tdb)  tdb_explink;	/* Expiration ordered list link */
+
     u_int32_t         tdb_exp_allocations;  /* Expire after so many flows */
     u_int32_t         tdb_soft_allocations; /* Expiration warning */ 
     u_int32_t         tdb_cur_allocations;  /* Total number of allocations */
@@ -240,17 +239,20 @@ struct tdb				/* tunnel descriptor block */
     u_int64_t         tdb_exp_timeout;	/* When does the SPI expire */
     u_int64_t         tdb_soft_timeout;	/* Send a soft-expire warning */
     u_int64_t         tdb_established;	/* When was the SPI established */
+    u_int64_t	      tdb_timeout;	/* Next absolute expiration time.  */
 
     u_int64_t	      tdb_first_use;	  /* When was it first used */
     u_int64_t         tdb_soft_first_use; /* Soft warning */
     u_int64_t         tdb_exp_first_use;  /* Expire if tdb_first_use +
 					   * tdb_exp_first_use <= curtime */
+
     u_int32_t	      tdb_spi;    	/* SPI */
     u_int16_t         tdb_amxkeylen;    /* AH-old only */
     u_int16_t         tdb_ivlen;        /* IV length */
     u_int8_t	      tdb_sproto;	/* IPsec protocol */
     u_int8_t          tdb_wnd;          /* Replay window */
-    u_int16_t         tdb_FILLER;       /* Padding */
+    u_int8_t          tdb_satype;       /* SA type (RFC2367, PF_KEY) */
+    u_int8_t          tdb_FILLER;       /* Padding */
     
     union sockaddr_union tdb_dst;	/* Destination address for this SA */
     union sockaddr_union tdb_src;	/* Source address for this SA */
@@ -291,7 +293,16 @@ struct tdb				/* tunnel descriptor block */
     TAILQ_HEAD(tdb_inp_head, inpcb) tdb_inp;
 };
 
-#define TDB_HASHMOD	257
+union authctx_old {
+    MD5_CTX md5ctx;
+    SHA1_CTX sha1ctx;
+};
+
+union authctx {
+    MD5_CTX md5ctx;
+    SHA1_CTX sha1ctx;
+    RMD160_CTX rmd160ctx;
+};
 
 struct tdb_ident {
     u_int32_t spi;
@@ -318,6 +329,8 @@ struct enc_xform {
     u_int32_t ivmask;           /* Or all possible modes, zero iv = 1 */ 
     void (*encrypt)(struct tdb *, u_int8_t *);
     void (*decrypt)(struct tdb *, u_int8_t *);
+    void (*setkey)(u_int8_t **, u_int8_t *, int len);
+    void (*zerokey)(u_int8_t **);
 };
 
 struct ipsecinit
@@ -349,6 +362,7 @@ struct xformsw
 #define XF_OLD_ESP	3	/* RFCs 1829 & 1851 */
 #define XF_NEW_AH	4	/* AH HMAC 96bits */
 #define XF_NEW_ESP	5	/* ESP + auth 96bits + replay counter */
+#define XF_TCPSIGNATURE	6	/* TCP MD5 Signature option, RFC 2358 */
 
 /* xform attributes */
 #define XFT_AUTH	0x0001
@@ -380,13 +394,22 @@ htonq(u_int64_t q)
 #endif                                          
 
 #ifdef _KERNEL
+
+/*
+ * Protects all tdb lists.
+ * Must at least be splsoftnet (note: do not use splsoftclock as it is
+ * special on some architectures, assuming it is always an spl lowering
+ * operation).
+ */
+#define spltdb	splsoftnet
+
 extern int encdebug;
 extern int ipsec_in_use;
 extern u_int8_t hmac_ipad_buffer[64];
 extern u_int8_t hmac_opad_buffer[64];
 
-struct tdb *tdbh[TDB_HASHMOD];
-struct expiration *explist;
+extern TAILQ_HEAD(expclusterlist_head, tdb) expclusterlist;
+extern TAILQ_HEAD(explist_head, tdb) explist;
 extern struct xformsw xformsw[], *xformswNXFORMSW;
 
 /* Check if a given tdb has encryption, authentication and/or tunneling */
@@ -395,17 +418,19 @@ extern struct xformsw xformsw[], *xformswNXFORMSW;
 
 /* Traverse spi chain and get attributes */
 
-#define SPI_CHAIN_ATTRIB(have, TDB_DIR, TDBP) {\
+#define SPI_CHAIN_ATTRIB(have, TDB_DIR, TDBP) do {\
+	int s = spltdb(); \
 	struct tdb *tmptdb = (TDBP); \
-	(have) = 0; \
 	\
+	(have) = 0; \
 	while (tmptdb && tmptdb->tdb_xform) { \
 	        if (tmptdb == NULL || tmptdb->tdb_flags & TDBF_INVALID) \
 	                break; \
                 (have) |= TDB_ATTRIB(tmptdb); \
                 tmptdb = tmptdb->TDB_DIR; \
         } \
-}
+	splx(s); \
+} while (0)
 
 /* Misc. */
 extern char *inet_ntoa4(struct in_addr);
@@ -417,14 +442,14 @@ extern u_int32_t reserve_spi(u_int32_t, u_int32_t, union sockaddr_union *,
 			     union sockaddr_union *, u_int8_t, int *);
 extern struct tdb *gettdb(u_int32_t, union sockaddr_union *, u_int8_t);
 extern void puttdb(struct tdb *);
-extern int tdb_delete(struct tdb *, int);
-extern int tdb_init (struct tdb *, u_int16_t, struct ipsecinit *);
-
-/* Expiration management routines */
-extern struct expiration *get_expiration(void);
-extern void put_expiration(struct expiration *);
+extern void tdb_delete(struct tdb *, int, int);
+extern int tdb_init(struct tdb *, u_int16_t, struct ipsecinit *);
+extern void tdb_expiration(struct tdb *, int);
+/* Flag values for the last argument of tdb_expiration().  */
+#define TDBEXP_EARLY	1	/* The tdb is likely to end up early.  */
+#define TDBEXP_TIMEOUT	2	/* Maintain expiration timeout.  */
+extern int tdb_walk(int (*)(struct tdb *, void *), void *);
 extern void handle_expirations(void *);
-extern void cleanup_expirations(union sockaddr_union *, u_int32_t, u_int8_t);
 
 /* Flow management routines */
 extern struct flow *get_flow(void);
@@ -478,6 +503,16 @@ extern int esp_new_zeroize(struct tdb *);
 extern int esp_new_output(struct mbuf *, struct sockaddr_encap *, struct tdb *,
 			  struct mbuf **);
 extern struct mbuf *esp_new_input(struct mbuf *, struct tdb *);
+
+/* XF_TCPSIGNATURE */
+extern int tcp_signature_tdb_attach __P((void));
+extern int tcp_signature_tdb_init __P((struct tdb *, struct xformsw *,
+				       struct ipsecinit *));
+extern int tcp_signature_tdb_zeroize __P((struct tdb *));
+extern struct mbuf *tcp_signature_tdb_input __P((struct mbuf *, struct tdb *));
+extern int tcp_signature_tdb_output __P((struct mbuf *,
+					 struct sockaddr_encap *, struct tdb *,
+					 struct mbuf **));
 
 /* Padding */
 extern caddr_t m_pad(struct mbuf *, int, int);

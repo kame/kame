@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_icmp.c,v 1.16 1999/01/08 11:35:09 deraadt Exp $	*/
+/*	$OpenBSD: ip_icmp.c,v 1.18 1999/09/26 23:59:15 deraadt Exp $	*/
 /*	$NetBSD: ip_icmp.c,v 1.19 1996/02/13 23:42:22 christos Exp $	*/
 
 /*
@@ -91,6 +91,8 @@ extern	struct protosw inetsw[];
 /*
  * Generate an error packet of type error
  * in response to bad packet ip.
+ *
+ * The ip packet inside has ip_off and ip_len in host byte order.
  */
 void
 icmp_error(n, type, code, dest, destifp)
@@ -116,7 +118,7 @@ icmp_error(n, type, code, dest, destifp)
 	 * Don't error if the old packet protocol was ICMP
 	 * error message, only known informational types.
 	 */
-	if (ntohs(oip->ip_off) &~ (IP_MF|IP_DF))
+	if (oip->ip_off &~ (IP_MF|IP_DF))
 		goto freeit;
 	if (oip->ip_p == IPPROTO_ICMP && type != ICMP_REDIRECT &&
 	  n->m_len >= oiplen + ICMP_MINLEN &&
@@ -133,7 +135,7 @@ icmp_error(n, type, code, dest, destifp)
 	m = m_gethdr(M_DONTWAIT, MT_HEADER);
 	if (m == NULL)
 		goto freeit;
-	icmplen = oiplen + min(8, ntohs(oip->ip_len));
+	icmplen = oiplen + min(8, oip->ip_len);
 	m->m_len = icmplen + ICMP_MINLEN;
 	MH_ALIGN(m, m->m_len);
 	icp = mtod(m, struct icmp *);
@@ -160,7 +162,8 @@ icmp_error(n, type, code, dest, destifp)
 	icp->icmp_code = code;
 	bcopy((caddr_t)oip, (caddr_t)&icp->icmp_ip, icmplen);
 	nip = &icp->icmp_ip;
-	nip->ip_len = htons((u_int16_t)(ntohs(nip->ip_len) + oiplen));
+	nip->ip_off = htons(nip->ip_off);
+	nip->ip_len = htons(nip->ip_len);
 
 	m0.m_next = NULL;			/* correct nip->ip_sum */
 	m0.m_data = (char *)nip;
@@ -180,6 +183,7 @@ icmp_error(n, type, code, dest, destifp)
 	m->m_pkthdr.rcvif = n->m_pkthdr.rcvif;
 	nip = mtod(m, struct ip *);
 	bcopy((caddr_t)oip, (caddr_t)nip, sizeof(struct ip));
+	nip->ip_off = htons(nip->ip_off);
 	nip->ip_len = m->m_len;
 	nip->ip_hl = sizeof(struct ip) >> 2;
 	nip->ip_p = IPPROTO_ICMP;

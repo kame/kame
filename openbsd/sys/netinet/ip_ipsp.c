@@ -1,9 +1,10 @@
-/*	$OpenBSD: ip_ipsp.c,v 1.40 1999/04/12 03:17:09 deraadt Exp $	*/
+/*	$OpenBSD: ip_ipsp.c,v 1.54 1999/09/03 13:52:34 ho Exp $	*/
 
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
- * Angelos D. Keromytis (kermit@csd.uch.gr) and 
- * Niels Provos (provos@physnet.uni-hamburg.de).
+ * Angelos D. Keromytis (kermit@csd.uch.gr), 
+ * Niels Provos (provos@physnet.uni-hamburg.de) and
+ * Niklas Hallqvist (niklas@appli.se).
  *
  * This code was written by John Ioannidis for BSD/OS in Athens, Greece, 
  * in November 1995.
@@ -14,11 +15,12 @@
  * Additional transforms and features in 1997 and 1998 by Angelos D. Keromytis
  * and Niels Provos.
  *
- * Additional features in 1999 by Angelos D. Keromytis.
+ * Additional features in 1999 by Angelos D. Keromytis and Niklas Hallqvist.
  *
- * Copyright (C) 1995, 1996, 1997, 1998, 1999 by John Ioannidis,
+ * Copyright (c) 1995, 1996, 1997, 1998, 1999 by John Ioannidis,
  * Angelos D. Keromytis and Niels Provos.
- *	
+ * Copyright (c) 1999 Niklas Hallqvist.
+ *
  * Permission to use, copy, and modify this software without fee
  * is hereby granted, provided that this entire notice is included in
  * all copies of any software which is or includes a copy or
@@ -72,15 +74,25 @@
 
 #include <dev/rndvar.h>
 
+#ifdef DDB
+#include <ddb/db_output.h>
+void tdb_hashstats(void);
+#endif
+
 #ifdef ENCDEBUG
 #define DPRINTF(x)	if (encdebug) printf x
 #else
 #define DPRINTF(x)
 #endif
 
+#ifdef __GNUC__
+#define INLINE static __inline
+#endif
+
 int		ipsp_kern __P((int, char **, int));
 u_int8_t       	get_sa_require  __P((struct inpcb *));
 int		check_ipsec_policy  __P((struct inpcb *, u_int32_t));
+void		tdb_rehash __P((void));
 
 extern int	ipsec_auth_default_level;
 extern int	ipsec_esp_trans_default_level;
@@ -89,6 +101,10 @@ extern int	ipsec_esp_network_default_level;
 extern int encdebug;
 int ipsec_in_use = 0;
 u_int32_t kernfs_epoch = 0;
+
+struct expclusterlist_head expclusterlist =
+    TAILQ_HEAD_INITIALIZER(expclusterlist);
+struct explist_head explist = TAILQ_HEAD_INITIALIZER(explist);
 
 u_int8_t hmac_ipad_buffer[64] = {
     0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 0x36, 
@@ -132,11 +148,22 @@ struct xformsw xformsw[] = {
       "Encryption + Authentication + Replay Protection",
       esp_new_attach,	 esp_new_init,  esp_new_zeroize,
       esp_new_input,	 esp_new_output, },
+#ifdef TCP_SIGNATURE
+    { XF_TCPSIGNATURE,	 XFT_AUTH, "TCP MD5 Signature Option, RFC 2385",
+      tcp_signature_tdb_attach, 	tcp_signature_tdb_init,
+      tcp_signature_tdb_zeroize,	tcp_signature_tdb_input,
+      tcp_signature_tdb_output, }
+#endif /* TCP_SIGNATURE */
 };
 
 struct xformsw *xformswNXFORMSW = &xformsw[sizeof(xformsw)/sizeof(xformsw[0])];
 
 unsigned char ipseczeroes[IPSEC_ZEROES_SIZE]; /* zeroes! */ 
+
+#define TDB_HASHSIZE_INIT 32
+static struct tdb **tdbh = NULL;
+static u_int tdb_hashmask = TDB_HASHSIZE_INIT - 1;
+static int tdb_count;
 
 /*
  * Check which transformationes are required
@@ -183,7 +210,7 @@ check_ipsec_policy(struct inpcb *inp, u_int32_t daddr)
     struct route_enc re0, *re = &re0;
     struct sockaddr_encap *dst; 
     u_int8_t sa_require, sa_have;
-    int error, i;
+    int error, i, s;
     struct tdb *tdb = NULL;
 
     if (inp == NULL || ((so = inp->inp_socket) == 0))
@@ -192,7 +219,8 @@ check_ipsec_policy(struct inpcb *inp, u_int32_t daddr)
     /* If IPSEC is not required just use what we got */
     if (!(sa_require = inp->inp_secrequire))
       return 0;
-	
+
+    s = spltdb();
     if (!inp->inp_tdb)
     {
 	bzero((caddr_t) re, sizeof(*re));
@@ -225,23 +253,26 @@ check_ipsec_policy(struct inpcb *inp, u_int32_t daddr)
 	    
 	    gw = (struct sockaddr_encap *) (re->re_rt->rt_gateway);
 	    
-	    if (gw->sen_type == SENT_IPSP) {
-	      sunion.sin.sin_family = AF_INET;
-	      sunion.sin.sin_len = sizeof(struct sockaddr_in);
-	      sunion.sin.sin_addr = gw->sen_ipsp_dst;
+	    if (gw->sen_type == SENT_IPSP)
+	    {
+		bzero(&sunion, sizeof(sunion));
+	        sunion.sin.sin_family = AF_INET;
+		sunion.sin.sin_len = sizeof(struct sockaddr_in);
+		sunion.sin.sin_addr = gw->sen_ipsp_dst;
 	      
-	      tdb = (struct tdb *) gettdb(gw->sen_ipsp_spi, &sunion,
-					  gw->sen_ipsp_sproto);
+		tdb = (struct tdb *) gettdb(gw->sen_ipsp_spi, &sunion,
+					    gw->sen_ipsp_sproto);
 	    }
 	    RTFREE(re->re_rt);
 	}
     } else
       tdb = inp->inp_tdb;
 
-    if (tdb) {
-	SPI_CHAIN_ATTRIB(sa_have, tdb_onext, tdb);
-    } else
-	sa_have = 0;
+    if (tdb)
+      SPI_CHAIN_ATTRIB(sa_have, tdb_onext, tdb);
+    else
+      sa_have = 0;
+    splx(s);
 
     /* Check if our requirements are met */
     if (!(sa_require & ~sa_have))
@@ -298,21 +329,28 @@ check_ipsec_policy(struct inpcb *inp, u_int32_t daddr)
 void
 tdb_add_inp(struct tdb *tdb, struct inpcb *inp)
 {
-	if (inp->inp_tdb) {
-		if (inp->inp_tdb == tdb)
-			return;
-		TAILQ_REMOVE(&inp->inp_tdb->tdb_inp, inp, inp_tdb_next);
-	}
-	inp->inp_tdb = tdb;
-	TAILQ_INSERT_TAIL(&tdb->tdb_inp, inp, inp_tdb_next);
+    int s = spltdb();
 
-	DPRINTF(("tdb_add_inp: tdb: %p, inp: %p\n", tdb, inp));
+    if (inp->inp_tdb)
+    {
+	if (inp->inp_tdb == tdb)
+	{
+	    splx(s);
+	    return;
+	}
+	TAILQ_REMOVE(&inp->inp_tdb->tdb_inp, inp, inp_tdb_next);
+    }
+    inp->inp_tdb = tdb;
+    TAILQ_INSERT_TAIL(&tdb->tdb_inp, inp, inp_tdb_next);
+    splx(s);
+
+    DPRINTF(("tdb_add_inp: tdb: %p, inp: %p\n", tdb, inp));
 }
 
 /*
- * Reserve an SPI; the SA is not valid yet though. Zero is reserved as
- * an error return value. If tspi is not zero, we try to allocate that
- * SPI.
+ * Reserve an SPI; the SA is not valid yet though.  We use SPI_LOCAL_USE as
+ * an error return value.  It'll not be a problem that we also use that
+ * for demand-keying as that is manually specified.
  */
 
 u_int32_t
@@ -323,33 +361,35 @@ reserve_spi(u_int32_t sspi, u_int32_t tspi, union sockaddr_union *src,
     u_int32_t spi;
     int nums;
 
-    if (tspi <= 255)   /* We don't reserve 0 < SPI <= 255 */
+    /* Don't accept ranges only encompassing reserved SPIs.  */
+    if (tspi < sspi || tspi <= SPI_RESERVED_MAX)
     {
-	(*errval) = EEXIST;
+	(*errval) = EINVAL;
 	return 0;
     }
-    
-    if ((sspi == tspi) && (sspi != 0))   /* Asking for a specific SPI */
+
+    /* Limit the range to not include reserved areas.  */
+    if (sspi <= SPI_RESERVED_MAX)
+      sspi = SPI_RESERVED_MAX + 1;
+
+    if (sspi == tspi)   /* Asking for a specific SPI */
       nums = 1;
     else
       nums = 50;  /* XXX figure out some good value */
 
     while (nums--)
     {
-	if (tspi != 0) /* SPIRANGE was defined */
+	if (sspi == tspi)  /* Specific SPI asked */
+	  spi = tspi;
+	else    /* Range specified */
 	{
-	    if (sspi == tspi)  /* Specific SPI asked */
-	      spi = tspi;
-	    else    /* Range specified */
-	    {
-		get_random_bytes((void *) &spi, sizeof(spi));
-		spi = sspi + (spi % (tspi - sspi));
-	    }
+	    get_random_bytes((void *) &spi, sizeof(spi));
+	    spi = sspi + (spi % (tspi - sspi));
 	}
-	else  /* Some SPI */
-	  get_random_bytes((void *) &spi, sizeof(spi));
 	  
-	if (spi <= 255) /* Don't allocate SPI <= 255, they're reserved */
+	/* Don't allocate reserved SPIs.  */
+	if (spi == SPI_LOCAL_USE ||
+	    (spi >= SPI_RESERVED_MIN && spi <= SPI_RESERVED_MAX))
 	  continue;
 	else
 	  spi = htonl(spi);
@@ -366,6 +406,7 @@ reserve_spi(u_int32_t sspi, u_int32_t tspi, union sockaddr_union *src,
 	bcopy(&src->sa, &tdbp->tdb_src.sa, SA_LEN(&src->sa));
 	tdbp->tdb_sproto = sproto;
 	tdbp->tdb_flags |= TDBF_INVALID;       /* Mark SA as invalid for now */
+	tdbp->tdb_satype = SADB_SATYPE_UNSPEC;
 	tdbp->tdb_established = time.tv_sec;
 	tdbp->tdb_epoch = kernfs_epoch - 1;
 	puttdb(tdbp);
@@ -380,6 +421,44 @@ reserve_spi(u_int32_t sspi, u_int32_t tspi, union sockaddr_union *src,
 }
 
 /*
+ * Our hashing function needs to stir things with a non-zero random multiplier
+ * so we cannot be DoS-attacked via choosing of the data to hash.
+ */
+INLINE int
+tdb_hash(u_int32_t spi, union sockaddr_union *dst, u_int8_t proto)
+{
+    static u_int32_t mult1 = 0, mult2 = 0;
+    u_int8_t *ptr = (u_int8_t *) dst;
+    int i, shift;
+    u_int64_t hash;
+    int val32 = 0;
+
+    while (mult1 == 0)
+	mult1 = arc4random();
+    while (mult2 == 0)
+	mult2 = arc4random();
+
+    hash = (spi ^ proto) * mult1;
+    for (i = 0; i < SA_LEN(&dst->sa); i++)
+    {
+	val32 = (val32 << 8) | ptr[i];
+	if (i % 4 == 3)
+	{
+	    hash ^= val32 * mult2;
+	    val32 = 0;
+	}
+    }
+    if (i % 4 != 0)
+	hash ^= val32 * mult2;
+
+    shift = ffs(tdb_hashmask + 1);
+    while ((hash & ~tdb_hashmask) != 0)
+      hash = (hash >> shift) ^ (hash & tdb_hashmask);
+
+    return hash;
+}
+
+/*
  * An IPSP SAID is really the concatenation of the SPI found in the 
  * packet, the destination address of the packet and the IPsec protocol.
  * When we receive an IPSP packet, we need to look up its tunnel descriptor
@@ -390,23 +469,76 @@ reserve_spi(u_int32_t sspi, u_int32_t tspi, union sockaddr_union *src,
 struct tdb *
 gettdb(u_int32_t spi, union sockaddr_union *dst, u_int8_t proto)
 {
-    u_int8_t *ptr = (u_int8_t *) dst;
-    u_int32_t hashval = proto + spi;
+    u_int32_t hashval;
     struct tdb *tdbp;
-    int i;
+    int s;
 
-    for (i = 0; i < SA_LEN(&dst->sa); i++)
-      hashval += ptr[i];
-    
-    hashval %= TDB_HASHMOD;
+    if (tdbh == NULL)
+      return (struct tdb *) NULL;
 
-    for (tdbp = tdbh[hashval]; tdbp; tdbp = tdbp->tdb_hnext)
+    hashval = tdb_hash(spi, dst, proto);
+
+    s = spltdb();
+    for (tdbp = tdbh[hashval]; tdbp != NULL; tdbp = tdbp->tdb_hnext)
       if ((tdbp->tdb_spi == spi) && 
 	  !bcmp(&tdbp->tdb_dst, dst, SA_LEN(&dst->sa)) &&
 	  (tdbp->tdb_sproto == proto))
 	break;
-	
+    splx(s);
+
     return tdbp;
+}
+
+#if DDB
+void
+tdb_hashstats()
+{
+    int i, cnt, buckets[16];
+    struct tdb *tdbp;
+
+    if (tdbh == NULL)
+    {
+	db_printf("no tdb hash table\n");
+	return;
+    }
+
+    bzero (buckets, sizeof(buckets));
+    for (i = 0; i <= tdb_hashmask; i++)
+    {
+	cnt = 0;
+	for (tdbp = tdbh[i]; cnt < 16 && tdbp != NULL; tdbp = tdbp->tdb_hnext)
+	  cnt++;
+	buckets[cnt]++;
+    }
+
+    db_printf("tdb cnt\t\tbucket cnt\n");
+    for (i = 0; i < 16; i++)
+      if (buckets[i] > 0)
+	db_printf("%d%c\t\t%d\n", i, i == 15 ? "+" : "", buckets[i]);
+}
+#endif	/* DDB */
+
+/*
+ * Caller is responsible for setting at least spltdb().
+ */
+
+int
+tdb_walk(int (*walker)(struct tdb *, void *), void *arg)
+{
+    int i, rval = 0;
+    struct tdb *tdbp, *next;
+
+    if (tdbh == NULL)
+        return ENOENT;
+
+    for (i = 0; i <= tdb_hashmask; i++)
+	for (tdbp = tdbh[i]; rval == 0 && tdbp != NULL; tdbp = next)
+	{
+	    next = tdbp->tdb_hnext;
+	    rval = walker(tdbp, (void *)arg);
+	}
+
+    return rval;
 }
 
 struct flow *
@@ -417,82 +549,29 @@ get_flow(void)
     MALLOC(flow, struct flow *, sizeof(struct flow), M_TDB, M_WAITOK);
     bzero(flow, sizeof(struct flow));
 
+    ipsec_in_use++;
     return flow;
 }
 
-struct expiration *
-get_expiration(void)
-{
-    struct expiration *exp;
-    
-    MALLOC(exp, struct expiration *, sizeof(struct expiration), M_TDB,
-	   M_WAITOK);
-
-    bzero(exp, sizeof(struct expiration));
-    
-    return exp;
-}
+/*
+ * Called at splsoftclock().
+ */
 
 void
-cleanup_expirations(union sockaddr_union *dst, u_int32_t spi, u_int8_t sproto)
-{
-    struct expiration *exp, *nexp;
-
-    for (exp = explist; exp; exp = (exp ? exp->exp_next : explist))
-      if (!bcmp(&exp->exp_dst, dst, SA_LEN(&dst->sa)) &&
-	  (exp->exp_spi == spi) && (exp->exp_sproto == sproto))
-      {
-	  /* Link previous to next */
-	  if (exp->exp_prev == (struct expiration *) NULL)
-	    explist = exp->exp_next;
-	  else
-	    exp->exp_prev->exp_next = exp->exp_next;
-	  
-	  /* Link next (if it exists) to previous */
-	  if (exp->exp_next != (struct expiration *) NULL)
-	    exp->exp_next->exp_prev = exp->exp_prev;
-
-	  nexp = exp;
-	  exp = exp->exp_prev;
-	  FREE(nexp, M_TDB);
-      }
-}
-
-void 
 handle_expirations(void *arg)
 {
-    struct expiration *exp;
     struct tdb *tdb;
-    
-    if (explist == (struct expiration *) NULL)
-      return;
-    
-    while (1)
-    {
-	exp = explist;
 
-	if (exp == (struct expiration *) NULL)
-	  return;
-	else
-	  if (exp->exp_timeout > time.tv_sec)
-	    break;
-	
-	/* Advance pointer */
-	explist = explist->exp_next;
-	if (explist)
-	  explist->exp_prev = NULL;
-	
-	tdb = gettdb(exp->exp_spi, &exp->exp_dst, exp->exp_sproto);
-	free(exp, M_TDB);
-	if (tdb == (struct tdb *) NULL)
-	  continue;			/* TDB is gone, ignore this */
-	
+    for (tdb = TAILQ_FIRST(&explist);
+	 tdb && tdb->tdb_timeout <= time.tv_sec;
+	 tdb = TAILQ_FIRST(&explist))
+    {
 	/* Hard expirations first */
 	if ((tdb->tdb_flags & TDBF_TIMER) &&
 	    (tdb->tdb_exp_timeout <= time.tv_sec))
 	{
 	    pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_HARD);
-	    tdb_delete(tdb, 0);
+	    tdb_delete(tdb, 0, 0);
 	    continue;
 	}
 	else
@@ -500,7 +579,7 @@ handle_expirations(void *arg)
 	      (tdb->tdb_first_use + tdb->tdb_exp_first_use <= time.tv_sec))
 	  {
 	      pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_HARD);
-	      tdb_delete(tdb, 0);
+	      tdb_delete(tdb, 0, 0);
 	      continue;
 	  }
 
@@ -510,6 +589,7 @@ handle_expirations(void *arg)
 	{
 	    pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_SOFT);
 	    tdb->tdb_flags &= ~TDBF_SOFT_TIMER;
+	    tdb_expiration(tdb, TDBEXP_EARLY);
 	}
 	else
 	  if ((tdb->tdb_flags & TDBF_SOFT_FIRSTUSE) &&
@@ -518,79 +598,215 @@ handle_expirations(void *arg)
 	  {
 	      pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_SOFT);
 	      tdb->tdb_flags &= ~TDBF_SOFT_FIRSTUSE;
+	      tdb_expiration(tdb, TDBEXP_EARLY);
 	  }
     }
 
-    if (explist)
+    /* If any tdb is left on the expiration queue, set the timer.  */
+    if (tdb)
       timeout(handle_expirations, (void *) NULL, 
-	      hz * (explist->exp_timeout - time.tv_sec));
+	      hz * (tdb->tdb_timeout - time.tv_sec));
 }
+
+/*
+ * Ensure the tdb is in the right place in the expiration list.
+ */
 
 void
-put_expiration(struct expiration *exp)
+tdb_expiration(struct tdb *tdb, int flags)
 {
-    struct expiration *expt;
-    int reschedflag = 0;
-    
-    if (exp == (struct expiration *) NULL)
+    u_int64_t next_timeout = 0;
+    struct tdb *t, *former_expirer, *next_expirer;
+    int will_be_first, sole_reason, early;
+    int s = spltdb();
+
+    /*
+     * If this is the local use SPI, this is an SPD entry, so don't setup any
+     * timers.
+     */
+    if (ntohl(tdb->tdb_spi) == SPI_LOCAL_USE)
     {
-	DPRINTF(("put_expiration(): NULL argument\n"));
+	splx(s);
 	return;
     }
-    
-    if (explist == (struct expiration *) NULL)
+
+    /* Find the earliest expiration.  */
+    if ((tdb->tdb_flags & TDBF_FIRSTUSE) && tdb->tdb_first_use != 0 &&
+	(next_timeout == 0 ||
+	 next_timeout > tdb->tdb_first_use + tdb->tdb_exp_first_use))
+	next_timeout = tdb->tdb_first_use + tdb->tdb_exp_first_use;
+    if ((tdb->tdb_flags & TDBF_SOFT_FIRSTUSE) && tdb->tdb_first_use != 0 &&
+	(next_timeout == 0 ||
+	 next_timeout > tdb->tdb_first_use + tdb->tdb_soft_first_use))
+	next_timeout = tdb->tdb_first_use + tdb->tdb_soft_first_use;
+    if ((tdb->tdb_flags & TDBF_TIMER) &&
+	(next_timeout == 0 || next_timeout > tdb->tdb_exp_timeout))
+	next_timeout = tdb->tdb_exp_timeout;
+    if ((tdb->tdb_flags & TDBF_SOFT_TIMER) &&
+	(next_timeout == 0 || next_timeout > tdb->tdb_soft_timeout))
+	next_timeout = tdb->tdb_soft_timeout;
+
+    /* No change?  */
+    if (next_timeout == tdb->tdb_timeout)
     {
-	explist = exp;
-	reschedflag = 1;
+      splx(s);
+      return;
+    }
+
+    /*
+     * Find out some useful facts: Will our tdb be first to expire?
+     * Was our tdb the sole reason for the old timeout?
+     */
+    former_expirer = TAILQ_FIRST(&expclusterlist);
+    next_expirer = TAILQ_NEXT(tdb, tdb_explink);
+    will_be_first = (next_timeout != 0 &&
+		     (former_expirer == NULL ||
+		      next_timeout < former_expirer->tdb_timeout));
+    sole_reason = (tdb == former_expirer &&
+		   (next_expirer == NULL ||
+		    tdb->tdb_timeout != next_expirer->tdb_timeout));
+
+    /*
+     * We need to untimeout if either:
+     * - there is an expiration pending and the new timeout is earlier than
+     *   what already exists or
+     * - the existing first expiration is due to our old timeout value solely
+     */
+    if ((former_expirer != NULL && will_be_first) || sole_reason)
+      untimeout(handle_expirations, (void *) NULL);
+
+    /*
+     * We need to timeout if we've been asked to and if either
+     * - our tdb has a timeout and no former expiration exist or
+     * - the new timeout is earlier than what already exists or
+     * - the existing first expiration is due to our old timeout value solely
+     *   and another expiration is in the pipe.
+     */
+    if ((flags & TDBEXP_TIMEOUT) &&
+	(will_be_first || (sole_reason && next_expirer != NULL)))
+      timeout(handle_expirations, (void *) NULL,
+	      hz * ((will_be_first ? next_timeout :
+		     next_expirer->tdb_timeout) - time.tv_sec));
+
+    /* Our old position, if any, is not relevant anymore.  */
+    if (tdb->tdb_timeout != 0)
+    {
+        if (tdb->tdb_expnext.tqe_prev != NULL)
+	{
+	    if (next_expirer && tdb->tdb_timeout == next_expirer->tdb_timeout)
+	      TAILQ_INSERT_BEFORE(tdb, next_expirer, tdb_expnext);
+	    TAILQ_REMOVE(&expclusterlist, tdb, tdb_expnext);
+	    tdb->tdb_expnext.tqe_prev = NULL;
+	}
+	TAILQ_REMOVE(&explist, tdb, tdb_explink);
+    }
+
+    tdb->tdb_timeout = next_timeout;
+
+    if (next_timeout == 0)
+    {
+      splx(s);
+      return;
+    }
+
+    /*
+     * Search front-to-back if we believe we will end up early, otherwise
+     * back-to-front.
+     */
+    early = will_be_first || (flags & TDBEXP_EARLY);
+    for (t = (early ? TAILQ_FIRST(&expclusterlist) :
+	      TAILQ_LAST(&expclusterlist, expclusterlist_head));
+	 t != NULL && (early ? (t->tdb_timeout <= next_timeout) : 
+		       (t->tdb_timeout > next_timeout));
+	 t = (early ? TAILQ_NEXT(t, tdb_expnext) :
+	      TAILQ_PREV(t, expclusterlist_head, tdb_expnext)))
+      ;
+    if (t == (early ? TAILQ_FIRST(&expclusterlist) : NULL))
+    {
+	/* We are to become the first expiration.  */
+	TAILQ_INSERT_HEAD(&expclusterlist, tdb, tdb_expnext);
+	TAILQ_INSERT_HEAD(&explist, tdb, tdb_explink);
     }
     else
-      if (explist->exp_timeout > exp->exp_timeout)
-      {
-	  exp->exp_next = explist;
-	  explist->exp_prev = exp;
-	  explist = exp;
-	  reschedflag = 2;
-      }
-      else
-      {
-	  for (expt = explist; expt->exp_next; expt = expt->exp_next)
-	    if (expt->exp_next->exp_timeout > exp->exp_timeout)
-	    {
-		expt->exp_next->exp_prev = exp;
-		exp->exp_next = expt->exp_next;
-		expt->exp_next = exp;
-		exp->exp_prev = expt;
-		break;
-	    }
-
-	  if (expt->exp_next == (struct expiration *) NULL)
-	  {
-	      expt->exp_next = exp;
-	      exp->exp_prev = expt;
-	  }
-      }
-
-    switch (reschedflag)
     {
-	case 1:
-	    timeout(handle_expirations, (void *) NULL, 
-		    hz * (explist->exp_timeout - time.tv_sec));
-	    break;
-	    
-	case 2:
-	    untimeout(handle_expirations, (void *) NULL);
-	    timeout(handle_expirations, (void *) NULL,
-		    hz * (explist->exp_timeout - time.tv_sec));
-	    break;
-	    
-	default:
-	    break;
+	if (early)
+	  t = (t ? TAILQ_PREV(t, expclusterlist_head, tdb_expnext) :
+	       TAILQ_LAST(&expclusterlist, expclusterlist_head));
+	if (TAILQ_NEXT(t, tdb_expnext))
+	  TAILQ_INSERT_BEFORE(TAILQ_NEXT(t, tdb_expnext), tdb, tdb_explink);
+	else
+	  TAILQ_INSERT_TAIL(&explist, tdb, tdb_explink);
+	if (t->tdb_timeout < next_timeout)
+	  TAILQ_INSERT_AFTER(&expclusterlist, t, tdb, tdb_expnext);
     }
+
+#ifdef DIAGNOSTIC
+    /*
+     * Check various invariants.
+     */
+    if (tdb->tdb_expnext.tqe_prev != NULL)
+    {
+	t = TAILQ_FIRST(&expclusterlist);
+	if (t != tdb && t->tdb_timeout >= tdb->tdb_timeout)
+	  panic("tdb_expiration: "
+		"expclusterlist first link out of order (%p, %p)",
+		tdb, t);
+	t = TAILQ_PREV(tdb, expclusterlist_head, tdb_expnext);
+	if (t != NULL && t->tdb_timeout >= tdb->tdb_timeout)
+	  panic("tdb_expiration: "
+		"expclusterlist prev link out of order (%p, %p)",
+		tdb, t);
+	else if (t == NULL && tdb != TAILQ_FIRST(&expclusterlist))
+	  panic("tdb_expiration: "
+		"expclusterlist first link out of order (%p, %p)",
+		tdb, TAILQ_FIRST(&expclusterlist));
+	t = TAILQ_NEXT(tdb, tdb_expnext);
+	if (t != NULL && t->tdb_timeout <= tdb->tdb_timeout)
+	  panic("tdb_expiration: "
+		"expclusterlist next link out of order (%p, %p)",
+		tdb, t);
+	else if (t == NULL &&
+		 tdb != TAILQ_LAST(&expclusterlist, expclusterlist_head))
+	  panic("tdb_expiration: "
+		"expclusterlist last link out of order (%p, %p)",
+		tdb, TAILQ_LAST(&expclusterlist, expclusterlist_head));
+	t = TAILQ_LAST(&expclusterlist, expclusterlist_head);
+	if (t != tdb && t->tdb_timeout <= tdb->tdb_timeout)
+	  panic("tdb_expiration: "
+		"expclusterlist last link out of order (%p, %p)",
+		tdb, t);
+    }
+    t = TAILQ_FIRST(&explist);
+    if (t != NULL && t->tdb_timeout > tdb->tdb_timeout)
+      panic("tdb_expiration: explist first link out of order (%p, %p)", tdb,
+	    t);
+    t = TAILQ_PREV(tdb, explist_head, tdb_explink);
+    if (t != NULL && t->tdb_timeout > tdb->tdb_timeout)
+      panic("tdb_expiration: explist prev link out of order (%p, %p)", tdb, t);
+    else if (t == NULL && tdb != TAILQ_FIRST(&explist))
+      panic("tdb_expiration: explist first link out of order (%p, %p)", tdb,
+	    TAILQ_FIRST(&explist));
+    t = TAILQ_NEXT(tdb, tdb_explink);
+    if (t != NULL && t->tdb_timeout < tdb->tdb_timeout)
+      panic("tdb_expiration: explist next link out of order (%p, %p)", tdb, t);
+    else if (t == NULL && tdb != TAILQ_LAST(&explist, explist_head))
+      panic("tdb_expiration: explist last link out of order (%p, %p)", tdb,
+	    TAILQ_LAST(&explist, explist_head));
+    t = TAILQ_LAST(&explist, explist_head);
+    if (t != tdb && t->tdb_timeout < tdb->tdb_timeout)
+      panic("tdb_expiration: explist last link out of order (%p, %p)", tdb, t);
+#endif
+
+    splx(s);
 }
+
+/*
+ * Caller is responsible for setting at least spltdb().
+ */
 
 struct flow *
 find_flow(union sockaddr_union *src, union sockaddr_union *srcmask,
-	  union sockaddr_union * dst, union sockaddr_union *dstmask,
+	  union sockaddr_union *dst, union sockaddr_union *dstmask,
 	  u_int8_t proto, struct tdb *tdb)
 {
     struct flow *flow;
@@ -606,6 +822,10 @@ find_flow(union sockaddr_union *src, union sockaddr_union *srcmask,
     return (struct flow *) NULL;
 }
 
+/*
+ * Caller is responsible for setting at least spltdb().
+ */
+
 struct flow *
 find_global_flow(union sockaddr_union *src, union sockaddr_union *srcmask,
 		 union sockaddr_union *dst, union sockaddr_union *dstmask,
@@ -615,28 +835,83 @@ find_global_flow(union sockaddr_union *src, union sockaddr_union *srcmask,
     struct tdb *tdb;
     int i;
 
-    for (i = 0; i < TDB_HASHMOD; i++)
-      for (tdb = tdbh[i]; tdb; tdb = tdb->tdb_hnext)
-	if ((flow = find_flow(src, srcmask, dst, dstmask, proto, tdb)) !=
-	    (struct flow *) NULL)
-	  return flow;
+    if (tdbh == NULL)
+      return (struct flow *) NULL;
 
+    for (i = 0; i <= tdb_hashmask; i++)
+    {
+	for (tdb = tdbh[i]; tdb != NULL; tdb = tdb->tdb_hnext)
+	  if ((flow = find_flow(src, srcmask, dst, dstmask, proto, tdb)) !=
+	      (struct flow *) NULL)
+	    return flow;
+    }
     return (struct flow *) NULL;
+}
+
+/*
+ * Caller is responsible for spltdb().
+ */
+
+void
+tdb_rehash(void)
+{
+    struct tdb **new_tdbh, *tdbp, *tdbnp;
+    u_int i, old_hashmask = tdb_hashmask;
+    u_int32_t hashval;
+
+    tdb_hashmask = (tdb_hashmask << 1) | 1;
+    MALLOC(new_tdbh, struct tdb **, sizeof(struct tdb *) * (tdb_hashmask + 1),
+	   M_TDB, M_WAITOK);
+    bzero(new_tdbh, sizeof(struct tdbh *) * (tdb_hashmask + 1));
+    for (i = 0; i <= old_hashmask; i++)
+      for (tdbp = tdbh[i]; tdbp != NULL; tdbp = tdbnp)
+      {
+	  tdbnp = tdbp->tdb_hnext;
+      	  hashval = tdb_hash(tdbp->tdb_spi, &tdbp->tdb_dst, tdbp->tdb_sproto);
+	  tdbp->tdb_hnext = new_tdbh[hashval];
+	  new_tdbh[hashval] = tdbp;
+      }
+    FREE(tdbh, M_TDB);
+    tdbh = new_tdbh;
 }
 
 void
 puttdb(struct tdb *tdbp)
 {
-    u_int8_t *ptr = (u_int8_t *) &tdbp->tdb_dst;
-    u_int32_t hashval = tdbp->tdb_sproto + tdbp->tdb_spi, i;
+    u_int32_t hashval;
+    int s = spltdb();
 
-    for (i = 0; i < SA_LEN(&tdbp->tdb_dst.sa); i++)
-      hashval += ptr[i];
+    if (tdbh == NULL)
+    {
+	MALLOC(tdbh, struct tdb **, sizeof(struct tdb *) * (tdb_hashmask + 1),
+	       M_TDB, M_WAITOK);
+	bzero(tdbh, sizeof(struct tdb *) * (tdb_hashmask + 1));
+    }
+
+    hashval = tdb_hash(tdbp->tdb_spi, &tdbp->tdb_dst, tdbp->tdb_sproto);
     
-    hashval %= TDB_HASHMOD;
+    /*
+     * Rehash if this tdb would cause a bucket to have more than two items
+     * and if the number of tdbs exceed 10% of the bucket count.  This
+     * number is arbitratily chosen and is just a measure to not keep rehashing
+     * when adding and removing tdbs which happens to always end up in the
+     * same bucket, which is not uncommon when doing manual keying.
+     */
+    if (tdbh[hashval] != NULL && tdbh[hashval]->tdb_hnext != NULL &&
+	tdb_count * 10 > tdb_hashmask + 1)
+    {
+	tdb_rehash();
+	hashval = tdb_hash(tdbp->tdb_spi, &tdbp->tdb_dst, tdbp->tdb_sproto);
+    }
     tdbp->tdb_hnext = tdbh[hashval];
     tdbh[hashval] = tdbp;
+    tdb_count++;
+    splx(s);
 }
+
+/*
+ * Caller is responsible for setting at least spltdb().
+ */
 
 void
 put_flow(struct flow *flow, struct tdb *tdb)
@@ -651,6 +926,10 @@ put_flow(struct flow *flow, struct tdb *tdb)
     if (flow->flow_next)
       flow->flow_next->flow_prev = flow;
 }
+
+/*
+ * Caller is responsible for setting at least spltdb().
+ */
 
 void
 delete_flow(struct flow *flow, struct tdb *tdb)
@@ -671,22 +950,24 @@ delete_flow(struct flow *flow, struct tdb *tdb)
 	}
     }
 
+    ipsec_in_use--;
     FREE(flow, M_TDB);
 }
 
-int
-tdb_delete(struct tdb *tdbp, int delchain)
+void
+tdb_delete(struct tdb *tdbp, int delchain, int expflags)
 {
-    u_int8_t *ptr = (u_int8_t *) &tdbp->tdb_dst;
     struct tdb *tdbpp;
     struct inpcb *inp;
-    u_int32_t hashval = tdbp->tdb_sproto + tdbp->tdb_spi, i;
+    u_int32_t hashval = tdbp->tdb_sproto + tdbp->tdb_spi;
+    int s;
 
-    for (i = 0; i < SA_LEN(&tdbp->tdb_dst.sa); i++)
-      hashval += ptr[i];
+    if (tdbh == NULL)
+      return;
 
-    hashval %= TDB_HASHMOD;
+    hashval = tdb_hash(tdbp->tdb_spi, &tdbp->tdb_dst, tdbp->tdb_sproto);
 
+    s = spltdb();
     if (tdbh[hashval] == tdbp)
     {
 	tdbpp = tdbp;
@@ -723,8 +1004,42 @@ tdb_delete(struct tdb *tdbp, int delchain)
 
     while (tdbp->tdb_flow)
     {
-	delete_flow(tdbp->tdb_flow, tdbp);
-	ipsec_in_use--;
+        /* Delete the flow and the routing entry that goes with it. */ 
+        struct sockaddr_encap encapdst, encapnetmask;
+
+        bzero(&encapdst, sizeof(struct sockaddr_encap));
+        bzero(&encapnetmask, sizeof(struct sockaddr_encap));
+
+        encapdst.sen_len = SENT_IP4_LEN;
+        encapdst.sen_family = PF_KEY;
+        encapdst.sen_type = SENT_IP4;
+        encapdst.sen_ip_src = tdbp->tdb_flow->flow_src.sin.sin_addr;
+        encapdst.sen_ip_dst = tdbp->tdb_flow->flow_dst.sin.sin_addr;
+        encapdst.sen_proto = tdbp->tdb_flow->flow_proto;
+        encapdst.sen_sport = tdbp->tdb_flow->flow_src.sin.sin_port;
+        encapdst.sen_dport = tdbp->tdb_flow->flow_dst.sin.sin_port;
+
+        encapnetmask.sen_len = SENT_IP4_LEN;
+        encapnetmask.sen_family = PF_KEY;
+        encapnetmask.sen_type = SENT_IP4;
+        encapnetmask.sen_ip_src = tdbp->tdb_flow->flow_srcmask.sin.sin_addr;
+        encapnetmask.sen_ip_dst = tdbp->tdb_flow->flow_dstmask.sin.sin_addr;
+
+        if (tdbp->tdb_flow->flow_proto)
+        {
+            encapnetmask.sen_proto = 0xff;
+            if (tdbp->tdb_flow->flow_src.sin.sin_port)
+              encapnetmask.sen_sport = 0xffff;
+            if (tdbp->tdb_flow->flow_dst.sin.sin_port)
+              encapnetmask.sen_dport = 0xffff;
+        }
+
+        rtrequest(RTM_DELETE, (struct sockaddr *) &encapdst,
+                  (struct sockaddr *) 0,
+                  (struct sockaddr *) &encapnetmask,
+                  0, (struct rtentry **) 0);
+
+        delete_flow(tdbp->tdb_flow, tdbp);
     }
 
     /* Cleanup SA-Bindings */
@@ -745,9 +1060,13 @@ tdb_delete(struct tdb *tdbp, int delchain)
     if (tdbp->tdb_bind_out)
       TAILQ_REMOVE(&tdbp->tdb_bind_out->tdb_bind_in, tdbp, tdb_bind_in_next);
 
-    /* removal of a larval SA should not remove the mature SA's expirations */
-    if ((tdbp->tdb_flags & TDBF_INVALID) == 0)
-      cleanup_expirations(&tdbp->tdb_dst, tdbp->tdb_spi, tdbp->tdb_sproto);
+    /* Remove us from the expiration lists.  */
+    if (tdbp->tdb_timeout != 0)
+    {
+        tdbp->tdb_flags &= ~(TDBF_FIRSTUSE | TDBF_SOFT_FIRSTUSE | TDBF_TIMER |
+			     TDBF_SOFT_TIMER);
+	tdb_expiration(tdbp, expflags);
+    }
 
     if (tdbp->tdb_srcid)
       FREE(tdbp->tdb_srcid, M_XDATA);
@@ -756,11 +1075,11 @@ tdb_delete(struct tdb *tdbp, int delchain)
       FREE(tdbp->tdb_dstid, M_XDATA);
 
     FREE(tdbp, M_TDB);
+    tdb_count--;
 
     if (delchain && tdbpp)
-      return tdb_delete(tdbpp, delchain);
-    else
-      return 0;
+      tdb_delete(tdbpp, delchain, expflags);
+    splx(s);
 }
 
 int
@@ -796,229 +1115,238 @@ ipsp_kern(int off, char **bufp, int len)
     static char buffer[IPSEC_KERNFS_BUFSIZE];
     struct flow *flow;
     struct tdb *tdb, *tdbp;
-    int l, i;
+    int l, i, s;
 
     if (off == 0)
       kernfs_epoch++;
     
-    if (bufp == NULL)
+    if (bufp == NULL || tdbh == NULL)
       return 0;
 
     bzero(buffer, IPSEC_KERNFS_BUFSIZE);
 
     *bufp = buffer;
     
-    for (i = 0; i < TDB_HASHMOD; i++)
-      for (tdb = tdbh[i]; tdb; tdb = tdb->tdb_hnext)
-	if (tdb->tdb_epoch != kernfs_epoch)
-	{
-	    tdb->tdb_epoch = kernfs_epoch;
+    for (i = 0; i <= tdb_hashmask; i++)
+    {
+        s = spltdb();
+	for (tdb = tdbh[i]; tdb; tdb = tdb->tdb_hnext)
+	  if (tdb->tdb_epoch != kernfs_epoch)
+	  {
+	      tdb->tdb_epoch = kernfs_epoch;
 
-	    l = sprintf(buffer, "SPI = %08x, Destination = %s, Sproto = %u\n",
-			ntohl(tdb->tdb_spi),
-			ipsp_address(tdb->tdb_dst), tdb->tdb_sproto);
+	      l = sprintf(buffer,
+			  "SPI = %08x, Destination = %s, Sproto = %u\n",
+			  ntohl(tdb->tdb_spi),
+			  ipsp_address(tdb->tdb_dst), tdb->tdb_sproto);
 
-	    l += sprintf(buffer + l, "\tEstablished %d seconds ago\n",
-			 time.tv_sec - tdb->tdb_established);
+	      l += sprintf(buffer + l, "\tEstablished %d seconds ago\n",
+			   time.tv_sec - tdb->tdb_established);
 
-	    l += sprintf(buffer + l, "\tSource = %s",
-			 ipsp_address(tdb->tdb_src));
+	      l += sprintf(buffer + l, "\tSource = %s",
+			   ipsp_address(tdb->tdb_src));
 
-	    if (tdb->tdb_proxy.sa.sa_family)
-	      l += sprintf(buffer + l, ", Proxy = %s\n",
-			   ipsp_address(tdb->tdb_proxy));
-	    else
-	      l += sprintf(buffer + l, "\n");
+	      if (tdb->tdb_proxy.sa.sa_family)
+		l += sprintf(buffer + l, ", Proxy = %s\n",
+			     ipsp_address(tdb->tdb_proxy));
+	      else
+		l += sprintf(buffer + l, "\n");
 
-	    l += sprintf(buffer + l, "\tFlags (%08x) = <", tdb->tdb_flags);
+	      l += sprintf(buffer + l, "\tFlags (%08x) = <", tdb->tdb_flags);
 
-	    if ((tdb->tdb_flags & ~(TDBF_TIMER | TDBF_BYTES |
-				    TDBF_ALLOCATIONS | TDBF_FIRSTUSE |
-				    TDBF_SOFT_TIMER | TDBF_SOFT_BYTES |
-				    TDBF_SOFT_FIRSTUSE |
-				    TDBF_SOFT_ALLOCATIONS)) == 0)
-	      l += sprintf(buffer + l, "none>\n");
-	    else
-	    {
-		/* We can reuse variable 'i' here, since we're not looping */
-		i = 0;
+	      if ((tdb->tdb_flags & ~(TDBF_TIMER | TDBF_BYTES |
+				      TDBF_ALLOCATIONS | TDBF_FIRSTUSE |
+				      TDBF_SOFT_TIMER | TDBF_SOFT_BYTES |
+				      TDBF_SOFT_FIRSTUSE |
+				      TDBF_SOFT_ALLOCATIONS)) == 0)
+		l += sprintf(buffer + l, "none>\n");
+	      else
+	      {
+		  /* We can reuse variable 'i' here, since we're not looping */
+		  i = 0;
 
-		if (tdb->tdb_flags & TDBF_UNIQUE)
-		{
-		    if (i)
-		      l += sprintf(buffer + l, ", ");
-		    else
+		  if (tdb->tdb_flags & TDBF_UNIQUE)
+		  {
+		      if (i)
+			l += sprintf(buffer + l, ", ");
+		      else
+			i = 1;
+
+		      l += sprintf(buffer + l, "unique");
 		      i = 1;
+		  }
 
-		    l += sprintf(buffer + l, "unique");
-		    i = 1;
-		}
+		  if (tdb->tdb_flags & TDBF_INVALID)
+		  {
+		      if (i)
+			l += sprintf(buffer + l, ", ");
+		      else
+			i = 1;
 
-		if (tdb->tdb_flags & TDBF_INVALID)
-		{
-		    if (i)
-		      l += sprintf(buffer + l, ", ");
-		    else
-		      i = 1;
+		      l += sprintf(buffer + l, "invalid");
+		  }
 
-		    l += sprintf(buffer + l, "invalid");
-		}
+		  if (tdb->tdb_flags & TDBF_HALFIV)
+		  {
+		      if (i)
+			l += sprintf(buffer + l, ", ");
+		      else
+			i = 1;
 
-		if (tdb->tdb_flags & TDBF_HALFIV)
-		{
-		    if (i)
-		      l += sprintf(buffer + l, ", ");
-		    else
-		      i = 1;
+		      l += sprintf(buffer + l, "halfiv");
+		  }
 
-		    l += sprintf(buffer + l, "halfiv");
-		}
+		  if (tdb->tdb_flags & TDBF_PFS)
+		  {
+		      if (i)
+			l += sprintf(buffer + l, ", ");
+		      else
+			i = 1;
 
-		if (tdb->tdb_flags & TDBF_PFS)
-		{
-		    if (i)
-		      l += sprintf(buffer + l, ", ");
-		    else
-		      i = 1;
+		      l += sprintf(buffer + l, "pfs");
+		  }
 
-		    l += sprintf(buffer + l, "pfs");
-		}
+		  if (tdb->tdb_flags & TDBF_TUNNELING)
+		  {
+		      if (i)
+			l += sprintf(buffer + l, ", ");
+		      else
+			i = 1;
 
-		if (tdb->tdb_flags & TDBF_TUNNELING)
-		{
-		    if (i)
-		      l += sprintf(buffer + l, ", ");
-		    else
-		      i = 1;
+		      l += sprintf(buffer + l, "tunneling");
+		  }
 
-		    l += sprintf(buffer + l, "tunneling");
-		}
+		  l += sprintf(buffer + l, ">\n");
+	      }
 
-		l += sprintf(buffer + l, ">\n");
-	    }
+	      if (tdb->tdb_xform)
+		l += sprintf(buffer + l, "\txform = <%s>\n", 
+			     tdb->tdb_xform->xf_name);
 
-	    if (tdb->tdb_xform)
-	      l += sprintf(buffer + l, "\txform = <%s>\n", 
-			   tdb->tdb_xform->xf_name);
+	      if (tdb->tdb_encalgxform)
+		l += sprintf(buffer + l, "\t\tEncryption = <%s>\n",
+			     tdb->tdb_encalgxform->name);
 
-	    if (tdb->tdb_encalgxform)
-	      l += sprintf(buffer + l, "\t\tEncryption = <%s>\n",
-			   tdb->tdb_encalgxform->name);
+	      if (tdb->tdb_authalgxform)
+		l += sprintf(buffer + l, "\t\tAuthentication = <%s>\n",
+			     tdb->tdb_authalgxform->name);
 
-	    if (tdb->tdb_authalgxform)
-	      l += sprintf(buffer + l, "\t\tAuthentication = <%s>\n",
-			   tdb->tdb_authalgxform->name);
+	      if (tdb->tdb_bind_out)
+		l += sprintf(buffer + l,
+			     "\tBound SA: SPI = %08x, "
+			     "Destination = %s, Sproto = %u\n",
+			     ntohl(tdb->tdb_bind_out->tdb_spi),
+			     ipsp_address(tdb->tdb_bind_out->tdb_dst),
+			     tdb->tdb_bind_out->tdb_sproto);
+	      for (i = 0, tdbp = TAILQ_FIRST(&tdb->tdb_bind_in); tdbp;
+		   tdbp = TAILQ_NEXT(tdbp, tdb_bind_in_next))
+		i++;
 
-	    if (tdb->tdb_bind_out)
-	      l += sprintf(buffer + l,
-			   "\tBound SA: SPI = %08x, "
-			   "Destination = %s, Sproto = %u\n",
-			   ntohl(tdb->tdb_bind_out->tdb_spi),
-			   ipsp_address(tdb->tdb_bind_out->tdb_dst),
-			   tdb->tdb_bind_out->tdb_sproto);
-	    for (i = 0, tdbp = TAILQ_FIRST(&tdb->tdb_bind_in); tdbp;
-		 tdbp = TAILQ_NEXT(tdbp, tdb_bind_in_next))
-	      i++;
+	      if (i > 0)
+		l += sprintf(buffer + l,
+			     "\tReferenced by %d incoming SA%s\n",
+			     i, i == 1 ? "" : "s");
 
-	    if (i > 0)
-	      l += sprintf(buffer + l,
-			   "\tReferenced by %d incoming SA%s\n",
-			   i, i == 1 ? "" : "s");
+	      if (tdb->tdb_onext)
+		l += sprintf(buffer + l,
+			     "\tNext SA: SPI = %08x, "
+			     "Destination = %s, Sproto = %u\n",
+			     ntohl(tdb->tdb_onext->tdb_spi),
+			     ipsp_address(tdb->tdb_onext->tdb_dst),
+			     tdb->tdb_onext->tdb_sproto);
 
-	    if (tdb->tdb_onext)
-	      l += sprintf(buffer + l,
-			   "\tNext SA: SPI = %08x, "
-			   "Destination = %s, Sproto = %u\n",
-			   ntohl(tdb->tdb_onext->tdb_spi),
-			   ipsp_address(tdb->tdb_onext->tdb_dst),
-			   tdb->tdb_onext->tdb_sproto);
+	      if (tdb->tdb_inext)
+		l += sprintf(buffer + l,
+			     "\tPrevious SA: SPI = %08x, "
+			     "Destination = %s, Sproto = %u\n",
+			     ntohl(tdb->tdb_inext->tdb_spi),
+			     ipsp_address(tdb->tdb_inext->tdb_dst),
+			     tdb->tdb_inext->tdb_sproto);
 
-	    if (tdb->tdb_inext)
-	      l += sprintf(buffer + l,
-			   "\tPrevious SA: SPI = %08x, "
-			   "Destination = %s, Sproto = %u\n",
-			   ntohl(tdb->tdb_inext->tdb_spi),
-			   ipsp_address(tdb->tdb_inext->tdb_dst),
-			   tdb->tdb_inext->tdb_sproto);
+	      for (i = 0, flow = tdb->tdb_flow; flow; flow = flow->flow_next)
+		i++;
 
-	    for (i = 0, flow = tdb->tdb_flow; flow; flow = flow->flow_next)
-	      i++;
+	      l+= sprintf(buffer + l, "\tCurrently used by %d flows\n", i);
 
-	    l+= sprintf(buffer + l, "\tCurrently used by %d flows\n", i);
-
-	    l += sprintf(buffer + l, "\t%u flows have used this SA\n",
-			 tdb->tdb_cur_allocations);
+	      l += sprintf(buffer + l, "\t%u flows have used this SA\n",
+			   tdb->tdb_cur_allocations);
 	    
-	    l += sprintf(buffer + l, "\t%qu bytes processed by this SA\n",
+	      l += sprintf(buffer + l, "\t%qu bytes processed by this SA\n",
 			 tdb->tdb_cur_bytes);
 	    
-	    l += sprintf(buffer + l, "\tExpirations:\n");
+	      l += sprintf(buffer + l, "\tExpirations:\n");
 
-	    if (tdb->tdb_flags & TDBF_TIMER)
-	      l += sprintf(buffer + l,
-			   "\t\tHard expiration(1) in %qu seconds\n",
-			   tdb->tdb_exp_timeout - time.tv_sec);
-	    
-	    if (tdb->tdb_flags & TDBF_SOFT_TIMER)
-	      l += sprintf(buffer + l,
-			   "\t\tSoft expiration(1) in %qu seconds\n",
-			   tdb->tdb_soft_timeout - time.tv_sec);
-	    
-	    if (tdb->tdb_flags & TDBF_BYTES)
-	      l += sprintf(buffer + l, "\t\tHard expiration after %qu bytes\n",
-			   tdb->tdb_exp_bytes);
-	    
-	    if (tdb->tdb_flags & TDBF_SOFT_BYTES)
-	      l += sprintf(buffer + l, "\t\tSoft expiration after %qu bytes\n",
-			   tdb->tdb_soft_bytes);
-
-	    if (tdb->tdb_flags & TDBF_ALLOCATIONS)
-	      l += sprintf(buffer + l,
-			   "\t\tHard expiration after %u flows\n",
-			   tdb->tdb_exp_allocations);
-	    
-	    if (tdb->tdb_flags & TDBF_SOFT_ALLOCATIONS)
-	      l += sprintf(buffer + l,
-			   "\t\tSoft expiration after %u flows\n",
-			   tdb->tdb_soft_allocations);
-
-	    if (tdb->tdb_flags & TDBF_FIRSTUSE)
-	    {
-		if (tdb->tdb_first_use)
+	      if (tdb->tdb_flags & TDBF_TIMER)
 		l += sprintf(buffer + l,
-			     "\t\tHard expiration(2) in %qu seconds\n",
-			     (tdb->tdb_first_use + tdb->tdb_exp_first_use) -
-			     time.tv_sec);
-		else
-		l += sprintf(buffer + l,
-			     "\t\tHard expiration in %qu seconds after first "
-			     "use\n", tdb->tdb_exp_first_use);
-	    }
-
-	    if (tdb->tdb_flags & TDBF_SOFT_FIRSTUSE)
-	    {
-	        if (tdb->tdb_first_use)
-		  l += sprintf(buffer + l,
-			       "\t\tSoft expiration(2) in %qu seconds\n",
-			       (tdb->tdb_first_use + tdb->tdb_soft_first_use) -
-			       time.tv_sec);
-	        else
-		  l += sprintf(buffer + l,
-			       "\t\tSoft expiration in %qu seconds after first "
-			       "use\n", tdb->tdb_soft_first_use);
-	    }
-
-	    if (!(tdb->tdb_flags & (TDBF_TIMER | TDBF_SOFT_TIMER | TDBF_BYTES |
-				    TDBF_SOFT_ALLOCATIONS | TDBF_ALLOCATIONS |
-				    TDBF_SOFT_BYTES | TDBF_FIRSTUSE |
-				    TDBF_SOFT_FIRSTUSE)))
-	      l += sprintf(buffer + l, "\t\t(none)\n");
-
-	    l += sprintf(buffer + l, "\n");
+			     "\t\tHard expiration(1) in %qu seconds\n",
+			     tdb->tdb_exp_timeout - time.tv_sec);
 	    
-	    return l;
-	}
-    
+	      if (tdb->tdb_flags & TDBF_SOFT_TIMER)
+		l += sprintf(buffer + l,
+			     "\t\tSoft expiration(1) in %qu seconds\n",
+			     tdb->tdb_soft_timeout - time.tv_sec);
+	    
+	      if (tdb->tdb_flags & TDBF_BYTES)
+		l += sprintf(buffer + l,
+			     "\t\tHard expiration after %qu bytes\n",
+			     tdb->tdb_exp_bytes);
+	    
+	      if (tdb->tdb_flags & TDBF_SOFT_BYTES)
+		l += sprintf(buffer + l,
+			     "\t\tSoft expiration after %qu bytes\n",
+			     tdb->tdb_soft_bytes);
+
+	      if (tdb->tdb_flags & TDBF_ALLOCATIONS)
+		l += sprintf(buffer + l,
+			     "\t\tHard expiration after %u flows\n",
+			     tdb->tdb_exp_allocations);
+	    
+	      if (tdb->tdb_flags & TDBF_SOFT_ALLOCATIONS)
+		l += sprintf(buffer + l,
+			     "\t\tSoft expiration after %u flows\n",
+			     tdb->tdb_soft_allocations);
+
+	      if (tdb->tdb_flags & TDBF_FIRSTUSE)
+	      {
+		  if (tdb->tdb_first_use)
+		    l += sprintf(buffer + l,
+				 "\t\tHard expiration(2) in %qu seconds\n",
+				 (tdb->tdb_first_use +
+				  tdb->tdb_exp_first_use) - time.tv_sec);
+		  else
+		    l += sprintf(buffer + l,
+				 "\t\tHard expiration in %qu seconds "
+				 "after first use\n",
+				 tdb->tdb_exp_first_use);
+	      }
+
+	      if (tdb->tdb_flags & TDBF_SOFT_FIRSTUSE)
+	      {
+		  if (tdb->tdb_first_use)
+		    l += sprintf(buffer + l,
+				 "\t\tSoft expiration(2) in %qu seconds\n",
+				 (tdb->tdb_first_use +
+				  tdb->tdb_soft_first_use) - time.tv_sec);
+		  else
+		    l += sprintf(buffer + l,
+				 "\t\tSoft expiration in %qu seconds "
+				 "after first use\n",
+				 tdb->tdb_soft_first_use);
+	      }
+
+	      if (!(tdb->tdb_flags &
+		    (TDBF_TIMER | TDBF_SOFT_TIMER | TDBF_BYTES |
+		     TDBF_SOFT_ALLOCATIONS | TDBF_ALLOCATIONS |
+		     TDBF_SOFT_BYTES | TDBF_FIRSTUSE | TDBF_SOFT_FIRSTUSE)))
+		l += sprintf(buffer + l, "\t\t(none)\n");
+
+	      l += sprintf(buffer + l, "\n");
+
+	      splx(s);
+	      return l;
+	  }
+	splx(s);
+    }
     return 0;
 }
 
@@ -1027,9 +1355,9 @@ inet_ntoa4(struct in_addr ina)
 {
     static char buf[4][4 * sizeof "123"];
     unsigned char *ucp = (unsigned char *) &ina;
-    static int i = 1;
+    static int i = 3;
  
-    i = (i + 1) % 2;
+    i = (i + 1) % 4;
     sprintf(buf[i], "%d.%d.%d.%d", ucp[0] & 0xff, ucp[1] & 0xff,
             ucp[2] & 0xff, ucp[3] & 0xff);
     return (buf[i]);

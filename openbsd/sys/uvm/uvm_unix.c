@@ -1,10 +1,5 @@
-/*	$OpenBSD: uvm_unix.c,v 1.2 1999/02/26 05:32:08 art Exp $	*/
 /*	$NetBSD: uvm_unix.c,v 1.7 1998/10/11 23:18:21 chuck Exp $	*/
 
-/*
- * XXXCDC: "ROUGH DRAFT" QUALITY UVM PRE-RELEASE FILE!   
- *         >>>USE AT YOUR OWN RISK, WORK IS NOT FINISHED<<<
- */
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
  * Copyright (c) 1991, 1993 The Regents of the University of California.  
@@ -140,19 +135,31 @@ uvm_grow(p, sp)
 	/*
 	 * For user defined stacks (from sendsig).
 	 */
+#ifdef MACHINE_STACK_GROWS_UP
+	if (sp > (vaddr_t)vm->vm_maxsaddr)
+#else
 	if (sp < (vaddr_t)vm->vm_maxsaddr)
+#endif
 		return (0);
 
 	/*
 	 * For common case of already allocated (from trap).
 	 */
+#ifdef MACHINE_STACK_GROWS_UP
+	if (sp < USRSTACK + ctob(vm->vm_ssize))
+#else
 	if (sp >= USRSTACK - ctob(vm->vm_ssize))
+#endif
 		return (1);
 
 	/*
 	 * Really need to check vs limit and increment stack size if ok.
 	 */
+#ifdef MACHINE_STACK_GROWS_UP
+	si = clrnd(btoc(sp - USRSTACK) - vm->vm_ssize);
+#else
 	si = clrnd(btoc(USRSTACK-sp) - vm->vm_ssize);
+#endif
 	if (vm->vm_ssize + si > btoc(p->p_rlimit[RLIMIT_STACK].rlim_cur))
 		return (0);
 	vm->vm_ssize += si;
@@ -220,9 +227,14 @@ uvm_coredump(p, vp, cred, chdr)
 		if (end > VM_MAXUSER_ADDRESS)
 			end = VM_MAXUSER_ADDRESS;
 
+#ifdef MACHINE_STACK_GROWS_UP
+		if (start >= USRSTACK) {
+			start = USRSTACK;
+#else
 		if (start >= (vaddr_t)vm->vm_maxsaddr) {
-			flag = CORE_STACK;
 			start = trunc_page(USRSTACK - ctob(vm->vm_ssize));
+#endif
+			flag = CORE_STACK;
 			if (start >= end)
 				continue;
 		} else

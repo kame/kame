@@ -97,6 +97,7 @@ int
 pfkey_sendup(struct socket *socket, struct mbuf *packet, int more)
 {
   struct mbuf *packet2;
+  int s;
 
   if (more) {
     if (!(packet2 = m_copym(packet, 0, M_COPYALL, M_DONTWAIT)))
@@ -104,10 +105,13 @@ pfkey_sendup(struct socket *socket, struct mbuf *packet, int more)
   } else
     packet2 = packet;
 
+  s = spltdb();
   if (!sbappendaddr(&socket->so_rcv, &pfkey_addr, packet2, NULL)) {
     m_freem(packet2);
-    return 0;
+    splx(s);
+    return ENOBUFS;
   }
+  splx(s);
 
   sorwakeup(socket);
   return 0;
@@ -117,22 +121,36 @@ static int
 pfkey_output(struct mbuf *mbuf, struct socket *socket)
 {
   void *message;
+  int error = 0;
 
 #if DIAGNOSTIC
-  if (!mbuf || !(mbuf->m_flags & M_PKTHDR)) 
-    return EINVAL;
+  if (!mbuf || !(mbuf->m_flags & M_PKTHDR)) {
+    error = EINVAL;
+    goto ret;
+  }
 #endif /* DIAGNOSTIC */
 
-  if (mbuf->m_pkthdr.len > PFKEY_MSG_MAXSZ)
-    return EMSGSIZE;
+  if (mbuf->m_pkthdr.len > PFKEY_MSG_MAXSZ) {
+    error = EMSGSIZE;
+    goto ret;
+  }
 
-  if (!(message = malloc((unsigned long) mbuf->m_pkthdr.len, M_TEMP,
-			 M_DONTWAIT)))
-    return ENOMEM;
+  if (!(message = malloc((unsigned long) mbuf->m_pkthdr.len, M_PFKEY,
+			 M_DONTWAIT))) {
+    error = ENOMEM;
+    goto ret;
+  }
 
   m_copydata(mbuf, 0, mbuf->m_pkthdr.len, message);
 
-  return pfkey_versions[socket->so_proto->pr_protocol]->send(socket, message, mbuf->m_pkthdr.len);
+  error =
+    pfkey_versions[socket->so_proto->pr_protocol]->send(socket, message,
+							mbuf->m_pkthdr.len);
+
+ ret:
+  if (mbuf)
+    m_freem (mbuf);
+  return error;
 }
 
 static int
@@ -252,7 +270,7 @@ pfkey_buildprotosw(void)
       j++;
 
   if (j) {
-    if (!(protosw = malloc(j * sizeof(struct protosw), M_TEMP, M_DONTWAIT)))
+    if (!(protosw = malloc(j * sizeof(struct protosw), M_PFKEY, M_DONTWAIT)))
       return ENOMEM;
 
     for (i = 0, p = protosw; i <= PFKEY_PROTOCOL_MAX; i++)
@@ -263,18 +281,18 @@ pfkey_buildprotosw(void)
       }
 
     if (pfkey_domain.dom_protosw)
-      free(pfkey_domain.dom_protosw, M_TEMP);
+      free(pfkey_domain.dom_protosw, M_PFKEY);
 
     pfkey_domain.dom_protosw = protosw;
     pfkey_domain.dom_protoswNPROTOSW = p;
   } else  {
-    if (!(protosw = malloc(sizeof(struct protosw), M_TEMP, M_DONTWAIT)))
+    if (!(protosw = malloc(sizeof(struct protosw), M_PFKEY, M_DONTWAIT)))
       return ENOMEM;
 
     bcopy(&pfkey_protosw_template, protosw, sizeof(struct protosw));
 
     if (pfkey_domain.dom_protosw)
-      free(pfkey_domain.dom_protosw, M_TEMP);
+      free(pfkey_domain.dom_protosw, M_PFKEY);
 
     pfkey_domain.dom_protosw = protosw;
     pfkey_domain.dom_protoswNPROTOSW = protosw;
