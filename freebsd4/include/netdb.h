@@ -61,8 +61,13 @@
 #ifndef _NETDB_H_
 #define _NETDB_H_
 
+#include <machine/ansi.h>
 #include <sys/cdefs.h>
-#include <sys/types.h>
+
+#ifdef	_BSD_SIZE_T_
+typedef	_BSD_SIZE_T_	size_t;
+#undef	_BSD_SIZE_T_
+#endif
 
 #ifndef _PATH_HEQUIV
 # define	_PATH_HEQUIV	"/etc/hosts.equiv"
@@ -201,7 +206,7 @@ struct addrinfo {
 typedef	_BSD_SOCKLEN_T_	socklen_t;
 #undef	_BSD_SOCKLEN_T_
 #endif
- 
+
 __BEGIN_DECLS
 void		endhostent __P((void));
 void		endnetent __P((void));

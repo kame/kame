@@ -51,6 +51,7 @@
 #define	_BSD_CLOCK_T_		int		/* clock() */
 #define	_BSD_PTRDIFF_T_		long		/* ptr1 - ptr2 */
 #define	_BSD_SIZE_T_		unsigned long	/* sizeof() */
+#define	_BSD_SOCKLEN_T_		__uint32_t
 #define	_BSD_SSIZE_T_		long		/* byte count or error */
 #define	_BSD_TIME_T_		int		/* time() */
 typedef struct {
@@ -63,7 +64,6 @@ typedef struct {
 #define	_BSD_TIMER_T_		int		/* timer_t */
 #define	_BSD_SUSECONDS_T_	int		/* suseconds_t */
 #define	_BSD_USECONDS_T_	unsigned int	/* useconds_t */
-#define	_BSD_SOCKLEN_T_		__uint32_t	/* socklen_t */
 
 /*
  * Types which are fundamental to the implementation and must be used
