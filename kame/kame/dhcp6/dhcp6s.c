@@ -61,7 +61,6 @@ struct servtab {
 	struct in6_addr serv;
 };
 
-int dump = 0;
 int debug = 0;
 #define dprintf(x)	{ if (debug) fprintf x; }
 char *device = NULL;
@@ -91,13 +90,10 @@ main(argc, argv)
 	struct in6_addr a;
 
 	srandom(time(NULL) & getpid());
-	while ((ch = getopt(argc, argv, "dDn:")) != EOF) {
+	while ((ch = getopt(argc, argv, "dn:")) != EOF) {
 		switch (ch) {
 		case 'd':
 			debug++;
-			break;
-		case 'D':
-			dump++;
 			break;
 		case 'n':
 			if (inet_pton(AF_INET6, optarg, &a, sizeof(a)) != 1) {
@@ -120,6 +116,9 @@ main(argc, argv)
 	}
 	device = argv[0];
 
+	if (!debug)
+		daemon(0, 0);
+
 	mainloop();
 	exit(0);
 }
@@ -127,7 +126,7 @@ main(argc, argv)
 static void
 usage()
 {
-	fprintf(stderr, "usage: dhcp6s [-dD] [-n serv] intface\n");
+	fprintf(stderr, "usage: dhcp6s [-d] [-n serv] intface\n");
 	exit(0);
 }
 
