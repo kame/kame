@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/07/19 07:50:22 $
+			$Date: 2000/07/26 02:32:12 $
 
 1. IPv6
 
@@ -116,7 +116,7 @@ draft-ietf-ngtrans-6to4-06.txt:
 	Connection of IPv6 Domains via IPv4 Clouds without Explicit Tunnels
     * "stf" interface implements it.  Be sure to read the next item before
       configuring it, there are security issues.
-http://playground.iijlab.net/i-d/draft-itojun-ipv6-transition-abuse-00.txt:
+draft-itojun-ipv6-transition-abuse-01.txt:
 	Possible abuse against IPv6 transition technologies
     * KAME does not implement RFC1933 automatic tunnel.
     * "stf" interface implements some address filters.  Refer to stf(4)
@@ -124,7 +124,7 @@ http://playground.iijlab.net/i-d/draft-itojun-ipv6-transition-abuse-00.txt:
       we do not include "stf" interface into GENERIC.v6 compilation.
     * kame/openbsd completely disables IPv4 mapped address support.
     * kame/netbsd makes IPv4 mapped address support off by default.
-    * See section 12.6 and 14 for more details.
+    * See section 1.12.6 and 1.14 for more details.
 draft-aboba-dnsext-mdns-00.txt: Multicast DNS
     * kame/mdnsd has test implementation, which will not be built in
       default compilation.  The draft will experience a major change in the
@@ -966,7 +966,7 @@ mapped address or not.  This adds many twists:
 		use EPSV/EPRT or LPSV/LPRT;	/*IPv6*/
 	else
 		error;
-  Under SIIT environment, the correct code would be:
+  The correct code, with consideration to IPv4 mapped address, would be:
 	if (sa_family == AF_INET)
 		use EPSV/EPRT or PASV/PORT;	/*IPv4*/
 	else if (sa_family == AF_INET6 && IPv4 mapped address)
@@ -981,17 +981,40 @@ mapped address or not.  This adds many twists:
 - By enabling kernel support for IPv4 mapped address (outgoing direction),
   servers on the kernel can be hosed by IPv6 native packet that has IPv4
   mapped address in IPv6 header source, and can generate unwanted IPv4 packets.
-  http://playground.iijlab.net/i-d/draft-itojun-ipv6-transition-abuse-00.txt
-  talks more about this scenario.
+  draft-itojun-ipv6-transition-abuse-01.txt talks more about this scenario.
 
 Due to the above twists, some of KAME userland programs has restrictions on
 the use of IPv4 mapped addresses:
 - rshd/rlogind do not accept connections from IPv4 mapped address.
   This is to avoid malicious use of IPv4 mapped address in IPv6 native
   packet, to bypass source-address based authentication.
-- ftp/ftpd does not support SIIT environment.  IPv4 mapped address will be
-  decoded in userland, and will be passed to AF_INET sockets
-  (SIIT client should pass IPv4 mapped address as is, to AF_INET6 sockets).
+- ftp/ftpd assume that you are on dual stack network.  IPv4 mapped address
+  will be decoded in userland, and will be passed to AF_INET sockets
+  (in other words, ftp/ftpd do not support SIIT environment).
+
+1.12.7 Interaction with SIIT translator
+
+SIIT translator is specified in RFC2765.  KAME node cannot become a SIIT
+translator box, nor SIIT end node (a node in SIIT cloud).
+
+To become a SIIT translator box, we need to put additional code for that.
+We do not have the code in our tree at this moment.
+
+There are multiple reasons that we are unable to become SIIT end node.
+(1) SIIT translators require end nodes in the SIIT cloud to be IPv6-only.
+Since we are unable to compile INET-less kernel, we are unable to become
+SIIT end node.  (2) As presented in 1.12.6, some of our userland code assumes
+dual stack network.  (3) KAME stack filters out IPv6 packets with IPv4
+mapped address in the header, to secure non-SIIT case (which is much more
+common).  Effectively KAME node will reject any packets via SIIT translator
+box.  See section 1.14 for more detail about the last item.
+
+There are documentation issues too - SIIT document requires very strange
+things.  For example, SIIT document asks IPv6-only (meaning no IPv4 code)
+node to be able to construct IPv4 IPsec headers.  If a node knows how to
+construct IPv4 IPsec headers, that is not an IPv6-only node, it is a dual-stack
+node.  The requirements imposed in SIIT document contradict with the other
+part of the document itself.
 
 1.13 sockaddr_storage
 
@@ -1056,13 +1079,16 @@ or bypass security controls:
 Also, since KAME does not support RFC1933 auto tunnels, seeing IPv4 compatible
 is very rare.  You should take caution if you see those on the wire.
 
+If we see IPv6 Packets with IPv4 mapped address (::ffff:0.0.0.0/96) in the
+header in dual-stack environment (not in SIIT environment), they indicate
+that someone is trying to inpersonate IPv4 peer.  The packet should be dropped.
+
 KAME code is carefully written to avoid such incidents.  More specifically,
 KAME kernel will reject packets with certain source/dstination address in IPv6
 base header, or IPv6 routing header.  Also, KAME default configuration file
 is written carefully, to avoid those attacks.
 
-http://playground.iijlab.net/i-d/draft-itojun-ipv6-transition-abuse-00.txt
-talks about more about this.
+draft-itojun-ipv6-transition-abuse-01.txt talks about more about this.
 
 1.15 Node's required addresses
 
