@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.257 2001/08/08 14:52:30 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.258 2001/08/14 06:02:39 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1692,6 +1692,9 @@ implementation proposes it as "AH tunnel and ESP tunnel".
 Racoon follows the latter route (previously it followed the former, and
 the latter interpretation seems to be popular/consensus).
 This raises real interoperability issue.  We hope this to be resolved quickly.
+
+racoon does not implement byte lifetime for both phase 1 and phase 2
+(RFC2409 page 35, Life Type = kilobytes).
 
 4.3 AH and ESP handling
 
