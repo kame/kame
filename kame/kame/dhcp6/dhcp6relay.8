@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6relay.8,v 1.12 2002/04/25 03:02:57 jinmei Exp $
+.\"	$KAME: dhcp6relay.8,v 1.13 2003/07/14 09:59:16 jinmei Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -37,7 +37,9 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl Ddf
+.Op Fl b Ar boundaddr
 .Op Fl H Ar hoplim
+.Op Fl r Ar relay-IF
 .Ar interface
 .\"
 .Sh DESCRIPTION
@@ -66,22 +68,33 @@ usually prints warning, debugging, or error messages to
 .Xr syslog 8 ,
 it prints the messages to standard error if this option is
 specified.
+.It Fl b Ar boundaddr
+Specifies the source address to relay packets to servers (or other
+agents).
 .It Fl H Ar hoplim
-The option specifies the hop limit of DHCPv6 Solicit messages forwarded to
+Specifies the hop limit of DHCPv6 Solicit messages forwarded to
 servers.
+.It Fl r Ar relay-IF
+Specifies the interface on which messages to servers are sent.
+When omitted, the same interface as
+.Ar interface
+will be used.
 .El
 .\"
 .Sh SEE ALSO
 .Xr dhcp6c 8 ,
 .Xr dhcp6s 8
 .Rs
+.%A R. Droms
 .%A J. Bound
-.%A M. Carney
+.%A B. Volz
+.%A T. Lemon
 .%A C. Perkins
-.%D 5 May 2000
+.%A M. Carney
+.%D 2 Nov 2002
 .%T Dynamic Host Configuration Protocol for IPv6 (DHCPv6)
 .%R internet draft
-.%N draft-ietf-dhc-dhcpv6-24.txt
+.%N draft-ietf-dhc-dhcpv6-28.txt
 .%O work in progress material
 .Re
 .\"
@@ -90,10 +103,5 @@ The
 .Nm
 command first appeared in WIDE/KAME IPv6 protocol stack kit.
 .\"
-.Sh BUGS
-The current implementation does not conform to the latest draft.
-.Pp
-The current implementation handles DHCP Solicit and DHCP Advertise
-messages only.
 .Bl -enum
 .El
