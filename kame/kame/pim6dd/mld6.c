@@ -63,7 +63,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: mld6.c,v 1.4 1999/12/10 06:09:13 itojun Exp $
+ *  $Id: mld6.c,v 1.5 1999/12/21 12:03:09 jinmei Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -157,16 +157,26 @@ init_mld6()
 
     /* specify to tell receiving interface */
     on = 1;
+#ifdef IPV6_RECVPKTINFO
+    if (setsockopt(mld6_socket, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
+		   sizeof(on)) < 0)
+	log(LOG_ERR, errno, "setsockopt(IPV6_RECVPKTINFO)");
+#else  /* old adv. API */
     if (setsockopt(mld6_socket, IPPROTO_IPV6, IPV6_PKTINFO, &on,
 		   sizeof(on)) < 0)
 	log(LOG_ERR, errno, "setsockopt(IPV6_PKTINFO)");
-
+#endif 
     on = 1;
     /* specify to tell value of hoplimit field of received IP6 hdr */
+#ifdef IPV6_RECVHOPLIMIT
+    if (setsockopt(mld6_socket, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on,
+		   sizeof(on)) < 0)
+	log(LOG_ERR, errno, "setsockopt(IPV6_RECVHOPLIMIT)");
+#else  /* old adv. API */
     if (setsockopt(mld6_socket, IPPROTO_IPV6, IPV6_HOPLIMIT, &on,
 		   sizeof(on)) < 0)
 	log(LOG_ERR, errno, "setsockopt(IPV6_HOPLIMIT)");
-
+#endif 
     /* initialize msghdr for receiving packets */
     rcviov[0].iov_base = (caddr_t) mld6_recv_buf;
     rcviov[0].iov_len = RECV_BUF_SIZE;

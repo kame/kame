@@ -152,9 +152,15 @@ void init_pim6()
 
 	/* specify to tell receiving interface */
 	on = 1;
+#ifdef IPV6_RECVPKTINFO
+	if (setsockopt(pim6_socket, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
+		       sizeof(on)) < 0)
+		log(LOG_ERR, errno, "setsockopt(IPV6_RECVPKTINFO)");
+#else
 	if (setsockopt(pim6_socket, IPPROTO_IPV6, IPV6_PKTINFO, &on,
 		       sizeof(on)) < 0)
 		log(LOG_ERR, errno, "setsockopt(IPV6_PKTINFO)");
+#endif 
 
 	/* initialize msghdr for receiving packets */
 	rcviovpim[0].iov_base = (caddr_t) pim6_recv_buf;
