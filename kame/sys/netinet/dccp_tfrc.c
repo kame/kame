@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: dccp_tfrc.c,v 1.1 2003/10/17 07:27:26 ono Exp $
+ * $Id: dccp_tfrc.c,v 1.1.1.1 2003/10/17 07:27:26 ono Exp $
  */
 
 /* This implementation conforms to the drafts of DCCP dated Mars 2003. The options used are window counter, elapsed time, loss event rate and receive rate.  No support for history discounting or oscillation prevention. */

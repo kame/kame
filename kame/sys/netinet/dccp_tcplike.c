@@ -31,15 +31,15 @@
  * Current Revision:
  *
  * $Source: /usr/home/sumikawa/kame/kame/kame/sys/netinet/dccp_tcplike.c,v $
- * $Revision: 1.1 $
+ * $Revision: 1.1.1.1 $
  * $Author: ono $
  * $Date: 2003/10/17 07:27:26 $
  *
  * Revision history:
  *
  * $Log: dccp_tcplike.c,v $
- * Revision 1.1  2003/10/17 07:27:26  ono
- * Initial revision
+ * Revision 1.1.1.1  2003/10/17 07:27:26  ono
+ * dccp from www.dccp.org
  *
  * Revision 1.48  2003/06/08 14:48:18  magerx-9
  * Added stats for TCPlike
