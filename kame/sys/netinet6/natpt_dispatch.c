@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_dispatch.c,v 1.4 2000/02/06 09:34:08 itojun Exp $
+ *	$Id: natpt_dispatch.c,v 1.5 2000/02/18 11:25:05 fujisawa Exp $
  */
 
 #include <sys/param.h>
@@ -63,6 +63,7 @@
  */
 
 u_int		natpt_debug;
+u_int		natpt_dump;
 
 static	struct _cell	*ifBox;
 
@@ -114,7 +115,7 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
     if (natpt_initialized == 0)
 	return (IPPROTO_IP);			/* goto ours		*/
 
-    if (isDebug(D_DIVEIN4))
+    if (isDump(D_DIVEIN4))
 	natpt_logMBuf(LOG_DEBUG, m4, "dive into natpt_in4.");
 
     ifnet = m4->m_pkthdr.rcvif;
@@ -149,7 +150,7 @@ natpt_in6(struct mbuf *m6, struct mbuf **m4)
     if (natpt_initialized == 0)
 	return (IPPROTO_IP);			/* goto mcastcheck	*/
 
-    if (isDebug(D_DIVEIN6))
+    if (isDump(D_DIVEIN6))
 	natpt_logMBuf(LOG_DEBUG, m6, "dive into natpt_in6.");
 
     ip6 = mtod(m6, struct ip6_hdr *);
@@ -164,13 +165,13 @@ natpt_in6(struct mbuf *m6, struct mbuf **m4)
 	|| (cand.s6_addr32[2] != natpt_prefix.s6_addr32[2])
 	|| (cand.s6_addr32[3] != natpt_prefix.s6_addr32[3]))
     {
-	if (isDebug(D_IN6REJECT))
+	if (isDump(D_IN6REJECT))
 	    natpt_logMBuf(LOG_DEBUG, m6, "v6 translation rejected.");
 
 	return (IPPROTO_IP);			/* goto mcastcheck	*/
     }
 
-    if (isDebug(D_IN6ACCEPT))
+    if (isDump(D_IN6ACCEPT))
 	natpt_logMBuf(LOG_DEBUG, m6, "v6 translation start.");
 
     ifnet = m6->m_pkthdr.rcvif;
@@ -369,7 +370,7 @@ natpt_outgoingIPv6(int sess, struct mbuf *m6, struct mbuf **m4)
     if ((rv = sanityCheckOut6(&cv6)) != IPPROTO_IPV6)
 	return (IPPROTO_DONE);				/* discard this packet	*/
 
-    if (isDebug(D_PEEKOUTGOINGV6))
+    if (isDump(D_PEEKOUTGOINGV6))
 	natpt_logIp6(LOG_DEBUG, cv6._ip._ip6);
 
     if ((cv6.ats = lookingForOutgoingV6Hash(&cv6)) == NULL)

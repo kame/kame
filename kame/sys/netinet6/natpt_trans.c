@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_trans.c,v 1.7 2000/02/06 09:34:09 itojun Exp $
+ *	$Id: natpt_trans.c,v 1.8 2000/02/18 11:25:06 fujisawa Exp $
  */
 
 #include <sys/param.h>
@@ -89,11 +89,11 @@ extern	struct in6_addr	 natpt_prefix;
 extern	struct in6_addr	 natpt_prefixmask;
 
 void		 tr_icmp4EchoReply		__P((struct _cv *, struct _cv *));
-void		 tr_icmp4Unreach		__P((struct _cv *, struct _cv *, struct _pat *));
+void		 tr_icmp4Unreach		__P((struct _cv *, struct _cv *, struct pAddr *));
 void		 tr_icmp4Echo			__P((struct _cv *, struct _cv *));
-void		 tr_icmp4Timxceed		__P((struct _cv *, struct _cv *, struct _pat *));
+void		 tr_icmp4Timxceed		__P((struct _cv *, struct _cv *, struct pAddr *));
 void		 tr_icmp4Paramprob		__P((struct _cv *, struct _cv *));
-void		 tr_icmp4MimicPayload		__P((struct _cv *, struct _cv *, struct _pat *));
+void		 tr_icmp4MimicPayload		__P((struct _cv *, struct _cv *, struct pAddr *));
 
 void		 tr_icmp6DstUnreach		__P((struct _cv *, struct _cv *));
 void		 tr_icmp6PacketTooBig		__P((struct _cv *, struct _cv *));
@@ -121,12 +121,12 @@ static	MALLOC_DEFINE(M_NATPT, "NATPT", "Network Address Translation - Protocol T
  */
 
 struct mbuf *
-translatingIPv4To6(struct _cv *cv4, struct _pat *pata)
+translatingIPv4To6(struct _cv *cv4, struct pAddr *pad)
 {
     struct timeval	 atv;
     struct mbuf		*m6 = NULL;
 
-    if (isDebug(D_TRANSLATINGIPV4TO6))
+    if (isDump(D_TRANSLATINGIPV4))
 	natpt_logIp4(LOG_DEBUG, cv4->_ip._ip4);
 
     microtime(&atv);
@@ -135,15 +135,15 @@ translatingIPv4To6(struct _cv *cv4, struct _pat *pata)
     switch (cv4->ip_payload)
     {
       case IPPROTO_ICMP:
-	m6 = translatingICMPv4To6(cv4, pata);
+	m6 = translatingICMPv4To6(cv4, pad);
 	break;
 
       case IPPROTO_TCP:
-	m6 = translatingTCPv4To6(cv4, pata);
+	m6 = translatingTCPv4To6(cv4, pad);
 	break;
 
       case IPPROTO_UDP:
-	m6 = translatingUDPv4To6(cv4, pata);
+	m6 = translatingUDPv4To6(cv4, pad);
 	break;
     }
     
@@ -155,7 +155,7 @@ translatingIPv4To6(struct _cv *cv4, struct _pat *pata)
 
 
 struct mbuf *
-translatingICMPv4To6(struct _cv *cv4, struct _pat *pata)
+translatingICMPv4To6(struct _cv *cv4, struct pAddr *pad)
 {
     struct _cv		 cv6;
     struct mbuf		*m6;
@@ -197,8 +197,8 @@ translatingICMPv4To6(struct _cv *cv4, struct _pat *pata)
     ip6->ip6_plen = 0;						/* XXX */
     ip6->ip6_nxt  = IPPROTO_ICMPV6;
     ip6->ip6_hlim = ip4->ip_ttl -1;
-    ip6->ip6_dst  = pata->dst.u.in6;
-/*  ip6->ip6_src  = pata->src.u.in6;						*/
+    ip6->ip6_dst  = pad->in6dst;
+    ip6->ip6_src  = pad->in6src;
     if (natpt_prefix.s6_addr32[0] != 0)
     {
 	ip6->ip6_src.s6_addr32[0] = natpt_prefix.s6_addr32[0];
@@ -220,7 +220,7 @@ translatingICMPv4To6(struct _cv *cv4, struct _pat *pata)
 	break;
 
       case ICMP_UNREACH:
-	tr_icmp4Unreach(cv4, &cv6, pata);
+	tr_icmp4Unreach(cv4, &cv6, pad);
 	break;
 
       case ICMP_ECHO:
@@ -228,7 +228,7 @@ translatingICMPv4To6(struct _cv *cv4, struct _pat *pata)
 	break;
 
       case ICMP_TIMXCEED:
-	tr_icmp4Timxceed(cv4, &cv6, pata);
+	tr_icmp4Timxceed(cv4, &cv6, pad);
 	break;
 
       case ICMP_PARAMPROB:
@@ -297,7 +297,7 @@ tr_icmp4EchoReply(struct _cv *cv4, struct _cv *cv6)
 
 
 void
-tr_icmp4Unreach(struct _cv *cv4, struct _cv *cv6, struct _pat *pata)
+tr_icmp4Unreach(struct _cv *cv4, struct _cv *cv6, struct pAddr *pad)
 {
     struct icmp		*icmp4 = cv4->_payload._icmp4;
     struct icmp6_hdr	*icmp6 = cv6->_payload._icmp6;
@@ -355,7 +355,7 @@ tr_icmp4Unreach(struct _cv *cv4, struct _cv *cv6, struct _pat *pata)
 	break;
     }
 
-    tr_icmp4MimicPayload(cv4, cv6, pata);
+    tr_icmp4MimicPayload(cv4, cv6, pad);
 }
 
 
@@ -392,7 +392,7 @@ tr_icmp4Echo(struct _cv *cv4, struct _cv *cv6)
 
 
 void
-tr_icmp4Timxceed(struct _cv *cv4, struct _cv *cv6, struct _pat *pata)
+tr_icmp4Timxceed(struct _cv *cv4, struct _cv *cv6, struct pAddr *pad)
 {
     struct icmp		*icmp4 = cv4->_payload._icmp4;
     struct icmp6_hdr	*icmp6 = cv6->_payload._icmp6;
@@ -402,7 +402,7 @@ tr_icmp4Timxceed(struct _cv *cv4, struct _cv *cv6, struct _pat *pata)
     icmp6->icmp6_id   = icmp4->icmp_id;
     icmp6->icmp6_seq  = icmp4->icmp_seq;
 
-    tr_icmp4MimicPayload(cv4, cv6, pata);
+    tr_icmp4MimicPayload(cv4, cv6, pad);
 }
 
 
@@ -420,7 +420,7 @@ tr_icmp4Paramprob(struct _cv *cv4, struct _cv *cv6)
 
 
 void
-tr_icmp4MimicPayload(struct _cv *cv4, struct _cv *cv6, struct _pat *pata)
+tr_icmp4MimicPayload(struct _cv *cv4, struct _cv *cv6, struct pAddr *pad)
 {
     int			 dgramlen;
     int			 icmp6dlen, icmp6rest;
@@ -451,8 +451,8 @@ tr_icmp4MimicPayload(struct _cv *cv4, struct _cv *cv6, struct _pat *pata)
     icmpip6->ip6_plen = 0;
     icmpip6->ip6_nxt  = IPPROTO_UDP;
     icmpip6->ip6_hlim = 0;
-    icmpip6->ip6_src  = pata->dst.u.in6;
-    icmpip6->ip6_dst  = pata->src.u.in6;
+    icmpip6->ip6_src  = pad->in6dst;
+    icmpip6->ip6_dst  = pad->in6src;
 
     icmp6dlen = sizeof(struct icmp6_hdr) + sizeof(struct ip6_hdr) + dgramlen;
     ip6->ip6_plen = ntohs(icmp6dlen);
@@ -465,21 +465,21 @@ tr_icmp4MimicPayload(struct _cv *cv4, struct _cv *cv6, struct _pat *pata)
 	struct udphdr	*icmpudp6;
 
 	icmpudp6 = (struct udphdr *)((caddr_t)icmpip6 + sizeof(struct ip6_hdr));
-	icmpudp6->uh_sport = cv4->ats->local.dport;
-	icmpudp6->uh_dport = cv4->ats->local.sport;
+	icmpudp6->uh_sport = cv4->ats->local._dport;
+	icmpudp6->uh_dport = cv4->ats->local._sport;
     }
 }
 
 
 struct mbuf *
-translatingTCPv4To6(struct _cv *cv4, struct _pat *pata)
+translatingTCPv4To6(struct _cv *cv4, struct pAddr *pad)
 {
     int			 cksumOrg;
     struct _cv		 cv6;
     struct mbuf		*m6;
 
     bzero(&cv6, sizeof(struct _cv));
-    m6 = translatingTCPUDPv4To6(cv4, pata, &cv6);
+    m6 = translatingTCPUDPv4To6(cv4, pad, &cv6);
     cv6.ip_p = cv6.ip_payload = IPPROTO_TCP;
     cksumOrg = ntohs(cv4->_payload._tcp4->th_sum);
 
@@ -511,13 +511,13 @@ translatingTCPv4To6(struct _cv *cv4, struct _pat *pata)
 
 
 struct mbuf *
-translatingUDPv4To6(struct _cv *cv4, struct _pat *pata)
+translatingUDPv4To6(struct _cv *cv4, struct pAddr *pad)
 {
     struct _cv		 cv6;
     struct mbuf		*m6;
 
     bzero(&cv6, sizeof(struct _cv));
-    m6 = translatingTCPUDPv4To6(cv4, pata, &cv6);
+    m6 = translatingTCPUDPv4To6(cv4, pad, &cv6);
     cv6.ip_p = cv6.ip_payload = IPPROTO_UDP;
 
     return (m6);
@@ -525,7 +525,7 @@ translatingUDPv4To6(struct _cv *cv4, struct _pat *pata)
 
 
 struct mbuf *
-translatingTCPUDPv4To6(struct _cv *cv4, struct _pat *pata, struct _cv *cv6)
+translatingTCPUDPv4To6(struct _cv *cv4, struct pAddr *pad, struct _cv *cv6)
 {
     struct mbuf		*m6;
     struct ip		*ip4;
@@ -647,12 +647,12 @@ translatingTCPUDPv4To6(struct _cv *cv4, struct _pat *pata, struct _cv *cv6)
     ip6->ip6_plen = htons(cv4->plen);
     ip6->ip6_nxt  = IPPROTO_TCP;
     ip6->ip6_hlim = ip4->ip_ttl -1;
-    ip6->ip6_src  = pata->src.u.in6;
-    ip6->ip6_dst  = pata->dst.u.in6;
+    ip6->ip6_src  = pad->in6src;
+    ip6->ip6_dst  = pad->in6dst;
 
     tcp6 = cv6->_payload._tcp6;
-    tcp6->th_sport = pata->sport;
-    tcp6->th_dport = pata->dport;
+    tcp6->th_sport = pad->_sport;
+    tcp6->th_dport = pad->_dport;
 
     return (m6);
 }
@@ -663,12 +663,12 @@ translatingTCPUDPv4To6(struct _cv *cv4, struct _pat *pata, struct _cv *cv6)
  */
 
 struct mbuf *
-translatingIPv6To4(struct _cv *cv6, struct _pat *pata)
+translatingIPv6To4(struct _cv *cv6, struct pAddr *pad)
 {
     struct timeval	 atv;
     struct mbuf		*m4 = NULL;
 
-    if (isDebug(D_TRANSLATINGIPV6TO4))
+    if (isDump(D_TRANSLATINGIPV6))
 	natpt_logIp6(LOG_DEBUG, cv6->_ip._ip6);
 
     microtime(&atv);
@@ -677,15 +677,15 @@ translatingIPv6To4(struct _cv *cv6, struct _pat *pata)
     switch (cv6->ip_payload)
     {
       case IPPROTO_ICMP:
-	m4 = translatingICMPv6To4(cv6, pata);
+	m4 = translatingICMPv6To4(cv6, pad);
 	break;
 
       case IPPROTO_TCP:
-	m4 = translatingTCPv6To4(cv6, pata);
+	m4 = translatingTCPv6To4(cv6, pad);
 	break;
 
       case IPPROTO_UDP:
-	m4 = translatingUDPv6To4(cv6, pata);
+	m4 = translatingUDPv6To4(cv6, pad);
 	break;
     }
 
@@ -704,7 +704,11 @@ translatingIPv6To4(struct _cv *cv6, struct _pat *pata)
 	{
 	    mlen += mm->m_len;
 	}
+
 	m4->m_pkthdr.len = mlen;
+
+	if (isDump(D_TRANSLATEDIPV4))
+	    natpt_logIp4(LOG_DEBUG, ip4);
     }
 
     return (m4);
@@ -712,7 +716,7 @@ translatingIPv6To4(struct _cv *cv6, struct _pat *pata)
 
 
 struct mbuf *
-translatingICMPv6To4(struct _cv *cv6, struct _pat *pata)
+translatingICMPv6To4(struct _cv *cv6, struct pAddr *pad)
 {
     struct _cv		 cv4;
     struct mbuf		*m4;
@@ -753,8 +757,8 @@ translatingICMPv6To4(struct _cv *cv6, struct _pat *pata)
     ip4->ip_off = 0;			/* flag and fragment offset		*/
     ip4->ip_ttl = ip6->ip6_hlim - 1;	/* Time To Live				*/
     ip4->ip_p	= cv6->ip_payload;	/* Final Payload			*/
-    ip4->ip_src = pata->src.u.in4;	/* source addresss			*/
-    ip4->ip_dst = pata->dst.u.in4;	/* destination address			*/
+    ip4->ip_src = pad->in4src;		/* source addresss			*/
+    ip4->ip_dst = pad->in4dst;		/* destination address			*/
 
     switch (icmp6->icmp6_type)
     {
@@ -951,14 +955,14 @@ tr_icmp6EchoReply(struct _cv *cv6, struct _cv *cv4)
 
 
 struct mbuf *
-translatingTCPv6To4(struct _cv *cv6, struct _pat *pata)
+translatingTCPv6To4(struct _cv *cv6, struct pAddr *pad)
 {
     int			 cksumOrg;
     struct _cv		 cv4;
     struct mbuf		*m4;
 
     bzero(&cv4, sizeof(struct _cv));
-    m4 = translatingTCPUDPv6To4(cv6, pata, &cv4);
+    m4 = translatingTCPUDPv6To4(cv6, pad, &cv4);
     cv4.ip_p = cv4.ip_payload = IPPROTO_TCP;
     cksumOrg = ntohs(cv6->_payload._tcp6->th_sum);
 
@@ -987,8 +991,12 @@ translatingTCPv6To4(struct _cv *cv6, struct _pat *pata)
 	iphlen = ip4->ip_hl << 2;
 
 	save_ip = *cv4._ip._ip4;
+#ifdef ti_next
 	ti->ti_next = ti->ti_prev = 0;
 	ti->ti_x1 = 0;
+#else
+	bzero(ti->ti_x1, 9);
+#endif
 	ti->ti_pr = IPPROTO_TCP;
 	ti->ti_len = htons(cv4.m->m_pkthdr.len - iphlen);
 	ti->ti_src = save_ip.ip_src;
@@ -1011,13 +1019,13 @@ translatingTCPv6To4(struct _cv *cv6, struct _pat *pata)
 
 
 struct mbuf *
-translatingUDPv6To4(struct _cv *cv6, struct _pat *pata)
+translatingUDPv6To4(struct _cv *cv6, struct pAddr *pad)
 {
     struct _cv		 cv4;
     struct mbuf		*m4;
 
     bzero(&cv4, sizeof(struct _cv));
-    m4 = translatingTCPUDPv6To4(cv6, pata, &cv4);
+    m4 = translatingTCPUDPv6To4(cv6, pad, &cv4);
     cv4.ip_p = cv4.ip_payload = IPPROTO_UDP;
 
     adjustUpperLayerChecksum(IPPROTO_IPV6, IPPROTO_UDP, cv6, &cv4);
@@ -1059,12 +1067,12 @@ translatingUDPv6To4(struct _cv *cv6, struct _pat *pata)
 
 
 struct mbuf *
-translatingTCPUDPv6To4(struct _cv *cv6, struct _pat *pata, struct _cv *cv4)
+translatingTCPUDPv6To4(struct _cv *cv6, struct pAddr *pad, struct _cv *cv4)
 {
     struct mbuf		*m4;
     struct ip		*ip4;
     struct ip6_hdr	*ip6;
-    struct tcphdr	*th;
+    struct tcpiphdr	*ti;
 
 #if	0
     if ((cv6->m->m_flags & M_EXT)
@@ -1147,12 +1155,12 @@ translatingTCPUDPv6To4(struct _cv *cv6, struct _pat *pata, struct _cv *cv4)
     ip4->ip_off = 0;			/* flag and fragment offset		*/
     ip4->ip_ttl = ip6->ip6_hlim;	/* Time To Live				*/
     ip4->ip_p	= cv6->ip_payload;	/* Final Payload			*/
-    ip4->ip_src = pata->src.u.in4;	/* source addresss			*/
-    ip4->ip_dst = pata->dst.u.in4;	/* destination address			*/
+    ip4->ip_src = pad->in4src;		/* source addresss			*/
+    ip4->ip_dst = pad->in4dst;		/* destination address			*/
 
-    th = (struct tcphdr *)(ip4 + 1);
-    th->th_sport = pata->sport;
-    th->th_dport = pata->dport;
+    ti = (struct tcpiphdr *)ip4;
+    ti->ti_sport = pad->_sport;
+    ti->ti_dport = pad->_dport;
 
     return (m4);
 }

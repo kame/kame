@@ -219,6 +219,17 @@ in_len2mask(mask, len)
 
 static int in_interfaces;	/* number of external internet interfaces */
 
+#ifdef NATPT
+void	in4_len2mask(struct in_addr *, int);
+
+void
+in4_len2mask(struct in_addr *mask, int len)
+{
+    in_len2mask(mask, len);
+}
+#endif	/* NATPT */
+
+
 /*
  * Generic internet control operations (ioctl's).
  * Ifp is 0 if not an interface-specific ioctl.

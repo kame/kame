@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_tslot.c,v 1.4 2000/02/06 09:34:09 itojun Exp $
+ *	$Id: natpt_tslot.c,v 1.5 2000/02/18 11:25:07 fujisawa Exp $
  */
 
 #include <sys/param.h>
@@ -78,12 +78,13 @@ static	time_t	 maxTTLtcp;
 static	time_t	 _natpt_TCPT_2MSL;
 static	time_t	 _natpt_tcp_maxidle;
 
+extern	struct in6_addr	 natpt_prefix;
+extern	struct in6_addr	 natpt_prefixmask;
 extern	struct in6_addr	 faith_prefix;
 extern	struct in6_addr	 faith_prefixmask;
 
-
-static struct _pat	*fillupOutgoingV6local	__P((struct _cSlot *, struct _cv *, struct _pat *));
-static struct _pat	*fillupOutgoingV6Remote	__P((struct _cSlot *, struct _cv *, struct _pat *));
+static struct pAddr	*fillupOutgoingV6local	__P((struct _cSlot *, struct _cv *, struct pAddr *));
+static struct pAddr	*fillupOutgoingV6Remote	__P((struct _cSlot *, struct _cv *, struct pAddr *));
 
 static struct _tSlot	*registTSlotEntry	__P((struct _tSlot *));
 static void	 _expireTSlot			__P((void *));
@@ -93,8 +94,8 @@ static int	 _removeHash			__P((struct _cell *(*table)[], int, caddr_t));
 
 static int	 _hash_ip4			__P((struct _cv *));
 static int	 _hash_ip6			__P((struct _cv *));
-static int	 _hash_pat4			__P((struct _pat *));
-static int	 _hash_pat6			__P((struct _pat *));
+static int	 _hash_pat4			__P((struct pAddr *));
+static int	 _hash_pat6			__P((struct pAddr *));
 static int	 _hash_sockaddr4		__P((struct sockaddr_in *));
 static int	 _hash_sockaddr6		__P((struct sockaddr_in6 *));
 static int	 _hash_pjw			__P((u_char *, int));
@@ -128,13 +129,13 @@ lookingForIncomingV4Hash(struct _cv *cv)
 	if ((cv->ip_payload == IPPROTO_TCP)
 	    || (cv->ip_payload == IPPROTO_UDP))
 	{
-	    if (cv->_payload._tcp4->th_sport!= ats->remote.dport)	continue;
-	    if (cv->_payload._tcp4->th_dport!= ats->remote.sport)	continue;
+	    if (cv->_payload._tcp4->th_sport!= ats->remote._dport)	continue;
+	    if (cv->_payload._tcp4->th_dport!= ats->remote._sport)	continue;
 	}
 	
 	ip4 = cv->_ip._ip4;
-	if ((ip4->ip_src.s_addr == ats->remote.dst.u.in4.s_addr)
-	    && (ip4->ip_dst.s_addr == ats->remote.src.u.in4.s_addr))
+	if ((ip4->ip_src.s_addr == ats->remote.in4dst.s_addr)
+	    && (ip4->ip_dst.s_addr == ats->remote.in4src.s_addr))
 	    return (ats);
     }
 
@@ -161,13 +162,13 @@ lookingForOutgoingV4Hash(struct _cv *cv)
 	if ((cv->ip_payload == IPPROTO_TCP)
 	    || (cv->ip_payload == IPPROTO_UDP))
 	{
-	    if (cv->_payload._tcp4->th_sport != ats->local.dport)	continue;
-	    if (cv->_payload._tcp4->th_dport != ats->local.sport)	continue;
+	    if (cv->_payload._tcp4->th_sport != ats->local._dport)	continue;
+	    if (cv->_payload._tcp4->th_dport != ats->local._sport)	continue;
 	}
 	
 	ip4 = cv->_ip._ip4;
-	if ((ip4->ip_src.s_addr == ats->local.dst.u.in4.s_addr)
-	    && (ip4->ip_dst.s_addr == ats->local.src.u.in4.s_addr))
+	if ((ip4->ip_src.s_addr == ats->local.in4dst.s_addr)
+	    && (ip4->ip_dst.s_addr == ats->local.in4src.s_addr))
 	    return (ats);
     }
 
@@ -194,13 +195,13 @@ lookingForIncomingV6Hash(struct _cv *cv)
 	if ((cv->ip_payload == IPPROTO_TCP)
 	    || (cv->ip_payload == IPPROTO_UDP))
 	{
-	    if (cv->_payload._tcp6->th_sport != ats->remote.dport)	continue;
-	    if (cv->_payload._tcp6->th_dport != ats->remote.sport)	continue;
+	    if (cv->_payload._tcp6->th_sport != ats->remote._dport)	continue;
+	    if (cv->_payload._tcp6->th_dport != ats->remote._sport)	continue;
 	}
 
 	ip6 = cv->_ip._ip6;
-	if ((IN6_ARE_ADDR_EQUAL(&ip6->ip6_src, &ats->remote.dst.u.in6))
-	    && (IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &ats->remote.src.u.in6)))
+	if ((IN6_ARE_ADDR_EQUAL(&ip6->ip6_src, &ats->remote.in6dst))
+	    && (IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &ats->remote.in6src)))
 	    return (ats);
     }
 
@@ -227,13 +228,13 @@ lookingForOutgoingV6Hash(struct _cv *cv)
 	if ((cv->ip_payload == IPPROTO_TCP)
 	    || (cv->ip_payload == IPPROTO_UDP))
 	{
-	    if (cv->_payload._tcp6->th_sport != ats->local.dport)	continue;
-	    if (cv->_payload._tcp6->th_dport != ats->local.sport)	continue;
+	    if (cv->_payload._tcp6->th_sport != ats->local._dport)	continue;
+	    if (cv->_payload._tcp6->th_dport != ats->local._sport)	continue;
 	}
 
 	ip6 = cv->_ip._ip6;
-	if ((IN6_ARE_ADDR_EQUAL(&ip6->ip6_src, &ats->local.dst.u.in6))
-	    && (IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &ats->local.src.u.in6)))
+	if ((IN6_ARE_ADDR_EQUAL(&ip6->ip6_src, &ats->local.in6dst))
+	    && (IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &ats->local.in6src)))
 	    return (ats);
     }
 
@@ -245,7 +246,7 @@ struct _tSlot	*
 internIncomingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
 {
     int			 s, hv4, hv6;
-    struct _pat		*local, *remote;
+    struct pAddr	*local, *remote;
     struct _tSlot	*ats;
 
     MALLOC(ats, struct _tSlot *, sizeof(struct _tSlot), M_TEMP, M_NOWAIT);
@@ -259,27 +260,38 @@ internIncomingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
 
     local = &ats->local;
     local->ip_p = IPPROTO_IPV6;
+    local->sa_family = AF_INET6;
+    local->in6src = natpt_prefix;
+    local->in6src.s6_addr32[3] = cv4->_ip._ip4->ip_src.s_addr;
+    local->in6dst = acs->local.in6src;
     if ((cv4->ip_payload == IPPROTO_TCP)
 	|| (cv4->ip_payload == IPPROTO_UDP))
     {
-	local->sport = cv4->_payload._tcp4->th_sport;
-	local->dport = cv4->_payload._tcp4->th_dport;
+	local->_sport = cv4->_payload._tcp4->th_sport;
+	local->_dport = cv4->_payload._tcp4->th_dport;
+
+	if (acs->map & NATPT_PORT_MAP)
+	{
+	    local->_dport = acs->local._port0;
+	}
     }
-    local->src.u.in6.s6_addr32[3] = cv4->_ip._ip4->ip_src.s_addr;
-    local->dst.u.in6 = acs->local.in6;
-    local->src.sa_family = local->dst.sa_family = AF_INET6;
 
     remote = &ats->remote;
     remote->ip_p = IPPROTO_IPV4;
+    remote->sa_family = AF_INET;
+    remote->in4src = acs->remote.in4src;
+    remote->in4dst = cv4->_ip._ip4->ip_src;
+    if (acs->remote.ad.type == ADDR_ANY)
+    {
+	remote->in4src = cv4->_ip._ip4->ip_dst;
+    }
+
     if ((cv4->ip_payload == IPPROTO_TCP)
 	|| (cv4->ip_payload == IPPROTO_UDP))
     {
-	remote->sport = cv4->_payload._tcp4->th_dport;
-	remote->dport = cv4->_payload._tcp4->th_sport;
+	remote->_sport = cv4->_payload._tcp4->th_dport;
+	remote->_dport = cv4->_payload._tcp4->th_sport;
     }
-    remote->src.u.in4 = acs->remote.in4;
-    remote->dst.u.in4 = cv4->_ip._ip4->ip_src;
-    remote->src.sa_family = remote->dst.sa_family = AF_INET;
 
     ats->ip_payload = cv4->ip_payload;
     ats->session = sess;
@@ -301,7 +313,7 @@ struct _tSlot	*
 internOutgoingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
 {
     int			 s, hv4, hv6;
-    struct _pat		*local, *remote;
+    struct pAddr	*local, *remote;
     struct _tSlot	*ats;
 
     MALLOC(ats, struct _tSlot *, sizeof(struct _tSlot), M_TEMP, M_NOWAIT);
@@ -315,50 +327,50 @@ internOutgoingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
 
     local = &ats->local;
     local->ip_p = IPPROTO_IPV4;
-    local->src.sa_family = local->dst.sa_family = AF_INET;
+    local->sa_family = AF_INET;
     if ((cv4->ip_payload == IPPROTO_TCP)
 	|| (cv4->ip_payload == IPPROTO_UDP))
     {
-	local->sport = cv4->_payload._tcp4->th_dport;
-	local->dport = cv4->_payload._tcp4->th_sport;
+	local->_sport = cv4->_payload._tcp4->th_dport;
+	local->_dport = cv4->_payload._tcp4->th_sport;
     }
 
-    if (acs->c.flags == NATPT_FAITH)
+    if (acs->flags == NATPT_FAITH)
     {
-	local->src.u.in4 = cv4->_ip._ip4->ip_dst;
-	local->dst.u.in4 = cv4->_ip._ip4->ip_src;
+	local->in4src = cv4->_ip._ip4->ip_dst;
+	local->in4dst = cv4->_ip._ip4->ip_src;
     }
     else
     {
-	local->src.u.in4 = acs->local.in4;
-	local->dst.u.in4 = cv4->_ip._ip4->ip_src;
+	local->in4src = acs->local.in4src;
+	local->in4dst = cv4->_ip._ip4->ip_src;
     }
 
     remote = &ats->remote;
     remote->ip_p = IPPROTO_IPV6;
-    remote->src.sa_family = remote->dst.sa_family = AF_INET6;
+    remote->sa_family = AF_INET6;
     if ((cv4->ip_payload == IPPROTO_TCP)
 	|| (cv4->ip_payload == IPPROTO_UDP))
     {
-	remote->sport = cv4->_payload._tcp4->th_sport;
-	remote->dport = cv4->_payload._tcp4->th_dport;
+	remote->_sport = cv4->_payload._tcp4->th_sport;
+	remote->_dport = cv4->_payload._tcp4->th_dport;
     }
 
-    if (acs->c.flags == NATPT_FAITH)
+    if (acs->flags == NATPT_FAITH)
     {
 	struct in6_ifaddr	*ia6;
 
-	remote->dst.u.in6.s6_addr32[0] = faith_prefix.s6_addr32[0];
-	remote->dst.u.in6.s6_addr32[1] = faith_prefix.s6_addr32[1];
-	remote->dst.u.in6.s6_addr32[3] = cv4->_ip._ip4->ip_dst.s_addr;
+	remote->in6dst.s6_addr32[0] = faith_prefix.s6_addr32[0];
+	remote->in6dst.s6_addr32[1] = faith_prefix.s6_addr32[1];
+	remote->in6dst.s6_addr32[3] = cv4->_ip._ip4->ip_dst.s_addr;
 
-	ia6 = in6_ifawithscope(natpt_ip6src, &remote->dst.u.in6);
-	remote->src.u.in6 = ia6->ia_addr.sin6_addr;
+	ia6 = in6_ifawithscope(natpt_ip6src, &remote->in6dst);
+	remote->in6src = ia6->ia_addr.sin6_addr;
     }
     else
     {
-	remote->src.u.in6.s6_addr32[3] = cv4->_ip._ip4->ip_src.s_addr;
-	remote->dst.u.in6 = acs->remote.in6;
+	remote->in6src.s6_addr32[3] = cv4->_ip._ip4->ip_src.s_addr;
+	remote->in6dst = acs->remote.in6src;
     }
 
     ats->ip_payload = cv4->ip_payload;
@@ -381,7 +393,7 @@ struct _tSlot	*
 internIncomingV6Hash(int sess, struct _cSlot *acs, struct _cv *cv6)
 {
     int			 s, hv4, hv6;
-    struct _pat		*local, *remote;
+    struct pAddr	*local, *remote;
     struct _tSlot	*ats;
 
     MALLOC(ats, struct _tSlot *, sizeof(struct _tSlot), M_TEMP, M_NOWAIT);
@@ -395,27 +407,30 @@ internIncomingV6Hash(int sess, struct _cSlot *acs, struct _cv *cv6)
 
     local = &ats->local;
     local->ip_p = IPPROTO_IPV4;
+    local->sa_family = AF_INET;
     if ((cv6->ip_payload == IPPROTO_TCP)
 	|| (cv6->ip_payload == IPPROTO_UDP))
     {
-	local->sport = cv6->_payload._tcp6->th_sport;
-	local->dport = cv6->_payload._tcp6->th_dport;
+	local->_sport = cv6->_payload._tcp6->th_sport;
+	local->_dport = cv6->_payload._tcp6->th_dport;
     }
-    local->src.u.in4 = acs->local.in4;
-    local->dst.u.in4.s_addr = cv6->_ip._ip6->ip6_dst.s6_addr32[3];
-    local->src.sa_family = local->dst.sa_family = AF_INET;
+    local->in4src = acs->local.in4src;
+    local->in4dst.s_addr = cv6->_ip._ip6->ip6_dst.s6_addr32[3];
+    local->sa_family = AF_INET;
+    local->ip_p = IPPROTO_IPV4;
 
     remote = &ats->remote;
     remote->ip_p = IPPROTO_IPV6;
     if ((cv6->ip_payload == IPPROTO_TCP)
 	|| (cv6->ip_payload == IPPROTO_UDP))
     {
-	remote->sport = cv6->_payload._tcp6->th_dport;
-	remote->dport = cv6->_payload._tcp6->th_sport;
+	remote->_sport = cv6->_payload._tcp6->th_dport;
+	remote->_dport = cv6->_payload._tcp6->th_sport;
     }
-    remote->src.u.in6 = cv6->_ip._ip6->ip6_dst;
-    remote->dst.u.in6 = acs->remote.in6;
-    remote->src.sa_family = remote->dst.sa_family = AF_INET6;
+    remote->in6src = cv6->_ip._ip6->ip6_dst;
+    remote->in6dst = acs->remote.in6dst;
+    remote->sa_family = AF_INET6;
+    remote->ip_p = IPPROTO_IPV6;
 
     ats->ip_payload = cv6->ip_payload;
     ats->session = sess;
@@ -437,7 +452,7 @@ struct _tSlot	*
 internOutgoingV6Hash(int sess, struct _cSlot *acs, struct _cv *cv6)
 {
     int			 s, hv4, hv6;
-    struct _pat		*local, *remote;
+    struct pAddr	*local, *remote;
     struct _tSlot	*ats;
 
     natpt_logIp6(LOG_DEBUG, cv6->_ip._ip6);
@@ -451,7 +466,7 @@ internOutgoingV6Hash(int sess, struct _cSlot *acs, struct _cv *cv6)
     
     bzero(ats, sizeof(struct _tSlot));
 
-    local = fillupOutgoingV6local (acs, cv6, &ats->local);
+    local = fillupOutgoingV6local(acs, cv6, &ats->local);
     if ((remote = fillupOutgoingV6Remote(acs, cv6, &ats->remote)) == 0)
     {
 	FREE(ats, M_TEMP);
@@ -513,11 +528,11 @@ checkTraceroute6Return(struct _cv *cv4)
 	if (ats->remote.ip_p != IPPROTO_IPV4)				continue;
 	if (ats->ip_payload  != IPPROTO_UDP)				continue;
 
-	if (icmpip4->ip_src.s_addr != ats->remote.src.u.in4.s_addr)	continue;
-	if (icmpip4->ip_dst.s_addr != ats->remote.dst.u.in4.s_addr)	continue;
+	if (icmpip4->ip_src.s_addr != ats->remote.in4src.s_addr)	continue;
+	if (icmpip4->ip_dst.s_addr != ats->remote.in4dst.s_addr)	continue;
 
-	if (icmpudp4->uh_sport != ats->remote.sport)			continue;
-	if (icmpudp4->uh_dport != ats->remote.dport)			continue;
+	if (icmpudp4->uh_sport != ats->remote._sport)			continue;
+	if (icmpudp4->uh_dport != ats->remote._dport)			continue;
 
 	cv4->flags |= NATPT_TRACEROUTE;
 	return (ats);
@@ -527,71 +542,82 @@ checkTraceroute6Return(struct _cv *cv4)
 }
 
 
-static struct _pat *
-fillupOutgoingV6local(struct _cSlot *acs, struct _cv *cv6, struct _pat *local)
+static struct pAddr *
+fillupOutgoingV6local(struct _cSlot *acs, struct _cv *cv6, struct pAddr *local)
 {
     local->ip_p = IPPROTO_IPV6;
-    local->src.sa_family = local->dst.sa_family = AF_INET6;
-    local->src.u.in6 = cv6->_ip._ip6->ip6_dst;
-    local->dst.u.in6 = cv6->_ip._ip6->ip6_src;
+    local->sa_family = AF_INET6;
+    local->in6src = cv6->_ip._ip6->ip6_dst;
+    local->in6dst = cv6->_ip._ip6->ip6_src;
 
     if ((cv6->ip_payload == IPPROTO_TCP)
 	|| (cv6->ip_payload == IPPROTO_UDP))
     {
-	local->sport = cv6->_payload._tcp6->th_dport;
-	local->dport = cv6->_payload._tcp6->th_sport;
+	local->_sport = cv6->_payload._tcp6->th_dport;
+	local->_dport = cv6->_payload._tcp6->th_sport;
     }
 
     return (local);
 }
 
 
-static struct _pat *
-fillupOutgoingV6Remote(struct _cSlot *acs, struct _cv *cv6, struct _pat *remote)
+static struct pAddr *
+fillupOutgoingV6Remote(struct _cSlot *acs, struct _cv *cv6, struct pAddr *remote)
 {
     remote->ip_p = IPPROTO_IPV4;
-    remote->src.sa_family = remote->dst.sa_family = AF_INET;
-    remote->src.u.in4 = acs->remote.in4;
-    remote->dst.u.in4.s_addr = cv6->_ip._ip6->ip6_dst.s6_addr32[3];
+    remote->sa_family = AF_INET;
+    remote->in4src = acs->remote.in4src;
+    remote->in4dst.s_addr = cv6->_ip._ip6->ip6_dst.s6_addr32[3];
 
     if ((cv6->ip_payload == IPPROTO_TCP)
 	|| (cv6->ip_payload == IPPROTO_UDP))
     {
-	remote->sport = cv6->_payload._tcp6->th_sport;
-	remote->dport = cv6->_payload._tcp6->th_dport;
+	remote->_sport = cv6->_payload._tcp6->th_sport;
+	remote->_dport = cv6->_payload._tcp6->th_dport;
 
-	if (acs->c.flags == NATPT_DYNAMIC)
+	/*
+	 * In case mappoing port number,	
+	 * acs->remote.port[0..1] has source port mapping range (from command line).
+	 *     remote->port[0..1] has actual translation slot info.
+	 */
+	if (acs->map & NATPT_PORT_MAP_DYNAMIC)
 	{
-	    int		firsttime = 0;
-	    struct _pat	pata;	/* pata.{s,d}port hold network byte order	*/
+	    int			firsttime = 0;
+	    u_short		cport, sport, eport;
+	    struct pAddr	pata;	/* pata.{s,d}port hold network byte order */
 
-	    if (acs->aux->cport == 0)
-		acs->aux->cport = acs->sport - 1;
+	    cport = ntohs(acs->cport);
+	    sport = ntohs(acs->remote._sport);
+	    eport = ntohs(acs->remote._eport);
+
+	    if (cport == 0)
+		cport = sport - 1;
 
 	    bzero(&pata, sizeof(pata));
 	    pata.ip_p = IPPROTO_IPV4;
-	    pata.src.u.in4 = acs->remote.in4;
-	    pata.dst.u.in4.s_addr = cv6->_ip._ip6->ip6_dst.s6_addr32[3];
-	    pata.dport = remote->dport;
+	    pata.sa_family = AF_INET;
+	    pata.in4src = acs->remote.in4src;
+	    pata.in4dst.s_addr = cv6->_ip._ip6->ip6_dst.s6_addr32[3];
+	    pata._dport = remote->_dport;
 
 	    for (;;)
 	    {
-		while (++acs->aux->cport <= acs->eport)
+		while (++cport <= eport)
 		{
-		    pata.sport = htons(acs->aux->cport);
+		    pata._sport = htons(cport);
 		    if (_outsideHash[_hash_pat4(&pata)] == NULL)
 			goto found;
 		}
 
 		if (firsttime == 0)
 		    firsttime++,
-		    acs->aux->cport = acs->sport - 1;
+		    cport = sport - 1;
 		else
 		    return (NULL);
 	    }
 
 	found:;
-	    remote->sport = pata.sport;
+	    remote->_sport = acs->cport = htons(cport);
 	}
     }
 
@@ -854,34 +880,34 @@ _hash_ip6(struct _cv *cv)
 
 
 static int
-_hash_pat4(struct _pat *pat4)
+_hash_pat4(struct pAddr *pat4)
 {
     struct sockaddr_in	src, dst;
 
     bzero(&src, sizeof(struct sockaddr_in));
     bzero(&dst, sizeof(struct sockaddr_in));
 
-    src.sin_port = pat4->sport;
-    src.sin_addr = pat4->src.u.in4;
-    dst.sin_port = pat4->dport;
-    dst.sin_addr = pat4->dst.u.in4;
+    src.sin_port = pat4->_sport;
+    src.sin_addr = pat4->in4src;
+    dst.sin_port = pat4->_dport;
+    dst.sin_addr = pat4->in4dst;
 
     return ((_hash_sockaddr4(&src) + _hash_sockaddr4(&dst)) % NATPT_MAXHASH);
 }
 
 
 static int
-_hash_pat6(struct _pat *pat6)
+_hash_pat6(struct pAddr *pat6)
 {
     struct sockaddr_in6	src, dst;
 
     bzero(&src, sizeof(struct sockaddr_in6));
     bzero(&dst, sizeof(struct sockaddr_in6));
 
-    src.sin6_port = pat6->sport;
-    src.sin6_addr = pat6->src.u.in6;
-    dst.sin6_port = pat6->dport;
-    dst.sin6_addr = pat6->dst.u.in6;
+    src.sin6_port = pat6->_sport;
+    src.sin6_addr = pat6->in6src;
+    dst.sin6_port = pat6->_dport;
+    dst.sin6_addr = pat6->in6dst;
 
     return ((_hash_sockaddr6(&src) + _hash_sockaddr6(&dst)) % NATPT_MAXHASH);
 }

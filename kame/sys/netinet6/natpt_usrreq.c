@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_usrreq.c,v 1.3 2000/01/06 14:27:06 itojun Exp $
+ *	$Id: natpt_usrreq.c,v 1.4 2000/02/18 11:25:07 fujisawa Exp $
  */
 
 #include <sys/types.h>
@@ -84,6 +84,7 @@ int	natpt_sogetopt	__P((struct socket *, int, struct mbuf *));
 static	int	_natptSetIf	__P((caddr_t));
 static	int	_natptGetIf	__P((caddr_t));
 static	int	_natptSetValue	__P((caddr_t));
+static	int	_natptTestLog	__P((caddr_t));
 
 void	natpt_init	__P((void));
 
@@ -388,6 +389,8 @@ natpt_control(struct socket *so, int cmd, caddr_t data, struct ifnet *ifp)
       case SIOCSETPREFIX:	return (_natptSetPrefix(data));
       case SIOCSETVALUE:	return (_natptSetValue(data));
 
+      case SIOCTESTLOG:		return (_natptTestLog(data));
+
       case SIOCBREAK:		return (_natptBreak());
     }
 
@@ -465,7 +468,28 @@ _natptSetValue(caddr_t addr)
       case NATPT_DEBUG:
 	natpt_debug = *((u_int *)mbx->m_aux);
 	break;
+
+      case NATPT_DUMP:
+	natpt_dump = *((u_int *)mbx->m_aux);
+	break;
     }
 
     return (0);
 }
+
+
+static int
+_natptTestLog(caddr_t addr)
+{
+    char		*fragile;
+    struct msgBox	*mbox = (struct msgBox *)addr;
+
+    MALLOC(fragile, char *, mbox->size, M_TEMP, M_WAITOK);
+    copyin(mbox->freight, fragile, mbox->size);
+
+    natpt_logMsg(LOG_DEBUG, fragile, mbox->size);
+
+    FREE(fragile, M_TEMP);
+    return (0);
+}
+

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_soctl.h,v 1.4 2000/01/06 14:27:05 itojun Exp $
+ *	$Id: natpt_soctl.h,v 1.5 2000/02/18 11:25:06 fujisawa Exp $
  */
 
 /* cmd for use with ioctl at the socket						*/
@@ -47,10 +47,12 @@
 #define	SIOCSETVALUE	_IOW ('n',  10, struct msgBox)	/* Set value		*/
 #define	SIOCGETVALUE	_IOW ('n',  11, struct msgBox)	/* Get value		*/
 
+#define	SIOCTESTLOG	_IOW ('n',  12, struct msgBox)	/* Test log		*/
+
 #define SIOCBREAK	_IO  ('n', 255)			/* stop			*/
 
 
-typedef	struct msgBox
+typedef	struct msgBox				/* sizeof():  44[byte]	*/
 {
     int		 flags;
 /* in case SIOC(GET|SET)IF		*/
@@ -61,8 +63,12 @@ typedef	struct msgBox
 #ifndef NATPT_STATIC
 #define	NATPT_STATIC		(0x01)
 #define	NATPT_DYNAMIC		(0x02)
-#define NATPT_FAITH		(0x04)
+#define NATPT_FAITH		(0x03)
 #endif
+
+/* in case SIOCFLUSHRULE ... bitwise	*/
+#define	FLUSH_STATIC		(0x01)
+#define	FLUSH_DYNAMIC		(0x02)
 
 /* in case SIOC(GET|SET)PREFIX		*/
 #define	PREFIX_FAITH		(0x01)
@@ -70,6 +76,7 @@ typedef	struct msgBox
 
 /* in case SIOC(GET|SET)VALUE		*/
 #define	NATPT_DEBUG		(0x01)		/* natpt_debug := <value>	*/
+#define	NATPT_DUMP		(0x02)		/* natpt_dump  := <value>	*/
 
     int		 size;				/* sizeof(*freight)		*/
     char	*freight;

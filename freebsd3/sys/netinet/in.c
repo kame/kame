@@ -63,6 +63,8 @@
  * $FreeBSD: src/sys/netinet/in.c,v 1.39.2.2 1999/08/29 16:29:33 peter Exp $
  */
 
+#include "opt_natpt.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -208,6 +210,18 @@ in_len2mask(mask, len)
 }
 
 static int in_interfaces;	/* number of external internet interfaces */
+
+#ifdef NATPT
+void	in4_len2mask	__P((struct in_addr *, int));
+
+void
+in4_len2mask(struct in_addr *mask, int len)
+{
+    in_len2mask(mask, len);
+}
+
+#endif
+
 
 /*
  * Generic internet control operations (ioctl's).

@@ -26,14 +26,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_var.h,v 1.2 1999/12/25 02:35:32 fujisawa Exp $
+ *	$Id: natpt_var.h,v 1.3 2000/02/18 11:25:07 fujisawa Exp $
  */
 
 
-extern	int		 natpt_initialized;
-extern	int		 ip6_protocol_tr;
+extern int		 natpt_initialized;
+extern int		 ip6_protocol_tr;
+extern u_int		 natpt_debug;
+extern u_int		 natpt_dump;
 
-extern	struct ifnet	*natpt_ip6src;
+extern struct ifnet	*natpt_ip6src;
 
 /*	natpt_log.c		*/
 void		 natpt_logMsg			__P((int, void *, size_t));
@@ -78,17 +80,17 @@ struct _tSlot	*internOutgoingV6Hash		__P((int, struct _cSlot *, struct _cv *));
 
 struct _tSlot	*checkTraceroute6Return		__P((struct _cv *));
 
-struct mbuf	*translatingIPv4To6		__P((struct _cv *, struct _pat *));
-struct mbuf	*translatingICMPv4To6		__P((struct _cv *, struct _pat *));
-struct mbuf	*translatingTCPv4To6		__P((struct _cv *, struct _pat *));
-struct mbuf	*translatingUDPv4To6		__P((struct _cv *, struct _pat *));
-struct mbuf	*translatingTCPUDPv4To6		__P((struct _cv *, struct _pat *, struct _cv *));
+struct mbuf	*translatingIPv4To6		__P((struct _cv *, struct pAddr *));
+struct mbuf	*translatingICMPv4To6		__P((struct _cv *, struct pAddr *));
+struct mbuf	*translatingTCPv4To6		__P((struct _cv *, struct pAddr *));
+struct mbuf	*translatingUDPv4To6		__P((struct _cv *, struct pAddr *));
+struct mbuf	*translatingTCPUDPv4To6		__P((struct _cv *, struct pAddr *, struct _cv *));
 
-struct mbuf	*translatingIPv6To4		__P((struct _cv *, struct _pat *));
-struct mbuf	*translatingICMPv6To4		__P((struct _cv *, struct _pat *));
-struct mbuf	*translatingTCPv6To4		__P((struct _cv *, struct _pat *));
-struct mbuf	*translatingUDPv6To4		__P((struct _cv *, struct _pat *));
-struct mbuf	*translatingTCPUDPv6To4		__P((struct _cv *, struct _pat *, struct _cv *));
+struct mbuf	*translatingIPv6To4		__P((struct _cv *, struct pAddr *));
+struct mbuf	*translatingICMPv6To4		__P((struct _cv *, struct pAddr *));
+struct mbuf	*translatingTCPv6To4		__P((struct _cv *, struct pAddr *));
+struct mbuf	*translatingUDPv6To4		__P((struct _cv *, struct pAddr *));
+struct mbuf	*translatingTCPUDPv6To4		__P((struct _cv *, struct pAddr *, struct _cv *));
 
 void		 init_hash			__P((void));
 void		 init_tslot			__P((void));

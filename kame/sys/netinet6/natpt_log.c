@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_log.c,v 1.3 2000/02/06 09:34:08 itojun Exp $
+ *	$Id: natpt_log.c,v 1.4 2000/02/18 11:25:05 fujisawa Exp $
  */
 
 #include <sys/errno.h>
@@ -97,23 +97,19 @@ natpt_logIp6(int priorities, struct ip6_hdr *ip6)
 int
 natpt_log(int type, int priorities, void *item, size_t size)
 {
+    struct sockproto	 proto;
     struct	mbuf	*m;
     struct	lbuf	*p;
 
-    m = natpt_lbuf(type, priorities, size);
-    if (m == NULL)
+    if ((m = natpt_lbuf(type, priorities, size)) == NULL)
 	return (ENOBUFS);
 
-    {
-	struct sockproto	proto;
+    p = (struct lbuf *)m->m_data;
+    m_copyback(m, sizeof(struct l_hdr), p->l_hdr.lh_size, (caddr_t)item);
 
-	p = (struct lbuf *)m->m_pktdat;
-	m_copyback(m, sizeof(struct l_hdr), p->l_hdr.lh_size, (caddr_t)item);
-
-	proto.sp_family = AF_INET;
-	proto.sp_protocol = IPPROTO_AHIP;
-	natpt_input(m, &proto, &_natpt_src, &_natpt_dst);
-    }
+    proto.sp_family = AF_INET;
+    proto.sp_protocol = IPPROTO_AHIP;
+    natpt_input(m, &proto, &_natpt_src, &_natpt_dst);
 
     return (0);
 }
@@ -160,10 +156,10 @@ natpt_lbuf(int type, int priorities, size_t size)
     if (m == NULL)
 	return (NULL);
 
-    m->m_pkthdr.len = m->m_len = roundup(size, 4);
+    m->m_pkthdr.len = m->m_len = MHLEN;
     m->m_pkthdr.rcvif = NULL;
 
-    p = (struct lbuf *)m->m_pktdat;
+    p = (struct lbuf *)m->m_data;
     p->l_hdr.lh_type = type;
     p->l_hdr.lh_pri  = priorities;
     p->l_hdr.lh_size = size;
