@@ -306,7 +306,7 @@ main(argc, argv)
 		switch (res->ai_family) {
 		case AF_INET6:
 			level = IPPROTO_IPV6;
-			optname = IPV6_IPSEC_POLICY;
+			optname = IPV6_IPSEC_POLICY_OUT;
 			break;
 		default:
 			level = optname = 0;
@@ -318,6 +318,7 @@ main(argc, argv)
 		} else
 			errx(1, "unsupported address family %d", res->ai_family);
 		free(buf);
+		/* XXX what do i do INBOUND policy ? */
 #else
 		errx(1, "ipsec policy has no efffect in this configuration");
 #endif
