@@ -532,7 +532,7 @@ main(argc, argv, envp)
 #endif
 	}
 #ifdef IP_TOS
-	if (family == AF_INET) {
+	if (his_addr.su_family == AF_INET) {
 		tos = IPTOS_LOWDELAY;
 		if (setsockopt(0, IPPROTO_IP, IP_TOS, (char *)&tos,
 			       sizeof(int)) < 0)
