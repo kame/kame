@@ -1,0 +1,13 @@
+--- rsaglue.c.orig	Wed Jul  8 09:40:38 1998
++++ rsaglue.c	Wed Oct  7 19:39:13 1998
+@@ -71,8 +71,8 @@
+    interface without modifying RSAREF. */
+ 
+ #define _MD5_H_ /* Kludge to prevent inclusion of rsaref md5.h. */
+-#include "rsaref2/source/global.h"
+-#include "rsaref2/source/rsaref.h"
++#include "source/global.h"
++#include "source/rsaref.h"
+ 
+ /* Convert an integer from gmp to rsaref representation. */
+ 

@@ -1,0 +1,33 @@
+--- auth-kerberos.c.orig	Sun Jun  6 02:01:32 1999
++++ auth-kerberos.c	Sun Jun  6 02:01:33 1999
+@@ -120,10 +120,18 @@
+       
+       debug("Kerberos invalid service name (%.100s).", server);
+       packet_send_debug("Kerberos invalid service name (%.100s).", server);
++#ifdef krb5_xfree
+       krb5_xfree(server);
++#else
++      free(server);
++#endif
+       return 0;
+     }
++#ifdef krb5_xfree
+   krb5_xfree(server);
++#else
++  free(server);
++#endif
+   
+   /* Extract the users name from the ticket client principal */
+   problem = krb5_copy_principal(ssh_context, ticket->enc_part2->client,
+@@ -159,7 +167,11 @@
+   packet_put_string((char *) reply.data, reply.length);
+   packet_send();
+   packet_write_wait();
++#ifdef krb5_xfree
+   krb5_xfree(reply.data);
++#else
++  krb5_free_data_contents(ssh_context, &reply);
++#endif
+   return 1;
+ }
+ #endif /* KRB5 */

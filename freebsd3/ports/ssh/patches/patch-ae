@@ -1,11 +1,46 @@
---- server_config.sample.orig	Sat Jul 18 03:29:55 1998
-+++ server_config.sample	Sat Jul 18 03:32:57 1998
-@@ -15,7 +15,7 @@
- FascistLogging no
- PrintMotd yes
- KeepAlive yes
--SyslogFacility DAEMON
-+SyslogFacility AUTH
- RhostsAuthentication no
- RhostsRSAAuthentication yes
- RSAAuthentication yes
+*** server_config.sample.orig	Wed May 12 20:18:51 1999
+--- server_config.sample	Sun Jun  6 02:36:38 1999
+***************
+*** 7,13 ****
+  ServerKeyBits 768
+  LoginGraceTime 600
+  KeyRegenerationInterval 3600
+! PermitRootLogin yes
+  IgnoreRhosts no
+  StrictModes yes
+  QuietMode no
+--- 7,13 ----
+  ServerKeyBits 768
+  LoginGraceTime 600
+  KeyRegenerationInterval 3600
+! PermitRootLogin no
+  IgnoreRhosts no
+  StrictModes yes
+  QuietMode no
+***************
+*** 16,27 ****
+  FascistLogging no
+  PrintMotd yes
+  KeepAlive yes
+! SyslogFacility DAEMON
+  RhostsAuthentication no
+  RhostsRSAAuthentication yes
+  RSAAuthentication yes
+  PasswordAuthentication yes
+! PermitEmptyPasswords yes
+  UseLogin no
+  # CheckMail no
+  # PidFile /u/zappa/.ssh/pid
+--- 16,27 ----
+  FascistLogging no
+  PrintMotd yes
+  KeepAlive yes
+! SyslogFacility AUTH
+  RhostsAuthentication no
+  RhostsRSAAuthentication yes
+  RSAAuthentication yes
+  PasswordAuthentication yes
+! PermitEmptyPasswords no
+  UseLogin no
+  # CheckMail no
+  # PidFile /u/zappa/.ssh/pid
