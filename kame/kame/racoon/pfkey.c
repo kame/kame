@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.81 2000/09/16 08:32:36 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.82 2000/09/16 09:18:47 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.81 2000/09/16 08:32:36 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.82 2000/09/16 09:18:47 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1119,7 +1119,7 @@ pk_recvupdate(mhp)
 
 	plog(logp, LOCATION, NULL,
 		"IPsec-SA established: %s\n",
-		sadbsecas2str(iph2->src, iph2->dst,
+		sadbsecas2str(iph2->dst, iph2->src,
 			msg->sadb_msg_satype, sa->sadb_sa_spi, sa_mode));
 
 	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
@@ -1250,12 +1250,10 @@ pk_recvadd(mhp)
 	 * because they must be updated by SADB_UPDATE message
 	 */
 
-	YIPSDEBUG(DEBUG_PFKEY,
-		plog(logp, LOCATION, NULL,
-			"pfkey ADD succeeded: %s\n",
-			sadbsecas2str(iph2->src, iph2->dst,
-				msg->sadb_msg_satype, sa->sadb_sa_spi,
-				sa_mode)));
+	plog(logp, LOCATION, NULL,
+		"IPsec-SA established: %s\n",
+		sadbsecas2str(iph2->src, iph2->dst,
+			msg->sadb_msg_satype, sa->sadb_sa_spi, sa_mode));
 
 	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
 	return 0;
@@ -1299,6 +1297,11 @@ pk_recvexpire(mhp)
 		return -1;
 	}
 
+	plog(logp, LOCATION, NULL,
+		"IPsec-SA expired: %s\n",
+		sadbsecas2str(src, dst,
+			msg->sadb_msg_satype, sa->sadb_sa_spi, sa_mode));
+
 	iph2 = getph2bysaidx(src, dst, proto_id, sa->sadb_sa_spi);
 	if (iph2 == NULL) {
 		/*
@@ -1317,11 +1320,6 @@ pk_recvexpire(mhp)
 
 	/* turn off the timer for calling isakmp_ph2expire() */ 
 	SCHED_KILL(iph2->sce);
-
-	plog(logp, LOCATION, NULL,
-		"IPsec-SA expired: %s\n",
-		sadbsecas2str(iph2->src, iph2->dst,
-			msg->sadb_msg_satype, sa->sadb_sa_spi, sa_mode));
 
 	iph2->status = PHASE2ST_EXPIRED;
 
@@ -1417,10 +1415,10 @@ pk_recvacquire(mhp)
 	struct policyindex spidx;
 
 	spidx.dir = IPSEC_DIR_INBOUND;
-	memcpy(&spidx.src, &sp->spidx.src, sizeof(spidx.src));
-	memcpy(&spidx.dst, &sp->spidx.dst, sizeof(spidx.dst));
-	spidx.prefs = sp->spidx.prefs;
-	spidx.prefd = sp->spidx.prefd;
+	memcpy(&spidx.src, &sp->spidx.dst, sizeof(spidx.src));
+	memcpy(&spidx.dst, &sp->spidx.src, sizeof(spidx.dst));
+	spidx.prefs = sp->spidx.prefd;
+	spidx.prefd = sp->spidx.prefs;
 	spidx.ul_proto = sp->spidx.ul_proto;
 
 	sp_in = getsp_r(&spidx);

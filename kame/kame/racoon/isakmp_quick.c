@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.52 2000/09/13 14:57:57 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.53 2000/09/16 09:18:47 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.52 2000/09/13 14:57:57 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.53 2000/09/16 09:18:47 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1885,9 +1885,11 @@ get_proposal_r(iph2)
 	struct sockaddr_storage x;
 
 	spidx.dir = IPSEC_DIR_OUTBOUND;
-	memcpy(&x, &spidx.src, sizeof(x));
 	memcpy(&spidx.src, &spidx.dst, sizeof(spidx.src));
 	memcpy(&spidx.dst, &x, sizeof(spidx.dst));
+	spidx.prefs = sp->spidx.prefd;
+	spidx.prefd = sp->spidx.prefs;
+	spidx.ul_proto = sp->spidx.ul_proto;
 
 	sp_out = getsp_r(&spidx);
 	if (!sp_out) {
