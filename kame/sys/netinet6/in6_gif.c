@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.79 2001/10/25 09:26:44 jinmei Exp $	*/
+/*	$KAME: in6_gif.c,v 1.80 2001/10/25 09:29:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -91,7 +91,7 @@
 static int gif_validate6 __P((const struct ip6_hdr *, struct gif_softc *,
 	struct ifnet *));
 #ifndef __OpenBSD__
-static int in6_gif_rtcachetime = 300; /* XXX see in_gif.c */
+static int in6_gif_rtcachettl = 300; /* XXX see in_gif.c */
 #endif
 
 extern struct domain inet6domain;
@@ -372,7 +372,7 @@ in6_gif_output(ifp, family, m)
 			return ENETUNREACH;	/* XXX */
 		}
 
-		sc->rtcache_expire = time_second + in6_gif_rtcachetime;
+		sc->rtcache_expire = time_second + in6_gif_rtcachettl;
 	}
 	
 #ifdef IPV6_MINMTU

@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.76 2001/10/25 09:26:43 jinmei Exp $	*/
+/*	$KAME: in_gif.c,v 1.77 2001/10/25 09:29:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -103,7 +103,7 @@ int ip_gif_ttl = GIF_TTL;
 int ip_gif_ttl = 0;
 #endif
 #ifndef __OpenBSD__
-static int in_gif_rtcachetime = 300; /* XXX appropriate value? configurable? */
+static int in_gif_rtcachettl = 300; /* XXX appropriate value? configurable? */
 #endif
 #ifdef __FreeBSD__
 SYSCTL_INT(_net_inet_ip, IPCTL_GIF_TTL, gifttl, CTLFLAG_RW,
@@ -361,7 +361,7 @@ in_gif_output(ifp, family, m)
 			return ENETUNREACH;	/*XXX*/
 		}
 
-		sc->rtcache_expire = time_second + in_gif_rtcachetime;
+		sc->rtcache_expire = time_second + in_gif_rtcachettl;
 	}
 
 	error = ip_output(m, NULL, &sc->gif_ro, 0, NULL);
