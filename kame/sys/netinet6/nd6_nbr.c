@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.70 2001/07/23 12:34:24 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.71 2001/07/23 13:00:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -776,6 +776,13 @@ nd6_na_input(m, off, icmp6len)
 			int s;
 
 			in6 = &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr;
+
+			/*
+			 * Lock to protect the default router list.
+			 * XXX: this might be unnecessary, since this function
+			 * is only called under the network software interrupt
+			 * context.  However, we keep it just for safety.  
+			 */
 #ifdef __NetBSD__
 			s = splsoftnet();
 #else
