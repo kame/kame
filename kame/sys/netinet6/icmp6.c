@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.191 2001/02/07 08:07:38 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.192 2001/02/08 14:25:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2935,9 +2935,6 @@ fail:
 #endif
 /*
  * ICMPv6 socket option processing.
- *
- * NOTE: for OSes that use NRL inpcb (bsdi4), do not forget to modify
- * sys/netinet6/raw_ipv6.c:rip6_ctloutput().
  */
 int
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
