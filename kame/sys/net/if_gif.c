@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.35 2000/10/07 05:14:09 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.36 2000/10/10 17:04:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -145,7 +145,7 @@ gifattach(dummy)
 #else
 	ngif = NGIF;
 #endif
-	gif = sc = malloc (ngif * sizeof(struct gif_softc), M_DEVBUF, M_WAIT);
+	gif = sc = malloc(ngif * sizeof(struct gif_softc), M_DEVBUF, M_WAIT);
 	bzero(sc, ngif * sizeof(struct gif_softc));
 	for (i = 0; i < ngif; sc++, i++) {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -630,14 +630,14 @@ gif_ioctl(ifp, cmd, data)
 
 		if (sc->gif_psrc)
 			free((caddr_t)sc->gif_psrc, M_IFADDR);
-		sa = (struct sockaddr *)malloc(size, M_IFADDR, M_WAITOK);
-		bcopy((caddr_t)src, (caddr_t)sa, size);
+		sa = (struct sockaddr *)malloc(src->sa_len, M_IFADDR, M_WAITOK);
+		bcopy((caddr_t)src, (caddr_t)sa, src->sa_len);
 		sc->gif_psrc = sa;
 
 		if (sc->gif_pdst)
 			free((caddr_t)sc->gif_pdst, M_IFADDR);
-		sa = (struct sockaddr *)malloc(size, M_IFADDR, M_WAITOK);
-		bcopy((caddr_t)dst, (caddr_t)sa, size);
+		sa = (struct sockaddr *)malloc(dst->sa_len, M_IFADDR, M_WAITOK);
+		bcopy((caddr_t)dst, (caddr_t)sa, dst->sa_len);
 		sc->gif_pdst = sa;
 
 		ifp->if_flags |= IFF_UP;
