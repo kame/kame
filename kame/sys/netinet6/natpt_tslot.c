@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.72 2002/12/18 12:06:13 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.73 2002/12/19 04:50:19 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -76,6 +76,10 @@ static time_t		 maxTTLtcp;
 
 static time_t		 natpt_TCPT_2MSL;
 static time_t		 natpt_tcp_maxidle;
+
+
+static struct callout_handle xlate_ch
+			= CALLOUT_HANDLE_INITIALIZER(&xlate_ch);
 
 
 struct tslhash
@@ -997,11 +1001,12 @@ natpt_duplicateXLate()
 	struct tSlot	*tslq, *tsln;
 	struct tcpstate	*ts;
 
-#if 0
+
 	/*
-	 * This check is unnecessary because translator call
-	 * natpt_releaseXLate() always.
+	 * This check became unnecessary because we release copied
+	 * memory at each time this routine is called.
 	 */
+#if 0
 	if (!TAILQ_EMPTY(&tsl_xlate_head)) {
 		natpt_error = EBUSY;
 		return (NULL);
@@ -1042,8 +1047,20 @@ natpt_duplicateXLate()
 	}
 	splx(s);
 
-	if (!TAILQ_EMPTY(&tsl_xlate_head))
-		timeout(natpt_releaseXLate, (caddr_t)0, xlateTimer * hz);
+	if (!TAILQ_EMPTY(&tsl_xlate_head)) {
+
+		/*
+		 * If callout function is not registered, register it.
+		 * Callout function is the preparation for the case
+		 * that command ("natptconfig show xlate copy") does
+		 * not call this relase-function.
+		 */
+		if ((xlate_ch.callout == NULL)
+		    || (xlate_ch.callout->c_func == NULL)) {
+			xlate_ch = timeout(natpt_releaseXLate, (void *)0,
+					   xlateTimer * hz);
+		}
+	}
 
 	return ((caddr_t)&tsl_xlate_head);
 }
@@ -1063,6 +1080,15 @@ natpt_releaseXLate(void *ignored_arg)
 	}
 
 	TAILQ_INIT(&tsl_xlate_head);
+
+	/*
+	 * If callout function is registered, unregister it because
+	 * the job of this function was finished.
+	 */
+	if (xlate_ch.callout
+	    && (xlate_ch.callout->c_func != NULL)) {
+		untimeout(natpt_releaseXLate, (void *)0, xlate_ch);
+	}
 }
 
 
