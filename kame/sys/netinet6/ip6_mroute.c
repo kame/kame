@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.54 2001/10/05 10:00:17 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.55 2001/10/16 06:24:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -926,7 +926,8 @@ add_m6fc(mfccp)
 	if (nstl == 0) {
 #ifdef MRT6DEBUG
 		if (mrt6debug & DEBUG_MFC)
-			log(LOG_DEBUG,"add_mfc no upcall h %d o %s g %s p %x\n",
+			log(LOG_DEBUG,
+			    "add_m6fc no upcall h %d o %s g %s p %x\n",
 			    hash,
 			    ip6_sprintf(&mfccp->mf6cc_origin.sin6_addr),
 			    ip6_sprintf(&mfccp->mf6cc_mcastgrp.sin6_addr),
@@ -1784,7 +1785,7 @@ register_send(ip6, mif, m)
 #ifdef MRT6DEBUG
 		if (mrt6debug)
 			log(LOG_WARNING,
-			    "register_send: ip_mrouter socket queue full\n");
+			    "register_send: ip6_mrouter socket queue full\n");
 #endif
 		++mrt6stat.mrt6s_upq_sockfull;
 		return ENOBUFS;
