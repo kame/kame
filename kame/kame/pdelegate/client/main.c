@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.4 2001/03/05 12:41:30 itojun Exp $	*/
+/*	$KAME: main.c,v 1.5 2001/03/05 23:44:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -32,11 +32,17 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/socket.h>
+
+#include <net/if.h>
+
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
+#include <netinet/icmp6.h>
+
 #include <unistd.h>
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <err.h>
 #include <netdb.h>
 
@@ -45,7 +51,7 @@
 
 int main __P((int, char **));
 static void usage __P((void));
-static void mainloop __P((void));
+static void mainloop __P((int));
 static void send_discover __P((int));
 static int receive_discover __P((int, struct sockaddr *, int *));
 static void send_initreq __P((int, const struct sockaddr *, int));
@@ -55,7 +61,6 @@ static int sethops __P((int, int));
 static int cmpsockaddr __P((const struct sockaddr *, int, const struct sockaddr *,
 	int));
 
-int s;
 int dflag = 0;
 const char *iface;
 
@@ -65,6 +70,7 @@ main(argc, argv)
 	char **argv;
 {
 	char c;
+	int sock;
 
 	while ((c = getopt(argc, argv, "d")) != EOF) {
 		switch (c) {
@@ -90,19 +96,20 @@ main(argc, argv)
 		/*NOTREACHED*/
 	}
 
-	s = sockopen();
+	sock = sockopen();
 	if (!dflag) {
 		struct icmp6_filter filt;
 
 		ICMP6_FILTER_SETBLOCKALL(&filt);
 		ICMP6_FILTER_SETPASS(ICMP6_PREFIX_DELEGATION, &filt);
-		if (setsockopt(s, IPPROTO_ICMPV6, ICMP6_FILTER, &filt,
+		if (setsockopt(sock, IPPROTO_ICMPV6, ICMP6_FILTER, &filt,
 		    sizeof(filt)) < 0) {
 			err(1, "setsockopt(ICMP6_FILTER)");
 			/*NOTREACHED*/
 		}
 	}
-	mainloop();
+	mainloop(sock);
+	exit(0);
 }
 
 static void
@@ -113,7 +120,8 @@ usage()
 }
 
 static void
-mainloop()
+mainloop(s)
+	int s;
 {
 	int state = 0;
 	fd_set *fds;
@@ -178,7 +186,8 @@ mainloop()
 
 				/* got discovery reply, send initreq */
 				warnx("bar");
-				send_initreq(s, (struct sockaddr *)&serv, servlen);
+				send_initreq(s, (struct sockaddr *)&serv,
+				    servlen);
 				state = 2;
 				settimeo(ICMP6_PD_INITIAL_INTERVAL);
 				retry = ICMP6_PD_INITIAL_RETRY_MAX;
@@ -189,8 +198,8 @@ mainloop()
 				warnx("initreq retry");
 				if (retry-- > 0) {
 					warnx("foo");
-					send_initreq(s, (struct sockaddr *)&serv,
-					    servlen);
+					send_initreq(s,
+					    (struct sockaddr *)&serv, servlen);
 					state = 2;
 					settimeo(ICMP6_PD_INITIAL_INTERVAL);
 				} else {
@@ -213,8 +222,9 @@ mainloop()
 					state = 2;
 					break;
 				}
-				if (!cmpsockaddr((struct sockaddr *)&serv, servlen,
-				    (struct sockaddr *)&from, fromlen)) {
+				if (!cmpsockaddr((struct sockaddr *)&serv,
+				    servlen, (struct sockaddr *)&from,
+				    fromlen)) {
 					warnx("a reply from different server");
 					state = 2;
 					break;
@@ -245,7 +255,7 @@ mainloop()
 				tvp = NULL;
 		} else
 			tvp = NULL;
-		warnx("select, timeout=%d.%06d", tvp ? tvp->tv_sec : -1,
+		warnx("select, timeout=%ld.%06ld", tvp ? tvp->tv_sec : -1,
 		    tvp ? tvp->tv_usec : 0);
 		warnx("state: %d retry: %d", state, retry);
 		gettimeofday(&prev, NULL);
@@ -346,7 +356,6 @@ send_initreq(s, serv, servlen)
 	int servlen;
 {
 	struct icmp6_prefix_request req;
-	int error;
 
 	warnx("send_initreq");
 
@@ -417,7 +426,6 @@ receive(s, buf, blen, from, fromlenp)
 {
 	ssize_t l;
 	struct icmp6_prefix_delegation *p;
-	int error;
 
 	l = recvfrom(s, buf, blen, 0, from, fromlenp);
 	if (l < 0 || l < sizeof(*p))

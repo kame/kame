@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.4 2001/03/05 12:41:30 itojun Exp $	*/
+/*	$KAME: main.c,v 1.5 2001/03/05 23:44:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -32,28 +32,36 @@
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/socket.h>
+
+#include <net/if.h>
+
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
+
+#include <arpa/inet.h>
+
 #include <unistd.h>
 #include <errno.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <err.h>
 #include <netdb.h>
+#include <string.h>
 
 #include "pdelegate.h"
 #include "sock.h"
 
 int main __P((int, char **));
 static void usage __P((void));
-static void mainloop __P((void));
-static struct timeval *settimeo __P((struct timeval *, struct timeval *));
-static void send_discover __P((int));
-static int receive_discover __P((int, struct sockaddr *, int *));
+static void mainloop __P((int));
+static int receive_ireq __P((int, char *, ssize_t, struct sockaddr *, int));
+static int receive_dquery __P((int, char *, ssize_t, struct sockaddr *, int));
 static int sethops __P((int, int));
 
-int s;
 int dflag = 0;
 const char *iface;
+struct in6_addr prefix;
+int prefixlen = -1;
 
 int
 main(argc, argv)
@@ -63,6 +71,8 @@ main(argc, argv)
 	char c;
 	unsigned int ifindex;
 	struct ipv6_mreq mreq;
+	char *p, *ep;
+	int sock;
 
 	while ((c = getopt(argc, argv, "d")) != EOF) {
 		switch (c) {
@@ -78,7 +88,7 @@ main(argc, argv)
 	argc -= optind;
 	argv += optind;
 
-	if (argc != 1) {
+	if (argc != 2) {
 		usage();
 		exit(1);
 	}
@@ -89,16 +99,40 @@ main(argc, argv)
 		/*NOTREACHED*/
 	}
 
-	s = sockopen();
-	if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_IF, &ifindex,
+	p = strchr(argv[1], '/');
+	if (!p) {
+		errx(1, "%s: invalid prefix", argv[1]);
+		/*NOTREACHED*/
+	}
+	*p++ = '\0';
+	if (inet_pton(AF_INET6, argv[1], &prefix) != 1) {
+		errx(1, "%s/%s: invalid prefix", argv[1], p);
+		/*NOTREACHED*/
+	}
+	ep = NULL;
+	prefixlen = (int)strtoul(p, &ep, 10);
+	if (!ep || *ep != '\0') {
+		errx(1, "%s/%s: invalid prefix", argv[1], p);
+		/*NOTREACHED*/
+	}
+	if (prefixlen < 0 || prefixlen > 64)  {
+		errx(1, "%s/%s: invalid prefix", argv[1], p);
+		/*NOTREACHED*/
+	}
+
+	sock = sockopen();
+	if (setsockopt(sock, IPPROTO_IPV6, IPV6_MULTICAST_IF, &ifindex,
 	    sizeof(ifindex)) < 0) {
 		err(1, "setsockopt(IPV6_MULTICAST_IF)");
 		/*NOTREACHED*/
 	}
 	memset(&mreq, 0, sizeof(mreq));
-	inet_pton(AF_INET6, ALLDELEGATORS, &mreq.ipv6mr_multiaddr);
+	if (inet_pton(AF_INET6, ALLDELEGATORS, &mreq.ipv6mr_multiaddr) != 1) {
+		errx(1, "%s: invalid address", ALLDELEGATORS);
+		/*NOTREACHED*/
+	}
 	mreq.ipv6mr_interface = ifindex;
-	if (setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP, &mreq,
+	if (setsockopt(sock, IPPROTO_IPV6, IPV6_JOIN_GROUP, &mreq,
 	    sizeof(mreq)) < 0) {
 		err(1, "setsockopt(IPV6_JOIN_GROUP)");
 		/*NOTREACHED*/
@@ -108,53 +142,26 @@ main(argc, argv)
 
 		ICMP6_FILTER_SETBLOCKALL(&filt);
 		ICMP6_FILTER_SETPASS(ICMP6_PREFIX_REQUEST, &filt);
-		if (setsockopt(s, IPPROTO_ICMPV6, ICMP6_FILTER, &filt,
+		if (setsockopt(sock, IPPROTO_ICMPV6, ICMP6_FILTER, &filt,
 		    sizeof(filt)) < 0) {
 			err(1, "setsockopt(ICMP6_FILTER)");
 			/*NOTREACHED*/
 		}
 	}
-	mainloop();
+	mainloop(sock);
+	exit(0);
 }
 
 static void
 usage()
 {
 
-	fprintf(stderr, "usage: pdelegated [-d] iface\n");
-}
-
-static struct timeval *
-settimeo(tvp, prev)
-	struct timeval *tvp;
-	struct timeval *prev;
-{
-	struct timeval now;
-
-	gettimeofday(&now, NULL);
-
-	now.tv_sec -= prev->tv_sec;
-	now.tv_usec -= prev->tv_usec;
-	while (now.tv_usec < 0) {
-		now.tv_sec--;
-		now.tv_usec += 1000000;
-	}
-
-	tvp->tv_sec -= now.tv_sec;
-	tvp->tv_usec -= now.tv_usec;
-	while (tvp->tv_usec < 0) {
-		tvp->tv_sec--;
-		tvp->tv_usec += 1000000;
-	}
-
-	if (tvp->tv_sec < 0)
-		return NULL;
-	else
-		return tvp;
+	fprintf(stderr, "usage: pdelegated [-d] iface prefix/prefixlen\n");
 }
 
 static void
-mainloop()
+mainloop(s)
+	int s;
 {
 	fd_set *fds;
 	size_t fdssize;
@@ -230,21 +237,21 @@ mainloop()
 int
 receive_dquery(s, rbuf, l, from, fromlen)
 	int s;
-	const char *rbuf;
+	char *rbuf;
 	ssize_t l;
 	struct sockaddr *from;
 	int fromlen;
 {
-	const struct icmp6_prefix_request *p;
+	struct icmp6_prefix_request *p;
 	char hbuf[NI_MAXHOST];
 	struct icmp6_prefix_delegation reply;
-	char sbuf[4096];
 
 	if (l < sizeof(*p)) {
 		warnx("too short message");
 		return -1;
 	}
-	p = (const struct icmp6_prefix_request *)rbuf;
+	/* LINTED const drop */
+	p = (struct icmp6_prefix_request *)rbuf;
 
 	if ((p->icmp6_pr_hdr.icmp6_pr_flaglen & ICMP6_PR_FLAGS_SCOPE) != 0) {
 		warnx("we do not serve site-local prefixes");
@@ -279,23 +286,21 @@ receive_dquery(s, rbuf, l, from, fromlen)
 int
 receive_ireq(s, rbuf, l, from, fromlen)
 	int s;
-	const char *rbuf;
+	char *rbuf;
 	ssize_t l;
 	struct sockaddr *from;
 	int fromlen;
 {
-	const struct icmp6_prefix_request *p;
+	struct icmp6_prefix_request *p;
 	char hbuf[NI_MAXHOST];
 	struct icmp6_prefix_delegation reply;
-	char sbuf[4096];
-	int prefixlen = 64;
-	char *prefix = "3ffe:501:ffff:ffff::";	/*test*/
 
 	if (l < sizeof(*p)) {
 		warnx("too short message");
 		return -1;
 	}
-	p = (const struct icmp6_prefix_request *)rbuf;
+	/* LINTED const drop */
+	p = (struct icmp6_prefix_request *)rbuf;
 
 	/* drop invalid packets */
 	if (!IN6_IS_ADDR_UNSPECIFIED(&p->icmp6_pr_prefix)) {
@@ -319,11 +324,9 @@ receive_ireq(s, rbuf, l, from, fromlen)
 		reply.icmp6_pd_hdr.icmp6_pd_flaglen = 0;
 	} else {
 		reply.icmp6_pd_hdr.icmp6_code = ICMP6_PD_PREFIX_DELEGATED;
-		reply.icmp6_pd_hdr.icmp6_pd_flaglen = prefixlen & ICMP6_PD_LEN_MASK;
-		if (inet_pton(AF_INET6, prefix, &reply.icmp6_pd_prefix) != 1) {
-			warnx("cannot assign prefix %s/%d", prefix, prefixlen);
-			return -1;
-		}
+		reply.icmp6_pd_hdr.icmp6_pd_flaglen =
+		    prefixlen & ICMP6_PD_LEN_MASK;
+		reply.icmp6_pd_prefix = prefix;
 	}
 	/* S bit = 0, global */
 	reply.icmp6_pd_hdr.icmp6_pd_flaglen &= ~ICMP6_PD_FLAGS_SCOPE;
