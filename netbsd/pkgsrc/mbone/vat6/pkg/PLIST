@@ -1,3 +1,0 @@
-@comment $NetBSD: PLIST,v 1.3 2000/01/26 22:14:27 jlam Exp $
-bin/vat6
-man/man1/vat6.1

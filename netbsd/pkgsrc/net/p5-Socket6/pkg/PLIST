@@ -1,6 +1,0 @@
-@comment $NetBSD$
-lib/perl5/site_perl/Socket6.pm
-lib/perl5/site_perl/${MACHINE_ARCH}-netbsd/auto/Socket6/.packlist
-lib/perl5/site_perl/${MACHINE_ARCH}-netbsd/auto/Socket6/Socket6.bs
-lib/perl5/site_perl/${MACHINE_ARCH}-netbsd/auto/Socket6/Socket6.so
-@dirrm lib/perl5/site_perl/${MACHINE_ARCH}-netbsd/auto/Socket6

@@ -1,8 +1,0 @@
-**************************************************************
-Executable for @@PKGNAME@@ is installed into
-@@PREFIX@@/libexec/smtpfeed.
-
-You'll need to prepare (1) sendmail with WIDE patch applied,
-and (2) properly configured sendmail.cf.
-(1) is included in mail/sendmail pkgsrc.
-**************************************************************

@@ -1,7 +1,0 @@
-mediator/dcsk.pl
-mediator/gethostent.pl
-mediator/getifaddrs
-mediator/mdc
-mediator/mediator
-mediator/mediator.conf.sample
-@dirrm mediator

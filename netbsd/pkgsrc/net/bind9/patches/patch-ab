@@ -1,7 +1,0 @@
---- Makefile.in-	Sat Jul  8 11:56:31 2000
-+++ Makefile.in	Sat Jul  8 11:56:58 2000
-@@ -44,3 +44,3 @@
- install:: isc-config.sh
--	${INSTALL_PROGRAM} isc-config.sh ${DESTDIR}${bindir}
-+	${INSTALL_PROGRAM:S/-s//} isc-config.sh ${DESTDIR}${bindir}
- 

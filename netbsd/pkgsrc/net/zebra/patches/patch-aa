@@ -1,8 +1,0 @@
-$NetBSD$
---- doc/Makefile.in-	Thu Aug 17 19:05:22 2000
-+++ doc/Makefile.in	Thu Aug 17 19:05:32 2000
-@@ -75,3 +75,3 @@
- LIB_REGEX = @LIB_REGEX@
--MAKEINFO = @MAKEINFO@
-+MAKEINFO = ../missing makeinfo
- OSPF6D = @OSPF6D@
