@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1561 2001/02/19 06:06:43 itojun Exp $
+$KAME: CHANGELOG,v 1.1562 2001/02/19 11:52:55 itojun Exp $
 
 <200102>
+Mon Feb 19 20:51:41 JST 2001  itojun@iijlab.net
+	* sys/netinet6/ipsec.c (netbsd only): correct severe memory leak
+	  in ipsec operation.  the bug was introduced on 2/14/2001.
+
 Mon Feb 19 15:03:24 JST 2001  itojun@iijlab.net
 	* sys/netinet6/ah_{core,output}.c: correct IPv4 option chasing in
 	  AH processing.  the change is important if you use IPsec.
