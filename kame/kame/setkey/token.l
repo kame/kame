@@ -1,4 +1,4 @@
-/*	$KAME: token.l,v 1.23 2001/08/16 09:16:06 itojun Exp $	*/
+/*	$KAME: token.l,v 1.24 2001/08/16 11:50:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -61,7 +61,7 @@
 	for (__p__ = __buf__; *__p__ != NULL; __p__++) \
 		if (*__p__ == '\n' || *__p__ == '\t') \
 			*__p__ = ' '; \
-	strcat(cmdarg, __buf__); \
+	strlcat(cmdarg, __buf__, sizeof(cmdarg)); \
 	free(__buf__); \
 }
 
@@ -220,15 +220,6 @@ any		{ PREPROC; return(ANY); }
 			return(DECSTRING);
 		}
 
-({ipaddress}|{hostname})	{
-			PREPROC;
-
-			yylval.val.len = yyleng;
-			yylval.val.buf = strdup(yytext);
-
-			return(ADDRESS);
-		}
-
 {ipaddrmask}	{
 			PREPROC;
 			yytext++;
@@ -279,6 +270,15 @@ any		{ PREPROC; return(ANY); }
 			yylval.val.len = yyleng;
 			yylval.val.buf = strdup(yytext);
 			return(STRING);
+		}
+
+({ipaddress}|{hostname})	{
+			PREPROC;
+
+			yylval.val.len = yyleng;
+			yylval.val.buf = strdup(yytext);
+
+			return(ADDRESS);
 		}
 
 .		{
