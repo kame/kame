@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/01/17 05:40:11 $
+			$Date: 2000/01/18 09:51:48 $
 
 1. IPv6
 
@@ -642,8 +642,7 @@ not recommend you to rely upon IPv4 mapped address.
 The platforms do not support IPv4 mapped address at all (both listening side
 and initiating side).  AF_INET6 and AF_INET sockets are totally separated.
 
-Port number space is totally separate between AF_INET and
-AF_INET6 sockets. 
+Port number space is totally separate between AF_INET and AF_INET6 sockets. 
 
 1.12.2 KAME/FreeBSD3x
 
@@ -671,7 +670,7 @@ There's no problem with open/close ordering.
 
 (XXX need checking)
 
-1.12.2.1 KAME/FreeBSD3x, initiating side
+1.12.2.2 KAME/FreeBSD3x, initiating side
 
 KAME/FreeBSD3x supports outgoing connetion to IPv4 mapped address
 (::ffff:10.1.1.1), if the node is configured to accept IPv4 connections
@@ -679,14 +678,14 @@ by AF_INET6 socket.
 
 (XXX need checking)
 
-1.12.4 KAME/NetBSD
+1.12.3 KAME/NetBSD
 
 KAME/NetBSD uses shared tcp4/6 code (from sys/netinet/tcp*) and shared
 udp4/6 code (from sys/netinet/udp*).  The implementation is made differently
 from KAME/FreeBSD3x.  KAME/NetBSD uses separate inpcb/in6pcb structures,
 while KAME/FreeBSD3x uses merged inpcb structure.
 
-1.12.4.1 KAME/NetBSD, listening side
+1.12.3.1 KAME/NetBSD, listening side
 
 The platform can be configured to support IPv4 mapped address/special AF_INET6
 wildcard bind (disabled by default).  Kernel behavior can be summarized as
@@ -711,21 +710,21 @@ conditions are satisfied:
   getsockopt(IPV6_BINDV6ONLY) returns 0.
 There's no problem with open/close ordering.
 
-1.12.4.1 KAME/NetBSD, initiating side
+1.12.3.2 KAME/NetBSD, initiating side
 
 When you initiate a connection, you can always connect to IPv4 destination
 over AF_INET6 socket, usin IPv4 mapped address destination (::ffff:10.1.1.1).
 This is enabled independently from the configuration for listening side, and
 always enabled.
 
-1.12.5 KAME/BSDI4
+1.12.4 KAME/BSDI4
 
 KAME/BSDI4 uses NRL-based TCP/UDP stack and inpcb source code,
 which was derived from NRL IPv6/IPsec stack.  I guess it supports IPv4 mapped
 address and speical AF_INET6 wildcard bind.  The implementation is, again,
 different from other KAME/*BSDs.
 
-1.12.5.1 KAME/BSDI4, listening side
+1.12.4.1 KAME/BSDI4, listening side
 
 NRL inpcb layer supports special behavior of AF_INET6 wildcard socket.
 It grabs IPv4 connection under certain condition.  NRL inpcb layer has
@@ -737,17 +736,17 @@ different behavior than KAME implementation, namely:
   both will success.  However, all IPv4 traffic (and IPv6 traffic) will be
   captured by IPv6 wildcard socket.
 
-1.12.5.2 KAME/BSDI4, initiating side
+1.12.4.2 KAME/BSDI4, initiating side
 
 KAME/BSDi4 supports connection initiation to IPv4 mapped address
 (like ::ffff:10.1.1.1).
 
-1.12.6 KAME/OpenBSD
+1.12.5 KAME/OpenBSD
 
 KAME/OpenBSD uses NRL-based TCP/UDP stack and inpcb source code,
 which was derived from NRL IPv6/IPsec stack.
 
-1.12.6.1 KAME/OpenBSD, listening side
+1.12.5.1 KAME/OpenBSD, listening side
 
 KAME/OpenBSD disables special behavior on AF_INET6 wildcard bind for
 security reasons (if IPv4 traffic toward AF_INET6 wildcard bind is allowed,
@@ -758,7 +757,7 @@ policy.
 As a result the behavior of KAME/OpenBSD is similar to KAME/BSDI3 and
 KAME/FreeBSD228 (see 1.12.1 for more detail).
 
-1.12.6.2 KAME/OpenBSD, initiating side
+1.12.5.2 KAME/OpenBSD, initiating side
 
 KAME/OpenBSD does not support connection initiation to IPv4 mapped address
 (like ::ffff:10.1.1.1).
