@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.117 2002/05/24 05:01:30 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.118 2002/05/24 07:04:49 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -443,8 +443,20 @@ natpt_icmp6Informational(struct pcv *cv6, struct pcv *cv4)
 	struct icmp6_hdr *icmp6 = cv6->pyld.icmp6;
 
 	icmp4->icmp_code = 0;
+
+#if 1
+	if (icmp6->icmp6_type == ICMP6_ECHO_REQUEST) {
+		cv6->ats->suit.ids[1] = icmp6->icmp6_data32[0];
+		icmp4->icmp_void
+			= cv6->ats->suit.ids[0]
+			= icmp6->icmp6_data32[0];
+	} else {
+		icmp4->icmp_void = cv6->ats->suit.ids[1];
+	}
+#else
 	icmp4->icmp_id	= icmp6->icmp6_id;
 	icmp4->icmp_seq	= icmp6->icmp6_seq;
+#endif
 
 	dlen = icmp6len - sizeof(struct icmp6_hdr);
 	icmp6off = (caddr_t)(cv6->pyld.icmp6) + sizeof(struct icmp6_hdr);
@@ -945,8 +957,20 @@ natpt_icmp4Informational(struct pcv *cv4, struct pcv *cv6)
 	struct icmp6_hdr *icmp6 = cv6->pyld.icmp6;
 
 	icmp6->icmp6_code = 0;
+
+#if 1
+	if (icmp4->icmp_type == ICMP_ECHO) {
+		cv4->ats->suit.ids[1] = icmp4->icmp_void;
+		icmp6->icmp6_data32[0]
+			= cv4->ats->suit.ids[0]
+			= icmp4->icmp_void;
+	} else {
+		icmp6->icmp6_data32[0] = cv4->ats->suit.ids[1];
+	}
+#else
 	icmp6->icmp6_id	 = icmp4->icmp_id;
 	icmp6->icmp6_seq = icmp4->icmp_seq;
+#endif
 
 	dlen = icmp4len - ICMP_MINLEN;
 	icmp4off = (caddr_t)(cv4->pyld.icmp4) + ICMP_MINLEN;

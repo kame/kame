@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.46 2002/05/21 06:29:44 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.47 2002/05/24 07:04:49 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -697,28 +697,56 @@ natpt_lookForHash(struct pcv *cv, struct tslhash *th, int side)
 		}
 
 		if (cv->sa_family == AF_INET6) {
+			struct icmp6_hdr	*icmp6;
+
 			ip6 = cv->ip.ip6;
 			if (!IN6_ARE_ADDR_EQUAL(&ip6->ip6_src, &pad->in6src)
 			    || !IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &pad->in6dst))
 				goto next;
-			if ((cv->ip_p == IPPROTO_TCP)
-			    || (cv->ip_p == IPPROTO_UDP)) {
+
+			switch (cv->ip_p) {
+			case IPPROTO_ICMPV6:
+				icmp6 = cv->pyld.icmp6;
+				if (icmp6->icmp6_type != ICMP6_ECHO_REPLY)
+					goto next;
+				if ((ats->suit.ids[0] != 0)
+				    && (icmp6->icmp6_data32[0] != ats->suit.ids[0]))
+					goto next;
+				break;
+
+			case IPPROTO_TCP:
+			case IPPROTO_UDP:
 				if (cv->pyld.tcp6->th_sport != pad->port[0])
 					goto next;
 				if (cv->pyld.tcp6->th_dport != pad->port[1])
 					goto next;
+				break;
 			}
 		} else {
+			struct icmp	*icmp4;
+
 			ip4 = cv->ip.ip4;
 			if ((ip4->ip_src.s_addr != pad->in4src.s_addr)
 			    || (ip4->ip_dst.s_addr != pad->in4dst.s_addr))
 				goto next;
-			if ((cv->ip_p == IPPROTO_TCP)
-			    || (cv->ip_p == IPPROTO_UDP)) {
+
+			switch (cv->ip_p) {
+			case IPPROTO_ICMP:
+				icmp4 = cv->pyld.icmp4;
+				if (icmp4->icmp_type != ICMP_ECHOREPLY)
+					goto next;
+				if ((ats->suit.ids[0] != 0)
+				    && (icmp4->icmp_void != ats->suit.ids[0]))
+					goto next;
+				break;
+
+			case IPPROTO_TCP:
+			case IPPROTO_UDP:
 				if (cv->pyld.tcp4->th_sport != pad->port[0])
 					goto next;
 				if (cv->pyld.tcp4->th_dport != pad->port[1])
 					goto next;
+				break;
 			}
 		}
 
