@@ -42,6 +42,7 @@ static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #include <sys/ioctl.h>
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
+#include <sys/sysctl.h>
 
 #include <net/route.h>
 #include <net/if.h>
@@ -62,6 +63,7 @@ static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #include <netinet6/udp6.h>
 #include <netinet6/udp6_var.h>
 #include <netinet6/pim6_var.h>
+#include <netinet6/raw_ip6.h>
 
 /* #include <arpa/inet.h> */
 #if 0
@@ -1177,6 +1179,52 @@ pim6_stats(off, name)
 	p(pim6s_rcv_registers, "\t%qu register%s received\n");
 	p(pim6s_rcv_badregisters, "\t%qu bad register%s received\n");
 	p(pim6s_snd_registers, "\t%qu register%s sent\n");
+#undef p
+}
+
+/*
+ * Dump raw ip6 statistics structure.
+ */
+void
+rip6_stats(off, name)
+	u_long off;
+	char *name;
+{
+	struct rip6stat rip6stat;
+	u_quad_t delivered;
+	int mib[4];
+	size_t l;
+
+	mib[0] = CTL_NET;
+	mib[1] = PF_INET6;
+	mib[2] = IPPROTO_IPV6;
+	mib[3] = IPV6CTL_RIP6STATS;
+	l = sizeof(rip6stat);
+	if (sysctl(mib, 4, &rip6stat, &l, NULL, 0) < 0) {
+		perror("Warning: sysctl(net.inet6.ip6.rip6stats)");
+		return;
+	}
+
+	printf("%s:\n", name);
+
+#define	p(f, m) if (rip6stat.f || sflag <= 1) \
+    printf(m, (u_quad_t)rip6stat.f, plural(rip6stat.f))
+	p(rip6s_ipackets, "\t%qu message%s received\n");
+	p(rip6s_isum, "\t%qu checksum calcuration%s on inbound\n");
+	p(rip6s_badsum, "\t%qu message%s with bad checksum\n");
+	p(rip6s_nosock, "\t%qu message%s dropped due to no socket\n");
+	p(rip6s_nosockmcast,
+	    "\t%qu multicast message%s dropped due to no socket\n");
+	p(rip6s_fullsock,
+	    "\t%qu message%s dropped due to full socket buffers\n");
+	delivered = rip6stat.rip6s_ipackets -
+		    rip6stat.rip6s_badsum -
+		    rip6stat.rip6s_nosock -
+		    rip6stat.rip6s_nosockmcast -
+		    rip6stat.rip6s_fullsock;
+	if (delivered || sflag <= 1)
+		printf("\t%qu delivered\n", (unsigned long long)delivered);
+	p(rip6s_opackets, "\t%qu datagram%s output\n");
 #undef p
 }
 

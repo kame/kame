@@ -219,6 +219,8 @@ struct protox ip6protox[] = {
 #endif
 	{ -1,		N_PIM6STAT,	1,	0,
 	  pim6_stats,	NULL,		"pim6" },
+	{ -1,		-1,		1,	0,
+	  rip6_stats,	NULL,		"rip6" },
 	{ -1,		-1,		0,	0,
 	  0,		NULL,		0 }
 };
