@@ -5,6 +5,7 @@ PROG=	ifconfig
 MAN=	ifconfig.8
 
 CPPFLAGS+=-DINET6
+CPPFLAGS+=-DMIP6
 
 # KAME scope id hack
 CPPFLAGS+=-DKAME_SCOPEID

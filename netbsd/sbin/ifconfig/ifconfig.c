@@ -272,6 +272,12 @@ const struct cmd {
 	{ "pltime",	NEXTARG,	0,		setia6pltime },
 	{ "vltime",	NEXTARG,	0,		setia6vltime },
 	{ "eui64",	0,		0,		setia6eui64 },
+#ifdef MIP6
+	{ "home",	IN6_IFF_HOME,	0,		setia6flags },
+	{ "-home",	-IN6_IFF_HOME,	0,		setia6flags },
+	{ "deregistering",	IN6_IFF_DEREGISTERING,	0,	setia6flags },
+	{ "-deregistering",	-IN6_IFF_DEREGISTERING,	0,	setia6flags },
+#endif /* MIP6 */
 #endif /*INET6*/
 #ifndef INET_ONLY
 	{ "range",	NEXTARG,	0,		setatrange },
@@ -2491,6 +2497,12 @@ in6_alias(creq)
 			printf(" detached");
 		if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DEPRECATED)
 			printf(" deprecated");
+#ifdef MIP6
+		if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_HOME)
+			printf(" home");
+		if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DEREGISTERING)
+			printf(" deregistering");
+#endif /* MIP6 */
 	}
 
 	if (scopeid)
