@@ -410,6 +410,11 @@ struct	in6_rrenumreq {
 #define IN6_IFF_NOTREADY (IN6_IFF_TENTATIVE|IN6_IFF_DUPLICATED)
 
 #ifdef _KERNEL
+#define IN6_ARE_SCOPE_CMP(a,b) ((a)-(b))
+#define IN6_ARE_SCOPE_EQUAL(a,b) ((a)==(b))
+#endif
+
+#ifdef _KERNEL
 extern struct in6_ifaddr *in6_ifaddr;
 
 extern struct in6_ifstat **in6_ifstat;
@@ -636,6 +641,7 @@ struct in6_ifaddr *in6ifa_ifpforlinklocal __P((struct ifnet *));
 struct in6_ifaddr *in6ifa_ifpwithaddr __P((struct ifnet *,
 					     struct in6_addr *));
 char	*ip6_sprintf __P((struct in6_addr *));
+int	in6_addr2scopeid __P((struct ifnet *, struct in6_addr *));
 int	in6_matchlen __P((struct in6_addr *, struct in6_addr *));
 int	in6_are_prefix_equal __P((struct in6_addr *p1, struct in6_addr *p2,
 				  int len));

@@ -202,6 +202,30 @@ struct	ip6stat {
 	u_quad_t ip6s_pulldown;		/* # of calls to m_pulldown */
 	u_quad_t ip6s_pulldown_copy;	/* # of mbuf copies in m_pulldown */
 	u_quad_t ip6s_pulldown_alloc;	/* # of mbuf allocs in m_pulldown */
+
+	/*
+	 * statistics for improvement of the source address selection
+	 * algorithm:
+	 * XXX: hardcoded 16 = # of ip6 multicast scope types + 1
+	 */
+	/* number of times that address selection fails */
+	u_quad_t ip6s_sources_none;
+	/* number of times that an address on the outgoing I/F is chosen */
+	u_quad_t ip6s_sources_sameif[16];
+	/* number of times that an address on a non-outgoing I/F is chosen */
+	u_quad_t ip6s_sources_otherif[16];
+	/*
+	 * number of times that an address that has the same scope
+	 * from the destination is chosen.
+	 */
+	u_quad_t ip6s_sources_samescope[16];
+	/*
+	 * number of times that an address that has a different scope
+	 * from the destination is chosen.
+	 */
+	u_quad_t ip6s_sources_otherscope[16];
+	/* number of times that an deprecated address is chosen */
+	u_quad_t ip6s_sources_deprecated[16];
 };
 
 #ifdef _KERNEL
