@@ -1,4 +1,4 @@
-/*	$KAME: mip6stat.c,v 1.13 2002/08/27 09:52:40 keiichi Exp $	*/
+/*	$KAME: mip6stat.c,v 1.14 2002/08/28 12:17:54 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -730,14 +730,14 @@ tmpshow(ip6stat, mip6stat)
 	M(mip6s_ba);
 	for (i = 0; i < 256; i++) {
 		if (mip6stat->mip6s_ba_hist[i] != 0)
-			printf("mip6s_ba_hist_%03d:%qu,",
+			printf("mip6s_ba_hist_%03u:%qu,",
 			    i, mip6stat->mip6s_ba_hist[i]);
 	}
 	M(mip6s_br);
 	M(mip6s_be);
 	for (i = 0; i < 256; i++) {
 		if (mip6stat->mip6s_be_hist[i] != 0)
-			printf("mip6s_be_hist_%03d:%qu,",
+			printf("mip6s_be_hist_%03u:%qu,",
 			    i, mip6stat->mip6s_be_hist[i]);
 	}
 	M(mip6s_hao);
@@ -756,14 +756,14 @@ tmpshow(ip6stat, mip6stat)
 	M(mip6s_oba);
 	for (i = 0; i < 256; i++) {
 		if (mip6stat->mip6s_oba_hist[i] != 0)
-			printf("mip6s_oba_hist_%03d:%qu,",
+			printf("mip6s_oba_hist_%03u:%qu,",
 			    i, mip6stat->mip6s_oba_hist[i]);
 	}
 	M(mip6s_obr);
 	M(mip6s_obe);
 	for (i = 0; i < 256; i++) {
 		if (mip6stat->mip6s_obe_hist[i] != 0)
-			printf("mip6s_obe_hist_%03d:%qu,",
+			printf("mip6s_obe_hist_%03u:%qu,",
 			    i, mip6stat->mip6s_obe_hist[i]);
 	}
 	M(mip6s_ohao);
