@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.127 2001/06/07 11:52:13 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.128 2001/06/20 12:34:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -252,7 +252,6 @@ int	 main __P((int, char *[]));
 void	 fill __P((char *, char *));
 int	 get_hoplim __P((struct msghdr *));
 int	 get_pathmtu __P((struct msghdr *));
-void	 set_pathmtu __P((int));
 struct in6_pktinfo *get_rcvpktinfo __P((struct msghdr *));
 void	 onsignal __P((int));
 void	 retransmit __P((void));
@@ -1075,7 +1074,6 @@ main(argc, argv)
 					printf("new path MTU (%d) is "
 					    "notified\n", mtu);
 				}
-				set_pathmtu(mtu);
 			}
 			continue;
 		} else {
@@ -2065,60 +2063,6 @@ get_pathmtu(mhdr)
 	}
 #endif
 	return(0);
-}
-
-void
-set_pathmtu(mtu)
-	int mtu;
-{
-#ifdef IPV6_USE_MTU
-	static int firsttime = 1;
-	struct cmsghdr *cm;
-
-	if (firsttime) {
-		int oldlen = smsghdr.msg_controllen;
-		char *oldbuf = smsghdr.msg_control;
-
-		/* XXX: We need to enlarge control message buffer */
-		firsttime = 0;	/* prevent further enlargement */
-
-		smsghdr.msg_controllen = oldlen + CMSG_SPACE(sizeof(int));
-		if ((smsghdr.msg_control =
-		     (char *)malloc(smsghdr.msg_controllen)) == NULL)
-			err(1, "set_pathmtu: malloc");
-		cm = (struct cmsghdr *)CMSG_FIRSTHDR(&smsghdr);
-		cm->cmsg_len = CMSG_LEN(sizeof(int));
-		cm->cmsg_level = IPPROTO_IPV6;
-		cm->cmsg_type = IPV6_USE_MTU;
-
-		cm = (struct cmsghdr *)CMSG_NXTHDR(&smsghdr, cm);
-		if (oldlen)
-			memcpy((void *)cm, (void *)oldbuf, oldlen);
-
-		free(oldbuf);
-	}
-
-	/*
-	 * look for a cmsgptr that points MTU structure.
-	 * XXX: this procedure seems redundant at this moment, but we'd better
-	 * keep the code generic enough for future extensions.
-	 */
-	for (cm = CMSG_FIRSTHDR(&smsghdr); cm;
-	     cm = (struct cmsghdr *)CMSG_NXTHDR(&smsghdr, cm)) {
-		if (cm->cmsg_len == 0) /* XXX: paranoid check */
-			errx(1, "set_pathmtu: internal error");
-
-		if (cm->cmsg_level == IPPROTO_IPV6 &&
-		    cm->cmsg_type == IPV6_USE_MTU &&
-		    cm->cmsg_len == CMSG_LEN(sizeof(int)))
-			break;
-	}
-
-	if (cm == NULL)
-		errx(1, "set_pathmtu: internal error: no space for path MTU");
-
-	*(int *)CMSG_DATA(cm) = mtu;
-#endif
 }
 
 /*
