@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.93 2001/11/06 02:01:53 sakane Exp $
+.\"	$KAME: racoon.conf.5,v 1.94 2001/12/19 18:54:50 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -347,6 +347,14 @@ They can be individually specified in each proposal.
 enable this to send an INITIAL-CONTACT message.
 The default value is
 .Ic on .
+This message is useful only when
+the implementation of the responder choices an old SA when there are multiple
+SAs which are different established time, and the initiator reboots.
+If racoon did not use the message,
+the responder would use an old SA even when an new SA was established.
+The KAME stack has the switch in the system wide value,
+net.key.preferred_oldsa.
+when the value is zero, the stack always use an new SA.
 .\"
 .It Ic passive (on \(ba off) ;
 If you do not want to initiate the negotiation, set this to on.
