@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.78 2002/09/11 02:34:17 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.79 2002/09/15 07:32:49 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -65,6 +65,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/domain.h>
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/callout.h>
 #elif defined(__OpenBSD__)
@@ -163,6 +164,8 @@ static void	expire_upcalls __P((void *));
 extern struct socket *ip_mrouter;
 #endif
 #endif
+
+extern struct domain inet6domain;
 
 /*
  * 'Interfaces' associated with decapsulator (so we can tell
@@ -634,8 +637,13 @@ ip6_mrouter_done()
 	bzero((caddr_t)mf6ctable, sizeof(mf6ctable));
 
 	/*
-	 * Reset de-encapsulation cache
+	 * Reset register interface
 	 */
+	if (inet6domain.dom_ifdetach) {
+		ifp = &multicast_register_if;
+		inet6domain.dom_ifdetach(ifp, ifp->if_afdata[AF_INET6]);
+		ifp->if_afdata[AF_INET6] = NULL;
+	}
 	reg_mif_num = -1;
 
 	ip6_mrouter = NULL;
@@ -690,19 +698,22 @@ add_m6if(mifcp)
 		return ENXIO;
 
 	if (mifcp->mif6c_flags & MIFF_REGISTER) {
+		ifp = &multicast_register_if;
+
 		if (reg_mif_num == (mifi_t)-1) {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-			strcpy(multicast_register_if.if_xname,
-			       "register_mif"); /* XXX */
+			strcpy(ifp->if_xname, "register_mif"); /* XXX */
 #else
-			multicast_register_if.if_name = "register_mif";
+			ifp->if_name = "register_mif";
 #endif
-			multicast_register_if.if_flags |= IFF_LOOPBACK;
-			multicast_register_if.if_index = mifcp->mif6c_mifi;
+			ifp->if_flags |= IFF_LOOPBACK;
+			ifp->if_index = mifcp->mif6c_mifi;
 			reg_mif_num = mifcp->mif6c_mifi;
+			if (inet6domain.dom_ifattach) {
+				ifp->if_afdata[AF_INET6]
+				    = inet6domain.dom_ifattach(&ifp);
+			}
 		}
-
-		ifp = &multicast_register_if;
 
 	} /* if REGISTER */
 	else {
@@ -790,6 +801,14 @@ del_m6if(mifip)
 	s = splnet();
 #endif
 
+	if (mifp->m6_flags & MIFF_REGISTER && reg_mif_num != (mifi_t) -1) {
+		reg_mif_num = -1;
+		if (inet6domain.dom_ifdetach) {
+			ifp = &multicast_register_if;
+			inet6domain.dom_ifdetach(ifp, ifp->if_afdata[AF_INET6]);
+			ifp->if_afdata[AF_INET6] = NULL;
+		}
+	}
 	if (!(mifp->m6_flags & MIFF_REGISTER)) {
 		/*
 		 * XXX: what if there is yet IPv4 multicast daemon
