@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.75 2000/12/26 00:10:19 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.76 2000/12/27 04:36:46 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1493,7 +1493,7 @@ oakley_check_certid(iph1)
 		name = eay_get_x509asn1subjectname(&iph1->cert_p->cert);
 		if (!name) {
 			plog(LLV_ERROR, LOCATION, NULL,
-				"Invalid SubjectName.\n");
+				"failed to get subjectName\n");
 			return ISAKMP_NTYPE_INVALID_CERTIFICATE;
 		}
 		if (idlen != name->l) {
@@ -1521,14 +1521,14 @@ oakley_check_certid(iph1)
 			if (eay_get_x509subjectaltname(&iph1->cert_p->cert,
 					&altname, &type, pos) !=0) {
 				plog(LLV_ERROR, LOCATION, NULL,
-					"Invalid SubjectAltName.\n");
+					"failed to get subjectAltName\n");
 				return ISAKMP_NTYPE_INVALID_CERTIFICATE;
 			}
 
 			/* it's the end condition of the loop. */
 			if (!altname) {
 				plog(LLV_ERROR, LOCATION, NULL,
-					"no proper SubjectAltName.\n");
+					"no proper subjectAltName.\n");
 				return ISAKMP_NTYPE_INVALID_CERTIFICATE;
 			}
 
@@ -1546,7 +1546,7 @@ oakley_check_certid(iph1)
 		error = getaddrinfo(altname, NULL, &hints, &res);
 		if (error != 0) {
 			plog(LLV_ERROR, LOCATION, NULL,
-				"Invalid SubjectAltName.\n");
+				"no proper subjectAltName.\n");
 			free(altname);
 			return ISAKMP_NTYPE_INVALID_CERTIFICATE;
 		}
@@ -1580,14 +1580,14 @@ oakley_check_certid(iph1)
 			if (eay_get_x509subjectaltname(&iph1->cert_p->cert,
 					&altname, &type, pos) != 0){
 				plog(LLV_ERROR, LOCATION, NULL,
-					"Invalid SubjectAltName.\n");
+					"failed to get subjectAltName\n");
 				return ISAKMP_NTYPE_INVALID_CERTIFICATE;
 			}
 
 			/* it's the end condition of the loop. */
 			if (!altname) {
 				plog(LLV_ERROR, LOCATION, NULL,
-					"no proper SubjectAltName.\n");
+					"no proper subjectAltName.\n");
 				return ISAKMP_NTYPE_INVALID_CERTIFICATE;
 			}
 
