@@ -1,4 +1,4 @@
-/*	$KAME: rp.h,v 1.6 2002/12/15 04:23:23 suz Exp $	*/
+/*	$KAME: rp.h,v 1.7 2003/04/30 05:09:01 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -57,6 +57,7 @@ extern char *cand_rp_ifname, *cand_bsr_ifname;
 
 extern u_int8					cand_rp_flag;
 extern u_int8					cand_bsr_flag;
+extern u_int8					static_rp_flag;
 extern u_int8					my_cand_rp_priority;
 extern u_int8					my_bsr_priority;
 extern u_int16					my_cand_rp_adv_period;
@@ -79,6 +80,12 @@ extern struct cand_rp_adv_message_ {
 	u_int16					message_size;
 } cand_rp_adv_message;
 
+struct staticrp {
+	struct sockaddr_in6 paddr;
+	u_int8 plen;
+	struct sockaddr_in6 rpaddr;
+	u_int8 priority;
+};
 
 extern void      init_rp6	__P((void));
 extern void      init_bsr6	__P((void));
@@ -116,7 +123,5 @@ extern int  remap_grpentry      __P((grpentry_t *grpentry_ptr));
 extern int  check_mrtentry_rp   __P((mrtentry_t *mrtentry_ptr,
                          struct sockaddr_in6 *rp_addr));
 
-
-
-
+extern void update_rp_neighbor __P((void));
 #endif

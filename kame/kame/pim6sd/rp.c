@@ -1,4 +1,4 @@
-/*	$KAME: rp.c,v 1.25 2003/04/30 04:49:34 suz Exp $	*/
+/*	$KAME: rp.c,v 1.26 2003/04/30 05:09:01 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -140,6 +140,8 @@ struct cand_rp_adv_message_ 	cand_rp_adv_message;
 struct in6_addr         	rp_my_ipv6_hashmask;
 char				*cand_rp_ifname;
 
+u_int8          		static_rp_flag;
+
 
 /*
  * Local functions definition.
@@ -166,6 +168,12 @@ init_rp6()
 {
     struct sockaddr_in6 *sa6 = NULL;
     u_int8 *data_ptr;
+
+    /* no need to init RP in case of static-rp */
+    if (static_rp_flag != FALSE) {
+	log(LOG_DEBUG, 0, "static-rp config");
+	return;
+    }
 
     /* defines RP address */
     if (cand_rp_ifname) {
@@ -1306,4 +1314,18 @@ check_mrtentry_rp(mrtentry_ptr, rp_addr)
     if (inet6_equal(&mrtentry_ptr->group->rpaddr,rp_addr))
 	return (TRUE);
     return (FALSE);
+}
+
+void
+update_rp_neighbor()
+{
+	cand_rp_t      *cand_rp;
+
+	for (cand_rp = cand_rp_list; cand_rp != NULL; cand_rp = cand_rp->next) {
+		/* existing upstream is updated automatically */
+		if (cand_rp->rpentry->upstream != NULL)
+			continue;
+
+		set_incoming(cand_rp->rpentry, PIM_IIF_RP);
+	}
 }

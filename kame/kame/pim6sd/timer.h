@@ -1,4 +1,4 @@
-/*	$KAME: timer.h,v 1.4 2000/12/04 06:45:32 itojun Exp $	*/
+/*	$KAME: timer.h,v 1.5 2003/04/30 05:09:01 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -52,6 +52,7 @@
 /* the default granularity if not specified in the config file */
 
 #define DEFAULT_TIMER_INTERVAL 5
+#define TIMER_INFINITY 0xffff
 
 /* For timeout. The timers count down */
 
@@ -62,20 +63,15 @@
 #define IF_TIMER_NOT_SET(timer) if ((timer) <= 0)
 #define FIRE_TIMER(timer)       (timer) = 0
 
-
-#define IF_TIMER_NOT_SET(timer) if ((timer) <= 0)
-
-#define IF_TIMEOUT(timer)       \
-    if (!((timer) -= (MIN(timer, timer_interval))))
-
-#define IF_NOT_TIMEOUT(timer)       \
-    if ((timer) -= (MIN(timer, timer_interval)))
-
 #define TIMEOUT(timer)          \
-    (!((timer) -= (MIN(timer, timer_interval))))
- 
+    ((timer) != TIMER_INFINITY && !((timer) -= (MIN(timer, timer_interval))))
+
 #define NOT_TIMEOUT(timer)      \
-    ((timer) -= (MIN(timer, timer_interval)))
+    ((timer) == TIMER_INFINITY || ((timer) -= (MIN(timer, timer_interval))))
+
+#define IF_TIMEOUT(timer)	if (TIMEOUT(timer))
+#define IF_NOT_TIMEOUT(timer)	if (NOT_TIMEOUT(timer))
+
 
 
 extern u_int32 pim_reg_rate_bytes;

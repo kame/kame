@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.59 2003/04/30 04:36:32 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.60 2003/04/30 05:09:01 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -290,6 +290,8 @@ receive_pim6_hello(src, pim_message, datalen)
      */
 
     send_pim6_hello(v, pim_hello_holdtime);
+
+    update_rp_neighbor();
 
     if (v->uv_flags & VIFF_DR)
     {

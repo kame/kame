@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.30 2003/02/12 04:30:11 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.31 2003/04/30 05:09:00 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -80,6 +80,7 @@ struct attr_list {
 		unsigned int flags;
 		double number;
 		struct in6_prefix prefix;
+		struct staticrp staticrp;
 	}attru;
 };
 
@@ -87,11 +88,12 @@ enum {IFA_FLAG, IFA_PREFERENCE, IFA_METRIC, RPA_PRIORITY, RPA_TIME,
       BSRA_PRIORITY, BSRA_TIME, BSRA_MASKLEN, IN6_PREFIX, THRESA_RATE,
       THRESA_INTERVAL,
       IFA_ROBUST, IFA_QUERY_INT, IFA_QUERY_INT_RESP, IFA_MLD_VERSION, IFA_LLQI,
+      STATICRP,
      };
 
 static int strict;		/* flag if the grammer check is strict */
 static struct attr_list *rp_attr, *bsr_attr, *grp_prefix, *regthres_attr,
-	*datathres_attr;
+	*datathres_attr, *static_rp;
 static int srcmetric, srcpref, helloperiod, jpperiod, granularity,
 	datatimo, regsuptimo, probetime, asserttimo;
 static double helloperiod_coef, jpperiod_coef;
@@ -115,6 +117,7 @@ extern int yylex __P((void));
 %token PHYINT IFNAME ENABLE DISABLE PREFERENCE METRIC NOLISTENER
 %token ROBUST QUERY_INT QUERY_INT_RESP MLD_VERSION LLQI
 %token GRPPFX
+%token STATICRP
 %token CANDRP CANDBSR TIME PRIORITY MASKLEN
 %token NUMBER STRING SLASH ANY
 %token REGTHRES DATATHRES RATE INTERVAL
@@ -126,6 +129,7 @@ extern int yylex __P((void));
 %type <val> STRING IFNAME
 %type <attr> if_attributes rp_substatement rp_attributes
 %type <attr> bsr_substatement bsr_attributes thres_attributes
+%type <num> staticrp_priority
 
 %%
 statements:
@@ -139,6 +143,7 @@ statement:
 	|	phyint_statement
 	|	candrp_statement
 	|	candbsr_statement
+	|	staticrp_statement
 	|	grppfx_statement
 	|	regthres_statement
 	|	datathres_statement
@@ -364,6 +369,80 @@ bsr_attributes:
 		}
 	;
 
+staticrp_statement: 
+	STATICRP STRING SLASH NUMBER STRING staticrp_priority EOS {
+		struct staticrp entry;
+		struct attr_list *new;
+		int syntax_ng = 0;
+
+		bzero(&entry, sizeof(entry));
+		entry.paddr.sin6_family = AF_INET6;
+		entry.paddr.sin6_len = sizeof(entry.paddr);
+		if (inet_pton(AF_INET6, $2.v, &entry.paddr.sin6_addr) != 1) {
+			yywarn("invalid IPv6 address: %s", $2.v);
+			syntax_ng = 1;
+		}
+		if (!IN6_IS_ADDR_MULTICAST(&entry.paddr.sin6_addr)) {
+			yywarn("group prefix(%s) must be a multicast address",
+			       sa6_fmt(&entry.paddr));
+			syntax_ng = 1;
+		}
+		if (IN6_IS_ADDR_MC_NODELOCAL(&entry.paddr.sin6_addr) ||
+		    IN6_IS_ADDR_MC_LINKLOCAL(&entry.paddr.sin6_addr)) {
+			yywarn("group prefix (%s) has a narrow scope ",
+			       sa6_fmt(&entry.paddr));
+			syntax_ng = 1;
+		}
+		free($2.v);	/* XXX: which was allocated dynamically */
+
+		entry.plen = $4;
+		if (entry.plen > 128) {
+			yywarn("invalid prefix length: %d", entry.plen);
+			syntax_ng = 1;
+		}
+
+		entry.rpaddr.sin6_family = AF_INET6;
+		entry.rpaddr.sin6_len = sizeof(entry.rpaddr);
+		if (inet_pton(AF_INET6, $5.v, &entry.rpaddr.sin6_addr) != 1) {
+			yywarn("invalid IPv6 address: %s", $5.v);
+			syntax_ng = 1;
+		}
+		if (IN6_IS_ADDR_MULTICAST(&entry.rpaddr.sin6_addr)) {
+			yywarn("RP address (%s) must not be a multicast address",
+			       sa6_fmt(&entry.rpaddr));
+			syntax_ng = 1;
+		}
+		if (IN6_IS_ADDR_LINKLOCAL(&entry.rpaddr.sin6_addr)) {
+			yywarn("RP address (%s) has a narrow scope ",
+			       sa6_fmt(&entry.rpaddr));
+			syntax_ng = 1;
+		}
+		free($5.v);	/* XXX: which was allocated dynamically */
+
+		entry.priority = $6;
+
+		if (syntax_ng)
+			break;
+
+		if ((new = malloc(sizeof(*new))) == NULL) {
+			yyerror("malloc failed");
+			return(NULL);
+		}
+		memset(new, 0, sizeof(*new));
+		new->type = STATICRP;
+		new->attru.staticrp = entry;
+		new->next = static_rp;
+		static_rp = new;
+		static_rp_flag = TRUE;
+	}
+	;
+
+staticrp_priority :
+	  { $$ = PIM_DEFAULT_CAND_RP_PRIORITY; }
+	| PRIORITY NUMBER
+	  { $$ = $2; }
+	;
+
 /* group_prefix <group-addr>/<prefix_len> */
 grppfx_statement:
 	GRPPFX STRING SLASH NUMBER EOS {
@@ -530,6 +609,7 @@ static int param_config __P((void));
 static int phyint_config __P((void));
 static int rp_config __P((void));
 static int bsr_config __P((void));
+static int static_rp_config __P((void));
 static int regthres_config __P((void));
 static int datathres_config __P((void));
 
@@ -844,6 +924,40 @@ phyint_config()
 }
 
 static int
+static_rp_config()
+{
+	struct attr_list *al;
+
+	if (cand_rp_flag == TRUE) {
+		yywarn("cand-rp and static-rp configuration cannot coexist");
+		return -1;
+	}
+
+	if (cand_bsr_flag == TRUE) {
+		yywarn("cand-bsr and static-rp configuration cannot coexist");
+		return -1;
+	}
+
+	for (al = static_rp; al; al = al->next) {
+		struct staticrp *entry;
+		struct in6_addr grp_mask;
+		struct in6_addr bsr_mask;
+
+		if (al->type != STATICRP)
+			continue;
+		entry = &al->attru.staticrp;
+
+		MASKLEN_TO_MASK6(entry->plen, grp_mask);
+		MASKLEN_TO_MASK6(8, bsr_mask);	/* XXX */
+		add_rp_grp_entry(&cand_rp_list, &grp_mask_list,
+				 &entry->rpaddr, entry->priority, TIMER_INFINITY,
+				 &entry->paddr, grp_mask,
+				 bsr_mask, 0);
+	}
+	return(0);
+}
+
+static int
 rp_config()
 {
 	struct attr_list *al;
@@ -1077,6 +1191,8 @@ cf_post_config()
 
 	phyint_config();
 
+	static_rp_config();
+
 	if (cand_bsr_flag == TRUE)
 		bsr_config();
 
@@ -1103,6 +1219,7 @@ cf_post_config()
 	/* cleanup temporary variables */
 	if (rp_attr) free_attr_list(rp_attr);
 	if (bsr_attr) free_attr_list(bsr_attr);
+	if (static_rp) free_attr_list(static_rp);
 	if (regthres_attr) free_attr_list(regthres_attr);
 	if (datathres_attr) free_attr_list(datathres_attr);
 	for (vifi = 0, v = uvifs; vifi < numvifs ; ++vifi , ++v)
@@ -1121,9 +1238,10 @@ cf_init(s, d)
 	strict = s;
 	debugonly = d;
 
-	rp_attr = bsr_attr = grp_prefix = regthres_attr	= datathres_attr = NULL;
+	rp_attr = bsr_attr = grp_prefix = regthres_attr	= datathres_attr
+		= static_rp = NULL;
 
-	cand_rp_flag = cand_bsr_flag = FALSE;
+	cand_rp_flag = cand_bsr_flag = static_rp_flag = FALSE;
 	cand_rp_ifname = cand_bsr_ifname = NULL;
 
 	srcmetric = srcpref = helloperiod = jpperiod = jpperiod_coef
