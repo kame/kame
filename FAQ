@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.59 2001/09/26 08:49:42 itojun Exp $
+$KAME: FAQ,v 1.60 2001/09/26 08:51:19 itojun Exp $
 
 
 GENERAL
@@ -200,7 +200,8 @@ kernel.
 	(for NFS-mounted /usr support).
 	It may be safer to put network interface initialization into
 	/etc/rc.local, and remove all network configurations from /etc/rc.conf
-	and/or /etc/netstart.
+	and/or /etc/netstart (you won't be able to use diskless configuration,
+	however).
 
 Q: Why do link-local addresses in the kernel structure have
 s6_addr16[1] filled?
