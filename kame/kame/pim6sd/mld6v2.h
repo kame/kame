@@ -93,9 +93,6 @@ struct mld_report_hdr {	/* Multicast Report */
 /*
  * Multicast Address Record Types 
  */
-/*
- * In PIM-SSM only value 1,5,6 are used 
- */
 
 #define MODE_IS_INCLUDE 	1
 #define MODE_IS_EXCLUDE		2
