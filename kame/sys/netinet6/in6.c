@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.286 2002/06/08 07:07:27 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.287 2002/06/08 08:25:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1009,7 +1009,7 @@ in6_update_ifa(ifp, ifra, ia)
 	 * zone identifier.
 	 */
 	dst6 = ifra->ifra_dstaddr;
-	if ((ifp->if_flags & (IFF_POINTOPOINT|IFF_LOOPBACK)) &&
+	if ((ifp->if_flags & (IFF_POINTOPOINT|IFF_LOOPBACK)) != 0 &&
 	    (dst6.sin6_family == AF_INET6)) {
 		u_int32_t zoneid;
 
