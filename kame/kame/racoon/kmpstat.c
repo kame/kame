@@ -1,4 +1,4 @@
-/*	$KAME: kmpstat.c,v 1.23 2000/12/15 13:43:56 sakane Exp $	*/
+/*	$KAME: kmpstat.c,v 1.24 2000/12/16 14:15:07 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -146,7 +146,7 @@ static char _addr1_[NI_MAXHOST], _addr2_[NI_MAXHOST];
 
 char *pname;
 int long_format = 0;
-u_int32_t loglevel = 0;
+u_int32_t loglevel = 4;
 
 void dump_isakmp_sa __P((char *, int));
 void dump_internal __P((char *, int));
