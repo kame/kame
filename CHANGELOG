@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2491 2003/10/15 00:22:01 jinmei Exp $
+$KAME: CHANGELOG,v 1.2492 2003/10/17 04:06:05 suz Exp $
 
 <200310>
+2003-10-17 SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/pim6sd/pim6_proto.c: sends the interface-address-list
+	option in option-24, as well as in option-65001, to catch up with
+	draft-ietf-pim-sm-v2-new-08.txt.
+
 2003-10-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_var.h: defined the prf_ra structure
 	outside of the in6_prflags structure to be friendly with C++.
