@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.40 2001/07/25 23:52:20 itojun Exp $
+$KAME: FAQ,v 1.41 2001/07/25 23:52:57 itojun Exp $
 
 
 GENERAL
@@ -39,6 +39,8 @@ Q: How can I contribute?
 	  documents in English include many typos, wording mistakes,
 	  and so forth.  We would be very grateful if you review our
 	  documents and send us updates.
+
+	- Design a logo/T-shirt :-)
 
 Q: What is the standard document the KAME code is based upon?
 Which version of IPv6/IPsec does KAME support?
