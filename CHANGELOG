@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.753 2000/04/07 14:16:15 itojun Exp $
+$Id: CHANGELOG,v 1.754 2000/04/08 00:50:43 itojun Exp $
 
 <200003>
+Sat Apr  8 09:49:57 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/gated-ipv6: upgrade to 3/9 snapshot.
+
 Fri Apr  7 23:14:53 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/ethereal: upgrade to 0.8.6.
 
