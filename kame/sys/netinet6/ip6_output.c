@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.119 2000/08/05 17:57:17 sumikawa Exp $	*/
+/*	$KAME: ip6_output.c,v 1.120 2000/08/06 13:18:14 kjc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3374,7 +3374,11 @@ ip6_mloopback(ifp, m, dst)
 	}
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if (__FreeBSD_version >= 410000)
+	(void)if_simloop(ifp, copym, dst->sin6_family, NULL);
+#else
 	(void)if_simloop(ifp, copym, (struct sockaddr *)dst, NULL);
+#endif
 #else
 	(void)looutput(ifp, copym, (struct sockaddr *)dst, NULL);
 #endif
