@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.102 2000/11/28 08:33:49 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.103 2000/12/01 11:38:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2198,7 +2198,7 @@ pr_icmph(icp, end)
 		if (!inet_ntop(AF_INET6, &red->nd_rd_target, ntop_buf,
 		    sizeof(ntop_buf)))
 			strncpy(ntop_buf, "?", sizeof(ntop_buf));
-		(void)printf("New Target: %s", ntop_buf);
+		(void)printf(" New Target: %s", ntop_buf);
 		break;
 	case ICMP6_NI_QUERY:
 		(void)printf("Node Information Query");
