@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.h,v 1.8 2000/03/25 07:23:47 sumikawa Exp $	*/
+/*	$KAME: ip6_mroute.h,v 1.9 2000/04/12 07:28:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -136,18 +136,21 @@ struct mrt6stat {
 };
 
 /*
- * Struct used to communicate from kernel to multicast router
- * note the convenient similarity to an IPv6 header.
+ * Structure used to communicate from kernel to multicast router.
+ * We'll overlay the structure onto an MLD header (not an IPv6 header
+ * like igmpmsg{} used for IPv4 implementation). This is because this
+ * structure will be passed via an IPv6 raw socket, on which an application
+ * will only receive the payload i.e. the data after the IPv6 header and all
+ * the extension headers. (see Section 3 of draft-ietf-ipngwg-2292bis-01)
  */
 struct mrt6msg {
-	u_long	    unused1;
-	u_char	    im6_msgtype;		/* what type of message	    */
 #define MRT6MSG_NOCACHE		1
 #define MRT6MSG_WRONGMIF	2
 #define MRT6MSG_WHOLEPKT	3		/* used for user level encap*/
 	u_char	    im6_mbz;			/* must be zero		    */
-	u_char	    im6_mif;			/* mif rec'd on		    */
-	u_char	    unused2;
+	u_char	    im6_msgtype;		/* what type of message	    */
+	u_int16_t   im6_mif;			/* mif rec'd on		    */
+	u_int32_t   im6_pad;			/* padding for 64bit arch   */
 	struct in6_addr  im6_src, im6_dst;
 };
 
