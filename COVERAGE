@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.12 2000/02/28 11:21:49 itojun Exp $
+$Id: COVERAGE,v 1.13 2000/02/28 12:00:51 itojun Exp $
 
 
 x: supported/integrated
@@ -34,8 +34,13 @@ getaddrinfo obeys configured resolv order
 		merged *-current	merged
 		net	open	free	net15	open27?	free40
 		--	--	--	--	--	--
-KAME as of	late	early	early	notyet	notyet	notyet
-		dec99	dec99	nov99
+KAME IPv6 as of	late	late	early	notyet	notyet	notyet
+		feb00	feb00	nov99
+		(no 2292bis)
+
+KAME IPsec as of
+		late	-	early	notyet	notyet	notyet
+		jan00		nov99
 
 TCP/UDP		see IMPLEMENTATION for details
 
@@ -48,6 +53,8 @@ icmp6 nodeinfo	04	04	04	notyet	notyet	notyet
 nd6_proxyall	-	-	x	notyet	notyet	notyet
 
 ndp -s proxy	x	x	-	notyet	notyet	notyet
+
+ndp -I		x	x	?	notyet	notyet	notyet
 
 CMSG_ALIGN	long	long	long	notyet	notyet	notyet
 
