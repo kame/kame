@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.53 2000/06/26 08:24:57 kjc Exp $
+$KAME: COVERAGE,v 1.54 2000/06/27 16:51:34 itojun Exp $
 
 
 x: supported/integrated
@@ -8,7 +8,7 @@ x: supported/integrated
 
 
 		KAME
-		net142	open26	free228	free35	free4	bsdi31	bsdi41
+		net142	open27	free228	free35	free4	bsdi31	bsdi41
 		--	--	--	--	--	--	--
 TCP/UDP		see IMPLEMENTATION for details
 
@@ -163,3 +163,8 @@ faithd		x	x	x	x	notyet	x	x
 
 syslogd		x	x	-	-	notyet	-	-
 lpr/lpd		x	x	-	-	notyet	-	-
+
+
+CAVEATS:
+- openbsd27 has some bugs in IPv6 multicast API handling.  if you would like
+  to use IPv6, it is suggested to upgrade to openbsd 2.7-STABLE kernel.
