@@ -33,7 +33,7 @@
  *
  * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>
  *
- * $Id: haddr.c,v 1.1 2000/02/07 17:27:09 itojun Exp $
+ * $Id: haddr.c,v 1.2 2000/02/08 02:58:57 itojun Exp $
  *
  */
 
@@ -48,7 +48,6 @@
 #endif
 #include <netdb.h>
 #include <netinet6/in6_var.h>
-#include <netinet6/in6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
 #include <netinet6/mip6.h>

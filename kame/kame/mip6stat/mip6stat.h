@@ -4,11 +4,11 @@
  *
  * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>
  *
- * $Id: mip6stat.h,v 1.2 2000/02/07 17:50:57 itojun Exp $
+ * $Id: mip6stat.h,v 1.3 2000/02/08 02:58:57 itojun Exp $
  *
  */
 
-#include <netinet6/in6.h>
+#include <netinet/in.h>
 #include <kvm.h>
 #include <fcntl.h>
 
