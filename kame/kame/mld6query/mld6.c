@@ -224,7 +224,7 @@ make_msg(int index, struct in6_addr *addr, u_int type)
 	if ((currentlen = inet6_opt_append(hbhbuf, hbhlen, currentlen,
 					   IP6OPT_ROUTER_ALERT, 2,
 					   2, &optp)) == -1)
-		errx(1, "inet6_opt_append(len = %d) failed",
+		errx(1, "inet6_opt_append(currentlen = %d, hbhlen = %d) failed",
 		     currentlen, hbhlen);
 	(void)inet6_opt_set_val(optp, 0, &rtalert_code, sizeof(rtalert_code));
 	if ((currentlen = inet6_opt_finish(hbhbuf, hbhlen, currentlen)) == -1)
