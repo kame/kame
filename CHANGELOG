@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2697 2004/12/02 11:14:21 jinmei Exp $
+$KAME: CHANGELOG,v 1.2698 2004/12/02 11:27:45 suz Exp $
 
 <200412>
 2004-12-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -7,7 +7,7 @@ $KAME: CHANGELOG,v 1.2697 2004/12/02 11:14:21 jinmei Exp $
 	header files from FreeBSD's source tree to be synchronized with
 	KAME's local changes.  libinet6 now includes getaddrinfo().
 
-2004-12-01 SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+2004-12-02 SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* freebsd4/sys/miscfs/procfs/procfs_status.c,
 	  freebsd5/sys/fs/procfs/procfs_status.c,
 	  freebsd5/sys/compat/linprofcs/linprocfs.c:
