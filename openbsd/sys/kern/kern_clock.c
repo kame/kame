@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_clock.c,v 1.42 2003/06/02 23:28:05 millert Exp $	*/
+/*	$OpenBSD: kern_clock.c,v 1.50 2004/08/05 13:45:30 art Exp $	*/
 /*	$NetBSD: kern_clock.c,v 1.34 1996/06/09 04:51:03 briggs Exp $	*/
 
 /*-
@@ -49,6 +49,9 @@
 #include <uvm/uvm_extern.h>
 #include <sys/sysctl.h>
 #include <sys/sched.h>
+#ifdef __HAVE_TIMECOUNTER
+#include <sys/timetc.h>
+#endif
 
 #include <machine/cpu.h>
 
@@ -101,14 +104,20 @@ int	profprocs;
 int	ticks;
 static int psdiv, pscnt;		/* prof => stat divider */
 int	psratio;			/* ratio: prof / stat */
+
+long cp_time[CPUSTATES];
+
+#ifndef __HAVE_TIMECOUNTER
 int	tickfix, tickfixinterval;	/* used if tick not really integral */
 static int tickfixcnt;			/* accumulated fractional error */
 
-long cp_time[CPUSTATES];
+volatile time_t time_second;
+volatile time_t time_uptime;
 
 volatile struct	timeval time
 	__attribute__((__aligned__(__alignof__(quad_t))));
 volatile struct	timeval mono_time;
+#endif
 
 #ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
 void	*softclock_si;
@@ -132,6 +141,9 @@ void
 initclocks()
 {
 	int i;
+#ifdef __HAVE_TIMECOUNTER
+	extern void inittimecounter(void);
+#endif
 
 #ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
 	softclock_si = softintr_establish(IPL_SOFTCLOCK, generic_softclock, NULL);
@@ -153,19 +165,67 @@ initclocks()
 	if (profhz == 0)
 		profhz = i;
 	psratio = profhz / i;
+#ifdef __HAVE_TIMECOUNTER
+	inittimecounter();
+#endif
+}
+
+/*
+ * hardclock does the accounting needed for ITIMER_PROF and ITIMER_VIRTUAL.
+ * We don't want to send signals with psignal from hardclock because it makes
+ * MULTIPROCESSOR locking very complicated. Instead we use a small trick
+ * to send the signals safely and without blocking too many interrupts
+ * while doing that (signal handling can be heavy).
+ *
+ * hardclock detects that the itimer has expired, and schedules a timeout
+ * to deliver the signal. This works because of the following reasons:
+ *  - The timeout structures can be in struct pstats because the timers
+ *    can be only activated on curproc (never swapped). Swapout can
+ *    only happen from a kernel thread and softclock runs before threads
+ *    are scheduled.
+ *  - The timeout can be scheduled with a 1 tick time because we're
+ *    doing it before the timeout processing in hardclock. So it will
+ *    be scheduled to run as soon as possible.
+ *  - The timeout will be run in softclock which will run before we
+ *    return to userland and process pending signals.
+ *  - If the system is so busy that several VIRTUAL/PROF ticks are
+ *    sent before softclock processing, we'll send only one signal.
+ *    But if we'd send the signal from hardclock only one signal would
+ *    be delivered to the user process. So userland will only see one
+ *    signal anyway.
+ */
+
+void
+virttimer_trampoline(void *v)
+{
+	struct proc *p = v;
+
+	psignal(p, SIGVTALRM);
+}
+
+void
+proftimer_trampoline(void *v)
+{
+	struct proc *p = v;
+
+	psignal(p, SIGPROF);
 }
 
 /*
  * The real-time timer, interrupting hz times per second.
  */
 void
-hardclock(frame)
-	register struct clockframe *frame;
+hardclock(struct clockframe *frame)
 {
-	register struct proc *p;
-	register int delta;
+	struct proc *p;
+#ifndef __HAVE_TIMECOUNTER
+	int delta;
 	extern int tickdelta;
 	extern long timedelta;
+#endif
+#ifdef __HAVE_CPUINFO
+	struct cpu_info *ci = curcpu();
+#endif
 
 	p = curproc;
 	if (p) {
@@ -178,10 +238,10 @@ hardclock(frame)
 		if (CLKF_USERMODE(frame) &&
 		    timerisset(&pstats->p_timer[ITIMER_VIRTUAL].it_value) &&
 		    itimerdecr(&pstats->p_timer[ITIMER_VIRTUAL], tick) == 0)
-			psignal(p, SIGVTALRM);
+			timeout_add(&pstats->p_virt_to, 1);
 		if (timerisset(&pstats->p_timer[ITIMER_PROF].it_value) &&
 		    itimerdecr(&pstats->p_timer[ITIMER_PROF], tick) == 0)
-			psignal(p, SIGPROF);
+			timeout_add(&pstats->p_prof_to, 1);
 	}
 
 	/*
@@ -190,6 +250,19 @@ hardclock(frame)
 	if (stathz == 0)
 		statclock(frame);
 
+#if defined(__HAVE_CPUINFO)
+	if (--ci->ci_schedstate.spc_rrticks <= 0)
+		roundrobin(ci);
+
+	/*
+	 * If we are not the primary CPU, we're not allowed to do
+	 * any more work.
+	 */
+	if (CPU_IS_PRIMARY(ci) == 0)
+		return;
+#endif
+
+#ifndef __HAVE_TIMECOUNTER
 	/*
 	 * Increment the time-of-day.  The increment is normally just
 	 * ``tick''.  If the machine is one which has a clock frequency
@@ -199,6 +272,7 @@ hardclock(frame)
 	 * ``tickdelta'' may also be added in.
 	 */
 	ticks++;
+
 	delta = tick;
 
 	if (tickfix) {
@@ -214,12 +288,13 @@ hardclock(frame)
 		timedelta -= tickdelta;
 	}
 
-#ifdef notyet
-	microset();
-#endif
-
 	BUMPTIME(&time, delta);
 	BUMPTIME(&mono_time, delta);
+	time_second = time.tv_sec;
+	time_uptime = mono_time.tv_sec;
+#else
+	tc_ticktock();
+#endif
 
 #ifdef CPU_CLOCKUPDATE
 	CPU_CLOCKUPDATE();
@@ -247,9 +322,9 @@ int
 hzto(tv)
 	struct timeval *tv;
 {
+	struct timeval now;
 	unsigned long ticks;
 	long sec, usec;
-	int s;
 
 	/*
 	 * If the number of usecs in the whole seconds part of the time
@@ -271,10 +346,9 @@ hzto(tv)
 	 * If ints have 32 bits, then the maximum value for any timeout in
 	 * 10ms ticks is 248 days.
 	 */
-	s = splhigh();
-	sec = tv->tv_sec - time.tv_sec;
-	usec = tv->tv_usec - time.tv_usec;
-	splx(s);
+	getmicrotime(&now);
+	sec = tv->tv_sec - now.tv_sec;
+	usec = tv->tv_usec - now.tv_usec;
 	if (usec < 0) {
 		sec--;
 		usec += 1000000;
@@ -388,18 +462,41 @@ stopprofclock(p)
  * do process and kernel statistics.
  */
 void
-statclock(frame)
-	register struct clockframe *frame;
+statclock(struct clockframe *frame)
 {
 #ifdef GPROF
-	register struct gmonparam *g;
-	register int i;
+	struct gmonparam *g;
+	int i;
 #endif
+#ifdef __HAVE_CPUINFO
+	struct cpu_info *ci = curcpu();
+	struct schedstate_percpu *spc = &ci->ci_schedstate;
+#else
 	static int schedclk;
-	register struct proc *p;
+#endif
+	struct proc *p = curproc;
+
+#ifdef __HAVE_CPUINFO
+	/*
+	 * Notice changes in divisor frequency, and adjust clock
+	 * frequency accordingly.
+	 */
+	if (spc->spc_psdiv != psdiv) {
+		spc->spc_psdiv = psdiv;
+		spc->spc_pscnt = psdiv;
+		if (psdiv == 1) {
+			setstatclockrate(stathz);
+		} else {
+			setstatclockrate(profhz);			
+		}
+	}
+
+/* XXX Kludgey */
+#define pscnt spc->spc_pscnt
+#define cp_time spc->spc_cp_time
+#endif
 
 	if (CLKF_USERMODE(frame)) {
-		p = curproc;
 		if (p->p_flag & P_PROFIL)
 			addupc_intr(p, CLKF_PC(frame));
 		if (--pscnt > 0)
@@ -441,7 +538,6 @@ statclock(frame)
 		 * so that we know how much of its real time was spent
 		 * in ``non-process'' (i.e., interrupt) work.
 		 */
-		p = curproc;
 		if (CLKF_INTR(frame)) {
 			if (p != NULL)
 				p->p_iticks++;
@@ -454,15 +550,27 @@ statclock(frame)
 	}
 	pscnt = psdiv;
 
+#ifdef __HAVE_CPUINFO
+#undef psdiv
+#undef cp_time
+#endif
+
 	if (p != NULL) {
 		p->p_cpticks++;
 		/*
 		 * If no schedclock is provided, call it here at ~~12-25 Hz;
 		 * ~~16 Hz is best
 		 */
-		if (schedhz == 0)
+		if (schedhz == 0) {
+#ifdef __HAVE_CPUINFO
+			if ((++curcpu()->ci_schedstate.spc_schedticks & 3) ==
+			    0)
+				schedclock(p);
+#else
 			if ((++schedclk & 3) == 0)
 				schedclock(p);
+#endif
+		}
 	}
 }
 
@@ -486,3 +594,76 @@ sysctl_clockrate(where, sizep)
 	clkinfo.stathz = stathz ? stathz : hz;
 	return (sysctl_rdstruct(where, sizep, NULL, &clkinfo, sizeof(clkinfo)));
 }
+
+#ifndef __HAVE_TIMECOUNTER
+/*
+ * Placeholders until everyone uses the timecounters code.
+ * Won't improve anything except maybe removing a bunch of bugs in fixed code.
+ */
+
+void
+getmicrotime(struct timeval *tvp)
+{
+	int s;
+
+	s = splhigh();
+	*tvp = time;
+	splx(s);
+}
+
+void
+nanotime(struct timespec *tsp)
+{
+	struct timeval tv;
+
+	microtime(&tv);
+	TIMEVAL_TO_TIMESPEC(&tv, tsp);
+}
+
+void
+getnanotime(struct timespec *tsp)
+{
+	struct timeval tv;
+
+	getmicrotime(&tv);
+	TIMEVAL_TO_TIMESPEC(&tv, tsp);
+}
+
+void
+nanouptime(struct timespec *tsp)
+{
+	struct timeval tv;
+
+	microuptime(&tv);
+	TIMEVAL_TO_TIMESPEC(&tv, tsp);
+}
+
+
+void
+getnanouptime(struct timespec *tsp)
+{
+	struct timeval tv;
+
+	getmicrouptime(&tv);
+	TIMEVAL_TO_TIMESPEC(&tv, tsp);
+}
+
+void
+microuptime(struct timeval *tvp)
+{
+	struct timeval tv;
+
+	microtime(&tv);
+	timersub(&tv, &boottime, tvp);
+}
+
+void
+getmicrouptime(struct timeval *tvp)
+{
+	int s;
+
+	s = splhigh();
+	*tvp = mono_time;
+	splx(s);
+}
+#endif /* __HAVE_TIMECOUNTERS */

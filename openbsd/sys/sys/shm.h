@@ -1,4 +1,4 @@
-/*	$OpenBSD: shm.h,v 1.15 2003/10/12 23:44:39 millert Exp $	*/
+/*	$OpenBSD: shm.h,v 1.19 2004/07/15 11:24:46 millert Exp $	*/
 /*	$NetBSD: shm.h,v 1.20 1996/04/09 20:55:35 cgd Exp $	*/
 
 /*
@@ -109,16 +109,28 @@ struct shmid_ds {
 };
 
 #ifdef _KERNEL
-struct oshmid_ds {
-	struct oipc_perm shm_perm;	/* operation permission structure */
+struct shmid_ds23 {
+	struct ipc_perm23 shm_perm;	/* operation permission structure */
 	int		shm_segsz;	/* size of segment in bytes */
 	pid_t		shm_lpid;	/* process ID of last shm op */
 	pid_t		shm_cpid;	/* process ID of creator */
-	short		shm_nattch;	/* number of current attaches */
+	shmatt_t	shm_nattch;	/* number of current attaches */
 	time_t		shm_atime;	/* time of last shmat() */
 	time_t		shm_dtime;	/* time of last shmdt() */
 	time_t		shm_ctime;	/* time of last change by shmctl() */
 	void		*shm_internal;	/* implementation specific data */
+};
+
+struct shmid_ds35 {
+	struct ipc_perm35 shm_perm;	/* operation permission structure */
+	int		  shm_segsz;	/* size of segment in bytes */
+	pid_t		  shm_lpid;	/* process ID of last shm op */
+	pid_t		  shm_cpid;	/* process ID of creator */
+	shmatt_t	  shm_nattch;	/* number of current attaches */
+	time_t		  shm_atime;	/* time of last shmat() */
+	time_t		  shm_dtime;	/* time of last shmdt() */
+	time_t		  shm_ctime;	/* time of last change by shmctl() */
+	void		  *shm_internal;/* implementation specific data */
 };
 #endif
 
@@ -149,14 +161,17 @@ extern struct shmid_ds **shmsegs;
 extern int shmseg;
 extern int shmmaxpgs;
 
+struct proc;
 struct vmspace;
 
-void shminit(void);
-void shmfork(struct vmspace *, struct vmspace *);
-void shmexit(struct vmspace *);
-void shmid_n2o(struct shmid_ds *, struct oshmid_ds *);
-int sysctl_sysvshm(int *, u_int, void *, size_t *, void *, size_t);
-int sys_shmat1(struct proc *, void *, register_t *, int);
+void	shminit(void);
+void	shmfork(struct vmspace *, struct vmspace *);
+void	shmexit(struct vmspace *);
+int	sysctl_sysvshm(int *, u_int, void *, size_t *, void *, size_t);
+int	sys_shmat1(struct proc *, void *, register_t *, int);
+int	shmctl1(struct proc *, int, int, caddr_t,
+	    int (*)(const void *, void *, size_t),
+	    int (*)(const void *, void *, size_t));
 
 #else /* !_KERNEL */
 
@@ -166,7 +181,7 @@ __BEGIN_DECLS
 void *shmat(int, const void *, int);
 int shmctl(int, int, struct shmid_ds *);
 int shmdt(const void *);
-int shmget(key_t, int, int);
+int shmget(key_t, size_t, int);
 __END_DECLS
 
 #endif /* !_KERNEL */

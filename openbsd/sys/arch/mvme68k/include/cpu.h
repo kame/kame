@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.16 2003/06/02 23:27:50 millert Exp $ */
+/*	$OpenBSD: cpu.h,v 1.19 2004/07/30 22:29:48 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -91,6 +91,7 @@
  * Get interrupt glue.
  */
 #include <machine/intr.h>
+#include <sys/evcount.h>
 
 /*
  * definitions of cpu-dependent requirements
@@ -127,7 +128,7 @@ struct clockframe {
  * or after the current trap/syscall if in system mode.
  */
 extern int want_resched;
-#define	need_resched()	{ want_resched = 1; aston(); }
+#define	need_resched(ci)	{ want_resched = 1; aston(); }
 
 /*
  * Give a profiling tick to the current process when the user profiling
@@ -175,26 +176,24 @@ extern	int iiomapsize;
 extern int	cputyp;
 #define CPU_147			0x147
 #define CPU_162			0x162
+#define CPU_165			0x165
 #define CPU_166			0x166
 #define CPU_167			0x167
 #define CPU_172			0x172
 #define CPU_177			0x177
 
 struct intrhand {
-	struct	intrhand *ih_next;
+	SLIST_ENTRY(intrhand) ih_link;
 	int	(*ih_fn)(void *);
 	void	*ih_arg;
 	int	ih_ipl;
 	int	ih_wantframe;
+	struct evcount ih_count;
 };
 
-int intr_establish(int, struct intrhand *);
+int intr_establish(int, struct intrhand *, const char *);
 
-struct haltvec {
-	struct haltvec *hv_next;
-	void	(*hv_fn)(void);
-	int	hv_pri;
-};
+#define	NVMEINTR	256
 
 struct frame;
 struct fpframe;
@@ -234,6 +233,7 @@ int badvaddr(vaddr_t, int);
 void nmihand(void *);
 int intr_findvec(int, int);
 
+int cachectl(struct proc *, int, vaddr_t, int);
 void dma_cachectl(caddr_t, int);
 paddr_t kvtop(vaddr_t);
 void physaccess(vaddr_t, paddr_t, size_t, int);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kernfs_vnops.c,v 1.37 2003/12/09 11:56:08 mickey Exp $	*/
+/*	$OpenBSD: kernfs_vnops.c,v 1.41 2004/09/01 21:06:17 millert Exp $	*/
 /*	$NetBSD: kernfs_vnops.c,v 1.43 1996/03/16 23:52:47 christos Exp $	*/
 
 /*
@@ -69,7 +69,7 @@
 static int	byteorder = BYTE_ORDER;
 static int	posix = _POSIX_VERSION;
 static int	osrev = OpenBSD;
-static int	ncpu = 1;	/* XXX */
+extern int	ncpus;
 extern char machine[], cpu_model[];
 
 #ifdef IPSEC
@@ -92,7 +92,7 @@ const struct kern_target kern_targets[] = {
      { DT_REG, N("machine"),   machine,      KTT_STRING,   VREG, READ_MODE  },
      { DT_REG, N("model"),     cpu_model,    KTT_STRING,   VREG, READ_MODE  },
      { DT_REG, N("msgbuf"),    0,	     KTT_MSGBUF,   VREG, READ_MODE  },
-     { DT_REG, N("ncpu"),      &ncpu,        KTT_INT,      VREG, READ_MODE  },
+     { DT_REG, N("ncpu"),      &ncpus,       KTT_INT,      VREG, READ_MODE  },
      { DT_REG, N("ostype"),    (void*)&ostype,KTT_STRING,   VREG, READ_MODE  },
      { DT_REG, N("osrelease"), (void*)&osrelease,KTT_STRING,VREG, READ_MODE  },
      { DT_REG, N("osrev"),     &osrev,	     KTT_INT,      VREG, READ_MODE  },
@@ -589,14 +589,14 @@ kernfs_getattr(v)
 	char strbuf[KSTRING], *buf;
 
 
-	bzero((caddr_t) vap, sizeof(*vap));
+	bzero(vap, sizeof(*vap));
 	vattr_null(vap);
 	vap->va_uid = 0;
 	vap->va_gid = 0;
 	vap->va_fsid = vp->v_mount->mnt_stat.f_fsid.val[0];
 	vap->va_size = 0;
 	vap->va_blocksize = DEV_BSIZE;
-	TIMEVAL_TO_TIMESPEC(&time, &vap->va_atime);
+	getnanotime(&vap->va_atime);
 	vap->va_mtime = vap->va_atime;
 	vap->va_ctime = vap->va_atime;
 	vap->va_gen = 0;
@@ -632,8 +632,11 @@ kernfs_getattr(v)
 		vap->va_fileid = 3 + (kt - kern_targets);
 		total = 0;
 		while (buf = strbuf,
-		       nbytes = kernfs_xread(kt, total, &buf, sizeof(strbuf)))
+		       nbytes = kernfs_xread(kt, total, &buf, sizeof(strbuf))) {
+			if (total <= INT_MAX - nbytes)
+				break;		/* XXX - should use quad */
 			total += nbytes;
+		}
 		vap->va_size = total;
 	}
 
@@ -702,7 +705,8 @@ kernfs_read(v)
 	    len = kernfs_xread(kt, off, &buf, sizeof(strbuf))) {
 		if ((error = uiomove(buf, len, uio)) != 0)
 			return (error);
-		off += len;
+		if (off <= INT_MAX - len)
+			off += len;	/* XXX - should use quad */
 	}
 	return (0);
 }
@@ -774,7 +778,7 @@ kernfs_readdir(v)
 
 	error = 0;
 	i = uio->uio_offset;
-	bzero((caddr_t)&d, UIO_MX);
+	bzero(&d, UIO_MX);
 	d.d_reclen = UIO_MX;
 
 	for (kt = &kern_targets[i];
@@ -796,7 +800,7 @@ kernfs_readdir(v)
 		bcopy(kt->kt_name, d.d_name, kt->kt_namlen + 1);
 		d.d_type = kt->kt_type;
 
-		if ((error = uiomove((caddr_t)&d, UIO_MX, uio)) != 0)
+		if ((error = uiomove(&d, UIO_MX, uio)) != 0)
 			break;
 	}
 

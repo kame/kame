@@ -1,4 +1,4 @@
-/*	$OpenBSD: wskbdmap_mfii.c,v 1.23 2004/03/16 07:50:26 miod Exp $ */
+/*	$OpenBSD: wskbdmap_mfii.c,v 1.25 2004/07/26 14:05:59 miod Exp $ */
 /*	$NetBSD: wskbdmap_mfii.c,v 1.15 2000/05/19 16:40:04 drochner Exp $	*/
 
 /*-
@@ -155,6 +155,8 @@ static const keysym_t pckbd_keydesc_us[] = {
     KC(220),			KS_Meta_R,
     KC(221),			KS_Menu,
 };
+
+#if !defined(SMALL_KERNEL) || !defined(__alpha__)
 
 static const keysym_t pckbd_keydesc_de[] = {
 /*  pos      normal		shifted		altgr		shift-altgr */
@@ -421,7 +423,7 @@ static const keysym_t pckbd_keydesc_be[] = {
     KC(4),   KS_quotedbl,	KS_3,		KS_numbersign,
     KC(5),   KS_apostrophe,	KS_4,
     KC(6),   KS_parenleft,	KS_5,
-    KC(7),   KS_currency,	KS_6,		KS_asciicircum,
+    KC(7),   KS_section,	KS_6,		KS_asciicircum,
     KC(8),   KS_egrave,		KS_7,
     KC(9),   KS_exclam,		KS_8,
     KC(10),  KS_ccedilla,	KS_9,		KS_braceleft,
@@ -434,8 +436,8 @@ static const keysym_t pckbd_keydesc_be[] = {
     KC(27),  KS_dollar,		KS_asterisk,	KS_bracketright,
     KC(30),  KS_q,
     KC(39),  KS_m,
-    KC(40),  KS_ugrave,		KS_percent,	KS_section,
-    KC(41),  KS_twosuperior,
+    KC(40),  KS_ugrave,		KS_percent,	KS_acute,
+    KC(41),  KS_twosuperior,	KS_threesuperior,
     KC(43),  KS_mu,		KS_sterling,	KS_grave,
     KC(44),  KS_w,
     KC(50),  KS_comma,		KS_question,
@@ -873,11 +875,14 @@ static const keysym_t pckbd_keydesc_si[]=
     KC(184), KS_Mode_switch,	KS_Multi_key,
 };
 
+#endif	/* SMALL_KERNEL */
+
 #define KBD_MAP(name, base, map) \
 			{ name, base, sizeof(map)/sizeof(keysym_t), map }
 
 const struct wscons_keydesc pckbd_keydesctab[] = {
 	KBD_MAP(KB_US,			0,	pckbd_keydesc_us),
+#if !defined(SMALL_KERNEL) || !defined(__alpha__)
 	KBD_MAP(KB_DE,			KB_US,	pckbd_keydesc_de),
 	KBD_MAP(KB_DE | KB_NODEAD,	KB_DE,	pckbd_keydesc_de_nodead),
 	KBD_MAP(KB_FR,			KB_US,	pckbd_keydesc_fr),
@@ -918,6 +923,7 @@ const struct wscons_keydesc pckbd_keydesctab[] = {
 	KBD_MAP(KB_PL,			KB_US,	pckbd_keydesc_pl),
 	KBD_MAP(KB_HU,			KB_US,	pckbd_keydesc_hu),
 	KBD_MAP(KB_SI,			KB_US,	pckbd_keydesc_si),
+#endif	/* SMALL_KERNEL */
 	{0, 0, 0, 0}
 };
 

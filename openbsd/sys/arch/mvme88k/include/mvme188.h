@@ -1,4 +1,4 @@
-/*	$OpenBSD: mvme188.h,v 1.15 2003/10/11 22:08:57 miod Exp $ */
+/*	$OpenBSD: mvme188.h,v 1.19 2004/08/02 08:35:00 miod Exp $ */
 /*
  * Copyright (c) 1999 Steve Murphree, Jr.
  * All rights reserved.
@@ -97,15 +97,12 @@
 #define MVME188_GLBRES	0xFFF8700C	/* 188 global reset reg */
 
 #define GCSR_BASE	0xfff86000
-#define GLOBAL0		GCSR_BASE + 0x01
-#define GLOBAL1		GCSR_BASE + 0x03
-#define GLOBAL2		GCSR_BASE + 0x05
-#define GLOBAL3		GCSR_BASE + 0x07
 #define GLB0		0xfff86001
 #define GLB1		0xfff86003
 #define GLB2		0xfff86005
 #define GLB3		0xfff86007
-#define M188_SYSCON	0x00000040
+#define	M188_LRST	0x00000080
+#define	M188_SYSCON	0x00000040
 #define UCSR_REG	0xfff87000
 #define GLBRES_REG	0xfff8700C
 
@@ -353,11 +350,20 @@
 #define DART_OPRS		0xfff82038	/* output port set */
 #define DART_OPRR		0xfff8203c	/* output port reset */
 
-#ifndef _LOCORE
-
 /*
- * Externals
+ * HYPERmodule CMMU addresses
  */
+
+#define VME_CMMU_I0	0xfff7e000
+#define VME_CMMU_I1	0xfff7d000
+#define VME_CMMU_I2	0xfff7b000
+#define VME_CMMU_I3	0xfff77000
+#define VME_CMMU_D0	0xfff6f000
+#define VME_CMMU_D1	0xfff5f000
+#define VME_CMMU_D2	0xfff3f000
+#define VME_CMMU_D3	0xfff7f000
+
+#ifndef _LOCORE
 
 extern unsigned int m188_curspl[MAX_CPUS];
 extern unsigned int int_mask_val[INT_LEVEL];
@@ -370,5 +376,3 @@ extern unsigned int *volatile int_mask_reg[MAX_CPUS];
 #define M188_IVEC		0x40	/* vector returned upon MVME188 int */
 
 #endif	/* __MACHINE_MVME188_H__ */
-
-

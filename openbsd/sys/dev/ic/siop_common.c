@@ -1,4 +1,4 @@
-/*	$OpenBSD: siop_common.c,v 1.19 2004/01/15 17:51:42 miod Exp $ */
+/*	$OpenBSD: siop_common.c,v 1.21 2004/07/21 19:55:30 mickey Exp $ */
 /*	$NetBSD: siop_common.c,v 1.31 2002/09/27 15:37:18 provos Exp $	*/
 
 /*
@@ -268,10 +268,8 @@ siop_setuptables(siop_cmd)
 		*targ_flags &= TARF_DT; /* Save TARF_DT 'cuz we don't set it here */
 		quirks = xs->sc_link->quirks;
 
-#ifndef __hppa__
 		if ((quirks & SDEV_NOTAGS) == 0)
 			*targ_flags |= TARF_TAG;
-#endif
 		if (((quirks & SDEV_NOWIDE) == 0) &&
 		    (sc->features & SF_BUS_WIDE))
 			*targ_flags |= TARF_WIDE;
@@ -706,6 +704,9 @@ void
 siop_minphys(bp)
 	struct buf *bp;
 {
+	if (bp->b_bcount > SIOP_MAXFER)
+		bp->b_bcount = SIOP_MAXFER;
+
 	minphys(bp);
 }
 

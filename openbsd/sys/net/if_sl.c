@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_sl.c,v 1.26 2003/12/16 20:33:25 markus Exp $	*/
+/*	$OpenBSD: if_sl.c,v 1.29 2004/06/24 19:35:25 tholo Exp $	*/
 /*	$NetBSD: if_sl.c,v 1.39.4.1 1996/06/02 16:26:31 thorpej Exp $	*/
 
 /*
@@ -452,10 +452,11 @@ sloutput(ifp, m, dst, rtp)
 	}
 	s = splimp();
 	if (sc->sc_oqlen && sc->sc_ttyp->t_outq.c_cc == sc->sc_oqlen) {
-		struct timeval tv;
+		struct timeval tv, tm;
 
+		getmicrotime(&tm);
 		/* if output's been stalled for too long, and restart */
-		timersub(&time, &sc->sc_lastpacket, &tv);
+		timersub(&tm, &sc->sc_lastpacket, &tv);
 		if (tv.tv_sec > 0) {
 			sc->sc_otimeout++;
 			slstart(sc->sc_ttyp);
@@ -468,7 +469,7 @@ sloutput(ifp, m, dst, rtp)
 		return (error);
 	}
 
-	sc->sc_lastpacket = time;
+	getmicrotime(&sc->sc_lastpacket);
 	if ((sc->sc_oqlen = sc->sc_ttyp->t_outq.c_cc) == 0)
 		slstart(sc->sc_ttyp);
 	splx(s);
@@ -585,7 +586,7 @@ slstart(tp)
 			bpf_tap(sc->sc_bpf, bpfbuf, len + SLIP_HDRLEN);
 		}
 #endif
-		sc->sc_lastpacket = time;
+		getmicrotime(&sc->sc_lastpacket);
 
 #if !(defined(__NetBSD__) || defined(__OpenBSD__))		/* XXX - cgd */
 		/*
@@ -758,15 +759,15 @@ slinput(c, tp)
 			 * this one is within the time limit.
 			 */
 			if (sc->sc_abortcount &&
-			    time.tv_sec >= sc->sc_starttime + ABT_WINDOW)
+			    time_second >= sc->sc_starttime + ABT_WINDOW)
 				sc->sc_abortcount = 0;
 			/*
 			 * If we see an abort after "idle" time, count it;
 			 * record when the first abort escape arrived.
 			 */
-			if (time.tv_sec >= sc->sc_lasttime + ABT_IDLE) {
+			if (time_second >= sc->sc_lasttime + ABT_IDLE) {
 				if (++sc->sc_abortcount == 1)
-					sc->sc_starttime = time.tv_sec;
+					sc->sc_starttime = time_second;
 				if (sc->sc_abortcount >= ABT_COUNT) {
 					slclose(tp);
 					return;
@@ -774,7 +775,7 @@ slinput(c, tp)
 			}
 		} else
 			sc->sc_abortcount = 0;
-		sc->sc_lasttime = time.tv_sec;
+		sc->sc_lasttime = time_second;
 	}
 
 	switch (c) {
@@ -876,13 +877,15 @@ slinput(c, tp)
 #endif
 
 		sc->sc_if.if_ipackets++;
-		sc->sc_lastpacket = time;
+		getmicrotime(&sc->sc_lastpacket);
 		s = splimp();
 		if (IF_QFULL(&ipintrq)) {
 			IF_DROP(&ipintrq);
 			sc->sc_if.if_ierrors++;
 			sc->sc_if.if_iqdrops++;
 			m_freem(m);
+			if (!ipintrq.ifq_congestion)
+				if_congestion(&ipintrq);
 		} else {
 			IF_ENQUEUE(&ipintrq, m);
 			schednetisr(NETISR_IP);

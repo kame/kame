@@ -1,7 +1,7 @@
-/*	$OpenBSD: db_interface.c,v 1.28 2003/07/15 18:15:41 mickey Exp $	*/
+/*	$OpenBSD: db_interface.c,v 1.30 2004/06/27 14:16:22 mickey Exp $	*/
 
 /*
- * Copyright (c) 1999-2002 Michael Shalayeff
+ * Copyright (c) 1999-2003 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -12,22 +12,18 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * IN NO EVENT SHALL THE AUTHOR OR HIS RELATIVES BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF MIND, USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #define DDB_DEBUG
@@ -310,8 +306,13 @@ db_stack_trace_print(addr, have_addr, count, modif, pr)
 
 			tf = (struct trapframe *)((char *)fp - sizeof(*tf));
 
-			(*pr)("-- trap #%d%s\n", tf->tf_flags & 0x3f,
-			    (tf->tf_flags & T_USER)? " from user" : "");
+			if (tf->tf_flags & TFF_SYS)
+				(*pr)("-- syscall #%d(%x, %x, %x, %x, ...)\n",
+				    tf->tf_t1, tf->tf_arg0, tf->tf_arg1,
+				    tf->tf_arg2, tf->tf_arg3);
+			else
+				(*pr)("-- trap #%d%s\n", tf->tf_flags & 0x3f,
+				    (tf->tf_flags & T_USER)? " from user" : "");
 
 			if (!(tf->tf_flags & TFF_LAST)) {
 				fp = (register_t *)tf->tf_r3;

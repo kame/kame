@@ -1,7 +1,7 @@
-/*	$OpenBSD: pmap.c,v 1.107 2004/01/14 09:12:49 mickey Exp $	*/
+/*	$OpenBSD: pmap.c,v 1.115 2004/08/05 09:06:24 mickey Exp $	*/
 
 /*
- * Copyright (c) 1998-2003 Michael Shalayeff
+ * Copyright (c) 1998-2004 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -12,22 +12,18 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF MIND,
- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * IN NO EVENT SHALL THE AUTHOR OR HIS RELATIVES BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF MIND, USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ * THE POSSIBILITY OF SUCH DAMAGE.
  */
 /*
  * References:
@@ -98,6 +94,7 @@ struct pmap	kernel_pmap_store;
 int		hppa_sid_max = HPPA_SID_MAX;
 struct pool	pmap_pmap_pool;
 struct pool	pmap_pv_pool;
+int		pmap_pvlowat = 252;
 struct simplelock pvalloc_lock;
 int 		pmap_initialized;
 
@@ -141,9 +138,9 @@ pmap_vtag(struct pmap *pmap, vaddr_t va)
 #endif
 
 static __inline void
-pmap_sdir_set(pa_space_t space, u_int32_t *pd)
+pmap_sdir_set(pa_space_t space, volatile u_int32_t *pd)
 {
-	u_int32_t *vtop;
+	volatile u_int32_t *vtop;
 
 	mfctl(CR_VTOP, vtop);
 #ifdef PMAPDEBUG
@@ -162,8 +159,8 @@ pmap_sdir_get(pa_space_t space)
 	return ((u_int32_t *)vtop[space]);
 }
 
-static __inline pt_entry_t *
-pmap_pde_get(u_int32_t *pd, vaddr_t va)
+static __inline volatile pt_entry_t *
+pmap_pde_get(volatile u_int32_t *pd, vaddr_t va)
 {
 	return ((pt_entry_t *)pd[va >> 22]);
 }
@@ -208,7 +205,7 @@ pmap_pde_alloc(struct pmap *pm, vaddr_t va, struct vm_page **pdep)
 }
 
 static __inline struct vm_page *
-pmap_pde_ptp(struct pmap *pm, pt_entry_t *pde)
+pmap_pde_ptp(struct pmap *pm, volatile pt_entry_t *pde)
 {
 	paddr_t pa = (paddr_t)pde;
 
@@ -233,21 +230,25 @@ pmap_pde_release(struct pmap *pmap, vaddr_t va, struct vm_page *ptp)
 		    ("pmap_pde_release: disposing ptp %p\n", ptp));
 		pmap_pde_set(pmap, va, 0);
 		pmap->pm_stats.resident_count--;
-		ptp->wire_count = 0;
-		uvm_pagefree(ptp);
 		if (pmap->pm_ptphint == ptp)
 			pmap->pm_ptphint = TAILQ_FIRST(&pmap->pm_obj.memq);
+		ptp->wire_count = 0;
+#ifdef DIAGNOSTIC
+		if (ptp->flags & PG_BUSY)
+			panic("pmap_pde_release: busy page table page");
+#endif
+		uvm_pagefree(ptp);
 	}
 }
 
 static __inline pt_entry_t
-pmap_pte_get(pt_entry_t *pde, vaddr_t va)
+pmap_pte_get(volatile pt_entry_t *pde, vaddr_t va)
 {
 	return (pde[(va >> 12) & 0x3ff]);
 }
 
 static __inline void
-pmap_pte_set(pt_entry_t *pde, vaddr_t va, pt_entry_t pte)
+pmap_pte_set(volatile pt_entry_t *pde, vaddr_t va, pt_entry_t pte)
 {
 	DPRINTF(PDB_FOLLOW|PDB_VP, ("pmap_pte_set(%p, 0x%x, 0x%x)\n",
 	    pde, va, pte));
@@ -285,7 +286,7 @@ pmap_pte_flush(struct pmap *pmap, vaddr_t va, pt_entry_t pte)
 static __inline pt_entry_t
 pmap_vp_find(struct pmap *pm, vaddr_t va)
 {
-	pt_entry_t *pde;
+	volatile pt_entry_t *pde;
 
 	if (!(pde = pmap_pde_get(pm->pm_pdir, va)))
 		return (0);
@@ -300,7 +301,8 @@ pmap_dump_table(pa_space_t space, vaddr_t sva)
 	pa_space_t sp;
 
 	for (sp = 0; sp <= hppa_sid_max; sp++) {
-		pt_entry_t *pde, pte;
+		volatile pt_entry_t *pde;
+		pt_entry_t pte;
 		vaddr_t va, pdemask;
 		u_int32_t *pd;
 
@@ -373,7 +375,7 @@ pmap_pv_alloc(void)
 
 	simple_lock(&pvalloc_lock);
 
-	pv = pool_get(&pmap_pv_pool, 0);
+	pv = pool_get(&pmap_pv_pool, PR_NOWAIT);
 
 	simple_unlock(&pvalloc_lock);
 
@@ -404,14 +406,12 @@ pmap_pv_enter(struct vm_page *pg, struct pv_entry *pve, struct pmap *pm,
 	pve->pv_pmap	= pm;
 	pve->pv_va	= va;
 	pve->pv_ptp	= pdep;
-	simple_lock(&pg->mdpage.pvh_lock);	/* lock pv_head */
 	pve->pv_next = pg->mdpage.pvh_list;
 	pg->mdpage.pvh_list = pve;
 #ifdef PMAPDEBUG
 	if (pmap_check_alias(pve, va, 0))
 		Debugger();
 #endif
-	simple_unlock(&pg->mdpage.pvh_lock);	/* unlock, done! */
 }
 
 static __inline struct pv_entry *
@@ -589,7 +589,9 @@ pmap_init()
 	pool_init(&pmap_pmap_pool, sizeof(struct pmap), 0, 0, 0, "pmappl",
 	    &pool_allocator_nointr);
 	pool_init(&pmap_pv_pool, sizeof(struct pv_entry), 0, 0, 0, "pmappv",
-	    &pool_allocator_nointr);
+	    NULL);
+	pool_setlowat(&pmap_pv_pool, pmap_pvlowat);
+	pool_sethiwat(&pmap_pv_pool, pmap_pvlowat * 32);
 
 	pmap_initialized = 1;
 
@@ -599,7 +601,7 @@ pmap_init()
 	 *     if we have any at SYSCALLGATE address (;
 	 */
 	{
-		pt_entry_t *pde;
+		volatile pt_entry_t *pde;
 
 		if (!(pde = pmap_pde_get(pmap_kernel()->pm_pdir, SYSCALLGATE)) &&
 		    !(pde = pmap_pde_alloc(pmap_kernel(), SYSCALLGATE, NULL)))
@@ -624,6 +626,7 @@ pmap_create()
 	pa_space_t space;
 
 	DPRINTF(PDB_FOLLOW|PDB_PMAP, ("pmap_create()\n"));
+
 	pmap = pool_get(&pmap_pmap_pool, PR_WAITOK);
 
 	simple_lock_init(&pmap->pm_obj.vmobjlock);
@@ -743,7 +746,8 @@ pmap_enter(pmap, va, pa, prot, flags)
 	vm_prot_t prot;
 	int flags;
 {
-	pt_entry_t *pde, pte;
+	volatile pt_entry_t *pde;
+	pt_entry_t pte;
 	struct vm_page *pg, *ptp = NULL;
 	struct pv_entry *pve;
 	boolean_t wired = (flags & PMAP_WIRED) != 0;
@@ -756,8 +760,10 @@ pmap_enter(pmap, va, pa, prot, flags)
 
 	if (!(pde = pmap_pde_get(pmap->pm_pdir, va)) &&
 	    !(pde = pmap_pde_alloc(pmap, va, &ptp))) {
-		if (flags & PMAP_CANFAIL)
+		if (flags & PMAP_CANFAIL) {
+			simple_unlock(&pmap->pm_obj.vmobjlock);
 			return (KERN_RESOURCE_SHORTAGE);
+		}
 
 		panic("pmap_enter: cannot allocate pde");
 	}
@@ -796,12 +802,13 @@ pmap_enter(pmap, va, pa, prot, flags)
 			pmap->pm_stats.wired_count++;
 		if (ptp)
 			ptp->wire_count++;
+		simple_lock(&pg->mdpage.pvh_lock);
 	}
-
 
 	if (pmap_initialized && (pg = PHYS_TO_VM_PAGE(PTE_PAGE(pa)))) {
 		if (!pve && !(pve = pmap_pv_alloc())) {
 			if (flags & PMAP_CANFAIL) {
+				simple_unlock(&pg->mdpage.pvh_lock);
 				simple_unlock(&pmap->pm_obj.vmobjlock);
 				return (KERN_RESOURCE_SHORTAGE);
 			}
@@ -810,6 +817,7 @@ pmap_enter(pmap, va, pa, prot, flags)
 		pmap_pv_enter(pg, pve, pmap, va, ptp);
 	} else if (pve)
 		pmap_pv_free(pve);
+	simple_unlock(&pg->mdpage.pvh_lock);
 
 enter:
 	/* preserve old ref & mod */
@@ -833,7 +841,8 @@ pmap_remove(pmap, sva, eva)
 	vaddr_t eva;
 {
 	struct pv_entry *pve;
-	pt_entry_t *pde, pte;
+	volatile pt_entry_t *pde;
+	pt_entry_t pte;
 	struct vm_page *pg;
 	vaddr_t pdemask;
 	int batch;
@@ -893,7 +902,8 @@ pmap_write_protect(pmap, sva, eva, prot)
 	vm_prot_t prot;
 {
 	struct vm_page *pg;
-	pt_entry_t *pde, pte;
+	volatile pt_entry_t *pde;
+	pt_entry_t pte;
 	u_int tlbprot, pdemask;
 
 	DPRINTF(PDB_FOLLOW|PDB_PMAP,
@@ -955,7 +965,8 @@ pmap_page_remove(pg)
 	     pve = (ppve = pve)->pv_next, pmap_pv_free(ppve)) {
 		struct pmap *pmap = pve->pv_pmap;
 		vaddr_t va = pve->pv_va;
-		pt_entry_t *pde, pte;
+		volatile pt_entry_t *pde;
+		pt_entry_t pte;
 
 		simple_lock(&pmap->pm_obj.vmobjlock);
 
@@ -983,7 +994,8 @@ pmap_unwire(pmap, va)
 	struct pmap *pmap;
 	vaddr_t	va;
 {
-	pt_entry_t *pde, pte = 0;
+	volatile pt_entry_t *pde;
+	pt_entry_t pte = 0;
 
 	DPRINTF(PDB_FOLLOW|PDB_PMAP, ("pmap_unwire(%p, 0x%x)\n", pmap, va));
 
@@ -1021,7 +1033,8 @@ pmap_changebit(struct vm_page *pg, u_int set, u_int clear)
 	for(pve = pg->mdpage.pvh_list; pve; pve = pve->pv_next) {
 		struct pmap *pmap = pve->pv_pmap;
 		vaddr_t va = pve->pv_va;
-		pt_entry_t *pde, opte, pte;
+		volatile pt_entry_t *pde;
+		pt_entry_t opte, pte;
 
 		simple_lock(&pmap->pm_obj.vmobjlock);
 		if ((pde = pmap_pde_get(pmap->pm_pdir, va))) {
@@ -1157,7 +1170,8 @@ pmap_kenter_pa(va, pa, prot)
 	paddr_t pa;
 	vm_prot_t prot;
 {
-	pt_entry_t *pde, pte;
+	volatile pt_entry_t *pde;
+	pt_entry_t pte;
 
 	DPRINTF(PDB_FOLLOW|PDB_ENTER,
 	    ("pmap_kenter_pa(%x, %x, %x)\n", va, pa, prot));
@@ -1179,8 +1193,6 @@ pmap_kenter_pa(va, pa, prot)
 		pte |= PTE_PROT(TLB_UNCACHABLE);
 	pmap_pte_set(pde, va, pte);
 
-	simple_unlock(&pmap->pm_obj.vmobjlock);
-
 #ifdef PMAPDEBUG
 	{
 		struct vm_page *pg;
@@ -1194,6 +1206,8 @@ pmap_kenter_pa(va, pa, prot)
 		}
 	}
 #endif
+	simple_unlock(&pmap->pm_obj.vmobjlock);
+
 	DPRINTF(PDB_FOLLOW|PDB_ENTER, ("pmap_kenter_pa: leaving\n"));
 }
 
@@ -1207,7 +1221,8 @@ pmap_kremove(va, size)
 #endif
 	struct pv_entry *pve;
 	vaddr_t eva, pdemask;
-	pt_entry_t *pde, pte;
+	volatile pt_entry_t *pde;
+	pt_entry_t pte;
 	struct vm_page *pg;
 
 	DPRINTF(PDB_FOLLOW|PDB_REMOVE,

@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.S,v 1.15 2004/01/03 00:57:06 pvalchev Exp $	*/
+/*	$OpenBSD: locore.S,v 1.18 2004/06/28 02:49:10 aaron Exp $	*/
 /*	$NetBSD: locore.S,v 1.2 1996/10/16 19:33:09 ws Exp $	*/
 
 /*
@@ -247,6 +247,9 @@ _C_LABEL(sw1):
 	lis	%r4,_C_LABEL(curproc)@ha
 	stw	%r31,_C_LABEL(curproc)@l(%r4)	/* record new process */
 
+	li	%r3,SONPROC
+	stb	%r3,P_STAT(%r31)
+
 	mfmsr	%r3
 	ori	%r3,%r3,PSL_EE		/* Now we can interrupt again */
 	mtmsr	%r3
@@ -257,7 +260,7 @@ _C_LABEL(sw1):
 	or.	%r30,%r30,%r30		/* old process was exiting? */
 	beq	switch_exited
 
-	mfsr	%r10,USER_SR		/* save USER_SR for copyin/copyout */
+	mfsr	%r10,PPC_USER_SR	/* save PPC_USER_SR for copyin/copyout*/
 	mfcr	%r11			/* save cr */
 	mr	%r12,%r2		/* save r2 */
 	stwu	%r1,-SFRAMELEN(%r1)	/* still running on old stack */
@@ -284,14 +287,14 @@ switch_exited:
 
 	addic.	%r5,%r5,64
 	li	%r6,0
-	mfsr	%r8,KERNEL_SR		/* save kernel SR */
+	mfsr	%r8,PPC_KERNEL_SR	/* save kernel SR */
 1:
 	addis	%r6,%r6,-0x10000000@ha	/* set new procs segment registers */
 	or.	%r6,%r6,%r6		/* This is done from the real address pmap */
 	lwzu	%r7,-4(%r5)		/* so we don't have to worry */
 	mtsrin	%r7,%r6			/* about accessibility */
 	bne	1b
-	mtsr	KERNEL_SR,%r8		/* restore kernel SR */
+	mtsr	PPC_KERNEL_SR,%r8	/* restore kernel SR */
 	isync
 
 	lwz	%r1,PCB_SP(%r4)		/* get new procs SP */
@@ -304,7 +307,7 @@ switch_exited:
 	mr	%r2,%r12		/* get saved r2 */
 	mtcr	%r11			/* get saved cr */
 	isync
-	mtsr	USER_SR,%r10		/* get saved USER_SR */
+	mtsr	PPC_USER_SR,%r10	/* get saved PPC_USER_SR */
 	isync
 
 switch_return:
@@ -807,9 +810,9 @@ _C_LABEL(ddbsize) = .-_C_LABEL(ddblow)
 	lis	%r2,_C_LABEL(curpm)@ha;	/* get real address of pmap */	\
 	lwz	%r2,_C_LABEL(curpm)@l(2);					\
 	lwz	%r3,PM_USRSR(%r2);					\
-	mtsr	USER_SR,%r3;						\
+	mtsr	PPC_USER_SR,%r3;					\
 	lwz	%r3,PM_KERNELSR(%r2);					\
-	mtsr	KERNEL_SR,%r3;						\
+	mtsr	PPC_KERNEL_SR,%r3;					\
 1:	mfsprg	%r2,1;			/* restore cr */		\
 	mtcr	%r2;							\
 	lwz	%r2,savearea(0);					\
@@ -845,9 +848,9 @@ realtrap:
  */
 s_trap:
 /* First have to enable KERNEL mapping */
-	lis	%r31,KERNEL_SEGMENT@ha
-	addi	%r31,%r31,KERNEL_SEGMENT@l
-	mtsr	KERNEL_SR,%r31
+	lis	%r31,PPC_KERNEL_SEGMENT@ha
+	addi	%r31,%r31,PPC_KERNEL_SEGMENT@l
+	mtsr	PPC_KERNEL_SR,%r31
 	FRAME_SETUP(tempsave)
 /* Now we can recover interrupts again: */
 	mfmsr	%r7
@@ -1015,9 +1018,9 @@ s_isitrap:
 	stw	%r4,12(%r1);						\
 	stw	%r3,8(%r1);						\
 /* interrupts are recoverable here, and enable translation */		\
-	lis	%r3,(KERNEL_SEGMENT|SR_SUKEY|SR_PRKEY)@ha;		\
-	addi	%r3,%r3,(KERNEL_SEGMENT|SR_SUKEY|SR_PRKEY)@l;		\
-	mtsr	KERNEL_SR,%r3;						\
+	lis	%r3,(PPC_KERNEL_SEGMENT|SR_SUKEY|SR_PRKEY)@ha;		\
+	addi	%r3,%r3,(PPC_KERNEL_SEGMENT|SR_SUKEY|SR_PRKEY)@l;	\
+	mtsr	PPC_KERNEL_SR,%r3;					\
 	mfmsr	%r5;							\
 	ori	%r5,%r5,(PSL_IR|PSL_DR|PSL_RI);				\
 	mtmsr	%r5;							\
@@ -1056,7 +1059,7 @@ intr_exit:
 	lis	%r3,_C_LABEL(curpm)@ha	/* get current pmap real address */
 	lwz	%r3,_C_LABEL(curpm)@l(%r3)
 	lwz	%r3,PM_KERNELSR(%r3)
-	mtsr	KERNEL_SR,%r3		/* Restore kernel SR */
+	mtsr	PPC_KERNEL_SR,%r3		/* Restore kernel SR */
 	lis	%r3,_C_LABEL(astpending)@ha	/* Test AST pending */
 	lwz	%r4,_C_LABEL(astpending)@l(%r3)
 	andi.	%r4,%r4,1
@@ -1154,56 +1157,16 @@ _C_LABEL(esigcode):
 
 
 	.data
-	.globl   _C_LABEL(intrnames)
-	.type   _C_LABEL(intrnames),@object
-	.globl   _C_LABEL(eintrnames)
-	.type   _C_LABEL(eintrnames),@object
+/* Some bogus data, to keep vmstat happy, for now. */
+	.globl	_C_LABEL(intrnames), _C_LABEL(eintrnames)
+	.globl	_C_LABEL(intrcnt), _C_LABEL(eintrcnt)
 _C_LABEL(intrnames):
-	.string "irq0" "irq1" "irq2" "irq3"
-	.string "irq4" "irq5" "irq6" "irq7"
-	.string "irq8" "irq9" "irq10" "irq11"
-	.string "irq12" "irq13" "irq14" "irq15"
-	.string "irq16" "irq17" "irq18" "irq19"
-	.string "irq20" "irq21" "irq22" "irq23"
-	.string "irq24" "irq25" "irq26" "irq27"
-	.string "irq28" "irq29" "irq30" "irq31"
-	.string "irq32" "irq33" "irq34" "irq35"
-	.string "irq36" "irq37" "irq38" "irq39"
-	.string "irq40" "irq41" "irq42" "irq43"
-	.string "irq44" "irq45" "irq46" "irq47"
-	.string "irq48" "irq49" "irq50" "irq51"
-	.string "irq52" "irq53" "irq54" "irq55"
-	.string "irq56" "irq57" "irq58" "irq59"
-	.string "irq60" "irq61" "irq62" "irq63"
-	.string "clock"
-	.string "stat"
-	.space 512
+	.long	0
 _C_LABEL(eintrnames):
-	.align 4
-	.globl   _C_LABEL(intrcnt)
-	.type   _C_LABEL(intrcnt),@object
-	.globl   _C_LABEL(eintrcnt)
-	.type   _C_LABEL(eintrcnt),@object
 _C_LABEL(intrcnt):
-	.long 0,0,0,0
-	.long 0,0,0,0
-	.long 0,0,0,0
-	.long 0,0,0,0
-	.long 0,0,0,0
-	.long 0,0,0,0
-	.long 0,0,0,0
-	.long 0,0,0,0
-	.long 0,0,0,0
-	.long 0,0,0,0
-	.long 0,0,0,0
-	.long 0,0,0,0
-	.long 0,0,0,0
-	.long 0,0,0,0
-	.long 0,0,0,0
-	.long 0,0,0,0
-	.long 0
-	.long 0
+	.long	0
 _C_LABEL(eintrcnt):
+
 
 #ifdef DDB
 /*

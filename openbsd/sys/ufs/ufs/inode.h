@@ -1,4 +1,4 @@
-/*	$OpenBSD: inode.h,v 1.25 2004/01/20 03:44:06 tedu Exp $	*/
+/*	$OpenBSD: inode.h,v 1.27 2004/07/13 21:04:29 millert Exp $	*/
 /*	$NetBSD: inode.h,v 1.8 1995/06/15 23:22:50 cgd Exp $	*/
 
 /*
@@ -122,9 +122,9 @@ struct inode_vtbl {
 	    struct ucred *);
 	int (* iv_update)(struct inode *, struct timespec *, struct timespec *,
 	    int waitfor);
-	int (* iv_inode_alloc)(struct inode *, int mode, 
+	int (* iv_inode_alloc)(struct inode *, mode_t mode, 
 	    struct ucred *, struct vnode **);
-	int (* iv_inode_free)(struct inode *, ino_t ino, int mode);
+	int (* iv_inode_free)(struct inode *, ino_t ino, mode_t mode);
 	int (* iv_buf_alloc)(struct inode *, off_t, int, struct ucred *,
 	    int, struct buf **);
 	int (* iv_bufatoff)(struct inode *, off_t offset, char **res,
@@ -274,7 +274,7 @@ struct indir {
 			(ip)->i_modrev++;				\
 		}							\
 		if ((ip)->i_flag & IN_CHANGE)				\
-			(ip)->i_ffs_ctime = time.tv_sec;		\
+			(ip)->i_ffs_ctime = time_second;		\
 		(ip)->i_flag &= ~(IN_ACCESS | IN_CHANGE | IN_UPDATE);	\
 	}								\
 }
@@ -289,7 +289,7 @@ struct indir {
 			(ip)->i_modrev++;				\
 		}							\
 		if ((ip)->i_flag & IN_CHANGE)				\
-			(ip)->i_e2fs_ctime = time.tv_sec;		\
+			(ip)->i_e2fs_ctime = time_second;		\
 		(ip)->i_flag &= ~(IN_ACCESS | IN_CHANGE | IN_UPDATE);	\
 	}								\
 }

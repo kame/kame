@@ -1,4 +1,4 @@
-/*	$OpenBSD: nfs_subs.c,v 1.43 2003/06/02 23:28:19 millert Exp $	*/
+/*	$OpenBSD: nfs_subs.c,v 1.50 2004/08/03 17:11:48 marius Exp $	*/
 /*	$NetBSD: nfs_subs.c,v 1.27.4.3 1996/07/08 20:34:24 jtc Exp $	*/
 
 /*
@@ -53,6 +53,7 @@
 #include <sys/socketvar.h>
 #include <sys/stat.h>
 #include <sys/malloc.h>
+#include <sys/pool.h>
 #include <sys/time.h>
 
 #include <uvm/uvm_extern.h>
@@ -70,9 +71,6 @@
 #include <miscfs/specfs/specdev.h>
 
 #include <netinet/in.h>
-#ifdef ISO
-#include <netiso/iso.h>
-#endif
 
 #include <dev/rndvar.h>
 
@@ -1073,6 +1071,10 @@ nfs_init()
 
 	timeout_set(&nfs_timer_to, nfs_timer, &nfs_timer_to);
 	nfs_timer(&nfs_timer_to);
+
+#ifdef NFSCLIENT
+	nfs_kqinit();
+#endif	
 }
 
 #ifdef NFSCLIENT
@@ -1123,7 +1125,7 @@ nfs_loadattrcache(vpp, mdp, dposp, vaper)
 	int32_t rdev;
 	struct mbuf *md;
 	enum vtype vtyp;
-	u_short vmode;
+	mode_t vmode;
 	struct timespec mtime;
 	struct vnode *nvp;
 	int v3 = NFS_ISV3(vp);
@@ -1136,13 +1138,13 @@ nfs_loadattrcache(vpp, mdp, dposp, vaper)
 	fp = (struct nfs_fattr *)cp2;
 	if (v3) {
 		vtyp = nfsv3tov_type(fp->fa_type);
-		vmode = fxdr_unsigned(u_short, fp->fa_mode);
-		rdev = makedev(fxdr_unsigned(u_char, fp->fa3_rdev.specdata1),
-			fxdr_unsigned(u_char, fp->fa3_rdev.specdata2));
+		vmode = fxdr_unsigned(mode_t, fp->fa_mode);
+		rdev = makedev(fxdr_unsigned(u_int32_t, fp->fa3_rdev.specdata1),
+			fxdr_unsigned(u_int32_t, fp->fa3_rdev.specdata2));
 		fxdr_nfsv3time(&fp->fa3_mtime, &mtime);
 	} else {
 		vtyp = nfsv2tov_type(fp->fa_type);
-		vmode = fxdr_unsigned(u_short, fp->fa_mode);
+		vmode = fxdr_unsigned(mode_t, fp->fa_mode);
 		if (vtyp == VNON || vtyp == VREG)
 			vtyp = IFTOVT(vmode);
 		rdev = fxdr_unsigned(int32_t, fp->fa2_rdev);
@@ -1206,7 +1208,7 @@ nfs_loadattrcache(vpp, mdp, dposp, vaper)
 	vap->va_mtime = mtime;
 	vap->va_fsid = vp->v_mount->mnt_stat.f_fsid.val[0];
 	if (v3) {
-		vap->va_nlink = fxdr_unsigned(u_short, fp->fa_nlink);
+		vap->va_nlink = fxdr_unsigned(nlink_t, fp->fa_nlink);
 		vap->va_uid = fxdr_unsigned(uid_t, fp->fa_uid);
 		vap->va_gid = fxdr_unsigned(gid_t, fp->fa_gid);
 		vap->va_size = fxdr_hyper(&fp->fa3_size);
@@ -1219,7 +1221,7 @@ nfs_loadattrcache(vpp, mdp, dposp, vaper)
 		vap->va_flags = 0;
 		vap->va_filerev = 0;
 	} else {
-		vap->va_nlink = fxdr_unsigned(u_short, fp->fa_nlink);
+		vap->va_nlink = fxdr_unsigned(nlink_t, fp->fa_nlink);
 		vap->va_uid = fxdr_unsigned(uid_t, fp->fa_uid);
 		vap->va_gid = fxdr_unsigned(gid_t, fp->fa_gid);
 		vap->va_size = fxdr_unsigned(u_int32_t, fp->fa2_size);
@@ -1249,7 +1251,7 @@ nfs_loadattrcache(vpp, mdp, dposp, vaper)
 		} else
 			np->n_size = vap->va_size;
 	}
-	np->n_attrstamp = time.tv_sec;
+	np->n_attrstamp = time_second;
 	if (vaper != NULL) {
 		bcopy((caddr_t)vap, (caddr_t)vaper, sizeof(*vap));
 		if (np->n_flag & NCHG) {
@@ -1268,7 +1270,7 @@ nfs_attrtimeo (np)
 {
 	struct vnode *vp = np->n_vnode;
 	struct nfsmount *nmp = VFSTONFS(vp->v_mount);
-	int tenthage = (time.tv_sec - np->n_mtime) / 10;
+	int tenthage = (time_second - np->n_mtime) / 10;
 	int minto, maxto;
 
 	if (vp->v_type == VDIR) {
@@ -1301,7 +1303,7 @@ nfs_getattrcache(vp, vaper)
 	struct nfsnode *np = VTONFS(vp);
 	struct vattr *vap;
 
-	if ((time.tv_sec - np->n_attrstamp) >= nfs_attrtimeo(np)) {
+	if ((time_second - np->n_attrstamp) >= nfs_attrtimeo(np)) {
 		nfsstats.attrcache_misses++;
 		return (ENOENT);
 	}
@@ -1355,7 +1357,7 @@ nfs_namei(ndp, fhp, len, slp, nam, mdp, dposp, retdirp, p, kerbflag)
 	struct componentname *cnp = &ndp->ni_cnd;
 
 	*retdirp = (struct vnode *)0;
-	MALLOC(cnp->cn_pnbuf, char *, len + 1, M_NAMEI, M_WAITOK);
+	cnp->cn_pnbuf = pool_get(&namei_pool, PR_WAITOK);
 	/*
 	 * Copy the name from the mbuf list to ndp->ni_pnbuf
 	 * and set the various ndp fields appropriately.
@@ -1442,7 +1444,7 @@ nfs_namei(ndp, fhp, len, slp, nam, mdp, dposp, retdirp, p, kerbflag)
 		return (0);
 	}
 out:
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, cnp->cn_pnbuf);
 	return (error);
 }
 
@@ -1706,21 +1708,6 @@ netaddr_match(family, haddr, nam)
 		    inetaddr->sin_addr.s_addr == haddr->had_inetaddr)
 			return (1);
 		break;
-#ifdef ISO
-	case AF_ISO:
-	    {
-		struct sockaddr_iso *isoaddr1, *isoaddr2;
-
-		isoaddr1 = mtod(nam, struct sockaddr_iso *);
-		isoaddr2 = mtod(haddr->had_nam, struct sockaddr_iso *);
-		if (isoaddr1->siso_family == AF_ISO &&
-		    isoaddr1->siso_nlen > 0 &&
-		    isoaddr1->siso_nlen == isoaddr2->siso_nlen &&
-		    SAME_ISOADDR(isoaddr1, isoaddr2))
-			return (1);
-		break;
-	    }
-#endif	/* ISO */
 	default:
 		break;
 	};
@@ -1755,6 +1742,172 @@ loop:
 		}
 	}
 	splx(s);
+}
+
+void
+nfs_merge_commit_ranges(vp)
+	struct vnode *vp;
+{
+	struct nfsnode *np = VTONFS(vp);
+
+	if (!(np->n_commitflags & NFS_COMMIT_PUSHED_VALID)) {
+		np->n_pushedlo = np->n_pushlo;
+		np->n_pushedhi = np->n_pushhi;
+		np->n_commitflags |= NFS_COMMIT_PUSHED_VALID;
+	} else {
+		if (np->n_pushlo < np->n_pushedlo)
+			np->n_pushedlo = np->n_pushlo;
+		if (np->n_pushhi > np->n_pushedhi)
+			np->n_pushedhi = np->n_pushhi;
+	}
+
+	np->n_pushlo = np->n_pushhi = 0;
+	np->n_commitflags &= ~NFS_COMMIT_PUSH_VALID;
+}
+
+int
+nfs_in_committed_range(vp, bp)
+	struct vnode *vp;
+	struct buf *bp;
+{
+	struct nfsnode *np = VTONFS(vp);
+	off_t lo, hi;
+
+	if (!(np->n_commitflags & NFS_COMMIT_PUSHED_VALID))
+		return 0;
+	lo = (off_t)bp->b_blkno * DEV_BSIZE;
+	hi = lo + bp->b_dirtyend;
+
+	return (lo >= np->n_pushedlo && hi <= np->n_pushedhi);
+}
+
+int
+nfs_in_tobecommitted_range(vp, bp)
+	struct vnode *vp;
+	struct buf *bp;
+{
+	struct nfsnode *np = VTONFS(vp);
+	off_t lo, hi;
+
+	if (!(np->n_commitflags & NFS_COMMIT_PUSH_VALID))
+		return 0;
+	lo = (off_t)bp->b_blkno * DEV_BSIZE;
+	hi = lo + bp->b_dirtyend;
+
+	return (lo >= np->n_pushlo && hi <= np->n_pushhi);
+}
+
+void
+nfs_add_committed_range(vp, bp)
+	struct vnode *vp;
+	struct buf *bp;
+{
+	struct nfsnode *np = VTONFS(vp);
+	off_t lo, hi;
+
+	lo = (off_t)bp->b_blkno * DEV_BSIZE;
+	hi = lo + bp->b_dirtyend;
+
+	if (!(np->n_commitflags & NFS_COMMIT_PUSHED_VALID)) {
+		np->n_pushedlo = lo;
+		np->n_pushedhi = hi;
+		np->n_commitflags |= NFS_COMMIT_PUSHED_VALID;
+	} else {
+		if (hi > np->n_pushedhi)
+			np->n_pushedhi = hi;
+		if (lo < np->n_pushedlo)
+			np->n_pushedlo = lo;
+	}
+}
+
+void
+nfs_del_committed_range(vp, bp)
+	struct vnode *vp;
+	struct buf *bp;
+{
+	struct nfsnode *np = VTONFS(vp);
+	off_t lo, hi;
+
+	if (!(np->n_commitflags & NFS_COMMIT_PUSHED_VALID))
+		return;
+
+	lo = (off_t)bp->b_blkno * DEV_BSIZE;
+	hi = lo + bp->b_dirtyend;
+
+	if (lo > np->n_pushedhi || hi < np->n_pushedlo)
+		return;
+	if (lo <= np->n_pushedlo)
+		np->n_pushedlo = hi;
+	else if (hi >= np->n_pushedhi)
+		np->n_pushedhi = lo;
+	else {
+		/*
+		 * XXX There's only one range. If the deleted range
+		 * is in the middle, pick the largest of the
+		 * contiguous ranges that it leaves.
+		 */
+		if ((np->n_pushedlo - lo) > (hi - np->n_pushedhi))
+			np->n_pushedhi = lo;
+		else
+			np->n_pushedlo = hi;
+	}
+}
+
+void
+nfs_add_tobecommitted_range(vp, bp)
+	struct vnode *vp;
+	struct buf *bp;
+{
+	struct nfsnode *np = VTONFS(vp);
+	off_t lo, hi;
+
+	lo = (off_t)bp->b_blkno * DEV_BSIZE;
+	hi = lo + bp->b_dirtyend;
+
+	if (!(np->n_commitflags & NFS_COMMIT_PUSH_VALID)) {
+		np->n_pushlo = lo;
+		np->n_pushhi = hi;
+		np->n_commitflags |= NFS_COMMIT_PUSH_VALID;
+	} else {
+		if (lo < np->n_pushlo)
+			np->n_pushlo = lo;
+		if (hi > np->n_pushhi)
+			np->n_pushhi = hi;
+	}
+}
+
+void
+nfs_del_tobecommitted_range(vp, bp)
+	struct vnode *vp;
+	struct buf *bp;
+{
+	struct nfsnode *np = VTONFS(vp);
+	off_t lo, hi;
+
+	if (!(np->n_commitflags & NFS_COMMIT_PUSH_VALID))
+		return;
+
+	lo = (off_t)bp->b_blkno * DEV_BSIZE;
+	hi = lo + bp->b_dirtyend;
+
+	if (lo > np->n_pushhi || hi < np->n_pushlo)
+		return;
+
+	if (lo <= np->n_pushlo)
+		np->n_pushlo = hi;
+	else if (hi >= np->n_pushhi)
+		np->n_pushhi = lo;
+	else {
+		/*
+		 * XXX There's only one range. If the deleted range
+		 * is in the middle, pick the largest of the
+		 * contiguous ranges that it leaves.
+		 */
+		if ((np->n_pushlo - lo) > (hi - np->n_pushhi))
+			np->n_pushhi = lo;
+		else
+			np->n_pushlo = hi;
+	}
 }
 
 /*

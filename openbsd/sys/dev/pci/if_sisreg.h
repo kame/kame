@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_sisreg.h,v 1.15 2004/01/01 11:44:49 markus Exp $ */
+/*	$OpenBSD: if_sisreg.h,v 1.18 2004/07/04 22:57:20 deraadt Exp $ */
 /*
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ee.columbia.edu>.  All rights reserved.
@@ -126,6 +126,10 @@
 #define SIS_EECTL_DOUT		0x00000002
 #define SIS_EECTL_CLK		0x00000004
 #define SIS_EECTL_CSEL		0x00000008
+
+#define SIS96x_EECTL_GNT	0x00000100
+#define SIS96x_EECTL_DONE	0x00000200
+#define SIS96x_EECTL_REQ	0x00000400
 
 #define	SIS_MII_CLK		0x00000040
 #define	SIS_MII_DIR		0x00000020
@@ -348,11 +352,12 @@ struct sis_desc {
 #define SIS_TXSTAT_UNDERRUN	0x02000000
 #define SIS_TXSTAT_TX_ABORT	0x04000000
 
-#define SIS_RX_LIST_CNT		64
+#define SIS_RX_LIST_CNT_MIN	4
+#define SIS_RX_LIST_CNT_MAX	64
 #define SIS_TX_LIST_CNT		128
 
 struct sis_list_data {
-	struct sis_desc		sis_rx_list[SIS_RX_LIST_CNT];
+	struct sis_desc		sis_rx_list[SIS_RX_LIST_CNT_MAX];
 	struct sis_desc		sis_tx_list[SIS_TX_LIST_CNT];
 };
 
@@ -384,6 +389,7 @@ struct sis_ring_data {
 #define SIS_REV_630EA1		0x0083
 #define SIS_REV_630ET		0x0084
 #define SIS_REV_635		0x0090
+#define SIS_REV_96x		0x0091
 
 struct sis_type {
 	u_int16_t		sis_vid;
@@ -434,6 +440,7 @@ struct sis_softc {
 	bus_dmamap_t		sc_rx_sparemap;
 	bus_dmamap_t		sc_tx_sparemap;
 	int			sis_stopped;
+	int			sc_rxbufs;
 };
 
 /*
@@ -446,7 +453,6 @@ struct sis_softc {
 	bus_space_read_4(sc->sis_btag, sc->sis_bhandle, reg)
 
 #define SIS_TIMEOUT		1000
-#define ETHER_ALIGN		2
 #define SIS_RXLEN		1536
 #define SIS_MIN_FRAMELEN	60
 

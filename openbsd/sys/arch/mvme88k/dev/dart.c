@@ -1,4 +1,4 @@
-/*	$OpenBSD: dart.c,v 1.30 2004/02/11 20:41:07 miod Exp $	*/
+/*	$OpenBSD: dart.c,v 1.41 2004/08/24 18:44:49 miod Exp $	*/
 
 /*
  * Mach Operating System
@@ -47,6 +47,7 @@
 
 #include <dev/cons.h>
 
+#include <machine/mvme188.h>
 #include <mvme88k/dev/sysconreg.h>
 #include <mvme88k/dev/dartreg.h>
 
@@ -57,10 +58,10 @@
 #endif
 
 #ifdef DEBUG
-   int dart_debug = 1;
-   #define dprintf(stuff) if (dart_debug) printf stuff
+int dart_debug = 1;
+#define dprintf(stuff) if (dart_debug) printf stuff
 #else
-   #define dprintf(stuff)
+#define dprintf(stuff)
 #endif
 
 #define	NDARTPORTS	2	/* Number of ports */
@@ -73,18 +74,14 @@ struct dart_info {
 
 struct dartsoftc {
 	struct device		sc_dev;
-	struct evcnt		sc_intrcnt;
 	union  dartreg		*dart_reg;
         union  dart_pt_io	*port_reg[NDARTPORTS];
 	struct dart_info	sc_dart[NDARTPORTS];
 	struct intrhand		sc_ih;
-	int			sc_flags;
-	int			sc_ipl;
-	int			sc_vec;
 };
 
-int dartmatch(struct device *parent, void *self, void *aux);
-void dartattach(struct device *parent, struct device *self, void *aux);
+int	dartmatch(struct device *parent, void *self, void *aux);
+void	dartattach(struct device *parent, struct device *self, void *aux);
 
 struct cfattach dart_ca = {
 	sizeof(struct dartsoftc), dartmatch, dartattach
@@ -109,7 +106,9 @@ void dartrint(struct dartsoftc *, int);
 void dartxint(struct dartsoftc *, int);
 
 int dartintr(void *);
+#if 0
 void dartbreak(dev_t dev, int state);
+#endif
 
 /*
  * Lock strategy in that driver:
@@ -121,11 +120,11 @@ void dartbreak(dev_t dev, int state);
  */
 
 #define DART_PORT(dev) minor(dev)
-#define dart_tty darttty
+
 struct dart_sv_reg dart_sv_reg;
 
 /* speed tables */
-struct dart_s {
+const struct dart_s {
 	int kspeed;
 	int dspeed;
 } dart_speeds[] = {
@@ -144,19 +143,19 @@ struct dart_s {
 	{B4800,		BD4800	},	/* 4800 baud */
 	{B9600,		BD9600	},	/* 9600 baud */
 	{B19200,	BD19200	},	/* 19200 baud */
-	{0xFFFF,	NOBAUD	},	/* anything more is uncivilized */
+	{-1,		NOBAUD	},	/* anything more is uncivilized */
 };
 
 int
 dart_speed(speed)
 	int speed;
 {
-	struct dart_s *ds = dart_speeds;
-	while (ds->kspeed != 0xFFFF) {
+	const struct dart_s *ds;
+
+	for (ds = dart_speeds; ds->kspeed != -1; ds++)
 		if (ds->kspeed == speed)
 			return ds->dspeed;
-		ds++;
-	}
+
 	return NOBAUD;
 }
 
@@ -184,14 +183,18 @@ dartmatch(parent, vcf, args)
 	union dartreg *addr;
 
 	/* Don't match if wrong cpu */
-	if (brdtyp != BRD_188) return (0);
-	ca->ca_vaddr = ca->ca_paddr; /* 1:1 */
-	addr = (union dartreg *)ca->ca_vaddr;
+	if (brdtyp != BRD_188)
+		return (0);
+
+	addr = (union dartreg *)ca->ca_paddr;
 
 	if (badvaddr((vaddr_t)addr, 2)) {
+#ifdef DEBUG
 		printf("==> dart: failed address check.\n");
+#endif
 		return (0);
 	}
+
 	return (1);
 }
 
@@ -207,17 +210,17 @@ dartattach(parent, self, aux)
 	union dart_pt_io *ptaddr; /* pointer to port regs */
 	int port;	/* port index */
 
+	if (ca->ca_ipl < 0)
+		ca->ca_ipl = IPL_TTY;
+
 	/* set up dual port memory and registers and init*/
-	sc->dart_reg = (union dartreg *)ca->ca_vaddr;
-        ptaddr = (union  dart_pt_io *)ca->ca_vaddr;
+	sc->dart_reg = (union dartreg *)ca->ca_paddr;
+        ptaddr = (union  dart_pt_io *)ca->ca_paddr;
 	sc->port_reg[A_PORT] = ptaddr;
 	ptaddr++;
 	sc->port_reg[B_PORT] = ptaddr;
-	sc->sc_ipl = ca->ca_ipl = IPL_TTY; /* always... hard coded ipl */
 	sc->sc_dart[A_PORT].tty = NULL;
 	sc->sc_dart[B_PORT].tty = NULL;
-	ca->ca_vec = SYSCV_SCC;	/* hard coded vector */
-	sc->sc_vec = ca->ca_vec;
 
 	addr = sc->dart_reg;
 
@@ -295,7 +298,7 @@ dartattach(parent, self, aux)
 	addr->write.wr_acr  = dart_sv_reg.sv_acr;
 	addr->write.wr_imr  = dart_sv_reg.sv_imr;
 	addr->write.wr_opcr = OPSET;
-	addr->write.wr_ivr = sc->sc_vec;
+	addr->write.wr_ivr = SYSCON_VECT + SYSCV_SCC;	/* hard coded vector */
 
 	/* enable interrupts */
 	sc->sc_ih.ih_fn = dartintr;
@@ -303,8 +306,7 @@ dartattach(parent, self, aux)
 	sc->sc_ih.ih_wantframe = 0;
 	sc->sc_ih.ih_ipl = ca->ca_ipl;
 
-	intr_establish(ca->ca_vec, &sc->sc_ih);
-	evcnt_attach(&sc->sc_dev, "intr", &sc->sc_intrcnt);
+	sysconintr_establish(SYSCV_SCC, &sc->sc_ih, self->dv_xname);
 	printf("\n");
 }
 
@@ -317,7 +319,7 @@ dartstart(tp)
 {
 	dev_t dev;
 	struct dartsoftc *sc;
-	int s, cc;
+	int s;
 	union dart_pt_io *ptaddr;
 	union dartreg *addr;
 	int port;
@@ -337,7 +339,7 @@ dartstart(tp)
 
 	s = spltty();
 
-	if (tp->t_state & (TS_TIMEOUT |TS_BUSY | TS_TTSTOP))
+	if (tp->t_state & (TS_TIMEOUT | TS_BUSY | TS_TTSTOP))
 		goto bail;
 
 	if (tp->t_outq.c_cc <= tp->t_lowat) {
@@ -350,9 +352,6 @@ dartstart(tp)
 		selwakeup(&tp->t_wsel);
 	}
 
-	if (tp->t_state & (TS_TIMEOUT | TS_BUSY | TS_TTSTOP))
-		goto bail;
-
 	dprintf(("dartstart: dev(%d, %d)\n", major(dev), minor(dev)));
 
 	if (port != CONS_PORT)
@@ -361,40 +360,37 @@ dartstart(tp)
 
 	if (tp->t_outq.c_cc != 0) {
 		tp->t_state |= TS_BUSY;
-		cc = tp->t_outq.c_cc;
+
 		/* load transmitter until it is full */
 		while (ptaddr->read.rd_sr & TXRDY) {
-                        if(cc == 0)
-				 break;
 			c = getc(&tp->t_outq);
-			cc--;
-			if (tp->t_flags & CS8 || c <= 0177) {
-				if (port != CONS_PORT)
-					dprintf(("dartstart: writing char \"%c\" (0x%02x) to port %d\n",
-						 c & 0xff, c & 0xff, port));
-				ptaddr->write.wr_tb = c & 0xff;
 
-				if (port != CONS_PORT)
-					dprintf(("dartstart: enabling Tx int\n"));
-				if (port == A_PORT)
-					dart_sv_reg.sv_imr = dart_sv_reg.sv_imr | ITXRDYA;
-				else
-					dart_sv_reg.sv_imr = dart_sv_reg.sv_imr | ITXRDYB;
-				addr->write.wr_imr = dart_sv_reg.sv_imr;
+			if (port != CONS_PORT)
+				dprintf(("dartstart: writing char \"%c\" (0x%02x) to port %d\n",
+					 c & 0xff, c & 0xff, port));
+			ptaddr->write.wr_tb = c & 0xff;
 
-			} else {
-				tp->t_state &= ~TS_BUSY;
-				if (port != CONS_PORT)
-					dprintf(("dartxint: timing out char \"%c\" (0x%02x)\n",
-					 c & 0xff, c % 0xff));
-				timeout_add(&tp->t_rstrt_to, 1);
-				tp->t_state |= TS_TIMEOUT;
-			}
+			if (port != CONS_PORT)
+				dprintf(("dartstart: enabling Tx int\n"));
+			if (port == A_PORT)
+				dart_sv_reg.sv_imr = dart_sv_reg.sv_imr | ITXRDYA;
+			else
+				dart_sv_reg.sv_imr = dart_sv_reg.sv_imr | ITXRDYB;
+			addr->write.wr_imr = dart_sv_reg.sv_imr;
+
+			if (tp->t_outq.c_cc == 0)
+				break;
+		}
+
+		tp->t_state &= ~TS_BUSY;
+
+		if (tp->t_outq.c_cc != 0) {
+			timeout_add(&tp->t_rstrt_to, 1);
+			tp->t_state |= TS_TIMEOUT;
 		}
 	}
 bail:
 	splx(s);
-	return;
 }
 
 /*
@@ -509,6 +505,7 @@ dartmctl (dev, flags, how)
 	return dcdstate;
 }
 
+#if 0
 /*
  * To be called at spltty - tty already locked.
  */
@@ -540,9 +537,8 @@ dartbreak(dev, state)
 	} else {
 		ptaddr->write.wr_cr = BRKSTOP;	 /* stop a break*/
 	}
-
-	return;
 }
+#endif
 
 int
 dartioctl(dev, cmd, data, flag, p)
@@ -677,7 +673,7 @@ dartparam(tp, t)
 			dart_sv_reg.sv_imr = dart_sv_reg.sv_imr & ~(ITXRDYA | IRXRDYA);
 		else
 			dart_sv_reg.sv_imr = dart_sv_reg.sv_imr & ~(ITXRDYB | IRXRDYB);
-		addr -> write.wr_imr = dart_sv_reg.sv_imr;
+		addr->write.wr_imr = dart_sv_reg.sv_imr;
 
 		/* hang up on zero baud rate */
 		if (tp->t_ispeed == 0) {
@@ -760,7 +756,7 @@ dartparam(tp, t)
 			dart_sv_reg.sv_imr = dart_sv_reg.sv_imr | ITXRDYA;
 		else
 			dart_sv_reg.sv_imr = dart_sv_reg.sv_imr | ITXRDYB;
-		addr -> write.wr_imr = dart_sv_reg.sv_imr;
+		addr->write.wr_imr = dart_sv_reg.sv_imr;
 	} else {
 		dprintf(("dartparam: not enabling Tx\n"));
 	}
@@ -773,7 +769,7 @@ dartparam(tp, t)
 		dart_sv_reg.sv_imr = dart_sv_reg.sv_imr | IRXRDYA;
 	else
 		dart_sv_reg.sv_imr = dart_sv_reg.sv_imr | IRXRDYB;
-	addr -> write.wr_imr = dart_sv_reg.sv_imr;
+	addr->write.wr_imr = dart_sv_reg.sv_imr;
 
 	return 0;
 }
@@ -800,17 +796,18 @@ dartmodemtrans(sc, ip, ipcr)
 		port = B_PORT;
 		dcdstate = !(ip & IPDCDB);
 	} else {
-		printf("dartmodemtrans: unknown transition:\n");
-		printf("dartmodemtrans: ip=0x%x ipcr=0x%x\n",
+		printf("dartmodemtrans: unknown transition ip=0x%x ipcr=0x%x\n",
 		       ip, ipcr);
-		panic("dartmodemtrans");
+		return;
 	}
+
 	dart = &sc->sc_dart[port];
 	tp = dart->tty;
-
-	dprintf(("dartmodemtrans: tp=0x%x new DCD state: %s\n",
-		 tp, dcdstate ? "UP" : "DOWN"));
-	(void) ttymodem(tp, dcdstate);
+	if (tp != NULL) {
+		dprintf(("dartmodemtrans: tp=0x%x new DCD state: %s\n",
+		    tp, dcdstate ? "UP" : "DOWN"));
+		ttymodem(tp, dcdstate);
+	}
 }
 
 int
@@ -998,7 +995,6 @@ dartrint(sc, port)
 
 #if defined(DDB)
 			if (db_console != 0) {
-				dprintf(("dartrint: break detected - entering debugger\n"));
 				Debugger();
 			}
 #endif
@@ -1078,8 +1074,6 @@ out:
 	simple_unlock(&dart->t_lock);
 
 	dprintf(("dartxint: ready - Tx disabled\n"));
-
-	return;
 }
 
 int
@@ -1088,54 +1082,64 @@ dartintr(arg)
 {
 	struct dartsoftc *sc = arg;
 
-	unsigned char isr;
+	unsigned char isr, imr;
 	int port;
 	union dartreg *addr;
 
 	/* read interrupt status register and mask with imr */
 	addr = sc->dart_reg;
-
 	isr = addr->read.rd_isr;
-	isr &= dart_sv_reg.sv_imr;
+	imr = dart_sv_reg.sv_imr;
 
-	if (isr) {     /* interrupt from this duart */
-		if (isr & IIPCHG) {
-			unsigned int ip = addr->read.rd_ip;
-			unsigned int ipcr = addr->read.rd_ipcr;
-			dartmodemtrans(sc, ip, ipcr);
-			return 1;
-		}
-
-		if (isr & (IRXRDYA | ITXRDYA))
-			port = 0;
-		else
-			if (isr & (IRXRDYB | ITXRDYB))
-			port = 1;
-		else {
-			printf("dartintr: spurious interrupt, isr 0x%08x\n", isr);
-			panic("dartintr");
-		}
-
-		dprintf(("dartintr: interrupt from port %d, isr 0x%08x\n",
-			 port, isr));
-
-		if (isr & (IRXRDYA | IRXRDYB)) {
-			dprintf(("dartintr: Rx interrupt\n"));
-			dartrint(sc, port);
-		}
-		if (isr & (ITXRDYA | ITXRDYB)) {
-			dprintf(("dartintr: Tx interrupt\n"));
-			dartxint(sc, port);
-		}
-		if (((port == A_PORT) && (isr & IBRKA))
-		    || ((port == B_PORT) && (isr & IBRKB))) {
-			union dart_pt_io *ptaddr =
-			(union dart_pt_io *)addr + port;
-
-			dprintf(("dartintr: clearing end of BREAK state\n"));
-			ptaddr->write.wr_cr = BRKINTRESET;
-		}
+	if ((isr & imr) == 0) {
+		/*
+		 * We got an interrupt on a disabled condition (such as TX
+		 * ready change on a disabled port). This should not happen,
+		 * but we have to claim the interrupt anyway.
+		 */
+#ifdef DIAGNOSTIC
+		printf("dartintr: spurious interrupt, isr %x imr %x\n",
+		    isr, imr);
+#endif
+		return 1;
 	}
+	isr &= imr;
+
+	if (isr & IIPCHG) {
+		unsigned int ip = addr->read.rd_ip;
+		unsigned int ipcr = addr->read.rd_ipcr;
+		dartmodemtrans(sc, ip, ipcr);
+		return 1;
+	}
+
+	if (isr & (IRXRDYA | ITXRDYA))
+		port = 0;
+	else if (isr & (IRXRDYB | ITXRDYB))
+		port = 1;
+	else {
+		printf("dartintr: spurious interrupt, isr 0x%08x\n", isr);
+		return 1;	/* claim it anyway */
+	}
+
+	dprintf(("dartintr: interrupt from port %d, isr 0x%08x\n",
+		 port, isr));
+
+	if (isr & (IRXRDYA | IRXRDYB)) {
+		dprintf(("dartintr: Rx interrupt\n"));
+		dartrint(sc, port);
+	}
+	if (isr & (ITXRDYA | ITXRDYB)) {
+		dprintf(("dartintr: Tx interrupt\n"));
+		dartxint(sc, port);
+	}
+	if ((port == A_PORT && (isr & IBRKA)) ||
+	    (port == B_PORT && (isr & IBRKB))) {
+		union dart_pt_io *ptaddr = (union dart_pt_io *)addr + port;
+
+		dprintf(("dartintr: clearing end of BREAK state\n"));
+		ptaddr->write.wr_cr = BRKINTRESET;
+	}
+
 	dprintf(("dartintr: ready\n"));
 	return 1;
 }
@@ -1151,15 +1155,17 @@ dartcnprobe(cp)
 {
 	int maj;
 
-	if (brdtyp != BRD_188 || badaddr(DART_BASE, 2) != 0) {
-		cp->cn_pri = CN_DEAD;
+	cp->cn_pri = CN_DEAD;
+
+	if (brdtyp != BRD_188 || badaddr(DART_BASE, 2) != 0)
 		return;
-	}
 
 	/* locate the major number */
 	for (maj = 0; maj < nchrdev; maj++)
 		if (cdevsw[maj].d_open == dartopen)
 			break;
+	if (maj == nchrdev)
+		return;
 
 	cp->cn_dev = makedev(maj, 0);
 	cp->cn_pri = CN_NORMAL;
@@ -1174,7 +1180,7 @@ dartcninit(cp)
 void
 dartcnputc(dev, c)
 	dev_t dev;
-	char c;
+	int c;
 {
 	union dartreg *addr;
 	union dart_pt_io *ptaddr;
@@ -1236,14 +1242,13 @@ dartcngetc(dev)
 	union dartreg  *addr;	   /* pointer to DUART regs */
 	union dart_pt_io  *ptaddr; /* pointer to port regs */
 	unsigned char   sr;	       /* status reg of port a/b */
-	int c;		/* received character */
+	u_char c;		/* received character */
 	int s;
 	int port;
 #if 1
 #else
 	m88k_psr_type psr;
 #endif
-	char buf[] = "char x";
 
 	port = DART_PORT(dev);
 #if 1
@@ -1260,7 +1265,7 @@ dartcngetc(dev)
 	/* enable receiver */
 	ptaddr->write.wr_cr = RXEN;
 
-	do {
+	for (;;) {
 		/* read status reg */
 		sr = ptaddr->read.rd_sr;
 
@@ -1275,34 +1280,23 @@ dartcngetc(dev)
 				ptaddr->write.wr_cr = BRKINTRESET;
 				DELAY_CR;
 				ptaddr->write.wr_cr = ERRRESET;
-#if 1
-				splx(s);
-#else
-				set_psr(psr);
-#endif
-				return c;
+				break;
 			}
 
-			if (sr & (FRERR|PERR|ROVRN)) {
+			if (sr & (FRERR | PERR | ROVRN)) {
 				/* clear error state */
 				ptaddr->write.wr_cr = ERRRESET;
 				DELAY_CR;
 				ptaddr->write.wr_cr = BRKINTRESET;
 			} else {
-				buf[5] = (char) c;
-#if 1
-				splx(s);
-#else
-				set_psr(psr);
-#endif
-				return (c & 0x7f);
+				break;
 			}
 		}
-	} while (-1);
+	}
 #if 1
 	splx(s);
 #else
 	set_psr(psr);
 #endif
-	return -1;
+	return (int)c;
 }

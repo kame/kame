@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_mbuf.c,v 1.64 2004/01/28 20:19:24 dhartmei Exp $	*/
+/*	$OpenBSD: uipc_mbuf.c,v 1.70 2004/05/27 04:55:28 tedu Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.15.4.1 1996/06/13 17:11:44 cgd Exp $	*/
 
 /*
@@ -99,16 +99,12 @@ int max_protohdr;		/* largest protocol header */
 int max_hdr;			/* largest link+protocol header */
 int max_datalen;		/* MHLEN - max_hdr */
 
-void	*mclpool_alloc(struct pool *, int);
-void	mclpool_release(struct pool *, void *);
 struct mbuf *m_copym0(struct mbuf *, int, int, int, int);
+void	nmbclust_update(void);
+
 
 const char *mclpool_warnmsg =
-    "WARNING: mclpool limit reached; increase NMBCLUSTERS";
-
-struct pool_allocator mclpool_allocator = {
-	mclpool_alloc, mclpool_release, 0,
-};
+    "WARNING: mclpool limit reached; increase kern.maxclusters";
 
 /*
  * Initialize the mbuf allcator.
@@ -116,24 +112,13 @@ struct pool_allocator mclpool_allocator = {
 void
 mbinit()
 {
-	vaddr_t minaddr, maxaddr;
-
-	minaddr = vm_map_min(kernel_map);
-	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-	    nmbclust*(MCLBYTES), VM_MAP_INTRSAFE, FALSE, NULL);
-
 	pool_init(&mbpool, MSIZE, 0, 0, 0, "mbpl", NULL);
-	pool_init(&mclpool, MCLBYTES, 0, 0, 0, "mclpl", &mclpool_allocator);
+	pool_init(&mclpool, MCLBYTES, 0, 0, 0, "mclpl", NULL);
 
 	pool_set_drain_hook(&mbpool, m_reclaim, NULL);
 	pool_set_drain_hook(&mclpool, m_reclaim, NULL);
 
-	/*
-	 * Set the hard limit on the mclpool to the number of
-	 * mbuf clusters the kernel is to support.  Log the limit
-	 * reached message max once a minute.
-	 */
-	(void)pool_sethardlimit(&mclpool, nmbclust, mclpool_warnmsg, 60);
+	nmbclust_update();
 
 	/*
 	 * Set a low water mark for both mbufs and clusters.  This should
@@ -145,20 +130,15 @@ mbinit()
 	pool_setlowat(&mclpool, mcllowat);
 }
 
-
-void *
-mclpool_alloc(struct pool *pp, int flags)
-{
-	boolean_t waitok = (flags & PR_WAITOK) ? TRUE : FALSE;
-
-	return ((void *)uvm_km_alloc_poolpage1(mb_map, uvmexp.mb_object,
-	    waitok));
-}
-
 void
-mclpool_release(struct pool *pp, void *v)
+nmbclust_update(void)
 {
-	uvm_km_free_poolpage1(mb_map, (vaddr_t)v);
+	/*
+	 * Set the hard limit on the mclpool to the number of
+	 * mbuf clusters the kernel is to support.  Log the limit
+	 * reached message max once a minute.
+	 */
+	(void)pool_sethardlimit(&mclpool, nmbclust, mclpool_warnmsg, 60);
 }
 
 void
@@ -314,7 +294,7 @@ m_copym0(m, off0, len, wait, deep)
 	if (off == 0 && m->m_flags & M_PKTHDR)
 		copyhdr = 1;
 	while (off > 0) {
-		if (m == 0)
+		if (m == NULL)
 			panic("m_copym0: null mbuf");
 		if (off < m->m_len)
 			break;
@@ -322,16 +302,16 @@ m_copym0(m, off0, len, wait, deep)
 		m = m->m_next;
 	}
 	np = &top;
-	top = 0;
+	top = NULL;
 	while (len > 0) {
-		if (m == 0) {
+		if (m == NULL) {
 			if (len != M_COPYALL)
-				panic("m_copym0: m == 0 and not COPYALL");
+				panic("m_copym0: m == NULL and not COPYALL");
 			break;
 		}
 		MGET(n, wait, m->m_type);
 		*np = n;
-		if (n == 0)
+		if (n == NULL)
 			goto nospace;
 		if (copyhdr) {
 			M_DUP_PKTHDR(n, m);
@@ -376,13 +356,13 @@ m_copym0(m, off0, len, wait, deep)
 		}
 		np = &n->m_next;
 	}
-	if (top == 0)
+	if (top == NULL)
 		MCFail++;
 	return (top);
 nospace:
 	m_freem(top);
 	MCFail++;
-	return (0);
+	return (NULL);
 }
 
 /*
@@ -439,14 +419,14 @@ m_copyback(m0, off, len, cp)
 	register struct mbuf *m = m0, *n;
 	int totlen = 0;
 
-	if (m0 == 0)
+	if (m0 == NULL)
 		return;
 	while (off > (mlen = m->m_len)) {
 		off -= mlen;
 		totlen += mlen;
-		if (m->m_next == 0) {
+		if (m->m_next == NULL) {
 			n = m_getclr(M_DONTWAIT, m->m_type);
-			if (n == 0)
+			if (n == NULL)
 				goto out;
 			n->m_len = min(MLEN, len + off);
 			m->m_next = n;
@@ -463,9 +443,9 @@ m_copyback(m0, off, len, cp)
 		totlen += mlen;
 		if (len == 0)
 			break;
-		if (m->m_next == 0) {
+		if (m->m_next == NULL) {
 			n = m_get(M_DONTWAIT, m->m_type);
-			if (n == 0)
+			if (n == NULL)
 				break;
 			n->m_len = min(MLEN, len);
 			m->m_next = n;
@@ -683,7 +663,8 @@ m_pullup2(n, len)
 		if (n->m_flags & M_PKTHDR) {
 			/* Too many adverse side effects. */
 			/* M_MOVE_PKTHDR(m, n); */
-			m->m_flags = (n->m_flags & M_COPYFLAGS) | M_EXT;
+			m->m_flags = (n->m_flags & M_COPYFLAGS) | 
+			    M_EXT | M_CLUSTER;
 			M_MOVE_HDR(m, n);
 			/* n->m_data is cool. */
 		}
@@ -741,8 +722,7 @@ m_getptr(m, loc, off)
 				}
 				else
 		  			return (NULL);
-	    		}
-	    		else
+	    		} else
 	      			m = m->m_next;
 		}
     	}

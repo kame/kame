@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ethersubr.c,v 1.75 2004/02/15 02:52:41 avsm Exp $	*/
+/*	$OpenBSD: if_ethersubr.c,v 1.79 2004/07/16 15:01:08 henning Exp $	*/
 /*	$NetBSD: if_ethersubr.c,v 1.19 1996/05/07 02:40:30 thorpej Exp $	*/
 
 /*
@@ -140,13 +140,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netipx/ipx_if.h>
 #endif
 
-#ifdef ISO
-#include <netiso/argo_debug.h>
-#include <netiso/iso.h>
-#include <netiso/iso_var.h>
-#include <netiso/iso_snpac.h>
-#endif
-
 #include <netccitt/x25.h>
 #include <netccitt/pk.h>
 #include <netccitt/pk_extern.h>
@@ -277,7 +270,7 @@ ether_output(ifp, m0, dst, rt0)
 		}
 		if (rt->rt_flags & RTF_REJECT)
 			if (rt->rt_rmx.rmx_expire == 0 ||
-			    time.tv_sec < rt->rt_rmx.rmx_expire)
+			    time_second < rt->rt_rmx.rmx_expire)
 				senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
 	}
 
@@ -395,52 +388,6 @@ ether_output(ifp, m0, dst, rt0)
 		}
 		} break;
 #endif /* NETATALK */
-#ifdef	ISO
-	case AF_ISO: {
-		int	snpalen;
-		struct	llc *l;
-		struct sockaddr_dl *sdl;
-
-		if (rt && (sdl = (struct sockaddr_dl *)rt->rt_gateway) &&
-		    sdl->sdl_family == AF_LINK && sdl->sdl_alen > 0) {
-			bcopy(LLADDR(sdl), (caddr_t)edst, sizeof(edst));
-		} else {
-			error = iso_snparesolve(ifp, (struct sockaddr_iso *)dst,
-						(char *)edst, &snpalen);
-			if (error)
-				goto bad; /* Not Resolved */
-		}
-		/* If broadcasting on a simplex interface, loopback a copy */
-		if (*edst & 1)
-			m->m_flags |= (M_BCAST|M_MCAST);
-		if ((m->m_flags & M_BCAST) && (ifp->if_flags & IFF_SIMPLEX) &&
-		    (mcopy = m_copy(m, 0, (int)M_COPYALL))) {
-			M_PREPEND(mcopy, sizeof (*eh), M_DONTWAIT);
-			if (mcopy) {
-				eh = mtod(mcopy, struct ether_header *);
-				bcopy(edst, eh->ether_dhost, sizeof (edst));
-				bcopy(ac->ac_enaddr, eh->ether_shost,
-				    sizeof (edst));
-			}
-		}
-		M_PREPEND(m, 3, M_DONTWAIT);
-		if (m == NULL)
-			return (0);
-		etype = htons(m->m_pkthdr.len);
-		l = mtod(m, struct llc *);
-		l->llc_dsap = l->llc_ssap = LLC_ISO_LSAP;
-		l->llc_control = LLC_UI;
-#ifdef ARGO_DEBUG
-		if (argo_debug[D_ETHER]) {
-			int i;
-			printf("unoutput: sending pkt to: ");
-			for (i=0; i < ETHER_ADDR_LEN; i++)
-				printf("%x ", edst[i] & 0xff);
-			printf("\n");
-		}
-#endif
-		} break;
-#endif /* ISO */
 /*	case AF_NSAP: */
 	case AF_CCITT: {
 		struct sockaddr_dl *sdl =
@@ -823,70 +770,6 @@ decapsulate:
 				goto decapsulate;
 			}
 			goto dropanyway;
-#ifdef	ISO
-		case LLC_ISO_LSAP:
-			switch (l->llc_control) {
-			case LLC_UI:
-				/* LLC_UI_P forbidden in class 1 service */
-				if ((l->llc_dsap == LLC_ISO_LSAP) &&
-				    (l->llc_ssap == LLC_ISO_LSAP)) {
-					/* LSAP for ISO */
-					if (m->m_pkthdr.len > etype)
-						m_adj(m, etype - m->m_pkthdr.len);
-					m->m_data += 3;		/* XXX */
-					m->m_len -= 3;		/* XXX */
-					m->m_pkthdr.len -= 3;	/* XXX */
-					M_PREPEND(m, sizeof *eh, M_DONTWAIT);
-					if (m == 0)
-						return;
-					*mtod(m, struct ether_header *) = *eh;
-#ifdef ARGO_DEBUG
-					if (argo_debug[D_ETHER])
-						printf("clnp packet");
-#endif
-					schednetisr(NETISR_ISO);
-					inq = &clnlintrq;
-					break;
-				}
-				goto dropanyway;
-
-			case LLC_XID:
-			case LLC_XID_P:
-				if (m->m_len < ETHER_ADDR_LEN)
-					goto dropanyway;
-				l->llc_window = 0;
-				l->llc_fid = 9;
-				l->llc_class = 1;
-				l->llc_dsap = l->llc_ssap = 0;
-				/* Fall through to */
-			case LLC_TEST:
-			case LLC_TEST_P:
-			{
-				struct sockaddr sa;
-				struct ether_header *eh2;
-				int i;
-				u_char c = l->llc_dsap;
-
-				l->llc_dsap = l->llc_ssap;
-				l->llc_ssap = c;
-				if (m->m_flags & (M_BCAST | M_MCAST))
-					bcopy(ac->ac_enaddr,
-					    eh->ether_dhost, ETHER_ADDR_LEN);
-				sa.sa_family = AF_UNSPEC;
-				sa.sa_len = sizeof(sa);
-				eh2 = (struct ether_header *)sa.sa_data;
-				for (i = 0; i < ETHER_ADDR_LEN; i++) {
-					eh2->ether_shost[i] = c = eh->ether_dhost[i];
-					eh2->ether_dhost[i] =
-						eh->ether_dhost[i] = eh->ether_shost[i];
-					eh->ether_shost[i] = c;
-				}
-				ifp->if_output(ifp, m, &sa, NULL);
-				return;
-			}
-			break;
-			}
-#endif /* ISO */
 #ifdef CCITT
 		case LLC_X25_LSAP:
 			if (m->m_pkthdr.len > etype)
@@ -914,11 +797,7 @@ decapsulate:
 	}
 
 	s = splimp();
-	if (IF_QFULL(inq)) {
-		IF_DROP(inq);
-		m_freem(m);
-	} else
-		IF_ENQUEUE(inq, m);
+	IF_INPUT_ENQUEUE(inq, m);
 	splx(s);
 }
 
@@ -1006,9 +885,8 @@ ether_ifdetach(ifp)
 
 #if 0
 /*
- * This is for reference.  We have a table-driven version
- * of the little-endian crc32 generator, which is faster
- * than the double-loop.
+ * This is for reference.  We have table-driven versions of the
+ * crc32 generators, which are faster than the double-loop.
  */
 u_int32_t
 ether_crc32_le(const u_int8_t *buf, size_t len)
@@ -1031,30 +909,6 @@ ether_crc32_le(const u_int8_t *buf, size_t len)
 
 	return (crc);
 }
-#else
-u_int32_t
-ether_crc32_le(const u_int8_t *buf, size_t len)
-{
-	static const u_int32_t crctab[] = {
-		0x00000000, 0x1db71064, 0x3b6e20c8, 0x26d930ac,
-		0x76dc4190, 0x6b6b51f4, 0x4db26158, 0x5005713c,
-		0xedb88320, 0xf00f9344, 0xd6d6a3e8, 0xcb61b38c,
-		0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c
-	};
-	u_int32_t crc;
-	int i;
-
-	crc = 0xffffffffU;	/* initial value */
-
-	for (i = 0; i < len; i++) {
-		crc ^= buf[i];
-		crc = (crc >> 4) ^ crctab[crc & 0xf];
-		crc = (crc >> 4) ^ crctab[crc & 0xf];
-	}
-
-	return (crc);
-}
-#endif
 
 u_int32_t
 ether_crc32_be(const u_int8_t *buf, size_t len)
@@ -1077,6 +931,57 @@ ether_crc32_be(const u_int8_t *buf, size_t len)
 
 	return (crc);
 }
+#else
+u_int32_t
+ether_crc32_le(const u_int8_t *buf, size_t len)
+{
+	static const u_int32_t crctab[] = {
+		0x00000000, 0x1db71064, 0x3b6e20c8, 0x26d930ac,
+		0x76dc4190, 0x6b6b51f4, 0x4db26158, 0x5005713c,
+		0xedb88320, 0xf00f9344, 0xd6d6a3e8, 0xcb61b38c,
+		0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c
+	};
+	size_t i;
+	u_int32_t crc;
+
+	crc = 0xffffffffU;	/* initial value */
+
+	for (i = 0; i < len; i++) {
+		crc ^= buf[i];
+		crc = (crc >> 4) ^ crctab[crc & 0xf];
+		crc = (crc >> 4) ^ crctab[crc & 0xf];
+	}
+
+	return (crc);
+}
+
+u_int32_t
+ether_crc32_be(const u_int8_t *buf, size_t len)
+{
+	static const u_int8_t rev[] = {
+		0x0, 0x8, 0x4, 0xc, 0x2, 0xa, 0x6, 0xe,
+		0x1, 0x9, 0x5, 0xd, 0x3, 0xb, 0x7, 0xf
+	};
+	static const u_int32_t crctab[] = {
+		0x00000000, 0x04c11db7, 0x09823b6e, 0x0d4326d9,
+		0x130476dc, 0x17c56b6b, 0x1a864db2, 0x1e475005,
+		0x2608edb8, 0x22c9f00f, 0x2f8ad6d6, 0x2b4bcb61,
+		0x350c9b64, 0x31cd86d3, 0x3c8ea00a, 0x384fbdbd
+	};
+	size_t i;
+	u_int32_t crc;
+	u_int8_t data;
+
+	crc = 0xffffffffU;	/* initial value */
+	for (i = 0; i < len; i++) {
+		data = buf[i];
+		crc = (crc << 4) ^ crctab[(crc >> 28) ^ rev[data & 0xf]];
+		crc = (crc << 4) ^ crctab[(crc >> 28) ^ rev[data >> 4]];
+	}
+
+	return (crc);
+}
+#endif
 
 #ifdef INET
 u_char	ether_ipmulticast_min[ETHER_ADDR_LEN] =

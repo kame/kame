@@ -1,4 +1,4 @@
-/*	$OpenBSD: vme.c,v 1.19 2004/01/14 20:52:49 miod Exp $ */
+/*	$OpenBSD: vme.c,v 1.22 2004/07/30 22:29:45 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -89,9 +89,7 @@ vmematch(parent, cf, args)
 	struct confargs *ca = args;
 
 	if (ca->ca_bustype == BUS_MC) {
-		struct mcreg *mc = (struct mcreg *)ca->ca_master;
-
-		if (mc->mc_ver & MC_VER_NOVME)
+		if (sys_mc->mc_ver & MC_VER_NOVME)
 			return (0);
 	}
 #endif
@@ -323,7 +321,6 @@ vmescan(parent, child, args, bustype)
 	oca.ca_vaddr = vmemap(sc, oca.ca_paddr, oca.ca_len, oca.ca_bustype);
 	if (!oca.ca_vaddr)
 		oca.ca_vaddr = (void *)-1;
-	oca.ca_master = (void *)sc;
 	oca.ca_name = cf->cf_driver->cd_name;
 	if ((*cf->cf_attach->ca_match)(parent, cf, &oca) == 0) {
 		if (oca.ca_vaddr != (void *)-1)
@@ -394,9 +391,10 @@ vmeattach(parent, self, args)
  * interrupt. If you share you will lose.
  */
 int
-vmeintr_establish(vec, ih)
+vmeintr_establish(vec, ih, name)
 	int vec;
 	struct intrhand *ih;
+	const char *name;
 {
 	struct vmesoftc *sc = (struct vmesoftc *) vme_cd.cd_devs[0];
 #if NPCC > 0
@@ -407,7 +405,7 @@ vmeintr_establish(vec, ih)
 #endif
 	int x;
 
-	x = (intr_establish(vec, ih));
+	x = intr_establish(vec, ih, name);
 
 	switch (vmebustype) {
 #if NPCC > 0
@@ -458,32 +456,38 @@ vme2chip_init(sc)
 	/* turn off SYSFAIL LED */
 	vme2->vme2_tctl &= ~VME2_TCTL_SYSFAIL;
 
-	ctl = vme2->vme2_masterctl;
+	/*
+	 * Display the VMEChip2 decoder status.
+	 */
 	printf("%s: using BUG parameters\n", sc->sc_dev.dv_xname);
-	/* setup a A32D16 space */
-	printf("%s: 1phys 0x%08lx-0x%08lx to VME 0x%08lx-0x%08lx\n",
-	    sc->sc_dev.dv_xname,
-	    vme2->vme2_master1 << 16, vme2->vme2_master1 & 0xffff0000,
-	    vme2->vme2_master1 << 16, vme2->vme2_master1 & 0xffff0000);
+	ctl = vme2->vme2_gcsrctl;
+	if (ctl & VME2_GCSRCTL_MDEN1) {
+		printf("%s: 1phys 0x%08lx-0x%08lx to VME 0x%08lx-0x%08lx\n",
+		    sc->sc_dev.dv_xname,
+		    vme2->vme2_master1 << 16, vme2->vme2_master1 & 0xffff0000,
+		    vme2->vme2_master1 << 16, vme2->vme2_master1 & 0xffff0000);
+	}
+	if (ctl & VME2_GCSRCTL_MDEN2) {
+		printf("%s: 2phys 0x%08lx-0x%08lx to VME 0x%08lx-0x%08lx\n",
+		    sc->sc_dev.dv_xname,
+		    vme2->vme2_master2 << 16, vme2->vme2_master2 & 0xffff0000,
+		    vme2->vme2_master2 << 16, vme2->vme2_master2 & 0xffff0000);
+	}
+	if (ctl & VME2_GCSRCTL_MDEN3) {
+		printf("%s: 3phys 0x%08lx-0x%08lx to VME 0x%08lx-0x%08lx\n",
+		    sc->sc_dev.dv_xname,
+		    vme2->vme2_master3 << 16, vme2->vme2_master3 & 0xffff0000,
+		    vme2->vme2_master3 << 16, vme2->vme2_master3 & 0xffff0000);
+	}
+	if (ctl & VME2_GCSRCTL_MDEN4) {
+		printf("%s: 4phys 0x%08lx-0x%08lx to VME 0x%08lx-0x%08lx\n",
+		    sc->sc_dev.dv_xname,
+		    vme2->vme2_master4 << 16, vme2->vme2_master4 & 0xffff0000,
+		    (vme2->vme2_master4 << 16) + (vme2->vme2_master4mod << 16),
+		    (vme2->vme2_master4 & 0xffff0000) +
+		      (vme2->vme2_master4mod & 0xffff0000));
+	}
 
-	/* setup a A32D32 space */
-	printf("%s: 2phys 0x%08lx-0x%08lx to VME 0x%08lx-0x%08lx\n",
-	    sc->sc_dev.dv_xname,
-	    vme2->vme2_master2 << 16, vme2->vme2_master2 & 0xffff0000,
-	    vme2->vme2_master2 << 16, vme2->vme2_master2 & 0xffff0000);
-
-	/* setup a A24D16 space */
-	printf("%s: 3phys 0x%08lx-0x%08lx to VME 0x%08lx-0x%08lx\n",
-	    sc->sc_dev.dv_xname,
-	    vme2->vme2_master3 << 16, vme2->vme2_master3 & 0xffff0000,
-	    vme2->vme2_master3 << 16, vme2->vme2_master3 & 0xffff0000);
-
-	/* setup a XXXXXX space */
-	printf("%s: 4phys 0x%08lx-0x%08lx to VME 0x%08lx-0x%08lx\n",
-	    sc->sc_dev.dv_xname,
-	    vme2->vme2_master4 << 16, vme2->vme2_master4 & 0xffff0000,
-	    (vme2->vme2_master4 << 16) + (vme2->vme2_master4mod << 16),
-       (vme2->vme2_master4 & 0xffff0000) + (vme2->vme2_master4 & 0xffff0000));
 	/*
 	 * Map the VME irq levels to the cpu levels 1:1.
 	 * This is rather inflexible, but much easier.
@@ -493,10 +497,7 @@ vme2chip_init(sc)
 	    (4 << VME2_IRQL4_VME4SHIFT) | (3 << VME2_IRQL4_VME3SHIFT) |
 	    (2 << VME2_IRQL4_VME2SHIFT) | (1 << VME2_IRQL4_VME1SHIFT);
 	printf("%s: vme to cpu irq level 1:1\n",sc->sc_dev.dv_xname);
-	/*
-	printf("%s: vme2_irql4 = 0x%08x\n",	sc->sc_dev.dv_xname,
-	    vme2->vme2_irql4);
-	*/
+
 #if NPCCTWO > 0
 	if (vmebustype == BUS_PCCTWO) {
 		/* 
@@ -506,7 +507,7 @@ vme2chip_init(sc)
 		sc->sc_abih.ih_ipl = 7;
 		sc->sc_abih.ih_wantframe = 1;
 
-		intr_establish(110, &sc->sc_abih);	/* XXX 110 */
+		intr_establish(110, &sc->sc_abih, sc->sc_dev.dv_xname);	/* XXX 110 */
 		vme2->vme2_irqen |= VME2_IRQ_AB;
 	}
 #endif

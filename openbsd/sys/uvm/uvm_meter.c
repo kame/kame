@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_meter.c,v 1.17 2002/03/14 01:27:18 millert Exp $	*/
+/*	$OpenBSD: uvm_meter.c,v 1.20 2004/06/21 23:50:38 tholo Exp $	*/
 /*	$NetBSD: uvm_meter.c,v 1.21 2001/07/14 06:36:03 matt Exp $	*/
 
 /*
@@ -84,7 +84,7 @@ static void uvm_loadav(struct loadavg *);
 void
 uvm_meter()
 {
-	if ((time.tv_sec % 5) == 0)
+	if ((time_second % 5) == 0)
 		uvm_loadav(&averunnable);
 	if (proc0.p_slptime > (maxslp / 2))
 		wakeup(&proc0);
@@ -92,7 +92,7 @@ uvm_meter()
 
 /*
  * uvm_loadav: compute a tenex style load average of a quantity on
- * 1, 5, and 15 minute internvals.
+ * 1, 5, and 15 minute intervals.
  */
 static void
 uvm_loadav(avg)
@@ -110,6 +110,7 @@ uvm_loadav(avg)
 		/* fall through */
 		case SRUN:
 		case SIDL:
+		case SONPROC:
 			nrun++;
 		}
 	}
@@ -263,6 +264,7 @@ uvm_total(totalp)
 
 		case SRUN:
 		case SIDL:
+		case SONPROC:
 			if (p->p_flag & P_INMEM)
 				totalp->t_rq++;
 			else

@@ -1,4 +1,4 @@
-/*	$OpenBSD: am7990.c,v 1.33 2003/08/18 18:23:58 jason Exp $	*/
+/*	$OpenBSD: am7990.c,v 1.35 2004/06/01 12:58:51 mcbride Exp $	*/
 /*	$NetBSD: am7990.c,v 1.22 1996/10/13 01:37:19 christos Exp $	*/
 
 /*-
@@ -61,7 +61,6 @@
 
 #if NBPFILTER > 0
 #include <net/bpf.h>
-#include <net/bpfdesc.h>
 #endif
 
 #include <dev/ic/am7990reg.h>
@@ -1004,9 +1003,7 @@ am7990_setladrf(ac, af)
 {
 	struct ifnet *ifp = &ac->ac_if;
 	struct ether_multi *enm;
-	register u_char *cp, c;
 	register u_int32_t crc;
-	register int i, len;
 	struct ether_multistep step;
 
 	/*
@@ -1035,21 +1032,7 @@ am7990_setladrf(ac, af)
 			goto allmulti;
 		}
 
-		cp = enm->enm_addrlo;
-		crc = 0xffffffff;
-		for (len = sizeof(enm->enm_addrlo); --len >= 0;) {
-			c = *cp++;
-			for (i = 8; --i >= 0;) {
-				if ((crc & 0x01) ^ (c & 0x01)) {
-					crc >>= 1;
-					crc ^= 0xedb88320;
-				} else
-					crc >>= 1;
-				c >>= 1;
-			}
-		}
-		/* Just want the 6 most significant bits. */
-		crc >>= 26;
+		crc = ether_crc32_le(enm->enm_addrlo, ETHER_ADDR_LEN) >> 26;
 
 		/* Set the corresponding bit in the filter. */
 		af[crc >> 4] |= 1 << (crc & 0xf);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ext2fs_vnops.c,v 1.33 2004/03/02 05:52:24 tedu Exp $	*/
+/*	$OpenBSD: ext2fs_vnops.c,v 1.36 2004/07/13 21:04:29 millert Exp $	*/
 /*	$NetBSD: ext2fs_vnops.c,v 1.1 1997/06/11 09:34:09 bouyer Exp $	*/
 
 /*
@@ -72,7 +72,7 @@
 #include <ufs/ext2fs/ext2fs_dir.h>
 
 
-static int ext2fs_chmod(struct vnode *, int, struct ucred *, struct proc *);
+static int ext2fs_chmod(struct vnode *, mode_t, struct ucred *, struct proc *);
 static int ext2fs_chown(struct vnode *, uid_t, gid_t, struct ucred *, struct proc *);
 
 union _qcvt {
@@ -216,8 +216,10 @@ ext2fs_getattr(v)
 	register struct vnode *vp = ap->a_vp;
 	register struct inode *ip = VTOI(vp);
 	register struct vattr *vap = ap->a_vap;
+	struct timeval tv;
 
-	EXT2FS_ITIMES(ip, &time, &time);
+	getmicrotime(&tv);
+	EXT2FS_ITIMES(ip, &tv, &tv);
 	/*
 	 * Copy from inode table
 	 */
@@ -378,7 +380,7 @@ ext2fs_setattr(v)
 static int
 ext2fs_chmod(vp, mode, cred, p)
 	register struct vnode *vp;
-	register int mode;
+	register mode_t mode;
 	register struct ucred *cred;
 	struct proc *p;
 {
@@ -537,7 +539,7 @@ ext2fs_link(v)
 		ip->i_e2fs_nlink--;
 		ip->i_flag |= IN_CHANGE;
 	}
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, cnp->cn_pnbuf);
 out1:
 	if (dvp != vp)
 		VOP_UNLOCK(vp, 0, p);
@@ -974,7 +976,8 @@ ext2fs_mkdir(v)
 	register struct inode *ip, *dp;
 	struct vnode *tvp;
 	struct ext2fs_dirtemplate dirtemplate;
-	int error, dmode;
+	mode_t dmode;
+	int error;
 
 #ifdef DIAGNOSTIC
 	if ((cnp->cn_flags & HASBUF) == 0)
@@ -1066,7 +1069,7 @@ bad:
 	} else
 		*ap->a_vpp = tvp;
 out:
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, cnp->cn_pnbuf);
 	vput(dvp);
 	return (error);
 }
@@ -1258,7 +1261,7 @@ ext2fs_makeinode(mode, dvp, vpp, cnp)
 
 	if ((error = ext2fs_inode_alloc(pdir, mode, cnp->cn_cred, &tvp)) 
 	    != 0) {
-		free(cnp->cn_pnbuf, M_NAMEI);
+		pool_put(&namei_pool, cnp->cn_pnbuf);
 		vput(dvp);
 		return (error);
 	}
@@ -1283,7 +1286,7 @@ ext2fs_makeinode(mode, dvp, vpp, cnp)
 	if (error != 0)
 		goto bad;
 	if ((cnp->cn_flags & SAVESTART) == 0)
-		FREE(cnp->cn_pnbuf, M_NAMEI);
+		pool_put(&namei_pool, cnp->cn_pnbuf);
 	vput(dvp);
 	*vpp = tvp;
 	return (0);
@@ -1293,7 +1296,7 @@ bad:
 	 * Write error occurred trying to update the inode
 	 * or the directory so must deallocate the inode.
 	 */
-	free(cnp->cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, cnp->cn_pnbuf);
 	vput(dvp);
 	ip->i_e2fs_nlink = 0;
 	ip->i_flag |= IN_CHANGE;

@@ -1,4 +1,4 @@
-#	$OpenBSD: files,v 1.292 2004/03/12 00:35:02 miod Exp $
+#	$OpenBSD: files,v 1.314 2004/08/05 17:04:51 pefo Exp $
 #	$NetBSD: files,v 1.87 1996/05/19 17:17:50 jonathan Exp $
 
 #	@(#)files.newconf	7.5 (Berkeley) 5/10/93
@@ -16,6 +16,8 @@ define	mii {[phy = -1]}
 define	midibus { }
 define	midisyn
 define	radiobus {}
+define	i2cbus {}
+define	gpiobus {}
 
 # audio device attributes
 define	mulaw
@@ -74,6 +76,10 @@ define	wskbddev {[console = -1], [mux = -1]}
 define	wsmousedev {[mux = -1]}
 define	wsrasteremulops
 
+# i2c device attributes
+define	i2cexec
+define	i2c_bitbang
+
 # SMC 93Cx6 Serial EEPROM devices
 define	smc93cx6
 file	dev/ic/smc93cx6.c		smc93cx6
@@ -112,6 +118,11 @@ device	ahc: scsi, smc93cx6
 file	dev/ic/aic7xxx.c		ahc
 file	dev/ic/aic7xxx_openbsd.c	ahc
 file	dev/ic/aic7xxx_seeprom.c	ahc
+
+# Adaptec U320 SCSI controllers
+device	ahd: scsi
+file	dev/ic/aic79xx.c		ahd
+file	dev/ic/aic79xx_openbsd.c	ahd
 
 # Adaptec AIC-6[23]60 SCSI controllers
 device	aic: scsi
@@ -184,7 +195,7 @@ file	dev/ic/siop.c			siop
 
 # Symbios/NCR 53c710 SCSI controllers
 device	osiop: scsi
-file	dev/ic/osiop.c			osiop & (osiop_gsc | osiop_eisa)
+file	dev/ic/osiop.c			osiop & (osiop_gsc | osiop_eisa | osiop_pcctwo)
 
 # Symbios/NCR 53c700 SCSI controllers
 device	oosiop: scsi
@@ -265,7 +276,7 @@ file	dev/ic/tropic.c		tr
 
 # 8250/16[45]50-based "com" ports
 device	com: tty
-file	dev/ic/com.c		com & (com_isa | com_isapnp | com_commulti | com_pcmcia | com_pica | com_algor | com_gsc | com_puc | com_ebus | com_dino) needs-flag
+file	dev/ic/com.c		com & (com_isa | com_isapnp | com_commulti | com_pcmcia | com_localbus | com_gsc | com_puc | com_ebus | com_dino) needs-flag
 
 # PC-like keyboard controller
 device	pckbc { [slot = -1] }
@@ -289,7 +300,7 @@ file	dev/ic/cy.c		cy & (cy_isa | cy_pci)	needs-flag
 
 # PC parallel ports (IEEE 1284)
 device	lpt
-file	dev/ic/lpt.c		lpt & (lpt_isa | lpt_pica | lpt_algor | lpt_gsc | lpt_puc | lpt_apio | lpt_ebus) needs-flag
+file	dev/ic/lpt.c		lpt & (lpt_isa | lpt_localbus | lpt_gsc | lpt_puc | lpt_apio | lpt_ebus) needs-flag
 
 # STI (hp graphics)
 device	sti: wsemuldisplaydev
@@ -306,6 +317,10 @@ file	dev/ic/trm.c		trm
 # National Semiconductor LM7[89] and compatible hardware monitors
 device	lm
 file	dev/ic/nslm7x.c		lm
+
+# ADMtek ADM8211 802.11
+device	atw: ether, ifnet, ifmedia, smc93cx6, wlan
+file	dev/ic/atw.c		atw
 
 # Attributes which machine-independent bus support can be attached to.
 # These should be defined here, because some of these busses can have
@@ -400,6 +415,9 @@ file	net/if_pfsync.c		pfsync	needs-flag
 
 pseudo-device bio
 file	dev/bio.c	bio needs-flag
+
+pseudo-device hotplug
+file	dev/hotplug.c		hotplug	needs-flag
 
 # XXX machine-independent SCSI files should live somewhere here, maybe
 
@@ -531,7 +549,7 @@ file kern/exec_script.c
 file kern/exec_subr.c
 file kern/init_main.c
 file kern/init_sysent.c
-file kern/kern_acct.c
+file kern/kern_acct.c			accounting
 file kern/kern_clock.c
 file kern/kern_descrip.c
 file kern/kern_event.c
@@ -553,15 +571,19 @@ file kern/kern_sig.c
 file kern/kern_subr.c
 file kern/kern_sysctl.c
 file kern/kern_synch.c
+file kern/kern_tc.c
 file kern/kern_time.c
 file kern/kern_timeout.c
 file kern/kern_watchdog.c		!small_kernel
 file kern/kern_xxx.c
 file kern/kgdb_stub.c			kgdb
+file kern/sched_bsd.c
 file kern/subr_autoconf.c
 file kern/subr_disk.c
+file kern/subr_evcount.c
 file kern/subr_extent.c
 file kern/subr_log.c
+file kern/subr_mutex.c
 file kern/subr_pool.c
 file kern/subr_prf.c
 file kern/subr_prof.c
@@ -669,15 +691,25 @@ file net/if_bridge.c			bridge			needs-count
 file net/bridgestp.c			bridge
 file net/if_vlan.c			vlan			needs-count
 file net/radix.c
+file net/radix_mpath.c			!small_kernel
 file net/raw_cb.c
 file net/raw_usrreq.c
 file net/route.c
+file net/route_src.c			!small_kernel
 file net/rtsock.c
 file net/slcompress.c			sl | ppp | strip
 file net/if_enc.c			enc			needs-count
 file net/if_gre.c			gre			needs-count
 #file net/if_ieee1394subr.c		ieee1394
-file net/if_ieee80211subr.c		wlan
+file net80211/ieee80211.c		wlan
+file net80211/ieee80211_compat.c	wlan
+file net80211/ieee80211_crypto.c	wlan
+file net80211/ieee80211_input.c		wlan
+file net80211/ieee80211_ioctl.c		wlan
+file net80211/ieee80211_node.c		wlan
+file net80211/ieee80211_output.c	wlan
+file net80211/ieee80211_proto.c		wlan
+file net80211/ieee80211_rssadapt.c	wlan
 file netccitt/ccitt_proto.c		ccitt
 file netccitt/hd_debug.c		hdlc
 file netccitt/hd_input.c		hdlc
@@ -730,8 +762,9 @@ file netinet/ip_ah.c			inet & ipsec
 file netinet/ip_carp.c			carp			needs-count
 file netinet/ip_ipcomp.c		inet & ipsec
 file crypto/rijndael.c			(inet & ipsec) | crypto | uvm_swap_encrypt
+file crypto/md5.c
 file crypto/rmd160.c			(inet & ipsec) | crypto
-file crypto/sha1.c			(inet & ipsec) | crypto
+file crypto/sha1.c			(inet & ipsec) | crypto | carp
 file crypto/sha2.c			(inet & ipsec) | crypto
 file crypto/blf.c			(inet & ipsec) | crypto | vnd
 file crypto/cast.c			(inet & ipsec) | crypto
@@ -752,43 +785,6 @@ file netatalk/at_proto.c		netatalk
 file netatalk/ddp_input.c		netatalk
 file netatalk/ddp_output.c		netatalk
 file netatalk/ddp_usrreq.c		netatalk
-file netiso/clnp_debug.c		iso
-file netiso/clnp_er.c			iso
-file netiso/clnp_frag.c			iso
-file netiso/clnp_input.c		iso
-file netiso/clnp_options.c		iso
-file netiso/clnp_output.c		iso
-file netiso/clnp_raw.c			iso
-file netiso/clnp_subr.c			iso
-file netiso/clnp_timer.c		iso
-file netiso/cltp_usrreq.c		iso
-file netiso/esis.c			iso
-file netiso/idrp_usrreq.c		iso
-file netiso/if_cons.c			iso
-file netiso/if_eon.c			eon
-file netiso/iso.c			iso
-file netiso/iso_chksum.c		iso
-file netiso/iso_pcb.c			iso
-file netiso/iso_proto.c			iso
-file netiso/iso_snpac.c			iso
-file netiso/tp_astring.c		iso | tpip
-file netiso/tp_cons.c			iso
-file netiso/tp_driver.c			iso | tpip
-file netiso/tp_emit.c			iso | tpip
-file netiso/tp_inet.c			iso | tpip
-file netiso/tp_input.c			iso | tpip
-file netiso/tp_iso.c			iso
-file netiso/tp_meas.c			iso | tpip
-file netiso/tp_output.c			iso | tpip
-file netiso/tp_pcb.c			iso | tpip
-file netiso/tp_subr.c			iso | tpip
-file netiso/tp_subr2.c			iso | tpip
-file netiso/tp_timer.c			iso | tpip
-file netiso/tp_trace.c			iso | tpip
-file netiso/tp_usrreq.c			iso | tpip
-file netiso/tuba_subr.c			iso | tuba
-file netiso/tuba_table.c		iso | tuba
-file netiso/tuba_usrreq.c		iso | tuba
 file netnatm/natm_pcb.c			natm
 file netnatm/natm_proto.c		natm
 file netnatm/natm.c			natm
@@ -817,6 +813,7 @@ file nfs/krpc_subr.c			nfsclient
 file nfs/nfs_bio.c			nfsclient
 file nfs/nfs_boot.c			nfsclient
 file nfs/nfs_node.c			nfsclient
+file nfs/nfs_kq.c                       nfsclient
 file nfs/nfs_serv.c			nfsserver
 file nfs/nfs_socket.c			nfsserver | nfsclient
 file nfs/nfs_srvcache.c			nfsserver

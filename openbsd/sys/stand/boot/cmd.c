@@ -1,4 +1,4 @@
-/*	$OpenBSD: cmd.c,v 1.52 2003/11/08 19:17:28 jmc Exp $	*/
+/*	$OpenBSD: cmd.c,v 1.57 2004/06/26 17:50:47 tom Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Michael Shalayeff
@@ -24,13 +24,19 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
  */
 
 #include <sys/param.h>
-#include <libsa.h>
 #include <sys/reboot.h>
+
+#ifdef REGRESS
+#include <sys/stat.h>
+#include <errno.h>
+#else
+#include <libsa.h>
 #include <lib/libkern/funcs.h>
+#endif
+
 #include "cmd.h"
 
 #define CTRL(c)	((c)&0x1f)
@@ -72,10 +78,9 @@ static void ls(char *, struct stat *);
 static int readline(char *, size_t, int);
 char *nextword(char *);
 static char *whatcmd(const struct cmd_table **ct, char *);
-static int docmd(void);
 static char *qualify(char *);
 
-char cmd_buf[133];
+char cmd_buf[CMD_BUFF_SIZE];
 
 int
 getcmd(void)
@@ -94,7 +99,7 @@ read_conf(void)
 #ifndef INSECURE
 	struct stat sb;
 #endif
-	int fd, eof = 0;
+	int fd, rc = 0;
 
 	if ((fd = open(qualify(cmd.conf), 0)) < 0) {
 		if (errno != ENOENT && errno != ENXIO) {
@@ -119,21 +124,41 @@ read_conf(void)
 		cmd.cmd = NULL;
 
 		do {
-			eof = read(fd, p, 1);
-		} while (eof > 0 && *p++ != '\n');
+			rc = read(fd, p, 1);
+		} while (rc > 0 && *p++ != '\n' &&
+		    (p-cmd_buf) < sizeof(cmd_buf));
 
-		if (eof < 0)
+		if (rc < 0) {			/* Error from read() */
 			printf("%s: %s\n", cmd.path, strerror(errno));
-		else
-			*--p = '\0';
+			break;
+		}
 
-	} while (eof > 0 && !(eof = docmd()));
+		if (rc == 0) {			/* eof from read() */
+			if (p != cmd_buf) {	/* Line w/o trailing \n */
+				*p = '\0';
+				rc = docmd();
+				break;
+			}
+		} else {			/* rc > 0, read a char */
+			p--;			/* Get back to last character */
+
+			if (*p != '\n') {	/* Line was too long */
+				printf("%s: line too long\n", cmd.path);
+
+				/* Don't want to run the truncated command */
+				rc = -1;
+			}
+
+			*p = '\0';
+		}
+
+	} while (rc > 0 && !(rc = docmd()));
 
 	close(fd);
-	return eof;
+	return rc;
 }
 
-static int
+int
 docmd(void)
 {
 	char *p = NULL;
@@ -143,7 +168,7 @@ docmd(void)
 	if (cmd.cmd == NULL) {
 
 		/* command */
-		for (p = cmd_buf; *p && (*p == ' ' || *p == '\t'); p++)
+		for (p = cmd_buf; *p == ' ' || *p == '\t'; p++)
 			;
 		if (*p == '#' || *p == '\0') { /* comment or empty string */
 #ifdef DEBUG
@@ -184,7 +209,12 @@ docmd(void)
 	}
 	cmd.argv[cmd.argc] = NULL;
 
+#ifdef REGRESS
+	printf("%s %s\n", cmd.argv[0],
+	    (cmd.argv[1] == NULL) ? "(null)" : cmd.argv[1]);
+#else
 	return (*cmd.cmd->cmd_exec)();
+#endif
 }
 
 static char *
@@ -237,6 +267,9 @@ readline(char *buf, size_t n, int to)
 	} else
 		while (!cnischar())
 			;
+
+	/* User has typed something.  Turn off timeouts. */
+	cmd.timeout = 0;
 
 	while (1) {
 		switch ((ch = getchar())) {

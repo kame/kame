@@ -1,4 +1,4 @@
-/*	$OpenBSD: auich.c,v 1.37 2003/10/10 04:38:56 jason Exp $	*/
+/*	$OpenBSD: auich.c,v 1.41 2004/07/21 04:05:33 tedu Exp $	*/
 
 /*
  * Copyright (c) 2000,2001 Michael Shalayeff
@@ -52,6 +52,15 @@
 #include <machine/bus.h>
 
 #include <dev/ic/ac97.h>
+
+/*
+ * XXX > 4GB kaboom: define kvtop as a truncated vtophys.  Will not
+ * do the right thing on machines with more than 4 gig of ram.
+ */
+#if defined(__amd64__)
+#include <uvm/uvm_extern.h>	/* for vtophys */
+#define kvtop(va)		(int)vtophys((vaddr_t)(va))
+#endif
 
 /* 12.1.10 NAMBAR - native audio mixer base address register */
 #define	AUICH_NAMBAR	0x10
@@ -231,6 +240,7 @@ static const struct auich_devtype {
 	{ PCI_VENDOR_SIS,	PCI_PRODUCT_SIS_7012_ACA,	0, "SiS7012" },
 	{ PCI_VENDOR_NVIDIA,	PCI_PRODUCT_NVIDIA_NFORCE_ACA,	0, "nForce" },
 	{ PCI_VENDOR_NVIDIA,	PCI_PRODUCT_NVIDIA_NFORCE2_ACA,	0, "nForce2" },
+	{ PCI_VENDOR_NVIDIA,	PCI_PRODUCT_NVIDIA_NFORCE3_ACA, 0, "nForce3" },
 	{ PCI_VENDOR_AMD,	PCI_PRODUCT_AMD_PBC768_ACA,	0, "AMD768" },
 	{ PCI_VENDOR_AMD,	PCI_PRODUCT_AMD_8111_ACA,	0, "AMD8111" },
 };
@@ -403,8 +413,10 @@ auich_attach(parent, self, aux)
 		    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_INTEL_82801DB_ACA) {
 			/* MSI 845G Max never return AUICH_PCR */
 			sc->sc_ignore_codecready = 1;
-		} else
+		} else {
+			printf("%s: reset failed!\n", sc->sc_dev.dv_xname);
 			return;
+		}
 	}
 
 	sc->host_if.arg = sc;
@@ -429,7 +441,7 @@ auich_attach(parent, self, aux)
 	sc->suspend = PWR_RESUME;
 	sc->powerhook = powerhook_establish(auich_powerhook, sc);
 
-	sc->sc_ac97rate = auich_calibrate(sc);
+	sc->sc_ac97rate = -1;
 }
 
 int
@@ -528,6 +540,10 @@ auich_open(v, flags)
 	void *v;
 	int flags;
 {
+	struct auich_softc *sc = v;
+
+	if (sc->sc_ac97rate == -1)
+		sc->sc_ac97rate = auich_calibrate(sc);
 	return 0;
 }
 
@@ -1355,19 +1371,19 @@ auich_calibrate(struct auich_softc *sc)
 			  (0 - 1) & AUICH_LVI_MASK);
 
 	/* start */
-	microtime(&t1);
+	microuptime(&t1);
 	bus_space_write_1(sc->iot, sc->aud_ioh, AUICH_PCMI + AUICH_CTRL,
 	    AUICH_RPBM);
 
 	/* wait */
 	while (nciv == ociv) {
-		microtime(&t2);
+		microuptime(&t2);
 		if (t2.tv_sec - t1.tv_sec > 1)
 			break;
 		nciv = bus_space_read_1(sc->iot, sc->aud_ioh,
 					AUICH_PCMI + AUICH_CIV);
 	}
-	microtime(&t2);
+	microuptime(&t2);
 
 	/* reset */
 	bus_space_write_1(sc->iot, sc->aud_ioh, AUICH_PCMI + AUICH_CTRL, AUICH_RR);

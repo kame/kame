@@ -1,4 +1,4 @@
-/*	$OpenBSD: intvec.s,v 1.17 2003/11/07 10:16:45 jmc Exp $   */
+/*	$OpenBSD: intvec.s,v 1.19 2004/07/07 23:10:46 deraadt Exp $   */
 /*	$NetBSD: intvec.s,v 1.39 1999/06/28 08:20:48 itojun Exp $   */
 
 /*
@@ -115,7 +115,7 @@ _rpb:
 	NOVEC;				# Unused, 7C
 	NOVEC;				# Unused, 80
 	NOVEC;				# Unused, 84
-	INTVEC(astintr,	KSTACK)		# Asynchronous Sustem Trap, AST
+	INTVEC(astintr,	KSTACK)		# Asynchronous System Trap, AST
 	NOVEC;				# Unused, 8C
 	NOVEC;				# Unused, 90
 	NOVEC;				# Unused, 94
@@ -302,8 +302,8 @@ ENTRY(netint)
 		.globl	hardclock
 hardclock:	mtpr	$0xc1,$PR_ICCS		# Reset interrupt flag
 		pushr	$0x3f
-	incl	_clock_intrcnt+EV_COUNT	# count the number of clock interrupts
-#	adwc	$0,_clock_intrcnt+EV_COUNT+4
+	incl	_clock_intrcnt+EC_COUNT	# count the number of clock interrupts
+	adwc	$0,_clock_intrcnt+EC_COUNT+4
 #ifdef VAX46
 		cmpl	_vax_boardtype,$VAX_BTYP_46
 		bneq	1f

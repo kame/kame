@@ -1,4 +1,4 @@
-/*	$OpenBSD: pciide.c,v 1.163.2.1 2004/05/14 21:32:19 brad Exp $	*/
+/*	$OpenBSD: pciide.c,v 1.169 2004/08/21 07:13:55 mickey Exp $	*/
 /*	$NetBSD: pciide.c,v 1.127 2001/08/03 01:31:08 tsutsui Exp $	*/
 
 /*
@@ -803,14 +803,10 @@ pciide_attach(parent, self, aux)
 	pcitag_t tag = pa->pa_tag;
 	struct pciide_softc *sc = (struct pciide_softc *)self;
 	pcireg_t csr;
-	char devinfo[256];
 
 	sc->sc_pp = pciide_lookup_product(pa->pa_id);
-	if (sc->sc_pp == NULL) {
+	if (sc->sc_pp == NULL)
 		sc->sc_pp = &default_product_desc;
-		pci_devinfo(pa->pa_id, pa->pa_class, 0, devinfo,
-		    sizeof devinfo);
-	}
 	sc->sc_rev = PCI_REVISION(pa->pa_class);
 
 	sc->sc_pc = pa->pa_pc;
@@ -916,13 +912,6 @@ pciide_mapregs_native(pa, cp, cmdsizep, ctlsizep, pci_intr)
 		sc->sc_pci_ih = pci_intr_establish(pa->pa_pc,
 		    intrhandle, IPL_BIO, pci_intr, sc,
 		    sc->sc_wdcdev.sc_dev.dv_xname);
-#ifdef __pegasos__
-		/* stupid broken board */
-		if (intrhandle == 0xe)
-			pci_intr_establish(pa->pa_pc,
-			    0xf, IPL_BIO, pci_intr, sc,
-			    sc->sc_wdcdev.sc_dev.dv_xname);
-#endif
 #else
 		sc->sc_pci_ih = pci_intr_establish(pa->pa_pc,
 		    intrhandle, IPL_BIO, pci_intr, sc);
@@ -1646,8 +1635,12 @@ next:
 			pciide_unmap_compat_intr(pa, cp, channel, interface);
 			bus_space_unmap(cp->wdc_channel.cmd_iot,
 			    cp->wdc_channel.cmd_ioh, cmdsize);
-			bus_space_unmap(cp->wdc_channel.ctl_iot,
-			    cp->wdc_channel.ctl_ioh, ctlsize);
+			if (interface & PCIIDE_INTERFACE_PCI(channel))
+				bus_space_unmap(cp->wdc_channel.ctl_iot,
+				    cp->ctl_baseioh, ctlsize);
+			else
+				bus_space_unmap(cp->wdc_channel.ctl_iot,
+				    cp->wdc_channel.ctl_ioh, ctlsize);
 		}
 		if (cp->hw_ok) {
 			cp->wdc_channel.data32iot = cp->wdc_channel.cmd_iot;
@@ -3620,6 +3613,7 @@ static struct sis_hostbr_type {
 	{PCI_PRODUCT_SIS_733, 0x00, 5, "733", SIS_TYPE_100NEW},
 	{PCI_PRODUCT_SIS_735, 0x00, 5, "735", SIS_TYPE_100NEW},
 	{PCI_PRODUCT_SIS_740, 0x00, 5, "740", SIS_TYPE_SOUTH},
+	{PCI_PRODUCT_SIS_741, 0x00, 6, "741", SIS_TYPE_SOUTH},
 	{PCI_PRODUCT_SIS_745, 0x00, 5, "745", SIS_TYPE_100NEW},
 	{PCI_PRODUCT_SIS_746, 0x00, 6, "746", SIS_TYPE_SOUTH},
 	{PCI_PRODUCT_SIS_748, 0x00, 6, "748", SIS_TYPE_SOUTH},
@@ -4224,6 +4218,12 @@ ns_scx200_chip_map(struct pciide_softc *sc, struct pci_attach_args *pa)
 		sc->sc_dma_maxsegsz = IDEDMA_BYTE_COUNT_MAX - PAGE_SIZE;
 		sc->sc_dma_boundary = IDEDMA_BYTE_COUNT_MAX - PAGE_SIZE;
 	}
+
+	/*
+	 * This chip seems to be unable to do one-sector transfers
+	 * using DMA.
+	 */
+	sc->sc_wdcdev.quirks = WDC_QUIRK_NOSHORTDMA;
 
 	pciide_print_channels(sc->sc_wdcdev.nchannels, interface);
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.6 2004/03/09 23:05:13 deraadt Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.10 2004/06/25 17:27:01 andreas Exp $	*/
 /*	$NetBSD: cpu.h,v 1.1 2003/04/26 18:39:39 fvdl Exp $	*/
 
 /*-
@@ -53,13 +53,12 @@
 
 #include <sys/device.h>
 #include <sys/lock.h>
+#include <sys/sched.h>
 
 struct cpu_info {
 	struct device *ci_dev;
 	struct cpu_info *ci_self;
-#if 0
 	struct schedstate_percpu ci_schedstate; /* scheduler state */
-#endif
 	struct cpu_info *ci_next;
 
 	struct proc *ci_curproc;
@@ -102,7 +101,6 @@ struct cpu_info {
 
 	int		ci_want_resched;
 	int		ci_astpending;
-	struct trapframe *ci_ddb_regs;
 
 	struct x86_cache_info ci_cinfo[CAI_COUNT];
 
@@ -113,11 +111,16 @@ struct cpu_info {
 
 	char		*ci_gdt;
 
+	volatile int	ci_ddb_paused;
+#define CI_DDB_RUNNING		0
+#define CI_DDB_SHOULDSTOP	1
+#define CI_DDB_STOPPED		2
+#define CI_DDB_ENTERDDB		3
+#define CI_DDB_INDDB		4
+
 	struct x86_64_tss	ci_doubleflt_tss;
-	struct x86_64_tss	ci_ddbipi_tss;
 
 	char *ci_doubleflt_stack;
-	char *ci_ddbipi_stack;
 
 	struct evcnt ci_ipi_events[X86_NIPI];
 };
@@ -141,6 +144,14 @@ extern struct cpu_info *cpu_info_list;
 #define CPU_INFO_FOREACH(cii, ci)	cii = 0, ci = cpu_info_list; \
 					ci != NULL; ci = ci->ci_next
 
+#define CPU_INFO_UNIT(ci)	((ci)->ci_dev->dv_unit)
+
+/*      
+ * Preempt the current process if in interrupt from user mode,
+ * or after the current trap/syscall if in system mode.
+ */
+extern void need_resched(struct cpu_info *);
+
 #if defined(MULTIPROCESSOR)
 
 #define X86_MAXPROCS		32	/* bitmask; can be bumped to 64 */
@@ -161,13 +172,6 @@ extern struct cpu_info *cpu_info[X86_MAXPROCS];
 void cpu_boot_secondary_processors(void);
 void cpu_init_idle_pcbs(void);    
 
-
-/*      
- * Preempt the current process if in interrupt from user mode,
- * or after the current trap/syscall if in system mode.
- */
-extern void need_resched(struct cpu_info *);
-
 #else /* !MULTIPROCESSOR */
 
 #define X86_MAXPROCS		1
@@ -186,29 +190,12 @@ extern struct cpu_info cpu_info_primary;
 #define	cpu_number()		0
 #define CPU_IS_PRIMARY(ci)	1
 
-/*
- * Preempt the current process if in interrupt from user mode,
- * or after the current trap/syscall if in system mode.
- */
+#endif	/* MULTIPROCESSOR */
+
+#include <machine/psl.h>
 
 #ifdef MULTIPROCESSOR
-#define need_resched(ci)						\
-do {									\
-	struct cpu_info *__ci = (ci);					\
-	__ci->ci_want_resched = 1;					\
-	if (__ci->ci_curproc != NULL)					\
-		aston(__ci->ci_curproc);				\
-} while (/*CONSTCOND*/0)
-#else
-#define need_resched()							\
-do {									\
-	struct cpu_info *__ci = curcpu();				\
-	__ci->ci_want_resched = 1;					\
-	if (__ci->ci_curproc != NULL)					\
-		aston(__ci->ci_curproc);				\
-} while (/*CONSTCOND*/0)
-#endif
-
+#include <sys/mplock.h>
 #endif
 
 #define aston(p)	((p)->p_md.md_astpending = 1)
@@ -246,11 +233,13 @@ extern u_int32_t cpus_attached;
 /*
  * We need a machine-independent name for this.
  */
-extern void delay(int);
+extern void (*delay_func)(int);
 struct timeval;
-extern void microtime(struct timeval *);
+extern void (*microtime_func)(struct timeval *);
 
-#define DELAY(x)		delay(x)
+#define DELAY(x)		(*delay_func)(x)
+#define delay(x)		(*delay_func)(x)
+#define microtime(tv)		(*microtime_func)(tv)
 
 
 /*
@@ -279,7 +268,6 @@ int	cpu_amd64speed(int *);
 void cpu_probe_features(struct cpu_info *);
 
 /* machdep.c */
-void	delay(int);
 void	dumpconf(void);
 int	cpu_maxproc(void);
 void	cpu_reset(void);
@@ -322,8 +310,6 @@ void x86_bus_space_init(void);
 void x86_bus_space_mallocok(void);
 
 #endif /* _KERNEL */
-
-#include <machine/psl.h>
 
 /* 
  * CTL_MACHDEP definitions.

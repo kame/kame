@@ -1,4 +1,4 @@
-/*	$OpenBSD: clock.c,v 1.10 2004/01/14 20:50:48 miod Exp $ */
+/*	$OpenBSD: clock.c,v 1.13 2004/07/30 22:29:44 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -158,24 +158,24 @@ clockattach(parent, self, args)
 	case BUS_PCC:
 		prof_reset = ca->ca_ipl | PCC_IRQ_IEN | PCC_TIMERACK;
 		stat_reset = ca->ca_ipl | PCC_IRQ_IEN | PCC_TIMERACK;
-		pccintr_establish(PCCV_TIMER1, &sc->sc_profih);
-		pccintr_establish(PCCV_TIMER2, &sc->sc_statih);
+		pccintr_establish(PCCV_TIMER1, &sc->sc_profih, "clock");
+		pccintr_establish(PCCV_TIMER2, &sc->sc_statih, "stat");
 		break;
 #endif
 #if NMC > 0
 	case BUS_MC:
 		prof_reset = ca->ca_ipl | MC_IRQ_IEN | MC_IRQ_ICLR;
 		stat_reset = ca->ca_ipl | MC_IRQ_IEN | MC_IRQ_ICLR;
-		mcintr_establish(MCV_TIMER1, &sc->sc_profih);
-		mcintr_establish(MCV_TIMER2, &sc->sc_statih);
+		mcintr_establish(MCV_TIMER1, &sc->sc_profih, "clock");
+		mcintr_establish(MCV_TIMER2, &sc->sc_statih, "stat");
 		break;
 #endif
 #if NPCCTWO > 0
 	case BUS_PCCTWO:
 		prof_reset = ca->ca_ipl | PCC2_IRQ_IEN | PCC2_IRQ_ICLR;
 		stat_reset = ca->ca_ipl | PCC2_IRQ_IEN | PCC2_IRQ_ICLR;
-		pcctwointr_establish(PCC2V_TIMER1, &sc->sc_profih);
-		pcctwointr_establish(PCC2V_TIMER2, &sc->sc_statih);
+		pcctwointr_establish(PCC2V_TIMER1, &sc->sc_profih, "clock");
+		pcctwointr_establish(PCC2V_TIMER2, &sc->sc_statih, "stat");
 		break;
 #endif
 	}
@@ -207,6 +207,7 @@ clockintr(arg)
 		break;
 #endif
 	}
+
 	hardclock(arg);
 	return (1);
 }
@@ -408,20 +409,23 @@ delay(us)
 		 * possible. However, since clock attaches before vme,
 		 * use a tight loop if necessary.
 		 */
-		if (sys_vme2 != NULL) {
-			sys_vme2->vme2_t1cmp = 0xffffffff;
-			sys_vme2->vme2_t1count = 0;
-			sys_vme2->vme2_tctl |= VME2_TCTL_CEN;
+	{
+		struct vme2reg *vme2;
 
-			while (sys_vme2->vme2_t1count < us)
-				;
+		if (sys_vme2 != NULL)
+			vme2 = sys_vme2;
+		else
+			vme2 = (struct vme2reg *)IIOV(0xfff40000);
 
-			sys_vme2->vme2_tctl &= ~VME2_TCTL_CEN;
-		} else {
-			c = 4 * us;
-			while (--c > 0)
-				;
-		}
+		vme2->vme2_t1cmp = 0xffffffff;
+		vme2->vme2_t1count = 0;
+		vme2->vme2_tctl |= VME2_TCTL_CEN;
+
+		while (vme2->vme2_t1count < us)
+			;
+
+		vme2->vme2_tctl &= ~VME2_TCTL_CEN;
+	}
 		break;
 #endif
 	}

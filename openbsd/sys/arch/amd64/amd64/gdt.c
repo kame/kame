@@ -1,4 +1,4 @@
-/*	$OpenBSD: gdt.c,v 1.2 2004/02/27 23:45:23 deraadt Exp $	*/
+/*	$OpenBSD: gdt.c,v 1.5 2004/07/08 04:23:04 david Exp $	*/
 /*	$NetBSD: gdt.c,v 1.1 2003/04/26 18:39:28 fvdl Exp $	*/
 
 /*-
@@ -54,9 +54,6 @@
 
 #include <machine/gdt.h>
 
-#define	MINGDTSIZ	2048
-#define	MAXGDTSIZ	65536
-
 int gdt_size;		/* size of GDT in bytes */
 int gdt_dyncount;	/* number of dyn. allocated GDT entries in use */
 int gdt_dynavail;
@@ -84,15 +81,15 @@ void gdt_put_slot(int);
 static __inline void
 gdt_lock()
 {
-
-	(void) lockmgr(&gdt_lock_store, LK_EXCLUSIVE, NULL, curproc);
+	if (curproc != NULL)		/* XXX - ugh. needed for startup */
+		(void) lockmgr(&gdt_lock_store, LK_EXCLUSIVE, NULL, curproc);
 }
 
 static __inline void
 gdt_unlock()
 {
-
-	(void) lockmgr(&gdt_lock_store, LK_RELEASE, NULL, curproc);
+	if (curproc != NULL)
+		(void) lockmgr(&gdt_lock_store, LK_RELEASE, NULL, curproc);
 }
 
 void
@@ -158,7 +155,7 @@ gdt_init()
 
 	old_gdt = gdtstore;
 	gdtstore = (char *)uvm_km_valloc(kernel_map, MAXGDTSIZ);
-	for (va = (vaddr_t)gdtstore; va < (vaddr_t)gdtstore + MINGDTSIZ;
+	for (va = (vaddr_t)gdtstore; va < (vaddr_t)gdtstore + gdt_size;
 	    va += PAGE_SIZE) {
 		pg = uvm_pagealloc(NULL, 0, NULL, UVM_PGA_ZERO);
 		if (pg == NULL) {
@@ -175,6 +172,7 @@ gdt_init()
 	gdt_init_cpu(ci);
 }
 
+#ifdef MULTIPROCESSOR
 /*
  * Allocate shadow GDT for a slave cpu.
  */
@@ -188,6 +186,7 @@ gdt_alloc_cpu(struct cpu_info *ci)
         memcpy(ci->ci_gdt, gdtstore,
 	   DYNSEL_START + gdt_dyncount * sizeof(struct sys_segment_descriptor));
 }
+#endif	/* MULTIPROCESSOR */
 
 
 /*
@@ -222,17 +221,17 @@ gdt_reload_cpu(struct cpu_info *ci)
 void
 gdt_grow()
 {
-	size_t old_len, new_len;
+	size_t old_len;
 	struct vm_page *pg;
 	vaddr_t va;
 
 	old_len = gdt_size;
-	gdt_size <<= 1;
-	new_len = old_len << 1;
+	gdt_size = 2 * gdt_size;
 	gdt_dynavail =
 	    (gdt_size - DYNSEL_START) / sizeof (struct sys_segment_descriptor);
 
-	for (va = (vaddr_t)gdtstore + old_len; va < (vaddr_t)gdtstore + new_len;
+	for (va = (vaddr_t)gdtstore + old_len;
+	    va < (vaddr_t)gdtstore + gdt_size;
 	    va += PAGE_SIZE) {
 		while ((pg = uvm_pagealloc(NULL, 0, NULL, UVM_PGA_ZERO)) ==
 		       NULL) {

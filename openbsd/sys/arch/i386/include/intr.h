@@ -1,4 +1,4 @@
-/*	$OpenBSD: intr.h,v 1.19 2003/04/17 03:42:14 drahn Exp $	*/
+/*	$OpenBSD: intr.h,v 1.22 2004/06/16 18:27:26 grange Exp $	*/
 /*	$NetBSD: intr.h,v 1.5 1996/05/13 06:11:28 mycroft Exp $	*/
 
 /*
@@ -33,85 +33,41 @@
 #ifndef _I386_INTR_H_
 #define _I386_INTR_H_
 
-/*
- * Intel APICs (advanced programmable interrupt controllers) have
- * bytesized priority registers where the upper nibble is the actual
- * interrupt priority level (a.k.a. IPL).  Interrupt vectors are
- * closely tied to these levels as interrupts whose vectors' upper
- * nibble is lower than or equal to the current level are blocked.
- * Not all 256 possible vectors are available for interrupts in
- * APIC systems, only
- *
- * For systems where instead the older ICU (interrupt controlling
- * unit, a.k.a. PIC or 82C59) is used, the IPL is not directly useful,
- * since the interrupt blocking is handled via interrupt masks instead
- * of levels.  However the IPL is easily used as an offset into arrays
- * of masks.
- */
-#define IPLSHIFT 4	/* The upper nibble of vectors is the IPL.	*/
-#define NIPL 16		/* Four bits of information gives as much.	*/
-#define IPL(level) ((level) >> IPLSHIFT)	/* Extract the IPL.	*/
-/* XXX Maybe this IDTVECOFF definition should be elsewhere? */
-#define IDTVECOFF 0x20	/* The lower 32 IDT vectors are reserved.	*/
-
-/*
- * This macro is only defined for 0 <= x < 14, i.e. there are fourteen
- * distinct priority levels available for interrupts.
- */
-#define MAKEIPL(priority) (IDTVECOFF + ((priority) << IPLSHIFT))
-
-/*
- * Interrupt priority levels.
- * XXX We are somewhat sloppy about what we mean by IPLs, sometimes
- * XXX we refer to the eight-bit value suitable for storing into APICs'
- * XXX priority registers, other times about the four-bit entity found
- * XXX in the former values' upper nibble, which can be used as offsets
- * XXX in various arrays of our implementation.  We are hoping that
- * XXX the context will provide enough information to not make this
- * XXX sloppy naming a real problem.
- */
-#define	IPL_NONE	0		/* nothing */
-#define	IPL_SOFTCLOCK	MAKEIPL(0)	/* timeouts */
-#define	IPL_SOFTNET	MAKEIPL(1)	/* protocol stacks */
-#define	IPL_BIO		MAKEIPL(2)	/* block I/O */
-#define	IPL_NET		MAKEIPL(3)	/* network */
-#define	IPL_SOFTTTY	MAKEIPL(4)	/* delayed terminal handling */
-#define	IPL_TTY		MAKEIPL(5)	/* terminal */
-#define	IPL_VM		MAKEIPL(6)	/* memory allocation */
-#define IPL_IMP		IPL_VM		/* XXX - should not be here. */
-#define	IPL_AUDIO	MAKEIPL(7)	/* audio */
-#define	IPL_CLOCK	MAKEIPL(8)	/* clock */
-#define	IPL_STATCLOCK	MAKEIPL(9)	/* statclock */
-#define	IPL_HIGH	MAKEIPL(9)	/* everything */
-
-/* Interrupt sharing types. */
-#define	IST_NONE	0	/* none */
-#define	IST_PULSE	1	/* pulsed */
-#define	IST_EDGE	2	/* edge-triggered */
-#define	IST_LEVEL	3	/* level-triggered */
-
-/* Soft interrupt masks. */
-#define	SIR_CLOCK	31
-#define	SIR_NET		30
-#define	SIR_TTY		29
+#include <machine/intrdefs.h>
 
 #ifndef _LOCORE
 
-volatile int cpl;	/* Current interrupt priority level.		*/
-volatile int ipending;	/* Interrupts pending.				*/
-volatile int astpending;/* Asynchronous software traps (softints) pending. */
-int imask[NIPL];	/* Bitmasks telling what interrupts are blocked. */
-int iunmask[NIPL];	/* Bitmasks telling what interrupts are accepted. */
+#ifdef MULTIPROCESSOR
+#include <machine/i82489reg.h>
+#include <machine/i82489var.h>
+#include <machine/cpu.h>
+#endif
+
+extern volatile u_int32_t lapic_tpr;	/* Current interrupt priority level. */
+
+extern volatile u_int32_t ipending;	/* Interrupts pending. */
+extern int imask[];	/* Bitmasks telling what interrupts are blocked. */
+extern int iunmask[];	/* Bitmasks telling what interrupts are accepted. */
 
 #define IMASK(level) imask[IPL(level)]
 #define IUNMASK(level) iunmask[IPL(level)]
 
 extern void Xspllower(void);
 
-static __inline int splraise(int);
-static __inline int spllower(int);
-#define SPLX_DECL void splx(int);
-static __inline void softintr(int);
+extern int splraise(int);
+extern int spllower(int);
+extern void splx(int);
+extern void softintr(int, int);
+
+/*
+ * compiler barrier: prevent reordering of instructions.
+ * XXX something similar will move to <sys/cdefs.h>
+ * or thereabouts.
+ * This prevents the compiler from reordering code around
+ * this "instruction", acting as a sequence point for code generation.
+ */
+
+#define	__splbarrier() __asm __volatile("":::"memory")
 
 /* SPL asserts */
 #ifdef DIAGNOSTIC
@@ -132,63 +88,6 @@ void splassert_check(int, const char *);
 #endif
 
 /*
- * Raise current interrupt priority level, and return the old one.
- */
-static __inline int
-splraise(ncpl)
-	int ncpl;
-{
-	int ocpl = cpl;
-
-	if (ncpl > ocpl)
-		cpl = ncpl;
-	__asm __volatile("":::"memory");
-	return (ocpl);
-}
-
-/*
- * Restore an old interrupt priority level.  If any thereby unmasked
- * interrupts are pending, call Xspllower() to process them.
- */
-#define SPLX_BODY							\
-void									\
-splx(ncpl)								\
-	int ncpl;							\
-{									\
-	__asm __volatile("":::"memory");				\
-	cpl = ncpl;							\
-	if (ipending & IUNMASK(ncpl))					\
-		Xspllower();						\
-}
-
-/* If SMALL_KERNEL make splx out of line, otherwise inline it.  */
-#ifdef SMALL_KERNEL
-#define SPLX_INLINED_BODY
-#define SPLX_OUTLINED_BODY	SPLX_BODY
-SPLX_DECL
-#else
-#define SPLX_INLINED_BODY	static __inline SPLX_BODY
-#define SPLX_OUTLINED_BODY
-static __inline SPLX_DECL
-#endif
-
-SPLX_INLINED_BODY
-
-/*
- * Same as splx(), but we return the old value of spl, for the
- * benefit of some splsoftclock() callers.
- */
-static __inline int
-spllower(ncpl)
-	int ncpl;
-{
-	int ocpl = cpl;
-
-	splx(ncpl);
-	return (ocpl);
-}
-
-/*
  * Hardware interrupt masks
  */
 #define	splbio()	splraise(IPL_BIO)
@@ -197,6 +96,7 @@ spllower(ncpl)
 #define	splaudio()	splraise(IPL_AUDIO)
 #define	splclock()	splraise(IPL_CLOCK)
 #define	splstatclock()	splhigh()
+#define splipi()	splraise(IPL_IPI)
 
 /*
  * Software interrupt masks
@@ -215,25 +115,40 @@ spllower(ncpl)
 #define	splvm()		splraise(IPL_VM)
 #define splimp()	splvm()
 #define	splhigh()	splraise(IPL_HIGH)
+#define	splsched()	splraise(IPL_SCHED)
+#define spllock() 	splhigh()
 #define	spl0()		spllower(IPL_NONE)
 
-/*
- * Software interrupt registration
- *
- * We hand-code this to ensure that it's atomic.
- */
-static __inline void
-softintr(mask)
-	int mask;
-{
-	__asm __volatile("orl %1, %0" : "=m"(ipending) : "ir" (mask));
-
-}
-
 #define	setsoftast()	(astpending = 1)
-#define	setsoftclock()	softintr(1 << SIR_CLOCK)
-#define	setsoftnet()	softintr(1 << SIR_NET)
-#define	setsofttty()	softintr(1 << SIR_TTY)
+#define	setsoftclock()	softintr(1 << SIR_CLOCK, IPL_SOFTCLOCK)
+#define	setsoftnet()	softintr(1 << SIR_NET, IPL_SOFTNET)
+#define	setsofttty()	softintr(1 << SIR_TTY, IPL_SOFTTTY)
+
+#define I386_IPI_HALT		0x00000001
+#define I386_IPI_MICROSET	0x00000002
+#define I386_IPI_FLUSH_FPU	0x00000004
+#define I386_IPI_SYNCH_FPU	0x00000008
+#define I386_IPI_TLB		0x00000010
+#define I386_IPI_MTRR		0x00000020
+#define I386_IPI_GDT		0x00000040
+#define I386_IPI_DDB		0x00000080	/* synchronize while in ddb */
+
+#define I386_NIPI	8
+
+struct cpu_info;
+
+#ifdef MULTIPROCESSOR
+int i386_send_ipi(struct cpu_info *, int);
+void i386_broadcast_ipi(int);
+void i386_multicast_ipi(int, int);
+void i386_ipi_handler(void);
+void i386_intlock(struct intrframe);
+void i386_intunlock(struct intrframe);
+void i386_softintlock(void);
+void i386_softintunlock(void);
+
+extern void (*ipifunc[I386_NIPI])(struct cpu_info *);
+#endif
 
 #endif /* !_LOCORE */
 

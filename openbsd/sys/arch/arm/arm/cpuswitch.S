@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpuswitch.S,v 1.2 2004/02/01 06:10:33 drahn Exp $	*/
+/*	$OpenBSD: cpuswitch.S,v 1.4 2004/08/04 20:20:18 miod Exp $	*/
 /*	$NetBSD: cpuswitch.S,v 1.41 2003/11/15 08:44:18 scw Exp $	*/
 
 /*
@@ -283,9 +283,6 @@ _C_LABEL(curpcb):
 	.text
 #endif
 
-.Lblock_userspace_access:
-	.word	_C_LABEL(block_userspace_access)
-
 .Lcpu_do_powersave:
 	.word	_C_LABEL(cpu_do_powersave)
 
@@ -537,11 +534,9 @@ ENTRY(cpu_switch)
 	/* l->l_cpu initialized in fork1() for single-processor */
 #endif
 
-#if 0
 	/* Process is now on a processor. */
-	mov	r0, #LSONPROC			/* l->l_stat = LSONPROC */
-	str	r0, [r6, #(P_STAT)]
-#endif
+	mov	r0, #SONPROC			/* p->p_stat = SONPROC */
+	strb	r0, [r6, #(P_STAT)]
 
 	/* We have a new curproc now so make a note it */
 	ldr	r7, .Lcurproc
@@ -674,7 +669,6 @@ ENTRY(cpu_switch)
 	cmpeq	r0, r1				/* Same DACR? */
 	beq	.Lcs_context_switched		/* yes! */
 
-	ldr	r3, .Lblock_userspace_access
 	mov	r12, #0
 	cmp	r5, #0				/* No last vm? (switch_exit) */
 	beq	.Lcs_cache_purge_skipped	/* No, we can skip cache flsh */
@@ -704,12 +698,6 @@ ENTRY(cpu_switch)
 	strb	r2, [r5, #(CS_CACHE_ID)]
 	strb	r2, [r5, #(CS_CACHE_D)]
 
-	/*
-	 * Don't allow user space access between the purge and the switch.
-	 */
-	mov	r2, #0x00000001
-	str	r2, [r3]
-
 	stmfd	sp!, {r0-r3}
 	ldr	r1, .Lcpufuncs
 	mov	lr, pc
@@ -718,7 +706,6 @@ ENTRY(cpu_switch)
 
 .Lcs_cache_purge_skipped:
 	/* rem: r1 = new DACR */
-	/* rem: r3 = &block_userspace_access */
 	/* rem: r4 = return value */
 	/* rem: r5 = &old_pmap->pm_cstate (or NULL) */
 	/* rem: r6 = new proc */
@@ -727,7 +714,6 @@ ENTRY(cpu_switch)
 	/* rem: r10 = old L1 */
 	/* rem: r11 = new L1 */
 
-	mov	r2, #0x00000000
 	ldr	r7, [r9, #(PCB_PL1VEC)]
 
 	/*
@@ -736,13 +722,6 @@ ENTRY(cpu_switch)
 	 * XXXSCW: Don't need to block FIQs if vectors have been relocated
 	 */
 	IRQdisableALL
-
-	/*
-	 * Interrupts are disabled so we can allow user space accesses again
-	 * as none will occur until interrupts are re-enabled after the
-	 * switch.
-	 */
-	str	r2, [r3]
 
 	/*
 	 * Ensure the vector table is accessible by fixing up the L1
@@ -915,7 +894,6 @@ ENTRY(cpu_switch)
 	 * Userpsace access already blocked by switch_exit().
 	 */
 	ldr	r9, [r6, #(P_ADDR)]		/* r9 = new PCB */
-	ldr	r3, .Lblock_userspace_access
 	mrc	p15, 0, r10, c2, c0, 0		/* r10 = old L1 */
 	mov	r5, #0				/* No previous cache state */
 	ldr	r1, [r9, #(PCB_DACR)]		/* r1 = new DACR */
@@ -986,8 +964,6 @@ ENTRY(switch_exit)
 	ldr	r0, .Lcurproc
 
 	mov	r5, r1
-	ldr	r1, .Lblock_userspace_access
-
 	mov	r6, r2
 
 	/*
@@ -1015,12 +991,6 @@ ENTRY(switch_exit)
 	ldr	r3, [r3, #(PCB_CSTATE)]		/* proc0's cache state */
 	mov	r2, #-1
 	str	r2, [r3, #(CS_ALL)]		/* proc0 is in da cache! */
-
-	/*
-	 * Don't allow user space access between the purge and the switch.
-	 */
-	mov	r2, #0x00000001
-	str	r2, [r1]
 
 	/* Switch to proc0 context */
 

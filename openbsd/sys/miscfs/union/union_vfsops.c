@@ -1,4 +1,4 @@
-/*	$OpenBSD: union_vfsops.c,v 1.16 2003/08/14 07:46:40 mickey Exp $	*/
+/*	$OpenBSD: union_vfsops.c,v 1.21 2004/07/11 00:11:50 pedro Exp $	*/
 /*	$NetBSD: union_vfsops.c,v 1.10 1995/06/18 14:47:47 cgd Exp $	*/
 
 /*
@@ -113,23 +113,19 @@ union_mount(mp, path, data, ndp, p)
 	/*
 	 * Find upper node.
 	 */
-	NDINIT(ndp, LOOKUP, FOLLOW|WANTPARENT,
-	       UIO_USERSPACE, args.target, p);
+	NDINIT(ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE, args.target, p);
 
 	if ((error = namei(ndp)) != 0)
 		goto bad;
 
 	upperrootvp = ndp->ni_vp;
-	vrele(ndp->ni_dvp);
-	ndp->ni_dvp = NULL;
 
 	if (upperrootvp->v_type != VDIR) {
 		error = EINVAL;
-		goto bad;
+		goto bad_unlock;
 	}
 	
-	um = (struct union_mount *) malloc(sizeof(struct union_mount),
-				M_MISCFSMNT, M_WAITOK);
+	um = malloc(sizeof(struct union_mount), M_MISCFSMNT, M_WAITOK);
 
 	/*
 	 * Keep a held reference to the target vnodes.
@@ -161,7 +157,7 @@ union_mount(mp, path, data, ndp, p)
 
 	default:
 		error = EINVAL;
-		goto bad;
+		goto bad_unlock;
 	}
 
 	/*
@@ -169,10 +165,13 @@ union_mount(mp, path, data, ndp, p)
 	 * supports whiteout operations
 	 */
 	if ((mp->mnt_flag & MNT_RDONLY) == 0) {
-		error = VOP_WHITEOUT(um->um_uppervp, (struct componentname *) 0, LOOKUP);
+		error = VOP_WHITEOUT(um->um_uppervp,
+		    (struct componentname *) 0, LOOKUP);
 		if (error)
-			goto bad;
+			goto bad_unlock;
 	}
+
+	VOP_UNLOCK(ndp->ni_vp, 0, p);
 
 	um->um_cred = p->p_ucred;
 	crhold(um->um_cred);
@@ -203,7 +202,7 @@ union_mount(mp, path, data, ndp, p)
 	 */
 	mp->mnt_flag |= (um->um_uppervp->v_mount->mnt_flag & MNT_RDONLY);
 
-	mp->mnt_data = (qaddr_t)um;
+	mp->mnt_data = um;
 	vfs_getnewfsid(mp);
 
 	(void) copyinstr(path, mp->mnt_stat.f_mntonname, MNAMELEN - 1, &size);
@@ -241,6 +240,8 @@ union_mount(mp, path, data, ndp, p)
 #endif
 	return (0);
 
+bad_unlock:
+	VOP_UNLOCK(ndp->ni_vp, 0, p);
 bad:
 	if (um)
 		free(um, M_MISCFSMNT);
@@ -317,7 +318,7 @@ union_unmount(mp, mntflags, p)
 	 * in the filesystem.
 	 */
 	for (freeing = 0; vflush(mp, um_rootvp, flags) != 0;) {
-		int n;
+		int n = 0;
 
 		/* count #vnodes held on mount list */
 		vfs_mount_foreach_vnode(mp, union_unmount_count_vnode, &n);

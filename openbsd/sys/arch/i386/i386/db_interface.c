@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_interface.c,v 1.12 2003/05/18 02:43:12 andreas Exp $	*/
+/*	$OpenBSD: db_interface.c,v 1.16 2004/07/20 20:18:53 art Exp $	*/
 /*	$NetBSD: db_interface.c,v 1.22 1996/05/03 19:42:00 christos Exp $	*/
 
 /* 
@@ -36,6 +36,7 @@
 #include <sys/proc.h>
 #include <sys/reboot.h>
 #include <sys/systm.h>
+#include <sys/mutex.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -53,11 +54,25 @@
 extern label_t	*db_recover;
 extern char *trap_type[];
 extern int trap_types;
+extern boolean_t db_cmd_loop_done;
+
+#ifdef MULTIPROCESSOR
+extern volatile int ddb_state;
+boolean_t	 db_switch_cpu;
+long		 db_switch_to_cpu;
+#endif
 
 int	db_active = 0;
 
 void kdbprinttrap(int, int);
 void db_sysregs_cmd(db_expr_t, int, db_expr_t, char *);
+#ifdef MULTIPROCESSOR
+void db_cpuinfo_cmd(db_expr_t, int, db_expr_t, char *);
+void db_startproc_cmd(db_expr_t, int, db_expr_t, char *);
+void db_stopproc_cmd(db_expr_t, int, db_expr_t, char *);
+void db_ddbproc_cmd(db_expr_t, int, db_expr_t, char *);
+int db_cpuid2apic(int);
+#endif /* MULTIPROCESSOR */
 
 /*
  * Print trap reason.
@@ -101,6 +116,14 @@ kdb_trap(type, code, regs)
 		}
 	}
 
+#ifdef MULTIPROCESSOR
+	mtx_enter(&ddb_mp_mutex);
+	if (ddb_state == DDB_STATE_EXITING)
+		ddb_state = DDB_STATE_NOT_RUNNING;
+	mtx_leave(&ddb_mp_mutex);
+	while (db_enter_ddb()) {
+#endif /* MULTIPROCESSOR */
+
 	/* XXX Should switch to kdb`s own stack here. */
 
 	ddb_regs = *regs;
@@ -109,7 +132,7 @@ kdb_trap(type, code, regs)
 		 * Kernel mode - esp and ss not saved
 		 */
 		ddb_regs.tf_esp = (int)&regs->tf_esp;	/* kernel stack pointer */
-		asm("movw %%ss,%w0" : "=r" (ddb_regs.tf_ss));
+		__asm__("movw %%ss,%w0" : "=r" (ddb_regs.tf_ss));
 	}
 
 	s = splhigh();
@@ -120,6 +143,8 @@ kdb_trap(type, code, regs)
 	db_active--;
 	splx(s);
 
+	regs->tf_fs     = ddb_regs.tf_fs & 0xffff;
+	regs->tf_gs     = ddb_regs.tf_gs & 0xffff;
 	regs->tf_es     = ddb_regs.tf_es & 0xffff;
 	regs->tf_ds     = ddb_regs.tf_ds & 0xffff;
 	regs->tf_edi    = ddb_regs.tf_edi;
@@ -138,6 +163,12 @@ kdb_trap(type, code, regs)
 		regs->tf_ss     = ddb_regs.tf_ss & 0xffff;
 	}
 
+
+#ifdef MULTIPROCESSOR
+		if (!db_switch_cpu)
+			ddb_state = DDB_STATE_EXITING;
+	}
+#endif /* MULTIPROCESSOR */
 	return (1);
 }
 
@@ -179,20 +210,147 @@ db_sysregs_cmd(addr, have_addr, count, modif)
 	db_printf("cr4:    0x%08x\n", cr);
 }
 
+#ifdef MULTIPROCESSOR
+int
+db_cpuid2apic(int id)
+{
+	int apic;
+
+	for (apic = 0; apic < I386_MAXPROCS; apic++) {
+		if (cpu_info[apic] != NULL &&
+		    cpu_info[apic]->ci_dev.dv_unit == id)
+			return (apic);
+	}
+	return (-1);
+}
+
+void
+db_cpuinfo_cmd(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
+{
+	int i;
+
+	for (i = 0; i < I386_MAXPROCS; i++) {
+		if (cpu_info[i] != NULL) {
+			db_printf("%c%4d: ", (i == cpu_number()) ? '*' : ' ',
+			    cpu_info[i]->ci_dev.dv_unit);
+			switch(cpu_info[i]->ci_ddb_paused) {
+			case CI_DDB_RUNNING:
+				db_printf("running\n");
+				break;
+			case CI_DDB_SHOULDSTOP:
+				db_printf("stopping\n");
+				break;
+			case CI_DDB_STOPPED:
+				db_printf("stopped\n");
+				break;
+			case CI_DDB_ENTERDDB:
+				db_printf("entering ddb\n");
+				break;
+			case CI_DDB_INDDB:
+				db_printf("ddb\n");
+				break;
+			default:
+				db_printf("? (%d)\n",
+				    cpu_info[i]->ci_ddb_paused);
+				break;
+			}
+		}
+	}
+}
+
+void
+db_startproc_cmd(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
+{
+	int apic;
+
+	if (have_addr) {
+		apic = db_cpuid2apic(addr);
+		if (apic >= 0 && apic < I386_MAXPROCS &&
+		    cpu_info[apic] != NULL && apic != cpu_number())
+			db_startcpu(apic);
+		else
+			db_printf("Invalid cpu %d\n", (int)addr);
+	} else {
+		for (apic = 0; apic < I386_MAXPROCS; apic++) {
+			if (cpu_info[apic] != NULL && apic != cpu_number()) {
+				db_startcpu(apic);
+			}
+		}
+	}
+}
+
+void
+db_stopproc_cmd(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
+{
+	int apic;
+
+	if (have_addr) {
+		apic = db_cpuid2apic(addr);
+		if (apic >= 0 && apic < I386_MAXPROCS &&
+		    cpu_info[apic] != NULL && apic != cpu_number())
+			db_stopcpu(apic);
+		else
+			db_printf("Invalid cpu %d\n", (int)addr);
+	} else {
+		for (apic = 0; apic < I386_MAXPROCS; apic++) {
+			if (cpu_info[apic] != NULL && apic != cpu_number()) {
+				db_stopcpu(apic);
+			}
+		}
+	}
+}
+
+void
+db_ddbproc_cmd(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
+{
+	int apic;
+
+	if (have_addr) {
+		apic = db_cpuid2apic(addr);
+		if (apic >= 0 && apic < I386_MAXPROCS &&
+		    cpu_info[apic] != NULL && apic != cpu_number()) {
+			db_stopcpu(apic);
+			db_switch_to_cpu = apic;
+			db_switch_cpu = 1;
+			db_cmd_loop_done = 1;
+		} else {
+			db_printf("Invalid cpu %d\n", (int)addr);
+		}
+	} else {
+		db_printf("CPU not specified\n");
+	}
+}
+#endif /* MULTIPROCESSOR */
+
 struct db_command db_machine_command_table[] = {
 	{ "sysregs",	db_sysregs_cmd,		0,	0 },
+#ifdef MULTIPROCESSOR
+	{ "cpuinfo",	db_cpuinfo_cmd,		0,	0 },
+	{ "startcpu",	db_startproc_cmd,	0,	0 },
+	{ "stopcpu",	db_stopproc_cmd,	0,	0 },
+	{ "ddbcpu",	db_ddbproc_cmd,		0,	0 },
+#endif /* MULTIPROCESSOR */
 	{ (char *)0, }
 };
 
 void
 db_machine_init()
 {
+#ifdef MULTIPROCESSOR
+	int i;
+#endif /* MULTIPROCESSOR */
 
 	db_machine_commands_install(db_machine_command_table);
+#ifdef MULTIPROCESSOR
+	for (i = 0; i < I386_MAXPROCS; i++) {
+		if (cpu_info[i] != NULL)
+			cpu_info[i]->ci_ddb_paused = CI_DDB_RUNNING;
+	}
+#endif /* MULTIPROCESSOR */
 }
 
 void
 Debugger()
 {
-	asm("int $3");
+	__asm__("int $3");
 }

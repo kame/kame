@@ -1,4 +1,4 @@
-/*	$OpenBSD: lp.c,v 1.8 2004/01/14 20:50:48 miod Exp $ */
+/*	$OpenBSD: lp.c,v 1.10 2004/07/30 22:29:45 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -46,7 +46,6 @@
 struct lpsoftc {
 	struct device	sc_dev;
 	struct intrhand	sc_ih;
-	struct pccreg	*sc_pcc;
 };
 
 void lpattach(struct device *, struct device *, void *);
@@ -82,16 +81,14 @@ lpattach(parent, self, args)
 	struct lpsoftc *sc = (struct lpsoftc *)self;
 	struct confargs *ca = args;
 
-	sc->sc_pcc = (struct pccreg *)ca->ca_master;
-
 	printf(": unsupported\n");
 
 	sc->sc_ih.ih_fn = lpintr;
 	sc->sc_ih.ih_arg = sc;
 	sc->sc_ih.ih_ipl = ca->ca_ipl;
-	pccintr_establish(PCCV_PRINTER, &sc->sc_ih);
+	pccintr_establish(PCCV_PRINTER, &sc->sc_ih, self->dv_xname);
 
-	sc->sc_pcc->pcc_lpirq = ca->ca_ipl | PCC_IRQ_IEN | PCC_LPIRQ_ACK;
+	sys_pcc->pcc_lpirq = ca->ca_ipl | PCC_IRQ_IEN | PCC_LPIRQ_ACK;
 }
 
 int

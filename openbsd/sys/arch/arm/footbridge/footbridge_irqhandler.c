@@ -1,4 +1,4 @@
-/*	$OpenBSD: footbridge_irqhandler.c,v 1.1 2004/02/01 05:09:49 drahn Exp $	*/
+/*	$OpenBSD: footbridge_irqhandler.c,v 1.4 2004/08/17 19:40:45 drahn Exp $	*/
 /*	$NetBSD: footbridge_irqhandler.c,v 1.9 2003/06/16 20:00:57 thorpej Exp $	*/
 
 /*
@@ -76,8 +76,6 @@ __volatile int footbridge_ipending;
 
 void footbridge_intr_dispatch(struct clockframe *frame);
 
-const struct evcnt *footbridge_pci_intr_evcnt __P((void *, pci_intr_handle_t));
-
 void footbridge_do_pending(void);
 
 static const uint32_t si_to_irqbit[SI_NQUEUES] =
@@ -97,21 +95,6 @@ static const int si_to_ipl[SI_NQUEUES] = {
 	IPL_SOFTNET,		/* SI_SOFTNET */
 	IPL_SOFTSERIAL,		/* SI_SOFTSERIAL */
 };
-
-const struct evcnt *
-footbridge_pci_intr_evcnt(pcv, ih)
-	void *pcv;
-	pci_intr_handle_t ih;
-{
-	/* XXX check range is valid */
-#if NISA > 0
-	if (ih >= 0x80 && ih <= 0x8f) {
-		return isa_intr_evcnt(NULL, (ih & 0x0f));
-	}
-#endif
-	return &footbridge_intrq[ih].iq_ev;
-}
-
 static __inline void
 footbridge_enable_irq(int irq)
 {
@@ -327,12 +310,6 @@ footbridge_intr_init(void)
 	for (i = 0; i < NIRQ; i++) {
 		iq = &footbridge_intrq[i];
 		TAILQ_INIT(&iq->iq_list);
-
-		snprintf(iq->iq_name, sizeof(iq->iq_name), "irq %d", i);
-#if 0
-		evcnt_attach_dynamic(&iq->iq_ev, EVCNT_TYPE_INTR,
-		    NULL, "footbridge", iq->iq_name);
-#endif
 	}
 	
 	footbridge_intr_calculate_masks();
@@ -373,12 +350,9 @@ footbridge_intr_claim(int irq, int ipl, char *name, int (*func)(void *), void *a
 
 	footbridge_intr_calculate_masks();
 
-	/* detach the existing event counter and add the new name */
-#if 0
-	evcnt_detach(&iq->iq_ev);
-	evcnt_attach_dynamic(&iq->iq_ev, EVCNT_TYPE_INTR,
-			NULL, "footbridge", name);
-#endif
+	if (name != NULL)
+		evcount_attach(&ih->ih_count, name, (void *)&ih->ih_irq,
+		    &evcount_intr);
 	
 	restore_interrupts(oldirqstate);
 	
@@ -447,14 +421,17 @@ footbridge_intr_dispatch(struct clockframe *frame)
 		footbridge_ipending &= ~ibit;
 
 		iq = &footbridge_intrq[irq];
-		iq->iq_ev.ev_count++;
 		uvmexp.intrs++;
 		current_spl_level |= iq->iq_mask;
 		oldirqstate = enable_interrupts(I32_bit);
 		for (ih = TAILQ_FIRST(&iq->iq_list);
 			((ih != NULL) && (intr_rc != 1));
 		     ih = TAILQ_NEXT(ih, ih_list)) {
-			intr_rc = (*ih->ih_func)(ih->ih_arg ? ih->ih_arg : frame);
+			intr_rc = (*ih->ih_func)(ih->ih_arg ?
+			    ih->ih_arg : frame);
+			if (intr_rc)
+				ih->ih_count.ec_count++;
+
 		}
 		restore_interrupts(oldirqstate);
 

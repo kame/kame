@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.24 2004/01/14 20:50:48 miod Exp $ */
+/*	$OpenBSD: autoconf.c,v 1.27 2004/07/30 22:29:48 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -91,11 +91,10 @@ void	swapconf(void);
 int	mainbus_print(void *, const char *);
 int	mainbus_scan(struct device *, void *, void *);
 int	findblkmajor(struct device *);
-struct	device *getdevunit(char *, int);
 struct	device *getdisk(char *, int, int, dev_t *);
 struct	device *parsedisk(char *, int, int, dev_t *);
 
-extern void init_sir(void);
+extern void init_intrs(void);
 extern void dumpconf(void);
 
 /*
@@ -183,7 +182,7 @@ cpu_configure()
 {
 	bootdv = NULL; /* set by device drivers (if found) */
 
-	init_sir();
+	init_intrs();
 
 	extio = extent_create("extio",
 	    (u_long)extiobase, (u_long)extiobase + ctob(EIOMAPSIZE),
@@ -387,6 +386,13 @@ setroot()
 	printf("boot device: %s\n",
 	    (bootdv) ? bootdv->dv_xname : "<unknown>");
 
+	/*
+	 * If 'swap generic' and we could not determine the boot device,
+	 * ask the user.
+	 */
+	if (mountroot == NULL && bootdv == NULL)
+		boothowto |= RB_ASKNAME;
+
 	if (boothowto & RB_ASKNAME) {
 		for (;;) {
 			printf("root device ");
@@ -537,32 +543,4 @@ gotswap:
 	 */
 	if (temp == dumpdev)
 		dumpdev = swdevt[0].sw_dev;
-}
-
-/*
- * find a device matching "name" and unit number
- */
-struct device *
-getdevunit(name, unit)
-	char *name;
-	int unit;
-{
-	struct device *dev = alldevs.tqh_first;
-	char num[10], fullname[16];
-	int lunit;
-
-	/* compute length of name and decimal expansion of unit number */
-	snprintf(num, sizeof num, "%d", unit);
-	lunit = strlen(num);
-	if (strlen(name) + lunit >= sizeof(fullname) - 1)
-		panic("config_attach: device name too long");
-
-	strlcpy(fullname, name, sizeof fullname);
-	strlcat(fullname, num, sizeof fullname);
-
-	while (strcmp(dev->dv_xname, fullname) != 0) {
-		if ((dev = dev->dv_list.tqe_next) == NULL)
-			return NULL;
-	}
-	return dev;
 }

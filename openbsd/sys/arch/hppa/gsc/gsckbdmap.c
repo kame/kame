@@ -1,11 +1,11 @@
-/*	$OpenBSD: gsckbdmap.c,v 1.5 2004/03/16 07:51:22 miod Exp $	*/
+/*	$OpenBSD: gsckbdmap.c,v 1.7 2004/07/26 14:06:12 miod Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
  */
-/*	OpenBSD: wskbdmap_mfii.c,v 1.23 2004/03/16 07:50:26 miod Exp  */
+/*	OpenBSD: wskbdmap_mfii.c,v 1.25 2004/07/26 14:05:59 miod Exp  */
 /*	$NetBSD: wskbdmap_mfii.c,v 1.15 2000/05/19 16:40:04 drochner Exp $	*/
 
 /*-
@@ -200,6 +200,8 @@ static const keysym_t pckbd_keydesc_precisionbook[] = {
     KC(139),			KS_Meta_L,
     KC(140),			KS_Meta_R,
 };
+
+#if !defined(SMALL_KERNEL) || !defined(__alpha__)
 
 static const keysym_t gsckbd_keydesc_de[] = {
 /*  pos      normal		shifted		altgr		shift-altgr */
@@ -466,7 +468,7 @@ static const keysym_t gsckbd_keydesc_be[] = {
     KC(38),	KS_quotedbl,	KS_3,	KS_numbersign,
     KC(37),	KS_apostrophe,	KS_4,
     KC(46),	KS_parenleft,	KS_5,
-    KC(54),	KS_currency,	KS_6,	KS_asciicircum,
+    KC(54),	KS_section,	KS_6,	KS_asciicircum,
     KC(61),	KS_egrave,	KS_7,
     KC(62),	KS_exclam,	KS_8,
     KC(70),	KS_ccedilla,	KS_9,	KS_braceleft,
@@ -479,8 +481,8 @@ static const keysym_t gsckbd_keydesc_be[] = {
     KC(91),	KS_dollar,	KS_asterisk,	KS_bracketright,
     KC(28),	KS_q,
     KC(76),	KS_m,
-    KC(82),	KS_ugrave,	KS_percent,	KS_section,
-    KC(14),	KS_twosuperior,
+    KC(82),	KS_ugrave,	KS_percent,	KS_acute,
+    KC(14),	KS_twosuperior,	KS_threesuperior,
     KC(93),	KS_mu,	KS_sterling,	KS_grave,
     KC(26),	KS_w,
     KC(58),	KS_comma,	KS_question,
@@ -917,11 +919,14 @@ static const keysym_t gsckbd_keydesc_si[]=
     KC(145),	KS_Mode_switch,	KS_Multi_key,
 };
 
+#endif	/* SMALL_KERNEL */
+
 #define KBD_MAP(name, base, map) \
 			{ name, base, sizeof(map)/sizeof(keysym_t), map }
 
 const struct wscons_keydesc gsckbd_keydesctab[] = {
 	KBD_MAP(KB_US,			0,	gsckbd_keydesc_us),
+#if !defined(SMALL_KERNEL) || !defined(__alpha__)
 	KBD_MAP(KB_DE,			KB_US,	gsckbd_keydesc_de),
 	KBD_MAP(KB_DE | KB_NODEAD,	KB_DE,	gsckbd_keydesc_de_nodead),
 	KBD_MAP(KB_FR,			KB_US,	gsckbd_keydesc_fr),
@@ -962,6 +967,7 @@ const struct wscons_keydesc gsckbd_keydesctab[] = {
 	KBD_MAP(KB_PL,			KB_US,	gsckbd_keydesc_pl),
 	KBD_MAP(KB_HU,			KB_US,	gsckbd_keydesc_hu),
 	KBD_MAP(KB_SI,			KB_US,	gsckbd_keydesc_si),
+#endif	/* SMALL_KERNEL */
 	KBD_MAP(KB_US | KB_MACHDEP,	KB_US,	pckbd_keydesc_precisionbook),
 	{0, 0, 0, 0}
 };

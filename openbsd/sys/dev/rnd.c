@@ -1,4 +1,4 @@
-/*	$OpenBSD: rnd.c,v 1.67 2004/03/15 14:17:25 mickey Exp $	*/
+/*	$OpenBSD: rnd.c,v 1.73 2004/07/21 01:02:07 mickey Exp $	*/
 
 /*
  * rnd.c -- A strong random number generator
@@ -192,28 +192,29 @@
  *	echo "Saving random seed..."
  *	dd if=/dev/urandom of=/etc/random-seed count=1
  *
- * For example, on many Linux systems, the appropriate scripts are
- * usually /etc/rc.d/rc.local and /etc/rc.d/rc.0, respectively.
+ * For example, on OpenBSD systems, the appropriate scripts are
+ * usually /etc/rc.local and /etc/rc.shutdown, respectively.
  *
  * Effectively, these commands cause the contents of the entropy pool
  * to be saved at shutdown time and reloaded into the entropy pool at
  * start-up.  (The 'dd' in the addition to the bootup script is to
  * make sure that /etc/random-seed is different for every start-up,
- * even if the system crashes without executing rc.0.)  Even with
+ * even if the system crashes without executing rc.shutdown) Even with
  * complete knowledge of the start-up activities, predicting the state
  * of the entropy pool requires knowledge of the previous history of
  * the system.
  *
- * Configuring the /dev/random driver under Linux
+ * Configuring the random(4) driver under OpenBSD
  * ==============================================
  *
- * The /dev/random driver under Linux uses minor numbers 8 and 9 of
- * the /dev/mem major number (#1).  So if your system does not have
- * /dev/random and /dev/urandom created already, they can be created
- * by using the commands:
+ * The special files for the random(4) driver should have been created
+ * during the installation process.  However, if your system does not have
+ * /dev/random and /dev/[s|u|p|a]random created already, they can be created
+ * by using the MAKEDEV(8) script in /dev:
  *
- *	mknod /dev/random c 1 8
- *	mknod /dev/urandom c 1 9
+ *	/dev/MAKEDEV random
+ *
+ * Check MAKEDEV for information about major and minor numbers.
  *
  * Acknowledgements:
  * =================
@@ -243,10 +244,11 @@
 #include <sys/malloc.h>
 #include <sys/fcntl.h>
 #include <sys/vnode.h>
-#include <sys/md5k.h>
 #include <sys/sysctl.h>
 #include <sys/timeout.h>
 #include <sys/poll.h>
+
+#include <crypto/md5.h>
 
 #include <dev/rndvar.h>
 #include <dev/rndioctl.h>
@@ -264,6 +266,7 @@ int	rnd_debug = 0x0000;
  * For a pool of size 64, try x^64+x^62+x^38+x^10+x^6+x+1.
  */
 #define POOLBITS (POOLWORDS*32)
+#define POOLBYTES (POOLWORDS*4)
 #if POOLWORDS == 2048
 #define	TAP1	1638
 #define	TAP2	1231
@@ -468,10 +471,10 @@ rnd_qlen(void)
 
 void dequeue_randomness(void *);
 
-static __inline void add_entropy_words(const u_int32_t *, u_int n);
+static void add_entropy_words(const u_int32_t *, u_int n);
 static __inline void extract_entropy(register u_int8_t *, int);
 
-static __inline u_int8_t arc4_getbyte(void);
+static u_int8_t arc4_getbyte(void);
 static __inline void arc4_stir(void);
 void arc4_reinit(void *v);
 void arc4maybeinit(void);
@@ -494,7 +497,7 @@ void arc4maybeinit(void);
  * RC4 is a registered trademark of RSA Laboratories.
  */
 
-static __inline u_int8_t
+static u_int8_t
 arc4_getbyte(void)
 {
 	register u_int8_t si, sj, ret;
@@ -582,15 +585,6 @@ arc4_reinit(v)
 	arc4random_initialized = 0;
 }
 
-static int arc4random_8(void);
-
-static int
-arc4random_8(void)
-{
-	arc4maybeinit();
-	return arc4_getbyte();
-}
-
 u_int32_t
 arc4random(void)
 {
@@ -675,7 +669,7 @@ randomclose(dev, flag, mode, p)
  * scancodes, for example), the upper bits of the entropy pool don't
  * get affected. --- TYT, 10/11/95
  */
-static __inline void
+static void
 add_entropy_words(buf, n)
 	const u_int32_t *buf;
 	u_int n;
@@ -964,15 +958,17 @@ randomread(dev, uio, ioflag)
 	struct uio *uio;
 	int	ioflag;
 {
-	int	ret = 0;
-	int	i;
+	int		ret = 0;
+	int		i;
+	u_int32_t 	*buf;
 
 	if (uio->uio_resid == 0)
 		return 0;
 
+	MALLOC(buf, u_int32_t *, POOLBYTES, M_TEMP, M_WAITOK);
+
 	while (!ret && uio->uio_resid > 0) {
-		u_int32_t buf[ POOLWORDS ];
-		int	n = min(sizeof(buf), uio->uio_resid);
+		int	n = min(POOLBYTES, uio->uio_resid);
 
 		switch(minor(dev)) {
 		case RND_RND:
@@ -1023,8 +1019,9 @@ randomread(dev, uio, ioflag)
 		{
 			u_int8_t *cp = (u_int8_t *) buf;
 			u_int8_t *end = cp + n;
+			arc4maybeinit();
 			while (cp < end)
-				*cp++ = arc4random_8();
+				*cp++ = arc4_getbyte();
 			break;
 		}
 		default:
@@ -1033,6 +1030,8 @@ randomread(dev, uio, ioflag)
 		if (n != 0 && ret == 0)
 			ret = uiomove((caddr_t)buf, n, uio);
 	}
+
+	FREE(buf, M_TEMP);
 	return ret;
 }
 
@@ -1126,7 +1125,8 @@ randomwrite(dev, uio, flags)
 	struct uio *uio;
 	int	flags;
 {
-	int	ret = 0;
+	int		ret = 0;
+	u_int32_t	*buf;
 
 	if (minor(dev) == RND_RND || minor(dev) == RND_PRND)
 		return ENXIO;
@@ -1134,9 +1134,10 @@ randomwrite(dev, uio, flags)
 	if (uio->uio_resid == 0)
 		return 0;
 
+	MALLOC(buf, u_int32_t *, POOLBYTES, M_TEMP, M_WAITOK);
+
 	while (!ret && uio->uio_resid > 0) {
-		u_int32_t	buf[ POOLWORDS ];
-		u_short		n = min(sizeof(buf),uio->uio_resid);
+		u_short	n = min(POOLBYTES, uio->uio_resid);
 
 		ret = uiomove((caddr_t)buf, n, uio);
 		if (!ret) {
@@ -1149,6 +1150,7 @@ randomwrite(dev, uio, flags)
 	if (minor(dev) == RND_ARND && !ret)
 		arc4random_initialized = 0;
 
+	FREE(buf, M_TEMP);
 	return ret;
 }
 

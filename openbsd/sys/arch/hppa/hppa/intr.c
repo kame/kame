@@ -1,7 +1,7 @@
-/*	$OpenBSD: intr.c,v 1.16 2003/12/30 22:53:54 mickey Exp $	*/
+/*	$OpenBSD: intr.c,v 1.22 2004/07/13 19:34:22 mickey Exp $	*/
 
 /*
- * Copyright (c) 2002 Michael Shalayeff
+ * Copyright (c) 2002-2004 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -35,8 +30,12 @@
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
+#include <sys/evcount.h>
+#include <sys/malloc.h>
 
 #include <net/netisr.h>
+
+#include <uvm/uvm_extern.h>	/* for uvmexp */
 
 #include <machine/autoconf.h>
 #include <machine/frame.h>
@@ -47,27 +46,30 @@ void softtty(void);
 
 struct hppa_iv {
 	char pri;
-	char bit;
+	char irq;
 	char flags;
 #define	HPPA_IV_CALL	0x01
 #define	HPPA_IV_SOFT	0x02
 	char pad;
+	int pad2;
 	int (*handler)(void *);
 	void *arg;
-	struct hppa_iv *next;
+	u_int bit;
 	struct hppa_iv *share;
-	int pad2[3];
+	struct hppa_iv *next;
+	struct evcount *cnt;
 } __packed;
 
 register_t kpsw = PSL_Q | PSL_P | PSL_C | PSL_D;
 volatile int cpu_inintr, cpl = IPL_NESTED;
 u_long cpu_mask;
-struct hppa_iv *intr_list, intr_store[8*2*CPU_NINTS], *intr_more = intr_store;
-struct hppa_iv intr_table[CPU_NINTS] = {
-	{ IPL_SOFTCLOCK, 0, HPPA_IV_SOFT, 0, (int (*)(void *))&softclock },
-	{ IPL_SOFTNET  , 0, HPPA_IV_SOFT, 0, (int (*)(void *))&softnet },
+struct hppa_iv intr_store[8*2*CPU_NINTS] __attribute__ ((aligned(32))),
+    *intr_more = intr_store, *intr_list;
+struct hppa_iv intr_table[CPU_NINTS] __attribute__ ((aligned(32))) = {
+	{ IPL_SOFTCLOCK, 0, HPPA_IV_SOFT, 0, 0, (int (*)(void *))&softclock },
+	{ IPL_SOFTNET  , 0, HPPA_IV_SOFT, 0, 0, (int (*)(void *))&softnet },
 	{ 0 }, { 0 },
-	{ IPL_SOFTTTY  , 0, HPPA_IV_SOFT, 0, (int (*)(void *))&softtty }
+	{ IPL_SOFTTTY  , 0, HPPA_IV_SOFT, 0, 0, (int (*)(void *))&softtty }
 };
 volatile u_long ipending, imask[NIPL] = {
 	0,
@@ -122,13 +124,13 @@ cpu_intr_init(void)
 			if (!bit--)
 				panic("cpu_intr_init: out of bits");
 
-			iv->bit = 31 - bit;
 			iv->next = NULL;
+			iv->bit = 1 << bit;
 			intr_table[bit] = *iv;
 			mask |= (1 << bit);
 			imask[(int)iv->pri] |= (1 << bit);
 		} else {
-			iv->bit = 31 - bit;
+			iv->bit = 1 << bit;
 			iv->next = intr_table[bit].next;
 			intr_table[bit].next = iv;
 		}
@@ -159,15 +161,21 @@ cpu_intr_map(void *v, int pri, int irq, int (*handler)(void *), void *arg,
     const char *name)
 {
 	struct hppa_iv *iv, *pv = v, *ivb = pv->next;
+	struct evcount *cnt;
 
 	if (irq < 0 || irq >= CPU_NINTS)
 		return (NULL);
 
+	MALLOC(cnt, struct evcount *, sizeof *cnt, M_DEVBUF, M_NOWAIT);
+	if (!cnt)
+		return (NULL);
+
 	iv = &ivb[irq];
 	if (iv->handler) {
-		if (!pv->share)
+		if (!pv->share) {
+			FREE(cnt, M_DEVBUF);
 			return (NULL);
-		else {
+		} else {
 			iv = pv->share;
 			pv->share = iv->share;
 			iv->share = ivb[irq].share;
@@ -175,11 +183,13 @@ cpu_intr_map(void *v, int pri, int irq, int (*handler)(void *), void *arg,
 		}
 	}
 
+	evcount_attach(cnt, name, NULL, &evcount_intr);
 	iv->pri = pri;
-	iv->bit = irq;
+	iv->irq = irq;
 	iv->flags = 0;
 	iv->handler = handler;
 	iv->arg = arg;
+	iv->cnt = cnt;
 	iv->next = intr_list;
 	intr_list = iv;
 
@@ -191,8 +201,13 @@ cpu_intr_establish(int pri, int irq, int (*handler)(void *), void *arg,
     const char *name)
 {
 	struct hppa_iv *iv, *ev;
+	struct evcount *cnt;
 
 	if (irq < 0 || irq >= CPU_NINTS || intr_table[irq].handler)
+		return (NULL);
+
+	MALLOC(cnt, struct evcount *, sizeof *cnt, M_DEVBUF, M_NOWAIT);
+	if (!cnt)
 		return (NULL);
 
 	cpu_mask |= (1 << irq);
@@ -200,10 +215,12 @@ cpu_intr_establish(int pri, int irq, int (*handler)(void *), void *arg,
 
 	iv = &intr_table[irq];
 	iv->pri = pri;
-	iv->bit = 31 - irq;
+	iv->irq = irq;
+	iv->bit = 1 << irq;
 	iv->flags = 0;
 	iv->handler = handler;
 	iv->arg = arg;
+	iv->cnt = cnt;
 	iv->next = NULL;
 	iv->share = NULL;
 
@@ -213,9 +230,46 @@ cpu_intr_establish(int pri, int irq, int (*handler)(void *), void *arg,
 		intr_more += 2 * CPU_NINTS;
 		for (ev = iv->next + CPU_NINTS; ev < intr_more; ev++)
 			ev->share = iv->share, iv->share = ev;
-	}
+		FREE(cnt, M_DEVBUF);
+		iv->cnt = NULL;
+	} else
+		evcount_attach(cnt, name, NULL, &evcount_intr);
 
 	return (iv);
+}
+
+int
+fls(u_int mask)
+{
+	int bit;
+
+	bit = 32;
+	if (!(mask & 0xffff0000)) {
+		bit -= 16;
+		mask <<= 16;
+	}
+
+	if (!(mask & 0xff000000)) {
+		bit -= 8;
+		mask <<= 8;
+	}
+
+	if (!(mask & 0xf0000000)) {
+		bit -= 4;
+		mask <<= 4;
+	}
+
+	if (!(mask & 0xc0000000)) {
+		bit -= 2;
+		mask <<= 2;
+	}
+
+	if (!(mask & 0x80000000)) {
+		bit -= 1;
+		mask <<= 1;
+	}
+
+	return mask? bit : 0;
 }
 
 void
@@ -229,19 +283,27 @@ cpu_intr(void *v)
 		frame->tf_flags |= TFF_INTR;
 
 	while ((mask = ipending & ~imask[s])) {
-		int r, bit = ffs(mask) - 1;
+		int r, bit = fls(mask) - 1;
 		struct hppa_iv *iv = &intr_table[bit];
 
 		ipending &= ~(1L << bit);
 		if (iv->flags & HPPA_IV_CALL)
 			continue;
 
+		uvmexp.intrs++;
+		if (iv->flags & HPPA_IV_SOFT)
+			uvmexp.softs++;
+
 		cpl = iv->pri;
 		mtctl(frame->tf_eiem, CR_EIEM);
 		for (r = iv->flags & HPPA_IV_SOFT;
 		    iv && iv->handler; iv = iv->next)
 			/* no arg means pass the frame */
-			r |= (iv->handler)(iv->arg? iv->arg : v) == 1;
+			if ((iv->handler)(iv->arg? iv->arg : v) == 1) {
+				if (iv->cnt)
+					iv->cnt->ec_count++;
+				r |= 1;
+			}
 #if 0	/* XXX this does not work, lasi gives us double ints */
 		if (!r) {
 			cpl = 0;

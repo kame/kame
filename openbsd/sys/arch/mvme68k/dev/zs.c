@@ -1,4 +1,4 @@
-/*	$OpenBSD: zs.c,v 1.15 2004/01/14 20:50:48 miod Exp $ */
+/*	$OpenBSD: zs.c,v 1.19 2004/07/31 22:27:34 miod Exp $ */
 
 /*
  * Copyright (c) 2000 Steve Murphree, Jr.
@@ -46,6 +46,7 @@
 #include <machine/cpu.h>
 
 #include <dev/cons.h>
+
 #include <mvme68k/dev/scc.h>
 
 #include "pcc.h"
@@ -57,7 +58,6 @@
 #if NMC > 0
 #include <mvme68k/dev/mcreg.h>
 #endif
-
 
 #include "zs.h"
 
@@ -107,14 +107,7 @@ struct zs {
 struct zssoftc {
 	struct device  sc_dev;
 	struct zs   sc_zs[2];
-	struct evcnt   sc_intrcnt;
 	struct intrhand   sc_ih;
-#if NPCC > 0
-	struct pccreg  *sc_pcc;
-#endif
-#if NMC > 0
-	struct mcreg   *sc_mc;
-#endif
 	int      sc_flags;
 };
 #define ZSSF_85230	1
@@ -166,11 +159,7 @@ void	zs_unblock(struct tty *);
 void	zs_txint(struct zs *);
 void	zs_rxint(struct zs *);
 void	zs_extint(struct zs *);
-int	zscnprobe(struct consdev *);
-void	zscninit(void);
-int	zscngetc(dev_t);
-void	zscnputc(dev_t, int);
-void	zs_cnsetup(int, struct termios *);
+cons_decl(zs);
 
 int
 zsmatch(parent, vcf, args)
@@ -209,31 +198,31 @@ zsattach(parent, self, args)
 	int   size;
 	static int initirq = 0;
 
-	/* connect the interrupt */
 	sc = (struct zssoftc *) self;
 
+	/* connect the interrupt */
 	sc->sc_ih.ih_fn = zsirq;
 	sc->sc_ih.ih_arg = (void *)self->dv_unit;
 	sc->sc_ih.ih_ipl = zs_level;
+	sc->sc_ih.ih_wantframe = 0;
+
 	switch (ca->ca_bustype) {
 #if NPCC > 0
-		case BUS_PCC:
-			pccintr_establish(PCCV_ZS, &sc->sc_ih);
-			sc->sc_pcc = (struct pccreg *)ca->ca_master;
-			break;
+	case BUS_PCC:
+		pccintr_establish(PCCV_ZS, &sc->sc_ih, self->dv_xname);
+		break;
 #endif
 #if NMC > 0
-		case BUS_MC:
-			if (sys_mc->mc_chiprev == 0x01)
-				/* 
-				 * MC rev 0x01 has a bug and can not access scc regs directly. 
-				 * Macros will do the right thing based on the value of 
-				 * mc_rev1_bug - XXX smurph 
-				 */
-				mc_rev1_bug = 1; /* defined in scc.h */
-			mcintr_establish(MCV_ZS, &sc->sc_ih);
-			sc->sc_mc = (struct mcreg *)ca->ca_master;
-			break;
+	case BUS_MC:
+		if (sys_mc->mc_chiprev == 0x01)
+			/* 
+			 * MC rev 0x01 has a bug and can not access scc regs directly. 
+			 * Macros will do the right thing based on the value of 
+			 * mc_rev1_bug - XXX smurph 
+			 */
+			mc_rev1_bug = 1; /* defined in scc.h */
+		mcintr_establish(MCV_ZS, &sc->sc_ih, self->dv_xname);
+		break;
 #endif
 	}
 
@@ -247,7 +236,7 @@ zsattach(parent, self, args)
 	 */
 	size = zsregs(ca->ca_vaddr, 0, &scc_cr, &scc_dr);
 
-	if (zs_is_console && self->dv_unit == zsunit(zs_cons_unit)) {
+	if (zs_is_console && self->dv_unit == zs_cons_unit) {
 		/* SCC is the console - it's already reset */
 		zc = zp + zsside(zs_cons_unit);
 		zc->scc = *zs_cons_scc;
@@ -287,28 +276,26 @@ zsattach(parent, self, args)
 	switch (ca->ca_bustype) {
 #if NPCC > 0
 		case BUS_PCC:
-			ir = sc->sc_pcc->pcc_zsirq;
+			ir = sys_pcc->pcc_zsirq;
 			if ((ir & PCC_IRQ_IPL) != 0 && (ir & PCC_IRQ_IPL) != zs_level)
 				panic("zs configured at different IPLs");
 			if (initirq)
 				break;
-			sc->sc_pcc->pcc_zsirq = zs_level | PCC_IRQ_IEN | PCC_ZS_PCCVEC;
+			sys_pcc->pcc_zsirq = zs_level | PCC_IRQ_IEN | PCC_ZS_PCCVEC;
 			break;
 #endif
 #if NMC > 0
 		case BUS_MC:
-			ir = sc->sc_mc->mc_zsirq;
+			ir = sys_mc->mc_zsirq;
 			if ((ir & MC_IRQ_IPL) != 0 && (ir & MC_IRQ_IPL) != zs_level)
 				panic("zs configured at different IPLs");
 			if (initirq)
 				break;
-			sc->sc_mc->mc_zsirq = zs_level | MC_IRQ_IEN;
+			sys_mc->mc_zsirq = zs_level | MC_IRQ_IEN;
 			break;
 #endif
 	}
 	initirq = 1;
-
-	evcnt_attach(&sc->sc_dev, "intr", &sc->sc_intrcnt);
 }
 
 void
@@ -783,7 +770,6 @@ zsirq(arg)
 		zs_extint(zp);
 	ZWRITE0(&zp->scc, 0x38);	/* reset highest IUS */
 
-	sc->sc_intrcnt.ev_count++;
 	return (1);
 }
 
@@ -992,20 +978,20 @@ zs_softint(arg)
  */
 
 /* probe for the SCC; should check hardware */
-int
+void
 zscnprobe(cp)
 	struct consdev *cp;
 {
 	int maj;
 
 	switch (cputyp) {
-		case CPU_147:
-		case CPU_162:
-		case CPU_172:
-			break;
-		default:
-			cp->cn_pri = CN_DEAD;
-			return (0);
+	case CPU_147:
+	case CPU_162:
+	case CPU_172:
+		break;
+	default:
+		cp->cn_pri = CN_DEAD;
+		return;
 	}
 
 	/* locate the major number */
@@ -1013,11 +999,8 @@ zscnprobe(cp)
 		if (cdevsw[maj].d_open == zsopen)
 			break;
 
-		/* initialize required fields */
 	cp->cn_dev = makedev(maj, 0);
-	cp->cn_pri = CN_INTERNAL;	/* better than PROM console */
-
-	return (1);
+	cp->cn_pri = CN_NORMAL;
 }
 
 /* initialize the keyboard for use as the console */
@@ -1033,12 +1016,6 @@ struct termios zscn_termios = {
 
 struct sccregs zs_cons_sccregs;
 int     zs_cons_imask;
-
-void
-zscninit()
-{
-	zs_cnsetup(0, &zscn_termios);
-}
 
 /* Polling routine for console input from a serial port. */
 int
@@ -1079,10 +1056,11 @@ zscnputc(dev, c)
 }
 
 void
-zs_cnsetup(unit, tiop)
-	int unit;
-	struct termios *tiop;
+zscninit(cp)
+	struct consdev *cp;
 {
+	int unit = 0;
+	struct termios *tiop = &zscn_termios;
 	volatile u_char *scc_cr, *scc_dr;
 	struct sccregs *scc;
 	int size;
@@ -1154,7 +1132,7 @@ zsregs(va, unit, crp, drp)
 #ifdef MVME147
 		case CPU_147:
 			if (!va)
-				va = (void *)IIOV(zs_cons_addrs_147[zsunit(unit)]);
+				va = (void *)IIOV(zs_cons_addrs_147[unit]);
 			scc_adr_147 = (volatile struct scc_147 *)va;
 			scc_cr = &scc_adr_147->cr;
 			scc_dr = &scc_adr_147->dr;
@@ -1165,7 +1143,7 @@ zsregs(va, unit, crp, drp)
 		case CPU_162:
 		case CPU_172:
 			if (!va)
-				va = (void *)IIOV(zs_cons_addrs_162[zsunit(unit)]);
+				va = (void *)IIOV(zs_cons_addrs_162[unit]);
 			scc_adr_162 = (volatile struct scc_162 *)va;
 			scc_cr = &scc_adr_162->cr;
 			scc_dr = &scc_adr_162->dr;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_fork.c,v 1.63 2003/09/23 20:26:18 millert Exp $	*/
+/*	$OpenBSD: kern_fork.c,v 1.72 2004/08/06 22:31:30 mickey Exp $	*/
 /*	$NetBSD: kern_fork.c,v 1.29 1996/02/09 18:59:34 christos Exp $	*/
 
 /*
@@ -44,6 +44,7 @@
 #include <sys/malloc.h>
 #include <sys/mount.h>
 #include <sys/proc.h>
+#include <sys/exec.h>
 #include <sys/resourcevar.h>
 #include <sys/signalvar.h>
 #include <sys/vnode.h>
@@ -118,7 +119,7 @@ sys_rfork(struct proc *p, void *v, register_t *retval)
 		flags |= FORK_NOZOMBIE;
 
 	if (rforkflags & RFMEM)
-		flags |= FORK_VMNOSTACK;
+		flags |= FORK_SHAREVM;
 
 	return (fork1(p, SIGCHLD, flags, NULL, 0, NULL, NULL, retval));
 }
@@ -169,7 +170,7 @@ fork1(struct proc *p1, int exitsig, int flags, void *stack, size_t stacksize,
 	/*
 	 * Allocate a pcb and kernel stack for the process
 	 */
-	uaddr = uvm_km_valloc(kernel_map, USPACE);
+	uaddr = uvm_km_valloc_align(kernel_map, USPACE, USPACE_ALIGN);
 	if (uaddr == 0) {
 		chgproccnt(uid, -1);
 		nprocs--;
@@ -202,6 +203,10 @@ fork1(struct proc *p1, int exitsig, int flags, void *stack, size_t stacksize,
 	 */
 	timeout_set(&p2->p_sleep_to, endtsleep, p2);
 	timeout_set(&p2->p_realit_to, realitexpire, p2);
+
+#if defined(__HAVE_CPUINFO)
+	p2->p_cpu = NULL;
+#endif
 
 	/*
 	 * Duplicate sub-structures as needed.
@@ -292,23 +297,6 @@ fork1(struct proc *p1, int exitsig, int flags, void *stack, size_t stacksize,
 	 */
 	PHOLD(p1);
 
-	if (flags & FORK_VMNOSTACK) {
-		/* share everything, but ... */
-		uvm_map_inherit(&p1->p_vmspace->vm_map,
-		    VM_MIN_ADDRESS, VM_MAXUSER_ADDRESS,
-		    MAP_INHERIT_SHARE);
-		/* ... don't share stack */
-#ifdef MACHINE_STACK_GROWS_UP
-		uvm_map_inherit(&p1->p_vmspace->vm_map,
-		    USRSTACK, USRSTACK + MAXSSIZ,
-		    MAP_INHERIT_COPY);
-#else
-		uvm_map_inherit(&p1->p_vmspace->vm_map,
-		    USRSTACK - MAXSSIZ, USRSTACK,
-		    MAP_INHERIT_COPY);
-#endif
-	}
-
 	p2->p_addr = (struct user *)uaddr;
 
 	/*
@@ -351,12 +339,15 @@ fork1(struct proc *p1, int exitsig, int flags, void *stack, size_t stacksize,
 	/*
 	 * Make child runnable, set start time, and add to run queue.
 	 */
-	s = splstatclock();
-	p2->p_stats->p_start = time;
+	SCHED_LOCK(s);
+ 	getmicrotime(&p2->p_stats->p_start);
 	p2->p_acflag = AFORK;
 	p2->p_stat = SRUN;
 	setrunqueue(p2);
-	splx(s);
+	SCHED_UNLOCK(s);
+
+	timeout_set(&p2->p_stats->p_virt_to, virttimer_trampoline, p2);
+	timeout_set(&p2->p_stats->p_prof_to, proftimer_trampoline, p2);
 
 	/*
 	 * Now can be swapped.
@@ -387,8 +378,10 @@ fork1(struct proc *p1, int exitsig, int flags, void *stack, size_t stacksize,
 	 * Return child pid to parent process,
 	 * marking us as parent via retval[1].
 	 */
-	retval[0] = p2->p_pid;
-	retval[1] = 0;
+	if (retval != NULL) {
+		retval[0] = p2->p_pid;
+		retval[1] = 0;
+	}
 	return (0);
 }
 
@@ -409,3 +402,20 @@ pidtaken(pid_t pid)
 			return (1);
 	return (0);
 }
+
+#if defined(MULTIPROCESSOR)
+/*
+ * XXX This is a slight hack to get newly-formed processes to
+ * XXX acquire the kernel lock as soon as they run.
+ */
+void
+proc_trampoline_mp(void)
+{
+	struct proc *p;
+
+	p = curproc;
+
+	SCHED_ASSERT_UNLOCKED();
+	KERNEL_PROC_LOCK(p);
+}
+#endif

@@ -1,4 +1,4 @@
-/*	$OpenBSD: mpt_openbsd.c,v 1.7 2004/03/19 02:47:36 krw Exp $	*/
+/*	$OpenBSD: mpt_openbsd.c,v 1.15 2004/08/23 20:52:15 marco Exp $	*/
 /*	$NetBSD: mpt_netbsd.c,v 1.7 2003/07/14 15:47:11 lukem Exp $	*/
 
 /*
@@ -14,12 +14,17 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR OR HIS RELATIVES BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  */
 
 /*
@@ -101,18 +106,18 @@
 
 #include <dev/ic/mpt.h>			/* pulls in all headers */
 
-static void	mpt_run_ppr(mpt_softc_t *);
-static int	mpt_ppr(mpt_softc_t *, struct scsi_link *, int speed);
-static int	mpt_poll(mpt_softc_t *, struct scsi_xfer *, int);
-static void	mpt_timeout(void *);
-static void	mpt_done(mpt_softc_t *, uint32_t);
-static int	mpt_run_xfer(mpt_softc_t *, struct scsi_xfer *);
-static void	mpt_check_xfer_settings(mpt_softc_t *, struct scsi_xfer *, MSG_SCSI_IO_REQUEST *);
-static void	mpt_ctlop(mpt_softc_t *, void *vmsg, uint32_t);
-static void	mpt_event_notify_reply(mpt_softc_t *, MSG_EVENT_NOTIFY_REPLY *);
+void	mpt_run_ppr(mpt_softc_t *, int);
+int	mpt_ppr(mpt_softc_t *, struct scsi_link *, int, int);
+int	mpt_poll(mpt_softc_t *, struct scsi_xfer *, int);
+void	mpt_timeout(void *);
+void	mpt_done(mpt_softc_t *, uint32_t);
+int	mpt_run_xfer(mpt_softc_t *, struct scsi_xfer *);
+void	mpt_check_xfer_settings(mpt_softc_t *, struct scsi_xfer *, MSG_SCSI_IO_REQUEST *);
+void	mpt_ctlop(mpt_softc_t *, void *vmsg, uint32_t);
+void	mpt_event_notify_reply(mpt_softc_t *, MSG_EVENT_NOTIFY_REPLY *);
 
-static int	mpt_action(struct scsi_xfer *);
-static void	mpt_minphys(struct buf *);
+int	mpt_action(struct scsi_xfer *);
+void	mpt_minphys(struct buf *);
 
 struct cfdriver mpt_cd = {
 	NULL, "mpt", DV_DULL
@@ -135,11 +140,13 @@ enum mpt_scsi_speed { U320, U160, U80 };
  * return 1 if passed
  */
 int
-mpt_ppr(mpt_softc_t *mpt, struct scsi_link *sc_link, int speed)
+mpt_ppr(mpt_softc_t *mpt, struct scsi_link *sc_link, int speed, int flags)
 {
 	fCONFIG_PAGE_SCSI_DEVICE_0 page0;
 	fCONFIG_PAGE_SCSI_DEVICE_1 page1;
 	uint8_t tp;
+	int error;
+	struct scsi_inquiry_data inqbuf;
 
 	if (mpt->verbose > 1) {
 		mpt_prt(mpt, "Entering PPR");
@@ -244,11 +251,16 @@ mpt_ppr(mpt_softc_t *mpt, struct scsi_link *sc_link, int speed)
 		    mpt->mpt_dev_page1[sc_link->target].Configuration);
 	}
 
-	/* use TUR for PPR, use another command if there is a NO_TUR quirk */
-	/* FIXME */
-	scsi_test_unit_ready(sc_link, TEST_READY_RETRIES_DEFAULT,
-		scsi_autoconf | SCSI_IGNORE_ILLEGAL_REQUEST |
-		SCSI_IGNORE_NOT_READY | SCSI_IGNORE_MEDIA_CHANGE);
+	/* 
+	 * use INQUIRY for PPR two reasons:
+	 * 1) actually transfer data at requested speed
+	 * 2) no need to test for TUR QUIRK
+	 */
+	error = scsi_inquire(sc_link, &inqbuf, flags);
+	if (error) {
+		mpt_prt(mpt, "Invalid INQUIRY on target: %d", sc_link->target);
+		return 0;
+	}
 
 	/* read page 0 back to figure out if the PPR worked */
         page0 = mpt->mpt_dev_page0[sc_link->target];
@@ -338,7 +350,7 @@ mpt_ppr(mpt_softc_t *mpt, struct scsi_link *sc_link, int speed)
  * Run PPR on all attached devices
  */
 void
-mpt_run_ppr(mpt_softc_t *mpt)
+mpt_run_ppr(mpt_softc_t *mpt, int flags)
 {
 	struct scsi_link *sc_link;
 	struct device *dev;
@@ -346,7 +358,8 @@ mpt_run_ppr(mpt_softc_t *mpt)
 	u_int16_t buswidth;
 
 	/* walk device list */
-	for (dev = TAILQ_FIRST(&alldevs); dev != NULL; dev = TAILQ_NEXT(dev, dv_list)) {
+	for (dev = TAILQ_FIRST(&alldevs); dev != NULL;
+	    dev = TAILQ_NEXT(dev, dv_list)) {
 		if (dev->dv_parent == (struct device *)mpt) {
 			/* found scsibus softc */
 			buswidth = ((struct scsi_link *)&mpt->sc_link)->adapter_buswidth;
@@ -356,21 +369,23 @@ mpt_run_ppr(mpt_softc_t *mpt)
 			for (target = 0; target < buswidth; target++) {
 				sc_link = ((struct scsibus_softc *)dev)->sc_link[target][0];
 				if ((sc_link != NULL)) {
-				/* got a device! run PPR */
+					/* got a device! run PPR */
+					/* FIXME: skip CPU devices since they
+					 * can crash at U320 speeds */
 					/*if (device == cpu) {
 						continue;
 					}*/
-					if (mpt_ppr(mpt, sc_link, U320)) {
+					if (mpt_ppr(mpt, sc_link, U320, flags)) {
 						mpt->mpt_negotiated_speed[target] = U320;
 						continue;
 					}
 
-					if (mpt_ppr(mpt, sc_link, U160)) {
+					if (mpt_ppr(mpt, sc_link, U160, flags)) {
 						mpt->mpt_negotiated_speed[target] = U160;
 						continue;
 					}
 
-					if (mpt_ppr(mpt, sc_link, U80)) {
+					if (mpt_ppr(mpt, sc_link, U80, flags)) {
 						mpt->mpt_negotiated_speed[target] = U80;
 						continue;
 					}
@@ -388,6 +403,8 @@ void
 mpt_attach(mpt_softc_t *mpt)
 {
 	struct scsi_link *lptr = &mpt->sc_link;
+	struct _CONFIG_PAGE_IOC_2 iocp2;
+	int rv;
 
 	mpt->bus = 0;		/* XXX ?? */
 
@@ -405,22 +422,46 @@ mpt_attach(mpt_softc_t *mpt)
 	if (mpt->is_fc) {
 		lptr->adapter_buswidth = 256;
 		lptr->adapter_target = 256;
-		lptr->openings = 4; /* 1024 requests / 256 targets = 4 each */
 	} else {
 		lptr->adapter_buswidth = 16;
 		lptr->adapter_target = mpt->mpt_ini_id;
-		lptr->openings = 16; /* 1024 requests / 16 targets = 16 each */
 	}
+	lptr->openings = MPT_MAX_REQUESTS(mpt) / lptr->adapter_buswidth;
 
 #ifdef MPT_DEBUG
 	mpt->verbose = 2;
 #endif
+
+	/* Read IOC page 2 to figure out if we have IM */
+	rv = mpt_read_cfg_header(mpt, MPI_CONFIG_PAGETYPE_IOC, 2,
+	    0, &iocp2.Header);
+	if (rv) {
+		mpt_prt(mpt, "Could not retrieve IOC PAGE 2 to determine"
+		    "RAID capabilities.");
+	}
+	else {
+		mpt->im_support = iocp2.CapabilitiesFlags &
+		    (MPI_IOCPAGE2_CAP_FLAGS_IS_SUPPORT |
+		     MPI_IOCPAGE2_CAP_FLAGS_IME_SUPPORT |
+		     MPI_IOCPAGE2_CAP_FLAGS_IM_SUPPORT);
+
+		if (mpt->verbose > 1) {
+			mpt_prt(mpt, "IOC Page 2: %x %x %x %x %x",
+			    iocp2.CapabilitiesFlags,
+			    iocp2.NumActiveVolumes,
+			    iocp2.MaxVolumes,
+			    iocp2.NumActivePhysDisks,
+			    iocp2.MaxPhysDisks);
+			mpt_prt(mpt, "IM support: %x", mpt->im_support);
+		}
+	}
+
 	(void) config_found(&mpt->mpt_dev, lptr, scsiprint);
 
 	/* done attaching now walk targets and PPR them */
 	/* FC does not do PPR */
 	if (!mpt->is_fc) {
-		mpt_run_ppr(mpt);
+		mpt_run_ppr(mpt, SCSI_POLL);
 	}
 }
 
@@ -492,8 +533,8 @@ mpt_dma_mem_alloc(mpt_softc_t *mpt)
 	error = bus_dmamem_alloc(mpt->sc_dmat, MPT_REQ_MEM_SIZE(mpt),
 	    PAGE_SIZE, 0, &request_seg, 1, &request_rseg, 0);
 	if (error) {
-		printf("%s: unable to allocate request area, "
-		    "error = %d\n", mpt->mpt_dev.dv_xname, error);
+		printf("%s: unable to allocate request area, error = %d\n",
+		    mpt->mpt_dev.dv_xname, error);
 		goto fail_4;
 	}
 
@@ -508,8 +549,8 @@ mpt_dma_mem_alloc(mpt_softc_t *mpt)
 	error = bus_dmamap_create(mpt->sc_dmat, MPT_REQ_MEM_SIZE(mpt), 1,
 	    MPT_REQ_MEM_SIZE(mpt), 0, 0, &mpt->request_dmap);
 	if (error) {
-		printf("%s: unable to create request DMA map, "
-		    "error = %d\n", mpt->mpt_dev.dv_xname, error);
+		printf("%s: unable to create request DMA map, error = %d\n",
+		    mpt->mpt_dev.dv_xname, error);
 		goto fail_6;
 	}
 
@@ -543,8 +584,8 @@ mpt_dma_mem_alloc(mpt_softc_t *mpt)
 		error = bus_dmamap_create(mpt->sc_dmat, MAXPHYS,
 		    MPT_SGL_MAX, MAXPHYS, 0, 0, &req->dmap);
 		if (error) {
-			printf("%s: unable to create req %d DMA map, "
-			    "error = %d\n", mpt->mpt_dev.dv_xname, i, error);
+			printf("%s: unable to create req %d DMA map, error = ",
+			    "%d", mpt->mpt_dev.dv_xname, i, error);
 			goto fail_8;
 		}
 	}
@@ -638,7 +679,7 @@ mpt_prt(mpt_softc_t *mpt, const char *fmt, ...)
 	printf("\n");
 }
 
-static int
+int
 mpt_poll(mpt_softc_t *mpt, struct scsi_xfer *xs, int count)
 {
 
@@ -654,7 +695,7 @@ mpt_poll(mpt_softc_t *mpt, struct scsi_xfer *xs, int count)
 	return (1);
 }
 
-static void
+void
 mpt_timeout(void *arg)
 {
 	request_t *req = arg;
@@ -664,7 +705,7 @@ mpt_timeout(void *arg)
 	uint32_t oseq;
 	int s, index;
 
-	mpt_prt(mpt, "command timeout\n");
+	mpt_prt(mpt, "command timeout");
 	sc_print_addr(linkp);
 
 	s = splbio();
@@ -701,7 +742,7 @@ mpt_timeout(void *arg)
 	splx(s);
 }
 
-static void
+void
 mpt_done(mpt_softc_t *mpt, uint32_t reply)
 {
 	struct scsi_xfer *xs = NULL;
@@ -897,7 +938,7 @@ mpt_done(mpt_softc_t *mpt, uint32_t reply)
 			break;
 		default:
 			sc_print_addr(linkp);
-			printf("invalid status code %d\n", xs->status);
+			mpt_prt(mpt, "invalid status code %d", xs->status);
 			xs->error = XS_DRIVER_STUFFUP;
 			break;
 		}
@@ -971,7 +1012,7 @@ mpt_done(mpt_softc_t *mpt, uint32_t reply)
 	}
 }
 
-static int
+int
 mpt_run_xfer(mpt_softc_t *mpt, struct scsi_xfer *xs)
 {
 	struct scsi_link *linkp = xs->sc_link;
@@ -1118,11 +1159,14 @@ mpt_run_xfer(mpt_softc_t *mpt, struct scsi_xfer *xs)
 					ntodo = MPT_NSGL(mpt) - 1;
 					ce->NextChainOffset = (MPT_RQSL(mpt) -
 					    sizeof(SGE_SIMPLE32)) >> 2;
+					ce->Length = MPT_NSGL(mpt)
+						* sizeof(SGE_SIMPLE32);
 				} else {
 					ntodo = nleft;
 					ce->NextChainOffset = 0;
+					ce->Length = ntodo
+						* sizeof(SGE_SIMPLE32);
 				}
-				ce->Length = ntodo * sizeof(SGE_SIMPLE32);
 				ce->Address = req->req_pbuf +
 				    ((char *)se - (char *)mpt_req);
 				ce->Flags = MPI_SGE_FLAGS_CHAIN_ELEMENT;
@@ -1229,7 +1273,7 @@ mpt_run_xfer(mpt_softc_t *mpt, struct scsi_xfer *xs)
 	return (COMPLETE);
 }
 
-static void
+void
 mpt_ctlop(mpt_softc_t *mpt, void *vmsg, uint32_t reply)
 {
 	MSG_DEFAULT_REPLY *dmsg = vmsg;
@@ -1276,7 +1320,7 @@ mpt_ctlop(mpt_softc_t *mpt, void *vmsg, uint32_t reply)
 	}
 }
 
-static void
+void
 mpt_event_notify_reply(mpt_softc_t *mpt, MSG_EVENT_NOTIFY_REPLY *msg)
 {
 
@@ -1479,7 +1523,7 @@ mpt_check_xfer_settings(mpt_softc_t *mpt, struct scsi_xfer *xs, MSG_SCSI_IO_REQU
  * SCSI interface routines
  *****************************************************************************/
 
-static int
+int
 mpt_action(struct scsi_xfer *xfer)
 {
 	mpt_softc_t *mpt = (void *) xfer->sc_link->adapter_softc;
@@ -1504,7 +1548,7 @@ mpt_action(struct scsi_xfer *xfer)
 #endif
 }
 
-static void
+void
 mpt_minphys(struct buf *bp)
 {
 
@@ -1533,21 +1577,21 @@ mpt_alloc_fw_mem(mpt_softc_t *mpt, uint32_t img_sz, int maxsgl)
 	error = bus_dmamem_alloc(mpt->sc_dmat, img_sz, PAGE_SIZE, 0,
 		&mpt->fw_seg, maxsgl, &mpt->fw_rseg, 0);
 	if (error) {
-	mpt_prt(mpt, "unable to allocate fw memory, error = %d\n", error);
+		mpt_prt(mpt, "unable to allocate fw memory, error = %d", error);
 		goto fw_fail0;
 	}
 
 	error = bus_dmamem_map(mpt->sc_dmat, &mpt->fw_seg, mpt->fw_rseg, img_sz,
 		(caddr_t *)&mpt->fw, BUS_DMA_COHERENT);
 	if (error) {
-		mpt_prt(mpt, "unable to map fw area, error = %d\n", error);
+		mpt_prt(mpt, "unable to map fw area, error = %d", error);
 		goto fw_fail1;
 	}
 
 	error = bus_dmamap_create(mpt->sc_dmat, img_sz, maxsgl, img_sz,
 		0, 0, &mpt->fw_dmap);
 	if (error) {
-		mpt_prt(mpt, "unable to create request DMA map, error = %d\n",
+		mpt_prt(mpt, "unable to create request DMA map, error = %d",
 			error);
 		goto fw_fail2;
 	}
@@ -1555,7 +1599,7 @@ mpt_alloc_fw_mem(mpt_softc_t *mpt, uint32_t img_sz, int maxsgl)
 	error = bus_dmamap_load(mpt->sc_dmat, mpt->fw_dmap, mpt->fw, img_sz,
 		NULL, 0);
 	if (error) {
-	mpt_prt(mpt, "unable to load request DMA map, error = %d\n", error);
+		mpt_prt(mpt, "unable to load request DMA map, error = %d", error);
 		goto fw_fail3;
 	}
 

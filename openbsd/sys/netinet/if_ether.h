@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ether.h,v 1.29 2003/06/02 23:28:13 millert Exp $	*/
+/*	$OpenBSD: if_ether.h,v 1.33 2004/07/31 16:34:57 brad Exp $	*/
 /*	$NetBSD: if_ether.h,v 1.22 1996/05/11 13:00:00 mycroft Exp $	*/
 
 /*
@@ -36,7 +36,7 @@
 #define _NETINET_IF_ETHER_H_
 
 /*
- * Some Ethernet constants.
+ * Some basic Ethernet constants.
  */
 #define	ETHER_ADDR_LEN	6	/* Ethernet address length		*/
 #define ETHER_TYPE_LEN	2	/* Ethernet type field length		*/
@@ -44,6 +44,20 @@
 #define ETHER_HDR_LEN	((ETHER_ADDR_LEN * 2) + ETHER_TYPE_LEN)
 #define ETHER_MIN_LEN	64	/* Minimum frame length, CRC included	*/
 #define ETHER_MAX_LEN	1518	/* Maximum frame length, CRC included	*/
+#define ETHER_MAX_LEN_JUMBO	9018	/* max jumbo frame len, including CRC */
+
+/*
+ * Some Ethernet extensions.
+ */
+#define ETHER_VLAN_ENCAP_LEN	4	/* len of 802.1Q VLAN encapsulation */
+
+/*
+ * Mbuf adjust factor to force 32-bit alignment of IP header.
+ * Drivers should do m_adj(m, ETHER_ALIGN) when setting up a
+ * receive so the upper layers get the IP header properly aligned
+ * past the 14-byte Ethernet header.
+ */
+#define ETHER_ALIGN	2	/* driver adjust for IP hdr alignment */
 
 /*
  * Ethernet address - 6 octets
@@ -55,7 +69,6 @@ struct ether_addr {
 /*
  * The length of the combined header.
  */
-
 struct	ether_header {
 	u_int8_t  ether_dhost[ETHER_ADDR_LEN];
 	u_int8_t  ether_shost[ETHER_ADDR_LEN];
@@ -68,12 +81,18 @@ struct	ether_header {
 
 #define	ETHERMTU	(ETHER_MAX_LEN - ETHER_HDR_LEN - ETHER_CRC_LEN)
 #define	ETHERMIN	(ETHER_MIN_LEN - ETHER_HDR_LEN - ETHER_CRC_LEN)
+#define	ETHERMTU_JUMBO	(ETHER_MAX_LEN_JUMBO - ETHER_HDR_LEN - ETHER_CRC_LEN)
 
 /*
  * Ethernet CRC32 polynomials (big- and little-endian verions).
  */
 #define	ETHER_CRC_POLY_LE	0xedb88320
 #define	ETHER_CRC_POLY_BE	0x04c11db6
+
+/*
+ * Ethernet-specific mbuf flags.
+ */
+#define M_HASFCS	M_LINK0	/* FCS included at end of frame */
 
 #ifdef _KERNEL
 /*
@@ -277,11 +296,13 @@ u_int32_t ether_crc32_be(const u_int8_t *, size_t);
 
 #else
 
+__BEGIN_DECLS
 char *ether_ntoa(struct ether_addr *);
 struct ether_addr *ether_aton(char *);
 int ether_ntohost(char *, struct ether_addr *);
 int ether_hostton(char *, struct ether_addr *);
 int ether_line(char *, struct ether_addr *, char *);
+__END_DECLS
 
 #endif /* _KERNEL */
 #endif /* _NETINET_IF_ETHER_H_ */

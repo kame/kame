@@ -1,61 +1,45 @@
-/*	$OpenBSD: sysconreg.h,v 1.4 2003/10/11 22:08:57 miod Exp $ */
+/*	$OpenBSD: sysconreg.h,v 1.7 2004/07/30 19:02:06 miod Exp $ */
 
 /*
- * Memory map for SYSCON found in mvme188 board set.
- * No specific chips are found here like the PCCTWO
- * on MVME1x7. All chips are included in this one
- * map/device so that devices don't run rampant in
- * the config files.  I may change this later XXX smurph.
+ * Copyright (c) 2004, Miodrag Vallat.
+ * Copyright (c) 1999 Steve Murphree, Jr.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
  */
-
-#include <machine/board.h>
-
-struct sysconreg {
-	unsigned int *volatile ien0;
-	unsigned int *volatile ien1;
-	unsigned int *volatile ien2;
-	unsigned int *volatile ien3;
-	unsigned int *volatile ienall;
-	unsigned int *volatile ist;
-	unsigned int *volatile setswi;
-	unsigned int *volatile clrswi;
-	unsigned int *volatile istate;
-	unsigned int *volatile clrint;
-	unsigned char *volatile global0;
-	unsigned char *volatile global1;
-	unsigned char *volatile global2;
-	unsigned char *volatile global3;
-	unsigned int *volatile ucsr;
-	unsigned int *volatile glbres;
-	unsigned int *volatile ccsr;
-	unsigned int *volatile error;
-	unsigned int *volatile pcnfa;
-	unsigned int *volatile pcnfb;
-	unsigned int *volatile extad;
-	unsigned int *volatile extam;
-	unsigned int *volatile whoami;
-	unsigned int *volatile wmad;
-	unsigned int *volatile rmad;
-	unsigned int *volatile wvad;
-	unsigned int *volatile rvad;
-	unsigned int *volatile cio_portc;
-	unsigned int *volatile cio_portb;
-	unsigned int *volatile cio_porta;
-	unsigned int *volatile cio_ctrl;
-};
-
-extern struct sysconreg *sys_syscon;
 
 /*
- * Vectors we use
+ * Map syscon interrupts a la PCC2
  */
-#define SYSCV_ABRT	0x52
-#define SYSCV_SYSF	0x53
-#define SYSCV_ACF 	0x54
-#define SYSCV_SCC 	0x55
-#define SYSCV_TIMER4    0x56
-#define SYSCV_TIMER3    0x57
-#define SYSCV_TIMER2    0x58
-#define SYSCV_TIMER1    0x59
+#define	SYSCON_VECT	0x50
+#define	SYSCON_NVEC	0x10
 
+#define SYSCV_ABRT	0x02
+#define SYSCV_SYSF	0x03
+#define SYSCV_ACF 	0x04
+#define SYSCV_SCC 	0x05
+#define SYSCV_TIMER4    0x06
+#define SYSCV_TIMER3    0x07
+#define SYSCV_TIMER2    0x08
+#define SYSCV_TIMER1    0x09
 
+int sysconintr_establish(int, struct intrhand *, const char *);

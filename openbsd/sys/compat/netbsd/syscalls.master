@@ -1,4 +1,4 @@
-;	$OpenBSD: syscalls.master,v 1.21 2004/01/14 05:23:25 tedu Exp $
+;	$OpenBSD: syscalls.master,v 1.24 2004/07/13 21:04:29 millert Exp $
 
 ;	@(#)syscalls.master	8.2 (Berkeley) 1/13/94
 
@@ -121,13 +121,11 @@
 35	NOARGS		{ int sys_fchflags(int fd, u_int flags); }
 36	NOARGS		{ void sys_sync(void); }
 37	NOARGS		{ int sys_kill(int pid, int signum); }
-; XXX struct stat43 *ub vs. struct ostat *ub
 38	STD		{ int compat_43_netbsd_sys_stat(char *path, \
-			    struct ostat *ub); } ostat
+			    struct stat43 *ub); } stat43
 39	NOARGS		{ pid_t sys_getppid(void); }
-; XXX struct stat43 *ub vs. struct ostat *ub
 40	STD		{ int compat_43_netbsd_sys_lstat(char *path, \
-			    struct ostat *ub); } olstat
+			    struct stat43 *ub); } lstat43
 41	NOARGS		{ int sys_dup(int fd); }
 42	NOARGS		{ int sys_opipe(void); }
 43	NOARGS		{ gid_t sys_getegid(void); }
@@ -146,7 +144,11 @@
 48	NOARGS		{ int sys_sigprocmask(int how, sigset_t mask); }
 49	NOARGS		{ int sys_getlogin(char *namebuf, u_int namelen); }
 50	NOARGS		{ int sys_setlogin(const char *namebuf); }
+#ifdef ACCOUNTING
 51	NOARGS		{ int sys_acct(const char *path); }
+#else
+51	UNIMPL		acct
+#endif
 52	NOARGS		{ int sys_sigpending(void); }
 53	NOARGS		{ int sys_osigaltstack(const struct osigaltstack *nss, \
 			    struct osigaltstack *oss); }
@@ -161,7 +163,7 @@
 			    char **argp, char **envp); }
 60	NOARGS		{ int sys_umask(int newmask); }
 61	STD		{ int netbsd_sys_chroot(char *path); }
-62	NOARGS		{ int sys_fstat(int fd, struct ostat *sb); } ofstat
+62	NOARGS		{ int sys_fstat(int fd, struct stat43 *sb); } fstat43
 63	NOARGS		{ int compat_43_sys_getkerninfo(int op, char *where, \
 			    int *size, int arg); } ogetkerninfo
 64	NOARGS		{ int compat_43_sys_getpagesize(void); } ogetpagesize
@@ -394,9 +396,9 @@
 186	UNIMPL
 187	UNIMPL
 #endif
-188	STD		{ int netbsd_sys_stat(char *path, struct stat *ub); }
-189	NOARGS		{ int sys_fstat(int fd, struct stat12 *sb); }
-190	STD		{ int netbsd_sys_lstat(char *path, struct stat *ub); }
+188	STD		{ int netbsd_sys_stat(char *path, struct stat35 *ub); }
+189	NOARGS		{ int sys_fstat(int fd, struct stat35 *sb); }
+190	STD		{ int netbsd_sys_lstat(char *path, struct stat35 *ub); }
 191	STD		{ long netbsd_sys_pathconf(char *path, int name); }
 192	NOARGS		{ long sys_fpathconf(int fd, int name); }
 193	NOARGS		{ int sys_swapctl(int cmd, const void *arg, int misc); }

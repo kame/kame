@@ -1,4 +1,4 @@
-#	$OpenBSD: RAMDISK,v 1.7 2004/03/12 01:40:48 deraadt Exp $
+#	$OpenBSD: RAMDISK,v 1.14 2004/09/06 10:49:42 deraadt Exp $
 
 machine		amd64		# architecture, used by config; REQUIRED
 
@@ -33,7 +33,7 @@ config		bsd	root on rd0a swap on rd0b and wd0b and sd0b
 
 mainbus0 at root
 
-cpu*	at mainbus0
+cpu*	at mainbus0 apid ?
 isa0	at mainbus0
 #isa0	at pcib?
 pci*	at mainbus0
@@ -98,6 +98,7 @@ wskbd*	at ukbd? console ? mux 1
 pckbc0		at isa?			# PC keyboard controller
 pckbd*		at pckbc?		# PC keyboard
 wskbd*		at pckbd? console ?
+vga0		at isa?
 vga*		at pci? dev ? function ?
 wsdisplay*	at vga? console ?
 
@@ -202,10 +203,11 @@ fxp*	at pci? dev ? function ?		# EtherExpress 10/100B ethernet
 #fpa*	at pci? dev ? function ?		# DEC DEFPA FDDI
 #xl*	at pci? dev ? function ?		# 3C9xx ethernet
 #xl*	at cardbus? dev ? function ?		# 3C575 ethernet
-#rl*	at pci? dev ? function ?		# RealTek 81[23]9 ethernet
+rl*	at pci? dev ? function ?		# RealTek 81[23]9 ethernet
+re*	at pci? dev ? function ?		# Realtek 8169/8169S/8110S
 #tx*	at pci? dev ? function ?		# SMC 83C170 EPIC ethernet
 #tl*	at pci? dev ? function ?		# Compaq Thunderlan ethernet
-#vr*	at pci? dev ? function ?		# VIA Rhine ethernet
+vr*	at pci? dev ? function ?		# VIA Rhine ethernet
 dc*	at pci? dev ? function ?		# 21143, "tulip" clone ethernet
 sis*	at pci? dev ? function ?		# SiS 900/7016 ethernet
 #wb*	at pci? dev ? function ?		# Winbond W89C840F ethernet
@@ -247,6 +249,7 @@ brgphy* at mii? phy ?				# Broadcom Gigabit PHYs
 #eephy* at mii? phy ?				# Marvell 88E1000 series PHY
 #xmphy*	at mii? phy ?				# XaQti XMAC-II PHYs
 #bmtphy* at mii? phy ?				# Broadcom 10/100 PHYs
+rgephy*	at mii? phy ?				# Realtek 8169S/8110S PHY
 ukphy*	at mii? phy ?				# "unknown" PHYs
 
 pseudo-device	loop	1		# network loopback
@@ -255,3 +258,4 @@ pseudo-device	loop	1		# network loopback
 pseudo-device	bpfilter 1		# packet filter
 pseudo-device	rd	1		# ramdisk
 #pseudo-device	ccd	4		# concatenated disk devices
+pseudo-device	wsmux	2

@@ -1,4 +1,4 @@
-/*	$OpenBSD: sysv_shm.c,v 1.41.2.1 2004/04/30 21:41:40 brad Exp $	*/
+/*	$OpenBSD: sysv_shm.c,v 1.46 2004/07/15 11:24:46 millert Exp $	*/
 /*	$NetBSD: sysv_shm.c,v 1.50 1998/10/21 22:24:29 tron Exp $	*/
 
 /*
@@ -172,7 +172,7 @@ shm_delete_mapping(struct vmspace *vm, struct shmmap_state *shmmap_s)
 	size = round_page(shmseg->shm_segsz);
 	uvm_deallocate(&vm->vm_map, shmmap_s->va, size);
 	shmmap_s->shmid = -1;
-	shmseg->shm_dtime = time.tv_sec;
+	shmseg->shm_dtime = time_second;
 	if ((--shmseg->shm_nattch <= 0) &&
 	    (shmseg->shm_perm.mode & SHMSEG_REMOVED)) {
 		shm_deallocate_segment(shmseg);
@@ -286,7 +286,7 @@ sys_shmat1(struct proc *p, void *v, register_t *retval, int findremoved)
 	shmmap_s->va = attach_va;
 	shmmap_s->shmid = SCARG(uap, shmid);
 	shmseg->shm_lpid = p->p_pid;
-	shmseg->shm_atime = time.tv_sec;
+	shmseg->shm_atime = time_second;
 	shmseg->shm_nattch++;
 	*retval = attach_va;
 	return (0);
@@ -300,28 +300,35 @@ sys_shmctl(struct proc *p, void *v, register_t *retval)
 		syscallarg(int) cmd;
 		syscallarg(struct shmid_ds *) buf;
 	} */ *uap = v;
-	int error;
-	struct ucred *cred = p->p_ucred;
-	struct shmid_ds inbuf;
-	struct shmid_ds *shmseg;
 
-	shmseg = shm_find_segment_by_shmid(SCARG(uap, shmid), 1);
+	return (shmctl1(p, SCARG(uap, shmid), SCARG(uap, cmd),
+	    (caddr_t)SCARG(uap, buf), copyin, copyout));
+}
+
+int
+shmctl1(struct proc *p, int shmid, int cmd, caddr_t buf,
+    int (*ds_copyin)(const void *, void *, size_t),
+    int (*ds_copyout)(const void *, void *, size_t))
+{
+	struct ucred *cred = p->p_ucred;
+	struct shmid_ds inbuf, *shmseg;
+	int error;
+
+	shmseg = shm_find_segment_by_shmid(shmid, 1);
 	if (shmseg == NULL)
 		return (EINVAL);
-	switch (SCARG(uap, cmd)) {
+	switch (cmd) {
 	case IPC_STAT:
 		if ((error = ipcperm(cred, &shmseg->shm_perm, IPC_R)) != 0)
 			return (error);
-		error = copyout((caddr_t)shmseg, SCARG(uap, buf),
-				sizeof(inbuf));
+		error = ds_copyout(shmseg, buf, sizeof(inbuf));
 		if (error)
 			return (error);
 		break;
 	case IPC_SET:
 		if ((error = ipcperm(cred, &shmseg->shm_perm, IPC_M)) != 0)
 			return (error);
-		error = copyin(SCARG(uap, buf), (caddr_t)&inbuf,
-		    sizeof(inbuf));
+		error = ds_copyin(buf, &inbuf, sizeof(inbuf));
 		if (error)
 			return (error);
 		shmseg->shm_perm.uid = inbuf.shm_perm.uid;
@@ -329,7 +336,7 @@ sys_shmctl(struct proc *p, void *v, register_t *retval)
 		shmseg->shm_perm.mode =
 		    (shmseg->shm_perm.mode & ~ACCESSPERMS) |
 		    (inbuf.shm_perm.mode & ACCESSPERMS);
-		shmseg->shm_ctime = time.tv_sec;
+		shmseg->shm_ctime = time_second;
 		break;
 	case IPC_RMID:
 		if ((error = ipcperm(cred, &shmseg->shm_perm, IPC_M)) != 0)
@@ -338,7 +345,7 @@ sys_shmctl(struct proc *p, void *v, register_t *retval)
 		shmseg->shm_perm.mode |= SHMSEG_REMOVED;
 		if (shmseg->shm_nattch <= 0) {
 			shm_deallocate_segment(shmseg);
-			shm_last_free = IPCID_TO_IX(SCARG(uap, shmid));
+			shm_last_free = IPCID_TO_IX(shmid);
 			shmsegs[shm_last_free] = NULL;
 		}
 		break;
@@ -384,8 +391,9 @@ shmget_allocate_segment(struct proc *p,
 	} */ *uap,
 	int mode, register_t *retval)
 {
+	size_t size;
 	key_t key;
-	int segnum, size;
+	int segnum;
 	struct ucred *cred = p->p_ucred;
 	struct shmid_ds *shmseg;
 	struct shm_handle *shm_handle;
@@ -445,7 +453,7 @@ shmget_allocate_segment(struct proc *p,
 	shmseg->shm_cpid = p->p_pid;
 	shmseg->shm_lpid = shmseg->shm_nattch = 0;
 	shmseg->shm_atime = shmseg->shm_dtime = 0;
-	shmseg->shm_ctime = time.tv_sec;
+	shmseg->shm_ctime = time_second;
 	shmseg->shm_internal = shm_handle;
 
 	*retval = IXSEQ_TO_IPCID(segnum, shmseg->shm_perm);
@@ -457,7 +465,7 @@ sys_shmget(struct proc *p, void *v, register_t *retval)
 {
 	struct sys_shmget_args /* {
 		syscallarg(key_t) key;
-		syscallarg(int) size;
+		syscallarg(size_t) size;
 		syscallarg(int) shmflg;
 	} */ *uap = v;
 	int segnum, mode, error;
@@ -539,21 +547,6 @@ shminit(void)
 	shm_last_free = 0;
 	shm_nused = 0;
 	shm_committed = 0;
-}
-
-void
-shmid_n2o(struct shmid_ds *n, struct oshmid_ds *o)
-{
-
-	o->shm_segsz = n->shm_segsz;
-	o->shm_lpid = n->shm_lpid;
-	o->shm_cpid = n->shm_cpid;
-	o->shm_nattch = n->shm_nattch;
-	o->shm_atime = n->shm_atime;
-	o->shm_dtime = n->shm_dtime;
-	o->shm_ctime = n->shm_ctime;
-	o->shm_internal = n->shm_internal;
-	ipc_n2o(&n->shm_perm, &o->shm_perm);
 }
 
 /*

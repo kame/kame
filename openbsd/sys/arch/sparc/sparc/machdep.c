@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.98 2004/03/10 23:02:54 tom Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.101 2004/07/06 21:05:36 deraadt Exp $	*/
 /*	$NetBSD: machdep.c,v 1.85 1997/09/12 08:55:02 pk Exp $ */
 
 /*
@@ -353,10 +353,11 @@ setregs(p, pack, stack, retval)
 	struct fpstate *fs;
 	int psr;
 
-	/* Setup the process StackGhost cookie which will be XORed into
+	/*
+	 * Setup the process StackGhost cookie which will be XORed into
 	 * the return pointer as register windows are over/underflowed
 	 */
-	p->p_addr->u_pcb.pcb_wcookie = 0;	/* XXX later arc4random(); */
+	p->p_addr->u_pcb.pcb_wcookie = arc4random();
 
 	/* The cookie needs to guarantee invalid alignment after the XOR */
 	switch (p->p_addr->u_pcb.pcb_wcookie % 3) {
@@ -372,7 +373,6 @@ setregs(p, pack, stack, retval)
 			(p->p_addr->u_pcb.pcb_wcookie & ~0x3);
 		break;
 	}
-
 
 	/* Don't allow misaligned code by default */
 	p->p_md.md_flags &= ~MDP_FIXALIGN;
@@ -987,6 +987,7 @@ mapdev(phys, virt, offset, size)
 	return (ret);
 }
 
+#ifdef COMPAT_SUNOS
 int
 cpu_exec_aout_makecmds(p, epp)
 	struct proc *p;
@@ -994,13 +995,12 @@ cpu_exec_aout_makecmds(p, epp)
 {
 	int error = ENOEXEC;
 
-#ifdef COMPAT_SUNOS
 	extern int sunos_exec_aout_makecmds(struct proc *, struct exec_package *);
 	if ((error = sunos_exec_aout_makecmds(p, epp)) == 0)
 		return 0;
-#endif
 	return error;
 }
+#endif
 
 #ifdef SUN4
 void

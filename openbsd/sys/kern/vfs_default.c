@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_default.c,v 1.22 2003/09/01 18:06:03 henning Exp $  */
+/*	$OpenBSD: vfs_default.c,v 1.25 2004/06/09 22:54:14 tedu Exp $  */
 
 /*
  *    Portions of this code are:
@@ -44,6 +44,7 @@
 #include <sys/vnode.h>
 #include <sys/namei.h>
 #include <sys/malloc.h>
+#include <sys/pool.h>
 #include <sys/event.h>
 #include <miscfs/specfs/specdev.h>
 
@@ -140,7 +141,7 @@ vop_generic_abortop(v)
 	} */ *ap = v;
  
 	if ((ap->a_cnp->cn_flags & (HASBUF | SAVESTART)) == HASBUF)
-		FREE(ap->a_cnp->cn_pnbuf, M_NAMEI);
+		pool_put(&namei_pool, ap->a_cnp->cn_pnbuf);
 	return (0);
 }
 
@@ -148,7 +149,7 @@ vop_generic_abortop(v)
  * Stubs to use when there is no locking to be done on the underlying object.
  * A minimal shared lock is necessary to ensure that the underlying object
  * is not revoked while an operation is in progress. So, an active shared
- * count is maintained in an auxillary vnode lock structure.
+ * count is maintained in an auxiliary vnode lock structure.
  */
 int
 vop_generic_lock(v)
@@ -224,18 +225,7 @@ int
 vop_generic_unlock(v)
 	void *v;
 {
-	struct vop_unlock_args /* {
-		struct vnodeop_desc *a_desc;
-		struct vnode *a_vp;
-		int a_flags;
-		struct proc *a_p;
-	} */ *ap = v;
-
-	struct vnode *vp = ap->a_vp;
-
-	if (vp->v_vnlock == NULL)
-		return (0);
-	return (lockmgr(vp->v_vnlock, LK_RELEASE, NULL, ap->a_p));
+	return (0);
 }
 
 /*
@@ -245,16 +235,7 @@ int
 vop_generic_islocked(v)
 	void *v;
 {
-	struct vop_islocked_args /* {
-		struct vnodeop_desc *a_desc;
-		struct vnode *a_vp;
-	} */ *ap = v;
-
-	struct vnode *vp = ap->a_vp;
-
-	if (vp->v_vnlock == NULL)
-		return (0);
-	return (lockstatus(vp->v_vnlock));
+	return (0);
 }
 
 struct filterops generic_filtops = 

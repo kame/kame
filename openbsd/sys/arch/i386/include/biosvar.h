@@ -1,4 +1,4 @@
-/*	$OpenBSD: biosvar.h,v 1.42 2003/11/27 00:31:55 espie Exp $	*/
+/*	$OpenBSD: biosvar.h,v 1.44 2004/06/23 00:21:49 tom Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Michael Shalayeff
@@ -158,6 +158,7 @@ typedef struct _bios_diskinfo {
 #define BDI_INVALID	0x00000001	/* I/O error during checksumming */
 #define BDI_GOODLABEL	0x00000002	/* Had SCSI or ST506/ESDI disklabel */
 #define BDI_BADLABEL	0x00000004	/* Had another disklabel */
+#define BDI_EL_TORITO	0x00000008	/* 2,048-byte sectors */
 #define BDI_PICKED	0x80000000	/* kernel-only: cksum matched */
 
 } bios_diskinfo_t;
@@ -191,6 +192,8 @@ typedef struct _bios_consdev {
 	dev_t	consdev;
 	int	conspeed;
 } bios_consdev_t;
+
+#define BOOTARG_SMPINFO 6		/* struct mp_float[] */
 
 #if defined(_KERNEL) || defined (_STANDALONE)
 
@@ -244,6 +247,8 @@ int  bios32_service(u_int32_t, bios32_entry_t, bios32_entry_info_t);
 
 extern u_int bootapiver;
 extern bios_memmap_t *bios_memmap;
+extern void *bios_smpinfo;
+extern bios_pciinfo_t *bios_pciinfo;
 
 #endif /* _KERNEL */
 #endif /* _LOCORE */

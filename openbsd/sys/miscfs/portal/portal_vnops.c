@@ -1,4 +1,4 @@
-/*	$OpenBSD: portal_vnops.c,v 1.17 2004/02/21 20:08:32 tedu Exp $	*/
+/*	$OpenBSD: portal_vnops.c,v 1.22 2004/07/22 06:12:43 tedu Exp $	*/
 /*	$NetBSD: portal_vnops.c,v 1.17 1996/02/13 13:12:57 mycroft Exp $	*/
 
 /*
@@ -339,7 +339,9 @@ portal_open(v)
 	/*
 	 * Kick off connection
 	 */
+	s = splsoftnet();
 	error = portal_connect(so, (struct socket *)fmp->pm_server->f_data);
+	splx(s);
 	if (error)
 		goto bad;
 
@@ -363,7 +365,7 @@ portal_open(v)
 			splx(s);
 			goto bad;
 		}
-		(void) tsleep((caddr_t) &so->so_timeo, PSOCK, "portalcon", 5 * hz);
+		(void) tsleep(&so->so_timeo, PSOCK, "portalcon", 5 * hz);
 	}
 	splx(s);
 
@@ -386,7 +388,7 @@ portal_open(v)
 	pcred.pcr_gid = ap->a_cred->cr_gid;
 	pcred.pcr_ngroups = ap->a_cred->cr_ngroups;
 	bcopy(ap->a_cred->cr_groups, pcred.pcr_groups, NGROUPS * sizeof(gid_t));
-	aiov[0].iov_base = (caddr_t) &pcred;
+	aiov[0].iov_base = &pcred;
 	aiov[0].iov_len = sizeof(pcred);
 	aiov[1].iov_base = pt->pt_arg;
 	aiov[1].iov_len = pt->pt_size;
@@ -410,7 +412,7 @@ portal_open(v)
 		fdpunlock(p->p_fd);
 		error = soreceive(so, (struct mbuf **) 0, &auio,
 					&m, &cm, &flags);
-		fdplock(p->p_fd, p);
+		fdplock(p->p_fd);
 		if (error)
 			goto bad;
 
@@ -464,7 +466,7 @@ portal_open(v)
 	 * integer file descriptors.  The fds were allocated by the action
 	 * of receiving the control message.
 	 */
-	ip = (int *) (cmsg + 1);
+	ip = (int *)(cmsg + 1);
 	fd = *ip++;
 	if (newfds > 1) {
 		/*
@@ -483,7 +485,6 @@ portal_open(v)
 	 * of the mode of the existing descriptor.
 	 */
 	if ((fp = fd_getfile(p->p_fd, fd)) == NULL) {
-		portal_closefd(p, fd);
 		error = EBADF;
 		goto bad;
 	}
@@ -528,7 +529,6 @@ portal_getattr(v)
 	} */ *ap = v;
 	struct vnode *vp = ap->a_vp;
 	struct vattr *vap = ap->a_vap;
-	struct timeval tv;
 
 	bzero(vap, sizeof(*vap));
 	vattr_null(vap);
@@ -537,8 +537,7 @@ portal_getattr(v)
 	vap->va_fsid = vp->v_mount->mnt_stat.f_fsid.val[0];
 	vap->va_size = DEV_BSIZE;
 	vap->va_blocksize = DEV_BSIZE;
-	microtime(&tv);
-	TIMEVAL_TO_TIMESPEC(&tv, &vap->va_atime);
+	getnanotime(&vap->va_atime);
 	vap->va_mtime = vap->va_atime;
 	vap->va_ctime = vap->va_atime;
 	vap->va_gen = 0;
@@ -624,7 +623,7 @@ portal_reclaim(v)
 	struct portalnode *pt = VTOPORTAL(ap->a_vp);
 
 	if (pt->pt_arg) {
-		free((caddr_t) pt->pt_arg, M_TEMP);
+		free(pt->pt_arg, M_TEMP);
 		pt->pt_arg = 0;
 	}
 	FREE(ap->a_vp->v_data, M_TEMP);

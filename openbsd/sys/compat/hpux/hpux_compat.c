@@ -1,4 +1,4 @@
-/*	$OpenBSD: hpux_compat.c,v 1.24 2003/08/15 20:32:15 tedu Exp $	*/
+/*	$OpenBSD: hpux_compat.c,v 1.28 2004/07/09 21:33:44 mickey Exp $	*/
 /*	$NetBSD: hpux_compat.c,v 1.35 1997/05/08 16:19:48 mycroft Exp $	*/
 
 /*
@@ -392,22 +392,16 @@ hpux_sys_utssys(p, v, retval)
 	case 0:
 		bzero(&ut, sizeof(ut));
 
-		strncpy(ut.sysname, ostype, sizeof(ut.sysname));
-		ut.sysname[sizeof(ut.sysname) - 1] = '\0';
+		strlcpy(ut.sysname, ostype, sizeof(ut.sysname));
 
 		/* copy hostname (sans domain) to nodename */
 		for (i = 0; i < 8 && hostname[i] != '.'; i++)
 			ut.nodename[i] = hostname[i];
 		ut.nodename[i] = '\0';
 
-		strncpy(ut.release, osrelease, sizeof(ut.release));
-		ut.release[sizeof(ut.release) - 1] = '\0';
-
-		strncpy(ut.version, version, sizeof(ut.version));
-		ut.version[sizeof(ut.version) - 1] = '\0';
-
-		strncpy(ut.machine, machine, sizeof(ut.machine));
-		ut.machine[sizeof(ut.machine) - 1] = '\0';
+		strlcpy(ut.release, osrelease, sizeof(ut.release));
+		strlcpy(ut.version, version, sizeof(ut.version));
+		strlcpy(ut.machine, machine, sizeof(ut.machine));
 
 		error = copyout((caddr_t)&ut,
 		    (caddr_t)SCARG(uap, uts), sizeof(ut));
@@ -728,7 +722,7 @@ hpux_shmctl1(p, uap, retval, isnew)
 			shp->shm_perm.gid = sbuf.shm_perm.gid;
 			shp->shm_perm.mode = (shp->shm_perm.mode & ~0777)
 				| (sbuf.shm_perm.mode & 0777);
-			shp->shm_ctime = time.tv_sec;
+			shp->shm_ctime = time_second;
 		}
 		return (error);
 	}
@@ -1049,6 +1043,8 @@ hpux_sys_lockf(p, v, retval)
 	return (0);
 }
 
+
+#ifndef __hppa__
 int
 hpux_sys_getaccess(p, v, retval)
 	struct proc *p;
@@ -1148,8 +1144,7 @@ hpux_sys_getaccess(p, v, retval)
 	crfree(cred);
 	return (error);
 }
-
-/* hpux_to_bsd_uoff() is found in hpux_machdep.c */
+#endif
 
 /*
  * Ancient HP-UX system calls.  Some 9.x executables even use them!
@@ -1204,18 +1199,16 @@ hpux_sys_stime_6x(p, v, retval)
 	struct hpux_sys_stime_6x_args /* {
 		syscallarg(int) time;
 	} */ *uap = v;
-	struct timeval tv;
-	int s, error;
+	struct timespec ts;
+	int error;
 
-	tv.tv_sec = SCARG(uap, time);
-	tv.tv_usec = 0;
+	ts.tv_sec = SCARG(uap, time);
+	ts.tv_nsec = 0;
 	if ((error = suser(p, 0)))
 		return (error);
 
-	/* WHAT DO WE DO ABOUT PENDING REAL-TIME TIMEOUTS??? */
-	boottime.tv_sec += tv.tv_sec - time.tv_sec;
-	s = splhigh(); time = tv; splx(s);
-	resettodr();
+	settime(&ts);
+
 	return (0);
 }
 
@@ -1229,12 +1222,11 @@ hpux_sys_ftime_6x(p, v, retval)
 		syscallarg(struct hpux_timeb *) tp;
 	} */ *uap = v;
 	struct hpux_otimeb tb;
-	int s;
+	struct timeval tv;
 
-	s = splhigh();
-	tb.time = time.tv_sec;
-	tb.millitm = time.tv_usec / 1000;
-	splx(s);
+	microtime(&tv);
+	tb.time = tv.tv_sec;
+	tb.millitm = tv.tv_usec / 1000;
 	tb.timezone = tz.tz_minuteswest;
 	tb.dstflag = tz.tz_dsttime;
 	return (copyout((caddr_t)&tb, (caddr_t)SCARG(uap, tp), sizeof (tb)));
@@ -1249,27 +1241,28 @@ hpux_sys_alarm_6x(p, v, retval)
 	struct hpux_sys_alarm_6x_args /* {
 		syscallarg(int) deltat;
 	} */ *uap = v;
-	int s = splhigh();
 	int timo;
+	struct timeval tv, atv;
 
 	timeout_del(&p->p_realit_to);
 	timerclear(&p->p_realtimer.it_interval);
 	*retval = 0;
+	getmicrouptime(&tv);
 	if (timerisset(&p->p_realtimer.it_value) &&
-	    timercmp(&p->p_realtimer.it_value, &time, >))
-		*retval = p->p_realtimer.it_value.tv_sec - time.tv_sec;
+	    timercmp(&p->p_realtimer.it_value, &tv, >))
+		*retval = p->p_realtimer.it_value.tv_sec - tv.tv_sec;
 	if (SCARG(uap, deltat) == 0) {
 		timerclear(&p->p_realtimer.it_value);
-		splx(s);
 		return (0);
 	}
-	p->p_realtimer.it_value = time;
+	atv.tv_sec = SCARG(uap, deltat);
+	atv.tv_usec = 0;
+	p->p_realtimer.it_value = tv;
 	p->p_realtimer.it_value.tv_sec += SCARG(uap, deltat);
-	timo = hzto(&p->p_realtimer.it_value);
+	timo = tvtohz(&atv);
 	if (timo <= 0)
 		timo = 1;
 	timeout_add(&p->p_realit_to, timo);
-	splx(s);
 	return (0);
 }
 
@@ -1310,9 +1303,11 @@ hpux_sys_times_6x(p, v, retval)
 	atms.tms_cstime = hpux_scale(&p->p_stats->p_cru.ru_stime);
 	error = copyout((caddr_t)&atms, (caddr_t)SCARG(uap, tms),
 	    sizeof (atms));
-	if (error == 0)
-		*(time_t *)retval = hpux_scale((struct timeval *)&time) -
-		    hpux_scale(&boottime);
+	if (error == 0) {
+		struct timeval tv;
+		getmicrouptime(&tv);
+		*(time_t *)retval = hpux_scale(&tv);
+	}
 	return (error);
 }
 
@@ -1354,7 +1349,7 @@ hpux_sys_utime_6x(p, v, retval)
 		if (error)
 			return (error);
 	} else
-		tv[0] = tv[1] = time.tv_sec;
+		tv[0] = tv[1] = time_second;
 	vattr_null(&vattr);
 	vattr.va_atime.tv_sec = tv[0];
 	vattr.va_atime.tv_nsec = 0;

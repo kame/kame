@@ -1,4 +1,4 @@
-/*	$OpenBSD: intr.c,v 1.20 2004/01/10 09:10:07 deraadt Exp $	*/
+/*	$OpenBSD: intr.c,v 1.22 2004/06/28 01:47:41 aaron Exp $	*/
 /*	$NetBSD: intr.c,v 1.39 2001/07/19 23:38:11 eeh Exp $ */
 
 /*
@@ -241,6 +241,11 @@ intr_establish(level, ih)
 	if (ih->ih_number <= 0 || ih->ih_number >= MAXINTNUM)
 		panic("intr_establish: bad intr number %x", ih->ih_number);
 
+	if (strlen(ih->ih_name) == 0)
+		evcount_attach(&ih->ih_count, "unknown", NULL, &evcount_intr);
+	else
+		evcount_attach(&ih->ih_count, ih->ih_name, NULL, &evcount_intr);
+
 	q = intrlev[ih->ih_number];
 	if (q == NULL) {
 		/* No interrupt already there, just put handler in place. */
@@ -280,15 +285,18 @@ intr_establish(level, ih)
 	if(ih->ih_map) {
 		id = CPU_UPAID;
 		m = *ih->ih_map;
-		if(INTTID(m) != id) {
+		if (INTTID(m) != id) {
+#ifdef DEBUG
 			printf("\nintr_establish: changing map 0x%llx -> ", m);
+#endif
 			m = (m & ~INTMAP_TID) | (id << INTTID_SHIFT);
+#ifdef DEBUG
 			printf("0x%llx (id=%llx) ", m, id);
+#endif
 		}
 		m |= INTMAP_V;
 		*ih->ih_map = m;
-	}
-	else {
+	} else {
 #ifdef DEBUG
 		printf(	"\n**********************\n"
 			"********************** intr_establish: no map register\n"

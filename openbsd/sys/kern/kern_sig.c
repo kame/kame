@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_sig.c,v 1.69 2004/01/14 05:23:25 tedu Exp $	*/
+/*	$OpenBSD: kern_sig.c,v 1.72 2004/07/04 13:35:01 niklas Exp $	*/
 /*	$NetBSD: kern_sig.c,v 1.54 1996/04/22 01:38:32 christos Exp $	*/
 
 /*
@@ -62,6 +62,7 @@
 #include <sys/malloc.h>
 #include <sys/pool.h>
 #include <sys/ptrace.h>
+#include <sys/sched.h>
 
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
@@ -762,18 +763,18 @@ trapsignal(p, signum, code, type, sigval)
 	register struct sigacts *ps = p->p_sigacts;
 	int mask;
 
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_PSIG)) {
-		siginfo_t si;
-
-		initsiginfo(&si, signum, code, type, sigval);
-		ktrpsig(p, signum, ps->ps_sigact[signum],
-		    p->p_sigmask, code, &si);
-	}
-#endif
 	mask = sigmask(signum);
 	if ((p->p_flag & P_TRACED) == 0 && (p->p_sigcatch & mask) != 0 &&
 	    (p->p_sigmask & mask) == 0) {
+#ifdef KTRACE
+		if (KTRPOINT(p, KTR_PSIG)) {
+			siginfo_t si;
+
+			initsiginfo(&si, signum, code, type, sigval);
+			ktrpsig(p, signum, ps->ps_sigact[signum],
+			    p->p_sigmask, type, &si);
+		}
+#endif
 		p->p_stats->p_ru.ru_nsignals++;
 		(*p->p_emul->e_sendsig)(ps->ps_sigact[signum], signum,
 		    p->p_sigmask, code, type, sigval);
@@ -785,7 +786,10 @@ trapsignal(p, signum, code, type, sigval)
 			ps->ps_sigact[signum] = SIG_DFL;
 		}
 	} else {
+		ps->ps_sig = signum;
 		ps->ps_code = code;	/* XXX for core dump/debugger */
+		ps->ps_type = type;
+		ps->ps_sigval = sigval;
 		psignal(p, signum);
 	}
 }
@@ -802,18 +806,29 @@ trapsignal(p, signum, code, type, sigval)
  *     regardless of the signal action (eg, blocked or ignored).
  *
  * Other ignored signals are discarded immediately.
+ *
+ * XXXSMP: Invoked as psignal() or sched_psignal().
  */
 void
-psignal(p, signum)
+psignal1(p, signum, dolock)
 	register struct proc *p;
 	register int signum;
+	int dolock;		/* XXXSMP: works, but icky */
 {
 	register int s, prop;
 	register sig_t action;
 	int mask;
 
+#ifdef DIAGNOSTIC
 	if ((u_int)signum >= NSIG || signum == 0)
 		panic("psignal signal number");
+
+	/* XXXSMP: works, but icky */
+	if (dolock)
+		SCHED_ASSERT_UNLOCKED();
+	else
+		SCHED_ASSERT_LOCKED();
+#endif
 
 	/* Ignore signal if we are exiting */
 	if (p->p_flag & P_WEXIT)
@@ -876,7 +891,10 @@ psignal(p, signum)
 	 */
 	if (action == SIG_HOLD && ((prop & SA_CONT) == 0 || p->p_stat != SSTOP))
 		return;
-	s = splhigh();
+	/* XXXSMP: works, but icky */
+	if (dolock)
+		SCHED_LOCK(s);
+
 	switch (p->p_stat) {
 
 	case SSLEEP:
@@ -918,7 +936,11 @@ psignal(p, signum)
 			p->p_siglist &= ~mask;
 			p->p_xstat = signum;
 			if ((p->p_pptr->p_flag & P_NOCLDSTOP) == 0)
-				psignal(p->p_pptr, SIGCHLD);
+				/*
+				 * XXXSMP: recursive call; don't lock
+				 * the second time around.
+				 */
+				sched_psignal(p->p_pptr, SIGCHLD);
 			proc_stop(p);
 			goto out;
 		}
@@ -1006,7 +1028,9 @@ runfast:
 run:
 	setrunnable(p);
 out:
-	splx(s);
+	/* XXXSMP: works, but icky */
+	if (dolock)
+		SCHED_UNLOCK(s);
 }
 
 /*
@@ -1051,7 +1075,7 @@ issignal(struct proc *p)
 			 */
 			p->p_xstat = signum;
 
-			s = splstatclock();	/* protect mi_switch */
+			SCHED_LOCK(s);	/* protect mi_switch */
 			if (p->p_flag & P_FSTRACE) {
 #ifdef	PROCFS
 				/* procfs debugging */
@@ -1067,6 +1091,7 @@ issignal(struct proc *p)
 				proc_stop(p);
 				mi_switch();
 			}
+			SCHED_ASSERT_UNLOCKED();
 			splx(s);
 
 			/*
@@ -1126,9 +1151,10 @@ issignal(struct proc *p)
 				p->p_xstat = signum;
 				if ((p->p_pptr->p_flag & P_NOCLDSTOP) == 0)
 					psignal(p->p_pptr, SIGCHLD);
+				SCHED_LOCK(s);
 				proc_stop(p);
-				s = splstatclock();
 				mi_switch();
+				SCHED_ASSERT_UNLOCKED();
 				splx(s);
 				break;
 			} else if (prop & SA_IGNORE) {
@@ -1176,6 +1202,9 @@ void
 proc_stop(p)
 	struct proc *p;
 {
+#ifdef MULTIPROCESSOR
+	SCHED_ASSERT_LOCKED();
+#endif
 
 	p->p_stat = SSTOP;
 	p->p_flag &= ~P_WAITED;
@@ -1195,31 +1224,39 @@ postsig(signum)
 	sig_t action;
 	u_long code;
 	int mask, returnmask;
-	union sigval null_sigval;
-	int s;
+	union sigval sigval;
+	int s, type;
 
 #ifdef DIAGNOSTIC
 	if (signum == 0)
 		panic("postsig");
 #endif
+
+	KERNEL_PROC_LOCK(p);
+
 	mask = sigmask(signum);
 	p->p_siglist &= ~mask;
 	action = ps->ps_sigact[signum];
+	sigval.sival_ptr = 0;
+	type = SI_USER;
 
 	if (ps->ps_sig != signum) {
 		code = 0;
+		type = SI_USER;
+		sigval.sival_ptr = 0;
 	} else {
 		code = ps->ps_code;
+		type = ps->ps_type;
+		sigval = ps->ps_sigval;
 	}
 
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_PSIG)) {
 		siginfo_t si;
 		
-		null_sigval.sival_ptr = 0;
-		initsiginfo(&si, signum, 0, SI_USER, null_sigval);
+		initsiginfo(&si, signum, code, type, sigval);
 		ktrpsig(p, signum, action, ps->ps_flags & SAS_OLDMASK ?
-		    ps->ps_oldmask : p->p_sigmask, code, &si);
+		    ps->ps_oldmask : p->p_sigmask, type, &si);
 	}
 #endif
 	if (action == SIG_DFL) {
@@ -1246,7 +1283,11 @@ postsig(signum)
 		 * mask from before the sigpause is what we want
 		 * restored after the signal processing is completed.
 		 */
+#ifdef MULTIPROCESSOR
+		s = splsched();
+#else
 		s = splhigh();
+#endif
 		if (ps->ps_flags & SAS_OLDMASK) {
 			returnmask = ps->ps_oldmask;
 			ps->ps_flags &= ~SAS_OLDMASK;
@@ -1262,12 +1303,17 @@ postsig(signum)
 		splx(s);
 		p->p_stats->p_ru.ru_nsignals++;
 		if (ps->ps_sig == signum) {
+			ps->ps_sig = 0;
 			ps->ps_code = 0;
+			ps->ps_type = SI_USER;
+			ps->ps_sigval.sival_ptr = NULL;
 		}
-		null_sigval.sival_ptr = 0;
+
 		(*p->p_emul->e_sendsig)(action, signum, returnmask, code,
-		    SI_USER, null_sigval);
+		    type, sigval);
 	}
+
+	KERNEL_PROC_UNLOCK(p);
 }
 
 /*
@@ -1297,7 +1343,6 @@ sigexit(p, signum)
 	register struct proc *p;
 	int signum;
 {
-
 	/* Mark process as going away */
 	p->p_flag |= P_WEXIT;
 

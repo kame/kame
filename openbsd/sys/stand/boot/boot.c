@@ -1,4 +1,4 @@
-/*	$OpenBSD: boot.c,v 1.30 2004/01/29 00:54:08 tom Exp $	*/
+/*	$OpenBSD: boot.c,v 1.32 2004/06/24 22:32:26 tom Exp $	*/
 
 /*
  * Copyright (c) 2003 Dale Rahn
@@ -49,6 +49,8 @@ char *progname = "BOOT";
 
 extern	const char version[];
 struct cmd_state cmd;
+
+/* bootprompt can be set by MD code to avoid prompt first time round */
 int bootprompt = 1;
 
 void
@@ -98,9 +100,10 @@ boot(dev_t bootdev)
 		strlcpy(cmd.image, bootfile, sizeof(cmd.image));
 		printf(" failed(%d). will try %s\n", errno, bootfile);
 
-		if (try < 2)
-			cmd.timeout++;
-		else {
+		if (try < 2) {
+			if (cmd.timeout > 0)
+				cmd.timeout++;
+		} else {
 			if (cmd.timeout)
 				printf("Turning timeout off.\n");
 			cmd.timeout = 0;

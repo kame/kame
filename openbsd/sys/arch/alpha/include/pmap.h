@@ -1,4 +1,4 @@
-/* $OpenBSD: pmap.h,v 1.15 2003/10/18 20:14:42 jmc Exp $ */
+/* $OpenBSD: pmap.h,v 1.20 2004/08/06 22:39:10 deraadt Exp $ */
 /* $NetBSD: pmap.h,v 1.37 2000/11/19 03:16:35 thorpej Exp $ */
 
 /*-
@@ -178,7 +178,7 @@ struct pv_head {
 
 #if defined(MULTIPROCESSOR)
 void	pmap_tlb_shootdown(pmap_t, vaddr_t, pt_entry_t);
-void	pmap_do_tlb_shootdown(void);
+void	pmap_do_tlb_shootdown(struct cpu_info *, struct trapframe *);
 void	pmap_tlb_shootdown_q_drain(u_long, boolean_t);
 #define	PMAP_TLB_SHOOTDOWN(pm, va, pte)					\
 	pmap_tlb_shootdown((pm), (va), (pte))
@@ -191,6 +191,9 @@ void	pmap_tlb_shootdown_q_drain(u_long, boolean_t);
 #define	pmap_wired_count(pmap)		((pmap)->pm_stats.wired_count)
 #define pmap_update(pmap)		/* nothing (yet) */
 
+#define pmap_proc_iflush(p, va, len)	/* nothing */
+#define pmap_unuse_final(p)		/* nothing */
+
 extern	pt_entry_t *VPT;		/* Virtual Page Table */
 
 #define	PMAP_STEAL_MEMORY		/* enable pmap_steal_memory() */
@@ -199,8 +202,9 @@ extern	pt_entry_t *VPT;		/* Virtual Page Table */
 /*
  * Alternate mapping hooks for pool pages.  Avoids thrashing the TLB.
  */
-#define	PMAP_MAP_POOLPAGE(pg)	ALPHA_PHYS_TO_K0SEG(VM_PAGE_TO_PHYS(pg))
-#define	PMAP_UNMAP_POOLPAGE(va)	PHYS_TO_VM_PAGE(ALPHA_K0SEG_TO_PHYS((va)))
+#define	pmap_map_direct(pg)	ALPHA_PHYS_TO_K0SEG(VM_PAGE_TO_PHYS(pg))
+#define	pmap_unmap_direct(va)	PHYS_TO_VM_PAGE(ALPHA_K0SEG_TO_PHYS((va)))
+#define	__HAVE_PMAP_DIRECT
 
 paddr_t vtophys(vaddr_t);
 

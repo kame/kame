@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.50 2004/01/11 16:33:01 drahn Exp $g
+#	$OpenBSD: GENERIC,v 1.58 2004/08/25 13:03:27 drahn Exp $g
 #
 # PPC GENERIC config file
 #
@@ -63,6 +63,7 @@ dc*		at pci? dev ? function ?	# DEC Tulip 21143 clones
 xl*		at pci? dev ? function ?	# 3C9xx ethernet
 em*		at pci? dev ? function ?	# Intel Pro/1000 ethernet
 ti*		at pci? dev ? function ?	# Alteon Tigon 1Gb ethernet
+re*		at pci? dev ? function ?	# Realtek 8169/8169S/8110S
 an*		at pci? dev ? function ?	# Cisco/Aironet
 wi*		at pci? dev ? function ?	# WaveLAN IEEE 802.11DS
 iop*		at pci? dev ? function ?	# I2O processor
@@ -85,6 +86,7 @@ sqphy*		at mii? phy ?			# Seeq 8022[013] PHYs
 brgphy*		at mii? phy ?			# Broadcom 10/100/1000 PHYs 
 bmtphy*		at mii? phy ?			# Broadcom 10/100 PHYs 
 eephy*		at mii? phy ?			# Marvell 88E1000 Gigabit PHYs
+rgephy*		at mii? phy ?			# Realtek 8169S/8110S PHY
 ukphy*		at mii? phy ?			# generic unknown PHYs
 
 # crypto
@@ -156,6 +158,8 @@ scsibus*	at iopsp?
 scsibus*	at siop?
 #scsibus*	at fwscsi?
 
+mediabay*	at macobio?
+wdc*		at mediabay?
 wdc*		at macobio?
 wd*		at wdc? drive ? flags 0x0000
 wd*		at pciide? drive ? flags 0x0000
@@ -165,37 +169,66 @@ scsibus*	at atapiscsi?
 
 # PCI USB Controllers
 ohci*		at pci?				# Open Host Controller
+ehci*		at pci? disable			# Enhanced Host Controller
 
 # USB bus support
 usb*		at ohci? flags 0x1
-uhub*		at usb?
-uhub*		at uhub? port ? configuration ? interface ?
+usb*		at ehci?
 
-uhidev*		at uhub? port ? configuration ? interface ?
-uhid*		at uhidev? reportid ?		# USB Generic HID devices
-ukbd*		at uhidev? reportid ?		# USB HID Keyboard devices
-ums*		at uhidev? reportid ?		# USB Mice
-wsmouse*	at ums? mux 0
-uaudio* 	at uhub? port ? configuration ? # USB Audio
-ulpt*		at uhub? port ? configuration ?	# USB Printer
-uscanner*	at uhub? port ?			# USB Scanner driver
-usscanner*	at uhub? port ?			# USB SCSI scanners
-scsibus*	at usscanner?
-#uyap*		at uhub? port ?			# Y@P firmware loader
-ugen*		at uhub? port ? configuration ? # USB Generic driver
-umass*		at uhub? port ? configuration ? # USB Mass Storage devices
-scsibus*	at umass?
-kue*		at uhub? port ?			# Kawasaki KL5KUSB101B
-aue*		at uhub? port ?			# USB EtherNet 
-uplcom* 	at uhub? port ?			# I/O DATA USB-RSAQ2 serial
-ucom*		at uplcom? portno ?
-wi*		at uhub? port ?			# WaveLAN IEEE 802.11DS
+# USB devices
+uhub*	at usb?				# USB Hubs
+uhub*	at uhub? port ? configuration ?	# USB Hubs
+umodem*	at uhub? port ? configuration ?	# USB Modems/Serial
+ucom*	at umodem?
+uvisor*	at uhub? port ? configuration ?	# Handspring Visor
+ucom*	at uvisor?
+uvscom*	at uhub? port ?			# SUNTAC Slipper U VS-10U serial
+ucom*	at uvscom? portno ?
+ubsa*	at uhub? port ?			# Belkin serial adapter
+ucom*	at ubsa? portno ?
+uftdi*	at uhub? port ?			# FTDI FT8U100AX serial adapter
+ucom*	at uftdi? portno ?
+uplcom* at uhub? port ?			# I/O DATA USB-RSAQ2 serial adapter
+ucom*	at uplcom? portno ?
+umct*	at uhub? port ?			# MCT USB-RS232 serial adapter
+ucom*	at umct? portno ?
+uaudio* at uhub? port ? configuration ?	# USB Audio
+audio*	at uaudio?
+umidi*	at uhub? port ? configuration ?	# USB MIDI
+midi*	at umidi?
+ulpt*	at uhub? port ? configuration ? # USB Printers
+umass*	at uhub? port ? configuration ? # USB Mass Storage devices
+scsibus* at umass?
+uhidev*	at uhub? port ? configuration ? interface ?	# Human Interface Devices
+ums*	at uhidev? reportid ?		# USB mouse
+wsmouse* at ums? mux 0
+ukbd*	at uhidev? reportid ?		# USB keyboard
+wskbd*	at ukbd? console ? mux 1
+uhid*	at uhidev? reportid ?		# USB generic HID support
+aue*	at uhub? port ?			# ADMtek AN986 Pegasus Ethernet
+axe*	at uhub? port ?			# ASIX Electronics AX88172 USB Ethernet
+cue*	at uhub? port ?			# CATC USB-EL1201A based Ethernet
+kue*	at uhub? port ?			# Kawasaki KL5KUSB101B based Ethernet
+cdce*	at uhub? port ?			# CDC Ethernet
+upl*	at uhub? port ?			# Prolific PL2301/PL2302 host-to-host `network'
+url*	at uhub? port ?			# Realtek RTL8150L based adapters
+wi*	at uhub? port ?			# WaveLAN IEEE 802.11DS
+urio*	at uhub? port ?			# Diamond Multimedia Rio 500
+uscanner* at uhub? port ?		# USB Scanners
+usscanner* at uhub? port ?		# USB SCSI scanners, e.g., HP5300
+scsibus* at usscanner?
+uyap*	at uhub? port ?			# Y@P firmware loader
+udsbr*	at uhub? port ?			# D-Link DSB-R100 radio
+radio*	at udsbr?			# USB radio
+ugen*	at uhub? port ? configuration ? # USB Generic driver
 
 # CardBus bus support
 cardbus*	at cardslot?
 pcmcia*		at cardslot?
 cbb*		at pci? dev ? function ?
 cardslot*	at cbb?
+ep*		at pcmcia? function ?		# PCMCIA based 3C5xx ethernet
+an*		at pcmcia? function ?		# Cisco/Aironet
 wi*		at pcmcia? function ?		# WaveLAN IEEE 802.11DS
 dc*		at cardbus? dev ? function ?	# 21143, "tulip" clone ethernet
 #fxp*		at cardbus? dev ? function ?	# Intel PRO/100 ethernet
@@ -219,4 +252,5 @@ ch*		at scsibus? target ? lun ?
 ss*		at scsibus? target ? lun ?
 uk*		at scsibus? target ? lun ?
 
+#pseudo-device	hotplug	1	# devices hot plugging
 pseudo-device	wsmux	2	# mouse & keyboard multiplexor

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pucdata.c,v 1.32 2004/03/10 00:47:50 deraadt Exp $	*/
+/*	$OpenBSD: pucdata.c,v 1.38 2004/08/18 19:58:14 millert Exp $	*/
 /*	$NetBSD: pucdata.c,v 1.6 1999/07/03 05:55:23 cgd Exp $	*/
 
 /*
@@ -750,6 +750,20 @@ const struct puc_device_description puc_devices[] = {
 	},
 
 	/*
+	 * Exsys EX-41098
+	 */
+	{   /* "Exsys EX-41098", */
+	    {	PCI_VENDOR_OXFORD2, PCI_PRODUCT_OXFORD2_EXSYS_EX41098,	0, 0 },
+	    {	0xffff, 0xffff,						0, 0 },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x08, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x10, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x18, COM_FREQ },
+	    },
+	},
+
+	/*
 	 * NEC PK-UG-X001 K56flex PCI Modem card.
 	 * NEC MARTH bridge chip and Rockwell RCVDL56ACF/SP using.
 	 */
@@ -882,6 +896,18 @@ const struct puc_device_description puc_devices[] = {
 	    },
 	},
 
+	/* SD-LAB PCI I/O Card 4S */
+	{   /* "Syba Tech Ltd. PCI-4S" */
+	    {   PCI_VENDOR_SYBA, PCI_PRODUCT_SYBA_4S,		0, 0	},
+	    {	0xffff,	0xffff,					0, 0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x3e8, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x2e8, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x3f8, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x10, 0x2f8, COM_FREQ },
+	    },
+	},
+
 	/* SD-LAB PCI I/O Card 4S2P */
 	{   /* "Syba Tech Ltd. PCI-4S2P-550-ECP" */
 	    {   PCI_VENDOR_SYBA, PCI_PRODUCT_SYBA_4S2P,		0, 0	},
@@ -956,6 +982,18 @@ const struct puc_device_description puc_devices[] = {
 		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
 		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ },
 		{ PUC_PORT_TYPE_LPT, 0x18, 0x00, 0x00 },
+	    },
+	},
+
+	/* NetMos 4S PCI 16C650 : 4S, 0P */
+	{   /* "NetMos NM9845 Quad UART" */
+	    {   PCI_VENDOR_NETMOS, PCI_PRODUCT_NETMOS_4S,	0, 0	},
+	    {	0xffff,	0xffff,					0, 0	},
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x1c, 0x00, COM_FREQ },
 	    },
 	},
 
@@ -1099,6 +1137,18 @@ const struct puc_device_description puc_devices[] = {
 		{ PUC_PORT_TYPE_COM, 0x18, 0x28, COM_FREQ * 4 },
 		{ PUC_PORT_TYPE_COM, 0x18, 0x30, COM_FREQ * 4 },
 		{ PUC_PORT_TYPE_COM, 0x18, 0x38, COM_FREQ * 4 },
+	    },
+	},
+
+	/* Avlab Technology, Inc. Low Profile PCI 4 Serial: 4S */
+	{   /* "Avlab Low Profile PCI 4 Serial" */
+	    {	PCI_VENDOR_AVLAB, PCI_PRODUCT_AVLAB_LPPCI4S,	0, 0  },
+	    {	0xffff,	0xffff,					0, 0  },
+	    {
+		{ PUC_PORT_TYPE_COM, 0x10, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x14, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x18, 0x00, COM_FREQ },
+		{ PUC_PORT_TYPE_COM, 0x1c, 0x00, COM_FREQ },
 	    },
 	},
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap_table.c,v 1.17 2004/01/05 20:07:03 miod Exp $	*/
+/*	$OpenBSD: pmap_table.c,v 1.20 2004/08/02 08:35:00 miod Exp $	*/
 
 /*
  * Mach Operating System
@@ -28,8 +28,6 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/types.h>
-#include <machine/board.h>
 #include <machine/cmmu.h>
 #include <uvm/uvm_extern.h>
 #include <machine/pmap_table.h>
@@ -42,16 +40,17 @@
 
 /*  phys_start, virt_start, size, prot, cacheability */
 #ifdef MVME187
+#include <machine/mvme187.h>
 const pmap_table_entry
 m187_board_table[] = {
 	{ BUG187_START, BUG187_START, round_page(BUG187_SIZE), RW, CI },
-	{ SRAM_START  , SRAM_START  , round_page(SRAM_SIZE)  , RW, CG },
 	{ OBIO_START  , OBIO_START  , round_page(OBIO_SIZE)  , RW, CI },
 	{ 0, 0, 0xffffffff, 0, 0 },
 };
 #endif
 
 #ifdef MVME188
+#include <machine/mvme188.h>
 const pmap_table_entry
 m188_board_table[] = {
 	{ MVME188_UTILITY, MVME188_UTILITY,
@@ -61,6 +60,7 @@ m188_board_table[] = {
 #endif
 
 #ifdef MVME197
+#include <machine/mvme197.h>
 const pmap_table_entry
 m197_board_table[] = {
 	{ FLASH_START, FLASH_START, round_page(FLASH_SIZE), RW, CI },

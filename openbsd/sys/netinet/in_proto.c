@@ -1,4 +1,4 @@
-/*	$OpenBSD: in_proto.c,v 1.38 2003/12/15 07:11:30 mcbride Exp $	*/
+/*	$OpenBSD: in_proto.c,v 1.40 2004/07/17 13:24:58 henning Exp $	*/
 /*	$NetBSD: in_proto.c,v 1.14 1996/02/18 18:58:32 christos Exp $	*/
 
 /*
@@ -105,6 +105,10 @@
 
 #include <net/if.h>
 #include <net/route.h>
+#include <net/radix.h>
+#ifndef SMALL_KERNEL
+#include <net/radix_mpath.h>
+#endif
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -145,11 +149,6 @@
 #include <netipx/ipx.h>
 #include <netipx/ipx_ip.h>
 #endif /* NSIP */
-
-#ifdef TPIP
-#include <netiso/tp_param.h>
-#include <netiso/tp_var.h>
-#endif /* TPIP */
 
 #ifdef EON
 #include <netiso/eonvar.h>
@@ -247,13 +246,6 @@ struct protosw inetsw[] = {
   rip_usrreq,
   igmp_init,	igmp_fasttimo,	igmp_slowtimo,	0,
 },
-#ifdef TPIP
-{ SOCK_SEQPACKET,&inetdomain,	IPPROTO_TP,	PR_CONNREQUIRED|PR_WANTRCVD|PR_ABRTACPTDIS,
-  tpip_input,	0,		tpip_ctlinput,	tp_ctloutput,
-  tp_usrreq,
-  tp_init,	0,		tp_slowtimo,	tp_drain,
-},
-#endif /* TPIP */
 /* EON (ISO CLNL over IP) */
 #ifdef EON
 { SOCK_RAW,	&inetdomain,	IPPROTO_EON,	0,
@@ -335,7 +327,12 @@ struct protosw inetsw[] = {
 struct domain inetdomain =
     { AF_INET, "internet", 0, 0, 0,
       inetsw, &inetsw[sizeof(inetsw)/sizeof(inetsw[0])], 0,
-      rn_inithead, 32, sizeof(struct sockaddr_in) };
+#ifndef SMALL_KERNEL
+      rn_mpath_inithead,
+#else
+      rn_inithead,
+#endif
+      32, sizeof(struct sockaddr_in) };
 
 #ifdef notyet /* XXXX */
 #include "hy.h"

@@ -1,4 +1,4 @@
-/*	$OpenBSD: null_vfsops.c,v 1.18 2004/03/03 06:01:49 tedu Exp $	*/
+/*	$OpenBSD: null_vfsops.c,v 1.22 2004/06/01 21:58:19 pedro Exp $	*/
 /*	$NetBSD: null_vfsops.c,v 1.38 2002/09/21 18:09:29 christos Exp $	*/
 
 /*
@@ -125,7 +125,7 @@ nullfs_mount(mp, path, data, ndp, p)
 	/*
 	 * Get argument
 	 */
-	error = copyin(data, (caddr_t)&args, sizeof(struct null_args));
+	error = copyin(data, &args, sizeof(struct null_args));
 	if (error)
 		return (error);
 
@@ -158,10 +158,10 @@ nullfs_mount(mp, path, data, ndp, p)
 	 * First cut at fixing up upper mount point
 	 */
 	nmp = (struct null_mount *) malloc(sizeof(struct null_mount),
-	    M_UFSMNT, M_WAITOK);		/* XXX */
-	memset((caddr_t)nmp, 0, sizeof(struct null_mount));
+	    M_MISCFSMNT, M_WAITOK);
+	memset(nmp, 0, sizeof(struct null_mount));
 
-	mp->mnt_data = (qaddr_t)nmp;
+	mp->mnt_data = nmp;
 	nmp->nullm_vfs = lowerrootvp->v_mount;
 	if (nmp->nullm_vfs->mnt_flag & MNT_LOCAL)
 		mp->mnt_flag |= MNT_LOCAL;
@@ -191,6 +191,7 @@ nullfs_mount(mp, path, data, ndp, p)
 	if (error) {
 		vput(lowerrootvp);
 		free(nmp->nullm_node_hashtbl, M_CACHE);
+		free(nmp, M_MISCFSMNT);
 		return (error);
 	}
 	/*
@@ -272,7 +273,7 @@ nullfs_unmount(mp, mntflags, p)
 	free(nmp->nullm_node_hashtbl, M_CACHE);
 	free(mp->mnt_data, M_MISCFSMNT);
 	mp->mnt_data = NULL;
-	return 0;
+	return (0);
 }
 
 extern const struct vnodeopv_desc nullfs_vnodeop_opv_desc;

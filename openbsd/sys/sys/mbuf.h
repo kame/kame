@@ -1,4 +1,4 @@
-/*	$OpenBSD: mbuf.h,v 1.74 2003/12/08 07:07:36 mcbride Exp $	*/
+/*	$OpenBSD: mbuf.h,v 1.77 2004/09/17 20:17:30 deraadt Exp $	*/
 /*	$NetBSD: mbuf.h,v 1.19 1996/02/09 18:25:14 christos Exp $	*/
 
 /*
@@ -72,7 +72,7 @@ struct m_hdr {
 	caddr_t	mh_data;		/* location of data */
 	u_int	mh_len;			/* amount of data in this mbuf */
 	short	mh_type;		/* type of data in this mbuf */
-	short	mh_flags;		/* flags; see below */
+	u_short	mh_flags;		/* flags; see below */
 };
 
 /* record/packet header in first mbuf of chain; valid if M_PKTHDR set */
@@ -156,11 +156,13 @@ struct mbuf {
 /* KAME IPv6 */
 #define M_ANYCAST6	0x4000	/* received as IPv6 anycast */
 
+#define M_LINK0		0x8000	/* link layer specific flag */
+
 #define M_LOOP		0x0040	/* for Mbuf statistics */
 
 /* flags copied when copying m_pkthdr */
 #define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_BCAST|M_MCAST|M_CONF|\
-			 M_AUTH|M_COMP|M_ANYCAST6|M_LOOP|M_TUNNEL)
+			 M_AUTH|M_COMP|M_ANYCAST6|M_LOOP|M_TUNNEL|M_LINK0)
 
 /* mbuf types */
 #define	MT_FREE		0	/* should be on free list */

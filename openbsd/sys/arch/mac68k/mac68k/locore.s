@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.s,v 1.33 2004/03/08 23:48:26 xsa Exp $	*/
+/*	$OpenBSD: locore.s,v 1.35 2004/07/02 17:33:43 miod Exp $	*/
 /*	$NetBSD: locore.s,v 1.103 1998/07/09 06:02:50 scottr Exp $	*/
 
 /*
@@ -674,8 +674,9 @@ ENTRY_NOPROFILE(trap12)
 	movl	d1,sp@-			| push length
 	movl	a1,sp@-			| push addr
 	movl	d0,sp@-			| push command
+	movl	_C_LABEL(curproc),sp@-	| push proc pointer
 	jbsr	_C_LABEL(cachectl)	| do it
-	lea	sp@(12),sp		| pop args
+	lea	sp@(16),sp		| pop args
 	jra	_ASM_LABEL(rei)		| all done
 
 /*
@@ -1173,6 +1174,7 @@ Lswnofpsave:
 	cmpb	#SRUN,a0@(P_STAT)
 	jne	Lbadsw
 #endif
+	movb	#SONPROC,a0@(P_STAT)
 	clrl	a0@(P_BACK)		| clear back link
 	movb	a0@(P_MD_FLAGS+3),mdpflag | low byte of p_md.md_flags
 	movl	a0@(P_ADDR),a1		| get p_addr

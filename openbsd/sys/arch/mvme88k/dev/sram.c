@@ -1,4 +1,4 @@
-/*	$OpenBSD: sram.c,v 1.15 2004/01/14 20:50:48 miod Exp $ */
+/*	$OpenBSD: sram.c,v 1.17 2004/04/24 19:51:48 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -43,10 +43,11 @@
 #include <uvm/uvm_extern.h>
 
 struct sramsoftc {
-	struct device	sc_dev;
-	void *		sc_paddr;
-	void *		sc_vaddr;
-	int		sc_len;
+	struct device		sc_dev;
+	paddr_t			sc_base;
+	size_t			sc_len;
+	bus_space_tag_t		sc_iot;
+	bus_space_handle_t	sc_ioh;
 };
 
 void sramattach(struct device *, struct device *, void *);
@@ -65,15 +66,10 @@ srammatch(parent, vcf, args)
 	struct device *parent;
 	void *vcf, *args;
 {
-	struct confargs *ca = args;
-
-	if (brdtyp != BRD_187 && brdtyp != BRD_8120)	/* The only one... */
+	if (brdtyp != BRD_187 && brdtyp != BRD_8120)	/* The only ones... */
 		return (0);
 
-	ca->ca_paddr = (void *)0xffe00000;
-	ca->ca_vaddr = (void *)0xffe00000;
-
-	return (!badvaddr((vaddr_t)ca->ca_vaddr, 1));
+	return (1);
 }
 
 void
@@ -83,28 +79,20 @@ sramattach(parent, self, args)
 {
 	struct confargs *ca = args;
 	struct sramsoftc *sc = (struct sramsoftc *)self;
+	bus_space_handle_t ioh;
 
-	switch (brdtyp) {
-#ifdef MVME187
-	case BRD_187:
-	case BRD_8120:
-		sc->sc_len = 128*1024;		/* always 128K */
-		break;
-#endif
-	default:
-		sc->sc_len = 0;
-		break;
+	sc->sc_iot = ca->ca_iot;
+	sc->sc_base = ca->ca_paddr;
+	sc->sc_len = 128 * 1024;		/* always 128K */
+
+	if (bus_space_map(sc->sc_iot, sc->sc_base, sc->sc_len, 0, &ioh) != 0) {
+		printf(": can't map memory!\n");
+		return;
 	}
 
-	printf(": len %d", sc->sc_len);
+	sc->sc_ioh = ioh;
 
-	sc->sc_paddr = ca->ca_paddr;
-	sc->sc_vaddr = mapiodev((void *)sc->sc_paddr, sc->sc_len);
-	if (sc->sc_vaddr == NULL) {
-		sc->sc_len = 0;
-		printf(" -- failed to map");
-	}
-	printf("\n");
+	printf(": %dKB\n", sc->sc_len / 1024);
 }
 
 /*ARGSUSED*/
@@ -157,7 +145,7 @@ sramioctl(dev, cmd, data, flag, p)
 
 /*ARGSUSED*/
 int
-sramread(dev, uio, flags)
+sramrw(dev, uio, flags)
 	dev_t dev;
 	struct uio *uio;
 	int flags;
@@ -165,20 +153,8 @@ sramread(dev, uio, flags)
 	int unit = minor(dev);
 	struct sramsoftc *sc = (struct sramsoftc *) sram_cd.cd_devs[unit];
 
-	return (memdevrw(sc->sc_vaddr, sc->sc_len, uio, flags));
-}
-
-/*ARGSUSED*/
-int
-sramwrite(dev, uio, flags)
-	dev_t dev;
-	struct uio *uio;
-	int flags;
-{
-	int unit = minor(dev);
-	struct sramsoftc *sc = (struct sramsoftc *) sram_cd.cd_devs[unit];
-
-	return (memdevrw(sc->sc_vaddr, sc->sc_len, uio, flags));
+	return memdevrw(bus_space_vaddr(sc->sc_iot, sc->sc_ioh),
+	    sc->sc_len, uio, flags);
 }
 
 paddr_t
@@ -194,7 +170,7 @@ srammmap(dev, off, prot)
 		return (-1);
 
 	/* allow access only in RAM */
-	if (off > sc->sc_len)
+	if (off < 0 || off > sc->sc_len)
 		return (-1);
-	return (atop(sc->sc_paddr + off));
+	return (atop(sc->sc_base + off));
 }

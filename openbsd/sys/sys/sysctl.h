@@ -1,4 +1,4 @@
-/*	$OpenBSD: sysctl.h,v 1.76 2004/02/27 21:46:44 grange Exp $	*/
+/*	$OpenBSD: sysctl.h,v 1.81 2004/08/04 23:33:32 deraadt Exp $	*/
 /*	$NetBSD: sysctl.h,v 1.16 1996/04/09 20:55:36 cgd Exp $	*/
 
 /*
@@ -179,7 +179,10 @@ struct ctlname {
 #define	KERN_WATCHDOG		64	/* node: watchdog */
 #define	KERN_EMUL		65	/* node: emuls */
 #define	KERN_PROC2		66	/* struct: process entries */
-#define	KERN_MAXID		67	/* number of valid kern ids */
+#define	KERN_MAXCLUSTERS	67	/* number of mclusters */
+#define KERN_EVCOUNT		68	/* node: event counters */
+#define	KERN_TIMECOUNTER	69	/* node: timecounter */
+#define	KERN_MAXID		70	/* number of valid kern ids */
 
 #define	CTL_KERN_NAMES { \
 	{ 0, 0 }, \
@@ -249,6 +252,9 @@ struct ctlname {
  	{ "watchdog", CTLTYPE_NODE }, \
  	{ "emul", CTLTYPE_NODE }, \
  	{ "proc2", CTLTYPE_STRUCT }, \
+ 	{ "maxclusters", CTLTYPE_INT }, \
+	{ "evcount", CTLTYPE_NODE }, \
+ 	{ "timecounter", CTLTYPE_NODE }, \
 }
 
 /*
@@ -333,6 +339,8 @@ struct kinfo_proc {
 #define	KI_WMESGLEN	8
 #define	KI_MAXLOGNAME	32
 #define	KI_EMULNAMELEN	8
+
+#define KI_NOCPU	(~(u_int64_t)0)
 
 struct kinfo_proc2 {
 	u_int64_t p_forw;		/* PTR: linked run/sleep queue. */
@@ -446,15 +454,17 @@ struct kinfo_proc2 {
 	u_int32_t p_svgid;		/* GID_T: saved group id */
 	char    p_emul[KI_EMULNAMELEN];	/* syscall emulation name */
 	u_int64_t p_rlim_rss_cur;	/* RLIM_T: soft limit for rss */
+	u_int64_t p_cpuid;		/* LONG: CPU id */
 };
 
 /*
- * KERN_INTR_CNT
+ * KERN_INTRCNT
  */
 #define KERN_INTRCNT_NUM	1	/* int: # intrcnt */
 #define KERN_INTRCNT_CNT	2	/* node: intrcnt */
 #define KERN_INTRCNT_NAME	3	/* node: names */
-#define KERN_INTRCNT_MAXID	4
+#define KERN_INTRCNT_VECTOR	4	/* node: interrupt vector # */
+#define KERN_INTRCNT_MAXID	5
 
 #define CTL_KERN_INTRCNT_NAMES { \
 	{ 0, 0 }, \
@@ -474,6 +484,23 @@ struct kinfo_proc2 {
 	{ 0, 0 }, \
 	{ "period", CTLTYPE_INT }, \
 	{ "auto", CTLTYPE_INT }, \
+}
+
+/*
+ * KERN_TIMECOUNTER
+ */
+#define KERN_TIMECOUNTER_TICK		1	/* int: number of revolutions */
+#define KERN_TIMECOUNTER_TIMESTEPWARNINGS 2	/* int: log a warning when time changes */
+#define KERN_TIMECOUNTER_HARDWARE	3	/* string: tick hardware used */
+#define KERN_TIMECOUNTER_CHOICE		4	/* string: tick hardware used */
+#define KERN_TIMECOUNTER_MAXID		5
+
+#define CTL_KERN_TIMECOUNTER_NAMES { \
+	{ 0, 0 }, \
+	{ "tick", CTLTYPE_INT }, \
+	{ "timestepwarnings", CTLTYPE_INT }, \
+	{ "hardware", CTLTYPE_STRING }, \
+	{ "choice", CTLTYPE_STRING }, \
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_syscalls_43.c,v 1.22 2003/06/02 23:27:59 millert Exp $	*/
+/*	$OpenBSD: vfs_syscalls_43.c,v 1.25 2004/07/14 18:57:57 millert Exp $	*/
 /*	$NetBSD: vfs_syscalls_43.c,v 1.4 1996/03/14 19:31:52 christos Exp $	*/
 
 /*
@@ -63,7 +63,7 @@
 
 #include <sys/pipe.h>
 
-static void cvtstat(struct stat *, struct ostat *);
+static void cvtstat(struct stat *, struct stat43 *);
 
 /*
  * Redirection info so we don't have to include the union fs routines in 
@@ -77,12 +77,12 @@ extern int (*union_check_p)(struct proc *, struct vnode **,
 				   struct file *, struct uio, int *);
 
 /*
- * Convert from an old to a new stat structure.
+ * Convert from a new to an old stat structure.
  */
 static void
 cvtstat(st, ost)
 	struct stat *st;
-	struct ostat *ost;
+	struct stat43 *ost;
 {
 
 	ost->st_dev = st->st_dev;
@@ -117,10 +117,10 @@ compat_43_sys_stat(p, v, retval)
 {
 	register struct compat_43_sys_stat_args /* {
 		syscallarg(char *) path;
-		syscallarg(struct ostat *) ub;
+		syscallarg(struct stat43 *) ub;
 	} */ *uap = v;
 	struct stat sb;
-	struct ostat osb;
+	struct stat43 osb;
 	int error;
 	struct nameidata nd;
 
@@ -132,8 +132,11 @@ compat_43_sys_stat(p, v, retval)
 	vput(nd.ni_vp);
 	if (error)
 		return (error);
+	/* Don't let non-root see generation numbers (for NFS security) */
+	if (suser(p, 0))
+		sb.st_gen = 0;
 	cvtstat(&sb, &osb);
-	error = copyout((caddr_t)&osb, (caddr_t)SCARG(uap, ub), sizeof (osb));
+	error = copyout(&osb, SCARG(uap, ub), sizeof(osb));
 	return (error);
 }
 
@@ -150,10 +153,10 @@ compat_43_sys_lstat(p, v, retval)
 {
 	register struct compat_43_sys_lstat_args /* {
 		syscallarg(char *) path;
-		syscallarg(struct ostat *) ub;
+		syscallarg(struct stat43 *) ub;
 	} */ *uap = v;
 	struct stat sb;
-	struct ostat osb;
+	struct stat43 osb;
 	int error;
 	struct nameidata nd;
 
@@ -165,11 +168,13 @@ compat_43_sys_lstat(p, v, retval)
 	vput(nd.ni_vp);
 	if (error)
 		return (error);
+	/* Don't let non-root see generation numbers (for NFS security) */
+	if (suser(p, 0))
+		sb.st_gen = 0;
 	cvtstat(&sb, &osb);
-	error = copyout(&osb, SCARG(uap, ub), sizeof (osb));
+	error = copyout(&osb, SCARG(uap, ub), sizeof(osb));
 	return (error);
 }
-
 
 /*
  * Return status information about a file descriptor.
@@ -183,13 +188,13 @@ compat_43_sys_fstat(p, v, retval)
 {
 	struct compat_43_sys_fstat_args /* {
 		syscallarg(int) fd;
-		syscallarg(struct ostat *) sb;
+		syscallarg(struct stat43 *) sb;
 	} */ *uap = v;
 	int fd = SCARG(uap, fd);
 	struct filedesc *fdp = p->p_fd;
 	struct file *fp;
 	struct stat ub;
-	struct ostat oub;
+	struct stat43 oub;
 	int error;
 
 	if ((fp = fd_getfile(fdp, fd)) == NULL)
@@ -197,13 +202,16 @@ compat_43_sys_fstat(p, v, retval)
 	FREF(fp);
 	error = (*fp->f_ops->fo_stat)(fp, &ub, p);
 	FRELE(fp);
-	cvtstat(&ub, &oub);
-	if (error == 0)
-		error = copyout((caddr_t)&oub, (caddr_t)SCARG(uap, sb),
-		    sizeof (oub));
+	if (error == 0) {
+		/* Don't let non-root see generation numbers
+		   (for NFS security) */
+		if (suser(p, 0))
+			ub.st_gen = 0;
+		cvtstat(&ub, &oub);
+		error = copyout(&oub, SCARG(uap, sb), sizeof(oub));
+	}
 	return (error);
 }
-
 
 /*
  * Truncate a file given a file descriptor.
@@ -299,12 +307,12 @@ compat_43_sys_creat(p, v, retval)
 {
 	register struct compat_43_sys_creat_args /* {
 		syscallarg(char *) path;
-		syscallarg(int) mode;
+		syscallarg(mode_t) mode;
 	} */ *uap = v;
 	struct sys_open_args /* {
 		syscallarg(char *) path;
 		syscallarg(int) flags;
-		syscallarg(int) mode;
+		syscallarg(mode_t) mode;
 	} */ nuap;
 
 	SCARG(&nuap, path) = SCARG(uap, path);

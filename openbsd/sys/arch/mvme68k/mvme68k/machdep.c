@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.83 2004/03/10 23:02:54 tom Exp $ */
+/*	$OpenBSD: machdep.c,v 1.86 2004/07/30 22:29:48 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -88,6 +88,7 @@
 #ifdef SYSVMSG
 #include <sys/msg.h>
 #endif
+#include <sys/evcount.h>
 
 #include <machine/autoconf.h>
 #include <machine/bugio.h>
@@ -125,15 +126,22 @@ extern vm_offset_t avail_end;
  * Declare these as initialized data so we can patch them.
  */
 #ifdef	NBUF
-int   nbuf = NBUF;
+int	nbuf = NBUF;
 #else
-int   nbuf = 0;
+int	nbuf = 0;
 #endif
+
+#ifndef	BUFCACHEPERCENT
+#define	BUFCACHEPERCENT	5
+#endif
+
 #ifdef	BUFPAGES
-int   bufpages = BUFPAGES;
+int	bufpages = BUFPAGES;
 #else
-int   bufpages = 0;
+int	bufpages = 0;
 #endif
+int	bufcachepercent = BUFCACHEPERCENT;
+
 int   maxmem;			/* max memory per process */
 int   physmem = MAXMEM;	/* max supported memory, changes to actual */
 /*
@@ -151,6 +159,13 @@ extern struct emul emul_hpux;
 extern struct emul emul_sunos;
 #endif
 
+/* 68060-specific event counters */
+#if defined(M68060)
+struct evcount ec_60bpe;
+#if defined(M060SP)
+struct evcount ec_60iem, ec_60fpiem, ec_60fpdem, ec_60fpeaem;
+#endif
+#endif
 /* 
  *  XXX this is to fake out the console routines, while 
  *  booting. New and improved! :-) smurph
@@ -178,7 +193,6 @@ void initvectors(void);
 void mvme68k_init(void);
 void identifycpu(void);
 int cpu_sysctl(int *, u_int, void *, size_t *, void *, size_t, struct proc *);
-void halt_establish(void (*)(void), int);
 void dumpconf(void);
 void straytrap(int, u_short);
 void netintr(void *);
@@ -187,6 +201,7 @@ int fpu_gettype(void);
 int memsize162(void);
 int memsize1x7(void);	/* in locore */
 int memsize(void);
+caddr_t allocsys(caddr_t);
 
 void
 mvme68k_init()
@@ -244,8 +259,8 @@ consinit()
 void
 cpu_startup()
 {
-	register unsigned i;
-	register caddr_t v, firstaddr;
+	unsigned i;
+	caddr_t v;
 	int base, residual;
 	
 	vaddr_t minaddr, maxaddr;
@@ -262,88 +277,39 @@ cpu_startup()
 	 * avail_end was pre-decremented in pmap_bootstrap to compensate.
 	 */
 	for (i = 0; i < btoc(MSGBUFSIZE); i++)
-		pmap_kenter_pa((vm_offset_t)msgbufp,
-		    avail_end + i * NBPG, VM_PROT_READ|VM_PROT_WRITE);
+		pmap_kenter_pa((vm_offset_t)msgbufp + i * PAGE_SIZE,
+		    avail_end + i * PAGE_SIZE, VM_PROT_READ|VM_PROT_WRITE);
 	pmap_update(pmap_kernel());
 	initmsgbuf((caddr_t)msgbufp, round_page(MSGBUFSIZE));
 
 	/*
 	 * Good {morning,afternoon,evening,night}.
 	 */
-	printf(version);
+	printf("%s", version);
 	identifycpu();
-	printf("real mem = %d\n", ctob(physmem));
+	printf("real mem = %d (%dK)\n", ctob(physmem), ctob(physmem) / 1024);
 
 	/*
-	 * Allocate space for system data structures.
-	 * The first available real memory address is in "firstaddr".
-	 * The first available kernel virtual address is in "v".
-	 * As pages of kernel virtual memory are allocated, "v" is incremented.
-	 * As pages of memory are allocated and cleared,
-	 * "firstaddr" is incremented.
-	 * An index into the kernel page table corresponding to the
-	 * virtual memory address maintained in "v" is kept in "mapaddr".
+	 * Find out how much space we need, allocate it,
+	 * and then give everything true virtual addresses.
 	 */
-	/*
-	 * Make two passes.  The first pass calculates how much memory is
-	 * needed and allocates it.  The second pass assigns virtual
-	 * addresses to the various data structures.
-	 */
-	firstaddr = 0;
-again:
-	v = (caddr_t)firstaddr;
-
-#define	valloc(name, type, num) \
-	    (name) = (type *)v; v = (caddr_t)((name)+(num))
-#define	valloclim(name, type, num, lim) \
-	    (name) = (type *)v; v = (caddr_t)((lim) = ((name)+(num)))
-#ifdef SYSVMSG
-	valloc(msgpool, char, msginfo.msgmax);
-	valloc(msgmaps, struct msgmap, msginfo.msgseg);
-	valloc(msghdrs, struct msg, msginfo.msgtql);
-	valloc(msqids, struct msqid_ds, msginfo.msgmni);
-#endif
-
-	/*
-	 * Determine how many buffers to allocate.
-	 * We just allocate a flat 5%.  Insure a minimum of 16 buffers.
-	 * We allocate 1/2 as many swap buffer headers as file i/o buffers.
-	 */
-	if (bufpages == 0)
-		bufpages = physmem / 20;
-	if (nbuf == 0) {
-		nbuf = bufpages;
-		if (nbuf < 16)
-			nbuf = 16;
-	}
-	valloc(buf, struct buf, nbuf);
-	/*
-	 * End of first pass, size has been calculated so allocate memory
-	 */
-	if (firstaddr == 0) {
-		size = (vm_size_t)(v - firstaddr);
-		firstaddr = (caddr_t) uvm_km_zalloc(kernel_map, round_page(size));
-		if (firstaddr == 0)
-			panic("startup: no room for tables");
-		goto again;
-	}
-	/*
-	 * End of second pass, addresses have been assigned
-	 */
-	if ((vm_size_t)(v - firstaddr) != size)
+	size = (vm_size_t)allocsys((caddr_t)0);
+	if ((v = (caddr_t) uvm_km_zalloc(kernel_map, round_page(size))) == 0)
+		panic("startup: no room for tables");
+	if (allocsys(v) - v != size)
 		panic("startup: table size inconsistency");
+
 	/*
 	 * Now allocate buffers proper.  They are different than the above
 	 * in that they usually occupy more virtual memory than physical.
 	 */
 	size = MAXBSIZE * nbuf;
-	if (uvm_map(kernel_map, (vaddr_t *) &buffers, m68k_round_page(size),
+	if (uvm_map(kernel_map, (vaddr_t *) &buffers, round_page(size),
 		    NULL, UVM_UNKNOWN_OFFSET, 0,
 		    UVM_MAPFLAG(UVM_PROT_NONE, UVM_PROT_NONE, UVM_INH_NONE,
 				UVM_ADV_NORMAL, 0)))
 		panic("cpu_startup: cannot allocate VM for buffers");
 	minaddr = (vaddr_t)buffers;
-	
 	if ((bufpages / nbuf) >= btoc(MAXBSIZE)) {
 		/* don't want to alloc more physical mem than needed */
 		bufpages = btoc(MAXBSIZE) * nbuf;
@@ -395,14 +361,16 @@ again:
 #ifdef DEBUG
 	pmapdebug = opmapdebug;
 #endif
-	printf("avail mem = %ld (%d pages)\n", ptoa(uvmexp.free), uvmexp.free);
-	printf("using %d buffers containing %d bytes of memory\n",
-			 nbuf, bufpages * PAGE_SIZE);
 
 	/*
 	 * Set up buffers, so they can be used to read disk labels.
 	 */
 	bufinit();
+
+	printf("avail mem = %d (%dK)\n",
+	    ptoa(uvmexp.free), ptoa(uvmexp.free) / 1024);
+	printf("using %d buffers containing %d bytes of memory\n",
+			 nbuf, bufpages * PAGE_SIZE);
 
 	/*
 	 * Configure the system.
@@ -414,6 +382,54 @@ again:
 		printf("kernel does not support -c; continuing..\n");
 #endif
 	}
+}
+
+/*
+ * Allocate space for system data structures.  We are given
+ * a starting virtual address and we return a final virtual
+ * address; along the way we set each data structure pointer.
+ *
+ * You call allocsys() with 0 to find out how much space we want,
+ * allocate that much and fill it with zeroes, and then call
+ * allocsys() again with the correct base virtual address.
+ */
+caddr_t
+allocsys(caddr_t v)
+{
+
+#define	valloc(name, type, num) \
+	    (name) = (type *)v; v = (caddr_t)((name) + (num))
+#ifdef SYSVMSG
+	valloc(msgpool, char, msginfo.msgmax);
+	valloc(msgmaps, struct msgmap, msginfo.msgseg);
+	valloc(msghdrs, struct msg, msginfo.msgtql);
+	valloc(msqids, struct msqid_ds, msginfo.msgmni);
+#endif
+
+	/*
+	 * Determine how many buffers to allocate (enough to
+	 * hold 5% of total physical memory, but at least 16).
+	 * Allocate 1/2 as many swap buffer headers as file i/o buffers.
+	 */
+	if (bufpages == 0)
+		bufpages = physmem * bufcachepercent / 100;
+	if (nbuf == 0) {
+		nbuf = bufpages;
+		if (nbuf < 16)
+			nbuf = 16;
+	}
+	/* Restrict to at most 70% filled kvm */
+	if (nbuf * MAXBSIZE >
+	    (VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS) * 7 / 10)
+		nbuf = (VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS) /
+		    MAXBSIZE * 7 / 10;
+
+	/* More buffer pages than fits into the buffers is senseless. */
+	if (bufpages > nbuf * MAXBSIZE / PAGE_SIZE)
+		bufpages = nbuf * MAXBSIZE / PAGE_SIZE;
+
+	valloc(buf, struct buf, nbuf);
+	return (v);
 }
 
 /*
@@ -592,6 +608,17 @@ identifycpu()
 #endif
 	}
 	printf("%s\n", cpu_model);
+
+	/* No better place to put these... */
+#if defined(M68060)
+	evcount_attach(&ec_60bpe, "68060bpe", NULL, &evcount_intr);
+#if defined(M060SP)
+	evcount_attach(&ec_60iem, "68060iem", NULL, &evcount_intr);
+	evcount_attach(&ec_60fpiem, "68060fpiem", NULL, &evcount_intr);
+	evcount_attach(&ec_60fpdem, "68060fpdem", NULL, &evcount_intr);
+	evcount_attach(&ec_60fpeaem, "68060fpeaem", NULL, &evcount_intr);
+#endif
+#endif
 }
 
 /*
@@ -628,54 +655,6 @@ cpu_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 }
 
 int   waittime = -1;
-
-static struct haltvec *halts;
-
-/* XXX insert by priority */
-void
-halt_establish(fn, pri)
-	void (*fn)(void);
-	int pri;
-{
-	struct haltvec *hv, *h;
-
-	hv = (struct haltvec *)malloc(sizeof(*hv), M_TEMP, M_NOWAIT);
-	if (hv == NULL)
-		return;
-	hv->hv_fn = fn;
-	hv->hv_pri = pri;
-	hv->hv_next = NULL;
-
-	/* put higher priorities earlier in the list */
-	h = halts;
-	if (h == NULL) {
-		halts = hv;
-		return;
-	}
-
-	if (h->hv_pri < pri) {
-		/* higher than first element */
-		hv->hv_next = halts;
-		halts = hv;
-		return;
-	}
-
-	while (h) {
-		if (h->hv_next == NULL) {
-			/* no more elements, must be the lowest priority */
-			h->hv_next = hv;
-			return;
-		}
-
-		if (h->hv_next->hv_pri < pri) {
-			/* next element is lower */
-			hv->hv_next = h->hv_next;
-			h->hv_next = hv;
-			return;
-		}
-		h = h->hv_next;
-	}
-}
 
 __dead void
 boot(howto)
@@ -727,10 +706,6 @@ haltsys:
 	if (howto & RB_HALT) {
 		printf("halted\n\n");
 	} else {
-		struct haltvec *hv;
-
-		for (hv = halts; hv; hv = hv->hv_next)
-			(*hv->hv_fn)();
 		doboot();
 	}
 	for (;;);
@@ -974,8 +949,8 @@ straytrap(pc, evec)
 	int pc;
 	u_short evec;
 {
-	printf("unexpected trap (vector %d) from %x\n",
-			 (evec & 0xFFF) >> 2, pc);
+	printf("unexpected trap (vector 0x%x) from %x\n",
+	    (evec & 0xFFF) >> 2, pc);
 }
 
 int   *nofault;

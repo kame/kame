@@ -1,4 +1,4 @@
-/*	$OpenBSD: aic7xxx_openbsd.c,v 1.21 2004/01/24 15:49:31 krw Exp $	*/
+/*	$OpenBSD: aic7xxx_openbsd.c,v 1.23 2004/08/13 23:38:54 krw Exp $	*/
 /*	$NetBSD: aic7xxx_osm.c,v 1.14 2003/11/02 11:07:44 wiz Exp $	*/
 
 /*
@@ -89,11 +89,7 @@ int
 ahc_attach(struct ahc_softc *ahc)
 {
 	char ahc_info[256];
-	int i, s;
-
-	LIST_INIT(&ahc->pending_scbs);
-	for (i = 0; i < AHC_NUM_TARGETS; i++)
-		TAILQ_INIT(&ahc->untagged_queues[i]);
+	int s;
 
         ahc_lock(ahc, &s);
 
@@ -239,6 +235,7 @@ ahc_done(struct ahc_softc *ahc, struct scb *scb)
 
 	/* Translate the CAM status code to a SCSI error code. */
 	switch (xs->error) {
+	case CAM_SCSI_STATUS_ERROR:
 	case CAM_REQ_INPROG:
 	case CAM_REQ_CMP:
 		switch (xs->status) {
@@ -308,9 +305,6 @@ ahc_done(struct ahc_softc *ahc, struct scb *scb)
 		    ahc_le32toh(scb->sg_list->len) & AHC_SG_LEN_MASK);
 		xs->error = XS_SENSE;
 	}
-	if (scb->flags & SCB_FREEZE_QUEUE) {
-		scb->flags &= ~SCB_FREEZE_QUEUE;
-	}
 
         ahc_lock(ahc, &s);       
 	ahc_free_scb(ahc, scb);
@@ -372,6 +366,7 @@ ahc_action(struct scsi_xfer *xs)
 
 	SC_DEBUG(xs->sc_link, SDEV_DB3, ("start scb(%p)\n", scb));
 	scb->xs = xs;
+	timeout_set(&xs->stimeout, ahc_timeout, scb);
 
 	/*
 	 * Put all the arguments for the xfer in the scb
@@ -385,8 +380,6 @@ ahc_action(struct scsi_xfer *xs)
 		hscb->control |= MK_MESSAGE;
 		ahc_execute_scb(scb, NULL, 0);
 	}
-
-	timeout_set(&xs->stimeout, ahc_timeout, scb);
 
 	return ahc_setup_data(ahc, xs, scb);
 }
@@ -563,7 +556,6 @@ ahc_execute_scb(void *arg, bus_dma_segment_t *dm_segs, int nsegments)
 
 			ahc->inited_target[xs->sc_link->target] = 1;
 		}
-
 		ahc_unlock(ahc, &s);
 		return (SUCCESSFULLY_QUEUED);
 	}

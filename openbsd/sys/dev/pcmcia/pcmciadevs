@@ -1,4 +1,4 @@
-	$OpenBSD: pcmciadevs,v 1.109 2004/01/24 23:30:26 deraadt Exp $
+	$OpenBSD: pcmciadevs,v 1.114 2004/06/04 18:03:35 millert Exp $
 /* $NetBSD: pcmciadevs,v 1.13 1998/08/17 23:10:12 thorpej Exp $ */
 
 /*
@@ -85,6 +85,8 @@ vendor SYMBOL			0x026c	Symbol
 vendor BUFFALO			0x026f	BUFFALO (Melco Corporation)
 vendor LINKSYS2			0x0274	The Linksys Group
 vendor IODATA2			0x028a	I-O DATA
+vendor ASUS			0x02aa	ASUS
+vendor MICROSOFT		0x02d2	Microsoft
 vendor NWN			0x0602	No Wires Needed
 vendor BREEZECOM		0x0a02	BreezeCOM
 vendor NEWMEDIA2		0x10cd	NewMedia
@@ -96,6 +98,7 @@ vendor ARCHOS			0x5241	Archos
 vendor DUAL			0x890f	Dual
 vendor COMPEX			0x8a01	Compex
 vendor MELCO			0x8a01	Melco Corporation
+vendor ADAPTEC2			0x9005	Adaptec
 vendor CONTEC			0xc001	Contec
 vendor MACNICA			0xc00b	MACNICA
 vendor ROLAND			0xc00c	Roland
@@ -128,6 +131,7 @@ product ACTIONTEC HWC01170	0x101  ACTIONTEC Wireless LAN PC CARD
 /* Adaptec */
 product ADAPTEC APA1460_1	0x0001 Adaptec APA-1460/A
 product ADAPTEC APA1460_2	0x0002 Adaptec APA-1460/B
+product ADAPTEC2 AWN8030	0x0021 Adaptec AWN-8030
 
 /* Aironet */
 product AIRONET PC4500		0x0005 Aironet PC4500
@@ -142,6 +146,9 @@ product ALLIEDTELESIS LA_PCM	0x0002 Allied Telesis LA-PCM
 
 /* Archos */
 product	ARCHOS ARC_ATAPI	0x0043 MiniCD
+
+/* ASUS */
+product	ASUS WL_100		0x0002 SpaceLink WL-100
 
 /* Bay Networks */
 product BAY STACK_650		0x0804 BayStack 650
@@ -215,6 +222,7 @@ product IBM ETHERJET		0x003f IBM EtherJet
 
 /* I-O DATA */
 product IODATA PCLATE		0x2216 I-O DATA PCLA/TE
+product IODATA 8041TX		0x8041 SMC8041TX
 product IODATA2 WNB11PCM	0x0002 I-O DATA WN-B11/PCM
 
 /* Intel */
@@ -255,6 +263,9 @@ product MEGAHERTZ2 XJACK	0x0103 Megahertz X-JACK
 
 /* Melco */
 product MELCO LPC3_TX	 	0xc1ab Melco LPC3-TX
+
+/* Microsoft */
+product MICROSOFT MN520		0x0001 Microsoft MN-520
 
 /* Motorola */
 product MOTOROLA POWER144	0x0105 Motorola Power 14.4

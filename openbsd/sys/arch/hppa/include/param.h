@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.21 2003/04/16 07:26:07 mickey Exp $	*/
+/*	$OpenBSD: param.h,v 1.24 2004/08/06 22:31:30 mickey Exp $	*/
 
 /* 
  * Copyright (c) 1988-1994, The University of Utah and
@@ -67,6 +67,7 @@
 #define	SINCR		(1)		/* increment of stack/NBPG */
 
 #define	USPACE		(4 * NBPG)	/* pages for user struct and kstack */
+#define	USPACE_ALIGN	(0)		/* u-area alignment 0-none */
 
 #ifndef	MSGBUFSIZE
 #define	MSGBUFSIZE	2*NBPG		/* default message buffer size */
@@ -83,9 +84,7 @@
 #define	MCLSHIFT	11
 #define	MCLBYTES	(1 << MCLSHIFT)	/* large enough for ether MTU */
 #define	MCLOFSET	(MCLBYTES - 1)
-#ifndef NMBCLUSTERS
-#define	NMBCLUSTERS	(2048)		/* cl map size: 1MB */
-#endif
+#define	NMBCLUSTERS	4096		/* map size, max cluster allocation */
 
 /*
  * Minimum and maximum sizes of the kernel malloc arena in PAGE_SIZE-sized
@@ -95,15 +94,15 @@
 #define	NKMEMPAGES_MAX_DEFAULT	((64 * 1024 * 1024) >> PAGE_SHIFT)
 
 /* pages ("clicks") (4096 bytes) to disk blocks */
-#define	ctod(x)	((x)<<(PGSHIFT-DEV_BSHIFT))
-#define	dtoc(x)	((x)>>(PGSHIFT-DEV_BSHIFT))
+#define	ctod(x)		((x) << (PGSHIFT - DEV_BSHIFT))
+#define	dtoc(x)		((x) >> (PGSHIFT - DEV_BSHIFT))
 
 /* pages to bytes */
-#define	ctob(x)	((x)<<PGSHIFT)
-#define	btoc(x)	(((unsigned)(x)+(NBPG-1))>>PGSHIFT)
+#define	ctob(x)		((x) << PGSHIFT)
+#define	btoc(x)		(((x) + PGOFSET) >> PGSHIFT)
 
-#define	btodb(bytes)	((unsigned)(bytes) >> DEV_BSHIFT)
-#define	dbtob(db)	((unsigned)(db) << DEV_BSHIFT)
+#define	btodb(x)	((x) >> DEV_BSHIFT)
+#define	dbtob(x)	((x) << DEV_BSHIFT)
 
 /*
  * Map a ``block device block'' to a file system block.

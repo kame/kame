@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_le.c,v 1.3 2003/12/30 21:25:59 miod Exp $ */
+/*	$OpenBSD: if_le.c,v 1.10 2004/07/30 19:02:05 miod Exp $ */
 
 /*-
  * Copyright (c) 1982, 1992, 1993
@@ -31,7 +31,8 @@
  *	@(#)if_le.c	8.2 (Berkeley) 10/30/93
  */
 
-#include "bpfilter.h"
+/* This card lives in D16 space */
+#define	__BUS_SPACE_RESTRICT_D16__
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -88,11 +89,11 @@ nvram_cmd(sc, cmd, addr)
 	u_char cmd;
 	u_short addr;
 {
-	int i;
 	struct vlereg1 *reg1 = (struct vlereg1 *)((struct le_softc *)sc)->sc_r1;
+	int i;
 
-	for (i=0;i<8;i++) {
-		reg1->ler1_ear=((cmd|(addr<<1))>>i); 
+	for (i = 0; i < 8; i++) {
+		reg1->ler1_ear = ((cmd | (addr << 1)) >> i); 
 		CDELAY; 
 	} 
 }
@@ -105,21 +106,27 @@ nvram_read(sc, nvram_addr)
 {
 	u_short val = 0, mask = 0x04000;
 	u_int16_t wbit;
-	/* these used by macros DO NOT CHANGE!*/
 	struct vlereg1 *reg1 = (struct vlereg1 *)((struct le_softc *)sc)->sc_r1;
-	((struct le_softc *)sc)->csr = 0x4f;
+
+	((struct le_softc *)sc)->sc_csr = 0x4f;
 	ENABLE_NVRAM;
 	nvram_cmd(sc, NVRAM_RCL, 0);
 	DISABLE_NVRAM;
 	CDELAY;
 	ENABLE_NVRAM;
 	nvram_cmd(sc, NVRAM_READ, nvram_addr);
-	for (wbit=0; wbit<15; wbit++) {
-		(reg1->ler1_ear & 0x01) ? (val = (val | mask)) : (val = (val & (~mask)));
-		mask = mask>>1;
+	for (wbit = 0; wbit < 15; wbit++) {
+		if (reg1->ler1_ear & 0x01)
+			val |= mask;
+		else
+			val &= ~mask;
+		mask = mask >> 1;
 		CDELAY;
 	}
-	(reg1->ler1_ear & 0x01) ? (val = (val | 0x8000)) : (val = (val & 0x7FFF));
+	if (reg1->ler1_ear & 0x01)
+		val |= 0x8000;
+	else
+		val &= 0x7fff;
 	CDELAY;
 	DISABLE_NVRAM;
 	return (val);
@@ -129,11 +136,11 @@ void
 vleetheraddr(sc)
 	struct am7990_softc *sc;
 {
-	u_char * cp = sc->sc_arpcom.ac_enaddr;
+	u_char *cp = sc->sc_arpcom.ac_enaddr;
 	u_int16_t ival[3];
-	u_char i;
+	int i;
 
-	for (i=0; i<3; i++) {
+	for (i = 0; i < 3; i++) {
 		ival[i] = nvram_read(sc, i);
 	}
 	memcpy(cp, &ival[0], 6);
@@ -144,7 +151,7 @@ vlewrcsr(sc, port, val)
 	struct am7990_softc *sc;
 	u_int16_t port, val;
 {
-	register struct vlereg1 *ler1 = (struct vlereg1 *)((struct le_softc *)sc)->sc_r1;
+	struct vlereg1 *ler1 = (struct vlereg1 *)((struct le_softc *)sc)->sc_r1;
 
 	ler1->ler1_rap = port;
 	ler1->ler1_rdp = val;
@@ -155,7 +162,7 @@ vlerdcsr(sc, port)
 	struct am7990_softc *sc;
 	u_int16_t port;
 {
-	register struct vlereg1 *ler1 = (struct vlereg1 *)((struct le_softc *)sc)->sc_r1;
+	struct vlereg1 *ler1 = (struct vlereg1 *)((struct le_softc *)sc)->sc_r1;
 	u_int16_t val;
 
 	ler1->ler1_rap = port;
@@ -168,11 +175,12 @@ void
 vleinit(sc)
 	struct am7990_softc *sc;
 {
-	register struct vlereg1 *reg1 = (struct vlereg1 *)((struct le_softc *)sc)->sc_r1;
+	struct vlereg1 *reg1 = (struct vlereg1 *)((struct le_softc *)sc)->sc_r1;
 	u_char vec = ((struct le_softc *)sc)->sc_vec;
 	u_char ipl = ((struct le_softc *)sc)->sc_ipl;
-	((struct le_softc *)sc)->csr = 0x4f;
-	WRITE_CSR_AND( ~ipl );
+
+	((struct le_softc *)sc)->sc_csr = 0x4f;
+	WRITE_CSR_AND(ipl);
 	SET_VEC(vec);
 	return;
 }
@@ -182,7 +190,8 @@ void
 vlereset(sc)
 	struct am7990_softc *sc;
 {
-	register struct vlereg1 *reg1 = (struct vlereg1 *)((struct le_softc *)sc)->sc_r1;
+	struct vlereg1 *reg1 = (struct vlereg1 *)((struct le_softc *)sc)->sc_r1;
+
 	RESET_HW;
 #ifdef LEDEBUG
 	if (sc->sc_debug) {
@@ -190,14 +199,14 @@ vlereset(sc)
 	}
 #endif
 	SYSFAIL_CL;
-	return;
 }
 
 int
 vle_intr(sc)
 	void *sc;
 {
-	register struct vlereg1 *reg1 = (struct vlereg1 *)((struct le_softc *)sc)->sc_r1;
+	struct le_softc *lesc = (struct le_softc *)sc;
+	struct vlereg1 *reg1 = (struct vlereg1 *)lesc->sc_r1;
 	int rc;
 
 	rc = am7990_intr(sc);
@@ -213,7 +222,6 @@ vle_copytobuf_contig(sc, from, boff, len)
 {
 	volatile caddr_t buf = sc->sc_mem;
 
-	dma_cachectl((vaddr_t)buf + boff, len, DMA_CACHE_SYNC);
 	d16_bcopy(from, buf + boff, len);
 }
 
@@ -225,7 +233,6 @@ vle_copyfrombuf_contig(sc, to, boff, len)
 {
 	volatile caddr_t buf = sc->sc_mem;
 
-	dma_cachectl((vaddr_t)buf + boff, len, DMA_CACHE_SYNC_INVAL);
 	d16_bcopy(buf + boff, to, len);
 }
 
@@ -236,7 +243,6 @@ vle_zerobuf_contig(sc, boff, len)
 {
 	volatile caddr_t buf = sc->sc_mem;
 
-	dma_cachectl((vaddr_t)buf + boff, len, DMA_CACHE_SYNC);
 	d16_bzero(buf + boff, len);
 }
 
@@ -246,8 +252,16 @@ lematch(parent, vcf, args)
 	void *vcf, *args;
 {
 	struct confargs *ca = args;
+	bus_space_tag_t iot = ca->ca_iot;
+	bus_space_handle_t ioh;
+	int rc;
 
-	return (!badvaddr((vaddr_t)ca->ca_vaddr, 2));
+	if (bus_space_map(iot, ca->ca_paddr, PAGE_SIZE, 0, &ioh) != 0)
+		return 0;
+	rc = badvaddr((vaddr_t)bus_space_vaddr(iot, ioh), 2);
+	bus_space_unmap(iot, ioh, PAGE_SIZE);
+
+	return rc == 0;
 }
 
 /*
@@ -261,11 +275,20 @@ leattach(parent, self, aux)
 	struct device *self;
 	void *aux;
 {
-	register struct le_softc *lesc = (struct le_softc *)self;
+	struct le_softc *lesc = (struct le_softc *)self;
 	struct am7990_softc *sc = &lesc->sc_am7990;
 	struct confargs *ca = aux;
-	caddr_t addr;
+	paddr_t paddr;
 	int card;
+	bus_space_tag_t iot = ca->ca_iot;
+	bus_space_handle_t ioh, memh;
+
+	if (ca->ca_vec < 0) {
+		printf(": no more interrupts!\n");
+		return;
+	}
+	if (ca->ca_ipl < 0)
+		ca->ca_ipl = IPL_NET;
 
 	/* Are we the boot device? */
 	if (ca->ca_paddr == bootaddr)
@@ -278,7 +301,7 @@ leattach(parent, self, aux)
 	 * at any other address.
 	 * XXX These physical addresses should be mapped in extio!!!
 	 */
-	switch ((int)ca->ca_paddr) {
+	switch (ca->ca_paddr) {
 	case 0xffff1200:
 		card = 0;
 		break;
@@ -302,24 +325,24 @@ leattach(parent, self, aux)
 		return;
 	}
 
-	addr = (caddr_t)(VLEMEMBASE - (card * VLEMEMSIZE));
-
-	sc->sc_mem = (void *)mapiodev(addr, VLEMEMSIZE);
-	if (sc->sc_mem == NULL) {
-		printf("\n%s: no more memory in external I/O map\n",
-		    sc->sc_dev.dv_xname);
-		return;
-	}
-	sc->sc_addr = kvtop((vaddr_t)sc->sc_mem);
-	if (sc->sc_addr == 0L) {
-		printf("\n%s: kvtop() failed!\n", sc->sc_dev.dv_xname);
+	if (bus_space_map(iot, ca->ca_paddr, PAGE_SIZE, 0, &ioh) != 0) {
+		printf(": can't map registers!\n");
 		return;
 	}
 
-	lesc->sc_r1 = (void *)ca->ca_vaddr;
+	paddr = VLEMEMBASE - (card * VLEMEMSIZE);
+	if (bus_space_map(iot, paddr, VLEMEMSIZE, 0, &memh) != 0) {
+		printf(": can't map buffers!\n");
+		bus_space_unmap(iot, ioh, PAGE_SIZE);
+		return;
+	}
+	lesc->sc_r1 = (void *)bus_space_vaddr(iot, ioh);
 	lesc->sc_ipl = ca->ca_ipl;
 	lesc->sc_vec = ca->ca_vec;
+
+	sc->sc_mem = (void *)bus_space_vaddr(iot, memh);
 	sc->sc_memsize = VLEMEMSIZE;
+	sc->sc_addr = paddr & 0x00ffffff;
 	sc->sc_conf3 = LE_C3_BSWP;
 	sc->sc_hwreset = vlereset;
 	sc->sc_rdcsr = vlerdcsr;
@@ -330,17 +353,16 @@ leattach(parent, self, aux)
 	sc->sc_copytobuf = vle_copytobuf_contig;
 	sc->sc_copyfrombuf = vle_copyfrombuf_contig;
 	sc->sc_zerobuf = vle_zerobuf_contig;
-	/* get ether address */
-	vleetheraddr(sc);
 
-	evcnt_attach(&sc->sc_dev, "intr", &lesc->sc_intrcnt);
-	evcnt_attach(&sc->sc_dev, "errs", &lesc->sc_errcnt);
+	/* get Ethernet address */
+	vleetheraddr(sc);
 
 	am7990_config(sc);
 
 	/* connect the interrupt */
 	lesc->sc_ih.ih_fn = vle_intr;
 	lesc->sc_ih.ih_arg = sc;
+	lesc->sc_ih.ih_wantframe = 0;
 	lesc->sc_ih.ih_ipl = ca->ca_ipl;
-	vmeintr_establish(ca->ca_vec + 0, &lesc->sc_ih);
+	vmeintr_establish(ca->ca_vec, &lesc->sc_ih, self->dv_xname);
 }

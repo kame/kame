@@ -1,4 +1,4 @@
-/*      $OpenBSD: isp_openbsd.h,v 1.24 2003/03/30 16:57:42 krw Exp $ */
+/*      $OpenBSD: isp_openbsd.h,v 1.26 2004/08/02 19:55:45 art Exp $ */
 /*
  * OpenBSD Specific definitions for the Qlogic ISP Host Adapter
  */
@@ -110,7 +110,10 @@ struct isposinfo {
  * Required Macros/Defines
  */
 
-#define	INLINE			inline
+#define	INLINE			__inline
+
+/* We don't want expensive inline functions. */
+#define EXP_INLINE
 
 #define	ISP2100_SCRLEN		0x800
 
@@ -125,10 +128,10 @@ struct isposinfo {
 	if (!MUST_POLL(isp))		\
 		ISP_LOCK(isp)
 
-#define	NANOTIME_T		struct timeval
-#define	GET_NANOTIME		microtime
-#define	GET_NANOSEC(x)		(((x)->tv_sec * 1000000 + (x)->tv_usec) * 1000)
-#define	NANOTIME_SUB		isp_microtime_sub
+#define	NANOTIME_T		struct timespec
+#define	GET_NANOTIME		nanotime
+#define	GET_NANOSEC(x)		(((x)->tv_sec * 1000000000 + (x)->tv_nsec))
+#define	NANOTIME_SUB		isp_nanotime_sub
 
 #define	MAXISPREQUEST(isp)	256
 
@@ -307,7 +310,7 @@ void isp_uninit(struct ispsoftc *);
 static INLINE void isp_lock(struct ispsoftc *);
 static INLINE void isp_unlock(struct ispsoftc *);
 static INLINE u_int64_t
-isp_microtime_sub(struct timeval *, struct timeval *);
+isp_nanotime_sub(struct timespec *, struct timespec *);
 static void isp_wait_complete(struct ispsoftc *);
 
 /*
@@ -365,11 +368,11 @@ isp_unlock(struct ispsoftc *isp)
 }
 
 static INLINE u_int64_t
-isp_microtime_sub(struct timeval *b, struct timeval *a)
+isp_nanotime_sub(struct timespec *b, struct timespec *a)
 {
-	struct timeval x;
+	struct timespec x;
 	u_int64_t elapsed;
-	timersub(b, a, &x);
+	timespecsub(b, a, &x);
 	elapsed = GET_NANOSEC(&x);
 	if (elapsed == 0)
 		elapsed++;

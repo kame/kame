@@ -1,4 +1,4 @@
-#	$OpenBSD: RAMDISK_CD,v 1.68 2004/03/10 01:23:25 deraadt Exp $
+#	$OpenBSD: RAMDISK_CD,v 1.79 2004/08/27 22:03:02 drahn Exp $
 
 machine		i386		# architecture, used by config; REQUIRED
 
@@ -10,6 +10,9 @@ option		I486_CPU
 option		I586_CPU
 option		I686_CPU
 option		GPL_MATH_EMULATE	# floating point emulation
+
+option		SMALL_KERNEL
+option		NO_PROPOLICE
 
 #option		DUMMY_NOPS	# speed hack; recommended
 
@@ -40,13 +43,16 @@ config		bsd	root on rd0a swap on rd0b and wd0b and sd0b
 
 mainbus0 at root
 
-bios0	at mainbus0
+cpu0	at mainbus? apid ?
+bios0	at mainbus0 apid ?
 apm0	at bios0 flags 0x0000	# flags 0x0101 to force protocol version 1.1
 #option	APMDEBUG
 pcibios0 at bios0 flags 0x0000
 
 isa0	at mainbus0
 isa0	at pcib?
+isa0	at ichpcib?
+isa0	at gscpcib?
 eisa0	at mainbus0
 pci*	at mainbus0
 
@@ -58,6 +64,8 @@ ppb*	at pci? dev ? function ?	# PCI-PCI bridges
 pci*	at ppb? bus ?
 pci*	at pchb? bus ?
 pcib*	at pci? dev ? function ?	# PCI-ISA bridge
+ichpcib* at pci? dev ? function ?	# Intel ICHx/ICHx-M LPC bridges
+gscpcib* at pci? dev ? function ?	# NS Geode SC1100 PCI-ISA bridge
 
 # CardBus bus support
 cardbus*	at cardslot?
@@ -77,10 +85,12 @@ pcic*	at pci? dev? function ?
 pcmcia*	at pcic? controller ? socket ?
 
 # PCI USB Controllers
+ehci*	at pci?				# Enhanced Host Controller
 uhci*	at pci?				# Universal Host Controller (Intel)
 ohci*	at pci?				# Open Host Controller
 
 # USB bus support
+usb*	at ehci?
 usb*	at uhci?
 usb*	at ohci?
 
@@ -102,11 +112,16 @@ umass*	at uhub? port ? configuration ? # USB Mass Storage devices
 scsibus* at umass?
 #ums*	at uhidev? reportid ?
 #wsmouse* at ums? mux 0
-#aue*	at uhub? port ?			# ADMtek AN986 Pegasus Ethernet
-#cue*	at uhub? port ?			# CATC USB-EL1201A based Ethernet
-#kue*	at uhub? port ?			# Kawasaki KL5KUSB101B based Ethernet
-#upl*	at uhub? port ?			# Prolific PL2301/PL2302 host-to-host `network'
-#urio*	at uhub? port ?			# Diamond Multimedia Rio 500
+aue*	at uhub? port ?			# ADMtek AN986 Pegasus Ethernet
+axe*	at uhub? port ?			# ASIX Electronics AX88172 USB Ethernet
+cue*	at uhub? port ?			# CATC USB-EL1201A based Ethernet
+kue*	at uhub? port ?			# Kawasaki KL5KUSB101B based Ethernet
+upl*	at uhub? port ?			# Prolific PL2301/PL2302 host-to-host `network'
+urio*	at uhub? port ?			# Diamond Multimedia Rio 500
+cdce*	at uhub? port ?			# CDC Ethernet
+upl*	at uhub? port ?			# Prolific PL2301/PL2302 host-to-host `network'
+url*	at uhub? port ?			# Realtek RTL8150L based adapters
+wi*	at uhub? port ?			# WaveLAN IEEE 802.11DS
 #uscanner* at uhub? port ?		# USB Scanners
 #usscanner* at uhub? port ?		# USB SCSI scanners, e.g., HP5300
 #scsibus* at usscanner?
@@ -163,8 +178,10 @@ ahb*	at eisa? slot ?			# Adaptec 174[024] SCSI controllers
 scsibus* at ahb?
 ahc0	at isa? port ? irq ?		# Adaptec 284x SCSI controllers
 ahc*	at eisa? slot ?			# Adaptec 274x, aic7770 SCSI controllers
-ahc*	at pci? dev ? function ?	# Adaptec 2940 SCSI controllers
+ahc*	at pci? dev ? function ?	# Adaptec 2940/3940/78?? SCSI controllers
 scsibus* at ahc?
+ahd*	at pci? dev ? function ?	# Adaptec 79?? SCSI controllers
+scsibus* at ahd?
 mpt*	at pci? dev ? function ?	# LSI Fusion-MPT SCSI/Fibre
 scsibus* at mpt?
 dpt*	at pci? dev ? function ?        # DPT SmartCache/SmartRAID PCI
@@ -297,6 +314,8 @@ sk*	at skc?					#  each port of above
 em*	at pci? dev ? function ?		# Intel Pro/1000 ethernet
 txp*	at pci? dev ? function ?		# 3com 3CR990
 nge*	at pci? dev ? function ?		# NS DP83820/DP83821 GigE
+re*	at pci? dev ? function ?		# Realtek 8169/8169S/8110S
+stge*	at pci? dev ? function ?		# Sundance TC9021 GigE
 bge*	at pci? dev ? function ?		# Broadcom BCM570x (aka Tigon3)
 #lge*	at pci? dev ? function ?		# Level1 LXT1001 GigE
 mtd*	at pci? dev ? function ?		# Myson MTD803
@@ -330,6 +349,7 @@ brgphy*	at mii? phy ?				# Broadcom Gigabit PHYs
 eephy* at mii? phy ?				# Marvell 88E1000 series PHY
 xmphy*	at mii? phy ?				# XaQti XMAC-II PHYs
 bmtphy* at mii? phy ?				# Broadcom 10/100 PHYs
+rgephy*	at mii? phy ?				# Realtek 8169S/8110S PHY
 ukphy*	at mii? phy ?				# "unknown" PHYs
 
 pseudo-device	loop	1		# network loopback
@@ -338,3 +358,4 @@ pseudo-device	loop	1		# network loopback
 pseudo-device	bpfilter 1		# packet filter
 pseudo-device	rd	1		# ramdisk
 pseudo-device	ccd	4		# concatenated disk devices
+pseudo-device	wsmux	2

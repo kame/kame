@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.h,v 1.21 2004/01/23 17:26:05 miod Exp $	*/
+/*	$OpenBSD: locore.h,v 1.24 2004/08/01 17:18:05 miod Exp $	*/
 
 #ifndef _MACHINE_LOCORE_H_
 #define _MACHINE_LOCORE_H_
@@ -9,26 +9,7 @@
  * C prototypes for various routines defined in locore_* and friends
  */
 
-/* locore_asm_routines.S */
-
-unsigned int do_load_word(vaddr_t address,
-    boolean_t supervisor_mode);
-unsigned int do_load_half(vaddr_t address,
-    boolean_t supervisor_mode);
-unsigned int do_load_byte(vaddr_t address,
-    boolean_t supervisor_mode);
-
-void do_store_word(vaddr_t address, unsigned int data,
-    boolean_t supervisor_mode);
-void do_store_half(vaddr_t address, unsigned int data,
-    boolean_t supervisor_mode);
-void do_store_byte(vaddr_t address, unsigned int data,
-    boolean_t supervisor_mode);
-
-unsigned do_xmem_word(vaddr_t address, unsigned int data,
-    boolean_t supervisor_mode);
-unsigned do_xmem_byte(vaddr_t address, unsigned int data,
-    boolean_t supervisor_mode);
+/* subr.S */
 
 unsigned read_processor_identification_register(void);
 int badaddr(vaddr_t addr, int size);
@@ -41,9 +22,6 @@ int guarded_access(unsigned char *volatile address,
 
 /* locore_c_routines.c */
 
-void dae_print(unsigned *eframe);
-void data_access_emulation(unsigned *eframe);
-
 unsigned getipl(void);
 
 /* machdep.c */
@@ -52,12 +30,10 @@ void _doboot(void);
 vaddr_t get_slave_stack(void);
 void slave_pre_main(void);
 int slave_main(void);
-int intr_findvec(int start, int end);
+int intr_findvec(int, int, int);
 void bugsyscall(void);
 void myetheraddr(u_char *cp);
 void dosoftint(void);
-void MY_info(struct trapframe *f, caddr_t p, int flags, char *s);
-void MY_info_done(struct trapframe *f, int flags);
 void mvme_bootstrap(void);
 void m187_ext_int(u_int v, struct trapframe *eframe);
 void m188_reset(void);

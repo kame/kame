@@ -1,7 +1,7 @@
-/*	$OpenBSD: cpu.h,v 1.39 2003/10/15 18:54:55 mickey Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.44 2004/06/30 18:18:54 mickey Exp $	*/
 
 /*
- * Copyright (c) 2000-2002 Michael Shalayeff
+ * Copyright (c) 2000-2004 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -70,7 +65,7 @@
 #ifndef _LOCORE
 /* types */
 enum hppa_cpu_type {
-	hpcx, hpcxs, hpcxt, hpcxta, hpcxl, hpcxl2, hpcxu, hpcxu2, hpcxw
+	hpcxs, hpcxt, hpcxta, hpcxl, hpcxl2, hpcxu, hpcxu2, hpcxw
 };
 extern enum hppa_cpu_type cpu_type;
 extern const char *cpu_typename;
@@ -83,7 +78,8 @@ extern int cpu_hvers;
 #define	HPPA_FPUS	0xc0
 #define	HPPA_FPUVER(w)	(((w) & 0x003ff800) >> 11)
 #define	HPPA_FPU_OP(w)	((w) >> 26)
-#define	HPPA_FPU_UNMPL	0x9
+#define	HPPA_FPU_UNMPL	0x01	/* exception reg, the rest is << 1 */
+#define	HPPA_FPU_ILL	0x80	/* software-only */
 #define	HPPA_FPU_I	0x01
 #define	HPPA_FPU_U	0x02
 #define	HPPA_FPU_O	0x04
@@ -128,7 +124,7 @@ extern int cpu_hvers;
 #define	CLKF_SYSCALL(framep)	((framep)->tf_flags & TFF_SYS)
 
 #define	signotify(p)		(setsoftast())
-#define	need_resched()		(want_resched = 1, setsoftast())
+#define	need_resched(ci)	(want_resched = 1, setsoftast())
 #define	need_proftick(p)	((p)->p_flag |= P_OWEUPC, setsoftast())
 
 #ifndef _LOCORE
@@ -168,11 +164,13 @@ int	cpu_dump(void);
  * CTL_MACHDEP definitions.
  */
 #define	CPU_CONSDEV		1	/* dev_t: console terminal device */
-#define	CPU_MAXID		2	/* number of valid machdep ids */
+#define	CPU_FPU			2	/* int: fpu present/enabled */
+#define	CPU_MAXID		3	/* number of valid machdep ids */
 
 #define CTL_MACHDEP_NAMES { \
 	{ 0, 0 }, \
 	{ "console_device", CTLTYPE_STRUCT }, \
+	{ "fpu", CTLTYPE_INT }, \
 }
 #endif
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: process_machdep.c,v 1.15 2004/02/05 01:06:33 deraadt Exp $	*/
+/*	$OpenBSD: process_machdep.c,v 1.19 2004/07/20 21:04:37 kettenis Exp $	*/
 /*	$NetBSD: process_machdep.c,v 1.22 1996/05/03 19:42:25 christos Exp $	*/
 
 /*
@@ -76,6 +76,8 @@
 #ifdef VM86
 #include <machine/vm86.h>
 #endif
+
+#include "npx.h"
 
 static __inline struct trapframe *process_frame(struct proc *);
 static __inline union savefpu *process_fpframe(struct proc *);
@@ -168,7 +170,6 @@ process_read_regs(p, regs)
 	struct reg *regs;
 {
 	struct trapframe *tf = process_frame(p);
-	struct pcb *pcb = &p->p_addr->u_pcb;
 
 #ifdef VM86
 	if (tf->tf_eflags & PSL_VM) {
@@ -180,8 +181,8 @@ process_read_regs(p, regs)
 	} else
 #endif
 	{
-		regs->r_gs = pcb->pcb_gs & 0xffff;
-		regs->r_fs = pcb->pcb_fs & 0xffff;
+		regs->r_gs = tf->tf_gs & 0xffff;
+		regs->r_fs = tf->tf_fs & 0xffff;
 		regs->r_es = tf->tf_es & 0xffff;
 		regs->r_ds = tf->tf_ds & 0xffff;
 		regs->r_eflags = tf->tf_eflags;
@@ -206,25 +207,47 @@ process_read_fpregs(p, regs)
 	struct proc *p;
 	struct fpreg *regs;
 {
+	union savefpu *frame = process_fpframe(p);
 
 	if (p->p_md.md_flags & MDP_USEDFPU) {
-		union savefpu *frame = process_fpframe(p);
-
 #if NNPX > 0
-		if (npxproc == p)
-			npxsave();
+		npxsave_proc(p, 1);
 #endif
-
+	} else {
+		/*
+		 * Fake a FNINIT.
+		 * The initial control word was already set by setregs(), so
+		 * save it temporarily.
+		 */
 		if (i386_use_fxsave) {
-			struct save87 s87;
+			uint32_t mxcsr = frame->sv_xmm.sv_env.en_mxcsr;
+			uint16_t cw = frame->sv_xmm.sv_env.en_cw;
 
-			/* XXX Yuck */
-			process_xmm_to_s87(&frame->sv_xmm, &s87);
-			memcpy(regs, &s87, sizeof(*regs));
- 		} else
-			bcopy(frame, regs, sizeof(*regs));
+			/* XXX Don't zero XMM regs? */
+			memset(&frame->sv_xmm, 0, sizeof(frame->sv_xmm));
+			frame->sv_xmm.sv_env.en_cw = cw;
+			frame->sv_xmm.sv_env.en_mxcsr = mxcsr;
+			frame->sv_xmm.sv_env.en_sw = 0x0000;
+			frame->sv_xmm.sv_env.en_tw = 0x00;
+		} else {
+			uint16_t cw = frame->sv_87.sv_env.en_cw;
+
+			memset(&frame->sv_87, 0, sizeof(frame->sv_87));
+			frame->sv_87.sv_env.en_cw = cw;
+			frame->sv_87.sv_env.en_sw = 0x0000;
+			frame->sv_87.sv_env.en_tw = 0xffff;
+		}
+		p->p_md.md_flags |= MDP_USEDFPU;
+	}
+
+	if (i386_use_fxsave) {
+		struct save87 s87;
+
+		/* XXX Yuck */
+		process_xmm_to_s87(&frame->sv_xmm, &s87);
+		memcpy(regs, &s87, sizeof(*regs));
 	} else
-		bzero(regs, sizeof(*regs));
+		memcpy(regs, &frame->sv_87, sizeof(*regs));
 
 	return (0);
 }
@@ -237,7 +260,6 @@ process_write_regs(p, regs)
 	struct reg *regs;
 {
 	struct trapframe *tf = process_frame(p);
-	struct pcb *pcb = &p->p_addr->u_pcb;
 
 #ifdef VM86
 	if (tf->tf_eflags & PSL_VM) {
@@ -249,22 +271,6 @@ process_write_regs(p, regs)
 	} else
 #endif
 	{
-		extern int gdt_size;
-		extern union descriptor *dynamic_gdt;
-
-#define	verr_ldt(slot)	(slot < pcb->pcb_ldt_len && \
-			 (pcb->pcb_ldt[slot].sd.sd_type & SDT_MEMRO) != 0 && \
-			 pcb->pcb_ldt[slot].sd.sd_dpl == SEL_UPL && \
-			 pcb->pcb_ldt[slot].sd.sd_p == 1)
-#define	verr_gdt(slot)	(slot < gdt_size && \
-			 (dynamic_gdt[slot].sd.sd_type & SDT_MEMRO) != 0 && \
-			 dynamic_gdt[slot].sd.sd_dpl == SEL_UPL && \
-			 dynamic_gdt[slot].sd.sd_p == 1)
-#define	verr(sel)	(ISLDT(sel) ? verr_ldt(IDXSEL(sel)) : \
-				      verr_gdt(IDXSEL(sel)))
-#define	valid_sel(sel)	(ISPL(sel) == SEL_UPL && verr(sel))
-#define	null_sel(sel)	(!ISLDT(sel) && IDXSEL(sel) == 0)
-
 		/*
 		 * Check for security violations.
 		 */
@@ -272,14 +278,8 @@ process_write_regs(p, regs)
 		    !USERMODE(regs->r_cs, regs->r_eflags))
 			return (EINVAL);
 
-		if ((regs->r_gs != pcb->pcb_gs && \
-		     !valid_sel(regs->r_gs) && !null_sel(regs->r_gs)) ||
-		    (regs->r_fs != pcb->pcb_fs && \
-		     !valid_sel(regs->r_fs) && !null_sel(regs->r_fs)))
-			return (EINVAL);
-
-		pcb->pcb_gs = regs->r_gs & 0xffff;
-		pcb->pcb_fs = regs->r_fs & 0xffff;
+		tf->tf_gs = regs->r_gs & 0xffff;
+		tf->tf_fs = regs->r_fs & 0xffff;
 		tf->tf_es = regs->r_es & 0xffff;
 		tf->tf_ds = regs->r_ds & 0xffff;
 		tf->tf_eflags = regs->r_eflags;
@@ -308,8 +308,7 @@ process_write_fpregs(p, regs)
 
 	if (p->p_md.md_flags & MDP_USEDFPU) {
 #if NNPX > 0
-		if (npxproc == p)
-			npxdrop();
+		npxsave_proc(p, 0);
 #endif
 	} else
 		p->p_md.md_flags |= MDP_USEDFPU;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.28 2003/06/02 23:27:49 millert Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.30 2004/06/13 21:49:17 niklas Exp $	*/
 /*	$NetBSD: cpu.h,v 1.45 1997/02/10 22:13:40 scottr Exp $	*/
 
 /*
@@ -106,7 +106,7 @@ struct clockframe {
  * or after the current trap/syscall if in system mode.
  */
 extern int want_resched;	/* resched() was called */
-#define	need_resched()	{ want_resched++; aston(); }
+#define	need_resched(ci)	{ want_resched++; aston(); }
 
 /*
  * Give a profiling tick to the current process from the softclock
@@ -322,6 +322,9 @@ int	suline(caddr_t, caddr_t);
 void	savectx(struct pcb *);
 void	proc_trampoline(void);
 void	loadustp(int);
+
+/* sys_machdep.c */
+int	cachectl(struct proc *, int, vaddr_t, int);
 
 /* vm_machdep.c */
 void	physaccess(caddr_t, caddr_t, register int, register int);

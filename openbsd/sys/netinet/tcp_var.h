@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_var.h,v 1.61 2004/03/02 12:51:12 markus Exp $	*/
+/*	$OpenBSD: tcp_var.h,v 1.65 2004/07/15 15:27:22 markus Exp $	*/
 /*	$NetBSD: tcp_var.h,v 1.17 1996/02/13 23:44:24 christos Exp $	*/
 
 /*
@@ -397,6 +397,7 @@ struct	tcpstat {
 	u_int32_t tcps_rcvwinprobe;	/* rcvd window probe packets */
 	u_int32_t tcps_rcvdupack;	/* rcvd duplicate acks */
 	u_int32_t tcps_rcvacktoomuch;	/* rcvd acks for unsent data */
+	u_int32_t tcps_rcvacktooold;	/* rcvd acks for old data */
 	u_int32_t tcps_rcvackpack;	/* rcvd ack packets */
 	u_int64_t tcps_rcvackbyte;	/* bytes acked by rcvd acks */
 	u_int32_t tcps_rcvwinupd;	/* rcvd window update packets */
@@ -464,7 +465,8 @@ struct	tcpstat {
 #define	TCPCTL_SYN_BUCKET_LIMIT	16 /* max size of hash bucket */
 #define	TCPCTL_RFC3390	       17 /* enable/disable RFC3390 increased cwnd */
 #define	TCPCTL_REASS_LIMIT     18 /* max entries for tcp reass queues */
-#define	TCPCTL_MAXID	       19
+#define	TCPCTL_DROP	       19 /* drop tcp connection */
+#define	TCPCTL_MAXID	       20
 
 #define	TCPCTL_NAMES { \
 	{ 0, 0 }, \
@@ -486,6 +488,7 @@ struct	tcpstat {
 	{ "synbucketlimit", 	CTLTYPE_INT }, \
 	{ "rfc3390", 	CTLTYPE_INT }, \
 	{ "reasslimit", 	CTLTYPE_INT }, \
+	{ "drop", 	CTLTYPE_STRUCT }, \
 }
 
 #define	TCPCTL_VARS { \
@@ -507,6 +510,7 @@ struct	tcpstat {
 	&tcp_syn_cache_limit, \
 	&tcp_syn_bucket_limit, \
 	&tcp_do_rfc3390, \
+	NULL, \
 	NULL \
 }
 
@@ -583,7 +587,7 @@ void	 tcp_setpersist(struct tcpcb *);
 void	 tcp_slowtimo(void);
 struct mbuf *
 	 tcp_template(struct tcpcb *);
-void	 tcp_trace(int, int, struct tcpcb *, caddr_t, int, int);
+void	 tcp_trace(short, short, struct tcpcb *, caddr_t, int, int);
 struct tcpcb *
 	 tcp_usrclosed(struct tcpcb *);
 int	 tcp_sysctl(int *, u_int, void *, size_t *, void *, size_t);
@@ -614,6 +618,8 @@ u_long	 tcp_seq_subtract(u_long, u_long );
 #endif /* TCP_SACK */
 #ifdef TCP_SIGNATURE
 int	tcp_signature_apply(caddr_t, caddr_t, unsigned int);
+int	tcp_signature(struct tdb *, int, struct mbuf *, struct tcphdr *,
+	    int, int, char *);
 #endif /* TCP_SIGNATURE */
 void	tcp_rndiss_init(void);
 tcp_seq	tcp_rndiss_next(void);

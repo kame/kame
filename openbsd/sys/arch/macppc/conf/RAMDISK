@@ -1,4 +1,4 @@
-#	$OpenBSD: RAMDISK,v 1.28 2004/03/30 19:34:31 deraadt Exp $
+#	$OpenBSD: RAMDISK,v 1.33 2004/08/25 13:03:27 drahn Exp $
 #
 # PPC GENERIC config file
 #
@@ -64,6 +64,7 @@ dc*		at pci? dev ? function ?	# DEC Tulip 21143 clones
 xl*		at pci? dev ? function ?	# 3C9xx ethernet
 em*		at pci? dev ? function ?	# Intel Pro/1000 ethernet
 ti*		at pci? dev ? function ?	# Alteon Tigon 1Gb ethernet
+re*		at pci? dev ? function ?	# Realtek 8169/8169S/8110S
 an*		at pci? dev ? function ?	# Cisco/Aironet 802.11DS
 wi*		at pci? dev ? function ?	# WaveLAN IEEE 802.11DS
 
@@ -84,6 +85,7 @@ sqphy*		at mii? phy ?		# Seeq 80220/80221/80223 PHYs
 brgphy*		at mii? phy ?		# Broadcom 10/100/1000 PHYs 
 bmtphy*		at mii? phy ?		# Broadcom 10/100 PHYs 
 eephy*		at mii? phy ?			# Marvell 88E1000 Gigabit PHYs
+rgephy*		at mii? phy ?			# Realtek 8169S/8110S PHY
 ukphy*		at mii? phy ?		# generic unknown PHYs
 
 macintr0	at macobio?		# old interrupt controller
@@ -115,6 +117,8 @@ scsibus*	at ahc?
 #scsibus*	at mesh?
 #scsibus*	at pcscp?
 
+mediabay*	at macobio?
+wdc*		at mediabay?
 wdc*		at macobio?
 wd*		at wdc? drive ? flags 0x0000
 wd*		at pciide? channel ? drive ?
@@ -124,9 +128,11 @@ scsibus*	at atapiscsi?
 
 # PCI USB Controllers
 ohci*		at pci?			# Open Host Controller
+ehci*		at pci?	disable		# Enhanced Host Controller
 
 # USB bus support
 usb*		at ohci?	flags 0x1
+usb*		at ehci?
 uhub*		at usb?
 uhub*		at uhub? port ? configuration ? interface ?
 
@@ -136,6 +142,14 @@ ukbd*		at uhidev? reportid ?		# USB HID Keyboard devices
 #ums*		at uhub? port ? configuration ?	# USB Mice
 #wsmouse*	at ums? mux 0
 #ulpt*		at uhub? port ? configuration ?	# USB Printer
+aue*		at uhub? port ?			# ADMtek AN986 Pegasus Ethernet
+axe*		at uhub? port ?			# ASIX Electronics AX88172 USB Ethernet
+cue*		at uhub? port ?			# CATC USB-EL1201A based Ethernet
+kue*		at uhub? port ?			# Kawasaki KL5KUSB101B based Ethernet
+cdce*		at uhub? port ?			# CDC Ethernet
+upl*		at uhub? port ?			# Prolific PL2301/PL2302 host-to-host
+url*		at uhub? port ?			# Realtek RTL8150L based adapters
+wi*		at uhub? port ?			# WaveLAN IEEE 802.11DS
 #uscanner*	at uhub? port ?			# USB Scanner driver
 #usscanner*	at uhub? port ?			# USB SCSI scanners
 #scsibus*	at usscanner?
@@ -143,8 +157,6 @@ ukbd*		at uhidev? reportid ?		# USB HID Keyboard devices
 #ugen*		at uhub? port ? configuration ? # USB Generic driver
 umass*		at uhub? port ? configuration ? # USB Mass Storage devices
 scsibus*	at umass?
-kue*		at uhub? port ?			# Kawasaki KL5KUSB101B
-aue*		at uhub? port ?			# USB EtherNet 
 
 # CardBus bus support
 cardbus*	at cardslot?

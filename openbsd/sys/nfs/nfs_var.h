@@ -1,4 +1,4 @@
-/*	$OpenBSD: nfs_var.h,v 1.21 2002/07/03 20:57:00 nate Exp $	*/
+/*	$OpenBSD: nfs_var.h,v 1.23 2004/08/03 17:11:48 marius Exp $	*/
 /*	$NetBSD: nfs_var.h,v 1.3 1996/02/18 11:53:54 fvdl Exp $	*/
 
 /*
@@ -257,6 +257,13 @@ int nfsrv_fhtovp(fhandle_t *, int, struct vnode **, struct ucred *,
 		      struct nfssvc_sock *, struct mbuf *, int *, int);
 int netaddr_match(int, union nethostaddr *, struct mbuf *);
 void nfs_clearcommit(struct mount *);
+int nfs_in_committed_range(struct vnode *, struct buf *);
+int nfs_in_tobecommitted_range(struct vnode *, struct buf *);
+void nfs_add_committed_range(struct vnode *, struct buf *);
+void nfs_del_committed_range(struct vnode *, struct buf *);
+void nfs_add_tobecommitted_range(struct vnode *, struct buf *);
+void nfs_del_tobecommitted_range(struct vnode *, struct buf *);
+void nfs_merge_commit_ranges(struct vnode *);
 int nfsrv_errmap(struct nfsrv_descript *, int);
 void nfsrvw_sort(gid_t *, int);
 void nfsrv_setcred(struct ucred *, struct ucred *);
@@ -277,3 +284,11 @@ int nfs_getnickauth(struct nfsmount *, struct ucred *, char **, int *,
 			 char *, int);
 int nfs_savenickauth(struct nfsmount *, struct ucred *, int, NFSKERBKEY_T,
 			  struct mbuf **, char **, struct mbuf *);
+
+/* nfs_kq.c */
+
+int  nfs_kqfilter(void *);
+void nfs_kqinit(void);
+
+#define VN_KNOTE(vp, b) \
+        KNOTE(&vp->v_selectinfo.vsi_selinfo.si_note, (b))

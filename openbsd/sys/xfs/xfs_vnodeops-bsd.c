@@ -51,6 +51,8 @@
 #include <vm/vnode_pager.h>
 #endif
 
+#include <sys/pool.h>
+
 RCSID("$arla: xfs_vnodeops-bsd.c,v 1.123 2003/02/15 16:40:36 lha Exp $");
 
 /*
@@ -353,7 +355,7 @@ cleanup_cnp (struct componentname *cnp, int error)
 #elif defined(PNBUF_PUT)
 	PNBUF_PUT(cnp->cn_pnbuf);
 #else
-	FREE (cnp->cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, cnp->cn_pnbuf);
 #endif
     }
 }
@@ -977,7 +979,7 @@ xfs_abortop (struct vop_abortop_args *ap)
 #elif defined(PNBUF_PUT)
 	PNBUF_PUT(cnp->cn_pnbuf);
 #else
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, cnp->cn_pnbuf);
 #endif
     return 0;
 }
@@ -1183,7 +1185,6 @@ xfs_print (struct vop_print_args *v)
 int
 xfs_advlock(struct vop_advlock_args *v)
 {
-#if 0
     struct vop_advlock_args /* {
 	struct vnode *a_vp;
 	caddr_t  a_id;
@@ -1191,30 +1192,12 @@ xfs_advlock(struct vop_advlock_args *v)
 	struct flock *a_fl;
 	int  a_flags;
     } */ *ap = v;
-
-    struct xfs_node *xn = VNODE_TO_XNODE(ap->a_vp);
-    int ret;
-    xfs_locktype_t locktype;
-
-/*     if (NNPFS_TOKEN_GOT(xn,  */
-
-    if (ap->a_fl.l_start != 0 ||
-	ap->a_fl.l_end != 0)
-	printf ("WARN: someone is trying byte-range locking\n");
-    
-    switch (ap->a_op) {
-    case F_SETLCK:
-	locktype = NNPFS_READLOCK;
-	break;
-
-    ret = xfs_advlock_common (xn, );
-
-    return ret;
-#elif defined(HAVE_KERNEL_LF_ADVLOCK) && !defined(__OpenBSD__) && !defined(__APPLE__)
+#if defined(HAVE_KERNEL_LF_ADVLOCK) && !defined(__APPLE__)
     struct xfs_node *xn = VNODE_TO_XNODE(ap->a_vp);
  
-    return lf_advlock(ap, &xn->lockf, xn->attr.va_size);
-  #else
+    return (lf_advlock(&xn->lockf, xn->attr.va_size, ap->a_id, ap->a_op,
+	    ap->a_fl, ap->a_flags));
+#else
      return EOPNOTSUPP;
 #endif
 }

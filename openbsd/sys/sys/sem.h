@@ -1,4 +1,4 @@
-/*	$OpenBSD: sem.h,v 1.14 2003/12/17 20:40:56 millert Exp $	*/
+/*	$OpenBSD: sem.h,v 1.18 2004/07/15 11:24:46 millert Exp $	*/
 /*	$NetBSD: sem.h,v 1.8 1996/02/09 18:25:29 christos Exp $	*/
 
 /*
@@ -65,8 +65,8 @@ struct semid_ds {
 };
 
 #ifdef _KERNEL
-struct osemid_ds {
-	struct oipc_perm sem_perm;	/* operation permission struct */
+struct semid_ds23 {
+	struct ipc_perm23 sem_perm;	/* operation permission struct */
 	struct sem	*sem_base;	/* pointer to first semaphore in set */
 	unsigned short	sem_nsems;	/* number of sems in set */
 	time_t		sem_otime;	/* last operation time */
@@ -76,6 +76,19 @@ struct osemid_ds {
 	    				/* 00:00:00 GMT, Jan. 1, 1970 */
 	long		sem_pad2;	/* SVABI/386 says I need this here */
 	long		sem_pad3[4];	/* SVABI/386 says I need this here */
+};
+
+struct semid_ds35 {
+	struct ipc_perm35 sem_perm;	/* operation permission struct */
+	struct sem	  *sem_base;	/* pointer to first semaphore in set */
+	unsigned short	  sem_nsems;	/* number of sems in set */
+	time_t		  sem_otime;	/* last operation time */
+	long		  sem_pad1;	/* SVABI/386 says I need this here */
+	time_t		  sem_ctime;	/* last change time */
+	    				/* Times measured in secs since */
+	    				/* 00:00:00 GMT, Jan. 1, 1970 */
+	long		  sem_pad2;	/* SVABI/386 says I need this here */
+	long		  sem_pad3[4];	/* SVABI/386 says I need this here */
 };
 #endif
 
@@ -195,17 +208,19 @@ extern struct	semid_ds **sema;	/* semaphore id list */
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
-int semctl(int, int, int, ...);
-int __semctl(int, int, int, union semun *);
-int semget(key_t, int, int);
-int semop(int, struct sembuf *, u_int);
-int semconfig(int);
+int	semctl(int, int, int, ...);
+int	__semctl(int, int, int, union semun *);
+int	semget(key_t, int, int);
+int	semop(int, struct sembuf *, size_t);
+int	semconfig(int);
 __END_DECLS
 #else
-void seminit(void);
-void semexit(struct proc *);
-void semid_n2o(struct semid_ds *, struct osemid_ds *);
-int sysctl_sysvsem(int *, u_int, void *, size_t *, void *, size_t);
+void	seminit(void);
+void	semexit(struct proc *);
+int	sysctl_sysvsem(int *, u_int, void *, size_t *, void *, size_t);
+int	semctl1(struct proc *, int, int, int, union semun *, register_t *,
+	    int (*)(const void *, void *, size_t),
+	    int (*)(const void *, void *, size_t));
 #endif /* !_KERNEL */
 
 #endif /* !_SEM_H_ */

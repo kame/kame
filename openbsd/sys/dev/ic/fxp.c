@@ -1,4 +1,4 @@
-/*	$OpenBSD: fxp.c,v 1.47.2.1 2004/05/14 21:28:43 brad Exp $	*/
+/*	$OpenBSD: fxp.c,v 1.56 2004/08/04 19:42:30 mickey Exp $	*/
 /*	$NetBSD: if_fxp.c,v 1.2 1997/06/05 02:01:55 thorpej Exp $	*/
 
 /*
@@ -73,7 +73,6 @@
 
 #if NBPFILTER > 0
 #include <net/bpf.h>
-#include <net/bpfdesc.h>
 #endif
 
 #include <sys/ioctl.h>
@@ -151,12 +150,16 @@ static u_char fxp_cb_config_template[] = {
 	0x05	/* 21 mc_all */
 };
 
+void fxp_eeprom_shiftin(struct fxp_softc *, int, int);
+void fxp_eeprom_putword(struct fxp_softc *, int, u_int16_t);
+void fxp_write_eeprom(struct fxp_softc *, u_short *, int, int);
 int fxp_mediachange(struct ifnet *);
 void fxp_mediastatus(struct ifnet *, struct ifmediareq *);
 void fxp_scb_wait(struct fxp_softc *);
 void fxp_start(struct ifnet *);
 int fxp_ioctl(struct ifnet *, u_long, caddr_t);
 void fxp_init(void *);
+void fxp_load_ucode(struct fxp_softc *);
 void fxp_stop(struct fxp_softc *, int);
 void fxp_watchdog(struct ifnet *);
 int fxp_add_rfabuf(struct fxp_softc *, struct mbuf *);
@@ -176,6 +179,12 @@ void fxp_scb_cmd(struct fxp_softc *, u_int8_t);
  * (1536 bytes), if an underrun occurs.
  */
 static int tx_threshold = 64;
+
+/*
+ * Interrupts coalescing code params
+ */
+int fxp_int_delay = FXP_INT_DELAY;
+int fxp_bundle_max = FXP_BUNDLE_MAX;
 
 /*
  * TxCB list index mask. This is used to do list wrap-around.
@@ -205,6 +214,86 @@ fxp_scb_wait(sc)
 	if (i == 0)
 		printf("%s: warning: SCB timed out\n", sc->sc_dev.dv_xname);
 }
+
+
+void
+fxp_eeprom_shiftin(struct fxp_softc *sc, int data, int length)
+{
+	u_int16_t reg;
+	int x;
+
+	/*
+	 * Shift in data.
+	 */
+	for (x = 1 << (length - 1); x; x >>= 1) {
+		if (data & x)
+			reg = FXP_EEPROM_EECS | FXP_EEPROM_EEDI;
+		else
+			reg = FXP_EEPROM_EECS;
+		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, reg);
+		DELAY(1);
+		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, reg | FXP_EEPROM_EESK);
+		DELAY(1);
+		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, reg);
+		DELAY(1);
+	}
+}
+
+
+void
+fxp_eeprom_putword(struct fxp_softc *sc, int offset, u_int16_t data)
+{
+	int i;
+
+	/*
+	 * Erase/write enable.
+	 */
+	CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, FXP_EEPROM_EECS);
+	fxp_eeprom_shiftin(sc, 0x4, 3);
+	fxp_eeprom_shiftin(sc, 0x03 << (sc->eeprom_size - 2), sc->eeprom_size);
+	CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, 0);
+	DELAY(1);
+	/*
+	 * Shift in write opcode, address, data.
+	 */
+	CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, FXP_EEPROM_EECS);
+	fxp_eeprom_shiftin(sc, FXP_EEPROM_OPC_WRITE, 3);
+	fxp_eeprom_shiftin(sc, offset, sc->eeprom_size);
+	fxp_eeprom_shiftin(sc, data, 16);
+	CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, 0);
+	DELAY(1);
+	/*
+	 * Wait for EEPROM to finish up.
+	 */
+	CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, FXP_EEPROM_EECS);
+	DELAY(1);
+	for (i = 0; i < 1000; i++) {
+		if (CSR_READ_2(sc, FXP_CSR_EEPROMCONTROL) & FXP_EEPROM_EEDO)
+			break;
+		DELAY(50);
+	}
+	CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, 0);
+	DELAY(1);
+	/*
+	 * Erase/write disable.
+	 */
+	CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, FXP_EEPROM_EECS);
+	fxp_eeprom_shiftin(sc, 0x4, 3);
+	fxp_eeprom_shiftin(sc, 0, sc->eeprom_size);
+	CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, 0);
+	DELAY(1);
+}
+
+void
+fxp_write_eeprom(struct fxp_softc *sc, u_short *data, int offset, int words)
+{
+	int i;
+
+	for (i = 0; i < words; i++)
+		fxp_eeprom_putword(sc, offset + i, data[i]);
+}
+
+
 
 /*************************************************************
  * Operating system-specific autoconfiguration glue
@@ -263,15 +352,15 @@ fxp_power(why, arg)
  * Do generic parts of attach.
  */
 int
-fxp_attach_common(sc, enaddr, intrstr)
+fxp_attach_common(sc, intrstr)
 	struct fxp_softc *sc;
-	u_int8_t *enaddr;
 	const char *intrstr;
 {
 	struct ifnet *ifp;
 	struct mbuf *m;
 	bus_dmamap_t rxmap;
 	u_int16_t data;
+	u_int8_t enaddr[6];
 	int i, err;
 
 	/*
@@ -320,18 +409,19 @@ fxp_attach_common(sc, enaddr, intrstr)
 	bzero(sc->sc_ctrl, sizeof(struct fxp_ctrl));
 
 	/*
-	 * Pre-allocate our receive buffers.
+	 * Pre-allocate some receive buffers.
 	 */
 	sc->sc_rxfree = 0;
-	for (i = 0; i < FXP_NRFABUFS; i++) {
+	for (i = 0; i < FXP_NRFABUFS_MIN; i++) {
 		if ((err = bus_dmamap_create(sc->sc_dmat, MCLBYTES, 1,
 		    MCLBYTES, 0, 0, &sc->sc_rxmaps[i])) != 0) {
-			printf("%s: unable to create tx dma map %d, error %d\n",
+			printf("%s: unable to create rx dma map %d, error %d\n",
 			    sc->sc_dev.dv_xname, i, err);
 			goto fail;
 		}
+		sc->rx_bufs++;
 	}
-	for (i = 0; i < FXP_NRFABUFS; i++)
+	for (i = 0; i < FXP_NRFABUFS_MIN; i++)
 		if (fxp_add_rfabuf(sc, NULL) != 0)
 			goto fail;
 
@@ -348,6 +438,13 @@ fxp_attach_common(sc, enaddr, intrstr)
 	sc->phy_primary_device = (data >> 8) & 0x3f;
 	sc->phy_10Mbps_only = data >> 15;
 
+	/*
+	 * Only 82558 and newer cards can do this.
+	 */
+	if (sc->sc_revision >= FXP_REV_82558_A4) {
+		sc->sc_int_delay = fxp_int_delay;
+		sc->sc_bundle_max = fxp_bundle_max;
+	}
 	/*
 	 * Read MAC address.
 	 */
@@ -373,6 +470,31 @@ fxp_attach_common(sc, enaddr, intrstr)
 
 	printf(": %s, address %s\n", intrstr,
 	    ether_sprintf(sc->sc_arpcom.ac_enaddr));
+
+	if (sc->sc_flags & FXPF_DISABLE_STANDBY) {
+		fxp_read_eeprom(sc, &data, 10, 1);
+		if (data & 0x02) {			/* STB enable */
+			u_int16_t cksum;
+			int i;
+
+			printf("%s: Disabling dynamic standby mode in EEPROM",
+			    sc->sc_dev.dv_xname);
+			data &= ~0x02;
+			fxp_write_eeprom(sc, &data, 10, 1);
+			printf(", New ID 0x%x", data);
+			cksum = 0;
+			for (i = 0; i < (1 << sc->eeprom_size) - 1; i++) {
+				fxp_read_eeprom(sc, &data, i, 1);
+				cksum += data;
+			}
+			i = (1 << sc->eeprom_size) - 1;
+			cksum = 0xBABA - cksum;
+			fxp_read_eeprom(sc, &data, i, 1);
+			fxp_write_eeprom(sc, &cksum, i, 1);
+			printf(", cksum @ 0x%x: 0x%x -> 0x%x\n",
+			    i, data, cksum);
+		}
+	}
 
 	/*
 	 * Initialize our media structures and probe the MII.
@@ -498,7 +620,7 @@ fxp_detach(sc)
  * contents with a varying number of address bits, but no such
  * register seem to be available. The high bits of register 10 are 01
  * on the 558 and 559, but apparently not on the 557.
- * 
+ *
  * The Linux driver computes a checksum on the EEPROM data, but the
  * value of this checksum is not very well documented.
  */
@@ -544,6 +666,11 @@ fxp_autosize_eeprom(sc)
 	DELAY(4);
 	sc->eeprom_size = x;
 }
+
+
+
+
+
 /*
  * Read from the serial EEPROM. Basically, you manually shift in
  * the read opcode (one bit at a time) and then shift in the address,
@@ -740,7 +867,7 @@ fxp_intr(arg)
 	bus_dmamap_t rxmap;
 	int claimed = 0;
 	int rnr = 0;
-	
+
 	/*
 	 * If the interface isn't running, don't try to
 	 * service the interrupt.. just ack it and bail.
@@ -801,9 +928,9 @@ fxp_intr(arg)
 			}
 		}
 		/*
-		 * Process receiver interrupts. If a no-resource (RNR)
-		 * condition exists, get whatever packets we can and
-		 * re-start the receiver.
+		 * Process receiver interrupts. If a Receive Unit
+		 * not ready (RNR) condition exists, get whatever
+		 * packets we can and re-start the receiver.
 		 */
 		if (statack & (FXP_SCB_STATACK_FR | FXP_SCB_STATACK_RNR)) {
 			struct mbuf *m;
@@ -847,6 +974,14 @@ rcvloop:
 						m_freem(m);
 						goto rcvloop;
 					}
+					if (*(u_int16_t *)(rfap +
+					    offsetof(struct fxp_rfa,
+					    rfa_status)) &
+					    htole16(FXP_RFA_STATUS_CRC)) {
+						m_freem(m);
+						goto rcvloop;
+					}
+
 					m->m_pkthdr.rcvif = ifp;
 					m->m_pkthdr.len = m->m_len =
 					    total_len;
@@ -861,13 +996,13 @@ rcvloop:
 		}
 		if (rnr) {
 			rxmap = *((bus_dmamap_t *)
-				  sc->rfa_headm->m_ext.ext_buf);
+			    sc->rfa_headm->m_ext.ext_buf);
 			fxp_scb_wait(sc);
 			CSR_WRITE_4(sc, FXP_CSR_SCB_GENERAL,
 				    rxmap->dm_segs[0].ds_addr +
 				    RFA_ALIGNMENT_FUDGE);
 			fxp_scb_cmd(sc, FXP_SCB_COMMAND_RU_START);
-			
+
 		}
 	}
 	return (claimed);
@@ -899,9 +1034,8 @@ fxp_stats_update(arg)
 	if (sp->rx_good) {
 		ifp->if_ipackets += letoh32(sp->rx_good);
 		sc->rx_idle_secs = 0;
-	} else {
+	} else
 		sc->rx_idle_secs++;
-	}
 	ifp->if_ierrors +=
 	    letoh32(sp->rx_crc_errors) +
 	    letoh32(sp->rx_alignment_errors) +
@@ -996,7 +1130,7 @@ fxp_stop(sc, drain)
 	mii_down(&sc->sc_mii);
 
 	/*
-	 * Issue software reset
+	 * Issue software reset.
 	 */
 	CSR_WRITE_4(sc, FXP_CSR_PORT, FXP_PORT_SELECTIVE_RESET);
 	DELAY(10);
@@ -1026,10 +1160,11 @@ fxp_stop(sc, drain)
 			bus_dmamap_unload(sc->sc_dmat, rxmap);
 			FXP_RXMAP_PUT(sc, rxmap);
 			m = m_free(m);
+			sc->rx_bufs--;
 		}
 		sc->rfa_headm = NULL;
 		sc->rfa_tailm = NULL;
-		for (i = 0; i < FXP_NRFABUFS; i++) {
+		for (i = 0; i < FXP_NRFABUFS_MIN; i++) {
 			if (fxp_add_rfabuf(sc, NULL) != 0) {
 				/*
 				 * This "can't happen" - we're at splimp()
@@ -1038,6 +1173,7 @@ fxp_stop(sc, drain)
 				 */
 				panic("fxp_stop: no buffers!");
 			}
+			sc->rx_bufs++;
 		}
 	}
 }
@@ -1085,8 +1221,9 @@ fxp_init(xsc)
 	struct fxp_cb_config *cbp;
 	struct fxp_cb_ias *cb_ias;
 	struct fxp_cb_tx *txp;
+	struct mbuf *m;
 	bus_dmamap_t rxmap;
-	int i, prm, allm, s;
+	int i, prm, allm, s, bufs;
 
 	s = splimp();
 
@@ -1107,6 +1244,9 @@ fxp_init(xsc)
 	CSR_WRITE_4(sc, FXP_CSR_SCB_GENERAL, 0);
 	fxp_scb_cmd(sc, FXP_SCB_COMMAND_RU_BASE);
 
+#ifndef SMALL_KERNEL
+	fxp_load_ucode(sc);
+#endif
 	/* Once through to set flags */
 	fxp_mc_setup(sc, 0);
 
@@ -1168,7 +1308,7 @@ fxp_init(xsc)
 	cbp->mc_all =		allm;
 #else
 	cbp->cb_command = htole16(FXP_CB_COMMAND_CONFIG | FXP_CB_COMMAND_EL);
-	if (allm) 
+	if (allm)
 		cbp->mc_all |= 0x08;		/* accept all multicasts */
 	else
 		cbp->mc_all &= ~0x08;		/* reject all multicasts */
@@ -1197,7 +1337,7 @@ fxp_init(xsc)
 		cbp->stripping &= ~0x08;
 
 	cbp->tx_dma_bytecount = 0; /* (no) tx DMA max, dma_dce = 0 ??? */
- 	cbp->ctrl1 |= 0x08;	/* ci_int = 1 */
+	cbp->ctrl1 |= 0x08;	/* ci_int = 1 */
 	cbp->ctrl3 |= 0x08;	/* nsai */
 	cbp->fifo_limit = 0x08; /* tx and rx fifo limit */
 	cbp->fdx_pin |= 0x80;	/* Enable full duplex setting by pin */
@@ -1276,6 +1416,32 @@ fxp_init(xsc)
 	/*
 	 * Initialize receiver buffer area - RFA.
 	 */
+	if (ifp->if_flags & IFF_UP)
+		bufs = FXP_NRFABUFS_MAX;
+	else
+		bufs = FXP_NRFABUFS_MIN;
+	if (sc->rx_bufs > bufs) {
+		while (sc->rfa_headm != NULL && sc->rx_bufs-- > bufs) {
+			rxmap = *((bus_dmamap_t *)m->m_ext.ext_buf);
+			bus_dmamap_unload(sc->sc_dmat, rxmap);
+			FXP_RXMAP_PUT(sc, rxmap);
+			sc->rfa_headm = m_free(m);
+		}
+	} else if (sc->rx_bufs < bufs) {
+		int err, tmp_rx_bufs = sc->rx_bufs;
+		for (i = sc->rx_bufs; i < bufs; i++) {
+			if ((err = bus_dmamap_create(sc->sc_dmat, MCLBYTES, 1,
+			    MCLBYTES, 0, 0, &sc->sc_rxmaps[i])) != 0) {
+				printf("%s: unable to create rx dma map %d, "
+				  "error %d\n", sc->sc_dev.dv_xname, i, err);
+				break;
+			}
+			sc->rx_bufs++;
+		}
+		for (i = tmp_rx_bufs; i < sc->rx_bufs; i++)
+			if (fxp_add_rfabuf(sc, NULL) != 0)
+				break;
+	}
 	fxp_scb_wait(sc);
 	rxmap = *((bus_dmamap_t *)sc->rfa_headm->m_ext.ext_buf);
 	CSR_WRITE_4(sc, FXP_CSR_SCB_GENERAL,
@@ -1676,3 +1842,114 @@ fxp_mc_setup(sc, doit)
 		FXP_MCS_SYNC(sc, BUS_DMASYNC_POSTREAD|BUS_DMASYNC_POSTWRITE);
 	} while (!(mcsp->cb_status & htole16(FXP_CB_STATUS_C)));
 }
+
+#ifndef SMALL_KERNEL
+#include <dev/microcode/fxp/rcvbundl.h>
+
+const u_int32_t fxp_ucode_d101a[] = D101_A_RCVBUNDLE_UCODE;
+const u_int32_t fxp_ucode_d101b0[] = D101_B0_RCVBUNDLE_UCODE;
+const u_int32_t fxp_ucode_d101ma[] = D101M_B_RCVBUNDLE_UCODE;
+const u_int32_t fxp_ucode_d101s[] = D101S_RCVBUNDLE_UCODE;
+const u_int32_t fxp_ucode_d102[] = D102_B_RCVBUNDLE_UCODE;
+const u_int32_t fxp_ucode_d102c[] = D102_C_RCVBUNDLE_UCODE;
+
+#define UCODE(x)	sizeof(x), x
+
+struct ucode {
+	u_int16_t	revision;
+	u_int16_t	int_delay_offset;
+	u_int16_t	bundle_max_offset;
+	u_int16_t	length;
+	const u_int32_t	*ucode;
+} const ucode_table[] = {
+	{ FXP_REV_82558_A4,
+	  D101_CPUSAVER_DWORD, 0,
+	  UCODE(fxp_ucode_d101a) },
+
+	{ FXP_REV_82558_B0,
+	  D101_CPUSAVER_DWORD, 0,
+	  UCODE(fxp_ucode_d101b0), },
+
+	{ FXP_REV_82559_A0,
+	  D101M_CPUSAVER_DWORD, D101M_CPUSAVER_BUNDLE_MAX_DWORD,
+	  UCODE(fxp_ucode_d101ma) },
+
+	{ FXP_REV_82559S_A,
+	  D101S_CPUSAVER_DWORD, D101S_CPUSAVER_BUNDLE_MAX_DWORD,
+	  UCODE(fxp_ucode_d101s) },
+
+	{ FXP_REV_82550,
+	  D102_B_CPUSAVER_DWORD, D102_B_CPUSAVER_BUNDLE_MAX_DWORD,
+	  UCODE(fxp_ucode_d102) },
+
+	{ FXP_REV_82550_C,
+	  D102_C_CPUSAVER_DWORD, D102_C_CPUSAVER_BUNDLE_MAX_DWORD,
+	  UCODE(fxp_ucode_d102c) },
+
+	{ 0, 0, 0, 0, NULL }
+};
+
+void
+fxp_load_ucode(struct fxp_softc *sc)
+{
+	const struct ucode *uc;
+	struct fxp_cb_ucode *cbp = &sc->sc_ctrl->u.code;
+	int i;
+
+	if (sc->sc_flags & FXPF_UCODE)
+		return;
+
+	for (uc = ucode_table; uc->ucode != NULL; uc++)
+		if (sc->sc_revision == uc->revision)
+			break;
+	if (uc->ucode == NULL)
+		return;	/* no ucode for this chip is found */
+
+	cbp->cb_status = 0;
+	cbp->cb_command = htole16(FXP_CB_COMMAND_UCODE|FXP_CB_COMMAND_EL);
+	cbp->link_addr = 0xffffffff;	/* (no) next command */
+	for (i = 0; i < uc->length; i++)
+		cbp->ucode[i] = htole32(uc->ucode[i]);
+
+	if (uc->int_delay_offset)
+		*((u_int16_t *)&cbp->ucode[uc->int_delay_offset]) =
+			htole16(sc->sc_int_delay + sc->sc_int_delay / 2);
+
+	if (uc->bundle_max_offset)
+		*((u_int16_t *)&cbp->ucode[uc->bundle_max_offset]) =
+			htole16(sc->sc_bundle_max);
+
+	FXP_UCODE_SYNC(sc, BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
+
+	/*
+	 * Download the ucode to the chip.
+	 */
+	fxp_scb_wait(sc);
+	CSR_WRITE_4(sc, FXP_CSR_SCB_GENERAL, sc->tx_cb_map->dm_segs->ds_addr
+	      + offsetof(struct fxp_ctrl, u.code));
+	fxp_scb_cmd(sc, FXP_SCB_COMMAND_CU_START);
+
+	/* ...and wait for it to complete. */
+	i = 10000;
+	do {
+		DELAY(2);
+		FXP_UCODE_SYNC(sc, BUS_DMASYNC_POSTREAD|BUS_DMASYNC_POSTWRITE);
+	} while (((cbp->cb_status & htole16(FXP_CB_STATUS_C)) == 0) && --i);
+	if (i == 0) {
+		printf("%s: timeout loading microcode\n", sc->sc_dev.dv_xname);
+		return;
+	}
+
+#ifdef DEBUG
+	printf("%s: microcode loaded, int_delay: %d usec",
+	    sc->sc_dev.dv_xname, sc->sc_int_delay);
+
+	if (uc->bundle_max_offset)
+		printf(", bundle_max %d\n", sc->sc_bundle_max);
+	else
+		printf("\n");
+#endif
+
+	sc->sc_flags |= FXPF_UCODE;
+}
+#endif /* SMALL_KERNEL */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.58 2004/02/14 15:09:22 grange Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.67 2004/08/05 03:07:47 dlg Exp $	*/
 /*	$NetBSD: cpu.h,v 1.35 1996/05/05 19:29:26 christos Exp $	*/
 
 /*-
@@ -41,9 +41,19 @@
 /*
  * Definitions unique to i386 cpu support.
  */
-#include <machine/psl.h>
 #include <machine/frame.h>
+#include <machine/psl.h>
 #include <machine/segments.h>
+#include <machine/intrdefs.h>
+
+#ifdef MULTIPROCESSOR
+#include <machine/i82489reg.h>
+#include <machine/i82489var.h>
+
+/* XXX for now... */
+#define NLAPIC 1
+
+#endif
 
 /*
  * definitions of cpu-dependent requirements
@@ -60,16 +70,158 @@
  */
 #define clockframe intrframe
 
-#define	CLKF_USERMODE(frame)	USERMODE((frame)->if_cs, (frame)->if_eflags)
-#define	CLKF_PC(frame)		((frame)->if_eip)
-#define	CLKF_INTR(frame)	(IDXSEL((frame)->if_cs) == GICODE_SEL)
+#include <sys/device.h>
+#include <sys/lock.h>                  /* will also get LOCKDEBUG */
+#include <sys/sched.h>
+
+struct intrsource;
+
+/* XXX stuff to move to cpuvar.h later */
+struct cpu_info {
+	struct device ci_dev;		/* our device */
+	struct cpu_info *ci_self;	/* pointer to this structure */
+	struct schedstate_percpu ci_schedstate; /* scheduler state */
+	struct cpu_info *ci_next;	/* next cpu */
+	
+	/* 
+	 * Public members. 
+	 */
+	struct proc *ci_curproc; 	/* current owner of the processor */
+	struct simplelock ci_slock;	/* lock on this data structure */
+	cpuid_t ci_cpuid; 		/* our CPU ID */
+	u_int ci_apicid;		/* our APIC ID */
+#if defined(DIAGNOSTIC) || defined(LOCKDEBUG)
+	u_long ci_spin_locks;		/* # of spin locks held */
+	u_long ci_simple_locks;		/* # of simple locks held */
+#endif
+
+	/*
+	 * Private members.
+	 */
+	struct proc *ci_fpcurproc;	/* current owner of the FPU */
+	int ci_fpsaving;		/* save in progress */
+
+	volatile u_int32_t ci_tlb_ipi_mask;
+
+	struct pcb *ci_curpcb;		/* VA of current HW PCB */
+	struct pcb *ci_idle_pcb;	/* VA of current PCB */
+	int ci_idle_tss_sel;		/* TSS selector of idle PCB */
+
+	struct intrsource *ci_isources[MAX_INTR_SOURCES];
+	u_int32_t	ci_ipending;
+	int		ci_ilevel;
+	int		ci_idepth;
+	u_int32_t	ci_imask[NIPL];
+	u_int32_t	ci_iunmask[NIPL];
+
+	paddr_t ci_idle_pcb_paddr;	/* PA of idle PCB */
+	u_long ci_flags;		/* flags; see below */
+	u_int32_t ci_ipis; 		/* interprocessor interrupts pending */
+	int sc_apic_version;  		/* local APIC version */
+	
+	u_int32_t	ci_level;
+	u_int32_t	ci_vendor[4];
+	u_int32_t	ci_signature;		/* X86 cpuid type */
+	u_int32_t	ci_feature_flags;	/* X86 CPUID feature bits */
+	u_int32_t	cpu_class;		/* CPU class */
+
+	struct cpu_functions *ci_func;	/* start/stop functions */
+	void (*cpu_setup)(const char *, int, int);	/* proc-dependant init */
+
+	int		ci_want_resched;
+	int		ci_astpending;
+
+	union descriptor *ci_gdt;
+
+	volatile int ci_ddb_paused;	/* paused due to other proc in ddb */
+#define CI_DDB_RUNNING		0
+#define CI_DDB_SHOULDSTOP	1
+#define CI_DDB_STOPPED		2
+#define CI_DDB_ENTERDDB		3
+#define CI_DDB_INDDB		4
+};
+
+/*
+ * Processor flag notes: The "primary" CPU has certain MI-defined
+ * roles (mostly relating to hardclock handling); we distinguish
+ * betwen the processor which booted us, and the processor currently
+ * holding the "primary" role just to give us the flexibility later to
+ * change primaries should we be sufficiently twisted.  
+ */
+
+#define	CPUF_BSP	0x0001		/* CPU is the original BSP */
+#define	CPUF_AP		0x0002		/* CPU is an AP */
+#define	CPUF_SP		0x0004		/* CPU is only processor */
+#define	CPUF_PRIMARY	0x0008		/* CPU is active primary processor */
+#define	CPUF_APIC_CD	0x0010		/* CPU has apic configured */
+
+#define	CPUF_PRESENT	0x1000		/* CPU is present */
+#define	CPUF_RUNNING	0x2000		/* CPU is running */
+
+/*
+ * We statically allocate the CPU info for the primary CPU (or,
+ * the only CPU on uniprocessors), and the primary CPU is the
+ * first CPU on the CPU info list.
+ */
+extern struct cpu_info cpu_info_primary;
+extern struct cpu_info *cpu_info_list;
+
+#define	CPU_INFO_ITERATOR		int
+#define	CPU_INFO_FOREACH(cii, ci)	cii = 0, ci = cpu_info_list; \
+					ci != NULL; ci = ci->ci_next
+
+#define CPU_INFO_UNIT(ci)	((ci)->ci_dev.dv_unit)
+
+#ifdef MULTIPROCESSOR
+
+#define I386_MAXPROCS		32	/* because we use a bitmask */
+
+#define CPU_STARTUP(_ci)	((_ci)->ci_func->start(_ci))
+#define CPU_STOP(_ci)		((_ci)->ci_func->stop(_ci))
+#define CPU_START_CLEANUP(_ci)	((_ci)->ci_func->cleanup(_ci))
+
+#define cpu_number()		(i82489_readreg(LAPIC_ID)>>LAPIC_ID_SHIFT)
+#define	curcpu()		(cpu_info[cpu_number()])
+
+#define CPU_IS_PRIMARY(ci)	((ci)->ci_flags & CPUF_PRIMARY)
+
+extern struct cpu_info	*cpu_info[I386_MAXPROCS];
+extern u_long		 cpus_running;
+
+extern void cpu_boot_secondary_processors(void);
+extern void cpu_init_idle_pcbs(void);
+
+#else /* MULTIPROCESSOR */
+
+#define I386_MAXPROCS		1
+
+#define cpu_number()		0
+#define	curcpu()		(&cpu_info_primary)
+
+#define CPU_IS_PRIMARY(ci)	1
+
+/*
+ * definitions of cpu-dependent requirements
+ * referenced in generic code
+ */
+#define	cpu_swapin(p)			/* nothing */
+
+#endif
+
+#define curpcb			curcpu()->ci_curpcb
+
+#define want_resched (curcpu()->ci_want_resched)
+#define astpending (curcpu()->ci_astpending)
 
 /*
  * Preempt the current process if in interrupt from user mode,
  * or after the current trap/syscall if in system mode.
  */
-int	want_resched;		/* resched() was called */
-#define	need_resched()		(want_resched = 1, setsoftast())
+extern void need_resched(struct cpu_info *);
+
+#define	CLKF_USERMODE(frame)	USERMODE((frame)->if_cs, (frame)->if_eflags)
+#define	CLKF_PC(frame)		((frame)->if_eip)
+#define	CLKF_INTR(frame)	(IDXSEL((frame)->if_cs) == GICODE_SEL)
 
 /*
  * Give a profiling tick to the current process when the user profiling
@@ -87,8 +239,13 @@ int	want_resched;		/* resched() was called */
 /*
  * We need a machine-independent name for this.
  */
-#define	DELAY(x)		delay(x)
-void	delay(int);
+extern void (*delay_func)(int);
+struct timeval;
+extern void (*microtime_func)(struct timeval *);
+
+#define	DELAY(x)		(*delay_func)(x)
+#define delay(x)		(*delay_func)(x)
+#define microtime(tv)		(*microtime_func)(tv)
 
 #if defined(I586_CPU) || defined(I686_CPU)
 /*
@@ -167,10 +324,13 @@ extern int i386_use_fxsave;
 extern int i386_has_sse;
 extern int i386_has_sse2;
 
+extern void (*update_cpuspeed)(void);
+
 /* machdep.c */
 void	dumpconf(void);
 void	cpu_reset(void);
 void	i386_proc0_tss_ldt_init(void);
+void	i386_init_pcb_tss_ldt(struct cpu_info *);
 void	cpuid(u_int32_t, u_int32_t *);
 
 /* locore.s */
@@ -187,18 +347,19 @@ void	proc_trampoline(void);
 void	initrtclock(void);
 void	startrtclock(void);
 void	rtcdrain(void *);
+void	i8254_delay(int);
+void	i8254_microtime(struct timeval *);
+void	i8254_initclocks(void);
 
 /* est.c */
 #if !defined(SMALL_KERNEL) && defined(I686_CPU)
 void	est_init(const char *);
-int     est_cpuspeed(int *);
 int     est_setperf(int);
 #endif
 
 /* longrun.c */
 #if !defined(SMALL_KERNEL) && defined(I586_CPU)
 void	longrun_init(void);
-int	longrun_cpuspeed(int *);
 int	longrun_setperf(int);
 #endif
 
@@ -208,9 +369,16 @@ void	p4tcc_init(int, int);
 int     p4tcc_setperf(int);
 #endif
 
+void	k6_powernow_init(void);
+int	k6_powernow_setperf(int);
+void	k7_powernow_init(uint32_t);
+int	k7_powernow_setperf(int);
+
+
 /* npx.c */
-void	npxdrop(void);
-void	npxsave(void);
+void	npxdrop(struct proc *);
+void	npxsave_proc(struct proc *, int);
+void	npxsave_cpu(struct cpu_info *, int);
 
 #if defined(GPL_MATH_EMULATE)
 /* math_emulate.c */
@@ -226,6 +394,7 @@ int	i386_set_ldt(struct proc *, void *, register_t *);
 
 /* isa_machdep.c */
 void	isa_defaultirq(void);
+void	isa_nodefaultirq(void);
 int	isa_nmi(void);
 
 /* pmap.c */
@@ -286,5 +455,13 @@ void	setconf(void);
 	{ "sse2", CTLTYPE_INT }, \
 	{ "xcrypt", CTLTYPE_INT }, \
 }
+
+/*
+ * This needs to be included late since it relies on definitions higher
+ * up in this file.
+ */
+#if defined(MULTIPROCESSOR) && defined(_KERNEL)
+#include <sys/mplock.h>
+#endif
 
 #endif /* !_I386_CPU_H_ */

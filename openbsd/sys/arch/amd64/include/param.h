@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.2 2004/02/27 17:41:25 deraadt Exp $	*/
+/*	$OpenBSD: param.h,v 1.5 2004/08/06 22:31:30 mickey Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -98,6 +98,7 @@
 #define	SINCR		1		/* increment of stack/NBPG */
 #define	UPAGES		5		/* pages of u-area */
 #define	USPACE		(UPAGES * NBPG)	/* total size of u-area */
+#define	USPACE_ALIGN	(0)		/* u-area alignment 0-none */
 
 #ifndef MSGBUFSIZE
 #define MSGBUFSIZE	4*NBPG		/* default message buffer size */
@@ -114,10 +115,7 @@
 #define	MCLSHIFT	11		/* convert bytes to m_buf clusters */
 #define	MCLBYTES	(1 << MCLSHIFT)	/* size of a m_buf cluster */
 #define MCLOFSET	(MCLBYTES - 1)	/* offset within a m_buf cluster */
-
-#ifndef NMBCLUSTERS
-#define	NMBCLUSTERS	2048		/* map size, max cluster allocation */
-#endif
+#define	NMBCLUSTERS	6144		/* map size, max cluster allocation */
 
 /*
  * Minimum and maximum sizes of the kernel malloc arena in PAGE_SIZE-sized
@@ -165,9 +163,3 @@
 #define btop(x)				x86_btop(x)
 #define ptob(x)				x86_ptob(x)
 #define round_pdr(x)			x86_round_pdr(x)
-
-/* XXX - oh, the horror.. Just for now. */
-#define KERNEL_PROC_LOCK(p)
-#define KERNEL_PROC_UNLOCK(p)
-#define KERNEL_LOCK(i)
-#define KERNEL_UNLOCK()

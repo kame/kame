@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.22 2002/11/21 03:59:16 drahn Exp $	*/
+/*	$OpenBSD: param.h,v 1.25 2004/08/06 22:31:31 mickey Exp $	*/
 /*	$NetBSD: param.h,v 1.1 1996/09/30 16:34:28 ws Exp $	*/
 
 /*-
@@ -67,6 +67,7 @@
 
 #define	UPAGES		4
 #define	USPACE		(UPAGES * NBPG)
+#define	USPACE_ALIGN	(0)		/* u-area alignment 0-none */
 
 /*
  * Constants related to network buffer management.
@@ -79,14 +80,7 @@
 #define	MCLSHIFT	11		/* convert bytes to m_buf clusters */
 #define	MCLBYTES	(1 << MCLSHIFT)	/* size of a m_buf cluster */
 #define	MCLOFSET	(MCLBYTES - 1)
-
-#ifndef NMBCLUSTERS
-#ifdef GATEWAY
-#define	NMBCLUSTERS	2048		/* map size, max cluster allocation */
-#else
-#define	NMBCLUSTERS	1024		/* map size, max cluster allocation */
-#endif
-#endif
+#define	NMBCLUSTERS	4096		/* map size, max cluster allocation */
 
 /*
  * pages ("clicks") to disk blocks
@@ -114,17 +108,17 @@
 /*
  * Segment handling stuff
  */
-#define	SEGMENT_LENGTH	0x10000000
-#define	SEGMENT_MASK	0xf0000000
+#define	PPC_SEGMENT_LENGTH	0x10000000
+#define	PPC_SEGMENT_MASK	0xf0000000
 
 /*
  * Fixed segments
  */
-#define	USER_SR		13
-#define	KERNEL_SR	14
-#define	KERNEL_SEG0	0xfffff0
-#define	KERNEL_SEGMENT	(KERNEL_SEG0 + KERNEL_SR)
-#define	USER_ADDR	((void *)(USER_SR << ADDR_SR_SHIFT))
+#define	PPC_USER_SR		13
+#define	PPC_KERNEL_SR	14
+#define	PPC_KERNEL_SEG0	0xfffff0
+#define	PPC_KERNEL_SEGMENT	(PPC_KERNEL_SEG0 + PPC_KERNEL_SR)
+#define	PPC_USER_ADDR	((void *)(PPC_USER_SR << ADDR_SR_SHIFT))
 
 /*
  * Some system constants

@@ -1,4 +1,4 @@
-/*	$OpenBSD: emuxki.c,v 1.16 2004/02/24 18:22:30 deraadt Exp $	*/
+/*	$OpenBSD: emuxki.c,v 1.19 2004/09/02 02:09:09 marco Exp $	*/
 /*	$NetBSD: emuxki.c,v 1.1 2001/10/17 18:39:41 jdolecek Exp $	*/
 
 /*-
@@ -407,7 +407,8 @@ emuxki_match(struct device *parent, void *match, void *aux)
 	struct pci_attach_args *pa = aux;
 
 	if (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_CREATIVELABS &&
-	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_CREATIVELABS_SBLIVE)
+	    (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_CREATIVELABS_SBLIVE ||
+	     PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_CREATIVELABS_SBLIVE2))
 		return (1);
 
 	return (0);
@@ -1609,7 +1610,7 @@ emuxki_resched_timer(struct emuxki_softc *sc)
 
 	if (timerate & ~EMU_TIMER_RATE_MASK)
 		timerate = 0;
-	bus_space_write_4(sc->sc_iot, sc->sc_ioh, EMU_TIMER, timerate);
+	bus_space_write_2(sc->sc_iot, sc->sc_ioh, EMU_TIMER, timerate);
 	if (!active && (sc->timerstate & EMU_TIMER_STATE_ENABLED)) {
 		bus_space_write_4(sc->sc_iot, sc->sc_ioh, EMU_INTE,
 			bus_space_read_4(sc->sc_iot, sc->sc_ioh, EMU_INTE) &

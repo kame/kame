@@ -1,4 +1,4 @@
-/*	$OpenBSD: bpfdesc.h,v 1.11 2003/10/22 18:42:40 canacar Exp $	*/
+/*	$OpenBSD: bpfdesc.h,v 1.14 2004/06/22 04:04:19 canacar Exp $	*/
 /*	$NetBSD: bpfdesc.h,v 1.11 1995/09/27 18:30:42 thorpej Exp $	*/
 
 /*
@@ -76,14 +76,17 @@ struct bpf_d {
 	u_char		bd_state;	/* idle, waiting, or timed out */
 	u_char		bd_immediate;	/* true to return on packet arrival */
 	u_char		bd_locked;	/* true if descriptor is locked */
+	u_char		bd_fildrop;	/* true if filtered packets will be dropped */
 	int		bd_hdrcmplt;	/* false to fill in src lladdr automatically */
 	int		bd_async;	/* non-zero if packet reception should generate signal */
 	int		bd_sig;		/* signal to send upon packet reception */
 	pid_t		bd_pgid;	/* process or group id for signal */
 	uid_t		bd_siguid;	/* uid for process that set pgid */
 	uid_t		bd_sigeuid;	/* euid for process that set pgid */
-	u_char		bd_pad;		/* explicit alignment */
+	u_int		bd_ref;		/* reference count */
 	struct selinfo	bd_sel;		/* bsd select info */
+	int		bd_unit;	/* logical unit number */
+	LIST_ENTRY(bpf_d) bd_list;	/* descriptor list */
 };
 
 /*

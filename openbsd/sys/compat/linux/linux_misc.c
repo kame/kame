@@ -1,4 +1,4 @@
-/*	$OpenBSD: linux_misc.c,v 1.55 2003/12/02 03:46:45 nordin Exp $	*/
+/*	$OpenBSD: linux_misc.c,v 1.57 2004/06/24 19:35:23 tholo Exp $	*/
 /*	$NetBSD: linux_misc.c,v 1.27 1996/05/20 01:59:21 fvdl Exp $	*/
 
 /*-
@@ -520,18 +520,12 @@ linux_sys_uname(p, v, retval)
 	int len;
 	char *cp;
 
-	strncpy(luts.l_sysname, ostype, sizeof(luts.l_sysname) - 1);
-	luts.l_sysname[sizeof(luts.l_sysname) - 1] = '\0';
-	strncpy(luts.l_nodename, hostname, sizeof(luts.l_nodename) - 1);
-	luts.l_nodename[sizeof(luts.l_nodename) - 1] = '\0';
-	strncpy(luts.l_release, osrelease, sizeof(luts.l_release) - 1);
-	luts.l_release[sizeof(luts.l_release) - 1] = '\0';
-	strncpy(luts.l_version, version, sizeof(luts.l_version) - 1);
-	luts.l_version[sizeof(luts.l_version) - 1] = '\0';
-	strncpy(luts.l_machine, machine, sizeof(luts.l_machine) - 1);
-	luts.l_machine[sizeof(luts.l_machine) - 1] = '\0';
-	strncpy(luts.l_domainname, domainname, sizeof(luts.l_domainname) - 1);
-	luts.l_domainname[sizeof(luts.l_domainname) - 1] = '\0';
+	strlcpy(luts.l_sysname, ostype, sizeof(luts.l_sysname));
+	strlcpy(luts.l_nodename, hostname, sizeof(luts.l_nodename));
+	strlcpy(luts.l_release, osrelease, sizeof(luts.l_release));
+	strlcpy(luts.l_version, version, sizeof(luts.l_version));
+	strlcpy(luts.l_machine, machine, sizeof(luts.l_machine));
+	strlcpy(luts.l_domainname, domainname, sizeof(luts.l_domainname));
 
 	/* This part taken from the the uname() in libc */
 	len = sizeof(luts.l_version);
@@ -556,11 +550,11 @@ linux_sys_olduname(p, v, retval)
 	int len;
 	char *cp;
 
-	strncpy(luts.l_sysname, ostype, sizeof(luts.l_sysname));
-	strncpy(luts.l_nodename, hostname, sizeof(luts.l_nodename));
-	strncpy(luts.l_release, osrelease, sizeof(luts.l_release));
-	strncpy(luts.l_version, version, sizeof(luts.l_version));
-	strncpy(luts.l_machine, machine, sizeof(luts.l_machine));
+	strlcpy(luts.l_sysname, ostype, sizeof(luts.l_sysname));
+	strlcpy(luts.l_nodename, hostname, sizeof(luts.l_nodename));
+	strlcpy(luts.l_release, osrelease, sizeof(luts.l_release));
+	strlcpy(luts.l_version, version, sizeof(luts.l_version));
+	strlcpy(luts.l_machine, machine, sizeof(luts.l_machine));
 
 	/* This part taken from the the uname() in libc */
 	len = sizeof(luts.l_version);
@@ -585,11 +579,11 @@ linux_sys_oldolduname(p, v, retval)
 	int len;
 	char *cp;
 
-	strncpy(luts.l_sysname, ostype, sizeof(luts.l_sysname));
-	strncpy(luts.l_nodename, hostname, sizeof(luts.l_nodename));
-	strncpy(luts.l_release, osrelease, sizeof(luts.l_release));
-	strncpy(luts.l_version, version, sizeof(luts.l_version));
-	strncpy(luts.l_machine, machine, sizeof(luts.l_machine));
+	strlcpy(luts.l_sysname, ostype, sizeof(luts.l_sysname));
+	strlcpy(luts.l_nodename, hostname, sizeof(luts.l_nodename));
+	strlcpy(luts.l_release, osrelease, sizeof(luts.l_release));
+	strlcpy(luts.l_version, version, sizeof(luts.l_version));
+	strlcpy(luts.l_machine, machine, sizeof(luts.l_machine));
 
 	/* This part taken from the the uname() in libc */
 	len = sizeof(luts.l_version);
@@ -765,7 +759,7 @@ linux_sys_times(p, v, retval)
 	struct timeval t;
 	struct linux_tms ltms;
 	struct rusage ru;
-	int error, s;
+	int error;
 
 	calcru(p, &ru.ru_utime, &ru.ru_stime, NULL);
 	ltms.ltms_utime = CONVTCK(ru.ru_utime);
@@ -777,9 +771,7 @@ linux_sys_times(p, v, retval)
 	if ((error = copyout(&ltms, SCARG(uap, tms), sizeof ltms)))
 		return error;
 
-	s = splclock();
-	timersub(&time, &boottime, &t);
-	splx(s);
+	microuptime(&t);
 
 	retval[0] = ((linux_clock_t)(CONVTCK(t)));
 	return 0;
@@ -846,6 +838,7 @@ linux_sys_alarm(p, v, retval)
 	} */ *uap = v;
 	int s;
 	struct itimerval *itp, it;
+	struct timeval tv;
 	int timo;
 
 	itp = &p->p_realtimer;
@@ -853,12 +846,12 @@ linux_sys_alarm(p, v, retval)
 	/*
 	 * Clear any pending timer alarms.
 	 */
-
+	getmicrouptime(&tv);
 	timeout_del(&p->p_realit_to);
 	timerclear(&itp->it_interval);
 	if (timerisset(&itp->it_value) &&
-	    timercmp(&itp->it_value, &time, >))
-		timersub(&itp->it_value, &time, &itp->it_value);
+	    timercmp(&itp->it_value, &tv, >))
+		timersub(&itp->it_value, &tv, &itp->it_value);
 	/*
 	 * Return how many seconds were left (rounded up)
 	 */
@@ -888,9 +881,7 @@ linux_sys_alarm(p, v, retval)
 
 	if (timerisset(&it.it_value)) {
 		timo = tvtohz(&it.it_value);
-		if (timo <= 0)
-			timo = 1;
-		timeradd(&it.it_value, &time, &it.it_value);
+		timeradd(&it.it_value, &tv, &it.it_value);
 		timeout_add(&p->p_realit_to, timo);
 	}
 	p->p_realtimer = it;
@@ -1448,7 +1439,7 @@ linux_sys_stime(p, v, retval)
 	struct linux_sys_time_args /* {
 		linux_time_t *t;
 	} */ *uap = v;
-	struct timeval atv;
+	struct timespec ats;
 	linux_time_t tt;
 	int error;
 
@@ -1458,10 +1449,10 @@ linux_sys_stime(p, v, retval)
 	if ((error = copyin(SCARG(uap, t), &tt, sizeof(tt))) != 0)
 		return (error);
 
-	atv.tv_sec = tt;
-	atv.tv_usec = 0;
+	ats.tv_sec = tt;
+	ats.tv_nsec = 0;
 
-	error = settime(&atv);
+	error = settime(&ats);
 
 	return (error);
 }
@@ -1516,9 +1507,10 @@ linux_sys_sysinfo(p, v, retval)
 	struct linux_sysinfo si;
 	struct loadavg *la;
 	extern int bufpages;
+	struct timeval tv;
 
-
-	si.uptime = time.tv_sec - boottime.tv_sec;
+	getmicrouptime(&tv);
+	si.uptime = tv.tv_sec;
 	la = &averunnable;
 	si.loads[0] = la->ldavg[0] * LINUX_SYSINFO_LOADS_SCALE / la->fscale;
 	si.loads[1] = la->ldavg[1] * LINUX_SYSINFO_LOADS_SCALE / la->fscale;

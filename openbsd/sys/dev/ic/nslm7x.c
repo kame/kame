@@ -1,4 +1,4 @@
-/*	$OpenBSD: nslm7x.c,v 1.6 2004/02/10 19:58:16 grange Exp $	*/
+/*	$OpenBSD: nslm7x.c,v 1.8 2004/06/24 19:35:23 tholo Exp $	*/
 /*	$NetBSD: nslm7x.c,v 1.17 2002/11/15 14:55:41 ad Exp $ */
 
 /*-
@@ -376,22 +376,18 @@ lm_gtredata(sme, tred)
 	 struct envsys_tre_data *tred;
 {
 	 static const struct timeval onepointfive = { 1, 500000 };
-	 struct timeval t;
+	 struct timeval t, mtv;
 	 struct lm_softc *sc = sme->sme_cookie;
-	 int i, s;
+	 int i;
 
 	 /* read new values at most once every 1.5 seconds */
 	 timeradd(&sc->lastread, &onepointfive, &t);
-	 s = splclock();
-	 i = timercmp(&mono_time, &t, >);
+	 getmicrouptime(&mtv);
+	 i = timercmp(&mtv, &t, >);
 	 if (i) {
-		  sc->lastread.tv_sec  = mono_time.tv_sec;
-		  sc->lastread.tv_usec = mono_time.tv_usec;
-	 }
-	 splx(s);
-
-	 if (i)
+		  sc->lastread = mtv;
 		  sc->refresh_sensor_data(sc);
+	 }
 
 	 *tred = sc->sensors[tred->sensor];
 
@@ -645,25 +641,34 @@ generic_svolt(struct lm_softc *sc, struct sensor *sensors)
 void
 generic_fanrpm(struct lm_softc *sc, struct sensor *sensors)
 {
-	int i, sdata, divisor;
+	int i, sdata, divisor, vidfan;
 
 	for (i = 0; i < 3; i++) {
 		sdata = (*sc->lm_readreg)(sc, LMD_SENSORBASE + 8 + i);
-		DPRINTF(("sdata[fan%d] 0x%x\n", i, sdata));
+		vidfan = (*sc->lm_readreg)(sc, LMD_VIDFAN);
+		DPRINTF(("sdata[fan%d] 0x%x", i, sdata));
 		if (i == 2)
-			divisor = 2;	/* Fixed divisor for FAN3 */
+			divisor = 1;	/* Fixed divisor for FAN3 */
 		else if (i == 1)	/* Bits 7 & 6 of VID/FAN  */
-			divisor = ((*sc->lm_readreg)(sc,
-			    LMD_VIDFAN) >> 6) & 0x3;
+			divisor = (vidfan >> 6) & 0x3;
 		else
-			divisor = ((*sc->lm_readreg)(sc,
-			    LMD_VIDFAN) >> 4) & 0x3;
+			divisor = (vidfan >> 4) & 0x3;
+		DPRINTF((", divisor %d\n", 2 << divisor));
 
 		if (sdata == 0xff) {
-			sensors[i].flags |= SENSOR_FINVALID;
+			/* Fan can be too slow, try to adjust the divisor */
+			if (i < 2 && divisor < 3) {
+				divisor++;
+				vidfan &= ~(0x3 << (i == 0 ? 4 : 6));
+				vidfan |= (divisor & 0x3) << (i == 0 ? 4 : 6);
+				(*sc->lm_writereg)(sc, LMD_VIDFAN, vidfan);
+			}
+			sensors[i].value = 0;
 		} else if (sdata == 0x00) {
+			sensors[i].flags |= SENSOR_FINVALID;
 			sensors[i].value = 0;
 		} else {
+			sensors[i].flags &= ~SENSOR_FINVALID;
 			sensors[i].value = 1350000 / (sdata << divisor);
 		}
 	}

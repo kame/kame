@@ -1,4 +1,4 @@
-/*	$OpenBSD: footbridge_com.c,v 1.2 2004/02/11 06:42:39 miod Exp $	*/
+/*	$OpenBSD: footbridge_com.c,v 1.4 2004/08/17 19:40:45 drahn Exp $	*/
 /*	$NetBSD: footbridge_com.c,v 1.13 2003/03/23 14:12:25 chris Exp $	*/
 
 /*-
@@ -96,19 +96,19 @@ struct fcom_softc {
 
 #define RX_BUFFER_SIZE	0x100
 
-static int  fcom_probe   __P((struct device *, void*, void *));
-static void fcom_attach  __P((struct device *, struct device *, void *));
-static void fcom_softintr __P((void *));
+static int  fcom_probe   (struct device *, void*, void *);
+static void fcom_attach  (struct device *, struct device *, void *);
+static void fcom_softintr (void *);
 
-static int fcom_rxintr __P((void *));
-/*static int fcom_txintr __P((void *));*/
+static int fcom_rxintr (void *);
+/*static int fcom_txintr (void *);*/
 
 /*struct consdev;*/
-/*void	fcomcnprobe	__P((struct consdev *));
-void	fcomcninit	__P((struct consdev *));*/
-int	fcomcngetc	__P((dev_t));
-void	fcomcnputc	__P((dev_t, int));
-void	fcomcnpollc	__P((dev_t, int));
+/*void	fcomcnprobe	(struct consdev *);
+void	fcomcninit	(struct consdev *);*/
+int	fcomcngetc	(dev_t);
+void	fcomcnputc	(dev_t, int);
+void	fcomcnpollc	(dev_t, int);
 
 struct cfattach fcom_ca = {
 	sizeof (struct fcom_softc), fcom_probe, fcom_attach
@@ -139,8 +139,8 @@ const struct cdevsw fcom_cdevsw = {
 };
 #endif
 
-void fcominit	 	__P((bus_space_tag_t, bus_space_handle_t, int, int));
-void fcominitcons 	__P((bus_space_tag_t, bus_space_handle_t));
+void fcominit	 	(bus_space_tag_t, bus_space_handle_t, int, int);
+void fcominitcons 	(bus_space_tag_t, bus_space_handle_t);
 
 bus_space_tag_t fcomconstag;
 bus_space_handle_t fcomconsioh;
@@ -221,14 +221,14 @@ fcom_attach(parent, self, aux)
 	printf("\n");
 
 	sc->sc_ih = footbridge_intr_claim(sc->sc_rx_irq, IPL_SERIAL,
-		"serial rx", fcom_rxintr, sc);
+		"serial_rx", fcom_rxintr, sc);
 	if (sc->sc_ih == NULL)
 		panic("%s: Cannot install rx interrupt handler",
 		    sc->sc_dev.dv_xname);
 }
 
-static void fcomstart __P((struct tty *));
-static int fcomparam __P((struct tty *, struct termios *));
+static void fcomstart (struct tty *);
+static int fcomparam (struct tty *, struct termios *);
 
 int
 fcomopen(dev, flag, mode, p)
@@ -639,7 +639,7 @@ fcom_rxintr(arg)
 				}
 			}
 	} while (1);
-	return(0);
+	return(1);
 }
 
 #if 0

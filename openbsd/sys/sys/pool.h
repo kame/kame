@@ -1,4 +1,4 @@
-/*	$OpenBSD: pool.h,v 1.15 2003/11/18 06:08:18 tedu Exp $	*/
+/*	$OpenBSD: pool.h,v 1.18 2004/07/29 09:18:17 mickey Exp $	*/
 /*	$NetBSD: pool.h,v 1.27 2001/06/06 22:00:17 rafal Exp $	*/
 
 /*-
@@ -115,7 +115,7 @@ struct pool {
 	unsigned int	pr_itemoffset;	/* Align this offset in item */
 	unsigned int	pr_minitems;	/* minimum # of items to keep */
 	unsigned int	pr_minpages;	/* same in page units */
-	unsigned int	pr_maxpages;	/* maximum # of pages to keep */
+	unsigned int	pr_maxpages;	/* maximum # of idle pages to keep */
 	unsigned int	pr_npages;	/* # of pages allocated */
 	unsigned int	pr_itemsperpage;/* # items that fit in a page */
 	unsigned int	pr_slack;	/* unused space in a page */
@@ -188,12 +188,11 @@ struct pool {
 };
 
 #ifdef _KERNEL
-/*
- * Alternate pool page allocator, provided for pools that know they
- * will never be accessed in interrupt context.
- */
+/* old nointr allocator, still needed for large allocations */
+extern struct pool_allocator pool_allocator_oldnointr;
+/* interrupt safe (name preserved for compat) new default allocator */
 extern struct pool_allocator pool_allocator_nointr;
-/* Standard pool allocator, provided here for reference. */
+/* previous interrupt safe allocator, allocates from kmem */
 extern struct pool_allocator pool_allocator_kmem;
 
 int		pool_allocator_drain(struct pool_allocator *, struct pool *,
@@ -228,13 +227,14 @@ void		pool_sethiwat(struct pool *, int);
 int		pool_sethardlimit(struct pool *, unsigned, const char *, int);
 void		pool_drain(void *);
 
+#ifdef DDB
 /*
  * Debugging and diagnostic aides.
  */
-void		pool_print(struct pool *, const char *);
 void		pool_printit(struct pool *, const char *,
 		    int (*)(const char *, ...));
 int		pool_chk(struct pool *, const char *);
+#endif
 
 /*
  * Pool cache routines.

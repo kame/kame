@@ -1,8 +1,8 @@
-#	$OpenBSD: Makefile.inc,v 1.34 2003/08/08 07:37:15 deraadt Exp $
+#	$OpenBSD: Makefile.inc,v 1.36 2004/07/24 17:39:27 millert Exp $
 
 CFLAGS=${DEBUG} ${COPTS} -Os -Wall -Werror
 CFLAGS+=	-fno-stack-protector
-CPPFLAGS+=-I${S} -I${SADIR}/libsa -I. -I${.CURDIR}
+CPPFLAGS+=-I${S} -I${SADIR}/libsa -I. -I${.CURDIR} -Derrno=errno
 SACFLAGS=-D_STANDALONE
 DEBUGLIBS=no
 DEBUGFLAGS=
@@ -29,7 +29,7 @@ SACFLAGS+=-nostdinc -fno-builtin -fpack-struct
 
 .if !make(libdep) && !make(sadep) && !make(salibdir) && !make(kernlibdir) && !make(obj)
 .BEGIN:
-	@([ X$(S) == X -o -h machine ] || ln -s $(S)/arch/i386/include machine)
+	@([ X$(S) = X -o -h machine ] || ln -s $(S)/arch/i386/include machine)
 .endif
 
 

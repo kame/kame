@@ -1,4 +1,4 @@
-/* $OpenBSD: intr.h,v 1.15 2002/04/29 07:35:13 miod Exp $ */
+/* $OpenBSD: intr.h,v 1.19 2004/08/16 16:43:52 art Exp $ */
 /* $NetBSD: intr.h,v 1.26 2000/06/03 20:47:41 thorpej Exp $ */
 
 /*-
@@ -68,6 +68,7 @@
 #ifndef _ALPHA_INTR_H_
 #define _ALPHA_INTR_H_
 
+#include <sys/evcount.h>
 #include <sys/lock.h>
 #include <sys/queue.h>
 #include <machine/atomic.h>
@@ -92,6 +93,7 @@
 #define	IPL_CLOCK	2	/* disable clock interrupts */
 #define	IPL_HIGH	3	/* disable all interrupts */
 #define	IPL_SERIAL	1	/* disable serial interrupts */
+#define	IPL_AUDIO	1	/* disable audio interrupts */
 
 #define	IPL_SOFTSERIAL	0	/* serial software interrupts */
 #define	IPL_SOFTNET	1	/* network software interrupts */
@@ -116,14 +118,8 @@
 #define	spllowersoftclock()	alpha_pal_swpipl(ALPHA_PSL_IPL_SOFT)
 
 /* IPL-raising functions/macros */
-static __inline int _splraise(int);
-static __inline int
-_splraise(s)
-	int s;
-{
-	int cur = alpha_pal_rdps() & ALPHA_PSL_IPL_MASK;
-	return (s > cur ? alpha_pal_swpipl(s) : cur);
-}
+int _splraise(int);
+
 #define splsoft()		_splraise(ALPHA_PSL_IPL_SOFT)
 #define splsoftserial()		splsoft()
 #define splsoftclock()		splsoft()
@@ -133,7 +129,8 @@ _splraise(s)
 #define splimp()                _splraise(ALPHA_PSL_IPL_IO)
 #define spltty()                _splraise(ALPHA_PSL_IPL_IO)
 #define splserial()             _splraise(ALPHA_PSL_IPL_IO)
-#define	splvm()			_splraise(ALPHA_PSL_IPL_IO)
+#define splaudio()		_splraise(ALPHA_PSL_IPL_IO)
+#define splvm()			_splraise(ALPHA_PSL_IPL_IO)
 #define splclock()              _splraise(ALPHA_PSL_IPL_CLOCK)
 #define splstatclock()          _splraise(ALPHA_PSL_IPL_CLOCK)
 #define splhigh()               _splraise(ALPHA_PSL_IPL_HIGH)
@@ -157,6 +154,7 @@ extern	ipifunc_t ipifuncs[ALPHA_NIPIS];
 
 void	alpha_send_ipi(unsigned long, unsigned long);
 void	alpha_broadcast_ipi(unsigned long);
+void	alpha_multicast_ipi(unsigned long, unsigned long);
 
 /*
  * Alpha shared-interrupt-line common code.
@@ -170,6 +168,7 @@ struct alpha_shared_intrhand {
 	void	*ih_arg;
 	int	ih_level;
 	unsigned int ih_num;
+	struct evcount ih_count;
 };
 
 struct alpha_shared_intr {

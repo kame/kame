@@ -1,4 +1,4 @@
-/*	$OpenBSD: nfs_vnops.c,v 1.58 2004/03/02 05:46:00 tedu Exp $	*/
+/*	$OpenBSD: nfs_vnops.c,v 1.63 2004/08/03 17:11:48 marius Exp $	*/
 /*	$NetBSD: nfs_vnops.c,v 1.62.4.1 1996/07/08 20:26:52 jtc Exp $	*/
 
 /*
@@ -45,10 +45,12 @@
 #include <sys/kernel.h>
 #include <sys/systm.h>
 #include <sys/resourcevar.h>
+#include <sys/poll.h>
 #include <sys/proc.h>
 #include <sys/mount.h>
 #include <sys/buf.h>
 #include <sys/malloc.h>
+#include <sys/pool.h>
 #include <sys/mbuf.h>
 #include <sys/conf.h>
 #include <sys/namei.h>
@@ -98,7 +100,7 @@ struct vnodeopv_entry_desc nfsv2_vnodeop_entries[] = {
 	{ &vop_lease_desc, nfs_lease_check },	/* lease */
 	{ &vop_ioctl_desc, nfs_ioctl },		/* ioctl */
 	{ &vop_poll_desc, nfs_poll },		/* poll */
-	{ &vop_kqfilter_desc, vop_generic_kqfilter },	/* kqfilter */
+	{ &vop_kqfilter_desc, nfs_kqfilter },	/* kqfilter */
 	{ &vop_revoke_desc, nfs_revoke },	/* revoke */
 	{ &vop_fsync_desc, nfs_fsync },		/* fsync */
 	{ &vop_remove_desc, nfs_remove },	/* remove */
@@ -557,6 +559,9 @@ nfs_setattr(v)
 		np->n_size = np->n_vattr.va_size = tsize;
 		uvm_vnp_setsize(vp, np->n_size);
 	}
+
+	VN_KNOTE(vp, NOTE_ATTRIB); /* XXX setattrrpc? */
+
 	return (error);
 }
 
@@ -1204,7 +1209,7 @@ nfs_mknodrpc(dvp, vpp, cnp, vap)
 			cache_enter(dvp, newvp, cnp);
 		*vpp = newvp;
 	}
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, cnp->cn_pnbuf);
 	VTONFS(dvp)->n_flag |= NMODIFIED;
 	if (!wccflag)
 		VTONFS(dvp)->n_attrstamp = 0;
@@ -1233,6 +1238,9 @@ nfs_mknod(v)
 	error = nfs_mknodrpc(ap->a_dvp, &newvp, ap->a_cnp, ap->a_vap);
 	if (!error)
 		vrele(newvp);
+
+	VN_KNOTE(ap->a_dvp, NOTE_WRITE);
+
 	return (error);
 }
 
@@ -1334,10 +1342,11 @@ again:
 			cache_enter(dvp, newvp, cnp);
 		*ap->a_vpp = newvp;
 	}
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, cnp->cn_pnbuf);
 	VTONFS(dvp)->n_flag |= NMODIFIED;
 	if (!wccflag)
 		VTONFS(dvp)->n_attrstamp = 0;
+	VN_KNOTE(ap->a_dvp, NOTE_WRITE);
 	vrele(dvp);
 	return (error);
 }
@@ -1408,10 +1417,14 @@ nfs_remove(v)
 			error = 0;
 	} else if (!np->n_sillyrename)
 		error = nfs_sillyrename(dvp, vp, cnp);
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, cnp->cn_pnbuf);
 	np->n_attrstamp = 0;
 	vrele(dvp);
 	vrele(vp);
+
+	VN_KNOTE(vp, NOTE_DELETE);
+	VN_KNOTE(dvp, NOTE_WRITE);
+
 	return (error);
 }
 
@@ -1502,6 +1515,7 @@ nfs_rename(v)
 	 */
 	if (tvp && tvp->v_usecount > 1 && !VTONFS(tvp)->n_sillyrename &&
 	    tvp->v_type != VDIR && !nfs_sillyrename(tdvp, tvp, tcnp)) {
+		VN_KNOTE(tvp, NOTE_DELETE);
 		vrele(tvp);
 		tvp = NULL;
 	}
@@ -1509,6 +1523,9 @@ nfs_rename(v)
 	error = nfs_renamerpc(fdvp, fcnp->cn_nameptr, fcnp->cn_namelen,
 		tdvp, tcnp->cn_nameptr, tcnp->cn_namelen, tcnp->cn_cred,
 		tcnp->cn_proc);
+
+	VN_KNOTE(fdvp, NOTE_WRITE);
+	VN_KNOTE(tdvp, NOTE_WRITE);
 
 	if (fvp->v_type == VDIR) {
 		if (tvp != NULL && tvp->v_type == VDIR)
@@ -1614,7 +1631,7 @@ nfs_link(v)
 	int v3;
 
 	if (dvp->v_mount != vp->v_mount) {
-		FREE(cnp->cn_pnbuf, M_NAMEI);
+		pool_put(&namei_pool, cnp->cn_pnbuf);
 		if (vp == dvp)
 			vrele(dvp);
 		else
@@ -1642,12 +1659,15 @@ nfs_link(v)
 		nfsm_wcc_data(dvp, wccflag);
 	}
 	nfsm_reqdone;
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, cnp->cn_pnbuf);
 	VTONFS(dvp)->n_flag |= NMODIFIED;
 	if (!attrflag)
 		VTONFS(vp)->n_attrstamp = 0;
 	if (!wccflag)
 		VTONFS(dvp)->n_attrstamp = 0;
+
+	VN_KNOTE(vp, NOTE_LINK);
+	VN_KNOTE(dvp, NOTE_WRITE);
 	vput(dvp);
 	/*
 	 * Kludge: Map EEXIST => 0 assuming that it is a reply to a retry.
@@ -1711,10 +1731,11 @@ nfs_symlink(v)
 	nfsm_reqdone;
 	if (newvp)
 		vrele(newvp);
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, cnp->cn_pnbuf);
 	VTONFS(dvp)->n_flag |= NMODIFIED;
 	if (!wccflag)
 		VTONFS(dvp)->n_attrstamp = 0;
+	VN_KNOTE(dvp, NOTE_WRITE);
 	vrele(dvp);
 	/*
 	 * Kludge: Map EEXIST => 0 assuming that it is a reply to a retry.
@@ -1799,9 +1820,11 @@ nfs_mkdir(v)
 	if (error) {
 		if (newvp)
 			vrele(newvp);
-	} else
+	} else {
+		VN_KNOTE(dvp, NOTE_WRITE|NOTE_LINK);
 		*ap->a_vpp = newvp;
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	}
+	pool_put(&namei_pool, cnp->cn_pnbuf);
 	vrele(dvp);
 	return (error);
 }
@@ -1832,7 +1855,7 @@ nfs_rmdir(v)
 	if (dvp == vp) {
 		vrele(dvp);
 		vrele(dvp);
-		FREE(cnp->cn_pnbuf, M_NAMEI);
+		pool_put(&namei_pool, cnp->cn_pnbuf);
 		return (EINVAL);
 	}
 	nfsstats.rpccnt[NFSPROC_RMDIR]++;
@@ -1844,10 +1867,14 @@ nfs_rmdir(v)
 	if (v3)
 		nfsm_wcc_data(dvp, wccflag);
 	nfsm_reqdone;
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, cnp->cn_pnbuf);
 	VTONFS(dvp)->n_flag |= NMODIFIED;
 	if (!wccflag)
 		VTONFS(dvp)->n_attrstamp = 0;
+
+	VN_KNOTE(dvp, NOTE_WRITE|NOTE_LINK);
+	VN_KNOTE(vp, NOTE_DELETE);
+
 	cache_purge(dvp);
 	cache_purge(vp);
 	vrele(vp);
@@ -2962,10 +2989,16 @@ nfs_writebp(bp, force)
 	int oldflags = bp->b_flags, retv = 1;
 	struct proc *p = curproc;	/* XXX */
 	off_t off;
+	size_t cnt;
 	int   s;
+	struct vnode *vp;
+	struct nfsnode *np;
 
 	if(!(bp->b_flags & B_BUSY))
 		panic("bwrite: buffer is not busy???");
+
+	vp = bp->b_vp;
+	np = VTONFS(vp);
 
 #ifdef fvdl_debug
 	printf("nfs_writebp(%x): vp %x voff %d vend %d doff %d dend %d\n",
@@ -2990,10 +3023,45 @@ nfs_writebp(bp, force)
 	 */
 	if ((oldflags & (B_NEEDCOMMIT | B_WRITEINPROG)) == B_NEEDCOMMIT) {
 		off = ((u_quad_t)bp->b_blkno) * DEV_BSIZE + bp->b_dirtyoff;
-		bp->b_flags |= B_WRITEINPROG;
-		retv = nfs_commit(bp->b_vp, off, bp->b_dirtyend-bp->b_dirtyoff,
-			bp->b_proc);
-		bp->b_flags &= ~B_WRITEINPROG;
+		cnt = bp->b_dirtyend - bp->b_dirtyoff;
+
+		rw_enter_write(&np->n_commitlock);
+		if (!(bp->b_flags & B_NEEDCOMMIT)) {
+			rw_exit_write(&np->n_commitlock);
+			return (0);
+		}
+
+		/*
+		 * If it's already been commited by somebody else,
+		 * bail.
+		 */
+		if (!nfs_in_committed_range(vp, bp)) {
+			int pushedrange = 0;
+			/*
+			 * Since we're going to do this, push as much
+			 * as we can.
+			 */
+
+			if (nfs_in_tobecommitted_range(vp, bp)) {
+				pushedrange = 1;
+				off = np->n_pushlo;
+				cnt = np->n_pushhi - np->n_pushlo;
+			}
+
+			bp->b_flags |= B_WRITEINPROG;
+			retv = nfs_commit(bp->b_vp, off, cnt, bp->b_proc);
+			bp->b_flags &= ~B_WRITEINPROG;
+
+			if (retv == 0) {
+				if (pushedrange)
+					nfs_merge_commit_ranges(vp);
+				else 
+					nfs_add_committed_range(vp, bp);
+			}
+		} else
+			retv = 0; /* It has already been commited. */
+
+		rw_exit_write(&np->n_commitlock);
 		if (!retv) {
 			bp->b_dirtyoff = bp->b_dirtyend = 0;
 			bp->b_flags &= ~B_NEEDCOMMIT;
@@ -3064,6 +3132,23 @@ nfsspec_access(v)
 	    ap->a_cred));
 }
 
+/* ARGSUSED */
+int
+nfs_poll(v)
+        void *v;
+{
+	struct vop_poll_args /* {
+		struct vnode *a_vp;
+		int  a_events;
+		struct proc *a_p;
+	} */ *ap = v;
+
+	/*
+	 * We should really check to see if I/O is possible.
+	 */
+	return (ap->a_events & (POLLIN | POLLOUT | POLLRDNORM | POLLWRNORM));
+}
+
 /*
  * Read wrapper for special devices.
  */
@@ -3083,8 +3168,7 @@ nfsspec_read(v)
 	 * Set access flag.
 	 */
 	np->n_flag |= NACC;
-	np->n_atim.tv_sec = time.tv_sec;
-	np->n_atim.tv_nsec = time.tv_usec * 1000;
+	getnanotime(&np->n_atim);
 	return (VOCALL(spec_vnodeop_p, VOFFSET(vop_read), ap));
 }
 
@@ -3107,8 +3191,7 @@ nfsspec_write(v)
 	 * Set update flag.
 	 */
 	np->n_flag |= NUPD;
-	np->n_mtim.tv_sec = time.tv_sec;
-	np->n_mtim.tv_nsec = time.tv_usec * 1000;
+	getnanotime(&np->n_mtim);
 	return (VOCALL(spec_vnodeop_p, VOFFSET(vop_write), ap));
 }
 
@@ -3167,8 +3250,7 @@ nfsfifo_read(v)
 	 * Set access flag.
 	 */
 	np->n_flag |= NACC;
-	np->n_atim.tv_sec = time.tv_sec;
-	np->n_atim.tv_nsec = time.tv_usec * 1000;
+	getnanotime(&np->n_atim);
 	return (VOCALL(fifo_vnodeop_p, VOFFSET(vop_read), ap));
 }
 
@@ -3192,8 +3274,7 @@ nfsfifo_write(v)
 	 * Set update flag.
 	 */
 	np->n_flag |= NUPD;
-	np->n_mtim.tv_sec = time.tv_sec;
-	np->n_mtim.tv_nsec = time.tv_usec * 1000;
+	getnanotime(&np->n_mtim);
 	return (VOCALL(fifo_vnodeop_p, VOFFSET(vop_write), ap));
 }
 
@@ -3219,12 +3300,10 @@ nfsfifo_close(v)
 
 	if (np->n_flag & (NACC | NUPD)) {
 		if (np->n_flag & NACC) {
-			np->n_atim.tv_sec = time.tv_sec;
-			np->n_atim.tv_nsec = time.tv_usec * 1000;
+			getnanotime(&np->n_atim);
 		}
 		if (np->n_flag & NUPD) {
-			np->n_mtim.tv_sec = time.tv_sec;
-			np->n_mtim.tv_nsec = time.tv_usec * 1000;
+			getnanotime(&np->n_mtim);
 		}
 		np->n_flag |= NCHG;
 		if (vp->v_usecount == 1 &&

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_spppsubr.c,v 1.19 2004/01/03 14:08:53 espie Exp $	*/
+/*	$OpenBSD: if_spppsubr.c,v 1.24 2004/07/16 15:01:09 henning Exp $	*/
 /*
  * Synchronous PPP/Cisco link level subroutines.
  * Keepalive protocol implemented in both Cisco and PPP modes.
@@ -62,7 +62,7 @@
 
 #if defined (__OpenBSD__)
 #include <sys/timeout.h>
-#include <sys/md5k.h>
+#include <crypto/md5.h>
 #else
 #include <sys/md5.h>
 #endif
@@ -102,13 +102,6 @@
 #ifdef NS
 #include <netns/ns.h>
 #include <netns/ns_if.h>
-#endif
-
-#ifdef ISO
-#include <netiso/argo_debug.h>
-#include <netiso/iso.h>
-#include <netiso/iso_var.h>
-#include <netiso/iso_snpac.h>
 #endif
 
 #include <net/if_sppp.h>
@@ -562,15 +555,6 @@ sppp_input(struct ifnet *ifp, struct mbuf *m)
 			}
 			break;
 #endif
-#ifdef ISO
-		case PPP_ISO:
-			/* OSI NLCP not implemented yet */
-			if (sp->pp_phase == PHASE_NETWORK) {
-				schednetisr (NETISR_ISO);
-				inq = &clnlintrq;
-			}
-			break;
-#endif
 		}
 		break;
 	case CISCO_MULTICAST:
@@ -636,6 +620,8 @@ sppp_input(struct ifnet *ifp, struct mbuf *m)
 		if (debug)
 			log(LOG_DEBUG, SPP_FMT "protocol queue overflow\n",
 				SPP_ARGS(ifp));
+		if (!inq->ifq_congestion)
+			if_congestion(inq);
 		goto drop;
 	}
 	IF_ENQUEUE(inq, m);
@@ -773,14 +759,6 @@ sppp_output(struct ifnet *ifp, struct mbuf *m,
 		h->protocol = htons ((sp->pp_flags & PP_CISCO) ?
 			ETHERTYPE_IPX : PPP_IPX);
 		break;
-#endif
-#ifdef ISO
-	case AF_ISO:    /* ISO OSI Protocol */
-		if (sp->pp_flags & PP_CISCO)
-			goto nosupport;
-		h->protocol = htons (PPP_ISO);
-		break;
-nosupport:
 #endif
 	default:
 		m_freem (m);
@@ -1145,15 +1123,9 @@ sppp_cisco_send(struct sppp *sp, int type, long par1, long par2)
 	struct ppp_header *h;
 	struct cisco_packet *ch;
 	struct mbuf *m;
-#if defined (__FreeBSD__)
-	struct timeval tv;
-#else
-	u_long t = (time.tv_sec - boottime.tv_sec) * 1000;
-#endif
+	struct timeval tv;	
 
-#if defined (__FreeBSD__)
 	getmicrouptime(&tv);
-#endif
 
 	MGETHDR (m, M_DONTWAIT, MT_DATA);
 	if (! m)
@@ -1172,13 +1144,8 @@ sppp_cisco_send(struct sppp *sp, int type, long par1, long par2)
 	ch->par2 = htonl (par2);
 	ch->rel = -1;
 
-#if defined (__FreeBSD__)
 	ch->time0 = htons ((u_short) (tv.tv_sec >> 16));
 	ch->time1 = htons ((u_short) tv.tv_sec);
-#else
-	ch->time0 = htons ((u_short) (t >> 16));
-	ch->time1 = htons ((u_short) t);
-#endif
 
 	if (debug)
 		log(LOG_DEBUG,
@@ -3384,24 +3351,15 @@ sppp_chap_tld(struct sppp *sp)
 HIDE void
 sppp_chap_scr(struct sppp *sp)
 {
-	u_long *ch, seed;
+	u_int32_t *ch;
 	u_char clen;
-#if defined (__NetBSD__) || defined (__OpenBSD__)
-	struct timeval tv;
-#endif
 
 	/* Compute random challenge. */
-	ch = (u_long *)sp->myauth.challenge;
-#if defined (__FreeBSD__)
-	read_random(&seed, sizeof seed);
-#else
-	microtime(&tv);
-	seed = tv.tv_sec ^ tv.tv_usec;
-#endif
-	ch[0] = seed ^ random();
-	ch[1] = seed ^ random();
-	ch[2] = seed ^ random();
-	ch[3] = seed ^ random();
+	ch = (u_int32_t *)sp->myauth.challenge;
+	ch[0] = arc4random();
+	ch[1] = arc4random();
+	ch[2] = arc4random();
+	ch[3] = arc4random();
 	clen = AUTHKEYLEN;
 
 	sp->confid[IDX_CHAP] = ++sp->pp_seq;

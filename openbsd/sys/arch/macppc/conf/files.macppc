@@ -1,4 +1,4 @@
-#	$OpenBSD: files.macppc,v 1.18 2004/01/11 16:33:01 drahn Exp $
+#	$OpenBSD: files.macppc,v 1.20 2004/07/20 14:51:07 miod Exp $
 
 #
 # macppc-specific configuration info
@@ -55,6 +55,7 @@ attach	memc at mainbus
 file	arch/macppc/dev/uni_n.c				memc
 
 major	{rd = 17}
+major	{wd = 0}
 major	{sd = 2}
 major	{cd = 3}
 
@@ -174,6 +175,11 @@ device	awacs: audio, auconv, mulaw
 attach	awacs at macobio
 file	arch/macppc/dev/awacs.c				awacs
 
+# Mediabay
+device mediabay {}
+attach mediabay at macobio
+file	arch/macppc/dev/mediabay.c			mediabay
+
 # Keywest I2C
 device ki2c {}
 attach ki2c at macobio
@@ -193,7 +199,7 @@ attach	gpio at macobio with gpio_obio
 attach	gpio at gpio with gpio_gpio
 file	arch/macppc/dev/gpio.c				gpio
 
-attach	wdc at macobio, kauaiata with wdc_obio
+attach	wdc at mediabay, macobio, kauaiata with wdc_obio
 file	arch/macppc/dev/wdc_obio.c			wdc_obio
 
 attach	wi at macobio with wi_obio

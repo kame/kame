@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.26 2004/01/14 01:45:50 miod Exp $	*/
+/*	$OpenBSD: param.h,v 1.29 2004/08/06 22:31:31 mickey Exp $	*/
 /*	$NetBSD: param.h,v 1.29 1996/03/04 05:04:26 cgd Exp $	*/
 
 /*-
@@ -97,9 +97,10 @@
 #define	SINCR		1		/* increment of stack/NBPG */
 #define	UPAGES		2		/* pages of u-area */
 #define	USPACE		(UPAGES * NBPG)	/* total size of u-area */
+#define	USPACE_ALIGN	(0)		/* u-area alignment 0-none */
 
 #ifndef MSGBUFSIZE
-#define MSGBUFSIZE	2*NBPG		/* default message buffer size */
+#define MSGBUFSIZE	4*NBPG		/* default message buffer size */
 #endif
 
 /*
@@ -113,10 +114,7 @@
 #define	MCLSHIFT	11		/* convert bytes to m_buf clusters */
 #define	MCLBYTES	(1 << MCLSHIFT)	/* size of a m_buf cluster */
 #define	MCLOFSET	(MCLBYTES - 1)	/* offset within a m_buf cluster */
-
-#ifndef NMBCLUSTERS
-#define	NMBCLUSTERS	2048		/* map size, max cluster allocation */
-#endif
+#define	NMBCLUSTERS	6144		/* map size, max cluster allocation */
 
 /*
  * Minimum and maximum sizes of the kernel malloc arena in PAGE_SIZE-sized

@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.22 2004/03/11 21:06:01 deraadt Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.30 2004/08/03 00:56:22 art Exp $	*/
 /*	$NetBSD: machdep.c,v 1.3 2003/05/07 22:58:18 fvdl Exp $	*/
 
 /*-
@@ -126,6 +126,7 @@
 #include <machine/biosvar.h>
 #include <machine/mpbiosvar.h>
 #include <machine/reg.h>
+#include <machine/kcore.h>
 
 #include <dev/isa/isareg.h>
 #include <machine/isa_machdep.h>
@@ -200,6 +201,10 @@ pid_t sigpid = 0;
 
 extern	paddr_t avail_start, avail_end;
 
+void (*delay_func)(int) = i8254_delay;
+void (*microtime_func)(struct timeval *) = i8254_microtime;
+void (*initclock_func)(void) = i8254_initclocks;
+
 struct mtrr_funcs *mtrr_funcs;
 
 /*
@@ -244,7 +249,6 @@ int	cpu_dumpsize(void);
 u_long	cpu_dump_mempagecnt(void);
 void	dumpsys(void);
 void	init_x86_64(paddr_t);
-void	syscall_intern(struct proc *p);
 
 #ifdef APERTURE
 #ifdef INSECURE
@@ -539,6 +543,7 @@ x86_64_proc0_tss_ldt_init(void)
  * Set up TSS and LDT for a new PCB.
  */         
          
+#ifdef MULTIPROCESSOR
 void    
 x86_64_init_pcb_tss_ldt(ci)   
 	struct cpu_info *ci;
@@ -558,6 +563,7 @@ x86_64_init_pcb_tss_ldt(ci)
         
         ci->ci_idle_tss_sel = tss_alloc(pcb);
 }       
+#endif	/* MULTIPROCESSOR */
 
 bios_diskinfo_t *
 bios_getdiskinfo(dev)
@@ -929,17 +935,37 @@ cpu_dump()
 	int (*dump)(dev_t, daddr_t, caddr_t, size_t);
 	char buf[dbtob(1)];
 	kcore_seg_t *segp;
+	cpu_kcore_hdr_t *cpuhdrp;
+	phys_ram_seg_t *memsegp;
+	int i;
 
 	dump = bdevsw[major(dumpdev)].d_dump;
 
 	memset(buf, 0, sizeof buf);
 	segp = (kcore_seg_t *)buf;
+	cpuhdrp = (cpu_kcore_hdr_t *)&buf[ALIGN(sizeof(*segp))];
+	memsegp = (phys_ram_seg_t *)&buf[ALIGN(sizeof(*segp)) +
+	    ALIGN(sizeof(*cpuhdrp))];
 
 	/*
 	 * Generate a segment header.
 	 */
 	CORE_SETMAGIC(*segp, KCORE_MAGIC, MID_MACHINE, CORE_CPU);
 	segp->c_size = dbtob(1) - ALIGN(sizeof(*segp));
+
+	/*
+	 * Add the machine-dependent header info.
+	 */
+	cpuhdrp->ptdpaddr = PTDpaddr;
+	cpuhdrp->nmemsegs = mem_cluster_cnt;
+
+	/*
+	 * Fill in the memory segment descriptors.
+	 */
+	for (i = 0; i < mem_cluster_cnt; i++) {
+		memsegp[i].start = mem_clusters[i].start;
+		memsegp[i].size = mem_clusters[i].size & ~PAGE_MASK;
+	}
 
 	return (dump(dumpdev, dumplo, (caddr_t)buf, dbtob(1)));
 }
@@ -1010,7 +1036,6 @@ dumpsys()
 {
 	u_long totalbytesleft, bytes, i, n, memseg;
 	u_long maddr;
-	int psize;
 	daddr_t blkno;
 	int (*dump)(dev_t, daddr_t, caddr_t, size_t);
 	int error;
@@ -1037,7 +1062,7 @@ dumpsys()
 
 	error = (*bdevsw[major(dumpdev)].d_psize)(dumpdev);
 	printf("dump ");
-	if (psize == -1) {
+	if (error == -1) {
 		printf("area unavailable\n");
 		return;
 	}
@@ -1135,8 +1160,6 @@ setregs(struct proc *p, struct exec_package *pack, u_long stack,
 #ifdef USER_LDT
 	pmap_ldt_cleanup(p);
 #endif
-
-	syscall_intern(p);
 
 	p->p_md.md_flags &= ~MDP_USEDFPU;
 	pcb->pcb_flags = 0;
@@ -1272,36 +1295,6 @@ extern vector *IDTVEC(exceptions)[];
 
 #define	KBTOB(x)	((size_t)(x) * 1024UL)
 
-#if 0
-void
-beepme(int pitch, int duration)
-{
-#define IO_TIMER1       0x040
-#define IO_PPI          0x061
-#define              TIMER_SEL2      0x80
-#define              TIMER_16BIT     0x30 
-#define              TIMER_SQWAVE    0x06 
-#define TIMER_CNTR2     (IO_TIMER1 + 2)
-#define TIMER_MODE      (IO_TIMER1 + 3)
-#define TIMER_FREQ      1193182
-#define TIMER_DIV(x) ((TIMER_FREQ+(x)/2)/(x))
-
-#define PIT_ENABLETMR2  0x01
-#define PIT_SPKRDATA    0x02
-#define PIT_SPKR        (PIT_ENABLETMR2|PIT_SPKRDATA)
-
-#define PITCH 440
-
-	outb(IO_TIMER1 + TIMER_MODE, TIMER_SEL2 | TIMER_16BIT | TIMER_SQWAVE);
-	outb(IO_TIMER1 + TIMER_CNTR2, TIMER_DIV(pitch) % 256);
-	outb(IO_TIMER1 + TIMER_CNTR2, TIMER_DIV(pitch) / 256);
-	outb(IO_PPI, inb(IO_PPI) | PIT_SPKR);
-	delay(duration / 2);
-	outb(IO_PPI, inb(IO_PPI) & ~PIT_SPKR);
-	delay(duration / 2);
-}
-#endif
-
 void
 init_x86_64(first_avail)
 	paddr_t first_avail;
@@ -1360,7 +1353,8 @@ init_x86_64(first_avail)
 	 * Call pmap initialization to make new kernel address space.
 	 * We must do this before loading pages into the VM system.
 	 */
-	pmap_bootstrap(VM_MIN_KERNEL_ADDRESS);
+	pmap_bootstrap(VM_MIN_KERNEL_ADDRESS,
+	    IOM_END + trunc_page(KBTOB(biosextmem)));
 
 	if (avail_start != PAGE_SIZE)
 		pmap_prealloc_lowmem_ptps();
@@ -1775,35 +1769,12 @@ cpu_dump_mempagecnt()
 	return (n);
 }
 
-#if 0
-extern void i8254_microtime(struct timeval *tv);
-
-/*
- * XXXXXXX
- * the simulator's 8254 seems to travel backward in time sometimes?
- * work around this with this hideous code. Unacceptable for
- * real hardware, but this is just a patch to stop the weird
- * effects. SMP unsafe, etc.
- */
 void
-microtime(struct timeval *tv)
+cpu_initclocks(void)
 {
-	static struct timeval mtv;
-
-	i8254_microtime(tv);
-	if (tv->tv_sec <= mtv.tv_sec && tv->tv_usec < mtv.tv_usec) {
-		mtv.tv_usec++;
-		if (mtv.tv_usec > 1000000) {
-			mtv.tv_sec++;
-			mtv.tv_usec = 0;
-		}
-		*tv = mtv;
-	} else
-		mtv = *tv;
+	(*initclock_func)();
 }
-#endif
 
-#ifdef MULTIPROCESSOR
 void
 need_resched(struct cpu_info *ci)
 {
@@ -1811,7 +1782,6 @@ need_resched(struct cpu_info *ci)
 	if ((ci)->ci_curproc != NULL)
 		aston((ci)->ci_curproc);
 }
-#endif
 
 /*
  * Allocate an IDT vector slot within the given range.

@@ -1,4 +1,4 @@
-/*	$OpenBSD: sshvar.h,v 1.3 2003/06/02 23:27:50 millert Exp $ */
+/*	$OpenBSD: sshvar.h,v 1.5 2004/07/30 22:29:45 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -121,7 +121,6 @@ struct ssh_tinfo {
 struct	ssh_softc {
 	struct	device sc_dev;
 	struct	intrhand sc_ih;
-	struct	evcnt sc_intrcnt;
 
 	u_char	sc_istat;
 	u_char	sc_dstat;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: rtl81x9.c,v 1.22 2003/10/21 18:58:49 jmc Exp $ */
+/*	$OpenBSD: rtl81x9.c,v 1.26 2004/06/06 17:56:36 mcbride Exp $ */
 
 /*
  * Copyright (c) 1997, 1998
@@ -160,7 +160,6 @@ int rl_miibus_readreg(struct device *, int, int);
 void rl_miibus_writereg(struct device *, int, int, int);
 void rl_miibus_statchg(struct device *);
 
-u_int8_t rl_calchash(caddr_t);
 void rl_setmulti(struct rl_softc *);
 void rl_reset(struct rl_softc *);
 int rl_list_tx_init(struct rl_softc *);
@@ -461,34 +460,6 @@ int rl_mii_writereg(sc, frame)
 }
 
 /*
- * Calculate CRC of a multicast group address, return the upper 6 bits.
- */
-u_int8_t rl_calchash(addr)
-	caddr_t			addr;
-{
-	u_int32_t		crc, carry;
-	int			i, j;
-	u_int8_t		c;
-
-	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF; /* initial value */
-
-	for (i = 0; i < 6; i++) {
-		c = *(addr + i);
-		for (j = 0; j < 8; j++) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (c & 0x01);
-			crc <<= 1;
-			c >>= 1;
-			if (carry)
-				crc = (crc ^ 0x04c11db6) | carry;
-		}
-	}
-
-	/* return the filter bit position */
-	return(crc >> 26);
-}
-
-/*
  * Program the 64-bit multicast hash filter.
  */
 void rl_setmulti(sc)
@@ -507,6 +478,7 @@ void rl_setmulti(sc)
 
 	rxfilt = CSR_READ_4(sc, RL_RXCFG);
 
+allmulti:
 	if (ifp->if_flags & IFF_ALLMULTI || ifp->if_flags & IFF_PROMISC) {
 		rxfilt |= RL_RXCFG_RX_MULTI;
 		CSR_WRITE_4(sc, RL_RXCFG, rxfilt);
@@ -522,8 +494,12 @@ void rl_setmulti(sc)
 	/* now program new ones */
 	ETHER_FIRST_MULTI(step, ac, enm);
 	while (enm != NULL) {
+		if (bcmp(enm->enm_addrlo, enm->enm_addrhi, ETHER_ADDR_LEN)) {
+			ifp->if_flags |= IFF_ALLMULTI;
+			goto allmulti;
+		}
 		mcnt++;
-		h = rl_calchash(enm->enm_addrlo);
+		h = ether_crc32_be(enm->enm_addrlo, ETHER_ADDR_LEN) >> 26;
 		if (h < 32)
 			hashes[0] |= (1 << h);
 		else
@@ -686,12 +662,12 @@ rl_rxeof(sc)
 		wrap = (sc->rl_cdata.rl_rx_buf + RL_RXBUFLEN) - rxbufpos;
 
 		if (total_len > wrap) {
-			m = m_devget(rxbufpos - RL_ETHER_ALIGN,
-			    wrap + RL_ETHER_ALIGN, 0, ifp, NULL);
+			m = m_devget(rxbufpos - ETHER_ALIGN,
+			    wrap + ETHER_ALIGN, 0, ifp, NULL);
 			if (m == NULL)
 				ifp->if_ierrors++;
 			else {
-				m_adj(m, RL_ETHER_ALIGN);
+				m_adj(m, ETHER_ALIGN);
 				m_copyback(m, wrap, total_len - wrap,
 					sc->rl_cdata.rl_rx_buf);
 				m = m_pullup(m, sizeof(struct ether_header));
@@ -700,12 +676,12 @@ rl_rxeof(sc)
 			}
 			cur_rx = (total_len - wrap + ETHER_CRC_LEN);
 		} else {
-			m = m_devget(rxbufpos - RL_ETHER_ALIGN,
-			    total_len + RL_ETHER_ALIGN, 0, ifp, NULL);
+			m = m_devget(rxbufpos - ETHER_ALIGN,
+			    total_len + ETHER_ALIGN, 0, ifp, NULL);
 			if (m == NULL)
 				ifp->if_ierrors++;
 			else
-				m_adj(m, RL_ETHER_ALIGN);
+				m_adj(m, ETHER_ALIGN);
 			cur_rx += total_len + 4 + ETHER_CRC_LEN;
 		}
 
@@ -923,7 +899,7 @@ void rl_start(ifp)
 		 * Transmit the frame.
 		 */
 		CSR_WRITE_4(sc, RL_CUR_TXADDR(sc),
-		    vtophys(mtod(RL_CUR_TXMBUF(sc), caddr_t)));
+		    vtophys(mtod(RL_CUR_TXMBUF(sc), vaddr_t)));
 		CSR_WRITE_4(sc, RL_CUR_TXSTAT(sc),
 		    RL_TXTHRESH(sc->rl_txthresh) |
 		    RL_CUR_TXMBUF(sc)->m_pkthdr.len);
@@ -968,7 +944,7 @@ void rl_init(xsc)
 	}
 
 	/* Init the RX buffer pointer register. */
-	CSR_WRITE_4(sc, RL_RXADDR, vtophys(sc->rl_cdata.rl_rx_buf));
+	CSR_WRITE_4(sc, RL_RXADDR, vtophys((vaddr_t)sc->rl_cdata.rl_rx_buf));
 
 	/* Init TX descriptors. */
 	rl_list_tx_init(sc);
@@ -1220,7 +1196,8 @@ rl_attach(sc)
 
 	if (rl_did == RT_DEVICEID_8139 || rl_did == ACCTON_DEVICEID_5030 ||
 	    rl_did == DELTA_DEVICEID_8139 || rl_did == ADDTRON_DEVICEID_8139 ||
-	    rl_did == DLINK_DEVICEID_8139 || rl_did == DLINK_DEVICEID_8139_2)
+	    rl_did == DLINK_DEVICEID_8139 || rl_did == DLINK_DEVICEID_8139_2 ||
+	    rl_did == ABOCOM_DEVICEID_8139)
 		sc->rl_type = RL_8139;
 	else if (rl_did == RT_DEVICEID_8129)
 		sc->rl_type = RL_8129;

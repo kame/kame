@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_fxp_pci.c,v 1.25 2004/02/25 12:25:09 markus Exp $	*/
+/*	$OpenBSD: if_fxp_pci.c,v 1.28 2004/08/04 19:42:30 mickey Exp $	*/
 
 /*
  * Copyright (c) 1995, David Greenman
@@ -134,7 +134,6 @@ fxp_pci_attach(parent, self, aux)
 	pci_chipset_tag_t pc = pa->pa_pc;
 	pci_intr_handle_t ih;
 	const char *intrstr = NULL;
-	u_int8_t enaddr[6];
 	bus_size_t iosize;
 	pcireg_t rev = PCI_REVISION(pa->pa_class);
 
@@ -144,6 +143,8 @@ fxp_pci_attach(parent, self, aux)
 		return;
 	}
 	sc->sc_dmat = pa->pa_dmat;
+	
+	sc->sc_revision = rev; 
 
 	/*
 	 * Allocate our interrupt.
@@ -201,13 +202,30 @@ fxp_pci_attach(parent, self, aux)
 		break;
 	}
 
+	/*
+	 * Cards for which we should WRITE TO THE EEPROM
+	 * to turn off dynamic standby mode to avoid
+	 * a problem where the card will fail to resume when
+	 * entering the IDLE state. We use this nasty if statement
+	 * and corresponding pci dev numbers directly so that people
+	 * know not to add new cards to this unless you are really
+	 * certain what you are doing and are not going to end up
+	 * killing people's eeproms.
+	 */
+	if ((PCI_VENDOR(pa->pa_id) == PCI_VENDOR_INTEL) &&
+	    (PCI_PRODUCT(pa->pa_id) == 0x2449 || 
+	    (PCI_PRODUCT(pa->pa_id) > 0x1030 && 
+	    PCI_PRODUCT(pa->pa_id) < 0x1039) || 
+	    (PCI_PRODUCT(pa->pa_id) == 0x1229 && (rev == 8 || rev == 9))))
+		sc->sc_flags |= FXPF_DISABLE_STANDBY;
+
 	/* enable bus mastering */
 	pci_conf_write(pa->pa_pc, pa->pa_tag, PCI_COMMAND_STATUS_REG,
 	    PCI_COMMAND_MASTER_ENABLE |
 	    pci_conf_read(pa->pa_pc, pa->pa_tag, PCI_COMMAND_STATUS_REG));
 
 	/* Do generic parts of attach. */
-	if (fxp_attach_common(sc, enaddr, intrstr)) {
+	if (fxp_attach_common(sc, intrstr)) {
 		/* Failed! */
 		pci_intr_disestablish(pc, sc->sc_ih);
 		bus_space_unmap(sc->sc_st, sc->sc_sh, iosize);

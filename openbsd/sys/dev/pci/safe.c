@@ -1,4 +1,4 @@
-/*	$OpenBSD: safe.c,v 1.12 2004/02/03 17:17:33 deraadt Exp $	*/
+/*	$OpenBSD: safe.c,v 1.14 2004/05/07 14:42:26 millert Exp $	*/
 
 /*-
  * Copyright (c) 2003 Sam Leffler, Errno Consulting
@@ -46,10 +46,10 @@
 
 #include <machine/bus.h>
 
+#include <crypto/md5.h>
 #include <crypto/sha1.h>
 #include <crypto/cryptodev.h>
 #include <crypto/cryptosoft.h>
-#include <sys/md5k.h>
 #include <dev/rndvar.h>
 
 #include <dev/pci/pcivar.h>
@@ -1989,7 +1989,7 @@ safe_kfeed(struct safe_softc *sc)
 		struct safe_pkq *q = SIMPLEQ_FIRST(&sc->sc_pkq);
 
 		sc->sc_pkq_cur = q;
-		SIMPLEQ_REMOVE_HEAD(&sc->sc_pkq, q, pkq_next);
+		SIMPLEQ_REMOVE_HEAD(&sc->sc_pkq, pkq_next);
 		if (safe_kstart(sc) != 0) {
 			crypto_kdone(q->pkq_krp);
 			free(q, M_DEVBUF);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ufs_vnops.c,v 1.54 2003/12/28 17:20:16 tedu Exp $	*/
+/*	$OpenBSD: ufs_vnops.c,v 1.58 2004/07/25 23:09:19 tedu Exp $	*/
 /*	$NetBSD: ufs_vnops.c,v 1.18 1996/05/11 18:28:04 mycroft Exp $	*/
 
 /*
@@ -50,6 +50,7 @@
 #include <sys/mount.h>
 #include <sys/vnode.h>
 #include <sys/malloc.h>
+#include <sys/pool.h>
 #include <sys/dirent.h>
 #include <sys/lockf.h>
 #include <sys/event.h>
@@ -230,8 +231,12 @@ ufs_close(v)
 	struct inode *ip = VTOI(vp);
 
 	simple_lock(&vp->v_interlock);
-	if (vp->v_usecount > 1)
-		ITIMES(ip, &time, &time);
+	if (vp->v_usecount > 1) {
+		struct timeval tv;
+
+		getmicrotime(&tv);
+		ITIMES(ip, &tv, &tv);
+	}
 	simple_unlock(&vp->v_interlock);
 	return (0);
 }
@@ -300,8 +305,10 @@ ufs_getattr(v)
 	struct vnode *vp = ap->a_vp;
 	struct inode *ip = VTOI(vp);
 	struct vattr *vap = ap->a_vap;
+	struct timeval tv;
 
-	ITIMES(ip, &time, &time);
+	getmicrotime(&tv);
+	ITIMES(ip, &tv, &tv);
 	/*
 	 * Copy from inode table
 	 */
@@ -725,7 +732,7 @@ ufs_link(v)
 		if (DOINGSOFTDEP(vp))
 			softdep_change_linkcnt(ip);
 	}
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, cnp->cn_pnbuf);
 	VN_KNOTE(vp, NOTE_LINK);
 	VN_KNOTE(dvp, NOTE_WRITE);
 out1:
@@ -791,7 +798,7 @@ ufs_whiteout(v)
 		/* NOTREACHED */
 	}
 	if (cnp->cn_flags & HASBUF) {
-		FREE(cnp->cn_pnbuf, M_NAMEI);
+		pool_put(&namei_pool, cnp->cn_pnbuf);
 		cnp->cn_flags &= ~HASBUF;
 	}
 	return (error);
@@ -906,7 +913,6 @@ abortit:
 		 * Relookup() may find a file that is unrelated to the
 		 * original one, or it may fail.  Too bad.
 		 */
-		vrele(fdvp);
 		vrele(fvp);
 		fcnp->cn_flags &= ~MODMASK;
 		fcnp->cn_flags |= LOCKPARENT | LOCKLEAF;
@@ -914,6 +920,7 @@ abortit:
 			panic("ufs_rename: lost from startdir");
 		fcnp->cn_nameiop = DELETE;
 		(void) relookup(fdvp, &fvp, fcnp);
+		vrele(fdvp);
 		if (fvp == NULL) {
 			return (ENOENT);
 		}
@@ -963,8 +970,6 @@ abortit:
 		doingdirectory = 1;
 	}
 	VN_KNOTE(fdvp, NOTE_WRITE);		/* XXX right place? */
-	/* Why? */
-	vrele(fdvp);
 
 	/*
 	 * When the target exists, both the directory
@@ -1167,6 +1172,7 @@ abortit:
 	if ((fcnp->cn_flags & SAVESTART) == 0)
 		panic("ufs_rename: lost from startdir");
 	(void) relookup(fdvp, &fvp, fcnp);
+	vrele(fdvp);
 	if (fvp != NULL) {
 		xp = VTOI(fvp);
 		dp = VTOI(fdvp);
@@ -1219,6 +1225,7 @@ bad:
 		vput(ITOV(xp));
 	vput(ITOV(dp));
 out:
+	vrele(fdvp);
 	if (doingdirectory)
 		ip->i_flag &= ~IN_RENAME;
 	if (vn_lock(fvp, LK_EXCLUSIVE, p) == 0) {
@@ -1281,7 +1288,7 @@ ufs_mkdir(v)
 
 	if ((error = getinoquota(ip)) ||
 	    (error = ufs_quota_alloc_inode(ip, cnp->cn_cred))) {
-		free(cnp->cn_pnbuf, M_NAMEI);
+		pool_put(&namei_pool, cnp->cn_pnbuf);
 		UFS_INODE_FREE(ip, ip->i_number, dmode);
 		vput(tvp);
 		vput(dvp);
@@ -1387,7 +1394,7 @@ bad:
 		vput(tvp);
 	}
 out:
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, cnp->cn_pnbuf);
 	vput(dvp);
 
 	return (error);
@@ -1866,8 +1873,12 @@ ufsspec_close(v)
 	struct inode *ip = VTOI(vp);
 
 	simple_lock(&vp->v_interlock);
-	if (ap->a_vp->v_usecount > 1)
-		ITIMES(ip, &time, &time);
+	if (ap->a_vp->v_usecount > 1) {
+		struct timeval tv;
+
+		getmicrotime(&tv);
+		ITIMES(ip, &tv, &tv);
+	}
 	simple_unlock(&vp->v_interlock);
 	return (VOCALL (spec_vnodeop_p, VOFFSET(vop_close), ap));
 }
@@ -1937,8 +1948,12 @@ ufsfifo_close(v)
 	struct inode *ip = VTOI(vp);
 
 	simple_lock(&vp->v_interlock);
-	if (ap->a_vp->v_usecount > 1)
-		ITIMES(ip, &time, &time);
+	if (ap->a_vp->v_usecount > 1) {
+		struct timeval tv;
+
+		getmicrotime(&tv);
+		ITIMES(ip, &tv, &tv);
+	}
 	simple_unlock(&vp->v_interlock);
 	return (VOCALL (fifo_vnodeop_p, VOFFSET(vop_close), ap));
 }
@@ -2015,6 +2030,7 @@ ufs_vinit(mntp, specops, fifoops, vpp)
 {
 	struct inode *ip;
 	struct vnode *vp, *nvp;
+	struct timeval mtv;
 
 	vp = *vpp;
 	ip = VTOI(vp);
@@ -2063,8 +2079,9 @@ ufs_vinit(mntp, specops, fifoops, vpp)
 	/*
 	 * Initialize modrev times
 	 */
-	SETHIGH(ip->i_modrev, mono_time.tv_sec);
-	SETLOW(ip->i_modrev, mono_time.tv_usec * 4294);
+	getmicrouptime(&mtv);
+	SETHIGH(ip->i_modrev, mtv.tv_sec);
+	SETLOW(ip->i_modrev, mtv.tv_usec * 4294);
 	*vpp = vp;
 	return (0);
 }
@@ -2094,7 +2111,7 @@ ufs_makeinode(mode, dvp, vpp, cnp)
 		mode |= IFREG;
 
 	if ((error = UFS_INODE_ALLOC(pdir, mode, cnp->cn_cred, &tvp)) != 0) {
-		free(cnp->cn_pnbuf, M_NAMEI);
+		pool_put(&namei_pool, cnp->cn_pnbuf);
 		vput(dvp);
 		return (error);
 	}
@@ -2104,7 +2121,7 @@ ufs_makeinode(mode, dvp, vpp, cnp)
 
 	if ((error = getinoquota(ip)) ||
 	    (error = ufs_quota_alloc_inode(ip, cnp->cn_cred))) {
-		free(cnp->cn_pnbuf, M_NAMEI);
+		pool_put(&namei_pool, cnp->cn_pnbuf);
 		UFS_INODE_FREE(ip, ip->i_number, mode);
 		vput(tvp);
 		vput(dvp);
@@ -2137,7 +2154,7 @@ ufs_makeinode(mode, dvp, vpp, cnp)
 		goto bad;
 
 	if ((cnp->cn_flags & SAVESTART) == 0)
-		FREE(cnp->cn_pnbuf, M_NAMEI);
+		pool_put(&namei_pool, cnp->cn_pnbuf);
 	vput(dvp);
 	*vpp = tvp;
 	return (0);
@@ -2147,7 +2164,7 @@ bad:
 	 * Write error occurred trying to update the inode
 	 * or the directory so must deallocate the inode.
 	 */
-	free(cnp->cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, cnp->cn_pnbuf);
 	vput(dvp);
 	ip->i_effnlink = 0;
 	ip->i_ffs_nlink = 0;

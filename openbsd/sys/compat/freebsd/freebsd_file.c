@@ -1,4 +1,4 @@
-/*	$OpenBSD: freebsd_file.c,v 1.17 2003/08/15 20:32:15 tedu Exp $	*/
+/*	$OpenBSD: freebsd_file.c,v 1.19 2004/07/13 21:04:29 millert Exp $	*/
 /*	$NetBSD: freebsd_file.c,v 1.3 1996/05/03 17:03:09 christos Exp $	*/
 
 /*
@@ -339,7 +339,7 @@ compat_43_freebsd_sys_stat(p, v, retval)
 {
 	struct compat_43_freebsd_sys_stat_args /* {
 		syscallarg(char *) path;
-		syscallarg(struct ostat *) ub;
+		syscallarg(struct stat43 *) ub;
 	} */ *uap = v;
 	caddr_t sg = stackgap_init(p->p_emul);
 
@@ -355,7 +355,7 @@ compat_43_freebsd_sys_lstat(p, v, retval)
 {
 	struct compat_43_freebsd_sys_lstat_args /* {
 		syscallarg(char *) path;
-		syscallarg(struct ostat *) ub;
+		syscallarg(struct stat43 *) ub;
 	} */ *uap = v;
 	caddr_t sg = stackgap_init(p->p_emul);
 
@@ -726,12 +726,12 @@ freebsd_sys_stat(p, v, retval)
 {
 	struct freebsd_sys_stat_args /* {
 		syscallarg(char *) path;
-		syscallarg(struct stat *) ub;
+		syscallarg(struct stat35 *) ub;
 	} */ *uap = v;
 	caddr_t sg = stackgap_init(p->p_emul);
 
 	FREEBSD_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
-	return sys_stat(p, uap, retval);
+	return compat_35_sys_stat(p, uap, retval);
 }
 
 int
@@ -742,12 +742,12 @@ freebsd_sys_lstat(p, v, retval)
 {
 	struct freebsd_sys_lstat_args /* {
 		syscallarg(char *) path;
-		syscallarg(struct stat *) ub;
+		syscallarg(struct stat35 *) ub;
 	} */ *uap = v;
 	caddr_t sg = stackgap_init(p->p_emul);
 
 	FREEBSD_CHECK_ALT_EXIST(p, &sg, SCARG(uap, path));
-	return sys_lstat(p, uap, retval);
+	return compat_35_sys_lstat(p, uap, retval);
 }
 
 int

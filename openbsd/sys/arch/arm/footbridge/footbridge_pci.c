@@ -1,4 +1,4 @@
-/*	$OpenBSD: footbridge_pci.c,v 1.1 2004/02/01 05:09:49 drahn Exp $	*/
+/*	$OpenBSD: footbridge_pci.c,v 1.4 2004/08/17 19:40:45 drahn Exp $	*/
 /*	$NetBSD: footbridge_pci.c,v 1.4 2001/09/05 16:17:35 matt Exp $	*/
 
 /*
@@ -56,19 +56,18 @@
 #include <dev/isa/isavar.h>
 #endif
 
-void		footbridge_pci_attach_hook __P((struct device *,
-		    struct device *, struct pcibus_attach_args *));
-int		footbridge_pci_bus_maxdevs __P((void *, int));
-pcitag_t	footbridge_pci_make_tag __P((void *, int, int, int));
-void		footbridge_pci_decompose_tag __P((void *, pcitag_t, int *,
-		    int *, int *));
-pcireg_t	footbridge_pci_conf_read __P((void *, pcitag_t, int));
-void		footbridge_pci_conf_write __P((void *, pcitag_t, int,
-		    pcireg_t));
-int		footbridge_pci_intr_map __P((struct pci_attach_args *,
-		    pci_intr_handle_t *));
-const char	*footbridge_pci_intr_string __P((void *, pci_intr_handle_t));
-const struct evcnt *footbridge_pci_intr_evcnt __P((void *, pci_intr_handle_t));
+void		footbridge_pci_attach_hook (struct device *,
+		    struct device *, struct pcibus_attach_args *);
+int		footbridge_pci_bus_maxdevs (void *, int);
+pcitag_t	footbridge_pci_make_tag (void *, int, int, int);
+void		footbridge_pci_decompose_tag (void *, pcitag_t, int *,
+		    int *, int *);
+pcireg_t	footbridge_pci_conf_read (void *, pcitag_t, int);
+void		footbridge_pci_conf_write (void *, pcitag_t, int,
+		    pcireg_t);
+int		footbridge_pci_intr_map (struct pci_attach_args *,
+		    pci_intr_handle_t *);
+const char	*footbridge_pci_intr_string (void *, pci_intr_handle_t);
 void		*footbridge_pci_intr_establish (void *, pci_intr_handle_t,
 		    int, int (*)(void *), void *, char *);
 void		footbridge_pci_intr_disestablish (void *, void *);
@@ -89,7 +88,6 @@ struct arm32_pci_chipset footbridge_pci_chipset = {
 	NULL,	/* intr_v */
 	footbridge_pci_intr_map,
 	footbridge_pci_intr_string,
-	footbridge_pci_intr_evcnt,
 	footbridge_pci_intr_establish,
 	footbridge_pci_intr_disestablish
 };
@@ -330,12 +328,13 @@ footbridge_pci_intr_map(pa, ihp)
 	return(0);
 }
 
+
 const char *
 footbridge_pci_intr_string(pcv, ih)
 	void *pcv;
 	pci_intr_handle_t ih;
 {
-	static char irqstr[8];		/* 4 + 2 + NULL + sanity */
+	static char irqstr[32];
 
 #ifdef PCI_DEBUG
 	printf("footbridge_pci_intr_string(pcv=0x%p, ih=0x%lx)\n", pcv, ih);
@@ -353,39 +352,22 @@ footbridge_pci_intr_string(pcv, ih)
 	return(irqstr);	
 }
 
-#if 0
-const struct evcnt *
-footbridge_pci_intr_evcnt(pcv, ih)
-	void *pcv;
-	pci_intr_handle_t ih;
-{
-
-	/* XXX for now, no evcnt parent reported */
-	return NULL;
-}
-#endif
 
 void *
 footbridge_pci_intr_establish(pcv, ih, level, func, arg, name)
 	void *pcv;
 	pci_intr_handle_t ih;
-	int level, (*func) __P((void *));
+	int level, (*func) (void *);
 	void *arg;
 	char *name;
 {
 	void *intr;
-	int length;
-	char *string;
 
 #ifdef PCI_DEBUG
 	printf("footbridge_pci_intr_establish(pcv=%p, ih=0x%lx, level=%d, func=%p, arg=%p)\n",
 	    pcv, ih, level, func, arg);
 #endif
 
-	/* Copy the interrupt string to a private buffer */
-	length = strlen(footbridge_pci_intr_string(pcv, ih));
-	string = malloc(length + 1, M_DEVBUF, M_WAITOK);
-	strlcpy(string, footbridge_pci_intr_string(pcv, ih), length);
 #if NISA > 0
 	/*
 	 * XXX the IDE driver will attach the interrupts in compat mode and
@@ -396,10 +378,10 @@ footbridge_pci_intr_establish(pcv, ih, level, func, arg, name)
 	 */
 	if (ih >= 0x80 && ih <= 0x8d) {
 		intr = isa_intr_establish(NULL, (ih & 0x0f), IST_EDGE,
-		    level, func, arg, string);
+		    level, func, arg, name);
 	} else
 #endif
-	intr = footbridge_intr_claim(ih, level, string, func, arg);
+	intr = footbridge_intr_claim(ih, level, name, func, arg);
 
 	return(intr);
 }
@@ -413,7 +395,6 @@ footbridge_pci_intr_disestablish(pcv, cookie)
 	printf("footbridge_pci_intr_disestablish(pcv=%p, cookie=0x%x)\n",
 	    pcv, cookie);
 #endif
-	/* XXXX Need to free the string */
 
 	footbridge_intr_disestablish(cookie);
 }

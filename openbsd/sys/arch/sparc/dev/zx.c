@@ -1,4 +1,4 @@
-/*	$OpenBSD: zx.c,v 1.5 2003/06/28 17:05:33 miod Exp $	*/
+/*	$OpenBSD: zx.c,v 1.7 2004/07/26 13:26:38 miod Exp $	*/
 /*	$NetBSD: zx.c,v 1.5 2002/10/02 16:52:46 thorpej Exp $	*/
 
 /*
@@ -92,7 +92,7 @@
 #include <dev/rasops/rasops.h>
 #include <machine/fbvar.h>
 
-#include <sparc/dev/zxreg.h>
+#include <dev/sbus/zxreg.h>
 #include <sparc/dev/sbusvar.h>
 
 #define	ZX_WID_SHARED_8		0
@@ -183,7 +183,6 @@ void	zx_fillrect(struct rasops_info *, int, int, int, int, long, int);
 int	zx_intr(void *);
 void	zx_prom(void *);
 
-void	zx_cursor(void *, int, int, int);
 void	zx_putchar(void *, int, int, u_int, long);
 void	zx_copycols(void *, int, int, int, int);
 void	zx_erasecols(void *, int, int, int, long);

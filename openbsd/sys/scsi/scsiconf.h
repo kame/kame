@@ -1,4 +1,4 @@
-/*	$OpenBSD: scsiconf.h,v 1.42.2.1 2004/04/30 22:07:37 brad Exp $	*/
+/*	$OpenBSD: scsiconf.h,v 1.47 2004/07/31 11:31:30 krw Exp $	*/
 /*	$NetBSD: scsiconf.h,v 1.35 1997/04/02 02:29:38 mycroft Exp $	*/
 
 /*
@@ -131,15 +131,6 @@ struct scsi_adapter {
 #define TRY_AGAIN_LATER		1
 #define	COMPLETE		2
 #define	ESCAPE_NOT_SUPPORTED	3
-
-/*
- * Device Specific Sense Handlers return either an errno
- * or one of these three items.
- */
-
-#define SCSIRET_NOERROR   0	/* No Error */
-#define SCSIRET_RETRY    -1	/* Retry the command that got this sense */
-#define SCSIRET_CONTINUE -2	/* Continue with standard sense processing */
 
 /*
  * These entry points are called by the low-end drivers to get services from
@@ -324,6 +315,7 @@ struct scsi_xfer {
  */
 #define TEST_READY_RETRIES_DEFAULT	5
 #define TEST_READY_RETRIES_CD		10
+#define TEST_READY_RETRIES_TAPE		60
 
 const void *scsi_inqmatch(struct scsi_inquiry_data *, const void *, int,
 	    int, int *);
@@ -335,7 +327,6 @@ void	scsi_free_xs(struct scsi_xfer *);
 int	scsi_execute_xs(struct scsi_xfer *);
 u_long	scsi_size(struct scsi_link *, int);
 int	scsi_test_unit_ready(struct scsi_link *, int, int);
-int	scsi_change_def(struct scsi_link *, int);
 int	scsi_inquire(struct scsi_link *, struct scsi_inquiry_data *, int);
 int	scsi_prevent(struct scsi_link *, int, int);
 int	scsi_start(struct scsi_link *, int, int);
@@ -351,7 +342,7 @@ int	scsi_do_safeioctl(struct scsi_link *, dev_t, u_long, caddr_t,
 void	sc_print_addr(struct scsi_link *);
 
 void	show_scsi_xs(struct scsi_xfer *);
-void	scsi_print_sense(struct scsi_xfer *, int);
+void	scsi_print_sense(struct scsi_xfer *);
 void	show_scsi_cmd(struct scsi_xfer *);
 void	show_mem(u_char *, int);
 int	scsi_probe_busses(int, int, int);

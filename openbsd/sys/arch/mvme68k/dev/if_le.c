@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_le.c,v 1.25 2003/12/30 21:25:58 miod Exp $ */
+/*	$OpenBSD: if_le.c,v 1.29 2004/07/30 22:29:45 miod Exp $ */
 
 /*-
  * Copyright (c) 1982, 1992, 1993
@@ -351,11 +351,7 @@ leattach(parent, self, aux)
 			    sc->sc_dev.dv_xname);
 			return;
 		}
-		sc->sc_addr = kvtop((vaddr_t)sc->sc_mem);
-		if (sc->sc_addr == 0L) {
-			printf("\n%s: kvtop() failed!\n", sc->sc_dev.dv_xname);
-			return;
-		}
+		sc->sc_addr = (paddr_t)addr & 0x00ffffff;
 
 		lesc->sc_r1 = (void *)ca->ca_vaddr;
 		lesc->sc_ipl = ca->ca_ipl;
@@ -396,13 +392,6 @@ leattach(parent, self, aux)
 		printf(": unknown bus type\n");
 		return;
 	}
-	evcnt_attach(&sc->sc_dev, "intr", &lesc->sc_intrcnt);
-	evcnt_attach(&sc->sc_dev, "errs", &lesc->sc_errcnt);
-
-	/*
-	if (lebustype == BUS_VMES) 
-		vleinit(sc);
-	*/
 
 	am7990_config(sc);
 
@@ -412,15 +401,15 @@ leattach(parent, self, aux)
 		lesc->sc_ih.ih_fn = vle_intr;
 		lesc->sc_ih.ih_arg = sc;
 		lesc->sc_ih.ih_ipl = pri;
-		vmeintr_establish(ca->ca_vec + 0, &lesc->sc_ih);
+		vmeintr_establish(ca->ca_vec + 0, &lesc->sc_ih, self->dv_xname);
 		break;
 #if NPCC > 0
 	case BUS_PCC:
 		lesc->sc_ih.ih_fn = am7990_intr;
 		lesc->sc_ih.ih_arg = sc;
 		lesc->sc_ih.ih_ipl = pri;
-		pccintr_establish(PCCV_LE, &lesc->sc_ih);
-		((struct pccreg *)ca->ca_master)->pcc_leirq = pri | PCC_IRQ_IEN;
+		pccintr_establish(PCCV_LE, &lesc->sc_ih, self->dv_xname);
+		sys_pcc->pcc_leirq = pri | PCC_IRQ_IEN;
 		break;
 #endif
 	}

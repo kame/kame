@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_machdep.h,v 1.9 2003/05/18 02:43:13 andreas Exp $	*/
+/*	$OpenBSD: db_machdep.h,v 1.13 2004/07/20 20:18:53 art Exp $	*/
 /*	$NetBSD: db_machdep.h,v 1.9 1996/05/03 19:23:59 christos Exp $	*/
 
 /* 
@@ -106,7 +106,7 @@ boolean_t	db_phys_eq(task_t, vaddr_t, task_t, vaddr_t);
  * Constants for KGDB.
  */
 typedef	long		kgdb_reg_t;
-#define	KGDB_NUMREGS	14
+#define	KGDB_NUMREGS	16
 #define	KGDB_BUFLEN	512
 
 #if 0
@@ -120,5 +120,16 @@ void		db_task_name(/* task_t */);
 int kdb_trap(int, int, db_regs_t *);
 
 void db_machine_init(void);
+int db_enter_ddb(void);
+void db_startcpu(int cpu);
+void db_stopcpu(int cpu);
+void i386_ipi_db(struct cpu_info *);
+
+extern struct mutex ddb_mp_mutex;
+
+/* For ddb_state */
+#define DDB_STATE_NOT_RUNNING	0
+#define DDB_STATE_RUNNING	1
+#define DDB_STATE_EXITING	2
 
 #endif	/* _I386_DB_MACHDEP_H_ */

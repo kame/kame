@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipsec_output.c,v 1.28 2003/12/02 23:16:29 markus Exp $ */
+/*	$OpenBSD: ipsec_output.c,v 1.31 2004/06/26 04:32:38 ho Exp $ */
 /*
  * The author of this code is Angelos D. Keromytis (angelos@cis.upenn.edu)
  *
@@ -57,7 +57,7 @@
 #define DPRINTF(x)
 #endif
 
-int	udpencap_enable = 0;	/* disabled by default */
+int	udpencap_enable = 1;	/* enabled by default */
 int	udpencap_port = 4500;	/* triggers decapsulation */
 
 /*
@@ -131,11 +131,7 @@ ipsp_process_packet(struct mbuf *m, struct tdb *tdb, int af, int tunalready)
 	 * Register first use if applicable, setup relevant expiration timer.
 	 */
 	if (tdb->tdb_first_use == 0) {
-		int pri;
-
-		pri = splhigh();
-		tdb->tdb_first_use = time.tv_sec;
-		splx(pri);
+		tdb->tdb_first_use = time_second;
 
 		tv.tv_usec = 0;
 
@@ -338,13 +334,16 @@ ipsp_process_done(struct mbuf *m, struct tdb *tdb)
 	struct tdb_ident *tdbi;
 	struct m_tag *mtag;
 
-	tdb->tdb_last_used = time.tv_sec;
+	tdb->tdb_last_used = time_second;
 
-	if (udpencap_enable && udpencap_port &&
-	    (tdb->tdb_flags & TDBF_UDPENCAP) != 0) {
+	if ((tdb->tdb_flags & TDBF_UDPENCAP) != 0) {
 		struct mbuf *mi;
 		struct udphdr *uh;
 
+		if (!udpencap_enable || !udpencap_port) {
+			m_freem(m);
+			return ENXIO;
+		}
 		mi = m_inject(m, sizeof(struct ip), sizeof(struct udphdr),
 		    M_DONTWAIT);
 		if (mi == NULL) {
@@ -532,7 +531,7 @@ ipsec_adjust_mtu(struct mbuf *m, u_int32_t mtu)
 
 		mtu -= adjust;
 		tdbp->tdb_mtu = mtu;
-		tdbp->tdb_mtutimeout = time.tv_sec + ip_mtudisc_timeout;
+		tdbp->tdb_mtutimeout = time_second + ip_mtudisc_timeout;
 	}
 
 	splx(s);

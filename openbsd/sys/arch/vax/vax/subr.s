@@ -1,4 +1,4 @@
-/*	$OpenBSD: subr.s,v 1.19 2003/11/07 10:16:45 jmc Exp $     */
+/*	$OpenBSD: subr.s,v 1.21 2004/07/07 23:10:46 deraadt Exp $     */
 /*	$NetBSD: subr.s,v 1.32 1999/03/25 00:41:48 mrg Exp $	   */
 
 /*
@@ -138,8 +138,8 @@ _cmn_idsptch:
 		movl	(sp)+,r0	# get pointer to idspvec
 		movl	8(r0),r1	# get evcnt pointer
 		beql	1f		# no ptr, skip increment
-		incl	EV_COUNT(r1)	# increment low longword
-#		adwc	$0,EV_COUNT+4(r1) # add any carry to hi longword
+		incl	EC_COUNT(r1)	# increment low longword
+		adwc	$0,EC_COUNT+4(r1) # add any carry to hi longword
 1:		pushl	4(r0)		# push argument
 		calls	$1,*(r0)	# call interrupt routine
 		popr	$0x3f		# pop registers
@@ -306,6 +306,7 @@ noque:	.asciz	"swtch"
 	bbsc	r3,_whichqs,2f		# no, clear bit in whichqs
 2:	clrl	4(r2)			# clear proc backpointer
 	clrl	_want_resched		# we are now changing process
+	movb	$SONPROC,P_STAT(r2)	# p->p_stat = SONPROC
 	movl	r2,_curproc		# set new process running
 	cmpl	r0,r2			# Same process?
 	bneq	1f			# No, continue

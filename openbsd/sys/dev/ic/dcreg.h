@@ -1,4 +1,4 @@
-/*	$OpenBSD: dcreg.h,v 1.33 2003/10/21 18:58:49 jmc Exp $ */
+/*	$OpenBSD: dcreg.h,v 1.35 2004/08/04 14:47:30 mickey Exp $ */
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -297,9 +297,15 @@
 
 /*
  * General purpose timer register
+ * (upper 15 bits exist on rev 0x41 chips only)
  */
-#define DC_TIMER_VALUE		0x0000FFFF
+#define DC_TIMER_CLKDIV		0x80000000	/* clock/16 */
+#define DC_TIMER_TXTIMER	0x78000000	/* TX intr delay timer */
+#define DC_TIMER_TXCOUNT	0x07000000	/* TX intr delay counter */
+#define DC_TIMER_RXTIMER	0x00F00000	/* RX intr delay timer */
+#define DC_TIMER_RXCOUNT	0x000E0000	/* RX intr delay counter */
 #define DC_TIMER_CONTINUOUS	0x00010000
+#define DC_TIMER_VALUE		0x0000FFFF	/* 81.92us */
 
 /*
  * 10baseT status register
@@ -768,7 +774,6 @@ struct dc_softc {
 	bus_space_read_4(sc->dc_btag, sc->dc_bhandle, reg)
 
 #define DC_TIMEOUT		1000
-#define ETHER_ALIGN		2
 
 /*
  * General constants that are fun to know.

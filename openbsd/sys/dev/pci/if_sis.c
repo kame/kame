@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_sis.c,v 1.36 2004/01/01 11:44:49 markus Exp $ */
+/*	$OpenBSD: if_sis.c,v 1.40 2004/07/04 22:57:20 deraadt Exp $ */
 /*
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
@@ -132,6 +132,7 @@ void sis_read_cmos(struct sis_softc *, struct pci_attach_args *, caddr_t, int, i
 #endif
 void sis_read_mac(struct sis_softc *, struct pci_attach_args *);
 void sis_read_eeprom(struct sis_softc *, caddr_t, int, int, int);
+void sis_read96x_mac(struct sis_softc *);
 
 void sis_mii_sync(struct sis_softc *);
 void sis_mii_send(struct sis_softc *, u_int32_t, int);
@@ -143,7 +144,6 @@ void sis_miibus_statchg(struct device *);
 
 void sis_setmulti_sis(struct sis_softc *);
 void sis_setmulti_ns(struct sis_softc *);
-u_int32_t sis_crc(struct sis_softc *, caddr_t);
 void sis_reset(struct sis_softc *);
 int sis_list_rx_init(struct sis_softc *);
 int sis_list_tx_init(struct sis_softc *);
@@ -360,6 +360,25 @@ void sis_read_mac(sc, pa)
 	enaddr[2] = CSR_READ_4(sc, SIS_RXFILT_DATA) & 0xffff;
 
 	SIS_SETBIT(sc, SIS_RXFILT_CTL, SIS_RXFILTCTL_ENABLE);
+}
+
+void sis_read96x_mac(sc)
+	struct sis_softc *sc;
+{
+	int i;
+
+	SIO_SET(SIS96x_EECTL_REQ);
+
+	for (i = 0; i < 2000; i++) {
+		if ((CSR_READ_4(sc, SIS_EECTL) & SIS96x_EECTL_GNT)) {
+			sis_read_eeprom(sc, (caddr_t)&sc->arpcom.ac_enaddr,
+			    SIS_EE_NODEADDR, 3, 0);
+			break;
+		} else
+			DELAY(1);
+	}
+
+	SIO_SET(SIS96x_EECTL_DONE);
 }
 
 /*
@@ -677,40 +696,6 @@ sis_miibus_statchg(self)
 	return;
 }
 
-u_int32_t sis_crc(sc, addr)
-	struct sis_softc	*sc;
-	caddr_t			addr;
-{
-	u_int32_t		crc, carry; 
-	int			i, j;
-	u_int8_t		c;
-
-	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF; /* initial value */
-
-	for (i = 0; i < 6; i++) {
-		c = *(addr + i);
-		for (j = 0; j < 8; j++) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (c & 0x01);
-			crc <<= 1;
-			c >>= 1;
-			if (carry)
-				crc = (crc ^ 0x04c11db6) | carry;
-		}
-	}
-
-	/*
-	 * return the filter bit position
-	 *
-	 * The NatSemi chip has a 512-bit filter, which is
-	 * different than the SiS, so we special-case it.
-	 */
-	if (sc->sis_type == SIS_TYPE_83815)
-		return((crc >> 23) & 0x1FF);
-
-	return((crc >> 25) & 0x0000007F);
-}
-
 void sis_setmulti_ns(sc)
 	struct sis_softc	*sc;
 {
@@ -723,6 +708,7 @@ void sis_setmulti_ns(sc)
 
 	ifp = &sc->arpcom.ac_if;
 
+allmulti:
 	if (ifp->if_flags & IFF_ALLMULTI || ifp->if_flags & IFF_PROMISC) {
 		SIS_CLRBIT(sc, SIS_RXFILT_CTL, NS_RXFILTCTL_MCHASH);
 		SIS_SETBIT(sc, SIS_RXFILT_CTL, SIS_RXFILTCTL_ALLMULTI);
@@ -746,7 +732,12 @@ void sis_setmulti_ns(sc)
 
 	ETHER_FIRST_MULTI(step, ac, enm);
 	while (enm != NULL) {
-		h = sis_crc(sc, enm->enm_addrlo);
+		if (bcmp(enm->enm_addrlo, enm->enm_addrhi, ETHER_ADDR_LEN)) {
+			ifp->if_flags |= IFF_ALLMULTI;
+			goto allmulti;
+		}
+
+		h = ether_crc32_be(enm->enm_addrlo, ETHER_ADDR_LEN) >> 23;
 		index = h >> 3;
 		bit = h & 0x1F;
 		CSR_WRITE_4(sc, SIS_RXFILT_CTL, NS_FILTADDR_FMEM_LO + index);
@@ -772,6 +763,7 @@ void sis_setmulti_sis(sc)
 
 	ifp = &sc->arpcom.ac_if;
 
+allmulti:
 	if (ifp->if_flags & IFF_ALLMULTI || ifp->if_flags & IFF_PROMISC) {
 		SIS_SETBIT(sc, SIS_RXFILT_CTL, SIS_RXFILTCTL_ALLMULTI);
 		return;
@@ -790,7 +782,13 @@ void sis_setmulti_sis(sc)
 	/* now program new ones */
 	ETHER_FIRST_MULTI(step, ac, enm);
 	while (enm != NULL) {
-		h = sis_crc(sc, enm->enm_addrlo);
+		if (bcmp(enm->enm_addrlo, enm->enm_addrhi, ETHER_ADDR_LEN)) {
+			ifp->if_flags |= IFF_ALLMULTI;
+			goto allmulti;
+		}
+
+		h = (ether_crc32_be(enm->enm_addrlo,
+		    ETHER_ADDR_LEN) >> 25) & 0x0000007F;
 		CSR_WRITE_4(sc, SIS_RXFILT_CTL, (4 + (h >> 4)) << 16);
 		SIS_SETBIT(sc, SIS_RXFILT_DATA, (1 << (h & 0xF)));
 		ETHER_NEXT_MULTI(step, enm);
@@ -973,7 +971,7 @@ void sis_attach(parent, self, aux)
 	/* Reset the adapter. */
 	sis_reset(sc);
 
-	printf(": ");
+	printf(":");
 
 	/*
 	 * Get station address from the EEPROM.
@@ -983,13 +981,13 @@ void sis_attach(parent, self, aux)
 		sc->sis_srr = CSR_READ_4(sc, NS_SRR);
 
 		if (sc->sis_srr == NS_SRR_15C)
-			printf("DP83815C,");
+			printf(" DP83815C,");
 		else if (sc->sis_srr == NS_SRR_15D)
-			printf("DP83815D,");
+			printf(" DP83815D,");
 		else if (sc->sis_srr == NS_SRR_16A)
-			printf("DP83816A,");
+			printf(" DP83816A,");
 		else
-			printf("srr %x,", sc->sis_srr);
+			printf(" srr %x,", sc->sis_srr);
 
 		/*
 		 * Reading the MAC address out of the EEPROM on
@@ -1049,7 +1047,9 @@ void sis_attach(parent, self, aux)
 			    0x9, 6);
 		else
 #endif
-		if (sc->sis_rev == SIS_REV_635 ||
+		if (sc->sis_rev == SIS_REV_96x)
+			sis_read96x_mac(sc);
+		else if (sc->sis_rev == SIS_REV_635 ||
 		    sc->sis_rev == SIS_REV_630ET ||
 		    sc->sis_rev == SIS_REV_630EA1)
 			sis_read_mac(sc, pa);
@@ -1090,7 +1090,7 @@ void sis_attach(parent, self, aux)
 	sc->sis_ldata = (struct sis_list_data *)sc->sc_listkva;
 	bzero(sc->sis_ldata, sizeof(struct sis_list_data));
 
-	for (i = 0; i < SIS_RX_LIST_CNT; i++) {
+	for (i = 0; i < SIS_RX_LIST_CNT_MAX; i++) {
 		if (bus_dmamap_create(sc->sc_dmat, MCLBYTES, 1, MCLBYTES, 0,
 		    BUS_DMA_NOWAIT, &sc->sis_ldata->sis_rx_list[i].map) != 0) {
 			printf(": can't create rx map\n");
@@ -1209,17 +1209,22 @@ int sis_list_rx_init(sc)
 {
 	struct sis_list_data	*ld;
 	struct sis_ring_data	*cd;
-	int			i;
 	bus_addr_t		next;
+	int			i;
 
 	ld = sc->sis_ldata;
 	cd = &sc->sis_cdata;
 
-	for (i = 0; i < SIS_RX_LIST_CNT; i++) {
+	if (sc->arpcom.ac_if.if_flags & IFF_UP)
+		sc->sc_rxbufs = SIS_RX_LIST_CNT_MAX;
+	else
+		sc->sc_rxbufs = SIS_RX_LIST_CNT_MIN;
+
+	for (i = 0; i < sc->sc_rxbufs; i++) {
 		if (sis_newbuf(sc, &ld->sis_rx_list[i], NULL) == ENOBUFS)
 			return(ENOBUFS);
 		next = sc->sc_listmap->dm_segs[0].ds_addr;
-		if (i == (SIS_RX_LIST_CNT - 1)) {
+		if (i == (sc->sc_rxbufs - 1)) {
 			ld->sis_rx_list[i].sis_nextdesc = &ld->sis_rx_list[0];
 			next +=
 			    offsetof(struct sis_list_data, sis_rx_list[0]);
@@ -1249,16 +1254,11 @@ int sis_newbuf(sc, c, m)
 
 	if (m == NULL) {
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-		if (m_new == NULL) {
-			printf("%s: no memory for rx list -- packet dropped!\n",
-			    sc->sc_dev.dv_xname);
+		if (m_new == NULL)
 			return(ENOBUFS);
-		}
 
 		MCLGET(m_new, M_DONTWAIT);
 		if (!(m_new->m_flags & M_EXT)) {
-			printf("%s: no memory for rx list -- packet dropped!\n",
-			    sc->sc_dev.dv_xname);
 			m_freem(m_new);
 			return(ENOBUFS);
 		}
@@ -1323,7 +1323,7 @@ void sis_rxeof(sc)
 		m = cur_rx->sis_mbuf;
 		cur_rx->sis_mbuf = NULL;
 		total_len = SIS_RXBYTES(cur_rx);
-		SIS_INC(i, SIS_RX_LIST_CNT);
+		SIS_INC(i, sc->sc_rxbufs);
 
 
 		/*
@@ -2044,7 +2044,7 @@ void sis_stop(sc)
 	/*
 	 * Free data in the RX lists.
 	 */
-	for (i = 0; i < SIS_RX_LIST_CNT; i++) {
+	for (i = 0; i < SIS_RX_LIST_CNT_MAX; i++) {
 		if (sc->sis_ldata->sis_rx_list[i].map->dm_nsegs != 0) {
 			bus_dmamap_t map = sc->sis_ldata->sis_rx_list[i].map;
 

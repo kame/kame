@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.s,v 1.38 2004/03/09 00:08:13 xsa Exp $	*/
+/*	$OpenBSD: locore.s,v 1.41 2004/07/22 19:36:38 miod Exp $	*/
 /*	$NetBSD: locore.s,v 1.91 1998/11/11 06:41:25 thorpej Exp $	*/
 
 /*
@@ -391,7 +391,7 @@ Lstart3:
  * Prepare to enable MMU.
  * Since the kernel is not mapped logical == physical we must insure
  * that when the MMU is turned on, all prefetched addresses (including
- * the PC) are valid.  In order guarentee that, we use the last physical
+ * the PC) are valid.  In order to guarantee that, we use the last physical
  * page (which is conveniently mapped == VA) and load it up with enough
  * code to defeat the prefetch, then we execute the jump back to here.
  *
@@ -879,8 +879,9 @@ ENTRY_NOPROFILE(trap12)
 	movl	d1,sp@-			| push length
 	movl	a1,sp@-			| push addr
 	movl	d0,sp@-			| push command
+	movl	_C_LABEL(curproc),sp@-	| push proc pointer
 	jbsr	_C_LABEL(cachectl)	| do it
-	lea	sp@(12),sp		| pop args
+	lea	sp@(16),sp		| pop args
 	jra	_ASM_LABEL(rei)		| all done
 
 /*
@@ -1325,6 +1326,7 @@ Lswnofpsave:
 	cmpb	#SRUN,a0@(P_STAT)
 	jne	Lbadsw
 #endif
+	movb	#SONPROC,a0@(P_STAT)
 	clrl	a0@(P_BACK)		| clear back link
 	movb	a0@(P_MD_FLAGS+3),mdpflag | low byte of p_md.md_flags
 	movl	a0@(P_ADDR),a1		| get p_addr

@@ -1,4 +1,4 @@
-/*	$OpenBSD: aac_pci.c,v 1.9 2002/07/27 19:21:16 aaron Exp $	*/
+/*	$OpenBSD: aac_pci.c,v 1.13 2004/08/29 19:07:26 marco Exp $	*/
 
 /*-
  * Copyright (c) 2000 Michael Smith
@@ -62,6 +62,34 @@
 int	aac_pci_probe(struct device *, void *, void *);
 void	aac_pci_attach(struct device *, struct device *, void *);
 
+/* Adaptec */
+#define PCI_PRODUCT_ADP2_AACASR2120S   0x0286
+#define PCI_PRODUCT_ADP2_AACADPSATA2C  0x0289
+#define PCI_PRODUCT_ADP2_AACADPSATA4C  0x0290
+#define PCI_PRODUCT_ADP2_AACADPSATA6C  0x0291
+#define PCI_PRODUCT_ADP2_AACADPSATA8C  0x0292
+#define PCI_PRODUCT_ADP2_AACADPSATA16C 0x0293
+
+/* Dell */
+#define PCI_PRODUCT_ADP2_AACCERCSATA6C 0x0291
+#define PCI_PRODUCT_ADP2_AACPERC320DC  0x0287
+
+struct aac_sub_ident {
+	u_int16_t subvendor;
+	u_int16_t subdevice;
+	char *desc;
+} aac_sub_identifiers[] = {
+	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_AACADPSATA2C, "Adaptec 1210SA" }, /* guess */
+	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_AACADPSATA4C, "Adaptec 2410SA" },
+	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_AACADPSATA6C, "Adaptec 2610SA" },
+	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_AACADPSATA8C, "Adaptec 2810SA" }, /* guess */
+	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_AACADPSATA16C, "Adaptec 21610SA" }, /* guess */
+	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_AACASR2120S, "Adaptec 2120S" },
+	{ PCI_VENDOR_DELL, PCI_PRODUCT_ADP2_AACCERCSATA6C, "Dell CERC-SATA" },
+	{ PCI_VENDOR_DELL, PCI_PRODUCT_ADP2_AACPERC320DC, "Dell PERC 320/DC" },
+	{ 0, 0, "" }
+};
+
 struct aac_ident {
 	u_int16_t vendor;
 	u_int16_t device;
@@ -96,6 +124,27 @@ struct aac_ident {
 	    PCI_PRODUCT_DELL_PERC_3SI, AAC_HWIF_I960RX },
 	{ PCI_VENDOR_DELL, PCI_PRODUCT_DELL_PERC_3SI_2, PCI_VENDOR_DELL,
 	    PCI_PRODUCT_DELL_PERC_3SI_2_SUB, AAC_HWIF_I960RX },
+	/* Adaptec SATA RAID 2 channel XXX guess */
+	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_ASR2200S, PCI_VENDOR_ADP2,
+	    PCI_PRODUCT_ADP2_AACADPSATA2C, AAC_HWIF_I960RX },
+	/* Adaptec SATA RAID 4 channel */
+	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_ASR2200S, PCI_VENDOR_ADP2,
+	    PCI_PRODUCT_ADP2_AACADPSATA4C, AAC_HWIF_I960RX },
+	/* Adaptec SATA RAID 6 channel XXX guess */
+	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_ASR2200S, PCI_VENDOR_ADP2,
+	    PCI_PRODUCT_ADP2_AACADPSATA6C, AAC_HWIF_I960RX },
+	/* Adaptec SATA RAID 8 channel XXX guess */
+	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_ASR2200S, PCI_VENDOR_ADP2,
+	    PCI_PRODUCT_ADP2_AACADPSATA8C, AAC_HWIF_I960RX },
+	/* Adaptec SATA RAID 16 channel XXX guess */
+	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_ASR2200S, PCI_VENDOR_ADP2,
+	    PCI_PRODUCT_ADP2_AACADPSATA16C, AAC_HWIF_I960RX },
+	/* Dell CERC-SATA */
+	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_ASR2200S, PCI_VENDOR_DELL,
+	    PCI_PRODUCT_ADP2_AACCERCSATA6C, AAC_HWIF_I960RX },
+	/* Dell PERC 320/DC */
+	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_ASR2200S, PCI_VENDOR_DELL,
+	    PCI_PRODUCT_ADP2_AACPERC320DC, AAC_HWIF_I960RX },
 	/* Adaptec ADP-2622 */
 	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_AAC2622, PCI_VENDOR_ADP2,
 	    PCI_PRODUCT_ADP2_AAC2622, AAC_HWIF_I960RX },
@@ -108,12 +157,12 @@ struct aac_ident {
 	/* Dell PERC 2/QC */
 	{ PCI_VENDOR_DEC, PCI_PRODUCT_DEC_CPQ42XX, PCI_VENDOR_ADP2,
 	    PCI_PRODUCT_ADP2_PERC_2QC, AAC_HWIF_STRONGARM },
-	/* Dell PERC 3/QC */
-	{ PCI_VENDOR_DEC, PCI_PRODUCT_DEC_CPQ42XX, PCI_VENDOR_ADP2,
-	    PCI_PRODUCT_ADP2_PERC_3QC, AAC_HWIF_STRONGARM },
 	/* HP NetRAID-4M */
 	{ PCI_VENDOR_DEC, PCI_PRODUCT_DEC_CPQ42XX, PCI_VENDOR_HP,
 	    PCI_PRODUCT_HP_NETRAID_4M, AAC_HWIF_STRONGARM },
+	/* Adaptec ASR-2120S */
+	{ PCI_VENDOR_ADP2, PCI_PRODUCT_ADP2_ASR2200S, PCI_VENDOR_ADP2,
+	    PCI_PRODUCT_ADP2_AACASR2120S, AAC_HWIF_I960RX },
 	{ 0, 0, 0, 0 }
 };
 
@@ -161,9 +210,22 @@ aac_pci_attach(parent, self, aux)
 	const char *intrstr;
 	int state = 0;
 	struct aac_ident *m;
+	struct aac_sub_ident *subid;
 	u_int32_t subsysid;
 
 	printf(": ");
+	subsysid = pci_conf_read(pa->pa_pc, pa->pa_tag, PCI_SUBSYS_ID_REG);
+	if ((PCI_VENDOR(pa->pa_id) != PCI_VENDOR(subsysid)) ||
+	    (PCI_PRODUCT(pa->pa_id) != PCI_PRODUCT(subsysid))) {
+		for (subid = aac_sub_identifiers; subid->subvendor != 0;
+		    subid++) {
+			if (subid->subvendor == PCI_VENDOR(subsysid) &&
+			    subid->subdevice == PCI_PRODUCT(subsysid)) {
+				printf("%s ", subid->desc);
+				break;
+			}
+		}
+	}
 
 	/*
 	 * Verify that the adapter is correctly set up in PCI space.
@@ -216,8 +278,6 @@ aac_pci_attach(parent, self, aux)
 	for (m = aac_identifiers; m->vendor != 0; m++)
 		if (m->vendor == PCI_VENDOR(pa->pa_id) &&
 		    m->device == PCI_PRODUCT(pa->pa_id)) {
-			subsysid = pci_conf_read(pa->pa_pc, pa->pa_tag,
-			    PCI_SUBSYS_ID_REG);
 			if (m->subvendor == PCI_VENDOR(subsysid) &&
 			    m->subdevice == PCI_PRODUCT(subsysid)) {
 				sc->sc_hwif = m->hwif;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: footbridge_clock.c,v 1.2 2004/02/14 00:17:06 drahn Exp $	*/
+/*	$OpenBSD: footbridge_clock.c,v 1.6 2004/08/18 13:25:26 drahn Exp $	*/
 /*	$NetBSD: footbridge_clock.c,v 1.17 2003/03/23 14:12:25 chris Exp $	*/
 
 /*
@@ -57,9 +57,9 @@
 extern struct footbridge_softc *clock_sc;
 extern u_int dc21285_fclk;
 
-int clockhandler __P((void *));
-int statclockhandler __P((void *));
-static int load_timer __P((int, int));
+int clockhandler (void *);
+int statclockhandler (void *);
+static int load_timer (int, int);
 
 /*
  * Statistics clock variance, in usec.  Variance must be a
@@ -75,8 +75,8 @@ int statcountperusec;		/* number of ticks per usec at current stathz */
 int statprev;			/* last value of we set statclock to */
 
 #if 0
-static int clockmatch	__P((struct device *parent, struct cfdata *cf, void *aux));
-static void clockattach	__P((struct device *parent, struct device *self, void *aux));
+static int clockmatch	(struct device *parent, struct cfdata *cf, void *aux);
+static void clockattach	(struct device *parent, struct device *self, void *aux);
 
 CFATTACH_DECL(footbridge_clock, sizeof(struct clock_softc),
     clockmatch, clockattach, NULL, NULL);
@@ -146,7 +146,7 @@ clockhandler(aframe)
 		extern int ticks;
 		debugled(ticks);
 	}
-	return(0);	/* Pass the interrupt on down the chain */
+	return(-1);	/* Pass the interrupt on down the chain */
 }
 
 /*
@@ -206,7 +206,7 @@ statclockhandler(aframe)
 		 */
 		statclock(frame);
 
-	return(0);	/* Pass the interrupt on down the chain */
+	return(-1);	/* Pass the interrupt on down the chain */
 }
 
 static int
@@ -289,7 +289,7 @@ cpu_initclocks()
 		profhz = stathz * 8;
 
 	/* Report the clock frequencies */
-	printf("clock: hz=%d stathz = %d profhz = %d\n", hz, stathz, profhz);
+	printf("clock: hz %d stathz %d profhz %d\n", hz, stathz, profhz);
 
 	/* Setup timer 1 and claim interrupt */
 	clock_sc->sc_clock_count = load_timer(TIMER_1_BASE, hz);
@@ -301,7 +301,7 @@ cpu_initclocks()
 	clock_sc->sc_clock_ticks_per_256us =
 	    ((((clock_sc->sc_clock_count * hz) / 1000) * 256) / 1000);
 	clock_sc->sc_clockintr = footbridge_intr_claim(IRQ_TIMER_1, IPL_CLOCK,
-	    "tmr1 hard clk", clockhandler, 0);
+	    "clock", clockhandler, 0);
 
 	if (clock_sc->sc_clockintr == NULL)
 		panic("%s: Cannot install timer 1 interrupt handler",
@@ -312,7 +312,7 @@ cpu_initclocks()
 		/* Setup timer 2 and claim interrupt */
 		setstatclockrate(stathz);
        		clock_sc->sc_statclockintr = footbridge_intr_claim(IRQ_TIMER_2, IPL_STATCLOCK,
-       		    "tmr2 stat clk", statclockhandler, 0);
+       		    "stat", statclockhandler, 0);
 		if (clock_sc->sc_statclockintr == NULL)
 			panic("%s: Cannot install timer 2 interrupt handler",
 			    clock_sc->sc_dev.dv_xname);

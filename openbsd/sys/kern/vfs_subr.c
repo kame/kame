@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_subr.c,v 1.97 2004/01/09 03:01:03 tedu Exp $	*/
+/*	$OpenBSD: vfs_subr.c,v 1.103 2004/08/04 20:36:27 art Exp $	*/
 /*	$NetBSD: vfs_subr.c,v 1.53 1996/04/22 01:39:13 christos Exp $	*/
 
 /*
@@ -106,7 +106,7 @@ int vfs_hang_addrlist(struct mount *, struct netexport *,
 				  struct export_args *);
 int vfs_free_netcred(struct radix_node *, void *);
 void vfs_free_addrlist(struct netexport *);
-static __inline__ void vputonfreelist(struct vnode *);
+void vputonfreelist(struct vnode *);
 
 int vflush_vnode(struct vnode *, void *);
 
@@ -649,11 +649,12 @@ loop:
 
 /*
  * Grab a particular vnode from the free list, increment its
- * reference count and lock it. The vnode lock bit is set the
- * vnode is being eliminated in vgone. The process is awakened
- * when the transition is completed, and an error returned to
- * indicate that the vnode is no longer usable (possibly having
- * been changed to a new file system type).
+ * reference count and lock it. If the vnode lock bit is set,
+ * the vnode is being eliminated in vgone. In that case, we
+ * cannot grab it, so the process is awakened when the
+ * transition is completed, and an error code is returned to
+ * indicate that the vnode is no longer usable, possibly
+ * having been changed to a new file system type.
  */
 int
 vget(vp, flags, p)
@@ -663,6 +664,7 @@ vget(vp, flags, p)
 {
 	int error;
 	int s;
+
 	/*
 	 * If the vnode is in the process of being cleaned out for
 	 * another use, we wait for the cleaning to finish and then
@@ -673,12 +675,18 @@ vget(vp, flags, p)
 		simple_lock(&vp->v_interlock);
 		flags |= LK_INTERLOCK;
 	}
+
 	if (vp->v_flag & VXLOCK) {
+		if (flags & LK_NOWAIT) {
+			simple_unlock(&vp->v_interlock);
+			return (EBUSY);
+		}
+
  		vp->v_flag |= VXWANT;
-		simple_unlock(&vp->v_interlock);
-		tsleep(vp, PINOD, "vget", 0);
+		ltsleep(vp, PINOD | PNORELOCK, "vget", 0, &vp->v_interlock);
 		return (ENOENT);
  	}
+
 	if (vp->v_usecount == 0 &&
 	    (vp->v_bioflag & VBIOONFREELIST)) {
 		s = splbio();
@@ -723,9 +731,8 @@ vref(vp)
 }
 #endif /* DIAGNOSTIC */
 
-static __inline__ void
-vputonfreelist(vp)
-	struct vnode *vp;
+void
+vputonfreelist(struct vnode *vp)
 {
 	int s;
 	struct freelst *lst;
@@ -901,7 +908,6 @@ loop:
 
 	return (error);
 }
-
 
 struct vflush_args {
 	struct vnode *skipvp;
@@ -1142,10 +1148,10 @@ vgonel(vp, p)
 	 */
 	if (vp->v_flag & VXLOCK) {
 		vp->v_flag |= VXWANT;
-		simple_unlock(&vp->v_interlock);
-		tsleep(vp, PINOD, "vgone", 0);
+		ltsleep(vp, PINOD | PNORELOCK, "vgone", 0, &vp->v_interlock);
 		return;
 	}
+
 	/*
 	 * Clean out the filesystem specific data.
 	 */
@@ -1617,7 +1623,7 @@ vfs_free_netcred(rn, w)
 {
 	register struct radix_node_head *rnh = (struct radix_node_head *)w;
 
-	(*rnh->rnh_deladdr)(rn->rn_key, rn->rn_mask, rnh);
+	(*rnh->rnh_deladdr)(rn->rn_key, rn->rn_mask, rnh, NULL);
 	free(rn, M_NETADDR);
 	return (0);
 }
@@ -1790,6 +1796,12 @@ vfs_unmountall(void)
 void
 vfs_shutdown()
 {
+#ifdef ACCOUNTING
+	extern void acct_shutdown(void);
+
+	acct_shutdown();
+#endif
+
 	/* XXX Should suspend scheduling. */
 	(void) spl0();
 
@@ -1944,7 +1956,6 @@ vwaitforio(vp, slpflag, wmesg, timeo)
 
 	return (error);
 }
-
 
 /*
  * Update outstanding I/O count and do wakeup if requested.
@@ -2166,10 +2177,10 @@ brelvp(bp)
 }
 
 /*
- * Replaces the current vnode associated with the buffer, if any
+ * Replaces the current vnode associated with the buffer, if any,
  * with a new vnode.
  *
- * If an output I/O is pending on the buffer, the old vnode is
+ * If an output I/O is pending on the buffer, the old vnode
  * I/O count is adjusted.
  *
  * Ignores vnode buffer queues. Must be called at splbio().

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_ipsp.c,v 1.156 2004/02/15 12:44:24 markus Exp $	*/
+/*	$OpenBSD: ip_ipsp.c,v 1.159 2004/06/21 23:50:37 tholo Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr),
@@ -311,6 +311,7 @@ gettdbbysrcdst(u_int32_t spi, union sockaddr_union *src,
 {
 	u_int32_t hashval;
 	struct tdb *tdbp;
+	union sockaddr_union su_null;
 
 	if (tdbsrc == NULL)
 		return (struct tdb *) NULL;
@@ -321,11 +322,28 @@ gettdbbysrcdst(u_int32_t spi, union sockaddr_union *src,
 		if (tdbp->tdb_sproto == proto &&
 		    (spi == 0 || tdbp->tdb_spi == spi) &&
 		    ((tdbp->tdb_flags & TDBF_INVALID) == 0) &&
-		    !bcmp(&tdbp->tdb_dst, dst, SA_LEN(&dst->sa)) &&
+		    (tdbp->tdb_dst.sa.sa_family == AF_UNSPEC ||
+		    !bcmp(&tdbp->tdb_dst, dst, SA_LEN(&dst->sa))) &&
 		    !bcmp(&tdbp->tdb_src, src, SA_LEN(&src->sa)))
 			break;
 
-	return tdbp;
+	if (tdbp != NULL)
+		return (tdbp);
+
+	bzero(&su_null, sizeof(su_null));
+	su_null.sa.sa_len = sizeof(struct sockaddr);
+	hashval = tdb_hash(0, &su_null, proto);
+
+	for (tdbp = tdbsrc[hashval]; tdbp != NULL; tdbp = tdbp->tdb_snext)
+		if (tdbp->tdb_sproto == proto &&
+		    (spi == 0 || tdbp->tdb_spi == spi) &&
+		    ((tdbp->tdb_flags & TDBF_INVALID) == 0) &&
+		    (tdbp->tdb_dst.sa.sa_family == AF_UNSPEC ||
+		    !bcmp(&tdbp->tdb_dst, dst, SA_LEN(&dst->sa))) &&
+		    tdbp->tdb_src.sa.sa_family == AF_UNSPEC)
+			break;
+
+	return (tdbp);
 }
 #endif
 
@@ -336,31 +354,36 @@ gettdbbysrcdst(u_int32_t spi, union sockaddr_union *src,
  * already established TDBs.
  */
 int
-ipsp_aux_match(struct ipsec_ref *tsrcid, struct ipsec_ref *psrcid,
-    struct ipsec_ref *tdstid, struct ipsec_ref *pdstid,
-    struct ipsec_ref *tlcred, struct ipsec_ref *plcred,
-    struct ipsec_ref *trcred, struct ipsec_ref *prcred,
-    struct sockaddr_encap *tfilter, struct sockaddr_encap *pfilter,
-    struct sockaddr_encap *tfiltermask, struct sockaddr_encap *pfiltermask)
+ipsp_aux_match(struct tdb *tdb,
+    struct ipsec_ref *psrcid,
+    struct ipsec_ref *pdstid,
+    struct ipsec_ref *plcred,
+    struct ipsec_ref *prcred,
+    struct sockaddr_encap *pfilter,
+    struct sockaddr_encap *pfiltermask)
 {
 	if (psrcid != NULL)
-		if (tsrcid == NULL || !ipsp_ref_match(tsrcid, psrcid))
+		if (tdb->tdb_srcid == NULL ||
+		    !ipsp_ref_match(tdb->tdb_srcid, psrcid))
 			return 0;
 
 	if (pdstid != NULL)
-		if (tdstid == NULL || !ipsp_ref_match(tdstid, pdstid))
+		if (tdb->tdb_dstid == NULL ||
+		    !ipsp_ref_match(tdb->tdb_dstid, pdstid))
 			return 0;
 
 	if (plcred != NULL)
-		if (tlcred == NULL || !ipsp_ref_match(tlcred, plcred))
+		if (tdb->tdb_local_cred == NULL ||
+		   !ipsp_ref_match(tdb->tdb_local_cred, plcred))
 			return 0;
 
 	if (prcred != NULL)
-		if (trcred == NULL || !ipsp_ref_match(trcred, prcred))
+		if (tdb->tdb_remote_cred == NULL ||
+		    !ipsp_ref_match(tdb->tdb_remote_cred, prcred))
 			return 0;
 
 	/* Check for filter matches. */
-	if (tfilter->sen_type) {
+	if (tdb->tdb_filter.sen_type) {
 		/*
 		 * XXX We should really be doing a subnet-check (see
 		 * whether the TDB-associated filter is a subset
@@ -368,9 +391,10 @@ ipsp_aux_match(struct ipsec_ref *tsrcid, struct ipsec_ref *psrcid,
 		 * most problems (all this will do is make every
 		 * policy get its own SAs).
 		 */
-		if (bcmp(tfilter, pfilter, sizeof(struct sockaddr_encap)) ||
-		    bcmp(tfiltermask, pfiltermask,
-			sizeof(struct sockaddr_encap)))
+		if (bcmp(&tdb->tdb_filter, pfilter,
+		    sizeof(struct sockaddr_encap)) ||
+		    bcmp(&tdb->tdb_filtermask, pfiltermask,
+		    sizeof(struct sockaddr_encap)))
 			return 0;
 	}
 
@@ -400,10 +424,8 @@ gettdbbyaddr(union sockaddr_union *dst, u_int8_t sproto,
 		    ((tdbp->tdb_flags & TDBF_INVALID) == 0) &&
 		    (!bcmp(&tdbp->tdb_dst, dst, SA_LEN(&dst->sa)))) {
 			/* Do IDs and local credentials match ? */
-			if (!ipsp_aux_match(tdbp->tdb_srcid, srcid,
-			    tdbp->tdb_dstid, dstid, tdbp->tdb_local_cred,
-			    local_cred, NULL, NULL, &tdbp->tdb_filter, filter,
-			    &tdbp->tdb_filtermask, filtermask))
+			if (!ipsp_aux_match(tdbp, srcid, dstid,
+			    local_cred, NULL, filter, filtermask))
 				continue;
 			break;
 		}
@@ -434,10 +456,8 @@ gettdbbysrc(union sockaddr_union *src, u_int8_t sproto,
 		    ((tdbp->tdb_flags & TDBF_INVALID) == 0) &&
 		    (!bcmp(&tdbp->tdb_src, src, SA_LEN(&src->sa)))) {
 			/* Check whether IDs match */
-			if (!ipsp_aux_match(tdbp->tdb_srcid, dstid,
-			    tdbp->tdb_dstid, srcid, NULL, NULL, NULL, NULL,
-			    &tdbp->tdb_filter, filter, &tdbp->tdb_filtermask,
-			    filtermask))
+			if (!ipsp_aux_match(tdbp, dstid, srcid, NULL, NULL,
+			    filter, filtermask))
 				continue;
 			break;
 		}
@@ -670,7 +690,7 @@ puttdb(struct tdb *tdbp)
 
 	tdb_count++;
 
-	ipsec_last_added = time.tv_sec;
+	ipsec_last_added = time_second;
 
 	splx(s);
 }
@@ -838,7 +858,7 @@ tdb_alloc(void)
 	TAILQ_INIT(&tdbp->tdb_policy_head);
 
 	/* Record establishment time. */
-	tdbp->tdb_established = time.tv_sec;
+	tdbp->tdb_established = time_second;
 	tdbp->tdb_epoch = kernfs_epoch - 1;
 
 	/* Initialize timeouts. */
@@ -899,7 +919,7 @@ ipsp_print_tdb(struct tdb *tdb, char *buffer, size_t buflen)
 	    "\tEstablished %d seconds ago\n"
 	    "\tSource = %s",
 	    ntohl(tdb->tdb_spi), ipsp_address(tdb->tdb_dst), tdb->tdb_sproto,
-	    time.tv_sec - tdb->tdb_established,
+	    time_second - tdb->tdb_established,
 	    ipsp_address(tdb->tdb_src));
 	l = strlen(buffer);
 
@@ -911,10 +931,10 @@ ipsp_print_tdb(struct tdb *tdb, char *buffer, size_t buflen)
 	snprintf(buffer + l, buflen - l, "\n");
 	l += strlen(buffer + l);
 
-	if (tdb->tdb_mtu && tdb->tdb_mtutimeout > time.tv_sec) {
+	if (tdb->tdb_mtu && tdb->tdb_mtutimeout > time_second) {
 		snprintf(buffer + l, buflen - l,
 		    "\tMTU: %d, expires in %llu seconds\n",
-		    tdb->tdb_mtu, tdb->tdb_mtutimeout - time.tv_sec);
+		    tdb->tdb_mtu, tdb->tdb_mtutimeout - time_second);
 		l += strlen(buffer + l);
 	}
 
@@ -1033,14 +1053,14 @@ ipsp_print_tdb(struct tdb *tdb, char *buffer, size_t buflen)
 	if (tdb->tdb_last_used) {
 		snprintf(buffer + l, buflen - l,
 		    "\tLast used %llu seconds ago\n",
-		    time.tv_sec - tdb->tdb_last_used);
+		    time_second - tdb->tdb_last_used);
 		l += strlen(buffer + l);
 	}
 
 	if (tdb->tdb_last_marked) {
 		snprintf(buffer + l, buflen - l,
 		    "\tLast marked/unmarked %llu seconds ago\n",
-		    time.tv_sec - tdb->tdb_last_marked);
+		    time_second - tdb->tdb_last_marked);
 		l += strlen(buffer + l);
 	}
 
@@ -1051,14 +1071,14 @@ ipsp_print_tdb(struct tdb *tdb, char *buffer, size_t buflen)
 	if (tdb->tdb_flags & TDBF_TIMER) {
 		snprintf(buffer + l, buflen -l,
 		    "\t\tHard expiration(1) in %llu seconds\n",
-		    tdb->tdb_established + tdb->tdb_exp_timeout - time.tv_sec);
+		    tdb->tdb_established + tdb->tdb_exp_timeout - time_second);
 		l += strlen(buffer + l);
 	}
 	if (tdb->tdb_flags & TDBF_SOFT_TIMER) {
 		snprintf(buffer + l, buflen -l,
 		    "\t\tSoft expiration(1) in %llu seconds\n",
 		    tdb->tdb_established + tdb->tdb_soft_timeout -
-		    time.tv_sec);
+		    time_second);
 		l += strlen(buffer + l);
 	}
 	if (tdb->tdb_flags & TDBF_BYTES) {
@@ -1090,7 +1110,7 @@ ipsp_print_tdb(struct tdb *tdb, char *buffer, size_t buflen)
 			snprintf(buffer + l, buflen -l,
 			    "\t\tHard expiration(2) in %llu seconds\n",
 			    (tdb->tdb_first_use + tdb->tdb_exp_first_use) -
-			    time.tv_sec);
+			    time_second);
 			l += strlen(buffer + l);
 		} else {
 			snprintf(buffer + l, buflen -l,
@@ -1106,7 +1126,7 @@ ipsp_print_tdb(struct tdb *tdb, char *buffer, size_t buflen)
 			snprintf(buffer + l, buflen -l,
 			    "\t\tSoft expiration(2) in %llu seconds\n",
 			    (tdb->tdb_first_use + tdb->tdb_soft_first_use) -
-			    time.tv_sec);
+			    time_second);
 			l += strlen(buffer + l);
 		} else {
 			snprintf(buffer + l, buflen -l,
@@ -1316,7 +1336,7 @@ ipsp_skipcrypto_mark(struct tdb_ident *tdbi)
 	tdb = gettdb(tdbi->spi, &tdbi->dst, tdbi->proto);
 	if (tdb != NULL) {
 		tdb->tdb_flags |= TDBF_SKIPCRYPTO;
-		tdb->tdb_last_marked = time.tv_sec;
+		tdb->tdb_last_marked = time_second;
 	}
 	splx(s);
 }
@@ -1331,7 +1351,7 @@ ipsp_skipcrypto_unmark(struct tdb_ident *tdbi)
 	tdb = gettdb(tdbi->spi, &tdbi->dst, tdbi->proto);
 	if (tdb != NULL) {
 		tdb->tdb_flags &= ~TDBF_SKIPCRYPTO;
-		tdb->tdb_last_marked = time.tv_sec;
+		tdb->tdb_last_marked = time_second;
 	}
 	splx(s);
 }

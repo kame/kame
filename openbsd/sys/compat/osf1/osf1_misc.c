@@ -1,4 +1,4 @@
-/* $OpenBSD: osf1_misc.c,v 1.14 2002/03/14 20:31:31 mickey Exp $ */
+/* $OpenBSD: osf1_misc.c,v 1.17 2004/06/25 16:28:51 deraadt Exp $ */
 /* $NetBSD: osf1_misc.c,v 1.55 2000/06/28 15:39:33 mrg Exp $ */
 
 /*
@@ -246,15 +246,9 @@ osf1_sys_uname(p, v, retval)
 	/* XXX would use stackgap, but our struct utsname is too big! */
 
 	bzero(&u, sizeof(u));
-	
-        strncpy(u.sysname, ostype, sizeof(u.sysname));
-	u.sysname[sizeof(u.sysname) - 1] = '\0';
-
-        strncpy(u.nodename, hostname, sizeof(u.nodename));
-	u.nodename[sizeof(u.nodename) - 1] = '\0';
-
-        strncpy(u.release, osrelease, sizeof(u.release));
-	u.release[sizeof(u.release) - 1] = '\0';
+	strlcpy(u.sysname, ostype, sizeof(u.sysname));
+	strlcpy(u.nodename, hostname, sizeof(u.nodename));
+	strlcpy(u.release, osrelease, sizeof(u.release));
 
         dp = u.version;
         ep = &u.version[sizeof(u.version) - 1];
@@ -268,8 +262,7 @@ osf1_sys_uname(p, v, retval)
                 *dp++ = *cp;
         *dp = '\0';
 
-        strncpy(u.machine, machine, sizeof(u.machine));
-	u.machine[sizeof(u.machine) - 1] = '\0';
+	strlcpy(u.machine, machine, sizeof(u.machine));
 
         return (copyout((caddr_t)&u, (caddr_t)SCARG(uap, name), sizeof u));
 }
@@ -284,7 +277,7 @@ osf1_sys_usleep_thread(p, v, retval)
 	struct osf1_timeval otv, endotv;
 	struct timeval tv, endtv;
 	u_long ticks;
-	int error, s;
+	int error;
 
 	if ((error = copyin(SCARG(uap, sleep), &otv, sizeof otv)))
 		return (error);
@@ -295,16 +288,16 @@ osf1_sys_usleep_thread(p, v, retval)
 	if (ticks == 0)
 		ticks = 1;
 
-	s = splclock();
-	tv = time;
-	splx(s);
+	getmicrotime(&tv);
 
 	tsleep(p, PUSER|PCATCH, "uslpthrd", ticks);	/* XXX */
 
 	if (SCARG(uap, slept) != NULL) {
-		s = splclock();
-		timersub(&time, &tv, &endtv);
-		splx(s);
+		struct timeval tv2;
+
+		getmicrotime(&tv2);
+		timersub(&tv2, &tv, &endtv);
+
 		if (endtv.tv_sec < 0 || endtv.tv_usec < 0)
 			endtv.tv_sec = endtv.tv_usec = 0;
 

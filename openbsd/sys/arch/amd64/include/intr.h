@@ -1,4 +1,4 @@
-/*	$OpenBSD: intr.h,v 1.1 2004/01/28 01:39:39 mickey Exp $	*/
+/*	$OpenBSD: intr.h,v 1.5 2004/06/28 01:52:26 deraadt Exp $	*/
 /*	$NetBSD: intr.h,v 1.2 2003/05/04 22:01:56 fvdl Exp $	*/
 
 /*-
@@ -44,7 +44,8 @@
 
 #ifndef _LOCORE
 #include <machine/cpu.h>
-#include <machine/pic.h>
+
+#include <sys/evcount.h>
 
 /*
  * Struct describing an interrupt source for a CPU. struct cpu_info
@@ -104,7 +105,7 @@ struct intrhand {
 	int	ih_slot;
 	struct cpu_info *ih_cpu;
 	int	ih_irq;
-	char	*ih_what;
+	struct evcount ih_count;
 };
 
 #define IMASK(ci,level) (ci)->ci_imask[(level)]
@@ -112,9 +113,9 @@ struct intrhand {
 
 extern void Xspllower(int);
 
-static __inline int splraise(int);
-static __inline void spllower(int);
-static __inline void softintr(int);
+int splraise(int);
+int spllower(int);
+void softintr(int);
 
 /*
  * Convert spl level to local APIC level
@@ -130,43 +131,6 @@ static __inline void softintr(int);
  */
 
 #define	__splbarrier() __asm __volatile("":::"memory")
-
-/*
- * Add a mask to cpl, and return the old value of cpl.
- */
-static __inline int
-splraise(int nlevel)
-{
-	int olevel;
-	struct cpu_info *ci = curcpu();
-
-	olevel = ci->ci_ilevel;
-	if (nlevel > olevel)
-		ci->ci_ilevel = nlevel;
-	__splbarrier();
-	return (olevel);
-}
-
-/*
- * Restore a value to cpl (unmasking interrupts).  If any unmasked
- * interrupts are pending, call Xspllower() to process them.
- */
-static __inline void
-spllower(int nlevel)
-{
-	struct cpu_info *ci = curcpu();
-
-	__splbarrier();
-	/*
-	 * Since this should only lower the interrupt level,
-	 * the XOR below should only show interrupts that
-	 * are being unmasked.
-	 */
-	if (ci->ci_ipending & IUNMASK(ci,nlevel))
-		Xspllower(nlevel);
-	else
-		ci->ci_ilevel = nlevel;
-}
 
 /*
  * Hardware interrupt masks
@@ -226,28 +190,14 @@ void splassert_check(int, const char *);
 #endif
 
 /*
- * Software interrupt registration
- *
- * We hand-code this to ensure that it's atomic.
- *
- * XXX always scheduled on the current CPU.
- */
-static __inline void
-softintr(int sir)
-{
-	struct cpu_info *ci = curcpu();
-
-	__asm __volatile("lock ; orl %1, %0" :
-	    "=m"(ci->ci_ipending) : "ir" (1 << sir));
-}
-
-/*
  * XXX
  */
 #define	setsoftnet()	softintr(SIR_NET)
 
 #define IPLSHIFT 4			/* The upper nibble of vectors is the IPL.      */
 #define IPL(level) ((level) >> IPLSHIFT)	/* Extract the IPL.    */
+
+#include <machine/pic.h>
 
 /*
  * Stub declarations.
@@ -270,8 +220,9 @@ int x86_nmi(void);
 void intr_calculatemasks(struct cpu_info *);
 int intr_allocate_slot_cpu(struct cpu_info *, struct pic *, int, int *);
 int intr_allocate_slot(struct pic *, int, int, int, struct cpu_info **, int *,
-		       int *);
-void *intr_establish(int, struct pic *, int, int, int, int (*)(void *), void *);
+	    int *);
+void *intr_establish(int, struct pic *, int, int, int, int (*)(void *),
+	    void *, char *);
 void intr_disestablish(struct intrhand *);
 void cpu_intr_init(struct cpu_info *);
 int intr_find_mpmapping(int bus, int pin, int *handle);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ffs_alloc.c,v 1.46 2004/01/20 03:44:06 tedu Exp $	*/
+/*	$OpenBSD: ffs_alloc.c,v 1.49 2004/07/13 21:04:29 millert Exp $	*/
 /*	$NetBSD: ffs_alloc.c,v 1.11 1996/05/11 18:27:09 mycroft Exp $	*/
 
 /*
@@ -128,8 +128,7 @@ ffs_alloc(ip, lbn, bpref, size, cred, bnp)
 		cg = ino_to_cg(fs, ip->i_number);
 	else
 		cg = dtog(fs, bpref);
-	bno = (daddr_t)ffs_hashalloc(ip, cg, (long)bpref, size,
-	    			     ffs_alloccg);
+	bno = (daddr_t)ffs_hashalloc(ip, cg, (long)bpref, size, ffs_alloccg);
 	if (bno > 0) {
 		ip->i_ffs_blocks += btodb(size);
 		ip->i_flag |= IN_CHANGE | IN_UPDATE;
@@ -566,7 +565,7 @@ fail:
  *      available inode is located.
  */
 int
-ffs_inode_alloc(struct inode *pip, int mode, struct ucred *cred,
+ffs_inode_alloc(struct inode *pip, mode_t mode, struct ucred *cred,
     struct vnode **vpp)
 {
 	struct vnode *pvp = ITOV(pip);
@@ -941,7 +940,7 @@ ffs_fragextend(ip, cg, bprev, osize, nsize)
 		brelse(bp);
 		return (0);
 	}
-	cgp->cg_time = time.tv_sec;
+	cgp->cg_time = time_second;
 	bno = dtogd(fs, bprev);
 	for (i = numfrags(fs, osize); i < frags; i++)
 		if (isclr(cg_blksfree(cgp), bno + i)) {
@@ -1008,7 +1007,7 @@ ffs_alloccg(ip, cg, bpref, size)
 		brelse(bp);
 		return (0);
 	}
-	cgp->cg_time = time.tv_sec;
+	cgp->cg_time = time_second;
 	if (size == fs->fs_bsize) {
 		bno = ffs_alloccgblk(ip, bp, bpref);
 		bdwrite(bp);
@@ -1339,7 +1338,7 @@ ffs_nodealloccg(ip, cg, ipref, mode)
 		brelse(bp);
 		return (0);
 	}
-	cgp->cg_time = time.tv_sec;
+	cgp->cg_time = time_second;
 	if (ipref) {
 		ipref %= fs->fs_ipg;
 		if (isclr(cg_inosused(cgp), ipref))
@@ -1417,7 +1416,7 @@ ffs_blkfree(ip, bno, size)
 	}
 	cg = dtog(fs, bno);
 	if ((u_int)bno >= fs->fs_size) {
-		printf("bad block %d, ino %d\n", bno, ip->i_number);
+		printf("bad block %d, ino %u\n", bno, ip->i_number);
 		ffs_fserr(fs, ip->i_ffs_uid, "bad block");
 		return;
 	}
@@ -1432,7 +1431,7 @@ ffs_blkfree(ip, bno, size)
 		brelse(bp);
 		return;
 	}
-	cgp->cg_time = time.tv_sec;
+	cgp->cg_time = time_second;
 	bno = dtogd(fs, bno);
 	if (size == fs->fs_bsize) {
 		blkno = fragstoblks(fs, bno);
@@ -1498,7 +1497,7 @@ ffs_blkfree(ip, bno, size)
 }
 
 int
-ffs_inode_free(struct inode *pip, ino_t ino, int mode)
+ffs_inode_free(struct inode *pip, ino_t ino, mode_t mode)
 {
 	struct vnode *pvp = ITOV(pip);
 
@@ -1515,7 +1514,7 @@ ffs_inode_free(struct inode *pip, ino_t ino, int mode)
  * The specified inode is placed back in the free map.
  */
 int
-ffs_freefile(struct inode *pip, ino_t ino, int mode)
+ffs_freefile(struct inode *pip, ino_t ino, mode_t mode)
 {
 	struct fs *fs;
 	struct cg *cgp;
@@ -1538,10 +1537,10 @@ ffs_freefile(struct inode *pip, ino_t ino, int mode)
 		brelse(bp);
 		return (0);
 	}
-	cgp->cg_time = time.tv_sec;
+	cgp->cg_time = time_second;
 	ino %= fs->fs_ipg;
 	if (isclr(cg_inosused(cgp), ino)) {
-		printf("dev = 0x%x, ino = %d, fs = %s\n",
+		printf("dev = 0x%x, ino = %u, fs = %s\n",
 		    pip->i_dev, ino, fs->fs_fsmnt);
 		if (fs->fs_ronly == 0)
 			panic("ffs_freefile: freeing free inode");

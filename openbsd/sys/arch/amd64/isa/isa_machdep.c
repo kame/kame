@@ -1,4 +1,4 @@
-/*	$OpenBSD: isa_machdep.c,v 1.1 2004/01/28 01:39:39 mickey Exp $	*/
+/*	$OpenBSD: isa_machdep.c,v 1.3 2004/06/28 01:52:26 deraadt Exp $	*/
 /*	$NetBSD: isa_machdep.c,v 1.22 1997/06/12 23:57:32 thorpej Exp $	*/
 
 #define ISA_DMA_STATS
@@ -132,6 +132,7 @@
 #include <machine/intr.h>
 #include <machine/pio.h>
 #include <machine/cpufunc.h>
+#include <machine/i8259.h>
 
 #include <dev/isa/isareg.h>
 #include <dev/isa/isavar.h>
@@ -139,7 +140,6 @@
 #include <dev/isa/isadmavar.h>
 #endif
 #include <i386/isa/isa_machdep.h>
-#include <i386/isa/icu.h>
 
 #include "isadma.h"
 
@@ -370,7 +370,8 @@ isa_intr_establish(ic, irq, type, level, ih_fun, ih_arg, ih_what)
 	struct intrhand **p, *q, *ih;
 	static struct intrhand fakehand = {fakeintr};
 
-	return intr_establish(irq, &i8259_pic, irq, type, level, ih_fun, ih_arg);
+	return intr_establish(irq, &i8259_pic, irq, type, level, ih_fun,
+	    ih_arg, ih_what);
 
 	/* no point in sleeping unless someone can free memory. */
 	ih = malloc(sizeof *ih, M_DEVBUF, cold ? M_NOWAIT : M_WAITOK);
@@ -426,7 +427,8 @@ isa_intr_establish(ic, irq, type, level, ih_fun, ih_arg, ih_what)
 	ih->ih_next = NULL;
 	ih->ih_level = level;
 	ih->ih_irq = irq;
-	ih->ih_what = ih_what;
+	evcount_attach(&ih->ih_count, ih_what, (void *)&ih->ih_irq,
+	    &evcount_intr);
 	*p = ih;
 
 	return (ih);
@@ -460,6 +462,7 @@ isa_intr_disestablish(ic, arg)
 		*p = q->ih_next;
 	else
 		panic("intr_disestablish: handler not registered");
+	evcount_detach(&ih->ih_count);
 	free(ih, M_DEVBUF);
 
 	if (intrhand[irq] == NULL)

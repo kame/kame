@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.h,v 1.34 2004/01/15 05:53:13 drahn Exp $	*/
+/*	$OpenBSD: pmap.h,v 1.38 2004/08/06 22:39:13 deraadt Exp $	*/
 /*	$NetBSD: pmap.h,v 1.1 1996/09/30 16:34:29 ws Exp $	*/
 
 /*-
@@ -119,8 +119,9 @@ boolean_t pteclrbits(paddr_t pa, u_int mask, u_int clear);
  * Really simple. 0x0->0x80000000 contain 1->1 mappings of the physical
  * memory. - XXX
  */
-#define PMAP_MAP_POOLPAGE(pg)		((vaddr_t)VM_PAGE_TO_PHYS(pg))
-#define PMAP_UNMAP_POOLPAGE(va)		PHYS_TO_VM_PAGE((paddr_t)va)
+#define pmap_map_direct(pg)		((vaddr_t)VM_PAGE_TO_PHYS(pg))
+#define pmap_unmap_direct(va)		PHYS_TO_VM_PAGE((paddr_t)va)
+#define	__HAVE_PMAP_DIRECT
 
 void pmap_bootstrap(u_int kernelstart, u_int kernelend);
 
@@ -132,6 +133,9 @@ void switchexit(struct proc *);
 
 int pte_spill_v(struct pmap *pm, u_int32_t va, u_int32_t dsisr, int exec_fault);
 #define pmap_copy(dst_pmap, src_pmap, dst_addr, len, src_addr) ;
+
+void pmap_proc_iflush(struct proc *proc, vaddr_t va, vsize_t len);
+#define pmap_unuse_final(p)		/* nothing */
 
 #endif	/* _KERNEL */
 #endif	/* _LOCORE */

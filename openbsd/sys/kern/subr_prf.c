@@ -1,4 +1,4 @@
-/*	$OpenBSD: subr_prf.c,v 1.58 2004/01/03 14:08:53 espie Exp $	*/
+/*	$OpenBSD: subr_prf.c,v 1.60 2004/07/20 20:19:52 art Exp $	*/
 /*	$NetBSD: subr_prf.c,v 1.45 1997/10/24 18:14:25 chuck Exp $	*/
 
 /*-
@@ -52,6 +52,7 @@
 #include <sys/syslog.h>
 #include <sys/malloc.h>
 #include <sys/pool.h>
+#include <sys/mutex.h>
 
 #include <dev/cons.h>
 
@@ -96,6 +97,8 @@ extern int uvm_doswapencrypt;
 
 int	 kprintf(const char *, int, void *, char *, va_list);
 void	 kputchar(int, int, struct tty *);
+
+struct mutex kprintf_mutex = MUTEX_INITIALIZER(IPL_HIGH);
 
 /*
  * globals
@@ -507,6 +510,8 @@ printf(const char *fmt, ...)
 	va_list ap;
 	int savintr, retval;
 
+	mtx_enter(&kprintf_mutex);
+
 	savintr = consintr;		/* disable interrupts */
 	consintr = 0;
 	va_start(ap, fmt);
@@ -515,6 +520,9 @@ printf(const char *fmt, ...)
 	if (!panicstr)
 		logwakeup();
 	consintr = savintr;		/* reenable interrupts */
+
+	mtx_leave(&kprintf_mutex);
+
 	return(retval);
 }
 
@@ -528,12 +536,17 @@ vprintf(const char *fmt, va_list ap)
 {
 	int savintr, retval;
 
+	mtx_enter(&kprintf_mutex);
+
 	savintr = consintr;		/* disable interrupts */
 	consintr = 0;
 	retval = kprintf(fmt, TOCONS | TOLOG, NULL, NULL, ap);
 	if (!panicstr)
 		logwakeup();
 	consintr = savintr;		/* reenable interrupts */
+
+	mtx_leave(&kprintf_mutex);
+
 	return (retval);
 }
 

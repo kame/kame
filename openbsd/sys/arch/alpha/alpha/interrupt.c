@@ -1,4 +1,4 @@
-/* $OpenBSD: interrupt.c,v 1.15 2003/11/06 21:09:34 mickey Exp $ */
+/* $OpenBSD: interrupt.c,v 1.18 2004/08/16 16:43:52 art Exp $ */
 /* $NetBSD: interrupt.c,v 1.46 2000/06/03 20:47:36 thorpej Exp $ */
 
 /*-
@@ -79,6 +79,7 @@
 #include <sys/device.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
+#include <sys/evcount.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -89,7 +90,6 @@
 #include <machine/rpb.h>
 #include <machine/frame.h>
 #include <machine/cpuconf.h>
-#include <machine/intrcnt.h>
 
 #if defined(MULTIPROCESSOR)
 #include <sys/device.h>
@@ -116,6 +116,8 @@
 #include "bridge.h"
 
 static u_int schedclk2;
+
+extern struct evcount clk_count;
 
 void netintr(void);
 
@@ -170,7 +172,7 @@ interrupt(unsigned long a0, unsigned long a1, unsigned long a2,
 			return;
 #endif
 		uvmexp.intrs++;
-		intrcnt[INTRCNT_CLOCK]++;
+		clk_count.ec_count++;
 		if (platform.clockintr) {
 			/*
 			 * Call hardclock().  This will also call
@@ -433,9 +435,6 @@ softintr_init()
 	    (void (*)(void *))netintr, NULL);
 	softclock_intrhand = softintr_establish(IPL_SOFTCLOCK,
 	    (void (*)(void *))softclock, NULL);
-
-	assert(softnet_intrhand != NULL);
-	assert(softclock_intrhand != NULL);
 }
 
 /*
@@ -527,4 +526,11 @@ softintr_disestablish(void *arg)
 	splx(s);
 
 	free(sih, M_DEVBUF);
+}
+
+int
+_splraise(int s)
+{
+	int cur = alpha_pal_rdps() & ALPHA_PSL_IPL_MASK;
+	return (s > cur ? alpha_pal_swpipl(s) : cur);
 }

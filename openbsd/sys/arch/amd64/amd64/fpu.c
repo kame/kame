@@ -1,4 +1,4 @@
-/*	$OpenBSD: fpu.c,v 1.4 2004/02/28 20:33:33 nordin Exp $	*/
+/*	$OpenBSD: fpu.c,v 1.6 2004/07/11 11:31:57 kettenis Exp $	*/
 /*	$NetBSD: fpu.c,v 1.1 2003/04/26 18:39:28 fvdl Exp $	*/
 
 /*-
@@ -89,7 +89,7 @@
 #define fwait()			__asm("fwait")
 #define	fxsave(addr)		__asm("fxsave %0" : "=m" (*addr))
 #define	fxrstor(addr)		__asm("fxrstor %0" : : "m" (*addr))
-#define	ldmxcsr(addr)		__asm("ldmxcsr %0" : "=m" (*addr))
+#define	ldmxcsr(addr)		__asm("ldmxcsr %0" : : "m" (*addr))
 #define fldcw(addr)		__asm("fldcw %0" : : "m" (*addr))
 #define	clts()			__asm("clts")
 #define	stts()			lcr0(rcr0() | CR0_TS)
@@ -288,7 +288,7 @@ fpusave_proc(struct proc *p, int save)
 #ifdef DIAGNOSTIC
 		spincount = 0;
 #endif
-		while (p->dpl_addr->u_pcb.pcb_fpcpu != NULL)
+		while (p->p_addr->u_pcb.pcb_fpcpu != NULL)
 #ifdef DIAGNOSTIC
 		{
 			spincount++;

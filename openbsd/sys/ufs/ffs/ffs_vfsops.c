@@ -1,4 +1,4 @@
-/*	$OpenBSD: ffs_vfsops.c,v 1.64 2004/01/25 20:02:52 tedu Exp $	*/
+/*	$OpenBSD: ffs_vfsops.c,v 1.68 2004/08/12 07:48:53 otto Exp $	*/
 /*	$NetBSD: ffs_vfsops.c,v 1.19 1996/02/09 22:22:26 christos Exp $	*/
 
 /*
@@ -110,7 +110,6 @@ struct pool ffs_ino_pool;
 int
 ffs_mountroot()
 {
-	extern struct vnode *rootvp;
 	struct fs *fs;
 	struct mount *mp;
 	struct proc *p = curproc;	/* XXX */
@@ -123,7 +122,7 @@ ffs_mountroot()
 	swapdev_vp = NULL;
 	if ((error = bdevvp(swapdev, &swapdev_vp)) ||
 	    (error = bdevvp(rootdev, &rootvp))) {
-		printf("ffs_mountroot: can't setup bdevvp's");
+		printf("ffs_mountroot: can't setup bdevvp's\n");
 		if (swapdev_vp)
 			vrele(swapdev_vp);
 		return (error);
@@ -552,8 +551,9 @@ ffs_reload(mountp, cred, p)
 	if (error)
 		return (error);
 	newfs = (struct fs *)bp->b_data;
-	if (newfs->fs_magic != FS_MAGIC || newfs->fs_bsize > MAXBSIZE ||
-	    newfs->fs_bsize < sizeof(struct fs)) {
+	if (newfs->fs_magic != FS_MAGIC || (u_int)newfs->fs_bsize > MAXBSIZE ||
+	    newfs->fs_bsize < sizeof(struct fs) ||
+	    (u_int)newfs->fs_sbsize > SBSIZE) {
 		brelse(bp);
 		return (EIO);		/* XXX needs translation */
 	}
@@ -630,7 +630,6 @@ ffs_mountfs(devvp, mp, p)
 	int32_t *lp;
 	size_t strsize;
 	struct ucred *cred;
-	extern struct vnode *rootvp;
 	u_int64_t maxfilesize;					/* XXX */
 
 	dev = devvp->v_rdev;
@@ -666,8 +665,9 @@ ffs_mountfs(devvp, mp, p)
 	if (error)
 		goto out;
 	fs = (struct fs *)bp->b_data;
-	if (fs->fs_magic != FS_UFS1_MAGIC || fs->fs_bsize > MAXBSIZE ||
-	    fs->fs_bsize < sizeof(struct fs)) {
+	if (fs->fs_magic != FS_UFS1_MAGIC || (u_int)fs->fs_bsize > MAXBSIZE ||
+	    fs->fs_bsize < sizeof(struct fs) ||
+	    (u_int)fs->fs_sbsize > SBSIZE) {
 		if (fs->fs_magic == FS_UFS2_MAGIC)
 			printf("no UFS2 support\n");
 		error = EFTYPE;		/* Inappropriate format */
@@ -1342,7 +1342,7 @@ ffs_sbupdate(mp, waitfor)
 	bp = getblk(mp->um_devvp, SBOFF >> (fs->fs_fshift - fs->fs_fsbtodb),
 		    (int)fs->fs_sbsize, 0, 0);
 	fs->fs_fmod = 0;
-	fs->fs_time = time.tv_sec;
+	fs->fs_time = time_second;
 	bcopy((caddr_t)fs, bp->b_data, (u_int)fs->fs_sbsize);
 	/* Restore compatibility to old file systems.		   XXX */
 	dfs = (struct fs *)bp->b_data;				/* XXX */

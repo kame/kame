@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_sf.c,v 1.21 2003/06/29 17:19:17 avsm Exp $ */
+/*	$OpenBSD: if_sf.c,v 1.25 2004/06/01 02:43:28 tedu Exp $ */
 /*
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
@@ -153,7 +153,6 @@ int sf_setvlan(struct sf_softc *, int, u_int32_t);
 #endif
 
 u_int8_t sf_read_eeprom(struct sf_softc *, int);
-u_int32_t sf_calchash(caddr_t);
 
 int sf_miibus_readreg(struct device *, int, int);
 void sf_miibus_writereg(struct device *, int, int, int);
@@ -161,6 +160,7 @@ void sf_miibus_statchg(struct device *);
 
 u_int32_t csr_read_4(struct sf_softc *, int);
 void csr_write_4(struct sf_softc *, int, u_int32_t);
+void sf_txthresh_adjust(struct sf_softc *);
 
 #define SF_SETBIT(sc, reg, x)	\
 	csr_write_4(sc, reg, csr_read_4(sc, reg) | x)
@@ -210,31 +210,6 @@ void csr_write_4(sc, reg, val)
 	return;
 }
 
-u_int32_t sf_calchash(addr)
-	caddr_t			addr;
-{
-	u_int32_t		crc, carry;
-	int			i, j;
-	u_int8_t		c;
-
-	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF; /* initial value */
-
-	for (i = 0; i < 6; i++) {
-		c = *(addr + i);
-		for (j = 0; j < 8; j++) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (c & 0x01);
-			crc <<= 1;
-			c >>= 1;
-			if (carry)
-				crc = (crc ^ 0x04c11db6) | carry;
-		}
-	}
-
-	/* return the filter bit position */
-	return(crc >> 23 & 0x1FF);
-}
-
 /*
  * Copy the address 'mac' into the perfect RX filter entry at
  * offset 'idx.' The perfect filter only has 16 entries so do
@@ -280,7 +255,7 @@ int sf_sethash(sc, mac, prio)
 	if (mac == NULL)
 		return(EINVAL);
 
-	h = sf_calchash(mac);
+	h = (ether_crc32_be(mac, ETHER_ADDR_LEN) >> 23) & 0x1FF;
 
 	if (prio) {
 		SF_SETBIT(sc, SF_RXFILT_HASH_BASE + SF_RXFILT_HASH_PRIOOFF +
@@ -394,6 +369,7 @@ void sf_setmulti(sc)
 	SF_CLRBIT(sc, SF_RXFILT, SF_RXFILT_ALLMULTI);
 
 	/* Now program new ones. */
+allmulti:
 	if (ifp->if_flags & IFF_ALLMULTI || ifp->if_flags & IFF_PROMISC) {
 		SF_SETBIT(sc, SF_RXFILT, SF_RXFILT_ALLMULTI);
 	} else {
@@ -403,6 +379,12 @@ void sf_setmulti(sc)
 
 		/* Now traverse the list backwards. */
 		while (enm != NULL) {
+			if (bcmp(enm->enm_addrlo, enm->enm_addrhi,
+			    ETHER_ADDR_LEN)) {
+				ifp->if_flags |= IFF_ALLMULTI;
+				goto allmulti;
+			}
+
 			/* if (enm->enm_addrlo->sa_family != AF_LINK)
 				continue; */
 			/*
@@ -411,14 +393,12 @@ void sf_setmulti(sc)
 			 * use the hash table.
 			 */
 			if (i < SF_RXFILT_PERFECT_CNT) {
-				sf_setperf(sc, i,
-			LLADDR((struct sockaddr_dl *)enm->enm_addrlo));
+				sf_setperf(sc, i, enm->enm_addrlo);
 				i++;
 				continue;
 			}
 
-			sf_sethash(sc,
-			    LLADDR((struct sockaddr_dl *)enm->enm_addrlo), 0);
+			sf_sethash(sc, enm->enm_addrlo, 0);
 			ETHER_NEXT_MULTI(step, enm);
 		}
 	}
@@ -819,16 +799,11 @@ int sf_newbuf(sc, c, m)
 
 	if (m == NULL) {
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-		if (m_new == NULL) {
-			printf("%s: no memory for rx list -- "
-			    "packet dropped!\n", sc->sc_dev.dv_xname);
+		if (m_new == NULL)
 			return(ENOBUFS);
-		}
 
 		MCLGET(m_new, M_DONTWAIT);
 		if (!(m_new->m_flags & M_EXT)) {
-			printf("%s: no memory for rx list -- "
-			    "packet dropped!\n", sc->sc_dev.dv_xname);
 			m_freem(m_new);
 			return(ENOBUFS);
 		}
@@ -842,7 +817,7 @@ int sf_newbuf(sc, c, m)
 	m_adj(m_new, sizeof(u_int64_t));
 
 	c->sf_mbuf = m_new;
-	c->sf_addrlo = SF_RX_HOSTADDR(vtophys(mtod(m_new, caddr_t)));
+	c->sf_addrlo = SF_RX_HOSTADDR(vtophys(mtod(m_new, vaddr_t)));
 	c->sf_valid = 1;
 
 	return(0);
@@ -954,18 +929,22 @@ void sf_txeof(sc)
 	while (cmpconsidx != cmpprodidx) {
 		cur_cmp = &sc->sf_ldata->sf_tx_clist[cmpconsidx];
 		cur_tx = &sc->sf_ldata->sf_tx_dlist[cur_cmp->sf_index >> 7];
-		SF_INC(cmpconsidx, SF_TX_CLIST_CNT);
 
 		if (cur_cmp->sf_txstat & SF_TXSTAT_TX_OK)
 			ifp->if_opackets++;
-		else
+		else {
+			if (cur_cmp->sf_txstat & SF_TXSTAT_TX_UNDERRUN)
+				sf_txthresh_adjust(sc);
 			ifp->if_oerrors++;
+		}
 
 		sc->sf_tx_cnt--;
 		if (cur_tx->sf_mbuf != NULL) {
 			m_freem(cur_tx->sf_mbuf);
 			cur_tx->sf_mbuf = NULL;
-		}
+		} else
+			break;
+		SF_INC(cmpconsidx, SF_TX_CLIST_CNT);
 	}
 
 	ifp->if_timer = 0;
@@ -974,6 +953,29 @@ void sf_txeof(sc)
 	csr_write_4(sc, SF_CQ_CONSIDX,
 	    (txcons & ~SF_CQ_CONSIDX_TXQ) |
 	    ((cmpconsidx << 16) & 0xFFFF0000));
+
+	return;
+}
+
+void
+sf_txthresh_adjust(sc)
+	struct sf_softc *sc;
+{
+	u_int32_t txfctl;
+	u_int8_t txthresh;
+
+	txfctl = csr_read_4(sc, SF_TX_FRAMCTL);
+	txthresh = txfctl & SF_TXFRMCTL_TXTHRESH;
+	if (txthresh < 0xFF) {
+		txthresh++;
+		txfctl &= ~SF_TXFRMCTL_TXTHRESH;
+		txfctl |= txthresh;
+#ifdef DIAGNOSTIC
+		printf("%s: tx underrun, increasing tx threshold to %d bytes\n",
+		    sc->sc_dev.dv_xname, txthresh * 4);
+#endif
+		csr_write_4(sc, SF_TX_FRAMCTL, txfctl);
+	}
 
 	return;
 }
@@ -1008,8 +1010,14 @@ int sf_intr(arg)
 		if (status & SF_ISR_RXDQ1_DMADONE)
 			sf_rxeof(sc);
 
-		if (status & SF_ISR_TX_TXDONE)
+		if (status & SF_ISR_TX_TXDONE ||
+		    status & SF_ISR_TX_DMADONE ||
+		    status & SF_ISR_TX_QUEUEDONE ||
+		    status & SF_ISR_TX_LOFIFO)
 			sf_txeof(sc);
+
+		if (status & SF_ISR_TX_LOFIFO)
+			sf_txthresh_adjust(sc);
 
 		if (status & SF_ISR_ABNORMALINTR) {
 			if (status & SF_ISR_STATSOFLOW) {
@@ -1094,7 +1102,7 @@ void sf_init(xsc)
 
 	/* Init the RX completion queue */
 	csr_write_4(sc, SF_RXCQ_CTL_1,
-	    vtophys(sc->sf_ldata->sf_rx_clist) & SF_RXCQ_ADDR);
+	    vtophys((vaddr_t)sc->sf_ldata->sf_rx_clist) & SF_RXCQ_ADDR);
 	SF_SETBIT(sc, SF_RXCQ_CTL_1, SF_RXCQTYPE_3);
 
 	/* Init RX DMA control. */
@@ -1102,17 +1110,17 @@ void sf_init(xsc)
 
 	/* Init the RX buffer descriptor queue. */
 	csr_write_4(sc, SF_RXDQ_ADDR_Q1,
-	    vtophys(sc->sf_ldata->sf_rx_dlist_big));
+	    vtophys((vaddr_t)sc->sf_ldata->sf_rx_dlist_big));
 	csr_write_4(sc, SF_RXDQ_CTL_1, (MCLBYTES << 16) | SF_DESCSPACE_16BYTES);
 	csr_write_4(sc, SF_RXDQ_PTR_Q1, SF_RX_DLIST_CNT - 1);
 
 	/* Init the TX completion queue */
 	csr_write_4(sc, SF_TXCQ_CTL,
-	    vtophys(sc->sf_ldata->sf_tx_clist) & SF_RXCQ_ADDR);
+	    vtophys((vaddr_t)sc->sf_ldata->sf_tx_clist) & SF_RXCQ_ADDR);
 
 	/* Init the TX buffer descriptor queue. */
 	csr_write_4(sc, SF_TXDQ_ADDR_HIPRIO,
-		vtophys(sc->sf_ldata->sf_tx_dlist));
+		vtophys((vaddr_t)sc->sf_ldata->sf_tx_dlist));
 	SF_SETBIT(sc, SF_TX_FRAMCTL, SF_TXFRMCTL_CPLAFTERTX);
 	csr_write_4(sc, SF_TXDQ_CTL,
 	    SF_TXBUFDESC_TYPE0|SF_TXMINSPACE_128BYTES|SF_TXSKIPLEN_8BYTES);
@@ -1171,7 +1179,8 @@ int sf_encap(sc, c, m_head)
 
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
 		if (m_new == NULL) {
-			printf("%s: no memory for tx list", sc->sc_dev.dv_xname);
+			printf("%s: no memory for tx list\n",
+			    sc->sc_dev.dv_xname);
 			return(1);
 		}
 
@@ -1179,7 +1188,7 @@ int sf_encap(sc, c, m_head)
 			MCLGET(m_new, M_DONTWAIT);
 			if (!(m_new->m_flags & M_EXT)) {
 				m_freem(m_new);
-				printf("%s: no memory for tx list",
+				printf("%s: no memory for tx list\n",
 				    sc->sc_dev.dv_xname);
 				return(1);
 			}
@@ -1191,7 +1200,7 @@ int sf_encap(sc, c, m_head)
 		m_head = m_new;
 		f = &c->sf_frags[0];
 		f->sf_fraglen = f->sf_pktlen = m_head->m_pkthdr.len;
-		f->sf_addr = vtophys(mtod(m_head, caddr_t));
+		f->sf_addr = vtophys(mtod(m_head, vaddr_t));
 		frag = 1;
 	}
 
@@ -1215,7 +1224,7 @@ void sf_start(ifp)
 
 	sc = ifp->if_softc;
 
-	if (!sc->sf_link)
+	if (!sc->sf_link && ifp->if_snd.ifq_len < 10)
 		return;
 
 	if (ifp->if_flags & IFF_OACTIVE)
@@ -1224,7 +1233,19 @@ void sf_start(ifp)
 	txprod = csr_read_4(sc, SF_TXDQ_PRODIDX);
 	i = SF_IDX_HI(txprod) >> 4;
 
+	if (sc->sf_ldata->sf_tx_dlist[i].sf_mbuf != NULL) {
+		printf("%s: TX ring full, resetting\n", sc->sc_dev.dv_xname);
+		sf_init(sc);
+		txprod = csr_read_4(sc, SF_TXDQ_PRODIDX);
+		i = SF_IDX_HI(txprod) >> 4;
+	}
+
 	while(sc->sf_ldata->sf_tx_dlist[i].sf_mbuf == NULL) {
+		if (sc->sf_tx_cnt >= (SF_TX_DLIST_CNT - 5)) {
+			ifp->if_flags |= IFF_OACTIVE;
+			cur_tx = NULL;
+			break;
+		}
 		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
@@ -1246,7 +1267,10 @@ void sf_start(ifp)
 
 		SF_INC(i, SF_TX_DLIST_CNT);
 		sc->sf_tx_cnt++;
-		if (sc->sf_tx_cnt == (SF_TX_DLIST_CNT - 2))
+		/*
+		 * Don't let the TX DMA queue get too full.
+		 */
+		if (sc->sf_tx_cnt > 64)
 			break;
 	}
 

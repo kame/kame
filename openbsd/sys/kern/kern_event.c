@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_event.c,v 1.22 2004/01/12 04:47:01 tedu Exp $	*/
+/*	$OpenBSD: kern_event.c,v 1.24 2004/06/24 19:35:24 tholo Exp $	*/
 
 /*-
  * Copyright (c) 1999,2000,2001 Jonathan Lemon <jlemon@FreeBSD.org>
@@ -127,20 +127,16 @@ struct filterops *sysfilt_ops[] = {
 	&sig_filtops,			/* EVFILT_SIGNAL */
 };
 
-/* XXX - call this on startup instead. */
 void kqueue_init(void);
-
-int kqueue_initialized;
 
 void
 kqueue_init(void)
 {
+
 	pool_init(&kqueue_pool, sizeof(struct kqueue), 0, 0, 0, "kqeuepl",
 	    &pool_allocator_nointr);
 	pool_init(&knote_pool, sizeof(struct knote), 0, 0, 0, "knotepl",
 	    &pool_allocator_nointr);
-
-	kqueue_initialized = 1;
 }
 
 int
@@ -313,9 +309,6 @@ sys_kqueue(struct proc *p, void *v, register_t *retval)
 	struct kqueue *kq;
 	struct file *fp;
 	int fd, error;
-
-	if (!kqueue_initialized)
-		kqueue_init();
 
 	error = falloc(p, &fp, &fd);
 	if (error)
@@ -552,7 +545,7 @@ kqueue_scan(struct file *fp, int maxevents, struct kevent *ulistp,
 {
 	struct kqueue *kq = (struct kqueue *)fp->f_data;
 	struct kevent *kevp;
-	struct timeval atv;
+	struct timeval atv, rtv, ttv;
 	struct knote *kn, marker;
 	int s, count, timeout, nkev = 0, error = 0;
 
@@ -572,10 +565,11 @@ kqueue_scan(struct file *fp, int maxevents, struct kevent *ulistp,
 			goto done;
 		}
 
-		s = splclock();
-		timeradd(&atv, &time, &atv);
-		timeout = hzto(&atv);
-		splx(s);
+		timeout = atv.tv_sec > 24 * 60 * 60 ?
+			24 * 60 * 60 * hz : tvtohz(&atv);
+
+		getmicrouptime(&rtv);
+		timeradd(&atv, &rtv, &atv);
 	} else {
 		atv.tv_sec = 0;
 		atv.tv_usec = 0;
@@ -585,9 +579,13 @@ kqueue_scan(struct file *fp, int maxevents, struct kevent *ulistp,
 
 retry:
 	if (atv.tv_sec || atv.tv_usec) {
-		timeout = hzto(&atv);
-		if (timeout <= 0)
+		getmicrouptime(&rtv);
+		if (timercmp(&rtv, &atv, >=))
 			goto done;
+		ttv = atv;
+		timersub(&ttv, &rtv, &ttv);
+		timeout = ttv.tv_sec > 24 * 60 * 60 ?
+			24 * 60 * 60 * hz : tvtohz(&ttv);
 	}
 
 start:

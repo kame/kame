@@ -1,5 +1,5 @@
-/*	$OpenBSD: umassvar.h,v 1.4 2004/02/21 00:47:42 krw Exp $ */
-/*	$NetBSD: umassvar.h,v 1.19 2003/02/22 05:18:50 tsutsui Exp $	*/
+/*	$OpenBSD: umassvar.h,v 1.7 2004/07/21 07:43:41 dlg Exp $ */
+/*	$NetBSD: umassvar.h,v 1.20 2003/09/08 19:31:01 mycroft Exp $	*/
 /*-
  * Copyright (c) 1999 MAEKAWA Masahide <bishop@rr.iij4u.or.jp>,
  *		      Nick Hibma <n_hibma@freebsd.org>
@@ -31,7 +31,7 @@
 
 #ifdef UMASS_DEBUG
 #define DIF(m, x)	if (umassdebug & (m)) do { x ; } while (0)
-#define DPRINTF(m, x)	if (umassdebug & (m)) logprintf x
+#define DPRINTF(m, x)	do { if (umassdebug & (m)) logprintf x; } while (0)
 #define UDMASS_UPPER	0x00008000	/* upper layer */
 #define UDMASS_GEN	0x00010000	/* general */
 #define UDMASS_SCSI	0x00020000	/* scsi */
@@ -177,10 +177,8 @@ struct umass_softc {
 #define UMASS_CPROTO_ISD_ATA	5
 
 	u_int32_t		sc_quirks;
-#define UMASS_QUIRK_RS_NO_CLEAR_UA	0x00000002
-#define UMASS_QUIRK_WRONG_CSWSIG	0x00000010
-#define UMASS_QUIRK_NO_MAX_LUN		0x00000020
-#define UMASS_QUIRK_WRONG_CSWTAG	0x00000040
+#define UMASS_QUIRK_WRONG_CSWSIG	0x00000001
+#define UMASS_QUIRK_WRONG_CSWTAG	0x00000002
 
 	u_int32_t		sc_busquirks;
 
@@ -263,6 +261,7 @@ struct umass_softc {
 	int			sc_xfer_flags;
 	char			sc_dying;
 	int			sc_refcnt;
+	int			sc_sense;
 
 	struct umassbus_softc	*bus;		 /* bus dependent data */
 };

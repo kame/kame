@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_wi.c,v 1.108 2004/03/18 16:16:10 millert Exp $	*/
+/*	$OpenBSD: if_wi.c,v 1.111 2004/08/16 03:42:22 millert Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -126,7 +126,7 @@ u_int32_t	widebug = WIDEBUG;
 
 #if !defined(lint) && !defined(__OpenBSD__)
 static const char rcsid[] =
-	"$OpenBSD: if_wi.c,v 1.108 2004/03/18 16:16:10 millert Exp $";
+	"$OpenBSD: if_wi.c,v 1.111 2004/08/16 03:42:22 millert Exp $";
 #endif	/* lint */
 
 #ifdef foo
@@ -293,6 +293,8 @@ wi_attach(struct wi_softc *sc, struct wi_funcs *funcs)
 		/* older prism firmware is slow so crank the count */
 		if (sc->sc_sta_firmware_ver < 10000)
 			sc->wi_cmd_count = 5000;
+		else
+			sc->wi_cmd_count = 2000;
 		if (sc->sc_sta_firmware_ver >= 800) {
 #ifndef SMALL_KERNEL
 			if (sc->sc_sta_firmware_ver != 10402)
@@ -1419,6 +1421,7 @@ wi_setmulti(sc)
 	mcast.wi_type = WI_RID_MCAST_LIST;
 	mcast.wi_len = ((ETHER_ADDR_LEN / 2) * 16) + 1;
 
+allmulti:
 	if (ifp->if_flags & IFF_ALLMULTI || ifp->if_flags & IFF_PROMISC) {
 		wi_write_record(sc, (struct wi_ltv_gen *)&mcast);
 		return;
@@ -1431,10 +1434,10 @@ wi_setmulti(sc)
 			break;
 		}
 
-		/* Punt on ranges. */
-		if (bcmp(enm->enm_addrlo, enm->enm_addrhi,
-		    sizeof(enm->enm_addrlo)) != 0)
-			break;
+		if (bcmp(enm->enm_addrlo, enm->enm_addrhi, ETHER_ADDR_LEN)) {
+			ifp->if_flags |= IFF_ALLMULTI;
+			goto allmulti;
+		}
 		bcopy(enm->enm_addrlo, (char *)&mcast.wi_mcast[i],
 		    ETHER_ADDR_LEN);
 		i++;
@@ -1518,7 +1521,7 @@ wi_setdef(sc, wreq)
 	case WI_RID_SYMBOL_DIVERSITY:
 		sc->wi_diversity = letoh16(wreq->wi_val[0]);
 		break;
-	case WI_RID_CNF_ENH_SECURITY:
+	case WI_RID_ENH_SECURITY:
 		sc->wi_enh_security = letoh16(wreq->wi_val[0]);
 		break;
 	case WI_RID_ENCRYPTION:
@@ -1756,7 +1759,7 @@ wi_ioctl(ifp, command, data)
 		case WI_RID_CREATE_IBSS:
 		case WI_RID_MICROWAVE_OVEN:
 		case WI_RID_OWN_SSID:
-		case WI_RID_CNF_ENH_SECURITY:
+		case WI_RID_ENH_SECURITY:
 			/*
 			 * Check for features that may not be supported
 			 * (must be just before default case).
@@ -1769,7 +1772,7 @@ wi_ioctl(ifp, command, data)
 			    !(sc->wi_flags & WI_FLAGS_HAS_CREATE_IBSS)) ||
 			    (wreq.wi_type == WI_RID_MICROWAVE_OVEN &&
 			    !(sc->wi_flags & WI_FLAGS_HAS_MOR)) ||
-			    (wreq.wi_type == WI_RID_CNF_ENH_SECURITY &&
+			    (wreq.wi_type == WI_RID_ENH_SECURITY &&
 			    !(sc->wi_flags & WI_FLAGS_HAS_ENH_SECURITY)) ||
 			    (wreq.wi_type == WI_RID_OWN_SSID &&
 			    wreq.wi_len != 0))
@@ -1915,7 +1918,7 @@ wi_init_io(sc)
 
 	/* Set Enhanced Security if supported. */
 	if (sc->wi_flags & WI_FLAGS_HAS_ENH_SECURITY)
-		WI_SETVAL(WI_RID_CNF_ENH_SECURITY, sc->wi_enh_security);
+		WI_SETVAL(WI_RID_ENH_SECURITY, sc->wi_enh_security);
 
 	/* Set Roaming Mode unless this is a Symbol card. */
 	if (sc->wi_flags & WI_FLAGS_HAS_ROAMING)

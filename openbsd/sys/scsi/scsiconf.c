@@ -1,4 +1,4 @@
-/*	$OpenBSD: scsiconf.c,v 1.87.2.1 2004/04/30 22:07:37 brad Exp $	*/
+/*	$OpenBSD: scsiconf.c,v 1.92 2004/07/31 11:31:30 krw Exp $	*/
 /*	$NetBSD: scsiconf.c,v 1.57 1996/05/02 01:09:01 neil Exp $	*/
 
 /*
@@ -121,19 +121,10 @@ scsiprint(aux, pnp)
 	void *aux;
 	const char *pnp;
 {
-#ifndef __OpenBSD__
-	struct scsi_link *l = aux;
-#endif
-
 	/* only "scsibus"es can attach to "scsi"s; easy. */
 	if (pnp)
 		printf("scsibus at %s", pnp);
 
-#ifndef __OpenBSD__
-	/* don't print channel if the controller says there can be only one. */
-	if (l->channel != SCSI_CHANNEL_ONLY_ONE)
-		printf(" channel %d", l->channel);
-#endif
 	return (UNCONF);
 }
 
@@ -655,7 +646,7 @@ scsi_probedev(scsi, inqbuflun0, target, lun)
 		sc_link->flags |= scsidebug_level;
 #endif /* SCSIDEBUG */
 
-#if defined(mvme68k) || defined(mvme88k)
+#if defined(mvme68k)
 	if (lun == 0) {
 		/* XXX some drivers depend on this */
 		scsi_test_unit_ready(sc_link, TEST_READY_RETRIES_DEFAULT,
@@ -664,14 +655,9 @@ scsi_probedev(scsi, inqbuflun0, target, lun)
 	}
 #endif
 
-#ifdef SCSI_2_DEF
-	/* Some devices need to be told to go to SCSI2. */
-	/* However some just explode if you tell them this... leave it out. */
-	scsi_change_def(sc_link, scsi_autoconf | SCSI_SILENT);
-#endif /* SCSI_2_DEF */
-
 	/* Now go ask the device all about itself. */
-	if (scsi_inquire(sc_link, &inqbuf, scsi_autoconf | SCSI_SILENT) != 0) {
+	rslt = scsi_inquire(sc_link, &inqbuf, scsi_autoconf | SCSI_SILENT);
+	if (rslt != 0) {
 		SC_DEBUG(sc_link, SDEV_DB2, ("Bad LUN. rslt = %i\n", rslt));
 		if (lun == 0)
 			rslt = EINVAL;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.106 2004/02/10 01:31:21 millert Exp $	*/
+/*	$OpenBSD: conf.c,v 1.108 2004/06/03 18:13:13 grange Exp $	*/
 /*	$NetBSD: conf.c,v 1.75 1996/05/03 19:40:20 christos Exp $	*/
 
 /*
@@ -201,6 +201,8 @@ cdev_decl(pci);
 #endif
 
 #include "pf.h"
+#include "hotplug.h"
+#include "gpio.h"
 
 struct cdevsw	cdevsw[] =
 {
@@ -310,6 +312,8 @@ struct cdevsw	cdevsw[] =
  	cdev_oci_init(NBIO,bio),	/* 79: ioctl tunnel */
 	cdev_ch_init(NGPR,gpr),		/* 80: GPR400 SmartCard reader */
 	cdev_ptm_init(NPTY,ptm),	/* 81: pseudo-tty ptm device */
+	cdev_hotplug_init(NHOTPLUG,hotplug), /* 82: devices hot plugging */
+	cdev_gpio_init(NGPIO,gpio),	/* 83: GPIO interface */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 

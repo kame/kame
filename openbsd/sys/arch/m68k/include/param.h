@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.8 2003/06/02 23:27:48 millert Exp $	*/
+/*	$OpenBSD: param.h,v 1.10 2004/08/06 22:31:31 mickey Exp $	*/
 /*	$NetBSD: param.h,v 1.2 1997/06/10 18:21:23 veego Exp $	*/
 
 /*
@@ -92,6 +92,7 @@
 #define UPAGES		2		/* pages of u-area */
 #endif
 #define	USPACE		(UPAGES * NBPG)
+#define	USPACE_ALIGN	(0)		/* u-area alignment 0-none */
 
 /*
  * Constants related to network buffer management.
@@ -108,13 +109,7 @@
 
 #define	MCLBYTES	(1 << MCLSHIFT)
 #define	MCLOFSET	(MCLBYTES - 1)
-#ifndef NMBCLUSTERS
-#ifdef GATEWAY
-# define	NMBCLUSTERS	1024	/* map size, max cluster allocation */
-#else
-# define	NMBCLUSTERS	512	/* map size, max cluster allocation */
-#endif
-#endif
+#define	NMBCLUSTERS	1024		/* map size, max cluster allocation */
 
 /* pages ("clicks") to disk blocks */
 #define	ctod(x)		((x) << (PGSHIFT - DEV_BSHIFT))

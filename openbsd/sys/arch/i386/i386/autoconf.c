@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.52 2003/10/15 03:56:21 david Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.54 2004/06/15 23:36:55 deraadt Exp $	*/
 /*	$NetBSD: autoconf.c,v 1.20 1996/05/03 19:41:56 christos Exp $	*/
 
 /*-
@@ -61,6 +61,12 @@
 
 #include <dev/cons.h>
 
+#include "ioapic.h"
+
+#if NIOAPIC > 0
+#include <machine/i82093var.h>
+#endif
+
 int findblkmajor(struct device *dv);
 char *findblkname(int);
 
@@ -83,8 +89,8 @@ extern int	viac3_rnd_present;
 void		viac3_rnd(void *);
 
 #ifdef CRYPTO
-extern int	viac3_crypto_present;
 void		viac3_crypto_setup(void);
+extern int	i386_has_xcrypt;
 #endif /* CRYPTO */
 #endif
 
@@ -109,6 +115,14 @@ cpu_configure()
 	printf("biomask %x netmask %x ttymask %x\n", (u_short)IMASK(IPL_BIO),
 	    (u_short)IMASK(IPL_NET), (u_short)IMASK(IPL_TTY));
 
+#if NIOAPIC > 0
+	ioapic_enable();
+#endif
+
+#ifdef MULTIPROCESSOR
+	/* propagate TSS and LDT configuration to the idle pcb's. */
+	cpu_init_idle_pcbs();
+#endif
 	spl0();
 
 	/*
@@ -134,7 +148,7 @@ cpu_configure()
 	/*
 	 * Also, if the chip has crypto available, enable it.
 	 */
-	if (viac3_crypto_present)
+	if (i386_has_xcrypt)
 		viac3_crypto_setup();
 #endif /* CRYPTO */
 #endif

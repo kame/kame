@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_extern.h,v 1.50 2003/08/10 00:04:50 miod Exp $	*/
+/*	$OpenBSD: uvm_extern.h,v 1.53 2004/05/27 04:55:28 tedu Exp $	*/
 /*	$NetBSD: uvm_extern.h,v 1.57 2001/03/09 01:02:12 chs Exp $	*/
 
 /*
@@ -357,7 +357,6 @@ struct uvmexp {
 
 	/* kernel memory objects: managed by uvm_km_kmemalloc() only! */
 	struct uvm_object *kmem_object;
-	struct uvm_object *mb_object;
 };
 
 #ifdef _KERNEL
@@ -511,6 +510,8 @@ void			uvm_km_free_poolpage1(vm_map_t, vaddr_t);
 #define	uvm_km_alloc_poolpage(waitok)	uvm_km_alloc_poolpage1(kmem_map, \
 						uvmexp.kmem_object, (waitok))
 #define	uvm_km_free_poolpage(addr)	uvm_km_free_poolpage1(kmem_map, (addr))
+void			*uvm_km_getpage(boolean_t);
+void			uvm_km_putpage(void *);
 
 /* uvm_map.c */
 int			uvm_map(vm_map_t, vaddr_t *, vsize_t,

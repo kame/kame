@@ -1,4 +1,4 @@
-/*	$OpenBSD: ohci_pci.c,v 1.19 2003/08/11 02:21:28 mickey Exp $	*/
+/*	$OpenBSD: ohci_pci.c,v 1.21 2004/05/24 22:52:52 mickey Exp $	*/
 /*	$NetBSD: ohci_pci.c,v 1.23 2002/10/02 16:51:47 thorpej Exp $	*/
 
 /*
@@ -55,6 +55,7 @@
 #include <machine/bus.h>
 
 #include <dev/pci/pcivar.h>
+#include <dev/pci/usb_pci.h>
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
@@ -70,6 +71,7 @@ int	ohci_pci_detach(device_ptr_t, int);
 
 struct ohci_pci_softc {
 	ohci_softc_t		sc;
+	struct usb_pci		sc_pci;
 	pci_chipset_tag_t	sc_pc;
 	void 			*sc_ih;		/* interrupt vectoring */
 };
@@ -141,6 +143,7 @@ ohci_pci_attach(struct device *parent, struct device *self, void *aux)
 	/* Map and establish the interrupt. */
 	if (pci_intr_map(pa, &ih)) {
 		printf(": couldn't map interrupt\n");
+		bus_space_unmap(sc->sc.iot, sc->sc.ioh, sc->sc.sc_size);
 		splx(s);
 		return;
 	}
@@ -152,6 +155,7 @@ ohci_pci_attach(struct device *parent, struct device *self, void *aux)
 		if (intrstr != NULL)
 			printf(" at %s", intrstr);
 		printf("\n");
+		bus_space_unmap(sc->sc.iot, sc->sc.ioh, sc->sc.sc_size);
 		splx(s);
 		return;
 	}
@@ -171,10 +175,13 @@ ohci_pci_attach(struct device *parent, struct device *self, void *aux)
 	if (r != USBD_NORMAL_COMPLETION) {
 		printf("%s: init failed, error=%d\n",
 		    sc->sc.sc_bus.bdev.dv_xname, r);
+		bus_space_unmap(sc->sc.iot, sc->sc.ioh, sc->sc.sc_size);
 		splx(s);
 		return;
 	}
 	splx(s);
+
+	usb_pci_add(&sc->sc_pci, pa, &sc->sc.sc_bus);
 
 	/* Attach usb device. */
 	sc->sc.sc_child = config_found((void *)sc, &sc->sc.sc_bus,
@@ -198,5 +205,6 @@ ohci_pci_detach(device_ptr_t self, int flags)
 		bus_space_unmap(sc->sc.iot, sc->sc.ioh, sc->sc.sc_size);
 		sc->sc.sc_size = 0;
 	}
+	usb_pci_rem(&sc->sc_pci);
 	return (0);
 }

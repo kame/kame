@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.22 2003/06/02 23:27:45 millert Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.24 2004/06/13 21:49:13 niklas Exp $	*/
 /*	$NetBSD: cpu.h,v 1.28 1998/02/13 07:41:51 scottr Exp $	*/
 
 /*
@@ -91,7 +91,7 @@ struct clockframe {
  * or after the current trap/syscall if in system mode.
  */
 extern int want_resched;	/* resched() was called */
-#define	need_resched()	{ want_resched++; aston(); }
+#define	need_resched(ci)	{ want_resched++; aston(); }
 
 /*
  * Give a profiling tick to the current process when the user profiling
@@ -180,7 +180,7 @@ int	badbaddr(caddr_t);
 void	dumpconf(void);
 
 /* sys_machdep.c functions */
-int	cachectl(int, vaddr_t, int);
+int	cachectl(struct proc *, int, vaddr_t, int);
 
 /* vm_machdep.c functions */
 void	physaccess(caddr_t, caddr_t, int, int);

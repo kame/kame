@@ -1,4 +1,4 @@
-/*	$OpenBSD: signalvar.h,v 1.10 2003/06/02 23:28:21 millert Exp $	*/
+/*	$OpenBSD: signalvar.h,v 1.12 2004/06/13 21:49:28 niklas Exp $	*/
 /*	$NetBSD: signalvar.h,v 1.17 1996/04/22 01:23:31 christos Exp $	*/
 
 /*
@@ -56,6 +56,8 @@ struct	sigacts {
 	struct	sigaltstack ps_sigstk;	/* sp & on stack state variable */
 	int	ps_sig;			/* for core dump/debugger XXX */
 	long	ps_code;		/* for core dump/debugger XXX */
+	int	ps_type;		/* for core dump/debugger XXX */
+	union sigval ps_sigval;		/* for core dump/debugger XXX */
 	sigset_t ps_usertramp;		/* SunOS compat; libc sigtramp XXX */
 	int	ps_refcnt;		/* reference count */
 };
@@ -157,7 +159,9 @@ void	csignal(pid_t pgid, int signum, uid_t uid, uid_t euid);
 int	issignal(struct proc *p);
 void	pgsignal(struct pgrp *pgrp, int sig, int checkctty);
 void	postsig(int sig);
-void	psignal(struct proc *p, int sig);
+void	psignal1(struct proc *p, int sig, int dolock);
+#define	psignal(p, sig)		psignal1((p), (sig), 1)
+#define	sched_psignal(p, sig)	psignal1((p), (sig), 0)
 void	siginit(struct proc *p);
 void	trapsignal(struct proc *p, int sig, u_long code, int type,
 	    union sigval val);

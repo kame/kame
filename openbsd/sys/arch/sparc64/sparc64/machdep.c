@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.67 2004/03/10 23:02:54 tom Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.70 2004/08/02 21:40:46 brad Exp $	*/
 /*	$NetBSD: machdep.c,v 1.108 2001/07/24 19:30:14 eeh Exp $ */
 
 /*-
@@ -1285,7 +1285,17 @@ _bus_dmamap_load_mbuf(t, t0, map, m, flags)
 			long incr;
 
 			incr = min(buflen, NBPG);
-			(void) pmap_extract(pmap_kernel(), vaddr, &pa);
+
+			if (pmap_extract(pmap_kernel(), vaddr, &pa) == FALSE) {
+#ifdef DIAGNOSTIC
+				printf("_bus_dmamap_load_mbuf: pmap_extract failed %lx\n",
+					vaddr);
+				map->_dm_type = 0;
+				map->_dm_source = NULL;
+#endif
+				return EINVAL;
+			}
+
 			buflen -= incr;
 			vaddr += incr;
 
@@ -1900,14 +1910,12 @@ bus_intr_allocate(bus_space_tag_t t, int (*handler)(void *), void *arg,
     const char *what)
 {
 	struct intrhand *ih;
-	size_t namelen = strlen(what) + 1;
 
-	ih = (struct intrhand *)
-		malloc(sizeof(struct intrhand) + namelen - 1, M_DEVBUF, M_NOWAIT);
+	ih = (struct intrhand *)malloc(sizeof(struct intrhand), M_DEVBUF, M_NOWAIT);
 	if (ih == NULL)
 		return (NULL);
 
-	memset(ih, 0, sizeof(struct intrhand) + namelen);
+	memset(ih, 0, sizeof(struct intrhand));
 
 	ih->ih_fun = handler;
 	ih->ih_arg = arg;
@@ -1916,7 +1924,7 @@ bus_intr_allocate(bus_space_tag_t t, int (*handler)(void *), void *arg,
 	ih->ih_map = mapper;
 	ih->ih_clr = clearer;
 	ih->ih_bus = t;
-	strlcpy(ih->ih_name, what, namelen);
+	strlcpy(ih->ih_name, what, sizeof(ih->ih_name));
 
 	return (ih);
 }

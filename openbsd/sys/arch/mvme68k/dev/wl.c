@@ -1,4 +1,4 @@
-/*	$OpenBSD: wl.c,v 1.14 2004/01/14 20:50:48 miod Exp $ */
+/*	$OpenBSD: wl.c,v 1.17 2004/07/30 22:29:45 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Dale Rahn. All rights reserved.
@@ -113,9 +113,9 @@ struct cl_info {
 
 struct wlsoftc {
 	struct device	sc_dev;
-	struct evcnt	sc_txintrcnt;
-	struct evcnt	sc_rxintrcnt;
-	struct evcnt	sc_mxintrcnt;
+	char		sc_txintrname[16 + 3];
+	char		sc_rxintrname[16 + 3];
+	char		sc_mxintrname[16 + 3];
 
 	time_t		sc_rotime;	/* time of last ring overrun */
 	time_t		sc_fotime;	/* time of last fifo overrun */
@@ -131,7 +131,6 @@ struct wlsoftc {
 	struct intrhand	sc_ih_m;
 	struct intrhand	sc_ih_t;
 	struct intrhand	sc_ih_r;
-	struct vme2reg	*sc_vme2;
 	u_char		sc_vec;
 	int		sc_flags;
 };
@@ -250,7 +249,6 @@ wlattach(parent, self, aux)
 	int i, j, s;
 
 	sc->cl_reg = (struct clreg *)&clb->chips[0].clreg;
-	sc->sc_vme2 = ca->ca_master;
 	sc->sc_vec = ca->ca_vec;
 
 	sc->sc_memv = 0xa5 + 0;
@@ -328,14 +326,17 @@ wlattach(parent, self, aux)
 	sc->sc_ih_r.ih_ipl = ca->ca_ipl;
 	sc->sc_ih_r.ih_wantframe = 0;
 
-	vmeintr_establish(ca->ca_vec + 0, &sc->sc_ih_e);
-	vmeintr_establish(ca->ca_vec + 1, &sc->sc_ih_m);
-	vmeintr_establish(ca->ca_vec + 2, &sc->sc_ih_t);
-	vmeintr_establish(ca->ca_vec + 3, &sc->sc_ih_r);
+	snprintf(sc->sc_txintrname, sizeof sc->sc_txintrname,
+	    "%s_tx", self->dv_xname);
+	snprintf(sc->sc_rxintrname, sizeof sc->sc_rxintrname,
+	    "%s_rx", self->dv_xname);
+	snprintf(sc->sc_mxintrname, sizeof sc->sc_mxintrname,
+	    "%s_mx", self->dv_xname);
 
-	evcnt_attach(&sc->sc_dev, "intr", &sc->sc_txintrcnt);
-	evcnt_attach(&sc->sc_dev, "intr", &sc->sc_rxintrcnt);
-	evcnt_attach(&sc->sc_dev, "intr", &sc->sc_mxintrcnt);
+	vmeintr_establish(ca->ca_vec + 0, &sc->sc_ih_e, sc->sc_rxintrname);
+	vmeintr_establish(ca->ca_vec + 1, &sc->sc_ih_m, sc->sc_mxintrname);
+	vmeintr_establish(ca->ca_vec + 2, &sc->sc_ih_t, sc->sc_txintrname);
+	vmeintr_establish(ca->ca_vec + 3, &sc->sc_ih_r, sc->sc_rxintrname);
 
 	p = sc->sc_memkv;
 	s = splhigh();
@@ -1125,8 +1126,6 @@ cl_mintr(sc)
 	printf("stk 0x%x mir 0x%x chan 0x%x\n",
 	    sc->cl_reg->cl_stk, mir, channel);
 
-	sc->sc_mxintrcnt.ev_count++;
-
 	if (misr & MISR_TIMER1) {
 		/* timers are not currently used?? */
 		log(LOG_WARNING, "cl_mintr: channel %x timer 1 unexpected\n",channel);
@@ -1183,7 +1182,6 @@ cl_txintr(sc)
 	printf("stk 0x%x tir 0x%x chan 0x%x cmr 0x%x tisr 0x%x tftc 0x%x\n",
 	    sc->cl_reg->cl_stk, tir, chan, cmr, tisr, tftc);
 
-	sc->sc_txintrcnt.ev_count++;
 	sc->sc_cl[chan].txcnt++;
 	tp = sc->sc_cl[chan].tty;
 
@@ -1258,7 +1256,6 @@ cl_rxintr(sc)
 	/*printf("stk 0x%x rir 0x%x chan 0x%x cmr 0x%x risrl 0x%x\n",
 	    sc->cl_reg->cl_stk, rir, chan, cmr, risrl);*/
 
-	sc->sc_rxintrcnt.ev_count++;
 	sc->sc_cl[chan].rxcnt++;
 
 	if (risrl & RISRL_TIMEOUT) {

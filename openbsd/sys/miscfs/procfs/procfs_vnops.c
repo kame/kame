@@ -1,4 +1,4 @@
-/*	$OpenBSD: procfs_vnops.c,v 1.30 2003/09/23 16:51:13 millert Exp $	*/
+/*	$OpenBSD: procfs_vnops.c,v 1.32 2004/06/24 19:35:25 tholo Exp $	*/
 /*	$NetBSD: procfs_vnops.c,v 1.40 1996/03/16 23:52:55 christos Exp $	*/
 
 /*
@@ -504,7 +504,6 @@ procfs_getattr(v)
 	struct pfsnode *pfs = VTOPFS(ap->a_vp);
 	struct vattr *vap = ap->a_vap;
 	struct proc *procp;
-	struct timeval tv;
 	int error;
 
 	/* first check the process still exists */
@@ -543,8 +542,7 @@ procfs_getattr(v)
 	 * p_stat structure is not addressible if u. gets
 	 * swapped out for that process.
 	 */
-	microtime(&tv);
-	TIMEVAL_TO_TIMESPEC(&tv, &vap->va_ctime);
+	getnanotime(&vap->va_ctime);
 	vap->va_atime = vap->va_mtime = vap->va_ctime;
 
 	switch (pfs->pfs_type) {
@@ -936,7 +934,7 @@ procfs_readdir(v)
 	i = uio->uio_offset;
 	if (i < 0)
 		return (EINVAL);
-	bzero((caddr_t)&d, UIO_MX);
+	bzero(&d, UIO_MX);
 	d.d_reclen = UIO_MX;
 
 	switch (pfs->pfs_type) {
@@ -964,7 +962,7 @@ procfs_readdir(v)
 			bcopy(pt->pt_name, d.d_name, pt->pt_namlen + 1);
 			d.d_type = pt->pt_type;
 
-			if ((error = uiomove((caddr_t)&d, UIO_MX, uio)) != 0)
+			if ((error = uiomove(&d, UIO_MX, uio)) != 0)
 				break;
 		}
 
@@ -1054,7 +1052,7 @@ procfs_readdir(v)
 				break;
 			}
 
-			if ((error = uiomove((caddr_t)&d, UIO_MX, uio)) != 0)
+			if ((error = uiomove(&d, UIO_MX, uio)) != 0)
 				break;
 		}
 	done:
@@ -1098,7 +1096,7 @@ procfs_readlink(v)
 	else
 		return (EINVAL);
 
-	return (uiomove((caddr_t)buf, len, ap->a_uio));
+	return (uiomove(buf, len, ap->a_uio));
 }
 
 /*

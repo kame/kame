@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_wi_ieee.h,v 1.22 2004/03/18 16:16:10 millert Exp $	*/
+/*	$OpenBSD: if_wi_ieee.h,v 1.24 2004/06/22 20:51:01 millert Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -46,19 +46,11 @@
  */
 
 #ifndef SIOCSWAVELAN
-#ifdef __FreeBSD__
 #define SIOCSWAVELAN	SIOCSIFGENERIC
-#else	/* !__FreeBSD__ */
-#define SIOCSWAVELAN	SIOCSIFASYNCMAP
-#endif	/* __FreeBSD__ */
 #endif
 
 #ifndef SIOCGWAVELAN
-#ifdef __FreeBSD__
 #define SIOCGWAVELAN	SIOCGIFGENERIC
-#else	/* !__FreeBSD__ */
-#define SIOCGWAVELAN	SIOCGIFASYNCMAP
-#endif	/* __FreeBSD__ */
 #endif
 
 /*
@@ -238,8 +230,8 @@ struct wi_counters {
 #define	WI_RID_SYMBOL_KEYLENGTH	0xFC2B
 #define	WI_RID_ROAMING_MODE	0xFC2D /* Roaming mode (1:firm,3:disable) */
 #define WI_RID_CUR_BEACON_INT	0xFC33 /* beacon xmit time for BSS creation */
-#define	WI_RID_CNF_ENH_SECURITY	0xFC43 /* hide SSID name (prism fw >= 1.6.3) */
-#define	WI_RID_CNF_DBM_ADJUST	0xFC46 /* Get DBM adjustment factor */
+#define	WI_RID_ENH_SECURITY	0xFC43 /* hide SSID name (prism fw >= 1.6.3) */
+#define	WI_RID_DBM_ADJUST	0xFC46 /* Get DBM adjustment factor */
 #define	WI_RID_SYMBOL_PREAMBLE	0xFC8C /* Enable/disable short preamble */
 #define	WI_RID_P2_SHORT_PREAMBLE	0xFCB0 /* Short preamble support */
 #define	WI_RID_P2_EXCLUDE_LONG_PREAMBLE	0xFCB1 /* Don't send long preamble */

@@ -1,4 +1,4 @@
-#	$OpenBSD: files.amd64,v 1.2 2004/02/25 00:16:41 deraadt Exp $
+#	$OpenBSD: files.amd64,v 1.5 2004/08/20 15:19:28 millert Exp $
 
 maxpartitions 16
 maxusers 2 16 128
@@ -21,10 +21,20 @@ file	arch/amd64/amd64/Locore.c
 file	arch/amd64/amd64/softintr.c
 file	arch/amd64/amd64/i8259.c
 file	arch/amd64/amd64/cacheinfo.c
+file	arch/amd64/amd64/mutex.S
 
 file	arch/amd64/amd64/intr.c
 file	arch/amd64/amd64/bus_space.c
 file	arch/amd64/amd64/bus_dma.c
+
+file	arch/amd64/amd64/mptramp.S		multiprocessor
+file	arch/amd64/amd64/ipifuncs.c		multiprocessor
+file	arch/amd64/amd64/ipi.c			multiprocessor
+
+file	arch/amd64/amd64/apic.c			ioapic | lapic
+
+file	arch/amd64/amd64/mpbios.c		mpbios
+
 
 file	arch/amd64/amd64/consinit.c
 file	dev/cons.c
@@ -54,12 +64,12 @@ include "dev/i2o/files.i2o"
 include "dev/atapiscsi/files.atapiscsi"
 include "dev/ata/files.ata"
 
-define mainbus { }
+define mainbus { apid = -1 }
 device	mainbus: isabus, pcibus, mainbus
 attach	mainbus at root
 file	arch/amd64/amd64/mainbus.c	mainbus
 
-define	cpu { [apid = -1] }
+define	cpu { apid = -1 }
 device	cpu
 attach	cpu at mainbus
 file	arch/amd64/amd64/cpu.c	cpu
@@ -79,6 +89,8 @@ file	arch/amd64/amd64/ioapic.c	ioapic needs-flag
 include "dev/pci/files.pci"
 file	arch/amd64/pci/pci_machdep.c	pci
 file	arch/amd64/pci/pciide_machdep.c	pciide
+
+include "dev/puc/files.puc"
 
 # PCI Host bridge chipsets
 device	pchb: pcibus

@@ -1,7 +1,7 @@
-/*	$OpenBSD: vm_machdep.c,v 1.50 2003/02/18 19:01:50 deraadt Exp $	*/
+/*	$OpenBSD: vm_machdep.c,v 1.54 2004/06/08 22:00:25 mickey Exp $	*/
 
 /*
- * Copyright (c) 1999-2003 Michael Shalayeff
+ * Copyright (c) 1999-2004 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -12,11 +12,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -205,31 +200,24 @@ cpu_fork(p1, p2, stack, stacksize, func, arg)
 	tf->tf_ipsw = PSL_C | PSL_Q | PSL_P | PSL_D | PSL_I /* | PSL_L */;
 
 	/*
-	 * Set up return value registers as libc:fork() expects
-	 */
-	tf->tf_ret0 = p1->p_pid;
-	tf->tf_ret1 = 1;	/* ischild */
-	tf->tf_t1 = 0;		/* errno */
-
-	/*
 	 * If specified, give the child a different stack.
 	 */
 	if (stack != NULL)
 		tf->tf_sp = (register_t)stack;
 
 	/*
-	 * Build a stack frame for the cpu_switch & co.
+	 * Build stack frames for the cpu_switch & co.
 	 */
 	osp = sp + HPPA_FRAME_SIZE;
-	sp += 2*HPPA_FRAME_SIZE + 20*4; /* std frame + calee-save registers */
-	*HPPA_FRAME_CARG(0, sp) = tf->tf_sp;
-	*HPPA_FRAME_CARG(1, sp) = KERNMODE(func);
-	*HPPA_FRAME_CARG(2, sp) = (register_t)arg;
-	*(register_t*)(osp) = (sp - HPPA_FRAME_SIZE);
-	*(register_t*)(sp + HPPA_FRAME_PSP) = osp;
+	*(register_t*)(osp - HPPA_FRAME_SIZE) = 0;
 	*(register_t*)(osp + HPPA_FRAME_CRP) = (register_t)&switch_trampoline;
 	*(register_t*)(osp + HPPA_FRAME_SL) = 0;	/* cpl */
-	tf->tf_sp = sp;
+	*(register_t*)(osp) = (osp - HPPA_FRAME_SIZE);
+
+	sp = osp + HPPA_FRAME_SIZE + 20*4; /* frame + calee-save registers */
+	*HPPA_FRAME_CARG(0, sp) = (register_t)arg;
+	*HPPA_FRAME_CARG(1, sp) = KERNMODE(func);
+	pcbp->pcb_ksp = sp;
 	fdcache(HPPA_SID_KERNEL, (vaddr_t)p2->p_addr, sp - (vaddr_t)p2->p_addr);
 }
 
@@ -240,8 +228,10 @@ cpu_exit(p)
 	extern paddr_t fpu_curpcb;	/* from locore.S */
 	struct trapframe *tf = p->p_md.md_regs;
 
-	if (fpu_curpcb == tf->tf_cr30)
+	if (fpu_curpcb == tf->tf_cr30) {
+		fpu_exit();
 		fpu_curpcb = 0;
+	}
 
 	exit2(p);
 	cpu_switch(p);

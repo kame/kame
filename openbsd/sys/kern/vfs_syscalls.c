@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_syscalls.c,v 1.108 2004/01/06 04:18:18 tedu Exp $	*/
+/*	$OpenBSD: vfs_syscalls.c,v 1.117 2004/08/05 04:46:26 tedu Exp $	*/
 /*	$NetBSD: vfs_syscalls.c,v 1.71 1996/04/23 10:29:02 mycroft Exp $	*/
 
 /*
@@ -49,6 +49,7 @@
 #include <sys/proc.h>
 #include <sys/uio.h>
 #include <sys/malloc.h>
+#include <sys/pool.h>
 #include <sys/dirent.h>
 #include <sys/extattr.h>
 
@@ -106,7 +107,6 @@ sys_mount(p, v, retval)
 	struct vattr va;
 	struct nameidata nd;
 	struct vfsconf *vfsp;
-	struct timeval tv;
 
 	if (usermount == 0 && (error = suser(p, 0)))
 		return (error);
@@ -154,7 +154,8 @@ sys_mount(p, v, retval)
 		}
 		/*
 		 * Do not allow NFS export by non-root users. Silently
-		 * enforce MNT_NOSUID and MNT_NODEV for non-root users.
+		 * enforce MNT_NOSUID and MNT_NODEV for non-root users, and
+		 * inherit MNT_NOEXEC from the mount point.
 		 */
 		if (p->p_ucred->cr_uid != 0) {
 			if (SCARG(uap, flags) & MNT_EXPORTED) {
@@ -162,6 +163,8 @@ sys_mount(p, v, retval)
 				return (EPERM);
 			}
 			SCARG(uap, flags) |= MNT_NOSUID | MNT_NODEV;
+			if (flag & MNT_NOEXEC)
+				SCARG(uap, flags) |= MNT_NOEXEC;
 		}
 		if ((error = vfs_busy(mp, LK_NOWAIT, 0, p)) != 0) {
 			vput(vp);
@@ -182,7 +185,8 @@ sys_mount(p, v, retval)
 	}
 	/*
 	 * Do not allow NFS export by non-root users. Silently
-	 * enforce MNT_NOSUID and MNT_NODEV for non-root users.
+	 * enforce MNT_NOSUID and MNT_NODEV for non-root users, and inherit
+	 * MNT_NOEXEC from the mount point.
 	 */
 	if (p->p_ucred->cr_uid != 0) {
 		if (SCARG(uap, flags) & MNT_EXPORTED) {
@@ -190,9 +194,13 @@ sys_mount(p, v, retval)
 			return (EPERM);
 		}
 		SCARG(uap, flags) |= MNT_NOSUID | MNT_NODEV;
+		if (vp->v_mount->mnt_flag & MNT_NOEXEC)
+			SCARG(uap, flags) |= MNT_NOEXEC;
 	}
-	if ((error = vinvalbuf(vp, V_SAVE, p->p_ucred, p, 0, 0)) != 0)
+	if ((error = vinvalbuf(vp, V_SAVE, p->p_ucred, p, 0, 0)) != 0) {
+		vput(vp);
 		return (error);
+	}
 	if (vp->v_type != VDIR) {
 		vput(vp);
 		return (ENOTDIR);
@@ -272,8 +280,7 @@ update:
 	 */
 	error = VFS_MOUNT(mp, SCARG(uap, path), SCARG(uap, data), &nd, p);
 	if (!error) {
-		microtime(&tv);
-		mp->mnt_stat.f_ctime = tv.tv_sec;
+		mp->mnt_stat.f_ctime = time_second;
 	}
 	if (mp->mnt_flag & MNT_UPDATE) {
 		vrele(vp);
@@ -319,7 +326,7 @@ update:
 	} else {
 		mp->mnt_vnodecovered->v_mountedhere = (struct mount *)0;
 		vfs_unbusy(mp, p);
-		free((caddr_t)mp, M_MOUNT);
+		free(mp, M_MOUNT);
 		vput(vp);
 	}
 	return (error);
@@ -432,7 +439,6 @@ int
 dounmount(struct mount *mp, int flags, struct proc *p, struct vnode *olddp)
 {
 	struct vnode *coveredvp;
-	struct proc *p2;
 	int error;
 	int hadsyncer = 0;
 
@@ -457,29 +463,6 @@ dounmount(struct mount *mp, int flags, struct proc *p, struct vnode *olddp)
 	}
 	CIRCLEQ_REMOVE(&mountlist, mp, mnt_list);
 	if ((coveredvp = mp->mnt_vnodecovered) != NULLVP) {
-		if (olddp) {
-			/* 
-			 * Try to put processes back in a real directory
-			 * after a forced unmount.
-			 * XXX We're not holding a ref on olddp, which may
-			 * change, so compare id numbers.
-			 */
-			LIST_FOREACH(p2, &allproc, p_list) {
-				struct filedesc *fdp = p2->p_fd;
-				if (fdp->fd_cdir &&
-				    fdp->fd_cdir->v_id == olddp->v_id) {
-					vrele(fdp->fd_cdir);
-					vref(coveredvp);
-					fdp->fd_cdir = coveredvp;
-				}
-				if (fdp->fd_rdir &&
-				    fdp->fd_rdir->v_id == olddp->v_id) {
-					vrele(fdp->fd_rdir);
-					vref(coveredvp);
-					fdp->fd_rdir = coveredvp;
-				}
-			}
-		}
 		coveredvp->v_mountedhere = NULL;
  		vrele(coveredvp);
  	}
@@ -487,7 +470,7 @@ dounmount(struct mount *mp, int flags, struct proc *p, struct vnode *olddp)
 	if (mp->mnt_vnodelist.lh_first != NULL)
 		panic("unmount: dangling vnode");
 	lockmgr(&mp->mnt_lock, LK_RELEASE | LK_INTERLOCK, &mountlist_slock, p);
-	free((caddr_t)mp, M_MOUNT);
+	free(mp, M_MOUNT);
 	return (0);
 }
 
@@ -601,11 +584,11 @@ sys_statfs(p, v, retval)
 #endif
 	/* Don't let non-root see filesystem id (for NFS security) */
 	if (suser(p, 0)) {
-		bcopy((caddr_t)sp, (caddr_t)&sb, sizeof(sb));
+		bcopy(sp, &sb, sizeof(sb));
 		sb.f_fsid.val[0] = sb.f_fsid.val[1] = 0;
 		sp = &sb;
 	}
-	return (copyout((caddr_t)sp, (caddr_t)SCARG(uap, buf), sizeof(*sp)));
+	return (copyout(sp, SCARG(uap, buf), sizeof(*sp)));
 }
 
 /*
@@ -647,11 +630,11 @@ sys_fstatfs(p, v, retval)
 #endif
 	/* Don't let non-root see filesystem id (for NFS security) */
 	if (suser(p, 0)) {
-		bcopy((caddr_t)sp, (caddr_t)&sb, sizeof(sb));
+		bcopy(sp, &sb, sizeof(sb));
 		sb.f_fsid.val[0] = sb.f_fsid.val[1] = 0;
 		sp = &sb;
 	}
-	return (copyout((caddr_t)sp, (caddr_t)SCARG(uap, buf), sizeof(*sp)));
+	return (copyout(sp, SCARG(uap, buf), sizeof(*sp)));
 }
 
 /*
@@ -671,12 +654,12 @@ sys_getfsstat(p, v, retval)
 	register struct mount *mp, *nmp;
 	register struct statfs *sp;
 	struct statfs sb;
-	caddr_t sfsp;
+	struct statfs *sfsp;
 	size_t count, maxcount;
 	int error, flags = SCARG(uap, flags);
 
 	maxcount = SCARG(uap, bufsize) / sizeof(struct statfs);
-	sfsp = (caddr_t)SCARG(uap, buf);
+	sfsp = SCARG(uap, buf);
 	count = 0;
 	simple_lock(&mountlist_slock);
 	for (mp = CIRCLEQ_FIRST(&mountlist); mp != CIRCLEQ_END(&mountlist);
@@ -706,16 +689,16 @@ sys_getfsstat(p, v, retval)
 				sp->f_eflags = STATFS_SOFTUPD;
 #endif
 			if (suser(p, 0)) {
-				bcopy((caddr_t)sp, (caddr_t)&sb, sizeof(sb));
+				bcopy(sp, &sb, sizeof(sb));
 				sb.f_fsid.val[0] = sb.f_fsid.val[1] = 0;
 				sp = &sb;
 			}
-			error = copyout((caddr_t)sp, sfsp, sizeof(*sp));
+			error = copyout(sp, sfsp, sizeof(*sp));
 			if (error) {
 				vfs_unbusy(mp, p);
 				return (error);
 			}
-			sfsp += sizeof(*sp);
+			sfsp++;
 		}
 		count++;
 		simple_lock(&mountlist_slock);
@@ -881,7 +864,7 @@ sys_open(p, v, retval)
 	struct sys_open_args /* {
 		syscallarg(const char *) path;
 		syscallarg(int) flags;
-		syscallarg(int) mode;
+		syscallarg(mode_t) mode;
 	} */ *uap = v;
 	struct filedesc *fdp = p->p_fd;
 	struct file *fp;
@@ -892,7 +875,7 @@ sys_open(p, v, retval)
 	struct flock lf;
 	struct nameidata nd;
 
-	fdplock(fdp, p);
+	fdplock(fdp);
 
 	if ((error = falloc(p, &fp, &indx)) != 0)
 		goto out;
@@ -925,7 +908,7 @@ sys_open(p, v, retval)
 	fp->f_flag = flags & FMASK;
 	fp->f_type = DTYPE_VNODE;
 	fp->f_ops = &vnops;
-	fp->f_data = (caddr_t)vp;
+	fp->f_data = vp;
 	if (flags & (O_EXLOCK | O_SHLOCK)) {
 		lf.l_whence = SEEK_SET;
 		lf.l_start = 0;
@@ -1007,13 +990,13 @@ sys_getfh(p, v, retval)
 	if (error)
 		return (error);
 	vp = nd.ni_vp;
-	bzero((caddr_t)&fh, sizeof(fh));
+	bzero(&fh, sizeof(fh));
 	fh.fh_fsid = vp->v_mount->mnt_stat.f_fsid;
 	error = VFS_VPTOFH(vp, &fh.fh_fid);
 	vput(vp);
 	if (error)
 		return (error);
-	error = copyout((caddr_t)&fh, (caddr_t)SCARG(uap, fhp), sizeof (fh));
+	error = copyout(&fh, SCARG(uap, fhp), sizeof(fh));
 	return (error);
 }
 
@@ -1056,7 +1039,7 @@ sys_fhopen(p, v, retval)
 	if ((flags & O_CREAT))
 		return (EINVAL);
 
-	fdplock(fdp, p);
+	fdplock(fdp);
 	if ((error = falloc(p, &fp, &indx)) != 0) {
 		fp = NULL;
 		goto bad;
@@ -1113,7 +1096,7 @@ sys_fhopen(p, v, retval)
 	fp->f_flag = flags & FMASK;
 	fp->f_type = DTYPE_VNODE;
 	fp->f_ops = &vnops;
-	fp->f_data = (caddr_t)vp;
+	fp->f_data = vp;
 	if (flags & (O_EXLOCK | O_SHLOCK)) {
 		lf.l_whence = SEEK_SET;
 		lf.l_start = 0;
@@ -1242,7 +1225,7 @@ sys_mknod(p, v, retval)
 {
 	register struct sys_mknod_args /* {
 		syscallarg(const char *) path;
-		syscallarg(int) mode;
+		syscallarg(mode_t) mode;
 		syscallarg(int) dev;
 	} */ *uap = v;
 	register struct vnode *vp;
@@ -1323,7 +1306,7 @@ sys_mkfifo(p, v, retval)
 #else
 	register struct sys_mkfifo_args /* {
 		syscallarg(const char *) path;
-		syscallarg(int) mode;
+		syscallarg(mode_t) mode;
 	} */ *uap = v;
 	struct vattr vattr;
 	int error;
@@ -1418,7 +1401,7 @@ sys_symlink(p, v, retval)
 	int error;
 	struct nameidata nd;
 
-	MALLOC(path, char *, MAXPATHLEN, M_NAMEI, M_WAITOK);
+	path = pool_get(&namei_pool, PR_WAITOK);
 	error = copyinstr(SCARG(uap, path), path, MAXPATHLEN, NULL);
 	if (error)
 		goto out;
@@ -1440,7 +1423,7 @@ sys_symlink(p, v, retval)
 	VOP_LEASE(nd.ni_dvp, p, p->p_ucred, LEASE_WRITE);
 	error = VOP_SYMLINK(nd.ni_dvp, &nd.ni_vp, &nd.ni_cnd, &vattr, path);
 out:
-	FREE(path, M_NAMEI);
+	pool_put(&namei_pool, path);
 	return (error);
 }
 
@@ -1668,7 +1651,7 @@ sys_stat(p, v, retval)
 	/* Don't let non-root see generation numbers (for NFS security) */
 	if (suser(p, 0))
 		sb.st_gen = 0;
-	error = copyout((caddr_t)&sb, (caddr_t)SCARG(uap, ub), sizeof (sb));
+	error = copyout(&sb, SCARG(uap, ub), sizeof(sb));
 	return (error);
 }
 
@@ -1701,7 +1684,7 @@ sys_lstat(p, v, retval)
 	/* Don't let non-root see generation numbers (for NFS security) */
 	if (suser(p, 0))
 		sb.st_gen = 0;
-	error = copyout((caddr_t)&sb, (caddr_t)SCARG(uap, ub), sizeof (sb));
+	error = copyout(&sb, SCARG(uap, ub), sizeof(sb));
 	return (error);
 }
 
@@ -1883,7 +1866,7 @@ sys_chmod(p, v, retval)
 {
 	register struct sys_chmod_args /* {
 		syscallarg(const char *) path;
-		syscallarg(int) mode;
+		syscallarg(mode_t) mode;
 	} */ *uap = v;
 	register struct vnode *vp;
 	struct vattr vattr;
@@ -1922,7 +1905,7 @@ sys_fchmod(p, v, retval)
 {
 	struct sys_fchmod_args /* {
 		syscallarg(int) fd;
-		syscallarg(int) mode;
+		syscallarg(mode_t) mode;
 	} */ *uap = v;
 	struct vattr vattr;
 	struct vnode *vp;
@@ -1968,7 +1951,7 @@ sys_chown(p, v, retval)
 	struct vattr vattr;
 	int error;
 	struct nameidata nd;
-	u_short mode;
+	mode_t mode;
 
 	NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, SCARG(uap, path), p);
 	if ((error = namei(&nd)) != 0)
@@ -2020,7 +2003,7 @@ sys_lchown(p, v, retval)
 	struct vattr vattr;
 	int error;
 	struct nameidata nd;
-	u_short mode;
+	mode_t mode;
 
 	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_USERSPACE, SCARG(uap, path), p);
 	if ((error = namei(&nd)) != 0)
@@ -2072,7 +2055,7 @@ sys_fchown(p, v, retval)
 	struct vattr vattr;
 	int error;
 	struct file *fp;
-	u_short mode;
+	mode_t mode;
 
 	if ((error = getvnode(p->p_fd, SCARG(uap, fd), &fp)) != 0)
 		return (error);
@@ -2130,8 +2113,8 @@ sys_utimes(p, v, retval)
 		tv[1] = tv[0];
 		vattr.va_vaflags |= VA_UTIMES_NULL;
 	} else {
-		error = copyin((caddr_t)SCARG(uap, tptr), (caddr_t)tv,
-		    sizeof (tv));
+		error = copyin(SCARG(uap, tptr), tv,
+		    sizeof(tv));
 		if (error)
 			return (error);
 		/* XXX workaround timeval matching the VFS constant VNOVAL */
@@ -2186,8 +2169,8 @@ sys_futimes(p, v, retval)
 		tv[1] = tv[0];
 		vattr.va_vaflags |= VA_UTIMES_NULL;
 	} else {
-		error = copyin((caddr_t)SCARG(uap, tptr), (caddr_t)tv,
-		    sizeof (tv));
+		error = copyin(SCARG(uap, tptr), tv,
+		    sizeof(tv));
 		if (error)
 			return (error);
 		/* XXX workaround timeval matching the VFS constant VNOVAL */
@@ -2271,11 +2254,13 @@ sys_ftruncate(p, v, retval)
 	struct vattr vattr;
 	struct vnode *vp;
 	struct file *fp;
+	off_t len;
 	int error;
 
 	if ((error = getvnode(p->p_fd, SCARG(uap, fd), &fp)) != 0)
 		return (error);
-	if ((fp->f_flag & FWRITE) == 0) {
+	len = SCARG(uap, length);
+	if ((fp->f_flag & FWRITE) == 0 || len < 0) {
 		error = EINVAL;
 		goto bad;
 	}
@@ -2286,7 +2271,7 @@ sys_ftruncate(p, v, retval)
 		error = EISDIR;
 	else if ((error = vn_writechk(vp)) == 0) {
 		VATTR_NULL(&vattr);
-		vattr.va_size = SCARG(uap, length);
+		vattr.va_size = len;
 		error = VOP_SETATTR(vp, &vattr, fp->f_cred, p);
 	}
 	VOP_UNLOCK(vp, 0, p);
@@ -2411,11 +2396,11 @@ out:
 		vrele(fvp);
 	}
 	vrele(tond.ni_startdir);
-	FREE(tond.ni_cnd.cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, tond.ni_cnd.cn_pnbuf);
 out1:
 	if (fromnd.ni_startdir)
 		vrele(fromnd.ni_startdir);
-	FREE(fromnd.ni_cnd.cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, fromnd.ni_cnd.cn_pnbuf);
 	if (error == -1)
 		return (0);
 	return (error);
@@ -2433,7 +2418,7 @@ sys_mkdir(p, v, retval)
 {
 	register struct sys_mkdir_args /* {
 		syscallarg(const char *) path;
-		syscallarg(int) mode;
+		syscallarg(mode_t) mode;
 	} */ *uap = v;
 	register struct vnode *vp;
 	struct vattr vattr;
@@ -2582,12 +2567,12 @@ unionread:
 		struct vnode *tvp = vp;
 		vp = vp->v_mount->mnt_vnodecovered;
 		VREF(vp);
-		fp->f_data = (caddr_t) vp;
+		fp->f_data = vp;
 		fp->f_offset = 0;
 		vrele(tvp);
 		goto unionread;
 	}
-	error = copyout((caddr_t)&loff, (caddr_t)SCARG(uap, basep),
+	error = copyout(&loff, SCARG(uap, basep),
 	    sizeof(long));
 	*retval = SCARG(uap, count) - auio.uio_resid;
 bad:
@@ -2605,7 +2590,7 @@ sys_umask(p, v, retval)
 	register_t *retval;
 {
 	struct sys_umask_args /* {
-		syscallarg(int) newmask;
+		syscallarg(mode_t) newmask;
 	} */ *uap = v;
 	register struct filedesc *fdp;
 

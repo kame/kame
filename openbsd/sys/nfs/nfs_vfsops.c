@@ -1,4 +1,4 @@
-/*	$OpenBSD: nfs_vfsops.c,v 1.51 2003/08/14 07:46:40 mickey Exp $	*/
+/*	$OpenBSD: nfs_vfsops.c,v 1.53 2004/06/21 23:50:38 tholo Exp $	*/
 /*	$NetBSD: nfs_vfsops.c,v 1.46.4.1 1996/05/25 22:40:35 fvdl Exp $	*/
 
 /*
@@ -264,10 +264,10 @@ nfs_mountroot()
 	 * XXX time must be non-zero when we init the interface or else
 	 * the arp code will wedge.  [Fixed now in if_ether.c]
 	 * However, the NFS attribute cache gives false "hits" when
-	 * time.tv_sec < NFS_ATTRTIMEO(np) so keep this in for now.
+	 * time_second < NFS_ATTRTIMEO(np) so keep this in for now.
 	 */
-	if (time.tv_sec < NFS_MAXATTRTIMO)
-		time.tv_sec = NFS_MAXATTRTIMO;
+	if (time_second < NFS_MAXATTRTIMO)
+		time_second = NFS_MAXATTRTIMO;
 
 	/*
 	 * Call nfs_boot_init() to fill in the nfs_diskless struct.
@@ -658,7 +658,7 @@ nfs_mount(mp, path, data, ndp, p)
 		return (error);
 	bzero(&hst[len], MNAMELEN - len);
 	/* sockargs() call must be after above copyin() calls */
-	error = sockargs(&nam, (caddr_t)args.addr, args.addrlen, MT_SONAME);
+	error = sockargs(&nam, args.addr, args.addrlen, MT_SONAME);
 	if (error)
 		return (error);
 	args.fh = nfh;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: proc.h,v 1.68 2003/11/08 06:11:11 nordin Exp $	*/
+/*	$OpenBSD: proc.h,v 1.75 2004/07/22 15:42:11 art Exp $	*/
 /*	$NetBSD: proc.h,v 1.44 1996/04/22 01:23:21 christos Exp $	*/
 
 /*-
@@ -45,6 +45,10 @@
 #include <sys/queue.h>
 #include <sys/timeout.h>		/* For struct timeout. */
 #include <sys/event.h>			/* For struct klist */
+
+#ifdef __HAVE_CPUINFO
+#define curproc curcpu()->ci_curproc
+#endif
 
 /*
  * One structure allocated per session.
@@ -164,7 +168,11 @@ struct	proc {
 	const char *p_wmesg;	 /* Reason for sleep. */
 	u_int	p_swtime;	 /* Time swapped in or out. */
 	u_int	p_slptime;	 /* Time since last blocked. */
+#ifdef __HAVE_CPUINFO
+	struct	cpu_info * __volatile p_cpu; /* CPU we're running on. */
+#else
 	int	p_schedflags;	 /* PSCHED_* flags */
+#endif
 
 	struct	itimerval p_realtimer;	/* Alarm timer. */
 	struct	timeout p_realit_to;	/* Alarm timeout. */
@@ -217,6 +225,7 @@ struct	proc {
 	u_short	p_xstat;	/* Exit status for wait; also stop signal. */
 	u_short	p_acflag;	/* Accounting flags. */
 	struct	rusage *p_ru;	/* Exit information. XXX */
+	int	p_locks;       	/* DEBUG: lockmgr count of held locks */
 };
 
 #define	p_session	p_pgrp->pg_session
@@ -229,6 +238,7 @@ struct	proc {
 #define	SSTOP	4		/* Process debugging or suspension. */
 #define	SZOMB	5		/* Awaiting collection by parent. */
 #define SDEAD	6		/* Process is almost a zombie. */
+#define	SONPROC	7		/* Process is currently on a CPU. */
 
 #define P_ZOMBIE(p)	((p)->p_stat == SZOMB || (p)->p_stat == SDEAD)
 
@@ -264,17 +274,19 @@ struct	proc {
 #define P_SYSTRACE	0x400000	/* Process system call tracing active*/
 #define P_CONTINUED	0x800000	/* Proc has continued from a stopped state. */
 #define P_SWAPIN	0x1000000	/* Swapping in right now */
+#define P_BIGLOCK	0x2000000	/* Process needs kernel "big lock" to run */
 
 #define	P_BITS \
     ("\20\01ADVLOCK\02CTTY\03INMEM\04NOCLDSTOP\05PPWAIT\06PROFIL\07SELECT" \
      "\010SINTR\011SUGID\012SYSTEM\013TIMEOUT\014TRACED\015WAITED\016WEXIT" \
      "\017EXEC\020PWEUPC\021FSTRACE\022SSTEP\023SUGIDEXEC\024NOCLDWAIT" \
-     "\025NOZOMBIE\026INEXEC\027SYSTRACE\030CONTINUED")
+     "\025NOZOMBIE\026INEXEC\027SYSTRACE\030CONTINUED\031SWAPIN\032BIGLOCK")
 
 /* Macro to compute the exit signal to be delivered. */
 #define P_EXITSIG(p) \
     (((p)->p_flag & (P_TRACED | P_FSTRACE)) ? SIGCHLD : (p)->p_exitsig)
 
+#ifndef __HAVE_CPUINFO
 /*
  * These flags are kept in p_schedflags.  p_schedflags may be modified
  * only at splstatclock().
@@ -283,6 +295,7 @@ struct	proc {
 #define PSCHED_SHOULDYIELD	0x0002	/* process should yield */
 
 #define PSCHED_SWITCHCLEAR	(PSCHED_SEENRR|PSCHED_SHOULDYIELD)
+#endif
 
 /*
  * MOVE TO ucred.h?
@@ -333,7 +346,6 @@ struct	pcred {
 #define FORK_CLEANFILES	0x00000020
 #define FORK_NOZOMBIE	0x00000040
 #define FORK_SHAREVM	0x00000080
-#define FORK_VMNOSTACK	0x00000100
 #define FORK_SIGHAND	0x00000200
 
 #define	PIDHASH(pid)	(&pidhashtbl[(pid) & pidhash])
@@ -344,7 +356,7 @@ extern u_long pidhash;
 extern LIST_HEAD(pgrphashhead, pgrp) *pgrphashtbl;
 extern u_long pgrphash;
 
-#ifndef curproc
+#if !defined(__HAVE_CPUINFO) && !defined(curproc)
 extern struct proc *curproc;		/* Current running proc. */
 #endif
 extern struct proc proc0;		/* Process slot for swapper. */
@@ -354,9 +366,6 @@ extern int randompid;			/* fork() should create random pid's */
 LIST_HEAD(proclist, proc);
 extern struct proclist allproc;		/* List of all processes. */
 extern struct proclist zombproc;	/* List of zombie processes. */
-
-extern struct proclist deadproc;	/* List of dead processes. */
-extern struct simplelock deadproc_slock;
 
 extern struct proc *initproc;		/* Process slots for init, pager. */
 extern struct proc *syncerproc;		/* filesystem syncer daemon */
@@ -400,7 +409,6 @@ void	setrunnable(struct proc *);
 #if !defined(setrunqueue)
 void	setrunqueue(struct proc *);
 #endif
-void	sleep(void *chan, int pri);
 void	uvm_swapin(struct proc *);  /* XXX: uvm_extern.h? */
 int	ltsleep(void *chan, int pri, const char *wmesg, int timo,
 	    volatile struct simplelock *);
@@ -428,5 +436,9 @@ void	child_return(void *);
 
 int	proc_cansugid(struct proc *);
 void	proc_zap(struct proc *);
+
+#if defined(MULTIPROCESSOR)
+void	proc_trampoline_mp(void);	/* XXX */
+#endif
 #endif	/* _KERNEL */
 #endif	/* !_SYS_PROC_H_ */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: udp_usrreq.c,v 1.99 2004/03/21 20:58:10 markus Exp $	*/
+/*	$OpenBSD: udp_usrreq.c,v 1.102 2004/08/10 20:11:04 markus Exp $	*/
 /*	$NetBSD: udp_usrreq.c,v 1.28 1996/03/16 23:54:03 christos Exp $	*/
 
 /*
@@ -278,6 +278,10 @@ udp_input(struct mbuf *m, ...)
 		/*
 		 * In IPv6, the UDP checksum is ALWAYS used.
 		 */
+		if (uh->uh_sum == 0) {
+			udpstat.udps_nosum++;
+			goto bad;
+		}
 		if ((uh->uh_sum = in6_cksum(m, IPPROTO_UDP, iphlen, len))) {
 			udpstat.udps_badsum++;
 			goto bad;
@@ -540,6 +544,7 @@ udp_input(struct mbuf *m, ...)
 			}
 #ifdef INET6
 			if (ip6) {
+				uh->uh_sum = savesum;
 				icmp6_error(m, ICMP6_DST_UNREACH,
 				    ICMP6_DST_UNREACH_NOPORT,0);
 			} else
@@ -829,7 +834,7 @@ udp6_ctlinput(cmd, sa, d)
 			/*
 			 * Depending on the value of "valid" and routing table
 			 * size (mtudisc_{hi,lo}wat), we will:
-			 * - recalcurate the new MTU and create the
+			 * - recalculate the new MTU and create the
 			 *   corresponding routing entry, or
 			 * - ignore the MTU change notification.
 			 */
@@ -862,6 +867,8 @@ udp_ctlinput(cmd, sa, v)
 {
 	struct ip *ip = v;
 	struct udphdr *uhp;
+	struct in_addr faddr;
+	struct inpcb *inp;
 	extern int inetctlerrmap[];
 	void (*notify)(struct inpcb *, int) = udp_notify;
 	int errno;
@@ -870,6 +877,9 @@ udp_ctlinput(cmd, sa, v)
 		return NULL;
 	if (sa->sa_family != AF_INET ||
 	    sa->sa_len != sizeof(struct sockaddr_in))
+		return NULL;
+	faddr = satosin(sa)->sin_addr;
+	if (faddr.s_addr == INADDR_ANY)
 		return NULL;
 
 	if ((unsigned)cmd >= PRC_NCMDS)
@@ -883,8 +893,10 @@ udp_ctlinput(cmd, sa, v)
 		return NULL;
 	if (ip) {
 		uhp = (struct udphdr *)((caddr_t)ip + (ip->ip_hl << 2));
-		(void) in_pcbnotify(&udbtable, sa, uhp->uh_dport, ip->ip_src,
-		    uhp->uh_sport, errno, notify);
+		inp = in_pcbhashlookup(&udbtable,
+		    ip->ip_dst, uhp->uh_dport, ip->ip_src, uhp->uh_sport);
+		if (inp && inp->inp_socket != NULL)
+			notify(inp, errno);
 	} else
 		in_pcbnotifyall(&udbtable, sa, errno, notify);
 	return NULL;

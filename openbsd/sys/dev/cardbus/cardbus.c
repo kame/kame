@@ -1,4 +1,4 @@
-/*	$OpenBSD: cardbus.c,v 1.9 2004/01/26 19:12:52 fgsch Exp $ */
+/*	$OpenBSD: cardbus.c,v 1.13 2004/08/02 21:42:58 brad Exp $ */
 /*	$NetBSD: cardbus.c,v 1.24 2000/04/02 19:11:37 mycroft Exp $	*/
 
 /*
@@ -166,6 +166,7 @@ cardbus_read_tuples(ca, cis_ptr, tuples, len)
 
     int i, j;
     int cardbus_space = cis_ptr & CARDBUS_CIS_ASIMASK;
+    bus_space_tag_t bar_tag;
     bus_space_handle_t bar_memh;
     bus_size_t bar_size;
     bus_addr_t bar_addr;
@@ -217,7 +218,7 @@ cardbus_read_tuples(ca, cis_ptr, tuples, len)
 	if(Cardbus_mapreg_map(ca->ca_ct, reg,
 			      CARDBUS_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT,
 			      0, 
-			      NULL, &bar_memh, &bar_addr, &bar_size)) {
+			      &bar_tag, &bar_memh, &bar_addr, &bar_size)) {
 	    printf("%s: failed to map memory\n", sc->sc_dev.dv_xname);
 	    return 1;
 	}
@@ -253,7 +254,7 @@ cardbus_read_tuples(ca, cis_ptr, tuples, len)
 		break;
 	    }
 	    while((p = SIMPLEQ_FIRST(&rom_image)) != NULL) {
-		SIMPLEQ_REMOVE_HEAD(&rom_image, p, next);
+		SIMPLEQ_REMOVE_HEAD(&rom_image, next);
 		free(p, M_DEVBUF);
 	    }
 	out:
@@ -273,12 +274,9 @@ cardbus_read_tuples(ca, cis_ptr, tuples, len)
 	cardbus_conf_write(cc, cf, tag, CARDBUS_COMMAND_STATUS_REG, 
 			   command & ~CARDBUS_COMMAND_MEM_ENABLE);
 	cardbus_conf_write(cc, cf, tag, reg, 0);
-#if 0
-	/* XXX unmap memory */
-	(*ca->ca_ct->ct_cf->cardbus_space_free)(ca->ca_ct, 
-						ca->ca_ct->ct_sc->sc_rbus_memt, 
-						bar_memh, bar_size);
-#endif
+
+	Cardbus_mapreg_unmap(ca->ca_ct, reg, bar_tag, bar_memh,
+	    bar_size);
 	break;
 
 #ifdef DIAGNOSTIC
@@ -435,14 +433,9 @@ cardbus_attach_card(sc)
       return 0;
     }
   }
-  
-  bhlc = cardbus_conf_read(cc, cf, tag, CARDBUS_BHLC_REG);
-  if (CARDBUS_LATTIMER(bhlc) < 0x10) {
-    bhlc &= ~(CARDBUS_LATTIMER_MASK << CARDBUS_LATTIMER_SHIFT);
-    bhlc |= (0x10 << CARDBUS_LATTIMER_SHIFT);
-    cardbus_conf_write(cc, cf, tag, CARDBUS_BHLC_REG, bhlc);
-  }
 
+  bhlc = cardbus_conf_read(cc, cf, tag, CARDBUS_BHLC_REG);
+  DPRINTF(("%s bhlc 0x%08x -> ", sc->sc_dev.dv_xname, bhlc));
   nfunction = CARDBUS_HDRTYPE_MULTIFN(bhlc) ? 8 : 1;
 
   for(function = 0; function < nfunction; function++) {
@@ -472,7 +465,26 @@ cardbus_attach_card(sc)
     cardbus_conf_write(cc, cf, tag, CARDBUS_BASE4_REG, 0);
     cardbus_conf_write(cc, cf, tag, CARDBUS_BASE5_REG, 0);
     cardbus_conf_write(cc, cf, tag, CARDBUS_ROM_REG, 0);
-    
+ 
+    /* set initial latency and cacheline size */
+    bhlc = cardbus_conf_read(cc, cf, tag, CARDBUS_BHLC_REG);
+    DPRINTF(("%s func%d bhlc 0x%08x -> ", sc->sc_dev.dv_xname,
+	function, bhlc));
+    bhlc &= ~((CARDBUS_LATTIMER_MASK << CARDBUS_LATTIMER_SHIFT) |
+	(CARDBUS_CACHELINE_MASK << CARDBUS_CACHELINE_SHIFT));
+    bhlc |= ((sc->sc_cacheline & CARDBUS_CACHELINE_MASK) << CARDBUS_CACHELINE_SHIFT);
+    bhlc |= ((sc->sc_lattimer & CARDBUS_LATTIMER_MASK) << CARDBUS_LATTIMER_SHIFT);
+
+    cardbus_conf_write(cc, cf, tag, CARDBUS_BHLC_REG, bhlc);
+    bhlc = cardbus_conf_read(cc, cf, tag, CARDBUS_BHLC_REG);
+    DPRINTF(("0x%08x\n", bhlc));
+
+    if (CARDBUS_LATTIMER(bhlc) < 0x10) {
+	bhlc &= ~(CARDBUS_LATTIMER_MASK << CARDBUS_LATTIMER_SHIFT);
+	bhlc |= (0x10 << CARDBUS_LATTIMER_SHIFT);
+	cardbus_conf_write(cc, cf, tag, CARDBUS_BHLC_REG, bhlc);
+    }
+
     /*
      * We need to allocate the ct here, since we might 
      * need it when reading the CIS
@@ -508,8 +520,6 @@ cardbus_attach_card(sc)
     ca.ca_class = class;
 
     ca.ca_intrline = sc->sc_intrline;
-
-    bzero(tuple, 2048);
 
     if(cardbus_read_tuples(&ca, cis_ptr, tuple, sizeof(tuple))) {
       printf("cardbus_attach_card: failed to read CIS\n");
@@ -594,7 +604,8 @@ cardbusprint(aux, pnp)
 	pci_devinfo(ca->ca_id, ca->ca_class, 1, devinfo, sizeof devinfo);
 	for (i = 0; i < 3 && ca->ca_cis.cis1_info[i]; i++)
 		printf("%s%s", i ? ", " : " \"", ca->ca_cis.cis1_info[i]);
-	printf("\"");
+	if (ca->ca_cis.cis1_info[0])
+		printf("\"");
     }
 
     return UNCONF;
@@ -629,7 +640,7 @@ cardbus_detach_card(sc)
 	/* call device detach function */
 
 	if (0 != config_detach(fndev, 0)) {
-	    printf("%s: cannot detaching dev %s, function %d\n",
+	    printf("%s: cannot detach dev %s, function %d\n",
 		   sc->sc_dev.dv_xname, fndev->dv_xname, ct->ct_func);
 	    prev_next = &(ct->ct_next);
 	} else {

@@ -1,6 +1,7 @@
-/*	$OpenBSD: vs.c,v 1.29 2004/01/29 21:39:05 deraadt Exp $ */
+/*	$OpenBSD: vs.c,v 1.53 2004/09/06 06:25:28 miod Exp $	*/
 
 /*
+ * Copyright (c) 2004, Miodrag Vallat.
  * Copyright (c) 1999 Steve Murphree, Jr.
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
@@ -34,8 +35,11 @@
  */
 
 /*
- * MVME328S scsi adaptor driver
+ * MVME328S SCSI adaptor driver
  */
+
+/* This card lives in D16 space */
+#define	__BUS_SPACE_RESTRICT_D16__
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -45,7 +49,7 @@
 #include <sys/buf.h>
 #include <sys/malloc.h>
 
-#include <uvm/uvm_param.h>
+#include <uvm/uvm.h>
 
 #include <scsi/scsi_all.h>
 #include <scsi/scsiconf.h>
@@ -55,8 +59,8 @@
 
 #include <mvme88k/dev/vsreg.h>
 #include <mvme88k/dev/vsvar.h>
-#include <mvme88k/dev/vme.h>		/* vme_findvec() */
-#include <machine/cmmu.h>		/* DMA_CACHE_SYNC, etc... */
+#include <mvme88k/dev/vme.h>
+#include <machine/cmmu.h>
 
 int	vsmatch(struct device *, void *, void *);
 void	vsattach(struct device *, struct device *, void *);
@@ -84,60 +88,84 @@ struct cfdriver vs_cd = {
 	NULL, "vs", DV_DULL,
 };
 
-int	do_vspoll(struct vs_softc *, int, int);
-void	thaw_queue(struct vs_softc *, u_int8_t);
+int	do_vspoll(struct vs_softc *, struct scsi_xfer *, int);
+void	thaw_queue(struct vs_softc *, int);
+void	thaw_all_queues(struct vs_softc *);
 M328_SG	vs_alloc_scatter_gather(void);
-M328_SG	vs_build_memory_structure(struct scsi_xfer *, M328_IOPB *);
-int	vs_checkintr(struct vs_softc *, struct scsi_xfer *, int *);
+M328_SG	vs_build_memory_structure(struct vs_softc *, struct scsi_xfer *,
+	    bus_addr_t);
 void	vs_chksense(struct scsi_xfer *);
 void	vs_dealloc_scatter_gather(M328_SG);
 int	vs_eintr(void *);
-M328_CQE *vs_getcqe(struct vs_softc *);
-M328_IOPB *vs_getiopb(struct vs_softc *);
+void	vs_free(M328_CMD *);
+bus_addr_t vs_getcqe(struct vs_softc *);
+bus_addr_t vs_getiopb(struct vs_softc *);
 int	vs_initialize(struct vs_softc *);
 int	vs_intr(struct vs_softc *);
 void	vs_link_sg_element(sg_list_element_t *, vaddr_t, int);
 void	vs_link_sg_list(sg_list_element_t *, vaddr_t, int);
 int	vs_nintr(void *);
-int	vs_poll(struct vs_softc *, struct scsi_xfer *);
-void	vs_reset(struct vs_softc *);
+int	vs_poll(struct vs_softc *, M328_CMD *);
+void	vs_print_addr(struct vs_softc *, struct scsi_xfer *);
+int	vs_queue_number(struct scsi_link *, struct vs_softc *);
+void	vs_reset(struct vs_softc *, int);
 void	vs_resync(struct vs_softc *);
-void	vs_scsidone(struct vs_softc *, struct scsi_xfer *, int);
+void	vs_scsidone(struct vs_softc *, struct scsi_xfer *);
 
 static __inline__ void vs_clear_return_info(struct vs_softc *);
+static __inline__ paddr_t kvtop(vaddr_t);
 
 int
-vsmatch(pdp, vcf, args)
-	struct device *pdp;
-	void *vcf, *args;
+vsmatch(struct device *device, void *cf, void *args)
 {
 	struct confargs *ca = args;
+	bus_space_tag_t iot = ca->ca_iot;
+	bus_space_handle_t ioh;
+	int rc;
 
-	return (!badvaddr((unsigned)ca->ca_vaddr, 1));
+	if (bus_space_map(iot, ca->ca_paddr, S_SHORTIO, 0, &ioh) != 0)
+		return 0;
+	rc = badvaddr((vaddr_t)bus_space_vaddr(iot, ioh), 1);
+	bus_space_unmap(iot, ioh, S_SHORTIO);
+
+	return rc == 0;
 }
 
 void
-vsattach(parent, self, auxp)
-	struct device *parent, *self;
-	void *auxp;
+vsattach(struct device *parent, struct device *self, void *args)
 {
 	struct vs_softc *sc = (struct vs_softc *)self;
-	struct confargs *ca = auxp;
-	struct vsreg * rp;
+	struct confargs *ca = args;
+	struct scsi_link *sc_link;
+	int evec, bus;
 	int tmp;
 
-	sc->sc_vsreg = rp = ca->ca_vaddr;
+	/* get the next available vector for the error interrupt */
+	evec = vme_findvec(ca->ca_vec);
+
+	if (ca->ca_vec < 0 || evec < 0) {
+		printf(": no more interrupts!\n");
+		return;
+	}
+	if (ca->ca_ipl < 0)
+		ca->ca_ipl = IPL_BIO;
+
+	printf(" vec 0x%x: ", evec);
+
+	sc->sc_paddr = ca->ca_paddr;
+	sc->sc_iot = ca->ca_iot;
+	if (bus_space_map(sc->sc_iot, sc->sc_paddr, S_SHORTIO, 0,
+	    &sc->sc_ioh) != 0) {
+		printf("can't map registers!\n");
+		return;
+	}
 
 	sc->sc_ipl = ca->ca_ipl;
 	sc->sc_nvec = ca->ca_vec;
-	/* get the next available vector for the error interrupt func. */
-	sc->sc_evec = vme_findvec();
-	sc->sc_link.adapter_softc = sc;
-	sc->sc_link.adapter_target = 7;
-	sc->sc_link.adapter = &vs_scsiswitch;
-	sc->sc_link.device = &vs_scsidev;
-	sc->sc_link.luns = 1;
-	sc->sc_link.openings = roundup(NUM_IOPB, 8) / 8;
+	sc->sc_evec = evec;
+
+	if (vs_initialize(sc))
+		return;
 
 	sc->sc_ih_n.ih_fn = vs_nintr;
 	sc->sc_ih_n.ih_arg = sc;
@@ -149,795 +177,746 @@ vsattach(parent, self, auxp)
 	sc->sc_ih_e.ih_wantframe = 0;
 	sc->sc_ih_e.ih_ipl = ca->ca_ipl;
 
-	if (vs_initialize(sc))
-		return;
+	vmeintr_establish(sc->sc_nvec, &sc->sc_ih_n, self->dv_xname);
+	snprintf(sc->sc_intrname_e, sizeof sc->sc_intrname_e,
+	    "%s_err", self->dv_xname);
+	vmeintr_establish(sc->sc_evec, &sc->sc_ih_e, sc->sc_intrname_e);
 
-	vmeintr_establish(sc->sc_nvec, &sc->sc_ih_n);
-	vmeintr_establish(sc->sc_evec, &sc->sc_ih_e);
-	evcnt_attach(&sc->sc_dev, "intr", &sc->sc_intrcnt_n);
-	evcnt_attach(&sc->sc_dev, "intr", &sc->sc_intrcnt_e);
+	printf("SCSI ID");
+
+	for (bus = 0; bus < 2; bus++) {
+		if (sc->sc_id[bus] < 0)
+			continue;
+
+		sc_link = &sc->sc_link[bus];
+		sc_link->adapter = &vs_scsiswitch;
+		sc_link->adapter_buswidth = 8;
+		sc_link->adapter_softc = sc;
+		sc_link->adapter_target = sc->sc_id[bus];
+		sc_link->device = &vs_scsidev;
+#if 0
+		sc_link->luns = 1;
+#endif
+		sc_link->openings = NUM_IOPB / 8;
+		if (bus != 0)
+			sc_link->flags = SDEV_2NDBUS;
+
+		printf("%c%d", bus == 0 ? ' ' : '/', sc->sc_id[bus]);
+	}
+
+	printf("\n");
 
 	/*
-	 * attach all scsi units on us, watching for boot device
+	 * Attach all scsi units on us, watching for boot device
 	 * (see dk_establish).
 	 */
 	tmp = bootpart;
-	if (ca->ca_paddr != bootaddr)
+	if (sc->sc_paddr != bootaddr)
 		bootpart = -1;		/* invalid flag to dk_establish */
-	config_found(self, &sc->sc_link, scsiprint);
-	bootpart = tmp;		    /* restore old value */
+
+	for (bus = 0; bus < 2; bus++) {
+		if (sc->sc_id[bus] < 0)
+			continue;
+
+		bootbus = bus;
+		config_found(self, &sc->sc_link[bus], scsiprint);
+	}
+
+	bootpart = tmp;		    /* restore old values */
+	bootbus = 0;
+}
+
+void
+vs_print_addr(struct vs_softc *sc, struct scsi_xfer *xs)
+{
+	if (xs == NULL)
+		printf("%s: ", sc->sc_dev.dv_xname);
+	else {
+		sc_print_addr(xs->sc_link);
+
+		/* print bus number too if appropriate */
+		if (sc->sc_id[1] >= 0)
+			printf("(bus %d) ",
+			    !!(xs->sc_link->flags & SDEV_2NDBUS));
+	}
 }
 
 int
-do_vspoll(sc, to, canreset)
-	struct vs_softc *sc;
-	int to;
-	int canreset;
+do_vspoll(struct vs_softc *sc, struct scsi_xfer *xs, int canreset)
 {
-	int i;
-	if (to <= 0 ) to = 50000;
-	/* use cmd_wait values? */
-	i = 10000;
-	/*spl0();*/
-	while (!(CRSW & (M_CRSW_CRBV | M_CRSW_CC))) {
-		if (--i <= 0) {
-#ifdef SDEBUG2
-			printf ("waiting: timeout %d crsw 0x%x\n", to, CRSW);
-#endif
-			i = 50000;
-			--to;
-			if (to <= 0) {
-				/*splx(s);*/
-				if (canreset) {
-					vs_reset(sc);
-					vs_resync(sc);
-				}
-				printf ("timed out: timeout %d crsw 0x%x\n", to, CRSW);
-				return 1;
+	int to;
+	int crsw, bus;
+
+	if (xs != NULL) {
+		bus = !!(xs->sc_link->flags & SDEV_2NDBUS);
+		to = xs->timeout;
+		if (to == 0)
+			to = 2000;
+	} else {
+		bus = -1;
+		to = 2000;
+	}
+
+	while (((crsw = CRSW) & (M_CRSW_CRBV | M_CRSW_CC)) == 0) {
+		if (to-- <= 0) {
+			vs_print_addr(sc, xs);
+			printf("command timeout, crsw 0x%x\n", crsw);
+
+			if (canreset) {
+				vs_reset(sc, bus);
+				vs_resync(sc);
 			}
+			return 1;
 		}
+		delay(1000);
 	}
 	return 0;
 }
 
 int
-vs_poll(sc, xs)
-	struct vs_softc *sc;
-	struct scsi_xfer *xs;
+vs_poll(struct vs_softc *sc, M328_CMD *cmd)
 {
-	int status;
-	int to;
+	struct scsi_xfer *xs;
+	int rc;
 
-	/*s = splbio();*/
-	to = xs->timeout / 1000;
-	for (;;) {
-		if (do_vspoll(sc, to, 1)) {
-			xs->error = XS_SELTIMEOUT;
-			xs->status = -1;
-			xs->flags |= ITSDONE;
-			/* clear the return information */
-			vs_clear_return_info(sc);
-			if (xs->flags & SCSI_POLL)
-				return (COMPLETE);
-			break;
-		}
-		if (vs_checkintr(sc, xs, &status)) {
-			vs_scsidone(sc, xs, status);
-		}
-		if (CRSW & M_CRSW_ER)
-			CRB_CLR_ER(CRSW);
-		CRB_CLR_DONE(CRSW);
-		if (xs->flags & ITSDONE) break;
-	}
-	/* clear the return information */
+	xs = cmd->xs;
+	rc = do_vspoll(sc, xs, 1);
+	vs_free(cmd);
+
+	if (rc != 0) {
+		xs->error = XS_SELTIMEOUT;
+		xs->status = -1;
+		xs->flags |= ITSDONE;
+#if 0
+		scsi_done(xs);
+#endif
+	} else
+		vs_scsidone(sc, xs);
+
+	if (CRSW & M_CRSW_ER)
+		CRB_CLR_ER;
+	CRB_CLR_DONE;
+
 	vs_clear_return_info(sc);
 	return (COMPLETE);
 }
 
 void
-thaw_queue(sc, target)
-	struct vs_softc *sc;
-	u_int8_t target;
+thaw_queue(struct vs_softc *sc, int target)
 {
-	u_short t;
-	t = target << 8;
-	t |= 0x0001;
-	THAW_REG = t;
+	THAW(target);
+
 	/* loop until thawed */
-	while (THAW_REG & 0x01);
+	while (THAW_REG & M_THAW_TWQE)
+		;
 }
 
 void
-vs_scsidone(sc, xs, stat)
-	struct vs_softc *sc;
-	struct scsi_xfer *xs;
-	int stat;
+thaw_all_queues(struct vs_softc *sc)
 {
-	int tgt;
-	xs->status = stat;
+	int i;
 
+	for (i = 1; i < NUM_WQ; i++)
+		thaw_queue(sc, i);
+}
+
+void
+vs_scsidone(struct vs_softc *sc, struct scsi_xfer *xs)
+{
+	u_int32_t len;
+	int error;
+	int tgt;
+
+	len = vs_read(4, sh_RET_IOPB + IOPB_LENGTH);
+	xs->resid = xs->datalen - len;
+
+	error = vs_read(2, sh_RET_IOPB + IOPB_STATUS);
+	if ((error & 0xff) == SCSI_SELECTION_TO) {
+		xs->error = XS_SELTIMEOUT;
+		xs->status = -1;
+	} else
+		xs->status = error >> 8;
+
+	tgt = vs_queue_number(xs->sc_link, sc);
 	while (xs->status == SCSI_CHECK) {
 		vs_chksense(xs);
-		tgt = xs->sc_link->target + 1;
 		thaw_queue(sc, tgt);
 	}
 
-	tgt = xs->sc_link->target + 1;
 	xs->flags |= ITSDONE;
-	/*sc->sc_tinfo[slp->target].cmds++;*/
-
-	/* thaw all work queues */
 	thaw_queue(sc, tgt);
+
 	scsi_done(xs);
 }
 
 int
-vs_scsicmd(xs)
-	struct scsi_xfer *xs;
+vs_scsicmd(struct scsi_xfer *xs)
 {
 	struct scsi_link *slp = xs->sc_link;
 	struct vs_softc *sc = slp->adapter_softc;
-	int flags;
-	unsigned long buf, len;
-	u_short iopb_len;
-	M328_CQE *mc = (M328_CQE*)&sc->sc_vsreg->sh_MCE;
-	M328_CRB *crb = (M328_CRB *)&sc->sc_vsreg->sh_CRB;
-	M328_IOPB *miopb = (M328_IOPB *)&sc->sc_vsreg->sh_MCE_IOPB;
-	M328_CQE *cqep;
-	M328_IOPB *iopb;
+	int flags, option;
+	unsigned int iopb_len;
+	bus_addr_t cqep, iopb;
 	M328_CMD *m328_cmd;
 
 	flags = xs->flags;
-
-#ifdef SDEBUG
-	printf("scsi_cmd() ");
-	if (xs->cmd->opcode == 0) {
-		printf("TEST_UNIT_READY ");
-	} else if (xs->cmd->opcode == REQUEST_SENSE) {
-		printf("REQUEST_SENSE   ");
-	} else if (xs->cmd->opcode == INQUIRY) {
-		printf("INQUIRY         ");
-	} else if (xs->cmd->opcode == MODE_SELECT) {
-		printf("MODE_SELECT     ");
-	} else if (xs->cmd->opcode == MODE_SENSE) {
-		printf("MODE_SENSE      ");
-	} else if (xs->cmd->opcode == START_STOP) {
-		printf("START_STOP      ");
-	} else if (xs->cmd->opcode == RESERVE) {
-		printf("RESERVE         ");
-	} else if (xs->cmd->opcode == RELEASE) {
-		printf("RELEASE         ");
-	} else if (xs->cmd->opcode == PREVENT_ALLOW) {
-		printf("PREVENT_ALLOW   ");
-	} else if (xs->cmd->opcode == POSITION_TO_ELEMENT) {
-		printf("POSITION_TO_EL  ");
-	} else if (xs->cmd->opcode == CHANGE_DEFINITION) {
-		printf("CHANGE_DEF      ");
-	} else if (xs->cmd->opcode == MODE_SENSE_BIG) {
-		printf("MODE_SENSE_BIG  ");
-	} else if (xs->cmd->opcode == MODE_SELECT_BIG) {
-		printf("MODE_SELECT_BIG ");
-	} else if (xs->cmd->opcode == 0x25) {
-		printf("READ_CAPACITY   ");
-	} else if (xs->cmd->opcode == 0x08) {
-		printf("READ_COMMAND    ");
-	}
-#endif
 	if (flags & SCSI_POLL) {
-		cqep = mc;
-		iopb = miopb;
+		cqep = sh_MCE;
+		iopb = sh_MCE_IOPB;
+
+		/* Wait until we can use the command queue entry. */
+		while (mce_read(2, CQE_QECR) & M_QECR_GO)
+			;
 	} else {
 		cqep = vs_getcqe(sc);
+		if (cqep == 0) {
+			xs->error = XS_DRIVER_STUFFUP;
+			return (TRY_AGAIN_LATER);
+		}
 		iopb = vs_getiopb(sc);
 	}
-	if (cqep == NULL) {
-		xs->error = XS_DRIVER_STUFFUP;
-		return (TRY_AGAIN_LATER);
+
+	vs_bzero(iopb, IOPB_LONG_SIZE);
+
+	/*
+	 * We should only provide the iopb len if the controller is not
+	 * able to compute it from the SCSI command group.
+	 * Note that it has no knowledge of group 2.
+	 */
+	switch ((xs->cmd->opcode) >> 5) {
+	case 0:
+	case 1:
+	case 5:
+		iopb_len = 0;
+		break;
+	default:
+		iopb_len = IOPB_SHORT_SIZE + xs->cmdlen;
+		break;
 	}
 
-	iopb_len = sizeof(M328_short_IOPB) + xs->cmdlen;
-	d16_bzero(iopb, sizeof(M328_IOPB));
+	bus_space_write_region_1(sc->sc_iot, sc->sc_ioh, iopb + IOPB_SCSI_DATA,
+	    (u_int8_t *)xs->cmd, xs->cmdlen);
 
-	d16_bcopy(xs->cmd, &iopb->iopb_SCSI[0], xs->cmdlen);
-	iopb->iopb_CMD = IOPB_SCSI;
-	iopb->iopb_UNIT = slp->lun << 3;
-	iopb->iopb_UNIT |= slp->target;
-	iopb->iopb_NVCT = (u_char)sc->sc_nvec;
-	iopb->iopb_EVCT = (u_char)sc->sc_evec;
+	vs_write(2, iopb + IOPB_CMD, IOPB_PASSTHROUGH);
+	vs_write(2, iopb + IOPB_UNIT,
+	  IOPB_UNIT_VALUE(!!(slp->flags & SDEV_2NDBUS), slp->target, slp->lun));
+	vs_write(1, iopb + IOPB_NVCT, sc->sc_nvec);
+	vs_write(1, iopb + IOPB_EVCT, sc->sc_evec);
 
 	/*
 	 * Since the 88k doesn't support cache snooping, we have
 	 * to flush the cache for a write and flush with inval for
 	 * a read, prior to starting the IO.
 	 */
-	if (xs->flags & SCSI_DATA_IN) {	 /* read */
-		dma_cachectl((vaddr_t)xs->data, xs->datalen,
-			     DMA_CACHE_SYNC_INVAL);
-		iopb->iopb_OPTION |= OPT_READ;
-	} else {			 /* write */
-		dma_cachectl((vaddr_t)xs->data, xs->datalen,
-			     DMA_CACHE_SYNC);
-		iopb->iopb_OPTION |= OPT_WRITE;
-	}
+	dma_cachectl((vaddr_t)xs->data, xs->datalen,
+	    flags & SCSI_DATA_IN ? DMA_CACHE_SYNC_INVAL : DMA_CACHE_SYNC);
+	
+	option = 0;
+	if (flags & SCSI_DATA_OUT)
+		option |= M_OPT_DIR;
 
 	if (flags & SCSI_POLL) {
-		iopb->iopb_OPTION |= OPT_INTDIS;
-		iopb->iopb_LEVEL = 0;
+		vs_write(2, iopb + IOPB_OPTION, option);
+		vs_write(2, iopb + IOPB_LEVEL, 0);
 	} else {
-		iopb->iopb_OPTION |= OPT_INTEN;
-		iopb->iopb_LEVEL = sc->sc_ipl;
+		vs_write(2, iopb + IOPB_OPTION, option | M_OPT_IE);
+		vs_write(2, iopb + IOPB_LEVEL, sc->sc_ipl);
 	}
-	iopb->iopb_ADDR = ADDR_MOD;
+	vs_write(2, iopb + IOPB_ADDR, ADDR_MOD);
 
-	/*
-	 * Wait until we can use the command queue entry.
-	 * Should only have to wait if the master command
-	      * queue entry is busy and we are polling.
-	 */
-	while (cqep->cqe_QECR & M_QECR_GO);
-
-	cqep->cqe_IOPB_ADDR = OFF(iopb);
-	cqep->cqe_IOPB_LENGTH = iopb_len;
-	if (flags & SCSI_POLL) {
-		cqep->cqe_WORK_QUEUE = 0;
-	} else {
-		cqep->cqe_WORK_QUEUE = slp->target + 1;
-	}
+	vs_write(2, cqep + CQE_IOPB_ADDR, iopb);
+	vs_write(1, cqep + CQE_IOPB_LENGTH, iopb_len);
+	vs_write(1, cqep + CQE_WORK_QUEUE,
+	    flags & SCSI_POLL ? 0 : vs_queue_number(slp, sc));
 
 	MALLOC(m328_cmd, M328_CMD*, sizeof(M328_CMD), M_DEVBUF, M_WAITOK);
 
 	m328_cmd->xs = xs;
-	if (xs->datalen) {
-		m328_cmd->top_sg_list = vs_build_memory_structure(xs, iopb);
-	} else {
-		m328_cmd->top_sg_list = (M328_SG)0;
-	}
+	if (xs->datalen != 0)
+		m328_cmd->top_sg_list = vs_build_memory_structure(sc, xs, iopb);
+	else
+		m328_cmd->top_sg_list = NULL;
 
-	LV(cqep->cqe_CTAG, m328_cmd);
+	vs_write(4, cqep + CQE_CTAG, (u_int32_t)m328_cmd);
 
-	if (crb->crb_CRSW & M_CRSW_AQ) {
-		cqep->cqe_QECR = M_QECR_AA;
-	}
-	VL(buf, iopb->iopb_BUFF);
-	VL(len, iopb->iopb_LENGTH);
-#ifdef SDEBUG
-	printf("tgt %d lun %d buf %x len %d wqn %d ipl %d crsw 0x%x\n",
-	       slp->target, slp->lun, buf, len, cqep->cqe_WORK_QUEUE,
-	       iopb->iopb_LEVEL, crb->crb_CRSW);
-#endif
-	cqep->cqe_QECR |= M_QECR_GO;
+	if (crb_read(2, CRB_CRSW) & M_CRSW_AQ)
+		vs_write(2, cqep + CQE_QECR, M_QECR_AA | M_QECR_GO);
+	else
+		vs_write(2, cqep + CQE_QECR, M_QECR_GO);
 
 	if (flags & SCSI_POLL) {
 		/* poll for the command to complete */
-		vs_poll(sc, xs);
-		return (COMPLETE);
+		return vs_poll(sc, m328_cmd);
 	}
+
 	return (SUCCESSFULLY_QUEUED);
 }
 
 void
-vs_chksense(xs)
-	struct scsi_xfer *xs;
+vs_chksense(struct scsi_xfer *xs)
 {
 	int s;
 	struct scsi_link *slp = xs->sc_link;
 	struct vs_softc *sc = slp->adapter_softc;
 	struct scsi_sense *ss;
-	M328_CQE *mc = (M328_CQE*)&sc->sc_vsreg->sh_MCE;
-	M328_IOPB *riopb = (M328_IOPB *)&sc->sc_vsreg->sh_RET_IOPB;
-	M328_IOPB *miopb = (M328_IOPB *)&sc->sc_vsreg->sh_MCE_IOPB;
 
 	/* ack and clear the error */
-	CRB_CLR_ER(CRSW);
-	CRB_CLR_DONE(CRSW);
+	if (CRSW & M_CRSW_ER)
+		CRB_CLR_ER;
+	CRB_CLR_DONE;
 	xs->status = 0;
 
-	d16_bzero(miopb, sizeof(M328_IOPB));
+	/* Wait until we can use the command queue entry. */
+	while (mce_read(2, CQE_QECR) & M_QECR_GO)
+		;
+
+	vs_bzero(sh_MCE_IOPB, IOPB_LONG_SIZE);
 	/* This is a command, so point to it */
-	ss = (void *)&miopb->iopb_SCSI[0];
-	d16_bzero(ss, sizeof(*ss));
+	ss = (void *)(bus_space_vaddr(sc->sc_iot, sc->sc_ioh) +
+	    sh_MCE_IOPB + IOPB_SCSI_DATA);
 	ss->opcode = REQUEST_SENSE;
 	ss->byte2 = slp->lun << 5;
 	ss->length = sizeof(struct scsi_sense_data);
 
-	miopb->iopb_CMD = IOPB_SCSI;
-	miopb->iopb_OPTION = OPT_READ;
-	miopb->iopb_NVCT = (u_char)sc->sc_nvec;
-	miopb->iopb_EVCT = (u_char)sc->sc_evec;
-	miopb->iopb_LEVEL = 0; /*sc->sc_ipl;*/
-	miopb->iopb_ADDR = ADDR_MOD;
-	LV(miopb->iopb_BUFF, kvtop((vaddr_t)&xs->sense));
-	LV(miopb->iopb_LENGTH, sizeof(struct scsi_sense_data));
+	mce_iopb_write(2, IOPB_CMD, IOPB_PASSTHROUGH);
+	mce_iopb_write(2, IOPB_OPTION, 0);
+	mce_iopb_write(1, IOPB_NVCT, sc->sc_nvec);
+	mce_iopb_write(1, IOPB_EVCT, sc->sc_evec);
+	mce_iopb_write(2, IOPB_LEVEL, 0 /* sc->sc_ipl */);
+	mce_iopb_write(2, IOPB_ADDR, ADDR_MOD);
+	mce_iopb_write(4, IOPB_BUFF, kvtop((vaddr_t)&xs->sense));
+	mce_iopb_write(4, IOPB_LENGTH, sizeof(struct scsi_sense_data));
+	mce_iopb_write(2, IOPB_UNIT,
+	  IOPB_UNIT_VALUE(!!(slp->flags & SDEV_2NDBUS), slp->target, slp->lun));
 
-	d16_bzero(mc, sizeof(M328_CQE));
-	mc->cqe_IOPB_ADDR = OFF(miopb);
-	mc->cqe_IOPB_LENGTH = sizeof(M328_short_IOPB) +
-			      sizeof(struct scsi_sense);
-	mc->cqe_WORK_QUEUE = 0;
-	mc->cqe_QECR = M_QECR_GO;
+	vs_bzero(sh_MCE, CQE_SIZE);
+	mce_write(2, CQE_IOPB_ADDR, sh_MCE_IOPB);
+	mce_write(1, CQE_IOPB_LENGTH, 0);
+	mce_write(1, CQE_WORK_QUEUE, 0);
+	mce_write(2, CQE_QECR, M_QECR_GO);
+
 	/* poll for the command to complete */
 	s = splbio();
-	do_vspoll(sc, 0, 1);
-	/*
-	if (xs->cmd->opcode != PREVENT_ALLOW) {
-	   xs->error = XS_SENSE;
-	}
-	*/
-	xs->status = riopb->iopb_STATUS >> 8;
-#ifdef SDEBUG
-	scsi_print_sense(xs, 2);
-#endif
+	do_vspoll(sc, xs, 1);
+	xs->status = vs_read(2, sh_RET_IOPB + IOPB_STATUS) >> 8;
 	splx(s);
 }
 
-M328_CQE *
-vs_getcqe(sc)
-	struct vs_softc *sc;
+bus_addr_t
+vs_getcqe(struct vs_softc *sc)
 {
-	M328_MCSB *mcsb = (M328_MCSB *)&sc->sc_vsreg->sh_MCSB;
-	M328_CQE *cqep;
+	bus_addr_t cqep;
+	int qhdp;
 
-	cqep = (M328_CQE *)&sc->sc_vsreg->sh_CQE[mcsb->mcsb_QHDP];
+	qhdp = mcsb_read(2, MCSB_QHDP);
+	cqep = sh_CQE(qhdp);
 
-	if (cqep->cqe_QECR & M_QECR_GO)
-		return NULL; /* Hopefully, this will never happen */
-	mcsb->mcsb_QHDP++;
-	if (mcsb->mcsb_QHDP == NUM_CQE)	mcsb->mcsb_QHDP = 0;
-	d16_bzero(cqep, sizeof(M328_CQE));
+	if (vs_read(2, cqep + CQE_QECR) & M_QECR_GO) {
+		/* should never happen */
+		return 0;
+	}
+
+	if (++qhdp == NUM_CQE)
+		qhdp = 0;
+	mcsb_write(2, MCSB_QHDP, qhdp);
+
+	vs_bzero(cqep, CQE_SIZE);
 	return cqep;
 }
 
-M328_IOPB *
-vs_getiopb(sc)
-	struct vs_softc *sc;
+bus_addr_t
+vs_getiopb(struct vs_softc *sc)
 {
-	M328_MCSB *mcsb = (M328_MCSB *)&sc->sc_vsreg->sh_MCSB;
-	M328_IOPB *iopb;
-	int slot;
+	bus_addr_t iopb;
+	int qhdp;
 
-	if (mcsb->mcsb_QHDP == 0) {
-		slot = NUM_CQE;
-	} else {
-		slot = mcsb->mcsb_QHDP - 1;
-	}
-	iopb = (M328_IOPB *)&sc->sc_vsreg->sh_IOPB[slot];
-	d16_bzero(iopb, sizeof(M328_IOPB));
+	/*
+	 * Since we are always invoked after vs_getcqe(), qhdp has already
+	 * been incremented...
+	 */
+	qhdp = mcsb_read(2, MCSB_QHDP);
+	if (--qhdp < 0)
+		qhdp = NUM_CQE - 1;
+
+	iopb = sh_IOPB(qhdp);
 	return iopb;
 }
 
 int
-vs_initialize(sc)
-	struct vs_softc *sc;
+vs_initialize(struct vs_softc *sc)
 {
-	M328_CIB *cib = (M328_CIB *)&sc->sc_vsreg->sh_CIB;
-	M328_CQE *mc = (M328_CQE*)&sc->sc_vsreg->sh_MCE;
-	M328_CRB *crb = (M328_CRB *)&sc->sc_vsreg->sh_CRB;
-	M328_IOPB *riopb = (M328_IOPB *)&sc->sc_vsreg->sh_RET_IOPB;
-	M328_MCSB *mcsb = (M328_MCSB *)&sc->sc_vsreg->sh_MCSB;
-	M328_IOPB *iopb;
-	M328_WQCF *wiopb = (M328_WQCF *)&sc->sc_vsreg->sh_MCE_IOPB;
-	u_short i, crsw;
-	int failed = 0;
+	int i, msr, dbid;
 
-	CRB_CLR_DONE(CRSW);
-	d16_bzero(cib, sizeof(M328_CIB));
-	mcsb->mcsb_QHDP = 0;
-	sc->sc_qhp = 0;
-	cib->cib_NCQE = 10;
-	cib->cib_BURST = 0;
-	cib->cib_NVECT = sc->sc_ipl << 8;
-	cib->cib_NVECT |= sc->sc_nvec;
-	cib->cib_EVECT = sc->sc_ipl << 8;
-	cib->cib_EVECT |= sc->sc_evec;
-	cib->cib_PID = 0x07;
-	cib->cib_SID = 0x00;
-	cib->cib_CRBO = OFF(crb);
-	cib->cib_SELECT_msw = HI(SELECTION_TIMEOUT);
-	cib->cib_SELECT_lsw = LO(SELECTION_TIMEOUT);
-	cib->cib_WQ0TIMO_msw = HI(4);
-	cib->cib_WQ0TIMO_lsw = LO(4);
-	cib->cib_VMETIMO_msw = 0; /*HI(VME_BUS_TIMEOUT);*/
-	cib->cib_VMETIMO_lsw = 0; /*LO(VME_BUS_TIMEOUT);*/
-	cib->cib_ERR_FLGS = M_ERRFLGS_RIN | M_ERRFLGS_RSE;
-	cib->cib_SBRIV = sc->sc_ipl << 8;
-	cib->cib_SBRIV |= sc->sc_evec;
-	cib->cib_SOF0 = 0x15;
-	cib->cib_SRATE0 = 100/4;
-	cib->cib_SOF1 = 0x0;
-	cib->cib_SRATE1 = 0x0;
+	/*
+	 * Reset the board, and wait for it to get ready.
+	 * The reset signal is applied for 70 usec, and the board status
+	 * is not tested until 100 usec after the reset signal has been
+	 * cleared, per the manual (MVME328/D1) pages 4-6 and 4-9.
+	 */
 
-	iopb = (M328_IOPB *)&sc->sc_vsreg->sh_MCE_IOPB;
-	d16_bzero(iopb, sizeof(M328_IOPB));
-	iopb->iopb_CMD = CNTR_INIT;
-	iopb->iopb_OPTION = 0;
-	iopb->iopb_NVCT = (u_char)sc->sc_nvec;
-	iopb->iopb_EVCT = (u_char)sc->sc_evec;
-	iopb->iopb_LEVEL = 0; /*sc->sc_ipl;*/
-	iopb->iopb_ADDR = SHIO_MOD;
-	LV(iopb->iopb_BUFF, OFF(cib));
-	LV(iopb->iopb_LENGTH, sizeof(M328_CIB));
+	mcsb_write(2, MCSB_MCR, M_MCR_RES | M_MCR_SFEN);
+	delay(70);
+	mcsb_write(2, MCSB_MCR, M_MCR_SFEN);
 
-	d16_bzero(mc, sizeof(M328_CQE));
-	mc->cqe_IOPB_ADDR = OFF(iopb);
-	mc->cqe_IOPB_LENGTH = sizeof(M328_IOPB);
-	mc->cqe_WORK_QUEUE = 0;
-	mc->cqe_QECR = M_QECR_GO;
+	delay(100);
+	i = 0;
+	for (;;) {
+		msr = mcsb_read(2, MCSB_MSR);
+		if ((msr & (M_MSR_BOK | M_MSR_CNA)) == M_MSR_BOK)
+			break;
+		if (++i > 5000) {
+			printf("board reset failed, status %x\n", msr);
+			return 1;
+		}
+		delay(1000);
+	}
+
+	/* initialize channels id */
+	sc->sc_id[0] = csb_read(1, CSB_PID);
+	sc->sc_id[1] = -1;
+	switch (dbid = csb_read(1, CSB_DBID)) {
+	case DBID_SCSI2:
+	case DBID_SCSI:
+#if 0
+		printf("daughter board, ");
+#endif
+		sc->sc_id[1] = csb_read(1, CSB_SID);
+		break;
+	case DBID_PRINTER:
+		printf("printer port, ");
+		break;
+	case DBID_NONE:
+		break;
+	default:
+		printf("unknown daughterboard id %x, ", dbid);
+		break;
+	}
+
+	CRB_CLR_DONE;
+	mcsb_write(2, MCSB_QHDP, 0);
+
+	vs_bzero(sh_CIB, CIB_SIZE);
+	cib_write(2, CIB_NCQE, NUM_CQE);
+	cib_write(2, CIB_BURST, 0);
+	cib_write(2, CIB_NVECT, (sc->sc_ipl << 8) | sc->sc_nvec);
+	cib_write(2, CIB_EVECT, (sc->sc_ipl << 8) | sc->sc_evec);
+	cib_write(2, CIB_PID, 0x08);	/* XXX default */
+	cib_write(2, CIB_SID, 0x08);
+	cib_write(2, CIB_CRBO, sh_CRB);
+	cib_write(4, CIB_SELECT, SELECTION_TIMEOUT);
+	cib_write(4, CIB_WQTIMO, 4);
+	cib_write(4, CIB_VMETIMO, 0 /* VME_BUS_TIMEOUT */);
+	cib_write(2, CIB_ERR_FLGS, M_ERRFLGS_RIN | M_ERRFLGS_RSE);
+	cib_write(2, CIB_SBRIV, (sc->sc_ipl << 8) | sc->sc_evec);
+	cib_write(1, CIB_SOF0, 0x15);
+	cib_write(1, CIB_SRATE0, 100 / 4);
+	cib_write(1, CIB_SOF1, 0);
+	cib_write(1, CIB_SRATE1, 0);
+
+	vs_bzero(sh_MCE_IOPB, IOPB_LONG_SIZE);
+	mce_iopb_write(2, IOPB_CMD, CNTR_INIT);
+	mce_iopb_write(2, IOPB_OPTION, 0);
+	mce_iopb_write(1, IOPB_NVCT, sc->sc_nvec);
+	mce_iopb_write(1, IOPB_EVCT, sc->sc_evec);
+	mce_iopb_write(2, IOPB_LEVEL, 0 /* sc->sc_ipl */);
+	mce_iopb_write(2, IOPB_ADDR, SHIO_MOD);
+	mce_iopb_write(4, IOPB_BUFF, sh_CIB);
+	mce_iopb_write(4, IOPB_LENGTH, CIB_SIZE);
+
+	vs_bzero(sh_MCE, CQE_SIZE);
+	mce_write(2, CQE_IOPB_ADDR, sh_MCE_IOPB);
+	mce_write(1, CQE_IOPB_LENGTH, 0);
+	mce_write(1, CQE_WORK_QUEUE, 0);
+	mce_write(2, CQE_QECR, M_QECR_GO);
+
 	/* poll for the command to complete */
-	do_vspoll(sc, 0, 1);
-	CRB_CLR_DONE(CRSW);
+	do_vspoll(sc, NULL, 1);
 
 	/* initialize work queues */
-	for (i = 1; i < 8; i++) {
-		d16_bzero(wiopb, sizeof(M328_IOPB));
-		wiopb->wqcf_CMD = CNTR_INIT_WORKQ;
-		wiopb->wqcf_OPTION = 0;
-		wiopb->wqcf_NVCT = (u_char)sc->sc_nvec;
-		wiopb->wqcf_EVCT = (u_char)sc->sc_evec;
-		wiopb->wqcf_ILVL = 0; /*sc->sc_ipl;*/
-		wiopb->wqcf_WORKQ = i;
-		wiopb->wqcf_WOPT = (WQO_FOE | WQO_INIT);
-		wiopb->wqcf_SLOTS = JAGUAR_MAX_Q_SIZ;
-		LV(wiopb->wqcf_CMDTO, 4); /* 1 second */
+	for (i = 1; i < NUM_WQ; i++) {
+		/* Wait until we can use the command queue entry. */
+		while (mce_read(2, CQE_QECR) & M_QECR_GO)
+			;
 
-		d16_bzero(mc, sizeof(M328_CQE));
-		mc->cqe_IOPB_ADDR = OFF(wiopb);
-		mc->cqe_IOPB_LENGTH = sizeof(M328_IOPB);
-		mc->cqe_WORK_QUEUE = 0;
-		mc->cqe_QECR = M_QECR_GO;
+		vs_bzero(sh_MCE_IOPB, IOPB_LONG_SIZE);
+		mce_iopb_write(2, WQCF_CMD, CNTR_INIT_WORKQ);
+		mce_iopb_write(2, WQCF_OPTION, 0);
+		mce_iopb_write(1, WQCF_NVCT, sc->sc_nvec);
+		mce_iopb_write(1, WQCF_EVCT, sc->sc_evec);
+		mce_iopb_write(2, WQCF_ILVL, 0 /* sc->sc_ipl */);
+		mce_iopb_write(2, WQCF_WORKQ, i);
+		mce_iopb_write(2, WQCF_WOPT, M_WOPT_FE | M_WOPT_IWQ);
+		mce_iopb_write(2, WQCF_SLOTS, JAGUAR_MAX_Q_SIZ);
+		mce_iopb_write(4, WQCF_CMDTO, 4);	/* 1 second */
+
+		vs_bzero(sh_MCE, CQE_SIZE);
+		mce_write(2, CQE_IOPB_ADDR, sh_MCE_IOPB);
+		mce_write(1, CQE_IOPB_LENGTH, 0);
+		mce_write(1, CQE_WORK_QUEUE, 0);
+		mce_write(2, CQE_QECR, M_QECR_GO);
+
 		/* poll for the command to complete */
-		do_vspoll(sc, 0, 1);
+		do_vspoll(sc, NULL, 1);
 		if (CRSW & M_CRSW_ER) {
-			/*printf("\nerror: queue %d status = 0x%x\n", i, riopb->iopb_STATUS);*/
-			/*failed = 1;*/
-			CRB_CLR_ER(CRSW);
+			printf("work queue %d initialization error 0x%x\n",
+			    i, vs_read(2, sh_RET_IOPB + IOPB_STATUS));
+			return 1;
 		}
-		CRB_CLR_DONE(CRSW);
-		delay(500);
+		CRB_CLR_DONE;
 	}
-	/* start queue mode */
-	CRSW = 0;
-	mcsb->mcsb_MCR |= M_MCR_SQM;
-	crsw = CRSW;
-	do_vspoll(sc, 0, 1);
-	if (CRSW & M_CRSW_ER) {
-		printf("error: status = 0x%x\n", riopb->iopb_STATUS);
-		CRB_CLR_ER(CRSW);
-	}
-	CRB_CLR_DONE(CRSW);
 
-	if (failed) {
-		printf(": failed!\n");
-		return (1);
-	}
-	/* reset SCSI bus */
-	vs_reset(sc);
+	/* start queue mode */
+	mcsb_write(2, MCSB_MCR, mcsb_read(2, MCSB_MCR) | M_MCR_SQM);
+
+	/* reset all SCSI buses */
+	vs_reset(sc, -1);
 	/* sync all devices */
 	vs_resync(sc);
-	printf(": target %d\n", sc->sc_link.adapter_target);
-	return (0); /* success */
+
+	return 0;
 }
 
 void
-vs_resync(sc)
-	struct vs_softc *sc;
+vs_resync(struct vs_softc *sc)
 {
-	M328_CQE *mc = (M328_CQE*)&sc->sc_vsreg->sh_MCE;
-	M328_IOPB *riopb = (M328_IOPB *)&sc->sc_vsreg->sh_RET_IOPB;
-	M328_DRCF *devreset = (M328_DRCF *)&sc->sc_vsreg->sh_MCE_IOPB;
-	u_short i;
-	for (i=0; i<7; i++) {
-		d16_bzero(devreset, sizeof(M328_DRCF));
-		devreset->drcf_CMD = CNTR_DEV_REINIT;
-		devreset->drcf_OPTION = 0x00;	    /* no interrupts yet... */
-		devreset->drcf_NVCT = sc->sc_nvec;
-		devreset->drcf_EVCT = sc->sc_evec;
-		devreset->drcf_ILVL = 0;
-		devreset->drcf_UNIT = i;
+	int bus, target;
 
-		d16_bzero(mc, sizeof(M328_CQE));
-		mc->cqe_IOPB_ADDR = OFF(devreset);
-		mc->cqe_IOPB_LENGTH = sizeof(M328_DRCF);
-		mc->cqe_WORK_QUEUE = 0;
-		mc->cqe_QECR = M_QECR_GO;
-		/* poll for the command to complete */
-		do_vspoll(sc, 0, 0);
-		if (riopb->iopb_STATUS) {
-#ifdef SDEBUG
-			printf("status: %x\n", riopb->iopb_STATUS);
-#endif
-			sc->sc_tinfo[i].avail = 0;
-		} else {
-			sc->sc_tinfo[i].avail = 1;
+	for (bus = 0; bus < 2; bus++) {
+		if (sc->sc_id[bus] < 0)
+			break;
+
+		for (target = 0; target < 8; target++) {
+			if (target == sc->sc_id[bus])
+				continue;
+
+			/* Wait until we can use the command queue entry. */
+			while (mce_read(2, CQE_QECR) & M_QECR_GO)
+				;
+
+			vs_bzero(sh_MCE_IOPB, IOPB_SHORT_SIZE);
+			mce_iopb_write(2, DRCF_CMD, CNTR_DEV_REINIT);
+			mce_iopb_write(2, DRCF_OPTION, 0); /* prefer polling */
+			mce_iopb_write(1, DRCF_NVCT, sc->sc_nvec);
+			mce_iopb_write(1, DRCF_EVCT, sc->sc_evec);
+			mce_iopb_write(2, DRCF_ILVL, 0);
+			mce_iopb_write(2, DRCF_UNIT,
+			    IOPB_UNIT_VALUE(bus, target, 0));
+
+			vs_bzero(sh_MCE, CQE_SIZE);
+			mce_write(2, CQE_IOPB_ADDR, sh_MCE_IOPB);
+			mce_write(1, CQE_IOPB_LENGTH, 0);
+			mce_write(1, CQE_WORK_QUEUE, 0);
+			mce_write(2, CQE_QECR, M_QECR_GO);
+
+			/* poll for the command to complete */
+			do_vspoll(sc, NULL, 0);
+			if (CRSW & M_CRSW_ER)
+				CRB_CLR_ER;
+			CRB_CLR_DONE;
 		}
-		if (CRSW & M_CRSW_ER) {
-			CRB_CLR_ER(CRSW);
-		}
-		CRB_CLR_DONE(CRSW);
 	}
 }
 
 void
-vs_reset(sc)
-	struct vs_softc *sc;
+vs_reset(struct vs_softc *sc, int bus)
 {
-	u_int s;
-	M328_CQE *mc = (M328_CQE*)&sc->sc_vsreg->sh_MCE;
-	M328_IOPB *riopb = (M328_IOPB *)&sc->sc_vsreg->sh_RET_IOPB;
-	M328_SRCF *reset = (M328_SRCF *)&sc->sc_vsreg->sh_MCE_IOPB;
+	int b, s;
 
-	d16_bzero(reset, sizeof(M328_SRCF));
-	reset->srcf_CMD = IOPB_RESET;
-	reset->srcf_OPTION = 0x00;	 /* no interrupts yet... */
-	reset->srcf_NVCT = sc->sc_nvec;
-	reset->srcf_EVCT = sc->sc_evec;
-	reset->srcf_ILVL = 0;
-	reset->srcf_BUSID = 0;
 	s = splbio();
 
-	d16_bzero(mc, sizeof(M328_CQE));
-	mc->cqe_IOPB_ADDR = OFF(reset);
-	mc->cqe_IOPB_LENGTH = sizeof(M328_SRCF);
-	mc->cqe_WORK_QUEUE = 0;
-	mc->cqe_QECR = M_QECR_GO;
-	/* poll for the command to complete */
-	while (1) {
-		do_vspoll(sc, 0, 0);
-		/* ack & clear scsi error condition cause by reset */
-		if (CRSW & M_CRSW_ER) {
-			CRB_CLR_ER(CRSW);
-			CRB_CLR_DONE(CRSW);
-			riopb->iopb_STATUS = 0;
-			break;
+	for (b = 0; b < 2; b++) {
+		if (bus >= 0 && b != bus)
+			continue;
+
+		/* Wait until we can use the command queue entry. */
+		while (mce_read(2, CQE_QECR) & M_QECR_GO)
+			;
+
+		vs_bzero(sh_MCE_IOPB, IOPB_SHORT_SIZE);
+		mce_iopb_write(2, SRCF_CMD, IOPB_RESET);
+		mce_iopb_write(2, SRCF_OPTION, 0);	/* prefer polling */
+		mce_iopb_write(1, SRCF_NVCT, sc->sc_nvec);
+		mce_iopb_write(1, SRCF_EVCT, sc->sc_evec);
+		mce_iopb_write(2, SRCF_ILVL, 0);
+		mce_iopb_write(2, SRCF_BUSID, b << 15);
+
+		vs_bzero(sh_MCE, CQE_SIZE);
+		mce_write(2, CQE_IOPB_ADDR, sh_MCE_IOPB);
+		mce_write(1, CQE_IOPB_LENGTH, 0);
+		mce_write(1, CQE_WORK_QUEUE, 0);
+		mce_write(2, CQE_QECR, M_QECR_GO);
+
+		/* poll for the command to complete */
+		for (;;) {
+			do_vspoll(sc, NULL, 0);
+			/* ack & clear scsi error condition cause by reset */
+			if (CRSW & M_CRSW_ER) {
+				CRB_CLR_DONE;
+				vs_write(2, sh_RET_IOPB + IOPB_STATUS, 0);
+				break;
+			}
+			CRB_CLR_DONE;
 		}
-		CRB_CLR_DONE(CRSW);
 	}
-	/* thaw all work queues */
-	thaw_queue(sc, 0xFF);
-	splx (s);
+
+	thaw_all_queues(sc);
+
+	splx(s);
 }
 
-/*
- * Process an interrupt from the MVME328
- * We'll generally update: xs->{flags,resid,error,sense,status} and
- * occasionally xs->retries.
- */
-
-int
-vs_checkintr(sc, xs, status)
-	struct vs_softc *sc;
-	struct scsi_xfer *xs;
-	int   *status;
+void
+vs_free(M328_CMD *m328_cmd)
 {
-	int   target = -1;
-	int   lun = -1;
-	M328_IOPB *riopb = (M328_IOPB *)&sc->sc_vsreg->sh_RET_IOPB;
-	struct scsi_generic *cmd;
-	u_long buf;
-	u_long len;
-	u_char error;
-
-	target = xs->sc_link->target;
-	lun = xs->sc_link->lun;
-	cmd = (struct scsi_generic *)&riopb->iopb_SCSI[0];
-
-	VL(buf, riopb->iopb_BUFF);
-	VL(len, riopb->iopb_LENGTH);
-	*status = riopb->iopb_STATUS >> 8;
-	error = riopb->iopb_STATUS & 0xFF;
-
-#ifdef SDEBUG
-	printf("scsi_chk() ");
-
-	if (xs->cmd->opcode == 0) {
-		printf("TEST_UNIT_READY ");
-	} else if (xs->cmd->opcode == REQUEST_SENSE) {
-		printf("REQUEST_SENSE   ");
-	} else if (xs->cmd->opcode == INQUIRY) {
-		printf("INQUIRY         ");
-	} else if (xs->cmd->opcode == MODE_SELECT) {
-		printf("MODE_SELECT     ");
-	} else if (xs->cmd->opcode == MODE_SENSE) {
-		printf("MODE_SENSE      ");
-	} else if (xs->cmd->opcode == START_STOP) {
-		printf("START_STOP      ");
-	} else if (xs->cmd->opcode == RESERVE) {
-		printf("RESERVE         ");
-	} else if (xs->cmd->opcode == RELEASE) {
-		printf("RELEASE         ");
-	} else if (xs->cmd->opcode == PREVENT_ALLOW) {
-		printf("PREVENT_ALLOW   ");
-	} else if (xs->cmd->opcode == POSITION_TO_ELEMENT) {
-		printf("POSITION_TO_EL  ");
-	} else if (xs->cmd->opcode == CHANGE_DEFINITION) {
-		printf("CHANGE_DEF      ");
-	} else if (xs->cmd->opcode == MODE_SENSE_BIG) {
-		printf("MODE_SENSE_BIG  ");
-	} else if (xs->cmd->opcode == MODE_SELECT_BIG) {
-		printf("MODE_SELECT_BIG ");
-	} else if (xs->cmd->opcode == 0x25) {
-		printf("READ_CAPACITY   ");
-	} else if (xs->cmd->opcode == 0x08) {
-		printf("READ_COMMAND    ");
+	if (m328_cmd->top_sg_list != NULL) {
+		vs_dealloc_scatter_gather(m328_cmd->top_sg_list);
+		m328_cmd->top_sg_list = (M328_SG)NULL;
 	}
-
-	printf("tgt %d lun %d buf %x len %d status %x ", target, lun, buf, len, riopb->iopb_STATUS);
-
-	if (CRSW & M_CRSW_EX) {
-		printf("[ex]");
-	}
-	if (CRSW & M_CRSW_QMS) {
-		printf("[qms]");
-	}
-	if (CRSW & M_CRSW_SC) {
-		printf("[sc]");
-	}
-	if (CRSW & M_CRSW_SE) {
-		printf("[se]");
-	}
-	if (CRSW & M_CRSW_AQ) {
-		printf("[aq]");
-	}
-	if (CRSW & M_CRSW_ER) {
-		printf("[er]");
-	}
-	printf("\n");
-#endif
-	if (len != xs->datalen) {
-		xs->resid = xs->datalen - len;
-	} else {
-		xs->resid = 0;
-	}
-
-	if (error == SCSI_SELECTION_TO) {
-		xs->error = XS_SELTIMEOUT;
-		xs->status = -1;
-		*status = -1;
-	}
-	return 1;
+	FREE(m328_cmd, M_DEVBUF); /* free the command tag */
 }
 
 /* normal interrupt routine */
 int
-vs_nintr(vsc)
-	void *vsc;
+vs_nintr(void *vsc)
 {
 	struct vs_softc *sc = (struct vs_softc *)vsc;
-	M328_CRB *crb = (M328_CRB *)&sc->sc_vsreg->sh_CRB;
 	M328_CMD *m328_cmd;
 	struct scsi_xfer *xs;
-	int status;
 	int s;
 
 	if ((CRSW & CONTROLLER_ERROR) == CONTROLLER_ERROR)
-		return(vs_eintr(sc));
+		return vs_eintr(sc);
 
-	s = splbio();
 	/* Got a valid interrupt on this device */
-	sc->sc_intrcnt_n.ev_count++;
+	s = splbio();
+	m328_cmd = (void *)crb_read(4, CRB_CTAG);
 
-	VL((unsigned long)m328_cmd, crb->crb_CTAG);
-#ifdef SDEBUG
-	printf("Interrupt!!! ");
-	printf("m328_cmd == 0x%x\n", m328_cmd);
-#endif
 	/*
 	 * If this is a controller error, there won't be a m328_cmd
-	 * pointer in the CTAG feild.  Bad things happen if you try
-	 * to point to address 0.  Controller error should be handled
-	 * in vsdma.c  I'll change this soon - steve.
+	 * pointer in the CTAG field.  Bad things happen if you try
+	 * to point to address 0.  But then, we should have caught
+	 * the controller error above.
 	 */
-	if (m328_cmd) {
+	if (m328_cmd != NULL) {
 		xs = m328_cmd->xs;
-		if (m328_cmd->top_sg_list) {
-			vs_dealloc_scatter_gather(m328_cmd->top_sg_list);
-			m328_cmd->top_sg_list = (M328_SG)0;
-		}
-		FREE(m328_cmd, M_DEVBUF); /* free the command tag */
-		if (vs_checkintr(sc, xs, &status)) {
-			vs_scsidone(sc, xs, status);
-		}
+		vs_free(m328_cmd);
+
+		vs_scsidone(sc, xs);
 	}
+
 	/* ack the interrupt */
 	if (CRSW & M_CRSW_ER)
-		CRB_CLR_ER(CRSW);
-	CRB_CLR_DONE(CRSW);
-	/* clear the return information */
+		CRB_CLR_ER;
+	CRB_CLR_DONE;
+
 	vs_clear_return_info(sc);
 	splx(s);
-	return (1);
+
+	return 1;
 }
 
+/* error interrupts */
 int
-vs_eintr(vsc)
-	void *vsc;
+vs_eintr(void *vsc)
 {
 	struct vs_softc *sc = (struct vs_softc *)vsc;
-	M328_CEVSB *crb = (M328_CEVSB *)&sc->sc_vsreg->sh_CRB;
 	M328_CMD *m328_cmd;
 	struct scsi_xfer *xs;
-	int crsw = crb->cevsb_CRSW;
-#ifdef SDEBUG
-	int type = crb->cevsb_TYPE;
-	int length = crb->cevsb_IOPB_LENGTH;
-	int wq = crb->cevsb_WORK_QUEUE;
-#endif
-	int ecode = crb->cevsb_ERROR;
-	int status, s;
-
-	s = splbio();
+	int crsw, ecode;
+	int s;
 
 	/* Got a valid interrupt on this device */
-	sc->sc_intrcnt_e.ev_count++;
+	s = splbio();
 
-	VL((unsigned long)m328_cmd, crb->cevsb_CTAG);
-#ifdef SDEBUG
-	printf("Error Interrupt!!! ");
-	printf("m328_cmd == 0x%x\n", m328_cmd);
-#endif
-	xs = m328_cmd->xs;
+	crsw = vs_read(2, sh_CEVSB + CEVSB_CRSW);
+	ecode = vs_read(1, sh_CEVSB + CEVSB_ERROR);
+	m328_cmd = (void *)crb_read(4, CRB_CTAG);
+	xs = m328_cmd != NULL ? m328_cmd->xs : NULL;
 
 	if (crsw & M_CRSW_RST) {
-		printf("%s: SCSI Bus Reset!\n", vs_name(sc));
-		/* clear the return information */
+		printf("%s: bus reset\n", sc->sc_dev.dv_xname);
 		vs_clear_return_info(sc);
 		splx(s);
-		return(1);
+		return 1;
 	}
+
+	vs_print_addr(sc, xs);
+
 	switch (ecode) {
 	case CEVSB_ERR_TYPE:
-		printf("%s: IOPB Type error!\n", vs_name(sc));
+		printf("IOPB type error\n");
 		break;
 	case CEVSB_ERR_TO:
-		printf("%s: Timeout!\n", vs_name(sc));
+		printf("timeout\n");
+		break;
+	case CEVSB_ERR_TR:
+		printf("reconnect error\n");
+		break;
+	case CEVSB_ERR_OF:
+		printf("overflow\n");
+		break;
+	case CEVSB_ERR_BD:
+		printf("bad direction\n");
+		break;
+	case CEVSB_ERR_NR:
+		printf("non-recoverable error\n");
+		break;
+	case CEVSB_ERR_PANIC:
+		printf("board panic\n");
+		break;
+	default:
+		printf("unexpected error %x\n", ecode);
+		break;
+	}
+
+	if (xs != NULL) {
 		xs->error = XS_SELTIMEOUT;
 		xs->status = -1;
 		xs->flags |= ITSDONE;
-		status = -1;
 		scsi_done(xs);
-		break;
-	case CEVSB_ERR_TR:	/* Target Reconnect, no IOPB */
-		printf("%s: Target Reconnect error!\n", vs_name(sc));
-		break;
-	case CEVSB_ERR_OF:	/* Overflow */
-		printf("%s: Overflow error!\n", vs_name(sc));
-		break;
-	case CEVSB_ERR_BD:	/* Bad direction */
-		printf("%s: Bad Direction!\n", vs_name(sc));
-		break;
-	case CEVSB_ERR_NR:	/* Non-Recoverable Error */
-		printf("%s: Non-Recoverable error!\n", vs_name(sc));
-		break;
-	case CESVB_ERR_PANIC:	/* Board Panic!!! */
-		printf("%s: Board Panic!!!\n", vs_name(sc));
-		break;
-	default:
-		printf("%s: Uh oh!... Error 0x%x\n", vs_name(sc), ecode);
-#ifdef DDB
-		Debugger();
-#endif
 	}
-#ifdef SDEBUG
-	printf("%s: crsw = 0x%x iopb_type = %d iopb_len = %d wq = %d error = 0x%x\n",
-	       vs_name(sc), crsw, type, length, wq, ecode);
-#endif
+
 	if (CRSW & M_CRSW_ER)
-		CRB_CLR_ER(CRSW);
-	CRB_CLR_DONE(CRSW);
-	thaw_queue(sc, 0xFF);
-	/* clear the return information */
+		CRB_CLR_ER;
+	CRB_CLR_DONE;
+
+	thaw_all_queues(sc);
 	vs_clear_return_info(sc);
 	splx(s);
-	return(1);
+
+	return 1;
 }
 
-static __inline__ void
-vs_clear_return_info(sc)
-	struct vs_softc *sc;
+static void
+vs_clear_return_info(struct vs_softc *sc)
 {
-        M328_IOPB *riopb = (M328_IOPB *)&sc->sc_vsreg->sh_RET_IOPB;
-	M328_CEVSB *crb = (M328_CEVSB *)&sc->sc_vsreg->sh_CRB;
-	d16_bzero(riopb, sizeof(M328_IOPB));
-	d16_bzero(crb, sizeof(M328_CEVSB));
+	vs_bzero(sh_RET_IOPB, CRB_SIZE + IOPB_LONG_SIZE);
+}
+
+/*
+ * Choose the work queue number for a specific target.
+ *
+ * Targets on the primary channel are mapped to queues 1-7, while targets
+ * on the secondary channel are mapped to queues 8-14.
+ * To do so, we assign each target the queue matching its own number,
+ * plus eight on the secondary bus, except for target 0 on the first channel
+ * and 7 on the secondary channel which gets assigned to the queue matching
+ * the controller id.
+ */
+int
+vs_queue_number(struct scsi_link *sl, struct vs_softc *sc)
+{
+	int bus, target;
+
+	bus = !!(sl->flags & SDEV_2NDBUS);
+	target = sl->target;
+
+	if (target == sc->sc_id[bus])
+		return 0;
+
+	if (target > sc->sc_id[bus])
+		target--;
+
+	return (bus == 0 ? 1 : 8) + target;
 }
 
 /*
@@ -956,13 +935,12 @@ vs_alloc_scatter_gather(void)
 }
 
 void
-vs_dealloc_scatter_gather(sg)
-	M328_SG sg;
+vs_dealloc_scatter_gather(M328_SG sg)
 {
 	int i;
 
 	if (sg->level > 0) {
-		for (i=0; sg->down[i] && i<MAX_SG_ELEMENTS; i++) {
+		for (i = 0; sg->down[i] && i < MAX_SG_ELEMENTS; i++) {
 			vs_dealloc_scatter_gather(sg->down[i]);
 		}
 	}
@@ -970,95 +948,90 @@ vs_dealloc_scatter_gather(sg)
 }
 
 void
-vs_link_sg_element(element, phys_add, len)
-	sg_list_element_t *element;
-	vaddr_t phys_add;
-	int len;
+vs_link_sg_element(sg_list_element_t *element, vaddr_t phys_add, int len)
 {
 	element->count.bytes = len;
-	LV(element->address, phys_add);
+	element->addrlo = phys_add;
+	element->addrhi = phys_add >> 16;
 	element->link = 0; /* FALSE */
 	element->transfer_type = NORMAL_TYPE;
 	element->memory_type = LONG_TRANSFER;
-	element->address_modifier = 0xD;
+	element->address_modifier = ADRM_EXT_S_D;
 }
 
 void
-vs_link_sg_list(list, phys_add, elements)
-	sg_list_element_t *list;
-	vaddr_t phys_add;
-	int elements;
+vs_link_sg_list(sg_list_element_t *list, vaddr_t phys_add, int elements)
 {
-
-	list->count.scatter.gather  = elements;
-	LV(list->address, phys_add);
+	list->count.scatter.gather = elements;
+	list->addrlo = phys_add;
+	list->addrhi = phys_add >> 16;
 	list->link = 1;	   /* TRUE */
 	list->transfer_type = NORMAL_TYPE;
 	list->memory_type = LONG_TRANSFER;
-	list->address_modifier = 0xD;
+	list->address_modifier = ADRM_EXT_S_D;
 }
 
 M328_SG
-vs_build_memory_structure(xs, iopb)
-	struct scsi_xfer *xs;
-	M328_IOPB  *iopb;	       /* the iopb */
+vs_build_memory_structure(struct vs_softc *sc, struct scsi_xfer *xs,
+     bus_addr_t iopb)
 {
-	M328_SG   sg;
+	M328_SG sg;
 	vaddr_t starting_point_virt, starting_point_phys, point_virt,
 	point1_phys, point2_phys, virt;
-	unsigned len;
-	int       level;
+	unsigned int len;
+	int level;
 
-	sg = (M328_SG)0;   /* Hopefully we need no scatter/gather list */
+	sg = NULL;	/* Hopefully we need no scatter/gather list */
 
 	/*
 	 * We have the following things:
-	 *	virt			the virtual address of the contiguous virtual memory block
-	 *	len			the length of the contiguous virtual memory block
-	 *	starting_point_virt	the virtual address of the contiguous *physical* memory block
-	 *	starting_point_phys	the *physical* address of the contiguous *physical* memory block
-	 *	point_virt		the pointer to the virtual memory we are checking at the moment
-	 *	point1_phys		the pointer to the *physical* memory we are checking at the moment
-	 *	point2_phys		the pointer to the *physical* memory we are checking at the moment
+	 *	virt			va of the virtual memory block
+	 *	len			length of the virtual memory block
+	 *	starting_point_virt	va of the physical memory block
+	 *	starting_point_phys	pa of the physical memory block
+	 *	point_virt		va of the virtual memory
+	 *				    we are checking at the moment
+	 *	point1_phys		pa of the physical memory
+	 *				    we are checking at the moment
+	 *	point2_phys		pa of another physical memory
+	 *				    we are checking at the moment
 	 */
 
 	level = 0;
 	virt = starting_point_virt = (vaddr_t)xs->data;
 	point1_phys = starting_point_phys = kvtop((vaddr_t)xs->data);
 	len = xs->datalen;
+
 	/*
 	 * Check if we need scatter/gather
 	 */
-
-	if (len > PAGE_SIZE) {
-		for (level = 0, point_virt = round_page(starting_point_virt+1);
+	if (trunc_page(virt + len - 1) != trunc_page(virt)) {
+		for (point_virt = round_page(starting_point_virt + 1);
 		    /* if we do already scatter/gather we have to stay in the loop and jump */
-		    point_virt < virt + (vaddr_t)len || sg ;
-		    point_virt += PAGE_SIZE) {			   /* out later */
+		    point_virt < virt + len || sg != NULL;
+		    point_virt += PAGE_SIZE) {		   /* out later */
 
 			point2_phys = kvtop(point_virt);
 
-			if ((point2_phys - trunc_page(point1_phys) - PAGE_SIZE) ||		   /* physical memory is not contiguous */
+			if ((point2_phys != trunc_page(point1_phys) + PAGE_SIZE) ||		   /* physical memory is not contiguous */
 			    (point_virt - starting_point_virt >= MAX_SG_BLOCK_SIZE && sg)) {   /* we only can access (1<<16)-1 bytes in scatter/gather_mode */
 				if (point_virt - starting_point_virt >= MAX_SG_BLOCK_SIZE) {	       /* We were walking too far for one scatter/gather block ... */
-					assert( MAX_SG_BLOCK_SIZE > PAGE_SIZE );
 					point_virt = trunc_page(starting_point_virt+MAX_SG_BLOCK_SIZE-1);    /* So go back to the beginning of the last matching page */
 					/* and generate the physical address of
 					 * this location for the next time. */
 					point2_phys = kvtop(point_virt);
 				}
 
-				if (!sg) {
-					/* We allocate our fist scatter/gather list */
+				if (sg == NULL)
 					sg = vs_alloc_scatter_gather();
-				}
-#if 1 /* broken firmware */
 
+#if 1 /* broken firmware */
 				if (sg->elements >= MAX_SG_ELEMENTS) {
 					vs_dealloc_scatter_gather(sg);
+					printf("%s: scatter/gather list too large\n",
+					    sc->sc_dev.dv_xname);
 					return (NULL);
 				}
-
 #else /* if the firmware will ever get fixed */
 				while (sg->elements >= MAX_SG_ELEMENTS) {
 					if (!sg->up) { /* If the list full in this layer ? */
@@ -1085,17 +1058,17 @@ vs_build_memory_structure(xs, iopb)
 					sg = sg->down[i]; /* Climb down */
 				}
 #endif /* 1 */
-				if (point_virt < virt+(vaddr_t)len) {
+				if (point_virt < virt + len) {
 					/* linking element */
 					vs_link_sg_element(&(sg->list[sg->elements]),
 							   starting_point_phys,
-							   point_virt-starting_point_virt);
+							   point_virt - starting_point_virt);
 					sg->elements++;
 				} else {
 					/* linking last element */
 					vs_link_sg_element(&(sg->list[sg->elements]),
 							   starting_point_phys,
-							   (vaddr_t)(virt+len)-starting_point_virt);
+							   virt + len - starting_point_virt);
 					sg->elements++;
 					break;			       /* We have now collected all blocks */
 				}
@@ -1110,7 +1083,7 @@ vs_build_memory_structure(xs, iopb)
 	 * Climb up along the right side of the tree until we reach the top.
 	 */
 
-	if (sg) {
+	if (sg != NULL) {
 		while (sg->up) {
 			/* link this list also in physical memory */
 			vs_link_sg_list(&(sg->up->list[sg->up->elements-1]),
@@ -1119,15 +1092,27 @@ vs_build_memory_structure(xs, iopb)
 			sg = sg->up;		       /* Climb up */
 		}
 
-		iopb->iopb_OPTION |= M_OPT_SG;
-		iopb->iopb_ADDR |= M_ADR_SG_LINK;
-		LV(iopb->iopb_BUFF, kvtop((vaddr_t)sg->list));
-		LV(iopb->iopb_LENGTH, sg->elements);
-		LV(iopb->iopb_SGTTL, len);
+		vs_write(2, iopb + IOPB_OPTION,
+		    vs_read(2, iopb + IOPB_OPTION) | M_OPT_SG);
+		vs_write(2, iopb + IOPB_ADDR,
+		    vs_read(2, iopb + IOPB_ADDR) | M_ADR_SG_LINK);
+		vs_write(4, iopb + IOPB_BUFF, kvtop((vaddr_t)sg->list));
+		vs_write(4, iopb + IOPB_LENGTH, sg->elements);
+		vs_write(4, iopb + IOPB_SGTTL, len);
 	} else {
 		/* no scatter/gather necessary */
-		LV(iopb->iopb_BUFF, starting_point_phys);
-		LV(iopb->iopb_LENGTH, len);
+		vs_write(4, iopb + IOPB_BUFF, starting_point_phys);
+		vs_write(4, iopb + IOPB_LENGTH, len);
 	}
-	return (sg);
+	return sg;
+}
+
+static paddr_t
+kvtop(vaddr_t va)
+{
+	paddr_t pa;
+
+	pmap_extract(pmap_kernel(), va, &pa);
+	/* XXX check for failure */
+	return pa;
 }

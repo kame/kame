@@ -1,5 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.355 2004/03/10 01:23:24 deraadt Exp $
-#	$NetBSD: GENERIC,v 1.48 1996/05/20 18:17:23 mrg Exp $
+#	$OpenBSD: GENERIC,v 1.376 2004/07/20 20:30:09 dhartmei Exp $
 #
 #	GENERIC -- everything that's currently supported
 #
@@ -40,12 +39,15 @@ config		bsd	swap generic
 
 mainbus0 at root
 
-bios0	at mainbus0
+cpu0	at mainbus? apid ?
+bios0	at mainbus0 apid ?
 apm0	at bios0 flags 0x0000	# flags 0x0101 to force protocol version 1.1
 pcibios0 at bios0 flags 0x0000	# use 0x30 for a total verbose
 
 isa0	at mainbus0
 isa0	at pcib?
+isa0	at ichpcib?
+isa0	at gscpcib?
 eisa0	at mainbus0
 pci*	at mainbus0 bus ?
 
@@ -58,17 +60,26 @@ ppb*	at pci? dev ? function ?	# PCI-PCI bridges
 pci*	at ppb? bus ?
 pci*	at pchb? bus ?
 pcib*	at pci? dev ? function ?	# PCI-ISA bridge
+ichpcib* at pci? dev ? function ?	# Intel ICHx/ICHx-M LPC bridges
+gscpcib* at pci? dev ? function ?	# NS Geode SC1100 PCI-ISA bridge
+gpio*	at gscpcib?
 
 # power management and other environmental stuff
 #amdpm*	at pci? dev ? function ?	# AMD768MPX
 elansc*	at pci? dev ? function ?	# AMD Elan SC520 System Controller
+gpio*	at elansc?
 geodesc* at pci? dev ? function ?	# Geode SC1100/SCx200 IAOC
 
 # National Semiconductor LM7[89] and compatible hardware monitors
 lm0	at isa? port 0x290
 #lm1	at isa? port 0x280
 #lm2	at isa? port 0x310
-nsclpcsio*	at isa?			# NS PC87366 hardware monitor
+nsclpcsio* at isa?			# NS PC87366 LPC Super I/O
+gpio*	at nsclpcsio?
+gscsio*	at isa?				# NS Geode SC1100 Super I/O
+iic0	at gscsio?			# ACCESS.bus 1
+iic1	at gscsio?			# ACCESS.bus 2
+lmtemp0	at iic1 addr 0x48		# NS LM75/LM77 temperature sensor
 
 it0	at isa? port 0x290		# IT8705F, IT8712F and SiS970 hardware
 					# monitors
@@ -99,52 +110,60 @@ cbb*		at pci? dev ? function ?
 cardslot*	at cbb?
 
 # PCI USB Controllers
+ehci*	at pci?				# Enhanced Host Controller
 uhci*	at pci?				# Universal Host Controller (Intel)
 ohci*	at pci?				# Open Host Controller
 
 # USB bus support
+usb*	at ehci?
 usb*	at uhci?
 usb*	at ohci?
 
+# USB devices
 uhub*	at usb?				# USB Hubs
 uhub*	at uhub? port ? configuration ?	# USB Hubs
 umodem*	at uhub? port ? configuration ?	# USB Modems/Serial
 ucom*	at umodem?
 uvisor*	at uhub? port ? configuration ?	# Handspring Visor
 ucom*	at uvisor?
-#uvscom*	at uhub? port ?			# SUNTAC Slipper U VS-10U serial
-#ucom*	at uvscom? portno ?
+uvscom*	at uhub? port ?			# SUNTAC Slipper U VS-10U serial
+ucom*	at uvscom? portno ?
 ubsa*	at uhub? port ?			# Belkin serial adapter
 ucom*	at ubsa? portno ?
 uftdi*	at uhub? port ?			# FTDI FT8U100AX serial adapter
 ucom*	at uftdi? portno ?
 uplcom* at uhub? port ?			# I/O DATA USB-RSAQ2 serial adapter
 ucom*	at uplcom? portno ?
-#umct*	at uhub? port ?			# MCT USB-RS232 serial adapter
-#ucom*	at umct? portno ?
+umct*	at uhub? port ?			# MCT USB-RS232 serial adapter
+ucom*	at umct? portno ?
 uaudio* at uhub? port ? configuration ?	# USB Audio
-#umidi* at uhub? port ? configuration ?
+audio*	at uaudio?
+umidi*	at uhub? port ? configuration ?	# USB MIDI
+midi*	at umidi?
 ulpt*	at uhub? port ? configuration ? # USB Printers
 umass*	at uhub? port ? configuration ? # USB Mass Storage devices
 scsibus* at umass?
-uhidev*	at uhub? port ? configuration ? interface ?
-ums*	at uhidev? reportid ?
+uhidev*	at uhub? port ? configuration ? interface ?	# Human Interface Devices
+ums*	at uhidev? reportid ?		# USB mouse
 wsmouse* at ums? mux 0
-ukbd*	at uhidev? reportid ?
+ukbd*	at uhidev? reportid ?		# USB keyboard
 wskbd*	at ukbd? console ? mux 1
-uhid*	at uhidev? reportid ?
+uhid*	at uhidev? reportid ?		# USB generic HID support
 aue*	at uhub? port ?			# ADMtek AN986 Pegasus Ethernet
+axe*	at uhub? port ?			# ASIX Electronics AX88172 USB Ethernet
 cue*	at uhub? port ?			# CATC USB-EL1201A based Ethernet
 kue*	at uhub? port ?			# Kawasaki KL5KUSB101B based Ethernet
+cdce*	at uhub? port ?			# CDC Ethernet
 upl*	at uhub? port ?			# Prolific PL2301/PL2302 host-to-host `network'
 url*	at uhub? port ?			# Realtek RTL8150L based adapters
+wi*	at uhub? port ?			# WaveLAN IEEE 802.11DS
 urio*	at uhub? port ?			# Diamond Multimedia Rio 500
 uscanner* at uhub? port ?		# USB Scanners
 usscanner* at uhub? port ?		# USB SCSI scanners, e.g., HP5300
 scsibus* at usscanner?
-#uyap*	at uhub? port ?			# Y@P firmware loader
-#udsbr*	at uhub? port ?			# D-Link DSB-R100 radio
-#radio*	at udsbr?
+uyap*	at uhub? port ?			# Y@P firmware loader
+udsbr*	at uhub? port ?			# D-Link DSB-R100 radio
+radio*	at udsbr?			# USB radio
 ugen*	at uhub? port ? configuration ? # USB Generic driver
 
 # FireWire Controllers
@@ -243,8 +262,10 @@ ahb*	at eisa? slot ?			# Adaptec 174[024] SCSI controllers
 scsibus* at ahb?
 ahc0	at isa? port ? irq ?		# Adaptec 284x SCSI controllers
 ahc*	at eisa? slot ?			# Adaptec 274x, aic7770 SCSI controllers
-ahc*	at pci? dev ? function ?	# Adaptec 2940 SCSI controllers
+ahc*	at pci? dev ? function ?	# Adaptec 2940/3940/78?? SCSI controllers
 scsibus* at ahc?
+ahd*	at pci? dev ? function ?	# Adaptec 79?? SCSI controllers
+scsibus* at ahd?
 mpt*	at pci? dev ? function ?	# LSI Fusion-MPT SCSI/Fibre
 scsibus* at mpt?
 dpt*	at pci? dev ? function ?	# DPT SmartCache/SmartRAID PCI
@@ -354,6 +375,7 @@ ep0	at eisa? slot ?
 ep*	at eisa? slot ?				# 3C579 ethernet
 fea*	at eisa? slot ?				# DEC DEFEA FDDI
 lmc*	at pci? dev ? function ?		# Lan Media Corp SSI/T3/HSSI
+san* 	at pci? dev ? function ?		# Sangoma PCI AFT card
 le*	at pci? dev ? function ?		# PCnet-PCI based ethernet
 le*	at isapnp?
 de*	at pci? dev ? function ?		# DC21X4X-based ethernet
@@ -388,15 +410,17 @@ em*	at pci? dev ? function ?		# Intel Pro/1000 ethernet
 txp*	at pci? dev ? function ?		# 3com 3CR990
 nge*	at pci? dev ? function ?		# NS DP83820/DP83821 GigE
 bge*	at pci? dev ? function ?		# Broadcom BCM570x (aka Tigon3)
+re*	at pci? dev ? function ?		# Realtek 8169/8169S/8110S
 stge*	at pci? dev ? function ?		# Sundance TC9021 GigE
 #lge*	at pci? dev ? function ?		# Level1 LXT1001 GigE
 hme*	at pci? dev ? function ?		# Sun Happy Meal
 bce*	at pci? dev ? function ?		# Broadcom BCM4401
 
 # Wireless network cards
+atw*	at pci? dev ? function ?		# ADMtek ADM8211 (802.11)
+atw*	at cardbus? dev ? function ?		# ADMtek ADM8211 (802.11)
 wi*	at pci? dev ? function ?		# WaveLAN IEEE 802.11DS
 wi*	at pcmcia? function ?			# WaveLAN IEEE 802.11DS
-wi*	at uhub? port ?				# WaveLAN IEEE 802.11DS
 #awi*	at pcmcia? function ?			# Bay Networks IEEE 802.11FH
 an*	at pci? dev ? function ?		# Aironet IEEE 802.11DS
 an*	at isapnp?				# Aironet IEEE 802.11DS
@@ -426,6 +450,7 @@ eephy* at mii? phy ?				# Marvell 88E1000 series PHY
 xmphy*	at mii? phy ?				# XaQti XMAC-II PHYs
 nsgphy*	at mii? phy ?				# NS gigabit PHYs
 urlphy*	at mii? phy ?				# Realtek RTL8150L internal PHY
+rgephy*	at mii? phy ?				# Realtek 8169S/8110S PHY
 ukphy*	at mii? phy ?				# "unknown" PHYs
 
 pss0	at isa? port 0x220 irq 7 drq 6		# Personal Sound System
@@ -495,7 +520,6 @@ audio*	at auich?
 audio*	at autri?
 audio*	at auvia?
 audio*	at fms?
-audio*	at uaudio?
 audio*	at maestro?
 audio*	at esa?
 audio*	at yds?
@@ -546,6 +570,7 @@ pseudo-device	mtrr		1	# Memory range attributes control
 pseudo-device	sequencer	1
 #pseudo-device	raid		4	# RAIDframe disk driver
 pseudo-device	bio		1	# ioctl multiplexing device
+pseudo-device	hotplug		1	# devices hot plugging
 
 # mouse & keyboard multiplexor pseudo-devices
 pseudo-device	wsmux		2

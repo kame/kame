@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_km.c,v 1.35 2004/02/23 06:19:32 drahn Exp $	*/
+/*	$OpenBSD: uvm_km.c,v 1.44 2004/08/24 07:16:12 tedu Exp $	*/
 /*	$NetBSD: uvm_km.c,v 1.42 2001/01/14 02:10:01 thorpej Exp $	*/
 
 /* 
@@ -109,7 +109,7 @@
  * most kernel private memory lives in kernel_object.   the only exception
  * to this is for memory that belongs to submaps that must be protected
  * by splvm().    each of these submaps has their own private kernel 
- * object (e.g. kmem_object, mb_object).
+ * object (e.g. kmem_object).
  *
  * note that just because a kernel object spans the entire kernel virtual
  * address space doesn't mean that it has to be mapped into the entire space.
@@ -128,8 +128,8 @@
  *   then that means that the page at offset 0x235000 in kernel_object is
  *   mapped at 0xf8235000.   
  *
- * note that the offsets in kmem_object and mb_object also follow this
- * rule.   this means that the offsets for kmem_object must fall in the
+ * note that the offsets in kmem_object also follow this rule.
+ * this means that the offsets for kmem_object must fall in the
  * range of [vm_map_min(kmem_object) - vm_map_min(kernel_map)] to
  * [vm_map_max(kmem_object) - vm_map_min(kernel_map)], so the offsets
  * in those objects will typically not start at zero.
@@ -144,6 +144,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
+#include <sys/kthread.h>
 
 #include <uvm/uvm.h>
 
@@ -162,7 +163,6 @@ simple_lock_data_t vmi_list_slock;
 
 static struct vm_map		kernel_map_store;
 static struct uvm_object	kmem_object_store;
-static struct uvm_object	mb_object_store;
 
 /*
  * All pager operations here are NULL, but the object must have
@@ -213,19 +213,6 @@ uvm_km_init(start, end)
 	/* we are special.  we never die */
 	kmem_object_store.uo_refs = UVM_OBJ_KERN_INTRSAFE; 
 	uvmexp.kmem_object = &kmem_object_store;
-
-	/*
-	 * mb_object: for mbuf cluster pages on platforms which use the
-	 * mb_map.  Memory is always wired, and this object (and the mb_map)
-	 * can be accessed at interrupt time.
-	 */
-	simple_lock_init(&mb_object_store.vmobjlock);
-	mb_object_store.pgops = &km_pager;
-	TAILQ_INIT(&mb_object_store.memq);
-	mb_object_store.uo_npages = 0;
-	/* we are special.  we never die */
-	mb_object_store.uo_refs = UVM_OBJ_KERN_INTRSAFE; 
-	uvmexp.mb_object = &mb_object_store;
 
 	/*
 	 * init the map and reserve already allocated kernel space 
@@ -826,12 +813,6 @@ uvm_km_valloc_wait(map, size)
 	return uvm_km_valloc_prefer_wait(map, size, UVM_UNKNOWN_OFFSET);
 }
 
-/* Sanity; must specify both or none. */
-#if (defined(PMAP_MAP_POOLPAGE) || defined(PMAP_UNMAP_POOLPAGE)) && \
-    (!defined(PMAP_MAP_POOLPAGE) || !defined(PMAP_UNMAP_POOLPAGE))
-#error Must specify MAP and UNMAP together.
-#endif
-
 /*
  * uvm_km_alloc_poolpage: allocate a page for the pool allocator
  *
@@ -845,7 +826,7 @@ uvm_km_alloc_poolpage1(map, obj, waitok)
 	struct uvm_object *obj;
 	boolean_t waitok;
 {
-#if defined(PMAP_MAP_POOLPAGE)
+#if defined(__HAVE_PMAP_DIRECT)
 	struct vm_page *pg;
 	vaddr_t va;
 
@@ -858,7 +839,7 @@ uvm_km_alloc_poolpage1(map, obj, waitok)
 		} else
 			return (0);
 	}
-	va = PMAP_MAP_POOLPAGE(pg);
+	va = pmap_map_direct(pg);
 	if (__predict_false(va == 0))
 		uvm_pagefree(pg);
 	return (va);
@@ -880,7 +861,7 @@ uvm_km_alloc_poolpage1(map, obj, waitok)
 	va = uvm_km_kmemalloc(map, obj, PAGE_SIZE, waitok ? 0 : UVM_KMF_NOWAIT);
 	splx(s);
 	return (va);
-#endif /* PMAP_MAP_POOLPAGE */
+#endif /* __HAVE_PMAP_DIRECT */
 }
 
 /*
@@ -895,8 +876,8 @@ uvm_km_free_poolpage1(map, addr)
 	vm_map_t map;
 	vaddr_t addr;
 {
-#if defined(PMAP_UNMAP_POOLPAGE)
-	uvm_pagefree(PMAP_UNMAP_POOLPAGE(addr));
+#if defined(__HAVE_PMAP_DIRECT)
+	uvm_pagefree(pmap_unmap_direct(addr));
 #else
 	int s;
 
@@ -913,5 +894,167 @@ uvm_km_free_poolpage1(map, addr)
 	s = splvm();
 	uvm_km_free(map, addr, PAGE_SIZE);
 	splx(s);
-#endif /* PMAP_UNMAP_POOLPAGE */
+#endif /* __HAVE_PMAP_DIRECT */
 }
+
+#if defined(__HAVE_PMAP_DIRECT)
+/*
+ * uvm_km_page allocator, __HAVE_PMAP_DIRECT arch
+ * On architectures with machine memory direct mapped into a portion
+ * of KVM, we have very little work to do.  Just get a physical page,
+ * and find and return its VA.  We use the poolpage functions for this.
+ */
+void
+uvm_km_page_init(void)
+{
+	/* nothing */
+}
+
+void *
+uvm_km_getpage(boolean_t waitok)
+{
+
+	return ((void *)uvm_km_alloc_poolpage1(NULL, NULL, waitok));
+}
+
+void
+uvm_km_putpage(void *v)
+{
+
+	uvm_km_free_poolpage1(NULL, (vaddr_t)v);
+}
+
+#else
+/*
+ * uvm_km_page allocator, non __HAVE_PMAP_DIRECT archs
+ * This is a special allocator that uses a reserve of free pages
+ * to fulfill requests.  It is fast and interrupt safe, but can only
+ * return page sized regions.  Its primary use is as a backend for pool.
+ *
+ * The memory returned is allocated from the larger kernel_map, sparing
+ * pressure on the small interrupt-safe kmem_map.  It is wired, but
+ * not zero filled.
+ */
+
+int uvm_km_pages_lowat; /* allocate more when reserve drops below this */
+int uvm_km_pages_free; /* number of pages currently on free list */
+struct km_page {
+	struct km_page *next;
+} *uvm_km_pages_head;
+
+void uvm_km_createthread(void *);
+void uvm_km_thread(void *);
+
+/*
+ * Allocate the initial reserve, and create the thread which will
+ * keep the reserve full.  For bootstrapping, we allocate more than
+ * the lowat amount, because it may be a while before the thread is
+ * running.
+ */
+void
+uvm_km_page_init(void)
+{
+	struct km_page *page;
+	int i;
+
+	if (!uvm_km_pages_lowat) {
+		/* based on physmem, calculate a good value here */
+		uvm_km_pages_lowat = physmem / 256;
+		if (uvm_km_pages_lowat < 128)
+			uvm_km_pages_lowat = 128;
+	}
+
+	for (i = 0; i < uvm_km_pages_lowat * 4; i++) {
+		page = (void *)uvm_km_alloc(kernel_map, PAGE_SIZE);
+		page->next = uvm_km_pages_head;
+		uvm_km_pages_head = page;
+	}
+	uvm_km_pages_free = i;
+
+	/* tone down if really high */
+	if (uvm_km_pages_lowat > 512)
+		uvm_km_pages_lowat = 512;
+
+	kthread_create_deferred(uvm_km_createthread, NULL);
+}
+
+void
+uvm_km_createthread(void *arg)
+{
+	kthread_create(uvm_km_thread, NULL, NULL, "kmthread");
+}
+
+/*
+ * Endless loop.  We grab pages in increments of 16 pages, then
+ * quickly swap them into the list.  At some point we can consider
+ * returning memory to the system if we have too many free pages,
+ * but that's not implemented yet.
+ */
+void
+uvm_km_thread(void *arg)
+{
+	struct km_page *head, *tail, *page;
+	int i, s, want;
+
+	for (;;) {
+		if (uvm_km_pages_free >= uvm_km_pages_lowat)
+			tsleep(&uvm_km_pages_head, PVM, "kmalloc", 0);
+		want = 16;
+		for (i = 0; i < want; i++) {
+			page = (void *)uvm_km_alloc(kernel_map, PAGE_SIZE);
+			if (i == 0)
+				head = tail = page;
+			page->next = head;
+			head = page;
+		}
+		s = splvm();
+		tail->next = uvm_km_pages_head;
+		uvm_km_pages_head = head;
+		uvm_km_pages_free += i;
+		splx(s);
+		wakeup(&uvm_km_pages_free);
+	}
+}
+
+
+/*
+ * Allocate one page.  We can sleep for more if the caller
+ * permits it.  Wake up the thread if we've dropped below lowat.
+ */
+void *
+uvm_km_getpage(boolean_t waitok)
+{
+	struct km_page *page = NULL;
+	int s;
+
+	s = splvm();
+	for (;;) {
+		page = uvm_km_pages_head;
+		if (page) {
+			uvm_km_pages_head = page->next;
+			uvm_km_pages_free--;
+			break;
+		}
+		if (!waitok)
+			break;
+		tsleep(&uvm_km_pages_free, PVM, "getpage", 0);
+	}
+	splx(s);
+	if (uvm_km_pages_free < uvm_km_pages_lowat)
+		wakeup(&uvm_km_pages_head);
+	return (page);
+}
+
+void
+uvm_km_putpage(void *v)
+{
+	struct km_page *page = v;
+	int s;
+
+	s = splvm();
+	page->next = uvm_km_pages_head;
+	uvm_km_pages_head = page;
+	uvm_km_pages_free++;
+	splx(s);
+}
+#endif

@@ -1,4 +1,4 @@
-/*	$OpenBSD: malloc.h,v 1.70 2004/01/14 19:34:05 grange Exp $	*/
+/*	$OpenBSD: malloc.h,v 1.73 2004/07/21 17:30:56 marius Exp $	*/
 /*	$NetBSD: malloc.h,v 1.39 1998/07/12 19:52:01 augustss Exp $	*/
 
 /*
@@ -70,7 +70,7 @@
 #define	M_IFADDR	9	/* interface address */
 #define	M_SOOPTS	10	/* socket options */
 #define	M_SYSCTL	11	/* sysctl buffers (persistent storage) */
-#define	M_NAMEI		12	/* namei path name buffer */
+/* 12 - free */
 /* 13 - free */
 #define	M_IOCTLOPS	14	/* ioctl data buffer */
 /* 15-18 - free */
@@ -172,7 +172,10 @@
 #define	M_NTFSRDATA	134	/* NTFS resident data */
 #define	M_NTFSDECOMP	135	/* NTFS decompression temporary */
 #define	M_NTFSRUN	136	/* NTFS vrun storage */
-#define	M_LAST		137	/* Must be last type + 1 */
+
+#define	M_KEVENT	137	/* kqueue related */
+
+#define	M_LAST		138	/* Must be last type + 1 */
 
 
 #define	INITKMEMNAMES { \
@@ -188,7 +191,7 @@
 	"ifaddr",	/* 9 M_IFADDR */ \
 	"soopts",	/* 10 M_SOOPTS */ \
 	"sysctl",	/* 11 M_SYSCTL */ \
-	"namei",	/* 12 M_NAMEI */ \
+	NULL, \
 	NULL, \
 	"ioctlops",	/* 14 M_IOCTLOPS */ \
 	NULL, \
@@ -298,6 +301,7 @@
 	"NTFS resident data ",	/* 134 M_NTFSRDATA */ \
 	"NTFS decomp",	/* 135 M_NTFSDECOMP */ \
 	"NTFS vrun",	/* 136 M_NTFSRUN */ \
+	"kqueue",	/* 137 M_KEVENT */ \
 }
 
 struct kmemstats {
@@ -437,6 +441,9 @@ size_t malloc_roundup(size_t);
 int	debug_malloc(unsigned long, int, int, void **);
 int	debug_free(void *, int);
 void	debug_malloc_init(void);
+void	debug_malloc_assert_allocated(void *, const char *);
+#define DEBUG_MALLOC_ASSERT_ALLOCATED(addr) 			\
+	debug_malloc_assert_allocated(addr, __func__)
 
 void	debug_malloc_print(void);
 void	debug_malloc_printit(int (*)(const char *, ...), vaddr_t);

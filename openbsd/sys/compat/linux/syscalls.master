@@ -1,4 +1,4 @@
-	$OpenBSD: syscalls.master,v 1.45 2003/09/04 02:57:22 tedu Exp $
+	$OpenBSD: syscalls.master,v 1.48 2004/07/09 23:52:02 millert Exp $
 ;	$NetBSD: syscalls.master,v 1.15 1995/12/18 14:35:10 fvdl Exp $
 
 ;	@(#)syscalls.master	8.1 (Berkeley) 7/19/93
@@ -107,7 +107,11 @@
 			    linux_handler_t handler); }
 49	NOARGS		linux_geteuid16 { uid_t sys_geteuid(void); }
 50	NOARGS		linux_getegid16 { gid_t sys_getegid(void); }
+#ifdef ACCOUNTING
 51	NOARGS		{ int sys_acct(char *path); }
+#else
+51	UNIMPL		acct
+#endif
 52	STD		{ int linux_sys_phys(void); }
 53	STD		{ int linux_sys_lock(void); }
 54	STD		{ int linux_sys_ioctl(int fd, u_long com, \
@@ -152,7 +156,7 @@
 82	STD		{ int linux_sys_oldselect(struct linux_select *lsp); }
 83	STD		{ int linux_sys_symlink(char *path, char *to); }
 84	NOARGS		{ int compat_43_sys_lstat(char *path, \
-			    struct ostat *up); } olstat
+			    struct stat43 *up); } olstat
 85	STD		{ int linux_sys_readlink(char *name, char *buf, \
 			    int count); }
 86	STD		{ int linux_sys_uselib(char *path); }
@@ -353,7 +357,7 @@
 216	NOARGS		{ int linux_sys_setfsgid(void); }
 217	NOARGS		{ int linux_sys_pivot_root(void); }
 218	NOARGS		{ int linux_sys_mincore(void); }
-219	NOARGS		{ int linux_sys_madvise(void); }
+219	NOARGS		{ int sys_madvise(void *addr, size_t len, int behav); }
 220	STD		{ int linux_sys_getdents64(int fd, void *dirent, \
 			    unsigned count); }
 221	STD		{ int linux_sys_fcntl64(u_int fd, u_int cmd, \

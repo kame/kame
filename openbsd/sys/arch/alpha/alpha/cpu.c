@@ -1,4 +1,4 @@
-/* $OpenBSD: cpu.c,v 1.17 2004/01/13 06:21:09 deraadt Exp $ */
+/* $OpenBSD: cpu.c,v 1.19 2004/06/13 21:49:11 niklas Exp $ */
 /* $NetBSD: cpu.c,v 1.44 2000/05/23 05:12:53 thorpej Exp $ */
 
 /*-
@@ -541,7 +541,7 @@ cpu_hatch(ci)
 
 int
 cpu_iccb_send(cpu_id, msg)
-	long cpu_id;
+	cpuid_t cpu_id;
 	const char *msg;
 {
 	struct pcs *pcsp = LOCATE_PCS(hwrpb, cpu_id);
@@ -565,7 +565,8 @@ cpu_iccb_send(cpu_id, msg)
 	strlcpy(pcsp->pcs_iccb.iccb_rxbuf, msg,
 	    sizeof pcsp->pcs_iccb.iccb_rxbuf);
 	pcsp->pcs_iccb.iccb_rxlen = strlen(msg);
-	atomic_setbits_ulong(&hwrpb->rpb_rxrdy, cpumask);
+	/* XXX cast to __volatile */
+	atomic_setbits_ulong((__volatile u_long *)&hwrpb->rpb_rxrdy, cpumask);
 
 	/* Wait for the message to be received. */
 	for (timeout = 10000; timeout != 0; timeout--) {
@@ -588,7 +589,7 @@ cpu_iccb_receive()
 	char *cp1, *cp2, buf[80];
 	struct pcs *pcsp;
 	u_int cnt;
-	long cpu_id;
+	cpuid_t cpu_id;
 
 	txrdy = hwrpb->rpb_txrdy;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.h,v 1.33 2003/05/26 16:25:32 art Exp $	*/
+/*	$OpenBSD: pmap.h,v 1.36 2004/08/06 22:39:13 deraadt Exp $	*/
 /*	$NetBSD: pmap.h,v 1.44 2000/04/24 17:18:18 thorpej Exp $	*/
 
 /*
@@ -236,6 +236,12 @@
 #define PG_PVLIST	PG_AVAIL2	/* mapping has entry on pvlist */
 #define	PG_X		PG_AVAIL3	/* executable mapping */
 
+/*
+ * Number of PTE's per cache line.  4 byte pte, 32-byte cache line
+ * Used to avoid false sharing of cache lines.
+ */
+#define NPTECL			8
+
 #ifdef _KERNEL
 /*
  * pmap data structures: see pmap.c for details of locking.
@@ -272,6 +278,7 @@ struct pmap {
 	union descriptor *pm_ldt;	/* user-set LDT */
 	int pm_ldt_len;			/* number of LDT entries */
 	int pm_ldt_sel;			/* LDT selector */
+	uint32_t pm_cpus;		/* mask oc CPUs using map */
 };
 
 /* pm_flags */
@@ -330,19 +337,7 @@ struct pv_page {
 };
 
 /*
- * pmap_remove_record: a record of VAs that have been unmapped, used to
- * flush TLB.  If we have more than PMAP_RR_MAX then we stop recording.
- */
-
-#define PMAP_RR_MAX	16	/* max of 16 pages (64K) */
-
-struct pmap_remove_record {
-	int prr_npages;
-	vaddr_t prr_vas[PMAP_RR_MAX];
-};
-
-/*
- * Global kernel variables
+ * global kernel variables
  */
 
 extern pd_entry_t	PTD[];
@@ -370,6 +365,9 @@ extern int pmap_pg_g;			/* do we support PG_G? */
 #define pmap_phys_address(ppn)		i386_ptob(ppn)
 #define pmap_valid_entry(E) 		((E) & PG_V) /* is PDE or PTE valid? */
 
+#define pmap_proc_iflush(p,va,len)	/* nothing */
+#define pmap_unuse_final(p)		/* nothing */
+
 
 /*
  * Prototypes
@@ -391,6 +389,10 @@ int		pmap_exec_fixup(struct vm_map *, struct trapframe *,
 		    struct pcb *);
 
 vaddr_t reserve_dumppages(vaddr_t); /* XXX: not a pmap fn */
+
+void	pmap_tlb_shootdown(pmap_t, vaddr_t, pt_entry_t, int32_t *);
+void	pmap_tlb_shootnow(int32_t);
+void	pmap_do_tlb_shootdown(struct cpu_info *);
 
 #define PMAP_GROWKERNEL		/* turn on pmap_growkernel interface */
 

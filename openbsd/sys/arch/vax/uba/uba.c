@@ -1,4 +1,4 @@
-/*	$OpenBSD: uba.c,v 1.18 2003/11/10 21:05:06 miod Exp $	   */
+/*	$OpenBSD: uba.c,v 1.20 2004/07/07 23:10:46 deraadt Exp $	   */
 /*	$NetBSD: uba.c,v 1.43 2000/01/24 02:40:36 matt Exp $	   */
 /*
  * Copyright (c) 1996 Jonathan Stone.
@@ -712,7 +712,7 @@ ubarelse(uh, amr)
 		wakeup((caddr_t)&uh->uh_mrwant);
 	}
 	while ((uu = uh->uh_resq.sqh_first)) {
-		SIMPLEQ_REMOVE_HEAD(&uh->uh_resq, uu, uu_resq);
+		SIMPLEQ_REMOVE_HEAD(&uh->uh_resq, uu_resq);
 		if ((*uu->uu_ready)(uu) == 0)
 			break;
 	}
@@ -917,7 +917,7 @@ ubaprint(aux, uba)
 {
 	struct uba_attach_args *ua = aux;
 
-	printf(" csr %o vec %o ipl %x", ua->ua_iaddr,
+	printf(" csr %o vec %d ipl %x", ua->ua_iaddr,
 	    ua->ua_cvec & 511, ua->ua_br);
 	return UNCONF;
 }

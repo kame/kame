@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_disasm.c,v 1.10 2004/02/01 19:13:44 deraadt Exp $	*/
+/*	$OpenBSD: db_disasm.c,v 1.12 2004/06/23 00:08:50 andreas Exp $	*/
 /*	$NetBSD: db_disasm.c,v 1.11 1996/05/03 19:41:58 christos Exp $	*/
 
 /* 
@@ -140,8 +140,13 @@ char *	db_GrpA[] = {
 };
 
 char *	db_GrpB[] = {
-	"xstore-rng",	"xcrypt-ecb",	"xcrypt-cbc",	"",
+	"xstore-rng",	"xcrypt-ecb",	"xcrypt-cbc",	"xcrypt-ctr",
 	"xcrypt-cfb",	"xcrypt-ofb",	"",		""
+};
+
+char *	db_GrpC[] = {
+	"montmul",	"xsha1",	"xsha256",	"",
+	"",		"",		"",		""
 };
 
 struct inst db_inst_0f0x[] = {
@@ -251,7 +256,7 @@ struct inst	db_inst_0fax[] = {
 /*a3*/	{ "bt",    TRUE,  LONG,  op2(R,E),    0 },
 /*a4*/	{ "shld",  TRUE,  LONG,  op3(Ib,R,E), 0 },
 /*a5*/	{ "shld",  TRUE,  LONG,  op3(CL,R,E), 0 },
-/*a6*/	{ "",      FALSE, NONE,  0,	      0 },
+/*a6*/	{ "",      TRUE,  NONE,  0,	      db_GrpC },
 /*a7*/	{ "",      TRUE,  NONE,  0,	      db_GrpB },
 
 /*a8*/	{ "push",  FALSE, NONE,  op1(Si),     0 },
@@ -556,7 +561,7 @@ struct inst db_inst_table[256] = {
 /*24*/	{ "and",   FALSE, BYTE,  op2(I, A),  0 },
 /*25*/	{ "and",   FALSE, LONG,  op2(I, A),  0 },
 /*26*/	{ "",      FALSE, NONE,  0,	     0 },
-/*27*/	{ "aaa",   FALSE, NONE,  0,	     0 },
+/*27*/	{ "daa",   FALSE, NONE,  0,	     0 },
 
 /*28*/	{ "sub",   TRUE,  BYTE,  op2(R, E),  0 },
 /*29*/	{ "sub",   TRUE,  LONG,  op2(R, E),  0 },
@@ -574,7 +579,7 @@ struct inst db_inst_table[256] = {
 /*34*/	{ "xor",   FALSE, BYTE,  op2(I, A),  0 },
 /*35*/	{ "xor",   FALSE, LONG,  op2(I, A),  0 },
 /*36*/	{ "",      FALSE, NONE,  0,	     0 },
-/*37*/	{ "daa",   FALSE, NONE,  0,	     0 },
+/*37*/	{ "aaa",   FALSE, NONE,  0,	     0 },
 
 /*38*/	{ "cmp",   TRUE,  BYTE,  op2(R, E),  0 },
 /*39*/	{ "cmp",   TRUE,  LONG,  op2(R, E),  0 },
@@ -1179,7 +1184,8 @@ db_disasm(loc, altfmt)
 	if (ip->i_extra == db_Grp1 || ip->i_extra == db_Grp2 ||
 	    ip->i_extra == db_Grp6 || ip->i_extra == db_Grp7 ||
 	    ip->i_extra == db_Grp8 || ip->i_extra == db_Grp9 ||
-	    ip->i_extra == db_GrpA || ip->i_extra == db_GrpB) {
+	    ip->i_extra == db_GrpA || ip->i_extra == db_GrpB ||
+	    ip->i_extra == db_GrpC) {
 		i_name = ((char **)ip->i_extra)[f_reg(regmodrm)];
 	} else if (ip->i_extra == db_Grp3) {
 		ip = (struct inst *)ip->i_extra;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_sysctl.c,v 1.104 2004/02/29 12:14:05 weingart Exp $	*/
+/*	$OpenBSD: kern_sysctl.c,v 1.118 2004/07/28 17:15:12 tholo Exp $	*/
 /*	$NetBSD: kern_sysctl.c,v 1.17 1996/05/20 17:49:05 mrg Exp $	*/
 
 /*-
@@ -62,6 +62,12 @@
 #include <sys/exec.h>
 #include <sys/mbuf.h>
 #include <sys/sensors.h>
+#ifdef __HAVE_TIMECOUNTER
+#include <sys/timetc.h>
+#endif
+#ifdef __HAVE_EVCOUNT
+#include <sys/evcount.h>
+#endif
 
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
@@ -90,6 +96,8 @@ extern struct disklist_head disklist;
 extern fixpt_t ccpu;
 extern  long numvnodes;
 
+extern void nmbclust_update(void);
+
 int sysctl_diskinit(int, struct proc *);
 int sysctl_proc_args(int *, u_int, void *, size_t *, struct proc *);
 int sysctl_intrcnt(int *, u_int, void *, size_t *);
@@ -98,6 +106,7 @@ int sysctl_emul(int *, u_int, void *, size_t *, void *, size_t);
 
 int (*cpu_cpuspeed)(int *);
 int (*cpu_setperf)(int);
+int perflevel = 100;
 
 /*
  * Lock to avoid too many processes vslocking a large amount of memory
@@ -276,6 +285,12 @@ kern_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 		case KERN_INTRCNT:
 		case KERN_WATCHDOG:
 		case KERN_EMUL:
+#ifdef __HAVE_EVCOUNT
+		case KERN_EVCOUNT:
+#endif
+#ifdef __HAVE_TIMECOUNTER
+		case KERN_TIMECOUNTER:
+#endif
 			break;
 		default:
 			return (ENOTDIR);	/* overloaded */
@@ -426,6 +441,20 @@ kern_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 		return (sysctl_malloc(name + 1, namelen - 1, oldp, oldlenp,
 		    newp, newlen, p));
 	case KERN_CPTIME:
+#ifdef __HAVE_CPUINFO
+	{
+		CPU_INFO_ITERATOR cii;
+		struct cpu_info *ci;
+		int i;
+
+		bzero(cp_time, sizeof(cp_time));
+
+		for (CPU_INFO_FOREACH(cii, ci)) {
+			for (i = 0; i < CPUSTATES; i++)
+				cp_time[i] += ci->ci_schedstate.spc_cp_time[i];
+		}
+	}
+#endif
 		return (sysctl_rdstruct(oldp, oldlenp, newp, &cp_time,
 		    sizeof(cp_time)));
 	case KERN_NCHSTATS:
@@ -495,6 +524,21 @@ kern_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	case KERN_EMUL:
 		return (sysctl_emul(name + 1, namelen - 1, oldp, oldlenp,
 		    newp, newlen));
+	case KERN_MAXCLUSTERS:
+		error = sysctl_int(oldp, oldlenp, newp, newlen, &nmbclust);
+		if (!error)
+			nmbclust_update();
+		return (error);
+#ifdef __HAVE_EVCOUNT
+	case KERN_EVCOUNT:
+		return (evcount_sysctl(name + 1, namelen - 1, oldp, oldlenp,
+		    newp, newlen));
+#endif
+#ifdef __HAVE_TIMECOUNTER
+	case KERN_TIMECOUNTER:
+		return (sysctl_tc(name + 1, namelen - 1, oldp, oldlenp,
+		    newp, newlen));
+#endif
 	default:
 		return (EOPNOTSUPP);
 	}
@@ -517,8 +561,6 @@ hw_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	extern char machine[], cpu_model[];
 	int err;
 	int cpuspeed;
-	static int perflevel = 100;
-	int operflevel;
 
 	/* all sysctl names at this level except sensors are terminal */
 	if (name[0] != HW_SENSORS && namelen != 1)
@@ -530,7 +572,7 @@ hw_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	case HW_MODEL:
 		return (sysctl_rdstring(oldp, oldlenp, newp, cpu_model));
 	case HW_NCPU:
-		return (sysctl_rdint(oldp, oldlenp, newp, 1));	/* XXX */
+		return (sysctl_rdint(oldp, oldlenp, newp, ncpus));
 	case HW_BYTEORDER:
 		return (sysctl_rdint(oldp, oldlenp, newp, BYTE_ORDER));
 	case HW_PHYSMEM:
@@ -570,17 +612,17 @@ hw_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	case HW_SETPERF:
 		if (!cpu_setperf)
 			return (EOPNOTSUPP);
-		operflevel = perflevel;
 		err = sysctl_int(oldp, oldlenp, newp, newlen, &perflevel);
 		if (err)
 			return err;
-		if (perflevel == operflevel)
-			return (0);
 		if (perflevel > 100)
 			perflevel = 100;
 		if (perflevel < 0)
 			perflevel = 0;
-		return (cpu_setperf(perflevel));
+		if (newp)
+			return (cpu_setperf(perflevel));
+		else
+			return (0);
 	default:
 		return (EOPNOTSUPP);
 	}
@@ -1255,7 +1297,11 @@ fill_kproc2(struct proc *p, struct kinfo_proc2 *ki)
 		ki->p_stat = p->p_stat;
 		ki->p_swtime = p->p_swtime;
 		ki->p_slptime = p->p_slptime;
+#ifdef __HAVE_CPUINFO
+		ki->p_schedflags = 0;
+#else
 		ki->p_schedflags = p->p_schedflags;
+#endif
 		ki->p_holdcnt = p->p_holdcnt;
 		ki->p_priority = p->p_priority;
 		ki->p_usrpri = p->p_usrpri;
@@ -1307,6 +1353,11 @@ fill_kproc2(struct proc *p, struct kinfo_proc2 *ki)
 			 &p->p_stats->p_cru.ru_stime, &ut);
 		ki->p_uctime_sec = ut.tv_sec;
 		ki->p_uctime_usec = ut.tv_usec;
+		ki->p_cpuid = KI_NOCPU;
+#ifdef MULTIPROCESSOR
+		if (p->p_cpu != NULL)
+			ki->p_cpuid = CPU_INFO_UNIT(p->p_cpu);
+#endif
 		PRELE(p);
 	}
 }
@@ -1348,6 +1399,14 @@ sysctl_proc_args(int *name, u_int namelen, void *oldp, size_t *oldlenp,
 
 	if ((vp = pfind(pid)) == NULL)
 		return (ESRCH);
+
+	if (oldp == NULL) {
+		if (op == KERN_PROC_NARGV || op == KERN_PROC_NENV)
+			*oldlenp = sizeof(int);
+		else
+			*oldlenp = ARG_MAX;	/* XXX XXX XXX */
+		return (0);
+	}
 
 	if (P_ZOMBIE(vp) || (vp->p_flag & P_SYSTEM))
 		return (EINVAL);
@@ -1396,12 +1455,6 @@ sysctl_proc_args(int *name, u_int namelen, void *oldp, size_t *oldlenp,
 	/* -1 to have space for a terminating NUL */
 	limit = *oldlenp - 1;
 	*oldlenp = 0;
-
-	if (limit > 8 * PAGE_SIZE) {
-		/* Don't allow a denial of service. */
-		error = E2BIG;
-		goto out;
-	}
 
 	rargv = oldp;
 
@@ -1731,6 +1784,9 @@ sysctl_sysvipc(name, namelen, where, sizep)
 int
 sysctl_intrcnt(int *name, u_int namelen, void *oldp, size_t *oldlenp)
 {
+#ifdef __HAVE_EVCOUNT
+	return (evcount_sysctl(name, namelen, oldp, oldlenp, NULL, 0));
+#else
 	extern int intrcnt[], eintrcnt[];
 	extern char intrnames[], eintrnames[];
 	char *intrname;
@@ -1764,6 +1820,7 @@ sysctl_intrcnt(int *name, u_int namelen, void *oldp, size_t *oldlenp)
 	default:
 		return (EOPNOTSUPP);
 	}
+#endif
 }
 
 int nsensors = 0;
@@ -1800,14 +1857,16 @@ sysctl_emul(int *name, u_int namelen, void *oldp, size_t *oldlenp,
 	if (name[0] == KERN_EMUL_NUM) {
 		if (namelen != 1)
 			return (ENOTDIR);
-		return (sysctl_rdint(oldp, oldlenp, newp, nemuls));
+		return (sysctl_rdint(oldp, oldlenp, newp, nexecs));
 	}
 
 	if (namelen != 2)
 		return (ENOTDIR);
-	if (name[0] > nemuls || name[0] < 0)
+	if (name[0] > nexecs || name[0] < 0)
 		return (EINVAL);
-	e = emulsw[name[0] - 1];
+	e = execsw[name[0] - 1].es_emul;
+	if (e == NULL)
+		return (EINVAL);
 
 	switch (name[1]) {
 	case KERN_EMUL_NAME:

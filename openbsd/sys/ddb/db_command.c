@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_command.c,v 1.34 2004/03/15 12:56:29 aaron Exp $	*/
+/*	$OpenBSD: db_command.c,v 1.38 2004/06/25 08:41:19 art Exp $	*/
 /*	$NetBSD: db_command.c,v 1.20 1996/03/30 22:30:05 christos Exp $	*/
 
 /* 
@@ -224,7 +224,7 @@ db_command(last_cmdp, cmd_table)
 			db_flush_lex();
 			return;
 		    }
-		    db_strcpy(modif, db_tok_string);
+		    db_strlcpy(modif, db_tok_string, sizeof(modif));
 		}
 		else {
 		    db_unread_token(t);
@@ -517,11 +517,16 @@ db_command_loop()
 	(void) setjmp(&db_jmpbuf);
 
 	while (!db_cmd_loop_done) {
+
 		if (db_print_position() != 0)
 			db_printf("\n");
 		db_output_line = 0;
 
+#ifdef MULTIPROCESSOR
+		db_printf("ddb{%d}> ", CPU_INFO_UNIT(curcpu()));
+#else
 		db_printf("ddb> ");
+#endif
 		(void) db_read_line();
 
 		db_command(&db_last_command, db_command_table);

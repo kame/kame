@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.s,v 1.39 2004/03/09 00:08:13 xsa Exp $ */
+/*	$OpenBSD: locore.s,v 1.43 2004/07/30 09:50:17 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -69,7 +69,7 @@
 #include <machine/trap.h>
 
 /*
- * Macro to relocate a symbol, used before MMU is enabled.
+ * Relocate a symbol, used before MMU is enabled.
  */
 #define	_RELOC(var, ar) \
 	lea	var,ar
@@ -78,7 +78,7 @@
 #define	ASRELOC(var, ar)	_RELOC(_ASM_LABEL(var), ar)
 
 /*
- * Macro to invoke a BUG routine.
+ * Invoke a BUG routine.
  */
 #define BUGCALL(id) \
 	trap	#15;	\
@@ -428,7 +428,7 @@ Lstart2:
 	addl	a5,a4			| convert to PA
 #if 0
 	| XXX clear from end-of-kernel to 1M, as a workaround for an
-	| inane pmap_bootstrap bug I cannot find (68040-specific)
+	| insane pmap_bootstrap bug I cannot find (68040-specific)
 	movl	a4,a0
 	movl	#1024*1024,d0
 	cmpl	a0,d0			| end of kernel is beyond 1M?
@@ -675,7 +675,7 @@ ENTRY_NOPROFILE(buserr60)
 	orl	#IC60_CABC,d2		| clear all branch cache entries
 	movc	d2,cacr
 	movl	d0,d1
-	addql	#1,L60bpe
+	addql	#1, _C_LABEL(ec_60bpe) + EC_COUNT32
 	andl	#0x7ffd,d1
 	jeq	_ASM_LABEL(faultstkadjnotrap2)
 Lnobpe:
@@ -954,8 +954,9 @@ ENTRY_NOPROFILE(trap12)
 	movl	d1,sp@-			| push length
 	movl	a1,sp@-			| push addr
 	movl	d0,sp@-			| push command
+	movl	_C_LABEL(curproc),sp@-	| push proc pointer
 	jbsr	_C_LABEL(cachectl)	| do it
-	lea	sp@(12),sp		| pop args
+	lea	sp@(16),sp		| pop args
 	jra	_ASM_LABEL(rei)		| all done
 
 /*
@@ -1330,6 +1331,7 @@ Lswnofpsave:
 	cmpb	#SRUN,a0@(P_STAT)
 	jne	Lbadsw
 #endif
+	movb	#SONPROC,a0@(P_STAT)
 	clrl	a0@(P_BACK)		| clear back link
 	| low byte of p_md.md_flags
 	movb	a0@(P_MD_FLAGS+3),_ASM_LABEL(mdpflag)
@@ -1887,18 +1889,18 @@ not147:
 3:	BUGCALL(MVMEPROM_EXIT)		| return to m68kbug
 	/*NOTREACHED*/
 
-#ifdef M68060
+#if defined(M68060) && defined(M060SP)
 GLOBAL(intemu60)
-	addql	#1,L60iem
+	addql	#1, _C_LABEL(ec_60iem) + EC_COUNT32
 	jra	_I_CALL_TOP+128+0x00
 GLOBAL(fpiemu60)
-	addql	#1,L60fpiem
+	addql	#1, _C_LABEL(ec_60fpiem) + EC_COUNT32
 	jra	_FP_CALL_TOP+128+0x30
 GLOBAL(fpdemu60)
-	addql	#1,L60fpdem
+	addql	#1, _C_LABEL(ec_60fpdem) + EC_COUNT32
 	jra	_FP_CALL_TOP+128+0x38
 GLOBAL(fpeaemu60)
-	addql	#1,L60fpeaem
+	addql	#1, _C_LABEL(ec_60fpeaem) + EC_COUNT32
 	jra	_FP_CALL_TOP+128+0x40
 #endif
 
@@ -1942,31 +1944,11 @@ GLOBAL(intrnames)
 	.asciz	"lev6"
 	.asciz	"nmi"
 	.asciz	"statclock"
-#ifdef M68060
-	.asciz	"60intemu"
-	.asciz	"60fpiemu"
-	.asciz	"60fpdemu"
-	.asciz	"60fpeaemu"
-	.asciz	"60bpe"
-#endif
-#ifdef FPU_EMULATE
-	.asciz	"fpe"
-#endif
 GLOBAL(eintrnames)
 	.even
 
 GLOBAL(intrcnt)
 	.long	0,0,0,0,0,0,0,0,0,0
-#ifdef M68060
-L60iem:		.long	0
-L60fpiem:	.long	0
-L60fpdem:	.long	0
-L60fpeaem:	.long	0
-L60bpe:		.long	0
-#endif
-#ifdef FPU_EMULATE
-Lfpecnt:	.long	0
-#endif
 GLOBAL(eintrcnt)
 
 #include <mvme68k/mvme68k/vectors.s>

@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.4 2004/02/23 01:19:52 tom Exp $	*/
+/*	$OpenBSD: conf.c,v 1.6 2004/05/30 08:11:26 grange Exp $	*/
 
 /*
  * Copyright (c) 1994, 1995 Charles M. Hannum.  All rights reserved.
@@ -190,6 +190,7 @@ cdev_decl(pci);
 #endif
 
 #include "pf.h"
+#include "hotplug.h"
 
 struct cdevsw	cdevsw[] =
 {
@@ -273,7 +274,7 @@ struct cdevsw	cdevsw[] =
 	cdev_usbdev_init(NUHID,uhid),	/* 62: USB generic HID */
 	cdev_usbdev_init(NUGEN,ugen),	/* 63: USB generic driver */
 	cdev_ulpt_init(NULPT,ulpt), 	/* 64: USB printers */
-	cdev_usbdev_init(NURIO,urio),	/* 65: USB Diamond Rio 500 */
+	cdev_urio_init(NURIO,urio),	/* 65: USB Diamond Rio 500 */
 	cdev_tty_init(NUCOM,ucom),	/* 66: USB tty */
 	cdev_mouse_init(NWSKBD, wskbd),	/* 67: keyboards */
 	cdev_mouse_init(NWSMOUSE,	/* 68: mice */
@@ -295,6 +296,7 @@ struct cdevsw	cdevsw[] =
  	cdev_oci_init(NBIO,bio),	/* 79: ioctl tunnel */
 	cdev_notdef(),			/* 80: gpr? XXX */
 	cdev_ptm_init(NPTY,ptm),	/* 81: pseudo-tty ptm device */
+	cdev_hotplug_init(NHOTPLUG,hotplug), /* 82: devices hot plugging */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 

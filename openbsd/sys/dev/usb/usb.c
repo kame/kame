@@ -1,4 +1,4 @@
-/*	$OpenBSD: usb.c,v 1.26 2003/11/07 11:10:47 jmc Exp $	*/
+/*	$OpenBSD: usb.c,v 1.29 2004/07/08 22:18:44 deraadt Exp $	*/
 /*	$NetBSD: usb.c,v 1.77 2003/01/01 00:10:26 thorpej Exp $	*/
 
 /*
@@ -73,8 +73,8 @@
 #include <dev/usb/usb_quirks.h>
 
 #ifdef USB_DEBUG
-#define DPRINTF(x)	if (usbdebug) logprintf x
-#define DPRINTFN(n,x)	if (usbdebug>(n)) logprintf x
+#define DPRINTF(x)	do { if (usbdebug) logprintf x; } while (0)
+#define DPRINTFN(n,x)	do { if (usbdebug>(n)) logprintf x; } while (0)
 int	usbdebug = 0;
 #if defined(UHCI_DEBUG) && NUHCI > 0
 extern int	uhcidebug;
@@ -689,7 +689,7 @@ usb_get_next_event(struct usb_event *ue)
 	}
 #endif
 	*ue = ueq->ue;
-	SIMPLEQ_REMOVE_HEAD(&usb_events, ueq, next);
+	SIMPLEQ_REMOVE_HEAD(&usb_events, next);
 	free(ueq, M_USBDEV);
 	usb_nevents--;
 	return (1);
@@ -720,15 +720,15 @@ usb_add_event(int type, struct usb_event *uep)
 {
 	struct usb_event_q *ueq;
 	struct usb_event ue;
-	struct timeval thetime;
+	struct timespec thetime;
 	int s;
 
-	microtime(&thetime);
+	nanotime(&thetime);
 	/* Don't want to wait here inside splusb() */
 	ueq = malloc(sizeof *ueq, M_USBDEV, M_WAITOK);
 	ueq->ue = *uep;
 	ueq->ue.ue_type = type;
-	TIMEVAL_TO_TIMESPEC(&thetime, &ueq->ue.ue_time);
+	ueq->ue.ue_time = thetime;
 
 	s = splusb();
 	if (++usb_nevents >= USB_MAX_EVENTS) {

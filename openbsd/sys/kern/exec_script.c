@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec_script.c,v 1.18 2003/05/03 21:14:59 deraadt Exp $	*/
+/*	$OpenBSD: exec_script.c,v 1.21 2004/07/07 07:31:40 marius Exp $	*/
 /*	$NetBSD: exec_script.c,v 1.13 1996/02/04 02:15:06 christos Exp $	*/
 
 /*
@@ -35,6 +35,7 @@
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/malloc.h>
+#include <sys/pool.h>
 #include <sys/vnode.h>
 #include <sys/namei.h>
 #include <sys/file.h>
@@ -44,6 +45,12 @@
 #include <uvm/uvm_extern.h>
 
 #include <sys/exec_script.h>
+
+#include "systrace.h"
+
+#if NSYSTRACE > 0
+#include <dev/systrace.h>
+#endif
 
 #if defined(SETUIDSCRIPTS) && !defined(FDSCRIPTS)
 #define FDSCRIPTS		/* Need this for safe set-id scripts. */
@@ -213,8 +220,25 @@ check_shell:
 	if ((epp->ep_flags & EXEC_HASFD) == 0) {
 #endif
 		/* normally can't fail, but check for it if diagnostic */
+#if NSYSTRACE > 0
+		error = 1;
+		if (ISSET(p->p_flag, P_SYSTRACE)) {
+			error = systrace_scriptname(p, *tmpsap);
+			if (error == 0)
+				tmpsap++;
+		}
+		if (error != 0)
+			/*
+			 * Since systrace_scriptname() provides a
+			 * convenience, not a security issue, we are
+			 * safe to do this.
+			 */
+			error = copystr(epp->ep_name, *tmpsap++,
+			    MAXPATHLEN, NULL);
+#else
 		error = copyinstr(epp->ep_name, *tmpsap++, MAXPATHLEN,
 		    (size_t *)0);
+#endif
 #ifdef DIAGNOSTIC
 		if (error != 0)
 			panic("exec_script: copyinstr couldn't fail");
@@ -245,7 +269,7 @@ check_shell:
 			vn_close(scriptvp, FREAD, p->p_ucred, p);
 
 		/* free the old pathname buffer */
-		FREE(oldpnbuf, M_NAMEI);
+		pool_put(&namei_pool, oldpnbuf);
 
 		epp->ep_flags |= (EXEC_HASARGL | EXEC_SKIPARG);
 		epp->ep_fa = shellargp;
@@ -278,7 +302,7 @@ fail:
 	} else
 		vn_close(scriptvp, FREAD, p->p_ucred, p);
 
-	FREE(epp->ep_ndp->ni_cnd.cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, epp->ep_ndp->ni_cnd.cn_pnbuf);
 
 	/* free the fake arg list, because we're not returning it */
 	if ((tmpsap = shellargp) != NULL) {

@@ -1,4 +1,4 @@
-/*	$OpenBSD: tty_pty.c,v 1.20 2004/02/23 21:17:54 beck Exp $	*/
+/*	$OpenBSD: tty_pty.c,v 1.25 2004/07/22 06:13:08 tedu Exp $	*/
 /*	$NetBSD: tty_pty.c,v 1.33.4.1 1996/06/02 09:08:11 mrg Exp $	*/
 
 /*
@@ -61,13 +61,13 @@
 #define BUFSIZ 100		/* Chunk size iomoved to/from user */
 
 /*
- * pts == /dev/tty[p-zP-T][0-9a-f]
- * ptc == /dev/pty[p-zP-T][0-9a-f]
+ * pts == /dev/tty[p-zP-T][0-9a-zA-Z]
+ * ptc == /dev/pty[p-zP-T][0-9a-zA-Z]
  */
 
 /* XXX this needs to come from somewhere sane, and work with MAKEDEV */
 #define TTY_LETTERS "pqrstuvwxyzPQRST"
-#define TTY_SUFFIX "0123456789abcdef"
+#define TTY_SUFFIX "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 static int pts_major;
 
@@ -82,7 +82,7 @@ struct	pt_softc {
 };
 
 #define	DEFAULT_NPTYS		8	/* default number of initial ptys */
-#define DEFAULT_MAXPTYS		256	/* default maximum number of ptys */
+#define DEFAULT_MAXPTYS		992	/* default maximum number of ptys */
 
 static struct pt_softc **pt_softc = NULL;	/* pty array */
 static int npty = 0;				/* size of pty array */
@@ -130,7 +130,7 @@ ptydevname(int minor, struct pt_softc *pti)
 	char buf[11] = "/dev/XtyXX";
 	int i, j;
 
-	i = minor / (sizeof(TTY_LETTERS) - 1);
+	i = minor / (sizeof(TTY_SUFFIX) - 1);
 	j = minor % (sizeof(TTY_SUFFIX) - 1);
 	if (i >= sizeof(TTY_LETTERS) - 1) {
 		pti->pty_pn[0] = '\0';
@@ -148,7 +148,7 @@ ptydevname(int minor, struct pt_softc *pti)
 /*
  * Allocate and zero array of nelem elements.
  */
-static struct pt_softc **
+struct pt_softc **
 ptyarralloc(int nelem)
 {
 	struct pt_softc **pt;
@@ -162,12 +162,12 @@ ptyarralloc(int nelem)
  * Check if the minor is correct and ensure necessary structures
  * are properly allocated.
  */
-static int
+int
 check_pty(int minor)
 {
 	struct pt_softc *pti;
 
-	rw_enter_write(&pt_softc_lock, curproc);
+	rw_enter_write(&pt_softc_lock);
 	if (minor >= npty) {
 		struct pt_softc **newpt;
 		int newnpty;
@@ -975,7 +975,7 @@ sysctl_pty(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp,
 		err = sysctl_int(oldp, oldlenp, newp, newlen, &newmax);
 		if (err)
 			return (err);
-		rw_enter_write(&pt_softc_lock, curproc);
+		rw_enter_write(&pt_softc_lock);
 		/*
 		 * We can't set the max lower than the current
 		 * active value or to a value bigger than a dev_t minor
@@ -1133,7 +1133,7 @@ ptmioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 	error = 0;
 	switch (cmd) {
 	case PTMGET:
-		fdplock(fdp, p);
+		fdplock(fdp);
 		/* Grab two filedescriptors. */
 		if ((error = falloc(p, &cfp, &cindx)) != 0) {
 			fdpunlock(fdp);

@@ -1,6 +1,3 @@
-/* $OpenBSD: internal_types.h,v 1.1 2002/04/24 21:53:11 espie Exp $ */
-/* Public domain */
-#ifndef _MACHINE_INTERNAL_TYPES_H_
-#define _MACHINE_INTERNAL_TYPES_H_
-
-#endif
+/* $OpenBSD: internal_types.h,v 1.3 2004/04/26 14:31:11 miod Exp $ */
+/* public domain */
+#include <m88k/internal_types.h>

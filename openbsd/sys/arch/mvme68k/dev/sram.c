@@ -1,4 +1,4 @@
-/*	$OpenBSD: sram.c,v 1.12 2004/01/14 20:50:48 miod Exp $ */
+/*	$OpenBSD: sram.c,v 1.14 2004/07/02 18:00:50 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -192,20 +192,7 @@ sramioctl(dev, cmd, data, flag, p)
 
 /*ARGSUSED*/
 int
-sramread(dev, uio, flags)
-	dev_t dev;
-	struct uio *uio;
-	int flags;
-{
-	int unit = minor(dev);
-	struct sramsoftc *sc = (struct sramsoftc *) sram_cd.cd_devs[unit];
-
-	return (memdevrw(sc->sc_vaddr, sc->sc_len, uio, flags));
-}
-
-/*ARGSUSED*/
-int
-sramwrite(dev, uio, flags)
+sramrw(dev, uio, flags)
 	dev_t dev;
 	struct uio *uio;
 	int flags;
@@ -229,7 +216,7 @@ srammmap(dev, off, prot)
 		return (-1);
 
 	/* allow access only in RAM */
-	if (off > sc->sc_len)
+	if (off < 0 || off > sc->sc_len)
 		return (-1);
 	return (m68k_btop(sc->sc_paddr + off));
 }

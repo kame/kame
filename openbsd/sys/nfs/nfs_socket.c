@@ -1,4 +1,4 @@
-/*	$OpenBSD: nfs_socket.c,v 1.35 2003/12/08 09:33:36 mickey Exp $	*/
+/*	$OpenBSD: nfs_socket.c,v 1.39 2004/07/14 18:32:34 pedro Exp $	*/
 /*	$NetBSD: nfs_socket.c,v 1.27 1996/04/15 20:20:00 thorpej Exp $	*/
 
 /*
@@ -242,7 +242,12 @@ nfs_connect(nmp, rep)
 		so->so_rcv.sb_timeo = (5 * hz);
 		so->so_snd.sb_timeo = (5 * hz);
 	} else {
-		so->so_rcv.sb_timeo = 0;
+		/*
+		 * enable receive timeout to detect server crash and
+		 * reconnect.  otherwise, we can be stuck in soreceive
+		 * forever.
+		 */
+		so->so_rcv.sb_timeo = (5 * hz);
 		so->so_snd.sb_timeo = 0;
 	}
 	if (nmp->nm_sotype == SOCK_DGRAM) {
@@ -322,10 +327,11 @@ nfs_reconnect(rep)
 	 * Loop through outstanding request list and fix up all requests
 	 * on old socket.
 	 */
-	for (rp = TAILQ_FIRST(&nfs_reqq); rp != NULL;
-	    rp = TAILQ_NEXT(rp, r_chain)) {
-		if (rp->r_nmp == nmp)
+	TAILQ_FOREACH(rp, &nfs_reqq, r_chain) {
+		if (rp->r_nmp == nmp) {
 			rp->r_flags |= R_MUSTRESEND;
+			rp->r_rexmit = 0;
+		}
 	}
 	return (0);
 }
@@ -490,6 +496,8 @@ tryagain:
 		while (rep->r_flags & R_MUSTRESEND) {
 			m = m_copym(rep->r_mreq, 0, M_COPYALL, M_WAIT);
 			nfsstats.rpcretries++;
+			rep->r_rtt = 0;
+			rep->r_flags &= ~R_TIMING;
 			error = nfs_send(so, rep->r_nmp->nm_nam, m, rep);
 			if (error) {
 				if (error == EINTR || error == ERESTART ||
@@ -518,6 +526,16 @@ tryagain:
 			   if (error == EWOULDBLOCK && rep) {
 				if (rep->r_flags & R_SOFTTERM)
 					return (EINTR);
+				/*
+				 * looks like the server died after it
+				 * received the request, make sure
+				 * that we will retransmit and we
+				 * don't get stuck here forever.
+				 */
+				if (rep->r_rexmit >= rep->r_nmp->nm_retry) {
+					nfsstats.rpctimeouts++;
+					error = EPIPE;
+				}
 			   }
 			} while (error == EWOULDBLOCK);
 			if (!error && auio.uio_resid > 0) {
@@ -732,7 +750,7 @@ nfsmout:
 					rt->srtt = nmp->nm_srtt[proct[rep->r_procnum] - 1];
 					rt->sdrtt = nmp->nm_sdrtt[proct[rep->r_procnum] - 1];
 					rt->fsid = nmp->nm_mountp->mnt_stat.f_fsid;
-					rt->tstamp = time;
+					getmicrotime(&rt->tstamp);
 					if (rep->r_flags & R_TIMING)
 						rt->rtt = rep->r_rtt;
 					else
@@ -911,7 +929,7 @@ tryagain:
 	TAILQ_INSERT_TAIL(&nfs_reqq, rep, r_chain);
 
 	/* Get send time for nqnfs */
-	reqtime = time.tv_sec;
+	reqtime = time_second;
 
 	/*
 	 * If backing off another request or avoiding congestion, don't
@@ -1022,8 +1040,8 @@ tryagain:
 				error == NFSERR_TRYLATER) {
 				m_freem(mrep);
 				error = 0;
-				waituntil = time.tv_sec + trylater_delay;
-				while (time.tv_sec < waituntil)
+				waituntil = time_second + trylater_delay;
+				while (time_second < waituntil)
 					(void) tsleep((caddr_t)&lbolt,
 						PSOCK, "nqnfstry", 0);
 				trylater_delay *= nfs_backoff[trylater_cnt];
@@ -1209,6 +1227,7 @@ nfs_timer(arg)
 	int s, error;
 #ifdef NFSSERVER
 	struct nfssvc_sock *slp;
+	struct timeval tv;
 	u_quad_t cur_usec;
 #endif
 
@@ -1306,7 +1325,8 @@ nfs_timer(arg)
 	 * Scan the write gathering queues for writes that need to be
 	 * completed now.
 	 */
-	cur_usec = (u_quad_t)time.tv_sec * 1000000 + (u_quad_t)time.tv_usec;
+	getmicrotime(&tv);
+	cur_usec = (u_quad_t)tv.tv_sec * 1000000 + (u_quad_t)tv.tv_usec;
 	for (slp = TAILQ_FIRST(&nfssvc_sockhead); slp != NULL;
 	    slp = TAILQ_NEXT(slp, ns_chain)) {
 	    if (LIST_FIRST(&slp->ns_tq) &&
@@ -1664,7 +1684,7 @@ nfs_getreq(nd, nfsd, has_header)
 
 			tvout.tv_sec = fxdr_unsigned(long, tvout.tv_sec);
 			tvout.tv_usec = fxdr_unsigned(long, tvout.tv_usec);
-			if (nuidp->nu_expire < time.tv_sec ||
+			if (nuidp->nu_expire < time_second ||
 			    nuidp->nu_timestamp.tv_sec > tvout.tv_sec ||
 			    (nuidp->nu_timestamp.tv_sec == tvout.tv_sec &&
 			     nuidp->nu_timestamp.tv_usec > tvout.tv_usec)) {

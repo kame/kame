@@ -1,4 +1,4 @@
-/*	$OpenBSD: systm.h,v 1.60 2004/01/05 00:16:56 espie Exp $	*/
+/*	$OpenBSD: systm.h,v 1.63 2004/06/20 17:28:26 itojun Exp $	*/
 /*	$NetBSD: systm.h,v 1.50 1996/06/09 04:55:09 briggs Exp $	*/
 
 /*-
@@ -79,12 +79,17 @@ extern const char osversion[];
 extern const char osrelease[];
 extern int cold;		/* cold start flag initialized in locore */
 
+extern int ncpus;		/* number of CPUs */
 extern int nblkdev;		/* number of entries in bdevsw */
 extern int nchrdev;		/* number of entries in cdevsw */
 
 extern int selwait;		/* select timeout address */
 
+#ifdef MULTIPROCESSOR
+#define curpriority (curcpu()->ci_schedstate.spc_curpriority)
+#else
 extern u_char curpriority;	/* priority of current process */
+#endif
 
 extern int maxmem;		/* max memory per process */
 extern int physmem;		/* physical memory */
@@ -177,15 +182,27 @@ extern	int splassert_ctl;
 
 void	tablefull(const char *);
 
-int	kcopy(const void *, void *, size_t);
+int	kcopy(const void *, void *, size_t)
+		__attribute__ ((__bounded__(__buffer__,1,3)))
+		__attribute__ ((__bounded__(__buffer__,2,3)));
 
-void	bcopy(const void *, void *, size_t);
-void	ovbcopy(const void *, void *, size_t);
-void	bzero(void *, size_t);
+void	bcopy(const void *, void *, size_t)
+		__attribute__ ((__bounded__(__buffer__,1,3)))
+		__attribute__ ((__bounded__(__buffer__,2,3)));
+void	ovbcopy(const void *, void *, size_t)
+		__attribute__ ((__bounded__(__buffer__,1,3)))
+		__attribute__ ((__bounded__(__buffer__,2,3)));
+void	bzero(void *, size_t)
+		__attribute__ ((__bounded__(__buffer__,1,2)));
 int	bcmp(const void *, const void *, size_t);
-void	*memcpy(void *, const void *, size_t);
-void	*memmove(void *, const void *, size_t);
-void	*memset(void *, int, size_t);
+void	*memcpy(void *, const void *, size_t)
+		__attribute__ ((__bounded__(__buffer__,1,3)))
+		__attribute__ ((__bounded__(__buffer__,2,3)));
+void	*memmove(void *, const void *, size_t)
+		__attribute__ ((__bounded__(__buffer__,1,3)))
+		__attribute__ ((__bounded__(__buffer__,2,3)));
+void	*memset(void *, int, size_t)
+		__attribute__ ((__bounded__(__buffer__,1,3)));
 
 int	copystr(const void *, void *, size_t, size_t *);
 int	copyinstr(const void *, void *, size_t, size_t *);
@@ -292,5 +309,28 @@ int	read_symtab_from_file(struct proc *,struct vnode *,const char *);
 #ifdef BOOT_CONFIG
 void	user_config(void);
 #endif
+
+#if defined(MULTIPROCESSOR)
+void	_kernel_lock_init(void);
+void	_kernel_lock(int);
+void	_kernel_unlock(void);
+void	_kernel_proc_lock(struct proc *);
+void	_kernel_proc_unlock(struct proc *);
+
+#define	KERNEL_LOCK_INIT()		_kernel_lock_init()
+#define	KERNEL_LOCK(flag)		_kernel_lock((flag))
+#define	KERNEL_UNLOCK()			_kernel_unlock()
+#define	KERNEL_PROC_LOCK(p)		_kernel_proc_lock((p))
+#define	KERNEL_PROC_UNLOCK(p)		_kernel_proc_unlock((p))
+
+#else /* ! MULTIPROCESSOR */
+
+#define	KERNEL_LOCK_INIT()		/* nothing */
+#define	KERNEL_LOCK(flag)		/* nothing */
+#define	KERNEL_UNLOCK()			/* nothing */
+#define	KERNEL_PROC_LOCK(p)		/* nothing */
+#define	KERNEL_PROC_UNLOCK(p)		/* nothing */
+
+#endif /* MULTIPROCESSOR */
 
 #endif /* __SYSTM_H__ */

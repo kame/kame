@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_carp.h,v 1.4 2003/11/16 20:30:07 avsm Exp $	*/
+/*	$OpenBSD: ip_carp.h,v 1.8 2004/07/29 22:12:15 mcbride Exp $	*/
 
 /*
  * Copyright (c) 2002 Michael Shalayeff. All rights reserved.
@@ -26,6 +26,33 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * The CARP header layout is as follows:
+ *
+ *     0                   1                   2                   3
+ *     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *    |Version| Type  | VirtualHostID |    AdvSkew    |    Auth Len   |
+ *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *    |   Reserved    |     AdvBase   |          Checksum             |
+ *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *    |                         Counter (1)                           |
+ *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *    |                         Counter (2)                           |
+ *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *    |                        SHA-1 HMAC (1)                         |
+ *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *    |                        SHA-1 HMAC (2)                         |
+ *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *    |                        SHA-1 HMAC (3)                         |
+ *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *    |                        SHA-1 HMAC (4)                         |
+ *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *    |                        SHA-1 HMAC (5)                         |
+ *    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+ *
+ */
+
 struct carp_header {
 #if BYTE_ORDER == LITTLE_ENDIAN
 	u_int8_t	carp_type:4,
@@ -42,7 +69,7 @@ struct carp_header {
 	u_int8_t	carp_advbase;	/* advertisement interval */
 	u_int16_t	carp_cksum;
 	u_int32_t	carp_counter[2];
-	unsigned char	carp_md[20];	/* sha1 message digest */
+	unsigned char	carp_md[20];	/* SHA1 HMAC */
 } __packed;
 
 #define	CARP_DFLTTL		255
@@ -52,7 +79,6 @@ struct carp_header {
 
 /* carp_type */
 #define	CARP_ADVERTISEMENT	0x01
-#define	CARP_LEAVE_GROUP	0x02
 
 #define	CARP_KEY_LEN		20	/* a sha1 hash of a passphrase */
 
@@ -63,24 +89,24 @@ struct carp_header {
  * Statistics.
  */
 struct carpstats {
-	u_long	carps_ipackets;		/* total input packets, IPv4 */
-	u_long	carps_ipackets6;	/* total input packets, IPv6 */
-	u_long	carps_badif;		/* wrong interface */
-	u_long	carps_badttl;		/* TTL is not CARP_DFLTTL */
-	u_long	carps_hdrops;		/* packets shorter than header */
-	u_long	carps_badsum;		/* bad checksum */
-	u_long	carps_badver;		/* bad (incl unsupp) version */
-	u_long	carps_badlen;		/* data length does not match */
-	u_long	carps_badauth;		/* bad authentication */
-	u_long	carps_badvhid;		/* bad VHID */
-	u_long	carps_badaddrs;		/* bad address list */
+	u_int64_t	carps_ipackets;		/* total input packets, IPv4 */
+	u_int64_t	carps_ipackets6;	/* total input packets, IPv6 */
+	u_int64_t	carps_badif;		/* wrong interface */
+	u_int64_t	carps_badttl;		/* TTL is not CARP_DFLTTL */
+	u_int64_t	carps_hdrops;		/* packets shorter than hdr */
+	u_int64_t	carps_badsum;		/* bad checksum */
+	u_int64_t	carps_badver;		/* bad (incl unsupp) version */
+	u_int64_t	carps_badlen;		/* data length does not match */
+	u_int64_t	carps_badauth;		/* bad authentication */
+	u_int64_t	carps_badvhid;		/* bad VHID */
+	u_int64_t	carps_badaddrs;		/* bad address list */
 
-	u_long	carps_opackets;		/* total output packets, IPv4 */
-	u_long	carps_opackets6;	/* total output packets, IPv6 */
-	u_long	carps_onomem;		/* no memory for an mbuf for a send */
-	u_long	carps_ostates;		/* total state updates sent */
+	u_int64_t	carps_opackets;		/* total output packets, IPv4 */
+	u_int64_t	carps_opackets6;	/* total output packets, IPv6 */
+	u_int64_t	carps_onomem;		/* no memory for an mbuf */
+	u_int64_t	carps_ostates;		/* total state updates sent */
 
-	u_long	carps_preempt;		/* if enabled, high-pri preemptions */
+	u_int64_t	carps_preempt;		/* if enabled, preemptions */
 };
 
 /*
@@ -118,6 +144,7 @@ struct carpreq {
 #ifdef _KERNEL
 void		 carp_ifdetach (struct ifnet *);
 void		 carp_input (struct mbuf *, ...);
+void		 carp_carpdev_state(void *);
 int		 carp6_input (struct mbuf **, int *, int);
 int		 carp_output (struct ifnet *, struct mbuf *, struct sockaddr *,
 		     struct rtentry *);

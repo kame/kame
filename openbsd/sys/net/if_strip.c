@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_strip.c,v 1.27 2003/12/10 07:22:42 itojun Exp $	*/
+/*	$OpenBSD: if_strip.c,v 1.30 2004/06/24 19:35:25 tholo Exp $	*/
 /*	$NetBSD: if_strip.c,v 1.2.4.3 1996/08/03 00:58:32 jtc Exp $	*/
 /*	from: NetBSD: if_sl.c,v 1.38 1996/02/13 22:00:23 christos Exp $	*/
 
@@ -315,7 +315,7 @@ void strip_timeout(void *x);
 #define CLEAR_RESET_TIMER(sc) \
  do {\
     (sc)->sc_state = ST_ALIVE;	\
-    (sc)->sc_statetimo = time.tv_sec + ST_PROBE_INTERVAL;	\
+    (sc)->sc_statetimo = time_second + ST_PROBE_INTERVAL;	\
 } while (0)
 
 /*
@@ -324,13 +324,13 @@ void strip_timeout(void *x);
  */
 #define FORCE_RESET(sc) \
  do {\
-    (sc)->sc_statetimo = time.tv_sec - 1; \
+    (sc)->sc_statetimo = time_second - 1; \
     (sc)->sc_state = ST_DEAD;	\
     /*(sc)->sc_if.if_timer = 0;*/ \
  } while (0)
 
 #define RADIO_PROBE_TIMEOUT(sc) \
-	 ((sc)-> sc_statetimo > time.tv_sec)
+	 ((sc)-> sc_statetimo > time_second)
 
 
 
@@ -424,7 +424,7 @@ stripinit(sc)
 
 	/* Initialize radio probe/reset state machine */
 	sc->sc_state = ST_DEAD;		/* assumet the worst. */
-	sc->sc_statetimo = time.tv_sec; /* do reset immediately */
+	sc->sc_statetimo = time_second; /* do reset immediately */
 
 	return (1);
 }
@@ -686,7 +686,7 @@ strip_send(sc, m0)
 	 * If a radio  probe is due now, append it to this packet  rather
 	 * than waiting until  the watchdog routine next runs.
 	 */
-	if (time.tv_sec >= sc->sc_statetimo && sc->sc_state == ST_ALIVE)
+	if (time_second >= sc->sc_statetimo && sc->sc_state == ST_ALIVE)
 		strip_proberadio(sc, tp);
 
 	return (m0);
@@ -834,10 +834,11 @@ stripoutput(ifp, m, dst, rt)
 
 	s = splimp();
 	if (sc->sc_oqlen && sc->sc_ttyp->t_outq.c_cc == sc->sc_oqlen) {
-		struct timeval tv;
+		struct timeval tv, tm;
 
 		/* if output's been stalled for too long, and restart */
-		timersub(&time, &sc->sc_lastpacket, &tv);
+		getmicrotime(&tm);
+		timersub(&tm, &sc->sc_lastpacket, &tv);
 		if (tv.tv_sec > 0) {
 			DPRINTF(("stripoutput: stalled, resetting\n"));
 			sc->sc_otimeout++;
@@ -860,7 +861,7 @@ stripoutput(ifp, m, dst, rt)
 		sc->sc_if.if_oerrors++;
 		return (error);
 	}
-	sc->sc_lastpacket = time;
+	getmicrotime(&sc->sc_lastpacket);
 	if ((sc->sc_oqlen = sc->sc_ttyp->t_outq.c_cc) == 0) {
 		stripstart(sc->sc_ttyp);
 	}
@@ -1002,7 +1003,7 @@ stripstart(tp)
 			bpf_tap(sc->sc_bpf, cp, len + SLIP_HDRLEN);
 		}
 #endif
-		sc->sc_lastpacket = time;
+		getmicrotime(&sc->sc_lastpacket);
 
 #if !(defined(__NetBSD__) || defined(__OpenBSD__))		/* XXX - cgd */
 		/*
@@ -1260,12 +1261,14 @@ stripinput(c, tp)
 	}
 
 	sc->sc_if.if_ipackets++;
-	sc->sc_lastpacket = time;
+	getmicrotime(&sc->sc_lastpacket);
 	s = splimp();
 	if (IF_QFULL(&ipintrq)) {
 		IF_DROP(&ipintrq);
 		sc->sc_if.if_ierrors++;
 		sc->sc_if.if_iqdrops++;
+		if (!ipintrq.ifq_congestion)
+			if_congestion(&ipintrq);
 		m_freem(m);
 	} else {
 		IF_ENQUEUE(&ipintrq, m);
@@ -1382,8 +1385,8 @@ strip_resetradio(sc, tp)
 	 * is so badlyhung it needs  powercycling.
 	 */
 	sc->sc_state = ST_DEAD;
-	sc->sc_lastpacket = time;
-	sc->sc_statetimo = time.tv_sec + STRIP_RESET_INTERVAL;
+	getmicrotime(&sc->sc_lastpacket);
+	sc->sc_statetimo = time_second + STRIP_RESET_INTERVAL;
 
 	/*
 	 * XXX Does calling the tty output routine now help resets?
@@ -1426,7 +1429,7 @@ strip_proberadio(sc, tp)
 			       sc->sc_if.if_xname);
 		/* Go to probe-sent state, set timeout accordingly. */
 		sc->sc_state = ST_PROBE_SENT;
-		sc->sc_statetimo = time.tv_sec + ST_PROBERESPONSE_INTERVAL;
+		sc->sc_statetimo = time_second + ST_PROBERESPONSE_INTERVAL;
 	} else {
 		addlog("%s: incomplete probe, tty queue %d bytes overfull\n",
 			sc->sc_if.if_xname, overflow);
@@ -1496,13 +1499,13 @@ strip_watchdog(ifp)
 		       ifp->if_xname,
  		       ((unsigned) sc->sc_state < 3) ?
 		       strip_statenames[sc->sc_state] : "<<illegal state>>",
-		       sc->sc_statetimo - time.tv_sec);
+		       sc->sc_statetimo - time_second);
 #endif
 
 	/*
 	 * If time in this state hasn't yet expired, return.
 	 */
-	if ((ifp->if_flags & IFF_UP) ==  0 || sc->sc_statetimo > time.tv_sec) {
+	if ((ifp->if_flags & IFF_UP) ==  0 || sc->sc_statetimo > time_second) {
 		goto done;
 	}
 

@@ -1,5 +1,5 @@
-/*	$OpenBSD: vector.S,v 1.1 2004/01/28 01:39:39 mickey Exp $	*/
-/*	$NetBSD: vector.S,v 1.2 2003/05/04 23:46:41 fvdl Exp $	*/
+/*	$OpenBSD: vector.S,v 1.5 2004/07/10 14:21:40 art Exp $	*/
+/*	$NetBSD: vector.S,v 1.5 2004/06/28 09:13:11 fvdl Exp $	*/
 
 /*
  * Copyright (c) 2001 Wasabi Systems, Inc.
@@ -223,6 +223,7 @@ calltrap:
 #ifdef DIAGNOSTIC
 	movl	CPUVAR(ILEVEL),%ebx
 #endif /* DIAGNOSTIC */
+	movq	%rsp, %rdi
 	call	_C_LABEL(trap)
 2:	/* Check for ASTs on exit to user mode. */
 	cli
@@ -233,6 +234,7 @@ calltrap:
 5:	CLEAR_ASTPENDING(%r11)
 	sti
 	movl	$T_ASTFLT,TF_TRAPNO(%rsp)
+	movq	%rsp, %rdi
 	call	_C_LABEL(trap)
 	jmp	2b
 #ifndef DIAGNOSTIC
@@ -294,8 +296,6 @@ IDTVEC(recurse_lapic_ipi)
 	pushq	$0		
 	pushq	$T_ASTFLT
 	INTRENTRY		
-IDTVEC(resume_lapic_ipi)
-	cli
 	jmp	1f
 IDTVEC(intr_lapic_ipi)
 	pushq	$0		
@@ -305,6 +305,7 @@ IDTVEC(intr_lapic_ipi)
 	movl	CPUVAR(ILEVEL),%ebx
 	cmpl	$IPL_IPI,%ebx
 	jae	2f
+IDTVEC(resume_lapic_ipi)
 1:
 	incl	CPUVAR(IDEPTH)
 	movl	$IPL_IPI,CPUVAR(ILEVEL)
@@ -317,21 +318,6 @@ IDTVEC(intr_lapic_ipi)
 	sti
 	INTRFASTEXIT
 
-#if defined(DDB)
-IDTVEC(intrddb)
-1:
-	pushq	$0
-	pushq	$T_BPTFLT
-	INTRENTRY
-	movl	$0xf,%eax
-	movq	%rax,%cr8
-	movl	$0,_C_LABEL(local_apic)+LAPIC_EOI
-	sti
-	call	_C_LABEL(ddb_ipi)
-	xorl	%eax,%eax
-	movq	%rax,%cr8
-	INTRFASTEXIT
-#endif /* DDB */
 #endif /* MULTIPROCESSOR */
 	
 	/*
@@ -342,8 +328,6 @@ IDTVEC(recurse_lapic_ltimer)
 	pushq	$0		
 	pushq	$T_ASTFLT
 	INTRENTRY		
-IDTVEC(resume_lapic_ltimer)
-	cli
 	jmp	1f
 IDTVEC(intr_lapic_ltimer)
 	pushq	$0		
@@ -353,6 +337,7 @@ IDTVEC(intr_lapic_ltimer)
 	movl	CPUVAR(ILEVEL),%ebx
 	cmpl	$IPL_CLOCK,%ebx
 	jae	2f
+IDTVEC(resume_lapic_ltimer)
 1:
 	incl	CPUVAR(IDEPTH)
 	movl	$IPL_CLOCK,CPUVAR(ILEVEL)
@@ -368,8 +353,8 @@ IDTVEC(intr_lapic_ltimer)
 #endif /* NLAPIC > 0 */
 
 #ifdef MULTIPROCESSOR
-#define LOCK_KERNEL	call _C_LABEL(x86_intlock)
-#define UNLOCK_KERNEL	call _C_LABEL(x86_intunlock)
+#define LOCK_KERNEL	movq %rsp, %rdi; call _C_LABEL(x86_intlock)
+#define UNLOCK_KERNEL	movq %rsp, %rdi; call _C_LABEL(x86_intunlock)
 #else
 #define LOCK_KERNEL
 #define UNLOCK_KERNEL
@@ -427,7 +412,10 @@ IDTVEC(intr_/**/name/**/num)						;\
 	movq	%rsp, %rdi						;\
 8:	movl	%r12d,CPUVAR(ILEVEL)					;\
 	call	*IH_FUN(%rbx)		/* call it */			;\
-	movq	IH_NEXT(%rbx),%rbx	/* next handler in chain */	;\
+	orq	%rax,%rax		/* should it be counted? */	;\
+	jz	4f							;\
+	incq	IH_COUNT(%rbx)						;\
+4:	movq	IH_NEXT(%rbx),%rbx	/* next handler in chain */	;\
 	testq	%rbx,%rbx						;\
 	jnz	6b							;\
 5:									\
@@ -760,6 +748,7 @@ _C_LABEL(netisr):
 
 IDTVEC(softserial)
 	movl	$IPL_SOFTSERIAL, CPUVAR(ILEVEL)
+	sti
 	incl	CPUVAR(IDEPTH)
 #ifdef MULTIPROCESSOR
 	call	_C_LABEL(x86_softintlock)
@@ -776,6 +765,7 @@ IDTVEC(softserial)
 
 IDTVEC(softnet)
 	movl	$IPL_SOFTNET, CPUVAR(ILEVEL)
+	sti
 	incl	CPUVAR(IDEPTH)
 #ifdef MULTIPROCESSOR	
 	call	_C_LABEL(x86_softintlock)
@@ -805,6 +795,7 @@ IDTVEC(softnet)
 
 IDTVEC(softclock)
 	movl	$IPL_SOFTCLOCK, CPUVAR(ILEVEL)
+	sti
 	incl	CPUVAR(IDEPTH)
 #ifdef MULTIPROCESSOR	
 	call	_C_LABEL(x86_softintlock)

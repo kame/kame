@@ -1,4 +1,4 @@
-/*	$OpenBSD: bpf.h,v 1.25 2004/02/06 22:38:58 tedu Exp $	*/
+/*	$OpenBSD: bpf.h,v 1.28 2004/06/22 04:04:19 canacar Exp $	*/
 /*	$NetBSD: bpf.h,v 1.15 1996/12/13 07:57:33 mikel Exp $	*/
 
 /*
@@ -113,6 +113,8 @@ struct bpf_version {
 #define BIOCSHDRCMPLT	_IOW('B',117, u_int)
 #define	BIOCLOCK	_IO('B',118)
 #define	BIOCSETWF	_IOW('B',119, struct bpf_program)
+#define BIOCGFILDROP	_IOR('B',120, u_int)
+#define BIOCSFILDROP	_IOW('B',121, u_int)
 
 struct bpf_timeval {
 	u_int32_t	tv_sec;
@@ -169,6 +171,7 @@ struct bpf_hdr {
 #define DLT_PPP_BSDOS	16	/* BSD/OS Point-to-point Protocol */
 #define DLT_OLD_PFLOG	17	/* Packet filter logging, old (XXX remove?) */
 #define DLT_PFSYNC	18	/* Packet filter state syncing */
+#define DLT_PPP_ETHER	51	/* PPP over Ethernet; session only, w/o ether header */
 #define DLT_IEEE802_11	105	/* IEEE 802.11 wireless */
 #define DLT_PFLOG	117	/* Packet filter logging, by pcap people */
 
@@ -235,7 +238,7 @@ struct bpf_insn {
 	u_int16_t code;
 	u_char 	  jt;
 	u_char 	  jf;
-	int32_t	  k;
+	u_int32_t k;
 };
 
 /*
@@ -246,8 +249,8 @@ struct bpf_insn {
 
 #ifdef _KERNEL
 int	 bpf_validate(struct bpf_insn *, int);
-void	 bpf_tap(caddr_t, u_char *, u_int);
-void	 bpf_mtap(caddr_t, struct mbuf *);
+int	 bpf_tap(caddr_t, u_char *, u_int);
+int	 bpf_mtap(caddr_t, struct mbuf *);
 void	 bpfattach(caddr_t *, struct ifnet *, u_int, u_int);
 void	 bpfdetach(struct ifnet *);
 void	 bpfilterattach(int);

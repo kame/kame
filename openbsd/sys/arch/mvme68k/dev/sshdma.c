@@ -1,4 +1,4 @@
-/*	$OpenBSD: sshdma.c,v 1.8 2004/01/14 20:50:48 miod Exp $ */
+/*	$OpenBSD: sshdma.c,v 1.11 2004/07/30 22:29:45 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -37,8 +37,10 @@
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/device.h>
+
 #include <scsi/scsi_all.h>
 #include <scsi/scsiconf.h>
+
 #include <machine/autoconf.h>
 #include <mvme68k/dev/sshreg.h>
 #include <mvme68k/dev/sshvar.h>
@@ -154,28 +156,18 @@ void *auxp;
 
 	switch (ca->ca_bustype) {
 #if NMC > 0
-		case BUS_MC:
-			{
-				struct mcreg *mc = (struct mcreg *)ca->ca_master;
-
-				mcintr_establish(MCV_NCR, &sc->sc_ih);
-				mc->mc_ncrirq = ca->ca_ipl | MC_IRQ_IEN;
-				break;
-			}
+	case BUS_MC:
+		mcintr_establish(MCV_NCR, &sc->sc_ih, self->dv_xname);
+		sys_mc->mc_ncrirq = ca->ca_ipl | MC_IRQ_IEN;
+		break;
 #endif
 #if NPCCTWO > 0
-		case BUS_PCCTWO:
-			{
-				struct pcctworeg *pcc2 = (struct pcctworeg *)ca->ca_master;
-
-				pcctwointr_establish(PCC2V_NCR, &sc->sc_ih);
-				pcc2->pcc2_ncrirq = ca->ca_ipl | PCC2_IRQ_IEN;
-				break;
-			}
+	case BUS_PCCTWO:
+		pcctwointr_establish(PCC2V_NCR, &sc->sc_ih, self->dv_xname);
+		sys_pcc2->pcc2_ncrirq = ca->ca_ipl | PCC2_IRQ_IEN;
+		break;
 #endif
 	}
-
-	evcnt_attach(&sc->sc_dev, "intr", &sc->sc_intrcnt);
 
 	/*
 	 * attach all scsi units on us, watching for boot device
@@ -212,7 +204,6 @@ afsc_dmaintr(arg)
 	sc->sc_dstat = rp->ssh_dstat;
 	sc->sc_sstat0 = rp->ssh_sstat0;
 	sshintr(sc);
-	sc->sc_intrcnt.ev_count++;
 	return (1);
 }
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: it.c,v 1.8 2004/02/10 20:01:40 grange Exp $	*/
+/*	$OpenBSD: it.c,v 1.10 2004/08/23 18:06:02 millert Exp $	*/
 
 /*
  * Copyright (c) 2003 Julien Bordet <zejames@greyhats.org>
@@ -96,6 +96,8 @@ it_match(struct device *parent, void *match, void *aux)
 	/* The monitoring may have been enabled by BIOS */
 	if (cr == 0x11 || cr == 0x13 || cr == 0x18 || cr == 0x19)
 		rv = 1;
+	else
+		rv = 0;
 
 	DPRINTF(("it: rv = %d, cr = %x\n", rv, cr));
 
@@ -299,14 +301,14 @@ it_generic_fanrpm(struct it_softc *sc, struct sensor *sensors)
 {
 	int i, sdata, divisor;
 
-	for (i = 0; i < 2; i++) {
+	for (i = 0; i < 3; i++) {
 		sdata = it_readreg(sc, ITD_SENSORFANBASE + i);
 		switch (i) {
 			case 2:
 				divisor = 2;
+				break;
 			case 1:
-				divisor = (it_readreg(sc, 
-				    ITD_FAN) >> 3) & 0x7;
+				divisor = (it_readreg(sc, ITD_FAN) >> 3) & 0x7;
 				break;
 			default:
 				divisor = it_readreg(sc, ITD_FAN) & 0x7;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: sio_pic.c,v 1.22 2003/05/11 19:41:09 deraadt Exp $	*/
+/*	$OpenBSD: sio_pic.c,v 1.24 2004/06/28 02:28:43 aaron Exp $	*/
 /* $NetBSD: sio_pic.c,v 1.28 2000/06/06 03:10:13 thorpej Exp $ */
 
 /*-
@@ -370,13 +370,6 @@ sio_intr_setup(pc, iot)
 	for (i = 0; i < ICU_LEN; i++) {
 		alpha_shared_intr_set_maxstrays(sio_intr, i, STRAY_MAX);
 
-#ifdef notyet
-		cp = alpha_shared_intr_string(sio_intr, i);
-		sprintf(cp, "irq %d", i);
-		evcnt_attach_dynamic(alpha_shared_intr_evcnt(sio_intr, i),
-		    EVCNT_TYPE_INTR, NULL, "isa", cp);
-#endif
-
 		switch (i) {
 		case 0:
 		case 1:
@@ -452,20 +445,6 @@ sio_intr_line(v, irq)
 {
 	return (irq);
 }
-
-#ifdef notyet
-const struct evcnt *
-sio_intr_evcnt(v, irq)
-	void *v;
-	int irq;
-{
-
-	if (irq == 0 || irq >= ICU_LEN || irq == 2)
-		panic("sio_intr_evcnt: bogus isa irq 0x%x", irq);
-
-	return (alpha_shared_intr_evcnt(sio_intr, irq));
-}
-#endif
 
 void *
 sio_intr_establish(v, irq, type, level, fn, arg, name)
@@ -548,7 +527,7 @@ sio_iointr(framep, vec)
 
 	irq = (vec - 0x800) >> 4;
 #ifdef DIAGNOSTIC
-	if (irq > ICU_LEN || irq < 0)
+	if (irq >= ICU_LEN || irq < 0)
 		panic("sio_iointr: irq out of range (%d)", irq);
 #endif
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: m88110.c,v 1.13 2004/01/02 17:08:57 miod Exp $	*/
+/*	$OpenBSD: m88110.c,v 1.18 2004/08/04 15:54:38 miod Exp $	*/
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * All rights reserved.
@@ -62,7 +62,6 @@
 #include <sys/systm.h>
 #include <sys/simplelock.h>
 
-#include <machine/board.h>
 #include <machine/cpu_number.h>
 #include <machine/cmmu.h>
 #include <machine/m88110.h>
@@ -97,14 +96,12 @@ void m88110_cmmu_parity_enable(void);
 unsigned m88110_cmmu_cpu_number(void);
 void m88110_cmmu_set_sapr(unsigned, unsigned);
 void m88110_cmmu_set_uapr(unsigned);
-void m88110_cmmu_set_pair_batc_entry(unsigned, unsigned, unsigned);
 void m88110_cmmu_flush_tlb(unsigned, unsigned, vaddr_t, vsize_t);
-void m88110_cmmu_pmap_activate(unsigned, unsigned,
-    u_int32_t i_batc[BATC_MAX], u_int32_t d_batc[BATC_MAX]);
 void m88110_cmmu_flush_cache(int, paddr_t, psize_t);
 void m88110_cmmu_flush_inst_cache(int, paddr_t, psize_t);
 void m88110_cmmu_flush_data_cache(int, paddr_t, psize_t);
 void m88110_dma_cachectl(vaddr_t, vsize_t, int);
+void m88110_dma_cachectl_pa(paddr_t, psize_t, int);
 void m88110_cmmu_dump_config(void);
 void m88110_cmmu_show_translation(unsigned, unsigned, unsigned, int);
 void m88110_show_apr(unsigned);
@@ -119,13 +116,12 @@ struct cmmu_p cmmu88110 = {
 	m88110_cmmu_cpu_number,
 	m88110_cmmu_set_sapr,
 	m88110_cmmu_set_uapr,
-	m88110_cmmu_set_pair_batc_entry,
 	m88110_cmmu_flush_tlb,
-	m88110_cmmu_pmap_activate,
 	m88110_cmmu_flush_cache,
 	m88110_cmmu_flush_inst_cache,
 	m88110_cmmu_flush_data_cache,
 	m88110_dma_cachectl,
+	m88110_dma_cachectl_pa,
 #ifdef DDB
 	m88110_cmmu_dump_config,
 	m88110_cmmu_show_translation,
@@ -234,7 +230,10 @@ m88110_cmmu_init(void)
 
 	/* clear BATCs */
 	for (i = 0; i < 8; i++) {
-		m88110_cmmu_set_pair_batc_entry(0, i, 0);
+		set_dir(i);
+		set_dbp(0);
+		set_iir(i);
+		set_ibp(0);
 	}
 
 	/* clear PATCs */
@@ -264,11 +263,7 @@ m88110_cmmu_init(void)
 	set_dcmd(CMMU_DCMD_INV_SATC);	/* invalidate ATCs */
 
 	set_isr(0);
-	set_ilar(0);
-	set_ipar(0);
 	set_dsr(0);
-	set_dlar(0);
-	set_dpar(0);
 }
 
 /*
@@ -347,30 +342,12 @@ m88110_cmmu_set_uapr(unsigned ap)
 	CMMU_LOCK;
 	set_iuap(ap);
 	set_duap(ap);
+
 	set_icmd(CMMU_ICMD_INV_UATC);
 	set_dcmd(CMMU_DCMD_INV_UATC);
+
+	/* We need to at least invalidate the TIC, as it is va-addressed */
 	mc88110_inval_inst();
-	CMMU_UNLOCK;
-}
-
-/*
- * Set batc entry number entry_no to value in
- * the data and instruction cache for the named CPU.
- *
- * Except for the cmmu_init, this function and m88110_cmmu_pmap_activate
- * are the only functions which may set the batc values.
- */
-void
-m88110_cmmu_set_pair_batc_entry(unsigned cpu, unsigned entry_no, unsigned value)
-{
-	CMMU_LOCK;
-
-	set_dir(entry_no);
-	set_dbp(value);
-
-	set_iir(entry_no);
-	set_ibp(value);
-
 	CMMU_UNLOCK;
 }
 
@@ -380,13 +357,12 @@ m88110_cmmu_set_pair_batc_entry(unsigned cpu, unsigned entry_no, unsigned value)
 
 /*
  *	flush any tlb
- *	Some functionality mimiced in m88110_cmmu_pmap_activate.
  */
 void
 m88110_cmmu_flush_tlb(unsigned cpu, unsigned kernel, vaddr_t vaddr,
     vsize_t size)
 {
-	int s = splhigh();	/* XXX really disable interrupts? */
+	u_int32_t psr = disable_interrupts_return_psr();
 
 	CMMU_LOCK;
 	if (kernel) {
@@ -398,33 +374,7 @@ m88110_cmmu_flush_tlb(unsigned cpu, unsigned kernel, vaddr_t vaddr,
 	}
 	CMMU_UNLOCK;
 
-	splx(s);
-}
-
-/*
- * New fast stuff for pmap_activate.
- * Does what a few calls used to do.
- * Only called from pmap.c's pmap_activate().
- */
-void
-m88110_cmmu_pmap_activate(unsigned cpu, unsigned uapr,
-    u_int32_t i_batc[BATC_MAX], u_int32_t d_batc[BATC_MAX])
-{
-	m88110_cmmu_set_uapr(uapr);
-
-	/*
-	for (entry_no = 0; entry_no < 8; entry_no++) {
-	   m88110_cmmu_set_batc_entry(cpu, entry_no, 0, i_batc[entry_no]);
-	   m88110_cmmu_set_batc_entry(cpu, entry_no, 1, d_batc[entry_no]);
-	}
-	*/
-	/*
-	 * Flush the user TLB.
-	 * IF THE KERNEL WILL EVER CARE ABOUT THE BATC ENTRIES,
-	 * THE SUPERVISOR TLBs SHOULD BE FLUSHED AS WELL.
-	 */
-	set_icmd(CMMU_ICMD_INV_UATC);
-	set_dcmd(CMMU_DCMD_INV_UATC);
+	set_psr(psr);
 }
 
 /*
@@ -459,13 +409,13 @@ m88110_cmmu_pmap_activate(unsigned cpu, unsigned uapr,
 void
 m88110_cmmu_flush_cache(int cpu, paddr_t physaddr, psize_t size)
 {
-	int s = splhigh();	/* XXX really disable interrupts? */
+	u_int32_t psr = disable_interrupts_return_psr();
 
 	mc88110_inval_inst();
 	mc88110_flush_data();
 	if (mc88410_present())
 		mc88410_flush();
-	splx(s);
+	set_psr(psr);
 }
 
 /*
@@ -474,10 +424,10 @@ m88110_cmmu_flush_cache(int cpu, paddr_t physaddr, psize_t size)
 void
 m88110_cmmu_flush_inst_cache(int cpu, paddr_t physaddr, psize_t size)
 {
-	int s = splhigh();	/* XXX really disable interrupts? */
+	u_int32_t psr = disable_interrupts_return_psr();
 
 	mc88110_inval_inst();
-	splx(s);
+	set_psr(psr);
 }
 
 /*
@@ -486,12 +436,12 @@ m88110_cmmu_flush_inst_cache(int cpu, paddr_t physaddr, psize_t size)
 void
 m88110_cmmu_flush_data_cache(int cpu, paddr_t physaddr, psize_t size)
 {
-	int s = splhigh();	/* XXX really disable interrupts? */
+	u_int32_t psr = disable_interrupts_return_psr();
 
 	mc88110_flush_data();
 	if (mc88410_present())
 		mc88410_flush();
-	splx(s);
+	set_psr(psr);
 }
 
 /*
@@ -500,36 +450,36 @@ m88110_cmmu_flush_data_cache(int cpu, paddr_t physaddr, psize_t size)
 void
 m88110_cmmu_sync_cache(paddr_t physaddr, psize_t size)
 {
-	int s = splhigh();	/* XXX really disable interrupts? */
+	u_int32_t psr = disable_interrupts_return_psr();
 
 	mc88110_inval_inst();
 	mc88110_flush_data();
 	if (mc88410_present())
 		mc88410_flush();
-	splx(s);
+	set_psr(psr);
 }
 
 void
 m88110_cmmu_sync_inval_cache(paddr_t physaddr, psize_t size)
 {
-	int s = splhigh();	/* XXX really disable interrupts? */
+	u_int32_t psr = disable_interrupts_return_psr();
 
 	mc88110_sync_data();
 	if (mc88410_present())
 		mc88410_sync();
-	splx(s);
+	set_psr(psr);
 }
 
 void
 m88110_cmmu_inval_cache(paddr_t physaddr, psize_t size)
 {
-	int s = splhigh();	/* XXX really disable interrupts? */
+	u_int32_t psr = disable_interrupts_return_psr();
 
 	mc88110_inval_inst();
 	mc88110_inval_data();
 	if (mc88410_present())
 		mc88410_inval();
-	splx(s);
+	set_psr(psr);
 }
 
 void
@@ -540,6 +490,22 @@ m88110_dma_cachectl(vaddr_t va, vsize_t size, int op)
 	if (pmap_extract(pmap_kernel(), va, &pa) == FALSE)
 		return;	/* XXX */
 
+	switch (op) {
+	case DMA_CACHE_SYNC:
+		m88110_cmmu_sync_cache(pa, size);
+		break;
+	case DMA_CACHE_SYNC_INVAL:
+		m88110_cmmu_sync_inval_cache(pa, size);
+		break;
+	default:
+		m88110_cmmu_inval_cache(pa, size);
+		break;
+	}
+}
+
+void
+m88110_dma_cachectl_pa(paddr_t pa, psize_t size, int op)
+{
 	switch (op) {
 	case DMA_CACHE_SYNC:
 		m88110_cmmu_sync_cache(pa, size);

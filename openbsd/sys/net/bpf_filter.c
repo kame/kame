@@ -1,4 +1,4 @@
-/*	$OpenBSD: bpf_filter.c,v 1.13.2.1 2004/05/10 04:16:03 brad Exp $	*/
+/*	$OpenBSD: bpf_filter.c,v 1.14 2004/04/26 08:10:10 otto Exp $	*/
 /*	$NetBSD: bpf_filter.c,v 1.12 1996/02/13 22:00:00 christos Exp $	*/
 
 /*
@@ -78,14 +78,16 @@
 	} \
 }
 
-int	bpf_m_xword(struct mbuf *, int, int *);
-int	bpf_m_xhalf(struct mbuf *, int, int *);
 extern int bpf_maxbufsize;
+
+int	bpf_m_xword(struct mbuf *, u_int32_t, int *);
+int	bpf_m_xhalf(struct mbuf *, u_int32_t, int *);
 
 int
 bpf_m_xword(m, k, err)
 	struct mbuf *m;
-	int k, *err;
+	u_int32_t k;
+	int *err;
 {
 	int len;
 	u_char *cp, *np;
@@ -93,7 +95,7 @@ bpf_m_xword(m, k, err)
 
 	MINDEX(len, m, k);
 	cp = mtod(m, u_char *) + k;
-	if (len - k >= 4) {
+	if (len >= k + 4) {
 		*err = 0;
 		return EXTRACT_LONG(cp);
 	}
@@ -121,7 +123,8 @@ bpf_m_xword(m, k, err)
 int
 bpf_m_xhalf(m, k, err)
 	struct mbuf *m;
-	int k, *err;
+	u_int32_t k;
+	int *err;
 {
 	int len;
 	u_char *cp;
@@ -129,7 +132,7 @@ bpf_m_xhalf(m, k, err)
 
 	MINDEX(len, m, k);
 	cp = mtod(m, u_char *) + k;
-	if (len - k >= 2) {
+	if (len >= k + 2) {
 		*err = 0;
 		return EXTRACT_SHORT(cp);
 	}
@@ -159,7 +162,7 @@ bpf_filter(pc, p, wirelen, buflen)
 	u_int buflen;
 {
 	u_int32_t A = 0, X = 0;
-	int k;
+	u_int32_t k;
 	int32_t mem[BPF_MEMWORDS];
 
 	if (pc == 0)
@@ -483,7 +486,7 @@ bpf_validate(f, len)
 	struct bpf_insn *f;
 	int len;
 {
-	int i, from;
+	u_int i, from;
 	struct bpf_insn *p;
 
 	if (len < 1 || len > BPF_MAXINSNS)
@@ -507,11 +510,11 @@ bpf_validate(f, len)
 				 * More strict check with actual packet length
 				 * is done runtime.
 				 */
-				if (p->k < 0 || p->k >= bpf_maxbufsize)
+				if (p->k >= bpf_maxbufsize)
 					return 0;
 				break;
 			case BPF_MEM:
-				if (p->k < 0 || p->k >= BPF_MEMWORDS)
+				if (p->k >= BPF_MEMWORDS)
 					return 0;
 				break;
 			case BPF_LEN:
@@ -522,7 +525,7 @@ bpf_validate(f, len)
 			break;
 		case BPF_ST:
 		case BPF_STX:
-			if (p->k < 0 || p->k >= BPF_MEMWORDS)
+			if (p->k >= BPF_MEMWORDS)
 				return 0;
 			break;
 		case BPF_ALU:

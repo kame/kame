@@ -1,4 +1,4 @@
-/*	$OpenBSD: cryptosoft.c,v 1.39 2003/07/24 08:03:19 itojun Exp $	*/
+/*	$OpenBSD: cryptosoft.c,v 1.41 2004/05/07 14:42:26 millert Exp $	*/
 
 /*
  * The author of this code is Angelos D. Keromytis (angelos@cis.upenn.edu)
@@ -27,8 +27,8 @@
 #include <sys/mbuf.h>
 #include <sys/sysctl.h>
 #include <sys/errno.h>
-#include <sys/md5k.h>
 #include <dev/rndvar.h>
+#include <crypto/md5.h>
 #include <crypto/sha1.h>
 #include <crypto/rmd160.h>
 #include <crypto/cast.h>
@@ -783,6 +783,9 @@ swcr_freesession(u_int64_t tid)
 		case CRYPTO_MD5_HMAC:
 		case CRYPTO_SHA1_HMAC:
 		case CRYPTO_RIPEMD160_HMAC:
+		case CRYPTO_SHA2_256_HMAC:
+		case CRYPTO_SHA2_384_HMAC:
+		case CRYPTO_SHA2_512_HMAC:
 			axf = swd->sw_axf;
 
 			if (swd->sw_ictx) {

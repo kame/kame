@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipic.c,v 1.13 2004/01/14 20:52:49 miod Exp $ */
+/*	$OpenBSD: ipic.c,v 1.15 2004/07/30 22:29:45 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -131,7 +131,6 @@ ipicscan(parent, child, args)
 		if (oca.ca_ipl > 0 && oca.ca_vec == -1)
 			oca.ca_vec = intr_findvec(255, 0);
 
-		oca.ca_master = (void *)sc;
 		oca.ca_name = cf->cf_driver->cd_name;
 
 		if ((*cf->cf_attach->ca_match)(parent, cf, &oca) == 0) {
@@ -161,7 +160,7 @@ ipicattach(parent, self, args)
 	 * the MC chip is rev 1. XXX - smurph
 	 */
 	if (sys_mc->mc_chiprev == 0x01) 
-      printf(": rev 1\n");
+		printf(": rev 1\n");
 	else
 		printf(": rev %d\n", sc->sc_ipic->ipic_chiprev);
 
@@ -189,9 +188,10 @@ ipicunmap(sc, addr, len)
 }
 
 int
-ipicintr_establish(vec, ih)
+ipicintr_establish(vec, ih, name)
 	int vec;
 	struct intrhand *ih;
+	const char *name;
 {
-	return (intr_establish(vec, ih));
+	return intr_establish(vec, ih, name);
 }

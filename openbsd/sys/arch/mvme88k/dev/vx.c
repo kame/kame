@@ -1,4 +1,4 @@
-/*	$OpenBSD: vx.c,v 1.27 2003/12/27 21:58:20 miod Exp $ */
+/*	$OpenBSD: vx.c,v 1.36 2004/07/30 19:02:06 miod Exp $ */
 /*
  * Copyright (c) 1999 Steve Murphree, Jr.
  * All rights reserved.
@@ -25,6 +25,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+/* This card lives in D16 space */
+#define	__BUS_SPACE_RESTRICT_D16__
 
 #include <sys/param.h>
 #include <sys/ioctl.h>
@@ -62,19 +65,15 @@ struct vx_info {
 
 struct vxsoftc {
 	struct device     sc_dev;
-	struct evcnt      sc_intrcnt;
 	struct vx_info  sc_info[NVXPORTS];
 	struct vxreg    *vx_reg;
-	unsigned int      board_addr;
+	vaddr_t		board_vaddr;
 	struct channel    *channel;
 	char              channel_number;
 	struct packet     sc_bppwait_pkt;
 	void              *sc_bppwait_pktp;
-	struct intrhand   sc_ih_c;
-	struct intrhand   sc_ih_s;
-	int               sc_ipl;
+	struct intrhand   sc_ih;
 	int               sc_vec;
-	int               sc_flags;
 	struct envelope   *elist_head, *elist_tail;
 	struct packet     *plist_head, *plist_tail;
 };
@@ -90,7 +89,7 @@ struct cfdriver vx_cd = {
 	NULL, "vx", DV_TTY
 };
 
-void	bpp_send(struct vxsoftc *, void *, int);
+int	bpp_send(struct vxsoftc *, void *, int);
 void	ccode(struct vxsoftc *, int, char);
 int	create_channels(struct vxsoftc *);
 void	create_free_queue(struct vxsoftc *);
@@ -101,7 +100,7 @@ short	flush_ctl(struct vxsoftc *, int, int);
 struct envelope *get_cmd_tail(struct vxsoftc *);
 void	*get_free_envelope(struct vxsoftc *);
 void	*get_free_packet(struct vxsoftc *);
-struct envelope *get_next_envelope(struct envelope *);
+struct envelope *get_next_envelope(struct vxsoftc *, struct envelope *);
 struct packet *get_packet(struct vxsoftc *, struct envelope *);
 struct envelope *get_status_head(struct vxsoftc *);
 void	put_free_envelope(struct vxsoftc *, void *);
@@ -133,6 +132,22 @@ void	vx_unblock(struct tty *);
 #define VX_UNIT(x) (minor(x) / NVXPORTS)
 #define VX_PORT(x) (minor(x) % NVXPORTS)
 
+/*
+ * Convert dual-ported physical addresse to host virtual address, and the
+ * opposite.
+ */
+#define	VIRTUAL(addr)	(((addr) & 0xffff) + sc->board_vaddr)
+#define	PHYSICAL(addr) \
+	(((addr - sc->board_vaddr) & 0xffff) | LOCAL_DPMEM_ADDRESS)
+
+#if 0
+#define  LO(x) (u_short)((unsigned long)x & 0x0000FFFF)
+#define  HI(x) (u_short)((unsigned long)x >> 16)
+#else
+#define	LO(x)	(u_short)(x)
+#define	HI(x)	(LOCAL_DPMEM_ADDRESS >> 16)
+#endif
+
 struct tty *
 vxtty(dev_t dev)
 {
@@ -153,13 +168,17 @@ vxmatch(struct device *parent, void *self, void *aux)
 {
 	struct vxreg *vx_reg;
 	struct confargs *ca = aux;
+	bus_space_tag_t iot = ca->ca_iot;
+	bus_space_handle_t ioh;
+	int rc;
 
-	ca->ca_ipl = IPL_TTY;
-	ca->ca_len = 0x10000;	/* we know this */
+	if (bus_space_map(iot, ca->ca_paddr, 0x10000, 0, &ioh) != 0)
+		return 0;
+	vx_reg = (struct vxreg *)bus_space_vaddr(iot, ioh);
+	rc = badvaddr((vaddr_t)&vx_reg->ipc_cr, 1);
+	bus_space_unmap(iot, ioh, 0x10000);
 
-	vx_reg = (struct vxreg *)ca->ca_vaddr;
-
-	return (!badvaddr((vaddr_t)&vx_reg->ipc_cr, 1));
+	return rc == 0;
 }
 
 void
@@ -167,13 +186,26 @@ vxattach(struct device *parent, struct device *self, void *aux)
 {
 	struct vxsoftc *sc = (struct vxsoftc *)self;
 	struct confargs *ca = aux;
+	bus_space_tag_t iot = ca->ca_iot;
+	bus_space_handle_t ioh;
+
+	if (ca->ca_vec < 0) {
+		printf(": no more interrupts!\n");
+		return;
+	}
+	if (ca->ca_ipl < 0)
+		ca->ca_ipl = IPL_TTY;
+
+	if (bus_space_map(iot, ca->ca_paddr, 0x10000, 0, &ioh) != 0) {
+		printf(": can't map registers!\n");
+		return;
+	}
 
 	/* set up dual port memory and registers and init */
-	sc->vx_reg = (struct vxreg *)ca->ca_vaddr;
-	sc->channel = (struct channel *)(ca->ca_vaddr + 0x0100);
-	sc->sc_ipl = ca->ca_ipl;
+	sc->board_vaddr = (vaddr_t)bus_space_vaddr(iot, ioh);
+	sc->vx_reg = (struct vxreg *)sc->board_vaddr;
+	sc->channel = (struct channel *)(sc->board_vaddr + 0x0100);
 	sc->sc_vec = ca->ca_vec;
-	sc->board_addr = (unsigned int)ca->ca_vaddr;
 
 	printf("\n");
 
@@ -188,13 +220,12 @@ vxattach(struct device *parent, struct device *self, void *aux)
 	}
 
 	/* enable interrupts */
-	sc->sc_ih_c.ih_fn = vx_intr;
-	sc->sc_ih_c.ih_arg = sc;
-	sc->sc_ih_c.ih_wantframe = 0;
-	sc->sc_ih_c.ih_ipl = ca->ca_ipl;
+	sc->sc_ih.ih_fn = vx_intr;
+	sc->sc_ih.ih_arg = sc;
+	sc->sc_ih.ih_wantframe = 0;
+	sc->sc_ih.ih_ipl = IPL_TTY;
 
-	vmeintr_establish(ca->ca_vec, &sc->sc_ih_c);
-	evcnt_attach(&sc->sc_dev, "intr", &sc->sc_intrcnt);
+	vmeintr_establish(ca->ca_vec, &sc->sc_ih, self->dv_xname);
 }
 
 short
@@ -213,9 +244,8 @@ dtr_ctl(struct vxsoftc *sc, int port, int on)
 	} else {
 		pkt.ioctl_arg_l = 7;  /* negate DTR */
 	}
-	bpp_send(sc, &pkt, NOWAIT);
 
-	return (pkt.error_l);
+	return bpp_send(sc, &pkt, WAIT);
 }
 
 short
@@ -234,9 +264,8 @@ rts_ctl(struct vxsoftc *sc, int port, int on)
 	} else {
 		pkt.ioctl_arg_l = 5;  /* negate RTS */
 	}
-	bpp_send(sc, &pkt, NOWAIT);
 
-	return (pkt.error_l);
+	return bpp_send(sc, &pkt, WAIT);
 }
 
 #if 0
@@ -252,9 +281,8 @@ flush_ctl(struct vxsoftc *sc, int port, int which)
 	pkt.status_pipe_number = sc->channel_number;
 	pkt.device_number = port;
 	pkt.ioctl_arg_l = which; /* 0=input, 1=output, 2=both */
-	bpp_send(sc, &pkt, NOWAIT);
 
-	return (pkt.error_l);
+	return bpp_send(sc, &pkt, WAIT);
 }
 #endif
 
@@ -348,7 +376,7 @@ vx_mctl(dev_t dev, int bits, int how)
 int
 vxopen(dev_t dev, int flag, int mode, struct proc *p)
 {
-	int s, unit, port;
+	int s, unit, port, error;
 	struct vx_info *vxt;
 	struct vxsoftc *sc;
 	struct tty *tp;
@@ -368,18 +396,15 @@ vxopen(dev_t dev, int flag, int mode, struct proc *p)
 #endif
 
 	bzero(&opkt, sizeof(struct packet));
-	opkt.link = 0x33333333;	/* eye catcher */
 	opkt.command_pipe_number = sc->channel_number;
 	opkt.status_pipe_number = sc->channel_number;
 	opkt.command = CMD_OPEN;
 	opkt.device_number = port;
 
-	bpp_send(sc, &opkt, WAIT);
-
-	if (opkt.error_l) {
+	if ((error = bpp_send(sc, &opkt, WAIT)) != 0) {
 #ifdef DEBUG_VXT
 		printf("unit %d, port %d, ", unit, port);
-		printf("error = %d\n", opkt.error_l);
+		printf("error = %d\n", error);
 #endif
 		return (ENXIO);
 	}
@@ -507,7 +532,6 @@ vxclose(dev_t dev, int flag, int mode, struct proc *p)
 	}
 
 	bzero(&cpkt, sizeof(struct packet));
-	cpkt.link = 0x55555555;	/* eye catcher */
 	cpkt.command_pipe_number = sc->channel_number;
 	cpkt.status_pipe_number = sc->channel_number;
 	cpkt.command = CMD_CLOSE;
@@ -538,7 +562,6 @@ read_wakeup(struct vxsoftc *sc, int port)
 		vxt->read_pending = 1;
 
 	bzero(&rwp, sizeof(struct packet));
-	rwp.link = 0x11111111;	/* eye catcher */
 	rwp.command_pipe_number = sc->channel_number;
 	rwp.status_pipe_number = sc->channel_number;
 	rwp.command = CMD_READW;
@@ -600,14 +623,11 @@ vxwrite(dev_t dev, struct uio *uio, int flag)
 	put = wp->put;
 	if ((put + 1) == get) {
 		bzero(&wwp, sizeof(struct packet));
-		wwp.link = 0x22222222;	/* eye catcher */
 		wwp.command_pipe_number = sc->channel_number;
 		wwp.status_pipe_number = sc->channel_number;
 		wwp.command = CMD_WRITEW;
 		wwp.device_number = port;
-		bpp_send(sc, &wwp, WAIT);
-
-		if (wwp.error_l != 0)
+		if (bpp_send(sc, &wwp, WAIT))
 			return (ENXIO);
 	}
 
@@ -783,7 +803,8 @@ vx_ccparam(struct vxsoftc *sc, struct termios *par, int port)
 	pkt.command_pipe_number = sc->channel_number;
 	pkt.status_pipe_number = sc->channel_number;
 	pkt.device_number = port;
-	bpp_send(sc, &pkt, WAIT);
+	if (bpp_send(sc, &pkt, WAIT))
+		return 0xff;
 
 	cflag = pkt.pb.tio.c_cflag;
 	cflag |= vxtspeed(par->c_ospeed);
@@ -823,7 +844,8 @@ vx_ccparam(struct vxsoftc *sc, struct termios *par, int port)
 	pkt.status_pipe_number = sc->channel_number;
 	pkt.device_number = port;
 	pkt.pb.tio.c_cflag = cflag;
-	bpp_send(sc, &pkt, WAIT);
+	if (bpp_send(sc, &pkt, WAIT))
+		return 0xff;
 
 	return imask;
 }
@@ -949,8 +971,6 @@ vx_intr(void *arg)
 	short cmd;
 	u_char port;
 
-	sc->sc_intrcnt.ev_count++;
-
 	while (env_isvalid(get_status_head(sc))) {
 		pktp = get_packet(sc, get_status_head(sc));
 		valid = env_isvalid(get_status_head(sc));
@@ -964,7 +984,7 @@ vx_intr(void *arg)
 			d16_bcopy(pktp, &sc->sc_bppwait_pkt, sizeof(struct packet));
 
 		d16_bcopy(pktp, &pkt, sizeof(struct packet));
-		next_envp = get_next_envelope(get_status_head(sc));
+		next_envp = get_next_envelope(sc, get_status_head(sc));
 		envp = get_status_head(sc);
 		/* return envelope and packet to the free queues */
 		put_free_envelope(sc, envp);
@@ -1107,14 +1127,14 @@ create_free_queue(struct vxsoftc *sc)
 	struct envelope *envp, env;
 	struct packet *pktp, pkt;
 
-	envp = (struct envelope *)ENVELOPE_AREA;
+	envp = (struct envelope *)VIRTUAL(ENVELOPE_AREA);
 	sc->elist_head = envp;
-	for (i = 0; i < NENVELOPES; i++) {
+	for (i = 1; i <= NENVELOPES; i++) {
 		bzero(&env, sizeof(struct envelope));
-		if (i == NENVELOPES - 1)
+		if (i == NENVELOPES)
 			env.link = NULL;
 		else
-			env.link = (u_long)envp + sizeof(struct envelope);
+			env.link = ENVELOPE_AREA + i * sizeof(struct envelope);
 		env.packet_ptr = NULL;
 		env.valid_flag = 0;
 		d16_bcopy(&env, envp, sizeof(struct envelope));
@@ -1122,14 +1142,14 @@ create_free_queue(struct vxsoftc *sc)
 	}
 	sc->elist_tail = --envp;
 
-	pktp = (struct packet *)PACKET_AREA;
+	pktp = (struct packet *)VIRTUAL(PACKET_AREA);
 	sc->plist_head = pktp;
-	for (i = 0; i < NPACKETS; i++) {
+	for (i = 1; i <= NPACKETS; i++) {
 		bzero(&pkt, sizeof(struct packet));
-		if (i == NPACKETS - 1)
+		if (i == NPACKETS)
 			pkt.link = NULL;
 		else
-			pkt.link = (u_long)pktp + sizeof(struct packet);
+			pkt.link = PACKET_AREA + i * sizeof(struct packet);
 		d16_bcopy(&pkt, pktp, sizeof(struct packet));
 		pktp++;
 	}
@@ -1139,13 +1159,13 @@ create_free_queue(struct vxsoftc *sc)
 void *
 get_free_envelope(struct vxsoftc *sc)
 {
-	void *envp;
-	u_long link;
+	struct envelope *envp;
+	paddr_t link;
 
 	envp = sc->elist_head;
 	/* pick envelope next pointer from the envelope itself */
-	d16_bcopy((const void *)&sc->elist_head->link, &link, sizeof link);
-	sc->elist_head = (struct envelope *)link;
+	d16_bcopy((const void *)&envp->link, &link, sizeof link);
+	sc->elist_head = (struct envelope *)VIRTUAL(link);
 	d16_bzero(envp, sizeof(struct envelope));
 
 	return envp;
@@ -1161,9 +1181,9 @@ put_free_envelope(struct vxsoftc *sc, void *ep)
 	d16_bzero(envp, sizeof(struct envelope));
 #endif
 	/* put envelope next pointer in the envelope itself */
-	link = (u_long)envp;
-	d16_bcopy(&link, (void *)&sc->elist_tail->link, sizeof link);
+	link = PHYSICAL((vaddr_t)envp);
 	d16_bzero((void *)&envp->link, sizeof envp->link);
+	d16_bcopy(&link, (void *)&sc->elist_tail->link, sizeof link);
 
 	sc->elist_tail = envp;
 }
@@ -1172,12 +1192,12 @@ void *
 get_free_packet(struct vxsoftc *sc)
 {
 	struct packet *pktp;
-	u_long link;
+	paddr_t link;
 
 	pktp = sc->plist_head;
 	/* pick packet next pointer from the packet itself */
-	d16_bcopy((const void *)&sc->plist_head->link, &link, sizeof link);
-	sc->plist_head = (struct packet *)link;
+	d16_bcopy((const void *)&pktp->link, &link, sizeof link);
+	sc->plist_head = (struct packet *)VIRTUAL(link);
 	d16_bzero(pktp, sizeof(struct packet));
 
 	return pktp;
@@ -1194,9 +1214,9 @@ put_free_packet(struct vxsoftc *sc, void *pp)
 #endif
 	pktp->command = CMD_PROCESSED;
 	/* put packet next pointer in the packet itself */
-	link = (u_long)pktp;
-	d16_bcopy(&link, (void *)&sc->plist_tail->link, sizeof link);
+	link = PHYSICAL((vaddr_t)pktp);
 	d16_bzero((void *)&pktp->link, sizeof pktp->link);
+	d16_bcopy(&link, (void *)&sc->plist_tail->link, sizeof link);
 
 	sc->plist_tail = pktp;
 }
@@ -1209,34 +1229,35 @@ put_free_packet(struct vxsoftc *sc, void *pp)
 int
 create_channels(struct vxsoftc *sc)
 {
-	struct envelope *envp;
+	u_long envp;
 	u_short status;
 	u_short tas;
-	struct vxreg *ipc_csr;
+	struct vxreg *ipc_csr = sc->vx_reg;
 
-	ipc_csr = sc->vx_reg;
 	/* wait for busy bit to clear */
-	while ((ipc_csr->ipc_cr & IPC_CR_BUSY)) ;
+	while ((ipc_csr->ipc_cr & IPC_CR_BUSY))
+		;
 
 	create_free_queue(sc);
+
 	/* set up channel header. we only want one */
 	tas = ipc_csr->ipc_tas;
 	while (!(tas & IPC_TAS_VALID_STATUS)) {
-		envp = get_free_envelope(sc);
+		envp = PHYSICAL((vaddr_t)get_free_envelope(sc));
 		sc->channel->command_pipe_head_ptr_h = HI(envp);
 		sc->channel->command_pipe_head_ptr_l = LO(envp);
 		sc->channel->command_pipe_tail_ptr_h =
 		    sc->channel->command_pipe_head_ptr_h;
 		sc->channel->command_pipe_tail_ptr_l =
 		    sc->channel->command_pipe_head_ptr_l;
-		envp = get_free_envelope(sc);
+		envp = PHYSICAL((vaddr_t)get_free_envelope(sc));
 		sc->channel->status_pipe_head_ptr_h = HI(envp);
 		sc->channel->status_pipe_head_ptr_l = LO(envp);
 		sc->channel->status_pipe_tail_ptr_h =
 		    sc->channel->status_pipe_head_ptr_h;
 		sc->channel->status_pipe_tail_ptr_l =
 		    sc->channel->status_pipe_head_ptr_l;
-		sc->channel->interrupt_level = sc->sc_ipl;
+		sc->channel->interrupt_level = IPL_TTY;
 		sc->channel->interrupt_vec = sc->sc_vec;
 		sc->channel->channel_priority = 0;
 		sc->channel->channel_number = 0;
@@ -1245,11 +1266,12 @@ create_channels(struct vxsoftc *sc)
 		sc->channel->datasize = 0; /* 32 bit data mode */
 
 		/* loop until TAS bit is zero */
-		while ((ipc_csr->ipc_tas & IPC_TAS_TAS)) ;
+		while ((ipc_csr->ipc_tas & IPC_TAS_TAS))
+			;
 		ipc_csr->ipc_tas |= IPC_TAS_TAS;
 		/* load address of channel header */
-		ipc_csr->ipc_addrh = HI(sc->channel);
-		ipc_csr->ipc_addrl = LO(sc->channel);
+		ipc_csr->ipc_addrh = HI(CHANNEL_H);
+		ipc_csr->ipc_addrl = LO(CHANNEL_H);
 		/* load address modifier reg (supervisor data access) */
 		ipc_csr->ipc_amr = 0x8d;
 		/* load tas with create channel command */
@@ -1271,10 +1293,12 @@ create_channels(struct vxsoftc *sc)
 	/* notify IPC that we are through */
 	ipc_csr->ipc_cr |= IPC_CR_ATTEN;
 	/* check and see if the channel was created */
-	if (!status && sc->channel->valid) {
+	if (status == 0 && sc->channel->valid) {
 		sc->channel_number = sc->channel->channel_number;
+#ifdef DEBUG_VXT
 		printf("%s: created channel %d\n", sc->sc_dev.dv_xname,
 		       sc->channel->channel_number);
+#endif
 		return 0;
 	} else {
 		switch (status) {
@@ -1304,13 +1328,13 @@ create_channels(struct vxsoftc *sc)
 }
 
 struct envelope *
-get_next_envelope(struct envelope *thisenv)
+get_next_envelope(struct vxsoftc *sc, struct envelope *thisenv)
 {
-	u_long ptr;
+	paddr_t ptr;
 
 	d16_bcopy((const void*)&thisenv->link, &ptr, sizeof ptr);
 
-	return ((struct envelope *)ptr);
+	return (struct envelope *)VIRTUAL(ptr);
 }
 
 int
@@ -1322,34 +1346,37 @@ env_isvalid(struct envelope *thisenv)
 struct envelope *
 get_cmd_tail(struct vxsoftc *sc)
 {
-	unsigned long retaddr;
+	paddr_t retaddr;
 
-	retaddr = (unsigned long)sc->vx_reg;
+	retaddr = sc->channel->command_pipe_tail_ptr_h << 16;
 	retaddr += sc->channel->command_pipe_tail_ptr_l;
-	return ((struct envelope *)retaddr);
+	return (struct envelope *)VIRTUAL(retaddr);
 }
 
 struct envelope *
 get_status_head(struct vxsoftc *sc)
 {
-	unsigned long retaddr;
+	paddr_t retaddr;
 
-	retaddr = (unsigned long)sc->vx_reg;
+	retaddr = sc->channel->status_pipe_head_ptr_h << 16;
 	retaddr += sc->channel->status_pipe_head_ptr_l;
-	return ((struct envelope *)retaddr);
+	return (struct envelope *)VIRTUAL(retaddr);
 }
 
 void
 set_status_head(struct vxsoftc *sc, void *envp)
 {
-	sc->channel->status_pipe_head_ptr_h = HI(envp);
-	sc->channel->status_pipe_head_ptr_l = LO(envp);
+	paddr_t ptr;
+
+	ptr = PHYSICAL((vaddr_t)envp);
+	sc->channel->status_pipe_head_ptr_h = HI(ptr);
+	sc->channel->status_pipe_head_ptr_l = LO(ptr);
 }
 
 struct packet *
 get_packet(struct vxsoftc *sc, struct envelope *thisenv)
 {
-	u_long baseaddr;
+	paddr_t baseaddr;
 
 	if (thisenv == NULL)
 		return NULL;
@@ -1361,47 +1388,54 @@ get_packet(struct vxsoftc *sc, struct envelope *thisenv)
 	 * offset to the board address.
 	 */
 	d16_bcopy((const void *)&thisenv->packet_ptr, &baseaddr, sizeof baseaddr);
-	baseaddr |= (u_long)sc->vx_reg;
-
-	return ((struct packet *)baseaddr);
+	return (struct packet *)VIRTUAL(baseaddr);
 }
 
 /*
  *	Send a command via BPP
  */
-void
+int
 bpp_send(struct vxsoftc *sc, void *pkt, int wait_flag)
 {
 	struct envelope *envp;
 	struct packet *pktp;
-	u_long ptr;
+	paddr_t ptr;
+	int tmo;
 
 	/* load up packet in dual port mem */
 	pktp = get_free_packet(sc);
 	d16_bcopy(pkt, pktp, sizeof(struct packet));
 
 	envp = get_cmd_tail(sc);
-	ptr = (unsigned long)get_free_envelope(sc); /* put a NULL env on the tail */
-	d16_bcopy(&ptr, (void *)&envp->link, sizeof envp->link);
+	ptr = PHYSICAL((vaddr_t)get_free_envelope(sc)); /* put a NULL env on the tail */
 	sc->channel->command_pipe_tail_ptr_h = HI(ptr);
 	sc->channel->command_pipe_tail_ptr_l = LO(ptr);
-	ptr = (u_long)pktp;
+	d16_bcopy(&ptr, (void *)&envp->link, sizeof envp->link);
+	ptr = PHYSICAL((vaddr_t)pktp);
 	d16_bcopy(&ptr, (void *)&envp->packet_ptr, sizeof envp->packet_ptr);
 	envp->valid_flag = 1;
 
 	sc->vx_reg->ipc_cr |= IPC_CR_ATTEN;
 
 	/* wait for a packet to return */
-	if (wait_flag != NOWAIT) {
-		while (pktp->command != CMD_PROCESSED) {
+	if (wait_flag == NOWAIT)
+		return 0;
+
+	tmo = 0;
+	while (pktp->command != CMD_PROCESSED) {
 #ifdef DEBUG_VXT
-			printf("Polling for packet 0x%x in envelope 0x%x...\n", pktp, envp);
+		printf("Polling for packet 0x%x in envelope 0x%x...\n", pktp, envp);
 #endif
-			vx_intr(sc);
-			delay(5000);
+		vx_intr(sc);
+		if (++tmo > 20) {
+			printf("%s: bpp_send pkt %x env %x timed out %d\n",
+			    sc->sc_dev.dv_xname, pktp, envp, pktp->command);
+			return ETIMEDOUT;
 		}
-		d16_bcopy(pktp, pkt, sizeof(struct packet));
+		delay(5000);
 	}
+	d16_bcopy(pktp, pkt, sizeof(struct packet));
+	return pktp->error_l;
 }
 
 /*
@@ -1412,29 +1446,28 @@ int
 vx_init(struct vxsoftc *sc)
 {
 	int i;
+	int error;
 	struct init_info *infp, inf;
-	struct wring *wringp;
-	struct rring *rringp;
-	struct termio def_termio;
+	paddr_t wringp, rringp;
 	struct packet init;
 	struct packet evnt;
 
-	bzero(&def_termio, sizeof(struct termio));
 	/* init wait queue */
 	d16_bzero(&sc->sc_bppwait_pkt, sizeof(struct packet));
 	sc->sc_bppwait_pktp = NULL;
 	/* set up init_info array */
-	wringp = (struct wring *)WRING_AREA;
-	rringp = (struct rring *)RRING_AREA;
-	infp = (struct init_info *)INIT_INFO_AREA;
+	wringp = WRING_AREA;
+	rringp = RRING_AREA;
+	infp = (struct init_info *)VIRTUAL(INIT_INFO_AREA);
+
 	for (i = 0; i < NVXPORTS; i++) {
 		bzero(&inf, sizeof(struct init_info));
 		inf.write_ring_ptr_h = HI(wringp);
 		inf.write_ring_ptr_l = LO(wringp);
-		sc->sc_info[i].wringp = wringp;
+		sc->sc_info[i].wringp = (struct wring *)VIRTUAL(wringp);
 		inf.read_ring_ptr_h = HI(rringp);
 		inf.read_ring_ptr_l = LO(rringp);
-		sc->sc_info[i].rringp = rringp;
+		sc->sc_info[i].rringp = (struct rring *)VIRTUAL(rringp);
 #ifdef DEBUG_VXT
 		printf("write at 0x%8x, read at 0x%8x\n", wringp, rringp);
 #endif
@@ -1450,31 +1483,28 @@ vx_init(struct vxsoftc *sc)
 		inf.def_termio.c_cc[1] = CQUIT;
 		inf.def_termio.c_cc[2] = CERASE;
 		inf.def_termio.c_cc[3] = CKILL;
-		inf.def_termio.c_cc[4] = 20;
-		inf.def_termio.c_cc[5] = 2;
-		inf.reserved1 = 0;  /* Must Be Zero */
-		inf.reserved2 = 0;
-		inf.reserved3 = 0;
-		inf.reserved4 = 0;
+		inf.def_termio.c_cc[4] = CEOF;
+		inf.def_termio.c_cc[5] = CEOL;
 		d16_bcopy(&inf, infp, sizeof(struct init_info));
-		wringp++; rringp++; infp++;
+		wringp += sizeof(struct wring);
+		rringp += sizeof(struct rring);
+		infp++;
 	}
+
 	/* set up init_packet */
 	bzero(&init, sizeof(struct packet));
-	init.link = 0x12345678;	/* eye catcher */
 	init.command = CMD_INIT;
 	init.command_pipe_number = sc->channel_number;
 	/* return status on the same channel */
 	init.status_pipe_number = sc->channel_number;
-	init.interrupt_level = sc->sc_ipl;
+	init.interrupt_level = IPL_TTY;
 	init.interrupt_vec = sc->sc_vec;
 	init.init_info_ptr_h = HI(INIT_INFO_AREA);
 	init.init_info_ptr_l = LO(INIT_INFO_AREA);
 
 	/* send packet to the firmware and wait for completion */
-	bpp_send(sc, &init, WAIT);
-	if (init.error_l != 0)
-		return init.error_l;
+	if ((error = bpp_send(sc, &init, WAIT)) != 0)
+		return error;
 
 	/* send one event packet to each device */
 	for (i = 0; i < NVXPORTS; i++) {
@@ -1487,5 +1517,6 @@ vx_init(struct vxsoftc *sc)
 		/* send packet to the firmware */
 		bpp_send(sc, &evnt, NOWAIT);
 	}
+
 	return 0;
 }

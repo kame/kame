@@ -1,4 +1,4 @@
-/*	$OpenBSD: pcc.c,v 1.12 2004/01/14 20:52:49 miod Exp $ */
+/*	$OpenBSD: pcc.c,v 1.14 2004/07/30 22:29:45 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -117,7 +117,6 @@ pcc_scan(parent, child, args)
 		oca.ca_paddr = (void *)-1;
 	}	
 	oca.ca_bustype = BUS_PCC;
-	oca.ca_master = (void *)sc->sc_pcc;
 	oca.ca_name = cf->cf_driver->cd_name;
 	if ((*cf->cf_attach->ca_match)(parent, cf, &oca) == 0)
 		return (0);
@@ -150,7 +149,7 @@ pccattach(parent, self, args)
 	sc->sc_nmiih.ih_fn = pccabort;
 	sc->sc_nmiih.ih_ipl = 7;
 	sc->sc_nmiih.ih_wantframe = 1;
-	pccintr_establish(PCCV_ABORT, &sc->sc_nmiih);
+	pccintr_establish(PCCV_ABORT, &sc->sc_nmiih, self->dv_xname);
 
 	sc->sc_pcc->pcc_vecbase = PCC_VECBASE;
 	sc->sc_pcc->pcc_abortirq = PCC_ABORT_IEN | PCC_ABORT_ACK;
@@ -165,15 +164,18 @@ pccattach(parent, self, args)
  * PCC interrupts land in a PCC_NVEC sized hole starting at PCC_VECBASE
  */
 int
-pccintr_establish(vec, ih)
+pccintr_establish(vec, ih, name)
 	int vec;
 	struct intrhand *ih;
+	const char *name;
 {
-	if (vec >= PCC_NVEC) {
-		printf("pcc: illegal vector: 0x%x\n", vec);
-		panic("pccintr_establish");
-	}
-	return (intr_establish(PCC_VECBASE+vec, ih));
+#ifdef DIAGNOSTIC
+	if (vec < 0 || vec >= PCC_NVEC)
+		panic("pccintr_establish: illegal vector for %s: 0x%x",
+		    name, vec);
+#endif
+
+	return intr_establish(PCC_VECBASE + vec, ih, name);
 }
 
 int

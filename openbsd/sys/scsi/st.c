@@ -1,4 +1,4 @@
-/*	$OpenBSD: st.c,v 1.35 2003/05/18 16:06:35 mickey Exp $	*/
+/*	$OpenBSD: st.c,v 1.41 2004/08/01 23:01:06 marco Exp $	*/
 /*	$NetBSD: st.c,v 1.71 1997/02/21 23:03:49 thorpej Exp $	*/
 
 /*
@@ -240,6 +240,14 @@ const struct st_quirk_inquiry_pattern st_quirk_patterns[] = {
 		{0, 0, 0},				/* minor 8-11 */
 		{0, 0, 0}				/* minor 12-15 */
 	}}},
+	{{T_SEQUENTIAL, T_REMOV,
+	 "TEAC    ", "MT-2ST/N50      ", ""},     {ST_Q_IGNORE_LOADS, 0, {
+		{0, 0, 0},				/* minor 0-3 */
+		{0, 0, 0},				/* minor 4-7 */
+		{0, 0, 0},				/* minor 8-11 */
+		{0, 0, 0}				/* minor 12-15 */
+	}}},
+
 };
 
 #define NOEJECT 0
@@ -378,7 +386,7 @@ stattach(parent, self, aux)
 	struct scsibus_attach_args *sa = aux;
 	struct scsi_link *sc_link = sa->sa_sc_link;
 
-	SC_DEBUG(sc_link, SDEV_DB2, ("stattach: "));
+	SC_DEBUG(sc_link, SDEV_DB2, ("stattach:\n"));
 
 	/*
 	 * Store information needed to contact our base driver
@@ -386,7 +394,6 @@ stattach(parent, self, aux)
 	st->sc_link = sc_link;
 	sc_link->device = &st_switch;
 	sc_link->device_softc = st;
-	sc_link->openings = 1;
 
 	/*
 	 * Check if the drive is a known criminal and take
@@ -401,11 +408,12 @@ stattach(parent, self, aux)
 	 */
 	printf("\n");
 	printf("%s: %s", st->sc_dev.dv_xname, st->quirkdata ? "rogue, " : "");
-	if (scsi_test_unit_ready(sc_link, TEST_READY_RETRIES_DEFAULT,
+	if (scsi_test_unit_ready(sc_link, TEST_READY_RETRIES_TAPE,
 	    scsi_autoconf | SCSI_SILENT | SCSI_IGNORE_MEDIA_CHANGE) ||
 	    st_mode_sense(st,
-	    scsi_autoconf | SCSI_SILENT | SCSI_IGNORE_MEDIA_CHANGE))
-		printf("drive empty\n");
+	    scsi_autoconf | SCSI_SILENT | SCSI_IGNORE_MEDIA_CHANGE)) {
+		printf("drive empty or not ready\n");
+	}
 	else {
 		printf("density code 0x%x, ", st->media_density);
 		if (st->media_blksize > 0)
@@ -523,7 +531,7 @@ stopen(dev, flags, mode, p)
 	 * Only allow one at a time
 	 */
 	if (sc_link->flags & SDEV_OPEN) {
-		printf("%s: already open\n", st->sc_dev.dv_xname);
+		SC_DEBUG(sc_link, SDEV_DB4, ("already open\n"));
 		return EBUSY;
 	}
 
@@ -642,7 +650,7 @@ st_mount_tape(dev, flags)
 	if (st->flags & ST_MOUNTED)
 		return 0;
 
-	SC_DEBUG(sc_link, SDEV_DB1, ("mounting\n "));
+	SC_DEBUG(sc_link, SDEV_DB1, ("mounting\n"));
 	st->flags |= ST_NEW_MOUNT;
 	st->quirks = st->drive_quirks | st->modes[dsty].quirks;
 	/*
@@ -877,10 +885,10 @@ ststrategy(bp)
 	struct buf *dp;
 	int s;
 
-	SC_DEBUG(st->sc_link, SDEV_DB1,
-	    ("ststrategy %ld bytes @ blk %d\n", bp->b_bcount, bp->b_blkno));
+	SC_DEBUG(st->sc_link, SDEV_DB2, ("ststrategy: %ld bytes @ blk %d\n",
+	    bp->b_bcount, bp->b_blkno));
 	/*
-	 * If it's a null transfer, return immediatly
+	 * If it's a null transfer, return immediately.
 	 */
 	if (bp->b_bcount == 0)
 		goto done;
@@ -963,7 +971,7 @@ ststart(v)
 	struct scsi_rw_tape cmd;
 	int flags;
 
-	SC_DEBUG(sc_link, SDEV_DB2, ("ststart "));
+	SC_DEBUG(sc_link, SDEV_DB2, ("ststart\n"));
 
 	splassert(IPL_BIO);
 
@@ -1463,7 +1471,7 @@ st_mode_sense(st, flags)
 	    ("density code 0x%x, %d-byte blocks, write-%s, ",
 	    st->media_density, st->media_blksize,
 	    st->flags & ST_READONLY ? "protected" : "enabled"));
-	SC_DEBUG(sc_link, SDEV_DB3,
+	SC_DEBUGN(sc_link, SDEV_DB3,
 	    ("%sbuffered\n",
 	    scsi_sense.header.dev_spec & SMH_DSP_BUFF_MODE ? "" : "un"));
 	if (st->page_0_size)
@@ -1799,12 +1807,28 @@ int
 st_interpret_sense(xs)
 	struct scsi_xfer *xs;
 {
-	struct scsi_link *sc_link = xs->sc_link;
 	struct scsi_sense_data *sense = &xs->sense;
-	struct buf *bp = xs->bp;
+	struct scsi_link *sc_link = xs->sc_link;
 	struct st_softc *st = sc_link->device_softc;
-	u_int8_t key;
+	struct buf *bp = xs->bp;
+	u_int8_t serr = sense->error_code & SSD_ERRCODE;
+	u_int8_t skey = sense->flags & SSD_KEY;
 	int32_t info;
+
+	if (((sense->flags & SDEV_OPEN) == 0) ||
+	    (serr != 0x70 && serr != 0x71))
+		return (EJUSTRETURN); /* let the generic code handle it */
+
+	switch (skey) {
+	case SKEY_NO_SENSE:
+	case SKEY_RECOVERED_ERROR:
+	case SKEY_MEDIUM_ERROR:
+	case SKEY_VOLUME_OVERFLOW:
+	case SKEY_BLANK_CHECK:
+		break;
+	default:
+		return (EJUSTRETURN);
+	}
 
 	/*
 	 * Get the sense fields and work out what code
@@ -1813,8 +1837,6 @@ st_interpret_sense(xs)
 		info = _4btol(sense->info);
 	else
 		info = xs->datalen;	/* bad choice if fixed blocks */
-	if ((sense->error_code & SSD_ERRCODE) != 0x70)
-		return SCSIRET_CONTINUE; /* let the generic code handle it */
 	if (st->flags & ST_FIXEDBLOCKS) {
 		xs->resid = info * st->blksize;
 		if (sense->flags & SSD_EOM) {
@@ -1893,17 +1915,15 @@ st_interpret_sense(xs)
 			xs->resid = info;
 			if (bp)
 				bp->b_resid = info;
-			return 0;
+			return (0);
 		}
 	}
-	key = sense->flags & SSD_KEY;
 
-	if (key == 0x8) {
+	if (skey == SKEY_BLANK_CHECK) {
 		/*
-		 * This quirk code helps the drive read the
-		 * first tape block, regardless of format.  That
-		 * is required for these drives to return proper
-		 * MODE SENSE information.
+		 * This quirk code helps the drive read the first tape block,
+		 * regardless of format.  That is required for these drives to
+		 * return proper MODE SENSE information.
 		 */
 		if ((st->quirks & ST_Q_SENSE_HELP) &&
 		    !(sc_link->flags & SDEV_MEDIA_LOADED)) {
@@ -1916,10 +1936,11 @@ st_interpret_sense(xs)
 				bp->b_resid = xs->resid;
 				/* return an EOF */
 			}
-			return 0;
+			return (0);
 		}
 	}
-	return SCSIRET_CONTINUE;
+
+	return (EJUSTRETURN);
 }
 
 /*

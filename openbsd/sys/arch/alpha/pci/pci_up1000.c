@@ -1,4 +1,4 @@
-/*	$OpenBSD: pci_up1000.c,v 1.7 2001/12/14 00:44:59 nate Exp $	*/
+/*	$OpenBSD: pci_up1000.c,v 1.9 2004/07/18 02:18:26 deraadt Exp $	*/
 /* $NetBSD: pci_up1000.c,v 1.6 2000/12/28 22:59:07 sommerfeld Exp $ */
 
 /*-
@@ -68,7 +68,6 @@
 int     api_up1000_intr_map(void *, pcitag_t, int, int, pci_intr_handle_t *);
 const char *api_up1000_intr_string(void *, pci_intr_handle_t);
 int	api_up1000_intr_line(void *, pci_intr_handle_t);
-const struct evcnt *api_up1000_intr_evcnt(void *, pci_intr_handle_t);
 void    *api_up1000_intr_establish(void *, pci_intr_handle_t,
 	    int, int (*func)(void *), void *, char *);
 void    api_up1000_intr_disestablish(void *, void *);
@@ -87,9 +86,6 @@ pci_up1000_pickintr(struct irongate_config *icp)
 	pc->pc_intr_map = api_up1000_intr_map;
 	pc->pc_intr_string = api_up1000_intr_string;
 	pc->pc_intr_line = api_up1000_intr_line;
-#if 0
-	pc->pc_intr_evcnt = api_up1000_intr_evcnt;
-#endif
 	pc->pc_intr_establish = api_up1000_intr_establish;
 	pc->pc_intr_disestablish = api_up1000_intr_disestablish;
 
@@ -137,12 +133,16 @@ api_up1000_intr_map(void *icv, pcitag_t bustag, int buspin, int line, pci_intr_h
 
 	/* XXX Check for 0? */
 	if (line > 15) {
+#ifdef DIAGNOSTIC
 		printf("api_up1000_intr_map: ISA IRQ too large (%d)\n",
 		    line);
+#endif
 		return (1);
 	}
 	if (line == 2) {
+#ifdef DIAGNOSTIC
 		printf("api_up1000_intr_map: changed IRQ 2 to IRQ 9\n");
+#endif
 		line = 9;
 	}
 
@@ -165,18 +165,6 @@ api_up1000_intr_line(void *icv, pci_intr_handle_t ih)
 {
 	return sio_intr_line(NULL /*XXX*/, ih);
 }
-
-#if 0
-const struct evcnt *
-api_up1000_intr_evcnt(void *icv, pci_intr_handle_t ih)
-{
-#if 0
-	struct irongate_config *icp = icv;
-#endif
-
-	return sio_intr_evcnt(NULL /*XXX*/, ih);
-}
-#endif
 
 void *
 api_up1000_intr_establish(void *icv, pci_intr_handle_t ih, int level,

@@ -1,4 +1,4 @@
-/*	$OpenBSD: scsi_base.c,v 1.55.2.1 2004/04/30 22:07:37 brad Exp $	*/
+/*	$OpenBSD: scsi_base.c,v 1.62 2004/07/31 11:31:30 krw Exp $	*/
 /*	$NetBSD: scsi_base.c,v 1.43 1997/04/02 02:29:36 mycroft Exp $	*/
 
 /*
@@ -58,7 +58,7 @@ static __inline void asc2ascii(u_int8_t, u_int8_t ascq, char *result,
     size_t len);
 int	sc_err1(struct scsi_xfer *, int);
 int	scsi_interpret_sense(struct scsi_xfer *);
-char   *scsi_decode_sense(void *, int);
+char   *scsi_decode_sense(struct scsi_sense_data *, int);
 
 /* Values for flag parameter to scsi_decode_sense. */
 #define	DECODE_SENSE_KEY	1
@@ -270,24 +270,6 @@ scsi_test_unit_ready(sc_link, retries, flags)
 }
 
 /*
- * Do a scsi operation, asking a device to run as SCSI-II if it can.
- */
-int 
-scsi_change_def(sc_link, flags)
-	struct scsi_link *sc_link;
-	int flags;
-{
-	struct scsi_changedef scsi_cmd;
-
-	bzero(&scsi_cmd, sizeof(scsi_cmd));
-	scsi_cmd.opcode = CHANGE_DEFINITION;
-	scsi_cmd.how = SC_SCSI_2;
-
-	return scsi_scsi_cmd(sc_link, (struct scsi_generic *) &scsi_cmd,
-	    sizeof(scsi_cmd), 0, 0, 2, 100000, NULL, flags);
-}
-
-/*
  * Do a scsi operation asking a device what it is.
  * Use the scsi_cmd routine in the switch table.
  */
@@ -388,7 +370,7 @@ scsi_done(xs)
 	if ((xs->flags & SCSI_USER) != 0) {
 		SC_DEBUG(sc_link, SDEV_DB3, ("calling user done()\n"));
 		scsi_user_done(xs); /* to take a copy of the sense etc. */
-		SC_DEBUG(sc_link, SDEV_DB3, ("returned from user done()\n "));
+		SC_DEBUG(sc_link, SDEV_DB3, ("returned from user done()\n"));
 
 		scsi_free_xs(xs); /* restarts queue too */
 		SC_DEBUG(sc_link, SDEV_DB3, ("returning to adapter\n"));
@@ -589,7 +571,7 @@ sc_err1(xs, async)
 {
 	int error;
 
-	SC_DEBUG(xs->sc_link, SDEV_DB3, ("sc_err1,err = 0x%x \n", xs->error));
+	SC_DEBUG(xs->sc_link, SDEV_DB3, ("sc_err1,err = 0x%x\n", xs->error));
 
 	/*
 	 * If it has a buf, we might be working with
@@ -673,37 +655,25 @@ int
 scsi_interpret_sense(xs)
 	struct scsi_xfer *xs;
 {
-	struct scsi_sense_data *sense;
+	struct scsi_sense_data *sense = &xs->sense;
 	struct scsi_link *sc_link = xs->sc_link;
-	u_int8_t key;
-	u_int32_t info;
+	u_int8_t serr, skey;
 	int error;
 
-	sense = &xs->sense;
+	SC_DEBUG(sc_link, SDEV_DB1,
+	    ("code:%#x valid:%d key:%#x ili:%d eom:%d fmark:%d extra:%d\n",
+	    sense->error_code & SSD_ERRCODE,
+	    sense->error_code & SSD_ERRCODE_VALID ? 1 : 0,
+	    sense->flags & SSD_KEY,
+	    sense->flags & SSD_ILI ? 1 : 0,
+	    sense->flags & SSD_EOM ? 1 : 0,
+	    sense->flags & SSD_FILEMARK ? 1 : 0,
+	    sense->extra_len));
 #ifdef	SCSIDEBUG
-	if ((sc_link->flags & SDEV_DB1) != 0) {
-		int count;
-		printf("code%x valid%x ",
-		    sense->error_code & SSD_ERRCODE,
-		    sense->error_code & SSD_ERRCODE_VALID ? 1 : 0);
-		printf("seg%x key%x ili%x eom%x fmark%x\n",
-		    sense->segment,
-		    sense->flags & SSD_KEY,
-		    sense->flags & SSD_ILI ? 1 : 0,
-		    sense->flags & SSD_EOM ? 1 : 0,
-		    sense->flags & SSD_FILEMARK ? 1 : 0);
-		printf("info: %x %x %x %x followed by %d extra bytes\n",
-		    sense->info[0],
-		    sense->info[1],
-		    sense->info[2],
-		    sense->info[3],
-		    sense->extra_len);
-		printf("extra: ");
-		for (count = 0; count < sense->extra_len; count++)
-			printf("%x ", sense->cmd_spec_info[count]);
-		printf("\n");
-	}
+	if ((sc_link->flags & SDEV_DB1) != 0)
+		show_mem((u_char *)&xs->sense, sizeof xs->sense);
 #endif	/* SCSIDEBUG */
+
 	/*
 	 * If the device has it's own error handler, call it first.
 	 * If it returns a legit error value, return that, otherwise
@@ -712,104 +682,80 @@ scsi_interpret_sense(xs)
 	if (sc_link->device->err_handler) {
 		SC_DEBUG(sc_link, SDEV_DB2, ("calling private err_handler()\n"));
 		error = (*sc_link->device->err_handler) (xs);
-		if (error != SCSIRET_CONTINUE)
+		if (error != EJUSTRETURN)
 			return error;		/* error >= 0  better ? */
 	}
-	/* otherwise use the default */
-	switch (sense->error_code & SSD_ERRCODE) {
-		/*
-		 * If it's code 70, use the extended stuff and interpret the key
-		 */
-	case 0x71:		/* delayed error */
-		sc_print_addr(sc_link);
-		key = sense->flags & SSD_KEY;
-		printf(" DEFERRED ERROR, key = 0x%x\n", key);
-		/* FALLTHROUGH */
-	case 0x70:
-		if ((sense->error_code & SSD_ERRCODE_VALID) != 0)
-			info = _4btol(sense->info);
-		else
-			info = 0;
-		key = sense->flags & SSD_KEY;
 
-		switch (key) {
-		case SKEY_NO_SENSE:
-		case SKEY_RECOVERED_ERROR:
-			if (xs->resid == xs->datalen)
-				xs->resid = 0;	/* not short read */
-		case SKEY_EQUAL:
-			error = 0;
-			break;
-		case SKEY_NOT_READY:
-			if ((sc_link->flags & SDEV_REMOVABLE) != 0)
-				sc_link->flags &= ~SDEV_MEDIA_LOADED;
-			if ((xs->flags & SCSI_IGNORE_NOT_READY) != 0)
-				return 0;
-			if (xs->retries && sense->add_sense_code == 0x04 &&
-			    sense->add_sense_code_qual == 0x01) {
-				xs->error = XS_BUSY;	/* ie. sense_retry */
-				return ERESTART;
-			}
-			if (xs->retries && !(sc_link->flags & SDEV_REMOVABLE)) {
-				delay(1000000);
-				return ERESTART;
-			}
-			error = EIO;
-			break;
-		case SKEY_ILLEGAL_REQUEST:
-			if ((xs->flags & SCSI_IGNORE_ILLEGAL_REQUEST) != 0)
-				return 0;
-			error = EINVAL;
-			break;
-		case SKEY_UNIT_ATTENTION:
-			if (sense->add_sense_code == 0x29)
-				return (ERESTART); /* device or bus reset */
-			if ((sc_link->flags & SDEV_REMOVABLE) != 0)
-				sc_link->flags &= ~SDEV_MEDIA_LOADED;
-			if ((xs->flags & SCSI_IGNORE_MEDIA_CHANGE) != 0 ||
-			    /* XXX Should reupload any transient state. */
-			    (sc_link->flags & SDEV_REMOVABLE) == 0)
-				return ERESTART;
-			error = EIO;
-			break;
-		case SKEY_WRITE_PROTECT:
-			error = EROFS;
-			break;
-		case SKEY_BLANK_CHECK:
-			error = 0;
-			break;
-		case SKEY_ABORTED_COMMAND:
-			error = ERESTART;
-			break;
-		case SKEY_VOLUME_OVERFLOW:
-			error = ENOSPC;
-			break;
-		default:
-			error = EIO;
-			break;
-		}
-
-		if (key && (xs->flags & SCSI_SILENT) == 0)
-			scsi_print_sense(xs, 0);
-
-		return error;
+	/* Default sense interpretation. */
+	serr = sense->error_code & SSD_ERRCODE;
+	if (serr != 0x70 && serr != 0x71)
+		skey = 0xff;	/* Invalid value, since key is 4 bit value. */
+	else
+		skey = sense->flags & SSD_KEY;
 
 	/*
-	 * Not code 70, just report it
+	 * Interpret the key/asc/ascq information where appropriate.
 	 */
-	default:
-		sc_print_addr(sc_link);
-		printf("Sense Error Code %d",
-		    sense->error_code & SSD_ERRCODE);
-		if ((sense->error_code & SSD_ERRCODE_VALID) != 0) {
-			struct scsi_sense_data_unextended *usense =
-			    (struct scsi_sense_data_unextended *)sense;
-			printf(" at block no. %d (decimal)",
-			    _3btol(usense->block));
+	error = 0;
+	switch (skey) {
+	case SKEY_NO_SENSE:
+	case SKEY_RECOVERED_ERROR:
+		if (xs->resid == xs->datalen)
+			xs->resid = 0;	/* not short read */
+		break;
+	case SKEY_BLANK_CHECK:
+	case SKEY_EQUAL:
+		break;
+	case SKEY_NOT_READY:
+		if ((sc_link->flags & SDEV_REMOVABLE) != 0)
+			sc_link->flags &= ~SDEV_MEDIA_LOADED;
+		if ((xs->flags & SCSI_IGNORE_NOT_READY) != 0)
+			return 0;
+		if (xs->retries && sense->add_sense_code == 0x04 &&
+		    sense->add_sense_code_qual == 0x01) {
+			xs->error = XS_BUSY;	/* ie. sense_retry */
+			return ERESTART;
 		}
-		printf("\n");
-		return EIO;
+		if (xs->retries && !(sc_link->flags & SDEV_REMOVABLE)) {
+			delay(1000000);
+			return ERESTART;
+		}
+		error = EIO;
+		break;
+	case SKEY_ILLEGAL_REQUEST:
+		if ((xs->flags & SCSI_IGNORE_ILLEGAL_REQUEST) != 0)
+			return 0;
+		error = EINVAL;
+		break;
+	case SKEY_UNIT_ATTENTION:
+		if (sense->add_sense_code == 0x29)
+			return (ERESTART); /* device or bus reset */
+		if ((sc_link->flags & SDEV_REMOVABLE) != 0)
+			sc_link->flags &= ~SDEV_MEDIA_LOADED;
+		if ((xs->flags & SCSI_IGNORE_MEDIA_CHANGE) != 0 ||
+		    /* XXX Should reupload any transient state. */
+		    (sc_link->flags & SDEV_REMOVABLE) == 0)
+			return ERESTART;
+		error = EIO;
+		break;
+	case SKEY_WRITE_PROTECT:
+		error = EROFS;
+		break;
+	case SKEY_ABORTED_COMMAND:
+		error = ERESTART;
+		break;
+	case SKEY_VOLUME_OVERFLOW:
+		error = ENOSPC;
+		break;
+	default:
+		error = EIO;
+		break;
 	}
+
+	if (skey && (xs->flags & SCSI_SILENT) == 0)
+		scsi_print_sense(xs);
+
+	return error;
 }
 
 /*
@@ -1439,130 +1385,80 @@ asc2ascii(asc, ascq, result, len)
 #endif /* SCSITERSE */
 
 void
-scsi_print_sense(xs, verbosity)
+scsi_print_sense(xs)
 	struct scsi_xfer *xs;
-	int verbosity;
 {
+	struct scsi_sense_data *sense = &xs->sense;
+	u_int8_t serr = sense->error_code & SSD_ERRCODE;
 	int32_t info;
-	register int i, j, k;
-	char *sbs, *s;
+	char *sbs;
 
 	sc_print_addr(xs->sc_link);
-	s = (char *) &xs->sense;
-	printf("Check Condition on opcode 0x%x\n", xs->cmd->opcode);
 
-	/*
-	 * Basics- print out SENSE KEY
-	 */
-	printf("    SENSE KEY: %s\n", scsi_decode_sense(s, DECODE_SENSE_KEY));
+	/* XXX For error 0x71, current opcode is not the relevant one. */
+	printf("%sCheck Condition (error %#x) on opcode 0x%x\n",
+	    (serr == 0x71) ? "DEFERRED " : "", serr, xs->cmd->opcode);
 
-	/*
- 	 * Print out, unqualified but aligned, FMK, EOM and ILI status.
-	 */
-	if (s[2] & 0xe0) {
+	if (serr != 0x70 && serr != 0x71) {	
+		if ((sense->error_code & SSD_ERRCODE_VALID) != 0) {
+			struct scsi_sense_data_unextended *usense =
+			    (struct scsi_sense_data_unextended *)sense;
+			printf("   AT BLOCK #: %d (decimal)",
+			    _3btol(usense->block));
+		}
+		return;
+	}
+
+	printf("    SENSE KEY: %s\n", scsi_decode_sense(sense,
+	    DECODE_SENSE_KEY));
+
+	if (sense->flags & (SSD_FILEMARK | SSD_EOM | SSD_ILI)) {
 		char pad = ' ';
 
 		printf("             ");
-		if (s[2] & SSD_FILEMARK) {
+		if (sense->flags & SSD_FILEMARK) {
 			printf("%c Filemark Detected", pad);
 			pad = ',';
 		}
-		if (s[2] & SSD_EOM) {
+		if (sense->flags & SSD_EOM) {
 			printf("%c EOM Detected", pad);
 			pad = ',';
 		}
-		if (s[2] & SSD_ILI)
+		if (sense->flags & SSD_ILI)
 			printf("%c Incorrect Length Indicator Set", pad);
 		printf("\n");
 	}
+
 	/*
-	 * Now we should figure out, based upon device type, how
-	 * to format the information field. Unfortunately, that's
-	 * not convenient here, so we'll print it as a signed
-	 * 32 bit integer.
+	 * It is inconvenient to use device type to figure out how to
+	 * format the info fields. So print them as 32 bit integers.
 	 */
-	info = _4btol(&s[3]);
+	info = _4btol(&sense->info[0]);
 	if (info)
-		printf("   INFO FIELD: %u\n", info);
+		printf("         INFO: 0x%x (VALID flag %s)\n", info,
+		    sense->error_code & SSD_ERRCODE_VALID ? "on" : "off");
 
-	/*
-	 * Now we check additional length to see whether there is
-	 * more information to extract.
-	 */
-
-	/* enough for command specific information? */
-	if (s[7] < 4)
+	if (sense->extra_len < 4)
 		return;
-	info = _4btol(&s[8]);
+
+	info = _4btol(&sense->cmd_spec_info[0]);
 	if (info)
-		printf(" COMMAND INFO: %d (0x%x)\n", info, info);
-
-	/*
-	 * Decode ASC && ASCQ info, plus FRU, plus the rest...
-	 */
-
-	sbs = scsi_decode_sense(s, DECODE_ASC_ASCQ);
+		printf(" COMMAND INFO: 0x%x\n", info);
+	sbs = scsi_decode_sense(sense, DECODE_ASC_ASCQ);
 	if (strlen(sbs) > 0)
 		printf("     ASC/ASCQ: %s\n", sbs);
-	if (s[14] != 0)
-		printf("     FRU CODE: 0x%x\n", s[14] & 0xff);
-	sbs = scsi_decode_sense(s, DECODE_SKSV);
+	if (sense->fru != 0)
+		printf("     FRU CODE: 0x%x\n", sense->fru);
+	sbs = scsi_decode_sense(sense, DECODE_SKSV);
 	if (strlen(sbs) > 0)
 		printf("         SKSV: %s\n", sbs);
-	if (verbosity == 0)
-		return;
-
-	/*
-	 * Now figure whether we should print any additional informtion.
-	 *
-	 * Where should we start from? If we had SKSV data,
-	 * start from offset 18, else from offset 15.
-	 *
-	 * From that point until the end of the buffer, check for any
-	 * nonzero data. If we have some, go back and print the lot,
-	 * otherwise we're done.
-	 */
-	if (strlen(sbs) > 0)
-		i = 18;
-	else
-		i = 15;
-
-	for (j = i; j < sizeof (xs->sense); j++)
-		if (s[j])
-			break;
-	if (j == sizeof (xs->sense))
-		return;
-
-	printf(" Additional Sense Information (byte %d out...):\n", i);
-	if (i == 15) {
-		printf("        %2d:", i);
-		k = 7;
-	} else {
-		printf("        %2d:", i);
-		k = 2;
-		j -= 2;
-	}
-	while (j > 0) {
-		if (i >= sizeof (xs->sense))
-			break;
-		if (k == 8) {
-			k = 0;
-			printf("\n        %2d:", i);
-		}
-		printf(" 0x%02x", s[i] & 0xff);
-		k++;
-		j--;
-		i++;
-	}
-	printf("\n");
 }
 
 char *
-scsi_decode_sense(sinfo, flag)
-	void *sinfo;
+scsi_decode_sense(sense, flag)
+	struct scsi_sense_data *sense;
 	int flag;
 {
-	struct scsi_sense_data *sense = sinfo;
 	static char rqsbuf[132];
 	u_int16_t count;
 	u_int8_t skey, spec_1;

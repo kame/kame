@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.12 2003/06/02 23:27:56 millert Exp $	*/
+/*	$OpenBSD: param.h,v 1.14 2004/08/06 22:31:31 mickey Exp $	*/
 /*	$NetBSD: param.h,v 1.25 2001/05/30 12:28:51 mrg Exp $ */
 
 /*
@@ -114,6 +114,7 @@ extern int nbpg, pgofset, pgshift;
 /* We get stack overflows w/8K stacks in 64-bit mode */
 #define	SSIZE		2		/* initial stack size in pages */
 #define	USPACE		(SSIZE*8192)
+#define	USPACE_ALIGN	(0)		/* u-area alignment 0-none */
 
 
 /*
@@ -182,14 +183,7 @@ extern int nbpg, pgofset, pgshift;
 #define	MCLSHIFT	11		/* log2(MCLBYTES) */
 #define	MCLBYTES	(1 << MCLSHIFT)	/* enough for whole Ethernet packet */
 #define	MCLOFSET	(MCLBYTES - 1)
-
-#ifndef NMBCLUSTERS
-#ifdef GATEWAY
-#define	NMBCLUSTERS	2048		/* map size, max cluster allocation */
-#else
-#define	NMBCLUSTERS	1024		/* map size, max cluster allocation */
-#endif
-#endif
+#define	NMBCLUSTERS	4096		/* map size, max cluster allocation */
 
 #define MSGBUFSIZE	NBPG
 

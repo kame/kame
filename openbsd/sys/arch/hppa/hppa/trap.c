@@ -1,7 +1,7 @@
-/*	$OpenBSD: trap.c,v 1.70 2003/12/20 21:49:06 miod Exp $	*/
+/*	$OpenBSD: trap.c,v 1.80 2004/07/13 19:34:23 mickey Exp $	*/
 
 /*
- * Copyright (c) 1998-2003 Michael Shalayeff
+ * Copyright (c) 1998-2004 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -12,22 +12,18 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF MIND,
- * USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * IN NO EVENT SHALL THE AUTHOR OR HIS RELATIVES BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF MIND, USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 /* #define TRAPDEBUG */
@@ -90,6 +86,42 @@ const char *trap_type[] = {
 int trap_types = sizeof(trap_type)/sizeof(trap_type[0]);
 
 int want_resched, astpending;
+
+#define	frame_regmap(tf,r)	(((u_int *)(tf))[hppa_regmap[(r)]])
+u_char hppa_regmap[32] = {
+	offsetof(struct trapframe, tf_pad[0]) / 4,	/* r0 XXX */
+	offsetof(struct trapframe, tf_r1) / 4,
+	offsetof(struct trapframe, tf_rp) / 4,
+	offsetof(struct trapframe, tf_r3) / 4,
+	offsetof(struct trapframe, tf_r4) / 4,
+	offsetof(struct trapframe, tf_r5) / 4,
+	offsetof(struct trapframe, tf_r6) / 4,
+	offsetof(struct trapframe, tf_r7) / 4,
+	offsetof(struct trapframe, tf_r8) / 4,
+	offsetof(struct trapframe, tf_r9) / 4,
+	offsetof(struct trapframe, tf_r10) / 4,
+	offsetof(struct trapframe, tf_r11) / 4,
+	offsetof(struct trapframe, tf_r12) / 4,
+	offsetof(struct trapframe, tf_r13) / 4,
+	offsetof(struct trapframe, tf_r14) / 4,
+	offsetof(struct trapframe, tf_r15) / 4,
+	offsetof(struct trapframe, tf_r16) / 4,
+	offsetof(struct trapframe, tf_r17) / 4,
+	offsetof(struct trapframe, tf_r18) / 4,
+	offsetof(struct trapframe, tf_t4) / 4,
+	offsetof(struct trapframe, tf_t3) / 4,
+	offsetof(struct trapframe, tf_t2) / 4,
+	offsetof(struct trapframe, tf_t1) / 4,
+	offsetof(struct trapframe, tf_arg3) / 4,
+	offsetof(struct trapframe, tf_arg2) / 4,
+	offsetof(struct trapframe, tf_arg1) / 4,
+	offsetof(struct trapframe, tf_arg0) / 4,
+	offsetof(struct trapframe, tf_dp) / 4,
+	offsetof(struct trapframe, tf_ret0) / 4,
+	offsetof(struct trapframe, tf_ret1) / 4,
+	offsetof(struct trapframe, tf_sp) / 4,
+	offsetof(struct trapframe, tf_r31) / 4,
+};
 
 void
 userret(struct proc *p, register_t pc, u_quad_t oticks)
@@ -197,8 +229,7 @@ trap(type, frame)
 	if (trapnum != T_INTERRUPT) {
 		uvmexp.traps++;
 		mtctl(frame->tf_eiem, CR_EIEM);
-	} else
-		uvmexp.intrs++;
+	}
 
 	switch (type) {
 	case T_NONEXIST:
@@ -246,11 +277,9 @@ trap(type, frame)
 		break;
 
 	case T_IBREAK | T_USER:
-		/* XXX */
-		frame->tf_iioq_head = frame->tf_iioq_tail;
-		frame->tf_iioq_tail += 4;
 	case T_DBREAK | T_USER:
 		/* pass to user debugger */
+		trapsignal(p, SIGTRAP, type &~ T_USER, TRAP_BRKPT, sv);
 		break;
 
 	case T_EXCEPTION | T_USER: {
@@ -263,17 +292,17 @@ trap(type, frame)
 		flt = 0;
 		if (i < 7) {
 			u_int32_t stat = HPPA_FPU_OP(*pex);
-			if (stat == HPPA_FPU_UNMPL)
+			if (stat & HPPA_FPU_UNMPL)
 				flt = FPE_FLTINV;
-			else if (stat & HPPA_FPU_V)
+			else if (stat & (HPPA_FPU_V << 1))
 				flt = FPE_FLTINV;
-			else if (stat & HPPA_FPU_Z)
+			else if (stat & (HPPA_FPU_Z << 1))
 				flt = FPE_FLTDIV;
-			else if (stat & HPPA_FPU_I)
+			else if (stat & (HPPA_FPU_I << 1))
 				flt = FPE_FLTRES;
-			else if (stat & HPPA_FPU_O)
+			else if (stat & (HPPA_FPU_O << 1))
 				flt = FPE_FLTOVF;
-			else if (stat & HPPA_FPU_U)
+			else if (stat & (HPPA_FPU_U << 1))
 				flt = FPE_FLTUND;
 			/* still left: under/over-flow w/ inexact */
 			*pex = 0;
@@ -294,7 +323,7 @@ trap(type, frame)
 
 	case T_EMULATION | T_USER:
 		sv.sival_int = va;
-		trapsignal(p, SIGILL, type &~ T_USER, ILL_ILLOPC, sv);
+		trapsignal(p, SIGILL, type &~ T_USER, ILL_COPROC, sv);
 		break;
 
 	case T_OVERFLOW | T_USER:
@@ -303,11 +332,8 @@ trap(type, frame)
 		break;
 
 	case T_CONDITION | T_USER:
-		break;
-
-	case T_ILLEGAL | T_USER:
 		sv.sival_int = va;
-		trapsignal(p, SIGILL, type &~ T_USER, ILL_ILLOPC, sv);
+		trapsignal(p, SIGFPE, type &~ T_USER, FPE_INTDIV, sv);
 		break;
 
 	case T_PRIV_OP | T_USER:
@@ -376,6 +402,14 @@ trap(type, frame)
 
 		ret = uvm_fault(map, hppa_trunc_page(va), fault, vftype);
 
+		/* dig probe insn */
+		if (ret && trapnum == T_DTLBMISSNA &&
+		    (opcode & 0xfc001f80) == 0x04001180) {
+			frame_regmap(frame, opcode & 0x1f) = 0;
+			frame->tf_ipsw |= PSL_N;
+			break;
+		}
+
 		/*
 		 * If this was a stack access we keep track of the maximum
 		 * accessed stack size.  Also, if uvm_fault gets a protection
@@ -411,7 +445,7 @@ trap(type, frame)
 				} else {
 					panic("trap: "
 					    "uvm_fault(%p, %lx, %d, %d): %d",
-					    map, va, 0, vftype, ret);
+					    map, va, fault, vftype, ret);
 				}
 			}
 		}
@@ -431,11 +465,25 @@ trap(type, frame)
 		panic("trap: divide by zero in the kernel");
 		break;
 
+	case T_ILLEGAL:
+	case T_ILLEGAL | T_USER:
+		/* see if it's a SPOP1,,0 */
+		if ((opcode & 0xfffffe00) == 0x10000200) {
+			frame_regmap(frame, opcode & 0x1f) = 0;
+			frame->tf_ipsw |= PSL_N;
+			break;
+		}
+		if (type & T_USER) {
+			sv.sival_int = va;
+			trapsignal(p, SIGILL, type &~ T_USER, ILL_ILLOPC, sv);
+			break;
+		}
+		/* FALLTHROUGH */
+
 	case T_LOWERPL:
 	case T_DPROT:
 	case T_IPROT:
 	case T_OVERFLOW:
-	case T_ILLEGAL:
 	case T_HIGHERPL:
 	case T_TAKENBR:
 	case T_POWERFAIL:
@@ -480,7 +528,16 @@ child_return(arg)
 	void *arg;
 {
 	struct proc *p = (struct proc *)arg;
-	userret(p, p->p_md.md_regs->tf_iioq_head, 0);
+	struct trapframe *tf = p->p_md.md_regs;
+
+	/*
+	 * Set up return value registers as libc:fork() expects
+	 */
+	tf->tf_ret0 = 0;
+	tf->tf_ret1 = 1;	/* ischild */
+	tf->tf_t1 = 0;		/* errno */
+
+	userret(p, tf->tf_iioq_head, 0);
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_SYSRET))
 		ktrsysret(p, SYS_fork, 0, 0);
@@ -628,6 +685,8 @@ syscall(struct trapframe *frame)
 		if (p->p_emul->e_errno)
 			error = p->p_emul->e_errno[error];
 		frame->tf_t1 = error;
+		frame->tf_ret0 = error;
+		frame->tf_ret1 = 0;
 		break;
 	}
 #ifdef SYSCALL_DEBUG

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_subr.c,v 1.26 2003/10/31 11:10:41 markus Exp $	*/
+/*	$OpenBSD: kern_subr.c,v 1.28 2004/06/13 21:49:26 niklas Exp $	*/
 /*	$NetBSD: kern_subr.c,v 1.15 1996/04/09 17:21:56 ragge Exp $	*/
 
 /*
@@ -40,6 +40,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
+#include <sys/sched.h>
 #include <sys/malloc.h>
 #include <sys/queue.h>
 #include <sys/kernel.h>
@@ -77,7 +78,12 @@ uiomove(cp, n, uio)
 		switch (uio->uio_segflg) {
 
 		case UIO_USERSPACE:
+#ifdef __HAVE_CPUINFO
+			if (curcpu()->ci_schedstate.spc_schedflags &
+			    SPCF_SHOULDYIELD)
+#else
 			if (p->p_schedflags & PSCHED_SHOULDYIELD)
+#endif
 				preempt(NULL);
 			if (uio->uio_rw == UIO_READ)
 				error = copyout(cp, iov->iov_base, cnt);

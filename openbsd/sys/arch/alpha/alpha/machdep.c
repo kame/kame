@@ -1,4 +1,4 @@
-/* $OpenBSD: machdep.c,v 1.86 2004/03/10 23:02:53 tom Exp $ */
+/* $OpenBSD: machdep.c,v 1.89 2004/07/06 21:53:59 deraadt Exp $ */
 /* $NetBSD: machdep.c,v 1.210 2000/06/01 17:12:38 thorpej Exp $ */
 
 /*-
@@ -190,9 +190,6 @@ struct	user *proc0paddr;
 
 /* Number of machine cycles per microsecond */
 u_int64_t	cycles_per_usec;
-
-/* number of cpus in the box.  really! */
-int		ncpus;
 
 struct bootinfo_kernel bootinfo;
 
@@ -393,10 +390,9 @@ nobootinfo:
 	 */
 	(*platform.cons_init)();
 
-#ifdef DIAGNOSTIC
+#if 0
 	/* Paranoid sanity checking */
 
-	/* We should always be running on the primary. */
 	assert(hwrpb->rpb_primary_cpu_id == alpha_pal_whami());
 
 	/*
@@ -760,7 +756,7 @@ nobootinfo:
 	 * Figure out the number of cpus in the box, from RPB fields.
 	 * Really.  We mean it.
 	 */
-	for (i = 0; i < hwrpb->rpb_pcs_cnt; i++) {
+	for (ncpus = 0, i = 0; i < hwrpb->rpb_pcs_cnt; i++) {
 		struct pcs *pcsp;
 
 		pcsp = LOCATE_PCS(hwrpb, i);
@@ -2046,7 +2042,7 @@ delay(n)
 		: "i" (2), "0" (N));
 }
 
-#if defined(COMPAT_OSF1) || 1		/* XXX */
+#if defined(COMPAT_OSF1)
 void	cpu_exec_ecoff_setregs(struct proc *, struct exec_package *,
 	    u_long, register_t *);
 

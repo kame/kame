@@ -1,7 +1,7 @@
-/*	$OpenBSD: fpemu.S,v 1.8 2003/04/10 17:27:58 mickey Exp $	*/
+/*	$OpenBSD: fpemu.S,v 1.12 2004/06/02 18:31:14 mickey Exp $	*/
 
 /*
- * Copyright (c) 2000,2002 Michael Shalayeff
+ * Copyright (c) 2000-2004 Michael Shalayeff
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -12,25 +12,22 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Michael Shalayeff.
- * 4. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
  * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * IN NO EVENT SHALL THE AUTHOR OR HIS RELATIVES BE LIABLE FOR ANY DIRECT,
+ * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * SERVICES; LOSS OF MIND, USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+ * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
+ * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include <machine/asm.h>
+#include <machine/cpu.h>
 #include "assym.h"
 
 #define	FPEMU_VERSION	(1 << 11)
@@ -96,7 +93,7 @@ LEAF_ENTRY(fpu_emulate)
 	extru,<> arg0, 31, 5, t2
 	b,n	$fpemu_nzt
 	nop
-	comib,=,n 2, t3, $fpemu_exit
+	/*comib,=,n 2, t3, $fpemu_exit*/
 	nop
 $fpemu_nzt
 	/*
@@ -191,41 +188,22 @@ $fpemu0c_0_5	/* frnd */
 	FP_TABLE2(frnd,sgl,dbl,invalid,quad)
 
 $fpemu0c_1
-	extru	t4, 16, 4, r1
+	extru	t4, 20, 4, r1
 	comib,=,n 0, r31, $fpemu0c_1_0
 	comib,=,n 1, r31, $fpemu0c_1_1
 	comib,=,n 2, r31, $fpemu0c_1_2
 	comib,=,n 3, r31, $fpemu0c_1_3
 
 $fpemu0c_1_0	/* fcnvff */
-#define	sgl_to_quad_fcnvff	invalid_fcnvff
-#define	dbl_to_quad_fcnvff	invalid_fcnvff
-#define	quad_to_sgl_fcnvff	invalid_fcnvff
-#define	quad_to_dbl_fcnvff	invalid_fcnvff
 	FP_TABLE3(fcnvff, invalid, dbl_to_sgl, invalid, quad_to_sgl, sgl_to_dbl, invalid, invalid, quad_to_dbl, invalid, invalid, invalid, invalid, sgl_to_quad, dbl_to_quad, invalid, invalid)
 
 $fpemu0c_1_1	/* fcnvxf */
-#define	sgl_to_quad_fcnvxf	invalid_fcnvxf
-#define	dbl_to_quad_fcnvxf	invalid_fcnvxf
-#define	quad_to_sgl_fcnvxf	invalid_fcnvxf
-#define	quad_to_dbl_fcnvxf	invalid_fcnvxf
-#define	quad_to_quad_fcnvxf	invalid_fcnvxf
 	FP_TABLE3(fcnvxf, sgl_to_sgl, dbl_to_sgl, invalid, quad_to_sgl, sgl_to_dbl, dbl_to_dbl, invalid, quad_to_dbl, invalid, invalid, invalid, invalid, sgl_to_quad, dbl_to_quad, invalid, quad_to_quad)
 
 $fpemu0c_1_2	/* fcnvfx */
-#define	sgl_to_quad_fcnvfx	invalid_fcnvfx
-#define	dbl_to_quad_fcnvfx	invalid_fcnvfx
-#define	quad_to_sgl_fcnvfx	invalid_fcnvfx
-#define	quad_to_dbl_fcnvfx	invalid_fcnvfx
-#define	quad_to_quad_fcnvfx	invalid_fcnvfx
 	FP_TABLE3(fcnvfx, sgl_to_sgl, dbl_to_sgl, invalid, quad_to_sgl, sgl_to_dbl, dbl_to_dbl, invalid, quad_to_dbl, invalid, invalid, invalid, invalid, sgl_to_quad, dbl_to_quad, invalid, quad_to_quad)
 
 $fpemu0c_1_3	/* fcnvfxt */
-#define	sgl_to_quad_fcnvfxt	invalid_fcnvfxt
-#define	dbl_to_quad_fcnvfxt	invalid_fcnvfxt
-#define	quad_to_sgl_fcnvfxt	invalid_fcnvfxt
-#define	quad_to_dbl_fcnvfxt	invalid_fcnvfxt
-#define	quad_to_quad_fcnvfxt	invalid_fcnvfxt
 	FP_TABLE3(fcnvfxt, sgl_to_sgl, dbl_to_sgl, invalid, quad_to_sgl, sgl_to_dbl, dbl_to_dbl, invalid, quad_to_dbl, invalid, invalid, invalid, invalid, sgl_to_quad, dbl_to_quad, invalid, quad_to_quad)
 
 $fpemu0c_2
@@ -238,6 +216,7 @@ $fpemu0c_2_0
 	sh3add	t1, arg3, arg1
 	extru,=	t4, 19, 1, r0	/* see if it's the L reg */
 	addi	4, arg1, arg1
+	extru	t4, 31, 5, arg2
 	FP_TABLE2(fcmp,sgl,dbl,invalid,invalid)
 
 $fpemu0c_2_1
@@ -313,9 +292,28 @@ $fpemu_exit
 invalid_fsqrt
 invalid_frnd
 invalid_fcnvff
+sgl_to_quad_fcnvff
+dbl_to_quad_fcnvff
+quad_to_sgl_fcnvff
+quad_to_dbl_fcnvff
 invalid_fcnvxf
+sgl_to_quad_fcnvxf
+dbl_to_quad_fcnvxf
+quad_to_sgl_fcnvxf
+quad_to_dbl_fcnvxf
+quad_to_quad_fcnvxf
 invalid_fcnvfx
+sgl_to_quad_fcnvfx
+dbl_to_quad_fcnvfx
+quad_to_sgl_fcnvfx
+quad_to_dbl_fcnvfx
+quad_to_quad_fcnvfx
 invalid_fcnvfxt
+sgl_to_quad_fcnvfxt
+dbl_to_quad_fcnvfxt
+quad_to_sgl_fcnvfxt
+quad_to_dbl_fcnvfxt
+quad_to_quad_fcnvfxt
 invalid_fcmp
 invalid_fadd
 invalid_fsub
@@ -323,7 +321,7 @@ invalid_fmpy
 invalid_fdiv
 invalid_frem
 	bv	0(rp)
-	ldi	1, ret0
+	ldi	HPPA_FPU_ILL, ret0
 EXIT(fpu_emulate)
 
 	.end

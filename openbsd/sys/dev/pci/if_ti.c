@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ti.c,v 1.48 2003/12/16 08:20:44 deraadt Exp $	*/
+/*	$OpenBSD: if_ti.c,v 1.53 2004/08/19 18:26:29 mcbride Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -679,11 +679,13 @@ void *ti_jalloc(sc)
 	entry = SLIST_FIRST(&sc->ti_jfree_listhead);
 
 	if (entry == NULL) {
+#ifdef TI_VERBOSE
 		printf("%s: no free jumbo buffers\n", sc->sc_dv.dv_xname);
+#endif
 		return(NULL);
 	}
 
-	SLIST_REMOVE_HEAD(&sc->ti_jinuse_listhead, jpool_entries);
+	SLIST_REMOVE_HEAD(&sc->ti_jfree_listhead, jpool_entries);
 	SLIST_INSERT_HEAD(&sc->ti_jinuse_listhead, entry, jpool_entries);
 	sc->ti_cdata.ti_jslots[entry->slot].ti_inuse = 1;
 	return(sc->ti_cdata.ti_jslots[entry->slot].ti_buf);
@@ -756,16 +758,11 @@ int ti_newbuf_std(sc, i, m, dmamap)
 
 	if (m == NULL) {
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-		if (m_new == NULL) {
-			printf("%s: mbuf allocation failed "
-			    "-- packet dropped!\n", sc->sc_dv.dv_xname);
+		if (m_new == NULL)
 			return(ENOBUFS);
-		}
 
 		MCLGET(m_new, M_DONTWAIT);
 		if (!(m_new->m_flags & M_EXT)) {
-			printf("%s: cluster allocation failed "
-			    "-- packet dropped!\n", sc->sc_dv.dv_xname);
 			m_freem(m_new);
 			return(ENOBUFS);
 		}
@@ -829,11 +826,8 @@ int ti_newbuf_mini(sc, i, m, dmamap)
 
 	if (m == NULL) {
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-		if (m_new == NULL) {
-			printf("%s: mbuf allocation failed "
-			    "-- packet dropped!\n", sc->sc_dv.dv_xname);
+		if (m_new == NULL)
 			return(ENOBUFS);
-		}
 		m_new->m_len = m_new->m_pkthdr.len = MHLEN;
 		m_adj(m_new, ETHER_ALIGN);
 
@@ -875,18 +869,13 @@ int ti_newbuf_jumbo(sc, i, m)
 
 		/* Allocate the mbuf. */
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-		if (m_new == NULL) {
-			printf("%s: mbuf allocation failed "
-			    "-- packet dropped!\n", sc->sc_dv.dv_xname);
+		if (m_new == NULL)
 			return(ENOBUFS);
-		}
 
 		/* Allocate the jumbo buffer */
 		buf = ti_jalloc(sc);
 		if (buf == NULL) {
 			m_freem(m_new);
-			printf("%s: jumbo allocation failed "
-			    "-- packet dropped!\n", sc->sc_dv.dv_xname);
 			return(ENOBUFS);
 		}
 
@@ -894,14 +883,14 @@ int ti_newbuf_jumbo(sc, i, m)
 		m_new->m_data = m_new->m_ext.ext_buf = (void *)buf;
 		m_new->m_flags |= M_EXT;
 		m_new->m_len = m_new->m_pkthdr.len =
-		    m_new->m_ext.ext_size = TI_JUMBO_FRAMELEN;
+		    m_new->m_ext.ext_size = ETHER_MAX_LEN_JUMBO;
 		m_new->m_ext.ext_free = ti_jfree;
 		m_new->m_ext.ext_arg = sc;
 		MCLINITREFERENCE(m_new);
 	} else {
 		m_new = m;
 		m_new->m_data = m_new->m_ext.ext_buf;
-		m_new->m_ext.ext_size = TI_JUMBO_FRAMELEN;
+		m_new->m_ext.ext_size = ETHER_MAX_LEN_JUMBO;
 	}
 
 	m_adj(m_new, ETHER_ALIGN);
@@ -1073,8 +1062,8 @@ int ti_init_tx_ring(sc)
 
 	SLIST_INIT(&sc->ti_tx_map_listhead);
 	for (i = 0; i < TI_TX_RING_CNT; i++) {
-		if (bus_dmamap_create(sc->sc_dmatag, MCLBYTES, TI_NTXSEG,
-		    MCLBYTES, 0, BUS_DMA_NOWAIT, &dmamap))
+		if (bus_dmamap_create(sc->sc_dmatag, ETHER_MAX_LEN_JUMBO,
+		    TI_NTXSEG, MCLBYTES, 0, BUS_DMA_NOWAIT, &dmamap))
 			return(ENOBUFS);
 
 		entry = malloc(sizeof(*entry), M_DEVBUF, M_NOWAIT);
@@ -1179,6 +1168,7 @@ void ti_setmulti(sc)
  
 	ifp = &sc->arpcom.ac_if;
 
+allmulti:
 	if (ifp->if_flags & IFF_ALLMULTI) {
 		TI_DO_CMD(TI_CMD_SET_ALLMULTI, TI_CMD_CODE_ALLMULTI_ENB, 0);
 		return;
@@ -1201,6 +1191,13 @@ void ti_setmulti(sc)
 	/* Now program new ones. */
 	ETHER_FIRST_MULTI(step, ac, enm);
 	while (enm != NULL) {
+		if (bcmp(enm->enm_addrlo, enm->enm_addrhi, ETHER_ADDR_LEN)) {
+			/* Re-enable interrupts. */
+			CSR_WRITE_4(sc, TI_MB_HOSTINTR, intrs);
+
+			ifp->if_flags |= IFF_ALLMULTI;
+			goto allmulti;
+		}
 		mc = malloc(sizeof(struct ti_mc_entry), M_DEVBUF, M_NOWAIT);
 		if (mc == NULL)
 			panic("ti_setmulti");
@@ -1462,7 +1459,7 @@ int ti_gibinit(sc)
 	/* Set up the jumbo receive ring. */
 	rcb = &sc->ti_rdata->ti_info.ti_jumbo_rx_rcb;
 	TI_HOSTADDR(rcb->ti_hostaddr) = TI_RING_DMA_ADDR(sc, ti_rx_jumbo_ring);
-	rcb->ti_max_len = TI_JUMBO_FRAMELEN;
+	rcb->ti_max_len = ETHER_MAX_LEN_JUMBO;
 	rcb->ti_flags = 0;
 	rcb->ti_flags |= TI_RCB_FLAG_IP_CKSUM | TI_RCB_FLAG_NO_PHDR_CKSUM;
 #if NVLAN > 0
@@ -2585,6 +2582,14 @@ int ti_ioctl(ifp, command, data)
 		default:
 			ti_init(sc);
 			break;
+		}
+		break;
+	case SIOCSIFMTU:
+		if (ifr->ifr_mtu > ETHERMTU_JUMBO) {
+			error = EINVAL;
+		} else {
+			ifp->if_mtu = ifr->ifr_mtu;
+			ti_init(sc);
 		}
 		break;
 	case SIOCSIFFLAGS:

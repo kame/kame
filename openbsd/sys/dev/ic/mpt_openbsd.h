@@ -1,4 +1,4 @@
-/*	$OpenBSD: mpt_openbsd.h,v 1.6 2004/03/20 03:54:16 krw Exp $	*/
+/*	$OpenBSD: mpt_openbsd.h,v 1.9 2004/08/23 20:52:15 marco Exp $	*/
 /*	$NetBSD: mpt_netbsd.h,v 1.2 2003/04/16 23:02:14 thorpej Exp $	*/
 
 /*
@@ -14,13 +14,19 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR OR HIS RELATIVES BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  */
+
 /*
  * Copyright (c) 2003 Wasabi Systems, Inc.
  * All rights reserved.
@@ -93,8 +99,8 @@
  * ZOOM International, s.r.o.
  */
 
-#ifndef _DEV_IC_MPT_NETBSD_H_
-#define	_DEV_IC_MPT_NETBSD_H_
+#ifndef _DEV_IC_MPT_OPENBSD_H_
+#define	_DEV_IC_MPT_OPENBSD_H_
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -204,6 +210,7 @@ typedef struct mpt_softc {
 	uint8_t		mpt_max_buses;
 	uint8_t         fw_download_boot;
 	uint32_t        fw_image_size;
+	uint32_t	im_support;
 
 	/* Port facts */
 	uint16_t	mpt_ini_id;
@@ -301,4 +308,4 @@ do {								\
 		(*(mpt)->sc_set_config_regs)((mpt));		\
 } while (/*CONSTCOND*/0)
 
-#endif /* _DEV_IC_MPT_NETBSD_H_ */
+#endif /* _DEV_IC_MPT_OPENBSD_H_ */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: specialreg.h,v 1.21 2004/02/19 22:33:29 grange Exp $	*/
+/*	$OpenBSD: specialreg.h,v 1.24 2004/06/25 01:02:53 tom Exp $	*/
 /*	$NetBSD: specialreg.h,v 1.7 1994/10/27 04:16:26 cgd Exp $	*/
 
 /*-
@@ -129,6 +129,7 @@
  * feature set for simplicity
  */
 #define CPUID_3DNOW	0x40000000	/* has 3DNow! instructions (AMD) */
+#define CPUID_LONG	0x20000000	/* long mode (AMD64, ext cpuid) */
 
 #define CPUIDECX_PNI	0x00000001	/* Prescott New Instructions */
 #define CPUIDECX_MWAIT	0x00000008	/* Monitor/Mwait */
@@ -232,6 +233,9 @@
 #define MSR_MC3_STATUS		0x411
 #define MSR_MC3_ADDR		0x412
 #define MSR_MC3_MISC		0x413
+
+/* AMD MSRs */
+#define MSR_K6_EPMR		0xc0000086
 
 /*
  * Constants related to MTRRs
@@ -425,6 +429,11 @@
 #define	PMC6_SEG_REG_RENAMES		0xd5	/* P-II and P-III only */
 #define	PMC6_RET_SEG_RENAMES		0xd6	/* P-II and P-III only */
 
+/* VIA C3 crypto featureset: for i386_has_xcrypt */
+#define C3_HAS_AES			1	/* cpu has AES */
+#define C3_HAS_SHA			2	/* cpu has SHA1 & SHA256 */
+#define C3_HAS_MM			4	/* cpu has RSA instructions */
+
 /* VIA C3 xcrypt-* instruction context control options */
 #define	C3_CRYPT_CWLO_ROUND_M		0x0000000f
 #define	C3_CRYPT_CWLO_ALG_M		0x00000070
@@ -439,10 +448,3 @@
 #define	C3_CRYPT_CWLO_KEY128		0x0000000a	/* 128bit, 10 rds */
 #define	C3_CRYPT_CWLO_KEY192		0x0000040c	/* 192bit, 12 rds */
 #define	C3_CRYPT_CWLO_KEY256		0x0000080e	/* 256bit, 15 rds */
-
-/* VIA C3 xcrypt-* opcodes */
-#define	VIAC3_CRYPTOP_RNG	0xc0		/* rng */
-#define	VIAC3_CRYPTOP_ECB	0xc8		/* aes-ecb */
-#define	VIAC3_CRYPTOP_CBC	0xd0		/* aes-cbc */
-#define	VIAC3_CRYPTOP_CFB	0xe0		/* aes-cfb */
-#define	VIAC3_CRYPTOP_OFB	0xe8		/* aes-ofb */

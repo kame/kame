@@ -1,4 +1,4 @@
-/*	$OpenBSD: footbridge_intr.h,v 1.1 2004/02/01 05:09:49 drahn Exp $	*/
+/*	$OpenBSD: footbridge_intr.h,v 1.3 2004/08/17 19:40:45 drahn Exp $	*/
 /* 	$NetBSD: footbridge_intr.h,v 1.4 2003/01/03 00:56:00 thorpej Exp $	*/
 
 /*
@@ -74,6 +74,7 @@
 
 #ifndef _LOCORE
 #include <arm/cpufunc.h>
+#include <sys/evcount.h>
 
 #include <arm/footbridge/dc21285mem.h>
 #include <arm/footbridge/dc21285reg.h>
@@ -193,6 +194,7 @@ void	_setsoftintr(int);
 
 struct intrhand {
 	TAILQ_ENTRY(intrhand) ih_list;	/* link on intrq list */
+	struct evcount ih_count;	/* interrupt counter */
 	int (*ih_func)(void *);		/* handler */
 	void *ih_arg;			/* arg for handler */
 	int ih_ipl;			/* IPL_* */
@@ -203,11 +205,9 @@ struct intrhand {
 
 struct intrq {
 	TAILQ_HEAD(, intrhand) iq_list;	/* handler list */
-	struct evcnt iq_ev;		/* event counter */
 	int iq_mask;			/* IRQs to mask while handling */
 	int iq_levels;			/* IPL_*'s this IRQ has */
 	int iq_ist;			/* share type */
-	char iq_name[IRQNAMESIZE];	/* interrupt name */
 };
 
 #endif /* _LOCORE */

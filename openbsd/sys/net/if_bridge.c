@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_bridge.c,v 1.131 2004/02/10 20:20:01 itojun Exp $	*/
+/*	$OpenBSD: if_bridge.c,v 1.137 2004/08/18 11:07:47 markus Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Jason L. Wright (jason@thought.net)
@@ -1392,6 +1392,11 @@ bridge_input(struct ifnet *ifp, struct ether_header *eh, struct mbuf *m)
 				bridge_rtupdate(sc,
 				    (struct ether_addr *)&eh->ether_shost,
 				    ifp, 0, IFBAF_DYNAMIC);
+			if (bridge_filterrule(&srcifl->bif_brlin, eh, m) ==
+			    BRL_ACTION_BLOCK) {
+				m_freem(m);
+				return (NULL);
+			}
 			m->m_pkthdr.rcvif = ifl->ifp;
 			if (ifp->if_type == IFT_GIF) {
 				m->m_flags |= M_PROTO1;
@@ -2118,7 +2123,7 @@ bridge_flushrule(struct bridge_iflist *bif)
 
 	while (!SIMPLEQ_EMPTY(&bif->bif_brlin)) {
 		p = SIMPLEQ_FIRST(&bif->bif_brlin);
-		SIMPLEQ_REMOVE_HEAD(&bif->bif_brlin, p, brl_next);
+		SIMPLEQ_REMOVE_HEAD(&bif->bif_brlin, brl_next);
 #if NPF > 0
 		pf_tag_unref(p->brl_tag);
 #endif
@@ -2126,7 +2131,7 @@ bridge_flushrule(struct bridge_iflist *bif)
 	}
 	while (!SIMPLEQ_EMPTY(&bif->bif_brlout)) {
 		p = SIMPLEQ_FIRST(&bif->bif_brlout);
-		SIMPLEQ_REMOVE_HEAD(&bif->bif_brlout, p, brl_next);
+		SIMPLEQ_REMOVE_HEAD(&bif->bif_brlout, brl_next);
 #if NPF > 0
 		pf_tag_unref(p->brl_tag);
 #endif
@@ -2236,11 +2241,7 @@ bridge_ipsec(int dir, int af, int hlen, struct mbuf *m)
 		if (tdb != NULL && (tdb->tdb_flags & TDBF_INVALID) == 0 &&
 		    tdb->tdb_xform != NULL) {
 			if (tdb->tdb_first_use == 0) {
-				int pri;
-
-				pri = splhigh();
-				tdb->tdb_first_use = time.tv_sec;
-				splx(pri);
+				tdb->tdb_first_use = time_second;
 
 				tv.tv_usec = 0;
 
@@ -2274,9 +2275,9 @@ bridge_ipsec(int dir, int af, int hlen, struct mbuf *m)
 			splx(s);
 			return (1);
 		} else {
+			splx(s);
  skiplookup:
 			/* XXX do an input policy lookup */
-			splx(s);
 			return (0);
 		}
 	} else { /* Outgoing from the bridge. */
@@ -2292,7 +2293,7 @@ bridge_ipsec(int dir, int af, int hlen, struct mbuf *m)
 #ifdef INET
 			case AF_INET:
 				if (pf_test(dir, &encif[0].sc_if,
-				    &m) != PF_PASS) {
+				    &m, NULL) != PF_PASS) {
 					m_freem(m);
 					return (1);
 				}
@@ -2301,7 +2302,7 @@ bridge_ipsec(int dir, int af, int hlen, struct mbuf *m)
 #ifdef INET6
 			case AF_INET6:
 				if (pf_test6(dir, &encif[0].sc_if,
-				    &m) != PF_PASS) {
+				    &m, NULL) != PF_PASS) {
 					m_freem(m);
 					return (1);
 				}
@@ -2427,7 +2428,7 @@ bridge_filter(struct bridge_softc *sc, int dir, struct ifnet *ifp,
 #if NPF > 0
 		/* Finally, we get to filter the packet! */
 		m->m_pkthdr.rcvif = ifp;
-		if (pf_test(dir, ifp, &m) != PF_PASS)
+		if (pf_test(dir, ifp, &m, eh) != PF_PASS)
 			goto dropit;
 		if (m == NULL)
 			goto dropit;
@@ -2473,7 +2474,7 @@ bridge_filter(struct bridge_softc *sc, int dir, struct ifnet *ifp,
 #endif /* IPSEC */
 
 #if NPF > 0
-		if (pf_test6(dir, ifp, &m) != PF_PASS)
+		if (pf_test6(dir, ifp, &m, eh) != PF_PASS)
 			goto dropit;
 		if (m == NULL)
 			return (NULL);

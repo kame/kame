@@ -1,4 +1,4 @@
-/*	$OpenBSD: msdosfs_vnops.c,v 1.43 2003/11/13 17:19:40 drahn Exp $	*/
+/*	$OpenBSD: msdosfs_vnops.c,v 1.46 2004/06/24 19:35:25 tholo Exp $	*/
 /*	$NetBSD: msdosfs_vnops.c,v 1.63 1997/10/17 11:24:19 ws Exp $	*/
 
 /*-
@@ -62,6 +62,7 @@
 #include <sys/signalvar.h>
 #include <miscfs/specfs/specdev.h> /* XXX */	/* defines v_rdev */
 #include <sys/malloc.h>
+#include <sys/pool.h>
 #include <sys/dirent.h>		/* defines dirent structure */
 #include <sys/lockf.h>
 #include <sys/poll.h>
@@ -152,18 +153,18 @@ msdosfs_create(v)
 	ndirent.de_devvp = pdep->de_devvp;
 	ndirent.de_pmp = pdep->de_pmp;
 	ndirent.de_flag = DE_ACCESS | DE_CREATE | DE_UPDATE;
-	TIMEVAL_TO_TIMESPEC(&time, &ts);
+	getnanotime(&ts);
 	DETIMES(&ndirent, &ts, &ts, &ts);
 	if ((error = createde(&ndirent, pdep, &dep, cnp)) != 0)
 		goto bad;
 	if ((cnp->cn_flags & SAVESTART) == 0)
-		FREE(cnp->cn_pnbuf, M_NAMEI);
+		pool_put(&namei_pool, cnp->cn_pnbuf);
 	vput(ap->a_dvp);
 	*ap->a_vpp = DETOV(dep);
 	return (0);
 
 bad:
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, cnp->cn_pnbuf);
 	vput(ap->a_dvp);
 	return (error);
 }
@@ -179,7 +180,7 @@ msdosfs_mknod(v)
 		struct vattr *a_vap;
 	} */ *ap = v;
 
-	FREE(ap->a_cnp->cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, ap->a_cnp->cn_pnbuf);
 	vput(ap->a_dvp);
 	return (EINVAL);
 }
@@ -215,7 +216,7 @@ msdosfs_close(v)
 	struct timespec ts;
 
 	if (vp->v_usecount > 1 && !VOP_ISLOCKED(vp)) {
-		TIMEVAL_TO_TIMESPEC(&time, &ts);
+		getnanotime(&ts);
 		DETIMES(dep, &ts, &ts, &ts);
 	}
 	return (0);
@@ -264,10 +265,10 @@ msdosfs_getattr(v)
 	struct msdosfsmount *pmp = dep->de_pmp;
 	struct vattr *vap = ap->a_vap;
 	struct timespec ts;
-	u_long dirsperblk = pmp->pm_BytesPerSec / sizeof(struct direntry);
-	u_long fileid;
+	uint32_t dirsperblk = pmp->pm_BytesPerSec / sizeof(struct direntry);
+	uint32_t fileid;
 
-	TIMEVAL_TO_TIMESPEC(&time, &ts);
+	getnanotime(&ts);
 	DETIMES(dep, &ts, &ts, &ts);
 	vap->va_fsid = dep->de_dev;
 	/*
@@ -363,7 +364,7 @@ msdosfs_setattr(v)
 		return EISDIR;
 
 	if (vap->va_size != VNOVAL) {
-		error = detrunc(dep, (u_long)vap->va_size, 0, cred, ap->a_p);
+		error = detrunc(dep, (uint32_t)vap->va_size, 0, cred, ap->a_p);
 		if (error)
 			return (error);
 	}
@@ -449,7 +450,7 @@ msdosfs_read(v)
 	do {
 		lbn = de_cluster(pmp, uio->uio_offset);
 		on = uio->uio_offset & pmp->pm_crbomask;
-		n = min((u_long) (pmp->pm_bpcluster - on), uio->uio_resid);
+		n = min((uint32_t) (pmp->pm_bpcluster - on), uio->uio_resid);
 		diff = dep->de_FileSize - uio->uio_offset;
 		if (diff <= 0)
 			return (0);
@@ -509,9 +510,9 @@ msdosfs_write(v)
 	int n;
 	int croffset;
 	int resid;
-	u_long osize;
+	uint32_t osize;
 	int error = 0;
-	u_long count;
+	uint32_t count;
 	daddr_t bn, lastcn;
 	struct buf *bp;
 	int ioflag = ap->a_ioflag;
@@ -695,7 +696,7 @@ msdosfs_ioctl(v)
 #if 0
 	struct vop_ioctl_args /* {
 		struct vnode *a_vp;
-		u_long a_command;
+		uint32_t a_command;
 		caddr_t a_data;
 		int a_fflag;
 		struct ucred *a_cred;
@@ -870,11 +871,11 @@ msdosfs_rename(v)
 	struct proc *p = curproc; /* XXX */
 	register struct denode *ip, *xp, *dp, *zp;
 	u_char toname[11], oldname[11];
-	u_long from_diroffset, to_diroffset;
+	uint32_t from_diroffset, to_diroffset;
 	u_char to_count;
 	int doingdirectory = 0, newparent = 0;
 	int error;
-	u_long cn, pcl;
+	uint32_t cn, pcl;
 	daddr_t bn;
 	struct msdosfsmount *pmp;
 	struct direntry *dotdotp;
@@ -1206,7 +1207,7 @@ msdosfs_mkdir(v)
 	struct denode *pdep = VTODE(ap->a_dvp);
 	int error;
 	int bn;
-	u_long newcluster, pcl;
+	uint32_t newcluster, pcl;
 	struct direntry *denp;
 	struct msdosfsmount *pmp = pdep->de_pmp;
 	struct buf *bp;
@@ -1233,7 +1234,7 @@ msdosfs_mkdir(v)
 	bzero(&ndirent, sizeof(ndirent));
 	ndirent.de_pmp = pmp;
 	ndirent.de_flag = DE_ACCESS | DE_CREATE | DE_UPDATE;
-	TIMEVAL_TO_TIMESPEC(&time, &ts);
+	getnanotime(&ts);
 	DETIMES(&ndirent, &ts, &ts, &ts);
 
 	/*
@@ -1292,7 +1293,7 @@ msdosfs_mkdir(v)
 	if ((error = createde(&ndirent, pdep, &dep, cnp)) != 0)
 		goto bad;
 	if ((cnp->cn_flags & SAVESTART) == 0)
-		FREE(cnp->cn_pnbuf, M_NAMEI);
+		pool_put(&namei_pool, cnp->cn_pnbuf);
 	vput(ap->a_dvp);
 	*ap->a_vpp = DETOV(dep);
 	return (0);
@@ -1300,7 +1301,7 @@ msdosfs_mkdir(v)
 bad:
 	clusterfree(pmp, newcluster, NULL);
 bad2:
-	FREE(cnp->cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, cnp->cn_pnbuf);
 	vput(ap->a_dvp);
 	return (error);
 }
@@ -1363,7 +1364,7 @@ msdosfs_rmdir(v)
 	/*
 	 * Truncate the directory that is being deleted.
 	 */
-	error = detrunc(ip, (u_long)0, IO_SYNC, cnp->cn_cred, cnp->cn_proc);
+	error = detrunc(ip, (uint32_t)0, IO_SYNC, cnp->cn_cred, cnp->cn_proc);
 	cache_purge(vp);
 out:
 	if (dvp)
@@ -1411,9 +1412,9 @@ msdosfs_readdir(v)
 	long on;
 	long lost;
 	long count;
-	u_long dirsperblk;
-	u_long cn;
-	u_long fileno;
+	uint32_t dirsperblk;
+	uint32_t cn;
+	uint32_t fileno;
 	long bias = 0;
 	daddr_t bn, lbn;
 	struct buf *bp;

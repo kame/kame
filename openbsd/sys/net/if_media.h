@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_media.h,v 1.12 2003/08/24 12:23:57 fgsch Exp $	*/
+/*	$OpenBSD: if_media.h,v 1.14 2004/06/27 03:44:50 millert Exp $	*/
 /*	$NetBSD: if_media.h,v 1.22 2000/02/17 21:53:16 sommerfeld Exp $	*/
 
 /*-
@@ -213,11 +213,54 @@ int	ifmedia_baudrate(int);
 #define	IFM_IEEE80211_DS5	6	/* Direct Sequence 5Mbps*/
 #define	IFM_IEEE80211_DS11	7	/* Direct Sequence 11Mbps*/
 #define	IFM_IEEE80211_DS1	8	/* Direct Sequence  1Mbps*/
+#define IFM_IEEE80211_DS22      9	/* Direct Sequence 22Mbps */ 
+#define IFM_IEEE80211_OFDM6     10	/* OFDM 6Mbps */
+#define IFM_IEEE80211_OFDM9     11	/* OFDM 9Mbps */
+#define IFM_IEEE80211_OFDM12    12	/* OFDM 12Mbps */
+#define IFM_IEEE80211_OFDM18    13	/* OFDM 18Mbps */
+#define IFM_IEEE80211_OFDM24    14	/* OFDM 24Mbps */
+#define IFM_IEEE80211_OFDM36    15	/* OFDM 36Mbps */
+#define IFM_IEEE80211_OFDM48    16	/* OFDM 48Mbps */
+#define IFM_IEEE80211_OFDM54    17	/* OFDM 54Mbps */
+#define IFM_IEEE80211_OFDM72    18	/* OFDM 72Mbps */
+
 #define	IFM_IEEE80211_ADHOC	0x100	/* Operate in Adhoc mode */
 #define	IFM_IEEE80211_HOSTAP	0x200	/* Operate in Host AP mode */
 #define	IFM_IEEE80211_IBSS	0x400	/* Operate in IBSS mode */
 #define	IFM_IEEE80211_IBSSMASTER 0x800	/* Operate as an IBSS master */
 #define	IFM_IEEE80211_MONITOR	0x1000	/* Operate in Monitor mode */
+#define	IFM_IEEE80211_TURBO	0x2000	/* Operate in Turbo mode */
+
+/* operating mode for multi-mode devices */
+#define IFM_IEEE80211_11A	0x00010000	/* 5Ghz, OFDM mode */
+#define IFM_IEEE80211_11B	0x00020000	/* Direct Sequence mode */
+#define IFM_IEEE80211_11G	0x00030000	/* 2Ghz, CCK mode */
+#define IFM_IEEE80211_FH	0x00040000	/* 2Ghz, GFSK mode */
+
+/*
+ * Digitally multiplexed "Carrier" Serial Interfaces
+ */
+#define	IFM_TDM		0x000000a0
+#define IFM_TDM_T1		3	/* T1 B8ZS+ESF 24 ts  */
+#define IFM_TDM_T1_AMI		4	/* T1 AMI+SF 24 ts */
+#define IFM_TDM_E1		5	/* E1 HDB3+G.703 clearchannel 32 ts */
+#define IFM_TDM_E1_G704		6	/* E1 HDB3+G.703+G.704 channelized 31 ts */
+#define IFM_TDM_E1_AMI		7	/* E1 AMI+G.703 32 ts */
+#define IFM_TDM_E1_AMI_G704	8	/* E1 AMI+G.703+G.704 31 ts */
+#define IFM_TDM_T3		9	/* T3 B3ZS+C-bit 672 ts */
+#define IFM_TDM_T3_M13		10	/* T3 B3ZS+M13 672 ts */
+#define IFM_TDM_E3		11	/* E3 HDB3+G.751 512? ts */
+#define IFM_TDM_E3_G751		12	/* E3 G.751 512 ts */
+#define IFM_TDM_E3_G832		13	/* E3 G.832 512 ts */
+/*
+ * 6 major ways that networks talk: Drivers enforce independent selection,
+ * meaning, a driver will ensure that only one of these is set at a time.
+ */
+#define IFM_TDM_HDLC_CRC16	0x0100	/* Use 16-bit CRC for HDLC instead */
+#define IFM_TDM_PPP		0x0200	/* SPPP (dumb) */
+#define IFM_TDM_FR_ANSI		0x0400	/* Frame Relay + LMI ANSI "Annex D" */
+#define IFM_TDM_FR_CISCO	0x0800	/* Frame Relay + LMI Cisco */
+#define IFM_TDM_FR_ITU		0x1000	/* Frame Relay + LMI ITU "Q933A" */
 
 /*
  * Shared media sub-types
@@ -245,6 +288,8 @@ int	ifmedia_baudrate(int);
 #define	IFM_IMASK	0xf0000000	/* Instance */
 #define	IFM_ISHIFT	28		/* Instance shift */
 #define	IFM_OMASK	0x0000ff00	/* Type specific options */
+#define	IFM_MMASK	0x00070000	/* Mode */
+#define	IFM_MSHIFT	16		/* Mode shift */
 #define	IFM_GMASK	0x0ff00000	/* Global options */
 
 #define	IFM_NMIN	IFM_ETHER	/* lowest Network type */
@@ -272,6 +317,7 @@ int	ifmedia_baudrate(int);
 #define	IFM_SUBTYPE(x)	((x) & IFM_TMASK)
 #define	IFM_INST(x)	(((x) & IFM_IMASK) >> IFM_ISHIFT)
 #define	IFM_OPTIONS(x)	((x) & (IFM_OMASK|IFM_GMASK))
+#define	IFM_MODE(x)	((x) & IFM_MMASK)
 
 #define	IFM_INST_MAX	IFM_INST(IFM_IMASK)
 #define	IFM_INST_ANY	(-1)
@@ -307,6 +353,7 @@ struct ifmedia_description {
 	{ IFM_TOKEN,			"token" },			\
 	{ IFM_FDDI,			"FDDI" },			\
 	{ IFM_IEEE80211,		"IEEE802.11" },			\
+	{ IFM_TDM,			"TDM" },			\
 	{ 0, NULL },							\
 }
 
@@ -382,6 +429,28 @@ struct ifmedia_description {
 	{ IFM_IEEE80211|IFM_IEEE80211_DS2,	"DS2" },		\
 	{ IFM_IEEE80211|IFM_IEEE80211_DS5,	"DS5" },		\
 	{ IFM_IEEE80211|IFM_IEEE80211_DS11,	"DS11" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_DS22,	"DS22" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM6,	"OFDM6" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM9,	"OFDM9" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM12,	"OFDM12" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM18,	"OFDM18" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM24,	"OFDM24" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM36,	"OFDM36" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM48,	"OFDM48" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM54,	"OFDM54" },		\
+	{ IFM_IEEE80211|IFM_IEEE80211_OFDM72,	"OFDM72" },		\
+									\
+	{ IFM_TDM|IFM_TDM_T1,		"t1" },				\
+	{ IFM_TDM|IFM_TDM_T1_AMI,	"t1-ami" },			\
+	{ IFM_TDM|IFM_TDM_E1,		"e1" },				\
+	{ IFM_TDM|IFM_TDM_E1_G704,	"e1-g.704" },			\
+	{ IFM_TDM|IFM_TDM_E1_AMI,	"e1-ami" },			\
+	{ IFM_TDM|IFM_TDM_E1_AMI_G704,	"e1-ami-g.704" },		\
+	{ IFM_TDM|IFM_TDM_T3,		"t3" },				\
+	{ IFM_TDM|IFM_TDM_T3_M13,	"t3-m13" },			\
+	{ IFM_TDM|IFM_TDM_E3,		"e3" },				\
+	{ IFM_TDM|IFM_TDM_E3_G751,	"e3-g.751" },			\
+	{ IFM_TDM|IFM_TDM_E3_G832,	"e3-g.832" },			\
 									\
 	{ 0, NULL },							\
 }
@@ -413,6 +482,12 @@ struct ifmedia_description {
 	{ IFM_IEEE80211|IFM_IEEE80211_IBSS,	"ibss" },		\
 	{ IFM_IEEE80211|IFM_IEEE80211_IBSSMASTER, "ibss-master" },	\
 	{ IFM_IEEE80211|IFM_IEEE80211_MONITOR,	"monitor" },		\
+									\
+	{ IFM_TDM|IFM_TDM_HDLC_CRC16,	"hdlc-crc16" },			\
+	{ IFM_TDM|IFM_TDM_PPP,		"ppp" },			\
+	{ IFM_TDM|IFM_TDM_FR_ANSI,	"framerelay-ansi" },		\
+	{ IFM_TDM|IFM_TDM_FR_CISCO,	"framerelay-cisco" },		\
+	{ IFM_TDM|IFM_TDM_FR_ANSI,	"framerelay-itu" },		\
 									\
 	{ 0, NULL },							\
 }
@@ -458,6 +533,18 @@ struct ifmedia_baudrate {
 	{ IFM_IEEE80211|IFM_IEEE80211_DS11, IF_Mbps(11) },		\
 	{ IFM_IEEE80211|IFM_IEEE80211_DS1, IF_Mbps(1) },		\
 									\
+	{ IFM_TDM|IFM_TDM_T1,		IF_Kbps(1536) },		\
+	{ IFM_TDM|IFM_TDM_T1_AMI,	IF_Kbps(1536) },		\
+	{ IFM_TDM|IFM_TDM_E1,		IF_Kbps(2048) },		\
+	{ IFM_TDM|IFM_TDM_E1_G704,	IF_Kbps(2048) },		\
+	{ IFM_TDM|IFM_TDM_E1_AMI,	IF_Kbps(2048) },		\
+	{ IFM_TDM|IFM_TDM_E1_AMI_G704,	IF_Kbps(2048) },		\
+	{ IFM_TDM|IFM_TDM_T3,		IF_Kbps(44736) },		\
+	{ IFM_TDM|IFM_TDM_T3_M13,	IF_Kbps(44736) },		\
+	{ IFM_TDM|IFM_TDM_E3,		IF_Kbps(34368) },		\
+	{ IFM_TDM|IFM_TDM_E3_G751,	IF_Kbps(34368) },		\
+	{ IFM_TDM|IFM_TDM_E3_G832,	IF_Kbps(34368) },		\
+									\
 	{ 0, 0 },							\
 }
 
@@ -483,6 +570,8 @@ struct ifmedia_status_description {
 	    { "no ring", "inserted" } },				\
 	{ IFM_IEEE80211,	IFM_AVALID,	IFM_ACTIVE,		\
 	    { "no network", "active" } },				\
+	{ IFM_TDM,		IFM_AVALID,	IFM_ACTIVE,		\
+	    { "no carrier", "active" } },				\
 	{ 0,			0,		0,			\
 	    { NULL, NULL } }						\
 }

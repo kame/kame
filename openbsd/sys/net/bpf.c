@@ -1,4 +1,4 @@
-/*	$OpenBSD: bpf.c,v 1.44 2004/02/24 21:43:55 tedu Exp $	*/
+/*	$OpenBSD: bpf.c,v 1.52 2004/09/12 09:35:50 claudio Exp $	*/
 /*	$NetBSD: bpf.c,v 1.33 1997/02/21 23:59:35 thorpej Exp $	*/
 
 /*
@@ -72,11 +72,10 @@ int bpf_maxbufsize = BPF_MAXBUFSIZE;
 
 /*
  *  bpf_iflist is the list of interfaces; each corresponds to an ifnet
- *  bpf_dtab holds the descriptors, indexed by minor device #
+ *  bpf_d_list is the list of descriptors
  */
 struct bpf_if	*bpf_iflist;
-struct bpf_d	*bpf_dtab;
-int nbpfilter;
+LIST_HEAD(, bpf_d) bpf_d_list;
 
 int	bpf_allocbufs(struct bpf_d *);
 void	bpf_freed(struct bpf_d *);
@@ -96,6 +95,10 @@ void	bpf_reset_d(struct bpf_d *);
 
 void	filt_bpfrdetach(struct knote *);
 int	filt_bpfread(struct knote *, long);
+
+struct bpf_d *bpfilter_lookup(int);
+struct bpf_d *bpfilter_create(int);
+void bpfilter_destroy(struct bpf_d *);
 
 int
 bpf_movein(uio, linktype, mp, sockp, filter)
@@ -292,6 +295,12 @@ bpf_detachd(d)
 #define D_MARKUSED(d) ((d)->bd_next = 0)
 
 /*
+ * Reference count access to descriptor buffers
+ */
+#define D_GET(d) ((d)->bd_ref++)
+#define D_PUT(d) bpf_freed(d)
+
+/*
  * bpfilterattach() is called at boot time in new systems.  We do
  * nothing here since old systems will not call this.
  */
@@ -300,19 +309,7 @@ void
 bpfilterattach(n)
 	int n;
 {
-	int i;
-
-	bpf_dtab = malloc(n * sizeof(*bpf_dtab), M_DEVBUF, M_NOWAIT);
-	if (!bpf_dtab)
-		return;
-	nbpfilter = n;
-	bzero(bpf_dtab, n * sizeof(*bpf_dtab));
-	/*
-	 * Mark all the descriptors free if this hasn't been done.
-	 */
-	if (!D_ISFREE(&bpf_dtab[0]))
-		for (i = 0; i < nbpfilter; ++i)
-			D_MARKFREE(&bpf_dtab[i]);
+	LIST_INIT(&bpf_d_list);
 }
 
 /*
@@ -329,20 +326,21 @@ bpfopen(dev, flag, mode, p)
 {
 	struct bpf_d *d;
 
-	if (minor(dev) >= nbpfilter)
+	/* create on demand */
+	if ((d = bpfilter_create(minor(dev))) == NULL)
 		return (ENXIO);
 	/*
 	 * Each minor can be opened by only one process.  If the requested
 	 * minor is in use, return EBUSY.
 	 */
-	d = &bpf_dtab[minor(dev)];
 	if (!D_ISFREE(d))
 		return (EBUSY);
 
 	/* Mark "free" and do most initialization. */
-	bzero((char *)d, sizeof(*d));
 	d->bd_bufsize = bpf_bufsize;
 	d->bd_sig = SIGIO;
+
+	D_GET(d);
 
 	return (0);
 }
@@ -359,14 +357,16 @@ bpfclose(dev, flag, mode, p)
 	int mode;
 	struct proc *p;
 {
-	struct bpf_d *d = &bpf_dtab[minor(dev)];
+	struct bpf_d *d;
 	int s;
 
+	d = bpfilter_lookup(minor(dev));
 	s = splimp();
 	if (d->bd_bif)
 		bpf_detachd(d);
+	bpf_wakeup(d);
+	D_PUT(d);
 	splx(s);
-	bpf_freed(d);
 
 	return (0);
 }
@@ -391,10 +391,11 @@ bpfread(dev, uio, ioflag)
 	struct uio *uio;
 	int ioflag;
 {
-	struct bpf_d *d = &bpf_dtab[minor(dev)];
+	struct bpf_d *d;
 	int error;
 	int s;
 
+	d = bpfilter_lookup(minor(dev));
 	if (d->bd_bif == 0)
 		return (ENXIO);
 
@@ -407,6 +408,8 @@ bpfread(dev, uio, ioflag)
 
 	s = splimp();
 
+	D_GET(d);
+	
 	/*
 	 * bd_rdStart is tagged when we start the read, iff there's a timeout.
 	 * we can then figure out when we're done reading.
@@ -422,6 +425,16 @@ bpfread(dev, uio, ioflag)
 	 * have arrived to fill the store buffer.
 	 */
 	while (d->bd_hbuf == 0) {
+		if (d->bd_bif == NULL) {
+			/* interface is gone */
+			if (d->bd_slen == 0) {
+				D_PUT(d);
+				splx(s);
+				return (EIO);
+			}
+			ROTATE_BUFFERS(d);
+			break;
+		}
 		if (d->bd_immediate && d->bd_slen != 0) {
 			/*
 			 * A packet(s) either arrived since the previous
@@ -442,6 +455,7 @@ bpfread(dev, uio, ioflag)
 				error = 0;
 		}
 		if (error == EINTR || error == ERESTART) {
+			D_PUT(d);
 			splx(s);
 			return (error);
 		}
@@ -460,6 +474,7 @@ bpfread(dev, uio, ioflag)
 				break;
 
 			if (d->bd_slen == 0) {
+				D_PUT(d);
 				splx(s);
 				return (0);
 			}
@@ -483,6 +498,8 @@ bpfread(dev, uio, ioflag)
 	d->bd_fbuf = d->bd_hbuf;
 	d->bd_hbuf = 0;
 	d->bd_hlen = 0;
+
+	D_PUT(d);
 	splx(s);
 
 	return (error);
@@ -513,16 +530,20 @@ bpfwrite(dev, uio, ioflag)
 	struct uio *uio;
 	int ioflag;
 {
-	struct bpf_d *d = &bpf_dtab[minor(dev)];
+	struct bpf_d *d;
 	struct ifnet *ifp;
 	struct mbuf *m;
 	int error, s;
 	struct sockaddr_storage dst;
 
+	d = bpfilter_lookup(minor(dev));
 	if (d->bd_bif == 0)
 		return (ENXIO);
 
 	ifp = d->bd_bif->bif_ifp;
+
+	if ((ifp->if_flags & IFF_UP) == 0)
+		return (ENETDOWN);
 
 	if (uio->uio_resid == 0)
 		return (0);
@@ -595,9 +616,10 @@ bpfioctl(dev, cmd, addr, flag, p)
 	int flag;
 	struct proc *p;
 {
-	struct bpf_d *d = &bpf_dtab[minor(dev)];
+	struct bpf_d *d;
 	int s, error = 0;
 
+	d = bpfilter_lookup(minor(dev));
 	if (d->bd_locked && suser(p, 0) != 0) {
 		/* list of allowed ioctls when locked and not root */
 		switch (cmd) {
@@ -804,6 +826,14 @@ bpfioctl(dev, cmd, addr, flag, p)
 		d->bd_locked = 1;
 		break;
 
+	case BIOCGFILDROP:	/* get "filter-drop" flag */
+		*(u_int *)addr = d->bd_fildrop;
+		break;
+
+	case BIOCSFILDROP:	/* set "filter-drop" flag */
+		d->bd_fildrop = *(u_int *)addr ? 1 : 0;
+		break;
+
 	case FIONBIO:		/* Non-blocking I/O */
 		if (*(int *)addr)
 			d->bd_rtout = -1;
@@ -915,32 +945,8 @@ bpf_setif(d, ifr)
 	struct bpf_d *d;
 	struct ifreq *ifr;
 {
-	struct bpf_if *bp;
-	char *cp;
-	int unit_seen, i, s, error;
-
-	/*
-	 * Make sure the provided name has a unit number, and default
-	 * it to '0' if not specified.
-	 * XXX This is ugly ... do this differently?
-	 */
-	unit_seen = 0;
-	cp = ifr->ifr_name;
-	cp[sizeof(ifr->ifr_name) - 1] = '\0';	/* sanity */
-	while (*cp++)
-		if (*cp >= '0' && *cp <= '9')
-			unit_seen = 1;
-	if (!unit_seen) {
-		/* Make sure to leave room for the '\0'. */
-		for (i = 0; i < (IFNAMSIZ - 1); ++i) {
-			if ((ifr->ifr_name[i] >= 'a' &&
-			     ifr->ifr_name[i] <= 'z') ||
-			    (ifr->ifr_name[i] >= 'A' &&
-			     ifr->ifr_name[i] <= 'Z'))
-				continue;
-			ifr->ifr_name[i] = '0';
-		}
-	}
+	struct bpf_if *bp, *candidate = NULL;
+	int s, error;
 
 	/*
 	 * Look through attached interfaces for the named one.
@@ -953,28 +959,31 @@ bpf_setif(d, ifr)
 			continue;
 		/*
 		 * We found the requested interface.
-		 * If it's not up, return an error.
+		 */
+		if (candidate == NULL || candidate->bif_dlt > bp->bif_dlt)
+			candidate = bp;
+	}
+
+	if (candidate != NULL) {
+		/*
 		 * Allocate the packet buffers if we need to.
 		 * If we're already attached to requested interface,
 		 * just flush the buffer.
 		 */
-		if ((ifp->if_flags & IFF_UP) == 0)
-			return (ENETDOWN);
-
 		if (d->bd_sbuf == 0) {
 			error = bpf_allocbufs(d);
 			if (error != 0)
 				return (error);
 		}
 		s = splimp();
-		if (bp != d->bd_bif) {
+		if (candidate != d->bd_bif) {
 			if (d->bd_bif)
 				/*
 				 * Detach if attached to something else.
 				 */
 				bpf_detachd(d);
 
-			bpf_attachd(d, bp);
+			bpf_attachd(d, candidate);
 		}
 		bpf_reset_d(d);
 		splx(s);
@@ -1014,7 +1023,7 @@ bpfpoll(dev, events, p)
 	/*
 	 * An imitation of the FIONREAD ioctl code.
 	 */
-	d = &bpf_dtab[minor(dev)];
+	d = bpfilter_lookup(minor(dev));
 	s = splimp();
 	if (d->bd_hlen == 0 && (!d->bd_immediate || d->bd_slen == 0)) {
 		revents = 0;		/* no data waiting */
@@ -1035,10 +1044,11 @@ struct filterops bpfread_filtops =
 int
 bpfkqfilter(dev_t dev,struct knote *kn)
 {
-	struct bpf_d *d = &bpf_dtab[minor(dev)];
+	struct bpf_d *d;
 	struct klist *klist;
 	int s;
 
+	d = bpfilter_lookup(minor(dev));
 	switch (kn->kn_filter) {
 	case EVFILT_READ:
 		klist = &d->bd_sel.si_note;
@@ -1062,9 +1072,10 @@ void
 filt_bpfrdetach(struct knote *kn)
 {
 	dev_t dev = (dev_t)((u_long)kn->kn_hook);
-	struct bpf_d *d = &bpf_dtab[minor(dev)];
+	struct bpf_d *d;
 	int s = splimp();
 
+	d = bpfilter_lookup(minor(dev));
 	SLIST_REMOVE(&d->bd_sel.si_note, kn, knote, kn_selnext);
 	splx(s);
 }
@@ -1073,11 +1084,12 @@ int
 filt_bpfread(struct knote *kn, long hint)
 {
 	dev_t dev = (dev_t)((u_long)kn->kn_hook);
-	struct bpf_d *d = &bpf_dtab[minor(dev)];
+	struct bpf_d *d;
 	int res, s;
 
 	kn->kn_data = 0;
 
+	d = bpfilter_lookup(minor(dev));
 	s = splimp();
 	res = d->bd_hlen != 0 || (d->bd_immediate && d->bd_slen != 0);
 	splx(s);
@@ -1090,7 +1102,7 @@ filt_bpfread(struct knote *kn, long hint)
  * by each process' filter, and if accepted, stashed into the corresponding
  * buffer.
  */
-void
+int
 bpf_tap(arg, pkt, pktlen)
 	caddr_t arg;
 	u_char *pkt;
@@ -1099,6 +1111,8 @@ bpf_tap(arg, pkt, pktlen)
 	struct bpf_if *bp;
 	struct bpf_d *d;
 	size_t slen;
+	int drop = 0;
+
 	/*
 	 * Note that the ipl does not have to be raised at this point.
 	 * The only problem that could arise here is that if two different
@@ -1108,9 +1122,14 @@ bpf_tap(arg, pkt, pktlen)
 	for (d = bp->bif_dlist; d != 0; d = d->bd_next) {
 		++d->bd_rcount;
 		slen = bpf_filter(d->bd_rfilter, pkt, pktlen, pktlen);
-		if (slen != 0)
+		if (slen != 0) {
 			bpf_catchpacket(d, pkt, pktlen, slen, bcopy);
+			if (d->bd_fildrop)
+				drop++;
+		}
 	}
+
+	return (drop);
 }
 
 /*
@@ -1143,7 +1162,7 @@ bpf_mcopy(src_arg, dst_arg, len)
 /*
  * Incoming linkage from device drivers, when packet is in an mbuf chain.
  */
-void
+int
 bpf_mtap(arg, m)
 	caddr_t arg;
 	struct mbuf *m;
@@ -1152,9 +1171,10 @@ bpf_mtap(arg, m)
 	struct bpf_d *d;
 	size_t pktlen, slen;
 	struct mbuf *m0;
+	int drop = 0;
 
 	if (m == NULL)
-		return;
+		return (0);
 
 	pktlen = 0;
 	for (m0 = m; m0 != 0; m0 = m0->m_next)
@@ -1163,9 +1183,14 @@ bpf_mtap(arg, m)
 	for (d = bp->bif_dlist; d != 0; d = d->bd_next) {
 		++d->bd_rcount;
 		slen = bpf_filter(d->bd_rfilter, (u_char *)m, pktlen, 0);
-		if (slen != 0)
+		if (slen != 0) {
 			bpf_catchpacket(d, (u_char *)m, pktlen, slen, bpf_mcopy);
+			if (d->bd_fildrop)
+				drop++;
+		}
 	}
+
+	return (drop);
 }
 
 /*
@@ -1280,18 +1305,16 @@ bpf_allocbufs(d)
 }
 
 /*
- * Free buffers currently in use by a descriptor.
- * Called on close.
+ * Free buffers currently in use by a descriptor
+ * when the reference count drops to zero.
  */
 void
 bpf_freed(d)
 	struct bpf_d *d;
 {
-	/*
-	 * We don't need to lock out interrupts since this descriptor has
-	 * been detached from its interface and it yet hasn't been marked
-	 * free.
-	 */
+	if (--d->bd_ref > 0)
+		return;
+
 	if (d->bd_sbuf != 0) {
 		free(d->bd_sbuf, M_DEVBUF);
 		if (d->bd_hbuf != 0)
@@ -1304,7 +1327,7 @@ bpf_freed(d)
 	if (d->bd_wfilter)
 		free((caddr_t)d->bd_wfilter, M_DEVBUF);
 
-	D_MARKFREE(d);
+	bpfilter_destroy(d);
 }
 
 /*
@@ -1350,7 +1373,7 @@ bpfdetach(ifp)
 {
 	struct bpf_if *bp, *nbp, **pbp = &bpf_iflist;
 	struct bpf_d *bd;
-	int maj, mn;
+	int maj;
 
 	for (bp = bpf_iflist; bp; bp = nbp) {
 		nbp= bp->bif_next;
@@ -1362,16 +1385,20 @@ bpfdetach(ifp)
 				if (cdevsw[maj].d_open == bpfopen)
 					break;
 
-			for (bd = bp->bif_dlist; bd; bd = bp->bif_dlist)
+			for (bd = bp->bif_dlist; bd; bd = bp->bif_dlist) {
+				struct bpf_d *d;
+
 				/*
 				 * Locate the minor number and nuke the vnode
 				 * for any open instance.
 				 */
-				for (mn = 0; mn < nbpfilter; mn++)
-					if (&bpf_dtab[mn] == bd) {
-						vdevgone(maj, mn, mn, VCHR);
+				LIST_FOREACH(d, &bpf_d_list, bd_list)
+					if (d == bd) {
+						vdevgone(maj, d->bd_unit,
+						    d->bd_unit, VCHR);
 						break;
 					}
+			}
 
 			free(bp, M_DEVBUF);
 		} else
@@ -1413,4 +1440,38 @@ bpf_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp,
 		return (EOPNOTSUPP);
 	}
 	return (0);
+}
+
+struct bpf_d *
+bpfilter_lookup(int unit)
+{
+	struct bpf_d *bd;
+
+	LIST_FOREACH(bd, &bpf_d_list, bd_list)
+		if (bd->bd_unit == unit)
+			return (bd);
+	return (NULL);
+}
+
+struct bpf_d *
+bpfilter_create(int unit)
+{
+	struct bpf_d *bd;
+
+	if ((bd = bpfilter_lookup(unit)) != NULL)
+		return (bd);
+	if ((bd = malloc(sizeof(*bd), M_DEVBUF, M_NOWAIT)) != NULL) {
+		bzero(bd, sizeof(*bd));
+		bd->bd_unit = unit;
+		D_MARKFREE(bd);
+		LIST_INSERT_HEAD(&bpf_d_list, bd, bd_list);
+	}
+	return (bd);
+}
+
+void
+bpfilter_destroy(struct bpf_d *bd)
+{
+	LIST_REMOVE(bd, bd_list);
+	free(bd, M_DEVBUF);
 }

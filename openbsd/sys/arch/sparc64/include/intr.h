@@ -1,4 +1,4 @@
-/*	$OpenBSD: intr.h,v 1.6 2003/06/24 21:54:39 henric Exp $	*/
+/*	$OpenBSD: intr.h,v 1.8 2004/06/28 01:47:41 aaron Exp $	*/
 /*	$NetBSD: intr.h,v 1.8 2001/01/14 23:50:30 thorpej Exp $ */
 
 /*-
@@ -44,6 +44,8 @@
 #include <sparc64/sparc64/intreg.h>
 #endif
 
+#include <sys/evcount.h>
+
 /*
  * Interrupt handler chains.  Interrupt handlers should return 0 for
  * ``not me'' or 1 (``I took care of it'').  intr_establish() inserts a
@@ -51,19 +53,19 @@
  * argument, or with a pointer to a clockframe if ih_arg is NULL.
  */
 struct intrhand {
-        int                     (*ih_fun)(void *);
-        void                    *ih_arg;
-        short                   ih_number;      /* interrupt number */
-                                                /* the H/W provides */
-        char                    ih_pil;         /* interrupt priority */
-        volatile char           ih_busy;        /* handler is on list */
-        struct intrhand         *ih_next;       /* global list */
-        struct intrhand         *ih_pending;    /* pending list */
-        volatile u_int64_t      *ih_map;        /* interrupt map reg */
-        volatile u_int64_t      *ih_clr;        /* clear interrupt reg */
-        u_int64_t               ih_count;       /* # of interrupts */
-        const void              *ih_bus;        /* parent bus */
-        char                    ih_name[1];     /* device name */
+	int			(*ih_fun)(void *);
+	void			*ih_arg;
+	short			ih_number;	/* interrupt number */
+						/* the H/W provides */
+	char			ih_pil;		/* interrupt priority */
+	volatile char		ih_busy;	/* handler is on list */
+	struct intrhand		*ih_next;	/* global list */
+	struct intrhand		*ih_pending;	/* pending list */
+	volatile u_int64_t	*ih_map;	/* interrupt map reg */
+	volatile u_int64_t	*ih_clr;	/* clear interrupt reg */
+	struct evcount		ih_count;	/* # of interrupts */
+	const void		*ih_bus;	/* parent bus */
+	char			ih_name[32];	/* device name */
 };
 
 extern struct intrhand *intrlev[MAXINTNUM];

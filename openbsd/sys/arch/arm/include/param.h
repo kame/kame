@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.h,v 1.2 2004/02/06 17:30:38 drahn Exp $	*/
+/*	$OpenBSD: param.h,v 1.5 2004/08/06 22:31:30 mickey Exp $	*/
 /*	$NetBSD: param.h,v 1.9 2002/03/24 03:37:23 thorpej Exp $	*/
 
 /*
@@ -57,17 +57,10 @@
 #define SINCR           1               /* increment of stack/NBPG */
 #define UPAGES          2               /* pages of u-area */
 #define USPACE          (UPAGES * PAGE_SIZE) /* total size of u-area */
+#define	USPACE_ALIGN	(0)		/* u-area alignment 0-none */
 
 #ifndef MSGBUFSIZE
 #define MSGBUFSIZE	PAGE_SIZE	/* default message buffer size */
-#endif
-
-#ifndef NMBCLUSTERS
-#ifdef GATEWAY
-#define	NMBCLUSTERS	2048		/* map size, max cluster allocation */
-#else
-#define	NMBCLUSTERS	1024		/* map size, max cluster allocation */
-#endif
 #endif
 
 /*
@@ -115,7 +108,7 @@
     
 #ifdef _KERNEL
 #ifndef _LOCORE
-void	delay __P((unsigned));
+void	delay (unsigned);
 #define DELAY(x)	delay(x)
 #endif
 #endif
@@ -196,13 +189,10 @@ void	delay __P((unsigned));
  * of the hardware page size.
  */
 #define	MSIZE		256		/* size of an mbuf */
-
-#ifndef MCLSHIFT
 #define	MCLSHIFT	11		/* convert bytes to m_buf clusters */
 					/* 2K cluster can hold Ether frame */
-#endif	/* MCLSHIFT */
-
 #define	MCLBYTES	(1 << MCLSHIFT)	/* size of a m_buf cluster */
+#define	NMBCLUSTERS	4096		/* map size, max cluster allocation */
 
 #define ovbcopy bcopy
 

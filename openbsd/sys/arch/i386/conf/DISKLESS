@@ -1,5 +1,4 @@
-#	$OpenBSD: DISKLESS,v 1.48 2002/12/10 23:37:03 miod Exp $
-#	$NetBSD: DISKLESS,v 1.26 1996/05/20 18:17:16 mrg Exp $
+#	$OpenBSD: DISKLESS,v 1.52 2004/06/26 21:01:09 miod Exp $
 #
 # DISKLESS -- Generic machine setup for diskless boot.
 # This kernel can be loaded from a bootable floppy (i.e. kernel-copy)
@@ -58,7 +57,7 @@ option		COMPAT_BSDOS	# binary compatibility with BSD/OS
 option		LKM		# loadable kernel modules
 
 #option		FFS		# UFS
-option		FFS_SOFTUPDATES	# Soft updates
+#option		FFS_SOFTUPDATES	# Soft updates
 #option		QUOTA		# UFS quotas
 option		MFS		# memory file system
 #option		EXT2FS		# Second Extended Filesystem
@@ -82,7 +81,6 @@ option		PROCFS		# /proc
 option		UMAPFS		# NULLFS + uid and gid remapping
 option		UNION		# union file system
 
-#option		GATEWAY		# packet forwarding
 option		INET		# IP + ICMP + TCP + UDP
 option		INET6		# IPv6 (needs INET)
 option		PULLDOWN_TEST	# use m_pulldown for IPv6 packet parsing
@@ -104,7 +102,8 @@ config		bsd	root on nfs swap on nfs
 
 mainbus0 at root
 
-bios0	at mainbus0
+cpu0	at mainbus? apid ?
+bios0	at mainbus0 apid ?
 apm0	at bios0 flags 0x0000	# flags 0x0101 to force protocol version 1.1
 pcibios0 at bios0 flags 0x0000	# use 0x30 for a total verbose
 

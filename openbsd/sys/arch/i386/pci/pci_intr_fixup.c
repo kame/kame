@@ -1,4 +1,4 @@
-/*	$OpenBSD: pci_intr_fixup.c,v 1.32 2004/02/24 19:30:00 markus Exp $	*/
+/*	$OpenBSD: pci_intr_fixup.c,v 1.35 2004/07/14 21:46:49 mickey Exp $	*/
 /*	$NetBSD: pci_intr_fixup.c,v 1.10 2000/08/10 21:18:27 soda Exp $	*/
 
 /*
@@ -100,12 +100,12 @@
 
 #include <machine/bus.h>
 #include <machine/intr.h>
+#include <machine/i8259.h>
 
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcidevs.h>
 
-#include <i386/isa/icu.h>
 #include <i386/pci/pcibiosvar.h>
 
 struct pciintr_link_map {
@@ -160,11 +160,18 @@ const struct pciintr_icu_table {
 	{ PCI_VENDOR_OPTI,	PCI_PRODUCT_OPTI_82C700,
 	  opti82c700_init },
 
+	{ PCI_VENDOR_RCC,	PCI_PRODUCT_RCC_ROSB4,
+	  osb4_init },
+	{ PCI_VENDOR_RCC,	PCI_PRODUCT_RCC_CSB5,
+	  osb4_init },
+
 	{ PCI_VENDOR_VIATECH,	PCI_PRODUCT_VIATECH_VT82C596A,
 	  via82c586_init, },
 	{ PCI_VENDOR_VIATECH,	PCI_PRODUCT_VIATECH_VT82C586_ISA,
 	  via82c586_init, },
 	{ PCI_VENDOR_VIATECH,	PCI_PRODUCT_VIATECH_VT82C686A_ISA,
+	  via82c586_init },
+	{ PCI_VENDOR_VIATECH,	PCI_PRODUCT_VIATECH_VT8366_ISA,
 	  via82c586_init },
 
 	{ PCI_VENDOR_VIATECH,	PCI_PRODUCT_VIATECH_VT8231_ISA,

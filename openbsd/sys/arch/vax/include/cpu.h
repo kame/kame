@@ -1,4 +1,4 @@
-/*      $OpenBSD: cpu.h,v 1.15 2003/11/10 21:05:06 miod Exp $      */
+/*      $OpenBSD: cpu.h,v 1.17 2004/07/07 23:10:45 deraadt Exp $      */
 /*      $NetBSD: cpu.h,v 1.41 1999/10/21 20:01:36 ragge Exp $      */
 
 /*
@@ -37,6 +37,7 @@
 
 #include <sys/cdefs.h>
 #include <sys/device.h>
+#include <sys/evcount.h>
 
 #include <machine/mtpr.h>
 #include <machine/pte.h>
@@ -88,7 +89,7 @@ extern int bootdev;
  * or after the current trap/syscall if in system mode.
  */
 
-#define need_resched(){ \
+#define need_resched(ci){ \
 	want_resched++; \
 	mtpr(AST_OK,PR_ASTLVL); \
 	}

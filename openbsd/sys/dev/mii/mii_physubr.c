@@ -1,4 +1,4 @@
-/*	$OpenBSD: mii_physubr.c,v 1.15 2003/03/11 18:28:45 jason Exp $	*/
+/*	$OpenBSD: mii_physubr.c,v 1.17 2004/08/03 19:05:56 brad Exp $	*/
 /*	$NetBSD: mii_physubr.c,v 1.20 2001/04/13 23:30:09 thorpej Exp $	*/
 
 /*-
@@ -57,6 +57,13 @@
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 
+#include "carp.h"
+#if NCARP > 0
+#include <netinet/in.h>
+#include <netinet/in_var.h>
+#include <netinet/ip_carp.h>
+#endif
+
 /*
  * Media to register setting conversion table.  Order matters.
  * XXX 802.3 doesn't specify ANAR or ANLPAR bits for 1000base.
@@ -95,7 +102,8 @@ mii_phy_setmedia(sc)
 	int bmcr, anar;
 
 	if (IFM_SUBTYPE(ife->ifm_media) == IFM_AUTO) {
-		if ((PHY_READ(sc, MII_BMCR) & BMCR_AUTOEN) == 0)
+		if ((PHY_READ(sc, MII_BMCR) & BMCR_AUTOEN) == 0 ||
+		    (sc->mii_flags & MIIF_FORCEANEG))
 			(void) mii_phy_auto(sc, 1);
 		return;
 	}
@@ -332,6 +340,10 @@ mii_phy_statusmsg(sc)
 		s = splnet();
 		rt_ifmsg(ifp);
 		splx(s);
+#if NCARP > 0
+		if (ifp->if_carp)
+			carp_carpdev_state(ifp->if_carp);
+#endif
 	}
 }
 

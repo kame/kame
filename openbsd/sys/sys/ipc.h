@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipc.h,v 1.8 2003/06/02 23:28:21 millert Exp $	*/
+/*	$OpenBSD: ipc.h,v 1.10 2004/07/15 11:24:46 millert Exp $	*/
 /*	$NetBSD: ipc.h,v 1.15 1996/02/09 18:25:12 christos Exp $	*/
 
 /*
@@ -59,12 +59,22 @@ struct ipc_perm {
 };
 
 #ifdef _KERNEL
-struct oipc_perm {
+struct ipc_perm23 {
 	unsigned short	cuid;	/* creator user id */
 	unsigned short	cgid;	/* creator group id */
 	unsigned short	uid;	/* user id */
 	unsigned short	gid;	/* group id */
 	unsigned short	mode;	/* r/w permission */
+	unsigned short	seq;	/* sequence # (to generate unique msg/sem/shm id) */
+	key_t		key;	/* user specified msg/sem/shm key */
+};
+
+struct ipc_perm35 {
+	uid_t		cuid;	/* creator user id */
+	gid_t		cgid;	/* creator group id */
+	uid_t		uid;	/* user id */
+	gid_t		gid;	/* group id */
+	u_int16_t	mode;	/* r/w permission */
 	unsigned short	seq;	/* sequence # (to generate unique msg/sem/shm id) */
 	key_t		key;	/* user specified msg/sem/shm key */
 };
@@ -93,11 +103,9 @@ struct oipc_perm {
 #define	IXSEQ_TO_IPCID(ix,perm)	(((perm.seq) << 16) | (ix & 0xffff))
 
 int ipcperm(struct ucred *, struct ipc_perm *, int);
-void ipc_n2o(struct ipc_perm *, struct oipc_perm *);
-void ipc_o2n(struct oipc_perm *, struct ipc_perm *);
-#endif /* _KERNEL */
 
-#ifndef _KERNEL
+#else /* !_KERNEL */
+
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS

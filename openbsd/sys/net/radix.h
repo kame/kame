@@ -1,4 +1,4 @@
-/*	$OpenBSD: radix.h,v 1.10 2003/08/27 00:33:34 henric Exp $	*/
+/*	$OpenBSD: radix.h,v 1.12 2004/04/25 02:48:03 itojun Exp $	*/
 /*	$NetBSD: radix.h,v 1.8 1996/02/13 22:00:37 christos Exp $	*/
 
 /*
@@ -59,7 +59,7 @@ struct radix_node {
 			struct	radix_node *rn_L;/* progeny */
 			struct	radix_node *rn_R;/* progeny */
 		} rn_node;
-	}	rn_u;
+	} rn_u;
 #ifdef RN_DEBUG
 	int rn_info;
 	struct radix_node *rn_twin;
@@ -114,7 +114,7 @@ struct radix_node_head {
 		     struct radix_node_head *head, struct radix_node nodes[]);
 					/* remove based on sockaddr */
 	struct	radix_node *(*rnh_deladdr)(void *v, void *mask,
-		    struct radix_node_head *head);
+		    struct radix_node_head *head, struct radix_node *rn);
 					/* remove based on packet hdr */
 	struct	radix_node *(*rnh_delpkt)(void *v, void *mask,
 		    struct radix_node_head *head);
@@ -131,6 +131,7 @@ struct radix_node_head {
 	int	(*rnh_walktree)(struct radix_node_head *,
 		     int (*)(struct radix_node *, void *), void *);
 	struct	radix_node rnh_nodes[3];/* empty tree for common case */
+	int	rnh_multipath;		/* multipath? */
 };
 
 
@@ -151,6 +152,7 @@ struct radix_node_head {
 #if defined(_KERNEL) || defined(_ROUTED)
 void	 rn_init(void);
 int	 rn_inithead(void **, int);
+int	 rn_inithead0(struct radix_node_head *, int);
 int	 rn_refines(void *, void *);
 int	 rn_walktree(struct radix_node_head *,
 			  int (*)(struct radix_node *, void *), void *);
@@ -158,7 +160,8 @@ struct radix_node
 	 *rn_addmask(void *, int, int),
 	 *rn_addroute(void *, void *, struct radix_node_head *,
 			struct radix_node [2]),
-	 *rn_delete(void *, void *, struct radix_node_head *),
+	 *rn_delete(void *, void *, struct radix_node_head *,
+			struct radix_node *),
 	 *rn_insert(void *, struct radix_node_head *, int *,
 			struct radix_node [2]),
 	 *rn_lookup(void *, void *, struct radix_node_head *),

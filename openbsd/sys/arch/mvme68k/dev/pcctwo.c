@@ -1,5 +1,5 @@
 
-/*	$OpenBSD: pcctwo.c,v 1.12 2004/01/14 20:52:49 miod Exp $ */
+/*	$OpenBSD: pcctwo.c,v 1.14 2004/07/30 22:29:45 miod Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -120,7 +120,6 @@ pcctwo_scan(parent, child, args)
 		oca.ca_paddr = (void *)-1;
 	}
 	oca.ca_bustype = BUS_PCCTWO;
-	oca.ca_master = (void *)sc->sc_pcc2;
 	oca.ca_name = cf->cf_driver->cd_name;
 	if ((*cf->cf_attach->ca_match)(parent, cf, &oca) == 0)
 		return (0);
@@ -160,13 +159,16 @@ pcctwoattach(parent, self, args)
  * PCC2 interrupts land in a PCC2_NVEC sized hole starting at PCC2_VECBASE
  */
 int
-pcctwointr_establish(vec, ih)
+pcctwointr_establish(vec, ih, name)
 	int vec;
 	struct intrhand *ih;
+	const char *name;
 {
-	if (vec >= PCC2_NVEC) {
-		printf("pcctwo: illegal vector: 0x%x\n", vec);
-		panic("pcctwointr_establish");
-	}
-	return (intr_establish(PCC2_VECBASE+vec, ih));
+#ifdef DIAGNOSTIC
+	if (vec < 0 || vec >= PCC2_NVEC)
+		panic("pcctwointr_establish: illegal vector for %s: 0x%x",
+		    name, vec);
+#endif
+
+	return intr_establish(PCC2_VECBASE + vec, ih, name);
 }

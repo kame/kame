@@ -1,4 +1,4 @@
-/*	$OpenBSD: rtsock.c,v 1.35 2004/01/15 10:47:55 markus Exp $	*/
+/*	$OpenBSD: rtsock.c,v 1.42 2004/08/03 11:22:15 henning Exp $	*/
 /*	$NetBSD: rtsock.c,v 1.18 1996/03/29 00:32:10 cgd Exp $	*/
 
 /*
@@ -79,20 +79,19 @@
 
 #include <sys/stdarg.h>
 
-struct	sockaddr route_dst = { 2, PF_ROUTE, };
-struct	sockaddr route_src = { 2, PF_ROUTE, };
-struct	sockproto route_proto = { PF_ROUTE, };
+struct sockaddr		route_dst = { 2, PF_ROUTE, };
+struct sockaddr		route_src = { 2, PF_ROUTE, };
+struct sockproto	route_proto = { PF_ROUTE, };
 
 struct walkarg {
 	int	w_op, w_arg, w_given, w_needed, w_tmemsize;
 	caddr_t	w_where, w_tmem;
 };
 
-static struct mbuf *
-		rt_msg1(int, struct rt_addrinfo *);
-static int	rt_msg2(int,
-		    struct rt_addrinfo *, caddr_t, struct walkarg *);
-static void	rt_xaddrs(caddr_t, caddr_t, struct rt_addrinfo *);
+static struct mbuf
+		*rt_msg1(int, struct rt_addrinfo *);
+static int	 rt_msg2(int, struct rt_addrinfo *, caddr_t, struct walkarg *);
+static void	 rt_xaddrs(caddr_t, caddr_t, struct rt_addrinfo *);
 
 /* Sleazy use of local variables throughout file, warning!!!! */
 #define dst	info.rti_info[RTAX_DST]
@@ -103,16 +102,13 @@ static void	rt_xaddrs(caddr_t, caddr_t, struct rt_addrinfo *);
 #define ifaaddr	info.rti_info[RTAX_IFA]
 #define brdaddr	info.rti_info[RTAX_BRD]
 
-/*ARGSUSED*/
 int
-route_usrreq(so, req, m, nam, control)
-	struct socket *so;
-	int req;
-	struct mbuf *m, *nam, *control;
+route_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *nam,
+    struct mbuf *control)
 {
-	int error = 0;
-	struct rawcb *rp = sotorawcb(so);
-	int s;
+	int		 error = 0;
+	struct rawcb	*rp = sotorawcb(so);
+	int		 s;
 
 	if (req == PRU_ATTACH) {
 		MALLOC(rp, struct rawcb *, sizeof(*rp), M_PCB, M_WAITOK);
@@ -149,7 +145,7 @@ route_usrreq(so, req, m, nam, control)
 	if (req == PRU_ATTACH && rp) {
 		int af = rp->rcb_proto.sp_protocol;
 		if (error) {
-			free((caddr_t)rp, M_PCB);
+			free(rp, M_PCB);
 			splx(s);
 			return (error);
 		}
@@ -170,29 +166,30 @@ route_usrreq(so, req, m, nam, control)
 	return (error);
 }
 
-/*ARGSUSED*/
 int
 route_output(struct mbuf *m, ...)
 {
-	struct rt_msghdr *rtm = 0;
-	struct radix_node *rn = 0;
-	struct rtentry *rt = 0;
-	struct rtentry *saved_nrt = 0;
-	struct radix_node_head *rnh;
-	struct rt_addrinfo info;
-	int len, error = 0;
-	struct ifnet *ifp = 0;
-	struct ifaddr *ifa = 0;
-	struct socket *so;
-	va_list ap;
+	struct rt_msghdr	*rtm = NULL;
+	struct radix_node	*rn = NULL;
+	struct rtentry		*rt = NULL;
+	struct rtentry		*saved_nrt = NULL;
+	struct radix_node_head	*rnh;
+	struct rt_addrinfo	 info;
+	int			 len, error = 0;
+	struct ifnet		*ifp = NULL;
+	struct ifaddr		*ifa = NULL;
+	struct socket		*so;
+	struct rawcb		*rp = NULL;
+	struct sockaddr_rtlabel	 sa_rt;
+	const char		*label;
+	va_list			 ap;
 
 	va_start(ap, m);
 	so = va_arg(ap, struct socket *);
 	va_end(ap);
 
-#define senderr(e) do { error = e; goto flush;} while (0)
 	if (m == 0 || ((m->m_len < sizeof(int32_t)) &&
-		       (m = m_pullup(m, sizeof(int32_t))) == 0))
+	    (m = m_pullup(m, sizeof(int32_t))) == 0))
 		return (ENOBUFS);
 	if ((m->m_flags & M_PKTHDR) == 0)
 		panic("route_output");
@@ -200,46 +197,69 @@ route_output(struct mbuf *m, ...)
 	if (len < sizeof(*rtm) ||
 	    len != mtod(m, struct rt_msghdr *)->rtm_msglen) {
 		dst = 0;
-		senderr(EINVAL);
+		error = EINVAL;
+		goto flush;
 	}
 	R_Malloc(rtm, struct rt_msghdr *, len);
 	if (rtm == 0) {
 		dst = 0;
-		senderr(ENOBUFS);
+		error = ENOBUFS;
+		goto flush;
 	}
 	m_copydata(m, 0, len, (caddr_t)rtm);
 	if (rtm->rtm_version != RTM_VERSION) {
 		dst = 0;
-		senderr(EPROTONOSUPPORT);
+		error = EPROTONOSUPPORT;
+		goto flush;
 	}
 	rtm->rtm_pid = curproc->p_pid;
+
 	bzero(&info, sizeof(info));
 	info.rti_addrs = rtm->rtm_addrs;
 	rt_xaddrs((caddr_t)(rtm + 1), len + (caddr_t)rtm, &info);
 	info.rti_flags = rtm->rtm_flags;
-	if (dst == 0 || (dst->sa_family >= AF_MAX))
-		senderr(EINVAL);
-	if (gate != 0 && (gate->sa_family >= AF_MAX))
-		senderr(EINVAL);
+	if (dst == 0 || dst->sa_family >= AF_MAX ||
+	    (gate != 0 && gate->sa_family >= AF_MAX)) {
+		error = EINVAL;
+		goto flush;
+	}
 	if (genmask) {
-		struct radix_node *t;
-		t = rn_addmask((caddr_t)genmask, 0, 1);
-		if (t && genmask->sa_len >= ((struct sockaddr *)t->rn_key)->sa_len &&
+		struct radix_node	*t;
+		t = rn_addmask(genmask, 0, 1);
+		if (t && genmask->sa_len >=
+		    ((struct sockaddr *)t->rn_key)->sa_len &&
 		    Bcmp((caddr_t *)genmask + 1, (caddr_t *)t->rn_key + 1,
 		    ((struct sockaddr *)t->rn_key)->sa_len) - 1)
 			genmask = (struct sockaddr *)(t->rn_key);
-		else
-			senderr(ENOBUFS);
+		else {
+			error = ENOBUFS;
+			goto flush;
+		}
 	}
 
 	/*
 	 * Verify that the caller has the appropriate privilege; RTM_GET
 	 * is the only operation the non-superuser is allowed.
 	 */
-	if (rtm->rtm_type != RTM_GET && suser(curproc, 0) != 0)
-		senderr(EACCES);
-	switch (rtm->rtm_type) {
+	if (rtm->rtm_type != RTM_GET && suser(curproc, 0) != 0) {
+		error = EACCES;
+		goto flush;
+	}
 
+	switch (rtm->rtm_type) {
+	case RTM_ADD:
+		if (gate == 0) {
+			error = EINVAL;
+			goto flush;
+		}
+		error = rtrequest1(rtm->rtm_type, &info, &saved_nrt);
+		if (error == 0 && saved_nrt) {
+			rt_setmetrics(rtm->rtm_inits, &rtm->rtm_rmx,
+			    &saved_nrt->rt_rmx);
+			saved_nrt->rt_refcnt--;
+			saved_nrt->rt_genmask = genmask;
+		}
+		break;
 	case RTM_DELETE:
 		error = rtrequest1(rtm->rtm_type, &info, &saved_nrt);
 		if (error == 0) {
@@ -247,68 +267,100 @@ route_output(struct mbuf *m, ...)
 			goto report;
 		}
 		break;
-
-	case RTM_ADD:
-		if (gate == 0)
-			senderr(EINVAL);
-		error = rtrequest1(rtm->rtm_type, &info, &saved_nrt);
-		if (error == 0 && saved_nrt) {
-			rt_setmetrics(rtm->rtm_inits,
-				&rtm->rtm_rmx, &saved_nrt->rt_rmx);
-			saved_nrt->rt_refcnt--;
-			saved_nrt->rt_genmask = genmask;
-		}
-		/* FALLTHROUGH */
 	case RTM_GET:
 	case RTM_CHANGE:
 	case RTM_LOCK:
 		if ((rnh = rt_tables[dst->sa_family]) == 0) {
-			senderr(EAFNOSUPPORT);
+			error = EAFNOSUPPORT;
+			goto flush;
 		}
 		rn = rnh->rnh_lookup(dst, netmask, rnh);
 		if (rn == NULL || (rn->rn_flags & RNF_ROOT) != 0) {
-			senderr(ESRCH);
+			error = ESRCH;
+			goto flush;
 		}
 		rt = (struct rtentry *)rn;
+#ifndef SMALL_KERNEL
+		/*
+		 * for RTM_CHANGE/LOCK, if we got multipath routes,
+		 * we require users to specify a matching RTAX_GATEWAY.
+		 *
+		 * for RTM_GET, gate is optional even with multipath.
+		 * if gate == NULL the first match is returned.
+		 * (no need to call rt_mpath_matchgate if gate == NULL)
+		 */
+		if (rn_mpath_capable(rnh) &&
+		    (rtm->rtm_type != RTM_GET || gate)) {
+			rt = rt_mpath_matchgate(rt, gate);
+			rn = (struct radix_node *)rt;
+			if (!rt) {
+				error = ESRCH;
+				goto flush;
+			}
+		}
+#endif
 		rt->rt_refcnt++;
 
-		switch (rtm->rtm_type) {
+		/*
+		 * RTM_CHANGE/LOCK need a perfect match, rn_lookup()
+		 * returns a perfect match in case a netmask is specified.
+		 * For host routes only a longest prefix match is returned
+		 * so it is necessary to compare the existence of the netmaks.
+		 * If both have a netmask rn_lookup() did a perfect match and
+		 * if non of them have a netmask both are host routes which is
+		 * also a perfect match.
+		 */
+		if (rtm->rtm_type != RTM_GET && !rt_mask(rt) != !netmask) {
+				error = ESRCH;
+				goto flush;
+		}
 
+		switch (rtm->rtm_type) {
 		case RTM_GET:
-		report:
+report:
 			dst = rt_key(rt);
 			gate = rt->rt_gateway;
 			netmask = rt_mask(rt);
 			genmask = rt->rt_genmask;
-			if (rtm->rtm_addrs & (RTA_IFP | RTA_IFA)) {
-				if ((ifp = rt->rt_ifp) != NULL) {
-					ifpaddr =
-					    TAILQ_FIRST(&ifp->if_addrlist)->ifa_addr;
-					ifaaddr = rt->rt_ifa->ifa_addr;
-					if (ifp->if_flags & IFF_POINTOPOINT)
-						brdaddr = rt->rt_ifa->ifa_dstaddr;
-					else
-						brdaddr = 0;
-					rtm->rtm_index = ifp->if_index;
-				} else {
-					ifpaddr = 0;
-					ifaaddr = 0;
-				}
+
+			if (rt->rt_labelid) {
+				bzero(&sa_rt, sizeof(sa_rt));
+				sa_rt.sr_len = sizeof(sa_rt);
+				label = rtlabel_id2name(rt->rt_labelid);
+				if (label != NULL)
+					strlcpy(sa_rt.sr_label, label,
+					    sizeof(sa_rt.sr_label));
+				info.rti_info[RTAX_LABEL] =
+				    (struct sockaddr *)&sa_rt;
 			}
-			len = rt_msg2(rtm->rtm_type, &info, (caddr_t)0,
-				(struct walkarg *)0);
+
+			ifpaddr = 0;
+			ifaaddr = 0;
+			if (rtm->rtm_addrs & (RTA_IFP | RTA_IFA) &&
+			    (ifp = rt->rt_ifp) != NULL) {
+				ifpaddr =
+				    TAILQ_FIRST(&ifp->if_addrlist)->ifa_addr;
+				ifaaddr = rt->rt_ifa->ifa_addr;
+				if (ifp->if_flags & IFF_POINTOPOINT)
+					brdaddr = rt->rt_ifa->ifa_dstaddr;
+				else
+					brdaddr = 0;
+				rtm->rtm_index = ifp->if_index;
+			}
+			len = rt_msg2(rtm->rtm_type, &info, NULL, NULL);
 			if (len > rtm->rtm_msglen) {
-				struct rt_msghdr *new_rtm;
+				struct rt_msghdr	*new_rtm;
 				R_Malloc(new_rtm, struct rt_msghdr *, len);
-				if (new_rtm == 0)
-					senderr(ENOBUFS);
+				if (new_rtm == 0) {
+					error = ENOBUFS;
+					goto flush;
+				}
 				Bcopy(rtm, new_rtm, rtm->rtm_msglen);
 				Free(rtm); rtm = new_rtm;
 			}
-			(void)rt_msg2(rtm->rtm_type, &info, (caddr_t)rtm,
-				(struct walkarg *)0);
+			rt_msg2(rtm->rtm_type, &info, (caddr_t)rtm, NULL);
 			rtm->rtm_flags = rt->rt_flags;
-			rtm->rtm_rmx = rt->rt_rmx;
+			rt_getmetrics(&rt->rt_rmx, &rtm->rtm_rmx);
 			rtm->rtm_addrs = info.rti_addrs;
 			break;
 
@@ -319,16 +371,18 @@ route_output(struct mbuf *m, ...)
 			 * by ll sockaddr when protocol address is ambiguous
 			 */
 			if ((error = rt_getifa(&info)) != 0)
-				senderr(error);
-			if (gate && rt_setgate(rt, rt_key(rt), gate))
-				senderr(EDQUOT);
+				goto flush;
+			if (gate && rt_setgate(rt, rt_key(rt), gate)) {
+				error = EDQUOT;
+				goto flush;
+			}
 			if (ifpaddr && (ifa = ifa_ifwithnet(ifpaddr)) &&
 			    (ifp = ifa->ifa_ifp) && (ifaaddr || gate))
 				ifa = ifaof_ifpforaddr(ifaaddr ? ifaaddr : gate,
 							ifp);
 			else if ((ifaaddr && (ifa = ifa_ifwithaddr(ifaaddr))) ||
-				 (gate && (ifa = ifa_ifwithroute(rt->rt_flags,
-							rt_key(rt), gate))))
+			    (gate && (ifa = ifa_ifwithroute(rt->rt_flags,
+			    rt_key(rt), gate))))
 				ifp = ifa->ifa_ifp;
 			if (ifa) {
 				struct ifaddr *oifa = rt->rt_ifa;
@@ -343,25 +397,23 @@ route_output(struct mbuf *m, ...)
 				}
 			}
 			rt_setmetrics(rtm->rtm_inits, &rtm->rtm_rmx,
-					&rt->rt_rmx);
+			    &rt->rt_rmx);
 			if (rt->rt_ifa && rt->rt_ifa->ifa_rtrequest)
-			       rt->rt_ifa->ifa_rtrequest(RTM_ADD, rt, &info);
+				rt->rt_ifa->ifa_rtrequest(RTM_ADD, rt, &info);
 			if (genmask)
 				rt->rt_genmask = genmask;
-			/*
-			 * Fall into
-			 */
-		case RTM_ADD:
+			/* fallthrough */
 		case RTM_LOCK:
 			rt->rt_rmx.rmx_locks &= ~(rtm->rtm_inits);
 			rt->rt_rmx.rmx_locks |=
-				(rtm->rtm_inits & rtm->rtm_rmx.rmx_locks);
+			    (rtm->rtm_inits & rtm->rtm_rmx.rmx_locks);
 			break;
 		}
 		break;
 
 	default:
-		senderr(EOPNOTSUPP);
+		error = EOPNOTSUPP;
+		break;
 	}
 
 flush:
@@ -373,12 +425,11 @@ flush:
 	}
 	if (rt)
 		rtfree(rt);
-    {
-	struct rawcb *rp = 0;
+
 	/*
 	 * Check to see if we don't want our own messages.
 	 */
-	if ((so->so_options & SO_USELOOPBACK) == 0) {
+	if (!(so->so_options & SO_USELOOPBACK)) {
 		if (route_cb.any_count <= 1) {
 			if (rtm)
 				Free(rtm);
@@ -405,25 +456,27 @@ flush:
 		raw_input(m, &route_proto, &route_src, &route_dst);
 	if (rp)
 		rp->rcb_proto.sp_family = PF_ROUTE;
-    }
+
 	return (error);
 }
 
 void
-rt_setmetrics(which, in, out)
-	u_long which;
-	struct rt_metrics *in, *out;
+rt_setmetrics(u_long which, struct rt_metrics *in, struct rt_kmetrics *out)
 {
-#define metric(f, e) if (which & (f)) out->e = in->e;
-	metric(RTV_RPIPE, rmx_recvpipe);
-	metric(RTV_SPIPE, rmx_sendpipe);
-	metric(RTV_SSTHRESH, rmx_ssthresh);
-	metric(RTV_RTT, rmx_rtt);
-	metric(RTV_RTTVAR, rmx_rttvar);
-	metric(RTV_HOPCOUNT, rmx_hopcount);
-	metric(RTV_MTU, rmx_mtu);
-	metric(RTV_EXPIRE, rmx_expire);
-#undef metric
+	if (which & RTV_MTU)
+		out->rmx_mtu = in->rmx_mtu;
+	if (which & RTV_EXPIRE)
+		out->rmx_expire = in->rmx_expire;
+}
+
+void
+rt_getmetrics(struct rt_kmetrics *in, struct rt_metrics *out)
+{
+	bzero(out, sizeof(*out));
+	out->rmx_locks = in->rmx_locks;
+	out->rmx_mtu = in->rmx_mtu;
+	out->rmx_expire = in->rmx_expire;
+	out->rmx_pksent = in->rmx_pksent;
 }
 
 #define ROUNDUP(a) \
@@ -431,12 +484,10 @@ rt_setmetrics(which, in, out)
 #define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
 
 static void
-rt_xaddrs(cp, cplim, rtinfo)
-	caddr_t cp, cplim;
-	struct rt_addrinfo *rtinfo;
+rt_xaddrs(caddr_t cp, caddr_t cplim, struct rt_addrinfo *rtinfo)
 {
-	struct sockaddr *sa;
-	int i;
+	struct sockaddr	*sa;
+	int		 i;
 
 	bzero(rtinfo->rti_info, sizeof(rtinfo->rti_info));
 	for (i = 0; (i < RTAX_MAX) && (cp < cplim); i++) {
@@ -448,33 +499,28 @@ rt_xaddrs(cp, cplim, rtinfo)
 }
 
 static struct mbuf *
-rt_msg1(type, rtinfo)
-	int type;
-	struct rt_addrinfo *rtinfo;
+rt_msg1(int type, struct rt_addrinfo *rtinfo)
 {
-	struct rt_msghdr *rtm;
-	struct mbuf *m;
-	int i;
-	struct sockaddr *sa;
-	int len, dlen;
+	struct rt_msghdr	*rtm;
+	struct mbuf		*m;
+	int			 i;
+	struct sockaddr		*sa;
+	int			 len, dlen;
 
 	switch (type) {
-
 	case RTM_DELADDR:
 	case RTM_NEWADDR:
 		len = sizeof(struct ifa_msghdr);
 		break;
-
 	case RTM_IFINFO:
 		len = sizeof(struct if_msghdr);
 		break;
-
 	case RTM_IFANNOUNCE:
 		len = sizeof(struct if_announcemsghdr);
 		break;
-
 	default:
 		len = sizeof(struct rt_msghdr);
+		break;
 	}
 	if (len > MCLBYTES)
 		panic("rt_msg1");
@@ -489,9 +535,9 @@ rt_msg1(type, rtinfo)
 	if (m == 0)
 		return (m);
 	m->m_pkthdr.len = m->m_len = len;
-	m->m_pkthdr.rcvif = 0;
+	m->m_pkthdr.rcvif = NULL;
 	rtm = mtod(m, struct rt_msghdr *);
-	bzero((caddr_t)rtm, len);
+	bzero(rtm, len);
 	for (i = 0; i < RTAX_MAX; i++) {
 		if ((sa = rtinfo->rti_info[i]) == NULL)
 			continue;
@@ -511,31 +557,25 @@ rt_msg1(type, rtinfo)
 }
 
 static int
-rt_msg2(type, rtinfo, cp, w)
-	int type;
-	struct rt_addrinfo *rtinfo;
-	caddr_t cp;
-	struct walkarg *w;
+rt_msg2(int type, struct rt_addrinfo *rtinfo, caddr_t cp, struct walkarg *w)
 {
-	int i;
-	int len, dlen, second_time = 0;
-	caddr_t cp0;
+	int		i;
+	int		len, dlen, second_time = 0;
+	caddr_t		cp0;
 
 	rtinfo->rti_addrs = 0;
 again:
 	switch (type) {
-
 	case RTM_DELADDR:
 	case RTM_NEWADDR:
 		len = sizeof(struct ifa_msghdr);
 		break;
-
 	case RTM_IFINFO:
 		len = sizeof(struct if_msghdr);
 		break;
-
 	default:
 		len = sizeof(struct rt_msghdr);
+		break;
 	}
 	if ((cp0 = cp) != NULL)
 		cp += len;
@@ -547,7 +587,7 @@ again:
 		rtinfo->rti_addrs |= (1 << i);
 		dlen = ROUNDUP(sa->sa_len);
 		if (cp) {
-			bcopy((caddr_t)sa, cp, (unsigned)dlen);
+			bcopy(sa, cp, (size_t)dlen);
 			cp += dlen;
 		}
 		len += dlen;
@@ -560,8 +600,7 @@ again:
 			if (rw->w_tmemsize < len) {
 				if (rw->w_tmem)
 					free(rw->w_tmem, M_RTABLE);
-				rw->w_tmem = (caddr_t) malloc(len, M_RTABLE,
-							      M_NOWAIT);
+				rw->w_tmem = malloc(len, M_RTABLE, M_NOWAIT);
 				if (rw->w_tmem)
 					rw->w_tmemsize = len;
 			}
@@ -590,13 +629,11 @@ again:
  * destination.
  */
 void
-rt_missmsg(type, rtinfo, flags, error)
-	int type, flags, error;
-	struct rt_addrinfo *rtinfo;
+rt_missmsg(int type, struct rt_addrinfo *rtinfo, int flags, int error)
 {
-	struct rt_msghdr *rtm;
-	struct mbuf *m;
-	struct sockaddr *sa = rtinfo->rti_info[RTAX_DST];
+	struct rt_msghdr	*rtm;
+	struct mbuf		*m;
+	struct sockaddr		*sa = rtinfo->rti_info[RTAX_DST];
 
 	if (route_cb.any_count == 0)
 		return;
@@ -607,7 +644,10 @@ rt_missmsg(type, rtinfo, flags, error)
 	rtm->rtm_flags = RTF_DONE | flags;
 	rtm->rtm_errno = error;
 	rtm->rtm_addrs = rtinfo->rti_addrs;
-	route_proto.sp_protocol = sa ? sa->sa_family : 0;
+	if (sa == NULL)
+		route_proto.sp_protocol = 0;
+	else
+		route_proto.sp_protocol = sa->sa_family;
 	raw_input(m, &route_proto, &route_src, &route_dst);
 }
 
@@ -616,16 +656,15 @@ rt_missmsg(type, rtinfo, flags, error)
  * socket indicating that the status of a network interface has changed.
  */
 void
-rt_ifmsg(ifp)
-	struct ifnet *ifp;
+rt_ifmsg(struct ifnet *ifp)
 {
-	struct if_msghdr *ifm;
-	struct mbuf *m;
-	struct rt_addrinfo info;
+	struct if_msghdr	*ifm;
+	struct mbuf		*m;
+	struct rt_addrinfo	 info;
 
 	if (route_cb.any_count == 0)
 		return;
-	bzero((caddr_t)&info, sizeof(info));
+	bzero(&info, sizeof(info));
 	m = rt_msg1(RTM_IFINFO, &info);
 	if (m == 0)
 		return;
@@ -647,25 +686,27 @@ rt_ifmsg(ifp)
  * copies of it.
  */
 void
-rt_newaddrmsg(cmd, ifa, error, rt)
-	int cmd, error;
-	struct ifaddr *ifa;
-	struct rtentry *rt;
+rt_newaddrmsg(int cmd, struct ifaddr *ifa, int error, struct rtentry *rt)
 {
-	struct rt_addrinfo info;
-	struct sockaddr *sa = NULL;
-	int pass;
-	struct mbuf *m = NULL;
-	struct ifnet *ifp = ifa->ifa_ifp;
+	struct rt_addrinfo	 info;
+	struct sockaddr		*sa = NULL;
+	int			 pass;
+	struct mbuf		*m = NULL;
+	struct ifnet		*ifp = ifa->ifa_ifp;
 
 	if (route_cb.any_count == 0)
 		return;
 	for (pass = 1; pass < 3; pass++) {
-		bzero((caddr_t)&info, sizeof(info));
+		bzero(&info, sizeof(info));
 		if ((cmd == RTM_ADD && pass == 1) ||
 		    (cmd == RTM_DELETE && pass == 2)) {
-			struct ifa_msghdr *ifam;
-			int ncmd = cmd == RTM_ADD ? RTM_NEWADDR : RTM_DELADDR;
+			struct ifa_msghdr	*ifam;
+			int			 ncmd;
+
+			if (cmd == RTM_ADD)
+				ncmd = RTM_NEWADDR;
+			else
+				ncmd = RTM_DELADDR;
 
 			ifaaddr = sa = ifa->ifa_addr;
 			ifpaddr = TAILQ_FIRST(&ifp->if_addrlist)->ifa_addr;
@@ -696,7 +737,10 @@ rt_newaddrmsg(cmd, ifa, error, rt)
 			rtm->rtm_errno = error;
 			rtm->rtm_addrs = info.rti_addrs;
 		}
-		route_proto.sp_protocol = sa ? sa->sa_family : 0;
+		if (sa == NULL)
+			route_proto.sp_protocol = 0;
+		else
+			route_proto.sp_protocol = sa->sa_family;
 		raw_input(m, &route_proto, &route_src, &route_dst);
 	}
 }
@@ -706,13 +750,11 @@ rt_newaddrmsg(cmd, ifa, error, rt)
  * network interface arrival and departure.
  */
 void
-rt_ifannouncemsg(ifp, what)
-	struct ifnet *ifp;
-	int what;
+rt_ifannouncemsg(struct ifnet *ifp, int what)
 {
-	struct if_announcemsghdr *ifan;
-	struct mbuf *m;
-	struct rt_addrinfo info;
+	struct if_announcemsghdr	*ifan;
+	struct mbuf			*m;
+	struct rt_addrinfo		 info;
 
 	if (route_cb.any_count == 0)
 		return;
@@ -732,18 +774,16 @@ rt_ifannouncemsg(ifp, what)
  * This is used in dumping the kernel table via sysctl().
  */
 int
-sysctl_dumpentry(rn, v)
-	struct radix_node *rn;
-	void *v;
+sysctl_dumpentry(struct radix_node *rn, void *v)
 {
-	struct walkarg *w = v;
-	struct rtentry *rt = (struct rtentry *)rn;
-	int error = 0, size;
-	struct rt_addrinfo info;
+	struct walkarg		*w = v;
+	struct rtentry		*rt = (struct rtentry *)rn;
+	int			 error = 0, size;
+	struct rt_addrinfo	 info;
 
 	if (w->w_op == NET_RT_FLAGS && !(rt->rt_flags & w->w_arg))
 		return 0;
-	bzero((caddr_t)&info, sizeof(info));
+	bzero(&info, sizeof(info));
 	dst = rt_key(rt);
 	gate = rt->rt_gateway;
 	netmask = rt_mask(rt);
@@ -754,17 +794,17 @@ sysctl_dumpentry(rn, v)
 		if (rt->rt_ifp->if_flags & IFF_POINTOPOINT)
 			brdaddr = rt->rt_ifa->ifa_dstaddr;
 	}
-	size = rt_msg2(RTM_GET, &info, 0, w);
+	size = rt_msg2(RTM_GET, &info, NULL, w);
 	if (w->w_where && w->w_tmem && w->w_needed <= 0) {
 		struct rt_msghdr *rtm = (struct rt_msghdr *)w->w_tmem;
 
 		rtm->rtm_flags = rt->rt_flags;
 		rtm->rtm_use = rt->rt_use;
-		rtm->rtm_rmx = rt->rt_rmx;
+		rt_getmetrics(&rt->rt_rmx, &rtm->rtm_rmx);
 		rtm->rtm_index = rt->rt_ifp->if_index;
 		rtm->rtm_errno = rtm->rtm_pid = rtm->rtm_seq = 0;
 		rtm->rtm_addrs = info.rti_addrs;
-		if ((error = copyout((caddr_t)rtm, w->w_where, size)) != 0)
+		if ((error = copyout(rtm, w->w_where, size)) != 0)
 			w->w_where = NULL;
 		else
 			w->w_where += size;
@@ -773,16 +813,14 @@ sysctl_dumpentry(rn, v)
 }
 
 int
-sysctl_iflist(af, w)
-	int	af;
-	struct	walkarg *w;
+sysctl_iflist(int af, struct walkarg *w)
 {
-	struct ifnet *ifp;
-	struct ifaddr *ifa;
-	struct	rt_addrinfo info;
-	int	len, error = 0;
+	struct ifnet		*ifp;
+	struct ifaddr		*ifa;
+	struct rt_addrinfo	 info;
+	int			 len, error = 0;
 
-	bzero((caddr_t)&info, sizeof(info));
+	bzero(&info, sizeof(info));
 	TAILQ_FOREACH(ifp, &ifnet, if_list) {
 		if (w->w_arg && w->w_arg != ifp->if_index)
 			continue;
@@ -790,7 +828,7 @@ sysctl_iflist(af, w)
 		if (!ifa)
 			continue;
 		ifpaddr = ifa->ifa_addr;
-		len = rt_msg2(RTM_IFINFO, &info, (caddr_t)0, w);
+		len = rt_msg2(RTM_IFINFO, &info, 0, w);
 		ifpaddr = 0;
 		if (w->w_where && w->w_tmem && w->w_needed <= 0) {
 			struct if_msghdr *ifm;
@@ -800,7 +838,7 @@ sysctl_iflist(af, w)
 			ifm->ifm_flags = ifp->if_flags;
 			ifm->ifm_data = ifp->if_data;
 			ifm->ifm_addrs = info.rti_addrs;
-			error = copyout((caddr_t)ifm, w->w_where, len);
+			error = copyout(ifm, w->w_where, len);
 			if (error)
 				return (error);
 			w->w_where += len;
@@ -833,25 +871,20 @@ sysctl_iflist(af, w)
 }
 
 int
-sysctl_rtable(name, namelen, where, given, new, newlen)
-	int	*name;
-	u_int	namelen;
-	void 	*where;
-	size_t	*given;
-	void	*new;
-	size_t	newlen;
+sysctl_rtable(int *name, u_int namelen, void *where, size_t *given, void *new,
+    size_t newlen)
 {
-	struct radix_node_head *rnh;
-	int	i, s, error = EINVAL;
-	u_char  af;
-	struct	walkarg w;
+	struct radix_node_head	*rnh;
+	int			 i, s, error = EINVAL;
+	u_char  		 af;
+	struct walkarg		 w;
 
 	if (new)
 		return (EPERM);
 	if (namelen != 3)
 		return (EINVAL);
 	af = name[0];
-	Bzero(&w, sizeof(w));
+	bzero(&w, sizeof(w));
 	w.w_where = where;
 	w.w_given = *given;
 	w.w_needed = 0 - w.w_given;
@@ -866,8 +899,7 @@ sysctl_rtable(name, namelen, where, given, new, newlen)
 		for (i = 1; i <= AF_MAX; i++)
 			if ((rnh = rt_tables[i]) && (af == 0 || af == i) &&
 			    (error = (*rnh->rnh_walktree)(rnh,
-							  sysctl_dumpentry,
-							  &w)))
+			    sysctl_dumpentry, &w)))
 				break;
 		break;
 
@@ -879,12 +911,12 @@ sysctl_rtable(name, namelen, where, given, new, newlen)
 		free(w.w_tmem, M_RTABLE);
 	w.w_needed += w.w_given;
 	if (where) {
-		*given = w.w_where - (caddr_t) where;
+		*given = w.w_where - (caddr_t)where;
 		if (*given < w.w_needed)
 			return (ENOMEM);
-	} else {
+	} else
 		*given = (11 * w.w_needed) / 10;
-	}
+
 	return (error);
 }
 

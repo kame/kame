@@ -1,4 +1,4 @@
-/*	$OpenBSD: mpt_pci.c,v 1.2 2004/03/06 03:59:29 krw Exp $	*/
+/*	$OpenBSD: mpt_pci.c,v 1.6 2004/08/23 21:00:42 marco Exp $	*/
 /*	$NetBSD: mpt_pci.c,v 1.2 2003/07/14 15:47:26 lukem Exp $	*/
 
 /*
@@ -14,12 +14,17 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR OR HIS RELATIVES BE LIABLE FOR ANY DIRECT,
- * INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  */
 
 /*
@@ -73,8 +78,11 @@
 #include <dev/pci/pcidevs.h>
 
 #define	MPT_PCI_MMBA		(PCI_MAPREG_START+0x04)
-
 #define PCI_MAPREG_ROM	0x30
+
+void mpt_pci_attach(struct device *, struct device *, void *);
+int mpt_pci_match(struct device *, void *, void *);
+const struct mpt_pci_product *mpt_pci_lookup(const struct pci_attach_args *);
 
 struct mpt_pci_softc {
 	mpt_softc_t sc_mpt;
@@ -95,9 +103,9 @@ struct mpt_pci_softc {
 	pcireg_t sc_pci_pmcsr;
 };
 
-static void	mpt_pci_link_peer(mpt_softc_t *);
-static void	mpt_pci_read_config_regs(mpt_softc_t *);
-static void	mpt_pci_set_config_regs(mpt_softc_t *);
+void	mpt_pci_link_peer(mpt_softc_t *);
+void	mpt_pci_read_config_regs(mpt_softc_t *);
+void	mpt_pci_set_config_regs(mpt_softc_t *);
 
 #define	MPP_F_FC	0x01	/* Fibre Channel adapter */
 #define	MPP_F_DUAL	0x02	/* Dual port adapter */
@@ -121,12 +129,11 @@ static const struct mpt_pci_product {
 	  MPP_F_FC },
 	{ PCI_VENDOR_SYMBIOS,	PCI_PRODUCT_SYMBIOS_FC919_1,
 	  MPP_F_FC },
-
 	{ 0,			0,
 	  0 },
 };
 
-static const struct mpt_pci_product *
+const struct mpt_pci_product *
 mpt_pci_lookup(const struct pci_attach_args *pa)
 {
 	const struct mpt_pci_product *mpp;
@@ -140,7 +147,7 @@ mpt_pci_lookup(const struct pci_attach_args *pa)
 }
 
 /* probe for mpt controller */
-static int
+int
 mpt_pci_match(struct device *parent, void *match, void *aux)
 {
 	struct pci_attach_args *pa = aux;
@@ -151,7 +158,7 @@ mpt_pci_match(struct device *parent, void *match, void *aux)
 	return (0);
 }
 
-static void
+void
 mpt_pci_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct mpt_pci_softc *psc = (void *) self;
@@ -167,8 +174,8 @@ mpt_pci_attach(struct device *parent, struct device *self, void *aux)
 
 	mpp = mpt_pci_lookup(pa);
 	if (mpp == NULL) {
-		printf("\n");
-		panic("mpt_pci_attach");
+		printf(": mpt_pci_lookup failed\n");
+		return;
 	}
 
 	psc->sc_pc = pa->pa_pc;
@@ -196,8 +203,7 @@ mpt_pci_attach(struct device *parent, struct device *self, void *aux)
 		mpt->sc_st = memt;
 		mpt->sc_sh = memh;
 	} else {
-		printf("%s: unable to map device registers\n",
-		    mpt->mpt_dev.dv_xname);
+		printf(": unable to map device registers\n");
 		return;
 	}
 
@@ -222,8 +228,7 @@ mpt_pci_attach(struct device *parent, struct device *self, void *aux)
 	 * Map and establish our interrupt.
 	 */
 	if (pci_intr_map(pa, &ih) != 0) {
-		printf("%s: unable to map interrupt\n",
-		    mpt->mpt_dev.dv_xname);
+		printf(": unable to map interrupt\n");
 		return;
 	}
 	intrstr = pci_intr_string(pa->pa_pc, ih);
@@ -243,8 +248,7 @@ mpt_pci_attach(struct device *parent, struct device *self, void *aux)
 
 	/* Allocate DMA memory. */
 	if (mpt_dma_mem_alloc(mpt) != 0) {
-		printf("%s: unable to allocate DMA memory\n",
-		    mpt->mpt_dev.dv_xname);
+		printf(": unable to allocate DMA memory\n");
 		return;
 	}
 
@@ -288,7 +292,7 @@ struct cfattach mpt_pci_ca = {
 /*
  * Find and remember our peer PCI function on a dual-port device.
  */
-static void
+void
 mpt_pci_link_peer(mpt_softc_t *mpt)
 {
 	extern struct cfdriver mpt_cd;
@@ -328,7 +332,7 @@ mpt_pci_link_peer(mpt_softc_t *mpt)
 /*
  * Save the volatile PCI configuration registers.
  */
-static void
+void
 mpt_pci_read_config_regs(mpt_softc_t *mpt)
 {
 	struct mpt_pci_softc *psc = (void *) mpt;
@@ -357,7 +361,7 @@ mpt_pci_read_config_regs(mpt_softc_t *mpt)
 /*
  * Restore the volatile PCI configuration registers.
  */
-static void
+void
 mpt_pci_set_config_regs(mpt_softc_t *mpt)
 {
 	struct mpt_pci_softc *psc = (void *) mpt;

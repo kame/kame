@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_exec.c,v 1.84 2004/03/12 09:32:55 tedu Exp $	*/
+/*	$OpenBSD: kern_exec.c,v 1.90 2004/08/24 23:01:26 mickey Exp $	*/
 /*	$NetBSD: kern_exec.c,v 1.75 1996/02/09 18:59:28 christos Exp $	*/
 
 /*-
@@ -40,6 +40,7 @@
 #include <sys/proc.h>
 #include <sys/mount.h>
 #include <sys/malloc.h>
+#include <sys/pool.h>
 #include <sys/namei.h>
 #include <sys/vnode.h>
 #include <sys/file.h>
@@ -64,6 +65,12 @@
 #include <machine/reg.h>
 
 #include <dev/rndvar.h>
+
+#include "systrace.h"
+
+#if NSYSTRACE > 0
+#include <dev/systrace.h>
+#endif
 
 /*
  * Map the shared signal code.
@@ -209,7 +216,7 @@ bad2:
 	 * close the vnode, free the pathname buf, and punt.
 	 */
 	vn_close(vp, FREAD, p->p_ucred, p);
-	FREE(ndp->ni_cnd.cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, ndp->ni_cnd.cn_pnbuf);
 	return (error);
 
 bad1:
@@ -217,7 +224,7 @@ bad1:
 	 * free the namei pathname buffer, and put the vnode
 	 * (which we don't yet have open).
 	 */
-	FREE(ndp->ni_cnd.cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, ndp->ni_cnd.cn_pnbuf);
 	vput(vp);
 	return (error);
 }
@@ -254,6 +261,12 @@ sys_execve(p, v, retval)
 	struct vmspace *vm = p->p_vmspace;
 	char **tmpfap;
 	extern struct emul emul_native;
+#if NSYSTRACE > 0
+	int wassugid =
+	    ISSET(p->p_flag, P_SUGID) || ISSET(p->p_flag, P_SUGIDEXEC);
+	char pathbuf[MAXPATHLEN];
+	size_t pathbuflen;
+#endif
 
 	/*
 	 * Cheap solution to complicated problems.
@@ -261,13 +274,28 @@ sys_execve(p, v, retval)
 	 */
 	p->p_flag |= P_INEXEC;
 
+#if NSYSTRACE > 0
+	if (ISSET(p->p_flag, P_SYSTRACE))
+		systrace_execve0(p);
+
+	error = copyinstr(SCARG(uap, path), pathbuf, MAXPATHLEN, &pathbuflen);
+	if (error != 0)
+		goto clrflag;
+
+	NDINIT(&nid, LOOKUP, NOFOLLOW, UIO_SYSSPACE, pathbuf, p);
+#else
 	/* init the namei data to point the file user's program name */
 	NDINIT(&nid, LOOKUP, NOFOLLOW, UIO_USERSPACE, SCARG(uap, path), p);
+#endif
 
 	/*
 	 * initialize the fields of the exec package.
 	 */
+#if NSYSTRACE > 0
+	pack.ep_name = pathbuf;
+#else
 	pack.ep_name = (char *)SCARG(uap, path);
+#endif
 	pack.ep_hdr = malloc(exec_maxhdrsz, M_EXEC, M_WAITOK);
 	pack.ep_hdrlen = exec_maxhdrsz;
 	pack.ep_hdrvalid = 0;
@@ -391,6 +419,7 @@ sys_execve(p, v, retval)
 	vm->vm_dsize = btoc(pack.ep_dsize);
 	vm->vm_ssize = btoc(pack.ep_ssize);
 	vm->vm_maxsaddr = (char *)pack.ep_maxsaddr;
+	vm->vm_minsaddr = (char *)pack.ep_minsaddr;
 
 	/* create the new process's VM space by running the vmcmds */
 #ifdef DIAGNOSTIC
@@ -564,7 +593,7 @@ sys_execve(p, v, retval)
 
 	uvm_km_free_wakeup(exec_map, (vaddr_t) argp, NCARGS);
 
-	FREE(nid.ni_cnd.cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, nid.ni_cnd.cn_pnbuf);
 	vn_close(pack.ep_vp, FREAD, cred, p);
 
 	/*
@@ -620,7 +649,16 @@ sys_execve(p, v, retval)
 	if (KTRPOINT(p, KTR_EMUL))
 		ktremul(p, p->p_emul->e_name);
 #endif
+
 	p->p_flag &= ~P_INEXEC;
+
+#if NSYSTRACE > 0
+	if (ISSET(p->p_flag, P_SYSTRACE) &&
+	    wassugid && !ISSET(p->p_flag, P_SUGID) &&
+	    !ISSET(p->p_flag, P_SUGIDEXEC))
+		systrace_execve1(pathbuf, p);
+#endif
+
 	return (0);
 
 bad:
@@ -637,11 +675,14 @@ bad:
 		FREE(pack.ep_emul_arg, M_TEMP);
 	/* close and put the exec'd file */
 	vn_close(pack.ep_vp, FREAD, cred, p);
-	FREE(nid.ni_cnd.cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, nid.ni_cnd.cn_pnbuf);
 	uvm_km_free_wakeup(exec_map, (vaddr_t) argp, NCARGS);
 
-freehdr:
+ freehdr:
 	free(pack.ep_hdr, M_EXEC);
+#if NSYSTRACE > 0
+ clrflag:
+#endif
 	p->p_flag &= ~P_INEXEC;
 	return (error);
 
@@ -657,7 +698,7 @@ exec_abort:
 		FREE(pack.ep_interp, M_TEMP);
 	if (pack.ep_emul_arg != NULL)
 		FREE(pack.ep_emul_arg, M_TEMP);
-	FREE(nid.ni_cnd.cn_pnbuf, M_NAMEI);
+	pool_put(&namei_pool, nid.ni_cnd.cn_pnbuf);
 	vn_close(pack.ep_vp, FREAD, cred, p);
 	uvm_km_free_wakeup(exec_map, (vaddr_t) argp, NCARGS);
 

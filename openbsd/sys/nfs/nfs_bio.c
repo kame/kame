@@ -1,4 +1,4 @@
-/*	$OpenBSD: nfs_bio.c,v 1.38 2003/06/02 23:28:19 millert Exp $	*/
+/*	$OpenBSD: nfs_bio.c,v 1.40 2004/08/03 17:11:48 marius Exp $	*/
 /*	$NetBSD: nfs_bio.c,v 1.25.4.2 1996/07/08 20:47:04 jtc Exp $	*/
 
 /*
@@ -34,7 +34,6 @@
  *
  *	@(#)nfs_bio.c	8.9 (Berkeley) 3/30/95
  */
-
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -291,7 +290,7 @@ nfs_write(v)
 	struct vattr vattr;
 	struct nfsmount *nmp = VFSTONFS(vp->v_mount);
 	daddr_t lbn, bn;
-	int n, on, error = 0;
+	int n, on, error = 0, extended = 0, wrotedta = 0, truncated = 0;
 
 #ifdef DIAGNOSTIC
 	if (uio->uio_rw != UIO_WRITE)
@@ -370,7 +369,9 @@ again:
 		if (uio->uio_offset + n > np->n_size) {
 			np->n_size = uio->uio_offset + n;
 			uvm_vnp_setsize(vp, (u_long)np->n_size);
-		}
+			extended = 1;
+		} else if (uio->uio_offset + n < np->n_size)
+			truncated = 1;
 
 		/*
 		 * If the new write will leave a contiguous dirty
@@ -407,11 +408,23 @@ again:
 			bp->b_validend = max(bp->b_validend, bp->b_dirtyend);
 		}
 
+		wrotedta = 1;
+
 		/*
 		 * Since this block is being modified, it must be written
 		 * again and not just committed.
 		 */
-		bp->b_flags &= ~B_NEEDCOMMIT;
+
+		if (NFS_ISV3(vp)) {
+			rw_enter_write(&np->n_commitlock);
+			if (bp->b_flags & B_NEEDCOMMIT) {
+				bp->b_flags &= ~B_NEEDCOMMIT;
+				nfs_del_tobecommitted_range(vp, bp);
+			}
+			nfs_del_committed_range(vp, bp);
+			rw_exit_write(&np->n_commitlock);
+		} else 
+			bp->b_flags &= ~B_NEEDCOMMIT;
 
 		/*
 		 * If the lease is non-cachable or IO_SYNC do bwrite().
@@ -429,6 +442,11 @@ again:
 			bdwrite(bp);
 		}
 	} while (uio->uio_resid > 0 && n > 0);
+
+	if (wrotedta)
+		VN_KNOTE(vp, NOTE_WRITE | (extended ? NOTE_EXTEND : 0) |
+		    (truncated ? NOTE_TRUNCATE : 0));
+
 	return (0);
 }
 
@@ -661,7 +679,7 @@ nfs_doio(bp, p)
 		error = nfs_readlinkrpc(vp, uiop, curproc->p_ucred);
 		break;
 	    default:
-		printf("nfs_doio:  type %x unexpected\n",vp->v_type);
+		printf("nfs_doio:  type %x unexpected\n", vp->v_type);
 		break;
 	    };
 	    if (error) {
@@ -686,10 +704,17 @@ nfs_doio(bp, p)
 		vp, bp, bp->b_dirtyoff, bp->b_dirtyend);
 #endif
 	    error = nfs_writerpc(vp, uiop, &iomode, &must_commit);
-	    if (!error && iomode == NFSV3WRITE_UNSTABLE)
+
+	    rw_enter_write(&np->n_commitlock);
+	    if (!error && iomode == NFSV3WRITE_UNSTABLE) {
 		bp->b_flags |= B_NEEDCOMMIT;
-	    else
+		nfs_add_tobecommitted_range(vp, bp);
+	    } else {
 		bp->b_flags &= ~B_NEEDCOMMIT;
+		nfs_del_committed_range(vp, bp);
+	    }
+	    rw_exit_write(&np->n_commitlock);
+
 	    bp->b_flags &= ~B_WRITEINPROG;
 
 	    /*

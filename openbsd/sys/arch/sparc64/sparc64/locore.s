@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.s,v 1.43 2004/01/08 17:14:04 pvalchev Exp $	*/
+/*	$OpenBSD: locore.s,v 1.47 2004/06/28 01:47:41 aaron Exp $	*/
 /*	$NetBSD: locore.s,v 1.137 2001/08/13 06:10:10 jdolecek Exp $	*/
 
 /*
@@ -2492,7 +2492,7 @@ textfault:
 	stx	%g6, [%sp + CC64FSZ + BIAS + TF_G + (6*8)]	! sneak in g6
 	rdpr	%tnpc, %g3
 	stx	%g7, [%sp + CC64FSZ + BIAS + TF_G + (7*8)]	! sneak in g7
-	rd	%y, %g7					! save y
+	rd	%y, %g4					! save y
 
 	/* Finish stackframe, call C trap handler */
 	stx	%g1, [%sp + CC64FSZ + BIAS + TF_TSTATE]		! set tf.tf_psr, tf.tf_pc
@@ -2517,7 +2517,7 @@ textfault:
 	/* Use trap type to see what handler to call */
 	cmp	%o1, T_INST_ERROR
 	be,pn	%xcc, text_error
-	 st	%g7, [%sp + CC64FSZ + BIAS + TF_Y]		! set tf.tf_y
+	 st	%g4, [%sp + CC64FSZ + BIAS + TF_Y]		! set tf.tf_y
 
 	wrpr	%g0, PSTATE_INTR, %pstate	! reenable interrupts
 	call	_C_LABEL(text_access_fault)	! mem_access_fault(&tf, type, pc, sfsr)
@@ -3309,18 +3309,11 @@ _C_LABEL(sparc_interrupt):
 	stx	%fp, [%sp + CC64FSZ + BIAS + TF_KSTACK]	!  old frame pointer
 	
 	sub	%l5, 0x40, %l6			! Convert to interrupt level
-	sethi	%hi(_C_LABEL(intrcnt)), %l4
 	stb	%l6, [%sp + CC64FSZ + BIAS + TF_PIL]	! set up intrframe/clockframe
 	rdpr	%pil, %o1
-	sll	%l6, 2, %l3
-	or	%l4, %lo(_C_LABEL(intrcnt)), %l4	! intrcnt[intlev]++;
 	stb	%o1, [%sp + CC64FSZ + BIAS + TF_OLDPIL]	! old %pil
-	ld	[%l4 + %l3], %o0
-	add	%l4, %l3, %l4
 	clr	%l5			! Zero handled count
 	mov	1, %l3			! Ack softint
-	inc	%o0	
-	st	%o0, [%l4]
 	sll	%l3, %l6, %l3		! Generate IRQ mask
 	
 	sethi	%hi(_C_LABEL(handled_intr_level)), %l4
@@ -3386,7 +3379,10 @@ sparc_intr_retry:
 
 	brz,pn	%l1, 0f
 	 add	%l5, %o0, %l5		! Add handler return value
+	ldx	[%l2 + IH_COUNT], %o0	! ih->ih_count.ec_count++;
 	stx	%g0, [%l1]		! Clear intr source
+	inc	%o0
+	stx	%o0, [%l2 + IH_COUNT]
 0:
 	brnz,pn	%l7, 2b			! 'Nother?
 	 mov	%l7, %l2
@@ -4895,6 +4891,7 @@ _C_LABEL(sigcode):
 	ldx	[%fp + BIAS + 128 + 8], %o1	! siginfo
 	call	%g1			! (*sa->sa_handler)(sig, sip, scp)
 	 add	%fp, BIAS + 128 + 16, %o2	! scp
+	wr	%l1, %g0, %y		! in any case, restore %y
 
 	/*
 	 * Now that the handler has returned, re-establish all the state
@@ -4914,7 +4911,7 @@ _C_LABEL(sigcode):
 	ldda	[%l0] ASI_BLK_P, %f16
 1:
 	bz,pt	%icc, 2f
-	 wr	%l1, %g0, %y		! in any case, restore %y
+	 nop
 	add	%sp, BIAS+CC64FSZ+BLOCK_SIZE, %l0	! Generate a pointer so we can
 	andn	%l0, BLOCK_ALIGN, %l0	! do a block load
 	inc	2*BLOCK_SIZE, %l0	! and skip what we already loaded
@@ -5878,10 +5875,8 @@ Lsw_scan:
 	 * p->p_cpu = curcpu();
 	 */
 #endif	/* defined(MULTIPROCESSOR) */
-#ifdef notyet
 	mov	SONPROC, %o0			! p->p_stat = SONPROC
 	stb	%o0, [%l3 + P_STAT]
-#endif	/* notyet */
 	sethi	%hi(_C_LABEL(want_resched)), %o0
 	st	%g0, [%o0 + %lo(_C_LABEL(want_resched))]	! want_resched = 0;
 	ldx	[%l3 + P_ADDR], %l1		! newpcb = p->p_addr;
@@ -8923,10 +8918,10 @@ Lfp_finish:
 	retl
 	 wr	%g0, FPRS_FEF, %fprs	! Mark FPU clean
 3:
-#ifdef DIAGONSTIC
+#ifdef DIAGNOSTIC
 	btst	7, %o2			! 32-bit aligned!?!?
 	bnz,pn	%icc, 6f
-#endif	/* DIAGONSTIC */
+#endif	/* DIAGNOSTIC */
 	 btst	FPRS_DL, %o5		! Lower FPU clean?
 	bz,a,pt	%icc, 4f		! Then skip it
 	 add	%o0, 128, %o0
@@ -9518,34 +9513,14 @@ _C_LABEL(ssym):
 _C_LABEL(proc0paddr):
 	.xword	_C_LABEL(u0)		! KVA of proc0 uarea
 
-/* interrupt counters	XXX THESE BELONG ELSEWHERE (if anywhere) */
+/* Some bogus data, to keep vmstat happy, for now. */
+	.globl	_C_LABEL(intrnames), _C_LABEL(eintrnames)
 	.globl	_C_LABEL(intrcnt), _C_LABEL(eintrcnt)
-	.globl _C_LABEL(intrnames), _C_LABEL(eintrnames)
-	OTYPE(intrcnt)
-	OTYPE(eintrcnt)
-	OTYPE(intrnames)
-	OTYPE(eintrnames)
 _C_LABEL(intrnames):
-	.asciz	"spur"
-	.asciz	"lev1"
-	.asciz	"lev2"
-	.asciz	"lev3"
-	.asciz	"lev4"
-	.asciz	"lev5"
-	.asciz	"lev6"
-	.asciz	"lev7"
-	.asciz  "lev8"
-	.asciz	"lev9"
-	.asciz	"clock"
-	.asciz	"lev11"
-	.asciz	"lev12"
-	.asciz	"lev13"
-	.asciz	"prof"
-	.asciz  "lev15"
+	.long	0
 _C_LABEL(eintrnames):
-	_ALIGN
 _C_LABEL(intrcnt):
-	.space	16 * 4
+	.long	0
 _C_LABEL(eintrcnt):
 
 	.comm	_C_LABEL(nwindows), 4

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ie.c,v 1.24 2004/01/14 20:50:48 miod Exp $ */
+/*	$OpenBSD: if_ie.c,v 1.27 2004/07/30 22:29:44 miod Exp $ */
 
 /*-
  * Copyright (c) 1999 Steve Murphree, Jr. 
@@ -169,7 +169,7 @@ struct vm_map *ie_map; /* for obio */
 struct ie_softc {
 	struct device sc_dev;   /* device structure */
 	struct intrhand sc_ih, sc_failih;  /* interrupt info */
-	struct evcnt sc_intrcnt; /* # of interrupts, per ie */
+	char	sc_failintrname[16 + 4];
 
 	caddr_t sc_iobase;      /* KVA of base of 24 bit addr space */
 	caddr_t sc_maddr;       /* KVA of base of chip's RAM (16bit addr sp.)*/
@@ -229,12 +229,6 @@ struct ie_softc {
 
 #ifdef IEDEBUG
 	int sc_debug;
-#endif
-#if NMC > 0
-	struct mcreg *sc_mc;
-#endif
-#if NPCCTWO > 0
-	struct pcctworeg *sc_pcc2;
 #endif
 };
 
@@ -483,46 +477,46 @@ ieattach(parent, self, aux)
 	sc->sc_failih.ih_arg = sc;
 	sc->sc_failih.ih_ipl = pri;
 
+	snprintf(sc->sc_failintrname, sizeof sc->sc_failintrname, "%s_err",		    self->dv_xname);
+
 	switch (sc->sc_bustype) {
 #if NMC > 0
 	case BUS_MC:
-		mcintr_establish(MCV_IE, &sc->sc_ih);
-		sc->sc_mc = (struct mcreg *)ca->ca_master;
-		sc->sc_mc->mc_ieirq = pri | MC_SC_SNOOP | MC_IRQ_IEN |
+		mcintr_establish(MCV_IE, &sc->sc_ih, self->dv_xname);
+		sys_mc->mc_ieirq = pri | MC_SC_SNOOP | MC_IRQ_IEN |
 		    MC_IRQ_ICLR;
-		mcintr_establish(MCV_IEFAIL, &sc->sc_failih);
-		sc->sc_mc->mc_iefailirq = pri | MC_IRQ_IEN | MC_IRQ_ICLR;
+		mcintr_establish(MCV_IEFAIL, &sc->sc_failih,
+		    sc->sc_failintrname);
+		sys_mc->mc_iefailirq = pri | MC_IRQ_IEN | MC_IRQ_ICLR;
 		break;
 #endif
 #if NPCCTWO > 0
 	case BUS_PCCTWO:
-		pcctwointr_establish(PCC2V_IE, &sc->sc_ih);
-		sc->sc_pcc2 = (struct pcctworeg *)ca->ca_master;
-      switch (cputyp) {
+		pcctwointr_establish(PCC2V_IE, &sc->sc_ih, self->dv_xname);
+		switch (cputyp) {
 #ifdef MVME172
-      case CPU_172:
+		case CPU_172:
 #endif 
 #ifdef MVME177
-      case CPU_177:
+		case CPU_177:
 #endif 
 #if defined(MVME172) || defined(MVME177)
-         /* no snooping on 68060 */
-         sc->sc_pcc2->pcc2_ieirq = pri | PCC2_SC_SNOOP |
-             PCC2_IRQ_IEN | PCC2_IRQ_ICLR;
-         break;
+			/* no snooping on 68060 */
+			sys_pcc2->pcc2_ieirq = pri | PCC2_SC_INHIBIT |
+			    PCC2_IRQ_IEN | PCC2_IRQ_ICLR;
+			break;
 #endif 
-      default:
-         sc->sc_pcc2->pcc2_ieirq = pri | PCC2_SC_SNOOP |
-             PCC2_IRQ_IEN | PCC2_IRQ_ICLR;
-      }
-		pcctwointr_establish(PCC2V_IEFAIL, &sc->sc_failih);
-		sc->sc_pcc2->pcc2_iefailirq = pri | PCC2_IRQ_IEN |
+		default:
+			sys_pcc2->pcc2_ieirq = pri | PCC2_SC_SNOOP |
+			    PCC2_IRQ_IEN | PCC2_IRQ_ICLR;
+		}
+		pcctwointr_establish(PCC2V_IEFAIL, &sc->sc_failih,
+		    sc->sc_failintrname);
+		sys_pcc2->pcc2_iefailirq = pri | PCC2_IRQ_IEN |
 		    PCC2_IRQ_ICLR;
 		break;
 #endif
 	}
-
-	evcnt_attach(&sc->sc_dev, "intr", &sc->sc_intrcnt);
 }
 
 /*
@@ -550,16 +544,16 @@ void *v;
 	switch (sc->sc_bustype) {
 #if NMC > 0
 	case BUS_MC:
-		sc->sc_mc->mc_ieirq |= MC_IRQ_ICLR;		/* safe: clear irq */
-		sc->sc_mc->mc_iefailirq |= MC_IRQ_ICLR;		/* clear failure */
-		sc->sc_mc->mc_ieerr = MC_IEERR_SCLR;		/* reset error */
+		sys_mc->mc_ieirq |= MC_IRQ_ICLR;		/* safe: clear irq */
+		sys_mc->mc_iefailirq |= MC_IRQ_ICLR;		/* clear failure */
+		sys_mc->mc_ieerr = MC_IEERR_SCLR;		/* reset error */
 		break;
 #endif
 #if NPCCTWO > 0
 	case BUS_PCCTWO:
-		sc->sc_pcc2->pcc2_ieirq |= PCC2_IRQ_ICLR;	/* safe: clear irq */
-		sc->sc_pcc2->pcc2_iefailirq |= PCC2_IRQ_ICLR;	/* clear failure */
-		sc->sc_pcc2->pcc2_ieerr = PCC2_IEERR_SCLR;	/* reset error */
+		sys_pcc2->pcc2_ieirq |= PCC2_IRQ_ICLR;		/* safe: clear irq */
+		sys_pcc2->pcc2_iefailirq |= PCC2_IRQ_ICLR;	/* clear failure */
+		sys_pcc2->pcc2_ieerr = PCC2_IEERR_SCLR;		/* reset error */
 		break;
 #endif
 	}
@@ -587,12 +581,12 @@ loop:
 	switch (sc->sc_bustype) {
 #if NMC > 0
 	case BUS_MC:
-		sc->sc_mc->mc_ieirq |= MC_IRQ_ICLR;		/* clear irq */
+		sys_mc->mc_ieirq |= MC_IRQ_ICLR;		/* clear irq */
 		break;
 #endif
 #if NPCCTWO > 0
 	case BUS_PCCTWO:
-		sc->sc_pcc2->pcc2_ieirq |= PCC2_IRQ_ICLR;	/* clear irq */
+		sys_pcc2->pcc2_ieirq |= PCC2_IRQ_ICLR;		/* clear irq */
 		break;
 #endif
 	}
@@ -635,7 +629,6 @@ loop:
 	if ((status = sc->scb->ie_status) & IE_ST_WHENCE)
 		goto loop;
 
-	sc->sc_intrcnt.ev_count++;
 	return 1;
 }
 

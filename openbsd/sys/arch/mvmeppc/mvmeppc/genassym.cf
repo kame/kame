@@ -1,4 +1,4 @@
-#	$OpenBSD: genassym.cf,v 1.5 2003/06/02 23:27:53 millert Exp $
+#	$OpenBSD: genassym.cf,v 1.7 2004/06/24 22:35:56 drahn Exp $
 #
 # Copyright (c) 1982, 1990 The Regents of the University of California.
 # All rights reserved.
@@ -35,7 +35,7 @@ include <sys/time.h>
 include <sys/proc.h>
 include <uvm/uvm_extern.h>
 
-include <machine/pcb.h>               
+include <machine/pcb.h>
 include <machine/pmap.h>
 
 export	FRAMELEN
@@ -63,8 +63,8 @@ member	pcb_spl
 member	PCB_FAULT	pcb_onfault
 
 struct	pmap
-member	PM_USRSR	pm_sr[USER_SR]
-member	PM_KERNELSR	pm_sr[KERNEL_SR]
+member	PM_USRSR	pm_sr[PPC_USER_SR]
+member	PM_KERNELSR	pm_sr[PPC_KERNEL_SR]
 
 struct	proc
 member	p_forw
