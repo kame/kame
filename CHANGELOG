@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.676 2000/03/09 19:39:42 itojun Exp $
+$Id: CHANGELOG,v 1.677 2000/03/09 21:13:56 itojun Exp $
 
 <200003>
+Fri Mar 10 06:11:03 JST 2000  itojun@iijlab.net
+	* sys/netinet/icmp6.h: fix member name of icmp6_filter to be
+	  compatible with RFC2292. (member name is icmp6_filt, not icmp6_filter)
+	  From: Francis Dupont
+
 Fri Mar 10 01:05:05 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ah_core.c: add strict mbuf boundary checks for IPv4/v6
 	  AH computation.  now IPv4/v6 AH processing is m_pulldown safe.
