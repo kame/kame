@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.111 2003/06/26 07:34:23 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.112 2003/06/28 03:56:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -122,7 +122,7 @@ struct	ip6_moptions {
 /* Routing header related info */
 struct	ip6po_rhinfo {
 	struct	ip6_rthdr *ip6po_rhi_rthdr; /* Routing header */
-#if defined(NEW_STRUCT_ROUTE) || defined(__OpenBSD__) || defined(__FreeBSD__)
+#if defined(NEW_STRUCT_ROUTE) || defined(__FreeBSD__)
 	struct	route ip6po_rhi_route; /* Route to the 1st hop */
 #else
 	struct	route_in6 ip6po_rhi_route; /* Route to the 1st hop */
@@ -136,7 +136,7 @@ struct	ip6po_rhinfo {
 /* Nexthop related info */
 struct	ip6po_nhinfo {
 	struct	sockaddr *ip6po_nhi_nexthop;
-#if defined(NEW_STRUCT_ROUTE) || defined(__OpenBSD__) || defined(__FreeBSD__)
+#if defined(NEW_STRUCT_ROUTE) || defined(__FreeBSD__)
 	struct	route ip6po_nhi_route; /* Route to the nexthop */
 #else
 	struct	route_in6 ip6po_nhi_route; /* Route to the nexthop */
@@ -419,7 +419,7 @@ int	ip6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 void	ip6_forward __P((struct mbuf *, int));
 
 void	ip6_mloopback __P((struct ifnet *, struct mbuf *, struct sockaddr_in6 *));
-#if defined(NEW_STRUCT_ROUTE) || defined(__OpenBSD__)  || defined(__FreeBSD__)
+#if defined(NEW_STRUCT_ROUTE) || defined(__FreeBSD__)
 #if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
 			struct route *,

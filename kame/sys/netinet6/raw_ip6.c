@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.138 2003/06/19 07:56:23 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.139 2003/06/28 03:56:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -129,7 +129,7 @@
 #define in6p_laddr	inp_laddr6
 #define in6p_faddr	inp_faddr6
 #define in6p_icmp6filt	inp_icmp6filt
-#define in6p_route	inp_route
+#define in6p_route	inp_route6
 #define in6p_socket	inp_socket
 #define in6p_flags	inp_flags
 #define in6p_moptions	inp_moptions6

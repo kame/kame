@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.318 2003/06/28 02:21:07 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.319 2003/06/28 03:56:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -411,8 +411,8 @@ extern struct	route ip6_forward_rt;
 #else
 extern struct	route_in6 ip6_forward_rt;
 
-/* NetBSD/OpenBSD requires NEW_STRUCT_ROUTE */
-#if defined(__OpenBSD__) || defined(__FreeBSD__)
+/* FreeBSD requires NEW_STRUCT_ROUTE */
+#if defined(__FreeBSD__)
 #error NEW_STRUCT_ROUTE is required
 #endif
 #endif

@@ -74,7 +74,7 @@ option		IPSEC		# IPsec
 #option		CCITT,LLC,HDLC	# X.25
 option		PPP_BSDCOMP	# PPP BSD compression
 option		PPP_DEFLATE
-#option		MROUTING	# Multicast router
+option		MROUTING	# Multicast router
 
 pseudo-device	pf		# packet filter
 pseudo-device	pflog		# pf log if
@@ -103,7 +103,3 @@ pseudo-device	gif	4	# IPv[46] over IPv[46] tunnel (RFC1933)
 #pseudo-device	faith	1	# IPv[46] tcp relay translation i/f
 
 option		BOOT_CONFIG	# add support for boot -c
-
-# KAME
-# these options are mandatory.
-option		NEW_STRUCT_ROUTE

@@ -114,11 +114,7 @@ struct inpcb {
 	caddr_t	  inp_ppcb;		/* pointer to per-protocol pcb */
 	union {				/* Route (notice increased size). */
 		struct route ru_route;
-#if 1 /*def NEW_STRUCT_ROUTE*/
-		struct route ru_route6;
-#else
 		struct route_in6 ru_route6;
-#endif
 	} inp_ru;
 #define	inp_route	inp_ru.ru_route
 #define	inp_route6	inp_ru.ru_route6
@@ -180,7 +176,7 @@ struct inpcb {
 #define in6p_faddr inp_faddr6
 #define in6p_moptions inp_moptions6
 #define in6p_flags inp_flags
-#define in6p_route inp_route
+#define in6p_route inp_route6
 #define in6p_fport inp_fport
 #define in6p_flowinfo inp_flowinfo
 #define in6p_lsa inp_lsa6

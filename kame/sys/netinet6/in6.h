@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.141 2003/06/26 07:34:23 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.142 2003/06/28 03:56:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -419,7 +419,7 @@ extern const struct in6_addr in6addr_linklocal_allv2routers;
 /*
  * IP6 route structure
  */
-#if !defined(__OpenBSD__) && !(defined(__FreeBSD__) && !defined(KLD_MODULE)) && !(defined(__bsdi__) && _BSDI_VERSION >= 200105)
+#if !(defined(__FreeBSD__) && !defined(KLD_MODULE)) && !(defined(__bsdi__) && _BSDI_VERSION >= 200105)
 #if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
 struct route_in6 {
 	struct	rtentry *ro_rt;
