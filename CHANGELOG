@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.665 2000/03/09 01:07:41 jinmei Exp $
+$Id: CHANGELOG,v 1.666 2000/03/09 04:20:22 jinmei Exp $
 
 <200003>
+2000-03-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd3/sys/netinet/tcp_input.c (tcp_input): did not try to
+	access to ip6_inputopts unless it's really an IPv6 packet.
+	In response to: a report from Noriaki Takamiya
+	<takamiya@po.ntts.co.jp>
+
 Thu Mar  9 09:41:53 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ah_core.c: treat AH checksum as immutable, if there are
 	  multiple AH present on a packet.
