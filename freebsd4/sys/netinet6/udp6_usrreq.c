@@ -1,3 +1,5 @@
+/*	$KAME: udp6_usrreq.c,v 1.4 2000/03/29 15:49:03 sumikawa Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
