@@ -1,15 +1,16 @@
 #
-# $Id: Makefile,v 1.1 2000/04/21 09:55:48 itojun Exp $
+# $Id: Makefile,v 1.2 2002/08/27 05:46:42 keiichi Exp $
 #
 SRCDIR=	${.CURDIR}/../../kame/mip6stat
 
 PROG=	mip6stat
-SRCS=	mip6stat.c bcache.c foraddr.c haddr.c halist.c config.c bulist.c
+SRCS=	mip6stat.c
 
-CFLAGS+=-DINET6 -Wall
-
-DPADD+=	${LIBKVM}
-LDADD+=	-lkvm
+CFLAGS+=-DINET6 -Wall -g
+BINGRP= kmem
+BINMODE=2555
+DPADD=  ${LIBKVM}
+LDADD=  -lkvm
 
 DPADD+=	${.OBJDIR}/../../lib/libinet6/libinet6.a /usr/local/v6/lib/libinet6.a
 LDADD+=	-L${.OBJDIR}/../../lib/libinet6 -L/usr/local/v6/lib -linet6
