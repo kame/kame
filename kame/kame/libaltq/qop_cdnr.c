@@ -1,4 +1,4 @@
-/*	$KAME: qop_cdnr.c,v 1.6 2000/10/18 09:15:19 kjc Exp $	*/
+/*	$KAME: qop_cdnr.c,v 1.7 2001/08/15 12:51:57 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -122,7 +122,7 @@ cdnr_ifname2ifinfo(const char *ifname)
 		return (NULL);
 
 	input_ifname[0] = '_';
-	strcpy(input_ifname+1, ifname);
+	strlcpy(input_ifname+1, ifname, sizeof(input_ifname)-1);
 	if (qop_add_if(&ifinfo, input_ifname, 0, &cdnr_qdisc, NULL) != 0) {
 		LOG(LOG_ERR, errno,
 		    "cdnr_ifname2ifinfo: can't add a input interface %s\n",

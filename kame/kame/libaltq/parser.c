@@ -1,4 +1,4 @@
-/*	$KAME: parser.c,v 1.9 2001/08/06 10:49:53 itojun Exp $	*/
+/*	$KAME: parser.c,v 1.10 2001/08/15 12:51:57 kjc Exp $	*/
 /*******************************************************************
 
   Copyright (c) 1996 by the University of Southern California
@@ -69,7 +69,7 @@ static int get_ifname(char **cpp, char **ifnamep);
 static int get_addr(char **cpp, struct in_addr *addr, struct in_addr *mask);
 static int get_port(const char *name, u_int16_t *port_no);
 static int get_proto(const char *name, int *proto_no);
-static int get_fltr_opts(char **cpp, char *fltr_name, size_t, int *ruleno);
+static int get_fltr_opts(char **cpp, char *fltr_name, size_t len, int *ruleno);
 static int interface_parser(char *cmdbuf);
 static int class_parser(char *cmdbuf) ;
 static int filter_parser(char *cmdbuf);
@@ -535,7 +535,7 @@ get_proto(const char *name, int *proto_no)
 }
 
 static int
-get_fltr_opts(char **cpp, char *fltr_name, size_t l, int *ruleno)
+get_fltr_opts(char **cpp, char *fltr_name, size_t len, int *ruleno)
 {
 	char w[128], *ocp;
 
@@ -544,7 +544,7 @@ get_fltr_opts(char **cpp, char *fltr_name, size_t l, int *ruleno)
 		if (EQUAL(w, "name")) {
 			if (!next_word(&ocp, w))
 				return (0);
-			strlcpy(fltr_name, w, l);
+			strlcpy(fltr_name, w, len);
 			*cpp = ocp;
 		} else if (EQUAL(w, "ruleno")) {
 			if (!next_word(&ocp, w))

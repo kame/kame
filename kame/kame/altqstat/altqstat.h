@@ -1,4 +1,4 @@
-/*	$KAME: altqstat.h,v 1.2 2000/10/18 09:15:16 kjc Exp $	*/
+/*	$KAME: altqstat.h,v 1.3 2001/08/15 12:51:58 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -52,7 +52,7 @@ stat_loop_t priq_stat_loop;
 
 struct redstats;
 
-void chandle2name(const char *ifname, u_long handle, char *name);
+void chandle2name(const char *ifname, u_long handle, char *name, size_t size);
 stat_loop_t *qdisc2stat_loop(const char *qdisc_name);
 int ifname2qdisc(const char *ifname, char *qname);
 double calc_interval(struct timeval *cur_time, struct timeval *last_time);
