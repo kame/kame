@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.104 2001/02/04 05:39:42 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.105 2001/02/04 05:54:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -667,8 +667,7 @@ nd6_timer(ignored_arg)
 					goto addrloop;
 				}
 			}
-		} else if (lt6->ia6t_preferred &&
-			   lt6->ia6t_preferred > time_second) {
+		} else if (IFA6_IS_DEPRECATED(ia6)) {
 			/*
 			 * A new RA might have made a deprecated address
 			 * preferred.

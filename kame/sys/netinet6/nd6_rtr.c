@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.91 2001/02/04 02:04:47 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.92 2001/02/04 05:54:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1201,8 +1201,8 @@ prelist_update(new, dr, m)
 #define TWOHOUR		(120*60)
 		lt6_tmp = ifa6->ia6_lifetime;
 
-		storedlifetime = lt6_tmp.ia6t_expire > time_second ?
-			lt6_tmp.ia6t_expire - time_second : 0;
+		storedlifetime = IFA6_IS_INVALID(ifa6) ? 0 :
+			(lt6_tmp.ia6t_expire - time_second);
 
 		if (TWOHOUR < new->ndpr_vltime ||
 		    storedlifetime < new->ndpr_vltime) {
@@ -1240,12 +1240,14 @@ prelist_update(new, dr, m)
 		 * XXX: how should we modify ia6t_[pv]ltime?
 		 */
 		if ((ifa6->ia6_flags & IN6_IFF_TEMPORARY) != 0) {
-			if (lt6_tmp.ia6t_expire >
+			if (lt6_tmp.ia6t_expire == 0 || /* no expire */
+			    lt6_tmp.ia6t_expire >
 			    ifa6->ia6_lifetime.ia6t_expire) {
 				lt6_tmp.ia6t_expire =
 					ifa6->ia6_lifetime.ia6t_expire;
 			}
-			if (lt6_tmp.ia6t_preferred >
+			if (lt6_tmp.ia6t_preferred == 0 || /* no expire */
+			    lt6_tmp.ia6t_preferred >
 			    ifa6->ia6_lifetime.ia6t_preferred) {
 				lt6_tmp.ia6t_preferred =
 					ifa6->ia6_lifetime.ia6t_preferred;
@@ -1920,15 +1922,15 @@ in6_tmpifadd(ia0, forcegen)
          * RANDOM_DELAY.
 	 */
 	if (ia0->ia6_lifetime.ia6t_expire != 0) {
-		vltime0 = (ia0->ia6_lifetime.ia6t_expire > time_second) ?
-			(ia0->ia6_lifetime.ia6t_expire - time_second) : 0;
+		vltime0 = IFA6_IS_INVALID(ia0) ? 0 :
+			(ia0->ia6_lifetime.ia6t_expire - time_second);
 		if (vltime0 > ip6_temp_valid_lifetime)
 			vltime0 = ip6_temp_valid_lifetime;
 	} else
 		vltime0 = ip6_temp_valid_lifetime;
 	if (ia0->ia6_lifetime.ia6t_preferred != 0) {
-		pltime0 = (ia0->ia6_lifetime.ia6t_preferred > time_second) ?
-			(ia0->ia6_lifetime.ia6t_preferred - time_second) : 0;
+		pltime0 = IFA6_IS_DEPRECATED(ia0) ? 0 :
+			(ia0->ia6_lifetime.ia6t_preferred - time_second);
 		if (pltime0 > ip6_temp_preferred_lifetime - ip6_desync_factor){
 			pltime0 = ip6_temp_preferred_lifetime -
 				ip6_desync_factor;
