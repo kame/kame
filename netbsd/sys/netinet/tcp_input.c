@@ -1091,8 +1091,10 @@ findpcb:
 				if (af == AF_INET6 && !ip6_use_deprecated) {
 					struct in6_ifaddr *ia6;
 					if ((ia6 = ip6_getdstifaddr(m)) &&
-					    (ia6->ia6_flags & IN6_IFF_DEPRECATED))
+					    (ia6->ia6_flags & IN6_IFF_DEPRECATED)) {
+						tp = NULL;
 						goto dropwithreset;
+					}
 				}
 #endif
 

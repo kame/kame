@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.38 2000/11/09 04:45:15 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.39 2000/11/09 05:05:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -706,8 +706,10 @@ findpcb:
 			 */
 			if (!ip6_use_deprecated) {
 				if ((ia6 = ip6_getdstifaddr(m)) &&
-				    (ia6->ia6_flags & IN6_IFF_DEPRECATED))
+				    (ia6->ia6_flags & IN6_IFF_DEPRECATED)) {
+					t6p = NULL;
 					goto dropwithreset;
+				}
 			}
 
 			oso = so;
