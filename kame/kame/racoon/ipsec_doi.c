@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.46 2000/02/08 12:52:06 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.47 2000/02/08 18:04:46 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -361,6 +361,22 @@ get_ph1approvalx(p, proposal)
 	if (t2isakmpsa(trns, &sa) < 0)
 		return NULL;
 	for (s = proposal; s != NULL; s = s->next) {
+		YIPSDEBUG(DEBUG_SA,
+			printf("lifetime = %ld\n", s->lifetime);
+			printf("lifebyte = %d\n", s->lifebyte);
+			printf("enctype = %s\n",
+				s_oakley_attr_v(OAKLEY_ATTR_ENC_ALG,
+						s->enctype));
+			printf("hashtype = %s\n",
+				s_oakley_attr_v(OAKLEY_ATTR_HASH_ALG,
+						s->authmethod));
+			printf("authmethod = %s\n",
+				s_oakley_attr_v(OAKLEY_ATTR_AUTH_METHOD,
+						s->authmethod));
+			printf("dh_group = %s\n",
+				s_oakley_attr_v(OAKLEY_ATTR_GRP_DESC,
+						s->authmethod));
+		);
 #if 0
 		/* XXX to be considered */
 		if (sa.lifetime > s->lifetime) ;
