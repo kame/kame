@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.97 2003/08/04 05:25:38 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.98 2003/08/08 11:59:11 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -100,10 +100,6 @@ struct mip6_bc {
 	void		      *mbc_dad;	     /* dad handler */
 	time_t		      mbc_mpa_exp;   /* expiration time for sending MPA */
 	                                     /* valid only when BUF_HOME. */
-#ifdef MIP6_CALLOUTTEST
-	struct mip6_timeout_entry *mbc_timeout;
-	struct mip6_timeout_entry *mbc_brr_timeout;
-#endif /* MIP6_CALLOUTTEST */
 	struct mip6_bc        *mbc_llmbc;
 	u_int32_t             mbc_refcnt;
 };

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.11 2003/07/31 09:56:39 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.12 2003/08/08 11:59:11 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -213,10 +213,6 @@ mip6_process_hrbu(bi)
 			if (llmbc->mbc_expire < time_second)
 				llmbc->mbc_expire = 0x7fffffff;
 			llmbc->mbc_state = MIP6_BC_FSM_STATE_BOUND;
-#ifdef MIP6_CALLOUTTEST
-			mip6_timeoutentry_update(llmbc->mbc_timeout, llmbc->mbc_expire);
-			mip6_timeoutentry_update(llmbc->mbc_brr_timeout, llmbc->mbc_expire - mbc->mbc_lifetime / 4);
-#endif /* MIP6_CALLOUTTEST */
 			/* modify encapsulation entry */
 			/* XXX */
 			if (mip6_tunnel_control(MIP6_TUNNEL_CHANGE, llmbc,
@@ -271,10 +267,6 @@ mip6_process_hrbu(bi)
 		if (mbc->mbc_expire < time_second)
 			mbc->mbc_expire = 0x7fffffff;
 		mbc->mbc_state = MIP6_BC_FSM_STATE_BOUND;
-#ifdef MIP6_CALLOUTTEST
-		mip6_timeoutentry_update(mbc->mbc_timeout, mbc->mbc_expire);
-		/* mip6_timeoutentry_update(mbc->mbc_brr_timeout, mbc->mbc_expire - mbc->mbc_lifetime / 4); */
-#endif /* MIP6_CALLOUTTEST */
 
 		/* modify the encapsulation entry. */
 		if (mip6_tunnel_control(MIP6_TUNNEL_CHANGE, mbc,

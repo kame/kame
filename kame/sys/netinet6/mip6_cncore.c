@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.27 2003/08/07 09:30:58 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.28 2003/08/08 11:59:11 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -807,9 +807,6 @@ mip6_bc_init()
         callout_init(&mip6_bc_ch);
 #endif
 	bzero(&mip6_bc_hash, sizeof(mip6_bc_hash));
-#ifdef MIP6_CALLOUTTEST
-	TAILQ_INIT(&mip6_bc_timeout_list);
-#endif
 }
 
 struct mip6_bc *
@@ -849,9 +846,6 @@ mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
 		mbc->mbc_expire = 0x7fffffff;
 	mbc->mbc_state = MIP6_BC_FSM_STATE_BOUND;
 	mbc->mbc_mpa_exp = time_second;	/* set to current time to send mpa as soon as created it */
-#ifdef MIP6_CALLOUTTEST
-	/* It isn't necessary to create timeout entry here because it will be done when inserting mbc to the list */
-#endif /* MIP6_CALLOUTTEST */
 	mbc->mbc_state = 0;
 	mbc->mbc_ifp = ifp;
 	mbc->mbc_llmbc = NULL;
@@ -904,11 +898,6 @@ mip6_bc_list_insert(mbc_list, mbc)
 
 	mbc->mbc_refcnt++;
 
-#ifdef MIP6_CALLOUTTEST
-	mbc->mbc_timeout = mip6_timeoutentry_insert(mbc->mbc_expire, (caddr_t)mbc); /* For BC expiration */
-	mbc->mbc_brr_timeout = mip6_timeoutentry_insert(mbc->mbc_expire - mbc->mbc_lifetime / 4, (caddr_t)mbc); /* For BRR */
-#endif
-
 	if (mip6_bc_count == 0) {
 		mip6log((LOG_INFO, "%s:%d: BC timer started.\n",
 			__FILE__, __LINE__));
@@ -943,11 +932,6 @@ mip6_bc_list_remove(mbc_list, mbc)
 			mip6_bc_hash[id] = NULL;
 		}
 	}
-#ifdef MIP6_CALLOUTTEST
-	if (mbc->mbc_timeout) {
-		mip6_timeoutentry_remove(mbc->mbc_timeout);
-	}
-#endif
 
 	mbc->mbc_refcnt--;
 	if (mbc->mbc_flags & IP6MU_CLONED) {
@@ -1061,10 +1045,6 @@ mip6_bc_update(mbc, coa_sa, dst_sa, flags, seqno, lifetime)
 	if (mbc->mbc_expire < time_second)
 		mbc->mbc_expire = 0x7fffffff;
 	mbc->mbc_state = MIP6_BC_FSM_STATE_BOUND;
-#ifdef MIP6_CALLOUTTEST
-	mip6_timeoutentry_update(mbc->mbc_timeout, mbc->mbc_expire);
-	mip6_timeoutentry_update(mbc->mbc_brr_timeout, mbc->mbc_expire - mbc->mbc_lifetime / 4);
-#endif /* MIP6_CALLOUTTEST */
 
 	return (0);
 }
@@ -1295,16 +1275,10 @@ mip6_bc_timeout(dummy)
 	void *dummy;
 {
 	int s;
-#ifdef MIP6_CALLOUTTEST
-	struct mip6_bc *mbc;
-	struct mip6_timeout *mto, *mto_next;
-	struct mip6_timeout_entry *mtoe, *mtoe_next;
-#else
 	struct mip6_bc *mbc, *mbc_next;
 #ifdef MIP6_HOME_AGENT
 	int error = 0;
 #endif /* MIP6_HOME_AGENT */
-#endif /* MIP6_CALLOUTTEST */
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
@@ -1315,26 +1289,6 @@ mip6_bc_timeout(dummy)
 	s = splnet();
 #endif
 
-#ifdef MIP6_CALLOUTTEST
-	for (mto = TAILQ_FIRST(&mip6_bc_timeout_list); mto; mto = mto_next) {
-		mto_next = TAILQ_NEXT(mto, mto_entry);
-
-		if (mto->mto_expire > time_second)
-			break;
-		for (mtoe = LIST_FIRST(&mto->mto_timelist); mtoe; mtoe = mtoe_next) {
-			mtoe_next = LIST_NEXT(mtoe, mtoe_entry);
-			mbc = (struct mip6_bc *)mtoe->mtoe_ptr;
-			if (mbc->mbc_expire <= time_second) {
-				mip6_bc_list_remove(&mip6_bc_list, 
-					(struct mip6_bc *)mtoe->mtoe_ptr);
-			} else {
-				/* This entry shows BRR timeout */
-				mbc->mbc_state |= MIP6_BC_STATE_BR_WAITSENT;
-				mip6_timeoutentry_remove(mtoe);
-			}
-		}
-	}
-#else
 	for (mbc = LIST_FIRST(&mip6_bc_list); mbc; mbc = mbc_next) {
 		mbc_next = LIST_NEXT(mbc, mbc_entry);
 		switch (mbc->mbc_state) {
@@ -1390,7 +1344,6 @@ mip6_bc_timeout(dummy)
 			break;
 		}
 	}
-#endif
 
 	if (mip6_bc_count != 0)
 		mip6_bc_starttimer();
