@@ -1,4 +1,4 @@
-$KAME: README,v 1.24 2001/04/12 05:35:57 sumikawa Exp $
+$KAME: README,v 1.25 2001/05/16 14:33:06 sumikawa Exp $
 
 This directory contains kame related ports only. Generic IPv6-enable
 ports are distributed by original FreeBSD ports.
@@ -12,13 +12,13 @@ kernel/application from different versions. You need to use
 ports-current at your own risk and you may require some knowledge to
 mix them.
 
-ports merging status at $Date: 2001/04/12 05:35:57 $
+ports merging status at $Date: 2001/05/16 14:33:06 $
 	KAME/FreeBSD3	ports-current
         -----------------------------
 	XFree86		not yet(based version in KAME ports is old
 				and maybe broken)
 	apache13	merged as www/apache13+ipv6
-	bind8		not yet(based version in KAME ports is old)
+	bind8		not yet
 	bind9		merged as net/bind9
 	ct		do not merge since this is KAME related port
 	echoping	not yet
@@ -37,7 +37,6 @@ ports merging status at $Date: 2001/04/12 05:35:57 $
 	ja-mnews	merged as japanese/mnews
 	ja-w3m		merged as japanese/w3m
 	ja-w3m-ssl	merged as japanese/w3m-ssl
-	kaffe		not yet(broken)
 	leafnode+	not yet
 	lftp		merged as ftp/lftp
 	libident6	not yet
@@ -88,7 +87,7 @@ ports merging status at $Date: 2001/04/12 05:35:57 $
 	v6tun		not yet
 	vat6		not yet(maybe)
 	vic6		not yet(maybe)
-	vnc		not yet(based version in KAME ports is old)
+	vnc		merged as net/vnc
 	w3m		merged as www/w3m
 	w3m-ssl		merged as www/w3m-ssl
 	wbd		not yet(maybe)
