@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.138 2001/08/14 12:26:06 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.139 2001/08/14 14:51:35 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -258,34 +258,9 @@ found:
 		oakley_dhgrp_free(sa->dhgrp);
 	}
 
-	sa->dhgrp = racoon_calloc(1, sizeof(struct dhgroup));
-	if (!sa->dhgrp) {
-		plog(LLV_ERROR, LOCATION, NULL,
-			"failed to get buffer\n");
+	if (oakley_setdhgroup(sa->dh_group, &sa->dhgrp) == -1) {
+		sa->dhgrp = NULL;
 		return NULL;
-	}
-	switch (sa->dh_group) {
-	case OAKLEY_ATTR_GRP_DESC_MODP768:
-	case OAKLEY_ATTR_GRP_DESC_MODP1024:
-	case OAKLEY_ATTR_GRP_DESC_MODP1536:
-		if (sa->dh_group > ARRAYLEN(dhgroup)
-		 || dhgroup[sa->dh_group].type == 0) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"invalid DH parameter grp=%d.\n",
-				sa->dh_group);
-			racoon_free(sa->dhgrp);
-			sa->dhgrp = NULL;
-			return NULL;
-		}
-		/* set defined dh vlaues */
-		memcpy(sa->dhgrp, &dhgroup[sa->dh_group],
-			sizeof(dhgroup[sa->dh_group]));
-		sa->dhgrp->prime = vdup(dhgroup[sa->dh_group].prime);
-		break;
-	default:
-		if (!sa->dhgrp->type || !sa->dhgrp->prime || !sa->dhgrp->gen1) {
-			break;
-		}
 	}
 
 saok:
@@ -544,11 +519,11 @@ t2isakmpsa(trns, sa)
 
 		switch (type) {
 		case OAKLEY_ATTR_ENC_ALG:
-			sa->enctype = (u_int8_t)ntohs(d->lorv);
+			sa->enctype = (u_int16_t)ntohs(d->lorv);
 			break;
 
 		case OAKLEY_ATTR_HASH_ALG:
-			sa->hashtype = (u_int8_t)ntohs(d->lorv);
+			sa->hashtype = (u_int16_t)ntohs(d->lorv);
 			break;
 
 		case OAKLEY_ATTR_AUTH_METHOD:
@@ -556,7 +531,7 @@ t2isakmpsa(trns, sa)
 			break;
 
 		case OAKLEY_ATTR_GRP_DESC:
-			sa->dh_group = (u_int8_t)ntohs(d->lorv);
+			sa->dh_group = (u_int16_t)ntohs(d->lorv);
 			break;
 
 		case OAKLEY_ATTR_GRP_TYPE:
@@ -667,7 +642,7 @@ t2isakmpsa(trns, sa)
 					len);
 				goto err;
 			}
-			sa->encklen = (u_int8_t)len;
+			sa->encklen = (u_int16_t)len;
 			keylen++;
 			break;
 		}
@@ -2191,18 +2166,7 @@ ahmismatch:
 				return -1;
 			}
 
-			switch (lorv) {
-			case OAKLEY_ATTR_GRP_DESC_MODP768:
-			case OAKLEY_ATTR_GRP_DESC_MODP1024:
-			case OAKLEY_ATTR_GRP_DESC_MODP1536:
-				break;
-			case OAKLEY_ATTR_GRP_DESC_EC2N155:
-			case OAKLEY_ATTR_GRP_DESC_EC2N185:
-				plog(LLV_ERROR, LOCATION, NULL,
-					"DH group %d isn't supported.\n",
-					lorv);
-				return -1;
-			default:
+			if (!alg_oakley_dhdef_doi(lorv)) {
 				plog(LLV_ERROR, LOCATION, NULL,
 					"invalid group description=%u.\n",
 					lorv);
@@ -2338,18 +2302,7 @@ check_attr_ipcomp(trns)
 				return -1;
 			}
 
-			switch (lorv) {
-			case OAKLEY_ATTR_GRP_DESC_MODP768:
-			case OAKLEY_ATTR_GRP_DESC_MODP1024:
-			case OAKLEY_ATTR_GRP_DESC_MODP1536:
-				break;
-			case OAKLEY_ATTR_GRP_DESC_EC2N155:
-			case OAKLEY_ATTR_GRP_DESC_EC2N185:
-				plog(LLV_ERROR, LOCATION, NULL,
-					"DH group %d isn't supported.\n",
-					lorv);
-				return -1;
-			default:
+			if (!alg_oakley_dhdef_doi(lorv)) {
 				plog(LLV_ERROR, LOCATION, NULL,
 					"invalid group description=%u.\n",
 					lorv);
@@ -2584,6 +2537,10 @@ setph1attr(sa, buf)
 	case OAKLEY_ATTR_GRP_DESC_MODP768:
 	case OAKLEY_ATTR_GRP_DESC_MODP1024:
 	case OAKLEY_ATTR_GRP_DESC_MODP1536:
+	case OAKLEY_ATTR_GRP_DESC_MODP2048:
+	case OAKLEY_ATTR_GRP_DESC_MODP3072:
+	case OAKLEY_ATTR_GRP_DESC_MODP4096:
+	case OAKLEY_ATTR_GRP_DESC_MODP8192:
 		/* don't attach group type for known groups */
 		attrlen += sizeof(struct isakmp_data);
 		if (buf) {
@@ -2725,16 +2682,8 @@ setph2proposal0(iph2, pp, pr)
 			return NULL;
 		}
 
-		switch (iph2->sainfo->pfs_group) {
-		case OAKLEY_ATTR_GRP_DESC_MODP768:
-		case OAKLEY_ATTR_GRP_DESC_MODP1024:
-		case OAKLEY_ATTR_GRP_DESC_MODP1536:
+		if (alg_oakley_dhdef_doi(iph2->sainfo->pfs_group))
 			attrlen += sizeof(struct isakmp_data);
-			break;
-		case 0:
-		default:
-			break;
-		}
 
 		p = vrealloc(p, p->l + sizeof(*trns) + attrlen);
 		if (p == NULL)
@@ -2786,17 +2735,9 @@ setph2proposal0(iph2, pp, pr)
 		 || pr->proto_id == IPSECDOI_PROTO_IPSEC_AH)
 			x = isakmp_set_attr_l(x, IPSECDOI_ATTR_AUTH, tr->authtype);
 
-		switch (iph2->sainfo->pfs_group) {
-		case OAKLEY_ATTR_GRP_DESC_MODP768:
-		case OAKLEY_ATTR_GRP_DESC_MODP1024:
-		case OAKLEY_ATTR_GRP_DESC_MODP1536:
+		if (alg_oakley_dhdef_doi(iph2->sainfo->pfs_group))
 			x = isakmp_set_attr_l(x, IPSECDOI_ATTR_GRP_DESC,
 				iph2->sainfo->pfs_group);
-			break;
-		case 0:
-		default:
-			break;
-		}
 
 		/* update length of this transform. */
 		trns = (struct isakmp_pl_t *)(p->v + trnsoff);
@@ -3770,8 +3711,8 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 			 *   Appendix A of [IKE].
 			 */
 			if (pp->pfs_group == 0)
-				pp->pfs_group = (u_int8_t)ntohs(d->lorv);
-			else if (pp->pfs_group != (u_int8_t)ntohs(d->lorv)) {
+				pp->pfs_group = (u_int16_t)ntohs(d->lorv);
+			else if (pp->pfs_group != (u_int16_t)ntohs(d->lorv)) {
 				plog(LLV_ERROR, LOCATION, NULL,
 					"pfs_group mismatched "
 					"in a proposal.\n");
@@ -3781,13 +3722,13 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 
 		case IPSECDOI_ATTR_ENC_MODE:
 			if (pr->encmode
-			 && pr->encmode != (u_int8_t)ntohs(d->lorv)) {
+			 && pr->encmode != (u_int16_t)ntohs(d->lorv)) {
 				plog(LLV_ERROR, LOCATION, NULL,
 					"multiple encmode exist "
 					"in a transform.\n");
 				goto end;
 			}
-			pr->encmode = (u_int8_t)ntohs(d->lorv);
+			pr->encmode = (u_int16_t)ntohs(d->lorv);
 			break;
 
 		case IPSECDOI_ATTR_AUTH:
@@ -3797,7 +3738,7 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 					"in a transform.\n");
 				goto end;
 			}
-			tr->authtype = (u_int8_t)ntohs(d->lorv);
+			tr->authtype = (u_int16_t)ntohs(d->lorv);
 			break;
 
 		case IPSECDOI_ATTR_KEY_LENGTH:
