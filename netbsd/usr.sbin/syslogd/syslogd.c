@@ -1,3 +1,5 @@
+/*	$NetBSD: syslogd.c,v 1.34.4.4 2001/03/22 02:48:58 he Exp $	*/
+
 /*
  * Copyright (c) 1983, 1988, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
@@ -41,7 +43,7 @@ __COPYRIGHT("@(#) Copyright (c) 1983, 1988, 1993, 1994\n\
 #if 0
 static char sccsid[] = "@(#)syslogd.c	8.3 (Berkeley) 4/4/94";
 #else
-__RCSID("$NetBSD: syslogd.c,v 1.30 1999/12/02 16:17:30 itojun Exp $");
+__RCSID("$NetBSD: syslogd.c,v 1.34.4.4 2001/03/22 02:48:58 he Exp $");
 #endif
 #endif /* not lint */
 
@@ -108,7 +110,6 @@ __RCSID("$NetBSD: syslogd.c,v 1.30 1999/12/02 16:17:30 itojun Exp $");
 #include <sys/syslog.h>
 
 char	*ConfFile = _PATH_LOGCONF;
-char	*PidFile = _PATH_LOGPID;
 char	ctty[] = _PATH_CONSOLE;
 
 #define FDMASK(fd)	(1 << (fd))
@@ -186,12 +187,12 @@ struct	filed consfile;
 int	Debug;			/* debug flag */
 char	LocalHostName[MAXHOSTNAMELEN+1];	/* our hostname */
 char	*LocalDomain;		/* our local domain name */
-int	InetInuse = 0;		/* non-zero if INET sockets are being used */
-int	*finet;			/* Internet datagram socket */
+int	*finet = NULL;			/* Internet datagram sockets */
 int	Initialized = 0;	/* set when we have initialized ourselves */
 int	MarkInterval = 20 * 60;	/* interval between marks in seconds */
 int	MarkSeq = 0;		/* mark sequence number */
-int	SecureMode = 0;		/* when true, speak only unix domain socks */
+int	SecureMode = 0;		/* listen only on unix domain socks */
+int	NumForwards = 0;	/* number of forwarding actions in conf file */
 char	**LogPaths;		/* array of pathnames to read messages from */
 
 void	cfline __P((char *, struct filed *));
@@ -224,7 +225,6 @@ main(argc, argv)
 	int funixsize = 0, funixmaxsize = 0;
 	struct sockaddr_un sunx, fromunix;
 	struct sockaddr_storage frominet;
-	FILE *fp;
 	char *p, *line, **pp;
 	struct pollfd *readfds;
 
@@ -247,7 +247,7 @@ main(argc, argv)
 			logpath_fileadd(&LogPaths, &funixsize, 
 			    &funixmaxsize, optarg);
 			break;
-		case 's':		/* no network mode */
+		case 's':		/* no network listen mode */
 			SecureMode++;
 			break;
 		case '?':
@@ -320,15 +320,7 @@ main(argc, argv)
 		dprintf("listening on unix dgram socket %s\n", *pp);
 	}
 
-	if (!SecureMode) 
-		finet = socksetup(PF_UNSPEC);
-	else
-		finet = NULL;
-
-	if (finet && *finet) {
-		dprintf("listening on inet and/or inet6 socket\n");
-		InetInuse = 1;
-	}
+	init(0);
 
 	if ((fklog = open(_PATH_KLOG, O_RDONLY, 0)) < 0) {
 		dprintf("can't open %s (%d)\n", _PATH_KLOG, errno);
@@ -337,22 +329,16 @@ main(argc, argv)
 	}
 
 	/* tuck my process id away, if i'm not in debug mode */
-	if (Debug == 0) {
-		fp = fopen(PidFile, "w");
-		if (fp != NULL) {
-			fprintf(fp, "%d\n", getpid());
-			(void) fclose(fp);
-		}
-	}
+	if (Debug == 0)
+		pidfile(NULL);
 
 	dprintf("off & running....\n");
 
-	init(0);
 	(void)signal(SIGHUP, init);
 
 	/* setup pollfd set. */
 	readfds = (struct pollfd *)malloc(sizeof(struct pollfd) *
-			(funixsize + (finet ? *finet : 0) + 2));
+			(funixsize + (finet ? *finet : 0) + 1));
 	if (readfds == NULL) {
 		logerror("couldn't allocate pollfds");
 		die(0);
@@ -363,7 +349,7 @@ main(argc, argv)
 		readfds[nfklogix].fd = fklog;
 		readfds[nfklogix].events = POLLIN | POLLPRI;
 	}
-	if (finet) {
+	if (finet && !SecureMode) {
 		nfinetix = malloc(*finet * sizeof(*nfinetix));
 		for (j = 0; j < *finet; j++) {
 			nfinetix[j] = nfds++;
@@ -423,16 +409,19 @@ main(argc, argv)
 				logerror(buf);
 			}
 		}
-		if (finet) {
+		if (finet && !SecureMode) {
 			for (j = 0; j < *finet; j++) {
-		    		if (readfds[nfinetix[j]].revents & (POLLIN | POLLPRI)) {
+		    		if (readfds[nfinetix[j]].revents &
+				    (POLLIN | POLLPRI)) {
 					dprintf("inet socket active\n");
 					len = sizeof(frominet);
-					i = recvfrom(finet[j+1], line, MAXLINE, 0,
-			    				(struct sockaddr *)&frominet, &len);
+					i = recvfrom(finet[j+1], line, MAXLINE,
+					    0, (struct sockaddr *)&frominet,
+					    &len);
 					if (i > 0) {
 						line[i] = '\0';
-						printline(cvthname(&frominet), line);
+						printline(cvthname(&frominet),
+						    line);
 					} else if (i < 0 && errno != EINTR)
 						logerror("recvfrom inet");
 				}
@@ -444,9 +433,11 @@ main(argc, argv)
 void
 usage()
 {
+	extern char *__progname;
 
 	(void)fprintf(stderr,
-	    "usage: syslogd [-f conffile] [-m markinterval] [-p logpath1] [-p logpath2 ..]\n");
+"usage: %s [-ds] [-f conffile] [-m markinterval] [-P logpathfile] [-p logpath1] [-p logpath2 ..]\n",
+	    __progname);
 	exit(1);
 }
 
@@ -542,7 +533,7 @@ printline(hname, msg)
 	q = line;
 
 	while ((c = *p++ & 0177) != '\0' &&
-	    q < &line[sizeof(line) - 1])
+	    q < &line[sizeof(line) - 2])
 		if (iscntrl(c))
 			if (c == '\n')
 				*q++ = ' ';
@@ -770,7 +761,10 @@ fprintlog(f, flags, msg)
 
 	case F_FORW:
 		dprintf(" %s\n", f->f_un.f_forw.f_hname);
-		/* check for local vs remote messages (from FreeBSD PR#bin/7055) */
+			/*
+			 * check for local vs remote messages
+			 * (from FreeBSD PR#bin/7055)
+			 */
 		if (strcmp(f->f_prevhost, LocalHostName)) {
 			l = snprintf(line, sizeof(line) - 1,
 				     "<%d>%.15s [%s]: %s",
@@ -783,14 +777,19 @@ fprintlog(f, flags, msg)
 		}
 		if (l > MAXLINE)
 			l = MAXLINE;
-		if (finet && *finet) {
+		if (finet) {
 			for (r = f->f_un.f_forw.f_addr; r; r = r->ai_next) {
 				for (j = 0; j < *finet; j++) {
 #if 0 
-					/* should we check AF first, or just trial and error? FWD */
-					if (r->ai_family == address_family_of(finet[j+1])) 
+					/*
+					 * should we check AF first, or just
+					 * trial and error? FWD
+					 */
+					if (r->ai_family ==
+					    address_family_of(finet[j+1])) 
 #endif
-					lsent = sendto(finet[j+1], line, l, 0, r->ai_addr, r->ai_addrlen);
+					lsent = sendto(finet[j+1], line, l, 0,
+					    r->ai_addr, r->ai_addrlen);
 					if (lsent == l) 
 						break;
 				}
@@ -1055,12 +1054,35 @@ init(signo)
 		case F_CONSOLE:
 			(void)close(f->f_file);
 			break;
+		case F_FORW:
+			if (f->f_un.f_forw.f_addr)
+				freeaddrinfo(f->f_un.f_forw.f_addr);
+			break;
 		}
 		next = f->f_next;
 		free((char *)f);
 	}
 	Files = NULL;
 	nextp = &Files;
+
+	/*
+	 *  Close all open sockets
+	 */
+
+	if (finet) {
+		for (i = 0; i < *finet; i++) {
+			if (close(finet[i+1]) < 0) {
+				logerror("close");
+				die(0);
+			}
+		}
+	}
+
+	/*
+	 *  Reset counter of forwarding actions
+	 */
+
+	NumForwards=0;
 
 	/* open the configuration file */
 	if ((cf = fopen(ConfFile, "r")) == NULL) {
@@ -1120,12 +1142,27 @@ init(signo)
 				break;
 
 			case F_USERS:
-				for (i = 0; i < MAXUNAMES && *f->f_un.f_uname[i]; i++)
+				for (i = 0;
+				    i < MAXUNAMES && *f->f_un.f_uname[i]; i++)
 					printf("%s, ", f->f_un.f_uname[i]);
 				break;
 			}
 			printf("\n");
 		}
+	}
+
+	finet = socksetup(PF_UNSPEC);
+	if (finet) {
+		if (SecureMode) {
+			for (i = 0; i < *finet; i++) {
+				if (shutdown(finet[i+1], SHUT_RD) < 0) {
+					logerror("shutdown");
+					die(0);
+				}
+			}
+		} else
+			dprintf("listening on inet and/or inet6 socket\n");
+		dprintf("sending on inet and/or inet6 socket\n");
 	}
 
 	logmsg(LOG_SYSLOG|LOG_INFO, "syslogd: restart", LocalHostName, ADDDATE);
@@ -1216,20 +1253,20 @@ cfline(line, f)
 	switch (*p)
 	{
 	case '@':
-		if (!InetInuse)
-			break;
 		(void)strcpy(f->f_un.f_forw.f_hname, ++p);
 		memset(&hints, 0, sizeof(hints));
 		hints.ai_family = AF_UNSPEC;
 		hints.ai_socktype = SOCK_DGRAM;
 		hints.ai_protocol = 0;
-		error = getaddrinfo(f->f_un.f_forw.f_hname, "syslog", &hints, &res);
+		error = getaddrinfo(f->f_un.f_forw.f_hname, "syslog", &hints,
+		    &res);
 		if (error) {
 			logerror(gai_strerror(error));
 			break;
 		}
 		f->f_un.f_forw.f_addr = res;
 		f->f_type = F_FORW;
+		NumForwards++;
 		break;
 
 	case '/':
@@ -1324,6 +1361,9 @@ socksetup(af)
 	struct addrinfo hints, *res, *r;
 	int error, maxs, *s, *socks;
 
+	if(SecureMode && !NumForwards)
+		return(NULL);
+
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_flags = AI_PASSIVE;
 	hints.ai_family = af;
@@ -1336,7 +1376,8 @@ socksetup(af)
 	}
 
 	/* Count max number of sockets we may open */
-	for (maxs = 0, r = res; r; r = r->ai_next, maxs++);
+	for (maxs = 0, r = res; r; r = r->ai_next, maxs++)
+		continue;
 	socks = malloc ((maxs+1) * sizeof(int));
 	if (!socks) {
 		logerror("couldn't allocate memory for sockets");
@@ -1351,7 +1392,7 @@ socksetup(af)
 			logerror("socket");
 			continue;
 		}
-		if (bind(*s, r->ai_addr, r->ai_addrlen) < 0) {
+		if (!SecureMode && bind(*s, r->ai_addr, r->ai_addrlen) < 0) {
 			close (*s);
 			logerror("bind");
 			continue;
