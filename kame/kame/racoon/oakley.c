@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.103 2001/09/26 05:30:34 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.104 2001/10/23 01:02:18 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2037,8 +2037,13 @@ oakley_skeyid(iph1)
 	/* SKEYID */
 	switch(iph1->approval->authmethod) {
 	case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
-		if (iph1->etype != ISAKMP_ETYPE_IDENT)
+		if (iph1->etype != ISAKMP_ETYPE_IDENT) {
 			iph1->authstr = getpskbyname(iph1->id_p);
+			plog(LLV_NOTIFY, LOCATION, NULL,
+				"couldn't find pskey, "
+				"try to get one by the peer's address.\n");
+			/*FALLTHROUGH*/
+		}
 		if (iph1->authstr == NULL) {
 			/*
 			 * If main mode or If failed to get psk by ID,
