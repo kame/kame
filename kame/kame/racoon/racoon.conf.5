@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.58 2000/10/23 12:08:17 sakane Exp $
+.\"	$KAME: racoon.conf.5,v 1.59 2000/10/23 12:23:15 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -302,6 +302,9 @@ can use this certificate as peer's.
 .It Ic send_cert (on \(ba off) ;
 If you don't want to send any certificate in some reasons, you may set off.
 default is on.
+.\"
+.It Ic send_cr (on \(ba off) ;
+If you don't want to send any certificate request in some reasons, you may set off.  default is on.
 .\"
 .It Ic verify_cert (on \(ba off) ;
 If you don't want to verify the certificate in some reasons, you may set off.
