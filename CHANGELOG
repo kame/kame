@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.739 2000/04/02 13:09:44 itojun Exp $
+$Id: CHANGELOG,v 1.740 2000/04/02 15:10:51 itojun Exp $
 
 <200003>
 Sun Apr  2 22:05:03 JST 2000  itojun@iijlab.net
@@ -9,6 +9,11 @@ Sun Apr  2 22:05:03 JST 2000  itojun@iijlab.net
 Sat Apr  1 22:47:12 JST 2000  itojun@iijlab.net
 	* sys/sys/socket.h (all platforms): avoid namespace pollution
 	  for CMSG_ALIGN().
+
+Thu Mar 30 2000  itojun@iijlab.net
+	* libinet6: by defining USE_EDNS0, resolver will make queries with
+	  EDNS0 UDP buffer size report. (experimental since BIND4/8 chokes
+	  with EDNS0 packet)
 
 Thu Mar 30 14:10:35 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd4: turn off gif and faith temporally.
