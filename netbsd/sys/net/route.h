@@ -323,6 +323,7 @@ void	 rtalloc __P((struct route *));
 struct rtentry *
 	 rtalloc1 __P((struct sockaddr *, int));
 void	 rtfree __P((struct rtentry *));
+int	 rt_getifa __P((struct rt_addrinfo *));
 int	 rtinit __P((struct ifaddr *, int, int));
 int	 rtioctl __P((u_long, caddr_t, struct proc *));
 void	 rtredirect __P((struct sockaddr *, struct sockaddr *,

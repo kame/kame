@@ -328,10 +328,18 @@ rtredirect(dst, gateway, netmask, flags, src, rtp)
 			 * Create new route, rather than smashing route to net.
 			 */
 		create:
+			if (rt)
+				rtfree(rt);
 			flags |=  RTF_GATEWAY | RTF_DYNAMIC;
-			error = rtrequest((int)RTM_ADD, dst, gateway,
-				    netmask, flags,
-				    (struct rtentry **)0);
+			info.rti_info[RTAX_DST] = dst;
+			info.rti_info[RTAX_GATEWAY] = gateway;
+			info.rti_info[RTAX_NETMASK] = netmask;
+			info.rti_ifa = ifa;
+			info.rti_flags = flags;
+			rt = NULL;
+			error = rtrequest1(RTM_ADD, &info, &rt);
+			if (rt != NULL)
+				flags = rt->rt_flags;
 			stat = &rtstat.rts_dynamic;
 		} else {
 			/*
@@ -453,6 +461,43 @@ rtrequest(req, dst, gateway, netmask, flags, ret_nrt)
 #define flags	info->rti_flags
 
 int
+rt_getifa(info)
+	struct rt_addrinfo *info;
+{
+	struct ifaddr *ifa;
+	int error = 0;
+
+	/*
+	 * ifp may be specified by sockaddr_dl when protocol address
+	 * is ambiguous
+	 */
+	if (info->rti_ifp == NULL && ifpaddr != NULL
+	    && ifpaddr->sa_family == AF_LINK &&
+	    (ifa = ifa_ifwithnet((struct sockaddr *)ifpaddr)) != NULL)
+		info->rti_ifp = ifa->ifa_ifp;
+	if (info->rti_ifa == NULL && ifaaddr != NULL)
+		info->rti_ifa = ifa_ifwithaddr(ifaaddr);
+	if (info->rti_ifa == NULL) {
+		struct sockaddr *sa;
+
+		sa = ifaaddr != NULL ? ifaaddr :
+		    (gateway != NULL ? gateway : dst);
+		if (sa != NULL && info->rti_ifp != NULL)
+			info->rti_ifa = ifaof_ifpforaddr(sa, info->rti_ifp);
+		else if (dst != NULL && gateway != NULL)
+			info->rti_ifa = ifa_ifwithroute(flags, dst, gateway);
+		else if (sa != NULL)
+			info->rti_ifa = ifa_ifwithroute(flags, sa, sa);
+	}
+	if ((ifa = info->rti_ifa) != NULL) {
+		if (info->rti_ifp == NULL)
+			info->rti_ifp = ifa->ifa_ifp;
+	} else
+		error = ENETUNREACH;
+	return (error);
+}
+
+int
 rtrequest1(req, info, ret_nrt)
 	int req;
 	struct rt_addrinfo *info;
@@ -504,8 +549,9 @@ rtrequest1(req, info, ret_nrt)
 		goto makeroute;
 
 	case RTM_ADD:
-		if ((ifa = ifa_ifwithroute(flags, dst, gateway)) == 0)
-			senderr(ENETUNREACH);
+		if (info->rti_ifa == 0 && (error = rt_getifa(info)))
+			senderr(error);
+		ifa = info->rti_ifa;
 	makeroute:
 		rt = pool_get(&rtentry_pool, PR_NOWAIT);
 		if (rt == 0)
@@ -641,17 +687,20 @@ rtinit(ifa, cmd, flags)
 {
 	struct rtentry *rt;
 	struct sockaddr *dst, *odst;
+	struct sockaddr *netmask;
 	struct sockaddr_storage deldst;
 	struct rtentry *nrt = 0;
 	int error;
+	struct rt_addrinfo info;
 
 	dst = flags & RTF_HOST ? ifa->ifa_dstaddr : ifa->ifa_addr;
+	netmask = flags & RTF_HOST ? NULL : ifa->ifa_netmask;
 	if (cmd == RTM_DELETE) {
-		if ((flags & RTF_HOST) == 0 && ifa->ifa_netmask) {
+		if (netmask) {
 			/* Delete subnet route for this interface */
 			odst = dst;
 			dst = (struct sockaddr *)&deldst;
-			rt_maskedcopy(odst, dst, ifa->ifa_netmask);
+			rt_maskedcopy(odst, dst, netmask);
 		}
 		if ((rt = rtalloc1(dst, 0)) != NULL) {
 			rt->rt_refcnt--;
@@ -660,8 +709,13 @@ rtinit(ifa, cmd, flags)
 							: ENETUNREACH);
 		}
 	}
-	error = rtrequest(cmd, dst, ifa->ifa_addr, ifa->ifa_netmask,
-			flags | ifa->ifa_flags, &nrt);
+	bzero(&info, sizeof(info));
+	info.rti_ifa = ifa;
+	info.rti_flags = flags | ifa->ifa_flags;
+	info.rti_info[RTAX_DST] = dst;
+	info.rti_info[RTAX_GATEWAY] = ifa->ifa_addr;
+	info.rti_info[RTAX_NETMASK] = netmask;
+	error = rtrequest1(cmd, &info, &nrt);
 	if (cmd == RTM_DELETE && error == 0 && (rt = nrt)) {
 		rt_newaddrmsg(cmd, ifa, error, nrt);
 		if (rt->rt_refcnt <= 0) {
