@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: var.h,v 1.4 2000/01/10 23:28:35 itojun Exp $ */
+/* YIPS @(#)$Id: var.h,v 1.5 2000/01/11 01:02:19 itojun Exp $ */
 
 #if !defined(_VAR_H_)
 #define _VAR_H_
@@ -66,10 +66,18 @@
  */
 #include <sys/socket.h>
 #include <netdb.h>
+
+/* var.h is used from non-racoon code (like eaytest), so we can't use niflags */
+#ifdef NI_WITHSCOPEID
+#define NIFLAGS	(NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID)
+#else
+#define NIFLAGS	(NI_NUMERICHOST | NI_NUMERICSERV)
+#endif
+
 #define GETNAMEINFO(x, y, z) \
 do { \
 	if (getnameinfo((x), (x)->sa_len, (y), sizeof(y), (z), sizeof(z), \
-			NI_NUMERICHOST | NI_NUMERICSERV) != 0) { \
+			NIFLAGS) != 0) { \
 		if (y) \
 			strncpy((y), "(invalid)", sizeof(y)); \
 		if (z) \

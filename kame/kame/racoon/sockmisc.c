@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sockmisc.c,v 1.5 2000/01/11 00:15:27 itojun Exp $ */
+/* YIPS @(#)$Id: sockmisc.c,v 1.6 2000/01/11 01:02:19 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -55,6 +55,12 @@
 #include "plog.h"
 #include "sockmisc.h"
 #include "debug.h"
+
+#ifdef NI_WITHSCOPEID
+const int niflags = NI_WITHSCOPEID;
+#else
+const int niflags = 0;
+#endif
 
 /*
  * compare two sockaddr without port number.

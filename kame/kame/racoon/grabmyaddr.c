@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: grabmyaddr.c,v 1.4 2000/01/10 22:42:13 itojun Exp $ */
+/* YIPS @(#)$Id: grabmyaddr.c,v 1.5 2000/01/11 01:02:18 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -150,7 +150,7 @@ grab_myaddrs()
 			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)
 			 || IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr)) {
 				sin6->sin6_scope_id =
-					*(u_int16_t *)&sin6->sin6_addr.s6_addr[2];
+					ntohs(*(u_int16_t *)&sin6->sin6_addr.s6_addr[2]);
 				sin6->sin6_addr.s6_addr[2] = 0;
 				sin6->sin6_addr.s6_addr[3] = 0;
 			}
@@ -160,7 +160,8 @@ grab_myaddrs()
 			YIPSDEBUG(DEBUG_MISC,
 				if (getnameinfo(p->addr, p->addr->sa_len,
 						_addr1_, sizeof(_addr1_),
-						NULL, 0, NI_NUMERICHOST))
+						NULL, 0,
+						NI_NUMERICHOST | niflags))
 					strcpy(_addr1_, "(invalid)");
 				plog(logp, LOCATION, NULL,
 					"my interface: %s (%s)\n",

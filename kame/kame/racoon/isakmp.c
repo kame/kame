@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.25 2000/01/11 00:28:49 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.26 2000/01/11 01:02:18 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1683,7 +1683,8 @@ getname(ap)
 	addr.sin_family = AF_INET;
 	memcpy(&addr.sin_addr, ap, sizeof(addr.sin_addr));
 	if (getnameinfo((struct sockaddr *)&addr, addr.sin_len,
-			ntop_buf, sizeof(ntop_buf), NULL, 0, NI_NUMERICHOST))
+			ntop_buf, sizeof(ntop_buf), NULL, 0,
+			NI_NUMERICHOST | niflags))
 		strncpy(ntop_buf, "?", sizeof(ntop_buf));
 
 	return ntop_buf;
@@ -1706,7 +1707,8 @@ getname6(ap)
 	addr.sin6_family = AF_INET6;
 	memcpy(&addr.sin6_addr, ap, sizeof(addr.sin6_addr));
 	if (getnameinfo((struct sockaddr *)&addr, addr.sin6_len,
-			ntop_buf, sizeof(ntop_buf), NULL, 0, NI_NUMERICHOST))
+			ntop_buf, sizeof(ntop_buf), NULL, 0,
+			NI_NUMERICHOST | niflags))
 		strncpy(ntop_buf, "?", sizeof(ntop_buf));
 
 	return ntop_buf;
@@ -1740,7 +1742,7 @@ doit:
 	if (from) {
 		if (getnameinfo(from, from->sa_len, hostbuf, sizeof(hostbuf),
 				portbuf, sizeof(portbuf),
-				NI_NUMERICHOST | NI_NUMERICSERV)) {
+				NI_NUMERICHOST | NI_NUMERICSERV | niflags)) {
 			strncpy(hostbuf, "?", sizeof(hostbuf));
 			strncpy(portbuf, "?", sizeof(portbuf));
 		}
@@ -1751,7 +1753,7 @@ doit:
 	if (my) {
 		if (getnameinfo(my, my->sa_len, hostbuf, sizeof(hostbuf),
 				portbuf, sizeof(portbuf),
-				NI_NUMERICHOST | NI_NUMERICSERV)) {
+				NI_NUMERICHOST | NI_NUMERICSERV | niflags)) {
 			strncpy(hostbuf, "?", sizeof(hostbuf));
 			strncpy(portbuf, "?", sizeof(portbuf));
 		}

@@ -26,7 +26,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sockmisc.h,v 1.2 2000/01/11 00:15:27 itojun Exp $ */
+/* YIPS @(#)$Id: sockmisc.h,v 1.3 2000/01/11 01:02:19 itojun Exp $ */
+
+extern const int niflags;
 
 extern int cmpsaddrwop __P((struct sockaddr *addr1, struct sockaddr *addr2));
 extern int cmpsaddr __P((struct sockaddr *addr1, struct sockaddr *addr2));
