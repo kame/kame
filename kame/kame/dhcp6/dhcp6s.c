@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.81 2002/05/23 02:27:51 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.82 2002/05/23 02:29:38 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -520,10 +520,8 @@ server6_recv(s)
 		    (struct sockaddr *)&from, fromlen);
 		break;
 	case DH6_RENEW:
-#if 0
 		(void)server6_react_renew(ifp, pi, dh6, &optinfo,
 		    (struct sockaddr *)&from, fromlen);
-#endif
 		break;
 	case DH6_REBIND:
 		(void)server6_react_rebind(ifp, dh6, &optinfo,
