@@ -738,11 +738,7 @@ netname6(struct sockaddr_in6 *sa6, struct in6_addr *mask)
 	int masklen, final = 0, illegal = 0;
 	int i;
 	char hbuf[NI_MAXHOST];
-#ifdef NI_WITHSCOPEID
-	int flag = NI_WITHSCOPEID;
-#else
 	int flag = 0;
-#endif
 	int error;
 
 	sin6 = *sa6;
@@ -828,11 +824,8 @@ char *
 routename6(struct sockaddr_in6 *sa6)
 {
 	static char line[NI_MAXHOST];
-#ifdef NI_WITHSCOPEID
-	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
-#else
 	const int niflag = NI_NUMERICHOST;
-#endif
+
 	if (getnameinfo((struct sockaddr *)sa6, sa6->sin6_len,
 	    line, sizeof(line), NULL, 0, niflag) != 0)
 		strlcpy(line, "", sizeof line);

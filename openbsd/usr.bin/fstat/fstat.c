@@ -828,11 +828,7 @@ inet6_addrstr(struct in6_addr *p)
 {
 	struct sockaddr_in6 sin6;
 	static char hbuf[NI_MAXHOST];
-#ifdef NI_WITHSCOPEID
-	const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
-#else
 	const int niflags = NI_NUMERICHOST;
-#endif
 
 	memset(&sin6, 0, sizeof(sin6));
 	sin6.sin6_family = AF_INET6;
