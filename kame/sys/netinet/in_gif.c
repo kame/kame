@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.75 2001/10/24 01:03:21 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.76 2001/10/25 09:26:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -324,20 +324,25 @@ in_gif_output(ifp, family, m)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	time_second = time.tv_sec;
 #endif
-	if (sc->rtcache_expire == 0 || time_second >= sc->rtcache_expire ||
-	    dst->sin_family != sin_dst->sin_family ||
-	    dst->sin_addr.s_addr != sin_dst->sin_addr.s_addr) {
-		/* cache route doesn't match or it has expired */
-		dst->sin_family = sin_dst->sin_family;
-		dst->sin_len = sizeof(struct sockaddr_in);
-		dst->sin_addr = sin_dst->sin_addr;
-		if (sc->gif_ro.ro_rt) {
-			RTFREE(sc->gif_ro.ro_rt);
-			sc->gif_ro.ro_rt = NULL;
-		}
+	if (sc->gif_ro.ro_rt && (!(sc->gif_ro.ro_rt->rt_flags & RTF_UP) ||
+				 dst->sin_family != sin_dst->sin_family ||
+				 dst->sin_addr.s_addr !=
+				 sin_dst->sin_addr.s_addr ||
+				 sc->rtcache_expire == 0 ||
+				 time_second >= sc->rtcache_expire)) {
+		/*
+		 * The cache route doesn't match, has been invalidated, or has
+		 * expired.
+		 */
+		RTFREE(sc->gif_ro.ro_rt);
+		sc->gif_ro.ro_rt = NULL;
 	}
 
 	if (sc->gif_ro.ro_rt == NULL) {
+		dst->sin_family = sin_dst->sin_family;
+		dst->sin_len = sizeof(struct sockaddr_in);
+		dst->sin_addr = sin_dst->sin_addr;
+
 #ifdef __bsdi__
 		rtcalloc(&sc->gif_ro);
 #else
