@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.75 2000/09/19 15:19:48 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.76 2000/09/19 21:31:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -921,7 +921,7 @@ ipsec4_setspidx_inpcb(m, pcb)
 		panic("ipsec4_setspidx_inpcb: no PCB found.\n");
 	if (pcb->inp_sp == NULL)
 		panic("ipsec4_setspidx_inpcb: no inp_sp found.\n");
-	if (pcb->inp_sp->sp_out ==NULL || pcb->inp_sp->sp_in == NULL)
+	if (pcb->inp_sp->sp_out == NULL || pcb->inp_sp->sp_in == NULL)
 		panic("ipsec4_setspidx_inpcb: no sp_in/out found.\n");
 
 	bzero(&pcb->inp_sp->sp_in->spidx, sizeof(*spidx));
@@ -1053,7 +1053,7 @@ ipsec6_setspidx_in6pcb(m, pcb)
 		panic("ipsec6_setspidx_in6pcb: no PCB found.\n");
 	if (pcb->in6p_sp == NULL)
 		panic("ipsec6_setspidx_in6pcb: no in6p_sp found.\n");
-	if (pcb->in6p_sp->sp_out ==NULL || pcb->in6p_sp->sp_in == NULL)
+	if (pcb->in6p_sp->sp_out == NULL || pcb->in6p_sp->sp_in == NULL)
 		panic("ipsec6_setspidx_in6pcb: no sp_in/out found.\n");
 
 	bzero(&pcb->in6p_sp->sp_in->spidx, sizeof(*spidx));
