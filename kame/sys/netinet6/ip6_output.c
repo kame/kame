@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.345 2002/11/01 11:09:51 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.346 2002/11/04 07:10:09 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -5058,8 +5058,6 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		}
 
 		greq = mtod(m, struct group_req *);
-		if (error)
-			break;
 		if (greq->gr_group.ss_family != AF_INET6) {
 			error = EPFNOSUPPORT;
 			break;
