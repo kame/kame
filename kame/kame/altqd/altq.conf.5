@@ -1,4 +1,4 @@
-.\"	$KAME: altq.conf.5,v 1.14 2002/11/08 06:35:01 kjc Exp $
+.\"	$KAME: altq.conf.5,v 1.15 2002/11/17 02:51:49 kjc Exp $
 .\"
 .\" Copyright (C) 2000
 .\" Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -1294,7 +1294,7 @@ interface fxp0 bandwidth 100M priq
 class priq fxp0 high_class NULL priority 2
         filter fxp0 high_class 0 0 0 0 1
 class priq fxp0 med_class NULL priority 1
-        filter fxp0 high_class 0 0 0 0 6
+        filter fxp0 med_class 0 0 0 0 6
 class priq fxp0 low_class NULL priority 0 default
 .Ed
 .Ss WFQ Example
