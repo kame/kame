@@ -40,14 +40,19 @@
 .Nd configure network interface parameters
 .Sh SYNOPSIS
 .Nm ifconfig
-.Ar interface address_family
+.Fl L
+.Ar interface
+.Oo
+.Ar address_family
 .Oo
 .Ar address
 .Op Ar dest_address
 .Oc
 .Op Ar parameters
+.Oc
 .Nm ifconfig
 .Fl a
+.Fl L
 .Op Fl d
 .Op Fl u
 .Op Ar address_family
@@ -109,6 +114,7 @@ with different naming schemes, specifying the address family is recommended.
 The address or protocol families currently
 supported are
 .Dq inet ,
+.Dq inet6 ,
 .Dq atalk ,
 .\" .Dq iso ,
 and
@@ -133,6 +139,13 @@ The following parameters may be set with
 Establish an additional network address for this interface.
 This is sometimes useful when changing network numbers, and
 one wishes to accept packets addressed to the old interface.
+.It Cm anycast
+(Inet6 only)
+Specify that the address configured is an anycast address.
+Based on the current specification,
+only routers may configure anycast addresses.
+Anycast address will not be used as source address of any of outgoing
+IPv6 packets.
 .It Cm arp
 Enable the use of the Address Resolution Protocol in mapping
 between network level addresses and link level addresses (default).
@@ -234,6 +247,16 @@ and 0's for the host part.
 The mask should contain at least the standard network portion,
 and the subnet field should be contiguous with the network
 portion.
+.It Cm prefixlen Ar len
+(Inet6 only)
+Specify that
+.Ar len
+bits are reserved for for subdividing networks into sub-networks.
+The
+.Ar len
+must be integer, and for syntactical reason it must be between 0 to 128.
+It is almost always 64 under the current IPv6 assignment rule.
+If the parameter is ommitted, 64 is used.
 .\" see 
 .\" Xr eon 5 .
 .\" .It Cm nsellength Ar n
@@ -300,6 +323,11 @@ will report only the details specific to that protocol family.
 If the driver does supports the media selection system, the supported
 media list will be included in the output.
 .Pp
+If
+.Fl L
+flag is supplied, address lifetime is dislayed for IPv6 addresses,
+as time offset string.
+.Pp
 Optionally, the
 .Fl a
 flag may be used instead of an interface name.  This flag instructs
@@ -330,12 +358,25 @@ it (or have need for it).
 Messages indicating the specified interface does not exist, the
 requested address is unknown, or the user is not privileged and
 tried to alter an interface's configuration.
+.Sh BUGS
+KAME kernel assigns IPv6 node-local and link-local addresses to interfaces
+at boot time automatically.  If they are deleted by
+.Nm ifconfig
+manually, the kernel shows very strange behavior. 
+So, such manuall deletions are strongly discouraged.
 .Sh SEE ALSO
 .Xr netstat 1 ,
 .Xr netintro 4 ,
 .Xr rc 8 ,
-.Xr routed 8
+.Xr routed 8 ,
 .\" .Xr eon 5
+.Sh BUGS
+KAME kernel assigns node-local and link-local addresses to interfaces
+at boot time automatically.
+If they are deleted by
+.Nm
+manually, the kernel shows very strange behavior. 
+So, such manual deletions are strongly discouraged.
 .Sh HISTORY
 The
 .Nm

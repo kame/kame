@@ -119,6 +119,7 @@ When the address family may is specified by any of the
 .Fl osi ,
 .Fl xns ,
 .Fl atalk ,
+.Fl inet6 ,
 or
 .Fl inet
 modifiers, only routes having destinations with addresses in the
@@ -212,6 +213,28 @@ One specifies an additional ensuing address parameter
 (to be interpreted as a network mask).
 The implicit network mask generated in the AF_INET case
 can be overridden by making sure this option follows the destination parameter.
+.Pp
+For
+.Dv AF_INET6 ,
+the
+.Fl prefixlen
+qualifier
+is available instead of the
+.Fl mask
+qualifier because non-continuous masks are not allowed in IPv6.
+For example,
+.Fl prefixlen Li 32
+specifies network mask of
+.Li ffff:ffff:0000:0000:0000:0000:0000:0000
+to be used.
+The default value of prefixlen is 64 to get along with
+the aggregatable address. 
+But 0 is assumed if 
+.Cm default
+is specified.
+Note that the qualifier works only for
+.Dv AF_INET6
+address family.
 .Pp
 Routes have associated flags which influence operation of the protocols
 when sending to destinations matched by the routes.
@@ -318,10 +341,10 @@ to create the new entry.
 .Sh SEE ALSO
 .Xr netintro 4 ,
 .Xr route 4 ,
-.Xr IPXrouted 8 ,
+.\" Xr esis 4 ,
+.Xr IPXrouted
 .Xr routed 8
 .\" .Xr XNSrouted 8
-.\" Xr esis 4 ,
 .Sh HISTORY
 The
 .Nm
@@ -331,3 +354,16 @@ command appeared in
 The first paragraph may have slightly exaggerated
 .Xr routed 8 Ns 's
 abilities.
+.Pp
+Some uses of the
+.Fl ifa
+or
+.Fl ifp
+modifiers with the add command will incorrectly fail with a
+.Dq Network is unreachable
+message if there is no default route.
+See case
+.Dv RTM_ADD
+in
+.Pa sys/net/rtsock.c:route_output
+for details.

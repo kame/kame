@@ -1,8 +1,8 @@
 #	@(#)Makefile	8.1 (Berkeley) 6/4/93
 
 LIB=	util
-SHLIB_MAJOR= 2
-SHLIB_MINOR= 2
+#SHLIB_MAJOR= 2
+#SHLIB_MINOR= 2
 CFLAGS+=-Wall -DLIBC_SCCS -I${.CURDIR} -I${.CURDIR}/../../sys
 #CFLAGS+=LOGIN_CAP_AUTH
 SRCS=	login.c login_tty.c logout.c logwtmp.c pty.c setproctitle.c \
@@ -27,6 +27,8 @@ MLINKS+=login_times.3 parse_lt.3 login_times.3 in_ltm.3 \
 MLINKS+=login_ok.3 auth_ttyok.3 login_ok.3 auth_hostok.3 \
 	login_ok.3 auth_timeok.3
 MLINKS+=uucplock.3 uu_lock.3 uucplock.3 uu_unlock.3 uucplock.3 uu_lockerr.3
+
+CFLAGS+=-DINET6
 
 beforeinstall:
 	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 ${.CURDIR}/libutil.h \

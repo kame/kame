@@ -43,6 +43,8 @@ static const char rcsid[] =
 #include <sys/types.h>
 #include <sys/file.h>
 #include <sys/stat.h>
+#include <sys/param.h>
+#include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
@@ -62,16 +64,33 @@ logwtmp(line, name, host)
 	struct utmp ut;
 	struct stat buf;
 	int fd;
+	char hostbuf[MAXHOSTNAMELEN];
 
 	if (strlen(host) > UT_HOSTSIZE) {
-		struct hostent *hp = gethostbyname(host);
+		int af;
+		struct hostent *hp;
 
-		if (hp != NULL) {
+		hp = gethostbyname2(host, af = AF_INET);
+#ifdef INET6
+		if (!hp)
+			hp = gethostbyname2(host, af = AF_INET6);
+#endif
+		if (hp && af == AF_INET) {
 			struct in_addr in;
 
 			memmove(&in, hp->h_addr, sizeof(in));
-			host = inet_ntoa(in);
-		} else
+			inet_ntop(af, &in, hostbuf, sizeof(hostbuf));
+			host = hostbuf;
+		}
+#ifdef INET6
+		else if (hp && af == AF_INET6) {
+			struct in6_addr in6;
+			memmove(&in6, hp->h_addr, sizeof(in6));
+			inet_ntop(af, &in6, hostbuf, sizeof(hostbuf));
+			host = hostbuf;
+		}
+#endif
+		else
 			host = "invalid hostname";
 	}
 

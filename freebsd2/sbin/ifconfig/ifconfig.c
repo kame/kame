@@ -59,6 +59,7 @@ static const char rcsid[] =
 /* IP */
 #include <netinet/in.h>
 #include <netinet/in_var.h>
+#include <netinet6/nd6.h>
 #include <arpa/inet.h>
 #include <netdb.h>
 
@@ -98,6 +99,10 @@ static const char rcsid[] =
 
 struct	ifreq		ifr, ridreq;
 struct	ifaliasreq	addreq;
+#ifdef INET6
+struct	in6_ifreq	in6_ridreq;
+struct	in6_aliasreq	in6_addreq;
+#endif
 #ifdef ISO
 struct	iso_ifreq	iso_ridreq;
 struct	iso_aliasreq	iso_addreq;
@@ -117,8 +122,15 @@ int	setipdst;
 int	doalias;
 int	clearaddr;
 int	newaddr = 1;
+#ifdef INET6
+static int ip6lifetime;
+#endif
 
 struct	afswtch;
+
+#ifdef INET6
+char ntop_buf[INET6_ADDRSTRLEN];	/*inet_ntop()*/
+#endif
 
 void	Perror __P((const char *cmd));
 void	checkatrange __P((struct sockaddr_at *));
@@ -130,10 +142,22 @@ void	status __P((const struct afswtch *afp, int addrcount,
 		    struct sockaddr_dl *sdl, struct if_msghdr *ifm,
 		    struct ifa_msghdr *ifam));
 void	usage __P((void));
+#ifdef INET6
+int	prefix __P((void *, int));
+static char *sec2str __P((time_t));
+int	explicit_prefix = 0;
+#endif
 
 typedef	void c_func __P((const char *cmd, int arg, int s, const struct afswtch *afp));
 c_func	setatphase, setatrange;
 c_func	setifaddr, setifbroadaddr, setifdstaddr, setifnetmask;
+#ifdef INET6
+c_func	setifprefixlen;
+c_func	setip6flags;
+c_func	setip6pltime;
+c_func	setip6vltime;
+void	setip6lifetime __P((const char *, const char *, const struct afswtch *));
+#endif
 c_func	setifipdst;
 c_func	setifflags, setifmetric, setifmtu;
 
@@ -164,6 +188,14 @@ struct	cmd {
 	{ "-swabips",	-EN_SWABIPS,	setifflags },
 #endif
 	{ "netmask",	NEXTARG,	setifnetmask },
+#ifdef INET6
+	{ "prefixlen",	NEXTARG,	setifprefixlen },
+	{ "anycast",	IN6_IFF_ANYCAST, setip6flags },
+	{ "tentative",	IN6_IFF_TENTATIVE, setip6flags },
+	{ "-tentative",	-IN6_IFF_TENTATIVE, setip6flags },
+	{ "pltime",	NEXTARG,	setip6pltime },
+	{ "vltime",	NEXTARG,	setip6vltime },
+#endif
 	{ "range",	NEXTARG,	setatrange },
 	{ "phase",	NEXTARG,	setatphase },
 	{ "metric",	NEXTARG,	setifmetric },
@@ -198,10 +230,16 @@ struct	cmd {
  */
 typedef	void af_status __P((int, struct rt_addrinfo *));
 typedef	void af_getaddr __P((const char *, int));
+typedef void af_getprefix __P((const char *, int));
 
 af_status	in_status, ipx_status, at_status, ether_status;
 af_getaddr	in_getaddr, ipx_getaddr, at_getaddr;
 
+#ifdef INET6
+af_status	in6_status;
+af_getaddr	in6_getaddr;
+af_getprefix	in6_getprefix;
+#endif /*INET6*/
 #ifdef NS
 af_status	xns_status;
 af_getaddr	xns_getaddr;
@@ -218,30 +256,42 @@ struct	afswtch {
 	short af_af;
 	af_status *af_status;
 	af_getaddr *af_getaddr;
+	af_getprefix *af_getprefix;
 	u_long af_difaddr;
 	u_long af_aifaddr;
+	u_long af_sifaddr;
 	caddr_t af_ridreq;
 	caddr_t af_addreq;
 } afs[] = {
 #define C(x) ((caddr_t) &x)
-	{ "inet", AF_INET, in_status, in_getaddr,
-	     SIOCDIFADDR, SIOCAIFADDR, C(ridreq), C(addreq) },
-	{ "ipx", AF_IPX, ipx_status, ipx_getaddr,
-	     SIOCDIFADDR, SIOCAIFADDR, C(ridreq), C(addreq) },
-	{ "atalk", AF_APPLETALK, at_status, at_getaddr,
-	     SIOCDIFADDR, SIOCAIFADDR, C(addreq), C(addreq) },
+	{ "inet", AF_INET, in_status, in_getaddr, NULL,
+	     SIOCDIFADDR, SIOCAIFADDR, SIOCSIFADDR,
+	     C(ridreq), C(addreq) },
+#ifdef INET6
+	{ "inet6", AF_INET6, in6_status, in6_getaddr, in6_getprefix,
+	     SIOCDIFADDR_IN6, SIOCAIFADDR_IN6, SIOCSIFADDR_IN6,
+	     C(in6_ridreq), C(in6_addreq) },
+#endif /*INET6*/
+	{ "ipx", AF_IPX, ipx_status, ipx_getaddr, NULL,
+	     SIOCDIFADDR, SIOCAIFADDR, SIOCSIFADDR,
+	     C(ridreq), C(addreq) },
+	{ "atalk", AF_APPLETALK, at_status, at_getaddr, NULL,
+	     SIOCDIFADDR, SIOCAIFADDR, SIOCSIFADDR,
+	     C(addreq), C(addreq) },
 #ifdef NS
-	{ "ns", AF_NS, xns_status, xns_getaddr,
-	     SIOCDIFADDR, SIOCAIFADDR, C(ridreq), C(addreq) },
+	{ "ns", AF_NS, xns_status, xns_getaddr, NULL,
+	     SIOCDIFADDR, SIOCAIFADDR, SIOCSIFADDR,
+	     C(ridreq), C(addreq) },
 #endif
 #ifdef ISO
-	{ "iso", AF_ISO, iso_status, iso_getaddr,
-	     SIOCDIFADDR_ISO, SIOCAIFADDR_ISO, C(iso_ridreq), C(iso_addreq) },
+	{ "iso", AF_ISO, iso_status, iso_getaddr, NULL,
+	     SIOCDIFADDR_ISO, SIOCAIFADDR_ISO, SIOCSIFADDR,
+	     C(iso_ridreq), C(iso_addreq) },
 #endif
-	{ "ether", AF_INET, ether_status, NULL },	/* XXX not real!! */
+	{ "ether", AF_INET, ether_status, NULL, NULL },	/* XXX not real!! */
 #if 0	/* XXX conflicts with the media command */
 #ifdef USE_IF_MEDIA
-	{ "media", AF_INET, media_status, NULL },	/* XXX not real!! */
+	{ "media", AF_INET, media_status, NULL, NULL },	/* XXX not real!! */
 #endif
 #endif
 	{ 0,	0,	    0,		0 }
@@ -273,15 +323,22 @@ rt_xaddrs(cp, cplim, rtinfo)
 	}
 }
 
-
 void
 usage()
 {
+#ifndef INET6
 	fprintf(stderr, "%s\n%s\n%s\n%s\n",
-	"usage: ifconfig interface address_family [address [dest_address]]",
-	"                [parameters]",
+	"usage: ifconfig interface [address_family [address [dest_address]]",
+	"                [parameters]]",
 	"       ifconfig -a [-d] [-u] [address_family]",
 	"       ifconfig -l [-d] [-u] [address_family]");
+#else
+	fprintf(stderr, "%s\n%s\n%s\n%s\n",
+	"usage: ifconfig [-L] interface [address_family [address [dest_address]]",
+	"                [parameters]]",
+	"       ifconfig -a [-L] [-d] [-u] [address_family]",
+	"       ifconfig -l [-d] [-u] [address_family]");
+#endif
 	exit(1);
 }
 
@@ -306,11 +363,20 @@ main(argc, argv)
 
 	/* Parse leading line options */
 	all = downonly = uponly = namesonly = 0;
-	while ((c = getopt(argc, argv, "adlmu")) != -1) {
+	while ((c = getopt(argc, argv, "adlmu"
+#ifdef INET6
+					"L"
+#endif
+			)) != -1) {
 		switch (c) {
 		case 'a':	/* scan all interfaces */
 			all++;
 			break;
+#ifdef INET6
+		case 'L':
+			ip6lifetime++;	/* print IPv6 adress lifetime */
+			break;
+#endif
 		case 'l':	/* scan interface names only */
 			namesonly++;
 			break;
@@ -392,6 +458,12 @@ main(argc, argv)
 	if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0)
 		errx(1, "actual retrieval of interface table");
 	lim = buf + needed;
+
+#ifdef INET6
+	/* initialization */
+	in6_addreq.ifra_lifetime.ia6t_pltime = ND6_INFINITE_LIFETIME;
+	in6_addreq.ifra_lifetime.ia6t_vltime = ND6_INFINITE_LIFETIME;
+#endif
 
 	next = buf;
 	while (next < lim) {
@@ -514,8 +586,17 @@ ifconfig(argc, argv, afp)
 		}
 		argc--, argv++;
 	}
+#ifdef INET6
+	if (ifr.ifr_addr.sa_family == AF_INET6 && explicit_prefix == 0) {
+		/* Aggregatable address architecture defines all prefixes
+		   are 64. So, it is convenient to set prefixlen to 64 if
+		   it is not specified. */
+		setifprefixlen("64", 0, s, afp);
+		/* in6_getprefix("64", MASK) if MASK is available here... */
+	}
+#endif
 #ifdef ISO
-	if (af == AF_ISO)
+	if (ifr.ifr_addr.sa_family == AF_ISO)
 		adjust_nsellength();
 #endif
 	if (setipdst && ifr.ifr_addr.sa_family == AF_IPX) {
@@ -607,6 +688,80 @@ setifnetmask(addr, dummy, s, afp)
 {
 	(*afp->af_getaddr)(addr, MASK);
 }
+
+#ifdef INET6
+void
+setifprefixlen(addr, dummy, s, afp)
+        const char *addr;
+	int dummy __unused;
+	int s;
+	const struct afswtch *afp;
+{
+        if (*afp->af_getprefix)
+                (*afp->af_getprefix)(addr, MASK);
+	explicit_prefix = 1;
+}
+
+void
+setip6flags(dummyaddr, flag, dummysoc, afp)
+	const char *dummyaddr __unused;
+	int flag;
+	int dummysoc __unused;
+	const struct afswtch *afp;
+{
+	if (afp->af_af != AF_INET6)
+		err(1, "address flags can be set only for inet6 addresses");
+
+	if (flag < 0)
+		in6_addreq.ifra_flags &= ~(-flag);
+	else
+		in6_addreq.ifra_flags |= flag;
+}
+
+void
+setip6pltime(val, flag, soc, afp)
+	const char *val;
+	int flag __unused;
+	int soc __unused;
+	const struct afswtch *afp;
+{
+	setip6lifetime("pltime", val, afp);
+}
+
+void
+setip6vltime(val, flag, soc, afp)
+	const char *val;
+	int flag __unused;
+	int soc __unused;
+	const struct afswtch *afp;
+{
+	setip6lifetime("vltime", val, afp);
+}
+
+void
+setip6lifetime(cmd, val, afp)
+	const char *cmd;
+	const char *val;
+	const struct afswtch *afp;
+{
+	time_t newval, t;
+	char *ep;
+
+	t = time(NULL);
+	newval = (time_t)strtoul(val, &ep, 0);
+	if (val == ep)
+		errx(1, "invalid %s", cmd);
+	if (afp->af_af != AF_INET6)
+		errx(1, "%s not allowed for the AF", cmd);
+	if (strcmp(cmd, "vltime") == 0) {
+		in6_addreq.ifra_lifetime.ia6t_expire = t + newval;
+		in6_addreq.ifra_lifetime.ia6t_vltime = newval;
+	} else if (strcmp(cmd, "pltime") == 0) {
+		in6_addreq.ifra_lifetime.ia6t_preferred = t + newval;
+		in6_addreq.ifra_lifetime.ia6t_pltime = newval;
+	}
+}
+#endif
 
 void
 setifbroadaddr(addr, dummy, s, afp)
@@ -855,6 +1010,99 @@ in_status(s, info)
 	putchar('\n');
 }
 
+#ifdef INET6
+void
+in6_status(s, info)
+	int s __unused;
+	struct rt_addrinfo * info;
+{
+	struct sockaddr_in6 *sin, null_sin;
+	struct in6_ifreq ifr6;
+	int s6;
+	u_int32_t flags6;
+	struct in6_addrlifetime lifetime;
+	time_t t = time(NULL);
+
+	memset(&null_sin, 0, sizeof(null_sin));
+
+	sin = (struct sockaddr_in6 *)info->rti_info[RTAX_IFA];
+	strncpy(ifr6.ifr_name, ifr.ifr_name, sizeof(ifr.ifr_name));
+	if ((s6 = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
+		perror("ifconfig: socket");
+		return;
+	}
+	ifr6.ifr_addr = *sin;
+	if (ioctl(s6, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
+		perror("ifconfig: ioctl(SIOCGIFAFLAG_IN6)");
+		close(s6);
+		return;
+	}
+	flags6 = ifr6.ifr_ifru.ifru_flags6;
+	memset(&lifetime, 0, sizeof(lifetime));
+	ifr6.ifr_addr = *sin;
+	if (ioctl(s6, SIOCGIFALIFETIME_IN6, &ifr6) < 0) {
+		perror("ifconfig: ioctl(SIOCGIFALIFETIME_IN6)");
+		close(s6);
+		return;
+	}
+	lifetime = ifr6.ifr_ifru.ifru_lifetime;
+	close(s6);
+
+	printf("\tinet6 %s ", inet_ntop(AF_INET6, &sin->sin6_addr,
+				ntop_buf, sizeof(ntop_buf)));
+
+
+	if (flags & IFF_POINTOPOINT) {
+		/* note RTAX_BRD overlap with IFF_BROADCAST */
+		sin = (struct sockaddr_in6 *)info->rti_info[RTAX_BRD];
+		/*
+		 * some of the interfaces do not have valid destination
+		 * address.
+		 */
+		if (sin && sin->sin6_family == AF_INET6) {
+			printf("--> %s ", inet_ntop(AF_INET6, &sin->sin6_addr,
+						ntop_buf, sizeof(ntop_buf)));
+		}
+	}
+
+	sin = (struct sockaddr_in6 *)info->rti_info[RTAX_NETMASK];
+	if (!sin)
+		sin = &null_sin;
+	printf("prefixlen %d ", prefix(&sin->sin6_addr,
+		sizeof(struct in6_addr)));
+
+	if (flags6 & IN6_IFF_ANYCAST)
+		printf("anycast ");
+	if (flags6 & IN6_IFF_TENTATIVE)
+		printf("tentative ");
+	if (flags6 & IN6_IFF_DUPLICATED)
+		printf("duplicated ");
+	if (flags6 & IN6_IFF_DETACHED)
+		printf("detached ");
+	if (flags6 & IN6_IFF_DEPRECATED)
+		printf("deprecated ");
+
+
+	if (ip6lifetime && (lifetime.ia6t_preferred || lifetime.ia6t_expire)) {
+		printf("pltime ");
+		if (lifetime.ia6t_preferred) {
+			printf("%s ", lifetime.ia6t_preferred < t
+				? "0" : sec2str(lifetime.ia6t_preferred - t));
+		} else
+			printf("infty ");
+
+		printf("vltime ");
+		if (lifetime.ia6t_expire) {
+			printf("%s ", lifetime.ia6t_expire < t
+				? "0" : sec2str(lifetime.ia6t_expire - t));
+		} else
+			printf("infty ");
+	}
+
+	putchar('\n');
+}
+#endif /*INET6*/
+
 void
 ipx_status(s, info)
 	int s __unused;
@@ -1032,6 +1280,54 @@ in_getaddr(s, which)
 	else
 		errx(1, "%s: bad value", s);
 }
+
+#ifdef INET6
+#define SIN6(x) ((struct sockaddr_in6 *) &(x))
+struct sockaddr_in6 *sin6tab[] = {
+SIN6(in6_ridreq.ifr_addr), SIN6(in6_addreq.ifra_addr),
+SIN6(in6_addreq.ifra_prefixmask), SIN6(in6_addreq.ifra_dstaddr)};
+
+void
+in6_getaddr(s, which)
+	const char *s;
+	int which;
+{
+	register struct sockaddr_in6 *sin = sin6tab[which];
+
+	newaddr &= 1;
+
+	sin->sin6_len = sizeof(*sin);
+	if (which != MASK)
+		sin->sin6_family = AF_INET6;
+
+        if (inet_pton(AF_INET6, s, &sin->sin6_addr) <= 0)
+		errx(1, "%s: bad value", s);
+}
+
+void
+in6_getprefix(plen, which)
+	const char *plen;
+	int which;
+{
+	register struct sockaddr_in6 *sin = sin6tab[which];
+	register u_char *cp;
+	int len = atoi(plen);
+
+	if ((len < 0) || (len > 128))
+		errx(1, "%s: bad value", plen);
+	sin->sin6_len = sizeof(*sin);
+	if (which != MASK)
+		sin->sin6_family = AF_INET6;
+	if ((len == 0) || (len == 128)) {
+		memset(&sin->sin6_addr, 0xff, sizeof(struct in6_addr));
+		return;
+	}
+	memset((void *)&sin->sin6_addr, 0x00, sizeof(sin->sin6_addr));
+	for (cp = (u_char *)&sin->sin6_addr; len > 7; len -= 8)
+		*cp++ = 0xff;
+	*cp = 0xff << (8 - len);
+}
+#endif
 
 /*
  * Print a value a la the %b format of the kernel's printf
@@ -1229,3 +1525,65 @@ adjust_nsellength()
 	fixnsel(sisotab[DSTADDR]);
 }
 #endif
+
+#ifdef INET6
+int
+prefix(val, size)
+        void *val;
+        int size;
+{
+        register u_char *name = (u_char *)val;
+        register int byte, bit, plen = 0;
+
+        for (byte = 0; byte < size; byte++, plen += 8)
+                if (name[byte] != 0xff)
+                        break;
+	if (byte == size)
+		return (plen);
+	for (bit = 7; bit != 0; bit--, plen++)
+                if (!(name[byte] & (1 << bit)))
+                        break;
+        for (; bit != 0; bit--)
+                if (name[byte] & (1 << bit))
+                        return(0);
+        byte++;
+        for (; byte < size; byte++)
+                if (name[byte])
+                        return(0);
+        return (plen);
+}
+
+static char *
+sec2str(total)
+	time_t total;
+{
+	static char result[256];
+	int days, hours, mins, secs;
+	int first = 1;
+	char *p = result;
+
+	if (0) {	/*XXX*/
+		days = total / 3600 / 24;
+		hours = (total / 3600) % 24;
+		mins = (total / 60) % 60;
+		secs = total % 60;
+
+		if (days) {
+			first = 0;
+			p += sprintf(p, "%dd", days);
+		}
+		if (!first || hours) {
+			first = 0;
+			p += sprintf(p, "%dh", hours);
+		}
+		if (!first || mins) {
+			first = 0;
+			p += sprintf(p, "%dm", mins);
+		}
+		sprintf(p, "%ds", secs);
+	} else
+		sprintf(p, "%lu", (unsigned long int)total);
+
+	return(result);
+}
+#endif /*INET6*/

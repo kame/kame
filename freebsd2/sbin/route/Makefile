@@ -3,7 +3,7 @@
 PROG=	route
 MAN8=	route.8
 SRCS=	route.c keywords.h
-CFLAGS+=-I. -Wall -DNS
+CFLAGS+=-I. -Wall -DNS -DINET6
 CLEANFILES+=keywords.h
 BINOWN=	root
 BINMODE=4555

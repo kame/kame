@@ -1,3 +1,4 @@
+/* slightly modified for experiment by itojun@itojun.org */
 /*
  * Copyright (c) 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -92,6 +93,10 @@ static const char rcsid[] =
 #include <netinet/ip_var.h>
 #include <arpa/inet.h>
 
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#endif /*IPSEC*/
+
 #define	PHDR_LEN	sizeof(struct timeval)
 #define	DEFDATALEN	(64 - PHDR_LEN)	/* default data length */
 #define	FLOOD_BACKOFF	20000		/* usecs to back off if F_FLOOD mode */
@@ -124,6 +129,14 @@ int options;
 #define	F_MTTL		0x0800
 #define	F_MIF		0x1000
 #define	F_AUDIBLE	0x2000
+#ifdef IPSEC
+#ifdef IPSEC_POLICY_IPSEC
+#define F_POLICY	0x4000
+#else
+#define	F_AUTHHDR	0x4000
+#define	F_ENCRYPT	0x8000
+#endif /*IPSEC_POLICY_IPSEC*/
+#endif /*IPSEC*/
 
 /*
  * MAX_DUP_CHK is the number of bits in received table, i.e. the maximum
@@ -202,6 +215,9 @@ main(argc, argv)
 	struct msghdr msg;
 	struct sockaddr_in from;
 	char ctrl[sizeof(struct cmsghdr) + sizeof(struct timeval)];
+#ifdef IPSEC_POLICY_IPSEC
+	char *policy = NULL;
+#endif
 
 	/*
 	 * Do the stuff that we need root priv's for *first*, and
@@ -217,7 +233,16 @@ main(argc, argv)
 	preload = 0;
 
 	datap = &outpack[8 + PHDR_LEN];
-	while ((ch = getopt(argc, argv, "I:LQRT:c:adfi:l:np:qrs:v")) != -1) {
+#ifndef IPSEC
+	while ((ch = getopt(argc, argv, "I:LQRT:c:adfi:l:np:qrs:v")) != -1)
+#else
+#ifdef IPSEC_POLICY_IPSEC
+	while ((ch = getopt(argc, argv, "I:LQRT:c:adfi:l:np:qrs:vP:")) != -1)
+#else
+	while ((ch = getopt(argc, argv, "I:LQRT:c:adfi:l:np:qrs:vAE")) != -1)
+#endif /*IPSEC_POLICY_IPSEC*/
+#endif
+	{
 		switch(ch) {
 		case 'a':
 			options |= F_AUDIBLE;
@@ -312,6 +337,21 @@ main(argc, argv)
 		case 'v':
 			options |= F_VERBOSE;
 			break;
+#ifdef IPSEC
+#ifdef IPSEC_POLICY_IPSEC
+		case 'P':
+			options |= F_POLICY;
+			policy = strdup(optarg);
+			break;
+#else
+		case 'A':
+			options |= F_AUTHHDR;
+			break;
+		case 'E':
+			options |= F_ENCRYPT;
+			break;
+#endif /*IPSEC_POLICY_IPSEC*/
+#endif /*IPSEC*/
 		default:
 			usage();
 		}
@@ -375,6 +415,39 @@ main(argc, argv)
 	if (options & F_SO_DONTROUTE)
 		(void)setsockopt(s, SOL_SOCKET, SO_DONTROUTE, (char *)&hold,
 		    sizeof(hold));
+#ifdef IPSEC
+#ifdef IPSEC_POLICY_IPSEC
+	if (options & F_POLICY) {
+		int len;
+		char *buf;
+		if ((len = ipsec_get_policylen(policy)) < 0)
+			errx(EX_CONFIG, ipsec_strerror());
+		if ((buf = malloc(len)) == NULL)
+			err(EX_UNAVAILABLE, "malloc");
+		if ((len = ipsec_set_policy(buf, len, policy)) < 0)
+			errx(EX_CONFIG, ipsec_strerror());
+		if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY, buf, len) < 0)
+			err(EX_CONFIG, NULL);
+		free(buf);
+	}
+#else
+	if (options & F_AUTHHDR) {
+		int optval = IPSEC_LEVEL_REQUIRE;
+#ifdef IP_AUTH_TRANS_LEVEL
+		(void)setsockopt(s, IPPROTO_IP, IP_AUTH_TRANS_LEVEL,
+			(char *)&optval, sizeof(optval));
+#else
+		(void)setsockopt(s, IPPROTO_IP, IP_AUTH_LEVEL,
+			(char *)&optval, sizeof(optval));
+#endif
+	}
+	if (options & F_ENCRYPT) {
+		int optval = IPSEC_LEVEL_REQUIRE;
+		(void)setsockopt(s, IPPROTO_IP, IP_ESP_TRANS_LEVEL,
+			(char *)&optval, sizeof(optval));
+	}
+#endif /*IPSEC_POLICY_IPSEC*/
+#endif /*IPSEC*/
 
 	/* record route option */
 	if (options & F_RROUTE) {
@@ -1270,7 +1343,19 @@ static void
 usage()
 {
 	fprintf(stderr, "%s\n%s\n",
-"usage: ping [-QRadfnqrv] [-c count] [-i wait] [-l preload] [-p pattern]",
-"            [-s packetsize] [host | [-L] [-I iface] [-T ttl] mcast-group]");
+"usage: ping [-"
+#ifdef IPSEC
+#ifndef IPSEC_POLICY_IPSEC
+		"AE"
+#endif
+#endif
+		"QRadfnqrv] [-c count] [-i wait] [-l preload] [-p pattern]",
+"            "
+#ifdef IPSEC
+#ifdef IPSEC_POLICY_IPSEC
+"[-P policy] "
+#endif
+#endif
+"[-s packetsize] [host | [-L] [-I iface] [-T ttl] mcast-group]");
 	exit(EX_USAGE);
 }

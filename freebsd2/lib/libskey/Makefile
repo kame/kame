@@ -12,8 +12,17 @@ MAN5=	skey.access.5
 CFLAGS+=-DPERMIT_CONSOLE -D_SKEY_INTERNAL -I${.CURDIR}
 CFLAGS+=-W -Wall -Werror
 
+CFLAGS+=-DINET6
+#CFLAGS+=-DHAVE_GETADDRINFO -DHAVE_GETNAMEINFO
+
 beforeinstall:
 	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 ${.CURDIR}/skey.h \
 		${DESTDIR}/usr/include
+
+# Since shlib replacement causes untrackable problem in various programs
+# (say, ftpd) we decided not to configure it by default.
+# must be larger than default /usr/lib/libskey.so
+#SHLIB_MAJOR=	2
+#SHLIB_MINOR=	1
 
 .include <bsd.lib.mk>

@@ -79,6 +79,8 @@ int FtpTimedOut;
 #define FTP_QUIT_HAPPY		221
 #define FTP_TRANSFER_HAPPY	226
 #define FTP_PASSIVE_HAPPY	227
+#define FTP_LPASSIVE_HAPPY	228
+#define FTP_EPASSIVE_HAPPY	229
 #define FTP_CHDIR_HAPPY		250
 
 /* FTP unhappy status codes */
@@ -323,11 +325,32 @@ ftpPassive(FILE *fp, int st)
 
     if (ftp->is_passive == st)
 	return SUCCESS;
-    i = cmd(ftp, "PASV");
-    if (i < 0)
-        return i;
-    if (i != FTP_PASSIVE_HAPPY)
-        return FAILURE;
+    switch (ftp->addrtype) {
+    case AF_INET:
+	i = cmd(ftp, "EPSV");
+	if (i < 0)
+	    return i;
+	if (i != FTP_PASSIVE_HAPPY) {
+	    i = cmd(ftp, "PASV");
+	    if (i < 0)
+		return i;
+	    if (i != FTP_PASSIVE_HAPPY)
+		return FAILURE;
+	}
+	break;
+    case AF_INET6:
+	i = cmd(ftp, "EPSV");
+	if (i < 0)
+	    return i;
+	if (i != FTP_EPASSIVE_HAPPY) {
+	    i = cmd(ftp, "LPSV");
+	    if (i < 0)
+		return i;
+	    if (i != FTP_LPASSIVE_HAPPY)
+		return FAILURE;
+	}
+	break;
+    }
     ftp->is_passive = !ftp->is_passive;
     return SUCCESS;
 }
@@ -668,10 +691,9 @@ cmd(FTP_t ftp, const char *fmt, ...)
 static int
 ftp_login_session(FTP_t ftp, char *host, char *user, char *passwd, int port, int verbose)
 {
-    struct hostent	*he = NULL;
-    struct sockaddr_in 	sin;
+    struct addrinfo	hints, *res;
+    int			err;
     int 		s;
-    unsigned long 	temp;
     int			i;
 
     if (networkInit() != SUCCESS)
@@ -692,33 +714,32 @@ ftp_login_session(FTP_t ftp, char *host, char *user, char *passwd, int port, int
     if (!port)
 	port = 21;
 
-    temp = inet_addr(host);
-    if (temp != INADDR_NONE) {
-	ftp->addrtype = sin.sin_family = AF_INET;
-	sin.sin_addr.s_addr = temp;
-    }
-    else {
-	he = gethostbyname(host);
-	if (!he) {
-	    ftp->error = 0;
-	    return FAILURE;
-	}
-	ftp->addrtype = sin.sin_family = he->h_addrtype;
-	bcopy(he->h_addr, (char *)&sin.sin_addr, he->h_length);
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = 0;
+    err = getaddrinfo(host, NULL, &hints, &res);
+    if (err) {
+	ftp->error = 0;
+	return FAILURE;
     }
 
-    sin.sin_port = htons(port);
+    ((struct sockaddr_in *) res->ai_addr)->sin_port = htons(port); /* XXX */
+    ftp->addrtype = res->ai_family;
 
     if ((s = socket(ftp->addrtype, SOCK_STREAM, 0)) < 0) {
+	freeaddrinfo(res);
 	ftp->error = -1;
 	return FAILURE;
     }
 
-    if (connect(s, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
+    if (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
 	(void)close(s);
+	freeaddrinfo(res);
 	ftp->error = errno;
 	return FAILURE;
     }
+    freeaddrinfo(res);
 
     ftp->fd_ctrl = s;
     ftp->con_state = isopen;
@@ -739,11 +760,13 @@ ftp_login_session(FTP_t ftp, char *host, char *user, char *passwd, int port, int
 static int
 ftp_file_op(FTP_t ftp, char *operation, char *file, FILE **fp, char *mode, off_t *seekto)
 {
-    int i,s;
+    int i,l,s;
     char *q;
     unsigned char addr[64];
-    struct sockaddr_in sin;
-    u_long a;
+    union sockaddr_cmn {
+	struct sockaddr_in sin4;
+	struct sockaddr_in6 sin6;
+    } sin;
 
     if (!fp)
 	return FAILURE;
@@ -758,18 +781,45 @@ ftp_file_op(FTP_t ftp, char *operation, char *file, FILE **fp, char *mode, off_t
     }
 
     if (ftp->is_passive) {
-        if (ftp->is_verbose)
-	    fprintf(stderr, "Sending PASV\n");
-	if (writes(ftp->fd_ctrl, "PASV\r\n")) {
-	    ftp_close(ftp);
-	    if (FtpTimedOut)
-		ftp->error = FTP_TIMED_OUT;
-	    return FTP_TIMED_OUT;
-	}
-	i = get_a_number(ftp, &q);
-	if (check_code(ftp, i, FTP_PASSIVE_HAPPY)) {
-	    ftp_close(ftp);
-	    return i;
+	if (ftp->addrtype == AF_INET) {
+            if (ftp->is_verbose)
+		fprintf(stderr, "Sending PASV\n");
+	    if (writes(ftp->fd_ctrl, "PASV\r\n")) {
+		ftp_close(ftp);
+		if (FtpTimedOut)
+		    ftp->error = FTP_TIMED_OUT;
+		return FTP_TIMED_OUT;
+	    }
+	    i = get_a_number(ftp, &q);
+	    if (check_code(ftp, i, FTP_PASSIVE_HAPPY)) {
+		ftp_close(ftp);
+		return i;
+	    }
+	} else {
+            if (ftp->is_verbose)
+		fprintf(stderr, "Sending EPSV\n");
+	    if (writes(ftp->fd_ctrl, "EPSV\r\n")) {
+		ftp_close(ftp);
+		if (FtpTimedOut)
+		    ftp->error = FTP_TIMED_OUT;
+		return FTP_TIMED_OUT;
+	    }
+	    i = get_a_number(ftp, &q);
+	    if (check_code(ftp, i, FTP_EPASSIVE_HAPPY)) {
+		if (ftp->is_verbose)
+		    fprintf(stderr, "Sending LPSV\n");
+		if (writes(ftp->fd_ctrl, "LPSV\r\n")) {
+		    ftp_close(ftp);
+		    if (FtpTimedOut)
+			ftp->error = FTP_TIMED_OUT;
+		    return FTP_TIMED_OUT;
+		}
+		i = get_a_number(ftp, &q);
+		if (check_code(ftp, i, FTP_LPASSIVE_HAPPY)) {
+		    ftp_close(ftp);
+		    return i;
+		}
+	    }
 	}
 	while (*q && !isdigit(*q))
 	    q++;
@@ -778,15 +828,23 @@ ftp_file_op(FTP_t ftp, char *operation, char *file, FILE **fp, char *mode, off_t
 	    return FAILURE;
 	}
 	q--;
-	for (i = 0; i < 6; i++) {
+	l = (ftp->addrtype == AF_INET ? 6 : 21);
+	for (i = 0; i < l; i++) {
 	    q++;
 	    addr[i] = strtol(q, &q, 10);
 	}
 
-	sin.sin_family = ftp->addrtype;
-	bcopy(addr, (char *)&sin.sin_addr, 4);
-	bcopy(addr + 4, (char *)&sin.sin_port, 2);
-	if (connect(s, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
+	sin.sin4.sin_family = ftp->addrtype;
+	if (ftp->addrtype == AF_INET6) {
+	    sin.sin6.sin6_len = sizeof(struct sockaddr_in6);
+	    bcopy(addr + 2, (char *)&sin.sin6.sin6_addr, 16);
+	    bcopy(addr + 19, (char *)&sin.sin6.sin6_port, 2);
+	} else {
+	    sin.sin4.sin_len = sizeof(struct sockaddr_in);
+	    bcopy(addr, (char *)&sin.sin4.sin_addr, 4);
+	    bcopy(addr + 4, (char *)&sin.sin4.sin_port, 2);
+	}
+	if (connect(s, (struct sockaddr *)&sin, sin.sin4.sin_len) < 0) {
 	    (void)close(s);
 	    return FAILURE;
 	}
@@ -813,29 +871,77 @@ ftp_file_op(FTP_t ftp, char *operation, char *file, FILE **fp, char *mode, off_t
 
 	i = sizeof sin;
 	getsockname(ftp->fd_ctrl, (struct sockaddr *)&sin, &i);
-	sin.sin_port = 0;
-	i = sizeof sin;
+	sin.sin4.sin_port = 0;
+	i = ((struct sockaddr *)&sin)->sa_len;
 	if (bind(s, (struct sockaddr *)&sin, i) < 0) {
 	    close(s);	
 	    return FAILURE;
 	}
+	i = sizeof sin;
 	getsockname(s,(struct sockaddr *)&sin,&i);
 	if (listen(s, 1) < 0) {
 	    close(s);	
 	    return FAILURE;
 	}
-	a = ntohl(sin.sin_addr.s_addr);
-	i = cmd(ftp, "PORT %d,%d,%d,%d,%d,%d",
-		(a                   >> 24) & 0xff,
-		(a                   >> 16) & 0xff,
-		(a                   >>  8) & 0xff,
-		a                           & 0xff,
-		(ntohs(sin.sin_port) >>  8) & 0xff,
-		ntohs(sin.sin_port)         & 0xff);
-	if (check_code(ftp, i, FTP_PORT_HAPPY)) {
-	    close(s);
-	    return i;
+
+      {
+	/* try EPRT. */
+	char hname[INET6_ADDRSTRLEN];
+	int af;
+
+	switch (sin.sin4.sin_family) {
+	case AF_INET:
+	case AF_INET6:
+	    af = (sin.sin4.sin_family == AF_INET) ? 1 : 2;
+	    if (getnameinfo((struct sockaddr *)&sin, sin.sin6.sin6_len,
+		    hname, sizeof(hname), NULL, 0, NI_NUMERICHOST) == 0) {
+		i = cmd(ftp, "EPRT |%d|%s|%d|", af, hname,
+		    htons(sin.sin6.sin6_port));
+	    } else
+		i = FTP_PORT_HAPPY + 1;
+	    break;
+	default:
+	    i = FTP_PORT_HAPPY + 1;
+	    break;
 	}
+      }
+
+	if (check_code(ftp, i, FTP_PORT_HAPPY)) {
+	    if (sin.sin4.sin_family == AF_INET) {
+		u_long a;
+		a = ntohl(sin.sin4.sin_addr.s_addr);
+		i = cmd(ftp, "PORT %d,%d,%d,%d,%d,%d",
+		    (a                   >> 24) & 0xff,
+		    (a                   >> 16) & 0xff,
+		    (a                   >>  8) & 0xff,
+		    a                           & 0xff,
+		    (ntohs(sin.sin4.sin_port) >>  8) & 0xff,
+		    ntohs(sin.sin4.sin_port)         & 0xff);
+		if (check_code(ftp, i, FTP_PORT_HAPPY)) {
+		    close(s);
+		    return i;
+		}
+	    } else {
+#define UC(b)	(((int)b)&0xff)
+		char *a;
+		a = (char *)&sin.sin6.sin6_addr;
+		i = cmd(ftp,
+"LPRT %d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d",
+		    6, 16,
+		    UC(a[0]),UC(a[1]),UC(a[2]),UC(a[3]),
+		    UC(a[4]),UC(a[5]),UC(a[6]),UC(a[7]),
+		    UC(a[8]),UC(a[9]),UC(a[10]),UC(a[11]),
+		    UC(a[12]),UC(a[13]),UC(a[14]),UC(a[15]),
+		    2,
+		    (ntohs(sin.sin4.sin_port) >>  8) & 0xff,
+		    ntohs(sin.sin4.sin_port)         & 0xff);
+		if (check_code(ftp, i, FTP_PORT_HAPPY)) {
+		    close(s);
+		    return i;
+		}
+	    }
+	}
+
 	if (seekto && *seekto) {
 	    i = cmd(ftp, "REST %d", *seekto);
 	    if (i < 0 || FTP_TIMEOUT(i)) {
