@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2.c,v 1.13 2002/10/02 06:28:08 suz Exp $
+ * $KAME: mld6v2.c,v 1.14 2003/01/23 00:25:25 suz Exp $
  */
 
 /*
@@ -81,6 +81,7 @@ extern int      ctlbuflen;
 extern struct iovec sndiov[2];
 extern struct msghdr sndmh;
 
+static struct sockaddr_in6 dst_sa;
 
 /*
  * this function build three type of messages : 
@@ -107,7 +108,6 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
 		unsigned int delay, int datalen, int alert, int sflag,
 		int qrv, int qqic)
 {
-    struct sockaddr_in6 dst_sa;
     struct mldv2_hdr *mhp = (struct mldv2_hdr *) mld6_send_buf;
     int             ctllen, hbhlen = 0;
     int             nbsrc = 0;

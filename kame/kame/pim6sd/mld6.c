@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.44 2002/08/01 03:34:02 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.45 2003/01/23 00:25:25 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -120,7 +120,7 @@ struct sockaddr_in6 allmldv2routers_group = {sizeof(struct sockaddr_in6), AF_INE
 extern struct in6_addr in6addr_linklocal_allnodes;
 
 /* local variables. */
-static struct sockaddr_in6 	dst = {sizeof(dst), AF_INET6};
+static struct sockaddr_in6 	dst_sa;
 struct msghdr 		sndmh, rcvmh;
 struct iovec 		sndiov[2];
 static struct iovec 		rcviov[2];
@@ -447,7 +447,6 @@ make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen, alert)
     struct sockaddr_in6 *src, *dst;
     struct in6_addr *group;
 {
-    struct sockaddr_in6 dst_sa;
     struct mld_hdr *mhp = (struct mld_hdr *)mld6_send_buf;
     int ctllen, hbhlen = 0;
 
@@ -459,7 +458,8 @@ make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen, alert)
 #ifdef MLD_MTRACE
     case MLD_MTRACE:
     case MLD_MTRACE_RESP:
-	sndmh.msg_name = (caddr_t)dst;
+	dst_sa.sin6_addr = dst->sin6_addr;
+	sndmh.msg_name = (caddr_t)&dst_sa;
 	break;
 #endif
     default:
