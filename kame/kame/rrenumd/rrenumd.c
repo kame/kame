@@ -1,4 +1,4 @@
-/*	$KAME: rrenumd.c,v 1.15 2000/07/07 12:17:15 itojun Exp $	*/
+/*	$KAME: rrenumd.c,v 1.16 2000/11/07 17:09:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -603,7 +603,7 @@ main(int argc, char *argv[])
 	memset(&timeout, 0, sizeof(timeout));
 	timeout.tv_sec = 30;
 
-	/* init temporal payload_list and send_counter*/
+	/* init temporary payload_list and send_counter*/
 	pl = pl_head;
 	send_counter = retry + 1;
 	while (1) {
