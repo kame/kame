@@ -220,10 +220,12 @@ struct nd_neighbor_advert {	/* neighbor advertisement */
 #define ND_NA_FLAG_ROUTER		0x80000000
 #define ND_NA_FLAG_SOLICITED		0x40000000
 #define ND_NA_FLAG_OVERRIDE		0x20000000
-#elif BYTE_ORDER == LITTLE_ENDIAN
+#else
+#if BYTE_ORDER == LITTLE_ENDIAN
 #define ND_NA_FLAG_ROUTER		0x80
 #define ND_NA_FLAG_SOLICITED		0x40
 #define ND_NA_FLAG_OVERRIDE		0x20
+#endif
 #endif
 
 struct nd_redirect {		/* redirect */
