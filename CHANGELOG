@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1031 2000/06/16 02:08:07 jinmei Exp $
+$Id: CHANGELOG,v 1.1032 2000/06/17 20:37:29 itojun Exp $
 
 <200006>
 2000-06-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -10,9 +10,6 @@ $Id: CHANGELOG,v 1.1031 2000/06/16 02:08:07 jinmei Exp $
 
 Fri Jun 16 05:01:24 JST 2000  itojun@iijlab.net
 	* openbsd/sys: sync with OpenBSD 2.7
-	  limitation: if you configure gif interface, kernel does not compile.
-	  this is because OpenBSD integrates gif into OpenBSD IPsec tunnel
-	  code.  we will need to resolve it.
 	  TODO: userland cleanup.  tests (i386/conf/GENERIC.KAME compiles but
 	  not tested).
 
