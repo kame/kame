@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.372 2004/02/13 11:54:30 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.373 2004/02/16 08:01:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2567,7 +2567,7 @@ icmp6_reflect(m, off)
 	bzero(&sa6_src, sizeof(sa6_src));
 	sa6_src.sin6_family = AF_INET6;
 	sa6_src.sin6_len = sizeof(sa6_src);
-	in6_recoverscope(&sa6_src, &ip6->ip6_dst, m->m_pkthdr.rcvif);
+	in6_recoverscope(&sa6_src, &ip6->ip6_src, m->m_pkthdr.rcvif);
 
 	/*
 	 * If the incoming packet was addressed directly to us (i.e. unicast),
