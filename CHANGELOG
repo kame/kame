@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2104 2002/03/17 22:04:56 jinmei Exp $
+$KAME: CHANGELOG,v 1.2105 2002/03/25 05:12:08 jinmei Exp $
 
 <200203>
 2002-03-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -25,8 +25,9 @@ $KAME: CHANGELOG,v 1.2104 2002/03/17 22:04:56 jinmei Exp $
 	incoming packets.
 
 Fri Mar 15 19:45:40 JST 2002  itojun@iijlab.net
-	* sys/netinet6/frag6.c: implement real lock around IPv6 reassembly code.
-	  (netbsd/openbsd only)
+	* sys/netinet6/frag6.c: implement real lock around IPv6 reassembly
+	code.
+	(netbsd/openbsd only)
 
 Fri Mar 15 18:28:20 JST 2002  itojun@iijlab.net
 	* netbsd/sys/netinet/tcp_subr.c: have tcp6_drain().
