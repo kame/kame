@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1962 2001/11/04 12:18:51 jinmei Exp $
+$KAME: CHANGELOG,v 1.1963 2001/11/04 14:04:08 jinmei Exp $
 
 <200111>
+2001-11-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (defrouter_select): do not override
+	a working router unless the new one is really better.  "better"
+	means (1) the old router is not known to be reachable, or (2) the
+	new router has a really higher preference value than the old one.
+
 2001-11-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	clarified cached route manipulation:
 	* kame/sys/netinet6/in6_src.c (in6_selectroute): check if the
