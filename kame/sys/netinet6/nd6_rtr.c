@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.82 2001/02/02 14:23:41 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.83 2001/02/03 09:23:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1307,6 +1307,8 @@ prelist_update(new, dr, m)
 #ifdef MIP6
   afteraddrconf:
 	if (newprefix) {
+		int onlink;
+
 		onlink = (pr->ndpr_stateflags & NDPRF_ONLINK); /* for MIP6 */
 
 		if (mip6_prelist_update_hook) {
