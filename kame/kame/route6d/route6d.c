@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.29 2000/06/02 02:30:42 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.30 2000/06/04 06:48:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.29 2000/06/02 02:30:42 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.30 2000/06/04 06:48:03 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -313,15 +313,15 @@ main(argc, argv)
 			}
 			break;
 #define	FLAG(c, flag, n)	case c: do { flag = n; break; } while(0)
-		FLAG('a', aflag, 1);
-		FLAG('d', dflag, 1);
-		FLAG('D', dflag, 2);
-		FLAG('h', hflag, 1);
-		FLAG('l', lflag, 1);
-		FLAG('n', nflag, 1);
-		FLAG('q', qflag, 1);
-		FLAG('s', sflag, 1);
-		FLAG('S', Sflag, 1);
+		FLAG('a', aflag, 1); break;
+		FLAG('d', dflag, 1); break;
+		FLAG('D', dflag, 2); break;
+		FLAG('h', hflag, 1); break;
+		FLAG('l', lflag, 1); break;
+		FLAG('n', nflag, 1); break;
+		FLAG('q', qflag, 1); break;
+		FLAG('s', sflag, 1); break;
+		FLAG('S', Sflag, 1); break;
 #undef	FLAG
 		default:
 			fatal("Invalid option specified, terminating");
@@ -2889,13 +2889,13 @@ mask2len(addr, lenlim)
 	if (j < lenlim) {
 		switch (*p) {
 #define	MASKLEN(m, l)	case m: do { i += l; break; } while (0)
-		MASKLEN(0xfe, 7);
-		MASKLEN(0xfc, 6);
-		MASKLEN(0xf8, 5);
-		MASKLEN(0xf0, 4);
-		MASKLEN(0xe0, 3);
-		MASKLEN(0xc0, 2);
-		MASKLEN(0x80, 1);
+		MASKLEN(0xfe, 7); break;
+		MASKLEN(0xfc, 6); break;
+		MASKLEN(0xf8, 5); break;
+		MASKLEN(0xf0, 4); break;
+		MASKLEN(0xe0, 3); break;
+		MASKLEN(0xc0, 2); break;
+		MASKLEN(0x80, 1); break;
 #undef	MASKLEN
 		}
 	}
