@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.721 2000/03/22 12:10:54 jinmei Exp $
+$Id: CHANGELOG,v 1.722 2000/03/22 12:15:58 jinmei Exp $
 
 <200003>
 2000-03-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* freebsd2/sbin/route/route.c (getaddr): use getifaddrs() instead
+	* freebsd[23]/sbin/route/route.c (getaddr): use getifaddrs() instead
 	of SIOCGIFCONF to examine all interface addresses.
 
 2000-03-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
