@@ -1,8 +1,8 @@
 TARGET?=	bogus
 ARCH?=		i386
-.if ${TARGET} == "freebsd4" || ${TARGET} == "openbsd" || ${TARGET} == "netbsd"
+.if ${TARGET} == "freebsd4"
 KERNCONF?=	GENERIC.KAME MIP6
-.elif ${TARGET} == "bsdi4"
+.elif ${TARGET} == "bsdi4" || ${TARGET} == "openbsd" || ${TARGET} == "netbsd"
 KERNCONF?=	GENERIC.KAME
 .else
 KERNCONF?=	GENERIC.v6
