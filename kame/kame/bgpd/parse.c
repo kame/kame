@@ -740,7 +740,7 @@ conf_check(char *filename)
 		== 0) {
 	      rip_use_sitelocal = 1;
 	      i += strlen(sysatom[C_YES]);
-	    } else if (strncasecmp(&buf[i], sysatom[C_YES],
+	    } else if (strncasecmp(&buf[i], sysatom[C_NO],
 				   strlen(sysatom[C_NO])) == 0) {
 	      rip_use_sitelocal = 0;
 	      i += strlen(sysatom[C_NO]);
