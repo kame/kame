@@ -33,6 +33,7 @@ SRCS=	mld6.c mld6_proto.c\
 	cfparse.y cftoken.l
 CLEANFILES+= lex.yy.c y.tab.h y.tab.c
 CFLAGS+= -g
+CFLAGS+=-I.
 CFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -I${SRCDIR}
 CFLAGS+=-DHAVE_STDARG_H
 LDADD+=	-L${.CURDIR}/../../../lib/libinet6 \
@@ -45,6 +46,9 @@ LDADD+=-ly -ll
 
 MAN5=	pim6sd.conf.5
 MAN8=	pim6sd.8
+
+# FreeBSD special
+SRCS+=y.tab.h
 
 afterinstall:
 	install ${COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
