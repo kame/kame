@@ -1,9 +1,8 @@
-#	$KAME: Makefile,v 1.2 2000/11/01 15:28:10 itojun Exp $
+#	$KAME: Makefile,v 1.3 2000/11/08 05:13:50 itojun Exp $
 
 .include "../Makefile.inc"
 .include <bsd.own.mk>
 
-WARNS?=	1
 PROG=	casttest
 SRCS=	casttest.c cast128.c
 MKMAN=	no

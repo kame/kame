@@ -1,11 +1,8 @@
-#	$KAME: Makefile,v 1.1 2000/11/02 00:06:26 itojun Exp $
+#	$KAME: Makefile,v 1.2 2000/11/08 05:13:51 itojun Exp $
 
 .include "../Makefile.inc"
 .include <bsd.own.mk>
 
-# XXX we may want to test md5 routines in libkern, for platforms ships
-# md5 routines with libkern.
-WARNS?=	1
 PROG=	md5test
 SRCS=	md5test.c md5.c
 MKMAN=	no
