@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1121 2000/07/11 04:04:17 jinmei Exp $
+$Id: CHANGELOG,v 1.1122 2000/07/11 17:23:42 jinmei Exp $
 
 <200006>
+2000-07-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_ifloop_request): 
+	do not force rtrequest() to return an rtentry when executing the
+	DELETE operation, in order to avoid overdecreasing the refcnt.
+	Older versions might cause leak of rtentry when you delete an IPv6
+	address (via ifconfig, ndp -P, or something). Fortunately, address
+	deletion is not issued so often, the bug is effectively not very
+	serious. However, if you have chance to update your kernel, it is
+	of course recommended to apply this fix.
+	
 2000-07-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.h: commented out the definition of
 	ND6_LLINFO_WAITDELETE, which is not used any more.
