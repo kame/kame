@@ -1429,6 +1429,7 @@ static int xl_attach(dev)
 	ifp->if_baudrate = 10000000;
 	IFQ_SET_MAXLEN(&ifp->if_snd, XL_TX_LIST_CNT - 1);
 	IFQ_SET_READY(&ifp->if_snd);
+	ifp->if_capenable = ifp->if_capabilities;
 
 	/*
 	 * Now we have to see what sort of media we have.
