@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.128 2004/03/21 14:40:51 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.129 2004/03/21 15:04:33 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -536,7 +536,7 @@ client6_expire_lifetime(arg)
 {
 	struct dhcp6_if *ifp = arg;
 
-	dprintf(LOG_INFO, FNAME, "lifetime on %s expired", ifp->ifname);
+	dprintf(LOG_DEBUG, FNAME, "lifetime on %s expired", ifp->ifname);
 
 	dhcp6_remove_timer(&ifp->timer);
 	client6_ifinit(ifp);
