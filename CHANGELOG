@@ -1,10 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.332 1999/12/13 01:51:55 sumikawa Exp $
+$Id: CHANGELOG,v 1.333 1999/12/13 03:29:54 itojun Exp $
 
 <199912>
 Mon Dec 13 10:49:48 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/heimdal: upgrade to 0.2f.
+	* netbsd/pkgsrc/security/heimdal: upgrade to 0.2f.
 
 Sun Dec 12 19:22:39 JST 1999  itojun@iijlab.net
 	* openbsd/sys/netinet/udp_usrreq.c: fix advanced API for udp.
