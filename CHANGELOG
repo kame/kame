@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.199 1999/10/20 11:16:05 sumikawa Exp $
+$Id: CHANGELOG,v 1.200 1999/10/20 15:23:28 sakane Exp $
 
 <199910>
+Thu Oct 21 00:19:23 JST 1999 sakane@ydc.co.jp
+	* kame/kame/libipsec:
+	Improved IPsec policy parser.  Following requests are allowed:
+		protocol/mode/src-dst/level
+		protocol/mode/src-dst
+		protocol/mode/src-dst/
+		protocol/transport
+		protocol/transport//level
+	See policy_parse.y for detail.
+
 Wed Oct 20 20:13:50 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd[23]/ports/ncftp3, netbsd/pkgsrc/net/ncftp4: upgrade to
 	3.0 beta 21.
