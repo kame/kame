@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.159 1999/10/06 04:25:31 jinmei Exp $
+$Id: CHANGELOG,v 1.160 1999/10/06 04:39:25 jinmei Exp $
 
 <199910>
 1999-10-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -47,7 +47,7 @@ Fri Oct  1 09:02:23 JST 1999  itojun@iijlab.net
 1999-09-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6.h (IP6_EXTHDR_CHECK): added a sanity check
 	for the case where m_next is NULL and m does not contain enough
-	data. This fix will prevent the kernel from referring illegal
+	data. This fix will prevent the kernel from referring to illegal
 	memory space when receiving a packet with bogus header length.
 
 Thu Sep 30 10:57:22 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
