@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.80 2001/10/25 09:29:02 jinmei Exp $	*/
+/*	$KAME: in6_gif.c,v 1.81 2001/10/25 09:38:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -90,9 +90,7 @@
 
 static int gif_validate6 __P((const struct ip6_hdr *, struct gif_softc *,
 	struct ifnet *));
-#ifndef __OpenBSD__
 static int in6_gif_rtcachettl = 300; /* XXX see in_gif.c */
-#endif
 
 extern struct domain inet6domain;
 struct ip6protosw in6_gif_protosw =
@@ -131,6 +129,7 @@ in6_gif_output(ifp, family, m)
 	int error;
 	int hlen, poff;
 	struct mbuf *mp;
+	long time_second;
 
 	if (sin6_src == NULL || sin6_dst == NULL ||
 	    sin6_src->sin6_family != AF_INET6 ||
@@ -213,26 +212,31 @@ in6_gif_output(ifp, family, m)
 #if NBRIDGE > 0
  sendit:
 #endif /* NBRIDGE */
-	/* See if out cached route remains the same */
-	if (dst->sin6_family != sin6_dst->sin6_family ||
-	     !IN6_ARE_ADDR_EQUAL(&dst->sin6_addr, &sin6_dst->sin6_addr)) {
-		/* cache route doesn't match */
+	/* See if out cached route is still valid */
+	if (sc->gif_ro6.ro_rt && (!(sc->gif_ro6.ro_rt->rt_flags & RTF_UP) ||
+				  dst->sin6_family != sin6_dst->sin6_family ||
+				  !IN6_ARE_ADDR_EQUAL(&dst->sin6_addr,
+						      &sin6_dst->sin6_addr) ||
+				  sc->rtcache_expire == 0 ||
+				  time_second >= sc->rtcache_expire)) {
+		RTFREE(sc->gif_ro6.ro_rt);
+		sc->gif_ro6.ro_rt = NULL;
+
+	}
+
+	if (sc->gif_ro6.ro_rt == NULL) {
 		bzero(dst, sizeof(*dst));
 		dst->sin6_family = sin6_dst->sin6_family;
 		dst->sin6_len = sizeof(struct sockaddr_in6);
 		dst->sin6_addr = sin6_dst->sin6_addr;
-		if (sc->gif_ro6.ro_rt) {
-			RTFREE(sc->gif_ro6.ro_rt);
-			sc->gif_ro6.ro_rt = NULL;
-		}
-	}
 
-	if (sc->gif_ro6.ro_rt == NULL) {
 		rtalloc((struct route *)&sc->gif_ro6);
 		if (sc->gif_ro6.ro_rt == NULL) {
 			m_freem(m);
 			return ENETUNREACH;
 		}
+
+		sc->rtcache_expire = time_second + in6_gif_rtcachettl;
 	}
 	
 	return(ip6_output(m, 0, &sc->gif_ro6, 0, 0, NULL));
