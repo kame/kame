@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.67 2000/10/01 10:51:54 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.68 2000/10/18 18:44:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -787,6 +787,22 @@ in6_ifattach(ifp, altifp)
 #ifdef __FreeBSD__
 	int hostnamelen	= strlen(hostname);
 #endif
+
+	/* some of the interfaces are inherently not IPv6 capable */
+	switch (ifp->if_type) {
+#ifdef IFT_BRIDGE	/*OpenBSD 2.8*/
+	case IFT_BRIDGE:
+		return;
+#endif
+#ifdef __OpenBSD__
+	case IFT_PROPVIRTUAL:
+		if (strncmp("bridge", ifp->if_xname, sizeof("bridge")) == 0 &&
+		    '0' <= ifp->if_xname[sizeof("bridge")] &&
+		    ifp->if_xname[sizeof("bridge")] <= '9')
+			return;
+		break;
+#endif
+	}
 
 	/*
 	 * We have some arrays that should be indexed by if_index.
