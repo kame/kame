@@ -47,7 +47,7 @@ SRCS+=	ipsec_strerror.c policy_parse.y policy_token.l
 SRCS+=	ipsec_dump_policy.c ipsec_get_policylen.c
 SRCS+=	key_debug.c
 LDADD+=	-ll -ly
-CLEANFILES+=	y.tab.c y.tab.h
+CLEANFILES+=	y.tab.c y.tab.h lex.__libyy.c test-policy
 YFLAGS+=-d -p __libyy
 LFLAGS+=-P__libyy
 
@@ -74,6 +74,17 @@ y.tab.h:	policy_parse.y
 
 .if (${OPSYS} == "NetBSD")
 MKPIC=no
+LFLAGS+=-olex.yy.c
+.endif
+
+# test program
+test-policy: test-policy.c
+.if (${OPSYS} != "FreeBSD")
+	$(CC) $(CFLAGS) -o test-policy test-policy.c \
+		-L${.OBJDIR} -lipsec -L/usr/local/v6/lib -linet6
+.else
+	$(CC) $(CFLAGS) -o test-policy test-policy.c \
+		-L${.CURDIR} -lipsec -L/usr/local/v6/lib -linet6
 .endif
 
 .include <bsd.lib.mk>

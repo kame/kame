@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: policy_parse.y,v 1.2 1999/11/04 00:34:15 sakane Exp $ */
+/* KAME $Id: policy_parse.y,v 1.3 1999/11/08 13:35:21 itojun Exp $ */
 
 /*
  * IN/OUT bound policy configuration take place such below:
@@ -199,7 +199,9 @@ void
 yyerror(msg)
 	char *msg;
 {
-	fprintf(stderr, "%s\n", msg);
+	extern char *__libyytext;	/*XXX*/
+
+	fprintf(stderr, "%s parsing \"%s\"\n", msg, __libyytext);
 
 	return;
 }
