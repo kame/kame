@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.30 1999/12/02 05:32:13 sakane Exp $ */
+/* KAME $Id: key.c,v 1.31 1999/12/15 16:30:37 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -45,6 +45,10 @@
 #  define KERNEL
 # endif
 #endif
+
+/* this is for backward compatibility. we should not touch those. */
+#define ss_len		__ss_len
+#define ss_family	__ss_family
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -628,10 +632,10 @@ key_allocsa(family, src, dst, proto, spi)
 
 				if (key_bbcmp(src,
 				     _INADDRBYSA(&sav->sah->saidx.src),
-				     _INALENBYAF(sav->sah->saidx.src.__ss_family) << 3)
+				     _INALENBYAF(sav->sah->saidx.src.ss_family) << 3)
 				 && key_bbcmp(dst,
 				     _INADDRBYSA(&sav->sah->saidx.dst),
-				     _INALENBYAF(sav->sah->saidx.dst.__ss_family) << 3))
+				     _INALENBYAF(sav->sah->saidx.dst.ss_family) << 3))
 					goto found;
 			}
 		}
@@ -1141,15 +1145,15 @@ key_sp2msg(sp)
 			xisr->sadb_x_ipsecrequest_reqid = isr->saidx.reqid;
 
 			p += sizeof(*xisr);
-			bcopy(&isr->saidx.src, p, isr->saidx.src.__ss_len);
-			p += isr->saidx.src.__ss_len;
-			bcopy(&isr->saidx.dst, p, isr->saidx.dst.__ss_len);
-			p += isr->saidx.src.__ss_len;
+			bcopy(&isr->saidx.src, p, isr->saidx.src.ss_len);
+			p += isr->saidx.src.ss_len;
+			bcopy(&isr->saidx.dst, p, isr->saidx.dst.ss_len);
+			p += isr->saidx.src.ss_len;
 
 			xisr->sadb_x_ipsecrequest_len =
 				PFKEY_ALIGN8(sizeof(*xisr)
-					+ isr->saidx.src.__ss_len
-					+ isr->saidx.dst.__ss_len);
+					+ isr->saidx.src.ss_len
+					+ isr->saidx.dst.ss_len);
 		}
 	}
 
@@ -1585,9 +1589,9 @@ key_getspmsglen(sp)
 
 	tlen = (sizeof(struct sadb_msg)
 		+ sizeof(struct sadb_address)
-		+ PFKEY_ALIGN8(_SALENBYAF(sp->spidx.src.__ss_family))
+		+ PFKEY_ALIGN8(_SALENBYAF(sp->spidx.src.ss_family))
 		+ sizeof(struct sadb_address)
-		+ PFKEY_ALIGN8(_SALENBYAF(sp->spidx.dst.__ss_family)));
+		+ PFKEY_ALIGN8(_SALENBYAF(sp->spidx.dst.ss_family)));
 
 	tlen += key_getspreqmsglen(sp);
 
@@ -1616,8 +1620,8 @@ key_getspreqmsglen(sp)
 
 	for (isr = sp->req; isr != NULL; isr = isr->next) {
 		len = sizeof(struct sadb_x_ipsecrequest)
-			+ isr->saidx.src.__ss_len
-			+ isr->saidx.dst.__ss_len;
+			+ isr->saidx.src.ss_len
+			+ isr->saidx.dst.ss_len;
 
 		tlen += PFKEY_ALIGN8(len);
 	}
@@ -1906,14 +1910,14 @@ key_checkspidup(saidx, spi)
 	struct secasvar *sav;
 
 	/* check address family */
-	if (saidx->src.__ss_family != saidx->src.__ss_family) {
+	if (saidx->src.ss_family != saidx->src.ss_family) {
 		printf("key_checkspidup: address family mismatched.\n");
 		return NULL;
 	}
 
 	/* check all SAD */
 	__LIST_FOREACH(sah, &sahtree, chain) {
-		if (!key_ismyaddr(sah->saidx.dst.__ss_family,
+		if (!key_ismyaddr(sah->saidx.dst.ss_family,
 		                  _INADDRBYSA(&sah->saidx.dst)))
 			continue;
 		sav = key_getsavbyspi(sah, spi);
@@ -2278,9 +2282,9 @@ key_getmsglen(sav)
 
 	len += sizeof(struct sadb_sa);
 	len += (sizeof(struct sadb_address)
-		+ PFKEY_ALIGN8(_SALENBYAF(sav->sah->saidx.src.__ss_family)));
+		+ PFKEY_ALIGN8(_SALENBYAF(sav->sah->saidx.src.ss_family)));
 	len += (sizeof(struct sadb_address)
-		+ PFKEY_ALIGN8(_SALENBYAF(sav->sah->saidx.dst.__ss_family)));
+		+ PFKEY_ALIGN8(_SALENBYAF(sav->sah->saidx.dst.ss_family)));
 
 	if (sav->key_auth != NULL)
 		len += sav->key_auth->sadb_key_len;
@@ -2525,7 +2529,7 @@ key_setdumpsa(newmsg, sav, type, satype, seq, pid)
 			p = key_setsadbaddr(p,
 			      SADB_EXT_ADDRESS_SRC,
 			      (struct sockaddr *)&sav->sah->saidx.src,
-			      _INALENBYAF(sav->sah->saidx.src.__ss_family) << 3,
+			      _INALENBYAF(sav->sah->saidx.src.ss_family) << 3,
 			      IPSEC_ULPROTO_ANY);
 			break;
 
@@ -2533,7 +2537,7 @@ key_setdumpsa(newmsg, sav, type, satype, seq, pid)
 			p = key_setsadbaddr(p,
 			      SADB_EXT_ADDRESS_DST,
 			      (struct sockaddr *)&sav->sah->saidx.dst,
-			      _INALENBYAF(sav->sah->saidx.dst.__ss_family) << 3,
+			      _INALENBYAF(sav->sah->saidx.dst.ss_family) << 3,
 			      IPSEC_ULPROTO_ANY);
 			break;
 
@@ -2908,8 +2912,8 @@ key_cmpsaidx_exactly(saidx0, saidx1)
 	 || saidx0->reqid != saidx1->reqid)
 		return 0;
 
-	if (bcmp(&saidx0->src, &saidx1->src, saidx0->src.__ss_len) != 0
-	 || bcmp(&saidx0->dst, &saidx1->dst, saidx0->dst.__ss_len) != 0)
+	if (bcmp(&saidx0->src, &saidx1->src, saidx0->src.ss_len) != 0
+	 || bcmp(&saidx0->dst, &saidx1->dst, saidx0->dst.ss_len) != 0)
 		return 0;
 
 	return 1;
@@ -2937,8 +2941,8 @@ key_cmpsaidx_withmode(saidx0, saidx1)
 		return 0;
 
 	if (saidx0->proto != saidx1->proto
-	 || saidx0->src.__ss_family != saidx1->src.__ss_family
-	 || saidx0->dst.__ss_family != saidx1->dst.__ss_family)
+	 || saidx0->src.ss_family != saidx1->src.ss_family
+	 || saidx0->dst.ss_family != saidx1->dst.ss_family)
 		return 0;
 
 	/* If reqid of SPD is equal to 0, unique SA is required. */
@@ -2951,7 +2955,7 @@ key_cmpsaidx_withmode(saidx0, saidx1)
 		return 0;
 
     {
-	int sa_len = _INALENBYAF(saidx0->src.__ss_family);
+	int sa_len = _INALENBYAF(saidx0->src.ss_family);
 
 	if (bcmp(_INADDRBYSA(&saidx0->src), _INADDRBYSA(&saidx1->src), sa_len)
 	 || bcmp(_INADDRBYSA(&saidx0->dst), _INADDRBYSA(&saidx1->dst), sa_len))
@@ -2986,8 +2990,8 @@ key_cmpspidx_exactly(spidx0, spidx1)
 	 || spidx0->ul_proto != spidx1->ul_proto)
 		return 0;
 
-	if (bcmp(&spidx0->src, &spidx1->src, spidx0->src.__ss_len) != 0
-	 || bcmp(&spidx0->dst, &spidx1->dst, spidx0->dst.__ss_len) != 0)
+	if (bcmp(&spidx0->src, &spidx1->src, spidx0->src.ss_len) != 0
+	 || bcmp(&spidx0->dst, &spidx1->dst, spidx0->dst.ss_len) != 0)
 		return 0;
 
 	return 1;
@@ -3013,8 +3017,8 @@ key_cmpspidx_withmask(spidx0, spidx1)
 	if (spidx0 == NULL || spidx1 == NULL)
 		return 0;
 
-	if (spidx0->src.__ss_family != spidx1->src.__ss_family
-	 || spidx0->dst.__ss_family != spidx1->dst.__ss_family)
+	if (spidx0->src.ss_family != spidx1->src.ss_family
+	 || spidx0->dst.ss_family != spidx1->dst.ss_family)
 		return 0;
 
 	/* if spidx.ul_proto == IPSEC_ULPROTO_ANY, ignore. */
@@ -4313,13 +4317,13 @@ key_acquire(saidx, spidx)
 	/* create new sadb_msg to reply. */
 	len = sizeof(struct sadb_msg)
 		+ sizeof(struct sadb_address)
-		+ PFKEY_ALIGN8(saidx->src.__ss_len)
+		+ PFKEY_ALIGN8(saidx->src.ss_len)
 		+ sizeof(struct sadb_address)
-		+ PFKEY_ALIGN8(saidx->dst.__ss_len)
+		+ PFKEY_ALIGN8(saidx->dst.ss_len)
 		+ sizeof(struct sadb_ident)
-		+ PFKEY_ALIGN8(spidx->src.__ss_len)
+		+ PFKEY_ALIGN8(spidx->src.ss_len)
 		+ sizeof(struct sadb_ident)
-		+ PFKEY_ALIGN8(spidx->dst.__ss_len)
+		+ PFKEY_ALIGN8(spidx->dst.ss_len)
 		+ sizeof(struct sadb_prop)
 		+ sizeof(struct sadb_comb); /* XXX to be multiple */
 
@@ -4351,12 +4355,12 @@ key_acquire(saidx, spidx)
 	p = key_setsadbaddr(p,
 	                    SADB_EXT_ADDRESS_SRC,
 	                    (struct sockaddr *)&saidx->src,
-	                    _INALENBYAF(saidx->src.__ss_family) << 3,
+	                    _INALENBYAF(saidx->src.ss_family) << 3,
 	                    IPSEC_ULPROTO_ANY);
 	p = key_setsadbaddr(p,
 	                    SADB_EXT_ADDRESS_DST,
 	                    (struct sockaddr *)&saidx->dst,
-	                    _INALENBYAF(saidx->dst.__ss_family) << 3,
+	                    _INALENBYAF(saidx->dst.ss_family) << 3,
 	                    IPSEC_ULPROTO_ANY);
 
 	/* set sadb_address for spidx's. */
@@ -4367,7 +4371,7 @@ key_acquire(saidx, spidx)
 	                    SADB_EXT_IDENTITY_SRC,
 			    SADB_X_IDENTTYPE_ADDR,
 	                    (caddr_t)&spidx->src,
-			    spidx->src.__ss_len,
+			    spidx->src.ss_len,
 			    *(u_int64_t *)&id);
 
 	bzero(&id, sizeof(id));
@@ -4377,7 +4381,7 @@ key_acquire(saidx, spidx)
 	                    SADB_EXT_IDENTITY_DST,
 			    SADB_X_IDENTTYPE_ADDR,
 	                    (caddr_t)&spidx->dst,
-			    spidx->dst.__ss_len,
+			    spidx->dst.ss_len,
 			    *(u_int64_t *)&id);
 
 	/* create proposal extension */
@@ -4865,9 +4869,9 @@ key_expire(sav)
 		+ sizeof(struct sadb_lifetime)
 		+ sizeof(struct sadb_lifetime)
 		+ sizeof(struct sadb_address)
-		+ PFKEY_ALIGN8(sav->sah->saidx.src.__ss_len)
+		+ PFKEY_ALIGN8(sav->sah->saidx.src.ss_len)
 		+ sizeof(struct sadb_address)
-		+ PFKEY_ALIGN8(sav->sah->saidx.dst.__ss_len);
+		+ PFKEY_ALIGN8(sav->sah->saidx.dst.ss_len);
 
 	KMALLOC(newmsg, struct sadb_msg *, len);
 	if (newmsg == NULL) {
@@ -4907,14 +4911,14 @@ key_expire(sav)
 	p = key_setsadbaddr(p,
 	                    SADB_EXT_ADDRESS_SRC,
 	                    (struct sockaddr *)&sav->sah->saidx.src,
-	                    _INALENBYAF(sav->sah->saidx.src.__ss_family) << 3,
+	                    _INALENBYAF(sav->sah->saidx.src.ss_family) << 3,
 	                    IPSEC_ULPROTO_ANY);
 
 	/* set sadb_address for destination */
 	p = key_setsadbaddr(p,
 	                    SADB_EXT_ADDRESS_DST,
 	                    (struct sockaddr *)&sav->sah->saidx.dst,
-	                    _INALENBYAF(sav->sah->saidx.dst.__ss_family) << 3,
+	                    _INALENBYAF(sav->sah->saidx.dst.ss_family) << 3,
 	                    IPSEC_ULPROTO_ANY);
 
 	error = key_sendall(newmsg, len);
