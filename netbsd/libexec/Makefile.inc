@@ -2,7 +2,7 @@
 #	@(#)Makefile.inc	8.1 (Berkeley) 6/4/93
 
 BINDIR?=	/usr/local/v6/libexec
-MANDIR?=	/usr/local/v6/man
+MANDIR=	/usr/local/v6/man
 
 # due to some misterious reasons, -linet6 needs -static in NetBSD.
 LDADD+=	-static
