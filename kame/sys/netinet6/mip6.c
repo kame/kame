@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.118 2002/03/01 09:37:38 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.119 2002/03/01 10:26:54 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -563,7 +563,6 @@ int
 mip6_process_pfxlist_status_change(hif_coa)
 	struct sockaddr_in6 *hif_coa; /* newly selected CoA. */
 {
-	struct nd_prefix *pr;
 	struct hif_softc *sc;
 	struct hif_subnet *hs;
 	int error = 0;
