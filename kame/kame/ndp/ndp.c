@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.59 2001/02/15 11:10:39 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.60 2001/02/16 03:52:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1022,7 +1022,7 @@ rtrlist()
  		exit(1);
  	}
 #define DR dr.defrouter[i]
-	for (i = 0 ; DR.if_index && i < PRLSTSIZ ; i++) {
+	for (i = 0 ; DR.if_index && i < DRLSTSIZ ; i++) {
 		struct sockaddr_in6 sin6;
 
 		bzero(&sin6, sizeof(sin6));
