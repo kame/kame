@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: bgpd.8,v 1.5 2000/02/18 06:58:38 jinmei Exp $
+.\"     $Id: bgpd.8,v 1.6 2000/07/04 02:41:38 jinmei Exp $
 .\"
 .Dd May 17, 1998
 .Dt BGPD 8
@@ -110,13 +110,9 @@ command was first appeared in Toshiba IPv6 protocol stack kit.
 No authentication is supported.
 Therfore, OPEN message's optional parameter always consists of nothing.
 .Pp
-Route filtering is supported only for RIPng routes.
-.Nm
-is not capable of filtering BGP routes.
-.Pp
 Currently, the
 .Nm
-doesn't watch the routing socket.
+daemon doesn't watch the routing socket.
 So after invoking,
 .Nm
 can't handle new routes which are manually added or are added
