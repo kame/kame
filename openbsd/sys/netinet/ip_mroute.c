@@ -743,8 +743,8 @@ vif_delete(ifp)
 {
 	int i;
 	struct vif *vifp;
-	struct mfc *rt, *nrt;
-	struct rtdetq *rte, *nrte, **prte;
+	struct mfc *rt;
+	struct rtdetq *rte;
 
 	for (i = 0; i < numvifs; i++) {
 		vifp = &viftable[i];
@@ -758,16 +758,10 @@ vif_delete(ifp)
 	numvifs = i;
 
 	for (i = 0; i < MFCTBLSIZ; i++) {
-		for (rt = LIST_FIRST(&mfchashtbl[i]); rt; rt = nrt) {
-			prte = &rt->mfc_stall;
-			for (rte = *prte; rte; rte = nrte) {
-				nrte = rte->next;
-				if (rte->ifp == ifp) {
-					m_freem(rte->m);
-					free(rte, M_MRTABLE);
-					*prte = nrte;
-				} else
-					prte = &rte->next;
+		for (rt = mfchashtbl[hash].lh_first; rt; rt = rt->mfc_hash.le_next) {
+			for (rte = rt->mfc_stall; rte; rte = rte->next) {
+				if (rte->ifp == ifp)
+					rte->ifp = NULL;
 			}
 		}
 	}
@@ -870,11 +864,13 @@ add_mfc(m)
 			/* free packets Qed at the end of this entry */
 			for (rte = rt->mfc_stall; rte != NULL; rte = nrte) {
 				nrte = rte->next;
+				if (rte->ifp) {
 #ifdef RSVP_ISI
-				ip_mdq(rte->m, rte->ifp, rt, -1);
+					ip_mdq(rte->m, rte->ifp, rt, -1);
 #else
-				ip_mdq(rte->m, rte->ifp, rt);
+					ip_mdq(rte->m, rte->ifp, rt);
 #endif /* RSVP_ISI */
+				}
 				m_freem(rte->m);
 #ifdef UPCALL_TIMING
 				collate(&rte->t);
