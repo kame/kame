@@ -1,5 +1,5 @@
 #! @LOCALPREFIX@/bin/perl
-# $Id: dsadd.pl,v 1.1 2003/01/10 03:46:47 sakane Exp $
+# $Id: dsadd.pl,v 1.2 2003/01/10 09:10:13 sakane Exp $
 # Dead SA Detection
 
 require 'getopts.pl';
@@ -14,17 +14,19 @@ $opt_E = 0;	# see -E option.
 $opt_S = 0;	# see -S option.
 $opt_i = 300;	# see -i option.
 $opt_L = 0;	# see -L option.
+$opt_P = 'user.notice';	# see -P option.
 
 sub usage
 {
-	print "Usage: dsadd [-c number] [-i time] [-LESvd]\n";
+	print "Usage: dsadd [-c number] [-i time] [-P priorify] [-LESd]\n";
 	print "\t-c: specify the number of icmp echo packet to be sent.\n";
-	print "\t-L: force to check only once.\n";
 	print "\t-i: if the current round takes more than the specified\n";
 	print "\t    time in seconds the next round will start immediately\n";
 	print "\t    after the current will finish.  otherwise the next will\n";
 	print "\t    start after the specified time from the current first\n";
 	print "\t    check.\n";
+	print "\t-P: specify the priority used by logger(1).\n";
+	print "\t-L: force to check only once.\n";
 	print "\t-E: don't delete the SA even if the SA looks dead.\n";
 	print "\t-S: don't tell syslog(8) what the SA has been deleted.\n";
 	print "\t-d: debug mode.\n";
@@ -138,7 +140,7 @@ sub delete_sa
 	$cmd = sprintf "delete $src $dst $proto $spi;";
 	print "  $cmd\n" if ($debug);
 
-	system("$logger -t dsadd \"SA deleted src=$src dst=$dst proto=$proto spi=$spi mode=$mode\"") if (! $opt_S);
+	system("$logger -p $opt_P -t dsadd \"SA deleted src=$src dst=$dst proto=$proto spi=$spi mode=$mode\"") if (! $opt_S);
 
 	open(OUT, "| $setkey -c");
 	print OUT "$cmd\n";
