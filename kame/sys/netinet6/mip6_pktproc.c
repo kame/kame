@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.7 2002/06/18 02:11:06 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.8 2002/06/18 03:02:43 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -158,7 +158,7 @@ mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
 
 	bzero(ip6mh, ip6mh_size);
 	ip6mh->ip6mh_pproto = IPPROTO_NONE;
-	ip6mh->ip6mh_len = (ip6mh_size - 8) >> 3;
+	ip6mh->ip6mh_len = ip6mh_size >> 3;
 	ip6mh->ip6mh_type = IP6M_HOME_TEST;
 	/* XXX ip6mh->ip6mh_nonce_index; */
 	ip6mh->ip6mh_mobile_cookie = htonl(cookie);
@@ -244,7 +244,7 @@ mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 
 	bzero(ip6mc, ip6mc_size);
 	ip6mc->ip6mc_pproto = IPPROTO_NONE;
-	ip6mc->ip6mc_len = (ip6mc_size - 8) >> 3;
+	ip6mc->ip6mc_len = ip6mc_size >> 3;
 	ip6mc->ip6mc_type = IP6M_CAREOF_TEST;
 	/* XXX ip6mc->ip6mc_nonce_index; */
 	ip6mc->ip6mc_mobile_cookie = htonl(cookie);
@@ -1130,7 +1130,7 @@ mip6_ip6mhi_create(pktopt_mobility, mbu)
 
 	bzero(ip6mhi, ip6mhi_size);
 	ip6mhi->ip6mhi_pproto = IPPROTO_NONE;
-	ip6mhi->ip6mhi_len = (ip6mhi_size - 8) >> 3;
+	ip6mhi->ip6mhi_len = ip6mhi_size >> 3;
 	ip6mhi->ip6mhi_type = IP6M_HOME_TEST_INIT;
 	ip6mhi->ip6mhi_mobile_cookie = mbu->mbu_mobile_cookie;
 
@@ -1167,7 +1167,7 @@ mip6_ip6mci_create(pktopt_mobility, mbu)
 
 	bzero(ip6mci, ip6mci_size);
 	ip6mci->ip6mci_pproto = IPPROTO_NONE;
-	ip6mci->ip6mci_len = (ip6mci_size - 8) >> 3;
+	ip6mci->ip6mci_len = ip6mci_size >> 3;
 	ip6mci->ip6mci_type = IP6M_CAREOF_TEST_INIT;
 	ip6mci->ip6mci_mobile_cookie = mbu->mbu_mobile_cookie;
 
@@ -1253,7 +1253,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 
 	bzero(ip6mu, ip6mu_size);
 	ip6mu->ip6mu_pproto = IPPROTO_NONE;
-	ip6mu->ip6mu_len = (ip6mu_size - 8) >> 3;
+	ip6mu->ip6mu_len = ip6mu_size >> 3;
 	ip6mu->ip6mu_type = IP6M_BINDING_UPDATE;
 	ip6mu->ip6mu_flags = mbu->mbu_flags;
 	ip6mu->ip6mu_seqno = htons(mbu->mbu_seqno);
@@ -1341,7 +1341,7 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh)
 
 	bzero(ip6ma, ip6ma_size);
 	ip6ma->ip6ma_pproto = IPPROTO_NONE;
-	ip6ma->ip6ma_len = (ip6ma_size - 8) >> 3;
+	ip6ma->ip6ma_len = ip6ma_size >> 3;
 	ip6ma->ip6ma_type = IP6M_BINDING_ACK;
 	ip6ma->ip6ma_status = status;
 	ip6ma->ip6ma_seqno = htons(seqno);
@@ -1381,7 +1381,7 @@ mip6_ip6me_create(pktopt_mobility, src, dst, status, addr)
 
 	bzero(ip6me, ip6me_size);
 	ip6me->ip6me_pproto = IPPROTO_NONE;
-	ip6me->ip6me_len = (sizeof(struct ip6m_binding_error) - 8) >> 3;
+	ip6me->ip6me_len = ip6me_size >> 3;
 	ip6me->ip6me_type = IP6M_BINDING_ERROR;
 	ip6me->ip6me_status = status;
 	ip6me->ip6me_addr = addr->sin6_addr;

@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.2 2002/06/09 16:16:00 keiichi Exp $	*/
+/*	$KAME: mobility6.c,v 1.3 2002/06/18 03:02:44 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -91,7 +91,11 @@ mobility6_input(mp, offp, proto)
 	if (mh6 == NULL)
 		return (IPPROTO_DONE);
 #endif
-	mh6len = (mh6->ip6m_len + 1) << 3;
+	mh6len = mh6->ip6m_len << 3;
+	if (mh6len < IP6M_MINLEN) {
+		/* too small */
+		goto bad;
+	}
 
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, mh6len, IPPROTO_DONE);
