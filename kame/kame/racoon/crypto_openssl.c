@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.52 2001/07/11 10:32:53 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.53 2001/07/11 10:33:56 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1344,7 +1344,7 @@ eay_hmacsha1_one(key, data)
 	SHA1_Final(res->v, &c);
 
 	return(res);
-};
+}
 
 /*
  * HMAC MD5
@@ -1407,7 +1407,7 @@ eay_hmacmd5_one(key, data)
 	MD5_Final(res->v, &c);
 
 	return(res);
-};
+}
 
 /*
  * SHA functions
