@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.51 2001/08/07 08:49:45 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.52 2001/10/09 12:58:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1173,17 +1173,21 @@ find_prefix(struct rainfo *rai, struct in6_addr *prefix, int plen)
 {
 	struct prefix *pp;
 	int bytelen, bitlen;
+	u_char bitmask;
 
 	for (pp = rai->prefix.next; pp != &rai->prefix; pp = pp->next) {
 		if (plen != pp->prefixlen)
 			continue;
 		bytelen = plen / 8;
 		bitlen = plen % 8;
+		bitmask = 0xff << (8 - bitlen);
 		if (memcmp((void *)prefix, (void *)&pp->prefix, bytelen))
 			continue;
-		if (prefix->s6_addr[bytelen] >> (8 - bitlen) ==
-		    pp->prefix.s6_addr[bytelen] >> (8 - bitlen))
+		if (bitlen == 0 ||
+		    ((prefix->s6_addr[bytelen] & bitmask) == 
+		     (pp->prefix.s6_addr[bytelen] & bitmask))) {
 			return(pp);
+		}
 	}
 
 	return(NULL);
@@ -1195,16 +1199,20 @@ prefix_match(struct in6_addr *p0, int plen0,
 	     struct in6_addr *p1, int plen1)
 {
 	int bytelen, bitlen;
+	u_char bitmask;
 
 	if (plen0 < plen1)
 		return(0);
 	bytelen = plen1 / 8;
 	bitlen = plen1 % 8;
+	bitmask = 0xff << (8 - bitlen);
 	if (memcmp((void *)p0, (void *)p1, bytelen))
 		return(0);
-	if (p0->s6_addr[bytelen] >> (8 - bitlen) ==
-	    p1->s6_addr[bytelen] >> (8 - bitlen))
+	if (bitlen == 0 ||
+	    ((p0->s6_addr[bytelen] & bitmask) ==
+	     (p1->s6_addr[bytelen] & bitmask))) { 
 		return(1);
+	}
 
 	return(0);
 }
