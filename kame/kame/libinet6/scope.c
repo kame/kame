@@ -1,4 +1,4 @@
-/*	$KAME: scope.c,v 1.4 2001/11/13 10:15:14 jinmei Exp $ */
+/*	$KAME: scope.c,v 1.5 2001/11/13 10:25:09 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -28,12 +28,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 
 #ifdef INET6
+#include <sys/queue.h>		/* XXX in6_var.h requires this */
 #include <net/if.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
