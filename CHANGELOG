@@ -1,8 +1,21 @@
+2000-02-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+
+
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.595 2000/02/23 12:29:37 sakane Exp $
+$Id: CHANGELOG,v 1.596 2000/02/23 15:10:00 jinmei Exp $
 
 <200002>
+2000-02-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/netstat/ipsec.c: 
+	* bsdi4/usr.sbin/netstat:
+	modified to print KAME's IPsec statistics.
+	
+2000-02-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/traceroute/traceroute.c (send_probe): 
+	* bsdi4/usr.sbin/traceroute/Makefile: 
+	changed a bit to calculate a UDP checksum correclty on bsdi4.
+
 Wed Feb 23 21:26:21 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	  fixed to compute RSA signature.  SIGN was computed including OID.
