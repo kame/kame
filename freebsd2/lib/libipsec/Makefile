@@ -20,6 +20,6 @@ MLINKS+=ipsec_set_policy.3 ipsec_get_policylen.3 \
 
 # FreeBSD special
 SRCS+=y.tab.h
-y.tab.h:	parse.y
+y.tab.h:	policy_parse.y
 
 .include <bsd.lib.mk>
