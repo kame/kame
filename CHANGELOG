@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1590 2001/03/05 18:37:05 thorpej Exp $
+$KAME: CHANGELOG,v 1.1591 2001/03/05 23:36:31 thorpej Exp $
 
 <200103>
+2001-03-05  Jason R. Thorpe  <thorpej@zembu.com>
+
+	* kame/racoon/gssapi.c: Use GSS_C_MECH_CODE when reporting
+	GSSAPI errors.
+
 2001-03-05  Jason R. Thorpe  <thorpej@zembu.com>
 
 	* kame/racoon/handler.c: Implement deleteallph2(), which
