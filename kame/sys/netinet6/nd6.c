@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.192 2001/09/12 16:52:39 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.193 2001/09/13 13:37:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -562,24 +562,45 @@ nd6_timer(ignored_arg)
 			} else {
 				struct mbuf *m = ln->ln_hold;
 				if (m) {
-					if (rt->rt_ifp) {
-						/*
-						 * Fake rcvif to make the ICMP
-						 * error more helpful in
-						 * diagnosing for the receiver.
-						 * XXX: should we consider
-						 * older rcvif?
-						 */
-						m->m_pkthdr.rcvif = rt->rt_ifp;
+					struct ip6_hdr *ip6_in;
+					struct sockaddr_in6 sin6_in;
+					int64_t zoneid;
+
+					/*
+					 * Fake rcvif to make the ICMP error
+					 * more helpful in diagnosing for the
+					 * receiver.
+					 * XXX: should we consider
+					 * older rcvif?
+					 */
+					m->m_pkthdr.rcvif = rt->rt_ifp;
+
+					/*
+					 * XXX: for scoped addresses, we should
+					 * disambiguate the zone.  We should
+					 * perhaps hang sockaddr_in6 as aux
+					 * data in the mbuf.
+					 */
+					ip6_in = mtod(m, struct ip6_hdr *);
+					zoneid = in6_addr2zoneid(rt->rt_ifp,
+								 &ip6_in->ip6_dst);
+					if (zoneid < 0) { /* impossible... */
+						m_freem(m);
 					} else {
-						/*
-						 * noone initialized rcvif
-						 * until this point.
-						 */
-						m->m_pkthdr.rcvif = NULL;
+						bzero(&sin6_in,
+						      sizeof(sin6_in));
+						sin6_in.sin6_addr = *ip6_in;
+						sin6_in.sin6_scope_id = zoneid;
+#ifndef SCOPEDROUTING
+						in6_embedscope(&ip6_in->ip6_dst,
+							       &sin6_in,
+							       NULL,
+							       rt->rt_ifp);
+#endif
+						icmp6_error(m,
+							    ICMP6_DST_UNREACH,
+							    ICMP6_DST_UNREACH_ADDR, 0);
 					}
-					icmp6_error(m, ICMP6_DST_UNREACH,
-						    ICMP6_DST_UNREACH_ADDR, 0);
 					ln->ln_hold = NULL;
 				}
 				next = nd6_free(rt, 0);
