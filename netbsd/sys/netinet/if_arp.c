@@ -144,6 +144,7 @@ static	void arprequest __P((struct ifnet *,
 	    struct in_addr *, struct in_addr *, u_int8_t *));
 static	void arptfree __P((struct llinfo_arp *));
 static	void arptimer __P((void *));
+static	void arp_rtdrain __P((struct rtentry *, struct rttimer *));
 static	struct llinfo_arp *arplookup __P((struct in_addr *, int, int));
 static	void in_arpinput __P((struct mbuf *));
 
@@ -370,6 +371,7 @@ arp_rtrequest(req, rt, info)
 	int s;
 	struct in_ifaddr *ia;
 	struct ifaddr *ifa;
+	int mine = 0;
 
 	if (!arpinit_done) {
 		arpinit_done = 1;
@@ -503,6 +505,7 @@ arp_rtrequest(req, rt, info)
 			 * better support for multiple IPv4 addresses on a
 			 * interface.
 			 */
+			mine = 1;
 			rt->rt_expire = 0;
 			Bcopy(LLADDR(rt->rt_ifp->if_sadl),
 			    LLADDR(SDL(gate)),
@@ -524,6 +527,14 @@ arp_rtrequest(req, rt, info)
 				rt->rt_ifa = ifa;
 			}
 		}
+
+		/*
+		 * if this is a cached route, which is very likely,
+		 * put it in the timer queue.
+		 */
+		if (!(rt->rt_flags & (RTF_STATIC | RTF_ANNOUNCE)) && !mine)
+			rt_add_cache(rt, arp_rtdrain);
+
 		break;
 
 	case RTM_DELETE:
@@ -545,6 +556,36 @@ arp_rtrequest(req, rt, info)
 		Free((caddr_t)la);
 	}
 	ARP_UNLOCK();
+}
+
+static void
+arp_rtdrain(rt, rtt)
+	struct rtentry *rt;
+	struct rttimer *rtt;
+{
+	struct llinfo_arp *la;
+	struct sockaddr_dl *sdl;
+
+	if ((la = (struct llinfo_arp *)rt->rt_llinfo) == NULL) {
+		/*
+		 * This case can happen when rtflushclone() invalidated the
+		 * route entry but there are still positive references to
+		 * this entry.
+		 */
+		return;
+	}
+
+	/* if the arp entry has been resolved, just keep it. */
+	sdl = (struct sockaddr_dl *)rt->rt_gateway;
+	if (sdl && sdl->sdl_family == AF_LINK && /* check just in case */
+	    sdl->sdl_alen != 0) {
+		rt_add_cache(rt, arp_rtdrain);
+		return;
+	}
+
+	arptfree(la);
+
+	return;			/* the caller will free rtt */
 }
 
 /*
