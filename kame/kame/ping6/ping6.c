@@ -1471,23 +1471,23 @@ pr_icmph(icp, end)
 	case ICMP6_DST_UNREACH:
 		switch(icp->icmp6_code) {
 		case ICMP6_DST_UNREACH_NOROUTE:
-			(void)printf("No Route to Destination");
+			(void)printf("No Route to Destination\n");
 			break;
 		case ICMP6_DST_UNREACH_ADMIN:
 			(void)printf("Destination Administratively "
 				     "Unreachable\n");
 			break;
 		case ICMP6_DST_UNREACH_BEYONDSCOPE:
-			(void)printf("Destination Unreachable Beyond Scope");
+			(void)printf("Destination Unreachable Beyond Scope\n");
 			break;
 		case ICMP6_DST_UNREACH_ADDR:
-			(void)printf("Destination Host Unreachable");
+			(void)printf("Destination Host Unreachable\n");
 			break;
 		case ICMP6_DST_UNREACH_NOPORT:
-			(void)printf("Destination Port Unreachable");
+			(void)printf("Destination Port Unreachable\n");
 			break;
 		default:
-			(void)printf("Destination Unreachable, Bad Code: %d",
+			(void)printf("Destination Unreachable, Bad Code: %d\n",
 			    icp->icmp6_code);
 			break;
 		}
@@ -1495,19 +1495,20 @@ pr_icmph(icp, end)
 		pr_retip((struct ip6_hdr *)(icp + 1), end);
 		break;
 	case ICMP6_PACKET_TOO_BIG:
-		(void)printf("Packet too big mtu = %d",
+		(void)printf("Packet too big mtu = %d\n",
 			     (int)ntohl(icp->icmp6_mtu));
+		pr_retip((struct ip6_hdr *)(icp + 1), end);
 		break;
 	case ICMP6_TIME_EXCEEDED:
 		switch(icp->icmp6_code) {
 		case ICMP6_TIME_EXCEED_TRANSIT:
-			(void)printf("Time to live exceeded");
+			(void)printf("Time to live exceeded\n");
 			break;
 		case ICMP6_TIME_EXCEED_REASSEMBLY:
-			(void)printf("Frag reassembly time exceeded");
+			(void)printf("Frag reassembly time exceeded\n");
 			break;
 		default:
-			(void)printf("Time exceeded, Bad Code: %d",
+			(void)printf("Time exceeded, Bad Code: %d\n",
 			    icp->icmp6_code);
 			break;
 		}
@@ -1529,7 +1530,7 @@ pr_icmph(icp, end)
 			 (void)printf("Bad code(%d) ", icp->icmp6_code);
 			 break;
 		}
-		(void)printf("pointer = 0x%02x",
+		(void)printf("pointer = 0x%02x\n",
 			     (int)ntohl(icp->icmp6_pptr));
 		pr_retip((struct ip6_hdr *)(icp + 1), end);
 		break;
