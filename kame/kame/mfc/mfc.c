@@ -1,4 +1,4 @@
-/*	$KAME: mfc.c,v 1.3 2004/01/21 06:49:57 suz Exp $	*/
+/*	$KAME: mfc.c,v 1.4 2004/01/29 15:20:30 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -31,7 +31,7 @@
 
 #include "mfc.h"
 
-int s;
+int s4, s6;
 static int mif2phyif[MAXMIFS];
 static int vif2phyif[MAXVIFS];
 
@@ -70,20 +70,20 @@ mfc_init()
 	int on;
 
 	/* enable IPv4 multicast routing */
-	if ((s = socket(AF_INET, SOCK_RAW, IPPROTO_IGMP)) < 0) {
+	if ((s4 = socket(AF_INET, SOCK_RAW, IPPROTO_IGMP)) < 0) {
 		errx(1, "socket");
 	}
 	on = 1;
-	if (setsockopt(s, IPPROTO_IP, MRT_INIT, &on, sizeof(on)) < 0) {
+	if (setsockopt(s4, IPPROTO_IP, MRT_INIT, &on, sizeof(on)) < 0) {
 		errx(1, "MRT_INIT %s", strerror(errno));
 	}
 
 	/* enable IPv6 multicast routing */
-	if ((s = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) < 0) {
+	if ((s6 = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) < 0) {
 		errx(1, "socket");
 	}
 	on = 1;
-	if (setsockopt(s, IPPROTO_IPV6, MRT6_INIT, &on, sizeof(on)) < 0) {
+	if (setsockopt(s6, IPPROTO_IPV6, MRT6_INIT, &on, sizeof(on)) < 0) {
 		errx(1, "MRT6_INIT %s", strerror(errno));
 	}
 
@@ -107,7 +107,7 @@ add_mif6(const char *ifname)
 		goto end; /* it's already registered */
 	mif6c.mif6c_pifi = ifindex;
 	mif6c.mif6c_flags = NULL;
-	err = setsockopt(s, IPPROTO_IPV6, MRT6_ADD_MIF, &mif6c, sizeof(mif6c)); 
+	err = setsockopt(s6, IPPROTO_IPV6, MRT6_ADD_MIF, &mif6c, sizeof(mif6c));
 	if (err != 0) {
 		errx(1, "MRT6_ADD_MIF for %s failed: %s",
 		     ifname, strerror(errno));
@@ -131,7 +131,7 @@ add_mif4(const char *ifname)
 	ifname2addr(ifname, &vifc.vifc_lcl_addr);
 	vifc.vifc_flags = NULL;
 	vifc.vifc_threshold = 1;
-	err = setsockopt(s, IPPROTO_IP, MRT_ADD_VIF, &vifc, sizeof(vifc)); 
+	err = setsockopt(s4, IPPROTO_IP, MRT_ADD_VIF, &vifc, sizeof(vifc)); 
 	if (err != 0) {
 		errx(1, "MRT_ADD_VIF for %s failed: %s",
 		     ifname, strerror(errno));
@@ -154,7 +154,7 @@ add_reg_mif6(void)
 		goto end; /* it's already registered */
 	mif6c.mif6c_pifi = ifindex;
 	mif6c.mif6c_flags = MIFF_REGISTER;
-	err =setsockopt(s, IPPROTO_IPV6, MRT6_ADD_MIF, &mif6c, sizeof(mif6c)); 
+	err =setsockopt(s4, IPPROTO_IPV6, MRT6_ADD_MIF, &mif6c, sizeof(mif6c)); 
 	if (err != 0) {
 		errx(1, "MRT6_ADD_MIF for %s failed: %s",
 		     "reg0", strerror(errno));
@@ -175,7 +175,7 @@ add_mfc6(struct sockaddr *src, struct sockaddr *dst, mifi_t in,
 	mf6c.mf6cc_parent = in;
 	mf6c.mf6cc_ifset = *out;
 
-	if (setsockopt(s, IPPROTO_IPV6, MRT6_ADD_MFC, &mf6c, sizeof(mf6c)) < 0) {
+	if (setsockopt(s6, IPPROTO_IPV6, MRT6_ADD_MFC, &mf6c, sizeof(mf6c)) < 0) {
 		errx(1, "MRT6_ADD_MFC %s", strerror(errno));
 	}
 }
@@ -198,7 +198,7 @@ add_mfc4(struct sockaddr *src, struct sockaddr *dst, mifi_t in,
 		else
 			mfc.mfcc_ttls[i] = 0;
 	}
-	if (setsockopt(s, IPPROTO_IP, MRT_ADD_MFC, &mfc, sizeof(mfc)) < 0) {
+	if (setsockopt(s4, IPPROTO_IP, MRT_ADD_MFC, &mfc, sizeof(mfc)) < 0) {
 		errx(1, "MRT_ADD_MFC %s", strerror(errno));
 	}
 }
