@@ -901,6 +901,9 @@ sys_getsockopt(struct proc *p, void *v, register_t *retval)
 		if (error == 0)
 			error = copyout(&valsize,
 					SCARG(uap, avalsize), sizeof(valsize));
+	} else {
+	 	if (m == msav)
+			used_my_mbuf = 1;
 	}
 	/*
 	 * Check to see if the caller used my mbuf or
