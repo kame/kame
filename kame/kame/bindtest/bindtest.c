@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.19 2001/05/08 00:42:24 jinmei Exp $	*/
+/*	$KAME: bindtest.c,v 1.20 2001/05/08 01:54:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -70,6 +70,7 @@
 #include <netdb.h>
 #include <errno.h>
 #include <err.h>
+#include <fcntl.h>
 
 #include <netinet/in.h>
 
@@ -97,12 +98,16 @@ static const char *printsa __P((struct sockaddr *, socklen_t));
 static const char *printres __P((struct addrinfo *));
 static int test __P((struct testitem *, struct testitem *));
 static void sendtest __P((int, int, struct testitem *));
+static void conntest __P((int, int, struct testitem *));
 
 static char *port = NULL;
 static int socktype = SOCK_DGRAM;
 static int summary = 0;
 static int reuseaddr = 0;
 static int reuseport = 0;
+static int connect1st = 0;
+static int connect2nd = 0;
+
 int
 main(argc, argv)
 	int argc;
@@ -112,8 +117,14 @@ main(argc, argv)
 	extern char *optarg;
 	struct testitem *testi, *testj;
 
-	while ((ch = getopt(argc, argv, "APp:st")) != EOF) {
+	while ((ch = getopt(argc, argv, "12APp:st")) != EOF) {
 		switch (ch) {
+		case '1':
+			connect1st = 1;
+			break;
+		case '2':
+			connect2nd = 1;
+			break;
 		case 'A':
 			reuseaddr = 1;
 #ifndef SO_REUSEADDR
@@ -141,6 +152,11 @@ main(argc, argv)
 		}
 	}
 
+	if (connect1st && connect2nd) {
+		fprintf(stderr, "-1 and -2 are exclusive.\n");
+		exit(1);
+	}
+
 #if 0
 	if (port == NULL)
 		port = allocport();
@@ -157,10 +173,13 @@ main(argc, argv)
 			errx(1, "getaddrinfo failed");
 	}
 
-	printf("starting tests, socktype = %s%s%s\n",
+	printf("starting tests, socktype = %s%s%s",
 	    socktype == SOCK_DGRAM ? "SOCK_DGRAM" : "SOCK_STREAM",
 	    reuseaddr ? ", SO_REUSEADDR" : "",
 	    reuseport ? ", SO_REUSEPORT" : "");
+	if (socktype == SOCK_STREAM && (connect1st != 0 || connect2nd != 0))
+		printf(" , connect to %s", (connect1st != 0) ? "1st" : "2nd");
+	putchar('\n');
 	if (summary) {
 		for (testi = testitems; testi->name; testi++)
 			printf("\t%s", testi->name);
@@ -354,6 +373,20 @@ test(t1, t2)
 			sendtest(sa, sb, t2);
 		else if (summary)
 			putchar('-');
+	} else if (reuseaddr != 0 || reuseport != 0) {
+		/*
+		 * We skip the test unless the REUSExxx option(s) is specified.
+		 * Otherwise, remaining TIME_WAIT sockets would prevent
+		 * succeeding sockets from being bound.
+		 */
+		if (t1->host != NULL && connect1st)
+			conntest(sa, sb, t1);
+		else if (summary)
+			putchar('-');
+		if (t2->host != NULL && connect2nd)
+			conntest(sa, sb, t2);
+		else if (summary)
+			putchar('-');
 	}
 	if (summary)
 		putchar(']');
@@ -471,6 +504,123 @@ sendtest(sa, sb, t)
 
 	if (summary) {
 		if (recva && recvb)
+			putchar('b');
+		else if (recva)
+			putchar('1');
+		else if (recvb)
+			putchar('2');
+		else
+			putchar('0');
+	}
+
+  done:
+	if (s >= 0)
+		close(s);
+}
+
+static void
+conntest(sa, sb, t)
+	int sa, sb;
+	struct testitem *t;
+{
+	int s = -1, maxfd;
+	int e;
+	int recva = 0, recvb = 0;
+	fd_set fdset, fdset0;
+	struct timeval timo;
+	struct sockaddr_storage ss;
+	struct sockaddr *from = (struct sockaddr *)&ss;
+	socklen_t fromlen;
+	int flags;
+
+	listen(sa, 5);
+	listen(sb, 5);
+	
+	if ((s = socket(t->res->ai_family, t->res->ai_socktype,
+			t->res->ai_protocol)) < 0) {
+		if (!summary) {
+			printf("\tfailed to open a socket for connecting: %s\n",
+			       strerror(errno));
+		} else
+			putchar('x');
+		goto done;
+	}
+	flags = fcntl(s, F_GETFL, 0);
+	flags |= O_NONBLOCK;
+	if (fcntl(s, F_SETFL, flags) < 0) {
+		if (!summary) {
+			printf("\tfailed to make connecting socket "
+			       "non-blocking: %s\n", strerror(errno));
+		} else
+			putchar('x');
+		goto done;
+	}
+
+	if ((connect(s, t->res->ai_addr, t->res->ai_addrlen)) < 0 &&
+	    errno != EINPROGRESS) {
+		if (!summary) {
+			printf("\tfailed to connect a packet to %s: %s\n",
+			       printres(t->res), strerror(errno));
+		} else
+			putchar('x');
+		goto done;
+	} else if (!summary)
+		printf("\ttried to connect to %s\n", printres(t->res));
+
+	FD_ZERO(&fdset0);
+	FD_SET(sa, &fdset0);
+	FD_SET(sb, &fdset0);
+	maxfd = (sa > sb) ? sa : sb;
+	timo.tv_sec = 1;
+	timo.tv_usec = 0;
+
+	fdset = fdset0;
+	if ((e = select(maxfd + 1, &fdset, NULL, NULL, &timo)) < 0) {
+		if (!summary) {
+			printf("\tfailed to select: %s\n", strerror(errno));
+		} else
+			putchar('x');
+		goto done;
+	}
+	if (FD_ISSET(sa, &fdset)) {
+		fromlen = sizeof(ss);
+		if (accept(sa, from, &fromlen) < 0) {
+			if (!summary) {
+				printf("\tfailed to accept on the "
+				       "1st socket: %s\n", strerror(errno));
+			}
+			else
+				; /* ignore it */
+		} else {
+			if (!summary) {
+				printf("\taccepted a connection from %s on "
+				       "the 1st socket\n",
+				       printsa(from, fromlen));
+			} else
+				recva++;
+		}
+	}
+	if (FD_ISSET(sb, &fdset)) {
+		fromlen = sizeof(ss);
+		if (accept(sb, from, &fromlen) < 0) {
+			if (!summary) {
+				printf("\tfailed to accept on the "
+				       "2nd socket: %s\n", strerror(errno));
+			}
+			else
+				; /* ignore it */
+		} else {
+			if (!summary) {
+				printf("\taccepted a connection from %s on "
+				       "the 2nd socket\n",
+				       printsa(from, fromlen));
+			} else
+				recvb++;
+		}
+	}
+
+	if (summary) {
+		if (recva && recvb) /* NB: should be impossible for TCP */
 			putchar('b');
 		else if (recva)
 			putchar('1');
