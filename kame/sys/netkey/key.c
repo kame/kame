@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.136 2000/06/24 00:31:14 itojun Exp $	*/
+/*	$KAME: key.c,v 1.137 2000/06/24 00:47:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1629,7 +1629,7 @@ key_spdadd(so, m, mhp)
 		printf("key_spdadd: Invalid SP direction.\n");
 #endif
 		mhp->msg->sadb_msg_errno = EINVAL;
-		return NULL;
+		return 0;
 	}
 
 	/* check policy */
@@ -1947,7 +1947,7 @@ key_spddelete2(so, m, mhp)
 		printf("key_spddelete2: invalid message is passed.\n");
 #endif
 		key_senderror(so, m, EINVAL);
-		return NULL;
+		return 0;
 	}
 
 	id = ((struct sadb_x_policy *)mhp->ext[SADB_X_EXT_POLICY])->sadb_x_policy_id;
@@ -5021,7 +5021,7 @@ key_add(so, m, mhp)
 	}
 
 	/* check SA values to be mature. */
-	if ((error = key_mature(newsav)) != NULL) {
+	if ((error = key_mature(newsav)) != 0) {
 		key_freesav(newsav);
 		return key_senderror(so, m, error);
 	}
