@@ -314,7 +314,7 @@ do { \
 		(rt)->rt_use++; \
 		(rt)->rt_lastreftime = time.tv_sec; \
 		i = ((rt)->rt_lastreftime - (rt)->rt_createtime) / 300; \
-		if (i > 12) \
+		if (i < 0 || i > 12) \
 			i = 12; \
 		(rt)->rt_usehist[i]++; \
 	} while (0)
@@ -323,7 +323,7 @@ do { \
 	do { \
 		int i; \
 		i = (time.tv_sec - (rt)->rt_createtime) / 300; \
-		if (i > 12) \
+		if (i < 0 || i > 12) \
 			i = 12; \
 		(rt)->rt_reusehist[i]++; \
 	} while (0)
@@ -332,7 +332,7 @@ do { \
 	do { \
 		int i; \
 		i = (time.tv_sec - (rt)->rt_createtime) / 300; \
-		if (i > 12) \
+		if (i < 0 || i > 12) \
 			i = 12; \
 		(rt)->rt_releasehist[i]++; \
 	} while (0)
