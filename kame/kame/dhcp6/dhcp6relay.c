@@ -460,8 +460,13 @@ relay6_react(siz, buf, dev, fromclient)
 {
 	union dhcp6 *dh6;
 
+	if (siz < 1) {		/* we need at least 1 byte to check type */
+		dprintf((stderr, "relay6_react: short packet\n"));
+		return;
+	}
+	
 	dh6 = (union dhcp6 *)buf;
-	dprintf((stderr, "msgtype=%d\n", dh6->dh6_msgtype));
+	dprintf((stderr, "relay6_react: msgtype=%d\n", dh6->dh6_msgtype));
 
 	if (fromclient) {
 		switch (dh6->dh6_msgtype) {
