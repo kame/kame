@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.14 2000/03/24 16:32:02 sakane Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.15 2000/03/28 12:30:35 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -142,9 +142,9 @@ cmpspidx(a, b)
 		return 1;
 
 	if (cmpsaddr((struct sockaddr *)&a->src, (struct sockaddr *)&b->src))
-		return 0;
+		return 1;
 	if (cmpsaddr((struct sockaddr *)&a->dst, (struct sockaddr *)&b->dst))
-		return 0;
+		return 1;
 
 	return 0;
 }
