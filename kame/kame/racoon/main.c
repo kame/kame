@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.27 2001/02/04 20:11:37 thorpej Exp $	*/
+/*	$KAME: main.c,v 1.28 2001/02/06 15:03:16 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -200,9 +200,11 @@ main(ac, av)
 			plog(LLV_ERROR, LOCATION, NULL,
 				"cannot open %s", pid_file);
 		}
-		if (atexit(cleanup_pidfile) < 0) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"cannot register pidfile cleanup");
+		if (!f_local) {
+			if (atexit(cleanup_pidfile) < 0) {
+				plog(LLV_ERROR, LOCATION, NULL,
+					"cannot register pidfile cleanup");
+			}
 		}
 	}
 
