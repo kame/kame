@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.39 2001/08/16 09:16:05 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.40 2001/08/16 10:02:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -69,9 +69,6 @@ u_int p_policy_len;
 char *p_policy;
 
 /* temporary buffer */
-static struct sockaddr *pp_addr;
-static u_int pp_prefix;
-static u_int pp_port;
 static caddr_t pp_key;
 
 extern u_char m_buf[BUFSIZ];
@@ -94,7 +91,9 @@ extern void yyerror __P((const char *));
 
 %union {
 	unsigned long num;
+	unsigned int intnum;
 	vchar_t val;
+	struct sockaddr *sa;
 }
 
 %token EOT
@@ -115,9 +114,11 @@ extern void yyerror __P((const char *));
 %type <num> UP_PROTO PR_ESP PR_AH PR_IPCOMP
 %type <num> ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP
 %type <num> DECSTRING
+%type <intnum> prefix port
 %type <val> PORT ADDRESS PL_REQUESTS
 %type <val> key_string policy_requests
 %type <val> QUOTEDSTRING HEXSTRING STRING
+%type <sa> ipaddress
 
 %%
 commands
@@ -157,57 +158,65 @@ add_command
 
 	/* delete */
 delete_command
-	:	DELETE { p_type = SADB_DELETE; }
-		sa_selector_spec extension_spec
+	:	DELETE sa_selector_spec extension_spec EOT
 		{
+			p_type = SADB_DELETE;
 			if (p_mode != IPSEC_MODE_ANY)
 				yyerror("WARNING: mode is obsoleted.");
 		}
-		EOT
 	;
 
 	/* deleteall command */
 deleteall_command
-	:	DELETEALL { p_type = SADB_DELETE; }
-		ipaddress { p_src = pp_addr; }
-		ipaddress { p_dst = pp_addr; }
-		protocol_spec 
-		{ p_no_spi = 1; }
-		EOT
+	:	DELETEALL ipaddress ipaddress protocol_spec EOT
+		{
+			p_type = SADB_DELETE;
+			p_src = $2;
+			p_dst = $3;
+			p_no_spi = 1;
+		}
 	;
 
 	/* get command */
 get_command
-	:	GET { p_type = SADB_GET; }
-		sa_selector_spec extension_spec
+	:	GET sa_selector_spec extension_spec EOT
 		{
+			p_type = SADB_GET;
 			if (p_mode != IPSEC_MODE_ANY)
 				yyerror("WARNING: mode is obsoleted.");
 		}
-		EOT
 	;
 
 	/* flush */
 flush_command
-	:	FLUSH { p_type = SADB_FLUSH; }
-		protocol_spec EOT
+	:	FLUSH protocol_spec EOT
+		{
+			p_type = SADB_FLUSH;
+		}
 	;
 
 	/* dump */
 dump_command
-	:	DUMP { p_type = SADB_DUMP; }
-		protocol_spec EOT
+	:	DUMP protocol_spec EOT
+		{
+			p_type = SADB_DUMP;
+		}
 	;
 
 	/* sa_selector_spec */
 sa_selector_spec
-	:	ipaddress { p_src = pp_addr; }
-		ipaddress { p_dst = pp_addr; }
-		protocol_spec spi
+	:	ipaddress ipaddress protocol_spec spi
+		{
+			p_src = $1;
+			p_dst = $2;
+		}
 	;
 
 protocol_spec
-	:	/*NOTHING*/ { p_satype = SADB_SATYPE_UNSPEC; }
+	:	/*NOTHING*/
+		{
+			p_satype = SADB_SATYPE_UNSPEC;
+		}
 	|	PR_ESP
 		{
 			p_satype = SADB_SATYPE_ESP;
@@ -448,69 +457,36 @@ spdflush_command:
 
 	/* sp_selector_spec */
 sp_selector_spec
-	:	ipaddress { p_src = pp_addr; }
-		prefix { p_prefs = pp_prefix; }
-		port
+	:	ipaddress prefix port ipaddress prefix port upper_spec
 		{
+			p_src = $1;
+			p_prefs = $2;
 			switch (p_src->sa_family) {
 			case AF_INET:
-				((struct sockaddr_in *)p_src)->sin_port =
-				    pp_port;
+				((struct sockaddr_in *)p_src)->sin_port = $3;
 				break;
 #ifdef INET6
 			case AF_INET6:
-				((struct sockaddr_in6 *)p_src)->sin6_port =
-				    pp_port;
+				((struct sockaddr_in6 *)p_src)->sin6_port = $3;
 				break;
 #endif
 			default:
 				exit(1); /*XXX*/
 			}
-		}
-		ipaddress { p_dst = pp_addr; }
-		prefix { p_prefd = pp_prefix; }
-		port
-		{
+			p_dst = $4;
+			p_prefd = $5;
 			switch (p_dst->sa_family) {
 			case AF_INET:
-				((struct sockaddr_in *)p_dst)->sin_port =
-				    pp_port;
+				((struct sockaddr_in *)p_dst)->sin_port = $6;
 				break;
 #ifdef INET6
 			case AF_INET6:
-				((struct sockaddr_in6 *)p_dst)->sin6_port =
-				    pp_port;
+				((struct sockaddr_in6 *)p_dst)->sin6_port = $6;
 				break;
 #endif
 			default:
 				exit(1); /*XXX*/
 			}
-		}
-		upper_spec
-		{
-			/* XXX is it something userland should check? */
-#if 0
-			switch (p_upper) {
-			case IPPROTO_ICMP:
-			case IPPROTO_ICMPV6:
-				if (_INPORTBYSA(p_src) != IPSEC_PORT_ANY
-				 || _INPORTBYSA(p_dst) != IPSEC_PORT_ANY) {
-					yyerror("port number must be \"any\".");
-					return -1;
-				}
-				if ((pp_addr->sa_family == AF_INET6
-				  && p_upper == IPPROTO_ICMP)
-				 || (pp_addr->sa_family == AF_INET
-				  && p_upper == IPPROTO_ICMPV6)) {
-					yyerror("upper layer protocol "
-						"mismatched.\n");
-					return -1;
-				}
-				break;
-			default:
-				break;
-			}
-#endif
 		}
 	;
 
@@ -525,46 +501,46 @@ ipaddress
 				/* yyerror already called by parse_addr */
 				return -1;
 			}
-			pp_addr = (struct sockaddr *)malloc(res->ai_addrlen);
-			if (!pp_addr) {
+			$$ = malloc(res->ai_addrlen);
+			if (!$$) {
+				freeaddrinfo(res);
+				free($1.buf);
 				yyerror("not enough core");
-				goto end;
+				return -1;
 			}
-
-			memcpy(pp_addr, res->ai_addr, res->ai_addrlen);
-		    end:
+			memcpy($$, res->ai_addr, res->ai_addrlen);
 			freeaddrinfo(res);
 			free($1.buf);
 		}
 	;
 
 prefix
-	:	/*NOTHING*/ { pp_prefix = ~0; }
-	|	PREFIX { pp_prefix = $1; }
+	:	/*NOTHING*/ { $$ = ~0; }
+	|	PREFIX { $$ = $1; }
 	;
 
 port
-	:	/*NOTHING*/ { pp_port = htons(IPSEC_PORT_ANY); }
+	:	/*NOTHING*/ { $$ = htons(IPSEC_PORT_ANY); }
 	|	PORT
 		{
 			struct servent *ent;
 
 			if (strcmp("any", $1.buf) == 0)
-				pp_port = IPSEC_PORT_ANY;
+				$$ = IPSEC_PORT_ANY;
 			else {
 				ent = getservbyname($1.buf, NULL);
 				if (ent) {
 					/* we just choice the first entry. */
-					pp_port = ent->s_port;
+					$$ = ent->s_port;
 				} else {
 					char *p = NULL;
-					pp_port = (u_int)strtol($1.buf, &p, 10);
+					$$ = (u_int)strtol($1.buf, &p, 10);
 					if (p && *p != '\0') {
 						yyerror("invalid service name");
 						free($1.buf);
 						return -1;
 					}
-					pp_port = htons(pp_port);
+					$$ = htons($$);
 				}
 			}
 			free($1.buf);
@@ -920,8 +896,7 @@ parse_init()
 	p_no_spi = 0;
 
 	p_src = 0, p_dst = 0;
-	pp_prefix = p_prefs = p_prefd = ~0;
-	pp_port = htons(IPSEC_PORT_ANY);
+	p_prefs = p_prefd = ~0;
 	p_upper = 0;
 
 	p_satype = 0;
@@ -953,4 +928,3 @@ free_buffer()
 
 	return;
 }
-
