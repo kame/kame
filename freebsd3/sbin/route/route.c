@@ -117,8 +117,6 @@ extern	char *inet_ntoa(), *iso_ntoa(), *link_ntoa();
 
 void usage __P((const char *)) __dead2;
 
-char ntop_buf[INET6_ADDRSTRLEN];	/*for inet_ntop()*/
-
 void
 usage(cp)
 	const char *cp;
@@ -524,16 +522,6 @@ netname(sa)
 
 		return(line);
 	}
-
-	    {	struct in6_addr in6;
-		int gap;
-
-		in6 = ((struct sockaddr_in6 *)sa)->sin6_addr;
-		gap = sizeof(struct sockaddr_in6) - sa->sa_len;
-		if (gap > 0)
-			bzero((char *)(&in6 + 1) - gap, gap);
-		return (inet_ntop(AF_INET6, &in6, ntop_buf, sizeof(ntop_buf)));
-	    }
 #endif
 
 	case AF_APPLETALK:
@@ -623,15 +611,6 @@ newroute(argc, argv)
 			case K_INET6:
 				af = AF_INET6;
 				aflen = sizeof(struct sockaddr_in6);
-#if 0
-				if (prefixlen("64") != 64) {
-					fprintf(stderr, "internal error: "
-						"setting prefixlen=64\n");
-					exit(1);
-				}
-				forcenet = 0;
-				ishost = 1;
-#endif
 				break;
 #endif
 			case K_ATALK:
