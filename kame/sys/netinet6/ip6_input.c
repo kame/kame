@@ -994,22 +994,6 @@ ip6_savecontrol(in6p, mp, ip6, m)
 			mp = &(*mp)->m_next;
 	}
 #endif
-	if (in6p->in6p_flags & IN6P_RECVDSTADDR) {
-		*mp = sbcreatecontrol((caddr_t) &ip6->ip6_dst,
-			sizeof(struct in6_addr), IPV6_RECVDSTADDR,
-			IPPROTO_IPV6);
-		if (*mp)
-			mp = &(*mp)->m_next;
-	}
-
-#ifdef noyet
-	/* options were tossed above */
-	if (in6p->in6p_flags & IN6P_RECVOPTS)
-		/* broken */
-	/* ip6_srcroute doesn't do what we want here, need to fix */
-	if (in6p->in6p_flags & IPV6P_RECVRETOPTS)
-		/* broken */
-#endif
 
 	/* RFC 2292 sec. 5 */
 	if (in6p->in6p_flags & IN6P_PKTINFO) {

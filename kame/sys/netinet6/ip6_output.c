@@ -1344,9 +1344,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 				}
 				/* fall through */
 			case IPV6_UNICAST_HOPS:
-			case IPV6_RECVOPTS:
-			case IPV6_RECVRETOPTS:
-			case IPV6_RECVDSTADDR:
 			case IPV6_PKTINFO:
 			case IPV6_HOPLIMIT:
 			case IPV6_RTHDR:
@@ -1411,19 +1408,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 	else \
 		in6p->in6p_flags &= ~(bit);
 #endif
-
-					case IPV6_RECVOPTS:
-						OPTSET(IN6P_RECVOPTS);
-						break;
-
-					case IPV6_RECVRETOPTS:
-						OPTSET(IN6P_RECVRETOPTS);
-						break;
-
-					case IPV6_RECVDSTADDR:
-						OPTSET(IN6P_RECVDSTADDR);
-						break;
-
 					case IPV6_PKTINFO:
 					case IPV6_RECVPKTINFO:
 						OPTSET(IN6P_PKTINFO);
@@ -1737,18 +1721,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 #else
 #define OPTBIT(bit) (in6p->in6p_flags & (bit) ? 1 : 0)
 #endif
-
-				case IPV6_RECVOPTS:
-					optval = OPTBIT(IN6P_RECVOPTS);
-					break;
-
-				case IPV6_RECVRETOPTS:
-					optval = OPTBIT(IN6P_RECVRETOPTS);
-					break;
-
-				case IPV6_RECVDSTADDR:
-					optval = OPTBIT(IN6P_RECVDSTADDR);
-					break;
 
 				case IPV6_PKTINFO:
 				case IPV6_RECVPKTINFO:

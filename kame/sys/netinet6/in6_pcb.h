@@ -110,9 +110,6 @@ struct	in6pcb {
 #define in6p_ip6_nxt in6p_ip6.ip6_nxt  /* for KAME src sync over BSD*'s */
 
 /* flags in in6p_flags */
-#define IN6P_RECVOPTS		0x01	/* receive incoming IP6 options */
-#define IN6P_RECVRETOPTS	0x02	/* receive IP6 options for reply */
-#define IN6P_RECVDSTADDR	0x04	/* receive IP6 dst address */
 #define IN6P_HIGHPORT		0x10	/* user wants "high" port binding */
 #define IN6P_LOWPORT		0x20	/* user wants "low" port binding */
 #define IN6P_ANONPORT		0x40	/* port chosen for user */
