@@ -1,4 +1,4 @@
-/*	$KAME: if.h,v 1.6 2001/01/21 15:37:14 itojun Exp $	*/
+/*	$KAME: if.h,v 1.7 2001/12/20 02:09:37 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -38,6 +38,9 @@ extern char *ifblock;
 struct nd_opt_hdr;
 struct sockaddr_dl *if_nametosdl __P((char *));
 int if_getmtu __P((char *));
+#ifdef MIP6
+int if_getifaflag __P((char *, struct in6_addr *));
+#endif
 int if_getflags __P((int, int));
 int lladdropt_length __P((struct sockaddr_dl *));
 void lladdropt_fill __P((struct sockaddr_dl *, struct nd_opt_hdr *));

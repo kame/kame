@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.19 2001/11/09 04:21:57 itojun Exp $	*/
+/*	$KAME: if.c,v 1.20 2001/12/20 02:09:37 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -46,6 +46,12 @@
 #include <net/if_dl.h>
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
+#ifdef MIP6
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include <net/if_var.h>
+#endif
+#include <netinet6/in6_var.h>
+#endif /* MIP6 */
 #ifdef __bsdi__
 # include <netinet/if_ether.h>
 #endif
@@ -185,6 +191,34 @@ if_getmtu(char *name)
 
 	return(mtu);
 }
+
+#ifdef MIP6
+int
+if_getifaflag(char *name, struct in6_addr *addr)
+{
+	struct in6_ifreq ifr;
+	int s;
+
+	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
+		syslog(LOG_ERR, "<%s> socket: %s", __FUNCTION__,
+		       strerror(errno));
+		return (0);
+	}
+
+	(void) memset(&ifr, 0, sizeof(ifr));
+	(void) strncpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
+	ifr.ifr_addr.sin6_family = AF_INET6;
+	ifr.ifr_addr.sin6_addr = *addr;
+	if (ioctl(s, SIOCGIFAFLAG_IN6, (caddr_t)&ifr) < 0) {
+		syslog(LOG_ERR, "<%s> ioctl:SIOCGIFALAG_IN6: failed for %s",
+		       __FUNCTION__, ifr.ifr_name);
+		close(s);
+		return (0);
+	}
+	close(s);
+	return (ifr.ifr_ifru.ifru_flags6);
+}
+#endif /* MIP6 */
 
 /* give interface index and its old flags, then new flags returned */
 int

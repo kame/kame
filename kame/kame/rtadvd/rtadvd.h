@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.h,v 1.18 2001/10/09 11:56:48 jinmei Exp $	*/
+/*	$KAME: rtadvd.h,v 1.19 2001/12/20 02:09:37 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -52,7 +52,7 @@
 #define MAXROUTERLIFETIME 9000
 #define MIN_MAXINTERVAL (mobileip6 ? 1.5 : 4.0)
 #define MAX_MAXINTERVAL 1800
-#define MIN_MININTERVAL	(mobileip6 ? 0.5 : 3)
+#define MIN_MININTERVAL	(mobileip6 ? 0.05 : 3.0)
 #define MAXREACHABLETIME 3600000
 
 #ifndef MIP6

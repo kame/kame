@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.54 2001/10/09 17:07:31 jinmei Exp $	*/
+/*	$KAME: rtadvd.c,v 1.55 2001/12/20 02:09:37 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -94,7 +94,7 @@ struct nd_optlist {
 	struct nd_opt_hdr *opt;
 };
 union nd_opts {
-	struct nd_opt_hdr *nd_opt_array[7];
+	struct nd_opt_hdr *nd_opt_array[9];
 	struct {
 		struct nd_opt_hdr *zero;
 		struct nd_opt_hdr *src_lladdr;
@@ -103,6 +103,8 @@ union nd_opts {
 		struct nd_opt_rd_hdr *rh;
 		struct nd_opt_mtu *mtu;
 		struct nd_optlist *list;
+		struct nd_opt_advinterval *adv;
+		struct nd_opt_homeagent_info *hai;
 	} nd_opt_each;
 };
 #define nd_opts_src_lladdr	nd_opt_each.src_lladdr
@@ -111,16 +113,21 @@ union nd_opts {
 #define nd_opts_rh		nd_opt_each.rh
 #define nd_opts_mtu		nd_opt_each.mtu
 #define nd_opts_list		nd_opt_each.list
+#define nd_opts_adv		nd_opt_each.adv
+#define nd_opts_hai		nd_opt_each.hai
 
 #define NDOPT_FLAG_SRCLINKADDR 0x1
 #define NDOPT_FLAG_TGTLINKADDR 0x2
 #define NDOPT_FLAG_PREFIXINFO 0x4
 #define NDOPT_FLAG_RDHDR 0x8
 #define NDOPT_FLAG_MTU 0x10
+#define NDOPT_FLAG_ADV 0x20
+#define NDOPT_FLAG_HAI 0x40
 
 u_int32_t ndopt_flags[] = {
 	0, NDOPT_FLAG_SRCLINKADDR, NDOPT_FLAG_TGTLINKADDR,
-	NDOPT_FLAG_PREFIXINFO, NDOPT_FLAG_RDHDR, NDOPT_FLAG_MTU
+	NDOPT_FLAG_PREFIXINFO, NDOPT_FLAG_RDHDR, NDOPT_FLAG_MTU,
+	0, NDOPT_FLAG_ADV, NDOPT_FLAG_HAI
 };
 
 int main __P((int, char *[]));
@@ -1231,7 +1238,7 @@ nd6_options(struct nd_opt_hdr *hdr, int limit,
 			goto bad;
 		}
 
-		if (hdr->nd_opt_type > ND_OPT_MTU) {
+		if (hdr->nd_opt_type > ND_OPT_HOMEAGENT_INFO) {
 			syslog(LOG_INFO,
 			       "<%s> unknown ND option(type %d)",
 			       __FUNCTION__,
@@ -1252,6 +1259,8 @@ nd6_options(struct nd_opt_hdr *hdr, int limit,
 		 case ND_OPT_TARGET_LINKADDR:
 		 case ND_OPT_REDIRECTED_HEADER:
 		 case ND_OPT_MTU:
+		 case ND_OPT_ADVINTERVAL:
+		 case ND_OPT_HOMEAGENT_INFO:
 			 if (ndopts->nd_opt_array[hdr->nd_opt_type]) {
 				 syslog(LOG_INFO,
 					"<%s> duplicated ND option"

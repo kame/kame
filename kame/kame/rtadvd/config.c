@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.57 2001/11/16 09:33:20 keiichi Exp $	*/
+/*	$KAME: config.c,v 1.58 2001/12/20 02:09:36 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -178,7 +178,12 @@ getconfig(intface)
 	MAYHAVE(val, "chlim", DEF_ADVCURHOPLIMIT);
 	tmp->hoplimit = val & 0xff;
 
+#ifdef MIP6
+	/* XXX TODO: check of home-link interface */
+	MAYHAVE(val, "raflags", mobileip6 ? ND_RA_FLAG_HOME_AGENT : 0);
+#else
 	MAYHAVE(val, "raflags", 0);
+#endif
 	tmp->managedflg = val & ND_RA_FLAG_MANAGED;
 	tmp->otherflg = val & ND_RA_FLAG_OTHER;
 #ifdef MIP6
@@ -243,7 +248,7 @@ getconfig(intface)
 	tmp->retranstimer = (u_int32_t)val64;
 
 #ifndef MIP6
-	if (agetstr("hapref", &bp) || agetstr("hatime", &bp)) {
+	if (agetnum("hapref") != -1 || agetnum("hatime") != -1) {
 		syslog(LOG_ERR,
 		       "<%s> mobile-ip6 configuration not supported",
 		       __FUNCTION__);
@@ -251,7 +256,7 @@ getconfig(intface)
 	}
 #else
 	if (!mobileip6) {
-		if (agetstr("hapref", &bp) || agetstr("hatime", &bp)) {
+		if (agetnum("hapref") != -1 || agetnum("hatime") != -1) {
 			syslog(LOG_ERR,
 			       "<%s> mobile-ip6 configuration without "
 			       "proper command line option",
@@ -259,20 +264,21 @@ getconfig(intface)
 			exit(1);
 		}
 	} else {
-		if ((val = agetnum("hapref")) >= 0)
-			tmp->hapref = (int16_t)val;
-		if (tmp->hapref != 0) {
+		MAYHAVE(val, "hapref", 0);	/* XXX signed */
+		if (tmp->hapref != 0)
 			MUSTHAVE(val, "hatime");
-			if (val <= 0) {
+		else
+			MAYHAVE(val, "hatime", 0);
+		if (val <= 0) {
+			if (tmp->hapref != 0 || val < 0) {
 				syslog(LOG_ERR,
 				       "<%s> home agent lifetime (%ld) on %s "
 				       "invalid (must be greater than 0)",
 				       __FUNCTION__, val, intface);
 				exit(1);
 			}
-
-			tmp->hatime = (u_int16_t)val;
 		}
+		tmp->hatime = (u_int16_t)val;
 	}
 #endif
 	/* prefix information */
@@ -360,22 +366,13 @@ getconfig(intface)
 
 			makeentry(entbuf, sizeof(entbuf), i, "pinfoflags",
 			    added);
-#ifdef MIP6
-			if (mobileip6)
-			{
-				MAYHAVE(val, entbuf,
-				    (ND_OPT_PI_FLAG_ONLINK|ND_OPT_PI_FLAG_AUTO|
-					 ND_OPT_PI_FLAG_ROUTER));
-			} else
-#endif
-			{
-				MAYHAVE(val, entbuf,
-				    (ND_OPT_PI_FLAG_ONLINK|ND_OPT_PI_FLAG_AUTO));
-			}
+			MAYHAVE(val, entbuf,
+				(ND_OPT_PI_FLAG_ONLINK|ND_OPT_PI_FLAG_AUTO));
 			pfx->onlinkflg = val & ND_OPT_PI_FLAG_ONLINK;
 			pfx->autoconfflg = val & ND_OPT_PI_FLAG_AUTO;
 #ifdef MIP6
-			pfx->routeraddr = val & ND_OPT_PI_FLAG_ROUTER;
+			if (mobileip6)
+				pfx->routeraddr = val & ND_OPT_PI_FLAG_ROUTER;
 #endif
 
 			makeentry(entbuf, sizeof(entbuf), i, "vltime", added);
@@ -626,6 +623,10 @@ get_prefix(struct rainfo *rai)
 	}
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
 		int plen;
+#ifdef MIP6
+		int ifa_flag;
+		int routeraddr = 0;
+#endif
 
 		if (strcmp(ifa->ifa_name, rai->ifname) != 0)
 			continue;
@@ -634,17 +635,27 @@ get_prefix(struct rainfo *rai)
 		a = &((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr;
 		if (IN6_IS_ADDR_LINKLOCAL(a))
 			continue;
-
+#ifdef MIP6
+		ifa_flag = if_getifaflag(rai->ifname, a);
+		if (ifa_flag & IN6_IFF_ANYCAST)
+			continue;			/* XXX */
+		if (mobileip6 && !IN6_IS_ADDR_SITELOCAL(a)) {
+			/* XXX maybe global? */
+			routeraddr = 1;
+		}
+#endif
 		/* get prefix length */
 		m = (u_char *)&((struct sockaddr_in6 *)ifa->ifa_netmask)->sin6_addr;
 		lim = (u_char *)(ifa->ifa_netmask) + ifa->ifa_netmask->sa_len;
 		plen = prefixlen(m, lim);
-		if (plen < 0 || plen > 128) {
+		if (plen <= 0 || plen > 128) {
 			syslog(LOG_ERR, "<%s> failed to get prefixlen "
 			       "or prefix is invalid",
 			       __FUNCTION__);
 			exit(1);
 		}
+		if (plen == 128)	/* XXX */
+			continue;
 		if (find_prefix(rai, a, plen)) {
 			/* ignore a duplicated prefix. */
 			continue;
@@ -662,13 +673,17 @@ get_prefix(struct rainfo *rai)
 		/* set prefix, sweep bits outside of prefixlen */
 		pp->prefixlen = plen;
 		memcpy(&pp->prefix, a, sizeof(*a));
-		p = (u_char *)&pp->prefix;
-		ep = (u_char *)(&pp->prefix + 1);
-		while (m < lim)
-			*p++ &= *m++;
-		while (p < ep)
-			*p++ = 0x00;
-
+#ifdef MIP6
+		if (!routeraddr)
+#endif
+		{
+			p = (u_char *)&pp->prefix;
+			ep = (u_char *)(&pp->prefix + 1);
+			while (m < lim)
+				*p++ &= *m++;
+			while (p < ep)
+				*p++ = 0x00;
+		}
 	        if (!inet_ntop(AF_INET6, &pp->prefix, ntopbuf,
 	            sizeof(ntopbuf))) {
 			syslog(LOG_ERR, "<%s> inet_ntop failed", __FUNCTION__);
@@ -683,6 +698,9 @@ get_prefix(struct rainfo *rai)
 		pp->preflifetime = DEF_ADVPREFERREDLIFETIME;
 		pp->onlinkflg = 1;
 		pp->autoconfflg = 1;
+#ifdef MIP6
+		pp->routeraddr = routeraddr;
+#endif
 		pp->origin = PREFIX_FROM_KERNEL;
 
 		/* link into chain */
