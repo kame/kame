@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.44 2001/06/25 07:17:24 jinmei Exp $	*/
+/*	$KAME: bindtest.c,v 1.45 2001/06/26 05:00:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -109,7 +109,7 @@ static int test __P((struct testitem *, struct testitem *));
 static void sendtest __P((int, int, struct addrinfo *));
 static void conntest __P((int, int, struct addrinfo *));
 
-static char *versionstr = "$KAME: bindtest.c,v 1.44 2001/06/25 07:17:24 jinmei Exp $"; 
+static char *versionstr = "$KAME: bindtest.c,v 1.45 2001/06/26 05:00:26 jinmei Exp $"; 
 static char *port = NULL;
 static char *otheraddr = NULL;
 static struct addrinfo *oai;
@@ -191,9 +191,8 @@ main(argc, argv)
 		fprintf(stderr, "-1, -2, and -o are exclusive.\n");
 		exit(1);
 	}
-	if ((connect1st || connect2nd || otheraddr) &&
-	    socktype != SOCK_STREAM) {
-		fprintf(stderr, "-1, -2, or -o must be specified with -t.\n");
+	if ((connect1st || connect2nd) && socktype != SOCK_STREAM) {
+		fprintf(stderr, "-1 or -2 must be specified with -t.\n");
 		exit(1);
 	}
 
