@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.30 2000/08/29 08:41:27 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.31 2000/08/29 10:40:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -78,8 +78,10 @@
 
 #define USE_BLOCKCRYPT
 
+#ifndef USE_BLOCKCRYPT
 static int esp_crypto_sanity __P((const struct esp_algorithm *,
 	struct secasvar *, int));
+#endif
 static int esp_null_mature __P((struct secasvar *));
 static int esp_null_decrypt __P((struct mbuf *, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
@@ -273,6 +275,7 @@ esp_schedule(algo, sav)
 	return error;
 }
 
+#ifndef USE_BLOCKCRYPT
 /*
  * default sanity check for algo->{de,en}crypt
  */
@@ -302,6 +305,7 @@ esp_crypto_sanity(algo, sav, ivlen)
  * mbuf assumption: foo_encrypt() assumes that IV part is placed in a single
  * mbuf, not across multiple mbufs.
  */
+#endif
 
 static int
 esp_null_mature(sav)
