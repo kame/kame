@@ -187,6 +187,8 @@ struct __res_state_ext {
 #define	RES_NOALIASES	0x00001000	/* shuts off HOSTALIASES feature */
 #define	RES_USE_INET6	0x00002000	/* use/map IPv6 in gethostbyname() */
 #define	RES_NOTLDQUERY	0x00004000	/* Don't query TLD names */
+/* KAME extensions: use higher bit to avoid conflict with ISC use */
+#define	RES_USE_EDNS0	0x40000000	/* use EDNS0 */
 
 #define RES_DEFAULT	(RES_RECURSE | RES_DEFNAMES | RES_DNSRCH)
 
