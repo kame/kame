@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.70 2001/09/20 07:56:49 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.71 2001/09/20 08:38:15 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -203,8 +203,9 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 		struct mip6_bu *mbu;
 		
 		/* find the address that is currently at home. */
-		/* XXX no TAILQ_FOREACH on bsdi4 */
-		TAILQ_FOREACH(sc, &hif_softc_list, hif_entry) {
+		for (sc = TAILQ_FIRST(&hif_softc_list);
+		     sc;
+		     sc = TAILQ_NEXT(sc, hif_entry)) {
 			if (sc->hif_location != HIF_LOCATION_HOME)
 				continue;
 
@@ -229,7 +230,9 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 		 * find a home address that has been registered to its
 		 * home agent.
 		 */
-		TAILQ_FOREACH(sc, &hif_softc_list, hif_entry) {
+		for (sc = TAILQ_FIRST(&hif_softc_list);
+		     sc;
+		     sc = TAILQ_NEXT(sc, hif_entry)) {
 			LIST_FOREACH(mbu, &sc->hif_bu_list, mbu_entry) {
 				if (mbu->mbu_reg_state
 				    == MIP6_BU_REG_STATE_REG) {
