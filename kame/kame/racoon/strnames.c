@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: strnames.c,v 1.5 2000/01/14 07:25:21 itojun Exp $ */
+/* YIPS @(#)$Id: strnames.c,v 1.6 2000/01/18 23:06:59 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -383,17 +383,17 @@ s_algtype(class, n)
 
 static char *name_ipsecdoi_ident[] = {
 	"",
-	"IPv4 address",
+	"IPv4_address",
 	"FQDN",
-	"User FQDN",
-	"IPv4 subnet",
-	"IPv6 address",
-	"IPv6 subnet",
-	"IPv4 address range",
-	"IPv6 address range",
-	"DER ASN1 DN",
-	"DER ASN1 GN",
-	"KEY ID",
+	"User_FQDN",
+	"IPv4_subnet",
+	"IPv6_address",
+	"IPv6_subnet",
+	"IPv4_address_range",
+	"IPv6_address_range",
+	"DER_ASN1_DN",
+	"DER_ASN1_GN",
+	"KEY_ID",
 };
 
 char *
