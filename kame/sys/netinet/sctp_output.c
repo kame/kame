@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.44 2004/08/17 06:28:02 t-momose Exp $	*/
+/*	$KAME: sctp_output.c,v 1.45 2005/01/25 07:35:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003, 2004 Cisco Systems Inc,
@@ -2240,6 +2240,9 @@ sctp_lowlevel_chunk_output(struct sctp_inpcb *inp,
 #endif
 				 o_flgs,
 				 ((struct in6pcb *)inp)->in6p_moptions,
+#ifdef __NetBSD__
+				 (struct socket *)inp->sctp_socket,			 	
+#endif
 				 &ifp
 #if (defined(__FreeBSD__) && __FreeBSD_version >= 480000)
 		    , NULL
@@ -7537,7 +7540,11 @@ sctp_send_shutdown_complete2(struct mbuf *m, int iphlen, struct sctphdr *sh)
 			    &comp_cp->sh);
 		}
 #endif
-		ip6_output(mout, NULL, &ro, 0, NULL, NULL
+		ip6_output(mout, NULL, &ro, 0, NULL, 
+#ifdef __NetBSD__
+			NULL,
+#endif
+			NULL
 #if (defined(__FreeBSD__) && __FreeBSD_version >= 480000)
 		    , NULL
 #endif
@@ -8475,7 +8482,11 @@ sctp_send_abort(struct mbuf *m, int iphlen, struct sctphdr *sh, uint32_t vtag,
 			sctp_print_address_pkt((struct ip *)ip6_out, &abm->sh);
                 }
 #endif
-		ip6_output(mout, NULL, &ro, 0, NULL, NULL
+		ip6_output(mout, NULL, &ro, 0, NULL, 
+#ifdef __NetBSD__
+			NULL,
+#endif
+			NULL
 #if (defined(__FreeBSD__) && __FreeBSD_version >= 480000)
 		    , NULL
 #endif
@@ -8610,7 +8621,11 @@ sctp_send_operr_to(struct mbuf *m, int iphlen,
 			sctp_print_address((struct sockaddr *)&fsa6);
 		}
 #endif /* SCTP_DEBUG */
-		ip6_output(scm, NULL, &ro, 0, NULL, NULL
+		ip6_output(scm, NULL, &ro, 0, NULL, 
+#ifdef __NetBSD__
+		NULL,
+#endif
+		NULL
 #if (defined(__FreeBSD__) && __FreeBSD_version >= 480000)
 	    , NULL
 #endif

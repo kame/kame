@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.42 2004/08/17 06:28:02 t-momose Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.43 2005/01/25 07:35:43 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -3597,7 +3597,7 @@ sctp_accept(struct socket *so, struct mbuf *nam)
 		inp->sctp_flags &= ~SCTP_PCB_FLAGS_DONT_WAKE;
 		if (inp->sctp_flags & SCTP_PCB_FLAGS_WAKEOUTPUT) {
 			inp->sctp_flags &= ~SCTP_PCB_FLAGS_WAKEOUTPUT;
-			if (sowriteable(inp->sctp_socket)) {
+			if (sowritable(inp->sctp_socket)) {
 				sowwakeup(inp->sctp_socket);
 			}
 		}
@@ -3992,7 +3992,8 @@ sctp_usrreq(so, req, m, nam, control)
 }
 #endif
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+//#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if __OpenBSD__
 /*
  * Sysctl for sctp variables.
  */
@@ -4009,6 +4010,7 @@ sctp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	/* All sysctl names at this level are terminal. */
 	if (namelen != 1)
 		return (ENOTDIR);
+sysctl_int();
 
 	switch (name[0]) {
 	case SCTPCTL_MAXDGRAM:
@@ -4048,5 +4050,119 @@ sctp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		return (ENOPROTOOPT);
 	}
 	/* NOTREACHED */
+}
+#endif
+#if __NetBSD__
+/*
+ * Sysctl for sctp variables.
+ */
+SYSCTL_SETUP(sysctl_net_inet_sctp_setup, "sysctl net.inet.sctp subtree setup")
+{
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+	               CTLTYPE_NODE, "net", NULL,
+                       NULL, 0, NULL, 0,
+                       CTL_NET, CTL_EOL);
+        sysctl_createv(clog, 0, NULL, NULL,
+                       CTLFLAG_PERMANENT,
+                       CTLTYPE_NODE, "inet", NULL,
+                       NULL, 0, NULL, 0,
+                       CTL_NET, PF_INET, CTL_EOL);
+        sysctl_createv(clog, 0, NULL, NULL,
+                       CTLFLAG_PERMANENT,
+                       CTLTYPE_NODE, "sctp",
+                       SYSCTL_DESCR("sctp related settings"),
+                       NULL, 0, NULL, 0,
+                       CTL_NET, PF_INET, IPPROTO_SCTP, CTL_EOL);
+
+       sysctl_createv(clog, 0, NULL, NULL,
+                       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+                       CTLTYPE_INT, "maxdgram",
+                       SYSCTL_DESCR("Maximum outgoing SCTP buffer size"),
+                       NULL, 0, &sctp_sendspace, 0,
+                       CTL_NET, PF_INET, IPPROTO_SCTP, SCTPCTL_MAXDGRAM,
+                       CTL_EOL);
+
+       sysctl_createv(clog, 0, NULL, NULL,
+                       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+                       CTLTYPE_INT, "recvspace",
+                       SYSCTL_DESCR("Maximum incoming SCTP buffer size"),
+                       NULL, 0, &sctp_recvspace, 0,
+                       CTL_NET, PF_INET, IPPROTO_SCTP, SCTPCTL_RECVSPACE,
+                       CTL_EOL);
+
+       sysctl_createv(clog, 0, NULL, NULL,
+                       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+                       CTLTYPE_INT, "autoasconf",
+                       SYSCTL_DESCR("Enable SCTP Auto-ASCONF"),
+                       NULL, 0, &sctp_auto_asconf, 0,
+                       CTL_NET, PF_INET, IPPROTO_SCTP, SCTPCTL_AUTOASCONF,
+                       CTL_EOL);
+
+       sysctl_createv(clog, 0, NULL, NULL,
+                       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+                       CTLTYPE_INT, "ecn_enable",
+                       SYSCTL_DESCR("Enable SCTP ECN"),
+                       NULL, 0, &sctp_ecn, 0,
+                       CTL_NET, PF_INET, IPPROTO_SCTP, SCTPCTL_ECN_ENABLE,
+                       CTL_EOL);
+
+       sysctl_createv(clog, 0, NULL, NULL,
+                       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+                       CTLTYPE_INT, "ecn_nonce",
+                       SYSCTL_DESCR("Enable SCTP ECN Nonce"),
+                       NULL, 0, &sctp_ecn_nonce, 0,
+                       CTL_NET, PF_INET, IPPROTO_SCTP, SCTPCTL_ECN_NONCE,
+                       CTL_EOL);
+
+       sysctl_createv(clog, 0, NULL, NULL,
+                       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+                       CTLTYPE_INT, "strict_sack",
+                       SYSCTL_DESCR("Enable SCTP Strict SACK checking"),
+                       NULL, 0, &sctp_strict_sacks, 0,
+                       CTL_NET, PF_INET, IPPROTO_SCTP, SCTPCTL_STRICT_SACK,
+                       CTL_EOL);
+
+       sysctl_createv(clog, 0, NULL, NULL,
+                       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+                       CTLTYPE_INT, "loopback_nocsum",
+                       SYSCTL_DESCR("Enable NO Csum on packets sent on loopback"),
+                       NULL, 0, &sctp_no_csum_on_loopback, 0,
+                       CTL_NET, PF_INET, IPPROTO_SCTP, SCTPCTL_NOCSUM_LO,
+                       CTL_EOL);
+
+       sysctl_createv(clog, 0, NULL, NULL,
+                       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+                       CTLTYPE_INT, "strict_init",
+                       SYSCTL_DESCR("Enable strict INIT/INIT-ACK singleton enforcement"),
+                       NULL, 0, &sctp_strict_init, 0,
+                       CTL_NET, PF_INET, IPPROTO_SCTP, SCTPCTL_STRICT_INIT,
+                       CTL_EOL);
+
+       sysctl_createv(clog, 0, NULL, NULL,
+                       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+                       CTLTYPE_INT, "peer_chkoh",
+                       SYSCTL_DESCR("Amount to debit peers rwnd per chunk sent"),
+                       NULL, 0, &sctp_peer_chunk_oh, 0,
+                       CTL_NET, PF_INET, IPPROTO_SCTP, SCTPCTL_PEER_CHK_OH,
+                       CTL_EOL);
+
+       sysctl_createv(clog, 0, NULL, NULL,
+                       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+                       CTLTYPE_INT, "maxburst",
+                       SYSCTL_DESCR("Default max burst for sctp endpoints"),
+                       NULL, 0, &sctp_max_burst_default, 0,
+                       CTL_NET, PF_INET, IPPROTO_SCTP, SCTPCTL_MAXBURST,
+                       CTL_EOL);
+
+       sysctl_createv(clog, 0, NULL, NULL,
+                       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+                       CTLTYPE_INT, "maxchunks",
+                       SYSCTL_DESCR("Default max chunks on queue per asoc"),
+                       NULL, 0, &sctp_max_chunks_on_queue, 0,
+                       CTL_NET, PF_INET, IPPROTO_SCTP, SCTPCTL_MAXCHUNKONQ,
+                       CTL_EOL);
+
 }
 #endif

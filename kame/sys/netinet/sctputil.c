@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.32 2004/08/17 06:28:02 t-momose Exp $	*/
+/*	$KAME: sctputil.c,v 1.33 2005/01/25 07:35:43 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -130,6 +130,7 @@
 #define NUMBER_OF_MTU_SIZES 18
 
 #ifdef SCTP_DEBUG
+#include <netinet/sctp_callout.h>	/* for callout_active() */
 extern u_int32_t sctp_debug_on;
 #endif
 
@@ -790,8 +791,8 @@ sctp_init_asoc(struct sctp_inpcb *m, struct sctp_association *asoc,
 	}
 	/* Now the mapping array */
 	asoc->mapping_array_size = SCTP_INITIAL_MAPPING_ARRAY;
-	MALLOC(asoc->mapping_array, u_int8_t *, asoc->mapping_array_size,
-	       M_PCB, M_NOWAIT);
+	MALLOC(asoc->mapping_array, u_int8_t *, 
+		asoc->streamoutcnt * asoc->mapping_array_size, M_PCB, M_NOWAIT);
 	if (asoc->mapping_array == NULL) {
 		FREE(asoc->strmout, M_PCB);
 		return (ENOMEM);
@@ -818,7 +819,7 @@ sctp_expand_mapping_array(struct sctp_association *asoc)
 	uint16_t new_size;
 	
 	new_size = asoc->mapping_array_size + SCTP_MAPPING_ARRAY_INCR;
-	MALLOC(new_array, u_int8_t *, new_size, M_PCB, M_NOWAIT);
+	MALLOC(new_array, u_int8_t *, asoc->streamoutcnt * new_size, M_PCB, M_NOWAIT);
 	if (new_array == NULL) {
 		/* can't get more, forget it */
 		printf("No memory for expansion of SCTP mapping array %d\n",
