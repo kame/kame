@@ -1,4 +1,4 @@
-/*	$OpenBSD: syscall.h,v 1.69 2003/09/07 21:01:07 miod Exp $	*/
+/*	$OpenBSD$	*/
 
 /*
  * System call numbers.
