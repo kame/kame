@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.81 2001/08/03 13:12:16 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.82 2001/08/03 13:29:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -163,6 +163,9 @@ ip6_forward(m, srcrt)
 	int error, type = 0, code = 0;
 	struct mbuf *mcopy = NULL;
 	struct ifnet *origifp;	/* maybe unnecessary */
+#ifdef IPSEC
+	struct secpolicy *sp = NULL;
+#endif
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
@@ -227,101 +230,76 @@ ip6_forward(m, srcrt)
 	mcopy = m_copy(m, 0, imin(m->m_pkthdr.len, ICMPV6_PLD_MAXLEN));
 
 #ifdef IPSEC
-	if (!ipsec_haspolicy(m)) {
-		struct secpolicy *sp = NULL;
-
-		/* get a security policy for this packet */
-		sp = ipsec6_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND, IP_FORWARDING,
-		    &error);
-		if (sp == NULL) {
-			ipsec6stat.out_inval++;
-			ip6stat.ip6s_cantforward++;
-			if (mcopy) {
-	#if 0
-				/* XXX: what icmp ? */
-	#else
-				m_freem(mcopy);
-	#endif
-			}
-			m_freem(m);
-			return;
+	/* get a security policy for this packet */
+	sp = ipsec6_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND, IP_FORWARDING,
+	    &error);
+	if (sp == NULL) {
+		ipsec6stat.out_inval++;
+		ip6stat.ip6s_cantforward++;
+		if (mcopy) {
+#if 0
+			/* XXX: what icmp ? */
+#else
+			m_freem(mcopy);
+#endif
 		}
-
-		error = 0;
-
-		/* check policy */
-		switch (sp->policy) {
-		case IPSEC_POLICY_DISCARD:
-			/*
-			 * This packet is just discarded.
-			 */
-			ipsec6stat.out_polvio++;
-			ip6stat.ip6s_cantforward++;
-			key_freesp(sp);
-			if (mcopy) {
-	#if 0
-				/* XXX: what icmp ? */
-	#else
-				m_freem(mcopy);
-	#endif
-			}
-			m_freem(m);
-			return;
-
-		case IPSEC_POLICY_BYPASS:
-		case IPSEC_POLICY_NONE:
-			/* no need to do IPsec. */
-			key_freesp(sp);
-			goto skip_ipsec;
-
-		case IPSEC_POLICY_IPSEC:
-			if (sp->req == NULL) {
-				/* XXX should be panic ? */
-				printf("ip6_forward: No IPsec request specified.\n");
-				ip6stat.ip6s_cantforward++;
-				key_freesp(sp);
-				if (mcopy) {
-	#if 0
-					/* XXX: what icmp ? */
-	#else
-					m_freem(mcopy);
-	#endif
-				}
-				m_freem(m);
-				return;
-			}
-			/* do IPsec */
-			break;
-
-		case IPSEC_POLICY_ENTRUST:
-		default:
-			/* should be panic ?? */
-			printf("ip6_forward: Invalid policy found. %d\n", sp->policy);
-			key_freesp(sp);
-			goto skip_ipsec;
-		}
-
-		if (ipsec_setpolicy(m, sp)) {
-			key_freesp(sp);
-			ipsec6stat.out_inval++;
-			ip6stat.ip6s_cantforward++;
-			m_freem(m);
-			return;
-		}
-	} else {
-		struct secpolicy *sp;
-
-		sp = ipsec_getpolicy(m);
-		if (sp) {
-			if (sp->policy != IPSEC_POLICY_IPSEC) {
-				key_freesp(sp);
-				goto skip_ipsec;
-			}
-			key_freesp(sp);
-		} else
-			goto skip_ipsec;
+		m_freem(m);
+		return;
 	}
 
+	error = 0;
+
+	/* check policy */
+	switch (sp->policy) {
+	case IPSEC_POLICY_DISCARD:
+		/*
+		 * This packet is just discarded.
+		 */
+		ipsec6stat.out_polvio++;
+		ip6stat.ip6s_cantforward++;
+		key_freesp(sp);
+		if (mcopy) {
+#if 0
+			/* XXX: what icmp ? */
+#else
+			m_freem(mcopy);
+#endif
+		}
+		m_freem(m);
+		return;
+
+	case IPSEC_POLICY_BYPASS:
+	case IPSEC_POLICY_NONE:
+		/* no need to do IPsec. */
+		key_freesp(sp);
+		goto skip_ipsec;
+
+	case IPSEC_POLICY_IPSEC:
+		if (sp->req == NULL) {
+			/* XXX should be panic ? */
+			printf("ip6_forward: No IPsec request specified.\n");
+			ip6stat.ip6s_cantforward++;
+			key_freesp(sp);
+			if (mcopy) {
+#if 0
+				/* XXX: what icmp ? */
+#else
+				m_freem(mcopy);
+#endif
+			}
+			m_freem(m);
+			return;
+		}
+		/* do IPsec */
+		break;
+
+	case IPSEC_POLICY_ENTRUST:
+	default:
+		/* should be panic ?? */
+		printf("ip6_forward: Invalid policy found. %d\n", sp->policy);
+		key_freesp(sp);
+		goto skip_ipsec;
+	}
 
     {
 	struct ipsec_output_state state;
@@ -339,9 +317,10 @@ ip6_forward(m, srcrt)
 	state.ro = NULL;	/* update at ipsec6_output_tunnel() */
 	state.dst = NULL;	/* update at ipsec6_output_tunnel() */
 
-	error = ipsec6_output_tunnel(&state, 0);
+	error = ipsec6_output_tunnel(&state, sp, 0);
 
 	m = state.m;
+	key_freesp(sp);
 
 	if (error) {
 		/* mbuf is already reclaimed in ipsec6_output_tunnel. */
