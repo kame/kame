@@ -56,19 +56,19 @@ and sending them to the multicast
 you specified.
 Also you must specify UDP
 .Ar port
-number or service name
-.Pq Xr services 5 .
+number or service name as seen on
+.Xr services 5 .
 .Pp
 The options are as follows:
 .Bl -tag -width Fl
 .It Fl l Ar hop_limit
 Specify the number of hop limit.
-By default, it depends on the system wide value,
-net.inet6.ip6.defmcasthlim.
+By default, it depends on the system default value.
 .It Fl i Ar interface
 Specify the interface name to use sending packets.
 By default, kernel will decide.
 .It Fl s Ar scope
+.Pq IPv6 only
 Specify the hint in order to decision of source IP address to send packets.
 By default, global scope is applied.
 If you don't specify
@@ -77,7 +77,7 @@ If you don't specify
 ignores this option.
 .Ar scope
 takes one of the following numeric:
-
+.Pp
 .Bl -tag -width "14 " -compact
 .It 1	node local
 .It 2	link local
@@ -100,6 +100,3 @@ will exit with positive value on errors.
 The
 .Nm
 command first appeared in WIDE/KAME IPv6 protocol stack kit.
-.\"
-.Sh BUGS
-IPv4 is not supported.
