@@ -821,10 +821,11 @@ tcp6_ctlinput(cmd, sa, d)
 		}
 
 		(void) in6_pcbnotify(&tcbtable, (struct sockaddr *)&sa6,
-		    th.th_dport, &s, th.th_sport, cmd, notify);
+				     th.th_dport, &s, th.th_sport, cmd,
+				     NULL, notify);
 	} else {
 		(void) in6_pcbnotify(&tcbtable, (struct sockaddr *)&sa6, 0,
-		    &zeroin6_addr, 0, cmd, notify);
+				     &zeroin6_addr, 0, cmd, NULL, notify);
 	}
 }
 #endif
@@ -896,7 +897,7 @@ tcp6_mtudisc_callback(faddr)
 	sin6.sin6_len = sizeof(struct sockaddr_in6);
 	sin6.sin6_addr = *faddr;
 	(void) in6_pcbnotify(&tcbtable, (struct sockaddr *)&sin6, 0,
-	    &zeroin6_addr, 0, EMSGSIZE, tcp6_mtudisc);
+			     &zeroin6_addr, 0, EMSGSIZE, NULL, tcp6_mtudisc);
 }
 
 void

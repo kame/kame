@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.65 2000/11/07 15:10:58 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.66 2000/11/18 11:08:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -503,6 +503,7 @@ udp6_ctlinput(cmd, sa, d)
 	register struct ip6_hdr *ip6;
 	struct mbuf *m;
 	int off;
+	void *cmdarg;
 	struct in6_addr s;
 	struct in6_addr finaldst;
 	void (*notify) __P((struct in6pcb *, int)) = udp6_notify;
@@ -534,25 +535,39 @@ udp6_ctlinput(cmd, sa, d)
 		m = ip6cp->ip6c_m;
 		ip6 = ip6cp->ip6c_ip6;
 		off = ip6cp->ip6c_off;
+		cmdarg = ip6cp->ip6c_cmdarg;
 
-		/* translate addresses into internal form */
-		bcopy(ip6cp->ip6c_finaldst, &finaldst, sizeof(finaldst));
-		if (IN6_IS_ADDR_LINKLOCAL(&finaldst)) {
-			finaldst.s6_addr16[1] =
-			    htons(m->m_pkthdr.rcvif->if_index);
+		bzero(&sa6, sizeof(sa6));
+		sa6.sin6_family = AF_INET6;
+		sa6.sin6_len = sizeof(sa6);
+		sa6.sin6_addr = *ip6cp->ip6c_finaldst;
+		sa6.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
+						     ip6cp->ip6c_finaldst);
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(ip6cp->ip6c_finaldst, &sa6, NULL, NULL)) {
+			/* should be impossbile */
+			printf("udp6_ctlinput: in6_embedscope failed\n");
+			return;
 		}
+#endif
 		bcopy(&ip6->ip6_src, &s, sizeof(s));
 		if (IN6_IS_ADDR_LINKLOCAL(&s))
 			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 	} else {
 		m = NULL;
 		ip6 = NULL;
-	}
+		cmdarg = NULL;
 
-	/* translate addresses into internal form */
-	sa6 = *(struct sockaddr_in6 *)sa;
-	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr) && m && m->m_pkthdr.rcvif)
-		sa6.sin6_addr.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
+		/* XXX: translate addresses into internal form */
+		sa6 = *(struct sockaddr_in6 *)sa;
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(&sa6.sin6_addr, &sa6, NULL, NULL)) {
+			/* should be impossbile */
+			printf("udp6_ctlinput: in6_embedscope failed\n");
+			return;
+		}
+#endif
+	}
 
 	if (ip6) {
 		/*
@@ -574,7 +589,7 @@ udp6_ctlinput(cmd, sa, d)
 			 * corresponding to the address in the ICMPv6 message
 			 * payload.
 			 */
-			if (in6_pcblookup_connect(&udb6, &finaldst,
+			if (in6_pcblookup_connect(&udb6, &sa6.sin6_addr,
 			    uh.uh_dport, &s, uh.uh_sport, 0))
 				;
 #if 0
@@ -585,7 +600,7 @@ udp6_ctlinput(cmd, sa, d)
 			 * We should at least check if the local address (= s)
 			 * is really ours.
 			 */
-			else if (in6_pcblookup_bind(&udb6, &finaldst,
+			else if (in6_pcblookup_bind(&udb6, &sa6.sin6_addr,
 			    uh.uh_dport, 0))
 				;
 #endif
@@ -605,11 +620,11 @@ udp6_ctlinput(cmd, sa, d)
 #endif
 
 		(void) in6_pcbnotify(&udb6, (struct sockaddr *)&sa6,
-					uh.uh_dport, &s,
-					uh.uh_sport, cmd, notify);
+				     uh.uh_dport, &s,
+				     uh.uh_sport, cmd, cmdarg, notify);
 	} else {
 		(void) in6_pcbnotify(&udb6, (struct sockaddr *)&sa6, 0,
-					&zeroin6_addr, 0, cmd, notify);
+				     &zeroin6_addr, 0, cmd, cmdarg, notify);
 	}
 }
 

@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.27 2000/11/05 18:30:19 jinmei Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.28 2000/11/18 11:08:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -618,7 +618,7 @@ tcp6_ctlinput(cmd, sa, d)
 
 		nmatch = in6_pcbnotify(&tcb6, (struct sockaddr *)&sa6,
 				       th.th_dport, &ip6_tmp.ip6_src,
-				       th.th_sport, cmd, notify);
+				       th.th_sport, cmd, NULL, notify);
 		if (nmatch == 0 && syn_cache_count6 &&
 		    (inet6ctlerrmap[cmd] == EHOSTUNREACH ||
 		     inet6ctlerrmap[cmd] == ENETUNREACH ||
@@ -626,7 +626,7 @@ tcp6_ctlinput(cmd, sa, d)
 			syn_cache_unreach6(&ip6_tmp, thp);
 	} else {
 		(void) in6_pcbnotify(&tcb6, (struct sockaddr *)&sa6, 0,
-				     &zeroin6_addr, 0, cmd, notify);
+				     &zeroin6_addr, 0, cmd, NULL, notify);
 	}
 }
 

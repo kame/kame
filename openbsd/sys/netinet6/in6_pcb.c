@@ -532,13 +532,14 @@ in6_pcbconnect(inp, nam)
  * Must be called at splnet.
  */
 int
-in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
+in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, cmdarg, notify)
 	struct inpcbtable *head;
 	struct sockaddr *dst;
 	uint fport_arg;
 	struct in6_addr *la;
 	uint lport_arg;
 	int cmd;
+	void *cmdarg;
 	void (*notify) __P((struct inpcb *, int));
 {
 	register struct inpcb *inp, *ninp;
@@ -597,6 +598,23 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
 
 			if (notify == in_rtchange)
 				continue; /* there's nothing to do any more */
+		}
+
+		/*
+		 * If the error designates a new path MTU for a destination
+		 * and the application (associated with this socket) wanted to
+		 * know the value, notify. Note that we notify for all
+		 * disconnected sockets if the corresponding application
+		 * wanted. This is because some UDP applications keep sending
+		 * sockets disconnected.
+		 * XXX: not sure if PRC_MSGSIZE can be given by other reasons
+		 *      than ICMP6 too big messages.
+		 * XXX: should we avoid to notify the value to TCP sockets?
+		 */
+		if (cmd == PRC_MSGSIZE && (inp->inp_flags & IN6P_MTU) != 0 &&
+		    (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6) ||
+		     IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6, faddr))) {
+			ip6_notify_pmtu(inp, dst, (u_int32_t *)cmdarg);
 		}
 
 		if (!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6, faddr) ||
