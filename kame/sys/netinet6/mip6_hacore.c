@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.19 2003/12/08 10:16:38 t-momose Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.20 2003/12/10 21:25:22 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -209,6 +209,8 @@ mip6_process_hrbu(bi)
 			if (llmbc->mbc_expire < time_second)
 				llmbc->mbc_expire = 0x7fffffff;
 			llmbc->mbc_state = MIP6_BC_FSM_STATE_BOUND;
+			mip6_bc_settimer(llmbc, -1);
+			mip6_bc_settimer(llmbc, mip6_brr(llmbc));
 			/* modify encapsulation entry */
 			/* XXX */
 			if (mip6_tunnel_control(MIP6_TUNNEL_CHANGE, llmbc,
@@ -263,6 +265,8 @@ mip6_process_hrbu(bi)
 		if (mbc->mbc_expire < time_second)
 			mbc->mbc_expire = 0x7fffffff;
 		mbc->mbc_state = MIP6_BC_FSM_STATE_BOUND;
+		mip6_bc_settimer(mbc, -1);
+		mip6_bc_settimer(mbc, mip6_brr(mbc));
 
 		/* modify the encapsulation entry. */
 		if (mip6_tunnel_control(MIP6_TUNNEL_CHANGE, mbc,

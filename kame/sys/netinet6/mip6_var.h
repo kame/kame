@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.110 2003/12/05 01:35:18 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.111 2003/12/10 21:25:22 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -108,6 +108,12 @@ struct mip6_bc {
 	                                     /* valid only when BUF_HOME. */
 	struct mip6_bc        *mbc_llmbc;
 	u_int32_t             mbc_refcnt;
+	u_int                 mbc_brr_sent;
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	struct callout        mbc_timer_ch;
+#elif defined(__OpenBSD__)
+	struct timeout        mbc_timer_ch;
+#endif
 };
 LIST_HEAD(mip6_bc_list, mip6_bc);
 
@@ -117,7 +123,6 @@ LIST_HEAD(mip6_bc_list, mip6_bc);
 #define MIP6_BC_FSM_STATE_WAITB  1
 #define MIP6_BC_FSM_STATE_WAITB2 2
 
-#define MIP6_BC_TIMEOUT_INTERVAL 1
 #define MIP6_REFRESH_MINLIFETIME 2
 #define MIP6_REFRESH_LIFETIME_RATE 50
 

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.51 2003/12/08 10:16:38 t-momose Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.52 2003/12/10 21:25:22 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -189,6 +189,12 @@ struct mip6stat mip6stat;
 
 static int mip6_bc_count = 0;
 
+static int mip6_brr_maxtries = 2;	/* times */
+static int mip6_brr_tryinterval = 10;	/* second */
+#define MIP6_BRR_SEND_EXPONENT	0
+#define MIP6_BRR_SEND_LINIER	1
+static int mip6_brr_mode = MIP6_BRR_SEND_EXPONENT;
+
 /* IPv6 extension header processing. */
 static int mip6_rthdr_create_withdst(struct ip6_rthdr **,
     struct sockaddr_in6 *, struct ip6_pktopts *);
@@ -202,9 +208,9 @@ static int mip6_bc_update(struct mip6_bc *, struct sockaddr_in6 *,
     struct sockaddr_in6 *, u_int16_t, u_int16_t, u_int32_t);
 static int mip6_bc_send_brr(struct mip6_bc *);
 static int mip6_bc_need_brr(struct mip6_bc *);
-static void mip6_bc_starttimer(void);
-static void mip6_bc_stoptimer(void);
-static void mip6_bc_timeout(void *);
+static void mip6_bc_settimer(struct mip6_bc *, int);
+static void mip6_bc_timer(void *);
+static u_int mip6_brr(struct mip6_bc *);
 
 /* return routability processing. */
 static void mip6_create_nonce(mip6_nonce_t *);
@@ -794,16 +800,24 @@ mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
 	mbc->mbc_flags = flags;
 	mbc->mbc_seqno = seqno;
 	mbc->mbc_lifetime = lifetime;
-	mbc->mbc_expire = time_second + mbc->mbc_lifetime;
-	/* sanity check for overflow */
-	if (mbc->mbc_expire < time_second)
-		mbc->mbc_expire = 0x7fffffff;
 	mbc->mbc_state = MIP6_BC_FSM_STATE_BOUND;
 	mbc->mbc_mpa_exp = time_second;	/* set to current time to send mpa as soon as created it */
 	mbc->mbc_state = 0;
 	mbc->mbc_ifp = ifp;
 	mbc->mbc_llmbc = NULL;
 	mbc->mbc_refcnt = 0;
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	callout_init(&mbc->mbc_timer_ch, NULL);
+#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	callout_init(&mbc->mbc_timer_ch);
+#elif defined(__OpenBSD__)
+	timeout_set(&mbc->mbc_timer_ch, mip6_mbc_timer, NULL);
+#endif
+	mbc->mbc_expire = time_second + lifetime;
+	/* sanity check for overflow */
+	if (mbc->mbc_expire < time_second)
+		mbc->mbc_expire = 0x7fffffff;
+	mip6_bc_settimer(mbc, mip6_brr(mbc));
 
 	if (mip6_bc_list_insert(&mip6_bc_list, mbc)) {
 		FREE(mbc, M_TEMP);
@@ -811,6 +825,56 @@ mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
 	}
 
 	return (mbc);
+}
+
+
+/*
+ *  |<---------------------------->|
+ *        lifetime                 ^
+ *  |<--------------->             mbc->mbc_expire
+ *       brrtime
+ *
+ */
+static void
+mip6_bc_settimer(mbc, time)
+	struct mip6_bc *mbc;
+	int time;	/* unit: second */
+{
+	long tick;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
+	int s;
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+
+	if (time != 0) {
+		tick = time * hz;
+		if (time < 0) {
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+			callout_stop(&mbc->mbc_timer_ch);
+#elif defined(__OpenBSD__)
+			timeout_del(&mbc->mbc_timer_ch);
+#else
+			untimeout(mip6_bc_timer, mbc;)
+#endif
+		} else {
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+			callout_reset(&mbc->mbc_timer_ch, tick,
+			    mip6_bc_timer, mbc);
+#elif defined(__OpenBSD__)
+			timeout_add(&mbc->mbc_timer_ch, tick);
+#else
+			timeout(mip6_bc_timer, mbc, tick);
+#endif
+		}
+	}
+
+	splx(s);
 }
 
 static int
@@ -851,12 +915,6 @@ mip6_bc_list_insert(mbc_list, mbc)
 	mip6_bc_hash[id] = mbc;
 
 	mbc->mbc_refcnt++;
-
-	if (mip6_bc_count == 0) {
-		mip6log((LOG_INFO, "%s:%d: BC timer started.\n",
-			__FILE__, __LINE__));
-		mip6_bc_starttimer();
-	}
 	mip6_bc_count++;
 
 	return (0);
@@ -893,6 +951,7 @@ mip6_bc_list_remove(mbc_list, mbc)
 		if (mbc->mbc_refcnt > 0)
 			return (0);
 	}
+	mip6_bc_settimer(mbc, -1);
 	LIST_REMOVE(mbc, mbc_entry);
 #ifdef MIP6_HOME_AGENT
 	if (mbc->mbc_flags & IP6MU_HOME) {
@@ -923,11 +982,6 @@ mip6_bc_list_remove(mbc_list, mbc)
 	FREE(mbc, M_TEMP);
 
 	mip6_bc_count--;
-	if (mip6_bc_count == 0) {
-		mip6_bc_stoptimer();
-		mip6log((LOG_INFO, "%s:%d: BC timer stopped.\n",
-			__FILE__, __LINE__));
-	}
 
 	return (error);
 }
@@ -997,6 +1051,8 @@ mip6_bc_update(mbc, coa_sa, dst_sa, flags, seqno, lifetime)
 	if (mbc->mbc_expire < time_second)
 		mbc->mbc_expire = 0x7fffffff;
 	mbc->mbc_state = MIP6_BC_FSM_STATE_BOUND;
+	mip6_bc_settimer(mbc, -1);
+	mip6_bc_settimer(mbc, mip6_brr(mbc));
 
 	return (0);
 }
@@ -1193,44 +1249,41 @@ mip6_bc_need_brr(mbc)
 	return (found);
 }
 
-static void
-mip6_bc_starttimer(void)
+static u_int
+mip6_brr(mbc)
+	struct mip6_bc *mbc;
 {
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	callout_reset(&mip6_bc_ch,
-		      MIP6_BC_TIMEOUT_INTERVAL * hz,
-		      mip6_bc_timeout, NULL);
-#elif defined(__OpenBSD__)
-	timeout_set(&mip6_bc_ch, mip6_bc_timeout, NULL);
-	timeout_add(&mip6_bc_ch,
-		    MIP6_BC_TIMEOUT_INTERVAL * hz);
-#else
-	timeout(mip6_bc_timeout, (void *)0,
-		MIP6_BC_TIMEOUT_INTERVAL * hz);
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
 #endif
+
+	switch (mbc->mbc_state) {
+	case MIP6_BC_FSM_STATE_BOUND:
+		if (mip6_brr_mode == MIP6_BRR_SEND_EXPONENT) 
+			return ((mbc->mbc_expire - mbc->mbc_lifetime / 2) - time_second);
+		else
+			return ((mbc->mbc_expire - 
+				mip6_brr_tryinterval * mip6_brr_maxtries) - time_second);
+		break;
+	case MIP6_BC_FSM_STATE_WAITB:
+		if (mip6_brr_mode == MIP6_BRR_SEND_EXPONENT) 
+			return (mbc->mbc_expire - time_second) / 2;
+		else
+			return (mip6_brr_tryinterval < mbc->mbc_expire - time_second 
+				? mip6_brr_tryinterval : mbc->mbc_expire - time_second);
+		break;
+	}
+
+	return (0); /* XXX; not reach */
 }
 
 static void
-mip6_bc_stoptimer(void)
-{
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	callout_stop(&mip6_bc_ch);
-#elif defined(__OpenBSD__)
-	timeout_del(&mip6_bc_ch);
-#else
-	untimeout(mip6_bc_timeout, (void *)0);
-#endif
-}
-
-static void
-mip6_bc_timeout(dummy)
-	void *dummy;
+mip6_bc_timer(arg)
+	void *arg;
 {
 	int s;
-	struct mip6_bc *mbc, *mbc_next;
-#ifdef MIP6_HOME_AGENT
-	int error = 0;
-#endif /* MIP6_HOME_AGENT */
+	u_int brrtime;
+	struct mip6_bc *mbc = arg;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
@@ -1241,64 +1294,52 @@ mip6_bc_timeout(dummy)
 	s = splnet();
 #endif
 
-	for (mbc = LIST_FIRST(&mip6_bc_list); mbc; mbc = mbc_next) {
-		mbc_next = LIST_NEXT(mbc, mbc_entry);
-		switch (mbc->mbc_state) {
-		case MIP6_BC_FSM_STATE_BOUND:
-			if (mbc->mbc_expire - (mbc->mbc_lifetime / 2)
-			    < time_second) {
-				if (mip6_bc_need_brr(mbc))
-					mip6_bc_send_brr(mbc);
-				mbc->mbc_state = MIP6_BC_FSM_STATE_WAITB;
-			}
-			break;
-		case MIP6_BC_FSM_STATE_WAITB:
-			if (mbc->mbc_expire - (mbc->mbc_lifetime / 4)
-			    < time_second) {
-				if (mip6_bc_need_brr(mbc))
-					mip6_bc_send_brr(mbc);
+	switch (mbc->mbc_state) {
+	case MIP6_BC_FSM_STATE_BOUND:
+		mbc->mbc_state = MIP6_BC_FSM_STATE_WAITB;
+		mbc->mbc_brr_sent = 0;
+		/* No break; */
+	case MIP6_BC_FSM_STATE_WAITB:
+		if (mip6_bc_need_brr(mbc) &&
+		    (mbc->mbc_brr_sent < mip6_brr_maxtries)) {
+			brrtime = mip6_brr(mbc);
+			if (brrtime == 0) {
 				mbc->mbc_state = MIP6_BC_FSM_STATE_WAITB2;
+			} else {
+				mip6_bc_send_brr(mbc);
 			}
-			break;
-		case MIP6_BC_FSM_STATE_WAITB2:
-			/* expiration check. */
-			if (mbc->mbc_expire < time_second) {
+			mip6_bc_settimer(mbc, mip6_brr(mbc));
+			mbc->mbc_brr_sent++;
+		} else {
+			mbc->mbc_state = MIP6_BC_FSM_STATE_WAITB2;
+			mip6_bc_settimer(mbc, mbc->mbc_expire - time_second);
+		}
+		break;
+	case MIP6_BC_FSM_STATE_WAITB2:
 #ifdef MIP6_HOME_AGENT
-				if (mbc->mbc_flags & IP6MU_CLONED) {
-					/*
-					 * cloned entry is removed
-					 * when the last referring mbc
-					 * is removed.
-					 */
-					continue;
-				}
-				if (mbc->mbc_llmbc != NULL) {
-					/* remove a cloned entry. */
-					error = mip6_bc_list_remove(
-					    &mip6_bc_list, mbc->mbc_llmbc);
-				}
-				if (error) {
-					mip6log((LOG_ERR,
-					    "%s:%d: failed to remove "
-					    "a cloned binding cache entry.\n",
-					    __FILE__, __LINE__));
-				}
-				/*
-				 * we must reset mbc_next.  since a
-				 * removal of a mbc may cause another
-				 * removal of a related cloned mbc,
-				 * mbc_next may have a bogus pointer.
-				 */
-				mbc_next = LIST_NEXT(mbc, mbc_entry);
-#endif /* MIP6_HOME_AGENT */
-				mip6_bc_list_remove(&mip6_bc_list, mbc);
-			}
+		if (mbc->mbc_flags & IP6MU_CLONED) {
+			/*
+			 * cloned entry is removed
+			 * when the last referring mbc
+			 * is removed.
+			 */
 			break;
 		}
+		if (mbc->mbc_llmbc != NULL) {
+			/* remove a cloned entry. */
+			error = mip6_bc_list_remove(
+			    &mip6_bc_list, mbc->mbc_llmbc);
+			if (error) {
+				mip6log((LOG_ERR,
+				    "%s:%d: failed to remove "
+				    "a cloned binding cache entry.\n",
+				    __FILE__, __LINE__));
+			}
+		}
+#endif /* MIP6_HOME_AGENT */
+		mip6_bc_list_remove(&mip6_bc_list, mbc);
+		break;
 	}
-
-	if (mip6_bc_count != 0)
-		mip6_bc_starttimer();
 
 	splx(s);
 }
