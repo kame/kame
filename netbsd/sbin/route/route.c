@@ -964,12 +964,13 @@ inet6_makenetandmask(sin6)
 			plen = "64";
 	}
 
-	if (plen) {
+	if (!plen || strcmp(plen, "128") == 0)
+		return 1;
+	else {
 		rtm_addrs |= RTA_NETMASK;
-		return prefixlen(plen);
+		(void)prefixlen(plen);
+		return 0;
 	}
-
-	return -1;
 }
 #endif
 
@@ -1065,8 +1066,7 @@ getaddr(which, s, hpp)
 #endif
 		freeaddrinfo(res);
 		if (which == RTA_DST)
-			if (inet6_makenetandmask(&su->sin6) == 128)
-				return 1;
+			return inet6_makenetandmask(&su->sin6);
 		return 0;
 	    }
 #endif
