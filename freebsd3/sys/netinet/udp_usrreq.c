@@ -775,6 +775,7 @@ udp_attach(struct socket *so, int proto, struct proc *p)
 	}
 	error = ipsec_init_policy(&inp->inp_sp_out);
 	if (error) {
+		in_pcbdetach(inp);
 		return error;
 	}
 #endif /*IPSEC*/
