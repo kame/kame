@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.5 2005/01/24 04:14:45 ryuji Exp $	*/
+/*	$KAME: shisad.h,v 1.6 2005/01/27 02:35:19 ryuji Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.
  * All rights reserved.
@@ -388,6 +388,8 @@ struct mip6_nonces_info * generate_nonces(struct mip6_nonces_info *);
 void init_nonces (void);
 void create_keygentoken(struct in6_addr *, struct mip6_nonces_info *, 
 			u_int8_t *, u_int8_t);
+
+int send_mps(struct mip6_hoainfo *, struct in6_addr *);
 
 
 /* binding.c */

@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.9 2005/01/26 07:41:59 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.10 2005/01/27 02:35:19 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -56,6 +56,7 @@
 #include <netinet/in.h>
 #include <netinet/ip6.h>
 #include <netinet/ip6mh.h>
+#include <netinet/icmp6.h>
 #include <netinet6/in6_var.h>
 #include <netinet/in_var.h>
 #include <netinet6/nd6.h>
@@ -1962,3 +1963,123 @@ create_keygentoken(addr, nonces, token, need_one)
         memcpy(token, token_tmp, MIP6_TOKEN_SIZE);
 }
 #endif /* MIP_CN */
+
+#ifdef MIP_MN
+int
+send_mps(hoainfo, dst)
+	struct mip6_hoainfo *hoainfo;
+        struct in6_addr *dst;
+{
+        struct msghdr msg;
+        struct iovec iov;
+        struct cmsghdr  *cmsgptr = NULL;
+        struct in6_pktinfo *pi = NULL;
+        struct sockaddr_in6 to;
+        char adata[512], buf[1024];
+        struct mip6_prefix_solicit *mpfx;
+        size_t mpfxlen = 0;
+        struct binding_update_list *bul;
+        struct ip6_dest *dest;
+        struct ip6_opt_home_address *hoadst;
+#if defined(MIP_MN) && defined(MIP_NEMO)
+	struct sockaddr_in6 *ar_sin6, ar_sin6_orig;
+#endif /* MIP_NEMO */ 
+
+	bul = bul_get(&hoainfo->hinfo_hoa, dst);
+	if(bul == NULL)
+		return 0;
+
+	if (debug)
+		syslog(LOG_INFO, "sending Mobile Prefix Solicitation\n");
+
+        memset(&to, 0, sizeof(to));
+        to.sin6_addr = *dst;
+        to.sin6_family = AF_INET6;
+        to.sin6_port = 0;
+        to.sin6_scope_id = 0;
+        to.sin6_len = sizeof (struct sockaddr_in6);
+
+
+        msg.msg_name = (void *)&to;
+        msg.msg_namelen = sizeof(struct sockaddr_in6);
+        msg.msg_iov = &iov;
+        msg.msg_iovlen = 1;
+        msg.msg_control = (void *) adata;
+        msg.msg_controllen = CMSG_SPACE(sizeof(struct in6_pktinfo)) + 
+		CMSG_SPACE(sizeof(struct ip6_opt_home_address) + 2 + 4);
+
+#if defined(MIP_MN) && defined(MIP_NEMO)
+        ar_sin6 = nemo_ar_get(&hoainfo->hinfo_hoa, &ar_sin6_orig);
+        if (ar_sin6) 
+                msg.msg_controllen += 
+                        CMSG_SPACE(sizeof(struct sockaddr_in6));
+#endif /*MIP_NEMO */
+
+        /* Packet Information i.e. Source Address */
+        cmsgptr = CMSG_FIRSTHDR(&msg);
+        pi = (struct in6_pktinfo *)(CMSG_DATA(cmsgptr));
+        memset(pi, 0, sizeof(*pi));
+        pi->ipi6_addr = bul->bul_coa;
+        cmsgptr->cmsg_level = IPPROTO_IPV6;
+        cmsgptr->cmsg_type = IPV6_PKTINFO;
+        cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
+        cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
+
+#if defined(MIP_MN) && defined(MIP_NEMO)
+        if (ar_sin6) { 
+                if (debug) 
+                        syslog(LOG_INFO, "sendmsg via %s/%d\n", 
+			       ip6_sprintf(&ar_sin6->sin6_addr), ar_sin6->sin6_scope_id);
+                cmsgptr->cmsg_len = CMSG_LEN(sizeof(struct sockaddr_in6));
+                cmsgptr->cmsg_level = IPPROTO_IPV6;
+                cmsgptr->cmsg_type = IPV6_NEXTHOP;
+                memcpy(CMSG_DATA(cmsgptr), ar_sin6, sizeof(struct sockaddr_in6));
+                cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
+        }
+#endif
+
+        /* Destination Option */
+	dest = (struct ip6_dest *)(CMSG_DATA(cmsgptr));
+	
+	/* padding */
+	MIP6_FILL_PADDING((char *)(dest + 1), MIP6_HOAOPT_PADLEN);
+	
+	dest->ip6d_nxt = 0;
+	dest->ip6d_len = ((sizeof(struct ip6_opt_home_address) +
+			   sizeof(struct ip6_dest) + MIP6_HOAOPT_PADLEN) >> 3) - 1;
+	
+	hoadst = (struct ip6_opt_home_address *)
+		((char *)(dest + 1) + MIP6_HOAOPT_PADLEN);
+	memset(hoadst, 0, sizeof(*hoadst));
+	hoadst->ip6oh_type = 0xc9;
+	hoadst->ip6oh_len = sizeof(struct ip6_opt_home_address) - 
+		sizeof(struct ip6_dest);
+	memcpy(hoadst->ip6oh_addr, &hoainfo->hinfo_hoa, sizeof(struct in6_addr));
+	
+	cmsgptr->cmsg_level = IPPROTO_IPV6;
+	cmsgptr->cmsg_type = IPV6_DSTOPTS;
+	cmsgptr->cmsg_len = 
+		CMSG_LEN(sizeof(struct ip6_opt_home_address) + 
+			 sizeof(struct ip6_dest) + MIP6_HOAOPT_PADLEN);
+	cmsgptr = CMSG_NXTHDR(&msg, cmsgptr);
+
+	hoainfo->hinfo_mps_id = (random() >> 16);
+
+        bzero(buf, sizeof(buf));
+        mpfx = (struct mip6_prefix_solicit *)buf;
+        mpfx->mip6_ps_type = MIP6_PREFIX_SOLICIT;
+        mpfx->mip6_ps_code = 0;
+        mpfx->mip6_ps_cksum = 0;
+        mpfx->mip6_ps_id = htonl(hoainfo->hinfo_mps_id);
+        mpfx->mip6_ps_reserved = 0;
+        mpfxlen = sizeof(struct mip6_prefix_solicit);
+
+        iov.iov_base = buf;
+        iov.iov_len = mpfxlen;
+       
+        if (sendmsg(icmp6sock, &msg, 0) < 0)
+                perror ("sendmsg");
+
+        return errno;
+}
+#endif /* MIP_MN */
