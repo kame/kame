@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: strnames.c,v 1.7 2000/03/13 10:30:49 sakane Exp $ */
+/* YIPS @(#)$Id: strnames.c,v 1.8 2000/05/31 15:13:17 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -72,6 +72,15 @@ static char *name_ipsecdoi_trns_isakmp[] = {
 	"IKE",
 };
 
+char *
+s_ipsecdoi_trns_isakmp(trns)
+	int trns;
+{
+	if (ARRAYLEN(name_ipsecdoi_trns_isakmp) > trns)
+		return name_ipsecdoi_trns_isakmp[trns];
+	return NULL;
+}
+
 static char *name_ipsecdoi_trns_ah[] = {
 	"",
 	"",
@@ -79,6 +88,15 @@ static char *name_ipsecdoi_trns_ah[] = {
 	"SHA",
 	"DES",
 };
+
+char *
+s_ipsecdoi_trns_ah(trns)
+	int trns;
+{
+	if (ARRAYLEN(name_ipsecdoi_trns_ah) > trns)
+		return name_ipsecdoi_trns_ah[trns];
+	return NULL;
+}
 
 static char *name_ipsecdoi_trns_esp[] = {
 	"",
@@ -95,6 +113,15 @@ static char *name_ipsecdoi_trns_esp[] = {
 	"NULL",
 };
 
+char *
+s_ipsecdoi_trns_esp(trns)
+	int trns;
+{
+	if (ARRAYLEN(name_ipsecdoi_trns_esp) > trns)
+		return name_ipsecdoi_trns_esp[trns];
+	return NULL;
+}
+
 static char *name_ipsecdoi_trns_ipcomp[] = {
 	"",
 	"OUI",
@@ -105,20 +132,30 @@ static char *name_ipsecdoi_trns_ipcomp[] = {
 	"NULL",
 };
 
-static char **name_ipsecdoi_trns[] = {
-	0,
-	name_ipsecdoi_trns_isakmp,
-	name_ipsecdoi_trns_ah,
-	name_ipsecdoi_trns_esp,
-	name_ipsecdoi_trns_ipcomp,
+char *
+s_ipsecdoi_trns_ipcomp(trns)
+	int trns;
+{
+	if (ARRAYLEN(name_ipsecdoi_trns_ipcomp) > trns)
+		return name_ipsecdoi_trns_ipcomp[trns];
+	return NULL;
+}
+
+static char *(*name_ipsecdoi_trns[])() = {
+	NULL,
+	s_ipsecdoi_trns_isakmp,
+	s_ipsecdoi_trns_ah,
+	s_ipsecdoi_trns_esp,
+	s_ipsecdoi_trns_ipcomp,
 };
 
 char *
 s_ipsecdoi_trns(proto, trns)
 	int proto, trns;
 {
-	if (ARRAYLEN(name_ipsecdoi_trns) > proto)
-		return name_ipsecdoi_trns[proto][trns];
+	if (ARRAYLEN(name_ipsecdoi_trns) > proto
+	 && name_ipsecdoi_trns[proto] != NULL)
+		return (*name_ipsecdoi_trns[proto])(trns);
 	return NULL;
 }
 
@@ -161,12 +198,30 @@ static char *name_attr_isakmp_enc[] = {
 	"CAST-CBC",
 };
 
+char *
+s_attr_isakmp_enc(type)
+	int type;
+{
+	if (ARRAYLEN(name_attr_isakmp_enc) > type)
+		return name_attr_isakmp_enc[type];
+	return NULL;
+}
+
 static char *name_attr_isakmp_hash[] = {
 	"",
 	"MD5",
 	"SHA",
 	"Tiger",
 };
+
+char *
+s_attr_isakmp_hash(type)
+	int type;
+{
+	if (ARRAYLEN(name_attr_isakmp_hash) > type)
+		return name_attr_isakmp_hash[type];
+	return NULL;
+}
 
 static char *name_attr_isakmp_method[] = {
 	"",
@@ -177,6 +232,15 @@ static char *name_attr_isakmp_method[] = {
 	"Revised encryption with RSA",
 };
 
+char *
+s_oakley_attr_method(type)
+	int type;
+{
+	if (ARRAYLEN(name_attr_isakmp_method) > type)
+		return name_attr_isakmp_method[type];
+	return NULL;
+}
+
 static char *name_attr_isakmp_desc[] = {
 	"",
 	"768-bit MODP group",
@@ -186,6 +250,15 @@ static char *name_attr_isakmp_desc[] = {
 	"1536-bit MODP group",
 };
 
+char *
+s_attr_isakmp_desc(type)
+	int type;
+{
+	if (ARRAYLEN(name_attr_isakmp_desc) > type)
+		return name_attr_isakmp_desc[type];
+	return NULL;
+}
+
 static char *name_attr_isakmp_group[] = {
 	"",
 	"MODP",
@@ -193,25 +266,43 @@ static char *name_attr_isakmp_group[] = {
 	"EC2N",
 };
 
+char *
+s_attr_isakmp_group(type)
+	int type;
+{
+	if (ARRAYLEN(name_attr_isakmp_group) > type)
+		return name_attr_isakmp_group[type];
+	return NULL;
+}
+
 static char *name_attr_isakmp_ltype[] = {
 	"",
 	"seconds",
 	"kilobytes"
 };
 
-static char **name_attr_isakmp_v[] = {
+char *
+s_attr_isakmp_ltype(type)
+	int type;
+{
+	if (ARRAYLEN(name_attr_isakmp_ltype) > type)
+		return name_attr_isakmp_ltype[type];
+	return NULL;
+}
+
+static char *(*name_attr_isakmp_v[])() = {
 	0,
-	name_attr_isakmp_enc,
-	name_attr_isakmp_hash,
-	name_attr_isakmp_method,
-	name_attr_isakmp_desc,
-	name_attr_isakmp_group,
+	s_attr_isakmp_enc,
+	s_attr_isakmp_hash,
+	s_oakley_attr_method,
+	s_attr_isakmp_desc,
+	s_attr_isakmp_group,
 	0,
 	0,
 	0,
 	0,
 	0,
-	name_attr_isakmp_ltype,
+	s_attr_isakmp_ltype,
 	0,
 	0,
 	0,
@@ -225,16 +316,7 @@ s_oakley_attr_v(type, val)
 {
 	if (ARRAYLEN(name_attr_isakmp_v) > type
 	 && name_attr_isakmp_v[type] != 0)
-		return name_attr_isakmp_v[type][val];
-	return NULL;
-}
-
-char *
-s_oakley_attr_method(type)
-	int type;
-{
-	if (ARRAYLEN(name_attr_isakmp_method) > type)
-		return name_attr_isakmp_method[type];
+		return (*name_attr_isakmp_v[type])(val);
 	return NULL;
 }
 
@@ -266,7 +348,16 @@ static char *name_attr_ipsec_ltype[] = {
 	"kilobytes"
 };
 
-static char *name_attr_ipsec_enc_mode[] = {
+char *
+s_ipsecdoi_ltype(type)
+	int type;
+{
+	if (ARRAYLEN(name_attr_ipsec_ltype) > type)
+		return name_attr_ipsec_ltype[type];
+	return "";
+}
+
+static char *name_attr_ipsec_encmode[] = {
 	"",
 	"Tunnel",
 	"Transport"
@@ -276,8 +367,8 @@ char *
 s_ipsecdoi_encmode(mode)
 	int mode;
 {
-	if (ARRAYLEN(name_attr_ipsec_enc_mode) > mode)
-		return name_attr_ipsec_enc_mode[mode];
+	if (ARRAYLEN(name_attr_ipsec_encmode) > mode)
+		return name_attr_ipsec_encmode[mode];
 	return "";
 }
 
@@ -289,13 +380,22 @@ static char *name_attr_ipsec_auth[] = {
 	"kpdk",
 };
 
-static char **name_attr_ipsec_v[] = {
+char *
+s_ipsecdoi_auth(type)
+	int type;
+{
+	if (ARRAYLEN(name_attr_ipsec_auth) > type)
+		return name_attr_ipsec_auth[type];
+	return "";
+}
+
+static char *(*name_attr_ipsec_v[])() = {
 	0,
-	name_attr_ipsec_ltype,
+	s_ipsecdoi_ltype,
 	0,
 	0,
-	name_attr_ipsec_enc_mode,
-	name_attr_ipsec_auth,
+	s_ipsecdoi_encmode,
+	s_ipsecdoi_auth,
 	0,
 	0,
 	0,
@@ -308,7 +408,7 @@ s_ipsecdoi_attr_v(type, val)
 {
 	if (ARRAYLEN(name_attr_ipsec_v) > type
 	 && name_attr_ipsec_v[type] != 0)
-		return name_attr_ipsec_v[type][val];
+		return (*name_attr_ipsec_v[type])(val);
 	return NULL;
 }
 
@@ -362,14 +462,14 @@ s_algstrength(s)
 	return NULL;
 }
 
-static char **name_algtype[] = {
-	name_ipsecdoi_trns_esp,
-	name_ipsecdoi_trns_ah,
-	name_ipsecdoi_trns_ipcomp,
-	name_attr_isakmp_enc,
-	name_attr_isakmp_hash,
-	name_attr_isakmp_desc,
-	name_attr_isakmp_method,
+static char *(*name_algtype[])() = {
+	s_ipsecdoi_trns_esp,
+	s_ipsecdoi_trns_ah,
+	s_ipsecdoi_trns_ipcomp,
+	s_attr_isakmp_enc,
+	s_attr_isakmp_hash,
+	s_attr_isakmp_desc,
+	s_oakley_attr_method,
 };
 
 char *
@@ -377,7 +477,7 @@ s_algtype(class, n)
 	int class, n;
 {
 	if (ARRAYLEN(name_algtype) > class)
-		return name_algtype[class][n];
+		return (*name_algtype[class])(n);
 	return NULL;
 }
 
