@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.204 2004/11/18 08:22:47 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.205 2004/11/30 18:05:40 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -65,8 +65,6 @@
 #include <netinet/in_pcb.h>
 #endif
 
-#include <net/if_stf.h>
-
 #include <netinet/ip6.h>
 #include <netinet6/in6_var.h>
 #ifdef __FreeBSD__
@@ -88,6 +86,7 @@
 #endif
 #endif
 
+#include <net/if_ist.h>
 #include <net/net_osdep.h>
 
 unsigned long in6_maxmtu = 0;
@@ -628,6 +627,12 @@ in6_ifattach_linklocal(ifp, altifp)
 		nd6log((LOG_ERR, "%s: 6to4 I/F cannot have linklocal address\n",
 		    if_name(ifp)));
 		return (-1);
+	} else if (ifp->if_type == IFT_IST) {
+		/* ToDo: automatically fetches an IPv4 address for ISATAP */
+		nd6log((LOG_ERR,
+		    "%s: ISATAP I/F needs static linklocal addressing\n",
+		    if_name(ifp)));
+		return (0);
 	} else {
 		if (get_ifid(ifp, altifp, &ifra.ifra_addr.sin6_addr) != 0) {
 			nd6log((LOG_ERR,

@@ -68,6 +68,9 @@
 #include <limits.h>
 #include <ifaddrs.h>
 #include "rtsold.h"
+#ifdef IFT_IST
+#include <net/if_ist.h>
+#endif
 
 extern int rssock;
 static int ifsock;
@@ -389,4 +392,40 @@ get_rtaddrs(int addrs, struct sockaddr *sa, struct sockaddr **rti_info)
 		} else
 			rti_info[i] = NULL;
 	}
+}
+
+#ifdef IFT_IST
+int
+is_isatap(struct ifinfo *ifinfo)
+{
+	return (ifinfo->sdl->sdl_type == IFT_IST);
+}
+#endif
+
+size_t
+get_isatap_router(struct ifinfo *ifinfo, void **buf)
+{
+#ifndef IFT_IST
+	return 0;
+#else
+	size_t needed;
+	int mib[4] = {CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_ISATAPRTR};
+
+	/* get ISATAP router list */
+	if (!is_isatap(ifinfo))
+		return 0;
+	if (sysctl(mib, 4, NULL, &needed, NULL, 0) < 0)
+		return 0;
+	if (needed == 0)
+		return 0;
+	if ((*buf = malloc(needed)) == NULL) {
+		warnmsg(LOG_ERR, __func__, "malloc failed");
+		exit(1);
+	}
+	if (sysctl(mib, 4, *buf, &needed, NULL, 0) < 0) {
+		warnmsg(LOG_ERR, __func__,  "sysctl failed");
+		exit(1);
+	}        
+	return needed;   
+#endif /* IFT_IST */    
 }

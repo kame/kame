@@ -35,6 +35,7 @@
 #include <sys/param.h>
 
 #include <net/if.h>
+#include <net/if_types.h>
 #include <net/if_dl.h>
 
 #include <netinet/in.h>
@@ -83,6 +84,7 @@ char *otherconf_script;
  * XXX: should be configurable 
  */
 #define PROBE_INTERVAL 60
+#define ISATAP_PROBE_INTERVAL 900 /* draft-ietf-ngtrans-isatap-09.txt 6.2.4 */
 
 int main __P((int, char **));
 
@@ -430,8 +432,16 @@ ifconfig(char *ifname)
 		/*
 		 * probe routers periodically even if the link status
 		 * does not change.
+		 * (ISATAP router cannot send unsolicited RA)
 		 */
+#ifdef IFT_IST
+		if (is_isatap(ifinfo))
+			ifinfo->probeinterval = ISATAP_PROBE_INTERVAL;
+		else
+			ifinfo->probeinterval = PROBE_INTERVAL;
+#else
 		ifinfo->probeinterval = PROBE_INTERVAL;
+#endif
 	}
 
 	/* activate interface: interface_up returns 0 on success */
@@ -679,7 +689,14 @@ rtsol_timer_update(struct ifinfo *ifinfo)
 		if (mobile_node) {
 			/* XXX should be configurable */
 			ifinfo->timer.tv_sec = 3;
-		} else
+		}
+#ifdef IFT_IST
+		else if (is_isatap(ifinfo)) {
+			/* don't have to consider I/F updown in ISATAP */
+			ifinfo->timer.tv_sec = 60;
+		}
+#endif
+		else
 			ifinfo->timer = tm_max;	/* stop timer(valid?) */
 		break;
 	case IFS_DELAY:

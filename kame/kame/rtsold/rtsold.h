@@ -83,6 +83,8 @@ extern void lladdropt_fill __P((struct sockaddr_dl *, struct nd_opt_hdr *));
 extern struct sockaddr_dl *if_nametosdl __P((char *));
 extern int getinet6sysctl __P((int));
 extern int setinet6sysctl __P((int, int));
+extern int is_isatap __P((struct ifinfo *));
+extern size_t get_isatap_router __P((struct ifinfo *, void **));
 
 /* rtsol.c */
 extern int sockopen __P((void));
