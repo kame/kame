@@ -640,7 +640,7 @@ cfparse(strict, debugonly)
 	int strict, debugonly;
 {
 	if ((yyin = fopen(configfilename, "r")) == NULL) {
-		fprintf(stderr, "cfparse: fopen(%s)", configfilename);
+		fprintf(stderr, "cfparse: fopen(%s)\n", configfilename);
 		return(-1);
 	}
 
