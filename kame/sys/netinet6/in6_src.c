@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.40 2001/06/06 09:52:17 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.41 2001/07/23 07:06:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -631,7 +631,7 @@ in6_embedscope(in6, sin6, in6p, ifpp)
 		scopeid = scope6_addr2default(in6);
 #endif
 
-	if (IN6_IS_SCOPE_LINKLOCAL(in6)) {
+	if (IN6_IS_SCOPE_LINKLOCAL(in6) || IN6_IS_ADDR_MC_NODELOCAL(in6)) {
 		struct in6_pktinfo *pi;
 
 		/*
@@ -691,7 +691,7 @@ in6_recoverscope(sin6, in6, ifp)
 	 */
 
 	sin6->sin6_scope_id = 0;
-	if (IN6_IS_SCOPE_LINKLOCAL(in6)) {
+	if (IN6_IS_SCOPE_LINKLOCAL(in6) || IN6_IS_ADDR_MC_NODELOCAL(in6)) {
 		/*
 		 * KAME assumption: link id == interface id
 		 */
@@ -718,6 +718,6 @@ void
 in6_clearscope(addr)
 	struct in6_addr *addr;
 {
-	if (IN6_IS_SCOPE_LINKLOCAL(addr))
+	if (IN6_IS_SCOPE_LINKLOCAL(addr) || IN6_IS_ADDR_MC_NODELOCAL(addr))
 		addr->s6_addr16[1] = 0;
 }

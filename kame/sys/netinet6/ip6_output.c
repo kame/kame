@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.198 2001/07/21 04:30:17 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.199 2001/07/23 07:06:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -673,7 +673,8 @@ skip_ipsec2:;
 		dst->sin6_addr = ip6->ip6_dst;
 #ifdef SCOPEDROUTING
 		/* XXX: sin6_scope_id should already be fixed at this point */
-		if (IN6_IS_SCOPE_LINKLOCAL(&dst->sin6_addr))
+		if (IN6_IS_SCOPE_LINKLOCAL(&dst->sin6_addr) ||
+		    IN6_IS_ADDR_MC_NODELOCAL(&dst->sin6_addr))
 			dst->sin6_scope_id = ntohs(dst->sin6_addr.s6_addr16[1]);
 #endif
 	}
@@ -1085,6 +1086,10 @@ skip_ipsec2:;
 			origifp = ifindex2ifnet[ntohs(ip6->ip6_src.s6_addr16[1])];
 		else if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst))
 			origifp = ifindex2ifnet[ntohs(ip6->ip6_dst.s6_addr16[1])];
+		else if (IN6_IS_ADDR_MC_NODELOCAL(&ip6->ip6_dst))
+			origifp = ifindex2ifnet[ntohs(ip6->ip6_dst.s6_addr16[1])];
+		/* there will be no nodelocal on src */
+
 		/*
 		 * XXX: origifp can be NULL even in those two cases above.
 		 * For example, if we remove the (only) link-local address
@@ -3426,9 +3431,10 @@ ip6_setmoptions(optname, im6op, m)
 		}
 		/*
 		 * Put interface index into the multicast address,
-		 * if the address has link-local scope.
+		 * if the address has interface/link-local scope.
 		 */
-		if (IN6_IS_ADDR_MC_LINKLOCAL(&mreq->ipv6mr_multiaddr)) {
+		if (IN6_IS_ADDR_MC_NODELOCAL(&mreq->ipv6mr_multiaddr) ||
+		    IN6_IS_ADDR_MC_LINKLOCAL(&mreq->ipv6mr_multiaddr)) {
 			mreq->ipv6mr_multiaddr.s6_addr16[1]
 				= htons(mreq->ipv6mr_interface);
 		}
@@ -3491,9 +3497,10 @@ ip6_setmoptions(optname, im6op, m)
 		ifp = ifindex2ifnet[mreq->ipv6mr_interface];
 		/*
 		 * Put interface index into the multicast address,
-		 * if the address has link-local scope.
+		 * if the address has interface/link-local scope.
 		 */
-		if (IN6_IS_ADDR_MC_LINKLOCAL(&mreq->ipv6mr_multiaddr)) {
+		if (IN6_IS_ADDR_MC_NODELOCAL(&mreq->ipv6mr_multiaddr) ||
+		    IN6_IS_ADDR_MC_LINKLOCAL(&mreq->ipv6mr_multiaddr)) {
 			mreq->ipv6mr_multiaddr.s6_addr16[1]
 				= htons(mreq->ipv6mr_interface);
 		}
