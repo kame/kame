@@ -44,10 +44,12 @@
 /*
  * Data types.
  */
+#include <machine/types.h>
+
 typedef u_char		sa_family_t;
-#ifndef __SOCKLEN_T_DEFINED
-typedef u_int32_t	socklen_t;
-#define __SOCKLEN_T_DEFINED
+#ifdef	_BSD_SOCKLEN_T_
+typedef	_BSD_SOCKLEN_T_	socklen_t;
+#undef	_BSD_SOCKLEN_T_
 #endif
  
 /*

@@ -62,7 +62,7 @@
 #define _NETDB_H_
 
 #include <sys/cdefs.h>
-#include <sys/types.h>
+#include <machine/types.h>
 
 #ifndef _PATH_HEQUIV
 # define	_PATH_HEQUIV	"/etc/hosts.equiv"
@@ -196,9 +196,9 @@ struct addrinfo {
 /*
  * data types - basically forward decl for getnameinfo()
  */
-#ifndef __SOCKLEN_T_DEFINED
-typedef u_int32_t	socklen_t;
-#define __SOCKLEN_T_DEFINED
+#ifdef	_BSD_SOCKLEN_T_
+typedef	_BSD_SOCKLEN_T_	socklen_t;
+#undef	_BSD_SOCKLEN_T_
 #endif
  
 __BEGIN_DECLS
