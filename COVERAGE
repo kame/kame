@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.100 2001/02/23 00:21:56 itojun Exp $
+$KAME: COVERAGE,v 1.101 2001/02/23 10:04:09 itojun Exp $
 
 
 x: supported/integrated
@@ -140,8 +140,17 @@ NUD on p2p	x	x	x	x	x	x	x	?
 NUD on p2p only if real neighbor
 		x	x	x	x	x	x	x	?
 
+ND6 WAITDELETE state (should be removed)
+		-	-	-	x	x	x	x	x
+
+expiration of ND6 STALE entries (nd6_gctimer)
+		x	x	x	-	-	-	-	-
+
 pfctlinput2	(*1)	x	-	-	-	-	-	-
     (*1) in ip6_input.c
+
+xx_ctlinput scope friendliness
+		x	x	x	-	-	-	-	-
 
 icmp6 beyondscope
 		x	x	x	x	x	x	x	x
