@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.32 2001/12/03 12:19:22 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.33 2001/12/04 10:36:57 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -110,13 +110,14 @@ extern struct mip6_ha_list mip6_ha_list; /* Global val holding all HAs */
 
 void mip6_init __P((void));
 
-int mip6_process_nd_prefix		__P((struct in6_addr *,
+int mip6_process_pinfo			__P((struct in6_addr *,
 					     struct nd_prefix *,
 					     struct nd_defrouter *,
 					     struct mbuf *));
-int mip6_process_defrouter_change	__P((struct nd_defrouter *));
+int mip6_process_pfxlist_status_change	__P((struct in6_addr *));
 void mip6_probe_routers			__P((void));
 int mip6_select_coa			__P((struct ifnet *));
+int mip6_select_coa2			__P((void));
 int mip6_process_movement		__P((void));
 
 int mip6_ifa_need_dad			__P((struct in6_ifaddr *));

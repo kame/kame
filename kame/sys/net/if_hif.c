@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.14 2001/12/03 12:28:07 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.15 2001/12/04 10:36:56 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -387,6 +387,32 @@ hif_ioctl(ifp, cmd, data)
 	return (error);
 }
 
+void
+hif_save_location(void)
+{
+	struct hif_softc *sc;
+
+	for (sc = TAILQ_FIRST(&hif_softc_list);
+	     sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
+		sc->hif_location_prev = sc->hif_location;
+		sc->hif_hs_prev = sc->hif_hs_current;
+	}
+}
+
+void
+hif_restore_location(void)
+{
+	struct hif_softc *sc;
+
+	for (sc = TAILQ_FIRST(&hif_softc_list);
+	     sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
+		sc->hif_location = sc->hif_location_prev;
+		sc->hif_hs_current = sc->hif_hs_prev;
+	}
+}
+
 struct hif_subnet *
 hif_subnet_create(ms)
      struct mip6_subnet *ms;
@@ -581,7 +607,6 @@ hif_coa_get_ifaddr(hcoa)
 
 		if (ia6->ia6_flags &
 		    (IN6_IFF_ANYCAST
-		     /* XXX should not use DEATCHed addr */
 		     /* | IN6_IFF_TENTATIVE */
 		     | IN6_IFF_DETACHED
 		     | IN6_IFF_DUPLICATED

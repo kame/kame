@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.184 2001/12/03 12:19:23 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.185 2001/12/04 10:36:57 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -314,25 +314,6 @@ nd6_ra_input(m, off, icmp6len)
 	dr = defrtrlist_update(&dr0);
     }
 
-#ifdef MIP6
-	/*
-	 * save current location for each hif.  the location of hif is
-	 * updated when processing each ndpr in
-	 * mip6_process_nd_prefix().  the saved value is used to
-	 * restore location information when coa is not changed.
-	 */
-	if (MIP6_IS_MN) {
-		struct hif_softc *sc;
-
-		for (sc = TAILQ_FIRST(&hif_softc_list);
-		     sc;
-		     sc = TAILQ_NEXT(sc, hif_entry)) {
-			sc->hif_location_prev = sc->hif_location;
-			sc->hif_hs_prev = sc->hif_hs_current;
-		}
-	}
-#endif /* MIP6 */
-
 	/*
 	 * prefix
 	 */
@@ -412,11 +393,11 @@ nd6_ra_input(m, off, icmp6len)
 				continue; /* prefix lifetime init failed */
 #ifdef MIP6
 			if (MIP6_IS_MN) {
-				if (mip6_process_nd_prefix(&saddr6, &pr,
-							   dr, m)) {
+				if (mip6_process_pinfo(&saddr6, &pr, dr, m)) {
 					mip6log((LOG_ERR,
 						 "%s:%d: "
-						 "process nd_prefix failed\n",
+						 "prefix info processing "
+						 "failed\n",
 						 __FILE__, __LINE__));
 					goto freeit;
 				}
@@ -428,31 +409,8 @@ nd6_ra_input(m, off, icmp6len)
 
 #ifdef MIP6
 	if (MIP6_IS_MN) {
-		int coa_changed = 0;
-
 		/* check reachability of all routers. */
 		mip6_probe_routers();
-
-		/* select a new CoA. */
-		coa_changed = mip6_select_coa(ifp);
-
-		if (coa_changed == 1) {
-			/* we moved. */
-			mip6_process_movement();
-		} else {
-			struct hif_softc *sc;
-
-			/*
-			 * we did not move.  restore previous
-			 * location.
-			 */
-			for (sc = TAILQ_FIRST(&hif_softc_list);
-			     sc;
-			     sc = TAILQ_NEXT(sc, hif_entry)) {
-				sc->hif_location = sc->hif_location_prev;
-				sc->hif_hs_current = sc->hif_hs_prev;
-			}
-		}
 	}
 
 	/* update home agent list. */
@@ -899,11 +857,6 @@ defrouter_select()
 	 * If default router list is empty, we should probably install
 	 * an interface route and assume that all destinations are on-link.
 	 */
-#ifdef MIP6
-	if (MIP6_IS_MN)
-		(void)mip6_process_defrouter_change(TAILQ_FIRST(&nd_defrouter));
-#endif /* MIP6 */
-
 	if (!TAILQ_FIRST(&nd_defrouter)) {
 		/*
 		 * XXX: The specification does not say this mechanism should
@@ -1800,6 +1753,20 @@ pfxlist_onlink_check()
 			ifa->ia6_flags &= ~IN6_IFF_DETACHED;
 		}
 	}
+
+#ifdef MIP6
+	if (MIP6_IS_MN) {
+		int coa_changed = 0;
+
+		hif_save_location();
+		coa_changed = mip6_select_coa2();
+		(void)mip6_process_pfxlist_status_change(&hif_coa);
+		if (coa_changed == 1)
+			mip6_process_movement();
+		else
+			hif_restore_location();
+	}
+#endif /* MIP6 */
 }
 
 int

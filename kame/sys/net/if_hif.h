@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.5 2001/10/26 08:48:55 keiichi Exp $	*/
+/*	$KAME: if_hif.h,v 1.6 2001/12/04 10:36:56 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -145,6 +145,8 @@ int hif_ioctl				__P((struct ifnet *, u_long, caddr_t));
 int hif_output				__P((struct ifnet *, struct mbuf *,
 					     struct sockaddr *,
 					     struct rtentry *));
+void hif_save_location __P((void));
+void hif_restore_location __P((void));
 
 /* XXX hif_coa management. this is bad design. re-consider. */
 struct hif_coa *hif_coa_create		__P((struct ifnet *));

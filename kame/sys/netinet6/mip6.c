@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.83 2001/12/03 12:19:22 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.84 2001/12/04 10:36:57 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -99,12 +99,12 @@ struct callout mip6_pfx_ch;
 #endif
 int mip6_pfx_timer_running = 0;
 
-static int mip6_determine_location_withndpr __P((struct hif_softc *,
-						 struct in6_addr *,
-						 struct nd_prefix *,
-						 struct nd_defrouter *));
-static int mip6_haddr_config __P((struct hif_softc *, struct ifnet *));
-static int mip6_attach_haddrs __P((struct hif_softc *, struct ifnet *));
+static int mip6_determine_location_withpinfo __P((struct hif_softc *,
+						  struct in6_addr *,
+						  struct nd_prefix *,
+						  struct nd_defrouter *));
+static int mip6_haddr_config __P((struct hif_softc *));
+static int mip6_attach_haddrs __P((struct hif_softc *));
 static int mip6_detach_haddrs __P((struct hif_softc *));
 static int mip6_add_haddrs __P((struct hif_softc *, struct ifnet *));
 static int mip6_remove_haddrs __P((struct hif_softc *, struct ifnet *));
@@ -157,82 +157,11 @@ mip6_init()
 }
 
 /*
- * default router change is one of possible reason of movement.
- * check it.
- */
-int
-mip6_process_defrouter_change(dr)
-	struct nd_defrouter *dr;
-{
-	int error = 0;
-#ifdef MD_WITH_DEFROUTER_CHANGE
-	struct hif_softc *sc;
-	struct mip6_pfx *mpfx;
-	struct nd_prefix *pr;
-	int coa_changed;
-
-	if (dr == NULL) {
-		/* we lost a default router.  maybe we are isolated. */
-		return (0);
-	}
-	if ((mip6_dr != NULL)
-	    && (IN6_ARE_ADDR_EQUAL(&mip6_dr->rtaddr, &dr->rtaddr))) {
-		/*
-		 * the default router wan't changed.
-		 */
-		return (0);
-	}
-
-	/*
-	 *  at this point, we have a default router that is different
-	 *  from the previous default router.
-	 */
-	mip6_dr = dr;
-
-	for (sc = TAILQ_FIRST(&hif_softc_list);
-	     sc;
-	     sc = TAILQ_NEXT(sc, hif_entry)) {
-		sc->hif_prevloc = sc->hif_location;
-		for (mpfx = LIST_FIRST(&sc->hif_pfx_list);
-		     mpfx;
-		     mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
-			for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
-				if (pr->ndpr_raf_onlink
-				    && mip6_pfx_list_find_withndpr(&sc->hif_pfx_list, pr, MIP6_MPFX_IS_HOME)) {
-					sc->hif_location = HIF_LOCATION_HOME;
-				} else {
-					sc->hif_location 
-						= HIF_LOCATION_FOREIGN;
-				}
-			}
-		}
-	}
-
-	coa_change = mip6_select_coa(dr->ifp);
-	if (coa_changed == -1) {
-		error = -1;
-		goto process_defrouter_change_done;
-	}
-
-	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
-	     sc = TAILQ_NEXT(sc, hif_entry)) {
-		if (mip6_process_movement(sc, coa_changed)) {
-			error = -1;
-			goto process_defrouter_change_done;
-		}
-	}
-
- process_defrouter_change_done:
-#endif /* MD_WITH_DEFROUTER_CHANGE */
-	return (error);
-}
-
-/*
  * we heard a router advertisement.
  * from the advertised prefix, we can find our current location.
  */
 int
-mip6_process_nd_prefix(saddr, ndpr, dr, m)
+mip6_process_pinfo(saddr, ndpr, dr, m)
 	struct in6_addr *saddr;
 	struct nd_prefix *ndpr;
 	struct nd_defrouter *dr;
@@ -257,7 +186,7 @@ mip6_process_nd_prefix(saddr, ndpr, dr, m)
 		 * determine the current location from the advertised
 		 * prefix and router information.
 		 */
-		error = mip6_determine_location_withndpr(sc, saddr, ndpr, dr);
+		error = mip6_determine_location_withpinfo(sc, saddr, ndpr, dr);
 		if (error) {
 			mip6log((LOG_ERR,
 				 "%s:%d: error while determining location.\n",
@@ -265,6 +194,7 @@ mip6_process_nd_prefix(saddr, ndpr, dr, m)
 			return (error);
 		}
 
+#if 0
 		/*
 		 * configure home addresses according to the home
 		 * prefixes and the current location determined above.
@@ -276,7 +206,7 @@ mip6_process_nd_prefix(saddr, ndpr, dr, m)
 				 __FILE__, __LINE__));
 			return (error);
 		}
-
+#endif
 	}
 
 	return (0);
@@ -297,7 +227,7 @@ mip6_process_nd_prefix(saddr, ndpr, dr, m)
  * }
  */
 static int
-mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
+mip6_determine_location_withpinfo(sc, rtaddr, ndpr, dr)
 	struct hif_softc *sc;
 	struct in6_addr *rtaddr;
 	struct nd_prefix *ndpr;
@@ -311,9 +241,10 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 	struct mip6_ha *mha;
 	struct in6_addr lladdr;
 	int mpfx_is_new, mha_is_new;
+	int location;
 	int error = 0;
 
-	sc->hif_location = HIF_LOCATION_UNKNOWN;
+	location = HIF_LOCATION_UNKNOWN;
 	if (!IN6_IS_ADDR_LINKLOCAL(rtaddr)) {
 		mip6log((LOG_NOTICE,
 			 "%s:%d: RA from a non-linklocal router (%s).\n",
@@ -338,13 +269,13 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 
 	if (hsbypfx) {
 		/* we are home. */
-		sc->hif_location = HIF_LOCATION_HOME;
+		location = HIF_LOCATION_HOME;
 	} else if ((hsbypfx == NULL) && hsbyha) {
 		/* we are home. */
-		sc->hif_location = HIF_LOCATION_HOME;
+		location = HIF_LOCATION_HOME;
 	} else {
 		/* we are foreign. */
-		sc->hif_location = HIF_LOCATION_FOREIGN;
+		location = HIF_LOCATION_FOREIGN;
 	}
 
 	/* update mip6_prefix_list. */
@@ -530,7 +461,7 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 				 __FILE__, __LINE__));
 			return (ENOMEM);
 		}
-		if (sc->hif_location == HIF_LOCATION_HOME) {
+		if (location == HIF_LOCATION_HOME) {
 			error = hif_subnet_list_insert(&sc->hif_hs_list_home,
 						       hs);
 			if (error) {
@@ -545,6 +476,7 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 		}
 	}
 
+#if XXX
 	/* determine current hif_subnet. */
 	sc->hif_hs_current
 		= hif_subnet_list_find_withprefix(&sc->hif_hs_list_home,
@@ -556,14 +488,63 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
 							&ndpr->ndpr_prefix.sin6_addr,
 							ndpr->ndpr_plen);
 	}
+#endif /* XXX */
+
+	return (0);
+}
+
+int
+mip6_process_pfxlist_status_change(hif_coa)
+	struct in6_addr *hif_coa; /* newly selected CoA. */
+{
+	struct nd_prefix *pr;
+	struct hif_softc *sc;
+	int error = 0;
+
+	for (sc = TAILQ_FIRST(&hif_softc_list);
+	     sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
+		sc->hif_location = HIF_LOCATION_UNKNOWN;
+
+		for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
+			if (!in6_are_prefix_equal(hif_coa,
+						  &pr->ndpr_prefix.sin6_addr,
+						  pr->ndpr_plen))
+				continue;
+
+			if (hif_subnet_list_find_withprefix(
+				    &sc->hif_hs_list_home,
+				    &pr->ndpr_prefix.sin6_addr,
+				    pr->ndpr_plen))
+				sc->hif_location = HIF_LOCATION_HOME;
+			else if (hif_subnet_list_find_withprefix(
+				    &sc->hif_hs_list_foreign,
+				    &pr->ndpr_prefix.sin6_addr,
+				    pr->ndpr_plen))
+				sc->hif_location = HIF_LOCATION_FOREIGN;
+		}
+		mip6log((LOG_INFO,
+			 "location = %d\n", sc->hif_location));
+
+		/*
+		 * configure home addresses according to the home
+		 * prefixes and the current location determined above.
+		 */
+		error = mip6_haddr_config(sc);
+		if (error) {
+			mip6log((LOG_ERR,
+				"%s:%d: home address configuration error.\n",
+				 __FILE__, __LINE__));
+			return (error);
+		}
+	}
 
 	return (0);
 }
 
 static int
-mip6_haddr_config(sc, ifp)
+mip6_haddr_config(sc)
 	struct hif_softc *sc;
-	struct ifnet *ifp;
 {
 	int error = 0;
 
@@ -585,7 +566,7 @@ mip6_haddr_config(sc, ifp)
 		 * from physical i/f to avoid the dupulication of
 		 * address.
 		 */
-		error = mip6_attach_haddrs(sc, ifp);
+		error = mip6_attach_haddrs(sc);
 		break;
 
 	case HIF_LOCATION_UNKNOWN:
@@ -725,25 +706,117 @@ mip6_select_coa(preferedifp)
 	return (ret);
 }
 
+int
+mip6_select_coa2(void)
+{
+	struct ifnet *ifp;
+	struct ifaddr *ia, *ia_next;
+	struct in6_ifaddr *ia6, *samecoa = NULL, *othercoa = NULL;
+
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	for (ifp = ifnet; ifp; ifp = ifp->if_next)
+#else
+	for (ifp = ifnet.tqh_first; ifp; ifp = ifp->if_list.tqe_next)
+#endif
+	{
+		if (ifp->if_type == IFT_HIF)
+			continue;
+
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+		for (ia = ifp->if_addrlist; ia; ia = ia_next)
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+		for (ia = TAILQ_FIRST(&ifp->if_addrhead); ia; ia = ia_next)
+#else
+		for (ia = ifp->if_addrlist.tqh_first; ia; ia = ia_next)
+#endif
+		{
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+			ia_next = ia->ifa_next;
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+			ia_next = TAILQ_NEXT(ia, ifa_link);
+#else
+			ia_next = ia->ifa_list.tqe_next;
+#endif
+			if (ia->ifa_addr->sa_family != AF_INET6)
+				continue;
+			ia6 = (struct in6_ifaddr *)ia;
+
+			if (ia6->ia6_flags &
+			    (IN6_IFF_ANYCAST
+			     /* | IN6_IFF_TENTATIVE */
+			     | IN6_IFF_DETACHED
+			     | IN6_IFF_DUPLICATED
+			     | IN6_IFF_DEPRECATED))
+				continue;
+			if (IN6_IS_ADDR_UNSPECIFIED(&ia6->ia_addr.sin6_addr))
+				continue;
+			if (IN6_IS_ADDR_LOOPBACK(&ia6->ia_addr.sin6_addr))
+				continue;
+			if (IN6_IS_ADDR_LINKLOCAL(&ia6->ia_addr.sin6_addr))
+				continue;
+
+			/* keep CoA same as possible. */
+			if (IN6_ARE_ADDR_EQUAL(&hif_coa,
+					       &ia6->ia_addr.sin6_addr)) {
+			    samecoa = ia6;
+			    break;
+			}
+
+			/* next candidate. */
+			othercoa = ia6;
+		}
+		if (samecoa)
+			break;
+	}
+	if (samecoa) {
+		/* CoA didn't change. */
+		return (0);
+	}
+
+	if (othercoa == NULL) {
+		mip6log((LOG_INFO,
+			 "%s:%d: no available CoA found\n",
+			 __FILE__, __LINE__));
+		return (0);
+	}
+
+	hif_coa = othercoa->ia_addr.sin6_addr;
+	mip6log((LOG_INFO,
+		 "%s:%d: CoA has changed to %s\n",
+		 __FILE__, __LINE__,
+		 ip6_sprintf(&othercoa->ia_addr.sin6_addr)));
+	return (1);
+}
+
 /*
  * 1. remove all haddr assinged to ifp.
  * 2. add all haddr for sc to scifp.
  */
 static int
-mip6_attach_haddrs(sc, ifp)
+mip6_attach_haddrs(sc)
 	struct hif_softc *sc;
-	struct ifnet *ifp;
 {
+	struct ifnet *ifp;
 	int error = 0;
 
 	/* remove all home addresses for sc from phisical I/F. */
-	error = mip6_remove_haddrs(sc, ifp);
-	if (error) {
-		mip6log((LOG_ERR,
-			 "%s:%d: remove haddrs from %s failed.\n",
-			 __FILE__, __LINE__,
-			 if_name(ifp)));
-		return (error);
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	for (ifp = ifnet; ifp; ifp = ifp->if_next)
+#else
+	for (ifp = ifnet.tqh_first; ifp; ifp = ifp->if_list.tqe_next)
+#endif
+	{
+		if (ifp->if_type == IFT_HIF)
+			continue;
+
+		error = mip6_remove_haddrs(sc, ifp);
+		if (error) {
+			mip6log((LOG_ERR,
+				 "%s:%d: remove haddrs from %s failed.\n",
+				 __FILE__, __LINE__,
+				 if_name(ifp)));
+			return (error);
+		}
 	}
 
 	/* add home addresses for sc to hif(itself) */
