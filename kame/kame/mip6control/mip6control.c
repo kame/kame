@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.46 2003/07/24 07:11:16 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.47 2003/07/31 01:35:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -874,12 +874,7 @@ static const char *
 bcflg_sprintf(flags)
 	u_int8_t flags;
 {
-	static char buf[] = "DRA";
-
-	snprintf(buf, sizeof(buf), "%s%s%s",
-		 (flags & MIP6_BC_STATE_DAD_WAIT ? "D" : "-"),
-		 (flags & MIP6_BC_STATE_BR_WAITSENT ? "R" : "-"),
-		 (flags & MIP6_BC_STATE_BA_WAITSENT ? "A" : "-"));
+	static char buf[] = "---";
 
 	return buf;
 }
