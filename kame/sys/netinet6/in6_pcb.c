@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.51 2000/06/12 09:24:41 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.52 2000/06/12 09:26:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -162,6 +162,9 @@ in6_pcbbind(in6p, nam)
 	struct socket *so = in6p->in6p_socket;
 	struct in6pcb *head = in6p->in6p_head;
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)NULL;
+#ifndef __NetBSD__
+	struct proc *p = curproc;	/*XXX*/
+#endif
 	u_int16_t lport = 0;
 	int wild = 0, reuseport = (so->so_options & SO_REUSEPORT);
 
@@ -244,11 +247,7 @@ in6_pcbbind(in6p, nam)
 		}
 		if (lport) {
 			int priv;
-#ifdef __NetBSD__
 			priv = (p && !suser(p->p_ucred, &p->p_acflag)) ? 1 : 0;
-#else
-			priv = (so->so_state & SS_PRIV) ? 1 : 0;
-#endif
 			/* GROSS */
 			if (ntohs(lport) < IPV6PORT_RESERVED && !priv)
 				return(EACCES);
