@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.44 2001/02/20 08:31:07 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.45 2001/02/20 08:37:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -27,10 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- */
-
-/*
- * in6_gif.c
  */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
