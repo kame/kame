@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.355 2005/02/11 05:57:19 kjc Exp $	*/
+/*	$KAME: ip6_input.c,v 1.356 2005/02/22 13:54:28 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -500,8 +500,7 @@ ip6_input(m)
 		goto bad;
 	}
 
-#ifdef PFIL_HOOKS
-#if defined(__NetBSD__)
+#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || (defined(__FreeBSD__) && __FreeBSD_version > 503000)
 	/*
 	 * Run through list of hooks for input packets.  If there are any
 	 * filters which require that additional packets in the flow are
@@ -522,29 +521,27 @@ ip6_input(m)
 		struct in6_addr odst;
 
 		odst = ip6->ip6_dst;
+#if defined(__FreeBSD__) && __FreeBSD_version > 503000
+		/* Jump over all PFIL processing if hooks are not active. */
+		if (inet6_pfil_hook.ph_busy_count == -1)
+			goto passin;
+#endif
 		if (pfil_run_hooks(&inet6_pfil_hook, &m, m->m_pkthdr.rcvif,
-				   PFIL_IN) != 0)
+				   PFIL_IN
+#if defined(__FreeBSD__) && __FreeBSD_version > 503000
+				   , NULL
+#endif
+				   ) != 0)
 			return;
 		if (m == NULL)
 			return;
 		ip6 = mtod(m, struct ip6_hdr *);
 		srcrt = !IN6_ARE_ADDR_EQUAL(&odst, &ip6->ip6_dst);
 	}
-#elif defined(__FreeBSD__) && __FreeBSD_version >= 500000
-	m0 = m;
-	pfh = pfil_hook_get(PFIL_IN, &inet6sw[ip6_protox[IPPROTO_IPV6]].pr_pfh);
-	for (; pfh; pfh = pfh->pfil_link.tqe_next)
-		if (pfh->pfil_func) {
-			rv = pfh->pfil_func(ip6, sizeof(*ip6),
-					    m->m_pkthdr.rcvif, 0, &m0);
-			if (rv)
-				return;
-			m = m0;
-			if (m == NULL)
-				return;
-			ip6 = mtod(m, struct ip6_hdr *);
-		}
-#endif /* FreeBSD5 */
+
+#if defined(__FreeBSD__) && __FreeBSD_version > 503000
+passin:
+#endif
 #endif /* PFIL_HOOKS */
 
 	ip6stat.ip6s_nxthist[ip6->ip6_nxt]++;
