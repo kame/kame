@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.40 2001/06/01 22:54:40 itojun Exp $	*/
+/*	$KAME: config.c,v 1.41 2001/06/02 17:53:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -433,7 +433,8 @@ getconfig(intface)
 	MAYHAVE(val, "routes", 0);
 	if (val < 0 || val > 0xffffffff) {
 		syslog(LOG_ERR,
-		       "<%s> number of route information improper", __FUNCTION__);
+		       "<%s> number of route information improper",
+		       __FUNCTION__);
 		exit(1);
 	}
 	tmp->routes = val;
