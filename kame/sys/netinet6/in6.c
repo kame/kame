@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.327 2002/11/04 06:27:17 suz Exp $	*/
+/*	$KAME: in6.c,v 1.328 2002/11/04 06:43:53 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3290,6 +3290,7 @@ in6_delmulti(in6m)
 		 */
 		in6_clear_all_pending_report(in6m);
 		if (in6m->in6m_refcount == 0) {
+			in6m->in6m_source->i6ms_robvar = 0;
 			mld6_stop_listening(in6m);
 		}
 	}
