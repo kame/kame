@@ -754,10 +754,11 @@ udp_output(m, va_alist)
 #endif
 
 #ifdef INET6
-	stickyopt = inp->inp_outputopts6;
+	if (v6packet)
+		stickyopt = inp->inp_outputopts6;
 	if (control && v6packet) {
 		error = ip6_setpktoptions(control, &opt,
-		    ((inp->inp_socket->so_state & SS_PRIV) != 0));
+		    ((inp->inp_socket->so_state & SS_PRIV) != 0), 0);
 		if (error != 0)
 			goto release;
 		inp->inp_outputopts6 = &opt;

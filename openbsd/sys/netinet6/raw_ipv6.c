@@ -469,7 +469,7 @@ rip6_output(m, so, dst, control)
   flags = (so->so_options & SO_DONTROUTE);
 
   if (control) {
-    error = ip6_setpktoptions(control, &opt, so->so_state & SS_PRIV);
+    error = ip6_setpktoptions(control, &opt, so->so_state & SS_PRIV, 0);
     if (error != 0)
       goto bad;
     optp = &opt;
