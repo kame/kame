@@ -1,4 +1,4 @@
-/*	$KAME: ip6_id.c,v 1.8 2003/09/06 13:41:06 itojun Exp $	*/
+/*	$KAME: ip6_id.c,v 1.9 2003/09/09 11:30:10 itojun Exp $	*/
 /*	$OpenBSD: ip_id.c,v 1.6 2002/03/15 18:19:52 millert Exp $	*/
 
 /*
@@ -137,7 +137,7 @@ static struct randomtab randomtab_32 = {
 	2147483629,		/* RU_N-1 = 2^2*3^2*59652323 */
 	7,			/* determine ru_a as RU_AGEN^(2*rand) */
 	1836660096,		/* RU_M = 2^7*3^15 - don't change */
-	{ 2, 3, 59652323, -1 },	/* factors of ru_n */
+	{ 2, 3, 59652323, 0 },	/* factors of ru_n */
 };
 
 static struct randomtab randomtab_20 = {
@@ -148,7 +148,7 @@ static struct randomtab randomtab_20 = {
 	524269,			/* RU_N-1 = 2^2*3^2*14563 */
 	7,			/* determine ru_a as RU_AGEN^(2*rand) */
 	279936,			/* RU_M = 2^7*3^7 - don't change */
-	{ 2, 3, 14563, -1 },	/* factors of ru_n */
+	{ 2, 3, 14563, 0 },	/* factors of ru_n */
 };
 
 static u_int32_t pmod(u_int32_t, u_int32_t, u_int32_t);
@@ -216,7 +216,7 @@ initid(struct randomtab *p)
 			if (j % p->pfacts[i] == 0)
 				break;
 
-		if (p->pfacts[i] <= 0)
+		if (p->pfacts[i] == 0)
 			noprime = 0;
 		else
 			j = (j + 1) % p->ru_n;
