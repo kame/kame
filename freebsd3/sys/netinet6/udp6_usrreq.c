@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.35 2000/07/27 06:26:23 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.36 2000/08/01 02:42:55 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -163,7 +163,7 @@ udp6_input(mp, offp, proto)
 	ip6 = mtod(m, struct ip6_hdr *);
 
 #if defined(NFAITH) && 0 < NFAITH
-	if (faithprefix(&ip6->ip6_dst) {
+	if (faithprefix(&ip6->ip6_dst)) {
 		/* XXX send icmp6 host/port unreach? */
 		m_freem(m);
 		return IPPROTO_DONE;
