@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)route.c	8.2 (Berkeley) 11/15/93
- * $FreeBSD: src/sys/net/route.c,v 1.59 2000/01/15 07:27:12 shin Exp $
+ * $FreeBSD: src/sys/net/route.c,v 1.59.2.1 2000/05/03 19:17:12 wollman Exp $
  */
 
 #include "opt_inet.h"
@@ -306,7 +306,9 @@ rtredirect(dst, gateway, netmask, flags, src, rtp)
 	 * we have a routing loop, perhaps as a result of an interface
 	 * going down recently.
 	 */
-#define	equal(a1, a2) (bcmp((caddr_t)(a1), (caddr_t)(a2), (a1)->sa_len) == 0)
+#define	equal(a1, a2) \
+	((a1)->sa_len == (a2)->sa_len && \
+	 bcmp((caddr_t)(a1), (caddr_t)(a2), (a1)->sa_len) == 0)
 	if (!(flags & RTF_DONE) && rt &&
 	     (!equal(src, rt->rt_gateway) || rt->rt_ifa != ifa))
 		error = EINVAL;
@@ -781,7 +783,7 @@ rt_fixchange(rn, vp)
 	xm1 = (u_char *)rt_mask(rt0);
 	xk2 = (u_char *)rt_key(rt);
 
-	for (i = rnh->rnh_treetop->rn_off; i < len; i++) {
+	for (i = rnh->rnh_treetop->rn_offset; i < len; i++) {
 		if ((xk2[i] & xm1[i]) != xk1[i]) {
 #ifdef DEBUG
 			if(rtfcdebug) printf("no match\n");
