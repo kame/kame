@@ -807,7 +807,7 @@ explore_numeric_scope(pai, hostname, servname, res)
 	const char *servname;
 	struct addrinfo **res;
 {
-#ifndef SCOPE_DELIMITER
+#if !defined(SCOPE_DELIMITER) || !defined(INET6)
 	return explore_numeric(pai, hostname, servname, res);
 #else
 	const struct afd *afd;
