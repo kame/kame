@@ -102,10 +102,10 @@ autobuild:
 .endif
 
 copyright.c: COPYRIGHT
-	(echo '/*	$$KAME: Makefile,v 1.32 2001/01/28 15:47:15 itojun Exp $$	*/'; \
+	(echo '/*\t\044KAME\044\t*/' | unvis; \
 	echo; \
 	echo '/*'; \
-	sed -e 's,^, * ,' -e 's, *$$,,' < ${.ALLSRC}; \
+	sed -e 's,^, * ,' -e 's, *$$,,' < COPYRIGHT; \
 	echo ' */') > ${.TARGET}
 
 .include "Makefile.inc"
