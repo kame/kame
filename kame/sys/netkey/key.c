@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.263 2002/10/27 04:26:52 itojun Exp $	*/
+/*	$KAME: key.c,v 1.264 2002/10/27 05:23:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1819,23 +1819,21 @@ key_spdadd(so, m, mhp)
 	 * specification.  applies only if we decapsulate in RFC2401
 	 * IPsec (implementation limitation).
 	 */
-	if (!ipsec_tunnel_device) {
-		for (isr = newsp->req; isr; isr = isr->next) {
-			struct sockaddr *sa;
+	for (isr = newsp->req; isr; isr = isr->next) {
+		struct sockaddr *sa;
 
-			if (isr->saidx.src.ss_family) {
-				sa = (struct sockaddr *)(src0 + 1);
-				if (sa->sa_family != isr->saidx.src.ss_family) {
-					keydb_delsecpolicy(newsp);
-					return key_senderror(so, m, EINVAL);
-				}
+		if (isr->saidx.src.ss_family) {
+			sa = (struct sockaddr *)(src0 + 1);
+			if (sa->sa_family != isr->saidx.src.ss_family) {
+				keydb_delsecpolicy(newsp);
+				return key_senderror(so, m, EINVAL);
 			}
-			if (isr->saidx.dst.ss_family) {
-				sa = (struct sockaddr *)(dst0 + 1);
-				if (sa->sa_family != isr->saidx.dst.ss_family) {
-					keydb_delsecpolicy(newsp);
-					return key_senderror(so, m, EINVAL);
-				}
+		}
+		if (isr->saidx.dst.ss_family) {
+			sa = (struct sockaddr *)(dst0 + 1);
+			if (sa->sa_family != isr->saidx.dst.ss_family) {
+				keydb_delsecpolicy(newsp);
+				return key_senderror(so, m, EINVAL);
 			}
 		}
 	}
