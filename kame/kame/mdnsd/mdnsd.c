@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.58 2002/09/24 09:15:48 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.59 2003/04/08 09:08:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -100,7 +100,7 @@ main(argc, argv)
 	struct sockdb *sd, *snext;
 	int nsock;
 
-	while ((ch = getopt(argc, argv, "46Dfh:i:lmNp:P:")) != -1) {
+	while ((ch = getopt(argc, argv, "46Dfh:i:lmNp:P:r:")) != -1) {
 		switch (ch) {
 		case '4':
 			family = AF_INET;
@@ -148,6 +148,9 @@ main(argc, argv)
 			mdstport = optarg;
 			mcastloop4 = 1;
 			mcastloop6 = 1;
+			break;
+		case 'r':
+			dstport = optarg;
 			break;
 		default:
 			usage();
@@ -335,7 +338,7 @@ usage()
 
 	fprintf(stderr,
 "usage: mdnsd [-46DflmN] [-h hostname] [-p srcport] [-P dstport]\n"
-"             -i iface [server...]\n");
+"             [-r relayport] -i iface [server...]\n");
 }
 
 static int
