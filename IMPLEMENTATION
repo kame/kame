@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/03/09 20:06:56 $
+			$Date: 2000/03/12 00:25:15 $
 
 1. IPv6
 
@@ -109,6 +109,18 @@ draft-ietf-ngtrans-tcpudp-relay-00.txt:
 	An IPv6-to-IPv4 transport relay translator
     * FAITH tcp relay translator (faithd) implements this.  See 3.1 for more
       details.
+draft-ietf-ngtrans-6to4-03.txt:
+	Connection of IPv6 Domains via IPv4 Clouds without Explicit Tunnels
+    * "stf" interface implments it.  Be sure to read the next item before
+      configuring it, there are security issues.
+http://playground.iijlab.net/i-d/draft-itojun-ipv6-transition-abuse-00.txt:
+	Possible abuse against IPv6 transition technologies
+    * KAME does not implement RFC1933 automatic tunnel.
+    * "stf" interface implements some address filters.  Refer to stf(4)
+      for details.  Since it is no way complete, we do not include "stf"
+      interface into GENERIC.v6 compilation.
+    * kame/openbsd completely disables IPv4 mapped address support.
+    * kame/netbsd makes IPv4 mapped address support off by default.
 
 1.2 Neighbor Discovery
 
