@@ -1,4 +1,4 @@
-/*	$NetBSD: kerberos5.c,v 1.4.2.3 2001/04/05 23:25:57 he Exp $	*/
+/*	$NetBSD: kerberos5.c,v 1.8 2001/09/17 12:34:43 assar Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -212,7 +212,7 @@ kerberos5_send(Authenticator *ap)
 		}
 		return (0);
 	}
-	krb5_auth_setkeytype(telnet_context, auth_context, KEYTYPE_DES);
+	krb5_auth_con_setkeytype(telnet_context, auth_context, KEYTYPE_DES);
 
 	foo[0] = ap->type;
 	foo[1] = ap->way;

@@ -1,4 +1,4 @@
-/*	$NetBSD: encrypt.h,v 1.5.10.1 2000/06/22 07:09:03 thorpej Exp $	*/
+/*	$NetBSD: encrypt.h,v 1.6 2000/06/22 06:47:43 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993

@@ -1,4 +1,4 @@
-/*	$NetBSD: enc-proto.h,v 1.4.2.1 2000/06/22 07:09:02 thorpej Exp $	*/
+/*	$NetBSD: enc-proto.h,v 1.4 2000/06/22 06:47:42 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993

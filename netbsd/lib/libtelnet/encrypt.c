@@ -1,4 +1,4 @@
-/*	$NetBSD: encrypt.c,v 1.6.10.2 2001/04/05 23:25:47 he Exp $	*/
+/*	$NetBSD: encrypt.c,v 1.8 2001/01/06 23:36:36 christos Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)encrypt.c	8.2 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: encrypt.c,v 1.6.10.2 2001/04/05 23:25:47 he Exp $");
+__RCSID("$NetBSD: encrypt.c,v 1.8 2001/01/06 23:36:36 christos Exp $");
 #endif /* not lint */
 
 /*

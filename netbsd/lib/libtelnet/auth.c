@@ -1,4 +1,4 @@
-/*	$NetBSD: auth.c,v 1.10.4.1 2000/06/22 07:09:02 thorpej Exp $	*/
+/*	$NetBSD: auth.c,v 1.11 2000/06/22 06:47:42 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)auth.c	8.3 (Berkeley) 5/30/95"
 #else
-__RCSID("$NetBSD: auth.c,v 1.10.4.1 2000/06/22 07:09:02 thorpej Exp $");
+__RCSID("$NetBSD: auth.c,v 1.11 2000/06/22 06:47:42 thorpej Exp $");
 #endif
 #endif /* not lint */
 

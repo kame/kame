@@ -1,4 +1,4 @@
-/*	$NetBSD: krb4encpwd.c,v 1.1.2.1 2000/06/22 07:09:03 thorpej Exp $	*/
+/*	$NetBSD: krb4encpwd.c,v 1.1 2000/06/22 06:47:46 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)krb4encpwd.c	8.3 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: krb4encpwd.c,v 1.1.2.1 2000/06/22 07:09:03 thorpej Exp $");
+__RCSID("$NetBSD: krb4encpwd.c,v 1.1 2000/06/22 06:47:46 thorpej Exp $");
 #endif
 #endif /* not lint */
 

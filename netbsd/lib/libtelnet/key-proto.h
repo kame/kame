@@ -1,4 +1,4 @@
-/*	$NetBSD: key-proto.h,v 1.4.2.1 2000/06/22 07:09:03 thorpej Exp $	*/
+/*	$NetBSD: key-proto.h,v 1.4 2000/06/22 06:47:45 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
