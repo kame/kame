@@ -141,13 +141,25 @@ ospf_init()
 
 #ifdef ADVANCEDAPI
   on = 1;
+#ifdef IPV6_RECVPKTINFO
+  if (setsockopt(ospfsock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
+		 &on, sizeof(on)) < 0)
+    fatal("<ospf_init>: setsockopt(IPV6_RECVPKTINFO)");
+#else  /* old adv. API */
   if (setsockopt(ospfsock, IPPROTO_IPV6, IPV6_PKTINFO,
 		 &on, sizeof(on)) < 0)
-    fatal("<ospf_init>: setsockopt IPV6_PKTINFO");
+    fatal("<ospf_init>: setsockopt(IPV6_PKTINFO)");
+#endif 
   on = 1;
-  if (setsockopt(ospfsock, IPPROTO_IPV6, IPV6_HOPLIMIT,
+#ifdef IPV6_RECVPKTINFO
+  if (setsockopt(ospfsock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
 		 &on, sizeof(on)) < 0)
-    fatal("<ospf_init>: setsockopt IPV6_HOPLIMIT");
+    fatal("<ospf_init>: setsockopt(IPV6_RECVPKTINFO)");
+#else  /* old adv. API */
+  if (setsockopt(ospfsock, IPPROTO_IPV6, IPV6_PKTINFO,
+		 &on, sizeof(on)) < 0)
+    fatal("<ospf_init>: setsockopt(IPV6_PKTINFO)");
+#endif 
 #endif /* ADVANCEDAPI */
 
   FD_SET(ospfsock,  &fdmask);   /* initialize */

@@ -148,13 +148,25 @@ rip_init()
 
 #ifdef ADVANCEDAPI
   on = 1;
+#ifdef IPV6_RECVPKTINFO
+  if (setsockopt(ripsock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
+		 &on, sizeof(on)) < 0)
+    fatal("<rip_init>: setsockopt(IPV6_RECVPKTINFO)");
+#else  /* old adv. API */
   if (setsockopt(ripsock, IPPROTO_IPV6, IPV6_PKTINFO,
 		 &on, sizeof(on)) < 0)
-    fatal("<rip_init>: setsockopt IPV6_PKTINFO");
+    fatal("<rip_init>: setsockopt(IPV6_PKTINFO)");
+#endif 
   on = 1;
-  if (setsockopt(ripsock, IPPROTO_IPV6, IPV6_HOPLIMIT,
+#ifdef IPV6_RECVPKTINFO
+  if (setsockopt(ripsock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
 		 &on, sizeof(on)) < 0)
-    fatal("<rip_init>: setsockopt IPV6_HOPLIMIT");
+    fatal("<rip_init>: setsockopt(IPV6_RECVPKTINFO)");
+#else  /* old adv. API */
+  if (setsockopt(ripsock, IPPROTO_IPV6, IPV6_PKTINFO,
+		 &on, sizeof(on)) < 0)
+    fatal("<rip_init>: setsockopt(IPV6_PKTINFO)");
+#endif 
 #endif /* ADVANCEDAPI */
 
   FD_SET(ripsock,  &fdmask);

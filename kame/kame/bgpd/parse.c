@@ -1187,9 +1187,15 @@ conf_check(char *filename)
 
     on = 1;
 #ifdef ADVANCEDAPI
+#ifdef IPV6_RECVPKTINFO
+    if (setsockopt(bgpsock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
+		   &on, sizeof(on)) < 0)
+      fatal("<conf_check>: setsockopt(IPV6_RECVPKTINFO)");
+#else  /* old adv. API */
     if (setsockopt(bgpsock, IPPROTO_IPV6, IPV6_PKTINFO,
 		   &on, sizeof(on)) < 0)
-      fatal("<conf_check>: setsockopt: IPV6_PKTINFO");
+      fatal("<conf_check>: setsockopt(IPV6_PKTINFO)");
+#endif 
 #endif
 
     if (listen(bgpsock, 5) < 0) {

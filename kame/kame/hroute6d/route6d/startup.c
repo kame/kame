@@ -1,5 +1,5 @@
 /* 
- * $Id: startup.c,v 1.4 1999/10/26 09:05:45 itojun Exp $
+ * $Id: startup.c,v 1.5 1999/12/21 12:00:44 jinmei Exp $
  */
 
 /*
@@ -141,8 +141,21 @@ initialize_sockets(void)
 		syslog(LOG_ERR, "multicast hops: %m");
 
 	hops = 1;		/* want to RX_INFO */
-	if (setsockopt(rip6_sock, IPPROTO_IPV6, IPV6_PKTINFO, (void *)&hops,
-		       sizeof(int)) < 0) {
+#ifdef IPV6_RECVPKTINFO
+	if (setsockopt(rip6_sock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
+		       (void *)&hops, sizeof(int)) < 0) {
+		syslog(LOG_ERR, "sockopt RECVPKTINFO: %m");
+		exit_route6d();
+	}
+#else  /* old adv. API */
+	if (setsockopt(rip6_sock, IPPROTO_IPV6, IPV6_PKTINFO,
+		       (void *)&hops, sizeof(int)) < 0) {
+		syslog(LOG_ERR, "sockopt PKTINFO: %m");
+		exit_route6d();
+	}
+#endif 
+	if (setsockopt(rip6_sock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
+		       (void *)&hops, sizeof(int)) < 0) {
 		syslog(LOG_ERR, "sockopt PKTINFO: %m");
 		exit_route6d();
 	}

@@ -296,9 +296,14 @@ main_listen_accept()
       }
 #ifdef ADVANCEDAPI
       on = 1;
+#ifdef IPV6_RECVPKTINFO
+      if (setsockopt(bnp->rp_socket, IPPROTO_IPV6, IPV6_RECVPKTINFO,
+		     &on, sizeof(on)) < 0)
+	fatal("<main_listen_accept>: setsockopt(IPV6_RECVPKTINFO)");
+#endif /* old adv. API */
       if (setsockopt(bnp->rp_socket, IPPROTO_IPV6, IPV6_PKTINFO,
 		     &on, sizeof(on)) < 0)
-	fatal("<main_listen_accept>: setsockopt: IPV6_PKTINFO");
+	fatal("<main_listen_accept>: setsockopt(IPV6_PKTINFO)");
 #endif
 
       bgp_send_open(bnp);

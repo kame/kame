@@ -158,9 +158,15 @@ connect_try(struct rpcb *bnp)
 
 #ifdef ADVANCEDAPI
   on = 1;
+#ifdef IPV6_RECVPKTINFO
+  if (setsockopt(bnp->rp_socket, IPPROTO_IPV6, IPV6_RECVPKTINFO,
+		 &on, sizeof(on)) < 0)
+    fatal("<connect_try>: setsockopt: IPV6_RECVPKTINFO");
+#else  /* old adv API */
   if (setsockopt(bnp->rp_socket, IPPROTO_IPV6, IPV6_PKTINFO,
 		 &on, sizeof(on)) < 0)
     fatal("<connect_try>: setsockopt: IPV6_PKTINFO");
+#endif 
 
   if (bnp->rp_mode & BGPO_IFSTATIC) {
     struct in6_pktinfo *pktinfo;
@@ -338,12 +344,21 @@ connect_process(struct rpcb *bnp)
       }
 
       off = 0;
+#ifdef IPV6_RECVPKTINFO
+      if (setsockopt(bnp->rp_socket, IPPROTO_IPV6, IPV6_RECVPKTINFO,
+		     &off, sizeof(off)) < 0) {
+	      syslog(LOG_INFO, "<%s>: failed to setsockopt(IPV6_RECVPKTINFO)",
+		     __FUNCTION__);
+	      CONNECT_RETRY(bnp);
+      }
+#else  /* old adv. API */
       if (setsockopt(bnp->rp_socket, IPPROTO_IPV6, IPV6_PKTINFO,
 		     &off, sizeof(off)) < 0) {
 	      syslog(LOG_INFO, "<%s>: failed to setsockopt(IPV6_PKTINFO)",
 		     __FUNCTION__);
 	      CONNECT_RETRY(bnp);
       }
+#endif 
     }
 #else  /* ! ADVANCEDAPI */
     {
@@ -2014,9 +2029,16 @@ bgp_process_keepalive (struct rpcb *bnp) {
       }
 
       off = 0;
-      if (setsockopt(bnp->rp_socket, IPPROTO_IPV6, IPV6_PKTINFO,  /* off */
+#ifdef IPV6_RECVPKTINFO
+      if (setsockopt(bnp->rp_socket, IPPROTO_IPV6, IPV6_RECVPKTINFO, /* off */
 		     &off, sizeof(off)) < 0)
-	fatal("<bgp_process_keepalive>: setsockopt: IPV6_PKTINFO");
+	      fatal("<bgp_process_keepalive>: setsockopt(IPV6_RECVPKTINFO)");
+#else  /* old adv. API */
+      if (setsockopt(bnp->rp_socket, IPPROTO_IPV6, IPV6_PKTINFO, /* off */
+		     &off, sizeof(off)) < 0)
+	      fatal("<bgp_process_keepalive>: setsockopt(IPV6_PKTINFO)");
+#endif 
+
       free(cmsgp);
       llhackaddr = bnp->rp_addr.sin6_addr;
       if (IN6_IS_ADDR_LINKLOCAL(&llhackaddr))
