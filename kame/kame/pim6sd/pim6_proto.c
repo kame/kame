@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.47 2001/10/24 22:21:36 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.48 2001/11/28 03:38:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -576,7 +576,6 @@ parse_pim6_hello(pim_message, datalen, src, opts)
     u_int16         option_type;
     u_int16         option_length;
     int             holdtime_received_ok = FALSE;
-    int             option_total_length;
     pim6_encod_uni_addr_t 	encod_uniaddr;
 
     /* 

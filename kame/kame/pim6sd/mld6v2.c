@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2.c,v 1.5 2001/11/27 07:23:28 suz Exp $
+ * $KAME: mld6v2.c,v 1.6 2001/11/28 03:38:41 itojun Exp $
  */
 
 /*
@@ -309,7 +309,7 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
 					       IP6OPT_ROUTER_ALERT, 2,
 					       2, &optp)) == -1)
 		log(LOG_ERR, 0,
-		    "inet6_opt_append(len = %d) failed", currentlen, hbhlen);
+		    "inet6_opt_append(len = %d/%d) failed", currentlen, hbhlen);
 	    (void) inet6_opt_set_val(optp, 0, &rtalert_code,
 				     sizeof(rtalert_code));
 	    if (inet6_opt_finish(hbhbuf, hbhlen, currentlen) == -1)

@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.36 2001/11/27 07:19:15 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.37 2001/11/28 03:38:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -535,7 +535,7 @@ make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen, alert)
 						       IP6OPT_ROUTER_ALERT, 2,
 						       2, &optp)) == -1)
 			    log(LOG_ERR, 0,
-				"inet6_opt_append(len = %d) failed",
+				"inet6_opt_append(len = %d/%d) failed",
 				currentlen, hbhlen);
 		    (void)inet6_opt_set_val(optp, 0, &rtalert_code,
 					    sizeof(rtalert_code));

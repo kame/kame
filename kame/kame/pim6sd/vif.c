@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.21 2001/11/27 07:51:39 suz Exp $	*/
+/*	$KAME: vif.c,v 1.22 2001/11/28 03:38:42 itojun Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -85,6 +85,7 @@
 #include "mrt.h"
 #include "debug.h"
 #include "timer.h"
+#include "callout.h"
 
 struct uvif	uvifs[MAXMIFS];	/*the list of virtualsinterfaces */
 mifi_t numvifs;				/*total number of interface */
