@@ -80,6 +80,8 @@ Major parameters are listed below.
 .It Ar number
 means hexa-decimal or decimal number.  The former is expressed with '0x'.
 .It Ar string
+.It Ar path
+.It Ar file
 means any string enclosed
 .Sq \&"
 .Pq double quote .
@@ -87,6 +89,64 @@ means any string enclosed
 means IPv6 and IPv4 address.
 .It Ar port
 means TCP/UDP port number.
+.It timeunit
+is one of following:
+sec, secs, second, seconds, min, mins, minute, minutes, hour, hours.
+.It byteunit
+is one of following: B, byte, bytes, KB, MB, TB.
+.El
+.\"
+.Ss Path Specification
+.Bl -tag -width Ds -compact
+.It Ic path include Ar path ;
+specifies a path to include file.  See
+.Ic File Include .
+.It Ic path pre_shared_key Ar file ;
+specifies a file including pre-shared key for various ID.
+This file includes some lines of a pair of
+.Ar ID
+and
+.Ar key .
+.Ar ID
+and
+.Ar key
+are separated by any number of blanks and/or tab characters.
+.It Ic path certificate Ar path ;
+racoon will search this directory if the certificate or certificate request
+is received.
+.El
+.\"
+.Ss File Include
+.Bl -tag -width Ds -compact
+other configuration file can be included by written like below.
+.It Ic include Ar file
+.El
+.\"
+.Ss Identifier Specification
+.Bl -tag -width Ds -compact
+.It Ic identifier Ic vendor_id Ar string ;
+.It Ic identifier Ic user_fqdn Ar string ;
+.It Ic identifier Ic fqdn Ar string ;
+.It Ic identifier Ic keyid Ar file ;
+.El
+.\"
+.Ss Timer Specification
+.Pp
+.Bl -tag -width Ds -compact
+.It Ic timer { Ar statements Ic }
+specifys default various timer.
+.Pp
+.Bl -tag -width Ds -compact
+.It counter Ar number ;
+maximun trying count to send.
+.It interval Ar number Ar timeunit ;
+maximun interval to resend.
+.It persend Ar number ;
+the number of packets per a send.
+.It phase1 Ar number Ar timeunit ;
+.It phase2 Ar number Ar timeunit ;
+timer for waiting to complete each phase.
+.El
 .El
 .\"
 .Ss Listening Port Specification
@@ -101,11 +161,11 @@ will listen to all available interface addresses.
 The followings are the list of statements.
 .Pp
 .Bl -tag -width Ds -compact
-.It Ic isakmp Ar address Ic port Ar port ;
+.It Ic isakmp Ar address [ Ar port ] ;
 If this(these) is specifyed,
 .Xr racoon 8
 will only listen to its address.
-.It Ic admin Ic port Ar port ;
+.It Ic admin Ic [ Ar port ] ;
 specify the port for connecting to
 .Xr kmpstat 8 .
 .El
@@ -115,105 +175,59 @@ specify the port for connecting to
 .Pp
 .Bl -tag -width Ds -compact
 .It Xo
-.Ic remote ( Ar address \*(Ba Ic anonymous )
+.Ic remote ( Ar address \*(Ba Ic anonymous ) [
+.Ar port ]
 .Ic { Ar statements Ic }
 .Xc
-definie the parameters of IKE phase 1, phase 2 and others.
+definies the parameters of IKE phase 1 per remote node.
 The followings are the list of statements.
 .Pp
 .Bl -tag -width Ds -compact
-.It Ic try_to_send Ar number ;
-the count of sending packet for retransmission.
-.It Ic send_timer Ar number ;
-the number of interval to re-send packet.
-.It Ic vendor_id Ar string ;
-define the vendor identifier.
 .\"
-.It Xo
-.Ic phase Ar number
-.Ic { Ar substatements Ic }
-.Xc
-.Ar number
-is 1 or 2 that mean IKE phase.
-The followings are the list of statements.
-.Pp
-.Bl -tag -width Ds -compact
-.It Ic exchange_mode ( main \*(Ba aggressive ) ;
-defined mode of phase 1.
-.Ic main
-and
-.Ic aggressive
-mean main mode and aggressive respectively.
+.It Ic exchange_mode ( main \*(Ba aggressive \*(Ba base ) ;
+defined exchange mode of phase 1.
+.\"
 .It Ic doi Ar ipsec_doi ;
 means to use IPSEC-DOI specifyed RFC 2407.
 It must be stated.
+.\"
 .It Ic situation Ic identity_only ;
 It must be stated.
-.It Ic pfs_group Ar group ;
-define the group of Diffie-Hellman exponentiations for PFS.
-It's only use in phase 2.
+.\"
+.It Ic dh_group Ar group ;
+define the group of Diffie-Hellman exponentiations for aggressive mode.
 .Ar group
-are one of the followings:
+are one of the following:
 .Ic modp768 , modp1024 , modp1536 .
-.It Ic id_type Ar type Ar string ;
-It's not used.
 .\"
-.It Xo
-.Ic proposal Ar number Ar protocol
-.Ic { Ar sub-substatements Ic }
-.Xc
-.Ar number
-must be increasing.
-.Ar protocol
-is one of followins:
-.Ic isakmp , esp , ah
-or
-.Ic ipcomp .
-.Pp
-.Ic isakmp
-means
-.Do
-Internet Security Association and Key Management Protocol
-.Dc ,
-RFC 2408.
-.Ic esp
-means
-.Do
-IP Encapsulating Security Payload
-.Dc ,
-RFC 2406.
-.Ic ah
-means
-.Do
-IP Authentication Header
-.Dc ,
-RFC 2402.
-.Ic ipcomp
-means
-.Do
-IP Payload Compression Protocol
-.Dc ,
-RFC 2393.
-.Pp
-.Bl -tag -width Ds -compact
-.\"
-.It Xo
-.Ic transform Ar number Ar transform
-.Ic { sub-sub-substatements }
-.Xc
-.Ar transform
+.It Ic identifier Ar idtype ;
+specifies ID type to use phase 1 negotiation.
+.Ar idtype
 is one of following:
-.Ic oakley
-for isakmp.
-.Ic des , 3des , des_iv64 , null , rc5 , cast128 , blowfish
-for esp.
-.Ic sha1 , md5
-for ah.
-.Ic oui , deflate , lzs
-for ipcomp.
-.Ar number
-must be increasing.
-.Pp
+.Ic address , fqdn , user_fqdn , keyid .
+These are linked to
+.Ic identifier
+directive.
+.\"
+.It Ic certificate_type Ar certtype ;
+specifies certificate type.
+.Ar certtype
+is one of followings:
+.Ic x509 , pkcs7 , pgp .
+.\"
+.It Ic lifetime time Ar number Ar timeunit ;
+.It Ic lifetime byte Ar number Ar byteunit ;
+define default lifetime of phase 1 SA.
+.\"
+.It Ic keepalive
+Not yet.
+.\"
+.It Ic nonce_size Ar number ;
+define the byte size of nonce value.
+.\"
+.It Xo
+.Ic proposal { Ar sub-substatements Ic }
+.Xc
 .Bl -tag -width Ds -compact
 .\"
 .It Ic encryption_algorithm Ar algorithm ;
@@ -235,7 +249,7 @@ for oakley.
 define the authentication method for phase 1 negotiation.
 .Ar type
 is only one:
-.Ic pre_shared_key Ar string ;
+.Ic pre_shared_key, rsasig , dsssig , rsaenc , rsarev .
 .\"
 .It Ic dh_group Ar group ;
 define the group of Diffie-Hellman exponentiations.
@@ -243,9 +257,92 @@ define the group of Diffie-Hellman exponentiations.
 is one of following:
 .Ic modp768 , modp1024 , modp1536 .
 .\"
+.It Ic strength Ar level ;
+specifies strength of cryptographic algorithm.
+.Ar level
+is one of following: extra_high, high, normal.
+.It Ic lifetime time Ar number Ar timeunit ;
+.It Ic lifetime byte Ar number Ar byteunit ;
+define lifetime of phase 1 SA eay proposal.
+.El
+.El
+.El
+.\"
+.Ss Policy Specifications 
+.Pp
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic policy Ar address_range Ar direction Ar action
+.Ic { Ar statements Ic }
+.Xc
+definies a action of matched packet.
+.Ar address_range
+is 
+.Ar source_range Ar destination_range Ar protocol .
+.Pp
+.Bl -tag -width Ds -compact
+.\"
+.It Ic pfs_group Ar group ;
+define the group of Diffie-Hellman exponentiations.
+.Ar group
+is one of following:
+.Ic modp768 , modp1024 , modp1536 .
+.\"
+.It Xo
+.Ic proposal
+.Ic { Ar sub-substatements Ic }
+.Xc
+.Bl -tag -width Ds -compact
+.\"
+.It Xo
+.Ic protocol Ar protocol
+.Ic { Ar sub-substatements Ic }
+.Xc
+.Ar protocol
+is one of followins:
+.Ic esp , ah
+or
+.Ic ipcomp .
+.Pp
+.Ic esp
+means
+.Do
+IP Encapsulating Security Payload
+.Dc ,
+RFC 2406.
+.Ic ah
+means
+.Do
+IP Authentication Header
+.Dc ,
+RFC 2402.
+.Ic ipcomp
+means
+.Do
+IP Payload Compression Protocol
+.Dc ,
+RFC 2393.
+.Pp
+.Bl -tag -width Ds -compact
+.\"
 .It Ic authentication_algorithm Ar algorithm ;
 .Ic hmac_md5, hmac_sha1, none
 for esp and ah.
+.\"
+.It Ic level Ar level ;
+.Ar level
+is one of following:
+.Ic use , require ;
+.\"
+.It Ic mode Ar mode ;
+.Ar mode
+is one of following:
+.Ic tunnel , transport .
+.Ic tunnel
+must be with perr's address.
+.\"
+.It Ic strength Ar level ;
+specifies strength of cryptographic algorithm.
 .\"
 .It Ic nonce_size Ar number ;
 define the byte size of random value.
@@ -257,28 +354,43 @@ But in the case of oakley, KB is not supported now.
 .El
 .El
 .El
-.It Xo
-.Ic post-command
-.Ic { Ar substatements Ic }
-.Xc
+.\"
+.Ss Algorithm Strength Specification
+.Pp
 .Bl -tag -width Ds -compact
-.It Ic path Ar path ;
-specify PATH to execute command.
-.It Ic exec Ar command ;
-define the command to execute after to negotiate phase 1.
-.It Ic success Ar command ;
-define the command to execute if success of execution the defined by
-.Ic exec .
-.It Ic failure Ar command ;
-define the command to execute if failure of execution the defined by
-.Ic exec .
+.It Ic algorithm_strength { Ar statements Ic }
+specifies algorithm strength.  These are extracted into attribute of
+proposal to negotiate SA.  There are seven type of class;
+ISAKMP authentication method,
+ISAKMP encryption algorithm,
+ISAKMP hash algorithm,
+ISAKMP DH group,
+IPsec encryption algorithm,
+IPsec authentication algorithm,
+IPsec compression algorithm.
+.Pp
+.Bl -tag -width Ds -compact
+.It Ic algorithm_class { Ar statements Ic }
+.Ic Algorithm_class
+is one of following:
+isakmp_auth_method isakmp_encryption, isakmp_hash,
+isakmp_dh_group, ipsec_encryption, ipsec_authentication,
+ipsec_ipcomp.
+Each class can be defined three level; "normal", "high" and "extra_high".
+Each level can be omited.  If so, it is interpreted that there is no
+algorithm appropreately for use in its level.  algorithm type may be
+defined at multiple level.
 .El
 .El
 .\"
-.Ss Filtering rules
+.Ss Static SA configuration
 .Bl -tag -width Ds -compact
-.It Ic filter { statements }
-It'll be supported in the future.
+.It Ic static_sa Ar parameters
+specifies static SA.  This
+.Ar parameters
+will be passed to
+.Xr setkey 8 .
+Not yet, but only define.
 .El
 .\"
 .Ss Specifying log file
@@ -286,7 +398,7 @@ It'll be supported in the future.
 .It Ic log ( Ar number \*(Ba Ar level ) ;
 define dump level.  It is debugging use.
 .Ar is one of following:
-.Ic info , notify , sched , sched2 , cipher , sa , net , misc , all .
+.Ic info , notify , debug , debug2 , debug3 , debug4 .
 .El
 .\"
 .Ss Specifying the way to pad
@@ -295,110 +407,125 @@ define dump level.  It is debugging use.
 specifyed padding format.
 The followings are the list of statements.
 .Bl -tag -width Ds -compact
-.It Ic max_length Ar number ;
-.It Ic random_length (on \(ba off) ;
-.It Ic check_length (on \(ba off) ;
-.It Ic excl_lastone (on \(ba off) ;
+.It Ic maximum_length Ar number ;
+.It Ic randomize (on \(ba off) ;
+.It Ic restrict_check (on \(ba off) ;
+.It Ic exclusive_tail (on \(ba off) ;
 .El
 .El
 .\"
 .Sh EXAMPLE
 .Bd -literal -offset
-# main mode example, with "anonymous" (any peer) configuration
-remote anonymous {
-	try_to_send 3;   # count
-	send_timer 20;   # (s)
-	vendor_id "KAME/racoon";
 
-	phase 1 {
-		exchange_mode main;
-		doi ipsec_doi;
-		situation identity_only;
+For example of remote directive.
+remote 172.168.2.2 [7000]
+{
+	exchange_mode main;
 
-		proposal 1 isakmp {
-			transform 1 oakley {
-				encryption_algorithm des;
-				hash_algorithm md5;
-				authentication_method pre_shared_key "mekmitasdigoat";
-				dh_group modp768;
-				nonce_size 16;
-				lifetime 7200 second;
-			}
-			transform 2 oakley {
-				encryption_algorithm des;
-				hash_algorithm md5;
-				authentication_method pre_shared_key "mekmitasdigoat";
-				dh_group modp1024;
-				nonce_size 16;
-				lifetime 7200 second;
-			}
-		}
+	# default doi is "ipsec_doi".
+	doi ipsec_doi;
+
+	# default situation is "identity_only".
+	situation identity_only;
+
+	# specify the identifier type
+	# "address", "fqdn", "user_fqdn", "keyid"
+	identifier user_fqdn;
+	certificate_type pgp;
+
+	# specify the bytes length of nonce.
+	nonce_size 16;
+
+	# means to do keep-a-live.  This should not be used in dial-up.
+	keepalive;
+
+	# default lifetime inlayed each proposals.
+	lifetime time 10 min;	# sec,min,hour
+	lifetime byte 5 MB;	# B,KB,GB
+
+	proposal {
+		strength normal;
+		authentication_method rsasig ;
 	}
+	proposal {
+		strength high;
+		authentication_method pre_shared_key ;
 
-	phase 2 {
-		doi ipsec_doi;
-		situation identity_only;
-
-		pfs_group modp1024;
-
-		proposal 1 ah {
-			transform 1 sha1 {
-				authentication_algorithm hmac_sha1;
-				lifetime 3600 second;
-				lifetime 10000 KB;
-			}
-		}
-		proposal 7 esp {
-			transform 1 des {
-				authentication_algorithm hmac_sha1;
-				lifetime 3600 second;
-				lifetime 10000 KB;
-			}
-		}
+		# they can be defined individually.
+		lifetime time 5 min;
+		lifetime byte 2 MB;
+	}
+	proposal {
+		# they can be defined explicitly.
+		encryption_algorithm des;
+		hash_algorithm md5;
+		dh_group modp1024;
+		authentication_method pre_shared_key ;
 	}
 }
 
-# aggressive mode example
-remote 10.0.0.1 {
-	try_to_send 10;   # count
-	send_timer 30;   # (s)
-	vendor_id "KAME/racoon";
+For example of policy directive.
 
-	phase 1 {
-		exchange_mode aggressive;
-		doi ipsec_doi;
-		situation identity_only;
-		pfs_group modp1024;
+# Fot example.
+# 10.1.1.0/24                  10.2.2.0/24
+#     --+--                      --+--
+#       |                          |
+#     +-+-+                      +-+-+
+#     | A |==========//==========| B |
+#     +---+                      +-+-+
+#       172.168.1.1      172.168.2.2
+# setting on gateway A:
 
-		proposal 1 isakmp {
-			transform 3 oakley {
-				encryption_algorithm 3des;
-				hash_algorithm md5;
-				authentication_method pre_shared_key "mekmitasdigoat";
-				nonce_size 16;
-				lifetime 900 second;
-			}
-			transform 7 oakley {
-				encryption_algorithm 3des;
-				hash_algorithm sha1;
-				authentication_method pre_shared_key "mekmitasdigoat";
-				nonce_size 16;
-				lifetime 300 second;
-			}
+policy 10.1.1.0/24 10.2.2.0/24 any inout ipsec
+{
+	# "pfs_group" specifies to require PFS, and defines a DH group number.
+	# It is followed by either "modp768", "modp1024" or "modp1536".
+	pfs_group modp768;
+
+	# "proposal" defines proposal of IPsec-SA.
+
+	# This proposal means IP2|ESP|IP1|ULP.
+	proposal {
+		# "lifetime" specifies two type of lifetime of SA.
+		lifetime time 200 second;
+		lifetime byte 5000 KB;
+
+		# "protocol" defines some of trasnform.
+		protocol esp {
+			# "level" can be followed by either "require", "use" or
+			# "default".  "default" is used if there is no "level".
+			level require ;
+
+			# "mode" can be followed by either "tunnel" or "use".
+			# If tunnel mode is specified, peer's address must be
+			# specifyed carefully.
+			mode tunnel 172.168.2.2;
+
+			# "strength" defines a strength of algorithm in use.
+			# This is either "extra_high", "high" or "normal".
+			strength high ;
 		}
 	}
 
-	phase 2 {
-		doi ipsec_doi;
-		situation identity_only;
-		pfs_group modp1024;
+	# This proposal means IP2|AH|ESP|IP1|ULP.
+	# The order of protocol is very important.  It means SA bundle or
+	# nested SAs.
+	proposal {
+		# "lifetime" specifies some lifetime of SA.
+		lifetime time 300 second;
+		lifetime byte 10000 KB;
 
-		proposal 16 esp {
-			transform 1 3des {
-				authentication_algorithm hmac_md5;
-				lifetime 300 second;
-				lifetime 10000 KB;
-			}
+		protocol esp {
+			level require ;
+			mode tunnel 172.168.2.2;
+			strength high ;
+		}
+
+		# "ah" means AH.
+		protocol ah {
+			level require ;
+			mode transport ;	# NOTE: not tunnel.
+			strength high ;
 		}
 	}
 }
@@ -417,5 +544,5 @@ configuration file first appeared in
 Yokogawa IPsec implementation.
 .\"
 .Sh BUGS
-Some statements may be obsoleted, but must be ramained.
-These will be deleted in the future.
+Some statements may not be implemented.
+These will be worked in the future.
