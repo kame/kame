@@ -140,8 +140,8 @@ frag6_input(mp, offp, proto)
 #else
 	rtcalloc((struct route *)&ro);
 #endif
-	if (ro.ro_rt != NULL)
-		dstifp = ro.ro_rt->rt_ifp;
+	if (ro.ro_rt != NULL && ro.ro_rt->rt_ifa != NULL)
+		dstifp = ((struct in6_ifaddr *)ro.ro_rt->rt_ifa)->ia_ifp;
 #else
 	/* we are violating the spec, this is not the destination interface */
 	if ((m->m_flags & M_PKTHDR) != 0)
