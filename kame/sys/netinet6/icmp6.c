@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.229 2001/07/24 02:58:58 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.230 2001/07/24 03:36:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -352,9 +352,15 @@ icmp6_error(m, type, code, param)
 	oip6 = mtod(m, struct ip6_hdr *);
 
 	/*
-	 * Multicast destination check.  For unrecognized option errors,
-	 * this check has already done in ip6_unknown_opt(), so we can
-	 * check only for other errors.
+	 * If the destination address of the erroneous packet is a multicast
+	 * address, or the packet was sent using link-layer multicast,
+	 * we should basically suppress sending an error (RFC 2463, Section
+	 * 2.4).
+	 * We have two exceptions (the item e.2 in that section):
+	 * - the Pakcet Too Big message can be sent for path MTU discovery.
+	 * - the Parameter Problem Message that can be allowed an icmp6 error
+	 *   in the option type field.  This check has been done in
+	 *   ip6_unknown_opt(), so we can just check the type and code.
 	 */
 	if ((m->m_flags & (M_BCAST|M_MCAST) ||
 	     IN6_IS_ADDR_MULTICAST(&oip6->ip6_dst)) &&
@@ -363,7 +369,10 @@ icmp6_error(m, type, code, param)
 	      code != ICMP6_PARAMPROB_OPTION)))
 		goto freeit;
 
-	/* Source address check.  XXX: the case of anycast source? */
+	/*
+	 * RFC 2463, 2.4 (e.5): source address check.
+	 * XXX: the case of anycast source?
+	 */
 	if (IN6_IS_ADDR_UNSPECIFIED(&oip6->ip6_src) ||
 	    IN6_IS_ADDR_MULTICAST(&oip6->ip6_src))
 		goto freeit;
