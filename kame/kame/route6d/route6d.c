@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.54 2001/01/22 13:24:35 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.55 2001/01/26 09:05:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.54 2001/01/22 13:24:35 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.55 2001/01/26 09:05:46 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -202,6 +202,9 @@ int logopened = 0;
 static	u_long	seq = 0;
 
 volatile int signo;
+volatile sig_atomic_t seenalrm;
+volatile sig_atomic_t seenquit;
+volatile sig_atomic_t seenusr1;
 
 #define	RRTF_AGGREGATE		0x08000000
 #define	RRTF_NOADVERTISE	0x10000000
@@ -211,7 +214,7 @@ volatile int signo;
 
 int main __P((int, char **));
 void sighandler __P((int));
-void ripalarm __P((int));
+void ripalarm __P((void));
 void riprecv __P((void));
 void ripsend __P((struct ifc *, struct sockaddr_in6 *, int));
 int out_filter __P((struct riprt *, struct ifc *));
@@ -238,7 +241,7 @@ void ifdump __P((int));
 void ifdump0 __P((FILE *, const struct ifc *));
 void rtdump __P((int));
 void rt_entry __P((struct rt_msghdr *, int));
-void rtdexit __P((int));
+void rtdexit __P((void));
 void riprequest __P((struct ifc *, struct netinfo6 *, int, struct sockaddr_in6 *));
 void ripflush __P((struct ifc *, struct sockaddr_in6 *));
 void sendrequest __P((struct ifc *));
@@ -438,6 +441,22 @@ main(argc, argv)
 	while (1) {
 		fd_set	recvec;
 
+		if (seenalrm) {
+			ripalarm();
+			seenalrm = 0;
+			continue;
+		}
+		if (seenquit) {
+			rtdexit();
+			seenquit = 0;
+			continue;
+		}
+		if (seenusr1) {
+			ifrtdump(SIGUSR1);
+			seenusr1 = 0;
+			continue;
+		}
+
 		FD_COPY(&sockvec, &recvec);
 		signo = 0;
 		switch (select(FD_SETSIZE, &recvec, 0, 0, 0)) {
@@ -445,20 +464,6 @@ main(argc, argv)
 			if (errno != EINTR) {
 				fatal("select");
 				/*NOTREACHED*/
-			}
-			switch (signo) {
-			case SIGALRM:
-				ripalarm(signo);
-				break;
-			case SIGQUIT:
-			case SIGTERM:
-				rtdexit(signo);
-				break;
-			case SIGUSR1:
-			case SIGHUP:
-			case SIGINT:
-				ifrtdump(signo);
-				break;
 			}
 			continue;
 		case 0:
@@ -482,7 +487,22 @@ void
 sighandler(sig)
 	int sig;
 {
+
 	signo = sig;
+	switch (signo) {
+	case SIGALRM:
+		seenalrm++;
+		break;
+	case SIGQUIT:
+	case SIGTERM:
+		seenquit++;
+		break;
+	case SIGUSR1:
+	case SIGHUP:
+	case SIGINT:
+		seenusr1++;
+		break;
+	}
 }
 
 /*
@@ -490,8 +510,7 @@ sighandler(sig)
  */
 /* ARGSUSED */
 void
-rtdexit(sig)
-	int sig;
+rtdexit()
 {
 	struct	riprt *rrt;
 
@@ -518,8 +537,7 @@ rtdexit(sig)
  */
 /* ARGSUSED */
 void
-ripalarm(sig)
-	int sig;
+ripalarm()
 {
 	struct	ifc *ifcp;
 	struct	riprt *rrt, *rrt_prev, *rrt_next;
@@ -3354,7 +3372,7 @@ fatal(fmt, va_alist)
 	vsnprintf(buf, sizeof(buf), fmt, ap);
 	perror(buf);
 	syslog(LOG_ERR, "%s: %s", buf, strerror(errno));
-	rtdexit(0);
+	rtdexit();
 	va_end(ap);
 }
 
