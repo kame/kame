@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1812 2001/07/25 02:57:06 itojun Exp $
+$KAME: CHANGELOG,v 1.1813 2001/07/25 06:35:21 jinmei Exp $
 
 <200107>
+2001-07-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/(various files): correctly supported
+	interface-local multicast:
+	- install ff01::%ifname/32 when first configuring an interface.
+	- changed the source address selection for ff01::xxxx.
+	- changed the outgoing interface selection for ff01::xxxx.
+	- prohibit packets towards ff01::xxx from being sent on the wire.
+	- reject packets towards ff01::xxxx from the wire.
+
 Wed Jul 25 11:52:34 JST 2001  itojun@iijlab.net
 	* sys/netinet/if_gif.c: use encap_attach(), instead of
 	  encap_attach_func().  enables us to use radix address match in
