@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.716 2000/03/22 07:30:12 itojun Exp $
+$Id: CHANGELOG,v 1.717 2000/03/22 08:57:58 itojun Exp $
 
 <200003>
+Wed Mar 22 17:57:21 JST 2000  itojun@iijlab.net
+	* netbsd: synchronize userland with 1.4.1 -> 1.4.2 changes.
+
 Wed Mar 22 16:29:19 JST 2000  itojun@iijlab.net
 	* {ports,pkgsrc}/net/bind8: upgrade to latest patch.  this avoids
 	  invalid use of netinet6/in6.h.
