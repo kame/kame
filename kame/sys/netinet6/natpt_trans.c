@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.31 2001/05/29 08:22:14 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.32 2001/05/29 12:40:16 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -88,9 +88,11 @@
 #define	FTP_CONTROL			21
 
 #if BYTE_ORDER == BIG_ENDIAN
+#define	FTP6_LPSV			0x4c505356
 #define	FTP6_EPRT			0x45505254
 #define	FTP6_EPSV			0x45505356
 #else
+#define	FTP6_LPSV			0x5653504c
 #define	FTP6_EPRT			0x54525045
 #define	FTP6_EPSV			0x56535045
 #endif
@@ -926,6 +928,32 @@ translatingFTP4ReplyTo6(struct _cv *cv6, struct pAddr *pad)
     ts  = ats->suit.tcp;
     switch (ts->ftpstate)
     {
+      case FTP6_LPSV:
+	{
+	    u_char	*h, *p;
+
+	    if (ftp4.cmd != 227)
+		return (0);
+
+	    /* getting:   227 Entering Passive Mode (h1,h2,h3,h4,p1,p2).	*/
+	    /* expecting: 228 Entering Long Passive Mode(...)			*/
+
+	    if (parse227(ftp4.arg, kk, &sin) == NULL)
+		return (0);
+
+	    h = (char *)&ats->local.in6src;
+	    p = (char *)&sin.sin_port;
+	    snprintf(Wow, sizeof(Wow),
+		     "228 Entering Long Passive Mode "
+		     "(%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u)\r\n",
+		     IPV6_VERSION >> 4, 16,
+		     h[0], h[1], h[ 2], h[ 3], h[ 4], h[ 5], h[ 6], h[ 7],
+		     h[8], h[9], h[10], h[11], h[12], h[13], h[14], h[15],
+		     2, p[0], p[1]);
+	    delta = rewriteMbuf(cv6->m, kb, (kk-kb), Wow, strlen(Wow));
+	    break;
+	 }
+	    
       case FTP6_EPSV:
 	if (ftp4.cmd != 227)
 	    return (0);
@@ -1511,6 +1539,12 @@ translatingFTP6CommandTo4(struct _cv *cv6, struct _cv *cv4)
     ts = cv4->ats->suit.tcp;
     switch(ftp6.cmd)
     {
+      case FTP6_LPSV:
+	ts->ftpstate = FTP6_LPSV;
+	tstr = "PASV\r\n";
+	delta = rewriteMbuf(cv4->m, kb, (kk-kb), tstr, strlen(tstr));
+	break;
+
       case FTP6_EPRT:
 	{
 	    char		*h, *p;
