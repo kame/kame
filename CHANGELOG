@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.770 2000/04/13 16:01:13 itojun Exp $
+$Id: CHANGELOG,v 1.771 2000/04/14 04:28:20 itojun Exp $
 
 <200003>
+Fri Apr 14 13:26:44 JST 2000  itojun@iijlab.net
+	* openbsd/sys/netinet/tcp_input.c: not use path MTU value on routing
+	  table when computing MSS, only if layer 3 supports path MTU
+	  discovery.  (openbsd has no IPv4 path mtu discovery.  a node may
+	  propose too large mss if we use rmx_mtu value)
+	  From: Hugh Graham <hugh@openbsd.org>
+
 Fri Apr 14 01:00:41 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ip6_output.c: require root privilege on IPV6_REACHCONF
 	  ancillary message (experimental, from jinmei).
