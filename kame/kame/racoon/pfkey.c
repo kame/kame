@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.44 2000/06/08 06:43:52 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.45 2000/06/08 15:40:26 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1323,15 +1323,6 @@ pk_recvacquire(mhp)
 	struct sadb_x_policy *xpl;
 	struct policyindex spidxtmp;
 	struct secpolicy *sp;
-#ifdef YIPS_DEBUG
-	char h1[NI_MAXHOST], h2[NI_MAXHOST];
-	char s1[NI_MAXSERV], s2[NI_MAXSERV];
-#ifdef NI_WITHSCOPEID
-	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
-#else
-	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
-#endif
-#endif
 #define MAXNESTEDSA	5	/* XXX */
 	struct ph2handle *iph2[MAXNESTEDSA];
 	struct ipsecrequest *req;
@@ -1414,14 +1405,8 @@ pk_recvacquire(mhp)
 		return -1;
 
 	YIPSDEBUG(DEBUG_NOTIFY,
-		h1[0] = s1[0] = h2[0] = s2[0] = '\0';
-		getnameinfo(iph2[n]->src, iph2[n]->src->sa_len,
-		    h1, sizeof(h1), s1, sizeof(s1), niflags);
-		getnameinfo(iph2[n]->dst, iph2[n]->dst->sa_len,
-		    h2, sizeof(h2), s2, sizeof(s2), niflags);
 		plog(logp, LOCATION, NULL,
-			"new acquire iph2 %p: src %s %s dst %s %s\n",
-			iph2, h1, s1, h2, s2));
+			"new acquire %s\n", spidx2str(&sp->spidx)));
 
 	/* get sainfo */
     {
