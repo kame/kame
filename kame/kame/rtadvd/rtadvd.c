@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.63 2002/05/21 23:33:01 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.64 2002/05/22 07:56:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -554,7 +554,7 @@ rtmsg_input()
 			    "<%s> interface %s becomes down. stop timer.",
 			    __FUNCTION__, rai->ifname);
 			rtadvd_remove_timer(&rai->timer);
-		} else if ((oldifflags & IFF_UP) == 0 &&	/* DOWN to UP */
+		} else if ((oldifflags & IFF_UP) == 0 && /* DOWN to UP */
 			 (iflist[ifindex]->ifm_flags & IFF_UP) != 0) {
 			syslog(LOG_INFO,
 			    "<%s> interface %s becomes up. restart timer.",
