@@ -29,6 +29,7 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/queue.h>
 #include <sys/uio.h>
 
 #include <net/if.h>
@@ -466,7 +467,12 @@ relay6_recv(s, rdevice)
 			break;
 		}
 	}
-	if (pi && rdevice) {
+	if (rdevice) {
+		if (pi == NULL) {
+			dprintf(LOG_WARNING, "relay6_recv: "
+				"failed to get the arrival interface");
+			return(-1);
+		}
 		if (if_indextoname(pi->ipi6_ifindex, rdevice) == NULL) {
 			dprintf(LOG_WARNING, "if_indextoname(id = %d): %s",
 				pi->ipi6_ifindex, strerror(errno));

@@ -31,6 +31,7 @@
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/ioctl.h>
+#include <sys/queue.h>
 #include <sys/uio.h>
 #if TIME_WITH_SYS_TIME
 # include <sys/time.h>
