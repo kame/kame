@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.165 2001/07/20 19:48:57 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.166 2001/07/20 19:57:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2103,7 +2103,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 #endif
 				if ((rt = rt->rt_gwroute) == 0)
 					senderr(EHOSTUNREACH);
-#ifdef __bsdi__
+#if defined(__bsdi__) || defined(__NetBSD__)
 				/* the "G" test below also prevents rt == rt0 */
 				if ((rt->rt_flags & RTF_GATEWAY) ||
 				    (rt->rt_ifp != ifp)) {
