@@ -1,11 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.937 2000/05/25 15:29:31 itojun Exp $
+$Id: CHANGELOG,v 1.938 2000/05/25 16:40:20 itojun Exp $
 
 <200005>
 Fri May 26 00:02:15 JST 2000  itojun@iijlab.net
 	* netbsd/usr.bin/ftp/fetch.c: do not transmit scope identifier
-	  on HTTP Host: directive, nor URL passed to web proxy.
+	  on HTTP Host: directive.  disallow scoped address if the access is
+	  via proxy.
+	* openbsd/usr.bin/ftp/fetch.c: do not transmit scope identifier on
+	  HTTP Host: directive.  correct Host: directive passing if the
+	  access is via proxy.
+	  TODO: disallow scoped address if the access is via proxy.
 
 Thu May 25 23:16:01 JST 2000  itojun@iijlab.net
 	* bsdi4/usr.bin/telnet/commands.c: use getaddrinfo to be scoped-address
