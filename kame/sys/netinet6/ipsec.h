@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.72 2004/05/24 11:06:14 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.73 2004/08/01 03:30:44 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -197,6 +197,7 @@ struct ipsecaux {
 #define IPSEC_POLICY_IPSEC	2	/* pass to IPsec */
 #define IPSEC_POLICY_ENTRUST	3	/* consulting SPD if present. */
 #define IPSEC_POLICY_BYPASS	4	/* only for privileged socket. */
+#define IPSEC_POLICY_TCP		5	/* TCP MD5 policy */
 
 /* Security protocol level */
 #define	IPSEC_LEVEL_DEFAULT	0	/* reference to system default */
