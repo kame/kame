@@ -63,10 +63,6 @@
 
 #include "pathnames.h"
 
-#ifndef DEFAULT_IF
-#define DEFAULT_IF "ep0"
-#endif
-
 extern u_char buf[];
 
 extern int getconfig(char *, u_char *);
