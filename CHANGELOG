@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.212 1999/10/25 18:17:46 sakane Exp $
+$Id: CHANGELOG,v 1.213 1999/10/26 04:28:32 itojun Exp $
 
 <199910>
+Tue Oct 26 13:27:43 JST 1999  itojun@iijlab.net
+	* netbsd/pkgsrc/www/wwwoffle: add wwwoffle 2.5 with IPv6 patch.
+
 Tue Oct 26 02:58:19 JST 1999 sakane@ydc.co.jp
 	* freebsd3/sys/netinet tcp_input.c udp_usrreq.c
 	Modify m_len before and after calling ipsec_in_reject().
