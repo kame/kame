@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.91 2001/08/13 19:45:17 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.92 2001/08/13 19:46:55 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -131,7 +131,7 @@ static struct hmac_algorithm hmacdef[] = {
 		eay_hmacsha2_512_final,	eay_hmacsha2_512_one, },
 };
 
-static struct cipher_algorithm cipher[] = {
+static struct cipher_algorithm encdef[] = {
 { "NULL",	NULL,			NULL,			NULL, },
 { "des",	eay_des_encrypt,	eay_des_decrypt,	eay_des_weakkey, },
 #ifdef HAVE_OPENSSL_IDEA_H
@@ -2373,7 +2373,7 @@ oakley_compute_enckey(iph1)
 				goto end;
 			}
 			plog(LLV_DEBUG, LOCATION, NULL,
-				"compute intermediate cipher key K%d\n",
+				"compute intermediate encryption key K%d\n",
 				subkey);
 			plogdump(LLV_DEBUG, buf->v, buf->l);
 			plogdump(LLV_DEBUG, res->v, res->l);
@@ -2406,17 +2406,17 @@ oakley_compute_enckey(iph1)
 	 */
 #if 0
 	/* weakkey check */
-	if (iph1->approval->enctype > ARRAYLEN(cipher))
+	if (iph1->approval->enctype > ARRAYLEN(encdef))
 		goto end;
-	if (cipher[iph1->approval->enctype].weakkey == NULL
-	 && (cipher[iph1->approval->enctype].weakkey)(iph1->key)) {
+	if (encdef[iph1->approval->enctype].weakkey == NULL
+	 && (encdef[iph1->approval->enctype].weakkey)(iph1->key)) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"weakkey was generated.\n");
 		goto end;
 	}
 #endif
 
-	plog(LLV_DEBUG, LOCATION, NULL, "final cipher key computed: ");
+	plog(LLV_DEBUG, LOCATION, NULL, "final encryption key computed: ");
 	plogdump(LLV_DEBUG, iph1->key->v, iph1->key->l);
 
 	error = 0;
@@ -2656,16 +2656,16 @@ oakley_do_decrypt(iph1, msg, ivdp, ivep)
 	memcpy(buf->v, pl, len);
 
 	/* do decrypt */
-	if (iph1->approval->enctype > ARRAYLEN(cipher)
-	 && cipher[iph1->approval->enctype].decrypt == NULL) {
+	if (iph1->approval->enctype > ARRAYLEN(encdef)
+	 && encdef[iph1->approval->enctype].decrypt == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"invalid cipher algoriym was passed.\n");
+			"invalid encryption algoriym was passed.\n");
 		goto end;
 	}
 
 	plog(LLV_DEBUG, LOCATION, NULL,
 		"decrypt(%s)\n",
-		cipher[iph1->approval->enctype].name);
+		encdef[iph1->approval->enctype].name);
 	plog(LLV_DEBUG, LOCATION, NULL, "with key: ");
 	plogdump(LLV_DEBUG, iph1->key->v, iph1->key->l);
 
@@ -2674,7 +2674,7 @@ oakley_do_decrypt(iph1, msg, ivdp, ivep)
 	struct timeval start, end;
 	gettimeofday(&start, NULL);
 #endif
-	new = (cipher[iph1->approval->enctype].decrypt)(buf, iph1->key, ivdp->v);
+	new = (encdef[iph1->approval->enctype].decrypt)(buf, iph1->key, ivdp->v);
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
 	syslog(LOG_NOTICE, "%s(%s size=%d): %8.6f", __FUNCTION__,
@@ -2797,16 +2797,16 @@ oakley_do_encrypt(iph1, msg, ivep, ivp)
 	plogdump(LLV_DEBUG, buf->v, buf->l);
 
 	/* do encrypt */
-	if (iph1->approval->enctype > ARRAYLEN(cipher)
-	 && cipher[iph1->approval->enctype].encrypt == NULL) {
+	if (iph1->approval->enctype > ARRAYLEN(encdef)
+	 && encdef[iph1->approval->enctype].encrypt == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"invalid cipher algoriym was passed.\n");
+			"invalid encryption algoriym was passed.\n");
 		goto end;
 	}
 
 	plog(LLV_DEBUG, LOCATION, NULL,
 		"encrypt(%s).\n",
-		cipher[iph1->approval->enctype].name);
+		encdef[iph1->approval->enctype].name);
 	plog(LLV_DEBUG, LOCATION, NULL, "with key: ");
 	plogdump(LLV_DEBUG, iph1->key->v, iph1->key->l);
 
@@ -2815,7 +2815,7 @@ oakley_do_encrypt(iph1, msg, ivep, ivp)
 	struct timeval start, end;
 	gettimeofday(&start, NULL);
 #endif
-	new = (cipher[iph1->approval->enctype].encrypt)(buf, iph1->key, ivep->v);
+	new = (encdef[iph1->approval->enctype].encrypt)(buf, iph1->key, ivep->v);
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
 	syslog(LOG_NOTICE, "%s(%s size=%d): %8.6f", __FUNCTION__,
