@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.24 2000/07/28 06:02:46 sakane Exp $	*/
+/*	$KAME: faithd.c,v 1.25 2000/07/28 06:14:38 sakane Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -650,7 +650,7 @@ map6to4(struct sockaddr_in6 *dst6, struct sockaddr_in *dst4)
 
 	if (dst4->sin_addr.s_addr == INADDR_ANY
 	 || dst4->sin_addr.s_addr == INADDR_BROADCAST
-	 || IN_MULTICAST(dst4->sin_addr.s_addr))
+	 || IN_MULTICAST(ntohl(dst4->sin_addr.s_addr)))
 		return 0;
 
 	return 1;
