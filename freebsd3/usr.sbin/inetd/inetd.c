@@ -434,7 +434,7 @@ main(argc, argv, envp)
 				"-C %s: bad value for maximum children/minute");
 			break;
 		case 'a':
-			if ((inet_pton(AF_INET6, optarg, &bind_address6) <= 0) &&
+			if ((inet_pton(AF_INET6, optarg, &bind_address6) != 1) &&
 			    !inet_aton(optarg, &bind_address4)) {
 				syslog(LOG_ERR,
 			         "-a %s: invalid IP address", optarg);
