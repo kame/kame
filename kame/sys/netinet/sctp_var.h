@@ -1,8 +1,5 @@
-/*	$KAME: sctp_var.h,v 1.9 2003/04/17 03:08:40 itojun Exp $	*/
+/*	$KAME: sctp_var.h,v 1.10 2003/04/17 05:38:50 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_var.h,v 1.46 2002/04/04 16:53:46 randall Exp	*/
-
-#ifndef _NETINET_SCTP_VAR_H_
-#define _NETINET_SCTP_VAR_H_
 
 /*
  * Copyright (c) 2001, 2002 Cisco Systems, Inc.
@@ -35,14 +32,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-#include "opt_inet6.h"
-#include "opt_inet.h"
-#endif
 
-#if defined(__NetBSD__)
-#include "opt_inet.h"
-#endif
+#ifndef _NETINET_SCTP_VAR_H_
+#define _NETINET_SCTP_VAR_H_
 
 #ifndef __OpenBSD__
 #include <sys/socketvar.h>
@@ -161,9 +153,7 @@ void	sctp_notify __P((struct sctp_inpcb *, int, struct sctphdr *,
 int sctp_usr_recvd __P((struct socket *, int));
 
 
-#ifdef INET6
 void ip_2_ip6_hdr __P((struct ip6_hdr *, struct ip *));
-#endif /* INET6 */
 
 int sctp_bindx(struct socket *, int, struct sockaddr_storage *,
 	int, int, struct proc *);
