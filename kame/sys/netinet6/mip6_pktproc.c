@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.31 2002/07/26 12:48:26 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.32 2002/07/26 16:49:10 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1675,7 +1675,6 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 	struct ip6m_binding_error *ip6me;
 	int ip6melen;
 {
-	struct ip6_hdr *ip6;
 	struct sockaddr_in6 *src_sa, *dst_sa;
 	struct sockaddr_in6 hoa;
 	u_int32_t hoazone;
@@ -1725,10 +1724,10 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 
 	/* find the corresponding binding update entry. */
 	switch (ip6me->ip6me_status) {
-	case IP6ME_UNVERIFIED_HAO:
-	case IP6ME_UNKNOWN_TYPE:
+	case IP6ME_STATUS_NO_BINDING:
+	case IP6ME_STATUS_UNKNOWN_MH_TYPE:
 		mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
-		    &src_sa, &hoa);
+		    src_sa, &hoa);
 		if (mbu == NULL) {
 			/* we have no binding update entry for the CN. */
 			goto bad;
@@ -1738,7 +1737,7 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 	}
 
 	switch (ip6me->ip6me_status) {
-	case IP6ME_UNVERIFIED_HAO:
+	case IP6ME_STATUS_NO_BINDING:
 		/* the CN doesn't have a binding cache entry.  start RR. */
 		error = mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_BE_1_RECEIVED,
 		    ip6me);
@@ -1751,7 +1750,7 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 
 		break;
 
-	case IP6ME_UNKNOWN_TYPE:
+	case IP6ME_STATUS_UNKNOWN_MH_TYPE:
 		/* XXX future extension? */
 		error = mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_BE_2_RECEIVED,
 		    ip6me);
