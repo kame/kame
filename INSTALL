@@ -1,6 +1,6 @@
 	Installation procedure - preparation of the tree
 	KAME project
-	$KAME: INSTALL,v 1.23 2000/07/26 08:09:28 itojun Exp $
+	$KAME: INSTALL,v 1.24 2000/08/14 07:24:03 itojun Exp $
 
 Let's call the entire file-tree under this directory "the KAME tree".
 
@@ -85,7 +85,7 @@ perform "make obj" unless you are ready to tackle those troubles.
 4. Some parts of the KAME tree will be compiled, only if there are
    certain libraries installed beforehand:
 	usr.sbin/racoon:
-		Compiles only when OpenSSL 0.9.4 is installed
+		Compiles only when OpenSSL 0.9.5a is installed
 		beforehand, and shell search path is configured to
 		reach "openssl" program.
    Please install those libraries before building.
