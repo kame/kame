@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.31 2002/12/02 03:48:15 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.32 2003/01/30 06:52:19 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -318,14 +318,6 @@ accept_listener_report(src, dst, group)
 		    inet6_fmt(group), v->uv_name);
 		return;
 	}
-#ifdef MLDV2_LISTENER_REPORT
-	if (v->uv_mld_version & MLDv2) {
-		log(LOG_DEBUG, 0,
-		    "shift to MLDv1 compat-mode for %s on Mif %s",
-		    inet6_fmt(group), v->uv_name);
-		mld_shift_to_v1mode(mifi, src, &group_sa);
-	}
-#endif
 
 	IF_DEBUG(DEBUG_MLD)
 		log(LOG_DEBUG, 0,
@@ -335,6 +327,15 @@ accept_listener_report(src, dst, group)
 
 	v->uv_in_mld_report++;
 
+#ifdef MLDV2_LISTENER_REPORT
+	if (v->uv_mld_version & MLDv2) {
+		log(LOG_DEBUG, 0,
+		    "shift to MLDv1 compat-mode for %s on Mif %s",
+		    inet6_fmt(group), v->uv_name);
+		mld_shift_to_v1mode(mifi, src, &group_sa);
+		return;
+	}
+#endif
 	recv_listener_report(mifi, src, &group_sa);
 }
 
