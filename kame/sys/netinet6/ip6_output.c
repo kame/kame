@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.184 2001/06/16 16:24:29 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.185 2001/06/19 01:57:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -285,7 +285,6 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		/* Hop-by-Hop options header */
 		MAKE_EXTHDR(opt->ip6po_hbh, &exthdrs.ip6e_hbh);
 		/* Destination options header(1st part) */
-		MAKE_EXTHDR(opt->ip6po_dest1, &exthdrs.ip6e_dest1);
 		if (opt->ip6po_rthdr) {
 			/*
 			 * Destination options header(1st part)
