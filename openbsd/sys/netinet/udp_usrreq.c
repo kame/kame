@@ -767,7 +767,7 @@ udp_output(m, va_alist)
 	register struct in6_addr laddr6;
 	int v6packet = 0;
 	struct ifnet *forceif = NULL;
-	struct sockaddr_in6 *sin6 = mtod(addr, struct sockaddr_in6 *);
+	struct sockaddr_in6 *sin6 = NULL;
 #endif /* INET6 */
 	int pcbflags = 0;
 
@@ -783,6 +783,8 @@ udp_output(m, va_alist)
 #endif /* INET6 */
 
 	if (addr) {
+		sin6 = mtod(addr, struct sockaddr_in6 *);
+
 	        /*
 		 * Save current PCB flags because they may change during
 		 * temporary connection, particularly the INP_IPV6_UNDEC
@@ -908,7 +910,7 @@ udp_output(m, va_alist)
 				 mopt->im6o_multicast_ifp) {
 				oifp = mopt->im6o_multicast_ifp;
 				faddr->s6_addr16[1] = oifp->if_index;
-			} else if (sin6->sin6_scope_id) {
+			} else if (sin6 && sin6->sin6_scope_id) {
 				/* boundary check */
 				if (sin6->sin6_scope_id < 0 
 				    || if_index < sin6->sin6_scope_id) {
@@ -921,15 +923,19 @@ udp_output(m, va_alist)
 			}
 		}
 		ipv6->ip6_hlim = in6_selecthlim(inp, oifp);
-		laddr = in6_selectsrc(sin6, inp->inp_outputopts6,
-				      inp->inp_moptions6,
-				      &inp->inp_route6,
-				      &inp->inp_laddr6, &error);
-		if (laddr == NULL) {
-			if (error == 0)
-				error = EADDRNOTAVAIL;
-			goto release;
-		}
+		if (sin6) {	/*XXX*/
+			laddr = in6_selectsrc(sin6, inp->inp_outputopts6,
+					      inp->inp_moptions6,
+					      &inp->inp_route6,
+					      &inp->inp_laddr6, &error);
+			if (laddr == NULL) {
+				if (error == 0)
+					error = EADDRNOTAVAIL;
+				goto release;
+			}
+		} else
+			laddr = &inp->inp_laddr6;
+
 		ipv6->ip6_src = *laddr;
 
 		ipv6->ip6_plen = (u_short)len + sizeof(struct udphdr);
@@ -1196,10 +1202,6 @@ udp_usrreq(so, req, m, addr, control)
 		if (error)
 			return (error);
 #endif
-if (inp == NULL) {
- printf("inp == NULL in %s:%d\n", __FILE__, __LINE__);
- return EINVAL;
-}
 		return (udp_output(m, inp, addr, control));
 
 	case PRU_ABORT:
