@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.17 2000/01/11 16:54:34 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.18 2000/01/11 17:01:47 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -771,7 +771,7 @@ prop2ipsecsa_recurse(b0, b, l, max, result)
 	size_t max;
 	struct ipsecsa **result;
 {
-	int ret;
+	int ret = 0;
 	size_t i;
 
 	for (b[l] = b0[l]; b[l]; b[l] = b[l]->tnext) {
