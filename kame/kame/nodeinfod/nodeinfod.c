@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.1 2001/07/20 05:11:46 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.2 2001/07/20 06:58:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -36,6 +36,7 @@
 #include <netinet/icmp6.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,10 +46,14 @@
 #include <err.h>
 #include <errno.h>
 #include <ifaddrs.h>
+#include <md5.h>
+#include <ctype.h>
 
 int main __P((int, char **));
 void usage __P((void));
-void init __P((void));
+void sockinit __P((void));
+int joingroups __P((const char *));
+const char *nigroup __P((const char *));
 void mainloop __P((void));
 ssize_t response __P((struct sockaddr*, socklen_t, char *, ssize_t));
 static int ni6_input_code0 __P((struct sockaddr *, socklen_t, const char *,
@@ -63,6 +68,7 @@ int ismyaddr __P((struct sockaddr *, socklen_t));
 int s;
 int mode = 7;	/* reply to all message types */
 char hostname[MAXHOSTNAMELEN];
+int foreground = 0;
 
 int (*func[256]) __P((struct sockaddr *, socklen_t, const char *, ssize_t));
 
@@ -75,8 +81,11 @@ main(argc, argv)
 
 	gethostname(hostname, sizeof(hostname));
 
-	while ((ch = getopt(argc, argv, "n:")) != -1) {
+	while ((ch = getopt(argc, argv, "fn:")) != -1) {
 		switch (ch) {
+		case 'f':
+			foreground++;
+			break;
 		case 'n':
 			strlcpy(hostname, optarg, sizeof(hostname));
 			break;
@@ -106,8 +115,10 @@ main(argc, argv)
 	func[NI_QTYPE_IPV4ADDR] = ni6_input;
 #endif
 
-	init();
-	daemon(0, 0);
+	sockinit();
+	joingroups(hostname);
+	if (!foreground)
+		daemon(0, 0);
 	mainloop();
 	exit(0);
 }
@@ -115,11 +126,11 @@ main(argc, argv)
 void
 usage()
 {
-	fprintf(stderr, "usage: nodeinfod [-n name]\n");
+	fprintf(stderr, "usage: nodeinfod [-f] [-n name]\n");
 }
 
 void
-init()
+sockinit()
 {
 	struct addrinfo hints, *res;
 	int error;
@@ -146,6 +157,113 @@ init()
 	}
 
 	/* XXX filter setup */
+}
+
+int
+joingroups(name)
+	const char *name;
+{
+	struct addrinfo hints, *res;
+	int error;
+	struct ifaddrs *ifa, *ifap;
+	unsigned int ifidx;
+	struct ipv6_mreq m6;
+	struct sockaddr_in6 *sin6;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = SOCK_RAW;
+	hints.ai_protocol = IPPROTO_ICMPV6;
+	hints.ai_flags = AI_PASSIVE;
+	error = getaddrinfo(nigroup(name), NULL, &hints, &res);
+	if (error) {
+		errx(1, "%s", gai_strerror(error));
+		/* NOTREACHED */
+	}
+
+	sin6 = (struct sockaddr_in6 *)res->ai_addr;
+	memset(&m6, 0, sizeof(m6));
+	memcpy(&m6.ipv6mr_multiaddr, &sin6->sin6_addr,
+	    sizeof(m6.ipv6mr_multiaddr));
+
+	if (getifaddrs(&ifap) < 0) {
+		err(1, "getifaddrs");
+		/* NOTREACHED */
+	}
+
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		/*
+		 * get a list of IPv6-capable interfaces.  we assume that
+		 * every interface has at least a link-local address associated
+		 * with it.
+		 */
+		if (ifa->ifa_addr->sa_family != AF_INET6)
+			continue;
+		sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
+		if (!IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
+			continue;
+
+		ifidx = if_nametoindex(ifa->ifa_name);
+		if (!ifidx)
+			continue;
+
+		m6.ipv6mr_interface = ifidx;
+
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP, &m6,
+		    sizeof(m6)) < 0) {
+			err(1, "setsockopt(IPV6_JOIN_GROUP)");
+			/* NOTREACHED */
+		}
+	}
+
+	freeifaddrs(ifap);
+
+	return 0;
+}
+
+const char *
+nigroup(name)
+	const char *name;
+{
+	const char *p;
+	unsigned char *q;
+	MD5_CTX ctxt;
+	u_int8_t digest[16];
+	u_int8_t c;
+	size_t l;
+	static char hbuf[NI_MAXHOST];
+	struct in6_addr in6;
+
+	p = strchr(name, '.');
+	if (!p)
+		p = name + strlen(name);
+	l = p - name;
+	if (l > 63 || l > sizeof(hbuf) - 1)
+		return NULL;	/*label too long*/
+	strncpy(hbuf, name, l);
+	hbuf[(int)l] = '\0';
+
+	for (q = hbuf; *q; q++) {
+		if (isupper(*q))
+			*q = tolower(*q);
+	}
+
+	/* generate 8 bytes of pseudo-random value. */
+	bzero(&ctxt, sizeof(ctxt));
+	MD5Init(&ctxt);
+	c = l & 0xff;
+	MD5Update(&ctxt, &c, sizeof(c));
+	MD5Update(&ctxt, hbuf, l);
+	MD5Final(digest, &ctxt);
+
+	if (inet_pton(AF_INET6, "ff02::2:0000:0000", &in6) != 1)
+		return NULL;	/*XXX*/
+	bcopy(digest, &in6.s6_addr[12], 4);
+
+	if (inet_ntop(AF_INET6, &in6, hbuf, sizeof(hbuf)) == NULL)
+		return NULL;
+
+	return hbuf;
 }
 
 void
