@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.25 2001/11/29 04:52:36 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.26 2001/12/13 15:41:44 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -304,19 +304,24 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	 *     |icmp|ip(src=ha,dst=mnhoa)|ip(src=cn,dst=mnhoa)|payload
 	 */
 	ip6 = mtod(m, struct ip6_hdr *);
-	plen = ip6->ip6_plen;
+	plen = ntohs(ip6->ip6_plen);
 	icmp6 = (struct icmp6_hdr *)((caddr_t)ip6 + off);
 	if (icmp6->icmp6_type >= 128) {
 		/*
-		 * this is not an icmp error message. no need to
+		 * this is not an icmp error message.  no need to
 		 * relay.
 		 */
 		return (0);
 	} 
+	/* check if we have a enough length icmp payload. */
 	if (plen < (sizeof(*icmp6) + sizeof(otip6) + sizeof(oip6))) {
 		/*
-		 * this is not an icmp against the encapsulated packet.
-		 * it apparently too small.
+		 * we have not enough length of icmp payload.  to
+		 * determine that this icmp is against the tunneled
+		 * ip, we at least have two ip header, one is for
+		 * tunneling from the home agent to the correspondent
+		 * node and the other is the original header from the
+		 * mobile node to the correspondent node.
 		 */
 		return (0);
 	}
