@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"	$Id: natptconfig.8,v 1.6 2000/04/16 17:58:49 itojun Exp $
+.\"	$Id: natptconfig.8,v 1.7 2000/04/16 18:05:01 itojun Exp $
 .\"
 .\" Note: The date here should be updated whenever a non-trivial
 .\" change is made to the manual page.
@@ -42,8 +42,10 @@
 .\"
 .Sh SYNOPSIS
 .Nm natptconfig
+.Op Fl d Ar debuglevel
 .Fl f Ar configfile
 .Nm natptconfig
+.Op Fl d Ar debuglevel
 .Ar subcommand Op Ar args...
 .\"
 .Sh DESCRIPTION
@@ -52,16 +54,23 @@ configures and control the IPv6-to-IPv4 translator implemented in the
 kernel.
 .Pp
 .Nm Natptconfig
-has two format of command line arguments.  First one has the following
-options.
+takes the following command line options.
 .Bl -tag -width Ds
+.It Fl d Ar debuglevel
+Set debug level to
+.Ar debuglevel .
 .It Fl f Ar configfile
-Evaluate the content of file specified by configfile, as configuration
-directives.  By specifying
+Evaluate the content of file specified by
+.Ar configfile ,
+as configuration directives.
+By specifying
 .Dq Li - ,
 standard input is used.
 .Pp
 .El
+The first form 
+.Pq with Fl f
+takes directives from the specified configuration file.
 The second form is to give single directive directly from the command line.
 .\"
 .Sh DIRECTIVES
