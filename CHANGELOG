@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.18 1999/08/14 14:21:59 jinmei Exp $
+$Id: CHANGELOG,v 1.19 1999/08/15 16:36:48 itojun Exp $
 
 <199908>
+Mon Aug 16 01:34:36 JST 1999  itojun@iijlab.net
+	* netbsd/pkgsrc/net/zebra, freebsd2/ports/zebra: upgrade to 0.77.
+
 1999-08-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/pim6sd: correctly supported restarting by SIGHUP.
 	Thanks to <mhoerdt@iutsud.u-strasbg.fr> for sending patch.
