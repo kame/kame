@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.26 2001/05/21 09:29:31 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.27 2001/05/21 09:55:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -181,6 +181,7 @@ udp6_output(in6p, m, addr6, control)
 #ifdef INET
 #ifdef __NetBSD__
 	struct ip *ip;
+	struct udpiphdr *ui;
 #endif
 #endif
 	int flags;
@@ -392,23 +393,29 @@ udp6_output(in6p, m, addr6, control)
 		}
 
 		ip = mtod(m, struct ip *);
-
-		ip->ip_len = plen;
-		ip->ip_p = IPPROTO_UDP;
-		ip->ip_ttl = in6_selecthlim(in6p, NULL);	/*XXX*/
-		ip->ip_tos = 0;			/*XXX*/
-		bcopy(&laddr->s6_addr[12], &ip->ip_src, sizeof(ip->ip_src));
-		bcopy(&faddr->s6_addr[12], &ip->ip_dst, sizeof(ip->ip_dst));
+		ui = (struct udpiphdr *)ip;
+		bzero(ui->ui_x1, sizeof ui->ui_x1);
+		ui->ui_pr = IPPROTO_UDP;
+		ui->ui_len = htons(hlen + plen);
+		bcopy(&laddr->s6_addr[12], &ui->ui_src, sizeof(ui->ui_src));
+		bcopy(&faddr->s6_addr[12], &ui->ui_dst, sizeof(ui->ui_dst));
+		ui->ui_ulen = ui->ui_len;
 
 		udp6->uh_sum = 0;
-		if ((udp6->uh_sum = in_cksum(m, ulen)) == 0)
+		if ((udp6->uh_sum = in_cksum(m, hlen + plen)) == 0)
 			udp6->uh_sum = 0xffff;
+
+		ip->ip_len = hlen + plen;
+		ip->ip_ttl = in6_selecthlim(in6p, NULL); /* XXX */
+		ip->ip_tos = 0;	/* XXX */
+
+		ip->ip_len = hlen + plen; /* XXX */
 
 		udpstat.udps_opackets++;
 #ifdef IPSEC
-		(void)ipsec_setsocket(m, NULL);	/*XXX*/
+		(void)ipsec_setsocket(m, NULL);	/* XXX */
 #endif /*IPSEC*/
-		error = ip_output(m, NULL, &in6p->in6p_route, 0 /*XXX*/);
+		error = ip_output(m, NULL, &in6p->in6p_route, 0 /* XXX */);
 		break;
 #else
 		error = EAFNOSUPPORT;
