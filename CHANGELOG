@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1685 2001/05/22 08:04:31 itojun Exp $
+$KAME: CHANGELOG,v 1.1686 2001/05/22 11:03:04 sumikawa Exp $
 
 <200105>
+Tue May 22 20:01:05 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd4/usr.bin/telnet: make buildable with 2292bis API.
+
 Tue May 22 17:00:41 JST 2001  itojun@iijlab.net
 	* sys/netinet6/ip6_input.c: repair mbuf alignment code in
 	  !PULLDOWN_TEST case (netbsd/openbsd are not affected).
