@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: remoteconf.h,v 1.9 2000/07/04 12:49:19 sakane Exp $ */
+/* YIPS @(#)$Id: remoteconf.h,v 1.10 2000/07/14 09:26:49 sakane Exp $ */
 
 /* remote configuration */
 
@@ -53,6 +53,7 @@ struct remoteconf {
 	char *peerscertfile;		/* file name of peer's certifcate */
 	int nonce_size;			/* the number of bytes of nonce */
 	int keepalive;			/* XXX may not use */
+	int ini_contact;		/* initial contact */
 
 	int dh_group;			/* use it when only aggressive mode */
 	struct dhgroup *dhgrp;		/* use it when only aggressive mode */

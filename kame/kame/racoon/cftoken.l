@@ -265,6 +265,7 @@ octetstring	{octet}({dot}{octet})+
 <S_RMTS>peers_certfile	{ YYD; return(PEERS_CERTFILE); }
 <S_RMTS>dh_group	{ YYD; return(DH_GROUP); }
 <S_RMTS>nonce_size	{ YYD; return(NONCE_SIZE); }
+<S_RMTS>initial_contact	{ YYD; return(INITIAL_CONTACT); }
 <S_RMTS>keepalive	{ YYD; return(KEEPALIVE); }
 <S_RMTS>lifetime	{ YYD; return(LIFETIME); }
 <S_RMTS>time		{ YYD; yylval.num = CF_LIFETYPE_TIME; return(LIFETYPE); }

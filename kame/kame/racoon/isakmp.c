@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.83 2000/07/07 10:09:23 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.84 2000/07/14 09:26:49 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -597,7 +597,8 @@ ph1_main(iph1, msg)
 
 		/* INITIAL-CONTACT processing */
 		/* don't anything if local test mode. */
-		if (!f_local && !getcontacted(iph1->remote)) {
+		if (!f_local
+		 && iph1->rmconf->ini_contact && !getcontacted(iph1->remote)) {
 			/* send INITIAL-CONTACT */
 			isakmp_info_send_n1(iph1,
 					ISAKMP_NTYPE_INITIAL_CONTACT, NULL);

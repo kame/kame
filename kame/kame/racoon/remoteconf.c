@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: remoteconf.c,v 1.8 2000/06/05 15:24:44 sakane Exp $ */
+/* YIPS @(#)$Id: remoteconf.c,v 1.9 2000/07/14 09:26:49 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -152,6 +152,7 @@ newrmconf()
 	new->sittype = IPSECDOI_SIT_IDENTITY_ONLY;
 	new->nonce_size = DEFAULT_NONCE_SIZE;
 	new->keepalive = FALSE;
+	new->ini_contact = TRUE;
 	new->retry_counter = lcconf->retry_counter;
 	new->retry_interval = lcconf->retry_interval;
 	new->count_persend = lcconf->count_persend;
