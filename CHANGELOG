@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.779 2000/04/17 12:07:06 itojun Exp $
+$Id: CHANGELOG,v 1.780 2000/04/17 12:28:41 kjc Exp $
 
 <200003>
+Mon Apr 17 20:32:27 JST 2000  kjc@csl.sony.co.jp
+	* add ALTQ support to freebsd4.
+
 Mon Apr 17 21:05:48 JST 2000  itojun@iijlab.net
 	* sys/netinet/ip_encap.c: support priority between attached
 	  interfaces.  see comments for more detail.
