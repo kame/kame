@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.72 2000/08/30 11:18:34 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.73 2000/08/31 10:21:22 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -86,6 +86,7 @@
 static u_int ipsecdoi2pfkey_aalg __P((u_int));
 static u_int ipsecdoi2pfkey_ealg __P((u_int));
 static u_int ipsecdoi2pfkey_calg __P((u_int));
+static u_int ipsecdoi2pfkey_alg __P((u_int, u_int));
 static u_int keylen_aalg __P((u_int));
 static u_int keylen_ealg __P((u_int, int));
 
@@ -112,7 +113,7 @@ pk_recvadd,
 pk_recvdelete,
 NULL,	/* SADB_GET */
 pk_recvacquire,
-NULL,	/* SADB_REGISTER */
+NULL,	/* SABD_REGISTER */
 pk_recvexpire,
 pk_recvflush,
 NULL,	/* SADB_DUMP */
@@ -353,7 +354,8 @@ pfkey_init()
 
 	YIPSDEBUG(DEBUG_PFKEY,
 		plog(logp, LOCATION, NULL, "call pfkey_send_register\n"););
-	if (pfkey_send_register(lcconf->sock_pfkey, SADB_SATYPE_ESP) < 0) {
+	if (pfkey_send_register(lcconf->sock_pfkey, SADB_SATYPE_ESP) < 0
+	 || pfkey_recv_register(lcconf->sock_pfkey) < 0) {
 		plog(logp, LOCATION, NULL,
 			"WARNING: failed to regist esp (%s)", ipsec_strerror());
 		reg_fail++;
@@ -362,7 +364,8 @@ pfkey_init()
 
 	YIPSDEBUG(DEBUG_PFKEY,
 		plog(logp, LOCATION, NULL, "call pfkey_send_register\n"););
-	if (pfkey_send_register(lcconf->sock_pfkey, SADB_SATYPE_AH) < 0) {
+	if (pfkey_send_register(lcconf->sock_pfkey, SADB_SATYPE_AH) < 0
+	 || pfkey_recv_register(lcconf->sock_pfkey) < 0) {
 		plog(logp, LOCATION, NULL,
 			"WARNING: failed to regist ah (%s)", ipsec_strerror());
 		reg_fail++;
@@ -371,7 +374,8 @@ pfkey_init()
 
 	YIPSDEBUG(DEBUG_PFKEY,
 		plog(logp, LOCATION, NULL, "call pfkey_send_register\n"););
-	if (pfkey_send_register(lcconf->sock_pfkey, SADB_X_SATYPE_IPCOMP) < 0) {
+	if (pfkey_send_register(lcconf->sock_pfkey, SADB_X_SATYPE_IPCOMP) < 0
+	 || pfkey_recv_register(lcconf->sock_pfkey) < 0) {
 		plog(logp, LOCATION, NULL,
 			"WARNING: failed to regist ipcomp (%s)", ipsec_strerror());
 		reg_fail++;
@@ -518,6 +522,25 @@ ipsecdoi2pfkey_proto(proto)
 	default:
 		plog(logp, LOCATION, NULL,
 			"Invalid ipsec_doi proto: %u\n", proto);
+		return ~0;
+	}
+	/*NOTREACHED*/
+}
+
+static u_int
+ipsecdoi2pfkey_alg(algclass, type)
+	u_int algclass, type;
+{
+	switch (algclass) {
+	case IPSECDOI_ATTR_AUTH:
+		return ipsecdoi2pfkey_aalg(type);
+	case IPSECDOI_PROTO_IPSEC_ESP:
+		return ipsecdoi2pfkey_ealg(type);
+	case IPSECDOI_PROTO_IPCOMP:
+		return ipsecdoi2pfkey_calg(type);
+	default:
+		plog(logp, LOCATION, NULL,
+			"Invalid ipsec_doi algclass: %u\n", algclass);
 		return ~0;
 	}
 	/*NOTREACHED*/
@@ -1840,6 +1863,54 @@ pk_sendeacquire(iph2)
 	free(newmsg);
 
 	return 0;
+}
+
+/*
+ * check if the algorithm is supported or not.
+ * OUT	 0: ok
+ *	-1: ng
+ */
+int
+pk_checkalg(class, calg, keylen)
+	int class, calg, keylen;
+{
+	int sup, error;
+	u_int alg;
+	struct sadb_alg alg0;
+
+	switch (algclass2doi(class)) {
+	case IPSECDOI_PROTO_IPSEC_ESP:
+		sup = SADB_EXT_SUPPORTED_ENCRYPT;
+		break;
+	case IPSECDOI_ATTR_AUTH:
+		sup = SADB_EXT_SUPPORTED_AUTH;
+		break;
+	case IPSECDOI_PROTO_IPCOMP:
+		plog(logp, LOCATION, NULL,
+			"WARNING: compression algorithm can not be checked.\n");
+		return 0;
+	default:
+		plog(logp, LOCATION, NULL, "ERROR: invalid algorithm class.\n");
+		return -1;
+	}
+	alg = ipsecdoi2pfkey_alg(algclass2doi(class), algtype2doi(class, calg));
+	if (alg == ~0)
+		return -1;
+
+	if (keylen == 0) {
+		if (ipsec_get_keylen(sup, alg, &alg0)) {
+			plog(logp, LOCATION, NULL,
+				"ERROR: %s.\n", ipsec_strerror());
+			return -1;
+		}
+		keylen = alg0.sadb_alg_minbits;
+	}
+
+	error = ipsec_check_keylen(sup, alg, keylen);
+	if (error)
+		plog(logp, LOCATION, NULL, "ERROR: %s.\n", ipsec_strerror());
+
+	return error;
 }
 
 /*

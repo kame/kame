@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: algorithm.h,v 1.7 2000/06/19 07:44:58 sakane Exp $ */
+/* YIPS @(#)$Id: algorithm.h,v 1.8 2000/08/31 10:21:22 sakane Exp $ */
 
 /* algorithm strength */
 enum {
@@ -67,6 +67,7 @@ enum {
 	algtype_des_iv64, algtype_des, algtype_3des,
 	algtype_rc5, algtype_idea, algtype_cast128, algtype_blowfish,
 	algtype_3idea, algtype_des_iv32, algtype_rc4, algtype_null_enc,
+	algtype_rijndael, algtype_twofish,
 };
 
 enum {

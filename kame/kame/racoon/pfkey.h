@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.h,v 1.9 2000/06/12 17:57:59 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.h,v 1.10 2000/08/31 10:21:22 sakane Exp $ */
 
 struct ipsecsa;
 
@@ -36,6 +36,8 @@ extern void pfkey_flush_sadb __P((u_int));
 extern int pfkey_init __P((void));
 
 extern struct pfkey_st *pfkey_getpst __P((caddr_t *, int, int));
+
+extern int pk_checkalg __P((int, int, int));
 
 extern int pk_sendgetspi __P((struct ph2handle *));
 extern int pk_sendupdate __P((struct ph2handle *));

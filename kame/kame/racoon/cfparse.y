@@ -32,6 +32,7 @@
 #include "policy.h"
 #include "sainfo.h"
 #include "oakley.h"
+#include "pfkey.h"
 #include "remoteconf.h"
 #include "grabmyaddr.h"
 #include "isakmp_var.h"
@@ -873,10 +874,24 @@ algorithm
 					return -1;
 				}
 			}
+
 			if ($2)
 				$$->encklen = $2;
 			else
 				$$->encklen = defklen;
+
+			/* check if it's supported algorithm by kernel */
+			if (!(cur_algclass == algclass_ipsec_auth && $1 == algtype_non_auth)
+			 && pk_checkalg(cur_algclass, $1, $$->encklen)) {
+				int a = algclass2doi(cur_algclass);
+				int b = algtype2doi(cur_algclass, $1);
+				if (a == IPSECDOI_ATTR_AUTH)
+					a = IPSECDOI_PROTO_IPSEC_AH;
+				yyerror("algorithm %s not supported",
+					s_ipsecdoi_trns(a, b));
+				free($$);
+				return -1;
+			}
 		}
 	;
 

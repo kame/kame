@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: session.c,v 1.9 2000/08/30 11:18:34 sakane Exp $ */
+/* YIPS @(#)$Id: session.c,v 1.10 2000/08/31 10:21:22 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -98,9 +98,6 @@ session(void)
 	init_signal();
 
 	if (admin_init() < 0)
-		exit(1);
-
-	if (pfkey_init() < 0)
 		exit(1);
 
 	initmyaddr();

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: main.c,v 1.9 2000/07/18 06:15:23 sakane Exp $ */
+/* YIPS @(#)$Id: main.c,v 1.10 2000/08/31 10:21:22 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -56,6 +56,7 @@
 #include "localconf.h"
 #include "session.h"
 #include "oakley.h"
+#include "pfkey.h"
 #include "crypto_openssl.h"
 
 /* debug flags */
@@ -119,6 +120,9 @@ main(ac, av)
 	"This product linked software developed by the OpenSSL Project"
 	"for use in the OpenSSL Toolkit. (http://www.openssl.org/)"
 	"\n");
+
+	if (pfkey_init() < 0)
+		exit(1);
 
 	error = cfparse();
 	if (error != 0) {
