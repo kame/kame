@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.258 2002/01/21 03:18:27 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.259 2002/01/21 04:58:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1377,8 +1377,10 @@ ip6_setpktaddrs(m, src, dst)
 
 	n = ip6_addaux(m);
 	if (n) {
-		mtod(n, struct ip6aux *)->ip6a_src = *src;
-		mtod(n, struct ip6aux *)->ip6a_dst = *dst;
+		if (src)
+			mtod(n, struct ip6aux *)->ip6a_src = *src;
+		if (dst)
+			mtod(n, struct ip6aux *)->ip6a_dst = *dst;
 	}
 
 	return(n);
