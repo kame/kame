@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.15 2002/10/11 14:08:37 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.16 2002/10/11 14:12:05 suz Exp $
  */
 
 /*
@@ -503,12 +503,10 @@ accept_listenerV2_report(src, dst, report_message, datalen)
                         s->al_checklist = MORETHANLLQI;
                     else
                         s->al_checklist = FALSE;
-		}
-		else
+		} else {
 		    /*
 		     * If not found, add it to the list and update kernel cache.
 		     */
-		{
 		    IF_DEBUG(DEBUG_MLD)
 			log(LOG_DEBUG, 0,
 			    "The source doesn't exist , trying to add it");
