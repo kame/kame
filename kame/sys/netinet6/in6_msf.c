@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.3 2002/09/19 03:35:56 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.4 2002/09/19 03:39:15 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -2151,9 +2151,6 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	int init, final;
 	int j;
 	int s;
-#ifdef MROUTING
-	extern struct socket *ip6_mrouter;
-#endif
 
 	if (*grpfp == NULL)
 		return EINVAL;
