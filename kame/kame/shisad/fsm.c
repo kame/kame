@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.13 2005/02/28 23:20:41 keiichi Exp $	*/
+/*	$KAME: fsm.c,v 1.14 2005/03/01 00:41:48 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -74,6 +74,7 @@ static int bul_fsm_back_register(struct binding_update_list *,
     struct fsm_message *);
 static int bul_fsm_back_deregister(struct binding_update_list *,
     struct fsm_message *);
+static void bul_fsm_try_other_home_agent(struct binding_update_list *);
 
 /* for debuging. */
 static void dump_ba(struct in6_addr *, struct in6_addr *, struct in6_addr *,
@@ -374,62 +375,28 @@ bul_reg_fsm(bul, event, data)
 			bul->bul_lifetime
 			    = set_default_bu_lifetime(bul->bul_hoainfo);
 			if ((bul->bul_flags & IP6_MH_BU_HOME) != 0) {
-				if (IN6_IS_ADDR_UNSPECIFIED(&bul->bul_peeraddr)){
-					/* 
-					 * pick an address of one of
-					 * our home agent from the
-					 * home agent list.
-					 */
-					hal = mip6_find_hal(bul->bul_hoainfo);
-					if (hal) {
-						bul->bul_peeraddr = hal->hal_ip6addr;
-						goto idle_send_bu;
-					}
-					
-					/*
-					 * keep idle state if we
-					 * haven't been assigned a
-					 * valid CoA
-					 */
-					if (IN6_IS_ADDR_UNSPECIFIED(&bul->bul_coa)) {
-						return (0);
+				if (!IN6_IS_ADDR_UNSPECIFIED(&bul->bul_peeraddr)){
+					error = send_bu(bul);
+					if (error) {
+						syslog(LOG_ERR,
+						    "sending a home "
+						    "registration "
+						    "failed. (%d)\n", error);
+						/* continue and try again. */
 					}
 
-					/* send a DHAAD request message. */
-					if (send_haadreq(bul->bul_hoainfo, 64 /* XXX */, &bul->bul_coa) > 0)
-						/* how handle this */;
-					
-					/* set retrans timer */
 					bul->bul_retrans_time
-					    = INITIAL_DHAAD_TIMEOUT;
+					    = initial_bindack_timeout_first_reg;
 					bul_set_retrans_timer(bul,
 					    bul->bul_retrans_time);
 
 					bul_set_expire_timer(bul,
 					    bul->bul_lifetime << 2);
 
-					REGFSMS = MIP6_BUL_REG_FSM_STATE_DHAAD;
-					return (0);
+					REGFSMS = MIP6_BUL_REG_FSM_STATE_WAITA;
+				} else {
+					bul_fsm_try_other_home_agent(bul);
 				}
-
-			idle_send_bu:
-				error = send_bu(bul);
-				if (error) {
-					syslog(LOG_ERR,
-					    "sending a home registration "
-					    "failed. (%d)\n", error);
-					/* continue and try again. */
-				}
-
-				bul->bul_retrans_time
-				    = initial_bindack_timeout_first_reg;
-				bul_set_retrans_timer(bul,
-				    bul->bul_retrans_time);
-
-				bul_set_expire_timer(bul,
-				    bul->bul_lifetime << 2);
-
-				REGFSMS = MIP6_BUL_REG_FSM_STATE_WAITA;
 			} else {
 				error = bul_rr_fsm(bul,
 				    MIP6_BUL_FSM_EVENT_START_RR, data);
@@ -869,55 +836,7 @@ bul_reg_fsm(bul, event, data)
 		case MIP6_BUL_FSM_EVENT_EXPIRE_TIMER:
 			/* in MIP6_BU_REG_FSM_STATE_WAITA */
 			if ((bul->bul_flags & IP6_MH_BU_HOME) != 0) {
-
-				/* XXX remove the current HA entry. */
-				/* mip6_remove_hal(bul->bul_peeraddr) */
-
-				/* 
-				 * pick an address of one of
-				 * our home agent from the
-				 * home agent list.
-				 */
-				hal = mip6_find_hal(bul->bul_hoainfo);
-				if (hal) {
-					bul->bul_peeraddr = hal->hal_ip6addr;
-					goto waita_send_bu;
-				}
-					
-				/* send a DHAAD request message. */
-				if (send_haadreq(bul->bul_hoainfo, 64 /* XXX */, &bul->bul_coa) > 0)
-					/* how handle this */;
-
-				/* set retrans timer */
-				bul->bul_retrans_time = INITIAL_DHAAD_TIMEOUT;
-				bul_set_retrans_timer(bul,
-				    bul->bul_retrans_time);
-
-				/* set expire timer */
-				bul_set_expire_timer(bul,
-				    bul->bul_lifetime << 2);
-
-				REGFSMS = MIP6_BUL_REG_FSM_STATE_DHAAD;
-				return (0);
-
-			waita_send_bu:
-				error = send_bu(bul);
-				if (error) {
-					syslog(LOG_ERR,
-					    "sending a home registration "
-					    "failed. (%d)\n", error);
-					/* continue and try again. */
-				}
-
-				bul->bul_retrans_time
-				    = initial_bindack_timeout_first_reg;
-				bul_set_retrans_timer(bul,
-				    bul->bul_retrans_time);
-
-				bul_set_expire_timer(bul,
-				    bul->bul_lifetime << 2);
-
-				REGFSMS = MIP6_BUL_REG_FSM_STATE_WAITA;
+				bul_fsm_try_other_home_agent(bul);
 			} else {
 				bul_stop_timers(bul);
 				bul_remove(bul);
@@ -1115,56 +1034,7 @@ bul_reg_fsm(bul, event, data)
 			}
 
 			if ((bul->bul_flags & IP6_MH_BU_HOME) != 0) {
-
-				/* XXX remove the current HA entry. */
-				/* mip6_remove_hal(bul->bul_peeraddr) */
-
-				/* 
-				 * pick an address of one of
-				 * our home agent from the
-				 * home agent list.
-				 */
-				hal = mip6_find_hal(bul->bul_hoainfo);
-				if (hal) {
-					bul->bul_peeraddr = hal->hal_ip6addr;
-					goto waitar_send_bu;
-				}
-					
-				/* send a DHAAD request message. */
-				if (send_haadreq(bul->bul_hoainfo, 64 /* XXX */, &bul->bul_coa) > 0)
-					/* how handle this */;
-
-				/* set retrans timer */
-				bul->bul_retrans_time
-				    = INITIAL_DHAAD_TIMEOUT;
-				bul_set_retrans_timer(bul,
-				    bul->bul_retrans_time);
-
-				/* set expire timer */
-				bul_set_expire_timer(bul,
-				    bul->bul_lifetime << 2);
-
-				REGFSMS = MIP6_BUL_REG_FSM_STATE_DHAAD;
-				return (0);
-
-			waitar_send_bu:
-				error = send_bu(bul);
-				if (error) {
-					syslog(LOG_ERR,
-					    "sending a home registration "
-					    "failed. (%d)\n", error);
-					/* continue and try again. */
-				}
-
-				bul->bul_retrans_time
-				    = initial_bindack_timeout_first_reg;
-				bul_set_retrans_timer(bul,
-				    bul->bul_retrans_time);
-
-				bul_set_expire_timer(bul,
-				    bul->bul_lifetime << 2);
-
-				REGFSMS = MIP6_BUL_REG_FSM_STATE_WAITA;
+				bul_fsm_try_other_home_agent(bul);
 			} else {
 				bul_stop_timers(bul);
 				bul_remove(bul);
@@ -1784,24 +1654,9 @@ bul_reg_fsm(bul, event, data)
 				    "removing bul entry from kernel "
 				    "failed.\n");
 			}
+
 			if ((bul->bul_flags & IP6_MH_BU_HOME) != 0) {
-				/* get another HA addr. */
-
-				/* if found,
-				 *   send bu,
-				 *   reset retrans count,
-				 *   start retrans timer,
-				 *   start expire timer.
-				 * break;
-				 */
-
-				/* XXX send DHAAD request. */
-
-				bul->bul_retrans_time = INITIAL_DHAAD_TIMEOUT;
-				bul_set_retrans_timer(bul,
-				    bul->bul_retrans_time);
-
-				REGFSMS = MIP6_BUL_REG_FSM_STATE_DHAAD;
+				bul_fsm_try_other_home_agent(bul);
 			} else {
 				/* remove a binding update entry for CN. */
 				bul_remove(bul);
@@ -2678,6 +2533,66 @@ bul_fsm_back_deregister(bul, data)
 	}
 	mbu = NULL; /* free in mip6_bu_list_remove_all() */
 #endif
+}
+
+static void
+bul_fsm_try_other_home_agent(bul)
+	struct binding_update_list *bul;
+{
+	struct home_agent_list *hal;
+	int error;
+
+	/* XXX remove the current HA entry. */
+	/* mip6_remove_hal(bul->bul_peeraddr) */
+
+	/* 
+	 * pick an address of one of our home agent from the home
+	 * agent list.
+	 */
+	hal = mip6_find_hal(bul->bul_hoainfo);
+	if (hal) {
+		bul->bul_peeraddr = hal->hal_ip6addr;
+		goto send_bu;
+	}
+					
+	/* keep current state if we haven't been assigned a valid CoA */
+	if (IN6_IS_ADDR_UNSPECIFIED(&bul->bul_coa))
+		return;
+
+	/* send a DHAAD request message. */
+	error = send_haadreq(bul->bul_hoainfo, 64 /* XXX */, &bul->bul_coa);
+	if (error) {
+		syslog(LOG_ERR,
+		    "sending a DHAAD request message failed. (%d)\n", error);
+		/* continue and try again. */
+	}
+
+	/* set retrans timer. */
+	bul->bul_retrans_time = INITIAL_DHAAD_TIMEOUT;
+	bul_set_retrans_timer(bul, bul->bul_retrans_time);
+
+	/* set expire timer. */
+	bul_set_expire_timer(bul, bul->bul_lifetime << 2);
+
+	bul->bul_reg_fsm_state = MIP6_BUL_REG_FSM_STATE_DHAAD;
+	return;
+
+send_bu:
+	error = send_bu(bul);
+	if (error) {
+		syslog(LOG_ERR,
+		    "sending a home registration failed. (%d)\n", error);
+		/* continue and try again. */
+	}
+
+	bul->bul_retrans_time = initial_bindack_timeout_first_reg;
+	bul_set_retrans_timer(bul, bul->bul_retrans_time);
+
+	bul_set_expire_timer(bul, bul->bul_lifetime << 2);
+
+	bul->bul_reg_fsm_state = MIP6_BUL_REG_FSM_STATE_WAITA;
+
+	return;
 }
 
 static int
