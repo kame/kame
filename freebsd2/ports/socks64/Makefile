@@ -1,13 +1,13 @@
 # New ports collection makefile for:	socks64
-# Version required:			v1.0r8-19990118
+# Version required:			v1.0r10-20000322
 # Date created:				24 Apr 1996
 # Whom:					pst
 #
-# $Id: Makefile,v 1.1 1999/08/09 01:37:33 itojun Exp $
+# $Id: Makefile,v 1.2 2000/03/25 05:48:06 sumikawa Exp $
 #
 
-DISTNAME=	socks5-v1.0r8
-PKGNAME=	socks64-1.0.8.19990118
+DISTNAME=	socks5-v1.0r10
+PKGNAME=	socks64-1.0.10.20000322
 CATEGORIES=	net security
 MASTER_SITES=	ftp://ftp.kame.net/pub/kame/misc/
 DISTFILES=	${DISTNAME}${EXTRACT_SUFX} ${SOCKS64}.tgz
@@ -19,7 +19,7 @@ MAINTAINER=	itojun@kame.net
 NO_CDROM=	"NEC has a funky license for this software"
 RESTRICTED=	"no commercial use"
 
-SOCKS64=	socks64-v10r8-19990118
+SOCKS64=	socks64-v10r10-20000322
 
 # here are some extra configure args you may wish to use
 # see the readme file before screwing with them
