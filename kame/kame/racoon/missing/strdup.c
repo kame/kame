@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  */
 /*
- * $Id: strdup.c,v 1.1 1999/08/08 23:31:31 itojun Exp $
+ * $Id: strdup.c,v 1.1.1.1 1999/08/08 23:31:31 itojun Exp $
  */
 
 #include <sys/types.h>
