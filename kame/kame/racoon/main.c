@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.41 2001/08/17 07:06:26 itojun Exp $	*/
+/*	$KAME: main.c,v 1.42 2001/10/18 07:13:13 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -76,7 +76,7 @@ int f_local = 0;	/* local test mode.  behave like a wall. */
 int vflag = 1;		/* for print-isakmp.c */
 static int loading_sa = 0;	/* install sa when racoon boots up. */
 
-#define RACOON_VERSION	"20001216 sakane@ydc.co.jp"
+#define RACOON_VERSION	"20001216 sakane@kame.net"
 #ifdef RACOON_PKG_VERSION
 static char version0[] = "@(#)package version " RACOON_PKG_VERSION ;
 static char version[] = "@(#)internal version " RACOON_VERSION ;
