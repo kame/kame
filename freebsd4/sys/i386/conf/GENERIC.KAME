@@ -323,6 +323,9 @@ options 	TCP_ECN		# ECN support in TCP
 #options 	NATPT_NAT	# IPv4 -> IPv4 NAT.
 				# Valid only when "options NATPT" is defined.
 
+# Source-Specific Multicast (SSM)
+#options 	IGMPV3		# IPv4
+
 #pseudo-device	atm
 #pseudo-device	dummy	1
 #pseudo-device	stf

@@ -242,6 +242,9 @@ options 	TCP_ECN		# ECN support in TCP
 # Network Address Translation - Protocol Translation (NAT-PT)
 #options 	NATPT
 
+# Source-Specific Multicast (SSM)
+#options 	IGMPV3		# IPv4
+
 #pseudo-device	atm
 #pseudo-device	dummy	1
 #pseudo-device	stf

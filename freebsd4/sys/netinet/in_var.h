@@ -31,13 +31,51 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_var.h	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/in_var.h,v 1.33 1999/12/29 04:41:00 peter Exp $
+ * $FreeBSD: src/sys/netinet/in_var.h,v 1.33.2.3 2001/12/14 20:09:34 jlemon Exp $
+ */
+
+/*
+ * Copyright (c) 2002 INRIA. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by INRIA and its
+ *	contributors.
+ * 4. Neither the name of INRIA nor the names of its contributors may be
+ *    used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+/*
+ * Implementation of Internet Group Management Protocol, Version 3.
+ *
+ * Developed by Hitoshi Asaeda, INRIA, February 2002.
  */
 
 #ifndef _NETINET_IN_VAR_H_
 #define _NETINET_IN_VAR_H_
 
 #include <sys/queue.h>
+#include <sys/fnv_hash.h>
 
 /*
  * Interface address, Internet version.  One of these structures
@@ -55,7 +93,8 @@ struct in_ifaddr {
 	u_long	ia_subnet;		/* subnet number, including net */
 	u_long	ia_subnetmask;		/* mask of subnet part */
 	struct	in_addr ia_netbroadcast; /* to recognize net broadcasts */
-	TAILQ_ENTRY(in_ifaddr) ia_link;	/* tailq macro glue */
+	LIST_ENTRY(in_ifaddr) ia_hash;	/* entry in bucket of inet addresses */
+	TAILQ_ENTRY(in_ifaddr) ia_link;	/* list of internet addresses */
 	struct	sockaddr_in ia_addr;	/* reserve space for interface name */
 	struct	sockaddr_in ia_dstaddr; /* reserve space for broadcast addr */
 #define	ia_broadaddr	ia_dstaddr
@@ -81,10 +120,23 @@ struct	in_aliasreq {
 
 
 #ifdef	_KERNEL
-extern	TAILQ_HEAD(in_ifaddrhead, in_ifaddr) in_ifaddrhead;
 extern	struct	ifqueue	ipintrq;		/* ip packet input queue */
 extern	struct	in_addr zeroin_addr;
 extern	u_char	inetctlerrmap[];
+
+/* 
+ * Hash table for IP addresses.
+ */
+extern	LIST_HEAD(in_ifaddrhashhead, in_ifaddr) *in_ifaddrhashtbl;
+extern	TAILQ_HEAD(in_ifaddrhead, in_ifaddr) in_ifaddrhead;
+extern	u_long in_ifaddrhmask;			/* mask for hash table */
+
+#define INADDR_NHASH_LOG2       9
+#define INADDR_NHASH		(1 << INADDR_NHASH_LOG2)
+#define INADDR_HASHVAL(x)	fnv_32_buf((&(x)), sizeof(x), FNV1_32_INIT)
+#define INADDR_HASH(x) \
+	(&in_ifaddrhashtbl[INADDR_HASHVAL(x) & in_ifaddrhmask])
+
 
 /*
  * Macro for finding the interface (ifnet structure) corresponding to one
@@ -94,20 +146,11 @@ extern	u_char	inetctlerrmap[];
 	/* struct in_addr addr; */ \
 	/* struct ifnet *ifp; */ \
 { \
-	register struct in_ifaddr *ia; \
+	struct in_ifaddr *ia; \
 \
-	for (ia = in_ifaddrhead.tqh_first; \
-	    ia != NULL && ((ia->ia_ifp->if_flags & IFF_POINTOPOINT)? \
-		IA_DSTSIN(ia):IA_SIN(ia))->sin_addr.s_addr != (addr).s_addr; \
-	    ia = ia->ia_link.tqe_next) \
-		 continue; \
-	if (ia == NULL) \
-	    for (ia = in_ifaddrhead.tqh_first; \
-		ia != NULL; \
-		ia = ia->ia_link.tqe_next) \
-		    if (ia->ia_ifp->if_flags & IFF_POINTOPOINT && \
-			IA_SIN(ia)->sin_addr.s_addr == (addr).s_addr) \
-			    break; \
+	LIST_FOREACH(ia, INADDR_HASH((addr).s_addr), ia_hash) \
+		if (IA_SIN(ia)->sin_addr.s_addr == (addr).s_addr) \
+			break; \
 	(ifp) = (ia == NULL) ? NULL : ia->ia_ifp; \
 }
 
@@ -119,9 +162,9 @@ extern	u_char	inetctlerrmap[];
 	/* struct ifnet *ifp; */ \
 	/* struct in_ifaddr *ia; */ \
 { \
-	for ((ia) = in_ifaddrhead.tqh_first; \
+	for ((ia) = TAILQ_FIRST(&in_ifaddrhead); \
 	    (ia) != NULL && (ia)->ia_ifp != (ifp); \
-	    (ia) = (ia)->ia_link.tqe_next) \
+	    (ia) = TAILQ_NEXT((ia), ia_link)) \
 		continue; \
 }
 #endif
@@ -134,7 +177,13 @@ extern	u_char	inetctlerrmap[];
 struct router_info {
 	struct ifnet *rti_ifp;
 	int    rti_type; /* type of router which is querier on this interface */
-	int    rti_time; /* # of slow timeouts since last old query */
+	u_int	rti_time;	/* # of slow timeouts since last old query */
+	u_int	rti_timer1;	/* IGMPv1 Querier Present timer */
+	u_int	rti_timer2;	/* IGMPv2 Querier Present timer */
+	u_int	rti_timer3;	/* IGMPv3 General Query (interface) timer */
+	u_int	rti_qrv;	/* Querier Robustness Variable */
+	u_int	rti_qqi;	/* Querier Interval Variable */
+	u_int	rti_qri;	/* Querier Response Interval */
 	struct router_info *rti_next;
 };
 
@@ -148,12 +197,14 @@ struct router_info {
  */
 struct in_multi {
 	LIST_ENTRY(in_multi) inm_link;	/* queue macro glue */
+#define	inm_list	inm_link	/* compatibility with NetBSD */
 	struct	in_addr inm_addr;	/* IP multicast address, convenience */
 	struct	ifnet *inm_ifp;		/* back pointer to ifnet */
 	struct	ifmultiaddr *inm_ifma;	/* back pointer to ifmultiaddr */
 	u_int	inm_timer;		/* IGMP membership report timer */
 	u_int	inm_state;		/*  state of the membership */
 	struct	router_info *inm_rti;	/* router info*/
+	struct	in_multi_source *inm_source;	/* filtered source list */
 };
 
 #ifdef _KERNEL
@@ -182,10 +233,9 @@ struct in_multistep {
 	/* struct ifnet *ifp; */ \
 	/* struct in_multi *inm; */ \
 do { \
-	register struct ifmultiaddr *ifma; \
+	struct ifmultiaddr *ifma; \
 \
-	for (ifma = (ifp)->if_multiaddrs.lh_first; ifma; \
-	     ifma = ifma->ifma_link.le_next) { \
+	LIST_FOREACH(ifma, &((ifp)->if_multiaddrs), ifma_link) { \
 		if (ifma->ifma_addr->sa_family == AF_INET \
 		    && ((struct sockaddr_in *)ifma->ifma_addr)->sin_addr.s_addr == \
 		    (addr).s_addr) \
@@ -206,25 +256,35 @@ do { \
 	/* struct in_multi *inm; */ \
 do { \
 	if (((inm) = (step).i_inm) != NULL) \
-		(step).i_inm = (step).i_inm->inm_link.le_next; \
+		(step).i_inm = LIST_NEXT((step).i_inm, inm_link); \
 } while(0)
 
 #define IN_FIRST_MULTI(step, inm) \
 	/* struct in_multistep step; */ \
 	/* struct in_multi *inm; */ \
 do { \
-	(step).i_inm = in_multihead.lh_first; \
+	(step).i_inm = LIST_FIRST(&in_multihead); \
 	IN_NEXT_MULTI((step), (inm)); \
 } while(0)
 
 struct	route;
+#ifdef IGMPV3
+struct	in_multi * in_addmulti __P((struct in_addr *, struct ifnet *,
+		u_int16_t, struct sockaddr_storage *, u_int, int, int *));
+void	in_delmulti __P((struct in_multi *, u_int16_t,
+		struct sockaddr_storage *, u_int, int, int *));
+struct	in_multi * in_modmulti __P((struct in_addr *, struct ifnet *, u_int16_t,
+		struct sockaddr_storage *, u_int, u_int16_t,
+		struct sockaddr_storage *, u_int, int, u_int, int *));
+#else
 struct	in_multi *in_addmulti __P((struct in_addr *, struct ifnet *));
 void	in_delmulti __P((struct in_multi *));
+#endif
 int	in_control __P((struct socket *, u_long, caddr_t, struct ifnet *,
 			struct proc *));
 void	in_rtqdrain __P((void));
 void	ip_input __P((struct mbuf *));
-int	in_ifadown __P((struct ifaddr *ifa));
+int	in_ifadown __P((struct ifaddr *ifa, int));
 void	in_ifscrub __P((struct ifnet *, struct in_ifaddr *));
 int	ipflow_fastforward __P((struct mbuf *));
 void	ipflow_create __P((const struct route *, struct mbuf *));

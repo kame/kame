@@ -34,6 +34,38 @@
  * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.59.2.23 2002/05/02 02:36:50 silby Exp $
  */
 
+/*
+ * Copyright (c) 2002 INRIA. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *	This product includes software developed by INRIA and its
+ *	contributors.
+ * 4. Neither the name of INRIA nor the names of its contributors may be
+ *    used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE INSTITUTE AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE INSTITUTE OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
 #include "opt_ipsec.h"
 #include "opt_inet6.h"
 
@@ -62,6 +94,10 @@
 #include <netinet/in_pcb.h>
 #include <netinet/in_var.h>
 #include <netinet/ip_var.h>
+#ifdef IGMPV3
+#include <netinet/in_msf.h>
+#endif
+
 #ifdef INET6
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
@@ -688,6 +724,12 @@ in_pcbpurgeif0(head, ifp)
 	struct inpcb *inp;
 	struct ip_moptions *imo;
 	int i, gap;
+#ifdef IGMPV3
+	struct sockaddr_storage *del_ss;
+	u_int16_t numsrc;
+	u_int mode;
+	int final, error;
+#endif
 
 	for (inp = head; inp != NULL; inp = LIST_NEXT(inp, inp_list)) {
 		imo = inp->inp_moptions;
@@ -707,7 +749,30 @@ in_pcbpurgeif0(head, ifp)
 			for (i = 0, gap = 0; i < imo->imo_num_memberships;
 			    i++) {
 				if (imo->imo_membership[i]->inm_ifp == ifp) {
+#ifdef IGMPV3
+					error = ip_getmopt_msflist
+						(imo->imo_msf[i], &numsrc,
+						 &del_ss, &mode);
+					if (error != 0) {
+						/* XXX strange... panic/skip? */
+						if (del_ss != NULL)
+							FREE(del_ss, M_IPMOPTS);
+						continue;
+					}
+					final = 1;
+					in_delmulti(imo->imo_membership[i],
+						    numsrc, del_ss, mode,
+						    final, &error);
+					if (del_ss != NULL)
+						FREE(del_ss, M_IPMOPTS);
+					in_freemopt_source_list
+						(imo->imo_msf[i],
+						 imo->imo_msf[i]->msf_head,
+						 imo->imo_msf[i]->msf_blkhead);
+					IMO_MSF_FREE(imo->imo_msf[i]);
+#else
 					in_delmulti(imo->imo_membership[i]);
+#endif
 					gap++;
 				} else if (gap != 0)
 					imo->imo_membership[i - gap] =
