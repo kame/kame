@@ -1,4 +1,4 @@
-/*	$KAME: ip6opt.c,v 1.9 2001/08/20 02:32:40 itojun Exp $	*/
+/*	$KAME: ip6opt.c,v 1.10 2001/12/25 04:07:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -590,12 +590,8 @@ inet6_opt_next(void *extbuf, size_t extlen, int prevlen, u_int8_t *typep,
 	if (prevlen == 0) {
 		optp = (u_int8_t *)((struct ip6_hbh *)extbuf + 1);
 	}
-	else {
+	else
 		optp = (u_int8_t *)extbuf + prevlen;
-		if ((optlen = ip6optlen(optp, lim)) == 0)
-			goto optend;
-		optp += optlen;
-	}
 
 	/* Find the next option skipping any padding options. */
 	while(optp < lim) {
@@ -614,7 +610,7 @@ inet6_opt_next(void *extbuf, size_t extlen, int prevlen, u_int8_t *typep,
 			*typep = *optp;
 			*lenp = optlen;
 			*databufp = optp + 2;
-			return(optp - (u_int8_t *)extbuf);
+			return(optp + optlen - (u_int8_t *)extbuf);
 		}
 	}
 
@@ -660,12 +656,8 @@ inet6_opt_find(void *extbuf, size_t extlen, int prevlen, u_int8_t type,
 	if (prevlen == 0) {
 		optp = (u_int8_t *)((struct ip6_hbh *)extbuf + 1);
 	}
-	else {
+	else
 		optp = (u_int8_t *)extbuf + prevlen;
-		if ((optlen = ip6optlen(optp, lim)) == 0)
-			goto optend;
-		optp += optlen;
-	}
 
 	/* Find the specified option */
 	while(optp < lim) {
@@ -675,7 +667,7 @@ inet6_opt_find(void *extbuf, size_t extlen, int prevlen, u_int8_t type,
 		if (*optp == type) { /* found */
 			*lenp = optlen;
 			*databufp = optp + 2;
-			return(optp - (u_int8_t *)extbuf);
+			return(optp + optlen - (u_int8_t *)extbuf);
 		}
 
 		optp += optlen;
