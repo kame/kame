@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2400 2003/05/27 07:14:53 jinmei Exp $
+$KAME: CHANGELOG,v 1.2401 2003/05/29 09:03:14 sakane Exp $
 
 <200305>
+Thu May 29 18:01:28 JST 2003 sakane@kame.net
+	* kame/racoon
+	the patches from <Francis.Dupont@enst-bretagne.fr>
+	- racoon must use the source addresss of the phase 1 negotiation
+	  that is in the acquire message.
+	- the missing in pk_recvspdupdate() was added.
+
 2003-05-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/setkey/{token.l, parse.y}: added a new keyword "null"
 	as the null encryption algorithm.  The old keyword "simple" was
