@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.70 2000/08/22 08:17:13 jinmei Exp $
+$KAME: COVERAGE,v 1.71 2000/08/23 03:39:30 itojun Exp $
 
 
 x: supported/integrated
@@ -81,7 +81,7 @@ ip6_forward rejects packets with unspecified IPv6 source
 		x	x	x	-	x	-	-
 
 ip6_mforward rejects packets with unspecified IPv6 source
-		x	-	?	-	-	?	-
+		x	-	-	-	-	-	-
 
 advanced API	2292bis	2292	2292	2292	2292	2292	2292
 		(*1)
