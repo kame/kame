@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.94 2001/12/19 14:36:09 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.95 2001/12/22 05:02:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -696,10 +696,10 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 		 * by that address must be a neighbor of the sending host.
 		 */
 		ron = &opts->ip6po_nextroute;
-		if (ron->ro_rt &&
-		    ((ron->ro_rt->rt_flags & (RTF_UP | RTF_LLINFO)) !=
-		     (RTF_UP | RTF_LLINFO) ||
-		     !SA6_ARE_ADDR_EQUAL(satosin6(&ron->ro_dst), sin6_next))) {
+		if ((ron->ro_rt &&
+		     (ron->ro_rt->rt_flags & (RTF_UP | RTF_LLINFO)) !=
+		     (RTF_UP | RTF_LLINFO)) ||
+		    !SA6_ARE_ADDR_EQUAL(satosin6(&ron->ro_dst), sin6_next)) {
 			if (ron->ro_rt) {
 				RTFREE(ron->ro_rt);
 				ron->ro_rt = NULL;
@@ -822,6 +822,9 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 	}
 
   done:
+	if (error == EHOSTUNREACH)
+		ip6stat.ip6s_noroute++;
+
 	if (retifp != NULL)
 		*retifp = ifp;
 	if (retrt != NULL)
