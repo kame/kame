@@ -57,6 +57,7 @@ AC_MSG_CHECKING(for libcrypto)
 for dir in $crypto_dir /usr/local/v6 /usr/local/ssl /usr/local /usr/pkg; do
 	ssleay_lib=no
 	ssleay_include=no
+	ssleay_cmd=no
 	if test -d $dir/lib -a -f $dir/lib/libcrypto.a; then
 		ssleay_lib="$dir/lib"
 	fi
@@ -69,7 +70,13 @@ for dir in $crypto_dir /usr/local/v6 /usr/local/ssl /usr/local /usr/pkg; do
 			ssleay_include="-I$dir/include -I$dir/include/openssl"
 		fi
 	fi
-	if test "$ssleay_lib" != "no" -a "$ssleay_include" != "no"; then
+	for ssleay_xcmd in ssleay openssl; do
+		if test -d $dir/bin -a -x $dir/bin/$ssleay_xcmd; then
+			ssleay_cmd="$dir/bin/$ssleay_xcmd"
+			break;
+		fi
+	done
+	if test "$ssleay_lib" != "no" -a "$ssleay_include" != "no" -a "$ssleay_cmd" != "no"; then
 		LIBS="-L$ssleay_lib $LIBS"
 		CPPFLAGS="$ssleay_include $CPPFLAGS"
 		break;
@@ -106,9 +113,14 @@ AC_CHECK_LIB(ssl, ssl_ok, [dnl
 	echo
 	], [], -lcrypto)
 
-dnl AC_MSG_CHECKING(SSLeay version number)
-dnl ssleay_version=`$ssleay_lib/../bin/ssleay version`
-dnl AC_MSG_RESULT($ssleay_version)
+AC_MSG_CHECKING(SSLeay version number)
+ssleay_version="`$ssleay_cmd version | cut -d' ' -f2 | tr -d '[a-zA-Z\.]' | tr -d '^0'`"
+if test -z "$ssleay_version"; then
+	ssleay_version="0"
+fi;
+SSLVERDEF="-DSSLVER=$ssleay_version"
+AC_MSG_RESULT("$ssleay_version")
+AC_SUBST(SSLVERDEF)
 
 AC_CHECK_LIB(crypto, des_cbc_encrypt)
 AC_CHECK_LIB(l, yywrap)

@@ -19,6 +19,23 @@ CFLAGS+=-I/usr/local/ssl/include/openssl
 .endif
 .endif
 
+.if exists(/usr/local/ssl/bin/openssl)
+ssleay_cmd=/usr/local/ssl/bin/openssl
+.elif exists(/usr/pkg/ssl/bin/openssl)
+ssleay_cmd=/usr/pkg/ssl/bin/openssl
+.elif exists(/usr/local/bin/openssl)
+ssleay_cmd=/usr/local/bin/openssl
+.elif exists(/usr/local/ssl/bin/ssleay)
+ssleay_cmd=/usr/local/ssl/bin/ssleay
+.elif exists(/usr/pkg/ssl/bin/ssleay)
+ssleay_cmd=/usr/pkg/ssl/bin/ssleay
+.elif exists(/usr/local/bin/ssleay)
+ssleay_cmd=/usr/local/bin/ssleay
+.else
+ssleay_cmd=openssl
+.endif
+SSLVERNUM!= $(ssleay_cmd) version | cut -d' ' -f2 | tr -d '[a-zA-Z\.]' | tr -d '^0'
+
 LDADD+=	-ly -ll
 DPADD+=	${LIBY} ${LIBL}
 LDADD+=	-L${.CURDIR}/../../../lib/libipsec \
