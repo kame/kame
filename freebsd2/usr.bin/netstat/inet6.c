@@ -1108,9 +1108,6 @@ icmp6_stats(off, name)
 
 	p(icp6s_reflect, "\t%qu message response%s generated\n");
 #undef p
-
-	p(icp6s_reflect, "\t%qu message response%s generated\n");
-#undef p
 #undef p_5
 }
 
