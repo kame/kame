@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.32 2001/07/13 05:49:49 itojun Exp $
+$KAME: FAQ,v 1.33 2001/07/16 03:32:29 itojun Exp $
 
 
 GENERAL
@@ -83,6 +83,19 @@ Q: Are there other documents/FAQ lists I may want to check?
 	- http://www.ipv6.org/, and http://www.jp.ipv6.org/ (if you can read
 	  Japanese texts).
 	- http://www.netbsd.org/Documentation/network/ipv6/
+
+Q: Which operating systems/vendor routers use KAME stack?
+	Operating systems:
+	- OpenBSD, http://www.openbsd.org/
+	- NetBSD, http://www.netbsd.org/
+	- FreeBSD, http://www.freebsd.org/
+	- BSD/OS, http://www.bsdi.com/
+	- Apple Darwin
+
+	Vendor routers:
+	- Hitachi GR2000, http://www.v6.hitachi.co.jp/GR2000/
+	- IIJ SEIL-T1, http://www.seil-t1.com/
+	- (more)
 
 
 INSTALLATION
