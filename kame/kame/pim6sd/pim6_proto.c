@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.65 2003/09/05 07:41:42 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.66 2003/09/05 07:52:45 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -1186,6 +1186,9 @@ receive_pim6_register_stop(reg_src, reg_dst, pim_message, datalen)
     GET_EGADDR6(&encod_grp, data_ptr);
     GET_EUADDR6(&encod_unisrc, data_ptr);
 
+    memset(&group, 0, sizeof(group));
+    group.sin6_family = AF_INET6;
+    group.sin6_len = sizeof(group);
     group.sin6_addr = encod_grp.mcast_addr;
 
     /* scope validation of the inner source and destination addresses */
@@ -1194,10 +1197,11 @@ receive_pim6_register_stop(reg_src, reg_dst, pim_message, datalen)
     if (IN6_IS_ADDR_MC_SITELOCAL(&ip->ip6_dst))
 	group.sin6_scope_id = addr2scopeid(&ip->ip6_src, &ip->ip6_dst,
 					   reg_src, reg_dst);
-    else
 #endif
 
-    group.sin6_scope_id = 0;
+    memset(&source, 0, sizeof(source));
+    source.sin6_family = AF_INET6;
+    source.sin6_len = sizeof(source);
     source.sin6_addr = encod_unisrc.unicast_addr;
 
     /* the source address must be global...but is it always true? */
@@ -1206,10 +1210,7 @@ receive_pim6_register_stop(reg_src, reg_dst, pim_message, datalen)
     if (IN6_IS_ADDR_SITELOCAL)
 	source.sin6_scope_id = addr2scopeid(&ip->ip6_src, &ip->ip6_dst,
 					    reg_src, reg_dst);
-    else
 #endif
-
-    source.sin6_scope_id = 0;
 
     if ((mifi = find_vif_direct_local(&source)) == NO_VIF) {
 	IF_DEBUG(DEBUG_PIM_REGISTER) {
@@ -1474,6 +1475,7 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
     if (num_groups == 0)
 	return (FALSE);		/* No indication for groups in the message */
     GET_HOSTSHORT(holdtime, data_ptr);
+    memset(&target, 0, sizeof(target));
     target.sin6_len = sizeof(target);
     target.sin6_family = AF_INET6;
     target.sin6_addr = uni_target_addr.unicast_addr;
@@ -3034,9 +3036,15 @@ receive_pim6_assert(src, dst, pim_message, datalen)
     GET_HOSTLONG(assert_metric, data_ptr);
     assert_rptbit = assert_preference & PIM_ASSERT_RPT_BIT;
 
+    memset(&source, 0, sizeof(source));
+    source.sin6_family = AF_INET6;
+    source.sin6_len = sizeof(source);
     source.sin6_addr = eusaddr.unicast_addr;
     source.sin6_scope_id = inet6_uvif2scopeid(&source, v);
 
+    memset(&group, 0, sizeof(group));
+    group.sin6_family = AF_INET6;
+    group.sin6_len = sizeof(group);
     group.sin6_addr = egaddr.mcast_addr;
     group.sin6_scope_id = inet6_uvif2scopeid(&group, v);
 
@@ -3466,6 +3474,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	    return(FALSE);
     }
 
+    memset(&new_bsr_address, 0, sizeof(new_bsr_address));
     new_bsr_address.sin6_addr = new_bsr_uni_addr.unicast_addr;
     new_bsr_address.sin6_len = sizeof(new_bsr_address);
     new_bsr_address.sin6_family = AF_INET6;
@@ -3973,6 +3982,8 @@ receive_pim6_cand_rp_adv(src, dst, pim_message, datalen)
     }
 
     memset(&rpp_, 0, sizeof(rpp_));
+    rpp_.sin6_family = AF_INET6;
+    rpp_.sin6_len = sizeof(rpp_);
     if (prefix_cnt == 0) {
 	/* The default ff:: and masklen of 8 */
 	MASKLEN_TO_MASK6(ALL_MCAST_GROUPS_LENGTH, grp_mask);
@@ -3988,6 +3999,10 @@ receive_pim6_cand_rp_adv(src, dst, pim_message, datalen)
 			 curr_bsr_fragment_tag);
 	return (TRUE);
     }
+
+    memset(&group_, 0, sizeof(group_));
+    group_.sin6_family = AF_INET6;
+    group_.sin6_len = sizeof(group_);
     while (prefix_cnt--) {
 	    /*
 	     * Sanity check for the message length.
@@ -4032,7 +4047,10 @@ send_pim6_cand_rp_adv()
     if (!inet6_valid_host(&curr_bsr_address))
 	return (FALSE);		/* No BSR yet */
 
-    if( inet6_equal(&curr_bsr_address, &my_bsr_address)) {
+    memset(&group_, 0, sizeof(group_));
+    group_.sin6_family = AF_INET6;
+    group_.sin6_len = sizeof(group_);
+    if (inet6_equal(&curr_bsr_address, &my_bsr_address)) {
 	/* I am the BSR and have to include my own group_prefix stuff */
 	prefix_cnt = *cand_rp_adv_message.prefix_cnt_ptr;
 	if (prefix_cnt == 0) {
