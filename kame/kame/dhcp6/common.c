@@ -212,7 +212,7 @@ getifaddr(addr, ifnam, prefix, plen, strong, ignoreflags)
 		     s1 != s2)
 			continue;
 
-		if (in6_matchflags(addr, ifnam, ignoreflags))
+		if (in6_matchflags(addr, ifr->ifr_name, ignoreflags))
 			continue;
 
 		if (ifr->ifr_addr.sa_family != AF_INET6)
