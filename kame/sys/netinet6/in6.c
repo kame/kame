@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.292 2002/06/09 14:43:58 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.293 2002/06/11 07:25:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1043,13 +1043,13 @@ in6_update_ifa(ifp, ifra, ia)
 
 		if ((ifp->if_flags & (IFF_POINTOPOINT|IFF_LOOPBACK)) == 0) {
 			/* XXX: noisy message */
-			log(LOG_INFO, "in6_update_ifa: a destination can be "
-			    "specified for a p2p or a loopback IF only\n");
+			nd6log((LOG_INFO, "in6_update_ifa: a destination can be "
+			    "specified for a p2p or a loopback IF only\n"));
 			return(EINVAL);
 		}
 		if (plen != 128) {
-			log(LOG_INFO, "in6_update_ifa: prefixlen should be "
-			    "128 when dstaddr is specified\n");
+			nd6log((LOG_INFO, "in6_update_ifa: prefixlen should be "
+			    "128 when dstaddr is specified\n"));
 #ifdef FORCE_P2PPLEN
 			/*
 			 * To be compatible with old configurations,
@@ -1077,9 +1077,9 @@ in6_update_ifa(ifp, ifra, ia)
 		 * the following log might be noisy, but this is a typical
 		 * configuration mistake or a tool's bug.
 		 */
-		log(LOG_INFO,
+		nd6log((LOG_INFO,
 		    "in6_update_ifa: valid lifetime is 0 for %s\n",
-		    ip6_sprintf(&ifra->ifra_addr.sin6_addr));
+		    ip6_sprintf(&ifra->ifra_addr.sin6_addr)));
 
 		if (ia == NULL)
 			return(0); /* there's nothing to do */
@@ -1159,9 +1159,9 @@ in6_update_ifa(ifp, ifra, ia)
 		 */
 		if (ia->ia_prefixmask.sin6_len &&
 		    in6_mask2len(&ia->ia_prefixmask.sin6_addr, NULL) != plen) {
-			log(LOG_INFO, "in6_update_ifa: the prefix length of an"
+			nd6log((LOG_INFO, "in6_update_ifa: the prefix length of an"
 			    " existing (%s) address should not be changed\n",
-			    ip6_sprintf(&ia->ia_addr.sin6_addr));
+			    ip6_sprintf(&ia->ia_addr.sin6_addr)));
 			error = EINVAL;
 			goto unlink;
 		}
@@ -1179,9 +1179,9 @@ in6_update_ifa(ifp, ifra, ia)
 
 		if ((ia->ia_flags & IFA_ROUTE) != 0 &&
 		    (e = rtinit(&(ia->ia_ifa), (int)RTM_DELETE, RTF_HOST)) != 0) {
-			log(LOG_ERR, "in6_update_ifa: failed to remove "
+			nd6log((LOG_ERR, "in6_update_ifa: failed to remove "
 			    "a route to the old destination: %s\n",
-			    ip6_sprintf(&ia->ia_addr.sin6_addr));
+			    ip6_sprintf(&ia->ia_addr.sin6_addr)));
 			/* proceed anyway... */
 		} else
 			ia->ia_flags &= ~IFA_ROUTE;
@@ -1260,10 +1260,10 @@ in6_update_ifa(ifp, ifra, ia)
 				LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
 				    i6mm_chain);
 			} else {
-				log(LOG_ERR, "in6_update_ifa: addmulti "
+				nd6log((LOG_ERR, "in6_update_ifa: addmulti "
 				    "failed for %s on %s (errno=%d)\n",
 				    ip6_sprintf(&llsol.sin6_addr),
-				    if_name(ifp), error);
+				    if_name(ifp), error));
 				goto cleanup;
 			}
 		}
@@ -1347,11 +1347,11 @@ in6_update_ifa(ifp, ifra, ia)
 			LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
 			    i6mm_chain);
 		} else {
-			log(LOG_WARNING,
+			nd6log((LOG_WARNING,
 			    "in6_update_ifa: addmulti failed for "
 			    "%s on %s (errno=%d)\n",
 			    ip6_sprintf(&mltaddr.sin6_addr),
-			    if_name(ifp), error);
+			    if_name(ifp), error));
 			goto cleanup;
 		}
 
@@ -1367,10 +1367,10 @@ in6_update_ifa(ifp, ifra, ia)
 				LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
 				    i6mm_chain);
 			} else {
-				log(LOG_WARNING, "in6_update_ifa: "
+				nd6log((LOG_WARNING, "in6_update_ifa: "
 				    "addmulti failed for %s on %s (errno=%d)\n",
 				    ip6_sprintf(&mltaddr.sin6_addr),
-				    if_name(ifp), error);
+				    if_name(ifp), error));
 				/* XXX not very fatal, go on... */
 			}
 		}
@@ -1441,11 +1441,11 @@ in6_update_ifa(ifp, ifra, ia)
 			LIST_INSERT_HEAD(&ia->ia6_memberships, imm,
 			    i6mm_chain);
 		} else {
-			log(LOG_WARNING, "in6_update_ifa: "
+			nd6log((LOG_WARNING, "in6_update_ifa: "
 			    "addmulti failed for %s on %s "
 			    "(errno=%d)\n",
 			    ip6_sprintf(&mltaddr.sin6_addr),
-			    if_name(ifp), error);
+			    if_name(ifp), error));
 			goto cleanup;
 		}
 	}
@@ -1606,8 +1606,8 @@ in6_unlink_ifa(ia, ifp)
 	 */
 	if ((oia->ia6_flags & IN6_IFF_AUTOCONF) != 0) {
 		if (oia->ia6_ndpr == NULL) {
-			log(LOG_NOTICE, "in6_unlink_ifa: autoconf'ed address "
-			    "%p has no prefix\n", oia);
+			lognd6((LOG_NOTICE, "in6_unlink_ifa: autoconf'ed address "
+			    "%p has no prefix\n", oia));
 		} else {
 			oia->ia6_ndpr->ndpr_refcnt--;
 			oia->ia6_flags &= ~IN6_IFF_AUTOCONF;
