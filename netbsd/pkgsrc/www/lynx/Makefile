@@ -15,6 +15,8 @@ PATCH_DIST_STRIP=	-p1
 MAINTAINER=	packages@netbsd.org
 HOMEPAGE=	http://sol.slcc.edu/lynx/
 
+BROKEN=		"subject to buffer overflow by malicious servers"
+
 CONFLICTS=	lynx-2.8rel.2 lynx-2.8.1*
 
 #DEPENDS+=	ncurses-1.9.9g:../../devel/ncurses
