@@ -1,4 +1,4 @@
-/*	$KAME: prefix.c,v 1.1 2000/11/14 22:21:09 itojun Exp $	*/
+/*	$KAME: prefix.c,v 1.2 2000/11/15 04:28:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -206,7 +206,11 @@ config_load1(line)
 
 	if (strlen(line) + 1 > sizeof(buf))
 		return NULL;
+#ifdef __bsdi__		/* XXX: I don't know strlcpy... (jinmei@kame.net) */
+	strncpy(buf, line, sizeof(buf));
+#else
 	strlcpy(buf, line, sizeof(buf));
+#endif
 
 	p = strchr(buf, '\n');
 	if (!p)
