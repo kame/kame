@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.66 2001/07/29 04:36:16 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.67 2001/07/30 08:42:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -521,6 +521,7 @@ gif_ioctl(ifp, cmd, data)
 
 	switch (cmd) {
 	case SIOCSIFADDR:
+		ifp->if_flags |= IFF_UP;
 		break;
 		
 	case SIOCSIFDSTADDR:
