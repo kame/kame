@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.24 2000/05/22 21:58:10 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.25 2000/05/22 22:23:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -323,7 +323,7 @@ die(sig)
 static void
 rtmsg_input()
 {
-	int n, type, ifindex, plen;
+	int n, type, ifindex = 0, plen;
 	size_t len;
 	char msg[2048], *next, *lim;
 	u_char ifname[16];
