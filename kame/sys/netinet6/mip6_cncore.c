@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.53 2003/12/11 05:02:55 itojun Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.54 2003/12/11 18:55:52 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -208,9 +208,7 @@ static int mip6_bc_update(struct mip6_bc *, struct sockaddr_in6 *,
     struct sockaddr_in6 *, u_int16_t, u_int16_t, u_int32_t);
 static int mip6_bc_send_brr(struct mip6_bc *);
 static int mip6_bc_need_brr(struct mip6_bc *);
-static void mip6_bc_settimer(struct mip6_bc *, int);
 static void mip6_bc_timer(void *);
-static u_int mip6_brr(struct mip6_bc *);
 
 /* return routability processing. */
 static void mip6_create_nonce(mip6_nonce_t *);
@@ -817,7 +815,7 @@ mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
 	/* sanity check for overflow */
 	if (mbc->mbc_expire < time_second)
 		mbc->mbc_expire = 0x7fffffff;
-	mip6_bc_settimer(mbc, mip6_brr(mbc));
+	mip6_bc_settimer(mbc, mip6_brr_time(mbc));
 
 	if (mip6_bc_list_insert(&mip6_bc_list, mbc)) {
 		FREE(mbc, M_TEMP);
@@ -835,7 +833,7 @@ mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
  *       brrtime
  *
  */
-static void
+void
 mip6_bc_settimer(mbc, t)
 	struct mip6_bc *mbc;
 	int t;	/* unit: second */
@@ -1049,7 +1047,7 @@ mip6_bc_update(mbc, coa_sa, dst_sa, flags, seqno, lifetime)
 		mbc->mbc_expire = 0x7fffffff;
 	mbc->mbc_state = MIP6_BC_FSM_STATE_BOUND;
 	mip6_bc_settimer(mbc, -1);
-	mip6_bc_settimer(mbc, mip6_brr(mbc));
+	mip6_bc_settimer(mbc, mip6_brr_time(mbc));
 
 	return (0);
 }
@@ -1246,8 +1244,8 @@ mip6_bc_need_brr(mbc)
 	return (found);
 }
 
-static u_int
-mip6_brr(mbc)
+u_int
+mip6_brr_time(mbc)
 	struct mip6_bc *mbc;
 {
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -1299,13 +1297,13 @@ mip6_bc_timer(arg)
 	case MIP6_BC_FSM_STATE_WAITB:
 		if (mip6_bc_need_brr(mbc) &&
 		    (mbc->mbc_brr_sent < mip6_brr_maxtries)) {
-			brrtime = mip6_brr(mbc);
+			brrtime = mip6_brr_time(mbc);
 			if (brrtime == 0) {
 				mbc->mbc_state = MIP6_BC_FSM_STATE_WAITB2;
 			} else {
 				mip6_bc_send_brr(mbc);
 			}
-			mip6_bc_settimer(mbc, mip6_brr(mbc));
+			mip6_bc_settimer(mbc, mip6_brr_time(mbc));
 			mbc->mbc_brr_sent++;
 		} else {
 			mbc->mbc_state = MIP6_BC_FSM_STATE_WAITB2;
@@ -1324,9 +1322,8 @@ mip6_bc_timer(arg)
 		}
 		if (mbc->mbc_llmbc != NULL) {
 			/* remove a cloned entry. */
-			error = mip6_bc_list_remove(
-			    &mip6_bc_list, mbc->mbc_llmbc);
-			if (error) {
+			if (mip6_bc_list_remove(
+			    &mip6_bc_list, mbc->mbc_llmbc) != 0) {
 				mip6log((LOG_ERR,
 				    "%s:%d: failed to remove "
 				    "a cloned binding cache entry.\n",

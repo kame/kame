@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.h,v 1.11 2003/12/05 01:35:17 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.h,v 1.12 2003/12/11 18:55:52 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -117,6 +117,10 @@ int mip6_cksum(struct sockaddr_in6 *, struct sockaddr_in6 *, u_int32_t,
 
 /* ICMPv6 processing. */
 int mip6_icmp6_input(struct mbuf *, int, int);
+
+/* Timer function */
+void mip6_bc_settimer(struct mip6_bc *, int);
+u_int mip6_brr_time(struct mip6_bc *);
 
 /* core functions for mobile node and home agent. */
 #if defined(MIP6_HOME_AGENT) || defined(MIP6_MOBILE_NODE)
