@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.43 2001/01/05 16:43:30 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.44 2001/01/05 16:47:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -690,7 +690,8 @@ explore_copy(pai, src0, res)
 	struct addrinfo **res;
 {
 	int error;
-	struct addrinfo sentinel, *cur, *src;
+	struct addrinfo sentinel, *cur;
+	const struct addrinfo *src;
 
 	_DIAGASSERT(pai != NULL);
 	/* src may be NULL */
@@ -700,7 +701,7 @@ explore_copy(pai, src0, res)
 	sentinel.ai_next = NULL;
 	cur = &sentinel;
 
-	for (src = (struct addrinfo *)src0; src != NULL; src = src->ai_next) {
+	for (src = src0; src != NULL; src = src->ai_next) {
 		if (src->ai_family != pai->ai_family)
 			continue;
 
