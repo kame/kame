@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.268 2002/05/29 12:59:36 sakane Exp $	*/
+/*	$KAME: nd6.c,v 1.269 2002/05/29 13:57:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1644,6 +1644,7 @@ nd6_ioctl(cmd, data, ifp)
 		break;
 	case OSIOCGIFINFO_IN6:
 		/* XXX: old ndp(8) assumes a positive value for linkmtu. */
+		bzero(&ndi->ndi, sizeof(ndi->ndi));
 		ndi->ndi.linkmtu = IN6_LINKMTU(ifp);
 		ndi->ndi.maxmtu = ND_IFINFO(ifp)->maxmtu;
 		ndi->ndi.basereachable = ND_IFINFO(ifp)->basereachable;
