@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.16 2001/03/22 03:34:47 jinmei Exp $	*/
+/*	$KAME: main.c,v 1.17 2001/04/04 15:06:17 jinmei Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Southern California.
@@ -608,14 +608,13 @@ usage:
 	    }
 	    lasttime = curtime;
 	    if (secs == 0 || difftime.tv_sec > 0)
-		if (secs == 0 || difftime.tv_sec > 0)
-		{
+	    {
 #ifdef TIMERDEBUG
 		    IF_DEBUG(DEBUG_TIMEOUT)
 			log(LOG_DEBUG, 0, "\taging callouts: secs %d, diff secs %d, diff usecs %d", secs, difftime.tv_sec, difftime.tv_usec);
 #endif
 		    age_callout_queue(difftime.tv_sec);
-		}
+	    }
 	    secs = -1;
 	} while (difftime.tv_sec > 0);
 
