@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.31 2004/06/07 11:38:41 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.32 2004/06/08 07:52:55 suz Exp $
  */
 
 /*
@@ -91,7 +91,6 @@
  * Forward declarations.
  */
 static void DelVifV2 __P((void *arg));
-static void SendQueryV2spec __P((void *arg));
 
 static int SetTimerV1compat __P((mifi_t, struct listaddr * g));
 static int DeleteTimerV1compat __P((int));
@@ -144,7 +143,7 @@ query_groupsV2(v)
  * So we call send_mldv2 two times
  */
 
-static void
+void
 SendQueryV2spec(arg)
     void           *arg;
 {

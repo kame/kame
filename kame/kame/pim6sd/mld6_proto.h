@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.h,v 1.10 2004/05/23 15:33:13 suz Exp $	*/
+/*	$KAME: mld6_proto.h,v 1.11 2004/06/08 07:52:55 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -111,8 +111,8 @@ extern void     recv_listener_report	__P((mifi_t,
                                              struct sockaddr_in6 *group));
 extern void     recv_listener_done      __P((mifi_t,
 					     struct sockaddr_in6 *src,
-                                             struct sockaddr_in6 *group,
-					     int));
+                                             struct sockaddr_in6 *group));
+extern int	SetTimer __P((int mifi, struct listaddr * g));
 extern void	DelVif __P((void *));
 
 #endif

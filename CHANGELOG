@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2618 2004/06/08 04:39:01 suz Exp $
+$KAME: CHANGELOG,v 1.2619 2004/06/08 07:52:54 suz Exp $
 
 <200406>
+2004-06-08  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
+	* kame/pimsd/mld6_proto.[ch], mld6v2.c, mld6v2_proto.[ch]:
+	When pim6sd receives a MLDv1 done from an interface, it advertises 
+	a group-specific Query in MLDv2 unless the interface is configured
+	only with MLDv1.  This is to prevent MLDv2 hosts from shifting to
+	MLDv1-compatible-mode unnecessarily.
+
 2004-06-08  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
 	* freebsd4/sys/net/rtsock.c: FreeBSD Security Advisory: 
 	FreeBSD-SA-04:12.jailroute

@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.34 2003/09/02 09:48:45 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.35 2004/06/08 07:52:55 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -123,7 +123,6 @@
 /*
  * Forward declarations.
  */
-static int SetTimer __P((int mifi, struct listaddr * g));
 static int DeleteTimer __P((int id));
 static void SendQuery __P((void *arg));
 static int SetQueryTimer
@@ -460,20 +459,23 @@ accept_listener_done(src, dst, group)
 		    sa6_fmt(src), inet6_fmt(dst), inet6_fmt(group));
 	v->uv_in_mld_done++;
 
-	recv_listener_done(mifi, src, &group_sa, MLDv1);
+	recv_listener_done(mifi, src, &group_sa);
 }
 
 
 /* shared with MLDv1-compat mode in mld6v2_proto.c */
 void
-recv_listener_done(mifi, src, grp, query_type)
+recv_listener_done(mifi, src, grp)
 	mifi_t mifi;
 	struct sockaddr_in6 *src, *grp;
-	int query_type;
 {
 	struct uvif *v = &uvifs[mifi];
 	register struct listaddr *g;
 
+	/*
+	 * XXX: in MLDv1-compat mode, non-querier is allowed to ignore MLDv2
+	 * report?
+	 */
 	if (!(v->uv_flags & (VIFF_QUERIER | VIFF_DR)))
 		return;
 
@@ -507,26 +509,15 @@ recv_listener_done(mifi, src, grp, query_type)
 			goto set_timer;
 
 		/*
-		 * if called from MLDv2, query is done by MLDv2,
-		 * regardless of compat-mode.
+		 * if an interface is configure in MLDv2, query is done 
+		 * by MLDv2, regardless of compat-mode.
 		 * (draft-vida-mld-v2-05.txt section 7.3.2 page 39)
 		 *
-		 * if called from MLDv1, query is done by MLDv1.
+		 * if an interface is configured only with MLDv1, query 
+		 * is done by MLDv1.
 		 */
-		switch (query_type) {
-		case MLDv1:
-#ifndef MLDV2_LISTENER_REPORT
-		default:
-#endif
-			send_mld6(MLD_LISTENER_QUERY, 0,
-				  &v->uv_linklocal->pa_addr, NULL,
-				  &g->al_addr.sin6_addr,
-				  v->uv_ifindex,
-				  MLD6_LAST_LISTENER_QUERY_INTERVAL, 0, 1);
-			break;
 #ifdef MLDV2_LISTENER_REPORT
-		case MLDv2:
-		default:
+		if (v->uv_mld_version & MLDv2) {
 			send_mld6v2(MLD_LISTENER_QUERY, 0,
 				    &v->uv_linklocal->pa_addr, NULL,
 				    &g->al_addr,
@@ -534,8 +525,14 @@ recv_listener_done(mifi, src, grp, query_type)
 				    MLD6_QUERY_RESPONSE_INTERVAL,
 				    0, TRUE, SFLAGNO, v->uv_mld_robustness,
 				    v->uv_mld_query_interval);
+		} else if (v->uv_mld_version & MLDv1) 
 #endif
-			break;
+		{
+			send_mld6(MLD_LISTENER_QUERY, 0,
+				  &v->uv_linklocal->pa_addr, NULL,
+				  &g->al_addr.sin6_addr,
+				  v->uv_ifindex,
+				  MLD6_LAST_LISTENER_QUERY_INTERVAL, 0, 1);
 		}
 		v->uv_out_mld_query++;
 
@@ -587,7 +584,7 @@ DelVif(arg)
 /*
  * Set a timer to delete the record of a group membership on a vif.
  */
-static int
+int
 SetTimer(mifi, g)
 	mifi_t mifi;
 	struct listaddr *g;
@@ -613,7 +610,11 @@ DeleteTimer(id)
 }
 
 /*
- * Send a group-specific query.
+ * Send a group-specific query.  This function shouldn't be called when 
+ * the interface is configured with MLDv2, to prevent MLDv2 hosts from
+ * shifting to MLDv1-compatible mode unnecessarily.
+ * (now it's called only from SetQueryTimer() when the interface is 
+ *  configured in MLDv1, so the above condition is satisfied)
  */
 static void
 SendQuery(arg)
@@ -622,6 +623,13 @@ SendQuery(arg)
 	cbk_t *cbk = (cbk_t *) arg;
 	register struct uvif *v = &uvifs[cbk->mifi];
 
+	/* sanity check */
+	if (v->uv_mld_version & MLDv2) {
+		log_msg(LOG_DEBUG, 0,
+			"MLDv2-ready I/F %s cannot send MLDv1 Query",
+			v->uv_name);
+		return;
+	}
 	if (v->uv_flags & VIFF_QUERIER &&
 	    (v->uv_flags & VIFF_NOLISTENER) == 0) {
 		send_mld6(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
@@ -635,6 +643,9 @@ SendQuery(arg)
 
 /*
  * Set a timer to send a group-specific query.
+ * If an interface is configured only with MLDv1, query is done by MLDv1.
+ * Otherwise (i.e. MLDv2 or any), query is done by MLDv2, regardless of
+ * compat-mode (draft-vida-mld-v2-08.txt section 8.3.2 page 47).
  */
 static int
 SetQueryTimer(g, mifi, to_expire, q_time)
@@ -644,12 +655,20 @@ SetQueryTimer(g, mifi, to_expire, q_time)
 	int q_time;
 {
 	cbk_t *cbk;
+	struct uvif *v = &uvifs[mifi];
 
 	cbk = (cbk_t *) malloc(sizeof(cbk_t));
 	cbk->g = g;
 	cbk->s = NULL;
 	cbk->q_time = q_time;
 	cbk->mifi = mifi;
+
+#ifdef MLDV2_LISTENER_REPORT
+	if (v->uv_mld_version & MLDv2) {
+		return timer_setTimer(to_expire, SendQueryV2spec, cbk);
+	}
+#endif
+	/* either MLDv1-bit or MLDv2-bit is on in v->uv_mld_version */
 	return timer_setTimer(to_expire, SendQuery, cbk);
 }
 
