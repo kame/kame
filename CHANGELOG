@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1568 2001/02/23 00:07:25 itojun Exp $
+$KAME: CHANGELOG,v 1.1569 2001/02/25 10:40:38 jinmei Exp $
 
 <200102>
+2001-02-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_need_cache): separated from
+	nd6_output() to decide whether to make a neighbor cache entry for
+	the link of a given interface.  This function is (currently)
+	called from nd6_output() and nd6_prefix_onlink(), and make the
+	decision policy consistent.
+	Based on the current policy, we do not make a neighbor cache for a
+	loopback link, in response to a comment from Miyata-san@YDC.
+
 Thu Feb 22 10:08:27 JST 2001 sakane@ydc.co.jp
 	* racoon:
 	fixed to check the outbound policy when the responder received the
