@@ -1,0 +1,10 @@
+--- print-stp.c-	Wed Jun 21 03:36:26 2000
++++ print-stp.c	Wed Jun 21 03:37:29 2000
+@@ -29,7 +29,6 @@
+ #include <netinet/udp.h>
+ #include <netinet/udp_var.h>
+ #include <netinet/tcp.h>
+-#include <netinet/tcpip.h>
+ 
+ #ifdef __STDC__
+ #include <stdlib.h>
