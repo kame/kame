@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/04/14 09:42:05 $
+			$Date: 2000/04/17 12:11:39 $
 
 1. IPv6
 
@@ -1350,7 +1350,7 @@ amount of extensions:
 4.6 ECN consideration on IPsec tunnels
 
 KAME IPsec implements ECN-friendly IPsec tunnel, described in
-draft-ipsec-ecn-00.txt.
+draft-ietf-ipsec-ecn-02.txt.
 Normal IPsec tunnel is described in RFC2401.  On encapsulation,
 IPv4 TOS field (or, IPv6 traffic class field) will be copied from inner
 IP header to outer IP header.  On decapsulation outer IP header
@@ -1359,7 +1359,7 @@ with ECN, since ECN bit on the outer IP TOS/traffic class field will be
 lost.
 To make IPsec tunnel ECN-friendly, we should modify encapsulation
 and decapsulation procedure.  This is described in
-http://www.aciri.org/floyd/papers/draft-ipsec-ecn-00.txt, chapter 3.
+draft-ietf-ipsec-ecn-02.txt, chapter 3.3.
 
 KAME IPsec tunnel implementation can give you three behaviors, by setting
 net.inet.ipsec.ecn (or net.inet6.ipsec6.ecn) to some value:
@@ -1367,7 +1367,8 @@ net.inet.ipsec.ecn (or net.inet6.ipsec6.ecn) to some value:
 - ECN forbidden (sysctl value 0)
 - ECN allowed (sysctl value 1)
 Note that the behavior is configurable in per-node manner, not per-SA manner
-(draft-ipsec-ecn-00 wants per-SA configuration, but it looks too much for me).
+(draft-ietf-ipsec-ecn-02 wants per-SA configuration, but it looks too much
+for me).
 
 The behavior is summarized as follows (see source code for more detail):
 
@@ -1394,7 +1395,7 @@ General strategy for configuration is as follows:
 The default behavior is "ECN forbidden" (sysctl value 0).
 
 For more information, please refer to:
-	http://www.aciri.org/floyd/papers/draft-ipsec-ecn-00.txt
+	draft-ietf-ipsec-ecn-02.txt
 	RFC2481 (Explicit Congestion Notification)
 	KAME sys/netinet6/{ah,esp}_input.c
 
