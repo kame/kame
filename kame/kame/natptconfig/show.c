@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.36 2002/12/16 09:23:04 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.37 2002/12/17 08:53:36 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -203,10 +203,8 @@ showXlate(int type, int copy, int interval)
 			}
 		}
 
-#if 0
 		if (copy)
 			releaseTQH();
-#endif
 
 		if (interval <= 0)
 			break;
