@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.114 2003/12/08 10:05:53 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.115 2003/12/08 14:53:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -774,6 +774,12 @@ add_m6if(mifcp)
 	if (ifp == NULL)
 		return (ENXIO);
 
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+
 	if (mifcp->mif6c_flags & MIFF_REGISTER) {
 		ifp = &multicast_register_if;
 
@@ -799,11 +805,6 @@ add_m6if(mifcp)
 		if ((ifp->if_flags & IFF_MULTICAST) == 0)
 			return (EOPNOTSUPP);
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-		s = splsoftnet();
-#else
-		s = splnet();
-#endif
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		error = if_allmulti(ifp, 1);
 #else
@@ -815,16 +816,12 @@ add_m6if(mifcp)
 		ifr.ifr_addr.sin6_addr = in6addr_any;
 		error = (*ifp->if_ioctl)(ifp, SIOCADDMULTI, (caddr_t)&ifr);
 #endif
-		splx(s);
-		if (error)
+		if (error) {
+			splx(s);
 			return (error);
+		}
 	}
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-	s = splsoftnet();
-#else
-	s = splnet();
-#endif
 	mifp->m6_flags     = mifcp->mif6c_flags;
 	mifp->m6_ifp       = ifp;
 #ifdef notyet
@@ -836,7 +833,6 @@ add_m6if(mifcp)
 	mifp->m6_pkt_out   = 0;
 	mifp->m6_bytes_in  = 0;
 	mifp->m6_bytes_out = 0;
-	splx(s);
 
 	/* Adjust nummifs up if the mifi is higher than nummifs */
 	if (nummifs <= mifcp->mif6c_mifi)
@@ -855,6 +851,8 @@ add_m6if(mifcp)
 		    ifp->if_name, ifp->if_unit);
 #endif
 #endif
+
+	splx(s);
 
 	return (0);
 }
