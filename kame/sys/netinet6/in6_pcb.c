@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.59 2000/07/12 12:58:03 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.60 2000/07/12 13:27:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -543,7 +543,7 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 		nin6p = in6p->in6p_next;
 
 		if (do_rtchange) {
-			struct sockaddr_in6 *dst;
+			struct sockaddr_in6 *dst6;
 
 			/*
 			 * Since a non-connected PCB might have a cached route,
