@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1841 2001/08/14 13:22:08 keiichi Exp $
+$KAME: CHANGELOG,v 1.1842 2001/08/15 11:29:57 jinmei Exp $
 
 <200108>
+2001-08-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/scope6.c (in6_addrscope): treat the loopback
+	address as global, because there is no ambiguity about scoping.
+	Otherwise, we'd see ::1%ID (ID != 0) via scope6_addr2default(),
+	which would rather has bad effects.
+	Note: I'm still not sure if this change is really safe.  We should
+	take care of the new behavior.
+
 2001-08-14 Keiichi SHIMA <keiichi@iij.ad.jp>
 	* add a home agents list timeout routine.
 	* add some init functions.
