@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.20 2004/04/22 02:52:15 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.21 2004/05/25 02:11:36 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -99,7 +99,7 @@
  *	@(#)igmp.c	8.1 (Berkeley) 7/19/93
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #endif
@@ -126,7 +126,7 @@
 #endif
 #include <sys/syslog.h>
 #include <sys/sysctl.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #endif
@@ -163,11 +163,11 @@
 
 #include <net/net_osdep.h>
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 static MALLOC_DEFINE(M_MRTABLE, "mrt", "multicast routing table");
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 struct in6_multihead in6_multihead;	/* XXX BSS initialization */
 #else
 /*
@@ -468,7 +468,7 @@ mld_input(m, off)
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct in6_multi *in6m = NULL;
 	struct sockaddr_in6 all_sa, mc_sa;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	struct ifmultiaddr *ifma;
 #else
 	struct in6_ifaddr *ia;
@@ -2094,7 +2094,7 @@ in6_delmulti(in6m)
 	in6_delmulti2(in6m, &error, 0, NULL, MCAST_EXCLUDE, 1);
 }
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 /*
  * Add an address to the list of IP6 multicast addresses for a given interface.
  * Add source addresses to the list also, if upstream router is MLDv2 capable
@@ -2794,7 +2794,7 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode, old_num, old_src, old_mode,
 	return in6m;
 }
 
-#else /* not FreeBSD3 */
+#else /* not FreeBSD */
 
 /*
  * Add an address to the list of IP6 multicast addresses for a given interface.
@@ -3419,7 +3419,7 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 	splx(s);
 	return in6m;
 }
-#endif /* not FreeBSD3 */
+#endif /* not FreeBSD */
 
 /* 
  * check if the given address should be announced via MLDv1/v2.
@@ -3509,7 +3509,7 @@ in6_leavegroup(imm)
 }
 
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 /*
  * Multicast address kludge:
  * If there were any multicast addresses attached to this interface address,
@@ -3633,5 +3633,5 @@ in6_purgemkludge(ifp)
 		break;
 	}
 }
-#endif /* !FreeBSD3 */
+#endif /* !FreeBSD */
 #endif /* MLDV2 */

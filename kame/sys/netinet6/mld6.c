@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.99 2004/03/30 03:37:54 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.100 2004/05/25 02:11:36 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -68,7 +68,7 @@
  *	@(#)igmp.c	8.1 (Berkeley) 7/19/93
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #endif
@@ -85,13 +85,9 @@
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/protosw.h>
-#ifdef __bsdi__
-#include <vm/vm.h>
-#include <sys/proc.h>
-#endif
 #include <sys/syslog.h>
 #include <sys/sysctl.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #endif
@@ -125,11 +121,11 @@
 
 #include <net/net_osdep.h>
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 static MALLOC_DEFINE(M_MRTABLE, "mrt", "multicast routing table");
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 struct in6_multihead in6_multihead;	/* XXX BSS initialization */
 #else
 /*
@@ -309,7 +305,7 @@ mld_input(m, off)
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct in6_multi *in6m = NULL;
 	struct sockaddr_in6 all_sa, mc_sa;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	struct ifmultiaddr *ifma;
 #else
 	struct in6_ifaddr *ia;
@@ -634,7 +630,7 @@ mld_sendpkt(in6m, type, dst)
 	}
 
 	ip6_output(mh, &ip6_opts, NULL, ia ? 0 : IPV6_UNSPECSRC, &im6o, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
+#ifdef __FreeBSD__
 		   ,NULL
 #endif
 		   );
@@ -704,7 +700,7 @@ mld_allocbuf(mh, len, in6m, type)
 
 
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 /*
  * Add an address to the list of IP6 multicast addresses for a given interface.
  * Add source addresses to the list also, if upstream router is MLDv2 capable
@@ -852,7 +848,7 @@ in6_delmulti(in6m)
 	splx(s);
 }
 
-#else /* not FreeBSD3 */
+#else /* not FreeBSD */
 
 /*
  * Add an address to the list of IP6 multicast addresses for a given interface.
@@ -945,7 +941,7 @@ in6_delmulti(in6m)
 	if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
 	splx(s);
 }
-#endif /* not FreeBSD3 */
+#endif /* not FreeBSD */
 
 struct in6_multi_mship *
 in6_joingroup(ifp, addr, errorp)
@@ -984,7 +980,7 @@ in6_leavegroup(imm)
 }
 
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 /*
  * Multicast address kludge:
  * If there were any multicast addresses attached to this interface address,
@@ -1106,6 +1102,6 @@ in6_purgemkludge(ifp)
 		break;
 	}
 }
-#endif /* not FreeBSD3 */
+#endif /* FreeBSD */
 
 #endif /* !MLDV2 */
