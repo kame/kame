@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.31 2001/11/28 06:05:43 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.32 2001/12/11 11:34:09 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -206,21 +206,45 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 		return (IPPROTO_DONE);	/* discard this packet without free. */
 	}
 
-	cv4.ats = natpt_lookForHash4(&cv4);
-	if ((cv4.ats == NULL)
-	    && ((ats = natpt_checkICMP(&cv4)) != NULL)) {
-		cv4.fromto = NATPT_TO;
-		cv4.flags |= NATPT_TRACEROUTE;
-		cv4.ats = ats;
-	}
+	if (isFragment(&cv4)) {
+		struct cSlot	*acs;
+		struct fragment	*frg;
 
-	if (cv4.ats == NULL ) {
-		struct cSlot	*csl;
+		/* fragmented packet */
+		if (isFirstFragment(&cv4)) {
+			/* first fragmented packet */
+			if ((cv4.ats = natpt_lookForHash4(&cv4)) == NULL) {
+				if ((acs = natpt_lookForRule4(&cv4)) == NULL)
+					return (IPPROTO_IP);
+				if ((cv4.ats = natpt_internHash4(acs, &cv4)) == NULL)
+					return (IPPROTO_IP);
+				if ((frg = natpt_internFragment4(&cv4)) == NULL)
+					return (IPPROTO_IP);
+				frg->tslot = cv4.ats;
+			}
+		} else {
+			/* fragmented packet after the first */
+			if ((cv4.ats = natpt_lookForFragment4(&cv4)) == NULL)
+				return (IPPROTO_MAX);
+		}
+	} else {
+		/* regular packet */
+		cv4.ats = natpt_lookForHash4(&cv4);
+		if ((cv4.ats == NULL)
+		    && ((ats = natpt_checkICMP(&cv4)) != NULL)) {
+			cv4.fromto = NATPT_TO;
+			cv4.flags |= NATPT_TRACEROUTE;
+			cv4.ats = ats;
+		}
 
-		if ((csl = natpt_lookForRule4(&cv4)) == NULL)
-			return (IPPROTO_IP);
-		if ((cv4.ats = natpt_internHash4(csl, &cv4)) == NULL)
-			return (IPPROTO_IP);
+		if (cv4.ats == NULL ) {
+			struct cSlot	*csl;
+
+			if ((csl = natpt_lookForRule4(&cv4)) == NULL)
+				return (IPPROTO_IP);
+			if ((cv4.ats = natpt_internHash4(csl, &cv4)) == NULL)
+				return (IPPROTO_IP);
+		}
 	}
 
 	if (cv4.fromto == NATPT_FROM) {
@@ -233,13 +257,74 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 
 #ifdef NATPT_NAT
 	if (pad->sa_family == AF_INET) {
-		if ((*m6 = natpt_translateIPv4To4(&cv4, pad)) == NULL)
-			return (IPPROTO_MAX);
-		return (IPPROTO_IPV4);
+		if (isNextFragment(&cv4)) {
+			/* fragmented packet after the first */
+			if ((*m6 = natpt_translateFragment4to4(&cv4, pad)) == NULL)
+				return (IPPROTO_MAX);
+		} else {
+			/* not fragmented or first fragmented packet */
+			if ((*m6 = natpt_translateIPv4To4(&cv4, pad)) == NULL)	/* XXX */
+				return (IPPROTO_MAX);
+		}
+			return (IPPROTO_IPV4);
 	} else
 #endif
-	if ((*m6 = natpt_translateIPv4To6(&cv4, pad)) == NULL)
-		return (IPPROTO_MAX);
+	{
+		if (isNextFragment(&cv4)) {
+			/* fragmented packet after the first */
+			if ((*m6 = natpt_translateFragment4to6(&cv4, pad)) == NULL)
+				return (IPPROTO_MAX);	/* discard this packet */
+		} else {
+			/* not fragmented or first fragmented packet */
+			if ((*m6 = natpt_translateIPv4To6(&cv4, pad)) == NULL)	/* XXX */
+				return (IPPROTO_MAX);	/* discard this packet */
+		}
+	}
+
+#if 0
+	/* revised version */
+	if (!isFragment or fristFragmentedPacket) {
+		rewrite TCPheader;
+		rewrite TCPpayload if can;
+		recheck Fragment is needed or not;
+
+		if (!needFragment)
+			nonFragment4 -> nonFratment6;
+		else
+			nonFragment4 -> Fragment6, Fragment6;
+	} else {
+		if (!needFragment)
+			Fragment4 -> Fragment6;
+		else
+			Fragment4 -> Fragment6, Fragment6;
+	}
+
+	/* Original version */
+	if (!isFragment)
+		if (!needFragment)
+			-- in case 0 <= packet size <= 1280
+			nonFragment4 -> nonFragment6;		-- rewrite TCP header
+								-- rewrite TCP payload
+		else
+			-- in case 1280 <= packet size <= 1500
+			nonFragment4 -> Fragment6, Fragment6;	-- rewrite TCP header
+	else
+		if (fristFragmentedPacket)
+			if (!needFragment)
+				-- in case 0 <= packet size <= 1280
+				Fragment4 -> Fragment6;		-- rewiret TCP header
+			else
+				-- in case 1280 < packet size <= 1500
+				Fragment4 -> Fragment6, Fragment6;
+		else
+			if (!needFragment)
+				-- in case 0 <= packet size <= 1280
+				Fragment4 -> Fragment6;
+			else
+				-- in case 1280 < packet size <= 1500
+				Fragment4 -> Fragment6, Fragment6;
+
+#endif
 
 	return (IPPROTO_IPV6);
 }
@@ -334,7 +419,7 @@ natpt_pyldaddr(struct ip6_hdr *ip6, caddr_t ip6end, int *proto, struct ip6_frag 
 			goto wayOut;
 
 		case IPPROTO_TCP:
-			hdrsz = sizeof(struct tcphdr);
+			hdrsz = ((struct tcp6hdr *)ip6ext)->th_off << 2;
 			goto wayOut;
 
 		case IPPROTO_UDP:
@@ -363,25 +448,57 @@ natpt_pyldaddr(struct ip6_hdr *ip6, caddr_t ip6end, int *proto, struct ip6_frag 
 int
 natpt_config4(struct mbuf *m, struct pcv *cv4)
 {
+	int		 hdrsz = 0;
 	struct ip	*ip = mtod(m, struct ip *);
+	caddr_t		 ip4end;
+	caddr_t		 ip4pyld;
 
 	bzero(cv4, sizeof(struct pcv));
 	cv4->sa_family = AF_INET;
 	cv4->m = m;
 	cv4->ip.ip4 = ip;
 	cv4->ip_p = ip->ip_p;
+	ip4pyld = (caddr_t)ip + (ip->ip_hl << 2);
+	ip4end	= mtod(m, caddr_t) + m->m_len;
 
 	switch (ip->ip_p) {
 	case IPPROTO_ICMP:
-	case IPPROTO_TCP:
-	case IPPROTO_UDP:
-		cv4->pyld.caddr = (caddr_t)ip + (ip->ip_hl << 2);
-		cv4->poff = cv4->pyld.caddr - (caddr_t)cv4->ip.ip4;
-		cv4->plen = (caddr_t)m->m_data + m->m_len - cv4->pyld.caddr;
-		return (ip->ip_p);
-	}
+		hdrsz = ICMP_MINLEN;
+		goto wayOut;
 
+	case IPPROTO_TCP:
+		hdrsz = ((struct tcphdr *)ip4pyld)->th_off << 2;
+		goto wayOut;
+
+	case IPPROTO_UDP:
+		hdrsz = sizeof(struct udphdr);
+		goto wayOut;
+	}
 	return (IPPROTO_IP);
+
+ wayOut:;
+
+	/* If a fragmented packet does not have enough upper layer header,
+	 * drop this packet.
+	 */
+	if (((ip->ip_off & (IP_MF|IP_OFFMASK|IP_RF)) == 0)
+	    && ((ip->ip_off & IP_OFFMASK) == 0)
+	    && ((ip4end - ip4pyld) < hdrsz))
+		return (IPPROTO_IP);
+
+	cv4->pyld.caddr = ip4pyld;
+	cv4->poff = cv4->pyld.caddr - (caddr_t)cv4->ip.ip4;
+	cv4->plen = (caddr_t)m->m_data + m->m_len - cv4->pyld.caddr;
+
+	if (((ip->ip_off & IP_OFFMASK) == 0)
+	    && ((ip->ip_off & IP_MF) != 0))
+		cv4->flags |= FIRST_FRAGMENT;
+	if ((ip->ip_off & IP_OFFMASK) != 0)
+		cv4->flags |= NEXT_FRAGMENT;
+	if (NATPT_FRGHDRSZ + cv4->plen > IPV6_MMTU)
+		cv4->flags |= NEED_FRAGMENT;
+
+	return (ip->ip_p);
 }
 
 

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_var.h,v 1.18 2001/11/28 06:05:43 fujisawa Exp $	*/
+/*	$KAME: natpt_var.h,v 1.19 2001/12/11 11:34:10 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -72,7 +72,9 @@ void		 natpt_init_rule	__P((void));
 struct mbuf	*natpt_translateIPv6To4	__P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateIPv4To6	__P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateIPv4To4	__P((struct pcv *, struct pAddr *));
-struct mbuf	*natpt_translateFragment6 __P((struct pcv *, struct pAddr *));
+struct mbuf	*natpt_translateFragment6    __P((struct pcv *, struct pAddr *));
+struct mbuf	*natpt_translateFragment4to6 __P((struct pcv *, struct pAddr *));
+struct mbuf	*natpt_translateFragment4to4 __P((struct pcv *, struct pAddr *));
 
 
 /*  natpt_tslot.c  */
@@ -85,7 +87,9 @@ struct tSlot	*natpt_internHash6	__P((struct cSlot *, struct pcv *));
 struct pAddr	*natpt_remapRemote4Port	__P((struct cSlot *, struct pAddr *));
 
 struct fragment	*natpt_internFragment6	__P((struct pcv *));
+struct fragment	*natpt_internFragment4	__P((struct pcv *));
 struct tSlot	*natpt_lookForFragment6	__P((struct pcv *));
+struct tSlot	*natpt_lookForFragment4	__P((struct pcv *));
 
 void		 natpt_init_tslot	__P((void));
 

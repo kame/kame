@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.34 2001/11/28 06:05:43 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.35 2001/12/11 11:34:10 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -507,6 +507,35 @@ natpt_internFragment6(struct pcv *cv6)
 }
 
 
+struct fragment *
+natpt_internFragment4(struct pcv *cv4)
+{
+	int			 s;
+	struct fragment		*frg;
+	struct timeval		 atv;
+
+	MALLOC(frg, struct fragment *, sizeof(struct fragment), M_NATPT, M_NOWAIT);
+	if (frg == NULL) {
+		return (NULL);
+	}
+
+	bzero(frg, sizeof(struct fragment));
+	frg->fg_family = AF_INET;
+	frg->fg_proto = cv4->ip_p;
+	frg->fg_id = cv4->ip.ip4->ip_id;
+	frg->fg_src.in4 = cv4->ip.ip4->ip_src;
+	frg->fg_dst.in4 = cv4->ip.ip4->ip_dst;
+	microtime(&atv);
+	frg->tstamp = atv.tv_sec;
+
+	s = splnet();
+	TAILQ_INSERT_TAIL(&frg_head, frg, frg_list);
+	splx(s);
+
+	return (frg);
+}
+
+
 struct tSlot *
 natpt_lookForFragment6(struct pcv *cv6)
 {
@@ -522,6 +551,31 @@ natpt_lookForFragment6(struct pcv *cv6)
 		if (!IN6_ARE_ADDR_EQUAL(&frg->fg_src.in6, &cv6->ip.ip6->ip6_src))
 			continue;
 		if (!IN6_ARE_ADDR_EQUAL(&frg->fg_dst.in6, &cv6->ip.ip6->ip6_dst))
+			continue;
+		return (frg->tslot);
+	}
+
+	return (NULL);
+}
+
+
+struct tSlot *
+natpt_lookForFragment4(struct pcv *cv4)
+{
+	struct fragment		 *frg;
+
+	for (frg = TAILQ_FIRST(&frg_head);
+	     frg;
+	     frg = TAILQ_NEXT(frg, frg_list)) {
+		if (frg->fg_family != AF_INET)
+			continue;
+		if (cv4->ip_p != frg->fg_proto)
+			continue;
+		if (frg->fg_id != cv4->ip.ip4->ip_id)
+			continue;
+		if (frg->fg_src.in4.s_addr != cv4->ip.ip4->ip_src.s_addr)
+			continue;
+		if (frg->fg_dst.in4.s_addr != cv4->ip.ip4->ip_dst.s_addr)
 			continue;
 		return (frg->tslot);
 	}

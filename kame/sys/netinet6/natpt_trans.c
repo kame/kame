@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.66 2001/12/07 07:07:10 itojun Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.67 2001/12/11 11:34:10 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -43,6 +43,8 @@
 #include <sys/socket.h>
 #include <sys/syslog.h>
 
+#include <net/route.h>				/* for <netinet6/ip6_var.h>	*/
+
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
@@ -54,6 +56,7 @@
 #include <netinet/tcp_fsm.h>
 #include <netinet/udp.h>
 
+#include <netinet6/ip6_var.h>			/* for ip6_forward()		*/
 #include <netinet6/natpt_defs.h>
 #include <netinet6/natpt_log.h>
 #include <netinet6/natpt_var.h>
@@ -179,6 +182,8 @@ struct mbuf	*natpt_translateTCPUDPv4To6	__P((struct pcv *, struct pAddr *,
 						     struct pcv *));
 void		 natpt_translatePYLD4To6	__P((struct pcv *));
 
+void		 natpt_translateFragment4to66	__P((struct pcv *, struct pAddr *));
+
 /* IPv4 -> IPv4 */
 struct mbuf	*natpt_translateICMPv4To4	__P((struct pcv *, struct pAddr *));
 void		 natpt_icmp4TimeExceed		__P((struct pcv *, struct mbuf *));
@@ -206,7 +211,7 @@ void		 natpt_decrementAck		__P((struct tcphdr *, int));
 int		 natpt_updateTcpStatus		__P((struct pcv *));
 int		 natpt_tcpfsm			__P((short state, int, u_char flags));
 struct mbuf	*natpt_mgethdr			__P((int, int));
-void		 natpt_composeIPv6Hdr		__P((struct pcv *, struct pAddr *,
+struct ip6_frag	*natpt_composeIPv6Hdr		__P((struct pcv *, struct pAddr *,
 						     struct ip6_hdr *));
 void		 natpt_composeIPv4Hdr		__P((struct pcv *, struct pAddr *,
 						     struct ip *));
@@ -1105,7 +1110,6 @@ natpt_translateTCPv4To6(struct pcv *cv4, struct pAddr *pad)
 		return (NULL);
 
 	cv6.ip_p = IPPROTO_TCP;
-	cv6.ip.ip6->ip6_nxt = IPPROTO_TCP;
 	natpt_updateTcpStatus(cv4);
 	natpt_translatePYLD4To6(&cv6);
 	if (cv6.ats->suit.tcps
@@ -1132,12 +1136,10 @@ natpt_translateUDPv4To6(struct pcv *cv4, struct pAddr *pad)
 	struct mbuf	*m6;
 
 	bzero(&cv6, sizeof(struct pcv));
-
 	if ((m6 = natpt_translateTCPUDPv4To6(cv4, pad, &cv6)) == NULL)
 		return (NULL);
 
 	cv6.ip_p = IPPROTO_UDP;
-	cv6.ip.ip6->ip6_nxt = IPPROTO_UDP;
 	natpt_fixTCPUDP64cksum(AF_INET, IPPROTO_UDP, &cv6, cv4);
 	return (m6);
 }
@@ -1147,43 +1149,57 @@ struct mbuf *
 natpt_translateTCPUDPv4To6(struct pcv *cv4, struct pAddr *pad, struct pcv *cv6)
 {
 	struct mbuf	*m6;
-	struct ip	*ip4;
 	struct ip6_hdr	*ip6;
-	struct tcp6hdr	*tcp6;
+	int		 hdrsz;
 
-	if ((m6 = natpt_mgethdr(sizeof(struct ip6_hdr), cv4->plen)) == NULL)
+	/*
+	 * Drop the fragmented packet which does not have enough
+	 * header.
+	 */
+	hdrsz = sizeof(struct udphdr);
+	if (cv4->ip_p == IPPROTO_TCP)
+		hdrsz = sizeof(struct tcphdr);		/* ignore tcp option	*/
+	if (isFragment(cv4) && cv4->plen < hdrsz)	/* do we need this?	*/
 		return (NULL);
 
-	{
-		caddr_t	tcp4;
-		caddr_t	tcp6;
-
-		cv6->m = m6;
-		ip6 = mtod(m6, struct ip6_hdr *);
-		tcp4 = (caddr_t)cv4->pyld.tcp4;
-		tcp6 = (caddr_t)ip6 + sizeof(struct ip6_hdr);
-		bcopy(tcp4, tcp6, cv4->plen);
-
-		m6->m_pkthdr.len
-			= m6->m_len
-			= sizeof(struct ip6_hdr) + cv4->plen;
-
-		cv6->ip.ip6 = mtod(m6, struct ip6_hdr *);
-		cv6->pyld.caddr = (caddr_t)cv6->ip.ip6 + sizeof(struct ip6_hdr);
-		cv6->plen = cv4->plen;
-		cv6->poff = cv6->pyld.caddr - (caddr_t)cv6->ip.ip6;
+	/*
+	 * If this packet needs fragmentation, handle it with the
+	 * other routine.
+	 */
+	if (needFragment(cv4)) {
+		natpt_translateFragment4to66(cv4, pad);
+		return (NULL);
 	}
 
+	/*
+	 * Start real work.
+	 */
+	hdrsz = sizeof(struct ip6_hdr);
+	if (isFragment(cv4))
+		hdrsz += sizeof(struct ip6_frag);
+	if ((m6 = natpt_mgethdr(hdrsz, cv4->plen)) == NULL)
+		return (NULL);
+
+	bzero(cv6, sizeof(struct pcv));
+	cv6->m = m6;
+	cv6->ip.ip6 = ip6 = mtod(m6, struct ip6_hdr *);
+	cv6->pyld.caddr = (caddr_t)(ip6 + 1);
+	cv6->plen = cv4->plen;
+	cv6->poff = cv6->pyld.caddr - (caddr_t)cv6->ip.ip6;
 	cv6->ats = cv4->ats;
 	cv6->fromto = cv4->fromto;
 
-	ip4 = mtod(cv4->m, struct ip *);
-	natpt_composeIPv6Hdr(cv4, pad, ip6);
+	ip6->ip6_plen = cv4->plen;
+	ip6->ip6_nxt  = IPPROTO_TCP;
 
-	tcp6 = cv6->pyld.tcp6;
-	tcp6->th_sport = pad->port[1];
-	tcp6->th_dport = pad->port[0];
+	if ((cv6->fh = natpt_composeIPv6Hdr(cv4, pad, ip6)) != NULL)
+		cv6->pyld.caddr += sizeof(struct ip6_frag);
 
+	bcopy(cv4->pyld.caddr, cv6->pyld.caddr, cv4->plen);
+	cv6->pyld.tcp6->th_sport = pad->port[1];
+	cv6->pyld.tcp6->th_dport = pad->port[0];
+
+	m6->m_pkthdr.len = m6->m_len = hdrsz + cv4->plen;
 	return (m6);
 }
 
@@ -1230,6 +1246,136 @@ natpt_translatePYLD4To6(struct pcv *cv6)
 	}
 
 	return ;
+}
+
+
+struct mbuf *
+natpt_translateFragment4to6(struct pcv *cv4, struct pAddr *pad)
+{
+	struct mbuf	*m6;
+	struct ip6_hdr	*ip6;
+	caddr_t		 pyld6;
+
+	if (NATPT_FRGHDRSZ + cv4->plen > IPV6_MMTU) {
+		natpt_translateFragment4to66(cv4, pad);
+		return (NULL);
+	}
+
+	if ((m6 = natpt_mgethdr(NATPT_FRGHDRSZ, cv4->plen)) == NULL)
+		return (NULL);
+
+	ip6 = mtod(m6, struct ip6_hdr *);
+	pyld6 = (caddr_t)(ip6 + 1);
+	if (natpt_composeIPv6Hdr(cv4, pad, ip6) != NULL)
+		pyld6 += sizeof(struct ip6_frag);
+
+	bcopy(cv4->pyld.caddr, pyld6, cv4->plen);
+	m6->m_pkthdr.len = m6->m_len = NATPT_FRGHDRSZ + cv4->plen;
+
+	return (m6);
+}
+
+
+void
+natpt_translateFragment4to66(struct pcv *cv4, struct pAddr *pad)
+{
+	int		 offset;
+	int		 plen;
+	struct mbuf	*m6;
+	struct ip	*ip4 = mtod(cv4->m, struct ip *);
+	struct ip6_hdr	*ip6,  ip6save;
+	struct ip6_frag	*frg6, frg6save;
+	caddr_t		 pyld4 = cv4->pyld.caddr;
+	caddr_t		 pyld6;
+
+	/*
+	 * Form 2 fragmented v6 packet because size of v6 packet after
+	 * v4->v6 translation exceeds IPV6_MMTU (1280 bytes).  This
+	 * two v6 packet is sent from this routine by calling
+	 * ip6_forward() directly.
+	 */
+
+	if ((m6 =natpt_mgethdr(0, IPV6_MMTU)) == NULL)
+		return ;
+
+	ip6 = mtod(m6, struct ip6_hdr *);
+	pyld6 = (caddr_t)(ip6 + 1);
+	frg6 = NULL;
+	if ((frg6 = natpt_composeIPv6Hdr(cv4, pad, ip6)) != NULL)
+		pyld6 += sizeof(struct ip6_frag);
+	bcopy(cv4->pyld.caddr, pyld6, NATPT_MAXULP);
+
+	/*
+	 * Renewal of port number and change of checksum.
+	 */
+	if ((isFirstFragment(cv4)
+	     || needFragment(cv4))
+	    && ((cv4->ip_p == IPPROTO_TCP)
+		|| (cv4->ip_p == IPPROTO_UDP))) {
+		u_short		 cksum4, cksum6;
+		struct ulc4	 ulc4;
+		struct ulc6	 ulc6;
+
+		((struct tcp6hdr *)pyld6)->th_sport = pad->port[1];
+		((struct tcp6hdr *)pyld6)->th_dport = pad->port[0];
+
+		bzero(&ulc4, sizeof(struct ulc4));
+		ulc4.ulc_src = ip4->ip_src;
+		ulc4.ulc_dst = ip4->ip_dst;
+		ulc4.ulc_tu.th.th_sport = ((struct tcphdr *)pyld4)->th_sport;
+		ulc4.ulc_tu.th.th_dport = ((struct tcphdr *)pyld4)->th_dport;
+
+		bzero(&ulc6, sizeof(struct ulc6));
+		ulc6.ulc_src = ip6->ip6_src;
+		ulc6.ulc_dst = ip6->ip6_dst;
+		ulc6.ulc_tu.th.th_sport = ((struct tcp6hdr *)pyld6)->th_sport;
+		ulc6.ulc_tu.th.th_dport = ((struct tcp6hdr *)pyld6)->th_dport;
+
+		if (cv4->ip_p == IPPROTO_TCP) {
+			cksum4 = ((struct tcphdr *)pyld4)->th_sum;
+			cksum6 = natpt_fixCksum(ntohs(cksum4),
+						(u_char *)&ulc4, sizeof(struct ulc4),
+						(u_char *)&ulc6, sizeof(struct ulc6));
+			((struct tcp6hdr *)pyld6)->th_sum = htons(cksum6);
+			natpt_updateTcpStatus(cv4);
+		} else {
+			cksum4 = ((struct udphdr *)pyld4)->uh_sum;
+			cksum6 = natpt_fixCksum(ntohs(cksum4),
+						(u_char *)&ulc4, sizeof(struct ulc4),
+						(u_char *)&ulc6, sizeof(struct ulc6));
+			((struct udphdr *)pyld6)->uh_sum = htons(cksum6);
+		}
+	}
+
+	ip6save = *ip6;
+	frg6save = *frg6;
+	m6->m_pkthdr.len = m6->m_len = IPV6_MMTU;
+	ip6_forward(m6, 1);			/* send first fragmented packet */
+
+	/*
+	 * Then, send second fragmented v6 packet.
+	 */
+
+	plen = cv4->plen - NATPT_MAXULP;
+	if ((m6 = natpt_mgethdr(NATPT_FRGHDRSZ, plen)) == NULL)
+		return ;
+
+	ip6 = mtod(m6, struct ip6_hdr *);
+	frg6 = (struct ip6_frag *)(ip6 + 1);
+	pyld6 = (caddr_t)(ip6 + 1) + sizeof(struct ip6_frag);
+
+	*ip6 = ip6save;
+	*frg6 = frg6save;
+
+	ip6->ip6_plen = htons(sizeof(struct ip6_frag) + plen);
+	offset = ((ip4->ip_off & IP_OFFMASK) << 3) + NATPT_MAXULP;
+	frg6->ip6f_offlg = htons(offset) & IP6F_OFF_MASK;
+	if (ip4->ip_off & IP_MF)
+		frg6->ip6f_offlg |= IP6F_MORE_FRAG;
+
+	bcopy(cv4->pyld.caddr+NATPT_MAXULP, pyld6, plen);
+	m6->m_pkthdr.len = m6->m_len = NATPT_FRGHDRSZ + plen;
+	ip6_forward(m6, 1);			/* send second fragmented packet */
 }
 
 
@@ -1537,6 +1683,31 @@ natpt_translatePYLD4To4(struct pcv *cv4to)
 		}
 	}
 }
+
+
+struct mbuf *
+natpt_translateFragment4to4(struct pcv *cv4from, struct pAddr *pad)
+{
+	struct pcv	 cv4to;
+	struct mbuf	*m4;
+	struct ip	*ip4to;
+
+	if ((m4 = m_copym(cv4from->m, 0, M_COPYALL, M_NOWAIT)) == NULL)
+		return (NULL);
+
+	bzero(&cv4to, sizeof(struct pcv));
+	cv4to.m = m4;
+	cv4to.ip.ip4 = mtod(m4, struct ip *);
+	cv4to.pyld.caddr = (caddr_t)cv4to.ip.ip4 + sizeof(struct ip);
+	cv4to.fromto = cv4from->fromto;
+
+	ip4to = cv4to.ip.ip4;
+	ip4to->ip_src = pad->in4dst;
+	ip4to->ip_dst = pad->in4src;
+	natpt_adjustMBuf(cv4from->m, m4);
+
+	return (m4);
+}
 #endif /* NATPT_NAT */
 
 
@@ -1750,7 +1921,7 @@ natpt_translateFTP4ReplyTo6(struct pcv *cv6)
 
 		if (natpt_parse227(ftp4.arg, kk, &sin) == NULL)
 			return (0);
-		snprintf(Wow, sizeof(Wow), 
+		snprintf(Wow, sizeof(Wow),
 			 "229 Entering Extended Passive Mode (|||%d|)\r\n",
 			 ntohs(sin.sin_port));
 		delta = natpt_rewriteMbuf(cv6->m, kb, (kk-kb), Wow, strlen(Wow));
@@ -2242,18 +2413,49 @@ natpt_mgethdr(int hlen, int len)
 }
 
 
-void
+struct ip6_frag *
 natpt_composeIPv6Hdr(struct pcv *cv4, struct pAddr *pad, struct ip6_hdr *ip6)
 {
 	struct ip	*ip4 = cv4->ip.ip4;
+	struct ip6_frag	*frg6 = NULL;
 
 	ip6->ip6_flow = 0;
 	ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
 	ip6->ip6_vfc |=	 IPV6_VERSION;
 	ip6->ip6_plen = htons(ip4->ip_len - sizeof(struct ip));
+	ip6->ip6_nxt  = (cv4->ip_p == IPPROTO_ICMP)
+		? IPPROTO_ICMPV6
+		: cv4->ip_p;
 	ip6->ip6_hlim = ip4->ip_ttl;
 	ip6->ip6_dst  = pad->in6src;
 	ip6->ip6_src  = pad->in6dst;
+
+	if (isFragment(cv4) || needFragment(cv4)) {
+		frg6 = (struct ip6_frag *)(caddr_t)(ip6 + 1);
+		frg6->ip6f_nxt = ip6->ip6_nxt;
+		frg6->ip6f_reserved = 0;
+		frg6->ip6f_offlg  = htons((ip4->ip_off & IP_OFFMASK) << 3);
+		if ((ip4->ip_off & IP_MF) || needFragment(cv4))
+			frg6->ip6f_offlg |= IP6F_MORE_FRAG;
+		frg6->ip6f_ident  = 0;
+		frg6->ip6f_ident |= ntohs(ip4->ip_id);
+		HTONL(frg6->ip6f_ident);
+
+		/* Get last fragmented packet length from given ip header.	*/
+		if (!needFragment(cv4)
+		    && ((ip4->ip_off & IP_OFFMASK) != 0)
+		    && ((ip4->ip_off & IP_MF) == 0))
+			ip6->ip6_plen
+				= ip4->ip_len
+				- sizeof(struct ip)
+				+ sizeof(struct ip6_frag);
+		else
+			ip6->ip6_plen = IPV6_MMTU - sizeof(struct ip6_hdr);
+		HTONS(ip6->ip6_plen);
+		ip6->ip6_nxt  = IPPROTO_FRAGMENT;
+	}
+
+	return (frg6);
 }
 
 

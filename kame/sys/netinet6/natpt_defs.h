@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.31 2001/11/28 06:05:42 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.32 2001/12/11 11:34:09 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -32,11 +32,13 @@
 #define	NATPTHASHSZ		(397)
 #define	MAXTSLOTENTRY		(4096)
 
+#define	NATPT_FRGHDRSZ		(sizeof(struct ip6_hdr) + sizeof(struct ip6_frag))
+#define	NATPT_MAXULP		(IPV6_MMTU - NATPT_FRGHDRSZ)
+
 #define	SIN4(s)			((struct sockaddr_in  *)s)
 #define	SIN6(s)			((struct sockaddr_in6 *)s)
 #define	SZSIN4			sizeof(struct sockaddr_in)
 #define	SZSIN6			sizeof(struct sockaddr_in6)
-
 
 #ifdef _KERNEL
 #define	isDebug(d)		(natpt_debug & (d))
@@ -74,7 +76,18 @@ struct pcv					/* sizeof(): 32[byte]	*/
 
 	u_char	 flags;
 #define	NATPT_TRACEROUTE	0x01
-#define	NATPT_NEEDFRAGMENT	0x02
+
+/* The following flags are used in IPv4->IPv6 translation.		*/
+#define	FIRST_FRAGMENT		0x02	/* is first fragment?		*/
+#define	NEXT_FRAGMENT		0x04	/* is fragment after the first?	*/
+#define	NEED_FRAGMENT		0x08	/* need fragment?		*/
+
+#define	IS_FRAGMENT		(FIRST_FRAGMENT | NEXT_FRAGMENT)
+
+#define	isFragment(cv)		((cv)->flags & IS_FRAGMENT)
+#define	isFirstFragment(cv)	((cv)->flags & FIRST_FRAGMENT)
+#define	isNextFragment(cv)	((cv)->flags & NEXT_FRAGMENT)
+#define	needFragment(cv)	((cv)->flags & NEED_FRAGMENT)
 
 	u_int16_t	 poff;		/* payload offset		*/
 	u_int16_t	 plen;		/* payload length		*/
@@ -117,8 +130,9 @@ union inaddr					/* sizeof():  16[byte]	*/
 struct fragment					/* sizeof(): 52[byte]	*/
 {
 	TAILQ_ENTRY(fragment)	frg_list;
-	u_int8_t	 fg_proto;		/* protocol			*/
 	u_int8_t	 fg_family;		/* AF_INET{,6} (sa_family_t)	*/
+	u_int8_t	 fg_proto;		/* protocol			*/
+	u_short		 fg_id;			/* identification in v4 header	*/
 	union inaddr	 fg_src;		/* source address		*/
 	union inaddr	 fg_dst;		/* destination address		*/
 	struct tSlot	*tslot;
