@@ -24,7 +24,4 @@ DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
 CPPFLAGS+=	-I${.CURDIR}
 .PATH: ${.CURDIR}/../../kame/netstat
 
-# KAME scope id hack
-CPPFLAGS+=-DKAME_SCOPEID
-
 .include <bsd.prog.mk>
