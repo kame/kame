@@ -1472,7 +1472,8 @@ ip_mloopback(ifp, m, dst)
 	struct mbuf *copym;
 
 	copym = m_copy(m, 0, M_COPYALL);
-	if (copym != NULL)
+	if (copym != NULL
+	 && (copym->m_flags & M_EXT || copym->m_len < sizeof(struct ip)))
 		copym = m_pullup(copym, sizeof(struct ip));
 	if (copym != NULL) {
 		/*
