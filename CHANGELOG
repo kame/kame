@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2529 2004/01/19 07:46:50 keiichi Exp $
+$KAME: CHANGELOG,v 1.2530 2004/01/20 10:20:43 suz Exp $
 
 <200401>
+2003-01-20  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/kame/dhcp6
+	supported DHCPv6 option for SIP servers (RFC3319).
+
 Mon Jan 19 16:15:48 JST 2004	keiichi@iij.ad.jp
 	* kame/sys/netinet6/dest6.c
 	send a binding error message when CN receives a home
