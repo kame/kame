@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.133 2001/02/26 13:51:43 sumikawa Exp $	*/
+/*	$KAME: nd6.c,v 1.134 2001/03/04 08:58:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1104,6 +1104,14 @@ nd6_free(rt)
 			 */
 			ln->ln_state = ND6_LLINFO_INCOMPLETE;
 
+			/*
+			 * Since defrouter_select() does not affect the
+			 * on-link determination and MIP6 needs the check
+			 * before the default router selection, we perform
+			 * the check now.
+			 */
+			pfxlist_onlink_check();
+
 			if (dr == TAILQ_FIRST(&nd_defrouter)) {
 				/*
 				 * It is used as the current default router,
@@ -1117,7 +1125,6 @@ nd6_free(rt)
 
 				defrouter_select();
 			}
-			pfxlist_onlink_check();
 		}
 		splx(s);
 	}
