@@ -1,4 +1,4 @@
-/* $Id: name6.c,v 1.17 2000/04/28 17:10:22 itojun Exp $ */
+/* $Id: name6.c,v 1.18 2000/05/01 02:36:28 itojun Exp $ */
 /*
  *	Atsushi Onoe <onoe@sm.sony.co.jp>
  */
@@ -1162,6 +1162,8 @@ _dns_ghbyname(const char *name, int af, int *errp)
 #ifdef INET6
 		case T_AAAA:
 #endif 
+			if (hbuf.h_name)
+				DNS_ASSERT(strcasecmp(hbuf.h_name, bp) == 0);
 			DNS_ASSERT(type == qtype);
 			bp = (char *)ALIGN(bp);
 			DNS_ASSERT(n == hbuf.h_length);
