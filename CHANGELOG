@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2479 2003/09/24 18:20:15 jinmei Exp $
+$KAME: CHANGELOG,v 1.2480 2003/09/29 03:11:31 jinmei Exp $
 
 <200309>
 2003-09-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -13,7 +13,7 @@ $KAME: CHANGELOG,v 1.2479 2003/09/24 18:20:15 jinmei Exp $
 	change implicitly corrected the termination behavior of racoon.
 
 2003-09-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* freebsd4/kame/racoon/session.c (check_flushsa): correctly
+	* kame/kame/racoon/session.c (check_flushsa): correctly
 	handled the case where pfkey_dump_sadb() returns NULL.  Otherwise,
 	racoon could crash in such a case.
 
