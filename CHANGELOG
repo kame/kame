@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2565 2004/03/14 10:39:14 jinmei Exp $
+$KAME: CHANGELOG,v 1.2566 2004/03/16 04:58:23 suz Exp $
 
 <200403>
+2004-03-16  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/sys/netinet6/{ip6_output.c, mldv2.c}: IGMPv3/MLDv2 is 
+	revived!
+
 2004-03-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/kern/uipc_syscalls.c (sockargs): allow more than
 	MLEN bytes for ancillary data to meet the requirement in Section
