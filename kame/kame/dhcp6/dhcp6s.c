@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.150 2005/03/21 07:49:28 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.151 2005/03/26 15:52:31 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -2422,7 +2422,7 @@ make_ia(spec, conflist, retlist, client_conf, do_binding)
 		calc_ia_timo(&ia, &ialist, client_conf);
 
 		/* make a binding for the set if necessary */
-		if (found && do_binding) {
+		if (do_binding) {
 			if (add_binding(&client_conf->duid, DHCP6_BINDING_IA,
 			    spec->type, spec->val_ia.iaid, &ialist) == NULL) {
 				dprintf(LOG_NOTICE, FNAME,
