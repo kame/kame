@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.52 2001/12/18 01:30:44 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.53 2001/12/27 02:13:39 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -911,7 +911,7 @@ mip6_validate_bu(m, opt)
 		return (0);
 	}
 #ifdef MIP6_DRAFT13
-	seqno = ntohs(bu_opt->ip6ou_seqno);
+	GET_NETVAL_S(bu_opt->ip6ou_seqno, seqno);
 #else
 	seqno = bu_opt->ip6ou_seqno;
 #endif
@@ -1000,9 +1000,9 @@ mip6_process_bu(m, opt)
 		pcoa = (struct in6_addr *)&altcoa_subopt->coa;
 	}
 
-	lifetime = ntohl(*(u_int32_t *)bu_opt->ip6ou_lifetime);
+	GET_NETVAL_L(bu_opt->ip6ou_lifetime, lifetime);
 #ifdef MIP6_DRAFT13
-	seqno = ntohs(bu_opt->ip6ou_seqno);
+	GET_NETVAL_S(bu_opt->ip6ou_seqno, seqno);
 #else
 	seqno = bu_opt->ip6ou_seqno;
 #endif
@@ -2102,7 +2102,7 @@ mip6_validate_ba(m, opt)
 		return (1);
 	}
 #ifdef MIP6_DRAFT13
-	seqno = ntohs(ba_opt->ip6oa_seqno);
+	GET_NETVAL_S(ba_opt->ip6oa_seqno, seqno);
 #else
 	seqno = ba_opt->ip6oa_seqno;
 	if (ba_opt->ip6oa_status == MIP6_BA_STATUS_SEQNO_TOO_SMALL) {
@@ -2203,7 +2203,7 @@ success:
 	mbu->mbu_state &= ~MIP6_BU_STATE_WAITACK;
 
 	/* update lifetime and refresh time. */
-	lifetime = ntohl(*(u_int32_t *)ba_opt->ip6oa_lifetime);
+	GET_NETVAL_L(ba_opt->ip6oa_lifetime, lifetime);
 	if (lifetime < mbu->mbu_lifetime) {
 		int64_t remain;
 		remain = mbu->mbu_remain - (mbu->mbu_lifetime - lifetime);
@@ -2211,7 +2211,7 @@ success:
 			remain = 0;
 		mbu->mbu_remain = remain;
 	}
-	mbu->mbu_refresh = ntohl(*(u_int32_t *)ba_opt->ip6oa_refresh);
+	GET_NETVAL_L(ba_opt->ip6oa_refresh, mbu->mbu_refresh);
 	mbu->mbu_refremain = mbu->mbu_refresh;
 
 	if (mbu->mbu_flags & IP6_BUF_HOME) {

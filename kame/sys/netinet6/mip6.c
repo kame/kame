@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.95 2001/12/21 00:47:39 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.96 2001/12/27 02:13:39 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1614,7 +1614,7 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		/* when registering to a CN, the prefixlen must be 0. */ 
 		bu_opt.ip6ou_prefixlen = 0;
 	}
-	bu_opt.ip6ou_seqno = htons(mbu->mbu_seqno);
+	SET_NETVAL_S(bu_opt.ip6ou_seqno, mbu->mbu_seqno);
 #else
 	bu_opt.ip6ou_seqno = mbu->mbu_seqno;
 #endif /* MIP6_DRAFT13 */
@@ -1848,7 +1848,7 @@ mip6_ba_destopt_create(pktopt_badest2, status, seqno, lifetime, refresh)
 	ba_opt.ip6oa_len = IP6OPT_BALEN; /* XXX consider authdata */
 	ba_opt.ip6oa_status = status;
 #ifdef MIP6_DRAFT13
-	ba_opt.ip6oa_seqno = htons(seqno);
+	SET_NETVAL_S(ba_opt.ip6oa_seqno, seqno);
 #else
 	ba_opt.ip6oa_seqno = seqno;
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.14 2001/12/05 08:10:00 k-sugyou Exp $	*/
+/*	$KAME: mip6_var.h,v 1.15 2001/12/27 02:13:40 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -45,6 +45,17 @@
 #else
 #define MIP6_SEQNO_T u_int8_t
 #endif /* MIP6_DRAFT13 */
+
+#define GET_NETVAL_S(p, v)	bcopy((p), &(v), sizeof(v)), v = ntohs(v)
+#define GET_NETVAL_L(p, v)	bcopy((p), &(v), sizeof(v)), v = ntohl(v)
+#define SET_NETVAL_S(p, v)	do {					\
+					u_int16_t s = htons(v);		\
+					bcopy(&s, (p), sizeof(s));	\
+				} while (0)
+#define SET_NETVAL_L(p, v)	do {					\
+					u_int32_t s = htonl(v);		\
+					bcopy(&s, (p), sizeof(s));	\
+				} while (0)
 
 struct mip6_prefix {
 	LIST_ENTRY(mip6_prefix) mpfx_entry;
