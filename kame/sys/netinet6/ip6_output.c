@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.285 2002/02/09 06:49:46 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.286 2002/02/09 11:36:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -202,10 +202,10 @@ static int ip6_insert_jumboopt __P((struct ip6_exthdrs *, u_int32_t));
 static int ip6_splithdr __P((struct mbuf *, struct ip6_exthdrs *));
 #ifdef NEW_STRUCT_ROUTE
 static int ip6_getpmtu __P((struct route *, struct route *, struct ifnet *,
-			    struct in6_addr *, u_long *));
+			    struct sockaddr_in6 *, u_long *));
 #else
 static int ip6_getpmtu __P((struct route *, struct route *, struct ifnet *,
-			    struct in6_addr *, u_long *));
+			    struct sockaddr_in6 *, u_long *));
 #endif
 
 #ifdef __bsdi__
@@ -255,13 +255,12 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #endif
 	struct rtentry *rt = NULL;
 	struct sockaddr_in6 *dst;
-	struct sockaddr_in6 *src_sa, *dst_sa;
+	struct sockaddr_in6 *src_sa, *dst_sa, finaldst_sa;
 	int error = 0;
 	struct in6_ifaddr *ia = NULL;
 	u_long mtu;
 	u_int32_t optlen = 0, plen = 0, unfragpartlen = 0;
 	struct ip6_exthdrs exthdrs;
-	struct in6_addr finaldst;
 	int clone = 0;
 	u_int32_t zone;
 #ifdef NEW_STRUCT_ROUTE
@@ -300,6 +299,8 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	struct inpcb *inp;
 	struct tdb *tdb;
 	int s;
+
+	bzero(&finaldst_sa, sizeof(finaldst_sa));
 
 	inp = NULL;     /* XXX */
 	if (inp && (inp->inp_flags & INP_IPV6) == 0)
@@ -771,12 +772,18 @@ skip_ipsec2:;
 		struct ip6_rthdr0 *rh0;
 		struct in6_addr *addr;
 		struct sockaddr_in6 sa;
+		struct in6_addr finaldst;
 
 		finaldst = ip6->ip6_dst;
 		switch (rh->ip6r_type) {
 		case IPV6_RTHDR_TYPE_0:
 			 rh0 = (struct ip6_rthdr0 *)rh;
 			 addr = (struct in6_addr *)(rh0 + 1);
+
+			 /* extract the final destination from the packet */
+			 if (ip6_getpktaddrs(m, NULL, &dst_sa))
+				 goto bad; /* XXX: impossible */
+			 finaldst_sa = *dst_sa;
 
 			 /*
 			  * construct a sockaddr_in6 form of the first hop.
@@ -848,6 +855,9 @@ skip_ipsec2:;
 		error = EIO;	/* XXX */
 		goto bad;
 	}
+	if (finaldst_sa.sin6_family == AF_UNSPEC)
+		finaldst_sa = *dst_sa;
+
 	/* initialize cached route */
 	if (ro == 0) {
 		ro = &ip6route;
@@ -1174,7 +1184,7 @@ skip_ipsec2:;
 		nd6_nud_hint(rt, NULL, 0);
 
 	/* Determine path MTU. */
-	if ((error = ip6_getpmtu(ro_pmtu, ro, ifp, &finaldst, &mtu)) != 0)
+	if ((error = ip6_getpmtu(ro_pmtu, ro, ifp, &finaldst_sa, &mtu)) != 0)
 		goto bad;
 
 	/*
@@ -1728,7 +1738,7 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup)
 	struct route_in6 *ro_pmtu, *ro;
 #endif
 	struct ifnet *ifp;
-	struct in6_addr *dst;	/* XXX: should be sockaddr_in6 */
+	struct sockaddr_in6 *dst;
 	u_long *mtup;
 {
 	u_int32_t mtu = 0;
@@ -1740,16 +1750,22 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup)
 			(struct sockaddr_in6 *)&ro_pmtu->ro_dst;
 		if (ro_pmtu->ro_rt && ((ro_pmtu->ro_rt->rt_flags & RTF_UP)
 				       == 0 ||
+#ifdef SCOPEDROUTING
+				       !SA6_ARE_ADDR_EQUAL(sa6_dst, dst)
+#else
 				       !IN6_ARE_ADDR_EQUAL(&sa6_dst->sin6_addr,
-							   dst))) {
+							   &dst->sin6_addr)
+#endif
+			    )) {
 			RTFREE(ro_pmtu->ro_rt);
 			ro_pmtu->ro_rt = (struct rtentry *)NULL;
 		}
 		if (ro_pmtu->ro_rt == NULL) {
-			bzero(sa6_dst, sizeof(*sa6_dst));
-			sa6_dst->sin6_family = AF_INET6;
-			sa6_dst->sin6_len = sizeof(struct sockaddr_in6);
-			sa6_dst->sin6_addr = *dst;
+			bzero(sa6_dst, sizeof(*sa6_dst)); /* for safety */
+			*sa6_dst = *dst;
+#ifndef SCOPEDROUTING
+			sa6_dst->sin6_scope_id = 0; /* XXX */
+#endif
 
 #ifdef __bsdi__			/* bsdi needs rtcalloc to clone a route. */
 			rtcalloc((struct route *)ro_pmtu);
@@ -2616,7 +2632,7 @@ do { \
 				 * the outgoing interface.
 				 */
 				error = ip6_getpmtu(ro, NULL, NULL,
-						    &in6p->in6p_faddr, &pmtu);
+						    &in6p->in6p_fsa, &pmtu);
 				if (error)
 					break;
 				if (pmtu > IPV6_MAXPACKET)
