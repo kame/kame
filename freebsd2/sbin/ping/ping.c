@@ -436,7 +436,7 @@ main(argc, argv)
 				err(EX_UNAVAILABLE, "malloc");
 			if ((len = ipsec_set_policy(buf, len, policy_in)) < 0)
 				errx(EX_CONFIG, ipsec_strerror());
-			if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY_IN,
+			if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY,
 					buf, len) < 0)
 				warn(NULL);
 			free(buf);
@@ -448,7 +448,7 @@ main(argc, argv)
 				err(EX_UNAVAILABLE, "malloc");
 			if ((len = ipsec_set_policy(buf, len, policy_out)) < 0)
 				errx(EX_CONFIG, ipsec_strerror());
-			if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY_OUT,
+			if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY,
 					buf, len) < 0)
 				warn(NULL);
 			free(buf);

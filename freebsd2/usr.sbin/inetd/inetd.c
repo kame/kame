@@ -1094,8 +1094,8 @@ ipsecsetup(sep)
 	}
 
 	if (policy_in != NULL) {
-		opt = (level == IPPROTO_IP) ? IP_IPSEC_POLICY_IN
-					    : IPV6_IPSEC_POLICY_IN;
+		opt = (level == IPPROTO_IP) ? IP_IPSEC_POLICY
+					    : IPV6_IPSEC_POLICY;
 		len = ipsec_get_policylen(policy_in);
 		if (len >= 0 && (buf = (char *)malloc(len)) != NULL) {
 			ipsec_set_policy(buf, len, policy_in);
@@ -1111,8 +1111,8 @@ ipsecsetup(sep)
 				policy_in);
 	}
 	if (policy_out != NULL) {
-		opt = (level == IPPROTO_IP) ? IP_IPSEC_POLICY_OUT
-					    : IPV6_IPSEC_POLICY_OUT;
+		opt = (level == IPPROTO_IP) ? IP_IPSEC_POLICY
+					    : IPV6_IPSEC_POLICY;
 		len = ipsec_get_policylen(policy_out);
 		if (len >= 0 && (buf = (char *)malloc(len)) != NULL) {
 			ipsec_set_policy(buf, len, policy_out);
