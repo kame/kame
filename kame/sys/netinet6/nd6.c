@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.168 2001/07/23 11:45:02 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.169 2001/07/23 14:07:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1619,6 +1619,7 @@ nd6_ioctl(cmd, data, ifp)
 		break;
 	case SIOCSNDFLUSH_IN6:	/* XXX: the ioctl name is confusing... */
 		/* sync kernel routing table with the default router list */
+		defrouter_reset();
 		defrouter_select();
 		break;
 	case SIOCSPFXFLUSH_IN6:

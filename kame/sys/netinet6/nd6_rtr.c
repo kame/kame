@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.147 2001/07/23 14:04:37 sumikawa Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.148 2001/07/23 14:07:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -727,6 +727,20 @@ defrouter_delreq(dr)
 
 	if (dr)
 		dr->installed = 0;
+}
+
+/*
+ * remove all default routes from default router list
+ */
+void
+defrouter_reset()
+{
+	struct nd_defrouter *dr;
+
+	for (dr = TAILQ_FIRST(&nd_defrouter); dr;
+	     dr = TAILQ_NEXT(dr, dr_entry))
+		defrouter_delreq(dr);
+	defrouter_delifreq();
 }
 
 /*
