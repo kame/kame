@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.408 2003/12/16 10:44:15 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.409 2003/12/24 09:10:07 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2074,10 +2074,10 @@ ip6_ctloutput(op, so, level, optname, mp)
 				struct mbuf *m;
 
 				error = soopt_getm(sopt, &m); /* XXX */
-				if (error != NULL)
+				if (error != 0)
 					break;
 				error = soopt_mcopyin(sopt, m); /* XXX */
-				if (error != NULL)
+				if (error != 0)
 					break;
 				error = ip6_pcbopts(&in6p->in6p_outputopts,
 						    m, so, sopt);
@@ -3008,10 +3008,10 @@ do { \
 				caddr_t oval = (caddr_t)sopt->sopt_val;
 
 				error = soopt_getm(sopt, &m); /* XXX */
-				if (error != NULL)
+				if (error != 0)
 					break;
 				error = soopt_mcopyin(sopt, m); /* XXX */
-				if (error != NULL)
+				if (error != 0)
 					break;
 				sopt->sopt_valsize = ovalsize;
 				sopt->sopt_val = oval;
