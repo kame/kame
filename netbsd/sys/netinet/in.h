@@ -235,8 +235,7 @@ struct ip_opts {
 #define	IP_RECVIF		20   /* bool; receive reception if w/dgram */
 #define	IP_ERRORMTU		21   /* int; get MTU of last xmit = EMSGSIZE */
 #if 1 /*IPSEC*/
-#define IP_IPSEC_POLICY_IN	22 /* struct; get/set security policy */
-#define IP_IPSEC_POLICY_OUT	23 /* struct; get/set security policy */
+#define IP_IPSEC_POLICY		22 /* struct; get/set security policy */
 #endif
 
 /*
