@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.112 2001/05/31 01:01:25 suz Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.113 2001/05/31 03:59:29 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -916,6 +916,7 @@ defrouter_select()
 }
 
 
+#ifdef	RTPREF
 /* 
  * for default router selection
  * regards router-preference field as a 2-bit signed integer 
@@ -938,6 +939,7 @@ rtpref(struct nd_defrouter *dr)
 	}
 	/* NOT REACH HERE */
 }
+#endf	/* RTPREF */
 
 static struct nd_defrouter *
 defrtrlist_update(new)
