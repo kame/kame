@@ -278,19 +278,19 @@ in6_ifattach(ifp, type, laddr, noloop)
 #endif
 	if (ifa != NULL) {
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		for ( ; ifa->ifa_next; ifa = ifa->ifa_next)
+		for ( ; ifa; ifa = ifa->ifa_next)
 #else
 		for ( ; ifa; ifa = TAILQ_NEXT(ifa, ifa_list))
 #endif
 		{
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+			ifap = &ifa->ifa_next;
+#endif
 			if (ifa->ifa_addr->sa_family != AF_INET6)
 				continue;
 			if (IN6_IS_ADDR_LINKLOCAL(&satosin6(ifa->ifa_addr)->sin6_addr))
 				return;
 		}
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		ifap = &ifa->ifa_next;
-#endif
 	} else {
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 		ifap = &ifp->if_addrlist;
