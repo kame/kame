@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.195 2003/07/01 05:59:18 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.196 2003/07/01 06:44:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -478,6 +478,10 @@ ipsec4_getpolicybysock(m, dir, so, error)
 	struct secpolicy *currsp = NULL;	/* policy on socket */
 	struct secpolicy *kernsp = NULL;	/* policy on kernel */
 	struct secpolicyindex spidx;
+#if NPF > 0
+	struct pf_tag *t;
+#endif
+	u_int16_t tag;
 
 	/* sanity check */
 	if (m == NULL || so == NULL || error == NULL)
@@ -499,6 +503,13 @@ ipsec4_getpolicybysock(m, dir, so, error)
 #ifdef DIAGNOSTIC
 	if (pcbsp == NULL)
 		panic("ipsec4_getpolicybysock: pcbsp is NULL.");
+#endif
+
+#if NPF > 0
+	t = ipsec_get_tag(m);
+	tag = t ? t->tag : 0;
+#else
+	tag = 0;
 #endif
 
 	/* if we have a cached entry, and if it is still valid, use it. */
@@ -537,7 +548,7 @@ ipsec4_getpolicybysock(m, dir, so, error)
 		case IPSEC_POLICY_ENTRUST:
 			/* look for a policy in SPD */
 			if (ipsec_setspidx_mbuf(&spidx, AF_INET, m, 1) == 0 &&
-			    (kernsp = key_allocsp(0, &spidx, dir)) != NULL) {
+			    (kernsp = key_allocsp(tag, &spidx, dir)) != NULL) {
 				/* SP found */
 				KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
 					printf("DP ipsec4_getpolicybysock called "
@@ -571,7 +582,7 @@ ipsec4_getpolicybysock(m, dir, so, error)
 	/* when non-privilieged socket */
 	/* look for a policy in SPD */
 	if (ipsec_setspidx_mbuf(&spidx, AF_INET, m, 1) == 0 &&
-	    (kernsp = key_allocsp(0, &spidx, dir)) != NULL) {
+	    (kernsp = key_allocsp(tag, &spidx, dir)) != NULL) {
 		/* SP found */
 		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
 			printf("DP ipsec4_getpolicybysock called "
@@ -698,6 +709,10 @@ ipsec6_getpolicybysock(m, dir, so, error)
 	struct secpolicy *currsp = NULL;	/* policy on socket */
 	struct secpolicy *kernsp = NULL;	/* policy on kernel */
 	struct secpolicyindex spidx;
+#if NPF > 0
+	struct pf_tag *t;
+#endif
+	u_int16_t tag;
 
 	/* sanity check */
 	if (m == NULL || so == NULL || error == NULL)
@@ -713,6 +728,13 @@ ipsec6_getpolicybysock(m, dir, so, error)
 #ifdef DIAGNOSTIC
 	if (pcbsp == NULL)
 		panic("ipsec6_getpolicybysock: pcbsp is NULL.");
+#endif
+
+#if NPF > 0
+	t = ipsec_get_tag(m);
+	tag = t ? t->tag : 0;
+#else
+	tag = 0;
 #endif
 
 	/* if we have a cached entry, and if it is still valid, use it. */
@@ -751,7 +773,7 @@ ipsec6_getpolicybysock(m, dir, so, error)
 		case IPSEC_POLICY_ENTRUST:
 			/* look for a policy in SPD */
 			if (ipsec_setspidx_mbuf(&spidx, AF_INET6, m, 1) == 0 &&
-			    (kernsp = key_allocsp(0, &spidx, dir)) != NULL) {
+			    (kernsp = key_allocsp(tag, &spidx, dir)) != NULL) {
 				/* SP found */
 				KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
 					printf("DP ipsec6_getpolicybysock called "
@@ -785,7 +807,7 @@ ipsec6_getpolicybysock(m, dir, so, error)
 	/* when non-privilieged socket */
 	/* look for a policy in SPD */
 	if (ipsec_setspidx_mbuf(&spidx, AF_INET6, m, 1) == 0 &&
-	    (kernsp = key_allocsp(0, &spidx, dir)) != NULL) {
+	    (kernsp = key_allocsp(tag, &spidx, dir)) != NULL) {
 		/* SP found */
 		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
 			printf("DP ipsec6_getpolicybysock called "
