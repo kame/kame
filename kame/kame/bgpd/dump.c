@@ -433,11 +433,14 @@ insert_bgp_route_entry(list, rte, bnp)
 			syslog(LOG_ERR, "<%s>: bogus bgproute list(%p)", brl);
 			continue; /* XXX */
 		}
-		if ((cmp = prefix_comp(rte, orte)) < 0)	/* rte < orte */
-			continue;
+		if ((cmp = prefix_comp(rte, orte)) == 0) /* rte == orte */
+			goto insert_entry;
 		else if (cmp > 0) /* rte > orte */
+			continue;
+		else {
+			brl = brl->prev; /* XXX */
 			break;	/* insert new list and entry */
-		goto insert_entry; /* rte == orte */
+		}
 	}
 	if ((newbrl = (struct bgproute_list *)malloc(sizeof(*newbrl))) == NULL)
 		fatalx("<insert_bgp_route_entry>: malloc failed"); /* XXX */
