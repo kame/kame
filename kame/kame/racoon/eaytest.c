@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.18 2000/12/16 14:15:07 sakane Exp $	*/
+/*	$KAME: eaytest.c,v 1.19 2000/12/17 23:04:19 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -46,6 +46,8 @@
 
 #include "oakley.h"
 #include "crypto_openssl.h"
+
+#define PVDUMP(var) hexdump((var)->v, (var)->l)
 
 u_int32_t loglevel = 4;
 
