@@ -1,4 +1,4 @@
-/*	$NetBSD: inetd.c,v 1.46 1999/01/20 09:24:06 mycroft Exp $	*/
+/*	$NetBSD: inetd.c,v 1.62.2.4 2000/07/26 23:13:31 mycroft Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -77,7 +77,7 @@ __COPYRIGHT("@(#) Copyright (c) 1983, 1991, 1993, 1994\n\
 #if 0
 static char sccsid[] = "@(#)inetd.c	8.4 (Berkeley) 4/13/94";
 #else
-__RCSID("$NetBSD: inetd.c,v 1.46 1999/01/20 09:24:06 mycroft Exp $");
+__RCSID("$NetBSD: inetd.c,v 1.62.2.4 2000/07/26 23:13:31 mycroft Exp $");
 #endif
 #endif /* not lint */
 
@@ -108,8 +108,8 @@ __RCSID("$NetBSD: inetd.c,v 1.46 1999/01/20 09:24:06 mycroft Exp $");
  *					name a tcpmux service
  *	socket type			stream/dgram/raw/rdm/seqpacket
  *	protocol			must be in /etc/protocols
- *	wait/nowait[.max]		single-threaded/multi-threaded, max #
- *	user[.group]			user/group to run daemon as
+ *	wait/nowait[:max]		single-threaded/multi-threaded, max #
+ *	user[:group]			user/group to run daemon as
  *	server program			full path name
  *	server program arguments	maximum of MAXARGS (20)
  *
@@ -117,8 +117,8 @@ __RCSID("$NetBSD: inetd.c,v 1.46 1999/01/20 09:24:06 mycroft Exp $");
  *      service name/version            must be in /etc/rpc
  *	socket type			stream/dgram/raw/rdm/seqpacket
  *	protocol			must be in /etc/protocols
- *	wait/nowait[.max]		single-threaded/multi-threaded
- *	user[.group]			user to run daemon as
+ *	wait/nowait[:max]		single-threaded/multi-threaded
+ *	user[:group]			user to run daemon as
  *	server program			full path name
  *	server program arguments	maximum of MAXARGS (20)
  *
@@ -172,7 +172,7 @@ __RCSID("$NetBSD: inetd.c,v 1.46 1999/01/20 09:24:06 mycroft Exp $");
  */
 
 /*
- * Here's the scoop concerning the user.group feature:
+ * Here's the scoop concerning the user:group feature:
  *
  * 1) set-group-option off.
  *
@@ -207,13 +207,16 @@ __RCSID("$NetBSD: inetd.c,v 1.46 1999/01/20 09:24:06 mycroft Exp $");
 #define RLIMIT_NOFILE	RLIMIT_OFILE
 #endif
 
+#ifndef NO_RPC
 #define RPC
+#endif
 
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #ifdef RPC
 #include <rpc/rpc.h>
-#include <rpc/pmap_clnt.h>
+#include <rpc/rpcb_clnt.h>
+#include <netconfig.h>
 #endif
 
 #include <ctype.h>
@@ -228,6 +231,7 @@ __RCSID("$NetBSD: inetd.c,v 1.46 1999/01/20 09:24:06 mycroft Exp $");
 #include <string.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <util.h>
 
 #include "pathnames.h"
 
@@ -273,6 +277,11 @@ int	options;
 int	timingout;
 struct	servent *sp;
 char	*curdom;
+#ifdef NI_WITHSCOPEID
+const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
+#else
+const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
+#endif
 
 #ifndef OPEN_MAX
 #define OPEN_MAX	64
@@ -280,7 +289,7 @@ char	*curdom;
 
 /* Reserve some descriptors, 3 stdio + at least: 1 log, 1 conf. file */
 #define FD_MARGIN	(8)
-typeof(((struct rlimit *)0)->rlim_cur)	rlim_ofile_cur = OPEN_MAX;
+rlim_t		rlim_ofile_cur = OPEN_MAX;
 
 #ifdef RLIMIT_NOFILE
 struct rlimit	rlim_ofile;
@@ -298,7 +307,7 @@ struct	servtab {
 	int	se_rpcversl;		/* rpc program lowest version */
 	int	se_rpcversh;		/* rpc program highest version */
 #define isrpcservice(sep)	((sep)->se_rpcversl != 0)
-	short	se_wait;		/* single threaded server */
+	pid_t	se_wait;		/* single threaded server */
 	short	se_checked;		/* looked at during merge */
 	char	*se_user;		/* user name to run as */
 	char	*se_group;		/* group name to run as */
@@ -369,13 +378,13 @@ char	       *sskip __P((char **));
 char	       *skip __P((char **));
 void		tcpmux __P((int, struct servtab *));
 void		usage __P((void));
-void		logpid __P((void));
 void		register_rpc __P((struct servtab *sep));
 void		unregister_rpc __P((struct servtab *sep));
 void		bump_nofile __P((void));
 void		inetd_setproctitle __P((char *, int));
 void		initring __P((void));
 long		machtime __P((void));
+int 		port_good_dg __P((struct sockaddr *sa));
 static int	getline __P((int, char *, int));
 int		main __P((int, char *[], char *[]));
 
@@ -412,23 +421,19 @@ struct biltin {
 	{ NULL }
 };
 
+/* list of "bad" ports. I.e. ports that are most obviously used for
+ * "cycling packets" denial of service attacks. See /etc/services.
+ * List must end with port number "0".
+ */
+
+u_int16_t bad_ports[] =  { 7, 9, 13, 19, 37, 0};
+
+
 #define NUMINT	(sizeof(intab) / sizeof(struct inent))
 char	*CONFIG = _PATH_INETDCONF;
 char	**Argv;
 char 	*LastArg;
 extern char	*__progname;
-
-#ifdef sun
-/*
- * Sun's RPC library caches the result of `dtablesize()'
- * This is incompatible with our "bumping" of file descriptors "on demand"
- */
-int
-_rpc_dtablesize()
-{
-	return rlim_ofile_cur;
-}
-#endif
 
 int
 main(argc, argv, envp)
@@ -477,7 +482,7 @@ main(argc, argv, envp)
 	if (debug == 0)
 		daemon(0, 0);
 	openlog(__progname, LOG_PID | LOG_NOWAIT, LOG_DAEMON);
-	logpid();
+	pidfile(NULL);
 
 #ifdef RLIMIT_NOFILE
 	if (getrlimit(RLIMIT_NOFILE, &rlim_ofile) < 0) {
@@ -925,6 +930,7 @@ config(signo)
 			}
 			sep->se_ctrladdr_size = res->ai_addrlen;
 			freeaddrinfo(res);
+#ifdef RPC
 			if (isrpcservice(sep)) {
 				struct rpcent *rp;
 
@@ -945,7 +951,9 @@ config(signo)
 					setup(sep);
 				if (sep->se_fd != -1)
 					register_rpc(sep);
-			} else {
+			} else
+#endif
+			{
 				if (sep->se_fd >= 0)
 					close_sep(sep);
 				if (sep->se_fd == -1 && !ISMUX(sep))
@@ -1028,7 +1036,6 @@ goaway(signo)
 		}
 		(void)close(sep->se_fd);
 	}
-	(void)unlink(_PATH_INETDPID);
 	exit(0);
 }
 
@@ -1145,12 +1152,12 @@ register_rpc(sep)
 {
 #ifdef RPC
 	int n;
+	struct netbuf nbuf;
 	struct sockaddr_storage ss;
-	struct sockaddr_in *sin = (struct sockaddr_in *)&ss;
-	struct protoent *pp;
+	struct netconfig *nconf;
 
-	if ((pp = getprotobyname(sep->se_proto+4)) == NULL) {
-		syslog(LOG_ERR, "%s: getproto: %m",
+	if ((nconf = getnetconfigent(sep->se_proto+4)) == NULL) {
+		syslog(LOG_ERR, "%s: getnetconfigent failed",
 		    sep->se_proto);
 		return;
 	}
@@ -1166,16 +1173,19 @@ register_rpc(sep)
 		return;
 	}
 
+	nbuf.buf = &ss;
+	nbuf.len = ss.ss_len;
+	nbuf.maxlen = sizeof (struct sockaddr_storage);
 	for (n = sep->se_rpcversl; n <= sep->se_rpcversh; n++) {
 		if (debug)
-			fprintf(stderr, "pmap_set: %u %u %u %u\n",
-			    sep->se_rpcprog, n, pp->p_proto,
-			    ntohs(sin->sin_port));
-		(void)pmap_unset(sep->se_rpcprog, n);
-		if (!pmap_set(sep->se_rpcprog, n, pp->p_proto, ntohs(sin->sin_port)))
-			syslog(LOG_ERR, "pmap_set: %u %u %u %u: %m",
-			    sep->se_rpcprog, n, pp->p_proto,
-			    ntohs(sin->sin_port));
+			fprintf(stderr, "rpcb_set: %u %d %s %s\n",
+			    sep->se_rpcprog, n, nconf->nc_netid,
+			    taddr2uaddr(nconf, &nbuf));
+		(void)rpcb_unset(sep->se_rpcprog, n, nconf);
+		if (!rpcb_set(sep->se_rpcprog, n, nconf, &nbuf))
+			syslog(LOG_ERR, "rpcb_set: %u %d %s %s%s",
+			    sep->se_rpcprog, n, nconf->nc_netid,
+			    taddr2uaddr(nconf, &nbuf), clnt_spcreateerror(""));
 	}
 #endif /* RPC */
 }
@@ -1186,14 +1196,21 @@ unregister_rpc(sep)
 {
 #ifdef RPC
 	int n;
+	struct netconfig *nconf;
+
+	if ((nconf = getnetconfigent(sep->se_proto+4)) == NULL) {
+		syslog(LOG_ERR, "%s: getnetconfigent failed",
+		    sep->se_proto);
+		return;
+	}
 
 	for (n = sep->se_rpcversl; n <= sep->se_rpcversh; n++) {
 		if (debug)
-			fprintf(stderr, "pmap_unset(%u, %u)\n",
-			    sep->se_rpcprog, n);
-		if (!pmap_unset(sep->se_rpcprog, n))
-			syslog(LOG_ERR, "pmap_unset(%u, %u)\n",
-			    sep->se_rpcprog, n);
+			fprintf(stderr, "rpcb_unset(%u, %d, %s)\n",
+			    sep->se_rpcprog, n, nconf->nc_netid);
+		if (!rpcb_unset(sep->se_rpcprog, n, nconf))
+			syslog(LOG_ERR, "rpcb_unset(%u, %d, %s) failed\n",
+			    sep->se_rpcprog, n, nconf->nc_netid);
 	}
 #endif /* RPC */
 }
@@ -1550,8 +1567,9 @@ do { \
 	arg = sskip(&cp);
 	{
 		char *cp;
-		cp = strchr(arg, '.');
-		if (cp) {
+		if ((cp = strchr(arg, ':')) == NULL)
+			cp = strchr(arg, '.');
+		if (cp != NULL) {
 			*cp++ = '\0';
 			sep->se_max = atoi(cp);
 		} else
@@ -1579,8 +1597,11 @@ do { \
 		}
 	}
 	sep->se_user = newstr(sskip(&cp));
-	if ((sep->se_group = strchr(sep->se_user, '.')))
+	if ((sep->se_group = strchr(sep->se_user, ':')) != NULL)
 		*sep->se_group++ = '\0';
+	else if ((sep->se_group = strchr(sep->se_user, '.')) != NULL)
+		*sep->se_group++ = '\0';
+
 	sep->se_server = newstr(sskip(&cp));
 	if (strcmp(sep->se_server, "internal") == 0) {
 		struct biltin *bi;
@@ -1758,8 +1779,7 @@ inetd_setproctitle(a, s)
 	size = sizeof(ss);
 	if (getpeername(s, (struct sockaddr *)&ss, &size) == 0) {
 		if (getnameinfo((struct sockaddr *)&ss, ss.ss_len,
-				hbuf, sizeof(hbuf), NULL, 0,
-				NI_NUMERICHOST) != 0)
+				hbuf, sizeof(hbuf), NULL, 0, niflags) != 0)
 			strcpy(hbuf, "?");
 		(void)snprintf(buf, sizeof buf, "-%s [%s]", a, hbuf);
 	} else
@@ -1768,17 +1788,6 @@ inetd_setproctitle(a, s)
 	cp += strlen(cp);
 	while (cp < LastArg)
 		*cp++ = ' ';
-}
-
-void
-logpid()
-{
-	FILE *fp;
-
-	if ((fp = fopen(_PATH_INETDPID, "w")) != NULL) {
-		fprintf(fp, "%u\n", getpid());
-		(void)fclose(fp);
-	}
 }
 
 void
@@ -1851,7 +1860,8 @@ echo_dg(s, sep)			/* Echo service -- echo data back */
 	size = sizeof(ss);
 	if ((i = recvfrom(s, buffer, sizeof(buffer), 0, sa, &size)) < 0)
 		return;
-	(void) sendto(s, buffer, i, 0, sa, size);
+	if (port_good_dg(sa))
+		(void) sendto(s, buffer, i, 0, sa, size);
 }
 
 /* ARGSUSED */
@@ -1950,6 +1960,9 @@ chargen_dg(s, sep)		/* Character generator */
 	if (recvfrom(s, text, sizeof(text), 0, sa, &size) < 0)
 		return;
 
+	if (!port_good_dg(sa))
+		return;
+
 	if ((len = endring - rs) >= LINESIZ)
 		memmove(text, rs, LINESIZ);
 	else {
@@ -2013,6 +2026,8 @@ machtime_dg(s, sep)
 	size = sizeof(ss);
 	if (recvfrom(s, (char *)&result, sizeof(result), 0, sa, &size) < 0)
 		return;
+	if (!port_good_dg(sa))
+		return;
 	result = machtime();
 	(void) sendto(s, (char *) &result, sizeof(result), 0, sa, size);
 }
@@ -2050,6 +2065,8 @@ daytime_dg(s, sep)		/* Return human-readable time of day */
 	sa = (struct sockaddr *)&ss;
 	size = sizeof(ss);
 	if (recvfrom(s, buffer, sizeof(buffer), 0, sa, &size) < 0)
+		return;
+	if (!port_good_dg(sa))
 		return;
 	len = snprintf(buffer, sizeof buffer, "%.24s\r\n", ctime(&clock));
 	(void) sendto(s, buffer, len, 0, sa, size);
@@ -2440,3 +2457,50 @@ int	ctrl;
 	return (result);
 }
 #endif
+
+/*
+ * check if the port where send data to is one of the obvious ports
+ * that are used for denial of service attacks like two echo ports
+ * just echoing data between them
+ */
+int
+port_good_dg(sa)
+	struct sockaddr *sa;
+{
+	u_int16_t port;
+	int i, bad;
+	char hbuf[NI_MAXHOST];
+
+	bad = 0;
+
+	switch (sa->sa_family) {
+	case AF_INET:
+		port = ntohs(((struct sockaddr_in *)sa)->sin_port);
+		break;
+#ifdef INET6
+	case AF_INET6:
+		port = ntohs(((struct sockaddr_in6 *)sa)->sin6_port);
+		break;
+#endif
+	default:
+		/* XXX unsupported af, is it safe to assume it to be safe? */
+		return 1;
+	}
+
+	for (i = 0; bad_ports[i] != 0; i++)
+		if (port == bad_ports[i]) {
+			bad = 1;
+			break;
+		}
+
+	if (bad) {
+		if (getnameinfo(sa, sa->sa_len, hbuf, sizeof(hbuf),
+				NULL, 0, niflags) != 0)
+			strcpy(hbuf, "?");
+		syslog(LOG_WARNING,"Possible DoS attack from %s, Port %d",
+			hbuf, port);
+		return (0);
+	} else
+		return (1);
+}
+
