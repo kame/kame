@@ -1,3 +1,4 @@
-$NetBSD: md5,v 1.2 1998/08/07 13:25:12 agc Exp $
+$NetBSD$
 
-MD5 (socks5-v1_0r2_tar.gz) = 939a70749080baca5763388b7123953f
+MD5 (socks5-v1.0r10.tar.gz) = 99d99a1723f793d7cb8e8043e72da9b1
+MD5 (socks64-v10r10-20000322.tgz) = 588a7577da96ef80cea947c846f4adeb
