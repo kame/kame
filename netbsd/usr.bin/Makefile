@@ -2,6 +2,6 @@
 
 SUBDIR+=ftp netstat rlogin rsh telnet vmstat finger tftp whois
 
-SUBDIR+=mcastread mcastsend mchat
+SUBDIR+=mcastread mcastsend mchat v6test
 
 .include <bsd.subdir.mk>
