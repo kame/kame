@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_output.c,v 1.13 2000/05/05 11:01:01 sumikawa Exp $	*/
+/*	$KAME: ipcomp_output.c,v 1.14 2000/05/19 05:13:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -403,7 +403,7 @@ ipcomp4_output(m, isr)
 		ipseclog((LOG_DEBUG, "ipcomp4_output: first mbuf too short\n"));
 		ipsecstat.out_inval++;
 		m_freem(m);
-		return NULL;
+		return 0;
 	}
 	ip = mtod(m, struct ip *);
 	/* XXX assumes that m->m_next points to payload */
@@ -423,7 +423,7 @@ ipcomp6_output(m, nexthdrp, md, isr)
 		ipseclog((LOG_DEBUG, "ipcomp6_output: first mbuf too short\n"));
 		ipsec6stat.out_inval++;
 		m_freem(m);
-		return NULL;
+		return 0;
 	}
 	return ipcomp_output(m, nexthdrp, md, isr, AF_INET6);
 }
