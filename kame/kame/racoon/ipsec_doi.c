@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.133 2001/04/06 14:23:47 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.134 2001/04/10 15:44:53 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -950,6 +950,7 @@ err:
 	return NULL;
 
 found:
+	flushsaprop(pr0);
 	plog(LLV_DEBUG, LOCATION, NULL, "matched\n");
 	iph2->approval = pr;
 
