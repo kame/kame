@@ -220,7 +220,7 @@ static struct addrinfo *get_ai __P((const struct addrinfo *,
 static int get_portmatch __P((const struct addrinfo *, const char *));
 static int get_port __P((struct addrinfo *, const char *, int));
 static const struct afd *find_afd __P((int));
-#ifdef AI_ADDRCONFIG
+#if 0
 static int addrconfig __P((const struct addrinfo *));
 #endif
 #ifdef INET6
@@ -581,10 +581,11 @@ explore_fqdn(pai, hostname, servname, res)
 
 	result = NULL;
 
-#ifdef AI_ADDRCONFIG
+#if 0
 	/*
 	 * If AI_ADDRCONFIG is specified, check if we are expected to
 	 * return the address family or not.
+	 * XXX does not handle PF_UNSPEC case, should filter final result
 	 */
 	if ((pai->ai_flags & AI_ADDRCONFIG) != 0 && !addrconfig(pai))
 		return 0;
@@ -989,7 +990,7 @@ find_afd(af)
 	return NULL;
 }
 
-#ifdef AI_ADDRCONFIG
+#if 0
 /*
  * post-2553: AI_ADDRCONFIG check.  if we use getipnodeby* as backend, backend
  * will take care of it.
