@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2208 2002/07/30 08:13:07 itojun Exp $
+$KAME: CHANGELOG,v 1.2209 2002/07/31 10:33:37 itojun Exp $
 
 <200207>
+Wed Jul 31 19:28:52 JST 2002  itojun@iijlab.net
+	* netbsd: use NetBSD 1.5.3 as base.  beware: NetBSD 1.5.3 is shipped
+	  with vulnerable openssl.
+
 Tue Jul 30 17:12:19 JST 2002  itojun@iijlab.net
 	* sys/netinet/sctp*: new sctp patch from randall.
 	* faithd.libevent: support PORT response without paren.
