@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.29 2001/10/29 02:36:16 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.30 2001/11/19 12:49:10 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -76,9 +76,10 @@ struct pcv					/* sizeof(): 32[byte]	*/
 #define	NATPT_TRACEROUTE	0x01
 #define	NATPT_NEEDFRAGMENT	0x02
 
-	int		 poff;		/* payload offset		*/
-	int		 plen;		/* payload length		*/
+	u_int16_t	 poff;		/* payload offset		*/
+	u_int16_t	 plen;		/* payload length		*/
 
+	struct ip6_frag	*fh;		/* Fragment header */
 	struct pcvaux	*aux;
 	struct mbuf	*m;
 	struct tSlot	*ats;
