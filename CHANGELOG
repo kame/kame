@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.6 1999/08/12 05:44:39 itojun Exp $
+$Id: CHANGELOG,v 1.7 1999/08/12 15:43:31 itojun Exp $
 
 <199908>
+Fri Aug 13 00:41:12 JST 1999  itojun@iijlab.net
+	* netbsd/usr.sbin/{tcpdmatch,tcpdchk}: made libwrap utilities
+	  IPv6 ready.
+
 Thu Aug 12 14:42:25 JST 1999  itojun@iijlab.net
 	* kame/kame/racoon: make idea.h optional.  now you can install SSLeay
 	  without idea, and build racoon (some users need this for patent
