@@ -1,3 +1,5 @@
+#	$KAME: prefix.sh,v 1.2 2001/02/04 03:22:16 jinmei Exp $
+
 #!/bin/sh
 
 iface=$1
