@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1918 2001/10/17 05:53:07 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1919 2001/10/18 05:29:41 keiichi Exp $
 
 <200110>
+Thu Oct 18 14:25:36 JST 2001 keiichi@iij.ad.jp
+	* kame/sys/netinet6/ip6_output.c
+	do not touch any extention headers during the mip6 processing
+	if IPV6_FORWARDING is set.
+
 2001-10-17 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_trans.c:
 	- Fix a bug to miscalculate when compute a checksum in IPv4 ->
