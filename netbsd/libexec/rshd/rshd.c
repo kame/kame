@@ -364,6 +364,7 @@ doit(fromp)
 		 * address corresponds to the name.
 		 */
 		hostname = saddr;
+		res0 = NULL;
 		if (check_all || local_domain(saddr)) {
 			strncpy(remotehost, saddr, sizeof(remotehost) - 1);
 			remotehost[sizeof(remotehost) - 1] = 0;
@@ -407,11 +408,12 @@ doit(fromp)
 					    "Host address mismatch for %s\n";
 					hostname = naddr;
 				}
-				freeaddrinfo(res0);
 			}
 		}
 		hostname = strncpy(hostnamebuf, hostname,
 		    sizeof(hostnamebuf) - 1);
+		if (res0)
+			freeaddrinfo(res0);
 	} else {
 		errorhost = hostname = strncpy(hostnamebuf,
 		    naddr, sizeof(hostnamebuf) - 1);

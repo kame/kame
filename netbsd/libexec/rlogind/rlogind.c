@@ -299,6 +299,7 @@ doit(f, fromp)
 		 * address corresponds to the name.
 		 */
 		hostname = saddr;
+		res0 = NULL;
 		if (check_all || local_domain(saddr)) {
 			strncpy(hostnamebuf, saddr, sizeof(hostnamebuf) - 1);
 			hostnamebuf[sizeof(hostnamebuf) - 1] = 0;
@@ -337,11 +338,12 @@ doit(f, fromp)
 						    : saddr);
 					hostname = naddr;
 				}
-				freeaddrinfo(res0);
 			}
 		}
 		hostname = strncpy(hostnamebuf, hostname,
 				   sizeof(hostnamebuf) - 1);
+		if (res0)
+			freeaddrinfo(res0);
 	} else
 		hostname = strncpy(hostnamebuf, naddr,
 				   sizeof(hostnamebuf) - 1);
