@@ -2184,6 +2184,36 @@ sockaddr_ntop(sa)
     return (char *)inet_ntop(sa->sa_family, addr, addrbuf, sizeof(addrbuf));
 }
 
+#if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
+static int
+setpolicy(net, res, policy)
+	int net;
+	struct addrinfo *res;
+	char *policy;
+{
+	char *buf;
+	int level;
+	int optname;
+
+	if (policy == NULL)
+		return 0;
+
+	buf = ipsec_set_policy(policy, strlen(policy));
+	if (buf == NULL) {
+		printf("%s\n", ipsec_strerror());
+		return -1;
+	}
+	level = res->ai_family == AF_INET ? IPPROTO_IP : IPPROTO_IPV6;
+	optname = res->ai_family == AF_INET ? IP_IPSEC_POLICY : IPV6_IPSEC_POLICY;
+	if (setsockopt(net, level, optname, buf, ipsec_get_policylen(buf)) < 0){
+		perror("setsockopt");
+		return -1;
+	}
+
+	free(buf);
+}
+#endif
+
     int
 tn(argc, argv)
     int argc;
@@ -2324,44 +2354,12 @@ tn(argc, argv)
 	    if (srp && setsockopt(net, proto, opt, srp, srlen) < 0)
 		perror("setsockopt (source route)");
 	}
-#if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
-    {
-	int len;
-	char *buf;
-	int level;
-	int optname;
 
-	if (ipsec_policy_in) {
-		if ((buf = ipsec_set_policy(ipsec_policy_in,
-				strlen(ipsec_policy_in))) == NULL) {
-			printf("%s\n", ipsec_strerror());
-			return 0;
-		}
-		len = ipsec_get_policylen(buf);
-		level = res->ai_family == AF_INET ? IPPROTO_IP : IPPROTO_IPV6;
-		optname = res->ai_family == AF_INET ? IP_IPSEC_POLICY : IPV6_IPSEC_POLICY;
-		if (setsockopt(net, level, optname, buf, len) < 0){
-			perror("setsockopt");
-			return 0;
-		}
-		free(buf);
-	}
-    	if (ipsec_policy_out) {
-		if ((buf = ipsec_set_policy(ipsec_policy_out,
-				strlen(ipsec_policy_out))) == NULL) {
-			printf("%s\n", ipsec_strerror());
-			return 0;
-		}
-		len = ipsec_get_policylen(buf);
-		level = res->ai_family == AF_INET ? IPPROTO_IP : IPPROTO_IPV6;
-		optname = res->ai_family == AF_INET ? IP_IPSEC_POLICY : IPV6_IPSEC_POLICY;
-		if (setsockopt(net, level, optname, buf, len) < 0){
-			perror("setsockopt");
-			return 0;
-		}
-		free(buf);
-	}
-    }
+#if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
+        if (setpolicy(net, res, ipsec_policy_in) < 0)
+                return 0;
+        if (setpolicy(net, res, ipsec_policy_out) < 0)
+                return 0;
 #endif
 
 	if (connect(net, res->ai_addr, res->ai_addrlen) < 0) {
