@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.17 2000/03/11 09:36:53 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.18 2000/03/11 13:05:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -103,12 +103,22 @@ static int mask_match __P((const struct encaptab *, const struct sockaddr *,
 		const struct sockaddr *));
 static void encap_fillarg __P((struct mbuf *, const struct encaptab *));
 
+/* rely upon BSS initialization */
 LIST_HEAD(, encaptab) encaptab;
 
 void
 encap_init()
 {
+#if 0
+	/*
+	 * we cannot use LIST_INIT() here, since drivers may want to call
+	 * encap_attach(), on driver attach.  encap_init() wlil be called
+	 * on AF_INET{,6} initialization, which happens after driver
+	 * initialization - using LIST_INIT() here can nuke encap_attach()
+	 * from drivers.
+	 */
 	LIST_INIT(&encaptab);
+#endif
 }
 
 void
