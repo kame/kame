@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.43 2000/03/07 20:22:47 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.44 2000/03/09 00:30:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -380,7 +380,7 @@ nd6_options(ndopts)
 			 * Unknown options must be silently ignored,
 			 * to accomodate future extension to the protocol.
 			 */
-			log(LOG_INFO,
+			log(LOG_DEBUG,
 			    "nd6_options: unsupported option %d - "
 			    "option ignored\n", nd_opt->nd_opt_type);
 		}
