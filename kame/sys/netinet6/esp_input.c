@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.67 2002/06/09 14:43:57 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.68 2002/07/17 23:49:16 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -933,10 +933,10 @@ noreplaycheck:
 				m_freem(m);
 			} else {
 				m_copydata(m, 0, maxlen, mtod(n, caddr_t));
-				m_adj(m, maxlen);
 				n->m_len = maxlen;
 				n->m_pkthdr.len = m->m_pkthdr.len;
 				n->m_next = m;
+				m_adj(m, maxlen);
 				m->m_flags &= ~M_PKTHDR;
 			}
 			m = n;
