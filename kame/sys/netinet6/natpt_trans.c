@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.62 2001/12/03 11:55:24 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.63 2001/12/03 12:59:30 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -262,6 +262,8 @@ natpt_translateICMPv6To4(struct pcv *cv6, struct pAddr *pad)
 	struct mbuf	*m4;
 	struct ip	*ip4;
 	struct ip6_hdr	*ip6 = mtod(cv6->m, struct ip6_hdr *);
+	struct icmp	 *icmp4;
+	struct icmp6_hdr *icmp6;
 
 	caddr_t		 icmp6end = (caddr_t)ip6 + cv6->m->m_pkthdr.len;
 	int		 icmp6len = icmp6end - (caddr_t)cv6->pyld.icmp6;
@@ -313,6 +315,11 @@ natpt_translateICMPv6To4(struct pcv *cv6, struct pAddr *pad)
 		m_freem(m4);		/* Silently drop.			*/
 		return (NULL);
 	}
+
+	icmp4 = cv4.pyld.icmp4;
+	icmp6 = cv6->pyld.icmp6;
+	icmp4->icmp_id	= icmp6->icmp6_id;
+	icmp4->icmp_seq	= icmp6->icmp6_seq;
 
 	if ((cv6->fh != NULL)
 	    && (cv6->pyld.icmp6->icmp6_type != ICMP6_DST_UNREACH)
@@ -371,8 +378,6 @@ natpt_icmp6DstUnreach(struct pcv *cv6, struct pcv *cv4)
 
 	icmp4->icmp_type = ICMP_UNREACH;
 	icmp4->icmp_code = 0;
-	icmp4->icmp_id	 = icmp6->icmp6_id;
-	icmp4->icmp_seq	 = icmp6->icmp6_seq;
 
 	switch (icmp6->icmp6_code) {
 	case ICMP6_DST_UNREACH_NOROUTE:
@@ -402,12 +407,9 @@ void
 natpt_icmp6PacketTooBig(struct pcv *cv6, struct pcv *cv4)
 {
 	struct icmp		*icmp4 = cv4->pyld.icmp4;
-	struct icmp6_hdr	*icmp6 = cv6->pyld.icmp6;
 
 	icmp4->icmp_type = ICMP_UNREACH;
 	icmp4->icmp_code = ICMP_UNREACH_NEEDFRAG;		/* do more	*/
-	icmp4->icmp_id	 = icmp6->icmp6_id;
-	icmp4->icmp_seq	 = icmp6->icmp6_seq;
 }
 
 
@@ -419,8 +421,6 @@ natpt_icmp6TimeExceed(struct pcv *cv6, struct pcv *cv4)
 
 	icmp4->icmp_type = ICMP_TIMXCEED;
 	icmp4->icmp_code = icmp6->icmp6_code;		/* code unchanged.	*/
-	icmp4->icmp_id	 = icmp6->icmp6_id;
-	icmp4->icmp_seq	 = icmp6->icmp6_seq;
 }
 
 
@@ -432,8 +432,6 @@ natpt_icmp6ParamProb(struct pcv *cv6, struct pcv *cv4)
 
 	icmp4->icmp_type = ICMP_PARAMPROB;			/* do more	*/
 	icmp4->icmp_code = 0;
-	icmp4->icmp_id	 = icmp6->icmp6_id;
-	icmp4->icmp_seq	 = icmp6->icmp6_seq;
 
 	if (icmp6->icmp6_code == ICMP6_PARAMPROB_NEXTHEADER) {
 		icmp4->icmp_type = ICMP_UNREACH;
@@ -446,12 +444,9 @@ void
 natpt_icmp6EchoRequest(struct pcv *cv6, struct pcv *cv4)
 {
 	struct icmp		*icmp4 = cv4->pyld.icmp4;
-	struct icmp6_hdr	*icmp6 = cv6->pyld.icmp6;
 
 	icmp4->icmp_type = ICMP_ECHO;
 	icmp4->icmp_code = 0;
-	icmp4->icmp_id	 = icmp6->icmp6_id;
-	icmp4->icmp_seq	 = icmp6->icmp6_seq;
 
 	{
 		int		 dlen;
@@ -475,12 +470,9 @@ void
 natpt_icmp6EchoReply(struct pcv *cv6, struct pcv *cv4)
 {
 	struct icmp		*icmp4 = cv4->pyld.icmp4;
-	struct icmp6_hdr	*icmp6 = cv6->pyld.icmp6;
 
 	icmp4->icmp_type = ICMP_ECHOREPLY;
 	icmp4->icmp_code = 0;
-	icmp4->icmp_id	 = icmp6->icmp6_id;
-	icmp4->icmp_seq	 = icmp6->icmp6_seq;
 
 	{
 		int		 dlen;
@@ -818,6 +810,7 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 	struct mbuf		*m6;
 	struct ip		*ip4 = mtod(cv4->m, struct ip *);
 	struct ip6_hdr		*ip6;
+	struct icmp		*icmp4;
 	struct icmp6_hdr	*icmp6;
 	caddr_t			 icmp4end;
 	int			 icmp4len;
@@ -885,7 +878,11 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 		return (NULL);
 	}
 
-	icmp6 = cv6.pyld.icmp6;;
+	icmp4 = cv4->pyld.icmp4;
+	icmp6 = cv6.pyld.icmp6;
+	icmp6->icmp6_id	 = icmp4->icmp_id;
+	icmp6->icmp6_seq = icmp4->icmp_seq;
+
 	icmp6->icmp6_cksum = 0;
 	icmp6->icmp6_cksum = in6_cksum(cv6.m, IPPROTO_ICMPV6,
 				       sizeof(struct ip6_hdr), ntohs(ip6->ip6_plen));
@@ -897,13 +894,10 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 void
 natpt_icmp4EchoReply(struct pcv *cv4, struct pcv *cv6)
 {
-	struct icmp		*icmp4 = cv4->pyld.icmp4;
 	struct icmp6_hdr	*icmp6 = cv6->pyld.icmp6;
 
 	icmp6->icmp6_type = ICMP6_ECHO_REPLY;
 	icmp6->icmp6_code = 0;
-	icmp6->icmp6_id	  = icmp4->icmp_id;
-	icmp6->icmp6_seq  = icmp4->icmp_seq;
 
 	{
 		int		 dlen;
@@ -934,8 +928,6 @@ natpt_icmp4Unreach(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 
 	icmp6->icmp6_type = ICMP6_DST_UNREACH;
 	icmp6->icmp6_code = 0;
-	icmp6->icmp6_id	  = icmp4->icmp_id;
-	icmp6->icmp6_seq  = icmp4->icmp_seq;
 
 	switch (icmp4->icmp_code) {
 	case ICMP_UNREACH_NET:
@@ -989,13 +981,10 @@ natpt_icmp4Unreach(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 void
 natpt_icmp4Echo(struct pcv *cv4, struct pcv *cv6)
 {
-	struct icmp		*icmp4 = cv4->pyld.icmp4;
 	struct icmp6_hdr	*icmp6 = cv6->pyld.icmp6;
 
 	icmp6->icmp6_type = ICMP6_ECHO_REQUEST;
 	icmp6->icmp6_code = 0;
-	icmp6->icmp6_id	  = icmp4->icmp_id;
-	icmp6->icmp6_seq  = icmp4->icmp_seq;
 
 	{
 		int		 dlen;
@@ -1021,26 +1010,20 @@ natpt_icmp4Echo(struct pcv *cv4, struct pcv *cv6)
 void
 natpt_icmp4Timxceed(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 {
-	struct icmp		*icmp4 = cv4->pyld.icmp4;
 	struct icmp6_hdr	*icmp6 = cv6->pyld.icmp6;
 
 	icmp6->icmp6_type = ICMP6_TIME_EXCEEDED;
 	icmp6->icmp6_code = 0;
-	icmp6->icmp6_id	  = icmp4->icmp_id;
-	icmp6->icmp6_seq  = icmp4->icmp_seq;
 }
 
 
 void
 natpt_icmp4Paramprob(struct pcv *cv4, struct pcv *cv6)
 {
-	struct icmp		*icmp4 = cv4->pyld.icmp4;
 	struct icmp6_hdr	*icmp6 = cv6->pyld.icmp6;
 
 	icmp6->icmp6_type = ICMP6_PARAM_PROB;
 	icmp6->icmp6_code = 0;
-	icmp6->icmp6_id	  = icmp4->icmp_id;
-	icmp6->icmp6_seq  = icmp4->icmp_seq;
 }
 
 
