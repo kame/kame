@@ -15,7 +15,7 @@ PATCH_DIST_STRIP=	-p1
 MAINTAINER=		ichiro@ichiro.org
 
 DEPENDS+=               tk-8.0.5:../../x11/tk80
-DEPENDS+=		gsm-1.0.10:${PKGSRCDIR}/audio/gsm
+#DEPENDS+=		gsm-1.0.10:${PKGSRCDIR}/audio/gsm
 
 NOT_FOR_PLATFORM=	*-*-alpha	# filter.cc compiler error
 
