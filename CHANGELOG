@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1210 2000/08/18 02:35:59 itojun Exp $
+$KAME: CHANGELOG,v 1.1211 2000/08/18 05:28:20 suz Exp $
 
 <200008>
+Fri Aug 18 14:22:15 JST 2000	suz@sdl.hitachi.co.jp
+	* kame/sys/netinet6/in6.c: always assign prefixlen 128
+	  for non-linklocal prefix of P2P and loopback I/F.
+	  This feature is enabled only when you define 
+	  "USE_FIXED_P2P_PLEN" macro.
+	
 Fri Aug 18 11:34:01 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/zebra: upgrade to 0.88.
 

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.104 2000/08/14 19:22:46 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.105 2000/08/18 05:28:19 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -877,6 +877,22 @@ in6_update_ifa(ifp, ifra, ia)
 		plen = in6_mask2len(&ifra->ifra_prefixmask.sin6_addr);
 	else
 		plen = in6_mask2len(&ia->ia_prefixmask.sin6_addr);
+
+#ifdef USE_FIXED_P2P_PLEN
+	/*
+	 * Prefix length of P2P I/F non-linklocal prefix should be 
+	 * 128 to prevent unnecessary ND query. 
+	 * So it is overwritten regardless of the given prefixlen.
+	 */
+	if (ifp->if_flags & (IFF_POINTOPOINT | IFF_LOOPBACK) && 
+	    !IN6_IS_ADDR_LINKLOCAL(&ia->ia_addr.sin6_addr)) {
+		if (ifra->ifra_prefixmask.sin6_len)
+			ifra->ifra_prefixmask.sin6_addr = in6mask128;
+		else
+			ia->ia_prefixmask.sin6_addr = in6mask128;
+		plen = 128;
+	}
+#endif
 
 	/* set prefix mask */
 	if (ifra->ifra_prefixmask.sin6_len) {
