@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.42 2004/06/10 07:28:29 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.43 2004/06/10 09:43:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -643,15 +643,42 @@ configure_keys(keylist)
 			    "secret not specified for key %s", key->name);
 			goto bad;
 		}
+		kinfo->expire = 0;
 		if (expire != NULL) {
-			if (strcmp(expire, "forever") != 0) { /* XXX */
-				dprintf(LOG_ERR, FNAME,
-				    "unsupported expiration (%s) time "
-				    "for key %s", expire, key->name); 
-				goto bad;
+			if (strcmp(expire, "forever") != 0) {
+				time_t now, expire_time;
+				struct tm *lt;
+
+				if (time(&now) == -1) {
+					dprintf(LOG_ERR, FNAME, "cannot get "
+					    "current time: %s",
+					    strerror(errno));
+					goto bad;
+				}
+				lt = localtime(&now);
+				lt->tm_sec = 0;
+				
+				if (strptime(expire, "%Y-%m-%d %H:%M", lt)
+				    == NULL &&
+				    strptime(expire, "%m-%d %H:%M", lt)
+				    == NULL &&
+				    strptime(expire, "%H:%M", lt) == NULL) {
+					dprintf(LOG_ERR, FNAME, "invalid "
+					    "expiration time: %s");
+					goto bad;
+				}
+
+				expire_time = mktime(lt);
+				if (expire_time < now) {
+					dprintf(LOG_ERR, FNAME, "past "
+					    "expiration time specified: %s",
+					    expire);
+					goto bad;
+				}
+
+				kinfo->expire = expire_time;
 			}
 		}
-		kinfo->expire = 0; /* never expire */
 	}
 
 	return (0);

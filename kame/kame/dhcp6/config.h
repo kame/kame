@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.30 2004/06/10 07:28:29 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.31 2004/06/10 09:43:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -224,7 +224,7 @@ struct keyinfo {
 	u_int32_t keyid;	/* key ID */
 	char *secret;		/* binary key */
 	size_t secretlen;	/* length of the key */
-	u_int32_t expire;	/* expiration time (0 means forever) */
+	time_t expire;		/* expiration time (0 means forever) */
 };
 
 /* structures and definitions used in the config file parser */

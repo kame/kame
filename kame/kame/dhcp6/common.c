@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.106 2004/06/10 07:28:28 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.107 2004/06/10 09:43:21 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -2611,10 +2611,21 @@ int
 dhcp6_validate_key(key)
 	struct keyinfo *key;
 {
+	time_t now;
+
 	if (key->expire == 0)	/* never expire */
 		return (0);
 
-	return (-1);
+	if (time(&now) == -1) {
+		dprintf(LOG_ERR, FNAME, "cannot get current time: %s",
+		    strerror(errno));
+		return (-1);	/* treat it as expiration (XXX) */
+	}
+
+	if (now > key->expire)
+		return (-1);
+
+	return (0);
 }
 
 char *
