@@ -1,12 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.327 1999/12/09 16:47:36 jinmei Exp $
+$Id: CHANGELOG,v 1.328 1999/12/10 00:38:33 jinmei Exp $
 
 <199912>
 1999-12-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ndp/ndp.c: a new option '-I interface' was added to
-	specify the default interface used for a default when there is no
-	router.
+	specify the default interface used for a default route when there
+	is no router.
 
 1999-12-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_rtr.c (defrouter_addifreq): was added
