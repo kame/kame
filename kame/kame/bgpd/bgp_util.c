@@ -1164,19 +1164,47 @@ char *
 bgp_peerstr(bnp)
 	struct rpcb *bnp;
 {
-	if (IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_addr.sin6_addr))
-		return(ip6str(&bnp->rp_addr.sin6_addr,
-			      bnp->rp_addr.sin6_scope_id));
+	char *cp;
+	struct rpcb *abnp;
+
+	if (IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_addr.sin6_addr)) {
+		cp = ip6str(&bnp->rp_addr.sin6_addr,
+			    bnp->rp_addr.sin6_scope_id);
+	}
 	else if (!IN6_IS_ADDR_UNSPECIFIED(&bnp->rp_gaddr))
-		return(ip6str(&bnp->rp_gaddr, 0));
+		cp = ip6str(&bnp->rp_gaddr, 0);
 	else {
 		unsigned int ifindex = 0;
 
 		if (bnp->rp_ife && bnp->rp_ife->ifi_ifn)
 			ifindex = bnp->rp_ife->ifi_ifn->if_index;
 
-		return(ip6str(&bnp->rp_laddr, ifindex));
+		cp = ip6str(&bnp->rp_laddr, ifindex);
 	}
+
+	if (cp == NULL)		/* XXX */
+		return(NULL);
+
+	if ((bnp->rp_mode & BGPO_PASSIVE) == 0)
+		abnp = bnp;
+	else {
+		if ((abnp = find_apeer_by_addr(&bnp->rp_gaddr)) == NULL)
+			abnp = find_apeer_by_addr(&bnp->rp_laddr);
+	}
+
+	if (abnp && abnp->rp_descr) {
+		int cplen = strlen(cp), space = MAXHOSTNAMELEN - cplen;
+		int desclen = strlen(abnp->rp_descr);
+
+		/* "3" is size of a pair of parenthesizes and terminator(\0) */
+		if (space >= desclen + 3) {
+			/* copy the description for the peer */
+			cp[cplen] = '(';
+			strcpy(&cp[cplen + 1], abnp->rp_descr);
+			strcpy(&cp[cplen + 1 + desclen], ")");
+		}
+	}
+	return(cp);
 }
 
 struct bgpcblist *

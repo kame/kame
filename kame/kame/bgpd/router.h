@@ -37,6 +37,7 @@ struct rpcb {
   struct  sockaddr_in6 rp_addr;     /* socket address/port                 */
   struct  in6_addr     rp_gaddr;    /* rtr's global address     (if known) */
   struct  in6_addr     rp_laddr;    /* rtr's link-local address (if known) */
+  char		      *rp_descr;    /* description of the peer */
   u_int32_t            rp_id;       /* Router ID, that the router told me  */
   u_int16_t            rp_as;       /* Autonomous System number            */
   u_int32_t	       rp_ebgp_as_prepends;/* # of iteration of prepended AS */

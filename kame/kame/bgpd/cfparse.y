@@ -1298,6 +1298,7 @@ bgp_config()
 				break;
 			case BGPPA_DESCR:
 				cprint("descr=%s ", attr->attru.str);
+				bnp->rp_descr = strdup(attr->attru.str);
 				break;
 			default:
 				cprint("unknown_attribute(%d) ", attr->code);
@@ -1499,7 +1500,7 @@ export_config()
 		for (bnp = bgb; bnp; ) { /* XXX: odd loop... */
 			if (bnp->rp_as == peeras) {
 				cprint(" peer as: %d (addr: %s) ",
-				       peeras, ip6str2(&bnp->rp_addr));
+				       peeras, bgp_peerstr(bnp));
 				if (add_protoexportlist(info, bnp))
 					return(-1);
 				cprint("\n");
@@ -1541,8 +1542,8 @@ add_protoaggr(attr, aggregated, ptype, pdata)
 		if (find_rtp(rtp, aggregated->rt_aggr.ag_rtp)) {
 			warnx("%s line %d: aggregation doubly defined: %s/%d",
 			      configfilename, attr->line,
-			      ip6str(&aggregated->rt_ripinfo.rip6_dest,
-				     aggregated->rt_ripinfo.rip6_plen));
+			      ip6str(&aggregated->rt_ripinfo.rip6_dest, 0),
+			      aggregated->rt_ripinfo.rip6_plen);
 			goto bad;
 		}
 		insque(rtp, aggregated->rt_aggr.ag_rtp);
@@ -1574,8 +1575,7 @@ aggr_proto_config(attr, aggregated)
 
 	switch(proto->type) {
 	case RTP_IFACE:
-		cprint("   interface_route(%s) ",
-		       proto->rtpu.ifname);
+		cprint("   interface_route(%s) ", proto->rtpu.ifname);
 
 		if ((ifp = find_if_by_name(proto->rtpu.ifname)) == NULL) {
 			warnx("%s line %d: invalid interface name: %s",
@@ -1623,10 +1623,12 @@ aggr_proto_config(attr, aggregated)
 		}
 
 		for (bnp = bgb; bnp; ) { /* XXX: odd loop... */
-			if (bnp->rp_as == peeras)
+			if (bnp->rp_as == peeras) {
+				cprint("\n    peer=%s", bgp_peerstr(bnp));
 				if (add_protoaggr(attr, aggregated,
 						  RTPROTO_BGP, (void *)bnp))
 					return(-1);
+			}
 
 			if ((bnp = bnp->rp_next) == bgb)
 				break;
