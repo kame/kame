@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.117 2004/08/22 02:11:18 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.118 2004/09/07 09:20:28 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -2643,9 +2643,13 @@ get_rdvalue(rdm, rdvalue, rdsize)
 	void *rdvalue;
 	size_t rdsize;
 {
+#if defined(HAVE_CLOCK_GETTIME)
 	struct timespec tp;
-	u_int32_t u32, l32;
 	double nsec;
+#else
+	struct timeval tv;
+#endif
+	u_int32_t u32, l32;
 
 	if (rdm != DHCP6_AUTHRDM_MONOCOUNTER) {
 		dprintf(LOG_INFO, FNAME, "unsupported RDM (%d)", rdm);
@@ -2656,6 +2660,7 @@ get_rdvalue(rdm, rdvalue, rdsize)
 		return (-1);
 	}
 
+#if defined(HAVE_CLOCK_GETTIME)
 	if (clock_gettime(CLOCK_REALTIME, &tp)) {
 		dprintf(LOG_WARNING, FNAME, "clock_gettime failed: %s",
 		    strerror(errno));
@@ -2668,6 +2673,16 @@ get_rdvalue(rdm, rdvalue, rdsize)
 	nsec = (double)tp.tv_nsec / 1e9 * 0x100000000ULL;
 	/* nsec should be smaller than 2^32 */
 	l32 = (u_int32_t)nsec;
+#else
+
+	if (gettimeofday(&tv, NULL) != 0) {
+		dprintf(LOG_WARNING, FNAME, "gettimeofday failed: %s",
+		    strerror(errno));
+		return (-1);
+	}
+	u32 = (u_int32_t)tv.tv_sec;
+	l32 = (u_int32_t)tv.tv_usec;
+#endif /* HAVE_CLOCK_GETTIME */
 
 	u32 = htonl(u32);
 	l32 = htonl(l32);
