@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_soctl.h,v 1.2 1999/12/25 02:35:31 fujisawa Exp $
+ *	$Id: natpt_soctl.h,v 1.3 2000/01/02 19:21:40 itojun Exp $
  */
 
 /* cmd for use with ioctl at the socket						*/
@@ -40,10 +40,10 @@
 #define	SIOCENBTRANS	_IOW ('n',   2, struct msgBox)	/* Enable  translation	*/
 #define SIOCDSBTRANS	_IOW ('n',   3, struct msgBox)	/* Disable translation	*/
 #define	SIOCSETRULE	_IOW ('n',   4, struct msgBox)	/* Set rule		*/
-#define	SIOCGETRULE	_IORW('n',   5, struct msgBox)	/* Get rule		*/
+#define	SIOCGETRULE	_IOWR('n',   5, struct msgBox)	/* Get rule		*/
 #define SIOCFLUSHRULE	_IOW ('n',   6, struct msgBox)	/* Flush rule		*/
 #define	SIOCSETPREFIX	_IOW ('n',   8, struct msgBox)	/* Set prefix		*/
-#define	SIOCGETPREFIX	_IORW('n',   9, struct msgBox)	/* Get prefix		*/
+#define	SIOCGETPREFIX	_IOWR('n',   9, struct msgBox)	/* Get prefix		*/
 #define	SIOCSETVALUE	_IOW ('n',  10, struct msgBox)	/* Set value		*/
 #define	SIOCGETVALUE	_IOW ('n',  11, struct msgBox)	/* Get value		*/
 
