@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.77 2004/01/03 01:35:13 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.78 2004/01/03 06:14:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -111,9 +111,6 @@ static int mobile_node = 0;
 #ifndef SMALL
 static int do_dump;
 static char *dumpfilename = "/var/run/rtsold.dump"; /* XXX: should be configurable */
-#endif
-#if 0
-static char *pidfilename = "/var/run/rtsold.pid"; /* should be configurable */
 #endif
 
 #if 0
@@ -311,23 +308,6 @@ main(int argc, char **argv)
 		exit(1);
 		/*NOTREACHED*/
 	}
-
-#if 0
-	/* dump the current pid */
-	if (!once) {
-		pid_t pid = getpid();
-		FILE *fp;
-
-		if ((fp = fopen(pidfilename, "w")) == NULL)
-			warnmsg(LOG_ERR, __func__,
-			    "failed to open a pid log file(%s): %s",
-			    pidfilename, strerror(errno));
-		else {
-			fprintf(fp, "%d\n", pid);
-			fclose(fp);
-		}
-	}
-#endif
 
 #if 0
 	/* revoke privilege */
