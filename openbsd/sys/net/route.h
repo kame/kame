@@ -240,6 +240,10 @@ struct rt_msghdr {
 struct rt_addrinfo {
 	int	rti_addrs;
 	struct	sockaddr *rti_info[RTAX_MAX];
+	int	rti_flags;
+	struct	ifaddr *rti_ifa;
+	struct	ifnet *rti_ifp;
+	struct	rt_msghdr *rti_rtm;
 };
 
 struct route_cb {
@@ -324,6 +328,7 @@ void	 rtalloc_noclone __P((struct route *, int));
 struct rtentry *
 	 rtalloc2 __P((struct sockaddr *, int, int));
 void	 rtfree __P((struct rtentry *));
+int	 rt_getifa __P((struct rt_addrinfo *));
 int	 rtinit __P((struct ifaddr *, int, int));
 int	 rtioctl __P((u_long, caddr_t, struct proc *));
 void	 rtredirect __P((struct sockaddr *, struct sockaddr *,
@@ -332,6 +337,7 @@ void	 rtredirect __P((struct sockaddr *, struct sockaddr *,
 int	 rtrequest __P((int, struct sockaddr *,
 			struct sockaddr *, struct sockaddr *, int,
 			struct rtentry **));
+int	 rtrequest1 __P((int, struct rt_addrinfo *, struct rtentry **));
 void	 ipv4_tunnelsetup __P((struct rtentry *));
 
 #ifdef MIP6
