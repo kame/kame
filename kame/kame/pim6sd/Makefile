@@ -58,7 +58,7 @@
 # Questions concerning this software should be directed to 
 # Kurt Windisch (kurtw@antc.uoregon.edu)
 #
-# $Id: Makefile,v 1.5 1999/10/29 09:04:52 jinmei Exp $
+# $Id: Makefile,v 1.6 1999/10/29 09:33:04 jinmei Exp $
 #
 #
 #Part of this program has been derived from PIM sparse-mode pimd.
@@ -80,7 +80,7 @@
 
 BINDIR=	$(PREFIX)/sbin
 PROG=	pim6sd
-CFLAGS+=-DHAVE_STDARG_H -DYIPS_DEBUG
+CFLAGS+=-DHAVE_STDARG_H
 LDADD+=-ly -ll
 SRCS=	mld6.c mld6_proto.c\
 	inet6.c kern.c main.c config.c debug.c routesock.c vers.c callout.c\
