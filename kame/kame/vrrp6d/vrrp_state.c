@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: vrrp_state.c,v 1.1 2002/07/09 07:19:20 ono Exp $
+ * $Id: vrrp_state.c,v 1.1.1.1 2002/07/09 07:19:20 ono Exp $
  */
 
 #include "vrrp_state.h"

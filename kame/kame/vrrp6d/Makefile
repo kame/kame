@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.1 2002/07/09 07:19:20 ono Exp $
+# $Id: Makefile,v 1.1.1.1 2002/07/09 07:19:20 ono Exp $
 
 PROG=		freevrrpd
 SRCS=		vrrp_misc.c vrrp_multicast.c vrrp_main.c vrrp_thread.c vrrp_state.c vrrp_network.c vrrp_interface.c vrrp_conf.c vrrp_signal.c # vrrp_list.c
