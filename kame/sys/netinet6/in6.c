@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.232 2001/09/17 15:00:18 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.233 2001/09/21 09:58:36 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -716,6 +716,40 @@ in6_control(so, cmd, data, ifp)
 
 	case SIOCGIFALIFETIME_IN6:
 		ifr->ifr_ifru.ifru_lifetime = ia->ia6_lifetime;
+		if (ia->ia6_lifetime.ia6t_vltime != ND6_INFINITE_LIFETIME) {
+			time_t maxexpire;
+			struct in6_addrlifetime *retlt = &ifr->ifr_ifru.ifru_lifetime;
+
+			/*
+			 * XXX: adjust expiration time assuming time_t is
+			 * signed.
+			 */
+			maxexpire = (-1) &
+				~(1 << ((sizeof(maxexpire) * 8) - 1));
+			if (ia->ia6_lifetime.ia6t_vltime < 
+			    maxexpire - ia->ia6_updatetime) {
+				retlt->ia6t_expire = ia->ia6_updatetime +
+					ia->ia6_lifetime.ia6t_vltime;
+			} else
+				retlt->ia6t_expire = maxexpire;
+		}
+		if (ia->ia6_lifetime.ia6t_pltime != ND6_INFINITE_LIFETIME) {
+			time_t maxexpire;
+			struct in6_addrlifetime *retlt = &ifr->ifr_ifru.ifru_lifetime;
+
+			/*
+			 * XXX: adjust expiration time assuming time_t is
+			 * signed.
+			 */
+			maxexpire = (-1) &
+				~(1 << ((sizeof(maxexpire) * 8) - 1));
+			if (ia->ia6_lifetime.ia6t_pltime < 
+			    maxexpire - ia->ia6_updatetime) {
+				retlt->ia6t_preferred = ia->ia6_updatetime +
+					ia->ia6_lifetime.ia6t_pltime;
+			} else
+				retlt->ia6t_preferred = maxexpire;
+		}
 		break;
 
 	case SIOCSIFALIFETIME_IN6:
@@ -1012,10 +1046,8 @@ in6_update_ifa(ifp, ifra, ia)
 	}
 	/* lifetime consistency check */
 	lt = &ifra->ifra_lifetime;
-	if (lt->ia6t_vltime != ND6_INFINITE_LIFETIME
-	    && lt->ia6t_vltime + time_second < time_second) {
-		return EINVAL;
-	}
+	if (lt->ia6t_pltime > lt->ia6t_vltime)
+		return(EINVAL);
 	if (lt->ia6t_vltime == 0) {
 		/*
 		 * the following log might be noisy, but this is a typical
@@ -1024,10 +1056,6 @@ in6_update_ifa(ifp, ifra, ia)
 		log(LOG_INFO,
 		    "in6_update_ifa: valid lifetime is 0 for %s\n",
 		    ip6_sprintf(&ifra->ifra_addr.sin6_addr));
-	}
-	if (lt->ia6t_pltime != ND6_INFINITE_LIFETIME
-	    && lt->ia6t_pltime + time_second < time_second) {
-		return EINVAL;
 	}
 
 	/*
@@ -1051,7 +1079,7 @@ in6_update_ifa(ifp, ifra, ia)
 		ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
 		ia->ia_addr.sin6_family = AF_INET6;
 		ia->ia_addr.sin6_len = sizeof(ia->ia_addr);
-		ia->ia6_createtime = time_second;
+		ia->ia6_createtime = ia->ia6_updatetime = time_second;
 		if ((ifp->if_flags & (IFF_POINTOPOINT | IFF_LOOPBACK)) != 0) {
 			/*
 			 * XXX: some functions expect that ifa_dstaddr is not

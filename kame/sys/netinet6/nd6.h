@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.69 2001/08/28 13:04:23 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.70 2001/09/21 09:58:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -130,9 +130,9 @@ struct	in6_prlist {
 		struct prf_ra raflags;
 		u_char	prefixlen;
 		u_char	origin;
-		u_long	vltime;
-		u_long	pltime;
-		u_long	expire;
+		u_int32_t vltime;
+		u_int32_t pltime;
+		time_t expire;
 		u_short if_index;
 		u_short advrtrs; /* number of advertisement routers */
 		struct	in6_addr advrtr[DRLSTSIZ]; /* XXX: explicit limit */
@@ -144,9 +144,9 @@ struct in6_prefix {
 	struct prf_ra raflags;
 	u_char	prefixlen;
 	u_char	origin;
-	u_long	vltime;
-	u_long	pltime;
-	u_long	expire;
+	u_int32_t vltime;
+	u_int32_t pltime;
+	time_t expire;
 	u_int32_t flags;
 	int refcnt;
 	u_short if_index;
@@ -236,8 +236,11 @@ struct nd_prefix {
 	struct in6_addr ndpr_addr; /* address that is derived from the prefix */
 	u_int32_t ndpr_vltime;	/* advertised valid lifetime */
 	u_int32_t ndpr_pltime;	/* advertised preferred lifetime */
+
 	time_t ndpr_expire;	/* expiration time of the prefix */
 	time_t ndpr_preferred;	/* preferred time of the prefix */
+	time_t ndpr_lastupdate; /* reception time of last advertisement */
+
 	struct prf_ra ndpr_flags;
 	u_int32_t ndpr_stateflags; /* actual state flags */
 	/* list of routers that advertise the prefix: */

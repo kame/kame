@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.103 2001/09/20 12:11:22 keiichi Exp $	*/
+/*	$KAME: in6.h,v 1.104 2001/09/21 09:58:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -374,18 +374,22 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #define IFA6_IS_DEPRECATED(a) \
-	((a)->ia6_lifetime.ia6t_preferred != 0 && \
-	 (a)->ia6_lifetime.ia6t_preferred < time_second)
+	((a)->ia6_lifetime.ia6t_pltime != ND6_INFINITE_LIFETIME && \
+	 (u_int32_t)((time_second - (a)->ia6_updatetime)) > \
+	 (a)->ia6_lifetime.ia6t_pltime)
 #define IFA6_IS_INVALID(a) \
-	((a)->ia6_lifetime.ia6t_expire != 0 && \
-	 (a)->ia6_lifetime.ia6t_expire < time_second)
+	((a)->ia6_lifetime.ia6t_vltime != ND6_INFINITE_LIFETIME && \
+	 (u_int32_t)((time_second - (a)->ia6_updatetime)) > \
+	 (a)->ia6_lifetime.ia6t_vltime)
 #else
 #define IFA6_IS_DEPRECATED(a) \
-	((a)->ia6_lifetime.ia6t_preferred != 0 && \
-	 (a)->ia6_lifetime.ia6t_preferred < time.tv_sec)
+	((a)->ia6_lifetime.ia6t_pltime != ND6_INFINITE_LIFETIME && \
+	 (u_int32_t)((time.tv_sec - (a)->ia6_updatetime)) > \
+	 (a)->ia6_lifetime.ia6t_pltime)
 #define IFA6_IS_INVALID(a) \
-	((a)->ia6_lifetime.ia6t_expire != 0 && \
-	 (a)->ia6_lifetime.ia6t_expire < time.tv_sec)
+	((a)->ia6_lifetime.ia6t_vltime != ND6_INFINITE_LIFETIME && \
+	 (u_int32_t)((time.tv_sec - (a)->ia6_updatetime)) > \
+	 (a)->ia6_lifetime.ia6t_vltime)
 #endif
 #endif /* _KERNEL */
 

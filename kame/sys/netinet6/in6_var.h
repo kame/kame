@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.66 2001/09/12 16:52:38 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.67 2001/09/21 09:58:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -79,7 +79,7 @@
  * hour rule for hosts).  they should never be modified by nd6_timeout or
  * anywhere else.
  *	userland -> kernel: accept pltime/vltime
- *	kernel -> userland: throuw up everything
+ *	kernel -> userland: throw up everything
  *	in kernel: modify preferred/expire only
  */
 struct in6_addrlifetime {
@@ -123,6 +123,7 @@ struct	in6_ifaddr {
 	time_t	ia6_createtime; /* the creation time of this address, which is
 				 * currently used for temporary addresses only.
 				 */
+	time_t	ia6_updatetime;
 
 	/* back pointer to the ND prefix (for autoconfigured addresses only) */
 	struct nd_prefix *ia6_ndpr;

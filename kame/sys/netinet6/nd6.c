@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.198 2001/09/18 13:35:50 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.199 2001/09/21 09:58:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -763,7 +763,8 @@ nd6_timer(ignored_arg)
 		 * since pltime is just for autoconf, pltime processing for
 		 * prefix is not necessary.
 		 */
-		if (pr->ndpr_expire && pr->ndpr_expire < time_second) {
+		if (pr->ndpr_vltime != ND6_INFINITE_LIFETIME &&
+		    time_second - pr->ndpr_lastupdate > pr->ndpr_vltime) {
 			struct nd_prefix *t;
 			t = pr->ndpr_next;
 
@@ -1591,8 +1592,20 @@ nd6_ioctl(cmd, data, ifp)
 			prl->prefix[i].vltime = pr->ndpr_vltime;
 			prl->prefix[i].pltime = pr->ndpr_pltime;
 			prl->prefix[i].if_index = pr->ndpr_ifp->if_index;
-			prl->prefix[i].expire = pr->ndpr_expire;
+			if (pr->ndpr_vltime == ND6_INFINITE_LIFETIME)
+				prl->prefix[i].expire = 0;
+			else {
+				time_t maxexpire;
 
+				/* XXX: we assume time_t is signed. */
+				maxexpire = (-1) &
+					~(1 << ((sizeof(maxexpire) * 8) - 1));
+				if (pr->ndpr_vltime < maxexpire - time_second)
+					prl->prefix[i].expire = time_second +
+						pr->ndpr_vltime;
+				else
+					prl->prefix[i].expire = maxexpire;
+			}
 			pfr = pr->ndpr_advrtrs.lh_first;
 			j = 0;
 			while (pfr) {
@@ -2411,7 +2424,21 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 				p->vltime = pr->ndpr_vltime;
 				p->pltime = pr->ndpr_pltime;
 				p->if_index = pr->ndpr_ifp->if_index;
-				p->expire = pr->ndpr_expire;
+				if (p->ndpr_vltime == ND6_INFINITE_LIFETIME)
+					p->expire = 0;
+				else {
+					time_t maxexpire;
+
+					/* XXX: we assume time_t is signed. */
+					maxexpire = (-1) &
+						~(1 << ((sizeof(maxexpire) * 8) - 1));
+					if (pr->ndpr_vltime <
+					    maxexpire - pr->ndpr_lastupdate) {
+						p->expire = pr->ndpr_lastupdate +
+							pr->ndpr_vltime;
+					} else
+						p->expire = maxexpire;
+				}
 				p->refcnt = pr->ndpr_refcnt;
 				p->flags = pr->ndpr_stateflags;
 				p->origin = PR_ORIG_RA;
@@ -2565,7 +2592,21 @@ nd6_sysctl_prlist SYSCTL_HANDLER_ARGS
 			p->vltime = pr->ndpr_vltime;
 			p->pltime = pr->ndpr_pltime;
 			p->if_index = pr->ndpr_ifp->if_index;
-			p->expire = pr->ndpr_expire;
+			if (pr->ndpr_vltime == ND6_INFINITE_LIFETIME)
+				p->expire = 0;
+			else {
+				time_t maxexpire;
+
+				/* XXX: we assume time_t is signed. */
+				maxexpire = (-1) &
+					~(1 << ((sizeof(maxexpire) * 8) - 1));
+				if (pr->ndpr_vltime <
+				    maxexpire - pr->ndpr_lastupdate) {
+					p->expire = pr->ndpr_lastupdate +
+						pr->ndpr_vltime;
+				} else
+					p->expire = maxexpire;
+			}
 			p->refcnt = pr->ndpr_refcnt;
 			p->flags = pr->ndpr_stateflags;
 			p->origin = PR_ORIG_RA;

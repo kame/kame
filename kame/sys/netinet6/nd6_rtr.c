@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.166 2001/09/20 09:36:08 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.167 2001/09/21 09:58:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -326,6 +326,9 @@ nd6_ra_input(m, off, icmp6len)
 		struct nd_opt_hdr *pt;
 		struct nd_opt_prefix_info *pi = NULL;
 		struct nd_prefix pr;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+		long time_second = time.tv_sec;
+#endif
 
 		for (pt = (struct nd_opt_hdr *)ndopts.nd_opts_pi;
 		     pt <= (struct nd_opt_hdr *)ndopts.nd_opts_pi_end;
@@ -389,6 +392,7 @@ nd6_ra_input(m, off, icmp6len)
 			pr.ndpr_vltime = ntohl(pi->nd_opt_pi_valid_time);
 			pr.ndpr_pltime =
 				ntohl(pi->nd_opt_pi_preferred_time);
+			pr.ndpr_lastupdate = time_second;
 
 			if (in6_init_prefix_ltimes(&pr))
 				continue; /* prefix lifetime init failed */
@@ -1268,6 +1272,7 @@ prelist_update(new, dr, m)
 			pr->ndpr_pltime = new->ndpr_pltime;
 			pr->ndpr_preferred = new->ndpr_preferred;
 			pr->ndpr_expire = new->ndpr_expire;
+			pr->ndpr_lastupdate = new->ndpr_lastupdate;
 		}
 
 		if (new->ndpr_raf_onlink &&
@@ -1416,16 +1421,18 @@ prelist_update(new, dr, m)
 		 * with the Subject "StoredLifetime in RFC 2462".
 		 */
 		lt6_tmp = ifa6->ia6_lifetime;
-		if (lt6_tmp.ia6t_expire == 0) /* never expire */
+		if (lt6_tmp.ia6t_vltime == ND6_INFINITE_LIFETIME)
 			storedlifetime = ND6_INFINITE_LIFETIME;
-		else if (lt6_tmp.ia6t_expire < time_second) {
+		else if (time_second - ifa6->ia6_updatetime >
+			 lt6_tmp.ia6t_vltime) {
 			/*
 			 * The case of "invalid" address.  We should usually
 			 * not see this case.
 			 */
 			storedlifetime = 0;
 		} else
-			storedlifetime = lt6_tmp.ia6t_expire - time_second;
+			storedlifetime = lt6_tmp.ia6t_vltime -
+				(time_second - ifa6->ia6_updatetime);
 		if (TWOHOUR < new->ndpr_vltime ||
 		    storedlifetime < new->ndpr_vltime) {
 			lt6_tmp.ia6t_vltime = new->ndpr_vltime;
@@ -1461,27 +1468,37 @@ prelist_update(new, dr, m)
 		 * draft-ietf-ipngwg-temp-addresses-v2-00.txt 3.3 (1);
 		 * we only update the lifetimes when they are in the maximum
 		 * intervals.
-		 * XXX: how should we modify ia6t_[pv]ltime?
 		 */
 		if ((ifa6->ia6_flags & IN6_IFF_TEMPORARY) != 0) {
-			time_t maxexpire, maxpreferred;
+			u_int32_t maxvltime, maxpltime;
 
-			maxexpire = ifa6->ia6_createtime +
-				ip6_temp_valid_lifetime;
-			maxpreferred = ifa6->ia6_createtime +
-				ip6_temp_preferred_lifetime - ip6_desync_factor;
+			if (ip6_temp_valid_lifetime >
+			    (u_int32_t)(time_second - ifa6->ia6_createtime)) {
+				maxvltime = ip6_temp_valid_lifetime -
+					(time_second - ifa6->ia6_createtime);
+			} else
+				maxvltime = 0;
+			if (ip6_temp_preferred_lifetime >
+			    (u_int32_t)((time_second - ifa6->ia6_createtime) +
+					ip6_desync_factor)) {
+				maxpltime = ip6_temp_preferred_lifetime -
+					(time_second - ifa6->ia6_createtime) -
+					ip6_desync_factor;
+			} else
+				maxpltime = 0;
 
-			if (lt6_tmp.ia6t_expire == 0 || /* no expire */
-			    lt6_tmp.ia6t_expire > maxexpire) {
-				lt6_tmp.ia6t_expire = maxexpire;
+			if (lt6_tmp.ia6t_vltime == ND6_INFINITE_LIFETIME ||
+			    lt6_tmp.ia6t_vltime > maxvltime) {
+				lt6_tmp.ia6t_vltime = maxvltime;
 			}
-			if (lt6_tmp.ia6t_preferred == 0 || /* no expire */
-			    lt6_tmp.ia6t_preferred > maxpreferred) {
-				lt6_tmp.ia6t_preferred = maxpreferred;
+			if (lt6_tmp.ia6t_pltime == ND6_INFINITE_LIFETIME ||
+			    lt6_tmp.ia6t_pltime > maxpltime) {
+				lt6_tmp.ia6t_pltime = maxpltime;
 			}
 		}
 
 		ifa6->ia6_lifetime = lt6_tmp;
+		ifa6->ia6_updatetime = time_second;
 	}
 	if (ia6_match == NULL && new->ndpr_vltime) {
 		/*
@@ -1976,7 +1993,7 @@ in6_ifadd(pr)
 	 * with the same interface identifier, than to have multiple addresses
 	 * with different interface identifiers.
 	 */
-	ifa = (struct ifaddr *)in6ifa_ifpforlinklocal(ifp, 0);/* 0 is OK? */
+	ifa = (struct ifaddr *)in6ifa_ifpforlinklocal(ifp, 0); /* 0 is OK? */
 	if (ifa)
 		ib = (struct in6_ifaddr *)ifa;
 	else
@@ -2083,7 +2100,7 @@ in6_tmpifadd(ia0, forcegen)
 	int i, error;
 	int trylimit = 3;	/* XXX: adhoc value */
 	u_int32_t randid[2];
-	time_t vltime0, pltime0;
+	u_int32_t vltime0, pltime0;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	time_t time_second = (time_t)time.tv_sec;
 #endif
@@ -2142,16 +2159,18 @@ in6_tmpifadd(ia0, forcegen)
          * of the public address or TEMP_PREFERRED_LIFETIME -
          * DESYNC_FACTOR.
 	 */
-	if (ia0->ia6_lifetime.ia6t_expire != 0) {
+	if (ia0->ia6_lifetime.ia6t_vltime != ND6_INFINITE_LIFETIME) {
 		vltime0 = IFA6_IS_INVALID(ia0) ? 0 :
-			(ia0->ia6_lifetime.ia6t_expire - time_second);
+			(ia0->ia6_lifetime.ia6t_vltime -
+			 (time_second - ia0->ia6_updatetime));
 		if (vltime0 > ip6_temp_valid_lifetime)
 			vltime0 = ip6_temp_valid_lifetime;
 	} else
 		vltime0 = ip6_temp_valid_lifetime;
-	if (ia0->ia6_lifetime.ia6t_preferred != 0) {
+	if (ia0->ia6_lifetime.ia6t_pltime != ND6_INFINITE_LIFETIME) {
 		pltime0 = IFA6_IS_DEPRECATED(ia0) ? 0 :
-			(ia0->ia6_lifetime.ia6t_preferred - time_second);
+			(ia0->ia6_lifetime.ia6t_pltime -
+			 (time_second - ia0->ia6_updatetime));
 		if (pltime0 > ip6_temp_preferred_lifetime - ip6_desync_factor){
 			pltime0 = ip6_temp_preferred_lifetime -
 				ip6_desync_factor;
