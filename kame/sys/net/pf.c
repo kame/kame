@@ -2027,8 +2027,14 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 	*uid = inp->inp_socket->so_euid;
 	*gid = inp->inp_socket->so_egid;
 #else
-	*uid = -1;
-	*gid = -1;
+	switch (af) {
+	case AF_INET:
+		*uid = inp->inp_socket->so_uid;
+		break;
+	case AF_INET6:
+		*uid = in6p->in6p_socket->so_uid;
+		break;
+	}
 #endif
 	return (1);
 }
