@@ -722,7 +722,6 @@ tcp6_ctlinput(cmd, sa, d)
 	struct mbuf *m;
 	int off;
 	struct in6_addr finaldst;
-	struct in6_addr s;
 	struct {
 		u_int16_t th_sport;
 		u_int16_t th_dport;
@@ -776,7 +775,7 @@ tcp6_ctlinput(cmd, sa, d)
 		 * XXX: We assume that when ip6 is non NULL,
 		 * M and OFF are valid.
 		 */
-		struct in6_addr s;
+		struct sockaddr_in6 sa6_src;
 
 		/* translate addresses into internal form */
 		bcopy(&ip6->ip6_src, &s, sizeof(s));
@@ -794,6 +793,13 @@ tcp6_ctlinput(cmd, sa, d)
 #endif
 		m_copydata(m, off, sizeof(*thp), (caddr_t)&th);
 
+		bzero(&sa6_src, sizeof(sa6_src));
+		sa6_src.sin6_family = AF_INET6;
+		sa6_src.sin6_len = sizeof(sa6_src);
+		sa6_src.sin6_addr = ip6->ip6_src;
+		sa6_src.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
+							 &ip6->ip6_src);
+
 		if (cmd == PRC_MSGSIZE) {
 			/*
 			 * Check to see if we have a valid TCP connection
@@ -801,10 +807,10 @@ tcp6_ctlinput(cmd, sa, d)
 			 * payload.
 			 */
 			if (in6_pcbhashlookup(&tcbtable, &finaldst,
-			    th.th_dport, &s, th.th_sport))
+			    th.th_dport, &sa6_src.sin6_addr, th.th_sport))
 				;
 			else if (in_pcblookup(&tcbtable, &finaldst, th.th_dport,
-			    &s, th.th_sport, INPLOOKUP_IPV6))
+			    &sa6_src.sin6_addr, th.th_sport, INPLOOKUP_IPV6))
 				;
 			else
 				return;
@@ -821,8 +827,8 @@ tcp6_ctlinput(cmd, sa, d)
 		}
 
 		(void) in6_pcbnotify(&tcbtable, (struct sockaddr *)&sa6,
-				     th.th_dport, &s, th.th_sport, cmd,
-				     NULL, notify);
+				     th.th_dport, &sa6_src.sin6_addr,
+				     th.th_sport, cmd, NULL, notify);
 	} else {
 		(void) in6_pcbnotify(&tcbtable, (struct sockaddr *)&sa6, 0,
 				     &zeroin6_addr, 0, cmd, NULL, notify);

@@ -1152,7 +1152,6 @@ tcp6_ctlinput(cmd, sa, d)
 	struct mbuf *m;
 	int off;
 	struct in6_addr finaldst;
-	struct in6_addr s;
 	struct {
 		u_int16_t th_sport;
 		u_int16_t th_dport;
@@ -1206,12 +1205,7 @@ tcp6_ctlinput(cmd, sa, d)
 		 * XXX: We assume that when ip6 is non NULL,
 		 * M and OFF are valid.
 		 */
-		struct in6_addr s;
-
-		/* translate addresses into internal form */
-		bcopy(&ip6->ip6_src, &s, sizeof(s));
-		if (IN6_IS_ADDR_LINKLOCAL(&s))
-			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
+		struct sockaddr_in6 sa6_src;
 
 		/* check if we can safely examine src and dst ports */
 		if (m->m_pkthdr.len < off + sizeof(*thp))
@@ -1224,6 +1218,13 @@ tcp6_ctlinput(cmd, sa, d)
 #endif
 		m_copydata(m, off, sizeof(*thp), (caddr_t)&th);
 
+		bzero(&sa6_src, sizeof(sa6_src));
+		sa6_src.sin6_family = AF_INET6;
+		sa6_src.sin6_len = sizeof(sa6_src);
+		sa6_src.sin6_addr = ip6->ip6_src;
+		sa6_src.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
+							 &ip6->ip6_src);
+
 		if (cmd == PRC_MSGSIZE) {
 			/*
 			 * Check to see if we have a valid TCP connection
@@ -1231,7 +1232,7 @@ tcp6_ctlinput(cmd, sa, d)
 			 * payload.
 			 */
 			if (!in6_pcblookup_connect(&tcb6, &finaldst,
-			    th.th_dport, &s, th.th_sport, 0))
+			    th.th_dport, &sa6_src.sin6_addr, th.th_sport, 0))
 				return;
 
 			/*
@@ -1246,20 +1247,14 @@ tcp6_ctlinput(cmd, sa, d)
 		}
 
 		nmatch = in6_pcbnotify(&tcb6, (struct sockaddr *)&sa6,
-				       th.th_dport, &s, th.th_sport, cmd,
-				       NULL, notify);
+				       th.th_dport, &sa6_src.sin6_addr,
+				       th.th_sport, cmd, NULL, notify);
 		if (nmatch == 0 && syn_cache_count &&
 		    (inet6ctlerrmap[cmd] == EHOSTUNREACH ||
 		     inet6ctlerrmap[cmd] == ENETUNREACH ||
-		     inet6ctlerrmap[cmd] == EHOSTDOWN)) {
-			struct sockaddr_in6 sin6;
-			bzero(&sin6, sizeof(sin6));
-			sin6.sin6_len = sizeof(sin6);
-			sin6.sin6_family = AF_INET6;
-			sin6.sin6_port = th.th_sport;
-			sin6.sin6_addr = s;
-			syn_cache_unreach((struct sockaddr *)&sin6, sa, &th);
-		}
+		     inet6ctlerrmap[cmd] == EHOSTDOWN))
+			syn_cache_unreach((struct sockaddr *)&sa6_src,
+					  sa, &th);
 	} else {
 		(void) in6_pcbnotify(&tcb6, (struct sockaddr *)&sa6, 0,
 				     &zeroin6_addr, 0, cmd, NULL, notify);
