@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.9 2003/01/24 05:11:35 sam Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.61 2004/02/04 01:01:09 suz Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.62 2004/02/04 02:46:17 keiichi Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -803,9 +803,9 @@ in6_pcbpurgeif0(head, ifp)
 						continue;
 					}
 					final = 1;
-					in6_delmulti(imm->i6mm_maddr, &error,
-						     numsrc, del_ss, mode,
-						     final);
+					in6_delmulti2(imm->i6mm_maddr, &error,
+						      numsrc, del_ss, mode,
+						      final);
 					if (del_ss != NULL)
 						FREE(del_ss, M_IPMOPTS);
 					in6_freemopt_source_list(msf,

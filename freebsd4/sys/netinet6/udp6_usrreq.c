@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.13 2003/01/24 05:11:35 sam Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.73 2004/02/04 02:46:17 keiichi Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.74 2004/02/05 11:02:08 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -154,7 +154,7 @@
 extern	struct protosw inetsw[];
 static	int udp6_detach __P((struct socket *so));
 static void pass_to_pcb6 __P((struct mbuf *, struct mbuf *, struct inpcb *,
-			      struct sockaddr_in6 *, struct inpcb *, int));
+			      struct in6_addr *, struct inpcb *, int));
 
 int
 udp6_input(mp, offp, proto)
@@ -289,8 +289,8 @@ udp6_input(mp, offp, proto)
 			     imm != NULL;
 			     imm = LIST_NEXT(imm, i6mm_chain)) {
 
-				if (SS_CMP(&imm->i6mm_maddr->in6m_sa,
-				    !=, &tosa2))
+				if (SS_CMP(&imm->i6mm_maddr->in6m_addr,
+				    !=, &ip6->ip6_dst))
 					continue;
 
 				msf = imm->i6mm_msf;
@@ -303,8 +303,8 @@ udp6_input(mp, offp, proto)
 				/* receive data from any source */
 				if (msf->msf_grpjoin != 0 &&
 				    msf->msf_blknumsrc == 0) {
-					pass_to_pcb6(m, opts, last, &src,
-						    in6p, off);
+					pass_to_pcb6(m, opts, last,
+						     &ip6->ip6_src, in6p, off);
 					break;
 				}
 				goto search_allow_list;
@@ -316,16 +316,16 @@ udp6_input(mp, offp, proto)
 				LIST_FOREACH(msfsrc, msf->msf_head, list) {
 					if (msfsrc->src.ss_family != AF_INET6)
 						continue;
-					if (SS_CMP(&msfsrc->src, <, &fromsa2))
+					if (SS_CMP(&msfsrc->src, <, &ip6->ip6_src))
 						continue;
-					if (SS_CMP(&msfsrc->src, >, &fromsa2)) {
+					if (SS_CMP(&msfsrc->src, >, &ip6->ip6_src)) {
 						/* terminate search, as there
 						 * will be no match */
 						break;
 					}
 
-					pass_to_pcb6(m, opts, last, &src,
-						     in6p, off);
+					pass_to_pcb6(m, opts, last,
+						     &ip6->ip6_src, in6p, off);
 					break;
 				}
 
@@ -336,9 +336,9 @@ udp6_input(mp, offp, proto)
 				LIST_FOREACH(msfsrc, msf->msf_blkhead, list) {
 					if (msfsrc->src.ss_family != AF_INET6)
 						continue;
-					if (SS_CMP(&msfsrc->src, <, &fromsa2))
+					if (SS_CMP(&msfsrc->src, <, &ip6->ip6_src))
 						continue;
-					if (SS_CMP(&msfsrc->src, >, &fromsa2)) {
+					if (SS_CMP(&msfsrc->src, >, &ip6->ip6_src)) {
 						/* blocks since the src matched
 						 * with block list */
 						break;
@@ -352,8 +352,8 @@ udp6_input(mp, offp, proto)
 				/* blocks since the source matched with block
 				 * list */
 				if (msfsrc == NULL)
-					pass_to_pcb6(m, opts, last, &src,
-						     in6p, off);
+					pass_to_pcb6(m, opts, last,
+						     &ip6->ip6_src, in6p, off);
 
 			end_of_search:
 				goto next_inp;
@@ -906,14 +906,20 @@ static void
 pass_to_pcb6(m, opts, last, src, in6p, off)
 	struct mbuf *m, *opts;
 	struct inpcb *last;
-	struct sockaddr_in6 *src;
+	struct in6_addr *src;
 	struct inpcb *in6p;
 	int off;
 {
 	struct mbuf *n;
+	struct sockaddr_in6 from;
 
 	if (last == NULL)
 		goto end;
+
+	bzero(&from, sizeof(from));
+	from.sin6_family = AF_INET6;
+	from.sin6_len = sizeof(from);
+	from.sin6_addr = *src;
 
 #ifdef IPSEC
 	/* check AH/ESP integrity. */
@@ -939,7 +945,7 @@ pass_to_pcb6(m, opts, last, src, in6p, off)
 			ip6_savecontrol(last, n, &opts);
 			m_adj(n, off + sizeof(struct udphdr));
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
-				(struct sockaddr *)&src, n, opts) == 0) {
+				(struct sockaddr *)&from, n, opts) == 0) {
 			m_freem(n);
 			if (opts)
 				m_freem(opts);
