@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.49 2002/05/31 10:19:46 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.50 2002/05/31 21:18:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -53,6 +53,7 @@
 #if (defined(__NetBSD__) && __NetBSD_Version__ >= 106010000) || defined(__OpenBSD__)
 #include <util.h>
 #endif
+
 #include "rtsold.h"
 
 struct ifinfo *iflist;
