@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.171 2004/03/14 10:22:08 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.172 2004/06/14 05:45:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -119,9 +119,7 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
-#if defined(__OpenBSD__) || defined(__NetBSD__) || defined(__FreeBSD__)
 #include <math.h>
-#endif
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -136,16 +134,7 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #include <netinet6/ipsec.h>
 #endif
 
-#if defined(__NetBSD__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 #include <md5.h>
-#else
-#include "md5.h"
-#endif
-
-/* portability */
-#if (defined(__bsdi__) && _BSDI_VERSION < 199802) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-#define socklen_t	int
-#endif
 
 struct tv32 {
 	u_int32_t tv32_sec;
@@ -239,9 +228,7 @@ int timing;			/* flag to do timing */
 double tmin = 999999999.0;	/* minimum round trip time */
 double tmax = 0.0;		/* maximum round trip time */
 double tsum = 0.0;		/* sum of all times, for doing average */
-#if defined(__OpenBSD__) || defined(__NetBSD__) || defined(__FreeBSD__)
 double tsumsq = 0.0;		/* sum of all times squared, for std. dev. */
-#endif
 
 /* for node addresses */
 u_short naflags;
@@ -1526,9 +1513,7 @@ pr_pack(buf, cc, mhdr)
 			triptime = ((double)tv.tv_sec) * 1000.0 +
 			    ((double)tv.tv_usec) / 1000.0;
 			tsum += triptime;
-#if defined(__OpenBSD__) || defined(__NetBSD__) || defined(__FreeBSD__)
 			tsumsq += triptime * triptime;
-#endif
 			if (triptime < tmin)
 				tmin = triptime;
 			if (triptime > tmax)
@@ -2220,16 +2205,10 @@ summary()
 		/* Only display average to microseconds */
 		double num = nreceived + nrepeats;
 		double avg = tsum / num;
-#if defined(__OpenBSD__) || defined(__NetBSD__) || defined(__FreeBSD__)
 		double dev = sqrt(tsumsq / num - avg * avg);
 		(void)printf(
 		    "round-trip min/avg/max/std-dev = %.3f/%.3f/%.3f/%.3f ms\n",
 		    tmin, avg, tmax, dev);
-#else
-		(void)printf(
-		    "round-trip min/avg/max = %.3f/%.3f/%.3f ms\n",
-		    tmin, avg, tmax);
-#endif
 		(void)fflush(stdout);
 	}
 	(void)fflush(stdout);

@@ -1,4 +1,4 @@
-/*	$KAME: trace.c,v 1.19 2003/09/02 09:48:46 suz Exp $	*/
+/*	$KAME: trace.c,v 1.20 2004/06/14 05:45:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -74,7 +74,7 @@
 #include <sys/uio.h>
 #include <sys/queue.h>
 #include <net/if.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <net/if_var.h>
 #endif
 #include <net/route.h>
