@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.27 2001/12/13 15:58:21 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.28 2001/12/13 23:27:56 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -142,7 +142,7 @@ mip6_icmp6_input(m, off, icmp6len)
 		 */
 		mip6_icmp6_find_addr((caddr_t)icmp6, icmp6len, &laddr, &paddr);
 		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, paddr);
-		if (mbc) {
+		if (mbc && (mbc->mbc_flags & IP6_BUF_HOME) != 0) {
 			mip6log((LOG_INFO,
 				 "%s:%d: "
 				 "a mobile node (%s) moved.\n",
