@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.64 2001/08/23 08:45:23 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.65 2001/08/30 08:56:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -332,6 +332,9 @@ encap4_lookup(m, off, proto, dir)
 }
 
 void
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+encap4_input(struct mbuf *m, int off, int proto)
+#else
 #if __STDC__
 encap4_input(struct mbuf *m, ...)
 #else
@@ -339,23 +342,28 @@ encap4_input(m, va_alist)
 	struct mbuf *m;
 	va_dcl
 #endif
+#endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 {
-#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if defined(__OpenBSD__)
 	struct ip *ip;
 #endif
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	int off, proto;
+	va_list ap;
+#endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 	const struct protosw *psw;
 	struct encaptab *match;
-	va_list ap;
 
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	va_start(ap, m);
 	off = va_arg(ap, int);
-#if !defined(__OpenBSD__) && !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if !defined(__OpenBSD__)
 	proto = va_arg(ap, int);
 #endif
 	va_end(ap);
+#endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 
-#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if defined(__OpenBSD__)
 	ip = mtod(m, struct ip *);
 	proto = ip->ip_p;
 #endif
@@ -367,26 +375,14 @@ encap4_input(m, va_alist)
 		psw = match->psw;
 		if (psw && psw->pr_input) {
 			encap_fillarg(m, match);
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-			(*psw->pr_input)(m, off);
-#else
 			(*psw->pr_input)(m, off, proto);
-#endif
 		} else
 			m_freem(m);
 		return;
 	}
 
 	/* for backward compatibility - messy... */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-	if (proto == IPPROTO_IPV4) {
-		ipip_input(m, off);
-		return;
-	}
-
-	/* last resort: inject to raw socket */
-	rip_input(m, off);
-#elif defined(__NetBSD__)
+#if defined(__NetBSD__)
 	/* last resort: inject to raw socket */
 	rip_input(m, off, proto);
 #elif defined(__OpenBSD__)

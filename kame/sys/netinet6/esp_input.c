@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.58 2001/08/14 08:29:03 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.59 2001/08/30 08:56:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,6 +108,11 @@ extern u_char ip_protox[];
 #endif
 
 void
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+esp4_input(m, off, proto)
+	struct mbuf *m;
+	int off, proto;
+#else
 #if __STDC__
 esp4_input(struct mbuf *m, ...)
 #else
@@ -115,6 +120,7 @@ esp4_input(m, va_alist)
 	struct mbuf *m;
 	va_dcl
 #endif
+#endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 {
 	struct ip *ip;
 	struct esp *esp;
@@ -128,17 +134,17 @@ esp4_input(m, va_alist)
 	size_t hlen;
 	size_t esplen;
 	int s;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	va_list ap;
 	int off, proto;
+#endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	va_start(ap, m);
 	off = va_arg(ap, int);
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	proto = va_arg(ap, int);
-#else
-	proto = mtod(m, struct ip *)->ip_p;
-#endif
 	va_end(ap);
+#endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 
 	/* sanity check for alignment. */
 	if (off % 4 != 0 || m->m_pkthdr.len % 4 != 0) {
@@ -461,11 +467,7 @@ noreplaycheck:
 				ipsecstat.in_polvio++;
 				goto bad;
 			}
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-			(*inetsw[ip_protox[nxt]].pr_input)(m, off);
-#else
 			(*inetsw[ip_protox[nxt]].pr_input)(m, off, nxt);
-#endif
 		} else
 			m_freem(m);
 		m = NULL;

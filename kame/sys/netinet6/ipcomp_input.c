@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_input.c,v 1.27 2001/08/14 08:29:03 itojun Exp $	*/
+/*	$KAME: ipcomp_input.c,v 1.28 2001/08/30 08:56:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -93,6 +93,11 @@ extern u_char ip_protox[];
 #endif
 
 void
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+ipcomp4_input(m, off, proto)
+	struct mbuf *m;
+	int off, proto;
+#else
 #if __STDC__
 ipcomp4_input(struct mbuf *m, ...)
 #else
@@ -100,6 +105,7 @@ ipcomp4_input(m, va_alist)
 	struct mbuf *m;
 	va_dcl
 #endif
+#endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 {
 	struct mbuf *md;
 	struct ip *ip;
@@ -111,17 +117,17 @@ ipcomp4_input(m, va_alist)
 	int error;
 	size_t newlen, olen;
 	struct secasvar *sav = NULL;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	int off, proto;
 	va_list ap;
+#endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	va_start(ap, m);
 	off = va_arg(ap, int);
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	proto = va_arg(ap, int);
-#else
-	proto = mtod(m, struct ip *)->ip_p;
-#endif
 	va_end(ap);
+#endif
 
 	if (m->m_pkthdr.len < off + sizeof(struct ipcomp)) {
 		ipseclog((LOG_DEBUG, "IPv4 IPComp input: assumption failed "
@@ -241,11 +247,7 @@ ipcomp4_input(m, va_alist)
 			ipsecstat.in_polvio++;
 			goto fail;
 		}
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-		(*inetsw[ip_protox[nxt]].pr_input)(m, off);
-#else
 		(*inetsw[ip_protox[nxt]].pr_input)(m, off, nxt);
-#endif
 	} else
 		m_freem(m);
 	m = NULL;

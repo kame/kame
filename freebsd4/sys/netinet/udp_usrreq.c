@@ -148,9 +148,9 @@ udp_init()
 }
 
 void
-udp_input(m, off)
+udp_input(m, off, proto)
 	register struct mbuf *m;
-	int off;
+	int off, proto;
 {
 	int iphlen = off;
 	register struct ip *ip;

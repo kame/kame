@@ -1,4 +1,4 @@
-/*	$KAME: ah.h,v 1.14 2001/07/26 06:53:14 jinmei Exp $	*/
+/*	$KAME: ah.h,v 1.15 2001/08/30 08:56:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -86,7 +86,11 @@ extern const struct ah_algorithm *ah_algorithm_lookup __P((int));
 extern int ah_hdrlen __P((struct secasvar *));
 
 extern size_t ah_hdrsiz __P((struct ipsecrequest *));
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+extern void ah4_input __P((struct mbuf *, int, int));
+#else
 extern void ah4_input __P((struct mbuf *, ...));
+#endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 extern int ah4_output __P((struct mbuf *, struct ipsecrequest *));
 extern int ah4_calccksum __P((struct mbuf *, caddr_t, size_t,
 	const struct ah_algorithm *, struct secasvar *));

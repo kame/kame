@@ -241,9 +241,9 @@ static struct sockaddr_in icmpgw = { sizeof (struct sockaddr_in), AF_INET };
  * Process a received ICMP message.
  */
 void
-icmp_input(m, off)
+icmp_input(m, off, proto)
 	register struct mbuf *m;
-	int off;
+	int off, proto;
 {
 	int hlen = off;
 	register struct icmp *icp;
@@ -591,7 +591,7 @@ reflect:
 	}
 
 raw:
-	rip_input(m, off);
+	rip_input(m, off, proto);
 	return;
 
 freeit:

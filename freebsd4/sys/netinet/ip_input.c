@@ -854,9 +854,9 @@ found:
 	 */
 	ipstat.ips_delivered++;
     {
-	int off = hlen;
+	int off = hlen, nh = ip->ip_p;
 
-	(*inetsw[ip_protox[ip->ip_p]].pr_input)(m, off);
+	(*inetsw[ip_protox[ip->ip_p]].pr_input)(m, off, nh);
 #ifdef	IPFIREWALL_FORWARD
 	ip_fw_fwd_addr = NULL;	/* tcp needed it */
 #endif

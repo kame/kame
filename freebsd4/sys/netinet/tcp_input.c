@@ -358,15 +358,15 @@ tcp6_input(mp, offp, proto)
 		return IPPROTO_DONE;
 	}
 
-	tcp_input(m, *offp);
+	tcp_input(m, *offp, proto);
 	return IPPROTO_DONE;
 }
 #endif
 
 void
-tcp_input(m, off0)
+tcp_input(m, off0, proto)
 	register struct mbuf *m;
-	int off0;
+	int off0, proto;
 {
 	register struct tcphdr *th;
 	register struct ip *ip = NULL;

@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.69 2001/08/30 05:46:12 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.70 2001/08/30 08:56:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -336,6 +336,11 @@ in_gif_output(ifp, family, m)
 }
 
 void
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+in_gif_input(m, off, proto)
+	struct mbuf *m;
+	int off, proto;
+#else
 #if __STDC__
 in_gif_input(struct mbuf *m, ...)
 #else
@@ -343,25 +348,30 @@ in_gif_input(m, va_alist)
 	struct mbuf *m;
 	va_dcl
 #endif
+#endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 {
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	int off, proto;
+	va_list ap;
+#endif
 	struct ifnet *gifp = NULL;
 	struct ip *ip;
-	va_list ap;
 #ifndef __OpenBSD__
 	int af;
 	u_int8_t otos;
 #endif
 
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	va_start(ap, m);
 	off = va_arg(ap, int);
-#if !defined(__OpenBSD__) && !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if !defined(__OpenBSD__)
 	proto = va_arg(ap, int);
 #endif
 	va_end(ap);
+#endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 
 	ip = mtod(m, struct ip *);
-#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if defined(__OpenBSD__)
 	proto = ip->ip_p;
 #endif
 
