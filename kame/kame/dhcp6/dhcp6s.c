@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.103 2003/07/17 07:34:35 suz Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.104 2003/07/17 07:54:48 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -574,7 +574,7 @@ server6_recv(s)
 	}
 
 	/*
-	 * A server never receives a relay reply message.  Since a relay
+	 * A server never receives a relay reply message.  Since relay
 	 * replay messages will annoy option parser below, we explicitly
 	 * reject them here.
 	 */
