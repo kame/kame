@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.35 2002/09/27 09:38:10 k-sugyou Exp $	*/
+/*	$KAME: if_hif.c,v 1.36 2002/10/04 05:54:04 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -666,11 +666,13 @@ hif_coa_get_ifaddr(hcoa)
 		     | IN6_IFF_DUPLICATED
 		     | IN6_IFF_DEPRECATED))
 			continue;
-		if (IN6_IS_ADDR_UNSPECIFIED(&ia6->ia_addr.sin6_addr))
-			continue;
-		if (IN6_IS_ADDR_LOOPBACK(&ia6->ia_addr.sin6_addr))
-			continue;
-		if (IN6_IS_ADDR_LINKLOCAL(&ia6->ia_addr.sin6_addr))
+		/*
+		 * XXX site-local care-of address not supported
+		 */
+		if (IN6_IS_ADDR_UNSPECIFIED(&ia6->ia_addr.sin6_addr)
+		    || IN6_IS_ADDR_LOOPBACK(&ia6->ia_addr.sin6_addr)
+		    || IN6_IS_ADDR_LINKLOCAL(&ia6->ia_addr.sin6_addr)
+		    || IN6_IS_ADDR_SITELOCAL(&ia6->ia_addr.sin6_addr))
 			continue;
 
 		/* found */
