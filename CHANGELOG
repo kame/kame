@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1411 2000/12/01 05:44:59 jinmei Exp $
+$KAME: CHANGELOG,v 1.1412 2000/12/01 05:47:28 jinmei Exp $
 
 <200012>
+2000-12-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/esp_input.c (esp6_ctlinput): called
+	pfctlinput2 to tell applications minimum information about an
+	error, even when the notification was encrypted. PCB notification
+	functions then might be able to detect an appropriate PCB using
+	source and destination addresses and IPv6 flow label.
+
 2000-12-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_output): called pfctlinput2
 	when fragmenting the packet, in order to tell applications the
