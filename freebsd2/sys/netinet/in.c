@@ -63,6 +63,8 @@
  *	$Id: in.c,v 1.25 1996/09/09 20:17:24 wollman Exp $
  */
 
+#include "opt_natpt.h"
+
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <sys/systm.h>
