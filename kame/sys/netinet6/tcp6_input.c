@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.35 2000/11/08 17:50:11 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.36 2000/11/09 01:57:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -690,7 +690,7 @@ findpcb:
 			 *    communication is okay - "SHOULD continue to be
 			 *    used"
 			 * 2. use of it with new communication:
-			 *   (2a) "SHOULD NOT be used if no alternate address
+			 *   (2a) "SHOULD NOT be used if alternate address
 			 *        with sufficient scope is available"
 			 *   (2b) nothing mentioned otherwise.
 			 * Here we fall into (2b) case as we have no choice in

@@ -721,7 +721,7 @@ findpcb:
 			 *    communication is okay - "SHOULD continue to be
 			 *    used"
 			 * 2. use of it with new communication:
-			 *   (2a) "SHOULD NOT be used if no alternate address
+			 *   (2a) "SHOULD NOT be used if alternate address
 			 *        with sufficient scope is available"
 			 *   (2b) nothing mentioned otherwise.
 			 * Here we fall into (2b) case as we have no choice in
