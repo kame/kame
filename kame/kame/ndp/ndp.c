@@ -912,7 +912,12 @@ plist()
 				 sizeof(ntop_buf)), PR.prefixlen,
 		       if_indextoname(PR.if_index, ifix_buf));
 		gettimeofday(&time, 0);
-		printf("  flags=%s%s",
+		/*
+		 * meaning of fields, especially flags, is very different
+		 * by origin.  notify the difference to the users.
+		 */
+		printf("  %s", PR.origin == PR_ORIG_RA ? "" : "advertise: ");
+		printf("flags=%s%s",
 		       PR.raflags.onlink ? "L" : "",
 		       PR.raflags.autonomous ? "A" : "");
 		if (PR.vltime == ND6_INFINITE_LIFETIME)
@@ -924,13 +929,37 @@ plist()
 		else
 			printf(", pltime=%ld", (long)PR.pltime);
 		if (PR.expire == 0)
-			printf(", expire=Never\n");
+			printf(", expire=Never");
 		else if (PR.expire >= time.tv_sec)
-			printf(", expire=%s\n",
+			printf(", expire=%s",
 				sec2str(PR.expire - time.tv_sec));
 		else
-			printf(", expired\n");
-		if (PR.advrtrs) {
+			printf(", expired");
+		switch (PR.origin) {
+		case PR_ORIG_RA:
+			printf(", origin=RA");
+			break;
+		case PR_ORIG_RR:
+			printf(", origin=RR");
+			break;
+		case PR_ORIG_STATIC:
+			printf(", origin=static");
+			break;
+		case PR_ORIG_KERNEL:
+			printf(", origin=kernel");
+			break;
+		default:
+			printf(", origin=?");
+			break;
+		}
+		printf("\n");
+		/*
+		 * "advertising router" list is meaningful only if the prefix
+		 * information is from RA.
+		 */
+		if (PR.origin != PR_ORIG_RA)
+			;
+		else if (PR.advrtrs) {
 			int j;
 			printf("  advertised by\n");
 			for (j = 0; j < PR.advrtrs; j++) {
@@ -968,8 +997,7 @@ plist()
 			if (PR.advrtrs > DRLSTSIZ)
 				printf("    and %d routers\n",
 				       PR.advrtrs - DRLSTSIZ);
-		}
-		else
+		} else
 			printf("  No advertising router\n");
 	}
 #undef PR

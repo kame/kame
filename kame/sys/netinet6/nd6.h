@@ -92,6 +92,7 @@ struct	in6_prlist {
 		struct	in6_addr prefix;
 		struct prf_ra raflags;
 		u_char	prefixlen;
+		u_char	origin;
 		u_long	vltime;
 		u_long	pltime;
 		u_long	expire;

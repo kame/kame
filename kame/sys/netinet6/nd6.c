@@ -1325,6 +1325,11 @@ nd6_ioctl(cmd, data, ifp)
 		splx(s);
 		break;
 	case SIOCGPRLST_IN6:
+		/*
+		 * XXX meaning of fields, especialy "raflags", is very
+		 * differnet between RA prefix list and RR/static prefix list.
+		 * how about separating ioctls into two?
+		 */
 		bzero(prl, sizeof(*prl));
 #ifdef __NetBSD__
 		s = splsoftnet();
@@ -1366,11 +1371,11 @@ nd6_ioctl(cmd, data, ifp)
 				pfr = pfr->pfr_next;
 			}
 			prl->prefix[i].advrtrs = j;
+			prl->prefix[i].origin = PR_ORIG_RA;
 
 			i++;
 			pr = pr->ndpr_next;
 		}
-		splx(s);
 	      {
 		struct rr_prefix *rpp;
 
@@ -1386,9 +1391,11 @@ nd6_ioctl(cmd, data, ifp)
 			prl->prefix[i].if_index = rpp->rp_ifp->if_index;
 			prl->prefix[i].expire = rpp->rp_expire;
 			prl->prefix[i].advrtrs = 0;
+			prl->prefix[i].origin = rpp->rp_origin;
 			i++;
 		}
 	      }
+		splx(s);
 
 		break;
 	case SIOCGIFINFO_IN6:
