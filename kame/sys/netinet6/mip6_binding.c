@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.119 2002/08/21 06:04:55 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.120 2002/08/23 11:17:35 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -773,20 +773,47 @@ mip6_bdt_create(sc, paddr)
 	struct hif_softc *sc;
 	struct sockaddr_in6 *paddr;
 {
+	struct ifnet *ifp;
+	struct ifaddr *ifa;
 	struct rt_addrinfo rti;
 	struct sockaddr_in6 dst, mask;
-	struct sockaddr_dl gate;
 	struct rtentry *retrt;
 	int error = 0;
 
+	if ((sc == NULL) || (paddr == NULL))
+		return (EINVAL);
+
 	(void)mip6_bdt_delete(paddr);
 
+	ifp = &sc->hif_if;
 	dst = *paddr;
 
-	/* XXX correct? */
-	bzero(&gate, sizeof(gate));
-	gate.sdl_len = sizeof(gate);
-	gate.sdl_family = AF_LINK;
+	/* search for a link-local addr */
+	ifa = (struct ifaddr *)in6ifa_ifpforlinklocal(ifp,
+	    IN6_IFF_NOTREADY | IN6_IFF_ANYCAST);
+	if (ifa == NULL) {
+		/* XXX: freebsd does not have ifa_ifwithaf */
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+		for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+		TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list)
+#else
+		for (ifa = ifp->if_addrlist.tqh_first;
+		     ifa;
+		     ifa = ifa->ifa_list.tqe_next)
+#endif
+		{
+			if (ifa->ifa_addr->sa_family == AF_INET6)
+				break;
+		}
+		/* should we care about ia6_flags? */
+	}
+	if (ifa == NULL) {
+		mip6log((LOG_ERR,
+		    "%s:%d: no associated address to this if(%s)\n",
+		    __FILE__, __LINE__, if_name(ifp)));
+		return (EINVAL);
+	}
 
         bzero(&mask, sizeof(mask));
         mask.sin6_len = sizeof(struct sockaddr_in6);
@@ -796,7 +823,7 @@ mip6_bdt_create(sc, paddr)
 	bzero((caddr_t)&rti, sizeof(rti));
 	rti.rti_flags = RTF_UP|RTF_HOST;
 	rti.rti_info[RTAX_DST] = (struct sockaddr *)&dst;
-	rti.rti_info[RTAX_GATEWAY] = (struct sockaddr *)&gate;
+	rti.rti_info[RTAX_GATEWAY] = (struct sockaddr *)ifa->ifa_addr;
 	rti.rti_info[RTAX_NETMASK] = (struct sockaddr *)&mask;
 	rti.rti_ifp = (struct ifnet *)sc;
 
