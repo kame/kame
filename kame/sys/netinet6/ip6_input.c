@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.102 2000/07/29 23:28:20 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.103 2000/08/02 11:02:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -252,15 +252,6 @@ ip6_init()
 	register int i;
 #ifndef __OpenBSD__
 	struct timeval tv;
-#endif
-#ifdef NEW_STRUCT_ROUTE
-#ifdef DIAGNOSTIC
-	struct route ro;
-
-	/* check for new assumption on struct route */
-	if (sizeof(ro.ro_dst) > sizeof(struct sockaddr_in6))
-		panic("sizeof(ro.ro_dst) insufficient");
-#endif
 #endif
 
 	pr = (struct ip6protosw *)pffindproto(PF_INET6, IPPROTO_RAW, SOCK_RAW);
@@ -599,10 +590,6 @@ ip6_input(m)
 			ip6_forward_rt.ro_rt = 0;
 		}
 
-#ifdef DIAGNOSTIC
-		if (sizeof(struct sockaddr_in6) > sizeof(ip6_forward_rt.ro_dst))
-			panic("sizeof(ip6_forward_rt.ro_dst) too small");
-#endif
 		bzero(&ip6_forward_rt.ro_dst, sizeof(struct sockaddr_in6));
 		dst6 = (struct sockaddr_in6 *)&ip6_forward_rt.ro_dst;
 		dst6->sin6_len = sizeof(struct sockaddr_in6);

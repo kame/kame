@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.32 2000/07/29 23:28:20 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.33 2000/08/02 11:02:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -312,10 +312,6 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 			struct sockaddr_in6 *sa6;
 
 			/* No route yet, so try to acquire one */
-#ifdef DIAGNOSTIC
-			if (sizeof(struct sockaddr_in6) > sizeof(ro->ro_dst))
-				panic("sizeof(ro->ro_dst) too small");
-#endif
 			bzero(&ro->ro_dst, sizeof(struct sockaddr_in6));
 			sa6 = (struct sockaddr_in6 *)&ro->ro_dst;
 			sa6->sin6_family = AF_INET6;

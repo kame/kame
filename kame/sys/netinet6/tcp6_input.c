@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.31 2000/07/28 12:12:23 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.32 2000/08/02 11:02:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2086,10 +2086,6 @@ tcp6_rtlookup(in6p)
 	if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
 		struct sockaddr_in6 *dst6;
 
-#ifdef DIAGNOSTIC
-		if (sizeof(struct sockaddr_in6) > sizeof(ro->ro_dst))
-			panic("sizeof(ro->ro_dst) too small");
-#endif
 		bzero(&ro->ro_dst, sizeof(struct sockaddr_in6));
 		dst6 = (struct sockaddr_in6 *)&ro->ro_dst;
 		dst6->sin6_family = AF_INET6;
