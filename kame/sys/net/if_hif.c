@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.68 2004/02/13 02:52:08 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.69 2004/02/13 04:52:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -67,7 +67,7 @@ t.
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * Ryuji Wakikawa, Koshiro Mitsuya, Susumu Koshiba, Masashi Watari
+ * Ryuji Wakikawa, Koshiro Mitsuya, Susumu Koshiba, Masafumi Watari
  * Keio University, Endo 5322, Kanagawa, Japan
  * E-mail: mip6@sfc.wide.ad.jp
  *
