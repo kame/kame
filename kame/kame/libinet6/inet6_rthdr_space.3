@@ -29,7 +29,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: inet6_rthdr_space.3,v 1.4 2000/02/05 12:10:41 jinmei Exp $
+.\"     $Id: inet6_rthdr_space.3,v 1.5 2000/02/05 13:19:07 jinmei Exp $
 .\"
 .Dd December 10, 1999
 .Dt INET6_OPTION_SPACE 3
@@ -60,7 +60,7 @@
 .Fn inet6_rthdr_reverse "const struct cmsghdr *in" "struct cmsghdr *out"
 .Ft int
 .Fn inet6_rthdr_segments "const struct cmsghdr *cmsg"
-.Ft "struct in6_addr"
+.Ft "struct in6_addr *"
 .Fn inet6_rthdr_getaddr "struct cmsghdr *cmsg" "int index"
 .Ft int
 .Fn inet6_rthdr_getflags "const struct cmsghdr *cmsg" "int index"
