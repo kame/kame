@@ -16,7 +16,6 @@
 
 struct mdd_info {
 	int debug;
-	struct timeval poll;
 	int linkpoll;
 	int dns;
 	int nondaemon;

@@ -1,4 +1,4 @@
-/*      $Id: babymdd.c,v 1.6 2005/03/01 17:42:40 ryuji Exp $  */
+/*      $Id: babymdd.c,v 1.7 2005/03/02 05:35:21 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -96,10 +96,9 @@ struct mdd_info babyinfo;
 void
 baby_usage()
 {
-	fprintf(stderr, "babymdd is a simple movement detecter for a mobile node and a mobile router\n");
         fprintf(stderr, "babymdd [options] -h mipif interfaces..\n");
-	fprintf(stderr, "\t-h mipif      specify your mipxx interface\n");
-	fprintf(stderr, "\tinterfaces    specify interfaces which you want to attach to the Internet. If you don't specify any interfaces, babymdd will use all the available interfaces.\n");
+	fprintf(stderr, "\t-h mipif      specify your mip pseudo interface\n");
+	fprintf(stderr, "\tinterfaces    specify interfaces\n");
 	fprintf(stderr, "Options\n");
         fprintf(stderr, "\t-d            turn on debug mode\n");
         fprintf(stderr, "\t-D            turn on verbose debug mode\n");
@@ -154,7 +153,6 @@ main (argc, argv)
 		switch (ch) {
 		case 'h':
 			babyinfo.hoa_index = if_nametoindex(optarg);
-
 			break;
 		case 'd':
 			babyinfo.debug = DEBUG_NORMAL;
@@ -177,6 +175,8 @@ main (argc, argv)
 			break;
 		}
 	}
+
+
 	if (babyinfo.hoa_index <= 0) {
 		baby_usage();
 		exit(0);
@@ -285,7 +285,7 @@ main (argc, argv)
 		if (babyinfo.mipsock >= nfds)    
 			nfds = babyinfo.mipsock + 1;
 
-                if (select(nfds, &fds, NULL, NULL, &babyinfo.poll) < 0) {
+                if (select(nfds, &fds, NULL, NULL, NULL) < 0) {
 			if (DEBUGNORM)
 				syslog(LOG_ERR, "select %s\n", strerror(errno));
                         exit(-1);
@@ -1360,3 +1360,4 @@ baby_ifindex2ifinfo(u_int16_t ifindex) {
 
 	return ifinfo;
 }
+
