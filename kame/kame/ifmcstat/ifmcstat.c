@@ -457,21 +457,22 @@ in6_multientry(mc)
 
 	KREAD(mc, &multi, struct in6_multi);
 	printf("\t\tgroup %s", inet6_n2a(&multi.in6m_sa));
-	printf(" refcnt %u", multi.in6m_refcount);
+	printf(" refcnt %u\n", multi.in6m_refcount);
 
 	if (multi.in6m_rti != NULL) {
 		KREAD(multi.in6m_rti, &rt6i, struct router_info);
+		printf("\t\t\t");
 		switch (rt6i.rt6i_type) {
 		case MLD_V1_ROUTER:
-			printf("\tmld_ver 1");
+			printf("mldv1");
 			break;
 #ifdef HAVE_MLDV2
 		case MLD_V2_ROUTER:
-			printf("\tmld_ver 2");
+			printf("mldv2");
 			break;
 #endif
 		default:
-			printf("\tmld_ver ?(%d)", rt6i.rt6i_type);
+			printf("mldv?(%d)", rt6i.rt6i_type);
 			break;
 		}
 	}
@@ -483,7 +484,7 @@ in6_multientry(mc)
 	}
 
 	KREAD(multi.in6m_source, &src, struct in6_multi_source);
-	printf("\tmode=%s\tgroup join=%d\n",
+	printf(" mode=%s grpjoin=%d\n",
 		src.i6ms_mode == MCAST_INCLUDE ? "include" :
 		src.i6ms_mode == MCAST_EXCLUDE ? "exclude" :
 		"???",
@@ -511,12 +512,12 @@ in6_addr_slistentry(struct in6_addr_slist *ias, char *heading)
 	struct in6_addr_source src;
 
 	if (ias == NULL) {
-		printf("\t\t\t%s (none)\n", heading);
+		printf("\t\t\t\t%s (none)\n", heading);
 		return;
 	}
 	memset(&slist, 0, sizeof(slist));
 	KREAD(ias, &slist, struct in6_addr_source);
-	printf("\t\t\t%s (entry num=%d)\n", heading, slist.numsrc);
+	printf("\t\t\t\t%s (entry num=%d)\n", heading, slist.numsrc);
 	if (slist.numsrc == 0) {
 		return;
 	}
@@ -524,7 +525,7 @@ in6_addr_slistentry(struct in6_addr_slist *ias, char *heading)
 
 	KREAD(head.lh_first, &src, struct in6_addr_source);
 	while (1) {
-		printf("\t\t\t\tsource %s (ref=%d)\n",
+		printf("\t\t\t\t\tsource %s (ref=%d)\n",
 			inet6_n2a(&src.i6as_addr),
 			src.i6as_refcount);
 		if (src.i6as_list.le_next == NULL)
@@ -647,26 +648,28 @@ in_multientry(mc)
 #endif
 
 	KREAD(mc, &multi, struct in_multi);
-	printf("\t\tgroup %s", inet_ntoa(multi.inm_addr));
+	printf("\t\tgroup %s\n", inet_ntoa(multi.inm_addr));
 
 	if (multi.inm_rti != NULL) {
 		KREAD(multi.inm_rti, &rti, struct router_info);
+		printf("\t\t");
 		switch (rti.rti_type) {
 		case IGMP_v1_ROUTER:
-			printf("\tigmp_ver 1");
+			printf("igmpv1");
 			break;
 		case IGMP_v2_ROUTER:
-			printf("\tigmp_ver 2");
+			printf("igmpv2");
 			break;
 #ifdef HAVE_IGMPV3
 		case IGMP_v3_ROUTER:
-			printf("\tigmp_ver 3");
+			printf("igmpv3");
 			break;
 #endif
 		default:
-			printf("\tigmp_ver ?(%d)", rti.rti_type);
+			printf("igmpv?(%d)", rti.rti_type);
 			break;
 		}
+		printf("\n");
 	}
 
 #ifdef HAVE_IGMPV3
@@ -712,12 +715,12 @@ in_addr_slistentry(struct in_addr_slist *ias, char *heading)
 	struct in_addr_source src;
 
 	if (ias == NULL) {
-		printf("\t\t\t%s (none)\n", heading);
+		printf("\t\t\t\t%s (none)\n", heading);
 		return;
 	}
 	memset(&slist, 0, sizeof(slist));
 	KREAD(ias, &slist, struct in_addr_source);
-	printf("\t\t\t%s (entry num=%d)\n", heading, slist.numsrc);
+	printf("\t\t\t\t%s (entry num=%d)\n", heading, slist.numsrc);
 	if (slist.numsrc == 0) {
 		return;
 	}
@@ -725,7 +728,7 @@ in_addr_slistentry(struct in_addr_slist *ias, char *heading)
 
 	KREAD(head.lh_first, &src, struct in_addr_source);
 	while (1) {
-		printf("\t\t\t\tsource %s (ref=%d)\n",
+		printf("\t\t\t\t\tsource %s (ref=%d)\n",
 			inet_ntoa(src.ias_addr.sin_addr), src.ias_refcount);
 		if (src.ias_list.le_next == NULL)
 			break;
