@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.139 2000/08/30 09:33:42 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.140 2000/09/06 12:31:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1140,7 +1140,7 @@ icmp6_mtudisc_update(dst, icmp6, m)
 
 /*
  * Process a Node Information Query packet, based on
- * draft-ietf-ipngwg-icmp-name-lookups-06.
+ * draft-ietf-ipngwg-icmp-name-lookups-07.
  * 
  * Spec incompatibilities:
  * - IPv6 Subject address handling
@@ -1191,7 +1191,7 @@ ni6_input(m, off)
 	 * The Responder must discard the Query without further processing
 	 * unless it is one of the Responder's unicast or anycast addresses, or
 	 * a link-local scope multicast address which the Responder has joined.
-	 * [icmp-name-lookups-06, Section 4.]
+	 * [icmp-name-lookups-07, Section 4.]
 	 */
 	bzero(&sin6, sizeof(sin6));
 	sin6.sin6_family = AF_INET6;
@@ -1211,7 +1211,7 @@ ni6_input(m, off)
 	switch (qtype) {
 	case NI_QTYPE_NOOP:
 	case NI_QTYPE_SUPTYPES:
-		/* 06 draft */
+		/* 07 draft */
 		if (ni6->ni_code == ICMP6_NI_SUBJ_FQDN && subjlen == 0)
 			break;
 		/*FALLTHROUGH*/
@@ -1332,7 +1332,8 @@ ni6_input(m, off)
 		break;
 	case NI_QTYPE_NODEADDR:
 		addrs = ni6_addrs(ni6, m, &ifp, subj);
-		if ((replylen += addrs * sizeof(struct in6_addr)) > MCLBYTES)
+		if ((replylen += addrs * (sizeof(struct in6_addr) +
+					  sizeof(u_int32_t))) > MCLBYTES)
 			replylen = MCLBYTES; /* XXX: will truncate pkt later */
 		break;
 	default:
@@ -1619,7 +1620,7 @@ ni6_addrs(ni6, m, ifpp, subj)
 	register struct ifnet *ifp;
 	register struct in6_ifaddr *ifa6;
 	register struct ifaddr *ifa;
-	struct sockaddr_in6 *subj_ip6 = NULL; /* XXX pedeant */
+	struct sockaddr_in6 *subj_ip6 = NULL; /* XXX pedant */
 	int addrs = 0, addrsofif, iffound = 0;
 	int niflags = ni6->ni_flags;
 
@@ -1667,7 +1668,7 @@ ni6_addrs(ni6, m, ifpp, subj)
 			 * Node Information proxy, since they represent
 			 * addresses of IPv4-only nodes, which perforce do
 			 * not implement this protocol.
-			 * [icmp-name-lookups-06, Section 5.4]
+			 * [icmp-name-lookups-07, Section 5.4]
 			 * So we don't support NI_NODEADDR_FLAG_COMPAT in
 			 * this function at this moment.
 			 */
@@ -1727,12 +1728,19 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 #endif
 	register struct in6_ifaddr *ifa6;
 	register struct ifaddr *ifa;
-	int copied = 0;
+	struct ifnet *ifp_dep = NULL;
+	int copied = 0, allow_deprecated = 0;
 	u_char *cp = (u_char *)(nni6 + 1);
 	int niflags = ni6->ni_flags;
+	u_int32_t ltime;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	if (ifp0 == NULL && !(niflags & NI_NODEADDR_FLAG_ALL))
 		return(0);	/* needless to copy */
+
+  again:
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	for (; ifp; ifp = ifp->if_next)
@@ -1750,6 +1758,23 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 			if (ifa->ifa_addr->sa_family != AF_INET6)
 				continue;
 			ifa6 = (struct in6_ifaddr *)ifa;
+
+			if ((ifa6->ia6_flags & IN6_IFF_DEPRECATED) != 0 &&
+			    allow_deprecated == 0) {
+				/*
+				 * prefererred address should be put before
+				 * deprecated addresses.
+				 */
+
+				/* record the interface for later search */
+				if (ifp_dep == NULL)
+					ifp_dep = ifp;
+
+				continue;
+			}
+			else if ((ifa6->ia6_flags & IN6_IFF_DEPRECATED) == 0 &&
+				 allow_deprecated != 0)
+				continue; /* we now collect deprecated addrs */
 
 			/* What do we have to do about ::1? */
 			switch(in6_addrscope(&ifa6->ia_addr.sin6_addr)) {
@@ -1781,7 +1806,8 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 				continue;
 
 			/* now we can copy the address */
-			if (resid < sizeof(struct in6_addr)) {
+			if (resid < sizeof(struct in6_addr) +
+			    sizeof(u_int32_t)) {
 				/*
 				 * We give up much more copy.
 				 * Set the truncate flag and return.
@@ -1790,17 +1816,56 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 					NI_NODEADDR_FLAG_TRUNCATE;
 				return(copied);
 			}
+
+			/*
+			 * Set the TTL of the address.
+			 * The TTL value should be one of the following
+			 * according to the specification:
+			 *
+			 * 1. The remaining lifetime of a DHCP lease on the
+			 *    address, or
+			 * 2. The remaining Valid Lifetime of a prefix from
+			 *    which the address was derived through Stateless
+			 *    Autoconfiguration.
+			 *
+			 * Note that we currently do not support stateful
+			 * address configuration by DHCPv6, so the former
+			 * case can't happen.
+			 */
+			if (ifa6->ia6_lifetime.ia6t_expire == 0)
+				ltime = ND6_INFINITE_LIFETIME;
+			else {
+				if (ifa6->ia6_lifetime.ia6t_expire >
+				    time_second)
+					ltime = htonl(ifa6->ia6_lifetime.ia6t_expire - time_second);
+				else
+					ltime = 0;
+			}
+			
+			bcopy(&ltime, cp, sizeof(u_int32_t));
+			cp += sizeof(u_int32_t);
+
+			/* copy the address itself */
 			bcopy(&ifa6->ia_addr.sin6_addr, cp,
 			      sizeof(struct in6_addr));
 			/* XXX: KAME link-local hack; remove ifindex */
 			if (IN6_IS_ADDR_LINKLOCAL(&ifa6->ia_addr.sin6_addr))
 				((struct in6_addr *)cp)->s6_addr16[1] = 0;
 			cp += sizeof(struct in6_addr);
-			resid -= sizeof(struct in6_addr);
-			copied += sizeof(struct in6_addr);
+			
+			resid -= (sizeof(struct in6_addr) + sizeof(u_int32_t));
+			copied += (sizeof(struct in6_addr) +
+				   sizeof(u_int32_t));
 		}
 		if (ifp0)	/* we need search only on the specified IF */
 			break;
+	}
+
+	if (allow_deprecated == 0 && ifp_dep != NULL) {
+		ifp = ifp_dep;
+		allow_deprecated = 1;
+
+		goto again;
 	}
 
 	return(copied);
