@@ -96,7 +96,7 @@ struct	in6pcb {
 	struct	mbuf *in6p_options;   /* IP6 options */
 	struct	ip6_pktopts *in6p_outputopts; /* IP6 options for outgoing packets */
 	struct	ip6_moptions *in6p_moptions; /* IP6 multicast options */
-	u_short	in6p_ifindex;
+
 	/* should move the following just after next/prev */
 	LIST_ENTRY(in6pcb) in6p_hlist;	/* hash chain */
 	u_long	in6p_hash;		/* hash value */
