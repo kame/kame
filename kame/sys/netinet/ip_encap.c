@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.46 2001/06/22 19:24:01 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.47 2001/07/24 13:38:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -711,9 +711,6 @@ encap_fillarg(m, ep)
 	struct mbuf *m;
 	const struct encaptab *ep;
 {
-#if 0
-	m->m_pkthdr.aux = ep->arg;
-#else
 	struct mbuf *n;
 
 	n = m_aux_add(m, AF_INET, IPPROTO_IPV4);
@@ -721,7 +718,6 @@ encap_fillarg(m, ep)
 		*mtod(n, void **) = ep->arg;
 		n->m_len = sizeof(void *);
 	}
-#endif
 }
 
 void *
@@ -729,11 +725,6 @@ encap_getarg(m)
 	struct mbuf *m;
 {
 	void *p;
-#if 0
-	p = m->m_pkthdr.aux;
-	m->m_pkthdr.aux = NULL;
-	return p;
-#else
 	struct mbuf *n;
 
 	p = NULL;
@@ -744,5 +735,4 @@ encap_getarg(m)
 		m_aux_delete(m, n);
 	}
 	return p;
-#endif
 }
