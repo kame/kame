@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_ident.c,v 1.44 2000/10/03 23:44:42 itojun Exp $	*/
+/*	$KAME: isakmp_ident.c,v 1.45 2000/10/04 03:30:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.44 2000/10/03 23:44:42 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.45 2000/10/04 03:30:42 itojun Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -143,7 +143,7 @@ ident_i1send(iph1, msg)
 
 	iph1->retry_counter = iph1->rmconf->retry_counter;
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
-			isakmp_ph1resend, iph1);
+	    isakmp_ph1resend_stub, iph1);
 
 	error = 0;
 
@@ -298,7 +298,7 @@ ident_i2send(iph1, msg)
 	/* add to the schedule to resend, and seve back pointer. */
 	iph1->retry_counter = iph1->rmconf->retry_counter;
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
-			isakmp_ph1resend, iph1);
+	    isakmp_ph1resend_stub, iph1);
 
 	error = 0;
 
@@ -462,7 +462,7 @@ ident_i3send(iph1, msg)
 
 	iph1->retry_counter = iph1->rmconf->retry_counter;
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
-			isakmp_ph1resend, iph1);
+	    isakmp_ph1resend_stub, iph1);
 
 	error = 0;
 
@@ -798,7 +798,7 @@ ident_r1send(iph1, msg)
 
 	iph1->retry_counter = iph1->rmconf->retry_counter;
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
-			isakmp_ph1resend, iph1);
+	    isakmp_ph1resend_stub, iph1);
 
 	error = 0;
 
@@ -952,7 +952,7 @@ ident_r2send(iph1, msg)
 
 	iph1->retry_counter = iph1->rmconf->retry_counter;
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
-			isakmp_ph1resend, iph1);
+	    isakmp_ph1resend_stub, iph1);
 
 	error = 0;
 

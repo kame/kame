@@ -1,4 +1,4 @@
-/*	$KAME: session.c,v 1.15 2000/10/03 23:40:58 itojun Exp $	*/
+/*	$KAME: session.c,v 1.16 2000/10/04 03:30:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: session.c,v 1.15 2000/10/03 23:40:58 itojun Exp $ */
+/* YIPS @(#)$Id: session.c,v 1.16 2000/10/04 03:30:43 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -82,6 +82,7 @@
 static void init_signal __P((void));
 static int set_signal __P((int sig, RETSIGTYPE (*func) __P((int))));
 static void check_sigreq __P((void));
+static void check_flushsa_stub __P((void *));
 static void check_flushsa __P((void));
 static int close_sockets __P((void));
 
@@ -266,7 +267,7 @@ check_sigreq()
 	default:
 		plog(logp, LOCATION, NULL, "caught signal %d\n", sigreq);
 		pfkey_send_flush(lcconf->sock_pfkey, SADB_SATYPE_UNSPEC);
-		sched_new(1, check_flushsa, NULL);
+		sched_new(1, check_flushsa_stub, NULL);
 		sigreq = 0;
 		break;
 	}
@@ -276,6 +277,14 @@ check_sigreq()
  * waiting the termination of processing until sending DELETE message
  * for all inbound SA will complete.
  */
+static void
+check_flushsa_stub(p)
+	void *p;
+{
+
+	check_flushsa();
+}
+
 static void
 check_flushsa()
 {
@@ -323,7 +332,7 @@ check_flushsa()
 	}
 
 	if (n) {
-		sched_new(1, check_flushsa, NULL);
+		sched_new(1, check_flushsa_stub, NULL);
 		return;
 	}
 

@@ -1,4 +1,4 @@
-/*	$KAME: handler.c,v 1.36 2000/09/19 06:49:29 sakane Exp $	*/
+/*	$KAME: handler.c,v 1.37 2000/10/04 03:30:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.36 2000/09/19 06:49:29 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.37 2000/10/04 03:30:41 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -146,7 +146,7 @@ purgeph1(iph1)
 		if (p->sce)
 			SCHED_KILL(p->sce);
 		p->status = PHASE1ST_EXPIRED;
-		p->sce = sched_new(1, isakmp_ph1delete, p);
+		p->sce = sched_new(1, isakmp_ph1delete_stub, p);
 	}
 }
 

@@ -1,4 +1,4 @@
-/*	$KAME: strnames.c,v 1.13 2000/09/13 04:50:29 itojun Exp $	*/
+/*	$KAME: strnames.c,v 1.14 2000/10/04 03:30:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: strnames.c,v 1.13 2000/09/13 04:50:29 itojun Exp $ */
+/* YIPS @(#)$Id: strnames.c,v 1.14 2000/10/04 03:30:43 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -51,7 +51,7 @@
 struct ksmap {
 	int key;
 	char *str;
-	char *(*f)();
+	char *(*f) __P((int));
 };
 
 static char *num2str __P((int n));

@@ -1,4 +1,4 @@
-/*	$KAME: remoteconf.h,v 1.16 2000/09/22 18:03:09 sakane Exp $	*/
+/*	$KAME: remoteconf.h,v 1.17 2000/10/04 03:30:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: remoteconf.h,v 1.16 2000/09/22 18:03:09 sakane Exp $ */
+/* YIPS @(#)$Id: remoteconf.h,v 1.17 2000/10/04 03:30:42 itojun Exp $ */
 
 /* remote configuration */
 
@@ -101,6 +101,7 @@ extern void delrmconf __P((struct remoteconf *));
 extern void delisakmpsa __P((struct isakmpsa *));
 extern void deletypes __P((struct etypes *));
 extern void insrmconf __P((struct remoteconf *));
+extern void remrmconf __P((struct remoteconf *));
 extern void flushrmconf __P((void));
 extern void initrmconf __P((void));
 extern struct etypes *check_etypeok

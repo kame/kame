@@ -1,6 +1,6 @@
-/*	$KAME: safefile.c,v 1.2 2000/09/13 04:50:28 itojun Exp $	*/
+/*	$KAME: safefile.c,v 1.3 2000/10/04 03:30:43 itojun Exp $	*/
 
-/*	$KAME: safefile.c,v 1.2 2000/09/13 04:50:28 itojun Exp $	*/
+/*	$KAME: safefile.c,v 1.3 2000/10/04 03:30:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -40,6 +40,7 @@
 #include "plog.h"
 #include "debug.h"
 #include "misc.h"
+#include "safefile.h"
 
 int
 safefile(path, secret)

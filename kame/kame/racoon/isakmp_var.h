@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_var.h,v 1.17 2000/09/13 04:50:26 itojun Exp $	*/
+/*	$KAME: isakmp_var.h,v 1.18 2000/10/04 03:30:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_var.h,v 1.17 2000/09/13 04:50:26 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_var.h,v 1.18 2000/10/04 03:30:42 itojun Exp $ */
 
 #define PORT_ISAKMP 500
 
@@ -66,15 +66,22 @@ extern int isakmp_open __P((void));
 extern void isakmp_close __P((void));
 extern int isakmp_send __P((struct ph1handle *, vchar_t *));
 
+extern void isakmp_ph1resend_stub __P((void *));
 extern void isakmp_ph1resend __P((struct ph1handle *));
+extern void isakmp_ph2resend_stub __P((void *));
 extern void isakmp_ph2resend __P((struct ph2handle *));
+extern void isakmp_ph1expire_stub __P((void *));
 extern void isakmp_ph1expire __P((struct ph1handle *));
+extern void isakmp_ph1delete_stub __P((void *));
 extern void isakmp_ph1delete __P((struct ph1handle *));
+extern void isakmp_ph2expire_stub __P((void *));
 extern void isakmp_ph2expire __P((struct ph2handle *));
+extern void isakmp_ph2delete_stub __P((void *));
 extern void isakmp_ph2delete __P((struct ph2handle *));
 
 extern int isakmp_post_acquire __P((struct ph2handle *));
 extern int isakmp_post_getspi __P((struct ph2handle *));
+extern void isakmp_chkph1there_stub __P((void *));
 extern void isakmp_chkph1there __P((struct ph2handle *));
 
 extern caddr_t isakmp_set_attr_v __P((caddr_t, int, caddr_t, int));

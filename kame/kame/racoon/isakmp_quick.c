@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.65 2000/09/22 20:33:53 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.66 2000/10/04 03:30:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.65 2000/09/22 20:33:53 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.66 2000/10/04 03:30:42 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -70,6 +70,7 @@
 #include "isakmp_var.h"
 #include "isakmp.h"
 #include "isakmp_inf.h"
+#include "isakmp_quick.h"
 #include "oakley.h"
 #include "handler.h"
 #include "ipsec_doi.h"
@@ -131,7 +132,7 @@ quick_i1prep(iph2, msg)
 		plog(logp, LOCATION, NULL, "pfkey getspi sent.\n"));
 
 	iph2->sce = sched_new(lcconf->wait_ph2complete,
-				pfkey_timeover, iph2);
+	    pfkey_timeover_stub, iph2);
 
 	error = 0;
 
@@ -285,7 +286,7 @@ quick_i1send(iph2, msg)
 	/* add to the schedule to resend */
 	iph2->retry_counter = iph2->ph1->rmconf->retry_counter;
 	iph2->scr = sched_new(iph2->ph1->rmconf->retry_interval,
-				isakmp_ph2resend, iph2);
+	    isakmp_ph2resend_stub, iph2);
 
 	error = 0;
 
@@ -1127,7 +1128,7 @@ quick_r1prep(iph2, msg)
 		plog(logp, LOCATION, NULL, "pfkey getspi sent.\n"));
 
 	iph2->sce = sched_new(lcconf->wait_ph2complete,
-				pfkey_timeover, iph2);
+	    pfkey_timeover_stub, iph2);
 
 	error = 0;
 
@@ -1310,7 +1311,7 @@ quick_r2send(iph2, msg)
 	/* add to the schedule to resend */
 	iph2->retry_counter = iph2->ph1->rmconf->retry_counter;
 	iph2->scr = sched_new(iph2->ph1->rmconf->retry_interval,
-				isakmp_ph2resend, iph2);
+	    isakmp_ph2resend_stub, iph2);
 
 	error = 0;
 

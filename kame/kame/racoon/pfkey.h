@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.h,v 1.12 2000/09/19 04:25:58 itojun Exp $	*/
+/*	$KAME: pfkey.h,v 1.13 2000/10/04 03:30:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.h,v 1.12 2000/09/19 04:25:58 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.h,v 1.13 2000/10/04 03:30:42 itojun Exp $ */
 
 extern int pfkey_handler __P((void));
 extern vchar_t *pfkey_dump_sadb __P((int));
@@ -44,6 +44,7 @@ extern int pk_sendupdate __P((struct ph2handle *));
 extern int pk_sendadd __P((struct ph2handle *));
 extern int pk_sendeacquire __P((struct ph2handle *));
 
+extern void pfkey_timeover_stub __P((void *));
 extern void pfkey_timeover __P((struct ph2handle *));
 
 extern u_int pfkey2ipsecdoi_proto __P((u_int));

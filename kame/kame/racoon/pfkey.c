@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.84 2000/09/21 19:02:49 itojun Exp $	*/
+/*	$KAME: pfkey.c,v 1.85 2000/10/04 03:30:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.84 2000/09/21 19:02:49 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.85 2000/10/04 03:30:42 itojun Exp $ */
 
 #define _PFKEY_C_
 
@@ -768,6 +768,14 @@ pfkey_convertfromipsecdoi(proto_id, t_id, hashtype,
 
 /* called from scheduler */
 void
+pfkey_timeover_stub(p)
+	void *p;
+{
+
+	pfkey_timeover((struct ph2handle *)p);
+}
+
+void
 pfkey_timeover(iph2)
 	struct ph2handle *iph2;
 {
@@ -1121,7 +1129,7 @@ pk_recvupdate(mhp)
 	unbindph12(iph2);
 
 	iph2->sce = sched_new(iph2->approval->lifetime,
-				isakmp_ph2expire, iph2);
+	    isakmp_ph2expire_stub, iph2);
 
 	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
 	return 0;

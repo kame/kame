@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.57 2000/09/22 06:34:03 itojun Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.58 2000/10/04 03:30:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.57 2000/09/22 06:34:03 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.58 2000/10/04 03:30:42 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -90,6 +90,7 @@
 static int isakmp_info_recv_n __P((struct ph1handle *, vchar_t *));
 static int isakmp_info_recv_d __P((struct ph1handle *, vchar_t *));
 
+static void purge_isakmp_spi __P((int, isakmp_index *, size_t));
 static void purge_ipsec_spi __P((struct sockaddr *, int, u_int32_t *, size_t));
 static void info_recv_initialcontact __P((struct ph1handle *));
 
@@ -883,7 +884,7 @@ purge_isakmp_spi(proto, spi, n)
 		if (iph1->sce)
 			SCHED_KILL(iph1->sce);
 		iph1->status = PHASE1ST_EXPIRED;
-		iph1->sce = sched_new(1, isakmp_ph1delete, iph1);
+		iph1->sce = sched_new(1, isakmp_ph1delete_stub, iph1);
 	}
 }
 

@@ -1,4 +1,4 @@
-/*	$KAME: schedule.h,v 1.9 2000/09/13 04:50:29 itojun Exp $	*/
+/*	$KAME: schedule.h,v 1.10 2000/10/04 03:30:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: schedule.h,v 1.9 2000/09/13 04:50:29 itojun Exp $ */
+/* YIPS @(#)$Id: schedule.h,v 1.10 2000/10/04 03:30:43 itojun Exp $ */
 
 #include <sys/queue.h>
 
@@ -40,7 +40,7 @@ struct sched {
 				 * if defined FIXY2038PROBLEM, this time
 				 * is from the time when called sched_init().
 				 */
-	void (*func)();		/* call this function when timeout. */
+	void (*func) __P((void *)); /* call this function when timeout. */
 	void *param;		/* pointer to parameter */
 
 	int dead;		/* dead or alive */
@@ -69,7 +69,7 @@ struct scheddump {
 };
 
 struct timeval *schedular __P((void));
-struct sched *sched_new __P((time_t, void (*func)(), void *));
+struct sched *sched_new __P((time_t, void (*func) __P((void *)), void *));
 void sched_kill __P((struct sched *));
 int sched_dump __P((caddr_t *, int *));
 void sched_init __P((void));

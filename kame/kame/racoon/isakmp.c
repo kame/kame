@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.105 2000/09/23 07:01:24 itojun Exp $	*/
+/*	$KAME: isakmp.c,v 1.106 2000/10/04 03:30:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.105 2000/09/23 07:01:24 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.106 2000/10/04 03:30:42 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -618,7 +618,8 @@ ph1_main(iph1, msg)
 		(void)time(&iph1->created);
 
 		/* add to the schedule to expire, and seve back pointer. */
-		iph1->sce = sched_new(iph1->approval->lifetime, isakmp_ph1expire, iph1);
+		iph1->sce = sched_new(iph1->approval->lifetime,
+		    isakmp_ph1expire_stub, iph1);
 
 		/* INITIAL-CONTACT processing */
 		/* don't anything if local test mode. */
@@ -1372,6 +1373,13 @@ isakmp_send(iph1, buf)
 
 /* called from scheduler */
 void
+isakmp_ph1resend_stub(p)
+	void *p;
+{
+	isakmp_ph1resend((struct ph1handle *)p);
+}
+
+void
 isakmp_ph1resend(iph1)
 	struct ph1handle *iph1;
 {
@@ -1397,10 +1405,18 @@ isakmp_ph1resend(iph1)
 	}
 
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
-			isakmp_ph1resend, iph1);
+	    isakmp_ph1resend_stub, iph1);
 }
 
 /* called from scheduler */
+void
+isakmp_ph2resend_stub(p)
+	void *p;
+{
+
+	isakmp_ph2resend((struct ph2handle *)p);
+}
+
 void
 isakmp_ph2resend(iph2)
 	struct ph2handle *iph2;
@@ -1427,10 +1443,18 @@ isakmp_ph2resend(iph2)
 	}
 
 	iph2->scr = sched_new(iph2->ph1->rmconf->retry_interval,
-				isakmp_ph2resend, iph2);
+	    isakmp_ph2resend_stub, iph2);
 }
 
 /* called from scheduler */
+void
+isakmp_ph1expire_stub(p)
+	void *p;
+{
+
+	isakmp_ph1expire((struct ph1handle *)p);
+}
+
 void
 isakmp_ph1expire(iph1)
 	struct ph1handle *iph1;
@@ -1450,12 +1474,20 @@ isakmp_ph1expire(iph1)
 
 	iph1->status = PHASE1ST_EXPIRED;
 
-	iph1->sce = sched_new(1, isakmp_ph1delete, iph1);
+	iph1->sce = sched_new(1, isakmp_ph1delete_stub, iph1);
 
 	return;
 }
 
 /* called from scheduler */
+void
+isakmp_ph1delete_stub(p)
+	void *p;
+{
+
+	isakmp_ph1delete((struct ph1handle *)p);
+}
+
 void
 isakmp_ph1delete(iph1)
 	struct ph1handle *iph1;
@@ -1465,7 +1497,7 @@ isakmp_ph1delete(iph1)
 	SCHED_INIT(iph1->sce);
 
 	if (LIST_FIRST(&iph1->ph2tree) != NULL) {
-		iph1->sce = sched_new(1, isakmp_ph1delete, iph1);
+		iph1->sce = sched_new(1, isakmp_ph1delete_stub, iph1);
 		return;
 	}
 
@@ -1494,6 +1526,14 @@ isakmp_ph1delete(iph1)
  * expires in the userland.
  */
 void
+isakmp_ph2expire_stub(p)
+	void *p;
+{
+
+	isakmp_ph2expire((struct ph2handle *)p);
+}
+
+void
 isakmp_ph2expire(iph2)
 	struct ph2handle *iph2;
 {
@@ -1510,12 +1550,20 @@ isakmp_ph2expire(iph2)
 	free(src);
 	free(dst);
 
-	iph2->sce = sched_new(10, isakmp_ph2delete, iph2);
+	iph2->sce = sched_new(10, isakmp_ph2delete_stub, iph2);
 
 	return;
 }
 
 /* called from scheduler. */
+void
+isakmp_ph2delete_stub(p)
+	void *p;
+{
+
+	isakmp_ph2delete((struct ph2handle *)p);
+}
+
 void
 isakmp_ph2delete(iph2)
 	struct ph2handle *iph2;
@@ -1569,7 +1617,7 @@ isakmp_post_acquire(iph2)
 	/* no ISAKMP-SA found. */
 	if (iph1 == NULL) {
 		iph2->retry_checkph1 = lcconf->retry_checkph1;
-		sched_new(1, isakmp_chkph1there, iph2);
+		sched_new(1, isakmp_chkph1there_stub, iph2);
 		YIPSDEBUG(DEBUG_STAMP,
 			plog(logp, LOCATION, NULL,
 				"IPsec-SA request for %s queued "
@@ -1587,7 +1635,7 @@ isakmp_post_acquire(iph2)
 	/* found ISAKMP-SA, but on negotiation. */
 	if (iph1->status != PHASE1ST_ESTABLISHED) {
 		iph2->retry_checkph1 = lcconf->retry_checkph1;
-		sched_new(1, isakmp_chkph1there, iph2);
+		sched_new(1, isakmp_chkph1there_stub, iph2);
 		YIPSDEBUG(DEBUG_STAMP,
 			plog(logp, LOCATION, iph2->dst,
 				"request for establishing IPsec-SA was queued "
@@ -1632,6 +1680,13 @@ isakmp_post_getspi(iph2)
 }
 
 /* called by scheduler */
+void
+isakmp_chkph1there_stub(p)
+	void *p;
+{
+	isakmp_chkph1there((struct ph2handle *)p);
+}
+
 void
 isakmp_chkph1there(iph2)
 	struct ph2handle *iph2;
@@ -1678,7 +1733,7 @@ isakmp_chkph1there(iph2)
 	}
 
 	/* no isakmp-sa found */
-	sched_new(1, isakmp_chkph1there, iph2);
+	sched_new(1, isakmp_chkph1there_stub, iph2);
 
 	return;
 }
@@ -2020,6 +2075,11 @@ etypesw2(etype)
 /* for print-isakmp.c */
 char *snapend;
 extern void isakmp_print __P((const u_char *, u_int, const u_char *));
+
+char *getname __P((const u_char *));
+#ifdef INET6
+char *getname6 __P((const u_char *));
+#endif
 
 /*
  * Return a name for the IP address pointed to by ap.  This address
