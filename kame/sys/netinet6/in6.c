@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.350 2003/10/15 00:15:12 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.351 2003/10/15 22:27:13 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2405,9 +2405,12 @@ in6_addmulti(maddr6, ifp, errorp)
 		ifr.ifr_addr = *maddr6;
 		if (ifp->if_ioctl == NULL)
 			*errorp = ENXIO; /* XXX: appropriate? */
-		else
+		else {
 			*errorp = (*ifp->if_ioctl)(ifp, SIOCADDMULTI,
 			    (caddr_t)&ifr);
+			if (*errorp == ENETRESET)
+				*errorp = 0;
+		}
 		if (*errorp) {
 			LIST_REMOVE(in6m, in6m_entry);
 			free(in6m, M_IPMADDR);
@@ -2704,6 +2707,7 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 	u_int8_t type = 0;		/* State-Change report type */
 	struct router6_info *rti;
 	int s;
+	int error;
 
 	*error = 0; /* initialize */
 
@@ -2863,7 +2867,8 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 	     */
 	    bcopy(ap, &ifr.ifr_addr, ap->sin6_len);
 	    if ((ifp->if_ioctl == NULL) ||
-		(*ifp->if_ioctl)(ifp, SIOCADDMULTI, (caddr_t)&ifr) != 0) {
+		(error = (*ifp->if_ioctl)(ifp, SIOCADDMULTI, (caddr_t)&ifr) != 0) &&
+		error != ENETRESET) {
 		LIST_REMOVE(in6m, in6m_entry);
 		free(in6m, M_IPMADDR);
 		*error = EINVAL /*???*/;
