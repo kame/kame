@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.209 2005/01/18 09:30:15 sakane Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.210 2005/01/19 04:40:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -138,6 +138,13 @@
 #define YES 1
 #define NO  0
 
+#ifndef IPPROTO_SCTP
+#define IPPROTO_SCTP	132
+#endif
+#ifndef IPPROTO_DCCP
+#define IPPROTO_DCCP	33
+#endif
+
 static const char in_addrany[] = { 0, 0, 0, 0 };
 static const char in_loopback[] = { 127, 0, 0, 1 };
 #ifdef INET6
@@ -202,6 +209,7 @@ static const struct explore explore[] = {
 #endif
 #ifdef INET6
 	{ PF_INET6, SOCK_DGRAM, IPPROTO_UDP, "udp", 0x1f },
+	{ PF_INET6, SOCK_DGRAM, IPPROTO_DCCP, "dccp", 0x1f },
 	{ PF_INET6, SOCK_DGRAM, IPPROTO_SCTP, "sctp", 0x1f },
 	{ PF_INET6, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x0f },	/* !PASSIVE */
 	{ PF_INET6, SOCK_STREAM, IPPROTO_TCP, "sctp", 0x0f },	/* !PASSIVE */
@@ -211,6 +219,7 @@ static const struct explore explore[] = {
 	{ PF_INET6, SOCK_RAW, ANY, NULL, 0x1d },
 #endif
 	{ PF_INET, SOCK_DGRAM, IPPROTO_UDP, "udp", 0x1f },
+	{ PF_INET, SOCK_DGRAM, IPPROTO_DCCP, "dccp", 0x1f },
 	{ PF_INET, SOCK_DGRAM, IPPROTO_SCTP, "sctp", 0x1f },
 	{ PF_INET, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x0f },	/* !PASSIVE */
 	{ PF_INET, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x0f },	/* !PASSIVE */
@@ -273,7 +282,7 @@ struct ai_order {
 };
 
 /* types for OS dependent portion */
-#if 0
+#if 1
 struct res_target {
 	struct res_target *next;
 	const char *name;	/* domain name */
@@ -3258,7 +3267,7 @@ _dns_getaddrinfo(name, pai, ac)
 		 * returned by getaddrinfo().
 		 */
 		if (addrconfig(AF_INET, ac)) {
-			qp->name = hostname;
+			qp->name = name;
 			qp->qclass = C_IN;
 			qp->qtype = T_A;
 			qp->answer = buf_current->buf;
@@ -3271,7 +3280,7 @@ _dns_getaddrinfo(name, pai, ac)
 			}
 		}
 		if (addrconfig(AF_INET6, ac)) {
-			qp->name = hostname;
+			qp->name = name;
 			qp->qclass = C_IN;
 			qp->qtype = T_AAAA;
 			qp->answer = buf_current->buf;
