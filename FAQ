@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.74 2001/12/04 05:53:53 jinmei Exp $
+$KAME: FAQ,v 1.75 2001/12/14 09:24:49 jinmei Exp $
 
 
 GENERAL
@@ -526,6 +526,12 @@ Q: How can I configure NAT-PT?
 	The manual for the command is natptconfig(8), and the manual
 	for the configuration file is natpt.conf(5).
 	kame/kame/natptconfig/natpt.conf is a simple configuration sample.
+
+Q: When I configure an IPv6 address by ifconfig(8) on a node doing
+stateless autoconfiguration, the interface route corresponding to the
+configured with ifconfig(8) immediately disappears.
+	This is the intentional behavior.
+	XXX: need more description.
 
 LICENSE AND CRYPTO EXPORT
 =========================
