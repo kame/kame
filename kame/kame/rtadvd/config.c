@@ -81,7 +81,7 @@ getconfig(intface)
 	char *addr;
 
 #define MUSTHAVE(var, cap)	\
-    {									\
+    do {								\
 	int t;								\
 	if ((t = agetnum(cap)) < 0) {					\
 		fprintf(stderr, "rtadvd: need %s for interface %s\n",	\
@@ -89,12 +89,12 @@ getconfig(intface)
 		exit(1);						\
 	}								\
 	var = t;							\
-     }
+     } while (0)
 #define MAYHAVE(var, cap, def)	\
-     {									\
+     do {								\
 	if ((var = agetnum(cap)) < 0)					\
 		var = def;						\
-     }
+     } while (0)
 
 	if ((stat = agetent(tbuf, intface)) <= 0) {
 		memset(tbuf, 0, sizeof(tbuf));
