@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.21 2000/02/16 13:14:39 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.22 2000/02/17 00:28:10 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1177,18 +1177,20 @@ oakley_validate_auth(iph1)
 			iph1->cert_p->v[0] = iph1->rmconf->certtype;
 
 			YIPSDEBUG(DEBUG_CERT,
-				plog(logp, LOCATION, NULL, "get peer's CERT:"));
+				plog(logp, LOCATION, NULL,
+					"get peer's CERT from cache:"));
 			YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->cert_p));
-		}
-
-		/* check certificate */
-		error = eay_check_x509cert(idstr,
-				iph1->cert_p->v[0],
-				iph1->cert_p->v + 1,
-				iph1->cert_p->l - 1);
-		if (error != 0) {
-			plog(logp, LOCATION, NULL, "CERT mismatch.\n");
-			return ISAKMP_NTYPE_INVALID_CERTIFICATE;
+		} else {
+			/* check certificate */
+			error = eay_check_x509cert(idstr,
+					iph1->cert_p->v[0],
+					iph1->cert_p->v + 1,
+					iph1->cert_p->l - 1);
+			if (error != 0) {
+				plog(logp, LOCATION, NULL, "CERT mismatch.\n");
+				return ISAKMP_NTYPE_INVALID_CERTIFICATE;
+			}
+			/* XXX should be cache ? */
 		}
 		YIPSDEBUG(DEBUG_CERT,
 			plog(logp, LOCATION, NULL,
