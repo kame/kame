@@ -546,7 +546,10 @@ pass:
 	      case IPPROTO_IPV4:	ip_forward(m1, 0);	break;
 	      case IPPROTO_IPV6:	ip6_forward(m1, 1);	break;
 	      case IPPROTO_MAX:			/* discard this packet	*/
-	      default:
+	      default:						break;
+
+	      case IPPROTO_DONE:		/* discard without free	*/
+		return;
 	    }
 
 	    if (m != m1)
