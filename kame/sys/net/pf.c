@@ -35,6 +35,7 @@
  */
 
 #ifdef __FreeBSD__
+#define _IP_VHL
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_altq.h"
@@ -93,6 +94,10 @@
 #include <netinet/tcp_var.h>
 #include <netinet/udp_var.h>
 #include <netinet/icmp_var.h>
+
+#ifdef __FreeBSD__
+#include <machine/in_cksum.h>
+#endif
 
 #ifdef __OpenBSD__
 #include <dev/rndvar.h>
@@ -1318,8 +1323,12 @@ pf_send_tcp(const struct pf_rule *r, sa_family_t af,
 		th->th_sum = in_cksum(m, len);
 
 		/* Finish the IP header */
+#ifdef __FreeBSD__
+		h->ip_vhl = IP_MAKE_VHL(4, sizeof(*h) >> 2);
+#else
 		h->ip_v = 4;
 		h->ip_hl = sizeof(*h) >> 2;
+#endif
 		h->ip_tos = IPTOS_LOWDELAY;
 		h->ip_len = len;
 		h->ip_off = ip_mtudisc ? IP_DF : 0;
@@ -4159,8 +4168,11 @@ pf_test_state_icmp(struct pf_state **state, int direction, struct ifnet *ifp,
 				return (PF_DROP);
 
 			/* offset of protocol header that follows h2 */
+#ifdef __FreeBSD__
+			off2 = ipoff2 + IP_VHL_HL(h2.ip_vhl) << 2;
+#else
 			off2 = ipoff2 + (h2.ip_hl << 2);
-
+#endif
 			pd2.proto = h2.ip_p;
 			pd2.src = (struct pf_addr *)&h2.ip_src;
 			pd2.dst = (struct pf_addr *)&h2.ip_dst;
@@ -4720,6 +4732,9 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 	struct m_tag		*mtag;
 	struct pf_addr		 naddr;
 	int			 error = 0;
+#ifdef __FreeBSD__
+	int			 sw_csum;
+#endif
 
 	if (m == NULL || *m == NULL || r == NULL ||
 	    (dir != PF_IN && dir != PF_OUT) || oifp == NULL)
@@ -4817,6 +4832,11 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 		}
 	}
 
+#ifdef __FreeBSD__
+	sw_csum = m0->m_pkthdr.csum_flags & ~ifp->if_hwassist;
+	m0->m_pkthdr.csum_flags &= ifp->if_hwassist;
+#endif
+
 	/* Copied from ip_output. */
 	if (ip->ip_len <= ifp->if_mtu) {
 		ip->ip_len = htons((u_int16_t)ip->ip_len);
@@ -4835,6 +4855,16 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 			tcpstat.tcps_outhwcsum++;
 		else if (m0->m_pkthdr.csum & M_UDPV4_CSUM_OUT)
 			udpstat.udps_outhwcsum++;
+#elif defined(__FreeBSD__)
+		ip->ip_sum = 0;
+		if (sw_csum & CSUM_DELAY_IP) {
+			if (ip->ip_vhl == IP_VHL_BORING) {
+				ip->ip_sum = in_cksum_hdr(ip);
+			} else {
+				ip->ip_sum = in_cksum(m,
+				    IP_VHL_HL(ip->ip_vhl) << 2);
+			}
+		}
 #else
 		ip->ip_sum = 0;
 		ip->ip_sum = in_cksum(m0, ip->ip_hl << 2);
@@ -4857,6 +4887,9 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 			goto bad;
 	}
 
+#ifdef __FreeBSD__
+	m0->m_pkthdr.csum_flags |= sw_csum;
+#endif
 	m1 = m0;
 	error = ip_fragment(m0, ifp, ifp->if_mtu);
 	if (error == EMSGSIZE)
@@ -5182,7 +5215,11 @@ pf_test(int dir, struct ifnet *ifp, struct mbuf **m0)
 	m = *m0;
 	h = mtod(m, struct ip *);
 
+#ifdef __FreeBSD__
+	off = IP_VHL_HL(h->ip_vhl) << 2;
+#else
 	off = h->ip_hl << 2;
+#endif
 	if (off < (int)sizeof(*h)) {
 		action = PF_DROP;
 		REASON_SET(&reason, PFRES_SHORT);
@@ -5324,7 +5361,13 @@ done:
 		    pd.tot_len, dir == PF_OUT, r->action == PF_PASS,
 		    r->dst.not);
 
-	if (action == PF_PASS && h->ip_hl > 5 &&
+	if (action == PF_PASS &&
+#ifdef __FreeBSD__
+	    IP_VHL_HL(h->ip_vhl) > 5
+#else
+	    h->ip_hl > 5
+#endif
+	    &&
 	    !((s && s->allow_opts) || r->allow_opts)) {
 		action = PF_DROP;
 		REASON_SET(&reason, PFRES_SHORT);
