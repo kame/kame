@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.212 2001/10/25 07:14:19 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.213 2001/10/25 07:25:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1085,7 +1085,7 @@ nd6_is_addr_neighbor(addr, ifp)
 		for (i = 0; i < 4; i++) {
 			if ((pr->ndpr_mask.s6_addr32[i] &
 			     addr->sin6_addr.s6_addr32[i]) !=
-			    pr->ndpr_addr.s6_addr32[i])
+			    pr->ndpr_prefix.sin6_addr.s6_addr32[i])
 				break;
 		}
 		if (i == 4)	/* full match */
