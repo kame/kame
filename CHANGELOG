@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1288 2000/09/22 05:14:37 itojun Exp $
+$KAME: CHANGELOG,v 1.1289 2000/09/22 08:16:25 itojun Exp $
 
 <200009>
 Fri Sep 22 14:00:17 JST 2000  itojun@iijlab.net
@@ -17,6 +17,7 @@ Fri Sep 22 14:00:17 JST 2000  itojun@iijlab.net
 	* racoon: (1) support short phase 2 SPI (16bit instead of 32bit) for
 	  IPComp, to meet the latest IPComp draft.  need more checks.
 	  (2) stabilize behavior when many phase 1 proposals are presetned.
+	  (3) make it possible to build with boehm GC.
 
 Thu Sep 21 03:18:11 JST 2000  itojun@iijlab.net
 	* sys/netinet6/esp_core.c: make it possible to use rijndael and twofish
