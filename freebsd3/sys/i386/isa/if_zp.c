@@ -881,6 +881,7 @@ zpread(sc)
 		sc->next_mb = (sc->next_mb + 1) % MAX_MBS;
 		m->m_data = m->m_pktdat;
 		m->m_flags = M_PKTHDR;
+		bzero(&m->m_pkthdr, sizeof(m->m_pkthdr));
 	}
 	if (totlen >= MHLEN)
 		MCLGET(m, M_DONTWAIT);
@@ -955,6 +956,7 @@ zpread(sc)
 			sc->next_mb = (sc->next_mb + 1) % MAX_MBS;
 			top->m_data = top->m_pktdat;
 			top->m_flags = M_PKTHDR;
+			bzero(&top->m_pkthdr, sizeof(top->m_pkthdr));
 		}
 		insw(BASE + EP_W1_RX_PIO_RD_1, mtod(top, caddr_t),
 		    sizeof(struct ether_header));
