@@ -50,6 +50,7 @@
 
 static char *configfile = NULL;
 static int foreground = 0;
+static int logstderr = 0;
 
 #define MAXSOCK	100
 
@@ -71,8 +72,11 @@ main(argc, argv)
 	int i, t;
 	const int yes = 1;
 
-	while ((ch = getopt(argc, argv, "Df:")) != -1) {
+	while ((ch = getopt(argc, argv, "dDf:")) != -1) {
 		switch (ch) {
+		case 'd':
+			logstderr = 1;
+			break;
 		case 'D':
 			foreground = 1;
 			break;
@@ -202,7 +206,7 @@ logmsg(int level, const char *msg, ...)
 #else
 	va_start(ap);
 #endif
-	if (foreground) {
+	if (logstderr) {
 		vfprintf(stderr, msg, ap);
 		fprintf(stderr, "\n");
 	} else
