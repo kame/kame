@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.364 1999/12/22 08:54:51 sakane Exp $
+$Id: CHANGELOG,v 1.365 1999/12/22 12:35:02 itojun Exp $
 
 <199912>
+Wed Dec 22 21:37:07 JST 1999  itojun@iijlab.net
+	* freebsd[23]/ports/inn: upgrade to 2.2.2 (not tested by KAME team).
+	  From: Satosi KOBAYASI <kobayasi@north.ad.jp>
+
 Wed Dec 22 17:52:14 JST 1999 sakane@ydc.co.jp
 	* kame/sys/netinet6:
 	Alart when sequence number cycles.
