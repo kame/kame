@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.7 2000/06/04 17:20:07 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.8 2000/06/04 17:21:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -182,7 +182,7 @@ udp6_output(in6p, m, addr6, control)
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 3)
 	if (p && !suser(p->p_ucred, &p->p_acflag))
 		priv = 1;
-#elif (define(__FreeBSD__) && __FreeBSD__ >= 4)
+#elif (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	if (p && !suser(p))
 		priv = 1;
 #else
