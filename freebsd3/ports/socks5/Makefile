@@ -3,7 +3,7 @@
 # Date created:				Fri Nov 26 10:41:04 JST 1999
 # Whom:					sumikawa
 #
-# $Id: Makefile,v 1.1 1999/11/30 12:52:27 sumikawa Exp $
+# $Id: Makefile,v 1.2 1999/12/28 04:38:05 sumikawa Exp $
 #
 
 DISTNAME=	socks5-v1.0r10
@@ -40,27 +40,20 @@ EXTRA_LDFLAGS=	-L/usr/local/v6/lib -linet6
 MAN1=		socks5.1 stopsocks.1 socks5_clients.1
 MAN5=		libsocks5.conf.5 socks5.conf.5
 
-pre-fetch:
-	@if [ ! -f ${DISTDIR}/${DISTNAME}${EXTRACT_SUFX} ]; then \
-	  ${ECHO} ""; \
-	  ${ECHO} "NEC requires that you grab the dist files from their"; \
-	  ${ECHO} "web site at http://www.socks.nec.com.  Please make sure"; \
-	  ${ECHO} "you have ${DISTNAME}${EXTRACT_SUFX} in ${DISTDIR}"; \
-	  ${ECHO} "and run make again."; \
-	  ${ECHO} ""; \
-	  exit 1;\
-	fi
-	@if [ ! -f ${DISTDIR}/${PATCHFILES} ]; then \
-	  ${ECHO} ""; \
-	  ${ECHO} "NEC requires that you grab the dist files from their"; \
-	  ${ECHO} "web site at http://www.socks.nec.com.  Please make sure"; \
-	  ${ECHO} "you have ${PATCHFILES} in ${DISTDIR}"; \
-	  ${ECHO} "and run make again."; \
-	  ${ECHO} ""; \
-	  exit 1;\
-	fi
+.include <bsd.port.pre.mk>
 
-.include <bsd.port.mk>
+.if !exists(${DISTDIR}/${DISTNAME}${EXTRACT_SUFX})
+IGNORE=		NEC requires that you grab the dist files from their \
+		web site at http://www.socks.nec.com.  Please make sure \
+		you have ${DISTNAME}${EXTRACT_SUFX} in ${DISTDIR} \
+		and run make again.
+.endif
+.if !exists(${DISTDIR}/${PATCHFILES})
+IGNORE=		NEC requires that you grab the dist files from their \
+		web site at http://www.socks.nec.com.  Please make sure \
+		you have ${PATCHFILES} in ${DISTDIR} \
+		and run make again.
+.endif
 
 # the following need to be included after bsd.port.mk, since OPSYS
 # ARCH are defined in bsd.port.mk
@@ -75,3 +68,5 @@ CONFIGURE_ENV=  LIBS=-lcrypt
 post-install:
 	ldconfig -m ${PREFIX}/lib
 .endif
+
+.include <bsd.port.post.mk>
