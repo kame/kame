@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.28 2001/01/23 13:32:18 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.29 2001/01/23 14:13:08 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -324,8 +324,7 @@ getconfig(intface)
 			pfx->onlinkflg = val & ND_OPT_PI_FLAG_ONLINK;
 			pfx->autoconfflg = val & ND_OPT_PI_FLAG_AUTO;
 #ifdef MIP6
-			if (mobileip6)
-				pfx->routeraddr = val & ND_OPT_PI_FLAG_RTADDR;
+			pfx->routeraddr = val & ND_OPT_PI_FLAG_RTADDR;
 #endif
 
 			makeentry(entbuf, i, "vltime", added);
