@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.15 2000/11/22 02:32:39 itojun Exp $	*/
+/*	$KAME: bindtest.c,v 1.16 2000/11/22 03:47:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -115,13 +115,13 @@ main(argc, argv)
 		case 'A':
 			reuseaddr = 1;
 #ifndef SO_REUSEADDR
-			errx("SO_REUSEADDR is not supported");
+			errx(1, "SO_REUSEADDR is not supported");
 #endif
 			break;
 		case 'P':
 			reuseport = 1;
 #ifndef SO_REUSEPORT
-			errx("SO_REUSEPORT is not supported");
+			errx(1, "SO_REUSEPORT is not supported");
 #endif
 			break;
 		case 'p':
