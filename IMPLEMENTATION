@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.189 2001/02/16 02:42:33 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.190 2001/02/16 03:09:32 itojun Exp $
 
 1. IPv6
 
@@ -1161,7 +1161,7 @@ that someone is trying to inpersonate IPv4 peer.  The packet should be dropped.
 IPv6 specifications do not talk very much about IPv6 unspecified address (::)
 in the IPv6 source address field.  Clarification is in progress.
 Here are couple of comments:
-- IPv6 unspecified address must be put into IPv6 source address field, if and
+- IPv6 unspecified address can be used in IPv6 source address field, if and
   only if we have no legal source address for the node.  The legal situations
   include, but may not be limited to, (1) MLD while no IPv6 address is assigned
   to the node and (2) DAD.
