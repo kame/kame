@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.43 2001/02/20 08:51:07 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.44 2001/02/21 00:16:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -804,7 +804,7 @@ struct eonhdr {
 	u_int8_t version;
 	u_int8_t class;
 	u_int16_t cksum;
-} *ehdr;
+};
 
 /*
  * prepend EON header to ISO PDU
