@@ -1,31 +1,3 @@
-/* Copyright (C) 2000 YDC Corpration
- * All rights reserved.
- * 
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the project nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- */
-
 /*
  * Copyright (c) 1983, 1988, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
@@ -127,7 +99,6 @@ static const char rcsid[] =
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <regex.h>
 #include <setjmp.h>
 #include <signal.h>
 #include <stdio.h>
@@ -140,6 +111,12 @@ static const char rcsid[] =
 
 #define SYSLOG_NAMES
 #include <sys/syslog.h>
+
+#ifdef NI_WITHSCOPEID
+static const int withscopeid = NI_WITHSCOPEID;
+#else
+static const int withscopeid = 0;
+#endif
 
 const char	*ConfFile = _PATH_LOGCONF;
 const char	*PidFile = _PATH_LOGPID;
@@ -186,16 +163,7 @@ struct filed {
 		char	f_uname[MAXUNAMES][UT_NAMESIZE+1];
 		struct {
 			char	f_hname[MAXHOSTNAMELEN+1];
-
-#ifdef INET6
-			int	f_family;
-			union {
-				struct sockaddr_in	f_inet;
-				struct sockaddr_in6	f_inet6;
-			} f_addr;
-#else
-			struct sockaddr_in	f_addr;
-#endif
+			struct addrinfo *f_addr;
 
 		} f_forw;		/* forwarding address */
 		char	f_fname[MAXPATHLEN];
@@ -246,27 +214,13 @@ struct allowedpeer {
 	u_short port;
 	union {
 		struct {
-			struct in_addr addr;
-			struct in_addr mask;
+			struct sockaddr_storage addr;
+			struct sockaddr_storage mask;
 		} numeric;
-
-#ifdef INET6
-		struct {
-			struct in6_addr addr6;
-			struct in6_addr mask6;
-		} numeric6;
-#endif
-
 		char *name;
 	} u;
 #define a_addr u.numeric.addr
 #define a_mask u.numeric.mask
-
-#ifdef INET6
-#define a6_addr u.numeric6.addr6
-#define a6_mask u.numeric6.mask6
-#endif
-
 #define a_name u.name
 };
 
@@ -305,21 +259,18 @@ int	Debug;			/* debug flag */
 int	resolve = 1;		/* resolve hostname */
 char	LocalHostName[MAXHOSTNAMELEN+1];	/* our hostname */
 char	*LocalDomain;		/* our local domain name */
-int	finet = -1;		/* Internet datagram socket */
-int	finet6 = -1;		/* IPv6 Internet datagram socket */
-
-#ifdef INET6
-int	ecode = 1;			/* getaddrinfo */
-struct addrinfo hints, *res = NULL;	/* getaddrinfo */
-char	from_addr[INET6_ADDRSTRLEN];	/* IPv6 address */
-#endif
-
+int	*finet = NULL;		/* Internet datagram socket */
 int	fklog = -1;		/* /dev/klog */
-int	LogPort;		/* port number for INET connections */
 int	Initialized = 0;	/* set when we have initialized ourselves */
 int	MarkInterval = 20 * 60;	/* interval between marks in seconds */
 int	MarkSeq = 0;		/* mark sequence number */
 int	SecureMode = 0;		/* when true, receive only unix domain socks */
+#ifdef INET6
+int	family = PF_UNSPEC;	/* protocol family (IPv4, IPv6 or both) */
+#else
+int	family = PF_INET;	/* protocol family (IPv4 only) */
+#endif
+int	send_to_all = 0;	/* send message to all IPv4/IPv6 addresses */
 
 char	bootfile[MAXLINE+1];	/* booted kernel file */
 
@@ -333,13 +284,14 @@ int	KeepKernFac = 0;	/* Keep remotely logged kernel facility */
 
 int	allowaddr __P((char *));
 void	cfline __P((char *, struct filed *, char *, char *));
-void    cvthname __P((struct sockaddr *, char *));
+char   *cvthname __P((struct sockaddr *));
 void	deadq_enter __P((pid_t, const char *));
 int	deadq_remove __P((pid_t));
 int	decode __P((const char *, CODE *));
 void	die __P((int));
 void	domark __P((int));
 void	fprintlog __P((struct filed *, int, char *));
+int*	socksetup __P((int));
 void	init __P((int));
 void	logerror __P((const char *));
 void	logmsg __P((int, char *, char *, int));
@@ -351,13 +303,8 @@ void	readklog __P((void));
 void	reapchild __P((int));
 char   *ttymsg __P((struct iovec *, int, char *, int));
 static void	usage __P((void));
-
-#ifdef INET6
 int	validate __P((struct sockaddr *, const char *));
-#else
-int	validate __P((struct sockaddr_in *, const char *));
-#endif
-
+static void	unmapped __P((struct sockaddr *));
 void	wallmsg __P((struct filed *, struct iovec *));
 int	waitdaemon __P((int, int, int));
 void	timedout __P((int));
@@ -367,20 +314,30 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
- 	int ch, i, l = 0;
- 	struct addrinfo hints, *res1 = NULL;
-	struct sockaddr_storage frominet;
+	int ch, i, l;
 	struct sockaddr_un sunx, fromunix;
+	struct sockaddr_storage frominet;
 	FILE *fp;
-	char *p, hname[NI_MAXHOST], line[MAXLINE + 1];
+	char *p, *hname, line[MAXLINE + 1];
 	struct timeval tv, *tvp;
 	struct sigaction sact;
 	sigset_t mask;
 	pid_t ppid = 1;
 	socklen_t len;
 
-	while ((ch = getopt(argc, argv, "a:df:kl:m:np:suv")) != -1)
+	while ((ch = getopt(argc, argv, "46Aa:df:kl:m:np:suv")) != -1)
 		switch (ch) {
+		case '4':
+			family = PF_INET;
+			break;
+#ifdef INET6
+		case '6':
+			family = PF_INET6;
+			break;
+#endif
+		case 'A':
+			send_to_all++;
+			break;
 		case 'a':		/* allow specific network addresses only */
 			if (allowaddr(optarg) == -1)
 				usage();
@@ -486,92 +443,23 @@ main(argc, argv)
 				die(0);
 		}
 	}
-
-#ifdef INET6
-	if (SecureMode <= 1) {
-		struct servent *sp;
-
-		sp = getservbyname("syslog", "udp");
-		if (sp == NULL) {
-			errno = 0;
-			logerror("syslog/udp: unknown service");
-			die(0);
-		}
-		bzero (&hints, sizeof(struct addrinfo));
-		hints.ai_flags = AI_PASSIVE;
-		hints.ai_family = PF_UNSPEC;
-		hints.ai_socktype = SOCK_DGRAM;
-		ecode = getaddrinfo(NULL, "syslog", &hints, &res);
-
-		if (ecode != 0) {
-			logerror("getaddrinfo");
-			freeaddrinfo(res);
-			die(0);
-		}
-
-		for (res1 = res; res1 ; res1 = res1->ai_next) {
-			if (res1->ai_family == PF_INET) {
-				finet = socket(res1->ai_family, res1->ai_socktype, res1->ai_protocol);
-				if (finet >= 0) {
-					if (bind(finet, res1->ai_addr, res1->ai_addrlen) < 0) {
-						logerror("bind");
-						if (!Debug) {
-							freeaddrinfo(res);
-							die(0);
-						}
-					}
-				}
-				else {
-					logerror("socket");
-				}
-			}
-			else if (res1->ai_family == PF_INET6) {
-				finet6 = socket(res1->ai_family, res1->ai_socktype, res1->ai_protocol);
-				if (finet6 >= 0) {
-					if (bind(finet6, res1->ai_addr, res1->ai_addrlen) < 0) {
-						logerror("bind");
-						if (!Debug) {
-							freeaddrinfo(res);
-							die(0);
-						}
-					}
-				}
-				else {
-					logerror("socket");
-				}
-			}
-		}
-	};
-#else
 	if (SecureMode <= 1)
-		finet = socket(AF_INET, SOCK_DGRAM, 0);
-	if (finet >= 0) {
-		struct servent *sp;
+		finet = socksetup(family);
 
-		sp = getservbyname("syslog", "udp");
-		if (sp == NULL) {
-			errno = 0;
-			logerror("syslog/udp: unknown service");
-			die(0);
-		}
-		memset(&sin, 0, sizeof(sin));
-		sin.sin_family = AF_INET;
-		sin.sin_port = LogPort = sp->s_port;
+	if (finet) {
+		if (SecureMode) {
+			for (i = 0; i < *finet; i++) {
+				if (shutdown(finet[i+1], SHUT_RD) < 0) {
+					logerror("shutdown");
+					if (!Debug)
+						die(0);
+				}
+			}
+		} else
+			dprintf("listening on inet and/or inet6 socket\n");
+		dprintf("sending on inet and/or inet6 socket\n");
+	}
 
-		if (bind(finet, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
-			logerror("bind");
-			if (!Debug)
-				die(0);
-		}
-	}
-	if (finet >= 0 && SecureMode) {
-		if (shutdown(finet, SHUT_RD) < 0) {
-			logerror("shutdown");
-			if (!Debug)
-				die(0);
-		}
-	}
-#endif
 	if ((fklog = open(_PATH_KLOG, O_RDONLY, 0)) >= 0)
 		if (fcntl(fklog, F_SETFL, O_NONBLOCK) < 0)
 			fklog = -1;
@@ -609,20 +497,13 @@ main(argc, argv)
 			if (fklog > nfds)
 				nfds = fklog;
 		}
-		if (finet != -1 && !SecureMode) {
-			FD_SET(finet, &readfds);
-			if (finet > nfds)
-				nfds = finet;
+		if (finet && !SecureMode) {
+			for (i = 0; i < *finet; i++) {
+				FD_SET(finet[i+1], &readfds);
+				if (finet[i+1] > nfds)
+					nfds = finet[i+1];
+			}
 		}
-
-#ifdef INET6
-		if (finet6 != -1) {
-			FD_SET(finet6, &readfds);
-			if (finet6 > nfds)
-				nfds = finet6;
-		}
-#endif
-
 		for (i = 0; i < nfunix; i++) {
 			if (funix[i] != -1) {
 				FD_SET(funix[i], &readfds);
@@ -650,33 +531,23 @@ main(argc, argv)
 		/*dprintf("got a message (%d, %#x)\n", nfds, readfds);*/
 		if (fklog != -1 && FD_ISSET(fklog, &readfds))
 			readklog();
-#ifdef INET6
-		if ((finet != -1 && FD_ISSET(finet, &readfds)) ||
-		    (finet6 != -1 && FD_ISSET(finet6, &readfds))) {
-
-			if (finet != -1 && FD_ISSET(finet, &readfds)) {
-				len = sizeof(frominet);
-				l = recvfrom(finet, line, MAXLINE, 0,
-					(struct sockaddr *)&frominet, &len);
-			} else if (finet6 != -1 && FD_ISSET(finet6, &readfds)) {
-				len = sizeof(frominet);
-				l = recvfrom(finet6, line, MAXLINE, 0,
-					(struct sockaddr *)&frominet, &len);
+		if (finet && !SecureMode) {
+			for (i = 0; i < *finet; i++) {
+				if (FD_ISSET(finet[i+1], &readfds)) {
+					len = sizeof(frominet);
+					l = recvfrom(finet[i+1], line, MAXLINE,
+					     0, (struct sockaddr *)&frominet,
+					     &len);
+					if (l > 0) {
+						line[l] = '\0';
+						hname = cvthname((struct sockaddr *)&frominet);
+						unmapped((struct sockaddr *)&frominet);
+						if (validate((struct sockaddr *)&frominet, hname))
+							printline(hname, line);
+					} else if (l < 0 && errno != EINTR)
+						logerror("recvfrom inet");
+				}
 			}
-
-#else
-		if (finet != -1 && FD_ISSET(finet, &readfds)) {
-			len = sizeof(frominet);
-			l = recvfrom(finet, line, MAXLINE, 0,
-			    (struct sockaddr *)&frominet, &len);
-#endif
-			if (l > 0) {
-				line[l] = '\0';
-				cvthname((struct sockaddr *)&frominet, hname);
-				if (validate((struct sockaddr *)&frominet, hname))
-					printline(hname, line);
-			} else if (l < 0 && errno != EINTR)
-				logerror("recvfrom inet");
 		}
 		for (i = 0; i < nfunix; i++) {
 			if (funix[i] != -1 && FD_ISSET(funix[i], &readfds)) {
@@ -691,11 +562,32 @@ main(argc, argv)
 			}
 		}
 	}
+}
 
-#ifdef INET6
-	freeaddrinfo(res);
-#endif
+static void
+unmapped(sa)
+	struct sockaddr *sa;
+{
+	struct sockaddr_in6 *sin6;
+	struct sockaddr_in sin;
 
+	if (sa->sa_family != AF_INET6)
+		return;
+	if (sa->sa_len != sizeof(struct sockaddr_in6) ||
+	    sizeof(sin) > sa->sa_len)
+		return;
+	sin6 = (struct sockaddr_in6 *)sa;
+	if (!IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr))
+		return;
+
+	memset(&sin, 0, sizeof(sin));
+	sin.sin_family = AF_INET;
+	sin.sin_len = sizeof(struct sockaddr_in);
+	memcpy(&sin.sin_addr, &sin6->sin6_addr.s6_addr[12],
+	       sizeof(sin.sin_addr));
+	sin.sin_port = sin6->sin6_port;
+
+	memcpy(sa, &sin, sin.sin_len);
 }
 
 static void
@@ -703,7 +595,7 @@ usage()
 {
 
 	fprintf(stderr, "%s\n%s\n%s\n",
-		"usage: syslogd [-dnsuv] [-a allowed_peer] [-f config_file]",
+		"usage: syslogd [-46Adnsuv] [-a allowed_peer] [-f config_file]",
 		"               [-m mark_interval] [-p log_socket]",
 		"               [-l log_socket]");
 	exit(1);
@@ -993,7 +885,8 @@ fprintlog(f, flags, msg)
 {
 	struct iovec iov[7];
 	struct iovec *v;
-	int l;
+	struct addrinfo *r;
+	int i, l, lsent = 0;
 	char line[MAXLINE + 1], repbuf[80], greetings[200];
 	char *msgret;
 
@@ -1100,44 +993,33 @@ fprintlog(f, flags, msg)
 		if (l > MAXLINE)
 			l = MAXLINE;
 
-#ifdef INET6
-		if (finet >= 0 || finet6 >= 0) {
-			if (f->f_un.f_forw.f_family == AF_INET) {
-				if (sendto(finet, line, l, 0,
-				(struct sockaddr *)&f->f_un.f_forw.f_addr.f_inet,
-				sizeof(f->f_un.f_forw.f_addr.f_inet)) == -1) {
-
-					int e = errno;
-					(void)close(f->f_file);
-					f->f_type = F_UNUSED;
-					errno = e;
-					logerror("sendto (IPv4)");
-				}
-			}
-			else if (f->f_un.f_forw.f_family == AF_INET6) {
-				if (sendto(finet6, line, l, 0,
-				    (struct sockaddr *)&f->f_un.f_forw.f_addr.f_inet6,
-				    sizeof(f->f_un.f_forw.f_addr.f_inet6)) == -1) {
-					int e = errno;
-					(void)close(f->f_file);
-					f->f_type = F_UNUSED;
-					errno = e;
-					logerror("sendto (IPv6)");
-				}
-			}
-		}
-#else
-		if ((finet >= 0) &&
-		     (sendto(finet, line, l, 0,
-			     (struct sockaddr *)&f->f_un.f_forw.f_addr,
-			     sizeof(f->f_un.f_forw.f_addr)) != l)) {
-			int e = errno;
-			(void)close(f->f_file);
-			f->f_type = F_UNUSED;
-			errno = e;
-			logerror("sendto");
-		}
+		if (finet) {
+			for (r = f->f_un.f_forw.f_addr; r; r = r->ai_next) {
+				for (i = 0; i < *finet; i++) {
+#if 0 
+					/*
+					 * should we check AF first, or just
+					 * trial and error? FWD
+					 */
+					if (r->ai_family ==
+					    address_family_of(finet[i+1])) 
 #endif
+					lsent = sendto(finet[i+1], line, l, 0,
+					    r->ai_addr, r->ai_addrlen);
+					if (lsent == l) 
+						break;
+				}
+				if (lsent == l && !send_to_all) 
+					break;
+			}
+			if (lsent != l) {
+				int e = errno;
+				(void)close(f->f_file);
+				errno = e;
+				f->f_type = F_UNUSED;
+				logerror("sendto");
+			}
+		}
 		break;
 
 	case F_FILE:
@@ -1300,27 +1182,43 @@ reapchild(signo)
 /*
  * Return a printable representation of a host address.
  */
-void
-cvthname(f, hname)
+char *
+cvthname(f)
 	struct sockaddr *f;
-	char * hname;
 {
+	int error;
 	sigset_t omask, nmask;
 	char *p;
+	static char hname[NI_MAXHOST], ip[NI_MAXHOST];
+
+	error = getnameinfo((struct sockaddr *)f,
+			    ((struct sockaddr *)f)->sa_len,
+			    ip, sizeof ip, NULL, 0,
+			    NI_NUMERICHOST | withscopeid);
+	dprintf("cvthname(%s)\n", ip);
+
+	if (error) {
+		dprintf("Malformed from address %s\n", gai_strerror(error));
+		return ("???");
+	}
+	if (!resolve)
+		return (ip);
 
 	sigemptyset(&nmask);
 	sigaddset(&nmask, SIGHUP);
 	sigprocmask(SIG_BLOCK, &nmask, &omask);
-
-	getnameinfo(f, f->sa_len, hname, NI_MAXHOST, NULL, 0,
-		    resolve ? NI_NUMERICHOST : 0);
-	dprintf("cvthname(%s)\n", hname);
-
+	error = getnameinfo((struct sockaddr *)f,
+			    ((struct sockaddr *)f)->sa_len,
+			    hname, sizeof hname, NULL, 0,
+			    NI_NAMEREQD | withscopeid);
 	sigprocmask(SIG_SETMASK, &omask, NULL);
-	if ((p = strchr(hname, '.')) &&
-	    strcasecmp(p + 1, LocalDomain) == 0)
+	if (error) {
+		dprintf("Host name for your address (%s) unknown\n", ip);
+		return (ip);
+	}
+	if ((p = strchr(hname, '.')) && strcasecmp(p + 1, LocalDomain) == 0)
 		*p = '\0';
-	return;
+	return (hname);
 }
 
 void
@@ -1604,13 +1502,8 @@ cfline(line, f, prog, host)
 	char *prog;
 	char *host;
 {
-#ifdef INET6
-	struct addrinfo *peer = NULL;
-#else
-	struct hostent *hp;
-#endif
-
-	int i, pri;
+	struct addrinfo hints, *res;
+	int error, i, pri;
 	char *bp, *p, *q;
 	char buf[MAXLINE], ebuf[100];
 
@@ -1734,50 +1627,16 @@ cfline(line, f, prog, host)
 		(void)strncpy(f->f_un.f_forw.f_hname, ++p,
 			sizeof(f->f_un.f_forw.f_hname)-1);
 		f->f_un.f_forw.f_hname[sizeof(f->f_un.f_forw.f_hname)-1] = '\0';
-
-#ifdef INET6
-		bzero(&hints, sizeof(struct addrinfo));
-		hints.ai_flags = PF_UNSPEC;
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = family;
 		hints.ai_socktype = SOCK_DGRAM;
-		ecode = getaddrinfo(f->f_un.f_forw.f_hname, "syslog", &hints, &peer);
-
-		if (ecode != 0) {
-			logerror("getaddrinfo: No address associated with name");
-			freeaddrinfo(peer);
-			die(0);
-		}
-
-		f->f_un.f_forw.f_family = peer->ai_family;
-
-		if (peer->ai_family == AF_INET) {
-			memset(&f->f_un.f_forw.f_addr.f_inet, 0,
-				sizeof(f->f_un.f_forw.f_addr.f_inet));
-			f->f_un.f_forw.f_addr.f_inet.sin_family = AF_INET;
-			f->f_un.f_forw.f_addr.f_inet.sin_port = LogPort;
-			memmove(&f->f_un.f_forw.f_addr.f_inet, peer->ai_addr, peer->ai_addrlen);
-		}
-		else if (peer->ai_family == AF_INET6) {
-			memset(&f->f_un.f_forw.f_addr.f_inet6, 0,
-				sizeof(f->f_un.f_forw.f_addr.f_inet6));
-			f->f_un.f_forw.f_addr.f_inet6.sin6_family = AF_INET6;
-			f->f_un.f_forw.f_addr.f_inet6.sin6_port = LogPort;
-			memmove(&f->f_un.f_forw.f_addr.f_inet6, peer->ai_addr, peer->ai_addrlen);
-		}
-		freeaddrinfo(peer);
-#else
-		hp = gethostbyname(f->f_un.f_forw.f_hname);
-		if (hp == NULL) {
-
-			logerror(hstrerror(h_errno));
+		error = getaddrinfo(f->f_un.f_forw.f_hname, "syslog", &hints,
+				    &res);
+		if (error) {
+			logerror(gai_strerror(error));
 			break;
 		}
-		memset(&f->f_un.f_forw.f_addr, 0,
-			 sizeof(f->f_un.f_forw.f_addr));
-		f->f_un.f_forw.f_addr.sin_family = AF_INET;
-		f->f_un.f_forw.f_addr.sin_port = LogPort;
-		memmove(&f->f_un.f_forw.f_addr.sin_addr, hp->h_addr, hp->h_length);
-#endif
-
+		f->f_un.f_forw.f_addr = res;
 		f->f_type = F_FORW;
 		break;
 
@@ -1949,77 +1808,136 @@ allowaddr(s)
 	char *cp1, *cp2;
 	struct allowedpeer ap;
 	struct servent *se;
-	regex_t re;
-	int i;
+	int masklen = -1;
+	struct addrinfo hints, *res;
+	struct in_addr *addrp, *maskp;
+	u_int32_t *mask6p;
+	char ip[NI_MAXHOST];
 
-	if ((cp1 = strrchr(s, ':'))) {
+#ifdef INET6
+	if (*s != '[' || (cp1 = strchr(s + 1, ']')) == NULL)
+#endif
+		cp1 = s;
+	if ((cp1 = strrchr(cp1, ':'))) {
 		/* service/port provided */
 		*cp1++ = '\0';
 		if (strlen(cp1) == 1 && *cp1 == '*')
 			/* any port allowed */
-			ap.port = htons(0);
+			ap.port = 0;
 		else if ((se = getservbyname(cp1, "udp")))
-			ap.port = se->s_port;
+			ap.port = ntohs(se->s_port);
 		else {
-			ap.port = htons((int)strtol(cp1, &cp2, 0));
+			ap.port = strtol(cp1, &cp2, 0);
 			if (*cp2 != '\0')
 				return -1; /* port not numeric */
 		}
 	} else {
 		if ((se = getservbyname("syslog", "udp")))
-			ap.port = se->s_port;
+			ap.port = ntohs(se->s_port);
 		else
 			/* sanity, should not happen */
-			ap.port = htons(514);
+			ap.port = 514;
 	}
 
-	/* the regexp's are ugly, but the cleanest way */
-
-	if (regcomp(&re, "^[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+(/[0-9]+)?$",
-		    REG_EXTENDED))
-		/* if RE compilation fails, that's an internal error */
-		abort();
-	if (regexec(&re, s, 0, 0, 0) == 0) {
-		/* arg `s' is numeric */
-		ap.isnumeric = 1;
-		if ((cp1 = strchr(s, '/')) != NULL) {
-			*cp1++ = '\0';
-			i = atoi(cp1);
-			if (i < 0 || i > 32)
-				return -1;
-			/* convert masklen to netmask */
-/* DEPEND */
-			ap.a_mask.s_addr = htonl(~((1 << (32 - i)) - 1));
-		}
-		if (ascii2addr(AF_INET, s, &ap.a_addr) == -1)
+	if ((cp1 = strchr(s, '/')) != NULL &&
+	    strspn(cp1 + 1, "0123456789") == strlen(cp1 + 1)) {
+		*cp1 = '\0';
+		if ((masklen = atoi(cp1 + 1)) < 0)
 			return -1;
-		if (cp1 == NULL) {
-			/* use default netmask */
-			if (IN_CLASSA(ntohl(ap.a_addr.s_addr)))
-				ap.a_mask.s_addr = htonl(IN_CLASSA_NET);
-			else if (IN_CLASSB(ntohl(ap.a_addr.s_addr)))
-				ap.a_mask.s_addr = htonl(IN_CLASSB_NET);
-			else
-				ap.a_mask.s_addr = htonl(IN_CLASSC_NET);
+	}
+#ifdef INET6
+	if (*s == '[') {
+		cp2 = s + strlen(s) - 1;
+		if (*cp2 == ']') {
+			++s;
+			*cp2 = '\0';
+		} else
+			cp2 = NULL;
+	} else
+		cp2 = NULL;
+#endif
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = AI_PASSIVE | AI_NUMERICHOST;
+	if (getaddrinfo(s, NULL, &hints, &res) == 0) {
+		ap.isnumeric = 1;
+		memcpy(&ap.a_addr, res->ai_addr, res->ai_addrlen);
+		memset(&ap.a_mask, 0, sizeof(ap.a_mask));
+		ap.a_mask.ss_family = res->ai_family;
+		if (res->ai_family == AF_INET) {
+			ap.a_mask.ss_len = sizeof(struct sockaddr_in);
+			maskp = &((struct sockaddr_in *)&ap.a_mask)->sin_addr;
+			if (masklen < 0) {
+				/* use default netmask */
+				addrp = &((struct sockaddr_in *)&ap.a_addr)->sin_addr;
+				if (IN_CLASSA(ntohl(addrp->s_addr)))
+					maskp->s_addr = htonl(IN_CLASSA_NET);
+				else if (IN_CLASSB(ntohl(addrp->s_addr)))
+					maskp->s_addr = htonl(IN_CLASSB_NET);
+				else
+					maskp->s_addr = htonl(IN_CLASSC_NET);
+			} else if (masklen <= 32) {
+				/* convert masklen to netmask */
+				maskp->s_addr = htonl(~((1 << (32 - masklen)) - 1));
+			} else {
+				freeaddrinfo(res);
+				return -1;
+			}
 		}
+#ifdef INET6
+		else if (res->ai_family == AF_INET6 && masklen <= 128) {
+			ap.a_mask.ss_len = sizeof(struct sockaddr_in6);
+			if (masklen < 0)
+				masklen = 128;
+			mask6p = (u_int32_t *)&((struct sockaddr_in6 *)&ap.a_mask)->sin6_addr;
+			/* convert masklen to netmask */
+			while (masklen > 0) {
+				if (masklen < 32) {
+					*mask6p = htonl(~(0xffffffff >> masklen));
+					break;
+				}
+				*mask6p++ = 0xffffffff;
+				masklen -= 32;
+			}
+		}
+#endif
+		else {
+			freeaddrinfo(res);
+			return -1;
+		}
+		freeaddrinfo(res);
 	} else {
 		/* arg `s' is domain name */
 		ap.isnumeric = 0;
 		ap.a_name = s;
+		if (cp1)
+			*cp1 = '/';
+#ifdef INET6
+		if (cp2) {
+			*cp2 = ']';
+			--s;
+		}
+#endif
 	}
-	regfree(&re);
 
 	if (Debug) {
 		printf("allowaddr: rule %d: ", NumAllowed);
 		if (ap.isnumeric) {
 			printf("numeric, ");
-			printf("addr = %s, ",
-			       addr2ascii(AF_INET, &ap.a_addr, sizeof(struct in_addr), 0));
-			printf("mask = %s; ",
-			       addr2ascii(AF_INET, &ap.a_mask, sizeof(struct in_addr), 0));
+			getnameinfo((struct sockaddr *)&ap.a_addr,
+				    ((struct sockaddr *)&ap.a_addr)->sa_len,
+				    ip, sizeof ip, NULL, 0,
+				    NI_NUMERICHOST | withscopeid);
+			printf("addr = %s, ", ip);
+			getnameinfo((struct sockaddr *)&ap.a_mask,
+				    ((struct sockaddr *)&ap.a_mask)->sa_len,
+				    ip, sizeof ip, NULL, 0,
+				    NI_NUMERICHOST | withscopeid);
+			printf("mask = %s; ", ip);
 		} else
 			printf("domainname = %s; ", ap.a_name);
-		printf("port = %d\n", ntohs(ap.port));
+		printf("port = %d\n", ap.port);
 	}
 
 	if ((AllowedPeers = realloc(AllowedPeers,
@@ -2036,46 +1954,91 @@ allowaddr(s)
  * Validate that the remote peer has permission to log to us.
  */
 int
-validate(f, hname)
-	struct sockaddr *f;
+validate(sa, hname)
+	struct sockaddr *sa;
 	const char *hname;
 {
-	int i;
+	int i, j, reject;
 	size_t l1, l2;
-	char *cp, name[NI_MAXHOST];
+	char *cp, name[NI_MAXHOST], ip[NI_MAXHOST], port[NI_MAXSERV];
 	struct allowedpeer *ap;
-#ifdef INET6
-	struct sockaddr_in *sin = NULL;
-	struct sockaddr_in6 *sin6 = NULL;
-#endif
+	struct sockaddr_in *sin, *a4p = NULL, *m4p = NULL;
+	struct sockaddr_in6 *sin6, *a6p = NULL, *m6p = NULL;
+	struct addrinfo hints, *res;
+	u_short sport;
 
 	if (NumAllowed == 0)
 		/* traditional behaviour, allow everything */
 		return 1;
 
 	strlcpy(name, hname, sizeof name);
-	if (strchr(name, '.') == NULL) {
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = AI_PASSIVE | AI_NUMERICHOST;
+	if (getaddrinfo(name, NULL, &hints, &res) == 0)
+		freeaddrinfo(res);
+	else if (strchr(name, '.') == NULL) {
 		strlcat(name, ".", sizeof name);
 		strlcat(name, LocalDomain, sizeof name);
 	}
-
-	getnameinfo(f, f->sa_len, name, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-	dprintf("validate: dgram name %s;\n", name);
+	if (getnameinfo(sa, sa->sa_len, ip, sizeof ip, port, sizeof port,
+			NI_NUMERICHOST | withscopeid | NI_NUMERICSERV) != 0)
+		return 0;	/* for safety, should not occur */
+	dprintf("validate: dgram from IP %s, port %s, name %s;\n",
+		ip, port, name);
+	sport = atoi(port);
 
 	/* now, walk down the list */
 	for (i = 0, ap = AllowedPeers; i < NumAllowed; i++, ap++) {
-		if (ntohs(ap->port) != 0 && ap->port != sin->sin_port) {
+		if (ap->port != 0 && ap->port != sport) {
 			dprintf("rejected in rule %d due to port mismatch.\n", i);
 			continue;
 		}
 
 		if (ap->isnumeric) {
-			/* xxx: IPv6? */
-			if ((sin->sin_addr.s_addr & ap->a_mask.s_addr)
-			    != ap->a_addr.s_addr) {
-				dprintf("rejected in rule %d due to IP mismatch.\n", i);
+			if (ap->a_addr.ss_family != sa->sa_family) {
+				dprintf("rejected in rule %d due to address family mismatch.\n", i);
 				continue;
 			}
+			if (ap->a_addr.ss_family == AF_INET) {
+				sin = (struct sockaddr_in *)sa;
+				a4p = (struct sockaddr_in *)&ap->a_addr;
+				m4p = (struct sockaddr_in *)&ap->a_mask;
+				if ((sin->sin_addr.s_addr & m4p->sin_addr.s_addr)
+				    != a4p->sin_addr.s_addr) {
+					dprintf("rejected in rule %d due to IP mismatch.\n", i);
+					continue;
+				}
+			}
+#ifdef INET6
+			else if (ap->a_addr.ss_family == AF_INET6) {
+				sin6 = (struct sockaddr_in6 *)sa;
+				a6p = (struct sockaddr_in6 *)&ap->a_addr;
+				m6p = (struct sockaddr_in6 *)&ap->a_mask;
+#ifdef NI_WITHSCOPEID
+				if (a6p->sin6_scope_id != 0 &&
+				    sin6->sin6_scope_id != a6p->sin6_scope_id) {
+					dprintf("rejected in rule %d due to scope mismatch.\n", i);
+					continue;
+				}
+#endif
+				reject = 0;
+				for (j = 0; j < 16; j += 4) {
+					if ((*(u_int32_t *)&sin6->sin6_addr.s6_addr[i] & *(u_int32_t *)&m6p->sin6_addr.s6_addr[i])
+					    != *(u_int32_t *)&a6p->sin6_addr.s6_addr[i]) {
+						++reject;
+						break;
+					}
+				}
+				if (reject) {
+					dprintf("rejected in rule %d due to IP mismatch.\n", i);
+					continue;
+				}
+			}
+#endif
+			else
+				continue;
 		} else {
 			cp = ap->a_name;
 			l1 = strlen(name);
@@ -2257,4 +2220,72 @@ log_deadchild(pid, status, name)
 		       "Logging subprocess %d (%s) exited %s %d.",
 		       pid, name, reason, code);
 	logerror(buf);
+}
+
+int *
+socksetup(af)
+	int af;
+{
+	struct addrinfo hints, *res, *r;
+	int error, maxs, *s, *socks;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_flags = AI_PASSIVE;
+	hints.ai_family = af;
+	hints.ai_socktype = SOCK_DGRAM;
+	error = getaddrinfo(NULL, "syslog", &hints, &res);
+	if (error) {
+		logerror(gai_strerror(error));
+		errno = 0;
+		die(0);
+	}
+
+	/* Count max number of sockets we may open */
+	for (maxs = 0, r = res; r; r = r->ai_next, maxs++);
+	socks = malloc((maxs+1) * sizeof(int));
+	if (!socks) {
+		logerror("couldn't allocate memory for sockets");
+		die(0);
+	}
+
+	*socks = 0;   /* num of sockets counter at start of array */
+	s = socks + 1;
+	for (r = res; r; r = r->ai_next) {
+		*s = socket(r->ai_family, r->ai_socktype, r->ai_protocol);
+		if (*s < 0) {
+			logerror("socket");
+			continue;
+		}
+#ifdef IPV6_BINDV6ONLY
+		if (r->ai_family == AF_INET6) {
+			int on = 1;
+			if (setsockopt(*s, IPPROTO_IPV6, IPV6_BINDV6ONLY,
+				       (char *)&on, sizeof (on)) < 0) {
+				logerror("setsockopt");
+				close(*s);
+				continue;
+			}
+		}
+#endif
+		if (bind(*s, r->ai_addr, r->ai_addrlen) < 0) {
+			close(*s);
+			logerror("bind");
+			continue;
+		}
+
+		(*socks)++;
+		s++;
+	}
+
+	if (*socks == 0) {
+		free(socks);
+		if (Debug)
+			return(NULL);
+		else
+			die(0);
+	}
+	if (res)
+		freeaddrinfo(res);
+
+	return(socks);
 }
