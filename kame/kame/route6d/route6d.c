@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.81 2002/02/25 02:27:22 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.82 2002/05/29 22:38:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.81 2002/02/25 02:27:22 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.82 2002/05/29 22:38:57 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -197,7 +197,7 @@ FILE	*rtlog = NULL;
 
 int logopened = 0;
 
-static	u_long	seq = 0;
+static	int	seq = 0;
 
 volatile sig_atomic_t seenalrm;
 volatile sig_atomic_t seenquit;
@@ -2791,7 +2791,7 @@ getroute(np, gw)
 	struct in6_addr *gw;
 {
 	u_char buf[BUFSIZ];
-	u_long myseq;
+	int myseq;
 	int len;
 	struct rt_msghdr *rtm;
 	struct sockaddr_in6 *sin6;
