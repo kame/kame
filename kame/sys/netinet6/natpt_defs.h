@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.22 2001/09/19 10:08:32 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.23 2001/10/14 17:20:04 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -65,27 +65,28 @@
 
 struct pcv					/* sizeof(): 32[byte]	*/
 {
-	u_char	 sa_family;
-	u_char	 ip_p;			/* IPPROTO_(ICMP[46]|TCP|UDP)	*/
+	u_char	 sa_family:8;
+	u_char	 ip_p:8;		/* IPPROTO_(ICMP[46]|TCP|UDP)	*/
 
-	u_char	 type;
+	u_char	 type:4;
 #define	NATPT_MAP64		1
 #define	NATPT_MAP46		2
 #define	NATPT_MAP44		3
 #define	NATPT_MAPDPORT		4
 #define	NATPT_MAPBIDIR		5
 
-	u_char	 fromto;
+	u_char	 fromto:4;
 #define	NATPT_FROM		0
 #define	NATPT_TO		1
 
-	u_char	 flags;
+	u_char	 flags:4;
 #define	NATPT_TRACEROUTE	0x01
 #define	NATPT_NEEDFRAGMENT	0x02
 
 	int		 poff;		/* payload offset		*/
 	int		 plen;		/* payload length		*/
 
+	struct pcvaux	*aux;
 	struct mbuf	*m;
 	struct tSlot	*ats;
 	union {
@@ -100,6 +101,15 @@ struct pcv					/* sizeof(): 32[byte]	*/
 		struct tcp6hdr	 *tcp6;
 		struct udphdr	 *udp;
 	}		pyld;
+};
+
+
+struct pcvaux
+{
+	u_short		 cksum6;
+	u_short		 cksum4;
+	struct ulc6	*ulc6;
+	struct ulc4	*ulc4;
 };
 
 

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.49 2001/10/14 16:27:47 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.50 2001/10/14 17:20:05 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -568,7 +568,6 @@ natpt_translateTCPv6To4(struct pcv *cv6, struct pAddr *pad)
 	natpt_updateTcpStatus(&cv4);
 	natpt_translatePYLD6To4(&cv4);
 	natpt_fixTCPUDP64cksum(AF_INET6, IPPROTO_TCP, cv6, &cv4);
-	natpt_recalculateTCP4Checksum(&cv4);			/* XXX */
 	return (m4);
 }
 
@@ -603,10 +602,41 @@ natpt_translateTCPUDPv6To4(struct pcv *cv6, struct pAddr *pad, struct pcv *cv4)
 	struct ip6_hdr	*ip6;
 	struct tcphdr	*th;
 
+	static struct pcvaux	aux;
+	static struct ulc6	ulc;
+
 	if ((m4 = m_copym(cv6->m, 0, M_COPYALL, M_NOWAIT)) == NULL) {
 		return (NULL);
 	}
 
+	/*
+	 * There is a case pointing the same data with m4 and cv6->m
+	 * after m_copym, we need to prepare for incremental checksum
+	 * calculation.
+	 */
+	bzero(&aux, sizeof(struct pcvaux));
+	bzero(&ulc, sizeof(struct ulc6));
+
+	ulc.ulc_src = cv6->ip.ip6->ip6_src;
+	ulc.ulc_dst = cv6->ip.ip6->ip6_dst;
+	ulc.ulc_len = htonl(cv6->plen);
+	ulc.ulc_pr  = cv6->ip_p;
+	if (cv6->ip_p == IPPROTO_TCP) {
+	    ulc.ulc_tu.th.th_sport = cv6->pyld.tcp6->th_sport;
+	    ulc.ulc_tu.th.th_dport = cv6->pyld.tcp6->th_dport;
+	    aux.cksum6 = ntohs(cv6->pyld.tcp6->th_sum);
+	} else {
+	    ulc.ulc_tu.uh.uh_sport = cv6->pyld.udp->uh_sport;
+	    ulc.ulc_tu.uh.uh_dport = cv6->pyld.udp->uh_dport;
+	    aux.cksum6 = ntohs(cv6->pyld.udp->uh_sum);
+	}
+
+	aux.ulc6 = &ulc;
+	cv6->aux = &aux;
+
+	/*
+	 * Start translation
+	 */
 	m4->m_data += sizeof(struct ip6_hdr) - sizeof(struct ip);
 	m4->m_pkthdr.len = m4->m_len = sizeof(struct ip) + cv6->plen;
 
@@ -2252,16 +2282,23 @@ natpt_fixTCPUDP64cksum(int header, int proto, struct pcv *cv6, struct pcv *cv4)
 	const char	*fn = __FUNCTION__;
 
 	int		cksum;
+	u_short		cksum6, cksum4;
 	struct ulc6	ulc6;
 	struct ulc4	ulc4;
 
 	bzero(&ulc6, sizeof(struct ulc6));
 	bzero(&ulc4, sizeof(struct ulc4));
 
-	ulc6.ulc_src = cv6->ip.ip6->ip6_src;
-	ulc6.ulc_dst = cv6->ip.ip6->ip6_dst;
-	ulc6.ulc_len = htonl(cv6->plen);
-	ulc6.ulc_pr  = cv6->ip_p;
+	if (cv6->aux && cv6->aux->ulc6) {
+		ulc6 = *(cv6->aux->ulc6);
+		cksum6 = cv6->aux->cksum6;
+	} else {
+		ulc6.ulc_src = cv6->ip.ip6->ip6_src;
+		ulc6.ulc_dst = cv6->ip.ip6->ip6_dst;
+		ulc6.ulc_len = htonl(cv6->plen);
+		ulc6.ulc_pr  = cv6->ip_p;
+		cksum6 = ntohs(cv6->pyld.tcp6->th_sum);
+	}
 
 	ulc4.ulc_src = cv4->ip.ip4->ip_src;
 	ulc4.ulc_dst = cv4->ip.ip4->ip_dst;
@@ -2270,8 +2307,10 @@ natpt_fixTCPUDP64cksum(int header, int proto, struct pcv *cv6, struct pcv *cv4)
 
 	switch (proto) {
 	case IPPROTO_TCP:
-		ulc6.ulc_tu.th.th_sport = cv6->pyld.tcp6->th_sport;
-		ulc6.ulc_tu.th.th_dport = cv6->pyld.tcp6->th_dport;
+		if (!cv6->aux || !cv6->aux->ulc6) {
+			ulc6.ulc_tu.th.th_sport = cv6->pyld.tcp6->th_sport;
+			ulc6.ulc_tu.th.th_dport = cv6->pyld.tcp6->th_dport;
+		}
 		ulc4.ulc_tu.th.th_sport = cv4->pyld.tcp4->th_sport;
 		ulc4.ulc_tu.th.th_dport = cv4->pyld.tcp4->th_dport;
 
@@ -2299,10 +2338,13 @@ natpt_fixTCPUDP64cksum(int header, int proto, struct pcv *cv6, struct pcv *cv4)
 		break;
 
 	case IPPROTO_UDP:
-		ulc6.ulc_tu.uh.uh_sport = cv6->pyld.udp->uh_sport;
-		ulc6.ulc_tu.uh.uh_dport = cv6->pyld.udp->uh_dport;
+		if (!cv6->aux || !cv6->aux->ulc6) {
+			ulc6.ulc_tu.uh.uh_sport = cv6->pyld.udp->uh_sport;
+			ulc6.ulc_tu.uh.uh_dport = cv6->pyld.udp->uh_dport;
+		}
 		ulc4.ulc_tu.uh.uh_sport = cv4->pyld.udp->uh_sport;
 		ulc4.ulc_tu.uh.uh_dport = cv4->pyld.udp->uh_dport;
+
 		if (header == AF_INET6) {
 			cksum = natpt_fixCksum(ntohs(cv6->pyld.udp->uh_sum),
 					       (u_char *)&ulc6, sizeof(struct ulc6),
