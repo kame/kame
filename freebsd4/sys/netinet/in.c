@@ -52,11 +52,6 @@
 
 #include <netinet/igmp_var.h>
 
-#include "gif.h"
-#if NGIF > 0
-#include <net/if_gif.h>
-#endif
-
 static MALLOC_DEFINE(M_IPMADDR, "in_multi", "internet multicast address");
 
 static int in_mask2len __P((struct in_addr *));
@@ -202,21 +197,6 @@ in_control(so, cmd, data, ifp, p)
 	struct sockaddr_in oldaddr;
 	int error, hostIsNew, maskIsNew, s;
 	u_long i;
-
-#if NGIF > 0
-        if (ifp && ifp->if_type == IFT_GIF) {
-                switch (cmd) {
-                case SIOCSIFPHYADDR:
-		case SIOCDIFPHYADDR:
-			if (p &&
-			    (error = suser(p)) != 0)
-        			return(error);
-                case SIOCGIFPSRCADDR:
-                case SIOCGIFPDSTADDR:
-                        return gif_ioctl(ifp, cmd, data);
-                }
-        }
-#endif
 
 	switch (cmd) {
 	case SIOCALIFADDR:

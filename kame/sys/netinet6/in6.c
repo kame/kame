@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.106 2000/08/25 10:32:17 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.107 2000/10/06 04:58:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -414,22 +414,6 @@ in6_control(so, cmd, data, ifp)
 		privileged++;
 #endif
 
-	/*
-	 * xxx should prevent processes for link-local addresses?
-	 */
-#if NGIF > 0
-	if (ifp && ifp->if_type == IFT_GIF) {
-		switch (cmd) {
-		case SIOCSIFPHYADDR_IN6:
-			if (!privileged)
-				return(EPERM);
-			/*fall through*/
-		case SIOCGIFPSRCADDR_IN6:
-		case SIOCGIFPDSTADDR_IN6:
-			return gif_ioctl(ifp, cmd, data);
-		}
-	}
-#endif
 	switch (cmd) {
 	case SIOCGETSGCNT_IN6:
 	case SIOCGETMIFCNT_IN6:

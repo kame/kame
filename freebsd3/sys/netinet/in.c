@@ -77,10 +77,6 @@
 #include <net/if.h>
 #include <net/if_types.h>
 #include <net/route.h>
-#include "gif.h"
-#if NGIF > 0
-#include <net/if_gif.h>
-#endif
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
@@ -244,21 +240,6 @@ in_control(so, cmd, data, ifp, p)
 	struct sockaddr_in oldaddr;
 	int error, hostIsNew, maskIsNew, s;
 	u_long i;
-
-#if NGIF > 0
-        if (ifp && ifp->if_type == IFT_GIF) {
-                switch (cmd) {
-                case SIOCSIFPHYADDR:
-		case SIOCDIFPHYADDR:
-			if (p &&
-			    (error = suser(p->p_ucred, &p->p_acflag)) != 0)
-        			return(error);
-                case SIOCGIFPSRCADDR:
-                case SIOCGIFPDSTADDR:
-                        return gif_ioctl(ifp, cmd, data);
-                }
-        }
-#endif
 
 	switch (cmd) {
 	case SIOCALIFADDR:
