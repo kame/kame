@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.381 2004/08/17 10:18:57 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.382 2004/11/04 03:01:23 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2520,6 +2520,7 @@ static int
 if2idlen(ifp)
 	struct ifnet *ifp;
 {
+#if 0
 	switch (ifp->if_type) {
 	case IFT_ETHER:		/* RFC2464 */
 #ifdef IFT_PROPVIRTUAL
@@ -2545,6 +2546,10 @@ if2idlen(ifp)
 	default:
 		return (-1);	/* unknown link type */
 	}
+#else
+	/* XXX when the function is called, if_type is not initialized. */
+	return (64);
+#endif
 }
 
 void *
