@@ -543,7 +543,6 @@ main(int argc, char *argv[])
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
     {
-	int len;
 	char *buf;
 	if (pingflags & F_POLICY) {
 		if (policy_in != NULL) {
