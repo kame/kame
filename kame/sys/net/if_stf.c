@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.6 2000/03/10 15:31:29 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.7 2000/03/10 15:56:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -199,6 +199,7 @@ stf_encapcheck(m, off, proto, arg)
 	struct ip ip;
 	struct in6_ifaddr *ia6;
 	struct stf_softc *sc;
+	struct in_addr a, b;
 
 	sc = (struct stf_softc *)arg;
 
@@ -213,8 +214,28 @@ stf_encapcheck(m, off, proto, arg)
 	ia6 = stf_getsrcifa6(&sc->sc_if);
 	if (ia6 == NULL)
 		return 0;
+
+	/*
+	 * check if IPv4 dst matches the IPv4 address derived from the
+	 * local 6to4 address.
+	 * success on: dst = 10.1.1.1, ia6->ia_addr = 2002:0a01:0101:...
+	 */
 	if (bcmp(GET_V4(&ia6->ia_addr.sin6_addr), &ip.ip_dst,
 	    sizeof(ip.ip_dst)) != 0)
+		return 0;
+
+	/*
+	 * check if IPv4 src matches the IPv4 address derived from the
+	 * local 6to4 address masked by prefixmask.
+	 * success on: src = 10.1.1.1, ia6->ia_addr = 2002:0a00:.../24
+	 * fail on: src = 10.1.1.1, ia6->ia_addr = 2002:0b00:.../24
+	 */
+	bzero(&a, sizeof(a));
+	a.s_addr = GET_V4(&ia6->ia_addr.sin6_addr)->s_addr;
+	a.s_addr &= GET_V4(&ia6->ia_prefixmask.sin6_addr)->s_addr;
+	b = ip.ip_src;
+	b.s_addr &= GET_V4(&ia6->ia_prefixmask.sin6_addr)->s_addr;
+	if (a.s_addr != b.s_addr)
 		return 0;
 
 	return 1;
