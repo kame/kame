@@ -1,4 +1,4 @@
-/*	$KAME: mrt.c,v 1.11 2002/06/26 10:24:48 jinmei Exp $	*/
+/*	$KAME: mrt.c,v 1.12 2002/12/15 04:36:32 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -266,9 +266,7 @@ find_route(source, group, flags, create)
 
 
     /* Creation allowed */
-
-    /* first try to find an RP for this mrt => not used in SSM */
-    if (flags & (MRTF_SG | MRTF_WC))
+    if (flags & (MRTF_RP | MRTF_WC | MRTF_SG))
     {
 
 	grpentry_ptr = create_grpentry(group);
@@ -276,9 +274,11 @@ find_route(source, group, flags, create)
 	{
 	    return (mrtentry_t *) NULL;
 	}
+    }
 
-	if (SSMGROUP(group))
-		goto not_create;
+    /* try to find an RP for mrt using RP */
+    if (flags & (MRTF_RP | MRTF_WC))
+    {
 	if (grpentry_ptr->active_rp_grp == (rp_grp_entry_t *) NULL)
 	{
 	    rp_grp_entry_ptr = rp_grp_match(group);
@@ -311,7 +311,6 @@ find_route(source, group, flags, create)
 	    rpentry_ptr = grpentry_ptr->active_rp_grp->rp->rpentry;
     }
 
-not_create:
     mrtentry_ptr_wc = mrtentry_ptr_pmbr = (mrtentry_t *) NULL;
 
     if (flags & MRTF_WC)
