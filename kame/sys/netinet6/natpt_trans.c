@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.123 2002/06/14 12:14:39 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.124 2002/06/23 08:08:24 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -599,7 +599,42 @@ natpt_translateTCPv6To4(struct pcv *cv6, struct pAddr *pad)
 	cv4.ip_p = IPPROTO_TCP;
 	natpt_updateTcpStatus(&cv4);
 	natpt_translatePYLD6To4(&cv4);
-	natpt_fixTCPUDP64cksum(AF_INET6, IPPROTO_TCP, cv6, &cv4);
+	if (cv4.ats->suit.tcps
+	    && (cv4.ats->suit.tcps->rewrite[cv4.fromto] == 0)) {
+		/* payload unchanged */
+		natpt_fixTCPUDP64cksum(AF_INET6, IPPROTO_TCP, cv6, &cv4);
+	} else {
+		int		  hlen, dlen, tcplen;
+		struct mbuf	 *m4 = cv4.m;
+		struct pseudohdr *ph;
+		struct tcp6hdr	 *tcp4 = cv4.pyld.tcp4;
+		char		  savedip[64];
+
+#ifdef _IP_VHL
+		hlen = IP_VHL_HL(cv4.ip.ip4->ip_vhl) << 2;
+#else
+		hlen = cv4.ip.ip4->ip_hl << 2;
+#endif
+
+		tcplen = cv4.ip.ip4->ip_len - hlen;
+		bcopy(cv4.ip.ip4, &savedip, hlen);
+		dlen = hlen - sizeof(struct pseudohdr);
+		m4->m_data += dlen;
+		m4->m_len  -= dlen;
+
+		ph = (struct pseudohdr *)m4->m_data;
+		ph->ip_src = ((struct ip *)&savedip)->ip_src;
+		ph->ip_dst = ((struct ip *)&savedip)->ip_dst;
+		ph->ip_p   = htons(((struct ip *)&savedip)->ip_p);
+		ph->ip_len = htons(tcplen);
+
+		tcp4->th_sum = 0;
+		tcp4->th_sum = in_cksum(m4, tcplen + sizeof(struct pseudohdr));
+		m4->m_data -= dlen;
+		m4->m_len  += dlen;
+		bcopy(&savedip, cv4.ip.ip4, hlen);
+	}
+
 	return (m4);
 }
 
