@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.73 2001/12/21 10:28:48 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.74 2001/12/27 04:42:09 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -2474,7 +2474,8 @@ natpt_composeIPv4Hdr(struct pcv *cv6, struct pAddr *pad, struct ip *ip4)
 
 		ip4->ip_len = ntohs(ip6->ip6_plen) - sizeof(struct ip6_frag)
 			+ sizeof(struct ip);
-		ip4->ip_id = fh6.ip6f_ident & 0xffff;
+		ip4->ip_id = ntohl(fh6.ip6f_ident) & 0xffff;
+		HTONS(ip4->ip_id);
 
 		ip4->ip_off = (offlg & 0xfff8) >> 3;
 		if (offlg & 0x0001)
