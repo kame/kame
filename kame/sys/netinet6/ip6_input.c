@@ -173,11 +173,11 @@ static void ip6_init2 __P((void *));
 
 static int ip6_hopopts_input __P((u_int32_t *, u_int32_t *, struct mbuf **, int *));
 
-#if defined(PTR)
+#if defined(NATPT)
 extern	int		ip6_protocol_tr;
 
-int	ptr_in6		__P((struct mbuf *, struct mbuf **));
-extern void ip_forward __P((struct mbuf *, int));
+int	natpt_in6	__P((struct mbuf *, struct mbuf **));
+extern void ip_forward	__P((struct mbuf *, int));
 #endif
 
 /*
@@ -393,7 +393,7 @@ ip6_input(m)
 	 * The following check is not documented in the spec.  Malicious party
 	 * may be able to use IPv4 mapped addr to confuse tcp/udp stack and
 	 * bypass security checks (act as if it was from 127.0.0.1 by using
-	 * IPv6 src ::ffff:127.0.0.1).  Be cautious.
+	 * IPv6 src ::ffff:127.0.0.1).	Be cautious.
 	 */
 	if (IN6_IS_ADDR_V4MAPPED(&ip6->ip6_src) ||
 	    IN6_IS_ADDR_V4MAPPED(&ip6->ip6_dst)) {
@@ -440,32 +440,6 @@ ip6_input(m)
 			ip6->ip6_dst.s6_addr16[1]
 				= htons(m->m_pkthdr.rcvif->if_index);
 	}
-
-#if defined(PTR)
-	/*
-	 *
-	 */
-	if (ip6_protocol_tr)
-	{
-	    struct mbuf *m1 = NULL;
-
-	    switch (ptr_in6(m, &m1))
-	    {
-	      case IPPROTO_IP:					goto mcastcheck;
-	      case IPPROTO_IPV4:	ip_forward(m1, 0);	break;
-	      case IPPROTO_IPV6:	ip6_forward(m1, 0);	break;
-	      case IPPROTO_MAX:			/* discard this packet	*/
-	      default:
-	    }
-
-	    if (m != m1)
-		m_freem(m);
-
-	    return;
-	}
-
-  mcastcheck:
-#endif
 
 	/*
 	 * Multicast check
@@ -565,6 +539,35 @@ ip6_input(m)
 			goto hbhcheck;
 		}
 	}
+#endif
+
+#if defined(NATPT)
+	/*
+	 * NAT-PT (Network Address Translation - Protocol Translation)
+	 */
+	if (ip6_protocol_tr)
+	{
+	    struct mbuf *m1 = NULL;
+
+	    switch (natpt_in6(m, &m1))
+	    {
+	      case IPPROTO_IP:					goto processpacket;
+	      case IPPROTO_IPV4:	ip_forward(m1, 0);	break;
+	      case IPPROTO_IPV6:	ip6_forward(m1, 0);	break;
+	      case IPPROTO_MAX:			/* discard this packet	*/
+	      default:						break;
+
+	      case IPPROTO_DONE:		/* discard without free	*/
+		return;
+	    }
+
+	    if (m != m1)
+		m_freem(m);
+
+	    return;
+	}
+
+  processpacket:
 #endif
 
 #if 0
