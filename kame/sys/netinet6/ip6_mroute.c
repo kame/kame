@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.62 2002/03/10 10:58:09 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.63 2002/03/24 20:43:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1772,10 +1772,8 @@ register_send(ip6, mif, m, src, dst)
 	if (i > len)
 		i = len;
 	mm = m_pullup(mm, i);
-	if (mm == NULL){
-		m_freem(mm);
+	if (mm == NULL)
 		return ENOBUFS;
-	}
 /* TODO: check it! */
 	mm->m_pkthdr.len = len + sizeof(struct ip6_hdr);
 
