@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1327 2000/10/09 18:53:23 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1328 2000/10/10 06:55:03 itojun Exp $
 
 <200010>
+Tue Oct 10 15:43:58 JST 2000  itojun@iijlab.net
+	* kame/rtsold/rtsock.c: watch routing socket for pcmcia/cardbus
+	  interface removal.  cease RS if an interface gets removed.
+	  (affects NetBSD 1.5 or higher)
+
 Tue Oct 10 03:50:32 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/wu-ftpd: upgrade to latest IPv6 patch. EPSV now
 	works. TODO: -s speaks IPv4 only.
