@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.83 2004/01/26 03:37:03 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.84 2004/01/26 03:54:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -310,6 +310,7 @@
  * - timercmp(), timersub(), timeradd()
  *	bsdi[34]: no timer*
  *	freebsd[45]: only in userland.  in kernel, timeval*() is available.
+ *		timevaladd/sub has different function prototype.
  */
 
 #ifndef __NET_NET_OSDEP_H_DEFINED_
