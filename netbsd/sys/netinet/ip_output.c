@@ -268,7 +268,8 @@ ip_output(m0, va_alist)
 	} else {
 		if (ro->ro_rt == 0) {
 #ifdef RADIX_MPATH
-			rtalloc_mpath(ro, ntohl(ip->ip_dst.s_addr));
+			rtalloc_mpath(ro,
+			    ntohl(ip->ip_src.s_addr ^ ip->ip_dst.s_addr));
 #else
 			rtalloc(ro);
 #endif

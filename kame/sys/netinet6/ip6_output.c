@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.199 2001/07/23 07:06:50 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.200 2001/07/23 07:32:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -799,7 +799,8 @@ skip_ipsec2:;
 			 */
 #ifdef RADIX_MPATH
 			rtalloc_mpath((struct route *)ro,
-			    ntohl(ip6->ip6_dst.s6_addr32[3]));
+			    ntohl(ip6->ip6_src.s6_addr32[3] ^
+			    ip6->ip6_dst.s6_addr32[3]));
 #else
 			rtalloc((struct route *)ro);
 #endif
