@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.251 2001/10/17 05:08:36 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.252 2001/10/22 05:16:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1592,6 +1592,9 @@ ni6_input(m, off)
 			goto bad;
 		}
 		break;
+	case NI_QTYPE_IPV4ADDR:
+		/* unsupported */
+		goto bad;
 	}
 
 	/* refuse based on configuration.  XXX ICMP6_NI_REFUSED? */
