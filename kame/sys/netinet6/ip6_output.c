@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.164 2001/02/10 05:05:15 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.165 2001/02/26 09:20:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1733,9 +1733,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_RECVRTHDR:
 			case IPV6_USE_MIN_MTU:
 			case IPV6_RECVPATHMTU:
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
-			case IPV6_BINDV6ONLY:
-#endif
+			case IPV6_V6ONLY:
 			case IPV6_RECVTCLASS:
 			case IPV6_AUTOFLOWLABEL:
 				if (optlen != sizeof(int)) {
@@ -1918,11 +1916,16 @@ do { \
 					OPTSET(IN6P_MTU);
 					break;
 
+				case IPV6_V6ONLY:
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
-				case IPV6_BINDV6ONLY:
 					OPTSET(IN6P_BINDV6ONLY);
-					break;
+#else
+					if (ip6_v6only == optval)
+						error = 0;
+					else
+						error = EINVAL;
 #endif
+					break;
 				case IPV6_RECVTCLASS:
 					/* cannot mix with RFC2292 XXX */
 					if (OPTBIT(IN6P_RFC2292)) {
@@ -2329,9 +2332,7 @@ do { \
 			case IPV6_RECVPATHMTU:
 
 			case IPV6_FAITH:
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
-			case IPV6_BINDV6ONLY:
-#endif
+			case IPV6_V6ONLY:
 #ifndef __bsdi__
 			case IPV6_PORTRANGE:
 #endif
@@ -2387,11 +2388,13 @@ do { \
 					optval = OPTBIT(IN6P_FAITH);
 					break;
 
+				case IPV6_V6ONLY:
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
-				case IPV6_BINDV6ONLY:
 					optval = OPTBIT(IN6P_BINDV6ONLY);
-					break;
+#else
+					optval = ip6_v6only;	/*XXX*/
 #endif
+					break;
 
 #ifndef __bsdi__
 				case IPV6_PORTRANGE:
