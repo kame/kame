@@ -810,6 +810,7 @@ netname6(sa6, mask)
 #else
 	int flag = 0;
 #endif
+	int error;
 
 	if (mask) {
 		masklen = 0;
@@ -870,8 +871,9 @@ netname6(sa6, mask)
 
 	if (nflag)
 		flag |= NI_NUMERICHOST;
-	if (getnameinfo((struct sockaddr *)sa6, sa6->sin6_len,
-			line, sizeof(line), NULL, 0, flag) != 0)
+	error = getnameinfo((struct sockaddr *)sa6, sa6->sin6_len,
+			line, sizeof(line), NULL, 0, flag);
+	if (error)
 		strcpy(line, "invalid");
 
 	if (nflag)
@@ -891,13 +893,20 @@ routename6(sa6)
 	int flag = 0;
 #endif
 	/* use local variable for safety */
-	struct sockaddr_in6 sa6_local = {AF_INET6, sizeof(sa6_local),};
+	struct sockaddr_in6 sa6_local;
+	int error;
+
+	memset(&sa6_local, 0, sizeof(sa6_local));
+	sa6_local.sin6_family = AF_INET6;
+	sa6_local.sin6_len = sizeof(struct sockaddr_in6);
+	sa6_local.sin6_addr = sa6->sin6_addr;
 
 	if (nflag)
 		flag |= NI_NUMERICHOST;
 
-	if (getnameinfo((struct sockaddr *)&sa6_local, sa6_local.sin6_len,
-			line, sizeof(line), NULL, 0, flag) != 0)
+	error = getnameinfo((struct sockaddr *)&sa6_local, sa6_local.sin6_len,
+			line, sizeof(line), NULL, 0, flag);
+	if (error)
 		strcpy(line, "invalid");
 
 	return line;
