@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.55 2000/06/12 16:18:32 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.56 2000/07/07 12:17:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -543,9 +543,9 @@ main(argc, argv)
 #ifdef IPSEC_POLICY_IPSEC
 	if (options & F_POLICY) {
 		if (setpolicy(s, policy_in) < 0)
-			errx(1, ipsec_strerror());
+			errx(1, "%s", ipsec_strerror());
 		if (setpolicy(s, policy_out) < 0)
-			errx(1, ipsec_strerror());
+			errx(1, "%s", ipsec_strerror());
 	}
 #else
 	if (options & F_AUTHHDR) {
@@ -1897,7 +1897,7 @@ setpolicy(so, policy)
 
 	buf = ipsec_set_policy(policy, strlen(policy));
 	if (buf == NULL)
-		errx(1, ipsec_strerror());
+		errx(1, "%s", ipsec_strerror());
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_IPSEC_POLICY,
 			buf, ipsec_get_policylen(buf)) < 0)
 		warnx("Unable to set IPSec policy");

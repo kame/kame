@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.30 2000/06/30 18:56:01 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.31 2000/07/07 12:17:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -596,9 +596,9 @@ main(argc, argv)
 	 * turned off.
 	 */
 	if (setpolicy(rcvsock, "in bypass") < 0)
-		errx(1, ipsec_strerror());
+		errx(1, "%s", ipsec_strerror());
 	if (setpolicy(rcvsock, "out bypass") < 0)
-		errx(1, ipsec_strerror());
+		errx(1, "%s", ipsec_strerror());
 #else
     {
 	int level = IPSEC_LEVEL_NONE;
@@ -670,9 +670,9 @@ main(argc, argv)
 	 * turned off.
 	 */
 	if (setpolicy(sndsock, "in bypass") < 0)
-		errx(1, ipsec_strerror());
+		errx(1, "%s", ipsec_strerror());
 	if (setpolicy(sndsock, "out bypass") < 0)
-		errx(1, ipsec_strerror());
+		errx(1, "%s", ipsec_strerror());
 #else
     {
 	int level = IPSEC_LEVEL_BYPASS;
@@ -890,7 +890,7 @@ setpolicy(so, policy)
 
 	buf = ipsec_set_policy(policy, strlen(policy));
 	if (buf == NULL) {
-		warnx("%s", ipsec_strerror());
+		warnx("%s", "%s", ipsec_strerror());
 		return -1;
 	}
 	(void)setsockopt(so, IPPROTO_IPV6, IPV6_IPSEC_POLICY,

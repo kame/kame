@@ -1,4 +1,4 @@
-/*	$KAME: rrenumd.c,v 1.14 2000/07/03 02:54:08 itojun Exp $	*/
+/*	$KAME: rrenumd.c,v 1.15 2000/07/07 12:17:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -291,7 +291,7 @@ sock6_open(struct flags *flags
 		char *buf;
 		buf = ipsec_set_policy(policy, strlen(policy));
 		if (buf == NULL)
-			errx(1, ipsec_strerror());
+			errx(1, "%s", ipsec_strerror());
 		/* XXX should handle in/out bound policy. */
 		if (setsockopt(s6, IPPROTO_IPV6, IPV6_IPSEC_POLICY,
 				buf, ipsec_get_policylen(buf)) < 0)
@@ -357,7 +357,7 @@ sock4_open(struct flags *flags
 		char *buf;
 		buf = ipsec_set_policy(policy, strlen(policy));
 		if (buf == NULL)
-			errx(1, ipsec_strerror());
+			errx(1, "%s", ipsec_strerror());
 		/* XXX should handle in/out bound policy. */
 		if (setsockopt(s4, IPPROTO_IP, IP_IPSEC_POLICY,
 				buf, ipsec_get_policylen(buf)) < 0)

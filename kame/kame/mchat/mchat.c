@@ -342,7 +342,7 @@ main(argc, argv)
 		buf = ipsec_set_policy(session->s_upolicy,
 			strlen(session->s_upolicy));
 		if (buf == NULL)
-			errx(1, ipsec_strerror());
+			errx(1, "%s", ipsec_strerror());
 		switch (res->ai_family) {
 		case AF_INET6:
 			level = IPPROTO_IPV6;
