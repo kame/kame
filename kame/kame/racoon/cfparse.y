@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.67 2000/09/15 21:37:46 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.68 2000/09/22 08:13:05 itojun Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -42,6 +42,9 @@
 #include "isakmp.h"
 #include "ipsec_doi.h"
 #include "strnames.h"
+#ifdef GC
+#include "gcmalloc.h"
+#endif
 
 struct proposalspec {
 	time_t lifetime;		/* for isakmp/ipsec */

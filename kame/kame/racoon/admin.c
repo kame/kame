@@ -1,4 +1,4 @@
-/*	$KAME: admin.c,v 1.15 2000/09/17 05:22:45 sakane Exp $	*/
+/*	$KAME: admin.c,v 1.16 2000/09/22 08:13:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: admin.c,v 1.15 2000/09/17 05:22:45 sakane Exp $ */
+/* YIPS @(#)$Id: admin.c,v 1.16 2000/09/22 08:13:05 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -68,6 +68,9 @@
 #include "admin.h"
 #include "admin_var.h"
 #include "session.h"
+#ifdef GC
+#include "gcmalloc.h"
+#endif
 
 static int admin_process __P((int, char *));
 static int admin_reply __P((int, struct admin_com *, vchar_t *));

@@ -1,4 +1,4 @@
-/*	$KAME: schedule.c,v 1.7 2000/09/13 04:50:29 itojun Exp $	*/
+/*	$KAME: schedule.c,v 1.8 2000/09/22 08:13:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: schedule.c,v 1.7 2000/09/13 04:50:29 itojun Exp $ */
+/* YIPS @(#)$Id: schedule.c,v 1.8 2000/09/22 08:13:06 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -41,6 +41,9 @@
 #include <errno.h>
 
 #include "schedule.h"
+#ifdef GC
+#include "gcmalloc.h"
+#endif
 
 #define FIXY2038PROBLEM
 

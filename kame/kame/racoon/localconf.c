@@ -1,4 +1,4 @@
-/*	$KAME: localconf.c,v 1.22 2000/09/13 04:50:27 itojun Exp $	*/
+/*	$KAME: localconf.c,v 1.23 2000/09/22 08:13:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.22 2000/09/13 04:50:27 itojun Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.23 2000/09/22 08:13:06 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -187,6 +187,7 @@ getpsk(str, len)
 	vchar_t *key = NULL;
 	char *p, *q;
 	size_t keylen;
+	char *k;
 
 	if (safefile(lcconf->pathinfo[LC_PATHTYPE_PSK], 1) == 0)
 		fp = fopen(lcconf->pathinfo[LC_PATHTYPE_PSK], "r");
@@ -225,8 +226,6 @@ getpsk(str, len)
 
 			/* fix key if hex string */
 			if (strncmp(p, "0x", 2) == 0) {
-				char *k;
-
 				k = str2val(p + 2, 16, &keylen);
 				if (k == NULL) {
 					plog(logp, LOCATION, NULL,
@@ -243,6 +242,8 @@ getpsk(str, len)
 				goto end;
 			}
 			memcpy(key->v, p, key->l);
+			if (k)
+				free(k);
 			goto end;
 		}
 	}

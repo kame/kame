@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.103 2000/09/21 15:18:24 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.104 2000/09/22 08:13:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.103 2000/09/21 15:18:24 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.104 2000/09/22 08:13:05 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -87,6 +87,9 @@
 #include "isakmp_inf.h"
 #include "isakmp_newg.h"
 #include "strnames.h"
+#ifdef GC
+#include "gcmalloc.h"
+#endif
 
 static int nostate1 __P((struct ph1handle *, vchar_t *));
 static int nostate2 __P((struct ph2handle *, vchar_t *));

@@ -1,9 +1,9 @@
-/*	$KAME: str2val.c,v 1.7 2000/09/22 08:13:06 itojun Exp $	*/
+/*	$KAME: gcmalloc.h,v 1.1 2000/09/22 08:13:05 itojun Exp $	*/
 
 /*
- * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -28,98 +28,21 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: str2val.c,v 1.7 2000/09/22 08:13:06 itojun Exp $ */
 
-#include <sys/types.h>
-#include <sys/param.h>
-#include <ctype.h>
+#ifndef _GCMALLOC_H_DEFINED
+#define _GCMALLOC_H_DEFINED
 
-#include <stdlib.h>
-#include <stdio.h>
+/*#define GC_DEBUG*/
+#include <gc.h>
 
-#include "str2val.h"
-#ifdef GC
-#include "gcmalloc.h"
+#define	malloc(x)	GC_MALLOC((x))
+#define	realloc(x, y)	GC_REALLOC((x), (y))
+
+/* normally, call to GC_free() is harmful. */
+#ifdef GC_DEBUG
+#define	free(x)		GC_FREE((x))
+#else
+#define	free(x)		(void)0
 #endif
 
-/*
- * exchange a value to a hex string.
- * must free buffer allocated later.
- */
-caddr_t
-val2str(buf, mlen)
-	const char *buf;
-	size_t mlen;
-{
-	caddr_t new;
-	size_t len = (mlen * 2) + mlen / 8 + 10;
-	size_t i, j;
-
-	if ((new = malloc(len)) == 0) return(0);
-
-	for (i = 0, j = 0; i < mlen; i++) {
-		snprintf(&new[j], len - j, "%02x", (u_char)buf[i]);
-		j += 2;
-		if (i % 8 == 7) {
-			new[j++] = ' ';
-			new[j] = '\0';
-		}
-	}
-	new[j] = '\0';
-
-	return(new);
-}
-
-/*
- * exchange a string based "base" to a value.
- */
-char *
-str2val(str, base, len)
-	char *str;
-	int base;
-	size_t *len;
-{
-	int f;
-	size_t i;
-	char *dst;
-	char *rp;
-	char *p, b[3];
-
-	i = 0;
-	for (p = str; *p != '\0'; p++) {
-		if (isxdigit(*p))
-			i++;
-		else if (isspace(*p))
-			;
-		else
-			return NULL;
-	}
-	if (i == 0 || (i % 2) != 0)
-		return NULL;
-	i /= 2;
-
-	if ((dst = malloc(i)) == NULL)
-		return NULL;
-
-	i = 0;
-	f = 0;
-	for (rp = dst, p = str; *p != '\0'; p++) {
-		if (isxdigit(*p)) {
-			if (!f) {
-				b[0] = *p;
-				f = 1;
-			} else {
-				b[1] = *p;
-				b[2] = '\0';
-				*rp++ = (char)strtol(b, NULL, base);
-				i++;
-				f = 0;
-			}
-		}
-	}
-
-	*len = i;
-
-	return(dst);
-}
-
+#endif

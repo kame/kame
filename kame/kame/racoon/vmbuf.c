@@ -1,4 +1,4 @@
-/*	$KAME: vmbuf.c,v 1.6 2000/09/13 04:50:30 itojun Exp $	*/
+/*	$KAME: vmbuf.c,v 1.7 2000/09/22 08:13:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: vmbuf.c,v 1.6 2000/09/13 04:50:30 itojun Exp $ */
+/* YIPS @(#)$Id: vmbuf.c,v 1.7 2000/09/22 08:13:06 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -41,6 +41,9 @@
 #include "misc.h"
 #include "vmbuf.h"
 #include "debug.h"
+#ifdef GC
+#include "gcmalloc.h"
+#endif
 
 vchar_t *
 vmalloc(size)
@@ -52,8 +55,8 @@ vmalloc(size)
 		return NULL;
 
 	var->l = size;
-
-	if ((var->v = (caddr_t)calloc(size, sizeof(u_char))) == NULL) {
+	var->v = (caddr_t)calloc(1, size);
+	if (var->v == NULL) {
 		(void)free(var);
 		return NULL;
 	}
@@ -76,7 +79,6 @@ vrealloc(ptr, size)
 		memset(v + ptr->l, 0, size - ptr->l);
 		ptr->v = v;
 		ptr->l = size;
-
 	} else {
 		if ((ptr = vmalloc(size)) == NULL)
 			return NULL;
@@ -113,4 +115,3 @@ vdup(src)
 
 	return new;
 }
-

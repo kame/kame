@@ -1,4 +1,4 @@
-/*	$KAME: misc.c,v 1.15 2000/09/13 04:50:27 itojun Exp $	*/
+/*	$KAME: misc.c,v 1.16 2000/09/22 08:13:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: misc.c,v 1.15 2000/09/13 04:50:27 itojun Exp $ */
+/* YIPS @(#)$Id: misc.c,v 1.16 2000/09/22 08:13:06 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -42,6 +42,9 @@
 #include "var.h"
 #include "misc.h"
 #include "debug.h"
+#ifdef GC
+#include "gcmalloc.h"
+#endif
 
 #ifndef NOUSE_PLOG
 #include "plog.h"
@@ -160,3 +163,33 @@ getfsize(path)
                 return st.st_size;
 }
 
+#ifdef GC
+/*
+ * to make boehm-gc work correctly, we need to allocate every dynamically
+ * allocated memory with boehm-gc.  we need to override some of the libc
+ * functions to do this.
+ */
+void *
+calloc(i, s)
+	size_t i, s;
+{
+	void *p;
+
+	p = malloc(i * s);
+	if (p)
+		memset(p, 0, i * s);
+	return p;
+}
+
+char *
+strdup(s)
+	const char *s;
+{
+	char *p;
+
+	p = malloc(strlen(s) + 1);
+	if (p)
+		strcpy(p, s);
+	return p;
+}
+#endif

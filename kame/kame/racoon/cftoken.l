@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.35 2000/09/13 06:31:13 itojun Exp $	*/
+/*	$KAME: cftoken.l,v 1.36 2000/09/22 08:13:05 itojun Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -35,6 +35,10 @@
 #include "isakmp.h"
 #include "ipsec_doi.h"
 #include "proposal.h"
+#ifdef GC
+#include "gcmalloc.h"
+#endif
+
 #include "y.tab.h"
 
 int yyerrorcount = 0;
