@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.14 2000/02/01 17:53:36 itojun Exp $
+# $Id: Makefile,v 1.15 2000/11/15 16:12:53 itojun Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -19,6 +19,7 @@ SUBDIR+=	inn
 SUBDIR+=	kaffe
 SUBDIR+=	libident6
 SUBDIR+=	libpcap
+SUBDIR+=	lukemftp
 SUBDIR+=	lynx
 SUBDIR+=	mediator
 SUBDIR+=	mnews
