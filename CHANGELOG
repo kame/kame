@@ -1,7 +1,24 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2179 2002/06/03 13:42:23 jinmei Exp $
+$KAME: CHANGELOG,v 1.2180 2002/06/06 05:09:30 fujisawa Exp $
 
 <200206>
+2002-06-06 Shin'ichi Fujisawa <fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_*.[ch]:
+	* kame/kame/natptconfig/*.[chly]:
+	  Picked up a modification minute of April and May, because I
+	  forgot to change this CHANGELOG.
+	  - Revise the following conformity with rfc2765 and rfc2766.
+	    - ICMPv[46] header incorrectness.
+	    - IPv[46] header incorrectness which is inside of the
+	      ICMPv[46] payload.
+	    - Support unknown protocol translation.
+	    - Fragmentation-related incorrectness.
+	  - Changed the expiration time of translation slot entry
+	    (icmp=10, udp=10, tcp=1800).
+	  - "natptconfig" command does not read kernel symbol table
+	    any more. "show rules" and "show xlate" subcommand read
+	    '/dev/kmem' as before.
+
 2002-06-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/ports/ppp: upgraded to the latest snap kit as of today
 	with KAME-original patches.
