@@ -1,6 +1,11 @@
-$Id: CHANGELOG,v 1.484 2000/01/26 03:05:39 itojun Exp $
+$Id: CHANGELOG,v 1.485 2000/01/26 05:17:03 itojun Exp $
 
 <200001>
+Wed Jan 26 14:16:00 JST 2000  itojun@iijlab.net
+	* kame/libinet6/getaddrinfo.c: from the specification, AI_CANONNAME
+	  does not imply reverse query.  ai_canonname has the same meaning as
+	  h_name (in struct hostent), nothing more.
+
 Wed Jan 26 12:04:42 JST 2000  itojun@iijlab.net
 	* kame/libinet6/bindresvport.c: remove bindresvport_af(), implement
 	  bindresvport_sa().
