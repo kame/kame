@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.9 2001/12/14 03:52:41 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.10 2001/12/14 09:48:13 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -48,6 +48,7 @@
 #include <net/if_hif.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
@@ -58,6 +59,8 @@
 
 static int getaddress(char *, struct in6_addr *);
 static const char *ip6_sprintf(const struct in6_addr *);
+static const char *raflg_sprintf(u_int8_t);
+static const char *buflg_sprintf(u_int8_t);
 
 static const char *pfx_desc[] = {
 	"prefix\t\tplen\tvltime\tvlrem\tpltime\tplrem\thaddr\n",
@@ -311,8 +314,8 @@ main(argc, argv)
 			       ip6_sprintf(&mha->mha_lladdr));
 			printf(ipaddr_fmt[longdisp],
 			       ip6_sprintf(&mha->mha_gaddr));
-			printf("%7x %7d %7d %7d\n",
-			       mha->mha_flags,
+			printf("%-7s %7d %7d %7d\n",
+			       raflg_sprintf(mha->mha_flags),
 			       mha->mha_pref,
 			       mha->mha_lifetime,
 			       mha->mha_remain);
@@ -352,7 +355,7 @@ main(argc, argv)
 			       ip6_sprintf(&mbu->mbu_haddr));
 			printf(ipaddr_fmt[longdisp],
 			       ip6_sprintf(&mbu->mbu_coa));
-			printf("%7u %7qd %7u %7qd %7u %7qd %7u %7x %7x %7x %7u %7u\n",
+			printf("%7u %7qd %7u %7qd %7u %7qd %7u %-7s %7x %7x %7u %7u\n",
 			       mbu->mbu_lifetime,
 			       mbu->mbu_remain,
 			       mbu->mbu_refresh,
@@ -360,7 +363,7 @@ main(argc, argv)
 			       mbu->mbu_acktimeout,
 			       mbu->mbu_ackremain,
 			       mbu->mbu_seqno,
-			       mbu->mbu_flags,
+			       buflg_sprintf(mbu->mbu_flags),
 			       mbu->mbu_reg_state,
 			       mbu->mbu_state,
 			       mbu->mbu_dontsend,
@@ -400,11 +403,11 @@ main(argc, argv)
 			       ip6_sprintf(&mbc->mbc_addr));
 			printf(
 #ifdef MIP6_DRAFT13
-			       "%7x %7u %7u %7u %7qd %7x\n",
+			       "%-7s %7u %7u %7u %7qd %5x\n",
 #else
-			       "%7x %7u %7u %7qd %7x\n",
+			       "%-7s %7u %7u %7qd %5x\n",
 #endif /* MIP6_DRAFT13 */
-			       mbc->mbc_flags,
+			       buflg_sprintf(mbc->mbc_flags),
 #ifdef MIP6_DRAFT13
 			       mbc->mbc_prefixlen,
 #endif /* MIP6_DRAFT13 */
@@ -461,4 +464,37 @@ ip6_sprintf(addr)
 		return "?";
 
 	return ip6buf[ip6round];
+}
+
+static const char *
+raflg_sprintf(flags)
+	u_int8_t flags;
+{
+	static char buf[] = "MOH";
+
+	snprintf(buf, sizeof(buf), "%s%s%s",
+		 (flags & ND_RA_FLAG_MANAGED ? "M" : ""),
+		 (flags & ND_RA_FLAG_OTHER ? "O" : ""),
+		 (flags & ND_RA_FLAG_HOME_AGENT ? "H" : ""));
+
+	return buf;
+}
+
+static const char *
+buflg_sprintf(flags)
+	u_int8_t flags;
+{
+	static char buf[] = "AHSO";
+
+	snprintf(buf, sizeof(buf), "%s%s%s%s",
+		 (flags & IP6_BUF_ACK ? "A" : ""),
+		 (flags & IP6_BUF_HOME ? "H" : ""),
+#ifdef MIP6_DRAFT13
+		 (flags & IP6_BUF_ROUTER ? "R" : ""),
+#else
+		 (flags & IP6_BUF_SINGLE ? "S" : ""),
+#endif
+		 (flags & IP6_BUF_DAD ? "D" : ""));
+
+	return buf;
 }
