@@ -1,13 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1853 2001/08/30 11:30:11 jinmei Exp $
+$KAME: CHANGELOG,v 1.1854 2001/08/30 11:33:09 jinmei Exp $
 
 <200108>
 2001-08-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/netinet/tcp_input.c (tcp_rtlookup): always used
-	rtcalloc() so that both active and passive connections make cloned
-	host routes.  The previous code, which calls rtalloc(), should not
-	have severe bad effects, but using rtcalloc() is more suitable to
-	bsdi's logic.
+	rtcalloc() so that both active and passive connections would make
+	cloned host routes.  The previous code, which called rtalloc(),
+	should not have severe bad effects, but using rtcalloc() is more
+	suitable to bsdi's logic.
 
 2001-08-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ndp/ndp.c (ifinfo):
