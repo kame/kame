@@ -1,12 +1,12 @@
 # New ports collection makefile for:	mrt
-# Version required:	1.5.1a
+# Version required:	1.5.2a
 # Date created:		Sat Jun  6 00:09:52 JST 1998
 # Whom:			Jun-ichiro itojun Itoh <itojun@itojun.org>
 #
-# $Id: Makefile,v 1.1 1999/08/08 23:59:25 itojun Exp $
+# $Id: Makefile,v 1.2 1999/08/24 14:39:34 itojun Exp $
 #
 
-DISTNAME=	mrt-${VERBASE}-src
+DISTNAME=	mrt-${VERBASE}${VERADD}-src
 PKGNAME=	mrt-${VERBASE}
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.merit.edu/net-research/mrt/
@@ -16,7 +16,8 @@ MAINTAINER=	itojun@itojun.org
 WRKSRC=		${WRKDIR}/mrt-${VERBASE}/src
 GNU_CONFIGURE=	yes
 
-VERBASE=	1.5.1a
+VERBASE=	2.0.0a
+VERADD=
 
 MAN8=	mrtd.8
 EXAMPLES=	programs/bgpsim/bgpsim.conf programs/bgpsim/bgpsim6.conf \
@@ -32,4 +33,4 @@ post-install:
 		${INSTALL_DATA} ${WRKSRC}/$$i ${PREFIX}/share/examples/mrt; \
 	done
 
-.include <bsd.port.mk>
+.include "../../mk/bsd.pkg.mk"

@@ -1,6 +1,6 @@
---- lib/kernel/bsd.c.orig	Tue Nov 24 07:47:22 1998
-+++ lib/kernel/bsd.c	Tue Aug 24 23:08:01 1999
-@@ -318,8 +318,8 @@
+--- lib/kernel/bsd.c.orig	Tue Aug  3 12:33:21 1999
++++ lib/kernel/bsd.c	Tue Aug 24 23:15:03 1999
+@@ -187,8 +187,8 @@
  #ifdef __KAME__
  	/* KAME IPV6 still requires an index here */
  	if (IN6_IS_ADDR_LINKLOCAL (&so_gate.sin6.sin6_addr)) {
@@ -11,14 +11,3 @@
  	}
  #endif /* __KAME__ */
  #ifdef notdef
-@@ -463,6 +463,10 @@
- #ifndef HAVE_IPV6
- #	define RTF_PRCLONING RTF_CLONING
- #endif /* !HAVE_IPV6*/
-+#ifndef RTF_PRCLONING
-+/* NetBSD workaround - is it correct? */
-+# define RTF_PRCLONING	0
-+#endif
- 	    if (BIT_TEST (rtm->rtm_flags, 
- 		    ~(RTF_UP|RTF_GATEWAY|RTF_HOST|RTF_STATIC|
- 			RTF_REJECT|RTF_BLACKHOLE|RTF_PRCLONING)))
