@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.10 2001/05/08 04:36:32 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.11 2001/05/13 15:45:07 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -79,7 +79,7 @@ main(int argc, char *argv[])
 	int ch;
 
 	type = MLD6_LISTENER_QUERY;
-	while ((ch = getopt(argc, argv, "d")) != -1) {
+	while ((ch = getopt(argc, argv, "dr")) != -1) {
 		switch (ch) {
 		case 'd':
 			type = MLD6_LISTENER_DONE;
@@ -102,7 +102,7 @@ main(int argc, char *argv[])
 	ifindex = (u_short)if_nametoindex(argv[0]);
 	if (ifindex == 0)
 		usage();
-	if (argc == 3 && inet_pton(AF_INET6, argv[1], &maddr) != 1)
+	if (argc == 2 && inet_pton(AF_INET6, argv[1], &maddr) != 1)
 		usage();
 
 	if ((s = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) < 0)
