@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.10 2001/08/14 13:02:55 itojun Exp $
+$KAME: helsinki-result.jp,v 1.11 2001/08/14 15:23:17 itojun Exp $
 
 
 generic
@@ -96,10 +96,19 @@ SecGo CryptoIP v3
 
 	phase 1 AESもできるらしい(SSH toolkit使用)。
 
+	Wed Aug 15 00:16:35 JST 2001
+	IPv4, ESP, transport mode
+	phase 1 3DES + SHA1, lifetime = 10min
+	phase 2 AES, lifetime = 2min
+
+	tested rekey as well.
+
+
 Oullim information technologies SECUREWORKS VPN gateway 3.0
 	Tue Aug 14 21:48:36 JST 2001
 	phase 2 AES/blowfishはどうだねとナンパしてみるも、not ready。
 	明日か明後日ねとのこと。
+
 
 Trilogy AdmitOne 2.6
 	Tue Aug 14 21:58:01 JST 2001
