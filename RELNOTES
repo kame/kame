@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/05/25 12:57:53 $
+		     $Date: 2000/06/22 08:32:37 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -83,5 +83,8 @@ Many of old ones have been solved.
   and kame/netbsd.
 
 - libinet6 resolver code does not support NIS lookup.
+
+- openbsd: 3C905B card does not handle multicast properly, and will have 
+  major problem with IPv6.  already corrected in SNAP kits.
 
 							<end of RELNOTES>
