@@ -545,21 +545,21 @@ struct in6_pktinfo {
 #define IPV6CTL_KAME_VERSION	20
 #define IPV6CTL_USE_DEPRECATED	21	/* use deprecated addr (RFC2462 5.5.4) */
 #define IPV6CTL_RR_PRUNE	22	/* walk timer for router renumbering */
-#ifdef MAPPED_ADDR_ENABLED
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 #define IPV6CTL_MAPPED_ADDR	23
-#endif /* MAPPED_ADDR_ENABLED */
+#endif
 /* New entries should be added here from current IPV6CTL_MAXID value. */
 #define IPV6CTL_MAXID		24
 
-#ifdef MAPPED_ADDR_ENABLED
+#ifdef IPV6CTL_MAPPED_ADDR
 #define IPV6CTL_NAMES_MAPPED_ADDR	"mapped_addr"
 #define IPV6CTL_TYPE_MAPPED_ADDR	CTLTYPE_INT
 #define IPV6CTL_VARS_MAPPED_ADDR	&ip6_mapped_addr_on
-#else  /* MAPPED_ADDR_ENABLED */
+#else
 #define IPV6CTL_NAMES_MAPPED_ADDR	0
 #define IPV6CTL_TYPE_MAPPED_ADDR	0
 #define IPV6CTL_VARS_MAPPED_ADDR	0
-#endif /* MAPPED_ADDR_ENABLED */
+#endif
 
 #define IPV6CTL_NAMES { \
 	{ 0, 0 }, \
@@ -627,6 +627,7 @@ struct	in6_ifaddr *in6_ifawithscope __P((struct ifnet *, struct in6_addr *));
 struct	in6_ifaddr *in6_ifawithifp __P((struct ifnet *, struct in6_addr *));
 extern void in6_if_up __P((struct ifnet *));
 #ifdef MAPPED_ADDR_ENABLED
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 struct sockaddr;
 
 void	in6_sin6_2_sin __P((struct sockaddr_in *sin,
@@ -635,6 +636,7 @@ void	in6_sin_2_v4mapsin6 __P((struct sockaddr_in *sin,
 				 struct sockaddr_in6 *sin6));
 void	in6_sin6_2_sin_in_sock __P((struct sockaddr *nam));
 void	in6_sin_2_v4mapsin6_in_sock __P((struct sockaddr **nam));
+#endif
 #endif /* MAPPED_ADDR_ENABLED */
 
 #define	satosin6(sa)	((struct sockaddr_in6 *)(sa))
