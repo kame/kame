@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.72 2000/02/28 14:27:23 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.73 2000/02/28 16:18:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -90,7 +90,7 @@
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #endif
@@ -98,7 +98,7 @@
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
 #include <netinet6/mld6_var.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__)
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__) && !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <netinet6/in6_pcb.h>
 #else
 #include <netinet/in_pcb.h>

@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.9 2000/02/22 14:04:14 itojun Exp $	*/
+/*	$KAME: dest6.c,v 1.10 2000/02/28 16:18:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -51,7 +51,7 @@
 #include <netinet/in_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__)
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__) && !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet/icmp6.h>
