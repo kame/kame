@@ -1,9 +1,9 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1451 2000/12/25 09:30:02 jinmei Exp $
+$KAME: CHANGELOG,v 1.1452 2000/12/25 09:31:48 itojun Exp $
 
 <200012>
-Fri Dec 22 JST 2000 itojun(?)
+Fri Dec 22 JST 2000 itojun@iijlab.net
 	* traceroute6, ping6: revoke root privilege earlier.
 
 2000-12-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
