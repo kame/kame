@@ -1,4 +1,4 @@
-.\"	$KAME: kame.4,v 1.7 2000/04/16 16:51:25 itojun Exp $
+.\"	$KAME: kame.4,v 1.8 2000/04/17 12:21:57 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998 and 1999 WIDE Project.
 .\" All rights reserved.
@@ -88,9 +88,9 @@ TCP relay translator, FAITH
 .Po
 .Xr faithd 8
 .Pc .
-and SIIT IPv6-to-v4 header translator implementation
+and NAT-PT IPv6-to-v4 header translator implementation
 .Po
-.Xr ptrconfig 8
+.Xr natptconfig 8
 .Pc .
 .\"
 .Ss IPsec and tunnelling
@@ -104,13 +104,20 @@ and SIIT IPv6-to-v4 header translator implementation
 Dozen of existing tools are modified for IPsec support, like
 .Xr ping 8 .
 .\"
+.Ss Alternate queueing framework
+.Xr altqstat 1 ,
+.Xr altqd 8 .
+.\"
+.Ss ATM PVC support
+.Xr pvc 4 ,
+.Xr pvcbridge 8 ,
+.Xr pvcsif 8 ,
+.Xr pvctxctl 8 .
+.\"
 .Ss Utilities/Diagnosis
-.Xr cksum6 1 ,
-.Xr v6test 1 ,
 .Xr icmp6dump 8 ,
 .Xr ping6 8 ,
-.Xr traceroute6 8 ,
-.Xr v6p 8 .
+.Xr traceroute6 8 .
 .Pp
 Dozen of existing utilities are modified for IPv6/IPsec support, like
 .Xr ftp 1
@@ -202,6 +209,8 @@ protocol stack conformance, please refer
 Bug reporting form, user mailing list, frequently asked questions list,
 latest packages, related software, and more information can be found at
 .Pa http://www.kame.net/ .
+Bugs can also be reported by using
+.Xr kame-send-pr 1 .
 .\"
 .Ss "Related project"
 TAHI project who is providing verification technology for IPv6, is
