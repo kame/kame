@@ -3,7 +3,7 @@ SRCDIR=	${.CURDIR}/../../kame/v6test
 PROG=	v6test
 SRCS=	v6test.c cksum.c testcap.c getconfig.c
 
-CFLAGS+=-I${SRCDIR}
+CFLAGS+=-I${SRCDIR} -DIPSEC
 LDADD+=	-L${.OBJDIR}/../../lib/libinet6 \
 	-L/usr/local/v6/lib -linet6
 DPADD+= ${.OBJDIR}/../lib/libinet6/libinet6.a \

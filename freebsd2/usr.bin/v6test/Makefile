@@ -3,7 +3,8 @@ SRCDIR=	${.CURDIR}/../../kame/v6test
 PROG=	v6test
 SRCS=	v6test.c cksum.c testcap.c getconfig.c
 
-CFLAGS+=-I${SRCDIR} -Duint8_t=u_int8_t -Duint16_t=u_int16_t -Duint32_t=u_int32_t
+CFLAGS+=-I${SRCDIR} -DIPSEC
+CFLAGS+=-Duint8_t=u_int8_t -Duint16_t=u_int16_t -Duint32_t=u_int32_t
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
 DPADD+= ${.CURDIR}/../lib/libinet6/libinet6.a \
