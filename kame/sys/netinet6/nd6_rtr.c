@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.165 2001/09/14 06:11:56 sumikawa Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.166 2001/09/20 09:36:08 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1416,9 +1416,16 @@ prelist_update(new, dr, m)
 		 * with the Subject "StoredLifetime in RFC 2462".
 		 */
 		lt6_tmp = ifa6->ia6_lifetime;
-		storedlifetime = IFA6_IS_INVALID(ifa6) ? 0 :
-			(lt6_tmp.ia6t_expire - time_second);
-
+		if (lt6_tmp.ia6t_expire == 0) /* never expire */
+			storedlifetime = ND6_INFINITE_LIFETIME;
+		else if (lt6_tmp.ia6t_expire < time_second) {
+			/*
+			 * The case of "invalid" address.  We should usually
+			 * not see this case.
+			 */
+			storedlifetime = 0;
+		} else
+			storedlifetime = lt6_tmp.ia6t_expire - time_second;
 		if (TWOHOUR < new->ndpr_vltime ||
 		    storedlifetime < new->ndpr_vltime) {
 			lt6_tmp.ia6t_vltime = new->ndpr_vltime;
