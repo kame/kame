@@ -735,39 +735,6 @@ explore_numeric(pai, hostname, servname, res)
 	flags = pai->ai_flags;
 
 	if (inet_pton(afd->a_af, hostname, pton) == 1) {
-#if 0
-		u_int32_t v4a;
-#ifdef INET6
-		struct in6_addr *v6a;
-#endif
-
-		switch (afd->a_af) {
-		case AF_INET:
-			v4a = (u_int32_t)ntohl(((struct in_addr *)pton)->s_addr);
-			if (IN_MULTICAST(v4a) || IN_EXPERIMENTAL(v4a))
-				flags &= ~AI_CANONNAME;
-			v4a >>= IN_CLASSA_NSHIFT;
-			if (v4a == 0 || v4a == IN_LOOPBACKNET)
-				flags &= ~AI_CANONNAME;
-			break;
-#ifdef INET6
-		case AF_INET6:
-			v6a = (struct in6_addr *)pton;
-			if (IN6_IS_ADDR_MULTICAST(v6a))
-				flags &= ~AI_CANONNAME;
-			if (IN6_IS_ADDR_UNSPECIFIED(v6a) ||
-			    IN6_IS_ADDR_LOOPBACK(v6a))
-				flags &= ~AI_CANONNAME;
-			if (IN6_IS_ADDR_LINKLOCAL(v6a))
-				flags &= ~AI_CANONNAME;
-
-			/* XXX sitelocal? */
-
-			break;
-#endif
-		}
-#endif
-
 		if (pai->ai_family == afd->a_af ||
 		    pai->ai_family == PF_UNSPEC /*?*/) {
 			GET_AI(cur->ai_next, afd, pton);
