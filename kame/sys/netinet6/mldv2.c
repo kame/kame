@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.13 2004/03/29 13:04:43 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.14 2004/03/30 03:37:54 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2338,6 +2338,7 @@ in6_delmulti2(in6m, errorp, numsrc, src, mode, final)
 	int final;			/* indicate complete leave by socket */
 {
 	struct	in6_ifreq ifr;
+	struct	in6_ifaddr *ia;
 	struct	mbuf *m = NULL;
 	struct	i6as_head *newhead = NULL;/* this may become new current head */
 	u_int	curmode;		/* current filter mode */
@@ -2369,6 +2370,20 @@ in6_delmulti2(in6m, errorp, numsrc, src, mode, final)
 				/* release reference */
 				IFAFREE(&in6m->in6m_ia->ia_ifa);
 			}
+
+			/*
+			 * Delete all references of this multicasting group
+			 * from the membership arrays
+			 */
+			for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
+				struct in6_multi_mship *imm;
+				LIST_FOREACH(imm, &ia->ia6_memberships,
+				    i6mm_chain) {
+					if (imm->i6mm_maddr == in6m)
+						imm->i6mm_maddr = NULL;
+				}
+			}
+
 			/*
 			 * Notify the network driver to update its multicast
 			 * reception filter.

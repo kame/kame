@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.98 2004/03/13 04:45:49 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.99 2004/03/30 03:37:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -802,6 +802,7 @@ in6_delmulti(in6m)
 	struct in6_multi *in6m;
 {
 	struct	in6_ifreq ifr;
+	struct	in6_ifaddr *ia;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	int	s = splsoftnet();
 #else
@@ -821,6 +822,19 @@ in6_delmulti(in6m)
 		LIST_REMOVE(in6m, in6m_entry);
 		if (in6m->in6m_ia) {
 			IFAFREE(&in6m->in6m_ia->ia_ifa); /* release reference */
+		}
+
+		/*
+		 * Delete all references of this multicasting group from
+		 * the membership arrays
+		 */
+		for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
+			struct in6_multi_mship *imm;
+			LIST_FOREACH(imm, &ia->ia6_memberships,
+			    i6mm_chain) {
+				if (imm->i6mm_maddr == in6m)
+					imm->i6mm_maddr = NULL;
+			}
 		}
 
 		/*
