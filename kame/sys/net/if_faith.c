@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.15 2000/07/26 05:45:06 itojun Exp $	*/
+/*	$KAME: if_faith.c,v 1.16 2000/08/01 02:34:54 sakane Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -347,7 +347,11 @@ faithprefix(in6)
 	sin6.sin6_family = AF_INET6;
 	sin6.sin6_len = sizeof(struct sockaddr_in6);
 	sin6.sin6_addr = *in6;
+#ifdef __FreeBSD__
+	rt = rtalloc1((struct sockaddr *)&sin6, 0, 0UL);
+#else
 	rt = rtalloc1((struct sockaddr *)&sin6, 0);
+#endif
 	if (rt && rt->rt_ifp && rt->rt_ifp->if_type == IFT_FAITH &&
 	    (rt->rt_ifp->if_flags & IFF_UP) != 0)
 		ret = 1;
