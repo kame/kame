@@ -1,9 +1,9 @@
-# New ports collection makefile for:    root
+# New ports collection makefile for:    geta
 # Version required:     1.0
-# Date created:         26 Nov 1998
+# Date created:         19 Apr 1999
 # Whom:                 sumikawa
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:09:44 itojun Exp $
+# $Id: Makefile,v 1.2 1999/08/24 17:34:12 sumikawa Exp $
 #
 
 DISTNAME=	pping-19990419
