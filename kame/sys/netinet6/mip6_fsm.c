@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.6 2002/07/26 12:48:26 keiichi Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.7 2002/08/08 07:18:01 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -572,6 +572,10 @@ mip6_bu_fsm(mbu, event, data)
 			 * XXX if there is any reason to believe
 			 * forward progress is begin made, do nothing.
 			 */
+
+			/* XXX reset state? */
+			*mbu_fsm_state = MIP6_BU_FSM_STATE_IDLE;
+
 			/*
 			 * send HoTI, CoTI, start retrans and failure
 			 * timers.
