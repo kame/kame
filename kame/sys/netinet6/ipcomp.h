@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp.h,v 1.6 2000/05/18 12:32:32 sumikawa Exp $	*/
+/*	$KAME: ipcomp.h,v 1.7 2000/05/18 12:45:13 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -40,6 +40,7 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#endif
 #if defined(__NetBSD__)
 #include "opt_inet.h"
 #endif
