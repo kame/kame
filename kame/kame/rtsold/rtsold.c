@@ -177,7 +177,7 @@ main(argc, argv)
 		errx(1, "failed to initilizatoin interfaces");
 	while (argc--) {
 		if (ifconfig(*argv))
-			errx(1, "failed to initilize %s", *argv);
+			errx(1, "failed to initialize %s", *argv);
 		argv++;
 	}
 
