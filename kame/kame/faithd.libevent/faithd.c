@@ -183,7 +183,7 @@ main(argc, argv)
 static void
 usage()
 {
-	fprintf(stderr, "usage: faithd [-D] [-f configfile] port...\n");
+	fprintf(stderr, "usage: faithd [-D] [-f configfile] service...\n");
 }
 
 #ifdef __STD__
