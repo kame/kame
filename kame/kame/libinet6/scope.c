@@ -1,4 +1,4 @@
-/*	$KAME: scope.c,v 1.2 2001/07/03 08:12:29 jinmei Exp $ */
+/*	$KAME: scope.c,v 1.3 2001/11/13 09:37:12 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -35,9 +35,14 @@
 
 #ifdef INET6
 #include <net/if.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include <net/if_var.h>
+#endif
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
 #endif
+
+#include <netinet/in.h>
 
 #include <errno.h>
 
@@ -49,6 +54,7 @@ addr2scopetype(sa)
 	struct sockaddr_in6 *sa6;
 #endif
 	struct sockaddr_in *sa4;
+	u_int8_t *addr4;
 
 	switch(sa->sa_family) {
 #ifdef INET6
@@ -64,7 +70,7 @@ addr2scopetype(sa)
 		 * XXX: hardcoded scope type values are bad...
 		 */
 		if (IN6_IS_ADDR_LOOPBACK(&sa6->sin6_addr))
-			return(1); /* node local scope */
+			return(2); /* a special type of link-local scope */
 		if (IN6_IS_ADDR_LINKLOCAL(&sa6->sin6_addr))
 			return(2); /* link-local scope */
 		if (IN6_IS_ADDR_SITELOCAL(&sa6->sin6_addr))
@@ -77,20 +83,18 @@ addr2scopetype(sa)
 		 * IPv4 pseudo scoping according to
 		 * draft-ietf-ipngwg-default-addr-select.
 		 */
-		sa4 = (struct sockaddr_in *)sa;
+		addr4 = (u_int8_t *)&((struct sockaddr_in *)sa)->sin_addr;
 		/* IPv4 autoconfiguration addresses have link-local scope. */
-		if (sa4->sin_addr.s_addr[0] == 169 &&
-		    sa4->sin_addr.s_addr[1] == 254)
+		if (addr4[0] == 169 && addr4[1] == 254)
 			return(2);
 		/* Private addresses have site-local scope. */
-		if (sa4->sin_addr.s_addr[0] == 10 ||
-		    (sa4->sin_addr.s_addr[0] == 172 &&
-		     (sa4->sin_addr.s_addr[1] & 0xf0) == 16) ||
-		    (sa4->sin_addr.s_addr[0] == 192 &&
-		     sa4->sin_addr.s_addr[1] == 168))
+		if (addr4[0] == 10 ||
+		    (addr4[0] == 172 && (addr4[1] & 0xf0) == 16) ||
+		    (addr4[0] == 192 &&  addr4[1] == 168)) {
 			return(5);
+		}
 		/* Loopback addresses have link-local scope. */
-		if (sa4->sin_addr.s_addr[0] == 127)
+		if (addr4[0] == 127)
 			return(2);
 		return(14);
 		break;
