@@ -1,6 +1,6 @@
 Installation procedure - preparation of the tree
 KAME project
-$Id: INSTALL,v 1.4 1999/08/26 11:20:10 itojun Exp $
+$Id: INSTALL,v 1.5 1999/08/30 04:49:24 itojun Exp $
 
 
 KAME build tree shares part of the tree among operating system
@@ -29,13 +29,16 @@ ready to tackle those troubles.
    tree to "kame" tree).
    NOTE: You'll need perl interpreter for invoking this.
 
-4. Some part of the tree works better if you have installed third-party
-   libraries.  Namely:
+4. Some part of the tree will be compiled, only if there are certain libraries
+   installed beforehand:
 	usr.sbin/tcpdump:
-		SSLeay or OpenSSL will let you look inside IPsec packet.
+		If There is SSLeay or OpenSSL installed beforehand, 
+		tcpdump will let you look inside IPsec packet (-E option).
 	usr.bin/racoon:
 		Compiles only if SSLeay or OpenSSL is installed beforehand.
-   Please install those libraries, preferrably with *BSD ports/packages.
+   Please install those libraries before building KAME tree.
+   If you are using {Net,Free,Open}BSD, ports/packages may help you build
+   and install them.
 
 5. Go down to the target operating system you have specified, and read
    document named "INSTALL".  Good luck!
