@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.conf.5,v 1.28 2005/02/03 19:37:35 jinmei Exp $
+.\"	$KAME: dhcp6c.conf.5,v 1.29 2005/02/03 19:41:31 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -548,6 +548,18 @@ keyinfo kame-key {
         secret "5pvW2g48OHPvkYMJSw0vZA==";
 };
 .Ed
+.Pp
+One easy way of generating a new secret in the base64 format is to
+execute the
+.Xr openssl 1
+command (when available) as follows,
+.Bd -literal -offset
+% openssl rand -base64 16
+.Ed
+.Pp
+and copy the output to the
+.Nm dhcp6c.conf
+file.
 .Pp
 To include an authentication option for DHCPv6 authentication,
 the
