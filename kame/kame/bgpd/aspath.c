@@ -790,7 +790,9 @@ msg2clstrlist(bnp, i, len)
     if (IamRR                   &&
 	clusterId != 0          &&    /*    global      */
 	clusterId == cll->cll_id) {   /* loop detection */ 
-      syslog(LOG_ERR, "<msg2clstrlist>: Cluster-list loop detected: %s", buf);
+      syslog(LOG_NOTICE,
+	     "<%s>: Cluster-list loop detected: %s from %s",
+	     __FUNCTION__, buf, bgp_peerstr(bnp));
       free_clstrlist(cll);
       return NULL;
     }

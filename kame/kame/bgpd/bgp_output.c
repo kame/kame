@@ -339,7 +339,6 @@ bgp_send_update(bnp, rte, headrte)
   if (bnp->rp_state != BGPSTATE_ESTABLISHED)
     fatalx("<bgp_send_update>: internal error: invalid state");
 
-
   if (rte == NULL) {                /* argument */
     IFLOG(LOG_BGPOUTPUT)
       syslog(LOG_DEBUG, "<%s>: Nothing to be sent.", __FUNCTION__);
@@ -369,15 +368,11 @@ bgp_send_update(bnp, rte, headrte)
   i += 2;
   /* IPv6 (BGP4+) doesn't send this.      */
 
-
   /*   Total Path Attribute Length (2 octets) (0...65535)    */
   i += 2;
-
   topa_p = i;
 
-
   rtp = &rte->rt_proto;              /* identical to each RTE */
-
 
   /*
    *   Path Attributes
@@ -413,7 +408,6 @@ bgp_send_update(bnp, rte, headrte)
     /*NOTREACHED*/
   }
 
-
   switch (origin) {
   case PATH_ORG_IGP: case PATH_ORG_EGP: case PATH_ORG_XX:
     outpkt[i] = origin;
@@ -425,9 +419,7 @@ bgp_send_update(bnp, rte, headrte)
     break;
   }
 
-
   i += PA4_LEN_ORIGIN;
-
   
   /**  AS_PATH (Type Code 2)  **/    /* well-known mandatory */
   outpkt[i++] |= PA_FLAG_TRANS;      /* well-known mandatory */
@@ -472,18 +464,14 @@ bgp_send_update(bnp, rte, headrte)
   BGP_LOG_ATTR;
   outpkt[i++] =  sizeof(struct in_addr); /* L (IPv4 specific) */
                                          /* V */
-
   /* added by jinmei to interoperate with CISCO */  
   memcpy(&outpkt[i], (void *)&bgpIdentifier, PA_LEN_NEXTHOP); 
 
   i +=  PA_LEN_NEXTHOP;                  /* IPv4 address makes "no sense" */
 
-
-
   /** MULTI_EXIT_DISC (Type Code 4) optional non-transitive    **/
   /*   which received from a neighboring AS      [BGP4+ 5.1.4]  */
   /*        MUST NOT be propagated to other neighboring ASs     */
-
   if ((bnp->rp_mode & BGPO_IGP) &&
       rte->rt_aspath              &&
       rte->rt_aspath->asp_med != 0)          /* net-order */
@@ -525,16 +513,14 @@ bgp_send_update(bnp, rte, headrte)
     /* no data */
   }
 
-
   /**   ORIGINATOR_ID (Type Code 9) optional non-transitive */
   /*
-     ORIGINATOR_ID is a new optional, non-transitive BGP attribute of Type
-     code 9.  This attribute is 4 bytes long and it will be created by a
-     RR. This attribute will carry the ROUTER_ID of the originator of the
-     route in the local AS. A BGP speaker should not create an
-     ORIGINATOR_ID attribute if one already exists.  A route reflector
-     must never send routing information back to the router specified in
-     ORIGINATOR_ID.  */
+   * ORIGINATOR_ID is a new optional, non-transitive BGP attribute of Type
+   * code 9.  This attribute is 4 bytes long and it will be created by a
+   * RR. This attribute will carry the ROUTER_ID of the originator of the
+   * route in the local AS. A BGP speaker should not create an
+   * ORIGINATOR_ID attribute if one already exists.
+   */
   if (IamRR &&
       (bnp->rp_mode & BGPO_IGP)) {
 
@@ -545,6 +531,20 @@ bgp_send_update(bnp, rte, headrte)
       netorigid = (rte->rt_aspath && (rte->rt_aspath->asp_origid != 0)) ?
 			rte->rt_aspath->asp_origid : rtp->rtp_bgp->rp_id;
 
+      /*
+       * A route reflector must never send routing information back to the
+       * router specified in ORIGINATOR_ID.
+       */
+      if (netorigid == bnp->rp_id) {
+	IFLOG(LOG_BGPOUTPUT)
+	  syslog(LOG_DEBUG,
+		 "<%s>: UPDATE to %s is prevented since it's going to be "
+		 "looped (Origin ID: %s)",
+		 __FUNCTION__, bgp_peerstr(bnp),
+		 inet_ntoa(*(struct in_addr *)&netorigid));
+	return(NULL);
+      }
+      
       outpkt[i++] |= PA_FLAG_OPT;
       outpkt[i++] =  PA4_TYPE_ORIGINATOR;     /* T */
       BGP_LOG_ATTR;
@@ -554,7 +554,6 @@ bgp_send_update(bnp, rte, headrte)
 	       inet_ntoa(*(struct in_addr *)&netorigid));
       memcpy(&outpkt[i], &netorigid, PA4_LEN_ORIGINATOR);
       i += PA4_LEN_ORIGINATOR;
-
     }
   }
 
@@ -601,8 +600,6 @@ bgp_send_update(bnp, rte, headrte)
     free_clstrlist(cll);
   }
   
-
-
   /**                                                            **/
   /**   MP_REACH_NLRI (Type Code 14)   (optional non-transitive) **/
   /**                                                            **/
@@ -894,8 +891,6 @@ bgp_send_update(bnp, rte, headrte)
   return rt;   /* the last RTE. */
 }
 
-
-
 /*
  *
  *   bgp_send_withdrawn()
@@ -1042,9 +1037,6 @@ bgp_send_withdrawn(bnp, rte, headrte)
   /**********                            **********/ 
   /**********   End of MP_UnReach_NLRI   **********/ 
   /**********                            **********/ 
-
-
-
 
   /* Total Path Attribute Length (2 octets) */
   nettpalen = htons(i - topa_p);

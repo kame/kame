@@ -297,14 +297,20 @@ dump_bgp_rtentry(FILE *fp, struct rt_entry *rte, char *indent)
 	}
 
 	fprintf(fp, "%s  ", indent); /* more indent */
-	fprintf(fp, "MED: %d localpref: %d origin: ID=%s,code=%s\n",
+	fprintf(fp, "MED: %d localpref: %d origin: %s\n",
 		(int)ntohl(ap->asp_med), (int)ntohl(ap->asp_localpref),
-		inet_ntop(AF_INET, &ap->asp_origid,
-			  inetaddrstr, INET_ADDRSTRLEN),
 		origin_str[ap->asp_origin]);
 
 	fprintf(fp, "%s  ", indent); /* more indent */
 	fprintf(fp, "ASPATH: %s\n", aspath2str(ap));
+
+	/* Route Reflection Origin ID and Cluster list*/
+	if (ap->asp_origid) {
+		fprintf(fp, "%s  ", indent); /* more indent */
+		fprintf(fp, "Originator ID: %s\n",
+			inet_ntop(AF_INET, &ap->asp_origid,
+				  inetaddrstr, INET_ADDRSTRLEN));
+	}
 	if (ap->asp_clstr) {
 		fprintf(fp, "%s  ", indent); /* more indent */
 		fprintf(fp, "Cluster list: %s\n",
@@ -325,7 +331,6 @@ dump_bgp_rtentry(FILE *fp, struct rt_entry *rte, char *indent)
 			fprintf(fp, "...");
 		fputc('\n', fp);
 	}
-
 }
 
 static void
