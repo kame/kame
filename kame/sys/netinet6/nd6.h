@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.59 2001/06/29 09:47:26 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.60 2001/07/18 08:17:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -83,7 +83,7 @@ struct nd_ifinfo {
 	int recalctm;			/* BaseReacable re-calculation timer */
 	u_int8_t chlim;			/* CurHopLimit */
 	u_int8_t receivedra;
-	/* the followings are for privacy extension for addrconf */
+	/* the following 3 members are for privacy extension for addrconf */
 	u_int8_t randomseed0[8]; /* upper 64 bits of MD5 digest */
 	u_int8_t randomseed1[8]; /* lower 64 bits (usually the EUI64 IFID) */
 	u_int8_t randomid[8];	/* current random ID */
