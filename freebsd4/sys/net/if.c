@@ -1629,6 +1629,7 @@ if_delmulti(ifp, sa)
 	LIST_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
 		if (equal(sa, ifma->ifma_addr))
 			break;
+	free(sa, M_IFMADDR);
 	if (ifma == 0)
 		return 0;
 
@@ -1642,7 +1643,6 @@ if_delmulti(ifp, sa)
 	ifp->if_ioctl(ifp, SIOCDELMULTI, 0);
 	splx(s);
 	free(ifma->ifma_addr, M_IFMADDR);
-	free(sa, M_IFMADDR);
 	free(ifma, M_IFMADDR);
 
 	return 0;
