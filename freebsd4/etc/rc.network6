@@ -329,13 +329,16 @@ network6_interface_setup() {
 	    	case ${ip6tempaddr} in
 		[Yy][Ee][Ss])
 			sysctl net.inet6.ip6.use_tempaddr=1 >/dev/null
+			case ${ip6prefertempaddr} in
+			[Yy][Ee][Ss])
+				sysctl net.inet6.ip6.prefer_tempaddr=1
+			;;
 			if [ -n "${ip6temppltime}" ]; then
-			    sysctl net.inet6.ip6.temppltime=${ip6temppltime} >/dev/null
+				sysctl net.inet6.ip6.temppltime=${ip6temppltime} >/dev/null
 			fi
 			if [ -n "${ip6tempvltime}" ]; then
-			    sysctl net.inet6.ip6.tempvltime=${ip6tempvltime} >/dev/null
+				sysctl net.inet6.ip6.tempvltime=${ip6tempvltime} >/dev/null
 			fi
-			;;
 		esac
 
 		sysctl net.inet6.ip6.accept_rtadv=1
