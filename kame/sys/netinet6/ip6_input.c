@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.251 2002/01/13 06:11:07 fujisawa Exp $	*/
+/*	$KAME: ip6_input.c,v 1.252 2002/01/17 14:29:44 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -724,8 +724,14 @@ ip6_input(m)
 	}
 #endif
 
-	/* drop packets if interface ID portion is already filled */
-	if ((m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) == 0) {
+#ifndef SCOPEDROUTING
+	/*
+	 * Drop packets if interface ID portion is already filled.
+	 * XXX: this is technically not a good behavior.  But, we internally
+	 * use the field to disambiguate link-local addresses, so we cannot
+	 * be generous against those a bit strange addresses.
+	 */
+	if (!(m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK)) {
 		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src) &&
 		    ip6->ip6_src.s6_addr16[1]) {
 			ip6stat.ip6s_badscope++;
@@ -738,6 +744,7 @@ ip6_input(m)
 			goto bad;
 		}
 	}
+#endif
 
 	/*
 	 * Embed interface ID as the zone ID for interface-local and
