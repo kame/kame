@@ -1,4 +1,4 @@
-/*	$NetBSD: netdb.h,v 1.18.2.3 2001/05/01 10:28:45 he Exp $	*/
+/*	$NetBSD: netdb.h,v 1.25.2.2 2002/08/27 09:29:24 lukem Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -89,8 +89,17 @@
 #define _NETDB_H_
 
 #include <machine/ansi.h>
+#include <sys/ansi.h>
 #include <sys/cdefs.h>
 #include <inttypes.h>
+
+/*
+ * Data types
+ */
+#ifndef socklen_t
+typedef __socklen_t	socklen_t;
+#define socklen_t	__socklen_t
+#endif
 
 #ifdef  _BSD_SIZE_T_
 typedef _BSD_SIZE_T_	size_t;
@@ -145,13 +154,30 @@ struct	protoent {
 	int	p_proto;	/* protocol # */
 };
 
-#if !defined(_XOPEN_SOURCE)
+/*
+ * Note: ai_addrlen used to be a size_t, per RFC 2553.
+ * In XNS5.2, and subsequently in POSIX-2001 and
+ * draft-ietf-ipngwg-rfc2553bis-02.txt it was changed to a socklen_t.
+ * To accomodate for this while preserving binary compatibility with the
+ * old interface, we prepend or append 32 bits of padding, depending on
+ * the (LP64) architecture's endianness.
+ *
+ * This should be deleted the next time the libc major number is
+ * incremented.
+ */
+#if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 520
 struct addrinfo {
 	int	ai_flags;	/* AI_PASSIVE, AI_CANONNAME, AI_NUMERICHOST */
 	int	ai_family;	/* PF_xxx */
 	int	ai_socktype;	/* SOCK_xxx */
 	int	ai_protocol;	/* 0 or IPPROTO_xxx for IPv4 and IPv6 */
-	size_t	ai_addrlen;	/* length of ai_addr */
+#if defined(__sparc64__)
+	int	__ai_pad0;
+#endif
+	socklen_t ai_addrlen;	/* length of ai_addr */
+#if defined(__alpha__) || (defined(__i386__) && defined(_LP64))
+	int	__ai_pad0;
+#endif
 	char	*ai_canonname;	/* canonical name for hostname */
 	struct sockaddr *ai_addr;	/* binary address */
 	struct addrinfo *ai_next;	/* next structure in linked list */
@@ -178,7 +204,7 @@ struct addrinfo {
 /*
  * Error return codes from getaddrinfo()
  */
-#if !defined(_XOPEN_SOURCE)
+#if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 520
 /* #define	EAI_ADDRFAMILY	 1	(obsoleted) */
 #define	EAI_AGAIN	 2	/* temporary failure in name resolution */
 #define	EAI_BADFLAGS	 3	/* invalid value for ai_flags */
@@ -190,15 +216,15 @@ struct addrinfo {
 #define	EAI_SERVICE	 9	/* servname not supported for ai_socktype */
 #define	EAI_SOCKTYPE	10	/* ai_socktype not supported */
 #define	EAI_SYSTEM	11	/* system error returned in errno */
-#define EAI_BADHINTS	12
-#define EAI_PROTOCOL	13
-#define EAI_MAX		14
-#endif /* !_XOPEN_SOURCE */
+#define	EAI_BADHINTS	12
+#define	EAI_PROTOCOL	13
+#define	EAI_MAX		14
+#endif /* !_XOPEN_SOURCE || (_XOPEN_SOURCE - 0) >= 520 */
 
 /*
  * Flag values for getaddrinfo()
  */
-#if !defined(_XOPEN_SOURCE)
+#if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 520
 #define	AI_PASSIVE	0x00000001 /* get address to use bind() */
 #define	AI_CANONNAME	0x00000002 /* fill ai_canonname */
 #define	AI_NUMERICHOST	0x00000004 /* prevent name resolution */
@@ -207,25 +233,14 @@ struct addrinfo {
     (AI_PASSIVE | AI_CANONNAME | AI_NUMERICHOST | AI_ADDRCONFIG)
 #endif
 
-#if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 500
-#define	AI_ALL		0x00000100 /* IPv6 and IPv4-mapped (with AI_V4MAPPED) */
-#endif
-#if !defined(_XOPEN_SOURCE)
-#define	AI_V4MAPPED_CFG	0x00000200 /* accept IPv4-mapped if kernel supports */
-#endif
-#if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 500
-#define	AI_ADDRCONFIG	0x00000400 /* only if any address is assigned */
-#define	AI_V4MAPPED	0x00000800 /* accept IPv4-mapped IPv6 address */
-/* special recommended flags for getipnodebyname */
-#define	AI_DEFAULT	(AI_V4MAPPED_CFG | AI_ADDRCONFIG)
-#endif
-
-#if !defined(_XOPEN_SOURCE)
+#if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 520
 /*
  * Constants for getnameinfo()
  */
+#if !defined(_XOPEN_SOURCE)
 #define	NI_MAXHOST	1025
 #define	NI_MAXSERV	32
+#endif
 
 /*
  * Flag values for getnameinfo()
@@ -243,17 +258,10 @@ struct addrinfo {
 /*
  * Scope delimit character
  */
-#define SCOPE_DELIMITER '%'		/*KAME extension*/
-#endif /* !_XOPEN_SOURCE */
-
-/*
- * Data types
- */
-#include <sys/ansi.h>
-#ifndef socklen_t
-typedef __socklen_t	socklen_t;
-#define socklen_t	__socklen_t
+#if !defined(_XOPEN_SOURCE)
+#define	SCOPE_DELIMITER '%'		/*KAME extension*/
 #endif
+#endif /* !_XOPEN_SOURCE || (_XOPEN_SOURCE - 0) >= 520 */
 
 /*
  * Flags for getrrsetbyname()
@@ -298,14 +306,14 @@ void		endservent __P((void));
 #if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 500
 void		freehostent __P((struct hostent *));
 #endif
-struct hostent	*gethostbyaddr __P((const char *, int, int));
+struct hostent	*gethostbyaddr __P((const char *, socklen_t, int));
 struct hostent	*gethostbyname __P((const char *));
 #if !defined(_XOPEN_SOURCE)
 struct hostent	*gethostbyname2 __P((const char *, int));
 #endif
 struct hostent	*gethostent __P((void));
-#if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 500
-#if 1 /* libinet6.a */
+#if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 520
+#if 0 /* we do not ship these */
 struct hostent	*getipnodebyaddr __P((const void *, size_t, int, int *));
 struct hostent	*getipnodebyname __P((const char *, int, int, int *));
 #endif
@@ -329,11 +337,11 @@ void		sethostent __P((int));
 #endif
 void		setnetent __P((int));
 void		setprotoent __P((int));
-#if !defined(_XOPEN_SOURCE)
+#if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 520
 int		getaddrinfo __P((const char *, const char *,
 				 const struct addrinfo *, struct addrinfo **));
 int		getnameinfo __P((const struct sockaddr *, socklen_t, char *,
-				 size_t, char *, size_t, int));
+				 socklen_t, char *, socklen_t, int));
 void		freeaddrinfo __P((struct addrinfo *));
 char		*gai_strerror __P((int));
 #endif

@@ -77,7 +77,7 @@
 
 /*
  *      @(#)nameser.h	8.1 (Berkeley) 6/2/93
- *	$NetBSD: nameser.h,v 1.13 1998/11/13 15:45:10 christos Exp $
+ *	$NetBSD: nameser.h,v 1.14 2000/08/09 14:41:00 itojun Exp $
  */
 
 #ifndef _ARPA_NAMESER_H_

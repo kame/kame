@@ -1,4 +1,4 @@
-/*	$NetBSD: resolv.h,v 1.18 1999/07/01 18:15:41 itojun Exp $	*/
+/*	$NetBSD: resolv.h,v 1.19 2000/08/09 14:40:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -286,6 +286,7 @@ extern const struct res_sym __p_type_syms[];
 #define	res_nameinquery	__res_nameinquery
 #define	res_queriesmatch __res_queriesmatch
 #define	res_close	__res_close
+#define	res_opt		__res_opt
 
 #ifdef BIND_RES_POSIX3
 #define	dn_expand	__dn_expand
@@ -347,6 +348,7 @@ int		res_nameinquery __P((const char *, int, int,
 int		res_queriesmatch __P((const u_char *, const u_char *,
 				      const u_char *, const u_char *));
 void		res_close __P((void));
+int		res_opt __P((int, u_char *, int, int));
 __END_DECLS
 
 #endif /* !_RESOLV_H_ */
