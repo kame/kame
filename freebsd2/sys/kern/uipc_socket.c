@@ -963,7 +963,7 @@ sosetopt(so, level, optname, m0)
 				goto bad;
 			}
 			tv = mtod(m, struct timeval *);
-			if (tv->tv_sec > SHRT_MAX / hz - hz) {
+			if (tv->tv_sec * hz + tv->tv_usec / tick > SHRT_MAX) {
 				error = EDOM;
 				goto bad;
 			}
