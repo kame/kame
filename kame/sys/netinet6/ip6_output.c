@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.98 2000/05/05 13:27:14 sumikawa Exp $	*/
+/*	$KAME: ip6_output.c,v 1.99 2000/05/08 08:01:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1725,9 +1725,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-				if (error = soopt_getm(sopt, &m)) /* XXX */
+				if ((error = soopt_getm(sopt, &m)) != 0) /* XXX */
 					break;
-				if (error = soopt_mcopyin(sopt, m)) /* XXX */
+				if ((error = soopt_mcopyin(sopt, m)) != 0) /* XXX */
 					break;
 #endif
 				if (m) {
