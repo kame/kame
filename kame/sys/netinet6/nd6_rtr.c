@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.69 2001/01/23 15:44:06 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.70 2001/01/23 17:56:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1521,7 +1521,7 @@ in6_ifadd(ifp, in6, addr, prefixlen, onlink, vltime, pltime)
 
 	/*
 	 * lifetime.
-	 * XXX: in6_init_address_ltimes would override these valueslater.
+	 * XXX: in6_init_address_ltimes would override these values later.
 	 * We should reconsider this logic. 
 	 */
 	ifra.ifra_lifetime.ia6t_vltime = vltime;
@@ -1652,7 +1652,7 @@ in6_init_prefix_ltimes(struct nd_prefix *ndpr)
 	long time_second = time.tv_sec;
 #endif
 
-	/* check if preferred lifetime > valid lifetime */
+	/* check if preferred lifetime > valid lifetime.  RFC2462 5.5.3 (c) */
 	if (ndpr->ndpr_pltime > ndpr->ndpr_vltime) {
 		log(LOG_INFO, "in6_init_prefix_ltimes: preferred lifetime"
 		    "(%d) is greater than valid lifetime(%d)\n",
