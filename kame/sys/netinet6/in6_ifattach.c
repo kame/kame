@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.104 2001/02/08 12:24:39 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.105 2001/02/08 12:48:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -89,7 +89,6 @@ static int get_hw_ifid __P((struct ifnet *, struct in6_addr *));
 static int get_ifid __P((struct ifnet *, struct ifnet *, struct in6_addr *));
 static int in6_ifattach_linklocal __P((struct ifnet *, struct ifnet *));
 static int in6_ifattach_loopback __P((struct ifnet *));
-static int nigroup __P((struct ifnet *, const char *, int, struct in6_addr *));
 
 #define EUI64_GBIT	0x01
 #define EUI64_UBIT	0x02
@@ -686,8 +685,8 @@ in6_ifattach_loopback(ifp)
  *
  * when ifp == NULL, the caller is responsible for filling scopeid.
  */
-static int
-nigroup(ifp, name, namelen, in6)
+int
+in6_nigroup(ifp, name, namelen, in6)
 	struct ifnet *ifp;
 	const char *name;
 	int namelen;
@@ -746,7 +745,7 @@ in6_nigroup_attach(name, namelen)
 	bzero(&mltaddr, sizeof(mltaddr));
 	mltaddr.sin6_family = AF_INET6;
 	mltaddr.sin6_len = sizeof(struct sockaddr_in6);
-	if (nigroup(NULL, name, namelen, &mltaddr.sin6_addr) != 0)
+	if (in6_nigroup(NULL, name, namelen, &mltaddr.sin6_addr) != 0)
 		return;
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
@@ -774,7 +773,7 @@ in6_nigroup_detach(name, namelen)
 	bzero(&mltaddr, sizeof(mltaddr));
 	mltaddr.sin6_family = AF_INET6;
 	mltaddr.sin6_len = sizeof(struct sockaddr_in6);
-	if (nigroup(NULL, name, namelen, &mltaddr.sin6_addr) != 0)
+	if (in6_nigroup(NULL, name, namelen, &mltaddr.sin6_addr) != 0)
 		return;
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
@@ -801,8 +800,6 @@ in6_ifattach(ifp, altifp)
 	struct ifnet *altifp;	/* secondary EUI64 source */
 {
 	static size_t if_indexlim = 8;
-	struct sockaddr_in6 mltaddr;
-	struct sockaddr_in6 mltmask;
 	struct in6_ifaddr *ia;
 	struct in6_addr in6;
 #ifdef __FreeBSD__
@@ -948,91 +945,6 @@ in6_ifattach(ifp, altifp)
 		/*NOTREACHED*/
 	}
 #endif
-
-	/*
-	 * join multicast
-	 */
-	if (ifp->if_flags & IFF_MULTICAST) {
-		int error;	/* not used */
-		struct in6_multi *in6m;
-
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-		/* Restore saved multicast addresses (if any). */
-		in6_restoremkludge(ia, ifp);
-#endif
-
-		bzero(&mltmask, sizeof(mltmask));
-		mltmask.sin6_len = sizeof(struct sockaddr_in6);
-		mltmask.sin6_family = AF_INET6;
-		mltmask.sin6_addr = in6mask32;
-
-		/*
-		 * join link-local all-nodes address
-		 */
-		bzero(&mltaddr, sizeof(mltaddr));
-		mltaddr.sin6_len = sizeof(struct sockaddr_in6);
-		mltaddr.sin6_family = AF_INET6;
-		mltaddr.sin6_addr = in6addr_linklocal_allnodes;
-		mltaddr.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
-
-		IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
-		if (in6m == NULL) {
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802)
-			struct rt_addrinfo info;
-
-			bzero(&info, sizeof(info));
-			info.rti_info[RTAX_DST] = (struct sockaddr *)&mltaddr;
-			info.rti_info[RTAX_GATEWAY] =
-				(struct sockaddr *)&ia->ia_addr;
-			info.rti_info[RTAX_NETMASK] =
-				(struct sockaddr *)&mltmask;
-			info.rti_info[RTAX_IFA] =
-				(struct sockaddr *)&ia->ia_addr;
-			info.rti_flags = RTF_UP | RTF_CLONING; /* XXX(why?) */
-			rtrequest1(RTM_ADD, &info, NULL);
-#else
-			rtrequest(RTM_ADD,
-				  (struct sockaddr *)&mltaddr,
-				  (struct sockaddr *)&ia->ia_addr,
-				  (struct sockaddr *)&mltmask,
-				  RTF_UP|RTF_CLONING,  /* xxx */
-				  (struct rtentry **)0);
-#endif
-			(void)in6_addmulti(&mltaddr.sin6_addr, ifp, &error);
-		}
-
-		/*
-		 * join node information group address
-		 */
-		if (nigroup(ifp, hostname, hostnamelen, &mltaddr.sin6_addr)
-		    == 0) {
-			IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
-			if (in6m == NULL && ia != NULL) {
-				(void)in6_addmulti(&mltaddr.sin6_addr,
-				    ifp, &error);
-			}
-		}
-
-		if (ifp->if_flags & IFF_LOOPBACK) {
-			in6 = in6addr_loopback;
-			ia = in6ifa_ifpwithaddr(ifp, &in6);
-			/*
-			 * join node-local all-nodes address, on loopback
-			 */
-			mltaddr.sin6_addr = in6addr_nodelocal_allnodes;
-
-			IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
-			if (in6m == NULL && ia != NULL) {
-				rtrequest(RTM_ADD,
-					  (struct sockaddr *)&mltaddr,
-					  (struct sockaddr *)&ia->ia_addr,
-					  (struct sockaddr *)&mltmask,
-					  RTF_UP,
-					  (struct rtentry **)0);
-				(void)in6_addmulti(&mltaddr.sin6_addr, ifp, &error);
-			}
-		}
-	}
 
 statinit:
 

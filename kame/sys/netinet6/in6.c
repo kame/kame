@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.171 2001/02/06 03:21:46 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.172 2001/02/08 12:48:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1152,23 +1152,105 @@ in6_update_ifa(ifp, ifra, ia)
 	}
 #endif
 
-	if (hostIsNew && (ifp->if_flags & IFF_MULTICAST)) {
+	if ((ifp->if_flags & IFF_MULTICAST) != 0) {
+		struct sockaddr_in6 mltaddr, mltmask;
+		struct in6_multi *in6m;
+
+		if (hostIsNew) {
+			/*
+			 * join solicited multicast addr for new host id
+			 */
+			struct in6_addr llsol;
+			bzero(&llsol, sizeof(struct in6_addr));
+			llsol.s6_addr16[0] = htons(0xff02);
+			llsol.s6_addr16[1] = htons(ifp->if_index);
+			llsol.s6_addr32[1] = 0;
+			llsol.s6_addr32[2] = htonl(1);
+			llsol.s6_addr32[3] =
+				ifra->ifra_addr.sin6_addr.s6_addr32[3];
+			llsol.s6_addr8[12] = 0xff;
+			(void)in6_addmulti(&llsol, ifp, &error);
+			if (error != 0) {
+				in6_purgeaddr((struct ifaddr *)ia);
+				return(error);
+			}
+		}
+
+		bzero(&mltmask, sizeof(mltmask));
+		mltmask.sin6_len = sizeof(struct sockaddr_in6);
+		mltmask.sin6_family = AF_INET6;
+		mltmask.sin6_addr = in6mask32;
+
 		/*
-		 * join solicited multicast addr for new host id
+		 * join link-local all-nodes address
 		 */
-		struct in6_addr llsol;
-		bzero(&llsol, sizeof(struct in6_addr));
-		llsol.s6_addr16[0] = htons(0xff02);
-		llsol.s6_addr16[1] = htons(ifp->if_index);
-		llsol.s6_addr32[1] = 0;
-		llsol.s6_addr32[2] = htonl(1);
-		llsol.s6_addr32[3] =
-			ifra->ifra_addr.sin6_addr.s6_addr32[3];
-		llsol.s6_addr8[12] = 0xff;
-		(void)in6_addmulti(&llsol, ifp, &error);
-		if (error != 0) {
-			in6_purgeaddr((struct ifaddr *)ia);
-			return(error);
+		bzero(&mltaddr, sizeof(mltaddr));
+		mltaddr.sin6_len = sizeof(struct sockaddr_in6);
+		mltaddr.sin6_family = AF_INET6;
+		mltaddr.sin6_addr = in6addr_linklocal_allnodes;
+		mltaddr.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
+
+		IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
+		if (in6m == NULL) {
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+			struct rt_addrinfo info;
+
+			bzero(&info, sizeof(info));
+			info.rti_info[RTAX_DST] = (struct sockaddr *)&mltaddr;
+			info.rti_info[RTAX_GATEWAY] =
+				(struct sockaddr *)&ia->ia_addr;
+			info.rti_info[RTAX_NETMASK] =
+				(struct sockaddr *)&mltmask;
+			info.rti_info[RTAX_IFA] =
+				(struct sockaddr *)&ia->ia_addr;
+			info.rti_flags = RTF_UP | RTF_CLONING; /* XXX(why?) */
+			rtrequest1(RTM_ADD, &info, NULL);
+#else
+			rtrequest(RTM_ADD,
+				  (struct sockaddr *)&mltaddr,
+				  (struct sockaddr *)&ia->ia_addr,
+				  (struct sockaddr *)&mltmask,
+				  RTF_UP|RTF_CLONING,  /* xxx */
+				  (struct rtentry **)0);
+#endif
+			(void)in6_addmulti(&mltaddr.sin6_addr, ifp, &error);
+		}
+
+		/*
+		 * join node information group address
+		 */
+		if (in6_nigroup(ifp, hostname, hostnamelen, &mltaddr.sin6_addr)
+		    == 0) {
+			IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
+			if (in6m == NULL && ia != NULL) {
+				(void)in6_addmulti(&mltaddr.sin6_addr,
+				    ifp, &error);
+			}
+		}
+
+		/*
+		 * join node-local all-nodes address, on loopback.
+		 * XXX: since "node-local" is obsoleted by interface-local,
+		 *      we have to join the group on every interface with
+		 *      some interface-boundary restriction.
+		 */
+		if (ifp->if_flags & IFF_LOOPBACK) {
+			struct in6_addr loop6 = in6addr_loopback;
+			ia = in6ifa_ifpwithaddr(ifp, &loop6);
+
+			mltaddr.sin6_addr = in6addr_nodelocal_allnodes;
+
+			IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
+			if (in6m == NULL && ia != NULL) {
+				rtrequest(RTM_ADD,
+					  (struct sockaddr *)&mltaddr,
+					  (struct sockaddr *)&ia->ia_addr,
+					  (struct sockaddr *)&mltmask,
+					  RTF_UP,
+					  (struct rtentry **)0);
+				(void)in6_addmulti(&mltaddr.sin6_addr, ifp,
+						   &error);
+			}
 		}
 	}
 
