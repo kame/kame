@@ -77,6 +77,7 @@
 #include "timer.h"
 #include "rp.h"
 #include "kern.h"
+#include "cfparse.h"
 
 char            	configfilename[256] = _PATH_PIM6D_CONF;
 char            	versionstring[100];
@@ -523,7 +524,11 @@ usage:
 	    if (sighandled & GOT_SIGUSR2)
 	    {
 		sighandled &= ~GOT_SIGUSR2;
+#ifdef notyet
 		cdump(SIGUSR2);
+#else
+		cfparse(0, 1);	/* reset debug level */
+#endif
 	    }
 	    if (sighandled & GOT_SIGALRM)
 	    {

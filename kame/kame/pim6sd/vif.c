@@ -91,6 +91,8 @@ void start_vif( vifi_t vifi );
 void stop_vif( vifi_t vivi );
 int update_reg_vif( vifi_t register_vifi);
 
+extern int cfparse(int, int);
+
 void init_vifs()
 {
 	vifi_t vifi;
@@ -133,7 +135,10 @@ void init_vifs()
 		log(LOG_ERR, 0, "There's no global address");
 	IF_DEBUG(DEBUG_IF)
 		log(LOG_DEBUG,0,"Getting vifs from %s",configfilename);
-	config_vifs_from_file();
+
+	/* read config from file */
+	if (cfparse(1, 0) != 0)
+		log(LOG_ERR, 0, "fatal error in parsing the config file");
 
 	enabled_vifs = 0;
 	phys_vif = -1;
@@ -799,4 +804,19 @@ stop_all_vifs()
 	    stop_vif(vifi);
 	}
     }
+}
+
+struct uvif *
+find_vif(ifname)
+	char *ifname;
+{
+	struct uvif *v;
+	vifi_t vifi;
+
+	for (vifi = 0, v = uvifs; vifi < numvifs ; ++vifi , ++v) {
+		if (strcasecmp(v->uv_name, ifname) == 0)
+			return(v);
+	}
+
+	return(NULL);
 }

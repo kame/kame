@@ -199,7 +199,9 @@ struct uvif {
 	u_int16	uv_jp_timer;	/* Join/Prune timer 			*/	
 	int uv_local_pref;	/* default local preference for assert  */	
 	int uv_local_metric;	/* default local metric for assert     */
-	struct pim_nbr_entry *uv_pim_neighbors;	/* list of PIM nbr routers */	
+	struct pim_nbr_entry *uv_pim_neighbors;	/* list of PIM nbr routers */
+
+	void *config_attr;	/* temporary buffer while parsing config */
 };
 
 struct phaddr {
@@ -245,4 +247,5 @@ extern vifi_t  find_vif_direct_local   __P((struct sockaddr_in6 *src));
 extern int vif_forwarder __P((if_set *p1 ,if_set *p2));
 extern if_set *vif_and __P((if_set *p1, if_set *p2, if_set *result)); 
 extern if_set *vif_xor __P((if_set *p1, if_set *p2, if_set *result));
+extern struct uvif *find_vif __P((char *ifname));
 #endif

@@ -192,16 +192,20 @@ inet6_fmt(struct in6_addr * addr)
     cp = ip6buf[ip6round];
     hp = NULL;
 
+#if 0
     hp = gethostbyaddr((char *)addr, sizeof(struct in6_addr), AF_INET6);
     if (!hp)
     {
+#endif
 	    inet_ntop(AF_INET6, addr, cp, INET6_ADDRSTRLEN);
 	    return (cp);
+#if 0
     }
     else {
 	    strncpy(cp, hp->h_name, INET6_ADDRSTRLEN);
 	    return(cp);
     }
+#endif
 }
 
 char           *

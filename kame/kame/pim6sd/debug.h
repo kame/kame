@@ -117,11 +117,20 @@ extern FILE *log_fp;
 #define DEBUG_TIMER           ( DEBUG_MLD_TIMER | DEBUG_DVMRP_TIMER | \
 				DEBUG_PIM_TIMER )
 #define DEBUG_ASSERT          ( DEBUG_PIM_ASSERT )
+
+/* CONFIG related */
+#define DEBUG_CONF 0x01000000
+
 #define DEBUG_ALL             0xffffffff
 #define DEBUG_SWITCH  		  0x80000000
 
 #define DEBUG_DEFAULT   0xffffffff/*  default if "-d" given without value */
 
+#if defined(YIPS_DEBUG)
+#define YIPSDEBUG(lev,arg) if ((debug & (lev)) == (lev)) { arg; }
+#else
+#define YIPSDEBUG(lev,arg)
+#endif /* defined(YIPS_DEBUG) */
 
 extern char *packet_kind        __P((u_int proto, u_int type,
                          u_int code));
