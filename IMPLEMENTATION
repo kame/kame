@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/11/22 08:53:54 $
+			$Date: 1999/11/25 09:29:23 $
 
 1. IPv6
 
@@ -437,6 +437,16 @@ IPsec does not work on jumbograms.  This is due to some specification twists
 in supporting AH with jumbograms (AH header size influences payload length,
 and this makes it real hard to authenticate inbound packet with jumbo payload
 option as well as AH).
+
+There are fundamental issues in *BSD support for jumbograms.  We would like to
+address those, but we need more time to finalize these.  To name a few:
+- mbuf pkthdr.len field is typed as "int", so it will not hold jumbogram
+  with len > 2G on 32bit architecture CPUs.
+- We (mistakingly) used "int" to hold packet length.  We need to convert them
+  into larger integral type.  It is not safe to convert them to u_int32_t,
+  as there can be overflow during packet length computation.
+- We (mistakingly) check for ip6_plen field of IPv6 header for packet payload
+  length in various places.  We should be checking mbuf pkthdr.len instead.
 
 1.8 Loop prevention in header processing
 
