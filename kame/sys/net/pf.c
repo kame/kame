@@ -5372,6 +5372,11 @@ pf_test6(int dir, struct ifnet *ifp, struct mbuf **m0)
 		goto done;
 	}
 
+	/* We do IP header normalization and packet reassembly here */
+	if (pf_normalize_ip6(m0, dir, ifp, &reason) != PF_PASS) {
+		action = PF_DROP;
+		goto done;
+	}
 	m = *m0;
 	h = mtod(m, struct ip6_hdr *);
 
