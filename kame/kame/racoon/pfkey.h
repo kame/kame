@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.h,v 1.8 2000/06/08 06:43:52 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.h,v 1.9 2000/06/12 17:57:59 sakane Exp $ */
 
 struct ipsecsa;
 
@@ -40,6 +40,7 @@ extern struct pfkey_st *pfkey_getpst __P((caddr_t *, int, int));
 extern int pk_sendgetspi __P((struct ph2handle *));
 extern int pk_sendupdate __P((struct ph2handle *));
 extern int pk_sendadd __P((struct ph2handle *));
+extern int pk_sendeacquire __P((struct ph2handle *));
 
 extern void pfkey_timeover __P((struct ph2handle *));
 

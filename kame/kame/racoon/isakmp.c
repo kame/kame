@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.64 2000/06/08 06:43:51 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.65 2000/06/12 17:57:58 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1489,16 +1489,19 @@ isakmp_chkph1there(iph2)
 {
 	struct ph1handle *iph1;
 
+	SCHED_INIT(iph2->scr);
+
 	iph2->retry_checkph1--;
 	if (iph2->retry_checkph1 < 0) {
 		/* give up phase 1 */
 		plog(logp, LOCATION, iph2->dst,
-			"gived up to wait isakmp-sa negotiation.\n");
+			"give up to wait isakmp-sa negotiation.\n");
 		YIPSDEBUG(DEBUG_MISC,
 			plog(logp, LOCATION, NULL,
 				"delete phase 2 handler.\n"));
 
-		/* XXX send acquire to kernel as error */
+		/* send acquire to kernel as error */
+		pk_sendeacquire(iph2);
 
 		unbindph12(iph2);
 		remph2(iph2);

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.47 2000/06/10 06:47:10 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.48 2000/06/12 17:57:59 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -758,7 +758,8 @@ pfkey_timeover(iph2)
 		saddrwop2str(iph2->dst));
 	SCHED_INIT(iph2->sce);
 
-	/* XXX do send error to kernel by SADB_ACQUIRE. */
+	/* send error to kernel by SADB_ACQUIRE. */
+	pk_sendeacquire(iph2);
 
 	unbindph12(iph2);
 	remph2(iph2);
@@ -1747,6 +1748,42 @@ pk_recvspdflush(mhp)
 	}
 
 	flushsp();
+
+	return 0;
+}
+
+/*
+ * send error against acquire message to kenrel.
+ */
+int
+pk_sendeacquire(iph2)
+	struct ph2handle *iph2;
+{
+	struct sadb_msg *newmsg;
+	int len;
+
+	len = sizeof(struct sadb_msg);
+	newmsg = CALLOC(len, struct sadb_msg *);
+	if (newmsg == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to get buffer to send acquire.\n");
+		return -1;
+	}
+
+	memset(newmsg, 0, len);
+	newmsg->sadb_msg_version = PF_KEY_V2;
+	newmsg->sadb_msg_type = SADB_ACQUIRE;
+	newmsg->sadb_msg_errno = ENOENT;	/* XXX */
+	newmsg->sadb_msg_satype = ipsecdoi2pfkey_proto(iph2->proposal->head->proto_id);
+	newmsg->sadb_msg_len = PFKEY_UNIT64(len);
+	newmsg->sadb_msg_reserved = 0;
+	newmsg->sadb_msg_seq = iph2->seq;
+	newmsg->sadb_msg_pid = (u_int32_t)getpid();
+
+	/* send message */
+	len = pfkey_send(lcconf->sock_pfkey, newmsg, len);
+
+	free(newmsg);
 
 	return 0;
 }
