@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.27 2001/07/26 06:53:17 jinmei Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.28 2001/08/01 04:29:57 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1998, 1999, 2000 and 2001 WIDE Project.
@@ -172,8 +172,8 @@ static int	icmp6type_match __P((struct icmp6_hdr *  icmp, struct ip6_fw * f));
 static void	ip6fw_report __P((struct ip6_fw *f, struct ip6_hdr *ip6,
 				struct ifnet *rif, struct ifnet *oif, int off, int nxt));
 
-static int	ip6_fw_chk __P((struct ip6_hdr **pip6,
-			struct ifnet *oif, u_int16_t *cookie, struct mbuf **m));
+static int	ip6_fw_chk __P((struct ip6_hdr **pip6, struct ifnet *oif,
+				struct mbuf **m));
 static int	ip6_fw_ctl __P((int stage, struct mbuf **mm));
 
 static char err_prefix[] = "ip6_fw_ctl:";
@@ -531,11 +531,6 @@ ip6fw_report(struct ip6_fw *f, struct ip6_hdr *ip6,
  *	ip	Pointer to packet header (struct ip6_hdr *)
  *	hlen	Packet header length
  *	oif	Outgoing interface, or NULL if packet is incoming
- * #ifndef IP6FW_DIVERT_RESTART
- *	*cookie	Ignore all divert/tee rules to this port (if non-zero)
- * #else
- *	*cookie Skip up to the first rule past this rule number;
- * #endif
  *	*m	The packet; we set to NULL when/if we nuke it.
  *
  * Return value:
@@ -548,7 +543,7 @@ ip6fw_report(struct ip6_fw *f, struct ip6_hdr *ip6,
 
 static int
 ip6_fw_chk(struct ip6_hdr **pip6,
-	struct ifnet *oif, u_int16_t *cookie, struct mbuf **m)
+	struct ifnet *oif, struct mbuf **m)
 {
 	struct ip6_fw_chain *chain;
 	struct ip6_fw *rule = NULL;
@@ -558,12 +553,11 @@ ip6_fw_chk(struct ip6_hdr **pip6,
 	int off = sizeof(struct ip6_hdr), nxt = ip6->ip6_nxt;
 	u_short src_port, dst_port;
 #ifdef	IP6FW_DIVERT_RESTART
-	u_int16_t skipto = *cookie;
+	u_int16_t skipto = 0;
 #else
-	u_int16_t ignport = ntohs(*cookie);
+	u_int16_t ignport = 0;
 #endif
 
-	*cookie = 0;
 	/*
 	 * Go down the chain, looking for enlightment
 	 * #ifdef IP6FW_DIVERT_RESTART
@@ -772,11 +766,6 @@ got_match:
 		case IPV6_FW_F_COUNT:
 			continue;
 		case IPV6_FW_F_DIVERT:
-#ifdef IP6FW_DIVERT_RESTART
-			*cookie = f->fw_number;
-#else
-			*cookie = htons(f->fw_divert_port);
-#endif /* IP6FW_DIVERT_RESTART */
 			return(f->fw_divert_port);
 		case IPV6_FW_F_TEE:
 			/*

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.210 2001/07/31 08:55:53 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.211 2001/08/01 04:29:57 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -594,10 +594,9 @@ ip6_input(m)
 	if (ip6_fw_chk_ptr)
 #endif
 	{
-		u_short port = 0;
 		/* If ipfw says divert, we have to just drop packet */
 		/* use port as a dummy argument */
-		if ((*ip6_fw_chk_ptr)(&ip6, NULL, &port, &m)) {
+		if ((*ip6_fw_chk_ptr)(&ip6, NULL, &m)) {
 			m_freem(m);
 			m = NULL;
 		}

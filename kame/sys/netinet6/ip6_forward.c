@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.77 2001/07/29 09:23:05 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.78 2001/08/01 04:29:57 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -549,9 +549,8 @@ ip6_forward(m, srcrt)
 #else
 	if (ip6_fw_chk_ptr) {
 #endif
-		u_short port = 0;
 		/* If ipfw says divert, we have to just drop packet */
-		if ((*ip6_fw_chk_ptr)(&ip6, rt->rt_ifp, &port, &m)) {
+		if ((*ip6_fw_chk_ptr)(&ip6, rt->rt_ifp, &m)) {
 			m_freem(m);
 			goto freecopy;
 		}
