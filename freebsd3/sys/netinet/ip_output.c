@@ -165,25 +165,20 @@ ip_output(m0, opt, ro, flags, imo)
 
 #ifdef IPSEC
 	/*
-	 * NOTE: m->m_pkthdr is NULL cleared below just to prevent ipfw code
-	 * from SEGV.
-	 * ipfw code uses rcvif to determine incoming interface, and
-	 * KAME uses rcvif for ipsec processing.
-	 * ipfw may not be working right with KAME at this moment.
-	 * We need more tests.
+	 * XXX We need more tests.
 	 */
 #ifdef DUMMYNET
 	if (m->m_type == MT_DUMMYNET) {
 		if (m->m_next != NULL) {
 			so = ipsec_getsocket(m->m_next);
-			ipsec_setsocket(m->m_next, NULL);
+			(void)ipsec_setsocket(m->m_next, NULL);
 		} else
 			so = NULL;
 	} else
 #endif
 	{
 		so = ipsec_getsocket(m);
-		ipsec_setsocket(m, NULL);
+		(void)ipsec_setsocket(m, NULL);
 	}
 #endif /*IPSEC*/
 

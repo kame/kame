@@ -136,7 +136,7 @@ ip_output(m0, opt, ro, flags, imo)
 
 #ifdef IPSEC
 	so = ipsec_getsocket(m);
-	ipsec_setsocket(m, NULL);
+	(void)ipsec_setsocket(m, NULL);
 #endif /*IPSEC*/
 
 #if defined(IPFIREWALL) && defined (DUMMYNET)

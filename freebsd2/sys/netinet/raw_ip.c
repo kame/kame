@@ -221,7 +221,10 @@ rip_output(m, so, dst)
 	}
 
 #ifdef IPSEC
-	ipsec_setsocket(m, so);
+	if (ipsec_setsocket(m, so) != 0) {
+		m_freem(m);
+		return ENOBUFS;
+	}
 #endif /*IPSEC*/
 	return (ip_output(m, inp->inp_options, &inp->inp_route, flags,
 			  inp->inp_moptions));

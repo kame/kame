@@ -738,7 +738,11 @@ send:
 #endif
 
 #ifdef IPSEC
-	ipsec_setsocket(m, so);
+	if (ipsec_setsocket(m, so) != 0) {
+		m_freem(m);
+		error = ENOBUFS;
+		goto out;
+	}
 #endif /*IPSEC*/
 	error = ip_output(m, tp->t_inpcb->inp_options, &tp->t_inpcb->inp_route,
 	    so->so_options & SO_DONTROUTE, 0);

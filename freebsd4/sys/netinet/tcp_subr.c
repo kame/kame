@@ -446,7 +446,10 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 		tcp_trace(TA_OUTPUT, 0, tp, mtod(m, void *), th, 0);
 #endif
 #ifdef IPSEC
-	ipsec_setsocket(m, tp ? tp->t_inpcb->inp_socket : NULL);
+	if (ipsec_setsocket(m, tp ? tp->t_inpcb->inp_socket : NULL) != 0) {
+		m_freem(m);
+		return;
+	}
 #endif
 #ifdef INET6
 	if (isipv6) {

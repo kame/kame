@@ -1599,7 +1599,7 @@ ip_forward(m, srcrt)
 	}
 
 #ifdef IPSEC
-	ipsec_setsocket(m, NULL);
+	(void)ipsec_setsocket(m, NULL);
 #endif /*IPSEC*/
 	error = ip_output(m, (struct mbuf *)0, &ipforward_rt, 
 			  IP_FORWARDING, 0);

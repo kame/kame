@@ -786,7 +786,7 @@ icmp_send(m, opts)
 	bzero(&ro, sizeof ro);
 
 #ifdef IPSEC
-	ipsec_setsocket(m, NULL);
+	(void)ipsec_setsocket(m, NULL);
 #endif /*IPSEC*/
 	(void) ip_output(m, opts, &ro, 0, NULL);
 	if (ro.ro_rt)

@@ -176,7 +176,7 @@ ip_output(m0, opt, ro, flags, imo)
             m0 = m = m->m_next ;
 #ifdef IPSEC
 	    so = ipsec_getsocket(m);
-	    ipsec_setsocket(m, NULL);
+	    (void)ipsec_setsocket(m, NULL);
 #endif
             ip = mtod(m, struct ip *);
             hlen = IP_VHL_HL(ip->ip_vhl) << 2 ;
@@ -186,7 +186,7 @@ ip_output(m0, opt, ro, flags, imo)
 #endif
 #ifdef IPSEC
 	so = ipsec_getsocket(m);
-	ipsec_setsocket(m, NULL);
+	(void)ipsec_setsocket(m, NULL);
 #endif
 
 #ifdef	DIAGNOSTIC

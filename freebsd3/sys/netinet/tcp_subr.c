@@ -445,7 +445,10 @@ tcp_respond(tp, iph, th, m, ack, seq, flags, isipv6)
 			  nth, 0);
 #endif
 #ifdef IPSEC
-	ipsec_setsocket(m, tp ? tp->t_inpcb->inp_socket : NULL);
+	if (ipsec_setsocket(m, tp ? tp->t_inpcb->inp_socket : NULL) != 0) {
+		m_freem(m);
+		return;
+	}
 #endif /*IPSEC*/
 #ifdef INET6
 	if (isipv6) {
