@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.49 2002/05/29 10:05:03 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.50 2002/05/30 05:59:02 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1019,6 +1019,8 @@ natpt_init_tslot()
 		TAILQ_INIT(&tslhashl[iter].tslhead);
 		TAILQ_INIT(&tslhashr[iter].tslhead);
 	}
+
+	natptctl_vars[NATPTCTL_TSLHEAD] = (caddr_t)&tsl_head;
 
 	natptctl_vars[NATPTCTL_TSLOTTIMER]  = (caddr_t)&tSlotTimer;
 	natptctl_vars[NATPTCTL_MAXTTYANY]   = (caddr_t)&maxTTLany;

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_soctl.h,v 1.19 2002/05/10 11:47:49 fujisawa Exp $	*/
+/*	$KAME: natpt_soctl.h,v 1.20 2002/05/30 05:59:02 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -68,6 +68,7 @@ struct natpt_msgBox {
 	union {
 		u_int M_uint;
 		int M_int[2];
+		caddr_t M_caddr;
 		struct in6_addr M_in6addr;
 	} M_data;
 };
@@ -76,3 +77,4 @@ struct natpt_msgBox {
 #define m_int0	M_data.M_int[0]
 #define m_int1	M_data.M_int[1]
 #define m_in6addr	M_data.M_in6addr
+#define	m_caddr M_data.M_caddr

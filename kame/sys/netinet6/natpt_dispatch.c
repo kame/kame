@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.57 2002/05/30 04:25:53 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.58 2002/05/30 05:59:02 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -588,6 +588,10 @@ natpt_getValue(caddr_t addr)
 
 	case NATPTCTL_IN6ADDR:
 		mbox->m_in6addr = *(struct in6_addr *)caddr;
+		break;
+
+	case NATPTCTL_CADDR_T:
+		mbox->m_caddr = caddr;
 		break;
 	}
 

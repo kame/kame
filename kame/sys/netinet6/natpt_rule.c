@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.48 2002/05/21 06:29:44 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.49 2002/05/30 05:59:02 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -521,4 +521,7 @@ natpt_init_rule()
 	cSlotTimer = 64;
 	csl_expire = 0;
 	TAILQ_INIT(&csl_head);
+
+	natptctl_vars[NATPTCTL_CSLHEAD] = (caddr_t)&csl_head;
+
 }
