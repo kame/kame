@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.23 2000/05/08 13:41:20 itojun Exp $	*/
+/*	$KAME: name6.c,v 1.24 2000/06/26 16:41:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1375,7 +1375,6 @@ getanswer(answer, anslen, qname, qtype, template, errp)
 #endif
 		case T_A:
 		case T_AAAA:
-			DNS_ASSERT(strcasecmp(template->h_name, bp) == 0);
 			DNS_ASSERT(n == template->h_length);
 			if (!haveanswer) {
 				register int nn;
