@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.96 2002/06/08 20:22:56 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.97 2002/07/15 14:22:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -412,12 +412,13 @@ struct rtentry *nd6_cache_lladdr __P((struct ifnet *, struct sockaddr_in6 *,
 	char *, int, int, int));
 int nd6_output __P((struct ifnet *, struct ifnet *, struct mbuf *,
 	struct sockaddr_in6 *, struct rtentry *));
+int nd6_need_cache __P((struct ifnet *));
 int nd6_storelladdr __P((struct ifnet *, struct rtentry *, struct mbuf *,
 	struct sockaddr *, u_char *));
+void nd6_drain __P((void));
 #ifndef __FreeBSD__
 int nd6_sysctl __P((int, void *, size_t *, void *, size_t));
 #endif
-int nd6_need_cache __P((struct ifnet *));
 
 /* nd6_nbr.c */
 void nd6_na_input __P((struct mbuf *, int, int));

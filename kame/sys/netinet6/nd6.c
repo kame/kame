@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.287 2002/07/08 06:22:47 ono Exp $	*/
+/*	$KAME: nd6.c,v 1.288 2002/07/15 14:22:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2401,6 +2401,35 @@ nd6_storelladdr(ifp, rt, m, dst, desten)
 
 	bcopy(LLADDR(sdl), desten, sdl->sdl_alen);
 	return(1);
+}
+
+/*
+ * NDP drain routine.  Called when memory is in short supply.
+ * Called at splimp();
+ * XXX locking
+ */
+void
+nd6_drain()
+{
+	struct llinfo_nd6 *ln, *nln;
+	int count = 0;
+	struct mbuf *mold;
+	int s;
+	
+	s = splsoftnet();
+	
+	for (ln = llinfo_nd6.ln_next; ln; ln = nln) {
+		nln = ln->ln_next;
+
+		mold = ln->ln_hold;
+		ln->ln_hold = NULL;
+
+		if (mold) {
+			m_freem(mold);
+			count++;
+		}
+	}
+	splx(s);
 }
 
 #ifndef __FreeBSD__
