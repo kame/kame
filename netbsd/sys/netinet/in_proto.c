@@ -195,14 +195,14 @@ struct protosw inetsw[] = {
 #endif /* IPSEC */
 #if NGIF > 0
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV4,	PR_ATOMIC|PR_ADDR,
-  in_gif_input,	0,	 	0,		0,
-  0,	  
+  in_gif_input,	rip_output, 	0,		rip_ctloutput,
+  rip_usrreq,	/*XXX*/
   0,		0,		0,		0,
 },
 #ifdef INET6
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
-  in_gif_input,	0,	 	0,		0,
-  0,	  
+  in_gif_input,	rip_output, 	0,		rip_ctloutput,
+  rip_usrreq,	/*XXX*/
   0,		0,		0,		0,
 },
 #endif /* INET6 */
