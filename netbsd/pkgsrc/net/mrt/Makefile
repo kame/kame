@@ -3,7 +3,7 @@
 # Date created:		Sat Jun  6 00:09:52 JST 1998
 # Whom:			Jun-ichiro itojun Itoh <itojun@itojun.org>
 #
-# $Id: Makefile,v 1.2 1999/08/24 14:39:34 itojun Exp $
+# $Id: Makefile,v 1.3 1999/11/01 12:25:57 itojun Exp $
 #
 
 DISTNAME=	mrt-${VERBASE}${VERADD}-src
@@ -16,7 +16,7 @@ MAINTAINER=	itojun@itojun.org
 WRKSRC=		${WRKDIR}/mrt-${VERBASE}/src
 GNU_CONFIGURE=	yes
 
-VERBASE=	2.0.0a
+VERBASE=	2.0.1a
 VERADD=
 
 MAN8=	mrtd.8
