@@ -1,4 +1,4 @@
-/*	$KAME: addrconf.c,v 1.3 2005/03/29 14:11:07 jinmei Exp $	*/
+/*	$KAME: addrconf.c,v 1.4 2005/03/29 14:13:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -171,7 +171,7 @@ update_address(ia, addr, dhcpifp, ctlp, callback)
 	    sacreate ? "create" : "update",
 	    in6addr2str(&addr->addr, 0), addr->pltime, addr->vltime);
 
-	if (sa->addr.vltime != 0 && sacreate)
+	if (sa->addr.vltime != 0)
 		na_ifaddrconf(IFADDRCONF_ADD, sa);
 
 	/*
