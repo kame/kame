@@ -428,7 +428,7 @@ udp6_input(mp, offp, proto)
 {
 	struct mbuf *m = *mp;
 	int off = *offp;
-	struct sockaddr_in6 *src0, *dst0, src, dst;
+	struct sockaddr_in6 src, dst;
 	struct ip6_hdr *ip6;
 	struct udphdr *uh;
 	u_int32_t plen, ulen;
@@ -462,7 +462,7 @@ udp6_input(mp, offp, proto)
 	ulen = ntohs((u_short)uh->uh_ulen);
 
 	/* extract full sockaddr structures for the src/dst addresses */
-	if (ip6_getpktaddrs(m, &src0, &dst0)) {
+	if (ip6_getpktaddrs(m, &src, &dst)) {
 		m_freem(m);
 		return IPPROTO_DONE;
 	}
@@ -501,8 +501,6 @@ udp6_input(mp, offp, proto)
 	}
 
 	/* Construct source and dst sockaddrs. */
-	src = *src0;
-	dst = *dst0;
 	src.sin6_port = uh->uh_sport;
 	dst.sin6_port = uh->uh_dport;
 

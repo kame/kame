@@ -739,7 +739,7 @@ tcp_input(m, va_alist)
 	struct in6pcb *in6p;
 #endif
 #ifdef INET6
-	struct sockaddr_in6 *src_sa6, *dst_sa6;
+	struct sockaddr_in6 src_sa6, dst_sa6;
 #endif
 	u_int8_t *optp = NULL;
 	int optlen = 0;
@@ -1074,11 +1074,11 @@ findpcb:
 #else
 		faith = 0;
 #endif
-		in6p = in6_pcblookup_connect(&tcb6, src_sa6, th->th_sport,
-					     dst_sa6, th->th_dport, faith);
+		in6p = in6_pcblookup_connect(&tcb6, &src_sa6, th->th_sport,
+					     &dst_sa6, th->th_dport, faith);
 		if (in6p == NULL) {
 			++tcpstat.tcps_pcbhashmiss;
-			in6p = in6_pcblookup_bind(&tcb6, dst_sa6,
+			in6p = in6_pcblookup_bind(&tcb6, &dst_sa6,
 				th->th_dport, faith);
 		}
 		if (in6p == NULL) {
@@ -1225,12 +1225,12 @@ findpcb:
 		case AF_INET6:
 			src.sin6.sin6_len = sizeof(struct sockaddr_in6);
 			src.sin6.sin6_family = AF_INET6;
-			sa6_copy_addr(src_sa6, &src.sin6);
+			sa6_copy_addr(&src_sa6, &src.sin6);
 			src.sin6.sin6_port = th->th_sport;
 
 			dst.sin6.sin6_len = sizeof(struct sockaddr_in6);
 			dst.sin6.sin6_family = AF_INET6;
-			sa6_copy_addr(dst_sa6, &dst.sin6);
+			sa6_copy_addr(&dst_sa6, &dst.sin6);
 			dst.sin6.sin6_port = th->th_dport;
 			break;
 #endif /* INET6 */
@@ -1427,8 +1427,8 @@ findpcb:
 #endif
 #ifdef INET6
 					case AF_INET6:
-						i = SA6_ARE_ADDR_EQUAL(src_sa6,
-								       dst_sa6);
+						i = SA6_ARE_ADDR_EQUAL(&src_sa6,
+								       &dst_sa6);
 						break;
 #endif
 					default:

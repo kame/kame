@@ -422,7 +422,7 @@ tcp_input(struct mbuf *m, ...)
 	struct tcphdr *th;
 #ifdef INET6
 	struct ip6_hdr *ip6 = NULL;
-	struct sockaddr_in6 *src_sa6, *dst_sa6, lsa6;
+	struct sockaddr_in6 src_sa6, dst_sa6, lsa6;
 #endif /* INET6 */
 #ifdef IPSEC
 	struct m_tag *mtag;
@@ -672,8 +672,8 @@ findpcb:
 	switch (af) {
 #ifdef INET6
 	case AF_INET6:
-		inp = in6_pcbhashlookup(&tcbtable, src_sa6, th->th_sport,
-		    dst_sa6, th->th_dport);
+		inp = in6_pcbhashlookup(&tcbtable, &src_sa6, th->th_sport,
+		    &dst_sa6, th->th_dport);
 		break;
 #endif
 	case AF_INET:
@@ -695,8 +695,8 @@ findpcb:
 			if (faithprefix(&ip6->ip6_dst))
 				flags |= INPLOOKUP_FAITH;
 #endif
-			inp = in_pcblookup(&tcbtable, src_sa6,
-			    th->th_sport, dst_sa6, th->th_dport,
+			inp = in_pcblookup(&tcbtable, &src_sa6,
+			    th->th_sport, &dst_sa6, th->th_dport,
 			    flags);
 			break;
 #endif /* INET6 */
@@ -868,7 +868,7 @@ findpcb:
 			switch (af) {
 #ifdef INET6
 			case AF_INET6:
-				sa6_copy_addr(dst_sa6, &inp->in6p_lsa);
+				sa6_copy_addr(&dst_sa6, &inp->in6p_lsa);
 				
 				/*inp->inp_options = ip6_srcroute();*/ /* soon. */
 				/*
@@ -1163,7 +1163,7 @@ findpcb:
 			switch (af) {
 #ifdef INET6
 			case AF_INET6:
-				if (SA6_ARE_ADDR_EQUAL(src_sa6, dst_sa6))
+				if (SA6_ARE_ADDR_EQUAL(&src_sa6, &dst_sa6))
 					goto drop;
 				break;
 #endif /* INET6 */
@@ -1214,13 +1214,13 @@ findpcb:
 			bzero(sin6, sizeof(*sin6));
 			sin6->sin6_family = AF_INET6;
 			sin6->sin6_len = sizeof(struct sockaddr_in6);
-			sa6_copy_addr(src_sa6, sin6);
+			sa6_copy_addr(&src_sa6, sin6);
 			sin6->sin6_port = th->th_sport;
 			sin6->sin6_flowinfo = htonl(0x0fffffff) &
 				inp->inp_ipv6.ip6_flow;
 			lsa6 = inp->in6p_lsa;
 			if (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa))
-				sa6_copy_addr(dst_sa6, &inp->in6p_lsa);
+				sa6_copy_addr(&dst_sa6, &inp->in6p_lsa);
 			/* This is a good optimization. */
 			if (in6_pcbconnect(inp, am)) {
 				sa6_copy_addr(&lsa6, &inp->in6p_lsa);

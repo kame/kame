@@ -355,7 +355,7 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 	struct ip *ip;
 	struct tcphdr *nth;
 #ifdef INET6
-	struct sockaddr_in6 nsrc6, ndst6, *src6, *dst6;
+	struct sockaddr_in6 nsrc6, ndst6, src6, dst6;
 #ifdef NEW_STRUCT_ROUTE
 	struct route *ro6 = 0;
 	struct route sro6;
@@ -409,8 +409,8 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 			m_freem(m);
 			return;	/* XXX: is this possible? */
 		}
-		src6 = &tp->t_inpcb->in6p_lsa;
-		dst6 = &tp->t_inpcb->in6p_fsa;
+		src6 = tp->t_inpcb->in6p_lsa;
+		dst6 = tp->t_inpcb->in6p_fsa;
 
 		if (isipv6) {
 			bcopy((caddr_t)ip6, mtod(m, caddr_t), 
@@ -439,10 +439,10 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 				m_freem(m);
 				return;
 			}
-			nsrc6 = *dst6;
-			ndst6 = *src6;
-			src6 = &nsrc6;
-			dst6 = &ndst6;
+			nsrc6 = dst6;
+			ndst6 = src6;
+			src6 = nsrc6;
+			dst6 = ndst6;
 			xchg(ip6->ip6_dst, ip6->ip6_src, struct in6_addr);
 			nth = (struct tcphdr *)(ip6 + 1);
 		} else
@@ -521,7 +521,7 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 #endif
 #ifdef INET6
 	if (isipv6) {
-		if (!ip6_setpktaddrs(m, src6, dst6)) {
+		if (!ip6_setpktaddrs(m, &src6, &dst6)) {
 			m_freem(m);
 			return;
 		}

@@ -552,7 +552,7 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 	int flags;
 {
 #ifdef INET6
-	struct sockaddr_in6 nsrc6, ndst6, *src6, *dst6;
+	struct sockaddr_in6 nsrc6, ndst6, src6, dst6;
 #endif
 	struct route *ro;
 	int error, tlen, win = 0;
@@ -598,8 +598,8 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 		case 6:
 			family = AF_INET6;
 			hlen = sizeof(struct ip6_hdr);
-			src6 = &tp->t_in6pcb->in6p_lsa;
-			dst6 = &tp->t_in6pcb->in6p_fsa;
+			src6 = tp->t_in6pcb->in6p_lsa;
+			dst6 = tp->t_in6pcb->in6p_fsa;
 			break;
 #endif
 		default:
@@ -674,8 +674,8 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 				m_freem(m);
 				return EINVAL; /* XXX */
 			}
-			nsrc6 = *src6;
-			ndst6 = *dst6;
+			nsrc6 = src6;
+			ndst6 = dst6;
 			break;
 #endif
 		default:
@@ -740,8 +740,8 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 			ip6->ip6_nxt = IPPROTO_TCP;
 			xchg(ip6->ip6_dst, ip6->ip6_src, struct in6_addr);
 			ip6->ip6_nxt = IPPROTO_TCP;
-			src6 = &nsrc6;
-			dst6 = &ndst6;
+			src6 = nsrc6;
+			dst6 = ndst6;
 			break;
 #endif
 #if 0
@@ -854,7 +854,7 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 				panic("tcp_respond: ip_dst != in6p_faddr");
 			}
 		} else if (family == AF_INET6) {
-			if (!SA6_ARE_ADDR_EQUAL(dst6,
+			if (!SA6_ARE_ADDR_EQUAL(&dst6,
 			    &tp->t_in6pcb->in6p_fsa)) {
 				panic("tcp_respond: ip6_dst != in6p_faddr");
 			}
@@ -882,7 +882,7 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 		     IP6PO_MINMTU_ALL)) {
 			ip6oflags |= IPV6_MINMTU;
 		}
-		if (!ip6_setpktaddrs(m, src6, dst6)) {
+		if (!ip6_setpktaddrs(m, &src6, &dst6)) {
 			m_freem(m);
 			return ENOBUFS;	/* XXX */
 		}

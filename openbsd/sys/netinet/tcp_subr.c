@@ -336,7 +336,7 @@ tcp_respond(tp, template, m, ack, seq, flags)
 	register struct tcphdr *th;
 	register struct tcpiphdr *ti = (struct tcpiphdr *)template;
 #ifdef INET6
-	struct sockaddr_in6 nsrc6, ndst6, *src6, *dst6;
+	struct sockaddr_in6 nsrc6, ndst6, src6, dst6;
 #endif /* INET6 */
 	int af;		/* af on wire */
 
@@ -368,8 +368,8 @@ tcp_respond(tp, template, m, ack, seq, flags)
 		switch (af) {
 #ifdef INET6
 		case AF_INET6:
-			src6 = &tp->t_inpcb->in6p_lsa;
-			dst6 = &tp->t_inpcb->in6p_fsa;
+			src6 = tp->t_inpcb->in6p_lsa;
+			dst6 = tp->t_inpcb->in6p_fsa;
 			break;
 #endif /* INET6 */
 		case AF_INET:
@@ -393,10 +393,10 @@ tcp_respond(tp, template, m, ack, seq, flags)
 				m_freem(m);
 				return;
 			}
-			nsrc6 = *dst6;
-			ndst6 = *src6;
-			src6 = &nsrc6;
-			dst6 = &ndst6;
+			nsrc6 = dst6;
+			ndst6 = src6;
+			src6 = nsrc6;
+			dst6 = ndst6;
 			m->m_len = sizeof(struct tcphdr) + sizeof(struct ip6_hdr);
 			xchg(((struct ip6_hdr *)ti)->ip6_dst,
 			    ((struct ip6_hdr *)ti)->ip6_src, struct in6_addr);
@@ -462,7 +462,7 @@ tcp_respond(tp, template, m, ack, seq, flags)
 		     IP6PO_MINMTU_ALL)) {
 			ip6oflags |= IPV6_MINMTU;
 		}
-		if (!ip6_setpktaddrs(m, src6, dst6)) {
+		if (!ip6_setpktaddrs(m, &src6, &dst6)) {
 			m_freem(m);
 			return;
 		}
