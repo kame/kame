@@ -63,6 +63,8 @@
  * $FreeBSD: src/sys/net/rtsock.c,v 1.37.2.1 1999/08/29 16:28:34 peter Exp $
  */
 
+/* for MIP6 */
+#include "opt_inet.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -380,6 +382,7 @@ route_output(m, so)
 		error = rtrequest(RTM_ADD, dst, gate, netmask,
 					rtm->rtm_flags, &saved_nrt);
 		if (error == 0 && saved_nrt) {
+#ifndef MIP6
 		    /* 
 		     * If the route request specified an interface with
 		     * IFA and/or IFP, we set the requested interface on
@@ -409,6 +412,7 @@ route_output(m, so)
 		     */
 
 			rt_setif(saved_nrt, ifpaddr, ifaaddr, gate);
+#endif
 			rt_setmetrics(rtm->rtm_inits,
 				&rtm->rtm_rmx, &saved_nrt->rt_rmx);
 			saved_nrt->rt_rmx.rmx_locks &= ~(rtm->rtm_inits);
@@ -511,10 +515,41 @@ route_output(m, so)
 			if ((rt->rt_flags & RTF_GATEWAY) && !gate)
 				gate = rt->rt_gateway;
 
+#ifndef MIP6
+			/* bbn patched */
 			rt_setif(rt, ifpaddr, ifaaddr, gate);
-
 			rt_setmetrics(rtm->rtm_inits, &rtm->rtm_rmx,
 					&rt->rt_rmx);
+#else
+			/* new gateway could require new ifaddr, ifp;
+			   flags may also be different; ifp may be specified
+			   by ll sockaddr when protocol address is ambiguous */
+			if (ifpaddr && (ifa = ifa_ifwithnet(ifpaddr)) &&
+			    (ifp = ifa->ifa_ifp) && (ifaaddr || gate))
+				ifa = ifaof_ifpforaddr(ifaaddr ? ifaaddr : gate,
+							ifp);
+			else if ((ifaaddr && (ifa = ifa_ifwithaddr(ifaaddr))) ||
+				 (gate && (ifa = ifa_ifwithroute(rt->rt_flags,
+							rt_key(rt), gate))))
+				ifp = ifa->ifa_ifp;
+			if (ifa) {
+				register struct ifaddr *oifa = rt->rt_ifa;
+				if (oifa != ifa) {
+				    if (oifa && oifa->ifa_rtrequest)
+					oifa->ifa_rtrequest(RTM_DELETE,
+								rt, gate);
+				    IFAFREE(rt->rt_ifa);
+				    rt->rt_ifa = ifa;
+				    ifa->ifa_refcnt++;
+				    rt->rt_ifp = ifp;
+				}
+			}
+			rt_setmetrics(rtm->rtm_inits, &rtm->rtm_rmx,
+					&rt->rt_rmx);
+			if (rt->rt_ifa && rt->rt_ifa->ifa_rtrequest)
+			       rt->rt_ifa->ifa_rtrequest(RTM_ADD, rt, gate);
+#endif
+
 			if (genmask)
 				rt->rt_genmask = genmask;
 			/*
@@ -588,6 +623,7 @@ rt_setmetrics(which, in, out)
 #undef metric
 }
 
+#ifndef MIP6
 /*
  * Set route's interface given ifpaddr, ifaaddr, and gateway.
  */
@@ -636,6 +672,7 @@ rt_setif(rt, Ifpaddr, Ifaaddr, Gate)
 	if (rt->rt_ifa && rt->rt_ifa->ifa_rtrequest)
 		rt->rt_ifa->ifa_rtrequest(RTM_ADD, rt, Gate);
 }
+#endif
 
 
 #define ROUNDUP(a) \
