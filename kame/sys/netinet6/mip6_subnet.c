@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.13 2001/11/29 04:38:39 keiichi Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.14 2001/11/29 11:29:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -81,6 +81,8 @@ static void mip6_subnet_stoptimer __P((void));
 struct callout mip6_subnet_ch = CALLOUT_INITIALIZER;
 #elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 struct callout mip6_subnet_ch;
+#elif defined(__OpenBSD__)
+struct timeout mip6_subnet_ch;
 #endif
 
 void
@@ -708,6 +710,10 @@ mip6_subnet_starttimer()
 	callout_reset(&mip6_subnet_ch,
 		      MIP6_SUBNET_TIMEOUT_INTERVAL * hz,
 		      mip6_subnet_timeout, NULL);
+#elif defined(__OpenBSD__)
+	timeout_set(&mip6_subnet_ch, mip6_subnet_timeout, NULL);
+	timeout_add(&mip6_subnet_ch,
+		    MIP6_SUBNET_TIMEOUT_INTERVAL * hz);
 #else
 	timeout(mip6_subnet_timeout, (void *)0,
 		MIP6_SUBNET_TIMEOUT_INTERVAL * hz);
@@ -719,6 +725,8 @@ mip6_subnet_stoptimer()
 {
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_stop(&mip6_subnet_ch);
+#elif defined(__OpenBSD__)
+	timeout_del(&mip6_subnet_ch);
 #else
 	untimeout(mip6_subnet_timeout, (void *)0);
 #endif

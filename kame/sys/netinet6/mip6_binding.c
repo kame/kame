@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.40 2001/11/29 04:38:38 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.41 2001/11/29 11:29:37 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -88,6 +88,9 @@ struct callout mip6_bc_ch = CALLOUT_INITIALIZER;
 #elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 struct callout mip6_bu_ch;
 struct callout mip6_bc_ch;
+#elif defined(__OpenBSD__)
+struct timeout mip6_bu_ch;
+struct timeout mip6_bc_ch;
 #endif
 static int mip6_bu_count = 0;
 static int mip6_bc_count = 0;
@@ -455,6 +458,10 @@ mip6_bu_starttimer()
 	callout_reset(&mip6_bu_ch,
 		      MIP6_BU_TIMEOUT_INTERVAL * hz,
 		      mip6_bu_timeout, NULL);
+#elif defined(__OpenBSD__)
+	timeout_set(&mip6_bu_ch, mip6_bu_timeout, NULL);
+	timeout_add(&mip6_bu_ch,
+		    MIP6_BU_TIMEOUT_INTERVAL * hz);
 #else
 	timeout(mip6_bu_timeout, (void *)0,
 		MIP6_BU_TIMEOUT_INTERVAL * hz);
@@ -466,6 +473,8 @@ mip6_bu_stoptimer()
 {
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_stop(&mip6_bu_ch);
+#elif defined(__OpenBSD__)
+	timeout_del(&mip6_bu_ch);
 #else
 	untimeout(mip6_bu_timeout, (void *)0);
 #endif
@@ -2349,6 +2358,8 @@ mip6_bc_stoptimer(void)
 {
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_stop(&mip6_bc_ch);
+#elif defined(__OpenBSD__)
+	timeout_del(&mip6_bc_ch);
 #else
 	untimeout(mip6_bc_timeout, (void *)0);
 #endif
@@ -2360,6 +2371,10 @@ static void mip6_bc_starttimer(void)
 	callout_reset(&mip6_bc_ch,
 		      MIP6_BC_TIMEOUT_INTERVAL * hz,
 		      mip6_bc_timeout, NULL);
+#elif defined(__OpenBSD__)
+	timeout_set(&mip6_bc_ch, mip6_bc_timeout, NULL);
+	timeout_add(&mip6_bc_ch,
+		    MIP6_BC_TIMEOUT_INTERVAL * hz);
 #else
 	timeout(mip6_bc_timeout, (void *)0,
 		MIP6_BC_TIMEOUT_INTERVAL * hz);
