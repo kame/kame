@@ -77,7 +77,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_debug.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_debug.c,v 1.6 2000/07/08 03:21:08 itojun Exp $";
+static char rcsid[] = "$Id: res_debug.c,v 1.7 2000/12/03 07:10:20 kjc Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/param.h>
@@ -880,7 +880,7 @@ __p_rr(cp, msg, file)
 #endif
 	if (cp - cp1 != dlen) {
 		fprintf(file, ";; packet size error (found %d, dlen was %d)\n",
-			cp - cp1, dlen);
+			(int)(cp - cp1), dlen);
 		cp = NULL;
 	}
 	return (cp);
