@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.285 2002/06/13 07:54:31 k-sugyou Exp $	*/
+/*	$KAME: nd6.c,v 1.286 2002/06/19 14:37:45 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2081,8 +2081,9 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 		goto bad;
 	}
 	sc = hif_list_find_withhaddr(src);
-	if (sc) {
-		return ((*sc->hif_if.if_output)((struct ifnet *)sc, m,  (struct sockaddr *)dst, rt));
+	if (sc && sc->hif_location == HIF_LOCATION_FOREIGN) {
+		return ((*sc->hif_if.if_output)((struct ifnet *)sc, m,
+		    (struct sockaddr *)dst, rt));
 	}
 		
 #endif /* MIP6 */

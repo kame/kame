@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.12 2002/06/19 12:30:05 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.13 2002/06/19 14:37:45 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1528,8 +1528,10 @@ mip6_create_cn_cookie(saddr, cookie, size)
 {
 	/* XXX Generatie cookie */
 	/* cookie = MAC_Kcn(saddr | nonce) */
+	/*
 	mip6_nonce_t nonce;
 	
 	mip6_nonce(nonce_index, &nonce);
+	*/
 	bzero(cookie, size);	/* XXX */
 }

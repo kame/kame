@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.113 2002/06/18 02:11:06 k-sugyou Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.114 2002/06/19 14:37:45 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -475,8 +475,11 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 				continue;
 			if ((mbu->mbu_flags & IP6MU_HOME) == 0)
 				continue;
+#if 0			/* XXX WAITD is CN's BU only? */
 			if (mbu->mbu_fsm_state ==
-					MIP6_BU_FSM_STATE_WAITD) {
+					MIP6_BU_FSM_STATE_WAITD)
+#endif
+			{
 				/* unspecified source */
 				dad = 1;
 				if (ln && ND6_IS_LLINFO_PROBREACH(ln))

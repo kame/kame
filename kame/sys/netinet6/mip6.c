@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.134 2002/06/19 12:30:05 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.135 2002/06/19 14:37:45 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -198,6 +198,7 @@ static int mip6_haddr_destopt_create __P((struct ip6_dest **,
 #ifdef MIP6_DRAFT17
 static void mip6_create_nonce __P((mip6_nonce_t *));
 static void mip6_create_nodekey __P((mip6_nodekey_t *));
+static int mip6_get_nodekey __P((int, mip6_nodekey_t *));
 static int mip6_get_mobility_options __P((struct ip6m_binding_update *,
 					 int, struct mip6_mobility_options *));
 #endif /* MIP6_DRAFT17 */
@@ -2547,7 +2548,7 @@ mip6_get_nonce(index, nonce)
 int
 mip6_get_nodekey(index, nonce)
 	int index;	/* nonce index */
-	mip6_nonce_t *nonce;
+	mip6_nodekey_t *nonce;
 {
 	/* To Be Written, soon */
 	return (0);
@@ -2573,11 +2574,11 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, hoa_sa)
 	u_int8_t authdata[SHA1_RESULTLEN];
 	SHA1_CTX ctx;
 
-	if (error = mip6_get_mobility_options(ip6mu, ip6mulen, &mopt))
+	if ((error = mip6_get_mobility_options(ip6mu, ip6mulen, &mopt)) != 0)
 		return (error);
 
 	/* Nonce index & Auth. data mobility options are required */
-	if (mopt.valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA) == 0)
+	if ((mopt.valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA)) == 0)
 		return (EINVAL);
 
 	if ((mip6_get_nonce(mopt.mopt_ho_nonce_idx, &home_nonce) != 0) ||
@@ -2587,35 +2588,35 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, hoa_sa)
 	if ((mip6_get_nodekey(mopt.mopt_ho_nonce_idx, &home_nodekey) != 0) ||
 	    (mip6_get_nodekey(mopt.mopt_co_nonce_idx, &coa_nodekey) != 0))
 		return (EINVAL);
-/*
+#if 0
 	hmac_sha1_init(state);
 	hmac_sha1_loop(state, ip6mu->ip6mu_homeaddr,
 		       sizeof(ip6mu->ip6mu_homeaddr));
 	hmac_sha1_loop(state, &home_nonce, sizeof(home_nonce));
 	hmac_sha1_result(state, &home_cookie);
-*/
-/*
+#endif
+#if 0
 	hmac_sha1_init(state);
 	hmac_sha1_loop(state, ip6->ip6_src,
 		       sizeof(ip6->ip6_src));
 	hmac_sha1_loop(state, &careof_nonce, sizeof(careof_nonce));
 	hmac_sha1_result(state, &careof_cookie);
-*/
+#endif
 	SHA1Init(&ctx);
 	SHA1Update(&ctx, (caddr_t)&home_cookie, sizeof(home_cookie));
 	SHA1Update(&ctx, (caddr_t)&careof_cookie, sizeof(careof_cookie));
 	SHA1Final(key_bu, &ctx);
 
-/*
+#if 0
 	hmac_sha1_init(state);
 	hmac_sha1_loop(state, ip6->ip6_src,
 		       sizeof(ip6->ip6_src));
 	hmac_sha1_loop(state, ip6->ip6_dest
 		       sizeof(ip6->ip6_dest));
 	hmac_sha1_loop(state, ip6mu, ip6mulen);
-	/* XXX must exclude Authentication mobility option
+	/* XXX must exclude Authentication mobility option */
 	hmac_sha1_result(state, authdata);
- */
+#endif
 
 	return (bcmp(mopt.mopt_auth, authdata, sizeof(authdata)));
 }
