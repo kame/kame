@@ -6,5 +6,3 @@ options 	INET6		# IPV6
 pseudo-device	gif		4
 #pseudo-device	dummy		1
 #pseudo-device	faith		1
-
-makeoptions	DEBUG="-g"
