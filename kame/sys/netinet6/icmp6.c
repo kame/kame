@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.148 2000/10/10 16:44:12 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.149 2000/10/10 16:45:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2845,6 +2845,7 @@ icmp6_ctloutput(op, so, level, optname, mp)
 			(vvp)->tv_usec += 1000000;			\
 		}							\
 	} while (0)
+#endif
 #endif
 
 #if 0 /*ndef HAVE_RATECHECK*/
