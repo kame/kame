@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.167 2000/10/05 04:02:57 itojun Exp $	*/
+/*	$KAME: key.c,v 1.168 2000/10/06 04:20:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -225,6 +225,10 @@ static const int maxsize[] = {
 	sizeof(struct sadb_x_sa2),	/* SADB_X_SA2 */
 };
 
+static int ipsec_esp_keymin = 256;
+static int ipsec_esp_auth = 0;
+static int ipsec_ah_keymin = 128;
+
 #ifdef __FreeBSD__
 #ifdef SYSCTL_DECL
 SYSCTL_DECL(_net_key);
@@ -271,10 +275,6 @@ SYSCTL_INT(_net_key, KEYCTL_ESP_KEYMIN,	esp_keymin, CTLFLAG_RW, \
 SYSCTL_INT(_net_key, KEYCTL_AH_KEYMIN,	ah_keymin, CTLFLAG_RW, \
 	&ipsec_ah_keymin,	0,	"");
 #endif /* __FreeBSD__ */
-
-static int ipsec_esp_keymin = 256;
-static int ipsec_esp_auth = 0;
-static int ipsec_ah_keymin = 128;
 
 #ifndef LIST_FOREACH
 #define LIST_FOREACH(elm, head, field)                                     \
