@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.17 2000/11/15 05:07:43 jinmei Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.18 2000/12/22 08:54:29 jinmei Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -120,6 +120,11 @@ The default value is 0.
 (num) Router lifetime field
 .Pq unit: seconds .
 Its value must be no greater than 3600000.
+When
+.Nm rtadvd
+runs on a host, this value must explicitly set 0 on all the
+advertising interfaces as described in
+.Xr rtadvd 8 .
 The default value is 1800.
 .It Cm \&rtime
 (num) Reachable time field
