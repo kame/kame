@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.26 2003/08/06 17:16:23 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.27 2003/08/07 09:30:58 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -331,6 +331,10 @@ mip6_ioctl(cmd, data)
 					hif_ha_list_remove(
 					    &sc->hif_ha_list_foreign,
 					    LIST_FIRST(&sc->hif_ha_list_foreign));
+				while (!LIST_EMPTY(&sc->hif_sp_list))
+					hif_site_prefix_list_remove(
+					    &sc->hif_sp_list,
+					    LIST_FIRST(&sc->hif_sp_list));
 				while (!LIST_EMPTY(&mip6_prefix_list))
 					mip6_prefix_list_remove(
 					    &mip6_prefix_list,

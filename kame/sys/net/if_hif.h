@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.19 2003/08/04 05:25:38 keiichi Exp $	*/
+/*	$KAME: if_hif.h,v 1.20 2003/08/07 09:30:58 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -160,6 +160,8 @@ struct hif_ha *hif_ha_list_find_withmha(struct hif_ha_list *,
     struct mip6_ha *);
 struct hif_ha *hif_ha_list_find_preferable(struct hif_ha_list *,
     struct mip6_prefix *);
+void hif_site_prefix_list_remove(struct hif_site_prefix_list *,
+    struct hif_site_prefix *);
 
 #endif /* _KERNEL */
 

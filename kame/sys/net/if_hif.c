@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.53 2003/08/05 13:19:23 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.54 2003/08/07 09:30:58 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -571,6 +571,15 @@ hif_ha_list_find_preferable(hif_ha_list, mpfx)
 	if (hha)
 		return(hha);
 	return (NULL);
+}
+
+void
+hif_site_prefix_list_remove(hsp_list, hsp)
+	struct hif_site_prefix_list *hsp_list;
+	struct hif_site_prefix *hsp;
+{
+	LIST_REMOVE(hsp, hsp_entry);
+	FREE(hsp, M_TEMP);
 }
 
 static int
