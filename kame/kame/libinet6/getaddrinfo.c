@@ -48,6 +48,7 @@
  *   when globbing NULL hostname (to loopback, or wildcard).  Is it the right
  *   thing to do?  What is the relationship with post-RFC2553 AI_ADDRCONFIG
  *   in ai_flags?
+ * - (post-2553) semantics of AI_ADDRCONFIG itself is too vague.
  * - The code makes use of following calls when asked to resolver with
  *   ai_family  = PF_UNSPEC:
  *	getipnodebyname(host, AF_INET6);
@@ -524,6 +525,12 @@ explore_fqdn(pai, hostname, servname, res)
 #endif
 	const struct afd *afd;
 	int error = 0;
+#if 0
+	struct addrinfo pai4;
+#ifdef INET6
+	struct addrinfo pai6;
+#endif
+#endif
 
 	*res = NULL;
 	sentinel.ai_next = NULL;
@@ -532,9 +539,40 @@ explore_fqdn(pai, hostname, servname, res)
 	/*
 	 * If AI_ADDRCONFIG is specified, check if we are expected to
 	 * return the address family or not.
+	 * assumes PF_UNSPEC = PF_INET + PF_INET6.
+	 *
+	 * NOTE: PF_UNSPEC case is for future use.
 	 */
-	if ((pai->ai_flags & AI_ADDRCONFIG) != 0 && !addrconfig(pai))
-		return 0;
+	if ((pai->ai_flags & AI_ADDRCONFIG) != 0) {
+		switch (pai->ai_family) {
+#if 0
+		case PF_UNSPEC:
+			pai4 = pai6 = *pai;
+			pai4.ai_family = PF_INET;
+#ifndef INET6
+			if (!addrconfig(&pai4))
+				return 0;
+#else
+			pai6.ai_family = PF_INET6;
+			if (!addrconfig(&pai4)) {
+				if (!addrconfig(&pai6))
+					return 0;
+				pai = &pai6;
+			} else {
+				if (!addrconfig(&pai6))
+					pai = &pai4;
+				else
+					; /* as is */
+			}
+#endif
+			break;
+#endif
+		default:
+			if (!addrconfig(pai))
+				return 0;
+			break;
+		}
+	}
 
 	/*
 	 * if the servname does not match socktype/protocol, ignore it.
