@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2487 2003/10/10 02:20:35 keiichi Exp $
+$KAME: CHANGELOG,v 1.2488 2003/10/10 14:00:13 suz Exp $
 
 <200310>
+2003-10-10 SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/sys/netinet6/ip6_input.c
+	fixed an endian bug on fragment header scanning.
+	Reported by Masahito Endo <masaxmasa@tahi.org>
+
 Fri Oct 10 11:17:46 JST 2003	keiichi@iij.ad.jp
 	* kame/sys/netinet6/nd6_rtr.c:nd6_rtmsg()
 	fixed a null pointer access when sending rtmsg where an interface
