@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.25 2003/08/06 19:52:53 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.26 2003/10/31 05:37:04 suz Exp $	*/
 
 %{
 /*
@@ -276,7 +276,7 @@ cfparse(conf)
 	if ((yyin = fopen(configfilename, "r")) == NULL) {
 		if (errno == ENOENT)
 			return (0);
-		dprintf(LOG_ERR, "cfparse: fopen(%s): %s",
+		dprintf(LOG_ERR, FNAME, "cfparse: fopen(%s): %s",
 			configfilename, strerror(errno));
 		return (-1);
 	}
