@@ -291,20 +291,7 @@ client6_init()
 	}
 	freeaddrinfo(res);
 
-#if 0
-	/* set interface to use */
-	ifidx = if_nametoindex(device);
-	if (!ifidx) {
-		err(1, "if_nametoindex(%s)", device);
-		/*NOTREACHED*/
-	}
-#endif
-
 	TAILQ_INIT(&servtab);
-
-#if 0
-	callback_register(s, NULL, capture_dhcpc6);
-#endif
 }
 
 static void
