@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.49 2001/12/12 05:37:45 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.50 2001/12/12 05:46:52 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -1441,6 +1441,7 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
     u_int16         		num_j_srcs;
     u_int16         		num_j_srcs_tmp;
     u_int16         		num_p_srcs;
+    u_int16         		num_p_srcs_tmp;
     struct sockaddr_in6		source;
     struct sockaddr_in6         group;
     struct sockaddr_in6		target;
@@ -2082,8 +2083,10 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 		goto bypass_rp;
 
 	rpentry_ptr = rp_match(&group);
-	if (rpentry_ptr == (rpentry_t *) NULL)
+	if (rpentry_ptr == (rpentry_t *) NULL) {
+	    data_ptr += (num_j_srcs + num_p_srcs) * sizeof(pim6_encod_src_addr_t);
 	    continue;
+	}
 
 	IF_DEBUG(DEBUG_PIM_JOIN_PRUNE)
 		log(LOG_DEBUG,0,"The rp for this JOIN/PRUNE is %s",inet6_fmt(&rpentry_ptr->address.sin6_addr));
@@ -2139,13 +2142,16 @@ bypass_rp:
 	    }
 	}
 
-	if (ignore_group == TRUE)
+	if (ignore_group == TRUE) {
+	    data_ptr += (num_j_srcs_tmp + num_p_srcs) * sizeof(pim6_encod_src_addr_t);
 	    continue;
+	}
 
 	data_ptr = data_ptr_group_p_start;
 
 	/* Process the Prune part first */
 
+	num_p_srcs_tmp = num_p_srcs;
 	while (num_p_srcs--)
 	{
 	    GET_ESADDR6(&encod_src, data_ptr);
@@ -2441,6 +2447,9 @@ bypass_rp:
 		continue;
 	    }
 	}			/* while(num_j_srcs--) */
+	if (num_p_srcs_tmp) {
+	    data_ptr += num_p_srcs_tmp * sizeof(pim6_encod_src_addr_t);
+	}
     }				/* for all groups */
 
     /* Now process the (*,*,RP) Join/Prune */
