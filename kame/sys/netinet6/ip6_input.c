@@ -1248,9 +1248,6 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 				 /*
 				  * Save a dst opt header before a routing
 				  * header if the user wanted.
-				  * TODO: storing all the dst opt headers
-				  * before a routing header in a single
-				  * ancillary data object.
 				  */
 				if (rthdr == 0 &&
 				    (in6p->in6p_flags & IN6P_RTHDRDSTOPTS)) {
@@ -1265,7 +1262,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 					 * If this is the 1st dst opt header
 					 * (that is placed before rthdr)
 					 * we enconter and this header is
-					 * not different than the previous one,
+					 * not different from the previous one,
 					 * simply ignore the header.
 					 */
 					if (ctl->dest1 == NULL &&
