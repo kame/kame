@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.92 2002/05/24 06:38:50 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.93 2002/09/10 02:10:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1862,6 +1862,7 @@ relay_dns(sd, buf, len, from, fromlen)
 			}
 
 			gettimeofday(&tv, 0);
+#if 0
 			if (ns->dormant.tv_sec != -1) {
 				if (tv.tv_sec > ns->dormant.tv_sec) {
 					if (dflag)
@@ -1874,6 +1875,7 @@ relay_dns(sd, buf, len, from, fromlen)
 					ns->nquery = ns->nresponse = 0;
 				}
 			}
+#endif
 
 			if (0 > edns0len && len > PACKETSZ) {
 				/* no EDNS0 on big message -> use TCP */

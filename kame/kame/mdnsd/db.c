@@ -1,4 +1,4 @@
-/*	$KAME: db.c,v 1.15 2001/08/22 03:05:29 itojun Exp $	*/
+/*	$KAME: db.c,v 1.16 2002/09/10 02:10:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -120,6 +120,7 @@ dbtimeo()
 			printnsdb(ns);
 #endif
 
+#if 0
 		if (ns->dormant.tv_sec == -1 && ns->dormant.tv_usec == -1 &&
 		    ns->nquery > ns->nresponse + dormantcount) {
 			if (dflag)
@@ -129,6 +130,7 @@ dbtimeo()
 			gettimeofday(&ns->dormant, 0);
 			ns->dormant.tv_sec += dormanttime;
 		}
+#endif
 
 		if (ns->expire.tv_sec == -1 && ns->expire.tv_usec == -1)
 			continue;
