@@ -116,6 +116,7 @@ __KERNEL_RCSID(0, "$NetBSD: udp_usrreq.c,v 1.93 2002/05/12 20:33:51 matt Exp $")
 #include <sys/proc.h>
 #include <sys/domain.h>
 #include <sys/sysctl.h>
+#include <sys/syslog.h>
 
 #include <net/if.h>
 #include <net/route.h>
@@ -945,7 +946,7 @@ udp6_realinput(af, src, dst, m, off)
 			for (imm = LIST_FIRST(&im6o->im6o_memberships);
 			     imm != NULL;
 			     imm = LIST_NEXT(imm, i6mm_chain)) {
-				if (SS_CMP(&imm->i6mm_maddr->in6m_sa, !=, dst2))
+				if (SS_CMP(&imm->i6mm_maddr->in6m_sa, !=, &dst2))
 					continue;
 				
 				if (imm->i6mm_msf == NULL) {
@@ -970,9 +971,9 @@ udp6_realinput(af, src, dst, m, off)
 					     list) {
 					if (msfsrc->src.ss_family != AF_INET6)
 						continue;
-					if (SS_CMP(&msfsrc->src, <, src2))
+					if (SS_CMP(&msfsrc->src, <, &src2))
 						continue;
-					if (SS_CMP(&msfsrc->src, >, src2)) {
+					if (SS_CMP(&msfsrc->src, >, &src2)) {
 						/* terminate search, as there
 						 * will be no match */
 						break;
@@ -991,9 +992,9 @@ udp6_realinput(af, src, dst, m, off)
 					     list) {
 					if (msfsrc->src.ss_family != AF_INET6)
 						continue;
-					if (SS_CMP(&msfsrc->src, <, src2))
+					if (SS_CMP(&msfsrc->src, <, &src2))
 						continue;
-					if (SS_CMP(&msfsrc->src, ==, src2)) {
+					if (SS_CMP(&msfsrc->src, ==, &src2)) {
 						/* blocks since the src matched
 						 * with block list */
 						break;
