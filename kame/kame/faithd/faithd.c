@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.28 2000/07/28 07:59:58 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.29 2000/09/12 05:20:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -238,7 +238,7 @@ daemon_main(int argc, char **argv)
 #endif
 		default:
 			usage();
-			break;
+			/*NOTREACHED*/
 		}
 	}
 	argc -= optind;
@@ -268,11 +268,8 @@ daemon_main(int argc, char **argv)
 
 	switch (argc) {
 	case 0:
-		serverpath = DEFAULT_PATH;
-		serverarg[0] = DEFAULT_NAME;
-		serverarg[1] = NULL;
-		service = DEFAULT_PORT_NAME;
-		break;
+		usage();
+		/*NOTREACHED*/
 	default:
 		serverargc = argc - NUMARG;
 		if (serverargc >= MAXARGV)
@@ -979,7 +976,7 @@ update_myaddrs()
 static void
 usage()
 {
-	fprintf(stderr, "usage: %s [-dp] [service [serverpath [serverargs]]]\n",
+	fprintf(stderr, "usage: %s [-dp] service [serverpath [serverargs]]\n",
 		faithdname);
 	exit(0);
 }
