@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.7 2000/05/30 16:13:13 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.8 2000/05/30 16:33:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -104,9 +104,12 @@ mainloop()
 			err(1, "recvfrom");
 
 		/*
-		 * XXX don't permit recursion for multicast query,
-		 * mdns-00 section 5 - we need to get destination address,
-		 * or we need to split listening socket into two
+		 * XXX we need to get destination address of incoming packet.
+		 * reason 1: we need to forbid recursion for multicast query.
+		 *	to check it, we need to know the destination address.
+		 * reason 2: for unicast query, we need to flip the src/dst
+		 *	pair.
+		 * reason 3: we do not want to be hosed by fake multicast reply.
 		 */
 
 		if (ismyaddr((struct sockaddr *)&from)) {
