@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.31 2003/06/12 09:58:27 suz Exp $ */
+/*	$KAME: sender.c,v 1.32 2003/06/12 10:11:09 suz Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -242,10 +242,10 @@ main(argc, argv)
 		hints.ai_family = AF_INET6;
 		hints.ai_socktype = SOCK_DGRAM; /* not used */
 		hints.ai_protocol = IPPROTO_UDP; /* not used */
-		if ((error = getaddrinfo(nexthop, NULL, &hints, &res)) < 0) {
+		error = getaddrinfo(nexthop, NULL, &hints, &res);
+		if (error)
 			errx(1, "getaddrinfo for nexthop: %s",
 			     gai_strerror(error));
-		}
 		memcpy(&ss_next, res->ai_addr, res->ai_addrlen);
 		nextlen = res->ai_addrlen;
 		sa_next = (struct sockaddr *)&ss_next;
@@ -258,10 +258,10 @@ main(argc, argv)
 		hints.ai_family = AF_INET6;
 		hints.ai_socktype = SOCK_DGRAM; /* not used */
 		hints.ai_protocol = IPPROTO_UDP; /* not used */
-		if ((error = getaddrinfo(stickynexthop, NULL, &hints, &res)) < 0) {
+		error = getaddrinfo(stickynexthop, NULL, &hints, &res);
+		if (error)
 			errx(1, "getaddrinfo for sticky nexthop: %s",
 			     gai_strerror(error));
-		}
 		memcpy(&sticky_ss_next, res->ai_addr, res->ai_addrlen);
 		stickynextlen = res->ai_addrlen;
 		sticky_sa_next = (struct sockaddr *)&sticky_ss_next;
