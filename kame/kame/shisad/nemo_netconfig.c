@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.4 2005/03/02 19:18:40 ryuji Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.5 2005/03/02 19:22:53 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -147,7 +147,7 @@ main (argc, argv)
 		case 'n':
 			numerichost = 1;
 			break;
-		case 'n':
+		case 'M':
 			multiplecoa = 1;
 			break;
 		case 'h':
@@ -475,11 +475,10 @@ set_nemo_ifinfo() {
         free(buf); 
 
 	if (debug) {
-		syslog(LOG_INFO, "Watched interface: ");
+		syslog(LOG_INFO, "Watched interface:\n");
 		LIST_FOREACH(nif, &nemo_ifhead, nemo_ifentry) {
-			syslog(LOG_INFO, "%s ", nif->ifname);
+			syslog(LOG_INFO, "%s\n", nif->ifname);
 		}
-		syslog(LOG_INFO, "\n");
 	}
 
 	return (0);
