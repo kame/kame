@@ -1,3 +1,5 @@
+/*	$KAME: dccp_tcplike.c,v 1.3 2003/10/18 07:52:00 itojun Exp $	*/
+
 /*
  * Copyright (c) 2003 Magnus Erixzon
  * All rights reserved.
@@ -31,15 +33,15 @@
  * Current Revision:
  *
  * $Source: /usr/home/sumikawa/kame/kame/kame/sys/netinet/dccp_tcplike.c,v $
- * $Revision: 1.2 $
- * $Author: ono $
- * $Date: 2003/10/17 12:08:25 $
+ * $Revision: 1.3 $
+ * $Author: itojun $
+ * $Date: 2003/10/18 07:52:00 $
  *
  * Revision history:
  *
  * $Log: dccp_tcplike.c,v $
- * Revision 1.2  2003/10/17 12:08:25  ono
- * make it compilable on freebsd4
+ * Revision 1.3  2003/10/18 07:52:00  itojun
+ * $KAME$
  *
  * Revision 1.48  2003/06/08 14:48:18  magerx-9
  * Added stats for TCPlike

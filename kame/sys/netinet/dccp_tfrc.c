@@ -1,3 +1,5 @@
+/*	$KAME: dccp_tfrc.c,v 1.3 2003/10/18 07:52:00 itojun Exp $	*/
+
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
  * All rights reserved.
@@ -25,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: dccp_tfrc.c,v 1.2 2003/10/17 12:08:25 ono Exp $
+ * $Id: dccp_tfrc.c,v 1.3 2003/10/18 07:52:00 itojun Exp $
  */
 
 /* This implementation conforms to the drafts of DCCP dated Mars 2003. The options used are window counter, elapsed time, loss event rate and receive rate.  No support for history discounting or oscillation prevention. */

@@ -1,3 +1,5 @@
+/*	$KAME: dccp_tfrc.h,v 1.2 2003/10/18 07:52:00 itojun Exp $	*/
+
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
  * All rights reserved.
@@ -25,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: dccp_tfrc.h,v 1.1 2003/10/17 07:27:26 ono Exp $
+ * $Id: dccp_tfrc.h,v 1.2 2003/10/18 07:52:00 itojun Exp $
  */
 
 
