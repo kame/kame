@@ -76,8 +76,13 @@
 #include <libtelnet/auth.h>
 #include <libtelnet/encrypt.h>
 #endif
+#if 0
 #include <libtelnet/misc.h>
 #include <libtelnet/misc-proto.h>
+#else
+#include "misc.h"
+#include "misc-proto.h"
+#endif
 
 #define LINEMODE
 
@@ -86,7 +91,9 @@
 #include "defines.h"
 #include "types.h"
 
+#if 0
 #undef AF_INET6 /* XXX - it has not been tested and it doesn't exist yet */
+#endif
 
 /* prototypes */
 

@@ -2405,6 +2405,7 @@ tn(argc, argv)
 			sa_size = sizeof(sin);
 			sa = (struct sockaddr *)&sin;
 			sin.sin_family = family;
+			sin.sin_len = sa_size;
 			sin.sin_addr   = *((struct in_addr *)(*host->h_addr_list));
 			break;
 #if defined(AF_INET6) && defined(HAVE_STRUCT_SOCKADDR_IN6)
@@ -2413,6 +2414,7 @@ tn(argc, argv)
 			sa_size = sizeof(sin6);
 			sa = (struct sockaddr *)&sin6;
 			sin6.sin6_family = family;
+			sin6.sin6_len = sa_size;
 			sin6.sin6_addr   = *((struct in6_addr *)(*host->h_addr_list));
 			break;
 #endif
@@ -2494,6 +2496,7 @@ tn(argc, argv)
     }
 
     do {
+fprintf(stderr, "family=%d\n", family);
 	net = socket(family, SOCK_STREAM, 0);
 	seteuid(getuid());
 	setuid(getuid());
@@ -2557,6 +2560,7 @@ tn(argc, argv)
 		perror("setsockopt (SO_DEBUG)");
 	}
 
+fprintf(stderr, "sa=%p(%d %d) size=%d\n", sa, sa->sa_family, sa->sa_len, sa_size);
 	if (connect(net, sa, sa_size) < 0) {
 	    int retry = 0;
 
@@ -2594,6 +2598,7 @@ tn(argc, argv)
 			break;
 #if defined(AF_INET6) && defined(HAVE_STRUCT_SOCKADDR_IN6)
 		case AF_INET6: {
+		    char buf[INET6_ADDRSTRLEN];
 		    printf("Trying %s...\r\n", inet_ntop(AF_INET6,
 					     &sin6.sin6_addr,
 					     buf,

@@ -38,6 +38,7 @@ PROG=	telnet
 
 CFLAGS+=-DTERMCAP -DKLUDGELINEMODE -DUSE_TERMIO -DSKEY -Dunix
 CFLAGS+=-DENV_HACK -D_USE_OLD_CURSES_
+CFLAGS+=-DHAVE_GETHOSTBYNAME2 -DHAVE_STRUCT_SOCKADDR_IN6
 CFLAGS+=-I${.CURDIR}/../../lib
 LDADD+=	-locurses -ltelnet
 DPADD=	${LIBOLDCURSES} ${LIBTELNET}
@@ -47,11 +48,11 @@ SRCS=	authenc.c commands.c main.c network.c ring.c sys_bsd.c telnet.c \
 
 .include <bsd.own.mk> # for KERBEROS
 
-.if (${KERBEROS} == "yes")
-CFLAGS+=-DENCRYPTION -DAUTHENTICATION -DKRB4
-LDADD+= -lkrb -ldes
-DPADD+= ${LIBDES} ${LIBKRB}
-.endif
+#.if (${KERBEROS} == "yes")
+#CFLAGS+=-DENCRYPTION -DAUTHENTICATION -DKRB4
+#LDADD+= -lkrb -ldes
+#DPADD+= ${LIBDES} ${LIBKRB}
+#.endif
 
 .include <bsd.prog.mk>
 
