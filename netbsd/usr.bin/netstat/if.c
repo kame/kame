@@ -260,6 +260,29 @@ intpr(interval, ifnetaddr, pfunc)
 				else
 					n = 17;
 				printf("%-*.*s ", n, n, cp);
+				if (aflag) {
+					u_long multiaddr;
+					struct in6_multi inm;
+		
+					multiaddr = (u_long)
+					    ifaddr.in6.ia6_multiaddrs.lh_first;
+					while (multiaddr != 0) {
+						kread(multiaddr, (char *)&inm,
+						   sizeof inm);
+						inet_ntop(AF_INET6, &inm.in6m_addr,
+						    hbuf, sizeof(hbuf));
+						cp = hbuf;
+						if (vflag)
+						    n = strlen(cp) < 17
+							? 17 : strlen(cp);
+						else
+						    n = 17;
+						printf("\n%25s %-*.*s ", "",
+						    n, n, cp);
+						multiaddr =
+						   (u_long)inm.in6m_entry.le_next;
+					}
+				}
 				break;
 #endif /*INET6*/
 #ifndef SMALL
