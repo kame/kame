@@ -1083,7 +1083,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctl)
 		struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 		if (ip6->ip6_nxt == IPPROTO_HOPOPTS) {
 			struct ip6_hbh *hbh, *prevhbh = NULL;
-			int hbhlen, prevhbhlen;
+			int hbhlen = 0, prevhbhlen = 0;
 
 #ifndef PULLDOWN_TEST
 			hbh = (struct ip6_hbh *)(ip6 + 1);
@@ -1267,7 +1267,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctl)
 			case IPPROTO_ROUTING:
 			{
 				struct ip6_rthdr *prevrth = NULL;
-				int prevrhlen;
+				int prevrhlen = 0;
 
 				rthdr++;
 				if (!in6p->in6p_flags & IN6P_RTHDR)

@@ -507,7 +507,7 @@ udp6_ctlinput(cmd, sa, d)
 	struct sockaddr_in6 sa6;
 	struct ip6_hdr *ip6;
 	struct mbuf *m;
-	int off;
+	int off = 0;
 
 	if (sa->sa_family != AF_INET6 ||
 	    sa->sa_len != sizeof(struct sockaddr_in6))
