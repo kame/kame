@@ -4,6 +4,9 @@
 PROG=	ifconfig
 MAN=	ifconfig.8
 
+#XXX: set empty strings to LDSTATIC to avoid conflict between libc and lbinet6
+LDSTATIC=			
+
 CPPFLAGS+=-DINET6
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
