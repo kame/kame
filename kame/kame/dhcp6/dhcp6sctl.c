@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6sctl.c,v 1.4 2004/06/12 12:49:03 jinmei Exp $	*/
+/*	$KAME: dhcp6sctl.c,v 1.5 2004/06/12 12:49:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -236,7 +236,7 @@ parse_duid(str, lenp, buf)
 		return (0);
 
 	for (cp = str, bp = buf; *cp != '\0';) {
-		/* this should not happen, but check it for safety: */
+		/* this should not happen, but check it for safety. */
 		if (bp - buf > duidlen)
 			goto bad;
 
