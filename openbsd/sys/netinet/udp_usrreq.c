@@ -1196,6 +1196,10 @@ udp_usrreq(so, req, m, addr, control)
 		if (error)
 			return (error);
 #endif
+if (inp == NULL) {
+ printf("inp == NULL in %s:%d\n", __FILE__, __LINE__);
+ return EINVAL;
+}
 		return (udp_output(m, inp, addr, control));
 
 	case PRU_ABORT:
