@@ -1,0 +1,10 @@
+--- etc.c.orig	Sat Apr 22 07:32:07 2000
++++ etc.c	Sat Apr 22 07:33:06 2000
+@@ -1079,7 +1079,6 @@
+ #else /* if !defined(USE_SSL_VERIFY) */
+ 	    ss->status = SSL_read(ss->handle, ss->buf, ss->bufsize);
+ #endif /* !defined(USE_SSL_VERIFY) */
+-	    ss->status = SSL_read(ss->handle, ss->buf, ss->bufsize);
+ 	}
+ 	else
+ 	    ss->status = read(ss->sock, ss->buf, ss->bufsize);

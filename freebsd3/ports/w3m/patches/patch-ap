@@ -1,0 +1,8 @@
+--- scripts/dirlist.cgi.orig	Thu Apr  6 16:42:40 2000
++++ scripts/dirlist.cgi	Thu Apr  6 16:42:48 2000
+@@ -1,4 +1,4 @@
+-#!/usr/local/bin/perl
++#!/usr/bin/perl
+ #
+ # Directory list CGI by Hironori Sakamoto (hsaka@mth.biglobe.ne.jp)
+ #
