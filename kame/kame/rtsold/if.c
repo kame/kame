@@ -66,6 +66,7 @@
 
 #include "rtsold.h"
 
+extern int rssock;
 static int ifsock;
 
 static int get_llflag __P((const char *name));
@@ -76,10 +77,7 @@ static void get_rtaddrs __P((int addrs, struct sockaddr *sa,
 int
 ifinit()
 {
-	if ((ifsock = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
-		warnmsg(LOG_ERR, __FUNCTION__, "socket: %s", strerror(errno));
-		return(-1);
-	}
+	ifsock = rssock;
 
 	return(0);
 }

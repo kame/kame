@@ -61,7 +61,7 @@ static struct iovec rcviov[2];
 static struct iovec sndiov[2];
 static struct sockaddr_in6 from;
 
-static int rssock;
+int rssock;
 
 static struct sockaddr_in6 sin6_allrouters = {sizeof(sin6_allrouters), AF_INET6};
 
