@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1034 2000/06/18 17:13:01 itojun Exp $
+$Id: CHANGELOG,v 1.1035 2000/06/18 19:18:14 sumikawa Exp $
 
 <200006>
+Mon Jun 19 04:15:23 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* Security fix "FreeBSD-SA-00:25 FreeBSD/Alpha platform lacks
+	  kernel pseudo-random number generator, some applications fail to
+	  detect this."
+	  From: http://www.securityfocus.com/templates/archive.pike?list=1&date=2000-06-08&msg=20000612215144.D1A3B37BBF7@hub.freebsd.org
+
 2000-06-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd[34]/sys/netinet6/udp6_usrreq.c (udp6_attach): 
 	initialized inp_ip_ttl in udp6_attach for mapped addresses.
