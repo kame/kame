@@ -1,10 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1231 2000/08/24 07:10:35 itojun Exp $
+$KAME: CHANGELOG,v 1.1232 2000/08/24 08:34:39 sumikawa Exp $
 
 <200008>
 Thu Aug 24 16:07:40 JST 2000  itojun@iijlab.net
-	* netbsd/pkgsrc/net/bind9: use bind 9.0.0rc4.
+	* netbsd/pkgsrc/net/bind9, freebsd3/ports/bind9: use bind
+	  9.0.0rc4.
 
 Thu Aug 24 16:01:26 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
