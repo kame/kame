@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.49 2000/08/30 11:18:34 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.50 2000/08/30 11:39:58 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -107,6 +107,7 @@ static struct cipher_algorithm cipher[] = {
 };
 
 static int oakley_compute_keymat_x __P((struct ph2handle *, int, int));
+static int get_cert_fromlocal __P((struct ph1handle *, int));
 #if 0
 static int check_typeofcertname __P((int, int));
 #endif
@@ -1131,60 +1132,11 @@ oakley_validate_auth(iph1)
 		YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->sig_p));
 
 		/* get peer's certificate if no there */
-		if (iph1->cert_p == NULL && iph1->rmconf->peerscertfile != NULL) {
-			char path[MAXPATHLEN];
-			vchar_t *cert;
-
-			switch (iph1->rmconf->certtype) {
-			case ISAKMP_CERT_X509SIGN:
-				/* make public file name */
-				getpathname(path, sizeof(path),
-					LC_PATHTYPE_CERT,
-					iph1->rmconf->peerscertfile);
-				cert = eay_get_x509cert(path);
-				YIPSDEBUG(DEBUG_CERT,
-					char *p = eay_get_x509text(cert);
-					plog(logp, LOCATION, NULL, "%s", p ? p : "\n");
-					free(p));
-				break;
-			default:
-				plog(logp, LOCATION, NULL,
-					"not supported certtype %d\n",
-					iph1->rmconf->certtype);
+		if (iph1->cert_p == NULL
+		 && iph1->rmconf->peerscertfile != NULL) {
+			error = get_cert_fromlocal(iph1, 0);
+			if (error)
 				return -1;
-			}
-
-			if (cert == NULL) {
-				plog(logp, LOCATION, NULL,
-					"failed to get peer's CERT.\n");
-				return -1;
-			}
-
-			iph1->cert_p = oakley_newcert();
-			if (!iph1->cert_p) {
-				plog(logp, LOCATION, NULL,
-					"failed to get cert buffer\n");
-				vfree(cert);
-				return -1;
-			}
-			iph1->cert_p->pl = vmalloc(cert->l + 1);
-			if (!iph1->cert_p->pl) {
-				plog(logp, LOCATION, NULL,
-					"failed to get cert buffer\n");
-				oakley_delcert(iph1->cert_p);
-				vfree(cert);
-				return -1;
-			}
-			memcpy(iph1->cert_p->pl->v + 1, cert->v, cert->l);
-			iph1->cert_p->pl->v[0] = iph1->rmconf->certtype;
-			iph1->cert_p->type = iph1->rmconf->certtype;
-			iph1->cert_p->cert.v = iph1->cert_p->pl->v + 1;
-			iph1->cert_p->cert.l = iph1->cert_p->pl->l - 1;
-
-			YIPSDEBUG(DEBUG_CERT,
-				plog(logp, LOCATION, NULL,
-					"get peer's CERT from cache:\n"));
-			YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->cert_p->pl));
 		}
 
 		/* don't cache the certificate passed. */
@@ -1208,7 +1160,7 @@ oakley_validate_auth(iph1)
 		}
 		YIPSDEBUG(DEBUG_CERT,
 			plog(logp, LOCATION, NULL,
-				"CERT authenticated\n"));
+				"CERT validated\n"));
 
 		switch (iph1->etype) {
 		case ISAKMP_ETYPE_IDENT:
@@ -1283,21 +1235,43 @@ int
 oakley_getmycert(iph1)
 	struct ph1handle *iph1;
 {
+	return get_cert_fromlocal(iph1, 1);
+}
+
+/*
+ * get a CERT from local file.
+ * IN:
+ *	my != 0 my cert.
+ *	my == 0 peer's cert.
+ */
+static int
+get_cert_fromlocal(iph1, my)
+	struct ph1handle *iph1;
+	int my;
+{
 	char path[MAXPATHLEN];
 	vchar_t *cert = NULL;
+	cert_t **certpl;
+	char *certfile;
 	int error = -1;
+
+	if (my) {
+		certfile = iph1->rmconf->mycertfile;
+		certpl = &iph1->cert;
+	} else {
+		certfile = iph1->rmconf->peerscertfile;
+		certpl = &iph1->cert_p;
+	}
+	if (!certfile) {
+		plog(logp, LOCATION, NULL, "ERROR: no CERT defined.\n");
+		return NULL;
+	}
 
 	switch (iph1->rmconf->certtype) {
 	case ISAKMP_CERT_X509SIGN:
-		if (iph1->rmconf->mycertfile == NULL) {
-			plog(logp, LOCATION, NULL, "no cert defined.\n");
-			goto end;
-		}
 
 		/* make public file name */
-		getpathname(path, sizeof(path),
-			LC_PATHTYPE_CERT,
-			iph1->rmconf->mycertfile);
+		getpathname(path, sizeof(path), LC_PATHTYPE_CERT, certfile);
 		cert = eay_get_x509cert(path);
 		YIPSDEBUG(DEBUG_CERT,
 			char *p = eay_get_x509text(cert);
@@ -1311,33 +1285,33 @@ oakley_getmycert(iph1)
 		goto end;
 	}
 
-	if (cert == NULL) {
-		plog(logp, LOCATION, NULL, "failed to get my CERT.\n");
+	if (!cert) {
+		plog(logp, LOCATION, NULL, "ERROR: failed to get my CERT.\n");
 		goto end;
 	}
 
-	iph1->cert = oakley_newcert();
-	if (!iph1->cert) {
+	*certpl = oakley_newcert();
+	if (!*certpl) {
 		plog(logp, LOCATION, NULL,
-			"failed to get cert buffer\n");
+			"ERROR: failed to get cert buffer.\n");
 		goto end;
 	}
-	iph1->cert->pl = vmalloc(cert->l + 1);
-	if (iph1->cert->pl == NULL) {
+	(*certpl)->pl = vmalloc(cert->l + 1);
+	if ((*certpl)->pl == NULL) {
 		plog(logp, LOCATION, NULL,
-			"failed to get cert buffer\n");
-		oakley_delcert(iph1->cert_p);
+			"ERROR: failed to get cert buffer\n");
+		oakley_delcert(*certpl);
 		goto end;
 	}
-	memcpy(iph1->cert->pl->v + 1, cert->v, cert->l);
-	iph1->cert->pl->v[0] = iph1->rmconf->certtype;
-	iph1->cert->type = iph1->rmconf->certtype;
-	iph1->cert->cert.v = iph1->cert->pl->v + 1;
-	iph1->cert->cert.l = iph1->cert->pl->l - 1;
+	memcpy((*certpl)->pl->v + 1, cert->v, cert->l);
+	(*certpl)->pl->v[0] = iph1->rmconf->certtype;
+	(*certpl)->type = iph1->rmconf->certtype;
+	(*certpl)->cert.v = (*certpl)->pl->v + 1;
+	(*certpl)->cert.l = (*certpl)->pl->l - 1;
 
 	YIPSDEBUG(DEBUG_CERT,
 		plog(logp, LOCATION, NULL, "created CERT payload:\n"));
-	YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->cert->pl));
+	YIPSDEBUG(DEBUG_CERT, PVDUMP((*certpl)->pl));
 
 	error = 0;
 
