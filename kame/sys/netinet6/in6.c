@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.85 2000/06/13 10:10:25 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.86 2000/06/29 07:22:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1485,6 +1485,9 @@ in6_ifinit(ifp, ia, sin6, scrub)
 	}
 	if ((error = rtinit(&(ia->ia_ifa), (int)RTM_ADD, flags)) == 0)
 		ia->ia_flags |= IFA_ROUTE;
+	/* XXX check if the subnet route points to the same interface */
+	if (error == EEXIST)
+		error = 0;
 
 	/* Add ownaddr as loopback rtentry, if necessary(ex. on p2p link). */
 	in6_ifaddloop(&(ia->ia_ifa));

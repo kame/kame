@@ -863,6 +863,10 @@ in_ifinit(ifp, ia, sin, scrub)
 	error = rtinit(&ia->ia_ifa, (int)RTM_ADD, flags);
 	if (!error)
 		ia->ia_flags |= IFA_ROUTE;
+	/* XXX check if the subnet route points to the same interface */
+	if (error == EEXIST)
+		error = 0;
+
 	/*
 	 * If the interface supports multicast, join the "all hosts"
 	 * multicast group on that interface.
