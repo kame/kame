@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.60 2001/08/17 10:09:45 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.61 2001/08/17 10:15:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -905,6 +905,7 @@ encap6_ctlinput(cmd, sa, d)
 
 		/* should optimize by looking at address pairs */
 
+		/* XXX need to pass ep->arg or ep itself to listeners */
 		psw = (const struct ip6protosw *)ep->psw;
 		if (psw && psw->pr_ctlinput)
 			(*psw->pr_ctlinput)(cmd, sa, d);
