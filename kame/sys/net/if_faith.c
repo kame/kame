@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.35 2003/03/28 05:46:05 suz Exp $	*/
+/*	$KAME: if_faith.c,v 1.36 2003/05/01 08:03:46 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -218,6 +218,7 @@ faithoutput(ifp, m, dst, rt)
 		struct mbuf m0;
 		u_int32_t af = dst->sa_family;
 
+		m0.m_flags = 0;
 		m0.m_next = m;
 		m0.m_len = 4;
 		m0.m_data = (char *)&af;

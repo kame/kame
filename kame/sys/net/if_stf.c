@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.108 2003/04/09 09:28:18 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.109 2003/05/01 08:03:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -607,6 +607,7 @@ stf_output(ifp, m, dst, rt)
 		struct mbuf m0;
 		u_int32_t af = AF_INET6;
 		
+		m0.m_flags = 0;
 		m0.m_next = m;
 		m0.m_len = 4;
 		m0.m_data = (char *)&af;
@@ -736,6 +737,7 @@ stf_output(ifp, m, dst, rt)
 		struct mbuf m0;
 		u_int32_t af = AF_INET6;
 		
+		m0.m_flags = 0;
 		m0.m_next = m;
 		m0.m_len = 4;
 		m0.m_data = (char *)&af;

@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.103 2003/03/28 09:55:54 suz Exp $	*/
+/*	$KAME: if_gif.c,v 1.104 2003/05/01 08:03:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -541,6 +541,7 @@ gif_input(m, af, ifp)
 		struct mbuf m0;
 		u_int32_t af1 = af;
 		
+		m0.m_flags = 0;
 		m0.m_next = m;
 		m0.m_len = 4;
 		m0.m_data = (char *)&af1;
