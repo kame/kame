@@ -2,11 +2,11 @@
 # Date created:		So  31 Mai 1998 11:00:30 CEST
 # Whom:			Andreas Klemm <andreas@klemm.gtn.com>
 #
-# $KAME: Makefile,v 1.11 2000/06/25 10:58:52 sumikawa Exp $
+# $KAME: Makefile,v 1.12 2000/08/18 05:48:32 sumikawa Exp $
 #
 
 PORTNAME=	zebra
-PORTVERSION=	0.87
+PORTVERSION=	0.88
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.zebra.org/pub/zebra/
 # you might need debugging, it's a developer release !
