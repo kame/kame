@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.358 2003/10/17 04:07:56 suz Exp $
+	$KAME: IMPLEMENTATION,v 1.359 2003/10/22 09:19:08 suz Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -261,8 +261,6 @@ draft-vida-mld-v2-05.txt: Multicast Listener Discovery Version 2 (MLDv2) for IPv
 draft-ietf-idmr-msf-api-03.txt: Socket Interface Extensions for Multicast Source Filters
     * IPv4 works for kame/freebsd4, kame/netbsd, and kame/openbsd.
     * IPv6 works for kame/freebsd4, kame/netbsd, and kame/openbsd.
-draft-ietf-ngtrans-isatap-08.txt: Intra-Site Automatic Tunnel Addressing Protocol (ISATAP)
-    * Working for freebsd4, netbsd, and openbsd, and bsdi4.
 
 1.2 Neighbor Discovery
 
