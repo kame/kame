@@ -1,7 +1,9 @@
+/*	$KAME: in6_pcb.h,v 1.4 2000/03/29 20:03:29 sumikawa Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -63,12 +65,12 @@
  */
 
 #ifndef _NETINET6_IN6_PCB_H_
-#define _NETINET6_IN6_PCB_H_
+#define	_NETINET6_IN6_PCB_H_
 
 #ifdef KERNEL
-#define satosin6(sa)	((struct sockaddr_in6 *)(sa))
-#define sin6tosa(sin6)	((struct sockaddr *)(sin6))
-#define ifatoia6(ifa)	((struct in6_ifaddr *)(ifa))
+#define	satosin6(sa)	((struct sockaddr_in6 *)(sa))
+#define	sin6tosa(sin6)	((struct sockaddr *)(sin6))
+#define	ifatoia6(ifa)	((struct in6_ifaddr *)(ifa))
 
 void	in6_losing __P((struct inpcb *));
 int	in6_pcballoc __P((struct socket *, struct inpcbinfo *, struct proc *));
@@ -78,7 +80,7 @@ void	in6_pcbdetach __P((struct inpcb *));
 void	in6_pcbdisconnect __P((struct inpcb *));
 int	in6_pcbladdr __P((struct inpcb *, struct sockaddr *,
 			  struct in6_addr **));
-struct inpcb *
+struct	inpcb *
 	in6_pcblookup_local __P((struct inpcbinfo *,
 				 struct in6_addr *, u_int, int));
 struct	inpcb *
@@ -93,11 +95,12 @@ int	in6_setpeeraddr __P((struct socket *so, struct sockaddr **nam));
 int	in6_setsockaddr __P((struct socket *so, struct sockaddr **nam));
 int	in6_mapped_sockaddr __P((struct socket *so, struct sockaddr **nam));
 int	in6_mapped_peeraddr __P((struct socket *so, struct sockaddr **nam));
-struct 	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
+struct	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
 				     struct ip6_pktopts *,
 				     struct ip6_moptions *,
 				     struct route_in6 *,
 				     struct in6_addr *, int *));
+int	in6_selecthlim __P((struct inpcb *, struct ifnet *));
 
 void	init_sin6 __P((struct sockaddr_in6 *sin6, struct mbuf *m));
 #endif /* KERNEL */
