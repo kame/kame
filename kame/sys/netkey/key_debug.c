@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.36 2003/06/27 06:46:01 itojun Exp $	*/
+/*	$KAME: key_debug.c,v 1.37 2003/07/12 09:51:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,7 +80,9 @@ static void kdebug_sadb_sa __P((struct sadb_ext *));
 static void kdebug_sadb_address __P((struct sadb_ext *));
 static void kdebug_sadb_key __P((struct sadb_ext *));
 static void kdebug_sadb_x_sa2 __P((struct sadb_ext *));
+#ifdef SADB_X_EXT_TAG
 static void kdebug_sadb_x_tag __P((struct sadb_ext *));
+#endif
 
 #ifdef _KERNEL
 static void kdebug_secreplay __P((struct secreplay *));
@@ -166,7 +168,9 @@ kdebug_sadb_ext_typestr(type)
 		TYPESTR(X_EXT_KMPRIVATE),
 		TYPESTR(X_EXT_POLICY),
 		TYPESTR(X_EXT_SA2),
+#ifdef SADB_X_EXT_TAG
 		TYPESTR(X_EXT_TAG),
+#endif
 		{ NULL }
 	};
 
@@ -252,9 +256,11 @@ kdebug_sadb(base)
 		case SADB_X_EXT_SA2:
 			kdebug_sadb_x_sa2(ext);
 			break;
+#ifdef SADB_X_EXT_TAG
 		case SADB_X_EXT_TAG:
 			kdebug_sadb_x_tag(ext);
 			break;
+#endif
 		default:
 			printf("kdebug_sadb: invalid ext_type %u was passed.\n",
 			    ext->sadb_ext_type);
@@ -495,6 +501,7 @@ kdebug_sadb_x_sa2(ext)
 	return;
 }
 
+#ifdef SADB_X_EXT_TAG
 static void
 kdebug_sadb_x_tag(ext)
 	struct sadb_ext *ext;
@@ -509,6 +516,7 @@ kdebug_sadb_x_tag(ext)
 
 	return;
 }
+#endif
 
 void
 kdebug_sadb_x_policy(ext)
