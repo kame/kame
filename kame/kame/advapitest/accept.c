@@ -1,4 +1,4 @@
-/*	$KAME: accept.c,v 1.20 2001/09/18 10:59:18 jinmei Exp $ */
+/*	$KAME: accept.c,v 1.21 2003/09/21 08:00:57 jinmei Exp $ */
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -49,7 +49,7 @@
 
 static u_char *rcvmsgbuf;
 static int rcvmsglen; 
-int aflag, dflag, Dflag, hflag, iflag, lflag, rflag, uflag; 
+int aflag, dflag, Dflag, hflag, iflag, lflag, rflag, uflag, tflag; 
 
 void usage __P((void));
 
@@ -99,6 +99,9 @@ main(argc, argv)
 			break;
 		case 'u':
 			uflag++;
+			break;
+		case 't':
+			tflag++;
 			break;
 		default:
 			usage();
@@ -208,6 +211,12 @@ main(argc, argv)
 	if ((aflag || rflag) &&
 	    setsockopt(s, IPPROTO_IPV6, IPV6_RECVRTHDR, &on, sizeof(on)) < 0)
 		err(1, "setsockopt(IPV6_RECVRTHDR)");
+#endif
+	/* specify to show received traffic class */
+#ifdef IPV6_RECVTCLASS
+	if ((aflag || tflag) &&
+	    setsockopt(s, IPPROTO_IPV6, IPV6_RECVTCLASS, &on, sizeof(on)) < 0)
+		err(1, "setsockopt(IPV6_RECVTCLASS)");
 #endif
 
 	if (bind(s, res->ai_addr, res->ai_addrlen) < 0)

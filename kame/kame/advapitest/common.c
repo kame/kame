@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.17 2002/07/30 04:42:42 jinmei Exp $ */
+/*	$KAME: common.c,v 1.18 2003/09/21 08:00:58 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -411,6 +411,15 @@ print_options(mh)
 		case IPV6_HOPLIMIT:
 			if (cm->cmsg_len == CMSG_LEN(sizeof(int))) {
 				printf("  Hoplimit = %d\n",
+				       *(int *)CMSG_DATA(cm));
+			}
+			break;
+#endif
+
+#ifdef IPV6_TCLASS
+		case IPV6_TCLASS:
+			if (cm->cmsg_len == CMSG_LEN(sizeof(int))) {
+				printf("  Traffic Class = %d\n",
 				       *(int *)CMSG_DATA(cm));
 			}
 			break;
