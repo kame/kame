@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.161 2002/05/27 02:45:43 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.162 2002/05/27 04:21:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1125,7 +1125,7 @@ in6_get_tmpifid(ifp, retbuf, baseid, generate)
 	int generate;
 {
 	u_int8_t nullbuf[8];
-	struct nd_ifinfo *ndi = NDI(ifp);
+	struct nd_ifinfo *ndi = ND_IFINFO(ifp);
 
 	bzero(nullbuf, sizeof(nullbuf));
 	if (bcmp(ndi->randomid, nullbuf, sizeof(nullbuf)) == 0) {
@@ -1185,11 +1185,7 @@ in6_tmpaddrtimer(ignored_arg)
 	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list))
 #endif
 	{
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
-		ndi = NDI(ifp);
-#else
-		ndi = NDI(ifp);
-#endif
+		ndi = ND_IFINFO(ifp);
 		if (bcmp(ndi->randomid, nullbuf, sizeof(nullbuf)) != 0) {
 			/*
 			 * We've been generating a random ID on this interface.

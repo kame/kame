@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.305 2002/05/26 23:07:52 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.306 2002/05/27 04:21:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2606,10 +2606,10 @@ icmp6_reflect(m, off)
 	ip6->ip6_vfc |= IPV6_VERSION;
 	ip6->ip6_nxt = IPPROTO_ICMPV6;
 	if (outif)
-		ip6->ip6_hlim = NDI(outif)->chlim;
+		ip6->ip6_hlim = ND_IFINFO(outif)->chlim;
 	else if (m->m_pkthdr.rcvif) {
 		/* XXX: This may not be the outgoing interface */
-		ip6->ip6_hlim = NDI(m->m_pkthdr.rcvif)->chlim;
+		ip6->ip6_hlim = ND_IFINFO(m->m_pkthdr.rcvif)->chlim;
 	} else
 		ip6->ip6_hlim = ip6_defhlim;
 

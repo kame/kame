@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.257 2002/05/27 03:21:48 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.258 2002/05/27 04:21:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -502,7 +502,7 @@ nd6_timer(ignored_arg)
 			ln = next;
 			continue;
 		}
-		ndi = NDI(ifp);
+		ndi = ND_IFINFO(ifp);
 		dst = (struct sockaddr_in6 *)rt_key(rt);
 
 		if (ln->ln_expire > time_second) {
@@ -524,7 +524,7 @@ nd6_timer(ignored_arg)
 			if (ln->ln_asked < nd6_mmaxtries) {
 				ln->ln_asked++;
 				ln->ln_expire = time_second +
-					ND6_RETRANS_SEC(NDI(ifp)->retrans);
+				    ND6_RETRANS_SEC(ND_IFINFO(ifp)->retrans);
 				nd6_ns_output(ifp, NULL, dst, ln, 0);
 			} else {
 				struct mbuf *m = ln->ln_hold;
@@ -575,7 +575,7 @@ nd6_timer(ignored_arg)
 			if (ln->ln_asked < nd6_umaxtries) {
 				ln->ln_asked++;
 				ln->ln_expire = time_second +
-					ND6_RETRANS_SEC(NDI(ifp)->retrans);
+				    ND6_RETRANS_SEC(ND_IFINFO(ifp)->retrans);
 				nd6_ns_output(ifp, dst, dst, ln, 0);
 			} else {
 				next = nd6_free(rt, 0);
@@ -1194,7 +1194,7 @@ nd6_nud_hint(rt, dst6, force)
 
 	ln->ln_state = ND6_LLINFO_REACHABLE;
 	if (ln->ln_expire)
-		ln->ln_expire = time_second + NDI(rt->rt_ifp)->reachable;
+		ln->ln_expire = time_second + ND_IFINFO(rt->rt_ifp)->reachable;
 }
 
 void
@@ -1649,20 +1649,20 @@ nd6_ioctl(cmd, data, ifp)
 	case OSIOCGIFINFO_IN6:
 		/* XXX: old ndp(8) assumes a positive value for linkmtu. */
 		ndi->ndi.linkmtu = IN6_LINKMTU(ifp);
-		ndi->ndi.maxmtu = NDI(ifp)->maxmtu;
-		ndi->ndi.basereachable = NDI(ifp)->basereachable;
-		ndi->ndi.reachable = NDI(ifp)->reachable;
-		ndi->ndi.retrans = NDI(ifp)->retrans;
-		ndi->ndi.flags = NDI(ifp)->flags;
-		ndi->ndi.recalctm = NDI(ifp)->recalctm;
-		ndi->ndi.chlim = NDI(ifp)->chlim;
-		ndi->ndi.receivedra = NDI(ifp)->receivedra;
+		ndi->ndi.maxmtu = ND_IFINFO(ifp)->maxmtu;
+		ndi->ndi.basereachable = ND_IFINFO(ifp)->basereachable;
+		ndi->ndi.reachable = ND_IFINFO(ifp)->reachable;
+		ndi->ndi.retrans = ND_IFINFO(ifp)->retrans;
+		ndi->ndi.flags = ND_IFINFO(ifp)->flags;
+		ndi->ndi.recalctm = ND_IFINFO(ifp)->recalctm;
+		ndi->ndi.chlim = ND_IFINFO(ifp)->chlim;
+		ndi->ndi.receivedra = ND_IFINFO(ifp)->receivedra;
 		break;
 	case SIOCGIFINFO_IN6:
-		ndi->ndi = *NDI(ifp);
+		ndi->ndi = *ND_IFINFO(ifp);
 		break;
 	case SIOCSIFINFO_FLAGS:
-		NDI(ifp)->flags = ndi->ndi.flags;
+		ND_IFINFO(ifp)->flags = ndi->ndi.flags;
 		break;
 	case SIOCSNDFLUSH_IN6:	/* XXX: the ioctl name is confusing... */
 		/* sync kernel routing table with the default router list */
@@ -2034,11 +2034,7 @@ nd6_slowtimo(ignored_arg)
 	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list))
 #endif
 	{
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
-		nd6if = NDI(ifp);
-#else
-		nd6if = NDI(ifp);
-#endif
+		nd6if = ND_IFINFO(ifp);
 		if (nd6if->basereachable && /* already initialized */
 		    (nd6if->recalctm -= ND6_SLOWTIMER_INTERVAL) <= 0) {
 			/*
@@ -2178,7 +2174,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	}
 	if (!ln || !rt) {
 		if ((ifp->if_flags & IFF_POINTOPOINT) == 0 &&
-		    !(NDI(ifp)->flags & ND6_IFF_PERFORMNUD)) {
+		    !(ND_IFINFO(ifp)->flags & ND6_IFF_PERFORMNUD)) {
 			log(LOG_DEBUG,
 			    "nd6_output: can't allocate llinfo for %s "
 			    "(ln=%p, rt=%p)\n",
@@ -2240,7 +2236,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	if (ln->ln_expire && ln->ln_asked == 0) {
 		ln->ln_asked++;
 		ln->ln_expire = time_second +
-			ND6_RETRANS_SEC(NDI(ifp)->retrans);
+			ND6_RETRANS_SEC(ND_IFINFO(ifp)->retrans);
 		nd6_ns_output(ifp, NULL, dst, ln, 0);
 	}
 	return(0);

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.88 2002/05/26 23:21:53 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.89 2002/05/27 04:21:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -101,11 +101,11 @@ struct nd_ifinfo {
 #define ND6_IFF_PREFER_SOURCE	0x4 /* XXX: not related to ND. */
 
 #ifdef _KERNEL
-#define NDI(ifp) \
+#define ND_IFINFO(ifp) \
 	(((struct in6_ifextra *)(ifp)->if_afdata[AF_INET6])->nd_ifinfo)
 #define IN6_LINKMTU(ifp) \
-	((NDI(ifp)->linkmtu && NDI(ifp)->linkmtu < (ifp)->if_mtu) \
-		? NDI(ifp)->linkmtu : (ifp)->if_mtu)
+	((ND_IFINFO(ifp)->linkmtu && ND_IFINFO(ifp)->linkmtu < (ifp)->if_mtu) \
+		? ND_IFINFO(ifp)->linkmtu : (ifp)->if_mtu)
 #endif
 
 struct in6_nbrinfo {
