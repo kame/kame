@@ -508,14 +508,14 @@ main(argc, argv)
 #endif 
 
 	/* specify to tell value of hoplimit field of received IP6 hdr */
-#ifdef IPV6_RECVPKTINFO
-	if (setsockopt(rcvsock, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
+#ifdef IPV6_RECVHOPLIMIT
+	if (setsockopt(rcvsock, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on,
 		       sizeof(on)) < 0)
-		err(1, "setsockopt(IPV6_RECVPKTINFO)");
+		err(1, "setsockopt(IPV6_RECVHOPLIMIT)");
 #else  /* old adv. API */
-	if (setsockopt(rcvsock, IPPROTO_IPV6, IPV6_PKTINFO, &on,
+	if (setsockopt(rcvsock, IPPROTO_IPV6, IPV6_HOPLIMIT, &on,
 		       sizeof(on)) < 0)
-		err(1, "setsockopt(IPV6_PKTINFO)");
+		err(1, "setsockopt(IPV6_HOPLIMIT)");
 #endif 
 
 	if (options & SO_DEBUG)
