@@ -26,7 +26,7 @@ MASTER_SITES=   http://www.apache.org/dist/ \
 		ftp://apache.nextpath.com/pub/apache/dist/
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	apache-1.3.12-v6-20000516.diff.gz
+PATCHFILES=	apache-1.3.12-v6-20000518.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@kame.net
