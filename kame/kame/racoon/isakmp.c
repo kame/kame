@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.49 2000/02/07 18:02:11 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.50 2000/02/16 13:44:16 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -959,6 +959,7 @@ isakmp_open()
 {
 	int tmp = 1;
 	struct myaddrs *p;
+	int error = 0;
 
 	for (p = lcconf->myaddrs; p; p = p->next) {
 		if (!p->addr)
@@ -982,22 +983,20 @@ isakmp_open()
 			plog(logp, LOCATION, NULL,
 				"unsupported address family %d\n",
 				lcconf->default_af);
-			return -1;
+			goto err_and_next;
 		}
 
 		if ((p->sock = socket(p->addr->sa_family, SOCK_DGRAM, 0)) < 0) {
 			plog(logp, LOCATION, NULL,
 				"socket (%s)\n", strerror(errno));
-			free(p->addr);
-			p->addr = NULL;
-			continue;
+			goto err_and_next;
 		}
 
 		if (setsockopt(p->sock, SOL_SOCKET, SO_REUSEPORT,
 		               (void *)&tmp, sizeof(tmp)) < 0) {
 			plog(logp, LOCATION, NULL,
 				"setsockopt (%s)\n", strerror(errno));
-			return -1;
+			goto err_and_next;
 		}
 
 		/* receive my interface address on inbound packets. */
@@ -1007,7 +1006,7 @@ isakmp_open()
 					(void *)&tmp, sizeof(tmp)) < 0) {
 				plog(logp, LOCATION, NULL,
 					"setsockopt (%s)\n", strerror(errno));
-				return -1;
+				goto err_and_next;
 			}
 			break;
 #ifdef INET6
@@ -1027,35 +1026,36 @@ isakmp_open()
 			{
 				plog(logp, LOCATION, NULL,
 					"setsockopt (%s)\n", strerror(errno));
-				return -1;
+				goto err_and_next;
 			}
 			break;
 #endif
 		}
 
 		if (setsockopt_bypass(p->sock, p->addr->sa_family) < 0)
-			return -1;
+			goto err_and_next;
 
-		YIPSDEBUG(DEBUG_INFO,
-			plog(logp, LOCATION, p->addr,
-				"opened.\n"));
 		if (bind(p->sock, p->addr, p->addr->sa_len) < 0) {
-			plog(logp, LOCATION, NULL,
-				"bind (%s)\n", strerror(errno));
+			plog(logp, LOCATION, p->addr,
+				"failed to bind (%s).\n", strerror(errno));
 			close(p->sock);
-			free(p->addr);
-			p->addr = NULL;
-			continue;
+			goto err_and_next;
 		}
 
-	    {
 		YIPSDEBUG(DEBUG_INFO,
 			plog(logp, LOCATION, p->addr,
 				"used as isakmp port (fd=%d).\n", p->sock));
-	    }
+
+		continue;
+
+	err_and_next:
+		free(p->addr);
+		p->addr = NULL;
+		error = -1;
+		continue;
 	}
 
-	return 0;
+	return error;
 }
 
 void
