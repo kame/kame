@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.12 2002/09/03 19:53:04 jmallett Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.61 2003/02/07 10:03:49 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.62 2003/02/18 04:29:28 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -326,7 +326,8 @@ udp6_input(mp, offp, proto)
 			/*
 			 * Receive multicast data which fits MSF condition.
 			 */
-			im6o = in6p->in6p_moptions;
+			if ((im6o = in6p->in6p_moptions) == NULL)
+				continue;
 			bzero(&src_h, sizeof(src_h));
 			src_h.sin6_family = AF_INET6;
 			src_h.sin6_len = sizeof(src_h);

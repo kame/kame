@@ -578,6 +578,8 @@ udp_input(struct mbuf *m, ...)
 #ifdef MLDV2
 			if (ip6) {
 				im6o = inp->in6p_moptions;
+				if (im6o == NULL)
+					continue;
 				goto scan_ipv6;
 			}
 #endif
@@ -588,6 +590,8 @@ udp_input(struct mbuf *m, ...)
 #endif
 #ifdef IGMPV3
 			imo = inp->inp_moptions;
+			if (imo == NULL)
+				continue;
 			goto scan_ipv4;
 
 scan_ipv4:

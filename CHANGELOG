@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2347 2003/02/14 12:24:38 t-momose Exp $
+$KAME: CHANGELOG,v 1.2348 2003/02/18 04:29:29 suz Exp $
 
 <200302>
+Tue Feb 18 12:19:53 JST 2003	suz@crl.hitachi.co.jp
+	* {freebsd4,freebsd5,netbsd,openbsd}/sys/netinet/udp_usrreq.c
+	  {freebsd4,freebsd5,kame}/sys/netinet6/udp6_usrreq.c:
+	  fixed an IGMPv3 or MLDv2 kernel crash by a UDP multicast packet to 
+	  addr:port, when some application joins to the addr and another 
+	  application listens to the UDP port by unicast.
+
+	  Reported by: Hitoshi Asaeda <Hitoshi.Asaeda@sophia.inria.fr>
+
 2003-02-14  MOMOSE Tsuyoshi  <t-momose@netlab.nec.co.jp>
 	*  kame/kame/sys/netinet6/{mobility6.c,mip6_pktproc.c},
 	   kame/kame/sys/netinet/ip6.h

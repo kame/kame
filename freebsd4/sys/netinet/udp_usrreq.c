@@ -382,7 +382,8 @@ udp_input(m, off)
 			if (!IN_MULTICAST(ntohl(ip->ip_dst.s_addr)))
 				continue;
 			
-			imo = inp->inp_moptions;
+			if ((imo = inp->inp_moptions) == NULL)
+				continue;
 			bzero(&src, sizeof(src));
 			src.sin_family = AF_INET;
 			src.sin_len = sizeof(src);

@@ -717,7 +717,8 @@ udp4_realinput(src, dst, m, off)
 			if (!IN_MULTICAST(dst4->s_addr))
 				goto bypass_msf_condition_check;
 			
-			imo = inp->inp_moptions;
+			if ((imo = inp->inp_moptions) == NULL)
+				continue;
 			for (i = 0; i < imo->imo_num_memberships; i++) {
 				if (imo->imo_membership[i]->inm_addr.s_addr
 				    != dst4->s_addr)
