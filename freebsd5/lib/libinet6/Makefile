@@ -10,7 +10,8 @@ CFLAGS+=-DINET6 -DUSE_GETIPNODEBY -DHAVE_SOCKADDR_SA_LEN \
 	-DHAVE_IF_NAMEINDEX -DFILTER_V4MAPPED -DHAVE_SOCKLEN_T
 CFLAGS+=-DMIP6
 
-SRCS=	getaddrinfo.c getnameinfo.c vars.c rresvport_af.c rcmd.c
+#SRCS=	getaddrinfo.c
+SRCS=	getnameinfo.c vars.c rresvport_af.c rcmd.c
 SRCS+=	if_indextoname.c if_nameindex.c if_nametoindex.c
 SRCS+=	rthdr.c ip6opt.c
 SRCS+=	name6.c
