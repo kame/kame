@@ -32,11 +32,11 @@ CFLAGS=	-DINET6 -Wall
 .if (${OPSYS} != "BSD/OS")
 CFLAGS+=-Werror
 .endif
-TARGET=	scope6confing
+TARGET=	scope6config
 
 all: $(TARGET)
 
-scope6confing: 
+scope6config: 
 	$(CC) $(CFLAGS) -o $@  scope6config.c
 
 clean:
