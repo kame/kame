@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.661 2000/03/07 10:12:40 sakane Exp $
+$Id: CHANGELOG,v 1.662 2000/03/08 06:48:28 jinmei Exp $
 
 <200003>
+2000-03-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/getnameinfo.c (getnameinfo): tried to parse
+	IPv6 scoped addresses according to the new format
+	(<addr>%<scopeid>).
+	* kame/kame/libinet6/getnameinfo.c (ip6_parsenumeric): was added
+	for the above purpose.
+
 Tue Mar  7 19:10:21 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	- Fixed to check OpenSSL version number.  reported by
