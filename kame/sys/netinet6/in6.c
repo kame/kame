@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.168 2001/02/05 14:29:48 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.169 2001/02/05 14:33:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1005,11 +1005,12 @@ in6_update_ifa(ifp, ifra, ia)
 			    "when dstaddr is specified\n");
 			return(EINVAL);
 		}
-		/* lifetime consistency check */
-		lt = &ifra->ifra_lifetime;
-		if (lt->ia6t_vltime != ND6_INFINITE_LIFETIME
-		    && lt->ia6t_vltime + time_second < time_second)
-			return EINVAL;
+	}
+	/* lifetime consistency check */
+	lt = &ifra->ifra_lifetime;
+	if (lt->ia6t_vltime != ND6_INFINITE_LIFETIME
+	    && lt->ia6t_vltime + time_second < time_second) {
+		return EINVAL;
 	}
 	if (lt->ia6t_vltime == 0) {
 		/*
