@@ -79,12 +79,16 @@ struct socket;
 struct domain;
 struct proc;
 struct ip6_hdr;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 struct pr_usrreqs;
 #endif
 
 struct ip6protosw {
+#if defined(__FreeBSD__) && __FreeBSD__ < 3
+	short 	pr_type;		/* socket type used for */
+#else
 	int 	pr_type;		/* socket type used for */
+#endif
 	struct	domain *pr_domain;	/* domain protocol a member of */
 	short	pr_protocol;		/* protocol number */
 	short	pr_flags;		/* see below */
@@ -126,9 +130,7 @@ struct ip6protosw {
 	void	(*pr_drain)		/* flush any excess space possible */
 			__P((void));
 #ifdef __FreeBSD__
-#if __FreeBSD__ >= 3
 	struct  pr_usrreqs *pr_usrreqs;	/* supersedes pr_usrreq() */
-#endif
 #else
 	int	(*pr_sysctl)		/* sysctl for protocol */
 			__P((int *, u_int, void *, size_t *, void *, size_t));

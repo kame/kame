@@ -191,8 +191,6 @@ ip6_init()
 	 */
 	microtime(&tv);
 	ip6_flow_seq = random() ^ tv.tv_usec;
-	in6_iflladdr = malloc(i, M_IFADDR, M_WAITOK);
-	bzero(in6_iflladdr, i);
 
 #ifndef __FreeBSD__
 	ip6_init2((void *)0);

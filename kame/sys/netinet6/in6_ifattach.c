@@ -238,7 +238,7 @@ in6_ifattach(ifp, type, laddr, noloop)
 			if_name(ifp));
 		return;
 	}
-	    
+
 	/*
 	 * We have some arrays that should be indexed by if_index.
 	 * since if_index will grow dynamically, they should grow too.
@@ -284,6 +284,9 @@ in6_ifattach(ifp, type, laddr, noloop)
 			if (IN6_IS_ADDR_LINKLOCAL(&satosin6(ifa->ifa_addr)->sin6_addr))
 				return;
 		}
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+		ifap = &ifa->ifa_next;
+#endif
 	} else {
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 		ifap = &ifp->if_addrlist;
@@ -405,7 +408,6 @@ in6_ifattach(ifp, type, laddr, noloop)
 		  RTF_UP|rtflag,
 		  (struct rtentry **)0);
 	ia->ia_flags |= IFA_ROUTE;
-
 
 	if (type == IN6_IFT_P2P || type == IN6_IFT_P2P802) {
 		/*
