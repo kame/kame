@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.379 2003/06/27 04:53:04 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.380 2003/06/30 05:39:29 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -108,7 +108,7 @@
 #include "opt_inet.h"
 #include "opt_ipsec.h"
 #endif
-#if defined(__OpenBSD__) || defined(__NetBSD__)
+#if defined(__OpenBSD__) || defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 4)
 #include "pf.h"
 #else
 #define NPF 0

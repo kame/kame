@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.121 2003/06/27 04:53:04 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.122 2003/06/30 05:39:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -42,7 +42,7 @@
 #include "opt_inet.h"
 #include "opt_ipsec.h"
 #endif
-#if defined(__OpenBSD__) || defined(__NetBSD__)
+#if defined(__OpenBSD__) || defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 4)
 #include "pf.h"
 #else
 #define NPF 0
@@ -793,7 +793,7 @@ ip6_forward(m, srcrt)
 		}
 	}
 
-#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || (defined(__OpenBSD__) && NPF > 0)
+#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || NPF > 0
  senderr:
 #endif
 	if (mcopy == NULL)
