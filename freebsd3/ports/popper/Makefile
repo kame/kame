@@ -15,7 +15,7 @@ MASTER_SITES=	ftp://ftp.qualcomm.com/eudora/servers/unix/popper/ \
 DISTNAME=	${PORTNAME}${PORTVERSION}
 
 PATCH_SITES=	http://www.imasy.or.jp/~ume/ipv6/
-PATCHFILES=	qpopper3.1.2-ipv6-20001210.diff.gz
+PATCHFILES=	qpopper3.1.2-ipv6-20001214.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	sumikawa@kame.net
