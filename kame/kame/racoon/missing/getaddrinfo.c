@@ -402,7 +402,7 @@ getaddrinfo(hostname, servname, hints, res)
 	
 	/* hostname as numeric name */
 	for (i = 0; afdl[i].a_af; i++) {
-		if (inet_pton(afdl[i].a_af, hostname, pton)) {
+		if (inet_pton(afdl[i].a_af, hostname, pton) == 1) {
 			u_long v4a;
 			u_char pfx;
 
