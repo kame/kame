@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.28 2000/03/09 19:36:21 itojun Exp $	*/
+/*	$KAME: ah_core.c,v 1.29 2000/03/11 09:20:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -745,7 +745,6 @@ again:
 		/*
 		 * copy ip hdr, modify to fit the AH checksum rule,
 		 * then take a checksum.
-		 * XXX need to care about source routing... jesus.
 		 */
 		struct ip iphdr;
 		size_t hlen;
