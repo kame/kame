@@ -292,7 +292,6 @@ get_in6_addr(addr, sap)
 		return(-1);
 	}
 
-
 	for(; res; res = res->ai_next) {
 		if (res->ai_addr->sa_family == AF_INET6) {
 			memcpy(sap, res->ai_addr, sizeof(*sap));
