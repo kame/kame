@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.113 2001/07/27 08:42:10 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.114 2001/07/27 18:25:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -265,7 +265,6 @@ ipsec_checkpcbcache(m, pcbsp, dir)
 	int dir;
 {
 	struct secpolicyindex spidx;
-	struct timeval tv;
 
 	switch (dir) {
 	case IPSEC_DIR_INBOUND:
@@ -290,8 +289,7 @@ ipsec_checkpcbcache(m, pcbsp, dir)
 	if (!key_cmpspidx_withmask(&pcbsp->cache[dir]->spidx, &spidx))
 		return NULL;
 
-	microtime(&tv);
-	pcbsp->cache[dir]->lastused = tv.tv_sec;
+	pcbsp->cache[dir]->lastused = mono_time.tv_sec;
 	pcbsp->cache[dir]->refcnt++;
 	KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
 		printf("DP ipsec_checkpcbcache cause refcnt++:%d SP:%p\n",
@@ -305,7 +303,6 @@ ipsec_fillpcbcache(pcbsp, sp, dir)
 	struct secpolicy *sp;
 	int dir;
 {
-	struct timeval tv;
 
 	switch (dir) {
 	case IPSEC_DIR_INBOUND:
@@ -328,8 +325,7 @@ ipsec_fillpcbcache(pcbsp, sp, dir)
 			printf("DP ipsec_fillpcbcache cause refcnt++:%d SP:%p\n",
 			pcbsp->cache[dir]->refcnt, pcbsp->cache[dir]));
 	}
-	microtime(&tv);
-	pcbsp->cachetime[dir] = tv.tv_sec;
+	pcbsp->cachetime[dir] = mono_time.tv_sec;
 
 	return 0;
 }
@@ -352,10 +348,8 @@ ipsec_invalpcbcache(pcbsp)
 int
 ipsec_invalpcbcacheall()
 {
-	struct timeval tv;
 
-	microtime(&tv);
-	sp_cachetime = tv.tv_sec;
+	sp_cachetime = mono_time.tv_sec;
 	return 0;
 }
 
