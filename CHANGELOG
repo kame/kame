@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.955 2000/05/30 11:59:12 itojun Exp $
+$Id: CHANGELOG,v 1.956 2000/05/30 14:59:00 itojun Exp $
 
 <200005>
+Tue May 30 23:56:04 JST 2000  itojun@iiljab.net
+	* sys/netinet6/ip6_output.c: make scopeid handling consistent
+	  for multicast loopback case (ip6_mloopback).
+
 Tue May 30 20:54:23 JST 2000  itojun@iijlab.net
 	* libinet6/resolv/res_send.c: with #define MULTICASTQUERY6, allow
 	  multicast address into /etc/resolv.conf "nameserver" line.
