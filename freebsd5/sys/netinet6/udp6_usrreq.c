@@ -130,11 +130,10 @@ udp6_input(mp, offp, proto)
 	struct mbuf **mp;
 	int *offp, proto;
 {
-	struct mbuf *m = *mp;
+	struct mbuf *m = *mp, *opts;
 	register struct ip6_hdr *ip6;
 	register struct udphdr *uh;
 	register struct inpcb *in6p;
-	struct ip6_recvpktopts opts;
 	int off = *offp;
 	int plen, ulen;
 	struct sockaddr_in6 src, dst, fromsa, tosa;
@@ -145,7 +144,7 @@ udp6_input(mp, offp, proto)
 	struct sock_msf_source *msfsrc;
 #endif	
 
-	bzero(&opts, sizeof(opts));
+	opts = NULL;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 
@@ -289,14 +288,14 @@ udp6_input(mp, offp, proto)
 				m_adj(n, off + sizeof(struct udphdr)); \
 				if (sbappendaddr(&last->in6p_socket->so_rcv, \
 						(struct sockaddr *)&fromsa, \
-						n, opts.head) == 0) { \
+						n, opts) == 0) { \
 					m_freem(n); \
-					if (opts.head) \
-						m_freem(opts.head); \
+					if (opts) \
+						m_freem(opts); \
 					udpstat.udps_fullsock++; \
 				} else \
 					sorwakeup(last->in6p_socket); \
-				bzero(&opts, sizeof(opts)); \
+				opts = NULL; \
 			} \
 		} \
 		last = in6p; \
@@ -317,14 +316,14 @@ udp6_input(mp, offp, proto)
 			m_adj(n, off + sizeof(struct udphdr)); \
 			if (sbappendaddr(&last->in6p_socket->so_rcv, \
 					(struct sockaddr *)&fromsa, \
-					n, opts.head) == 0) { \
+					n, opts) == 0) { \
 				m_freem(n); \
-				if (opts.head) \
-					m_freem(opts.head); \
+				if (opts) \
+					m_freem(opts); \
 				udpstat.udps_fullsock++; \
 			} else { \
 				sorwakeup(last->in6p_socket); \
-				bzero(&opts, sizeof(opts)); \
+				opts = NULL; \
 			} \
 		} \
 		last = inp; \
@@ -445,14 +444,14 @@ udp6_input(mp, offp, proto)
 					m_adj(n, off + sizeof(struct udphdr));
 					if (sbappendaddr(&last->in6p_socket->so_rcv,
 							(struct sockaddr *)&fromsa,
-							n, opts.head) == 0) {
+							n, opts) == 0) {
 						m_freem(n);
-						if (opts.head)
-							m_freem(opts.head);
+						if (opts)
+							m_freem(opts);
 						udpstat.udps_fullsock++;
 					} else
 						sorwakeup(last->in6p_socket);
-					bzero(&opts, sizeof(opts));
+					opts = NULL;
 				}
 			}
 #endif /* !MLDV2 */
@@ -506,8 +505,7 @@ udp6_input(mp, offp, proto)
 
 		m_adj(m, off + sizeof(struct udphdr));
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
-				(struct sockaddr *)&fromsa,
-				m, opts.head) == 0) {
+				(struct sockaddr *)&fromsa, m, opts) == 0) {
 			udpstat.udps_fullsock++;
 			goto bad;
 		}
@@ -567,8 +565,7 @@ udp6_input(mp, offp, proto)
 		ip6_savecontrol(in6p, m, &opts);
 	m_adj(m, off + sizeof(struct udphdr));
 	if (sbappendaddr(&in6p->in6p_socket->so_rcv,
-			(struct sockaddr *)&fromsa,
-			m, opts.head) == 0) {
+			(struct sockaddr *)&fromsa, m, opts) == 0) {
 		udpstat.udps_fullsock++;
 		goto bad;
 	}
@@ -577,8 +574,8 @@ udp6_input(mp, offp, proto)
 bad:
 	if (m)
 		m_freem(m);
-	if (opts.head)
-		m_freem(opts.head);
+	if (opts)
+		m_freem(opts);
 	return IPPROTO_DONE;
 }
 

@@ -210,9 +210,6 @@ udp_input(m, off)
 	register struct udphdr *uh;
 	register struct inpcb *inp;
 	struct mbuf *opts = 0;
-#ifdef INET6
-	struct ip6_recvpktopts opts6;
-#endif 
 	int len;
 	struct ip save_ip;
 #ifdef IGMPV3
@@ -224,9 +221,6 @@ udp_input(m, off)
 #endif
 
 	udpstat.udps_ipackets++;
-#ifdef INET6
-	bzero(&opts6, sizeof(opts6));
-#endif
 
 	/*
 	 * Strip IP options, if any; should skip this,
@@ -604,11 +598,6 @@ udp_append(last, ip, n, off)
 {
 	struct sockaddr *append_sa;
 	struct mbuf *opts = 0;
-#ifdef INET6
-	struct ip6_recvpktopts opts6;
-
-	bzero(&opts6, sizeof(opts6));
-#endif
 
 #ifdef IPSEC
 	/* check AH/ESP integrity. */
@@ -639,7 +628,7 @@ udp_append(last, ip, n, off)
 
 			savedflags = last->inp_flags;
 			last->inp_flags &= ~INP_UNMAPPABLEOPTS;
- 			ip6_savecontrol(last, n, &opts6);
+ 			ip6_savecontrol(last, n, &opts);
 			last->inp_flags = savedflags;
 		} else
 #endif
@@ -652,7 +641,6 @@ udp_append(last, ip, n, off)
 			udp_in6.uin6_init_done = 1;
 		}
 		append_sa = (struct sockaddr *)&udp_in6.uin6_sin;
- 		opts = opts6.head;
 	} else
 #endif
 	append_sa = (struct sockaddr *)&udp_in;

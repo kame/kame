@@ -142,7 +142,7 @@ rip6_input(mp, offp, proto)
 	register struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	register struct inpcb *in6p;
 	struct inpcb *last = 0;
-	struct ip6_recvpktopts opts;
+	struct mbuf *opts = NULL;
 	struct sockaddr_in6 src, dst, fromsa;
 
 	rip6stat.rip6s_ipackets++;
@@ -170,8 +170,6 @@ rip6_input(mp, offp, proto)
 		m_freem(m);
 		return IPPROTO_DONE;
 	}
-
-	bzero(&opts, sizeof(opts));
 
 	LIST_FOREACH(in6p, &ripcb, inp_list) {
 		if ((in6p->in6p_vflag & INP_IPV6) == 0)
@@ -223,14 +221,14 @@ rip6_input(mp, offp, proto)
 				m_adj(n, *offp);
 				if (sbappendaddr(&last->in6p_socket->so_rcv,
 						(struct sockaddr *)&fromsa,
-						 n, opts.head) == 0) {
+						 n, opts) == 0) {
 					m_freem(n);
-					if (opts.head)
-						m_freem(opts.head);
+					if (opts)
+						m_freem(opts);
 					rip6stat.rip6s_fullsock++;
 				} else
 					sorwakeup(last->in6p_socket);
-				bzero(&opts, sizeof(opts));
+				opts = NULL;
 			}
 		}
 		last = in6p;
@@ -263,11 +261,10 @@ rip6_input(mp, offp, proto)
 		/* strip intermediate headers */
 		m_adj(m, *offp);
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
-				(struct sockaddr *)&fromsa, m,
-				 opts.head) == 0) {
+				(struct sockaddr *)&fromsa, m, opts) == 0) {
 			m_freem(m);
-			if (opts.head)
-				m_freem(opts.head);
+			if (opts)
+				m_freem(opts);
 			rip6stat.rip6s_fullsock++;
 		} else
 			sorwakeup(last->in6p_socket);
