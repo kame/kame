@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2564 2004/03/13 05:18:41 jinmei Exp $
+$KAME: CHANGELOG,v 1.2565 2004/03/14 10:39:14 jinmei Exp $
 
 <200403>
+2004-03-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/kern/uipc_syscalls.c (sockargs): allow more than
+	MLEN bytes for ancillary data to meet the requirement in Section
+	20.1 of RFC3542.  (Still not large enough though, because the new
+	upper limit is MCLBYTES).
+
 2004-03-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/mld6.c (mld_input): use a local sockaddr_in6
 	structure to match multicast addresses in order to handle
