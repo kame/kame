@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1618 2001/03/21 22:05:37 jinmei Exp $
+$KAME: CHANGELOG,v 1.1619 2001/03/21 23:07:36 sakane Exp $
 
 <200103>
+Thu Mar 22 08:06:30 JST 2001 sakane@ydc.co.jp
+	* racoon:
+	fixed to parse modp1536 of DH group. reported by <shigeru@iij.ad.jp>
+
 2001-03-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_cache_lladdr): set nd6_gctimer to
 	ln_expire just after the state transition to STALE.  This change
