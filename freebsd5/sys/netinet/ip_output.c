@@ -1917,9 +1917,11 @@ ip_multicast_if(a, ifindexp)
 		*ifindexp = 0;
 	if (ntohl(a->s_addr) >> 24 == 0) {
 		ifindex = ntohl(a->s_addr) & 0xffffff;
-		if (ifindex < 0 || if_index < ifindex)
+		if (ifindex < 0 || if_indexlim <= ifindex)
 			return NULL;
 		ifp = ifnet_byindex(ifindex);
+		if (!ifp)
+			return NULL;
 		if (ifindexp)
 			*ifindexp = ifindex;
 	} else {
@@ -2910,7 +2912,7 @@ in_getmopt_ifargs(sopt, ifp, ia_grp, index)
 	/*
 	 * If the interface is specified, validate it.
 	 */
-	if (index < 0 || if_index < index)
+	if (index < 0 || if_indexlim <= index || !ifnet_byindex(index))
 		return ENXIO;	/* XXX EINVAL? */
 
 	switch (optname) {

@@ -276,7 +276,7 @@ add_cluster(u_int16_t cluster_id, struct arpcom *ac)
 	/*
 	 * and finally update pointers in ifp2sc
 	 */
-	for (i = 0 ; i < if_index && i < BDG_MAX_PORTS; i++)
+	for (i = 0 ; i < if_indexlim && i < BDG_MAX_PORTS; i++)
 	    if (ifp2sc[i].cluster != NULL)
 		ifp2sc[i].cluster = c + (ifp2sc[i].cluster - clusters);
 	free(clusters, M_IFADDR);

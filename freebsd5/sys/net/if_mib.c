@@ -65,7 +65,7 @@ SYSCTL_DECL(_net_link_generic);
 SYSCTL_NODE(_net_link_generic, IFMIB_SYSTEM, system, CTLFLAG_RW, 0,
 	    "Variables global to all interfaces");
 SYSCTL_INT(_net_link_generic_system, IFMIB_IFCOUNT, ifcount, CTLFLAG_RD,
-	   &if_index, 0, "Number of configured interfaces");
+	   &if_indexlim, 0, "Number of configured interfaces");	/*XXX*/
 
 static int
 sysctl_ifdata(SYSCTL_HANDLER_ARGS) /* XXX bad syntax! */
@@ -80,7 +80,7 @@ sysctl_ifdata(SYSCTL_HANDLER_ARGS) /* XXX bad syntax! */
 	if (namelen != 2)
 		return EINVAL;
 
-	if (name[0] <= 0 || name[0] > if_index ||
+	if (name[0] <= 0 || name[0] >= if_indexlim ||
 	    ifaddr_byindex(name[0]) == NULL)
 		return ENOENT;
 
