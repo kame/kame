@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.19 2001/08/15 09:28:49 sakane Exp $
+$KAME: helsinki-result.jp,v 1.20 2001/08/15 09:48:02 itojun Exp $
 
 
 generic
@@ -19,6 +19,12 @@ generic
 	ためにbakeoffしているような気がしてきた。というか、ipsec自体SSH社の
 	利益のためのプロトコルじゃないかという気すらしてくる。複雑にすれば
 	するほどSSH社は儲かる... (conspiracy theory)
+
+	id payloadに対するpolicy database検索の見直し。anyの場合wildcardだと
+	思って検索すべき。
+
+	phase 2で、ipsec enc modeがついていなかったときの取り扱い
+	(transport modeと思ってよいのではないか)。
 
 
 latest isakmpd on KAME
@@ -149,6 +155,13 @@ Oullim information technologies SECUREWORKS VPN gateway 3.0
 >    (id: idtype=IPv4 protoid=0 port=0 len=4 130.233.9.166)
 >    (id: idtype=IPv4net protoid=0 port=0 len=8 192.168.10.0/255.255.255.0)
 
+	Wed Aug 15 18:39:11 JST 2001
+	IPv4, ESP, tunnel mode
+	phase 1 3DES + SHA1, group 2, lifetime = 10min
+	phase 2 AES, group 2, lifetime = 2min
+
+	IKE的には大丈夫。IPsec的にまだ駄目。
+
 
 Trilogy AdmitOne 2.6
 	Tue Aug 14 21:58:01 JST 2001
@@ -164,6 +177,37 @@ Trilogy AdmitOne 2.6
 
 	Trilogy側はIKE phase 2のkey lengthがbyte単位だと思っているらしく
 	negotiation失敗。修正後再挑戦。
+
+	Wed Aug 15 17:40:05 JST 2001
+	IPv4, ESP, transport mode
+	phase 1 3DES + SHA1, group 1, lifetime = 10min
+	phase 2 AES + SHA1, group 1, lifetime = 2min
+
+	再挑戦。こちらがinitiatorのときはうまくいく。あちらがinitiatorの
+	場合、id payloadにproto=icmpが埋まっており、こちらのkernel policy
+	proto=anyにmatchせずno policy foundになる。要修正。
+
+>spdadd 130.233.9.166 130.233.10.167 any -P out ipsec esp/transport//use;
+>spdadd 130.233.10.167 130.233.9.166 any -P in ipsec esp/transport//use;
+
+>35:45.215745 130.233.10.167:500 -> 130.233.9.166:500: isakmp 1.0 msgid dba05304: phase 2/others ? oakley-quick:
+>    (hash: len=20)
+>    (sa: doi=ipsec situation=identity
+>        (p: #1 protoid=ipsec-esp transform=1 spi=dba05304
+>            (t: #1 id=aes (type=lifetype value=sec)(type=life value=7080)(type=lifetype value=kb)(type=life value=2000)(type=
+>group desc value=modp768)(type=enc mode value=transport)(type=auth value=hmac-sha1)(type=keylen value=0080))))
+>    (nonce: n len=64)
+>    (ke: key len=96)
+>    (id: idtype=IPv4 protoid=icmp port=0 len=4 130.233.10.167)
+>    (id: idtype=IPv4 protoid=icmp port=0 len=4 130.233.9.166)
+
+>2001-08-15 17:35:45: DEBUG: isakmp_quick.c:1951:get_proposal_r(): get a src address from ID payload 130.233.10.167[0] prefixlen=32 ul_proto=1
+>2001-08-15 17:35:45: DEBUG: isakmp_quick.c:1956:get_proposal_r(): get dst address from ID payload 130.233.9.166[0] prefixlen=32 ul_proto=1
+>2001-08-15 17:35:45: DEBUG: policy.c:245:cmpspidxwild(): sub:0xbfbfd350: 130.233.10.167/32[0] 130.233.9.166/32[0] proto=icmp dir=in
+>2001-08-15 17:35:45: DEBUG: policy.c:246:cmpspidxwild(): db: 0x80ca408: 130.233.10.167/32[0] 130.233.9.166/32[0] proto=any dir=in
+>2001-08-15 17:35:45: DEBUG: policy.c:245:cmpspidxwild(): sub:0xbfbfd350: 130.233.10.167/32[0] 130.233.9.166/32[0] proto=icmp dir=in
+>2001-08-15 17:35:45: DEBUG: policy.c:246:cmpspidxwild(): db: 0x80ca808: 130.233.9.166/32[0] 130.233.10.167/32[0] proto=any dir=out
+>2001-08-15 17:35:45: ERROR: isakmp_quick.c:1979:get_proposal_r(): no policy found: 130.233.10.167/32[0] 130.233.9.166/32[0] proto=icmp dir=in
 
 
 ZyXEL
