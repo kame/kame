@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.12 2000/06/07 00:29:14 itojun Exp $	*/
+/*	$KAME: setkey.c,v 1.13 2000/06/08 21:55:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -49,6 +49,8 @@
 #include <unistd.h>
 #include <errno.h>
 #include <netdb.h>
+
+#include "libpfkey.h"
 
 void Usage __P((void));
 int main __P((int, char **));

@@ -4,6 +4,7 @@ LIBPFKEYDIR!=	cd ${.CURDIR}/../../lib/libpfkey; make print-objdir
 PROG=	setkey
 SRCS=	setkey.c parse.y token.l
 CFLAGS+=-g
+CPPFLAGS+=	-I${.CURDIR}/../../kame/libipsec
 LDADD+=	-ll -ly
 DPADD+=	${LIBL} ${LIBY}
 CLEANFILES+=	y.tab.c y.tab.h key_test.o keytest
