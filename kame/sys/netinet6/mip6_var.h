@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.16 2001/12/27 02:21:23 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.17 2002/01/17 01:16:43 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -111,18 +111,25 @@ struct mip6_bu {
 	struct in6_addr     mbu_haddr;      /* home address */
 	struct in6_addr     mbu_coa;        /* COA */
 	u_int32_t           mbu_lifetime;   /* BU lifetime */
+#if 0
 	int64_t             mbu_remain;     /* lifetime remain */
+#endif
+	time_t              mbu_expire;     /* expiration time of this BU. */
 	u_int32_t           mbu_refresh;    /* refresh frequency */
+#if 0
 	int64_t             mbu_refremain;  /* refresh time remain */
+#endif
+	time_t              mbu_refexpire;  /* expiration time of refresh. */
 	u_int32_t           mbu_acktimeout; /* current ack timo value */
+#if 0
 	int64_t             mbu_ackremain;  /* acklifetime remain */
+#endif
+	time_t              mbu_ackexpire;  /* expiration time of ack. */
 	MIP6_SEQNO_T        mbu_seqno;      /* sequence number */
 	u_int8_t            mbu_flags;      /* BU flags */
 	u_int8_t            mbu_state;
-	struct hif_softc    *mbu_hif;       /* back pointer to hif */
-	u_int8_t            mbu_dontsend;   /* peer doesn't support mip6 */
-	u_int8_t            mbu_coafallback; /* peer doesn't support HA DH */
 	u_int8_t            mbu_reg_state;  /* registration status */
+	struct hif_softc    *mbu_hif;       /* back pointer to hif */
 	const struct encaptab *mbu_encap;
 };
 #define MIP6_BU_REG_STATE_NOTREG       0x01
@@ -130,8 +137,10 @@ struct mip6_bu {
 #define MIP6_BU_REG_STATE_REG          0x03
 #define MIP6_BU_REG_STATE_DEREGWAITACK 0x04
 
-#define MIP6_BU_STATE_WAITSENT 0x01
-#define MIP6_BU_STATE_WAITACK  0x02
+#define MIP6_BU_STATE_WAITSENT    0x01
+#define MIP6_BU_STATE_WAITACK     0x02
+#define MIP6_BU_STATE_BUNOTSUPP   0x04
+#define MIP6_BU_STATE_MIP6NOTSUPP 0x80
 
 #define MIP6_BU_TIMEOUT_INTERVAL 1
 
@@ -147,7 +156,7 @@ struct mip6_bc {
 #endif /* MIP6_DRAFT13 */
 	MIP6_SEQNO_T          mbc_seqno;     /* recved BU seqno */
 	u_int32_t             mbc_lifetime;  /* recved BU lifetime */
-	int64_t               mbc_remain;    /* remaining lifetime */
+	time_t                mbc_expire;    /* expiration time of this BC. */
 	u_int8_t              mbc_state;     /* BC state */
 	struct ifnet          *mbc_ifp;      /* ifp that the BC belongs to. */
 	                                     /* valid only when BUF_HOME. */

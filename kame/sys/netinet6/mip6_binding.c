@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.59 2002/01/11 07:01:57 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.60 2002/01/17 01:16:42 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -229,6 +229,9 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 {
 	struct mip6_bu *mbu;
 	u_int32_t coa_lifetime;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	MALLOC(mbu, struct mip6_bu *, sizeof(struct mip6_bu),
 	       M_TEMP, M_NOWAIT);
@@ -258,11 +261,11 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 	} else {
 		mbu->mbu_lifetime = mpfx->mpfx_pltime;
 	}
-	mbu->mbu_remain = mbu->mbu_lifetime;
+	mbu->mbu_expire = time_second + mbu->mbu_lifetime;
 	mbu->mbu_refresh = mbu->mbu_lifetime;
-	mbu->mbu_refremain = mbu->mbu_refresh;
+	mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
 	mbu->mbu_acktimeout = MIP6_BA_INITIAL_TIMEOUT;
-	mbu->mbu_ackremain = mbu->mbu_acktimeout;
+	mbu->mbu_ackexpire = time_second + mbu->mbu_acktimeout;
 	mbu->mbu_flags = flags;
 	mbu->mbu_hif = sc;
 	/* *mbu->mbu_encap = NULL; */
@@ -400,6 +403,9 @@ mip6_home_registration(sc)
 		mip6_bu_list_insert(&sc->hif_bu_list, mbu);
 	} else {
 		int32_t coa_lifetime, prefix_lifetime;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+		long time_second = time.tv_sec;
+#endif
 
 		/* a binding update entry exists.  update information. */
 
@@ -423,14 +429,14 @@ mip6_home_registration(sc)
 		} else {
 			mbu->mbu_lifetime = prefix_lifetime;
 		}
-		mbu->mbu_remain = mbu->mbu_lifetime;
+		mbu->mbu_expire = time_second + mbu->mbu_lifetime;
 		mbu->mbu_refresh = mbu->mbu_lifetime;
-		mbu->mbu_refremain = mbu->mbu_refresh;
+		mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
 		mbu->mbu_acktimeout = MIP6_BA_INITIAL_TIMEOUT;
-		mbu->mbu_ackremain = mbu->mbu_acktimeout;
+		mbu->mbu_ackexpire = time_second + mbu->mbu_acktimeout;
 		/* mbu->mbu_flags |= IP6_BUF_DAD ;*/
 	}
-	mbu->mbu_state = MIP6_BU_STATE_WAITACK | MIP6_BU_STATE_WAITSENT;
+	mbu->mbu_state |= (MIP6_BU_STATE_WAITACK|MIP6_BU_STATE_WAITSENT);
 
 	/*
 	 * XXX
@@ -447,6 +453,9 @@ mip6_bu_list_notify_binding_change(sc)
 	struct mip6_prefix *mpfx;
 	struct mip6_bu *mbu, *mbu_next;
 	int32_t coa_lifetime;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	/* for each BU entry, update COA and make them about to send. */
 	for (mbu = LIST_FIRST(&sc->hif_bu_list);
@@ -479,9 +488,9 @@ mip6_bu_list_notify_binding_change(sc)
 		} else {
 			mbu->mbu_lifetime = mpfx->mpfx_pltime;
 		}
-		mbu->mbu_remain = mbu->mbu_lifetime;
+		mbu->mbu_expire = time_second + mbu->mbu_lifetime;
 		mbu->mbu_refresh = mbu->mbu_lifetime;
-		mbu->mbu_refremain = mbu->mbu_refresh;
+		mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
 		mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
 		mip6_bu_send_bu(mbu);
 	}
@@ -525,6 +534,9 @@ mip6_bu_timeout(arg)
 	int s;
 	struct hif_softc *sc;
 	int error = 0;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 #ifdef __NetBSD__
 	s = splsoftnet();
@@ -541,14 +553,8 @@ mip6_bu_timeout(arg)
 		     mbu != NULL; mbu = mbu_entry) {
 			mbu_entry = LIST_NEXT(mbu, mbu_entry);
 
-			/* count down timer values */
-			mbu->mbu_remain -= MIP6_BU_TIMEOUT_INTERVAL;
-			mbu->mbu_refremain -= MIP6_BU_TIMEOUT_INTERVAL;
-			if (mbu->mbu_state & MIP6_BU_STATE_WAITACK)
-				mbu->mbu_ackremain -= MIP6_BU_TIMEOUT_INTERVAL;
-
 			/* check expiration */
-			if (mbu->mbu_remain < 0) {
+			if (mbu->mbu_expire < time_second) {
 				if ((mbu->mbu_flags & IP6_BUF_HOME) != 0) {
 					/*
 					 * the binding update entry for
@@ -571,36 +577,39 @@ mip6_bu_timeout(arg)
 			}
 
 			/* check if the peer supports BU */
-			if (mbu->mbu_dontsend)
+			if ((mbu->mbu_state & MIP6_BU_STATE_BUNOTSUPP) != 0)
 				continue;
 
 #ifdef MIP6_ALLOW_COA_FALLBACK
 			/* check if the peer supports HA destopt */
-			if (mbu->mbu_coafallback)
+			if ((mbu->mbu_state & MIP6_BU_STATE_MIP6NOTSUPP) != 0)
 				continue;
 #endif
 
 			/* check ack status */
 			if ((mbu->mbu_flags & IP6_BUF_ACK)
-			    && (mbu->mbu_state & MIP6_BU_STATE_WAITACK)
-			    && (mbu->mbu_ackremain < 0)) {
+			    && ((mbu->mbu_state & MIP6_BU_STATE_WAITACK) != 0)
+			    && (mbu->mbu_ackexpire < time_second)) {
 				mbu->mbu_acktimeout *= 2;
 				if (mbu->mbu_acktimeout > MIP6_BA_MAX_TIMEOUT)
 					mbu->mbu_acktimeout
 						= MIP6_BA_MAX_TIMEOUT;
-				mbu->mbu_ackremain = mbu->mbu_acktimeout;
+				mbu->mbu_ackexpire
+					= time_second + mbu->mbu_acktimeout;
 				mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
 			}
 
 			/* refresh check */
-			if (mbu->mbu_refremain < 0) {
+			if (mbu->mbu_refexpire < time_second) {
 				/* refresh binding */
-				mbu->mbu_refremain = mbu->mbu_refresh;
+				mbu->mbu_refexpire
+					= time_second + mbu->mbu_refresh;
 				if (mbu->mbu_flags & IP6_BUF_ACK) {
 					mbu->mbu_acktimeout
 						= MIP6_BA_INITIAL_TIMEOUT;
-					mbu->mbu_ackremain
-						= mbu->mbu_acktimeout;
+					mbu->mbu_ackexpire
+						= time_second
+						+ mbu->mbu_acktimeout;
 					mbu->mbu_state
 						|= MIP6_BU_STATE_WAITACK;
 				}
@@ -608,7 +617,7 @@ mip6_bu_timeout(arg)
 			}
 
 			/* send pending BUs */
-			if (mbu->mbu_state & MIP6_BU_STATE_WAITSENT) {
+			if ((mbu->mbu_state & MIP6_BU_STATE_WAITSENT) != 0) {
 				if (mip6_bu_send_bu(mbu)) {
 					mip6log((LOG_ERR,
 						 "%s:%d: "
@@ -1030,6 +1039,9 @@ mip6_process_bu(m, opt)
 	MIP6_SEQNO_T seqno;
 	struct mip6_bc *mbc;
 	int error = 0;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	bu_opt = (struct ip6_opt_binding_update *)(opt);
@@ -1123,7 +1135,8 @@ mip6_process_bu(m, opt)
 #endif /* MIP6_DRAFT13 */
 				mbc->mbc_seqno = seqno;
 				mbc->mbc_lifetime = lifetime;
-				mbc->mbc_remain = mbc->mbc_lifetime;
+				mbc->mbc_expire
+					= time_second + mbc->mbc_lifetime;
 			}
 			
 			if (bu_opt->ip6ou_flags & IP6_BUF_ACK) {
@@ -1398,6 +1411,9 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 	struct mip6_bc *dad_mbc = NULL;
 	struct in6_addr lladdr = in6addr_any;
 	u_int32_t prlifetime;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	/* find the home ifp of this homeaddress. */
 	for(pr = nd_prefix.lh_first;
@@ -1512,7 +1528,7 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 #endif /* MIP6_DRAFT13 */
 			mbc->mbc_seqno = seqno;
 			mbc->mbc_lifetime = lifetime;
-			mbc->mbc_remain = mbc->mbc_lifetime;	
+			mbc->mbc_expire = time_second + mbc->mbc_lifetime;
 
 			/* modify encapsulation entry */
 			if (mip6_tunnel_control(MIP6_TUNNEL_CHANGE,
@@ -1589,7 +1605,8 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 #endif /* MIP6_DRAFT13 */
 				mbc->mbc_seqno = seqno;
 				mbc->mbc_lifetime = lifetime;
-				mbc->mbc_remain = mbc->mbc_lifetime;
+				mbc->mbc_expire
+					= time_second + mbc->mbc_lifetime;
 
 				if (IN6_IS_ADDR_LINKLOCAL(&haddr))
 					continue;
@@ -2053,24 +2070,20 @@ mip6_bu_print(mbu)
 		 "flags      0x%x\n"
 		 "state      0x%x\n"
 		 "hif        0x%p\n"
-		 "dontsend   %u\n"
-		 "coafb      %u\n"
 		 "reg_state  %u\n",
 		 ip6_sprintf(&mbu->mbu_paddr),
 		 ip6_sprintf(&mbu->mbu_haddr),
 		 ip6_sprintf(&mbu->mbu_coa),
 		 (u_long)mbu->mbu_lifetime,
-		 (long long)mbu->mbu_remain,
+		 (long long)mbu->mbu_expire,
 		 (u_long)mbu->mbu_refresh,
-		 (long long)mbu->mbu_refremain,
+		 (long long)mbu->mbu_refexpire,
 		 (u_long)mbu->mbu_acktimeout,
-		 (long long)mbu->mbu_ackremain,
+		 (long long)mbu->mbu_ackexpire,
 		 mbu->mbu_seqno,
 		 mbu->mbu_flags,
 		 mbu->mbu_state,
 		 mbu->mbu_hif,
-		 mbu->mbu_dontsend,
-		 mbu->mbu_coafallback,
 		 mbu->mbu_reg_state));
 
 }
@@ -2333,6 +2346,9 @@ mip6_process_ba(m, opt)
 	struct mip6_bu *mbu;
 	u_int32_t lifetime;
 	int error = 0;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	ba_opt = (struct ip6_opt_binding_ack *)opt;
@@ -2387,14 +2403,12 @@ success:
 	/* update lifetime and refresh time. */
 	GET_NETVAL_L(ba_opt->ip6oa_lifetime, lifetime);
 	if (lifetime < mbu->mbu_lifetime) {
-		int64_t remain;
-		remain = mbu->mbu_remain - (mbu->mbu_lifetime - lifetime);
-		if (remain < 0)
-			remain = 0;
-		mbu->mbu_remain = remain;
+		mbu->mbu_expire -= (mbu->mbu_lifetime - lifetime);
+		if (mbu->mbu_expire < time_second)
+			mbu->mbu_expire = time_second;
 	}
 	GET_NETVAL_L(ba_opt->ip6oa_refresh, mbu->mbu_refresh);
-	mbu->mbu_refremain = mbu->mbu_refresh;
+	mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
 
 	if (mbu->mbu_flags & IP6_BUF_HOME) {
 		/* this is from our home agent */
@@ -2734,6 +2748,7 @@ mip6_ba_authdata_calc(sav, src, dst, ba_opt, authdata, sumbuf)
 	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_type, 1);
 	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_len, 1);
 	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_status, 1);
+	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_reserved, 1);
 	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_seqno, 1);
 	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_lifetime[0], 4);
 	(algo->update)(&algos, (caddr_t)&ba_opt->ip6oa_refresh[0], 4);
@@ -2773,6 +2788,9 @@ mip6_process_br(m, opt)
 	struct mip6_bu *mbu;
 	struct mip6_prefix *mpfx;
 	int64_t haddr_remain, coa_remain, remain;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	br_opt = (struct ip6_opt_binding_request *)opt;
@@ -2803,7 +2821,7 @@ mip6_process_br(m, opt)
 	remain =  (haddr_remain < coa_remain)
 		? haddr_remain : coa_remain;
 	mbu->mbu_lifetime = (u_int32_t)remain;
-	mbu->mbu_remain = mbu->mbu_lifetime;
+	mbu->mbu_expire = time_second + mbu->mbu_lifetime;
 	mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
 
 	/*
@@ -2852,6 +2870,9 @@ mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
 #endif /* MIP6_DRAFT13 */
 {
 	struct mip6_bc *mbc;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	MALLOC(mbc, struct mip6_bc *, sizeof(struct mip6_bc),
 	       M_TEMP, M_NOWAIT);
@@ -2872,7 +2893,7 @@ mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
 #endif /* MIP6_DRAFT13 */
 	mbc->mbc_seqno = seqno;
 	mbc->mbc_lifetime = lifetime;
-	mbc->mbc_remain = mbc->mbc_lifetime;
+	mbc->mbc_expire = time_second + mbc->mbc_lifetime;
 	mbc->mbc_state = 0;
 	mbc->mbc_ifp = ifp;
 
@@ -2969,6 +2990,9 @@ mip6_bc_timeout(dummy)
 {
 	int s;
 	struct mip6_bc *mbc, *mbc_next;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 #ifdef __NetBSD__
 	s = splsoftnet();
@@ -2978,10 +3002,9 @@ mip6_bc_timeout(dummy)
 
 	for (mbc = LIST_FIRST(&mip6_bc_list); mbc; mbc = mbc_next) {
 		mbc_next = LIST_NEXT(mbc, mbc_entry);
-		mbc->mbc_remain -= MIP6_BC_TIMEOUT_INTERVAL;
 
 		/* expiration check */
-		if (mbc->mbc_remain < 0) {
+		if (mbc->mbc_expire < time_second) {
 			mip6_bc_list_remove(&mip6_bc_list, mbc);
 		}
 
@@ -2989,7 +3012,8 @@ mip6_bc_timeout(dummy)
 		   piggybacked before */
 
 		/* XXX set BR_WAITSENT when BC is going to expire */
-		if (mbc->mbc_remain < (mbc->mbc_lifetime / 4)) { /* XXX */
+		if ((mbc->mbc_expire - time_second)
+		    < (mbc->mbc_lifetime / 4)) { /* XXX */
 			mbc->mbc_state |= MIP6_BC_STATE_BR_WAITSENT;
 		}
 
@@ -3481,10 +3505,13 @@ mip6_route_optimize(m)
 			error = ENOMEM;
 			goto bad;
 		}
-		mbu->mbu_state = MIP6_BU_STATE_WAITSENT;
+		mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
 
 		mip6_bu_list_insert(&sc->hif_bu_list, mbu);
 	} else {
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+		long time_second = time.tv_sec;
+#endif
 		/*
 		 * found a binding update entry.  we should resend a
 		 * binding update to this peer because he is not add
@@ -3497,10 +3524,10 @@ mip6_route_optimize(m)
 		} else {
 			mbu->mbu_lifetime = mpfx->mpfx_pltime;
 		}
-		mbu->mbu_remain = mbu->mbu_lifetime;
+		mbu->mbu_expire = time_second + mbu->mbu_lifetime;
 		mbu->mbu_refresh = mbu->mbu_lifetime;
-		mbu->mbu_refremain = mbu->mbu_refresh;
-		mbu->mbu_state = MIP6_BU_STATE_WAITSENT;
+		mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
+		mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
 	}
 
 	return (0);

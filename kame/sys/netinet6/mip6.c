@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.101 2002/01/11 07:01:56 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.102 2002/01/17 01:16:42 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1529,6 +1529,9 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 	struct mip6_bu *mbu;
 	struct mip6_bu *hrmbu;
 	int error = 0;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	/*
 	 * do not send a binding update destination option to the
@@ -1564,7 +1567,7 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 				 __FILE__, __LINE__));
 			return (0);
 		}
-		mbu->mbu_state = MIP6_BU_STATE_WAITSENT;
+		mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
 		mip6_bu_list_insert(&sc->hif_bu_list, mbu);
 	}
 	if (mbu == NULL) {
@@ -1575,9 +1578,9 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		 */
 		return (0);
 	}
-	if (mbu->mbu_dontsend) {
+	if ((mbu->mbu_flags & MIP6_BU_STATE_BUNOTSUPP) != 0) {
 		/*
-		 * mbu_dontsend is set when we receive
+		 * MIP6_BU_STATE_NOBUSUPPORT is set when we receive
 		 * ICMP6_PARAM_PROB against the binding update sent
 		 * before.  this means the peer doesn't support MIP6
 		 * (at least the BU destopt).  we should not send any
@@ -1597,7 +1600,7 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		mip6_icmp6_ha_discov_req_output(sc);
 		return (0);
 	}
-	if (!(mbu->mbu_state & MIP6_BU_STATE_WAITSENT)) {
+	if ((mbu->mbu_state & MIP6_BU_STATE_WAITSENT) == 0) {
 		/* no need to send */
 		return (0);
 	}
@@ -1619,6 +1622,8 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 	{
 		/* no security association. */
 		mbu->mbu_state &= ~MIP6_BU_STATE_WAITSENT; /* XXX */
+		mbu->mbu_state &= ~MIP6_BU_STATE_WAITACK; /* XXX */
+		mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP; /* XXX */
 		error = EACCES;
 		goto freesp;
 	}
@@ -1648,9 +1653,9 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		bcopy((caddr_t)&lifetime, (caddr_t)bu_opt.ip6ou_lifetime,
 		      sizeof(lifetime));
 		mbu->mbu_lifetime = lifetime;
-		mbu->mbu_remain = lifetime;
+		mbu->mbu_expire = time_second + lifetime;
 		mbu->mbu_refresh = mbu->mbu_lifetime;
-		mbu->mbu_refremain = mbu->mbu_lifetime;
+		mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
 	}
 #ifdef MIP6_DRAFT13
 	/* set the prefix length of this binding update. */
@@ -1796,7 +1801,7 @@ mip6_haddr_destopt_create(pktopt_haddr, dst, sc)
 
 	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, dst);
 #ifdef MIP6_ALLOW_COA_FALLBACK
-	if (mbu && mbu->mbu_coafallback) {
+	if (mbu && ((mbu->mbu_state & MIP6_BU_STATE_MIP6NOTSUPP) != 0)) {
 		return (0);
 	}
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.13 2002/01/08 02:41:21 k-sugyou Exp $	*/
+/*	$KAME: mip6control.c,v 1.14 2002/01/17 01:16:43 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -77,8 +77,8 @@ static const char *pfx_desc[] = {
 	"prefix\t\t\t\tplen\tvltime\tvlrem\tpltime\tplrem\thaddr\n"
 };
 static const char *bu_desc[] = {
-	"paddr\t\thaddr\t\tcoa\t\tlifetim\tltrem\trefresh\trefrem\tacktimo\tackrem\tseqno\tflags\trstate\tstate\tdontsnd\tcoafb\n",
-	"paddr\t\t\t\thaddr\t\t\t\tcoa\t\t\t\tlifetim\tltrem\trefresh\trefrem\tacktimo\tackrem\tseqno\tflags\trstate\tstate\tdontsnd\tcoafb\n"
+	"paddr\t\thaddr\t\tcoa\t\tlifetim\tltrem\trefresh\trefrem\tacktimo\tackrem\tseqno\tflags\trstate\tstate\n",
+	"paddr\t\t\t\thaddr\t\t\t\tcoa\t\t\t\tlifetim\tltrem\trefresh\trefrem\tacktimo\tackrem\tseqno\tflags\trstate\tstate\n"
 };
 static const char *ha_desc[] = {
 	"lladdr\t\tgaddr\t\tflags\tpref\tlifetim\tltrem\n",
@@ -86,13 +86,13 @@ static const char *ha_desc[] = {
 };
 #ifdef MIP6_DRAFT13
 static const char *bc_desc[] = {
-	"phaddr\t\tpcoa\t\taddr\t\tflags\tplen\tseqno\tlifetim\tltrem\tstats\n",
-	"phaddr\t\t\t\tpcoa\t\t\t\taddr\t\t\t\tflags\tplen\tseqno\tlifetim\tltrem\tstats\n"
+	"phaddr\t\tpcoa\t\taddr\t\tflags\tplen\tseqno\tlifetim\tltrem\tstate\n",
+	"phaddr\t\t\t\tpcoa\t\t\t\taddr\t\t\t\tflags\tplen\tseqno\tlifetim\tltrem\tstate\n"
 };
 #else
 static const char *bc_desc[] = {
-	"phaddr\t\tpcoa\t\taddr\t\tflags\tseqno\tlifetim\tltrem\tstats\n",
-	"phaddr\t\t\t\tpcoa\t\t\t\taddr\t\t\t\tflags\tseqno\tlifetim\tltrem\tstats\n"
+	"phaddr\t\tpcoa\t\taddr\t\tflags\tseqno\tlifetim\tltrem\tstate\n",
+	"phaddr\t\t\t\tpcoa\t\t\t\taddr\t\t\t\tflags\tseqno\tlifetim\tltrem\tstate\n"
 };
 #endif /* MIP6_DRAFT13 */
 static const char *ipaddr_fmt[] = {
@@ -358,6 +358,9 @@ main(argc, argv)
 	if (gbu) {
 		struct hif_softc *sc;
 		struct mip6_bu *mbu, mip6_bu;
+		struct timeval time;
+
+		gettimeofday(&time, 0);
 
 		sc = get_hif_softc(ifnarg);
 		printf(bu_desc[longdisp]);
@@ -372,25 +375,27 @@ main(argc, argv)
 			       ip6_sprintf(&mbu->mbu_haddr));
 			printf(ipaddr_fmt[longdisp],
 			       ip6_sprintf(&mbu->mbu_coa));
-			printf("%7u %7qd %7u %7qd %7u %7qd %7u %-7s %7x %7x %7u %7u\n",
+			printf("%7u %7ld %7u %7ld %7u %7ld %7u %-7s %7x %7x\n",
 			       mbu->mbu_lifetime,
-			       mbu->mbu_remain,
+			       mbu->mbu_expire - time.tv_sec,
 			       mbu->mbu_refresh,
-			       mbu->mbu_refremain,
+			       mbu->mbu_refexpire - time.tv_sec,
 			       mbu->mbu_acktimeout,
-			       mbu->mbu_ackremain,
+			       (mbu->mbu_ackexpire - time.tv_sec) < 0 ? 0
+			       : (mbu->mbu_ackexpire - time.tv_sec), /* XXX */
 			       mbu->mbu_seqno,
 			       buflg_sprintf(mbu->mbu_flags),
 			       mbu->mbu_reg_state,
-			       mbu->mbu_state,
-			       mbu->mbu_dontsend,
-			       mbu->mbu_coafallback);
+			       mbu->mbu_state);
 		}
 	}
 
 	if (gbc) {
 		struct mip6_bc_list mip6_bc_list;
 		struct mip6_bc *mbc, mip6_bc;
+		struct timeval time;
+
+		gettimeofday(&time, 0);
 
 		if (nl[N_MIP6_BC_LIST].n_value == 0) {
 			fprintf(stderr, "bc not found\n");
@@ -411,9 +416,9 @@ main(argc, argv)
 			       ip6_sprintf(&mbc->mbc_addr));
 			printf(
 #ifdef MIP6_DRAFT13
-			       "%-7s %7u %7u %7u %7qd %5x\n",
+			       "%-7s %7u %7u %7u %7ld %5x\n",
 #else
-			       "%-7s %7u %7u %7qd %5x\n",
+			       "%-7s %7u %7u %7ld %5x\n",
 #endif /* MIP6_DRAFT13 */
 			       buflg_sprintf(mbc->mbc_flags),
 #ifdef MIP6_DRAFT13
@@ -421,7 +426,7 @@ main(argc, argv)
 #endif /* MIP6_DRAFT13 */
 			       mbc->mbc_seqno,
 			       mbc->mbc_lifetime,
-			       mbc->mbc_remain,
+			       mbc->mbc_expire - time.tv_sec,
 			       mbc->mbc_state);
 		}
 	}

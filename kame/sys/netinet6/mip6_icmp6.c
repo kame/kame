@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.31 2002/01/08 02:40:58 k-sugyou Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.32 2002/01/17 01:16:42 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -235,7 +235,8 @@ mip6_icmp6_input(m, off, icmp6len)
 						 "%s:%d: a node (%s) doesn't support a binding update destopt.\n",
 						 __FILE__, __LINE__,
 						 ip6_sprintf(paddr)));
-					mbu->mbu_dontsend = 1;
+					mbu->mbu_state
+						|= MIP6_BU_STATE_BUNOTSUPP;
 				}
 			}
 			break;
@@ -262,8 +263,10 @@ mip6_icmp6_input(m, off, icmp6len)
 				mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
 								  paddr);
 				if (mbu) {
-					mbu->mbu_dontsend = 1;
-					mbu->mbu_coafallback = 1;
+					mbu->mbu_state
+						|= MIP6_BU_STATE_BUNOTSUPP;
+					mbu->mbu_state
+						|= MIP6_BU_STATE_MIP6NOTSUPP;
 				}
 			}
 #endif /* MIP6_ALLOW_COA_FALLBACK */
