@@ -1,4 +1,4 @@
-.\"	$KAME: bindtest.1,v 1.21 2001/06/27 04:02:34 jinmei Exp $
+.\"	$KAME: bindtest.1,v 1.22 2001/06/27 04:07:47 jinmei Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -134,7 +134,9 @@ Specifies an additional address to test
 or
 .Xr sendto 2
 behavior.
-The address should already be assigned to the node.
+The address should already be assigned to the node,
+and should not be the loopback address
+.Pq 127.0.0.1 .
 .It Fl p Ar port
 .Ar port
 specifies the TCP/UDP port number used for the test.
