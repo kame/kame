@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.17 2000/01/24 03:39:29 sumikawa Exp $
+# $Id: Makefile,v 1.18 2000/01/25 19:01:46 sumikawa Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -23,6 +23,7 @@ SUBDIR+=	ja-w3m-ssl
 SUBDIR+=	kaffe
 SUBDIR+=	lftp
 SUBDIR+=	libident6
+SUBDIR+=	libpcap
 SUBDIR+=	lynx
 SUBDIR+=	mediator
 SUBDIR+=	mozilla
@@ -52,6 +53,7 @@ SUBDIR+=	squid11
 SUBDIR+=	ssh
 SUBDIR+=	tcp_wrapper
 SUBDIR+=	tcpd6
+SUBDIR+=	tcpdump
 SUBDIR+=	tcptrace
 SUBDIR+=	totd
 SUBDIR+=	ucd-snmp
