@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.123 2001/05/08 04:36:34 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.124 2001/05/09 04:33:55 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -883,11 +883,6 @@ main(argc, argv)
 		src.sin6_addr = dst.sin6_addr;
 		src.sin6_port = ntohs(DUMMY_PORT);
 		src.sin6_scope_id = dst.sin6_scope_id;
-
-
-#ifdef USE_SIN6_SCOPE_ID
-		src.sin6_scope_id = dst.sin6_scope_id;
-#endif
 
 #ifdef USE_RFC2292BIS
 		if (pktinfo &&
