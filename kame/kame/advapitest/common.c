@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.18 2003/09/21 08:00:58 jinmei Exp $ */
+/*	$KAME: common.c,v 1.19 2003/11/03 01:25:30 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -99,7 +99,7 @@ dump_localopt(s, socktype, proto)
 	else if (optlen == sizeof(int))
 		printf("IPV6_HOPLIMIT: %d\n", *(int *)optbuf);
 	else {
-		/* this should be the case in rfc2292bis-03 */
+		/* this should be the case in RFC3542 */
 		warnx("IPV6_HOPLIMIT: invalid option length: %d", optlen);
 	}
 #endif
@@ -250,7 +250,7 @@ dump_localopt(s, socktype, proto)
 		warnx("IPV6_RECVHOPOPTS: invalid option length: %d", optlen);
 #endif
 
-#ifdef IPV6_RECVRTHDRDSTOPTS	/* rfc2292bis-03 obsoleted this option. */
+#ifdef IPV6_RECVRTHDRDSTOPTS	/* RFC3542 obsoleted this option. */
 	optlen = sizeof(optbuf);
 	if (getsockopt(s, IPPROTO_IPV6, IPV6_RECVRTHDRDSTOPTS, optbuf, &optlen))
 		warn("getsockopt(IPV6_RECVRTHDRDSTOPTS)");

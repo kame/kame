@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.32 2003/06/12 10:11:09 suz Exp $ */
+/*	$KAME: sender.c,v 1.33 2003/11/03 01:25:30 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -53,7 +53,7 @@
 
 int dsthdr1len = -1, dsthdr2len = -1, hbhlen = -1;
 int stickydsthdr1len = -1, stickydsthdr2len = -1, stickyhbhlen = -1;
-char *hlimp, *stickyhlimp;
+char *hlimp, *stickyhlimp, *basicapihlimp;
 char *tclassp, *stickytclassp;
 int hlim, tclass;
 
@@ -110,7 +110,7 @@ main(argc, argv)
 		} \
 	} while (0)
 
-	while ((ch = getopt(argc, argv, "cD:d:f:h:l:M:mn:Pp:s:t:T:v")) != -1)
+	while ((ch = getopt(argc, argv, "cD:d:f:h:l:L:M:mn:Pp:s:t:T:v")) != -1)
 		switch(ch) {
 		case 'c':
 			cflag++;
@@ -149,6 +149,9 @@ main(argc, argv)
 				stickyhlimp = optarg;
 			else
 				hlimp = optarg;
+			break;
+		case 'L':
+			basicapihlimp = optarg;
 			break;
 		case 'M':
 			STICKYCHECK;
@@ -362,7 +365,7 @@ main(argc, argv)
 	}
 
 	/*
-	 * rfc2292bis-03 obsoleted sticky hlim option, but we intentionally try
+	 * RFC3542 obsoleted sticky hlim option, but we intentionally try
 	 * to set this option to see what happens.
 	 */
 	if (stickyhlimp != NULL) {
@@ -370,6 +373,22 @@ main(argc, argv)
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_HOPLIMIT,
 			       &hlim, sizeof(hlim))) {
 			warn("setsockopt(IPV6_HOPLIMIT, %d)", hlim);
+		}
+	}
+
+	/*
+	 * If given, specify the hop limit value by the basic API.
+	 * We ignore errors because we're testing for the advanced API.
+	 */
+	if (basicapihlimp != NULL) {
+		hlim = atoi(basicapihlimp);
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_UNICAST_HOPS,
+		    &hlim, sizeof (hlim))) {
+			warn("setsockopt(IPV6_UNICAST_HOPS, %d)", hlim);
+		}
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
+		    &hlim, sizeof (hlim))) {
+			warn("setsockopt(IPV6_MULTICAST_HOPS, %d)", hlim);
 		}
 	}
 #endif
@@ -672,6 +691,7 @@ usage()
 		"              [-f (0|1)] [-f sticky (0|1)] (dontfrag flag)\n"
 		"              [-h hbhoptlen] [-h sticky sticky_hbhoptlen]\n"
 		"              [-l hoplimit] [-l sticky sticky_hoplimit]\n"
+		"              [-L basicAPI_hoplimit]\n"
 		"              [-m] (enable recvpathmtu)\n"
 		"              [-M (d|0|1)] [-M sticky (d|0|1)] (minmtu flag)\n"
 		"              [-n nexthop] [-n sticky sticky_nexthop]\n"
