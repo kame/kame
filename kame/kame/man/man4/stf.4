@@ -1,4 +1,4 @@
-.\"     $KAME: stf.4,v 1.1 2000/03/06 06:56:28 itojun Exp $
+.\"     $KAME: stf.4,v 1.2 2000/03/10 13:37:54 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -41,14 +41,35 @@ The
 .Nm
 interface supports
 .Dq 6to4
-encapsulation.
+IPv6 in IPv4 encapsulation.
 It can tunnel IPv6 traffic over IPv4, as specified in
 .Li draft-ietf-ngtrans-6to4-03.txt .
 .Pp
 Due to the way 6to4 protocol is specified,
 .Nm
 interface requires certain configuration to work properly.
-Read the specification for configuration details.
+You must configure single
+.Pq no more than 1
+valid 6to4 address to the interface.
+.Dq A valid 6to4 address
+is an address which has the following properties:
+.Bl -bullet
+.It
+matches
+.Li 2001:xxyy:zzuu::/48
+where
+.Li xxyy:zzuu
+is a hexadecimal notation of an IPv4 address for the node,
+.It
+The interface identifier portion
+.Pq lower 64 bits
+is properly filled without address collision, and
+.It
+The prefix length equals to 16.
+.El
+.Pp
+Read the specification for more details.
+.Pp
 .Pp
 .Nm
 can be configured to be ECN friendly.
@@ -58,7 +79,7 @@ See
 .Xr gif 4
 for details.
 .Pp
-Please note that 6to4 is inherently
+Please note that 6to4 spec is written as
 .Dq accept tunnelled packet from everyone
 tunnelling device.
 By enabling
@@ -67,6 +88,18 @@ device, you are making it much easier for attackers
 to inject malicious IPv6 packet to your node.
 Administrators must take caution when enabling it.
 It is recommended to filter IPv4 packet as necessary.
+.\"
+.Sh EXAMPLES
+Note that
+.Li 8504:0506
+is equal to
+.Li 133.4.5.6 ,
+written in hexadecimals.
+.Bd -literal
+# ifconfig ne0 inet 133.4.5.6 netmask 0xffffff00
+# ifconfig stf0 inet6 2001:8504:0506:0000:a00:5aff:fe38:6f86 \\
+	prefixlen 16 alias
+.Ed
 .\"
 .Sh SEE ALSO
 .Xr gif 4 ,
