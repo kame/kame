@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2470 2003/09/12 08:34:22 itojun Exp $
+$KAME: CHANGELOG,v 1.2471 2003/09/12 10:28:02 itojun Exp $
 
 <200309>
+Fri Sep 12 19:27:25 JST 2003  itojun@iijlab.net
+	* netbsd/sys/netinet/udp_usrreq.c: send icmp admin prohibit if
+	  socket policy mismatches.
+
 Fri Sep 12 17:33:33 JST 2003  itojun@iijlab.net
 	* sys/netkey/key.c: make it possible to get SA/SP dump via sysctl.
 	* setkey: use sysctl
