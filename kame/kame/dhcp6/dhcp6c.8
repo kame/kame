@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.8,v 1.27 2003/09/29 04:18:17 jinmei Exp $
+.\"	$KAME: dhcp6c.8,v 1.28 2003/10/31 05:44:08 suz Exp $
 .\"
 .\" Copyright (C) 1998 and 1999 WIDE Project.
 .\" All rights reserved.
@@ -54,6 +54,10 @@ The command line options are:
 Use
 .Ar configfile
 as the configuration file.
+.Ar configfile
+must be the absolute path from root to the file, unless
+.Fl f
+option is specified.
 .It Fl d
 Print debugging messages.
 .It Fl D
