@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.111 2001/12/20 13:59:12 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.112 2001/12/21 04:30:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -471,9 +471,10 @@ struct route_in6 {
 #define IPV6_USE_MIN_MTU	42 /* bool; send packets at the minimum MTU */
 #define IPV6_RECVPATHMTU	43 /* bool; notify an according MTU */
 
-/* the followings are used as cmsg type only */
-#define IPV6_PATHMTU		44 /* 4 bytes int; MTU notification */
-#define IPV6_REACHCONF		45 /* no data; ND reachability confirm */
+#define IPV6_PATHMTU		44 /* mtuinfo; get the current path MTU (sopt),
+				      4 bytes int; MTU notification (cmsg) */
+#define IPV6_REACHCONF		45 /* no data; ND reachability confirm
+				      (cmsg only) */
 
 /* more new socket options introduced in RFC2292bis */
 #define IPV6_PKTINFO		46 /* in6_pktinfo; send if, src addr */

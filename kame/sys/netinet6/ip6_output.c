@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.249 2001/12/20 13:59:13 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.250 2001/12/21 04:30:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -194,6 +194,14 @@ static int ip6_insertfraghdr __P((struct mbuf *, struct mbuf *, int,
 				  struct ip6_frag **));
 static int ip6_insert_jumboopt __P((struct ip6_exthdrs *, u_int32_t));
 static int ip6_splithdr __P((struct mbuf *, struct ip6_exthdrs *));
+#ifdef NEW_STRUCT_ROUTE
+static int ip6_getpmtu __P((struct route *, struct route *, struct ifnet *,
+			    struct in6_addr *, u_long *));
+#else
+static int ip6_getpmtu __P((struct route *, struct route *, struct ifnet *,
+			    struct in6_addr *, u_long *));
+#endif
+
 #ifdef __bsdi__
 #if _BSDI_VERSION < 199802
 extern struct ifnet loif;
@@ -1156,55 +1164,9 @@ skip_ipsec2:;
 	if (opt && (opt->ip6po_flags & IP6PO_REACHCONF))
 		nd6_nud_hint(rt, NULL, 0);
 
-	/*
-	 * Determine path MTU.
-	 */
-	if (ro_pmtu != ro) {
-		/* The first hop and the final destination may differ. */
-		struct sockaddr_in6 *sin6_fin =
-			(struct sockaddr_in6 *)&ro_pmtu->ro_dst;
-		if (ro_pmtu->ro_rt && ((ro_pmtu->ro_rt->rt_flags & RTF_UP) == 0 ||
-				       !IN6_ARE_ADDR_EQUAL(&sin6_fin->sin6_addr,
-							   &finaldst))) {
-			RTFREE(ro_pmtu->ro_rt);
-			ro_pmtu->ro_rt = (struct rtentry *)0;
-		}
-		if (ro_pmtu->ro_rt == 0) {
-			bzero(sin6_fin, sizeof(*sin6_fin));
-			sin6_fin->sin6_family = AF_INET6;
-			sin6_fin->sin6_len = sizeof(struct sockaddr_in6);
-			sin6_fin->sin6_addr = finaldst;
-
-#ifdef __bsdi__			/* bsdi needs rtcalloc to clone a route. */
-			rtcalloc((struct route *)ro_pmtu);
-#else
-			rtalloc((struct route *)ro_pmtu);
-#endif
-		}
-	}
-	if (ro_pmtu->ro_rt != NULL) {
-		u_int32_t ifmtu = nd_ifinfo[ifp->if_index].linkmtu;
-
-		mtu = ro_pmtu->ro_rt->rt_rmx.rmx_mtu;
-		if (mtu > ifmtu || mtu == 0) {
-			/*
-			 * The MTU on the route is larger than the MTU on
-			 * the interface!  This shouldn't happen, unless the
-			 * MTU of the interface has been changed after the
-			 * interface was brought up.  Change the MTU in the
-			 * route to match the interface MTU (as long as the
-			 * field isn't locked).
-			 *
-			 * if MTU on the route is 0, we need to fix the MTU.
-			 * this case happens with path MTU discovery timeouts.
-			 */
-			 mtu = ifmtu;
-			 if ((ro_pmtu->ro_rt->rt_rmx.rmx_locks & RTV_MTU) == 0)
-				 ro_pmtu->ro_rt->rt_rmx.rmx_mtu = mtu; /* XXX */
-		}
-	} else {
-		mtu = nd_ifinfo[ifp->if_index].linkmtu;
-	}
+	/* Determine path MTU. */
+	if ((error = ip6_getpmtu(ro_pmtu, ro, ifp, &finaldst, &mtu)) != 0)
+		goto bad;
 
 	/*
 	 * An advanced API option (IPV6_USE_MIN_MTU) overrides mtu setting.
@@ -1464,7 +1426,6 @@ skip_ipsec2:;
 			mtu = IPV6_MAXPACKET;
 
 		/* Notify a proper path MTU to applications. */
-		/* mtu > IPV6_MAXPACKET case is already covered */
 		mtu32 = (u_int32_t)mtu;
 		bzero(&ip6cp, sizeof(ip6cp));
 		ip6cp.ip6c_cmdarg = (void *)&mtu32;
@@ -1803,6 +1764,76 @@ ip6_insertfraghdr(m0, m, hlen, frghdrp)
 	}
 
 	return(0);
+}
+
+static int
+ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup)
+#ifdef NEW_STRUCT_ROUTE
+	struct route *ro_pmtu, *ro;
+#else
+	struct route_in6 *ro_pmtu, *ro;
+#endif
+	struct ifnet *ifp;
+	struct in6_addr *dst;	/* XXX: should be sockaddr_in6 */
+	u_long *mtup;
+{
+	u_int32_t mtu = 0;
+	int error = 0;
+
+	if (ro_pmtu != ro) {
+		/* The first hop and the final destination may differ. */
+		struct sockaddr_in6 *sa6_dst =
+			(struct sockaddr_in6 *)&ro_pmtu->ro_dst;
+		if (ro_pmtu->ro_rt && ((ro_pmtu->ro_rt->rt_flags & RTF_UP)
+				       == 0 ||
+				       !IN6_ARE_ADDR_EQUAL(&sa6_dst->sin6_addr,
+							   dst))) {
+			RTFREE(ro_pmtu->ro_rt);
+			ro_pmtu->ro_rt = (struct rtentry *)NULL;
+		}
+		if (ro_pmtu->ro_rt == NULL) {
+			bzero(sa6_dst, sizeof(*sa6_dst));
+			sa6_dst->sin6_family = AF_INET6;
+			sa6_dst->sin6_len = sizeof(struct sockaddr_in6);
+			sa6_dst->sin6_addr = *dst;
+
+#ifdef __bsdi__			/* bsdi needs rtcalloc to clone a route. */
+			rtcalloc((struct route *)ro_pmtu);
+#else
+			rtalloc((struct route *)ro_pmtu);
+#endif
+		}
+	}
+	if (ro_pmtu->ro_rt) {
+		u_int32_t ifmtu;
+
+		if (ifp == NULL)
+			ifp = ro_pmtu->ro_rt->rt_ifp;
+		ifmtu = nd_ifinfo[ifp->if_index].linkmtu;
+		mtu = ro_pmtu->ro_rt->rt_rmx.rmx_mtu;
+		if (mtu > ifmtu || mtu == 0) {
+			/*
+			 * The MTU on the route is larger than the MTU on
+			 * the interface!  This shouldn't happen, unless the
+			 * MTU of the interface has been changed after the
+			 * interface was brought up.  Change the MTU in the
+			 * route to match the interface MTU (as long as the
+			 * field isn't locked).
+			 *
+			 * if MTU on the route is 0, we need to fix the MTU.
+			 * this case happens with path MTU discovery timeouts.
+			 */
+			 mtu = ifmtu;
+			 if ((ro_pmtu->ro_rt->rt_rmx.rmx_locks & RTV_MTU) == 0)
+				 ro_pmtu->ro_rt->rt_rmx.rmx_mtu = mtu; /* XXX */
+		}
+	} else if (ifp) {
+		mtu = nd_ifinfo[ifp->if_index].linkmtu;
+	} else
+		error = EHOSTUNREACH; /* XXX */
+
+	*mtup = mtu;
+	return(error);
 }
 
 /*
@@ -2760,10 +2791,6 @@ do { \
 					}
 					optval = *((int *)optdata);
 					break;
-#ifdef HAVE_NRL_INPCB
-#undef in6p
-#undef in6p_outputopts
-#endif
 				}
 				if (error)
 					break;
@@ -2777,10 +2804,6 @@ do { \
 #endif
 				break;
 
-#ifdef HAVE_NRL_INPCB
-#define in6p inp
-#define in6p_outputopts inp_outputopts6
-#endif
 			case IPV6_OTCLASS:
 				error = ip6_getpcbopt(in6p->in6p_outputopts,
 				    optname, &optdata, &optdatalen);
@@ -2794,10 +2817,50 @@ do { \
 				bcopy(optdata, mtod(m, caddr_t), optdatalen);
 #endif
 				break;
-#ifdef HAVE_NRL_INPCB
-#undef in6p
-#undef in6p_outputopts
+
+			case IPV6_PATHMTU:
+			{
+				u_long pmtu = 0;
+				struct ip6_mtuinfo mtuinfo;
+#ifdef NEW_STRUCT_ROUTE
+				struct route *ro = &in6p->in6p_route;
+#else
+				struct route_in6 *ro = (struct route_in6 *)&in6p->in6p_route;
 #endif
+
+				if (!(so->so_state & SS_ISCONNECTED))
+					return(ENOTCONN);
+				/*
+				 * XXX: we dot not consider the case of source
+				 * routing, nor optional information to specify
+				 * the outgoing interface.
+				 */
+				error = ip6_getpmtu(ro, NULL, NULL,
+						    &in6p->in6p_faddr, &pmtu);
+				if (error)
+					break;
+				if (pmtu > IPV6_MAXPACKET)
+					pmtu = IPV6_MAXPACKET;
+
+				bzero(&mtuinfo, sizeof(mtuinfo));
+				mtuinfo.ip6m_mtu = (u_int32_t)pmtu;
+				optdata = (void *)&mtuinfo;
+				optdatalen = sizeof(mtuinfo);
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				error = sooptcopyout(sopt, optdata,
+						     optdatalen);
+#else  /* !FreeBSD3 */
+					if (optdatalen > MCLBYTES)
+						return(EMSGSIZE); /* XXX */
+					*mp = m = m_get(M_WAIT, MT_SOOPTS);
+					if (optdatalen > MLEN)
+						MCLGET(m, M_WAIT);
+					m->m_len = optdatalen;
+					bcopy(optdata, mtod(m, void *),
+					      optdatalen);
+#endif /* FreeBSD3 */
+				break;
+			}
 
 			case IPV6_2292PKTINFO:
 			case IPV6_2292HOPLIMIT:
@@ -2843,10 +2906,6 @@ do { \
 			case IPV6_RTHDR:
 			case IPV6_DSTOPTS:
 			case IPV6_RTHDRDSTOPTS:
-#ifdef HAVE_NRL_INPCB
-#define in6p inp
-#define in6p_outputopts inp_outputopts6
-#endif
 				error = ip6_getpcbopt(in6p->in6p_outputopts,
 						      optname, &optdata,
 						      &optdatalen);
@@ -2866,10 +2925,6 @@ do { \
 					      optdatalen);
 #endif /* FreeBSD3 */
 				}
-#ifdef HAVE_NRL_INPCB
-#undef in6p
-#undef in6p_outputopts
-#endif
 				break;
 
 			case IPV6_MULTICAST_IF:
