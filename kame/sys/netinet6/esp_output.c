@@ -1,4 +1,4 @@
-/*	$KAME: esp_output.c,v 1.29 2000/08/29 11:22:48 itojun Exp $	*/
+/*	$KAME: esp_output.c,v 1.30 2000/09/18 20:37:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -319,17 +319,6 @@ esp_output(m, nexthdrp, md, isr, af)
 		break;
 #endif
 	}
-
-#if 0 /*enable it if you #undef USE_BLOCKCRYPT in esp_core.c*/
-	/* make the packet over-writable */
-	mprev->m_next = NULL;
-	if ((md = ipsec_copypkt(md)) == NULL) {
-		m_freem(m);
-		error = ENOBUFS;
-		goto fail;
-	}
-	mprev->m_next = md;
-#endif
 
 	espoff = m->m_pkthdr.len - plen;
 
