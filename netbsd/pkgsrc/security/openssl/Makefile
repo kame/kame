@@ -1,14 +1,18 @@
-# $NetBSD: Makefile,v 1.11 1999/12/16 12:03:21 abs Exp $
+# $NetBSD: Makefile,v 1.16 2000/07/24 11:11:16 tron Exp $
 #
 
-DISTNAME=		openssl-0.9.4
+DISTNAME=		openssl-0.9.5a
 CATEGORIES=		security
-MASTER_SITES=		ftp://ftp.openssl.org/source/
+MASTER_SITES=		ftp://ftp.openssl.org/source/ \
+			ftp://ftp.uni-trier.de/pub/unix/security/openssl/
 
 MAINTAINER=		packages@netbsd.org
 HOMEPAGE=		http://www.openssl.org/
 
 CONFLICTS=		SSLeay-* ssleay-*
+
+# cope with bsd.pkg.mk differences
+LOWER_OPSYS?=		netbsd
 
 USE_PERL5=		yes
 
@@ -18,26 +22,30 @@ MIRROR_DISTFILE=	no
 ONLY_FOR_PLATFORM=	NetBSD-*-alpha NetBSD-*-arm32 NetBSD-*-i386 \
 			NetBSD-*-m68k NetBSD-*-mips NetBSD-*-mipseb \
 			NetBSD-*-mipsel NetBSD-*-ns32k NetBSD-*-powerpc \
-			NetBSD-*-sparc NetBSD-*-vax
+			NetBSD-*-sparc NetBSD-*-vax \
+			SunOS-*
 
 CONFIGURE_ARGS=		-fPIC -DPIC --openssldir=${PREFIX} --prefix=${PREFIX} \
 			${LDFLAGS}
 #CONFIGURE_ENV=		PREFIX=${PREFIX}
-MAKE_ENV=		LD_LIBRARY_PATH=${WRKSRC} MAKELIB=${FILESDIR}/makelib
-
-# Note, this list gets bigger if using the RSAref library
-PLIST_SRC=		pkg/PLIST
-
-.if !exists(/usr/libexec/ld.elf_so) && !exists(/usr/libexec/ld.so)
-IGNORE=			requires shared object support
-.endif
 
 .include "../../mk/bsd.prefs.mk"
+
+PATCHDIR=		${WRKDIR}/.patches
+.if ${OPSYS} == "NetBSD"
+MAKE_ENV=		LD_LIBRARY_PATH=${WRKSRC} MAKELIB=${FILESDIR}/makelib
+.endif
+
+PLIST_SRC=		${WRKDIR}/.PLIST_SRC
+
+.if ${OPSYS} == "NetBSD" && !exists(/usr/libexec/ld.elf_so) && !exists(/usr/libexec/ld.so)
+IGNORE=			requires shared object support
+.endif
 
 .if defined(USE_RSAREF2) && ${USE_RSAREF2} == YES
 DEPENDS=		rsaref-2.0p3:../../security/rsaref
 CONFIGURE_ARGS+=	rsaref
-PLIST_SRC+=		pkg/PLIST.rsaref
+PLIST_RSAREF=		${PKGDIR}/PLIST.rsaref
 .endif
 
 fetch-depends:
@@ -49,6 +57,15 @@ fetch-depends:
 	@${ECHO} the USA MUST set this variable to NO.  RSA licensees may
 	@${ECHO} choose -- NO is faster.
 	@${FALSE}
+.endif
+
+pre-patch:
+	${MKDIR} ${WRKDIR}/.patches
+	@${CP} ${.CURDIR}/patches/patch-* ${WRKDIR}/.patches
+.if ${OPSYS} == "NetBSD"
+	for FILE in ${.CURDIR}/patches/patch.netbsd-*; do \
+		${CP} $$FILE ${PATCHDIR}/patch-$${FILE##*-}; \
+	done
 .endif
 
 # The Perl stuff doesn't work yet (nor did it work properly in SSLeay...)
@@ -81,8 +98,14 @@ do-install:
 		${INSTALL_SCRIPT} ${WRKDIR}/der_chop ${PREFIX}/bin/
 	cd ${WRKSRC}/apps && ${INSTALL_SCRIPT} CA.sh CA.pl ${PREFIX}/bin/
 	${INSTALL_DATA} ${WRKSRC}/apps/openssl.cnf ${PREFIX}/etc/openssl.cnf.example
-	cd ${WRKSRC} && \
-		${INSTALL_DATA} libcrypto.so.?.0 libssl.so.?.0 ${PREFIX}/lib/
+	cd ${WRKSRC} && ${INSTALL_DATA} libcrypto.a libssl.a ${PREFIX}/lib/
+.if ${OPSYS} == "NetBSD"
+	cd ${WRKSRC} && ${INSTALL_DATA} libcrypto.so.?.0 libssl.so.?.0 ${PREFIX}/lib/
+.endif
+.if exists(/usr/bin/ranlib)
+	/usr/bin/ranlib ${PREFIX}/lib/libcrypto.a
+	/usr/bin/ranlib ${PREFIX}/lib/libssl.a
+.endif
 .if defined(USE_RSAREF2) && ${USE_RSAREF2} == YES
 	# libRSAglue.a is only useful if you are using the RSAREF2 library.
 	cd ${WRKSRC} && ${INSTALL_DATA} libRSAglue.a ${PREFIX}/lib/
@@ -100,11 +123,29 @@ do-install:
 	done
 #	@cd ${WRKSRC}/perl && ${MAKE} install
 	${INSTALL_DATA_DIR} ${PREFIX}/share/doc/openssl
-	${INSTALL_DATA} ${WRKSRC}/doc/* ${PREFIX}/share/doc/openssl
-	${INSTALL_DATA_DIR} ${PREFIX}/certs ${PREFIX}/private
+	${INSTALL_DATA_DIR} ${PREFIX}/share/doc/openssl/apps
+	${INSTALL_DATA_DIR} ${PREFIX}/share/doc/openssl/crypto
+	${INSTALL_DATA_DIR} ${PREFIX}/share/doc/openssl/ssl
+	${INSTALL_DATA} ${WRKSRC}/doc/apps/* \
+		${PREFIX}/share/doc/openssl/apps/
+	${INSTALL_DATA} ${WRKSRC}/doc/crypto/* \
+		${PREFIX}/share/doc/openssl/crypto/
+	${INSTALL_DATA} ${WRKSRC}/doc/ssl/* \
+		${PREFIX}/share/doc/openssl/ssl/
+	for file in README c-indentation.el openssl.txt openssl_button.gif \
+	openssl_button.html ssleay.txt ; do \
+		${INSTALL_DATA} ${WRKSRC}/doc/$$file \
+			${PREFIX}/share/doc/openssl/; \
+	done
+	${INSTALL_DATA_DIR} ${PREFIX}/certs
+	${INSTALL_DATA_DIR} ${PREFIX}/private
 	@if [ ! -f ${PREFIX}/etc/openssl.cnf ]; then \
 		${CP} -p ${PREFIX}/etc/openssl.cnf.example ${PREFIX}/etc/openssl.cnf; \
 	fi
+
+post-install:
+	${CAT} ${PKGDIR}/PLIST.common ${PKGDIR}/PLIST.${LOWER_OPSYS} \
+		${PLIST_RSAREF} > ${PLIST_SRC}
 
 .include  "../../mk/bsd.pkg.mk"
 
