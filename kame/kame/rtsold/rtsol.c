@@ -71,11 +71,22 @@ sockopen()
 	int on;
 	struct icmp6_filter filt;
 	static u_char answer[1500];
-	static u_char rcvcmsgbuf[CMSG_SPACE(sizeof(struct in6_pktinfo)) +
-				CMSG_SPACE(sizeof(int))];
-	static u_char sndcmsgbuf[CMSG_SPACE(sizeof(struct in6_pktinfo)) + 
-				CMSG_SPACE(sizeof(int))];
+	static u_char *rcvcmsgbuf = NULL, *sndcmsgbuf = NULL;
 
+	if (rcvcmsgbuf == NULL &&
+	    (rcvcmsgbuf = malloc(CMSG_SPACE(sizeof(struct in6_pktinfo)) +
+				 CMSG_SPACE(sizeof(int)))) == NULL) {
+		warnmsg(LOG_ERR, __FUNCTION__,
+			"malloc for receive msghdr failed");
+		return(-1);
+	}
+	if (sndcmsgbuf == NULL &&
+	    (sndcmsgbuf = malloc(CMSG_SPACE(sizeof(struct in6_pktinfo)) + 
+				 CMSG_SPACE(sizeof(int)))) == NULL) {
+		warnmsg(LOG_ERR, __FUNCTION__,
+			"malloc for send msghdr failed");
+		return(-1);
+	}
 	memset(&sin6_allrouters, 0, sizeof(struct sockaddr_in6));
 	if (inet_pton(AF_INET6, ALLROUTER,
 		      &sin6_allrouters.sin6_addr.s6_addr) != 1) {
