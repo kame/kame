@@ -923,13 +923,11 @@ link_stray_ia6s(struct rr_prefix *rpp)
 {
 	struct ifaddr *ifa;
 
-#ifdef __NetBSD__
+#if (defined(__FreeBSD__) && __FreeBSD__ < 3) || defined(__bsdi__)
+	for (ifa = rpp->rp_ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
+#else
 	for (ifa = rpp->rp_ifp->if_addrlist.tqh_first; ifa;
 	     ifa = ifa->ifa_list.tqe_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-	TAILQ_FOREACH(ifa, &rpp->rp_ifp->if_addrhead, ifa_link)
-#else
-	for (ifa = rpp->rp_ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
 #endif
 	{
 		struct rp_addr *rap;
