@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.59 2001/08/13 17:47:59 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.60 2001/08/13 17:48:42 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1678,7 +1678,7 @@ eay_hmacmd5_final(c)
 }
 
 /*
- * SHA512 functions
+ * SHA2-512 functions
  */
 caddr_t
 eay_sha2_512_init()
@@ -1730,7 +1730,7 @@ eay_sha2_512_one(data)
 }
 
 /*
- * SHA384 functions
+ * SHA2-384 functions
  */
 caddr_t
 eay_sha2_384_init()
@@ -1782,7 +1782,7 @@ eay_sha2_384_one(data)
 }
 
 /*
- * SHA256 functions
+ * SHA2-256 functions
  */
 caddr_t
 eay_sha2_256_init()
