@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.58 2001/09/26 08:43:48 itojun Exp $
+$KAME: FAQ,v 1.59 2001/09/26 08:49:42 itojun Exp $
 
 
 GENERAL
@@ -105,6 +105,21 @@ Q: Which operating systems/vendor routers use KAME stack?
 	- Hitachi GR2000, http://www.v6.hitachi.co.jp/GR2000/
 	- IIJ SEIL-T1, http://www.seil-t1.com/
 	- (more)
+
+Q: How portable KAME stack is?  is it possible to port it to embedded operating
+systems like VxWorks?
+	KAME stack assumes that the following items are available:
+	- mbuf for holding packet data
+	- software interrupts to handle incoming packets
+	- timer interrupts like timeout(9)
+	- spl for concurrency control with interrupting threads
+	i.e. we assume 4.4BSD kernel programming environment.  We don't have
+	time to port it to VxWorks or any other operating systems, so if you
+	want to do it you need to port it on your own.
+
+	We have heard of Win95/98 port of KAME IPsec stack in the past.
+	Also it is apparent that some of the vendor routers are using KAME
+	stack on top of VxWorks.
 
 
 INSTALLATION
