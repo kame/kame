@@ -8,7 +8,7 @@ CPPFLAGS+=-DINET6 -DUSE_GETIPNODEBY -DHAVE_SOCKADDR_SA_LEN \
 	-DHAVE_INADDRSZ -DHAVE_IN6ADDRSZ -DHAVE_RES_USE_INET6 -DHAVE_AAAA \
 	-DHAVE_RES_STATE_EXT -DHAVE_NEW_RES_STATE
 
-SRCS=	getaddrinfo.c getnameinfo.c vars.c rresvport_af.c rcmd.c
+SRCS=	getaddrinfo.c getnameinfo.c ifname.c vars.c rresvport_af.c rcmd.c
 SRCS+=	rthdr.c ip6opt.c
 SRCS+=	name6.c
 SRCS+=	base64.c herror.c nsap_addr.c 
@@ -18,12 +18,15 @@ SRCS+=	res_send.c
 SRCS+=	inet_pton.c inet_addr.c
 
 MAN=	getaddrinfo.3 getnameinfo.3 gethostbyname.3 resolver.3 \
-	rresvport_af.3 getipnodebyname.3 inet6_option_space.3 \
+	rresvport_af.3 if_indextoname.3 getipnodebyname.3 inet6_option_space.3 \
 	inet6_rthdr_space.3
 MLINKS+=	getipnodebyname.3 getipnodebyaddr.3 \
 		getipnodebyname.3 freehostent.3 \
 		getaddrinfo.3 freeaddrinfo.3 \
 		getaddrinfo.3 gai_strerror.3 \
+		if_indextoname.3 if_nametoindex.3 \
+		if_indextoname.3 if_nameindex.3 \
+		if_indextoname.3 if_freenameindex.3 \
 		inet6_option_space.3 inet6_option_init.3 \
 		inet6_option_space.3 inet6_option_append.3 \
 		inet6_option_space.3 inet6_option_alloc.3 \
