@@ -1,5 +1,5 @@
 #	from: @(#)Makefile	8.1 (Berkeley) 6/6/93
-#	$NetBSD: Makefile,v 1.17 2000/01/31 14:28:17 itojun Exp $
+#	$NetBSD: Makefile,v 1.19 2001/11/19 03:18:28 itojun Exp $
 
 PROG=	inetd
 SRCS=	inetd.c

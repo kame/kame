@@ -2082,7 +2082,7 @@ print_service(action, sep)
 {
 	if (isrpcservice(sep))
 		fprintf(stderr,
-		    "%s: %s rpcprog=%d, rpcvers = %d/%d, proto=%s, wait.max=%d.%d, user.group=%s.%s builtin=%lx server=%s"
+		    "%s: %s rpcprog=%d, rpcvers = %d/%d, proto=%s, wait:max=%d.%d, user:group=%s.%s builtin=%lx server=%s"
 #ifdef IPSEC
 		    " policy=\"%s\""
 #endif
