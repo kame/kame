@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.30 2001/01/05 03:44:29 itojun Exp $	*/
+/*	$KAME: name6.c,v 1.31 2001/01/05 13:37:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -187,10 +187,6 @@ union inx_addr {
 #define	map_one		map_addr_un.mau_one
 #define	map_inaddr	map_addr_un.mau_inaddr
 };
-
-/* should be obsoleted */
-struct hostent *getnodebyname __P((const char *, int, int));
-struct hostent *getnodebyaddr __P((const void *, size_t, int));
 
 static struct hostent *_hpcopy(struct hostent *hp, int *errp);
 static struct hostent *_hpaddr(int af, const char *name, void *addr, int *errp);
@@ -634,31 +630,6 @@ endhostent(void)
 	_dns_ehent();
 #endif /* DNS */
 }
-
-/* XXX: should be deprecated */
-struct hostent *
-getnodebyname(const char *name, int af, int flags)
-{
-	return getipnodebyname(name, af, flags, &h_errno);
-}
-
-#ifdef __warn_references
-__warn_references(getnodebyname,
-	"warning: getnodebyname() deprecated, "
-	"should use getaddrinfo() or getipnodebyname()");
-#endif
-
-struct hostent *
-getnodebyaddr(const void *src, size_t len, int af)
-{
-	return getipnodebyaddr(src, len, af, &h_errno);
-}
-
-#ifdef __warn_references
-__warn_references(getnodebyaddr,
-	"warning: getnodebyaddr() deprecated, "
-	"should use getnameinfo() or getipnodebyaddr()");
-#endif
 
 /*
  * Private utility functions
