@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.227 2001/07/07 05:44:29 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.228 2001/07/07 06:06:29 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1953,6 +1953,28 @@ to make the distributed develoment smooth.
   agreed that all the styles from (D) to (G) are valid.  So, when you
   see styles like (D) and (E) in the KAME code and feel a bit strange,
   please just keep them.  They are intentional.
+- When inserting a separate block just to define some intra-block
+  variables, add the level of indentation as if the block was in a
+  control statement such as if-else, for, or while.  For example,
+	foo ()
+	{
+		int a;
+
+		{
+			int internal_a;
+			...
+		}
+	}
+  should be used, instead of
+	foo ()
+	{
+		int a;
+
+	    {
+		int internal_a;
+		...
+	     }
+	}
 
 When you want to contribute something to the KAME project, and if *you
 do not mind* the agreement, it would be helpful for the project to
