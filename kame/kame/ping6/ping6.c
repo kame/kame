@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.145 2001/11/13 12:38:50 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.146 2002/01/11 17:54:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -651,7 +651,7 @@ main(argc, argv)
 	seteuid(getuid());
 	setuid(getuid());
 
-	if (options & F_FLOOD && options & F_INTERVAL)
+	if ((options & F_FLOOD) && (options & F_INTERVAL))
 		errx(1, "-f and -i incompatible options");
 
 	if ((options & F_NOUSERDATA) == 0) {
