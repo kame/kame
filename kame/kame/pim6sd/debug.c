@@ -444,6 +444,8 @@ dump_vifs(fp)
 		fprintf(fp, " DR");
 	    if (v->uv_flags & VIFF_PIM_NBR)
 		fprintf(fp, " PIM");
+	    if (v->uv_flags & VIFF_QUERIER)
+		fprintf(fp, " QUERY");
 #if 0				/* impossible */
 	    if (v->uv_flags & VIFF_DVMRP_NBR)
 	    {
