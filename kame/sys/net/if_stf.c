@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.17 2000/03/12 10:50:56 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.18 2000/03/12 10:51:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * 6to4 interface, based on draft-ietf-ngtrans-6to4-04.txt.
+ * 6to4 interface, based on draft-ietf-ngtrans-6to4-03.txt.
  *
  * 6to4 interface is NOT capable of link-layer multicasting.
  *
