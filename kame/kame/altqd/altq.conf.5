@@ -922,7 +922,7 @@ conditioner fxp0 dropper <drop>
 # EF conditioner
 # mark EF to all packets from 192.168.0.117
 #
-conditioner pvc1 ef_cdnr <tbmeter 6M 64K <pass><drop>>
+conditioner pvc1 ef_cdnr <tbmeter 6M 64K <mark 0xb8><drop>>
         filter fxp0 ef_cdnr 0 0 192.168.0.117 0 0
 
 #
