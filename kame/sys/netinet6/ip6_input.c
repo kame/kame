@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.181 2001/02/26 08:04:52 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.182 2001/03/01 09:10:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -129,6 +129,9 @@
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/nd6.h>
 #include <netinet6/in6_prefix.h>
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#endif
 
 #ifdef MIP6
 #include <netinet6/mip6.h>
@@ -1196,6 +1199,19 @@ ip6_input(m)
 			mhist->m_len += sizeof(nxt);
 		} else {
 			ip6stat.ip6s_toomanyhdr++;
+			goto bad;
+		}
+#endif
+
+#ifdef IPSEC
+		/*
+		 * enforce IPsec policy checking if we are seeing last header.
+		 * note that we do not visit this with protocols with pcb layer
+		 * code - like udp/tcp/raw ip.
+		 */
+		if ((inet6sw[ip6_protox[nxt]].pr_flags & PR_LASTHDR) != 0 &&
+		    ipsec6_in_reject(m, NULL)) {
+			ipsec6stat.in_polvio++;
 			goto bad;
 		}
 #endif
