@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.21 2000/05/16 16:40:25 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.22 2000/05/17 03:41:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.21 2000/05/16 16:40:25 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.22 2000/05/17 03:41:39 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -1936,7 +1936,7 @@ ifrt_p2p(ifcp, again)
 	struct riprt *rrt;
 	struct netinfo6 *np;
 	struct in6_addr addr, dest;
-	int advert, i;
+	int advert, ignore, i;
 #define P2PADVERT_NETWORK	1
 #define P2PADVERT_ADDR		2
 #define P2PADVERT_DEST		4
@@ -1950,18 +1950,25 @@ ifrt_p2p(ifcp, again)
 		dest = ifa->ifa_raddr;
 		applyplen(&addr, ifa->ifa_plen);
 		applyplen(&dest, ifa->ifa_plen);
+		advert = ignore = 0;
 		switch (behavior) {
 		case CISCO:
 			/*
-			 * advertise addr/plen, treating p2p interface
-			 * just like shared medium interface.
-			 * this may cause trouble if you reuse addr/plen
-			 * in other places.
+			 * honor addr/plen, just like normal shared medium
+			 * interface.  this may cause trouble if you reuse
+			 * addr/plen in other interfaces.
+			 *
+			 * advertise addr/plen.
 			 */
 			advert |= P2PADVERT_NETWORK;
 			break;
 		case GATED:
 			/*
+			 * prefixlen on p2p interface is meaningless.
+			 *
+			 * do not install network route to route6d routing
+			 * table (if we do, it would prevent route installation
+			 * for other p2p interface that shares addr/plen).
 			 * advertise dest/128.  since addr/128 is not
 			 * advertised, addr/128 is not reachable from other
 			 * interfaces (if p2p interface is A, addr/128 is not
@@ -1969,6 +1976,7 @@ ifrt_p2p(ifcp, again)
 			 * is not advertised.
 			 */
 			advert |= P2PADVERT_DEST;
+			ignore |= P2PADVERT_NETWORK;
 			break;
 		case ROUTE6D:
 			/*
@@ -1979,11 +1987,14 @@ ifrt_p2p(ifcp, again)
 			else {
 				advert |= P2PADVERT_ADDR;
 				advert |= P2PADVERT_DEST;
+				ignore |= P2PADVERT_NETWORK;
 			}
 			break;
 		}
 
 		for (i = 1; i <= P2PADVERT_MAX; i *= 2) {
+			if ((ignore & i) != 0)
+				continue;
 			if ((rrt = MALLOC(struct riprt)) == NULL)
 				fatal("malloc: struct riprt");
 			memset(rrt, 0, sizeof(*rrt));
