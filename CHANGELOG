@@ -1,9 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.175 1999/10/08 01:31:08 itojun Exp $
+$Id: CHANGELOG,v 1.176 1999/10/08 03:38:11 itojun Exp $
 
 <199910>
-Fri Oct  8 08:42:12 JST 1999
+Fri Oct  8 12:21:39 JST 1999  itojun@iijlab.net
+	* netbsd/pkgsrc/audio/mpg123, freebsd2/ports/mpg123:
+	  upgrade to latest IPv6 patch.
+	* netbsd/pkgsrc/www/lynx, freebsd2/ports/lynx:
+	  upgrade to 2.8.2 + latest IPv6 patch.
+	  From: Hideaki YOSHIFUJI <yoshfuji@ecei.tohoku.ac.jp>
+
+Fri Oct  8 08:42:12 JST 1999  itojun@iijlab.net
 	* openbsd/sys/net/route.[ch], kame/sys/netinet6/icmp6.c:
 	  synchronize ipv6 pmtud code for openbsd with netbsd.
 	  this includes change to openbsd/sys/net/route.[ch] for
