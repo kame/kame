@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.968 2000/06/04 13:06:35 itojun Exp $
+$Id: CHANGELOG,v 1.969 2000/06/04 13:31:45 itojun Exp $
 
 <200006>
+Sun Jun  4 22:28:30 JST 2000  itojun@iijlab.net
+	* libinet6/resolv/res_send.c: remove MULTICASTQUERY6 case.
+	  it is unnecessary since we have mdnsd, and it was mistake in BIND9
+	  that BIND9 replied to multicast queries.
+
 Sun Jun  4 21:57:47 JST 2000  itojun@iijlab.net
 	* sys/netinet6/nd6.c: revise upper-layer reachability confirmation
 	  hint processing.  count hints from upper-layer, and if the count
