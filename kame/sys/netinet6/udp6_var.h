@@ -1,4 +1,4 @@
-/*	$KAME: udp6_var.h,v 1.10 2000/05/22 15:24:07 itojun Exp $	*/
+/*	$KAME: udp6_var.h,v 1.11 2000/06/05 00:14:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -142,8 +142,13 @@ struct	udp6stat udp6stat;
 void	udp6_ctlinput __P((int, struct sockaddr *, void *));
 void	udp6_init __P((void));
 int	udp6_input __P((struct mbuf **, int *, int));
+#ifndef __NetBSD__
 int	udp6_output __P((struct in6pcb *,
 			 struct mbuf *, struct mbuf *, struct mbuf *));
+#else
+int	udp6_output __P((struct in6pcb *, struct mbuf *, struct mbuf *,
+	struct mbuf *, struct proc *));
+#endif
 int	udp6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 int	udp6_usrreq __P((struct socket *,

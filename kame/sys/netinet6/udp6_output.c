@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.8 2000/06/04 17:21:11 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.9 2000/06/05 00:14:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -153,7 +153,15 @@ udp6_output(in6p, m, addr6, control, p)
 	struct mbuf *control;
 	struct sockaddr *addr6;
 	struct proc *p;
+#elif defined(__NetBSD__)
+int
+udp6_output(in6p, m, addr6, control, p)
+	register struct in6pcb *in6p;
+	register struct mbuf *m;
+	struct mbuf *addr6, *control;
+	struct proc *p;
 #else
+int
 udp6_output(in6p, m, addr6, control)
 	register struct in6pcb *in6p;
 	register struct mbuf *m;
@@ -169,9 +177,6 @@ udp6_output(in6p, m, addr6, control)
 	int error = 0;
 	struct ip6_pktopts opt, *stickyopt = in6p->in6p_outputopts;
 	int priv;
-#ifdef __NetBSD__
-	struct proc *p = curproc;	/* XXX */
-#endif
 	int af, hlen;
 #ifdef __NetBSD__
 	struct ip *ip;

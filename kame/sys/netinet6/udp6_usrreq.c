@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.50 2000/05/22 15:24:07 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.51 2000/06/05 00:14:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -963,7 +963,11 @@ udp6_usrreq(so, req, m, addr6, control)
 		break;
 
 	case PRU_SEND:
+#ifdef __NetBSD__
+		return(udp6_output(in6p, m, addr6, control, p));
+#else
 		return(udp6_output(in6p, m, addr6, control));
+#endif
 
 	case PRU_ABORT:
 		soisdisconnected(so);
