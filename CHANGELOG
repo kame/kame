@@ -1,6 +1,12 @@
-$Id: CHANGELOG,v 1.478 2000/01/24 14:38:11 itojun Exp $
+$Id: CHANGELOG,v 1.479 2000/01/25 08:22:27 itojun Exp $
 
 <200001>
+Tue Jan 25 17:21:15 JST 2000  itojun@iijlab.net
+	* kame/libinet6/rcmd.c: make rcmd() behavior to IPv4-only, for safety
+	  (see 2292bis for reasons).  implement rcmd_af().
+	  KAME-supplied rlogin(1) and rsh(1) may not work right due to the
+	  change.
+
 Mon Jan 24 23:37:38 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/ethereal: upgrade to 0.8.1.
 
