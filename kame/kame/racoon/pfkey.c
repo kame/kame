@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.61 2000/07/05 07:39:16 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.62 2000/07/05 16:53:55 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -714,8 +714,9 @@ pfkey_timeover(iph2)
 		saddrwop2str(iph2->dst));
 	SCHED_INIT(iph2->sce);
 
-	/* send error to kernel by SADB_ACQUIRE. */
-	pk_sendeacquire(iph2);
+	/* If initiator side, send error to kernel by SADB_ACQUIRE. */
+	if (iph2->side == INITIATOR)
+		pk_sendeacquire(iph2);
 
 	unbindph12(iph2);
 	remph2(iph2);
