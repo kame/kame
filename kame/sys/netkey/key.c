@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.160 2000/09/22 16:04:37 itojun Exp $	*/
+/*	$KAME: key.c,v 1.161 2000/09/26 07:55:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3180,28 +3180,13 @@ key_mature(sav)
 
 	/* check compression algorithm */
 	if ((checkmask & 4) != 0) {
-		struct ipcomp_algorithm *algo;
-
-		switch (sav->alg_enc) {
-		case SADB_X_CALG_NONE:
-		case SADB_X_CALG_OUI:
-		case SADB_X_CALG_DEFLATE:
-		case SADB_X_CALG_LZS:
-			break;
-		default:
-#ifdef IPSEC_DEBUG
-			printf("key_mature: unknown compression algorithm.\n");
-#endif
-			return EINVAL;
-		}
+		const struct ipcomp_algorithm *algo;
 
 		/* algorithm-dependent check */
-		algo = &ipcomp_algorithms[sav->alg_enc];
-
-		if (!(algo->compress && algo->decompress)) {
+		algo = ipcomp_algorithm_lookup(sav->alg_enc);
+		if (!algo) {
 #ifdef IPSEC_DEBUG
-			printf("key_mature: "
-				"unsupported compression algorithm.\n");
+			printf("key_mature: unknown compression algorithm.\n");
 #endif
 			return EINVAL;
 		}
@@ -5517,13 +5502,48 @@ key_getcomb_ah()
 }
 
 /*
- * XXX TBD
+ * not really an official behavior.  discussed in pf_key@inner.net in Sep2000.
+ * XXX reorder combinations by preference
  */
 static struct mbuf *
 key_getcomb_ipcomp()
 {
+	struct sadb_comb *comb;
+	const struct ipcomp_algorithm *algo;
+	struct mbuf *m;
+	int i;
+	const int l = PFKEY_ALIGN8(sizeof(struct sadb_comb));
 
-	return NULL;
+	m = NULL;
+	for (i = 1; i <= SADB_X_CALG_MAX; i++) {
+		algo = ipcomp_algorithm_lookup(i);
+		if (!algo)
+			continue;
+
+		if (!m) {
+#ifdef DIAGNOSTIC
+			if (l > MLEN)
+				panic("assumption failed in key_getcomb_ah");
+#endif
+			MGET(m, M_DONTWAIT, MT_DATA);
+			if (m) {
+				M_ALIGN(m, l);
+				m->m_len = l;
+				m->m_next = NULL;
+			}
+		} else
+			M_PREPEND(m, l, M_DONTWAIT);
+		if (!m)
+			return NULL;
+
+		comb = mtod(m, struct sadb_comb *);
+		bzero(comb, sizeof(*comb));
+		key_getcomb_setlifetime(comb);
+		comb->sadb_comb_encrypt = i;
+		/* what should we set into sadb_comb_*_{min,max}bits? */
+	}
+
+	return m;
 }
 
 /*

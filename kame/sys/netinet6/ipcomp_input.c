@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_input.c,v 1.17 2000/09/21 16:30:30 itojun Exp $	*/
+/*	$KAME: ipcomp_input.c,v 1.18 2000/09/26 07:55:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -108,7 +108,7 @@ ipcomp4_input(m, va_alist)
 	struct mbuf *md;
 	struct ip *ip;
 	struct ipcomp *ipcomp;
-	struct ipcomp_algorithm *algo;
+	const struct ipcomp_algorithm *algo;
 	u_int16_t cpi;	/* host order */
 	u_int16_t nxt;
 	size_t hlen;
@@ -159,10 +159,7 @@ ipcomp4_input(m, va_alist)
 			/* other parameters to look at? */
 		}
 	}
-	if (cpi < IPCOMP_MAX && ipcomp_algorithms[cpi].decompress != NULL)
-		algo = &ipcomp_algorithms[cpi];
-	else
-		algo = NULL;
+	algo = ipcomp_algorithm_lookup(cpi);
 	if (!algo) {
 		ipseclog((LOG_WARNING, "IPv4 IPComp input: unknown cpi %u\n",
 			cpi));
@@ -262,7 +259,7 @@ ipcomp6_input(mp, offp, proto)
 	int off;
 	struct ip6_hdr *ip6;
 	struct ipcomp *ipcomp;
-	struct ipcomp_algorithm *algo;
+	const struct ipcomp_algorithm *algo;
 	u_int16_t cpi;	/* host order */
 	u_int16_t nxt;
 	int error;
@@ -297,10 +294,7 @@ ipcomp6_input(mp, offp, proto)
 			/* other parameters to look at? */
 		}
 	}
-	if (cpi < IPCOMP_MAX && ipcomp_algorithms[cpi].decompress != NULL)
-		algo = &ipcomp_algorithms[cpi];
-	else
-		algo = NULL;
+	algo = ipcomp_algorithm_lookup(cpi);
 	if (!algo) {
 		ipseclog((LOG_WARNING, "IPv6 IPComp input: unknown cpi %u; "
 			"dropping the packet for simplicity\n", cpi));

@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_core.c,v 1.21 2000/09/21 18:07:40 itojun Exp $	*/
+/*	$KAME: ipcomp_core.c,v 1.22 2000/09/26 07:55:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -84,12 +84,19 @@ static int deflate_window_out = -12;
 static const int deflate_window_in = -1 * MAX_WBITS;	/* don't change it */
 static int deflate_memlevel = MAX_MEM_LEVEL;
 
-struct ipcomp_algorithm ipcomp_algorithms[] = {
-	{ NULL, NULL, -1 },
-	{ NULL, NULL, -1 },
+static const struct ipcomp_algorithm ipcomp_algorithms[] = {
 	{ deflate_compress, deflate_decompress, 90 },
-	{ NULL, NULL, 90 },
 };
+
+const struct ipcomp_algorithm *
+ipcomp_algorithm_lookup(idx)
+	int idx;
+{
+
+	if (idx == SADB_X_CALG_DEFLATE)
+		return &ipcomp_algorithms[0];
+	return NULL;
+}
 
 static void *
 deflate_alloc(aux, items, siz)

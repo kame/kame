@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_output.c,v 1.18 2000/09/21 19:34:33 itojun Exp $	*/
+/*	$KAME: ipcomp_output.c,v 1.19 2000/09/26 07:55:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -118,7 +118,7 @@ ipcomp_output(m, nexthdrp, md, isr, af)
 	struct mbuf *mprev;
 	struct ipcomp *ipcomp;
 	struct secasvar *sav = isr->sav;
-	struct ipcomp_algorithm *algo;
+	const struct ipcomp_algorithm *algo;
 	u_int16_t cpi;		/* host order */
 	size_t plen0, plen;	/*payload length to be compressed*/
 	size_t compoff;
@@ -142,8 +142,8 @@ ipcomp_output(m, nexthdrp, md, isr, af)
 	}
 
 	/* grab parameters */
-	if ((ntohl(sav->spi) & ~0xffff) != 0 || sav->alg_enc >= IPCOMP_MAX
-	 || ipcomp_algorithms[sav->alg_enc].compress == NULL) {
+	algo = ipcomp_algorithm_lookup(sav->alg_enc);
+	if ((ntohl(sav->spi) & ~0xffff) != 0 || !algo) {
 		ipsecstat.out_inval++;
 		m_freem(m);
 		return EINVAL;
@@ -152,7 +152,6 @@ ipcomp_output(m, nexthdrp, md, isr, af)
 		cpi = sav->alg_enc;
 	else
 		cpi = ntohl(sav->spi) & 0xffff;
-	algo = &ipcomp_algorithms[sav->alg_enc];	/*XXX*/
 
 	/* compute original payload length */
 	plen = 0;
