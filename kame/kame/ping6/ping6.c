@@ -760,7 +760,7 @@ main(argc, argv)
 	for (;;) {
 		struct msghdr m;
 		struct cmsghdr *cm;
-		u_char buf[256];
+		u_char buf[1024];
 		struct iovec iov[2];
 
 		if (options & F_FLOOD) {
