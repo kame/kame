@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.8 2002/06/18 03:02:43 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.9 2002/06/18 06:02:05 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1327,12 +1327,13 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh)
 	u_int32_t refresh;
 {
 	struct ip6m_binding_ack *ip6ma;
-	int ip6ma_size;
+	int ip6ma_size, pad;
 
 	*pktopt_mobility = NULL;
 
 	ip6ma_size = sizeof(struct ip6m_binding_ack);
-	ip6ma_size += 4; /* XXX */
+	pad = (ip6ma_size + 4) & ~4;
+	ip6ma_size += pad;	/* XXX */
 
 	MALLOC(ip6ma, struct ip6m_binding_ack *,
 	       ip6ma_size, M_IP6OPT, M_NOWAIT);
@@ -1349,6 +1350,13 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh)
 	ip6ma->ip6ma_refresh = htonl(refresh);
 
 	/* XXX authorization data processing. */
+
+	/* XXX padN */
+	if (pad > 1) {
+		u_char *p = ((u_char *)ip6ma) + ip6ma_size - pad;
+		*p++ = MIP6OPT_PADN;
+		*p = pad;
+	}
 
 	/* calculate checksum. */
 	ip6ma->ip6ma_cksum = mip6_cksum(src, dst, ip6ma_size,
