@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.141 2002/10/01 13:19:36 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.142 2003/03/17 23:10:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -590,9 +590,9 @@ getaddrinfo(hostname, servname, hints, res)
 		goto globcopy;
 	}
 
-	if (pai->ai_flags & AI_NUMERICHOST)
-		ERR(EAI_NONAME);
 	if (hostname == NULL)
+		ERR(EAI_NONAME);	/* used to be EAI_NODATA */
+	if (pai->ai_flags & AI_NUMERICHOST)
 		ERR(EAI_NONAME);
 
 	/*
