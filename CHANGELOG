@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2323 2003/01/29 12:29:34 t-momose Exp $
+$KAME: CHANGELOG,v 1.2324 2003/01/30 04:07:21 suz Exp $
 
 <200301>
+Thu Jan 30 13:04:25 JST 2003	suz@crl.hitachi.co.jp
+	* kame/kame/pim6sd/{rp.c, cfparse.y}:
+	fixed a bug that "cand_bsr/cand_rp (ifname)" does not work.
+	(reported by Pekka Savola in snap-users ML #7516)
+
 2003-01-29  MOMOSE Tsuyoshi  <t-momose@netlab.nec.co.jp>
 
 	* kame/kame/sys/netinet6/mip6.c, mip6_var.h, mip6_pktpro.c:
