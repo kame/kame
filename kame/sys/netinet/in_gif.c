@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.93 2003/11/11 15:34:43 t-momose Exp $	*/
+/*	$KAME: in_gif.c,v 1.94 2004/05/21 08:35:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -31,10 +31,8 @@
 
 #ifdef __FreeBSD__
 #include "opt_mrouting.h"
-#if __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
-#endif
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
@@ -51,13 +49,13 @@
 #ifdef __FreeBSD__
 #include <sys/sysctl.h>
 #endif
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#ifndef __FreeBSD__
 #include <sys/ioctl.h>
 #endif
 #include <sys/syslog.h>
 #include <sys/protosw.h>
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <sys/malloc.h>
 #endif
 
@@ -117,13 +115,13 @@ struct protosw in_gif_protosw =
   rip_output,
 #endif
   0,		rip_ctloutput,
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
   0,
 #else
   rip_usrreq,
 #endif
   0,            0,              0,              0,
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
   &rip_usrreqs
 #endif
 };
@@ -233,7 +231,7 @@ in_gif_output(ifp, family, m)
 	struct ip iphdr;	/* capsule IP header, host byte ordered */
 	int proto, error;
 	u_int8_t tos;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	struct timeval mono_time;
 #endif
 
@@ -315,7 +313,7 @@ in_gif_output(ifp, family, m)
 		return ENOBUFS;
 	bcopy(&iphdr, mtod(m, struct ip *), sizeof(struct ip));
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 	microtime(&mono_time);
 #endif
 
@@ -346,11 +344,7 @@ in_gif_output(ifp, family, m)
 		dst->sin_len = sizeof(struct sockaddr_in);
 		dst->sin_addr = sin_dst->sin_addr;
 
-#ifdef __bsdi__
-		rtcalloc(&sc->gif_ro);
-#else
 		rtalloc(&sc->gif_ro);
-#endif
 		if (sc->gif_ro.ro_rt == NULL) {
 			m_freem(m);
 			return ENETUNREACH;
@@ -377,7 +371,7 @@ in_gif_output(ifp, family, m)
 }
 
 void
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifdef __FreeBSD__
 in_gif_input(m, off)
 	struct mbuf *m;
 	int off;
@@ -391,7 +385,7 @@ in_gif_input(m, va_alist)
 #endif
 #endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 {
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 	int off, proto;
 	va_list ap;
 #else
@@ -404,17 +398,17 @@ in_gif_input(m, va_alist)
 	u_int8_t otos;
 #endif
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	va_start(ap, m);
 	off = va_arg(ap, int);
 #if !defined(__OpenBSD__)
 	proto = va_arg(ap, int);
 #endif
 	va_end(ap);
-#endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
+#endif
 
 	ip = mtod(m, struct ip *);
-#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if defined(__OpenBSD__) || defined(__FreeBSD__)
 	proto = ip->ip_p;
 #endif
 

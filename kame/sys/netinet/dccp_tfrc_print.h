@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tfrc_print.h,v 1.6 2004/02/12 18:31:24 itojun Exp $	*/
+/*	$KAME: dccp_tfrc_print.h,v 1.7 2004/05/21 08:35:48 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
@@ -55,14 +55,14 @@
 
 #define PRINTSENDHIST(ccbp,elmp) \
         do {    \
-            if (STAILQ_EMPTY(&((ccbp)->hist))) \
+            if (TAILQ_EMPTY(&((ccbp)->hist))) \
                TFRC_DEBUG((LOG_INFO, "Send history is empty\n")); \
             else {   \
                 TFRC_DEBUG((LOG_INFO, "Send history:\n")); \
-	      (elmp)= STAILQ_FIRST(&((ccbp)->hist)); \
+	      (elmp)= TAILQ_FIRST(&((ccbp)->hist)); \
 	      while ((elmp) != NULL) {  \
 		 PRINTSHISTENTRY((elmp)); \
-                 (elmp) = STAILQ_NEXT((elmp),linfo); \
+                 (elmp) = TAILQ_NEXT((elmp),linfo); \
 	      }\
 	    }\
          } while (0)
@@ -76,14 +76,14 @@
 
 #define PRINTRECVHIST(ccbp,elmp) \
         do {    \
-            if (STAILQ_EMPTY(&((ccbp)->hist))) \
+            if (TAILQ_EMPTY(&((ccbp)->hist))) \
                TFRC_DEBUG((LOG_INFO, "Recv history is empty\n")); \
             else {   \
                 TFRC_DEBUG((LOG_INFO, "Recv history:\n")); \
-	      (elmp)= STAILQ_FIRST(&((ccbp)->hist)); \
+	      (elmp)= TAILQ_FIRST(&((ccbp)->hist)); \
 	      while ((elmp) != NULL) {  \
 		 PRINTRHISTENTRY((elmp)); \
-                 (elmp) = STAILQ_NEXT((elmp),linfo); \
+                 (elmp) = TAILQ_NEXT((elmp),linfo); \
 	      }\
 	    }\
          } while (0)

@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tfrc.h,v 1.6 2004/02/12 17:35:31 itojun Exp $	*/
+/*	$KAME: dccp_tfrc.h,v 1.7 2004/05/21 08:35:48 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
@@ -62,7 +62,7 @@
 #define TFRC_SEND_WAIT_TERM     20
 
 /* Packet history */
-STAILQ_HEAD(s_hist_head,s_hist_entry); 
+TAILQ_HEAD(s_hist_head,s_hist_entry); 
 
 struct fixpoint {
 	long long num;
@@ -70,7 +70,7 @@ struct fixpoint {
 };
  
 struct s_hist_entry {
-	STAILQ_ENTRY(s_hist_entry) linfo;	/* Tail queue. */
+	TAILQ_ENTRY(s_hist_entry) linfo;	/* Tail queue. */
 	u_int32_t seq;		/* Sequence number */
 	struct timeval t_sent;	/* When the packet was sent */
 	u_int8_t win_count;	/* Windowcounter for packet */
@@ -175,10 +175,10 @@ void tfrc_send_packet_recv(void *, char *, int);
 #define TFRC_RECV_IVAL_F_LENGTH  8
 
 /* Packet history */
-STAILQ_HEAD(r_hist_head,r_hist_entry); 
+TAILQ_HEAD(r_hist_head,r_hist_entry); 
  
 struct r_hist_entry {
-	STAILQ_ENTRY(r_hist_entry) linfo;	/* Tail queue. */
+	TAILQ_ENTRY(r_hist_entry) linfo;	/* Tail queue. */
 	u_int32_t seq;		/* Sequence number */
 	struct timeval t_recv;	/* When the packet was received */
 	u_int8_t win_count;	/* Window counter for that packet */

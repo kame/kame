@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.92 2004/04/15 01:36:22 suz Exp $	*/
+/*	$KAME: icmp6.h,v 1.93 2004/05/21 08:35:48 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -862,35 +862,6 @@ struct icmp6stat {
 	{ "mldalwaysv2", CTLTYPE_INT }, \
 }
 
-#ifdef __bsdi__
-#define ICMPV6CTL_VARS { \
-	0, \
-	0, \
-	&icmp6_rediraccept,   \
-	&icmp6_redirtimeout,  \
-	0, \
-	0, \
-	&nd6_prune,	\
-	0, \
-	&nd6_delay,	\
-	&nd6_umaxtries, \
-	&nd6_mmaxtries,	\
-	&nd6_useloopback, \
-	0, \
-	&icmp6_nodeinfo, \
-	&icmp6errppslim, \
-	&nd6_maxnudhint, \
-	0, \
-	0, \
-	&nd6_debug, \
-	0, \
-	0, \
-	&mldmaxsrcfilter, \
-	&mldsomaxsrc, \
-	&mldalways_v2, \
-}
-#endif
-
 #define RTF_PROBEMTU	RTF_PROTO1
 
 #ifdef _KERNEL
@@ -910,10 +881,6 @@ void	icmp6_reflect __P((struct mbuf *, size_t));
 void	icmp6_prepare __P((struct mbuf *));
 void	icmp6_redirect_input __P((struct mbuf *, int));
 void	icmp6_redirect_output __P((struct mbuf *, struct rtentry *));
-#ifdef __bsdi__
-int	icmp6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
-void	icmp6_mtuexpire __P((struct rtentry *, struct rttimer *));
-#endif /*__bsdi__*/
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 int	icmp6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 #endif

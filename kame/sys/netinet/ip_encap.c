@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.93 2004/05/20 08:15:54 suz Exp $	*/
+/*	$KAME: ip_encap.c,v 1.94 2004/05/21 08:35:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -327,7 +327,7 @@ encap4_lookup(m, off, proto, dir)
 }
 
 void
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifdef __FreeBSD__
 encap4_input(struct mbuf *m, int off)
 #else
 #if __STDC__
@@ -337,27 +337,27 @@ encap4_input(m, va_alist)
 	struct mbuf *m;
 	va_dcl
 #endif
-#endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
+#endif
 {
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 	int off, proto;
 	va_list ap;
 #else
 	int proto;
-#endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
+#endif
 	const struct protosw *psw;
 	struct encaptab *match;
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 	va_start(ap, m);
 	off = va_arg(ap, int);
-#if !defined(__OpenBSD__)
+#ifdef __NetBSD__
 	proto = va_arg(ap, int);
 #endif
 	va_end(ap);
-#endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
+#endif
 
-#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if defined(__OpenBSD__) || defined(__FreeBSD__)
 	proto = mtod(m, struct ip *)->ip_p;
 #endif
 
@@ -368,7 +368,7 @@ encap4_input(m, va_alist)
 		psw = match->psw;
 		if (psw && psw->pr_input) {
 			encap_fillarg(m, match);
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 			(*psw->pr_input)(m, off);
 #else
 			(*psw->pr_input)(m, off, proto);
@@ -405,16 +405,6 @@ encap4_input(m, va_alist)
 
 	/* last resort: inject to raw socket */
 	rip_input(m, off);
-#else /* freebsd2, freebsd3, bsdi3, bsdi4 */
-#ifdef MROUTING
-	if (proto == IPPROTO_IPV4) {
-		ipip_input(m, off, proto);
-		return;
-	}
-#endif
-
-	/* last resort: inject to raw socket */
-	rip_input(m, off, proto);
 #endif
 }
 #endif
@@ -820,7 +810,7 @@ fail:
 /* XXX encap4_ctlinput() is necessary if we set DF=1 on outer IPv4 header */
 
 #ifdef INET6
-#if defined(HAVE_NRL_INPCB) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(HAVE_NRL_INPCB) || defined(__FreeBSD__)
 #define in6_rtchange	in_rtchange
 #define in6pcb		inpcb
 #endif
