@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.40 2001/06/25 04:54:30 itojun Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.41 2001/07/11 09:14:34 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -2081,6 +2081,9 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 	    continue;
 	}
 
+	if (SSMGROUP(&group))
+		goto bypass_rp;
+
 	rpentry_ptr = rp_match(&group);
 	if (rpentry_ptr == (rpentry_t *) NULL)
 	    continue;
@@ -2088,6 +2091,7 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 	IF_DEBUG(DEBUG_PIM_JOIN_PRUNE)
 		log(LOG_DEBUG,0,"The rp for this JOIN/PRUNE is %s",inet6_fmt(&rpentry_ptr->address.sin6_addr));
 
+bypass_rp:
 	data_ptr_group_j_start = data_ptr;
 	data_ptr_group_p_start = data_ptr + num_j_srcs * sizeof(pim6_encod_src_addr_t);
 

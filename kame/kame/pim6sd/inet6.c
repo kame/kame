@@ -1,4 +1,4 @@
-/*	$KAME: inet6.c,v 1.9 2000/12/04 06:45:29 itojun Exp $	*/
+/*	$KAME: inet6.c,v 1.10 2001/07/11 09:14:34 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -192,6 +192,23 @@ inet6_match_prefix(sa1, sa2, mask)
     }
 
     return (1);
+}
+
+int 
+inet6_same_prefix(sa1,sa2,mask)
+    struct sockaddr_in6 *sa1,*sa2;
+    struct in6_addr *mask;
+{
+    int i;
+
+    for (i = 0; i < 16; i++)
+    {
+
+        if ((sa1->sin6_addr.s6_addr[i] ^ sa2->sin6_addr.s6_addr[i]) &
+             mask->s6_addr[i])
+             return (0);
+    }
+    return 1;
 }
 
 char *

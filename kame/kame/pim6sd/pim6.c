@@ -1,4 +1,4 @@
-/*	$KAME: pim6.c,v 1.15 2001/03/21 23:04:57 jinmei Exp $	*/
+/*	$KAME: pim6.c,v 1.16 2001/07/11 09:14:34 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -103,6 +103,10 @@
 #include "debug.h"
 
 struct sockaddr_in6 allpim6routers_group;
+struct sockaddr_in6 ssmtransientprefix;
+struct sockaddr_in6 ssmpermanentprefix;
+struct in6_addr mmask;
+
 int pim6_socket;
 char *pim6_recv_buf;
 char *pim6_send_buf;
@@ -160,6 +164,21 @@ init_pim6()
 	if (inet_pton(AF_INET6, "ff00::",
 		      (void *)&sockaddr6_d.sin6_addr) != 1)
 		log(LOG_ERR, 0, "inet_pton failed for ff00::");
+
+	memset(&ssmtransientprefix, 0, sizeof(ssmtransientprefix));
+	ssmtransientprefix.sin6_len = sizeof(ssmtransientprefix);
+	ssmtransientprefix.sin6_family = AF_INET6;
+	if (inet_pton(AF_INET6, "ff30::", (void *) &ssmtransientprefix.sin6_addr) != 1)
+	    log(LOG_ERR, 0, "inet_pton failed for ff3::");
+
+	if (inet_pton(AF_INET6, "fff0::", (void *) &ssmmask) != 1)
+	    log(LOG_ERR, 0, "inet_pton failed for fff::");
+
+	memset(&ssmpermanentprefix, 0, sizeof(ssmpermanentprefix));
+	ssmpermanentprefix.sin6_len = sizeof(ssmpermanentprefix);
+	ssmpermanentprefix.sin6_family = AF_INET6;
+	if (inet_pton(AF_INET6, "ff20::", (void *) &ssmpermanentprefix.sin6_addr) != 1)
+	    log(LOG_ERR, 0, "inet_pton failed for ff2::");
 
 	/* specify to tell receiving interface */
 	on = 1;

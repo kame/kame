@@ -1,4 +1,4 @@
-/*	$KAME: inet6.h,v 1.6 2000/12/04 06:45:29 itojun Exp $	*/
+/*	$KAME: inet6.h,v 1.7 2001/07/11 09:14:34 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -60,6 +60,9 @@ extern int  inet6_localif_address __P((struct sockaddr_in6 *sa,
 extern int  inet6_greaterthan __P((struct sockaddr_in6 *sa1,
                        struct sockaddr_in6 *sa2));
 extern int  inet6_match_prefix __P((struct sockaddr_in6 *sa1,
+				   struct sockaddr_in6 * sa2,
+				   struct in6_addr * mask));
+extern int inet6_same_prefix __P((struct sockaddr_in6 * sa1,
                     struct sockaddr_in6 *sa2,
                     struct in6_addr *mask));
 extern int  inet6_mask2plen    __P((struct in6_addr *mask));

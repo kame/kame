@@ -1,4 +1,4 @@
-/*	$KAME: mrt.c,v 1.7 2001/06/25 04:54:29 itojun Exp $	*/
+/*	$KAME: mrt.c,v 1.8 2001/07/11 09:14:34 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -61,6 +61,7 @@
 #include "mrt.h"
 #include "vif.h"
 #include "rp.h"
+#include "pim6.h"
 #include "pimd.h"
 #include "debug.h"
 #include "mld6.h"
@@ -267,6 +268,7 @@ find_route(source, group, flags, create)
 
     /* Creation allowed */
 
+    /* first try to find an RP for this mrt => not used in SSM */
     if (flags & (MRTF_SG | MRTF_WC))
     {
 
@@ -276,6 +278,8 @@ find_route(source, group, flags, create)
 	    return (mrtentry_t *) NULL;
 	}
 
+	if (SSMGROUP(group))
+		goto not_create;
 	if (grpentry_ptr->active_rp_grp == (rp_grp_entry_t *) NULL)
 	{
 	    rp_grp_entry_ptr = rp_grp_match(group);
@@ -308,6 +312,7 @@ find_route(source, group, flags, create)
 	    rpentry_ptr = grpentry_ptr->active_rp_grp->rp->rpentry;
     }
 
+not_create:
     mrtentry_ptr_wc = mrtentry_ptr_pmbr = (mrtentry_t *) NULL;
 
     if (flags & MRTF_WC)
@@ -397,12 +402,16 @@ find_route(source, group, flags, create)
 
 	if (mrtentry_ptr->flags & MRTF_NEW)
 	{
+	    if (SSMGROUP(group))
+		goto not_copy;
+
 	    if ((mrtentry_ptr_2 = grpentry_ptr->grp_route)
 		== (mrtentry_t *) NULL)
 	    {
 		mrtentry_ptr_2 = rpentry_ptr->mrtlink;
 	    }
 	    /* Copy the oif list from the existing (*,G) or (*,*,RP) entry */
+	    /* not used in SSM */
 	    if (mrtentry_ptr_2 != (mrtentry_t *) NULL)
 	    {
 		VOIF_COPY(mrtentry_ptr_2, mrtentry_ptr);
@@ -416,6 +425,8 @@ find_route(source, group, flags, create)
 		    mrtentry_ptr->flags |= MRTF_RP;
 		}
 	    }
+
+    not_copy:
 	    if (!(mrtentry_ptr->flags & MRTF_RP))
 	    {
 		mrtentry_ptr->incoming = srcentry_ptr->incoming;
@@ -423,11 +434,14 @@ find_route(source, group, flags, create)
 		mrtentry_ptr->metric = srcentry_ptr->metric;
 		mrtentry_ptr->preference = srcentry_ptr->preference;
 	    }
-	    move_kernel_cache(mrtentry_ptr, 0);
+	    if (!SSMGROUP(group))
+	    	move_kernel_cache(mrtentry_ptr, 0);
 #ifdef RSRR
 	    rsrr_cache_bring_up(mrtentry_ptr);
 #endif				/* RSRR */
 	}
+	if (SSMGROUP(group))
+		add_kernel_cache(mrtentry_ptr, source, group, MFC_MOVE_FORCE);
 	return (mrtentry_ptr);
     }
 
@@ -613,8 +627,12 @@ delete_mrtentry(mrtentry_ptr)
 		     * All (S,G) MRT entries are gone. Allow creating (*,G)
 		     * MFC entries.
 		     */
-		    mrtentry_rp
-			= mrtentry_ptr->group->active_rp_grp->rp->rpentry->mrtlink;
+		    if (!SSMGROUP(&mrtentry_ptr->group->group)) {
+			mrtentry_rp
+			    = mrtentry_ptr->group->active_rp_grp->rp->rpentry->mrtlink;
+		    } else {
+			mrtentry_rp = NULL;
+		    }
 		    mrtentry_wc = mrtentry_ptr->group->grp_route;
 		    if (mrtentry_rp != (mrtentry_t *) NULL)
 			mrtentry_rp->flags &= ~MRTF_MFC_CLONE_SG;
@@ -1440,6 +1458,9 @@ move_kernel_cache(mrtentry_ptr, flags)
 	 */
 	/* TODO: XXX: No need for this? Thinking.... */
 	/* move_kernel_cache(mrtentry_ptr->group->grp_route, flags); */
+
+	if (SSMGROUP(&mrtentry_ptr->group->group))
+		return;
 
 	if ((mrtentry_rp = mrtentry_ptr->group->grp_route) ==
 	    (mrtentry_t *) NULL)

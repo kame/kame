@@ -1,4 +1,4 @@
-/*	$KAME: route.c,v 1.16 2001/06/25 04:54:30 itojun Exp $	*/
+/*	$KAME: route.c,v 1.17 2001/07/11 09:14:34 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -59,6 +59,7 @@
 #include <syslog.h>
 #include "defs.h"
 #include "pimd.h"
+#include "pim6.h"
 #include "vif.h"
 #include "mrt.h"
 #include "debug.h"
@@ -301,7 +302,22 @@ add_leaf(vifi, source, group)
 	    return;
     }
 
-    mrtentry_ptr = find_route(&sockaddr6_any, group, MRTF_WC, CREATE);
+    /*
+     * look if this group address is in the ssm range:
+     * if true we have to create an (S,G) entry
+     * the source have to be specified => mldv2_proto  
+     */
+    if (SSMGROUP(group)) {
+	log(LOG_DEBUG, 0, "Hmmm this is an SSM group...");
+	if (source == NULL) {
+	    log(LOG_DEBUG, 0,
+		"Sorry,the source is unspecified,will not forward");
+	    return;
+	}
+	mrtentry_ptr = find_route(source, group, MRTF_SG, CREATE);
+    } else {
+	mrtentry_ptr = find_route(&sockaddr6_any, group, MRTF_WC, CREATE);
+    }
 
     if (mrtentry_ptr == (mrtentry_t *) NULL)
 	return;
@@ -360,7 +376,24 @@ delete_leaf(vifi, source, group)
     if_set     old_oifs;
     if_set     new_leaves;
 
-    mrtentry_ptr = find_route(&sockaddr6_any, group, MRTF_WC, DONT_CREATE);
+    /*
+     * look if this group address is in the ssm range:
+     * if true we have to create an (S,G) entry 
+     * the source have to be specified => mldv2_proto  
+     */
+
+    if (SSMGROUP(group)) {
+	log(LOG_DEBUG, 0, "Hey! this is an SSM group...");
+	if (source == NULL) {
+	    log(LOG_DEBUG, 0,
+		"Sorry,the source is unspecified,delete leaf wrong call");
+	    return;
+	}
+	mrtentry_ptr = find_route(source, group, MRTF_SG, DONT_CREATE);
+    } else {
+	mrtentry_ptr = find_route(&sockaddr6_any, group, MRTF_WC, DONT_CREATE);
+    }
+
     if (mrtentry_ptr == (mrtentry_t *) NULL)
 	return;
 
@@ -398,6 +431,8 @@ delete_leaf(vifi, source, group)
 	 mrtentry_srcs != (mrtentry_t *) NULL;
 	 mrtentry_srcs = mrtentry_srcs->grpnext)
     {
+	if (SSMGROUP(&mrtentry_srcs->group->group))
+		continue;
 	IF_COPY(&mrtentry_srcs->leaves, &new_leaves);
 	IF_CLR(vifi, &new_leaves);
 	change_interfaces(mrtentry_srcs,
@@ -433,6 +468,10 @@ calc_oifs(mrtentry_ptr, oifs_ptr)
 	return;
     }
     IF_ZERO(&oifs);
+
+    if (SSMGROUP(&mrtentry_ptr->group->group))
+	goto bypass_pmbr;
+
     if (!(mrtentry_ptr->flags & MRTF_PMBR))
     {
 	/* Either (*,G) or (S,G). Merge with the oifs from the (*,*,RP) */
@@ -459,6 +498,7 @@ calc_oifs(mrtentry_ptr, oifs_ptr)
 	}
     }
 
+bypass_pmbr:
     /* Calculate my own stuff */
     IF_MERGE(&oifs, &mrtentry_ptr->joined_oifs, &oifs);
     IF_CLR_MASK(&oifs, &mrtentry_ptr->pruned_oifs);
@@ -744,13 +784,19 @@ change_interfaces(mrtentry_ptr, new_iif, new_joined_oifs_, new_pruned_oifs,
 	mrtentry_t     *mrtentry_tmp;
 #endif				/* KERNEL_MFC_WC_G */
 
-	mrtentry_rp = mrtentry_ptr->group->active_rp_grp->rp->rpentry->mrtlink;
-	mrtentry_wc = mrtentry_ptr->group->grp_route;
+	if (!SSMGROUP(&mrtentry_ptr->group->group)) {
+	    mrtentry_rp =
+		mrtentry_ptr->group->active_rp_grp->rp->rpentry->mrtlink;
+	    mrtentry_wc = mrtentry_ptr->group->grp_route;
+	}
 #ifdef KERNEL_MFC_WC_G
 	/*
 	 * Check whether (*,*,RP) or (*,G) have different (iif,oifs) from the
 	 * (S,G). If "yes", then forbid creating (*,G) MFC.
+	 * => not used in PIM SSM
 	 */
+	if (SSMGROUP(&mrtentry_ptr->group->group))
+	    goto bypass_rpentry;
 	for (mrtentry_tmp = mrtentry_rp; 1; mrtentry_tmp = mrtentry_wc)
 	{
 	    for (; 1;)
@@ -774,6 +820,7 @@ change_interfaces(mrtentry_ptr, new_iif, new_joined_oifs_, new_pruned_oifs,
 	    if (mrtentry_tmp == mrtentry_wc)
 		break;
 	}
+bypass_rpentry:
 #endif				/* KERNEL_MFC_WC_G */
 
 	if (IF_ISEMPTY(&new_real_oifs))
@@ -911,6 +958,17 @@ process_cache_miss(im)
     iif = im->im6_mif;
 
     uvifs[iif].uv_cache_miss++;
+
+     /* cache(s) miss are not processed in SSM */
+
+    if(SSMGROUP(&group))
+    {
+	IF_DEBUG(DEBUG_MFC)
+		log(LOG_DEBUG,0,"SSM Cache miss src %s dst %s, iif %d",
+	    inet6_fmt(&source.sin6_addr), inet6_fmt(&group.sin6_addr), iif);
+	return;
+    }
+
     IF_DEBUG(DEBUG_MFC)
 	log(LOG_DEBUG, 0, "Cache miss, src %s, dst %s, iif %d",
 	    inet6_fmt(&source.sin6_addr), inet6_fmt(&group.sin6_addr), iif);
