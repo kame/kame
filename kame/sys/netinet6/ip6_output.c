@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.263 2001/12/24 18:23:52 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.264 2001/12/24 18:28:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3912,11 +3912,6 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		struct ifnet *ifp = NULL;
 		struct in6_pktinfo *pktinfo;
 
-		if (len == 0) {	/* just remove the option */
-			ip6_clearpktopts(opt, IPV6_PKTINFO);
-			break;
-		}
-
 		if (len != sizeof(struct in6_pktinfo))
 			return(EINVAL);
 
@@ -3928,7 +3923,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		 * in6addr_any and ipi6_ifindex being zero.
 		 * [rfc2292bis-02, Section 6]
 		 */
-		if (sticky && optname == IPV6_PKTINFO && opt->ip6po_pktinfo) {
+		if (optname == IPV6_PKTINFO && opt->ip6po_pktinfo) {
 			if (pktinfo->ipi6_ifindex == 0 &&
 			    IN6_IS_ADDR_UNSPECIFIED(&pktinfo->ipi6_addr)) {
 				ip6_clearpktopts(opt, optname);
