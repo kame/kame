@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.44 2000/08/06 16:43:17 itojun Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.45 2000/09/25 22:43:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -170,12 +170,12 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 				(flags & NI_DGRAM) ? "udp" : "tcp");
 		}
 		if (sp) {
-			if (strlen(sp->s_name) > servlen)
+			if (strlen(sp->s_name) + 1 > servlen)
 				return ENI_MEMORY;
 			strcpy(serv, sp->s_name);
 		} else {
 			snprintf(numserv, sizeof(numserv), "%d", ntohs(port));
-			if (strlen(numserv) > servlen)
+			if (strlen(numserv) + 1 > servlen)
 				return ENI_MEMORY;
 			strcpy(serv, numserv);
 		}
@@ -278,7 +278,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 					*p = '\0';
 			}
 #endif
-			if (strlen(hp->h_name) > hostlen) {
+			if (strlen(hp->h_name) + 1 > hostlen) {
 #ifdef USE_GETIPNODEBY
 				freehostent(hp);
 #endif
