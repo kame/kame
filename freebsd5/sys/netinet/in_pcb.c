@@ -222,10 +222,6 @@ in_pcballoc(so, pcbinfo, td)
 		inp->inp_vflag |= INP_IPV6PROTO;
 		if (ip6_v6only)
 			inp->inp_flags |= IN6P_IPV6_V6ONLY;
-		inp->in6p_fsa.sin6_family =
-			inp->in6p_lsa.sin6_family = AF_INET6;
-		inp->in6p_fsa.sin6_len =
-			inp->in6p_lsa.sin6_len = sizeof(struct sockaddr_in6);
 	}
 #endif
 	LIST_INSERT_HEAD(pcbinfo->listhead, inp, inp_list);

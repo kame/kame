@@ -87,7 +87,6 @@ static const char rcsid[] =
 char	*inetname (struct in_addr *);
 void	inetprint (struct in_addr *, int, const char *, int);
 #ifdef INET6
-extern void	sa_print (struct sockaddr *, char *, int);
 static int udp_done, tcp_done;
 #ifdef DCCP
 static int dccp_done;
@@ -301,11 +300,11 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 			}
 #ifdef INET6
 			else if (inp->inp_vflag & INP_IPV6) {
-				sa_print((struct sockaddr *)&inp->in6p_lsa,
-				    name, 1);
+				inet6print(&inp->in6p_laddr,
+				    (int)inp->inp_lport, name, 1);
 				if (!Lflag)
-					sa_print((struct sockaddr *)&inp->in6p_fsa,
-					    name, 1);
+					inet6print(&inp->in6p_faddr,
+					    (int)inp->inp_fport, name, 1);
 			} /* else nothing printed now */
 #endif /* INET6 */
 		} else if (inp->inp_flags & INP_ANONPORT) {
@@ -318,11 +317,11 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 			}
 #ifdef INET6
 			else if (inp->inp_vflag & INP_IPV6) {
-				sa_print((struct sockaddr *)&inp->in6p_lsa,
-				    name, 1);
+				inet6print(&inp->in6p_laddr,
+				    (int)inp->inp_lport, name, 1);
 				if (!Lflag)
-					sa_print((struct sockaddr *)&inp->in6p_fsa,
-					    name, 0);
+					inet6print(&inp->in6p_faddr,
+					    (int)inp->inp_fport, name, 0);
 			} /* else nothing printed now */
 #endif /* INET6 */
 		} else {
@@ -337,11 +336,11 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 			}
 #ifdef INET6
 			else if (inp->inp_vflag & INP_IPV6) {
-				sa_print((struct sockaddr *)&inp->in6p_lsa,
-				    name, 0);
+				inet6print(&inp->in6p_laddr,
+				    (int)inp->inp_lport, name, 0);
 				if (!Lflag)
-					sa_print((struct sockaddr *)&inp->in6p_fsa,
-					    name,
+					inet6print(&inp->in6p_faddr,
+					    (int)inp->inp_fport, name,
 					    inp->inp_lport != inp->inp_fport);
 			} /* else nothing printed now */
 #endif /* INET6 */
@@ -577,7 +576,6 @@ dccp_stats(u_long off __unused, const char *name, int af1 __unused)
 {
 	struct dccpstat dccpstat, zerostat;
 	size_t len = sizeof dccpstat;
-	u_long delivered;
 
 	if (zflag)
 		memset(&zerostat, 0, len);
@@ -624,7 +622,7 @@ dccp_stats(u_long off __unused, const char *name, int af1 __unused)
 	p(tfrcs_recv_losts, "\t%lu lost packet%s\n");
 	p(tfrcs_recv_noopt, "\t%lu dropped packet%s (missing option)\n");
 	p(tfrcs_recv_nomem, "\t%lu dropped packet%s (no memory for history)\n");
-	p(tfrcs_recv_erropt, "\t%lu feedback packet%s failed option adding%s on feedback packet\n");
+	p(tfrcs_recv_erropt, "\t%lu feedback packet%s failed option adding on feedback packet\n");
 
 	printf("\n\tTCPlike Sender:\n");
 	p(tcplikes_send_conn, "\t%lu connection%s established\n");

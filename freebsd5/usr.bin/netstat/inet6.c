@@ -72,6 +72,9 @@ static char sccsid[] = "@(#)inet6.c	8.4 (Berkeley) 4/20/94";
 
 struct	socket sockb;
 
+char	*inet6name (struct in6_addr *);
+
+static char ntop_buf[INET6_ADDRSTRLEN];
 
 static	const char *ip6nh[] = {
 	"hop by hop",
@@ -1067,47 +1070,67 @@ rip6_stats(u_long off __unused, const char *name, int af1 __unused)
 		(ret) = getservbyport((int)(port), (proto));\
 };
 
+void
+inet6print(struct in6_addr *in6, int port, const char *proto, int numeric)
+{
+	struct servent *sp = 0;
+	char line[80], *cp;
+	int width;
+
+	sprintf(line, "%.*s.", Wflag ? 39 :
+		(Aflag && !numeric) ? 12 : 16, inet6name(in6));
+	cp = index(line, '\0');
+	if (!numeric && port)
+		GETSERVBYPORT6(port, proto, sp);
+	if (sp || port == 0)
+		sprintf(cp, "%.8s", sp ? sp->s_name : "*");
+	else
+		sprintf(cp, "%d", ntohs((u_short)port));
+	width = Wflag ? 45 : Aflag ? 18 : 22;
+	printf("%-*.*s ", width, width, line);
+}
+
 /*
  * Construct an Internet address representation.
  * If the numeric_addr has been supplied, give
  * numeric value, otherwise try for symbolic name.
- *
- * XXX: we could make this function protocol-independent.
- * XXX: proto is currently ignored.
  */
-void
-sa_print(struct sockaddr *sa, char *proto, int numeric)
-{
-	struct sockaddr_in6 sa6;
-	char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
-	int flags = 0;
-	int n, hwidth, totalwidth;
 
-	hwidth = Wflag ? 39 : ((Aflag && !numeric) ? 12 : 16);
-	totalwidth = Wflag ? 45 : (Aflag ? 18 : 22);
+char *
+inet6name(struct in6_addr *in6p)
+ {
+	register char *cp;
+	static char line[50];
+	struct hostent *hp;
+	static char domain[MAXHOSTNAMELEN];
+	static int first = 1;
 
-	/* XXX: strip off embedded link ID */
-	if (sa->sa_family == AF_INET6) { /* for safety */
-		sa6 = *(struct sockaddr_in6 *)sa;
-		if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr) ||
-		    IN6_IS_ADDR_MC_LINKLOCAL(&sa6.sin6_addr)) {
-			sa6.sin6_addr.s6_addr[2] = 0;
-			sa6.sin6_addr.s6_addr[3] = 0;
-		}
-		sa = (struct sockaddr *)&sa6;
+	if (first && !numeric_addr) {
+		first = 0;
+		if (gethostname(domain, MAXHOSTNAMELEN) == 0 &&
+		    (cp = index(domain, '.')))
+			(void) strcpy(domain, cp + 1);
+		else
+			domain[0] = 0;
 	}
-
-	if (numeric)
-		flags |= NI_NUMERICHOST | NI_NUMERICSERV;
-
-	if (getnameinfo(sa, sa->sa_len, hbuf, sizeof(hbuf), sbuf,
-	    sizeof(sbuf), flags)) {
-		printf("%-*s ", totalwidth, "???");
-		return;
-	}
-
-	n = printf("%.*s.%-5.5s ", hwidth, hbuf, sbuf);
-	if (n <= totalwidth)
-		printf("%*s", totalwidth - n + 1, "");
+	cp = 0;
+	if (!numeric_addr && !IN6_IS_ADDR_UNSPECIFIED(in6p)) {
+		hp = gethostbyaddr((char *)in6p, sizeof(*in6p), AF_INET6);
+		if (hp) {
+			if ((cp = index(hp->h_name, '.')) &&
+			    !strcmp(cp + 1, domain))
+				*cp = 0;
+			cp = hp->h_name;
+ 		}
+ 	}
+	if (IN6_IS_ADDR_UNSPECIFIED(in6p))
+		strcpy(line, "*");
+	else if (cp)
+		strcpy(line, cp);
+	else 
+		sprintf(line, "%s",
+			inet_ntop(AF_INET6, (void *)in6p, ntop_buf,
+				sizeof(ntop_buf)));
+	return (line);
 }
 #endif /*INET6*/
