@@ -659,7 +659,7 @@ kernfs_getattr(v)
 	 * We don't guard the read from time(9) with splclock(9) since we
 	 * don't actually need to be THAT sure the access is atomic. 
 	 */
-	if (kfs->kfs_kt->kt_namlen == 8 && 
+	if (kfs->kfs_kt && kfs->kfs_kt->kt_namlen == 8 && 
 	    !memcmp(kfs->kfs_kt->kt_name, "boottime", 8)) {
 		TIMEVAL_TO_TIMESPEC(&boottime, &vap->va_ctime);
 	} else {
@@ -673,7 +673,11 @@ kernfs_getattr(v)
 
 	switch (kfs->kfs_type) {
 	case Pkern:
-		vap->va_nlink = 4;
+#ifdef IPSEC
+		vap->va_nlink = 4; /* 2 extra subdirs */
+#else
+		vap->va_nlink = 2;
+#endif
 		vap->va_bytes = vap->va_size = DEV_BSIZE;
 		break;
 
