@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.77 2001/12/11 04:39:32 sakane Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.78 2001/12/19 18:29:39 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -936,7 +936,11 @@ purge_ipsec_spi(dst0, proto, spi, n)
 }
 
 /*
- * delete all IKE/IPSEC-SA relatived to remote address.
+ * delete all phase2 sa relatived to the destination address.
+ * Don't delete Phase 1 handlers on INITIAL-CONTACT, and don't ignore
+ * an INITIAL-CONTACT if we have contacted the peer.  This matches the
+ * Sun IKE behavior, and makes rekeying work much better when the peer
+ * restarts.
  */
 static void
 info_recv_initialcontact(iph1)
