@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: keyv2.h,v 1.3 1999/09/01 16:31:49 sakane Exp $ */
+/* $Id: keyv2.h,v 1.4 1999/09/09 09:27:25 sakane Exp $ */
 
 /*
  * This file has been derived rfc 2367,
@@ -225,7 +225,7 @@ struct sadb_x_policy {
  * This structure is aligned 8 bytes.
  */
 struct sadb_x_ipsecrequest {
-  u_int16_t sadb_x_ipsecrequest_len;	/* structure length aligned 8 bytes.
+  u_int16_t sadb_x_ipsecrequest_len;	/* structure length aligned to 8 bytes.
 					 * This value is true length of bytes.
 					 * Not in units of 64 bits. */
   u_int16_t sadb_x_ipsecrequest_proto;	/* See ipsec.h */
@@ -233,10 +233,11 @@ struct sadb_x_ipsecrequest {
   u_int16_t sadb_x_ipsecrequest_level;	/* See ipsec.h */
 
   /*
-   * followed by source and destination IP address for peer of SA.
-   * These encoded two of sockaddr structure. Each of length of address
-   * are not aligned 64bits, but sum of length is aligned to 64bits.
-   * Must set sa_len exactly.
+   * followed by source IP address of SA, and immediately followed by
+   * destination IP address of SA.  These encoded two of sockaddr structure
+   * without any padding.  Must set each sa_len exactly.
+   * Each of length of the sockaddr structure are not aligned to 64bits,
+   * but sum of x_policy, request and addresses is aligned to 64bits.
    */
 };
 
