@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.h,v 1.35 2000/09/11 11:36:41 sumikawa Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.36 2000/10/31 04:02:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -127,6 +127,7 @@ struct	in6pcb {
 #define IN6P_RTHDR		0x100000 /* receive routing header */
 #define IN6P_RTHDRDSTOPTS	0x200000 /* receive dstoptions before rthdr */
 #define IN6P_TCLASS		0x400000 /* receive traffic class value */
+#define IN6P_AUTOFLOWLABEL	0x800000 /* attach flowlabel automatically */
 
 #define IN6P_HIGHPORT		0x1000000 /* user wants "high" port binding */
 #define IN6P_LOWPORT		0x2000000 /* user wants "low" port binding */
@@ -138,7 +139,7 @@ struct	in6pcb {
 
 #define IN6P_CONTROLOPTS	(IN6P_PKTINFO|IN6P_HOPLIMIT|IN6P_HOPOPTS|\
 				 IN6P_DSTOPTS|IN6P_RTHDR|IN6P_RTHDRDSTOPTS|\
-				 IN6P_TCLASS|IN6P_RFC2292)
+				 IN6P_TCLASS|IN6P_AUTOFLOWLABEL|IN6P_RFC2292)
 
 #define IN6PLOOKUP_WILDCARD	1
 #define IN6PLOOKUP_SETLOCAL	2

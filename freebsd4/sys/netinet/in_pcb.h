@@ -239,6 +239,7 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
 #define	IN6P_RTHDR		0x100000 /* receive routing header */
 #define	IN6P_RTHDRDSTOPTS	0x200000 /* receive dstoptions before rthdr */
 #define IN6P_TCLASS		0x400000 /* receive traffic class value */
+#define IN6P_AUTOFLOWLABEL	0x800000 /* attach flowlabel automatically */
 #define	IN6P_BINDV6ONLY		0x10000000 /* do not grab IPv4 traffic */
 #define IN6P_MINMTU		0x20000000 /* use minimum MTU */
 #define IN6P_RFC2292		0x40000000 /* used RFC2292 API on the socket */
@@ -246,9 +247,9 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
 					INP_RECVIF|\
 				 IN6P_PKTINFO|IN6P_HOPLIMIT|IN6P_HOPOPTS|\
 				 IN6P_DSTOPTS|IN6P_RTHDR|IN6P_RTHDRDSTOPTS|\
-				 IN6P_TCLASS|IN6P_RFC2292)
+				 IN6P_TCLASS|IN6P_AUTOFLOWLABEL|IN6P_RFC2292)
 #define	INP_UNMAPPABLEOPTS	(IN6P_HOPOPTS|IN6P_DSTOPTS|IN6P_RTHDR|\
-				 IN6P_TCLASS)
+				 IN6P_TCLASS|IN6P_AUTOFLOWLABEL)
 
  /* for KAME src sync over BSD*'s */
 #define	IN6P_HIGHPORT		INP_HIGHPORT
