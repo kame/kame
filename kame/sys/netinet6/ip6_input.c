@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.125 2000/10/31 04:36:17 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.126 2000/11/08 14:57:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -621,6 +621,8 @@ ip6_input(m)
 				ctr_end = read_tsc();
 #ifdef MEASURE_PERFORMANCE_UDPONLY
 				if (ip6->ip6_nxt == IPPROTO_UDP)
+#else
+				if (1)
 #endif
 					add_performance_log(ctr_end - ctr_beg,
 							    &ip6->ip6_dst);
@@ -644,12 +646,14 @@ ip6_input(m)
 			if ((ia->ia6_flags & IN6_IFF_ANYCAST) != 0)
 				m->m_flags |= M_ANYCAST6;
 #ifdef MEASURE_PERFORMANCE
-				ctr_end = read_tsc();
+			ctr_end = read_tsc();
 #ifdef MEASURE_PERFORMANCE_UDPONLY
-				if (ip6->ip6_nxt == IPPROTO_UDP)
+			if (ip6->ip6_nxt == IPPROTO_UDP)
+#else
+			if (1)
 #endif
-					add_performance_log(ctr_end - ctr_beg,
-							    &ip6->ip6_dst);
+				add_performance_log(ctr_end - ctr_beg,
+						    &ip6->ip6_dst);
 #endif
 			ours = 1;
 			deliverifp = m->m_pkthdr.rcvif;
@@ -727,6 +731,8 @@ ip6_input(m)
 		ctr_end = read_tsc();
 #ifdef MEASURE_PERFORMANCE_UDPONLY
 		if (ip6->ip6_nxt == IPPROTO_UDP)
+#else
+		if (1)
 #endif
 			add_performance_log(ctr_end - ctr_beg, &ip6->ip6_dst);
 #endif
@@ -759,6 +765,8 @@ ip6_input(m)
 	ctr_end = read_tsc();
 #ifdef MEASURE_PERFORMANCE_UDPONLY
 	if (ip6->ip6_nxt == IPPROTO_UDP)
+#else
+	if (1)
 #endif
 		add_performance_log(ctr_end - ctr_beg, &ip6->ip6_dst);
 #endif
