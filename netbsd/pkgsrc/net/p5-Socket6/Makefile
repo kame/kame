@@ -1,8 +1,8 @@
 # $NetBSD$
 #
 
-DISTNAME=		Socket6-0.06
-PKGNAME=		p5-Socket6-0.06
+DISTNAME=		Socket6-0.07
+PKGNAME=		p5-Socket6-0.07
 CATEGORIES=		net perl5
 MASTER_SITES=		${MASTER_SITE_PERL_CPAN:=Socket6/}
 
