@@ -155,6 +155,10 @@ static struct nlist nl[] = {
 	{ "_nmbufs" },
 #define	N_RTTRASH	42
 	{ "_rttrash" },
+#define N_SCTPEPINFO	43
+	{ "_sctppcbinfo" },
+#define N_SCTPPEGS	44
+	{ "_sctp_pegs" },
 	{ "" },
 };
 
@@ -183,6 +187,10 @@ struct protox {
 	{ -1,		-1,		1,	protopr,
 	  dccp_stats,	NULL,		"dccp", IPPROTO_DCCP },
 #endif /* DCCP */
+#ifdef SCTP
+	{ N_SCTPEPINFO,	N_SCTPPEGS,	1,	sctp_protopr,
+	  sctp_stats,	NULL,		"sctp",	0},
+#endif /* SCTP */
 	{ -1,		-1,		1,	protopr,
 	  NULL,		NULL,		"divert",IPPROTO_DIVERT },
 	{ -1,		-1,		1,	protopr,

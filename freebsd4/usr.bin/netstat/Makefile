@@ -3,11 +3,13 @@
 
 PROG=	netstat
 SRCS=	if.c inet.c inet6.c main.c mbuf.c mroute.c ipx.c route.c \
-	unix.c atalk.c netgraph.c mroute6.c ipsec.c # iso.c ns.c tp_astring.c 
+	unix.c atalk.c netgraph.c mroute6.c ipsec.c sctp.c \
+	# iso.c ns.c tp_astring.c 
 CFLAGS+=-Wall -I${.CURDIR}
 CFLAGS+=-DIPSEC
 CFLAGS+=-DINET6
 CFLAGS+=-DDCCP
+CFLAGS+=-DSCTP
 
 #CFLAGS+=-g
 #.PATH:	${.CURDIR}/../../sys/netiso
