@@ -1,6 +1,6 @@
 #
 # perl prepare.pl kame <osname>
-# $Id: prepare.pl,v 1.8 1999/08/12 13:12:31 itojun Exp $
+# $Id: prepare.pl,v 1.9 1999/08/14 03:40:52 itojun Exp $
 #
 
 $debug = 1;
@@ -33,11 +33,13 @@ sub dig {
 		%linkdir = ();
 		open(IN, "< $dst/.prepare");
 		while (<IN>) {
-			s/\n$//;
-			if (/^exclude\s+(\S+)\s*$/) {
+			s/\s*\n$//;
+			s/^\s*//;
+			s/\#.*//;
+			if (/^exclude\s+(\S+)$/) {
 				$exclude{$1}++;
 			}
-			if (/^linkdir\s+(\S+)\s*$/) {
+			if (/^linkdir\s+(\S+)$/) {
 				$linkdir{$1}++;
 			}
 		}
