@@ -246,8 +246,10 @@ main(argc, argv)
 			char *tempchroot;
 			struct stat sb;
 			int statret;
+			char ntop_buf[INET6_ADDRSTRLEN];
 
-			tempchroot = inet_ntoa(from.sin_addr);
+			tempchroot = inet_ntop(from.ss_family, &from,
+					       ntop_buf, INET6_ADDRSTRLEN);
 			asprintf(&tempchroot, "%s/%s", chroot_dir, tempchroot);
 			statret = stat(tempchroot, &sb);
 			if ((sb.st_mode & S_IFDIR) &&
