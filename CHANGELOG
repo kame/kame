@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.931 2000/05/24 16:36:07 sakane Exp $
+$Id: CHANGELOG,v 1.932 2000/05/25 07:01:33 jinmei Exp $
 
 <200005>
+2000-05-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_ifattach.c (in6_ifattach,
+	in6_ifattach_addaddr): use rtrequest1() when assigning IPv6
+	addresses since this function is more conscious of interfaces than
+	rtrequest() and is suitable for link-local addresses.
+
 Thu May 25 01:25:39 JST 2000 sakane@ydc.co.jp
 	* kame/sys/{netkey/key.c,netinet6/ipsec.c}:
 	* kame/kame/setkey:
