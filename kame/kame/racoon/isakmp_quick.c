@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.63 2000/09/22 16:12:21 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.64 2000/09/22 17:42:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.63 2000/09/22 16:12:21 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.64 2000/09/22 17:42:09 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -155,6 +155,7 @@ quick_i1send(iph2, msg)
 	int error = ISAKMP_INTERNAL_ERROR;
 	int pfsgroup, idci, idcr;
 	int np;
+	struct ipsecdoi_id_b *id, *id_p;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -207,10 +208,17 @@ quick_i1send(iph2, msg)
 		plog(logp, LOCATION, NULL, "IDcr:");
 		PVDUMP(iph2->id_p););
 
-	/* we do not attach IDci nor IDcr for transport mode negotiation */
-	if (ipsecdoi_transportmode(iph2) &&
-	   ((struct ipsecdoi_id_b *)iph2->id->v)->proto_id == IPSEC_PORT_ANY &&
-	   ((struct ipsecdoi_id_b *)iph2->id_p->v)->proto_id == IPSEC_PORT_ANY){
+	/*
+	 * we do not attach IDci nor IDcr, under the following condition:
+	 * - all proposals are transport mode
+	 * - id payload suggests to encrypt all the traffic (no specific
+	 *   protocol type)
+	 */
+	id = (struct ipsecdoi_id_b *)iph2->id->v;
+	id_p = (struct ipsecdoi_id_b *)iph2->id_p->v;
+	if ((id->proto_id == IPPROTO_IP || id->proto_id == IPPROTO_IPV6) &&
+	    (id_p->proto_id == IPPROTO_IP || id_p->proto_id == IPPROTO_IPV6) &&
+	    ipsecdoi_transportmode(iph2)) {
 		/* XXX debug message? */
 		idci = idcr = 0;
 	} else
