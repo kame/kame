@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.33 2000/05/30 04:19:37 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.34 2000/05/31 15:08:57 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1016,16 +1016,6 @@ quick_r1recv(iph2, msg0)
 		error = ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 		goto end;
 	}
-#ifdef INTEROP_NEC
-	if (iph2->id_p != NULL) {
-		vfree(iph2->id_p);
-		iph2->id_p = NULL;
-	}
-	if (iph2->id != NULL) {
-		vfree(iph2->id);
-		iph2->id = NULL;
-	}
-#endif
 
 	/* get sainfo */
 	if (get_sainfo_r(iph2) < 0) {
@@ -1622,29 +1612,6 @@ get_sainfo_r(iph2)
 	int error = -1;
 
 	if (iph2->id_p == NULL) {
-		switch (iph2->dst->sa_family) {
-		case AF_INET:
-			prefixlen = sizeof(struct in_addr) << 3;
-			break;
-		case AF_INET6:
-			prefixlen = sizeof(struct in6_addr) << 3;
-			break;
-		default:
-			plog(logp, LOCATION, NULL,
-				"invalid family: %d\n", iph2->dst->sa_family);
-			goto end;
-		}
-		idsrc = ipsecdoi_sockaddr2id(iph2->dst, prefixlen, IPSEC_ULPROTO_ANY);
-	} else {
-		idsrc = vdup(iph2->id_p);
-	}
-	if (idsrc == NULL) {
-		plog(logp, LOCATION, NULL,
-			"failed to set ID for source.\n");
-		goto end;
-	}
-
-	if (iph2->id == NULL) {
 		switch (iph2->src->sa_family) {
 		case AF_INET:
 			prefixlen = sizeof(struct in_addr) << 3;
@@ -1657,11 +1624,34 @@ get_sainfo_r(iph2)
 				"invalid family: %d\n", iph2->src->sa_family);
 			goto end;
 		}
-		iddst = ipsecdoi_sockaddr2id(iph2->dst, prefixlen, IPSEC_ULPROTO_ANY);
+		idsrc = ipsecdoi_sockaddr2id(iph2->src, prefixlen, IPSEC_ULPROTO_ANY);
 	} else {
 		idsrc = vdup(iph2->id);
 	}
 	if (idsrc == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to set ID for source.\n");
+		goto end;
+	}
+
+	if (iph2->id == NULL) {
+		switch (iph2->dst->sa_family) {
+		case AF_INET:
+			prefixlen = sizeof(struct in_addr) << 3;
+			break;
+		case AF_INET6:
+			prefixlen = sizeof(struct in6_addr) << 3;
+			break;
+		default:
+			plog(logp, LOCATION, NULL,
+				"invalid family: %d\n", iph2->dst->sa_family);
+			goto end;
+		}
+		iddst = ipsecdoi_sockaddr2id(iph2->dst, prefixlen, IPSEC_ULPROTO_ANY);
+	} else {
+		iddst = vdup(iph2->id_p);
+	}
+	if (iddst == NULL) {
 		plog(logp, LOCATION, NULL,
 			"failed to set ID for destination.\n");
 		goto end;
