@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.18 2004/06/14 05:35:13 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.19 2004/07/04 11:04:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -74,14 +74,15 @@
 #define IP6OPT_ROUTER_ALERT	IP6OPT_RTALERT
 #endif
 
+#define QUERY_RESPONSE_INTERVAL 10000
+
 struct msghdr m;
 struct sockaddr_in6 dst;
 struct mld_hdr mldh;
 struct in6_addr maddr = IN6ADDR_ANY_INIT, any = IN6ADDR_ANY_INIT;
+u_int16_t delay = QUERY_RESPONSE_INTERVAL;
 u_short ifindex;
 int s;
-
-#define QUERY_RESPONSE_INTERVAL 10000
 
 void make_msg(int index, struct in6_addr *addr, u_int type);
 void usage(void);
@@ -104,8 +105,11 @@ main(int argc, char *argv[])
 	struct mif6ctl mc;
 
 	type = MLD_LISTENER_QUERY;
-	while ((ch = getopt(argc, argv, "dr")) != -1) {
+	while ((ch = getopt(argc, argv, "D:dr")) != -1) {
 		switch (ch) {
+		case 'D':
+			delay = atoi(optarg);
+			break;
 		case 'd':
 			type = MLD_LISTENER_DONE;
 			break;
@@ -177,7 +181,7 @@ main(int argc, char *argv[])
 		goto finish;
 	}
 
-	itimer.it_value.tv_sec =  QUERY_RESPONSE_INTERVAL / 1000;
+	itimer.it_value.tv_sec =  delay / 1000;
 	itimer.it_interval.tv_sec = 0;
 	itimer.it_interval.tv_usec = 0;
 	itimer.it_value.tv_usec = 0;
@@ -243,7 +247,7 @@ make_msg(int index, struct in6_addr *addr, u_int type)
 
 	bzero(&mldh, sizeof(mldh));
 	mldh.mld_type = type & 0xff;
-	mldh.mld_maxdelay = htons(QUERY_RESPONSE_INTERVAL);
+	mldh.mld_maxdelay = htons(delay);
 	mldh.mld_addr = *addr;
 
 	/* MLD packet should be advertised from linklocal address */

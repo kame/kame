@@ -1,4 +1,4 @@
-.\"	$KAME: mld6query.8,v 1.6 2003/04/02 11:29:54 suz Exp $
+.\"	$KAME: mld6query.8,v 1.7 2004/07/04 11:04:07 jinmei Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -37,6 +37,7 @@
 .\"
 .Sh SYNOPSIS
 .Nm
+.Op Fl D Ar delay
 .Op Fl dr
 .Ar intface
 .Op Ar maddr
@@ -51,10 +52,15 @@ toward interface
 If you omit
 .Ar maddr ,
 linklocal all nodes multicast address(ff02::1) is used.
+The maximum response delay field is set to 1000 as specified in the
+standard,
+but a different value can be specified by the argument of the
+.Fl D
+option.
 .Pp
 After sending a query,
 .Nm
-waits for replies for at most 10 seconds.
+waits for replies for the period in the maximum response delay field.
 If a reply is returned,
 .Nm
 prints it with its type and then waits for another reply.
