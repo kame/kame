@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.24 2001/08/15 10:34:41 itojun Exp $
+$KAME: helsinki-result.jp,v 1.25 2001/08/15 12:04:49 sakane Exp $
 
 
 generic
@@ -286,7 +286,16 @@ Fitec
 
 	KeyUsage をIKEにしとかないと怒られる。
 	他の実装とうまくいかないのは、これが原因か？
+	そうでもなさそう、opensslの問題かも。
 
+SSH
+	ssh solaris version:
+	ssh側: IKEのパケットが出ない。
+	nd cacheの問題か？
+		tcpだけのポリシでもIKEのパケットが出せない。
+		solarisはstatic cache entry入れるコマンドがないらしい。
+		一旦ping6してcacheを作った気になってもNSを出そうとする。
+	原因調査するから再戦してねと言われる。
 
 freeswan
 	IPv4, IPComp + ESP, transport mode
