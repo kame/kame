@@ -53,7 +53,7 @@ gai_strerror(int errnum)
 		return "temporary failure in name resolution";
 	case EAI_FAIL:
 		return "non-recoverable failure in name resolution";
-	case EAI_NODATA:
+	case -5: /* was EAI_NODATA */
 		return "no address associated with name";
 	case EAI_FAMILY:
 		return "ai_family not supported";
@@ -61,7 +61,7 @@ gai_strerror(int errnum)
 		return "ai_socktype not supported";
 	case EAI_SERVICE:
 		return "service not supported for ai_socktype";
-	case EAI_ADDRFAMILY:
+	case -9: /* was EAI_ADDRFAMILY */
 		return "address family for name not supported";
 	case EAI_MEMORY:
 		return "memory allocation failure";
