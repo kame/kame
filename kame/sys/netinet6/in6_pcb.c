@@ -119,6 +119,9 @@ in6_pcballoc(so, head)
 	struct in6pcb *head;
 {
 	struct in6pcb *in6p;
+#ifdef __NetBSD__
+	int s;
+#endif
 #ifdef IPSEC
 	int error;
 #endif
@@ -150,10 +153,16 @@ in6_pcballoc(so, head)
 		return error;
 	}
 #endif /* IPSEC */
+#ifdef __NetBSD__
+	s = splnet();
+#endif
 	in6p->in6p_next = head->in6p_next;
 	head->in6p_next = in6p;
 	in6p->in6p_prev = head;
 	in6p->in6p_next->in6p_prev = in6p;
+#ifdef __NetBSD__
+	splx(s);
+#endif
 	if (ip6_v6only)
 		in6p->in6p_flags |= IN6P_IPV6_V6ONLY;
 	if (ip6_auto_flowlabel)
@@ -513,6 +522,9 @@ in6_pcbdetach(in6p)
 	struct in6pcb *in6p;
 {
 	struct socket *so = in6p->in6p_socket;
+#ifdef __NetBSD__
+	int s;
+#endif
 
 #ifdef IPSEC
 	ipsec6_delete_pcbpolicy(in6p);
@@ -531,10 +543,15 @@ in6_pcbdetach(in6p)
 
 	if (in6p->in6p_route.ro_rt)
 		rtfree(in6p->in6p_route.ro_rt);
-
+#ifdef __NetBSD__
+	s = splnet();
+#endif
 	in6p->in6p_next->in6p_prev = in6p->in6p_prev;
 	in6p->in6p_prev->in6p_next = in6p->in6p_next;
 	in6p->in6p_prev = NULL;
+#ifdef __NetBSD__
+	splx(s);
+#endif
 	FREE(in6p, M_PCB);
 }
 
