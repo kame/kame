@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.94 2001/02/19 11:45:56 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.95 2001/02/20 01:32:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3251,13 +3251,6 @@ struct mbuf *
 ipsec_copypkt(m)
 	struct mbuf *m;
 {
-#ifdef __NetBSD__
-	struct mbuf *n;
-
-	n = m_dup(m, 0, M_COPYALL, M_DONTWAIT);
-	m_freem(m);
-	return n;
-#else
 	struct mbuf *n, **mpp, *mnew;
 
 	for (n = m, mpp = &m; n; n = n->m_next) {
@@ -3367,7 +3360,6 @@ ipsec_copypkt(m)
   fail:
 	m_freem(m);
 	return(NULL);
-#endif
 }
 
 static struct mbuf *
