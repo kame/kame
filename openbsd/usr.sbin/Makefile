@@ -2,4 +2,6 @@
 
 SUBDIR+=inetd sysctl
 
+SUBDIR+=rtsold
+
 .include <bsd.subdir.mk>

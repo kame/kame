@@ -46,8 +46,7 @@
 #ifdef __NetBSD__
 #include <net/if_ether.h>
 #endif
-
-#ifdef __bsdi__
+#if defined(__bsdi__) || defined(__OpenBSD__)
 # include <netinet/in.h>
 # include <netinet/if_ether.h>
 #endif
@@ -358,7 +357,7 @@ getifa(char *name, struct in6_ifaddr *ifap)
 		KREAD(ifp, &ifnet, struct ifnet);
 		if (ifnet.if_index == index)
 			break;
-#if defined(__NetBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		ifp = TAILQ_NEXT(&ifnet, if_list);
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 3
 		ifp = TAILQ_NEXT(&ifnet, if_link);
@@ -372,7 +371,7 @@ getifa(char *name, struct in6_ifaddr *ifap)
 		goto bad;
 	}
 
-#if defined(__NetBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	ifa = (struct in6_ifaddr *)TAILQ_FIRST(&ifnet.if_addrlist);
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 3
 	ifa = (struct in6_ifaddr *)TAILQ_FIRST(&ifnet.if_addrhead);
@@ -387,7 +386,7 @@ getifa(char *name, struct in6_ifaddr *ifap)
 			return 0;
 		}
 
-#if defined(__NetBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		ifa = (struct in6_ifaddr *)
 			TAILQ_NEXT((struct ifaddr *)ifap, ifa_list);
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 3
