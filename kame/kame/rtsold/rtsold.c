@@ -1,3 +1,5 @@
+/*	$KAME: rtsold.c,v 1.22 2000/08/13 06:14:59 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -51,8 +53,8 @@
 
 struct ifinfo *iflist;
 struct timeval tm_max =	{0x7fffffff, 0x7fffffff};
-int aflag;
-int dflag;
+int aflag = 0;
+int dflag = 0;
 static int log_upto = 999;
 static int fflag = 0;
 
@@ -130,6 +132,7 @@ main(argc, argv)
 		switch (ch) {
 		case 'a':
 			aflag = 1;
+			break;
 		case 'd':
 			dflag = 1;
 			break;
@@ -162,18 +165,14 @@ main(argc, argv)
 		}
 
 		argv = autoifprobe();
-		if (argv) {
-			for (i = 0; argv[i]; i++)
-				;
-			argc = i;
-			if (dflag) {
-				warnx("probing %s%s", argv[0],
-				    argc == 1 ? "" : " and others");
-			}
-		} else {
+		if (!argv) {
 			errx(1, "could not autoprobe interface");
 			/*NOTREACHED*/
 		}
+
+		for (i = 0; argv[i]; i++)
+			;
+		argc = i;
 	}
 	if (argc == 0) {
 		usage(argv0);
@@ -750,6 +749,9 @@ autoifprobe()
 		ifname[sizeof(ifname) - 1] = '\0';
 		argv[0] = ifname;
 		argv[1] = NULL;
+
+		if (dflag > 0)
+			warnx("probing %s", argv[0]);
 	}
 	freeifaddrs(ifap);
 	if (target)

@@ -1,3 +1,5 @@
+/*	$KAME: dump.c,v 1.7 2000/08/13 06:14:59 itojun Exp $	*/
+
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.

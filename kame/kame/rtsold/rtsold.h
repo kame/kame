@@ -1,3 +1,5 @@
+/*	$KAME: rtsold.h,v 1.9 2000/08/13 06:15:00 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
