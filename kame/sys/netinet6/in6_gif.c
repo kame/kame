@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.84 2001/11/08 07:33:05 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.85 2001/11/08 07:47:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -221,7 +221,16 @@ in6_gif_output(ifp, family, m)
 		sc->gif_ro6.ro_rt = NULL;
 	}
 
+#ifdef IPV6_MINMTU
+	/*
+	 * force fragmentation to minimum MTU, to avoid path MTU discovery.
+	 * it is too painful to ask for resend of inner packet, to achieve
+	 * path MTU discovery for encapsulated packets.
+	 */
+	error = ip6_output(m, 0, &sc->gif_ro6, IPV6_MINMTU, 0, NULL);
+#else
 	error = ip6_output(m, 0, &sc->gif_ro6, 0, 0, NULL);
+#endif
 
 	if (sc->gif_ro6.ro_rt && time_second >= sc->rtcache_expire)
 		sc->rtcache_expire = time_second + in6_gif_rtcachettl;
