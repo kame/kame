@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.19 2000/05/05 11:01:03 sumikawa Exp $	*/
+/*	$KAME: mld6.c,v 1.20 2000/07/12 12:58:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -87,6 +87,9 @@
 #endif
 
 #include <net/if.h>
+#ifdef NEW_STRUCT_ROUTE
+#include <net/route.h>
+#endif
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>

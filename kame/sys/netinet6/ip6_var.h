@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.33 2000/06/11 14:59:20 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.34 2000/07/12 12:58:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -121,7 +121,11 @@ struct	ip6_moptions {
 /* Routing header related info */
 struct	ip6po_rhinfo {
 	struct	ip6_rthdr *ip6po_rhi_rthdr; /* Routing header */
+#ifdef NEW_STRUCT_ROUTE
+	struct	route ip6po_rhi_route; /* Route to the 1st hop */
+#else
 	struct	route_in6 ip6po_rhi_route; /* Route to the 1st hop */
+#endif
 };
 #define ip6po_rthdr	ip6po_rhinfo.ip6po_rhi_rthdr
 #define ip6po_route	ip6po_rhinfo.ip6po_rhi_route
@@ -330,9 +334,17 @@ int	ip6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 void	ip6_forward __P((struct mbuf *, int));
 
 void	ip6_mloopback __P((struct ifnet *, struct mbuf *, struct sockaddr_in6 *));
+#ifdef NEW_STRUCT_ROUTE
 int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
-			struct route_in6 *, int,
+			struct route *,
+			int,
 			struct ip6_moptions *, struct ifnet **));
+#else
+int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
+			struct route_in6 *,
+			int,
+			struct ip6_moptions *, struct ifnet **));
+#endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 int	ip6_ctloutput __P((struct socket *, struct sockopt *sopt));
 #else

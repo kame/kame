@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.115 2000/07/03 13:23:28 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.116 2000/07/12 12:58:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -185,7 +185,11 @@ int
 ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	struct mbuf *m0;
 	struct ip6_pktopts *opt;
+#ifdef NEW_STRUCT_ROUTE
+	struct route *ro;
+#else
 	struct route_in6 *ro;
+#endif
 	int flags;
 	struct ip6_moptions *im6o;
 	struct ifnet **ifpp;		/* XXX: just for statistics */
@@ -194,7 +198,11 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	struct ifnet *ifp, *origifp;
 	struct mbuf *m = m0;
 	int hlen, tlen, len, off;
+#ifdef NEW_STRUCT_ROUTE
+	struct route ip6route;
+#else
 	struct route_in6 ip6route;
+#endif
 	struct sockaddr_in6 *dst;
 	int error = 0;
 	struct in6_ifaddr *ia;
@@ -202,7 +210,11 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	u_int32_t optlen = 0, plen = 0, unfragpartlen = 0;
 	struct ip6_exthdrs exthdrs;
 	struct in6_addr finaldst;
+#ifdef NEW_STRUCT_ROUTE
+	struct route *ro_pmtu = NULL;
+#else
 	struct route_in6 *ro_pmtu = NULL;
+#endif
 	int hdrsplit = 0;
 	int needipsec = 0;
 #if defined(__bsdi__) && _BSDI_VERSION < 199802
@@ -566,7 +578,11 @@ skip_ipsec2:;
 		error = ipsec6_output_tunnel(&state, sp, flags);
 
 		m = state.m;
+#ifdef NEW_STRUCT_ROUTE
+		ro = state.ro;
+#else
 		ro = (struct route_in6 *)state.ro;
+#endif
 		dst = (struct sockaddr_in6 *)state.dst;
 		if (error) {
 			/* mbuf is already reclaimed in ipsec6_output_tunnel. */
@@ -2613,7 +2629,11 @@ ip6_setmoptions(optname, im6op, m)
 	struct ipv6_mreq *mreq;
 	struct ifnet *ifp;
 	struct ip6_moptions *im6o = *im6op;
+#ifdef NEW_STRUCT_ROUTE
+	struct route ro;
+#else
 	struct route_in6 ro;
+#endif
 	struct sockaddr_in6 *dst;
 	struct in6_multi_mship *imm;
 #if defined(__bsdi__) && _BSDI_VERSION >= 199802

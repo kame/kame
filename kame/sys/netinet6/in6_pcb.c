@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.57 2000/07/07 10:27:12 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.58 2000/07/12 11:24:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -721,7 +721,11 @@ struct rtentry *
 in6_pcbrtentry(in6p)
 	struct in6pcb *in6p;
 {
+#ifdef NEW_STRUCT_ROUTE
+	struct route *ro;
+#else
 	struct route_in6 *ro;
+#endif
 	struct sockaddr_in6 *dst6;
 
 	ro = &in6p->in6p_route;

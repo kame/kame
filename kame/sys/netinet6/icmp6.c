@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.120 2000/07/06 11:47:20 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.121 2000/07/12 12:58:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -172,7 +172,11 @@ static void icmp6_mtudisc_timeout __P((struct rtentry *, struct rttimer *));
 #endif
 
 #ifdef COMPAT_RFC1885
+#ifdef NEW_STRUCT_ROUTE
+static struct route icmp6_reflect_rt;
+#else
 static struct route_in6 icmp6_reflect_rt;
+#endif
 #endif
 
 #ifdef MIP6
@@ -1079,7 +1083,11 @@ icmp6_mtudisc_update(dst, icmp6, m)
 	struct rtentry *rt = NULL;
 	struct sockaddr_in6 sin6;
 #ifdef __bsdi__
+#ifdef NEW_STRUCT_ROUTE
+	struct route ro6;
+#else
 	struct route_in6 ro6;
+#endif
 #endif
 
 	bzero(&sin6, sizeof(sin6));

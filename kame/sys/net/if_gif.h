@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.h,v 1.13 2000/06/17 20:34:24 itojun Exp $	*/
+/*	$KAME: if_gif.h,v 1.14 2000/07/12 12:59:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -55,7 +55,11 @@ struct gif_softc {
 	union {
 		struct route  gifscr_ro;    /* xxx */
 #ifdef INET6
+#ifdef NEW_STRUCT_ROUTE
+		struct route gifscr_ro6; /* xxx */
+#else
 		struct route_in6 gifscr_ro6; /* xxx */
+#endif
 #endif
 	} gifsc_gifscr;
 	int		gif_flags;

@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.22 2000/03/25 07:24:01 sumikawa Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.23 2000/07/12 12:58:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -231,7 +231,11 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 	struct tcp6hdr *nth;
 	int tlen;
 	int win = 0;
+#ifdef NEW_STRUCT_ROUTE
+	struct route *ro = 0;
+#else
 	struct route_in6 *ro = 0;
+#endif
 	struct in6pcb *in6p = NULL;
 	struct ifnet *oifp = NULL;
 
@@ -657,7 +661,11 @@ tcp6_mtudisc(in6p, errno)
 	int errno;
 {
 	struct tcp6cb *t6p = intotcp6cb(in6p);
+#ifdef NEW_STRUCT_ROUTE
+	struct route *ro = &(in6p->in6p_route);
+#else
 	struct route_in6 *ro = &(in6p->in6p_route);
+#endif
 	int usable_mtu;
 
 	if (t6p == NULL)

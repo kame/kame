@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.15 2000/06/23 16:18:20 itojun Exp $	*/
+/*	$KAME: route6.c,v 1.16 2000/07/12 12:58:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -43,6 +43,9 @@
 #include <sys/systm.h>
 
 #include <net/if.h>
+#ifdef NEW_STRUCT_ROUTE
+#include <net/route.h>
+#endif
 
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>

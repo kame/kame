@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.39 2000/07/03 13:23:28 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.40 2000/07/12 12:58:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,7 +80,11 @@
 
 #include <net/net_osdep.h>
 
+#ifdef NEW_STRUCT_ROUTE
+struct	route ip6_forward_rt;
+#else
 struct	route_in6 ip6_forward_rt;
+#endif
 
 /*
  * Forward a packet.  If some error occurs return the sender
@@ -255,10 +259,6 @@ ip6_forward(m, srcrt)
 	error = ipsec6_output_tunnel(&state, sp, 0);
 
 	m = state.m;
-#if 0	/* XXX allocate a route (ro, dst) again later */
-	ro = (struct route_in6 *)state.ro;
-	dst = (struct sockaddr_in6 *)state.dst;
-#endif
 	key_freesp(sp);
 
 	if (error) {

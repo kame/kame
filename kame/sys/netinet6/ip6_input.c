@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.95 2000/07/02 07:49:37 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.96 2000/07/12 12:58:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -355,7 +355,11 @@ ip6intr()
 NETISR_SET(NETISR_IPV6, ip6intr);
 #endif
 
+#ifdef NEW_STRUCT_ROUTE
+extern struct	route ip6_forward_rt;
+#else
 extern struct	route_in6 ip6_forward_rt;
+#endif
 
 void
 ip6_input(m)
@@ -566,9 +570,11 @@ ip6_input(m)
 	if (ip6_forward_rt.ro_rt != NULL &&
 	    (ip6_forward_rt.ro_rt->rt_flags & RTF_UP) != 0 && 
 	    IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst,
-			       &ip6_forward_rt.ro_dst.sin6_addr))
+			       &((struct sockaddr_in6 *)(&ip6_forward_rt.ro_dst))->sin6_addr))
 		ip6stat.ip6s_forward_cachehit++;
 	else {
+		struct sockaddr_in6 *dst6;
+
 		if (ip6_forward_rt.ro_rt) {
 			/* route is down or destination is different */
 			ip6stat.ip6s_forward_cachemiss++;
@@ -577,9 +583,10 @@ ip6_input(m)
 		}
 
 		bzero(&ip6_forward_rt.ro_dst, sizeof(struct sockaddr_in6));
-		ip6_forward_rt.ro_dst.sin6_len = sizeof(struct sockaddr_in6);
-		ip6_forward_rt.ro_dst.sin6_family = AF_INET6;
-		ip6_forward_rt.ro_dst.sin6_addr = ip6->ip6_dst;
+		dst6 = (struct sockaddr_in6 *)&ip6_forward_rt.ro_dst;
+		dst6->sin6_len = sizeof(struct sockaddr_in6);
+		dst6->sin6_family = AF_INET6;
+		dst6->sin6_addr = ip6->ip6_dst;
 #ifdef SCOPEDROUTING
 		ip6_forward_rt.ro_dst.sin6_scope_id =
 			in6_addr2scopeid(m->m_pkthdr.rcvif, &ip6->ip6_dst);

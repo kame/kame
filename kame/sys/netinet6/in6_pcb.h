@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.h,v 1.27 2000/06/09 00:06:14 itojun Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.28 2000/06/09 01:10:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -91,7 +91,11 @@ struct	in6pcb {
 	u_int32_t in6p_flowinfo;	/* priority and flowlabel */
 	struct	socket *in6p_socket;	/* back pointer to socket */
 	caddr_t	in6p_ppcb;		/* pointer to per-protocol pcb */
+#ifdef NEW_STRUCT_ROUTE
+	struct	route in6p_route;	/* placeholder for routing entry */
+#else
 	struct	route_in6 in6p_route;	/* placeholder for routing entry */
+#endif
 	int	in6p_flags;		/* generic IP6/datagram flags */
 	int	in6p_hops;		/* default hop limit */
 	struct	ip6_hdr in6p_ip6;	/* header prototype */
@@ -169,10 +173,19 @@ void	in6_setpeeraddr __P((struct in6pcb *, struct mbuf *));
 void	in6_setsockaddr __P((struct in6pcb *, struct mbuf *));
 
 /* in in6_src.c */
+#ifdef NEW_STRUCT_ROUTE
+struct 	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
+				     struct ip6_pktopts *,
+				     struct ip6_moptions *,
+				     struct route *,
+				     struct in6_addr *, int *));
+#else
 struct 	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
 				     struct ip6_pktopts *,
 				     struct ip6_moptions *,
 				     struct route_in6 *,
+				     struct in6_addr *, int *));
+#endif
 				     struct in6_addr *, int *));
 int	in6_selecthlim __P((struct in6pcb *, struct ifnet *));
 int	in6_pcbsetport __P((struct in6_addr *, struct in6pcb *));

@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.24 2000/03/25 07:23:41 sumikawa Exp $	*/
+/*	$KAME: frag6.c,v 1.25 2000/07/12 12:58:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -153,7 +153,11 @@ frag6_input(mp, offp, proto)
 	int fragoff, frgpartlen;	/* must be larger than u_int16_t */
 	struct ifnet *dstifp;
 #ifdef IN6_IFSTAT_STRICT
+#ifdef NEW_STRUCT_ROUTE
+	static struct route ro;
+#else
 	static struct route_in6 ro;
+#endif
 	struct sockaddr_in6 *dst;
 #endif
 
@@ -644,9 +648,6 @@ frag6_slowtimo()
 	int s = splsoftnet();
 #else
 	int s = splnet();
-#endif
-#if 0
-	extern struct	route_in6 ip6_forward_rt;
 #endif
 
 	frag6_doing_reass = 1;

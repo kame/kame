@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.25 2000/07/09 12:52:03 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.26 2000/07/12 12:58:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2049,7 +2049,11 @@ struct rtentry *
 tcp6_rtlookup(in6p)
 	register struct in6pcb *in6p;
 {
+#ifdef NEW_STRUCT_ROUTE
+	struct route *ro;
+#else
 	struct route_in6 *ro;
+#endif
 	register struct rtentry *rt;
 
 	ro = &in6p->in6p_route;

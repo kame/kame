@@ -1,4 +1,4 @@
-/*	$KAME: in6_prefix.c,v 1.30 2000/06/12 14:53:17 jinmei Exp $	*/
+/*	$KAME: in6_prefix.c,v 1.31 2000/07/12 12:58:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,6 +80,9 @@
 #endif
 
 #include <net/if.h>
+#ifdef NEW_STRUCT_ROUTE
+#include <net/route.h>
+#endif
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>

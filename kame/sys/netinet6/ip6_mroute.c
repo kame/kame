@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.24 2000/05/19 07:37:05 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.25 2000/07/12 12:58:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1554,8 +1554,13 @@ phyint_send(ip6, mifp, m)
 #else
 	int s = splnet();
 #endif
-	static struct route_in6 ro6;
+#ifdef NEW_STRUCT_ROUTE
+	static struct route ro;
+#else
+	static struct route_in6 ro;
+#endif
 	struct	in6_multi *in6m;
+	struct sockaddr_in6 *dst6;
 
 	/*
 	 * Make a new reference to the packet; make sure that
@@ -1585,7 +1590,7 @@ phyint_send(ip6, mifp, m)
 		/* XXX: ip6_output will override ip6->ip6_hlim */
 		im6o.im6o_multicast_hlim = ip6->ip6_hlim;
 		im6o.im6o_multicast_loop = 1;
-		error = ip6_output(mb_copy, NULL, &ro6,
+		error = ip6_output(mb_copy, NULL, &ro,
 				   IPV6_FORWARDING, &im6o, NULL);
 
 #ifdef MRT6DEBUG
@@ -1601,28 +1606,33 @@ phyint_send(ip6, mifp, m)
 	 * If we belong to the destination multicast group
 	 * on the outgoing interface, loop back a copy.
 	 */
+	dst6 = (struct sockaddr_in6 *)&ro.ro_dst;
 	IN6_LOOKUP_MULTI(ip6->ip6_dst, ifp, in6m);
 	if (in6m != NULL) {
-		ro6.ro_dst.sin6_len = sizeof(struct sockaddr_in6);
-		ro6.ro_dst.sin6_family = AF_INET6;
-		ro6.ro_dst.sin6_addr = ip6->ip6_dst;
-		ip6_mloopback(ifp, m, &ro6.ro_dst);
+		dst6->sin6_len = sizeof(struct sockaddr_in6);
+		dst6->sin6_family = AF_INET6;
+		dst6->sin6_addr = ip6->ip6_dst;
+		ip6_mloopback(ifp, m, &ro.ro_dst);
 	}
 	/*
 	 * Put the packet into the sending queue of the outgoing interface
 	 * if it would fit in the MTU of the interface.
 	 */
 	if (mb_copy->m_pkthdr.len < ifp->if_mtu || ifp->if_mtu < IPV6_MMTU) {
-		ro6.ro_dst.sin6_len = sizeof(struct sockaddr_in6);
-		ro6.ro_dst.sin6_family = AF_INET6;
-		ro6.ro_dst.sin6_addr = ip6->ip6_dst;
+		dst6->sin6_len = sizeof(struct sockaddr_in6);
+		dst6->sin6_family = AF_INET6;
+		dst6->sin6_addr = ip6->ip6_dst;
 		/*
 		 * We just call if_output instead of nd6_output here, since
 		 * we need no ND for a multicast forwarded packet...right?
 		 */
+#ifdef NEW_STRUCT_ROUTE
+		error = (*ifp->if_output)(ifp, mb_copy, &ro, NULL);
+#else
 		error = (*ifp->if_output)(ifp, mb_copy,
-					  (struct sockaddr *)&ro6.ro_dst,
+					  (struct sockaddr *)&ro.ro_dst,
 					  NULL);
+#endif
 #ifdef MRT6DEBUG
 		if (mrt6debug & DEBUG_XMIT)
 			log(LOG_DEBUG, "phyint_send on mif %d err %d\n",

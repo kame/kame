@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.67 2000/07/11 17:31:32 jinmei Exp $	*/
+/*	$KAME: ipsec.c,v 1.68 2000/07/12 12:58:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3017,9 +3017,14 @@ ipsec6_output_tunnel(state, sp, flags)
 			 * select from ?  But I had set from SA at
 			 * ipsec6_encapsulate().
 			 */
+#ifdef NEW_STRUCT_ROUTE
+			ia6 = in6_selectsrc(dst6, NULL, NULL, state->ro,
+					    NULL, &error);
+#else
 			ia6 = in6_selectsrc(dst6, NULL, NULL,
 					    (struct route_in6 *)state->ro,
 					    NULL, &error);
+#endif
 			if (ia6 == NULL) {
 				ip6stat.ip6s_noroute++;
 				ipsec6stat.out_noroute++;
