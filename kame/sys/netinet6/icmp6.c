@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.289 2002/04/06 11:26:21 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.290 2002/04/06 11:37:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1383,8 +1383,8 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 	 * whereas using a too large MTU causes reachability problem.
 	 * The former should be better.
 	 */
-	if (mtu < IPV6_MINMTU)
-		mtu = IPV6_MINMTU;
+	if (mtu < IPV6_MMTU)
+		mtu = IPV6_MMTU;
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	/*
@@ -1436,7 +1436,8 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 #endif
 #endif
 
-	if (rt && (rt->rt_flags & RTF_HOST) && mtu >= IPV6_MMTU &&
+	if (rt && (rt->rt_flags & RTF_HOST) &&
+	    mtu >= IPV6_MMTU &&	/* this is actually ensured already */
 	    mtu < rt->rt_ifp->if_mtu && mtu < rt->rt_rmx.rmx_mtu) {
 		icmp6stat.icp6s_pmtuchg++;
 		rt->rt_rmx.rmx_mtu = mtu;
