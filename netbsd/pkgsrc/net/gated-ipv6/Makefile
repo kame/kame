@@ -3,7 +3,7 @@
 # Date created:		Wed Oct 21 11:39:18 JST 1998
 # Whom:			itojun
 #
-# $Id: Makefile,v 1.1.1.1 1999/08/10 09:14:37 itojun Exp $
+# $Id: Makefile,v 1.1.1.1.2.1 1999/10/12 05:15:27 itojun Exp $
 #
 
 DISTNAME=	gated-pubipv6-snapshot.031999
@@ -18,6 +18,8 @@ PATCH_DIST_STRIP=	-p2
 
 MAINTAINER=	itojun@itojun.org
 HOMEPAGE=	http://www.gated.org/
+
+BROKEN=		"patch uses nonstandard struct field"
 
 NO_PACKAGE=	"binary redistribution restricted to members"
 NO_CDROM=	"binary redistribution restricted to members"
