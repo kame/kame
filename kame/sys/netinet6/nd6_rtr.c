@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.152 2001/07/23 15:10:03 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.153 2001/07/23 15:17:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -422,7 +422,7 @@ nd6_ra_input(m, off, icmp6len)
  skip:
 	
 	/*
-	 * Src linkaddress
+	 * Source link layer address
 	 */
     {
 	char *lladdr = NULL;
