@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/26 03:42:11 $
+		     $Date: 2000/04/26 09:28:10 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -78,5 +78,9 @@ Many of old ones have been solved.
   you want IPv6-ready tcpdump/libpcap, download them from tcpdump.org.
   We supply ports/pkgsrc for easier installation on kame/freebsd[23]
   and kame/netbsd.
+
+- The DNS resolver code in libinet6 is based on BIND 4.9.5.  There are
+  security enhancement implemented in BIND 4.9.7 (basically more strict
+  boundary checking).  ISC do not recommend users to use pre-4.9.7 BIND.
 
 							<end of RELNOTES>
