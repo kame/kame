@@ -4,7 +4,7 @@
 # For more information on this file, please read the handbook section on
 # Kernel Configuration Files:
 #
-#    http://www.FreeBSD.org/handbook/kernelconfig-config.html
+#    http://www.FreeBSD.org/doc/en_US.ISO8859-1/books/handbook/kernelconfig-config.html
 #
 # The handbook is also available locally in /usr/share/doc/handbook
 # if you've installed the doc distribution, otherwise always see the
@@ -19,7 +19,7 @@
 #
 # For hardware specific information check HARDWARE.TXT
 #
-# $FreeBSD: src/sys/alpha/conf/GENERIC,v 1.71.2.19 2002/03/27 21:09:22 wilko Exp $
+# $FreeBSD: src/sys/alpha/conf/GENERIC,v 1.71.2.24 2002/08/31 20:28:26 obrien Exp $
 
 machine		alpha
 cpu		EV4
@@ -89,6 +89,7 @@ device		atapist		# ATAPI tape drives
 device		ahc		# AHA2940 and onboard AIC7xxx devices
 #device		esp		# 53C94 & friends, not CAM-ified
 device		isp		# Qlogic family
+device		mpt		# LSI-Logic MPT/Fusion
 device		ncr		# NCR/Symbios Logic
 device		sym		# NCR/Symbios Logic (newer chipsets)
 
@@ -119,16 +120,16 @@ device		sc0	at isa?
 # real time clock
 device		mcclock0 at isa? port 0x70
 
-# Serial (COM) ports
+# Serial (COM) ports (required)
 device		sio0	at isa? port IO_COM1 irq 4
 device		sio1	at isa? port IO_COM2 irq 3 flags 0x50
 
 # Parallel port
-device          ppc0    at isa? irq 7
-device          ppbus           # Parallel port bus (required)
-device          lpt             # Printer
-device          ppi             # Parallel port interface device
-#device         vpo             # Requires scbus and da
+device		ppc0	at isa? irq 7
+device		ppbus		# Parallel port bus (required)
+device		lpt		# Printer
+device		ppi		# Parallel port interface device
+#device		vpo		# Requires scbus and da
  
 # PCI Ethernet NICs.
 device		de		# DEC/Intel DC21x4x (``Tulip'')

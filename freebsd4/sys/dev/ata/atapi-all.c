@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-all.c,v 1.46.2.13.2.2 2002/08/04 11:36:48 murray Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-all.c,v 1.46.2.17 2002/09/16 19:37:53 sos Exp $
  */
 
 #include "opt_ata.h"
@@ -184,6 +184,7 @@ atapi_queue_cmd(struct ata_device *atadev, int8_t *ccb, caddr_t data,
     request->data = data;
     request->bytecount = count;
     request->flags = flags;
+    request->error = EINPROGRESS;
     request->timeout = timeout * hz;
     request->ccbsize = atadev->param->packet_size ? 16 : 12;
     bcopy(ccb, request->ccb, request->ccbsize);
@@ -214,8 +215,9 @@ atapi_queue_cmd(struct ata_device *atadev, int8_t *ccb, caddr_t data,
 	return 0;
     }
 
-    /* wait for request to complete */
-    tsleep((caddr_t)request, PRIBIO, "atprq", 0);
+    /* only sleep when command is in progress */
+    if (request->error == EINPROGRESS)
+	tsleep((caddr_t)request, PRIBIO, "atprq", 0);
     splx(s);
     error = request->error;
     if (error)
@@ -712,7 +714,7 @@ atapi_cmd2str(u_int8_t cmd)
     case 0xbe: return ("READ_CD");
     case 0xff: return ("POLL_DSC");
     default: {
-	static char buffer[16];
+	static char buffer[20];
 	sprintf(buffer, "unknown CMD (0x%02x)", cmd);
 	return buffer;
 	}

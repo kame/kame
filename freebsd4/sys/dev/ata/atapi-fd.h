@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-fd.h,v 1.10.2.4.2.1 2002/08/04 11:36:48 murray Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-fd.h,v 1.10.2.5 2002/07/31 11:19:26 sos Exp $
  */
 
 /* ATAPI Rewriteable drive Capabilities and Mechanical Status Page */

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if.c	8.3 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/net/if.c,v 1.85.2.18 2002/04/28 05:40:25 suz Exp $
+ * $FreeBSD: src/sys/net/if.c,v 1.85.2.19 2002/08/30 14:23:38 sobomax Exp $
  */
 
 #include "opt_compat.h"
@@ -1015,6 +1015,7 @@ ifioctl(so, cmd, data, p)
 	struct ifstat *ifs;
 	int error;
 	short oif_flags;
+	int new_flags;
 
 	switch (cmd) {
 
@@ -1044,6 +1045,7 @@ ifioctl(so, cmd, data, p)
 
 	case SIOCGIFFLAGS:
 		ifr->ifr_flags = ifp->if_flags;
+		ifr->ifr_flagshigh = ifp->if_ipending >> 16;
 		break;
 
 	case SIOCGIFCAP:
@@ -1067,22 +1069,31 @@ ifioctl(so, cmd, data, p)
 		error = suser(p);
 		if (error)
 			return (error);
-		ifr->ifr_prevflags = ifp->if_flags;
+		new_flags = (ifr->ifr_flags & 0xffff) |
+		    (ifr->ifr_flagshigh << 16);
 		if (ifp->if_flags & IFF_SMART) {
 			/* Smart drivers twiddle their own routes */
 		} else if (ifp->if_flags & IFF_UP &&
-		    (ifr->ifr_flags & IFF_UP) == 0) {
+		    (new_flags & IFF_UP) == 0) {
 			int s = splimp();
 			if_down(ifp);
 			splx(s);
-		} else if (ifr->ifr_flags & IFF_UP &&
+		} else if (new_flags & IFF_UP &&
 		    (ifp->if_flags & IFF_UP) == 0) {
 			int s = splimp();
 			if_up(ifp);
 			splx(s);
 		}
 		ifp->if_flags = (ifp->if_flags & IFF_CANTCHANGE) |
-			(ifr->ifr_flags &~ IFF_CANTCHANGE);
+			(new_flags &~ IFF_CANTCHANGE);
+		ifp->if_ipending = (ifp->if_ipending & IFF_CANTCHANGE) |
+			(new_flags &~ IFF_CANTCHANGE);
+		if (new_flags & IFF_PPROMISC) {
+			/* Permanently promiscuous mode requested */
+			ifp->if_flags |= IFF_PROMISC;
+		} else if (ifp->if_pcount == 0) {
+			ifp->if_flags &= ~IFF_PROMISC;
+		}
 		if (ifp->if_ioctl)
 			(void) (*ifp->if_ioctl)(ifp, cmd, data);
 		getmicrotime(&ifp->if_lastchange);
@@ -1298,6 +1309,11 @@ ifpromisc(ifp, pswitch)
 	int oldflags;
 
 	oldflags = ifp->if_flags;
+	if (ifp->if_ipending & IFF_PPROMISC) {
+		/* Do nothing if device is in permanently promiscuous mode */
+		ifp->if_pcount += pswitch ? 1 : -1;
+		return (0);
+	}
 	if (pswitch) {
 		/*
 		 * If the device is not configured up, we cannot put it in
@@ -1318,6 +1334,7 @@ ifpromisc(ifp, pswitch)
 		    ifp->if_name, ifp->if_unit);
 	}
 	ifr.ifr_flags = ifp->if_flags;
+	ifr.ifr_flagshigh = ifp->if_ipending >> 16;
 	error = (*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 	if (error == 0)
 		rt_ifmsg(ifp);
@@ -1431,6 +1448,7 @@ if_allmulti(ifp, onswitch)
 		if (ifp->if_amcount++ == 0) {
 			ifp->if_flags |= IFF_ALLMULTI;
 			ifr.ifr_flags = ifp->if_flags;
+			ifr.ifr_flagshigh = ifp->if_ipending >> 16;
 			error = ifp->if_ioctl(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 		}
 	} else {
@@ -1440,6 +1458,7 @@ if_allmulti(ifp, onswitch)
 			ifp->if_amcount = 0;
 			ifp->if_flags &= ~IFF_ALLMULTI;
 			ifr.ifr_flags = ifp->if_flags;
+			ifr.ifr_flagshigh = ifp->if_ipending >> 16;
 			error = ifp->if_ioctl(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 		}
 	}
@@ -1659,9 +1678,11 @@ if_setlladdr(struct ifnet *ifp, const u_char *lladdr, int len)
 	if ((ifp->if_flags & IFF_UP) != 0) {
 		ifp->if_flags &= ~IFF_UP;
 		ifr.ifr_flags = ifp->if_flags;
+		ifr.ifr_flagshigh = ifp->if_ipending >> 16;
 		(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 		ifp->if_flags |= IFF_UP;
 		ifr.ifr_flags = ifp->if_flags;
+		ifr.ifr_flagshigh = ifp->if_ipending >> 16;
 		(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 #ifdef INET
 		/*

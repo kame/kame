@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/Makefile,v 1.110.2.50 2002/05/04 08:23:52 asmodai Exp $
+# $FreeBSD: src/sys/modules/Makefile,v 1.110.2.58 2002/09/03 16:55:23 gibbs Exp $
 
 # XXX present but broken: ip_mroute_mod pcic
 
@@ -32,7 +32,6 @@ SUBDIR=	accf_data \
 	if_vlan \
 	iir \
 	ip6fw \
-	ipfilter \
 	ipfw \
 	ispfw \
 	joy \
@@ -59,6 +58,7 @@ SUBDIR=	accf_data \
 	portal \
 	procfs \
 	rl \
+	rp \
 	sf \
 	sis \
 	sk \
@@ -70,6 +70,7 @@ SUBDIR=	accf_data \
 	tl \
 	twe \
 	txp \
+	ucom \
 	ufm \
 	ugen \
 	uhid \
@@ -83,6 +84,7 @@ SUBDIR=	accf_data \
 	uplcom \
 	usb \
 	uscanner \
+	uvisor \
 	uvscom \
 	vinum \
 	vn \
@@ -92,9 +94,14 @@ SUBDIR=	accf_data \
 	wx \
 	xl
 
+.if !defined(NO_IPFILTER)
+SUBDIR+=ipfilter
+.endif
+
 # XXX some of these can move to the general case when de-i386'ed
 .if ${MACHINE_ARCH} == "i386"
 SUBDIR+=aac \
+	ar \
 	asr \
 	bktr \
 	ciss \
@@ -112,6 +119,8 @@ SUBDIR+=aac \
 	scsi_low \
 	smbfs \
 	splash \
+	sppp \
+	sr \
 	stg \
 	streams \
 	svr4 \
@@ -129,6 +138,10 @@ SUBDIR+=pmc \
 
 .if ${MACHINE_ARCH} == "alpha"
 SUBDIR+=osf1
+.endif
+
+.if defined(WANT_EXT2FS_MODULE)
+SUBDIR+=ext2fs
 .endif
 
 .if defined(MODULES_OVERRIDE)

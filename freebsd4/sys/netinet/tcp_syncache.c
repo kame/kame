@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/tcp_syncache.c,v 1.5.2.6 2002/03/10 07:23:28 ume Exp $
+ * $FreeBSD: src/sys/netinet/tcp_syncache.c,v 1.5.2.8 2002/08/18 22:04:47 silby Exp $
  */
 
 #include "opt_inet6.h"
@@ -371,16 +371,22 @@ syncache_timer(xslot)
 		if (ticks < nsc->sc_rxttime)
 			break;
 		sc = nsc;
-		nsc = TAILQ_NEXT(sc, sc_timerq);
 		inp = sc->sc_tp->t_inpcb;
 		if (slot == SYNCACHE_MAXREXMTS ||
 		    slot >= tcp_syncache.rexmt_limit ||
 		    inp->inp_gencnt != sc->sc_inp_gencnt) {
+			nsc = TAILQ_NEXT(sc, sc_timerq);
 			syncache_drop(sc, NULL);
 			tcpstat.tcps_sc_stale++;
 			continue;
 		}
+		/*
+		 * syncache_respond() may call back into the syncache to
+		 * to modify another entry, so do not obtain the next
+		 * entry on the timer chain until it has completed.
+		 */
 		(void) syncache_respond(sc, NULL);
+		nsc = TAILQ_NEXT(sc, sc_timerq);
 		tcpstat.tcps_sc_retransmitted++;
 		TAILQ_REMOVE(&tcp_syncache.timerq[slot], sc, sc_timerq);
 		SYNCACHE_TIMEOUT(sc, slot + 1);
@@ -1127,15 +1133,27 @@ syncache_respond(sc, m)
 		ip = mtod(m, struct ip *);
 		ip->ip_v = IPVERSION;
 		ip->ip_hl = sizeof(struct ip) >> 2;
-		ip->ip_tos = 0;
 		ip->ip_len = tlen;
 		ip->ip_id = 0;
 		ip->ip_off = 0;
-		ip->ip_ttl = ip_defttl;
 		ip->ip_sum = 0;
 		ip->ip_p = IPPROTO_TCP;
 		ip->ip_src = sc->sc_inc.inc_laddr;
 		ip->ip_dst = sc->sc_inc.inc_faddr;
+		ip->ip_ttl = sc->sc_tp->t_inpcb->inp_ip_ttl;   /* XXX */
+		ip->ip_tos = sc->sc_tp->t_inpcb->inp_ip_tos;   /* XXX */
+
+		/*
+		 * See if we should do MTU discovery.  Route lookups are expensive,
+		 * so we will only unset the DF bit if:
+		 *
+		 *	1) path_mtu_discovery is disabled
+		 *	2) the SCF_UNREACH flag has been set
+		 */
+		if (path_mtu_discovery
+		    && ((sc->sc_flags & SCF_UNREACH) == 0)) {
+		       ip->ip_off |= IP_DF;
+		}
 
 		th = (struct tcphdr *)(ip + 1);
 	}

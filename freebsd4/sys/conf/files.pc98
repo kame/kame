@@ -3,7 +3,7 @@
 #
 # modified for PC-9801
 #
-# $FreeBSD: src/sys/conf/files.pc98,v 1.140.2.35 2002/04/28 20:20:30 imp Exp $
+# $FreeBSD: src/sys/conf/files.pc98,v 1.140.2.40 2002/10/05 18:31:47 scottl Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -80,6 +80,7 @@ crypto/des/arch/i386/des_enc.S		optional	netsmbcrypto
 crypto/des/des_setkey.c			optional	netsmbcrypto
 #dev/advansys/adv_isa.c		optional	adv isa
 dev/aic/aic_cbus.c		optional	aic isa
+dev/ar/if_ar_isa.c		optional	ar isa
 dev/ct/bshw_machdep.c		optional	ct
 dev/ct/ct.c			optional	ct
 dev/ct/ct_isa.c			optional	ct isa
@@ -90,8 +91,7 @@ dev/ed/if_ed_cbus.c		optional	ed isa
 dev/ed/if_ed_pccard.c		optional	ed card
 dev/eisa/eisaconf.c		optional	eisa
 dev/em/if_em.c			optional	em
-dev/em/if_em_fxhw.c		optional	em
-dev/em/if_em_phy.c		optional	em
+dev/em/if_em_hw.c		optional	em
 dev/fb/fb.c			optional	fb
 dev/fb/fb.c			optional	gdc
 dev/fb/splash.c			optional	splash
@@ -109,6 +109,7 @@ dev/snc/dp83932subr.c		optional	snc
 dev/snc/if_snc.c		optional	snc
 dev/snc/if_snc_cbus.c		optional	snc isa
 dev/snc/if_snc_pccard.c		optional	snc card
+dev/sr/if_sr_isa.c		optional	sr isa
 fs/smbfs/smbfs_io.c		optional	smbfs
 fs/smbfs/smbfs_node.c		optional	smbfs
 fs/smbfs/smbfs_smb.c		optional	smbfs
@@ -231,13 +232,11 @@ i386/isa/elink.c		optional	ie
 pc98/pc98/fd.c			optional	fd
 i386/isa/gpib.c			optional	gp
 i386/isa/gsc.c			optional	gsc
-i386/isa/if_ar.c		optional	ar
 i386/isa/if_cx.c		optional	cx
 i386/isa/if_el.c		optional	el
 i386/isa/if_le.c		optional	le
 i386/isa/if_lnc.c		optional	lnc
 i386/isa/if_rdp.c		optional	rdp
-i386/isa/if_sr.c		optional	sr
 i386/isa/if_wl.c		optional	wl
 i386/isa/intr_machdep.c		standard
 i386/isa/ipl_funcs.c		standard				   \
@@ -248,7 +247,6 @@ pc98/pc98/isa_dma.c		optional	isa
 i386/isa/istallion.c		optional	stli
 i386/isa/labpc.c		optional	labpc
 i386/isa/loran.c		optional	loran
-i386/isa/matcd/matcd.c		optional	matcd
 i386/isa/mca_machdep.c		optional	mca
 i386/isa/mcd.c			optional	mcd
 pc98/pc98/mse.c			optional	mse

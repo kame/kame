@@ -1,5 +1,5 @@
-/*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.9 2002/04/28 05:40:27 suz Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.57 2002/10/10 05:36:22 suz Exp $	*/
+/*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.12 2002/09/03 19:53:04 jmallett Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.58 2002/10/24 09:24:16 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -533,7 +533,7 @@ udp6_input(mp, offp, proto)
 
 			strcpy(buf, ip6_sprintf(&ip6->ip6_dst));
 			log(LOG_INFO,
-			    "Connection attempt to UDP %s:%d from %s:%d\n",
+			    "Connection attempt to UDP [%s]:%d from [%s]:%d\n",
 			    buf, ntohs(uh->uh_dport),
 			    ip6_sprintf(&ip6->ip6_src), ntohs(uh->uh_sport));
 		}

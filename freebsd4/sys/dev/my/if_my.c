@@ -998,7 +998,8 @@ my_attach(device_t dev)
 	ifp->if_watchdog = my_watchdog;
 	ifp->if_init = my_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	if (sc->my_info->my_did == MTD803ID)
 		sc->my_pinfo = my_phys;
@@ -1416,7 +1417,7 @@ my_intr(void *arg)
 
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, MY_IMR, MY_INTRS);
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		my_start(ifp);
 	MY_UNLOCK(sc);
 	return;
@@ -1508,7 +1509,7 @@ my_start(struct ifnet * ifp)
 	}
 	start_tx = sc->my_cdata.my_tx_free;
 	while (sc->my_cdata.my_tx_free->my_mbuf == NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -1803,7 +1804,7 @@ my_watchdog(struct ifnet * ifp)
 	my_stop(sc);
 	my_reset(sc);
 	my_init(sc);
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		my_start(ifp);
 	MY_LOCK(sc);
 	return;

@@ -2,7 +2,7 @@
 # LINT -- config file for checking all the sources, tries to pull in
 #	as much of the source tree as it can.
 #
-# $FreeBSD: src/sys/i386/conf/LINT,v 1.749.2.115 2002/05/22 17:08:04 pdeuskar Exp $
+# $FreeBSD: src/sys/i386/conf/LINT,v 1.749.2.124 2002/10/05 18:31:47 scottl Exp $
 #
 # NB: You probably don't want to try running a kernel built from this
 # file.  Instead, you should start from GENERIC, and add options from
@@ -190,6 +190,8 @@ cpu		I686_CPU		# aka Pentium Pro(tm)
 # only when CPU_PPRO2CELERON is defined and Mendocino Celeron is detected.
 # The default value is 5.
 #
+# CPU_ELAN enables support for AMDs ElanSC520 CPU.
+#
 # CPU_LOOP_EN prevents flushing the prefetch buffer if the destination
 # of a jump is already present in the prefetch buffer on Cyrix 5x86(NOTE
 # 1).
@@ -239,6 +241,7 @@ options 	CPU_BLUELIGHTNING_3X
 options 	CPU_BTB_EN
 options 	CPU_DIRECT_MAPPED_CACHE
 options 	CPU_DISABLE_5X86_LSSER
+options		CPU_ELAN
 options 	CPU_ENABLE_SSE
 options 	CPU_FASTER_5X86_FPU
 options 	CPU_I486_ON_386
@@ -451,6 +454,7 @@ options 	NETGRAPH_FRAME_RELAY
 options 	NETGRAPH_HOLE
 options 	NETGRAPH_IFACE
 options 	NETGRAPH_KSOCKET
+options 	NETGRAPH_L2TP
 options 	NETGRAPH_LMI
 # MPPC compression requires proprietary files (not included)
 #options 	NETGRAPH_MPPC_COMPRESSION
@@ -588,7 +592,7 @@ options 	TCPDEBUG
 # machine by watching the counter.
 options		RANDOM_IP_ID
 
-# Statically Link in accept filters
+# Statically link in accept filters
 options                ACCEPT_FILTER_DATA
 options                ACCEPT_FILTER_HTTP
 
@@ -1595,7 +1599,6 @@ device		pca0 at isa? port IO_TIMER1
 #
 # mcd: Mitsumi CD-ROM using proprietary (non-ATAPI) interface
 # scd: Sony CD-ROM using proprietary (non-ATAPI) interface
-# matcd: Matsushita/Panasonic CD-ROM using proprietary (non-ATAPI) interface
 # wt: Wangtek and Archive QIC-02/QIC-36 tape drives
 # ctx: Cortex-I frame grabber
 # apm: Laptop Advanced Power Management (experimental)
@@ -1695,7 +1698,6 @@ device		mcd0	at isa? port 0x300 irq 10
 # for the Sony CDU31/33A CDROM
 device		scd0	at isa? port 0x230
 # for the SoundBlaster 16 multicd - up to 4 devices
-device		matcd0  at isa? port 0x230
 device		wt0	at isa? port 0x300 irq 5 drq 1
 device		ctx0	at isa? port 0x230 iomem 0xd0000
 device		spigot0 at isa? port 0xad6 irq 15 iomem 0xee000
@@ -1791,9 +1793,20 @@ device		pci
 options 	PCI_ENABLE_IO_MODES
 #options 	PCI_QUIET	#quiets PCI code on chipset settings
 
+# AGP GART support
+#
+device		agp
+
 
 # The `ahc' device provides support for the Adaptec 29/3940(U)(W)
 # and motherboard based AIC7870/AIC7880 adapters.
+#
+# The 'ahd' device provides support for the Adaptec 79xx Ultra320
+# SCSI adapters. Options are documented in the ahd(4) manpage:
+options		AHD_DEBUG
+options		AHD_DEBUG_OPTS=0xffffffff
+options		AHD_REG_PRETTY_PRINT
+#options	AHD_TMODE_ENABLE=0xff
 #
 # The `amd' device provides support for the AMD 53C974 SCSI host
 # adapter chip as found on devices such as the Tekram DC-390(T).
@@ -1978,6 +1991,7 @@ options 	PCI_ENABLE_IO_MODES
 # OC-3136, OC-3137, OC-3139, OC-3140, OC-3141, OC-3540, OC-3250
 #
 device		ahc		# AHA2940 and onboard AIC7xxx devices
+device		ahd		# AIC79xx devices
 device		amd		# AMD 53C974 (Teckram DC-390(T))
 device		isp		# Qlogic family
 device		ispfw		# Firmware for QLogic HBAs
@@ -2350,7 +2364,7 @@ pseudo-device	"i4bisppp"	4
 #
 # Supported devices:
 # vpo	Iomega Zip Drive
-#	Requires SCSI disk support ('scbus' and 'da'), best
+#	Requires SCSI disk support ('scbus' and 'da'); the best
 #	performance is achieved with ports in EPP 1.9 mode.
 # lpt	Parallel Printer
 # plip	Parallel network interface
@@ -2615,6 +2629,12 @@ device		ums
 device		urio
 # USB scanners
 device		uscanner
+# USB com devices
+device		ucom
+device		uplcom
+device		uvscom
+device		uvisor
+
 #
 # ADMtek USB ethernet. Supports the LinkSys USB100TX,
 # the Billionton USB100, the Melco LU-ATX, the D-Link DSB-650TX
@@ -2635,17 +2655,7 @@ device		kue
 
 # debugging options for the USB subsystem
 #
-options 	UHCI_DEBUG
-options 	OHCI_DEBUG
 options 	USB_DEBUG
-
-options 	UGEN_DEBUG
-options 	UHID_DEBUG
-options 	UHUB_DEBUG
-options 	UKBD_DEBUG
-options 	ULPT_DEBUG
-options 	UMASS_DEBUG
-options 	UMS_DEBUG
 
 # options for ukbd:
 options 	UKBD_DFLT_KEYMAP	# specify the built-in keymap
@@ -2710,6 +2720,23 @@ options 	TIMER_FREQ="((14318182+6)/12)"
 options 	VFS_BIO_DEBUG
 options		XBONEHACK
 
+# ALTQ options
+options 	ALTQ		#alternate queueing
+options 	ALTQ_CBQ	#class based queueing
+options 	ALTQ_WFQ	#weighted fair queueing
+options 	ALTQ_FIFOQ	#fifo queueing
+options 	ALTQ_RED	#random early detection
+options 	ALTQ_FLOWVALVE	#flowvalve for RED (needs RED)
+options 	ALTQ_RIO	#triple	 red for diffserv (needs RED)
+options 	ALTQ_LOCALQ	#local use
+options 	ALTQ_HFSC	#hierarchical fair service curve
+options 	ALTQ_JOBS	#joint buffer management and scheduling
+options 	ALTQ_IPSEC	#check ipsec in IPv4
+options 	ALTQ_CDNR	#diffserv traffic conditioner
+options 	ALTQ_BLUE	#blue by wu-chang feng
+options 	ALTQ_PRIQ	#priority queue
+options 	ALTQ_NOPCC	#don't use processor cycle counter
+options 	ALTQ_DEBUG	#for debugging
 # ALTQ options
 options 	ALTQ		#alternate queueing
 options 	ALTQ_CBQ	#class based queueing

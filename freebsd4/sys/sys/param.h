@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)param.h	8.3 (Berkeley) 4/4/95
- * $FreeBSD: src/sys/sys/param.h,v 1.61.2.27.2.2 2002/07/19 16:59:43 murray Exp $
+ * $FreeBSD: src/sys/sys/param.h,v 1.61.2.32.2.1 2002/10/08 04:59:24 murray Exp $
  */
 
 #ifndef _SYS_PARAM_H_
@@ -50,9 +50,11 @@
  * __FreeBSD_version numbers are documented in the Porter's Handbook.
  * If you bump the version for any reason, you should update the documentation
  * there.
+ * Currently this lives here:
+ *	doc/en_US.ISO8859-1/books/porters-handbook/book.sgml
  */
 #undef __FreeBSD_version
-#define __FreeBSD_version 460002	/* Master, propagated to newvers */
+#define __FreeBSD_version 470000	/* Master, propagated to newvers */
 
 #ifndef NULL
 #define	NULL	0

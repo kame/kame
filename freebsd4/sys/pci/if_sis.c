@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sis.c,v 1.13.4.20 2002/02/19 15:59:38 ambrisko Exp $
+ * $FreeBSD: src/sys/pci/if_sis.c,v 1.13.4.22 2002/08/09 02:40:21 luigi Exp $
  */
 
 /*
@@ -101,7 +101,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_sis.c,v 1.13.4.20 2002/02/19 15:59:38 ambrisko Exp $";
+  "$FreeBSD: src/sys/pci/if_sis.c,v 1.13.4.22 2002/08/09 02:40:21 luigi Exp $";
 #endif
 
 /*
@@ -196,12 +196,6 @@ static driver_t sis_driver = {
 };
 
 static devclass_t sis_devclass;
-
-#ifdef __i386__
-static int sis_quick=1;
-SYSCTL_INT(_hw, OID_AUTO, sis_quick, CTLFLAG_RW,
-	&sis_quick,0,"do not mdevget in sis driver");
-#endif
 
 DRIVER_MODULE(if_sis, pci, sis_driver, sis_devclass, 0, 0);
 DRIVER_MODULE(miibus, sis, miibus_driver, miibus_devclass, 0, 0);
@@ -1097,32 +1091,17 @@ static int sis_newbuf(sc, c, m)
 	struct sis_desc		*c;
 	struct mbuf		*m;
 {
-	struct mbuf		*m_new = NULL;
-
-	if (c == NULL)
-		return(EINVAL);
 
 	if (m == NULL) {
-		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-		if (m_new == NULL)
+		m = m_getcl(M_DONTWAIT, MT_DATA, M_PKTHDR);
+		if (m == NULL)
 			return(ENOBUFS);
-
-		MCLGET(m_new, M_DONTWAIT);
-		if (!(m_new->m_flags & M_EXT)) {
-			m_freem(m_new);
-			return(ENOBUFS);
-		}
-		m_new->m_len = m_new->m_pkthdr.len = MCLBYTES;
 	} else {
-		m_new = m;
-		m_new->m_len = m_new->m_pkthdr.len = MCLBYTES;
-		m_new->m_data = m_new->m_ext.ext_buf;
+		m->m_data = m->m_ext.ext_buf;
 	}
 
-	m_adj(m_new, sizeof(u_int64_t));
-
-	c->sis_mbuf = m_new;
-	c->sis_ptr = vtophys(mtod(m_new, caddr_t));
+	c->sis_mbuf = m;
+	c->sis_ptr = vtophys(mtod(m, caddr_t));
 	c->sis_ctl = SIS_RXLEN;
 
 	return(0);
@@ -1135,7 +1114,6 @@ static int sis_newbuf(sc, c, m)
 static void sis_rxeof(sc)
 	struct sis_softc	*sc;
 {
-        struct ether_header	*eh;
         struct mbuf		*m;
         struct ifnet		*ifp;
 	struct sis_desc		*cur_rx;
@@ -1186,10 +1164,9 @@ static void sis_rxeof(sc)
 		 * if the allocation fails, then use m_devget and leave the
 		 * existing buffer in the receive ring.
 		 */
-		if (sis_quick && sis_newbuf(sc, cur_rx, NULL) == 0) {
-			m->m_pkthdr.rcvif = ifp;
+		if (sis_newbuf(sc, cur_rx, NULL) == 0)
 			m->m_pkthdr.len = m->m_len = total_len;
-		} else
+		else
 #endif
 		{
 			struct mbuf *m0;
@@ -1205,11 +1182,7 @@ static void sis_rxeof(sc)
 		}
 
 		ifp->if_ipackets++;
-		eh = mtod(m, struct ether_header *);
-
-		/* Remove header from mbuf and pass it on. */
-		m_adj(m, sizeof(struct ether_header));
-		ether_input(ifp, eh, m);
+		ether_input(ifp, NULL, m);
 	}
 
 	sc->sis_cdata.sis_rx_prod = i;
@@ -1238,9 +1211,6 @@ static void sis_txeof(sc)
 	u_int32_t		idx;
 
 	ifp = &sc->arpcom.ac_if;
-
-	/* Clear the timeout timer. */
-	ifp->if_timer = 0;
 
 	/*
 	 * Go through our tx list and free mbufs for those
@@ -1281,11 +1251,11 @@ static void sis_txeof(sc)
 		ifp->if_timer = 0;
 	}
 
-	sc->sis_cdata.sis_tx_cons = idx;
-
-	if (cur_tx != NULL)
+	if (idx != sc->sis_cdata.sis_tx_cons) {
+		sc->sis_cdata.sis_tx_cons = idx;
 		ifp->if_flags &= ~IFF_OACTIVE;
-
+	}
+	ifp->if_timer = (sc->sis_cdata.sis_tx_cnt == 0) ? 0 : 5;
 	return;
 }
 

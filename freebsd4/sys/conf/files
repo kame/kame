@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/files,v 1.340.2.102 2002/05/04 08:48:53 msmith Exp $
+# $FreeBSD: src/sys/conf/files,v 1.340.2.115 2002/09/01 02:21:04 mjacob Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -8,12 +8,28 @@ aicasm				optional ahc				   \
 	dependency 	"$S/dev/aic7xxx/aicasm/*.[chyl]"		   \
 	compile-with	"${MAKE} -f $S/dev/aic7xxx/aicasm/Makefile MAKESRCPATH=$S/dev/aic7xxx/aicasm" \
 	no-obj no-implicit-rule						   \
-	clean		"aicasm aicasm_gram.c aicasm_scan.c y.tab.h"
-aic7xxx_{seq,reg}.h		optional ahc				   \
-	compile-with	"./aicasm ${INCLUDES} -I$S/cam/scsi -I$S/dev/aic7xxx -o aic7xxx_seq.h -r aic7xxx_reg.h $S/dev/aic7xxx/aic7xxx.seq"   \
+	clean		"aicasm* y.tab.h"
+aicasm				optional ahd			  	   \
+	dependency 	"$S/dev/aic7xxx/aicasm/*.[chyl]"		   \
+	compile-with	"${MAKE} -f $S/dev/aic7xxx/aicasm/Makefile MAKESRCPATH=$S/dev/aic7xxx/aicasm" \
+	no-obj no-implicit-rule						   \
+	clean		"aicasm* y.tab.h"
+aic7xxx_{seq.h,reg.h,reg_print.c}	optional ahc			   \
+	compile-with	"./aicasm ${INCLUDES} -I$S/cam/scsi -I$S/dev/aic7xxx -o aic7xxx_seq.h -r aic7xxx_reg.h -p aic7xxx_reg_print.c -i $S/dev/aic7xxx/aic7xxx_osm.h $S/dev/aic7xxx/aic7xxx.seq"   \
 	no-obj no-implicit-rule before-depend				   \
-	clean		"aic7xxx_seq.h aic7xxx_reg.h"			   \
+	clean		"aic7xxx_seq.h aic7xxx_reg.h aic7xxx_reg_print.c"  \
 	dependency	"$S/dev/aic7xxx/aic7xxx.{reg,seq} $S/cam/scsi/scsi_message.h aicasm"
+aic7xxx_reg_print.o		optional ahc ahc_reg_pretty_print	\
+	compile-with	"${NORMAL_C}"					\
+	no-implicit-rule local
+aic79xx_{seq.h,reg.h,reg_print.c}	optional ahd pci		   \
+	compile-with	"./aicasm ${INCLUDES} -I$S/cam/scsi -I$S/dev/aic7xxx -o aic79xx_seq.h -r aic79xx_reg.h -p aic79xx_reg_print.c -i $S/dev/aic7xxx/aic79xx_osm.h $S/dev/aic7xxx/aic79xx.seq"   \
+	no-obj no-implicit-rule before-depend				   \
+	clean		"aic79xx_seq.h aic79xx_reg.h aic79xx_reg_print.c"  \
+	dependency	"$S/dev/aic7xxx/aic79xx.{reg,seq} $S/cam/scsi/scsi_message.h aicasm"
+aic79xx_reg_print.o		optional ahd pci ahd_reg_pretty_print	\
+	compile-with	"${NORMAL_C}"					\
+	no-implicit-rule local
 device_if.o			standard				\
 	compile-with	"${NORMAL_C}"					\
 	no-implicit-rule local
@@ -47,6 +63,7 @@ altq/altq_cdnr.c	optional altq
 altq/altq_conf.c	optional altq
 altq/altq_fifoq.c	optional altq
 altq/altq_hfsc.c	optional altq
+altq/altq_jobs.c	optional altq
 altq/altq_localq.c	optional altq
 altq/altq_priq.c	optional altq
 altq/altq_red.c		optional altq
@@ -82,6 +99,7 @@ cam/scsi/scsi_low_pisa.c	optional ncv
 cam/scsi/scsi_low_pisa.c	optional nsp
 cam/scsi/scsi_low_pisa.c	optional stg
 cam/scsi/scsi_pass.c	optional pass
+cam/scsi/scsi_passthru_target.c	optional passthru_target
 cam/scsi/scsi_ses.c	optional ses
 cam/scsi/scsi_target.c	optional targ
 cam/scsi/scsi_targ_bh.c	optional targbh
@@ -141,6 +159,8 @@ dev/an/if_an.c		optional an
 dev/an/if_an_isa.c	optional an isa
 dev/an/if_an_pci.c	optional an pci
 dev/an/if_an_pccard.c	optional an card
+dev/ar/if_ar.c		optional ar
+dev/ar/if_ar_pci.c	optional ar pci
 dev/asr/asr.c		optional asr pci
 dev/ata/ata-all.c	optional ata
 dev/ata/ata-isa.c	optional ata isa
@@ -173,6 +193,10 @@ dev/aic7xxx/aic7xxx.c	optional ahc
 dev/aic7xxx/aic7xxx_93cx6.c	optional ahc
 dev/aic7xxx/aic7xxx_osm.c	optional ahc
 dev/aic7xxx/aic7xxx_pci.c	optional ahc pci
+dev/aic7xxx/ahd_pci.c	optional ahd pci
+dev/aic7xxx/aic79xx.c	optional ahd pci
+dev/aic7xxx/aic79xx_osm.c	optional ahd pci
+dev/aic7xxx/aic79xx_pci.c	optional ahd pci
 dev/bge/if_bge.c	optional bge
 dev/buslogic/bt.c	optional bt
 dev/buslogic/bt_isa.c	optional bt isa
@@ -284,6 +308,10 @@ dev/mlx/mlx.c		optional mlx
 dev/mly/mly.c		optional mly
 dev/mly/mly_cam.c	optional mly
 dev/mly/mly_pci.c	optional mly
+dev/mpt/mpt.c		optional mpt
+dev/mpt/mpt_debug.c	optional mpt
+dev/mpt/mpt_freebsd.c	optional mpt
+dev/mpt/mpt_pci.c	optional mpt
 dev/my/if_my.c		optional my
 dev/musycc/musycc.c	optional musycc
 dev/ncv/ncr53c500.c	optional ncv
@@ -388,6 +416,9 @@ dev/ppbus/vpo.c		optional vpo
 dev/ppbus/vpoio.c	optional vpo
 dev/ray/if_ray.c        optional ray card
 dev/ray/if_ray.c        optional ray pccard
+dev/rp/rp.c		optional nrp
+dev/rp/rp_isa.c		optional nrp isa
+dev/rp/rp_pci.c		optional nrp pci
 dev/sbni/if_sbni_pci.c	optional sbni pci
 smbus_if.o		optional smbus					\
 	dependency	"smbus_if.c smbus_if.h"				\
@@ -416,6 +447,8 @@ dev/sn/if_sn.c		optional sn
 dev/sn/if_sn_isa.c	optional sn isa
 dev/sn/if_sn_pccard.c	optional sn card
 dev/snp/snp.c		optional snp
+dev/sr/if_sr.c		optional sr
+dev/sr/if_sr_pci.c	optional sr pci
 dev/stg/tmc18c30.c	optional stg
 dev/stg/tmc18c30_isa.c	optional stg isa
 dev/stg/tmc18c30_pccard.c	optional stg card
@@ -739,6 +772,7 @@ net/route.c		standard
 net/rtsock.c		standard
 net/slcompress.c	optional ppp
 net/slcompress.c	optional sl
+net/slcompress.c	optional sppp
 net/zlib.c		optional ppp_deflate
 net/zlib.c		optional ipsec
 netatalk/aarp.c		optional netatalk
@@ -841,6 +875,7 @@ netgraph/ng_frame_relay.c	optional netgraph_frame_relay
 netgraph/ng_hole.c	optional netgraph_hole
 netgraph/ng_iface.c	optional netgraph_iface
 netgraph/ng_ksocket.c	optional netgraph_ksocket
+netgraph/ng_l2tp.c	optional netgraph_l2tp
 netgraph/ng_lmi.c	optional netgraph_lmi
 netgraph/ng_mppc.c	optional netgraph_mppc_compression
 # The next two files (plus the header file net/mppc.h) are proprietary and
@@ -886,6 +921,7 @@ netinet/ip_divert.c	optional ipdivert
 netinet/ip_dummynet.c	optional dummynet
 netinet/ip_flow.c	optional inet
 netinet/ip_fw.c		optional ipfirewall
+netinet/ip_fw2.c	optional ipfw2
 netinet/ip_icmp.c	optional inet
 netinet/ip_input.c	optional inet
 netinet/ip_mroute.c	optional inet
@@ -1062,7 +1098,6 @@ dev/bktr/bktr_tuner.c	optional bktr pci
 dev/bktr/bktr_audio.c	optional bktr pci
 dev/bktr/bktr_os.c	optional bktr pci
 pci/cy_pci.c		optional cy pci
-pci/if_ar_p.c		optional ar pci
 pci/if_dc.c		optional dc
 pci/if_de.c		optional de
 pci/if_en_pci.c		optional en pci
@@ -1074,7 +1109,6 @@ pci/if_sf.c		optional sf
 pci/if_sis.c		optional sis
 pci/if_sk.c		optional sk
 pci/if_ste.c		optional ste
-pci/if_sr_p.c		optional sr pci
 pci/if_ti.c		optional ti
 pci/if_tl.c		optional tl
 pci/if_tx.c		optional tx
@@ -1179,6 +1213,9 @@ usb_if.h		optional usb					\
 	clean		"usb_if.h"
 dev/usb/uhci.c		optional uhci
 dev/usb/ohci.c		optional ohci
+dev/usb/ucom.c		optional ucom
+dev/usb/uvisor.c	optional uvisor ucom
+dev/usb/uvscom.c	optional uvscom ucom
 dev/usb/usb.c		optional usb
 dev/usb/usbdi.c		optional usb
 dev/usb/usbdi_util.c	optional usb
@@ -1191,6 +1228,7 @@ dev/usb/ufm.c		optional ufm
 dev/usb/ugen.c		optional ugen
 dev/usb/uhid.c		optional uhid
 dev/usb/ums.c		optional ums
+dev/usb/uplcom.c	optional uplcom ucom
 dev/usb/urio.c		optional urio
 dev/usb/ulpt.c		optional ulpt
 dev/usb/ukbd.c		optional ukbd
@@ -1251,8 +1289,11 @@ dev/sound/pci/maestro.c optional pcm pci
 dev/sound/pci/neomagic.c optional pcm pci
 dev/sound/pci/solo.c	optional pcm pci
 dev/sound/pci/t4dwave.c	optional pcm pci
+dev/sound/pci/via8233.c	optional pcm pci
 dev/sound/pci/via82c686.c	optional pcm pci
 dev/sound/pci/vibes.c	optional pcm pci
+dev/sound/usb/uaudio.c	optional pcm usb
+dev/sound/usb/uaudio_pcm.c	optional pcm usb
 #
 ac97_if.o		optional pcm					\
 	dependency	"ac97_if.c ac97_if.h"				\
@@ -1332,10 +1373,11 @@ dev/sound/pcm/vchan.c	optional pcm
 # of the files in libkern/ are only needed on some architectures, e.g.,
 # libkern/divdi3.c is needed by i386 but not alpha.  Also, some of these
 # routines may be optimized for a particular platform.  In either case,
-# the file should be moved to <arch>/conf/files.<arch> from here.
+# the file should be moved to conf/files.<arch> from here.
 #
 libkern/arc4random.c	standard
 libkern/bcd.c		standard
+libkern/crc32.c		standard
 libkern/iconv.c		optional libiconv
 libkern/iconv_xlat.c	optional libiconv
 iconv_converter_if.o	optional libiconv				\

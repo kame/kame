@@ -1,7 +1,7 @@
 /*
  * random.h -- A strong random number generator
  *
- * $FreeBSD: src/sys/sys/random.h,v 1.19.2.1 2000/05/10 02:04:52 obrien Exp $
+ * $FreeBSD: src/sys/sys/random.h,v 1.19.2.2 2002/09/17 17:11:54 sam Exp $
  *
  * Version 0.95, last modified 18-Oct-95
  * 
@@ -74,6 +74,7 @@ inthand2_t add_interrupt_randomness;
 #ifdef notused
 void add_blkdev_randomness(int major);
 #endif
+void add_true_randomness(int);
 
 #ifdef notused
 void get_random_bytes(void *buf, u_int nbytes);

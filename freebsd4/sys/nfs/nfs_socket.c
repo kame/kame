@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_socket.c	8.5 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/nfs/nfs_socket.c,v 1.60.2.3.2.1 2002/08/01 19:31:55 des Exp $
+ * $FreeBSD: src/sys/nfs/nfs_socket.c,v 1.60.2.5 2002/07/19 17:19:53 dillon Exp $
  */
 
 /*
@@ -706,12 +706,13 @@ errout:
 				    error,
 				 rep->r_nmp->nm_mountp->mnt_stat.f_mntfromname);
 			error = nfs_sndlock(rep);
-			if (!error)
+			if (!error) {
 				error = nfs_reconnect(rep);
-			if (!error)
-				goto tryagain;
-			else
-				nfs_sndunlock(rep);
+				if (!error)
+					goto tryagain;
+				else
+					nfs_sndunlock(rep);
+			}
 		}
 	} else {
 		if ((so = rep->r_nmp->nm_so) == NULL)
@@ -2212,6 +2213,7 @@ nfsrv_getstream(slp, waitflag)
 		len = 0;
 		m = slp->ns_raw;
 		om = (struct mbuf *)0;
+
 		while (len < slp->ns_reclen) {
 			if ((len + m->m_len) > slp->ns_reclen) {
 				m2 = m_copym(m, 0, slp->ns_reclen - len,

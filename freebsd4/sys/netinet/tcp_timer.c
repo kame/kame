@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_timer.c	8.2 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_timer.c,v 1.34.2.11 2001/08/22 00:59:12 silby Exp $
+ * $FreeBSD: src/sys/netinet/tcp_timer.c,v 1.34.2.13 2002/08/16 22:16:39 dillon Exp $
  */
 
 #include "opt_compat.h"
@@ -74,13 +74,13 @@ sysctl_msec_to_ticks(SYSCTL_HANDLER_ARGS)
 	int error, s, tt;
 
 	tt = *(int *)oidp->oid_arg1;
-	s = tt * 1000 / hz;
+	s = (int)((int64_t)tt * 1000 / hz);
 
 	error = sysctl_handle_int(oidp, &s, 0, req);
 	if (error || !req->newptr)
 		return (error);
 
-	tt = s * hz / 1000;
+	tt = (int)((int64_t)s * hz / 1000);
 	if (tt < 1)
 		return (EINVAL);
 
@@ -108,6 +108,14 @@ SYSCTL_PROC(_net_inet_tcp, TCPCTL_DELACKTIME, delacktime,
 int	tcp_msl;
 SYSCTL_PROC(_net_inet_tcp, OID_AUTO, msl, CTLTYPE_INT|CTLFLAG_RW,
     &tcp_msl, 0, sysctl_msec_to_ticks, "I", "Maximum segment lifetime");
+
+int	tcp_rexmit_min;
+SYSCTL_PROC(_net_inet_tcp, OID_AUTO, rexmit_min, CTLTYPE_INT|CTLFLAG_RW,
+    &tcp_rexmit_min, 0, sysctl_msec_to_ticks, "I", "Minimum Retransmission Timeout");
+
+int	tcp_rexmit_slop;
+SYSCTL_PROC(_net_inet_tcp, OID_AUTO, rexmit_slop, CTLTYPE_INT|CTLFLAG_RW,
+    &tcp_rexmit_slop, 0, sysctl_msec_to_ticks, "I", "Retransmission Timer Slop");
 
 static int	always_keepalive = 0;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, always_keepalive, CTLFLAG_RW, 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)tcp_usrreq.c	8.2 (Berkeley) 1/3/94
- * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.51.2.12.2.1 2002/06/07 20:54:02 obrien Exp $
+ * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.51.2.16 2002/08/24 18:40:26 dillon Exp $
  */
 
 #include "opt_ipsec.h"
@@ -757,6 +757,7 @@ tcp_connect(tp, nam, p)
 	tp->t_state = TCPS_SYN_SENT;
 	callout_reset(tp->tt_keep, tcp_keepinit, tcp_timer_keep, tp);
 	tp->iss = tcp_new_isn(tp);
+	tp->t_bw_rtseq = tp->iss;
 	tcp_sendseqinit(tp);
 
 	/*
@@ -861,6 +862,7 @@ tcp6_connect(tp, nam, p)
 	tp->t_state = TCPS_SYN_SENT;
 	callout_reset(tp->tt_keep, tcp_keepinit, tcp_timer_keep, tp);
 	tp->iss = tcp_new_isn(tp);
+	tp->t_bw_rtseq = tp->iss;
 	tcp_sendseqinit(tp);
 
 	/*

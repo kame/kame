@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)udp_usrreq.c	8.6 (Berkeley) 5/23/95
- * $FreeBSD: src/sys/netinet/udp_usrreq.c,v 1.64.2.15 2001/10/29 19:28:43 ume Exp $
+ * $FreeBSD: src/sys/netinet/udp_usrreq.c,v 1.64.2.16 2002/08/07 16:14:47 luigi Exp $
  */
 
 /*
@@ -529,12 +529,12 @@ udp_input(m, off)
 			udpstat.udps_noportbcast++;
 			goto bad;
 		}
+		if (blackhole)
+			goto bad;
 #ifdef ICMP_BANDLIM
 		if (badport_bandlim(BANDLIM_ICMP_UNREACH) < 0)
 			goto bad;
 #endif
-		if (blackhole)
-			goto bad;
 		*ip = save_ip;
 		ip->ip_len += iphlen;
 		icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_PORT, 0, 0);

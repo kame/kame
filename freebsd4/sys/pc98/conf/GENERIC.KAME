@@ -4,7 +4,7 @@
 # For more information on this file, please read the handbook section on
 # Kernel Configuration Files:
 #
-#    http://www.freebsd.org/handbook/kernelconfig-config.html
+#    http://www.FreeBSD.org/doc/en_US.ISO8859-1/books/handbook/kernelconfig-config.html
 #
 # The handbook is also available locally in /usr/share/doc/handbook
 # if you've installed the doc distribution, otherwise always see the
@@ -15,7 +15,7 @@
 # device lines is also present in the ./LINT configuration file. If you are
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-# $FreeBSD: src/sys/pc98/conf/GENERIC,v 1.142.2.27.2.1 2002/01/26 14:52:29 murray Exp $
+# $FreeBSD: src/sys/pc98/conf/GENERIC,v 1.142.2.31 2002/08/01 17:26:24 blackend Exp $
 
 machine		pc98
 cpu		I386_CPU
@@ -155,7 +155,7 @@ device		sc0	at isa?
 device		npx0	at nexus? port IO_NPX irq 8
 
 # Power management support (see LINT for more options)
-#device		apm0    at nexus? disable flags 0x20 # Advanced Power Management
+#device		apm0	at nexus? disable flags 0x20 # Advanced Power Management
 #device		pmc0	at isa? port 0x8f0
 
 # PCCARD (PCMCIA) support
@@ -252,8 +252,9 @@ device		olpt0	at isa? port IO_LPT
 
 # PCI Ethernet NICs.
 device		de		# DEC/Intel DC21x4x (``Tulip'')
-device		vx		# 3Com 3c590, 3c595 (``Vortex'')
+device		em		# Intel PRO/1000 adapter Gigabit Ethernet Card (``Wiseman'')
 device		txp		# 3Com 3cR990 (``Typhoon'')
+device		vx		# 3Com 3c590, 3c595 (``Vortex'')
 
 # PCI Ethernet NICs that use the common MII bus controller code.
 # NOTE: Be sure to keep the 'device miibus' line in order to use these NICs!
@@ -269,7 +270,6 @@ device		tl		# Texas Instruments ThunderLAN
 device		tx		# SMC EtherPower II (83c170 ``EPIC'')
 device		vr		# VIA Rhine, Rhine II
 device		wb		# Winbond W89C840F
-device		wx		# Intel Gigabit Ethernet Card (``Wiseman'')
 device		xl		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
 device		bge		# Broadcom BCM570x (``Tigon III'')
 

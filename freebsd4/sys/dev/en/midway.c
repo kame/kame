@@ -1955,7 +1955,7 @@ struct mbuf **mm, *prev;
 #endif
 
   d = mtod(m, u_char *);
-  off = ((uintptr_t) (void *) d) % sizeof(u_int32_t);
+  off = ((unsigned long) d) % sizeof(u_int32_t);
 
   if (off) {
     if ((m->m_flags & M_EXT) == 0) {
@@ -2503,7 +2503,7 @@ struct en_launch *l;
       cnt = (need - len) % sizeof(u_int32_t);
       if (cnt && M_TRAILINGSPACE(tmp) >= cnt)
         len += cnt;			/* pad for FLUSH */
-    }
+    } 
       
 #if !defined(MIDWAY_ENIONLY)
 

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-cd.c,v 1.48.2.16.2.1 2002/08/04 11:36:48 murray Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-cd.c,v 1.48.2.18 2002/09/16 19:38:37 sos Exp $
  */
 
 #include "opt_ata.h"
@@ -490,6 +490,7 @@ static int
 acdopen(dev_t dev, int flags, int fmt, struct proc *p)
 {
     struct acd_softc *cdp = dev->si_drv1;
+    int timeout = 60;
     
     if (!cdp)
 	return ENXIO;
@@ -498,6 +499,19 @@ acdopen(dev_t dev, int flags, int fmt, struct proc *p)
 	if (count_dev(dev) > 1)
 	    return EBUSY;
     }
+
+    /* wait if drive is not finished loading the medium */
+    while (timeout--) {
+	struct atapi_reqsense *sense = cdp->device->result;
+
+	if (!atapi_test_ready(cdp->device))
+	    break;
+	if (sense->sense_key == 2  && sense->asc == 4 && sense->ascq == 1)
+	    tsleep(&timeout, PRIBIO, "acdld", hz / 2);
+	else
+	    break;
+    }
+
     if (count_dev(dev) == 1) {
 	if (cdp->changer_info && cdp->slot != cdp->changer_info->current_slot) {
 	    acd_select_slot(cdp);
