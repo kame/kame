@@ -1,4 +1,4 @@
-/*	$KAME: altq_rmclass.h,v 1.4 2000/10/18 09:15:24 kjc Exp $	*/
+/*	$KAME: altq_rmclass.h,v 1.5 2000/12/02 13:44:40 kjc Exp $	*/
 
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
@@ -171,7 +171,7 @@ struct rm_class {
 	struct timeval	undertime_;	/* time can next send */
 	struct timeval	last_;		/* time last packet sent */
 	struct timeval	overtime_;
-	struct callout_handle callout_handle; /* handle for timeout() calls */
+	struct callout	callout_; 	/* for timeout() calls */
 
 	rm_class_stats_t stats_;	/* Class Statistics */
 };

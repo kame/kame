@@ -1,4 +1,4 @@
-/*	$KAME: altq_subr.c,v 1.6 2000/10/18 09:15:24 kjc Exp $	*/
+/*	$KAME: altq_subr.c,v 1.7 2000/12/02 13:44:40 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_subr.c,v 1.6 2000/10/18 09:15:24 kjc Exp $
+ * $Id: altq_subr.c,v 1.7 2000/12/02 13:44:40 kjc Exp $
  */
 
 #ifdef ALTQ
@@ -107,6 +107,7 @@ static void 	ip4f_free __P((struct ip4_frag *));
 
 int (*altq_input) __P((struct mbuf *, int)) = NULL;
 static int tbr_timer = 0;	/* token bucket regulator timer */
+static struct callout tbr_callout = CALLOUT_INITIALIZER;
 
 /*
  * alternate queueing support routines
@@ -342,7 +343,7 @@ tbr_set(ifq, profile)
 		FREE(otbr, M_DEVBUF);
 	else {
 		if (tbr_timer == 0) {
-			timeout(tbr_timeout, (void *)0, 1);
+			CALLOUT_RESET(&tbr_callout, 1, tbr_timeout, (void *)0);
 			tbr_timer = 1;
 		}
 	}
@@ -380,7 +381,7 @@ tbr_timeout(arg)
 	}
 	splx(s);
 	if (active > 0)
-		timeout(tbr_timeout, (void *)0, 1);
+		CALLOUT_RESET(&tbr_callout, 1, tbr_timeout, (void *)0);
 	else
 		tbr_timer = 0;	/* don't need tbr_timer anymore */
 #if defined(__alpha__) && !defined(ALTQ_NOPCC)

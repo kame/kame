@@ -1,4 +1,4 @@
-/*	$KAME: altq_rmclass.c,v 1.7 2000/10/18 09:15:23 kjc Exp $	*/
+/*	$KAME: altq_rmclass.c,v 1.8 2000/12/02 13:44:40 kjc Exp $	*/
 
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
@@ -35,7 +35,7 @@
  * LBL code modified by speer@eng.sun.com, May 1977.
  * For questions and/or comments, please send mail to cbq@ee.lbl.gov
  *
- * $Id: altq_rmclass.c,v 1.7 2000/10/18 09:15:23 kjc Exp $
+ * $Id: altq_rmclass.c,v 1.8 2000/12/02 13:44:40 kjc Exp $
  */
 
 #ident "@(#)rm_class.c  1.48     97/12/05 SMI"
@@ -229,7 +229,7 @@ rmc_newclass(pri, ifd, nsecPerByte, action, maxq, parent, borrow,
 	if (cl == NULL)
 		return (NULL);
 	bzero(cl, sizeof(struct rm_class));
-	CALLOUT_HANDLE_INIT(&cl->callout_handle);
+	CALLOUT_INIT(&cl->callout_);
 	MALLOC(cl->q_, class_queue_t *, sizeof(class_queue_t),
 	       M_DEVBUF, M_WAITOK);
 	if (cl->q_ == NULL) {
@@ -564,7 +564,7 @@ rmc_delete_class(ifd, cl)
 	ASSERT(cl->children_ == NULL);
 
 	if (cl->sleeping_)
-		UNTIMEOUT((timeout_t *)rmc_restart, cl, cl->callout_handle);
+		CALLOUT_STOP(&cl->callout_);
 	
 	s = splimp();
 	/*
@@ -914,7 +914,7 @@ rmc_under_limit(cl, now)
 		if (TV_LT(now, &cl->undertime_))
 			return (0);
 
-		UNTIMEOUT((timeout_t *)rmc_restart, cl, cl->callout_handle);
+		CALLOUT_STOP(&cl->callout_);
 		cl->sleeping_ = 0;
 		cl->undertime_.tv_sec = 0;
 		return (1);
@@ -1087,7 +1087,7 @@ _rmc_wrr_dequeue_next(ifd, op)
 	cpri = cl->pri_;
 #if 0	/* too time-consuming for nothing */
 	if (cl->sleeping_)
-		UNTIMEOUT((timeout_t *)rmc_restart, cl, cl->callout_handle);
+		CALLOUT_STOP(&cl->callout_);
 	cl->sleeping_ = 0;
 	cl->undertime_.tv_sec = 0;
 #endif
@@ -1204,7 +1204,7 @@ _rmc_prr_dequeue_next(ifd, op)
 	cpri = cl->pri_;
 #if 0	/* too time-consuming for nothing */
 	if (cl->sleeping_)
-		UNTIMEOUT((timeout_t *)rmc_restart, cl, cl->callout_handle);
+		CALLOUT_STOP(&cl->callout_);
 	cl->sleeping_ = 0;
 	cl->undertime_.tv_sec = 0;
 #endif
@@ -1387,8 +1387,7 @@ rmc_update_class_util(ifd)
 			    (avgidle > cl->maxidle_) ? cl->maxidle_ : avgidle;
 			cl->undertime_.tv_sec = 0;
 			if (cl->sleeping_) {
-				UNTIMEOUT((timeout_t *)rmc_restart, cl,
-					     cl->callout_handle);
+				CALLOUT_STOP(&cl->callout_);
 				cl->sleeping_ = 0;
 			}
 		}
@@ -1568,8 +1567,8 @@ rmc_delay_action(cl, borrow)
 #endif
 		} else
 			t = 2;
-		TIMEOUT((timeout_t *)rmc_restart, (caddr_t)cl, t,
-			cl->callout_handle);
+		CALLOUT_RESET(&cl->callout_, t,
+			      (timeout_t *)rmc_restart, (caddr_t)cl);
 	}
 }
 

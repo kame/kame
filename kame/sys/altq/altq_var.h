@@ -1,4 +1,4 @@
-/*	$KAME: altq_var.h,v 1.5 2000/12/02 06:41:40 itojun Exp $	*/
+/*	$KAME: altq_var.h,v 1.6 2000/12/02 13:44:40 kjc Exp $	*/
 
 /*
  * Copyright (C) 1998-2000
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_var.h,v 1.5 2000/12/02 06:41:40 itojun Exp $
+ * $Id: altq_var.h,v 1.6 2000/12/02 13:44:40 kjc Exp $
  */
 #ifndef _ALTQ_ALTQ_VAR_H_
 #define	_ALTQ_ALTQ_VAR_H_
@@ -107,8 +107,10 @@ extern void init_machclk(void);
 
 #if defined(__i386__) && !defined(ALTQ_NOPCC)
 /* for pentium tsc */
+#include <machine/cpufunc.h>
+
 #define	read_machclk()		rdtsc()
-#ifndef __FreeBSD__
+#ifdef __OpenBSD__
 static __inline u_int64_t
 rdtsc(void)
 {
@@ -116,7 +118,7 @@ rdtsc(void)
 	__asm __volatile(".byte 0x0f, 0x31" : "=A" (rv));
 	return (rv);
 }
-#endif /* !__FreeBSD__ */
+#endif /* __OpenBSD__ */
 
 #elif defined(__alpha__) && !defined(ALTQ_NOPCC)
 /* for alpha rpcc */
@@ -176,23 +178,32 @@ typedef u_long ioctlcmd_t;
 #endif
 
 /* macro for timeout/untimeout */
-#ifdef __NetBSD__
-#error notyet
-#elif (__FreeBSD_version > 300000)
-#define	CALLOUT_HANDLE_INIT(h)	callout_handle_init((h))
-#define	TIMEOUT(f,a,t,h)	(h) = timeout((f),(a),(t))
-#define	UNTIMEOUT(f,a,h)	untimeout((f),(a),(h))
+#if (__FreeBSD_version > 300000) || defined(__NetBSD__)
+/* use callout */
+#include <sys/callout.h>
+
+#define	CALLOUT_INIT(c)		callout_init((c))
+#define	CALLOUT_RESET(c,t,f,a)	callout_reset((c),(t),(f),(a))
+#define	CALLOUT_STOP(c)		callout_stop((c))
+#ifndef CALLOUT_INITIALIZER
+#define	CALLOUT_INITIALIZER	{ { { NULL } }, 0, NULL, NULL, 0 }
+#endif
 #else
-/* dummy callout_handle structure */
-struct callout_handle {
-	void *callout;
+/* use old-style timeout/untimeout */
+/* dummy callout structure */
+struct callout {
+	void		*c_arg;			/* function argument */
+	void		(*c_func) __P((void *));/* functiuon to call */
 };
-#define	CALLOUT_HANDLE_INIT(h)	do { (h)->callout = NULL; } while (0)
-#define	TIMEOUT(f,a,t,h)	timeout((f),(a),(t))
-#define	UNTIMEOUT(f,a,h)	untimeout((f),(a))
+#define	CALLOUT_INIT(c)		do { bzero((c), sizeof(*(c))); } while (0)
+#define	CALLOUT_RESET(c,t,f,a)	do {	(c)->c_arg = (a);	\
+					(c)->c_func = (f);	\
+					timeout((f),(a),(t)); } while (0)
+#define	CALLOUT_STOP(c)		untimeout((c)->c_func,(c)->c_arg)
+#define	CALLOUT_INITIALIZER	{ NULL, NULL }
+#endif
 #if !defined(__FreeBSD__)
 typedef void (timeout_t)(void *);
-#endif
 #endif
 
 #define	m_pktlen(m)		((m)->m_pkthdr.len)

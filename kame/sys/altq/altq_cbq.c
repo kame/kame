@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.c,v 1.7 2000/10/18 09:15:22 kjc Exp $	*/
+/*	$KAME: altq_cbq.c,v 1.8 2000/12/02 13:44:40 kjc Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -29,7 +29,7 @@
  *  
  * These notices must be retained in any copies of any part of this software.
  *
- * $Id: altq_cbq.c,v 1.7 2000/10/18 09:15:22 kjc Exp $
+ * $Id: altq_cbq.c,v 1.8 2000/12/02 13:44:40 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
@@ -619,7 +619,7 @@ cbq_ifattach(ifacep)
 	if (new_cbqp == NULL)
 		return (ENOMEM);
 	bzero(new_cbqp, sizeof(cbq_state_t));
- 	CALLOUT_HANDLE_INIT(&(new_cbqp->callout_handle));
+ 	CALLOUT_INIT(&new_cbqp->cbq_callout);
 	MALLOC(new_cbqp->cbq_class_tbl, struct rm_class **,
 	       sizeof(struct rm_class *) * CBQ_MAX_CLASSES, M_DEVBUF, M_WAITOK);
 	if (new_cbqp->cbq_class_tbl == NULL) {

@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.h,v 1.4 2000/10/18 09:15:22 kjc Exp $	*/
+/*	$KAME: altq_cbq.h,v 1.5 2000/12/02 13:44:40 kjc Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -205,7 +205,7 @@ typedef struct cbqstate {
 	struct rm_class		**cbq_class_tbl;
 
 	struct rm_ifdat		ifnp;
-	struct callout_handle	callout_handle;	/* handle for timeouts */
+	struct callout		cbq_callout;	/* for timeouts */
 
 	struct acc_classifier	cbq_classifier;
 } cbq_state_t;
