@@ -212,13 +212,20 @@ means to use IPSEC-DOI specifyed RFC 2407.
 means to use SIT_IDENTITY_ONLY specifyed RFC 2407.
 .\"
 .It Ic identifier Ar idtype ;
-specifies ID type to use phase 1 negotiation.
-.Ar idtype
-is one of following:
-.Ic address , fqdn , user_fqdn , keyid .
-These are linked to
+specifies ID type to use in phase 1 negotiation.
+The following type can be defined as
+.Ar idtype .
+.Ic address
+is default.
+.Ic fqdn , user_fqdn , keyid
+are linked to
 .Ic identifier
 directive.
+When you use some authentication method with a certificate,
+you can define either
+.Ic certname
+or
+.Ic certaltname .
 .\"
 .It Ic certificate_type Ar certspec ;
 specifies a certificate specification.
