@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/09/20 08:44:34 $
+			$Date: 1999/09/23 06:28:05 $
 
 1. IPv6
 
@@ -755,6 +755,7 @@ Here is a list of FreeBSD 3.x-RELEASE drivers and its conditions:
 	(Ethernet)
 	fe	ok		ok		yes
 	fxp	ok		ok		yes
+	wi	ok		ok		yes
 	lnc	?		ok		-
 	cnw	ok		ok		-(*)
 	ep	ok		ok		-

@@ -1,9 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.130 1999/09/22 11:45:15 sakane Exp $
+$Id: CHANGELOG,v 1.131 1999/09/23 06:28:05 sumikawa Exp $
 
 
 <199909>
+Thu Sep 23 15:24:45 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/sys/i386/if_wi.c: WaveLAN/IEEE speaks IPv6. It is new
+	  official supported device.
+
 Wed Sep 22 20:42:25 JST 1999 sakane@ydc.co.jp
 	* kame/kame/mchat:
 	Added two new command, /file and /log.  `/file' is to send file
