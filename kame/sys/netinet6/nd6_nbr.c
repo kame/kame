@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.38 2000/07/06 05:36:44 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.39 2000/10/02 11:31:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -118,10 +118,22 @@ nd6_ns_input(m, off, icmp6len)
 	union nd_opts ndopts;
 	struct sockaddr_dl *proxydl = NULL;
 
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off, icmp6len,);
+	nd_ns = (struct nd_neighbor_solicit *)((caddr_t)ip6 + off);
+#else
+	IP6_EXTHDR_GET(nd_ns, struct nd_neighbor_solicit *, m, off, icmp6len);
+	if (nd_ns == NULL) {
+		icmp6stat.icp6s_tooshort++;
+		return;
+	}
+#endif
+	ip6 = mtod(m, struct ip6_hdr *); /* adjust pointer for safety */
+	taddr6 = nd_ns->nd_ns_target;
+
 	if (ip6->ip6_hlim != 255) {
-		log(LOG_ERR,
-		    "nd6_ns_input: invalid hlim %d\n", ip6->ip6_hlim);
-		goto freeit;
+		log(LOG_ERR, "nd6_ns_input: invalid hlim %d\n", ip6->ip6_hlim);
+		goto bad;
 	}
 
 	if (IN6_IS_ADDR_UNSPECIFIED(&saddr6)) {
@@ -138,18 +150,6 @@ nd6_ns_input(m, off, icmp6len)
 			goto bad;
 		}
 	}
-
-#ifndef PULLDOWN_TEST
-	IP6_EXTHDR_CHECK(m, off, icmp6len,);
-	nd_ns = (struct nd_neighbor_solicit *)((caddr_t)ip6 + off);
-#else
-	IP6_EXTHDR_GET(nd_ns, struct nd_neighbor_solicit *, m, off, icmp6len);
-	if (nd_ns == NULL) {
-		icmp6stat.icp6s_tooshort++;
-		return;
-	}
-#endif
-	taddr6 = nd_ns->nd_ns_target;
 
 	if (IN6_IS_ADDR_MULTICAST(&taddr6)) {
 		log(LOG_INFO, "nd6_ns_input: bad NS target (multicast)\n");
