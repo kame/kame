@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1196 2000/08/14 09:20:07 suz Exp $
+$KAME: CHANGELOG,v 1.1197 2000/08/14 12:24:17 itojun Exp $
 
 <200008> 
+Mon Aug 14 21:22:20 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/devel/boehm-gc: upgrade to 5.0a7
+	* netbsd/pkgsrc/www/w3m: upgrade to 0.1.10
+
 Mon Aug 14 18:15:54 JST 2000	suz@kame.net
 	* freebsd{2,3}/sbin/ifconfig/ifconfig.c
 	+ don't assign dummy address to an interface when it's brought
