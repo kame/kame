@@ -1,4 +1,4 @@
-/*	$KAME: gssapi.c,v 1.4 2000/12/15 15:26:29 itojun Exp $	*/
+/*	$KAME: gssapi.c,v 1.5 2001/01/27 00:15:57 thorpej Exp $	*/
 
 /*
  * Copyright 2000 Wasabi Systems, Inc.
@@ -163,8 +163,8 @@ gssapi_get_itoken(struct ph1handle *iph1, int *lenp)
 	OM_uint32 maj_stat, min_stat;
 	gss_name_t partner;
 
-	if (iph1->gssapi_state == NULL)
-		gssapi_init(iph1);
+	if (iph1->gssapi_state == NULL && gssapi_init(iph1) < 0)
+		return -1;
 
 	gps = iph1->gssapi_state;
 
@@ -227,8 +227,8 @@ gssapi_get_rtoken(struct ph1handle *iph1, int *lenp)
 	OM_uint32 min_stat, maj_stat;
 	gss_name_t client_name;
 
-	if (iph1->gssapi_state == NULL)
-		gssapi_init(iph1);
+	if (iph1->gssapi_state == NULL && gssapi_init(iph1) < 0)
+		return -1;
 
 	gps = iph1->gssapi_state;
 
@@ -301,8 +301,8 @@ gssapi_save_received_token(struct ph1handle *iph1, vchar_t *token)
 	gss_buffer_t gsstoken;
 	int ret;
 
-	if (iph1->gssapi_state == NULL)
-		gssapi_init(iph1);
+	if (iph1->gssapi_state == NULL && gssapi_init(iph1) < 0)
+		return -1;
 
 	gps = gssapi_get_state(iph1);
 
