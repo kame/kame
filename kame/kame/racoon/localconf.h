@@ -26,13 +26,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.h,v 1.1 2000/01/09 01:31:27 itojun Exp $ */
+/* YIPS @(#)$Id: localconf.h,v 1.2 2000/01/10 17:49:16 itojun Exp $ */
 
 /* local configuration */
 
 /* must include algstrength.h first. */
 
-#define LC_DEFAULT_CF	"/usr/local/etc/racoon.conf"
+#define LC_DEFAULT_CF	SYSCONFDIR "/racoon.conf"
 
 #define LC_PATHTYPE_INCLUDE	0
 #define LC_PATHTYPE_PSK		1

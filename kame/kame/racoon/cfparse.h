@@ -26,9 +26,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: cfparse.h,v 1.4 2000/01/09 01:31:21 itojun Exp $ */
+/* YIPS @(#)$Id: cfparse.h,v 1.5 2000/01/10 17:49:16 itojun Exp $ */
 
-#define DEFAULT_CF_FILE "/usr/local/etc/racoon.conf"
+#define DEFAULT_CF_FILE	SYSCONFDIR "/racoon.conf"
 
 #define CF_PATHTYPE_INCLUDE	0
 #define CF_PATHTYPE_PSK		1
