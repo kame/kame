@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.46 2002/05/09 12:36:29 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.47 2002/05/09 13:01:07 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -747,7 +747,6 @@ get_delegated_prefixes(p, ep, optinfo)
 					in6addr2str(&pi.dh6_pi_paddr, 0),
 					pi.dh6_pi_plen);
 			}
-			break;
 
 			if ((dp = malloc(sizeof(*dp))) == NULL) {
 				dprintf(LOG_ERR, "memory allocation failed"
