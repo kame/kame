@@ -2707,9 +2707,10 @@ ip_getmopt_sgaddr(sopt, ifp, ss_grp, ss_src)
 
 		sin_src = SIN(ss_src);
 		sin_src->sin_addr = mreqsrc.imr_sourceaddr;
+		sin_src->sin_len = sizeof(*sin_src);
 		sin_grp = SIN(ss_grp);
 		sin_grp->sin_addr = mreqsrc.imr_multiaddr;
-		sin_grp->sin_len = sin_src->sin_len = sizeof(sin_grp);
+		sin_grp->sin_len = sizeof(*sin_grp);
 		sin_ifa.sin_addr = mreqsrc.imr_interface;
 
 		/*
@@ -2758,9 +2759,10 @@ ip_getmopt_sgaddr(sopt, ifp, ss_grp, ss_src)
 
 		sin_src = SIN(ss_src);
 		sin_src->sin_addr = SIN(&gsreq.gsr_source)->sin_addr;
+		sin_src->sin_len = sizeof(*sin_src);
 		sin_grp = SIN(ss_grp);
 		sin_grp->sin_addr = SIN(&gsreq.gsr_group)->sin_addr;
-		sin_src->sin_len = sin_grp->sin_len = sizeof(sin_grp);
+		sin_grp->sin_len = sizeof(*sin_grp);
 
 		if (!IN_MULTICAST(SIN_ADDR_H(sin_grp)) ||
 			IN_LOCAL_GROUP(SIN_ADDR_H(sin_grp))) {
