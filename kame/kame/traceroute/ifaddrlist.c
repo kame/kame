@@ -33,7 +33,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/ifaddrlist.c,v 1.3 2000/02/23 07:30:25 itojun Exp $ (LBL)";
+    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/ifaddrlist.c,v 1.4 2000/02/23 16:09:11 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -149,7 +149,11 @@ ifaddrlist(register struct ifaddrlist **ipaddrp, register char *errbuf)
 	}
 
 	*ipaddrp = ifaddrlist;
+#ifdef HAVE_FREEIFADDRS
+	freeifaddrs(ifap);
+#else
 	free(ifap);
+#endif
 	return nipaddr;
 #else
 	register int fd, nipaddr;
