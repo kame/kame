@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.181 2003/06/28 14:42:12 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.182 2003/07/08 09:27:06 ono Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -78,6 +78,7 @@
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
+#include <netinet6/ip6_mroute.h>
 #include <netinet6/scope6_var.h>
 
 #include <net/net_osdep.h>
@@ -990,6 +991,9 @@ in6_ifdetach(ifp)
 	struct in6_multi *in6m, *in6m_next;
 #endif
 	struct in6_multi_mship *imm;
+
+	/* remove ip6_mrouter stuff */
+	ip6_mrouter_detach(ifp);
 
 	/* remove neighbor management table */
 	nd6_purge(ifp);
