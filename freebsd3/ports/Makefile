@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.6 1999/11/16 11:13:32 sumikawa Exp $
+# $Id: Makefile,v 1.7 1999/11/25 09:00:49 sumikawa Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -15,6 +15,7 @@ SUBDIR+=	gated-ipv6
 SUBDIR+=	geta
 SUBDIR+=	heimdal
 SUBDIR+=	icecast
+SUBDIR+=	ipv6socket_scrub
 SUBDIR+=	irc
 SUBDIR+=	inn
 SUBDIR+=	kaffe
