@@ -1,4 +1,4 @@
-/*	$KAME: ip6protosw.h,v 1.27 2002/07/31 10:59:05 suz Exp $	*/
+/*	$KAME: ip6protosw.h,v 1.28 2002/09/27 07:18:55 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -74,13 +74,6 @@
  * Protocol switch table for IPv6.
  * All other definitions should refer to sys/protosw.h
  */
-
-#ifdef __NetBSD__
-/*
- * For pfil_head structure.
- */
-#include <net/pfil.h>
-#endif
 
 struct mbuf;
 struct sockaddr;
@@ -176,9 +169,6 @@ struct ip6protosw {
 #else
 	int	(*pr_sysctl)		/* sysctl for protocol */
 			__P((int *, u_int, void *, size_t *, void *, size_t));
-#endif
-#ifdef __NetBSD__
-	struct	pfil_head	pr_pfh;
 #endif
 };
 
