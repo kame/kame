@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.20 2000/01/11 18:24:57 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.21 2000/01/11 22:26:13 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -547,6 +547,10 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	iph2->ph1 = iph1;
 	iph2->side = INITIATOR;
 	iph2->status = PHASE2ST_START;
+	if ((flags & ISAKMP_FLAG_A) == 0)
+		iph2->flags = (hash == NULL ? 0 : ISAKMP_FLAG_E);
+	else
+		iph2->flags = (hash == NULL ? 0 : ISAKMP_FLAG_A);
 	iph2->msgid = isakmp_newmsgid2(iph1);
 
 	/* get IV and HASH(1) if skeyid_a was generated. */
@@ -598,10 +602,7 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	isakmp->np = hash == NULL ? (np & 0xff) : ISAKMP_NPTYPE_HASH;
 	isakmp->v = iph1->version;
 	isakmp->etype = ISAKMP_ETYPE_INFO;
-	if ((flags & ISAKMP_FLAG_A) == 0)
-		isakmp->flags = (hash == NULL ? 0 : ISAKMP_FLAG_E);
-	else
-		isakmp->flags = (hash == NULL ? 0 : ISAKMP_FLAG_A);
+	isakmp->flags = iph2->flags;
 	memcpy(&isakmp->msgid, &iph2->msgid, sizeof(isakmp->msgid));
 	isakmp->len   = htonl(tlen);
 	p = (char *)(isakmp + 1);

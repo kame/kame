@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.37 2000/01/11 22:10:18 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.38 2000/01/11 22:26:12 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -480,7 +480,7 @@ isakmp_main(msg, remote, local)
 		 * don't initiate commit bit.  should be fixed in the future.
 		 */
 		if (ISSET(isakmp->flags, ISAKMP_FLAG_C))
-			iph2->ph1->flags |= ISAKMP_FLAG_C;
+			iph2->flags |= ISAKMP_FLAG_C;
 
 		/* receive */
 		if (ph2exchange[etypesw(isakmp->etype)]
@@ -719,6 +719,7 @@ isakmp_ph2begin_r(iph1, msg)
 	iph2->ph1 = iph1;
 	iph2->side = RESPONDER;
 	iph2->status = PHASE2ST_START;
+	iph2->flags = isakmp->flags;
 	iph2->msgid = isakmp->msgid;
 	iph2->seq = pk_getseq();
 	iph2->ivm = oakley_newiv2(iph1, iph2->msgid);
@@ -1632,7 +1633,7 @@ set_isakmp_header2(vbuf, iph2, nptype)
 	isakmp->np = nptype;
 	isakmp->v = iph2->ph1->version;
 	isakmp->etype = ISAKMP_ETYPE_QUICK;
-	isakmp->flags = iph2->ph1->flags;
+	isakmp->flags = iph2->flags;
 	memcpy(&isakmp->msgid, &iph2->msgid, sizeof(isakmp->msgid));
 	isakmp->len = htonl(vbuf->l);
 

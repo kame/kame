@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.14 2000/01/11 21:24:54 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.15 2000/01/11 22:26:13 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -476,7 +476,7 @@ quick_i2recv(iph2, msg0)
 
 	if (result) {
 		plog(logp, LOCATION, iph2->ph1->remote, "HASH(2) mismatch.\n");
-		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL, iph2->ph1->flags);
+		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL, iph2->flags);
 		goto end;
 	}
     }
@@ -602,7 +602,7 @@ quick_i2send(iph2, msg0)
 	}
 
 	/* if there is commit bit don't set up SA now. */
-	if (ISSET(iph2->ph1->flags, ISAKMP_FLAG_C)) {
+	if (ISSET(iph2->flags, ISAKMP_FLAG_C)) {
 		iph2->status = PHASE2ST_COMMIT;
 		error = 0;
 		goto end;
@@ -743,13 +743,13 @@ quick_i3recv(iph2, msg0)
 
 	if (result) {
 		plog(logp, LOCATION, iph2->ph1->remote, "HASH(4) mismatch.\n");
-		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL, iph2->ph1->flags);
+		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL, iph2->flags);
 		goto end;
 	}
     }
 
 	iph2->status = PHASE2ST_ADDSA;
-	iph2->ph1->flags ^= ISAKMP_FLAG_C;	/* reset bit */
+	iph2->flags ^= ISAKMP_FLAG_C;	/* reset bit */
 
 	/* don't anything if local test mode. */
 	if (f_local) {
@@ -1025,7 +1025,7 @@ quick_r1recv(iph2, msg0)
 
 	if (result) {
 #if 0	/* XXX can't get SA's values because before checking SA */
-		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL, iph2->ph1->flags);
+		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL, iph2->flags);
 #endif
 		plog(logp, LOCATION, iph2->ph1->remote, "HASH(1) mismatch.\n");
 		error = ISAKMP_NTYPE_INVALID_HASH_INFORMATION;
@@ -1448,13 +1448,13 @@ quick_r3recv(iph2, msg0)
 
 	if (result) {
 		plog(logp, LOCATION, iph2->ph1->remote, "HASH(3) mismatch.\n");
-		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL, iph2->ph1->flags);
+		isakmp_info_send_n2(iph2, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL, iph2->flags);
 		goto end;
 	}
     }
 
 	/* if there is commit bit, don't set up SA now. */
-	if (ISSET(iph2->ph1->flags, ISAKMP_FLAG_C)) {
+	if (ISSET(iph2->flags, ISAKMP_FLAG_C)) {
 		iph2->status = PHASE2ST_COMMIT;
 	} else
 		iph2->status = PHASE2ST_STATUS6;
@@ -1597,7 +1597,7 @@ quick_r3prep(iph2, msg0)
 		goto end;
 
 	iph2->status = PHASE2ST_ADDSA;
-	iph2->ph1->flags ^= ISAKMP_FLAG_C;	/* reset bit */
+	iph2->flags ^= ISAKMP_FLAG_C;	/* reset bit */
 
 	/* don't anything if local test mode. */
 	if (f_local) {
@@ -1663,7 +1663,7 @@ quick_ir1sendmx(iph2, body)
 	}
 
 	/* re-set encryption flag, for serurity. */
-	iph2->ph1->flags |= ISAKMP_FLAG_E;
+	iph2->flags |= ISAKMP_FLAG_E;
 
 	/* set isakmp header */
 	p = set_isakmp_header2(buf, iph2, ISAKMP_NPTYPE_HASH);

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.5 2000/01/10 00:39:35 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.6 2000/01/11 22:26:12 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -218,7 +218,8 @@ struct ph2handle {
 	int inuse;			/* received EXPIRE message */
 					/* 0: init, 1: grace, 2: sa require */
 
-	u_int32_t msgid;		/* msgid in phase 2 */
+	u_int8_t flags;			/* Flags for phase 2 */
+	u_int32_t msgid;		/* msgid for phase 2 */
 
 	struct ipsecsa *approval;	/* SA(s) approved. */
 			/* point to one of the proposals in policyindex. */
