@@ -23,6 +23,7 @@ BINOWN=	root
 BINGRP=	bin
 BINMODE=4555
 
+CFLAGS+=-ansi -pedantic -Wall
 .if (${OPSYS} != "NetBSD")
 CFLAGS+=-Wall
 .endif
@@ -32,7 +33,7 @@ CFLAGS+=-DINET6 -DUSE_RFC2292BIS
 CFLAGS+=-DIPSEC
 .endif
 .else
-CPPFLAGS+=-DINET6 -DIPSEC
+CPPFLAGS+=-DINET6 -DIPSEC -DUSE_RFC2292BIS
 .endif
 .if exists(/usr/local/v6/lib/libipsec.a)
 LDADD+=	-L${.OBJDIR}/../libipsec -L${.OBJDIR}/../libipsec/obj \
@@ -56,10 +57,10 @@ DPADD+=	${.OBJDIR}/../libinet6/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 .endif
 
-.if (${OPSYS} != "NetBSD")
-MAN8=	traceroute6.8
-.else
+.if (${OPSYS} == "NetBSD") || (${OPSYS} == "OpenBSD")
 MAN=	traceroute6.8
+.else
+MAN8=	traceroute6.8
 .endif
 
 .include <bsd.prog.mk>
