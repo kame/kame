@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.422 2000/01/09 01:34:34 itojun Exp $
+$Id: CHANGELOG,v 1.423 2000/01/10 03:08:44 jinmei Exp $
 
 <200001>
 Sun Jan  9 10:32:59 JST 2000  sakane@kame.net
@@ -59,7 +59,7 @@ Sat Jan  8 00:37:28 2000  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	  command and natpt related commands.
 
 	- These NAT-PT translator and commands are now under development.
-	  It's user interface and overall functionality are subjects to
+	  Its user interface and overall functionality are subject to
 	  future improvements and changes.  So, please be careful when you
 	  try it.
 
