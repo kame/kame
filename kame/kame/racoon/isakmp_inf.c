@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.35 2000/07/04 17:23:17 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.36 2000/07/06 09:21:26 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -792,6 +792,12 @@ purge_spi(proto, spi, n)
 			continue;
 		}
 
+		if (sa->sadb_sa_state != SADB_SASTATE_MATURE
+		 && sa->sadb_sa_state != SADB_SASTATE_DYING) {
+			msg = next;
+			continue;
+		}
+
 		/* XXX n^2 algorithm, inefficient */
 		/* XXX should we remove SAs with opposite direction as well? */
 		for (i = 0; i < n; i++) {
@@ -869,6 +875,12 @@ info_recv_initialcontact(remote)
 		sa = (struct sadb_sa *)mhp[SADB_EXT_SA];
 		src = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]);
 		dst = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]);
+
+		if (sa->sadb_sa_state != SADB_SASTATE_MATURE
+		 && sa->sadb_sa_state != SADB_SASTATE_DYING) {
+			msg = next;
+			continue;
+		}
 
 		if (!cmpsaddrwop(remote, src) || !cmpsaddrwop(remote, dst)) {
 			YIPSDEBUG(DEBUG_DMISC,
