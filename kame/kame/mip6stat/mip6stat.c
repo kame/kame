@@ -1,4 +1,4 @@
-/*	$KAME: mip6stat.c,v 1.16 2002/09/01 05:58:02 keiichi Exp $	*/
+/*	$KAME: mip6stat.c,v 1.17 2002/12/16 05:52:56 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -197,10 +197,10 @@ static const char *binding_ack_status_desc[] = {
 	"not home agent for this mobile node",
 	"duplicate address detection failed",
 	"sequence number out of window",
-	"route optimization unnecessary due to low traffic",
-	"invalid authenticator",
 	"expired home nonce index",
 	"expired care-of nonce index",
+	"expired Nonces",
+	"#139"
 	"#140",
 	"#141",
 	"#142",
