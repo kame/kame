@@ -12,7 +12,7 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
- *	$Id: ip6_fw.c,v 1.3 1999/08/06 17:05:39 itojun Exp $
+ *	$Id: ip6_fw.c,v 1.4 1999/08/06 17:11:46 itojun Exp $
  */
 
 /*
@@ -52,17 +52,16 @@
 #include <netinet6/ip6.h>
 #include <netinet6/icmp6.h>
 #include <netinet6/ip6_fw.h>
-#if 0
+#ifdef TCP6
 #include <netinet6/tcp6.h>
 #include <netinet6/tcp6_timer.h>
 #include <netinet6/tcp6_var.h>
-#else
+#endif
 #include <netinet/ip_var.h>
 #include <netinet/tcp.h>
 #include <netinet/tcp_seq.h>
 #include <netinet/tcp_timer.h>
 #include <netinet/tcp_var.h>
-#endif
 #include <netinet/udp.h>
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -747,7 +746,7 @@ got_match:
 	    && !IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
 		switch (rule->fw_reject_code) {
 		case IPV6_FW_REJECT_RST:
-#if 0	/*not tested*/
+#if 1	/*not tested*/
 		  {
 			struct tcphdr *const tcp =
 				(struct tcphdr *) ((caddr_t)ip6 + off);
@@ -788,7 +787,7 @@ got_match:
 			}
 			bcopy(&ti, ip6, sizeof(ti));
 #ifdef TCP6
-			tcp6_respond(NULL, ip6, (struct tcphdr *)(ip6 + 1),
+			tcp6_respond(NULL, ip6, (struct tcp6hdr *)(ip6 + 1),
 				*m, ack, seq, flags);
 #elif defined(__NetBSD__)
 			tcp_respond(NULL, NULL, *m, (struct tcphdr *)(ip6 + 1),
