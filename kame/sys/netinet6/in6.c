@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.188 2001/06/04 08:53:39 keiichi Exp $	*/
+/*	$KAME: in6.c,v 1.189 2001/06/11 12:52:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2600,11 +2600,11 @@ in6_ifawithscope(oifp, dst)
 			 * 2. we are looking at a deprecated address,
 			 *    and ifa_best is also deprecated.
 			 * Also, we do not have to consider a case where
-			 * the scope of if_best is larger(smaller) than dst and
-			 * the scope of the current address is smaller(larger)
-			 * than dst. Such a case has already been covered.
-			 * Tiebreaking is done according to the following
-			 * items:
+			 * the scope of ifa_best is larger(smaller) than dst
+			 * and the scope of the current address is smaller
+			 * (larger) than dst. Such a case has already been
+			 * covered. Tiebreaking is done according to the
+			 * following items:
 			 * - the scope comparison between the address and
 			 *   dst (dscopecmp)
 			 * - the scope comparison between the address and
