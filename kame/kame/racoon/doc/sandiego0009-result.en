@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.7 2000/09/19 07:52:44 itojun Exp $
+$KAME: sandiego0009-result.en,v 1.8 2000/09/19 16:00:39 sakane Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -43,10 +43,9 @@ vs Cryptek
 	phase 2: PFS group 2
 	    ESP 3des-cbc, hmac-sha1, transport mode, lifetime 600
 	Notes:
-	racoon crashed because of linker problem, header size had changed.
-	ph1 proposal mismatched because he sent DH group 1, but I expected 2.
-	he sent 4 as ph1 spi size.  I warned and ignore it.
-	he sent tiger as hash.  It was his fault.
+	- racoon crashed because of linker problem, header size had changed.
+	- ph1 proposal mismatched because he sent DH group 1, but I expected 2.
+	- he sent 4 as ph1 spi size.  I warned and ignore it.
 
 vs SSH (IPv6)
 	phase 1: responder, aggressive
@@ -75,3 +74,26 @@ vs SSH (IPv6)
 	  ssh does not assume it
 	  (fixed/racoon can do both behavior, not sure if which side is more
 	  common)
+
+vs RapidStreem (CONTINUE)
+	phase 1: responder, main
+	    RSAsig, 3des-cbc, md5, DH group 1, lifetime 600
+	phase 2:
+	Notes:
+	- racoon crashed due to unkown problem.  I may be incorrect to use
+	  openssl functions.
+	- he sent multiple subjectAltName and ID was matched 2nd one.
+	  But racoon can not process multiple one.
+
+vs HITACHI
+	phase 1: responder, main
+	    RSAsig, 3des-cbc, sha1, DH group 2, lifetime 600
+	    both subjectAltName and DN are OK.
+	phase 2:
+		des, hmac-sha1, tunnel mode, lifetime 300	<== choiced
+		des, hmac-md5, tunnel mode, lifetime 300
+		3des, hmac-sha1, tunnel mode, lifetime 300
+		3des, hmac-md5, tunnel mode, lifetime 300
+	Notes:
+	- rekeying is fine.
+
