@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.30 2000/04/17 12:01:12 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.31 2000/04/19 05:51:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -147,7 +147,7 @@ struct stf_softc {
 };
 
 static struct stf_softc *stf;
-static int nstf = 1;
+static int nstf;
 
 #if NGIF > 0
 extern int ip_gif_ttl;	/*XXX*/
@@ -191,6 +191,11 @@ stfattach(dummy)
 	int i;
 	const struct encaptab *p;
 
+#ifdef __NetBSD__
+	nstf = dummy;
+#else
+	nstf = NSTF;
+#endif
 	stf = malloc(nstf * sizeof(struct stf_softc), M_DEVBUF, M_WAIT);
 	bzero(stf, nstf * sizeof(struct stf_softc));
 	sc = stf;
