@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.49 2001/02/04 05:25:49 jinmei Exp $	*/
+/*	$KAME: rtadvd.c,v 1.50 2001/02/04 06:15:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -78,7 +78,8 @@ struct in6_addr in6a_site_allrouters;
 static char *dumpfilename = "/var/run/rtadvd.dump"; /* XXX: should be configurable */
 static char *pidfilename = "/var/run/rtadvd.pid"; /* should be configurable */
 static char *mcastif;
-int sock, rtsock;
+int sock;
+int rtsock = -1;
 #ifdef MIP6
 int mobileip6 = 0;
 #endif
@@ -302,7 +303,7 @@ main(argc, argv)
 		}
 		if (i == 0)	/* timeout */
 			continue;
-		if (sflag == 0 && FD_ISSET(rtsock, &select_fd))
+		if (rtsock != -1 && FD_ISSET(rtsock, &select_fd))
 			rtmsg_input();
 		if (FD_ISSET(sock, &select_fd))
 			rtadvd_input();
