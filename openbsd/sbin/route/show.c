@@ -70,6 +70,10 @@ extern char *netname __P((struct sockaddr *));
 extern char *ns_print __P((struct sockaddr_ns *));
 extern int nflag;
 
+#define ROUNDUP(a) \
+	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
+#define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
+
 /*
  * Definitions for showing gateway flags.
  */
@@ -211,7 +215,7 @@ p_rtentry(rtm)
 		p_sockaddr(sa, rtm->rtm_flags, 16);
 		if (sa->sa_len == 0)
 			sa->sa_len = sizeof(in_addr_t);
-		sa = (struct sockaddr *)(sa->sa_len + (char *)sa);
+		sa = (struct sockaddr *)(ROUNDUP(sa->sa_len) + (char *)sa);
 		p_sockaddr(sa, 0, 18);
 	}
 	p_flags(rtm->rtm_flags & interesting, "%-6.6s ");
@@ -242,6 +246,11 @@ pr_family(af)
 	case AF_INET:
 		afname = "Internet";
 		break;
+#ifdef INET6
+	case AF_INET6:
+		afname = "Internet6";
+		break;
+#endif /* INET6 */
 	case AF_NS:
 		afname = "XNS";
 		break;
@@ -320,6 +329,21 @@ p_sockaddr(sa, flags, width)
 			cp = (flags & RTF_HOST) ? routename(sa) : netname(sa);
 		break;
 	    }
+
+#ifdef INET6
+	case AF_INET6:
+	    {
+		struct sockaddr_in6 *sin = (struct sockaddr_in6 *)sa;
+
+		cp = IN6_IS_ADDR_UNSPECIFIED(&sin->sin6_addr) ? "default" :
+			((flags & RTF_HOST) ?
+			routename(sa) :	netname(sa));
+		/* make sure numeric address is not truncated */
+		if (strchr(cp, ':') != NULL && strlen(cp) > width)
+			width = strlen(cp);
+		break;
+	    }
+#endif /* INET6 */
 
 	case AF_NS:
 		cp = ns_print((struct sockaddr_ns *)sa);

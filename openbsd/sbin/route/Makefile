@@ -6,6 +6,8 @@ SRCS=	route.c show.c keywords.c ccitt_addr.c
 BINOWN=	root
 BINMODE=555
 
+CPPFLAGS+=	-DINET6
+
 route.o .depend lint tags: keywords.h
 
 .include <bsd.prog.mk>

@@ -28,6 +28,7 @@ interface
 ifa
 ifp
 inet
+inet6
 ipx
 iso
 link
@@ -41,6 +42,7 @@ net
 netmask
 nostatic
 osi
+prefixlen
 proto1
 proto2
 recvpipe
