@@ -1,4 +1,10 @@
 #
+# KAME NOTE: kernel compilation may fail if you enable any of items that are
+# commented out. (to be improved in the future, but do it on your own risk.
+# report results to snap-users@kame.net)
+#
+
+#
 # GENERIC -- Generic kernel configuration file for FreeBSD/i386
 #
 # For more information on this file, please read the handbook section on
