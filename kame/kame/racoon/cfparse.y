@@ -1092,7 +1092,7 @@ set_ipsec_proposal(spidx, prspec)
 			;
 		while (s != NULL) {
 			YIPSDEBUG(DEBUG_CONF,
-				printf("lifetime = %ld\n", p->lifetime);
+				printf("lifetime = %ld\n", (long)p->lifetime);
 				printf("lifebyte = %d\n", p->lifebyte);
 				printf("level=%s\n", s_ipsec_level(s->ipsec_level));
 				printf("mode=%s\n", s_ipsecdoi_encmode(s->encmode));
@@ -1207,8 +1207,8 @@ set_isakmp_proposal(rmconf, prspec)
 		;
 	while (s != NULL) {
 		YIPSDEBUG(DEBUG_CONF,
-			printf("lifetime = %ld\n",
-				s->lifetime ? s->lifetime : p->lifetime);
+			printf("lifetime = %ld\n", (long)
+				(s->lifetime ? s->lifetime : p->lifetime));
 			printf("lifebyte = %d\n",
 				s->lifebyte ? s->lifebyte : p->lifebyte);
 			printf("strength=%s\n", s_algstrength(s->strength));

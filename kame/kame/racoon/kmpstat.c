@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: kmpstat.c,v 1.8 2000/02/01 16:57:44 sumikawa Exp $ */
+/* YIPS @(#)$Id: kmpstat.c,v 1.9 2000/02/11 08:20:42 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -921,8 +921,8 @@ print_schedule(buf, len)
 
 		printf("%-8ld %-8ld %-8ld %s\n",
 			sc->id,
-			sc->tick,
-			sc->xtime,
+			(long)sc->tick,
+			(long)sc->xtime,
 			tbuf);
 		sc++;
 	}

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.49 2000/02/09 05:18:08 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.50 2000/02/11 08:20:42 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -850,7 +850,7 @@ prop2ipsecsa_recurse(b0, b, l, max, result)
 				break;
 		} else {
 			for (i = 0; i < max; i++)
-				printf(" %d=%p", i, b[i]);
+				printf(" %ld=%p", (long)i, b[i]);
 			printf("\n");
 			ret = prop2ipsecsa_emit(b, max, result);
 #if 0
