@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.18 2000/03/12 10:51:46 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.19 2000/03/12 10:52:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -32,7 +32,9 @@
 /*
  * 6to4 interface, based on draft-ietf-ngtrans-6to4-03.txt.
  *
- * 6to4 interface is NOT capable of link-layer multicasting.
+ * 6to4 interface is NOT capable of link-layer (I mean, IPv4) multicasting.
+ * There is no address mapping defined from IPv6 multicast address to IPv4
+ * address.  Therefore, we do not have IFF_MULTICAST on the interface.
  *
  * Due to the lack of address mapping for link-local addresses, we cannot
  * throw packets toward link-local addresses (fe80::x).  Also, we cannot throw
