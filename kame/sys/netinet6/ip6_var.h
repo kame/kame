@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.44 2000/10/31 04:36:17 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.45 2000/11/08 17:50:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -301,9 +301,11 @@ int	icmp6_ctloutput __P((struct socket *, struct sockopt *sopt));
 int	icmp6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 #endif
 
+struct in6_ifaddr;
 void	ip6_init __P((void));
 void	ip6intr __P((void));
 void	ip6_input __P((struct mbuf *));
+struct in6_ifaddr *ip6_getdstifaddr __P((struct mbuf *));
 void	ip6_freepcbopts __P((struct ip6_pktopts *));
 void	ip6_freemoptions __P((struct ip6_moptions *));
 int	ip6_unknown_opt __P((u_int8_t *, struct mbuf *, int));

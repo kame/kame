@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.34 2000/11/08 17:20:45 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.35 2000/11/08 17:50:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -125,6 +125,11 @@
 #include "faith.h"
 #if defined(NFAITH) && NFAITH > 0
 #include <net/if_faith.h>
+#endif
+
+/* hack for backward compat - should be nuked */
+#ifndef M_ANYCAST6
+#define M_ANYCAST6	0
 #endif
 
 struct tcp6stat	tcp6stat;
@@ -474,17 +479,16 @@ tcp6_input(mp, offp, proto)
 	int iss = 0;
 	u_long thwin;
 	struct tcp6_opt_info opti;
+	struct in6_ifaddr *ia6;
 
 	tcp6stat.tcp6s_rcvtotal++;
 
-#if 1
-	/* XXX not a good place to put this into... */
-	if (m && (m->m_flags & M_ANYCAST6)) {
+	ia6 = ip6_getdstifaddr(m);
+	if (ia6 && (ia6->ia6_flags & IN6_IFF_ANYCAST)) {
 		icmp6_error(m, ICMP6_DST_UNREACH, ICMP6_DST_UNREACH_ADDR,
-			(caddr_t)&ip6->ip6_dst - (caddr_t)ip6);
+		    (caddr_t)&ip6->ip6_dst - (caddr_t)ip6);
 		return IPPROTO_DONE;
 	}
-#endif
 
 	opti.ts_present = 0;
 	opti.maxseg = 0;
@@ -698,13 +702,7 @@ findpcb:
 			 * I believe 5.5.4 is the best one, so we follow 5.5.4.
 			 */
 			if (!ip6_use_deprecated) {
-				struct mbuf *n;
-				struct in6_ifaddr *ia6;
-
-				n = m_aux_find(m, AF_INET6, IPPROTO_IPV6);
-				if (n && n->m_len == sizeof(ia6))
-					ia6 = *mtod(n, struct in6_ifaddr **);
-				if (ia6 &&
+				if ((ia6 = ip6_getdstifaddr(m)) &&
 				    (ia6->ia6_flags & IN6_IFF_DEPRECATED))
 					goto drop;
 			}

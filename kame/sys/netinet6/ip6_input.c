@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.127 2000/11/08 17:12:13 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.128 2000/11/08 17:50:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -216,6 +216,7 @@ ip6_fw_ctl_t *ip6_fw_ctl_ptr;
 struct ip6stat ip6stat;
 
 static void ip6_init2 __P((void *));
+static void ip6_setdstifaddr __P((struct mbuf *, struct in6_ifaddr *));
 
 static int ip6_hopopts_input __P((u_int32_t *, u_int32_t *, struct mbuf **, int *));
 #ifdef PULLDOWN_TEST
@@ -615,8 +616,12 @@ ip6_input(m)
 			if ((ia->ia6_flags & IN6_IFF_NOTREADY) == 0 &&
 			    IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr,
 					       &ip6->ip6_dst)) {
+#ifdef M_ANYCAST6
 				if ((ia->ia6_flags & IN6_IFF_ANYCAST) != 0)
 					m->m_flags |= M_ANYCAST6;
+#endif
+				/* record address information into m_aux. */
+				ip6_setdstifaddr(m, ia6);
 #ifdef MEASURE_PERFORMANCE
 				ctr_end = read_tsc();
 #ifdef MEASURE_PERFORMANCE_UDPONLY
@@ -643,8 +648,13 @@ ip6_input(m)
 		if ((ih = in6h_lookup(&ip6->ip6_dst, m->m_pkthdr.rcvif)) !=
 		    NULL &&
 		    (ia = ih->in6h_ifa) != NULL) {
+#ifdef M_ANYCAST6
 			if ((ia->ia6_flags & IN6_IFF_ANYCAST) != 0)
 				m->m_flags |= M_ANYCAST6;
+#endif
+			/* record address information into m_aux. */
+			ip6_setdstifaddr(m, ia6);
+
 #ifdef MEASURE_PERFORMANCE
 			ctr_end = read_tsc();
 #ifdef MEASURE_PERFORMANCE_UDPONLY
@@ -738,21 +748,13 @@ ip6_input(m)
 			add_performance_log(ctr_end - ctr_beg, &ip6->ip6_dst);
 #endif
 
+#ifdef M_ANYCAST6
 		if (ia6->ia6_flags & IN6_IFF_ANYCAST)
 			m->m_flags |= M_ANYCAST6;
+#endif
 
-		/*
-		 * record address information into m_aux.
-		 * TODO: we will be able to remove M_ANYCAST.
-		 */
-		n = m_aux_add(m, AF_INET6, IPPROTO_IPV6);
-		if (n) {
-			if (M_TRAILINGSPACE(n) >= sizeof(ia6)) {
-				n->m_len = sizeof(ia6);
-				*mtod(n, struct in6_ifaddr **) = ia6;
-			} else
-				m_aux_delete(m, n);
-		}
+		/* record address information into m_aux. */
+		ip6_setdstifaddr(m, ia6);
 
 		/*
 		 * packets to a tentative, duplicated, or somehow invalid
@@ -1044,6 +1046,39 @@ ip6_input(m)
 	return;
  bad:
 	m_freem(m);
+}
+
+/*
+ * set/grab in6_ifaddr correspond to IPv6 destination address.
+ */
+static void
+ip6_setdstifaddr(m, ia6)
+	struct mbuf *m;
+	struct in6_ifaddr *ia6;
+{
+	struct mbuf *n;
+
+	n = m_aux_add(m, AF_INET6, IPPROTO_IPV6);
+	if (n) {
+		if (M_TRAILINGSPACE(n) >= sizeof(ia6)) {
+			n->m_len = sizeof(ia6);
+			*mtod(n, struct in6_ifaddr **) = ia6;
+		} else
+			m_aux_delete(m, n);
+	}
+}
+
+struct in6_ifaddr *
+ip6_getdstifaddr(m)
+	struct mbuf *m;
+{
+	struct mbuf *n;
+
+	n = m_aux_find(m, AF_INET6, IPPROTO_IPV6);
+	if (n && n->m_len == sizeof(struct in6_ifaddr *))
+		return *mtod(n, struct in6_ifaddr **);
+	else
+		return NULL;
 }
 
 /*

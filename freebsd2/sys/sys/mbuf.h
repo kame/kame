@@ -163,7 +163,6 @@ struct mbuf {
 /* mbuf pkthdr flags, also in m_flags */
 #define	M_BCAST		0x0100	/* send/received as link-level broadcast */
 #define	M_MCAST		0x0200	/* send/received as link-level multicast */
-#define M_ANYCAST6	0x0400  /* received as IPv6 anycast */
 
 /* mbuf pkthdr flags, also in m_flags */
 #define M_AUTHIPHDR	0x1000	/* data origin authentication for IP header */
@@ -172,7 +171,7 @@ struct mbuf {
 #define M_AUTHIPDGM	0x8000	/* data origin authentication */
 
 /* flags copied when copying m_pkthdr */
-#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_BCAST|M_MCAST|M_ANYCAST6|M_AUTHIPHDR|M_DECRYPTED|M_LOOP|M_AUTHIPDGM)
+#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_BCAST|M_MCAST|M_AUTHIPHDR|M_DECRYPTED|M_LOOP|M_AUTHIPDGM)
 
 /* mbuf types */
 #define	MT_FREE		0	/* should be on free list */
