@@ -665,6 +665,16 @@ server6_react_request(buf, siz, rcvpi)
 	struct tm *tm;
 	struct dhcp6e extbuf;
 	int agent;
+#ifdef USE_DHCP6EXT_NULTERM
+#define PADLEN0(x)	((x) + 1)
+#else
+#define PADLEN0(x)	((x))
+#endif
+#ifdef USE_DHCP6EXT_PAD4
+#define PADLEN(x)	((PADLEN0((x)) + 3) & ~3)
+#else
+#define PADLEN(x)	(PADLEN0((x)))
+#endif
 
 	dprintf(LOG_DEBUG, "react_request");
 
@@ -852,15 +862,17 @@ server6_react_request(buf, siz, rcvpi)
 
 	/* DNS domain */
 	opt = dhcp6opttab_byname("Domain Name");
-	if (opt && dnsdom && ext + sizeof(extbuf) + strlen(dnsdom) + 1 <= ep) {
+	if (opt && dnsdom &&
+	    ext + sizeof(extbuf) + PADLEN(strlen(dnsdom)) <= ep) {
 		int dnsdom_len;
 
 		dnsdom_len = strlen(dnsdom);
 		extbuf.dh6e_type = htons(opt->code);
-		extbuf.dh6e_len = htons(dnsdom_len) + 1;	/*XXX padding?*/
+		extbuf.dh6e_len = PADLEN(dnsdom_len);
+		extbuf.dh6e_len = htons(extbuf.dh6e_len);
 		memcpy(ext, &extbuf, sizeof(extbuf));
 		memset(ext + sizeof(extbuf), 0, ntohs(extbuf.dh6e_len));
-		strncpy(ext + sizeof(extbuf), dnsdom, ntohs(extbuf.dh6e_len));
+		memcpy(ext + sizeof(extbuf), dnsdom, ntohs(extbuf.dh6e_len));
 		ext += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
 		len += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
 	}
@@ -887,16 +899,18 @@ server6_react_request(buf, siz, rcvpi)
 		}
 
 		opt = dhcp6opttab_byname("IEEE 1003.1 POSIX Timezone");
-		if (opt && ext + sizeof(extbuf) + strlen(tm->tm_zone) + 1 <= ep) {
+		if (opt &&
+		    ext + sizeof(extbuf) + PADLEN(strlen(tm->tm_zone)) <= ep) {
 			int zone_len;
 
 			zone_len = strlen(tm->tm_zone);
 			extbuf.dh6e_type = htons(opt->code);
-			extbuf.dh6e_len = htons(zone_len) + 1;	/*XXX padding?*/
+			extbuf.dh6e_len = PADLEN(zone_len);
+			extbuf.dh6e_len = htons(extbuf.dh6e_len);
 			memcpy(ext, &extbuf, sizeof(extbuf));
 			memset(ext + sizeof(extbuf), 0, ntohs(extbuf.dh6e_len));
-			strncpy(ext + sizeof(extbuf), tm->tm_zone,
-				ntohs(extbuf.dh6e_len));
+			memcpy(ext + sizeof(extbuf), tm->tm_zone,
+			    strlen(tm->tm_zone));
 			ext += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
 			len += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
 		}
@@ -909,4 +923,6 @@ server6_react_request(buf, siz, rcvpi)
 	}
 
 	return 0;
+#undef PADLEN0
+#undef PADLEN
 }
