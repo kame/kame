@@ -1650,7 +1650,7 @@ ip_setmoptions(sopt, imop)
 			rtfree(ro.ro_rt);
 		}
 		else {
-			ifp = ip_multicast_if(&mreq->imr_interface, NULL);
+			ifp = ip_multicast_if(&mreq.imr_interface, NULL);
 		}
 
 		/*
@@ -1718,7 +1718,7 @@ ip_setmoptions(sopt, imop)
 		if (mreq.imr_interface.s_addr == INADDR_ANY)
 			ifp = NULL;
 		else {
-			ifp = ip_multicast_if(&mreq->imr_interface, NULL);
+			ifp = ip_multicast_if(&mreq.imr_interface, NULL);
 			if (ifp == NULL) {
 				error = EADDRNOTAVAIL;
 				splx(s);
@@ -1802,7 +1802,7 @@ ip_getmoptions(sopt, imo)
 			addr.s_addr = INADDR_ANY;
 		else if (imo->imo_multicast_addr.s_addr) {
 			/* return the value user has set */
-			*addr = imo->imo_multicast_addr;
+			addr = imo->imo_multicast_addr;
 		} else {
 			IFP_TO_IA(imo->imo_multicast_ifp, ia);
 			addr.s_addr = (ia == NULL) ? INADDR_ANY
