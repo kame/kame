@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.122 2003/04/23 09:15:52 keiichi Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.123 2003/06/03 08:25:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -959,7 +959,7 @@ nd6_na_input(m, off, icmp6len)
 			    rt->rt_ifp);
 			if (dr)
 				defrtrlist_del(dr);
-			else if (!ip6_forwarding && ip6_accept_rtadv) {
+			else if (!ip6_forwarding) {
 				/*
 				 * Even if the neighbor is not in the default
 				 * router list, the neighbor may be used

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.315 2003/04/28 06:38:04 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.316 2003/06/03 08:25:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1054,7 +1054,7 @@ nd6_free(rt, gc)
 	 * even though it is not harmful, it was not really necessary.
 	 */
 
-	if (!ip6_forwarding && ip6_accept_rtadv) { /* XXX: too restrictive? */
+	if (!ip6_forwarding) {
 		int s;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		s = splsoftnet();
