@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.66 2000/06/15 04:08:54 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.67 2000/07/11 17:31:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2619,7 +2619,7 @@ ipsec4_output(state, sp, flags)
 			 && ((state->ro->ro_rt->rt_flags & RTF_UP) == 0
 			  || dst4->sin_addr.s_addr != ip->ip_dst.s_addr)) {
 				RTFREE(state->ro->ro_rt);
-				bzero((caddr_t)state->ro, sizeof (*state->ro));
+				state->ro->ro_rt = NULL;
 			}
 			if (state->ro->ro_rt == 0) {
 				dst4->sin_family = AF_INET;
@@ -2990,7 +2990,7 @@ ipsec6_output_tunnel(state, sp, flags)
 			 && ((state->ro->ro_rt->rt_flags & RTF_UP) == 0
 			  || !IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr, &ip6->ip6_dst))) {
 				RTFREE(state->ro->ro_rt);
-				bzero((caddr_t)state->ro, sizeof (*state->ro));
+				state->ro->ro_rt = NULL;
 			}
 			if (state->ro->ro_rt == 0) {
 				bzero(dst6, sizeof(*dst6));
