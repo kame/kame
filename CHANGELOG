@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.500.2.7 2000/02/10 05:19:06 itojun Exp $
+$Id: CHANGELOG,v 1.500.2.8 2000/02/10 05:21:51 itojun Exp $
 
 <200002>
 Thu Feb 10 22:56:51 JST 2000  itojun@iijlab.net
-	* bsdi3/sys/i386/isa/if_cce.c: fix mbuf allocation on inbound packet.
+	* bsdi[34]/sys/i386/isa/if_cce.c: fix mbuf allocation on inbound packet.
 	  From: SUZUKI Shinsuke <suz@sdl.hitachi.co.jp>
 	* bsdi3/sbin/ifconfig/ifconfig.c: fix error trap on bogus IPv6 hotname.
 	  From: SUZUKI Shinsuke <suz@sdl.hitachi.co.jp>
