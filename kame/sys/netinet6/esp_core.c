@@ -1,3 +1,5 @@
+/*	$KAME: esp_core.c,v 1.11 2000/02/22 14:04:15 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.

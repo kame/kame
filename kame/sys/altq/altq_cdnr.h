@@ -1,3 +1,5 @@
+/*	$KAME: altq_cdnr.h,v 1.3 2000/02/22 14:00:31 itojun Exp $	*/
+
 /*
  * Copyright (C) 1999
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -23,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_cdnr.h,v 1.2 2000/02/02 06:39:36 kjc Exp $
+ * $Id: altq_cdnr.h,v 1.3 2000/02/22 14:00:31 itojun Exp $
  */
 
 #ifndef _ALTQ_ALTQ_CDNR_H_

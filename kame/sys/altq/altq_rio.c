@@ -1,3 +1,5 @@
+/*	$KAME: altq_rio.c,v 1.3 2000/02/22 14:00:34 itojun Exp $	*/
+
 /*
  * Copyright (C) 1998-1999
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -55,7 +57,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_rio.c,v 1.2 2000/02/03 07:59:00 kjc Exp $
+ * $Id: altq_rio.c,v 1.3 2000/02/22 14:00:34 itojun Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)

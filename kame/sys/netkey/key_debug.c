@@ -1,3 +1,5 @@
+/*	$KAME: key_debug.c,v 1.12 2000/02/22 14:06:40 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -27,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: key_debug.c,v 1.11 2000/02/06 09:34:18 itojun Exp $ */
+/* KAME @(#)$Id: key_debug.c,v 1.12 2000/02/22 14:06:40 itojun Exp $ */
 
 #ifdef _KERNEL
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)

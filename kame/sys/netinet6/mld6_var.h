@@ -1,3 +1,5 @@
+/*	$KAME: mld6_var.h,v 1.3 2000/02/22 14:04:27 itojun Exp $	*/
+
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.

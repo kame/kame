@@ -1,3 +1,5 @@
+/*	$KAME: des_locl.h,v 1.2 2000/02/22 14:01:24 itojun Exp $	*/
+
 /* lib/des/des_locl.h */
 /* Copyright (C) 1995-1996 Eric Young (eay@mincom.oz.au)
  * All rights reserved.

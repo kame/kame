@@ -1,3 +1,5 @@
+/*	$KAME: altq_wfq.c,v 1.2 2000/02/22 14:00:36 itojun Exp $	*/
+
 /*
  * Copyright (C) 1997-1999
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -23,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_wfq.c,v 1.1 2000/01/18 07:29:15 kjc Exp $
+ * $Id: altq_wfq.c,v 1.2 2000/02/22 14:00:36 itojun Exp $
  */
 /*
  *  March 27, 1997.  Written by Hiroshi Kyusojin of Keio University

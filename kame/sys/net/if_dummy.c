@@ -1,3 +1,5 @@
+/*	$KAME: if_dummy.c,v 1.7 2000/02/22 14:01:45 itojun Exp $	*/
+
 /*
  * Copyright (c) 1982, 1986, 1993
  *	The Regents of the University of California.  All rights reserved.

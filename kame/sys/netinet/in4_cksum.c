@@ -1,3 +1,4 @@
+/*	$KAME: in4_cksum.c,v 1.7 2000/02/22 14:01:58 itojun Exp $	*/
 /*	$NetBSD: in_cksum.c,v 1.13 1996/10/13 02:03:03 christos Exp $	*/
 
 /*

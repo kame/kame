@@ -1,3 +1,5 @@
+/*	$KAME: natpt_rule.c,v 1.6 2000/02/22 14:04:28 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -26,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_rule.c,v 1.5 2000/02/18 18:09:07 itojun Exp $
+ *	$Id: natpt_rule.c,v 1.6 2000/02/22 14:04:28 itojun Exp $
  */
 
 #include <sys/errno.h>

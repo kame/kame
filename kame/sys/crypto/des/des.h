@@ -1,3 +1,5 @@
+/*	$KAME: des.h,v 1.2 2000/02/22 14:01:23 itojun Exp $	*/
+
 /* lib/des/des.h */
 /* Copyright (C) 1995-1996 Eric Young (eay@mincom.oz.au)
  * All rights reserved.

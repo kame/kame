@@ -1,3 +1,5 @@
+/*	$KAME: bf_cbc_m.c,v 1.2 2000/02/22 14:01:19 itojun Exp $	*/
+
 /*
  * heavily modified to accept mbuf, by Jun-ichiro itojun Itoh
  * <itojun@itojun.org>, 1997.

@@ -1,3 +1,5 @@
+/*	$KAME: ip6_output.c,v 1.80 2000/02/22 14:04:22 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.

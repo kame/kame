@@ -1,4 +1,5 @@
-/* $Id: altq_rmclass.h,v 1.1 2000/01/18 07:29:14 kjc Exp $ */
+/*	$KAME: altq_rmclass.h,v 1.2 2000/02/22 14:00:35 itojun Exp $	*/
+
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
  * All rights reserved.

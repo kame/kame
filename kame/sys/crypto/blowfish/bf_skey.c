@@ -1,3 +1,5 @@
+/*	$KAME: bf_skey.c,v 1.2 2000/02/22 14:01:20 itojun Exp $	*/
+
 /* crypto/bf/bf_skey.c */
 /* Copyright (C) 1995-1997 Eric Young (eay@mincom.oz.au)
  * All rights reserved.

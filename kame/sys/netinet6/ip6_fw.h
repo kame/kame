@@ -1,3 +1,5 @@
+/*	$KAME: ip6_fw.h,v 1.2 2000/02/22 14:04:21 itojun Exp $	*/
+
 /*
  * Copyright (c) 1993 Daniel Boulet
  * Copyright (c) 1994 Ugen J.S.Antsilevich
@@ -11,7 +13,7 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
- *	$Id: ip6_fw.h,v 1.1 1999/08/06 14:10:09 itojun Exp $
+ *	$Id: ip6_fw.h,v 1.2 2000/02/22 14:04:21 itojun Exp $
  */
 
 #ifndef _IP6_FW_H

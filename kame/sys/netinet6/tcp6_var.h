@@ -1,3 +1,5 @@
+/*	$KAME: tcp6_var.h,v 1.6 2000/02/22 14:04:37 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.

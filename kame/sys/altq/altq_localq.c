@@ -1,3 +1,5 @@
+/*	$KAME: altq_localq.c,v 1.2 2000/02/22 14:00:33 itojun Exp $	*/
+
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 #include "opt_altq.h"

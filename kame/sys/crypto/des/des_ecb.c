@@ -1,3 +1,5 @@
+/*	$KAME: des_ecb.c,v 1.2 2000/02/22 14:01:24 itojun Exp $	*/
+
 /* crypto/des/ecb_enc.c */
 /* Copyright (C) 1995-1996 Eric Young (eay@mincom.oz.au)
  * All rights reserved.

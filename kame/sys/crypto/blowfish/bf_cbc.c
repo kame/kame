@@ -1,3 +1,5 @@
+/*	$KAME: bf_cbc.c,v 1.2 2000/02/22 14:01:19 itojun Exp $	*/
+
 /* crypto/bf/bf_cbc.c */
 /* Copyright (C) 1995-1997 Eric Young (eay@mincom.oz.au)
  * All rights reserved.

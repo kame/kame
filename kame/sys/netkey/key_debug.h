@@ -1,3 +1,5 @@
+/*	$KAME: key_debug.h,v 1.4 2000/02/22 14:06:41 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -27,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: key_debug.h,v 1.3 2000/01/29 06:21:02 itojun Exp $ */
+/* $Id: key_debug.h,v 1.4 2000/02/22 14:06:41 itojun Exp $ */
 
 #ifndef _NETKEY_KEY_DEBUG_H_
 #define _NETKEY_KEY_DEBUG_H_

@@ -1,3 +1,5 @@
+/*	$KAME: des_cbc.c,v 1.2 2000/02/22 14:01:24 itojun Exp $	*/
+
 /*
  * heavily modified by Yoshifumi Nishida <nishida@sfc.wide.ad.jp>.
  * then, completely rewrote by Jun-ichiro itojun Itoh <itojun@itojun.org>,

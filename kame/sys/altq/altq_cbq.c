@@ -1,3 +1,5 @@
+/*	$KAME: altq_cbq.c,v 1.2 2000/02/22 14:00:31 itojun Exp $	*/
+
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
  *
@@ -27,7 +29,7 @@
  *  
  * These notices must be retained in any copies of any part of this software.
  *
- * $Id: altq_cbq.c,v 1.1 2000/01/18 07:29:10 kjc Exp $
+ * $Id: altq_cbq.c,v 1.2 2000/02/22 14:00:31 itojun Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)

@@ -1,3 +1,5 @@
+/*	$KAME: bf_pi.h,v 1.2 2000/02/22 14:01:20 itojun Exp $	*/
+
 /* crypto/bf/bf_pi.h */
 /* Copyright (C) 1995-1997 Eric Young (eay@mincom.oz.au)
  * All rights reserved.

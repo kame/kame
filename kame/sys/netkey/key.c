@@ -1,3 +1,5 @@
+/*	$KAME: key.c,v 1.65 2000/02/22 14:06:39 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -27,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.64 2000/02/06 11:01:36 itojun Exp $ */
+/* KAME $Id: key.c,v 1.65 2000/02/22 14:06:39 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367

@@ -1,3 +1,5 @@
+/*	$KAME: keysock.c,v 1.12 2000/02/22 14:06:41 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -27,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: keysock.c,v 1.11 2000/02/06 11:01:38 itojun Exp $ */
+/* KAME @(#)$Id: keysock.c,v 1.12 2000/02/22 14:06:41 itojun Exp $ */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"

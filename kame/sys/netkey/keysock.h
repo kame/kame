@@ -1,3 +1,5 @@
+/*	$KAME: keysock.h,v 1.6 2000/02/22 14:06:42 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -27,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: keysock.h,v 1.5 2000/01/29 06:21:03 itojun Exp $ */
+/* $Id: keysock.h,v 1.6 2000/02/22 14:06:42 itojun Exp $ */
 
 #ifndef _NETKEY_KEYSOCK_H_
 #define _NETKEY_KEYSOCK_H_

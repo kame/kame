@@ -1,3 +1,5 @@
+/*	$KAME: mip6_hooks.c,v 1.3 2000/02/22 14:04:25 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
  * All rights reserved.
@@ -34,7 +36,7 @@
  * Author: Hesham Soliman <hesham.soliman@ericsson.com.au>
  *         Martti Kuparinen <martti.kuparinen@ericsson.com>
  *
- * $Id: mip6_hooks.c,v 1.2 2000/02/19 13:11:41 itojun Exp $
+ * $Id: mip6_hooks.c,v 1.3 2000/02/22 14:04:25 itojun Exp $
  *
  */
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)

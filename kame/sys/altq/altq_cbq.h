@@ -1,4 +1,5 @@
-/* $Id: altq_cbq.h,v 1.1 2000/01/18 07:29:10 kjc Exp $ */
+/*	$KAME: altq_cbq.h,v 1.2 2000/02/22 14:00:31 itojun Exp $	*/
+
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
  *

@@ -1,3 +1,5 @@
+/*	$KAME: rtsock_mip.c,v 1.4 2000/02/22 14:01:47 itojun Exp $	*/
+
 /* to be included from net/rtsock.c - ugly but necessary for portability */
 /*
  * Mobile IPv6 addition.

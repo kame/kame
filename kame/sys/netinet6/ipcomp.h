@@ -1,3 +1,5 @@
+/*	$KAME: ipcomp.h,v 1.4 2000/02/22 14:04:23 itojun Exp $	*/
+
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.

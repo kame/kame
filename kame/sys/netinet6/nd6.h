@@ -1,3 +1,5 @@
+/*	$KAME: nd6.h,v 1.15 2000/02/22 14:04:30 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.

@@ -1,3 +1,5 @@
+/*	$KAME: ip6_mroute.c,v 1.15 2000/02/22 14:04:21 itojun Exp $	*/
+
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.

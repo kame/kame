@@ -1,3 +1,5 @@
+/*	$KAME: sk.h,v 1.2 2000/02/22 14:01:25 itojun Exp $	*/
+
 /* crypto/des/sk.h */
 /* Copyright (C) 1995-1996 Eric Young (eay@mincom.oz.au)
  * All rights reserved.

@@ -1,3 +1,5 @@
+/*	$KAME: blowfish.h,v 1.2 2000/02/22 14:01:21 itojun Exp $	*/
+
 /* crypto/bf/blowfish.h */
 /* Copyright (C) 1995-1997 Eric Young (eay@mincom.oz.au)
  * All rights reserved.

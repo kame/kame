@@ -1,3 +1,5 @@
+/*	$KAME: altq_hfsc.c,v 1.3 2000/02/22 14:00:33 itojun Exp $	*/
+
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
  *
@@ -30,7 +32,7 @@
  * and to grant Carnegie Mellon the rights to redistribute these
  * changes without encumbrance.
  *
- * $Id: altq_hfsc.c,v 1.2 2000/02/03 07:59:00 kjc Exp $
+ * $Id: altq_hfsc.c,v 1.3 2000/02/22 14:00:33 itojun Exp $
  */
 /*
  * H-FSC is described in Proceedings of SIGCOMM'97,

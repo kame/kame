@@ -1,3 +1,5 @@
+/*	$KAME: ip_ecn.h,v 1.3 2000/02/22 14:01:59 itojun Exp $	*/
+
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -26,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: ip_ecn.h,v 1.2 1999/08/19 12:57:44 itojun Exp $
+ * $Id: ip_ecn.h,v 1.3 2000/02/22 14:01:59 itojun Exp $
  */
 /*
  * ECN consideration on tunnel ingress/egress operation.

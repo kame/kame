@@ -1,3 +1,5 @@
+/*	$KAME: altq_subr.c,v 1.2 2000/02/22 14:00:35 itojun Exp $	*/
+
 /*
  * Copyright (C) 1997-1999
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -23,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_subr.c,v 1.1 2000/01/18 07:29:14 kjc Exp $
+ * $Id: altq_subr.c,v 1.2 2000/02/22 14:00:35 itojun Exp $
  */
 
 #ifdef ALTQ

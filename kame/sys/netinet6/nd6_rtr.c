@@ -1,3 +1,5 @@
+/*	$KAME: nd6_rtr.c,v 1.26 2000/02/22 14:04:33 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.

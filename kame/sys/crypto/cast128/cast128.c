@@ -1,3 +1,5 @@
+/*	$KAME: cast128.c,v 1.2 2000/02/22 14:01:22 itojun Exp $	*/
+
 /*
  * heavily modified by Tomomi Suzuki <suzuki@grelot.elec.ryukoku.ac.jp>
  */ 

@@ -1,3 +1,5 @@
+/*	$KAME: mip6_md.c,v 1.10 2000/02/22 14:04:26 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
  * All rights reserved.
@@ -33,7 +35,7 @@
  *
  * Author:  Mattias Pettersson <mattias.pettersson@era.ericsson.se>
  *
- * $Id: mip6_md.c,v 1.9 2000/02/20 08:29:43 itojun Exp $
+ * $Id: mip6_md.c,v 1.10 2000/02/22 14:04:26 itojun Exp $
  *
  */
 

@@ -1,3 +1,5 @@
+/*	$KAME: key.h,v 1.9 2000/02/22 14:06:40 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -27,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: key.h,v 1.8 2000/01/29 06:21:01 itojun Exp $ */
+/* $Id: key.h,v 1.9 2000/02/22 14:06:40 itojun Exp $ */
 
 #ifndef _NETKEY_KEY_H_
 #define _NETKEY_KEY_H_

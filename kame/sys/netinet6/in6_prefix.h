@@ -1,3 +1,5 @@
+/*	$KAME: in6_prefix.h,v 1.5 2000/02/22 14:04:19 itojun Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, 1998 and 1999 WIDE Project.
  * All rights reserved.
