@@ -1,9 +1,9 @@
 # New ports collection makefile for:	bind9
-# Version required:	9.0.0b1
-# Date created:		Sun Feb  6 02:55:31 JST 2000
-# Whom:			sumikawa
+# Version required:	9.0.0b2
+# Date created:		Sat Apr 29 18:50:37 JST 2000
+# Whom:			jinmei
 #
-# $Id: Makefile,v 1.2 2000/04/29 09:49:05 jinmei Exp $
+# $Id: Makefile,v 1.3 2000/04/29 09:50:22 jinmei Exp $
 #
 
 DISTNAME=	bind-9.0.0b2
