@@ -1,4 +1,4 @@
-/*	$KAME: rafixd.h,v 1.1 2003/03/12 15:59:09 jinmei Exp $	*/
+/*	$KAME: rafixd.h,v 1.2 2003/03/14 10:01:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -29,9 +29,9 @@
  * SUCH DAMAGE.
  */
 #ifdef HAVE_ANSI_FUNC
-#define FNAME __func__ ": "
+#define FNAME __func__
 #elif defined (HAVE_GCC_FUNCTION)
-#define FNAME __FUNCTION__ ": "
+#define FNAME __FUNCTION__
 #else
 #define FNAME ""
 #endif
