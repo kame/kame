@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.40 2000/03/22 16:02:57 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.41 2000/03/25 07:23:44 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -92,6 +92,9 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_pcb.h>
 #include <netinet6/nd6.h>
+#ifdef ENABLE_DEFAULT_SCOPE
+#include <netinet6/scope6_var.h> 
+#endif
 
 #ifndef __bsdi__
 #include "loop.h"
@@ -175,6 +178,12 @@ in6_pcbbind(in6p, nam)
 		 */
 		if (sin6->sin6_family != AF_INET6)
 			return(EAFNOSUPPORT);
+
+#ifdef ENABLE_DEFAULT_SCOPE
+		if (sin6->sin6_scope_id == 0)
+			sin6->sin6_scope_id =
+				scope6_addr2default(&sin6->sin6_addr);
+#endif
 
 		/*
 		 * If the scope of the destination is link-local, embed the
@@ -330,6 +339,11 @@ in6_pcbconnect(in6p, nam)
 		if (IN6_IS_ADDR_V4MAPPED(&in6p->in6p_laddr))
 			return EINVAL;
 	}
+
+#ifdef ENABLE_DEFAULT_SCOPE
+      if (sin6->sin6_scope_id == 0) /* do not override if already specified */
+	      sin6->sin6_scope_id = scope6_addr2default(&sin6->sin6_addr);
+#endif
 
 	/*
 	 * If the scope of the destination is link-local, embed the interface

@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.26 2000/05/15 09:30:42 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.27 2000/05/19 05:48:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -93,6 +93,9 @@
 #include <netinet6/in6_pcb.h>
 #include <netinet6/nd6.h>
 #include <netinet6/ip6protosw.h>
+#ifdef ENABLE_DEFAULT_SCOPE
+#include <netinet6/scope6_var.h>
+#endif
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
@@ -660,9 +663,25 @@ rip6_usrreq(so, req, m, nam, control, p)
 #else
 		   (ifnet.tqh_first == 0) ||
 #endif
-		   (addr->sin6_family != AF_INET6) ||
-		   (!IN6_IS_ADDR_UNSPECIFIED(&addr->sin6_addr) &&
-		    (ia = ifa_ifwithaddr((struct sockaddr *)addr)) == 0)) {
+		   (addr->sin6_family != AF_INET6)) {
+			error = EADDRNOTAVAIL;
+			break;
+		}
+#ifdef ENABLE_DEFAULT_SCOPE
+		if (addr->sin6_scope_id == 0) {	/* not change if specified  */
+			addr->sin6_scope_id =
+				scope6_addr2default(&addr->sin6_addr);
+		}
+#endif
+		/*
+		 * Currently, ifa_ifwithaddr tends to fail for a link-local
+		 * address, since it implicitly expects that the link ID
+		 * for the address is embedded in the sin6_addr part.
+		 * For now, we'd rather keep this "as is". We'll eventually fix
+		 * this in a more natural way.
+		 */
+		if (!IN6_IS_ADDR_UNSPECIFIED(&addr->sin6_addr) &&
+		    (ia = ifa_ifwithaddr((struct sockaddr *)addr)) == 0) {
 			error = EADDRNOTAVAIL;
 			break;
 		}
@@ -699,6 +718,12 @@ rip6_usrreq(so, req, m, nam, control, p)
 			error = EAFNOSUPPORT;
 			break;
 		}
+
+#ifdef ENABLE_DEFAULT_SCOPE
+		if (addr->sin6_scope_id == 0)
+			addr->sin6_scope_id =
+				scope6_addr2default(&addr->sin6_addr);
+#endif
 
 		/* Source address selection. XXX: need pcblookup? */
 		in6a = in6_selectsrc(addr, in6p->in6p_outputopts,
@@ -755,6 +780,11 @@ rip6_usrreq(so, req, m, nam, control, p)
 			}
 			dst = mtod(nam, struct sockaddr_in6 *);
 		}
+#ifdef ENABLE_DEFAULT_SCOPE
+		if (dst->sin6_scope_id == 0)
+			dst->sin6_scope_id =
+				scope6_addr2default(&dst->sin6_addr);
+#endif
 		error = rip6_output(m, so, dst, control);
 		m = NULL;
 		break;
