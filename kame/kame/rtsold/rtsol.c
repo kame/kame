@@ -78,7 +78,7 @@ sockopen()
 
 	memset(&sin6_allrouters, 0, sizeof(struct sockaddr_in6));
 	if (inet_pton(AF_INET6, ALLROUTER,
-		      &sin6_allrouters.sin6_addr.s6_addr) < 0) {
+		      &sin6_allrouters.sin6_addr.s6_addr) != 1) {
 		warnmsg(LOG_ERR, __FUNCTION__, "inet_pton failed for %s",
 		       ALLROUTER);
 		return(-1);

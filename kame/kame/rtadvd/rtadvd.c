@@ -184,7 +184,10 @@ main(argc, argv)
 	while (argc--)
 		getconfig(*argv++);
 
-	inet_pton(AF_INET6, ALLNODES, &sin6_allnodes.sin6_addr);
+	if (inet_pton(AF_INET6, ALLNODES, &sin6_allnodes.sin6_addr) != 1) {
+		fprintf(stderr, "fatal: inet_pton failed\n");
+		exit(1);
+	}
 	sock_open();
 
 	if (!fflag)
