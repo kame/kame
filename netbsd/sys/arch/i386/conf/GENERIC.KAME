@@ -9,7 +9,7 @@ options 	IPSEC_ESP	# IP security (encryption part; define w/IPSEC)
 
 #options 	ND6_DEBUG	# net.inet6.icmp6.nd6_debug=1 by default
 
-options 	SCTP		# adds SCTP stack to kernel - requires INET6
+#options 	SCTP		# adds SCTP stack to kernel - requires INET6
 #options 	SCTP_DEBUG	# adds debugging support for SCTP
 #options 	SCTP_TCP_MODEL_SUPPORT	# adds TCP model support
 #options 	SCTP_USE_ADLER32	# use obsolete Adler32 checksum,
@@ -49,7 +49,7 @@ options 	RADIX_MPATH
 #options 	MLDV2		# IPv6
 
 # Mobile IPv6
-options 	MIP6			# required for all node types
+#options 	MIP6			# required for all node types
 #options 	MIP6_HOME_AGENT		# required for a home agent
 #options 	MIP6_MOBILE_NODE	# required for a mobile node
 #pseudo-device	hif	1		# required for a mobile node
