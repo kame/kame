@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.423 2004/02/09 18:55:32 t-momose Exp $	*/
+/*	$KAME: ip6_output.c,v 1.424 2004/02/10 12:02:41 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3718,6 +3718,10 @@ ip6_setmoptions(optname, im6op, m)
 			error = EADDRNOTAVAIL; /* XXX: should not happen */
 			break;
 		}
+		if (in6_embedscope(&sa6_mc.sin6_addr, &sa6_mc)) {
+			error = EADDRNOTAVAIL; /* XXX: should not happen */
+			break;
+		}
 
 		/*
 		 * See if the membership already exists.
@@ -3805,6 +3809,11 @@ ip6_setmoptions(optname, im6op, m)
 				error = EADDRNOTAVAIL;
 				break;
 			}
+			if (in6_embedscope(&sa6_mc.sin6_addr, &sa6_mc)) {
+				/* XXX: should not happen */
+				error = EADDRNOTAVAIL;
+				break;
+			}
 		} else {
 			/*
 			 * The API spec says as follows:
@@ -3850,6 +3859,11 @@ ip6_setmoptions(optname, im6op, m)
 		error = ip6_getmopt_sgaddr(m, optname, &ifp, &ss_grp, NULL);
 		if (error != 0)
 			break;
+			if (in6_embedscope(&sa6_mc.sin6_addr, &sa6_mc)) {
+				/* XXX: should not happen */
+				error = EADDRNOTAVAIL;
+				break;
+			}
 		/* check for duplication */
 		for (imm = im6o->im6o_memberships.lh_first;
 		     imm != NULL; imm = imm->i6mm_chain.le_next) {
@@ -5006,6 +5020,16 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 			error = EINVAL;
 			break;
 		}
+		/* Fill in the scope zone ID */
+		if (in6_addr2zoneid(ifp, &ss_grp.sin6_addr,
+		    &ss_grp.sin6_scope_id)) {
+			error = EADDRNOTAVAIL; /* XXX: should not happen */
+			break;
+		}
+		if (in6_embedscope(&ss_grp.sin6_addr, &ss_grp)) {
+			error = EADDRNOTAVAIL; /* XXX: should not happen */
+			break;
+		}
 
 		/*
 		 * Get a pointer to the ifnet structure.
@@ -5046,13 +5070,33 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		sin6_src->sin6_addr = SIN6(&gsreq->gsr_source)->sin6_addr;
 		sin6_src->sin6_len = sizeof(*sin6_src);
 		sin6_src->sin6_family = AF_INET6;
-		sin6_src->sin6_scope_id =SIN6(&gsreq->gsr_source)->sin6_scope_id;
+		/* Fill in the scope zone ID */
+		if (in6_addr2zoneid(ifp, &sin6_src.sin6_addr,
+		    &sin6_src.sin6_scope_id)) {
+			error = EADDRNOTAVAIL; /* XXX: should not happen */
+			break;
+		}
+		if (in6_embedscope(&sin6_src.sin6_addr, &sin6_src)) {
+			error = EADDRNOTAVAIL; /* XXX: should not happen */
+			break;
+		}
+
 		sin6_grp = SIN6(ss_grp);
 		bzero(sin6_grp, sizeof(*sin6_grp));
 		sin6_grp->sin6_addr = SIN6(&gsreq->gsr_group)->sin6_addr;
 		sin6_grp->sin6_len = sizeof(*sin6_grp);
 		sin6_grp->sin6_family = AF_INET6;
 		sin6_grp->sin6_scope_id =SIN6(&gsreq->gsr_group)->sin6_scope_id;
+		/* Fill in the scope zone ID */
+		if (in6_addr2zoneid(ifp, &ss_grp.sin6_addr,
+		    &ss_grp.sin6_scope_id)) {
+			error = EADDRNOTAVAIL; /* XXX: should not happen */
+			break;
+		}
+		if (in6_embedscope(&ss_grp.sin6_addr, &ss_grp)) {
+			error = EADDRNOTAVAIL; /* XXX: should not happen */
+			break;
+		}
 
 		if (!IN6_IS_ADDR_MULTICAST(SIN6_ADDR(ss_grp)) ||
 		    IN6_IS_LOCAL_GROUP(SIN6_ADDR(ss_grp))) {
