@@ -1,4 +1,4 @@
-/* $KAME: getrrsetbyname.c,v 1.3 2001/08/16 19:35:26 itojun Exp $ */
+/* $KAME: getrrsetbyname.c,v 1.4 2003/03/07 07:34:21 itojun Exp $ */
 /* $OpenBSD: getrrsetbyname.c,v 1.4 2001/08/16 18:16:43 ho Exp $ */
 
 /*
@@ -101,7 +101,8 @@ getrrsetbyname(const char *hostname, unsigned int rdclass,
 	struct dns_response *response;
 	struct dns_rr *rr;
 	struct rdatainfo *rdata;
-	unsigned int length, index_ans, index_sig;
+	int length;
+	unsigned int index_ans, index_sig;
 	char answer[ANSWER_BUFFER_SIZE];
 
 	/* check for invalid class and type */
