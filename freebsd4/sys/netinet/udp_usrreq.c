@@ -83,9 +83,9 @@
  * Per RFC 768, August, 1980.
  */
 #ifndef	COMPAT_42
-static int	udpcksum = 1;
+int	udpcksum = 1;
 #else
-static int	udpcksum = 0;		/* XXX */
+int	udpcksum = 0;		/* XXX */
 #endif
 SYSCTL_INT(_net_inet_udp, UDPCTL_CHECKSUM, checksum, CTLFLAG_RW,
 		&udpcksum, 0, "");
