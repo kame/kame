@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.61 2000/09/22 09:05:09 itojun Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.62 2000/09/22 15:47:02 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.61 2000/09/22 09:05:09 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.62 2000/09/22 15:47:02 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1037,7 +1037,7 @@ quick_r1recv(iph2, msg0)
 	if (get_sainfo_r(iph2) != 0) {
 		plog(logp, LOCATION, NULL,
 			"failed to get sainfo.\n");
-		error = ISAKMP_INTERNAL_ERROR;
+		error = ISAKMP_NTYPE_NO_PROPOSAL_CHOSEN;
 		goto end;
 	}
 
@@ -1045,7 +1045,7 @@ quick_r1recv(iph2, msg0)
 	if (get_proposal_r(iph2) < 0) {
 		plog(logp, LOCATION, NULL,
 			"failed to get proposal for responder.\n");
-		error = ISAKMP_INTERNAL_ERROR;
+		error = ISAKMP_NTYPE_NO_PROPOSAL_CHOSEN;
 		goto end;
 	}
 
