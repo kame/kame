@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.18 1999/10/27 17:41:41 sakane Exp $ */
+/* KAME $Id: keydb.c,v 1.19 1999/10/28 06:50:58 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -2505,7 +2505,7 @@ key_setsadbmsg(buf, type, tlen, satype, seq, pid, reserved1, reserved2)
 	u_int len;
 
 	p = (struct sadb_msg *)buf;
-	len = sizeof(struct sadb_sa);
+	len = sizeof(struct sadb_msg);
 
 	bzero(p, len);
 	p->sadb_msg_version = PF_KEY_V2;
