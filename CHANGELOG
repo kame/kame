@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1199 2000/08/15 07:40:49 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1200 2000/08/15 07:43:33 itojun Exp $
 
-<200008> 
+<200008>
+Tue Aug 15 16:41:23 JST 2000  itojun@iijlab.net
+	* netbsd: change kernel headers to use "NEW_STRUCT_ROUTE" definition.
+	  kernel can panic if you don't define it in kernel configuration file.
+
 Tue Aug 15 16:39:43 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/postfix: postfix 20000531 + IPv6 patch.
 
