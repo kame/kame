@@ -1,4 +1,4 @@
-/*	$KAME: keydb.c,v 1.72 2003/06/30 05:49:02 itojun Exp $	*/
+/*	$KAME: keydb.c,v 1.73 2003/06/30 10:02:15 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -92,8 +92,7 @@ keydb_newsecpolicy()
 }
 
 u_int32_t
-keydb_newspid(id)
-	u_int32_t id;
+keydb_newspid(void)
 {
 	u_int32_t newid = 0;
 	static u_int32_t lastalloc = IPSEC_MANUAL_POLICYID_MAX;

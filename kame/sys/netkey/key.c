@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.287 2003/06/30 05:49:01 itojun Exp $	*/
+/*	$KAME: key.c,v 1.288 2003/06/30 10:02:15 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1344,7 +1344,7 @@ key_newsp(id)
 	}
 
 	if (id == 0) {
-		if ((newid = keydb_newspid(id)) == 0) {
+		if ((newid = keydb_newspid()) == 0) {
 			ipseclog((LOG_DEBUG, 
 			    "key_newsp: new policy_id allocation failed."));
 			return NULL;
