@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1025 2000/06/15 05:44:39 sakane Exp $
+$Id: CHANGELOG,v 1.1026 2000/06/15 12:23:31 sakane Exp $
 
 <200006>
+Thu Jun 15 21:22:35 JST 2000 sakane@kame.net
+	* kame/sys/netkey/key.c:
+	Fixed extension length of two key extension when dumping SA.
+	setkey was failed to print keys if SA has both encryption and
+	authentication keys.
+
 Thu Jun 15 14:44:30 JST 2000 sakane@kame.net
 	* kame/kame/racoon:
 	CR payload is only made if signature authentication method is applied.
