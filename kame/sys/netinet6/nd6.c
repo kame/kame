@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.202 2001/09/21 14:00:18 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.203 2001/09/24 16:25:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2438,13 +2438,19 @@ fill_drlist(req)
 	struct sysctl_req *req;
 #endif
 {
-	int error = 0;
+	int error = 0, s;
 	struct in6_defrouter *d, *de;
 	struct nd_defrouter *dr;
 #ifdef __FreeBSD__
 	struct in6_defrouter dbuf;
 #else
 	size_t l;
+#endif
+
+#ifdef __NetBSD__
+	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 	
 #ifndef __FreeBSD__
@@ -2502,6 +2508,8 @@ fill_drlist(req)
 		*oldlenp = l;
 #endif
 
+	splx(s);
+
 	return(error);
 }
 
@@ -2516,13 +2524,19 @@ fill_prlist(req)
 	struct sysctl_req *req;
 #endif
 {
-	int error = 0;
+	int error = 0, s;
 	struct in6_prefix *p, *pe;
 	struct nd_prefix *pr;
 #ifdef __FreeBSD__
 	struct in6_defrouter pbuf[1024]; /* XXX */
 #else
 	size_t l;
+#endif
+
+#ifdef __NetBSD__
+	s = splsoftnet();
+#else
+	s = splnet();
 #endif
 
 #ifndef __FreeBSD__
@@ -2635,6 +2649,8 @@ fill_prlist(req)
 	} else
 		*oldlenp = l;
 #endif
+
+	splx(s);
 
 	return(error);
 }
