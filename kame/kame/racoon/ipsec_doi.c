@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.61 2000/04/24 19:57:24 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.62 2000/04/24 20:57:12 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1721,13 +1721,15 @@ ahmismatch:
 			if (flag) {
 				/* i.e. ISAKMP_GEN_TV */
 				/* warning */
-				plog(logp, LOCATION, NULL,
-					"should be TLV when LD.\n");
+				YIPSDEBUG(DEBUG_NOTIFY,
+					plog(logp, LOCATION, NULL,
+					"should be TLV when LD.\n"));
 			} else {
 				/* i.e. ISAKMP_GEN_TLV */
 				if (lorv == 0) {
-					plog(logp, LOCATION, NULL,
-						"invalid length of LD\n");
+					YIPSDEBUG(DEBUG_NOTIFY,
+						plog(logp, LOCATION, NULL,
+						"invalid length of LD\n"));
 					return -1;
 				}
 
@@ -1872,13 +1874,15 @@ check_attr_ipcomp(trns)
 			if (flag) {
 				/* i.e. ISAKMP_GEN_TV */
 				/* warning */
-				plog(logp, LOCATION, NULL,
-					"should be TLV when LD.\n");
+				YIPSDEBUG(DEBUG_NOTIFY,
+					plog(logp, LOCATION, NULL,
+					"should be TLV when LD.\n"));
 			} else {
 				/* i.e. ISAKMP_GEN_TLV */
 				if (lorv == 0) {
-					plog(logp, LOCATION, NULL,
-						"invalid length of LD\n");
+					YIPSDEBUG(DEBUG_NOTIFY,
+						plog(logp, LOCATION, NULL,
+						"invalid length of LD\n"));
 					return -1;
 				}
 

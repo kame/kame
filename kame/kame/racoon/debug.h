@@ -26,10 +26,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: debug.h,v 1.6 2000/04/24 07:37:43 sakane Exp $ */
+/* YIPS @(#)$Id: debug.h,v 1.7 2000/04/24 20:57:12 sakane Exp $ */
 
-#define DEBUG_INFO	0x00000002	/*XX*/
-#define DEBUG_NOTIFY	0x00000004	/*XX*/
+#define DEBUG_INFO	0x00000002	/*force informational*/
+#define DEBUG_NOTIFY	0x00000004	/*force notify*/
 #define DEBUG_DEBUG	0x00000008	/* output plog() to stdout */
 
 #define DEBUG_DATE	0x00000010	/*XX*/
