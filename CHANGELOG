@@ -1,8 +1,26 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.352 1999/12/20 08:03:47 itojun Exp $
+$Id: CHANGELOG,v 1.353 1999/12/21 08:30:44 itojun Exp $
 
 <199912>
+Tue Dec 21 17:30:09 JST 1999  itojun@iijlab.net
+	* netbsd/sys: make AF_INET6 wildcard socket special behavior
+	  (RFC1933 IPv4 mapped addr) configurable.
+	  - no MAPPED_ADDR_ENABLED option: disabled, AF_INET{,6} sockets are
+	    totally separate
+	  - MAPPED_ADDR_ENABLED=0: code compiled in, disabled by default,
+	    can be turned on by sysctl or setsockopt
+	  - MAPPED_ADDR_ENABLED=1: code compiled in, enabled by default,
+	    can be turned off by sysctl or setsockopt
+	  per-socket behavior will be copied from sysctl config on in6pcb
+	  creation time.  you need to reopen a socket, or perform setsockopt,
+	  to change behavior of a socket.
+
+	  TODO: too many options will kill us, we may want to decrease number
+	  of #ifdef by making some of the above behavior a default.
+	  TODO: net.inet6.ip6.mapped_addr has reverse semantics from
+	  setsockopt(IPV6_BINDV6ONLY).  this is confusing and should be changed.
+
 Mon Dec 20 17:05:42 JST 1999  sumikawa@kame.net
 	* freebsd3/ports/{xtris,netris}, netbsd/pkgsrc/games/{xtris,netris}:
 	  tetris over IPv6 network.
