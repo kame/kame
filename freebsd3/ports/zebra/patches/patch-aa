@@ -1,0 +1,192 @@
+Index: doc/zebra.info
+===================================================================
+RCS file: /cvsroot/zebra/doc/zebra.info,v
+retrieving revision 1.66
+diff -c -r1.66 zebra.info
+*** doc/zebra.info	1999/08/15 14:20:19	1.66
+--- doc/zebra.info	1999/08/20 00:02:43
+***************
+*** 1743,1750 ****
+  * debug ripng zebra:                     ripngd Terminal Mode Commands.
+  * debug update:                          bgpd Terminal Mode Commands.
+  * description DESCRIPTION ...:           Interface.
+! * distribute-list ACCESS_LIST DIRECT IFNAME <1>: ripngd Filtering Commands.
+! * distribute-list ACCESS_LIST DIRECT IFNAME: Filtering RIP Routes.
+  * enable password PASSWORD:              Basic Configuration.
+  * exec-timeout SECOND:                   Basic Configuration.
+  * flush_timer TIME:                      ripngd Configuration.
+--- 1743,1750 ----
+  * debug ripng zebra:                     ripngd Terminal Mode Commands.
+  * debug update:                          bgpd Terminal Mode Commands.
+  * description DESCRIPTION ...:           Interface.
+! * distribute-list ACCESS_LIST DIRECT IFNAME <1>: Filtering RIP Routes.
+! * distribute-list ACCESS_LIST DIRECT IFNAME: ripngd Filtering Commands.
+  * enable password PASSWORD:              Basic Configuration.
+  * exec-timeout SECOND:                   Basic Configuration.
+  * flush_timer TIME:                      ripngd Configuration.
+***************
+*** 1783,1794 ****
+  * neighbor PEER shutdown:                bgpd Configuration.
+  * neighbor PEER version VERSION:         bgpd Configuration.
+  * neighbor PEER weight WEIGHT:           bgpd Configuration.
+! * network IFNAME <1>:                    ripngd Configuration.
+! * network IFNAME:                        ripd Configuration.
+  * network IPV4-NETWORK area AREA-ID:     ospfd Configuration.
+! * network NETWORK <1>:                   bgpd Configuration.
+! * network NETWORK <2>:                   ripngd Configuration.
+! * network NETWORK:                       ripd Configuration.
+  * no banner motd:                        Basic Configuration.
+  * no debug event:                        bgpd Terminal Mode Commands.
+  * no debug keepalive:                    bgpd Terminal Mode Commands.
+--- 1783,1794 ----
+  * neighbor PEER shutdown:                bgpd Configuration.
+  * neighbor PEER version VERSION:         bgpd Configuration.
+  * neighbor PEER weight WEIGHT:           bgpd Configuration.
+! * network IFNAME <1>:                    ripd Configuration.
+! * network IFNAME:                        ripngd Configuration.
+  * network IPV4-NETWORK area AREA-ID:     ospfd Configuration.
+! * network NETWORK <1>:                   ripd Configuration.
+! * network NETWORK <2>:                   bgpd Configuration.
+! * network NETWORK:                       ripngd Configuration.
+  * no banner motd:                        Basic Configuration.
+  * no debug event:                        bgpd Terminal Mode Commands.
+  * no debug keepalive:                    bgpd Terminal Mode Commands.
+Index: lib/sockunion.h
+===================================================================
+RCS file: /cvsroot/zebra/lib/sockunion.h,v
+retrieving revision 1.12
+diff -c -r1.12 sockunion.h
+*** lib/sockunion.h	1999/08/01 06:29:07	1.12
+--- lib/sockunion.h	1999/08/20 00:02:44
+***************
+*** 64,74 ****
+  /* Macro to set link local index to the IPv6 address.  For KAME IPv6
+     stack. */
+  #ifdef KAME
+! #define	IN6_LINKLOCAL_IFINDEX(a)  ((a).s6_addr8[2] << 8 | (a).s6_addr8[3])
+  #define SET_IN6_LINKLOCAL_IFINDEX(a, i) \
+    do { \
+!     (a).s6_addr8[2] = ((i) >> 8) & 0xff; \
+!     (a).s6_addr8[3] = (i) & 0xff; \
+    } while (0)
+  #else
+  #define	IN6_LINKLOCAL_IFINDEX(a)
+--- 64,74 ----
+  /* Macro to set link local index to the IPv6 address.  For KAME IPv6
+     stack. */
+  #ifdef KAME
+! #define	IN6_LINKLOCAL_IFINDEX(a)  ((a).s6_addr[2] << 8 | (a).s6_addr[3])
+  #define SET_IN6_LINKLOCAL_IFINDEX(a, i) \
+    do { \
+!     (a).s6_addr[2] = ((i) >> 8) & 0xff; \
+!     (a).s6_addr[3] = (i) & 0xff; \
+    } while (0)
+  #else
+  #define	IN6_LINKLOCAL_IFINDEX(a)
+Index: ospf6d/ospf6_dump.c
+===================================================================
+RCS file: /cvsroot/zebra/ospf6d/ospf6_dump.c,v
+retrieving revision 1.37
+diff -c -r1.37 ospf6_dump.c
+*** ospf6d/ospf6_dump.c	1999/08/17 04:34:38	1.37
+--- ospf6d/ospf6_dump.c	1999/08/20 00:02:44
+***************
+*** 97,103 ****
+    char *type, unknown[64];
+  
+    inet_ntop (AF_INET, &lsreq->lsreq_advrtr, advrtr, sizeof (advrtr));
+!   snprintf (id, sizeof (id), "%lu", ntohl (lsreq->lsreq_id));
+    switch (ntohs (lsreq->lsreq_type))
+      {
+        case LST_ROUTER_LSA:
+--- 97,103 ----
+    char *type, unknown[64];
+  
+    inet_ntop (AF_INET, &lsreq->lsreq_advrtr, advrtr, sizeof (advrtr));
+!   snprintf (id, sizeof (id), "%u", (u_int32_t)ntohl (lsreq->lsreq_id));
+    switch (ntohs (lsreq->lsreq_type))
+      {
+        case LST_ROUTER_LSA:
+***************
+*** 126,132 ****
+    char *type, unknown[64];
+  
+    inet_ntop (AF_INET, &lsh->lsh_advrtr, advrtr, sizeof (advrtr));
+!   snprintf (id, sizeof (id), "%lu", ntohl (lsh->lsh_id));
+    switch (ntohs (lsh->lsh_type))
+      {
+        case LST_ROUTER_LSA:
+--- 126,132 ----
+    char *type, unknown[64];
+  
+    inet_ntop (AF_INET, &lsh->lsh_advrtr, advrtr, sizeof (advrtr));
+!   snprintf (id, sizeof (id), "%u", (u_int32_t)ntohl (lsh->lsh_id));
+    switch (ntohs (lsh->lsh_type))
+      {
+        case LST_ROUTER_LSA:
+***************
+*** 155,162 ****
+    char *type, unknown[64];
+  
+    inet_ntop (AF_INET, &lsh->lsh_advrtr, advrtr, sizeof (advrtr));
+!   snprintf (id, sizeof (id), "%lu", ntohl (lsh->lsh_id));
+!   snprintf (seqnum, sizeof (seqnum), "%lx", ntohl (lsh->lsh_seqnum));
+    switch (ntohs (lsh->lsh_type))
+      {
+        case LST_ROUTER_LSA:
+--- 155,162 ----
+    char *type, unknown[64];
+  
+    inet_ntop (AF_INET, &lsh->lsh_advrtr, advrtr, sizeof (advrtr));
+!   snprintf (id, sizeof (id), "%u", (u_int32_t)ntohl (lsh->lsh_id));
+!   snprintf (seqnum, sizeof (seqnum), "%x", (u_int32_t)ntohl (lsh->lsh_seqnum));
+    switch (ntohs (lsh->lsh_type))
+      {
+        case LST_ROUTER_LSA:
+Index: zebra/rt_socket.c
+===================================================================
+RCS file: /cvsroot/zebra/zebra/rt_socket.c,v
+retrieving revision 1.22
+diff -c -r1.22 rt_socket.c
+*** zebra/rt_socket.c	1999/08/14 07:47:39	1.22
+--- zebra/rt_socket.c	1999/08/20 00:02:46
+***************
+*** 31,41 ****
+  /* Macro to set link local index to the IPv6 address.  For KAME IPv6
+     stack. */
+  #ifdef KAME
+! #define	IN6_LINKLOCAL_IFINDEX(a)  ((a).s6_addr8[2] << 8 | (a).s6_addr8[3])
+  #define SET_IN6_LINKLOCAL_IFINDEX(a, i) \
+    do { \
+!     (a).s6_addr8[2] = ((i) >> 8) & 0xff; \
+!     (a).s6_addr8[3] = (i) & 0xff; \
+    } while (0)
+  #else
+  #define	IN6_LINKLOCAL_IFINDEX(a)
+--- 31,41 ----
+  /* Macro to set link local index to the IPv6 address.  For KAME IPv6
+     stack. */
+  #ifdef KAME
+! #define	IN6_LINKLOCAL_IFINDEX(a)  ((a).s6_addr[2] << 8 | (a).s6_addr[3])
+  #define SET_IN6_LINKLOCAL_IFINDEX(a, i) \
+    do { \
+!     (a).s6_addr[2] = ((i) >> 8) & 0xff; \
+!     (a).s6_addr[3] = (i) & 0xff; \
+    } while (0)
+  #else
+  #define	IN6_LINKLOCAL_IFINDEX(a)
+--- ospf6d/ospf6_interface.c-	Fri Aug 20 09:15:00 1999
++++ ospf6d/ospf6_interface.c	Fri Aug 20 09:14:44 1999
+@@ -198,10 +198,10 @@
+ 
+ #ifdef KAME
+   /* if KAME, clear ifindex included in address */
+-  if (buf->s6_addr8[1] & 0x0f)
++  if (buf->s6_addr[1] & 0x0f)
+     {
+       char linklocal_str[64];
+-      buf->s6_addr8[3] &= ~((char)0x0f);
++      buf->s6_addr[3] &= ~((char)0x0f);
+       inet_ntop (AF_INET6, buf, linklocal_str, sizeof (linklocal_str));
+       o6log.interface ("clear kame ifindex, %s", linklocal_str);
+     }
