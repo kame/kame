@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.177 2001/02/18 20:36:55 fujisawa Exp $	*/
+/*	$KAME: ip6_input.c,v 1.178 2001/02/19 10:12:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -494,6 +494,7 @@ ip6_input(m)
 		else
 			ip6stat.ip6s_mext1++;
 	} else {
+#define M2MMAX	(sizeof(ip6stat.ip6s_m2m)/sizeof(ip6stat.ip6s_m2m[0]))
 		if (m->m_next) {
 			if (m->m_flags & M_LOOP) {
 #ifdef __bsdi__
@@ -501,12 +502,13 @@ ip6_input(m)
 #else
 				ip6stat.ip6s_m2m[loif[0].if_index]++;	/*XXX*/
 #endif
-			} else if (m->m_pkthdr.rcvif->if_index <= 31)
+			} else if (m->m_pkthdr.rcvif->if_index < M2MMAX)
 				ip6stat.ip6s_m2m[m->m_pkthdr.rcvif->if_index]++;
 			else
 				ip6stat.ip6s_m2m[0]++;
 		} else
 			ip6stat.ip6s_m1++;
+#undef M2MMAX
 	}
 
 	in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_receive);
