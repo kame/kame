@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 1999/10/07 07:16:16 $
+		     $Date: 1999/10/07 07:20:18 $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -343,21 +343,17 @@ Refer to gifconfig(8) for more details.
 <<<inetd/inet6d>>>
 
 We supply two variant of inetd(8) with KAME kit.
-inetd(8) updates by KAME are two fold:
-- AF_INET6 socket support
-- IPsec policy support
 
-One is called inet6d, which is in kit/src/inet6d in the KAME kit.
-This will look at configuration file in /usr/local/v6/etc/inet6d.conf.
-If "tcp" or "udp" lines appear on inet6d.conf, it will consider those lines
-as request for AF_INET6 wildcard bind socket.
-inet6d can be used with OS-supplied inetd (/usr/sbin/inetd).
+On most of OS platforms, we supply revised inetd(8) in /usr/local/v6/sbin.
+This supports AF_INET and AF_INET6 sockets, with IPsec policy configuration
+support.  This is intended to replace OS-supplied inetd(8).
 
-On some of KAME kit, we supply kit/usr.sbin/inetd as well.
-Binary will be installed into /usr/local/v6/sbin/inetd.
-Basically its aim is to replace OS-supplied inetd.  The behavior of the
-binary is OS platform dependent.  See INSTALL document in each of the
-operating system directory.
+On some of the OS platforms, inet6d(8) is supplied as well.
+This is designed to serve AF_INET6 services only, and you may want to use
+it with OS-supplied inetd(8).
+
+Consult INSTALL document in platform-dependent directory (for example,
+netbsd/INSTALL).
 
 <<<IPsec>>>
 
