@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.51 2000/04/14 09:34:30 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.52 2000/04/14 23:19:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -216,6 +216,9 @@ found:
 		bzero(&in6->s6_addr[8], 8);
 		in6->s6_addr[15] = addr[0];
 
+		/*
+		 * due to insufficient bitwidth, we mark it local.
+		 */
 		in6->s6_addr[8] &= ~EUI64_GBIT;	/* g bit to "individual" */
 		in6->s6_addr[8] |= EUI64_UBIT;	/* u bit to "local" */
 		break;
@@ -225,9 +228,10 @@ found:
 	case IFT_STF:
 #endif
 		/*
-		 * mech-05/6to4-04: use IPv4 address as ifid source.
-		 * the specification does not survive IPv4 renumbering.
-		 * I'd rather not implement it, or make it optional (itojun).
+		 * mech-06 says: "SHOULD use IPv4 address as ifid source".
+		 * however, IPv4 address is not very suitable as unique
+		 * identifier source (can be renumbered).
+		 * we don't do this.
 		 */
 		return -1;
 
@@ -296,6 +300,7 @@ get_ifid(ifp0, altifp, in6)
 			continue;
 		if (get_hw_ifid(ifp, in6) != 0)
 			continue;
+
 		/*
 		 * to borrow ifid from other interface, ifid needs to be
 		 * globally unique
