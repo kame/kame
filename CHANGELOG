@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1350 2000/10/22 14:11:37 itojun Exp $
+$KAME: CHANGELOG,v 1.1351 2000/10/24 07:30:12 jinmei Exp $
 
 <200010>
+2000-10-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_ifscrub): checked the existence of
+	dstaddr before calling rtinit(). This fix will solve the KAME PR
+	sys/295.
+
 Sun Oct 22 23:08:22 JST 2000  itojun@iijlab.net
 	* kame/sys/netinet6/in6_pcb.c (freebsd2/bsdi3):
 	  don't do anything special against IPv4 mapped address, as we don't
