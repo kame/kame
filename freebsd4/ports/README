@@ -1,4 +1,4 @@
-$KAME: README,v 1.14 2000/11/03 16:14:56 sumikawa Exp $
+$KAME: README,v 1.15 2000/11/12 19:47:36 sumikawa Exp $
 
 This directory contains kame related ports only. Generic IPv6-enable
 ports are distributed by original FreeBSD ports.
@@ -12,7 +12,7 @@ kernel/application from different versions. You need to use
 ports-current at your own risk and you may require some knowledge to
 mix them.
 
-ports merging status at $Date: 2000/11/03 16:14:56 $
+ports merging status at $Date: 2000/11/12 19:47:36 $
 	KAME/FreeBSD3	ports-current
         -----------------------------
 	XFree86		not yet(based version in KAME ports is old
@@ -75,7 +75,7 @@ ports merging status at $Date: 2000/11/03 16:14:56 $
 	sendmail	merged in original distribution
 	socks5		not yet
 	socks64		not yet
-	solidpop3d	not yet
+	solidpop3d	merged as mail/solidpop3d
 	squid11		not yet(based version in KAME ports is old)
 	ssh		merged as security/ssh
 	tcp_wrapper	merged in original distribution
