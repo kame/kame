@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.176 2001/10/31 11:22:25 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.177 2001/10/31 11:25:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -944,7 +944,7 @@ static int
 rtpref(struct nd_defrouter *dr)
 {
 #ifdef RTPREF
-	switch (dr->flags & ND_RA_FLAG_RTPREF_MASK) {
+	switch ((dr->flags & ND_RA_FLAG_RTPREF_MASK)) {
 	case ND_RA_FLAG_RTPREF_HIGH:
 		return RTPREF_HIGH;
 	case ND_RA_FLAG_RTPREF_MEDIUM:
@@ -953,8 +953,12 @@ rtpref(struct nd_defrouter *dr)
 	case ND_RA_FLAG_RTPREF_LOW:
 		return RTPREF_LOW;
 	default:
-		nd6log((LOG_ERR, "rtpref: impossible RA flag %x",
-		       dr->flags));
+		/*
+		 * This case should never happen.  If it did, it would mean a
+		 * serious bug of kernel internal.  We thus always bark here.
+		 * Or, can we even panic?
+		 */
+		log(LOG_ERR, "rtpref: impossible RA flag %x", dr->flags);
 		return RTPREF_INVALID;
 	}
 	/* NOT REACH HERE */
