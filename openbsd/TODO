@@ -1,6 +1,6 @@
 TODOs for KAME/OpenBSD
 Jun-ichiro Hagino, KAME project
-$Id: TODO,v 1.24 1999/10/07 23:43:45 itojun Exp $
+$Id: TODO,v 1.25 1999/11/03 05:53:02 itojun Exp $
 
 
 Things we can do with the current code:
@@ -20,6 +20,7 @@ Things we can do with the current code:
 
 Things we can't do with the current code:
 - setsockopt(), ioctl and advapi needs checking
+- ipv4 mapped address
 - check advanced APIs (both userland and kernel)
 - multicast related items need checking
 	I was told that OpenBSD guys will never replace IPsec code.
