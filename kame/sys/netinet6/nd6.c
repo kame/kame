@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.352 2004/04/09 05:43:41 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.353 2004/04/09 06:16:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2772,7 +2772,7 @@ fill_prlist(req)
 			bzero(&p->prefix, sizeof(p->prefix));
 			p->prefix.sin6_family = AF_INET6;
 			p->prefix.sin6_len = sizeof(struct sockaddr_in6);
-			p->prefix.sin6_addr = pr->ndpr_prefix;
+			p->prefix.sin6_addr = pr->ndpr_prefix; /* redundant */
 			if (in6_recoverscope(&p->prefix,
 			    &p->prefix.sin6_addr, pr->ndpr_ifp) != 0)
 				log(LOG_ERR,
