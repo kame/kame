@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.20 2000/12/15 13:43:56 sakane Exp $	*/
+/*	$KAME: main.c,v 1.21 2000/12/16 14:50:35 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -66,7 +66,7 @@ int f_debugcmd = 0;	/* specifyed debug level by command line. */
 int f_local = 0;	/* local test mode.  behave like a wall. */
 int vflag = 1;		/* for print-isakmp.c */
 
-static char version[] = "@(#)racoon 20001111 sakane@ydc.co.jp";
+static char version[] = "@(#)racoon 20001216 sakane@ydc.co.jp";
 
 int main __P((int, char **));
 static void Usage __P((void));
@@ -87,7 +87,7 @@ Usage()
 	printf("   -a: You can specify a explicit port for administration.\n");
 	printf("   -f: specify a configuration file.\n");
 	printf("   -l: specify a log file.\n");
-	printf("   -d: is specified debug mode.\n");
+	printf("   -d: is specified debug level. increasing -d becomes more verbose.\n");
 	printf("   -F: is forced running in foreground.\n");
 #ifdef INET6
 	printf("   -6: is specified IPv6 mode.\n");
@@ -130,6 +130,7 @@ main(ac, av)
 	}
 
 	/* re-parse to prefer to command line parameters. */
+	loglevel = 4;
 	parse(ac, av);
 
 	if (f_foreground)
@@ -177,7 +178,6 @@ parse(ac, av)
 {
 	extern char *optarg;
 	extern int optind;
-	char *p;
 	int c;
 #ifdef YYDEBUG
 	extern int yydebug;
@@ -189,7 +189,7 @@ parse(ac, av)
 	else
 		pname = *av;
 
-	while ((c = getopt(ac, av, "d:Fp:a:f:l:vZ"
+	while ((c = getopt(ac, av, "dFp:a:f:l:vZ"
 #ifdef YYDEBUG
 			"y"
 #endif
@@ -199,12 +199,8 @@ parse(ac, av)
 			)) != EOF) {
 		switch (c) {
 		case 'd':
-			loglevel = strtoul(optarg, &p, 16);
-			f_debugcmd = 1;
-			if (*p != '\0') {
-				printf("invalid flag (%s)\n", optarg);
-				exit(1);
-			}
+			loglevel++;
+			f_debugcmd++;
 			break;
 		case 'F':
 			printf("Foreground mode.\n");

@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.8,v 1.20 2000/12/15 15:27:29 sakane Exp $
+.\"	$KAME: racoon.8,v 1.21 2000/12/16 14:50:35 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -50,7 +50,7 @@
 .Op Fl l Ar logfile
 .Ek
 .Bk -words
-.Op Fl d Ar debuglevel
+.Op Fl d
 .Ek
 .\"
 .Sh DESCRIPTION
@@ -76,12 +76,8 @@ as the logging file.
 run
 .Nm racoon
 in the foreground.
-.It Fl d Ar debuglevel
-set the daemon's debug level to
-.Ar debuglevel .
-Debugging trances from
-.Nm racoon
-become more verbose as the debug level increases.
+.It Fl d
+increase the debug level.
 .It Fl v
 causes a packet dump verbose when using high debugging level.
 .El

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.77 2000/12/15 13:43:54 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.78 2000/12/16 14:50:35 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -258,8 +258,8 @@ identifier_stmt
 		QUOTEDSTRING EOS
 	|	IDENTIFIERTYPE QUOTEDSTRING EOS
 		{
-			yywarn("WARNINIG: identifier should be defined at each remote directives.");
-			yywarn("WARNINIG: it will be obsoleted near future.");
+			yywarn("identifier should be defined at each remote directives.");
+			yywarn("it will be obsoleted near future.");
 			$2->l--;	/* nuke '\0' */
 			lcconf->ident[$1] = $2;
 			if (lcconf->ident[$1] == NULL) {
@@ -277,26 +277,18 @@ logging_statement
 log_level
 	:	HEXSTRING
 		{
-			if (($1->l - 2) / 2 > sizeof(u_int32_t)) {
-				yyerror("invalid debugging level: %s",
-					$1->v);
-				return -1;
-			}
+			yywarn("such a log specification will be obsoleted.");
+			vfree($1);
 
 			/* command line option has a priority than it. */
-			if (!f_debugcmd) {
-				u_int32_t v;
-
-				v = strtoul($1->v, NULL, 16);
-				loglevel |= v;
-			}
-			vfree($1);
+			if (!f_debugcmd)
+				loglevel++;
 		}
 	|	LOGLEV
 		{
 			/* command line option has a priority than it. */
 			if (!f_debugcmd)
-				loglevel = $1;
+				loglevel += $1;
 		}
 	;
 
