@@ -1256,11 +1256,11 @@ bgp_process_update(struct rpcb *bnp)
 	       poctets);
 	i += poctets;
 
-#ifdef DEBUG
-	syslog(LOG_DEBUG, "BGP+ RECV\t\t%s/%d",
-	       inet_ntop(AF_INET6, &rte->rt_ripinfo.rip6_dest,
-			 in6txt, INET6_ADDRSTRLEN),
-	       rte->rt_ripinfo.rip6_plen);	       
+#ifdef DEBUG_BGP
+	syslog(LOG_NOTICE, "BGP+ RECV\t\t%s/%d from %s",
+	       ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+	       rte->rt_ripinfo.rip6_plen,
+	       bgp_peerstr(bnp));
 #endif
 
 	if (!IN6_IS_ADDR_ROUTABLE(&rte->rt_ripinfo.rip6_dest)) {
