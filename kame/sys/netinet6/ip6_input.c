@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.91 2000/05/30 11:53:11 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.92 2000/05/30 12:15:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -221,6 +221,27 @@ int (*mip6_route_optimize_hook)(struct mbuf *m) = 0;
 #ifdef MEASURE_PERFORMANCE
 static __inline unsigned long long read_tsc __P((void));
 static __inline void add_performance_log __P((unsigned long long)); 
+#endif
+
+#ifdef MEASURE_PERFORMANCE
+static __inline unsigned long long 
+read_tsc(void)
+{
+     unsigned int h,l;
+     /* read Pentium counter */
+     __asm__(".byte 0x0f,0x31" :"=a" (l), "=d" (h));
+     return ((unsigned long long)h<<32) | l;
+}
+
+static __inline void
+add_performance_log(val)
+	unsigned long long val;
+{
+	static int logentry = 0;
+
+	logentry = (logentry + 1) % IP6_PERFORM_LOGSIZE;
+	ip6_performance_log[logentry] = val;
+}
 #endif
 
 /*
@@ -469,6 +490,9 @@ ip6_input(m)
 		goto bad;
 	}
 #endif
+#ifdef MEASURE_PERFORMANCE
+	ctr_beg = read_tsc();
+#endif
 	if (IN6_IS_ADDR_LOOPBACK(&ip6->ip6_src) ||
 	    IN6_IS_ADDR_LOOPBACK(&ip6->ip6_dst)) {
 		if (m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) {
@@ -513,9 +537,6 @@ ip6_input(m)
 	/*
 	 * Multicast check
 	 */
-#ifdef MEASURE_PERFORMANCE
-	ctr_beg = read_tsc();
-#endif
 	if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
 	  	struct	in6_multi *in6m = 0;
 
@@ -537,6 +558,7 @@ ip6_input(m)
 		goto hbhcheck;
 	}
 
+#if 1				/* XXX */
 	/*
 	 *  Unicast check
 	 */
@@ -601,6 +623,24 @@ ip6_input(m)
 			/* this interface is not ready, fall through */
 		}
 	}
+#else  /* corresponds to 'ifdef [01] (with XXX)' above */
+	/* traditional linear search: just for measurement */
+	{
+		struct in6_ifaddr *ia;
+
+		for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
+			if ((ia->ia6_flags & IN6_IFF_NOTREADY) == 0 &&
+			    IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr,
+					       &ip6->ip6_dst)) {
+				if ((ia->ia6_flags & IN6_IFF_ANYCAST) != 0)
+					m->m_flags |= M_ANYCAST6;
+				ours = 1;
+				deliverifp = ia->ia_ifp;
+				goto hbhcheck;
+			}
+		}
+	}
+#endif /* corresponds to '[01] (with XXX)' above */
 
 	/*
 	 * FAITH(Firewall Aided Internet Translator)
@@ -2031,24 +2071,3 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	}
 }
 #endif /* __bsdi__ */
-
-#ifdef MEASURE_PERFORMANCE
-static __inline unsigned long long 
-read_tsc(void)
-{
-     unsigned int h,l;
-     /* read Pentium counter */
-     __asm__(".byte 0x0f,0x31" :"=a" (l), "=d" (h));
-     return ((unsigned long long)h<<32) | l;
-}
-
-static __inline void
-add_performance_log(val)
-	unsigned long long val;
-{
-	static int logentry = 0;
-
-	logentry = (logentry + 1) % IP6_PERFORM_LOGSIZE;
-	ip6_performance_log[logentry] = val;
-}
-#endif
