@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.29 2000/04/14 08:29:15 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.30 2000/04/17 12:01:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -289,7 +289,8 @@ stf_encapcheck(m, off, proto, arg)
 	if (a.s_addr != b.s_addr)
 		return 0;
 
-	return 1;
+	/* stf interface makes single side match only */
+	return 32;
 }
 
 static struct in6_ifaddr *

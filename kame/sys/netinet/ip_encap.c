@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.24 2000/04/15 02:21:00 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.25 2000/04/17 12:01:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -144,8 +144,9 @@ encap4_input(m, va_alist)
 	int off, proto;
 	struct ip *ip;
 	struct sockaddr_in s, d;
-	struct encaptab *ep;
+	struct encaptab *ep, *match;
 	va_list ap;
+	int prio, matchprio;
 
 	va_start(ap, m);
 	off = va_arg(ap, int);
@@ -168,28 +169,55 @@ encap4_input(m, va_alist)
 	d.sin_len = sizeof(struct sockaddr_in);
 	d.sin_addr = ip->ip_dst;
 
+	match = NULL;
+	matchprio = 0;
 	for (ep = LIST_FIRST(&encaptab); ep; ep = LIST_NEXT(ep, chain)) {
 		if (ep->af != AF_INET)
 			continue;
 		if (ep->proto >= 0 && ep->proto != proto)
 			continue;
-		if (ep->func) {
-			if ((*ep->func)(m, off, proto, ep->arg) == 0)
-				continue;
-		} else {
+		if (ep->func)
+			prio = (*ep->func)(m, off, proto, ep->arg);
+		else {
 			/*
 			 * it's inbound traffic, we need to match in reverse
 			 * order
 			 */
-			if (mask_match(ep, (struct sockaddr *)&d,
-			    (struct sockaddr *)&s) == 0)
-				continue;
+			prio = mask_match(ep, (struct sockaddr *)&d,
+			    (struct sockaddr *)&s);
 		}
 
-		/* found a match */
-		if (ep->psw && ep->psw->pr_input) {
-			encap_fillarg(m, ep);
-			(*ep->psw->pr_input)(m, off, proto);
+		/*
+		 * We prioritize the matches by using bit length of the
+		 * matches.  mask_match() and user-supplied matching function
+		 * should return the bit length of the matches (for example,
+		 * if both src/dst are matched, 64 should be returned).
+		 * 0 or negative return value means "it did not match".
+		 *
+		 * The question is, since we have two "mask" portion, we
+		 * cannot really define total order between entries.
+		 * For example, which of these should be preferred?
+		 * mask_match() returns 48 (32 + 16) for both of them.
+		 *	src=3ffe::/16, dst=3ffe:501::/32
+		 *	src=3ffe:501::/32, dst=3ffe::/16
+		 *
+		 * We need to loop through all the possible candidates
+		 * to get the best match - the search takes O(n) for
+		 * n attachments (i.e. interfaces).
+		 */
+		if (prio <= 0)
+			continue;
+		if (prio > matchprio) {
+			matchprio = prio;
+			match = ep;
+		}
+	}
+
+	if (match) {
+		/* found a match, "match" has the best one */
+		if (match->psw && match->psw->pr_input) {
+			encap_fillarg(m, match);
+			(*match->psw->pr_input)(m, off, proto);
 		} else
 			m_freem(m);
 		return;
@@ -277,17 +305,7 @@ static void
 encap_add(ep)
 	struct encaptab *ep;
 {
-	/*
-	 * Order of insertion will determine the priority in lookup.
-	 * We should be careful putting them in specific-one-first order.
-	 * The question is, since we have two "mask" portion, we cannot really
-	 * define total order between entries.
-	 * For example, which of these should be preferred?
-	 *	src=3ffe::/16, dst=3ffe:501::/32
-	 *	src=3ffe:501::/32, dst=3ffe::/16
-	 *
-	 * At this moment we don't care about the ordering.
-	 */
+
 	LIST_INSERT_HEAD(&encaptab, ep, chain);
 }
 
@@ -449,6 +467,7 @@ mask_match(ep, sp, dp)
 	struct sockaddr_storage d;
 	int i;
 	u_int8_t *p, *q, *r;
+	int matchlen;
 
 	if (sp->sa_len > sizeof(s) || dp->sa_len > sizeof(d))
 		return 0;
@@ -457,17 +476,25 @@ mask_match(ep, sp, dp)
 	if (sp->sa_len != ep->src.ss_len || dp->sa_len != ep->dst.ss_len)
 		return 0;
 
+	matchlen = 0;
+
 	p = (u_int8_t *)sp;
 	q = (u_int8_t *)&ep->srcmask;
 	r = (u_int8_t *)&s;
-	for (i = 0 ; i < sp->sa_len; i++)
+	for (i = 0 ; i < sp->sa_len; i++) {
 		r[i] = p[i] & q[i];
+		/* XXX estimate */
+		matchlen += (q[i] ? 8 : 0);
+	}
 
 	p = (u_int8_t *)dp;
 	q = (u_int8_t *)&ep->dstmask;
 	r = (u_int8_t *)&d;
-	for (i = 0 ; i < dp->sa_len; i++)
+	for (i = 0 ; i < dp->sa_len; i++) {
 		r[i] = p[i] & q[i];
+		/* XXX rough estimate */
+		matchlen += (q[i] ? 8 : 0);
+	}
 
 	/* need to overwrite len/family portion as we don't compare them */
 	s.ss_len = sp->sa_len;
@@ -477,7 +504,7 @@ mask_match(ep, sp, dp)
 
 	if (bcmp(&s, &ep->src, ep->src.ss_len) == 0 &&
 	    bcmp(&d, &ep->dst, ep->dst.ss_len) == 0) {
-		return 1;
+		return matchlen;
 	} else
 		return 0;
 }

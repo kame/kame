@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.32 2000/04/17 03:02:42 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.33 2000/04/17 12:01:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -428,5 +428,6 @@ gif_encapcheck4(m, off, proto, arg)
 		rtfree(rt);
 	}
 
-	return 1;
+	/* prioritize: IFF_LINK0 mode is less preferred */
+	return (sc->gif_if.if_flags & IFF_LINK0) ? 32 : 32 * 2;
 }
