@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.88 2001/08/06 08:31:54 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.89 2001/08/06 09:22:49 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -198,8 +198,9 @@ oakley_dh_compute(dh, pub, priv, pub_p, gxy)
 
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_NOTICE, "%s(%s): %8.6f", __FUNCTION__,
-		s_attr_isakmp_group(dh->type), timedelta(&start, &end));
+	syslog(LOG_NOTICE, "%s(%s%d): %8.6f", __FUNCTION__,
+		s_attr_isakmp_group(dh->type), dh->prime->l << 3,
+		timedelta(&start, &end));
     }
 #endif
 
@@ -245,8 +246,9 @@ oakley_dh_generate(dh, pub, priv)
 
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_NOTICE, "%s(%s): %8.6f", __FUNCTION__,
-		s_attr_isakmp_group(dh->type), timedelta(&start, &end));
+	syslog(LOG_NOTICE, "%s(%s%d): %8.6f", __FUNCTION__,
+		s_attr_isakmp_group(dh->type), dh->prime->l << 3,
+		timedelta(&start, &end));
 #endif
 	plog(LLV_DEBUG, LOCATION, NULL, "compute DH's private.\n");
 	plogdump(LLV_DEBUG, (*priv)->v, (*priv)->l);
