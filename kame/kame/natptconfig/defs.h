@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: defs.h,v 1.3 2000/02/18 11:39:53 fujisawa Exp $
+ *	$Id: defs.h,v 1.4 2000/03/09 02:59:54 fujisawa Exp $
  */
 
 /*
@@ -41,6 +41,8 @@
 #define	FALSE			(~TRUE)
 #endif
 
+#define	LONG			(1)
+#define	SHORT			(2)
 
 #define	ROUNDUP(x)		roundup(x, sizeof(void *))
 

@@ -26,14 +26,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: showsubs.h,v 1.1 2000/02/19 00:02:05 fujisawa Exp $
+ *	$Id: showsubs.h,v 1.2 2000/03/09 02:59:55 fujisawa Exp $
  */
 
 struct logmsg
 {
     u_int	 lmsg_size;	/* data byte count, including hdr	*/
     char	*lmsg_last;	/* pointer to just after last byte.	*/
-    u_char	 lmsg_data[1];	/* just followed character.		*/
+    char	 lmsg_data[1];	/* just followed character.		*/
 };
 
 
@@ -41,5 +41,7 @@ struct logmsg
  *
  */
 
-struct logmsg	*composeCSlotEntry		__P((struct _cSlot *));
+struct logmsg	*composeCSlotEntry	__P((struct _cSlot *));
+struct logmsg	*composeTSlotEntry	__P((struct _tSlot *, struct _tcpstate *, int));
+
 

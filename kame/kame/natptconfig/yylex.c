@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: yylex.c,v 1.3 2000/02/18 11:39:56 fujisawa Exp $
+ *	$Id: yylex.c,v 1.4 2000/03/09 02:59:55 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -67,6 +67,7 @@ struct
     { "interface",	SINTERFACE,	"SINTERFACE",	},
     { "internal",	SINTERNAL,	"SINTERNAL",	},
     { "log",		SLOG,		"SLOG",		},
+    { "long",		SLONG,		"SLONG",	},
     { "map",		SMAP,		"SMAP",		},
     { "mapping",	SMAPPING,	"SMAPPING",	},
     { "natpt",		SNATPT,		"SNATPT",	},

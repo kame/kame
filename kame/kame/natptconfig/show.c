@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: show.c,v 1.6 2000/02/23 12:53:19 fujisawa Exp $
+ *	$Id: show.c,v 1.7 2000/03/09 02:59:54 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -47,9 +47,6 @@
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
-
-#define	TCPSTATES	1
-#include <netinet/tcp_fsm.h>
 
 #include <netinet6/natpt_defs.h>
 #include <netinet6/natpt_soctl.h>
@@ -97,11 +94,11 @@ static	struct nlist	nl[] =
 
 static void	_showRuleStatic		__P((int, struct _cSlot *));
 static void	_showRuleDynamic	__P((int, struct _cSlot *));
+#ifdef notyet
 static void	_showRuleFaith		__P((int, struct _cSlot *));
-
-static void	_showXlate		__P((u_long));
-static void	_showXlateHeterogeneous	__P((struct _tSlot *));
-static void	_showXlateHomogeneous	__P((struct _tSlot *));
+#endif /* notyet */	
+static void	_showXlate		__P((int, u_long));
+static void	_writeXlateHeader	__P((void));
 
 
 /*
@@ -187,7 +184,9 @@ showRule(int type)
 	    {
 	      case NATPT_STATIC:	_showRuleStatic(num, &acs);	break;
 	      case NATPT_DYNAMIC:	_showRuleDynamic(num, &acs);	break;
+#ifdef notyet
 	      case NATPT_FAITH:		_showRuleFaith(num, &acs);	break;
+#endif /* notyet */
 	    }
 	}
 	num++;
@@ -238,7 +237,7 @@ showCSlotEntry(struct _cSlot *cslot)
 
 
 void
-showXlate(int interval)
+showXlate(int type, int interval)
 {
     int		 pos;
     int		 rv;
@@ -251,7 +250,7 @@ showXlate(int interval)
 	if (pos == 0)
 	    printf("No active xlate\n");
 	else
-	    _showXlate(pos);
+	    _showXlate(type, pos);
 
 	if (interval <= 0)
 	    break ;
@@ -289,6 +288,7 @@ _showRuleDynamic(int num, struct _cSlot *acs)
 }
 
 
+#ifdef notyet
 static void
 _showRuleFaith(int num, struct _cSlot *acs)
 {
@@ -298,32 +298,13 @@ _showRuleFaith(int num, struct _cSlot *acs)
 
     printf("\n");
 }
-
-
-#define	_writeXlateHeader()					\
-		{						\
-		    printf("%-6s",  "Proto");			\
-		    printf("%-21s", "Local Address");		\
-		    printf("%-22s", "Foreign Address");		\
-		    printf("%-21s", "Remote Address");		\
-		    printf("%6s",  "Ipkts");			\
-		    printf("%6s",  "Opkts");			\
-		    printf(" ");				\
-								\
-		    printf("%-8s",  "  Idle");			\
-		    printf("%-8s",  " (state)");		\
-		    printf("\n");				\
-		}
+#endif /* notyet */
 
 
 static void
-_showXlate(u_long pos)
+_showXlate(int type, u_long pos)
 {
     Cell	 cons;
-    int		 rv;
-#if	0
-    char	 Wow[BUFSIZ];
-#endif
 
     _writeXlateHeader();
 
@@ -332,58 +313,18 @@ _showXlate(u_long pos)
 	readKvm((void *)&cons, sizeof(Cell), pos);
 	if (cons.car)
 	{
+	    struct logmsg	*lmsg;
 	    struct _tSlot	 tslot;
-	    struct timeval	 tp;
-	    struct timezone	 tzp;
-	    int			 idle;
-	    char		*p;
+	    struct _tcpstate	 ts;
 
 	    readKvm((void *)&tslot, sizeof(struct _tSlot), (u_long)cons.car);
+	    if (tslot.ip_payload == IPPROTO_TCP)
+		readKvm((void *)&ts, sizeof(struct _tcpstate), (u_long)tslot.suit.tcp);
 
-	    switch (tslot.ip_payload)
-	    {
-	      case IPPROTO_ICMP: p = "icmp"; break;
-	      case IPPROTO_UDP:  p = "udp" ; break;
-	      case IPPROTO_TCP:  p = "tcp" ; break;
-	      default:		 p = "unk" ; break;
-	    }
-	    printf("%-6s", p);
+	    lmsg = composeTSlotEntry(&tslot, &ts, type);
 
-	    if (tslot.local.sa_family != tslot.remote.sa_family)
-		_showXlateHeterogeneous(&tslot);
-	    else
-		_showXlateHomogeneous(&tslot);
-
-	    rv = gettimeofday(&tp, &tzp);
-	    idle = tp.tv_sec - tslot.tstamp;
-	    printf("%02d:%02d:%02d", idle / 3600, (idle % 3600)/60, idle % 60);
-
-	    switch (tslot.ip_payload)
-	    {
-	      case IPPROTO_ICMP:
-		{
-		    printf(" %5d/%-5d",
-				tslot.suit.ih_idseq.icd_id,
-				tslot.suit.ih_idseq.icd_seq);
-		}
-		break;
-
-	      case IPPROTO_TCP:
-		{
-		    struct _tcpstate	ts;
-
-		    readKvm((void *)&ts, sizeof(struct _tcpstate), (u_long)tslot.suit.tcp);
-
-		    if ((ts._state >= 0) && (ts._state < TCP_NSTATES))
-			printf(" %s ", tcpstates[ts._state]);
-		    else
-			printf(" %d ", ts._state);
-		}
-		break;
-	      
-	    }
-
-	    printf("\n");
+	    printf("%s\n", (char *)&lmsg->lmsg_data[0]);
+	    free(lmsg);
 	}
 	pos = (u_long)cons.cdr;
     }
@@ -391,25 +332,20 @@ _showXlate(u_long pos)
 
 
 static void
-_showXlateHeterogeneous(struct _tSlot *tslot )
+_writeXlateHeader()
 {
-    char	ntop_buf[INET6_ADDRSTRLEN];
-    
-    printf("%s.%d ", inet_ntop(tslot->local.sa_family, &tslot->local.in6src, ntop_buf, sizeof(ntop_buf)),
-	   ntohs(tslot->local._sport));
-    printf("%s.%d ", inet_ntop(tslot->local.sa_family, &tslot->local.in6dst, ntop_buf, sizeof(ntop_buf)),
-	   ntohs(tslot->local._dport));
+    printf("%-5s",  "Proto");
+    printf("%-21s", "Local Address (src)");
+    printf("%-22s", "Local Address (dst)");
+    printf("%-21s", "Remote Address (src)");
+    printf("%-22s", "Remote Address (dst)");
+    printf("%6s",  "Ipkts");
+    printf("%6s",  "Opkts");
+    printf(" ");
 
-    printf("%s.%d ", inet_ntop(tslot->remote.sa_family, &tslot->remote.in6src, ntop_buf, sizeof(ntop_buf)),
-	   ntohs(tslot->remote._sport));
-    printf("%s.%d ", inet_ntop(tslot->remote.sa_family, &tslot->remote.in6dst, ntop_buf, sizeof(ntop_buf)),
-	   ntohs(tslot->remote._dport));
-}
-
-
-static void
-_showXlateHomogeneous(struct _tSlot *tslot)
-{
+    printf("%-8s",  "  Idle");
+    printf("%-8s",  " (state)");
+    printf("\n");
 }
 
 

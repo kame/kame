@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: showsubs.c,v 1.1 2000/02/19 00:02:05 fujisawa Exp $
+ *	$Id: showsubs.c,v 1.2 2000/03/09 02:59:54 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -42,10 +42,14 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 
+#define	TCPSTATES	1
+#include <netinet/tcp_fsm.h>
+
 #include <netinet6/natpt_defs.h>
 
 #include <arpa/inet.h>
 
+#include "defs.h"
 #include "showsubs.h"
 
 
@@ -56,6 +60,11 @@
 static void	_composeAddrPort	__P((struct logmsg *, struct pAddr *));
 static void	_composeAddrPort4	__P((struct logmsg *, struct pAddr *));
 static void	_composeAddrPort6	__P((struct logmsg *, struct pAddr *));
+static void	_composeAddrPortXL	__P((struct logmsg *, struct pAddr *, int));
+static void	_composeAddrPortXL4	__P((struct logmsg *, struct pAddr *, int));
+static void	_composeAddrPortXL6	__P((struct logmsg *, struct pAddr *, int));
+static void	_composeAddrPortXL6long	 __P((struct logmsg *, struct in6_addr *, u_short));
+static void	_composeAddrPortXL6short __P((struct logmsg *, struct in6_addr *, u_short));
 
 void		concat			__P((struct logmsg *, char *, ...));
 
@@ -105,6 +114,58 @@ composeCSlotEntry(struct _cSlot *slt)
     return (lmsg);
 }
 
+
+struct logmsg *
+composeTSlotEntry(struct _tSlot *slot, struct _tcpstate *ts, int type)
+{
+    int			 rv;
+    int			 idle;
+    struct logmsg	*lmsg;
+    struct timeval	 tp;
+    struct timezone	 tzp;
+
+    lmsg = (struct logmsg *)malloc(BUFSIZ);
+    bzero(lmsg, BUFSIZ);
+
+    lmsg->lmsg_size = BUFSIZ;
+    lmsg->lmsg_last = &lmsg->lmsg_data[0];
+
+    switch (slot->ip_payload)
+    {
+      case IPPROTO_ICMP:	concat(lmsg, "icmp ");	break;
+      case IPPROTO_TCP:		concat(lmsg, "tcp  ");	break;
+      case IPPROTO_UDP:		concat(lmsg, "udp  ");	break;
+      default:			concat(lmsg, "unk  ");	break;
+    }
+
+    _composeAddrPortXL(lmsg, &slot->local,  type);
+    _composeAddrPortXL(lmsg, &slot->remote, type);
+
+    rv = gettimeofday(&tp, &tzp);
+    idle = tp.tv_sec - slot->tstamp;
+    concat(lmsg, "%02d:%02d:%02d ", idle/3600, (idle%3600)/60, idle%60);
+
+    switch (slot->ip_payload)
+    {
+      case IPPROTO_ICMP:
+	concat(lmsg, " %5d/%-5d", slot->suit.ih_idseq.icd_id, slot->suit.ih_idseq.icd_seq);
+	break;
+
+      case IPPROTO_TCP:
+	if ((ts->_state >= 0) && (ts->_state < TCP_NSTATES))
+	    concat(lmsg, " %s ", tcpstates[ts->_state]);
+	else
+	    concat(lmsg, " %d ", ts->_state);
+	break;
+    }
+
+    return (lmsg);
+}
+
+
+/*
+ *
+ */
 
 static void
 _composeAddrPort(struct logmsg *lmsg, struct pAddr *apt)
@@ -163,6 +224,98 @@ _composeAddrPort6(struct logmsg *lmsg, struct pAddr *apt)
 }
 
 
+static void
+_composeAddrPortXL(struct logmsg *lmsg, struct pAddr *apt, int type)
+{
+    if (apt->sa_family == AF_INET)
+	_composeAddrPortXL4(lmsg, apt, type);
+    else
+	_composeAddrPortXL6(lmsg, apt, type);
+}
+
+
+static void
+_composeAddrPortXL4(struct logmsg *lmsg, struct pAddr *apt, int type)
+{
+    char	Bow[128];
+    char	Wow[128];
+
+    inet_ntop(AF_INET, &apt->in4src, Bow, sizeof(Bow));
+    sprintf(Wow, "%s.%d", Bow, ntohs(apt->_sport));
+    concat(lmsg, "%-22s", Wow);
+
+    inet_ntop(AF_INET, &apt->in4dst, Bow, sizeof(Bow));
+    sprintf(Wow, "%s.%d", Bow, ntohs(apt->_dport));
+    concat(lmsg, "%-22s", Wow);
+}
+
+
+static void
+_composeAddrPortXL6(struct logmsg *lmsg, struct pAddr *apt, int type)
+{
+    if (type == LONG)
+    {
+	_composeAddrPortXL6long(lmsg, &apt->in6src, apt->_sport);
+	_composeAddrPortXL6long(lmsg, &apt->in6dst, apt->_dport);
+	
+    }
+    else
+    {
+	_composeAddrPortXL6short(lmsg, &apt->in6src, apt->_sport);
+	_composeAddrPortXL6short(lmsg, &apt->in6dst, apt->_dport);
+    }
+}
+
+
+static void
+_composeAddrPortXL6long(struct logmsg *lmsg, struct in6_addr *addr, u_short port)
+{
+    char	Bow[128];
+    char	Wow[128];
+
+    inet_ntop(AF_INET6, addr, Bow, sizeof(Bow));
+    sprintf(Wow, "%s.%d", Bow, ntohs(port));
+    concat(lmsg, "%-45s", Wow);
+}
+
+
+static void
+_composeAddrPortXL6short(struct logmsg *lmsg, struct in6_addr *addr, u_short port)
+{
+    int		 iter;
+    char	*s, *d;
+    char	 Bow[128];
+    char	 Wow[128];
+    char	 miaow[128];
+
+    bzero(miaow, sizeof(miaow));
+    bzero(Bow,   sizeof(Bow));
+    inet_ntop(AF_INET6, addr, miaow, sizeof(miaow));
+
+    if (strlen(miaow) <= 15)
+    {
+	strcpy(Bow, miaow);
+    }
+    else
+    {
+	s = miaow;
+	d = Bow;
+	for (iter = 0; iter <= 3; iter++)	*d++ = *s++;
+	*d++ = '=';
+	while (*s++ != '\0')			;
+	s -= 10;
+	for (iter = 0; iter <= 9; iter++)	*d++ = *s++;
+    }
+
+    sprintf(Wow, "%s.%d", Bow, ntohs(port));
+    concat(lmsg, "%-22s", Wow);
+}
+
+
+/*
+ *
+ */
+
 void
 concat(struct logmsg *lmsg, char *fmt, ...)
 {
@@ -180,27 +333,3 @@ concat(struct logmsg *lmsg, char *fmt, ...)
 
     va_end(ap);
 }
-
-
-/*
- *
- */
-
-#ifdef NATPTCONFIG
-
-void
-log(int priority, char *fmt, ...)
-{
-    va_list	ap;
-    char	Wow[BUFSIZ];
-
-    va_start(ap, fmt);
-    vsprintf(Wow, fmt, ap);
-
-    fprintf(stdout, "%s", Wow),
-    fprintf(stdout, "\n");
-
-    va_end(ap);
-}
-
-#endif

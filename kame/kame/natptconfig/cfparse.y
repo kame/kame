@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: cfparse.y,v 1.5 2000/02/23 12:53:19 fujisawa Exp $
+ *	$Id: cfparse.y,v 1.6 2000/03/09 02:59:54 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -107,6 +107,7 @@ yyerror(char *msg, ...)
 %token		SINTERFACE
 %token		SINTERNAL
 %token		SLOG
+%token		SLONG
 %token		SMAP
 %token		SMAPPING
 %token		SNATPT
@@ -163,6 +164,7 @@ yyerror(char *msg, ...)
 %type	<UShrt>	port
 %type	<Int>	opt_proto
 %type	<Int>	opt_type
+%type	<Int>	opt_long
 %type	<Int>	opt_decimal
 
 
@@ -307,8 +309,8 @@ show
 		    { showRule(NATPT_STATIC); }
 		| SSHOW SDYNAMIC
 		    { showRule(NATPT_DYNAMIC); }
-		| SSHOW SXLATE opt_decimal
-		    { showXlate($3); }
+		| SSHOW SXLATE opt_long opt_decimal
+		    { showXlate($3, $4); }
 		| SSHOW SVARIABLES
 		    { showVariables(); }
 		| SSHOW SMAPPING
@@ -465,6 +467,13 @@ opt_type
 		    { $$ = NATPT_STATIC; }
 		| SDYNAMIC
 		    { $$ = NATPT_DYNAMIC; }
+		;
+
+opt_long
+		:
+		    { $$ = 0; }
+		| SLONG
+		    { $$ = LONG; }
 		;
 
 opt_decimal
