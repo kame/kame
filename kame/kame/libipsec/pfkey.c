@@ -28,7 +28,7 @@
  */
 
 #ifndef lint
-static char *rcsid = "@(#) pfkey.c $Revision: 1.12 $";
+static char *rcsid = "@(#) pfkey.c $Revision: 1.13 $";
 #endif
 
 #include <sys/types.h>
@@ -1407,7 +1407,7 @@ pfkey_setsadblifetime(buf, type, l_alloc, l_bytes, l_addtime, l_usetime)
 		p->sadb_lifetime_allocations
 			= (l_alloc * soft_lifetime_allocations_rate) /100;
 		p->sadb_lifetime_bytes
-			= ((l_bytes * soft_lifetime_bytes_rate) /100) << 10;
+			= (l_bytes * soft_lifetime_bytes_rate) /100;
 		p->sadb_lifetime_addtime
 			= (l_addtime * soft_lifetime_addtime_rate) /100;
 		p->sadb_lifetime_usetime
@@ -1415,7 +1415,7 @@ pfkey_setsadblifetime(buf, type, l_alloc, l_bytes, l_addtime, l_usetime)
 		break;
 	case SADB_EXT_LIFETIME_HARD:
 		p->sadb_lifetime_allocations = l_alloc;
-		p->sadb_lifetime_bytes = l_bytes << 10;
+		p->sadb_lifetime_bytes = l_bytes;
 		p->sadb_lifetime_addtime = l_addtime;
 		p->sadb_lifetime_usetime = l_usetime;
 		break;
