@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 1999/10/05 10:56:08 $
+		     $Date: 1999/10/06 05:06:34 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -36,6 +36,6 @@ those platforms.  Here is a brief list of important differences:
 	ALTQ 1.2 is merged into:	KAME/FreeBSD228, KAME/FreeBSD32
 	No ALTQ support in:		KAME/BSDI31, KAME/NetBSD141
 - TCP
-	see kit/IMPLEMENTATION for details.
+	see IMPLEMENTATION for details.
 
 							<end of RELNOTES>
