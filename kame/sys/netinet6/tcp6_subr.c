@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.39 2002/02/02 08:27:12 jinmei Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.40 2002/02/02 08:45:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -264,8 +264,8 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 		*nth = *th;
 		flags = TH_ACK;
 
-		src6 = &tp->t_in6pcb->in6p_lsa;
-		dst6 = &tp->t_in6pcb->in6p_fsa;
+		src6 = &t6p->t_in6pcb->in6p_lsa;
+		dst6 = &t6p->t_in6pcb->in6p_fsa;
 	} else {
 		m_freem(m->m_next);
 		m->m_next = 0;
