@@ -132,7 +132,6 @@ MALLOC_DEFINE(M_IPMOPTS, "ip_moptions", "internet multicast options");
 u_short ip_id;
 
 static struct mbuf *ip_insertoptions(struct mbuf *, struct mbuf *, int *);
-static struct ifnet *ip_multicast_if(struct in_addr *, int *);
 static int ip_getmopt_ifargs
 	(struct sockopt *, struct ifnet **, struct in_addr *, struct in_addr *);
 #ifdef IGMPV3
