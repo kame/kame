@@ -1,7 +1,18 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1733 2001/06/20 05:34:24 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1734 2001/06/20 11:45:41 jinmei Exp $
 
 <200106>
+2001-06-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet/tcp_subr.c (tcp_rtlookup):
+	* freebsd4/sys/netinet/tcp_subr.c (tcp_rtlookup6):
+	made sure to use the correct sa_len for rtalloc().  sizeof(ro_dst)
+	is not necessarily the correct one, especially in NEW_STRUCT_ROUTE
+	cases for IPv6.
+	The previous code could turn the path MTU discovery off as a bad
+	effect.  If you define NEW_STRUCT_ROUTE in a KAME snap
+	(note that GENERIC.KAME defines this option), be sure to update
+	the kernel.
+
 Wed Jun 20 14:33:28 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/sys/netinet6/{in6_var.h,in6.c,natpt_rule.c,nd6_rtr.c}:
 	  remove in6_len2mask(). this fucnction is duplicated with
