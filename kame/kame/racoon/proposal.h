@@ -1,4 +1,4 @@
-/*	$KAME: proposal.h,v 1.7 2000/09/13 14:57:58 sakane Exp $	*/
+/*	$KAME: proposal.h,v 1.8 2000/09/19 04:25:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.h,v 1.7 2000/09/13 14:57:58 sakane Exp $ */
+/* YIPS @(#)$Id: proposal.h,v 1.8 2000/09/19 04:25:58 itojun Exp $ */
 
 #include <sys/queue.h>
 
@@ -48,7 +48,7 @@
  * 	               +------- proto1[trans1, trans2, trans3, ...]
  *
  *   incoming packets needs to be parsed to construct the same structure
- *   (we use separate structures, "ipsecsa" and "prop_pair" for those).
+ *   (check "prop_pair" too).
  */
 /* SA proposal specification */
 struct saprop {
