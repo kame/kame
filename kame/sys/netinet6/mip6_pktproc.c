@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.82 2002/11/13 00:58:10 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.83 2002/11/22 06:18:36 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -163,7 +163,7 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 
  free_ip6pktopts:
 	if (opt.ip6po_mobility != NULL)
-		free(opt.ip6po_mobility, M_IP6OPT);
+		FREE(opt.ip6po_mobility, M_IP6OPT);
 
 	return (0);
 }
@@ -274,7 +274,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 
  free_ip6pktopts:
 	if (opt.ip6po_mobility != NULL)
-		free(opt.ip6po_mobility, M_IP6OPT);
+		FREE(opt.ip6po_mobility, M_IP6OPT);
 
 	return (0);
 }
@@ -1179,7 +1179,7 @@ mip6_bu_send_hoti(mbu)
 
  free_ip6pktopts:
 	if (opt.ip6po_mobility)
-		free(opt.ip6po_mobility, M_IP6OPT);
+		FREE(opt.ip6po_mobility, M_IP6OPT);
 
 	return (0);
 }
@@ -1224,7 +1224,7 @@ mip6_bu_send_coti(mbu)
 
  free_ip6pktopts:
 	if (opt.ip6po_mobility)
-		free(opt.ip6po_mobility, M_IP6OPT);
+		FREE(opt.ip6po_mobility, M_IP6OPT);
 
 	return (0);
 }
@@ -1272,7 +1272,7 @@ mip6_bu_send_cbu(mbu)
 
  free_ip6pktopts:
 	if (opt.ip6po_mobility)
-		free(opt.ip6po_mobility, M_IP6OPT);
+		FREE(opt.ip6po_mobility, M_IP6OPT);
 
 	return (error);
 }
@@ -1340,9 +1340,9 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh, mopt)
 	}
  free_ip6pktopts:
 	if (opt.ip6po_rthdr2)
-		free(opt.ip6po_rthdr2, M_IP6OPT);
+		FREE(opt.ip6po_rthdr2, M_IP6OPT);
 	if (opt.ip6po_mobility)
-		free(opt.ip6po_mobility, M_IP6OPT);
+		FREE(opt.ip6po_mobility, M_IP6OPT);
 
 	return (error);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.15 2002/11/01 11:09:51 keiichi Exp $	*/
+/*	$KAME: mobility6.c,v 1.16 2002/11/22 06:18:36 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -279,7 +279,7 @@ mobility6_send_be(src, dst, status, home)
 
  free_ip6pktopts:
 	if (opt.ip6po_mobility)
-		free(opt.ip6po_mobility, M_IP6OPT);
+		FREE(opt.ip6po_mobility, M_IP6OPT);
 
 	return (error);
 }

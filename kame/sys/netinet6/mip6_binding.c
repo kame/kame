@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.150 2002/11/13 00:58:10 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.151 2002/11/22 06:18:35 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -785,7 +785,7 @@ mip6_bu_send_bu(mbu)
 
  free_ip6pktopts:
 	if (opt.ip6po_mobility)
-		free(opt.ip6po_mobility, M_IP6OPT);
+		FREE(opt.ip6po_mobility, M_IP6OPT);
 
  bu_send_bu_end:
 	return (error);
@@ -1342,7 +1342,7 @@ mip6_process_hrbu(bi)
 			mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
 			/* modify encapsulation entry */
 			/* XXX */
-			mip6_tunnel_control(MIP6_TUNNEL_ADD,
+			mip6_tunnel_control(MIP6_TUNNEL_CHANGE,
 					    mbc,
 					    mip6_bc_encapcheck,
 					    &mbc->mbc_encap);
@@ -1420,7 +1420,7 @@ mip6_process_hrbu(bi)
 				mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
 				/* modify encapsulation entry */
 				/* XXX */
-				mip6_tunnel_control(MIP6_TUNNEL_ADD,
+				mip6_tunnel_control(MIP6_TUNNEL_CHANGE,
 						    mbc,
 						    mip6_bc_encapcheck,
 						    &mbc->mbc_encap);
@@ -1525,8 +1525,7 @@ mip6_dad_start(mbc)
 	if (mbc->mbc_dad != NULL)
 		return (EEXIST);
 
-	ia = (struct in6_ifaddr *)
-		malloc(sizeof(*ia), M_IFADDR, M_NOWAIT);
+	MALLOC(ia, struct in6_ifaddr *, sizeof(*ia), M_IFADDR, M_NOWAIT);
 	if (ia == NULL)
 		return (ENOBUFS);
 
@@ -1539,7 +1538,7 @@ mip6_dad_start(mbc)
 	sa6_copy_addr(&mbc->mbc_phaddr, &ia->ia_addr);
 	if (in6_addr2zoneid(ia->ia_ifp, &ia->ia_addr.sin6_addr,
 			    &ia->ia_addr.sin6_scope_id)) {
-		free(ia, M_IFADDR);
+		FREE(ia, M_IFADDR);
 		return (EINVAL);
 	}
 	in6_embedscope(&ia->ia_addr.sin6_addr, &ia->ia_addr);
@@ -1559,7 +1558,7 @@ mip6_dad_stop(mbc)
 	if (ia == NULL)
 		return (ENOENT);
 	nd6_dad_stop((struct ifaddr *)ia);
-	free(ia, M_IFADDR);
+	FREE(ia, M_IFADDR);
 	mbc->mbc_dad = NULL;
 	return (0);
 }
@@ -1579,11 +1578,11 @@ mip6_dad_success(ifa)
 	if (!mbc)
 		return (ENOENT);
 
-	free(ifa, M_IFADDR);
+	FREE(ifa, M_IFADDR);
 	mbc->mbc_dad = NULL;
 	mbc->mbc_state &= ~MIP6_BC_STATE_DAD_WAIT;
 	/* create encapsulation entry */
-	mip6_tunnel_control(MIP6_TUNNEL_ADD,
+	mip6_tunnel_control(MIP6_TUNNEL_ADD,	/* XXX or MIP6_TUNNEL_CHANGE */
 			    mbc,
 			    mip6_bc_encapcheck,
 			    &mbc->mbc_encap);
@@ -1657,7 +1656,7 @@ mip6_dad_error(ifa, err)
 
 	if ((my->mbc_flags & IP6MU_CLONED) == 0)
 		prim = my;
-	free(ifa, M_IFADDR);
+	FREE(ifa, M_IFADDR);
 	my->mbc_dad = NULL;
 	for (mbc = LIST_FIRST(&mip6_bc_list);
 	    mbc;
@@ -1907,7 +1906,7 @@ mip6_bc_proxy_control(target, local, cmd)
 			}
 		}
 
-		free(sdl, M_IFMADDR);
+		FREE(sdl, M_IFMADDR);
 
 		break;
 
