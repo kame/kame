@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.68 2001/07/23 14:41:08 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.69 2001/07/23 14:46:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -166,12 +166,14 @@ static char *sec2str __P((time_t t));
 static char *ether_str __P((struct sockaddr_dl *sdl));
 static void ts_print __P((const struct timeval *));
 
+#ifdef ICMPV6CTL_ND6_DRLIST
 static char *rtpref_str[] = {
 	"medium",		/* 00 */
 	"high",			/* 01 */
 	"rsv",			/* 10 */
 	"low"			/* 11 */
 };
+#endif
 
 int
 main(argc, argv)
