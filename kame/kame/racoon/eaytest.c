@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: eaytest.c,v 1.6 2000/08/10 12:37:09 sakane Exp $ */
+/* YIPS @(#)$Id: eaytest.c,v 1.7 2000/08/24 11:06:28 sakane Exp $ */
 
 #include <sys/types.h>
 
@@ -49,7 +49,8 @@
 u_int32_t debug = 0;
 
 char *capath = "/usr/local/openssl/certs";
-char cert1[] =
+char *certs[] = {
+/* self signed */
 "-----BEGIN X509 CERTIFICATE-----\n"
 "MIICzDCCAjWgAwIBAgIEOXGTAjANBgkqhkiG9w0BAQUFADBaMQswCQYDVQQGEwJG\n"
 "STEkMCIGA1UEChMbU1NIIENvbW11bmljYXRpb25zIFNlY3VyaXR5MREwDwYDVQQL\n"
@@ -66,8 +67,26 @@ char cert1[] =
 "CSqGSIb3DQEBBQUAA4GBAFVbX9xotcHmtI96iXGNuzXqAObUBDAg4hDymi2RLitv\n"
 "uVJYPH5t6qDqu499FbwPsatoRc/l62cmc0qmFStmvg0p5s+/dW2gtBeV1+cfdv+O\n"
 "1GrjSmhAPPiwQFarhJzJeNo5PHplcj9ICNzDfcLZtqhiZFLq0wl5pNQM4UqWuFNl\n"
-"-----END X509 CERTIFICATE-----\n\n"
-;
+"-----END X509 CERTIFICATE-----\n\n",
+/* signed by SSH testing CA + CA1 + CA2 */
+"-----BEGIN X509 CERTIFICATE-----\n"
+"MIICtTCCAj+gAwIBAgIEOaR8NjANBgkqhkiG9w0BAQUFADBjMQswCQYDVQQGEwJG\n"
+"STEkMCIGA1UEChMbU1NIIENvbW11bmljYXRpb25zIFNlY3VyaXR5MREwDwYDVQQL\n"
+"EwhXZWIgdGVzdDEbMBkGA1UEAxMSVGVzdCBDQSAxIHN1YiBjYSAyMB4XDTAwMDgy\n"
+"NDAwMDAwMFoXDTAwMTAwMTAwMDAwMFowgZoxCzAJBgNVBAYTAkpQMREwDwYDVQQI\n"
+"EwhLYW5hZ2F3YTERMA8GA1UEBxMIRnVqaXNhd2ExFTATBgNVBAoTDFdJREUgUHJv\n"
+"amVjdDEVMBMGA1UECxMMS0FNRSBQcm9qZWN0MRcwFQYDVQQDEw5TaG9pY2hpIFNh\n"
+"a2FuZTEeMBwGCSqGSIb3DQEJAQwPc2FrYW5lQGthbWUubmV0MIGfMA0GCSqGSIb3\n"
+"DQEBAQUAA4GNADCBiQKBgQCpIQG/H3zn4czAmPBcbkDrYxE1A9vcpghpib3Of0Op\n"
+"SsiWIBOyIMiVAzK/I/JotWp3Vdn5fzGp/7DGAbWXAALas2xHkNmTMPpu6qhmNQ57\n"
+"kJHZHal24mgc1hwbrI9fb5olvIexx9a1riNPnKMRVHzXYizsyMbf+lJJmZ8QFhWN\n"
+"twIDAQABo18wXTALBgNVHQ8EBAMCBaAwGgYDVR0RBBMwEYEPc2FrYW5lQGthbWUu\n"
+"bmV0MDIGA1UdHwQrMCkwJ6AloCOGIWh0dHA6Ly9sZGFwLnNzaC5maS9jcmxzL2Nh\n"
+"MS0yLmNybDANBgkqhkiG9w0BAQUFAANhADtaqual41OWshF/rwCTuR6zySBJysGp\n"
+"+qjkp5efCiYKhAu1L4WXlMsV/SNdzspui5tHasPBvUw8gzFsU/VW/B2zuQZkimf1\n"
+"u6ZPjUb/vt8vLOPScP5MeH7xrTk9iigsqQ==\n"
+"-----END X509 CERTIFICATE-----\n\n",
+};
 
 /* test */
 
@@ -75,30 +94,54 @@ char cert1[] =
 void
 certtest()
 {
+	vchar_t c;
 	int error;
-	vchar_t CApath, c;
+	int i;
 
 	printf("\n**Test for Certificate.**\n");
+	printf("CAUTION: the second certificate may be invalid on your "
+		"environment because it was signed by SSH test CA and you "
+		"may not own their certificates.\n");
 
 	eay_init_error();
 
-    {
-	struct stat sb;
+	for (i = 0; i < sizeof(certs)/sizeof(certs[0]); i++) {
 
-	stat(capath, &sb);
-	if (!(sb.st_mode & S_IFDIR)) {
-		printf("ERROR: %s is not directory.\n", capath);
-		return;
+		printf("CERT[%d]===\n", i);
+
+		c.v = certs[i];
+		c.l = strlen(certs[i]);
+
+	    {
+		char *text;
+
+		text = eay_get_x509text(&c);
+		printf("%s", text);
+		free(text);
+	    }
+
+#if 0
+	    {
+		vchar_t *subjectaltname;
+		subjectaltname = eay_get_x509subjectaltname(&c);
+		printf("SubjectAltName: [%s]\n", subjectaltname->v);
+		vfree(subjectaltname);
+	    }
+#endif
+
+	    {
+		struct stat sb;
+
+		stat(capath, &sb);
+		if (!(sb.st_mode & S_IFDIR)) {
+			printf("ERROR: %s is not directory.\n", capath);
+			return;
+		}
+	    }
+
+		error = eay_check_x509cert(&c, capath);
+		printf("cert is %s\n", error ? "bad" : "good");
 	}
-    }
-
-	CApath.v = capath;
-	CApath.l = strlen(capath);
-	c.v = cert1;
-	c.l = strlen(cert1);
-
-	error = eay_check_x509cert(&c, &CApath);
-	printf("cert is %s\n", error ? "bad" : "good");
 }
 
 void
