@@ -39,6 +39,10 @@
  * - We use getipnodebyname() just for thread-safeness.  There's no intent
  *   to let it do PF_UNSPEC (actually we never pass PF_UNSPEC to
  *   getipnodebyname().
+ * - The code filters out AFs that are not supported by the kernel,
+ *   when resolving FQDNs and globbing NULL hostname.  Is it the right
+ *   thing to do?  What is the relationship with post-RFC2553 AI_ADDRCONFIG
+ *   in ai_flags?
  */
 
 #ifdef HAVE_CONFIG_H
