@@ -351,6 +351,11 @@ relay6_init()
 		err(1, "bind(ssock)");
 		/* NOTREACHED */
 	}
+	if (setsockopt(ssock, SOL_SOCKET, SO_REUSEPORT,
+		       &on, sizeof(on)) < 0) {
+		err(1, "setsockopt(ssock, SO_REUSEPORT)");
+		/* NOTREACHED */
+	}
 	memcpy(&sa6_client, res->ai_addr, sizeof(sa6_client));
 	freeaddrinfo(res);
 

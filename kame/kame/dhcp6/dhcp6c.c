@@ -257,6 +257,11 @@ client6_init()
 		err(1, "socket(inbound)");
 		/*NOTREACHED*/
 	}
+	if (setsockopt(insock, SOL_SOCKET, SO_REUSEPORT,
+		       &on, sizeof(on)) < 0) {
+		err(1, "setsockopt(inbound, SO_REUSEPORT)");
+		/* NOTREACHED */
+	}
 	if (bind(insock, res->ai_addr, res->ai_addrlen) < 0) {
 		err(1, "bind(inbonud)");
 		/*NOTREACHED*/
