@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.9 2003/01/24 05:11:35 sam Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.65 2004/02/13 12:38:52 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.66 2004/03/14 10:53:15 jinmei Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -96,13 +96,13 @@
 #include <netinet/ip6.h>
 #include <netinet/ip_var.h>
 #include <netinet6/ip6_var.h>
-#ifdef MLDV2
-#include <netinet6/in6_msf.h>
-#endif
 #include <netinet6/nd6.h>
 #include <netinet/in_pcb.h>
 #include <netinet6/in6_pcb.h>
 #include <netinet6/scope6_var.h>
+#ifdef MLDV2
+#include <netinet6/in6_msf.h>
+#endif
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
