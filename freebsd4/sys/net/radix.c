@@ -743,7 +743,8 @@ rn_delete(v_arg, netmask_arg, head, rn)
 			mpath_enable = 1;
 		else
 			tt = rn_search(v, x);
-	}
+	} else
+		tt = rn_search(v, x);
 #else
 	tt = rn_search(v, x);
 #endif
