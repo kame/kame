@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.99 2003/07/08 10:15:15 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.100 2003/07/08 12:26:22 ono Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -706,6 +706,10 @@ ip6_mrouter_detach(ifp)
 	struct mf6c *mfc;
 	mifi_t mifi;
 	int i;
+
+	if (ip6_mrouter == NULL) {
+		return;
+	}
 
 	/*
 	 * Delete a mif which points to ifp.
