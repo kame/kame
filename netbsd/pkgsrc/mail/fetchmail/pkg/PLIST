@@ -1,0 +1,15 @@
+@comment $NetBSD: PLIST,v 1.3 1998/07/04 04:41:36 mycroft Exp $
+bin/fetchmail
+bin/fetchmailconf
+man/man1/fetchmail.1.gz
+man/man1/fetchmailconf.1.gz
+share/doc/fetchmail/README
+share/doc/fetchmail/COPYING
+share/doc/fetchmail/FAQ
+share/doc/fetchmail/NOTES
+share/doc/fetchmail/FEATURES
+share/doc/fetchmail/fetchmail-FAQ.html
+share/doc/fetchmail/design-notes.html
+share/doc/fetchmail/fetchmail-features.html
+share/doc/fetchmail/sample.rcfile
+@dirrm share/doc/fetchmail
