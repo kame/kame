@@ -1,11 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.26 1999/08/18 15:37:57 itojun Exp $
+$Id: CHANGELOG,v 1.27 1999/08/19 00:25:55 itojun Exp $
 
 <199908>
 Thu Aug 19 00:38:02 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/net/ucd-snmp, freebsd2/ports/ucd-snmp:
-	  upgrade to 3.5.2.  freebsd3/ports/ucd-snmp is not buildable.
+	  upgrade to 3.6.2.  freebsd3/ports/ucd-snmp is not buildable.
 
 Wed Aug 18 22:02:14 JST 1999  itojun@iijlab.net
 	* sys/netinet6/in6_var.h: Based on RFC2465, IPv6 per-interface
