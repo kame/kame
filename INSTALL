@@ -1,6 +1,6 @@
 	Installation procedure - preparation of the tree
 	KAME project
-	$Id: INSTALL,v 1.5.2.2 1999/10/07 01:55:46 kazu Exp $
+	$Id: INSTALL,v 1.5.2.3 1999/10/07 10:17:33 itojun Exp $
 
 KAME build tree shares part of the tree among operating system
 platforms.  The "kame" directory is shared among "netbsd", "freebsd2",
@@ -18,6 +18,8 @@ ready to tackle those troubles.
    files under /usr/local/v6 to avoid conflicts or misuse of old file during
    build process.  We recommend you to remove the following, at least:
 	/usr/local/v6/lib/*
+   Also, do not forget to update /usr/include in step 5 (see below),
+   otherwise include files and source code become out-of-sync.
   
 1. Identify your target operating system, by looking at document named
    "VERSION".  Suppose the target is "netbsd".
@@ -41,8 +43,18 @@ ready to tackle those troubles.
 	usr.bin/racoon:
 		Compiles only if SSLeay or OpenSSL is installed beforehand.
    Please install those libraries before building KAME tree.
-   If you are using {Net,Free,Open}BSD, ports/packages may help you build
-   and install them.
+
+   We support the following installations in build tree:
+   - you installed SSLeay, with default installation path
+   - you installed OpenSSL, with default installation path
+	This means that you have given no option to "./configure".
+   - you installed SSLeay, via FreeBSD ports/NetBSD pkgsrc system
+   - you installed OpenSSL, via FreeBSD ports/NetBSD pkgsrc system.
+	Note that we do not support ports-current/pkgsrc-current.  Please
+	stick to the ports/pkgsrc came the FreeBSD/NetBSD you are using.
+   If you install SSLeay/OpenSSL with some other ways, KAME build tree
+   may fail to find SSLeay/OpenSSL and omit compilation of, for example,
+   usr.sbin/racoon.
 
 5. Go down to the target operating system you have specified, and read
    document named "INSTALL".  Good luck!
