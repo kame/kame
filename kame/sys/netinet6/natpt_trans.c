@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.32 2001/05/29 12:40:16 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.33 2001/05/31 14:04:20 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -89,10 +89,12 @@
 
 #if BYTE_ORDER == BIG_ENDIAN
 #define	FTP6_LPSV			0x4c505356
+#define	FTP6_LPRT			0x4c505254
 #define	FTP6_EPRT			0x45505254
 #define	FTP6_EPSV			0x45505356
 #else
 #define	FTP6_LPSV			0x5653504c
+#define	FTP6_LPRT			0x5452504c
 #define	FTP6_EPRT			0x54525045
 #define	FTP6_EPSV			0x56535045
 #endif
@@ -145,6 +147,7 @@ void		 translatingPYLD6To4		__P((struct _cv *, struct _cv *));
 int		 translatingFTP6CommandTo4	__P((struct _cv *, struct _cv *));
 
 struct ftpparam *parseFTPdialogue		__P((caddr_t, caddr_t, struct ftpparam *));
+struct sockaddr *parseLPRT			__P((caddr_t, caddr_t, struct sockaddr_in6 *));
 struct sockaddr	*parseEPRT			__P((caddr_t, caddr_t, struct sockaddr_in6 *));
 struct sockaddr	*parse227			__P((caddr_t, caddr_t, struct sockaddr_in *));
 int		 natpt_pton6			__P((caddr_t, caddr_t, struct in6_addr *));
@@ -928,6 +931,26 @@ translatingFTP4ReplyTo6(struct _cv *cv6, struct pAddr *pad)
     ts  = ats->suit.tcp;
     switch (ts->ftpstate)
     {
+      case FTP6_LPRT:
+      case FTP6_EPRT:
+	{
+	    char	*d;
+
+	    if (ftp4.cmd != 200)
+		return (0);
+
+	    /* getting:   200 PORT command successful.	*/
+	    /* expecting: 200 EPRT command successful.	*/
+
+	    d = ftp4.arg;
+	    if ((d[0] == 'P') && (d[1] == 'O'))
+	    {
+		d[0] = (ts->ftpstate == FTP6_LPRT) ? 'L' : 'E';
+		d[1] = 'P';
+	    }
+	}
+	break;
+
       case FTP6_LPSV:
 	{
 	    u_char	*h, *p;
@@ -1545,15 +1568,25 @@ translatingFTP6CommandTo4(struct _cv *cv6, struct _cv *cv4)
 	delta = rewriteMbuf(cv4->m, kb, (kk-kb), tstr, strlen(tstr));
 	break;
 
+      case FTP6_LPRT:
       case FTP6_EPRT:
 	{
 	    char		*h, *p;
 	    struct _tSlot	*ats;
 	    struct pAddr	 local, remote;
 
-	    ts->ftpstate = FTP6_EPRT;
-	    if (parseEPRT(ftp6.arg, kk, &sin6) == NULL)
-		return (0);
+	    if (ftp6.cmd == FTP6_LPRT)
+	    {
+		ts->ftpstate = FTP6_LPRT;
+		if (parseLPRT(ftp6.arg, kk, &sin6) == NULL)
+		    return (0);
+	    }
+	    else
+	    {
+		ts->ftpstate = FTP6_EPRT;
+		if (parseEPRT(ftp6.arg, kk, &sin6) == NULL)
+		    return (0);
+	    }
 
 	    ats = cv4->ats;
 	    local = ats->local;
@@ -1736,6 +1769,66 @@ parseFTPdialogue(caddr_t kb, caddr_t kk, struct ftpparam *ftp6)
 	ftp6->arg = kb;
 
     return (ftp6);
+}
+
+
+struct sockaddr *
+parseLPRT(caddr_t kb, caddr_t kk, struct sockaddr_in6 *sin6)
+{
+    int			 port, bite;
+    int			 hal = 16;
+    int			 pal = 2;
+    u_char		*d;
+
+    bzero(sin6, sizeof(struct sockaddr_in6));
+    sin6->sin6_len = sizeof(struct sockaddr_in6);
+    sin6->sin6_family = AF_INET6;
+
+    if (kb + 5 > kk)			return (NULL);	/* 5 for "6,16," */
+    if ((kb[0] != '6') || (kb[1] != ',')
+	|| (kb[2] != '1') || (kb[3] != '6') || (kb[4] != ','))
+	return (NULL);
+    kb += 5;
+
+    d = (u_char *)&sin6->sin6_addr;
+    for (bite = 0; (kb < kk) && (isdigit(*kb) || (*kb == ',')); kb++)
+    {
+	if (*kb == ',')
+	{
+	    *d++ = (bite & 0xff);
+	    bite = 0;
+	    if (--hal <= 0)
+		break;
+	}
+	else
+	    bite = bite * 10 + *kb - '0';
+    }
+
+    if (hal != 0)			return (NULL);
+    if (kb + 3 > kk)			return (NULL);	/* 3 for ",2," */
+    if ((kb[0] != ',') || (kb[1] != '2') || (kb[2] != ','))
+	return (NULL);
+    kb += 3;
+
+    d = (u_char *)&sin6->sin6_port;
+    for (port = 0; (kb < kk) && (isdigit(*kb) || (*kb == ',')); kb++)
+    {
+	if (*kb == ',')
+	{
+	    *d++ = (port & 0xff);
+	    port = 0;
+	    if (--pal <= 0)
+		break;
+	}
+	else
+	    port = port * 10 + *kb - '0';
+    }
+
+    if (pal != 1)			return (NULL);
+    if (port > 0)
+	*d = (port & 0xff);
+
+    return ((struct sockaddr *)sin6);
 }
 
 
