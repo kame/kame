@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.25 2002/02/01 08:54:45 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.26 2002/02/01 13:35:07 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -132,6 +132,7 @@ yyerror(char *msg, ...)
 %token		SPORT
 %token		SPREFIX
 %token		SPROTO
+%token		SRENUM
 %token		SRULES
 %token		SSET
 %token		SSHOW
@@ -347,6 +348,13 @@ rules
 			ruletab.bidir  = $8;
 			setRules(NATPT_MAP44, &ruletab);
 		    }
+
+		| map SRENUM
+		    { renumRules(-1, -1); }
+		| map SRENUM SDECIMAL
+		    { renumRules($3, -1); }
+		| map SRENUM SDECIMAL SDECIMAL
+		    { renumRules($3, $4); }
 
 		| map SFLUSH opt_all
 		    { flushRules($3); }

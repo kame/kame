@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.40 2002/01/31 13:43:09 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.41 2002/02/01 13:35:06 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -377,6 +377,30 @@ natpt_prependRule(struct cSlot *cst)
 
 	if (csl_expire == 0)
 		timeout(natpt_expireCSlot, (caddr_t)0, cSlotTimer);
+
+	return (0);
+}
+
+
+int
+natpt_renumRules(caddr_t addr)
+{
+	int			 s;
+	int			 rnum, interval;
+	struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
+	struct cSlot		*csl;
+
+	rnum     = mbx->m_int0; if (rnum < 0)	    rnum     = 100;
+	interval = mbx->m_int1;	if (interval < 0)   interval = 100;
+
+	s = splnet();
+	for (csl = TAILQ_FIRST(&csl_head);
+	     csl;
+	     csl = TAILQ_NEXT(csl, csl_list)) {
+		csl->rnum = rnum;
+		rnum += interval;
+	}
+	splx(s);
 
 	return (0);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: misc.c,v 1.25 2002/02/01 08:54:45 fujisawa Exp $	*/
+/*	$KAME: misc.c,v 1.26 2002/02/01 13:35:07 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -185,6 +185,22 @@ setRules(int type, struct ruletab *ruletab)
 
 	f->lifetime = CSLOT_INFINITE_LIFETIME;
 	if (soctl(sfd, NATPT_SETRULES, &mBox) < 0)
+		soctlFailure(fn);
+}
+
+
+void
+renumRules(int start, int interval)
+{
+	const char *fn = __FUNCTION__;
+
+	struct natpt_msgBox	 mBox;
+
+	bzero(&mBox, sizeof(struct natpt_msgBox));
+	mBox.m_int0 = start;
+	mBox.m_int1 = interval;
+
+	if (soctl(sfd, NATPT_RENUMRULE, &mBox) < 0)
 		soctlFailure(fn);
 }
 

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_soctl.h,v 1.14 2002/02/01 08:54:45 fujisawa Exp $	*/
+/*	$KAME: natpt_soctl.h,v 1.15 2002/02/01 13:35:06 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -41,7 +41,8 @@
 #define NATPT_DSBTRANS	_IOW ('n',   3, struct natpt_msgBox)	/* Disable translation	*/
 #define	NATPT_SETRULES	_IOW ('n',   4, struct natpt_msgBox)	/* Set rules		*/
 #define	NATPT_GETRULE	_IOWR('n',   5, struct natpt_msgBox)	/* Get rule		*/
-#define NATPT_FLUSHRULE	_IOW ('n',   6, struct natpt_msgBox)	/* Flush rule		*/
+#define NATPT_RENUMRULE	_IOW ('n',   6, struct natpt_msgBox)	/* Flush rule		*/
+#define NATPT_FLUSHRULE	_IOW ('n',   7, struct natpt_msgBox)	/* Renumber rule	*/
 #define	NATPT_SETPREFIX	_IOW ('n',   8, struct natpt_msgBox)	/* Set prefix		*/
 #define	NATPT_GETPREFIX	_IOWR('n',   9, struct natpt_msgBox)	/* Get prefix		*/
 #define	NATPT_SETVALUE	_IOW ('n',  10, struct natpt_msgBox)	/* Set value		*/
@@ -70,10 +71,13 @@ struct natpt_msgBox
 	caddr_t	freight;
 	union {
 		u_int		M_uint;
+		int		M_int[2];
 		struct in6_addr	M_in6addr;
 	}	M_data;
 };
 
 
 #define	m_uint		M_data.M_uint
+#define	m_int0		M_data.M_int[0]
+#define	m_int1		M_data.M_int[1]
 #define m_in6addr	M_data.M_in6addr
