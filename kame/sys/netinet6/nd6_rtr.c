@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.196 2002/03/02 15:51:35 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.197 2002/03/29 05:25:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -627,7 +627,8 @@ defrouter_addifreq(ifp)
 		return;
 	}
 
-	flags = ifa->ifa_flags;
+	/* RTF_CLONING is necessary to make sure to perform ND */
+	flags = ifa->ifa_flags | RTF_CLONING;
 #if (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 	bzero(&info, sizeof(info));
 	info.rti_info[RTAX_DST] = (struct sockaddr *)&def;
