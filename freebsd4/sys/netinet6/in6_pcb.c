@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.10 2000/07/12 11:41:39 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.11 2000/07/12 13:35:52 jinmei Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -273,7 +273,6 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 	struct in6_addr **plocal_addr6;
 {
 	register struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)nam;
-	struct in6_pktinfo *pi;
 	struct ifnet *ifp = NULL;
 	int error = 0;
 
@@ -808,7 +807,7 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 			continue;
 
  		if (do_rtchange) {
-			struct sockaddr_in6 *dst;
+			struct sockaddr_in6 *dst6;
 
  			/*
  			 * Since a non-connected PCB might have a cached route,
