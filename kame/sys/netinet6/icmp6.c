@@ -426,6 +426,14 @@ icmp6_input(mp, offp, proto)
 		struct route_in6 ro6;
 #endif
 
+		if (icmp6len < sizeof(struct icmp6_hdr) + sizeof(struct ip6_hdr)) {
+			icmp6stat.icp6s_tooshort++;
+			goto freeit;
+		}
+		IP6_EXTHDR_CHECK(m, off,
+			sizeof(struct icmp6_hdr) + sizeof(struct ip6_hdr),
+			IPPROTO_DONE);
+		icmp6 = (struct icmp6_hdr *)(mtod(m, caddr_t) + off);
 		code = PRC_MSGSIZE;
 		bzero(&sin6, sizeof(sin6));
 		sin6.sin6_family = PF_INET6;
@@ -529,7 +537,8 @@ icmp6_input(mp, offp, proto)
 			nicmp6 = (struct icmp6_hdr *)(nip6 + 1);
 			bcopy(icmp6, nicmp6, sizeof(struct icmp6_hdr));
 			/*
-			 * Adjust mbuf. ip6_plen will be adjusted.
+			 * Adjust mbuf. ip6_plen will be adjusted in
+			 * ip6_output().
 			 */
 			noff = sizeof(struct ip6_hdr);
 			n->m_len = noff + sizeof(struct icmp6_hdr);
