@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.304 2003/09/07 13:49:54 itojun Exp $	*/
+/*	$KAME: key.c,v 1.305 2003/09/07 14:33:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -7961,7 +7961,7 @@ key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr)
 		return (-1);
 
 	/* update a SADB from a home agent to a mobile node. */
-	for (sa = LIST_FIRST(&sahtree); sa != NULL; sa = LIST_NEXT(sa, chain)) {
+	LIST_FOREACH(sa, &sahtree, chain) {
 		if (!SA6_ARE_ADDR_EQUAL(haaddr,
 			(struct sockaddr_in6 *)&sa->saidx.src))
 			continue;
@@ -8006,7 +8006,7 @@ key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr)
 		return (-1);
 
 	/* update a SADB from a mobile node to a home agent. */
-	for (sa = LIST_FIRST(&sahtree); sa != NULL; sa = LIST_NEXT(sa, chain)) {
+	LIST_FOREACH(sa, &sahtree, chain) {
 /* XXX don't check the old CoA.  instead, we use uniqid.
 		if (!SA6_ARE_ADDR_EQUAL(ocoa,
 			(struct sockaddr_in6 *)&sa->saidx.src))
@@ -8062,7 +8062,7 @@ key_mip6_update_home_agent_ipsecdb(haddr, ocoa, ncoa, haaddr)
 		return (-1);
 
 	/* update a SADB from a mobile node to a home agent. */
-	for (sa = LIST_FIRST(&sahtree); sa != NULL; sa = LIST_NEXT(sa, chain)) {
+	LIST_FOREACH(sa, &sahtree, chain) {
 /* XXX don't check the old CoA.  instead we use a uniqid.
 		if (!SA6_ARE_ADDR_EQUAL(ocoa,
 			(struct sockaddr_in6 *)&sa->saidx.src))
@@ -8103,7 +8103,7 @@ key_mip6_update_home_agent_ipsecdb(haddr, ocoa, ncoa, haaddr)
 		return (-1);
 
 	/* update a SADB from a home agent to a mobile node. */
-	for (sa = LIST_FIRST(&sahtree); sa != NULL; sa = LIST_NEXT(sa, chain)) {
+	LIST_FOREACH(sa, &sahtree, chain) {
 		if (!SA6_ARE_ADDR_EQUAL(haaddr,
 			(struct sockaddr_in6 *)&sa->saidx.src))
 			continue;
@@ -8147,9 +8147,7 @@ key_mip6_find_sp(dir, src, dst)
 	struct secpolicy *sp;
 	struct secpolicyindex *spidx;
 
-	for (sp = LIST_FIRST(&sptree[dir]);
-	     sp != NULL;
-	     sp = LIST_NEXT(sp, chain)) {
+	LIST_FOREACH(sp, &sptree[dir], chain) {
 		/* check if we have a valid spidx. */
 		if ((spidx = sp->spidx) == NULL)
 			continue;
