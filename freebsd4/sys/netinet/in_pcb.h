@@ -232,6 +232,8 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
 #define	INP_MTUDISC		0x100	/* user can do MTU discovery */
 #define	INP_FAITH		0x200	/* accept FAITH'ed connections */
 
+#define IN6P_IPV6_V6ONLY	0x008000 /* restrict AF_INET6 socket for v6 */
+
 #define	IN6P_PKTINFO		0x010000 /* receive IP6 dst and I/F */
 #define	IN6P_HOPLIMIT		0x020000 /* receive hoplimit */
 #define	IN6P_HOPOPTS		0x040000 /* receive hop-by-hop options */
