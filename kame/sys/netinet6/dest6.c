@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.21 2001/01/23 09:20:40 itojun Exp $	*/
+/*	$KAME: dest6.c,v 1.22 2001/01/23 10:55:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -204,6 +204,8 @@ dest6_input(mp, offp, proto)
 	if (haopt && ip6a &&
 	    (ip6a->ip6a_flags & (IP6A_HASEEN | IP6A_SWAP)) == IP6A_HASEEN) {
 		/* XXX should we do this now or later? */
+		/* XXX interaction with 2292bis IPV6_RECVDSTOPT */
+		/* XXX interaction with ipsec - should be okay */
 		bcopy(&ip6a->ip6a_careof, haopt->ip6oh_addr,
 		    sizeof(haopt->ip6oh_addr));
 		bcopy(&ip6a->ip6a_home, &ip6->ip6_src,
