@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.24 2000/08/13 18:08:53 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.25 2000/08/13 18:14:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -713,6 +713,9 @@ warnmsg(priority, func, msg, va_alist)
 static char **
 autoifprobe()
 {
+#ifndef HAVE_GETIFADDRS
+	errx(1, "-a is not available with the configuration");
+#else
 	static char ifname[IFNAMSIZ + 1];
 	static char *argv[2];
 	struct ifaddrs *ifap, *ifa, *target;
@@ -763,4 +766,5 @@ autoifprobe()
 		return argv;
 	else
 		return (char **)NULL;
+#endif
 }
