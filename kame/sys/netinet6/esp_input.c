@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.80 2003/04/09 09:28:19 suz Exp $	*/
+/*	$KAME: esp_input.c,v 1.81 2003/07/04 00:48:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -360,8 +360,8 @@ noreplaycheck:
 	nxt = esptail.esp_nxt;
 	taillen = esptail.esp_padlen + sizeof(esptail);
 
-	if (m->m_pkthdr.len < taillen
-	 || m->m_pkthdr.len - taillen < hlen) {	/* ? */
+	if (m->m_pkthdr.len < taillen ||
+	    m->m_pkthdr.len - taillen < off + esplen + ivlen + sizeof(esptail)) {
 		ipseclog((LOG_WARNING,
 		    "bad pad length in IPv4 ESP input: %s %s\n",
 		    ipsec4_logpacketstr(ip, spi), ipsec_logsastr(sav)));
