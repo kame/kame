@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_var.h,v 1.15 2000/07/26 03:50:34 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_var.h,v 1.16 2000/08/09 18:27:58 sakane Exp $ */
 
 #define PORT_ISAKMP 500
 
@@ -77,6 +77,8 @@ extern void isakmp_chkph1there __P((struct ph2handle *));
 
 extern caddr_t isakmp_set_attr_v __P((caddr_t, int, caddr_t, int));
 extern caddr_t isakmp_set_attr_l __P((caddr_t, int, u_int32_t));
+extern vchar_t *isakmp_add_attr_v __P((vchar_t *, int, caddr_t, int));
+extern vchar_t *isakmp_add_attr_l __P((vchar_t *, int, u_int32_t));
 
 extern int isakmp_newcookie __P((caddr_t, struct sockaddr *, struct sockaddr *));
 

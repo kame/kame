@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.89 2000/08/02 20:33:54 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.90 2000/08/09 18:27:58 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1710,6 +1710,68 @@ isakmp_set_attr_l(buf, type, val)
 	data->lorv = htons((u_int16_t)val);
 
 	return buf + sizeof(*data);
+}
+
+/* add a variable data attribute to the buffer by reallocating it.
+vchar_t *
+isakmp_add_attr_v(buf0, type, val, len)
+	vchar_t *buf0;
+	int type;
+	caddr_t val;
+	int len;
+{
+	vchar_t *buf = NULL;
+	struct isakmp_data *data;
+	int tlen;
+
+	tlen = sizeof(*data) + len;
+
+	if (buf0)
+		buf = vrealloc(buf0, buf0->l + tlen);
+	else
+		buf = vmalloc(tlen);
+	if (!buf) {
+		plog(logp, LOCATION, NULL,
+			"failed to get a attribute buffer.\n");
+		return NULL;
+	}
+
+	data = (struct isakmp_data *)(buf->v + (buf0 ? buf0->l : 0));
+	data->type = htons((u_int16_t)type | ISAKMP_GEN_TLV);
+	data->lorv = htons((u_int16_t)len);
+	memcpy(data + 1, val, len);
+
+	return buf;
+}
+
+/* add a fixed data attribute to the buffer by reallocating it.
+vchar_t *
+isakmp_add_attr_l(buf0, type, val)
+	vchar_t *buf0;
+	int type;
+	u_int32_t val;
+{
+	vchar_t *buf = NULL;
+	struct isakmp_data *data;
+	int tlen;
+
+	tlen = sizeof(*data);
+
+	if (buf0)
+		buf = vrealloc(buf0, buf0->l + tlen);
+	else
+		buf = vmalloc(tlen);
+	if (!buf) {
+		plog(logp, LOCATION, NULL,
+			"failed to get a attribute buffer.\n");
+		return NULL;
+	}
+
+	data = (struct isakmp_data *)(buf->v + (buf0 ? buf0->l : 0));
+	data->type = htons((u_int16_t)type | ISAKMP_GEN_TV);
+	data->lorv = htons((u_int16_t)val);
+
+	return buf;
 }
 
 /*
