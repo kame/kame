@@ -598,7 +598,7 @@ if test "$liblwres_dir" != "no"; then
 			RACOON_PATH_LIBS(lwres_getrrsetbyname, lwres, "$liblwres_dir/lib")
 		fi
 		CFLAGS="$CFLAGS -I$liblwres_dir/include"
-		AC_DEFINE(HAVE_LWRES)
+		AC_CHECK_FUNCS(lwres_getrrsetbyname)
 	else
 		echo "FATAL: $liblwres_dir/lib or $liblwres_dir/include not found"
 		exit 1

@@ -1,4 +1,4 @@
-/*	$KAME: getcertsbyname.c,v 1.2 2001/04/11 09:51:59 sakane Exp $	*/
+/*	$KAME: getcertsbyname.c,v 1.3 2001/07/29 13:56:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -34,7 +34,7 @@
 #include <netinet/in.h>
 #include <arpa/nameser.h>
 #include <resolv.h>
-#ifdef HAVE_LWRES
+#ifdef HAVE_LWRES_GETRRSETBYNAME
 #include <lwres/netdb.h>
 #include <lwres/lwres.h>
 #else
@@ -100,7 +100,7 @@ freecertinfo(ci)
 /*
  * get CERT RR by FQDN and create certinfo structure chain.
  */
-#ifdef HAVE_LWRES
+#ifdef HAVE_LWRES_GETRRSETBYNAME
 int
 getcertsbyname(name, res)
 	char *name;
@@ -183,7 +183,7 @@ end:
 
 	return error;
 }
-#else	/*!HAVE_LWRES*/
+#else	/*!HAVE_LWRES_GETRRSETBYNAME*/
 int
 getcertsbyname(name, res)
 	char *name;
