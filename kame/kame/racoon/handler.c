@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.25 2000/06/28 05:59:32 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.26 2000/07/04 00:58:42 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -433,13 +433,22 @@ getph2bysaidx(src, dst, proto_id, spi)
 	struct saproto *pr;
 
 	LIST_FOREACH(iph2, &ph2tree, chain) {
-		if (iph2->approval == NULL)
+		if (iph2->proposal == NULL && iph2->approval == NULL)
 			continue;
-		for (pr = iph2->approval->head; pr != NULL; pr = pr->next) {
-			if (proto_id != pr->proto_id)
-				break;
-			if (spi == pr->spi || spi == pr->spi_p)
-				return iph2;
+		if (iph2->approval != NULL) {
+			for (pr = iph2->approval->head; pr != NULL; pr = pr->next) {
+				if (proto_id != pr->proto_id)
+					break;
+				if (spi == pr->spi || spi == pr->spi_p)
+					return iph2;
+			}
+		} else if (iph2->proposal != NULL) {
+			for (pr = iph2->proposal->head; pr != NULL; pr = pr->next) {
+				if (proto_id != pr->proto_id)
+					break;
+				if (spi == pr->spi)
+					return iph2;
+			}
 		}
 	}
 
@@ -594,7 +603,8 @@ flushph2()
 		next = LIST_NEXT(p, chain);
 
 		/* send delete information */
-		isakmp_info_send_d2(p);
+		if (p->status == PHASE2ST_ESTABLISHED) 
+			isakmp_info_send_d2(p);
 
 		unbindph12(p);
 		remph2(p);
