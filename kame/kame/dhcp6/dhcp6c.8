@@ -26,28 +26,64 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: dhcp6c.8,v 1.6 2000/05/13 19:56:44 itojun Exp $
+.\"     $Id: dhcp6c.8,v 1.7 2000/06/19 08:06:10 jinmei Exp $
 .\"
 .Dd Sep 12, 1999
 .Dt DHCP6C 8
 .Os KAME
 .Sh NAME
 .Nm dhcp6c
-.Nd tiny DHCPv6 client
+.Nd tiny DHCPv6 client daemon
 .\"
 .Sh SYNOPSIS
 .Nm
-.Op Fl d
+.Op Fl Dd
+.Op Fl f
 .Ar interface
 .\"
 .Sh DESCRIPTION
 .Nm
-works as DHCPv6 client and gets information from DHCPv6 server.
+works as a DHCPv6 client and gets information from DHCPv6 servers
+to configure the specified
+.Ar interface .
 .Pp
-.Fl d
-turns on debugging messages.
+The command line options are:
+.Bl -tag -width indent
+.\"
+.It Fl d
+Print debugging messages.
+.It Fl D
+Even more debugging information is printed.
+.It Fl f
+Foreground mode (useful when debugging).
+Although
+.Nm
+usually prints warning, debugging, or error messages to
+.Xr syslog 8 ,
+it prints the messages to standard error if this option is
+specified.
+.El
+.Pp
+The program will daemonize itself on invocation unless the
+.Fl f
+option is specified.
+.Pp
+Upon receipt of the
+.Dv SIGHUP
+signal,
+.Nm
+will reinvoke itself, unless it is still soliciting servers or
+requesting resources.
+.\"
+.Sh FILES
+.Bl -tag -width /var/run/dhcp6c.pid -compact
+.It Pa /var/run/dhcp6c.pid
+contains pid of the currently running
+.Nm dhcp6c .
+.El
 .\"
 .Sh SEE ALSO
+.Xr daemon 3 ,
 .Xr dhcp6relay 8 ,
 .Xr dhcp6s 8
 .Rs
@@ -73,8 +109,6 @@ To name a few:
 .Bl -enum
 .It
 it does not cache DHCPv6 server address,
-.It
-it does not manage client XID,
 .It
 it does not handle resource allocations
 .Pq such as IPv6 address ,
