@@ -355,13 +355,14 @@ dump_nbrs(fp)
 	struct uvif *v;
 	vifi_t vifi;
 	pim_nbr_entry_t *n;
-	int first = 1;
 
 	fprintf(fp, "PIM Neighbor List\n");
 	fprintf(fp, " %-3s %6s %-40s %-5s\n",
 		"Mif", "PhyIF", "Address", "Timer");
 
 	for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) {
+		int first = 1;
+
 		if ((n = v->uv_pim_neighbors) != NULL) {
 			if (first) {
 				fprintf(fp, " %-3u %6s", vifi,
