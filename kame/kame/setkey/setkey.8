@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: setkey.8,v 1.7.2.1 1999/10/07 02:28:40 sakane Exp $
+.\"     $Id: setkey.8,v 1.7.2.2 1999/10/07 06:24:32 itojun Exp $
 .\"
 .Dd May 17, 1998
 .Dt SETKEY 8
@@ -433,6 +433,17 @@ means that kernel use a SA if it's available,
 otherwise kernel keeps normal operation.
 .Li require
 means SA is required whenever kernel deals with the packet.
+Note that
+.Dq Li discard
+and
+.Dq Li none
+are not in the syntax described in
+.Xr ipsec_set_policy 3 .
+There are little differences in the syntax.
+See
+.Xr ipsec_set_policy 3
+for detail.
+.Pp
 .El
 .Pp
 .\"
@@ -450,18 +461,18 @@ of
 .Ar protocol
 parameter:
 .Pp
-.Bl -column "algorithmxx" -column "keylengthxx" -offset 
-.It Sy algorithm	key length (bits)	comment
-.It hmac-md5	128		ah: rfc2403
-.It 	128			ah-old: rfc2085
-.It hmac-sha1	160		ah: rfc2404
-.It 	160			ah-old: 128bit ICV (no document)
-.It keyed-md5	128			ah: 96bit ICV (no document)
-.It 	128			ah-old: rfc1828
-.It keyed-sha1	160			ah: 96bit ICV (no document)
-.It 	160			ah-old: 128bit ICV (no document)
-.It null	0 to 2048		for debugging
-.El
+.Bd -literal -offset indent
+algorithm	keylen (bits)	comment
+hmac-md5	128		ah: rfc2403
+		128		ah-old: rfc2085
+hmac-sha1	160		ah: rfc2404
+		160		ah-old: 128bit ICV (no document)
+keyed-md5	128		ah: 96bit ICV (no document)
+		128		ah-old: rfc1828
+keyed-sha1	160		ah: 96bit ICV (no document)
+		160		ah-old: 128bit ICV (no document)
+null		0 to 2048	for debugging
+.Ed
 .Pp
 Following are the list of encryption algorithms that can be used as
 .Ar ealgo
@@ -471,17 +482,17 @@ of
 .Ar protocol
 parameter:
 .Pp
-.Bl -column "algorithmxx" -column "keylengthxx" -offset
-.It Sy algorithm	key length(bits)	comment
-.It des-cbc	64			esp-old: rfc1829, esp: rfc2405
-.It 3des-cbc	192			rfc2451
-.It simple	0 to 2048		rfc2410
-.It blowfish-cbc	40 to 448		rfc2451
-.It cast128-cbc	40 to 128		rfc2451
-.It rc5-cbc	40 to 2040		rfc2451
-.It des-deriv	64		ipsec-ciph-des-derived-01 (expired)
-.It 3des-deriv	192		no document
-.El
+.Bd -literal -offset indent
+algorithm	keylen (bits)	comment
+des-cbc		64		esp-old: rfc1829, esp: rfc2405
+3des-cbc	192		rfc2451
+simple		0 to 2048	rfc2410
+blowfish-cbc	40 to 448	rfc2451
+cast128-cbc	40 to 128	rfc2451
+rc5-cbc		40 to 2040	rfc2451
+des-deriv	64		ipsec-ciph-des-derived-01 (expired)
+3des-deriv	192		no document
+.Ed
 .Pp
 Following are the list of compression algorithms that can be used as
 .Ar calgo
@@ -491,11 +502,11 @@ of
 .Ar protocol
 parameter:
 .Pp
-.Bl -column "algorithmxx" -offset
-.It Sy algorithm	comment
-.It deflate	rfc2394
-.It lzs	rfc2395
-.El
+.Bd -literal -offset indent
+algorithm	comment
+deflate		rfc2394
+lzs		rfc2395
+.Ed
 .\" 
 .Sh EXAMPLES
 .Bd -literal -offset
