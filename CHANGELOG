@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.416 2000/01/07 17:30:11 jinmei Exp $
+$Id: CHANGELOG,v 1.417 2000/01/07 18:22:15 itojun Exp $
 
 <200001>
+Sat Jan  8 03:20:05 JST 2000  itojun@iijlab.net
+	* */sys/netinet/udp_usrreq.c, kame/sys/netinet6/udp6_usrreq.c:
+	  drop incoming udp packet with dst port = 0.  it is, or seems to be,
+	  illegal based on RFC768 (99% sure but 1% in doubt).
+	  with traditional 4.4BSD code, udp socket will mistakingly accept
+	  such packets after socket() and before first bind()/connect().
+	  this can be used to confuse, or de-synchronize, udp-based protocols.
+
 Sat Jan  8 00:37:28 2000  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* kame/sys/netinet6/natpt*.[ch]: NAT-PT translator. 
 	* kame/kame/{natptconfig,natptd,natptlog}: translator configulation
