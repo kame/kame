@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.140 2001/01/22 13:12:01 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.141 2001/01/22 13:20:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -822,24 +822,29 @@ in6_update_ifa(ifp, ifra, ia)
 	 * If the destination address on a p2p interface is specified,
 	 * and the address is a scoped one, validate/set the scope
 	 * zone identifier.
-	 * XXX: currently, only link-local address is supported.
 	 */
 	dst6 = ifra->ifra_dstaddr;
 	if ((ifp->if_flags & IFF_POINTOPOINT) &&
 	    (dst6.sin6_family == AF_INET6)) {
-		if (IN6_IS_ADDR_LINKLOCAL(&dst6.sin6_addr)) {
-			if (dst6.sin6_addr.s6_addr16[1] == 0) {
-				/* 
-				 * link ID is not embedded by the user.
-				 */
-				dst6.sin6_addr.s6_addr16[1]
-					= htons(ifp->if_index);
-			} else if (dst6.sin6_addr.s6_addr16[1] !=
-				   htons(ifp->if_index)) {
-				/* link id is contradict */
-				return(EINVAL);
-			}
-		}
+		int scopeid;
+
+#ifndef SCOPEDROUTING
+		if ((error = in6_recoverscope(&dst6,
+					      &ifra->ifra_dstaddr.sin6_addr,
+					      ifp)) != 0)
+			return(error);
+#endif
+		scopeid = in6_addr2scopeid(ifp, &dst6.sin6_addr);
+		if (dst6.sin6_scope_id == 0) /* user omit to specify the ID. */
+			dst6.sin6_scope_id = scopeid;
+		else if (dst6.sin6_scope_id != scopeid)
+			return(EINVAL); /* scope ID mismatch. */
+#ifndef SCOPEDROUTING
+		if ((error = in6_embedscope(&dst6.sin6_addr, &dst6, NULL, NULL))
+		    != 0)
+			return(error);
+		dst6.sin6_scope_id = 0; /* XXX */
+#endif
 	}
 	/*
 	 * When the destination address is specified, the corresponding
