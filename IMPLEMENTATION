@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/03/12 00:25:15 $
+			$Date: 2000/03/12 10:25:14 $
 
 1. IPv6
 
@@ -117,8 +117,8 @@ http://playground.iijlab.net/i-d/draft-itojun-ipv6-transition-abuse-00.txt:
 	Possible abuse against IPv6 transition technologies
     * KAME does not implement RFC1933 automatic tunnel.
     * "stf" interface implements some address filters.  Refer to stf(4)
-      for details.  Since it is no way complete, we do not include "stf"
-      interface into GENERIC.v6 compilation.
+      for details.  Since there's no way to make 6to4 interface 100% secure,
+      we do not include "stf" interface into GENERIC.v6 compilation.
     * kame/openbsd completely disables IPv4 mapped address support.
     * kame/netbsd makes IPv4 mapped address support off by default.
 
