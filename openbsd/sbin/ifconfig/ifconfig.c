@@ -1,4 +1,4 @@
-/*	$OpenBSD: ifconfig.c,v 1.36 2000/04/28 04:44:58 chris Exp $	*/
+/*	$OpenBSD: ifconfig.c,v 1.40 2000/08/03 07:34:41 angelos Exp $	*/
 /*      $NetBSD: ifconfig.c,v 1.40 1997/10/01 02:19:43 enami Exp $      */
 
 /*
@@ -81,7 +81,7 @@ static char copyright[] =
 #if 0
 static char sccsid[] = "@(#)ifconfig.c	8.2 (Berkeley) 2/16/94";
 #else
-static char rcsid[] = "$OpenBSD: ifconfig.c,v 1.36 2000/04/28 04:44:58 chris Exp $";
+static char rcsid[] = "$OpenBSD: ifconfig.c,v 1.40 2000/08/03 07:34:41 angelos Exp $";
 #endif
 #endif /* not lint */
 
@@ -769,24 +769,26 @@ gifsettunnel(src, dst)
 	char *src;
 	char *dst;
 {
-        struct addrinfo *srcres, *dstres;
+	struct addrinfo hints, *srcres, *dstres;
 	struct ifaliasreq addreq;
 	int ecode;
-
 #ifdef INET6
 	struct in6_aliasreq in6_addreq;
 #endif /* INET6 */
 
-	if ((ecode = getaddrinfo(src, NULL, NULL, &srcres)) != 0)
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = afp->af_af;
+
+	if ((ecode = getaddrinfo(src, NULL, &hints, &srcres)) != 0)
 		errx(1, "error in parsing address string: %s",
 		     gai_strerror(ecode));
 
-	if ((ecode = getaddrinfo(dst, NULL, NULL, &dstres)) != 0)
+	if ((ecode = getaddrinfo(dst, NULL, &hints, &dstres)) != 0)
 		errx(1, "error in parsing address string: %s",
 		     gai_strerror(ecode));
 
 	if (srcres->ai_addr->sa_family != dstres->ai_addr->sa_family)
-	        errx(1,
+		errx(1,
 		     "source and destination address families do not match");
 
 	switch (srcres->ai_addr->sa_family)
@@ -1412,9 +1414,14 @@ phys_status(force)
 	u_long srccmd, dstcmd;
 	struct ifreq *ifrp;
 	char *ver = "";
-
+#ifdef NI_WITHSCOPEID
+	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+	const int niflag = NI_NUMERICHOST;
+#endif
 #ifdef INET6
 	struct in6_ifreq in6_ifr;
+	int s6;
 #endif /* INET6 */
 
 	force = 0;	/*fool gcc*/
@@ -1423,27 +1430,45 @@ phys_status(force)
 #ifdef INET6
 	bzero(&in6_ifr, sizeof(in6_ifr));
 	strncpy(in6_ifr.ifr_name, name, IFNAMSIZ);
-	srccmd = SIOCGIFPSRCADDR_IN6;
-	dstcmd = SIOCGIFPDSTADDR_IN6;
-	ifrp = (struct ifreq *) &in6_ifr;
+	s6 = socket(AF_INET6, SOCK_DGRAM, 0);
+	if (s6 < 0) {
+		ifrp = &ifr;
+		srccmd = SIOCGIFPSRCADDR;
+		dstcmd = SIOCGIFPDSTADDR;
+	} else {
+		close(s6);
+		srccmd = SIOCGIFPSRCADDR_IN6;
+		dstcmd = SIOCGIFPDSTADDR_IN6;
+		ifrp = (struct ifreq *) &in6_ifr;
+	}
 #else /* INET6 */
-	ifrp = ifr;
+	ifrp = &ifr;
 	srccmd = SIOCGIFPSRCADDR;
 	dstcmd = SIOCGIFPDSTADDR;
 #endif /* INET6 */
 
 	if (0 <= ioctl(s, srccmd, (caddr_t)ifrp)) {
+#ifdef INET6
+		if (ifrp->ifr_addr.sa_family == AF_INET6)
+			in6_fillscopeid((struct sockaddr_in6 *)&ifrp->ifr_addr);
+#endif
 		getnameinfo(&ifrp->ifr_addr, ifrp->ifr_addr.sa_len,
-			    psrcaddr, NI_MAXHOST, 0, 0, NI_NUMERICHOST);
+			    psrcaddr, NI_MAXHOST, 0, 0, niflag);
 #ifdef INET6
 		if (ifrp->ifr_addr.sa_family == AF_INET6)
 			ver = "6";
 #endif /* INET6 */
 
-		if (0 <= ioctl(s, dstcmd, (caddr_t)ifrp))
+		if (0 <= ioctl(s, dstcmd, (caddr_t)ifrp)) {
+#ifdef INET6
+			if (ifrp->ifr_addr.sa_family == AF_INET6) {
+				in6_fillscopeid((struct sockaddr_in6 *)
+				    &ifrp->ifr_addr);
+			}
+#endif
 		        getnameinfo(&ifrp->ifr_addr, ifrp->ifr_addr.sa_len,
-				    pdstaddr, NI_MAXHOST, 0, 0,
-				    NI_NUMERICHOST);
+				    pdstaddr, NI_MAXHOST, 0, 0, niflag);
+		}
 
 		printf("\tphysical address inet%s %s --> %s\n", ver,
 		       psrcaddr, pdstaddr);

@@ -1,4 +1,4 @@
-.\"	$OpenBSD: ifconfig.8,v 1.43 2000/04/26 19:03:46 chris Exp $
+.\"	$OpenBSD: ifconfig.8,v 1.48 2000/10/17 21:56:06 naddy Exp $
 .\"	$NetBSD: ifconfig.8,v 1.11 1996/01/04 21:27:29 pk Exp $
 .\"     $FreeBSD: ifconfig.8,v 1.16 1998/02/01 07:03:29 steve Exp $
 .\"
@@ -111,7 +111,7 @@ and each of the six bytes of the host number,
 through
 .Ar f ,
 are specified in hexadecimal.
-The host number may be omitted on 10Mb/s Ethernet interfaces,
+The host number may be omitted on Ethernet interfaces,
 which use the hardware physical address,
 and on interfaces other than the first.
 For the
@@ -168,7 +168,7 @@ between network level addresses and link level addresses (default).
 This is currently implemented for mapping between
 .Tn DARPA
 Internet
-addresses and 10Mb/s Ethernet addresses.
+addresses and Ethernet addresses.
 .It Fl arp
 Disable the use of the Address Resolution Protocol.
 .It Cm anycast
@@ -214,7 +214,7 @@ When an interface is marked
 the system will not attempt to
 transmit messages through that interface.
 If possible, the interface will be reset to disable reception as well.
-This action does not automatically disable routes using the interface.
+This action automatically disables routes using the interface.
 .It Cm dstsa
 Bind an
 .Xr ipsec 4
@@ -410,6 +410,11 @@ There is some evidence that a number different from 1 may be useful
 for
 .Tn AFI
 37 type addresses.
+.It Cm nwid Ar id
+(IEEE 802.11 devices only, specifically
+.Xr ray 4 )
+.br
+Configure network ID for IEEE 802.11-based wireless network interfaces.
 .It Cm phase
 The argument following this specifies the version (phase) of the
 AppleTalk network attached to the interface.
@@ -473,7 +478,7 @@ messages in a manner which minimizes the number of
 memory to memory copy operations performed by the receiver.
 On networks that support the Address Resolution Protocol (see
 .Xr arp 4 ;
-currently, only 10 Mb/s Ethernet),
+currently, only Ethernet),
 this flag indicates that the system should request that other
 systems use trailers when sending to this host.
 Similarly, trailer encapsulations will be sent to other
@@ -559,6 +564,7 @@ tried to alter an interface's configuration.
 .Xr netstat 1 ,
 .Xr ifmedia 4 ,
 .Xr netintro 4 ,
+.Xr hostname.if 5 ,
 .Xr brconfig 8 ,
 .Xr rc 8 ,
 .Xr routed 8
