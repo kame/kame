@@ -86,6 +86,9 @@ static char *any_ntoa __P((const struct sockaddr *));
 static void set_metric __P((char *, int));
 static void newroute __P((int, char **));
 static void inet_makenetandmask __P((u_int32_t, struct sockaddr_in *));
+#ifdef INET6
+static void inet6_makenetandmask __P((struct sockaddr_in6 *));
+#endif
 static int getaddr __P((int, char *, struct hostent **));
 static void flushroutes __P((int, char *[]));
 #ifndef SMALL
@@ -381,9 +384,6 @@ routename(sa)
 	static char domain[MAXHOSTNAMELEN + 1];
 	static int first = 1;
 	struct in_addr in;
-#ifdef INET6
-	static char ntop_buf[NI_MAXHOST];
-#endif
 
 	if (first) {
 		first = 0;
@@ -429,14 +429,32 @@ routename(sa)
 #ifndef SMALL
 #ifdef INET6
 	case AF_INET6:
-	    {	struct in6_addr in6;
-		int gap;
+	    {
+		struct sockaddr_in6 sin6;
+#ifdef NI_WITHSCOPEID
+		const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+		const int niflags = NI_NUMERICHOST;
+#endif
 
-		in6 = ((struct sockaddr_in6 *)sa)->sin6_addr;
-		gap = 24 - sa->sa_len;
-		if (gap > 0)
-			bzero((char *)(&in6 + 1) - gap, gap);
-		return ((char *)inet_ntop(AF_INET6, &in6, ntop_buf, sizeof(ntop_buf)));
+		memset(&sin6, 0, sizeof(sin6));
+		memcpy(&sin6, sa, sa->sa_len);
+		sin6.sin6_len = sizeof(struct sockaddr_in6);
+		sin6.sin6_family = AF_INET6;
+#ifdef __KAME__
+		if (sa->sa_len == sizeof(struct sockaddr_in6) &&
+		    IN6_IS_ADDR_LINKLOCAL(&sin6.sin6_addr) &&
+		    sin6.sin6_scope_id == 0) {
+			sin6.sin6_scope_id =
+			    ntohs(*(u_int16_t *)&sin6.sin6_addr.s6_addr[2]);
+			sin6.sin6_addr.s6_addr[2] = 0;
+			sin6.sin6_addr.s6_addr[3] = 0;
+		}
+#endif
+		if (getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len,
+		    line, sizeof(line), NULL, 0, nflag ? niflags : 0) != 0)
+			strncpy(line, "invalid", sizeof(line));
+		break;
 	    }
 #endif
 
@@ -903,6 +921,33 @@ inet_makenetandmask(net, sin)
 	sin->sin_len = 1 + cp - (char *)sin;
 }
 
+#ifdef INET6
+static void
+inet6_makenetandmask(sin6)
+	struct sockaddr_in6 *sin6;
+{
+	char *plen = NULL;
+	struct in6_addr in6;
+
+	if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr) &&
+	    sin6->sin6_scope_id == 0) {
+		plen = "0";
+	} else if ((sin6->sin6_addr.s6_addr[0] & 0xe0) == 0x20) {
+		/* aggregatable global unicast - RFC2374 */
+		memset(&in6, 0, sizeof(in6));
+		if (!memcmp(&sin6->sin6_addr.s6_addr[8], &in6.s6_addr[8], 8))
+			plen = "64";
+		else
+			plen = "128";
+	}
+
+	if (plen) {
+		rtm_addrs |= RTA_NETMASK;
+		prefixlen(plen);
+	}
+}
+#endif
+
 /*
  * Interpret an argument as a network address of some kind,
  * returning 1 if a host address, 0 if a network address.
@@ -991,6 +1036,7 @@ getaddr(which, s, hpp)
 				htons(sin6->sin6_scope_id);
 		}
 #endif
+		inet6_makenetandmask(&su->sin6);
 		freeaddrinfo(res);
 		return 0;
 	    }
