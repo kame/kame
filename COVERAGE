@@ -1,0 +1,65 @@
+Support coverage table for KAME/*BSD and KAME-merged *BSD
+KAME project
+$Id: COVERAGE,v 1.1 2000/02/17 07:07:47 itojun Exp $
+
+
+x: supported/integrated
+-: not supported/not integrated
+
+
+		KAME
+		net141	open26	free228	free34	bsdi31	bsdi41
+		--	--	--	--	--	--
+TCP/UDP		see IMPLEMENTATION for details
+
+ALTQ		x	x	x	x	-	-
+
+IPsec		x	(*1)	x	x	x	(*2)
+    (*1) OpenBSD IPsec is available for IPv4 IPsec.  no IPv6 IPsec.
+    (*2) compilable but panics if you boot IPsec-ready kernel. we are
+	working on it.
+
+NAT/PT		(*1)	(*1)	x	(*1)	(*1)	(*1)
+    (*1) compilable but not tested
+
+mobile-ip6	(*1)	(*1)	(*1)	(*1)	(*1)	(*1)
+    (*1) compilable but not tested
+
+
+		merged *-current	merged
+		net	open	free	net15	open27?	free40
+		--	--	--	--	--	--
+KAME as of	late	early	early	notyet	notyet	notyet
+		dec99	dec99	nov99
+
+TCP/UDP		see IMPLEMENTATION for details
+
+ALTQ		-	-	-	notyet	notyet	notyet
+
+IPsec		x	(*1)	(*2)	notyet	notyet	notyet
+    (*1) OpenBSD IPsec is available for IPv4 IPsec.  OpenBSD team is working
+	on OpenBSD IPsec support for IPv6 IPsec (no KAME IPsec is integrated)
+    (*2) policy management code is different from post-dec99 code
+
+NAT/PT		-	-	-	notyet	notyet	notyet
+
+mobile-ip6	-	-	-	notyet	notyet	notyet
+
+IPv6 resolver	(*1)	-	x	notyet	notyet	notyet
+    (*1) libc resolver can handle IPv6 transport (IPv6 address in
+	/etc/resolv.conf), but not with userland tools like nslookup or dig.
+
+basic userland	x	x	x	notyet	notyet	notyet
+
+route6d		x	x	?	notyet	notyet	notyet
+hroute6d	-	-	?	notyet	notyet	notyet
+bgpd		-	-	?	notyet	notyet	notyet
+pim6dd		x	x	?	notyet	notyet	notyet
+pim6sd		x	x	?	notyet	notyet	notyet
+
+rtsol/rtsold	x	x	x	notyet	notyet	notyet
+rtadvd		x	x	x	notyet	notyet	notyet
+rrenumd		-	-	x	notyet	notyet	notyet
+
+syslogd		x	-	-	notyet	notyet	notyet
+lpr/lpd		x	-	?	notyet	notyet	notyet
