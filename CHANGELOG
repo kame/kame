@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.724 2000/03/22 17:36:55 itojun Exp $
+$Id: CHANGELOG,v 1.725 2000/03/24 08:38:33 itojun Exp $
 
 <200003>
 Thu Mar 23 02:36:12 JST 2000  itojun@iijlab.net
@@ -36,6 +36,7 @@ Thu Mar 23 02:36:12 JST 2000  itojun@iijlab.net
 	
 Wed Mar 22 17:57:21 JST 2000  itojun@iijlab.net
 	* netbsd: synchronize userland with 1.4.1 -> 1.4.2 changes.
+	  TODO: boot floppies (netbsd/distrib).
 
 Wed Mar 22 16:29:19 JST 2000  itojun@iijlab.net
 	* {ports,pkgsrc}/net/bind8: upgrade to latest patch.  this avoids
