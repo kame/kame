@@ -988,7 +988,7 @@ dump_rp_set(fp)
 	    {
 		grp_mask = rp_grp_entry->group;
 		/* XXX: hardcoding */
-		fprintf(fp, "%45s %-16.16s %-4u %-4u %-3u\n", "",
+		fprintf(fp, "%44s %-16.16s %-4u %-4u %-3u\n", "",
 			net6name(&grp_mask->group_addr.sin6_addr,
 				 &grp_mask->group_mask),
 			rp_grp_entry->priority,
