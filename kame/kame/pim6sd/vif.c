@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.35 2003/02/12 10:09:17 suz Exp $	*/
+/*	$KAME: vif.c,v 1.36 2003/05/21 06:47:39 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -133,12 +133,11 @@ void init_vifs()
 
 	/* clean all the interfaces ... */
 
-	for(vifi = 0,v=uvifs; vifi < MAXMIFS; ++ vifi, ++v)
-	{
-		memset(v,0,sizeof(*v)); /* everything is zeroed  => NULL , pointer NULL , addrANY ...) */
+	for (vifi = 0, v = uvifs; vifi < MAXMIFS; ++vifi, ++v) {
+		memset(v, 0, sizeof(*v));
 		v->uv_metric = DEFAULT_METRIC;
 		v->uv_rate_limit = DEFAULT_PHY_RATE_LIMIT;
-		strncpy(v->uv_name,"",IFNAMSIZ);
+		strncpy(v->uv_name, "", IFNAMSIZ);
 		v->uv_local_pref = default_source_preference;
 		v->uv_local_metric = default_source_metric;
 		v->uv_mld_version = MLD6_DEFAULT_VERSION;
@@ -148,9 +147,9 @@ void init_vifs()
 		v->uv_mld_llqi = MLD6_DEFAULT_LAST_LISTENER_QUERY_INTERVAL;
 	}
 	IF_DEBUG(DEBUG_IF)
-		log(LOG_DEBUG,0,"Interfaces world initialized...");
+		log(LOG_DEBUG, 0, "Interfaces world initialized...");
 	IF_DEBUG(DEBUG_IF)
-		log(LOG_DEBUG,0,"Getting vifs from %s",configfilename);
+		log(LOG_DEBUG, 0, "Getting vifs from %s", configfilename);
 
 	/* read config from file */
 	if (cfparse(1, 0) != 0)
@@ -160,44 +159,45 @@ void init_vifs()
 	phys_vif = -1;
 
 	IF_DEBUG(DEBUG_IF)
-		log(LOG_DEBUG,0,"Getting vifs from kernel");
+		log(LOG_DEBUG, 0, "Getting vifs from kernel");
 	config_vifs_from_kernel();
 
 	/* IPv6 PIM needs one global unicast address (at least for now) */
 	if (max_global_address() == NULL)
 		log(LOG_ERR, 0, "There's no global address available");
 
-	for( vifi = 0, v = uvifs ; vifi < numvifs ; ++ vifi,++v)
-	{
-		if(v->uv_flags & (VIFF_DISABLED | VIFF_DOWN | MIFF_REGISTER))
-			continue;
-		if(v->uv_linklocal == NULL)
-			log(LOG_ERR,0,"there is no link-local address on vif %s",v->uv_name);
-		if (phys_vif == -1) {
-			struct phaddr *p;
+	for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) {
+		struct phaddr *p;
 
-			/*
-			 * If this vif has a global address, set its id
-			 * to phys_vif.
-			 */
-			for(p = v->uv_addrs; p; p = p->pa_next) {
-				if (!IN6_IS_ADDR_LINKLOCAL(&p->pa_addr.sin6_addr) &&
-				    !IN6_IS_ADDR_SITELOCAL(&p->pa_addr.sin6_addr)) {
-					phys_vif = vifi;
-					break;
-				}
+		if (v->uv_flags & (VIFF_DISABLED | VIFF_DOWN | MIFF_REGISTER))
+			continue;
+		if (v->uv_linklocal == NULL)
+			log(LOG_ERR, 0,
+			    "there is no link-local address on vif %s",
+			    v->uv_name);
+
+		/* If this vif has a global address, set its id to phys_vif */
+		if (phys_vif != -1)
+			continue;
+
+		for (p = v->uv_addrs; p; p = p->pa_next) {
+			if (!IN6_IS_ADDR_LINKLOCAL(&p->pa_addr.sin6_addr) &&
+			    !IN6_IS_ADDR_SITELOCAL(&p->pa_addr.sin6_addr)) {
+				phys_vif = vifi;
+				break;
 			}
 		}
 		enabled_vifs++;
 	}
 	if (enabled_vifs < 2)
-		log(LOG_ERR,0,"can't forward: %s",
-		enabled_vifs == 0 ? "no enabled vifs" : "only one enabled vif" );
+		log(LOG_ERR, 0, "can't forward: %s",
+		    enabled_vifs == 0 ? "no enabled vifs" :
+		     "only one enabled vif");
 
-	memset(&if_nullset,0,sizeof(if_nullset));
+	memset(&if_nullset, 0, sizeof(if_nullset));
 	k_init_pim(mld6_socket);	
 	IF_DEBUG(DEBUG_PIM_DETAIL)
-		log(LOG_DEBUG,0,"Pim kernel initialization done");
+		log(LOG_DEBUG, 0, "Pim kernel initialization done");
 
 
 	/* Add a dummy virtual interface to support Registers in the kernel. */
@@ -206,6 +206,7 @@ void init_vifs()
 	start_all_vifs();
 
 }
+
 int init_reg_vif()
 {
 	struct uvif *v;
