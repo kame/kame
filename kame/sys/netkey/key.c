@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.157 2000/09/22 14:42:35 sakane Exp $	*/
+/*	$KAME: key.c,v 1.158 2000/09/22 15:13:23 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -5895,6 +5895,7 @@ key_acquire2(so, m, mhp)
 	if (mhp->msg->sadb_msg_len == PFKEY_UNIT64(sizeof(struct sadb_msg))) {
 #ifndef IPSEC_NONBLOCK_ACQUIRE
 		struct secacq *acq;
+		struct timeval tv;
 
 		/* check sequence number */
 		if (mhp->msg->sadb_msg_seq == 0) {
@@ -5915,7 +5916,8 @@ key_acquire2(so, m, mhp)
 		}
 
 		/* reset acq counter in order to deletion by timehander. */
-		acq->created = key_blockacq_lifetime;
+		microtime(&tv);
+		acq->created = tv.tv_sec;
 		acq->count = 0;
 #endif
 		m_freem(m);
