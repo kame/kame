@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_mbuf.c,v 1.17 1999/10/01 02:00:12 jason Exp $	*/
+/*	$OpenBSD: uipc_mbuf.c,v 1.22 2000/03/03 11:15:43 angelos Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.15.4.1 1996/06/13 17:11:44 cgd Exp $	*/
 
 /*
@@ -730,6 +730,102 @@ bad:
 }
 
 /*
+ * Return a pointer to mbuf/offset of location in mbuf chain.
+ */
+struct mbuf *
+m_getptr(m, loc, off)
+	struct mbuf *m;
+	int loc;
+	int *off;
+{
+	while (loc >= 0) {
+		/* Normal end of search */
+		if (m->m_len > loc) {
+	    		*off = loc;
+	    		return (m);
+		}
+		else {
+	    		loc -= m->m_len;
+
+	    		if (m->m_next == NULL) {
+				if (loc == 0) {
+ 					/* Point at the end of valid data */
+		    			*off = m->m_len;
+		    			return (m);
+				}
+				else
+		  			return (NULL);
+	    		}
+	    		else
+	      			m = m->m_next;
+		}
+    	}
+
+	return (NULL);
+}
+
+/*
+ * Inject a new mbuf chain of length siz in mbuf chain m0 at
+ * position len0. Returns a pointer to the first injected mbuf, or
+ * NULL on failure (m0 is left undisturbed). Note that if there is
+ * enough space for an object of size siz in the appropriate position,
+ * no memory will be allocated. Also, there will be no data movement in
+ * the first len0 bytes (pointers to that will remain valid).
+ *
+ * XXX It is assumed that siz is less than the size of an mbuf at the moment.
+ */
+struct mbuf *
+m_inject(m0, len0, siz, wait)
+	register struct mbuf *m0;
+	int len0, siz, wait;
+{
+	register struct mbuf *m, *n, *n2 = NULL, *n3;
+	unsigned len = len0, remain;
+
+	if ((siz >= MHLEN) || (len0 <= 0))
+	        return (NULL);
+	for (m = m0; m && len > m->m_len; m = m->m_next)
+		len -= m->m_len;
+	if (m == NULL)
+		return (NULL);
+	remain = m->m_len - len;
+	if (remain == 0) {
+	        if ((m->m_next) &&  (M_LEADINGSPACE(m->m_next) >= siz)) {
+		        m->m_next->m_len += siz;
+			m0->m_pkthdr.len += siz;
+			m->m_next->m_data -= siz;
+			return m->m_next;
+		}
+	} else {
+	        n2 = m_copym2(m, len, remain, wait);
+		if (n2 == NULL)
+		        return (NULL);
+	}
+
+	MGET(n, wait, MT_DATA);
+	if (n == NULL) {
+	        if (n2)
+		        m_freem(n2);
+		return (NULL);
+	}
+
+	n->m_len = siz;
+	m0->m_pkthdr.len += siz;
+	m->m_len -= remain; /* Trim */
+	if (n2)	{
+	        for (n3 = n; n3->m_next != NULL; n3 = n3->m_next)
+		        ;
+		n3->m_next = n2;
+	} else
+	        n3 = n;
+	for (; n3->m_next != NULL; n3 = n3->m_next)
+	        ;
+	n3->m_next = m->m_next;
+	m->m_next = n;
+	return n;
+}
+
+/*
  * Partition an mbuf chain in two pieces, returning the tail --
  * all but the first len0 bytes.  In case of failure, it returns NULL and
  * attempts to restore the chain to its original state.
@@ -751,8 +847,8 @@ m_split(m0, len0, wait)
 		MGETHDR(n, wait, m0->m_type);
 		if (n == NULL)
 			return (NULL);
-		n->m_pkthdr.rcvif = m0->m_pkthdr.rcvif;
-		n->m_pkthdr.len = m0->m_pkthdr.len - len0;
+		n->m_pkthdr = m0->m_pkthdr;
+		n->m_pkthdr.len -= len0;
 		olen = m0->m_pkthdr.len;
 		m0->m_pkthdr.len = len0;
 		if (m->m_flags & M_EXT)
@@ -935,4 +1031,3 @@ m_apply(m, off, len, f, fstate)
 
 	return (0);
 }
-

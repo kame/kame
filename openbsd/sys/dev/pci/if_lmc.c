@@ -1,3 +1,4 @@
+/*	$OpenBSD: if_lmc.c,v 1.6 2000/04/27 00:32:09 chris Exp $ */
 /*	$NetBSD: if_lmc.c,v 1.1 1999/03/25 03:32:43 explorer Exp $	*/
 
 /*-
@@ -62,6 +63,22 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * LMC1200 (DS1) & LMC5245 (DS3) LED definitions
+ * led0 yellow = far-end link is in Red alarm condition
+ * led1 blue   = received an Alarm Indication signal (upstream failure)
+ * led2 Green  = power to adapter, Gate Array loaded & driver attached
+ * led3 red    = Loss of Signal (LOS) or out of frame (OOF) conditions
+ *               detected on T3 receive signal
+ *
+ * LMC1000 (SSI) & LMC5200 (HSSI) LED definitions
+ * led0 Green  = power to adapter, Gate Array loaded & driver attached
+ * led1 Green  = DSR and DTR and RTS and CTS are set (CA, TA for LMC5200)
+ * led2 Green  = Cable detected (Green indicates non-loopback mode for LMC5200)
+ * led3 red    = No timing is available from the cable or the on-board
+ *               frequency generator. (ST not available for LMC5200)
+ */
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
@@ -70,7 +87,7 @@
 #include <sys/errno.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
-/*#include <sys/proc.h>	only for declaration of wakeup() used by vm.h */
+#include <sys/proc.h>
 #if defined(__FreeBSD__)
 #include <machine/clock.h>
 #elif defined(__bsdi__) || defined(__NetBSD__) || defined(__OpenBSD__)
@@ -426,6 +443,36 @@ lmc_watchdog(int unit)
 
 	state = 0;
 
+	/*
+	 * Make sure the tx jabber and rx watchdog are off,
+	 * and the transmit and recieve processes are running.
+	 */
+	LMC_CSR_WRITE (sc, csr_15, 0x00000011);
+	sc->lmc_cmdmode |= TULIP_CMD_TXRUN | TULIP_CMD_RXRUN;
+	LMC_CSR_WRITE (sc, csr_command, sc->lmc_cmdmode);
+
+	/* Is the transmit clock still available? */
+	ticks = LMC_CSR_READ (sc, csr_gp_timer);
+	ticks = 0x0000ffff - (ticks & 0x0000ffff);
+
+	if (ticks == 0)
+	{
+		/* no clock found ? */
+		if (sc->tx_clockState != 0)
+		{
+			sc->tx_clockState = 0;
+			if (sc->lmc_cardtype == LMC_CARDTYPE_SSI)
+				lmc_led_on (sc, LMC_MII16_LED3); /* ON red */
+		}
+	else
+		if (sc->tx_clockState == 0)
+		{
+			sc->tx_clockState = 1;
+			if (sc->lmc_cardtype == LMC_CARDTYPE_SSI)
+				lmc_led_off (sc, LMC_MII16_LED3); /* OFF red */
+		}
+	}
+
 	link_status = sc->lmc_media->get_link_status(sc);
 	ostatus = ((sc->lmc_flags & LMC_MODEMOK) == LMC_MODEMOK);
 
@@ -433,26 +480,52 @@ lmc_watchdog(int unit)
 	 * hardware level link lost, but the interface is marked as up.
 	 * Mark it as down.
 	 */
-        if (link_status == 0 && ostatus) {
+        if (link_status == LMC_LINK_DOWN && ostatus) {
 		printf(LMC_PRINTF_FMT ": physical link down\n",
 		       LMC_PRINTF_ARGS);
 		sc->lmc_flags &= ~LMC_MODEMOK;
-		lmc_led_off(sc, LMC_MII16_LED1);
+		if (sc->lmc_cardtype == LMC_CARDTYPE_DS3 ||
+		    sc->lmc_cardtype == LMC_CARDTYPE_T1)
+			lmc_led_on (sc, LMC_DS3_LED3 | LMC_DS3_LED2);
+							/* turn on red LED */
+		else {
+			lmc_led_off (sc, LMC_MII16_LED1);
+			lmc_led_on (sc, LMC_MII16_LED0);
+			if (sc->lmc_timing == LMC_CTL_CLOCK_SOURCE_EXT)
+				lmc_led_on (sc, LMC_MII16_LED3);
+		}
+
 	}
 
 	/*
 	 * hardware link is up, but the interface is marked as down.
 	 * Bring it back up again.
 	 */
-	if (link_status != 0 && !ostatus) {
+	if (link_status != LMC_LINK_DOWN && !ostatus) {
 		printf(LMC_PRINTF_FMT ": physical link up\n",
 		       LMC_PRINTF_ARGS);
 		if (sc->lmc_flags & LMC_IFUP)
 			lmc_ifup(sc);
 		sc->lmc_flags |= LMC_MODEMOK;
-		lmc_led_on(sc, LMC_MII16_LED1); 
+		if (sc->lmc_cardtype == LMC_CARDTYPE_DS3 ||
+		    sc->lmc_cardtype == LMC_CARDTYPE_T1)
+		{
+			sc->lmc_miireg16 |= LMC_DS3_LED3;
+			lmc_led_off (sc, LMC_DS3_LED3);
+							/* turn off red LED */
+			lmc_led_on (sc, LMC_DS3_LED2);
+		} else {
+			lmc_led_on (sc, LMC_MII16_LED0 | LMC_MII16_LED1
+				    | LMC_MII16_LED2);
+			if (sc->lmc_timing != LMC_CTL_CLOCK_SOURCE_EXT)
+				lmc_led_off (sc, LMC_MII16_LED3);
+		}
+
 		return;
 	}
+
+	/* Call media specific watchdog functions */
+	sc->lmc_media->watchdog(sc);
 
 	/*
 	 * remember the timer value
@@ -476,12 +549,19 @@ lmc_ifup(lmc_softc_t * const sc)
 	lmc_dec_reset(sc);
 	lmc_reset(sc);
 
-	sc->lmc_media->set_link_status(sc, 1);
+	sc->lmc_media->set_link_status(sc, LMC_LINK_UP);
 	sc->lmc_media->set_status(sc, NULL);
 
 	sc->lmc_flags |= LMC_IFUP;
 
-	lmc_led_on(sc, LMC_MII16_LED1);
+	/*
+	 * for DS3 & DS1 adapters light the green light, led2
+	 */
+	if (sc->lmc_cardtype == LMC_CARDTYPE_DS3 ||
+	    sc->lmc_cardtype == LMC_CARDTYPE_T1)
+		lmc_led_on (sc, LMC_MII16_LED2);
+	else
+		lmc_led_on (sc, LMC_MII16_LED0 | LMC_MII16_LED2);
 
 	/*
 	 * select what interrupts we want to get
@@ -514,8 +594,8 @@ lmc_ifdown(lmc_softc_t * const sc)
 	sc->lmc_if.if_timer = 0;
 	sc->lmc_flags &= ~LMC_IFUP;
 
-	sc->lmc_media->set_link_status(sc, 0);
-	lmc_led_off(sc, LMC_MII16_LED1);
+	sc->lmc_media->set_link_status(sc, LMC_LINK_DOWN);
+	lmc_led_off(sc, LMC_MII16_LED_ALL);
 
 	lmc_dec_reset(sc);
 	lmc_reset(sc);
@@ -1129,6 +1209,7 @@ lmc_ifioctl(struct ifnet * ifp, ioctl_cmd_t cmd, caddr_t data)
 #if defined(__NetBSD__) || defined(__FreeBSD__) || defined(__OpenBSD__)
 	lmc_spl_t s;
 #endif
+	struct proc *p = curproc;
 	int error = 0;
 	struct ifreq *ifr = (struct ifreq *)data;
 	u_int32_t new_state;
@@ -1147,11 +1228,9 @@ lmc_ifioctl(struct ifnet * ifp, ioctl_cmd_t cmd, caddr_t data)
 		break;
 
 	case LMCIOCSINFO:
-#if 0 /* XXX */
 		error = suser(p->p_ucred, &p->p_acflag);
 		if (error)
 			goto out;
-#endif
 
 		error = copyin(ifr->ifr_data, &ctl, sizeof(lmc_ctl_t));
 		if (error != 0)
@@ -1163,9 +1242,6 @@ lmc_ifioctl(struct ifnet * ifp, ioctl_cmd_t cmd, caddr_t data)
 		break;
 
 #if defined(__NetBSD__) || defined(__FreeBSD__) || defined(__OpenBSD__)
-#if !defined(ifr_mtu)
-#define ifr_mtu ifr_metric
-#endif
 	case SIOCSIFMTU:
 		/*
 		 * Don't allow the MTU to get larger than we can handle
@@ -1173,7 +1249,10 @@ lmc_ifioctl(struct ifnet * ifp, ioctl_cmd_t cmd, caddr_t data)
 		if (ifr->ifr_mtu > LMC_MTU) {
 			error = EINVAL;
 			goto out;
+		} else {
+                        ifp->if_mtu = ifr->ifr_mtu;
 		}
+		break;
 #endif
 	}
 
@@ -1332,7 +1411,8 @@ lmc_ifstart_one(struct ifnet * const ifp)
 
 	ifq = &sc->lmc_p2pcom.p2p_isnd;
 
-	m = ifq->ifq_head;
+        m = ifq->ifq_head;
+    {
 	if (m == NULL) {
 		ifq = &sc->lmc_if.if_snd;
 		m = ifq->ifq_head;
@@ -1342,6 +1422,7 @@ lmc_ifstart_one(struct ifnet * const ifp)
 	IF_DEQUEUE(ifq, m);
 
 	m = lmc_txput(sc, m);
+    }
 	if (m != NULL)
 		IF_PREPEND(ifq, m);
 
@@ -1431,7 +1512,14 @@ lmc_attach(lmc_softc_t * const sc)
 	 * turn off those LEDs...
 	 */
 	sc->lmc_miireg16 |= LMC_MII16_LED_ALL;
-	lmc_led_on(sc, LMC_MII16_LED0);
+	/*
+	 * for DS3 & DS1 adapters light the green light, led2
+	 */
+	if (sc->lmc_cardtype == LMC_CARDTYPE_DS3 ||
+	    sc->lmc_cardtype == LMC_CARDTYPE_T1)
+		lmc_led_on (sc, LMC_MII16_LED2);
+	else
+		lmc_led_on (sc, LMC_MII16_LED0 | LMC_MII16_LED2);
 }
 
 void

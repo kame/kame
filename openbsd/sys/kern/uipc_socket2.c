@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_socket2.c,v 1.10 1999/02/19 15:06:52 millert Exp $	*/
+/*	$OpenBSD: uipc_socket2.c,v 1.14 2000/02/29 19:16:46 itojun Exp $	*/
 /*	$NetBSD: uipc_socket2.c,v 1.11 1996/02/04 02:17:55 christos Exp $	*/
 
 /*
@@ -145,9 +145,9 @@ soisdisconnected(so)
  * When an attempt at a new connection is noted on a socket
  * which accepts connections, sonewconn is called.  If the
  * connection is possible (subject to space constraints, etc.)
- * then we allocate a new structure, propoerly linked into the
+ * then we allocate a new structure, properly linked into the
  * data structure of the original socket, and return this.
- * Connstatus may be 0, or SO_ISCONFIRMING, or SO_ISCONNECTED.
+ * Connstatus may be 0, or SS_ISCONFIRMING, or SS_ISCONNECTED.
  *
  * Currently, sonewconn() is defined as sonewconn1() in socketvar.h
  * to catch calls that are missing the (new) second parameter.

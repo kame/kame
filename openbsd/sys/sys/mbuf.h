@@ -1,4 +1,4 @@
-/*	$OpenBSD: mbuf.h,v 1.12 1999/10/01 02:00:11 jason Exp $	*/
+/*	$OpenBSD: mbuf.h,v 1.16 2000/04/26 18:40:50 chris Exp $	*/
 /*	$NetBSD: mbuf.h,v 1.19 1996/02/09 18:25:14 christos Exp $	*/
 
 /*
@@ -125,6 +125,7 @@ struct mbuf {
 #define	M_EXT		0x0001	/* has associated external storage */
 #define	M_PKTHDR	0x0002	/* start of record */
 #define	M_EOR		0x0004	/* end of record */
+#define	M_PROTO1	0x0008	/* protocol-specific */
 
 #define	M_MIP6TUNNEL	0x0010	/* MIP6 temporary use */
 
@@ -151,7 +152,7 @@ struct mbuf {
 #endif
 
 /* flags copied when copying m_pkthdr */
-#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_BCAST|M_MCAST|M_CONF|M_AUTH|M_ANYCAST6|M_LOOP)
+#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_BCAST|M_MCAST|M_CONF|M_AUTH|M_ANYCAST6|M_LOOP)
 
 /* mbuf types */
 #define	MT_FREE		0	/* should be on free list */
@@ -417,6 +418,8 @@ struct	mbuf *m_pullup2 __P((struct mbuf *, int));
 struct	mbuf *m_retry __P((int, int));
 struct	mbuf *m_retryhdr __P((int, int));
 struct	mbuf *m_split __P((struct mbuf *, int, int));
+struct  mbuf *m_inject __P((struct mbuf *, int, int, int));
+struct  mbuf *m_getptr __P((struct mbuf *, int, int *));
 void	m_adj __P((struct mbuf *, int));
 int	m_clalloc __P((int, int));
 void	m_copyback __P((struct mbuf *, int, int, caddr_t));

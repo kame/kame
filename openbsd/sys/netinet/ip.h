@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip.h,v 1.5 1999/07/06 20:17:52 cmetz Exp $	*/
+/*	$OpenBSD: ip.h,v 1.6 1999/12/08 06:50:19 itojun Exp $	*/
 /*	$NetBSD: ip.h,v 1.9 1995/05/15 01:22:44 cgd Exp $	*/
 
 /*

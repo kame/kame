@@ -1,4 +1,4 @@
-/*	$OpenBSD: ppp_defs.h,v 1.9 1999/02/11 19:52:11 mickey Exp $	*/
+/*	$OpenBSD: ppp_defs.h,v 1.10 1999/12/08 06:50:18 itojun Exp $	*/
 /*	$NetBSD: ppp_defs.h,v 1.1 1995/07/04 06:28:26 paulus Exp $	*/
 
 /*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_fddisubr.c,v 1.19 1999/07/28 20:02:41 fgsch Exp $	*/
+/*	$OpenBSD: if_fddisubr.c,v 1.22 2000/02/07 06:09:08 itojun Exp $	*/
 /*	$NetBSD: if_fddisubr.c,v 1.5 1996/05/07 23:20:21 christos Exp $	*/
 
 /*
@@ -236,8 +236,6 @@ fddi_output(ifp, m0, dst, rt0)
 		type = htons(ETHERTYPE_IPX);
  		bcopy((caddr_t)&(((struct sockaddr_ipx*)dst)->sipx_addr.ipx_host),
 		    (caddr_t)edst, sizeof (edst));
-		if (!bcmp((caddr_t)edst, (caddr_t)&ipx_thishost, sizeof(edst)))
-			return (looutput(ifp, m, dst, rt));
 		/* If broadcasting on a simplex interface, loopback a copy */
 		if ((m->m_flags & M_BCAST) && (ifp->if_flags & IFF_SIMPLEX))
 			mcopy = m_copy(m, 0, (int)M_COPYALL);

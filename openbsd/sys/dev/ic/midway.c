@@ -1,5 +1,5 @@
-/*	$OpenBSD: midway.c,v 1.25 1999/06/06 15:39:15 deraadt Exp $	*/
-/*	$NetBSD: midway.c,v 1.37 1998/10/20 17:53:54 chuck Exp $	*/
+/*	$OpenBSD: midway.c,v 1.26 2000/04/27 00:04:25 chris Exp $	*/
+/*	(sync'd to midway.c 1.68)	*/
 
 /*
  *
@@ -1273,10 +1273,6 @@ caddr_t data;
 #endif
 		break;
 
-#if defined(SIOCSIFMTU)		/* ??? copied from if_de */
-#if !defined(ifr_mtu)
-#define ifr_mtu ifr_metric
-#endif
 	case SIOCSIFMTU:
 	    /*
 	     * Set the interface MTU.
@@ -1292,7 +1288,6 @@ caddr_t data;
 	    en_reset(sc);
 	    en_init(sc);
 	    break;
-#endif /* SIOCSIFMTU */
 
 #ifdef ATM_PVCEXT
 	case SIOCADDMULTI:

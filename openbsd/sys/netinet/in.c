@@ -1,4 +1,4 @@
-/*	$OpenBSD: in.c,v 1.13 1999/04/20 20:06:11 niklas Exp $	*/
+/*	$OpenBSD: in.c,v 1.17 2000/03/22 03:48:30 itojun Exp $	*/
 /*	$NetBSD: in.c,v 1.26 1996/02/13 23:41:39 christos Exp $	*/
 
 /*
@@ -201,7 +201,6 @@ in_control(so, cmd, data, ifp)
 	if (ifp && ifp->if_type == IFT_GIF) {
 		switch (cmd) {
 		case SIOCSIFPHYADDR:
-		case SIOCDIFPHYADDR:
 			if ((so->so_state & SS_PRIV) == 0)
 				return(EPERM);
 		case SIOCGIFPSRCADDR:
@@ -661,8 +660,8 @@ in_ifinit(ifp, ia, sin, scrub)
 	 */
 	if (ifp->if_ioctl &&
 	    (error = (*ifp->if_ioctl)(ifp, SIOCSIFADDR, (caddr_t)ia))) {
-		splx(s);
 		ia->ia_addr = oldaddr;
+		splx(s);
 		return (error);
 	}
 	splx(s);

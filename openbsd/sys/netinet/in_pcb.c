@@ -1,4 +1,4 @@
-/*	$OpenBSD: in_pcb.c,v 1.34 1999/05/16 21:48:29 niklas Exp $	*/
+/*	$OpenBSD: in_pcb.c,v 1.42 2000/04/27 09:23:21 itojun Exp $	*/
 /*	$NetBSD: in_pcb.c,v 1.25 1996/02/13 23:41:53 christos Exp $	*/
 
 /*
@@ -797,12 +797,14 @@ in_pcblookup(table, faddrp, fport_arg, laddrp, lport_arg, flags)
 			struct in6_addr *faddr6 = (struct in6_addr *)faddrp;
 
 			/* 
-			 * Always skip AF_INET sockets when looking for AF_INET6
-			 * addresses.  The only problem with this comes if the
-			 * PF_INET6 addresses are v4-mapped addresses.  From what
-			 * I've been able to see, none of the callers cause such
-			 * a situation to occur.  If such a situation DID occur,
-			 * then it is possible to miss a matching PCB.
+			 * Always skip AF_INET sockets when looking
+			 * for AF_INET6 addresses.  The only problem
+			 * with this comes if the PF_INET6 addresses
+			 * are v4-mapped addresses.  From what I've
+			 * been able to see, none of the callers cause
+			 * such a situation to occur.  If such a
+			 * situation DID occur, then it is possible to
+			 * miss a matching PCB.
 			 */
 			if (!(inp->inp_flags & INP_IPV6))
 				continue;

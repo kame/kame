@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_input.c,v 1.42 1999/09/25 06:35:48 deraadt Exp $	*/
+/*	$OpenBSD: ip_input.c,v 1.55 2000/05/10 03:22:39 jason Exp $	*/
 /*	$NetBSD: ip_input.c,v 1.30 1996/03/16 23:53:58 christos Exp $	*/
 
 /*
@@ -78,6 +78,19 @@
 #endif
 
 int encdebug = 0;
+int ipsec_acl = 1;
+int ipsec_keep_invalid = IPSEC_DEFAULT_EMBRYONIC_SA_TIMEOUT;
+int ipsec_require_pfs = IPSEC_DEFAULT_PFS;
+int ipsec_soft_allocations = IPSEC_DEFAULT_SOFT_ALLOCATIONS;
+int ipsec_exp_allocations = IPSEC_DEFAULT_EXP_ALLOCATIONS;
+int ipsec_soft_bytes = IPSEC_DEFAULT_SOFT_BYTES;
+int ipsec_exp_bytes = IPSEC_DEFAULT_EXP_BYTES;
+int ipsec_soft_timeout = IPSEC_DEFAULT_SOFT_TIMEOUT;
+int ipsec_exp_timeout = IPSEC_DEFAULT_EXP_TIMEOUT;
+int ipsec_soft_first_use = IPSEC_DEFAULT_SOFT_FIRST_USE;
+int ipsec_exp_first_use = IPSEC_DEFAULT_EXP_FIRST_USE;
+char ipsec_def_enc[20];
+char ipsec_def_auth[20];
 
 /*
  * Note: DIRECTED_BROADCAST is handled this way so that previous
@@ -222,6 +235,9 @@ ip_init()
 		DP_SET(baddynamicports.tcp, defbaddynamicports_tcp[i]);
 	for (i = 0; defbaddynamicports_udp[i] != 0; i++)
 		DP_SET(baddynamicports.udp, defbaddynamicports_tcp[i]);
+
+	strncpy(ipsec_def_enc, IPSEC_DEFAULT_DEF_ENC, sizeof(ipsec_def_enc));
+	strncpy(ipsec_def_auth, IPSEC_DEFAULT_DEF_AUTH, sizeof(ipsec_def_auth));
 }
 
 struct	sockaddr_in ipaddr = { sizeof(ipaddr), AF_INET };
@@ -340,7 +356,7 @@ ipv4_input(struct mbuf *m, ...)
 
 	/*
 	 * Check that the amount of data in the buffers
-	 * is as at least much as the IP header would have us expect.
+	 * is at least as much as the IP header would have us expect.
 	 * Trim mbufs if longer than we expect.
 	 * Drop packet if shorter than we expect.
 	 */
@@ -579,8 +595,11 @@ in_iawithaddr(ina, m)
 			     * either for subnet or net.
 			     */
 			    ina.s_addr == ia->ia_subnet ||
-			    ina.s_addr == ia->ia_net)
+			    ina.s_addr == ia->ia_net) {
+				/* Make sure M_BCAST is set */
+				m->m_flags |= M_BCAST;
 				return ia;
+			    }
 		}
 	}
 
@@ -840,15 +859,16 @@ ip_dooptions(m)
 {
 	register struct ip *ip = mtod(m, struct ip *);
 	register u_char *cp;
-	register struct ip_timestamp *ipt;
+	struct ip_timestamp ipt;
 	register struct in_ifaddr *ia;
 	int opt, optlen, cnt, off, code, type = ICMP_PARAMPROB, forward = 0;
-	struct in_addr *sin, dst;
+	struct in_addr sin, dst;
 	n_time ntime;
 
 	dst = ip->ip_dst;
 	cp = (u_char *)(ip + 1);
 	cnt = (ip->ip_hl << 2) - sizeof (struct ip);
+
 	for (; cnt > 0; cnt -= optlen, cp += optlen) {
 		opt = cp[IPOPT_OPTVAL];
 		if (opt == IPOPT_EOL)
@@ -866,6 +886,7 @@ ip_dooptions(m)
 				goto bad;
 			}
 		}
+
 		switch (opt) {
 
 		default:
@@ -982,23 +1003,23 @@ ip_dooptions(m)
 
 		case IPOPT_TS:
 			code = cp - (u_char *)ip;
-			ipt = (struct ip_timestamp *)cp;
-			if (ipt->ipt_ptr < 5 || ipt->ipt_len < 5)
+			bcopy(cp, &ipt, sizeof(struct ip_timestamp));
+			if (ipt.ipt_ptr < 5 || ipt.ipt_len < 5)
 				goto bad;
-			if (ipt->ipt_ptr - 1 + sizeof(n_time) > ipt->ipt_len) {
-				if (++ipt->ipt_oflw == 0)
+			if (ipt.ipt_ptr - 1 + sizeof(n_time) > ipt.ipt_len) {
+				if (++ipt.ipt_oflw == 0)
 					goto bad;
 				break;
 			}
-			sin = (struct in_addr *)(cp + ipt->ipt_ptr - 1);
-			switch (ipt->ipt_flg) {
+			bcopy(cp + ipt.ipt_ptr - 1, &sin, sizeof sin);
+			switch (ipt.ipt_flg) {
 
 			case IPOPT_TS_TSONLY:
 				break;
 
 			case IPOPT_TS_TSANDADDR:
-				if (ipt->ipt_ptr - 1 + sizeof(n_time) +
-				    sizeof(struct in_addr) > ipt->ipt_len)
+				if (ipt.ipt_ptr - 1 + sizeof(n_time) +
+				    sizeof(struct in_addr) > ipt.ipt_len)
 					goto bad;
 				ipaddr.sin_addr = dst;
 				ia = (INA)ifaof_ifpforaddr((SA)&ipaddr,
@@ -1006,31 +1027,31 @@ ip_dooptions(m)
 				if (ia == 0)
 					continue;
 				bcopy((caddr_t)&ia->ia_addr.sin_addr,
-				    (caddr_t)sin, sizeof(struct in_addr));
-				ipt->ipt_ptr += sizeof(struct in_addr);
+				    (caddr_t)&sin, sizeof(struct in_addr));
+				ipt.ipt_ptr += sizeof(struct in_addr);
 				break;
 
 			case IPOPT_TS_PRESPEC:
-				if (ipt->ipt_ptr - 1 + sizeof(n_time) +
-				    sizeof(struct in_addr) > ipt->ipt_len)
+				if (ipt.ipt_ptr - 1 + sizeof(n_time) +
+				    sizeof(struct in_addr) > ipt.ipt_len)
 					goto bad;
-				bcopy((caddr_t)sin, (caddr_t)&ipaddr.sin_addr,
+				bcopy((caddr_t)&sin, (caddr_t)&ipaddr.sin_addr,
 				    sizeof(struct in_addr));
 				if (ifa_ifwithaddr((SA)&ipaddr) == 0)
 					continue;
-				ipt->ipt_ptr += sizeof(struct in_addr);
+				ipt.ipt_ptr += sizeof(struct in_addr);
 				break;
 
 			default:
 				/* XXX can't take &ipt->ipt_flg */
-				code = (u_char *)&ipt->ipt_ptr -
+				code = (u_char *)&ipt.ipt_ptr -
 				    (u_char *)ip + 1;
 				goto bad;
 			}
 			ntime = iptime();
-			bcopy((caddr_t)&ntime, (caddr_t)cp + ipt->ipt_ptr - 1,
+			bcopy((caddr_t)&ntime, (caddr_t)cp + ipt.ipt_ptr - 1,
 			    sizeof(n_time));
-			ipt->ipt_ptr += sizeof(n_time);
+			ipt.ipt_ptr += sizeof(n_time);
 		}
 	}
 	if (forward && ipforwarding) {
@@ -1040,9 +1061,7 @@ ip_dooptions(m)
 	return (0);
 bad:
 	ip->ip_len -= ip->ip_hl << 2;   /* XXX icmp_error adds in hdr length */
-	HTONS(ip->ip_len);	/* XXX because ip_input changed these three */
 	HTONS(ip->ip_id);
-	HTONS(ip->ip_off);
 	icmp_error(m, type, code, 0, 0);
 	ipstat.ips_badoptions++;
 	return (1);
@@ -1507,6 +1526,45 @@ ip_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		    &ip_maxqueue));
 	case IPCTL_ENCDEBUG:
 		return (sysctl_int(oldp, oldlenp, newp, newlen, &encdebug));
+	case IPCTL_IPSEC_ACL:
+		return (sysctl_int(oldp, oldlenp, newp, newlen, &ipsec_acl));
+	case IPCTL_IPSEC_EMBRYONIC_SA_TIMEOUT:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+				   &ipsec_keep_invalid));
+	case IPCTL_IPSEC_REQUIRE_PFS:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+				   &ipsec_require_pfs));
+	case IPCTL_IPSEC_SOFT_ALLOCATIONS:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+				   &ipsec_soft_allocations));
+	case IPCTL_IPSEC_ALLOCATIONS:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+				   &ipsec_exp_allocations));
+	case IPCTL_IPSEC_SOFT_BYTES:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+				   &ipsec_soft_bytes));
+	case IPCTL_IPSEC_BYTES:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+				   &ipsec_exp_bytes));
+	case IPCTL_IPSEC_TIMEOUT:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+				   &ipsec_exp_timeout));
+	case IPCTL_IPSEC_SOFT_TIMEOUT:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+				   &ipsec_soft_timeout));
+	case IPCTL_IPSEC_SOFT_FIRSTUSE:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+				   &ipsec_soft_first_use));
+	case IPCTL_IPSEC_FIRSTUSE:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+				   &ipsec_exp_first_use));
+	case IPCTL_IPSEC_ENC_ALGORITHM:
+	        return (sysctl_tstring(oldp, oldlenp, newp, newlen,
+				       ipsec_def_enc, sizeof(ipsec_def_enc)));
+	case IPCTL_IPSEC_AUTH_ALGORITHM:
+	        return (sysctl_tstring(oldp, oldlenp, newp, newlen,
+				       ipsec_def_auth,
+				       sizeof(ipsec_def_auth)));
 	default:
 		return (EOPNOTSUPP);
 	}

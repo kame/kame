@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.h,v 1.13 1999/08/08 00:43:00 niklas Exp $	*/
+/*	$OpenBSD: if.h,v 1.17 2000/03/22 11:28:42 itojun Exp $	*/
 /*	$NetBSD: if.h,v 1.23 1996/05/07 02:40:27 thorpej Exp $	*/
 
 /*
@@ -322,6 +322,7 @@ struct	ifreq {
 #define	ifr_broadaddr	ifr_ifru.ifru_broadaddr	/* broadcast address */
 #define	ifr_flags	ifr_ifru.ifru_flags	/* flags */
 #define	ifr_metric	ifr_ifru.ifru_metric	/* metric */
+#define	ifr_mtu		ifr_ifru.ifru_metric	/* mtu (overload) */
 #define	ifr_media	ifr_ifru.ifru_metric	/* media options (overload) */
 #define	ifr_data	ifr_ifru.ifru_data	/* for use by interface */
 };
@@ -383,22 +384,20 @@ __BEGIN_DECLS
 unsigned int if_nametoindex __P((const char *));
 char 	*if_indextoname __P((unsigned int, char *));
 struct	if_nameindex *if_nameindex __P((void));
-void	if_freenameindex __P((struct if_nameindex *));
 __END_DECLS
-#if 0
 #define if_freenameindex(x)	free(x)
-#endif
 #endif
 
 #include <net/if_arp.h>
 
 #ifdef _KERNEL
-#define	IFAFREE(ifa) { \
+#define	IFAFREE(ifa) \
+do { \
 	if ((ifa)->ifa_refcnt <= 0) \
 		ifafree(ifa); \
 	else \
 		(ifa)->ifa_refcnt--; \
-	}
+} while (0)
 
 struct ifnet_head ifnet;
 struct ifnet **ifindex2ifnet;

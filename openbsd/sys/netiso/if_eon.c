@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_eon.c,v 1.5 1996/05/22 12:02:42 deraadt Exp $	*/
+/*	$OpenBSD: if_eon.c,v 1.7 1999/12/08 06:50:24 itojun Exp $	*/
 /*	$NetBSD: if_eon.c,v 1.15 1996/05/09 22:29:37 scottr Exp $	*/
 
 /*-

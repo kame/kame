@@ -1,3 +1,4 @@
+/*	$OpenBSD: if_spppsubr.c,v 1.5 2000/04/26 18:39:38 chris Exp $	*/
 /*
  * Synchronous PPP/Cisco link level subroutines.
  * Keepalive protocol implemented in both Cisco and PPP modes.
@@ -17,7 +18,6 @@
  *
  * Version 2.6, Tue May 12 17:10:39 MSD 1998
  *
- * $Id: if_spppsubr.c,v 1.3 1999/08/06 23:02:27 niklas Exp $
  */
 
 #include <sys/param.h>
@@ -1041,9 +1041,6 @@ sppp_ioctl(struct ifnet *ifp, u_long cmd, void *data)
 		break;
 
 #ifdef SIOCSIFMTU
-#ifndef ifr_mtu
-#define ifr_mtu ifr_metric
-#endif
 	case SIOCSIFMTU:
 		if (ifr->ifr_mtu < 128 || ifr->ifr_mtu > sp->lcp.their_mru)
 			return (EINVAL);

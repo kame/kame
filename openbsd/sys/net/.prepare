@@ -2,3 +2,5 @@ exclude altq_conf.c
 exclude altq_conf.h
 exclude if_altq.h
 exclude pfkeyv2.h
+conflict if_gif.c
+conflict if_gif.h

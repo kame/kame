@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_output.c,v 1.21 1999/07/06 20:17:53 cmetz Exp $	*/
+/*	$OpenBSD: tcp_output.c,v 1.30 2000/02/21 21:42:13 provos Exp $	*/
 /*	$NetBSD: tcp_output.c,v 1.16 1997/06/03 16:17:09 kml Exp $	*/
 
 /*
@@ -152,19 +152,30 @@ void
 tcp_sack_adjust(tp)
 	struct tcpcb *tp;
 {
-	int i;
-
-	for (i = 0; i < tp->rcv_numsacks; i++) {
-		if (SEQ_LT(tp->snd_nxt, tp->sackblks[i].start))
-			break;
-		if (SEQ_LEQ(tp->sackblks[i].end, tp->snd_nxt))
-			continue;
-		if (tp->sackblks[i].start == 0 && tp->sackblks[i].end == 0)
-			continue;
-		/* snd_nxt must be in middle of block of SACKed data */
-		tp->snd_nxt = tp->sackblks[i].end;
-		break;
+	struct sackhole *cur = tp->snd_holes;
+	if (cur == 0)
+		return; /* No holes */
+	if (SEQ_GEQ(tp->snd_nxt, tp->rcv_lastsack))
+		return; /* We're already beyond any SACKed blocks */
+	/* 
+	 * Two cases for which we want to advance snd_nxt:  
+	 * i) snd_nxt lies between end of one hole and beginning of another
+	 * ii) snd_nxt lies between end of last hole and rcv_lastsack
+	 */
+	while (cur->next) {
+		if (SEQ_LT(tp->snd_nxt, cur->end))
+			return;
+		if (SEQ_GEQ(tp->snd_nxt, cur->next->start)) 
+			cur = cur->next;
+		else {
+			tp->snd_nxt = cur->next->start;
+			return;
+		}
 	}
+	if (SEQ_LT(tp->snd_nxt, cur->end))
+		return;
+	tp->snd_nxt = tp->rcv_lastsack;
+	return;
 }
 #endif /* TCP_SACK */
 
@@ -182,12 +193,12 @@ tcp_output(tp)
 	register struct tcphdr *th;
 	u_char opt[MAX_TCPOPTLEN];
 	unsigned int optlen, hdrlen;
-	int idle, sendalot;
+	int idle, sendalot = 0;
 #ifdef TCP_SACK
 	int i, sack_rxmit = 0;
 	struct sackhole *p;
 #endif
-#if defined(TCP_SACK) || defined(TCP_NEWRENO)
+#if defined(TCP_SACK)
 	int maxburst = TCP_MAXBURST;
 #endif
 #ifdef TCP_SIGNATURE
@@ -214,7 +225,6 @@ tcp_output(tp)
 		 */
 		tp->snd_cwnd = tp->t_maxseg;
 again:
-	sendalot = 0;
 #ifdef TCP_SACK
 	/*
 	 * If we've recently taken a timeout, snd_max will be greater than
@@ -228,12 +238,6 @@ again:
 	win = ulmin(tp->snd_wnd, tp->snd_cwnd);
 
 	flags = tcp_outflags[tp->t_state];
-	/*
-	 * If in persist timeout with window of 0, send 1 byte.
-	 * Otherwise, if window is small but nonzero
-	 * and timer expired, we will send what we can
-	 * and go to transmit state.
-	 */
 
 #ifdef TCP_SACK
 	/* 
@@ -260,6 +264,13 @@ again:
 	}
 #endif /* TCP_SACK */
 
+	sendalot = 0;
+	/*
+	 * If in persist timeout with window of 0, send 1 byte.
+	 * Otherwise, if window is small but nonzero
+	 * and timer expired, we will send what we can
+	 * and go to transmit state.
+	 */
 	if (tp->t_force) {
 		if (win == 0) {
 			/*
@@ -399,6 +410,19 @@ again:
 	if (flags & TH_FIN &&
 	    ((tp->t_flags & TF_SENTFIN) == 0 || tp->snd_nxt == tp->snd_una))
 		goto send;
+#ifdef TCP_SACK
+	/*
+	 * In SACK, it is possible for tcp_output to fail to send a segment 
+	 * after the retransmission timer has been turned off.  Make sure
+	 * that the retransmission timer is set.
+	 */
+	if (SEQ_GT(tp->snd_max, tp->snd_una) &&
+	    tp->t_timer[TCPT_REXMT] == 0 &&
+	    tp->t_timer[TCPT_PERSIST] == 0) {
+		tp->t_timer[TCPT_REXMT] = tp->t_rxtcur;
+		return (0);
+	}
+#endif /* TCP_SACK */
 
 	/*
 	 * TCP window updates are not reliable, rather a polling protocol
@@ -794,7 +818,7 @@ send:
 		union sockaddr_union sa;
 		struct tdb *tdb;
 
-		memset(&sa, 0, sizeof(union sockaddr_union));
+		bzero(&sa, sizeof(union sockaddr_union));
 
 		switch (tp->pf) {
 		case 0:	/*default to PF_INET*/
@@ -814,6 +838,8 @@ send:
 #endif /* INET6 */
 		}
 
+		/* XXX gettdb() should really be called at spltdb().      */
+		/* XXX this is splsoftnet(), currently they are the same. */
 		tdb = gettdb(0, &sa, IPPROTO_TCP);
 		if (tdb == NULL)
 			return (EPERM);
@@ -1046,7 +1072,7 @@ out:
 		tp->rcv_adv = tp->rcv_nxt + win;
 	tp->last_ack_sent = tp->rcv_nxt;
 	tp->t_flags &= ~(TF_ACKNOW|TF_DELACK);
-#if defined(TCP_SACK) || defined(TCP_NEWRENO)
+#if defined(TCP_SACK)
 	if (sendalot && --maxburst)
 #else
 	if (sendalot)
@@ -1066,6 +1092,8 @@ tcp_setpersist(tp)
 	/*
 	 * Start/restart persistance timer.
 	 */
+	if (t < tp->t_rttmin)
+		t = tp->t_rttmin;
 	TCPT_RANGESET(tp->t_timer[TCPT_PERSIST],
 	    t * tcp_backoff[tp->t_rxtshift],
 	    TCPTV_PERSMIN, TCPTV_PERSMAX);

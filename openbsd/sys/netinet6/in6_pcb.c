@@ -1,3 +1,5 @@
+/*	$OpenBSD: in6_pcb.c,v 1.12 2000/04/27 09:23:21 itojun Exp $	*/
+
 /*
 %%% copyright-nrl-95
 This software is Copyright 1995-1998 by Randall Atkinson, Ronald Lee,
@@ -43,7 +45,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
  *
  */
 
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -52,11 +53,9 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
-/*#include <sys/ioctl.h>*/
 #include <sys/errno.h>
 #include <sys/time.h>
 #include <sys/proc.h>
-#include <dev/rndvar.h>
 
 #include <net/if.h>
 #include <net/route.h>
@@ -70,25 +69,15 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 
-#undef IPSEC
-
-#if defined(_BSDI_VERSION) && (_BSDI_VERSION >= 199802)
-#include <machine/pcpu.h>
-#endif /* defined(_BSDI_VERSION) && (_BSDI_VERSION >= 199802) */
-
-#ifdef DEBUG_NRL
-#include <sys/debug.h>
-#else /* DEBUG_NRL */
-#include <netinet6/debug.h>
-#endif /* DEBUG_NRL */
-
 /*
  * External globals
  */
 
+#include <dev/rndvar.h>
 
 extern struct in6_ifaddr *in6_ifaddr;
 extern struct in_ifaddr *in_ifaddr;
+
 /*
  * Globals
  */
@@ -140,6 +129,7 @@ in6_pcbbind(inp, nam)
 
   if (in6_ifaddr == 0 || in_ifaddr == 0)
     return EADDRNOTAVAIL;
+
   if (inp->inp_lport != 0 || !IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6))
     return EINVAL;   /* If already bound, EINVAL! */
 
@@ -394,13 +384,6 @@ portloop:
 }
 
 /*----------------------------------------------------------------------
- * This is maximum suckage point value.  This function is the first 
- * half or so of in6_pcbconnect.  It exists because FreeBSD's code 
- * supports this function for T/TCP.  If we want TCP to work with our 
- * code it must be supported. 
- ----------------------------------------------------------------------*/
-
-/*----------------------------------------------------------------------
  * Connect from a socket to a specified address.
  * Both address and port must be specified in argument sin6.
  * Eventually, flow labels will have to be dealt with here, as well.
@@ -542,11 +525,7 @@ in6_pcbconnect(inp, nam)
  ----------------------------------------------------------------------*/
 
 int
-#ifdef IPSEC
-in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify, m, nexthdr)
-#else /* IPSEC */
 in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
-#endif /* IPSEC */
      struct inpcbtable *head;
      struct sockaddr *dst;
      uint fport_arg;
@@ -554,27 +533,12 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
      uint lport_arg;
      int cmd;
      void (*notify) __P((struct inpcb *, int));
-#ifdef IPSEC
-     struct mbuf *m;
-     int nexthdr;
-#endif /* IPSEC */
 {
-#define in6_rtchange in_rtchange /* XXX: openbsd does not have in6_rtchange */
-
   register struct inpcb *inp, *ninp;
   struct in6_addr *faddr,laddr = *la;
   u_short fport = fport_arg, lport = lport_arg;
   int errno, nmatch = 0;
-  int do_rtchange = (notify == in6_rtchange);
-#ifdef IPSEC
-  struct sockaddr_in6 srcsa, dstsa;
-#endif /* IPSEC */
-
-  DPRINTF(IDL_EVENT,("Entering in6_pcbnotify.  head = 0x%lx, dst is\n", (unsigned long)head));
-  DDO(IDL_EVENT,dump_smart_sockaddr(dst));
-  DPRINTF(IDL_EVENT,("fport_arg = %d, lport_arg = %d, cmd = %d\n",\
-			   fport_arg, lport_arg, cmd));
-  DDO(IDL_EVENT,printf("la is ");dump_in6_addr(la));
+  int do_rtchange = (notify == in_rtchange);
 
   if ((unsigned)cmd > PRC_NCMDS || dst->sa_family != AF_INET6)
     return 1;
@@ -588,74 +552,47 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
   
   /*
    * Redirects go to all references to the destination,
-   * and use in6_rtchange to invalidate the route cache.
-   * Dead host indications: also use in6_rtchange to invalidate
+   * and use in_rtchange to invalidate the route cache.
+   * Dead host indications: also use in_rtchange to invalidate
    * the cache, and deliver the error to all the sockets.
    * Otherwise, if we have knowledge of the local port and address,
    * deliver only to that socket.
    */
+
   if (PRC_IS_REDIRECT(cmd) || cmd == PRC_HOSTDEAD)
     {
       fport = 0;
       lport = 0;
       laddr = in6addr_any;
 
-      notify = in6_rtchange;
+      notify = in_rtchange;
     }
   errno = inet6ctlerrmap[cmd];
-
-#ifdef IPSEC
-  /* Build these again because args aren't necessarily correctly formed
-     sockaddrs, and the policy code will eventually need that. -cmetz */
-
-  memset(&srcsa, 0, sizeof(struct sockaddr_in6));
-  srcsa.sin6_len = sizeof(struct sockaddr_in6);
-  srcsa.sin6_family = AF_INET6;
-  /* defer port */
-  srcsa.sin6_addr = *faddr;
-
-  memset(&dstsa, 0, sizeof(struct sockaddr_in6));
-  dstsa.sin6_len = sizeof(struct sockaddr_in6);
-  dstsa.sin6_family = AF_INET6;
-  /* defer port */
-  dstsa.sin6_addr = laddr;
-#endif /* IPSEC */
 
   for (inp = head->inpt_queue.cqh_first;
        inp != (struct inpcb *)&head->inpt_queue; inp = ninp)
     {
       ninp = inp->inp_queue.cqe_next;
+
+#ifdef INET6
       if ((inp->inp_flags & INP_IPV6) == 0)
 	continue;
+#endif
 
       if (do_rtchange) {
 	/*
 	 * Since a non-connected PCB might have a cached route,
-	 * we always call in6_rtchange without matching
+	 * we always call in_rtchange without matching
 	 * the PCB to the src/dst pair.
 	 *
-	 * XXX: we assume in6_rtchange does not free the PCB.
+	 * XXX: we assume in_rtchange does not free the PCB.
 	 */
 	if (IN6_ARE_ADDR_EQUAL(&inp->inp_route6.ro_dst.sin6_addr, faddr)) {
-#ifdef IPSEC
-	  /* Pretend the packet came in for this source/destination port pair,
-	     since that's what we care about for policy. If the passed in
-	     fport and/or lport were nonzero, the comparison will make sure
-	     they match that of the PCB and the right thing will happen.
-	     -cmetz */
-	  srcsa.sin6_port = inp->inp_fport;
-	  dstsa.sin6_port = inp->inp_lport;
-
-	  /* XXX - state arg should not be NULL */
-	  if (!netproc_inputpolicy(inp->inp_socket, (struct sockaddr *)&srcsa,
-			          (struct sockaddr *)&dstsa, nexthdr, m, NULL,
-				   NULL))
-#endif /* IPSEC */
 	    {
-	      in6_rtchange(inp, errno);
+	      in_rtchange(inp, errno);
 	    }
 
-	  if (notify == in6_rtchange)
+	  if (notify == in_rtchange)
 		  continue;		/* there's nothing to do any more */
 	}
       }
@@ -666,31 +603,15 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
 	  (!IN6_IS_ADDR_UNSPECIFIED(&laddr) && !IN6_ARE_ADDR_EQUAL(&inp->inp_laddr6, &laddr)) ||
 	  (fport && inp->inp_fport != fport))
 	{
+	  inp = inp->inp_queue.cqe_next;
 	  continue;
 	}
       nmatch++;
 
       if (notify)
-	{
-#ifndef IPSEC
-	  (*notify)(inp, errno);
-#else
-	  /* See the above comment */
-	  srcsa.sin6_port = inp->inp_fport;
-	  dstsa.sin6_port = inp->inp_lport;
-
-	  /* XXX - state arg should not be NULL */
-	  if (!netproc_inputpolicy(inp->inp_socket, (struct sockaddr *)&srcsa,
-			          (struct sockaddr *)&dstsa, nexthdr, m, NULL,
-				   NULL))
-	    {
-	      (*notify)(inp, errno);
-	    }
-#endif /* IPSEC */
-	}
+	(*notify)(inp, errno);
     }
    return 0;
-#undef in6_rtchange
 }
 
 /*----------------------------------------------------------------------

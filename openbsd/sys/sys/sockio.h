@@ -1,4 +1,4 @@
-/*	$OpenBSD: sockio.h,v 1.9 1999/03/19 02:46:55 jason Exp $	*/
+/*	$OpenBSD: sockio.h,v 1.16 2000/04/26 18:37:37 chris Exp $	*/
 /*	$NetBSD: sockio.h,v 1.5 1995/08/23 00:40:47 thorpej Exp $	*/
 
 /*-
@@ -89,6 +89,9 @@
 #define	SIOCSIFMEDIA	_IOWR('i', 53, struct ifreq)	/* set net media */
 #define	SIOCGIFMEDIA	_IOWR('i', 54, struct ifmediareq) /* get net media */
 
+#define	SIOCSIFGENERIC	 _IOW('i', 57, struct ifreq)	/* generic IF set op */
+#define	SIOCGIFGENERIC	_IOWR('i', 58, struct ifreq)	/* generic IF get op */
+
 #define SIOCSIFPHYADDR   _IOW('i', 70, struct ifaliasreq) /* set gif addres */
 #define	SIOCGIFPSRCADDR	_IOWR('i', 71, struct ifreq)	/* get gif psrc addr */
 #define	SIOCGIFPDSTADDR	_IOWR('i', 72, struct ifreq)	/* get gif pdst addr */
@@ -108,9 +111,24 @@
 #define	SIOCBRDGDADDR	_IOWR('i', 71, struct ifbareq)	/* delete addr */
 #define	SIOCBRDGFLUSH	_IOWR('i', 72, struct ifbreq)	/* flush addr cache */
 
+#define SIOCGENCSA	_IOWR('i', 73, struct ifsa)	/* get enc sa */
+#define SIOCSENCDSTSA	_IOW('i', 74, struct ifsa)	/* set enc sa */
+#define SIOCSENCSRCSA	_IOW('i', 75, struct ifsa)	/* set enc sa */
+#define SIOCSENCCLEARSA	_IOW('i', 76, struct ifsa)	/* set enc sa */
+
+#define SIOCBRDGARL	_IOWR('i', 77, struct ifbrlreq)	/* add bridge rule */
+#define SIOCBRDGFRL	_IOWR('i', 78, struct ifbrlreq)	/* flush brdg rules */
+#define SIOCBRDGGRL	_IOWR('i', 79, struct ifbrlconf)/* get bridge rules */
+
+#define GRESADDRS       _IOW('i', 101, struct ifreq)
+#define GRESADDRD       _IOW('i', 102, struct ifreq)   
+#define GREGADDRS       _IOWR('i', 103, struct ifreq)
+#define GREGADDRD       _IOWR('i', 104, struct ifreq)
+#define GRESPROTO       _IOW('i' , 105, struct ifreq)
+#define GREGPROTO       _IOWR('i', 106, struct ifreq)
+
 #define	SIOCSIFMTU	 _IOW('i', 127, struct ifreq)	/* set ifnet mtu */
 #define	SIOCGIFMTU	_IOWR('i', 126, struct ifreq)	/* get ifnet mtu */
 #define	SIOCSIFASYNCMAP  _IOW('i', 125, struct ifreq)	/* set ppp asyncmap */
 #define	SIOCGIFASYNCMAP _IOWR('i', 124, struct ifreq)	/* get ppp asyncmap */
-
 #endif /* !_SYS_SOCKIO_H_ */

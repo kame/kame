@@ -1,4 +1,4 @@
-/*	$OpenBSD: in_pcb.h,v 1.17 1999/03/27 21:04:19 provos Exp $	*/
+/*	$OpenBSD: in_pcb.h,v 1.23 2000/04/27 15:41:06 millert Exp $	*/
 /*	$NetBSD: in_pcb.h,v 1.14 1996/02/13 23:42:00 christos Exp $	*/
 
 /*
@@ -66,9 +66,6 @@
  */
 
 #include <sys/queue.h>
-#if 0	/*KAME IPSEC*/
-#include <netinet6/ipsec.h>
-#endif
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
@@ -140,11 +137,6 @@ struct inpcb {
 	int	inp_fflowinfo;          /* Foreign flowlabel & priority */
 	int	inp_csumoffset;
 	struct	icmp6_filter *inp_icmp6filt;
-#if 0 /*KAME IPSEC*/
-	struct secpolicy *inp_sp;	/* security policy. It may not be
-v					 * used according to policy selection.
-					 */
-#endif
 };
 
 struct inpcbtable {
@@ -222,7 +214,7 @@ struct inpcbtable {
 #define	DP_ISSET(m, p)	((m)[((p) - IPPORT_RESERVED/2) / DP_MAPBITS] & (1 << ((p) % DP_MAPBITS)))
 
 /* default values for baddynamicports [see ip_init()] */
-#define	DEFBADDYNAMICPORTS_TCP	{ 749, 750, 751, 760, 761, 871, 0 }
+#define	DEFBADDYNAMICPORTS_TCP	{ 587, 749, 750, 751, 760, 761, 871, 0 }
 #define	DEFBADDYNAMICPORTS_UDP	{ 750, 751, 0 }
 
 struct baddynamicports {

@@ -1,13 +1,5 @@
 include	"arch/i386/conf/GENERIC"
 
-option		INET6		# IPV6
-
-# for IPv6
-pseudo-device	gif		4
-#pseudo-device	dummy		1
-#pseudo-device	faith		1
-#pseudo-device	stf
-
 # a pseudo device needed for ALTQ
 pseudo-device	altq		# altq pseudo-device
 

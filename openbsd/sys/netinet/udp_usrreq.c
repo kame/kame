@@ -1,4 +1,4 @@
-/*	$OpenBSD: udp_usrreq.c,v 1.27 1999/09/23 07:20:35 deraadt Exp $	*/
+/*	$OpenBSD: udp_usrreq.c,v 1.40 2000/04/09 17:43:02 angelos Exp $	*/
 /*	$NetBSD: udp_usrreq.c,v 1.28 1996/03/16 23:54:03 christos Exp $	*/
 
 /*
@@ -191,6 +191,8 @@ udp_input(m, va_alist)
 	/* Save the last SA which was used to process the mbuf */
 	if ((m->m_flags & (M_CONF|M_AUTH)) && m->m_pkthdr.tdbi) {
 		struct tdb_ident *tdbi = m->m_pkthdr.tdbi;
+		/* XXX gettdb() should really be called at spltdb().      */
+		/* XXX this is splsoftnet(), currently they are the same. */
 		tdb = gettdb(tdbi->spi, &tdbi->dst, tdbi->proto);
 		free(m->m_pkthdr.tdbi, M_TEMP);
 		m->m_pkthdr.tdbi = NULL;
@@ -250,9 +252,11 @@ udp_input(m, va_alist)
 	}
 	uh = (struct udphdr *)(mtod(m, caddr_t) + iphlen);
 
-	/* destination port of 0 is illegal, based on RFC768. */
-	if (uh->uh_dport == 0)
+	/* Check for illegal destination port 0 */
+	if (uh->uh_dport == 0) {
+		udpstat.udps_noport++;
 		goto bad;
+	}
 
 	/*
 	 * Make mbuf data length reflect UDP length.
@@ -525,9 +529,7 @@ udp_input(m, va_alist)
 #endif /* INET6 */
 			{
 				*ip = save_ip;
-				HTONS(ip->ip_len);
 				HTONS(ip->ip_id);
-				HTONS(ip->ip_off);
 				uh->uh_sum = savesum;
 				icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_PORT,
 					0, 0);
@@ -1099,7 +1101,12 @@ udp_usrreq(so, req, m, addr, control)
 
 	case PRU_BIND:
 		s = splsoftnet();
-		error = in_pcbbind(inp, addr);
+#ifdef INET6
+		if (inp->inp_flags & INP_IPV6)
+			error = in6_pcbbind(inp, addr);
+		else
+#endif
+			error = in_pcbbind(inp, addr);
 		splx(s);
 		break;
 

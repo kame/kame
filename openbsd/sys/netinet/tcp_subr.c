@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_subr.c,v 1.19 1999/08/27 08:15:50 millert Exp $	*/
+/*	$OpenBSD: tcp_subr.c,v 1.25 2000/03/21 04:53:13 angelos Exp $	*/
 /*	$NetBSD: tcp_subr.c,v 1.22 1996/02/13 23:44:00 christos Exp $	*/
 
 /*
@@ -107,7 +107,7 @@ int    tcp_do_rfc1323 = TCP_DO_RFC1323;
 
 #ifndef TCP_DO_SACK
 #ifdef TCP_SACK
-#define TCP_DO_SACK	0	/* XXX - make this 1 when SACK is fixed */
+#define TCP_DO_SACK	1
 #else
 #define TCP_DO_SACK	0
 #endif
@@ -888,20 +888,21 @@ tcp_signature_tdb_zeroize(tdbp)
 	return (0);
 }
 
-struct mbuf *
-tcp_signature_tdb_input(m, tdbp)
+int
+tcp_signature_tdb_input(m, tdbp, skip, protoff)
 	struct mbuf *m;
 	struct tdb *tdbp;
+	int skip, protoff;
 {
 	return (0);
 }
 
 int
-tcp_signature_tdb_output(m, gw, tdbp, mp)
+tcp_signature_tdb_output(m, tdbp, mp, skip, protoff)
 	struct mbuf *m;
-	struct sockaddr_encap *gw;
 	struct tdb *tdbp;
 	struct mbuf **mp;
+	int skip, protoff;
 {
 	return (EINVAL);
 }

@@ -61,6 +61,8 @@
 #include <machine/instr.h>
 #include <machine/trap.h>
 
+#include <sparc/sparc/cpuvar.h>
+
 #ifdef INET
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
@@ -106,7 +108,7 @@ strayintr(fp)
 
 static struct intrhand level10 = { clockintr };
 static struct intrhand level14 = { statintr };
-
+union sir sir;
 /*
  * Level 1 software interrupt (could also be Sbus level 1 interrupt).
  * Three possible reasons:
@@ -178,6 +180,69 @@ soft01intr(fp)
 	}
 	return (1);
 }
+
+#if defined(SUN4M)
+void	nmi_hard __P((void));
+void
+nmi_hard()
+{
+	/*
+         * A level 15 hard interrupt.
+         */
+#ifdef noyet
+	int fatal = 0;
+#endif
+	u_int32_t si;
+	u_int afsr, afva;
+
+	afsr = afva = 0;
+	if ((*cpuinfo.get_asyncflt)(&afsr, &afva) == 0) {
+		printf("Async registers (mid %d): afsr=%b; afva=0x%x%x\n",
+		       cpuinfo.mid, afsr, AFSR_BITS,
+		       (afsr & AFSR_AFA) >> AFSR_AFA_RSHIFT, afva);
+	}
+
+	if (cpuinfo.master == 0) {
+		/*
+		 * For now, just return.
+		 * Should wait on damage analysis done by the master.
+		 */
+		return;
+	}
+
+	/*
+	 * Examine pending system interrupts.
+	 */
+	si = *((u_int32_t *)ICR_SI_PEND);
+	printf("NMI: system interrupts: %b\n", si, SINTR_BITS);
+
+#ifdef notyet
+	if ((si & SINTR_M) != 0) {
+		/* ECC memory error */
+                if (memerr_handler != NULL)
+                        fatal |= (*memerr_handler)();
+        }
+        if ((si & SINTR_I) != 0) {
+                /* MBus/SBus async error */
+                if (sbuserr_handler != NULL)
+                        fatal |= (*sbuserr_handler)();
+        }
+        if ((si & SINTR_V) != 0) {
+                /* VME async error */
+                if (vmeerr_handler != NULL)
+                        fatal |= (*vmeerr_handler)();
+        }
+        if ((si & SINTR_ME) != 0) {
+                /* Module async error */
+                if (moduleerr_handler != NULL)
+                        fatal |= (*moduleerr_handler)();
+        }
+
+        if (fatal)
+#endif
+                panic("nmi");
+}
+#endif
 
 static struct intrhand level01 = { soft01intr };
 
@@ -273,7 +338,10 @@ intr_fasttrap(level, vec)
 #ifdef DIAGNOSTIC
 	int displ;	/* suspenders, belt, and buttons too */
 #endif
-	int s;
+	int s, i;
+	int instr[3];
+	char *instrp;
+	char *tvp;
 
 	tv = &trapbase[T_L1INT - 1 + level];
 	hi22 = ((u_long)vec) >> 10;
@@ -296,13 +364,13 @@ intr_fasttrap(level, vec)
 		    tv->tv_instr[0], tv->tv_instr[1], tv->tv_instr[2],
 		    I_MOVi(I_L3, level), I_BA(0, displ), I_RDPSR(I_L0));
 #endif
-	/* kernel text is write protected -- let us in for a moment */
-	pmap_changeprot(pmap_kernel(), (vaddr_t)tv,
-	    VM_PROT_READ|VM_PROT_WRITE, 1);
-	tv->tv_instr[0] = I_SETHI(I_L3, hi22);	/* sethi %hi(vec),%l3 */
-	tv->tv_instr[1] = I_JMPLri(I_G0, I_L3, lo10);/* jmpl %l3+%lo(vec),%g0 */
-	tv->tv_instr[2] = I_RDPSR(I_L0);	/* mov %psr, %l0 */
-	pmap_changeprot(pmap_kernel(), (vaddr_t)tv, VM_PROT_READ, 1);
-	fastvec |= 1 << level;
-	splx(s);
+	
+	instr[0] = I_SETHI(I_L3, hi22);		/* sethi %hi(vec),%l3 */
+	instr[1] = I_JMPLri(I_G0, I_L3, lo10);	/* jmpl %l3+%lo(vec),%g0 */
+	instr[2] = I_RDPSR(I_L0);		/* mov %psr, %l0 */
+
+	tvp = (char *)tv->tv_instr;
+	instrp = (char *)instr;
+	for (i = 0; i < sizeof(int) * 3; i++, instrp++, tvp++)
+		pmap_writetext(tvp, *instrp);
 }

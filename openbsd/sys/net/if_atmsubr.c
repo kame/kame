@@ -1,5 +1,5 @@
-/*      $OpenBSD: if_atmsubr.c,v 1.11 1999/02/04 00:04:18 deraadt Exp $       */
- 
+/*      $OpenBSD: if_atmsubr.c,v 1.12 2000/02/07 06:09:08 itojun Exp $       */
+
 /*
  *
  * Copyright (c) 1996 Charles D. Cranor and Washington University.
@@ -84,6 +84,9 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <altq/altq_afmap.h>
 #endif
 #endif
+#ifdef INET6
+#include <netinet6/in6_var.h>
+#endif /* INET6 */
 
 #define senderr(e) { error = (e); goto bad;}
 

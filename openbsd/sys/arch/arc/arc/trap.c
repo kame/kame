@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.22 1999/05/24 23:08:59 jason Exp $	*/
+/*	$OpenBSD: trap.c,v 1.23 1999/12/08 06:50:15 itojun Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.

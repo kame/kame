@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_input.c,v 1.49 1999/09/01 21:38:21 provos Exp $	*/
+/*	$OpenBSD: tcp_input.c,v 1.60 2000/04/28 00:31:48 itojun Exp $	*/
 /*	$NetBSD: tcp_input.c,v 1.23 1996/02/13 23:43:44 christos Exp $	*/
 
 /*
@@ -415,6 +415,8 @@ tcp_input(m, va_alist)
 	/* Save the last SA which was used to process the mbuf */
 	if ((m->m_flags & (M_CONF|M_AUTH)) && m->m_pkthdr.tdbi) {
 		struct tdb_ident *tdbi = m->m_pkthdr.tdbi;
+		/* XXX gettdb() should really be called at spltdb().      */
+		/* XXX this is splsoftnet(), currently they are the same. */
 		tdb = gettdb(tdbi->spi, &tdbi->dst, tdbi->proto);
 		free(m->m_pkthdr.tdbi, M_TEMP);
 		m->m_pkthdr.tdbi = NULL;
@@ -875,14 +877,14 @@ findpcb:
 				ND6_HINT(tp);
 				sbdrop(&so->so_snd, acked);
 				tp->snd_una = th->th_ack;
-#if defined(TCP_SACK) || defined(TCP_NEWRENO)
+#if defined(TCP_SACK)
 				/* 
 				 * We want snd_last to track snd_una so
 				 * as to avoid sequence wraparound problems
 				 * for very large transfers.
 				 */
 				tp->snd_last = tp->snd_una;
-#endif /* TCP_SACK or TCP_NEWRENO */
+#endif /* TCP_SACK */
 #if defined(TCP_SACK) && defined(TCP_FACK)
 				tp->snd_fack = tp->snd_una;
 				tp->retran_data = 0;
@@ -1146,9 +1148,9 @@ findpcb:
 #endif /* !TCP_COMPAT_42 */
 		tp->irs = th->th_seq;
 		tcp_sendseqinit(tp);
-#if defined (TCP_SACK) || defined (TCP_NEWRENO)
+#if defined (TCP_SACK)
 		tp->snd_last = tp->snd_una;
-#endif /* TCP_SACK || TCP_NEWRENO */
+#endif /* TCP_SACK */
 #if defined(TCP_SACK) && defined(TCP_FACK)
 		tp->snd_fack = tp->snd_una;
 		tp->retran_data = 0;
@@ -1583,7 +1585,7 @@ trimthenstep6:
 					    ulmin(tp->snd_wnd, tp->snd_cwnd) /
 						2 / tp->t_maxseg;
 
-#if defined(TCP_SACK) || defined(TCP_NEWRENO) 
+#if defined(TCP_SACK) 
 					if (SEQ_LT(th->th_ack, tp->snd_last)){
 					    	/* 
 						 * False fast retx after 
@@ -1598,7 +1600,7 @@ trimthenstep6:
 					if (win < 2)
 						win = 2;
 					tp->snd_ssthresh = win * tp->t_maxseg;
-#if defined(TCP_SACK) || defined(TCP_NEWRENO)
+#if defined(TCP_SACK)
 					tp->snd_last = tp->snd_max;
 #endif
 #ifdef TCP_SACK
@@ -1623,18 +1625,6 @@ trimthenstep6:
 						tp->snd_cwnd = tp->snd_ssthresh+
 					           tp->t_maxseg * tp->t_dupacks;
 #endif /* TCP_FACK */
-						/* 
-						 * It is possible for 
-						 * tcp_output to fail to send
-						 * a segment.  If so, make 
-						 * sure that REMXT timer is set.
-						 */ 
-						if (SEQ_GT(tp->snd_max, 
-						    tp->snd_una) &&
-                        			tp->t_timer[TCPT_REXMT] == 0 &&
-                        			tp->t_timer[TCPT_PERSIST] == 0)
-                        			tp->t_timer[TCPT_REXMT] = 
-						    tp->t_rxtcur;
 						goto drop;
 					}
 #endif /* TCP_SACK */
@@ -1681,23 +1671,7 @@ trimthenstep6:
 		 * If the congestion window was inflated to account
 		 * for the other side's cached packets, retract it.
 		 */
-#ifdef TCP_NEWRENO
-		if (tp->t_dupacks >= tcprexmtthresh && !tcp_newreno(tp, th)) {
-			/* Out of fast recovery */
-			tp->snd_cwnd = tp->snd_ssthresh;
-			/* 
-			 * Window inflation should have left us with approx.
-			 * snd_ssthresh outstanding data.  But in case we
-			 * would be inclined to send a burst, better to do
-			 * it via the slow start mechanism.
-			 */
-			if (tcp_seq_subtract(tp->snd_max, th->th_ack) <
-			    tp->snd_ssthresh)
-				tp->snd_cwnd = tcp_seq_subtract(tp->snd_max,
-				    th->th_ack) + tp->t_maxseg;	
-			tp->t_dupacks = 0;
-		}
-#elif defined(TCP_SACK)
+#if defined(TCP_SACK)
 		if (!tp->sack_disable) {
 			if (tp->t_dupacks >= tcprexmtthresh) {
 				/* Check for a partial ACK */
@@ -1738,7 +1712,9 @@ trimthenstep6:
 				tp->t_dupacks = 0;
 			}
 		}
-#else /* else neither TCP_NEWRENO nor TCP_SACK */
+		if (tp->t_dupacks < tcprexmtthresh)
+			tp->t_dupacks = 0;
+#else /* else no TCP_SACK */
 		if (tp->t_dupacks >= tcprexmtthresh &&
 		    tp->snd_cwnd > tp->snd_ssthresh)
 			tp->snd_cwnd = tp->snd_ssthresh;
@@ -1790,7 +1766,7 @@ trimthenstep6:
 
 		if (cw > tp->snd_ssthresh)
 			incr = incr * incr / cw;
-#if defined (TCP_NEWRENO) || defined (TCP_SACK)
+#if defined (TCP_SACK)
 		if (SEQ_GEQ(th->th_ack, tp->snd_last)) 
 #endif
 		tp->snd_cwnd = min(cw + incr, TCP_MAXWIN<<tp->snd_scale);
@@ -2072,17 +2048,6 @@ dodata:							/* XXX */
 	 */
 	if (needoutput || (tp->t_flags & TF_ACKNOW)) {
 		(void) tcp_output(tp);
-#ifdef TCP_SACK
-	/* 
-	 * In SACK, it is possible for tcp_output() to fail to send a segment 
-	 * after the retransmission timer has been turned off.  Make sure that
-	 * the retransmission timer is set if we are in fast recovery. 
-	 */
-		if (needoutput && SEQ_GT(tp->snd_max, tp->snd_una) && 
-		    tp->t_timer[TCPT_REXMT] == 0 && 
-		    tp->t_timer[TCPT_PERSIST] == 0)
-			tp->t_timer[TCPT_REXMT] = tp->t_rxtcur;
-#endif
 	}
 	return;
 
@@ -2239,7 +2204,7 @@ tcp_dooptions(tp, cp, cnt, th, ts_present, ts_val, ts_ecr)
 		(void) tcp_mss(tp, mss);	/* sets t_maxseg */
 }
 
-#if defined(TCP_SACK) || defined(TCP_NEWRENO)
+#if defined(TCP_SACK)
 u_long 
 tcp_seq_subtract(a, b)
 	u_long a, b;
@@ -2399,7 +2364,7 @@ tcp_sack_option(tp, th, cp, optlen)
 			if (SEQ_LT(sack.start, tp->snd_una))
 				continue;
 		}
-		if (SEQ_GEQ(sack.end, tp->snd_max))
+		if (SEQ_GT(sack.end, tp->snd_max))
 			continue;
 		if (tp->snd_holes == 0) { /* first hole */
 			tp->snd_holes = (struct sackhole *)
@@ -2689,6 +2654,7 @@ tcp_xmit_timer(tp, rtt)
 	short rtt;
 {
 	register short delta;
+	short rttmin;
 
 	tcpstat.tcps_rttupdated++;
 	--rtt;
@@ -2741,8 +2707,11 @@ tcp_xmit_timer(tp, rtt)
 	 * statistical, we have to test that we don't drop below
 	 * the minimum feasible timer (which is 2 ticks).
 	 */
-	TCPT_RANGESET(tp->t_rxtcur, TCP_REXMTVAL(tp),
-	    rtt + 2, TCPTV_REXMTMAX);
+	if (tp->t_rttmin > rtt + 2)
+		rttmin = tp->t_rttmin;
+	else
+		rttmin = rtt + 2;
+	TCPT_RANGESET(tp->t_rxtcur, TCP_REXMTVAL(tp), rttmin, TCPTV_REXMTMAX);
 	
 	/*
 	 * We received an ack for a packet that wasn't retransmitted;
@@ -2842,7 +2811,9 @@ tcp_mss(tp, offer)
 		 * is also a minimum value; this is subject to time.
 		 */
 		if (rt->rt_rmx.rmx_locks & RTV_RTT)
-			tp->t_rttmin = rtt / (RTM_RTTUNIT / PR_SLOWHZ);
+			TCPT_RANGESET(tp->t_rttmin,
+			    rtt / (RTM_RTTUNIT / PR_SLOWHZ),
+			    TCPTV_MIN, TCPTV_REXMTMAX);
 		tp->t_srtt = rtt / (RTM_RTTUNIT / (PR_SLOWHZ * TCP_RTT_SCALE));
 		if (rt->rt_rmx.rmx_rttvar)
 			tp->t_rttvar = rt->rt_rmx.rmx_rttvar /
@@ -2978,7 +2949,7 @@ tcp_mss(tp, offer)
 }
 #endif /* TUBA_INCLUDE */
 
-#if defined(TCP_NEWRENO) || defined (TCP_SACK)
+#if defined (TCP_SACK)
 /* 
  * Checks for partial ack.  If partial ack arrives, force the retransmission
  * of the next unacknowledged segment, do not clear tp->t_dupacks, and return
@@ -3020,4 +2991,4 @@ tcp_newreno(tp, th)
     }
     return 0;
 }
-#endif /* TCP_NEWRENO || TCP_SACK */
+#endif /* TCP_SACK */

@@ -1,4 +1,4 @@
-/*      $OpenBSD: if_atm.c,v 1.6 1997/09/28 23:09:55 deraadt Exp $       */
+/*      $OpenBSD: if_atm.c,v 1.7 1999/12/08 06:50:18 itojun Exp $       */
 
 /*
  *

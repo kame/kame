@@ -1,4 +1,4 @@
-/*	$OpenBSD: socket.h,v 1.29 1999/06/06 23:19:08 deraadt Exp $	*/
+/*	$OpenBSD: socket.h,v 1.33 2000/04/03 06:00:29 itojun Exp $	*/
 /*	$NetBSD: socket.h,v 1.14 1996/02/09 18:25:36 christos Exp $	*/
 
 /*
@@ -40,7 +40,7 @@
 #define	_SYS_SOCKET_H_
 
 /*
- * needed for __CMSG_ALIGN
+ * needed for ALIGNBYTES
  */
 #include <machine/param.h>
 
@@ -360,19 +360,10 @@ struct cmsghdr {
 
 #define	CMSG_FIRSTHDR(mhdr)	((struct cmsghdr *)(mhdr)->msg_control)
 
-/*
- * Alignment requirement for CMSG struct manipulation.
- *
- * XXX
- * This is still a little bit questionable from two points:
- * (1) It is not future adaptable.  If old binaries and new kernel uses
- * different definition for ALIGNBYTES, old binaries will choke.
- * (2) Also, it may not be correct to add dependency from sys/socket.h to
- * machine/param.h.
- */
-#define	__CMSG_ALIGN(len)	(((len)+ ALIGNBYTES) & ~ALIGNBYTES)
+/* Round len up to next alignment boundary */
+#define	__CMSG_ALIGN(len)	ALIGN(len)
 #ifdef _KERNEL
-#define CMSG_ALIGN(n)	__CMSG_ALIGN(n)
+#define CMSG_ALIGN(n)		__CMSG_ALIGN(n)
 #endif
 
 /* Length of the contents of a control message of length len */
