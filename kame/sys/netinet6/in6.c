@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.259 2002/01/21 11:37:50 keiichi Exp $	*/
+/*	$KAME: in6.c,v 1.260 2002/01/31 14:14:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1012,7 +1012,7 @@ in6_update_ifa(ifp, ifra, ia)
 	dst6 = ifra->ifra_dstaddr;
 	if ((ifp->if_flags & (IFF_POINTOPOINT|IFF_LOOPBACK)) &&
 	    (dst6.sin6_family == AF_INET6)) {
-		int64_t zoneid;
+		u_int32_t zoneid;
 
 #ifndef SCOPEDROUTING
 		if ((error = in6_recoverscope(&dst6,
@@ -1020,7 +1020,7 @@ in6_update_ifa(ifp, ifra, ia)
 					      ifp)) != 0)
 			return(error);
 #endif
-		if ((zoneid = in6_addr2zoneid(ifp, &dst6.sin6_addr)) < 0)
+		if (in6_addr2zoneid(ifp, &dst6.sin6_addr, &zoneid))
 			return(EINVAL);
 		if (dst6.sin6_scope_id == 0) /* user omit to specify the ID. */
 			dst6.sin6_scope_id = zoneid;
@@ -1691,7 +1691,6 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 	struct if_laddrreq *iflr = (struct if_laddrreq *)data;
 	struct ifaddr *ifa;
 	struct sockaddr *sa;
-	int64_t zoneid;
 
 	/* sanity checks */
 	if (!data || !ifp) {
@@ -1887,10 +1886,9 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 			s6 = (struct sockaddr_in6 *)&iflr->addr;
 			if (IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr)) {
 				s6->sin6_addr.s6_addr16[1] = 0;
-				zoneid = in6_addr2zoneid(ifp, &s6->sin6_addr);
-				if (zoneid < 0) /* XXX: should not happen */
-					return(EINVAL);
-				s6->sin6_scope_id = zoneid;
+				if (in6_addr2zoneid(ifp, &s6->sin6_addr,
+						    &s6->sin6_scope_id))
+					return(EINVAL);	/* XXX: */
 			}
 #endif
 			if ((ifp->if_flags & IFF_POINTOPOINT) != 0) {
@@ -1900,11 +1898,10 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 				s6 = (struct sockaddr_in6 *)&iflr->dstaddr;
 				if (IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr)) {
 					s6->sin6_addr.s6_addr16[1] = 0;
-					zoneid = in6_addr2zoneid(ifp,
-								 &s6->sin6_addr);
-					if (zoneid < 0) /* XXX */
-						return(EINVAL);
-					s6->sin6_scope_id = zoneid;
+					if (in6_addr2zoneid(ifp,
+							    &s6->sin6_addr,
+							    &s6->sin6_scope_id))
+						return(EINVAL); /* EINVAL */
 				}
 #endif
 			} else

@@ -75,6 +75,7 @@
 #include <netinet/ip_var.h>
 #ifdef INET6
 #include <netinet6/ip6_var.h>
+#include <netinet6/scope6_var.h>
 #endif
 #include <netinet/tcp.h>
 #include <netinet/tcp_fsm.h>
@@ -333,6 +334,7 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 	struct ip *ip;
 	struct tcphdr *nth;
 #ifdef INET6
+	struct sockaddr_in6 nsrc6, ndst6, *src6, *dst6;
 #ifdef NEW_STRUCT_ROUTE
 	struct route *ro6 = 0;
 	struct route sro6;
@@ -382,6 +384,13 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 		tlen = 0;
 		m->m_data += max_linkhdr;
 #ifdef INET6
+		if (!tp) {
+			m_freem(m);
+			return;	/* XXX: is this possible? */
+		}
+		src6 = &tp->t_inpcb->in6p_lsa;
+		dst6 = &tp->t_inpcb->in6p_fsa;
+
 		if (isipv6) {
 			bcopy((caddr_t)ip6, mtod(m, caddr_t), 
 			      sizeof(struct ip6_hdr));
@@ -405,6 +414,14 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 #define xchg(a,b,type) { type t; t=a; a=b; b=t; }
 #ifdef INET6
 		if (isipv6) {
+			if (!ip6_getpktaddrs(m, &src6, &dst6)) {
+				m_freem(m);
+				return;
+			}
+			nsrc6 = *dst6;
+			ndst6 = *src6;
+			src6 = &nsrc6;
+			dst6 = &ndst6;
 			xchg(ip6->ip6_dst, ip6->ip6_src, struct in6_addr);
 			nth = (struct tcphdr *)(ip6 + 1);
 		} else
@@ -480,6 +497,10 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 #endif
 #ifdef INET6
 	if (isipv6) {
+		if (!ip6_setpktaddrs(m, src6, dst6)) {
+			m_freem(m);
+			return;
+		}
 		(void)ip6_output(m, NULL, ro6, ipflags, NULL, NULL);
 		if (ro6 == &sro6 && ro6->ro_rt) {
 			RTFREE(ro6->ro_rt);
@@ -948,6 +969,10 @@ tcp6_getcred(SYSCTL_HANDLER_ARGS)
 	error = SYSCTL_IN(req, addrs, sizeof(addrs));
 	if (error)
 		return (error);
+	if ((error = scope6_check_id(&addrs[0], ip6_use_defzone)) != 0 ||
+	    (error = scope6_check_id(&addrs[1], ip6_use_defzone)) != 0) {
+		return (error);
+	}
 	if (IN6_IS_ADDR_V4MAPPED(&addrs[0].sin6_addr)) {
 		if (IN6_IS_ADDR_V4MAPPED(&addrs[1].sin6_addr))
 			mapped = 1;
@@ -963,9 +988,9 @@ tcp6_getcred(SYSCTL_HANDLER_ARGS)
 			addrs[0].sin6_port,
 			0, NULL);
 	else
-		inp = in6_pcblookup_hash(&tcbinfo, &addrs[1].sin6_addr,
+		inp = in6_pcblookup_hash(&tcbinfo, &addrs[1],
 				 addrs[1].sin6_port,
-				 &addrs[0].sin6_addr, addrs[0].sin6_port,
+				 &addrs[0], addrs[0].sin6_port,
 				 0, NULL);
 	if (inp == NULL || inp->inp_socket == NULL) {
 		error = ENOENT;
@@ -1413,7 +1438,10 @@ ipsec_hdrsiz_tcp(tp)
 		m->m_pkthdr.len = m->m_len =
 			sizeof(struct ip6_hdr) + sizeof(struct tcphdr);
 		tcp_fillheaders(tp, ip6, th);
-		hdrsiz = ipsec6_hdrsiz(m, IPSEC_DIR_OUTBOUND, inp);
+		if (!ip6_setpktaddrs(m, &inp->in6p_lsa, &inp->in6p_fsa))
+			hdrsiz = 0; /* XXX */
+		else
+			hdrsiz = ipsec6_hdrsiz(m, IPSEC_DIR_OUTBOUND, inp);
 	} else
 #endif /* INET6 */
       {

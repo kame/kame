@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.98 2002/01/10 12:21:34 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.99 2002/01/31 14:14:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -542,9 +542,10 @@ udp6_ctlinput(cmd, sa, d)
 			 * corresponding to the address in the ICMPv6 message
 			 * payload.
 			 */
-			if (in6_pcblookup_connect(&udb6, &sa6->sin6_addr,
-			    uh.uh_dport, (struct in6_addr *)&sa6_src->sin6_addr,
-			    uh.uh_sport, 0))
+			if (in6_pcblookup_connect(&udb6, sa6,
+						  uh.uh_dport,
+						  (struct sockaddr_in6 *)sa6_src,
+						  uh.uh_sport, 0))
 				valid++;
 #if 0
 			/*
@@ -554,7 +555,7 @@ udp6_ctlinput(cmd, sa, d)
 			 * We should at least check if the local address (= s)
 			 * is really ours.
 			 */
-			else if (in6_pcblookup_bind(&udb6, &sa6->sin6_addr,
+			else if (in6_pcblookup_bind(&udb6, sa6,
 						    uh.uh_dport, 0))
 				valid++;
 #endif

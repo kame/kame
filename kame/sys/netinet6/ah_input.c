@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.67 2002/01/07 11:39:56 kjc Exp $	*/
+/*	$KAME: ah_input.c,v 1.68 2002/01/31 14:14:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -677,6 +677,7 @@ ah6_input(mp, offp, proto)
 	struct mbuf *m = *mp;
 	int off = *offp;
 	struct ip6_hdr *ip6;
+	struct sockaddr_in6 *src_sa, *dst_sa;
 	struct ah *ah;
 	u_int32_t spi;
 	const struct ah_algorithm *algo;
@@ -702,6 +703,10 @@ ah6_input(mp, offp, proto)
 	ip6 = mtod(m, struct ip6_hdr *);
 	nxt = ah->ah_nxt;
 
+	/* extract full sockaddr structures for the src/dst addresses */
+	if (ip6_getpktaddrs(m, &src_sa, &dst_sa))
+		goto fail;
+
 	/* find the sassoc. */
 	spi = ah->ah_spi;
 
@@ -712,9 +717,8 @@ ah6_input(mp, offp, proto)
 		goto fail;
 	}
 
-	if ((sav = key_allocsa(AF_INET6,
-	                      (caddr_t)&ip6->ip6_src, (caddr_t)&ip6->ip6_dst,
-	                      IPPROTO_AH, spi)) == 0) {
+	if ((sav = key_allocsa(AF_INET6, (caddr_t)src_sa, (caddr_t)dst_sa,
+			       IPPROTO_AH, spi)) == 0) {
 		ipseclog((LOG_WARNING,
 		    "IPv6 AH input: no key association found for spi %u\n",
 		    (u_int32_t)ntohl(spi)));
@@ -939,8 +943,8 @@ ah6_input(mp, offp, proto)
 			ipsec6stat.in_inval++;
 			goto fail;
 		}
-		if (!key_checktunnelsanity(sav, AF_INET6,
-			    (caddr_t)&ip6->ip6_src, (caddr_t)&ip6->ip6_dst)) {
+		if (!key_checktunnelsanity(sav, AF_INET6, (caddr_t)src_sa,
+					   (caddr_t)dst_sa)) {
 			ipseclog((LOG_NOTICE, "ipsec tunnel address mismatch "
 			    "in IPv6 AH input: %s %s\n",
 			    ipsec6_logpacketstr(ip6, spi),

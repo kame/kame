@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.62 2002/01/07 11:39:57 kjc Exp $	*/
+/*	$KAME: esp_input.c,v 1.63 2002/01/31 14:14:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -557,6 +557,7 @@ esp6_input(mp, offp, proto)
 	struct mbuf *m = *mp;
 	int off = *offp;
 	struct ip6_hdr *ip6;
+	struct sockaddr_in6 *src_sa, *dst_sa;
 	struct esp *esp;
 	struct esptail esptail;
 	u_int32_t spi;
@@ -588,6 +589,10 @@ esp6_input(mp, offp, proto)
 #endif
 	ip6 = mtod(m, struct ip6_hdr *);
 
+	/* extract full sockaddr structures for the src/dst addresses */
+	if (ip6_getpktaddrs(m, &src_sa, &dst_sa))
+		goto bad;
+
 	if (ntohs(ip6->ip6_plen) == 0) {
 		ipseclog((LOG_ERR, "IPv6 ESP input: "
 		    "ESP with IPv6 jumbogram is not supported.\n"));
@@ -598,9 +603,8 @@ esp6_input(mp, offp, proto)
 	/* find the sassoc. */
 	spi = esp->esp_spi;
 
-	if ((sav = key_allocsa(AF_INET6,
-	                      (caddr_t)&ip6->ip6_src, (caddr_t)&ip6->ip6_dst,
-	                      IPPROTO_ESP, spi)) == 0) {
+	if ((sav = key_allocsa(AF_INET6, (caddr_t)src_sa, (caddr_t)dst_sa,
+			       IPPROTO_ESP, spi)) == 0) {
 		ipseclog((LOG_WARNING,
 		    "IPv6 ESP input: no key association found for spi %u\n",
 		    (u_int32_t)ntohl(spi)));
@@ -824,8 +828,8 @@ noreplaycheck:
 			ipsec6stat.in_inval++;
 			goto bad;
 		}
-		if (!key_checktunnelsanity(sav, AF_INET6,
-			    (caddr_t)&ip6->ip6_src, (caddr_t)&ip6->ip6_dst)) {
+		if (!key_checktunnelsanity(sav, AF_INET6, (caddr_t)src_sa,
+					   (caddr_t)dst_sa)) {
 			ipseclog((LOG_ERR, "ipsec tunnel address mismatch "
 			    "in IPv6 ESP input: %s %s\n",
 			    ipsec6_logpacketstr(ip6, spi),

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.76 2001/12/18 02:10:31 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.77 2002/01/31 14:14:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -408,11 +408,13 @@ int nd6_need_cache __P((struct ifnet *));
 
 /* nd6_nbr.c */
 void nd6_na_input __P((struct mbuf *, int, int));
-void nd6_na_output __P((struct ifnet *, const struct in6_addr *,
-	const struct in6_addr *, u_long, int, struct sockaddr *));
+void nd6_na_output __P((struct ifnet *, const struct sockaddr_in6 *,
+			const struct sockaddr_in6 *, u_long, int,
+			struct sockaddr *));
 void nd6_ns_input __P((struct mbuf *, int, int));
-void nd6_ns_output __P((struct ifnet *, const struct in6_addr *,
-	const struct in6_addr *, struct llinfo_nd6 *, int));
+void nd6_ns_output __P((struct ifnet *, const struct sockaddr_in6 *,
+			const struct sockaddr_in6 *,
+			struct llinfo_nd6 *, int));
 caddr_t nd6_ifptomac __P((struct ifnet *));
 void nd6_dad_start __P((struct ifaddr *, int *));
 void nd6_dad_stop __P((struct ifaddr *));

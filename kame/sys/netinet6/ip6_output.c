@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.279 2002/01/26 06:12:30 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.280 2002/01/31 14:14:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -255,6 +255,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #endif
 	struct rtentry *rt = NULL;
 	struct sockaddr_in6 *dst;
+	struct sockaddr_in6 *src_sa, *dst_sa;
 	int error = 0;
 	struct in6_ifaddr *ia = NULL;
 	u_long mtu;
@@ -748,7 +749,7 @@ skip_ipsec2:;
 		}
 	} else {
 		/*
-		 * this is the forwarding packet.  The typical (and
+		 * this is a forwarded packet.  The typical (and
 		 * only ?) case is multicast packet forwarding.  The
 		 * swapping has been already done before (if
 		 * necessary).  we must not touch any extension
@@ -758,7 +759,7 @@ skip_ipsec2:;
 #endif /* MIP6 */
 
 	/*
-	 * If there is a routing header, replace destination address field
+	 * If there is a routing header, replace the destination address field
 	 * with the first hop of the routing header.
 	 */
 	if (exthdrs.ip6e_rthdr) {
@@ -767,6 +768,7 @@ skip_ipsec2:;
 						  struct ip6_rthdr *));
 		struct ip6_rthdr0 *rh0;
 		struct in6_addr *addr;
+		struct sockaddr_in6 sa;
 
 		finaldst = ip6->ip6_dst;
 		switch (rh->ip6r_type) {
@@ -774,11 +776,32 @@ skip_ipsec2:;
 			 rh0 = (struct ip6_rthdr0 *)rh;
 			 addr = (struct in6_addr *)(rh0 + 1);
 
-			 ip6->ip6_dst = *addr;
+			 /*
+			  * construct a sockaddr_in6 form of the first hop.
+			  * XXX: we may not have enough information about
+			  * its scope zone; there is no standard API to pass
+			  * the information from the application.
+			  */
+			 bzero(&sa, sizeof(sa));
+			 sa.sin6_family = AF_INET6;
+			 sa.sin6_len = sizeof(sa);
+			 sa.sin6_addr = *addr;
+			 if ((error = scope6_check_id(&sa, ip6_use_defzone))
+			     != 0) {
+				 goto bad;
+			 }
+			 if (!ip6_setpktaddrs(m, NULL, &sa)) {
+				 error = ENOBUFS;
+				 goto bad;
+			 }
+			 ip6->ip6_dst = sa.sin6_addr;
 			 bcopy((caddr_t)(addr + 1), (caddr_t)addr,
 				 sizeof(struct in6_addr) * (rh0->ip6r0_segleft - 1)
 				 );
 			 *(addr + rh0->ip6r0_segleft - 1) = finaldst;
+			 /* XXX */
+			 in6_clearscope(addr + rh0->ip6r0_segleft - 1);
+
 			 break;
 		default:	/* is it possible? */
 			 error = EINVAL;
@@ -808,6 +831,22 @@ skip_ipsec2:;
 	/*
 	 * Route packet.
 	 */
+
+	/*
+	 * first extract sockaddr_in6 structures for the source and destination
+	 * addresses attached to the packet.  when source-routing, the
+	 * destination address should specify the first hop.
+	 */
+	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
+		/*
+		 * we dare to dump the fact here because this should be an
+		 * internal bug.
+		 */
+		printf("ip6_output: can't find src/dst addresses\n");
+		error = EIO;	/* XXX */
+		goto bad;
+	}
+	/* initialize cached route */
 	if (ro == 0) {
 		ro = &ip6route;
 		bzero((caddr_t)ro, sizeof(*ro));
@@ -817,17 +856,12 @@ skip_ipsec2:;
 		ro = &opt->ip6po_route;
 #ifdef MIP6
 	else if (exthdrs.ip6e_rthdr) {
-		struct sockaddr_in6 *firsthop;
-		struct ip6_hdr *ip6
-			= mtod(m, struct ip6_hdr *); /* needed ? */;
-
 		ro = &mip6_ip6route;
 		bzero((caddr_t)ro, sizeof(*ro));
-		firsthop = (struct sockaddr_in6 *)&ro->ro_dst;
-		bzero(firsthop, sizeof(*firsthop));
-		firsthop->sin6_family = AF_INET6;
-		firsthop->sin6_len = sizeof(struct sockaddr_in6);
-		firsthop->sin6_addr = ip6->ip6_dst;
+		*(struct sockaddr_in6 *)&ro->ro_dst = *src_sa;
+#ifndef SCOPEDROUTING		/* XXX */
+		((struct sockaddr_in6 *)&ro->ro_dst)->sin6_scope_id = 0;
+#endif
 	}
 #endif /* MIP6 */
 	dst = (struct sockaddr_in6 *)&ro->ro_dst;
@@ -854,8 +888,8 @@ skip_ipsec2:;
 				ip6->ip6_hlim = opt->ip6po_hlim & 0xff;
 
 			/*
-			 * XXX what should we do if ip6_hlim == 0 and the packet
-			 * gets tunnelled?
+			 * XXX what should we do if ip6_hlim == 0 and the
+			 * packet gets tunneled?
 			 */
 		}
 
@@ -967,36 +1001,16 @@ skip_ipsec2:;
 		 * a good style....
 		 */
 		struct ifnet *ifp0 = NULL;
-		struct sockaddr_in6 src;
-		struct sockaddr_in6 dst0;
 		int clone = 0;
-		int64_t zone;
+		u_int32_t zone;
 
-		/*
-		 * XXX: sockaddr_in6 for the destination should be passed
-		 * from the upper layer with a proper scope zone ID, in order
-		 * to make a copy here. 
-		 */
-		bzero(&dst0, sizeof(dst0));
-		dst0.sin6_family = AF_INET6;
-		dst0.sin6_len = sizeof(dst0);
-		dst0.sin6_addr = ip6->ip6_dst;
-#ifdef SCOPEDROUTING
-		/* XXX: in6_recoverscope will clear the embedded ID */
-		error = in6_recoverscope(&dst0, &dst0.sin6_addr, NULL);
-		if (error != 0) {
-			ip6stat.ip6s_badscope++;
-			in6_ifstat_inc(ifp, ifs6_out_discard);
-			goto bad;
-		}
-#endif
 
 #if defined(__bsdi__) || defined(__FreeBSD__)
 		if (ro != &ip6route && !IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
 			clone = 1;
 #endif
 
-		if ((error = in6_selectroute(&dst0, opt, im6o, ro,
+		if ((error = in6_selectroute(dst_sa, opt, im6o, ro,
 					     &ifp, &rt, clone)) != 0) {
 			switch (error) {
 			case EHOSTUNREACH:
@@ -1015,7 +1029,7 @@ skip_ipsec2:;
 			 * If in6_selectroute() does not return a route entry,
 			 * dst may not have been updated. 
 			 */
-			*dst = dst0;	/* XXX */
+			*dst = *dst_sa;	/* XXX */
 		}
 
 		/*
@@ -1039,34 +1053,23 @@ skip_ipsec2:;
 			ifp0 = ia->ia_ifp;
 		else
 			ifp0 = ifp;
-		/* XXX: we should not do this conversion for every packet. */
-		bzero(&src, sizeof(src));
-		src.sin6_family = AF_INET6;
-		src.sin6_len = sizeof(src);
-		src.sin6_addr = ip6->ip6_src;
-		if ((error = in6_recoverscope(&src, &ip6->ip6_src, NULL))
-		    != 0) {
-			goto badscope;
-		}
-		if ((zone = in6_addr2zoneid(ifp0, &src.sin6_addr)) < 0 ||
-		    zone != src.sin6_scope_id) {
+		if (in6_addr2zoneid(ifp0, &src_sa->sin6_addr, &zone) ||
+		    zone != src_sa->sin6_scope_id) {
 #ifdef SCOPEDEBUG		/* will be removed shortly */
-			printf("ip6 output: bad source scope %s for %s on %s\n",
-			       ip6_sprintf(&ip6->ip6_src),
-			       ip6_sprintf(&ip6->ip6_dst), if_name(ifp0));
+			printf("ip6 output: bad source scope %s%%%d for %s%%%d on %s\n",
+			       ip6_sprintf(&src_sa->sin6_addr),
+			       src_sa->sin6_scope_id,
+			       ip6_sprintf(&dst_sa->sin6_addr),
+			       dst_sa->sin6_scope_id, if_name(ifp0));
 #endif
 			goto badscope;
 		}
-		/* XXX: in6_recoverscope will clear the embedded ID */
-		if ((error = in6_recoverscope(&dst0, &ip6->ip6_dst, NULL))
-		    != 0) {
-			goto badscope;
-		}
-		if ((zone = in6_addr2zoneid(ifp0, &dst0.sin6_addr)) < 0 ||
-		    zone != dst0.sin6_scope_id) {
+		if (in6_addr2zoneid(ifp0, &dst_sa->sin6_addr, &zone) ||
+		    zone != dst_sa->sin6_scope_id) {
 #ifdef SCOPEDEBUG		/* will be removed shortly */
-			printf("ip6 output: bad dst scope %s on %s\n",
-			       ip6_sprintf(&dst0.sin6_addr), if_name(ifp0));
+			printf("ip6 output: bad dst scope %s%%%d on %s\n",
+			       ip6_sprintf(&dst_sa->sin6_addr),
+			       dst_sa->sin6_scope_id, if_name(ifp0));
 #endif
 			goto badscope;
 		}
@@ -1212,21 +1215,21 @@ skip_ipsec2:;
 		origifp = NULL;
 		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src)) {
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
-			origifp = ifnet_byindex(ntohs(ip6->ip6_src.s6_addr16[1]));
+			origifp = ifnet_byindex(ntohs(src_sa->sin6_addr.s6_addr16[1]));
 #else
-			origifp = ifindex2ifnet[ntohs(ip6->ip6_src.s6_addr16[1])];
+			origifp = ifindex2ifnet[ntohs(src_sa->sin6_addr.s6_addr16[1])];
 #endif
 		} else if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst)) {
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
-			origifp = ifnet_byindex(ntohs(ip6->ip6_dst.s6_addr16[1]));
+			origifp = ifnet_byindex(ntohs(dst_sa->sin6_addr.s6_addr16[1]));
 #else
-			origifp = ifindex2ifnet[ntohs(ip6->ip6_dst.s6_addr16[1])];
+			origifp = ifindex2ifnet[ntohs(dst_sa->sin6_addr.s6_addr16[1])];
 #endif
 		} else if (IN6_IS_ADDR_MC_INTFACELOCAL(&ip6->ip6_dst)) {
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
-			origifp = ifnet_byindex(ntohs(ip6->ip6_dst.s6_addr16[1]));
+			origifp = ifnet_byindex(ntohs(dst_sa->sin6_addr.s6_addr16[1]));
 #else
-			origifp = ifindex2ifnet[ntohs(ip6->ip6_dst.s6_addr16[1])];
+			origifp = ifindex2ifnet[ntohs(dst_sa->sin6_addr.s6_addr16[1])];
 #endif
 		}
 

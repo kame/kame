@@ -192,7 +192,7 @@ void	in6_pcbdetach __P((struct in6pcb *));
 void	in6_pcbdisconnect __P((struct in6pcb *));
 struct	in6pcb *
 	in6_pcblookup __P((struct in6pcb *,
-			   struct in6_addr *, u_int, struct in6_addr *,
+			   struct sockaddr_in6 *, u_int, struct sockaddr_in6 *,
 			   u_int, int));
 int	in6_pcbnotify __P((struct in6pcb *, struct sockaddr *,
 			   u_int, struct sockaddr *, u_int, int, void *,
@@ -205,33 +205,38 @@ void	in6_setsockaddr __P((struct in6pcb *, struct mbuf *));
 
 /* in in6_src.c */
 #if defined(NEW_STRUCT_ROUTE) || defined(__NetBSD__) || defined(__FreeBSD__)
-struct 	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
-				     struct ip6_pktopts *,
-				     struct ip6_moptions *,
-				     struct route *, struct in6_addr *,
-				     struct ifnet **, int *));
+struct 	sockaddr_in6 *in6_selectsrc __P((struct sockaddr_in6 *,
+					 struct ip6_pktopts *,
+					 struct ip6_moptions *,
+					 struct route *, struct sockaddr_in6 *,
+					 struct ifnet **, int *));
 int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
 			 struct ip6_moptions *, struct route *,
 			 struct ifnet **, struct rtentry **, int));
 #else
-struct 	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
-				     struct ip6_pktopts *,
-				     struct ip6_moptions *,
-				     struct route_in6 *, struct in6_addr *,
-				     struct ifnet **, int *));
+struct 	sockaddr_in6 *in6_selectsrc __P((struct sockaddr_in6 *,
+					 struct ip6_pktopts *,
+					 struct ip6_moptions *,
+					 struct route_in6 *,
+					 struct sockaddr_in6 *,
+					 struct ifnet **, int *));
 int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
 			 struct ip6_moptions *, struct route_in6 *,
 			 struct ifnet **, struct rtentry **, int));
 #endif
 int	in6_selecthlim __P((struct in6pcb *, struct ifnet *));
-int	in6_pcbsetport __P((struct in6_addr *, struct in6pcb *));
+int	in6_pcbsetport __P((struct sockaddr_in6 *, struct in6pcb *));
 #ifndef TCP6
 extern struct rtentry *
 	in6_pcbrtentry __P((struct in6pcb *));
 extern struct in6pcb *in6_pcblookup_connect __P((struct in6pcb *,
-	struct in6_addr *, u_int, struct in6_addr *, u_int, int));
+						 struct sockaddr_in6 *,
+						 u_int,
+						 struct sockaddr_in6 *,
+						 u_int, int));
 extern struct in6pcb *in6_pcblookup_bind __P((struct in6pcb *,
-	struct in6_addr *, u_int, int));
+					      struct sockaddr_in6 *,
+					      u_int, int));
 #endif
 #endif /* _KERNEL */
 

@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.30 2002/01/21 05:00:41 jinmei Exp $	*/
+/*	$KAME: route6.c,v 1.31 2002/01/31 14:14:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -159,7 +159,6 @@ ip6_rthdr0(m, ip6, rh0)
 {
 	int addrs, index;
 	struct sockaddr_in6 next_sa;
-	int64_t nextzone;
 	struct in6_addr *nextaddr, tmpaddr;
 	struct in6_ifaddr *ifa;
 
@@ -278,10 +277,6 @@ ip6_rthdr0(m, ip6, rh0)
 	 */
 	if ((ifa = ip6_getdstifaddr(m)) == NULL)
 		goto bad;
-	if ((nextzone = in6_addr2zoneid(ifa->ia_ifp, nextaddr)) < 0) {
-		ip6stat.ip6s_badscope++;
-		goto bad;
-	}
 	/*
 	 * construct a sockaddr_in6 for the next hop with the zone ID,
 	 * then update the recorded destination address.
@@ -290,7 +285,10 @@ ip6_rthdr0(m, ip6, rh0)
 	next_sa.sin6_family = AF_INET6;
 	next_sa.sin6_len = sizeof(next_sa);
 	next_sa.sin6_addr = *nextaddr;
-	next_sa.sin6_scope_id = nextzone;
+	if (in6_addr2zoneid(ifa->ia_ifp, nextaddr, &next_sa.sin6_scope_id)) {
+		ip6stat.ip6s_badscope++;
+		goto bad;
+	}
 	if (in6_embedscope(&next_sa.sin6_addr, &next_sa)) {
 		/* XXX: should not happen */
 		ip6stat.ip6s_badscope++;

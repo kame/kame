@@ -881,6 +881,12 @@ send:
 			goto out;
 		}
 #endif /*IPSEC*/
+		if (!ip6_setpktaddrs(m, &tp->t_inpcb->in6p_lsa,
+				     &tp->t_inpcb->in6p_fsa)) {
+			m_freem(m);
+			error = ENOBUFS;
+			goto out;
+		}
 		error = ip6_output(m,
 			    tp->t_inpcb->in6p_outputopts,
 			    &tp->t_inpcb->in6p_route,

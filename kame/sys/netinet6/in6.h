@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.115 2002/01/02 06:43:13 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.116 2002/01/31 14:14:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -246,6 +246,10 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
 	(((a)->sin6_scope_id == 0 || (b)->sin6_scope_id == 0 || \
 	  ((a)->sin6_scope_id == (b)->sin6_scope_id)) && \
 	 (bcmp(&(a)->sin6_addr, &(b)->sin6_addr, sizeof(struct in6_addr)) == 0))
+#define sa6_copy_addr(s, d) do { \
+	(d)->sin6_addr = (s)->sin6_addr; \
+	(d)->sin6_scope_id = (s)->sin6_scope_id; \
+	} while (0)
 #endif
 
 /*

@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.6 2001/07/29 19:32:40 ume Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.44 2002/01/10 12:22:02 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.45 2002/01/31 14:17:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -100,6 +100,7 @@
 #include <netinet/icmp6.h>
 #include <netinet6/udp6_var.h>
 #include <netinet6/ip6protosw.h>
+#include <netinet6/scope6_var.h>
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
@@ -130,7 +131,7 @@ udp6_input(mp, offp, proto)
 	struct ip6_recvpktopts opts;
 	int off = *offp;
 	int plen, ulen;
-	struct sockaddr_in6 udp_in6;
+	struct sockaddr_in6 *src, *dst, src_storage, dst_storage, fromsa;
 
 	bzero(&opts, sizeof(opts));
 
@@ -152,6 +153,30 @@ udp6_input(mp, offp, proto)
 	IP6_EXTHDR_GET(uh, struct udphdr *, m, off, sizeof(*uh));
 	if (!uh)
 		return IPPROTO_DONE;
+#endif
+
+	/*
+	 * extract full sockaddr structures for the src/dst addresses,
+	 * and make local copies of them.  The copies are necessary
+	 * because the memory that stores src and dst may be freed during
+	 * the process below.
+	 */
+	if (ip6_getpktaddrs(m, &src, &dst)) {
+		m_freem(m);
+		goto bad;
+	}
+	src_storage = *src;
+	dst_storage = *dst;
+	src = &src_storage;
+	dst = &dst_storage;
+
+	/*
+	 * XXX: the address may have embedded scope zone ID, which should be
+	 * hidden from applications.
+	 */
+	fromsa = *src;
+#ifndef SCOPEDROUTING
+	in6_clearscope(&fromsa.sin6_addr);
 #endif
 
 	udpstat.udps_ipackets++;
@@ -206,8 +231,7 @@ udp6_input(mp, offp, proto)
 		/*
 		 * Construct sockaddr format source address.
 		 */
-		init_sin6(&udp_in6, m); /* general init */
-		udp_in6.sin6_port = uh->uh_sport;
+		fromsa.sin6_port = uh->uh_sport;
 		/*
 		 * KAME note: traditionally we dropped udpiphdr from mbuf here.
 		 * We need udphdr for IPsec processing so we do that later.
@@ -224,13 +248,13 @@ udp6_input(mp, offp, proto)
 			if (in6p->in6p_lport != uh->uh_dport)
 				continue;
 			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
-				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr,
-							&ip6->ip6_dst))
+				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa,
+							src))
 					continue;
 			}
 			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
-				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr,
-							&ip6->ip6_src) ||
+				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa,
+							dst) ||
 				   in6p->in6p_fport != uh->uh_sport)
 					continue;
 			}
@@ -262,7 +286,7 @@ udp6_input(mp, offp, proto)
 
 					m_adj(n, off + sizeof(struct udphdr));
 					if (sbappendaddr(&last->in6p_socket->so_rcv,
-							(struct sockaddr *)&udp_in6,
+							(struct sockaddr *)&fromsa,
 							n, opts.head) == 0) {
 						m_freem(n);
 						if (opts.head)
@@ -272,6 +296,13 @@ udp6_input(mp, offp, proto)
 						sorwakeup(last->in6p_socket);
 					bzero(&opts, sizeof(opts));
 				}
+				/*
+				 * XXX: m_copy above removes m_aux that
+				 * contains the packet addresses, while we
+				 * still need them for IPsec.
+				 */
+				if (!ip6_setpktaddrs(m, src, dst))
+					goto bad; /* XXX */
 			}
 			last = in6p;
 			/*
@@ -312,7 +343,7 @@ udp6_input(mp, offp, proto)
 
 		m_adj(m, off + sizeof(struct udphdr));
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
-				(struct sockaddr *)&udp_in6,
+				(struct sockaddr *)&fromsa,
 				m, opts.head) == 0) {
 			udpstat.udps_fullsock++;
 			goto bad;
@@ -323,8 +354,8 @@ udp6_input(mp, offp, proto)
 	/*
 	 * Locate pcb for datagram.
 	 */
-	in6p = in6_pcblookup_hash(&udbinfo, &ip6->ip6_src, uh->uh_sport,
-				  &ip6->ip6_dst, uh->uh_dport, 1,
+	in6p = in6_pcblookup_hash(&udbinfo, src, uh->uh_sport,
+				  dst, uh->uh_dport, 1,
 				  m->m_pkthdr.rcvif);
 	if (in6p == 0) {
 		if (log_in_vain) {
@@ -359,14 +390,13 @@ udp6_input(mp, offp, proto)
 	 * Construct sockaddr format source address.
 	 * Stuff source address and datagram in user buffer.
 	 */
-	init_sin6(&udp_in6, m); /* general init */
-	udp_in6.sin6_port = uh->uh_sport;
+	fromsa.sin6_port = uh->uh_sport;
 	if (in6p->in6p_flags & IN6P_CONTROLOPTS
 	    || in6p->in6p_socket->so_options & SO_TIMESTAMP)
 		ip6_savecontrol(in6p, ip6, m, &opts);
 	m_adj(m, off + sizeof(struct udphdr));
 	if (sbappendaddr(&in6p->in6p_socket->so_rcv,
-			(struct sockaddr *)&udp_in6,
+			(struct sockaddr *)&fromsa,
 			m, opts.head) == 0) {
 		udpstat.udps_fullsock++;
 		goto bad;
@@ -467,10 +497,13 @@ udp6_getcred(SYSCTL_HANDLER_ARGS)
 	error = SYSCTL_IN(req, addrs, sizeof(addrs));
 	if (error)
 		return (error);
+	if ((error = scope6_check_id(&addrs[0], ip6_use_defzone)) != 0 ||
+	    (error = scope6_check_id(&addrs[1], ip6_use_defzone)) != 0) {
+		return (error);
+	}
 	s = splnet();
-	inp = in6_pcblookup_hash(&udbinfo, &addrs[1].sin6_addr,
-				 addrs[1].sin6_port,
-				 &addrs[0].sin6_addr, addrs[0].sin6_port,
+	inp = in6_pcblookup_hash(&udbinfo, &addrs[1], addrs[1].sin6_port,
+				 &addrs[0], addrs[0].sin6_port,
 				 1, NULL);
 	if (!inp || !inp->inp_socket) {
 		error = ENOENT;
@@ -661,7 +694,7 @@ udp6_disconnect(struct socket *so)
 
 	s = splnet();
 	in6_pcbdisconnect(inp);
-	inp->in6p_laddr = in6addr_any;
+	sa6_copy_addr(&sa6_any, &inp->in6p_lsa);
 	splx(s);
 	so->so_state &= ~SS_ISCONNECTED;		/* XXX */
 	return 0;

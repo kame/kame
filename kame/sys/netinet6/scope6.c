@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.27 2001/12/18 02:23:45 itojun Exp $	*/
+/*	$KAME: scope6.c,v 1.28 2002/01/31 14:14:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -265,12 +265,14 @@ in6_addrscope(addr)
  * a 32bit integer is not enough to tell a large ID from an error (-1).
  * So, we intentionally use a large type as the return value.
  */
-int64_t
-in6_addr2zoneid(ifp, addr)
+int
+in6_addr2zoneid(ifp, addr, ret_id)
 	struct ifnet *ifp;	/* must not be NULL */
 	struct in6_addr *addr;	/* must not be NULL */
+	u_int32_t *ret_id;	/* must not be NULL */
 {
 	int scope;
+	u_int32_t zoneid = 0;
 
 #ifdef DIAGNOSTIC
 	if (scope6_ids == NULL) { /* should not happen */
@@ -279,6 +281,10 @@ in6_addr2zoneid(ifp, addr)
 	}
 	if (ifp->if_index >= if_indexlim) {
 		panic("in6_addr2zoneid: invalid interface");
+		/* NOTREACHED */
+	}
+	if (ret_id == NULL) {
+		panic("in6_addr2zoneid: return ID is null");
 		/* NOTREACHED */
 	}
 #endif
@@ -290,8 +296,10 @@ in6_addr2zoneid(ifp, addr)
 	if (IN6_IS_ADDR_LOOPBACK(addr)) {
 		if (!(ifp->if_flags & IFF_LOOPBACK))
 			return(-1);
-		else
-			return(0); /* there's no ambiguity */
+		else {
+			*ret_id = 0; /* there's no ambiguity */
+			return(0);
+		}
 	}
 
 	scope = in6_addrscope(addr);
@@ -299,20 +307,28 @@ in6_addr2zoneid(ifp, addr)
 #define SID scope6_ids[ifp->if_index]
 	switch (scope) {
 	case IPV6_ADDR_SCOPE_INTFACELOCAL: /* should be interface index */
-		return(SID.s6id_list[IPV6_ADDR_SCOPE_INTFACELOCAL]);
+		zoneid = SID.s6id_list[IPV6_ADDR_SCOPE_INTFACELOCAL];
+		break;
 
 	case IPV6_ADDR_SCOPE_LINKLOCAL:
-		return(SID.s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL]);
+		zoneid = SID.s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL];
+		break;
 
 	case IPV6_ADDR_SCOPE_SITELOCAL:
-		return(SID.s6id_list[IPV6_ADDR_SCOPE_SITELOCAL]);
+		zoneid = SID.s6id_list[IPV6_ADDR_SCOPE_SITELOCAL];
+		break;
 
 	case IPV6_ADDR_SCOPE_ORGLOCAL:
-		return(SID.s6id_list[IPV6_ADDR_SCOPE_ORGLOCAL]);
+		zoneid = SID.s6id_list[IPV6_ADDR_SCOPE_ORGLOCAL];
+		break;
 
 	default:
-		return(0);	/* XXX: treat as global. */
+		zoneid = 0;	/* XXX: treat as global. */
+		break;
 	}
+
+	*ret_id = zoneid;
+	return(0);	
 #undef SID
 }
 
@@ -376,13 +392,12 @@ scope6_setzoneid(ifp, sin6)
 	struct ifnet *ifp;
 	struct sockaddr_in6 *sin6;
 {
-	int64_t zoneid;
+	u_int32_t zoneid;
 	int error;
 
-	zoneid = in6_addr2zoneid(ifp, &sin6->sin6_addr);
-				 
-	if (zoneid < 0)
+	if (in6_addr2zoneid(ifp, &sin6->sin6_addr, &zoneid))
 		return(ENXIO);
+
 	if (zoneid) {
 		sin6->sin6_scope_id = zoneid;
 		if ((error = in6_embedscope(&sin6->sin6_addr, sin6)) != 0)

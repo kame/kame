@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.259 2002/01/21 04:58:09 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.260 2002/01/31 14:14:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -467,7 +467,7 @@ ip6_input(m)
 	int nxt, ours = 0;
 	struct ifnet *deliverifp = NULL;
 	struct sockaddr_in6 sa6_src, sa6_dst;
-	int64_t srczone, dstzone;
+	u_int32_t srczone, dstzone;
 #if 0
 	struct mbuf *mhist;	/* onion peeling history */
 	caddr_t hist;
@@ -746,10 +746,8 @@ ip6_input(m)
 	 * XXX: sin6_family and sin6_len will NOT be referred to, but we fill
 	 * in these fields just in case.
 	 */
-	if ((srczone = in6_addr2zoneid(m->m_pkthdr.rcvif,
-				       &ip6->ip6_src)) < 0 ||
-	    (dstzone = in6_addr2zoneid(m->m_pkthdr.rcvif,
-				       &ip6->ip6_dst)) < 0) {
+	if (in6_addr2zoneid(m->m_pkthdr.rcvif, &ip6->ip6_src, &srczone) ||
+	    in6_addr2zoneid(m->m_pkthdr.rcvif, &ip6->ip6_dst, &dstzone)) {
 		/*
 		 * Note that these generic checks cover cases that src or
 		 * dst are the loopback address and the receiving interface
@@ -763,14 +761,14 @@ ip6_input(m)
 	sa6_src.sin6_family = sa6_dst.sin6_family = AF_INET6;
 	sa6_src.sin6_len = sa6_dst.sin6_len = sizeof(struct sockaddr_in6);
 	sa6_src.sin6_addr = ip6->ip6_src;
-	sa6_src.sin6_scope_id = srczone; /* srczone should be in 32bit here */
+	sa6_src.sin6_scope_id = srczone;
 	if (in6_embedscope(&sa6_src.sin6_addr, &sa6_src)) {
 		/* XXX: should not happen */
 		ip6stat.ip6s_badscope++;
 		goto bad;
 	}
 	sa6_dst.sin6_addr = ip6->ip6_dst;
-	sa6_dst.sin6_scope_id = dstzone; /* dstzone should be in 32bit here */
+	sa6_dst.sin6_scope_id = dstzone;
 	if (in6_embedscope(&sa6_dst.sin6_addr, &sa6_dst)) { /* XXX */
 		ip6stat.ip6s_badscope++;
 		goto bad;
@@ -921,8 +919,14 @@ ip6_input(m)
 		 */
 	if (ip6_forward_rt.ro_rt != NULL &&
 	    (ip6_forward_rt.ro_rt->rt_flags & RTF_UP) != 0 && 
-	    IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst,
-			       &((struct sockaddr_in6 *)(&ip6_forward_rt.ro_dst))->sin6_addr))
+#ifdef SCOPEDROUTING
+	    SA6_ARE_ADDR_EQUAL(&sa6_dst,
+			       (struct sockaddr_in6 *)(&ip6_forward_rt.ro_dst))
+#else
+	    IN6_ARE_ADDR_EQUAL(&sa6_dst.sin6_addr,
+			       &((struct sockaddr_in6 *)(&ip6_forward_rt.ro_dst))->sin6_addr)
+#endif
+		)
 		ip6stat.ip6s_forward_cachehit++;
 	else {
 		struct sockaddr_in6 *dst6;
@@ -1123,7 +1127,7 @@ ip6_input(m)
 	if (deliverifp && !ip6_getdstifaddr(m)) {
 		struct in6_ifaddr *ia6;
 
-		ia6 = in6_ifawithifp(deliverifp, &ip6->ip6_dst);
+		ia6 = in6_ifawithifp(deliverifp, &sa6_dst.sin6_addr);
 		if (ia6) {
 			if (!ip6_setdstifaddr(m, ia6)) {
 				/*
@@ -1264,7 +1268,7 @@ ip6_input(m)
 #if defined(__NetBSD__) && defined(IFA_STATS)
 	if (deliverifp != NULL) {
 		struct in6_ifaddr *ia6;
-		ia6 = in6_ifawithifp(deliverifp, &ip6->ip6_dst);
+		ia6 = in6_ifawithifp(deliverifp, &sa6_dst->sin6_addr);
 		if (ia6)
 			ia6->ia_ifa.ifa_data.ifad_inbytes += m->m_pkthdr.len;
 	}
@@ -1374,13 +1378,42 @@ ip6_setpktaddrs(m, src, dst)
 	struct sockaddr_in6 *src, *dst;
 {
 	struct mbuf *n;
+	struct sockaddr_in6 *sin6;
 
 	n = ip6_addaux(m);
 	if (n) {
-		if (src)
-			mtod(n, struct ip6aux *)->ip6a_src = *src;
-		if (dst)
-			mtod(n, struct ip6aux *)->ip6a_dst = *dst;
+		if (src) {
+			if (src->sin6_family != AF_INET6 ||
+			    src->sin6_len != sizeof(*src)) {
+				printf("ip6_setpktaddrs: illegal src: "
+				       "family=%d, len=%d\n",
+				       src->sin6_family, src->sin6_len);
+				return(NULL);
+			}
+			/*
+			 * we only copy the "address" part to avoid misuse
+			 * the port, flow info, etc.
+			 */
+			sin6 = &mtod(n, struct ip6aux *)->ip6a_src;
+			bzero(sin6, sizeof(*sin6));
+			sin6->sin6_family = AF_INET6;
+			sin6->sin6_len = sizeof(*sin6);
+			sa6_copy_addr(src, sin6);
+		}
+		if (dst) {
+			if (dst->sin6_family != AF_INET6 ||
+			    dst->sin6_len != sizeof(*dst)) {
+				printf("ip6_setpktaddrs: illegal dst: "
+				       "family=%d, len=%d\n",
+				       dst->sin6_family, dst->sin6_len);
+				return(NULL);
+			}
+			sin6 = &mtod(n, struct ip6aux *)->ip6a_dst;
+			bzero(sin6, sizeof(*sin6));
+			sin6->sin6_family = AF_INET6;
+			sin6->sin6_len = sizeof(*sin6);
+			sa6_copy_addr(dst, sin6);
+		}
 	}
 
 	return(n);
@@ -1393,14 +1426,27 @@ ip6_getpktaddrs(m, src, dst)
 {
 	struct mbuf *n;
 
-	if (src == NULL || dst == NULL)
+	if (src == NULL && dst == NULL)
 		return(-1);
 
-	if ((n = ip6_findaux(m)) == NULL)
-		return (-1);
+	if ((n = ip6_findaux(m)) == NULL) {
+		struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 
-	*src = &mtod(n, struct ip6aux *)->ip6a_src;
-	*dst = &mtod(n, struct ip6aux *)->ip6a_dst;
+		printf("ip6_getpktaddrs no aux: src=%s, dst=%s, nxt=%d\n",
+		       ip6_sprintf(&ip6->ip6_src), ip6_sprintf(&ip6->ip6_dst),
+		       ip6->ip6_nxt);
+		return (-1);
+	}
+
+	if (mtod(n, struct ip6aux *)->ip6a_src.sin6_family != AF_INET6 ||
+	    mtod(n, struct ip6aux *)->ip6a_dst.sin6_family != AF_INET6) {
+		printf("ip6_getpktaddrs: src or dst are invalid\n");
+	}
+
+	if (src)
+		*src = &mtod(n, struct ip6aux *)->ip6a_src;
+	if (dst)
+		*dst = &mtod(n, struct ip6aux *)->ip6a_dst;
 
 	return(0);
 }
@@ -1714,9 +1760,7 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 		struct in6_pktinfo pi6;
 
 		bcopy(&ip6->ip6_dst, &pi6.ipi6_addr, sizeof(struct in6_addr));
-		if (IN6_IS_SCOPE_LINKLOCAL(&pi6.ipi6_addr) ||
-		    IN6_IS_ADDR_MC_INTFACELOCAL(&pi6.ipi6_addr))
-			pi6.ipi6_addr.s6_addr16[1] = 0;
+		in6_clearscope(&pi6.ipi6_addr);	/* XXX */
 		pi6.ipi6_ifindex = (m && m->m_pkthdr.rcvif)
 					? m->m_pkthdr.rcvif->if_index
 					: 0;

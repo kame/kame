@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.110 2002/01/28 08:25:19 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.111 2002/01/31 14:14:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2946,4 +2946,38 @@ mip6_create_addr(addr, ifid, prefix, prefixlen)
 			addr->s6_addr8[i]
 				= ifid->s6_addr8[i];
 	}
+}
+
+/* an ad-hoc supplement function to set full sockaddr src/dst to a packet */
+int
+mip6_setpktaddrs(m)
+	struct mbuf *m;
+{
+	struct sockaddr_in6 src_sa, dst_sa;
+	struct in6_addr *src, *dst;
+	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
+	int error;
+
+	src = &ip6->ip6_src;
+	dst = &ip6->ip6_dst;
+
+	bzero(&src_sa, sizeof(src_sa));
+	bzero(&dst_sa, sizeof(dst_sa));
+
+	src_sa.sin6_family = dst_sa.sin6_family = AF_INET6;
+	src_sa.sin6_len = dst_sa.sin6_len = sizeof(struct sockaddr_in6);
+	src_sa.sin6_addr = *src;
+	dst_sa.sin6_addr = *dst;
+
+	/* recover scope zone IDs */
+	if ((error = in6_recoverscope(&src_sa, src, NULL)) != 0)
+		return(error);
+	src_sa.sin6_addr = *src; /* XXX */
+	if ((error = in6_recoverscope(&dst_sa, dst, NULL)) != 0)
+		return(error);
+	dst_sa.sin6_addr = *dst; /* XXX */
+
+	if (!ip6_setpktaddrs(m, &src_sa, &dst_sa))
+		return(ENOBUFS);
+	return(0);
 }

@@ -340,6 +340,12 @@ tcp_template(tp)
 		}
 		ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
 		ip6->ip6_vfc |= IPV6_VERSION;
+
+		if (!ip6_setpktaddrs(m, &in6p->in6p_lsa, &in6p->in6p_fsa)) {
+			m_freem(m);
+			tp->t_template = NULL;
+			return(NULL); /* ENOBUFS */
+		}
 		break;
 	    }
 #endif
@@ -390,7 +396,8 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 {
 #ifndef INET6
 	struct route iproute;
-#else
+#else  /* defined(INET6) */
+	struct sockaddr_in6 nsrc6, ndst6, *src6, *dst6;
 #ifdef NEW_STRUCT_ROUTE
 	struct route iproute;
 #else
@@ -436,6 +443,8 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 		case 6:
 			family = AF_INET6;
 			hlen = sizeof(struct ip6_hdr);
+			src6 = &tp->t_in6pcb->in6p_lsa;
+			dst6 = &tp->t_in6pcb->in6p_fsa;
 			break;
 #endif
 		default:
@@ -506,6 +515,10 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 			family = AF_INET6;
 			hlen = sizeof(struct ip6_hdr);
 			ip6 = mtod(m, struct ip6_hdr *);
+			if (!ip6_getpktaddrs(m, &src6, &dst6)) {
+				m_freem(m);
+				return EINVAL; /* XXX */
+			}
 			break;
 #endif
 		default:
@@ -570,6 +583,10 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 			ip6->ip6_nxt = IPPROTO_TCP;
 			xchg(ip6->ip6_dst, ip6->ip6_src, struct in6_addr);
 			ip6->ip6_nxt = IPPROTO_TCP;
+			nsrc6 = *dst6;
+			ndst6 = *src6;
+			src6 = &nsrc6;
+			dst6 = &ndst6;
 			break;
 #endif
 #if 0
@@ -688,8 +705,10 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 				panic("tcp_respond: ip_dst != in6p_faddr");
 			}
 		} else if (family == AF_INET6) {
-			if (!IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &tp->t_in6pcb->in6p_faddr))
+			if (!SA6_ARE_ADDR_EQUAL(dst6,
+						&tp->t_in6pcb->in6p_fsa)) {
 				panic("tcp_respond: ip6_dst != in6p_faddr");
+			}
 		} else
 			panic("tcp_respond: address family mismatch");
 #endif
@@ -722,7 +741,10 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 			bzero(dst, sizeof(*dst));
 			dst->sin6_family = AF_INET6;
 			dst->sin6_len = sizeof(*dst);
-			dst->sin6_addr = ip6->ip6_dst;
+			sa6_copy_addr(dst, dst);
+#ifndef SCOPEDROUTING
+			dst->sin6_scope_id = 0;	/* XXX */
+#endif
 			break;
 		    }
 #endif
@@ -757,6 +779,10 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 		    (tp->t_in6pcb->in6p_outputopts->ip6po_flags &
 		     IP6PO_MINMTU)) {
 			ip6oflags |= IPV6_MINMTU;
+		}
+		if (!ip6_setpktaddrs(m, src6, dst6)) {
+			m_freem(m);
+			return ENOBUFS;	/* XXX */
 		}
 #ifdef NEW_STRUCT_ROUTE
 		error = ip6_output(m, NULL, ro, ip6oflags, NULL, NULL);
@@ -1223,9 +1249,9 @@ tcp6_ctlinput(cmd, sa, d)
 			 * corresponding to the address in the ICMPv6 message
 			 * payload.
 			 */
-			if (in6_pcblookup_connect(&tcb6, &sa6->sin6_addr,
-			    th.th_dport, (struct in6_addr *)&sa6_src->sin6_addr,
-			    th.th_sport, 0))
+			if (in6_pcblookup_connect(&tcb6, sa6, th.th_dport,
+						  (struct sockaddr_in6 *)sa6_src,
+						  th.th_sport, 0))
 				valid++;
 
 			/*

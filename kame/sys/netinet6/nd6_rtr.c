@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.189 2002/01/17 05:24:03 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.190 2002/01/31 14:14:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -134,10 +134,7 @@ nd6_rs_input(m, off, icmp6len)
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	struct nd_router_solicit *nd_rs;
-	struct in6_addr saddr6 = ip6->ip6_src;
-#if 0
-	struct in6_addr daddr6 = ip6->ip6_dst;
-#endif
+	struct sockaddr_in6 *src_sa6;
 	char *lladdr = NULL;
 	int lladdrlen = 0;
 #if 0
@@ -165,7 +162,7 @@ nd6_rs_input(m, off, icmp6len)
 	 * Don't update the neighbor cache, if src = ::.
 	 * This indicates that the src has no IP address assigned yet.
 	 */
-	if (IN6_IS_ADDR_UNSPECIFIED(&saddr6))
+	if (IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src))
 		goto freeit;
 
 #ifndef PULLDOWN_TEST
@@ -178,6 +175,9 @@ nd6_rs_input(m, off, icmp6len)
 		return;
 	}
 #endif
+
+	if (ip6_getpktaddrs(m, &src_sa6, NULL))
+		goto freeit;
 
 	icmp6len -= sizeof(*nd_rs);
 	nd6_option_init(nd_rs + 1, icmp6len, &ndopts);
@@ -197,11 +197,13 @@ nd6_rs_input(m, off, icmp6len)
 		nd6log((LOG_INFO,
 		    "nd6_rs_input: lladdrlen mismatch for %s "
 		    "(if %d, RS packet %d)\n",
-			ip6_sprintf(&saddr6), ifp->if_addrlen, lladdrlen - 2));
+			ip6_sprintf(&src_sa6->sin6_addr),
+			ifp->if_addrlen, lladdrlen - 2));
 		goto bad;
 	}
 
-	nd6_cache_lladdr(ifp, &saddr6, lladdr, lladdrlen, ND_ROUTER_SOLICIT, 0);
+	nd6_cache_lladdr(ifp, &src_sa6->sin6_addr, lladdr, lladdrlen,
+			 ND_ROUTER_SOLICIT, 0);
 
  freeit:
 	m_freem(m);
@@ -228,9 +230,8 @@ nd6_ra_input(m, off, icmp6len)
 	struct nd_ifinfo *ndi = &nd_ifinfo[ifp->if_index];
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	struct nd_router_advert *nd_ra;
-	struct in6_addr saddr6 = ip6->ip6_src;
+	struct sockaddr_in6 *src_sa6;
 #if 0
-	struct in6_addr daddr6 = ip6->ip6_dst;
 	int flags; /* = nd_ra->nd_ra_flags_reserved; */
 	int is_managed = ((flags & ND_RA_FLAG_MANAGED) != 0);
 	int is_other = ((flags & ND_RA_FLAG_OTHER) != 0);
@@ -256,10 +257,10 @@ nd6_ra_input(m, off, icmp6len)
 		goto bad;
 	}
 
-	if (!IN6_IS_ADDR_LINKLOCAL(&saddr6)) {
+	if (!IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_src)) {
 		nd6log((LOG_ERR,
 		    "nd6_ra_input: src %s is not link-local\n",
-		    ip6_sprintf(&saddr6)));
+		    ip6_sprintf(&ip6->ip6_src)));
 		goto bad;
 	}
 
@@ -273,6 +274,9 @@ nd6_ra_input(m, off, icmp6len)
 		return;
 	}
 #endif
+
+	if (ip6_getpktaddrs(m, &src_sa6, NULL))
+		goto freeit;
 
 	icmp6len -= sizeof(*nd_ra);
 	nd6_option_init(nd_ra + 1, icmp6len, &ndopts);
@@ -291,7 +295,7 @@ nd6_ra_input(m, off, icmp6len)
 #endif
 
 	Bzero(&dr0, sizeof(dr0));
-	dr0.rtaddr = saddr6;
+	dr0.rtaddr = src_sa6->sin6_addr;
 	dr0.flags  = nd_ra->nd_ra_flags_reserved;
 	dr0.rtlifetime = ntohs(nd_ra->nd_ra_router_lifetime);
 	dr0.expire = time_second + dr0.rtlifetime;
@@ -395,7 +399,8 @@ nd6_ra_input(m, off, icmp6len)
 				continue; /* prefix lifetime init failed */
 #ifdef MIP6
 			if (MIP6_IS_MN) {
-				if (mip6_prefix_list_update(&saddr6, &pr, dr, m)) {
+				if (mip6_prefix_list_update(&src_sa6->sin6_addr,
+							    &pr, dr, m)) {
 					mip6log((LOG_ERR,
 						 "%s:%d: "
 						 "prefix info processing "
@@ -428,7 +433,8 @@ nd6_ra_input(m, off, icmp6len)
 		struct mip6_ha *mha;
 
 		/* the home agent is shutting down. */
-		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &saddr6);
+		mha = mip6_ha_list_find_withaddr(&mip6_ha_list,
+						 &src_sa6->sin6_addr);
 		if (mha) {
 			if (mip6_ha_list_remove(&mip6_ha_list, mha)) {
 				mip6log((LOG_ERR,
@@ -492,13 +498,15 @@ nd6_ra_input(m, off, icmp6len)
 
 	if (lladdr && ((ifp->if_addrlen + 2 + 7) & ~7) != lladdrlen) {
 		nd6log((LOG_INFO,
-		    "nd6_ra_input: lladdrlen mismatch for %s "
-		    "(if %d, RA packet %d)\n",
-			ip6_sprintf(&saddr6), ifp->if_addrlen, lladdrlen - 2));
+			"nd6_ra_input: lladdrlen mismatch for %s "
+			"(if %d, RA packet %d)\n",
+			ip6_sprintf(&src_sa6->sin6_addr),
+			ifp->if_addrlen, lladdrlen - 2));
 		goto bad;
 	}
 
-	nd6_cache_lladdr(ifp, &saddr6, lladdr, lladdrlen, ND_ROUTER_ADVERT, 0);
+	nd6_cache_lladdr(ifp, &src_sa6->sin6_addr, lladdr,
+			 lladdrlen, ND_ROUTER_ADVERT, 0);
 
 	/*
 	 * Installing a link-layer address might change the state of the

@@ -66,6 +66,7 @@
 #include <netinet/ip_var.h>
 #ifdef INET6
 #include <netinet6/ip6_var.h>
+#include <netinet6/scope6_var.h>
 #endif
 #include <netinet/tcp.h>
 #include <netinet/tcp_fsm.h>
@@ -790,10 +791,16 @@ tcp6_connect(tp, nam, p)
 	struct socket *so = inp->inp_socket;
 	struct tcpcb *otp;
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)nam;
-	struct in6_addr *addr6;
+	struct sockaddr_in6 *addr6;
+#ifndef SCOPEDROUTING
+	struct sockaddr_in6 addr6_storage;
+#endif
 	struct rmxp_tao *taop;
 	struct rmxp_tao tao_noncached;
 	int error;
+
+	if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
+		return(error);
 
 	if (inp->inp_lport == 0) {
 		error = in6_pcbbind(inp, (struct sockaddr *)0, p);
@@ -809,11 +816,20 @@ tcp6_connect(tp, nam, p)
 	error = in6_pcbladdr(inp, nam, &addr6);
 	if (error)
 		return error;
+#ifndef SCOPEDROUTING	 /* XXX: addr6 may not have a valid zone id */
+	addr6_storage = *addr6;
+	if ((error = in6_recoverscope(&addr6_storage,
+				      &addr6->sin6_addr, NULL)) != 0) {
+		return (error);
+	}
+	/* XXX: also recover the embedded zone ID */
+	addr6_storage.sin6_addr = addr6->sin6_addr;
+	addr6 = &addr6_storage;
+#endif
 	oinp = in6_pcblookup_hash(inp->inp_pcbinfo,
-				  &sin6->sin6_addr, sin6->sin6_port,
+				  sin6, sin6->sin6_port,
 				  IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr)
-				  ? addr6
-				  : &inp->in6p_laddr,
+				  ? addr6 : &inp->in6p_lsa,
 				  inp->inp_lport,  0, NULL);
 	if (oinp) {
 		if (oinp != inp && (otp = intotcpcb(oinp)) != NULL &&
@@ -824,9 +840,12 @@ tcp6_connect(tp, nam, p)
 		else
 			return EADDRINUSE;
 	}
-	if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr))
-		inp->in6p_laddr = *addr6;
+	if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa.sin6_addr)) {
+		inp->in6p_lsa.sin6_addr = addr6->sin6_addr;
+		inp->in6p_lsa.sin6_scope_id = addr6->sin6_scope_id;
+	}
 	inp->in6p_faddr = sin6->sin6_addr;
+	inp->in6p_fsa.sin6_scope_id = sin6->sin6_scope_id;
 	inp->inp_fport = sin6->sin6_port;
 	if ((sin6->sin6_flowinfo & IPV6_FLOWINFO_MASK) != NULL)
 		inp->in6p_flowinfo = sin6->sin6_flowinfo;

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.84 2002/01/21 03:20:06 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.85 2002/01/31 14:14:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -81,7 +81,7 @@ struct	ip6q {
 	u_int32_t	ip6q_ident;
 	u_int8_t	ip6q_arrive;
 	u_int8_t	ip6q_ttl;
-	struct in6_addr	ip6q_src, ip6q_dst;
+	struct sockaddr_in6 ip6q_src, ip6q_dst;
 	struct ip6q	*ip6q_next;
 	struct ip6q	*ip6q_prev;
 	int		ip6q_unfrglen;	/* len of unfragmentable part */
@@ -454,6 +454,27 @@ int	rip6_usrreq __P((struct socket *,
 
 int	dest6_input __P((struct mbuf **, int *, int));
 int	none_input __P((struct mbuf **, int *, int));
+
+#ifdef NEW_STRUCT_ROUTE
+struct sockaddr_in6 *in6_selectsrc __P((struct sockaddr_in6 *,
+					struct ip6_pktopts *,
+					struct ip6_moptions *,
+					struct route *, struct sockaddr_in6 *,
+					struct ifnet **, int *));
+int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
+			 struct ip6_moptions *, struct route *,
+			 struct ifnet **, struct rtentry **, int));
+#else
+struct sockaddr_in6 *in6_selectsrc __P((struct sockaddr_in6 *,
+					struct ip6_pktopts *,
+					struct ip6_moptions *,
+					struct route_in6 *,
+					struct sockaddr_in6 *,
+					struct ifnet **, int *));
+int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
+			 struct ip6_moptions *, struct route_in6 *,
+			 struct ifnet **, struct rtentry **, int));
+#endif
 #endif /* _KERNEL */
 
 #endif /* !_NETINET6_IP6_VAR_H_ */

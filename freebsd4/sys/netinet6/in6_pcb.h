@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.h,v 1.2.2.3 2001/08/13 16:26:17 ume Exp $	*/
-/*	$KAME: in6_pcb.h,v 1.17 2001/11/12 11:11:22 jinmei Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.18 2002/01/31 14:17:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -82,13 +82,13 @@ int	in6_pcbconnect __P((struct inpcb *, struct sockaddr *, struct proc *));
 void	in6_pcbdetach __P((struct inpcb *));
 void	in6_pcbdisconnect __P((struct inpcb *));
 int	in6_pcbladdr __P((struct inpcb *, struct sockaddr *,
-			  struct in6_addr **));
+			  struct sockaddr_in6 **));
 struct	inpcb *
 	in6_pcblookup_local __P((struct inpcbinfo *,
-				 struct in6_addr *, u_int, int));
+				 struct sockaddr_in6 *, u_int, int));
 struct	inpcb *
-	in6_pcblookup_hash __P((struct inpcbinfo *,
-				struct in6_addr *, u_int, struct in6_addr *,
+	in6_pcblookup_hash __P((struct inpcbinfo *, struct sockaddr_in6 *,
+				u_int, struct sockaddr_in6 *,
 				u_int, int, struct ifnet *));
 void	in6_pcbnotify __P((struct inpcbhead *, struct sockaddr *,
 			   u_int, struct sockaddr *, u_int, int, void *,
@@ -98,27 +98,9 @@ int	in6_setpeeraddr __P((struct socket *so, struct sockaddr **nam));
 int	in6_setsockaddr __P((struct socket *so, struct sockaddr **nam));
 int	in6_mapped_sockaddr __P((struct socket *so, struct sockaddr **nam));
 int	in6_mapped_peeraddr __P((struct socket *so, struct sockaddr **nam));
-#if 1 /* def NEW_STRUCT_ROUTE */
-struct	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
-				     struct ip6_pktopts *,
-				     struct ip6_moptions *,
-				     struct route *, struct in6_addr *,
-				     struct ifnet **, int *));
-int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
-			 struct ip6_moptions *, struct route *,
-			 struct ifnet **, struct rtentry **, int));
-#else
-struct	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
-				     struct ip6_pktopts *,
-				     struct ip6_moptions *,
-				     struct route_in6 *, struct in6_addr *,
-				     struct ifnet **, int *));
-int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
-			 struct ip6_moptions *, struct route_in6 *,
-			 struct ifnet **, struct rtentry **, int));
-#endif
 int	in6_selecthlim __P((struct in6pcb *, struct ifnet *));
-int	in6_pcbsetport __P((struct in6_addr *, struct inpcb *, struct proc *));
+int	in6_pcbsetport __P((struct sockaddr_in6 *, struct inpcb *,
+			    struct proc *));
 void	init_sin6 __P((struct sockaddr_in6 *sin6, struct mbuf *m));
 #endif /* _KERNEL */
 

@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.89 2002/01/07 11:39:57 kjc Exp $	*/
+/*	$KAME: in6_gif.c,v 1.90 2002/01/31 14:14:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -225,6 +225,10 @@ in6_gif_output(ifp, family, m)
 		sc->gif_ro6.ro_rt = NULL;
 	}
 
+	if (!ip6_setpktaddrs(m, sin6_src, sin6_dst)) {
+		m_freem(m);
+		return(ENOBUFS);
+	}
 #ifdef IPV6_MINMTU
 	/*
 	 * force fragmentation to minimum MTU, to avoid path MTU discovery.
@@ -352,6 +356,10 @@ in6_gif_output(ifp, family, m)
 		sc->gif_ro6.ro_rt = NULL;
 	}
 
+	if (!ip6_setpktaddrs(m, sin6_src, sin6_dst)) {
+		m_freem(m);
+		return(ENOBUFS);
+	}
 #ifdef IPV6_MINMTU
 	/*
 	 * force fragmentation to minimum MTU, to avoid path MTU discovery.

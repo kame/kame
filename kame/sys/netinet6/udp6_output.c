@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.55 2002/01/20 10:40:30 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.56 2002/01/31 14:14:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -162,7 +162,13 @@ udp6_output(in6p, m, addr6, control)
 	u_int32_t plen = sizeof(struct udphdr) + ulen;
 	struct ip6_hdr *ip6;
 	struct udphdr *udp6;
-	struct in6_addr *laddr, *faddr;
+	struct sockaddr_in6 *lsa6 = NULL, *fsa6 = NULL;
+#ifndef SCOPEDROUTING
+	struct sockaddr_in6 lsa6_storage;
+#endif
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	struct sockaddr_in6 lsa6_mapped; /* XXX ugly */
+#endif
 	u_short fport;
 	int error = 0;
 	struct ip6_pktopts opt, *stickyopt = in6p->in6p_outputopts;
@@ -175,7 +181,7 @@ udp6_output(in6p, m, addr6, control)
 #endif
 #endif
 	int flags = 0;
-	struct sockaddr_in6 tmp, *sin6 = NULL;
+	struct sockaddr_in6 tmp;
 
 	priv = 0;
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 3)
@@ -192,22 +198,22 @@ udp6_output(in6p, m, addr6, control)
 	if (addr6) {
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		/* addr6 has been validated in udp6_send(). */
-		sin6 = (struct sockaddr_in6 *)addr6;
+		fsa6 = (struct sockaddr_in6 *)addr6;
 #else
-		sin6 = mtod(addr6, struct sockaddr_in6 *);
+		fsa6 = mtod(addr6, struct sockaddr_in6 *);
 
-		if (addr6->m_len != sizeof(*sin6))
+		if (addr6->m_len != sizeof(*fsa6))
 			return(EINVAL);
 
-		if (sin6->sin6_family != AF_INET6)
+		if (fsa6->sin6_family != AF_INET6)
 			return(EAFNOSUPPORT);
 #endif
 
 		/* protect *sin6 from overwrites */
-		tmp = *sin6;
-		sin6 = &tmp;
+		tmp = *fsa6;
+		fsa6 = &tmp;
 
-		if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
+		if ((error = scope6_check_id(fsa6, ip6_use_defzone)) != 0)
 			return(error);
 	}
 
@@ -217,7 +223,7 @@ udp6_output(in6p, m, addr6, control)
 		in6p->in6p_outputopts = &opt;
 	}
 
-	if (sin6) {
+	if (fsa6) {
 		/*
 		 * IPv4 version of udp_output calls in_pcbconnect in this case,
 		 * which needs splnet and affects performance.
@@ -226,7 +232,7 @@ udp6_output(in6p, m, addr6, control)
 		 * and in6_pcbsetport in order to fill in the local address
 		 * and the local port.
 		 */
-		if (sin6->sin6_port == 0) {
+		if (fsa6->sin6_port == 0) {
 			error = EADDRNOTAVAIL;
 			goto release;
 		}
@@ -237,10 +243,9 @@ udp6_output(in6p, m, addr6, control)
 			goto release;
 		}
 
-		faddr = &sin6->sin6_addr;
-		fport = sin6->sin6_port; /* allow 0 port */
+		fport = fsa6->sin6_port; /* allow 0 port */
 
-		if (IN6_IS_ADDR_V4MAPPED(faddr)) {
+		if (IN6_IS_ADDR_V4MAPPED(&fsa6->sin6_addr)) {
 #ifdef __OpenBSD__		/* does not support mapped addresses */
 			if (1)
 #else
@@ -275,21 +280,38 @@ udp6_output(in6p, m, addr6, control)
 			af = AF_INET;
 		}
 
-		if (!IN6_IS_ADDR_V4MAPPED(faddr)) {
+		if (!IN6_IS_ADDR_V4MAPPED(&fsa6->sin6_addr)) {
 			struct ifnet *ifp = NULL;
 
-			laddr = in6_selectsrc(sin6, in6p->in6p_outputopts,
-					      in6p->in6p_moptions,
-					      &in6p->in6p_route,
-					      &in6p->in6p_laddr, &ifp, &error);
-
-			if (ifp && sin6->sin6_scope_id == 0 &&
-			    (error = scope6_setzoneid(ifp, sin6)) != 0) {
+			lsa6 = in6_selectsrc(fsa6, in6p->in6p_outputopts,
+					     in6p->in6p_moptions,
+					     &in6p->in6p_route,
+					     &in6p->in6p_lsa, &ifp, &error);
+#ifndef SCOPEDROUTING
+			/*
+			 * XXX: sa6 may not have a valid sin6_scope_id in
+			 * the non-SCOPEDROUTING case.
+			 */
+			if (lsa6) {
+				bzero(&lsa6_storage, sizeof(lsa6_storage));
+				lsa6_storage.sin6_family = AF_INET6;
+				lsa6_storage.sin6_len = sizeof(lsa6_storage);
+				if ((error = in6_recoverscope(&lsa6_storage,
+							      &lsa6->sin6_addr,
+							      NULL)) != 0) {
+					goto release;
+				}
+				/* XXX */
+				lsa6_storage.sin6_addr = lsa6->sin6_addr;
+				lsa6 = &lsa6_storage;
+			}
+#endif
+			if (ifp && fsa6->sin6_scope_id == 0 &&
+			    (error = scope6_setzoneid(ifp, fsa6)) != 0) {
 				goto release;
 			}
 		} else {
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-			struct in6_addr laddr_mapped; /* XXX ugly */
 			/*
 			 * XXX: freebsd[34] does not have in_selectsrc, but
 			 * we can omit the whole part because freebsd4 calls
@@ -302,7 +324,8 @@ udp6_output(in6p, m, addr6, control)
 				bzero(&sin_dst, sizeof(sin_dst));
 				sin_dst.sin_family = AF_INET;
 				sin_dst.sin_len = sizeof(sin_dst);
-				bcopy(&faddr->s6_addr[12], &sin_dst.sin_addr,
+				bcopy(&fsa6->sin6_addr.s6_addr[12],
+				      &sin_dst.sin_addr,
 				      sizeof(sin_dst.sin_addr));
 				sinp = in_selectsrc(&sin_dst,
 						    (struct route *)&in6p->in6p_route,
@@ -313,28 +336,31 @@ udp6_output(in6p, m, addr6, control)
 						error = EADDRNOTAVAIL;
 					goto release;
 				}
-				bzero(&laddr_mapped, sizeof(laddr_mapped));
-				laddr_mapped.s6_addr16[5] = 0xffff; /* ugly */
+				bzero(&lsa6_mapped, sizeof(lsa6_mapped));
+				lsa6_mapped.sin6_family = AF_INET6;
+				lsa6_mapped.sin6_len = sizeof(lsa6_mapped);
+				/* ugly */
+				lsa6_mapped.sin6_addr.s6_addr16[5] = 0xffff;
 				bcopy(&sinp->sin_addr,
-				      &laddr_mapped.s6_addr[12],
+				      &lsa6_mapped.sin6_addr.s6_addr[12],
 				      sizeof(sinp->sin_addr));
-				laddr = &laddr_mapped;
+				lsa6 = &lsa6_mapped;
 			} else
 #endif /* !(freebsd3 and later) */
 			{
-				laddr = &in6p->in6p_laddr;	/* XXX */
+				lsa6 = &in6p->in6p_lsa;
 			}
 		}
-		if (laddr == NULL) {
+		if (lsa6 == NULL) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
 			goto release;
 		}
 		if (in6p->in6p_lport == 0 &&
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-		    (error = in6_pcbsetport(laddr, in6p, p)) != 0
+		    (error = in6_pcbsetport(lsa6, in6p, p)) != 0
 #else
-		    (error = in6_pcbsetport(laddr, in6p)) != 0
+		    (error = in6_pcbsetport(lsa6, in6p)) != 0
 #endif
 			)
 			goto release;
@@ -364,8 +390,8 @@ udp6_output(in6p, m, addr6, control)
 			} else
 				af = AF_INET;
 		}
-		laddr = &in6p->in6p_laddr;
-		faddr = &in6p->in6p_faddr;
+		lsa6 = &in6p->in6p_lsa;
+		fsa6 = &in6p->in6p_fsa;
 		fport = in6p->in6p_fport;
 	}
 
@@ -407,8 +433,8 @@ udp6_output(in6p, m, addr6, control)
 		ip6->ip6_hlim	= in6_selecthlim(in6p,
 						 in6p->in6p_route.ro_rt ?
 						 in6p->in6p_route.ro_rt->rt_ifp : NULL);
-		ip6->ip6_src	= *laddr;
-		ip6->ip6_dst	= *faddr;
+		ip6->ip6_src	= lsa6->sin6_addr;
+		ip6->ip6_dst	= fsa6->sin6_addr;
 
 		if ((udp6->uh_sum = in6_cksum(m, IPPROTO_UDP,
 				sizeof(struct ip6_hdr), plen)) == 0) {
@@ -422,8 +448,13 @@ udp6_output(in6p, m, addr6, control)
 			goto release;
 		}
 #endif /* IPSEC */
+		/* attach the full sockaddr_in6 addresses to the packet. */
+		if (!ip6_setpktaddrs(m, lsa6, fsa6)) {
+			error = ENOBUFS;
+			goto release;
+		}
 		error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route,
-		    flags, in6p->in6p_moptions, NULL);
+				   flags, in6p->in6p_moptions, NULL);
 		break;
 	case AF_INET:
 #if defined(INET) && (defined(__NetBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802))
@@ -444,13 +475,15 @@ udp6_output(in6p, m, addr6, control)
 #endif
 		ui->ui_pr = IPPROTO_UDP;
 		ui->ui_len = htons(plen);
-		bcopy(&laddr->s6_addr[12], &ui->ui_src, sizeof(ui->ui_src));
+		bcopy(&lsa6->sin6_addr.s6_addr[12], &ui->ui_src,
+		      sizeof(ui->ui_src));
 		ui->ui_ulen = ui->ui_len;
 
 #ifdef  __NetBSD__
 		flags = (in6p->in6p_socket->so_options &
 			 (SO_DONTROUTE | SO_BROADCAST));
-		bcopy(&faddr->s6_addr[12], &ui->ui_dst, sizeof(ui->ui_dst));
+		bcopy(&fsa6->sin6_addr.s6_addr[12],
+		      &ui->ui_dst, sizeof(ui->ui_dst));
 		udp6->uh_sum = in_cksum(m, hlen + plen);
 #elif (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 		flags = (in6p->inp_socket->so_options &
@@ -474,10 +507,10 @@ udp6_output(in6p, m, addr6, control)
 			/* See the comment in udp_output(). */
 			ui->ui_dst.s_addr = INADDR_BROADCAST;
 			udp6->uh_sum = in_cksum(m, hlen + plen);
-			bcopy(&faddr->s6_addr[12], &ui->ui_dst,
+			bcopy(&fsa6->sin6_addr.s6_addr[12], &ui->ui_dst,
 			    sizeof(ui->ui_dst));
 		} else {
-			bcopy(&faddr->s6_addr[12], &ui->ui_dst,
+			bcopy(&fsa6->sin6_addr.s6_addr[12], &ui->ui_dst,
 			    sizeof(ui->ui_dst));
 			udp6->uh_sum = in_cksum(m, hlen + plen);
 		}

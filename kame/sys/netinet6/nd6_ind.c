@@ -1,4 +1,4 @@
-/*	$KAME: nd6_ind.c,v 1.3 2001/07/26 06:53:19 jinmei Exp $	*/
+/*	$KAME: nd6_ind.c,v 1.4 2002/01/31 14:14:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -95,8 +95,6 @@ nd6_ins_input(m, off, icmp6len)
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	struct ind_neighbor_solicit *ind_ns;
-	struct in6_addr saddr6 = ip6->ip6_src;
-	struct in6_addr daddr6 = ip6->ip6_dst;
 	union nd_opts ndopts;
 	char *slladdr = NULL, *tlladdr = NULL;
 	int slladdrlen = 0, tlladdrlen = 0;
@@ -147,8 +145,10 @@ nd6_ins_input(m, off, icmp6len)
 	return;
 
  bad:
-	nd6log((LOG_ERR, "ind6_ns_input: src=%s\n", ip6_sprintf(&saddr6)));
-	nd6log((LOG_ERR, "ind6_ns_input: dst=%s\n", ip6_sprintf(&daddr6)));
+	nd6log((LOG_ERR, "ind6_ns_input: src=%s\n",
+		ip6_sprintf(&ip6->ip6_src)));
+	nd6log((LOG_ERR, "ind6_ns_input: dst=%s\n",
+		ip6_sprintf(&ip6->ip6_dst)));
 #if 0
 	icmp6stat.icp6s_badns++;
 #endif
@@ -175,10 +175,6 @@ nd6_ina_input(m, off, icmp6len)
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	struct ind_neighbor_advert *ind_na;
-#if 0
-	struct in6_addr saddr6 = ip6->ip6_src;
-#endif
-	struct in6_addr daddr6 = ip6->ip6_dst;
 	union nd_opts ndopts;
 	char *slladdr = NULL, *tlladdr = NULL;
 	int slladdrlen = 0, tlladdrlen = 0;

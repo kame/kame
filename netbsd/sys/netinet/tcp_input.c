@@ -577,6 +577,9 @@ tcp_input(m, va_alist)
 	struct ip6_hdr *ip6;
 	struct in6pcb *in6p;
 #endif
+#ifdef INET6
+	struct sockaddr_in6 *src_sa6, *dst_sa6;
+#endif
 	caddr_t optp = NULL;
 	int optlen = 0;
 	int len, tlen, toff, hdroptlen = 0;
@@ -811,6 +814,14 @@ tcp_input(m, va_alist)
 	}
 	tiflags = th->th_flags;
 
+#ifdef INET6
+	/* extract full sockaddr structures for the src/dst addresses */
+	if (af == AF_INET6) {
+		if (ip6_getpktaddrs(m, &src_sa6, &dst_sa6))
+			goto drop;
+	}
+#endif
+
 	/*
 	 * Locate pcb for segment.
 	 */
@@ -829,24 +840,30 @@ findpcb:
 		}
 #ifdef INET6
 		if (inp == 0) {
-			struct in6_addr s, d;
+			struct sockaddr_in6 s, d;
 
 			/*
 			 * mapped addr case.  IPV6_V6ONLY case is handled in
 			 * in6_pcblookup_bind().
 			 */
 			bzero(&s, sizeof(s));
-			s.s6_addr16[5] = htons(0xffff);
-			bcopy(&ip->ip_src, &s.s6_addr32[3], sizeof(ip->ip_src));
+			s.sin6_family = AF_INET6;
+			s.sin6_len = sizeof(s);
+			s.sin6_addr.s6_addr16[5] = htons(0xffff);
+			bcopy(&ip->ip_src, &s.sin6_addr.s6_addr32[3],
+			      sizeof(ip->ip_src));
 			bzero(&d, sizeof(d));
-			d.s6_addr16[5] = htons(0xffff);
-			bcopy(&ip->ip_dst, &d.s6_addr32[3], sizeof(ip->ip_dst));
+			d.sin6_family = AF_INET6;
+			d.sin6_len = sizeof(d);
+			d.sin6_addr.s6_addr16[5] = htons(0xffff);
+			bcopy(&ip->ip_dst, &d.sin6_addr.s6_addr32[3],
+			      sizeof(ip->ip_dst));
 			in6p = in6_pcblookup_connect(&tcb6, &s, th->th_sport,
-				&d, th->th_dport, 0);
+						     &d, th->th_dport, 0);
 			if (in6p == 0) {
 				++tcpstat.tcps_pcbhashmiss;
 				in6p = in6_pcblookup_bind(&tcb6, &d,
-					th->th_dport, 0);
+							  th->th_dport, 0);
 			}
 		}
 #endif
@@ -910,11 +927,11 @@ findpcb:
 #else
 		faith = 0;
 #endif
-		in6p = in6_pcblookup_connect(&tcb6, &ip6->ip6_src, th->th_sport,
-			&ip6->ip6_dst, th->th_dport, faith);
+		in6p = in6_pcblookup_connect(&tcb6, src_sa6, th->th_sport,
+					     dst_sa6, th->th_dport, faith);
 		if (in6p == NULL) {
 			++tcpstat.tcps_pcbhashmiss;
-			in6p = in6_pcblookup_bind(&tcb6, &ip6->ip6_dst,
+			in6p = in6_pcblookup_bind(&tcb6, dst_sa6,
 				th->th_dport, faith);
 		}
 		if (in6p == NULL) {
@@ -1023,12 +1040,12 @@ findpcb:
 		case AF_INET6:
 			src.sin6.sin6_len = sizeof(struct sockaddr_in6);
 			src.sin6.sin6_family = AF_INET6;
-			src.sin6.sin6_addr = ip6->ip6_src;
+			sa6_copy_addr(src_sa6, &src.sin6);
 			src.sin6.sin6_port = th->th_sport;
 
 			dst.sin6.sin6_len = sizeof(struct sockaddr_in6);
 			dst.sin6.sin6_family = AF_INET6;
-			dst.sin6.sin6_addr = ip6->ip6_dst;
+			sa6_copy_addr(dst_sa6, &dst.sin6);
 			dst.sin6.sin6_port = th->th_dport;
 			break;
 #endif /* INET6 */
@@ -1200,7 +1217,8 @@ findpcb:
 						break;
 #ifdef INET6
 					case AF_INET6:
-						i = IN6_ARE_ADDR_EQUAL(&ip6->ip6_src, &ip6->ip6_dst);
+						i = SA6_ARE_ADDR_EQUAL(src_sa6,
+								       dst_sa6);
 						break;
 #endif
 					default:
@@ -3079,7 +3097,8 @@ syn_cache_get(src, dst, th, hlen, tlen, so, m)
 #ifdef INET6
 	case AF_INET6:
 		if (in6p) {
-			in6p->in6p_laddr = ((struct sockaddr_in6 *)dst)->sin6_addr;
+			sa6_copy_addr((struct sockaddr_in6 *)dst,
+				      &in6p->in6p_lsa);
 			in6p->in6p_lport = ((struct sockaddr_in6 *)dst)->sin6_port;
 #if 0
 			in6p->in6p_flowinfo = ip6->ip6_flow & IPV6_FLOWINFO_MASK;
@@ -3577,6 +3596,10 @@ syn_cache_respond(sc, m)
 		th = (struct tcphdr *)(ip6 + 1);
 		th->th_dport = sc->sc_src.sin6.sin6_port;
 		th->th_sport = sc->sc_dst.sin6.sin6_port;
+		if (!ip6_setpktaddrs(m, &sc->sc_dst.sin6, &sc->sc_src.sin6)) {
+			m_freem(m);
+			return ENOBUFS;
+		}
 		break;
 #endif
 	default:
@@ -3667,8 +3690,13 @@ syn_cache_respond(sc, m)
 			RTFREE(ro->ro_rt);
 			ro->ro_rt = NULL;
 		}
-		bcopy(&sc->sc_src, &ro->ro_dst, sc->sc_src.sa.sa_len); 
-		rtalloc(ro);
+		bcopy(&sc->sc_src, &ro->ro_dst, sc->sc_src.sa.sa_len);
+#if defined(INET6) && !defined(SCOPEDROUTING)
+		/* XXX */
+		if (sc->sc_src.sa.sa_family == AF_INET6)
+			((struct sockaddr_in6 *)&(ro->ro_dst))->sin6_scope_id = 0;
+#endif
+ 		rtalloc(ro);
 		if ((rt = ro->ro_rt) == NULL) {
 			m_freem(m);
 			switch (sc->sc_src.sa.sa_family) {

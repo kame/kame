@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.221 2001/12/18 02:23:45 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.222 2002/01/31 14:14:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -577,15 +577,10 @@ nd6_timer(ignored_arg)
 				ln->ln_asked++;
 				ln->ln_expire = time_second +
 					nd_ifinfo[ifp->if_index].retrans / 1000;
-				nd6_ns_output(ifp, NULL, &dst->sin6_addr,
-					ln, 0);
+				nd6_ns_output(ifp, NULL, dst, ln, 0);
 			} else {
 				struct mbuf *m = ln->ln_hold;
 				if (m) {
-					struct ip6_hdr *ip6_in;
-					struct sockaddr_in6 sin6_in;
-					int64_t szoneid, dzoneid;
-
 					/*
 					 * Fake rcvif to make the ICMP error
 					 * more helpful in diagnosing for the
@@ -595,37 +590,8 @@ nd6_timer(ignored_arg)
 					 */
 					m->m_pkthdr.rcvif = rt->rt_ifp;
 
-					/*
-					 * XXX: for scoped addresses, we should
-					 * disambiguate the zone.  We should
-					 * perhaps hang sockaddr_in6 as aux
-					 * data in the mbuf.
-					 */
-					ip6_in = mtod(m, struct ip6_hdr *);
-					szoneid = in6_addr2zoneid(rt->rt_ifp,
-								  &ip6_in->ip6_src);
-					dzoneid = in6_addr2zoneid(rt->rt_ifp,
-								  &ip6_in->ip6_dst);
-					if (szoneid < 0 || dzoneid < 0) {
-						/* impossible... */
-						m_freem(m);
-					} else {
-						bzero(&sin6_in,
-						      sizeof(sin6_in));
-						sin6_in.sin6_addr = ip6_in->ip6_src;
-						sin6_in.sin6_scope_id = szoneid;
-						in6_embedscope(&ip6_in->ip6_src,
-							       &sin6_in);
-						bzero(&sin6_in,
-						      sizeof(sin6_in));
-						sin6_in.sin6_addr = ip6_in->ip6_dst;
-						sin6_in.sin6_scope_id = dzoneid;
-						in6_embedscope(&ip6_in->ip6_dst,
-							       &sin6_in);
-						icmp6_error(m,
-							    ICMP6_DST_UNREACH,
-							    ICMP6_DST_UNREACH_ADDR, 0);
-					}
+					icmp6_error(m, ICMP6_DST_UNREACH,
+						    ICMP6_DST_UNREACH_ADDR, 0);
 					ln->ln_hold = NULL;
 				}
 				next = nd6_free(rt, 0);
@@ -651,9 +617,7 @@ nd6_timer(ignored_arg)
 				ln->ln_state = ND6_LLINFO_PROBE;
 				ln->ln_expire = time_second +
 					ndi->retrans / 1000;
-				nd6_ns_output(ifp, &dst->sin6_addr,
-					      &dst->sin6_addr,
-					      ln, 0);
+				nd6_ns_output(ifp, dst, dst, ln, 0);
 			} else {
 				ln->ln_state = ND6_LLINFO_STALE; /* XXX */
 				ln->ln_expire = time_second + nd6_gctimer;
@@ -664,8 +628,7 @@ nd6_timer(ignored_arg)
 				ln->ln_asked++;
 				ln->ln_expire = time_second +
 					nd_ifinfo[ifp->if_index].retrans / 1000;
-				nd6_ns_output(ifp, &dst->sin6_addr,
-					       &dst->sin6_addr, ln, 0);
+				nd6_ns_output(ifp, dst, dst, ln, 0);
 			} else {
 				next = nd6_free(rt, 0);
 			}
@@ -945,18 +908,14 @@ nd6_lookup(addr6, create, ifp)
 {
 	struct rtentry *rt;
 	struct sockaddr_in6 sin6;
-#ifdef SCOPEDROUTING
-	int64_t zoneid;
-#endif
 
 	bzero(&sin6, sizeof(sin6));
 	sin6.sin6_len = sizeof(struct sockaddr_in6);
 	sin6.sin6_family = AF_INET6;
 	sin6.sin6_addr = *addr6;
 #ifdef SCOPEDROUTING
-	if ((zoneid = in6_addr2zoneid(ifp, addr6)) < 0)
+	if (in6_addr2zoneid(ifp, addr6, &sin6.sin6_scope_id))
 		return(NULL);
-	sin6.sin6_scope_id = zoneid;
 #endif
 	rt = rtalloc1((struct sockaddr *)&sin6, create
 #ifdef __FreeBSD__
@@ -2271,7 +2230,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 			ln->ln_asked++;
 			ln->ln_expire = time_second +
 				nd_ifinfo[ifp->if_index].retrans / 1000;
-			nd6_ns_output(ifp, NULL, &dst->sin6_addr, ln, 0);
+			nd6_ns_output(ifp, NULL, dst, ln, 0);
 		}
 	}
 	return(0);

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.75 2002/01/29 01:41:47 jinmei Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.76 2002/01/31 14:14:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -693,6 +693,10 @@ mip6_bu_send_bu(mbu)
 	}
 
 	/* output a null packet. */
+	if ((error = mip6_setpktaddrs(m)) != 0) { /* XXX */
+		m_freem(m);
+		goto send_bu_end;
+	}
 	error = ip6_output(m, NULL, NULL, 0, NULL, NULL);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -1981,6 +1985,10 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 		opt.ip6po_rthdr = pktopt_rthdr;
 	}
 
+	if ((error = mip6_setpktaddrs(m)) != 0) { /* XXX */
+		m_freem(m);
+		goto free_ip6pktopts;
+	}
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -2133,17 +2141,31 @@ mip6_bc_proxy_control(target, local, cmd)
 				 __FILE__, __LINE__,
 				 ip6_sprintf(target), error));
 		}
-		
+
 		{
 			/* very XXX */
-			struct in6_addr daddr;
-			
-			daddr = in6addr_linklocal_allnodes;
-			daddr.s6_addr16[1] = htons(ifp->if_index);
-			nd6_na_output(ifp, &daddr, target,
-				      ND_NA_FLAG_OVERRIDE,
-				      1,
-				      (struct sockaddr *)sdl);
+			struct sockaddr_in6 daddr;
+
+			bzero(&daddr, sizeof(daddr));
+			daddr.sin6_family = AF_INET6;
+			daddr.sin6_len = sizeof(daddr);
+			daddr.sin6_addr = in6addr_linklocal_allnodes;
+			if (in6_addr2zoneid(ifp, &daddr.sin6_addr,
+					    &daddr.sin6_scope_id)) {
+				/* XXX: should not happen */
+				mip6log((LOG_ERR,
+					 "%s:%d: in6_addr2zoneid failed\n"
+					 __FILE__, __LINE__));
+				error = EIO; /* XXX */
+			} else {
+				if ((error = in6_embedscope(&daddr.sin6_addr,
+							    &daddr)) == 0) {
+					nd6_na_output(ifp, &daddr, target,
+						      ND_NA_FLAG_OVERRIDE,
+						      1,
+						      (struct sockaddr *)sdl);
+				}
+			}
 		}
 
 		free(sdl, M_IFMADDR);
@@ -2603,9 +2625,8 @@ success:
 
 			/* XXX: send a unsolicited na. */
 		{
-			struct sockaddr_in6 sa6;
+			struct sockaddr_in6 sa6, daddr;
 			struct ifaddr *ifa;
-			struct in6_addr daddr;
 
 			bzero(&sa6, sizeof(sa6));
 			sa6.sin6_family = AF_INET6;
@@ -2613,8 +2634,27 @@ success:
 			sa6.sin6_addr = mbu->mbu_coa;	/* XXX or mbu_haddr */
 
 			ifa = ifa_ifwithaddr((struct sockaddr *)&sa6);
-			daddr = in6addr_linklocal_allnodes;
-			daddr.s6_addr16[1] = htons(ifa->ifa_ifp->if_index);
+
+			bzero(&daddr, sizeof(daddr));
+			daddr.sin6_family = AF_INET6;
+			daddr.sin6_len = sizeof(daddr);
+			daddr.sin6_addr = in6addr_linklocal_allnodes;
+			if (in6_addr2zoneid(ifa->ifa_ifp, &daddr.sin6_addr,
+					    &daddr.sin6_scope_id)) {
+				/* XXX: should not happen */
+				mip6log((LOG_ERR,
+					 "%s:%d: in6_addr2zoneid failed\n"
+					 __FILE__, __LINE__));
+				return(EIO);
+			}
+			if ((error = in6_embedscope(&daddr.sin6_addr,
+						    &daddr))) {
+				/* XXX: should not happen */
+				mip6log((LOG_ERR,
+					 "%s:%d: in6_embedscope failed\n"
+					 __FILE__, __LINE__));
+				return(error);
+			}
 			nd6_na_output(ifa->ifa_ifp, &daddr,
 					      &mbu->mbu_haddr,
 					      ND_NA_FLAG_OVERRIDE,
@@ -2681,10 +2721,18 @@ mip6_bu_authdata_verify(src, dst, coa, bu_opt, authdata)
 	u_int32_t authdata_spi;
 	u_char sumbuf[AH_MAXSUMSIZE];
 	int error = 0;
+	struct sockaddr_in6 src_sa, dst_sa;
 
 	bcopy((caddr_t)&authdata->spi, &authdata_spi, sizeof(authdata_spi));
 
-	sav = key_allocsa(AF_INET6, (caddr_t)src, (caddr_t)dst,
+	/* XXX: this function should take full sockaddrs */
+	bzero(&src_sa, sizeof(src_sa));
+	bzero(&dst_sa, sizeof(dst_sa));
+	src_sa.sin6_family = dst_sa.sin6_family = AF_INET6;
+	src_sa.sin6_len = dst_sa.sin6_len = sizeof(struct sockaddr_in6);
+	src_sa.sin6_addr = *src;
+	dst_sa.sin6_addr = *dst;
+	sav = key_allocsa(AF_INET6, (caddr_t)&src_sa, (caddr_t)&dst_sa,
 			  IPPROTO_AH, authdata_spi);
 	if (sav == NULL) {
 		/* no secirity association found. */
@@ -2736,10 +2784,18 @@ mip6_ba_authdata_verify(src, dst, ba_opt, authdata)
 	u_int32_t authdata_spi;
 	u_char sumbuf[AH_MAXSUMSIZE];
 	int error = 0;
+	struct sockaddr_in6 src_sa, dst_sa;
 
 	bcopy((caddr_t)&authdata->spi, &authdata_spi, sizeof(authdata_spi));
 
-	sav = key_allocsa(AF_INET6, (caddr_t)src, (caddr_t)dst,
+	/* XXX: this function should take full sockaddrs */
+	bzero(&src_sa, sizeof(src_sa));
+	bzero(&dst_sa, sizeof(dst_sa));
+	src_sa.sin6_family = dst_sa.sin6_family = AF_INET6;
+	src_sa.sin6_len = dst_sa.sin6_len = sizeof(struct sockaddr_in6);
+	src_sa.sin6_addr = *src;
+	dst_sa.sin6_addr = *dst;
+	sav = key_allocsa(AF_INET6, (caddr_t)&src_sa, (caddr_t)&dst_sa,
 			  IPPROTO_AH, authdata_spi);
 	if (sav == NULL) {
 		/* no secirity association found. */
@@ -3479,7 +3535,7 @@ mip6_tunnel_output(mp, mbc)
 	struct in6_addr *encap_src = &mbc->mbc_addr;
 	struct in6_addr *encap_dst = &mbc->mbc_pcoa;
 	struct ip6_hdr *ip6;
-	int len;
+	int len, error;
 
 	bzero(&dst, sizeof(dst));
 	dst.sin6_len = sizeof(struct sockaddr_in6);
@@ -3552,8 +3608,16 @@ mip6_tunnel_output(mp, mbc)
 	 * it is too painful to ask for resend of inner packet, to achieve
 	 * path MTU discovery for encapsulated packets.
 	 */
+	if ((error = mip6_setpktaddrs(m)) != 0) { /* XXX */
+		m_freem(m);
+		return(error);
+	}
 	return(ip6_output(m, 0, 0, IPV6_MINMTU, 0, NULL));
 #else
+	if ((error = mip6_setpktaddrs(m)) != 0) { /* XXX */
+		m_freem(m);
+		return(error);
+	}
 	return(ip6_output(m, 0, 0, 0, 0, NULL));
 #endif
 }

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.92 2002/01/21 04:56:54 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.93 2002/01/31 14:14:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -175,7 +175,7 @@ ip6_forward(m, srcrt)
 	struct mbuf *mcopy = NULL;
 	struct ifnet *origifp;	/* maybe unnecessary */
 	struct sockaddr_in6 *sa6_src, *sa6_dst;
-	int64_t dstzone;
+	u_int32_t dstzone;
 #ifdef IPSEC
 	struct secpolicy *sp = NULL;
 #endif
@@ -515,16 +515,14 @@ ip6_forward(m, srcrt)
 	 * unreachable error with Code 2 (beyond scope of source address).
 	 * [draft-ietf-ipngwg-icmp-v3-02.txt, Section 3.1]
 	 */
-	if ((dstzone = in6_addr2zoneid(rt->rt_ifp, &ip6->ip6_src)) < 0) {
-		/*
-		 * XXX: will this really happen? should return an icmp error?
-		 */
+	if (in6_addr2zoneid(rt->rt_ifp, &ip6->ip6_src, &dstzone)) {
+		/* XXX: this should not happen */
 		ip6stat.ip6s_cantforward++;
 		ip6stat.ip6s_badscope++;
 		m_freem(m);
 		return;
 	}
-	if (sa6_src->sin6_scope_id != (u_int32_t)dstzone) {
+	if (sa6_src->sin6_scope_id != dstzone) {
 		ip6stat.ip6s_cantforward++;
 		ip6stat.ip6s_badscope++;
 		in6_ifstat_inc(rt->rt_ifp, ifs6_in_discard);

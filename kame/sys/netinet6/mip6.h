@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.47 2002/01/28 07:57:07 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.48 2002/01/31 14:14:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -327,6 +327,7 @@ struct ifaddr *mip6_dad_find		__P((struct in6_addr *, struct ifnet *));
 #define mip6log(arg) do { if (mip6_config.mcfg_debug) log arg;} while (0)
 void mip6_ha_print __P((struct mip6_ha *));
 
+int mip6_setpktaddrs __P((struct mbuf *));
 #endif /* _KERNEL */
 
 #endif /* !_MIP6_H_ */

@@ -1,4 +1,4 @@
-/*	$KAME: in6_cksum.c,v 1.10 2000/12/03 00:53:59 itojun Exp $	*/
+/*	$KAME: in6_cksum.c,v 1.11 2002/01/31 14:14:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -148,13 +148,13 @@ in6_cksum(m, nxt, off, len)
 
 	/* IPv6 source address */
 	sum += w[0];
-	if (!IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))
+	if (!IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src)) /* XXX */
 		sum += w[1];
 	sum += w[2]; sum += w[3]; sum += w[4]; sum += w[5];
 	sum += w[6]; sum += w[7];
 	/* IPv6 destination address */
 	sum += w[8];
-	if (!IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst))
+	if (!IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst)) /* XXX */
 		sum += w[9];
 	sum += w[10]; sum += w[11]; sum += w[12]; sum += w[13];
 	sum += w[14]; sum += w[15];

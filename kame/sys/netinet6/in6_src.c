@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.103 2002/01/21 07:49:27 k-sugyou Exp $	*/
+/*	$KAME: in6_src.c,v 1.104 2002/01/31 14:14:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -183,9 +183,9 @@ static struct in6_addrpolicy *match_addrsel_policy __P((struct sockaddr_in6 *));
  	goto out; 		/* XXX: we can't use 'break' here */ \
 } while(0)
 
-struct in6_addr *
+struct sockaddr_in6 *
 in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
-	struct sockaddr_in6 *dstsock;
+	struct sockaddr_in6 *dstsock, *laddr;
 	struct ip6_pktopts *opts;
 	struct ip6_moptions *mopts;
 #ifdef NEW_STRUCT_ROUTE
@@ -194,7 +194,6 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 	struct route_in6 *ro;
 #endif
 	struct ifnet **ifpp;
-	struct in6_addr *laddr;
 	int *errorp;
 {
 	struct in6_addr *dst;
@@ -203,6 +202,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 	struct in6_pktinfo *pi = NULL;
 	int dst_scope = -1, best_scope = -1, best_matchlen = -1;
 	struct in6_addrpolicy *dst_policy = NULL, *best_policy = NULL;
+	u_int32_t odstzone;
 #ifdef MIP6
 	struct hif_softc *sc;
 	struct mip6_unuse_hoa *uh;
@@ -243,14 +243,11 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 		srcsock.sin6_len = sizeof(srcsock);
 		srcsock.sin6_addr = pi->ipi6_addr;
 		if (ifp) {
-			int64_t zone;
-
-			zone = in6_addr2zoneid(ifp, &pi->ipi6_addr);
-			if (zone < 0) { /* XXX: this should not happen */
-				*errorp = EINVAL;
+			if (in6_addr2zoneid(ifp, &pi->ipi6_addr,
+					    &srcsock.sin6_scope_id)) {
+				*errorp = EINVAL; /* XXX */
 				return(NULL);
 			}
-			srcsock.sin6_scope_id = zone;
 		}
 		if ((*errorp = in6_embedscope(&srcsock.sin6_addr, &srcsock))
 		    != 0) {
@@ -268,13 +265,13 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 		pi->ipi6_addr = srcsock.sin6_addr; /* XXX: this overrides pi */
 		if (*ifpp)
 			*ifpp = ifp;
-		return(&pi->ipi6_addr);
+		return(&ia6->ia_addr);
 	}
 
 	/*
 	 * Otherwise, if the socket has already bound the source, just use it.
 	 */
-	if (laddr && !IN6_IS_ADDR_UNSPECIFIED(laddr))
+	if (laddr && !IN6_IS_ADDR_UNSPECIFIED(&laddr->sin6_addr))
 		return(laddr);
 
 	/*
@@ -312,10 +309,14 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 	if (ifp == NULL)	/* this should not happen */
 		panic("in6_selectsrc: NULL ifp");
 #endif
+	if (in6_addr2zoneid(ifp, dst, &odstzone)) { /* impossible */
+		*errorp = EIO;	/* XXX */
+		return(NULL);
+	}
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
 		int new_scope = -1, new_matchlen = -1;
 		struct in6_addrpolicy *new_policy = NULL;
-		int64_t srczone, dstzone;
+		u_int32_t srczone, osrczone, dstzone;
 		struct ifnet *ifp1 = ia->ia_ifp;
 
 		/*
@@ -324,13 +325,13 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 		 * does not contain the outgoing interface.
 		 * XXX: we should probably use sin6_scope_id here.
 		 */
-		if ((dstzone = in6_addr2zoneid(ifp1, dst)) < 0 ||
-		    dstzone != in6_addr2zoneid(ifp, dst)) {
+		if (in6_addr2zoneid(ifp1, dst, &dstzone) ||
+		    odstzone != dstzone) {
 			continue;
 		}
-		if ((srczone = in6_addr2zoneid(ifp1, &ia->ia_addr.sin6_addr))
-		    < 0 ||
-		    srczone != in6_addr2zoneid(ifp, &ia->ia_addr.sin6_addr)) {
+		if (in6_addr2zoneid(ifp, &ia->ia_addr.sin6_addr, &osrczone) ||
+		    in6_addr2zoneid(ifp1, &ia->ia_addr.sin6_addr, &srczone) ||
+		    osrczone != srczone) {
 			continue;
 		}
 
@@ -601,7 +602,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 
 	if (ifpp)
 		*ifpp = ifp;
-	return(&ia->ia_addr.sin6_addr);
+	return(&ia->ia_addr);
 }
 #undef REPLACE
 #undef BREAK
@@ -629,7 +630,7 @@ in6_selectif(dstsock, opts, mopts, ro, retifp)
 	}
 
 	/*
-	 * do not use a rejected or black route.
+	 * do not use a rejected or black hole route.
 	 * XXX: this check should be done in the L2 output routine.
 	 * However, if we skipped this check here, we'd see the following
 	 * scenario:
@@ -646,8 +647,7 @@ in6_selectif(dstsock, opts, mopts, ro, retifp)
 	 * We thus reject the case here.
 	 */
 	if (rt && (rt->rt_flags & (RTF_REJECT | RTF_BLACKHOLE))) {
-		return(rt->rt_flags & RTF_BLACKHOLE ? 0 :
-		       rt->rt_flags & RTF_HOST ? EHOSTUNREACH : ENETUNREACH);
+		return(rt->rt_flags & RTF_HOST ? EHOSTUNREACH : ENETUNREACH);
 	}
 
 	/*
@@ -683,6 +683,19 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 	struct sockaddr_in6 *sin6_next;
 	struct in6_pktinfo *pi = NULL;
 	struct in6_addr *dst = &dstsock->sin6_addr;
+
+#if 0
+	if (dstsock->sin6_addr.s6_addr32[0] == 0 &&
+	    dstsock->sin6_addr.s6_addr32[1] == 0 &&
+	    !IN6_IS_ADDR_LOOPBACK(&dstsock->sin6_addr)) {
+		printf("in6_selectroute: strange destination %s\n",
+		       ip6_sprintf(&dstsock->sin6_addr));
+	} else {
+		printf("in6_selectroute: destination = %s%%%d\n",
+		       ip6_sprintf(&dstsock->sin6_addr),
+		       dstsock->sin6_scope_id); /* for debug */
+	}
+#endif
 
 	/* If the caller specify the outgoing interface explicitly, use it. */
 	if (opts && (pi = opts->ip6po_pktinfo) != NULL && pi->ipi6_ifindex) {
@@ -780,8 +793,13 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 		if (ro->ro_rt &&
 		    (!(ro->ro_rt->rt_flags & RTF_UP) ||
 		     ro->ro_dst.sa_family != AF_INET6 || 
+#ifdef SCOPEDROUTING
+		     !SA6_ARE_ADDR_EQUAL(&satosin6(&ro->ro_dst), dstsock)
+#else
 		     !IN6_ARE_ADDR_EQUAL(&satosin6(&ro->ro_dst)->sin6_addr,
-					dst))) {
+					 dst)
+#endif
+			    )) {
 			RTFREE(ro->ro_rt);
 			ro->ro_rt = (struct rtentry *)NULL;
 		}
@@ -791,11 +809,9 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 			/* No route yet, so try to acquire one */
 			bzero(&ro->ro_dst, sizeof(struct sockaddr_in6));
 			sa6 = (struct sockaddr_in6 *)&ro->ro_dst;
-			sa6->sin6_family = AF_INET6;
-			sa6->sin6_len = sizeof(struct sockaddr_in6);
-			sa6->sin6_addr = *dst;
-#ifdef SCOPEDROUTING
-			sa6->sin6_scope_id = dstsock->sin6_scope_id;
+			*sa6 = *dstsock;
+#ifndef SCOPEDROUTING		/* XXX */
+			sa6->sin6_scope_id = 0;
 #endif
 			if (clone) {
 #ifdef __bsdi__
@@ -862,6 +878,13 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 	}
 
   done:
+	if (ifp == NULL && rt == NULL) {
+		/*
+		 * This can happen if the caller did not pass a cached route
+		 * nor any other hints.  We treat this case an error.
+		 */
+		error = EHOSTUNREACH;
+	}
 	if (error == EHOSTUNREACH)
 		ip6stat.ip6s_noroute++;
 
@@ -915,7 +938,7 @@ in6_selecthlim(in6p, ifp)
 #endif
 int
 in6_pcbsetport(laddr, in6p)
-	struct in6_addr *laddr;
+	struct sockaddr_in6 *laddr;
 	struct in6pcb *in6p;
 {
 	struct socket *so = in6p->in6p_socket;
@@ -959,7 +982,7 @@ in6_pcbsetport(laddr, in6p)
 	goto startover;	/*to randomize*/
 	for (;;) {
 		lport = htons(head->in6p_lport);
-		if (IN6_IS_ADDR_V4MAPPED(laddr)) {
+		if (IN6_IS_ADDR_V4MAPPED(&laddr->sin6_addr)) {
 #ifdef HAVE_NRL_INPCB
 #ifdef INPLOOKUP_WILDCARD6
 			wild &= ~INPLOOKUP_WILDCARD6;
@@ -982,8 +1005,9 @@ in6_pcbsetport(laddr, in6p)
 					 0, (struct in_addr *)laddr,
 					 lport, wild | INPLOOKUP_IPV6);
 #else
-			t = in6_pcblookup(head, &zeroin6_addr, 0, laddr,
-					  lport, wild);
+			t = in6_pcblookup(head,
+					  (struct sockaddr_in6 *)&sa6_any,
+					  0, laddr, lport, wild);
 #endif
 		}
 		if (t == 0)
@@ -1017,7 +1041,7 @@ in6_pcbsetport(laddr, in6p)
  */
 int
 in6_pcbsetport(laddr, inp, p)
-	struct in6_addr *laddr;
+	struct sockaddr_in6 *laddr;
 	struct inpcb *inp;
 	struct proc *p;
 {
@@ -1070,15 +1094,15 @@ in6_pcbsetport(laddr, inp, p)
 				 * Undo any address bind that may have
 				 * occurred above.
 				 */
-				inp->in6p_laddr = in6addr_any;
+				sa6_copy_addr(&sa6_any, &inp->in6p_lsa);
 				return (EAGAIN);
 			}
 			--*lastport;
 			if (*lastport > first || *lastport < last)
 				*lastport = first;
 			lport = htons(*lastport);
-		} while (in6_pcblookup_local(pcbinfo,
-					     &inp->in6p_laddr, lport, wild));
+		} while (in6_pcblookup_local(pcbinfo, &inp->in6p_lsa,
+					     lport, wild));
 	} else {
 		/*
 			 * counting up
@@ -1091,7 +1115,7 @@ in6_pcbsetport(laddr, inp, p)
 				 * Undo any address bind that may have
 				 * occurred above.
 				 */
-				inp->in6p_laddr = in6addr_any;
+				sa6_copy_addr(&sa6_any, &inp->in6p_lsa);
 				return (EAGAIN);
 			}
 			++*lastport;
@@ -1099,12 +1123,12 @@ in6_pcbsetport(laddr, inp, p)
 				*lastport = first;
 			lport = htons(*lastport);
 		} while (in6_pcblookup_local(pcbinfo,
-					     &inp->in6p_laddr, lport, wild));
+					     &inp->in6p_lsa, lport, wild));
 	}
 
 	inp->inp_lport = lport;
 	if (in_pcbinshash(inp) != 0) {
-		inp->in6p_laddr = in6addr_any;
+		sa6_copy_addr(&sa6_any, &inp->in6p_lsa);
 		inp->inp_lport = 0;
 		return (EAGAIN);
 	}

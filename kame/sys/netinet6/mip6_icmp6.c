@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.34 2002/01/29 01:40:56 jinmei Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.35 2002/01/31 14:14:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -403,6 +403,10 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 
 	/* XXX IPSEC? */
 
+	if ((error = mip6_setpktaddrs(n)) != 0) { /* XXX */
+		m_freem(n);
+		return(0);
+	}
 	error = ip6_output(n, NULL, NULL, 0, NULL, NULL);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -652,6 +656,10 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 			    sizeof(struct ip6_hdr),
 			    n->m_pkthdr.len - sizeof(struct ip6_hdr));
 
+	if ((error = mip6_setpktaddrs(n)) != 0) { /* XXX */
+		m_freem(n);
+		return(error);
+	}
 	error = ip6_output(n, NULL, NULL, 0, NULL, NULL);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -954,6 +962,10 @@ mip6_icmp6_ha_discov_req_output(sc)
 	hdreq->discov_req_cksum = in6_cksum(m, IPPROTO_ICMPV6, off, icmp6len);
 
 	/* send the DHAAD request packet to the home agent anycast address. */
+	if ((error = mip6_setpktaddrs(m)) != 0) { /* XXX */
+		m_freem(m);
+		return(error);
+	}
 	error = ip6_output(m, NULL, NULL, 0, NULL, NULL);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -1060,6 +1072,10 @@ mip6_icmp6_mp_sol_output(mpfx, mha)
 	mp_sol->mp_sol_cksum
 		= in6_cksum(m, IPPROTO_ICMPV6, sizeof(*ip6), icmp6len);
 
+	if ((error = mip6_setpktaddrs(m)) != 0) { /* XXX */
+		m_freem(m);
+		return(error);
+	}
 	error = ip6_output(m, 0, 0, 0, 0,NULL);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -1172,6 +1188,10 @@ mip6_tunneled_rs_output(sc, mpfx)
 		 ip6_sprintf(&ip6->ip6_src),
 		 ip6_sprintf(&ip6->ip6_dst)));
 
+	if ((error = mip6_setpktaddrs(m)) != 0) { /* XXX */
+		m_freem(m);
+		return(-1);
+	}
 	return(ip6_output(m, 0, 0, 0, 0,NULL));
 }
 

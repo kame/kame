@@ -356,7 +356,7 @@ tcp_input(m, off0)
 	int todrop, acked, ourfinisacked, needoutput = 0;
 	struct in_addr laddr;
 #ifdef INET6
-	struct in6_addr laddr6;
+	struct sockaddr_in6 *src_sa6, *dst_sa6;
 #endif
 	int dropsocket = 0;
 	int iss = 0;
@@ -509,6 +509,14 @@ tcp_input(m, off0)
 		goto drop;
 #endif
 
+#ifdef INET6
+	/* extract full sockaddr structures for the src/dst addresses */
+	if (isipv6) {
+		if (ip6_getpktaddrs(m, &src_sa6, &dst_sa6))
+			goto drop;
+	}
+#endif
+
 	/*
 	 * Convert TCP protocol specific fields to host format.
 	 */
@@ -567,8 +575,8 @@ findpcb:
       {
 #ifdef INET6
 	if (isipv6)
-		inp = in6_pcblookup_hash(&tcbinfo, &ip6->ip6_src, th->th_sport,
-					 &ip6->ip6_dst, th->th_dport, 1,
+		inp = in6_pcblookup_hash(&tcbinfo, src_sa6, th->th_sport,
+					 dst_sa6, th->th_dport, 1,
 					 m->m_pkthdr.rcvif);
 	else
 #endif /* INET6 */
@@ -784,7 +792,7 @@ findpcb:
 			inp = (struct inpcb *)so->so_pcb;
 #ifdef INET6
 			if (isipv6)
-				inp->in6p_laddr = ip6->ip6_dst;
+				sa6_copy_addr(dst_sa6, &inp->in6p_lsa);
 			else {
 				inp->inp_vflag &= ~INP_IPV6;
 				inp->inp_vflag |= INP_IPV4;
@@ -800,9 +808,10 @@ findpcb:
 				 * put the PCB on the hash lists.
 				 */
 #ifdef INET6
-				if (isipv6)
-					inp->in6p_laddr = in6addr_any;
-				else
+				if (isipv6) {
+					sa6_copy_addr(&sa6_any,
+						      &inp->in6p_lsa);
+				} else
 #endif /* INET6 */
 				inp->inp_laddr.s_addr = INADDR_ANY;
 				inp->inp_lport = 0;
@@ -1105,6 +1114,8 @@ findpcb:
 			goto drop;
 #ifdef INET6
 		if (isipv6) {
+			struct sockaddr_in6 lsa6;
+
 			MALLOC(sin6, struct sockaddr_in6 *, sizeof *sin6,
 			       M_SONAME, M_NOWAIT);
 			if (sin6 == NULL)
@@ -1112,14 +1123,14 @@ findpcb:
 			bzero(sin6, sizeof(*sin6));
 			sin6->sin6_family = AF_INET6;
 			sin6->sin6_len = sizeof(*sin6);
-			sin6->sin6_addr = ip6->ip6_src;
+			sa6_copy_addr(src_sa6, sin6);
 			sin6->sin6_port = th->th_sport;
-			laddr6 = inp->in6p_laddr;
+			lsa6 = inp->in6p_lsa;
 			if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr))
-				inp->in6p_laddr = ip6->ip6_dst;
+				sa6_copy_addr(dst_sa6, &inp->in6p_lsa);
 			if (in6_pcbconnect(inp, (struct sockaddr *)sin6,
 					   &proc0)) {
-				inp->in6p_laddr = laddr6;
+				sa6_copy_addr(&lsa6, &inp->in6p_lsa);
 				FREE(sin6, M_SONAME);
 				goto drop;
 			}

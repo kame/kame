@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.33 2002/01/07 11:34:48 kjc Exp $	*/
+/*	$KAME: frag6.c,v 1.34 2002/01/31 14:14:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -155,18 +155,12 @@ frag6_input(mp, offp, proto)
 	struct ip6_frag *ip6f;
 	struct ip6q *q6;
 	struct ip6asfrag *af6, *ip6af, *af6dwn;
+	struct in6_ifaddr *ia;
+	struct sockaddr_in6 *src_sa, *dst_sa;
 	int offset = *offp, nxt, i, next;
 	int first_frag = 0;
 	int fragoff, frgpartlen;	/* must be larger than u_int16_t */
 	struct ifnet *dstifp;
-#ifdef IN6_IFSTAT_STRICT
-#ifdef NEW_STRUCT_ROUTE
-	static struct route ro;
-#else
-	static struct route_in6 ro;
-#endif
-	struct sockaddr_in6 *dst;
-#endif
 	u_int8_t ecn, ecn0;
 
 	ip6 = mtod(m, struct ip6_hdr *);
@@ -176,32 +170,20 @@ frag6_input(mp, offp, proto)
 #else
 	IP6_EXTHDR_GET(ip6f, struct ip6_frag *, m, offset, sizeof(*ip6f));
 	if (ip6f == NULL)
-		return IPPROTO_DONE;
+		return (IPPROTO_DONE);
 #endif
+
+	/* extract full sockaddr structures for the src/dst addresses */
+	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
+		m_freem(m);
+		return (IPPROTO_DONE);
+	}
 
 	dstifp = NULL;
 #ifdef IN6_IFSTAT_STRICT
 	/* find the destination interface of the packet. */
-	dst = (struct sockaddr_in6 *)&ro.ro_dst;
-	if (ro.ro_rt
-	 && ((ro.ro_rt->rt_flags & RTF_UP) == 0
-	  || !IN6_ARE_ADDR_EQUAL(&dst->sin6_addr, &ip6->ip6_dst))) {
-		RTFREE(ro.ro_rt);
-		ro.ro_rt = (struct rtentry *)0;
-	}
-	if (ro.ro_rt == NULL) {
-		bzero(dst, sizeof(*dst));
-		dst->sin6_family = AF_INET6;
-		dst->sin6_len = sizeof(struct sockaddr_in6);
-		dst->sin6_addr = ip6->ip6_dst;
-	}
-#ifndef __bsdi__
-	rtalloc((struct route *)&ro);
-#else
-	rtcalloc((struct route *)&ro);
-#endif
-	if (ro.ro_rt != NULL && ro.ro_rt->rt_ifa != NULL)
-		dstifp = ((struct in6_ifaddr *)ro.ro_rt->rt_ifa)->ia_ifp;
+	if ((ia = ip6_getdstifaddr(m)) != NULL)
+		dstifp = ia->ia_ifp;
 #else
 	/* we are violating the spec, this is not the destination interface */
 	if ((m->m_flags & M_PKTHDR) != 0)
@@ -240,8 +222,8 @@ frag6_input(mp, offp, proto)
 
 	for (q6 = ip6q.ip6q_next; q6 != &ip6q; q6 = q6->ip6q_next)
 		if (ip6f->ip6f_ident == q6->ip6q_ident &&
-		    IN6_ARE_ADDR_EQUAL(&ip6->ip6_src, &q6->ip6q_src) &&
-		    IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &q6->ip6q_dst))
+		    SA6_ARE_ADDR_EQUAL(src_sa, &q6->ip6q_src) &&
+		    SA6_ARE_ADDR_EQUAL(dst_sa, &q6->ip6q_dst))
 			break;
 
 	if (q6 == &ip6q) {
@@ -277,8 +259,8 @@ frag6_input(mp, offp, proto)
 		q6->ip6q_ident	= ip6f->ip6f_ident;
 		q6->ip6q_arrive = 0; /* Is it used anywhere? */
 		q6->ip6q_ttl 	= IPV6_FRAGTTL;
-		q6->ip6q_src	= ip6->ip6_src;
-		q6->ip6q_dst	= ip6->ip6_dst;
+		q6->ip6q_src	= *src_sa;
+		q6->ip6q_dst	= *dst_sa;
 		q6->ip6q_unfrglen = -1;	/* The 1st fragment has not arrived. */
 	}
 
@@ -342,8 +324,8 @@ frag6_input(mp, offp, proto)
 				 * Restore source and destination addresses
 				 * in the erroneous IPv6 header.
 				 */
-				ip6err->ip6_src = q6->ip6q_src;
-				ip6err->ip6_dst = q6->ip6q_dst;
+				ip6err->ip6_src = q6->ip6q_src.sin6_addr;
+				ip6err->ip6_dst = q6->ip6q_dst.sin6_addr;
 
 				icmp6_error(merr, ICMP6_PARAM_PROB,
 					    ICMP6_PARAMPROB_HEADER,
@@ -521,8 +503,9 @@ insert:
 	free(ip6af, M_FTABLE);
 	ip6 = mtod(m, struct ip6_hdr *);
 	ip6->ip6_plen = htons((u_short)next + offset - sizeof(struct ip6_hdr));
-	ip6->ip6_src = q6->ip6q_src;
-	ip6->ip6_dst = q6->ip6q_dst;
+	/* XXX: ip6q_src, dst may have an embedded zone ID */
+	ip6->ip6_src = q6->ip6q_src.sin6_addr;
+	ip6->ip6_dst = q6->ip6q_dst.sin6_addr;
 	nxt = q6->ip6q_nxt;
 #ifdef notyet
 	*q6->ip6q_nxtp = (u_char)(nxt & 0xff);
@@ -616,8 +599,8 @@ frag6_freef(q6)
 			ip6 = mtod(m, struct ip6_hdr *);
 
 			/* restoure source and destination addresses */
-			ip6->ip6_src = q6->ip6q_src;
-			ip6->ip6_dst = q6->ip6q_dst;
+			ip6->ip6_src = q6->ip6q_src.sin6_addr;
+			ip6->ip6_dst = q6->ip6q_dst.sin6_addr;
 
 			icmp6_error(m, ICMP6_TIME_EXCEEDED,
 				    ICMP6_TIME_EXCEED_REASSEMBLY, 0);

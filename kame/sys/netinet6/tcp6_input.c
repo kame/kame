@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.47 2002/01/10 13:22:04 jinmei Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.48 2002/01/31 14:14:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -151,9 +151,9 @@ extern int tcp_log_in_vain;
 #define TSTMP_LT(a,b)	((int)((a)-(b)) < 0)
 #define TSTMP_GEQ(a,b)	((int)((a)-(b)) >= 0)
 
-static struct in6pcb *tcp6_listen_lookup __P((struct in6_addr, u_short));
-static struct in6pcb *tcp6_conn_lookup __P((struct in6_addr, u_short,
-		struct in6_addr, u_short));
+static struct in6pcb *tcp6_listen_lookup __P((struct sockaddr_in6 *, u_short));
+static struct in6pcb *tcp6_conn_lookup __P((struct sockaddr_in6 *, u_short,
+					    struct sockaddr_in6 *, u_short));
 static void tcp6_start2msl __P((struct in6pcb *, struct tcp6cb *));
 static void tcp6_rtt_init __P((struct tcp6cb *, struct rtentry *));
 static int  tcp6_mss_round __P((int));
@@ -210,19 +210,20 @@ do {									\
  */
 static struct in6pcb *
 tcp6_listen_lookup(dst, dport)
-	struct in6_addr dst;
+	struct sockaddr_in6 *dst;
 	u_short dport;
 {
 	struct in6pcb *in6p, *maybe = NULL;
 	int faith;
 
 #if defined(NFAITH) && NFAITH > 0
-	faith = faithprefix(&dst);
+	faith = faithprefix(&dst->sin6_addr);
 #else
 	faith = 0;
 #endif
 
-	for (in6p = tcp6_listen_hash[dport % tcp6_listen_hash_size].lh_first; in6p;
+	for (in6p = tcp6_listen_hash[dport % tcp6_listen_hash_size].lh_first;
+	     in6p;
 	     in6p = in6p->in6p_hlist.le_next) {
 		if (faith && !(in6p->in6p_flags & IN6P_FAITH))
 			continue;
@@ -231,7 +232,7 @@ tcp6_listen_lookup(dst, dport)
 		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
 			if (maybe == NULL)
 				maybe = in6p;
-		} else if (IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, &dst))
+		} else if (SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst))
 			return (in6p);
 	}
 	return (maybe);
@@ -244,22 +245,22 @@ tcp6_listen_lookup(dst, dport)
  */
 static struct in6pcb *
 tcp6_conn_lookup(src, sport, dst, dport)
-	struct in6_addr src;
+	struct sockaddr_in6 *src;
 	u_short sport;
-	struct in6_addr dst;
+	struct sockaddr_in6 *dst;
 	u_short dport;
 {
 	struct in6pcb *in6p;
 	u_long hash;
-	hash = IN6_HASH(&src, sport, &dst, dport);
+	hash = IN6_HASH(&src->sin6_addr, sport, &dst->sin6_addr, dport);
 	for (in6p = tcp6_conn_hash[hash % tcp6_conn_hash_size].lh_first; in6p;
-	    in6p = in6p->in6p_hlist.le_next) {
+	     in6p = in6p->in6p_hlist.le_next) {
 		if (in6p->in6p_hash != hash)
 			continue;
-		if (IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, &src) &&
+		if (SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, src) &&
 		    in6p->in6p_fport == sport &&
 		    in6p->in6p_lport == dport &&
-		    IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, &dst))
+		    SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst))
 			return (in6p);
 	}
 	return (NULL);
@@ -466,8 +467,9 @@ tcp6_input(mp, offp, proto)
 	int hdroptlen = 0;
 	short ostate = 0; /* just to avoid warning */
 #if 0
-	struct in6_addr laddr;
+	struct sockaddr_in6 lsa6;
 #endif
+	struct sockaddr_in6 *src_sa6, *dst_sa6;
 	int dropsocket = 0;
 	int iss = 0;
 	u_long thwin;
@@ -556,6 +558,10 @@ tcp6_input(mp, offp, proto)
 	}
 	thflags = th->th_flags;
 
+	/* extract full sockaddr structures for the src/dst addresses */
+	if (ip6_getpktaddrs(m, &src_sa6, &dst_sa6))
+		goto drop;
+
 	/*
 	 * Locate pcb for segment.
 	 */
@@ -563,13 +569,13 @@ findpcb:
 	in6p = tcp6_last_in6pcb;
 	if (in6p->in6p_lport != th->th_dport ||
 	    in6p->in6p_fport != th->th_sport ||
-	    !IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, &ip6->ip6_src) ||
-	    !IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, &ip6->ip6_dst)) {
-		if ((in6p = tcp6_conn_lookup(ip6->ip6_src, th->th_sport,
-					     ip6->ip6_dst, th->th_dport))
+	    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, src_sa6) ||
+	    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst_sa6)) {
+		if ((in6p = tcp6_conn_lookup(src_sa6, th->th_sport,
+					     dst_sa6, th->th_dport))
 		    == NULL &&
 		    ((thflags & (TH_SYN|TH_ACK)) == TH_SYN || syn_cache_count6)) {
-			in6p = tcp6_listen_lookup(ip6->ip6_dst, th->th_dport);
+			in6p = tcp6_listen_lookup(dst_sa6, th->th_dport);
 		}
 		if (in6p)
 			tcp6_last_in6pcb = in6p;
@@ -733,7 +739,7 @@ findpcb:
 			 */
 			dropsocket++;
 			in6p = sotoin6pcb(so);
-			in6p->in6p_laddr = ip6->ip6_dst;
+			sa6_copy_addr(dst_sa6, &inp->in6p_lsa);
 			in6p->in6p_lport = th->th_dport;
 
 			/* Inherit socket options from the listening socket. */
@@ -932,8 +938,8 @@ after_listen:
 		 * local address is always set here.
 		 */
 		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
-			in6p->in6p_laddr = ip6->ip6_dst;
-		in6p->in6p_faddr = ip6->ip6_src;
+			sa6_copy_addr(dst_sa6, &in6p->in6p_lsa);
+		sa6_copy_addr(src_sa6, &in6p->in6p_fsa);
 		in6p->in6p_fport = th->th_sport;
 #else
 		struct sockaddr_in6 sin6;
@@ -944,16 +950,16 @@ after_listen:
 		 */
 		sin6.sin6_addr = ip6->ip6_src;
 		sin6.sin6_port = th->th_sport;
-		laddr = in6p->in6p_laddr;
+		lsa6 = in6p->in6p_lsa6;
 		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
-			in6p->in6p_laddr = ip6->ip6_dst;
+			sa6_copy_addr(dst_sa6, &in6p->in6p_lsa);
 		if (in6_pcbconnectok(in6p, &sin6)) {
-			in6p->in6p_laddr = laddr;
+			sa6_copy_addr(&lsa6, &in6p->in6p_lsa);
 			goto drop;
 		}
 #endif
-		in6p->in6p_hash = IN6_HASH(&ip6->ip6_src, th->th_sport,
-					   &ip6->ip6_dst, th->th_dport);
+		in6p->in6p_hash = IN6_HASH(&src_sa6->sin6_addr, th->th_sport,
+					   &dst_sa6->sin6_addr, th->th_dport);
 		LIST_INSERT_HEAD(&tcp6_conn_hash[in6p->in6p_hash %
 		    tcp6_conn_hash_size], in6p, in6p_hlist);
 		t6p->t_template = tcp6_template(t6p);
