@@ -1,4 +1,4 @@
-/*	$KAME: ip6protosw.h,v 1.10 2000/03/29 22:51:25 itojun Exp $	*/
+/*	$KAME: ip6protosw.h,v 1.11 2000/10/03 09:59:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -96,10 +96,10 @@ struct ip6ctlparam {
 };
 
 struct ip6protosw {
-#if (defined(__FreeBSD__) && __FreeBSD__ < 3) || defined(__OpenBSD__)
-	short	pr_type;		/* socket type used for */
-#else
+#ifdef __NetBSD__
 	int	pr_type;		/* socket type used for */
+#else
+	short	pr_type;		/* socket type used for */
 #endif
 	struct	domain *pr_domain;	/* domain protocol a member of */
 	short	pr_protocol;		/* protocol number */
