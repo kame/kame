@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1562 2001/02/19 11:52:55 itojun Exp $
+$KAME: CHANGELOG,v 1.1563 2001/02/21 03:51:48 itojun Exp $
 
 <200102>
+Wed Feb 21 13:04:17 JST 2001  itojun@iijlab.net
+	* openbsd/usr.sbin/pim6{sd,dd}: compile these on openbsd.
+	  not really tested.
+
+Wed Feb 21 13:00:00 JST 2001  itojun@iijlab.net
+	* sys/netinet6/ah_{core,output}.c: one more correction to IPv4 option
+	  chasing in AH processing.
+
 Mon Feb 19 20:51:41 JST 2001  itojun@iijlab.net
 	* sys/netinet6/ipsec.c (netbsd only): correct severe memory leak
 	  in ipsec operation.  the bug was introduced on 2/14/2001.
