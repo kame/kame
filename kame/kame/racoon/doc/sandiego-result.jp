@@ -10,6 +10,10 @@ vs microsoft
 vs bluesteel
 	うまくいったらしい。
 
+	うまくいかなかった。
+	initiator: 鍵できたけど ping しても向こうが返事せず。
+		再戦予定
+
 vs racoon
 	rekey問題を解決したあと
 	- phase 2を5秒に1回rekey
@@ -29,6 +33,9 @@ vs racoon
 
 vs ashley laurent
 	phase 1 userfqdn supportいれてよんと言われた。今回間に合うのかな。
+
+	userfqdn 入れて再戦しようとしたけど、敵が tunnel mode の client あり
+	しかサポートしてないので、明日再戦予定。
 
 vs ericsson
 	initiator: 既知のDH groupについてはDH group typeをつけてはいけない
@@ -57,6 +64,19 @@ vs radguard
 	client: ばっちり、ただし先方にfragment問題あり(ping > 1500答えなし)
 		phase 1: pre-shared/3des/sha1/dh2
 		phase 2: esp tun(自分自身)/3des/sha1/dh2
+
+vs network associates
+	base mode:
+		initiator/responder: psk
+		PSK の HASH_R の計算は RFC2409 だよと諭される…
+		治して phase1 ok. 
+		phase2 で向こうに no proposal choosen. と言われる。
+		md5/sha1 x des/3des, esp, transport のはずなんだけど…
+		チェックしてもらってる最中。
+
+vs intel
+	base mode: initiator/responder共に敵がHASHの計算間違っているらしい。
+		再戦予定。
 
 テストするには
 	psk.txtにエントリ追加。
