@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.102 2000/05/22 10:30:41 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.103 2000/05/22 11:02:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -135,7 +135,7 @@ extern struct in6pcb rawin6pcb;
 #else
 extern struct inpcbhead ripcb;
 #endif
-extern struct timeval icmp6errratelim;
+extern u_int icmp6errratelim;
 extern int icmp6_nodeinfo;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 static struct rttimer_queue *icmp6_mtudisc_timeout_q = NULL;
@@ -165,6 +165,7 @@ static void icmp6_mtudisc_timeout __P((struct rtentry *, struct rttimer *));
 #ifdef COMPAT_RFC1885
 static struct route_in6 icmp6_reflect_rt;
 #endif
+static struct timeval icmp6_nextsend = {0, 0};
 
 #ifdef MIP6
 int (*mip6_icmp6_input_hook)(struct mbuf *m, int off) = NULL;
@@ -2675,10 +2676,12 @@ icmp6_ratelimit(dst, type, code)
 	const int type;			/* not used at this moment */
 	const int code;			/* not used at this moment */
 {
-#ifndef HAVE_RATECHECK
-	static struct timeval icmp6errratelim_last;
 	struct timeval tp;
-	struct timeval nextsend;
+	long sec_diff, usec_diff;
+
+	/* If we are not doing rate limitation, it is always okay to send */
+	if (!icmp6errratelim)
+		return 0;
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	microtime(&tp);
@@ -2686,41 +2689,22 @@ icmp6_ratelimit(dst, type, code)
 #else
 	tp = time;
 #endif
-
-	/* always okay to send the first packet */
-	if (icmp6errratelim_last.tv_sec == 0 &&
-	    icmp6errratelim_last.tv_usec == 0) {
-		goto okaytosend;
+	if (tp.tv_sec < icmp6_nextsend.tv_sec
+	 || (tp.tv_sec == icmp6_nextsend.tv_sec
+	  && tp.tv_usec < icmp6_nextsend.tv_usec)) {
+		/* The packet is subject to rate limit */
+		return 1;
+	}
+	sec_diff = icmp6errratelim / 1000000;
+	usec_diff = icmp6errratelim % 1000000;
+	icmp6_nextsend.tv_sec = tp.tv_sec + sec_diff;
+	if ((tp.tv_usec = tp.tv_usec + usec_diff) >= 1000000) {
+		icmp6_nextsend.tv_sec++;
+		icmp6_nextsend.tv_usec -= 1000000;
 	}
 
-	nextsend.tv_sec = icmp6errratelim_last.tv_sec + icmp6errratelim.tv_sec;
-	nextsend.tv_usec = icmp6errratelim_last.tv_usec +
-	    icmp6errratelim.tv_usec;
-	nextsend.tv_sec += (nextsend.tv_usec / 1000000);
-	nextsend.tv_usec %= 1000000;
-
-	if (nextsend.tv_sec <= tp.tv_sec)
-		goto okaytosend;
-	else if (nextsend.tv_sec == tp.tv_sec && nextsend.tv_usec <= tp.tv_usec)
-		goto okaytosend;
-
-	/* The packet is subject to rate limit */
-	icmp6errratelim_last = tp;
-	return 1;
-
-okaytosend:
 	/* it is okay to send this */
-	icmp6errratelim_last = tp;
 	return 0;
-#else
-	static struct timeval icmp6errratelim_last;
-
-	/*
-	 * ratecheck() returns true if it is okay to send.  We return
-	 * true if it is not okay to send.
-	 */
-	return (ratecheck(&icmp6errratelim_last, &icmp6errratelim) == 0);
-#endif
 }
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -2853,25 +2837,8 @@ icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		return sysctl_rdstruct(oldp, oldlenp, newp,
 				&icmp6stat, sizeof(icmp6stat));
 	case ICMPV6CTL_ERRRATELIMIT:
-	    {
-		int rate_usec, error, s;
-
-		/*
-		 * The sysctl specifies the rate in usec-between-icmp,
-		 * so we must convert from/to a timeval.
-		 */
-		rate_usec = (icmp6errratelim.tv_sec * 1000000) +
-		    icmp6errratelim.tv_usec;
-		error = sysctl_int(oldp, oldlenp, newp, newlen, &rate_usec);
-		if (error)
-			return (error);
-		s = splsoftnet();
-		icmp6errratelim.tv_sec = rate_usec / 1000000;
-		icmp6errratelim.tv_usec = rate_usec % 1000000;
-		splx(s);
-
-		return (0);
-	    }
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+				  &icmp6errratelim);
 	case ICMPV6CTL_ND6_PRUNE:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &nd6_prune);
 	case ICMPV6CTL_ND6_DELAY:
