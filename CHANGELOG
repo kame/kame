@@ -1,5 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2391 2003/04/30 05:12:50 suz Exp $
+$KAME: CHANGELOG,v 1.2392 2003/05/01 06:54:58 itojun Exp $
+
+<200305>
+Thu May  1 15:53:10 JST 2003  itojun@iijlab.net
+	* openbsd: switch to 3.3.  note that we now use openbsd/sys/altq,
+	  not kame/sys/altq (via symlinks), since ALTQ is integrated into
+	  OpenBSD PF.  therefore, before you upgrade, you'd need to cleanup
+	  the symbolic links by
+	  % /bin/rm -fr kame openbsd/sys/altq
+	  also we no longer build some of ALTQ tools.
 
 <200304>
 Wed Apr 30 14:08:18 JST 2003	suz@crl.hitachi.co.jp
