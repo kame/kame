@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.883 2000/05/16 14:56:36 jinmei Exp $
+$Id: CHANGELOG,v 1.884 2000/05/17 01:11:14 itojun Exp $
 
 <200005>
+Wed May 17 10:09:42 JST 2000  itojun@iijlab.net
+	* kame/sys/net/if_gif.c: with "options XBONEHACK", allow multiple
+	  gif tunnels to be configured with the same pair of outer addresses.
+	  From: Lars Eggert <larse@isi.edu>
+	* kame/sys/net/if_gif.c: always disallow multiple multi-dest tunnels.
+
 2000-05-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/common.c (getifaddr): corrected the 2nd argument
 	to in6_matchflags().
