@@ -56,10 +56,8 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
-#ifdef INET6
 #include <netinet6/ip6.h>
 #include <netinet6/ip6_var.h>
-#endif /* INET6 */
 #include <netinet/in_pcb.h>
 #include <netinet/in_var.h>
 #include <netinet/ip_var.h>

@@ -89,10 +89,8 @@
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
-#if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
-#endif
 #include <netinet/in_pcb.h>
 #include <netinet/in_var.h>
 #include <netinet/ip_icmp.h>
