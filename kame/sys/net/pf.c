@@ -1991,16 +1991,6 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 		break;
 #ifdef INET6
 	case AF_INET6:
-#ifdef __OpenBSD__
-		inp = in6_pcbhashlookup(tb, &saddr->v6, sport, &daddr->v6,
-		    dport);
-		if (inp == NULL) {
-			inp = in_pcblookup(tb, &saddr->v6, sport, &daddr->v6,
-			    dport, INPLOOKUP_WILDCARD | INPLOOKUP_IPV6);
-			if (inp == NULL)
-				return (0);
-		}
-#else
 	{
 		struct sockaddr_in6 s, d;
 
@@ -2010,15 +2000,24 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 		s.sin6_family = d.sin6_family = AF_INET6;
 		in6_recoverscope(&s, &saddr->v6, NULL);
 		in6_recoverscope(&d, &daddr->v6, NULL);
+#ifdef __OpenBSD__
+		inp = in6_pcbhashlookup(tb, &s, sport, &d, dport);
+		if (inp == NULL) {
+			inp = in_pcblookup(tb, &s, sport, &d,
+			    dport, INPLOOKUP_WILDCARD | INPLOOKUP_IPV6);
+			if (inp == NULL)
+				return (0);
+		}
+#else
 		in6p = in6_pcblookup_connect(&tcb6, &s, sport, &d, dport, 0);
 		if (in6p == NULL) {
 			in6p = in6_pcblookup_bind(&tcb6, &d, dport, 0);
 			if (in6p == NULL)
 				return (0);
 		}
-	}
 #endif
 		break;
+	}
 #endif /* INET6 */
 
 	default:
@@ -2118,7 +2117,11 @@ pf_calc_mss(struct pf_addr *addr, sa_family_t af, u_int16_t offer)
 #endif /* INET */
 #ifdef INET6
 	struct sockaddr_in6	*dst6;
+#ifdef NEW_STRUCT_ROUTE
+	struct route		 ro6;
+#else
 	struct route_in6	 ro6;
+#endif
 #endif /* INET6 */
 	struct rtentry		*rt = NULL;
 	int			 hlen;
