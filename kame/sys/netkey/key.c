@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.231 2002/03/01 04:03:25 sakane Exp $	*/
+/*	$KAME: key.c,v 1.232 2002/03/01 04:20:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -6704,6 +6704,7 @@ key_expire(sav)
 	mtod(result, struct sadb_msg *)->sadb_msg_len =
 	    PFKEY_UNIT64(result->m_pkthdr.len);
 
+	splx(s);
 	return key_sendup_mbuf(NULL, result, KEY_SENDUP_REGISTERED);
 
  fail:
