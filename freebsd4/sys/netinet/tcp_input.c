@@ -1040,20 +1040,10 @@ after_listen:
 				tcpstat.tcps_rcvackpack++;
 				tcpstat.tcps_rcvackbyte += acked;
 				sbdrop(&so->so_snd, acked);
-				tp->snd_una = th->th_ack;
-#ifdef TCP_ECN
-				/*
-				 * if not in recovery, sync snd_recover with
-				 * snd_una to avoid wraparound problems.
-				 */
-				if (SEQ_GT(tp->snd_una, tp->snd_recover))
-					tp->snd_recover = tp->snd_una;
-#else
 				if (SEQ_GT(tp->snd_una, tp->snd_high) &&
 				    SEQ_LEQ(th->th_ack, tp->snd_high))
 					tp->snd_high = th->th_ack - 1;
-				tp->snd_recover = th->th_ack;
-#endif
+				tp->snd_una = tp->snd_recover = th->th_ack;
 				tp->t_dupacks = 0;
 				m_freem(m);
 				ND6_HINT(tp); /* some progress has been done */
@@ -1793,15 +1783,8 @@ trimthenstep6:
 				} else if (tp->t_dupacks == tcprexmtthresh) {
 					tcp_seq onxt = tp->snd_nxt;
 					u_int win;
-					if ((tcp_do_newreno
-#ifdef TCP_ECN 
-					     || tcp_do_ecn
-#endif
-					        ) && SEQ_LEQ(th->th_ack, tp->snd_high)) {
-						/* False retransmit, should not
-						 * cut window
-						 */
-						tp->snd_cwnd += tp->t_maxseg;
+					if (tcp_do_newreno &&
+					    SEQ_LEQ(th->th_ack, tp->snd_high)) {
 						tp->t_dupacks = 0;
 						break;
 					}

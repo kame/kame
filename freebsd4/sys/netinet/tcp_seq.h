@@ -71,15 +71,9 @@
 #define	tcp_rcvseqinit(tp) \
 	(tp)->rcv_adv = (tp)->rcv_nxt = (tp)->irs + 1
 
-#if 1 /* TCP_ECN */
 #define	tcp_sendseqinit(tp) \
 	(tp)->snd_una = (tp)->snd_nxt = (tp)->snd_max = (tp)->snd_up = \
 	    (tp)->snd_recover = (tp)->snd_high = (tp)->iss
-#else
-#define	tcp_sendseqinit(tp) \
-	(tp)->snd_una = (tp)->snd_nxt = (tp)->snd_max = (tp)->snd_up = \
-	    (tp)->iss
-#endif
 
 #define TCP_PAWS_IDLE	(24 * 24 * 60 * 60 * hz)
 					/* timestamp wrap-around time */

@@ -440,12 +440,7 @@ tcp_timer_rexmt(xtp)
 		tp->t_srtt = 0;
 	}
 	tp->snd_nxt = tp->snd_una;
-	/*
-	 * Note:  We overload snd_recover to function also as the
-	 * snd_last variable described in RFC 2582
-	 */
-	tp->snd_recover = tp->snd_max;
-	tp->snd_high = tp->snd_max;
+	tp->snd_high = tp->snd_recover = tp->snd_max;
 #ifdef TCP_ECN
 	tp->t_flags |= TF_SEND_CWR;
 #endif
