@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: ndp.8,v 1.1 1999/08/08 23:30:48 itojun Exp $
+.\"     $Id: ndp.8,v 1.2 1999/10/07 05:26:13 itojun Exp $
 .\"
 .Dd May 17, 1998
 .Dt NDP 8
@@ -38,10 +38,10 @@
 .Sh SYNOPSIS
 .Nm ndp
 .Fl a
-.Op Fl nt
+.Op Fl ntl
 .Nm ndp
 .Fl A Ar wait
-.Op Fl nt
+.Op Fl ntl
 .Nm ndp
 .Fl c
 .Op Fl nt
@@ -99,6 +99,8 @@ Harmonize consistency between the routing table and the default router
 list; install the top entry of the list into the kernel routing table.
 .It Fl i
 view ND information for specified interface.
+.It Fl l
+Do not truncate numeric IPv6 address.
 .It Fl n
 Do not try to resolve numeric address to hostname.
 .It Fl p

@@ -126,6 +126,7 @@ static int tflag;
 static int32_t thiszone;	/* time difference with gmt */
 static int s = -1;
 static int repeat = 0;
+static int lflag = 0;
 
 char ntop_buf[INET6_ADDRSTRLEN];	/* inet_ntop() */
 char host_buf[NI_MAXHOST];		/* getnameinfo() */
@@ -166,7 +167,7 @@ main(argc, argv)
 
 	pid = getpid();
 	thiszone = gmt2local(0);
-	while ((ch = getopt(argc, argv, "acndfiprstA:HPR")) != EOF)
+	while ((ch = getopt(argc, argv, "acndfilprstA:HPR")) != EOF)
 		switch ((char)ch) {
 		case 'a':
 			aflag = 1;
@@ -194,6 +195,9 @@ main(argc, argv)
 				usage();
 			file(argv[2]);
 			exit(0);
+		case 'l' :
+			lflag = 1;
+			break;
 		case 'r' :
 			rflag = 1;
 			break;
@@ -496,6 +500,7 @@ dump(addr)
 	struct hostent *hp;
 	struct in6_nbrinfo *nbi;
 	struct timeval time;
+	int addrwidth;
 
 	/* Print header */
 	if (!tflag)
@@ -546,7 +551,14 @@ again:;
 		if (tflag)
 			ts_print(&time);
 
-		printf("%-29.29s %-18.18s %6.6s", host_buf,
+		if (lflag) {
+			addrwidth = strlen(host_buf);
+			if (addrwidth < 29)
+				addrwidth = 29;
+		} else
+			addrwidth = 29;
+
+		printf("%-*.*s %-18.18s %6.6s", addrwidth, addrwidth, host_buf,
 		       ether_str(sdl),
 		       if_indextoname(sdl->sdl_index, ifix_buf));
 
@@ -698,8 +710,8 @@ void
 usage()
 {
 	printf("usage: ndp hostname\n");
-	printf("       ndp -a[nt]\n");
-	printf("       ndp [-nt] -A wait\n");
+	printf("       ndp -a[ntl]\n");
+	printf("       ndp [-ntl] -A wait\n");
 	printf("       ndp -c[nt]\n");
 	printf("       ndp -d[nt] hostname\n");
 	printf("       ndp -f[nt] filename\n");
