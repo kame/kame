@@ -1,4 +1,4 @@
-/*	$NetBSD: cmds.c,v 1.47 1999/03/08 03:09:08 lukem Exp $	*/
+/*	$NetBSD: cmds.c,v 1.47.2.3 1999/06/25 01:14:39 cgd Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -36,6 +36,9 @@
  * This code is derived from software contributed to The NetBSD Foundation
  * by Jason R. Thorpe of the Numerical Aerospace Simulation Facility,
  * NASA Ames Research Center.
+ *
+ * This code is derived from software contributed to The NetBSD Foundation
+ * by Luke Mewburn.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -104,7 +107,7 @@
 #if 0
 static char sccsid[] = "@(#)cmds.c	8.6 (Berkeley) 10/9/94";
 #else
-__RCSID("$NetBSD: cmds.c,v 1.47 1999/03/08 03:09:08 lukem Exp $");
+__RCSID("$NetBSD: cmds.c,v 1.47.2.3 1999/06/25 01:14:39 cgd Exp $");
 #endif
 #endif /* not lint */
 
@@ -754,9 +757,9 @@ status(argc, argv)
 	    "Hash mark printing: %s; Mark count: %d; Progress bar: %s.\n",
 	    onoff(hash), mark, onoff(progress));
 	fprintf(ttyout, "Use of PORT/LPRT cmds: %s.\n", onoff(sendport));
-#ifndef SMALL
+#ifndef NO_EDITCOMPLETE
 	fprintf(ttyout, "Command line editing: %s.\n", onoff(editing));
-#endif /* !SMALL */
+#endif /* !NO_EDITCOMPLETE */
 	if (macnum > 0) {
 		fputs("Macros:\n", ttyout);
 		for (i=0; i<macnum; i++) {
@@ -804,7 +807,7 @@ setbell(argc, argv)
 	code = togglevar(argc, argv, &bell, "Bell mode");
 }
 
-#ifndef SMALL
+#ifndef NO_EDITCOMPLETE
 /*
  * Set command line editing
  */
@@ -818,7 +821,7 @@ setedit(argc, argv)
 	code = togglevar(argc, argv, &editing, "Editing mode");
 	controlediting();
 }
-#endif /* !SMALL */
+#endif /* !NO_EDITCOMPLETE */
 
 /*
  * Turn on packet tracing.
@@ -1379,15 +1382,22 @@ user(argc, argv)
 	}
 	n = command("USER %s", argv[1]);
 	if (n == CONTINUE) {
-		if (argc < 3 )
-			argv[2] = getpass("Password: "), argc++;
+		if (argc < 3) {
+			argv[2] = getpass("Password: ");
+			argc++;
+		}
 		n = command("PASS %s", argv[2]);
 	}
 	if (n == CONTINUE) {
 		if (argc < 4) {
 			(void)fputs("Account: ", ttyout);
 			(void)fflush(ttyout);
-			(void)fgets(acct, sizeof(acct) - 1, stdin);
+			if (fgets(acct, sizeof(acct) - 1, stdin) == NULL) {
+				fprintf(ttyout,
+				    "\nEOF received; login aborted.\n");
+				code = -1;
+				return;
+			}
 			acct[strlen(acct) - 1] = '\0';
 			argv[3] = acct; argc++;
 		}
@@ -2285,7 +2295,7 @@ page(argc, argv)
 	int argc;
 	char *argv[];
 {
-	int ohash, orestart_point, overbose;
+	int ohash, orestart_point, overbose, len;
 	char *p, *pager, *oldargv1;
 
 	if ((argc < 2 && !another(&argc, &argv, "filename")) || argc > 2) {
@@ -2299,10 +2309,11 @@ page(argc, argv)
 		return;
 	}
 	p = getenv("PAGER");
-	if (p == NULL)
+	if (p == NULL || p[0] == '\0')
 		p = PAGER;
-	pager = xmalloc(strlen(p) + 2);
-	(void)sprintf(pager, "|%s", p);
+	len = strlen(p) + 2;
+	pager = xmalloc(len);
+	(void)snprintf(pager, len, "|%s", p);
 
 	ohash = hash;
 	orestart_point = restart_point;

@@ -1,4 +1,4 @@
-/*	$NetBSD: util.c,v 1.46 1999/03/08 03:09:08 lukem Exp $	*/
+/*	$NetBSD: util.c,v 1.46.2.2 1999/06/25 01:15:42 cgd Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
@@ -75,7 +75,7 @@
 
 #include <sys/cdefs.h>
 #ifndef lint
-__RCSID("$NetBSD: util.c,v 1.46 1999/03/08 03:09:08 lukem Exp $");
+__RCSID("$NetBSD: util.c,v 1.46.2.2 1999/06/25 01:15:42 cgd Exp $");
 #endif /* not lint */
 
 /*
@@ -169,13 +169,10 @@ setpeer(argc, argv)
 	if (host) {
 		int overbose;
 
-		if (gatemode) {
-			if (command("PASSERVE %s", argv[1]) != COMPLETE)
-				return;
-			if (verbose)
-				fprintf(ttyout,
-				    "Connected via pass-through server %s\n",
-				    gateserver);
+		if (gatemode && verbose) {
+			fprintf(ttyout,
+			    "Connecting via pass-through server %s\n",
+			    gateserver);
 		}
 
 		connected = 1;
@@ -254,28 +251,22 @@ ftp_login(host, user, pass)
 {
 	char tmp[80];
 	const char *acct;
-	char anonpass[MAXLOGNAME + 2]; /* "user@" */
 	struct passwd *pw;
-	int n, aflag = 0;
+	int n, aflag, rval, freeuser, freepass, freeacct, len;
 
 	acct = NULL;
-	if (user == NULL) {
-		if (ruserpass(host, &user, &pass, &acct) < 0) {
-			code = -1;
-			return (0);
-		}
-	}
+	aflag = rval = freeuser = freepass = freeacct = 0;
 
 	/*
 	 * Set up arguments for an anonymous FTP session, if necessary.
 	 */
-	if ((user == NULL || pass == NULL) && anonftp) {
-		memset(anonpass, 0, sizeof(anonpass));
-
+	if (anonftp) {
 		/*
 		 * Set up anonymous login password.
 		 */
 		if ((pass = getenv("FTPANONPASS")) == NULL) {
+			char *anonpass;
+
 			if ((pass = getlogin()) == NULL) {
 				if ((pw = getpwuid(getuid())) == NULL)
 					pass = "anonymous";
@@ -290,10 +281,24 @@ ftp_login(host, user, pass)
 			 * a FQDN in the anonymous password.
 			 * - thorpej@netbsd.org
 			 */
-			snprintf(anonpass, sizeof(anonpass) - 1, "%s@", pass);
+			len = strlen(pass) + 2;
+			anonpass = xmalloc(len);
+			snprintf(anonpass, len, "%s@", pass);
 			pass = anonpass;
+			freepass = 1;
 		}
 		user = "anonymous";	/* as per RFC 1635 */
+	}
+
+	if (user == NULL) {
+		freeuser = 1;
+		if (pass == NULL)
+			freepass = 1;
+		freeacct = 1;
+		if (ruserpass(host, &user, &pass, &acct) < 0) {
+			code = -1;
+			goto cleanup_ftp_login;
+		}
 	}
 
 	while (user == NULL) {
@@ -306,13 +311,29 @@ ftp_login(host, user, pass)
 		else
 			fprintf(ttyout, "Name (%s): ", host);
 		*tmp = '\0';
-		(void)fgets(tmp, sizeof(tmp) - 1, stdin);
+		if (fgets(tmp, sizeof(tmp) - 1, stdin) == NULL) {
+			fprintf(ttyout, "\nEOF received; login aborted.\n");
+			code = -1;
+			goto cleanup_ftp_login;
+		}
 		tmp[strlen(tmp) - 1] = '\0';
 		if (*tmp == '\0')
 			user = myname;
 		else
 			user = tmp;
 	}
+
+	if (gatemode) {
+		char *nuser;
+		int len;
+
+		len = strlen(user) + 1 + strlen(host) + 1;
+		nuser = xmalloc(len);
+		snprintf(nuser, len, "%s@%s", user, host);
+		user = nuser;
+		freeuser = 1;
+	}
+
 	n = command("USER %s", user);
 	if (n == CONTINUE) {
 		if (pass == NULL)
@@ -321,17 +342,25 @@ ftp_login(host, user, pass)
 	}
 	if (n == CONTINUE) {
 		aflag++;
-		if (acct == NULL)
+		if (acct == NULL) {
 			acct = getpass("Account:");
+			freeacct = 0;
+		}
+		if (acct[0] == '\0') {
+			warnx("Login failed.");
+			goto cleanup_ftp_login;
+		}
 		n = command("ACCT %s", acct);
 	}
 	if ((n != COMPLETE) ||
 	    (!aflag && acct != NULL && command("ACCT %s", acct) != COMPLETE)) {
 		warnx("Login failed.");
-		return (0);
+		goto cleanup_ftp_login;
 	}
+	rval = 1;
 	if (proxy)
-		return (1);
+		goto cleanup_ftp_login;
+
 	connected = -1;
 	for (n = 0; n < macnum; ++n) {
 		if (!strcmp("init", macros[n].mac_name)) {
@@ -341,7 +370,14 @@ ftp_login(host, user, pass)
 			break;
 		}
 	}
-	return (1);
+cleanup_ftp_login:
+	if (user != NULL && freeuser)
+		free((char *)user);
+	if (pass != NULL && freepass)
+		free((char *)pass);
+	if (acct != NULL && freeacct)
+		free((char *)acct);
+	return (rval);
 }
 
 /*
@@ -728,7 +764,7 @@ mkgmtime(tm)
 }
 #endif	/* not HAVE_TIMEGM */
 
-#ifndef	SMALL
+#ifndef	NO_PROGRESS
 
 /*
  * return non-zero if we're the current foreground process
@@ -756,7 +792,7 @@ updateprogressmeter(dummy)
 
 	progressmeter(0);
 }
-#endif	/* SMALL */
+#endif	/* NO_PROGRESS */
 
 
 /*
@@ -775,14 +811,16 @@ static const char prefixes[] = " KMGTP";
  *   with flag = 0
  * - After the transfer, call with flag = 1
  */
+#ifndef	NO_PROGRESS
 static struct timeval start;
 static struct timeval lastupdate;
+#endif
 
 void
 progressmeter(flag)
 	int flag;
 {
-#ifndef	SMALL
+#ifndef	NO_PROGRESS
 	static off_t lastsize;
 	struct timeval now, td, wait;
 	off_t cursize, abbrevsize, bytespersec;
@@ -901,7 +939,7 @@ progressmeter(flag)
 		(void)putc('\n', ttyout);
 	}
 	fflush(ttyout);
-#endif	/* SMALL */
+#endif	/* NO_PROGRESS */
 }
 
 /*
@@ -916,7 +954,7 @@ void
 ptransfer(siginfo)
 	int siginfo;
 {
-#ifndef	SMALL
+#ifndef	NO_PROGRESS
 	struct timeval now, td, wait;
 	double elapsed;
 	off_t bytespersec;
@@ -989,7 +1027,7 @@ ptransfer(siginfo)
 	}
 	len += snprintf(buf + len, sizeof(buf) - len, "\n");
 	(void)write(siginfo ? STDERR_FILENO : fileno(ttyout), buf, len);
-#endif	/* SMALL */
+#endif	/* NO_PROGRESS */
 }
 
 /*
@@ -1068,7 +1106,7 @@ alarmtimer(wait)
 /*
  * Setup or cleanup EditLine structures
  */
-#ifndef SMALL
+#ifndef NO_EDITCOMPLETE
 void
 controlediting()
 {
@@ -1109,7 +1147,7 @@ controlediting()
 		}
 	}
 }
-#endif /* !SMALL */
+#endif /* !NO_EDITCOMPLETE */
 
 /*
  * Parse the specified socket buffer size.

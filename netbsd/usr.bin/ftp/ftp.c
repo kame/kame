@@ -1,4 +1,4 @@
-/*	$NetBSD: ftp.c,v 1.41 1999/02/19 16:29:27 lukem Exp $	*/
+/*	$NetBSD: ftp.c,v 1.41.2.1 1999/06/22 21:02:42 perry Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -67,7 +67,7 @@
 #if 0
 static char sccsid[] = "@(#)ftp.c	8.6 (Berkeley) 10/27/94";
 #else
-__RCSID("$NetBSD: ftp.c,v 1.41 1999/02/19 16:29:27 lukem Exp $");
+__RCSID("$NetBSD: ftp.c,v 1.41.2.1 1999/06/22 21:02:42 perry Exp $");
 #endif
 #endif /* not lint */
 
@@ -1058,13 +1058,6 @@ done:
 	contin2:	;
 		}
 break2:
-		if (bare_lfs) {
-			fprintf(ttyout,
-			"WARNING! %d bare linefeeds received in ASCII mode.\n",
-			    bare_lfs);
-			fputs("File may not have transferred correctly.\n",
-			    ttyout);
-		}
 		if (hash && (!progress || filesize < 0)) {
 			if (bytes < hashbytes)
 				(void)putc('#', ttyout);
@@ -1088,6 +1081,12 @@ break2:
 		(void)signal(SIGPIPE, oldintp);
 	(void)fclose(din);
 	(void)getreply(0);
+	if (bare_lfs) {
+		fprintf(ttyout,
+		    "WARNING! %d bare linefeeds received in ASCII mode.\n",
+		    bare_lfs);
+		fputs("File may not have transferred correctly.\n", ttyout);
+	}
 	if (bytes >= 0 && is_retr) {
 		if (bytes > 0)
 			ptransfer(0);
@@ -1111,7 +1110,7 @@ break2:
 
 abort:
 
-/* abort using RFC959 recommended IP,SYNC sequence */
+/* abort using RFC 959 recommended IP,SYNC sequence */
 
 	progress = oprogress;
 	preserve = opreserve;
@@ -1867,7 +1866,7 @@ abort_remote(din)
 	 * send IAC in urgent mode instead of DM because 4.3BSD places oob mark
 	 * after urgent byte rather than before as is protocol now
 	 */
-	sprintf(buf, "%c%c%c", IAC, IP, IAC);
+	snprintf(buf, sizeof(buf), "%c%c%c", IAC, IP, IAC);
 	if (send(fileno(cout), buf, 3, MSG_OOB) != 3)
 		warn("abort");
 	fprintf(cout, "%cABOR\r\n", DM);

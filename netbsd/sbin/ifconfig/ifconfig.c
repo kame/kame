@@ -1,4 +1,4 @@
-/*	$NetBSD: ifconfig.c,v 1.50 1999/04/01 08:12:23 chopps Exp $	*/
+/*	$NetBSD: ifconfig.c,v 1.50.2.2 1999/06/18 17:42:19 perry Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -80,7 +80,7 @@ __COPYRIGHT("@(#) Copyright (c) 1983, 1993\n\
 #if 0
 static char sccsid[] = "@(#)ifconfig.c	8.2 (Berkeley) 2/16/94";
 #else
-__RCSID("$NetBSD: ifconfig.c,v 1.50 1999/04/01 08:12:23 chopps Exp $");
+__RCSID("$NetBSD: ifconfig.c,v 1.50.2.2 1999/06/18 17:42:19 perry Exp $");
 #endif
 #endif /* not lint */
 
@@ -437,7 +437,7 @@ main(argc, argv)
 		exit(0);
 	}
 
-	/* following operations assume inet familiy as default */
+	/* The following operations assume inet family as the default. */
 	if (afp == NULL)
 		afp = afs;
 	af = ifr.ifr_addr.sa_family = afp->af_af;
