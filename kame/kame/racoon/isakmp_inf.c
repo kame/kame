@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.49 2000/08/09 19:05:09 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.50 2000/08/09 19:08:30 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -734,9 +734,8 @@ isakmp_add_pl_n(buf0, pr, type, data)
 	n->spi_size = pr->spisize;
 	n->type = htons(type);
 	*(u_int32_t *)(n + 1) = (u_int32_t)htonl(pr->spi);	/* XXX */
-	if (data) {
-		memcpy((caddr_t)(n + 1) + pr->spisize, &pr->spi, pr->spisize);
-	}
+	if (data)
+		memcpy((caddr_t)(n + 1) + pr->spisize, data->v, data->l);
 
 	return buf;
 }
