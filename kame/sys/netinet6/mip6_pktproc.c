@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.27 2002/07/24 08:53:36 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.28 2002/07/24 10:13:11 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -174,9 +174,9 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 }
 
 int
-mip6_ip6mh_create(pktopt_mobility, dst, src, cookie)
+mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
 	struct ip6_mobility **pktopt_mobility;
-	struct sockaddr_in6 *dst, *src;
+	struct sockaddr_in6 *src, *dst;
 	u_int32_t cookie;
 {
 	struct ip6m_home_test *ip6mh;
@@ -203,8 +203,8 @@ mip6_ip6mh_create(pktopt_mobility, dst, src, cookie)
 	ip6mh->ip6mh_type = IP6M_HOME_TEST;
 	ip6mh->ip6mh_nonce_index = htonl(nonce_index);
 	ip6mh->ip6mh_mobile_cookie = htonl(cookie);
-	mip6_create_cookie(&src->sin6_addr,
-			   &home_nodekey, &home_nonce, ip6mh->ip6mh_cookie);
+	mip6_create_cookie(&dst->sin6_addr,
+			   &home_nodekey, &home_nonce, &ip6mh->ip6mh_cookie);
 
 	/* calculate checksum. */
 	ip6mh->ip6mh_cksum = mip6_cksum(src, dst,
@@ -281,9 +281,9 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 }
 
 int
-mip6_ip6mc_create(pktopt_mobility, dst, src, cookie)
+mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 	struct ip6_mobility **pktopt_mobility;
-	struct sockaddr_in6 *dst, *src;
+	struct sockaddr_in6 *src, *dst;
 	u_int32_t cookie;
 {
 	struct ip6m_careof_test *ip6mc;
@@ -312,7 +312,7 @@ mip6_ip6mc_create(pktopt_mobility, dst, src, cookie)
 	ip6mc->ip6mc_mobile_cookie = htonl(cookie);
 	mip6_create_cookie(&dst->sin6_addr,
 			   &careof_nodekey, &careof_nonce,
-			   ip6mc->ip6mc_cookie);
+			   &ip6mc->ip6mc_cookie);
 	
 	/* calculate checksum. */
 	ip6mc->ip6mc_cksum = mip6_cksum(src, dst,
@@ -1552,9 +1552,9 @@ printf("MN: Care-of Cookie: %*D\n", sizeof(mbu->mbu_careof_cookie), (caddr_t)&mb
 #endif
 		/* Calculate K_bu */
 		SHA1Init(&sha1_ctx);
-		SHA1Update(&sha1_ctx, (caddr_t)mbu->mbu_home_cookie,
+		SHA1Update(&sha1_ctx, (caddr_t)&mbu->mbu_home_cookie,
 			   sizeof(mbu->mbu_home_cookie));
-		SHA1Update(&sha1_ctx, (caddr_t)mbu->mbu_careof_cookie,
+		SHA1Update(&sha1_ctx, (caddr_t)&mbu->mbu_careof_cookie,
 			   sizeof(mbu->mbu_careof_cookie));
 		SHA1Final(key_bu, &sha1_ctx);
 #if RR_DBG

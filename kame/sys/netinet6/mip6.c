@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.146 2002/07/24 08:53:36 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.147 2002/07/24 10:13:11 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2654,22 +2654,22 @@ printf("CN: Careof Nodekey: %*D\n", sizeof(coa_nodekey), &coa_nodekey, ":");
 
 	/* Calculate home cookie */
 	mip6_create_cookie(&ip6mu->ip6mu_addr,
-			   &home_nodekey, &home_nonce, home_cookie);
+			   &home_nodekey, &home_nonce, &home_cookie);
 #if RR_DBG
 printf("CN: Home Cookie: %*D\n", sizeof(home_cookie), (u_int8_t *)&home_cookie, ":");
 #endif
 
 	/* Calculate care-of cookie */
 	mip6_create_cookie(&ip6->ip6_src, 
-			   &coa_nodekey, &careof_nonce, careof_cookie);
+			   &coa_nodekey, &careof_nonce, &careof_cookie);
 #if RR_DBG
 printf("CN: Care-of Cookie: %*D\n", sizeof(careof_cookie), (u_int8_t *)&careof_cookie, ":");
 #endif
 
 	/* Calculate K_bu */
 	SHA1Init(&sha1_ctx);
-	SHA1Update(&sha1_ctx, (caddr_t)home_cookie, sizeof(home_cookie));
-	SHA1Update(&sha1_ctx, (caddr_t)careof_cookie, sizeof(careof_cookie));
+	SHA1Update(&sha1_ctx, (caddr_t)&home_cookie, sizeof(home_cookie));
+	SHA1Update(&sha1_ctx, (caddr_t)&careof_cookie, sizeof(careof_cookie));
 	SHA1Final(key_bu, &sha1_ctx);
 #if RR_DBG
 printf("CN: K_bu: %*D\n", sizeof(key_bu), key_bu, ":");
