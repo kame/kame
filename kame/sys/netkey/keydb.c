@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.32 1999/12/22 04:23:30 sakane Exp $ */
+/* KAME $Id: keydb.c,v 1.33 2000/01/04 09:58:10 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -1776,11 +1776,13 @@ key_newsav(mhp, sah)
 	case SADB_GETSPI:
 		newsav->spi = 0;
 
+#ifdef IPSEC_DOSEQCHECK
 		/* sync sequence number */
 		if (msg0->sadb_msg_seq == 0)
 			newsav->seq =
 				(acq_seq = (acq_seq == ~0 ? 1 : ++acq_seq));
 		else
+#endif
 			newsav->seq = msg0->sadb_msg_seq;
 		break;
 
@@ -3683,12 +3685,22 @@ key_update(mhp)
 		return NULL;
 
 	/* find a SA with sequence number. */
-	if ((sav = key_getsavbyseq(sah, msg0->sadb_msg_seq)) == NULL) {
+#ifdef IPSEC_DOSEQCHECK
+	if (msg0->sadb_msg_seq != 0
+	 && (sav = key_getsavbyseq(sah, msg0->sadb_msg_seq)) == NULL) {
 		printf("key_update: no larval SA with sequence %u exists.\n",
 			msg0->sadb_msg_seq);
 		msg0->sadb_msg_errno = ENOENT;
 		return NULL;
 	}
+#else
+	if ((sav = key_getsavbyspi(sah, sa0->sadb_sa_spi)) == NULL) {
+		printf("key_update: no such a SA found (spi:%u)\n",
+			(u_int32_t)ntohl(sa0->sadb_sa_spi));
+		msg0->sadb_msg_errno = EINVAL;
+		return NULL;
+	}
+#endif
 
 	/* validity check */
 	if (sav->sah->saidx.proto != proto) {
@@ -3697,6 +3709,7 @@ key_update(mhp)
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
+#ifdef IPSEC_DOSEQCHECK
 	if (sav->spi != sa0->sadb_sa_spi) {
 		printf("key_update: SPI mismatched (DB:%u param:%u)\n",
 			(u_int32_t)ntohl(sav->spi),
@@ -3704,6 +3717,7 @@ key_update(mhp)
 		msg0->sadb_msg_errno = EINVAL;
 		return NULL;
 	}
+#endif
 	if (sav->pid != msg0->sadb_msg_pid) {
 		printf("key_update: pid mismatched (DB:%u param:%u)\n",
 			sav->pid, msg0->sadb_msg_pid);
