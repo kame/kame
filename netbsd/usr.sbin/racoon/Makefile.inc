@@ -20,6 +20,7 @@ CFLAGS+=-I/usr/pkg/include/ssleay
 .endif
 
 LDADD+=	-ly -ll
+DPADD+=	${LIBY} ${LIBL}
 LDADD+=	-L${.CURDIR}/../../../lib/libipsec \
 	-L${.CURDIR}/../../../lib/libipsec/obj \
 	-L${.CURDIR}/../../../lib/libinet6 \
