@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.776 2000/04/17 03:03:26 itojun Exp $
+$Id: CHANGELOG,v 1.777 2000/04/17 04:33:34 itojun Exp $
 
 <200003>
+Mon Apr 17 13:32:48 JST 2000  itojun@iijlab.net
+	* kame/ndp/ndp.c: remove leftover from IPv4 arp logic in set() and
+	  delete().  this caused infinite loop in certain oruting setup.
+
 Mon Apr 17 11:37:44 JST 2000  itojun@iijlab.net
 	* sys/netinet/in_gif.c: reject packets with IPv4 broadcast address
 	  on outer IPv4 source.  this is suggested in ngtrans-mech-05.
