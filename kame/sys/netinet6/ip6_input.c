@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.335 2004/02/06 07:29:07 suz Exp $	*/
+/*	$KAME: ip6_input.c,v 1.336 2004/02/11 10:48:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -984,8 +984,8 @@ ip6_input(m)
 	 */
 #if defined(NFAITH) && 0 < NFAITH
 	if (ip6_keepfaith) {
-		if (ip6_forward_rt.ro_rt && ip6_forward_rt.ro_rt->rt_ifp
-		 && ip6_forward_rt.ro_rt->rt_ifp->if_type == IFT_FAITH) {
+		if (ip6_forward_rt.ro_rt && ip6_forward_rt.ro_rt->rt_ifp &&
+		    ip6_forward_rt.ro_rt->rt_ifp->if_type == IFT_FAITH) {
 			/* XXX do we need more sanity checks? */
 			ours = 1;
 			deliverifp = ip6_forward_rt.ro_rt->rt_ifp; /* faith */

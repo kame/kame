@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.84 2004/02/03 07:25:21 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.85 2004/02/11 10:48:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -185,8 +185,8 @@ ah4_input(m, va_alist)
 	}
 	KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
 		printf("DP ah4_input called to allocate SA:%p\n", sav));
-	if (sav->state != SADB_SASTATE_MATURE
-	 && sav->state != SADB_SASTATE_DYING) {
+	if (sav->state != SADB_SASTATE_MATURE &&
+	    sav->state != SADB_SASTATE_DYING) {
 		ipseclog((LOG_DEBUG,
 		    "IPv4 AH input: non-mature/dying SA found for spi %u\n",
 		    (u_int32_t)ntohl(spi)));
@@ -396,8 +396,7 @@ ah4_input(m, va_alist)
 #endif /* INET6 */
 #endif /* 0 */
 
-	if (m->m_flags & M_AUTHIPHDR
-	 && m->m_flags & M_AUTHIPDGM) {
+	if (m->m_flags & M_AUTHIPHDR && m->m_flags & M_AUTHIPDGM) {
 #if 0
 		ipseclog((LOG_DEBUG,
 		    "IPv4 AH input: authentication succeess\n"));
@@ -733,8 +732,8 @@ ah6_input(mp, offp, proto)
 	}
 	KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
 		printf("DP ah6_input called to allocate SA:%p\n", sav));
-	if (sav->state != SADB_SASTATE_MATURE
-	 && sav->state != SADB_SASTATE_DYING) {
+	if (sav->state != SADB_SASTATE_MATURE &&
+	    sav->state != SADB_SASTATE_DYING) {
 		ipseclog((LOG_DEBUG,
 		    "IPv6 AH input: non-mature/dying SA found for spi %u; ",
 		    (u_int32_t)ntohl(spi)));
@@ -882,8 +881,7 @@ ah6_input(mp, offp, proto)
 	}
 #endif
 
-	if (m->m_flags & M_AUTHIPHDR
-	 && m->m_flags & M_AUTHIPDGM) {
+	if (m->m_flags & M_AUTHIPHDR && m->m_flags & M_AUTHIPDGM) {
 #if 0
 		ipseclog((LOG_DEBUG,
 		    "IPv6 AH input: authentication succeess\n"));

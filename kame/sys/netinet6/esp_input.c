@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.85 2004/02/03 07:25:21 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.86 2004/02/11 10:48:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -187,8 +187,8 @@ esp4_input(m, va_alist)
 	}
 	KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
 		printf("DP esp4_input called to allocate SA:%p\n", sav));
-	if (sav->state != SADB_SASTATE_MATURE
-	 && sav->state != SADB_SASTATE_DYING) {
+	if (sav->state != SADB_SASTATE_MATURE &&
+	    sav->state != SADB_SASTATE_DYING) {
 		ipseclog((LOG_DEBUG,
 		    "IPv4 ESP input: non-mature/dying SA found for spi %u\n",
 		    (u_int32_t)ntohl(spi)));
@@ -213,8 +213,8 @@ esp4_input(m, va_alist)
 		goto bad;
 	}
 
-	if (!((sav->flags & SADB_X_EXT_OLD) == 0 && sav->replay
-	 && (sav->alg_auth && sav->key_auth)))
+	if (!((sav->flags & SADB_X_EXT_OLD) == 0 && sav->replay &&
+	    sav->alg_auth && sav->key_auth))
 		goto noreplaycheck;
 
 	if (sav->alg_auth == SADB_X_AALG_NULL ||
@@ -627,8 +627,8 @@ esp6_input(mp, offp, proto)
 	}
 	KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
 		printf("DP esp6_input called to allocate SA:%p\n", sav));
-	if (sav->state != SADB_SASTATE_MATURE
-	 && sav->state != SADB_SASTATE_DYING) {
+	if (sav->state != SADB_SASTATE_MATURE &&
+	    sav->state != SADB_SASTATE_DYING) {
 		ipseclog((LOG_DEBUG,
 		    "IPv6 ESP input: non-mature/dying SA found for spi %u\n",
 		    (u_int32_t)ntohl(spi)));
@@ -653,8 +653,8 @@ esp6_input(mp, offp, proto)
 		goto bad;
 	}
 
-	if (!((sav->flags & SADB_X_EXT_OLD) == 0 && sav->replay
-	 && (sav->alg_auth && sav->key_auth)))
+	if (!((sav->flags & SADB_X_EXT_OLD) == 0 && sav->replay &&
+	    sav->alg_auth && sav->key_auth))
 		goto noreplaycheck;
 
 	if (sav->alg_auth == SADB_X_AALG_NULL ||

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.425 2004/02/11 10:25:51 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.426 2004/02/11 10:52:39 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1433,8 +1433,7 @@ skip_ipsec2:;
 		if (ia6) {
 			/* Record statistics for this interface address. */
 #if defined(__NetBSD__) && defined(IFA_STATS)
-			ia6->ia_ifa.ifa_data.ifad_outbytes +=
-				m->m_pkthdr.len;
+			ia6->ia_ifa.ifa_data.ifad_outbytes += m->m_pkthdr.len;
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 4
 			ia6->ia_ifa.if_opackets++;
 			ia6->ia_ifa.if_obytes += m->m_pkthdr.len;
