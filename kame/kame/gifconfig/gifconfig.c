@@ -1,4 +1,4 @@
-/*	$KAME: gifconfig.c,v 1.13 2000/10/07 05:14:26 itojun Exp $	*/
+/*	$KAME: gifconfig.c,v 1.14 2001/01/01 04:04:56 jinmei Exp $	*/
 
 /*
  * Copyright (c) 1983, 1993
@@ -110,7 +110,7 @@ void delifaddrs __P((char *, int));
 
 #define	NEXTARG		0xffffff
 
-struct	cmd {
+static struct	cmd {
 	char	*c_name;
 	int	c_parameter;		/* NEXTARG means next argv */
 	void	(*c_func) __P((char *, int));
