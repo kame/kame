@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.45 2000/10/05 03:25:23 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.46 2000/10/05 04:02:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -117,7 +117,6 @@ static int esp_cbc_decrypt __P((struct mbuf *, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_cbc_encrypt __P((struct mbuf *, size_t, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
-static void esp_stir_iv __P((struct secasvar *));
 
 #define MAXIVLEN	16
 
@@ -1038,20 +1037,9 @@ esp_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	bzero(iv, sizeof(iv));
 	bzero(sbuf, sizeof(sbuf));
 
-	esp_stir_iv(sav);
+	key_sa_stir_iv(sav);
 
 	return 0;
-}
-
-/*
- * increment iv.
- */
-static void
-esp_stir_iv(sav)
-	struct secasvar *sav;
-{
-
-	key_randomfill(sav->iv, sav->ivlen);
 }
 
 /*------------------------------------------------------------*/

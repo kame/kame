@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.166 2000/10/05 03:45:27 itojun Exp $	*/
+/*	$KAME: key.c,v 1.167 2000/10/05 04:02:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -7348,6 +7348,16 @@ key_sa_chgstate(sav, state)
 
 	sav->state = state;
 	LIST_INSERT_HEAD(&sav->sah->savtree[state], sav, chain);
+}
+
+void
+key_sa_stir_iv(sav)
+	struct secasvar *sav;
+{
+
+	if (!sav->iv)
+		panic("key_sa_stir_iv called with sav == NULL");
+	key_randomfill(sav->iv, sav->ivlen);
 }
 
 /* XXX too much? */

@@ -1,4 +1,4 @@
-/*	$KAME: key.h,v 1.18 2000/10/05 03:25:24 itojun Exp $	*/
+/*	$KAME: key.h,v 1.19 2000/10/05 04:02:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -69,6 +69,7 @@ extern int key_checktunnelsanity __P((struct secasvar *, u_int,
 					caddr_t, caddr_t));
 extern void key_sa_recordxfer __P((struct secasvar *, struct mbuf *));
 extern void key_sa_routechange __P((struct sockaddr *));
+extern void key_sa_stir_iv __P((struct secasvar *));
 
 #ifdef __FreeBSD__
 #ifdef MALLOC_DECLARE
