@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.114 2001/02/23 09:05:07 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.115 2001/02/23 09:12:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -930,12 +930,16 @@ in6_ifattach(ifp, altifp)
 	/*
 	 * assign a link-local address, if there's none. 
 	 */
-	if (!ip6_auto_linklocal)
-		goto statinit;
-
-	ia = in6ifa_ifpforlinklocal(ifp, 0);
-	if (ia == NULL && in6_ifattach_linklocal(ifp, altifp) != 0)
-		goto statinit;
+	if (ip6_auto_linklocal) {
+		ia = in6ifa_ifpforlinklocal(ifp, 0);
+		if (ia == NULL) {
+			if (in6_ifattach_linklocal(ifp, altifp) == 0) {
+				/* linklocal address assigned */
+			} else {
+				/* failed to assign linklocal address.  bark? */
+			}
+		}
+	}
 
 statinit:
 
