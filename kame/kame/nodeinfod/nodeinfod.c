@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.16 2001/10/23 07:31:25 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.17 2001/10/24 04:40:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -382,7 +382,7 @@ mainloop()
 			qtype = ntohs(ni6->ni_qtype);
 
 		/* pass 2nd arg just for linux friendliness... */
-		if (func[qtype])
+		if (qtype < sizeof(func) / sizeof(func[0]) && func[qtype])
 			(void) (*func[qtype])(sa, salen, buf, l);
 	}
 }
