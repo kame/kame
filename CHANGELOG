@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1361 2000/11/05 09:42:20 jinmei Exp $
+$KAME: CHANGELOG,v 1.1362 2000/11/05 15:24:35 itojun Exp $
 
 <200011>
+Mon Nov  6 00:36:02 JST 2000  itojun@iijlab.net
+	* sys/netinet6/udp6_output.c (bsdi4/openbsd): do not mix up
+	  inbound and outbound flowlabel value.
+	  
 Thu Nov  2 23:17:07 JST 2000  itojun@iijlab.net
 	* sys/netinet6/esp_core.c: fix [13]DES on big endian machines.
 	  report from shigeru@iij.ad.jp.
