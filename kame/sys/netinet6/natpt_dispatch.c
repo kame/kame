@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.66 2002/08/09 11:30:19 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.67 2002/08/12 07:59:28 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -151,6 +151,10 @@ natpt_in6(struct mbuf *m6, struct mbuf **m4)
 		if ((cv6.fh->ip6f_offlg & IP6F_OFF_MASK) == 0) {
 			/* first fragmented packet */
 			if ((cv6.ats = natpt_lookForHash6(&cv6)) == NULL) {
+				if ((cv6.ip_p == IPPROTO_TCP)
+				    && (((cv6.pyld.tcp4->th_flags & TH_SYN) == 0)
+					|| ((cv6.pyld.tcp4->th_flags & TH_ACK) != 0)))
+					return (IPPROTO_IP);
 				if ((acs = natpt_lookForRule6(&cv6)) == NULL)
 					return (IPPROTO_IP);
 				if ((cv6.ats = natpt_internHash6(acs, &cv6)) == NULL)
@@ -173,6 +177,10 @@ natpt_in6(struct mbuf *m6, struct mbuf **m4)
 		if (cv6.ats == NULL) {
 			struct cSlot	*acs;
 
+			if ((cv6.ip_p == IPPROTO_TCP)
+			    && (((cv6.pyld.tcp4->th_flags & TH_SYN) == 0)
+				|| ((cv6.pyld.tcp4->th_flags & TH_ACK) != 0)))
+				return (IPPROTO_IP);
 			if ((acs = natpt_lookForRule6(&cv6)) == NULL)
 				return (IPPROTO_IP);
 			if ((cv6.ats = natpt_internHash6(acs, &cv6)) == NULL)

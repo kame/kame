@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.50 2002/07/25 02:35:59 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.51 2002/08/12 07:59:28 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -83,11 +83,6 @@ natpt_lookForRule6(struct pcv *cv6)
 	const char *fn = __FUNCTION__;
 	int s;
 	struct cSlot *csl;
-
-	if ((cv6->ip_p == IPPROTO_TCP)
-	    && (((cv6->pyld.tcp4->th_flags & TH_SYN) == 0)
-		|| ((cv6->pyld.tcp4->th_flags & TH_ACK) != 0)))
-		return (NULL);
 
 	s = splnet();
 	for (csl = TAILQ_FIRST(&csl_head); csl; csl = TAILQ_NEXT(csl, csl_list)) {
