@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.133 2000/06/22 08:38:34 sakane Exp $	*/
+/*	$KAME: key.c,v 1.134 2000/06/22 09:06:22 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3785,6 +3785,42 @@ key_cmpsaidx_withmode(saidx0, saidx1)
 }
 
 /*
+ * compare two secasindex structure without mode.
+ * don't compare port.
+ * IN:
+ *	saidx0: source, it is often in SAD.
+ *	saidx1: object, it is often from user.
+ * OUT:
+ *	1 : equal
+ *	0 : not equal
+ */
+static int
+key_cmpsaidx_withoutmode(saidx0, saidx1)
+	struct secasindex *saidx0, *saidx1;
+{
+	/* sanity */
+	if (saidx0 == NULL && saidx1 == NULL)
+		return 1;
+
+	if (saidx0 == NULL || saidx1 == NULL)
+		return 0;
+
+	if (saidx0->proto != saidx1->proto)
+		return 0;
+
+	if (key_sockaddrcmp((struct sockaddr *)&saidx0->src,
+	    (struct sockaddr *)&saidx1->src, 0) != 0) {
+		return 0;
+	}
+	if (key_sockaddrcmp((struct sockaddr *)&saidx0->dst,
+	    (struct sockaddr *)&saidx1->dst, 0) != 0) {
+		return 0;
+	}
+
+	return 1;
+}
+
+/*
  * compare two secindex structure exactly.
  * IN:
  *	spidx0: source, it is often in SPD.
@@ -5140,7 +5176,7 @@ key_delete(so, m, mhp)
 	struct sadb_address *src0, *dst0;
 	struct secasindex saidx;
 	struct secashead *sah;
-	struct secasvar *sav;
+	struct secasvar *sav = NULL;
 	u_int16_t proto;
 
 	/* sanity check */
@@ -5183,21 +5219,17 @@ key_delete(so, m, mhp)
 	LIST_FOREACH(sah, &sahtree, chain) {
 		if (sah->state == SADB_SASTATE_DEAD)
 			continue;
-		if (key_cmpsaidx_withmode(&sah->saidx, &saidx))
+		if (key_cmpsaidx_withoutmode(&sah->saidx, &saidx) == 0)
+			continue;
+
+		/* get a SA with SPI. */
+		sav = key_getsavbyspi(sah, sa0->sadb_sa_spi);
+		if (sav)
 			break;
 	}
 	if (sah == NULL) {
 #ifdef IPSEC_DEBUG
 		printf("key_delete: no SA found.\n");
-#endif
-		return key_senderror(so, m, ENOENT);
-	}
-
-	/* get a SA with SPI. */
-	sav = key_getsavbyspi(sah, sa0->sadb_sa_spi);
-	if (sav == NULL) {
-#ifdef IPSEC_DEBUG
-		printf("key_delete: no alive SA found.\n");
 #endif
 		return key_senderror(so, m, ENOENT);
 	}
@@ -5252,7 +5284,7 @@ key_get(so, m, mhp)
 	struct sadb_address *src0, *dst0;
 	struct secasindex saidx;
 	struct secashead *sah;
-	struct secasvar *sav;
+	struct secasvar *sav = NULL;
 	u_int16_t proto;
 
 	/* sanity check */
@@ -5295,21 +5327,17 @@ key_get(so, m, mhp)
 	LIST_FOREACH(sah, &sahtree, chain) {
 		if (sah->state == SADB_SASTATE_DEAD)
 			continue;
-		if (key_cmpsaidx_withmode(&sah->saidx, &saidx))
+		if (key_cmpsaidx_withoutmode(&sah->saidx, &saidx) == 0)
+			continue;
+
+		/* get a SA with SPI. */
+		sav = key_getsavbyspi(sah, sa0->sadb_sa_spi);
+		if (sav)
 			break;
 	}
 	if (sah == NULL) {
 #ifdef IPSEC_DEBUG
 		printf("key_get: no SA found.\n");
-#endif
-		return key_senderror(so, m, ENOENT);
-	}
-
-	/* get a SA with SPI. */
-	sav = key_getsavbyspi(sah, sa0->sadb_sa_spi);
-	if (sav == NULL) {
-#ifdef IPSEC_DEBUG
-		printf("key_get: no SA with state of mature found.\n");
 #endif
 		return key_senderror(so, m, ENOENT);
 	}
