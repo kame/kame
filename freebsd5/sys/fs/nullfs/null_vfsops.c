@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,7 +32,7 @@
  *	@(#)null_vfsops.c	8.2 (Berkeley) 1/21/94
  *
  * @(#)lofs_vfsops.c	1.2 (Berkeley) 6/18/92
- * $FreeBSD: src/sys/fs/nullfs/null_vfsops.c,v 1.59 2003/06/12 20:48:37 phk Exp $
+ * $FreeBSD: src/sys/fs/nullfs/null_vfsops.c,v 1.63 2004/07/30 22:08:50 phk Exp $
  */
 
 /*
@@ -46,6 +42,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
@@ -60,7 +57,7 @@ static MALLOC_DEFINE(M_NULLFSMNT, "NULLFS mount", "NULLFS mount structure");
 
 static vfs_fhtovp_t	nullfs_fhtovp;
 static vfs_checkexp_t	nullfs_checkexp;
-static vfs_nmount_t	nullfs_mount;
+static vfs_mount_t	nullfs_mount;
 static vfs_quotactl_t	nullfs_quotactl;
 static vfs_root_t	nullfs_root;
 static vfs_start_t	nullfs_start;
@@ -75,10 +72,7 @@ static vfs_extattrctl_t	nullfs_extattrctl;
  * Mount null layer
  */
 static int
-nullfs_mount(mp, ndp, td)
-	struct mount *mp;
-	struct nameidata *ndp;
-	struct thread *td;
+nullfs_mount(struct mount *mp, struct thread *td)
 {
 	int error = 0;
 	struct vnode *lowerrootvp, *vp;
@@ -87,6 +81,7 @@ nullfs_mount(mp, ndp, td)
 	char *target;
 	size_t size;
 	int isvnunlocked = 0, len;
+	struct nameidata nd, *ndp = &nd;
 
 	NULLFSDEBUG("nullfs_mount(mp = %p)\n", (void *)mp);
 
@@ -231,7 +226,7 @@ nullfs_unmount(mp, mntflags, td)
 		flags |= FORCECLOSE;
 
 	/* There is 1 extra root vnode reference (nullm_rootvp). */
-	error = vflush(mp, 1, flags);
+	error = vflush(mp, 1, flags, td);
 	if (error)
 		return (error);
 
@@ -245,11 +240,11 @@ nullfs_unmount(mp, mntflags, td)
 }
 
 static int
-nullfs_root(mp, vpp)
+nullfs_root(mp, vpp, td)
 	struct mount *mp;
 	struct vnode **vpp;
+	struct thread *td;
 {
-	struct thread *td = curthread;	/* XXX */
 	struct vnode *vp;
 
 	NULLFSDEBUG("nullfs_root(mp = %p, vp = %p->%p)\n", (void *)mp,
@@ -264,7 +259,7 @@ nullfs_root(mp, vpp)
 
 #ifdef NULLFS_DEBUG
 	if (VOP_ISLOCKED(vp, NULL)) {
-		Debugger("root vnode is locked.\n");
+		kdb_enter("root vnode is locked.\n");
 		vrele(vp);
 		return (EDEADLK);
 	}
@@ -406,7 +401,7 @@ static struct vfsops null_vfsops = {
 	.vfs_extattrctl =	nullfs_extattrctl,
 	.vfs_fhtovp =		nullfs_fhtovp,
 	.vfs_init =		nullfs_init,
-	.vfs_nmount =		nullfs_mount,
+	.vfs_mount =		nullfs_mount,
 	.vfs_quotactl =		nullfs_quotactl,
 	.vfs_root =		nullfs_root,
 	.vfs_start =		nullfs_start,

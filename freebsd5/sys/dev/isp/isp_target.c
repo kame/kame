@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/isp_target.c,v 1.27 2003/09/13 01:58:26 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/isp_target.c,v 1.30 2004/05/24 07:02:25 njl Exp $ */
 /*
  * Machine and OS Independent Target Mode Code for the Qlogic SCSI/FC adapters.
  *
@@ -159,6 +159,7 @@ isp_target_notify(struct ispsoftc *isp, void *vptr, u_int16_t *optrp)
 		isp_get_atio2(isp, at2iop, (at2_entry_t *) local);
 		isp_handle_atio2(isp, (at2_entry_t *) local);
 		break;
+	case RQSTYPE_CTIO3:
 	case RQSTYPE_CTIO2:
 		isp_get_ctio2(isp, ct2iop, (ct2_entry_t *) local);
 		isp_handle_ctio2(isp, (ct2_entry_t *) local);
@@ -446,7 +447,7 @@ isp_endcmd(struct ispsoftc *isp, void *arg, u_int32_t code, u_int16_t hdl)
 			cto->ct_lun = aep->at_lun;
 		}
 		cto->ct_rxid = aep->at_rxid;
-		cto->rsp.m1.ct_scsi_status = sts & 0xff;
+		cto->rsp.m1.ct_scsi_status = sts;
 		cto->ct_flags = CT2_SENDSTATUS | CT2_NO_DATA | CT2_FLAG_MODE1;
 		if (hdl == 0) {
 			cto->ct_flags |= CT2_CCINCR;
@@ -455,7 +456,7 @@ isp_endcmd(struct ispsoftc *isp, void *arg, u_int32_t code, u_int16_t hdl)
 			cto->ct_resid = aep->at_datalen;
 			cto->rsp.m1.ct_scsi_status |= CT2_DATA_UNDER;
 		}
-		if ((sts & 0xff) == SCSI_CHECK && (sts & ECMD_SVALID)) {
+		if (sts == SCSI_CHECK && (code & ECMD_SVALID)) {
 			cto->rsp.m1.ct_resp[0] = 0xf0;
 			cto->rsp.m1.ct_resp[2] = (code >> 12) & 0xf;
 			cto->rsp.m1.ct_resp[7] = 8;
@@ -881,7 +882,7 @@ isp_handle_ctio(struct ispsoftc *isp, ct_entry_t *ct)
 	char *fmsg = NULL;
 
 	if (ct->ct_syshandle) {
-		xs = isp_find_xs(isp, ct->ct_syshandle);
+		xs = isp_find_xs_tgt(isp, ct->ct_syshandle);
 		if (xs == NULL)
 			pl = ISP_LOGALL;
 	} else {
@@ -1041,7 +1042,7 @@ isp_handle_ctio2(struct ispsoftc *isp, ct2_entry_t *ct)
 	char *fmsg = NULL;
 
 	if (ct->ct_syshandle) {
-		xs = isp_find_xs(isp, ct->ct_syshandle);
+		xs = isp_find_xs_tgt(isp, ct->ct_syshandle);
 		if (xs == NULL)
 			pl = ISP_LOGALL;
 	} else {
@@ -1152,7 +1153,7 @@ isp_handle_ctio2(struct ispsoftc *isp, ct2_entry_t *ct)
 		 * order we got them.
 		 */
 		if (ct->ct_syshandle == 0) {
-			if ((ct->ct_flags & CT_SENDSTATUS) == 0) {
+			if ((ct->ct_flags & CT2_SENDSTATUS) == 0) {
 				isp_prt(isp, pl,
 				    "intermediate CTIO completed ok");
 			} else {
@@ -1168,7 +1169,7 @@ isp_handle_ctio2(struct ispsoftc *isp, ct2_entry_t *ct)
 		if ((ct->ct_flags & CT2_DATAMASK) != CT2_NO_DATA) {
 			ISP_DMAFREE(isp, xs, ct->ct_syshandle);
 		}
-		if (ct->ct_flags & CT_SENDSTATUS) {
+		if (ct->ct_flags & CT2_SENDSTATUS) {
 			/*
 			 * Sent status and command complete.
 			 *

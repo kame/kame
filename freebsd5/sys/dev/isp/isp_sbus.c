@@ -27,18 +27,20 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/isp/isp_sbus.c,v 1.11 2003/09/02 19:52:31 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/isp/isp_sbus.c,v 1.15 2004/08/12 17:41:29 marius Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/resource.h>
+
+#include <dev/ofw/ofw_bus.h>
+
 #include <machine/bus.h>
 #include <machine/resource.h>
 #include <sys/rman.h>
-#include <dev/ofw/openfirm.h>
-#include <machine/ofw_machdep.h>
 #include <sparc64/sbus/sbusvar.h>
 
 #include <dev/isp/isp_freebsd.h>
@@ -109,7 +111,7 @@ static int
 isp_sbus_probe(device_t dev)
 {
 	int found = 0;
-	char *name = sbus_get_name(dev);
+	const char *name = ofw_bus_get_name(dev);
 	if (strcmp(name, "SUNW,isp") == 0 ||
 	    strcmp(name, "QLGC,isp") == 0 ||
 	    strcmp(name, "ptisp") == 0 ||
@@ -175,7 +177,7 @@ isp_sbus_attach(device_t dev)
 
 	rid = 0;
 	regs =
-	    bus_alloc_resource(dev, SYS_RES_MEMORY, &rid, 0, ~0, 1, RF_ACTIVE);
+	    bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid, RF_ACTIVE);
 	if (regs == 0) {
 		device_printf(dev, "unable to map registers\n");
 		goto bad;
@@ -239,8 +241,8 @@ isp_sbus_attach(device_t dev)
 	 * would fail in trying to download (via poking)
 	 * FW. We give up on them.
 	 */
-	if (strcmp("PTI,ptisp", sbus_get_name(dev)) == 0 ||
-	    strcmp("ptisp", sbus_get_name(dev)) == 0) {
+	if (strcmp("PTI,ptisp", ofw_bus_get_name(dev)) == 0 ||
+	    strcmp("ptisp", ofw_bus_get_name(dev)) == 0) {
 		isp->isp_confopts |= ISP_CFG_NORELOAD;
 	}
 
@@ -259,8 +261,8 @@ isp_sbus_attach(device_t dev)
 	}
 
 	iqd = 0;
-	sbs->sbus_ires = bus_alloc_resource(dev, SYS_RES_IRQ, &iqd, 0, ~0,
-	    1, RF_ACTIVE | RF_SHAREABLE);
+	sbs->sbus_ires = bus_alloc_resource_any(dev, SYS_RES_IRQ, &iqd,
+	    RF_ACTIVE | RF_SHAREABLE);
 	if (sbs->sbus_ires == NULL) {
 		device_printf(dev, "could not allocate interrupt\n");
 		goto bad;
@@ -489,7 +491,7 @@ isp_sbus_mbxdma(struct ispsoftc *isp)
 
 	ISP_UNLOCK(isp);
 
-	if (bus_dma_tag_create(NULL, 1, BUS_SPACE_MAXADDR_24BIT-1,
+	if (bus_dma_tag_create(NULL, 1, BUS_SPACE_MAXADDR_24BIT+1,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR_32BIT,
 	    NULL, NULL, BUS_SPACE_MAXSIZE_32BIT, ISP_NSEGS,
 	    BUS_SPACE_MAXADDR_24BIT, 0, busdma_lock_mutex, &Giant,
@@ -522,7 +524,7 @@ isp_sbus_mbxdma(struct ispsoftc *isp)
 	len += ISP_QUEUE_SIZE(RESULT_QUEUE_LEN(isp));
 
 	ns = (len / PAGE_SIZE) + 1;
-	if (bus_dma_tag_create(sbs->dmat, QENTRY_LEN, BUS_SPACE_MAXADDR_24BIT-1,
+	if (bus_dma_tag_create(sbs->dmat, QENTRY_LEN, BUS_SPACE_MAXADDR_24BIT+1,
 	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR_32BIT, NULL, NULL,
 	    len, ns, BUS_SPACE_MAXADDR_24BIT, 0, busdma_lock_mutex, &Giant,
 	    &isp->isp_cdmat)) {

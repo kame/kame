@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/drm/radeon_mem.c,v 1.4 2003/09/09 00:24:31 anholt Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/drm/radeon_mem.c,v 1.5 2004/06/11 03:26:59 anholt Exp $");
 
 #include "dev/drm/radeon.h"
 #include "dev/drm/drmP.h"
@@ -141,12 +141,12 @@ static int init_heap(struct mem_block **heap, int start, int size)
 	struct mem_block *blocks = DRM_MALLOC(sizeof(*blocks));
 
 	if (!blocks) 
-		return -ENOMEM;
+		return DRM_ERR(ENOMEM);
 	
 	*heap = DRM_MALLOC(sizeof(**heap));
 	if (!*heap) {
 		DRM_FREE( blocks, sizeof(*blocks) );
-		return -ENOMEM;
+		return DRM_ERR(ENOMEM);
 	}
 
 	blocks->start = start;

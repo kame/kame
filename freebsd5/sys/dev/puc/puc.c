@@ -26,9 +26,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/puc/puc.c,v 1.27 2003/09/26 04:44:55 marcel Exp $");
-
 /*
  * Copyright (c) 1996, 1998, 1999
  *	Christopher G. Demetriou.  All rights reserved.
@@ -61,7 +58,7 @@ __FBSDID("$FreeBSD: src/sys/dev/puc/puc.c,v 1.27 2003/09/26 04:44:55 marcel Exp 
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/puc/puc.c,v 1.27 2003/09/26 04:44:55 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/puc/puc.c,v 1.33 2004/07/01 17:23:49 imp Exp $");
 
 /*
  * PCI "universal" communication card device driver, glues com, lpt,
@@ -84,8 +81,8 @@ __FBSDID("$FreeBSD: src/sys/dev/puc/puc.c,v 1.27 2003/09/26 04:44:55 marcel Exp 
  * 'com' and 'lpt' attachments to pci.
  */
 
+#define __RMAN_RESOURCE_VISIBLE	/* Shouldn't be there */
 #include "opt_puc.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -174,6 +171,7 @@ puc_attach(device_t dev, const struct puc_device_description *desc)
 	struct puc_device *pdev;
 	struct resource *res;
 	struct resource_list_entry *rle;
+	bus_space_handle_t bh;
 
 	if (desc == NULL)
 		return (ENXIO);
@@ -188,7 +186,7 @@ puc_attach(device_t dev, const struct puc_device_description *desc)
 	printf("puc: name: %s\n", sc->sc_desc.name);
 #endif
 	rid = 0;
-	res = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
+	res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 	    RF_ACTIVE | RF_SHAREABLE);
 	if (!res)
 		return (ENXIO);
@@ -223,13 +221,13 @@ puc_attach(device_t dev, const struct puc_device_description *desc)
 		type = (sc->sc_desc.ports[i].flags & PUC_FLAGS_MEMORY)
 		    ? SYS_RES_MEMORY : SYS_RES_IOPORT;
 
-		res = bus_alloc_resource(dev, type, &rid, 0ul, ~0ul, 1,
+		res = bus_alloc_resource_any(dev, type, &rid,
 		    RF_ACTIVE);
 		if (res == NULL &&
 		    sc->sc_desc.ports[i].flags & PUC_FLAGS_ALTRES) {
 			type = (type == SYS_RES_IOPORT)
 			    ? SYS_RES_MEMORY : SYS_RES_IOPORT;
-			res = bus_alloc_resource(dev, type, &rid, 0ul, ~0ul, 1,
+			res = bus_alloc_resource_any(dev, type, &rid,
 			    RF_ACTIVE);
 		}
 		if (res == NULL) {
@@ -322,14 +320,16 @@ puc_attach(device_t dev, const struct puc_device_description *desc)
 				return (ENOMEM);
 			}
 
-			rle->res->r_start = rman_get_start(res) +
-			    sc->sc_desc.ports[i].offset;
-			rle->res->r_end = rle->res->r_start + ressz - 1;
-			rle->res->r_bustag = rman_get_bustag(res);
-			bus_space_subregion(rle->res->r_bustag,
+			rman_set_start(rle->res, rman_get_start(res) +
+			    sc->sc_desc.ports[i].offset);
+			rman_set_end(rle->res, rman_get_start(rle->res) +
+			    ressz - 1);
+			rman_set_bustag(rle->res, rman_get_bustag(res));
+			bus_space_subregion(rman_get_bustag(rle->res),
 			    rman_get_bushandle(res),
 			    sc->sc_desc.ports[i].offset, ressz,
-			    &rle->res->r_bushandle);
+			    &bh);
+			rman_set_bushandle(rle->res, bh);
 		}
 
 		pdev->port = i + 1;

@@ -20,10 +20,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -44,7 +40,7 @@
  *
  * From:
  *	$Id: procfs_regs.c,v 3.2 1993/12/15 09:40:17 jsp Exp $
- * $FreeBSD: src/sys/fs/procfs/procfs_dbregs.c,v 1.23 2003/10/02 15:00:55 nectar Exp $
+ * $FreeBSD: src/sys/fs/procfs/procfs_dbregs.c,v 1.24.2.1 2004/10/09 17:11:08 das Exp $
  */
 
 #include <sys/param.h>
@@ -67,12 +63,12 @@ procfs_doprocdbregs(PFS_FILL_ARGS)
 	struct dbreg r;
 
 	PROC_LOCK(p);
+	KASSERT(p->p_lock > 0, ("proc not held"));
 	if (p_candebug(td, p) != 0) {
 		PROC_UNLOCK(p);
 		return (EPERM);
 	}
 
-	_PHOLD(p);
 	/* XXXKSE: */
 	error = proc_read_dbregs(FIRST_THREAD_IN_PROC(p), &r);
 	if (error == 0) {
@@ -87,7 +83,6 @@ procfs_doprocdbregs(PFS_FILL_ARGS)
 			/* XXXKSE: */
 			error = proc_write_dbregs(FIRST_THREAD_IN_PROC(p), &r);
 	}
-	_PRELE(p);
 	PROC_UNLOCK(p);
 
 	uio->uio_offset = 0;

@@ -44,7 +44,7 @@
 
 #include <dev/sound/pci/via8233.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/via8233.c,v 1.13 2003/09/02 17:30:37 jhb Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/via8233.c,v 1.17 2004/07/16 03:59:27 tanimura Exp $");
 
 #define VIA8233_PCI_ID 0x30591106
 
@@ -53,6 +53,7 @@ SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/via8233.c,v 1.13 2003/09/02 17
 #define VIA8233_REV_ID_8233	0x30
 #define VIA8233_REV_ID_8233A	0x40
 #define VIA8233_REV_ID_8235	0x50
+#define VIA8233_REV_ID_8237	0x60
 
 #define SEGS_PER_CHAN	2			/* Segments per channel */
 #define NDXSCHANS	4			/* No of DXS channels */
@@ -635,6 +636,9 @@ via_probe(device_t dev)
 		case VIA8233_REV_ID_8235:
 			device_set_desc(dev, "VIA VT8235");
 			return 0;
+		case VIA8233_REV_ID_8237:
+			device_set_desc(dev, "VIA VT8237");
+			return 0;
 		default:
 			device_set_desc(dev, "VIA VT8233X");	/* Unknown */
 			return 0;
@@ -766,8 +770,8 @@ via_attach(device_t dev)
 	pci_enable_busmaster(dev);
 	
 	via->regid = PCIR_BAR(0);
-	via->reg = bus_alloc_resource(dev, SYS_RES_IOPORT, &via->regid, 0, ~0,
-				      1, RF_ACTIVE);
+	via->reg = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &via->regid,
+					  RF_ACTIVE);
 	if (!via->reg) {
 		device_printf(dev, "cannot allocate bus resource.");
 		goto bad;
@@ -778,8 +782,8 @@ via_attach(device_t dev)
 	via->bufsz = pcm_getbuffersize(dev, 4096, VIA_DEFAULT_BUFSZ, 65536);
 
 	via->irqid = 0;
-	via->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &via->irqid, 0, ~0, 1,
-				      RF_ACTIVE | RF_SHAREABLE);
+	via->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &via->irqid,
+					  RF_ACTIVE | RF_SHAREABLE);
 	if (!via->irq || 
 	    snd_setup_intr(dev, via->irq, 0, via_intr, via, &via->ih)) {
 		device_printf(dev, "unable to map interrupt\n");
@@ -843,8 +847,8 @@ via_attach(device_t dev)
 		ac97_setextmode(via->codec, ext);
 	}
 
-	snprintf(status, SND_STATUSLEN, "at io 0x%lx irq %ld", 
-		 rman_get_start(via->reg), rman_get_start(via->irq));
+	snprintf(status, SND_STATUSLEN, "at io 0x%lx irq %ld %s", 
+		 rman_get_start(via->reg), rman_get_start(via->irq),PCM_KLDSTRING(snd_via8233));
 
 	/* Register */
 	if (pci_get_revid(dev) == VIA8233_REV_ID_8233A) {
@@ -919,5 +923,5 @@ static driver_t via_driver = {
 };
 
 DRIVER_MODULE(snd_via8233, pci, via_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_via8233, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_via8233, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_via8233, 1);

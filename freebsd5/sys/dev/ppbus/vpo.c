@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ppbus/vpo.c,v 1.29 2003/08/24 17:54:16 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ppbus/vpo.c,v 1.33 2004/07/09 16:56:46 cognet Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -90,7 +90,11 @@ static void
 vpo_identify(driver_t *driver, device_t parent)
 {
 
-	BUS_ADD_CHILD(parent, 0, "vpo", -1);
+	device_t dev;
+
+	dev = device_find_child(parent, "vpo", 0);
+	if (!dev)
+		BUS_ADD_CHILD(parent, 0, "vpo", -1);
 }
 
 /*
@@ -103,7 +107,6 @@ vpo_probe(device_t dev)
 	int error;
 
 	vpo = DEVTOSOFTC(dev);
-	bzero(vpo, sizeof(struct vpo_data));
 
 	/* vpo dependent initialisation */
 	vpo->vpo_unit = device_get_unit(dev);
@@ -191,6 +194,7 @@ vpo_cam_rescan(struct vpo_data *vpo)
         if (xpt_create_path(&path, xpt_periph, cam_sim_path(vpo->sim), 0, 0)
             != CAM_REQ_CMP) {
 		/* A failure is benign as the user can do a manual rescan */
+		free(ccb, M_TEMP);
                 return;
 	}
 

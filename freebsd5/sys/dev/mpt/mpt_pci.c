@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mpt/mpt_pci.c,v 1.14 2003/09/02 17:30:36 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mpt/mpt_pci.c,v 1.16 2004/03/17 17:50:37 njl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -319,8 +319,8 @@ mpt_attach(device_t dev)
 
 	/* Get a handle to the interrupt */
 	iqd = 0;
-	mpt->pci_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &iqd, 0, ~0,
-	    1, RF_ACTIVE | RF_SHAREABLE);
+	mpt->pci_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &iqd,
+	    RF_ACTIVE | RF_SHAREABLE);
 	if (mpt->pci_irq == NULL) {
 		device_printf(dev, "could not allocate interrupt\n");
 		goto bad;
@@ -474,7 +474,7 @@ mpt_dma_mem_alloc(mpt_softc_t *mpt)
 	device_t dev = mpt->dev;
 
 	/* Check if we alreay have allocated the reply memory */
-	if (mpt->reply_phys != NULL) {
+	if (mpt->reply_phys != 0) {
 		return 0;
 	}
 

@@ -21,7 +21,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  *
- * $FreeBSD: src/sys/dev/drm/drm_sysctl.h,v 1.6 2003/10/24 21:45:21 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_sysctl.h,v 1.7 2004/01/06 04:34:52 anholt Exp $
  */
 
 #ifdef __FreeBSD__
@@ -194,7 +194,7 @@ static int DRM(vm_info)DRM_SYSCTL_HANDLER_ARGS
 		else
 			type = types[map->type];
 
-		if (map->mtrr <= 0)
+		if (!map->mtrr)
 			yesno = "no";
 		else
 			yesno = "yes";

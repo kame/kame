@@ -25,10 +25,11 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/pci/pcibus.c,v 1.33 2003/08/22 07:20:27 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/pci/pcibus.c,v 1.34.2.1 2004/09/02 06:12:19 marcel Exp $");
 
 #include "opt_isa.h"
 
+#define __RMAN_RESOURCE_VISIBLE
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -261,7 +262,7 @@ alpha_pci_alloc_resource(device_t bus, device_t child, int type, int *rid,
 		else if (flags & PCI_RF_BWX)
 			va = ALPHAPCI_CVT_BWX(bus, rv->r_start);
 		else
-			va = (void *) rv->r_start; /* maybe NULL? */
+			va = (void *)ALPHA_PHYS_TO_K0SEG(rv->r_start);
 		rman_set_virtual(rv, va);
 
 		break;

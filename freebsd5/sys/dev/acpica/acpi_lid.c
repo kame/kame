@@ -28,11 +28,12 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/acpica/acpi_lid.c,v 1.15 2003/10/25 05:03:24 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/acpica/acpi_lid.c,v 1.26.2.1 2004/08/29 23:24:33 njl Exp $");
 
 #include "opt_acpi.h"
 #include <sys/param.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/proc.h>
 
@@ -48,6 +49,8 @@ struct acpi_lid_softc {
     ACPI_HANDLE	lid_handle;
     int		lid_status;	/* open or closed */
 };
+
+ACPI_SERIAL_DECL(lid, "ACPI lid");
 
 static int	acpi_lid_probe(device_t dev);
 static int	acpi_lid_attach(device_t dev);
@@ -75,17 +78,19 @@ static driver_t acpi_lid_driver = {
 
 static devclass_t acpi_lid_devclass;
 DRIVER_MODULE(acpi_lid, acpi, acpi_lid_driver, acpi_lid_devclass, 0, 0);
+MODULE_DEPEND(acpi_lid, acpi, 1, 1, 1);
 
 static int
 acpi_lid_probe(device_t dev)
 {
-    if (acpi_get_type(dev) == ACPI_TYPE_DEVICE && !acpi_disabled("lid") &&
-	acpi_MatchHid(dev, "PNP0C0D")) {
+    static char *lid_ids[] = { "PNP0C0D", NULL };
 
-	device_set_desc(dev, "Control Method Lid Switch");
-	return (0);
-    }
-    return (ENXIO);
+    if (acpi_disabled("lid") ||
+	ACPI_ID_PROBE(device_get_parent(dev), dev, lid_ids) == NULL)
+	return (ENXIO);
+
+    device_set_desc(dev, "Control Method Lid Switch");
+    return (0);
 }
 
 static int
@@ -99,21 +104,24 @@ acpi_lid_attach(device_t dev)
     sc->lid_dev = dev;
     sc->lid_handle = acpi_get_handle(dev);
 
-    /* Install notification handler */
+    /*
+     * If a system does not get lid events, it may make sense to change
+     * the type to ACPI_ALL_NOTIFY.  Some systems generate both a wake and
+     * runtime notify in that case though.
+     */
     AcpiInstallNotifyHandler(sc->lid_handle, ACPI_DEVICE_NOTIFY,
 			     acpi_lid_notify_handler, sc);
-    acpi_device_enable_wake_capability(sc->lid_handle, 1);
 
-    return_VALUE (0);
+    /* Enable the GPE for wake/runtime. */
+    acpi_wake_init(dev, ACPI_GPE_TYPE_WAKE_RUN);
+    acpi_wake_set_enable(dev, 1);
+
+    return (0);
 }
 
 static int
 acpi_lid_suspend(device_t dev)
 {
-    struct acpi_lid_softc	*sc;
-
-    sc = device_get_softc(dev);
-    acpi_device_enable_wake_event(sc->lid_handle);
     return (0);
 }
 
@@ -133,19 +141,20 @@ acpi_lid_notify_status_changed(void *arg)
     ACPI_FUNCTION_TRACE((char *)(uintptr_t)__func__);
 
     sc = (struct acpi_lid_softc *)arg;
+    ACPI_SERIAL_BEGIN(lid);
 
     /*
      * Evaluate _LID and check the return value, update lid status.
      *	Zero:		The lid is closed
      *	Non-zero:	The lid is open
      */
-    status = acpi_EvaluateInteger(sc->lid_handle, "_LID", &sc->lid_status);
+    status = acpi_GetInteger(sc->lid_handle, "_LID", &sc->lid_status);
     if (ACPI_FAILURE(status))
-	return_VOID;
+	goto out;
 
     acpi_sc = acpi_device_get_parent_softc(sc->lid_dev);
     if (acpi_sc == NULL)
-        return_VOID;
+	goto out;
 
     ACPI_VPRINT(sc->lid_dev, acpi_sc, "Lid %s\n",
 		sc->lid_status ? "opened" : "closed");
@@ -157,6 +166,8 @@ acpi_lid_notify_status_changed(void *arg)
     else
 	EVENTHANDLER_INVOKE(acpi_wakeup_event, acpi_sc->acpi_lid_switch_sx);
 
+out:
+    ACPI_SERIAL_END(lid);
     return_VOID;
 }
 
@@ -166,16 +177,18 @@ acpi_lid_notify_status_changed(void *arg)
 static void 
 acpi_lid_notify_handler(ACPI_HANDLE h, UINT32 notify, void *context)
 {
-    struct acpi_lid_softc	*sc = (struct acpi_lid_softc *)context;
+    struct acpi_lid_softc	*sc;
 
     ACPI_FUNCTION_TRACE_U32((char *)(uintptr_t)__func__, notify);
 
+    sc = (struct acpi_lid_softc *)context;
     switch (notify) {
     case ACPI_NOTIFY_STATUS_CHANGED:
 	AcpiOsQueueForExecution(OSD_PRIORITY_LO,
 				acpi_lid_notify_status_changed, sc);
 	break;
     default:
+	device_printf(sc->lid_dev, "unknown notify %#x\n", notify);
 	break;
     }
 

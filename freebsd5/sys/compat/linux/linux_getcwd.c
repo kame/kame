@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/linux/linux_getcwd.c,v 1.14 2003/11/17 18:57:20 rwatson Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/linux/linux_getcwd.c,v 1.15 2004/08/16 07:28:16 tjr Exp $");
 
 #include "opt_compat.h"
 #include "opt_mac.h"
@@ -59,8 +59,15 @@ __FBSDID("$FreeBSD: src/sys/compat/linux/linux_getcwd.c,v 1.14 2003/11/17 18:57:
 #include <sys/dirent.h>
 #include <ufs/ufs/dir.h>	/* XXX only for DIRBLKSIZ */
 
+#include "opt_compat.h"
+
+#if !COMPAT_LINUX32
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
+#else
+#include <machine/../linux32/linux.h>
+#include <machine/../linux32/linux32_proto.h>
+#endif
 #include <compat/linux/linux_util.h>
 
 static int

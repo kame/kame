@@ -21,10 +21,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ep/if_ep_eisa.c,v 1.28 2003/10/26 22:28:20 imp Exp $");
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ep/if_ep_eisa.c,v 1.28 2003/10/26 22:28:20 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ep/if_ep_eisa.c,v 1.31 2004/07/22 07:11:15 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -115,7 +112,7 @@ ep_eisa_probe(device_t dev)
 
 	/* We must be in EISA configuration mode */
 	if ((inw(iobase + EP_W0_ADDRESS_CFG) & 0x1f) != 0x1f)
-		return ENXIO;
+		return (ENXIO);
 
 	eisa_add_iospace(dev, iobase, EP_EISA_IOSIZE, RESVADDR_NONE);
 	eisa_add_iospace(dev, port, EP_IOSIZE, RESVADDR_NONE);
@@ -182,8 +179,7 @@ ep_eisa_attach(device_t dev)
 	int rid;
 
 	rid = 1;
-	eisa_io = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-	    0, ~0, 1, RF_ACTIVE);
+	eisa_io = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid, RF_ACTIVE);
 	if (!eisa_io) {
 		device_printf(dev, "No I/O space?!\n");
 		error = ENXIO;

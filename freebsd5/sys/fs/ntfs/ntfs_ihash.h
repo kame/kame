@@ -25,13 +25,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/ntfs/ntfs_ihash.h,v 1.7 2002/03/19 22:20:11 alfred Exp $
+ * $FreeBSD: src/sys/fs/ntfs/ntfs_ihash.h,v 1.8 2004/06/16 09:47:04 phk Exp $
  */
 
 extern struct lock ntfs_hashlock;
 void ntfs_nthashinit(void);
 void ntfs_nthashdestroy(void);
-struct ntnode   *ntfs_nthashlookup(dev_t, ino_t);
-struct ntnode   *ntfs_nthashget(dev_t, ino_t);
+struct ntnode   *ntfs_nthashlookup(struct cdev *, ino_t);
+struct ntnode   *ntfs_nthashget(struct cdev *, ino_t);
 void ntfs_nthashins(struct ntnode *);
 void ntfs_nthashrem(register struct ntnode *);

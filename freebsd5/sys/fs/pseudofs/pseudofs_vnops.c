@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/fs/pseudofs/pseudofs_vnops.c,v 1.42.2.1 2004/02/10 21:08:01 nectar Exp $
+ *	$FreeBSD: src/sys/fs/pseudofs/pseudofs_vnops.c,v 1.45.2.1 2004/09/06 19:38:01 rwatson Exp $
  */
 
 #include <sys/param.h>
@@ -606,6 +606,7 @@ pfs_readdir(struct vop_readdir_args *va)
 	struct proc *p;
 	off_t offset;
 	int error, i, resid;
+	struct sbuf sb;
 
 	PFS_TRACE((pd->pn_name));
 
@@ -623,12 +624,16 @@ pfs_readdir(struct vop_readdir_args *va)
 	if (offset < 0 || offset % PFS_DELEN != 0 || resid < PFS_DELEN)
 		PFS_RETURN (EINVAL);
 
+	if (sbuf_new(&sb, NULL, resid, SBUF_FIXEDLEN) == NULL)
+		PFS_RETURN (ENOMEM);
+
 	/* skip unwanted entries */
 	sx_slock(&allproc_lock);
 	for (pn = NULL, p = NULL; offset > 0; offset -= PFS_DELEN)
 		if (pfs_iterate(curthread, pid, pd, &pn, &p) == -1) {
 			/* nothing left... */
 			sx_sunlock(&allproc_lock);
+			sbuf_delete(&sb);
 			PFS_RETURN (0);
 		}
 
@@ -669,21 +674,18 @@ pfs_readdir(struct vop_readdir_args *va)
 			entry.d_type = DT_LNK;
 			break;
 		default:
-			sx_sunlock(&allproc_lock);
 			panic("%s has unexpected node type: %d", pn->pn_name, pn->pn_type);
 		}
 		PFS_TRACE((entry.d_name));
-		if ((error = uiomove(&entry, PFS_DELEN, uio))) {
-			sx_sunlock(&allproc_lock);
-			PFS_RETURN (error);
-		}
+		sbuf_bcat(&sb, &entry, PFS_DELEN);
 		offset += PFS_DELEN;
 		resid -= PFS_DELEN;
 	}
-
 	sx_sunlock(&allproc_lock);
-	uio->uio_offset += offset;
-	PFS_RETURN (0);
+	sbuf_finish(&sb);
+	error = uiomove(sbuf_data(&sb), sbuf_len(&sb), uio);
+	sbuf_delete(&sb);
+	PFS_RETURN (error);
 }
 
 /*

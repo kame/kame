@@ -531,7 +531,7 @@ static char	MATCDCOPYRIGHT[] = "Matsushita CD-ROM driver, Copr. 1994,1995,2002,2
 /*	Flags in the if_state array */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/matcd/matcd.c,v 1.3 2003/10/18 17:44:01 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/matcd/matcd.c,v 1.5 2004/06/16 09:46:49 phk Exp $");
 
 #define	BUSBUSY	0x01			/*<18>Bus is already busy*/
 
@@ -624,7 +624,7 @@ struct	matcd_mbx {
 
 static	struct matcd_data {
 	device_t	dev;
-	dev_t		matcd_dev_t;
+	struct cdev *matcd_dev_t;
 	short		config;
 	short		drivemode;	/*Last state drive was set to*/
 	short		flags;
@@ -657,8 +657,8 @@ static	unsigned char	if_state[4]={0,0,0,0};	/*State of host I/F and bus*/
 
 int		matcd_probe(struct matcd_softc *sc);
 int		matcd_attach(struct matcd_softc *sc);
-static int	matcdopen(dev_t dev, int flags, int fmt, struct thread *ptx);
-static int	matcdclose(dev_t dev, int flags, int fmt, struct thread *ptx);
+static int	matcdopen(struct cdev *dev, int flags, int fmt, struct thread *ptx);
+static int	matcdclose(struct cdev *dev, int flags, int fmt, struct thread *ptx);
 static void	matcdstrategy(struct bio *bp);
 static d_ioctl_t	matcdioctl;
 static timeout_t	matcd_timeout;
@@ -668,7 +668,7 @@ static timeout_t	matcd_timeout;
 	Internal function declarations
 ---------------------------------------------------------------------------*/
 
-static	int	matcdsize(dev_t dev);
+static	int	matcdsize(struct cdev *dev);
 static	void	matcd_start(struct bio_queue_head *dp);
 static	void	zero_cmd(char *);
 static	void	matcd_pread(int port, int count, unsigned char * data);
@@ -740,6 +740,7 @@ static	int	matcd_pitch(int ldrive, int cdrive, int controller,
 ---------------------------------------------------------------------------*/
 
 static struct cdevsw matcd_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	matcdopen,	/* open */
 	.d_close =	matcdclose,	/* close */
 	.d_read =	physread,	/* read */
@@ -750,7 +751,7 @@ static struct cdevsw matcd_cdevsw = {
 	.d_strategy =	matcdstrategy,	/* strategy */
 	.d_name =	"matcd",	/* name */
 	.d_maj =	RAW_DEVICE,	/* maj */
-	.d_flags =	D_DISK,		/* flags */
+	.d_flags =	D_DISK | D_NEEDGIANT,
 };
 
 
@@ -771,7 +772,7 @@ int matcd_attach(struct matcd_softc *sc)
 	unsigned char	data[12];
 	struct	matcd_data *cd;
 	int port = sc->port_bsh;	/*Take port ID selected in probe()*/
-	dev_t	d;
+	struct cdev *d;
 	int unit=0;
 
 	printf("matcdc%d: Host interface type %d port %x\n",
@@ -863,7 +864,7 @@ int matcd_attach(struct matcd_softc *sc)
 <15>	If LOCKDRIVE is enabled, additional minor number devices allow
 <15>	the drive to be locked while being accessed.
 ---------------------------------------------------------------------------*/
-static int	matcdopen(dev_t dev, int flags, int fmt,
+static int	matcdopen(struct cdev *dev, int flags, int fmt,
 		  struct thread *ptx)
 {
 	int cdrive,ldrive,partition,controller,lock;
@@ -1050,7 +1051,7 @@ static int	matcdopen(dev_t dev, int flags, int fmt,
 	the drive.  See Edit 15 in Edit History.
 ---------------------------------------------------------------------------*/
 
-static int matcdclose(dev_t dev, int flags, int fmt,struct thread *ptx)
+static int matcdclose(struct cdev *dev, int flags, int fmt,struct thread *ptx)
 {
 	int	ldrive,cdrive,port,partition,controller,lock;
 	struct matcd_data *cd;
@@ -1909,7 +1910,7 @@ static void matcd_start(struct bio_queue_head *dp)
 	things that don't fit into the block read scheme of things.
 ---------------------------------------------------------------------------*/
 
-static int matcdioctl(dev_t dev, unsigned long command,
+static int matcdioctl(struct cdev *dev, unsigned long command,
 			   caddr_t addr, int flags,
 			   struct thread *td)
 {
@@ -2050,7 +2051,7 @@ static int matcdioctl(dev_t dev, unsigned long command,
 	matcdsize - Reports how many blocks exist on the disc.
 ---------------------------------------------------------------------------*/
 
-static int	matcdsize(dev_t dev)
+static int	matcdsize(struct cdev *dev)
 {
 	int	size,blksize;
 	int	ldrive,part;

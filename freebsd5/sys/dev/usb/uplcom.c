@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/uplcom.c,v 1.17 2003/11/16 13:13:16 akiyama Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/uplcom.c,v 1.20.2.1 2004/09/20 04:46:41 sanpei Exp $");
 
 /*
  * Copyright (c) 2001 The NetBSD Foundation, Inc.
@@ -78,6 +78,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/uplcom.c,v 1.17 2003/11/16 13:13:16 akiyama 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/malloc.h>
 #include <sys/bus.h>
 #include <sys/ioccom.h>
@@ -100,7 +101,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/uplcom.c,v 1.17 2003/11/16 13:13:16 akiyama 
 
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
-#include <dev/usb/usbdevs.h>
+#include "usbdevs.h"
 #include <dev/usb/usb_quirks.h>
 
 #include <dev/usb/ucomvar.h>
@@ -210,6 +211,9 @@ static const struct uplcom_product {
 	{ USB_VENDOR_RATOC, USB_PRODUCT_RATOC_REXUSB60 },
 	/* ELECOM UC-SGT */
 	{ USB_VENDOR_ELECOM, USB_PRODUCT_ELECOM_UCSGT },
+	{ USB_VENDOR_ELECOM, USB_PRODUCT_ELECOM_UCSGT0 },
+	/* Sony Ericsson USB Cable */
+	{ USB_VENDOR_SONYERICSSON, USB_PRODUCT_SONYERICSSON_DCU10 },
 	/* SOURCENEXT KeikaiDenwa 8 */
 	{ USB_VENDOR_SOURCENEXT, USB_PRODUCT_SOURCENEXT_KEIKAI8 },
 	/* SOURCENEXT KeikaiDenwa 8 with charger */

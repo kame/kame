@@ -48,7 +48,7 @@
 
 #include <gnu/dev/sound/pci/csaimg.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/csa.c,v 1.27 2003/09/02 17:30:37 jhb Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/csa.c,v 1.30 2004/07/16 03:59:27 tanimura Exp $");
 
 /* This is the pci device id. */
 #define CS4610_PCI_ID 0x60011013
@@ -259,20 +259,23 @@ csa_attach(device_t dev)
 	scp->binfo.card = scp->card;
 	printf("csa: card is %s\n", scp->card->name);
 	resp->io_rid = PCIR_BAR(0);
-	resp->io = bus_alloc_resource(dev, SYS_RES_MEMORY, &resp->io_rid, 0, ~0, 1, RF_ACTIVE);
+	resp->io = bus_alloc_resource_any(dev, SYS_RES_MEMORY, 
+		&resp->io_rid, RF_ACTIVE);
 	if (resp->io == NULL)
 		return (ENXIO);
 	resp->mem_rid = PCIR_BAR(1);
-	resp->mem = bus_alloc_resource(dev, SYS_RES_MEMORY, &resp->mem_rid, 0, ~0, 1, RF_ACTIVE);
+	resp->mem = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+		&resp->mem_rid, RF_ACTIVE);
 	if (resp->mem == NULL)
 		goto err_io;
 	resp->irq_rid = 0;
-	resp->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &resp->irq_rid, 0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+	resp->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ,
+		&resp->irq_rid, RF_ACTIVE | RF_SHAREABLE);
 	if (resp->irq == NULL)
 		goto err_mem;
 
 	/* Enable interrupt. */
-	if (snd_setup_intr(dev, resp->irq, INTR_MPSAFE, csa_intr, scp, &scp->ih))
+	if (snd_setup_intr(dev, resp->irq, 0, csa_intr, scp, &scp->ih))
 		goto err_intr;
 #if 0
 	if ((csa_readio(resp, BA0_HISR) & HISR_INTENA) == 0)
@@ -1061,5 +1064,5 @@ static driver_t csa_driver = {
  * csa can be attached to a pci bus.
  */
 DRIVER_MODULE(snd_csa, pci, csa_driver, csa_devclass, 0, 0);
-MODULE_DEPEND(snd_csa, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_csa, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_csa, 1);

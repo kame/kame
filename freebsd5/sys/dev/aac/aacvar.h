@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/aac/aacvar.h,v 1.36.2.1 2004/02/18 06:20:50 scottl Exp $
+ *	$FreeBSD: src/sys/dev/aac/aacvar.h,v 1.46 2004/08/13 01:44:09 scottl Exp $
  */
 
 #include <sys/bio.h>
@@ -125,7 +125,7 @@ struct aac_disk
 	device_t			ad_dev;
 	struct aac_softc		*ad_controller;
 	struct aac_container		*ad_container;
-	struct disk			ad_disk;
+	struct disk			*ad_disk;
 	int				ad_flags;
 #define AAC_DISK_OPEN	(1<<0)
 	int				ad_cylinders;
@@ -165,8 +165,7 @@ struct aac_command
 #define AAC_ON_AACQ_FREE	(1<<5)
 #define AAC_ON_AACQ_READY	(1<<6)
 #define AAC_ON_AACQ_BUSY	(1<<7)
-#define AAC_ON_AACQ_COMPLETE	(1<<8)
-#define AAC_ON_AACQ_MASK	((1<<5)|(1<<6)|(1<<7)|(1<<8))
+#define AAC_ON_AACQ_MASK	((1<<5)|(1<<6)|(1<<7))
 #define AAC_QUEUE_FRZN		(1<<9)		/* Freeze the processing of
 						 * commands on the queue. */
 
@@ -233,6 +232,7 @@ struct aac_interface
 extern struct aac_interface	aac_rx_interface;
 extern struct aac_interface	aac_sa_interface;
 extern struct aac_interface	aac_fa_interface;
+extern struct aac_interface	aac_rkt_interface;
 
 #define AAC_GET_FWSTATUS(sc)		((sc)->aac_if.aif_get_fwstatus((sc)))
 #define AAC_QNOTIFY(sc, qbit)		((sc)->aac_if.aif_qnotify((sc), (qbit)))
@@ -261,13 +261,6 @@ extern struct aac_interface	aac_fa_interface;
 					sc->aac_bhandle, reg, val)
 #define AAC_GETREG1(sc, reg)		bus_space_read_1 (sc->aac_btag, \
 					sc->aac_bhandle, reg)
-
-/* Define the OS version specific locks */
-typedef struct mtx aac_lock_t;
-#define AAC_LOCK_INIT(l, s)	mtx_init(l, s, NULL, MTX_DEF)
-#define AAC_LOCK_ACQUIRE(l)	mtx_lock(l)
-#define AAC_LOCK_RELEASE(l)	mtx_unlock(l)
-
 
 /*
  * Per-controller structure.
@@ -301,7 +294,8 @@ struct aac_softc
 	int			aac_hwif;
 #define AAC_HWIF_I960RX		0
 #define AAC_HWIF_STRONGARM	1
-#define	AAC_HWIF_FALCON		2
+#define AAC_HWIF_FALCON		2
+#define AAC_HWIF_RKT		3
 #define AAC_HWIF_UNKNOWN	-1
 	bus_dma_tag_t		aac_common_dmat;	/* common structure
 							 * DMA tag */
@@ -331,13 +325,13 @@ struct aac_softc
 
 	/* connected containters */
 	TAILQ_HEAD(,aac_container)	aac_container_tqh;
-	aac_lock_t		aac_container_lock;
+	struct mtx		aac_container_lock;
 
-	/* Protect the sync fib */
-#define AAC_SYNC_LOCK_FORCE	(1 << 0)
-	aac_lock_t		aac_sync_lock;
-
-	aac_lock_t		aac_io_lock;
+	/*
+	 * The general I/O lock.  This protects the sync fib, the lists, the
+	 * queues, and the registers.
+	 */
+	struct mtx		aac_io_lock;
 
 	/* delayed activity infrastructure */
 	struct task		aac_task_complete;	/* deferred-completion
@@ -345,8 +339,8 @@ struct aac_softc
 	struct intr_config_hook	aac_ich;
 
 	/* management interface */
-	dev_t			aac_dev_t;
-	aac_lock_t		aac_aifq_lock;
+	struct cdev *aac_dev_t;
+	struct mtx		aac_aifq_lock;
 	struct aac_aif_command	aac_aifq[AAC_AIFQ_LENGTH];
 	int			aac_aifq_head;
 	int			aac_aifq_tail;
@@ -396,9 +390,6 @@ extern void		aac_startio(struct aac_softc *sc);
 extern int		aac_alloc_command(struct aac_softc *sc,
 					  struct aac_command **cmp);
 extern void		aac_release_command(struct aac_command *cm);
-extern int		aac_alloc_sync_fib(struct aac_softc *sc,
-					 struct aac_fib **fib, int flags);
-extern void		aac_release_sync_fib(struct aac_softc *sc);
 extern int		aac_sync_fib(struct aac_softc *sc, u_int32_t command,
 				     u_int32_t xferstate, struct aac_fib *fib,
 				     u_int16_t datasize);
@@ -572,5 +563,23 @@ aac_print_printf(struct aac_softc *sc)
 	 */
 	device_printf(sc->aac_dev, "**Monitor** %.*s", AAC_PRINTF_BUFSIZE,
 		      sc->aac_common->ac_printf);
+	sc->aac_common->ac_printf[0] = 0;
 	AAC_QNOTIFY(sc, AAC_DB_PRINTF);
 }
+
+static __inline int
+aac_alloc_sync_fib(struct aac_softc *sc, struct aac_fib **fib)
+{
+
+	mtx_lock(&sc->aac_io_lock);
+	*fib = &sc->aac_common->ac_sync_fib;
+	return (0);
+}
+
+static __inline void
+aac_release_sync_fib(struct aac_softc *sc)
+{
+
+	mtx_unlock(&sc->aac_io_lock);
+}
+

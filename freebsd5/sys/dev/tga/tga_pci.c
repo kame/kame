@@ -27,17 +27,15 @@
  * Copyright (c) 2000 Andrew Miklic, Andrew Gallatin, and Thomas V. Crimi
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/tga/tga_pci.c,v 1.6 2003/08/24 17:55:53 obrien Exp $");
-
 #include "opt_fb.h"
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/tga/tga_pci.c,v 1.6 2003/08/24 17:55:53 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/tga/tga_pci.c,v 1.8.2.1 2004/09/02 06:14:42 marcel Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/conf.h>
 #include <sys/proc.h>
 #include <sys/fcntl.h>
@@ -92,14 +90,14 @@ DRIVER_MODULE(tga, pci, tga_driver, tga_devclass, 0, 0);
 static struct gfb_type tga_devs[] = {
 	{ DEC_VENDORID, DEC_DEVICEID_TGA,
 	"DEC TGA (21030) 2D Graphics Accelerator" },
-	{ DEC_VENDORID, DEC_DEVICEID_TGA2,
-	"DEC TGA2 (21130) 3D Graphics Accelerator" },
 	{ 0, 0, NULL }
 };
 
 #ifdef FB_INSTALL_CDEV
 
 static struct cdevsw tga_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	pcigfb_open,
 	.d_close =	pcigfb_close,
 	.d_read =	pcigfb_read,

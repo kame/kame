@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/freebsd32/freebsd32_misc.c,v 1.15 2003/11/07 21:27:13 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/freebsd32/freebsd32_misc.c,v 1.23 2004/06/17 17:16:41 phk Exp $");
 
 #include "opt_compat.h"
 
@@ -35,6 +35,7 @@ __FBSDID("$FreeBSD: src/sys/compat/freebsd32/freebsd32_misc.c,v 1.15 2003/11/07 
 #include <sys/exec.h>
 #include <sys/fcntl.h>
 #include <sys/filedesc.h>
+#include <sys/namei.h>
 #include <sys/imgact.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
@@ -66,6 +67,7 @@ __FBSDID("$FreeBSD: src/sys/compat/freebsd32/freebsd32_misc.c,v 1.15 2003/11/07 
 #include <sys/user.h>
 #include <sys/utsname.h>
 #include <sys/vnode.h>
+#include <sys/wait.h>
 
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
@@ -84,174 +86,19 @@ CTASSERT(sizeof(struct timespec32) == 8);
 CTASSERT(sizeof(struct statfs32) == 256);
 CTASSERT(sizeof(struct rusage32) == 72);
 
-/*
- * [ taken from the linux emulator ]
- * Search an alternate path before passing pathname arguments on
- * to system calls. Useful for keeping a separate 'emulation tree'.
- *
- * If cflag is set, we check if an attempt can be made to create
- * the named file, i.e. we check if the directory it should
- * be in exists.
- */
-int
-freebsd32_emul_find(td, sgp, prefix, path, pbuf, cflag)
-	struct thread	*td;
-	caddr_t		*sgp;		/* Pointer to stackgap memory */
-	const char	*prefix;
-	char		*path;
-	char		**pbuf;
-	int		cflag;
-{
-	int			error;
-	size_t			len, sz;
-	char			*buf, *cp, *ptr;
-	struct ucred		*ucred;
-	struct nameidata	nd;
-	struct nameidata	ndroot;
-	struct vattr		vat;
-	struct vattr		vatroot;
-
-	buf = (char *) malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	*pbuf = path;
-
-	for (ptr = buf; (*ptr = *prefix) != '\0'; ptr++, prefix++)
-		continue;
-
-	sz = MAXPATHLEN - (ptr - buf);
-
-	/*
-	 * If sgp is not given then the path is already in kernel space
-	 */
-	if (sgp == NULL)
-		error = copystr(path, ptr, sz, &len);
-	else
-		error = copyinstr(path, ptr, sz, &len);
-
-	if (error) {
-		free(buf, M_TEMP);
-		return error;
-	}
-
-	if (*ptr != '/') {
-		free(buf, M_TEMP);
-		return EINVAL;
-	}
-
-	/*
-	 *  We know that there is a / somewhere in this pathname.
-	 *  Search backwards for it, to find the file's parent dir
-	 *  to see if it exists in the alternate tree. If it does,
-	 *  and we want to create a file (cflag is set). We don't
-	 *  need to worry about the root comparison in this case.
-	 */
-
-	if (cflag) {
-		for (cp = &ptr[len] - 1; *cp != '/'; cp--)
-			;
-		*cp = '\0';
-
-		NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, buf, td);
-
-		if ((error = namei(&nd)) != 0) {
-			free(buf, M_TEMP);
-			return error;
-		}
-
-		*cp = '/';
-	} else {
-		NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, buf, td);
-
-		if ((error = namei(&nd)) != 0) {
-			free(buf, M_TEMP);
-			return error;
-		}
-
-		/*
-		 * We now compare the vnode of the freebsd32_root to the one
-		 * vnode asked. If they resolve to be the same, then we
-		 * ignore the match so that the real root gets used.
-		 * This avoids the problem of traversing "../.." to find the
-		 * root directory and never finding it, because "/" resolves
-		 * to the emulation root directory. This is expensive :-(
-		 */
-		NDINIT(&ndroot, LOOKUP, FOLLOW, UIO_SYSSPACE,
-		    freebsd32_emul_path, td);
-
-		if ((error = namei(&ndroot)) != 0) {
-			/* Cannot happen! */
-			free(buf, M_TEMP);
-			vrele(nd.ni_vp);
-			return error;
-		}
-
-		ucred = td->td_ucred;
-		if ((error = VOP_GETATTR(nd.ni_vp, &vat, ucred, td)) != 0) {
-			goto bad;
-		}
-
-		if ((error = VOP_GETATTR(ndroot.ni_vp, &vatroot, ucred,
-		    td)) != 0) {
-			goto bad;
-		}
-
-		if (vat.va_fsid == vatroot.va_fsid &&
-		    vat.va_fileid == vatroot.va_fileid) {
-			error = ENOENT;
-			goto bad;
-		}
-
-	}
-	if (sgp == NULL)
-		*pbuf = buf;
-	else {
-		sz = &ptr[len] - buf;
-		*pbuf = stackgap_alloc(sgp, sz + 1);
-		error = copyout(buf, *pbuf, sz);
-		free(buf, M_TEMP);
-	}
-
-	vrele(nd.ni_vp);
-	if (!cflag)
-		vrele(ndroot.ni_vp);
-
-	return error;
-
-bad:
-	vrele(ndroot.ni_vp);
-	vrele(nd.ni_vp);
-	free(buf, M_TEMP);
-	return error;
-}
-
-int
-freebsd32_open(struct thread *td, struct freebsd32_open_args *uap)
-{
-	caddr_t sg;
-
-	sg = stackgap_init();
-	CHECKALTEXIST(td, &sg, uap->path);
-
-	return open(td, (struct open_args *) uap);
-}
-
 int
 freebsd32_wait4(struct thread *td, struct freebsd32_wait4_args *uap)
 {
-	int error;
-	caddr_t sg;
-	struct rusage32 *rusage32, ru32;
-	struct rusage *rusage = NULL, ru;
+	int error, status;
+	struct rusage32 ru32;
+	struct rusage ru;
 
-	rusage32 = uap->rusage;
-	if (rusage32) {
-		sg = stackgap_init();
-		rusage = stackgap_alloc(&sg, sizeof(struct rusage));
-		uap->rusage = (struct rusage32 *)rusage;
-	}
-	error = wait4(td, (struct wait_args *)uap);
+	error = kern_wait(td, uap->pid, &status, uap->options, &ru);
 	if (error)
 		return (error);
-	if (rusage32 && (error = copyin(rusage, &ru, sizeof(ru)) == 0)) {
+	if (uap->status != NULL)
+		error = copyout(&status, uap->status, sizeof(status));
+	if (uap->rusage != NULL && error == 0) {
 		TV_CP(ru, ru32, ru_utime);
 		TV_CP(ru, ru32, ru_stime);
 		CP(ru, ru32, ru_maxrss);
@@ -268,11 +115,12 @@ freebsd32_wait4(struct thread *td, struct freebsd32_wait4_args *uap)
 		CP(ru, ru32, ru_nsignals);
 		CP(ru, ru32, ru_nvcsw);
 		CP(ru, ru32, ru_nivcsw);
-		error = copyout(&ru32, rusage32, sizeof(ru32));
+		error = copyout(&ru32, uap->rusage, sizeof(ru32));
 	}
 	return (error);
 }
 
+#ifdef COMPAT_FREEBSD4
 static void
 copy_statfs(struct statfs *in, struct statfs32 *out)
 {
@@ -293,15 +141,17 @@ copy_statfs(struct statfs *in, struct statfs32 *out)
 	bcopy(in->f_fstypename,
 	      out->f_fstypename, MFSNAMELEN);
 	bcopy(in->f_mntonname,
-	      out->f_mntonname, MNAMELEN);
+	      out->f_mntonname, min(MNAMELEN, FREEBSD4_MNAMELEN));
 	CP(*in, *out, f_syncreads);
 	CP(*in, *out, f_asyncreads);
 	bcopy(in->f_mntfromname,
-	      out->f_mntfromname, MNAMELEN);
+	      out->f_mntfromname, min(MNAMELEN, FREEBSD4_MNAMELEN));
 }
+#endif
 
+#ifdef COMPAT_FREEBSD4
 int
-freebsd32_getfsstat(struct thread *td, struct freebsd32_getfsstat_args *uap)
+freebsd4_freebsd32_getfsstat(struct thread *td, struct freebsd4_freebsd32_getfsstat_args *uap)
 {
 	int error;
 	caddr_t sg;
@@ -332,28 +182,7 @@ freebsd32_getfsstat(struct thread *td, struct freebsd32_getfsstat_args *uap)
 	}
 	return (error);
 }
-
-int
-freebsd32_access(struct thread *td, struct freebsd32_access_args *uap)
-{
-	caddr_t sg;
-
-	sg = stackgap_init();
-	CHECKALTEXIST(td, &sg, uap->path);
-
-	return access(td, (struct access_args *)uap);
-}
-
-int
-freebsd32_chflags(struct thread *td, struct freebsd32_chflags_args *uap)
-{
-	caddr_t sg;
-
-	sg = stackgap_init();
-	CHECKALTEXIST(td, &sg, uap->path);
-
-	return chflags(td, (struct chflags_args *)uap);
-}
+#endif
 
 struct sigaltstack32 {
 	u_int32_t	ss_sp;
@@ -402,7 +231,6 @@ freebsd32_execve(struct thread *td, struct freebsd32_execve_args *uap)
 	int count;
 
 	sg = stackgap_init();
-	CHECKALTEXIST(td, &sg, uap->fname);
 	ap.fname = uap->fname;
 
 	if (uap->argv) {
@@ -647,6 +475,34 @@ freebsd32_setitimer(struct thread *td, struct freebsd32_setitimer_args *uap)
 }
 
 int
+freebsd32_getitimer(struct thread *td, struct freebsd32_getitimer_args *uap)
+{
+	int error;
+	caddr_t sg;
+	struct itimerval32 *p32, s32;
+	struct itimerval *p = NULL, s;
+
+	p32 = uap->itv;
+	if (p32) {
+		sg = stackgap_init();
+		p = stackgap_alloc(&sg, sizeof(struct itimerval));
+		uap->itv = (struct itimerval32 *)p;
+	}
+	error = getitimer(td, (struct getitimer_args *) uap);
+	if (error)
+		return (error);
+	if (p32) {
+		error = copyin(p, &s, sizeof(s));
+		if (error)
+			return (error);
+		TV_CP(s, s32, it_interval);
+		TV_CP(s, s32, it_value);
+		error = copyout(&s32, p32, sizeof(s32));
+	}
+	return (error);
+}
+
+int
 freebsd32_select(struct thread *td, struct freebsd32_select_args *uap)
 {
 	int error;
@@ -761,29 +617,21 @@ int
 freebsd32_gettimeofday(struct thread *td,
 		       struct freebsd32_gettimeofday_args *uap)
 {
-	int error;
-	caddr_t sg;
-	struct timeval32 *p32, s32;
-	struct timeval *p = NULL, s;
+	struct timeval atv;
+	struct timeval32 atv32;
+	struct timezone rtz;
+	int error = 0;
 
-	p32 = uap->tp;
-	if (p32) {
-		sg = stackgap_init();
-		p = stackgap_alloc(&sg, sizeof(struct timeval));
-		uap->tp = (struct timeval32 *)p;
+	if (uap->tp) {
+		microtime(&atv);
+		CP(atv, atv32, tv_sec);
+		CP(atv, atv32, tv_usec);
+		error = copyout(&atv32, uap->tp, sizeof (atv32));
 	}
-	error = gettimeofday(td, (struct gettimeofday_args *) uap);
-	if (error)
-		return (error);
-	if (p32) {
-		error = copyin(p, &s, sizeof(s));
-		if (error)
-			return (error);
-		CP(s, s32, tv_sec);
-		CP(s, s32, tv_usec);
-		error = copyout(&s32, p32, sizeof(s32));
-		if (error)
-			return (error);
+	if (error == 0 && uap->tzp != NULL) {
+		rtz.tz_minuteswest = tz_minuteswest;
+		rtz.tz_dsttime = tz_dsttime;
+		error = copyout(&rtz, uap->tzp, sizeof (rtz));
 	}
 	return (error);
 }
@@ -1025,8 +873,9 @@ freebsd32_adjtime(struct thread *td, struct freebsd32_adjtime_args *uap)
 	return (error);
 }
 
+#ifdef COMPAT_FREEBSD4
 int
-freebsd32_statfs(struct thread *td, struct freebsd32_statfs_args *uap)
+freebsd4_freebsd32_statfs(struct thread *td, struct freebsd4_freebsd32_statfs_args *uap)
 {
 	int error;
 	caddr_t sg;
@@ -1051,9 +900,11 @@ freebsd32_statfs(struct thread *td, struct freebsd32_statfs_args *uap)
 	}
 	return (error);
 }
+#endif
 
+#ifdef COMPAT_FREEBSD4
 int
-freebsd32_fstatfs(struct thread *td, struct freebsd32_fstatfs_args *uap)
+freebsd4_freebsd32_fstatfs(struct thread *td, struct freebsd4_freebsd32_fstatfs_args *uap)
 {
 	int error;
 	caddr_t sg;
@@ -1078,6 +929,36 @@ freebsd32_fstatfs(struct thread *td, struct freebsd32_fstatfs_args *uap)
 	}
 	return (error);
 }
+#endif
+
+#ifdef COMPAT_FREEBSD4
+int
+freebsd4_freebsd32_fhstatfs(struct thread *td, struct freebsd4_freebsd32_fhstatfs_args *uap)
+{
+	int error;
+	caddr_t sg;
+	struct statfs32 *p32, s32;
+	struct statfs *p = NULL, s;
+
+	p32 = uap->buf;
+	if (p32) {
+		sg = stackgap_init();
+		p = stackgap_alloc(&sg, sizeof(struct statfs));
+		uap->buf = (struct statfs32 *)p;
+	}
+	error = fhstatfs(td, (struct fhstatfs_args *) uap);
+	if (error)
+		return (error);
+	if (p32) {
+		error = copyin(p, &s, sizeof(s));
+		if (error)
+			return (error);
+		copy_statfs(&s, &s32);
+		error = copyout(&s32, p32, sizeof(s32));
+	}
+	return (error);
+}
+#endif
 
 int
 freebsd32_semsys(struct thread *td, struct freebsd32_semsys_args *uap)
@@ -1202,13 +1083,13 @@ freebsd32_sendfile(struct thread *td, struct freebsd32_sendfile_args *uap)
 }
 
 struct stat32 {
-	udev_t	st_dev;
+	dev_t	st_dev;
 	ino_t	st_ino;
 	mode_t	st_mode;
 	nlink_t	st_nlink;
 	uid_t	st_uid;
 	gid_t	st_gid;
-	udev_t	st_rdev;
+	dev_t	st_rdev;
 	struct timespec32 st_atimespec;
 	struct timespec32 st_mtimespec;
 	struct timespec32 st_ctimespec;
@@ -1248,54 +1129,48 @@ copy_stat( struct stat *in, struct stat32 *out)
 int
 freebsd32_stat(struct thread *td, struct freebsd32_stat_args *uap)
 {
+	struct stat sb;
+	struct stat32 sb32;
 	int error;
-	caddr_t sg;
-	struct stat32 *p32, s32;
-	struct stat *p = NULL, s;
+	struct nameidata nd;
 
-	p32 = uap->ub;
-	if (p32) {
-		sg = stackgap_init();
-		p = stackgap_alloc(&sg, sizeof(struct stat));
-		uap->ub = (struct stat32 *)p;
-	}
-	error = stat(td, (struct stat_args *) uap);
+#ifdef LOOKUP_SHARED
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF | NOOBJ,
+	    UIO_USERSPACE, uap->path, td);
+#else
+	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | NOOBJ, UIO_USERSPACE,
+	    uap->path, td);
+#endif
+	if ((error = namei(&nd)) != 0)
+		return (error);
+	error = vn_stat(nd.ni_vp, &sb, td->td_ucred, NOCRED, td);
+	NDFREE(&nd, NDF_ONLY_PNBUF);
+	vput(nd.ni_vp);
 	if (error)
 		return (error);
-	if (p32) {
-		error = copyin(p, &s, sizeof(s));
-		if (error)
-			return (error);
-		copy_stat(&s, &s32);
-		error = copyout(&s32, p32, sizeof(s32));
-	}
+	copy_stat(&sb, &sb32);
+	error = copyout(&sb32, uap->ub, sizeof (sb32));
 	return (error);
 }
 
 int
 freebsd32_fstat(struct thread *td, struct freebsd32_fstat_args *uap)
 {
+	struct file *fp;
+	struct stat ub;
+	struct stat32 ub32;
 	int error;
-	caddr_t sg;
-	struct stat32 *p32, s32;
-	struct stat *p = NULL, s;
 
-	p32 = uap->ub;
-	if (p32) {
-		sg = stackgap_init();
-		p = stackgap_alloc(&sg, sizeof(struct stat));
-		uap->ub = (struct stat32 *)p;
-	}
-	error = fstat(td, (struct fstat_args *) uap);
+	if ((error = fget(td, uap->fd, &fp)) != 0)
+		return (error);
+	mtx_lock(&Giant);
+	error = fo_stat(fp, &ub, td->td_ucred, td);
+	mtx_unlock(&Giant);
+	fdrop(fp, td);
 	if (error)
 		return (error);
-	if (p32) {
-		error = copyin(p, &s, sizeof(s));
-		if (error)
-			return (error);
-		copy_stat(&s, &s32);
-		error = copyout(&s32, p32, sizeof(s32));
-	}
+	copy_stat(&ub, &ub32);
+	error = copyout(&ub32, uap->ub, sizeof(ub32));
 	return (error);
 }
 
@@ -1303,26 +1178,23 @@ int
 freebsd32_lstat(struct thread *td, struct freebsd32_lstat_args *uap)
 {
 	int error;
-	caddr_t sg;
-	struct stat32 *p32, s32;
-	struct stat *p = NULL, s;
+	struct vnode *vp;
+	struct stat sb;
+	struct stat32 sb32;
+	struct nameidata nd;
 
-	p32 = uap->ub;
-	if (p32) {
-		sg = stackgap_init();
-		p = stackgap_alloc(&sg, sizeof(struct stat));
-		uap->ub = (struct stat32 *)p;
-	}
-	error = lstat(td, (struct lstat_args *) uap);
+	NDINIT(&nd, LOOKUP, NOFOLLOW | LOCKLEAF | NOOBJ, UIO_USERSPACE,
+	    uap->path, td);
+	if ((error = namei(&nd)) != 0)
+		return (error);
+	vp = nd.ni_vp;
+	error = vn_stat(vp, &sb, td->td_ucred, NOCRED, td);
+	NDFREE(&nd, NDF_ONLY_PNBUF);
+	vput(vp);
 	if (error)
 		return (error);
-	if (p32) {
-		error = copyin(p, &s, sizeof(s));
-		if (error)
-			return (error);
-		copy_stat(&s, &s32);
-		error = copyout(&s32, p32, sizeof(s32));
-	}
+	copy_stat(&sb, &sb32);
+	error = copyout(&sb32, uap->ub, sizeof (sb32));
 	return (error);
 }
 

@@ -100,7 +100,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/owi/if_owi.c,v 1.3.2.1 2003/12/10 15:02:02 bms Exp $";
+  "$FreeBSD: src/sys/dev/owi/if_owi.c,v 1.7 2004/05/23 16:11:50 mux Exp $";
 #endif
 
 static void wi_intr(void *);
@@ -226,8 +226,6 @@ owi_generic_attach(device_t dev)
 	bcopy((char *)&mac.wi_mac_addr,
 	   (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
 
-	device_printf(dev, "802.11 address: %6D\n", sc->arpcom.ac_enaddr, ":");
-
 	owi_get_id(sc);
 
 	if_initname(ifp, device_get_name(dev), sc->wi_unit);
@@ -235,7 +233,6 @@ owi_generic_attach(device_t dev)
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = wi_ioctl;
-	ifp->if_output = ether_output;
 	ifp->if_start = wi_start;
 	ifp->if_watchdog = wi_watchdog;
 	ifp->if_init = wi_init;
@@ -1969,8 +1966,8 @@ owi_alloc(dev, rid)
 		sc->wi_bhandle = rman_get_bushandle(sc->iobase);
 	} else {
 		sc->mem_rid = rid;
-		sc->mem = bus_alloc_resource(dev, SYS_RES_MEMORY,
-		    &sc->mem_rid, 0, ~0, 1, RF_ACTIVE);
+		sc->mem = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+		    &sc->mem_rid, RF_ACTIVE);
 
 		if (!sc->mem) {
 			device_printf(dev, "No Mem space on prism2.5?\n");
@@ -1983,8 +1980,8 @@ owi_alloc(dev, rid)
 
 
 	sc->irq_rid = 0;
-	sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irq_rid,
-	    0, ~0, 1, RF_ACTIVE |
+	sc->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irq_rid,
+	    RF_ACTIVE |
 	    ((sc->wi_bus_type == WI_BUS_PCCARD) ? 0 : RF_SHAREABLE));
 
 	if (!sc->irq) {

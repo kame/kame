@@ -33,7 +33,7 @@
 
 #include <dev/sound/pci/via82c686.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/via82c686.c,v 1.27 2003/09/02 17:30:37 jhb Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/via82c686.c,v 1.31 2004/07/16 03:59:27 tanimura Exp $");
 
 #define VIA_PCI_ID 0x30581106
 #define	NSEGS		4	/* Number of segments in SGD table */
@@ -507,7 +507,8 @@ via_attach(device_t dev)
 	}
 
 	via->regid = PCIR_BAR(0);
-	via->reg = bus_alloc_resource(dev, SYS_RES_IOPORT, &via->regid, 0, ~0, 1, RF_ACTIVE);
+	via->reg = bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+		&via->regid, RF_ACTIVE);
 	if (!via->reg) {
 		device_printf(dev, "cannot allocate bus resource.");
 		goto bad;
@@ -518,7 +519,8 @@ via_attach(device_t dev)
 	via->bufsz = pcm_getbuffersize(dev, 4096, VIA_DEFAULT_BUFSZ, 65536);
 
 	via->irqid = 0;
-	via->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &via->irqid, 0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+	via->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &via->irqid,
+		RF_ACTIVE | RF_SHAREABLE);
 	if (!via->irq || snd_setup_intr(dev, via->irq, 0, via_intr, via, &via->ih)) {
 		device_printf(dev, "unable to map interrupt\n");
 		goto bad;
@@ -567,12 +569,16 @@ via_attach(device_t dev)
 		goto bad;
 	}
 
-	if (bus_dmamem_alloc(via->sgd_dmat, (void **)&via->sgd_table, BUS_DMA_NOWAIT, &via->sgd_dmamap) == -1)
+	if (bus_dmamem_alloc(via->sgd_dmat, (void **)&via->sgd_table,
+	    BUS_DMA_NOWAIT, &via->sgd_dmamap) != 0)
 		goto bad;
-	if (bus_dmamap_load(via->sgd_dmat, via->sgd_dmamap, via->sgd_table, NSEGS * sizeof(struct via_dma_op), dma_cb, via, 0))
+	if (bus_dmamap_load(via->sgd_dmat, via->sgd_dmamap, via->sgd_table,
+	    NSEGS * sizeof(struct via_dma_op), dma_cb, via, 0) != 0)
 		goto bad;
 
-	snprintf(status, SND_STATUSLEN, "at io 0x%lx irq %ld", rman_get_start(via->reg), rman_get_start(via->irq));
+	snprintf(status, SND_STATUSLEN, "at io 0x%lx irq %ld %s",
+		 rman_get_start(via->reg), rman_get_start(via->irq),
+		 PCM_KLDSTRING(snd_via82c686));
 
 	/* Register */
 	if (pcm_register(dev, via, 1, 1)) goto bad;
@@ -628,5 +634,5 @@ static driver_t via_driver = {
 };
 
 DRIVER_MODULE(snd_via82c686, pci, via_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_via82c686, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_via82c686, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_via82c686, 1);

@@ -4,7 +4,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/vinum/vinumioctl.c,v 1.49 2003/08/24 17:55:56 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/vinum/vinumioctl.c,v 1.51 2004/07/10 21:17:04 marcel Exp $");
 /*-
  * Copyright (c) 1997, 1998, 1999
  *	Nan Yang Computer Services Limited.  All rights reserved.
@@ -65,7 +65,7 @@ jmp_buf command_fail;					    /* return on a failed command */
 
 /* ioctl routine */
 int
-vinumioctl(dev_t dev,
+vinumioctl(struct cdev *dev,
     u_long cmd,
     caddr_t data,
     int flag,
@@ -178,7 +178,7 @@ vinumioctl(dev_t dev,
 
 /* Handle ioctls for the super device */
 int
-vinum_super_ioctl(dev_t dev,
+vinum_super_ioctl(struct cdev *dev,
     u_long cmd,
     caddr_t data)
 {
@@ -201,7 +201,7 @@ vinum_super_ioctl(dev_t dev,
 		boothowto |= RB_GDB;			    /* serial debug line */
 	    else
 		boothowto &= ~RB_GDB;			    /* local ddb */
-	    Debugger("vinum debug");
+	    kdb_enter("vinum debug");
 	}
 	ioctl_reply = (struct _ioctl_reply *) data;	    /* reinstate the address to reply to */
 	ioctl_reply->error = 0;

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/twe/twe_freebsd.c,v 1.31 2003/12/02 07:57:20 ps Exp $
+ * $FreeBSD: src/sys/dev/twe/twe_freebsd.c,v 1.39 2004/06/16 09:47:00 phk Exp $
  */
 
 /*
@@ -67,18 +67,19 @@ static	d_close_t		twe_close;
 static	d_ioctl_t		twe_ioctl_wrapper;
 
 static struct cdevsw twe_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	twe_open,
 	.d_close =	twe_close,
 	.d_ioctl =	twe_ioctl_wrapper,
 	.d_name =	"twe",
-	.d_maj =	TWE_CDEV_MAJOR,
 };
 
 /********************************************************************************
  * Accept an open operation on the control device.
  */
 static int
-twe_open(dev_t dev, int flags, int fmt, d_thread_t *td)
+twe_open(struct cdev *dev, int flags, int fmt, d_thread_t *td)
 {
     int			unit = minor(dev);
     struct twe_softc	*sc = devclass_get_softc(twe_devclass, unit);
@@ -91,7 +92,7 @@ twe_open(dev_t dev, int flags, int fmt, d_thread_t *td)
  * Accept the last close on the control device.
  */
 static int
-twe_close(dev_t dev, int flags, int fmt, d_thread_t *td)
+twe_close(struct cdev *dev, int flags, int fmt, d_thread_t *td)
 {
     int			unit = minor(dev);
     struct twe_softc	*sc = devclass_get_softc(twe_devclass, unit);
@@ -104,7 +105,7 @@ twe_close(dev_t dev, int flags, int fmt, d_thread_t *td)
  * Handle controller-specific control operations.
  */
 static int
-twe_ioctl_wrapper(dev_t dev, u_long cmd, caddr_t addr, int32_t flag, d_thread_t *td)
+twe_ioctl_wrapper(struct cdev *dev, u_long cmd, caddr_t addr, int32_t flag, d_thread_t *td)
 {
     struct twe_softc		*sc = (struct twe_softc *)dev->si_drv1;
     
@@ -215,7 +216,8 @@ twe_attach(device_t dev)
      * Allocate the PCI register window.
      */
     rid = TWE_IO_CONFIG_REG;
-    if ((sc->twe_io = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1, RF_ACTIVE)) == NULL) {
+    if ((sc->twe_io = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid, 
+        RF_ACTIVE)) == NULL) {
 	twe_printf(sc, "can't allocate register window\n");
 	twe_free(sc);
 	return(ENXIO);
@@ -246,7 +248,8 @@ twe_attach(device_t dev)
      * Allocate and connect our interrupt.
      */
     rid = 0;
-    if ((sc->twe_irq = bus_alloc_resource(sc->twe_dev, SYS_RES_IRQ, &rid, 0, ~0, 1, RF_SHAREABLE | RF_ACTIVE)) == NULL) {
+    if ((sc->twe_irq = bus_alloc_resource_any(sc->twe_dev, SYS_RES_IRQ,
+        &rid, RF_SHAREABLE | RF_ACTIVE)) == NULL) {
 	twe_printf(sc, "can't allocate interrupt\n");
 	twe_free(sc);
 	return(ENXIO);
@@ -420,7 +423,7 @@ twe_free(struct twe_softc *sc)
 	bus_release_resource(sc->twe_dev, SYS_RES_IOPORT, TWE_IO_CONFIG_REG, sc->twe_io);
 
     /* destroy control device */
-    if (sc->twe_dev_t != (dev_t)NULL)
+    if (sc->twe_dev_t != (struct cdev *)NULL)
 	destroy_dev(sc->twe_dev_t);
 
     sysctl_ctx_free(&sc->sysctl_ctx);
@@ -640,7 +643,7 @@ struct twed_softc
     device_t		twed_dev;
     struct twe_softc	*twed_controller;	/* parent device softc */
     struct twe_drive	*twed_drive;		/* drive data in parent softc */
-    struct disk		twed_disk;		/* generic disk handle */
+    struct disk		*twed_disk;		/* generic disk handle */
 };
 
 /*
@@ -743,9 +746,9 @@ twed_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size_t l
 
     dp = arg;
     twed_sc = (struct twed_softc *)dp->d_drv1;
-    twe_sc  = (struct twe_softc *)twed_sc->twed_controller;
-    if (!twed_sc || !twe_sc)
+    if (twed_sc == NULL)
 	return(ENXIO);
+    twe_sc  = (struct twe_softc *)twed_sc->twed_controller;
 
     if (length > 0) {
 	if ((error = twe_dump_blocks(twe_sc, twed_sc->twed_drive->td_twe_unit, offset / TWE_BLOCK_SIZE, virtual, length / TWE_BLOCK_SIZE)) != 0)
@@ -805,19 +808,24 @@ twed_attach(device_t dev)
     
     /* attach a generic disk device to ourselves */
 
-    sc->twed_disk.d_open = twed_open;
-    sc->twed_disk.d_strategy = twed_strategy;
-    sc->twed_disk.d_dump = (dumper_t *)twed_dump;
-    sc->twed_disk.d_name = "twed";
-    sc->twed_disk.d_drv1 = sc;
-    sc->twed_disk.d_maxsize = (TWE_MAX_SGL_LENGTH - 1) * PAGE_SIZE;
-    sc->twed_disk.d_sectorsize = TWE_BLOCK_SIZE;
-    sc->twed_disk.d_mediasize = TWE_BLOCK_SIZE * (off_t)sc->twed_drive->td_size;
-    sc->twed_disk.d_fwsectors = sc->twed_drive->td_sectors;
-    sc->twed_disk.d_fwheads = sc->twed_drive->td_heads;
     sc->twed_drive->td_sys_unit = device_get_unit(dev);
 
-    disk_create(sc->twed_drive->td_sys_unit, &sc->twed_disk, 0, NULL, NULL);
+    sc->twed_disk = disk_alloc();
+    sc->twed_disk->d_open = twed_open;
+    sc->twed_disk->d_strategy = twed_strategy;
+    sc->twed_disk->d_dump = (dumper_t *)twed_dump;
+    sc->twed_disk->d_name = "twed";
+    sc->twed_disk->d_drv1 = sc;
+    sc->twed_disk->d_maxsize = (TWE_MAX_SGL_LENGTH - 1) * PAGE_SIZE;
+    sc->twed_disk->d_sectorsize = TWE_BLOCK_SIZE;
+    sc->twed_disk->d_mediasize = TWE_BLOCK_SIZE * (off_t)sc->twed_drive->td_size;
+    sc->twed_disk->d_fwsectors = sc->twed_drive->td_sectors;
+    sc->twed_disk->d_fwheads = sc->twed_drive->td_heads;
+    sc->twed_disk->d_unit = sc->twed_drive->td_sys_unit;
+    sc->twed_disk->d_flags = DISKFLAG_NEEDSGIANT;
+
+    disk_create(sc->twed_disk, DISK_VERSION);
+
 #ifdef FREEBSD_4
     disks_registered++;
 #endif
@@ -837,10 +845,10 @@ twed_detach(device_t dev)
 
     debug_called(4);
 
-    if (sc->twed_disk.d_flags & DISKFLAG_OPEN)
+    if (sc->twed_disk->d_flags & DISKFLAG_OPEN)
 	return(EBUSY);
 
-    disk_destroy(&sc->twed_disk);
+    disk_destroy(sc->twed_disk);
 
 #ifdef FREEBSD_4
     if (--disks_registered == 0)
@@ -931,6 +939,8 @@ twe_setup_data_dmamap(void *arg, bus_dma_segment_t *segs, int nsegments, int err
 
     tr->tr_flags |= TWE_CMD_MAPPED;
 
+    if (tr->tr_flags & TWE_CMD_IN_PROGRESS)
+	sc->twe_state &= ~TWE_STATE_FRZN;
     /* save base of first segment in command (applicable if there only one segment) */
     tr->tr_dataphys = segs[0].ds_addr;
 
@@ -1004,8 +1014,10 @@ twe_setup_data_dmamap(void *arg, bus_dma_segment_t *segs, int nsegments, int err
 	}
     }
 
-    if (twe_start(tr) == EBUSY)
+    if (twe_start(tr) == EBUSY) {
+	tr->tr_sc->twe_state |= TWE_STATE_CTLR_BUSY;
 	twe_requeue_ready(tr);
+    }
 }
 
 static void
@@ -1027,8 +1039,10 @@ twe_map_request(struct twe_request *tr)
 
     debug_called(4);
 
-    if (sc->twe_state & TWE_STATE_FRZN)
+    if (sc->twe_state & (TWE_STATE_CTLR_BUSY | TWE_STATE_FRZN)) {
+	twe_requeue_ready(tr);
 	return (EBUSY);
+    }
 
     bus_dmamap_sync(sc->twe_cmd_dmat, sc->twe_cmdmap, BUS_DMASYNC_PREWRITE);
 
@@ -1043,26 +1057,35 @@ twe_map_request(struct twe_request *tr)
 	if (((vm_offset_t)tr->tr_data % TWE_ALIGNMENT) != 0) {
 	    tr->tr_realdata = tr->tr_data;				/* save pointer to 'real' data */
 	    tr->tr_flags |= TWE_CMD_ALIGNBUF;
-	    tr->tr_data = malloc(tr->tr_length, TWE_MALLOC_CLASS, M_NOWAIT);	/* XXX check result here */
+	    tr->tr_data = malloc(tr->tr_length, TWE_MALLOC_CLASS, M_NOWAIT);
+	    if (tr->tr_data == NULL) {
+		twe_printf(sc, "%s: malloc failed\n", __func__);
+		tr->tr_data = tr->tr_realdata; /* restore original data pointer */
+		return(ENOMEM);
+	    }
 	}
 	
 	/*
 	 * Map the data buffer into bus space and build the s/g list.
-	*/
+	 */
 	if (tr->tr_flags & TWE_CMD_IMMEDIATE) {
 	    bcopy(tr->tr_data, sc->twe_immediate, tr->tr_length);
-	    bus_dmamap_load(sc->twe_immediate_dmat, sc->twe_immediate_map, sc->twe_immediate,
+	    error = bus_dmamap_load(sc->twe_immediate_dmat, sc->twe_immediate_map, sc->twe_immediate,
 			    tr->tr_length, twe_setup_data_dmamap, tr, 0);
 	} else {
 	    error = bus_dmamap_load(sc->twe_buffer_dmat, tr->tr_dmamap, tr->tr_data, tr->tr_length, 
 				    twe_setup_data_dmamap, tr, 0);
 	}
 	if (error == EINPROGRESS) {
+	    tr->tr_flags |= TWE_CMD_IN_PROGRESS;
 	    sc->twe_state |= TWE_STATE_FRZN;
 	    error = 0;
 	}
     } else
-	error = twe_start(tr);
+	if ((error = twe_start(tr)) == EBUSY) {
+	    sc->twe_state |= TWE_STATE_CTLR_BUSY;
+	    twe_requeue_ready(tr);
+	}
 
     return(error);
 }
@@ -1119,6 +1142,7 @@ twe_unmap_request(struct twe_request *tr)
 }
 
 #ifdef TWE_DEBUG
+void twe_report(void);
 /********************************************************************************
  * Print current controller status, call from DDB.
  */

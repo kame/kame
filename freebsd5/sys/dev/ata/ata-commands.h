@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998 - 2003 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 1998 - 2004 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-commands.h,v 1.1 2003/08/24 09:22:26 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-commands.h,v 1.2 2004/04/30 16:21:34 sos Exp $
  */
 
 /* ATA commands */
@@ -43,6 +43,8 @@
 #define ATA_WRITE_DMA48			0x35	/* write w/DMA command */
 #define ATA_WRITE_DMA_QUEUED48		0x36	/* write w/DMA QUEUED command */
 #define ATA_WRITE_MUL48			0x39	/* write multi command */
+#define ATA_READ_FPDMA_QUEUED		0x60	/* read w/DMA NCQ */
+#define ATA_WRITE_FPDMA_QUEUED		0x61	/* write w/DMA NCQ */
 #define ATA_PACKET_CMD			0xa0	/* packet command */
 #define ATA_ATAPI_IDENTIFY		0xa1	/* get ATAPI params*/
 #define ATA_SERVICE			0xa2	/* service command */

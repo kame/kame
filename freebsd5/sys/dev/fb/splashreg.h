@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fb/splashreg.h,v 1.5 2000/04/29 13:33:18 peter Exp $
+ * $FreeBSD: src/sys/dev/fb/splashreg.h,v 1.6 2004/07/15 08:26:01 phk Exp $
  */
 
 #ifndef _DEV_FB_SPLASHREG_H_
@@ -55,6 +55,7 @@ typedef struct image_decoder	scrn_saver_t;
 		case MOD_UNLOAD:				\
 			return splash_unregister(&sw);		\
 		default:					\
+			return EOPNOTSUPP;			\
 			break;					\
 		}						\
 		return 0;					\
@@ -76,6 +77,7 @@ typedef struct image_decoder	scrn_saver_t;
 		case MOD_UNLOAD:				\
 			return splash_unregister(&sw);		\
 		default:					\
+			return EOPNOTSUPP;			\
 			break;					\
 		}						\
 		return 0;					\

@@ -23,10 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/dsp.h,v 1.7 2003/09/07 16:28:03 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/dsp.h,v 1.8 2004/01/20 03:58:57 matk Exp $
  */
 
-int dsp_register(int unit, int channel);
-int dsp_registerrec(int unit, int channel);
-int dsp_unregister(int unit, int channel);
-int dsp_unregisterrec(int unit, int channel);
+extern struct cdevsw dsp_cdevsw;

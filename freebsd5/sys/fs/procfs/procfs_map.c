@@ -14,10 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,7 +32,7 @@
  *
  *	@(#)procfs_status.c	8.3 (Berkeley) 2/17/94
  *
- * $FreeBSD: src/sys/fs/procfs/procfs_map.c,v 1.34 2003/10/19 14:33:00 mux Exp $
+ * $FreeBSD: src/sys/fs/procfs/procfs_map.c,v 1.36 2004/04/07 20:46:02 imp Exp $
  */
 
 #include <sys/param.h>
@@ -95,7 +91,7 @@ procfs_doprocmap(PFS_FILL_ARGS)
 
 	if (uio->uio_offset != 0)
 		return (0);
-	
+
 	error = 0;
 	if (map != &curthread->td_proc->p_vmspace->vm_map)
 		vm_map_lock_read(map);
@@ -150,7 +146,7 @@ procfs_doprocmap(PFS_FILL_ARGS)
 				type = "device";
 				break;
 			}
-			
+
 			flags = obj->flags;
 			ref_count = obj->ref_count;
 			shadow_count = obj->shadow_count;
@@ -191,6 +187,6 @@ procfs_doprocmap(PFS_FILL_ARGS)
 	}
 	if (map != &curthread->td_proc->p_vmspace->vm_map)
 		vm_map_unlock_read(map);
-	
+
 	return (error);
 }

@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/si/si.c,v 1.118 2003/08/24 18:03:43 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/si/si.c,v 1.132 2004/07/28 06:21:53 kan Exp $");
 
 #ifndef lint
 static const char si_copyright1[] =  "@(#) Copyright (C) Specialix International, 1990,1992,1998",
@@ -47,8 +47,10 @@ static const char si_copyright1[] =  "@(#) Copyright (C) Specialix International
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#ifndef BURN_BRIDGES
+#if defined(COMPAT_43)
 #include <sys/ioctl_compat.h>
+#endif
 #endif
 #include <sys/tty.h>
 #include <sys/conf.h>
@@ -95,13 +97,11 @@ enum si_mctl { GET, SET, BIS, BIC };
 static void si_command(struct si_port *, int, int);
 static int si_modem(struct si_port *, enum si_mctl, int);
 static void si_write_enable(struct si_port *, int);
-static int si_Sioctl(dev_t, u_long, caddr_t, int, struct thread *);
+static int si_Sioctl(struct cdev *, u_long, caddr_t, int, struct thread *);
 static void si_start(struct tty *);
 static void si_stop(struct tty *, int);
 static timeout_t si_lstart;
-static void si_disc_optim(struct tty *tp, struct termios *t,struct si_port *pp);
 static void sihardclose(struct si_port *pp);
-static void sidtrwakeup(void *chan);
 
 #ifdef SI_DEBUG
 static char	*si_mctl2str(enum si_mctl cmd);
@@ -117,18 +117,14 @@ static	d_close_t	siclose;
 static	d_write_t	siwrite;
 static	d_ioctl_t	siioctl;
 
-#define	CDEV_MAJOR	68
 static struct cdevsw si_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	siopen,
 	.d_close =	siclose,
-	.d_read =	ttyread,
 	.d_write =	siwrite,
 	.d_ioctl =	siioctl,
-	.d_poll =	ttypoll,
 	.d_name =	"si",
-	.d_maj =	CDEV_MAJOR,
-	.d_flags =	D_TTY,
-	.d_kqfilter =	ttykqfilter,
+	.d_flags =	D_TTY | D_NEEDGIANT,
 };
 
 static int si_Nports;
@@ -219,22 +215,36 @@ static char *si_type[] = {
 static void __inline
 si_bcopy(const void *src, void *dst, size_t len)
 {
+	u_char *d;
+	const u_char *s;
+
+	d = dst;
+	s = src;
 	while (len--)
-		*(((u_char *)dst)++) = *(((const u_char *)src)++);
+		*d++ = *s++;
 }
 static void __inline
 si_vbcopy(const volatile void *src, void *dst, size_t len)
 {
+	u_char *d;
+	const volatile u_char *s;
+
+	d = dst;
+	s = src;
 	while (len--)
-		*(((u_char *)dst)++) = *(((const volatile u_char *)src)++);
+		*d++ = *s++;
 }
 static void __inline
 si_bcopyv(const void *src, volatile void *dst, size_t len)
 {
-	while (len--)
-		*(((volatile u_char *)dst)++) = *(((const u_char *)src)++);
-}
+	volatile u_char *d;
+	const u_char *s;
 
+	d = dst;
+	s = src;
+	while (len--)
+		*d++ = *s++;
+}
 
 /*
  * Attach the device.  Initialize the card.
@@ -546,7 +556,6 @@ try_next:
 			pp->sp_tty = ttymalloc(NULL);
 			pp->sp_pend = IDLE_CLOSE;
 			pp->sp_state = 0;	/* internal flag */
-			pp->sp_dtr_wait = 3 * hz;
 			pp->sp_iin.c_iflag = TTYDEF_IFLAG;
 			pp->sp_iin.c_oflag = TTYDEF_OFLAG;
 			pp->sp_iin.c_cflag = TTYDEF_CFLAG;
@@ -594,7 +603,7 @@ try_next2:
 }
 
 static	int
-siopen(dev_t dev, int flag, int mode, struct thread *td)
+siopen(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 	int oldspl, error;
 	int card, port;
@@ -655,11 +664,9 @@ siopen(dev_t dev, int flag, int mode, struct thread *td)
 	error = 0;
 
 open_top:
-	while (pp->sp_state & SS_DTR_OFF) {
-		error = tsleep(&pp->sp_dtr_wait, TTIPRI|PCATCH, "sidtr", 0);
-		if (error != 0)
-			goto out;
-	}
+	error = ttydtrwaitsleep(tp);
+	if (error != 0)
+		goto out;
 
 	if (tp->t_state & TS_ISOPEN) {
 		/*
@@ -718,7 +725,7 @@ open_top:
 		/* set initial DCD state */
 		pp->sp_last_hi_ip = ccbp->hi_ip;
 		if ((pp->sp_last_hi_ip & IP_DCD) || IS_CALLOUT(mynor)) {
-			(*linesw[tp->t_line].l_modem)(tp, 1);
+			ttyld_modem(tp, 1);
 		}
 	}
 
@@ -744,8 +751,8 @@ open_top:
 		goto open_top;
 	}
 
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
-	si_disc_optim(tp, &tp->t_termios, pp);
+	error = ttyld_open(tp, dev);
+	ttyldoptim(tp);
 	if (tp->t_state & TS_ISOPEN && IS_CALLOUT(mynor))
 		pp->sp_active_out = TRUE;
 
@@ -763,7 +770,7 @@ out:
 }
 
 static	int
-siclose(dev_t dev, int flag, int mode, struct thread *td)
+siclose(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 	struct si_port *pp;
 	struct tty *tp;
@@ -794,7 +801,7 @@ siclose(dev_t dev, int flag, int mode, struct thread *td)
 	si_write_enable(pp, 0);		/* block writes for ttywait() */
 
 	/* THIS MAY SLEEP IN TTYWAIT!!! */
-	(*linesw[tp->t_line].l_close)(tp, flag);
+	ttyld_close(tp, flag);
 
 	si_write_enable(pp, 1);
 
@@ -810,10 +817,8 @@ siclose(dev_t dev, int flag, int mode, struct thread *td)
 		pp->sp_state &= ~SS_LSTART;
 	}
 
-	si_stop(tp, FREAD | FWRITE);
-
 	sihardclose(pp);
-	ttyclose(tp);
+	tty_close(tp);
 	pp->sp_state &= ~SS_OPEN;
 
 out:
@@ -842,11 +847,7 @@ sihardclose(struct si_port *pp)
 		(void) si_modem(pp, BIC, TIOCM_DTR|TIOCM_RTS);
 		(void) si_command(pp, FCLOSE, SI_NOWAIT);
 
-		if (pp->sp_dtr_wait != 0) {
-			timeout(sidtrwakeup, pp, pp->sp_dtr_wait);
-			pp->sp_state |= SS_DTR_OFF;
-		}
-
+		ttydtrwaitstart(tp);
 	}
 	pp->sp_active_out = FALSE;
 	wakeup(&pp->sp_active_out);
@@ -855,27 +856,8 @@ sihardclose(struct si_port *pp)
 	splx(oldspl);
 }
 
-
-/*
- * called at splsoftclock()...
- */
-static void
-sidtrwakeup(void *chan)
-{
-	struct si_port *pp;
-	int oldspl;
-
-	oldspl = spltty();
-
-	pp = (struct si_port *)chan;
-	pp->sp_state &= ~SS_DTR_OFF;
-	wakeup(&pp->sp_dtr_wait);
-
-	splx(oldspl);
-}
-
 static	int
-siwrite(dev_t dev, struct uio *uio, int flag)
+siwrite(struct cdev *dev, struct uio *uio, int flag)
 {
 	struct si_port *pp;
 	struct tty *tp;
@@ -906,7 +888,7 @@ siwrite(dev_t dev, struct uio *uio, int flag)
 		}
 	}
 
-	error = (*linesw[tp->t_line].l_write)(tp, uio, flag);
+	error = ttyld_write(tp, uio, flag);
 out:
 	splx(oldspl);
 	return (error);
@@ -914,7 +896,7 @@ out:
 
 
 static	int
-siioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
+siioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 {
 	struct si_port *pp;
 	struct tty *tp;
@@ -922,9 +904,11 @@ siioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 	int mynor = minor(dev);
 	int oldspl;
 	int blocked = 0;
+#ifndef BURN_BRIDGES
 #if defined(COMPAT_43)
 	u_long oldcmd;
 	struct termios term;
+#endif
 #endif
 
 	if (IS_SI_IOCTL(cmd))
@@ -971,6 +955,7 @@ siioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 	/*
 	 * Do the old-style ioctl compat routines...
 	 */
+#ifndef BURN_BRIDGES
 #if defined(COMPAT_43)
 	term = tp->t_termios;
 	oldcmd = cmd;
@@ -979,6 +964,7 @@ siioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 		return (error);
 	if (cmd != oldcmd)
 		data = (caddr_t)&term;
+#endif
 #endif
 	/*
 	 * Do the initial / lock state business
@@ -1015,25 +1001,21 @@ siioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 	case TIOCSETAW:
 	case TIOCSETAF:
 	case TIOCDRAIN:
+#ifndef BURN_BRIDGES
 #ifdef COMPAT_43
 	case TIOCSETP:
+#endif
 #endif
 		blocked++;	/* block writes for ttywait() and siparam() */
 		si_write_enable(pp, 0);
 	}
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, td);
-	if (error != ENOIOCTL)
+	error = ttyioctl(dev, cmd, data, flag, td);
+	ttyldoptim(tp);
+	if (error != ENOTTY)
 		goto out;
 
 	oldspl = spltty();
-
-	error = ttioctl(tp, cmd, data, flag);
-	si_disc_optim(tp, &tp->t_termios, pp);
-	if (error != ENOIOCTL) {
-		splx(oldspl);
-		goto out;
-	}
 
 	error = 0;
 	switch (cmd) {
@@ -1061,15 +1043,6 @@ siioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 	case TIOCMGET:
 		*(int *)data = si_modem(pp, GET, 0);
 		break;
-	case TIOCMSDTRWAIT:
-		/* must be root since the wait applies to following logins */
-		error = suser(td);
-		if (error == 0)
-			pp->sp_dtr_wait = *(int *)data * hz / 100;
-		break;
-	case TIOCMGDTRWAIT:
-		*(int *)data = pp->sp_dtr_wait * 100 / hz;
-		break;
 	default:
 		error = ENOTTY;
 	}
@@ -1086,7 +1059,7 @@ out:
  * Handle the Specialix ioctls. All MUST be called via the CONTROL device
  */
 static int
-si_Sioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
+si_Sioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 {
 	struct si_softc *xsc;
 	struct si_port *xpp;
@@ -1478,12 +1451,12 @@ si_modem_state(struct si_port *pp, struct tty *tp, int hi_ip)
 		if (!(pp->sp_last_hi_ip & IP_DCD)) {
 			DPRINT((pp, DBG_INTR, "modem carr on t_line %d\n",
 				tp->t_line));
-			(void)(*linesw[tp->t_line].l_modem)(tp, 1);
+			(void)ttyld_modem(tp, 1);
 		}
 	} else {
 		if (pp->sp_last_hi_ip & IP_DCD) {
 			DPRINT((pp, DBG_INTR, "modem carr off\n"));
-			if ((*linesw[tp->t_line].l_modem)(tp, 0))
+			if (ttyld_modem(tp, 0))
 				(void) si_modem(pp, SET, 0);
 		}
 	}
@@ -1691,7 +1664,7 @@ si_intr(void *arg)
 			 */
 			if (ccbp->hi_state & ST_BREAK) {
 				if (isopen) {
-				    (*linesw[tp->t_line].l_rint)(TTY_BI, tp);
+				    ttyld_rint(tp, TTY_BI);
 				}
 				ccbp->hi_state &= ~ST_BREAK;   /* A Bit iffy this */
 				DPRINT((pp, DBG_INTR, "si_intr break\n"));
@@ -1820,7 +1793,7 @@ si_intr(void *arg)
 				 */
 				for(x = 0; x < n; x++) {
 					i = si_rxbuf[x];
-					if ((*linesw[tp->t_line].l_rint)(i, tp)
+					if (ttyld_rint(tp, i)
 					     == -1) {
 						pp->sp_delta_overflows++;
 					}
@@ -1833,7 +1806,7 @@ si_intr(void *arg)
 			/*
 			 * Do TX stuff
 			 */
-			(*linesw[tp->t_line].l_start)(tp);
+			ttyld_start(tp);
 
 		} /* end of for (all ports on this controller) */
 	} /* end of for (all controllers) */
@@ -1975,7 +1948,7 @@ si_lstart(void *arg)
 	ttwwakeup(tp);
 
 	/* nudge protocols - eg: ppp */
-	(*linesw[tp->t_line].l_start)(tp);
+	ttyld_start(tp);
 
 	pp->sp_state &= ~SS_INLSTART;
 	splx(oldspl);
@@ -2085,29 +2058,6 @@ si_command(struct si_port *pp, int cmd, int waitflag)
 		}
 	}
 	splx(oldspl);
-}
-
-static void
-si_disc_optim(struct tty *tp, struct termios *t, struct si_port *pp)
-{
-	/*
-	 * XXX can skip a lot more cases if Smarts.  Maybe
-	 * (IGNCR | ISTRIP | IXON) in c_iflag.  But perhaps we
-	 * shouldn't skip if (TS_CNTTB | TS_LNCH) is set in t_state.
-	 */
-	if (!(t->c_iflag & (ICRNL | IGNCR | IMAXBEL | INLCR | ISTRIP | IXON)) &&
-	    (!(t->c_iflag & BRKINT) || (t->c_iflag & IGNBRK)) &&
-	    (!(t->c_iflag & PARMRK) ||
-	     (t->c_iflag & (IGNPAR | IGNBRK)) == (IGNPAR | IGNBRK)) &&
-	    !(t->c_lflag & (ECHO | ICANON | IEXTEN | ISIG | PENDIN)) &&
-	    linesw[tp->t_line].l_rint == ttyinput)
-		tp->t_state |= TS_CAN_BYPASS_L_RINT;
-	else
-		tp->t_state &= ~TS_CAN_BYPASS_L_RINT;
-	pp->sp_hotchar = linesw[tp->t_line].l_hotchar;
-	DPRINT((pp, DBG_OPTIM, "bypass: %s, hotchar: %x\n",
-		(tp->t_state & TS_CAN_BYPASS_L_RINT) ? "on" : "off",
-		pp->sp_hotchar));
 }
 
 

@@ -11,10 +11,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -32,7 +28,7 @@
  * SUCH DAMAGE.
  *
  *	from: vector.s, 386BSD 0.1 unknown origin
- * $FreeBSD: src/sys/amd64/amd64/apic_vector.S,v 1.96 2003/12/06 23:19:47 peter Exp $
+ * $FreeBSD: src/sys/amd64/amd64/apic_vector.S,v 1.100 2004/05/24 12:08:56 bde Exp $
  */
 
 /*
@@ -104,7 +100,7 @@
 	SUPERALIGN_TEXT ;						\
 IDTVEC(vec_name) ;							\
 	PUSH_FRAME ;							\
-	FAKE_MCOUNT(13*4(%esp)) ;	/* XXX avoid double count */	\
+	FAKE_MCOUNT(TF_RIP(%rsp)) ;					\
 	movq	lapic, %rdx ;	/* pointer to local APIC */		\
 	movl	LA_ISR + 16 * (index)(%rdx), %eax ;	/* load ISR */	\
 	bsrl	%eax, %eax ;	/* index of highset set bit in ISR */	\
@@ -133,7 +129,6 @@ IDTVEC(spuriousint)
 
 	iretq
 
-MCOUNT_LABEL(bintr2)
 	ISR_VEC(1, apic_isr1)
 	ISR_VEC(2, apic_isr2)
 	ISR_VEC(3, apic_isr3)
@@ -141,7 +136,6 @@ MCOUNT_LABEL(bintr2)
 	ISR_VEC(5, apic_isr5)
 	ISR_VEC(6, apic_isr6)
 	ISR_VEC(7, apic_isr7)
-MCOUNT_LABEL(eintr2)
 
 #ifdef SMP
 /*
@@ -238,7 +232,7 @@ IDTVEC(statclock)
 	movq	lapic, %rdx
 	movl	$0, LA_EOI(%rdx)	/* End Of Interrupt to APIC */
 
-	FAKE_MCOUNT(13*4(%esp))
+	FAKE_MCOUNT(TF_RIP(%rsp))
 
 	call	forwarded_statclock
 	MEXITCOUNT
@@ -260,7 +254,7 @@ IDTVEC(cpuast)
 	movq	lapic, %rdx
 	movl	$0, LA_EOI(%rdx)	/* End Of Interrupt to APIC */
 
-	FAKE_MCOUNT(13*4(%esp))
+	FAKE_MCOUNT(TF_RIP(%rsp))
 
 	MEXITCOUNT
 	jmp	doreti
@@ -325,19 +319,4 @@ IDTVEC(rendezvous)
 	movl	$0, LA_EOI(%rax)	/* End Of Interrupt to APIC */
 	POP_FRAME			/* Why not doreti? */
 	iretq
-	
-#ifdef LAZY_SWITCH
-/*
- * Clean up when we lose out on the lazy context switch optimization.
- * ie: when we are about to release a PTD but a cpu is still borrowing it.
- */
-	SUPERALIGN_TEXT
-IDTVEC(lazypmap)
-	PUSH_FRAME
-	call	pmap_lazyfix_action
-	movq	lapic, %rax	
-	movl	$0, LA_EOI(%rax)	/* End Of Interrupt to APIC */
-	POP_FRAME			/* Why not doreti? */
-	iretq
-#endif
 #endif /* SMP */

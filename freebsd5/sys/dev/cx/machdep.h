@@ -15,7 +15,7 @@
  * all derivative works or modified versions.
  *
  * Cronyx Id: machdep.h,v 1.3.4.3 2003/11/27 14:21:58 rik Exp $
- * $FreeBSD: src/sys/dev/cx/machdep.h,v 1.1 2003/12/03 07:29:38 imp Exp $
+ * $FreeBSD: src/sys/dev/cx/machdep.h,v 1.2 2004/03/12 21:45:26 trhodes Exp $
  */
 
 /*
@@ -84,7 +84,7 @@
 #endif
 
 #ifndef inline
-#   if __GNUC__ >= 2
+#   if __GNUC__ >= 2 || defined(__INTEL_COMPILER)
 #      define inline __inline__
 #   else
 #      define inline /**/

@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/io_apic.c,v 1.7 2003/11/17 08:58:12 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/io_apic.c,v 1.11 2004/08/16 23:12:29 peter Exp $");
 
 #include "opt_atpic.h"
 #include "opt_isa.h"
@@ -50,10 +50,6 @@ __FBSDID("$FreeBSD: src/sys/amd64/amd64/io_apic.c,v 1.7 2003/11/17 08:58:12 pete
 #include <machine/intr_machdep.h>
 #include <machine/apicvar.h>
 #include <machine/segments.h>
-
-#if defined(DEV_ISA) && defined(DEV_ATPIC) && !defined(NO_MIXED_MODE)
-#define	MIXED_MODE
-#endif
 
 #define IOAPIC_ISA_INTS		16
 #define	IOAPIC_MEM_REGION	32
@@ -104,6 +100,7 @@ struct ioapic_intsrc {
 	u_int io_edgetrigger:1;
 	u_int io_masked:1;
 	int io_dest:5;
+	int io_bus:4;
 };
 
 struct ioapic {
@@ -117,30 +114,45 @@ struct ioapic {
 	struct ioapic_intsrc io_pins[0];
 };
 
-static STAILQ_HEAD(,ioapic) ioapic_list = STAILQ_HEAD_INITIALIZER(ioapic_list);
-static u_int next_id, program_logical_dest;
-
 static u_int	ioapic_read(volatile ioapic_t *apic, int reg);
 static void	ioapic_write(volatile ioapic_t *apic, int reg, u_int val);
+static const char *ioapic_bus_string(int bus_type);
+static void	ioapic_print_vector(struct ioapic_intsrc *intpin);
 static void	ioapic_enable_source(struct intsrc *isrc);
-static void	ioapic_disable_source(struct intsrc *isrc);
+static void	ioapic_disable_source(struct intsrc *isrc, int eoi);
 static void	ioapic_eoi_source(struct intsrc *isrc);
 static void	ioapic_enable_intr(struct intsrc *isrc);
 static int	ioapic_vector(struct intsrc *isrc);
 static int	ioapic_source_pending(struct intsrc *isrc);
+static int	ioapic_config_intr(struct intsrc *isrc, enum intr_trigger trig,
+		    enum intr_polarity pol);
 static void	ioapic_suspend(struct intsrc *isrc);
 static void	ioapic_resume(struct intsrc *isrc);
 static void	ioapic_program_destination(struct ioapic_intsrc *intpin);
-#ifdef MIXED_MODE
+static void	ioapic_program_intpin(struct ioapic_intsrc *intpin);
 static void	ioapic_setup_mixed_mode(struct ioapic_intsrc *intpin);
-#endif
 
+static STAILQ_HEAD(,ioapic) ioapic_list = STAILQ_HEAD_INITIALIZER(ioapic_list);
 struct pic ioapic_template = { ioapic_enable_source, ioapic_disable_source,
 			       ioapic_eoi_source, ioapic_enable_intr,
 			       ioapic_vector, ioapic_source_pending,
-			       ioapic_suspend, ioapic_resume };
+			       ioapic_suspend, ioapic_resume,
+			       ioapic_config_intr };
 	
-static int next_ioapic_base, logical_clusters, current_cluster;
+static int bsp_id, current_cluster, logical_clusters, next_ioapic_base;
+static u_int mixed_mode_enabled, next_id, program_logical_dest;
+#if defined(NO_MIXED_MODE) || !defined(DEV_ATPIC)
+static int mixed_mode_active = 0;
+#else
+static int mixed_mode_active = 1;
+#endif
+TUNABLE_INT("hw.apic.mixed_mode", &mixed_mode_active);
+
+static __inline void
+_ioapic_eoi_source(struct intsrc *isrc)
+{
+	lapic_eoi();
+}
 
 static u_int
 ioapic_read(volatile ioapic_t *apic, int reg)
@@ -158,6 +170,45 @@ ioapic_write(volatile ioapic_t *apic, int reg, u_int val)
 	mtx_assert(&icu_lock, MA_OWNED);
 	apic->ioregsel = reg;
 	apic->iowin = val;
+}
+
+static const char *
+ioapic_bus_string(int bus_type)
+{
+
+	switch (bus_type) {
+	case APIC_BUS_ISA:
+		return ("ISA");
+	case APIC_BUS_EISA:
+		return ("EISA");
+	case APIC_BUS_PCI:
+		return ("PCI");
+	default:
+		return ("unknown");
+	}
+}
+
+static void
+ioapic_print_vector(struct ioapic_intsrc *intpin)
+{
+
+	switch (intpin->io_vector) {
+	case VECTOR_DISABLED:
+		printf("disabled");
+		break;
+	case VECTOR_EXTINT:
+		printf("ExtINT");
+		break;
+	case VECTOR_NMI:
+		printf("NMI");
+		break;
+	case VECTOR_SMI:
+		printf("SMI");
+		break;
+	default:
+		printf("%s IRQ %u", ioapic_bus_string(intpin->io_bus),
+		    intpin->io_vector);
+	}
 }
 
 static void
@@ -180,7 +231,7 @@ ioapic_enable_source(struct intsrc *isrc)
 }
 
 static void
-ioapic_disable_source(struct intsrc *isrc)
+ioapic_disable_source(struct intsrc *isrc, int eoi)
 {
 	struct ioapic_intsrc *intpin = (struct ioapic_intsrc *)isrc;
 	struct ioapic *io = (struct ioapic *)isrc->is_pic;
@@ -195,6 +246,10 @@ ioapic_disable_source(struct intsrc *isrc)
 		    flags);
 		intpin->io_masked = 1;
 	}
+
+	if (eoi == PIC_EOI)
+		_ioapic_eoi_source(isrc);
+
 	mtx_unlock_spin(&icu_lock);
 }
 
@@ -202,7 +257,83 @@ static void
 ioapic_eoi_source(struct intsrc *isrc)
 {
 
-	lapic_eoi();
+	_ioapic_eoi_source(isrc);
+}
+
+/*
+ * Completely program an intpin based on the data in its interrupt source
+ * structure.
+ */
+static void
+ioapic_program_intpin(struct ioapic_intsrc *intpin)
+{
+	struct ioapic *io = (struct ioapic *)intpin->io_intsrc.is_pic;
+	uint32_t low, high, value;
+
+	/*
+	 * For pins routed via mixed mode or disabled, just ensure that
+	 * they are masked.
+	 */
+	if (intpin->io_dest == DEST_EXTINT ||
+	    intpin->io_vector == VECTOR_DISABLED) {
+		low = ioapic_read(io->io_addr,
+		    IOAPIC_REDTBL_LO(intpin->io_intpin));
+		if ((low & IOART_INTMASK) == IOART_INTMCLR)
+			ioapic_write(io->io_addr,
+			    IOAPIC_REDTBL_LO(intpin->io_intpin),
+			    low | IOART_INTMSET);
+		return;
+	}
+
+	/* Set the destination. */
+	if (intpin->io_dest == DEST_NONE) {
+		low = IOART_DESTPHY;
+		high = bsp_id << APIC_ID_SHIFT;
+	} else {
+		low = IOART_DESTLOG;
+		high = (intpin->io_dest << APIC_ID_CLUSTER_SHIFT |
+		    APIC_ID_CLUSTER_ID) << APIC_ID_SHIFT;
+	}
+
+	/* Program the rest of the low word. */
+	if (intpin->io_edgetrigger)
+		low |= IOART_TRGREDG;
+	else
+		low |= IOART_TRGRLVL;
+	if (intpin->io_activehi)
+		low |= IOART_INTAHI;
+	else
+		low |= IOART_INTALO;
+	if (intpin->io_masked)
+		low |= IOART_INTMSET;
+	switch (intpin->io_vector) {
+	case VECTOR_EXTINT:
+		KASSERT(intpin->io_edgetrigger,
+		    ("EXTINT not edge triggered"));
+		low |= IOART_DELEXINT;
+		break;
+	case VECTOR_NMI:
+		KASSERT(intpin->io_edgetrigger,
+		    ("NMI not edge triggered"));
+		low |= IOART_DELNMI;
+		break;
+	case VECTOR_SMI:
+		KASSERT(intpin->io_edgetrigger,
+		    ("SMI not edge triggered"));
+		low |= IOART_DELSMI;
+		break;
+	default:
+		low |= IOART_DELLOPRI | apic_irq_to_idt(intpin->io_vector);
+	}
+
+	/* Write the values to the APIC. */
+	mtx_lock_spin(&icu_lock);
+	ioapic_write(io->io_addr, IOAPIC_REDTBL_LO(intpin->io_intpin), low);
+	value = ioapic_read(io->io_addr, IOAPIC_REDTBL_HI(intpin->io_intpin));
+	value &= ~IOART_DEST;
+	value |= high;
+	ioapic_write(io->io_addr, IOAPIC_REDTBL_HI(intpin->io_intpin), value);
+	mtx_unlock_spin(&icu_lock);
 }
 
 /*
@@ -212,7 +343,6 @@ static void
 ioapic_program_destination(struct ioapic_intsrc *intpin)
 {
 	struct ioapic *io = (struct ioapic *)intpin->io_intsrc.is_pic;
-	uint32_t value;
 
 	KASSERT(intpin->io_dest != DEST_NONE,
 	    ("intpin not assigned to a cluster"));
@@ -221,23 +351,10 @@ ioapic_program_destination(struct ioapic_intsrc *intpin)
 	if (bootverbose) {
 		printf("ioapic%u: routing intpin %u (", io->io_id,
 		    intpin->io_intpin);
-		if (intpin->io_vector == VECTOR_EXTINT)
-			printf("ExtINT");
-		else
-			printf("IRQ %u", intpin->io_vector);
+		ioapic_print_vector(intpin);
 		printf(") to cluster %u\n", intpin->io_dest);
 	}
-	mtx_lock_spin(&icu_lock);
-	value = ioapic_read(io->io_addr, IOAPIC_REDTBL_LO(intpin->io_intpin));
-	value &= ~IOART_DESTMOD;
-	value |= IOART_DESTLOG;
-	ioapic_write(io->io_addr, IOAPIC_REDTBL_LO(intpin->io_intpin), value);
-	value = ioapic_read(io->io_addr, IOAPIC_REDTBL_HI(intpin->io_intpin));
-	value &= ~IOART_DEST;
-	value |= (intpin->io_dest << APIC_ID_CLUSTER_SHIFT |
-	    APIC_ID_CLUSTER_ID) << APIC_ID_SHIFT;
-	ioapic_write(io->io_addr, IOAPIC_REDTBL_HI(intpin->io_intpin), value);
-	mtx_unlock_spin(&icu_lock);
+	ioapic_program_intpin(intpin);
 }
 
 static void
@@ -291,6 +408,48 @@ ioapic_source_pending(struct intsrc *isrc)
 	return (lapic_intr_pending(intpin->io_vector));
 }
 
+static int
+ioapic_config_intr(struct intsrc *isrc, enum intr_trigger trig,
+    enum intr_polarity pol)
+{
+	struct ioapic_intsrc *intpin = (struct ioapic_intsrc *)isrc;
+	struct ioapic *io = (struct ioapic *)isrc->is_pic;
+	int changed;
+
+	KASSERT(!(trig == INTR_TRIGGER_CONFORM || pol == INTR_POLARITY_CONFORM),
+	    ("%s: Conforming trigger or polarity\n", __func__));
+
+	/*
+	 * EISA interrupts always use active high polarity, so don't allow
+	 * them to be set to active low.
+	 *
+	 * XXX: Should we write to the ELCR if the trigger mode changes for
+	 * an EISA IRQ?
+	 */
+	if (intpin->io_bus == APIC_BUS_EISA)
+		pol = INTR_POLARITY_HIGH;
+	changed = 0;
+	if (intpin->io_edgetrigger != (trig == INTR_TRIGGER_EDGE)) {
+		if (bootverbose)
+			printf("ioapic%u: Changing trigger for pin %u to %s\n",
+			    io->io_id, intpin->io_intpin,
+			    trig == INTR_TRIGGER_EDGE ? "edge" : "level");
+		intpin->io_edgetrigger = (trig == INTR_TRIGGER_EDGE);
+		changed++;
+	}
+	if (intpin->io_activehi != (pol == INTR_POLARITY_HIGH)) {
+		if (bootverbose)
+			printf("ioapic%u: Changing polarity for pin %u to %s\n",
+			    io->io_id, intpin->io_intpin,
+			    pol == INTR_POLARITY_HIGH ? "high" : "low");
+		intpin->io_activehi = (pol == INTR_POLARITY_HIGH);
+		changed++;
+	}
+	if (changed)
+		ioapic_program_intpin(intpin);
+	return (0);
+}
+
 static void
 ioapic_suspend(struct intsrc *isrc)
 {
@@ -302,7 +461,18 @@ static void
 ioapic_resume(struct intsrc *isrc)
 {
 
-	TODO;
+	ioapic_program_intpin((struct ioapic_intsrc *)isrc);
+}
+
+/*
+ * APIC enumerators call this function to indicate that the 8259A AT PICs
+ * are available and that mixed mode can be used.
+ */
+void
+ioapic_enable_mixed_mode(void)
+{
+
+	mixed_mode_enabled = 1;
 }
 
 /*
@@ -377,41 +547,36 @@ ioapic_create(uintptr_t addr, int32_t apic_id, int intbase)
 		intpin->io_vector = intbase + i;
 
 		/*
-		 * Assume that pin 0 on the first IO APIC is an ExtINT pin by
-		 * default.  Assume that intpins 1-15 are ISA interrupts and
-		 * use suitable defaults for those.  Assume that all other
-		 * intpins are PCI interrupts.  Enable the ExtINT pin by
-		 * default but mask all other pins.
+		 * Assume that pin 0 on the first I/O APIC is an ExtINT pin
+		 * and that pins 1-15 are ISA interrupts.  Assume that all
+		 * other pins are PCI interrupts.
 		 */
-		if (intpin->io_vector == 0) {
-			intpin->io_activehi = 1;
-			intpin->io_edgetrigger = 1;
-			intpin->io_vector = VECTOR_EXTINT;
-			intpin->io_masked = 0;
-		} else if (intpin->io_vector < IOAPIC_ISA_INTS) {
+		if (intpin->io_vector == 0)
+			ioapic_set_extint(io, i);
+		else if (intpin->io_vector < IOAPIC_ISA_INTS) {
+			intpin->io_bus = APIC_BUS_ISA;
 			intpin->io_activehi = 1;
 			intpin->io_edgetrigger = 1;
 			intpin->io_masked = 1;
 		} else {
+			intpin->io_bus = APIC_BUS_PCI;
 			intpin->io_activehi = 0;
 			intpin->io_edgetrigger = 0;
 			intpin->io_masked = 1;
 		}
 
 		/*
-		 * Start off without a logical cluster destination until
-		 * the pin is enabled.
+		 * Route interrupts to the BSP by default using physical
+		 * addressing.  Vectored interrupts get readdressed using
+		 * logical IDs to CPU clusters when they are enabled.
 		 */
 		intpin->io_dest = DEST_NONE;
-		if (bootverbose) {
+		if (bootverbose && intpin->io_vector != VECTOR_DISABLED) {
 			printf("ioapic%u: intpin %d -> ",  io->io_id, i);
-			if (intpin->io_vector == VECTOR_EXTINT)
-				printf("ExtINT");
-			else
-				printf("irq %u", intpin->io_vector);
-			printf(" (%s, active%s)\n", intpin->io_edgetrigger ?
-			    "edge" : "level", intpin->io_activehi ? "hi" :
-			    "lo");
+			ioapic_print_vector(intpin);
+			printf(" (%s, %s)\n", intpin->io_edgetrigger ?
+			    "edge" : "level", intpin->io_activehi ? "high" :
+			    "low");
 		}
 		value = ioapic_read(apic, IOAPIC_REDTBL_LO(i));
 		ioapic_write(apic, IOAPIC_REDTBL_LO(i), value | IOART_INTMSET);
@@ -466,6 +631,25 @@ ioapic_remap_vector(void *cookie, u_int pin, int vector)
 }
 
 int
+ioapic_set_bus(void *cookie, u_int pin, int bus_type)
+{
+	struct ioapic *io;
+
+	if (bus_type < 0 || bus_type > APIC_BUS_MAX)
+		return (EINVAL);
+	io = (struct ioapic *)cookie;
+	if (pin >= io->io_numintr)
+		return (EINVAL);
+	if (io->io_pins[pin].io_vector >= NUM_IO_INTS)
+		return (EINVAL);
+	io->io_pins[pin].io_bus = bus_type;
+	if (bootverbose)
+		printf("ioapic%u: intpin %d bus %s\n", io->io_id, pin,
+		    ioapic_bus_string(bus_type));
+	return (0);
+}
+
+int
 ioapic_set_nmi(void *cookie, u_int pin)
 {
 	struct ioapic *io;
@@ -473,8 +657,11 @@ ioapic_set_nmi(void *cookie, u_int pin)
 	io = (struct ioapic *)cookie;
 	if (pin >= io->io_numintr)
 		return (EINVAL);
+	if (io->io_pins[pin].io_vector == VECTOR_NMI)
+		return (0);
 	if (io->io_pins[pin].io_vector >= NUM_IO_INTS)
 		return (EINVAL);
+	io->io_pins[pin].io_bus = APIC_BUS_UNKNOWN;
 	io->io_pins[pin].io_vector = VECTOR_NMI;
 	io->io_pins[pin].io_masked = 0;
 	io->io_pins[pin].io_edgetrigger = 1;
@@ -493,8 +680,11 @@ ioapic_set_smi(void *cookie, u_int pin)
 	io = (struct ioapic *)cookie;
 	if (pin >= io->io_numintr)
 		return (EINVAL);
+	if (io->io_pins[pin].io_vector == VECTOR_SMI)
+		return (0);
 	if (io->io_pins[pin].io_vector >= NUM_IO_INTS)
 		return (EINVAL);
+	io->io_pins[pin].io_bus = APIC_BUS_UNKNOWN;
 	io->io_pins[pin].io_vector = VECTOR_SMI;
 	io->io_pins[pin].io_masked = 0;
 	io->io_pins[pin].io_edgetrigger = 1;
@@ -513,10 +703,18 @@ ioapic_set_extint(void *cookie, u_int pin)
 	io = (struct ioapic *)cookie;
 	if (pin >= io->io_numintr)
 		return (EINVAL);
+	if (io->io_pins[pin].io_vector == VECTOR_EXTINT)
+		return (0);
 	if (io->io_pins[pin].io_vector >= NUM_IO_INTS)
 		return (EINVAL);
+	io->io_pins[pin].io_bus = APIC_BUS_UNKNOWN;
 	io->io_pins[pin].io_vector = VECTOR_EXTINT;
-	io->io_pins[pin].io_masked = 0;
+
+	/* Enable this pin if mixed mode is available and active. */
+	if (mixed_mode_enabled && mixed_mode_active)
+		io->io_pins[pin].io_masked = 0;
+	else
+		io->io_pins[pin].io_masked = 1;
 	io->io_pins[pin].io_edgetrigger = 1;
 	io->io_pins[pin].io_activehi = 1;
 	if (bootverbose)
@@ -526,36 +724,36 @@ ioapic_set_extint(void *cookie, u_int pin)
 }
 
 int
-ioapic_set_polarity(void *cookie, u_int pin, char activehi)
+ioapic_set_polarity(void *cookie, u_int pin, enum intr_polarity pol)
 {
 	struct ioapic *io;
 
 	io = (struct ioapic *)cookie;
-	if (pin >= io->io_numintr)
+	if (pin >= io->io_numintr || pol == INTR_POLARITY_CONFORM)
 		return (EINVAL);
 	if (io->io_pins[pin].io_vector >= NUM_IO_INTS)
 		return (EINVAL);
-	io->io_pins[pin].io_activehi = activehi;
+	io->io_pins[pin].io_activehi = (pol == INTR_POLARITY_HIGH);
 	if (bootverbose)
 		printf("ioapic%u: intpin %d polarity: %s\n", io->io_id, pin,
-		    activehi ? "active-hi" : "active-lo");
+		    pol == INTR_POLARITY_HIGH ? "high" : "low");
 	return (0);
 }
 
 int
-ioapic_set_triggermode(void *cookie, u_int pin, char edgetrigger)
+ioapic_set_triggermode(void *cookie, u_int pin, enum intr_trigger trigger)
 {
 	struct ioapic *io;
 
 	io = (struct ioapic *)cookie;
-	if (pin >= io->io_numintr)
+	if (pin >= io->io_numintr || trigger == INTR_TRIGGER_CONFORM)
 		return (EINVAL);
 	if (io->io_pins[pin].io_vector >= NUM_IO_INTS)
 		return (EINVAL);
-	io->io_pins[pin].io_edgetrigger = edgetrigger;
+	io->io_pins[pin].io_edgetrigger = (trigger == INTR_TRIGGER_EDGE);
 	if (bootverbose)
 		printf("ioapic%u: intpin %d trigger: %s\n", io->io_id, pin,
-		    edgetrigger ? "edge" : "level");
+		    trigger == INTR_TRIGGER_EDGE ? "edge" : "level");
 	return (0);
 }
 
@@ -580,6 +778,7 @@ ioapic_register(void *cookie)
 	printf("ioapic%u <Version %u.%u> irqs %u-%u on motherboard\n",
 	    io->io_id, flags >> 4, flags & 0xf, io->io_intbase,
 	    io->io_intbase + io->io_numintr - 1);
+	bsp_id = PCPU_GET(apic_id);
 	for (i = 0, pin = io->io_pins; i < io->io_numintr; i++, pin++) {
 		/*
 		 * Finish initializing the pins by programming the vectors
@@ -587,60 +786,18 @@ ioapic_register(void *cookie)
 		 */
 		if (pin->io_vector == VECTOR_DISABLED)
 			continue;
-		flags = IOART_DESTPHY;
-		if (pin->io_edgetrigger)
-			flags |= IOART_TRGREDG;
-		else
-			flags |= IOART_TRGRLVL;
-		if (pin->io_activehi)
-			flags |= IOART_INTAHI;
-		else
-			flags |= IOART_INTALO;
-		if (pin->io_masked)
-			flags |= IOART_INTMSET;
-		switch (pin->io_vector) {
-		case VECTOR_EXTINT:
-			KASSERT(pin->io_edgetrigger,
-			    ("EXTINT not edge triggered"));
-			flags |= IOART_DELEXINT;
-			break;
-		case VECTOR_NMI:
-			KASSERT(pin->io_edgetrigger,
-			    ("NMI not edge triggered"));
-			flags |= IOART_DELNMI;
-			break;
-		case VECTOR_SMI:
-			KASSERT(pin->io_edgetrigger,
-			    ("SMI not edge triggered"));
-			flags |= IOART_DELSMI;
-			break;
-		default:
-			flags |= IOART_DELLOPRI |
-			    apic_irq_to_idt(pin->io_vector);
-		}
-		mtx_lock_spin(&icu_lock);
-		ioapic_write(apic, IOAPIC_REDTBL_LO(i), flags);
-
+		ioapic_program_intpin(pin);
+		if (pin->io_vector >= NUM_IO_INTS)
+			continue;
 		/*
-		 * Route interrupts to the BSP by default using physical
-		 * addressing.  Vectored interrupts get readdressed using
-		 * logical IDs to CPU clusters when they are enabled.
+		 * Route IRQ0 via the 8259A using mixed mode if mixed mode
+		 * is available and turned on.
 		 */
-		flags = ioapic_read(apic, IOAPIC_REDTBL_HI(i));
-		flags &= ~IOART_DEST;
-		flags |= PCPU_GET(apic_id) << APIC_ID_SHIFT;
-		ioapic_write(apic, IOAPIC_REDTBL_HI(i), flags);
-		mtx_unlock_spin(&icu_lock);
-		if (pin->io_vector < NUM_IO_INTS) {
-#ifdef MIXED_MODE
-			/* Route IRQ0 via the 8259A using mixed mode. */
-			if (pin->io_vector == 0)
-				ioapic_setup_mixed_mode(pin);
-			else
-#endif
-				intr_register_source(&pin->io_intsrc);
-		}
-			
+		if (pin->io_vector == 0 && mixed_mode_active &&
+		    mixed_mode_enabled)
+			ioapic_setup_mixed_mode(pin);
+		else
+			intr_register_source(&pin->io_intsrc);
 	}
 }
 
@@ -664,7 +821,6 @@ ioapic_set_logical_destinations(void *arg __unused)
 SYSINIT(ioapic_destinations, SI_SUB_SMP, SI_ORDER_SECOND,
     ioapic_set_logical_destinations, NULL)
 
-#ifdef MIXED_MODE
 /*
  * Support for mixed-mode interrupt sources.  These sources route an ISA
  * IRQ through the 8259A's via the ExtINT on pin 0 of the I/O APIC that
@@ -673,7 +829,7 @@ SYSINIT(ioapic_destinations, SI_SUB_SMP, SI_ORDER_SECOND,
  * that IRQ instead.
  */
 
-void
+static void
 ioapic_setup_mixed_mode(struct ioapic_intsrc *intpin)
 {
 	struct ioapic_intsrc *extint;
@@ -693,5 +849,3 @@ ioapic_setup_mixed_mode(struct ioapic_intsrc *intpin)
 		ioapic_assign_cluster(extint);
 #endif
 }
-
-#endif /* MIXED_MODE */

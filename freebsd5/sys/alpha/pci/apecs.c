@@ -55,8 +55,9 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/pci/apecs.c,v 1.24 2003/11/17 06:10:14 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/pci/apecs.c,v 1.26 2004/07/01 15:07:27 gallatin Exp $");
 
+#define __RMAN_RESOURCE_VISIBLE
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -292,7 +293,7 @@ apecs_attach(device_t dev)
 	sc->smem_base = APECS_PCI_SPARSE;
 	sc->io_base = APECS_PCI_SIO;
 	sc->cfg0_base = KV(APECS_PCI_CONF);
-	sc->cfg1_base = NULL;
+	sc->cfg1_base = 0;
 
 	set_iointr(alpha_dispatch_intr);
 

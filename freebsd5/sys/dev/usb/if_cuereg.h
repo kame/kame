@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/usb/if_cuereg.h,v 1.12 2003/10/04 21:41:01 joe Exp $
+ * $FreeBSD: src/sys/dev/usb/if_cuereg.h,v 1.13 2004/05/23 12:35:24 iedowse Exp $
  */
 
 /*
@@ -182,6 +182,7 @@ struct cue_softc {
 #endif
 	char			cue_dying;
 	struct timeval		cue_rx_notice;
+	struct usb_qdat		cue_qdat;
 };
 
 #if 0

@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/linux/linux_mib.c,v 1.21 2003/06/10 21:27:39 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/linux/linux_mib.c,v 1.22 2004/08/16 07:28:16 tjr Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -39,7 +39,13 @@ __FBSDID("$FreeBSD: src/sys/compat/linux/linux_mib.c,v 1.21 2003/06/10 21:27:39 
 #include <sys/lock.h>
 #include <sys/mutex.h>
 
+#include "opt_compat.h"
+
+#if !COMPAT_LINUX32
 #include <machine/../linux/linux.h>
+#else
+#include <machine/../linux32/linux.h>
+#endif
 #include <compat/linux/linux_mib.h>
 
 struct linux_prison {

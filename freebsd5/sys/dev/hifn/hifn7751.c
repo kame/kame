@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/hifn/hifn7751.c,v 1.23 2003/10/08 20:25:47 sam Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/hifn/hifn7751.c,v 1.28 2004/07/04 16:11:01 stefanf Exp $");
 
 /*
  * Driver for various Hifn encryption processors.
@@ -54,6 +54,7 @@ __FBSDID("$FreeBSD: src/sys/dev/hifn/hifn7751.c,v 1.23 2003/10/08 20:25:47 sam E
 #include <sys/errno.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/mbuf.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
@@ -150,7 +151,7 @@ static	void hifn_alloc_slot(struct hifn_softc *, int *, int *, int *, int *);
 static	void hifn_write_reg_0(struct hifn_softc *, bus_size_t, u_int32_t);
 static	void hifn_write_reg_1(struct hifn_softc *, bus_size_t, u_int32_t);
 
-static __inline__ u_int32_t
+static __inline u_int32_t
 READ_REG_0(struct hifn_softc *sc, bus_size_t reg)
 {
     u_int32_t v = bus_space_read_4(sc->sc_st0, sc->sc_sh0, reg);
@@ -159,7 +160,7 @@ READ_REG_0(struct hifn_softc *sc, bus_size_t reg)
 }
 #define	WRITE_REG_0(sc, reg, val)	hifn_write_reg_0(sc, reg, val)
 
-static __inline__ u_int32_t
+static __inline u_int32_t
 READ_REG_1(struct hifn_softc *sc, bus_size_t reg)
 {
     u_int32_t v = bus_space_read_4(sc->sc_st1, sc->sc_sh1, reg);
@@ -320,8 +321,8 @@ hifn_attach(device_t dev)
 	 * and WRITE_REG_1 macros throughout the driver.
 	 */
 	rid = HIFN_BAR0;
-	sc->sc_bar0res = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
-			 		    0, ~0, 1, RF_ACTIVE);
+	sc->sc_bar0res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
+			 			RF_ACTIVE);
 	if (sc->sc_bar0res == NULL) {
 		device_printf(dev, "cannot map bar%d register space\n", 0);
 		goto fail_pci;
@@ -331,8 +332,8 @@ hifn_attach(device_t dev)
 	sc->sc_bar0_lastreg = (bus_size_t) -1;
 
 	rid = HIFN_BAR1;
-	sc->sc_bar1res = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
-					    0, ~0, 1, RF_ACTIVE);
+	sc->sc_bar1res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
+						RF_ACTIVE);
 	if (sc->sc_bar1res == NULL) {
 		device_printf(dev, "cannot map bar%d register space\n", 1);
 		goto fail_io0;
@@ -386,10 +387,10 @@ hifn_attach(device_t dev)
 	sc->sc_dma = (struct hifn_dma *)kva;
 	bzero(sc->sc_dma, sizeof(*sc->sc_dma));
 
-	KASSERT(sc->sc_st0 != NULL, ("hifn_attach: null bar0 tag!"));
-	KASSERT(sc->sc_sh0 != NULL, ("hifn_attach: null bar0 handle!"));
-	KASSERT(sc->sc_st1 != NULL, ("hifn_attach: null bar1 tag!"));
-	KASSERT(sc->sc_sh1 != NULL, ("hifn_attach: null bar1 handle!"));
+	KASSERT(sc->sc_st0 != 0, ("hifn_attach: null bar0 tag!"));
+	KASSERT(sc->sc_sh0 != 0, ("hifn_attach: null bar0 handle!"));
+	KASSERT(sc->sc_st1 != 0, ("hifn_attach: null bar1 tag!"));
+	KASSERT(sc->sc_sh1 != 0, ("hifn_attach: null bar1 handle!"));
 
 	/*
 	 * Reset the board and do the ``secret handshake''
@@ -434,8 +435,8 @@ hifn_attach(device_t dev)
 	 * Arrange the interrupt line.
 	 */
 	rid = 0;
-	sc->sc_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
-					0, ~0, 1, RF_SHAREABLE|RF_ACTIVE);
+	sc->sc_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
+					    RF_SHAREABLE|RF_ACTIVE);
 	if (sc->sc_irq == NULL) {
 		device_printf(dev, "could not map interrupt\n");
 		goto fail_mem;
@@ -2437,6 +2438,8 @@ hifn_process(void *arg, struct cryptop *crp, int hint)
 			}
 		}
 
+		if (enccrd->crd_flags & CRD_F_KEY_EXPLICIT)
+			cmd->cry_masks |= HIFN_CRYPT_CMD_NEW_KEY;
 		cmd->ck = enccrd->crd_key;
 		cmd->cklen = enccrd->crd_klen >> 3;
 

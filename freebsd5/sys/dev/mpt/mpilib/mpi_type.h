@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/mpt/mpilib/mpi_type.h,v 1.3 2002/08/30 03:36:50 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/mpt/mpilib/mpi_type.h,v 1.4 2004/03/12 21:45:28 trhodes Exp $ */
 /*
  * Copyright (c) 2000, 2001 by LSI Logic Corporation
  *
@@ -68,7 +68,7 @@ typedef unsigned char   U8;
 typedef signed   short  S16;
 typedef unsigned short  U16;
 
-#if defined(unix) || defined(__arm) || defined(ALPHA) || defined(__GNUC__)
+#if defined(unix) || defined(__arm) || defined(ALPHA) || defined(__GNUC__) || defined(__INTEL_COMPILER)
 
     typedef signed   int   S32;
     typedef unsigned int   U32;

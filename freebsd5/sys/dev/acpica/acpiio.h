@@ -24,14 +24,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/acpica/acpiio.h,v 1.9 2003/09/13 20:13:01 njl Exp $
+ *	$FreeBSD: src/sys/dev/acpica/acpiio.h,v 1.10.2.1 2004/08/19 19:08:57 njl Exp $
  */
 
 /*
  * Core ACPI subsystem ioctls
  */
-#define ACPIIO_ENABLE		_IO('P', 1)
-#define ACPIIO_DISABLE		_IO('P', 2)
 #define ACPIIO_SETSLPSTATE	_IOW('P', 3, int)
 
 struct acpi_battdesc {
@@ -44,7 +42,7 @@ struct acpi_battdesc {
 
 struct acpi_battinfo {
     int	 cap;				/* percent */
-    int	 min;				/* remianing time */
+    int	 min;				/* remaining time */
     int	 state;				/* battery state */
 };
 
@@ -57,8 +55,8 @@ struct acpi_bif {
     u_int32_t dvol;			/* Design voltage (mV) */
     u_int32_t wcap;			/* WARN capacity */
     u_int32_t lcap;			/* Low capacity */
-    u_int32_t gra1;			/* Granulity 1(Warn to Low) */
-    u_int32_t gra2;			/* Granulity 2(Full to Warn) */
+    u_int32_t gra1;			/* Granularity 1 (Warn to Low) */
+    u_int32_t gra2;			/* Granularity 2 (Full to Warn) */
     char model[ACPI_CMBAT_MAXSTRLEN];	/* model identifier */
     char serial[ACPI_CMBAT_MAXSTRLEN];	/* Serial number */
     char type[ACPI_CMBAT_MAXSTRLEN];	/* Type */

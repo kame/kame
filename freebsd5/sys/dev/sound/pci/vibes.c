@@ -36,7 +36,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/vibes.c,v 1.14 2003/08/22 07:04:11 imp Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/vibes.c,v 1.17 2004/07/16 03:59:27 tanimura Exp $");
 
 /* ------------------------------------------------------------------------- */
 /* Constants */
@@ -547,6 +547,7 @@ sv_mix_setrecsrc(struct snd_mixer *m, u_int32_t mask)
 		}
 	}
 	DEB(printf("sv_mix_setrecsrc: mask 0x%08x adc_input 0x%02x\n", mask, v));
+	sv_indirect_set(sc, SV_REG_ADC_INPUT, v);
 	return mask;
 }
 
@@ -878,8 +879,8 @@ sv_attach(device_t dev) {
         pcm_addchan(dev, PCMDIR_PLAY, &svpchan_class, sc);
         pcm_addchan(dev, PCMDIR_REC,  &svrchan_class, sc);
 
-        snprintf(status, SND_STATUSLEN, "at io 0x%lx irq %ld",
-                 rman_get_start(sc->enh_reg),  rman_get_start(sc->irq));
+        snprintf(status, SND_STATUSLEN, "at io 0x%lx irq %ld %s",
+                 rman_get_start(sc->enh_reg),  rman_get_start(sc->irq),PCM_KLDSTRING(snd_vibes));
         pcm_setstatus(dev, status);
 
         DEB(printf("sv_attach: succeeded\n"));
@@ -942,5 +943,5 @@ static driver_t sonicvibes_driver = {
 };
 
 DRIVER_MODULE(snd_vibes, pci, sonicvibes_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_vibes, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_vibes, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_vibes, 1);

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)param.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/amd64/include/param.h,v 1.9 2003/11/17 08:58:14 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/param.h,v 1.13.2.1 2004/09/10 00:04:16 scottl Exp $
  */
 
 /*
@@ -115,9 +115,9 @@
 /* Size of the level 4 page-map level-4 table units */
 #define	NPML4EPG	(PAGE_SIZE/(sizeof (pml4_entry_t)))
 #define	NPML4EPGSHIFT	9		/* LOG2(NPML4EPG) */
-#define	PML4SHIFT	39		/* LOG2(NBPML4T) */
-#define	NBPML4T		(1ul<<PML4SHIFT)/* bytes/page map lev4 table */
-#define	PML4MASK	(NBPML4T-1)
+#define	PML4SHIFT	39		/* LOG2(NBPML4) */
+#define	NBPML4		(1ul<<PML4SHIFT)/* bytes/page map lev4 table */
+#define	PML4MASK	(NBPML4-1)
 
 #define IOPAGES	2		/* pages of i/o permission bitmap */
 
@@ -142,7 +142,7 @@
  * the kern.maxbcache /boot/loader.conf variable.
  */
 #ifndef VM_BCACHE_SIZE_MAX
-#define	VM_BCACHE_SIZE_MAX	(200 * 1024 * 1024)
+#define	VM_BCACHE_SIZE_MAX	(400 * 1024 * 1024)
 #endif
 
 /*

@@ -40,8 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/nsp/nsp.c,v 1.10 2003/08/24 17:54:13 obrien Exp $");
-#include "opt_ddb.h"
+__FBSDID("$FreeBSD: src/sys/dev/nsp/nsp.c,v 1.12 2004/07/10 21:06:08 marcel Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -79,8 +78,8 @@ __FBSDID("$FreeBSD: src/sys/dev/nsp/nsp.c,v 1.10 2003/08/24 17:54:13 obrien Exp 
 #include <machine/bus_memio.h>
 #include <machine/bus.h>
 
-#include <machine/dvcfg.h>
-#include <machine/physio_proc.h>
+#include <compat/netbsd/dvcfg.h>
+#include <compat/netbsd/physio_proc.h>
 
 #include <cam/scsi/scsi_low.h>
 #include <dev/nsp/nspreg.h>
@@ -1534,10 +1533,10 @@ nspintr(arg)
 	{
 		nsp_error(sc, "current status", isrc, ph, irqphs);
 		scsi_low_print(slp, NULL);
-#ifdef	DDB
+#ifdef	KDB
 		if (nsp_debug > 1)
 			SCSI_LOW_DEBUGGER("nsp");
-#endif	/* DDB */
+#endif	/* KDB */
 	}
 #endif	/* NSP_DEBUG */
 

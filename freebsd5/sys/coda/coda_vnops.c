@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/coda/coda_vnops.c,v 1.51 2003/09/07 07:43:09 tjr Exp $");
+__FBSDID("$FreeBSD: src/sys/coda/coda_vnops.c,v 1.53 2004/07/28 06:05:41 kan Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -238,7 +238,7 @@ coda_open(v)
 /* locals */
     int error;
     struct vnode *vp;
-    dev_t dev;
+    struct cdev *dev;
     ino_t inode;
 
     MARK_ENTRY(CODA_OPEN_STATS);
@@ -1740,7 +1740,7 @@ coda_reclaim(v)
     cache_purge(vp);
     lockdestroy(&(VTOC(vp)->c_lock));
     coda_free(VTOC(vp));
-    VTOC(vp) = NULL;
+    vp->v_data = NULL;
     return (0);
 }
 
@@ -1806,7 +1806,7 @@ coda_islocked(v)
 
 /* How one looks up a vnode given a device/inode pair: */
 int
-coda_grab_vnode(dev_t dev, ino_t ino, struct vnode **vpp)
+coda_grab_vnode(struct cdev *dev, ino_t ino, struct vnode **vpp)
 {
     /* This is like VFS_VGET() or igetinode()! */
     int           error;

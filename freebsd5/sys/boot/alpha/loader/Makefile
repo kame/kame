@@ -1,12 +1,11 @@
-# $FreeBSD: src/sys/boot/alpha/loader/Makefile,v 1.7 2002/05/10 09:26:29 obrien Exp $
+# $FreeBSD: src/sys/boot/alpha/loader/Makefile,v 1.8 2004/02/11 22:01:17 ru Exp $
 
-BASE= 		loader
-PROG= 		${BASE}
+BOOT= 		loader
 NEWVERSWHAT=	"SRM disk boot" alpha
 INSTALL_HELP=	yes
 LOAD_ADDRESS=	${SECONDARY_LOAD_ADDRESS}
 
 # Only disk support
-CFLAGS+=	-ffreestanding -DLOADER_DISK_SUPPORT	# -DLOADER_EXT2FS_SUPPORT
+CFLAGS+=	-DLOADER_DISK_SUPPORT	# -DLOADER_EXT2FS_SUPPORT
 
-.include 	<${.CURDIR}/../common/Makefile.common>
+.include "${.CURDIR}/../common/Makefile.common"

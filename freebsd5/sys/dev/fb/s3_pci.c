@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/fb/s3_pci.c,v 1.6 2003/08/24 17:46:06 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/fb/s3_pci.c,v 1.7 2004/03/17 17:50:32 njl Exp $");
 
 /* Enable LFB on S3 cards that has only VESA 1.2 BIOS */
 
@@ -498,8 +498,8 @@ s3pci_attach(device_t dev)
 	sc->enh_sh = rman_get_bushandle(sc->enh_res);
 
 	rid = PCI_BASE_MEMORY;
-	if (!(sc->mem_res = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
-				 0, ~0, 1, RF_ACTIVE))) {
+	if (!(sc->mem_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
+				 RF_ACTIVE))) {
 
 		printf("%s: mem resource allocation failed!\n", __func__);
 		goto error;

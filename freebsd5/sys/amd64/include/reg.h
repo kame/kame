@@ -14,10 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -35,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)reg.h	5.5 (Berkeley) 1/18/91
- * $FreeBSD: src/sys/amd64/include/reg.h,v 1.33 2003/11/08 04:39:22 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/reg.h,v 1.35 2004/04/05 23:55:14 imp Exp $
  */
 
 #ifndef _MACHINE_REG_H_
@@ -84,10 +80,23 @@ struct fpreg {
 	unsigned long	fpr_spare[12];
 };
 
+/*
+ * Register set accessible via /proc/$pid/dbregs.
+ */
 struct dbreg {
-	unsigned long grrr;
+	unsigned long  dr[16];	/* debug registers */
+				/* Index 0-3: debug address registers */
+				/* Index 4-5: reserved */
+				/* Index 6: debug status */
+				/* Index 7: debug control */
+				/* Index 8-15: reserved */
 };
 
+#define DBREG_DR7_EXEC      0x00      /* break on execute       */
+#define DBREG_DR7_WRONLY    0x01      /* break on write         */
+#define DBREG_DR7_RDWR      0x03      /* break on read or write */
+#define DBREG_DRX(d,x) ((d)->dr[(x)]) /* reference dr0 - dr15 by
+                                         register number */
 #ifdef _KERNEL
 /*
  * XXX these interfaces are MI, so they should be declared in a MI place.

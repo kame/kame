@@ -35,21 +35,22 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/nsp/nsp_pccard.c,v 1.16 2003/08/24 17:54:13 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/nsp/nsp_pccard.c,v 1.20 2004/05/27 03:49:43 imp Exp $");
 
 #include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/malloc.h>
+#include <sys/bus.h>
 #include <sys/errno.h>
-
-#include <vm/vm.h>
+#include <sys/kernel.h>
+#include <sys/malloc.h>
+#include <sys/systm.h>
 
 #include <machine/bus.h>
-#include <machine/dvcfg.h>
+#include <machine/resource.h>
+#include <sys/rman.h>
+#include <compat/netbsd/dvcfg.h>
 
 #include <sys/device_port.h>
 
-#include <dev/pccard/pccarddevs.h>
 #include <dev/pccard/pccardvar.h>
 
 #include <cam/scsi/scsi_low.h>
@@ -60,13 +61,7 @@ __FBSDID("$FreeBSD: src/sys/dev/nsp/nsp_pccard.c,v 1.16 2003/08/24 17:54:13 obri
 
 #define	NSP_HOSTID	7
 
-#include	<sys/kernel.h>
-#include	<sys/module.h>
-#if !defined(__FreeBSD__) || __FreeBSD_version < 500014
-#include	<sys/select.h>
-#endif
-#include 	<pccard/cardinfo.h>
-#include	<pccard/slot.h>
+#include "pccarddevs.h"
 
 #define	PIO_MODE 0x100		/* pd_flags */
 
@@ -138,8 +133,8 @@ nsp_alloc_resource(DEVPORT_PDEVICE dev)
 	}
 
 	sc->irq_rid = 0;
-	sc->irq_res = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irq_rid,
-					 0, ~0, 1, RF_ACTIVE);
+	sc->irq_res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irq_rid,
+					     RF_ACTIVE);
 	if (sc->irq_res == NULL) {
 		nsp_release_resource(dev);
 		return(ENOMEM);
@@ -162,8 +157,8 @@ nsp_alloc_resource(DEVPORT_PDEVICE dev)
 	}
 
 	sc->mem_rid = 0;
-	sc->mem_res = bus_alloc_resource(dev, SYS_RES_MEMORY, &sc->mem_rid,
-					 0, ~0, 1, RF_ACTIVE);
+	sc->mem_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &sc->mem_rid,
+					     RF_ACTIVE);
 	if (sc->mem_res == NULL) {
 		nsp_release_resource(dev);
 		return(ENOMEM);

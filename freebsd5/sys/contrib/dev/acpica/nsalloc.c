@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsalloc - Namespace allocation and deletion utilities
- *              $Revision: 82 $
+ *              $Revision: 87 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2003, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -355,11 +355,11 @@ AcpiNsInstallNode (
     {
 #ifdef ACPI_ALPHABETIC_NAMESPACE
         /*
-         * Walk the list whilst searching for the the correct
+         * Walk the list whilst searching for the correct
          * alphabetic placement.
          */
         PreviousChildNode = NULL;
-        while (AcpiNsCompareNames (ChildNode->Name.Ascii, Node->Name.Ascii) < 0)
+        while (AcpiNsCompareNames (AcpiUtGetNodeName (ChildNode), AcpiUtGetNodeName (Node)) < 0)
         {
             if (ChildNode->Flags & ANOBJ_END_OF_PEER_LIST)
             {
@@ -428,9 +428,11 @@ AcpiNsInstallNode (
     Node->OwnerId = OwnerId;
     Node->Type = (UINT8) Type;
 
-    ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "%4.4s (%s) added to %4.4s (%s) %p at %p\n",
-        Node->Name.Ascii, AcpiUtGetTypeName (Node->Type),
-        ParentNode->Name.Ascii, AcpiUtGetTypeName (ParentNode->Type), ParentNode, Node));
+    ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
+        "%4.4s (%s) [Node %p Owner %X] added to %4.4s (%s) [Node %p]\n",
+        AcpiUtGetNodeName (Node), AcpiUtGetTypeName (Node->Type), Node, OwnerId,
+        AcpiUtGetNodeName (ParentNode), AcpiUtGetTypeName (ParentNode->Type),
+        ParentNode));
 
     /*
      * Increment the reference count(s) of all parents up to

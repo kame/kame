@@ -22,7 +22,7 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/ofw/libofw/libofw.h,v 1.7 2002/11/10 19:17:36 jake Exp $
+ * $FreeBSD: src/sys/boot/ofw/libofw/libofw.h,v 1.9 2004/08/02 03:05:09 grehan Exp $
  */
 
 #include "openfirm.h"
@@ -36,7 +36,7 @@ struct ofw_devdesc {
 };
 
 extern int	ofw_getdev(void **vdev, const char *devspec, const char **path);
-extern int	ofw_setcurrdev(struct env_var *ev, int flags, void *value);
+extern ev_sethook_t ofw_setcurrdev;
 
 extern struct devsw		ofwdisk;
 extern struct netif_driver	ofwnet;
@@ -50,7 +50,7 @@ ssize_t ofw_readin(const int fd, vm_offset_t dest, const size_t len);
 extern int	ofw_boot(void);
 extern int	ofw_autoload(void);
 
-void	ofw_memmap(void);
+void	ofw_memmap(int);
 void	*ofw_alloc_heap(unsigned int);
 void	ofw_release_heap(void);
 
@@ -67,6 +67,13 @@ extern void	reboot(void);
 struct ofw_reg
 {
 	cell_t		base;
+	cell_t		size;
+};
+
+struct ofw_reg2
+{
+	cell_t		base_hi;
+	cell_t		base_lo;
 	cell_t		size;
 };
 

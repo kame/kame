@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/mp_machdep.c,v 1.230 2003/12/03 14:57:25 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/mp_machdep.c,v 1.242.2.2 2004/09/09 09:56:58 julian Exp $");
 
 #include "opt_cpu.h"
 #include "opt_kstack_pages.h"
@@ -57,6 +57,7 @@ __FBSDID("$FreeBSD: src/sys/amd64/amd64/mp_machdep.c,v 1.230 2003/12/03 14:57:25
 #include <machine/clock.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
+#include <machine/psl.h>
 #include <machine/smp.h>
 #include <machine/specialreg.h>
 #include <machine/tss.h>
@@ -78,11 +79,10 @@ int	boot_cpu_id = -1;	/* designated BSP */
 extern	int nkpt;
 
 /*
- * CPU topology map datastructures for HTT. (XXX)
+ * CPU topology map datastructures for HTT.
  */
-struct cpu_group mp_groups[MAXCPU];
-struct cpu_top mp_top;
-struct cpu_top *smp_topology;
+static struct cpu_group mp_groups[MAXCPU];
+static struct cpu_top mp_top;
 
 /* AP uses this during bootstrap.  Do not staticize.  */
 char *bootSTK;
@@ -103,7 +103,6 @@ struct pcb stoppcbs[MAXCPU];
 vm_offset_t smp_tlb_addr1;
 vm_offset_t smp_tlb_addr2;
 volatile int smp_tlb_wait;
-struct mtx smp_tlb_mtx;
 
 extern inthand_t IDTVEC(fast_syscall), IDTVEC(fast_syscall32);
 
@@ -112,7 +111,6 @@ extern inthand_t IDTVEC(fast_syscall), IDTVEC(fast_syscall32);
  */
 
 static u_int logical_cpus;
-static u_int logical_cpus_mask;
 
 /* used to hold the AP's until we are ready to release them */
 static struct mtx ap_boot_mtx;
@@ -137,10 +135,56 @@ static int	start_all_aps(void);
 static int	start_ap(int apic_id);
 static void	release_aps(void *dummy);
 
-static int	hlt_cpus_mask;
 static int	hlt_logical_cpus;
 static struct	sysctl_ctx_list logical_cpu_clist;
 static u_int	bootMP_size;
+
+static void
+mem_range_AP_init(void)
+{
+	if (mem_range_softc.mr_op && mem_range_softc.mr_op->initAP)
+		mem_range_softc.mr_op->initAP(&mem_range_softc);
+}
+
+void
+mp_topology(void)
+{
+	struct cpu_group *group;
+	int logical_cpus;
+	int apic_id;
+	int groups;
+	int cpu;
+
+	/* Build the smp_topology map. */
+	/* Nothing to do if there is no HTT support. */
+	if ((cpu_feature & CPUID_HTT) == 0)
+		return;
+	logical_cpus = (cpu_procinfo & CPUID_HTT_CORES) >> 16;
+	if (logical_cpus <= 1)
+		return;
+	group = &mp_groups[0];
+	groups = 1;
+	for (cpu = 0, apic_id = 0; apic_id < MAXCPU; apic_id++) {
+		if (!cpu_info[apic_id].cpu_present)
+			continue;
+		/*
+		 * If the current group has members and we're not a logical
+		 * cpu, create a new group.
+		 */
+		if (group->cg_count != 0 && (apic_id % logical_cpus) == 0) {
+			group++;
+			groups++;
+		}
+		group->cg_count++;
+		group->cg_mask |= 1 << cpu;
+		cpu++;
+	}
+
+	mp_top.ct_count = groups;
+	mp_top.ct_group = mp_groups;
+	smp_topology = &mp_top;
+}
+
 
 /*
  * Calculate usable address in base memory for AP trampoline code.
@@ -151,7 +195,7 @@ mp_bootaddress(u_int basemem)
 
 	bootMP_size = mptramp_end - mptramp_start;
 	boot_address = trunc_page(basemem * 1024); /* round down to 4k boundary */
-	if ((basemem - boot_address) < bootMP_size)
+	if (((basemem * 1024) - boot_address) < bootMP_size)
 		boot_address -= PAGE_SIZE;	/* not enough, lower by 4k */
 	/* 3 levels of page table pages */
 	mptramp_pagetables = boot_address - (PAGE_SIZE * 3);
@@ -163,9 +207,9 @@ void
 cpu_add(u_int apic_id, char boot_cpu)
 {
 
-	if (apic_id > MAXCPU) {
+	if (apic_id >= MAXCPU) {
 		printf("SMP: CPU %d exceeds maximum CPU %d, ignoring\n",
-		    apic_id, MAXCPU);
+		    apic_id, MAXCPU - 1);
 		return;
 	}
 	KASSERT(cpu_info[apic_id].cpu_present == 0, ("CPU %d added twice",
@@ -263,11 +307,6 @@ cpu_mp_start(void)
 	/* Install an inter-CPU IPI for forwarding statclock() */
 	setidt(IPI_STATCLOCK, IDTVEC(statclock), SDT_SYSIGT, SEL_KPL, 0);
 	
-#ifdef LAZY_SWITCH
-	/* Install an inter-CPU IPI for lazy pmap release */
-	setidt(IPI_LAZYPMAP, IDTVEC(lazypmap), SDT_SYSIGT, SEL_KPL, 0);
-#endif
-
 	/* Install an inter-CPU IPI for all-CPU rendezvous */
 	setidt(IPI_RENDEZVOUS, IDTVEC(rendezvous), SDT_SYSIGT, SEL_KPL, 0);
 
@@ -276,8 +315,6 @@ cpu_mp_start(void)
 
 	/* Install an inter-CPU IPI for CPU stop/restart */
 	setidt(IPI_STOP, IDTVEC(cpustop), SDT_SYSIGT, SEL_KPL, 0);
-
-	mtx_init(&smp_tlb_mtx, "tlb", NULL, MTX_SPIN);
 
 	/* Set boot_cpu_id if needed. */
 	if (boot_cpu_id == -1) {
@@ -394,11 +431,11 @@ init_secondary(void)
 	/* set up CPU registers and state */
 	cpu_setregs();
 
+	/* set up SSE/NX registers */
+	initializecpu();
+
 	/* set up FPU state on the AP */
 	fpuinit();
-
-	/* set up SSE registers */
-	enable_sse();
 
 	/* A quick check from sanity claus */
 	if (PCPU_GET(apic_id) != lapic_id()) {
@@ -669,7 +706,7 @@ smp_tlb_shootdown(u_int vector, vm_offset_t addr1, vm_offset_t addr2)
 	ncpu = mp_ncpus - 1;	/* does not shootdown self */
 	if (ncpu < 1)
 		return;		/* no other cpus */
-	mtx_assert(&smp_tlb_mtx, MA_OWNED);
+	mtx_assert(&smp_rv_mtx, MA_OWNED);
 	smp_tlb_addr1 = addr1;
 	smp_tlb_addr2 = addr2;
 	atomic_store_rel_int(&smp_tlb_wait, 0);
@@ -755,7 +792,7 @@ smp_targeted_tlb_shootdown(u_int mask, u_int vector, vm_offset_t addr1, vm_offse
 		if (ncpu < 1)
 			return;
 	}
-	mtx_assert(&smp_tlb_mtx, MA_OWNED);
+	mtx_assert(&smp_rv_mtx, MA_OWNED);
 	smp_tlb_addr1 = addr1;
 	smp_tlb_addr2 = addr2;
 	atomic_store_rel_int(&smp_tlb_wait, 0);
@@ -976,7 +1013,8 @@ sysctl_hlt_cpus(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 SYSCTL_PROC(_machdep, OID_AUTO, hlt_cpus, CTLTYPE_INT|CTLFLAG_RW,
-    0, 0, sysctl_hlt_cpus, "IU", "");
+    0, 0, sysctl_hlt_cpus, "IU",
+    "Bitmap of CPUs to halt.  101 (binary) will halt CPUs 0 and 2.");
 
 static int
 sysctl_hlt_logical_cpus(SYSCTL_HANDLER_ARGS)

@@ -45,7 +45,7 @@
 #include <alpha/isa/isavar.h>
 #endif
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/gusc.c,v 1.12 2001/08/23 11:30:50 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/gusc.c,v 1.14.2.1 2004/10/15 05:14:10 njl Exp $");
 
 #define LOGICALID_NOPNP 0
 #define LOGICALID_PCM   0x0000561e
@@ -504,8 +504,10 @@ alloc_resource(sc_p scp)
 		}
 		if (scp->irq == NULL) {
 			scp->irq_rid = 0;
-			scp->irq = bus_alloc_resource(scp->dev, SYS_RES_IRQ, &scp->irq_rid,
-						      0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+			scp->irq = 
+				bus_alloc_resource_any(scp->dev, SYS_RES_IRQ, 
+						       &scp->irq_rid,
+						       RF_ACTIVE|RF_SHAREABLE);
 			if (scp->irq == NULL)
 				return (1);
 			scp->irq_alloced = 0;
@@ -514,8 +516,11 @@ alloc_resource(sc_p scp)
 			if (scp->drq[i] == NULL) {
 				scp->drq_rid[i] = i;
 				if (base == 0 || i == 0)
-					scp->drq[i] = bus_alloc_resource(scp->dev, SYS_RES_DRQ, &scp->drq_rid[i],
-									 0, ~0, 1, RF_ACTIVE);
+					scp->drq[i] = 
+						bus_alloc_resource_any(
+							scp->dev, SYS_RES_DRQ,
+							&scp->drq_rid[i],
+							RF_ACTIVE);
 				else if ((flags & DV_F_DUAL_DMA) != 0)
 					/* XXX The secondary drq is specified in the flag. */
 					scp->drq[i] = bus_alloc_resource(scp->dev, SYS_RES_DRQ, &scp->drq_rid[i],
@@ -651,7 +656,8 @@ static driver_t gusc_driver = {
  * gusc can be attached to an isa bus.
  */
 DRIVER_MODULE(snd_gusc, isa, gusc_driver, gusc_devclass, 0, 0);
-MODULE_DEPEND(snd_gusc, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+DRIVER_MODULE(snd_gusc, acpi, gusc_driver, gusc_devclass, 0, 0);
+MODULE_DEPEND(snd_gusc, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_gusc, 1);
 
 

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/fs/msdosfs/msdosfs_fat.c,v 1.32 2003/03/04 00:04:42 jeff Exp $ */
+/* $FreeBSD: src/sys/fs/msdosfs/msdosfs_fat.c,v 1.35.2.1 2004/10/13 16:27:27 delphij Exp $ */
 /*	$NetBSD: msdosfs_fat.c,v 1.28 1997/11/17 15:36:49 ws Exp $	*/
 
 /*-
@@ -237,6 +237,11 @@ pcbmap(dep, findcn, bnp, cnp, sp)
 			bp_bn = bn;
 		}
 		prevcn = cn;
+		if (bo >= bsize) {
+			if (bp)
+				brelse(bp);
+			return (EIO);
+		}
 		if (FAT32(pmp))
 			cn = getulong(&bp->b_data[bo]);
 		else
@@ -1105,4 +1110,81 @@ extendfile(dep, count, bpp, ncp, flags)
 	}
 
 	return (0);
+}
+
+/*-
+ * Routine to mark a FAT16 or FAT32 volume as "clean" or "dirty" by
+ * manipulating the upper bit of the FAT entry for cluster 1.  Note that
+ * this bit is not defined for FAT12 volumes, which are always assumed to
+ * be dirty.
+ *
+ * The fatentry() routine only works on cluster numbers that a file could
+ * occupy, so it won't manipulate the entry for cluster 1.  So we have to do
+ * it here.  The code was stolen from fatentry() and tailored for cluster 1.
+ *
+ * Inputs:
+ *	pmp	The MS-DOS volume to mark
+ *	dirty	Non-zero if the volume should be marked dirty; zero if it
+ *		should be marked clean
+ *
+ * Result:
+ *	0	Success
+ *	EROFS	Volume is read-only
+ *	?	(other errors from called routines)
+ */
+int
+markvoldirty(struct msdosfsmount *pmp, int dirty)
+{
+	struct buf *bp;
+	u_long bn, bo, bsize, byteoffset, fatval;
+	int error;
+
+	/*
+	 * FAT12 does not support a "clean" bit, so don't do anything for
+	 * FAT12.
+	 */
+	if (FAT12(pmp))
+		return (0);
+
+	/* Can't change the bit on a read-only filesystem. */
+	if (pmp->pm_flags & MSDOSFSMNT_RONLY)
+		return (EROFS);
+
+	/*
+	 * Fetch the block containing the FAT entry.  It is given by the
+	 * pseudo-cluster 1.
+	 */
+	byteoffset = FATOFS(pmp, 1);
+	fatblock(pmp, byteoffset, &bn, &bsize, &bo);
+	error = bread(pmp->pm_devvp, bn, bsize, NOCRED, &bp);
+	if (error) {
+		brelse(bp);
+		return (error);
+	}
+
+	/*
+	 * Get the current value of the FAT entry and set/clear the relevant
+	 * bit.  Dirty means clear the "clean" bit; clean means set the
+	 * "clean" bit.
+	 */
+	if (FAT32(pmp)) {
+		/* FAT32 uses bit 27. */
+		fatval = getulong(&bp->b_data[bo]);
+		if (dirty)
+			fatval &= 0xF7FFFFFF;
+		else
+			fatval |= 0x08000000;
+		putulong(&bp->b_data[bo], fatval);
+	} else {
+		/* Must be FAT16; use bit 15. */
+		fatval = getushort(&bp->b_data[bo]);
+		if (dirty)
+			fatval &= 0x7FFF;
+		else
+			fatval |= 0x8000;
+		putushort(&bp->b_data[bo], fatval);
+	}
+
+	/* Write out the modified FAT block synchronously. */
+	return (bwrite(bp));
 }

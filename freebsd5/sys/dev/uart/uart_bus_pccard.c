@@ -24,7 +24,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/uart/uart_bus_pccard.c,v 1.6 2003/10/07 04:26:14 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/uart/uart_bus_pccard.c,v 1.8 2004/05/27 03:49:44 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -36,12 +36,12 @@ __FBSDID("$FreeBSD: src/sys/dev/uart/uart_bus_pccard.c,v 1.6 2003/10/07 04:26:14
 #include <machine/resource.h>
 
 #include <dev/pccard/pccard_cis.h>
-#include <dev/pccard/pccarddevs.h>
-#include <dev/pccard/pccardreg.h>
 #include <dev/pccard/pccardvar.h>
 
 #include <dev/uart/uart.h>
 #include <dev/uart/uart_bus.h>
+
+#include "pccarddevs.h"
 
 static	int	uart_pccard_match(device_t self);
 static	int	uart_pccard_probe(device_t dev);

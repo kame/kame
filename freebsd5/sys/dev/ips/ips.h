@@ -25,13 +25,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ips/ips.h,v 1.5 2003/11/27 08:37:36 mbr Exp $
+ * $FreeBSD: src/sys/dev/ips/ips.h,v 1.11 2004/06/16 09:46:46 phk Exp $
  */
 
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
 #include <sys/types.h>
@@ -39,6 +40,7 @@
 #include <sys/bio.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
+#include <sys/sema.h>
 #include <sys/time.h>
 
 #include <machine/bus_memio.h>
@@ -49,12 +51,16 @@
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 
+MALLOC_DECLARE(M_IPSBUF);
+
 /*
  *   IPS CONSTANTS
  */
 #define IPS_VENDOR_ID                   0x1014
+#define IPS_VENDOR_ID_ADAPTEC		0x9005
 #define IPS_MORPHEUS_DEVICE_ID          0x01BD
 #define IPS_COPPERHEAD_DEVICE_ID        0x002E
+#define IPS_MARCO_DEVICE_ID		0x0250
 #define IPS_CSL				0xff
 #define IPS_POCL			0x30
 
@@ -376,6 +382,7 @@ typedef struct ips_command{
 	bus_dmamap_t		command_dmamap;
 	void *			command_buffer;
 	u_int32_t		command_phys_addr;/*WARNING! must be changed if 64bit addressing ever used*/	
+	struct sema		cmd_sema;
 	ips_cmd_status_t	status;
 	SLIST_ENTRY(ips_command)	next;
 	bus_dma_tag_t		data_dmatag;
@@ -407,7 +414,7 @@ typedef struct ips_softc{
 	bus_dma_tag_t		command_dmatag;
 	bus_dma_tag_t		sg_dmatag;
         device_t                dev;
-        dev_t                   device_file;
+        struct cdev *device_file;
 	struct callout_handle	timer;
 	u_int16_t		adapter_type;
 	ips_adapter_info_t	adapter_info;
@@ -427,7 +434,9 @@ typedef struct ips_softc{
         void                    (* ips_adapter_intr)(void *sc);
 	void			(* ips_issue_cmd)(ips_command_t *command);
 	ips_copper_queue_t *	copper_queue;
-	struct mtx		cmd_mtx;
+	struct mtx		queue_mtx;
+	struct bio_queue_head	queue;
+
 }ips_softc_t;
 
 /* function defines from ips_ioctl.c */
@@ -438,7 +447,7 @@ extern void ipsd_finish(struct bio *iobuf);
 
 /* function defines from ips_commands.c */
 extern int ips_flush_cache(ips_softc_t *sc);
-extern void ips_start_io_request(ips_softc_t *sc, struct bio *iobuf);
+extern void ips_start_io_request(ips_softc_t *sc);
 extern int ips_get_drive_info(ips_softc_t *sc);
 extern int ips_get_adapter_info(ips_softc_t *sc);
 extern int ips_ffdc_reset(ips_softc_t *sc);

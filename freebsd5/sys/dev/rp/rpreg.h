@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/rp/rpreg.h,v 1.4 2000/06/11 06:43:14 tanimura Exp $
+ * $FreeBSD: src/sys/dev/rp/rpreg.h,v 1.6 2004/06/21 13:02:25 gallatin Exp $
  */
 
 /*
@@ -368,10 +368,9 @@ struct CONTROLLER_str
 	struct resource		**io;		/* IO resources */
 
 	struct rp_port		*rp;		/* port */
-	struct tty		*tty;		/* tty */
 
 	/* Device nodes */
-	dev_t			*dev_nodes;
+	struct cdev **dev_nodes;
 
 	/* Bus-specific properties */
 	void			*bus_ctlp;
@@ -1005,6 +1004,7 @@ void sEnInterrupts(CHANNEL_T *ChP,Word_t Flags);
 void sDisInterrupts(CHANNEL_T *ChP,Word_t Flags);
 int rp_attachcommon(CONTROLLER_T *ctlp, int num_aiops, int num_ports);
 void rp_releaseresource(CONTROLLER_t *ctlp);
+void rp_untimeout(void);
 
 #ifndef ROCKET_C
 extern Byte_t R[RDATASIZE];

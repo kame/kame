@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998 - 2003 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 1998 - 2004 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-tape.h,v 1.20 2003/08/24 09:22:26 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-tape.h,v 1.22 2004/06/16 09:46:37 phk Exp $
  */
 
 /* ATAPI tape drive Capabilities and Mechanical Status Page */
@@ -154,10 +154,10 @@ struct ast_softc {
 #define		F_ONSTREAM		0x0100	/* OnStream ADR device */
 
     int				blksize;	/* block size (512 | 1024) */
-    struct mtx			queue_mtx;	/* queue lock */
+    struct mtx			queue_mtx;	/* bio queue lock */
     struct bio_queue_head	queue;		/* queue of i/o requests */
     struct atapi_params		*param;		/* drive parameters table */
     struct ast_cappage		cap;		/* capabilities page info */
     struct devstat		*stats;		/* devstat entry */
-    dev_t			dev1, dev2;	/* device place holders */
+    struct cdev *dev1, *dev2;	/* device place holders */
 };

@@ -33,11 +33,11 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- *	from: NetBSD: if_hme_sbus.c,v 1.9 2001/11/13 06:58:17 lukem Exp
+ *	from: NetBSD: if_hme_sbus.c,v 1.19 2004/03/17 17:04:58 pk Exp
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/hme/if_hme_sbus.c,v 1.8 2003/09/02 20:24:42 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/hme/if_hme_sbus.c,v 1.14 2004/08/12 20:37:02 marius Exp $");
 
 /*
  * SBus front-end device driver for the HME ethernet device.
@@ -47,17 +47,17 @@ __FBSDID("$FreeBSD: src/sys/dev/hme/if_hme_sbus.c,v 1.8 2003/09/02 20:24:42 marc
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/resource.h>
 #include <sys/socket.h>
 
+#include <dev/ofw/ofw_bus.h>
+
 #include <machine/bus.h>
-#include <dev/ofw/openfirm.h>
 #include <machine/ofw_machdep.h>
 #include <machine/resource.h>
 
 #include <sys/rman.h>
-
-#include <dev/ofw/openfirm.h>
 
 #include <net/ethernet.h>
 #include <net/if.h>
@@ -132,9 +132,9 @@ MODULE_DEPEND(hme, ether, 1, 1, 1);
 static int
 hme_sbus_probe(device_t dev)
 {
-	char *name;
+	const char *name;
 
-	name = sbus_get_name(dev);
+	name = ofw_bus_get_name(dev);
 	if (strcmp(name, "SUNW,qfe") == 0 ||
 	    strcmp(name, "SUNW,hme") == 0) {
 		device_set_desc(dev, "Sun HME 10/100 Ethernet");
@@ -150,7 +150,7 @@ hme_sbus_attach(device_t dev)
 	struct hme_softc *sc = &hsc->hsc_hme;
 	u_int32_t burst;
 	u_long start, count;
-	int error;
+	int error = 0;
 
 	/*
 	 * Map five register banks:
@@ -162,10 +162,9 @@ hme_sbus_attach(device_t dev)
 	 *	bank 4: HME MIF registers
 	 *
 	 */
-	sc->sc_sebo = sc->sc_etxo = sc->sc_erxo = sc->sc_maco = sc->sc_mifo = 0;
 	hsc->hsc_seb_rid = 0;
-	hsc->hsc_seb_res = bus_alloc_resource(dev, SYS_RES_MEMORY,
-	    &hsc->hsc_seb_rid, 0, ~0, 1, RF_ACTIVE);
+	hsc->hsc_seb_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+	    &hsc->hsc_seb_rid, RF_ACTIVE);
 	if (hsc->hsc_seb_res == NULL) {
 		device_printf(dev, "cannot map SEB registers\n");
 		return (ENXIO);
@@ -174,30 +173,33 @@ hme_sbus_attach(device_t dev)
 	sc->sc_sebh = rman_get_bushandle(hsc->hsc_seb_res);
 
 	hsc->hsc_etx_rid = 1;
-	hsc->hsc_etx_res = bus_alloc_resource(dev, SYS_RES_MEMORY,
-	    &hsc->hsc_etx_rid, 0, ~0, 1, RF_ACTIVE);
+	hsc->hsc_etx_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+	    &hsc->hsc_etx_rid, RF_ACTIVE);
 	if (hsc->hsc_etx_res == NULL) {
 		device_printf(dev, "cannot map ETX registers\n");
+		error = ENXIO;
 		goto fail_seb_res;
 	}
 	sc->sc_etxt = rman_get_bustag(hsc->hsc_etx_res);
 	sc->sc_etxh = rman_get_bushandle(hsc->hsc_etx_res);
 
 	hsc->hsc_erx_rid = 2;
-	hsc->hsc_erx_res = bus_alloc_resource(dev, SYS_RES_MEMORY,
-	    &hsc->hsc_erx_rid, 0, ~0, 1, RF_ACTIVE);
+	hsc->hsc_erx_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+	    &hsc->hsc_erx_rid, RF_ACTIVE);
 	if (hsc->hsc_erx_res == NULL) {
 		device_printf(dev, "cannot map ERX registers\n");
+		error = ENXIO;
 		goto fail_etx_res;
 	}
 	sc->sc_erxt = rman_get_bustag(hsc->hsc_erx_res);
 	sc->sc_erxh = rman_get_bushandle(hsc->hsc_erx_res);
 
 	hsc->hsc_mac_rid = 3;
-	hsc->hsc_mac_res = bus_alloc_resource(dev, SYS_RES_MEMORY,
-	    &hsc->hsc_mac_rid, 0, ~0, 1, RF_ACTIVE);
+	hsc->hsc_mac_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+	    &hsc->hsc_mac_rid, RF_ACTIVE);
 	if (hsc->hsc_mac_res == NULL) {
 		device_printf(dev, "cannot map MAC registers\n");
+		error = ENXIO;
 		goto fail_erx_res;
 	}
 	sc->sc_mact = rman_get_bustag(hsc->hsc_mac_res);
@@ -205,48 +207,55 @@ hme_sbus_attach(device_t dev)
 
 	/*
 	 * At least on some HMEs, the MIF registers seem to be inside the MAC
-	 * range, so map try to kluge around it.
+	 * range, so try to kludge around it.
 	 */
 	hsc->hsc_mif_rid = 4;
-	hsc->hsc_mif_res = bus_alloc_resource(dev, SYS_RES_MEMORY,
-	    &hsc->hsc_mif_rid, 0, ~0, 1, RF_ACTIVE);
+	hsc->hsc_mif_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+	    &hsc->hsc_mif_rid, RF_ACTIVE);
 	if (hsc->hsc_mif_res == NULL) {
 		if (bus_get_resource(dev, SYS_RES_MEMORY, hsc->hsc_mif_rid,
 		    &start, &count) != 0) {
 			device_printf(dev, "cannot get MIF registers\n");
+			error = ENXIO;
 			goto fail_mac_res;
 		}
 		if (start < rman_get_start(hsc->hsc_mac_res) ||
 		    start + count - 1 > rman_get_end(hsc->hsc_mac_res)) {
 			device_printf(dev, "cannot move MIF registers to MAC "
 			    "bank\n");
+			error = ENXIO;
 			goto fail_mac_res;
 		}
 		sc->sc_mift = sc->sc_mact;
-		sc->sc_mifh = sc->sc_mach;
-		sc->sc_mifo = sc->sc_maco + start -
-		    rman_get_start(hsc->hsc_mac_res);
+		bus_space_subregion(sc->sc_mact, sc->sc_mach,
+		    start - rman_get_start(hsc->hsc_mac_res), count,
+		    &sc->sc_mifh);
 	} else {
 		sc->sc_mift = rman_get_bustag(hsc->hsc_mif_res);
 		sc->sc_mifh = rman_get_bushandle(hsc->hsc_mif_res);
 	}
 
 	hsc->hsc_irid = 0;
-	hsc->hsc_ires = bus_alloc_resource(dev, SYS_RES_IRQ, &hsc->hsc_irid, 0,
-	    ~0, 1, RF_SHAREABLE | RF_ACTIVE);
+	hsc->hsc_ires = bus_alloc_resource_any(dev, SYS_RES_IRQ, 
+	    &hsc->hsc_irid, RF_SHAREABLE | RF_ACTIVE);
 	if (hsc->hsc_ires == NULL) {
 		device_printf(dev, "could not allocate interrupt\n");
 		error = ENXIO;
 		goto fail_mif_res;
 	}
 
-
 	OF_getetheraddr(dev, sc->sc_arpcom.ac_enaddr);
 
 	burst = sbus_get_burstsz(dev);
 	/* Translate into plain numerical format */
-	sc->sc_burst =  (burst & SBUS_BURST_32) ? 32 :
-	    (burst & SBUS_BURST_16) ? 16 : 0;
+	if ((burst & SBUS_BURST_64))
+		sc->sc_burst = 64;
+	else if ((burst & SBUS_BURST_32))
+		sc->sc_burst = 32;
+	else if ((burst & SBUS_BURST_16))
+		sc->sc_burst = 16;
+	else
+		 sc->sc_burst = 0;
 
 	sc->sc_pci = 0;	/* XXX: should all be done in bus_dma. */
 	sc->sc_dev = dev;
@@ -255,7 +264,6 @@ hme_sbus_attach(device_t dev)
 		device_printf(dev, "could not be configured\n");
 		goto fail_ires;
 	}
-
 
 	if ((error = bus_setup_intr(dev, hsc->hsc_ires, INTR_TYPE_NET, hme_intr,
 	     sc, &hsc->hsc_ih)) != 0) {
@@ -284,7 +292,7 @@ fail_etx_res:
 fail_seb_res:
 	bus_release_resource(dev, SYS_RES_MEMORY, hsc->hsc_seb_rid,
 	    hsc->hsc_seb_res);
-	return (ENXIO);
+	return (error);
 }
 
 static int

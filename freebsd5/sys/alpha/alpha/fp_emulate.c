@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/fp_emulate.c,v 1.13 2003/08/17 06:42:07 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/fp_emulate.c,v 1.14 2004/05/06 09:35:57 das Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -296,7 +296,7 @@ static int fp_emulate(union alpha_instruction ins, struct thread *td)
 		td->td_pcb->pcb_fp_control = control;
 
 		/* Regenerate the control register */
-		fpcr = fpregs->fpr_cr & FPCR_DYN_MASK;
+		fpcr = fpregs->fpr_cr & (FPCR_DYN_MASK | FPCR_STATUS_MASK);
 		fpcr |= ((control & IEEE_STATUS_MASK)
 			 << IEEE_STATUS_TO_FPCR_SHIFT);
 		if (!(control & IEEE_TRAP_ENABLE_INV))

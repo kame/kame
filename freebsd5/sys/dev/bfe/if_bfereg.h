@@ -1,5 +1,27 @@
 /* Copyright (c) 2003 Stuart Walsh */
-/* $FreeBSD: src/sys/dev/bfe/if_bfereg.h,v 1.1 2003/09/09 18:17:22 wpaul Exp $ */
+/*
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS 'AS IS' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+/* $FreeBSD: src/sys/dev/bfe/if_bfereg.h,v 1.3.2.1 2004/09/04 19:23:54 des Exp $ */
 
 #ifndef _BFE_H
 #define _BFE_H
@@ -37,11 +59,11 @@
 #define BFE_ISTAT_MII_WRITE 0x08000000 /* MII Write Interrupt */
 #define BFE_ISTAT_MII_READ  0x10000000 /* MII Read Interrupt */
 #define BFE_ISTAT_ERRORS    (BFE_ISTAT_DSCE | BFE_ISTAT_DATAE | BFE_ISTAT_DPE |\
-        BFE_ISTAT_RDU | BFE_ISTAT_RFO | BFE_ISTAT_TFU)
+	BFE_ISTAT_RDU | BFE_ISTAT_RFO | BFE_ISTAT_TFU)
 
 #define BFE_IMASK           0x00000024 /* Interrupt Mask */
 #define BFE_IMASK_DEF       (BFE_ISTAT_ERRORS | BFE_ISTAT_TO | BFE_ISTAT_RX | \
-        BFE_ISTAT_TX)
+	BFE_ISTAT_TX)
 
 #define BFE_MAC_CTRL        0x000000A8 /* MAC Control */
 #define BFE_CTRL_CRC32_ENAB 0x00000001 /* CRC32 Generation Enable */
@@ -386,7 +408,7 @@
 #define BFE_RX_FLAG_MISS    0x00000080 /* Received due to promisc mode */
 #define BFE_RX_FLAG_LAST    0x00000800 /* Last buffer in frame */
 #define BFE_RX_FLAG_ERRORS  (BFE_RX_FLAG_ODD | BFE_RX_FLAG_SERR |           \
-        BFE_RX_FLAG_CRCERR | BFE_RX_FLAG_OFIFO)
+	BFE_RX_FLAG_CRCERR | BFE_RX_FLAG_OFIFO)
 
 #define BFE_MCAST_TBL_SIZE  32
 #define BFE_PCI_DMA         0x40000000
@@ -394,6 +416,7 @@
 
 #define BCOM_VENDORID           0x14E4
 #define BCOM_DEVICEID_BCM4401   0x4401
+#define BCOM_DEVICEID_BCM4401B0	0x170c
 
 #define PCI_SETBIT(dev, reg, x, s)  \
     pci_write_config(dev, reg, (pci_read_config(dev, reg, s) | (x)), s)
@@ -411,16 +434,16 @@
 #define BFE_TX_QLEN             256
 
 #define CSR_READ_4(sc, reg)                                                 \
-        bus_space_read_4(sc->bfe_btag, sc->bfe_bhandle, reg)
+	bus_space_read_4(sc->bfe_btag, sc->bfe_bhandle, reg)
 
 #define CSR_WRITE_4(sc, reg, val)                                            \
-        bus_space_write_4(sc->bfe_btag, sc->bfe_bhandle, reg, val)
+	bus_space_write_4(sc->bfe_btag, sc->bfe_bhandle, reg, val)
 
 #define BFE_OR(sc, name, val)                                               \
-        CSR_WRITE_4(sc, name, CSR_READ_4(sc, name) | val)
+	CSR_WRITE_4(sc, name, CSR_READ_4(sc, name) | val)
 
 #define BFE_AND(sc, name, val)                                              \
-        CSR_WRITE_4(sc, name, CSR_READ_4(sc, name) & val)
+	CSR_WRITE_4(sc, name, CSR_READ_4(sc, name) & val)
 
 #define BFE_LOCK(scp)       mtx_lock(&sc->bfe_mtx)
 #define BFE_UNLOCK(scp)     mtx_unlock(&sc->bfe_mtx)
@@ -464,7 +487,7 @@ struct bfe_hw_stats {
     u_int32_t rx_pause_pkts, rx_nonpause_pkts;
 };
 
-struct bfe_softc 
+struct bfe_softc
 {
     struct arpcom           arpcom;     /* interface info */
     device_t                bfe_dev;
@@ -502,7 +525,7 @@ struct bfe_softc
     char                    *bfe_vpd_readonly;
 };
 
-struct bfe_type 
+struct bfe_type
 {
     u_int16_t   bfe_vid;
     u_int16_t   bfe_did;

@@ -1,7 +1,7 @@
 /*
- *       Copyright (c) 2000-03 ICP vortex GmbH
- *       Copyright (c) 2002-03 Intel Corporation
- *       Copyright (c) 2003    Adaptec Inc.
+ *       Copyright (c) 2000-04 ICP vortex GmbH
+ *       Copyright (c) 2002-04 Intel Corporation
+ *       Copyright (c) 2003-04 Adaptec Inc.
  *       All Rights Reserved
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,11 +39,11 @@
  *              Mike Smith;             Some driver source code.
  *              FreeBSD.ORG;            Great O/S to work on and for.
  *
- * $Id: iir.c 1.4 2003/08/26 12:29:44 achim Exp $"
+ * $Id: iir.c 1.5 2004/03/30 10:17:53 achim Exp $"
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/iir/iir.c,v 1.9 2003/09/26 15:36:47 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/iir/iir.c,v 1.10.2.1 2004/09/08 19:54:36 scottl Exp $");
 
 #define _IIR_C_
 
@@ -291,27 +291,12 @@ iir_init(struct gdt_softc *gdt)
         return (1);
     }
 
-    if (!gdt_internal_cmd(gdt, gccb, GDT_CACHESERVICE, GDT_INIT, 
-                          GDT_LINUX_OS, 0, 0)) {
-        printf("iir%d: Cache service initialization error %d\n",
-               gdt->sc_hanum, gdt->sc_status);
-        gdt_free_ccb(gdt, gccb);
-        return (1);
-    }
     gdt_internal_cmd(gdt, gccb, GDT_CACHESERVICE, GDT_UNFREEZE_IO,
                      0, 0, 0);
 
-    if (!gdt_internal_cmd(gdt, gccb, GDT_CACHESERVICE, GDT_MOUNT, 
-                          0xffff, 1, 0)) {
-        printf("iir%d: Cache service mount error %d\n",
-               gdt->sc_hanum, gdt->sc_status);
-        gdt_free_ccb(gdt, gccb);
-        return (1);
-    }
-
     if (!gdt_internal_cmd(gdt, gccb, GDT_CACHESERVICE, GDT_INIT, 
                           GDT_LINUX_OS, 0, 0)) {
-        printf("iir%d: Cache service post-mount initialization error %d\n",
+        printf("iir%d: Cache service initialization error %d\n",
                gdt->sc_hanum, gdt->sc_status);
         gdt_free_ccb(gdt, gccb);
         return (1);
@@ -889,13 +874,7 @@ gdt_raw_cmd(struct gdt_softc *gdt, union ccb *ccb, int *lock)
                 }
                 splx(s);
             } else {
-                struct bus_dma_segment seg; 
-            
-                /* Pointer to physical buffer */
-                seg.ds_addr =
-                    (bus_addr_t)ccb->csio.data_ptr;
-                seg.ds_len = ccb->csio.dxfer_len;
-                gdtexecuteccb(gccb, &seg, 1, 0);
+		panic("iir: CAM_DATA_PHYS not supported");
             }
         } else {
             struct bus_dma_segment *segs;
@@ -1004,13 +983,7 @@ gdt_cache_cmd(struct gdt_softc *gdt, union ccb *ccb, int *lock)
             }
             splx(s);
         } else {
-            struct bus_dma_segment seg; 
-            
-            /* Pointer to physical buffer */
-            seg.ds_addr =
-                (bus_addr_t)ccb->csio.data_ptr;
-            seg.ds_len = ccb->csio.dxfer_len;
-            gdtexecuteccb(gccb, &seg, 1, 0);
+	    panic("iir: CAM_DATA_PHYS not supported");
         }
     } else {
         struct bus_dma_segment *segs;

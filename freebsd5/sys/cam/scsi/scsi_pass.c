@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_pass.c,v 1.38 2003/06/10 18:14:05 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_pass.c,v 1.41 2004/06/16 09:46:31 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -74,10 +74,9 @@ struct pass_softc {
 	u_int8_t		pd_type;
 	union ccb		saved_ccb;
 	struct devstat		*device_stats;
-	dev_t			dev;
+	struct cdev *dev;
 };
 
-#define PASS_CDEV_MAJOR 31
 
 static	d_open_t	passopen;
 static	d_close_t	passclose;
@@ -106,11 +105,12 @@ static struct periph_driver passdriver =
 PERIPHDRIVER_DECLARE(pass, passdriver);
 
 static struct cdevsw pass_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	passopen,
 	.d_close =	passclose,
 	.d_ioctl =	passioctl,
 	.d_name =	"pass",
-	.d_maj =	PASS_CDEV_MAJOR,
 };
 
 static void
@@ -317,7 +317,7 @@ passregister(struct cam_periph *periph, void *arg)
 }
 
 static int
-passopen(dev_t dev, int flags, int fmt, struct thread *td)
+passopen(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	struct cam_periph *periph;
 	struct pass_softc *softc;
@@ -384,7 +384,7 @@ passopen(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static int
-passclose(dev_t dev, int flag, int fmt, struct thread *td)
+passclose(struct cdev *dev, int flag, int fmt, struct thread *td)
 {
 	struct 	cam_periph *periph;
 	struct	pass_softc *softc;
@@ -446,7 +446,7 @@ passdone(struct cam_periph *periph, union ccb *done_ccb)
 }
 
 static int
-passioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
+passioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
 {
 	struct	cam_periph *periph;
 	struct	pass_softc *softc;

@@ -31,7 +31,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/sbp.c,v 1.71 2003/11/12 04:06:21 simokawa Exp $
+ * $FreeBSD: src/sys/dev/firewire/sbp.c,v 1.79 2004/07/20 04:49:44 simokawa Exp $
  *
  */
 
@@ -39,34 +39,48 @@
 #include <sys/systm.h>
 #include <sys/module.h>
 #include <sys/bus.h>
+#include <sys/kernel.h>
 #include <sys/sysctl.h>
 #include <machine/bus.h>
 #include <sys/malloc.h>
-#if __FreeBSD_version >= 501102
+#if defined(__FreeBSD__) && __FreeBSD_version >= 501102
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #endif
 
-#if __FreeBSD_version < 500106
+#if defined(__DragonFly__) || __FreeBSD_version < 500106
 #include <sys/devicestat.h>	/* for struct devstat */
 #endif
 
+#ifdef __DragonFly__
+#include <bus/cam/cam.h>
+#include <bus/cam/cam_ccb.h>
+#include <bus/cam/cam_sim.h>
+#include <bus/cam/cam_xpt_sim.h>
+#include <bus/cam/cam_debug.h>
+#include <bus/cam/cam_periph.h>
+#include <bus/cam/scsi/scsi_all.h>
+
+#include <bus/firewire/firewire.h>
+#include <bus/firewire/firewirereg.h>
+#include <bus/firewire/fwdma.h>
+#include <bus/firewire/iec13213.h>
+#include "sbp.h"
+#else
 #include <cam/cam.h>
 #include <cam/cam_ccb.h>
 #include <cam/cam_sim.h>
 #include <cam/cam_xpt_sim.h>
 #include <cam/cam_debug.h>
 #include <cam/cam_periph.h>
-
 #include <cam/scsi/scsi_all.h>
-
-#include <sys/kernel.h>
 
 #include <dev/firewire/firewire.h>
 #include <dev/firewire/firewirereg.h>
 #include <dev/firewire/fwdma.h>
 #include <dev/firewire/iec13213.h>
 #include <dev/firewire/sbp.h>
+#endif
 
 #define ccb_sdev_ptr	spriv_ptr0
 #define ccb_sbp_ptr	spriv_ptr1
@@ -86,7 +100,7 @@
  * STATUS FIFO addressing
  *   bit
  * -----------------------
- *  0- 1( 2): 0 (alingment)
+ *  0- 1( 2): 0 (alignment)
  *  2- 7( 6): target
  *  8-15( 8): lun
  * 16-31( 8): reserved
@@ -108,11 +122,13 @@ static char *orb_fun_name[] = {
 
 static int debug = 0;
 static int auto_login = 1;
-static int max_speed = 2;
+static int max_speed = -1;
 static int sbp_cold = 1;
 static int ex_login = 1;
 static int login_delay = 1000;	/* msec */
 static int scan_delay = 500;	/* msec */
+static int use_doorbell = 0;
+static int sbp_tags = 0;
 
 SYSCTL_DECL(_hw_firewire);
 SYSCTL_NODE(_hw_firewire, OID_AUTO, sbp, CTLFLAG_RD, 0, "SBP-II Subsystem");
@@ -123,17 +139,23 @@ SYSCTL_INT(_hw_firewire_sbp, OID_AUTO, auto_login, CTLFLAG_RW, &auto_login, 0,
 SYSCTL_INT(_hw_firewire_sbp, OID_AUTO, max_speed, CTLFLAG_RW, &max_speed, 0,
 	"SBP transfer max speed");
 SYSCTL_INT(_hw_firewire_sbp, OID_AUTO, exclusive_login, CTLFLAG_RW,
-	&ex_login, 0, "SBP transfer max speed");
+	&ex_login, 0, "SBP enable exclusive login");
 SYSCTL_INT(_hw_firewire_sbp, OID_AUTO, login_delay, CTLFLAG_RW,
 	&login_delay, 0, "SBP login delay in msec");
 SYSCTL_INT(_hw_firewire_sbp, OID_AUTO, scan_delay, CTLFLAG_RW,
 	&scan_delay, 0, "SBP scan delay in msec");
+SYSCTL_INT(_hw_firewire_sbp, OID_AUTO, use_doorbell, CTLFLAG_RW,
+	&use_doorbell, 0, "SBP use doorbell request");
+SYSCTL_INT(_hw_firewire_sbp, OID_AUTO, tags, CTLFLAG_RW, &sbp_tags, 0,
+	"SBP tagged queuing support");
 
 TUNABLE_INT("hw.firewire.sbp.auto_login", &auto_login);
 TUNABLE_INT("hw.firewire.sbp.max_speed", &max_speed);
 TUNABLE_INT("hw.firewire.sbp.exclusive_login", &ex_login);
 TUNABLE_INT("hw.firewire.sbp.login_delay", &login_delay);
 TUNABLE_INT("hw.firewire.sbp.scan_delay", &scan_delay);
+TUNABLE_INT("hw.firewire.sbp.use_doorbell", &use_doorbell);
+TUNABLE_INT("hw.firewire.sbp.tags", &sbp_tags);
 
 #define NEED_RESPONSE 0
 
@@ -147,8 +169,8 @@ struct sbp_ocb {
 	STAILQ_ENTRY(sbp_ocb)	ocb;
 	union ccb	*ccb;
 	bus_addr_t	bus_addr;
-	u_int32_t	orb[8];
-#define IND_PTR_OFFSET	(8*sizeof(u_int32_t))
+	uint32_t	orb[8];
+#define IND_PTR_OFFSET	(8*sizeof(uint32_t))
 	struct ind_ptr  ind_ptr[SBP_IND_MAX];
 	struct sbp_dev	*sdev;
 	int		flags; /* XXX should be removed */
@@ -170,16 +192,19 @@ struct sbp_dev{
 #define SBP_DEV_ATTACHED	5	/* in operation */
 #define SBP_DEV_DEAD		6	/* unavailable unit */
 #define SBP_DEV_RETRY		7	/* unavailable unit */
-	u_int8_t status:4,
+	uint8_t status:4,
 		 timeout:4;
-	u_int8_t type;
-	u_int16_t lun_id;
-	u_int16_t freeze;
+	uint8_t type;
+	uint16_t lun_id;
+	uint16_t freeze;
 #define	ORB_LINK_DEAD		(1 << 0)
 #define	VALID_LUN		(1 << 1)
 #define	ORB_POINTER_ACTIVE	(1 << 2)
 #define	ORB_POINTER_NEED	(1 << 3)
-	u_int16_t flags;
+#define	ORB_DOORBELL_ACTIVE	(1 << 4)
+#define	ORB_DOORBELL_NEED	(1 << 5)
+#define	ORB_SHORTAGE		(1 << 6)
+	uint16_t flags;
 	struct cam_path *path;
 	struct sbp_target *target;
 	struct fwdma_alloc dma;
@@ -188,6 +213,7 @@ struct sbp_dev{
 	struct sbp_ocb *ocb;
 	STAILQ_HEAD(, sbp_ocb) ocbs;
 	STAILQ_HEAD(, sbp_ocb) free_ocbs;
+	struct sbp_ocb *last_ocb;
 	char vendor[32];
 	char product[32];
 	char revision[10];
@@ -199,7 +225,7 @@ struct sbp_target {
 	struct sbp_dev	**luns;
 	struct sbp_softc *sbp;
 	struct fw_device *fwdev;
-	u_int32_t mgm_hi, mgm_lo;
+	uint32_t mgm_hi, mgm_lo;
 	struct sbp_ocb *mgm_ocb_cur;
 	STAILQ_HEAD(, sbp_ocb) mgm_ocb_queue;
 	struct callout mgm_ocb_timeout;
@@ -216,30 +242,33 @@ struct sbp_softc {
 	struct fw_bind fwb;
 	bus_dma_tag_t	dmat;
 	struct timeval last_busreset;
+#define SIMQ_FREEZED 1
+	int flags;
 };
 
-static void sbp_post_explore __P((void *));
-static void sbp_recv __P((struct fw_xfer *));
-static void sbp_mgm_callback __P((struct fw_xfer *));
+static void sbp_post_explore (void *);
+static void sbp_recv (struct fw_xfer *);
+static void sbp_mgm_callback (struct fw_xfer *);
 #if 0
-static void sbp_cmd_callback __P((struct fw_xfer *));
+static void sbp_cmd_callback (struct fw_xfer *);
 #endif
-static void sbp_orb_pointer __P((struct sbp_dev *, struct sbp_ocb *));
-static void sbp_execute_ocb __P((void *,  bus_dma_segment_t *, int, int));
-static void sbp_free_ocb __P((struct sbp_dev *, struct sbp_ocb *));
-static void sbp_abort_ocb __P((struct sbp_ocb *, int));
-static void sbp_abort_all_ocbs __P((struct sbp_dev *, int));
-static struct fw_xfer * sbp_write_cmd __P((struct sbp_dev *, int, int));
-static struct sbp_ocb * sbp_get_ocb __P((struct sbp_dev *));
-static struct sbp_ocb * sbp_enqueue_ocb __P((struct sbp_dev *, struct sbp_ocb *));
-static struct sbp_ocb * sbp_dequeue_ocb __P((struct sbp_dev *, struct sbp_status *));
+static void sbp_orb_pointer (struct sbp_dev *, struct sbp_ocb *);
+static void sbp_doorbell(struct sbp_dev *);
+static void sbp_execute_ocb (void *,  bus_dma_segment_t *, int, int);
+static void sbp_free_ocb (struct sbp_dev *, struct sbp_ocb *);
+static void sbp_abort_ocb (struct sbp_ocb *, int);
+static void sbp_abort_all_ocbs (struct sbp_dev *, int);
+static struct fw_xfer * sbp_write_cmd (struct sbp_dev *, int, int);
+static struct sbp_ocb * sbp_get_ocb (struct sbp_dev *);
+static struct sbp_ocb * sbp_enqueue_ocb (struct sbp_dev *, struct sbp_ocb *);
+static struct sbp_ocb * sbp_dequeue_ocb (struct sbp_dev *, struct sbp_status *);
 static void sbp_cam_detach_sdev(struct sbp_dev *);
 static void sbp_free_sdev(struct sbp_dev *);
-static void sbp_cam_detach_target __P((struct sbp_target *));
-static void sbp_free_target __P((struct sbp_target *));
-static void sbp_mgm_timeout __P((void *arg));
-static void sbp_timeout __P((void *arg));
-static void sbp_mgm_orb __P((struct sbp_dev *, int, struct sbp_ocb *));
+static void sbp_cam_detach_target (struct sbp_target *);
+static void sbp_free_target (struct sbp_target *);
+static void sbp_mgm_timeout (void *arg);
+static void sbp_timeout (void *arg);
+static void sbp_mgm_orb (struct sbp_dev *, int, struct sbp_ocb *);
 
 MALLOC_DEFINE(M_SBP, "sbp", "SBP-II/FireWire");
 
@@ -323,8 +352,11 @@ END_DEBUG
 
 	device_set_desc(dev, "SBP-2/SCSI over FireWire");
 
+#if 0
 	if (bootverbose)
 		debug = bootverbose;
+#endif
+
 	return (0);
 }
 
@@ -466,7 +498,7 @@ END_DEBUG
 		    M_SBP, M_NOWAIT | M_ZERO);
 		
 		if (newluns == NULL) {
-			printf("%s: realloc failed\n", __FUNCTION__);
+			printf("%s: realloc failed\n", __func__);
 			newluns = target->luns;
 			maxlun = target->num_lun;
 		}
@@ -502,7 +534,7 @@ END_DEBUG
 			sdev = malloc(sizeof(struct sbp_dev),
 			    M_SBP, M_NOWAIT | M_ZERO);
 			if (sdev == NULL) {
-				printf("%s: malloc failed\n", __FUNCTION__);
+				printf("%s: malloc failed\n", __func__);
 				goto next;
 			}
 			target->luns[lun] = sdev;
@@ -520,11 +552,11 @@ END_DEBUG
 			goto next;
 
 		fwdma_malloc(sbp->fd.fc, 
-			/* alignment */ sizeof(u_int32_t),
+			/* alignment */ sizeof(uint32_t),
 			SBP_DMA_SIZE, &sdev->dma, BUS_DMA_NOWAIT);
 		if (sdev->dma.v_addr == NULL) {
 			printf("%s: dma space allocation failed\n",
-							__FUNCTION__);
+							__func__);
 			free(sdev, M_SBP);
 			target->luns[lun] = NULL;
 			goto next;
@@ -666,7 +698,7 @@ sbp_login(struct sbp_dev *sdev)
 	if (t.tv_sec >= 0 && t.tv_usec > 0)
 		ticks = (t.tv_sec * 1000 + t.tv_usec / 1000) * hz / 1000;
 SBP_DEBUG(0)
-	printf("%s: sec = %ld usec = %ld ticks = %d\n", __FUNCTION__,
+	printf("%s: sec = %ld usec = %ld ticks = %d\n", __func__,
 	    t.tv_sec, t.tv_usec, ticks);
 END_DEBUG
 	callout_reset(&sdev->login_callout, ticks,
@@ -764,6 +796,10 @@ sbp_post_busreset(void *arg)
 SBP_DEBUG(0)
 	printf("sbp_post_busreset\n");
 END_DEBUG
+	if ((sbp->sim->flags & SIMQ_FREEZED) == 0) {
+		xpt_freeze_simq(sbp->sim, /*count*/1);
+		sbp->sim->flags |= SIMQ_FREEZED;
+	}
 	microtime(&sbp->last_busreset);
 }
 
@@ -789,7 +825,7 @@ END_DEBUG
 	xpt_async(AC_BUS_RESET, sbp->path, /*arg*/ NULL);
 #endif
 
-	/* Gabage Collection */
+	/* Garbage Collection */
 	for(i = 0 ; i < SBP_NUM_TARGETS ; i ++){
 		target = &sbp->targets[i];
 		STAILQ_FOREACH(fwdev, &sbp->fd.fc->devices, link)
@@ -833,6 +869,8 @@ END_DEBUG
 		if (target->num_lun == 0)
 			sbp_free_target(target);
 	}
+	xpt_release_simq(sbp->sim, /*run queue*/TRUE);
+	sbp->sim->flags &= ~SIMQ_FREEZED;
 }
 
 #if NEED_RESPONSE
@@ -1060,11 +1098,11 @@ sbp_agent_reset_callback(struct fw_xfer *xfer)
 	sdev = (struct sbp_dev *)xfer->sc;
 SBP_DEBUG(1)
 	sbp_show_sdev_info(sdev, 2);
-	printf("%s\n", __FUNCTION__);
+	printf("%s\n", __func__);
 END_DEBUG
 	if (xfer->resp != 0) {
 		sbp_show_sdev_info(sdev, 2);
-		printf("%s: resp=%d\n", __FUNCTION__, xfer->resp);
+		printf("%s: resp=%d\n", __func__, xfer->resp);
 	}
 
 	sbp_xfer_free(xfer);
@@ -1138,11 +1176,11 @@ sbp_orb_pointer_callback(struct fw_xfer *xfer)
 
 SBP_DEBUG(1)
 	sbp_show_sdev_info(sdev, 2);
-	printf("%s\n", __FUNCTION__);
+	printf("%s\n", __func__);
 END_DEBUG
 	if (xfer->resp != 0) {
 		/* XXX */
-		printf("%s: xfer->resp = %d\n", __FUNCTION__, xfer->resp);
+		printf("%s: xfer->resp = %d\n", __func__, xfer->resp);
 	}
 	sbp_xfer_free(xfer);
 	sdev->flags &= ~ORB_POINTER_ACTIVE;
@@ -1165,12 +1203,12 @@ sbp_orb_pointer(struct sbp_dev *sdev, struct sbp_ocb *ocb)
 	struct fw_pkt *fp;
 SBP_DEBUG(1)
 	sbp_show_sdev_info(sdev, 2);
-	printf("%s: 0x%08x\n", __FUNCTION__, (u_int32_t)ocb->bus_addr);
+	printf("%s: 0x%08x\n", __func__, (uint32_t)ocb->bus_addr);
 END_DEBUG
 
 	if ((sdev->flags & ORB_POINTER_ACTIVE) != 0) {
 SBP_DEBUG(0)
-		printf("%s: orb pointer active\n", __FUNCTION__);
+		printf("%s: orb pointer active\n", __func__);
 END_DEBUG
 		sdev->flags |= ORB_POINTER_NEED;
 		return;
@@ -1187,7 +1225,7 @@ END_DEBUG
 	fp->mode.wreqb.extcode = 0;
 	xfer->send.payload[0] = 
 		htonl(((sdev->target->sbp->fd.fc->nodeid | FWLOCALBUS )<< 16));
-	xfer->send.payload[1] = htonl((u_int32_t)ocb->bus_addr);
+	xfer->send.payload[1] = htonl((uint32_t)ocb->bus_addr);
 
 	if(fw_asyreq(xfer->fc, -1, xfer) != 0){
 			sbp_xfer_free(xfer);
@@ -1196,21 +1234,26 @@ END_DEBUG
 	}
 }
 
-#if 0
 static void
-sbp_cmd_callback(struct fw_xfer *xfer)
+sbp_doorbell_callback(struct fw_xfer *xfer)
 {
-SBP_DEBUG(1)
 	struct sbp_dev *sdev;
 	sdev = (struct sbp_dev *)xfer->sc;
+
+SBP_DEBUG(1)
 	sbp_show_sdev_info(sdev, 2);
-	printf("sbp_cmd_callback\n");
+	printf("sbp_doorbell_callback\n");
 END_DEBUG
 	if (xfer->resp != 0) {
 		/* XXX */
-		printf("%s: xfer->resp = %d\n", __FUNCTION__, xfer->resp);
+		printf("%s: xfer->resp = %d\n", __func__, xfer->resp);
 	}
 	sbp_xfer_free(xfer);
+	sdev->flags &= ~ORB_DOORBELL_ACTIVE;
+	if ((sdev->flags & ORB_DOORBELL_NEED) != 0) {
+		sdev->flags &= ~ORB_DOORBELL_NEED;
+		sbp_doorbell(sdev);
+	}
 	return;
 }
 
@@ -1224,15 +1267,19 @@ SBP_DEBUG(1)
 	printf("sbp_doorbell\n");
 END_DEBUG
 
+	if ((sdev->flags & ORB_DOORBELL_ACTIVE) != 0) {
+		sdev->flags |= ORB_DOORBELL_NEED;
+		return;
+	}
+	sdev->flags |= ORB_DOORBELL_ACTIVE;
 	xfer = sbp_write_cmd(sdev, FWTCODE_WREQQ, 0x10);
 	if (xfer == NULL)
 		return;
-	xfer->act.hand = sbp_cmd_callback;
-	fp = (struct fw_pkt *)xfer->send.buf;
+	xfer->act.hand = sbp_doorbell_callback;
+	fp = &xfer->send.hdr;
 	fp->mode.wreqq.data = htonl(0xf);
 	fw_asyreq(xfer->fc, -1, xfer);
 }
-#endif
 
 static struct fw_xfer *
 sbp_write_cmd(struct sbp_dev *sdev, int tcode, int offset)
@@ -1382,7 +1429,7 @@ start:
 	xfer->send.payload[1] = htonl(ocb->bus_addr & 0xffffffff);
 SBP_DEBUG(0)
 	sbp_show_sdev_info(sdev, 2);
-	printf("mgm orb: %08x\n", (u_int32_t)ocb->bus_addr);
+	printf("mgm orb: %08x\n", (uint32_t)ocb->bus_addr);
 END_DEBUG
 
 	fw_asyreq(xfer->fc, -1, xfer);
@@ -1484,7 +1531,7 @@ END_DEBUG
 							| CAM_AUTOSNS_VALID;
 /*
 {
-		u_int8_t j, *tmp;
+		uint8_t j, *tmp;
 		tmp = sense;
 		for( j = 0 ; j < 32 ; j+=8){
 			printf("sense %02x%02x %02x%02x %02x%02x %02x%02x\n", 
@@ -1531,10 +1578,6 @@ END_DEBUG
 #endif
 		/* fall through */
 	case T_RBC:
-		/* enable tagged queuing */
-#if 1
-		inq->flags |= SID_CmdQue;
-#endif
 		/*
 		 * Override vendor/product/revision information.
 		 * Some devices sometimes return strange strings.
@@ -1546,6 +1589,15 @@ END_DEBUG
 #endif
 		break;
 	}
+	/*
+	 * Force to enable/disable tagged queuing.
+	 * XXX CAM also checks SCP_QUEUE_DQUE flag in the control mode page.
+	 */
+	if (sbp_tags > 0)
+		inq->flags |= SID_CmdQue;
+	else if (sbp_tags < 0)
+		inq->flags &= ~SID_CmdQue;
+
 }
 
 static void
@@ -1562,9 +1614,9 @@ sbp_recv1(struct fw_xfer *xfer)
 	struct sbp_status *sbp_status;
 	struct sbp_target *target;
 	int	orb_fun, status_valid0, status_valid, t, l, reset_agent = 0;
-	u_int32_t addr;
+	uint32_t addr;
 /*
-	u_int32_t *ld;
+	uint32_t *ld;
 	ld = xfer->recv.buf;
 printf("sbp %x %d %d %08x %08x %08x %08x\n",
 			xfer->resp, xfer->recv.len, xfer->recv.off, ntohl(ld[0]), ntohl(ld[1]), ntohl(ld[2]), ntohl(ld[3]));
@@ -1621,10 +1673,10 @@ END_DEBUG
 		ocb = sbp_dequeue_ocb(sdev, sbp_status);
 		if (ocb == NULL) {
 			sbp_show_sdev_info(sdev, 2);
-#if __FreeBSD_version >= 500000
-			printf("No ocb(%x) on the queue\n",
-#else
+#if defined(__DragonFly__) || __FreeBSD_version < 500000
 			printf("No ocb(%lx) on the queue\n",
+#else
+			printf("No ocb(%x) on the queue\n",
 #endif
 					ntohl(sbp_status->orb_lo));
 		}
@@ -1649,10 +1701,10 @@ END_DEBUG
 SBP_DEBUG(0)
 		sbp_show_sdev_info(sdev, 2);
 		printf("ORB status src:%x resp:%x dead:%x"
-#if __FreeBSD_version >= 500000
-				" len:%x stat:%x orb:%x%08x\n",
-#else
+#if defined(__DragonFly__) || __FreeBSD_version < 500000
 				" len:%x stat:%x orb:%x%08lx\n",
+#else
+				" len:%x stat:%x orb:%x%08x\n",
 #endif
 			sbp_status->src, sbp_status->resp, sbp_status->dead,
 			sbp_status->len, sbp_status->status,
@@ -1774,7 +1826,7 @@ END_DEBUG
 			if(ocb->ccb != NULL){
 				union ccb *ccb;
 /*
-				u_int32_t *ld;
+				uint32_t *ld;
 				ld = ocb->ccb->csio.data_ptr;
 				if(ld != NULL && ocb->ccb->csio.dxfer_len != 0)
 					printf("ptr %08x %08x %08x %08x\n", ld[0], ld[1], ld[2], ld[3]);
@@ -1803,7 +1855,8 @@ printf("len %d\n", sbp_status->len);
 		}
 	}
 
-	sbp_free_ocb(sdev, ocb);
+	if (!use_doorbell)
+		sbp_free_ocb(sdev, ocb);
 done:
 	if (reset_agent)
 		sbp_agent_reset(sdev);
@@ -1871,6 +1924,10 @@ END_DEBUG
 	bzero(sbp, sizeof(struct sbp_softc));
 	sbp->fd.dev = dev;
 	sbp->fd.fc = device_get_ivars(dev);
+
+	if (max_speed < 0)
+		max_speed = sbp->fd.fc->speed;
+
 	error = bus_dma_tag_create(/*parent*/sbp->fd.fc->dmat,
 				/* XXX shoud be 4 for sane backend? */
 				/*alignment*/1,
@@ -1881,7 +1938,7 @@ END_DEBUG
 				/*maxsize*/0x100000, /*nsegments*/SBP_IND_MAX,
 				/*maxsegsz*/SBP_SEG_MAX,
 				/*flags*/BUS_DMA_ALLOCNOW,
-#if __FreeBSD_version >= 501102
+#if defined(__FreeBSD__) && __FreeBSD_version >= 501102
 				/*lockfunc*/busdma_lock_mutex,
 				/*lockarg*/&Giant,
 #endif
@@ -2153,7 +2210,7 @@ sbp_mgm_timeout(void *arg)
 
 	sbp_show_sdev_info(sdev, 2);
 	printf("request timeout(mgm orb:0x%08x) ... ",
-	    (u_int32_t)ocb->bus_addr);
+	    (uint32_t)ocb->bus_addr);
 	target->mgm_ocb_cur = NULL;
 	sbp_free_ocb(sdev, ocb);
 #if 0
@@ -2175,7 +2232,7 @@ sbp_timeout(void *arg)
 
 	sbp_show_sdev_info(sdev, 2);
 	printf("request timeout(cmd orb:0x%08x) ... ",
-	    (u_int32_t)ocb->bus_addr);
+	    (uint32_t)ocb->bus_addr);
 
 	sdev->timeout ++;
 	switch(sdev->timeout) {
@@ -2328,6 +2385,10 @@ END_DEBUG
 #endif
 		if ((ocb = sbp_get_ocb(sdev)) == NULL) {
 			ccb->ccb_h.status = CAM_REQUEUE_REQ;
+			if (sdev->freeze == 0) {
+				xpt_freeze_devq(sdev->path, 1);
+				sdev->freeze ++;
+			}
 			xpt_done(ccb);
 			return;
 		}
@@ -2382,9 +2443,9 @@ printf("ORB %08x %08x %08x %08x\n", ntohl(ocb->orb[4]), ntohl(ocb->orb[5]), ntoh
 	case XPT_CALC_GEOMETRY:
 	{
 		struct ccb_calc_geometry *ccg;
-#if __FreeBSD_version < 501100
-		u_int32_t size_mb;
-		u_int32_t secs_per_cylinder;
+#if defined(__DragonFly__) || __FreeBSD_version < 501100
+		uint32_t size_mb;
+		uint32_t secs_per_cylinder;
 		int extended = 1;
 #endif
 
@@ -2397,21 +2458,21 @@ printf("ORB %08x %08x %08x %08x\n", ntohl(ocb->orb[4]), ntohl(ocb->orb[5]), ntoh
 		}
 SBP_DEBUG(1)
 		printf("%s:%d:%d:%d:XPT_CALC_GEOMETRY: "
-#if __FreeBSD_version >= 500000
-			"Volume size = %jd\n",
-#else
+#if defined(__DragonFly__) || __FreeBSD_version < 500000
 			"Volume size = %d\n",
+#else
+			"Volume size = %jd\n",
 #endif
 			device_get_nameunit(sbp->fd.dev),
 			cam_sim_path(sbp->sim),
 			ccb->ccb_h.target_id, ccb->ccb_h.target_lun,
-#if __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 			(uintmax_t)
 #endif
 				ccg->volume_size);
 END_DEBUG
 
-#if __FreeBSD_version < 501100
+#if defined(__DragonFly__) || __FreeBSD_version < 501100
 		size_mb = ccg->volume_size
 			/ ((1024L * 1024L) / ccg->block_size);
 
@@ -2527,11 +2588,11 @@ sbp_execute_ocb(void *arg,  bus_dma_segment_t *segments, int seg, int error)
 SBP_DEBUG(2)
 	printf("sbp_execute_ocb: seg %d", seg);
 	for (i = 0; i < seg; i++)
-#if __FreeBSD_version >= 500000
+#if defined(__DragonFly__) || __FreeBSD_version < 500000
+		printf(", %x:%d", segments[i].ds_addr, segments[i].ds_len);
+#else
 		printf(", %jx:%jd", (uintmax_t)segments[i].ds_addr,
 					(uintmax_t)segments[i].ds_len);
-#else
-		printf(", %x:%d", segments[i].ds_addr, segments[i].ds_len);
 #endif
 	printf("\n");
 END_DEBUG
@@ -2551,10 +2612,10 @@ SBP_DEBUG(0)
 			/* XXX LSI Logic "< 16 byte" bug might be hit */
 			if (s->ds_len < 16)
 				printf("sbp_execute_ocb: warning, "
-#if __FreeBSD_version >= 500000
-					"segment length(%zd) is less than 16."
-#else
+#if defined(__DragonFly__) || __FreeBSD_version < 500000
 					"segment length(%d) is less than 16."
+#else
+					"segment length(%zd) is less than 16."
 #endif
 					"(seg=%d/%d)\n", s->ds_len, i+1, seg);
 END_DEBUG
@@ -2572,9 +2633,18 @@ END_DEBUG
 			BUS_DMASYNC_PREREAD : BUS_DMASYNC_PREWRITE);
 	prev = sbp_enqueue_ocb(ocb->sdev, ocb);
 	fwdma_sync(&ocb->sdev->dma, BUS_DMASYNC_PREWRITE);
-	if (prev == NULL || (ocb->sdev->flags & ORB_LINK_DEAD) != 0) {
-		ocb->sdev->flags &= ~ORB_LINK_DEAD;
-		sbp_orb_pointer(ocb->sdev, ocb); 
+	if (use_doorbell) {
+		if (prev == NULL) {
+			if (ocb->sdev->last_ocb != NULL)
+				sbp_doorbell(ocb->sdev);
+			else
+				sbp_orb_pointer(ocb->sdev, ocb); 
+		}
+	} else {
+		if (prev == NULL || (ocb->sdev->flags & ORB_LINK_DEAD) != 0) {
+			ocb->sdev->flags &= ~ORB_LINK_DEAD;
+			sbp_orb_pointer(ocb->sdev, ocb); 
+		}
 	}
 }
 
@@ -2602,12 +2672,12 @@ sbp_dequeue_ocb(struct sbp_dev *sdev, struct sbp_status *sbp_status)
 
 SBP_DEBUG(1)
 	sbp_show_sdev_info(sdev, 2);
-#if __FreeBSD_version >= 500000
-	printf("%s: 0x%08x src %d\n",
-#else
+#if defined(__DragonFly__) || __FreeBSD_version < 500000
 	printf("%s: 0x%08lx src %d\n",
+#else
+	printf("%s: 0x%08x src %d\n",
 #endif
-	    __FUNCTION__, ntohl(sbp_status->orb_lo), sbp_status->src);
+	    __func__, ntohl(sbp_status->orb_lo), sbp_status->src);
 END_DEBUG
 	for (ocb = STAILQ_FIRST(&sdev->ocbs); ocb != NULL; ocb = next) {
 		next = STAILQ_NEXT(ocb, ocb);
@@ -2627,17 +2697,30 @@ END_DEBUG
 				bus_dmamap_unload(sdev->target->sbp->dmat,
 					ocb->dmamap);
 			}
-			if (sbp_status->src == SRC_NO_NEXT) {
-				if (next != NULL)
-					sbp_orb_pointer(sdev, next); 
-				else if (order > 0) {
-					/*
-					 * Unordered execution
-					 * We need to send pointer for
-					 * next ORB
-					 */
-					sdev->flags |= ORB_LINK_DEAD;
+			if (!use_doorbell) {
+				if (sbp_status->src == SRC_NO_NEXT) {
+					if (next != NULL)
+						sbp_orb_pointer(sdev, next); 
+					else if (order > 0) {
+						/*
+						 * Unordered execution
+						 * We need to send pointer for
+						 * next ORB
+						 */
+						sdev->flags |= ORB_LINK_DEAD;
+					}
 				}
+			} else {
+				/*
+				 * XXX this is not correct for unordered
+				 * execution. 
+				 */
+				if (sdev->last_ocb != NULL)
+					sbp_free_ocb(sdev, sdev->last_ocb);
+				sdev->last_ocb = ocb;
+				if (next != NULL &&
+				    sbp_status->src == SRC_NO_NEXT)
+					sbp_doorbell(sdev);
 			}
 			break;
 		} else
@@ -2657,35 +2740,38 @@ static struct sbp_ocb *
 sbp_enqueue_ocb(struct sbp_dev *sdev, struct sbp_ocb *ocb)
 {
 	int s = splfw();
-	struct sbp_ocb *prev;
+	struct sbp_ocb *prev, *prev2;
 
 SBP_DEBUG(1)
 	sbp_show_sdev_info(sdev, 2);
-#if __FreeBSD_version >= 500000
-	printf("%s: 0x%08jx\n", __FUNCTION__, (uintmax_t)ocb->bus_addr);
+#if defined(__DragonFly__) || __FreeBSD_version < 500000
+	printf("%s: 0x%08x\n", __func__, ocb->bus_addr);
 #else
-	printf("%s: 0x%08x\n", __FUNCTION__, ocb->bus_addr);
+	printf("%s: 0x%08jx\n", __func__, (uintmax_t)ocb->bus_addr);
 #endif
 END_DEBUG
-	prev = STAILQ_LAST(&sdev->ocbs, sbp_ocb, ocb);
+	prev2 = prev = STAILQ_LAST(&sdev->ocbs, sbp_ocb, ocb);
 	STAILQ_INSERT_TAIL(&sdev->ocbs, ocb, ocb);
 
 	if (ocb->ccb != NULL)
 		ocb->ccb->ccb_h.timeout_ch = timeout(sbp_timeout, (caddr_t)ocb,
 					(ocb->ccb->ccb_h.timeout * hz) / 1000);
 
-	if (prev != NULL) {
+	if (use_doorbell && prev == NULL)
+		prev2 = sdev->last_ocb;
+
+	if (prev2 != NULL) {
 SBP_DEBUG(2)
-#if __FreeBSD_version >= 500000
-		printf("linking chain 0x%jx -> 0x%jx\n",
-		    (uintmax_t)prev->bus_addr, (uintmax_t)ocb->bus_addr);
-#else
+#if defined(__DragonFly__) || __FreeBSD_version < 500000
 		printf("linking chain 0x%x -> 0x%x\n",
-		    prev->bus_addr, ocb->bus_addr);
+		    prev2->bus_addr, ocb->bus_addr);
+#else
+		printf("linking chain 0x%jx -> 0x%jx\n",
+		    (uintmax_t)prev2->bus_addr, (uintmax_t)ocb->bus_addr);
 #endif
 END_DEBUG
-		prev->orb[1] = htonl(ocb->bus_addr);
-		prev->orb[0] = 0;
+		prev2->orb[1] = htonl(ocb->bus_addr);
+		prev2->orb[0] = 0;
 	}
 	splx(s);
 
@@ -2699,6 +2785,7 @@ sbp_get_ocb(struct sbp_dev *sdev)
 	int s = splfw();
 	ocb = STAILQ_FIRST(&sdev->free_ocbs);
 	if (ocb == NULL) {
+		sdev->flags |= ORB_SHORTAGE;
 		printf("ocb shortage!!!\n");
 		return NULL;
 	}
@@ -2714,6 +2801,14 @@ sbp_free_ocb(struct sbp_dev *sdev, struct sbp_ocb *ocb)
 	ocb->flags = 0;
 	ocb->ccb = NULL;
 	STAILQ_INSERT_TAIL(&sdev->free_ocbs, ocb, ocb);
+	if ((sdev->flags & ORB_SHORTAGE) != 0) {
+		int count;
+
+		sdev->flags &= ~ORB_SHORTAGE;
+		count = sdev->freeze;
+		sdev->freeze = 0;
+		xpt_release_devq(sdev->path, count, TRUE);
+	}
 }
 
 static void
@@ -2724,10 +2819,10 @@ sbp_abort_ocb(struct sbp_ocb *ocb, int status)
 	sdev = ocb->sdev;
 SBP_DEBUG(0)
 	sbp_show_sdev_info(sdev, 2);
-#if __FreeBSD_version >= 500000
-	printf("sbp_abort_ocb 0x%jx\n", (uintmax_t)ocb->bus_addr);
-#else
+#if defined(__DragonFly__) || __FreeBSD_version < 500000
 	printf("sbp_abort_ocb 0x%x\n", ocb->bus_addr);
+#else
+	printf("sbp_abort_ocb 0x%jx\n", (uintmax_t)ocb->bus_addr);
 #endif
 END_DEBUG
 SBP_DEBUG(1)
@@ -2764,6 +2859,10 @@ sbp_abort_all_ocbs(struct sbp_dev *sdev, int status)
 		next = STAILQ_NEXT(ocb, ocb);
 		sbp_abort_ocb(ocb, status);
 	}
+	if (sdev->last_ocb != NULL) {
+		sbp_free_ocb(sdev, sdev->last_ocb);
+		sdev->last_ocb = NULL;
+	}
 
 	splx(s);
 }
@@ -2786,6 +2885,9 @@ static driver_t sbp_driver = {
 	sbp_methods,
 	sizeof(struct sbp_softc),
 };
+#ifdef __DragonFly__
+DECLARE_DUMMY_MODULE(sbp);
+#endif
 DRIVER_MODULE(sbp, firewire, sbp_driver, sbp_devclass, 0, 0);
 MODULE_VERSION(sbp, 1);
 MODULE_DEPEND(sbp, firewire, 1, 1, 1);

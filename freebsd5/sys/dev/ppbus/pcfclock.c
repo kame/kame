@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ppbus/pcfclock.c,v 1.13 2003/08/24 17:54:16 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ppbus/pcfclock.c,v 1.19 2004/07/09 16:56:46 cognet Exp $");
 
 #include "opt_pcfclock.h"
 
@@ -35,6 +35,7 @@ __FBSDID("$FreeBSD: src/sys/dev/ppbus/pcfclock.c,v 1.13 2003/08/24 17:54:16 obri
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/conf.h>
 #include <sys/fcntl.h>
 #include <sys/uio.h>
@@ -67,13 +68,13 @@ static	d_open_t		pcfclock_open;
 static	d_close_t		pcfclock_close;
 static	d_read_t		pcfclock_read;
 
-#define CDEV_MAJOR 140
 static struct cdevsw pcfclock_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	pcfclock_open,
 	.d_close =	pcfclock_close,
 	.d_read =	pcfclock_read,
 	.d_name =	PCFCLOCK_NAME,
-	.d_maj =	CDEV_MAJOR,
 };
 
 #ifndef PCFCLOCK_MAX_RETRIES
@@ -117,7 +118,11 @@ static void
 pcfclock_identify(driver_t *driver, device_t parent)
 {
 
-	BUS_ADD_CHILD(parent, 0, PCFCLOCK_NAME, -1);
+	device_t dev;
+
+	dev = device_find_child(parent, PCFCLOCK_NAME, 0);
+	if (!dev)
+		BUS_ADD_CHILD(parent, 0, PCFCLOCK_NAME, -1);
 }
 
 static int
@@ -128,7 +133,6 @@ pcfclock_probe(device_t dev)
 	device_set_desc(dev, "PCF-1.0");
 
 	sc = DEVTOSOFTC(dev);
-	bzero(sc, sizeof(struct pcfclock_data));
 	
 	return (0);
 }
@@ -147,7 +151,7 @@ pcfclock_attach(device_t dev)
 }
 
 static int 
-pcfclock_open(dev_t dev, int flag, int fms, struct thread *td)
+pcfclock_open(struct cdev *dev, int flag, int fms, struct thread *td)
 {
 	u_int unit = minor(dev);
 	struct pcfclock_data *sc = UNITOSOFTC(unit);
@@ -168,7 +172,7 @@ pcfclock_open(dev_t dev, int flag, int fms, struct thread *td)
 }
 
 static int
-pcfclock_close(dev_t dev, int flags, int fmt, struct thread *td)
+pcfclock_close(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	u_int unit = minor(dev);
 	struct pcfclock_data *sc = UNITOSOFTC(unit);
@@ -183,7 +187,7 @@ pcfclock_close(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static void
-pcfclock_write_cmd(dev_t dev, unsigned char command)
+pcfclock_write_cmd(struct cdev *dev, unsigned char command)
 {
 	u_int unit = minor(dev);
 	device_t ppidev = UNITODEVICE(unit);
@@ -203,7 +207,7 @@ pcfclock_write_cmd(dev_t dev, unsigned char command)
 }
 
 static void
-pcfclock_display_data(dev_t dev, char buf[18]) 
+pcfclock_display_data(struct cdev *dev, char buf[18]) 
 {
 	u_int unit = minor(dev);
 #ifdef PCFCLOCK_VERBOSE
@@ -227,7 +231,7 @@ pcfclock_display_data(dev_t dev, char buf[18])
 }
 
 static int 
-pcfclock_read_data(dev_t dev, char *buf, ssize_t bits)
+pcfclock_read_data(struct cdev *dev, char *buf, ssize_t bits)
 {
 	u_int unit = minor(dev);
 	device_t ppidev = UNITODEVICE(unit);
@@ -266,7 +270,7 @@ pcfclock_read_data(dev_t dev, char *buf, ssize_t bits)
 }
 
 static int 
-pcfclock_read_dev(dev_t dev, char *buf, int maxretries) 
+pcfclock_read_dev(struct cdev *dev, char *buf, int maxretries) 
 {
 	u_int unit = minor(dev);
 	device_t ppidev = UNITODEVICE(unit);
@@ -296,7 +300,7 @@ pcfclock_read_dev(dev_t dev, char *buf, int maxretries)
 }
 
 static int
-pcfclock_read(dev_t dev, struct uio *uio, int ioflag)
+pcfclock_read(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	u_int unit = minor(dev);
 	char buf[18];

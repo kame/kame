@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ips/ips_commands.c,v 1.7.2.1 2004/01/06 15:52:23 mbr Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ips/ips_commands.c,v 1.11 2004/06/14 18:19:04 jdp Exp $");
 
 #include <dev/ips/ips.h>
 
@@ -44,9 +44,7 @@ static void ips_wakeup_callback(ips_command_t *command)
 	status->value = command->status.value;
 	bus_dmamap_sync(command->sc->command_dmatag, command->command_dmamap, 
 			BUS_DMASYNC_POSTWRITE);
-	mtx_lock(&command->sc->cmd_mtx);
-	wakeup(status);
-	mtx_unlock(&command->sc->cmd_mtx);
+	sema_post(&command->cmd_sema);
 }
 /* Below are a series of functions for sending an IO request
  * to the adapter.  The flow order is: start, send, callback, finish.
@@ -163,15 +161,24 @@ static int ips_send_io_request(ips_command_t *command)
 	return 0;
 } 
 
-void ips_start_io_request(ips_softc_t *sc, struct bio *iobuf)
+void ips_start_io_request(ips_softc_t *sc)
 {
-	if(ips_get_free_cmd(sc, ips_send_io_request, iobuf, 0)){
-		device_printf(sc->dev, "no mem for command slots!\n");
-		iobuf->bio_flags |= BIO_ERROR;
-		iobuf->bio_error = ENOMEM;
-		ipsd_finish(iobuf);
+	struct bio *iobuf;
+
+	mtx_lock(&sc->queue_mtx);
+	iobuf = bioq_first(&sc->queue);
+	if(!iobuf) {
+		mtx_unlock(&sc->queue_mtx);
 		return;
 	}
+
+	if(ips_get_free_cmd(sc, ips_send_io_request, iobuf, IPS_NOWAIT_FLAG)){
+		mtx_unlock(&sc->queue_mtx);
+		return;
+	}
+	
+	bioq_remove(&sc->queue, iobuf);
+	mtx_unlock(&sc->queue_mtx);
 	return;
 }
 
@@ -236,15 +243,13 @@ static int ips_send_adapter_info_cmd(ips_command_t *command)
 		goto exit;
 	}
 	command->callback = ips_wakeup_callback;
-	mtx_lock(&sc->cmd_mtx);
 	bus_dmamap_load(command->data_dmatag, command->data_dmamap, 
 			command->data_buffer,IPS_ADAPTER_INFO_LEN, 
 			ips_adapter_info_callback, command, BUS_DMA_NOWAIT);
 
 	if ((status->value == IPS_ERROR_STATUS) ||
-	    (msleep(status, &sc->cmd_mtx, 0, "ips", 30*hz) == EWOULDBLOCK))
+	    (sema_timedwait(&command->cmd_sema, 30*hz) != 0))
 		error = ETIMEDOUT;
-	mtx_unlock(&sc->cmd_mtx);
 
 	if (error == 0) {
 		bus_dmamap_sync(command->data_dmatag, command->data_dmamap, 
@@ -267,19 +272,19 @@ int ips_get_adapter_info(ips_softc_t *sc)
 {
 	int error = 0;
 	ips_cmd_status_t *status;
-	status = malloc(sizeof(ips_cmd_status_t), M_DEVBUF, M_NOWAIT|M_ZERO);
+	status = malloc(sizeof(ips_cmd_status_t), M_IPSBUF, M_NOWAIT|M_ZERO);
 	if(!status)
 		return ENOMEM;
 	if(ips_get_free_cmd(sc, ips_send_adapter_info_cmd, status, 
 			    IPS_NOWAIT_FLAG) > 0){
 		device_printf(sc->dev, "unable to get adapter configuration\n");
-		free(status, M_DEVBUF);
+		free(status, M_IPSBUF);
 		return ENXIO;
 	}
 	if (COMMAND_ERROR(status)){
 		error = ENXIO;
 	}
-	free(status, M_DEVBUF);
+	free(status, M_IPSBUF);
 	return error;
 }
 
@@ -343,14 +348,12 @@ static int ips_send_drive_info_cmd(ips_command_t *command)
 		goto exit;
 	}
 	command->callback = ips_wakeup_callback;
-	mtx_lock(&sc->cmd_mtx);
 	bus_dmamap_load(command->data_dmatag, command->data_dmamap, 
 			command->data_buffer,IPS_DRIVE_INFO_LEN, 
 			ips_drive_info_callback, command, BUS_DMA_NOWAIT);
 	if ((status->value == IPS_ERROR_STATUS) ||
-	    (msleep(status, &sc->cmd_mtx, 0, "ips", 10*hz) == EWOULDBLOCK))
+	    (sema_timedwait(&command->cmd_sema, 10*hz) != 0))
 		error = ETIMEDOUT;
-	mtx_unlock(&sc->cmd_mtx);
 
 	if (error == 0) {
 		bus_dmamap_sync(command->data_dmatag, command->data_dmamap, 
@@ -375,19 +378,19 @@ int ips_get_drive_info(ips_softc_t *sc)
 {
 	int error = 0;
 	ips_cmd_status_t *status;
-	status = malloc(sizeof(ips_cmd_status_t), M_DEVBUF, M_NOWAIT|M_ZERO);
+	status = malloc(sizeof(ips_cmd_status_t), M_IPSBUF, M_NOWAIT|M_ZERO);
 	if(!status)
 		return ENOMEM;
 	if(ips_get_free_cmd(sc, ips_send_drive_info_cmd, status, 
 			    IPS_NOWAIT_FLAG) > 0){
-		free(status, M_DEVBUF);
+		free(status, M_IPSBUF);
 		device_printf(sc->dev, "unable to get drive configuration\n");
 		return ENXIO;
 	}
 	if(COMMAND_ERROR(status)){
 		error = ENXIO;
 	}
-	free(status, M_DEVBUF);
+	free(status, M_IPSBUF);
 	return error;
 }
 
@@ -406,11 +409,9 @@ static int ips_send_flush_cache_cmd(ips_command_t *command)
 	command_struct->id = command->id;
 	bus_dmamap_sync(sc->command_dmatag, command->command_dmamap, 
 			BUS_DMASYNC_PREWRITE);
-	mtx_lock(&sc->cmd_mtx);
 	sc->ips_issue_cmd(command);
 	if (status->value != IPS_ERROR_STATUS)
-		msleep(status, &sc->cmd_mtx, 0, "flush2", 0);
-	mtx_unlock(&sc->cmd_mtx);
+		sema_wait(&command->cmd_sema);
 	ips_insert_free_cmd(sc, command);
 	return 0;
 }
@@ -418,19 +419,19 @@ static int ips_send_flush_cache_cmd(ips_command_t *command)
 int ips_flush_cache(ips_softc_t *sc)
 {
 	ips_cmd_status_t *status;
-	status = malloc(sizeof(ips_cmd_status_t), M_DEVBUF, M_NOWAIT|M_ZERO);
+	status = malloc(sizeof(ips_cmd_status_t), M_IPSBUF, M_NOWAIT|M_ZERO);
 	if(!status)
 		return ENOMEM;
 	device_printf(sc->dev, "flushing cache\n");
 	if(ips_get_free_cmd(sc, ips_send_flush_cache_cmd, status, 
 			    IPS_NOWAIT_FLAG)){
-		free(status, M_DEVBUF);
+		free(status, M_IPSBUF);
 		device_printf(sc->dev, "ERROR: unable to get a command! can't flush cache!\n");
 	}
 	if(COMMAND_ERROR(status)){
 		device_printf(sc->dev, "ERROR: cache flush command failed!\n");
 	}
-	free(status, M_DEVBUF);
+	free(status, M_IPSBUF);
 	return 0;
 }
 
@@ -494,11 +495,9 @@ static int ips_send_ffdc_reset_cmd(ips_command_t *command)
 
 	bus_dmamap_sync(sc->command_dmatag, command->command_dmamap,
 			BUS_DMASYNC_PREWRITE);
-	mtx_lock(&sc->cmd_mtx);
 	sc->ips_issue_cmd(command);
 	if (status->value != IPS_ERROR_STATUS)
-		msleep(status, &sc->cmd_mtx, 0, "ffdc", 0);
-	mtx_unlock(&sc->cmd_mtx);
+		sema_wait(&command->cmd_sema);
 	ips_insert_free_cmd(sc, command);
 	return 0;
 }
@@ -506,18 +505,18 @@ static int ips_send_ffdc_reset_cmd(ips_command_t *command)
 int ips_ffdc_reset(ips_softc_t *sc)
 {
 	ips_cmd_status_t *status;
-	status = malloc(sizeof(ips_cmd_status_t), M_DEVBUF, M_NOWAIT|M_ZERO);
+	status = malloc(sizeof(ips_cmd_status_t), M_IPSBUF, M_NOWAIT|M_ZERO);
 	if(!status)
 		return ENOMEM;
 	if(ips_get_free_cmd(sc, ips_send_ffdc_reset_cmd, status,
 			    IPS_NOWAIT_FLAG)){
-		free(status, M_DEVBUF);
+		free(status, M_IPSBUF);
 		device_printf(sc->dev, "ERROR: unable to get a command! can't send ffdc reset!\n");
 	}
 	if(COMMAND_ERROR(status)){
 		device_printf(sc->dev, "ERROR: ffdc reset command failed!\n");
 	}
-	free(status, M_DEVBUF);
+	free(status, M_IPSBUF);
 	return 0;
 }
 
@@ -603,14 +602,12 @@ static int ips_read_nvram(ips_command_t *command){
 		goto exit;
 	}
 	command->callback = ips_write_nvram;
-	mtx_lock(&sc->cmd_mtx);
 	bus_dmamap_load(command->data_dmatag, command->data_dmamap, 
 			command->data_buffer,IPS_NVRAM_PAGE_SIZE, 
 			ips_read_nvram_callback, command, BUS_DMA_NOWAIT);
 	if ((status->value == IPS_ERROR_STATUS) ||
-	    (msleep(status, &sc->cmd_mtx, 0, "ips", 0) == EWOULDBLOCK))
+	    (sema_timedwait(&command->cmd_sema, 30*hz) != 0))
 		error = ETIMEDOUT;
-	mtx_unlock(&sc->cmd_mtx);
 
 	if (error == 0) {
 		bus_dmamap_sync(command->data_dmatag, command->data_dmamap, 
@@ -629,18 +626,18 @@ exit:
 int ips_update_nvram(ips_softc_t *sc)
 {
 	ips_cmd_status_t *status;
-	status = malloc(sizeof(ips_cmd_status_t), M_DEVBUF, M_NOWAIT|M_ZERO);
+	status = malloc(sizeof(ips_cmd_status_t), M_IPSBUF, M_NOWAIT|M_ZERO);
 	if(!status)
 		return ENOMEM;
 	if(ips_get_free_cmd(sc, ips_read_nvram, status, IPS_NOWAIT_FLAG)){
-		free(status, M_DEVBUF);
+		free(status, M_IPSBUF);
 		device_printf(sc->dev, "ERROR: unable to get a command! can't update nvram\n");
 		return 1;
 	}
 	if(COMMAND_ERROR(status)){
 		device_printf(sc->dev, "ERROR: nvram update command failed!\n");
 	}
-	free(status, M_DEVBUF);
+	free(status, M_IPSBUF);
 	return 0;
 
 
@@ -661,11 +658,9 @@ static int ips_send_config_sync_cmd(ips_command_t *command)
 	command_struct->reserve2 = IPS_POCL;
 	bus_dmamap_sync(sc->command_dmatag, command->command_dmamap, 
 			BUS_DMASYNC_PREWRITE);
-	mtx_lock(&sc->cmd_mtx);
 	sc->ips_issue_cmd(command);
 	if (status->value != IPS_ERROR_STATUS)
-		msleep(status, &sc->cmd_mtx, 0, "ipssyn", 0);
-	mtx_unlock(&sc->cmd_mtx);
+		sema_wait(&command->cmd_sema);
 	ips_insert_free_cmd(sc, command);
 	return 0;
 }
@@ -684,11 +679,9 @@ static int ips_send_error_table_cmd(ips_command_t *command)
 	command_struct->reserve2 = IPS_CSL;
 	bus_dmamap_sync(sc->command_dmatag, command->command_dmamap, 
 			BUS_DMASYNC_PREWRITE);
-	mtx_lock(&sc->cmd_mtx);
 	sc->ips_issue_cmd(command);
 	if (status->value != IPS_ERROR_STATUS)
-		msleep(status, &sc->cmd_mtx, 0, "ipsetc", 0);
-	mtx_unlock(&sc->cmd_mtx);
+		sema_wait(&command->cmd_sema);
 	ips_insert_free_cmd(sc, command);
 	return 0;
 }
@@ -697,18 +690,18 @@ static int ips_send_error_table_cmd(ips_command_t *command)
 int ips_clear_adapter(ips_softc_t *sc)
 {
 	ips_cmd_status_t *status;
-	status = malloc(sizeof(ips_cmd_status_t), M_DEVBUF, M_NOWAIT|M_ZERO);
+	status = malloc(sizeof(ips_cmd_status_t), M_IPSBUF, M_NOWAIT|M_ZERO);
 	if(!status)
 		return ENOMEM;
 	device_printf(sc->dev, "syncing config\n");
 	if(ips_get_free_cmd(sc, ips_send_config_sync_cmd, status, 
 			    IPS_NOWAIT_FLAG)){
-		free(status, M_DEVBUF);
+		free(status, M_IPSBUF);
 		device_printf(sc->dev, "ERROR: unable to get a command! can't sync cache!\n");
 		return 1;
 	}
 	if(COMMAND_ERROR(status)){
-		free(status, M_DEVBUF);
+		free(status, M_IPSBUF);
 		device_printf(sc->dev, "ERROR: cache sync command failed!\n");
 		return 1;
 	}
@@ -716,16 +709,16 @@ int ips_clear_adapter(ips_softc_t *sc)
 	device_printf(sc->dev, "clearing error table\n");
 	if(ips_get_free_cmd(sc, ips_send_error_table_cmd, status, 
 			    IPS_NOWAIT_FLAG)){
-		free(status, M_DEVBUF);
+		free(status, M_IPSBUF);
 		device_printf(sc->dev, "ERROR: unable to get a command! can't sync cache!\n");
 		return 1;
 	}
 	if(COMMAND_ERROR(status)){
 		device_printf(sc->dev, "ERROR: etable command failed!\n");
-		free(status, M_DEVBUF);
+		free(status, M_IPSBUF);
 		return 1;
 	}
 
-	free(status, M_DEVBUF);
+	free(status, M_IPSBUF);
 	return 0;
 }

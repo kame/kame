@@ -23,7 +23,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/ddb/db_variables.h,v 1.12 2002/03/20 05:14:28 alfred Exp $
+ * $FreeBSD: src/sys/ddb/db_variables.h,v 1.13 2004/07/10 23:47:19 marcel Exp $
  */
 
 /*
@@ -52,6 +52,7 @@ struct db_variable {
 extern struct db_variable	db_regs[];	/* machine registers */
 extern struct db_variable	*db_eregs;
 
-void	db_read_variable(struct db_variable *, db_expr_t *);
+int db_read_variable(struct db_variable *, db_expr_t *);
+int db_write_variable(struct db_variable *, db_expr_t);
 
 #endif /* _!DDB_DB_VARIABLES_H_ */

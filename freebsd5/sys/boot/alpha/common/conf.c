@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/boot/alpha/common/conf.c,v 1.4 2002/12/19 19:34:58 jake Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/alpha/common/conf.c,v 1.6 2004/03/25 20:36:57 jhb Exp $");
 
 #include <stand.h>
 #include "libalpha/libalpha.h"
@@ -66,6 +67,7 @@ struct fs_ops *file_system[] = {
     &nfs_fsops,
 #endif
     &gzipfs_fsops,
+    &splitfs_fsops,
     NULL
 };
 

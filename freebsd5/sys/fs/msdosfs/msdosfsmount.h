@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/fs/msdosfs/msdosfsmount.h,v 1.29 2003/09/26 20:26:23 fjoe Exp $ */
+/* $FreeBSD: src/sys/fs/msdosfs/msdosfsmount.h,v 1.33 2004/07/03 13:22:38 tjr Exp $ */
 /*	$NetBSD: msdosfsmount.h,v 1.17 1997/11/17 15:37:07 ws Exp $	*/
 
 /*-
@@ -53,16 +53,20 @@
 
 #ifdef _KERNEL
 
+#include <sys/tree.h>
+
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_MSDOSFSMNT);
 #endif
+
+struct msdosfs_fileno;
 
 /*
  * Layout of the mount control block for a msdos filesystem.
  */
 struct msdosfsmount {
 	struct mount *pm_mountp;/* vfs mount struct for this fs */
-	dev_t pm_dev;		/* block special device mounted */
+	struct cdev *pm_dev;		/* block special device mounted */
 	uid_t pm_uid;		/* uid to set as owner of the files */
 	gid_t pm_gid;		/* gid to set as owner of the files */
 	mode_t pm_mask;		/* mask to and with file protection bits 
@@ -99,7 +103,20 @@ struct msdosfsmount {
 	void *pm_w2u;	/* Unicode->Local iconv handle */
 	void *pm_u2d;	/* Unicode->DOS iconv handle */
 	void *pm_d2u;	/* DOS->Local iconv handle */
+	u_int32_t pm_nfileno;	/* next 32-bit fileno */
+	RB_HEAD(msdosfs_filenotree, msdosfs_fileno) pm_filenos; /* 64<->32-bit fileno mapping */
 };
+
+/*
+ * A 64-bit file number and the 32-bit file number to which it is mapped,
+ * in a red-black tree node.
+ */
+struct msdosfs_fileno {
+	RB_ENTRY(msdosfs_fileno)	mf_tree;
+	uint32_t			mf_fileno32;
+	uint64_t			mf_fileno64;
+};
+
 /* Byte offset in FAT on filesystem pmp, cluster cn */
 #define	FATOFS(pmp, cn)	((cn) * (pmp)->pm_fatmult / (pmp)->pm_fatdiv)
 
@@ -202,6 +219,10 @@ int msdosfs_init(struct vfsconf *vfsp);
 int msdosfs_uninit(struct vfsconf *vfsp);
 int msdosfs_mountroot(void);
 
+void msdosfs_fileno_init(struct mount *);
+void msdosfs_fileno_free(struct mount *);
+uint32_t msdosfs_fileno_map(struct mount *, uint64_t);
+
 #endif /* _KERNEL */
 
 /*
@@ -213,13 +234,13 @@ struct msdosfs_args {
 	uid_t	uid;		/* uid that owns msdosfs files */
 	gid_t	gid;		/* gid that owns msdosfs files */
 	mode_t	mask;		/* file mask to be applied for msdosfs perms */
-	mode_t	dirmask;	/* dir  mask to be applied for msdosfs perms */
 	int	flags;		/* see below */
 	int magic;		/* version number */
 	u_int16_t u2w[128];     /* Local->Unicode table */
 	char	*cs_win;	/* Windows(Unicode) Charset */
 	char	*cs_dos;	/* DOS Charset */
 	char	*cs_local;	/* Local Charset */
+	mode_t	dirmask;	/* dir  mask to be applied for msdosfs perms */
 };
 
 /*
@@ -236,6 +257,7 @@ struct msdosfs_args {
 #define	MSDOSFSMNT_RONLY	0x80000000	/* mounted read-only	*/
 #define	MSDOSFSMNT_WAITONFAT	0x40000000	/* mounted synchronous	*/
 #define	MSDOSFS_FATMIRROR	0x20000000	/* FAT is mirrored */
+#define	MSDOSFS_LARGEFS		0x10000000	/* perform fileno mapping */
 
 #define MSDOSFS_ARGSMAGIC	0xe4eff300
 

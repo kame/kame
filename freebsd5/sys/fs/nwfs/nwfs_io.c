@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/nwfs/nwfs_io.c,v 1.32 2003/10/04 23:37:38 alc Exp $
+ * $FreeBSD: src/sys/fs/nwfs/nwfs_io.c,v 1.34 2004/05/06 05:03:20 alc Exp $
  *
  */
 #include <sys/param.h>
@@ -235,12 +235,15 @@ nwfs_writevnode(vp, uiop, cred, ioflag)
 		}
 	}
 	if (uiop->uio_resid == 0) return 0;
-	if (td && uiop->uio_offset + uiop->uio_resid
-	    > td->td_proc->p_rlimit[RLIMIT_FSIZE].rlim_cur) {
+	if (td != NULL) {
 		PROC_LOCK(td->td_proc);
-		psignal(td->td_proc, SIGXFSZ);
+		if  (uiop->uio_offset + uiop->uio_resid >
+		    lim_cur(td->td_proc, RLIMIT_FSIZE)) {
+			psignal(td->td_proc, SIGXFSZ);
+			PROC_UNLOCK(td->td_proc);
+			return (EFBIG);
+		}
 		PROC_UNLOCK(td->td_proc);
-		return (EFBIG);
 	}
 	error = ncp_write(NWFSTOCONN(nmp), &np->n_fh, uiop, cred);
 	NCPVNDEBUG("after: ofs=%d,resid=%d\n",(int)uiop->uio_offset, uiop->uio_resid);
@@ -460,8 +463,6 @@ nwfs_getpages(ap)
 		vm_page_t m;
 		nextoff = toff + PAGE_SIZE;
 		m = pages[i];
-
-		m->flags &= ~PG_ZERO;
 
 		if (nextoff <= size) {
 			m->valid = VM_PAGE_BITS_ALL;

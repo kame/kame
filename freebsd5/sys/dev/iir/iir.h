@@ -1,8 +1,8 @@
-/* $FreeBSD: src/sys/dev/iir/iir.h,v 1.5 2003/09/26 15:36:47 scottl Exp $ */
+/* $FreeBSD: src/sys/dev/iir/iir.h,v 1.10 2004/06/16 09:46:46 phk Exp $ */
 /*
- *       Copyright (c) 2000-03 ICP vortex GmbH
- *       Copyright (c) 2002-03 Intel Corporation
- *       Copyright (c) 2003    Adaptec Inc.
+ *       Copyright (c) 2000-04 ICP vortex GmbH
+ *       Copyright (c) 2002-04 Intel Corporation
+ *       Copyright (c) 2003-04 Adaptec Inc.
  *       All Rights Reserved
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,16 +41,14 @@
  * credits:     Niklas Hallqvist;       OpenBSD driver for the ICP Controllers.
  *              FreeBSD.ORG;            Great O/S to work on and for.
  *
- * $Id: iir.h 1.5 2003/08/26 12:28:21 achim Exp $"
+ * $Id: iir.h 1.6 2004/03/30 10:19:44 achim Exp $"
  */
 
 #ifndef _IIR_H
 #define _IIR_H
 
 #define IIR_DRIVER_VERSION      1
-#define IIR_DRIVER_SUBVERSION   4
-
-#define IIR_CDEV_MAJOR          164
+#define IIR_DRIVER_SUBVERSION   5
 
 /* OEM IDs */
 #define OEM_ID_ICP              0x941c
@@ -156,6 +154,8 @@
 #define GDT_IOCTL_GENERAL       _IOWR('J', 0, gdt_ucmd_t) /* general IOCTL */
 #define GDT_IOCTL_DRVERS        _IOR('J', 1, int)      /* get driver version */
 #define GDT_IOCTL_CTRTYPE       _IOWR('J', 2, gdt_ctrt_t) /* get ctr. type */
+#define GDT_IOCTL_DRVERS_OLD    _IOWR('J', 1, int)      /* get driver version */
+#define GDT_IOCTL_CTRTYPE_OLD   _IOR('J', 2, gdt_ctrt_t) /* get ctr. type */
 #define GDT_IOCTL_OSVERS        _IOR('J', 3, gdt_osv_t) /* get OS version */
 #define GDT_IOCTL_CTRCNT        _IOR('J', 5, int)       /* get ctr. count */
 #define GDT_IOCTL_EVENT         _IOWR('J', 8, gdt_event_t) /* get event */
@@ -602,7 +602,7 @@ struct gdt_softc {
 #define GDT_POLLING     0x01
 #define GDT_SHUTDOWN    0x02
 #define GDT_POLL_WAIT   0x80
-    dev_t sc_dev;
+    struct cdev *sc_dev;
     bus_space_tag_t sc_dpmemt;
     bus_space_handle_t sc_dpmemh;
     bus_addr_t sc_dpmembase;
@@ -699,7 +699,7 @@ void    iir_free(struct gdt_softc *);
 void    iir_attach(struct gdt_softc *);
 void    iir_intr(void *arg);
 
-#ifdef __GNUC__
+#if defined( __GNUC__) || defined(__INTEL_COMPILER)
 /* These all require correctly aligned buffers */
 static __inline__ void gdt_enc16(u_int8_t *, u_int16_t);
 static __inline__ void gdt_enc32(u_int8_t *, u_int32_t);
@@ -746,8 +746,8 @@ gdt_dec32(addr)
 extern TAILQ_HEAD(gdt_softc_list, gdt_softc) gdt_softcs;
 extern u_int8_t gdt_polling;
 
-dev_t   gdt_make_dev(int unit);
-void    gdt_destroy_dev(dev_t dev);
+struct cdev *gdt_make_dev(int unit);
+void    gdt_destroy_dev(struct cdev *dev);
 void    gdt_next(struct gdt_softc *gdt);
 void gdt_free_ccb(struct gdt_softc *gdt, struct gdt_ccb *gccb);
 

@@ -27,7 +27,9 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_ttold.c,v 1.12 2003/06/10 21:35:15 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_ttold.c,v 1.13 2004/06/21 22:57:10 phk Exp $");
+
+#ifndef BURN_BRIDGES
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -376,3 +378,5 @@ svr4_ttold_ioctl(fp, td, retval, fd, cmd, data)
 		return 0;	/* ENOSYS really */
 	}
 }
+
+#endif /* BURN_BRIDGES */

@@ -22,11 +22,11 @@
  * DEALINGS IN THE SOFTWARE.
  *
  *
- * $FreeBSD: src/sys/dev/drm/drm_vm.h,v 1.8 2003/10/24 01:48:16 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_vm.h,v 1.11 2004/06/16 09:46:42 phk Exp $
  */
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500102
-static int DRM(dma_mmap)(dev_t kdev, vm_offset_t offset, vm_paddr_t *paddr, 
+static int DRM(dma_mmap)(struct cdev *kdev, vm_offset_t offset, vm_paddr_t *paddr, 
     int prot)
 #elif defined(__FreeBSD__)
 static int DRM(dma_mmap)(dev_t kdev, vm_offset_t offset, int prot)
@@ -55,7 +55,7 @@ static paddr_t DRM(dma_mmap)(dev_t kdev, vm_offset_t offset, int prot)
 }
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500102
-int DRM(mmap)(dev_t kdev, vm_offset_t offset, vm_paddr_t *paddr, 
+int DRM(mmap)(struct cdev *kdev, vm_offset_t offset, vm_paddr_t *paddr, 
     int prot)
 #elif defined(__FreeBSD__)
 int DRM(mmap)(dev_t kdev, vm_offset_t offset, int prot)
@@ -68,7 +68,7 @@ paddr_t DRM(mmap)(dev_t kdev, off_t offset, int prot)
 	drm_map_list_entry_t *listentry = NULL;
 	drm_file_t *priv;
 
-	DRM_GET_PRIV_WITH_RETURN(priv, (DRMFILE)DRM_CURRENTPID);
+	DRM_GET_PRIV_WITH_RETURN(priv, (DRMFILE)(uintptr_t)DRM_CURRENTPID);
 
 	if (!priv->authenticated)
 		return DRM_ERR(EACCES);

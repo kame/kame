@@ -1,21 +1,20 @@
-# $FreeBSD: src/sys/conf/options.pc98,v 1.171 2003/11/15 12:31:02 nyan Exp $
+# $FreeBSD: src/sys/conf/options.pc98,v 1.177 2004/08/16 13:59:01 rwatson Exp $
 # Options specific to the pc98 platform kernels
 
 AUTO_EOI_1		opt_auto_eoi.h
-AUTO_EOI_2		opt_auto_eoi.h
 BROKEN_KEYBOARD_RESET	opt_reset.h
-COMPAT_OLDISA
+DISABLE_PG_G		opt_pmap.h
+DISABLE_PSE		opt_pmap.h
 I586_PMC_GUPROF		opt_i586_guprof.h
 MAXMEM
 MPTABLE_FORCE_HTT
 NO_MIXED_MODE
 PERFMON
-DISABLE_PSE		opt_pmap.h
-DISABLE_PG_G		opt_pmap.h
 PMAP_SHPGPERPROC	opt_pmap.h
-PPC_PROBE_CHIPSET	opt_ppc.h
-PPC_DEBUG		opt_ppc.h
 POWERFAIL_NMI		opt_trap.h
+PPC_DEBUG		opt_ppc.h
+PPC_PROBE_CHIPSET	opt_ppc.h
+MP_WATCHDOG		opt_mp_watchdog.h
 
 # Options for emulators.  These should only be used at config time, so
 # they are handled like options for static filesystems
@@ -25,15 +24,14 @@ IBCS2			opt_dontuse.h
 COMPAT_LINUX		opt_dontuse.h
 COMPAT_SVR4		opt_dontuse.h
 DEBUG_SVR4		opt_svr4.h
-PECOFF_SUPPORT		opt_dontuse.h
 PECOFF_DEBUG		opt_pecoff.h
+PECOFF_SUPPORT		opt_dontuse.h
 
 # Change KVM size.  Changes things all over the kernel.
 KVA_PAGES		opt_global.h
 
 CLK_CALIBRATION_LOOP		opt_clock.h
 CLK_USE_I8254_CALIBRATION	opt_clock.h
-CLK_USE_TSC_CALIBRATION		opt_clock.h
 TIMER_FREQ			opt_clock.h
 
 CPU_BLUELIGHTNING_3X		opt_cpu.h
@@ -73,6 +71,9 @@ GDC
 # Video spigot
 SPIGOT_UNSECURE		opt_spigot.h
 
+# Enables NETGRAPH support for Cronyx adapters
+NETGRAPH_CRONYX		opt_ng_cronyx.h
+
 # -------------------------------
 # isdn4bsd: passive PCI cards
 # -------------------------------
@@ -81,33 +82,29 @@ ELSA_QS1PCI		opt_i4b.h
 # isdn4bsd: misc options
 # -------------------------------
 # temporary workaround for SMP machines
-I4B_SMP_WORKAROUND      opt_i4b.h
+I4B_SMP_WORKAROUND	opt_i4b.h
 # enable VJ compression code for ipr i/f
 IPR_VJ			opt_i4b.h
 IPR_LOG			opt_i4b.h
 
 # bs driver options
-SCSI_BOUNCE_SIZE	opt_bs.h
 BS_TARG_SAFEMODE	opt_bs.h
+SCSI_BOUNCE_SIZE	opt_bs.h
 
 # ct driver options
-CT_USE_RELOCATE_OFFSET	opt_ct.h
 CT_BUS_WEIGHT		opt_ct.h
+CT_USE_RELOCATE_OFFSET	opt_ct.h
 
 # npx options
 FPU_ERROR_BROKEN	opt_npx.h
 
 # PC98 options
-PC98			opt_global.h
 EPSON_BOUNCEDMA		opt_pc98.h
 EPSON_MEMWIN		opt_pc98.h
 LINE30			opt_syscons.h
+PC98			opt_global.h
 
 # Device options
 DEV_APIC		opt_apic.h
-DEV_NPX			opt_npx.h
 DEV_MECIA		opt_mecia.h
-
-# -------------------------------
-# EOF
-# -------------------------------
+DEV_NPX			opt_npx.h

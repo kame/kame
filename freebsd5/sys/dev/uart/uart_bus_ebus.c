@@ -25,18 +25,19 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/uart/uart_bus_ebus.c,v 1.2 2003/09/26 05:14:56 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/uart/uart_bus_ebus.c,v 1.5 2004/08/12 17:41:30 marius Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
+
+#include <dev/ofw/ofw_bus.h>
+
 #include <machine/bus.h>
 #include <sys/rman.h>
 #include <machine/resource.h>
-
-#include <dev/ofw/openfirm.h>
-#include <sparc64/ebus/ebusvar.h>
 
 #include <dev/uart/uart.h>
 #include <dev/uart/uart_bus.h>
@@ -61,15 +62,17 @@ static driver_t uart_ebus_driver = {
 static int
 uart_ebus_probe(device_t dev)
 {
-	const char *nm;
+	const char *nm, *cmpt;
 	struct uart_softc *sc;
 	int error;
 
 	sc = device_get_softc(dev);
 	sc->sc_class = NULL;
 
-	nm = ebus_get_name(dev);
-	if (!strcmp(nm, "su")) {
+	nm = ofw_bus_get_name(dev);
+	cmpt = ofw_bus_get_compat(dev);
+	if (!strcmp(nm, "su") || !strcmp(nm, "su_pnp") || (cmpt != NULL &&
+	    (!strcmp(cmpt, "su") || !strcmp(cmpt, "su16550")))) {
 		sc->sc_class = &uart_ns8250_class;
 		return (uart_bus_probe(dev, 0, 0, 0, 0));
 	}

@@ -25,8 +25,9 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/mcbus/mcpcia.c,v 1.28 2003/11/17 06:10:14 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/mcbus/mcpcia.c,v 1.29 2004/07/01 15:07:26 gallatin Exp $");
 
+#define __RMAN_RESOURCE_VISIBLE
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>

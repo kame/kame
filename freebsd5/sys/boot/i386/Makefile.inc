@@ -1,17 +1,25 @@
 # Common defines for all of /sys/boot/i386/
 #
-# $FreeBSD: src/sys/boot/i386/Makefile.inc,v 1.4 2003/06/26 03:51:57 peter Exp $
+# $FreeBSD: src/sys/boot/i386/Makefile.inc,v 1.9 2004/02/09 14:11:55 ru Exp $
 
-LOADER_ADDRESS?=	0x200000
-CFLAGS+=		-ffreestanding -mpreferred-stack-boundary=2
+BINDIR?=	/boot
+
+LOADER_ADDRESS?=0x200000
+CFLAGS+=	-ffreestanding -mpreferred-stack-boundary=2
+LDFLAGS+=	-nostdlib
 
 .if ${MACHINE_ARCH} == "amd64"
-.MAKEFLAGS:  MACHINE_ARCH=i386 MACHINE=i386 REALLY_AMD64=true
+CFLAGS+=	-m32
+LDFLAGS+=	-m elf_i386_fbsd
+AFLAGS+=	--32
 .endif
 
-.if defined(REALLY_AMD64) && !defined(__been_to_Makefile_inc)
-__been_to_Makefile_inc=	1
-CFLAGS+=		-m32
-LDFLAGS+=		-m elf_i386_fbsd
-AFLAGS+=		--32
+# BTX components
+.if exists(${.OBJDIR}/../btx)
+BTXDIR=		${.OBJDIR}/../btx
+.else
+BTXDIR=		${.CURDIR}/../btx
 .endif
+BTXLDR=		${BTXDIR}/btxldr/btxldr
+BTXKERN=	${BTXDIR}/btx/btx
+BTXCRT=		${BTXDIR}/lib/crt0.o

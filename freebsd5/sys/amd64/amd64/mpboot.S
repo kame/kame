@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/amd64/mpboot.S,v 1.24 2003/11/17 08:58:12 peter Exp $
+ * $FreeBSD: src/sys/amd64/amd64/mpboot.S,v 1.26 2004/06/08 01:02:52 peter Exp $
  */
 
 #include <machine/asmacros.h>		/* miscellaneous asm macros */
@@ -102,7 +102,7 @@ protmode:
 	 */
 	movl	$MSR_EFER, %ecx
 	rdmsr
-	orl	$EFER_LME | EFER_SCE | EFER_NXE, %eax
+	orl	$EFER_LME | EFER_SCE, %eax
 	wrmsr
 
 	/*

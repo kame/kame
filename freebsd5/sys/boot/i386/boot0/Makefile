@@ -1,12 +1,10 @@
-# $FreeBSD: src/sys/boot/i386/boot0/Makefile,v 1.17 2002/09/17 01:48:54 peter Exp $
+# $FreeBSD: src/sys/boot/i386/boot0/Makefile,v 1.29 2004/04/28 21:31:19 ru Exp $
 
-PROG=		boot0
-NOMAN=
+PROG?=	boot0
 STRIP=
-BINDIR?=	/boot
-BINMODE=	444
-
-M4?=	m4
+BINMODE=${NOBINMODE}
+NOMAN=
+SRCS=	${PROG}.S
 
 # The default set of flags compiled into boot0.  This enables update (writing
 # the modified boot0 back to disk after running so that the selection made is
@@ -23,14 +21,16 @@ BOOT_BOOT0_TICKS?=	0xb6
 # unless you are glutton for punishment.
 BOOT_BOOT0_ORG?=	0x600
 
-boot0: boot0.o
-	${LD} -N -e start -Ttext ${BOOT_BOOT0_ORG} -o boot0.out boot0.o
-	objcopy -S -O binary boot0.out ${.TARGET}
+# Comm settings for boot0sio.  0xE3 => 9600 8-N-1
+# XXX: We should create a build-tool or something to convert BOOT_CONSOLE_SPEED
+# and BOOT_COMCONSOLE_PORT into the correct values to define on the build
+# command line
+BOOT_BOOT0_COMCONSOLE_SPEED?=	0xE3
 
-boot0.o: boot0.s
-	${AS} ${AFLAGS} --defsym FLAGS=${BOOT_BOOT0_FLAGS} \
-		--defsym TICKS=${BOOT_BOOT0_TICKS} ${.IMPSRC} -o ${.TARGET}
+CFLAGS+=-DFLAGS=${BOOT_BOOT0_FLAGS} \
+	-DTICKS=${BOOT_BOOT0_TICKS} \
+	-DCOMSPEED=${BOOT_BOOT0_COMCONSOLE_SPEED}
 
-CLEANFILES+= boot0.out boot0.o
+LDFLAGS=-N -e start -Ttext ${BOOT_BOOT0_ORG} -Wl,-S,--oformat,binary
 
 .include <bsd.prog.mk>

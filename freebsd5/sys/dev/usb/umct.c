@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/umct.c,v 1.5 2003/11/16 12:13:39 akiyama Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/umct.c,v 1.8 2004/08/07 23:45:04 sanpei Exp $");
 
 /*
  * Driver for the MCT (Magic Control Technology) USB-RS232 Converter.
@@ -43,6 +43,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/umct.c,v 1.5 2003/11/16 12:13:39 akiyama Exp
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/tty.h>
 #include <sys/interrupt.h>
@@ -50,7 +51,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/umct.c,v 1.5 2003/11/16 12:13:39 akiyama Exp
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
-#include <dev/usb/usbdevs.h>
+#include "usbdevs.h"
 #include <dev/usb/ucomvar.h>
 
 /* The UMCT advertises the standard 8250 UART registers */
@@ -111,6 +112,7 @@ Static const struct umct_product {
 	{ USB_VENDOR_MCT, USB_PRODUCT_MCT_SITECOM_USB232 },
 	{ USB_VENDOR_MCT, USB_PRODUCT_MCT_DU_H3SP_USB232 },
 	{ USB_VENDOR_BELKIN, USB_PRODUCT_BELKIN_F5U109 },
+	{ USB_VENDOR_BELKIN, USB_PRODUCT_BELKIN_F5U409 },
 	{ 0, 0 }
 };
 

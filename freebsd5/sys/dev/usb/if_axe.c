@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/if_axe.c,v 1.9 2003/11/13 20:55:51 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/if_axe.c,v 1.22 2004/08/15 10:51:21 iedowse Exp $");
 
 /*
  * ASIX Electronics AX88172 USB 2.0 ethernet driver. Used in the
@@ -73,6 +73,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/if_axe.c,v 1.9 2003/11/13 20:55:51 obrien Ex
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 
 #include <net/if.h>
@@ -90,7 +91,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/if_axe.c,v 1.9 2003/11/13 20:55:51 obrien Ex
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
 #include <dev/usb/usbdivar.h>
-#include <dev/usb/usbdevs.h>
+#include "usbdevs.h"
 #include <dev/usb/usb_ethersubr.h>
 
 #include <dev/mii/mii.h>
@@ -107,12 +108,12 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/if_axe.c,v 1.9 2003/11/13 20:55:51 obrien Ex
 Static struct axe_type axe_devs[] = {
 	{ USB_VENDOR_ASIX, USB_PRODUCT_ASIX_AX88172 },
 	{ USB_VENDOR_DLINK, USB_PRODUCT_DLINK_DUBE100 },
-	{ USB_VENDOR_LINKSYS2, USB_PRODUCT_LINKSYS_USB200M },
+	{ USB_VENDOR_LINKSYS2, USB_PRODUCT_LINKSYS2_USB200M },
+	{ USB_VENDOR_MELCO, USB_PRODUCT_MELCO_LUAU2KTX },
 	{ USB_VENDOR_NETGEAR, USB_PRODUCT_NETGEAR_FA120 },
+	{ USB_VENDOR_SYSTEMTALKS, USB_PRODUCT_SYSTEMTALKS_SGCX2UL },
 	{ 0, 0 }
 };
-
-Static struct usb_qdat axe_qdat;
 
 Static int axe_match(device_ptr_t);
 Static int axe_attach(device_ptr_t);
@@ -140,7 +141,6 @@ Static int axe_ifmedia_upd(struct ifnet *);
 Static void axe_ifmedia_sts(struct ifnet *, struct ifmediareq *);
 
 Static void axe_setmulti(struct axe_softc *);
-Static u_int32_t axe_mchash(caddr_t);
 
 Static device_method_t axe_methods[] = {
 	/* Device interface */
@@ -313,29 +313,6 @@ axe_ifmedia_sts(struct ifnet *ifp, struct ifmediareq *ifmr)
         return;
 }
 
-Static u_int32_t
-axe_mchash(caddr_t addr)
-{
-	u_int32_t	crc, carry;
-	int		idx, bit;
-	u_int8_t	data;
-
-	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF; /* initial value */
-
-	for (idx = 0; idx < 6; idx++) {
-		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
-			crc <<= 1;
-			if (carry)
-				crc = (crc ^ 0x04c11db6) | carry;
-		}
-	}
-
-	/* return the filter bit position */
-	return((crc >> 26) & 0x0000003F);
-}
-
 Static void
 axe_setmulti(struct axe_softc *sc)
 {
@@ -361,7 +338,8 @@ axe_setmulti(struct axe_softc *sc)
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = axe_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = ether_crc32_be(LLADDR((struct sockaddr_dl *)
+		    ifma->ifma_addr), ETHER_ADDR_LEN) >> 26;
 		hashtbl[h / 8] |= 1 << (h % 8);
 	}
 
@@ -492,28 +470,23 @@ USB_ATTACH(axe)
 	 */
 	sc->axe_phyaddrs[0] = sc->axe_phyaddrs[1] = 0xFF;
 
-	/*
-	 * An ASIX chip was detected. Inform the world.
-	 */
-	printf("axe%d: Ethernet address: %6D\n", sc->axe_unit, eaddr, ":");
-
 	bcopy(eaddr, (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
 	if_initname(ifp, "axe", sc->axe_unit);
 	ifp->if_mtu = ETHERMTU;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_NEEDSGIANT;
 	ifp->if_ioctl = axe_ioctl;
-	ifp->if_output = ether_output;
 	ifp->if_start = axe_start;
 	ifp->if_watchdog = axe_watchdog;
 	ifp->if_init = axe_init;
 	ifp->if_baudrate = 10000000;
 	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 
-	axe_qdat.ifp = ifp;
-	axe_qdat.if_rxstart = axe_rxstart;
+	sc->axe_qdat.ifp = ifp;
+	sc->axe_qdat.if_rxstart = axe_rxstart;
 
 	if (mii_phy_probe(self, &sc->axe_miibus,
 	    axe_ifmedia_upd, axe_ifmedia_sts)) {
@@ -715,7 +688,7 @@ axe_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	}
 
 	ifp->if_ipackets++;
-	m->m_pkthdr.rcvif = (struct ifnet *)&axe_qdat;
+	m->m_pkthdr.rcvif = (struct ifnet *)&sc->axe_qdat;
 	m->m_pkthdr.len = m->m_len = total_len;
 
 	/* Put the packet on the special USB input queue. */
@@ -837,7 +810,8 @@ axe_encap(struct axe_softc *sc, struct mbuf *m, int idx)
 	c->axe_mbuf = m;
 
 	usbd_setup_xfer(c->axe_xfer, sc->axe_ep[AXE_ENDPT_TX],
-	    c, c->axe_buf, m->m_pkthdr.len, 0, 10000, axe_txeof);
+	    c, c->axe_buf, m->m_pkthdr.len, USBD_FORCE_SHORT_XFER,
+	    10000, axe_txeof);
 
 	/* Transmit */
 	err = usbd_transfer(c->axe_xfer);
@@ -1102,8 +1076,6 @@ axe_stop(struct axe_softc *sc)
 
 	AXE_LOCK(sc);
 
-	axe_reset(sc);
-
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_timer = 0;
 
@@ -1151,6 +1123,8 @@ axe_stop(struct axe_softc *sc)
 		}
 		sc->axe_ep[AXE_ENDPT_INTR] = NULL;
 	}
+
+	axe_reset(sc);
 
 	/* Free RX resources. */
 	for (i = 0; i < AXE_RX_LIST_CNT; i++) {

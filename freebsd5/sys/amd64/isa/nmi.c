@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/isa/nmi.c,v 1.78 2003/11/04 13:01:41 nyan Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/isa/nmi.c,v 1.80 2004/05/16 20:30:47 peter Exp $");
 
 #include "opt_mca.h"
 
@@ -46,10 +42,6 @@ __FBSDID("$FreeBSD: src/sys/amd64/isa/nmi.c,v 1.78 2003/11/04 13:01:41 nyan Exp 
 #include <sys/systm.h>
 
 #include <machine/md_var.h>
-
-#ifdef DEV_MCA
-#include <i386/bios/mca_machdep.h>
-#endif
 
 #define NMI_PARITY (1 << 7)
 #define NMI_IOCHAN (1 << 6)
@@ -69,10 +61,6 @@ isa_nmi(int cd)
 	int eisa_port = inb(0x461);
 
 	log(LOG_CRIT, "NMI ISA %x, EISA %x\n", isa_port, eisa_port);
-#ifdef DEV_MCA
-	if (MCA_system && mca_bus_nmi())
-		return(0);
-#endif
 	
 	if (isa_port & NMI_PARITY) {
 		log(LOG_CRIT, "RAM parity error, likely hardware failure.");

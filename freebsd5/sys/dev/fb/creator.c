@@ -23,20 +23,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fb/creator.c,v 1.2 2003/11/11 07:34:08 jake Exp $
+ * $FreeBSD: src/sys/dev/fb/creator.c,v 1.5 2004/07/09 23:12:22 marius Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
-#include <sys/kernel.h>
-#include <sys/conf.h>
-#include <sys/cons.h>
-#include <sys/proc.h>
-#include <sys/fcntl.h>
-#include <sys/malloc.h>
 #include <sys/fbio.h>
 #include <sys/consio.h>
+#include <sys/kernel.h>
+#include <sys/module.h>
 
 #include <machine/bus.h>
 #include <machine/ofw_upa.h>
@@ -165,7 +161,7 @@ creator_configure(int flags)
 	struct upa_regs reg[FFB_NREG];
 	struct creator_softc *sc;
 	phandle_t chosen;
-	phandle_t stdout;
+	ihandle_t stdout;
 	phandle_t child;
 	char buf[32];
 	int i;
@@ -183,7 +179,7 @@ creator_configure(int flags)
 
 	chosen = OF_finddevice("/chosen");
 	OF_getprop(chosen, "stdout", &stdout, sizeof(stdout));
-	if (child == stdout)
+	if (child == OF_instance_to_package(stdout))
 		sc->sc_console = 1;
 
 	OF_getprop(child, "reg", reg, sizeof(reg));
@@ -292,11 +288,11 @@ creator_init(int unit, video_adapter_t *adp, int flags)
 	FFB_WRITE(sc, FFB_DAC, FFB_DAC_VALUE2, 0x0);
 
 	if (sc->sc_console) {
-		col = NULL;
-		row = NULL;
+		col = 0;
+		row = 0;
 		OF_interpret("stdout @ is my-self addr line# addr column# ",
 		    2, &col, &row);
-		if (col != NULL && row != NULL) {
+		if (col != 0 && row != 0) {
 			sc->sc_colp = (int *)(col + 4);
 			sc->sc_rowp = (int *)(row + 4);
 		}

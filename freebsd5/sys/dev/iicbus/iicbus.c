@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/iicbus/iicbus.c,v 1.17 2003/08/24 17:49:13 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/iicbus/iicbus.c,v 1.20 2004/05/27 13:29:09 joerg Exp $");
 
 /*
  * Autoconfiguration and support routines for the Philips serial I2C bus
@@ -46,6 +46,9 @@ __FBSDID("$FreeBSD: src/sys/dev/iicbus/iicbus.c,v 1.17 2003/08/24 17:49:13 obrie
 #define DEVTOIICBUS(dev) ((struct iicbus_device*)device_get_ivars(dev))
 
 static devclass_t iicbus_devclass;
+
+/* See comments below for why auto-scanning is a bad idea. */
+#define SCAN_IICBUS 0
 
 /*
  * Device methods
@@ -83,7 +86,7 @@ iicbus_probe(device_t dev)
 	return (0);
 }
 
-#if 0
+#if SCAN_IICBUS
 static int 
 iic_probe_device(device_t dev, u_char addr)
 {
@@ -113,6 +116,10 @@ iic_probe_device(device_t dev, u_char addr)
 static int
 iicbus_attach(device_t dev)
 {
+#if SCAN_IICBUS
+	unsigned char addr;
+#endif
+
 	iicbus_reset(dev, IIC_FASTEST, 0, NULL);
 
 	/* device probing is meaningless since the bus is supposed to be
@@ -120,11 +127,11 @@ iicbus_attach(device_t dev)
 	 * accesses like stop after start to fast, reads for less than
 	 * x bytes...
 	 */
-#if 0
+#if SCAN_IICBUS
 	printf("Probing for devices on iicbus%d:", device_get_unit(dev));
 
 	/* probe any devices */
-	for (addr = FIRST_SLAVE_ADDR; addr <= LAST_SLAVE_ADDR; addr++) {
+	for (addr = 16; addr < 240; addr++) {
 		if (iic_probe_device(dev, (u_char)addr)) {
 			printf(" <%x>", addr);
 		}
@@ -133,7 +140,9 @@ iicbus_attach(device_t dev)
 #endif
   
 	/* attach any known device */
-	device_add_child(dev, NULL, -1);
+	device_add_child(dev, "ic", -1);
+	device_add_child(dev, "iic", -1);
+	device_add_child(dev, "iicsmb", -1);
 
 	bus_generic_attach(dev);
          
@@ -179,6 +188,7 @@ iicbus_null_repeated_start(device_t dev, u_char addr)
 }
 
 DRIVER_MODULE(iicbus, pcf, iicbus_driver, iicbus_devclass, 0, 0);
+DRIVER_MODULE(iicbus, envctrl, iicbus_driver, iicbus_devclass, 0, 0);
 DRIVER_MODULE(iicbus, iicbb, iicbus_driver, iicbus_devclass, 0, 0);
 DRIVER_MODULE(iicbus, bti2c, iicbus_driver, iicbus_devclass, 0, 0);
 MODULE_VERSION(iicbus, IICBUS_MODVER);

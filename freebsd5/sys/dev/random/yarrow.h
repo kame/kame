@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2000 Mark R V Murray
+ * Copyright (c) 2000-2004 Mark R V Murray
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/random/yarrow.h,v 1.17 2002/01/10 00:09:21 msmith Exp $
+ * $FreeBSD: src/sys/dev/random/yarrow.h,v 1.18 2004/04/09 15:47:09 markm Exp $
  */
 
 /* This contains Yarrow-specific declarations.

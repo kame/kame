@@ -14,10 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by the University of
- *      California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -36,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/ia32/ia32_signal.c,v 1.7 2003/12/03 07:00:30 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/ia32/ia32_signal.c,v 1.10 2004/04/05 23:55:14 imp Exp $");
 
 #include "opt_compat.h"
 
@@ -194,9 +190,9 @@ freebsd4_ia32_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	/* Save user context. */
 	bzero(&sf, sizeof(sf));
 	sf.sf_uc.uc_sigmask = *mask;
-	sf.sf_uc.uc_stack.ss_sp = (uintptr_t)p->p_sigstk.ss_sp;
-	sf.sf_uc.uc_stack.ss_size = p->p_sigstk.ss_size;
-	sf.sf_uc.uc_stack.ss_flags = (p->p_flag & P_ALTSTACK)
+	sf.sf_uc.uc_stack.ss_sp = (uintptr_t)td->td_sigstk.ss_sp;
+	sf.sf_uc.uc_stack.ss_size = td->td_sigstk.ss_size;
+	sf.sf_uc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK)
 	    ? ((oonstack) ? SS_ONSTACK : 0) : SS_DISABLE;
 	sf.sf_uc.uc_mcontext.mc_onstack = (oonstack) ? 1 : 0;
 	sf.sf_uc.uc_mcontext.mc_gs = rgs();
@@ -220,10 +216,10 @@ freebsd4_ia32_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	sf.sf_uc.uc_mcontext.mc_ss = regs->tf_ss;
 
 	/* Allocate space for the signal handler context. */
-	if ((p->p_flag & P_ALTSTACK) != 0 && !oonstack &&
+	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		sfp = (struct ia32_sigframe4 *)(p->p_sigstk.ss_sp +
-		    p->p_sigstk.ss_size - sizeof(sf));
+		sfp = (struct ia32_sigframe4 *)(td->td_sigstk.ss_sp +
+		    td->td_sigstk.ss_size - sizeof(sf));
 	} else
 		sfp = (struct ia32_sigframe4 *)regs->tf_rsp - 1;
 	PROC_UNLOCK(p);
@@ -235,8 +231,7 @@ freebsd4_ia32_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	/* Build the argument list for the signal handler. */
 	sf.sf_signum = sig;
 	sf.sf_ucontext = (register_t)&sfp->sf_uc;
-	PROC_LOCK(p);
-	if (SIGISMEMBER(p->p_sigacts->ps_siginfo, sig)) {
+	if (SIGISMEMBER(psp->ps_siginfo, sig)) {
 		/* Signal handler installed with SA_SIGINFO. */
 		sf.sf_siginfo = (u_int32_t)(uintptr_t)&sfp->sf_si;
 		sf.sf_ah = (u_int32_t)(uintptr_t)catcher;
@@ -252,7 +247,6 @@ freebsd4_ia32_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 		sf.sf_ah = (u_int32_t)(uintptr_t)catcher;
 	}
 	mtx_unlock(&psp->ps_mtx);
-	PROC_UNLOCK(p);
 
 	/*
 	 * Copy the sigframe out to the user's stack.
@@ -308,9 +302,9 @@ ia32_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	/* Save user context. */
 	bzero(&sf, sizeof(sf));
 	sf.sf_uc.uc_sigmask = *mask;
-	sf.sf_uc.uc_stack.ss_sp = (uintptr_t)p->p_sigstk.ss_sp;
-	sf.sf_uc.uc_stack.ss_size = p->p_sigstk.ss_size;
-	sf.sf_uc.uc_stack.ss_flags = (p->p_flag & P_ALTSTACK)
+	sf.sf_uc.uc_stack.ss_sp = (uintptr_t)td->td_sigstk.ss_sp;
+	sf.sf_uc.uc_stack.ss_size = td->td_sigstk.ss_size;
+	sf.sf_uc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK)
 	    ? ((oonstack) ? SS_ONSTACK : 0) : SS_DISABLE;
 	sf.sf_uc.uc_mcontext.mc_onstack = (oonstack) ? 1 : 0;
 	sf.sf_uc.uc_mcontext.mc_gs = rgs();
@@ -337,10 +331,10 @@ ia32_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	fpstate_drop(td);
 
 	/* Allocate space for the signal handler context. */
-	if ((p->p_flag & P_ALTSTACK) != 0 && !oonstack &&
+	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		sp = p->p_sigstk.ss_sp +
-		    p->p_sigstk.ss_size - sizeof(sf);
+		sp = td->td_sigstk.ss_sp +
+		    td->td_sigstk.ss_size - sizeof(sf);
 	} else
 		sp = (char *)regs->tf_rsp - sizeof(sf);
 	/* Align to 16 bytes. */
@@ -354,8 +348,7 @@ ia32_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	/* Build the argument list for the signal handler. */
 	sf.sf_signum = sig;
 	sf.sf_ucontext = (register_t)&sfp->sf_uc;
-	PROC_LOCK(p);
-	if (SIGISMEMBER(p->p_sigacts->ps_siginfo, sig)) {
+	if (SIGISMEMBER(psp->ps_siginfo, sig)) {
 		/* Signal handler installed with SA_SIGINFO. */
 		sf.sf_siginfo = (u_int32_t)(uintptr_t)&sfp->sf_si;
 		sf.sf_ah = (u_int32_t)(uintptr_t)catcher;
@@ -371,7 +364,6 @@ ia32_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 		sf.sf_ah = (u_int32_t)(uintptr_t)catcher;
 	}
 	mtx_unlock(&psp->ps_mtx);
-	PROC_UNLOCK(p);
 
 	/*
 	 * Copy the sigframe out to the user's stack.

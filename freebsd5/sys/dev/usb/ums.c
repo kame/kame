@@ -37,10 +37,10 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/ums.c,v 1.64 2003/11/09 09:17:22 tanimura Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/ums.c,v 1.70 2004/08/15 23:39:18 imp Exp $");
 
 /*
- * HID spec: http://www.usb.org/developers/data/devclass/hid1_1.pdf
+ * HID spec: http://www.usb.org/developers/devclass_docs/HID1_11.pdf
  */
 
 #include <sys/param.h>
@@ -67,7 +67,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/ums.c,v 1.64 2003/11/09 09:17:22 tanimura Ex
 
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
-#include <dev/usb/usbdevs.h>
+#include "usbdevs.h"
 #include <dev/usb/usb_quirks.h>
 #include <dev/usb/hid.h>
 
@@ -130,7 +130,7 @@ struct ums_softc {
 #	  define	UMS_SELECT	0x02	/* select is waiting */
 	struct selinfo	rsel;		/* process waiting in select */
 
-	dev_t		dev;		/* specfs */
+	struct cdev *dev;		/* specfs */
 };
 
 #define MOUSE_FLAGS_MASK (HIO_CONST|HIO_RELATIVE)
@@ -152,16 +152,16 @@ Static d_read_t  ums_read;
 Static d_ioctl_t ums_ioctl;
 Static d_poll_t  ums_poll;
 
-#define UMS_CDEV_MAJOR	111
 
 Static struct cdevsw ums_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	ums_open,
 	.d_close =	ums_close,
 	.d_read =	ums_read,
 	.d_ioctl =	ums_ioctl,
 	.d_poll =	ums_poll,
 	.d_name =	"ums",
-	.d_maj =	UMS_CDEV_MAJOR,
 #if __FreeBSD_version < 500014
 	.d_bmaj		-1
 #endif
@@ -214,10 +214,8 @@ USB_ATTACH(ums)
 	sc->sc_disconnected = 1;
 	sc->sc_iface = iface;
 	id = usbd_get_interface_descriptor(iface);
-	usbd_devinfo(uaa->device, 0, devinfo);
+	usbd_devinfo(uaa->device, USBD_SHOW_INTERFACE_CLASS, devinfo);
 	USB_ATTACH_SETUP;
-	printf("%s: %s, iclass %d/%d\n", USBDEVNAME(sc->sc_dev),
-	       devinfo, id->bInterfaceClass, id->bInterfaceSubClass);
 	ed = usbd_interface2endpoint_descriptor(iface, 0);
 	if (!ed) {
 		printf("%s: could not read endpoint descriptor\n",
@@ -589,7 +587,7 @@ ums_disable(priv)
 }
 
 Static int
-ums_open(dev_t dev, int flag, int fmt, usb_proc_ptr p)
+ums_open(struct cdev *dev, int flag, int fmt, usb_proc_ptr p)
 {
 	struct ums_softc *sc;
 
@@ -599,7 +597,7 @@ ums_open(dev_t dev, int flag, int fmt, usb_proc_ptr p)
 }
 
 Static int
-ums_close(dev_t dev, int flag, int fmt, usb_proc_ptr p)
+ums_close(struct cdev *dev, int flag, int fmt, usb_proc_ptr p)
 {
 	struct ums_softc *sc;
 
@@ -615,7 +613,7 @@ ums_close(dev_t dev, int flag, int fmt, usb_proc_ptr p)
 }
 
 Static int
-ums_read(dev_t dev, struct uio *uio, int flag)
+ums_read(struct cdev *dev, struct uio *uio, int flag)
 {
 	struct ums_softc *sc;
 	int s;
@@ -685,7 +683,7 @@ ums_read(dev_t dev, struct uio *uio, int flag)
 }
 
 Static int
-ums_poll(dev_t dev, int events, usb_proc_ptr p)
+ums_poll(struct cdev *dev, int events, usb_proc_ptr p)
 {
 	struct ums_softc *sc;
 	int revents = 0;
@@ -711,7 +709,7 @@ ums_poll(dev_t dev, int events, usb_proc_ptr p)
 }
 
 int
-ums_ioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, usb_proc_ptr p)
+ums_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, usb_proc_ptr p)
 {
 	struct ums_softc *sc;
 	int error = 0;

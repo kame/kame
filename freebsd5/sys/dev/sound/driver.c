@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THEPOSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/driver.c,v 1.10 2001/07/01 19:38:58 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/driver.c,v 1.12 2004/07/15 08:26:03 phk Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -38,6 +38,7 @@ snd_modevent(module_t mod, int type, void *data)
 	case MOD_UNLOAD:
 		break;
 	default:
+		return (EOPNOTSUPP);
 		break;
 	}
 	return 0;
@@ -75,5 +76,6 @@ MODULE_DEPEND(snd_driver, snd_sb16, 1, 1, 1);
 MODULE_DEPEND(snd_driver, snd_sbc, 1, 1, 1);
 MODULE_DEPEND(snd_driver, snd_solo, 1, 1, 1);
 MODULE_DEPEND(snd_driver, snd_t4dwave, 1, 1, 1);
+MODULE_DEPEND(snd_driver, snd_via8233, 1, 1, 1);
 MODULE_DEPEND(snd_driver, snd_via82c686, 1, 1, 1);
 MODULE_DEPEND(snd_driver, snd_vibes, 1, 1, 1);

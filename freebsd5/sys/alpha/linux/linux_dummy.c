@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/linux/linux_dummy.c,v 1.37 2003/08/22 07:20:26 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/linux/linux_dummy.c,v 1.38 2004/03/29 02:19:43 bms Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -66,7 +66,6 @@ DUMMY(sendfile);
 DUMMY(getdtablesize);
 DUMMY(gethostname);
 DUMMY(getpagesize);
-DUMMY(madvise);
 DUMMY(mincore);
 DUMMY(old_adjtimex);
 DUMMY(pciconfig_iobase);

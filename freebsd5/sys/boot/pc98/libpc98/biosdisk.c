@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/boot/pc98/libpc98/biosdisk.c,v 1.25 2003/09/08 09:11:20 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/boot/pc98/libpc98/biosdisk.c,v 1.30 2004/06/17 11:44:05 phk Exp $");
 
 /*
  * BIOS disk device handling.
@@ -343,6 +343,7 @@ bd_print(int verbose)
 			    line, verbose);
 			break;
 		    default:
+			break;
 		    }
 		}
 #else
@@ -988,6 +989,7 @@ bd_realstrategy(void *devdata, int rw, daddr_t dblk, size_t size, char *buf, siz
     return (0);
 		default:
 		 /* DO NOTHING */
+			break;
 	}
 
 	return EROFS;

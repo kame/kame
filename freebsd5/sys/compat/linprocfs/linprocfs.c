@@ -40,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/linprocfs/linprocfs.c,v 1.78 2003/10/20 04:10:20 cognet Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/linprocfs/linprocfs.c,v 1.84 2004/08/16 08:19:18 tjr Exp $");
 
 #include <sys/param.h>
 #include <sys/queue.h>
@@ -59,6 +59,7 @@ __FBSDID("$FreeBSD: src/sys/compat/linprocfs/linprocfs.c,v 1.78 2003/10/20 04:10
 #include <sys/proc.h>
 #include <sys/resourcevar.h>
 #include <sys/sbuf.h>
+#include <sys/smp.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 #include <sys/systm.h>
@@ -85,12 +86,17 @@ __FBSDID("$FreeBSD: src/sys/compat/linprocfs/linprocfs.c,v 1.78 2003/10/20 04:10
 extern int ncpus;
 #endif /* __alpha__ */
 
-#ifdef __i386__
+#if defined(__i386__) || defined(__amd64__)
 #include <machine/cputypes.h>
 #include <machine/md_var.h>
-#endif /* __i386__ */
+#endif /* __i386__ || __amd64__ */
 
+#include "opt_compat.h"
+#if !COMPAT_LINUX32				/* XXX */
 #include <machine/../linux/linux.h>
+#else
+#include <machine/../linux32/linux.h>
+#endif
 #include <compat/linux/linux_ioctl.h>
 #include <compat/linux/linux_mib.h>
 #include <compat/linux/linux_util.h>
@@ -142,9 +148,11 @@ linprocfs_domeminfo(PFS_FILL_ARGS)
 	swapused = j * PAGE_SIZE;
 	swapfree = swaptotal - swapused;
 	memshared = 0;
+	mtx_lock(&vm_object_list_mtx);
 	TAILQ_FOREACH(object, &vm_object_list, object_list)
 		if (object->shadow_count > 1)
 			memshared += object->resident_page_count;
+	mtx_unlock(&vm_object_list_mtx);
 	memshared *= PAGE_SIZE;
 	/*
 	 * We'd love to be able to write:
@@ -248,21 +256,15 @@ linprocfs_docpuinfo(PFS_FILL_ARGS)
 }
 #endif /* __alpha__ */
 
-#ifdef __i386__
+#if defined(__i386__) || defined(__amd64__)
 /*
- * Filler function for proc/cpuinfo (i386 version)
+ * Filler function for proc/cpuinfo (i386 & amd64 version)
  */
 static int
 linprocfs_docpuinfo(PFS_FILL_ARGS)
 {
-	int class, fqmhz, fqkhz, ncpu;
-	int name[2], olen, plen;
+	int class, fqmhz, fqkhz;
 	int i;
-
-	name[0] = CTL_HW;
-	name[1] = HW_NCPU;
-	if (kernel_sysctl(td, name, 2, &ncpu, &olen, NULL, 0, &plen) != 0)
-		ncpu = 1;
 
 	/*
 	 * We default the flags to include all non-conflicting flags,
@@ -279,6 +281,7 @@ linprocfs_docpuinfo(PFS_FILL_ARGS)
 	};
 
 	switch (cpu_class) {
+#ifdef __i386__
 	case CPUCLASS_286:
 		class = 2;
 		break;
@@ -297,9 +300,14 @@ linprocfs_docpuinfo(PFS_FILL_ARGS)
 	default:
 		class = 0;
 		break;
+#else
+	default:
+		class = 6;
+		break;
+#endif
 	}
 
-	for (i = 0; i < ncpu; ++i) {
+	for (i = 0; i < mp_ncpus; ++i) {
 		sbuf_printf(sb,
 		    "processor\t: %d\n"
 		    "vendor_id\t: %.20s\n"
@@ -334,7 +342,7 @@ linprocfs_docpuinfo(PFS_FILL_ARGS)
 
 	return (0);
 }
-#endif /* __i386__ */
+#endif /* __i386__ || __amd64__ */
 
 /*
  * Filler function for proc/mtab
@@ -355,7 +363,7 @@ linprocfs_domtab(PFS_FILL_ARGS)
 	/* resolve symlinks etc. in the emulation tree prefix */
 	NDINIT(&nd, LOOKUP, FOLLOW, UIO_SYSSPACE, linux_emul_path, td);
 	flep = NULL;
-	if (namei(&nd) != 0 || vn_fullpath(td, nd.ni_vp, &dlep, &flep) == -1)
+	if (namei(&nd) != 0 || vn_fullpath(td, nd.ni_vp, &dlep, &flep) != 0)
 		lep = linux_emul_path;
 	else
 		lep = dlep;
@@ -364,10 +372,6 @@ linprocfs_domtab(PFS_FILL_ARGS)
 	mtx_lock(&mountlist_mtx);
 	error = 0;
 	TAILQ_FOREACH(mp, &mountlist, mnt_list) {
-		error = VFS_STATFS(mp, &mp->mnt_stat, td);
-		if (error)
-			break;
-
 		/* determine device name */
 		mntfrom = mp->mnt_stat.f_mntfromname;
 
@@ -413,26 +417,20 @@ linprocfs_domtab(PFS_FILL_ARGS)
 static int
 linprocfs_dostat(PFS_FILL_ARGS)
 {
-	size_t olen, plen;
-	int name[2];
-	int i, ncpu;
+	int i;
 
-	name[0] = CTL_HW;
-	name[1] = HW_NCPU;
-	if (kernel_sysctl(td, name, 2, &ncpu, &olen, NULL, 0, &plen) != 0)
-		ncpu = 1;
 	sbuf_printf(sb, "cpu %ld %ld %ld %ld\n",
 	    T2J(cp_time[CP_USER]),
 	    T2J(cp_time[CP_NICE]),
 	    T2J(cp_time[CP_SYS] /*+ cp_time[CP_INTR]*/),
 	    T2J(cp_time[CP_IDLE]));
-	if (ncpu > 1)
-		for (i = 0; i < ncpu; ++i)
+	if (mp_ncpus > 1)
+		for (i = 0; i < mp_ncpus; ++i)
 			sbuf_printf(sb, "cpu%d %ld %ld %ld %ld\n", i,
-			    T2J(cp_time[CP_USER]) / ncpu,
-			    T2J(cp_time[CP_NICE]) / ncpu,
-			    T2J(cp_time[CP_SYS]) / ncpu,
-			    T2J(cp_time[CP_IDLE]) / ncpu);
+			    T2J(cp_time[CP_USER]) / mp_ncpus,
+			    T2J(cp_time[CP_NICE]) / mp_ncpus,
+			    T2J(cp_time[CP_SYS]) / mp_ncpus,
+			    T2J(cp_time[CP_IDLE]) / mp_ncpus);
 	sbuf_printf(sb,
 	    "disk 0 0 0 0\n"
 	    "page %u %u\n"
@@ -784,7 +782,7 @@ linprocfs_doproccmdline(PFS_FILL_ARGS)
 	 */
 
 	PROC_LOCK(p);
-	if (p->p_args && (ps_argsopen || !p_cansee(td, p))) {
+	if (p->p_args && p_cansee(td, p) == 0) {
 		sbuf_bcpy(sb, p->p_args->ar_args, p->p_args->ar_length);
 		PROC_UNLOCK(p);
 	} else if (p != td->td_proc) {

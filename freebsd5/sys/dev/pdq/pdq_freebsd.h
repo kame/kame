@@ -24,7 +24,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  * Id: pdqvar.h,v 1.21 1997/03/21 21:16:04 thomas Exp
- * $FreeBSD: src/sys/dev/pdq/pdq_freebsd.h,v 1.7 2003/10/31 18:32:03 brooks Exp $
+ * $FreeBSD: src/sys/dev/pdq/pdq_freebsd.h,v 1.8 2004/06/13 17:29:07 mlaier Exp $
  *
  */
 
@@ -97,8 +97,10 @@ enum _pdq_type_t {
 #define	sc_ifmedia	ifmedia
 #define	sc_if		arpcom.ac_if
 #define	sc_bpf		sc_if.if_bpf
+#if 0 /* ALTQ */
 #define	IFQ_DEQUEUE	IF_DEQUEUE
 #define	IFQ_IS_EMPTY(q)	((q)->ifq_len == 0)
+#endif
 
 typedef struct _pdq_os_ctx_t {
 	struct arpcom		arpcom;

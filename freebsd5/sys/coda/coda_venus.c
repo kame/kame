@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/coda/coda_venus.c,v 1.18 2003/09/07 07:43:09 tjr Exp $");
+__FBSDID("$FreeBSD: src/sys/coda/coda_venus.c,v 1.21 2004/06/17 17:16:40 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -198,7 +198,7 @@ venus_root(void *mdp,
 int
 venus_open(void *mdp, CodaFid *fid, int flag,
 	struct ucred *cred, struct proc *p,
-/*out*/	dev_t *dev, ino_t *inode)
+/*out*/	struct cdev **dev, ino_t *inode)
 {
     int cflag;
     DECL(coda_open);			/* sets Isize & Osize */
@@ -212,8 +212,7 @@ venus_open(void *mdp, CodaFid *fid, int flag,
 
     error = coda_call(mdp, Isize, &Osize, (char *)inp);
     if (!error) {
-/* 5/11	*dev =  udev2dev(outp->dev, 2); */
-	*dev =  udev2dev(outp->dev, 0);
+	*dev =  findcdev(outp->dev);
 	*inode = outp->inode;
     }
 

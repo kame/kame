@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/gem/if_gem.c,v 1.20 2003/10/31 18:32:01 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/gem/if_gem.c,v 1.27 2004/08/13 23:11:24 rwatson Exp $");
 
 /*
  * Driver for Sun GEM ethernet controllers.
@@ -46,6 +46,7 @@ __FBSDID("$FreeBSD: src/sys/dev/gem/if_gem.c,v 1.20 2003/10/31 18:32:01 brooks E
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
 
@@ -234,31 +235,26 @@ gem_attach(sc)
 	 * allocated.
 	 */
 
-	/* Announce ourselves. */
-	device_printf(sc->sc_dev, "Ethernet address:");
-	for (i = 0; i < 6; i++)
-		printf("%c%02x", i > 0 ? ':' : ' ', sc->sc_arpcom.ac_enaddr[i]);
-
 	/* Get RX FIFO size */
 	sc->sc_rxfifosize = 64 *
 	    bus_space_read_4(sc->sc_bustag, sc->sc_h, GEM_RX_FIFO_SIZE);
-	printf(", %uKB RX fifo", sc->sc_rxfifosize / 1024);
 
 	/* Get TX FIFO size */
 	v = bus_space_read_4(sc->sc_bustag, sc->sc_h, GEM_TX_FIFO_SIZE);
-	printf(", %uKB TX fifo\n", v / 16);
+	device_printf(sc->sc_dev, "%ukB RX FIFO, %ukB TX FIFO\n",
+	    sc->sc_rxfifosize / 1024, v / 16);
 
 	/* Initialize ifnet structure. */
 	ifp->if_softc = sc;
 	if_initname(ifp, device_get_name(sc->sc_dev),
 	    device_get_unit(sc->sc_dev));
 	ifp->if_mtu = ETHERMTU;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_NEEDSGIANT;
 	ifp->if_start = gem_start;
 	ifp->if_ioctl = gem_ioctl;
 	ifp->if_watchdog = gem_watchdog;
 	ifp->if_init = gem_init;
-	ifp->if_output = ether_output;
 	ifp->if_snd.ifq_maxlen = GEM_TXQUEUELEN;
 	/*
 	 * Walk along the list of attached MII devices and
@@ -1849,14 +1845,11 @@ gem_setladrf(sc)
 {
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	struct ifmultiaddr *inm;
-	struct sockaddr_dl *sdl;
 	bus_space_tag_t t = sc->sc_bustag;
 	bus_space_handle_t h = sc->sc_h;
-	u_char *cp;
 	u_int32_t crc;
 	u_int32_t hash[16];
 	u_int32_t v;
-	int len;
 	int i;
 
 	/* Get current RX configuration */
@@ -1896,24 +1889,9 @@ gem_setladrf(sc)
 	TAILQ_FOREACH(inm, &sc->sc_arpcom.ac_if.if_multiaddrs, ifma_link) {
 		if (inm->ifma_addr->sa_family != AF_LINK)
 			continue;
-		sdl = (struct sockaddr_dl *)inm->ifma_addr;
-		cp = LLADDR(sdl);
-		crc = 0xffffffff;
-		for (len = sdl->sdl_alen; --len >= 0;) {
-			int octet = *cp++;
-			int i;
+		crc = ether_crc32_le(LLADDR((struct sockaddr_dl *)
+		    inm->ifma_addr), ETHER_ADDR_LEN);
 
-#define MC_POLY_LE	0xedb88320UL	/* mcast crc, little endian */
-			for (i = 0; i < 8; i++) {
-				if ((crc & 1) ^ (octet & 1)) {
-					crc >>= 1;
-					crc ^= MC_POLY_LE;
-				} else {
-					crc >>= 1;
-				}
-				octet >>= 1;
-			}
-		}
 		/* Just want the 8 most significant bits. */
 		crc >>= 24;
 

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/syscons.h,v 1.77 2003/08/24 04:04:44 jake Exp $
+ * $FreeBSD: src/sys/dev/syscons/syscons.h,v 1.80 2004/07/28 06:29:02 kan Exp $
  */
 
 #ifndef _DEV_SYSCONS_SYSCONS_H_
@@ -92,7 +92,7 @@
 #define SC_DRIVER_NAME	"sc"
 #define SC_VTY(dev)	minor(dev)
 #define SC_DEV(sc, vty)	((sc)->dev[(vty) - (sc)->first_vty])
-#define SC_STAT(dev)	((scr_stat *)(dev)->si_drv1)
+#define SC_STAT(dev)	(*((scr_stat **)&(dev)->si_drv1))
 
 /* printable chars */
 #ifndef PRINTABLE
@@ -208,7 +208,7 @@ typedef struct sc_softc {
 
 	int		first_vty;
 	int		vtys;
-	dev_t		*dev;
+	struct cdev **dev;
 	struct scr_stat	*cur_scp;
 	struct scr_stat	*new_scp;
 	struct scr_stat	*old_scp;
@@ -391,6 +391,7 @@ typedef struct sc_term_sw {
 				return EBUSY;			\
 			return sc_term_remove(&sw);		\
 		default:					\
+			return EOPNOTSUPP;			\
 			break;					\
 		}						\
 		return 0;					\
@@ -462,6 +463,7 @@ typedef struct sc_renderer {
 			}					\
 			break;					\
 		default:					\
+			return EOPNOTSUPP;			\
 			break;					\
 		}						\
 		return error;					\
@@ -518,7 +520,7 @@ typedef struct {
 		(*kbdsw[(kbd)->kb_index]->poll)((kbd), (on))
 
 /* syscons.c */
-extern int 	(*sc_user_ioctl)(dev_t dev, u_long cmd, caddr_t data,
+extern int 	(*sc_user_ioctl)(struct cdev *dev, u_long cmd, caddr_t data,
 				 int flag, struct thread *td);
 
 int		sc_probe_unit(int unit, int flags);

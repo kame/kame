@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ray/if_ray.c,v 1.67 2003/10/31 18:32:04 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ray/if_ray.c,v 1.72 2004/08/13 23:39:07 rwatson Exp $");
 
 /*	$NetBSD: if_ray.c,v 1.12 2000/02/07 09:36:27 augustss Exp $	*/
 /* 
@@ -248,6 +248,7 @@ __FBSDID("$FreeBSD: src/sys/dev/ray/if_ray.c,v 1.67 2003/10/31 18:32:04 brooks E
 #include <sys/limits.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 
 #include <machine/bus.h>
 #include <machine/resource.h>
@@ -505,11 +506,11 @@ ray_attach(device_t dev)
 	ifp->if_softc = sc;
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_timer = 0;
-	ifp->if_flags = (IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST);
+	ifp->if_flags = (IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_NEEDSGIANT);
 	ifp->if_hdrlen = sizeof(struct ieee80211_frame) + 
 	    sizeof(struct ether_header);
 	ifp->if_baudrate = 1000000; /* Is this baud or bps ;-) */
-	ifp->if_output = ether_output;
 	ifp->if_start = ray_tx;
 	ifp->if_ioctl = ray_ioctl;
 	ifp->if_watchdog = ray_watchdog;
@@ -3136,7 +3137,7 @@ ray_com_init(struct ray_comq_entry *com, ray_comqfn_t function, int flags, char 
 	com->c_function = function;
 	com->c_flags = flags;
 	com->c_retval = 0;
-	com->c_ccs = NULL;
+	com->c_ccs = 0;
 	com->c_wakeup = NULL;
 	com->c_pr = NULL;
 	com->c_mesg = mesg;
@@ -3235,7 +3236,7 @@ cleanup:
 				RAY_DCOM(sc, RAY_DBG_DCOM, com[i], "removing");
 				TAILQ_REMOVE(&sc->sc_comq, com[i], c_chain);
 				ray_ccs_free(sc, com[i]->c_ccs);
-				com[i]->c_ccs = NULL;
+				com[i]->c_ccs = 0;
 			}
 
 	return (error);
@@ -3291,7 +3292,7 @@ ray_com_runq_done(struct ray_softc *sc)
 	com->c_flags |= RAY_COM_FCOMPLETED;
 	com->c_retval = 0;
 	ray_ccs_free(sc, com->c_ccs);
-	com->c_ccs = NULL;
+	com->c_ccs = 0;
 
 	if (com->c_flags & RAY_COM_FWOK)
 		wakeup(com->c_wakeup);
@@ -3486,7 +3487,7 @@ ray_ccs_fill(struct ray_softc *sc, size_t ccs, u_int cmd)
 	RAY_DPRINTF(sc, RAY_DBG_SUBR | RAY_DBG_CCS, "");
 	RAY_MAP_CM(sc);
 
-	if (ccs == NULL)
+	if (ccs == 0)
 		RAY_PANIC(sc, "ccs not allocated");
 
 	SRAM_WRITE_FIELD_1(sc, ccs, ray_cmd, c_status, RAY_CCS_STATUS_BUSY);
@@ -3727,8 +3728,8 @@ ray_res_alloc_irq(struct ray_softc *sc)
 	    bus_get_resource_count(sc->dev, SYS_RES_IRQ, 0));
 
 	sc->irq_rid = 0;
-	sc->irq_res = bus_alloc_resource(sc->dev, SYS_RES_IRQ, &sc->irq_rid,
-	    0, ~0, 1, RF_ACTIVE);
+	sc->irq_res = bus_alloc_resource_any(sc->dev, SYS_RES_IRQ, &sc->irq_rid,
+	    RF_ACTIVE);
 	if (!sc->irq_res) {
 		RAY_PRINTF(sc, "Cannot allocate irq");
 		return (ENOMEM);

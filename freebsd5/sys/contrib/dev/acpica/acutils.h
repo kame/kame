@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acutils.h -- prototypes for the common (subsystem-wide) procedures
- *       $Revision: 155 $
+ *       $Revision: 161 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2003, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -125,14 +125,12 @@ ACPI_STATUS (*ACPI_PKG_CALLBACK) (
     ACPI_GENERIC_STATE      *State,
     void                    *Context);
 
-
 ACPI_STATUS
 AcpiUtWalkPackageTree (
     ACPI_OPERAND_OBJECT     *SourceObject,
     void                    *TargetObject,
     ACPI_PKG_CALLBACK       WalkCallback,
     void                    *Context);
-
 
 typedef struct acpi_pkg_info
 {
@@ -197,6 +195,14 @@ AcpiUtGetMutexName (
 char *
 AcpiUtGetTypeName (
     ACPI_OBJECT_TYPE        Type);
+
+char *
+AcpiUtGetNodeName (
+    void                    *Object);
+
+char *
+AcpiUtGetDescriptorName (
+    void                    *Object);
 
 char *
 AcpiUtGetObjectTypeName (
@@ -539,7 +545,12 @@ AcpiUtDeleteInternalObjectList (
 #define METHOD_NAME__PRT        "_PRT"
 #define METHOD_NAME__CRS        "_CRS"
 #define METHOD_NAME__PRS        "_PRS"
+#define METHOD_NAME__PRW        "_PRW"
 
+
+ACPI_STATUS
+AcpiUtOsiImplementation (
+    ACPI_WALK_STATE         *WalkState);
 
 ACPI_STATUS
 AcpiUtEvaluateObject (
@@ -574,6 +585,10 @@ AcpiUtExecute_UID (
     ACPI_NAMESPACE_NODE     *DeviceNode,
     ACPI_DEVICE_ID          *Uid);
 
+ACPI_STATUS
+AcpiUtExecute_Sxds (
+    ACPI_NAMESPACE_NODE     *DeviceNode,
+    UINT8                   *Highest);
 
 /*
  * UtMutex - mutual exclusion interfaces

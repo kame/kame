@@ -28,7 +28,7 @@
  *    Rickard E. (Rik) Faith <faith@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/drm_bufs.h,v 1.8 2003/11/12 20:56:30 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_bufs.h,v 1.10 2004/01/06 04:34:52 anholt Exp $
  */
 
 #include "dev/drm/drmP.h"
@@ -88,7 +88,7 @@ int DRM(addmap)( DRM_IOCTL_ARGS )
 	map->size = request.size;
 	map->type = request.type;
 	map->flags = request.flags;
-	map->mtrr   = -1;
+	map->mtrr = 0;
 	map->handle = 0;
 	
 	/* Only allow shared memory to be removable since we only keep enough
@@ -105,28 +105,23 @@ int DRM(addmap)( DRM_IOCTL_ARGS )
 		DRM(free)( map, sizeof(*map), DRM_MEM_MAPS );
 		return DRM_ERR(EINVAL);
 	}
+	if (map->offset + map->size < map->offset) {
+		DRM(free)(map, sizeof(*map), DRM_MEM_MAPS);
+		return DRM_ERR(EINVAL);
+	}
 
 	switch ( map->type ) {
 	case _DRM_REGISTERS:
-	case _DRM_FRAME_BUFFER:
-		if ( map->offset + map->size < map->offset ) {
-			DRM(free)( map, sizeof(*map), DRM_MEM_MAPS );
-			return DRM_ERR(EINVAL);
-		}
-#if __REALLY_HAVE_MTRR
-		if ( map->type == _DRM_FRAME_BUFFER ||
-		     (map->flags & _DRM_WRITE_COMBINING) ) {
-			int mtrr;
-			     
-			mtrr = DRM(mtrr_add)(map->offset, map->size,
-			     DRM_MTRR_WC);
-			if (mtrr == 0)
-				map->mtrr = 1;
-		}
-#endif /* __REALLY_HAVE_MTRR */
 		DRM_IOREMAP(map, dev);
+		if (!(map->flags & _DRM_WRITE_COMBINING))
+			break;
+		/* FALLTHROUGH */
+	case _DRM_FRAME_BUFFER:
+#if __REALLY_HAVE_MTRR
+		if (DRM(mtrr_add)(map->offset, map->size, DRM_MTRR_WC) == 0)
+			map->mtrr = 1;
+#endif
 		break;
-
 	case _DRM_SHM:
 		map->handle = (void *)DRM(alloc)(map->size, DRM_MEM_SAREA);
 		DRM_DEBUG( "%lu %d %p\n",
@@ -153,7 +148,7 @@ int DRM(addmap)( DRM_IOCTL_ARGS )
 #if __REALLY_HAVE_AGP
 	case _DRM_AGP:
 		map->offset += dev->agp->base;
-		map->mtrr   = dev->agp->agp_mtrr; /* for getmap */
+		map->mtrr   = dev->agp->mtrr; /* for getmap */
 		break;
 #endif
 	case _DRM_SCATTER_GATHER:
@@ -232,12 +227,12 @@ int DRM(rmmap)( DRM_IOCTL_ARGS )
 	case _DRM_REGISTERS:
 	case _DRM_FRAME_BUFFER:
 #if __REALLY_HAVE_MTRR
-		if (map->mtrr >= 0) {
-			int __unused mtrr;
+		if (map->mtrr) {
+			int __unused retcode;
 			
-			mtrr = DRM(mtrr_del)(map->offset, map->size,
+			retcode = DRM(mtrr_del)(map->offset, map->size,
 			    DRM_MTRR_WC);
-			DRM_DEBUG("mtrr_del = %d\n", mtrr);
+			DRM_DEBUG("mtrr_del = %d\n", retcode);
 		}
 #endif
 		DRM(ioremapfree)(map);
@@ -263,7 +258,7 @@ static void DRM(cleanup_buf_error)(drm_device_t *dev, drm_buf_entry_t *entry)
 #if __HAVE_PCI_DMA
 	if (entry->seg_count) {
 		for (i = 0; i < entry->seg_count; i++) {
-			if (entry->seglist[i] != NULL)
+			if (entry->seglist[i] != 0)
 				DRM(pci_free)(dev, entry->buf_size,
 				    (void *)entry->seglist[i],
 				    entry->seglist_bus[i]);
@@ -483,7 +478,7 @@ static int DRM(addbufs_pci)(drm_device_t *dev, drm_buf_desc_t *request)
 	while ( entry->buf_count < count ) {
 		vaddr = (vm_offset_t) DRM(pci_alloc)(dev, size, alignment,
 		    0xfffffffful, &bus_addr);
-		if (vaddr == NULL) {
+		if (vaddr == 0) {
 			/* Set count correctly so we free the proper amount. */
 			entry->buf_count = count;
 			entry->seg_count = count;

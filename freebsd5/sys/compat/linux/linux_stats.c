@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/linux/linux_stats.c,v 1.56 2003/11/05 23:52:54 anholt Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/linux/linux_stats.c,v 1.62 2004/08/16 07:28:16 tjr Exp $");
 
 #include "opt_mac.h"
 
@@ -45,8 +45,15 @@ __FBSDID("$FreeBSD: src/sys/compat/linux/linux_stats.c,v 1.56 2003/11/05 23:52:5
 #include <sys/systm.h>
 #include <sys/vnode.h>
 
+#include "opt_compat.h"
+
+#if !COMPAT_LINUX32
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
+#else
+#include <machine/../linux32/linux.h>
+#include <machine/../linux32/linux32_proto.h>
+#endif
 
 #include <compat/linux/linux_util.h>
 
@@ -55,7 +62,7 @@ newstat_copyout(struct stat *buf, void *ubuf)
 {
 	struct l_newstat tbuf;
 	struct cdevsw *cdevsw;
-	dev_t dev;
+	struct cdev *dev;
 
 	bzero(&tbuf, sizeof(tbuf));
 	tbuf.st_dev = uminor(buf->st_dev) | (umajor(buf->st_dev) << 8);
@@ -76,7 +83,7 @@ newstat_copyout(struct stat *buf, void *ubuf)
 	 * in FreeBSD but block devices under Linux.
 	 */
 	if (S_ISCHR(tbuf.st_mode) &&
-	    (dev = udev2dev(buf->st_rdev, 0)) != NODEV) {
+	    (dev = findcdev(buf->st_rdev)) != NULL) {
 		cdevsw = devsw(dev);
 		if (cdevsw != NULL && (cdevsw->d_flags & D_DISK)) {
 			tbuf.st_mode &= ~S_IFMT;
@@ -342,7 +349,7 @@ int
 linux_ustat(struct thread *td, struct linux_ustat_args *args)
 {
 	struct l_ustat lu;
-	dev_t dev;
+	struct cdev *dev;
 	struct vnode *vp;
 	struct statfs *stat;
 	int error;
@@ -360,13 +367,19 @@ linux_ustat(struct thread *td, struct linux_ustat_args *args)
 
 	/*
 	 * XXX - Don't return an error if we can't find a vnode for the
-	 * device. Our dev_t is 32-bits whereas Linux only has a 16-bits
-	 * dev_t. The dev_t that is used now may as well be a truncated
-	 * dev_t returned from previous syscalls. Just return a bzeroed
+	 * device. Our struct cdev *is 32-bits whereas Linux only has a 16-bits
+	 * struct cdev *. The struct cdev *that is used now may as well be a truncated
+	 * struct cdev *returned from previous syscalls. Just return a bzeroed
 	 * ustat in that case.
+	 *
+	 * XXX: findcdev() SHALL not be used this way.  Somebody (TM) will
+	 *	have to find a better way.  It may be that we should stick
+	 *	a dev_t into struct mount, and walk the mountlist for a
+	 *	perfect match and failing that try again looking for a
+	 *	minor-truncated match.
 	 */
-	dev = makedev(args->dev >> 8, args->dev & 0xFF);
-	if (vfinddev(dev, VCHR, &vp)) {
+	dev = findcdev(makedev(args->dev >> 8, args->dev & 0xFF));
+	if (dev != NULL && vfinddev(dev, &vp)) {
 		if (vp->v_mount == NULL)
 			return (EINVAL);
 #ifdef MAC
@@ -386,14 +399,14 @@ linux_ustat(struct thread *td, struct linux_ustat_args *args)
 	return (copyout(&lu, args->ubuf, sizeof(lu)));
 }
 
-#if defined(__i386__)
+#if defined(__i386__) || (defined(__amd64__) && COMPAT_LINUX32)
 
 static int
 stat64_copyout(struct stat *buf, void *ubuf)
 {
 	struct l_stat64 lbuf;
 	struct cdevsw *cdevsw;
-	dev_t dev;
+	struct cdev *dev;
 
 	bzero(&lbuf, sizeof(lbuf));
 	lbuf.st_dev = uminor(buf->st_dev) | (umajor(buf->st_dev) << 8);
@@ -414,7 +427,7 @@ stat64_copyout(struct stat *buf, void *ubuf)
 	 * in FreeBSD but block devices under Linux.
 	 */
 	if (S_ISCHR(lbuf.st_mode) &&
-	    (dev = udev2dev(buf->st_rdev, 0)) != NODEV) {
+	    (dev = findcdev(buf->st_rdev)) != NULL) {
 		cdevsw = devsw(dev);
 		if (cdevsw != NULL && (cdevsw->d_flags & D_DISK)) {
 			lbuf.st_mode &= ~S_IFMT;
@@ -525,4 +538,4 @@ linux_fstat64(struct thread *td, struct linux_fstat64_args *args)
 	return (error);
 }
 
-#endif /* __i386__ */
+#endif /* __i386__ || __amd64__ */

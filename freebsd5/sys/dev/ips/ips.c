@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ips/ips.c,v 1.6 2003/11/27 08:37:36 mbr Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ips/ips.c,v 1.13 2004/06/16 09:46:46 phk Exp $");
 
 #include <dev/ips/ips.h>
 #include <sys/stat.h>
@@ -37,13 +37,15 @@ static d_open_t ips_open;
 static d_close_t ips_close;
 static d_ioctl_t ips_ioctl;
 
-#define IPS_CDEV_MAJOR 175
+MALLOC_DEFINE(M_IPSBUF, "ipsbuf","IPS driver buffer");
+
 static struct cdevsw ips_cdevsw = {
-	.d_open = ips_open,
-	.d_close = ips_close,
-	.d_ioctl = ips_ioctl,
-	.d_name = "ips",
-	.d_maj = IPS_CDEV_MAJOR,
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
+	.d_open =	ips_open,
+	.d_close =	ips_close,
+	.d_ioctl =	ips_ioctl,
+	.d_name =	"ips",
 };
 
 static const char* ips_adapter_name[] = {
@@ -66,14 +68,14 @@ static const char* ips_adapter_name[] = {
 };
 
 
-static int ips_open(dev_t dev, int flags, int fmt, struct thread *td)
+static int ips_open(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	ips_softc_t *sc = dev->si_drv1;
 	sc->state |= IPS_DEV_OPEN;
         return 0;
 }
 
-static int ips_close(dev_t dev, int flags, int fmt, struct thread *td)
+static int ips_close(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	ips_softc_t *sc = dev->si_drv1;
 	sc->state &= ~IPS_DEV_OPEN;
@@ -81,7 +83,7 @@ static int ips_close(dev_t dev, int flags, int fmt, struct thread *td)
         return 0;
 }
 
-static int ips_ioctl(dev_t dev, u_long command, caddr_t addr, int32_t flags, struct thread *td)
+static int ips_ioctl(struct cdev *dev, u_long command, caddr_t addr, int32_t flags, struct thread *td)
 {
 	ips_softc_t *sc;
 
@@ -102,16 +104,23 @@ static void ips_cmd_dmaload(void *cmdptr, bus_dma_segment_t *segments,int segnum
 static __inline__ int ips_cmdqueue_free(ips_softc_t *sc)
 {
 	int i, error = -1;
-	intrmask_t mask = splbio();
+	ips_command_t *command;
+	intrmask_t mask;
+
+	mask = splbio();
 	if(!sc->used_commands){
 		for(i = 0; i < sc->max_cmds; i++){
-			if(!(sc->commandarray[i].command_phys_addr))
+
+			command = &sc->commandarray[i];
+			sema_destroy(&command->cmd_sema);
+
+			if(command->command_phys_addr == 0)
 				continue;
 			bus_dmamap_unload(sc->command_dmatag, 
-					  sc->commandarray[i].command_dmamap);
+					  command->command_dmamap);
 			bus_dmamem_free(sc->command_dmatag, 
-					sc->commandarray[i].command_buffer,
-					sc->commandarray[i].command_dmamap);
+					command->command_buffer,
+					command->command_dmamap);
 		}
 		error = 0;
 		sc->state |= IPS_OFFLINE;
@@ -129,13 +138,10 @@ static __inline__ int ips_cmdqueue_init(ips_softc_t *sc)
 	SLIST_INIT(&sc->free_cmd_list);
 	STAILQ_INIT(&sc->cmd_wait_list);
 	for(i = 0; i < sc->max_cmds; i++){
-		sc->commandarray[i].id = i;
-		sc->commandarray[i].sc = sc;
-		SLIST_INSERT_HEAD(&sc->free_cmd_list, &sc->commandarray[i], 
-				  next);	
-	}
-	for(i = 0; i < sc->max_cmds; i++){
 		command = &sc->commandarray[i];
+		command->id = i;
+		command->sc = sc;
+
 		if(bus_dmamem_alloc(sc->command_dmatag,&command->command_buffer,
 		    BUS_DMA_NOWAIT, &command->command_dmamap))
 			goto error;
@@ -147,12 +153,15 @@ static __inline__ int ips_cmdqueue_init(ips_softc_t *sc)
 			    command->command_buffer, command->command_dmamap);
 			goto error;
 		}
+
+		sema_init(&command->cmd_sema, 0, "IPS Command Semaphore");
+		SLIST_INSERT_HEAD(&sc->free_cmd_list, command, next);	
 	}
 	sc->state &= ~IPS_OFFLINE;
 	return 0;
 error:
-		ips_cmdqueue_free(sc);
-		return ENOMEM;
+	ips_cmdqueue_free(sc);
+	return ENOMEM;
 }
 
 static int ips_add_waiting_command(ips_softc_t *sc, int (*callback)(ips_command_t *), void *data, unsigned long flags)
@@ -163,12 +172,13 @@ static int ips_add_waiting_command(ips_softc_t *sc, int (*callback)(ips_command_
 	unsigned long memflags = 0;
 	if(IPS_NOWAIT_FLAG & flags)
 		memflags = M_NOWAIT;
-	waiter = malloc(sizeof(ips_wait_list_t), M_DEVBUF, memflags);
+	waiter = malloc(sizeof(ips_wait_list_t), M_IPSBUF, memflags);
 	if(!waiter)
 		return ENOMEM;
 	mask = splbio();
 	if(sc->state & IPS_OFFLINE){
 		splx(mask);
+		free(waiter, M_IPSBUF);
 		return EIO;
 	}
 	command = SLIST_FIRST(&sc->free_cmd_list);
@@ -178,7 +188,7 @@ static int ips_add_waiting_command(ips_softc_t *sc, int (*callback)(ips_command_
 		splx(mask);
 		clear_ips_command(command);
 		bzero(command->command_buffer, IPS_COMMAND_LEN);
-		free(waiter, M_DEVBUF);
+		free(waiter, M_IPSBUF);
 		command->arg = data;
 		return callback(command);
 	}
@@ -213,7 +223,7 @@ static void ips_run_waiting_command(ips_softc_t *sc)
 	bzero(command->command_buffer, IPS_COMMAND_LEN);
 	command->arg = waiter->data;
 	callback = waiter->callback;
-	free(waiter, M_DEVBUF);
+	free(waiter, M_IPSBUF);
 	callback(command);
 	return;	
 }
@@ -253,6 +263,10 @@ void ips_insert_free_cmd(ips_softc_t *sc, ips_command_t *command)
 {
 	intrmask_t mask;
 	mask = splbio();
+
+	if (sema_value(&command->cmd_sema) != 0)
+		panic("ips: command returned non-zero semaphore");
+
 	SLIST_INSERT_HEAD(&sc->free_cmd_list, command, next);
 	(sc->used_commands)--;
 	splx(mask);
@@ -374,6 +388,7 @@ int ips_adapter_init(ips_softc_t *sc)
 {
         int i;
         DEVICE_PRINTF(1,sc->dev, "initializing\n");
+
         if (bus_dma_tag_create(	/* parent    */	sc->adapter_dmatag,
 				/* alignemnt */	1,
 				/* boundary  */	0,
@@ -418,8 +433,6 @@ int ips_adapter_init(ips_softc_t *sc)
 
 	if(sc->ips_adapter_reinit(sc, 0))
 		goto error;
-
-	mtx_init(&sc->cmd_mtx, "ips command mutex", NULL, MTX_DEF);
 
 	/* initialize ffdc values */
 	microtime(&sc->ffdc_resettime);
@@ -533,8 +546,6 @@ int ips_adapter_free(ips_softc_t *sc)
 	mask = splbio();
 	untimeout(ips_timeout, sc, sc->timer);
 	splx(mask);
-	if (mtx_initialized(&sc->cmd_mtx))
-		mtx_destroy(&sc->cmd_mtx);
 
 	if(sc->sg_dmatag)
 		bus_dma_tag_destroy(sc->sg_dmatag);

@@ -26,12 +26,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/acpica/acpi_resource.c,v 1.20 2003/09/26 05:24:55 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/acpica/acpi_resource.c,v 1.28.2.1 2004/08/31 05:26:37 njl Exp $");
 
 #include "opt_acpi.h"
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/bus.h>
+#include <sys/malloc.h>
+#include <sys/module.h>
 
 #include <machine/bus.h>
 #include <machine/resource.h>
@@ -43,6 +45,94 @@ __FBSDID("$FreeBSD: src/sys/dev/acpica/acpi_resource.c,v 1.20 2003/09/26 05:24:5
 /* Hooks for the ACPI CA debugging infrastructure */
 #define _COMPONENT	ACPI_BUS
 ACPI_MODULE_NAME("RESOURCE")
+
+struct lookup_irq_request {
+    ACPI_RESOURCE *acpi_res;
+    struct resource *res;
+    int		counter;
+    int		rid;
+    int		found;
+};
+
+static ACPI_STATUS
+acpi_lookup_irq_handler(ACPI_RESOURCE *res, void *context)
+{
+    struct lookup_irq_request *req;
+    u_int irqnum, irq;
+
+    switch (res->Id) {
+    case ACPI_RSTYPE_IRQ:
+    case ACPI_RSTYPE_EXT_IRQ:
+	if (res->Id == ACPI_RSTYPE_IRQ) {
+	    irqnum = res->Data.Irq.NumberOfInterrupts;
+	    irq = res->Data.Irq.Interrupts[0];
+	} else {
+	    irqnum = res->Data.ExtendedIrq.NumberOfInterrupts;
+	    irq = res->Data.ExtendedIrq.Interrupts[0];
+	}
+	if (irqnum != 1)
+	    break;
+	req = (struct lookup_irq_request *)context;
+	if (req->counter != req->rid) {
+	    req->counter++;
+	    break;
+	}
+	req->found = 1;
+	KASSERT(irq == rman_get_start(req->res),
+	    ("IRQ resources do not match"));
+	bcopy(res, req->acpi_res, sizeof(ACPI_RESOURCE));
+	return (AE_CTRL_TERMINATE);
+    }
+    return (AE_OK);
+}
+
+ACPI_STATUS
+acpi_lookup_irq_resource(device_t dev, int rid, struct resource *res,
+    ACPI_RESOURCE *acpi_res)
+{
+    struct lookup_irq_request req;
+    ACPI_STATUS status;
+
+    req.acpi_res = acpi_res;
+    req.res = res;
+    req.counter = 0;
+    req.rid = rid;
+    req.found = 0;
+    status = AcpiWalkResources(acpi_get_handle(dev), "_CRS",
+	acpi_lookup_irq_handler, &req);
+    if (ACPI_SUCCESS(status) && req.found == 0)
+	status = AE_NOT_FOUND;
+    return (status);
+}
+
+void
+acpi_config_intr(device_t dev, ACPI_RESOURCE *res)
+{
+    u_int irq;
+    int pol, trig;
+
+    switch (res->Id) {
+    case ACPI_RSTYPE_IRQ:
+	KASSERT(res->Data.Irq.NumberOfInterrupts == 1,
+	    ("%s: multiple interrupts", __func__));
+	irq = res->Data.Irq.Interrupts[0];
+	trig = res->Data.Irq.EdgeLevel;
+	pol = res->Data.Irq.ActiveHighLow;
+	break;
+    case ACPI_RSTYPE_EXT_IRQ:
+	KASSERT(res->Data.ExtendedIrq.NumberOfInterrupts == 1,
+	    ("%s: multiple interrupts", __func__));
+	irq = res->Data.ExtendedIrq.Interrupts[0];
+	trig = res->Data.ExtendedIrq.EdgeLevel;
+	pol = res->Data.ExtendedIrq.ActiveHighLow;
+	break;
+    default:
+	panic("%s: bad resource type %u", __func__, res->Id);
+    }
+    BUS_CONFIG_INTR(dev, irq, (trig == ACPI_EDGE_SENSITIVE) ?
+	INTR_TRIGGER_EDGE : INTR_TRIGGER_LEVEL, (pol == ACPI_ACTIVE_HIGH) ?
+	INTR_POLARITY_HIGH : INTR_POLARITY_LOW);	
+}
 
 /*
  * Fetch a device's resources and associate them with the device.
@@ -56,7 +146,7 @@ ACPI_MODULE_NAME("RESOURCE")
  */
 ACPI_STATUS
 acpi_parse_resources(device_t dev, ACPI_HANDLE handle,
-		     struct acpi_parse_resource_set *set)
+		     struct acpi_parse_resource_set *set, void *arg)
 {
     ACPI_BUFFER		buf;
     ACPI_RESOURCE	*res;
@@ -86,7 +176,7 @@ acpi_parse_resources(device_t dev, ACPI_HANDLE handle,
     }
     ACPI_DEBUG_PRINT((ACPI_DB_RESOURCES, "%s - got %ld bytes of resources\n",
 		     acpi_name(handle), (long)buf.Length));
-    set->set_init(dev, &context);
+    set->set_init(dev, arg, &context);
 
     /* Iterate through the resources */
     curr = buf.Pointer;
@@ -373,7 +463,7 @@ acpi_parse_resources(device_t dev, ACPI_HANDLE handle,
  * Resource-set vectors used to attach _CRS-derived resources 
  * to an ACPI device.
  */
-static void	acpi_res_set_init(device_t dev, void **context);
+static void	acpi_res_set_init(device_t dev, void *arg, void **context);
 static void	acpi_res_set_done(device_t dev, void *context);
 static void	acpi_res_set_ioport(device_t dev, void *context,
 				    u_int32_t base, u_int32_t length);
@@ -411,15 +501,17 @@ struct acpi_res_context {
     int		ar_nmem;
     int		ar_nirq;
     int		ar_ndrq;
+    void 	*ar_parent;
 };
 
 static void
-acpi_res_set_init(device_t dev, void **context)
+acpi_res_set_init(device_t dev, void *arg, void **context)
 {
     struct acpi_res_context	*cp;
 
     if ((cp = AcpiOsAllocate(sizeof(*cp))) != NULL) {
 	bzero(cp, sizeof(*cp));
+	cp->ar_parent = arg;
 	*context = cp;
     }
 }
@@ -493,9 +585,6 @@ acpi_res_set_irq(device_t dev, void *context, u_int32_t *irq, int count,
 	return;
 
     bus_set_resource(dev, SYS_RES_IRQ, cp->ar_nirq++, *irq, 1);
-    BUS_CONFIG_INTR(dev, *irq, (trig == ACPI_EDGE_SENSITIVE) ?
-	INTR_TRIGGER_EDGE : INTR_TRIGGER_LEVEL, (pol == ACPI_ACTIVE_HIGH) ?
-	INTR_POLARITY_HIGH : INTR_POLARITY_LOW);
 }
 
 static void
@@ -534,72 +623,114 @@ acpi_res_set_end_dependant(device_t dev, void *context)
 }
 
 /*
- * Resource-owning placeholders.
+ * Resource-owning placeholders for IO and memory pseudo-devices.
  *
- * This code "owns" system resource objects that aren't
- * otherwise useful to devices, and which shouldn't be
- * considered "free".
- *
- * Note that some systems claim *all* of the physical address space
- * with a PNP0C01 device, so we cannot correctly "own" system memory
- * here (must be done in the SMAP handler on x86 systems, for
- * example).
+ * This code allocates system resources that will be used by ACPI
+ * child devices.  The acpi parent manages these resources through a
+ * private rman.
  */
 
-static int	acpi_sysresource_probe(device_t dev);
-static int	acpi_sysresource_attach(device_t dev);
+static int	acpi_sysres_rid = 100;
 
-static device_method_t acpi_sysresource_methods[] = {
+static int	acpi_sysres_probe(device_t dev);
+static int	acpi_sysres_attach(device_t dev);
+
+static device_method_t acpi_sysres_methods[] = {
     /* Device interface */
-    DEVMETHOD(device_probe,	acpi_sysresource_probe),
-    DEVMETHOD(device_attach,	acpi_sysresource_attach),
+    DEVMETHOD(device_probe,	acpi_sysres_probe),
+    DEVMETHOD(device_attach,	acpi_sysres_attach),
 
     {0, 0}
 };
 
-static driver_t acpi_sysresource_driver = {
+static driver_t acpi_sysres_driver = {
     "acpi_sysresource",
-    acpi_sysresource_methods,
+    acpi_sysres_methods,
     0,
 };
 
-static devclass_t acpi_sysresource_devclass;
-DRIVER_MODULE(acpi_sysresource, acpi, acpi_sysresource_driver,
-	      acpi_sysresource_devclass, 0, 0);
+static devclass_t acpi_sysres_devclass;
+DRIVER_MODULE(acpi_sysresource, acpi, acpi_sysres_driver, acpi_sysres_devclass,
+    0, 0);
+MODULE_DEPEND(acpi_sysresource, acpi, 1, 1, 1);
 
 static int
-acpi_sysresource_probe(device_t dev)
+acpi_sysres_probe(device_t dev)
 {
-    if (!acpi_disabled("sysresource") && acpi_MatchHid(dev, "PNP0C02"))
-	device_set_desc(dev, "System Resource");
-    else
+    static char *sysres_ids[] = { "PNP0C01", "PNP0C02", NULL };
+
+    if (acpi_disabled("sysresource") ||
+	ACPI_ID_PROBE(device_get_parent(dev), dev, sysres_ids) == NULL)
 	return (ENXIO);
 
+    device_set_desc(dev, "System Resource");
     device_quiet(dev);
     return (-100);
 }
 
 static int
-acpi_sysresource_attach(device_t dev)
+acpi_sysres_attach(device_t dev)
 {
-    struct resource	*res;
-    int			i, rid;
+    device_t bus;
+    struct resource_list_entry *bus_rle, *dev_rle;
+    struct resource_list *bus_rl, *dev_rl;
+    int done, type;
+    u_long start, end, count;
 
     /*
-     * Suck up all the resources that might have been assigned to us.
-     * Note that it's impossible to tell the difference between a
-     * resource that someone else has claimed, and one that doesn't
-     * exist.
+     * Loop through all current resources to see if the new one overlaps
+     * any existing ones.  If so, grow the old one up and/or down
+     * accordingly.  Discard any that are wholly contained in the old.  If
+     * the resource is unique, add it to the parent.  It will later go into
+     * the rman pool.
      */
-    for (i = 0; i < 100; i++) {
-	rid = i;
-	res = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1, 0);
-	rid = i;
-	res = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid, 0, ~0, 1, 0);
-	rid = i;
-	res = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
-				 RF_SHAREABLE);
+    bus = device_get_parent(dev);
+    dev_rl = BUS_GET_RESOURCE_LIST(bus, dev);
+    bus_rl = BUS_GET_RESOURCE_LIST(device_get_parent(bus), bus);
+    SLIST_FOREACH(dev_rle, dev_rl, link) {
+	if (dev_rle->type != SYS_RES_IOPORT && dev_rle->type != SYS_RES_MEMORY)
+	    continue;
+
+	start = dev_rle->start;
+	end = dev_rle->end;
+	count = dev_rle->count;
+	type = dev_rle->type;
+	done = FALSE;
+
+	SLIST_FOREACH(bus_rle, bus_rl, link) {
+	    if (bus_rle->type != type)
+		continue;
+
+	    /* New resource wholly contained in old, discard. */
+	    if (start >= bus_rle->start && end <= bus_rle->end)
+		break;
+
+	    /* New tail overlaps old head, grow existing resource downward. */
+	    if (start < bus_rle->start && end >= bus_rle->start) {
+		bus_rle->count += bus_rle->start - start;
+		bus_rle->start = start;
+		done = TRUE;
+	    }
+
+	    /* New head overlaps old tail, grow existing resource upward. */
+	    if (start <= bus_rle->end && end > bus_rle->end) {
+		bus_rle->count += end - bus_rle->end;
+		bus_rle->end = end;
+		done = TRUE;
+	    }
+
+	    /* If we adjusted the old resource, we're finished. */
+	    if (done)
+		break;
+	}
+
+	/* If we didn't merge with anything, add this resource. */
+	if (bus_rle == NULL)
+	    bus_set_resource(bus, type, acpi_sysres_rid++, start, count);
     }
+
+    /* After merging/moving resources to the parent, free the list. */
+    resource_list_free(dev_rl);
 
     return (0);
 }

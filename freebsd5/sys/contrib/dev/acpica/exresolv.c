@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresolv - AML Interpreter object resolution
- *              $Revision: 119 $
+ *              $Revision: 124 $
  *
  *****************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2003, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -122,6 +122,7 @@
 #include "acdispat.h"
 #include "acinterp.h"
 #include "acnamesp.h"
+#include "acparser.h"
 
 
 #define _COMPONENT          ACPI_EXECUTER
@@ -268,15 +269,15 @@ AcpiExResolveObjectToValue (
                 return_ACPI_STATUS (Status);
             }
 
+            ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Arg/Local %X] ValueObj is %p\n",
+                StackDesc->Reference.Offset, ObjDesc));
+
             /*
              * Now we can delete the original Reference Object and
-             * replace it with the resolve value
+             * replace it with the resolved value
              */
             AcpiUtRemoveReference (StackDesc);
             *StackPtr = ObjDesc;
-
-            ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "[Arg/Local %d] ValueObj is %p\n",
-                StackDesc->Reference.Offset, ObjDesc));
             break;
 
 
@@ -322,8 +323,8 @@ AcpiExResolveObjectToValue (
 
                 /* Invalid reference object */
 
-                ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                    "Unknown TargetType %X in Index/Reference obj %p\n",
+                ACPI_REPORT_ERROR ((
+                    "During resolve, Unknown TargetType %X in Index/Reference obj %p\n",
                     StackDesc->Reference.TargetType, StackDesc));
                 Status = AE_AML_INTERNAL;
                 break;
@@ -333,6 +334,7 @@ AcpiExResolveObjectToValue (
 
         case AML_REF_OF_OP:
         case AML_DEBUG_OP:
+        case AML_LOAD_OP:
 
             /* Just leave the object as-is */
 
@@ -341,8 +343,8 @@ AcpiExResolveObjectToValue (
 
         default:
 
-            ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unknown Reference opcode %X in %p\n",
-                Opcode, StackDesc));
+            ACPI_REPORT_ERROR (("During resolve, Unknown Reference opcode %X (%s) in %p\n",
+                Opcode, AcpiPsGetOpcodeName (Opcode), StackDesc));
             Status = AE_AML_INTERNAL;
             break;
         }
@@ -435,6 +437,8 @@ AcpiExResolveMultiple (
 
             if (ACPI_GET_DESCRIPTOR_TYPE (Node) != ACPI_DESC_TYPE_NAMED)
             {
+                ACPI_REPORT_ERROR (("AcpiExResolveMultiple: Not a NS node %p [%s]\n",
+                        Node, AcpiUtGetDescriptorName (Node)));
                 return_ACPI_STATUS (AE_AML_INTERNAL);
             }
 
@@ -489,7 +493,9 @@ AcpiExResolveMultiple (
 
             if (ACPI_GET_DESCRIPTOR_TYPE (Node) != ACPI_DESC_TYPE_NAMED)
             {
-                return_ACPI_STATUS (AE_AML_INTERNAL);
+                ACPI_REPORT_ERROR (("AcpiExResolveMultiple: Not a NS node %p [%s]\n",
+                        Node, AcpiUtGetDescriptorName (Node)));
+               return_ACPI_STATUS (AE_AML_INTERNAL);
             }
 
             /* Get the attached object */

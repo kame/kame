@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/advansys/adv_eisa.c,v 1.15 2003/08/24 17:48:01 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/advansys/adv_eisa.c,v 1.16 2004/03/17 17:50:24 njl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -145,16 +145,15 @@ adv_eisa_attach(device_t dev)
 	adv_b = NULL;
 
 	rid = 0;
-	io = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-				0, ~0, 1, RF_ACTIVE);
+	io = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid, RF_ACTIVE);
 	if (!io) {
 		device_printf(dev, "No I/O space?!\n");
 		return ENOMEM;
 	}
 
 	rid = 0;
-	irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
-				 0, ~0, 1, RF_SHAREABLE | RF_ACTIVE);
+	irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
+				     RF_SHAREABLE | RF_ACTIVE);
 	if (!irq) {
 		device_printf(dev, "No irq?!\n");
 		bus_release_resource(dev, SYS_RES_IOPORT, 0, io);

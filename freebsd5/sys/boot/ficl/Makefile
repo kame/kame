@@ -1,10 +1,6 @@
-# $FreeBSD: src/sys/boot/ficl/Makefile,v 1.35 2003/06/30 19:08:49 ru Exp $
+# $FreeBSD: src/sys/boot/ficl/Makefile,v 1.37.2.1 2004/08/23 04:26:55 marcel Exp $
 #
-.if ${MACHINE_ARCH} == "amd64"
-.MAKEFLAGS:  MACHINE_ARCH=i386 MACHINE=i386 REALLY_AMD64=true
-.endif
-
-.PATH: ${.CURDIR}/${MACHINE_ARCH}
+.PATH: ${.CURDIR}/${MACHINE_ARCH:S/amd64/i386/}
 BASE_SRCS=	dict.c ficl.c fileaccess.c float.c loader.c math64.c \
 		prefix.c search.c stack.c tools.c vm.c words.c
 
@@ -12,10 +8,13 @@ SRCS=		${BASE_SRCS} sysdep.c softcore.c
 CLEANFILES=	softcore.c testmain testmain.o
 CFLAGS+=	-ffreestanding
 .if ${MACHINE_ARCH} == "alpha"
-CFLAGS+=	-mno-fp-regs
+CFLAGS+=	-mno-fp-regs -Os
 .endif
-.if ${MACHINE_ARCH} == "i386"
+.if ${MACHINE_ARCH} == "i386" || ${MACHINE_ARCH} == "amd64"
 CFLAGS+=	-mpreferred-stack-boundary=2
+.endif
+.if ${MACHINE_ARCH} == "powerpc"
+CFLAGS+=	-msoft-float
 .endif
 .if ${MACHINE} == "pc98"
 CFLAGS+=	-DPC98
@@ -41,17 +40,18 @@ SOFTWORDS=	softcore.fr jhlocal.fr marker.fr freebsd.fr ficllocal.fr \
 # Optional OO extension softwords
 #SOFTWORDS+=	oo.fr classes.fr
 
-.if defined(REALLY_AMD64)
+.if ${MACHINE_ARCH} == "amd64"
 CFLAGS+=	-m32 -I.
 .endif
 
-CFLAGS+=	-I${.CURDIR} -I${.CURDIR}/${MACHINE_ARCH} -I${.CURDIR}/../common
+CFLAGS+=	-I${.CURDIR} -I${.CURDIR}/${MACHINE_ARCH:S/amd64/i386/} \
+		-I${.CURDIR}/../common
 
 softcore.c: ${SOFTWORDS} softcore.awk
 	(cd ${.CURDIR}/softwords; cat ${SOFTWORDS} \
 	    | awk -f softcore.awk -v datestamp="`LC_ALL=C date`") > ${.TARGET}
 
-.if defined(REALLY_AMD64)
+.if ${MACHINE_ARCH} == "amd64"
 ${SRCS:M*.c:R:S/$/.o/g}: machine
 
 beforedepend ${OBJS}: machine

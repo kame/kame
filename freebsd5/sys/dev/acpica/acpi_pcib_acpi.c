@@ -24,16 +24,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/acpica/acpi_pcib_acpi.c,v 1.29 2003/08/22 06:06:16 imp Exp $
+ *	$FreeBSD: src/sys/dev/acpica/acpi_pcib_acpi.c,v 1.39.2.2 2004/10/14 23:52:21 imp Exp $
  */
 #include "opt_acpi.h"
 #include <sys/param.h>
 #include <sys/bus.h>
-#include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/malloc.h>
+#include <sys/module.h>
+#include <sys/sysctl.h>
 
 #include "acpi.h"
-
 #include <dev/acpica/acpivar.h>
 
 #include <machine/pci_cfgreg.h>
@@ -43,15 +44,14 @@
 
 #include <dev/acpica/acpi_pcibvar.h>
 
-/*
- * Hooks for the ACPI CA debugging infrastructure
- */
+/* Hooks for the ACPI CA debugging infrastructure. */
 #define _COMPONENT	ACPI_BUS
 ACPI_MODULE_NAME("PCI_ACPI")
 
 struct acpi_hpcib_softc {
     device_t		ap_dev;
     ACPI_HANDLE		ap_handle;
+    int			ap_flags;
 
     int			ap_segment;	/* analagous to Alpha 'hose' */
     int			ap_bus;		/* bios-assigned bus number */
@@ -59,17 +59,23 @@ struct acpi_hpcib_softc {
     ACPI_BUFFER		ap_prt;		/* interrupt routing table */
 };
 
-
 static int		acpi_pcib_acpi_probe(device_t bus);
 static int		acpi_pcib_acpi_attach(device_t bus);
 static int		acpi_pcib_acpi_resume(device_t bus);
-static int		acpi_pcib_read_ivar(device_t dev, device_t child, int which, uintptr_t *result);
-static int		acpi_pcib_write_ivar(device_t dev, device_t child, int which, uintptr_t value);
-static u_int32_t	acpi_pcib_read_config(device_t dev, int bus, int slot, int func, int reg, int bytes);
-static void		acpi_pcib_write_config(device_t dev, int bus, int slot, int func, int reg, 
-					       u_int32_t data, int bytes);
+static int		acpi_pcib_read_ivar(device_t dev, device_t child,
+			    int which, uintptr_t *result);
+static int		acpi_pcib_write_ivar(device_t dev, device_t child,
+			    int which, uintptr_t value);
+static uint32_t		acpi_pcib_read_config(device_t dev, int bus, int slot,
+			    int func, int reg, int bytes);
+static void		acpi_pcib_write_config(device_t dev, int bus, int slot,
+			    int func, int reg, uint32_t data, int bytes);
 static int		acpi_pcib_acpi_route_interrupt(device_t pcib,
-    device_t dev, int pin);
+			    device_t dev, int pin);
+static struct resource *acpi_pcib_acpi_alloc_resource(device_t dev,
+  			    device_t child, int type, int *rid,
+			    u_long start, u_long end, u_long count,
+			    u_int flags);
 
 static device_method_t acpi_pcib_acpi_methods[] = {
     /* Device interface */
@@ -83,7 +89,7 @@ static device_method_t acpi_pcib_acpi_methods[] = {
     DEVMETHOD(bus_print_child,		bus_generic_print_child),
     DEVMETHOD(bus_read_ivar,		acpi_pcib_read_ivar),
     DEVMETHOD(bus_write_ivar,		acpi_pcib_write_ivar),
-    DEVMETHOD(bus_alloc_resource,	bus_generic_alloc_resource),
+    DEVMETHOD(bus_alloc_resource,	acpi_pcib_acpi_alloc_resource),
     DEVMETHOD(bus_release_resource,	bus_generic_release_resource),
     DEVMETHOD(bus_activate_resource,	bus_generic_activate_resource),
     DEVMETHOD(bus_deactivate_resource, 	bus_generic_deactivate_resource),
@@ -106,25 +112,21 @@ static driver_t acpi_pcib_acpi_driver = {
 };
 
 DRIVER_MODULE(acpi_pcib, acpi, acpi_pcib_acpi_driver, pcib_devclass, 0, 0);
+MODULE_DEPEND(acpi_pcib, acpi, 1, 1, 1);
 
 static int
 acpi_pcib_acpi_probe(device_t dev)
 {
+    static char *pcib_ids[] = { "PNP0A03", NULL };
 
-    if ((acpi_get_type(dev) == ACPI_TYPE_DEVICE) &&
-	!acpi_disabled("pci") &&
-	acpi_MatchHid(dev, "PNP0A03")) {
+    if (acpi_disabled("pcib") ||
+	ACPI_ID_PROBE(device_get_parent(dev), dev, pcib_ids) == NULL)
+	return (ENXIO);
 
-	if (!pci_cfgregopen())
-		return(ENXIO);
-
-	/*
-	 * Set device description 
-	 */
-	device_set_desc(dev, "ACPI Host-PCI bridge");
-	return(0);
-    }
-    return(ENXIO);
+    if (pci_cfgregopen() == 0)
+	return (ENXIO);
+    device_set_desc(dev, "ACPI Host-PCI bridge");
+    return (0);
 }
 
 static int
@@ -158,14 +160,14 @@ acpi_pcib_acpi_attach(device_t dev)
      *     if _BBN is zero and pcib0 already exists, we try to read our
      *     bus number from the configuration registers at address _ADR.
      */
-    status = acpi_EvaluateInteger(sc->ap_handle, "_BBN", &sc->ap_bus);
+    status = acpi_GetInteger(sc->ap_handle, "_BBN", &sc->ap_bus);
     if (ACPI_FAILURE(status)) {
 	if (status != AE_NOT_FOUND) {
 	    device_printf(dev, "could not evaluate _BBN - %s\n",
 		AcpiFormatException(status));
-	    return_VALUE(ENXIO);
+	    return_VALUE (ENXIO);
 	} else {
-	    /* if it's not found, assume 0 */
+	    /* If it's not found, assume 0. */
 	    sc->ap_bus = 0;
 	}
     }
@@ -177,14 +179,14 @@ acpi_pcib_acpi_attach(device_t dev)
     busok = 1;
     if (sc->ap_bus == 0 && devclass_get_device(pcib_devclass, 0) != dev) {
 	busok = 0;
-	status = acpi_EvaluateInteger(sc->ap_handle, "_ADR", &addr);
+	status = acpi_GetInteger(sc->ap_handle, "_ADR", &addr);
 	if (ACPI_FAILURE(status)) {
 	    if (status != AE_NOT_FOUND) {
 		device_printf(dev, "could not evaluate _ADR - %s\n",
 		    AcpiFormatException(status));
-		return_VALUE(ENXIO);
+		return_VALUE (ENXIO);
 	    } else
-		device_printf(dev, "could not determine config space address\n");
+		device_printf(dev, "couldn't find _ADR\n");
 	} else {
 	    /* XXX: We assume bus 0. */
 	    slot = addr >> 16;
@@ -193,7 +195,7 @@ acpi_pcib_acpi_attach(device_t dev)
 		device_printf(dev, "reading config registers from 0:%d:%d\n",
 		    slot, func);
 	    if (host_pcib_get_busno(pci_cfgregread, 0, slot, func, &busno) == 0)
-		device_printf(dev, "could not read bus number from config space\n");
+		device_printf(dev, "couldn't read bus number from cfg space\n");
 	    else {
 		sc->ap_bus = busno;
 		busok = 1;
@@ -216,12 +218,14 @@ acpi_pcib_acpi_attach(device_t dev)
      * Get our segment number by evaluating _SEG
      * It's OK for this to not exist.
      */
-    if (ACPI_FAILURE(status = acpi_EvaluateInteger(sc->ap_handle, "_SEG", &sc->ap_segment))) {
+    status = acpi_GetInteger(sc->ap_handle, "_SEG", &sc->ap_segment);
+    if (ACPI_FAILURE(status)) {
 	if (status != AE_NOT_FOUND) {
-	    device_printf(dev, "could not evaluate _SEG - %s\n", AcpiFormatException(status));
-	    return_VALUE(ENXIO);
+	    device_printf(dev, "could not evaluate _SEG - %s\n",
+		AcpiFormatException(status));
+	    return_VALUE (ENXIO);
 	}
-	/* if it's not found, assume 0 */
+	/* If it's not found, assume 0. */
 	sc->ap_segment = 0;
     }
 
@@ -231,9 +235,8 @@ acpi_pcib_acpi_attach(device_t dev)
 static int
 acpi_pcib_acpi_resume(device_t dev)
 {
-    struct acpi_hpcib_softc	*sc = device_get_softc(dev);
 
-    return (acpi_pcib_resume(dev, &sc->ap_prt, sc->ap_bus));
+    return (acpi_pcib_resume(dev));
 }
 
 /*
@@ -245,14 +248,17 @@ acpi_pcib_read_ivar(device_t dev, device_t child, int which, uintptr_t *result)
     struct acpi_hpcib_softc	*sc = device_get_softc(dev);
 
     switch (which) {
-    case  PCIB_IVAR_BUS:
+    case PCIB_IVAR_BUS:
 	*result = sc->ap_bus;
-	return(0);
-    case  ACPI_IVAR_HANDLE:
+	return (0);
+    case ACPI_IVAR_HANDLE:
 	*result = (uintptr_t)sc->ap_handle;
-	return(0);
+	return (0);
+    case ACPI_IVAR_FLAGS:
+	*result = (uintptr_t)sc->ap_flags;
+	return (0);
     }
-    return(ENOENT);
+    return (ENOENT);
 }
 
 static int
@@ -261,21 +267,29 @@ acpi_pcib_write_ivar(device_t dev, device_t child, int which, uintptr_t value)
     struct acpi_hpcib_softc 	*sc = device_get_softc(dev);
 
     switch (which) {
-    case  PCIB_IVAR_BUS:
+    case PCIB_IVAR_BUS:
 	sc->ap_bus = value;
-	return(0);
+	return (0);
+    case ACPI_IVAR_HANDLE:
+	sc->ap_handle = (ACPI_HANDLE)value;
+	return (0);
+    case ACPI_IVAR_FLAGS:
+	sc->ap_flags = (int)value;
+	return (0);
     }
-    return(ENOENT);
+    return (ENOENT);
 }
 
-static u_int32_t
-acpi_pcib_read_config(device_t dev, int bus, int slot, int func, int reg, int bytes)
+static uint32_t
+acpi_pcib_read_config(device_t dev, int bus, int slot, int func, int reg,
+    int bytes)
 {
-    return(pci_cfgregread(bus, slot, func, reg, bytes));
+    return (pci_cfgregread(bus, slot, func, reg, bytes));
 }
 
 static void
-acpi_pcib_write_config(device_t dev, int bus, int slot, int func, int reg, u_int32_t data, int bytes)
+acpi_pcib_write_config(device_t dev, int bus, int slot, int func, int reg,
+    uint32_t data, int bytes)
 {
     pci_cfgregwrite(bus, slot, func, reg, data, bytes);
 }
@@ -283,9 +297,28 @@ acpi_pcib_write_config(device_t dev, int bus, int slot, int func, int reg, u_int
 static int
 acpi_pcib_acpi_route_interrupt(device_t pcib, device_t dev, int pin)
 {
-    struct acpi_hpcib_softc *sc;
 
-    /* find the bridge softc */
-    sc = device_get_softc(pcib);
-    return (acpi_pcib_route_interrupt(pcib, dev, pin, &sc->ap_prt));
+    return (acpi_pcib_route_interrupt(pcib, dev, pin));
+}
+
+static int acpi_host_mem_start = 0x80000000;
+TUNABLE_INT("hw.acpi.host_mem_start", &acpi_host_mem_start);
+
+struct resource *
+acpi_pcib_acpi_alloc_resource(device_t dev, device_t child, int type, int *rid,
+    u_long start, u_long end, u_long count, u_int flags)
+{
+    /*
+     * If no memory preference is given, use upper 32MB slot most
+     * bioses use for their memory window.  Typically other bridges
+     * before us get in the way to assert their preferences on memory.
+     * Hardcoding like this sucks, so a more MD/MI way needs to be
+     * found to do it.  This is typically only used on older laptops
+     * that don't have pci busses behind pci bridge, so assuming > 32MB
+     * is liekly OK.
+     */
+    if (type == SYS_RES_MEMORY && start == 0UL && end == ~0UL)
+	start = acpi_host_mem_start;
+    return (bus_generic_alloc_resource(dev, child, type, rid, start, end,
+	count, flags));
 }

@@ -2,7 +2,7 @@
  *
  * Module Name: nsutils - Utilities for accessing ACPI namespace, accessing
  *                        parents and siblings and Scope manipulation
- *              $Revision: 129 $
+ *              $Revision: 134 $
  *
  *****************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2003, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -256,6 +256,12 @@ AcpiNsPrintNodePathname (
     ACPI_STATUS             Status;
 
 
+    if (!Node)
+    {
+        AcpiOsPrintf ("[NULL NAME]");
+        return;
+    }
+
     /* Convert handle to a full pathname and print it (with supplied message) */
 
     Buffer.Length = ACPI_ALLOCATE_LOCAL_BUFFER;
@@ -335,7 +341,7 @@ AcpiNsGetType (
 
     if (!Node)
     {
-        ACPI_REPORT_WARNING (("NsGetType: Null Node ptr"));
+        ACPI_REPORT_WARNING (("NsGetType: Null Node input pointer\n"));
         return_VALUE (ACPI_TYPE_ANY);
     }
 
@@ -577,12 +583,12 @@ AcpiNsBuildInternalName (
 
     if (Info->FullyQualified)
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "returning [%p] (abs) \"\\%s\"\n",
+        ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Returning [%p] (abs) \"\\%s\"\n",
             InternalName, InternalName));
     }
     else
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "returning [%p] (rel) \"%s\"\n",
+        ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Returning [%p] (rel) \"%s\"\n",
             InternalName, InternalName));
     }
 
@@ -1047,7 +1053,7 @@ AcpiNsGetNodeByPath (
     Status = AcpiUtAcquireMutex (ACPI_MTX_NAMESPACE);
     if (ACPI_FAILURE (Status))
     {
-        return_ACPI_STATUS (Status);
+        goto Cleanup;
     }
 
     /* Setup lookup scope (search starting point) */
@@ -1066,10 +1072,10 @@ AcpiNsGetNodeByPath (
                 InternalPath, AcpiFormatException (Status)));
     }
 
-    /* Cleanup */
-
     (void) AcpiUtReleaseMutex (ACPI_MTX_NAMESPACE);
 
+Cleanup:
+    /* Cleanup */
     if (InternalPath)
     {
         ACPI_MEM_FREE (InternalPath);
@@ -1110,8 +1116,8 @@ AcpiNsFindParentName (
         if (ParentNode)
         {
             ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Parent of %p [%4.4s] is %p [%4.4s]\n",
-                ChildNode,  ChildNode->Name.Ascii,
-                ParentNode, ParentNode->Name.Ascii));
+                ChildNode,  AcpiUtGetNodeName (ChildNode),
+                ParentNode, AcpiUtGetNodeName (ParentNode)));
 
             if (ParentNode->Name.Integer)
             {
@@ -1120,7 +1126,7 @@ AcpiNsFindParentName (
         }
 
         ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "unable to find parent of %p (%4.4s)\n",
-            ChildNode, ChildNode->Name.Ascii));
+            ChildNode, AcpiUtGetNodeName (ChildNode)));
     }
 
     return_VALUE (ACPI_UNKNOWN_NAME);

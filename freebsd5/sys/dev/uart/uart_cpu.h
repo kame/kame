@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003 Marcel Moolenaar
+ * Copyright (c) 2003, 2004 Marcel Moolenaar
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/uart/uart_cpu.h,v 1.4 2003/09/23 09:25:38 nyan Exp $
+ * $FreeBSD: src/sys/dev/uart/uart_cpu.h,v 1.6 2004/08/14 23:54:27 marius Exp $
  */
 
 #ifndef _DEV_UART_CPU_H_
@@ -45,6 +45,9 @@ extern struct uart_ops uart_i8251_ops;
 extern struct uart_ops uart_ns8250_ops;
 extern struct uart_ops uart_sab82532_ops;
 extern struct uart_ops uart_z8530_ops;
+
+extern bus_space_tag_t uart_bus_space_io;
+extern bus_space_tag_t uart_bus_space_mem;
 
 /*
  * Console and debug port device info.
@@ -69,8 +72,10 @@ struct uart_devinfo {
 
 int uart_cpu_eqres(struct uart_bas *, struct uart_bas *);
 int uart_cpu_getdev(int, struct uart_devinfo *);
+int uart_getenv(int, struct uart_devinfo *);
 
-void uart_add_sysdev(struct uart_devinfo*);
+void uart_add_sysdev(struct uart_devinfo *);
+void uart_cpu_identify(driver_t *, device_t);
 
 /*
  * Operations for low-level access to the UART. Primarily for use

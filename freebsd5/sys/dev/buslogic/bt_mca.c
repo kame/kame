@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/buslogic/bt_mca.c,v 1.8 2003/08/24 17:46:02 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/buslogic/bt_mca.c,v 1.9 2004/03/17 17:50:29 njl Exp $");
 
 /*
  * Written using the bt_isa/bt_pci code as a reference.
@@ -122,8 +122,7 @@ bt_mca_alloc_resources(device_t dev, int mode)
 	int			rid;
 
 	rid = 0;
-	io = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-				0, ~0, 1, RF_ACTIVE);
+	io = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid, RF_ACTIVE);
 	if (io == NULL) {
 		printf("bt_mca_alloc_resources() failed to allocate IOPORT\n");
 		return (ENOMEM);
@@ -132,16 +131,14 @@ bt_mca_alloc_resources(device_t dev, int mode)
 	if (mode == BT_MCA_ATTACH) {
 
 		rid = 0;
-		irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
-					 0, ~0, 1, RF_ACTIVE);
+		irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid, RF_ACTIVE);
 		if (irq == NULL) {
 			printf("bt_mca_alloc_resources() failed to allocate IRQ\n");
 			goto bad;
 		}
 	
 		rid = 0;
-		drq = bus_alloc_resource(dev, SYS_RES_DRQ, &rid,
-						 0, ~0, 1, RF_ACTIVE);
+		drq = bus_alloc_resource_any(dev, SYS_RES_DRQ, &rid, RF_ACTIVE);
 		if (drq == NULL) {
 			printf("bt_mca_alloc_resources() failed to allocate DRQ\n");
 			goto bad;

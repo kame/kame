@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/digi/digi.h,v 1.14 2003/08/07 15:04:24 jhb Exp $
+ * $FreeBSD: src/sys/dev/digi/digi.h,v 1.17 2004/07/11 15:18:37 phk Exp $
  */
 
 #define	W(p)				(*(u_int16_t *)(p))
@@ -72,7 +72,7 @@ struct digi_p {
 	volatile struct board_chan *bc;
 	struct tty *tp;
 
-	dev_t dev[6];
+	struct cdev *dev[6];
 
 	u_char *txbuf;
 	u_char *rxbuf;
@@ -86,7 +86,6 @@ struct digi_p {
 	u_char modem;		/* Force values */
 
 	int active_out;		/* nonzero if the callout device is open */
-	int dtr_wait;		/* time to hold DTR down on close (* 1/hz) */
 	u_int wopeners;		/* # processes waiting for DCD in open() */
 
 	/*
@@ -106,10 +105,6 @@ struct digi_p {
 	/* Lock state. */
 	struct termios lt_in;		/* should be in struct tty */
 	struct termios lt_out;
-
-	u_int do_timestamp;
-	u_int do_dcd_timestamp;
-	struct timeval dcd_timestamp;
 
 	u_long bytes_in, bytes_out;
 	u_int delta_error_counts[CE_NTYPES];
@@ -164,7 +159,7 @@ struct digi_softc {
 		int iorid;
 		void *irqHandler;
 		int unit;
-		dev_t ctldev;
+		struct cdev *ctldev;
 	} res;
 
 	u_char *vmem;			/* virtual memory address */

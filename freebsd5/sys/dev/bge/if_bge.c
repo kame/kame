@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/bge/if_bge.c,v 1.60 2003/11/14 17:16:56 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/bge/if_bge.c,v 1.72.2.2 2004/09/29 14:31:49 ps Exp $");
 
 /*
  * Broadcom BCM570x family gigabit ethernet driver for FreeBSD.
@@ -73,6 +73,7 @@ __FBSDID("$FreeBSD: src/sys/dev/bge/if_bge.c,v 1.60 2003/11/14 17:16:56 obrien E
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 #include <sys/queue.h>
 
@@ -148,10 +149,18 @@ static struct bge_type bge_devs[] = {
 		"Broadcom BCM5704S Dual Gigabit Ethernet" },
 	{ BCOM_VENDORID, BCOM_DEVICEID_BCM5705,
 		"Broadcom BCM5705 Gigabit Ethernet" },
+	{ BCOM_VENDORID, BCOM_DEVICEID_BCM5705K,
+		"Broadcom BCM5705K Gigabit Ethernet" },
 	{ BCOM_VENDORID, BCOM_DEVICEID_BCM5705M,
 		"Broadcom BCM5705M Gigabit Ethernet" },
 	{ BCOM_VENDORID, BCOM_DEVICEID_BCM5705M_ALT,
 		"Broadcom BCM5705M Gigabit Ethernet" },
+	{ BCOM_VENDORID, BCOM_DEVICEID_BCM5750,
+		"Broadcom BCM5750 Gigabit Ethernet" },
+	{ BCOM_VENDORID, BCOM_DEVICEID_BCM5750M,
+		"Broadcom BCM5750M Gigabit Ethernet" },
+	{ BCOM_VENDORID, BCOM_DEVICEID_BCM5751,
+		"Broadcom BCM5751 Gigabit Ethernet" },
 	{ BCOM_VENDORID, BCOM_DEVICEID_BCM5782,
 		"Broadcom BCM5782 Gigabit Ethernet" },
 	{ BCOM_VENDORID, BCOM_DEVICEID_BCM5788,
@@ -164,6 +173,8 @@ static struct bge_type bge_devs[] = {
 		"SysKonnect Gigabit Ethernet" },
 	{ ALTIMA_VENDORID, ALTIMA_DEVICE_AC1000,
 		"Altima AC1000 Gigabit Ethernet" },
+	{ ALTIMA_VENDORID, ALTIMA_DEVICE_AC1002,
+		"Altima AC1002 Gigabit Ethernet" },
 	{ ALTIMA_VENDORID, ALTIMA_DEVICE_AC9100,
 		"Altima AC9100 Gigabit Ethernet" },
 	{ 0, 0, NULL }
@@ -206,7 +217,6 @@ static void bge_ifmedia_sts	(struct ifnet *, struct ifmediareq *);
 static u_int8_t	bge_eeprom_getbyte	(struct bge_softc *, int, u_int8_t *);
 static int bge_read_eeprom	(struct bge_softc *, caddr_t, int, int);
 
-static u_int32_t bge_mchash	(caddr_t);
 static void bge_setmulti	(struct bge_softc *);
 
 static void bge_handle_events	(struct bge_softc *);
@@ -1128,27 +1138,6 @@ bge_init_tx_ring(sc)
 	return(0);
 }
 
-#define BGE_POLY	0xEDB88320
-
-static u_int32_t
-bge_mchash(addr)
-	caddr_t addr;
-{
-	u_int32_t crc;
-	int idx, bit;
-	u_int8_t data;
-
-	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF; /* initial value */
-
-	for (idx = 0; idx < 6; idx++) {
-		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1)
-			crc = (crc >> 1) ^ (((crc ^ data) & 1) ? BGE_POLY : 0);
-	}
-
-	return(crc & 0x7F);
-}
-
 static void
 bge_setmulti(sc)
 	struct bge_softc *sc;
@@ -1176,7 +1165,8 @@ bge_setmulti(sc)
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = bge_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = ether_crc32_le(LLADDR((struct sockaddr_dl *)
+		    ifma->ifma_addr), ETHER_ADDR_LEN) & 0x7F;
 		hashes[(h & 0x60) >> 5] |= 1 << (h & 0x1F);
 	}
 
@@ -1232,7 +1222,11 @@ bge_chipinit(sc)
 		BGE_MEMWIN_WRITE(sc, i, 0);
 
 	/* Set up the PCI DMA control register. */
-	if (pci_read_config(sc->bge_dev, BGE_PCI_PCISTATE, 4) &
+	if (sc->bge_pcie) {
+		dma_rw_ctl = BGE_PCI_READ_CMD|BGE_PCI_WRITE_CMD |
+		    (0xf << BGE_PCIDMARWCTL_RD_WAT_SHIFT) |
+		    (0x2 << BGE_PCIDMARWCTL_WR_WAT_SHIFT);
+	} else if (pci_read_config(sc->bge_dev, BGE_PCI_PCISTATE, 4) &
 	    BGE_PCISTATE_PCI_BUSMODE) {
 		/* Conventional PCI bus */
 		dma_rw_ctl = BGE_PCI_READ_CMD|BGE_PCI_WRITE_CMD |
@@ -1271,7 +1265,8 @@ bge_chipinit(sc)
 
 	if (sc->bge_asicrev == BGE_ASICREV_BCM5703 ||
 	    sc->bge_asicrev == BGE_ASICREV_BCM5704 ||
-	    sc->bge_asicrev == BGE_ASICREV_BCM5705)
+	    sc->bge_asicrev == BGE_ASICREV_BCM5705 ||
+	    sc->bge_asicrev == BGE_ASICREV_BCM5750)
 		dma_rw_ctl &= ~BGE_PCIDMARWCTL_MINDMA;
 	pci_write_config(sc->bge_dev, BGE_PCI_DMA_RW_CTL, dma_rw_ctl, 4);
 
@@ -1324,7 +1319,8 @@ bge_blockinit(sc)
 
 	/* Note: the BCM5704 has a smaller mbuf space than other chips. */
 
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705) {
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5750) {
 		/* Configure mbuf memory pool */
 		if (sc->bge_extram) {
 			CSR_WRITE_4(sc, BGE_BMAN_MBUFPOOL_BASEADDR,
@@ -1349,7 +1345,8 @@ bge_blockinit(sc)
 	}
 
 	/* Configure mbuf pool watermarks */
-	if (sc->bge_asicrev == BGE_ASICREV_BCM5705) {
+	if (sc->bge_asicrev == BGE_ASICREV_BCM5705 ||
+	    sc->bge_asicrev == BGE_ASICREV_BCM5750) {
 		CSR_WRITE_4(sc, BGE_BMAN_MBUFPOOL_READDMA_LOWAT, 0x0);
 		CSR_WRITE_4(sc, BGE_BMAN_MBUFPOOL_MACRX_LOWAT, 0x10);
 	} else {
@@ -1363,7 +1360,8 @@ bge_blockinit(sc)
 	CSR_WRITE_4(sc, BGE_BMAN_DMA_DESCPOOL_HIWAT, 10);
 
 	/* Enable buffer manager */
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705) {
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5750) {
 		CSR_WRITE_4(sc, BGE_BMAN_MODE,
 		    BGE_BMANMODE_ENABLE|BGE_BMANMODE_LOMBUF_ATTN);
 
@@ -1406,7 +1404,8 @@ bge_blockinit(sc)
 	    BGE_ADDR_HI(sc->bge_ldata.bge_rx_std_ring_paddr);
 	bus_dmamap_sync(sc->bge_cdata.bge_rx_std_ring_tag,
 	    sc->bge_cdata.bge_rx_std_ring_map, BUS_DMASYNC_PREREAD);
-	if (sc->bge_asicrev == BGE_ASICREV_BCM5705)
+	if (sc->bge_asicrev == BGE_ASICREV_BCM5705 ||
+	    sc->bge_asicrev == BGE_ASICREV_BCM5750)
 		rcb->bge_maxlen_flags = BGE_RCB_MAXLEN_FLAGS(512, 0);
 	else
 		rcb->bge_maxlen_flags =
@@ -1428,7 +1427,8 @@ bge_blockinit(sc)
 	 * using this ring (i.e. once we set the MTU
 	 * high enough to require it).
 	 */
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705) {
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5750) {
 		rcb = &sc->bge_ldata.bge_info.bge_jumbo_rx_rcb;
 
 		rcb->bge_hostaddr.bge_addr_lo =
@@ -1492,7 +1492,8 @@ bge_blockinit(sc)
 	vrcb->bge_hostaddr.bge_addr_hi =
 	    htole32(BGE_ADDR_HI(sc->bge_ldata.bge_tx_ring_paddr));
 	vrcb->bge_nicaddr = BGE_NIC_TXRING_ADDR(0, BGE_TX_RING_CNT);
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705)
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5750)
 		vrcb->bge_maxlen_flags =
 		    BGE_RCB_MAXLEN_FLAGS(BGE_TX_RING_CNT, 0);
 
@@ -1581,7 +1582,8 @@ bge_blockinit(sc)
 	CSR_WRITE_4(sc, BGE_HCC_TX_COAL_TICKS, sc->bge_tx_coal_ticks);
 	CSR_WRITE_4(sc, BGE_HCC_RX_MAX_COAL_BDS, sc->bge_rx_max_coal_bds);
 	CSR_WRITE_4(sc, BGE_HCC_TX_MAX_COAL_BDS, sc->bge_tx_max_coal_bds);
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705) {
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5750) {
 		CSR_WRITE_4(sc, BGE_HCC_RX_COAL_TICKS_INT, 0);
 		CSR_WRITE_4(sc, BGE_HCC_TX_COAL_TICKS_INT, 0);
 	}
@@ -1589,7 +1591,8 @@ bge_blockinit(sc)
 	CSR_WRITE_4(sc, BGE_HCC_TX_MAX_COAL_BDS_INT, 0);
 
 	/* Set up address of statistics block */
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705) {
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5750) {
 		CSR_WRITE_4(sc, BGE_HCC_STATS_ADDR_HI,
 		    BGE_ADDR_HI(sc->bge_ldata.bge_stats_paddr));
 		CSR_WRITE_4(sc, BGE_HCC_STATS_ADDR_LO,
@@ -1620,7 +1623,8 @@ bge_blockinit(sc)
 	CSR_WRITE_4(sc, BGE_RXLP_MODE, BGE_RXLPMODE_ENABLE);
 
 	/* Turn on RX list selector state machine. */
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705)
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5750)
 		CSR_WRITE_4(sc, BGE_RXLS_MODE, BGE_RXLSMODE_ENABLE);
 
 	/* Turn on DMA, clear stats */
@@ -1642,7 +1646,8 @@ bge_blockinit(sc)
 #endif
 
 	/* Turn on DMA completion state machine */
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705)
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5750)
 		CSR_WRITE_4(sc, BGE_DMAC_MODE, BGE_DMACMODE_ENABLE);
 
 	/* Turn on write DMA state machine */
@@ -1663,7 +1668,8 @@ bge_blockinit(sc)
 	CSR_WRITE_4(sc, BGE_RDBDI_MODE, BGE_RDBDIMODE_ENABLE);
 
 	/* Turn on Mbuf cluster free state machine */
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705)
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5750)
 		CSR_WRITE_4(sc, BGE_MBCF_MODE, BGE_MBCFMODE_ENABLE);
 
 	/* Turn on send BD completion state machine */
@@ -1997,7 +2003,8 @@ bge_dma_alloc(dev)
 
 	sc->bge_ldata.bge_rx_std_ring_paddr = ctx.bge_busaddr;
 
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705) {
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5750) {
 
 		/*
 		 * Create tag for jumbo mbufs.
@@ -2248,8 +2255,8 @@ bge_attach(dev)
 	pci_enable_busmaster(dev);
 
 	rid = BGE_PCI_BAR0;
-	sc->bge_res = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
-	    0, ~0, 1, RF_ACTIVE|PCI_RF_DENSE);
+	sc->bge_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
+	    RF_ACTIVE|PCI_RF_DENSE);
 
 	if (sc->bge_res == NULL) {
 		printf ("bge%d: couldn't map memory\n", unit);
@@ -2264,7 +2271,7 @@ bge_attach(dev)
 	/* Allocate interrupt */
 	rid = 0;
 	
-	sc->bge_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
+	sc->bge_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 	    RF_SHAREABLE | RF_ACTIVE);
 
 	if (sc->bge_irq == NULL) {
@@ -2276,6 +2283,29 @@ bge_attach(dev)
 	sc->bge_unit = unit;
 
 	BGE_LOCK_INIT(sc, device_get_nameunit(dev));
+
+	/* Save ASIC rev. */
+
+	sc->bge_chipid =
+	    pci_read_config(dev, BGE_PCI_MISC_CTL, 4) &
+	    BGE_PCIMISCCTL_ASICREV;
+	sc->bge_asicrev = BGE_ASICREV(sc->bge_chipid);
+	sc->bge_chiprev = BGE_CHIPREV(sc->bge_chipid);
+
+	/*
+	 * XXX: Broadcom Linux driver.  Not in specs or eratta.
+	 * PCI-Express?
+	 */
+	if (sc->bge_asicrev == BGE_ASICREV_BCM5750) {
+		u_int32_t v;
+
+		v = pci_read_config(dev, BGE_PCI_MSI_CAPID, 4);
+		if (((v >> 8) & 0xff) == BGE_PCIE_CAPID_REG) {
+			v = pci_read_config(dev, BGE_PCIE_CAPID_REG, 4);
+			if ((v & 0xff) == BGE_PCIE_CAPID)
+				sc->bge_pcie = 1;
+		}
+	}
 
 	/* Try to reset the chip. */
 	bge_reset(sc);
@@ -2307,22 +2337,9 @@ bge_attach(dev)
 		goto fail;
 	}
 
-	/*
-	 * A Broadcom chip was detected. Inform the world.
-	 */
-	printf("bge%d: Ethernet address: %6D\n", unit,
-	    sc->arpcom.ac_enaddr, ":");
-
-	/* Save ASIC rev. */
-
-	sc->bge_chipid =
-	    pci_read_config(dev, BGE_PCI_MISC_CTL, 4) &
-	    BGE_PCIMISCCTL_ASICREV;
-	sc->bge_asicrev = BGE_ASICREV(sc->bge_chipid);
-	sc->bge_chiprev = BGE_CHIPREV(sc->bge_chipid);
-
 	/* 5705 limits RX return ring to 512 entries. */
-	if (sc->bge_asicrev == BGE_ASICREV_BCM5705)
+	if (sc->bge_asicrev == BGE_ASICREV_BCM5705 ||
+	    sc->bge_asicrev == BGE_ASICREV_BCM5750)
 		sc->bge_return_ring_cnt = BGE_RETURN_RING_CNT_5705;
 	else
 		sc->bge_return_ring_cnt = BGE_RETURN_RING_CNT;
@@ -2339,7 +2356,8 @@ bge_attach(dev)
 	 * Try to allocate memory for jumbo buffers.
 	 * The 5705 does not appear to support jumbo frames.
 	 */
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705) {
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5750) {
 		if (bge_alloc_jumbo_mem(sc)) {
 			printf("bge%d: jumbo buffer allocation "
 			    "failed\n", sc->bge_unit);
@@ -2362,14 +2380,14 @@ bge_attach(dev)
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = bge_ioctl;
-	ifp->if_output = ether_output;
 	ifp->if_start = bge_start;
 	ifp->if_watchdog = bge_watchdog;
 	ifp->if_init = bge_init;
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_snd.ifq_maxlen = BGE_TX_RING_CNT - 1;
 	ifp->if_hwassist = BGE_CSUM_FEATURES;
-	ifp->if_capabilities = IFCAP_HWCSUM | IFCAP_VLAN_HWTAGGING |
+	/* NB: the code for RX csum offload is disabled for now */
+	ifp->if_capabilities = IFCAP_TXCSUM | IFCAP_VLAN_HWTAGGING |
 	    IFCAP_VLAN_MTU;
 	ifp->if_capenable = ifp->if_capabilities;
 
@@ -2405,6 +2423,7 @@ bge_attach(dev)
 		    IFM_ETHER|IFM_1000_SX|IFM_FDX, 0, NULL);
 		ifmedia_add(&sc->bge_ifmedia, IFM_ETHER|IFM_AUTO, 0, NULL);
 		ifmedia_set(&sc->bge_ifmedia, IFM_ETHER|IFM_AUTO);
+		sc->bge_ifmedia.ifm_media = sc->bge_ifmedia.ifm_cur->ifm_media;
 	} else {
 		/*
 		 * Do transceiver setup.
@@ -2486,7 +2505,8 @@ bge_detach(dev)
 	}
 
 	bge_release_resources(sc);
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705)
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5750)
 		bge_free_jumbo_mem(sc);
 
 	return(0);
@@ -2529,7 +2549,7 @@ bge_reset(sc)
 	struct bge_softc *sc;
 {
 	device_t dev;
-	u_int32_t cachesize, command, pcistate;
+	u_int32_t cachesize, command, pcistate, reset;
 	int i, val = 0;
 
 	dev = sc->bge_dev;
@@ -2543,11 +2563,36 @@ bge_reset(sc)
 	    BGE_PCIMISCCTL_INDIRECT_ACCESS|BGE_PCIMISCCTL_MASK_PCI_INTR|
 	    BGE_PCIMISCCTL_ENDIAN_WORDSWAP|BGE_PCIMISCCTL_PCISTATE_RW, 4);
 
+	reset = BGE_MISCCFG_RESET_CORE_CLOCKS|(65<<1);
+
+	/* XXX: Broadcom Linux driver. */
+	if (sc->bge_pcie) {
+		if (CSR_READ_4(sc, 0x7e2c) == 0x60)	/* PCIE 1.0 */
+			CSR_WRITE_4(sc, 0x7e2c, 0x20);
+		if (sc->bge_chipid != BGE_CHIPID_BCM5750_A0) {
+			/* Prevent PCIE link training during global reset */
+			CSR_WRITE_4(sc, BGE_MISC_CFG, (1<<29));
+			reset |= (1<<29);
+		}
+	}
+			
 	/* Issue global reset */
-	bge_writereg_ind(sc, BGE_MISC_CFG,
-	    BGE_MISCCFG_RESET_CORE_CLOCKS|(65<<1));
+	bge_writereg_ind(sc, BGE_MISC_CFG, reset);
 
 	DELAY(1000);
+
+	/* XXX: Broadcom Linux driver. */
+	if (sc->bge_pcie) {
+		if (sc->bge_chipid == BGE_CHIPID_BCM5750_A0) {
+			uint32_t v;
+
+			DELAY(500000); /* wait for link training to complete */
+			v = pci_read_config(dev, 0xc4, 4);
+			pci_write_config(dev, 0xc4, v | (1<<15), 4);
+		}
+		/* Set PCIE max payload size and clear error status. */
+		pci_write_config(dev, 0xd8, 0xf5000, 4);
+	}
 
 	/* Reset some of the PCI state that got zapped by reset */
 	pci_write_config(dev, BGE_PCI_MISC_CTL,
@@ -2556,6 +2601,11 @@ bge_reset(sc)
 	pci_write_config(dev, BGE_PCI_CACHESZ, cachesize, 4);
 	pci_write_config(dev, BGE_PCI_CMD, command, 4);
 	bge_writereg_ind(sc, BGE_MISC_CFG, (65 << 1));
+
+	/* Enable memory arbiter. */
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5750)
+		CSR_WRITE_4(sc, BGE_MARB_MODE, BGE_MARBMODE_ENABLE);
 
 	/*
 	 * Prevent PXE restart: write a magic number to the
@@ -2594,16 +2644,31 @@ bge_reset(sc)
 		DELAY(10);
 	}
 
-	/* Enable memory arbiter. */
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705)
-		CSR_WRITE_4(sc, BGE_MARB_MODE, BGE_MARBMODE_ENABLE);
-
 	/* Fix up byte swapping */
 	CSR_WRITE_4(sc, BGE_MODE_CTL, BGE_MODECTL_BYTESWAP_NONFRAME|
 	    BGE_MODECTL_BYTESWAP_DATA);
 
 	CSR_WRITE_4(sc, BGE_MAC_MODE, 0);
 
+	/*
+	 * The 5704 in TBI mode apparently needs some special
+	 * adjustment to insure the SERDES drive level is set
+	 * to 1.2V.
+	 */
+	if (sc->bge_asicrev == BGE_ASICREV_BCM5704 && sc->bge_tbi) {
+		uint32_t serdescfg;
+		serdescfg = CSR_READ_4(sc, BGE_SERDES_CFG);
+		serdescfg = (serdescfg & ~0xFFF) | 0x880;
+		CSR_WRITE_4(sc, BGE_SERDES_CFG, serdescfg);
+	}
+
+	/* XXX: Broadcom Linux driver. */
+	if (sc->bge_pcie && sc->bge_chipid != BGE_CHIPID_BCM5750_A0) {
+		uint32_t v;
+
+		v = CSR_READ_4(sc, 0x7c00);
+		CSR_WRITE_4(sc, 0x7c00, v | (1<<25));
+	}
 	DELAY(10000);
 
 	return;
@@ -2633,7 +2698,8 @@ bge_rxeof(sc)
 	    sc->bge_cdata.bge_rx_return_ring_map, BUS_DMASYNC_POSTWRITE);
 	bus_dmamap_sync(sc->bge_cdata.bge_rx_std_ring_tag,
 	    sc->bge_cdata.bge_rx_std_ring_map, BUS_DMASYNC_POSTREAD);
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705) {
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5750) {
 		bus_dmamap_sync(sc->bge_cdata.bge_rx_jumbo_ring_tag,
 		    sc->bge_cdata.bge_rx_jumbo_ring_map,
 		    BUS_DMASYNC_POSTREAD);
@@ -2720,7 +2786,7 @@ bge_rxeof(sc)
 		m->m_pkthdr.rcvif = ifp;
 
 #if 0 /* currently broken for some packets, possibly related to TCP options */
-		if (ifp->if_hwassist) {
+		if (ifp->if_capenable & IFCAP_RXCSUM) {
 			m->m_pkthdr.csum_flags |= CSUM_IP_CHECKED;
 			if ((cur_rx->bge_ip_csum ^ 0xffff) == 0)
 				m->m_pkthdr.csum_flags |= CSUM_IP_VALID;
@@ -2749,7 +2815,8 @@ bge_rxeof(sc)
 	bus_dmamap_sync(sc->bge_cdata.bge_rx_std_ring_tag,
 	    sc->bge_cdata.bge_rx_std_ring_map,
 	    BUS_DMASYNC_POSTREAD|BUS_DMASYNC_PREWRITE);
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705) {
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5750) {
 		bus_dmamap_sync(sc->bge_cdata.bge_rx_jumbo_ring_tag,
 		    sc->bge_cdata.bge_rx_jumbo_ring_map,
 		    BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
@@ -2811,7 +2878,7 @@ bge_intr(xsc)
 	struct bge_softc *sc;
 	struct ifnet *ifp;
 	u_int32_t statusword;
-	u_int32_t status;
+	u_int32_t status, mimode;
 
 	sc = xsc;
 	ifp = &sc->arpcom.ac_if;
@@ -2837,7 +2904,7 @@ bge_intr(xsc)
 	 * Process link state changes.
 	 * Grrr. The link status word in the status block does
 	 * not work correctly on the BCM5700 rev AX and BX chips,
-	 * according to all avaibable information. Hence, we have
+	 * according to all available information. Hence, we have
 	 * to enable MII interrupts in order to properly obtain
 	 * async link changes. Unfortunately, this also means that
 	 * we have to read the MAC status register to detect link
@@ -2872,10 +2939,19 @@ bge_intr(xsc)
 			 * that sometimes appear on fiber NICs during
 			 * periods of heavy traffic. (There should be no
 			 * effect on copper NICs.)
+			 *
+			 * If we do have a copper NIC (bge_tbi == 0) then
+			 * check that the AUTOPOLL bit is set before
+			 * processing the event as a real link change.
+			 * Turning AUTOPOLL on and off in the MII read/write
+			 * functions will often trigger a link status
+			 * interrupt for no reason.
 			 */
 			status = CSR_READ_4(sc, BGE_MAC_STS);
+			mimode = CSR_READ_4(sc, BGE_MI_MODE);
 			if (!(status & (BGE_MACSTAT_PORT_DECODE_ERROR|
-			    BGE_MACSTAT_MI_COMPLETE))) {
+			    BGE_MACSTAT_MI_COMPLETE)) && (!sc->bge_tbi &&
+			    (mimode & BGE_MIMODE_AUTOPOLL))) {
 				sc->bge_link = 0;
 				callout_stop(&sc->bge_stat_ch);
 				bge_tick_locked(sc);
@@ -2926,7 +3002,8 @@ bge_tick_locked(sc)
 
 	BGE_LOCK_ASSERT(sc);
 
-	if (sc->bge_asicrev == BGE_ASICREV_BCM5705)
+	if (sc->bge_asicrev == BGE_ASICREV_BCM5705 ||
+	    sc->bge_asicrev == BGE_ASICREV_BCM5750)
 		bge_stats_update_regs(sc);
 	else
 		bge_stats_update(sc);
@@ -2939,6 +3016,9 @@ bge_tick_locked(sc)
 		if (CSR_READ_4(sc, BGE_MAC_STS) &
 		    BGE_MACSTAT_TBI_PCS_SYNCHED) {
 			sc->bge_link++;
+			if (sc->bge_asicrev == BGE_ASICREV_BCM5704)
+				BGE_CLRBIT(sc, BGE_MAC_MODE,
+				    BGE_MACMODE_TBI_SEND_CFGS);
 			CSR_WRITE_4(sc, BGE_MAC_STS, 0xFFFFFFFF);
 			printf("bge%d: gigabit link up\n", sc->bge_unit);
 			if (ifp->if_snd.ifq_head != NULL)
@@ -3133,6 +3213,11 @@ bge_start_locked(ifp)
 			break;
 
 		/*
+		 * XXX
+		 * The code inside the if() block is never reached since we
+		 * must mark CSUM_IP_FRAGS in our if_hwassist to start getting
+		 * requests to checksum TCP/UDP in a fragmented packet.
+		 * 
 		 * XXX
 		 * safety overkill.  If this is a fragmented packet chain
 		 * with delayed TCP/UDP checksums, then only encapsulate
@@ -3335,6 +3420,23 @@ bge_ifmedia_upd(ifp)
 			return(EINVAL);
 		switch(IFM_SUBTYPE(ifm->ifm_media)) {
 		case IFM_AUTO:
+			/*
+			 * The BCM5704 ASIC appears to have a special
+			 * mechanism for programming the autoneg
+			 * advertisement registers in TBI mode.
+			 */
+			if (sc->bge_asicrev == BGE_ASICREV_BCM5704) {
+				uint32_t sgdig;
+				CSR_WRITE_4(sc, BGE_TX_TBI_AUTONEG, 0);
+				sgdig = CSR_READ_4(sc, BGE_SGDIG_CFG);
+				sgdig |= BGE_SGDIGCFG_AUTO|
+				    BGE_SGDIGCFG_PAUSE_CAP|
+				    BGE_SGDIGCFG_ASYM_PAUSE;
+				CSR_WRITE_4(sc, BGE_SGDIG_CFG,
+				    sgdig|BGE_SGDIGCFG_SEND);
+				DELAY(5);
+				CSR_WRITE_4(sc, BGE_SGDIG_CFG, sgdig);
+			}
 			break;
 		case IFM_1000_SX:
 			if ((ifm->ifm_media & IFM_GMASK) == IFM_FDX) {
@@ -3413,7 +3515,8 @@ bge_ioctl(ifp, command, data)
 	switch(command) {
 	case SIOCSIFMTU:
 		/* Disallow jumbo frames on 5705. */
-		if ((sc->bge_asicrev == BGE_ASICREV_BCM5705 &&
+		if (((sc->bge_asicrev == BGE_ASICREV_BCM5705 ||
+		      sc->bge_asicrev == BGE_ASICREV_BCM5750) &&
 		    ifr->ifr_mtu > ETHERMTU) || ifr->ifr_mtu > BGE_JUMBO_MTU)
 			error = EINVAL;
 		else {
@@ -3476,11 +3579,13 @@ bge_ioctl(ifp, command, data)
 		break;
         case SIOCSIFCAP:
 		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
-		if (mask & IFCAP_HWCSUM) {
-			if (IFCAP_HWCSUM & ifp->if_capenable)
-				ifp->if_capenable &= ~IFCAP_HWCSUM;
+		/* NB: the code for RX csum offload is disabled for now */
+		if (mask & IFCAP_TXCSUM) {
+			ifp->if_capenable ^= IFCAP_TXCSUM;
+			if (IFCAP_TXCSUM & ifp->if_capenable)
+				ifp->if_hwassist = BGE_CSUM_FEATURES;
 			else
-				ifp->if_capenable |= IFCAP_HWCSUM;
+				ifp->if_hwassist = 0;
 		}
 		error = 0;
 		break;
@@ -3538,7 +3643,8 @@ bge_stop(sc)
 	BGE_CLRBIT(sc, BGE_RX_MODE, BGE_RXMODE_ENABLE);
 	BGE_CLRBIT(sc, BGE_RBDI_MODE, BGE_RBDIMODE_ENABLE);
 	BGE_CLRBIT(sc, BGE_RXLP_MODE, BGE_RXLPMODE_ENABLE);
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705)
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5750)
 		BGE_CLRBIT(sc, BGE_RXLS_MODE, BGE_RXLSMODE_ENABLE);
 	BGE_CLRBIT(sc, BGE_RDBDI_MODE, BGE_RBDIMODE_ENABLE);
 	BGE_CLRBIT(sc, BGE_RDC_MODE, BGE_RDCMODE_ENABLE);
@@ -3552,7 +3658,8 @@ bge_stop(sc)
 	BGE_CLRBIT(sc, BGE_SDI_MODE, BGE_SDIMODE_ENABLE);
 	BGE_CLRBIT(sc, BGE_RDMA_MODE, BGE_RDMAMODE_ENABLE);
 	BGE_CLRBIT(sc, BGE_SDC_MODE, BGE_SDCMODE_ENABLE);
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705)
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5750)
 		BGE_CLRBIT(sc, BGE_DMAC_MODE, BGE_DMACMODE_ENABLE);
 	BGE_CLRBIT(sc, BGE_SBDC_MODE, BGE_SBDCMODE_ENABLE);
 
@@ -3562,11 +3669,13 @@ bge_stop(sc)
 	 */
 	BGE_CLRBIT(sc, BGE_HCC_MODE, BGE_HCCMODE_ENABLE);
 	BGE_CLRBIT(sc, BGE_WDMA_MODE, BGE_WDMAMODE_ENABLE);
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705)
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5750)
 		BGE_CLRBIT(sc, BGE_MBCF_MODE, BGE_MBCFMODE_ENABLE);
 	CSR_WRITE_4(sc, BGE_FTQ_RESET, 0xFFFFFFFF);
 	CSR_WRITE_4(sc, BGE_FTQ_RESET, 0);
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705) {
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5750) {
 		BGE_CLRBIT(sc, BGE_BMAN_MODE, BGE_BMANMODE_ENABLE);
 		BGE_CLRBIT(sc, BGE_MARB_MODE, BGE_MARBMODE_ENABLE);
 	}
@@ -3584,7 +3693,8 @@ bge_stop(sc)
 	bge_free_rx_ring_std(sc);
 
 	/* Free jumbo RX list. */
-	if (sc->bge_asicrev != BGE_ASICREV_BCM5705)
+	if (sc->bge_asicrev != BGE_ASICREV_BCM5705 &&
+	    sc->bge_asicrev != BGE_ASICREV_BCM5750)
 		bge_free_rx_ring_jumbo(sc);
 
 	/* Free TX buffers. */

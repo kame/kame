@@ -22,9 +22,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/ofw/libofw/ofw_copy.c,v 1.11 2002/07/18 12:39:02 benno Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/ofw/libofw/ofw_copy.c,v 1.14 2004/07/08 06:06:56 grehan Exp $");
+
 /*
  * MD primitives supporting placement of module data 
  *
@@ -45,9 +47,11 @@ ofw_copyin(const void *src, vm_offset_t dest, const size_t len)
 {
 	void	*destp, *addr;
 	size_t	dlen;
+	size_t  resid;
 
 	destp = (void *)(dest & ~PAGE_MASK);
-	dlen = roundup(len, PAGE_SIZE);
+	resid = dest & PAGE_MASK;
+	dlen = roundup(len + resid, PAGE_SIZE);
 
 	if (OF_call_method("claim", memory, 3, 1, destp, dlen, 0, &addr)
 	    == -1) {
@@ -98,7 +102,8 @@ ofw_readin(const int fd, vm_offset_t dest, const size_t len)
 		got = read(fd, buf, get);
 
 		if (got <= 0) {
-			printf("ofw_readin: read failed\n");
+			if (got < 0)
+				printf("ofw_readin: read failed\n");
 			break;
 		}
 

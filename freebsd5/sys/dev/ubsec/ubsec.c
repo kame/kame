@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ubsec/ubsec.c,v 1.27 2003/08/24 17:55:54 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ubsec/ubsec.c,v 1.29 2004/05/30 20:08:45 phk Exp $");
 
 /*
  * uBsec 5[56]01, 58xx hardware crypto accelerator
@@ -53,6 +53,7 @@ __FBSDID("$FreeBSD: src/sys/dev/ubsec/ubsec.c,v 1.27 2003/08/24 17:55:54 obrien 
 #include <sys/errno.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/mbuf.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
@@ -321,8 +322,8 @@ ubsec_attach(device_t dev)
 	 * Setup memory-mapping of PCI registers.
 	 */
 	rid = BS_BAR;
-	sc->sc_sr = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
-				       0, ~0, 1, RF_ACTIVE);
+	sc->sc_sr = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
+					   RF_ACTIVE);
 	if (sc->sc_sr == NULL) {
 		device_printf(dev, "cannot map register space\n");
 		goto bad;
@@ -334,8 +335,8 @@ ubsec_attach(device_t dev)
 	 * Arrange interrupt line.
 	 */
 	rid = 0;
-	sc->sc_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
-					0, ~0, 1, RF_SHAREABLE|RF_ACTIVE);
+	sc->sc_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
+					    RF_SHAREABLE|RF_ACTIVE);
 	if (sc->sc_irq == NULL) {
 		device_printf(dev, "could not map interrupt\n");
 		goto bad1;

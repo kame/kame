@@ -39,8 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/stg/tmc18c30.c,v 1.9 2003/08/24 18:17:23 obrien Exp $");
-#include "opt_ddb.h"
+__FBSDID("$FreeBSD: src/sys/dev/stg/tmc18c30.c,v 1.12 2004/07/10 21:14:20 marcel Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -77,8 +76,8 @@ __FBSDID("$FreeBSD: src/sys/dev/stg/tmc18c30.c,v 1.9 2003/08/24 18:17:23 obrien 
 #include <machine/bus_pio.h>
 #include <machine/bus.h>
 
-#include <machine/dvcfg.h>
-#include <machine/physio_proc.h>
+#include <compat/netbsd/dvcfg.h>
+#include <compat/netbsd/physio_proc.h>
 
 #include <cam/scsi/scsi_low.h>
 #include <dev/stg/tmc18c30reg.h>
@@ -857,7 +856,7 @@ stg_reselected(sc)
 
 	/* XXX:
 	 * We should ack the reselection as soon as possible,
-	 * becuase the target would abort the current reselection seq 
+	 * because the target would abort the current reselection seq 
   	 * due to reselection timeout.
 	 */
 	tout = STG_DELAY_SELECT_POLLING_MAX;
@@ -1068,10 +1067,10 @@ stgintr(arg)
 		scsi_low_print(slp, NULL);
 		printf("%s: st %x ist %x\n\n", slp->sl_xname,
 		       status, astatus);
-#ifdef	DDB
+#ifdef	KDB
 		if (stg_debug > 1)
 			SCSI_LOW_DEBUGGER("stg");
-#endif	/* DDB */
+#endif	/* KDB */
 	}
 #endif	/* STG_DEBUG */
 

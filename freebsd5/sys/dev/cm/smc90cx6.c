@@ -1,7 +1,7 @@
 /*	$NetBSD: smc90cx6.c,v 1.38 2001/07/07 15:57:53 thorpej Exp $ */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/cm/smc90cx6.c,v 1.12 2003/10/31 18:31:58 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/cm/smc90cx6.c,v 1.14 2004/08/13 22:57:44 rwatson Exp $");
 
 /*-
  * Copyright (c) 1994, 1995, 1998 The NetBSD Foundation, Inc.
@@ -230,8 +230,7 @@ cm_alloc_irq(dev, rid)
 	struct cm_softc *sc = device_get_softc(dev);
 	struct resource *res;
 
-	res = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
-				 0ul, ~0ul, 1, RF_ACTIVE);
+	res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid, RF_ACTIVE);
 	if (res) {
 		sc->irq_rid = rid;
 		sc->irq_res = res;
@@ -322,7 +321,7 @@ cm_attach(dev)
 	/* XXX IFQ_SET_READY(&ifp->if_snd); */
 	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 	ifp->if_timer = 0;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_NEEDSGIANT;
 
 	arc_ifattach(ifp, linkaddress);
 

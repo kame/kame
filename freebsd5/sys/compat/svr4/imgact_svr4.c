@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/svr4/imgact_svr4.c,v 1.21 2003/06/10 21:35:15 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/svr4/imgact_svr4.c,v 1.23 2004/06/24 02:21:17 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -90,7 +90,7 @@ exec_svr4_imgact(imgp)
     }
     bss_size = round_page(a_out->a_bss);
 #ifdef DEBUG
-    printf("imgact: text: %08lx, data: %08lx, bss: %08lx\n", a_out->a_text, a_out->a_data, bss_size);
+    printf("imgact: text: %08lx, data: %08lx, bss: %08lx\n", (u_long)a_out->a_text, (u_long)a_out->a_data, bss_size);
 #endif
 
     /*
@@ -104,14 +104,16 @@ exec_svr4_imgact(imgp)
     /* text + data can't exceed file size */
     if (a_out->a_data + a_out->a_text > imgp->attr->va_size)
 	return (EFAULT);
-    /* For p_rlimit below. */
-    mtx_assert(&Giant, MA_OWNED);
     /*
      * text/data/bss must not exceed limits
      */
+    PROC_LOCK(imgp->proc);
     if (a_out->a_text > maxtsiz ||
-	a_out->a_data + bss_size > imgp->proc->p_rlimit[RLIMIT_DATA].rlim_cur)
+	a_out->a_data + bss_size > lim_cur(imgp->proc, RLIMIT_DATA)) {
+    	PROC_UNLOCK(imgp->proc);
 	return (ENOMEM);
+    }
+    PROC_UNLOCK(imgp->proc);
 
     VOP_UNLOCK(imgp->vp, 0, td);
 
@@ -191,7 +193,7 @@ exec_svr4_imgact(imgp)
     
 #ifdef DEBUG
 	printf("imgact: startaddr=%08lx, length=%08lx\n", (u_long)vmaddr,
-	    a_out->a_text + a_out->a_data);
+	    (u_long)a_out->a_text + a_out->a_data);
 #endif
 	/*
 	 * allow read/write of data

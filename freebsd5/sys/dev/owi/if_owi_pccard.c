@@ -60,7 +60,7 @@
 #include <dev/owi/if_ieee80211.h>
 
 #include <dev/pccard/pccardvar.h>
-#include <dev/pccard/pccarddevs.h>
+#include "pccarddevs.h"
 
 #include <dev/wi/if_wavelan_ieee.h>
 #include <dev/owi/if_wivar.h>
@@ -70,7 +70,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/owi/if_owi_pccard.c,v 1.1 2003/08/24 05:42:49 imp Exp $";
+  "$FreeBSD: src/sys/dev/owi/if_owi_pccard.c,v 1.2 2004/05/26 00:52:57 imp Exp $";
 #endif
 
 static int wi_pccard_probe(device_t);

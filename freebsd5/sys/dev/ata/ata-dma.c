@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ata/ata-dma.c,v 1.123.2.1 2004/01/27 05:53:18 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ata/ata-dma.c,v 1.129.2.2 2004/09/30 21:29:19 sos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -49,7 +49,7 @@ __FBSDID("$FreeBSD: src/sys/dev/ata/ata-dma.c,v 1.123.2.1 2004/01/27 05:53:18 sc
 /* prototypes */
 static void ata_dmaalloc(struct ata_channel *);
 static void ata_dmafree(struct ata_channel *);
-static void ata_dmasetupd_cb(void *, bus_dma_segment_t *, int, int);
+static void ata_dmasetprd(void *, bus_dma_segment_t *, int, int);
 static int ata_dmaload(struct ata_device *, caddr_t, int32_t, int);
 static int ata_dmaunload(struct ata_channel *);
 
@@ -57,9 +57,8 @@ static int ata_dmaunload(struct ata_channel *);
 static MALLOC_DEFINE(M_ATADMA, "ATA DMA", "ATA driver DMA");
 
 /* misc defines */
-#define MAXSEGSZ	PAGE_SIZE
 #define MAXTABSZ	PAGE_SIZE
-#define MAXCTLDMASZ	(2 * (MAXTABSZ + MAXPHYS))
+#define MAXWSPCSZ	PAGE_SIZE
 
 struct ata_dc_cb_args {
     bus_addr_t maddr;
@@ -72,14 +71,14 @@ ata_dmainit(struct ata_channel *ch)
     if ((ch->dma = malloc(sizeof(struct ata_dma), M_ATADMA, M_NOWAIT|M_ZERO))) {
 	ch->dma->alloc = ata_dmaalloc;
 	ch->dma->free = ata_dmafree;
+	ch->dma->setprd = ata_dmasetprd;
 	ch->dma->load = ata_dmaload;
 	ch->dma->unload = ata_dmaunload;
 	ch->dma->alignment = 2;
-	ch->dma->max_iosize = 64 * 1024;
-	ch->dma->boundary = 64 * 1024;
+	ch->dma->max_iosize = 128 * DEV_BSIZE;
+	ch->dma->boundary = 128 * DEV_BSIZE;
     }
 }
-
 
 static void
 ata_dmasetupc_cb(void *xsc, bus_dma_segment_t *segs, int nsegs, int error)
@@ -95,10 +94,10 @@ ata_dmaalloc(struct ata_channel *ch)
 {
     struct ata_dc_cb_args ccba;
 
-    if (bus_dma_tag_create(NULL, 1, 0,
+    if (bus_dma_tag_create(NULL, ch->dma->alignment, 0,
 			   BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR,
-			   NULL, NULL, MAXCTLDMASZ,
-			   ATA_DMA_ENTRIES, BUS_SPACE_MAXSIZE_32BIT,
+			   NULL, NULL, 256 * DEV_BSIZE,
+			   ATA_DMA_ENTRIES, ch->dma->max_iosize,
 			   BUS_DMA_ALLOCNOW, NULL, NULL, &ch->dma->dmatag))
 	goto error;
 
@@ -110,8 +109,8 @@ ata_dmaalloc(struct ata_channel *ch)
 
     if (bus_dma_tag_create(ch->dma->dmatag,ch->dma->alignment,ch->dma->boundary,
 			   BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR,
-			   NULL, NULL, ch->dma->max_iosize, 
-			   ATA_DMA_ENTRIES, ch->dma->boundary,
+			   NULL, NULL, 256 * DEV_BSIZE,
+			   ATA_DMA_ENTRIES, ch->dma->max_iosize,
 			   BUS_DMA_ALLOCNOW, NULL, NULL, &ch->dma->ddmatag))
 	goto error;
 
@@ -121,16 +120,35 @@ ata_dmaalloc(struct ata_channel *ch)
 
     if (bus_dmamap_load(ch->dma->cdmatag, ch->dma->cdmamap, ch->dma->dmatab,
 			MAXTABSZ, ata_dmasetupc_cb, &ccba, 0) || ccba.error) {
-	bus_dmamem_free(ch->dma->cdmatag, ch->dma->dmatab,ch->dma->cdmamap);
+	bus_dmamem_free(ch->dma->cdmatag, ch->dma->dmatab, ch->dma->cdmamap);
 	goto error;
     }
     ch->dma->mdmatab = ccba.maddr;
+
     if (bus_dmamap_create(ch->dma->ddmatag, 0, &ch->dma->ddmamap))
 	goto error;
+
+    if (bus_dma_tag_create(ch->dma->dmatag, PAGE_SIZE, PAGE_SIZE,
+			   BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR,
+			   NULL, NULL, MAXWSPCSZ, 1, MAXWSPCSZ,
+			   BUS_DMA_ALLOCNOW, NULL, NULL, &ch->dma->wdmatag))
+	goto error;
+
+    if (bus_dmamem_alloc(ch->dma->wdmatag, (void **)&ch->dma->workspace, 0,
+			 &ch->dma->wdmamap))
+	goto error;
+
+    if (bus_dmamap_load(ch->dma->wdmatag, ch->dma->wdmamap, ch->dma->workspace,
+			MAXWSPCSZ, ata_dmasetupc_cb, &ccba, 0) || ccba.error) {
+	bus_dmamem_free(ch->dma->wdmatag, ch->dma->workspace, ch->dma->wdmamap);
+	goto error;
+    }
+    ch->dma->wdmatab = ccba.maddr;
+
     return;
 
 error:
-    ata_printf(ch, -1, "WARNING - DMA tag allocation failed, disabling DMA\n");
+    ata_printf(ch, -1, "WARNING - DMA allocation failed, disabling DMA\n");
     ata_dmafree(ch);
     free(ch->dma, M_ATADMA);
     ch->dma = NULL;
@@ -139,6 +157,17 @@ error:
 static void
 ata_dmafree(struct ata_channel *ch)
 {
+    if (ch->dma->wdmatab) {
+	bus_dmamap_unload(ch->dma->wdmatag, ch->dma->wdmamap);
+	bus_dmamem_free(ch->dma->wdmatag, ch->dma->workspace, ch->dma->wdmamap);
+	ch->dma->wdmatab = 0;
+	ch->dma->wdmamap = NULL;
+	ch->dma->workspace = NULL;
+    }
+    if (ch->dma->wdmatag) {
+	bus_dma_tag_destroy(ch->dma->wdmatag);
+	ch->dma->wdmatag = NULL;
+    }
     if (ch->dma->mdmatab) {
 	bus_dmamap_unload(ch->dma->cdmatag, ch->dma->cdmamap);
 	bus_dmamem_free(ch->dma->cdmatag, ch->dma->dmatab, ch->dma->cdmamap);
@@ -164,45 +193,30 @@ ata_dmafree(struct ata_channel *ch)
     }
 }
 
-struct ata_dmasetup_data_cb_args {
-    struct ata_dmaentry *dmatab;
-    int error;
-};
-
 static void
-ata_dmasetupd_cb(void *xsc, bus_dma_segment_t *segs, int nsegs, int error)
+ata_dmasetprd(void *xsc, bus_dma_segment_t *segs, int nsegs, int error)
 {
-    struct ata_dmasetup_data_cb_args *cba =
-	(struct ata_dmasetup_data_cb_args *)xsc;
-    bus_size_t cnt;
-    u_int32_t lastcount;
-    int i, j;
+    struct ata_dmasetprd_args *args = xsc;
+    struct ata_dma_prdentry *prd = args->dmatab;
+    int i;
 
-    cba->error = error;
-    if (error != 0)
+    if ((args->error = error))
 	return;
-    lastcount = j = 0;
+
     for (i = 0; i < nsegs; i++) {
-	/*
-	 * A maximum segment size was specified for bus_dma_tag_create, but
-	 * some busdma code does not seem to honor this, so fix up if needed.
-	 */
-	for (cnt = 0; cnt < segs[i].ds_len; cnt += MAXSEGSZ, j++) {
-	    cba->dmatab[j].base = htole32(segs[i].ds_addr + cnt);
-	    lastcount = ulmin(segs[i].ds_len - cnt, MAXSEGSZ) & 0xffff;
-	    cba->dmatab[j].count = htole32(lastcount);
-	}
+	prd[i].addr = htole32(segs[i].ds_addr);
+	prd[i].count = htole32(segs[i].ds_len);
     }
-    cba->dmatab[j - 1].count = htole32(lastcount | ATA_DMA_EOT);
+    prd[i - 1].count |= htole32(ATA_DMA_EOT);
 }
 
 static int
 ata_dmaload(struct ata_device *atadev, caddr_t data, int32_t count, int dir)
 {
     struct ata_channel *ch = atadev->channel;
-    struct ata_dmasetup_data_cb_args cba;
+    struct ata_dmasetprd_args cba;
 
-    if (ch->dma->flags & ATA_DMA_ACTIVE) {
+    if (ch->dma->flags & ATA_DMA_LOADED) {
 	ata_prtdev(atadev, "FAILURE - already active DMA on this device\n");
 	return -1;
     }
@@ -227,15 +241,14 @@ ata_dmaload(struct ata_device *atadev, caddr_t data, int32_t count, int dir)
     bus_dmamap_sync(ch->dma->cdmatag, ch->dma->cdmamap, BUS_DMASYNC_PREWRITE);
 
     if (bus_dmamap_load(ch->dma->ddmatag, ch->dma->ddmamap, data, count,
-			ata_dmasetupd_cb, &cba, 0) || cba.error)
+			ch->dma->setprd, &cba, 0) || cba.error)
 	return -1;
 
     bus_dmamap_sync(ch->dma->ddmatag, ch->dma->ddmamap,
 		    dir ? BUS_DMASYNC_PREREAD : BUS_DMASYNC_PREWRITE);
 
     ch->dma->cur_iosize = count;
-    ch->dma->flags = dir ? (ATA_DMA_ACTIVE | ATA_DMA_READ) : ATA_DMA_ACTIVE;
-
+    ch->dma->flags = dir ? (ATA_DMA_LOADED | ATA_DMA_READ) : ATA_DMA_LOADED;
     return 0;
 }
 
@@ -250,7 +263,6 @@ ata_dmaunload(struct ata_channel *ch)
     bus_dmamap_unload(ch->dma->ddmatag, ch->dma->ddmamap);
 
     ch->dma->cur_iosize = 0;
-    ch->dma->flags = 0;
-
+    ch->dma->flags &= ~ATA_DMA_LOADED;
     return 0;
 }

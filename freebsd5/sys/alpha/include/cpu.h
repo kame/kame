@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/cpu.h,v 1.36 2003/08/17 06:42:07 marcel Exp $ */
+/* $FreeBSD: src/sys/alpha/include/cpu.h,v 1.40 2004/08/03 18:44:26 mux Exp $ */
 /* From: NetBSD: cpu.h,v 1.18 1997/09/23 23:17:49 mjacob Exp */
 
 /*
@@ -18,10 +18,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -97,6 +93,7 @@ struct clockframe {
 #ifdef _KERNEL
 
 #define	cpu_getstack(td)	(alpha_pal_rdusp())
+#define	cpu_spinwait()		/* nothing */
 #define	get_cyclecount		alpha_rpcc
 
 void	cpu_halt(void);

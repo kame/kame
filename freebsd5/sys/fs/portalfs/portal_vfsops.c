@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -35,7 +31,7 @@
  *
  *	@(#)portal_vfsops.c	8.11 (Berkeley) 5/14/95
  *
- * $FreeBSD: src/sys/fs/portalfs/portal_vfsops.c,v 1.47 2003/06/12 20:48:37 phk Exp $
+ * $FreeBSD: src/sys/fs/portalfs/portal_vfsops.c,v 1.51 2004/07/30 22:08:50 phk Exp $
  */
 
 /*
@@ -62,7 +58,7 @@
 
 static MALLOC_DEFINE(M_PORTALFSMNT, "PORTAL mount", "PORTAL mount structure");
 
-static vfs_mount_t	portal_mount;
+static vfs_omount_t	portal_omount;
 static vfs_unmount_t	portal_unmount;
 static vfs_root_t	portal_root;
 static vfs_statfs_t	portal_statfs;
@@ -71,11 +67,10 @@ static vfs_statfs_t	portal_statfs;
  * Mount the per-process file descriptors (/dev/fd)
  */
 static int
-portal_mount(mp, path, data, ndp, td)
+portal_omount(mp, path, data, td)
 	struct mount *mp;
 	char *path;
 	caddr_t data;
-	struct nameidata *ndp;
 	struct thread *td;
 {
 	struct file *fp;
@@ -174,7 +169,7 @@ portal_unmount(mp, mntflags, td)
 		return (EBUSY);
 #endif
 	/* There is 1 extra root vnode reference (pm_root). */
-	error = vflush(mp, 1, flags);
+	error = vflush(mp, 1, flags, td);
 	if (error)
 		return (error);
 
@@ -198,11 +193,11 @@ portal_unmount(mp, mntflags, td)
 }
 
 static int
-portal_root(mp, vpp)
+portal_root(mp, vpp, td)
 	struct mount *mp;
 	struct vnode **vpp;
+	struct thread *td;
 {
-	struct thread *td = curthread;	/* XXX */
 	struct vnode *vp;
 
 	/*
@@ -240,7 +235,7 @@ portal_statfs(mp, sbp, td)
 }
 
 static struct vfsops portal_vfsops = {
-	.vfs_mount =		portal_mount,
+	.vfs_omount =		portal_omount,
 	.vfs_root =		portal_root,
 	.vfs_statfs =		portal_statfs,
 	.vfs_unmount =		portal_unmount,

@@ -31,22 +31,22 @@
  * notice.
  */
 
-#include "opt_ddb.h"
-
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 /* __KERNEL_RCSID(0, "$NetBSD: interrupt.c,v 1.23 1998/02/24 07:38:01 thorpej Exp $");*/
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/interrupt.c,v 1.76 2003/11/17 06:10:14 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/interrupt.c,v 1.82 2004/07/20 06:32:32 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/interrupt.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
+#include <sys/sched.h>
 #include <sys/smp.h>
 #include <sys/unistd.h>
 #include <sys/vmmeter.h>
@@ -64,10 +64,6 @@ __FBSDID("$FreeBSD: src/sys/alpha/alpha/interrupt.c,v 1.76 2003/11/17 06:10:14 p
 struct evcnt clock_intr_evcnt;	/* event counter for clock intrs. */
 #else
 #include <machine/intrcnt.h>
-#endif
-
-#ifdef DDB
-#include <ddb/ddb.h>
 #endif
 
 volatile int mc_expected, mc_received;
@@ -107,6 +103,7 @@ interrupt(a0, a1, a2, framep)
 	intr_restore(s);
 #endif
 	atomic_add_int(&td->td_intr_nesting_level, 1);
+
 #if KSTACK_GUARD_PAGES == 0
 #ifndef SMP
 	{
@@ -133,7 +130,7 @@ interrupt(a0, a1, a2, framep)
 		alpha_clock_interrupt(framep);
 		break;
 
-	case  ALPHA_INTR_ERROR:	/* Machine Check or Correctable Error */
+	case ALPHA_INTR_ERROR:	/* Machine Check or Correctable Error */
 		a0 = alpha_pal_rdmces();
 		if (platform.mcheck_handler)
 			(*platform.mcheck_handler)(a0, framep, a1, a2);
@@ -230,8 +227,8 @@ fatal:
 		printf("        pid = %d, comm = %s\n", curproc->p_pid,
 		    curproc->p_comm);
 	printf("\n");
-#ifdef DDB
-	kdb_trap(mces, vector, param, ALPHA_KENTRY_MM, framep);
+#ifdef KDB
+	kdb_trap(ALPHA_KENTRY_MM, mces, framep);
 #endif
 	panic("machine check");
 }
@@ -438,6 +435,8 @@ alpha_dispatch_intr(void *frame, unsigned long vector)
 	if ((ih->ih_flags & IH_FAST) != 0) {
 		critical_enter();
 		ih->ih_handler(ih->ih_argument);
+		/* XXX */
+		curthread->td_pflags &= ~TDP_OWEPREEMPT;
 		critical_exit();
 		return;
 	}
@@ -447,8 +446,16 @@ alpha_dispatch_intr(void *frame, unsigned long vector)
 		    "alpha_dispatch_intr: disabling vector 0x%x", i->vector);
 		ithd->it_disable(ithd->it_vector);
 	}
-	error = ithread_schedule(ithd, 0 /* !cold */);
+
+	/*
+	 * It seems that we need to return from an interrupt back to PAL
+	 * on the same CPU that received the interrupt, so pin the interrupted
+	 * thread to the current CPU until we return from the interrupt.
+	 */
+	sched_pin();
+	error = ithread_schedule(ithd);
 	KASSERT(error == 0, ("got an impossible stray interrupt"));
+	sched_unpin();
 }
 
 static void

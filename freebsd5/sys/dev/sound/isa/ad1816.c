@@ -33,7 +33,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/ad1816.c,v 1.29 2003/09/07 16:28:02 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/ad1816.c,v 1.33.2.1 2004/10/15 05:14:10 njl Exp $");
 
 struct ad1816_info;
 
@@ -518,17 +518,17 @@ ad1816_alloc_resources(struct ad1816_info *ad1816, device_t dev)
     	int ok = 1, pdma, rdma;
 
 	if (!ad1816->io_base)
-    		ad1816->io_base = bus_alloc_resource(dev, SYS_RES_IOPORT, &ad1816->io_rid,
-						  0, ~0, 1, RF_ACTIVE);
+    		ad1816->io_base = bus_alloc_resource_any(dev, 
+			SYS_RES_IOPORT, &ad1816->io_rid, RF_ACTIVE);
 	if (!ad1816->irq)
-    		ad1816->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &ad1816->irq_rid,
-					      0, ~0, 1, RF_ACTIVE);
+    		ad1816->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ,
+			&ad1816->irq_rid, RF_ACTIVE);
 	if (!ad1816->drq1)
-    		ad1816->drq1 = bus_alloc_resource(dev, SYS_RES_DRQ, &ad1816->drq1_rid,
-					       0, ~0, 1, RF_ACTIVE);
+    		ad1816->drq1 = bus_alloc_resource_any(dev, SYS_RES_DRQ,
+			&ad1816->drq1_rid, RF_ACTIVE);
     	if (!ad1816->drq2)
-        	ad1816->drq2 = bus_alloc_resource(dev, SYS_RES_DRQ, &ad1816->drq2_rid,
-					       0, ~0, 1, RF_ACTIVE);
+        	ad1816->drq2 = bus_alloc_resource_any(dev, SYS_RES_DRQ, 
+			&ad1816->drq2_rid, RF_ACTIVE);
 
     	if (!ad1816->io_base || !ad1816->drq1 || !ad1816->irq) ok = 0;
 
@@ -604,7 +604,7 @@ ad1816_attach(device_t dev)
     	ad1816_init(ad1816, dev);
     	if (mixer_init(dev, &ad1816mixer_class, ad1816)) goto no;
 
-	snd_setup_intr(dev, ad1816->irq, INTR_MPSAFE, ad1816_intr, ad1816, &ad1816->ih);
+	snd_setup_intr(dev, ad1816->irq, 0, ad1816_intr, ad1816, &ad1816->ih);
     	if (bus_dma_tag_create(/*parent*/NULL, /*alignment*/2, /*boundary*/0,
 			/*lowaddr*/BUS_SPACE_MAXADDR_24BIT,
 			/*highaddr*/BUS_SPACE_MAXADDR,
@@ -621,12 +621,13 @@ ad1816_attach(device_t dev)
 	else
 		status2[0] = '\0';
 
-    	snprintf(status, SND_STATUSLEN, "at io 0x%lx irq %ld drq %ld%s bufsz %u",
+    	snprintf(status, SND_STATUSLEN, "at io 0x%lx irq %ld drq %ld%s bufsz %u %s",
     	     	rman_get_start(ad1816->io_base),
 		rman_get_start(ad1816->irq),
 		rman_get_start(ad1816->drq1),
 		status2,
-		ad1816->bufsize);
+		ad1816->bufsize,
+		PCM_KLDSTRING(snd_ad1816));
 
     	if (pcm_register(dev, ad1816, 1, 1)) goto no;
     	pcm_addchan(dev, PCMDIR_REC, &ad1816chan_class, ad1816);
@@ -672,7 +673,8 @@ static driver_t ad1816_driver = {
 };
 
 DRIVER_MODULE(snd_ad1816, isa, ad1816_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_ad1816, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+DRIVER_MODULE(snd_ad1816, acpi, ad1816_driver, pcm_devclass, 0, 0);
+MODULE_DEPEND(snd_ad1816, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_ad1816, 1);
 
 

@@ -25,15 +25,15 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/scd/scdreg.h,v 1.6 2002/11/05 09:37:31 mdodd Exp $
+ * $FreeBSD: src/sys/dev/scd/scdreg.h,v 1.7 2004/03/12 21:45:28 trhodes Exp $
  *
  */
 
 #ifndef SCD_H
 #define	SCD_H
 
-#ifdef __GNUC__
-#if __GNUC__ >= 2
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
+#if __GNUC__ >= 2 || defined(__INTEL_COMPILER)
 #pragma pack(1)
 #endif
 #endif

@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, Revision 2.2  92/04/04  11:35:03  rpd
- * $FreeBSD: src/sys/boot/pc98/boot2/boot.h,v 1.5 2002/10/03 16:20:14 nyan Exp $
+ * $FreeBSD: src/sys/boot/pc98/boot2/boot.h,v 1.6 2004/07/30 09:42:04 nyan Exp $
  */
 
 #include <sys/param.h>
@@ -87,7 +87,7 @@ int strcmp(const char *s1, const char *s2);
 #ifdef CDBOOT
 int strcasecmp(const char *s1, const char *s2);
 #endif /* !CDBOOT */
-void bcopy(const void *from, void *to, size_t len);
+void memcpy(const void *from, void *to, size_t len);
 void twiddle(void);
 #ifdef PC98
 void machine_check(void);

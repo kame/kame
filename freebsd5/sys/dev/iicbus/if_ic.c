@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/iicbus/if_ic.c,v 1.19 2003/10/31 18:32:02 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/iicbus/if_ic.c,v 1.21 2004/08/13 23:16:44 rwatson Exp $");
 
 /*
  * I2C bus IP driver
@@ -66,7 +66,7 @@ __FBSDID("$FreeBSD: src/sys/dev/iicbus/if_ic.c,v 1.19 2003/10/31 18:32:02 brooks
 
 #define PCF_MASTER_ADDRESS 0xaa
 
-#define ICHDRLEN	sizeof(u_int)
+#define ICHDRLEN	sizeof(u_int32_t)
 #define ICMTU		1500		/* default mtu */
 
 struct ic_softc {
@@ -136,7 +136,8 @@ icattach(device_t dev)
 	ifp->if_softc = sc;
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ICMTU;
-	ifp->if_flags = IFF_SIMPLEX | IFF_POINTOPOINT | IFF_MULTICAST;
+	ifp->if_flags = IFF_SIMPLEX | IFF_POINTOPOINT | IFF_MULTICAST |
+	    IFF_NEEDSGIANT;
 	ifp->if_ioctl = icioctl;
 	ifp->if_output = icoutput;
 	ifp->if_type = IFT_PARA;
@@ -369,7 +370,7 @@ icoutput(struct ifnet *ifp, struct mbuf *m,
 	int s, len, sent;
 	struct mbuf *mm;
 	u_char *cp;
-	u_int hdr = dst->sa_family;
+	u_int32_t hdr = dst->sa_family;
 
 	ifp->if_flags |= IFF_RUNNING;
 
@@ -400,23 +401,7 @@ icoutput(struct ifnet *ifp, struct mbuf *m,
 
 	} while ((mm = mm->m_next));
 
-	if (ifp->if_bpf) {
-		struct mbuf m0, *n = m;
-
-		/*
-		 * We need to prepend the address family as
-		 * a four byte field.  Cons up a dummy header
-		 * to pacify bpf.  This is safe because bpf
-		 * will only read from the mbuf (i.e., it won't
-		 * try to free it or keep a pointer a to it).
-		 */
-		m0.m_next = m;
-		m0.m_len = sizeof(u_int);
-		m0.m_data = (char *)&hdr;
-		n = &m0;
-
-		BPF_MTAP(ifp, n);
-	}
+	BPF_MTAP2(ifp, &hdr, sizeof(hdr), m);
 
 	sc->ic_sending = 1;
 

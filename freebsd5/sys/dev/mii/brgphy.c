@@ -31,19 +31,17 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/brgphy.c,v 1.28 2003/10/31 18:32:02 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/brgphy.c,v 1.31 2004/05/30 17:57:40 phk Exp $");
 
 /*
  * Driver for the Broadcom BCR5400 1000baseTX PHY. Speed is always
  * 1000mbps; all we need to negotiate here is full or half duplex.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/brgphy.c,v 1.28 2003/10/31 18:32:02 brooks Exp $");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 #include <sys/bus.h>
 
@@ -362,8 +360,8 @@ setit:
 		/*
 		 * Only retry autonegotiation every 5 seconds.
 		 */
-		if (++sc->mii_ticks != 5)
-			return (0);
+		if (++sc->mii_ticks <= 5)
+			break;
 		
 		sc->mii_ticks = 0;
 		brgphy_mii_phy_auto(sc);
@@ -381,7 +379,6 @@ setit:
 	if (sc->mii_media_active != mii->mii_media_active || 
 	    sc->mii_media_status != mii->mii_media_status ||
 	    cmd == MII_MEDIACHG) {
-		mii_phy_update(sc, cmd);
 		switch (brgphy_mii_model) {
 		case MII_MODEL_xxBROADCOM_BCM5401:
 			bcm5401_load_dspcode(sc);
@@ -391,6 +388,7 @@ setit:
 			break;
 		}
 	}
+	mii_phy_update(sc, cmd);
 	return (0);
 }
 

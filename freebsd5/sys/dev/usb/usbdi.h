@@ -1,5 +1,5 @@
 /*	$NetBSD: usbdi.h,v 1.62 2002/07/11 21:14:35 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usbdi.h,v 1.48 2003/07/14 20:31:03 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usbdi.h,v 1.50 2004/08/15 23:39:18 imp Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -89,7 +89,6 @@ typedef void (*usbd_callback)(usbd_xfer_handle, usbd_private_handle,
 #define USBD_DEFAULT_TIMEOUT 5000 /* ms = 5 s */
 
 #if defined(__FreeBSD__)
-#define USB_CDEV_MAJOR 108
 #endif
 
 usbd_status usbd_open_pipe(usbd_interface_handle iface, u_int8_t address,
@@ -263,6 +262,9 @@ struct usb_attach_arg {
 #define UMATCH_NONE					(ENXIO)
 
 #endif
+
+#define USBD_SHOW_DEVICE_CLASS		0x1
+#define USBD_SHOW_INTERFACE_CLASS	0x2
 
 #if defined(__FreeBSD__)
 int usbd_driver_load(module_t mod, int what, void *arg);

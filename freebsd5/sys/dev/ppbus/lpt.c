@@ -51,7 +51,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ppbus/lpt.c,v 1.29 2003/08/24 17:54:16 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ppbus/lpt.c,v 1.34 2004/07/09 16:56:46 cognet Exp $");
 
 /*
  * Device Driver for AT parallel printer port
@@ -189,15 +189,15 @@ static	d_write_t	lptwrite;
 static	d_read_t	lptread;
 static	d_ioctl_t	lptioctl;
 
-#define CDEV_MAJOR 16
 static struct cdevsw lpt_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	lptopen,
 	.d_close =	lptclose,
 	.d_read =	lptread,
 	.d_write =	lptwrite,
 	.d_ioctl =	lptioctl,
 	.d_name =	LPT_NAME,
-	.d_maj =	CDEV_MAJOR,
 };
 
 static int
@@ -340,7 +340,11 @@ static void
 lpt_identify(driver_t *driver, device_t parent)
 {
 
-	BUS_ADD_CHILD(parent, 0, LPT_NAME, -1);
+	device_t dev;
+
+	dev = device_find_child(parent, LPT_NAME, 0);
+	if (!dev)
+		BUS_ADD_CHILD(parent, 0, LPT_NAME, -1);
 }
 
 /*
@@ -352,7 +356,6 @@ lpt_probe(device_t dev)
 	struct lpt_data *sc;
 	
 	sc = DEVTOSOFTC(dev);
-	bzero(sc, sizeof(struct lpt_data));
 
 	/*
 	 * Now, try to detect the printer.
@@ -451,7 +454,7 @@ lptout(void *arg)
  */
 
 static	int
-lptopen(dev_t dev, int flags, int fmt, struct thread *td)
+lptopen(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	int s;
 	int trys, err;
@@ -571,7 +574,7 @@ lptopen(dev_t dev, int flags, int fmt, struct thread *td)
  */
 
 static	int
-lptclose(dev_t dev, int flags, int fmt, struct thread *td)
+lptclose(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	u_int unit = LPTUNIT(minor(dev));
 	struct lpt_data *sc = UNITOSOFTC(unit);
@@ -680,7 +683,7 @@ lpt_pushbytes(device_t dev)
  */
 
 static int
-lptread(dev_t dev, struct uio *uio, int ioflag)
+lptread(struct cdev *dev, struct uio *uio, int ioflag)
 {
         u_int	unit = LPTUNIT(minor(dev));
 	struct lpt_data *sc = UNITOSOFTC(unit);
@@ -725,7 +728,7 @@ error:
  */
 
 static	int
-lptwrite(dev_t dev, struct uio *uio, int ioflag)
+lptwrite(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	register unsigned n;
 	int err;
@@ -893,7 +896,7 @@ lptintr(device_t dev)
 }
 
 static	int
-lptioctl(dev_t dev, u_long cmd, caddr_t data, int flags, struct thread *td)
+lptioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags, struct thread *td)
 {
 	int	error = 0;
         u_int	unit = LPTUNIT(minor(dev));

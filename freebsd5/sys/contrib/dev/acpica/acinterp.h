@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acinterp.h - Interpreter subcomponent prototypes and defines
- *       $Revision: 146 $
+ *       $Revision: 149 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2003, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -189,6 +189,12 @@ AcpiExConvertToAscii (
 /*
  * exfield - ACPI AML (p-code) execution - field manipulation
  */
+
+ACPI_STATUS
+AcpiExCommonBufferSetup (
+    ACPI_OPERAND_OBJECT     *ObjDesc,
+    UINT32                  BufferLength,
+    UINT32                  *DatumCount);
 
 ACPI_STATUS
 AcpiExExtractFromField (
@@ -636,8 +642,11 @@ ACPI_STATUS
 AcpiExStoreObjectToNode (
     ACPI_OPERAND_OBJECT     *SourceDesc,
     ACPI_NAMESPACE_NODE     *Node,
-    ACPI_WALK_STATE         *WalkState);
+    ACPI_WALK_STATE         *WalkState,
+    UINT8                   ImplicitConversion);
 
+#define ACPI_IMPLICIT_CONVERSION        TRUE
+#define ACPI_NO_IMPLICIT_CONVERSION     FALSE
 
 /*
  * exstoren

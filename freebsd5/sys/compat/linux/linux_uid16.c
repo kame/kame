@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/linux/linux_uid16.c,v 1.12 2003/10/21 11:00:33 tjr Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/linux/linux_uid16.c,v 1.15 2004/08/16 07:28:16 tjr Exp $");
 
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -36,8 +36,15 @@ __FBSDID("$FreeBSD: src/sys/compat/linux/linux_uid16.c,v 1.12 2003/10/21 11:00:3
 #include <sys/sysproto.h>
 #include <sys/systm.h>
 
+#include "opt_compat.h"
+
+#if !COMPAT_LINUX32
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
+#else
+#include <machine/../linux32/linux.h>
+#include <machine/../linux32/linux32_proto.h>
+#endif
 
 #include <compat/linux/linux_util.h>
 
@@ -116,7 +123,7 @@ linux_setgroups16(struct thread *td, struct linux_setgroups16_args *args)
 	 * Keep cr_groups[0] unchanged to prevent that.
 	 */
 
-	if ((error = suser_cred(oldcred, PRISON_ROOT)) != 0) {
+	if ((error = suser_cred(oldcred, SUSER_ALLOWJAIL)) != 0) {
 		PROC_UNLOCK(p);
 		crfree(newcred);
 		return (error);
@@ -190,7 +197,7 @@ linux_getgroups16(struct thread *td, struct linux_getgroups16_args *args)
 
 /*
  * The FreeBSD native getgid(2) and getuid(2) also modify td->td_retval[1]
- * when COMPAT_43 or COMPAT_SUNOS is defined. This globbers registers that
+ * when COMPAT_43 is defined. This globbers registers that
  * are assumed to be preserved. The following lightweight syscalls fixes
  * this. See also linux_getpid(2), linux_getgid(2) and linux_getuid(2) in
  * linux_misc.c

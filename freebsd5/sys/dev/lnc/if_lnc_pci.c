@@ -29,13 +29,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/lnc/if_lnc_pci.c,v 1.31 2003/09/02 17:30:36 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/lnc/if_lnc_pci.c,v 1.34.2.1 2004/08/25 17:30:36 mux Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/socket.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 
 #include <machine/bus.h>
 #include <machine/resource.h>
@@ -92,7 +93,6 @@ lnc_pci_attach(device_t dev)
 {
 	lnc_softc_t *sc = device_get_softc(dev);
 	unsigned command;
-	int rid = 0;
 	int err = 0;
 	bus_size_t lnc_mem_size;
 
@@ -102,25 +102,31 @@ lnc_pci_attach(device_t dev)
 	command |= PCIM_CMD_PORTEN | PCIM_CMD_BUSMASTEREN;
 	pci_write_config(dev, PCIR_COMMAND, command, 4);
 
-	rid = PCIR_BAR(0);
-	sc->portres = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1,
-	                                 RF_ACTIVE);
+	sc->portrid = PCIR_BAR(0);
+	sc->portres = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &sc->portrid,
+					     RF_ACTIVE);
 
-	if (! sc->portres)
+	if (! sc->portres) {
 		device_printf(dev, "Cannot allocate I/O ports\n");
+		lnc_release_resources(dev);
+		return (ENXIO);
+	}
+	
+	sc->irqres = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irqrid,
+					    RF_ACTIVE|RF_SHAREABLE);
 
-	rid = 0;
-	sc->irqres = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
-	                                RF_ACTIVE|RF_SHAREABLE);
-
-	if (! sc->irqres)
+	if (! sc->irqres) {
 		device_printf(dev, "Cannot allocate irq\n");
-
+		lnc_release_resources(dev);
+		return (ENXIO);
+	}
 	err = bus_setup_intr(dev, sc->irqres, INTR_TYPE_NET, lncintr,
 	                     sc, &sc->intrhand);
-	if (err)
+	if (err) {
 		device_printf(dev, "Cannot setup irq handler\n");
-
+		lnc_release_resources(dev);
+		return (ENXIO);
+	}
 	sc->lnc_btag = rman_get_bustag(sc->portres);
 	sc->lnc_bhandle = rman_get_bushandle(sc->portres);
 
@@ -148,7 +154,7 @@ lnc_pci_attach(device_t dev)
 	err = bus_dma_tag_create(NULL,			/* parent */
 				 1,			/* alignement */
 				 0,			/* boundary */
-				 BUS_SPACE_MAXADDR,	/* lowaddr */
+				 BUS_SPACE_MAXADDR_24BIT,	/* lowaddr */
 				 BUS_SPACE_MAXADDR,	/* highaddr */
 				 NULL, NULL,		/* filter, filterarg */
 				 lnc_mem_size,		/* segsize */
@@ -161,7 +167,7 @@ lnc_pci_attach(device_t dev)
 
 	if (err) {
 		device_printf(dev, "Can't create DMA tag\n");
-		/* XXX need to free currently allocated resources here */
+		lnc_release_resources(dev);
 		return (ENOMEM);
 	}
 
@@ -170,7 +176,7 @@ lnc_pci_attach(device_t dev)
 
 	if (err) {
 		device_printf(dev, "Couldn't allocate memory\n");
-		/* XXX need to free currently allocated resources here */
+		lnc_release_resources(dev);
 		return (ENOMEM);
 	}
 
@@ -180,6 +186,8 @@ lnc_pci_attach(device_t dev)
 	/* Call generic attach code */
 	if (! lnc_attach_common(dev)) {
 		device_printf(dev, "Generic attach code failed\n");
+		lnc_release_resources(dev);
+		return (ENXIO);
 	}
 	return (0);
 }

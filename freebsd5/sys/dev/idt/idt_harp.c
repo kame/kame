@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/idt/idt_harp.c,v 1.4 2003/08/24 17:49:13 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/idt/idt_harp.c,v 1.5.2.2 2004/09/15 18:38:32 andre Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -347,7 +347,7 @@ idt_harp_init(nicstar_reg_t *idt)
 	 * points to start of EEPROM and includes all the device registers
 	 * in the lower 2 Megabytes.
 	 */
-	idt->iu_config.ac_ram = NULL;
+	idt->iu_config.ac_ram = 0;
 	idt->iu_config.ac_ramsize = 0;
 
 	for (i = 0; i < 6; i++) {
@@ -762,6 +762,5 @@ idt_receive(nicstar_reg_t * idt, struct mbuf * m, int vpi, int vci)
 	/*
 	 * Schedule callback
 	 */
-	if (! netisr_queue(NETISR_ATM, m))
-		KB_FREEALL(m);
+	netisr_queue(NETISR_ATM, m);	/* mbuf is free'd on failure. */
 }

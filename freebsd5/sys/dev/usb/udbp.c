@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/udbp.c,v 1.24 2003/08/24 17:55:55 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/udbp.c,v 1.28 2004/08/15 23:39:18 imp Exp $");
 
 /* Driver for arbitrary double bulk pipe devices.
  * The driver assumes that there will be the same driver on the other side.
@@ -99,7 +99,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/udbp.c,v 1.24 2003/08/24 17:55:55 obrien Exp
 #include <dev/usb/usbdivar.h>
 #include <dev/usb/usbhid.h>
 
-#include <dev/usb/usbdevs.h>
+#include "usbdevs.h"
 
 
 #include <netgraph/ng_message.h>
@@ -196,18 +196,16 @@ Static const struct ng_cmdlist ng_udbp_cmdlist[] = {
 
 /* Netgraph node type descriptor */
 Static struct ng_type ng_udbp_typestruct = {
-	NG_ABI_VERSION,
-	NG_UDBP_NODE_TYPE,
-	NULL,
-	ng_udbp_constructor,
-	ng_udbp_rcvmsg,
-	ng_udbp_rmnode,
-	ng_udbp_newhook,
-	NULL,
-	ng_udbp_connect,
-	ng_udbp_rcvdata,
-	ng_udbp_disconnect,
-	ng_udbp_cmdlist
+	.version =	NG_ABI_VERSION,
+	.name =		NG_UDBP_NODE_TYPE,
+	.constructor =	ng_udbp_constructor,
+	.rcvmsg =	ng_udbp_rcvmsg,
+	.shutdown =	ng_udbp_rmnode,
+	.newhook =	ng_udbp_newhook,
+	.connect =	ng_udbp_connect,
+	.rcvdata =	ng_udbp_rcvdata,
+	.disconnect =	ng_udbp_disconnect,
+	.cmdlist =	ng_udbp_cmdlist,
 };
 
 Static int udbp_setup_in_transfer	(udbp_p sc);
@@ -269,10 +267,8 @@ USB_ATTACH(udbp)
 	/* fetch the interface handle for the first interface */
 	(void) usbd_device2interface_handle(uaa->device, 0, &iface);
 	id = usbd_get_interface_descriptor(iface);
-	usbd_devinfo(uaa->device, 0, devinfo);
+	usbd_devinfo(uaa->device, USBD_SHOW_INTERFACE_CLASS, devinfo);
 	USB_ATTACH_SETUP;
-	printf("%s: %s, iclass %d/%d\n", USBDEVNAME(sc->sc_dev),
-	       devinfo, id->bInterfaceClass, id->bInterfaceSubClass);
 
 	/* Find the two first bulk endpoints */
 	for (i = 0 ; i < id->bNumEndpoints; i++) {
@@ -731,19 +727,20 @@ ng_udbp_rcvdata(hook_p hook, item_p item)
 	struct ifqueue	*xmitq_p;
 	int	s;
 	struct mbuf *m;
-	meta_p meta;
+	struct ng_tag_prio *ptag;
 
 	NGI_GET_M(item, m);
-	NGI_GET_META(item, meta);
 	NG_FREE_ITEM(item);
+
 	/*
 	 * Now queue the data for when it can be sent
 	 */
-	if (meta && meta->priority > 0) {
+	if ((ptag = (struct ng_tag_prio *)m_tag_locate(m, NGM_GENERIC_COOKIE,
+	    NG_TAG_PRIO, NULL)) != NULL && (ptag->priority > NG_PRIO_CUTOFF) )
 		xmitq_p = (&sc->xmitq_hipri);
-	} else {
+	else
 		xmitq_p = (&sc->xmitq);
-	}
+
 	s = splusb();
 	IF_LOCK(xmitq_p);
 	if (_IF_QFULL(xmitq_p)) {
@@ -765,7 +762,6 @@ bad:	/*
 	 * check if we need to free the mbuf, and then return the error
 	 */
 	NG_FREE_M(m);
-	NG_FREE_META(meta);
 	return (error);
 }
 

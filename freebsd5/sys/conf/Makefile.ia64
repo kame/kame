@@ -1,7 +1,7 @@
 # Makefile.ia64 -- with config changes.
 # Copyright 1990 W. Jolitz
 #	from: src/sys/conf/Makefile.alpha,v 1.76
-# $FreeBSD: src/sys/conf/Makefile.ia64,v 1.56 2003/05/16 21:26:40 marcel Exp $
+# $FreeBSD: src/sys/conf/Makefile.ia64,v 1.57 2004/05/09 22:29:37 cognet Exp $
 #
 # Makefile for FreeBSD
 #
@@ -19,7 +19,7 @@
 GCC3=	you bet
 
 # Which version of config(8) is required.
-%VERSREQ=	500012
+%VERSREQ=	500013
 
 STD8X16FONT?=	iso
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/mlx/mlx.c,v 1.41 2003/09/02 08:30:31 scottl Exp $
+ *	$FreeBSD: src/sys/dev/mlx/mlx.c,v 1.48 2004/06/16 09:46:50 phk Exp $
  */
 
 /*
@@ -53,14 +53,13 @@
 #include <dev/mlx/mlxvar.h>
 #include <dev/mlx/mlxreg.h>
 
-#define MLX_CDEV_MAJOR	130
-
 static struct cdevsw mlx_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	mlx_open,
 	.d_close =	mlx_close,
 	.d_ioctl =	mlx_ioctl,
 	.d_name =	"mlx",
-	.d_maj =	MLX_CDEV_MAJOR,
 };
 
 devclass_t	mlx_devclass;
@@ -205,7 +204,7 @@ mlx_free(struct mlx_softc *sc)
 	free(sc->mlx_enq2, M_DEVBUF);
 
     /* destroy control device */
-    if (sc->mlx_dev_t != (dev_t)NULL)
+    if (sc->mlx_dev_t != (struct cdev *)NULL)
 	destroy_dev(sc->mlx_dev_t);
 }
 
@@ -363,7 +362,8 @@ mlx_attach(struct mlx_softc *sc)
      * Allocate and connect our interrupt.
      */
     rid = 0;
-    sc->mlx_irq = bus_alloc_resource(sc->mlx_dev, SYS_RES_IRQ, &rid, 0, ~0, 1, RF_SHAREABLE | RF_ACTIVE);
+    sc->mlx_irq = bus_alloc_resource_any(sc->mlx_dev, SYS_RES_IRQ, &rid,
+        RF_SHAREABLE | RF_ACTIVE);
     if (sc->mlx_irq == NULL) {
 	device_printf(sc->mlx_dev, "can't allocate interrupt\n");
 	mlx_free(sc);
@@ -434,13 +434,13 @@ mlx_attach(struct mlx_softc *sc)
 	    return(ENXIO);
 	}
 	sc->mlx_enq2->me_firmware_id = ('0' << 24) | (0 << 16) | (meo->me_fwminor << 8) | meo->me_fwmajor;
-	free(meo, M_DEVBUF);
 	
 	/* XXX require 2.42 or better (PCI) or 2.14 or better (EISA) */
 	if (meo->me_fwminor < 42) {
 	    device_printf(sc->mlx_dev, " *** WARNING *** This firmware revision is not recommended\n");
 	    device_printf(sc->mlx_dev, " *** WARNING *** Use revision 2.42 or later\n");
 	}
+	free(meo, M_DEVBUF);
 	break;
     case MLX_IFTYPE_3:
 	/* XXX certify 3.52? */
@@ -721,7 +721,7 @@ mlx_submit_buf(struct mlx_softc *sc, mlx_bio *bp)
  * Accept an open operation on the control device.
  */
 int
-mlx_open(dev_t dev, int flags, int fmt, struct thread *td)
+mlx_open(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
     int			unit = minor(dev);
     struct mlx_softc	*sc = devclass_get_softc(mlx_devclass, unit);
@@ -734,7 +734,7 @@ mlx_open(dev_t dev, int flags, int fmt, struct thread *td)
  * Accept the last close on the control device.
  */
 int
-mlx_close(dev_t dev, int flags, int fmt, struct thread *td)
+mlx_close(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
     int			unit = minor(dev);
     struct mlx_softc	*sc = devclass_get_softc(mlx_devclass, unit);
@@ -747,7 +747,7 @@ mlx_close(dev_t dev, int flags, int fmt, struct thread *td)
  * Handle controller-specific control operations.
  */
 int
-mlx_ioctl(dev_t dev, u_long cmd, caddr_t addr, int32_t flag, struct thread *td)
+mlx_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int32_t flag, struct thread *td)
 {
     int				unit = minor(dev);
     struct mlx_softc		*sc = devclass_get_softc(mlx_devclass, unit);
@@ -1555,9 +1555,9 @@ mlx_enquire(struct mlx_softc *sc, int command, size_t bufsize, void (* complete)
     if ((mc->mc_complete == NULL) && (mc != NULL))
 	mlx_releasecmd(mc);
     /* we got an error, and we allocated a result */
-    if ((error != 0) && (mc->mc_data != NULL)) {
-	free(mc->mc_data, M_DEVBUF);
-	mc->mc_data = NULL;
+    if ((error != 0) && (result != NULL)) {
+	free(result, M_DEVBUF);
+	result = NULL;
     }
     return(result);
 }

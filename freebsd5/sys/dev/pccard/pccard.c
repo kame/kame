@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/pccard/pccard.c,v 1.91 2003/11/04 06:30:59 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/pccard/pccard.c,v 1.93 2004/08/16 15:57:18 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -152,17 +152,29 @@ static int
 pccard_set_default_descr(device_t dev)
 {
 	const char *vendorstr, *prodstr;
+	uint32_t vendor, prod;
 	char *str;
 
 	if (pccard_get_vendor_str(dev, &vendorstr))
 		return (0);
 	if (pccard_get_product_str(dev, &prodstr))
 		return (0);
-	str = malloc(strlen(vendorstr) + strlen(prodstr) + 2, M_DEVBUF,
-	    M_WAITOK);
-	sprintf(str, "%s %s", vendorstr, prodstr);
-	device_set_desc_copy(dev, str);
-	free(str, M_DEVBUF);
+	if (vendorstr != NULL && prodstr != NULL) {
+		str = malloc(strlen(vendorstr) + strlen(prodstr) + 2, M_DEVBUF,
+		    M_WAITOK);
+		sprintf(str, "%s %s", vendorstr, prodstr);
+		device_set_desc_copy(dev, str);
+		free(str, M_DEVBUF);
+	} else {
+		if (pccard_get_vendor(dev, &vendor))
+			return (0);
+		if (pccard_get_product(dev, &prod))
+			return (0);
+		str = malloc(100, M_DEVBUF, M_WAITOK);
+		snprintf(str, 100, "vendor=0x%x product=0x%x", vendor, prod);
+		device_set_desc_copy(dev, str);
+		free(str, M_DEVBUF);
+	}
 	return (0);
 }
 
@@ -366,10 +378,12 @@ pccard_do_product_lookup(device_t bus, device_t dev,
 		if (matches && fcn != ent->pp_expfunc)
 			matches = 0;
 		if (matches && ent->pp_cis[0] &&
-		    strcmp(ent->pp_cis[0], vendorstr) != 0)
+		    (vendorstr == NULL ||
+		    strcmp(ent->pp_cis[0], vendorstr) != 0))
 			matches = 0;
 		if (matches && ent->pp_cis[1] &&
-		    strcmp(ent->pp_cis[1], prodstr) != 0)
+		    (prodstr == NULL ||
+		    strcmp(ent->pp_cis[1], prodstr) != 0))
 			matches = 0;
 		/* XXX need to match cis[2] and cis[3] also XXX */
 		if (matchfn != NULL)
@@ -450,8 +464,8 @@ pccard_function_init(struct pccard_function *pf)
 		}
 		if (cfe->irqmask) {
 			cfe->irqrid = 0;
-			r = cfe->irqres = bus_alloc_resource(bus, SYS_RES_IRQ,
-			    &cfe->irqrid, 0, ~0, 1, 0);
+			r = cfe->irqres = bus_alloc_resource_any(bus,
+				SYS_RES_IRQ, &cfe->irqrid, 0);
 			if (cfe->irqres == NULL)
 				goto not_this_one;
 			resource_list_add(rl, SYS_RES_IRQ, cfe->irqrid,

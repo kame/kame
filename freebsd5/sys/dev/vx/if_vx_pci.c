@@ -28,11 +28,12 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/vx/if_vx_pci.c,v 1.28 2003/10/31 18:32:06 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/vx/if_vx_pci.c,v 1.30 2004/05/30 20:08:46 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 
 #include <net/if.h>
@@ -131,8 +132,7 @@ vx_pci_attach(
     sc = device_get_softc(dev);
 
     rid = PCIR_BAR(0);
-    sc->vx_res = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-	0, ~0, 1, RF_ACTIVE);
+    sc->vx_res = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid, RF_ACTIVE);
 
     if (sc->vx_res == NULL)
 	goto bad;
@@ -141,7 +141,7 @@ vx_pci_attach(
     sc->bsh = rman_get_bushandle(sc->vx_res);
 
     rid = 0;
-    sc->vx_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
+    sc->vx_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 	RF_SHAREABLE | RF_ACTIVE);
 
     if (sc->vx_irq == NULL)

@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/boot/efi/libefi/efi_console.c,v 1.4 2003/04/03 21:36:29 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/boot/efi/libefi/efi_console.c,v 1.5 2004/03/09 04:00:33 marcel Exp $");
 
 #include <efi.h>
 #include <efilib.h>
@@ -46,6 +46,7 @@ efi_cons_probe(struct console *cp)
 static int
 efi_cons_init(int arg)
 {
+	conout->SetAttribute(conout, EFI_TEXT_ATTR(EFI_LIGHTGRAY, EFI_BLACK));
 	return 0;
 }
 

@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_sysvec.c,v 1.35 2003/10/20 10:38:48 tjr Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_sysvec.c,v 1.37 2004/07/15 08:26:00 phk Exp $");
 
 /* XXX we use functions that might not exist. */
 #include "opt_compat.h"
@@ -199,7 +199,8 @@ Elf32_Brandinfo svr4_brand = {
   "SVR4",
   svr4_emul_path,
   "/lib/libc.so.1",
-  &svr4_sysvec
+  &svr4_sysvec,
+  NULL,
 };
 
 const char      svr4_emul_path[] = "/compat/svr4";
@@ -410,6 +411,7 @@ svr4_elf_modevent(module_t mod, int type, void *data)
 			printf("svr4 ELF exec handler removed\n");
 		break;
 	default:
+		return (EOPNOTSUPP);
 		break;
 	}
 	return error;

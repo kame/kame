@@ -1,8 +1,16 @@
-# $FreeBSD: src/sys/conf/options.powerpc,v 1.7 2003/04/12 09:40:37 des Exp $
+# $FreeBSD: src/sys/conf/options.powerpc,v 1.9 2004/06/25 13:44:34 grehan Exp $
 # Options specific to the powerpc platform kernels
 
 OEA			opt_global.h
 IPKDB
 
+GFB_DEBUG		opt_gfb.h
+GFB_NO_FONT_LOADING	opt_gfb.h
+GFB_NO_MODE_CHANGE	opt_gfb.h
+
 POWERMAC		opt_platform.h
 PSIM
+
+SC_OFWFB		opt_ofwfb.h
+
+OFWCONS_POLL_HZ		opt_ofw.h

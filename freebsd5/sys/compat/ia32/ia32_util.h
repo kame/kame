@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/ia32/ia32_util.h,v 1.8 2003/09/25 01:10:23 peter Exp $
+ * $FreeBSD: src/sys/compat/ia32/ia32_util.h,v 1.9 2003/12/11 01:05:09 peter Exp $
  */
 
 #include <vm/vm.h>
@@ -37,8 +37,13 @@
 #include <sys/sysent.h>
 #include <sys/cdefs.h>
 
-#define FREEBSD32_USRSTACK	((1ul << 32) - PAGE_SIZE)
+#ifdef __ia64__
+#define FREEBSD32_USRSTACK	((1ul << 32) - IA32_PAGE_SIZE * 2)
+#else
+#define FREEBSD32_USRSTACK	((1ul << 32) - IA32_PAGE_SIZE)
+#endif
 
+#define	IA32_PAGE_SIZE	4096
 #define	IA32_MAXDSIZ	(512*1024*1024)		/* 512MB */
 #define	IA32_MAXSSIZ	(64*1024*1024)		/* 64MB */
 #define IA32_MAXVMEM	0			/* Unlimited */

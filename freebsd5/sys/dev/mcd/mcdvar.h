@@ -1,5 +1,5 @@
 /*
- * $FreeBSD: src/sys/dev/mcd/mcdvar.h,v 1.3 2002/11/06 08:08:55 mdodd Exp $
+ * $FreeBSD: src/sys/dev/mcd/mcdvar.h,v 1.4 2004/06/16 09:46:49 phk Exp $
  */
 
 struct mcd_mbx {
@@ -35,7 +35,7 @@ struct mcd_data {
 
 struct mcd_softc {
 	device_t		dev;
-	dev_t			mcd_dev_t;
+	struct cdev *mcd_dev_t;
 	int			debug;
 
 	struct resource *	port;

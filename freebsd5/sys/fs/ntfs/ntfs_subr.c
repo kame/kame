@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/ntfs/ntfs_subr.c,v 1.32.2.1 2003/12/17 09:35:44 tjr Exp $
+ * $FreeBSD: src/sys/fs/ntfs/ntfs_subr.c,v 1.34 2004/07/28 06:30:43 kan Exp $
  */
 
 #include <sys/param.h>
@@ -1899,7 +1899,7 @@ ntfs_procfixups(
 			return (EINVAL);
 		}
 		*cfxp = *fxp;
-		((caddr_t) cfxp) += ntmp->ntm_bps;
+		cfxp = (u_int16_t *) ((caddr_t) cfxp + ntmp->ntm_bps);
 	}
 	return (0);
 }

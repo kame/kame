@@ -26,11 +26,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: ahc_eisa.c,v 1.29 2003/05/03 23:27:57 gibbs Exp $
+ * $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/ahc_eisa.c#13 $
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/ahc_eisa.c,v 1.31 2003/08/24 17:48:02 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aic7xxx/ahc_eisa.c,v 1.34 2004/08/17 00:14:30 gibbs Exp $");
 
 #include <dev/aic7xxx/aic7xxx_osm.h>
 
@@ -61,8 +61,7 @@ aic7770_probe(device_t dev)
 	eisa_add_iospace(dev, iobase, AHC_EISA_IOSIZE, RESVADDR_NONE);
 
 	rid = 0;
-	regs = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-				0, ~0, 1, RF_ACTIVE);
+	regs = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid, RF_ACTIVE);
 	if (regs == NULL) {
 		device_printf(dev, "Unable to map I/O space?!\n");
 		return ENOMEM;
@@ -132,7 +131,7 @@ aic7770_attach(device_t dev)
 
 	/* Allocate a dmatag for our SCB DMA maps */
 	/* XXX Should be a child of the PCI bus dma tag */
-	error = bus_dma_tag_create(/*parent*/NULL, /*alignment*/1,
+	error = aic_dma_tag_create(ahc, /*parent*/NULL, /*alignment*/1,
 				   /*boundary*/0,
 				   /*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
 				   /*highaddr*/BUS_SPACE_MAXADDR,
@@ -141,8 +140,6 @@ aic7770_attach(device_t dev)
 				   /*nsegments*/AHC_NSEG,
 				   /*maxsegsz*/AHC_MAXTRANSFER_SIZE,
 				   /*flags*/0,
-				   /*lockfunc*/busdma_lock_mutex,
-				   /*lockarg*/&Giant,
 				   &ahc->parent_dmat);
 
 	if (error != 0) {
@@ -162,41 +159,6 @@ aic7770_attach(device_t dev)
 	return (0);
 }
 
-int
-aic7770_map_registers(struct ahc_softc *ahc, u_int unused_ioport_arg)
-{
-	struct	resource *regs;
-	int	rid;
-
-	rid = 0;
-	regs = bus_alloc_resource(ahc->dev_softc, SYS_RES_IOPORT,
-				  &rid, 0, ~0, 1, RF_ACTIVE);
-	if (regs == NULL) {
-		device_printf(ahc->dev_softc, "Unable to map I/O space?!\n");
-		return ENOMEM;
-	}
-	ahc->platform_data->regs_res_type = SYS_RES_IOPORT;
-	ahc->platform_data->regs_res_id = rid,
-	ahc->platform_data->regs = regs;
-	ahc->tag = rman_get_bustag(regs);
-	ahc->bsh = rman_get_bushandle(regs);
-	return (0);
-}
-
-int
-aic7770_map_int(struct ahc_softc *ahc, int irq)
-{
-	int zero;
-
-	zero = 0;
-	ahc->platform_data->irq =
-	    bus_alloc_resource(ahc->dev_softc, SYS_RES_IRQ, &zero,
-			       0, ~0, 1, RF_ACTIVE);
-	if (ahc->platform_data->irq == NULL)
-		return (ENOMEM);
-	ahc->platform_data->irq_res_type = SYS_RES_IRQ;
-	return (ahc_map_int(ahc));
-}
 
 static device_method_t ahc_eisa_device_methods[] = {
 	/* Device interface */

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/twe/twe.c,v 1.18 2003/12/02 07:57:19 ps Exp $
+ *	$FreeBSD: src/sys/dev/twe/twe.c,v 1.22 2004/06/11 18:42:44 vkashyap Exp $
  */
 
 /*
@@ -273,7 +273,7 @@ twe_del_unit(struct twe_softc *sc, int unit)
 {
     int error;
 
-    if (unit < 0 || unit > TWE_MAX_UNITS)
+    if (unit < 0 || unit >= TWE_MAX_UNITS)
 	return (ENXIO);
 
     if (sc->twe_drive[unit].td_disk == NULL)
@@ -384,7 +384,7 @@ twe_startio(struct twe_softc *sc)
 
     debug_called(4);
 
-    if (sc->twe_state & TWE_STATE_FRZN)
+    if (sc->twe_state & (TWE_STATE_CTLR_BUSY | TWE_STATE_FRZN))
 	return;
 
     /* spin until something prevents us from doing any work */
@@ -396,13 +396,13 @@ twe_startio(struct twe_softc *sc)
 	/* build a command from an outstanding bio */
 	if (tr == NULL) {
 	    
-	    /* see if there's work to be done */
-	    if ((bp = twe_dequeue_bio(sc)) == NULL)
+	    /* get a command to handle the bio with */
+	    if (twe_get_request(sc, &tr))
 		break;
 
-	    /* get a command to handle the bio with */
-	    if (twe_get_request(sc, &tr)) {
-		twe_enqueue_bio(sc, bp);	/* failed, put the bio back */
+	    /* see if there's work to be done */
+	    if ((bp = twe_dequeue_bio(sc)) == NULL) {
+		twe_release_request(tr);
 		break;
 	    }
 
@@ -431,16 +431,21 @@ twe_startio(struct twe_softc *sc)
 	if (tr == NULL)
 	    break;
 	
-	/* map the command so the controller can work with it */
+	/* try to map and submit the command to controller */
 	error = twe_map_request(tr);
-	if (error != 0) {
-	    if (error == EBUSY) {
-		twe_requeue_ready(tr);		/* try it again later */
-		break;				/* don't try anything more for now */
-	    }
 
-	    /* we don't support any other return from twe_start */
-	    twe_panic(sc, "twe_map_request returned nonsense");
+	if (error != 0) {
+	    if (error == EBUSY)
+		break;
+	    tr->tr_status = TWE_CMD_ERROR;
+	    if (tr->tr_private != NULL) {
+		bp = (twe_bio *)(tr->tr_private);
+		TWE_BIO_SET_ERROR(bp, error);
+		tr->tr_private = NULL;
+		twed_intr(bp);
+	        twe_release_request(tr);
+	    } else if (tr->tr_flags & TWE_CMD_SLEEPER)
+		wakeup_one(tr); /* wakeup the sleeping owner */
 	}
     }
 }
@@ -529,7 +534,9 @@ twe_ioctl(struct twe_softc *sc, int ioctlcmd, void *addr)
 	}
 
 	/* run the command */
-	twe_wait_request(tr);
+	error = twe_wait_request(tr);
+	if (error)
+	    goto cmd_done;
 
 	/* copy the command out again */
 	bcopy(cmd, &tu->tu_command, sizeof(TWE_Command));
@@ -757,7 +764,7 @@ twe_get_param(struct twe_softc *sc, int table_id, int param_id, size_t param_siz
     } else {
 	tr->tr_complete = func;
 	error = twe_map_request(tr);
-	if (error == 0)
+	if ((error == 0) || (error == EBUSY))
 	    return(func);
     }
 
@@ -880,8 +887,6 @@ twe_init_connection(struct twe_softc *sc, int mode)
 
     /* submit the command */
     error = twe_immediate_request(tr);
-    /* XXX check command result? */
-    twe_unmap_request(tr);
     twe_release_request(tr);
 
     if (mode == TWE_INIT_MESSAGE_CREDITS)
@@ -910,7 +915,7 @@ twe_wait_request(struct twe_request *tr)
 	tsleep(tr, PRIBIO, "twewait", 0);
     splx(s);
     
-    return(0);
+    return(tr->tr_status != TWE_CMD_COMPLETE);
 }
 
 /********************************************************************************
@@ -921,13 +926,15 @@ twe_wait_request(struct twe_request *tr)
 static int
 twe_immediate_request(struct twe_request *tr)
 {
+    int		error;
 
     debug_called(4);
 
     tr->tr_flags |= TWE_CMD_IMMEDIATE;
     tr->tr_status = TWE_CMD_BUSY;
-    twe_map_request(tr);
-
+    if ((error = twe_map_request(tr)) != 0)
+	if (error != EBUSY)
+	    return(error);
     while (tr->tr_status == TWE_CMD_BUSY){
 	twe_done(tr->tr_sc);
     }
@@ -1127,6 +1134,7 @@ twe_done(struct twe_softc *sc)
 	    /* move to completed queue */
 	    twe_remove_busy(tr);
 	    twe_enqueue_complete(tr);
+	    sc->twe_state &= ~TWE_STATE_CTLR_BUSY;
 	} else {
 	    break;					/* no response ready */
 	}
@@ -1174,8 +1182,6 @@ twe_complete(struct twe_softc *sc)
 	    debug(2, "command left for owner");
 	}
     }   
-
-    sc->twe_state &= ~TWE_STATE_FRZN;
 }
 
 /********************************************************************************
@@ -1842,7 +1848,7 @@ twe_panic(struct twe_softc *sc, char *reason)
 #endif
 }
 
-#ifdef TWE_DEBUG
+#if 0
 /********************************************************************************
  * Print a request/command in human-readable format.
  */

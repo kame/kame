@@ -25,10 +25,11 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/zs/zs_macio.c,v 1.3 2003/08/24 17:55:58 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/zs/zs_macio.c,v 1.6 2004/08/12 17:41:30 marius Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/interrupt.h>
 #include <sys/kernel.h>
@@ -36,8 +37,8 @@ __FBSDID("$FreeBSD: src/sys/dev/zs/zs_macio.c,v 1.3 2003/08/24 17:55:58 obrien E
 #include <machine/resource.h>
 #include <sys/rman.h>
 
+#include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/openfirm.h>
-#include <powerpc/powermac/maciovar.h>
 
 #include <dev/zs/z8530reg.h>
 #include <dev/zs/z8530var.h>
@@ -131,7 +132,7 @@ static int
 zs_macio_probe(device_t dev)
 {
 
-	if (strcmp(macio_get_name(dev), "escc") != 0 ||
+	if (strcmp(ofw_bus_get_name(dev), "escc") != 0 ||
 	    device_get_unit(dev) != 0)
 		return (ENXIO);
 	return (zs_probe(dev));
@@ -141,20 +142,18 @@ static int
 zs_macio_attach(device_t dev)
 {
 	struct	zs_macio_softc *sc;
-	struct	macio_reg *reg;
 
 	sc = device_get_softc(dev);
-	reg = macio_get_regs(dev);
 
-	sc->sc_memres = bus_alloc_resource(dev, SYS_RES_MEMORY, &sc->sc_memrid,
-	    0, ~1, 1, RF_ACTIVE);
+	sc->sc_memres = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+	    &sc->sc_memrid, RF_ACTIVE);
 	if (sc->sc_memres == NULL) {
 		device_printf(dev, "could not allocate memory\n");
 		goto error;
 	}
 	sc->sc_irqrid1 = 0;
-	sc->sc_irqres1 = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->sc_irqrid1,
-	    0, ~0, 1, RF_ACTIVE);
+	sc->sc_irqres1 = bus_alloc_resource_any(dev, SYS_RES_IRQ,
+	    &sc->sc_irqrid1, RF_ACTIVE);
 	if (sc->sc_irqres1 == NULL) {
 		device_printf(dev, "could not allocate interrupt 1\n");
 		goto error;
@@ -165,8 +164,8 @@ zs_macio_attach(device_t dev)
 		goto error;
 	}
 	sc->sc_irqrid2 = 1;
-	sc->sc_irqres2 = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->sc_irqrid2,
-	    0, ~0, 1, RF_ACTIVE);
+	sc->sc_irqres2 = bus_alloc_resource_any(dev, SYS_RES_IRQ,
+	    &sc->sc_irqrid2, RF_ACTIVE);
 	if (sc->sc_irqres2 == NULL) {
 		device_printf(dev, "could not allocate interrupt 2\n");
 		goto error;
@@ -264,16 +263,15 @@ zstty_set_speed(struct zstty_softc *sc, int ospeed)
 int
 zstty_console(device_t dev, char *mode, int len)
 {
-	device_t	parent;
-	phandle_t	chosen, options;
+	phandle_t	chosen, options, parent;
 	ihandle_t	stdin, stdout;
 	phandle_t	stdinp, stdoutp;
 	char		input[32], output[32];
 	const char	*desc;
 
-	parent = device_get_parent(dev);
 	chosen = OF_finddevice("/chosen");
 	options = OF_finddevice("/options");
+	parent = ofw_bus_get_node(device_get_parent(dev));
 	if (OF_getprop(chosen, "stdin", &stdin, sizeof(stdin)) == -1 ||
 	    OF_getprop(chosen, "stdout", &stdout, sizeof(stdout)) == -1 ||
 	    OF_getprop(options, "input-device", input, sizeof(input)) == -1 ||
@@ -284,8 +282,7 @@ zstty_console(device_t dev, char *mode, int len)
 	stdinp = OF_parent(OF_instance_to_package(stdin));
 	stdoutp = OF_parent(OF_instance_to_package(stdout));
 	desc = device_get_desc(dev);
-	if (macio_get_node(parent) == stdinp &&
-	    macio_get_node(parent) == stdoutp &&
+	if (parent == stdinp && parent == stdoutp &&
 	    input[3] == desc[3] && output[3] == desc[3]) {
 		if (mode != NULL)
 			strlcpy(mode, "57600,8,n,1,-", len);

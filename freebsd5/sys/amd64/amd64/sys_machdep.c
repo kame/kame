@@ -11,10 +11,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -35,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/sys_machdep.c,v 1.87 2003/11/21 03:01:59 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/sys_machdep.c,v 1.88 2004/04/05 23:55:13 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

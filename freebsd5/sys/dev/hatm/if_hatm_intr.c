@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/hatm/if_hatm_intr.c,v 1.15 2003/11/05 11:15:47 harti Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/hatm/if_hatm_intr.c,v 1.16 2003/12/24 18:22:04 alfred Exp $");
 
 /*
  * ForeHE driver.
@@ -342,7 +342,7 @@ he_intr_rbp(struct hatm_softc *sc, struct herbp *rbp, u_int large,
 			if ((error = bus_dmamap_load(sc->mbuf_tag,
 			    sc->rmaps[sc->lbufs_next],
 			    m->m_data, rbp->bsize, hatm_mbuf_helper,
-			    &rbp->rbp[rbp->tail].phys, BUS_DMA_NOWAIT)) != NULL)
+			    &rbp->rbp[rbp->tail].phys, BUS_DMA_NOWAIT)) != 0)
 				panic("hatm: mbuf mapping failed %d", error);
 
 			bus_dmamap_sync(sc->mbuf_tag,

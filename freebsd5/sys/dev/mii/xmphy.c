@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/xmphy.c,v 1.13 2003/08/24 17:54:10 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/xmphy.c,v 1.16 2004/05/30 17:57:40 phk Exp $");
 
 /*
  * driver for the XaQti XMAC II's internal PHY. This is sort of
@@ -39,12 +39,10 @@ __FBSDID("$FreeBSD: src/sys/dev/mii/xmphy.c,v 1.13 2003/08/24 17:54:10 obrien Ex
  * here is full/half duplex. Speed is always 1000mbps.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/xmphy.c,v 1.13 2003/08/24 17:54:10 obrien Exp $");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 #include <sys/bus.h>
 
@@ -255,8 +253,8 @@ xmphy_service(sc, mii, cmd)
 		/*
 		 * Only retry autonegotiation every 5 seconds.
 		 */
-		if (++sc->mii_ticks != 5)
-			return (0);
+		if (++sc->mii_ticks <= 5)
+			break;
 		
 		sc->mii_ticks = 0;
 

@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aha/aha_mca.c,v 1.10 2003/11/09 19:51:16 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aha/aha_mca.c,v 1.11 2004/03/17 17:50:24 njl Exp $");
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -126,8 +126,7 @@ aha_mca_attach (device_t dev)
 	void *			ih;
 
 	rid = 0;
-	io = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-				0, ~0, 1, RF_ACTIVE);
+	io = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid, RF_ACTIVE);
 	if (!io) {
 		device_printf(dev, "No I/O space?!\n");
 		error = ENOMEM;
@@ -135,8 +134,7 @@ aha_mca_attach (device_t dev)
 	}
 
 	rid = 0;
-	irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
-				 0, ~0, 1, RF_ACTIVE);
+	irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid, RF_ACTIVE);
 	if (irq == NULL) {
 		device_printf(dev, "No IRQ?!\n");
 		error = ENOMEM;
@@ -144,8 +142,7 @@ aha_mca_attach (device_t dev)
 	}
 
 	rid = 0;
-	drq = bus_alloc_resource(dev, SYS_RES_DRQ, &rid,
-				 0, ~0, 1, RF_ACTIVE);
+	drq = bus_alloc_resource_any(dev, SYS_RES_DRQ, &rid, RF_ACTIVE);
 	if (drq == NULL) {
 		device_printf(dev, "No DRQ?!\n");
 		error = ENOMEM;

@@ -28,12 +28,9 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/gfb/gfb_pci.c,v 1.9 2003/09/26 10:41:43 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/gfb/gfb_pci.c,v 1.13 2004/07/10 22:29:41 marcel Exp $");
 
 #include "opt_fb.h"
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/gfb/gfb_pci.c,v 1.9 2003/09/26 10:41:43 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -66,22 +63,9 @@ __FBSDID("$FreeBSD: src/sys/dev/gfb/gfb_pci.c,v 1.9 2003/09/26 10:41:43 phk Exp 
 #include <dev/fb/gfb.h>
 #include <dev/gfb/gfb_pci.h>
 
-#ifdef __alpha__
-
-#include <machine/rpb.h>
-#include <machine/cpu.h>
-
-#endif /* __alpha__ */
-
 #if 0
 static devclass_t gfb_devclass;
 #endif
-
-#ifdef __alpha__
-
-extern void sccnattach(void);
-
-#endif /* __alpha__ */
 
 extern struct gfb_font bold8x16;
 extern struct gfb_softc *gfb_device_softcs[2][16];
@@ -93,9 +77,6 @@ pcigfb_attach(device_t dev)
 	gfb_softc_t sc;
 	video_adapter_t *adp;
 	int unit, flags, error, rid, va_index;
-#ifdef __alpha__
-	struct ctb *ctb;
-#endif /* __alpha__ */
 
 	s = splimp();
 	error = 0;
@@ -104,7 +85,7 @@ pcigfb_attach(device_t dev)
 	sc = device_get_softc(dev);
 	sc->rev = pci_get_revid(dev);
 	rid = GFB_MEM_BASE_RID;
-	sc->res = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid, 0, ~0, 1,
+	sc->res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
 	    RF_ACTIVE|PCI_RF_DENSE);
 	if(sc->res == NULL) {
 		device_printf(dev, "couldn't map memory\n");
@@ -115,7 +96,7 @@ pcigfb_attach(device_t dev)
 
 	/* Allocate interrupt (irq)... */
 	rid = 0x0;
-	sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
+	sc->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 	    RF_SHAREABLE|RF_ACTIVE);
 	if(sc->irq == NULL) {
 		device_printf(dev, "Couldn't map interrupt\n");
@@ -136,9 +117,9 @@ pcigfb_attach(device_t dev)
 		adp->va_mem_base = (vm_offset_t)rman_get_virtual(sc->res);
 		adp->va_mem_size = rman_get_end(sc->res) -
 		    rman_get_start(sc->res);
-		adp->va_io_base = NULL;
+		adp->va_io_base = (vm_offset_t)sc->res;	/* XXX */
 		adp->va_io_size = 0;
-		adp->va_crtc_addr = NULL;
+		adp->va_crtc_addr = 0;
 		gfb_device_softcs[sc->model][unit] = sc;
 		sc->gfbc = (struct gfb_conf *)malloc(sizeof(struct gfb_conf),
 		    M_DEVBUF, M_NOWAIT);
@@ -190,19 +171,6 @@ pcigfb_attach(device_t dev)
 		sc->gfbc = gfb_device_softcs[sc->model][unit]->gfbc;
 		gfb_device_softcs[sc->model][unit] = sc;
 	}
-
-	/*
-	   This is a back-door for PCI devices--since FreeBSD no longer supports
-	   PCI configuration-space accesses during the *configure() phase for
-	   video adapters, we cannot identify a PCI device as the console during
-	   the first call to sccnattach(). There must be a second chance for PCI
-	   adapters to be recognized as the console, and this is it...
-	*/
-#ifdef __alpha__
-	ctb = (struct ctb *)(((caddr_t)hwrpb) + hwrpb->rpb_ctb_off);
-	if (ctb->ctb_term_type == 3) /* Display adapter */
-		sccnattach();
-#endif /* __alpha__ */
 
 	device_printf(dev, "Board type %s\n", sc->gfbc->name);
 	device_printf(dev, "%d x %d, %dbpp, %s RAMDAC\n",
@@ -260,7 +228,7 @@ pcigfb_detach(device_t dev)
 #ifdef FB_INSTALL_CDEV
 
 int
-pcigfb_open(dev_t dev, int flag, int mode, struct thread *td)
+pcigfb_open(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 	struct gfb_softc *sc;
 	int error;
@@ -277,7 +245,7 @@ pcigfb_open(dev_t dev, int flag, int mode, struct thread *td)
 }
 
 int
-pcigfb_close(dev_t dev, int flag, int mode, struct thread *td)
+pcigfb_close(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 	struct gfb_softc *sc;
 
@@ -286,7 +254,7 @@ pcigfb_close(dev_t dev, int flag, int mode, struct thread *td)
 }
 
 int
-pcigfb_read(dev_t dev, struct uio *uio, int flag)
+pcigfb_read(struct cdev *dev, struct uio *uio, int flag)
 {
 	struct gfb_softc *sc;
 
@@ -295,7 +263,7 @@ pcigfb_read(dev_t dev, struct uio *uio, int flag)
 }
 
 int
-pcigfb_write(dev_t dev, struct uio *uio, int flag)
+pcigfb_write(struct cdev *dev, struct uio *uio, int flag)
 {
 	struct gfb_softc *sc;
 
@@ -304,7 +272,7 @@ pcigfb_write(dev_t dev, struct uio *uio, int flag)
 }
 
 int
-pcigfb_ioctl(dev_t dev, u_long cmd, caddr_t arg, int flag, struct thread *td)
+pcigfb_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td)
 {
 	struct gfb_softc *sc;
 
@@ -313,7 +281,7 @@ pcigfb_ioctl(dev_t dev, u_long cmd, caddr_t arg, int flag, struct thread *td)
 }
 
 int
-pcigfb_mmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int prot)
+pcigfb_mmap(struct cdev *dev, vm_offset_t offset, vm_paddr_t *paddr, int prot)
 {
 	struct gfb_softc *sc;
 

@@ -1,5 +1,5 @@
 /*	$NetBSD: uftdireg.h,v 1.6 2002/07/11 21:14:28 augustss Exp $ */
-/*	$FreeBSD: src/sys/dev/usb/uftdireg.h,v 1.1 2002/08/11 23:32:33 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uftdireg.h,v 1.2 2004/07/01 17:16:20 brooks Exp $	*/
 
 /*
  * Definitions for the FTDI USB Single Port Serial Converter -
@@ -104,7 +104,9 @@ enum {
 	ftdi_8u232am_b115200 = 0x001a,
 	ftdi_8u232am_b230400 = 0x000d,
 	ftdi_8u232am_b460800 = 0x4006,
-	ftdi_8u232am_b921600 = 0x8003
+	ftdi_8u232am_b921600 = 0x8003,
+	ftdi_8u232am_b2000000 = 0x0001,	/* special case for 2M baud */
+	ftdi_8u232am_b3000000 = 0x0000,	/* special case for 3M baud */
 };
 
 /*

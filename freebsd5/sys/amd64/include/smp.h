@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/amd64/include/smp.h,v 1.78 2003/11/17 08:58:14 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/smp.h,v 1.80 2004/05/16 22:11:50 peter Exp $
  *
  */
 
@@ -44,8 +44,7 @@ inthand_t
 	IDTVEC(statclock),	/* Forward statclock() */
 	IDTVEC(cpuast),		/* Additional software trap on other cpu */ 
 	IDTVEC(cpustop),	/* CPU stops & waits to be restarted */
-	IDTVEC(rendezvous),	/* handle CPU rendezvous */
-	IDTVEC(lazypmap);	/* handle lazy pmap release */
+	IDTVEC(rendezvous);	/* handle CPU rendezvous */
 
 /* functions in mp_machdep.c */
 void	cpu_add(u_int apic_id, char boot_cpu);
@@ -60,6 +59,7 @@ void	forward_hardclock(void);
 void	forwarded_hardclock(struct clockframe frame);
 u_int	mp_bootaddress(u_int);
 int	mp_grab_cpu_hlt(void);
+void	mp_topology(void);
 void	smp_invlpg(vm_offset_t addr);
 void	smp_masked_invlpg(u_int mask, vm_offset_t addr);
 void	smp_invlpg_range(vm_offset_t startva, vm_offset_t endva);

@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.22 2003/10/08 01:20:00 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.26 2004/05/27 03:49:39 imp Exp $");
 
 #include "opt_inet.h"
 
@@ -66,12 +66,13 @@ __FBSDID("$FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.22 2003/10/08 01:20:00 imp
 #include <net/if_types.h>
 #include <net/if_media.h>
 
-#include <dev/pccard/pccardvar.h>
-#include <dev/pccard/pccarddevs.h>
-#include "card_if.h"
-
 #include <dev/an/if_aironet_ieee.h>
 #include <dev/an/if_anreg.h>
+
+#include <dev/pccard/pccardvar.h>
+
+#include "pccarddevs.h"
+#include "card_if.h"
 
 /*
  * Support for PCMCIA cards.
@@ -79,13 +80,12 @@ __FBSDID("$FreeBSD: src/sys/dev/an/if_an_pccard.c,v 1.22 2003/10/08 01:20:00 imp
 static int  an_pccard_match(device_t);
 static int  an_pccard_probe(device_t);
 static int  an_pccard_attach(device_t);
-static int  an_pccard_detach(device_t);
 
 static device_method_t an_pccard_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		pccard_compat_probe),
 	DEVMETHOD(device_attach,	pccard_compat_attach),
-	DEVMETHOD(device_detach,	an_pccard_detach),
+	DEVMETHOD(device_detach,	an_detach),
 	DEVMETHOD(device_shutdown,	an_shutdown),
 
 	/* Card interface */
@@ -106,7 +106,6 @@ static devclass_t an_pccard_devclass;
 
 DRIVER_MODULE(an, pccard, an_pccard_driver, an_pccard_devclass, 0, 0);
 MODULE_DEPEND(an, wlan, 1, 1, 1);
-MODULE_DEPEND(an, pccard, 1, 1, 1);
 
 static const struct pccard_product an_pccard_products[] = {
 	PCMCIA_CARD(AIRONET, PC4800, 0),
@@ -128,27 +127,6 @@ an_pccard_match(device_t dev)
 		return (0);
 	}
 	return (ENXIO);
-}
-
-static int
-an_pccard_detach(device_t dev)
-{
-	struct an_softc		*sc = device_get_softc(dev);
-	struct ifnet		*ifp = &sc->arpcom.ac_if;
-
-	if (sc->an_gone) {
-		device_printf(dev,"already unloaded\n");
-		return(0);
-	}
-	an_stop(sc);
-	ifmedia_removeall(&sc->an_ifmedia);
-	ifp->if_flags &= ~IFF_RUNNING;
-	ether_ifdetach(ifp);
-	sc->an_gone = 1;
-	bus_teardown_intr(dev, sc->irq_res, sc->irq_handle);
-	an_release_resources(dev);
-	mtx_destroy(&sc->an_mtx);
-	return (0);
 }
 
 static int

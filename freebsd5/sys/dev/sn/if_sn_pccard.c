@@ -30,28 +30,26 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sn/if_sn_pccard.c,v 1.20 2003/10/25 19:56:19 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sn/if_sn_pccard.c,v 1.25 2004/05/30 20:08:41 phk Exp $");
 
 #include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/kernel.h>
-#include <sys/socket.h>
-
-#include <sys/module.h>
 #include <sys/bus.h>
+#include <sys/kernel.h>
+#include <sys/module.h>
+#include <sys/socket.h>
+#include <sys/systm.h>
 
-#include <machine/bus.h>
-#include <machine/resource.h>
- 
 #include <net/ethernet.h> 
 #include <net/if.h> 
 #include <net/if_arp.h>
 
-#include <dev/sn/if_snvar.h>
+#include <machine/bus.h>
+
 #include <dev/pccard/pccardvar.h>
-#include <dev/pccard/pccarddevs.h>
+#include <dev/sn/if_snvar.h>
 
 #include "card_if.h"
+#include "pccarddevs.h"
 
 static const struct pccard_product sn_pccard_products[] = {
 	PCMCIA_CARD(DSPSI, XJACK, 0),
@@ -169,5 +167,4 @@ static driver_t sn_pccard_driver = {
 extern devclass_t sn_devclass;
 
 DRIVER_MODULE(sn, pccard, sn_pccard_driver, sn_devclass, 0, 0);
-MODULE_DEPEND(sn, pccard, 1, 1, 1);
 MODULE_DEPEND(sn, ether, 1, 1, 1);

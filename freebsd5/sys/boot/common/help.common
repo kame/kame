@@ -16,7 +16,7 @@
 	If needed, disable the use of ACPI with:
 
 	unset acpi_load
-	$hint.acpi.0.disabled="1"
+	set hint.acpi.0.disabled="1"
 
 ################################################################################
 # Tautoboot DBoot after a delay
@@ -205,7 +205,8 @@
 
 	Sets the list of directories which will be searched in for modules
 	named in a load command or implicitly required by a dependency. The
-	default module_path is "/boot/kernel;/boot/modules".
+	default module_path is "/boot/modules" with the kernel directory
+	prepended.
 
 ################################################################################
 # Tset Sprompt DSet the command prompt
@@ -244,7 +245,7 @@
 		Set the number of sendfile buffers to be allocated.  This
 		overrides the value determined when the kernel was compiled.
 
-	set kern.vm.kmem.size=<value>		VM_KMEM_SIZE
+	set vm.kmem_size=<value>		VM_KMEM_SIZE
 
 		Sets the size of kernel memory (bytes).  This overrides
 		the value determined when the kernel was compiled.
@@ -275,13 +276,6 @@
 		On systems where memory cannot be accurately probed,
 		this option provides a hint as to the actual size of
 		system memory (which will be tested before use).
-
-	set hw.pci.allow_unsupported_io_range=<value>
-
-		Allow the PCI Bridge to pass through an unsupported
-		memory range assigned by the BIOS.
-
-		value is 0 (default) or non-zero to enable.
 
 	set hw.pci.enable_io_modes=<value>
 

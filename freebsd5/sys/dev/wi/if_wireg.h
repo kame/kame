@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/wi/if_wireg.h,v 1.42 2003/09/05 22:29:30 sam Exp $
+ * $FreeBSD: src/sys/dev/wi/if_wireg.h,v 1.43 2003/12/28 06:58:52 sam Exp $
  */
 
 #define WI_DELAY	5
@@ -684,33 +684,32 @@ struct wi_frame {
 /*
  * Radio capture format for Prism.
  */
-#define WI_RX_RADIOTAP_PRESENT0 \
+#define WI_RX_RADIOTAP_PRESENT \
 	((1 << IEEE80211_RADIOTAP_FLAGS) | \
 	 (1 << IEEE80211_RADIOTAP_RATE) | \
 	 (1 << IEEE80211_RADIOTAP_CHANNEL) | \
 	 (1 << IEEE80211_RADIOTAP_DB_ANTSIGNAL) | \
-	 (1 << IEEE80211_RADIOTAP_DB_ANTNOISE) | \
-	 (1 << IEEE80211_RADIOTAP_EXT))
-
-#define WI_RX_RADIOTAP_PRESENT1	(1 << (IEEE80211_RADIOTAP_TIME - 32))
+	 (1 << IEEE80211_RADIOTAP_DB_ANTNOISE))
 
 struct wi_rx_radiotap_header {
 	struct ieee80211_radiotap_header wr_ihdr;
-	u_int32_t	wr_present1;
 	u_int8_t	wr_flags;
 	u_int8_t	wr_rate;
 	u_int16_t	wr_chan_freq;
 	u_int16_t	wr_chan_flags;
 	u_int8_t	wr_antsignal;
 	u_int8_t	wr_antnoise;
-	u_int32_t	wr_time;
 };
 
 #define WI_TX_RADIOTAP_PRESENT \
-	((1 << IEEE80211_RADIOTAP_CHANNEL))
+	((1 << IEEE80211_RADIOTAP_FLAGS) | \
+	 (1 << IEEE80211_RADIOTAP_RATE) | \
+	 (1 << IEEE80211_RADIOTAP_CHANNEL))
 
 struct wi_tx_radiotap_header {
 	struct ieee80211_radiotap_header wt_ihdr;
+	u_int8_t	wt_flags;
+	u_int8_t	wt_rate;
 	u_int16_t	wt_chan_freq;
 	u_int16_t	wt_chan_flags;
 };

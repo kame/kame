@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/uart/uart_dev_z8530.c,v 1.6 2003/09/26 05:14:56 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/uart/uart_dev_z8530.c,v 1.8 2004/06/24 10:07:28 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -244,6 +244,7 @@ z8530_getc(struct uart_bas *bas)
 struct z8530_softc {
 	struct uart_softc base;
 	uint8_t	tpc;
+	uint8_t	txidle;
 };
 
 static int z8530_bus_attach(struct uart_softc *);
@@ -305,6 +306,7 @@ z8530_bus_attach(struct uart_softc *sc)
 		z8530->tpc = z8530_setup(bas, 9600, 8, 1, UART_PARITY_NONE);
 		z8530->tpc &= ~(TPC_DTR|TPC_RTS);
 	}
+	z8530->txidle = 1;	/* Report UART_IPEND_TXIDLE. */
 
 	sc->sc_rxfifosz = 3;
 	sc->sc_txfifosz = 1;
@@ -348,8 +350,8 @@ z8530_bus_getsig(struct uart_softc *sc)
 		mtx_lock_spin(&sc->sc_hwmtx);
 		bes = uart_getmreg(&sc->sc_bas, RR_BES);
 		mtx_unlock_spin(&sc->sc_hwmtx);
-		SIGCHG(bes & BES_CTS, sig, UART_SIG_CTS, UART_SIG_DCTS);
-		SIGCHG(bes & BES_DCD, sig, UART_SIG_DCD, UART_SIG_DDCD);
+		SIGCHG(bes & BES_CTS, sig, SER_CTS, SER_DCTS);
+		SIGCHG(bes & BES_DCD, sig, SER_DCD, SER_DDCD);
 		new = sig & ~UART_SIGMASK_DELTA;
 	} while (!atomic_cmpset_32(&sc->sc_hwsig, old, new));
 	return (sig);
@@ -385,6 +387,7 @@ z8530_bus_ioctl(struct uart_softc *sc, int request, intptr_t data)
 static int
 z8530_bus_ipend(struct uart_softc *sc)
 {
+	struct z8530_softc *z8530 = (struct z8530_softc*)sc;
 	struct uart_bas *bas;
 	int ipend;
 	uint32_t sig;
@@ -400,15 +403,16 @@ z8530_bus_ipend(struct uart_softc *sc)
 		uart_setreg(bas, REG_CTRL, CR_RSTXSI);
 		ipend |= UART_IPEND_BREAK;
 	}
-	if (bes & BES_TXE) {
+	if (bes & BES_TXE && z8530->txidle) {
 		uart_setreg(bas, REG_CTRL, CR_RSTTXI);
 		ipend |= UART_IPEND_TXIDLE;
+		z8530->txidle = 0;	/* Suppress UART_IPEND_TXIDLE. */
 	}
 	if (bes & BES_RXA)
 		ipend |= UART_IPEND_RXREADY;
 	sig = sc->sc_hwsig;
-	SIGCHG(bes & BES_CTS, sig, UART_SIG_CTS, UART_SIG_DCTS);
-	SIGCHG(bes & BES_DCD, sig, UART_SIG_DCD, UART_SIG_DDCD);
+	SIGCHG(bes & BES_CTS, sig, SER_CTS, SER_DCTS);
+	SIGCHG(bes & BES_DCD, sig, SER_DCD, SER_DDCD);
 	if (sig & UART_SIGMASK_DELTA)
 		ipend |= UART_IPEND_SIGCHG;
 	src = uart_getmreg(bas, RR_SRC);
@@ -505,22 +509,22 @@ z8530_bus_setsig(struct uart_softc *sc, int sig)
 	do {
 		old = sc->sc_hwsig;
 		new = old;
-		if (sig & UART_SIG_DDTR) {
-			SIGCHG(sig & UART_SIG_DTR, new, UART_SIG_DTR,
-			    UART_SIG_DDTR);
+		if (sig & SER_DDTR) {
+			SIGCHG(sig & SER_DTR, new, SER_DTR,
+			    SER_DDTR);
 		}
-		if (sig & UART_SIG_DRTS) {
-			SIGCHG(sig & UART_SIG_RTS, new, UART_SIG_RTS,
-			    UART_SIG_DRTS);
+		if (sig & SER_DRTS) {
+			SIGCHG(sig & SER_RTS, new, SER_RTS,
+			    SER_DRTS);
 		}
 	} while (!atomic_cmpset_32(&sc->sc_hwsig, old, new));
 
 	mtx_lock_spin(&sc->sc_hwmtx);
-	if (new & UART_SIG_DTR)
+	if (new & SER_DTR)
 		z8530->tpc |= TPC_DTR;
 	else
 		z8530->tpc &= ~TPC_DTR;
-	if (new & UART_SIG_RTS)
+	if (new & SER_RTS)
 		z8530->tpc |= TPC_RTS;
 	else
 		z8530->tpc &= ~TPC_RTS;
@@ -533,6 +537,7 @@ z8530_bus_setsig(struct uart_softc *sc, int sig)
 static int
 z8530_bus_transmit(struct uart_softc *sc)
 {
+	struct z8530_softc *z8530 = (struct z8530_softc*)sc;
 	struct uart_bas *bas;
 
 	bas = &sc->sc_bas;
@@ -542,6 +547,7 @@ z8530_bus_transmit(struct uart_softc *sc)
 	uart_setreg(bas, REG_DATA, sc->sc_txbuf[0]);
 	uart_barrier(bas);
 	sc->sc_txbusy = 1;
+	z8530->txidle = 1;	/* Report UART_IPEND_TXIDLE again. */
 	mtx_unlock_spin(&sc->sc_hwmtx);
 	return (0);
 }

@@ -36,13 +36,12 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sab/sab.c,v 1.21 2003/11/09 09:17:22 tanimura Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sab/sab.c,v 1.35 2004/08/12 17:41:30 marius Exp $");
 
 /*
  * SAB82532 Dual UART driver
  */
 
-#include "opt_ddb.h"
 #include "opt_comconsole.h"
 
 #include <sys/param.h>
@@ -52,20 +51,23 @@ __FBSDID("$FreeBSD: src/sys/dev/sab/sab.c,v 1.21 2003/11/09 09:17:22 tanimura Ex
 #include <sys/cons.h>
 #include <sys/fcntl.h>
 #include <sys/interrupt.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/mutex.h>
+#include <sys/module.h>
 #include <sys/proc.h>
+
+#include <dev/ofw/ofw_bus.h>
+#include <dev/ofw/openfirm.h>
+
 #include <machine/bus.h>
 #include <machine/resource.h>
+
 #include <sys/rman.h>
+#include <sys/serial.h>
 #include <sys/syslog.h>
 #include <sys/tty.h>
-
-#include <ddb/ddb.h>
-
-#include <dev/ofw/openfirm.h>
-#include <sparc64/ebus/ebusvar.h>
 
 #include <dev/sab/sab82532reg.h>
 
@@ -82,7 +84,7 @@ struct sabtty_softc {
 	struct sab_softc	*sc_parent;
 	bus_space_tag_t		sc_bt;
 	bus_space_handle_t	sc_bh;
-	dev_t			sc_si;
+	struct cdev *sc_si;
 	struct tty		*sc_tty;
 	int			sc_channel;
 	int			sc_icnt;
@@ -130,7 +132,8 @@ static int sabtty_detach(device_t dev);
 
 static int sabtty_intr(struct sabtty_softc *sc);
 static void sabtty_softintr(struct sabtty_softc *sc);
-static int sabtty_mdmctrl(struct sabtty_softc *sc, int bits, int how);
+static void sabttybreak(struct tty *tp, int brk);
+static int sabttymodem(struct tty *tp, int biton, int bitoff);
 static int sabtty_param(struct sabtty_softc *sc, struct tty *tp,
     struct termios *t);
 static void sabtty_cec_wait(struct sabtty_softc *sc);
@@ -154,22 +157,17 @@ static void sabtty_cnputc(struct sabtty_softc *sc, int c);
 
 static d_open_t sabttyopen;
 static d_close_t sabttyclose;
-static d_ioctl_t sabttyioctl;
 
 static void sabttystart(struct tty *tp);
 static void sabttystop(struct tty *tp, int rw);
 static int sabttyparam(struct tty *tp, struct termios *t);
 
 static struct cdevsw sabtty_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	sabttyopen,
 	.d_close =	sabttyclose,
-	.d_read =	ttyread,
-	.d_write =	ttywrite,
-	.d_ioctl =	sabttyioctl,
-	.d_poll =	ttypoll,
 	.d_name =	"sabtty",
-	.d_flags =	D_TTY,
-	.d_kqfilter =	ttykqfilter,
+	.d_flags =	D_TTY | D_NEEDGIANT,
 };
 
 static device_method_t sab_methods[] = {
@@ -253,12 +251,13 @@ sab_probe(device_t dev)
 	bus_space_tag_t tag;
 	uint8_t r;
 	int rid;
+	const char *name;
 
-	if (strcmp(ebus_get_name(dev), "se") != 0 &&
-	    strcmp(ebus_get_name(dev), "serial") != 0)
+	name = ofw_bus_get_name(dev);
+	if (strcmp(name, "se") != 0 && strcmp(name, "serial") != 0)
 		return (ENXIO);
 	rid = 0;
-	res = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1,
+	res = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid,
 	    RF_ACTIVE);
 	if (res == NULL)
 		return (ENXIO);
@@ -298,11 +297,11 @@ sab_attach(device_t dev)
 	irqrid = 0;
 	irqres = NULL;
 	sc = device_get_softc(dev);
-	iores = bus_alloc_resource(dev, SYS_RES_IOPORT, &iorid, 0, ~0, 1,
+	iores = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &iorid,
 	    RF_ACTIVE);
 	if (iores == NULL)
 		goto error;
-	irqres = bus_alloc_resource(dev, SYS_RES_IRQ, &irqrid, 0, ~0, 1,
+	irqres = bus_alloc_resource_any(dev, SYS_RES_IRQ, &irqrid,
 	    RF_ACTIVE);
 	if (irqres == NULL)
 		goto error;
@@ -463,6 +462,8 @@ sabtty_attach(device_t dev)
 
 	tp->t_oproc = sabttystart;
 	tp->t_param = sabttyparam;
+	tp->t_modem = sabttymodem;
+	tp->t_break = sabttybreak;
 	tp->t_stop = sabttystop;
 	tp->t_iflag = TTYDEF_IFLAG;
 	tp->t_oflag = TTYDEF_OFLAG;
@@ -557,9 +558,10 @@ sabtty_intr(struct sabtty_softc *sc)
 	if (len != 0) {
 		for (i = 0; i < len; i++) {
 			c = SAB_READ(sc, SAB_RFIFO);
-#if defined(DDB) && defined(ALT_BREAK_TO_DEBUGGER)
+#if defined(KDB) && defined(ALT_BREAK_TO_DEBUGGER)
 			if (sc->sc_console != 0 && (i & 1) == 0)
-				brk = db_alt_break(c, &sc->sc_alt_break_state);
+				brk = kdb_alt_break(c,
+				    &sc->sc_alt_break_state);
 #endif
 			*sc->sc_iput++ = c;
 			if (sc->sc_iput == sc->sc_ibuf + sizeof(sc->sc_ibuf))
@@ -579,6 +581,12 @@ sabtty_intr(struct sabtty_softc *sc)
 		SAB_WRITE(sc, SAB_IMR1, sc->sc_imr1);
 		needsoft = 1;
 	}
+
+#if defined(DDB) && defined(BREAK_TO_DEBUGGER)
+	if (sc->sc_console != 0 && (isr1 & SAB_ISR1_BRK) != 0) {
+		brk = 1;
+	}
+#endif
 
 	if (isr1 & SAB_ISR1_XPR) {
 		if (sc->sc_ocnt > 0) {
@@ -600,7 +608,7 @@ sabtty_intr(struct sabtty_softc *sc)
 
 	if (brk != 0)
 		breakpoint();
-	
+
 	return (needsoft);
 }
 
@@ -624,18 +632,18 @@ sabtty_softintr(struct sabtty_softc *sc)
 		if (sc->sc_iget == sc->sc_ibuf + sizeof(sc->sc_ibuf))
 			sc->sc_iget = sc->sc_ibuf;
 
-		(*linesw[tp->t_line].l_rint)(data, tp);
+		ttyld_rint(tp, data);
 	}
 
 	if (sc->sc_tx_done != 0) {
 		sc->sc_tx_done = 0;
 		tp->t_state &= ~TS_BUSY;
-		(*linesw[tp->t_line].l_start)(tp);
+		ttyld_start(tp);
 	}
 }
 
 static int
-sabttyopen(dev_t dev, int flags, int mode, struct thread *td)
+sabttyopen(struct cdev *dev, int flags, int mode, struct thread *td)
 {
 	struct sabtty_softc *sc;
 	struct tty *tp;
@@ -646,7 +654,7 @@ sabttyopen(dev_t dev, int flags, int mode, struct thread *td)
 
 	if ((tp->t_state & TS_ISOPEN) != 0 &&
 	    (tp->t_state & TS_XCLUDE) != 0 &&
-	    !suser(td))
+	    suser(td) != 0)
 		return (EBUSY);
 
 	if ((tp->t_state & TS_ISOPEN) == 0) {
@@ -677,8 +685,13 @@ sabttyopen(dev_t dev, int flags, int mode, struct thread *td)
 		SAB_WRITE(sc->sc_parent, SAB_IPC, sc->sc_parent->sc_ipc);
 		sc->sc_imr0 = SAB_IMR0_PERR | SAB_IMR0_FERR | SAB_IMR0_PLLA;
 		SAB_WRITE(sc, SAB_IMR0, sc->sc_imr0);
+#if defined(DDB) && defined(BREAK_TO_DEBUGGER)
+		sc->sc_imr1 = SAB_IMR1_ALLS | SAB_IMR1_XDU |
+		    SAB_IMR1_TIN | SAB_IMR1_CSC | SAB_IMR1_XMR | SAB_IMR1_XPR;
+#else
 		sc->sc_imr1 = SAB_IMR1_BRK | SAB_IMR1_ALLS | SAB_IMR1_XDU |
 		    SAB_IMR1_TIN | SAB_IMR1_CSC | SAB_IMR1_XMR | SAB_IMR1_XPR;
+#endif
 		SAB_WRITE(sc, SAB_IMR1, sc->sc_imr1);
 		SAB_WRITE(sc, SAB_CCR0, SAB_READ(sc, SAB_CCR0) | SAB_CCR0_PU);
 		sabtty_cec_wait(sc);
@@ -696,11 +709,11 @@ sabttyopen(dev_t dev, int flags, int mode, struct thread *td)
 		/* XXX handle initial DCD */
 	}
 
-	error = ttyopen(dev, tp);
+	error = tty_open(dev, tp);
 	if (error != 0)
 		return (error);
 
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = ttyld_open(tp, dev);
 	if (error != 0)
 		return (error);
 
@@ -708,7 +721,7 @@ sabttyopen(dev_t dev, int flags, int mode, struct thread *td)
 }
 
 static int
-sabttyclose(dev_t dev, int flags, int mode, struct thread *td)
+sabttyclose(struct cdev *dev, int flags, int mode, struct thread *td)
 {
 	struct tty *tp;
 
@@ -717,64 +730,24 @@ sabttyclose(dev_t dev, int flags, int mode, struct thread *td)
 	if ((tp->t_state & TS_ISOPEN) == 0)
 		return (0);
 
-	(*linesw[tp->t_line].l_close)(tp, flags);
-	ttyclose(tp);
+	ttyld_close(tp, flags);
+	tty_close(tp);
 
 	return (0);
 }
 
-static int
-sabttyioctl(dev_t dev, u_long cmd, caddr_t data, int flags, struct thread *td)
+static void
+sabttybreak(struct tty *tp, int brk)
 {
 	struct sabtty_softc *sc;
-	struct tty *tp;
-	int error;
 
-	sc = dev->si_drv1;
-	tp = dev->si_tty;
-
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flags, td);
-	if (error != ENOIOCTL)
-		return (error);
-
-	error = ttioctl(tp, cmd, data, flags);
-	if (error != ENOIOCTL)
-		return (error);
-
-	error = 0;
-	switch (cmd) {
-	case TIOCSBRK:
+	sc = tp->t_dev->si_drv1;
+	if (brk)
 		SAB_WRITE(sc, SAB_DAFO,
 		    SAB_READ(sc, SAB_DAFO) | SAB_DAFO_XBRK);
-		break;
-	case TIOCCBRK:
+	else
 		SAB_WRITE(sc, SAB_DAFO,
 		    SAB_READ(sc, SAB_DAFO) & ~SAB_DAFO_XBRK);
-		break;
-	case TIOCSDTR:
-		sabtty_mdmctrl(sc, TIOCM_DTR, DMBIS);
-		break;
-	case TIOCCDTR:
-		sabtty_mdmctrl(sc, TIOCM_DTR, DMBIC);
-		break;
-	case TIOCMBIS:
-		sabtty_mdmctrl(sc, *((int *)data), DMBIS);
-		break;
-	case TIOCMBIC:
-		sabtty_mdmctrl(sc, *((int *)data), DMBIC);
-		break;
-	case TIOCMGET:
-		*((int *)data) = sabtty_mdmctrl(sc, 0, DMGET);
-		break;
-	case TIOCMSET:
-		sabtty_mdmctrl(sc, *((int *)data), DMSET);
-		break;
-	default:
-		error = ENOTTY;
-		break;
-	}
-
-	return (error);
 }
 
 static void
@@ -853,71 +826,45 @@ sabttyparam(struct tty *tp, struct termios *t)
 }
 
 int
-sabtty_mdmctrl(struct sabtty_softc *sc, int bits, int how)
+sabttymodem(struct tty *tp, int biton, int bitoff)
 {
+	struct sabtty_softc *sc;
 	u_int8_t r;
 
-	switch (how) {
-	case DMGET:
-		bits = 0;
+	sc = tp->t_dev->si_drv1;
+	if (biton == 0 && bitoff == 0) {
 		if (SAB_READ(sc, SAB_STAR) & SAB_STAR_CTS)
-			bits |= TIOCM_CTS;
+			biton |= TIOCM_CTS;
 		if ((SAB_READ(sc, SAB_VSTR) & SAB_VSTR_CD) == 0)
-			bits |= TIOCM_CD;
+			biton |= TIOCM_CD;
 
 		r = SAB_READ(sc, SAB_PVR);
 		if ((r & sc->sc_pvr_dtr) == 0)
-			bits |= TIOCM_DTR;
+			biton |= TIOCM_DTR;
 		if ((r & sc->sc_pvr_dsr) == 0)
-			bits |= TIOCM_DSR;
+			biton |= TIOCM_DSR;
 
 		r = SAB_READ(sc, SAB_MODE);
 		if ((r & (SAB_MODE_RTS|SAB_MODE_FRTS)) == SAB_MODE_RTS)
-			bits |= TIOCM_RTS;
-		break;
-	case DMSET:
+			biton |= TIOCM_RTS;
+		return (biton);
+	}
+	bitoff |= biton;
+	if (bitoff & SER_RTS) {
 		r = SAB_READ(sc, SAB_MODE);
-		if (bits & TIOCM_RTS) {
-			r &= ~SAB_MODE_FRTS;
+		r &= ~SAB_MODE_FRTS;
+		if (biton & SER_RTS)
 			r |= SAB_MODE_RTS;
-		} else
-			r |= SAB_MODE_FRTS | SAB_MODE_RTS;
 		SAB_WRITE(sc, SAB_MODE, r);
-
+	}
+	if (bitoff & SER_DTR) {
 		r = SAB_READ(sc, SAB_PVR);
-		if (bits & TIOCM_DTR)
-			r &= ~sc->sc_pvr_dtr;
-		else
+		r &= ~sc->sc_pvr_dtr;
+		if (biton & SER_DTR)
 			r |= sc->sc_pvr_dtr;
 		SAB_WRITE(sc, SAB_PVR, r);
-		break;
-	case DMBIS:
-		if (bits & TIOCM_RTS) {
-			r = SAB_READ(sc, SAB_MODE);
-			r &= ~SAB_MODE_FRTS;
-			r |= SAB_MODE_RTS;
-			SAB_WRITE(sc, SAB_MODE, r);
-		}
-		if (bits & TIOCM_DTR) {
-			r = SAB_READ(sc, SAB_PVR);
-			r &= ~sc->sc_pvr_dtr;
-			SAB_WRITE(sc, SAB_PVR, r);
-		}
-		break;
-	case DMBIC:
-		if (bits & TIOCM_RTS) {
-			r = SAB_READ(sc, SAB_MODE);
-			r |= SAB_MODE_FRTS | SAB_MODE_RTS;
-			SAB_WRITE(sc, SAB_MODE, r);
-		}
-		if (bits & TIOCM_DTR) {
-			r = SAB_READ(sc, SAB_PVR);
-			r |= sc->sc_pvr_dtr;
-			SAB_WRITE(sc, SAB_PVR, r);
-		}
-		break;
 	}
-	return (bits);
+	return (0);
 }
 
 int
@@ -941,8 +888,10 @@ sabtty_param(struct sabtty_softc *sc, struct tty *tp, struct termios *t)
 		return (0);
 
 	/* hang up line if ospeed is zero, otherwise raise dtr */
-	sabtty_mdmctrl(sc, TIOCM_DTR,
-	    (t->c_ospeed == 0) ? DMBIC : DMBIS);
+	if (t->c_ospeed != 0)
+		sabttymodem(tp, SER_DTR, 0);
+	else
+		sabttymodem(tp, 0, SER_DTR);
 
 	dafo = SAB_READ(sc, SAB_DAFO);
 
@@ -1245,25 +1194,25 @@ sabtty_cnputc(struct sabtty_softc *sc, int c)
 static int
 sabtty_console(device_t dev, char *mode, int len)
 {
-	device_t parent;
 	phandle_t chosen;
 	phandle_t options;
+	phandle_t parent;
 	ihandle_t stdin;
 	ihandle_t stdout;
 	char output[32];
 	char input[32];
 	char name[32];
 
-	parent = device_get_parent(dev);
 	chosen = OF_finddevice("/chosen");
 	options = OF_finddevice("/options");
+	parent = ofw_bus_get_node(device_get_parent(dev));
 	if (OF_getprop(chosen, "stdin", &stdin, sizeof(stdin)) == -1 ||
 	    OF_getprop(chosen, "stdout", &stdout, sizeof(stdout)) == -1 ||
 	    OF_getprop(options, "input-device", input, sizeof(input)) == -1 ||
 	    OF_getprop(options, "output-device", output, sizeof(output)) == -1)
 		return (0);
-	if (ebus_get_node(parent) != OF_instance_to_package(stdin) ||
-	    ebus_get_node(parent) != OF_instance_to_package(stdout))
+	if (parent != OF_instance_to_package(stdin) ||
+	    parent != OF_instance_to_package(stdout))
 		return (0);
 	if ((strcmp(input, device_get_desc(dev)) == 0 &&
 	     strcmp(output, device_get_desc(dev)) == 0) ||

@@ -24,7 +24,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/include/cputypes.h,v 1.17 2003/05/01 01:05:23 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/cputypes.h,v 1.18 2004/06/03 20:18:15 peter Exp $
  */
 
 #ifndef _MACHINE_CPUTYPES_H_
@@ -44,11 +44,6 @@
 #define	CPU_SLEDGEHAMMER 2	/* AMD Sledgehammer */
 
 #ifndef LOCORE
-struct cpu_nameclass {
-	char	*cpu_name;
-	int	cpu_class;
-};
-
 extern int	cpu;
 extern int	cpu_class;
 #endif

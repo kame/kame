@@ -1,5 +1,5 @@
-/* $NetBSD$ */
-/* $FreeBSD: src/sys/dev/awi/am79c930var.h,v 1.2 2002/03/20 02:02:35 alfred Exp $ */
+/* $NetBSD: am79c930var.h,v 1.3 2004/01/15 09:33:48 onoe Exp $ */
+/* $FreeBSD: src/sys/dev/awi/am79c930var.h,v 1.3 2004/01/15 10:04:20 onoe Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.

@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/vx/if_vx_eisa.c,v 1.20 2003/10/31 18:32:06 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/vx/if_vx_eisa.c,v 1.22 2004/08/11 20:35:55 gibbs Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -122,16 +122,14 @@ vx_eisa_attach(device_t dev)
      * driver comes first.
      */
     rid = 0;
-    io = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-			    0, ~0, 1, RF_ACTIVE);
+    io = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid, RF_ACTIVE);
     if (!io) {
 	device_printf(dev, "No I/O space?!\n");
 	goto bad;
     }
 
     rid = 1;
-    eisa_io = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-				 0, ~0, 1, RF_ACTIVE);
+    eisa_io = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid, RF_ACTIVE);
     if (!eisa_io) {
 	device_printf(dev, "No I/O space?!\n");
 	goto bad;
@@ -144,8 +142,7 @@ vx_eisa_attach(device_t dev)
     sc->bsh = rman_get_bushandle(io);
 
     rid = 0;
-    irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
-			     0, ~0, 1, RF_ACTIVE);
+    irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid, RF_ACTIVE);
     if (!irq) {
 	device_printf(dev, "No irq?!\n");
 	goto bad;
@@ -186,7 +183,7 @@ static device_method_t vx_eisa_methods[] = {
 static driver_t vx_eisa_driver = {
 	"vx",
 	vx_eisa_methods,
-	1,			/* unused */
+	sizeof(struct vx_softc)
 };
 
 static devclass_t vx_devclass;

@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/syscons/sysmouse.c,v 1.15 2003/08/24 18:17:24 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/syscons/sysmouse.c,v 1.24 2004/07/15 20:47:39 phk Exp $");
 
 #include "opt_syscons.h"
 
@@ -42,7 +42,6 @@ __FBSDID("$FreeBSD: src/sys/dev/syscons/sysmouse.c,v 1.15 2003/08/24 18:17:24 ob
 
 #ifndef SC_NO_SYSMOUSE
 
-#define	CDEV_MAJOR	12		/* major number, shared with syscons */
 #define SC_MOUSE 	128		/* minor number */
 
 static d_open_t		smopen;
@@ -50,14 +49,12 @@ static d_close_t	smclose;
 static d_ioctl_t	smioctl;
 
 static struct cdevsw sm_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	smopen,
 	.d_close =	smclose,
-	.d_read =	ttyread,
 	.d_ioctl =	smioctl,
-	.d_poll =	ttypoll,
 	.d_name =	"sysmouse",
-	.d_maj =	CDEV_MAJOR,
-	.d_flags =	D_TTY,
+	.d_flags =	D_TTY | D_NEEDGIANT,
 };
 
 /* local variables */
@@ -69,7 +66,7 @@ static void		smstart(struct tty *tp);
 static int		smparam(struct tty *tp, struct termios *t);
 
 static int
-smopen(dev_t dev, int flag, int mode, struct thread *td)
+smopen(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 	struct tty *tp;
 
@@ -95,16 +92,16 @@ smopen(dev_t dev, int flag, int mode, struct thread *td)
 		tp->t_lflag = TTYDEF_LFLAG;
 		tp->t_ispeed = tp->t_ospeed = TTYDEF_SPEED;
 		smparam(tp, &tp->t_termios);
-		(*linesw[tp->t_line].l_modem)(tp, 1);
+		ttyld_modem(tp, 1);
 	} else if (tp->t_state & TS_XCLUDE && suser(td)) {
 		return EBUSY;
 	}
 
-	return (*linesw[tp->t_line].l_open)(dev, tp);
+	return ttyld_open(tp, dev);
 }
 
 static int
-smclose(dev_t dev, int flag, int mode, struct thread *td)
+smclose(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 	struct tty *tp;
 	int s;
@@ -112,8 +109,8 @@ smclose(dev_t dev, int flag, int mode, struct thread *td)
 	tp = dev->si_tty;
 	s = spltty();
 	mouse_level = 0;
-	(*linesw[tp->t_line].l_close)(tp, flag);
-	ttyclose(tp);
+	ttyld_close(tp, flag);
+	tty_close(tp);
 	splx(s);
 
 	return 0;
@@ -148,12 +145,11 @@ smparam(struct tty *tp, struct termios *t)
 }
 
 static int
-smioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
+smioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 {
 	struct tty *tp;
 	mousehw_t *hw;
 	mousemode_t *mode;
-	int error;
 	int s;
 
 	tp = dev->si_tty;
@@ -236,27 +232,20 @@ smioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 		return ENODEV;
 	}
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, td);
-	if (error != ENOIOCTL)
-		return error;
-	error = ttioctl(tp, cmd, data, flag);
-	if (error != ENOIOCTL)
-		return error;
-	return ENOTTY;
+	return(ttyioctl(dev, cmd, data, flag, td));
 }
 
 static void
 sm_attach_mouse(void *unused)
 {
-	dev_t dev;
+	struct cdev *dev;
 
 	dev = make_dev(&sm_cdevsw, SC_MOUSE, UID_ROOT, GID_WHEEL, 0600,
 		       "sysmouse");
 	/* sysmouse doesn't have scr_stat */
 }
 
-SYSINIT(sysmouse, SI_SUB_DRIVERS, SI_ORDER_MIDDLE + CDEV_MAJOR,
-	sm_attach_mouse, NULL)
+SYSINIT(sysmouse, SI_SUB_DRIVERS, SI_ORDER_MIDDLE, sm_attach_mouse, NULL)
 
 int
 sysmouse_event(mouse_info_t *info)
@@ -317,7 +306,7 @@ sysmouse_event(mouse_info_t *info)
 	buf[2] = y >> 1;
 	buf[4] = y - buf[2];
 	for (i = 0; i < MOUSE_MSC_PACKETSIZE; ++i)
-		(*linesw[sysmouse_tty->t_line].l_rint)(buf[i], sysmouse_tty);
+		ttyld_rint(sysmouse_tty, buf[i]);
 	if (mouse_level >= 1) {
 		/* extended part */
         	z = imax(imin(z, 127), -128);
@@ -326,8 +315,7 @@ sysmouse_event(mouse_info_t *info)
         	/* buttons 4-10 */
         	buf[7] = (~mouse_status.button >> 3) & 0x7f;
         	for (i = MOUSE_MSC_PACKETSIZE; i < MOUSE_SYS_PACKETSIZE; ++i)
-			(*linesw[sysmouse_tty->t_line].l_rint)(buf[i],
-							       sysmouse_tty);
+			ttyld_rint(sysmouse_tty, buf[i]);
 	}
 
 	return mouse_status.flags;

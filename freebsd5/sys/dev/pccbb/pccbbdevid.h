@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2001 M. Warner Losh. All rights reserved.
+ * Copyright (c) 2001-2004 M. Warner Losh. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pccbb/pccbbdevid.h,v 1.13 2003/08/22 08:49:56 imp Exp $
+ * $FreeBSD: src/sys/dev/pccbb/pccbbdevid.h,v 1.16 2004/07/22 20:19:57 imp Exp $
  */
 
 /* Vendor/Device IDs */
@@ -48,7 +48,7 @@
 #define	PCIC_ID_OZ6912		0x69721217ul	/* Also 6972 */
 #define	PCIC_ID_OZ6922		0x69251217ul
 #define	PCIC_ID_OZ6933		0x69331217ul
-/* O2Micro 711E1 */
+#define PCIC_ID_OZ711E1		0x71131217ul	/* O2Micro 711E1 */
 #define	PCIC_ID_RICOH_RL5C465	0x04651180ul
 #define	PCIC_ID_RICOH_RL5C466	0x04661180ul
 #define	PCIC_ID_RICOH_RL5C475	0x04751180ul
@@ -84,6 +84,9 @@
 #define	PCIC_ID_TI4451		0xac42104cul
 #define PCIC_ID_TI4510		0xac44104cul
 #define PCIC_ID_TI4520		0xac46104cul
+#define PCIC_ID_TI6411		0x8031104cul	/* PCI[67]x[12]1 */
+#define PCIC_ID_TI6420		0xac8d104cul	/* PCI[67]x20 Smartcard dis */
+#define PCIC_ID_TI6420SC	0xac8e104cul	/* PCI[67]x20 Smartcard en */
 #define PCIC_ID_TI7410		0xac49104cul
 #define PCIC_ID_TI7510		0xac47104cul
 #define PCIC_ID_TI7610		0xac48104cul

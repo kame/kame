@@ -25,13 +25,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/puc/puc_pccard.c,v 1.7 2003/10/27 06:41:40 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/puc/puc_pccard.c,v 1.9 2004/05/30 20:08:38 phk Exp $");
 
 #include "opt_puc.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
 #include <sys/malloc.h>
@@ -50,7 +51,6 @@ const struct puc_device_description rscom_devices = {
 
 	"ARGOSY SP320 Dual port serial PCMCIA",
 	/* http://www.argosy.com.tw/product/sp320.htm */
-	NULL,
 		{	0,	0,	0,	0	},
 		{	0,	0,	0,	0	},
 	{

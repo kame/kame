@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/vinum/vinumrequest.c,v 1.71 2003/11/24 04:06:56 grog Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/vinum/vinumrequest.c,v 1.73 2004/03/19 10:28:34 le Exp $");
 
 #include <dev/vinum/vinumhdr.h>
 #include <dev/vinum/request.h>
@@ -234,10 +234,18 @@ vinumstart(struct buf *bp, int reviveok)
 	if (vol != NULL) {
 	    plexno = vol->preferred_plex;		    /* get the plex to use */
 	    if (plexno < 0) {				    /* round robin */
-		plexno = vol->last_plex_read;
-		vol->last_plex_read++;
-		if (vol->last_plex_read >= vol->plexes)	    /* got the the end? */
-		    vol->last_plex_read = 0;		    /* wrap around */
+		for (plexno = 0; plexno < vol->plexes; plexno++)
+		    if (abs(bp->b_blkno - PLEX[vol->plex[plexno]].last_addr) <= ROUNDROBIN_SWITCH)
+		        break;
+		if (plexno >= vol->plexes) {
+		    vol->last_plex_read++;
+		    if (vol->last_plex_read >= vol->plexes)
+			vol->last_plex_read = 0;
+		    plexno = vol->last_plex_read;
+		} else {
+		    vol->last_plex_read = plexno;
+		};
+		PLEX[vol->plex[plexno]].last_addr = bp->b_blkno;
 	    }
 	    status = build_read_request(rq, plexno);	    /* build a request */
 	} else {
@@ -1018,7 +1026,7 @@ sdio(struct buf *bp)
 int
 vinum_bounds_check(struct buf *bp, struct volume *vol)
 {
-    int maxsize = vol->size;				    /* size of the partition (sectors) */
+    int64_t maxsize = vol->size;			    /* size of the partition (sectors) */
     int size = (bp->b_bcount + DEV_BSIZE - 1) >> DEV_BSHIFT; /* size of this request (sectors) */
 
 #ifdef LABELSECTOR

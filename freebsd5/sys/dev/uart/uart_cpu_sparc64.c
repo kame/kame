@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003 Marcel Moolenaar
+ * Copyright (c) 2003, 2004 Marcel Moolenaar
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,21 +25,32 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/uart/uart_cpu_sparc64.c,v 1.7 2003/11/11 06:52:04 jake Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/uart/uart_cpu_sparc64.c,v 1.12 2004/08/15 02:17:20 marius Exp $");
+
+#include "opt_isa.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 
 #include <machine/bus.h>
 #include <machine/bus_private.h>
+#include <machine/resource.h>
 
+#include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/openfirm.h>
 #include <machine/ofw_machdep.h>
 
+#include <isa/isavar.h>
+
 #include <dev/uart/uart.h>
+#include <dev/uart/uart_bus.h>
 #include <dev/uart/uart_cpu.h>
 
-static phandle_t uart_cpu_getdev_keyboard(phandle_t root);
+#include <sparc64/pci/ofw_pci.h>
+#include <sparc64/isa/ofw_isa.h>
+
+bus_space_tag_t uart_bus_space_io;
+bus_space_tag_t uart_bus_space_mem;
 
 static struct bus_space_tag bst_store[3];
 
@@ -67,21 +78,93 @@ uart_cpu_eqres(struct uart_bas *b1, struct uart_bas *b2)
 	return ((b1->bsh == b2->bsh) ? 1 : 0);
 }
 
+/*
+ * Get the address of the UART that is selected as the console, if the
+ * console is an UART of course. Note that we enforce that both stdin and
+ * stdout are selected.
+ * Note that the currently active console (i.e. /chosen/stdout and
+ * /chosen/stdin) may not be the same as the device selected in the
+ * environment (ie /options/output-device and /options/input-device) because
+ * keyboard and screen were selected but the keyboard was unplugged or the
+ * user has changed the environment. In the latter case I would assume that
+ * the user expects that FreeBSD uses the new console setting.
+ * For weirder configurations, use ofw_console(4).
+ */
 static phandle_t
-uart_cpu_getdev_keyboard(phandle_t root)
+uart_cpu_getdev_console(phandle_t options, char *dev, size_t devsz)
 {
-	phandle_t child;
-	phandle_t node;
 	char buf[32];
+	ihandle_t stdin, stdout;
+	phandle_t chosen, input;
 
-	for (child = OF_child(root); child != 0 && child != -1;
-	    child = OF_peer(child)) {
+	if (OF_getprop(options, "input-device", dev, devsz) == -1)
+		return (-1);
+	if ((input = OF_finddevice(dev)) == -1)
+		return (-1);
+	if (OF_getprop(options, "output-device", buf, sizeof(buf)) == -1)
+		return (-1);
+	if (!strcmp(dev, "keyboard") && !strcmp(buf, "screen")) {
+		if ((chosen = OF_finddevice("/chosen")) == -1)
+			return (-1);
+		if (OF_getprop(chosen, "stdin", &stdin, sizeof(stdin)) == -1)
+			return (-1);
+		if ((input = OF_instance_to_package(stdin)) == -1)
+			return (-1);
+		if (OF_getprop(chosen, "stdout", &stdout, sizeof(stdout)) == -1)
+			return (-1);
+		if (OF_instance_to_package(stdout) != input)
+			return (-1);
+		snprintf(dev, devsz, "ttya");
+	} else if (OF_finddevice(buf) != input)
+		return (-1);
+	if (OF_getprop(input, "device_type", buf, sizeof(buf)) == -1)
+		return (-1);
+	if (strcmp(buf, "serial") != 0)
+		return (-1);
+	return (input);
+}
+
+/*
+ * Get the address of the UART that's selected as the debug port. Since
+ * there's no place for this in the OF, we use the kernel environment
+ * variable "hw.uart.dbgport". Note however that the variable is not a
+ * list of attributes. It's single device name or alias, as known by
+ * the OF.
+ */
+static phandle_t
+uart_cpu_getdev_dbgport(phandle_t options, char *dev, size_t devsz)
+{
+	char buf[32];
+	phandle_t input;
+
+	if (!getenv_string("hw.uart.dbgport", dev, devsz))
+		return (-1);
+	if ((input = OF_finddevice(dev)) == -1)
+		return (-1);
+	if (OF_getprop(input, "device_type", buf, sizeof(buf)) == -1)
+		return (-1);
+	if (strcmp(buf, "serial") != 0)
+		return (-1);
+	return (input);
+}
+
+static phandle_t
+uart_cpu_getdev_keyboard(phandle_t root, char *dev, size_t devsz)
+{
+	char buf[32];
+	phandle_t child, node;
+
+	child = OF_child(root);
+	while (child != 0 && child != -1) {
 		if (OF_getprop(child, "device_type", buf, sizeof(buf)) != -1 &&
 		    !strcmp(buf, "serial") &&
-		    OF_getprop(child, "keyboard", buf, sizeof(buf)) != -1)
+		    OF_getprop(child, "keyboard", buf, sizeof(buf)) != -1) {
+			OF_getprop(child, "name", dev, devsz);
 			return (child);
-		if ((node = uart_cpu_getdev_keyboard(child)) != -1)
+		}
+		if ((node = uart_cpu_getdev_keyboard(child, dev, devsz)) != -1)
 			return (node);
+		child = OF_peer(child);
 	}
 	return (-1);
 }
@@ -90,47 +173,29 @@ int
 uart_cpu_getdev(int devtype, struct uart_devinfo *di)
 {
 	char buf[32], dev[32], compat[32];
-	phandle_t input, options, output;
+	phandle_t input, options;
 	bus_addr_t addr;
 	int baud, bits, error, space, stop;
 	char flag, par;
 
-	/*
-	 * Get the address of the UART that is selected as the console, if
-	 * the console is an UART of course. Note that we enforce that both
-	 * stdin and stdout are selected. For weird configurations, use
-	 * ofw_console(4).
-	 * Note that the currently active console (ie /chosen/stdout and
-	 * /chosen/stdin) may not be the same as the device selected in the
-	 * environment (ie /options/output-device and /options/input-device)
-	 * because the user may have changed the environment. In that case
-	 * I would assume that the user expects that FreeBSD uses the new
-	 * console setting. There's choice choice, really.
-	 */
-	 if ((options = OF_finddevice("/options")) == -1)
-		 return (ENXIO);
-	if (devtype == UART_DEV_CONSOLE) {
-		if (OF_getprop(options, "input-device", dev, sizeof(dev)) == -1)
-			return (ENXIO);
-		if ((input = OF_finddevice(dev)) == -1)
-			return (ENXIO);
-		if (OF_getprop(input, "device_type", buf, sizeof(buf)) == -1)
-			return (ENXIO);
-		if (strcmp(buf, "serial"))
-			return (ENODEV);
-		if (OF_getprop(options, "output-device", buf, sizeof(buf))
-		    == -1)
-			return (ENXIO);
-		if ((output = OF_finddevice(buf)) == -1)
-			return (ENXIO);
-		if (input != output)
-			return (ENXIO);
-	} else if (devtype == UART_DEV_KEYBOARD) {
-		if ((input = uart_cpu_getdev_keyboard(OF_peer(0))) == -1)
-			return (ENXIO);
-	} else
-		return (ENODEV);
-
+	if ((options = OF_finddevice("/options")) == -1)
+		return (ENXIO);
+	switch (devtype) {
+	case UART_DEV_CONSOLE:
+		input = uart_cpu_getdev_console(options, dev, sizeof(dev));
+		break;
+	case UART_DEV_DBGPORT:
+		input = uart_cpu_getdev_dbgport(options, dev, sizeof(dev));
+		break;
+	case UART_DEV_KEYBOARD:
+		input = uart_cpu_getdev_keyboard(OF_peer(0), dev, sizeof(dev));
+		break;
+	default:
+		input = -1;
+		break;
+	}
+	if (input == -1)
+		return (ENXIO);
 	error = OF_decode_addr(input, &space, &addr);
 	if (error)
 		return (error);
@@ -182,4 +247,40 @@ uart_cpu_getdev(int devtype, struct uart_devinfo *di)
 	di->parity = (par == 'n') ? UART_PARITY_NONE :
 	    (par == 'o') ? UART_PARITY_ODD : UART_PARITY_EVEN;
 	return (0);
+}
+
+void
+uart_cpu_identify(driver_t *driver, device_t parent)
+{
+#ifdef DEV_ISA
+	char buf[32];
+	struct isa_regs reg;
+	device_t child;
+	phandle_t node;
+	ofw_isa_intr_t intr;
+#endif
+
+#ifdef DEV_ISA
+	if (strcmp(device_get_name(parent), "isa") == 0) {
+		if ((node = ofw_bus_get_node(device_get_parent(parent))) == 0)
+			return;
+		for (node = OF_child(node); node != 0; node = OF_peer(node)) {
+			if (OF_getprop(node, "name", buf, sizeof(buf)) == -1)
+				continue;
+			if (strcmp(buf, "serial") != 0)
+				continue;
+			if ((OF_getprop(node, "reg", &reg,
+			    sizeof(reg)) == -1) ||
+		    	    (OF_getprop(node, "interrupts", &intr,
+			    sizeof(intr)) == -1))
+				continue;
+			if ((child = BUS_ADD_CHILD(parent, ISA_ORDER_SENSITIVE,
+			    uart_driver_name, -1)) == NULL)
+				return;
+			bus_set_resource(child, SYS_RES_IOPORT, 0,
+			    ISA_REG_PHYS(&reg), reg.size);
+			bus_set_resource(child, SYS_RES_IRQ, 0, intr, 1);
+		}
+	}
+#endif
 }

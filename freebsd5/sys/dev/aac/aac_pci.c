@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aac/aac_pci.c,v 1.40 2003/11/01 00:13:43 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aac/aac_pci.c,v 1.48.4.1 2004/10/23 19:22:22 scottl Exp $");
 
 /*
  * PCI bus interface and resource allocation.
@@ -39,6 +39,7 @@ __FBSDID("$FreeBSD: src/sys/dev/aac/aac_pci.c,v 1.40 2003/11/01 00:13:43 scottl 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 
 #include <sys/bio.h>
 #include <sys/bus.h>
@@ -127,6 +128,14 @@ struct aac_ident
 	 AAC_FLAGS_256FIBS, "Adaptec SCSI RAID 2120S"},
 	{0x9005, 0x0285, 0x9005, 0x0290, AAC_HWIF_I960RX, AAC_FLAGS_NO4GB,
 	 "Adaptec SCSI RAID 2410SA"},
+	{0x9005, 0x0285, 0x1028, 0x0291, AAC_HWIF_I960RX, AAC_FLAGS_NO4GB,
+	 "Dell CERC SATA RAID 2"},
+	{0x9005, 0x0285, 0x9005, 0x0292, AAC_HWIF_I960RX, AAC_FLAGS_NO4GB,
+	 "Adaptec SCSI RAID 2810SA"},
+	{0x9005, 0x0285, 0x9005, 0x0293, AAC_HWIF_I960RX, AAC_FLAGS_NO4GB,
+	 "Adaptec SCSI RAID 21610SA"},
+	{0x9005, 0x0286, 0x9005, 0x028d, AAC_HWIF_RKT, 0,
+	 "Adaptec SCSI RAID 2130S"},
 	{0, 0, 0, 0, 0, 0, 0}
 };
 
@@ -197,11 +206,11 @@ aac_pci_attach(device_t dev)
 	 * Allocate the PCI register window.
 	 */
 	sc->aac_regs_rid = PCIR_BAR(0);
-	if ((sc->aac_regs_resource = bus_alloc_resource(sc->aac_dev,
-							SYS_RES_MEMORY,
-							&sc->aac_regs_rid,
-							0, ~0, 1,
-							RF_ACTIVE)) == NULL) {
+	if ((sc->aac_regs_resource = bus_alloc_resource_any(sc->aac_dev,
+							    SYS_RES_MEMORY,
+							    &sc->aac_regs_rid,
+							    RF_ACTIVE)) ==
+							    NULL) {
 		device_printf(sc->aac_dev,
 			      "couldn't allocate register window\n");
 		goto out;
@@ -213,21 +222,24 @@ aac_pci_attach(device_t dev)
 	 * Allocate and connect our interrupt.
 	 */
 	sc->aac_irq_rid = 0;
-	if ((sc->aac_irq = bus_alloc_resource(sc->aac_dev, SYS_RES_IRQ,
-			   		      &sc->aac_irq_rid, 0, ~0, 1,
-			   		      RF_SHAREABLE |
-					      RF_ACTIVE)) == NULL) {
+	if ((sc->aac_irq = bus_alloc_resource_any(sc->aac_dev, SYS_RES_IRQ,
+			   			  &sc->aac_irq_rid,
+			   			  RF_SHAREABLE |
+						  RF_ACTIVE)) == NULL) {
 		device_printf(sc->aac_dev, "can't allocate interrupt\n");
 		goto out;
 	}
-#ifndef INTR_ENTROPY
-#define INTR_ENTROPY 0
-#endif
 	if (bus_setup_intr(sc->aac_dev, sc->aac_irq,
-			   INTR_MPSAFE|INTR_TYPE_BIO|INTR_ENTROPY, aac_intr,
+			   INTR_FAST|INTR_TYPE_BIO, aac_intr,
 			   sc, &sc->aac_intr)) {
-		device_printf(sc->aac_dev, "can't set up interrupt\n");
-		goto out;
+		device_printf(sc->aac_dev, "can't set up FAST interrupt\n");
+		if (bus_setup_intr(sc->aac_dev, sc->aac_irq,
+				   INTR_MPSAFE|INTR_ENTROPY|INTR_TYPE_BIO,
+				   aac_intr, sc, &sc->aac_intr)) {
+			device_printf(sc->aac_dev,
+				      "can't set up MPSAFE interrupt\n");
+			goto out;
+		}
 	}
 
 	/* assume failure is 'out of memory' */
@@ -257,7 +269,6 @@ aac_pci_attach(device_t dev)
 	 * Detect the hardware interface version, set up the bus interface
 	 * indirection.
 	 */
-	sc->aac_hwif = AAC_HWIF_UNKNOWN;
 	for (i = 0; aac_identifiers[i].vendor != 0; i++) {
 		if ((aac_identifiers[i].vendor == pci_get_vendor(dev)) &&
 		    (aac_identifiers[i].device == pci_get_device(dev)) &&
@@ -269,7 +280,6 @@ aac_pci_attach(device_t dev)
 				debug(2, "set hardware up for i960Rx");
 				sc->aac_if = aac_rx_interface;
 				break;
-
 			case AAC_HWIF_STRONGARM:
 				debug(2, "set hardware up for StrongARM");
 				sc->aac_if = aac_sa_interface;
@@ -277,6 +287,13 @@ aac_pci_attach(device_t dev)
 			case AAC_HWIF_FALCON:
 				debug(2, "set hardware up for Falcon/PPC");
 				sc->aac_if = aac_fa_interface;
+				break;
+			case AAC_HWIF_RKT:
+				debug(2, "setu hardware up for Rocket/MIPS");
+				sc->aac_if = aac_rkt_interface;
+				break;
+			default:
+				sc->aac_hwif = AAC_HWIF_UNKNOWN;
 				break;
 			}
 

@@ -11,10 +11,6 @@
 # 2. Redistributions in binary form must reproduce the above copyright
 #    notice, this list of conditions and the following disclaimer in the
 #    documentation and/or other materials provided with the distribution.
-# 3. All advertising materials mentioning features or use of this software
-#    must display the following acknowledgement:
-#	This product includes software developed by the University of
-#	California, Berkeley and its contributors.
 # 4. Neither the name of the University nor the names of its contributors
 #    may be used to endorse or promote products derived from this software
 #    without specific prior written permission.
@@ -32,7 +28,7 @@
 # SUCH DAMAGE.
 #
 #	@(#)systags.sh	8.1 (Berkeley) 6/10/93
-# $FreeBSD: src/sys/conf/systags.sh,v 1.7 1999/08/28 00:41:02 peter Exp $
+# $FreeBSD: src/sys/conf/systags.sh,v 1.9 2004/04/07 20:45:56 imp Exp $
 #
 # systags.sh - construct a system tags file using dependence relations
 #	in a .depend file
@@ -41,7 +37,7 @@
 
 rm -f tags tags.tmp tags.cfiles tags.sfiles tags.hfiles
 MACHINE=`uname -m`
-sed -e "s, machine/, ../../$MACHINE/include/,g" \
+sed -e "s, machine/, ../../../$MACHINE/include/,g" \
 	-e 's,[a-z][^/    ]*/\.\./,,g' .depend | awk '{
 		for (i = 1; i <= NF; ++i) {
 			t = substr($i, length($i) - 1)

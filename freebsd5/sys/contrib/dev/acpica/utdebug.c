@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utdebug - Debug print routines
- *              $Revision: 109 $
+ *              $Revision: 111 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2003, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -530,7 +530,7 @@ AcpiUtValueExit (
 
     AcpiUtDebugPrint (ACPI_LV_FUNCTIONS, LineNumber, DbgInfo,
             "%s %8.8X%8.8X\n", AcpiGbl_FnExitStr,
-            ACPI_HIDWORD (Value), ACPI_LODWORD (Value));
+            ACPI_FORMAT_UINT64 (Value));
 
     AcpiGbl_NestingLevel--;
 }

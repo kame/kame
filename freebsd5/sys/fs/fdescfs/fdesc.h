@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -35,7 +31,7 @@
  *
  *	@(#)fdesc.h	8.5 (Berkeley) 1/21/94
  *
- * $FreeBSD: src/sys/fs/fdescfs/fdesc.h,v 1.16 2002/03/19 22:19:59 alfred Exp $
+ * $FreeBSD: src/sys/fs/fdescfs/fdesc.h,v 1.18 2004/07/12 08:14:05 alfred Exp $
  */
 
 #ifdef _KERNEL
@@ -62,8 +58,8 @@ struct fdescnode {
 #define VFSTOFDESC(mp)	((struct fdescmount *)((mp)->mnt_data))
 #define	VTOFDESC(vp) ((struct fdescnode *)(vp)->v_data)
 
-extern int fdesc_init(struct vfsconf *);
-extern int fdesc_root(struct mount *, struct vnode **);
+extern vfs_init_t fdesc_init;
+extern vfs_root_t fdesc_root;
 extern int fdesc_allocvp(fdntype, int, struct mount *, struct vnode **,
 			      struct thread *);
 #endif /* _KERNEL */

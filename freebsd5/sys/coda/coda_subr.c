@@ -52,7 +52,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/coda/coda_subr.c,v 1.28 2003/11/05 04:30:06 kan Exp $");
+__FBSDID("$FreeBSD: src/sys/coda/coda_subr.c,v 1.29 2004/07/04 08:52:33 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -308,15 +308,12 @@ void
 coda_checkunmounting(mp)
 	struct mount *mp;
 {
-	register struct vnode *vp, *nvp;
+	struct vnode *vp, *nvp;
 	struct cnode *cp;
 	int count = 0, bad = 0;
 
 	MNT_ILOCK(mp);
-	for (vp = TAILQ_FIRST(&mp->mnt_nvnodelist); vp; vp = nvp) {
-		nvp = TAILQ_NEXT(vp, v_nmntvnodes);
-		if (vp->v_mount != mp)
-			continue;
+	MNT_VNODE_FOREACH(vp, mp, nvp) {
 		VI_LOCK(vp);
 		if (vp->v_iflag & VI_XLOCK) {
 			VI_UNLOCK(vp);

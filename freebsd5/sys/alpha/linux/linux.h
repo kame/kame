@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/linux/linux.h,v 1.58 2003/04/16 20:04:47 jhb Exp $
+ * $FreeBSD: src/sys/alpha/linux/linux.h,v 1.59 2004/08/16 07:05:44 tjr Exp $
  */
 
 #ifndef _ALPHA_LINUX_LINUX_H_
@@ -45,6 +45,9 @@ extern u_char linux_debug_map[];
 MALLOC_DECLARE(M_LINUX);
 #endif
 
+#define	PTRIN(v)	(void *)(v)
+#define	PTROUT(v)	(l_uintptr_t)(v)
+
 typedef int		l_int;
 typedef int64_t		l_long;
 typedef int64_t		l_longlong;
@@ -55,6 +58,7 @@ typedef uint64_t	l_ulonglong;
 typedef unsigned short	l_ushort;
 
 typedef char		*l_caddr_t;
+typedef l_ulong		l_uintptr_t;
 typedef l_long		l_clock_t;
 typedef l_int		l_daddr_t;
 typedef l_uint		l_dev_t;

@@ -14,10 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -38,7 +34,7 @@
  *
  * From:
  *	$Id: procfs_status.c,v 3.1 1993/12/15 09:40:17 jsp Exp $
- * $FreeBSD: src/sys/fs/procfs/procfs_status.c,v 1.49 2003/06/15 00:31:22 davidxu Exp $
+ * $FreeBSD: src/sys/fs/procfs/procfs_status.c,v 1.52 2004/04/07 20:46:02 imp Exp $
  */
 
 #include <sys/param.h>
@@ -85,8 +81,8 @@ procfs_doprocstatus(PFS_FILL_ARGS)
 	SESS_LOCK(sess);
 	sid = sess->s_leader ? sess->s_leader->p_pid : 0;
 
-/* comm pid ppid pgid sid maj,min ctty,sldr start ut st wmsg 
-                                euid ruid rgid,egid,groups[1 .. NGROUPS]
+/* comm pid ppid pgid sid maj,min ctty,sldr start ut st wmsg
+				euid ruid rgid,egid,groups[1 .. NGROUPS]
 */
 
 	pc = p->p_comm;
@@ -154,7 +150,7 @@ procfs_doprocstatus(PFS_FILL_ARGS)
 		(u_long)cr->cr_ruid,
 		(u_long)cr->cr_rgid);
 
-	/* egid (cr->cr_svgid) is equal to cr_ngroups[0] 
+	/* egid (cr->cr_svgid) is equal to cr_ngroups[0]
 	   see also getegid(2) in /sys/kern/kern_prot.c */
 
 	for (i = 0; i < cr->cr_ngroups; i++) {
@@ -191,7 +187,7 @@ procfs_doproccmdline(PFS_FILL_ARGS)
 	 */
 
 	PROC_LOCK(p);
-	if (p->p_args && (ps_argsopen || !p_cansee(td, p))) {
+	if (p->p_args && p_cansee(td, p) == 0) {
 		sbuf_bcpy(sb, p->p_args->ar_args, p->p_args->ar_length);
 		PROC_UNLOCK(p);
 		return (0);

@@ -29,7 +29,7 @@
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/fm801.c,v 1.20 2003/09/02 17:30:37 jhb Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/fm801.c,v 1.23 2004/07/16 03:59:27 tanimura Exp $");
 
 #define PCI_VENDOR_FORTEMEDIA	0x1319
 #define PCI_DEVICE_FORTEMEDIA1	0x08011319
@@ -589,13 +589,15 @@ fm801_pci_attach(device_t dev)
 	for (i = 0; (mapped == 0) && (i < PCI_MAXMAPS_0); i++) {
 		fm801->regid = PCIR_BAR(i);
 		fm801->regtype = SYS_RES_MEMORY;
-		fm801->reg = bus_alloc_resource(dev, fm801->regtype, &fm801->regid,
-						0, ~0, 1, RF_ACTIVE);
+		fm801->reg = bus_alloc_resource_any(dev, fm801->regtype,
+						    &fm801->regid, RF_ACTIVE);
 		if(!fm801->reg)
 		{
 			fm801->regtype = SYS_RES_IOPORT;
-			fm801->reg = bus_alloc_resource(dev, fm801->regtype, &fm801->regid,
-						0, ~0, 1, RF_ACTIVE);
+			fm801->reg = bus_alloc_resource_any(dev, 
+							    fm801->regtype,
+							    &fm801->regid,
+							    RF_ACTIVE);
 		}
 
 		if(fm801->reg) {
@@ -620,8 +622,8 @@ fm801_pci_attach(device_t dev)
 	if (mixer_init(dev, ac97_getmixerclass(), codec) == -1) goto oops;
 
 	fm801->irqid = 0;
-	fm801->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &fm801->irqid,
-				0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+	fm801->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &fm801->irqid,
+					    RF_ACTIVE | RF_SHAREABLE);
 	if (!fm801->irq || snd_setup_intr(dev, fm801->irq, 0, fm801_intr, fm801, &fm801->ih)) {
 		device_printf(dev, "unable to map interrupt\n");
 		goto oops;
@@ -638,9 +640,9 @@ fm801_pci_attach(device_t dev)
 		goto oops;
 	}
 
-	snprintf(status, 64, "at %s 0x%lx irq %ld",
+	snprintf(status, 64, "at %s 0x%lx irq %ld %s",
 		(fm801->regtype == SYS_RES_IOPORT)? "io" : "memory",
-		rman_get_start(fm801->reg), rman_get_start(fm801->irq));
+		rman_get_start(fm801->reg), rman_get_start(fm801->irq),PCM_KLDSTRING(snd_fm801));
 
 #define FM801_MAXPLAYCH	1
 	if (pcm_register(dev, fm801, FM801_MAXPLAYCH, 1)) goto oops;
@@ -714,8 +716,7 @@ fm801_pci_probe( device_t dev )
 
 		regid = PCIR_BAR(0);
 		regtype = SYS_RES_IOPORT;
-		reg = bus_alloc_resource(dev, regtype, &regid, 0, ~0, 1,
-		    RF_ACTIVE);
+		reg = bus_alloc_resource_any(dev, regtype, &regid, RF_ACTIVE);
 
 		if (reg == NULL)
 			return ENXIO;
@@ -798,5 +799,5 @@ static driver_t fm801_driver = {
 };
 
 DRIVER_MODULE(snd_fm801, pci, fm801_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_fm801, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_fm801, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_fm801, 1);

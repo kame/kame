@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_vnops.c,v 1.42 2003/10/18 11:06:15 phk Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_vnops.c,v 1.46 2004/07/26 07:24:02 cperciva Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -241,6 +241,8 @@ smbfs_close(ap)
 {
 	struct vnode *vp = ap->a_vp;
 	struct thread *td = ap->a_td;
+	struct smbnode *np = VTOSMB(vp);
+	struct smb_cred scred;
 	int dolock;
 
 	VI_LOCK(vp);
@@ -249,7 +251,12 @@ smbfs_close(ap)
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY | LK_INTERLOCK, td);
 	else
 		VI_UNLOCK(vp);
-	/* Nothing. */
+	if (vp->v_type == VDIR && (np->n_flag & NOPEN) != 0 &&
+	    np->n_dirseq != NULL) {
+		smb_makescred(&scred, td, ap->a_cred);
+		smbfs_findclose(np->n_dirseq, &scred);
+		np->n_dirseq = NULL;
+	}
 	if (dolock)
 		VOP_UNLOCK(vp, 0, td);
 	return 0;
@@ -272,7 +279,7 @@ smbfs_getattr(ap)
 	struct vattr *va=ap->a_vap;
 	struct smbfattr fattr;
 	struct smb_cred scred;
-	u_int32_t oldsize;
+	u_quad_t oldsize;
 	int error;
 
 	SMBVDEBUG("%lx: '%s' %d\n", (long)vp, np->n_name, (vp->v_vflag & VV_ROOT) != 0);
@@ -364,7 +371,7 @@ smbfs_setattr(ap)
 		atime = &vap->va_atime;
 	if (mtime != atime) {
 		if (ap->a_cred->cr_uid != VTOSMBFS(vp)->sm_args.uid &&
-		    (error = suser_cred(ap->a_cred, PRISON_ROOT)) &&
+		    (error = suser_cred(ap->a_cred, SUSER_ALLOWJAIL)) &&
 		    ((vap->va_vaflags & VA_UTIMES_NULL) == 0 ||
 		    (error = VOP_ACCESS(vp, VWRITE, ap->a_cred, ap->a_td))))
 			return (error);
@@ -531,6 +538,8 @@ smbfs_remove(ap)
 		return EPERM;
 	smb_makescred(&scred, cnp->cn_thread, cnp->cn_cred);
 	error = smbfs_smb_delete(np, &scred);
+	if (error == 0)
+		np->n_flag |= NGONE;
 	cache_purge(vp);
 	return error;
 }
@@ -597,6 +606,7 @@ smbfs_rename(ap)
 			error = smbfs_smb_delete(VTOSMB(tvp), &scred);
 			if (error)
 				goto out_cacherem;
+			VTOSMB(fvp)->n_flag |= NGONE;
 		}
 		error = smbfs_smb_rename(VTOSMB(fvp), VTOSMB(tdvp),
 		    tcnp->cn_nameptr, tcnp->cn_namelen, &scred);
@@ -732,6 +742,8 @@ smbfs_rmdir(ap)
 
 	smb_makescred(&scred, cnp->cn_thread, cnp->cn_cred);
 	error = smbfs_smb_rmdir(np, &scred);
+	if (error == 0)
+		np->n_flag |= NGONE;
 	dnp->n_flag |= NMODIFIED;
 	smbfs_attr_cacheremove(dvp);
 /*	cache_purge(dvp);*/
@@ -1089,6 +1101,7 @@ smbfs_lookup(ap)
 	int nameiop = cnp->cn_nameiop;
 	int nmlen = cnp->cn_namelen;
 	int lockparent, wantparent, error, islastcn, isdot;
+	int killit;
 	
 	SMBVDEBUG("\n");
 	cnp->cn_flags &= ~PDIRUNLOCK;
@@ -1158,8 +1171,23 @@ smbfs_lookup(ap)
 			}
 		}
 		if (!error) {
+			killit = 0;
 			if (vpid == vp->v_id) {
-			   if (!VOP_GETATTR(vp, &vattr, cnp->cn_cred, td)
+			   error = VOP_GETATTR(vp, &vattr, cnp->cn_cred, td);
+			   /*
+			    * If the file type on the server is inconsistent
+			    * with what it was when we created the vnode,
+			    * kill the bogus vnode now and fall through to
+			    * the code below to create a new one with the
+			    * right type.
+			    */
+			   if (error == 0 &&
+			      ((vp->v_type == VDIR &&
+			      (VTOSMB(vp)->n_dosattr & SMB_FA_DIR) == 0) ||
+			      (vp->v_type == VREG &&
+			      (VTOSMB(vp)->n_dosattr & SMB_FA_DIR) != 0)))
+			      killit = 1;
+			   else if (error == 0
 			/*    && vattr.va_ctime.tv_sec == VTOSMB(vp)->n_ctime*/) {
 				if (nameiop != LOOKUP && islastcn)
 					cnp->cn_flags |= SAVENAME;
@@ -1169,6 +1197,8 @@ smbfs_lookup(ap)
 			   cache_purge(vp);
 			}
 			vput(vp);
+			if (killit)
+				vgone(vp);
 			if (lockparent && dvp != vp && islastcn)
 				VOP_UNLOCK(dvp, 0, td);
 		}

@@ -51,7 +51,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/cmi.c,v 1.24 2003/11/11 05:38:27 scottl Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/cmi.c,v 1.29 2004/07/16 03:59:27 tanimura Exp $");
 
 /* Supported chip ID's */
 #define CMI8338A_PCI_ID   0x010013f6
@@ -860,8 +860,8 @@ cmi_attach(device_t dev)
 	sc->sh = rman_get_bushandle(sc->reg);
 
 	sc->irqid = 0;
-	sc->irq   = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irqid,
-					0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+	sc->irq   = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irqid,
+					   RF_ACTIVE | RF_SHAREABLE);
 	if (!sc->irq ||
 	    snd_setup_intr(dev, sc->irq, INTR_MPSAFE, cmi_intr, sc, &sc->ih)) {
 		device_printf(dev, "cmi_attach: Unable to map interrupt\n");
@@ -898,8 +898,8 @@ cmi_attach(device_t dev)
 	pcm_addchan(dev, PCMDIR_PLAY, &cmichan_class, sc);
 	pcm_addchan(dev, PCMDIR_REC, &cmichan_class, sc);
 
-	snprintf(status, SND_STATUSLEN, "at io 0x%lx irq %ld",
-		 rman_get_start(sc->reg), rman_get_start(sc->irq));
+	snprintf(status, SND_STATUSLEN, "at io 0x%lx irq %ld %s",
+		 rman_get_start(sc->reg), rman_get_start(sc->irq),PCM_KLDSTRING(snd_cmi));
 	pcm_setstatus(dev, status);
 
 	DEB(printf("cmi_attach: succeeded\n"));
@@ -1008,5 +1008,5 @@ static driver_t cmi_driver = {
 };
 
 DRIVER_MODULE(snd_cmi, pci, cmi_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_cmi, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_cmi, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_cmi, 1);

@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/syscons/scvidctl.c,v 1.31 2003/08/24 18:17:24 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/syscons/scvidctl.c,v 1.32 2004/07/13 16:06:19 stefanf Exp $");
 
 #include "opt_syscons.h"
 
@@ -92,7 +92,7 @@ typedef struct old_video_adapter_info {
     u_int		va_window;	/* virtual address */
     size_t		va_window_size;
     size_t		va_window_gran;
-    u_int		va_buffer;;
+    u_int		va_buffer;
     size_t		va_buffer_size;
     int			va_initial_mode;
     int			va_initial_bios_mode;

@@ -26,16 +26,17 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/syscons/scterm-sc.c,v 1.19 2003/08/24 18:17:24 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/syscons/scterm-sc.c,v 1.21 2004/05/30 20:08:42 phk Exp $");
 
 #include "opt_syscons.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/consio.h>
 
-#ifdef __sparc64__
+#if __sparc64__ || __powerpc__
 #include <machine/sc_machdep.h>
 #else
 #include <machine/pc/display.h>

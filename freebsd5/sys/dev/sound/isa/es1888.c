@@ -29,7 +29,7 @@
 
 #include <isa/isavar.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/es1888.c,v 1.10 2003/02/08 07:05:07 nyan Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/es1888.c,v 1.11 2004/07/16 03:59:54 tanimura Exp $");
 
 #ifdef __alpha__
 static int
@@ -171,7 +171,7 @@ static driver_t es1888_driver = {
 };
 
 DRIVER_MODULE(snd_es1888, isa, es1888_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_es1888, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_es1888, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_es1888, 1);
 
 

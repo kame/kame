@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/alpha/conf/NOTES,v 1.153 2003/08/25 03:43:08 marcel Exp $
+# $FreeBSD: src/sys/alpha/conf/NOTES,v 1.154.2.1 2004/09/13 21:15:05 wilko Exp $
 #
 # This file contains machine dependent kernel configuration notes.  For
 # machine independent notes, look in /sys/conf/NOTES.
@@ -36,12 +36,8 @@ options 	DEC_KN20AA		# AlphaStation 500, 600
 options 	DEC_ST550		# Personal Workstation 433, 500, 600
 options 	DEC_ST6600		# XP1000, DP264, DS20, DS10, family
 options 	DEC_1000A		# AlphaServer 1000, 1000A, 800
-options 	DEC_KN8AE		# AlphaServer 8200/8400 (Turbolaser)
 options 	DEC_KN300		# AlphaServer 4100 (Rawhide),
 					# AlphaServer 1200 (Tincup)
-
-# Allow building a kernel without sio(4).
-options 	NO_SIO
 
 
 #####################################################################

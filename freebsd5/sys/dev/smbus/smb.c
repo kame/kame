@@ -23,9 +23,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/smbus/smb.c,v 1.29 2003/08/10 14:28:24 ticso Exp $
- *
+ * $FreeBSD: src/sys/dev/smbus/smb.c,v 1.34 2004/06/16 09:46:56 phk Exp $
  */
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -46,7 +46,7 @@
 struct smb_softc {
 
 	int sc_count;			/* >0 if device opened */
-	dev_t sc_devnode;
+	struct cdev *sc_devnode;
 };
 
 #define IIC_SOFTC(unit) \
@@ -83,19 +83,15 @@ static driver_t smb_driver = {
 
 static	d_open_t	smbopen;
 static	d_close_t	smbclose;
-static	d_write_t	smbwrite;
-static	d_read_t	smbread;
 static	d_ioctl_t	smbioctl;
 
-#define CDEV_MAJOR 106
 static struct cdevsw smb_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	smbopen,
 	.d_close =	smbclose,
-	.d_read =	smbread,
-	.d_write =	smbwrite,
 	.d_ioctl =	smbioctl,
 	.d_name =	"smb",
-	.d_maj =	CDEV_MAJOR,
 };
 
 static void
@@ -141,14 +137,14 @@ smb_detach(device_t dev)
 }
 
 static int
-smbopen (dev_t dev, int flags, int fmt, struct thread *td)
+smbopen (struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	struct smb_softc *sc = IIC_SOFTC(minor(dev));
 
-	if (!sc)
-		return (EINVAL);
+	if (sc == NULL)
+		return (ENXIO);
 
-	if (sc->sc_count)
+	if (sc->sc_count != 0)
 		return (EBUSY);
 
 	sc->sc_count++;
@@ -157,15 +153,16 @@ smbopen (dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static int
-smbclose(dev_t dev, int flags, int fmt, struct thread *td)
+smbclose(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	struct smb_softc *sc = IIC_SOFTC(minor(dev));
 
-	if (!sc)
-		return (EINVAL);
+	if (sc == NULL)
+		return (ENXIO);
 
-	if (!sc->sc_count)
-		return (EINVAL);
+	if (sc->sc_count == 0)
+		/* This is not supposed to happen. */
+		return (0);
 
 	sc->sc_count--;
 
@@ -173,35 +170,25 @@ smbclose(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static int
-smbwrite(dev_t dev, struct uio * uio, int ioflag)
+smbioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags, struct thread *td)
 {
-	/* not supported */
-
-	return (EINVAL);
-}
-
-static int
-smbread(dev_t dev, struct uio * uio, int ioflag)
-{
-	/* not supported */
-
-	return (EINVAL);
-}
-
-static int
-smbioctl(dev_t dev, u_long cmd, caddr_t data, int flags, struct thread *td)
-{
-	device_t smbdev = IIC_DEVICE(minor(dev));
-	struct smb_softc *sc = IIC_SOFTC(minor(dev));
-	device_t parent = device_get_parent(smbdev);
-
-	int error = 0;
+	char buf[SMB_MAXBLOCKSIZE];
+	device_t parent;
 	struct smbcmd *s = (struct smbcmd *)data;
+	struct smb_softc *sc = IIC_SOFTC(minor(dev));
+	device_t smbdev = IIC_DEVICE(minor(dev));
+	int error;
+	short w;
+	char c;
 
-	if (!sc || !s)
+	if (sc == NULL)
+		return (ENXIO);
+	if (s == NULL)
 		return (EINVAL);
 
-	/* allocate the bus */
+	parent = device_get_parent(smbdev);
+
+	/* Allocate the bus. */
 	if ((error = smbus_request_bus(parent, smbdev,
 			(flags & O_NONBLOCK) ? SMB_DONTWAIT : (SMB_WAIT | SMB_INTR))))
 		return (error);
@@ -234,40 +221,68 @@ smbioctl(dev_t dev, u_long cmd, caddr_t data, int flags, struct thread *td)
 		break;
 
 	case SMB_READB:
-		if (s->data.byte_ptr)
+		if (s->data.byte_ptr) {
 			error = smbus_error(smbus_readb(parent, s->slave,
-						s->cmd, s->data.byte_ptr));
+						s->cmd, &c));
+			if (error)
+				break;
+			error = copyout(&c, s->data.byte_ptr,
+					sizeof(*(s->data.byte_ptr)));
+		}
 		break;
 
 	case SMB_READW:
-		if (s->data.word_ptr)
+		if (s->data.word_ptr) {
 			error = smbus_error(smbus_readw(parent, s->slave,
-						s->cmd, s->data.word_ptr));
+						s->cmd, &w));
+			if (error == 0) {
+				error = copyout(&w, s->data.word_ptr,
+						sizeof(*(s->data.word_ptr)));
+			}
+		}
 		break;
 
 	case SMB_PCALL:
-		if (s->data.process.rdata)
+		if (s->data.process.rdata) {
+
 			error = smbus_error(smbus_pcall(parent, s->slave, s->cmd,
-				s->data.process.sdata, s->data.process.rdata));
+				s->data.process.sdata, &w));
+			if (error)
+				break;
+			error = copyout(&w, s->data.process.rdata,
+					sizeof(*(s->data.process.rdata)));
+		}
+		
 		break;
 
 	case SMB_BWRITE:
-		if (s->count && s->data.byte_ptr)
+		if (s->count && s->data.byte_ptr) {
+			if (s->count > SMB_MAXBLOCKSIZE)
+				s->count = SMB_MAXBLOCKSIZE;
+			error = copyin(s->data.byte_ptr, buf, s->count);
+			if (error)
+				break;
 			error = smbus_error(smbus_bwrite(parent, s->slave,
-						s->cmd, s->count, s->data.byte_ptr));
+						s->cmd, s->count, buf));
+		}
 		break;
 
 	case SMB_BREAD:
-		if (s->count && s->data.byte_ptr)
+		if (s->count && s->data.byte_ptr) {
+			if (s->count > SMB_MAXBLOCKSIZE)
+				s->count = SMB_MAXBLOCKSIZE;
 			error = smbus_error(smbus_bread(parent, s->slave,
-						s->cmd, s->count, s->data.byte_ptr));
+						s->cmd, s->count, buf));
+			if (error)
+				break;
+			error = copyout(buf, s->data.byte_ptr, s->count);
+		}
 		break;
 		
 	default:
-		error = ENODEV;
+		error = ENOTTY;
 	}
 
-	/* release the bus */
 	smbus_release_bus(parent, smbdev);
 
 	return (error);

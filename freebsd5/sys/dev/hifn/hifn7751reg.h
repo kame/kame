@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/hifn/hifn7751reg.h,v 1.3 2003/10/08 20:25:47 sam Exp $ */
+/* $FreeBSD: src/sys/dev/hifn/hifn7751reg.h,v 1.4 2004/03/10 10:10:46 phk Exp $ */
 /*	$OpenBSD: hifn7751reg.h,v 1.35 2002/04/08 17:49:42 jason Exp $	*/
 
 /*
@@ -375,7 +375,7 @@ typedef struct hifn_desc {
 /*
  * PLL config register 
  */
-#define	HIFN_PLL_7956		0x00001d18	/* 7956 PLL config value */ 
+#define	HIFN_PLL_7956		0x00001d19	/* 7956 PLL config value */ 
 
 /*********************************************************************
  * Structs for board commands 

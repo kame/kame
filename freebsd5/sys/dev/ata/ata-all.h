@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-all.h,v 1.68.2.3 2004/02/11 08:47:21 scottl Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-all.h,v 1.81.2.3 2004/10/10 15:01:47 sos Exp $
  */
 
 /* ATA register defines */
@@ -156,6 +156,28 @@
 #define ATA_OP_CONTINUES		0
 #define ATA_OP_FINISHED			1
 
+/* ATAPI request sense structure */
+struct atapi_sense {
+    u_int8_t	error_code	:7;		/* current or deferred errors */
+    u_int8_t	valid		:1;		/* follows ATAPI spec */
+    u_int8_t	segment;			/* Segment number */
+    u_int8_t	sense_key	:4;		/* sense key */
+    u_int8_t	reserved2_4	:1;		/* reserved */
+    u_int8_t	ili		:1;		/* incorrect length indicator */
+    u_int8_t	eom		:1;		/* end of medium */
+    u_int8_t	filemark	:1;		/* filemark */
+    u_int32_t	cmd_info __packed;		/* cmd information */
+    u_int8_t	sense_length;			/* additional sense len (n-7) */
+    u_int32_t	cmd_specific_info __packed;	/* additional cmd spec info */
+    u_int8_t	asc;				/* additional sense code */
+    u_int8_t	ascq;				/* additional sense code qual */
+    u_int8_t	replaceable_unit_code;		/* replaceable unit code */
+    u_int8_t	sk_specific	:7;		/* sense key specific */
+    u_int8_t	sksv		:1;		/* sense key specific info OK */
+    u_int8_t	sk_specific1;			/* sense key specific */
+    u_int8_t	sk_specific2;			/* sense key specific */
+};
+
 struct ata_request {
     struct ata_device		*device;	/* ptr to device softc */
     void			*driver;	/* driver specific */
@@ -164,11 +186,14 @@ struct ata_request {
 	struct {
 	    u_int8_t		command;	/* command reg */
 	    u_int8_t		feature;	/* feature reg */
-	    u_int64_t		lba;		/* lba reg */
 	    u_int16_t		count;		/* count reg */
+	    u_int64_t		lba;		/* lba reg */
 	} ata;
 	struct {
 	    u_int8_t		ccb[16];	/* ATAPI command block */
+	    struct atapi_sense	sense_data;	/* ATAPI request sense data */
+	    u_int8_t		sense_key;	/* ATAPI request sense key */
+	    u_int8_t		sense_cmd;	/* ATAPI saved command */
 	} atapi;
     } u;
 
@@ -201,7 +226,7 @@ struct ata_request {
     struct sema			done;		/* request done sema */
     int				retries;	/* retry count */
     int				timeout;	/* timeout for this cmd */
-    struct callout_handle	timeout_handle; /* handle for untimeout */
+    struct callout		callout; 	/* callout management */
     int				result;		/* result error code */
     struct task			task;		/* task management */
     struct bio			*bio;		/* bio for this request */
@@ -214,8 +239,8 @@ struct ata_request {
 #define ATA_DEBUG_RQ(request, string) \
     { \
     if (request->flags & ATA_R_DEBUG) \
-        ata_prtdev(request->device, "req=%08x %s " string "\n", \
-                   (u_int)request, ata_cmd2str(request)); \
+        ata_prtdev(request->device, "req=%p %s " string "\n", \
+                   request, ata_cmd2str(request)); \
     }
 #else
 #define ATA_DEBUG_RQ(request, string)
@@ -247,11 +272,17 @@ struct ata_device {
     void			(*setmode)(struct ata_device *atadev, int mode);
 };
 
-/* structure for holding DMA address data */
-struct ata_dmaentry {
-    u_int32_t base;
+/* structure for holding DMA Physical Region Descriptors (PRD) entries */
+struct ata_dma_prdentry {
+    u_int32_t addr;
     u_int32_t count;
 };  
+
+/* structure used by the setprd function */
+struct ata_dmasetprd_args {
+    void *dmatab;
+    int error;
+};
 
 /* structure holding DMA related information */
 struct ata_dma {
@@ -260,18 +291,25 @@ struct ata_dma {
     bus_dmamap_t		cdmamap;	/* control DMA map */
     bus_dma_tag_t		ddmatag;	/* data DMA tag */
     bus_dmamap_t		ddmamap;	/* data DMA map */
-    struct ata_dmaentry		*dmatab;	/* DMA transfer table */
+    void			*dmatab;	/* DMA transfer table */
     bus_addr_t			mdmatab;	/* bus address of dmatab */
+    bus_dma_tag_t		wdmatag;	/* workspace DMA tag */
+    bus_dmamap_t		wdmamap;	/* workspace DMA map */
+    u_int8_t			*workspace;	/* workspace */
+    bus_addr_t			wdmatab;	/* bus address of dmatab */
+
     u_int32_t			alignment;	/* DMA engine alignment */
     u_int32_t			boundary;	/* DMA engine boundary */
     u_int32_t			max_iosize;	/* DMA engine max IO size */
     u_int32_t			cur_iosize;	/* DMA engine current IO size */
     int				flags;
-#define ATA_DMA_ACTIVE			0x01	/* DMA transfer in progress */
-#define ATA_DMA_READ			0x02	/* transaction is a read */
+#define ATA_DMA_READ			0x01	/* transaction is a read */
+#define ATA_DMA_LOADED			0x02	/* DMA tables etc loaded */
+#define ATA_DMA_ACTIVE			0x04	/* DMA transfer in progress */
 
     void (*alloc)(struct ata_channel *ch);
     void (*free)(struct ata_channel *ch);
+    void (*setprd)(void *xsc, bus_dma_segment_t *segs, int nsegs, int error);
     int (*load)(struct ata_device *atadev, caddr_t data, int32_t count,int dir);
     int (*unload)(struct ata_channel *ch);
     int (*start)(struct ata_channel *ch);
@@ -280,9 +318,11 @@ struct ata_dma {
 
 /* structure holding lowlevel functions */
 struct ata_lowlevel {
-    void (*reset)(struct ata_channel *ch);
-    int (*transaction)(struct ata_request *request);
+    int (*begin_transaction)(struct ata_request *request);
+    int (*end_transaction)(struct ata_request *request);
     void (*interrupt)(void *channel);
+    void (*reset)(struct ata_channel *ch);
+    int (*command)(struct ata_device *atadev, u_int8_t command, u_int64_t lba, u_int16_t count, u_int16_t feature);
 };
 
 /* structure holding resources for an ATA channel */
@@ -307,6 +347,7 @@ struct ata_channel {
 #define		ATA_ATAPI_DMA_RO	0x08
 #define		ATA_48BIT_ACTIVE	0x10
 #define		ATA_IMMEDIATE_MODE	0x20
+#define		ATA_HWGONE		0x40
 
     struct ata_device		device[2];	/* devices on this channel */
 #define		MASTER			0x00
@@ -318,41 +359,22 @@ struct ata_channel {
 #define		ATA_ATAPI_MASTER	0x04
 #define		ATA_ATAPI_SLAVE		0x08
 
-    int				state;		/* ATA channel state control */
+    struct mtx			state_mtx;	/* state lock */
+    int				state;		/* ATA channel state */
 #define		ATA_IDLE		0x0000
 #define		ATA_ACTIVE		0x0001
-#define		ATA_CONTROL		0x0002
+#define		ATA_INTERRUPT		0x0002
+#define		ATA_TIMEOUT		0x0004
 
-    void (*reset)(struct ata_channel *);
-    void (*locking)(struct ata_channel *, int);
+    void			(*reset)(struct ata_channel *);
+    int				(*locking)(struct ata_channel *, int);
 #define		ATA_LF_LOCK		0x0001
 #define		ATA_LF_UNLOCK		0x0002
+#define		ATA_LF_WHICH		0x0004
 
     struct mtx			queue_mtx;	/* queue lock */
     TAILQ_HEAD(, ata_request)	ata_queue;	/* head of ATA queue */
-    void			*running;	/* currently running request */
-};
-
-/* ATAPI request sense structure */
-struct atapi_sense {
-    u_int8_t	error_code	:7;		/* current or deferred errors */
-    u_int8_t	valid		:1;		/* follows ATAPI spec */
-    u_int8_t	segment;			/* Segment number */
-    u_int8_t	sense_key	:4;		/* sense key */
-    u_int8_t	reserved2_4	:1;		/* reserved */
-    u_int8_t	ili		:1;		/* incorrect length indicator */
-    u_int8_t	eom		:1;		/* end of medium */
-    u_int8_t	filemark	:1;		/* filemark */
-    u_int32_t	cmd_info __packed;		/* cmd information */
-    u_int8_t	sense_length;			/* additional sense len (n-7) */
-    u_int32_t	cmd_specific_info __packed;	/* additional cmd spec info */
-    u_int8_t	asc;				/* additional sense code */
-    u_int8_t	ascq;				/* additional sense code qual */
-    u_int8_t	replaceable_unit_code;		/* replaceable unit code */
-    u_int8_t	sk_specific	:7;		/* sense key specific */
-    u_int8_t	sksv		:1;		/* sense key specific info OK */
-    u_int8_t	sk_specific1;			/* sense key specific */
-    u_int8_t	sk_specific2;			/* sense key specific */
+    struct ata_request		*running;	/* currently running request */
 };
 
 /* disk bay/enclosure related */
@@ -373,6 +395,7 @@ int ata_attach(device_t dev);
 int ata_detach(device_t dev);
 int ata_suspend(device_t dev);
 int ata_resume(device_t dev);
+void ata_udelay(int interval);
 int ata_printf(struct ata_channel *ch, int device, const char *fmt, ...) __printflike(3, 4);
 int ata_prtdev(struct ata_device *atadev, const char *fmt, ...) __printflike(2, 3);
 void ata_set_name(struct ata_device *atadev, char *name, int lun);
@@ -393,10 +416,13 @@ int ata_controlcmd(struct ata_device *atadev, u_int8_t command, u_int16_t featur
 int ata_atapicmd(struct ata_device *atadev, u_int8_t *ccb, caddr_t data, int count, int flags, int timeout);
 void ata_queue_request(struct ata_request *request);
 void ata_finish(struct ata_request *request);
+void ata_catch_inflight(struct ata_channel *ch);
+void ata_fail_requests(struct ata_channel *ch, struct ata_device *device);
 char *ata_cmd2str(struct ata_request *request);
 
 /* ata-lowlevel.c: */
 void ata_generic_hw(struct ata_channel *ch);
+int ata_generic_command(struct ata_device *atadev, u_int8_t command, u_int64_t lba, u_int16_t count, u_int16_t feature);
 
 /* subdrivers */
 void ad_attach(struct ata_device *atadev);
@@ -411,18 +437,6 @@ void atapi_cam_reinit_bus(struct ata_channel *ch);
 extern uma_zone_t ata_zone;
 #define ata_alloc_request() uma_zalloc(ata_zone, M_NOWAIT | M_ZERO)
 #define ata_free_request(request) uma_zfree(ata_zone, request)
-
-/* macros for locking a channel */
-#define ATA_LOCK_CH(ch, value) \
-	atomic_cmpset_acq_int(&(ch)->state, ATA_IDLE, (value))
-
-#define ATA_SLEEPLOCK_CH(ch, value) \
-	while (!atomic_cmpset_acq_int(&(ch)->state, ATA_IDLE, (value))) \
-	    tsleep((caddr_t)&(ch), PRIBIO, "atalck", 1);
-
-#define ATA_FORCELOCK_CH(ch, value) atomic_store_rel_int(&(ch)->state, (value))
-
-#define ATA_UNLOCK_CH(ch) atomic_store_rel_int(&(ch)->state, ATA_IDLE)
 
 /* macros to hide busspace uglyness */
 #define ATA_INB(res, offset) \
@@ -477,101 +491,44 @@ extern uma_zone_t ata_zone;
 				       rman_get_bushandle((res)), \
 				       (offset), (addr), (count))
 
-#define ATA_IDX_SET(ch, idx) \
-	ATA_OUTB(ch->r_io[ATA_IDX_ADDR].res, ch->r_io[ATA_IDX_ADDR].offset, \
-		 ch->r_io[idx].offset)
-	
 #define ATA_IDX_INB(ch, idx) \
-	((ch->r_io[idx].res) \
-	? ATA_INB(ch->r_io[idx].res, ch->r_io[idx].offset) \
-	: (ATA_IDX_SET(ch, idx), \
-	   ATA_INB(ch->r_io[ATA_IDX_DATA].res, ch->r_io[ATA_IDX_DATA].offset)))
+	ATA_INB(ch->r_io[idx].res, ch->r_io[idx].offset)
 
 #define ATA_IDX_INW(ch, idx) \
-	((ch->r_io[idx].res) \
-	? ATA_INW(ch->r_io[idx].res, ch->r_io[idx].offset) \
-	: (ATA_IDX_SET(ch, idx), \
-	   ATA_INW(ch->r_io[ATA_IDX_DATA].res, ch->r_io[ATA_IDX_DATA].offset)))
+	ATA_INW(ch->r_io[idx].res, ch->r_io[idx].offset)
 
 #define ATA_IDX_INL(ch, idx) \
-	((ch->r_io[idx].res) \
-	? ATA_INL(ch->r_io[idx].res, ch->r_io[idx].offset) \
-	: (ATA_IDX_SET(ch, idx), \
-	   ATA_INL(ch->r_io[ATA_IDX_DATA].res, ch->r_io[ATA_IDX_DATA].offset)))
+	ATA_INL(ch->r_io[idx].res, ch->r_io[idx].offset)
 
 #define ATA_IDX_INSW(ch, idx, addr, count) \
-	((ch->r_io[idx].res) \
-	? ATA_INSW(ch->r_io[idx].res, ch->r_io[idx].offset, addr, count) \
-	: (ATA_IDX_SET(ch, idx), \
-	   ATA_INSW(ch->r_io[ATA_IDX_DATA].res, \
-		    ch->r_io[ATA_IDX_DATA].offset, addr, count)))
+	ATA_INSW(ch->r_io[idx].res, ch->r_io[idx].offset, addr, count)
 
 #define ATA_IDX_INSW_STRM(ch, idx, addr, count) \
-	((ch->r_io[idx].res) \
-	? ATA_INSW_STRM(ch->r_io[idx].res, ch->r_io[idx].offset, addr, count) \
-	: (ATA_IDX_SET(ch, idx), \
-	   ATA_INSW_STRM(ch->r_io[ATA_IDX_DATA].res, \
-			 ch->r_io[ATA_IDX_DATA].offset, addr, count)))
+	ATA_INSW_STRM(ch->r_io[idx].res, ch->r_io[idx].offset, addr, count)
 
 #define ATA_IDX_INSL(ch, idx, addr, count) \
-	((ch->r_io[idx].res) \
-	? ATA_INSL(ch->r_io[idx].res, ch->r_io[idx].offset, addr, count) \
-	: (ATA_IDX_SET(ch, idx), \
-	   ATA_INSL(ch->r_io[ATA_IDX_DATA].res, \
-		    ch->r_io[ATA_IDX_DATA].offset, addr, count)))
+	ATA_INSL(ch->r_io[idx].res, ch->r_io[idx].offset, addr, count)
 
 #define ATA_IDX_INSL_STRM(ch, idx, addr, count) \
-	((ch->r_io[idx].res) \
-	? ATA_INSL_STRM(ch->r_io[idx].res, ch->r_io[idx].offset, addr, count) \
-	: (ATA_IDX_SET(ch, idx), \
-	   ATA_INSL_STRM(ch->r_io[ATA_IDX_DATA].res, \
-			 ch->r_io[ATA_IDX_DATA].offset, addr, count)))
+	ATA_INSL_STRM(ch->r_io[idx].res, ch->r_io[idx].offset, addr, count)
 
 #define ATA_IDX_OUTB(ch, idx, value) \
-	((ch->r_io[idx].res) \
-	? ATA_OUTB(ch->r_io[idx].res, ch->r_io[idx].offset, value) \
-	: (ATA_IDX_SET(ch, idx), \
-	   ATA_OUTB(ch->r_io[ATA_IDX_DATA].res, \
-		    ch->r_io[ATA_IDX_DATA].offset, value)))
+	ATA_OUTB(ch->r_io[idx].res, ch->r_io[idx].offset, value)
 
 #define ATA_IDX_OUTW(ch, idx, value) \
-	((ch->r_io[idx].res) \
-	? ATA_OUTW(ch->r_io[idx].res, ch->r_io[idx].offset, value) \
-	: (ATA_IDX_SET(ch, idx), \
-	   ATA_OUTW(ch->r_io[ATA_IDX_DATA].res, \
-		    ch->r_io[ATA_IDX_DATA].offset, value)))
+	ATA_OUTW(ch->r_io[idx].res, ch->r_io[idx].offset, value)
 
 #define ATA_IDX_OUTL(ch, idx, value) \
-	((ch->r_io[idx].res) \
-	? ATA_OUTL(ch->r_io[idx].res, ch->r_io[idx].offset, value) \
-	: (ATA_IDX_SET(ch, idx), \
-	   ATA_OUTL(ch->r_io[ATA_IDX_DATA].res, \
-		    ch->r_io[ATA_IDX_DATA].offset, value)))
+	ATA_OUTL(ch->r_io[idx].res, ch->r_io[idx].offset, value)
 
 #define ATA_IDX_OUTSW(ch, idx, addr, count) \
-	((ch->r_io[idx].res) \
-	? ATA_OUTSW(ch->r_io[idx].res, ch->r_io[idx].offset, addr, count) \
-	: (ATA_IDX_SET(ch, idx), \
-	   ATA_OUTSW(ch->r_io[ATA_IDX_DATA].res, \
-		     ch->r_io[ATA_IDX_DATA].offset, addr, count)))
+	ATA_OUTSW(ch->r_io[idx].res, ch->r_io[idx].offset, addr, count)
 
 #define ATA_IDX_OUTSW_STRM(ch, idx, addr, count) \
-	((ch->r_io[idx].res) \
-	? ATA_OUTSW_STRM(ch->r_io[idx].res, ch->r_io[idx].offset, addr, count) \
-	: (ATA_IDX_SET(ch, idx), \
-	   ATA_OUTSW_STRM(ch->r_io[ATA_IDX_DATA].res, \
-			  ch->r_io[ATA_IDX_DATA].offset, addr, count)))
+	ATA_OUTSW_STRM(ch->r_io[idx].res, ch->r_io[idx].offset, addr, count)
 
 #define ATA_IDX_OUTSL(ch, idx, addr, count) \
-	((ch->r_io[idx].res) \
-	? ATA_OUTSL(ch->r_io[idx].res, ch->r_io[idx].offset, addr, count) \
-	: (ATA_IDX_SET(ch, idx), \
-	   ATA_OUTSL(ch->r_io[ATA_IDX_DATA].res, \
-		     ch->r_io[ATA_IDX_DATA].offset, addr, count)))
+	ATA_OUTSL(ch->r_io[idx].res, ch->r_io[idx].offset, addr, count)
 
 #define ATA_IDX_OUTSL_STRM(ch, idx, addr, count) \
-	((ch->r_io[idx].res) \
-	? ATA_OUTSL_STRM(ch->r_io[idx].res, ch->r_io[idx].offset, addr, count) \
-	: (ATA_IDX_SET(ch, idx), \
-	   ATA_OUTSL_STRM(ch->r_io[ATA_IDX_DATA].res, \
-			  ch->r_io[ATA_IDX_DATA].offset, addr, count)))
+	ATA_OUTSL_STRM(ch->r_io[idx].res, ch->r_io[idx].offset, addr, count)

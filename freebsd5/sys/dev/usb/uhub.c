@@ -1,4 +1,4 @@
-/*	$NetBSD: uhub.c,v 1.64 2003/02/08 03:32:51 ichiro Exp $	*/
+/*	$NetBSD: uhub.c,v 1.68 2004/06/29 06:30:05 mycroft Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/uhub.c,v 1.54 2003/08/24 17:55:55 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/uhub.c,v 1.62.2.1 2004/09/13 03:00:06 imp Exp $");
 
 /*
  * USB spec: http://www.usb.org/developers/docs/usbspec.zip
@@ -54,7 +54,6 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/uhub.c,v 1.54 2003/08/24 17:55:55 obrien Exp
 #elif defined(__FreeBSD__)
 #include <sys/module.h>
 #include <sys/bus.h>
-#include "bus_if.h"
 #endif
 #include <sys/sysctl.h>
 
@@ -91,8 +90,8 @@ Static usbd_status uhub_explore(usbd_device_handle hub);
 Static void uhub_intr(usbd_xfer_handle, usbd_private_handle,usbd_status);
 
 #if defined(__FreeBSD__)
-Static bus_driver_added_t uhub_driver_added;
-Static bus_child_detached_t uhub_child_detached;
+Static bus_child_location_str_t uhub_child_location_str;
+Static bus_child_pnpinfo_str_t uhub_child_pnpinfo_str;
 #endif
 
 
@@ -110,21 +109,25 @@ CFATTACH_DECL(uhub_uhub, sizeof(struct uhub_softc),
     uhub_match, uhub_attach, uhub_detach, uhub_activate);
 #elif defined(__FreeBSD__)
 USB_DECLARE_DRIVER_INIT(uhub,
-			DEVMETHOD(bus_driver_added, uhub_driver_added),
-			DEVMETHOD(bus_child_detached, uhub_child_detached),
-			DEVMETHOD(device_suspend, bus_generic_suspend),
-			DEVMETHOD(device_resume, bus_generic_resume),
-			DEVMETHOD(device_shutdown, bus_generic_shutdown)
-			);
+	DEVMETHOD(bus_child_pnpinfo_str, uhub_child_pnpinfo_str),
+	DEVMETHOD(bus_child_location_str, uhub_child_location_str),
+	DEVMETHOD(bus_driver_added, bus_generic_driver_added),
+	DEVMETHOD(device_suspend, bus_generic_suspend),
+	DEVMETHOD(device_resume, bus_generic_resume),
+	DEVMETHOD(device_shutdown, bus_generic_shutdown)
+	);
 
 /* Create the driver instance for the hub connected to usb case. */
 devclass_t uhubroot_devclass;
 
 Static device_method_t uhubroot_methods[] = {
+	DEVMETHOD(bus_child_location_str, uhub_child_location_str),
+	DEVMETHOD(bus_child_pnpinfo_str, uhub_child_pnpinfo_str),
+	DEVMETHOD(bus_driver_added, bus_generic_driver_added),
+
 	DEVMETHOD(device_probe, uhub_match),
 	DEVMETHOD(device_attach, uhub_attach),
-
-	/* detach is not allowed for a root hub */
+	DEVMETHOD(device_detach, uhub_detach),
 	DEVMETHOD(device_suspend, bus_generic_suspend),
 	DEVMETHOD(device_resume, bus_generic_resume),
 	DEVMETHOD(device_shutdown, bus_generic_shutdown),
@@ -174,7 +177,6 @@ USB_ATTACH(uhub)
 	sc->sc_hub = dev;
 	usbd_devinfo(dev, 1, devinfo);
 	USB_ATTACH_SETUP;
-	printf("%s: %s\n", USBDEVNAME(sc->sc_dev), devinfo);
 
 	err = usbd_set_config_index(dev, 0, 1);
 	if (err) {
@@ -308,6 +310,7 @@ USB_ATTACH(uhub)
 			up->power = USB_MAX_POWER;
 		else
 			up->power = USB_MIN_POWER;
+		up->restartcnt = 0;
 	}
 
 	/* XXX should check for none, individual, or ganged power? */
@@ -372,9 +375,12 @@ uhub_explore(usbd_device_handle dev)
 		DPRINTFN(3,("uhub_explore: %s port %d status 0x%04x 0x%04x\n",
 			    USBDEVNAME(sc->sc_dev), port, status, change));
 		if (change & UPS_C_PORT_ENABLED) {
-			DPRINTF(("uhub_explore: C_PORT_ENABLED\n"));
+			DPRINTF(("uhub_explore: C_PORT_ENABLED 0x%x\n", change));
 			usbd_clear_port_feature(dev, port, UHF_C_PORT_ENABLE);
-			if (status & UPS_PORT_ENABLED) {
+			if (change & UPS_C_CONNECT_STATUS) {
+				/* Ignore the port error if the device
+				   vanished. */
+			} else if (status & UPS_PORT_ENABLED) {
 				printf("%s: illegal enable change, port %d\n",
 				       USBDEVNAME(sc->sc_dev), port);
 			} else {
@@ -389,7 +395,7 @@ uhub_explore(usbd_device_handle dev)
 				else
 					printf("%s: port error, giving up "
 					       "port %d\n",
-					       USBDEVNAME(sc->sc_dev), port);
+					  USBDEVNAME(sc->sc_dev), port);
 			}
 		}
 		if (!(change & UPS_C_CONNECT_STATUS)) {
@@ -575,46 +581,105 @@ USB_DETACH(uhub)
 }
 
 #if defined(__FreeBSD__)
-/* Called when a device has been detached from it */
-Static void
-uhub_child_detached(device_t self, device_t child)
+int
+uhub_child_location_str(device_t cbdev, device_t child, char *buf,
+    size_t buflen)
 {
-       struct uhub_softc *sc = device_get_softc(self);
-       usbd_device_handle devhub = sc->sc_hub;
-       usbd_device_handle dev;
-       int nports;
-       int port;
-       int i;
+	struct uhub_softc *sc = device_get_softc(cbdev);
+	usbd_device_handle devhub = sc->sc_hub;
+	usbd_device_handle dev;
+	int nports;
+	int port;
+	int i;
 
-       if (!devhub->hub)
-               /* should never happen; children are only created after init */
-               panic("hub not fully initialised, but child deleted?");
+	nports = devhub->hub->hubdesc.bNbrPorts;
+	for (port = 0; port < nports; port++) {
+		dev = devhub->hub->ports[port].device;
+		if (dev && dev->subdevs) {
+			for (i = 0; dev->subdevs[i]; i++) {
+				if (dev->subdevs[i] == child) {
+					goto found_dev;
+				}
+			}
+		}
+	}
+	DPRINTFN(0,("uhub_child_location_str: device not on hub\n"));
+	buf[0] = '\0';
+	return (0);
 
-       nports = devhub->hub->hubdesc.bNbrPorts;
-       for (port = 0; port < nports; port++) {
-               dev = devhub->hub->ports[port].device;
-               if (dev && dev->subdevs) {
-                       for (i = 0; dev->subdevs[i]; i++) {
-                               if (dev->subdevs[i] == child) {
-                                       dev->subdevs[i] = NULL;
-                                       return;
-                               }
-                       }
-               }
-       }
+found_dev:
+	if (dev->ifacenums == NULL) {
+		snprintf(buf, buflen, "port=%i", port);
+	} else {
+		snprintf(buf, buflen, "port=%i interface=%i",
+		    port, dev->ifacenums[i]);
+	}
+	return (0);
 }
 
-Static void
-uhub_driver_added(device_t _dev, driver_t *_driver)
+int
+uhub_child_pnpinfo_str(device_t cbdev, device_t child, char *buf,
+    size_t buflen)
 {
-	/* Don't do anything, as reprobing does not work currently. We should
-	 * really call through to usbd_new_device or a function along those
-	 * lines that reinitialises the device if it is not owned by any
-	 * driver. But this is complicated. Manual replugging by the user is
-	 * easier.
-	 */
+	struct uhub_softc *sc = device_get_softc(cbdev);
+	usbd_device_handle devhub = sc->sc_hub;
+	usbd_device_handle dev;
+	usb_string_descriptor_t us;
+	struct usbd_interface *iface;
+	char serial[128];
+	int nports;
+	int port;
+	int i, j, size;
+	int err;
 
-	 ;
+	nports = devhub->hub->hubdesc.bNbrPorts;
+	for (port = 0; port < nports; port++) {
+		dev = devhub->hub->ports[port].device;
+		if (dev && dev->subdevs) {
+			for (i = 0; dev->subdevs[i]; i++) {
+				if (dev->subdevs[i] == child) {
+					goto found_dev;
+				}
+			}
+		}
+	}
+	DPRINTFN(0,("uhub_child_pnpinfo_str: device not on hub\n"));
+	buf[0] = '\0';
+	return (0);
+
+found_dev:
+	j = 0;
+	if (dev->ddesc.iSerialNumber != 0) {
+		err = usbd_get_string_desc(dev, dev->ddesc.iSerialNumber, 0,
+		  &us, &size);
+		if (err == 0) {
+			do {
+				serial[j] = UGETW(us.bString[j]);
+				j++;
+			} while (j < ((us.bLength - 2) / 2));
+		}
+	}
+	serial[j] = '\0';
+	if (dev->ifacenums == NULL) {
+		snprintf(buf, buflen, "vendor=0x%04x product=0x%04x "
+		    "devclass=0x%02x devsubclass=0x%02x "
+		    "sernum=\"%s\"",
+		    UGETW(dev->ddesc.idVendor), UGETW(dev->ddesc.idProduct),
+		    dev->ddesc.bDeviceClass, dev->ddesc.bDeviceSubClass,
+		    serial);
+	} else {
+		iface = &dev->ifaces[dev->ifacenums[i]];
+		snprintf(buf, buflen, "vendor=0x%04x product=0x%04x "
+		    "devclass=0x%02x devsubclass=0x%02x "
+		    "sernum=\"%s\" "
+		    "intclass=0x%02x intsubclass=0x%02x",
+		    UGETW(dev->ddesc.idVendor), UGETW(dev->ddesc.idProduct),
+		    dev->ddesc.bDeviceClass, dev->ddesc.bDeviceSubClass,
+		    serial,
+		    iface->idesc->bInterfaceClass,
+		    iface->idesc->bInterfaceSubClass);
+	}
+	return (0);
 }
 #endif
 

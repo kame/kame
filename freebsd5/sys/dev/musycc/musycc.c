@@ -8,7 +8,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/musycc/musycc.c,v 1.30 2003/09/02 17:30:37 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/musycc/musycc.c,v 1.33.2.1 2004/10/15 21:45:13 jmg Exp $");
 
 /*
  * Card state machine:
@@ -222,7 +222,7 @@ struct softc {
 	struct mdesc *mdt[NHDLC];
 	struct mdesc *mdr[NHDLC];
 	node_p node;			/* NG node */
-	char nodename[NG_NODELEN + 1];	/* NG nodename */
+	char nodename[NG_NODESIZ];	/* NG nodename */
 	struct schan *chan[NHDLC];
 	u_long		cnt_ferr;
 	u_long		cnt_cerr;
@@ -274,18 +274,15 @@ static  ng_rcvdata_t musycc_rcvdata;
 static  ng_disconnect_t musycc_disconnect;
 
 static struct ng_type ngtypestruct = {
-	NG_ABI_VERSION,
-	NG_NODETYPE,
-	NULL, 
-	musycc_constructor,
-	musycc_rcvmsg,
-	musycc_shutdown,
-	musycc_newhook,
-	NULL,
-	musycc_connect,
-	musycc_rcvdata,
-	musycc_disconnect,
-	NULL
+	.version =	NG_ABI_VERSION,
+	.name =		NG_NODETYPE,
+	.constructor =	musycc_constructor,
+	.rcvmsg =	musycc_rcvmsg,
+	.shutdown =	musycc_shutdown,
+	.newhook =	musycc_newhook,
+	.connect =	musycc_connect,
+	.rcvdata =	musycc_rcvdata,
+	.disconnect =	musycc_disconnect,
 };
 
 /*
@@ -742,7 +739,7 @@ musycc_intr0_rx_eom(struct softc *sc, int ch)
 			/* Don't print a lot, just the begining will do */
 			if (m->m_len > 16)
 				m->m_len = m->m_pkthdr.len = 16;
-			m_print(m);
+			m_print(m, -1);
 			printf("\n");
 		}
 		md->status = 1600;	/* XXX: MTU */
@@ -1468,8 +1465,7 @@ musycc_attach(device_t self)
 	csc->f[f] = self;
 	device_set_softc(self, csc);
 	rid = PCIR_BAR(0);
-	res = bus_alloc_resource(self, SYS_RES_MEMORY, &rid,
-	    0, ~0, 1, RF_ACTIVE);
+	res = bus_alloc_resource_any(self, SYS_RES_MEMORY, &rid, RF_ACTIVE);
 	if (res == NULL) {
 		device_printf(self, "Could not map memory\n");
 		return ENXIO;
@@ -1479,8 +1475,8 @@ musycc_attach(device_t self)
 
 	/* Allocate interrupt */
 	rid = 0;
-	csc->irq[f] = bus_alloc_resource(self, SYS_RES_IRQ, &rid, 0, ~0,
-	    1, RF_SHAREABLE | RF_ACTIVE);
+	csc->irq[f] = bus_alloc_resource_any(self, SYS_RES_IRQ, &rid,
+	    RF_SHAREABLE | RF_ACTIVE);
 
 	if (csc->irq[f] == NULL) {
 		printf("couldn't map interrupt\n");

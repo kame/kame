@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -35,7 +31,7 @@
  *
  *	@(#)fdesc_vfsops.c	8.4 (Berkeley) 1/21/94
  *
- * $FreeBSD: src/sys/fs/fdescfs/fdesc_vfsops.c,v 1.41 2003/06/17 09:00:15 tjr Exp $
+ * $FreeBSD: src/sys/fs/fdescfs/fdesc_vfsops.c,v 1.46 2004/07/30 22:08:49 phk Exp $
  */
 
 /*
@@ -58,7 +54,7 @@
 
 static MALLOC_DEFINE(M_FDESCMNT, "FDESC mount", "FDESC mount structure");
 
-static vfs_nmount_t	fdesc_mount;
+static vfs_mount_t	fdesc_mount;
 static vfs_unmount_t	fdesc_unmount;
 static vfs_statfs_t	fdesc_statfs;
 
@@ -66,10 +62,7 @@ static vfs_statfs_t	fdesc_statfs;
  * Mount the per-process file descriptors (/dev/fd)
  */
 static int
-fdesc_mount(mp, ndp, td)
-	struct mount *mp;
-	struct nameidata *ndp;
-	struct thread *td;
+fdesc_mount(struct mount *mp, struct thread *td)
 {
 	int error = 0;
 	struct fdescmount *fmp;
@@ -121,7 +114,7 @@ fdesc_unmount(mp, mntflags, td)
 	 * There is 1 extra root vnode reference corresponding
 	 * to f_root.
 	 */
-	if ((error = vflush(mp, 1, flags)) != 0)
+	if ((error = vflush(mp, 1, flags, td)) != 0)
 		return (error);
 
 	/*
@@ -134,11 +127,11 @@ fdesc_unmount(mp, mntflags, td)
 }
 
 int
-fdesc_root(mp, vpp)
+fdesc_root(mp, vpp, td)
 	struct mount *mp;
 	struct vnode **vpp;
+	struct thread *td;
 {
-	struct thread *td = curthread;	/* XXX */
 	struct vnode *vp;
 
 	/*
@@ -169,7 +162,9 @@ fdesc_statfs(mp, sbp, td)
 	 * limit is ever reduced below the current number
 	 * of open files... ]
 	 */
-	lim = td->td_proc->p_rlimit[RLIMIT_NOFILE].rlim_cur;
+	PROC_LOCK(td->td_proc);
+	lim = lim_cur(td->td_proc, RLIMIT_NOFILE);
+	PROC_UNLOCK(td->td_proc);
 	fdp = td->td_proc->p_fd;
 	FILEDESC_LOCK(fdp);
 	last = min(fdp->fd_nfiles, lim);
@@ -205,7 +200,7 @@ fdesc_statfs(mp, sbp, td)
 
 static struct vfsops fdesc_vfsops = {
 	.vfs_init =		fdesc_init,
-	.vfs_nmount =		fdesc_mount,
+	.vfs_mount =		fdesc_mount,
 	.vfs_root =		fdesc_root,
 	.vfs_statfs =		fdesc_statfs,
 	.vfs_unmount =		fdesc_unmount,

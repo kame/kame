@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/boot/pc98/boot2/sys.c,v 1.5 2003/09/08 09:11:20 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/boot/pc98/boot2/sys.c,v 1.6 2004/07/30 09:42:04 nyan Exp $");
 
 /*
  * Ported to PC-9801 by Yoshio Kimura
@@ -95,7 +95,7 @@ read(char *buffer, int count)
 			if (size > count)
 				size = count;
 			devread(iobuf, bnum2, cnt2);
-			bcopy(iobuf+off, buffer, size);
+			memcpy(iobuf+off, buffer, size);
 		}
 		buffer += size;
 		count -= size;
@@ -118,7 +118,7 @@ read(char *buffer, int count)
 		if (count < size)
 			size = count;
 		devread(iobuf, off >> 9, 512);
-		bcopy(iobuf+cnt, buffer, size);
+		memcpy(iobuf+cnt, buffer, size);
 		count -= size;
 		off += size;
 		buffer += size;
@@ -132,7 +132,7 @@ read(char *buffer, int count)
 	}
 	if (count) {
 		devread(iobuf, off >> 9, 512);
-		bcopy(iobuf, buffer, count);
+		memcpy(iobuf, buffer, count);
 	}
 }
 #endif
@@ -148,7 +148,7 @@ find(char *path)
 	list_only = (path[0] == '?' && path[1] == '\0');
 loop:
 	devread(iobuf, fsbtodb(fs, ino_to_fsba(fs, ino)) + boff, fs->fs_bsize);
-	bcopy((void *)&((struct dinode *)iobuf)[ino % fs->fs_inopb],
+	memcpy((void *)&((struct dinode *)iobuf)[ino % fs->fs_inopb],
 	      (void *)&inode.i_din,
 	      sizeof (struct dinode));
 	if (!*path)

@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/alpha/libalpha/devicename.c,v 1.4 1999/08/28 00:39:27 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/alpha/libalpha/devicename.c,v 1.5 2004/01/04 23:21:01 obrien Exp $");
 
 #include <stand.h>
 #include <string.h>

@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/mlphy.c,v 1.18 2003/08/24 17:54:10 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/mlphy.c,v 1.19 2004/05/03 13:01:34 andre Exp $");
 
 /*
  * driver for Micro Linear 6692 PHYs
@@ -337,8 +337,8 @@ mlphy_service(xsc, mii, cmd)
 		/*
 		 * Only retry autonegotiation every 5 seconds.
 		 */
-		if (++sc->mii_ticks != 5)
-			return (0);
+		if (++sc->mii_ticks <= 5)
+			break;
 		
 		sc->mii_ticks = 0;
 		msc->ml_linked = 0;

@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/ieee_float.c,v 1.9 2003/08/22 07:20:25 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/ieee_float.c,v 1.10 2004/05/06 09:36:11 das Exp $");
 
 #include <sys/types.h>
 #ifdef TEST
@@ -311,6 +311,9 @@ makefloat(int sign, int exp, u_int64_t frac,
 				frac = frachi;
 			break;
 		}
+
+		if (frac == 0)
+			*status |= FPCR_UNF;
 
 		/*
 		 * Rounding up may take us to TWO if

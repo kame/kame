@@ -14,7 +14,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/boot/i386/boot2/boot2.c,v 1.67 2003/11/15 10:04:06 bde Exp $");
+__FBSDID("$FreeBSD: src/sys/boot/i386/boot2/boot2.c,v 1.70 2004/07/30 00:33:09 kan Exp $");
 
 #include <sys/param.h>
 #include <sys/disklabel.h>
@@ -139,7 +139,16 @@ static int xputc(int);
 static int xgetc(int);
 static int getc(int);
 
-#define memcpy __builtin_memcpy
+static void memcpy(void *, const void *, int);
+static void
+memcpy(void *dst, const void *src, int len)
+{
+    const char *s = src;
+    char *d = dst;
+
+    while (len--)
+        *d++ = *s++;
+}
 
 static inline int
 strcmp(const char *s1, const char *s2)

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/kbd/kbdreg.h,v 1.16 2003/09/27 08:29:58 phk Exp $
+ * $FreeBSD: src/sys/dev/kbd/kbdreg.h,v 1.17 2004/06/16 09:46:48 phk Exp $
  */
 
 #ifndef _DEV_KBD_KBDREG_H_
@@ -90,7 +90,7 @@ struct keyboard {
 #define KB_DELAY2	100
 	unsigned long	kb_count;	/* # of processed key strokes */
 	u_char		kb_lastact[NUM_KEYS/2];
-	dev_t		kb_dev;
+	struct cdev *kb_dev;
 };
 
 #define KBD_IS_VALID(k)		((k)->kb_flags & KB_VALID)

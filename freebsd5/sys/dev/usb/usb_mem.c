@@ -1,5 +1,5 @@
 /*	$NetBSD: usb_mem.c,v 1.26 2003/02/01 06:23:40 thorpej Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usb_mem.c,v 1.5 2003/10/04 22:13:21 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb_mem.c,v 1.6 2004/08/02 13:59:02 iedowse Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -46,7 +46,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/usb_mem.c,v 1.5 2003/10/04 22:13:21 joe Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/usb_mem.c,v 1.6 2004/08/02 13:59:02 iedowse Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -142,7 +142,8 @@ usb_block_allocmem(bus_dma_tag_t tag, size_t size, size_t align,
 	s = splusb();
 	/* First check the free list. */
 	for (p = LIST_FIRST(&usb_blk_freelist); p; p = LIST_NEXT(p, next)) {
-		if (p->tag == tag && p->size >= size && p->align >= align) {
+		if (p->tag == tag && p->size >= size && p->size < size * 2 &&
+		    p->align >= align) {
 			LIST_REMOVE(p, next);
 			usb_blk_nfree--;
 			splx(s);

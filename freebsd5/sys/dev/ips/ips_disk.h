@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ips/ips_disk.h,v 1.2 2003/08/22 06:00:27 imp Exp $
+ * $FreeBSD: src/sys/dev/ips/ips_disk.h,v 1.3 2004/02/18 21:36:52 phk Exp $
  */
 
 
@@ -61,6 +61,6 @@ typedef struct ipsdisk_softc {
 	int		unit;
 	int		disk_number;
 	u_int32_t 	state;
-	struct disk 	ipsd_disk;
+	struct disk 	*ipsd_disk;
 	ips_softc_t	*sc;
 }ipsdisk_softc_t;

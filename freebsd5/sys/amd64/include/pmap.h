@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -43,7 +39,7 @@
  *
  *	from: hp300: @(#)pmap.h	7.2 (Berkeley) 12/16/90
  *	from: @(#)pmap.h	7.4 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/amd64/include/pmap.h,v 1.109 2003/11/17 08:58:14 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/pmap.h,v 1.122.2.2 2004/10/10 19:08:00 alc Exp $
  */
 
 #ifndef _MACHINE_PMAP_H_
@@ -66,12 +62,13 @@
 #define	PG_AVAIL1	0x200	/*    /	Available for system	*/
 #define	PG_AVAIL2	0x400	/*   <	programmers use		*/
 #define	PG_AVAIL3	0x800	/*    \				*/
+#define	PG_NX		(1ul<<63) /* No-execute */
 
 
 /* Our various interpretations of the above */
 #define PG_W		PG_AVAIL1	/* "Wired" pseudoflag */
 #define	PG_MANAGED	PG_AVAIL2
-#define	PG_FRAME	(~((vm_paddr_t)PAGE_MASK))
+#define	PG_FRAME	(0x000ffffffffff000ul)
 #define	PG_PROT		(PG_RW|PG_U)	/* all protection bits . */
 #define PG_N		(PG_NC_PWT|PG_NC_PCD)	/* Non-cacheable */
 
@@ -100,8 +97,9 @@
 	((unsigned long)(l2) << PDRSHIFT) | \
 	((unsigned long)(l1) << PAGE_SHIFT))
 
+/* Initial number of kernel page tables */
 #ifndef NKPT
-#define	NKPT		120	/* initial number of kernel page tables */
+#define	NKPT		240	/* Enough for 16GB (2MB page tables) */
 #endif
 
 #define NKPML4E		1		/* number of kernel PML4 slots */
@@ -133,6 +131,8 @@
 #ifndef LOCORE
 
 #include <sys/queue.h>
+#include <sys/_lock.h>
+#include <sys/_mutex.h>
 
 typedef u_int64_t pd_entry_t;
 typedef u_int64_t pt_entry_t;
@@ -194,17 +194,29 @@ pte_load_store(pt_entry_t *ptep, pt_entry_t pte)
 {
 	pt_entry_t r;
 
-	r = *ptep;
-	*ptep = pte;
+	__asm __volatile(
+	    "xchgq %0,%1"
+	    : "=m" (*ptep),
+	      "=r" (r)
+	    : "1" (pte),
+	      "m" (*ptep));
 	return (r);
 }
 
 #define	pte_load_clear(pte)	atomic_readandclear_long(pte)
 
-#define	pte_clear(ptep)		pte_load_store((ptep), (pt_entry_t)0ULL)
-#define	pte_store(ptep, pte)	pte_load_store((ptep), (pt_entry_t)pte)
+static __inline void
+pte_store(pt_entry_t *ptep, pt_entry_t pte)
+{
+
+	*ptep = pte;
+}
+
+#define	pte_clear(ptep)		pte_store((ptep), (pt_entry_t)0ULL)
 
 #define	pde_store(pdep, pde)	pte_store((pdep), (pde))
+
+extern pt_entry_t pg_nx;
 
 #endif /* _KERNEL */
 
@@ -219,21 +231,30 @@ struct md_page {
 };
 
 struct pmap {
+	struct mtx		pm_mtx;
 	pml4_entry_t		*pm_pml4;	/* KVA of level 4 page table */
 	TAILQ_HEAD(,pv_entry)	pm_pvlist;	/* list of mappings in pmap */
 	u_int			pm_active;	/* active on cpus */
 	/* spare u_int here due to padding */
 	struct pmap_statistics	pm_stats;	/* pmap statistics */
-	LIST_ENTRY(pmap) 	pm_list;	/* List of all pmaps */
 };
-
-#define	pmap_page_is_mapped(m)	(!TAILQ_EMPTY(&(m)->md.pv_list))
 
 typedef struct pmap	*pmap_t;
 
 #ifdef _KERNEL
 extern struct pmap	kernel_pmap_store;
 #define kernel_pmap	(&kernel_pmap_store)
+
+#define	PMAP_LOCK(pmap)		mtx_lock(&(pmap)->pm_mtx)
+#define	PMAP_LOCK_ASSERT(pmap, type) \
+				mtx_assert(&(pmap)->pm_mtx, (type))
+#define	PMAP_LOCK_DESTROY(pmap)	mtx_destroy(&(pmap)->pm_mtx)
+#define	PMAP_LOCK_INIT(pmap)	mtx_init(&(pmap)->pm_mtx, "pmap", \
+				    NULL, MTX_DEF | MTX_DUPOK)
+#define	PMAP_LOCKED(pmap)	mtx_owned(&(pmap)->pm_mtx)
+#define	PMAP_MTX(pmap)		(&(pmap)->pm_mtx)
+#define	PMAP_TRYLOCK(pmap)	mtx_trylock(&(pmap)->pm_mtx)
+#define	PMAP_UNLOCK(pmap)	mtx_unlock(&(pmap)->pm_mtx)
 #endif
 
 /*
@@ -245,7 +266,6 @@ typedef struct pv_entry {
 	vm_offset_t	pv_va;		/* virtual address for mapping */
 	TAILQ_ENTRY(pv_entry)	pv_list;
 	TAILQ_ENTRY(pv_entry)	pv_plist;
-	vm_page_t	pv_ptem;	/* VM page for pte */
 } *pv_entry_t;
 
 #ifdef	_KERNEL
@@ -261,20 +281,18 @@ extern struct ppro_vmtrr PPro_vmtrr[NPPROVMTRR];
 extern caddr_t	CADDR1;
 extern pt_entry_t *CMAP1;
 extern vm_paddr_t avail_end;
-extern vm_paddr_t avail_start;
-extern vm_offset_t clean_eva;
-extern vm_offset_t clean_sva;
 extern vm_paddr_t phys_avail[];
-extern char *ptvmmap;		/* poor name! */
 extern vm_offset_t virtual_avail;
 extern vm_offset_t virtual_end;
 
+#define	pmap_page_is_mapped(m)	(!TAILQ_EMPTY(&(m)->md.pv_list))
+
 void	pmap_bootstrap(vm_paddr_t *);
 void	pmap_kenter(vm_offset_t va, vm_paddr_t pa);
+void	*pmap_kenter_temporary(vm_paddr_t pa, int i);
 void	pmap_kremove(vm_offset_t);
 void	*pmap_mapdev(vm_paddr_t, vm_size_t);
 void	pmap_unmapdev(vm_offset_t, vm_size_t);
-pt_entry_t *pmap_pte_quick(pmap_t, vm_offset_t) __pure2;
 void	pmap_invalidate_page(pmap_t, vm_offset_t);
 void	pmap_invalidate_range(pmap_t, vm_offset_t, vm_offset_t);
 void	pmap_invalidate_all(pmap_t);

@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ofw/openfirm.c,v 1.11 2003/08/24 17:54:14 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ofw/openfirm.c,v 1.13 2004/08/16 15:45:26 marius Exp $");
 /*
  * Copyright (C) 2000 Benno Rice.
  * All rights reserved.
@@ -68,7 +68,7 @@ __FBSDID("$FreeBSD: src/sys/dev/ofw/openfirm.c,v 1.11 2003/08/24 17:54:14 obrien
 
 #include <dev/ofw/openfirm.h>
 
-MALLOC_DEFINE(M_OFWPROP, "openfirm", "OpenFirmware properties");
+MALLOC_DEFINE(M_OFWPROP, "openfirm", "Open Firmware properties");
 
 static ihandle_t stdin;
 static ihandle_t stdout;
@@ -325,9 +325,9 @@ OF_getprop(phandle_t package, char *propname, void *buf, int buflen)
 }
 
 /*
- * Store the value of a property of a package into newly allocated memory (using
- * the M_OFWPROP malloc pool and M_WAITOK). elsz is the size of a single element,
- * the number of elements is return in number.
+ * Store the value of a property of a package into newly allocated memory
+ * (using the M_OFWPROP malloc pool and M_WAITOK). elsz is the size of a
+ * single element, the number of elements is return in number.
  */
 int
 OF_getprop_alloc(phandle_t package, char *propname, int elsz, void **buf)
@@ -385,7 +385,7 @@ OF_setprop(phandle_t package, char *propname, void *buf, int len)
 		cell_t		nreturns;
 		cell_t		package;
 		cell_t		propname;
-		cell_t		buf;;
+		cell_t		buf;
 		cell_t		len;
 		cell_t		size;
 	} args = {
@@ -743,7 +743,7 @@ OF_boot(char *bootspec)
 	for (;;);			/* just in case */
 }
 
-/* Suspend and drop back to the OpenFirmware interface. */
+/* Suspend and drop back to the Open Firmware interface. */
 void
 OF_enter()
 {
@@ -761,7 +761,7 @@ OF_enter()
 	return;				/* We may come back. */
 }
 
-/* Shut down and drop back to the OpenFirmware interface. */
+/* Shut down and drop back to the Open Firmware interface. */
 void
 OF_exit()
 {

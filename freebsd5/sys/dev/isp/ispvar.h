@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/ispvar.h,v 1.63 2003/09/13 01:59:14 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/ispvar.h,v 1.66 2004/05/24 07:02:25 njl Exp $ */
 /*
  * Soft Definitions for for Qlogic ISP SCSI adapters.
  *
@@ -54,7 +54,7 @@
 #endif
 
 #define	ISP_CORE_VERSION_MAJOR	2
-#define	ISP_CORE_VERSION_MINOR	7
+#define	ISP_CORE_VERSION_MINOR	8
 
 /*
  * Vector for bus specific code to provide specific services.
@@ -426,6 +426,13 @@ typedef struct ispsoftc {
 	 */
 	XS_T **isp_xflist;
 
+#ifdef	ISP_TARGET_MODE
+	/*
+	 * Active target commands are stored here, indexed by handle function.
+	 */
+	void **isp_tgtlist;
+#endif
+
 	/*
 	 * request/result queue pointers and DMA handles for them.
 	 */
@@ -487,8 +494,8 @@ typedef struct ispsoftc {
  *
  */
 #define	ISP_ROLE_NONE		0x0
-#define	ISP_ROLE_INITIATOR	0x1
-#define	ISP_ROLE_TARGET		0x2
+#define	ISP_ROLE_TARGET		0x1
+#define	ISP_ROLE_INITIATOR	0x2
 #define	ISP_ROLE_BOTH		(ISP_ROLE_TARGET|ISP_ROLE_INITIATOR)
 #define	ISP_ROLE_EITHER		ISP_ROLE_BOTH
 #ifndef	ISP_DEFAULT_ROLES
@@ -679,7 +686,8 @@ typedef enum {
 	ISPCTL_SEND_LIP,		/* Send a LIP */
 	ISPCTL_GET_POSMAP,		/* Get FC-AL position map */
 	ISPCTL_RUN_MBOXCMD,		/* run a mailbox command */
-	ISPCTL_TOGGLE_TMODE		/* toggle target mode */
+	ISPCTL_TOGGLE_TMODE,		/* toggle target mode */
+	ISPCTL_GET_PDB			/* get a single port database entry */
 } ispctl_t;
 int isp_control(struct ispsoftc *, ispctl_t, void *);
 
@@ -752,7 +760,7 @@ int isp_async(struct ispsoftc *, ispasync_t, void *);
 /*
  * Platform Dependent Error and Debug Printout
  */
-#ifdef	__GNUC__
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
 void isp_prt(struct ispsoftc *, int level, const char *, ...)
 	__attribute__((__format__(__printf__,3,4)));
 #else

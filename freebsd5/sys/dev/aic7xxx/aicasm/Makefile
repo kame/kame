@@ -1,6 +1,7 @@
+#
 # $Id: //depot/aic7xxx/freebsd/dev/aic7xxx/aicasm/Makefile#2 $
 #
-# $FreeBSD: src/sys/dev/aic7xxx/aicasm/Makefile,v 1.16 2002/09/26 21:46:19 gibbs Exp $
+# $FreeBSD: src/sys/dev/aic7xxx/aicasm/Makefile,v 1.18 2004/03/12 21:36:12 trhodes Exp $
 
 PROG=	aicasm
 
@@ -12,8 +13,8 @@ GENHDRS=	aicasm_gram.h aicasm_macro_gram.h
 
 SRCS=	${GENHDRS} ${CSRCS} ${YSRCS} ${LSRCS}
 CLEANFILES+= ${GENHDRS} ${YSRCS:R:C/(.*)/\1.output/g}
-DPADD+=	${LIBL}
-LDADD+=	-ll
+DPADD=	${LIBL}
+LDADD=	-ll
 
 # Correct path for kernel builds
 # Don't rely on the kernel's .depend file
@@ -22,7 +23,13 @@ LDADD+=	-ll
 DEPENDFILE=
 .endif
 
-CFLAGS+= -nostdinc -I/usr/include -I.
+.if ${CC} == "icc"
+CFLAGS+=	-restrict
+NOSTDINC=	-X
+.else
+NOSTDINC=	-nostdinc
+.endif
+CFLAGS+= ${NOSTDINC} -I/usr/include -I.
 .ifdef MAKESRCPATH
 CFLAGS+= -I${MAKESRCPATH}
 .endif

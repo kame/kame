@@ -32,7 +32,7 @@
  * Rewritten by:
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/mga_dma.c,v 1.9 2003/11/12 20:56:30 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/mga_dma.c,v 1.10 2004/01/06 04:34:53 anholt Exp $
  */
 
 #include "dev/drm/mga.h"
@@ -502,14 +502,6 @@ static int mga_do_init_dma( drm_device_t *dev, drm_mga_init_t *init )
 		return DRM_ERR(EINVAL);
 	}
 
-	DRM_FIND_MAP( dev_priv->fb, init->fb_offset );
-	if(!dev_priv->fb) {
-		DRM_ERROR( "failed to find framebuffer!\n" );
-		/* Assign dev_private so we can do cleanup. */
-		dev->dev_private = (void *)dev_priv;
-		mga_do_cleanup_dma( dev );
-		return DRM_ERR(EINVAL);
-	}
 	DRM_FIND_MAP( dev_priv->mmio, init->mmio_offset );
 	if(!dev_priv->mmio) {
 		DRM_ERROR( "failed to find mmio region!\n" );

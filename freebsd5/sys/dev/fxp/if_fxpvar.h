@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fxp/if_fxpvar.h,v 1.29 2003/10/30 23:12:24 brooks Exp $
+ * $FreeBSD: src/sys/dev/fxp/if_fxpvar.h,v 1.32 2004/06/02 22:59:57 mux Exp $
  */
 
 /*
@@ -104,15 +104,17 @@
 #if __FreeBSD_version < 500000
 #define	FXP_LOCK(_sc)
 #define	FXP_UNLOCK(_sc)
+#define	FXP_LOCKED(_sc)
+#define	FXP_LOCK_ASSERT(_sc, _what)
 #define	INTR_MPSAFE		0
-#define mtx_owned(a)		0
-#define mtx_assert(a, b)
 #define mtx_init(a, b, c, d)
 #define mtx_destroy(a)
 struct mtx { int dummy; };
 #else
 #define	FXP_LOCK(_sc)		mtx_lock(&(_sc)->sc_mtx)
 #define	FXP_UNLOCK(_sc)		mtx_unlock(&(_sc)->sc_mtx)
+#define	FXP_LOCKED(_sc)		mtx_owned(&(_sc)->sc_mtx)
+#define	FXP_LOCK_ASSERT(_sc, _what)	mtx_assert(&(_sc)->sc_mtx, (_what))
 #endif
 
 /*
@@ -180,10 +182,10 @@ struct fxp_softc {
 	struct ifmedia sc_media;	/* media information */
 	device_t miibus;
 	device_t dev;
-	struct sysctl_ctx_list sysctl_ctx;
-	struct sysctl_oid *sysctl_tree;
 	int tunable_int_delay;		/* interrupt delay value for ucode */
 	int tunable_bundle_max;		/* max # frames per interrupt (ucode) */
+	int tunable_noflow;		/* flow control disabled */
+	int rnr;			/* RNR events */
 	int eeprom_size;		/* size of serial EEPROM */
 	int suspended;			/* 0 = normal  1 = suspended or dead */
 	int cu_resume_bug;
@@ -209,6 +211,7 @@ struct fxp_softc {
 #define FXP_FLAG_UCODE		0x0100	/* ucode is loaded */
 #define FXP_FLAG_DEFERRED_RNR	0x0200	/* DEVICE_POLLING deferred RNR */
 #define FXP_FLAG_EXT_RFA	0x0400	/* extended RFDs for csum offload */
+#define FXP_FLAG_SAVE_BAD	0x0800	/* save bad pkts: bad size, CRC, etc */
 
 /* Macros to ease CSR access. */
 #define	CSR_READ_1(sc, reg)						\

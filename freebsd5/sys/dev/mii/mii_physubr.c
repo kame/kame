@@ -38,14 +38,11 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/mii_physubr.c,v 1.19 2003/08/24 17:54:10 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/mii_physubr.c,v 1.21 2004/05/29 18:09:10 marius Exp $");
 
 /*
  * Subroutines common to all PHYs.
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/mii_physubr.c,v 1.19 2003/08/24 17:54:10 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -231,9 +228,11 @@ mii_phy_tick(struct mii_softc *sc)
 	/*
 	 * Only retry autonegotiation every N seconds.
 	 */
-	if (sc->mii_anegticks == 0)
+	if (sc->mii_anegticks == 0) {
 		sc->mii_anegticks = 17;
-	if (++sc->mii_ticks != sc->mii_anegticks)
+		return (0);
+	}
+	if (++sc->mii_ticks <= sc->mii_anegticks)
 		return (EJUSTRETURN);
 
 	sc->mii_ticks = 0;

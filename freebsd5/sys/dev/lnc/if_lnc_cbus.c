@@ -32,12 +32,13 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/lnc/if_lnc_cbus.c,v 1.5 2003/08/24 17:49:15 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/lnc/if_lnc_cbus.c,v 1.7 2004/06/03 06:10:00 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/malloc.h>
 #include <sys/socket.h>
 
@@ -164,8 +165,8 @@ lnc_isa_attach(device_t dev)
 		bus_set_resource(dev, SYS_RES_IRQ, 0,  6, 1);
 
 	sc->irqrid = 0;
-	sc->irqres = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irqrid, 0, ~0, 1,
-	                                RF_ACTIVE);
+	sc->irqres = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irqrid,
+					    RF_ACTIVE);
 
 	if (! sc->irqres) {
 		device_printf(dev, "Failed to allocate irq\n");

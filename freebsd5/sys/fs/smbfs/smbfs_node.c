@@ -29,10 +29,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_node.c,v 1.17 2003/10/05 02:43:30 jeff Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_node.c,v 1.20 2004/07/10 21:21:13 marcel Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
@@ -140,7 +141,7 @@ smbfs_name_free(u_char *name)
 	cp--;
 	if (*cp != 0xfc) {
 		printf("First byte of name entry '%s' corrupted\n", name);
-		Debugger("ditto");
+		kdb_enter("ditto");
 	}
 	cp -= sizeof(int);
 	nmlen = *(int*)cp;
@@ -148,11 +149,11 @@ smbfs_name_free(u_char *name)
 	if (nmlen != slen) {
 		printf("Name length mismatch: was %d, now %d name '%s'\n",
 		    nmlen, slen, name);
-		Debugger("ditto");
+		kdb_enter("ditto");
 	}
 	if (name[nmlen] != 0xfe) {
 		printf("Last byte of name entry '%s' corrupted\n", name);
-		Debugger("ditto");
+		kdb_enter("ditto");
 	}
 	free(cp, M_SMBNODENAME);
 #else
@@ -164,6 +165,7 @@ static int
 smbfs_node_alloc(struct mount *mp, struct vnode *dvp,
 	const char *name, int nmlen, struct smbfattr *fap, struct vnode **vpp)
 {
+	struct vattr vattr;
 	struct thread *td = curthread;	/* XXX */
 	struct smbmount *smp = VFSTOSMBFS(mp);
 	struct smbnode_hashhead *nhpp;
@@ -208,6 +210,20 @@ loop:
 		smbfs_hash_unlock(smp, td);
 		if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK, td) != 0)
 			goto retry;
+		/* Force cached attributes to be refreshed if stale. */
+		(void)VOP_GETATTR(vp, &vattr, td->td_ucred, td);
+		/*
+		 * If the file type on the server is inconsistent with
+		 * what it was when we created the vnode, kill the
+		 * bogus vnode now and fall through to the code below
+		 * to create a new one with the right type.
+		 */
+		if ((vp->v_type == VDIR && (np->n_dosattr & SMB_FA_DIR) == 0) ||
+		    (vp->v_type == VREG && (np->n_dosattr & SMB_FA_DIR) != 0)) {
+			vput(vp);
+			vgone(vp);
+			break;
+		}
 		*vpp = vp;
 		return 0;
 	}
@@ -358,9 +374,11 @@ smbfs_inactive(ap)
 			}
 		}
 		np->n_flag &= ~NOPEN;
+		smbfs_attr_cacheremove(vp);
 	}
-	smbfs_attr_cacheremove(vp);
 	VOP_UNLOCK(vp, 0, td);
+	if (np->n_flag & NGONE)
+		vrecycle(vp, NULL, td);
 	return (0);
 }
 /*

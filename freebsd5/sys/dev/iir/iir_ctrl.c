@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/iir/iir_ctrl.c,v 1.11 2003/09/26 15:36:47 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/iir/iir_ctrl.c,v 1.15 2004/06/16 09:46:46 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -68,17 +68,16 @@ static d_write_t	iir_write;
 static d_read_t		iir_read;
 static d_ioctl_t	iir_ioctl;
 
-#define CDEV_MAJOR          IIR_CDEV_MAJOR
-
 /* Normally, this is a static structure.  But we need it in pci/iir_pci.c */
 static struct cdevsw iir_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	iir_open,
 	.d_close =	iir_close,
 	.d_read =	iir_read,
 	.d_write =	iir_write,
 	.d_ioctl =	iir_ioctl,
 	.d_name =	"iir",
-	.d_maj =	CDEV_MAJOR,
 };
 
 /*
@@ -96,10 +95,10 @@ extern gdt_statist_t gdt_stat;
  * Given a controller number,
  * make a special device and return the dev_t
  */
-dev_t 
+struct cdev *
 gdt_make_dev(int unit)
 {
-    dev_t dev;
+    struct cdev *dev;
 
 #ifdef SDEV_PER_HBA
     dev = make_dev(&iir_cdevsw, hba2minor(unit), UID_ROOT, GID_OPERATOR,
@@ -115,7 +114,7 @@ gdt_make_dev(int unit)
 }
 
 void
-gdt_destroy_dev(dev_t dev)
+gdt_destroy_dev(struct cdev *dev)
 {
     if (dev != NULL)
         destroy_dev(dev);
@@ -145,7 +144,7 @@ gdt_minor2softc(int minor_no)
 }
 
 static int
-iir_open(dev_t dev, int flags, int fmt, d_thread_t * p)
+iir_open(struct cdev *dev, int flags, int fmt, d_thread_t * p)
 {
     GDT_DPRINTF(GDT_D_DEBUG, ("iir_open()\n"));
 
@@ -163,7 +162,7 @@ iir_open(dev_t dev, int flags, int fmt, d_thread_t * p)
 }
 
 static int
-iir_close(dev_t dev, int flags, int fmt, d_thread_t * p)
+iir_close(struct cdev *dev, int flags, int fmt, d_thread_t * p)
 {
     GDT_DPRINTF(GDT_D_DEBUG, ("iir_close()\n"));
                 
@@ -181,7 +180,7 @@ iir_close(dev_t dev, int flags, int fmt, d_thread_t * p)
 }
 
 static int
-iir_write(dev_t dev, struct uio * uio, int ioflag)
+iir_write(struct cdev *dev, struct uio * uio, int ioflag)
 {
     GDT_DPRINTF(GDT_D_DEBUG, ("iir_write()\n"));
                 
@@ -199,7 +198,7 @@ iir_write(dev_t dev, struct uio * uio, int ioflag)
 }
 
 static int
-iir_read(dev_t dev, struct uio * uio, int ioflag)
+iir_read(struct cdev *dev, struct uio * uio, int ioflag)
 {
     GDT_DPRINTF(GDT_D_DEBUG, ("iir_read()\n"));
                 
@@ -223,7 +222,7 @@ iir_read(dev_t dev, struct uio * uio, int ioflag)
  */
 
 static int
-iir_ioctl(dev_t dev, u_long cmd, caddr_t cmdarg, int flags, d_thread_t * p)
+iir_ioctl(struct cdev *dev, u_long cmd, caddr_t cmdarg, int flags, d_thread_t * p)
 {
     GDT_DPRINTF(GDT_D_DEBUG, ("iir_ioctl() cmd 0x%lx\n",cmd));
 
@@ -262,11 +261,13 @@ iir_ioctl(dev_t dev, u_long cmd, caddr_t cmdarg, int flags, d_thread_t * p)
         }
 
       case GDT_IOCTL_DRVERS:
+      case GDT_IOCTL_DRVERS_OLD:
         *(int *)cmdarg = 
             (IIR_DRIVER_VERSION << 8) | IIR_DRIVER_SUBVERSION;
         break;
 
       case GDT_IOCTL_CTRTYPE:
+      case GDT_IOCTL_CTRTYPE_OLD:
         {
             gdt_ctrt_t *p;
             struct gdt_softc *gdt; 
@@ -379,5 +380,5 @@ iir_drvinit(void *unused)
     }
 }
 
-SYSINIT(iir_dev, SI_SUB_DRIVERS, SI_ORDER_MIDDLE + CDEV_MAJOR, iir_drvinit, NULL)
+SYSINIT(iir_dev, SI_SUB_DRIVERS, SI_ORDER_MIDDLE, iir_drvinit, NULL)
 */

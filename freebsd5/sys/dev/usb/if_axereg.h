@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/usb/if_axereg.h,v 1.2 2003/06/15 21:45:43 wpaul Exp $
+ * $FreeBSD: src/sys/dev/usb/if_axereg.h,v 1.3 2004/05/23 12:35:24 iedowse Exp $
  */
 
 /*
@@ -168,6 +168,7 @@ struct axe_softc {
 	unsigned char		axe_ipgs[3];
 	unsigned char 		axe_phyaddrs[2];
 	struct timeval		axe_rx_notice;
+	struct usb_qdat		axe_qdat;
 };
 
 #if 0

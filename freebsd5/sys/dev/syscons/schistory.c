@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/syscons/schistory.c,v 1.18 2003/08/24 18:17:23 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/syscons/schistory.c,v 1.19 2004/01/21 05:08:51 grehan Exp $");
 
 #include "opt_syscons.h"
 
@@ -42,7 +42,7 @@ __FBSDID("$FreeBSD: src/sys/dev/syscons/schistory.c,v 1.18 2003/08/24 18:17:23 o
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 
-#ifdef __sparc64__
+#if __sparc64__ || __powerpc__
 #include <machine/sc_machdep.h>
 #else
 #include <machine/pc/display.h>

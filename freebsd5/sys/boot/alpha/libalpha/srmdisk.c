@@ -23,9 +23,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/alpha/libalpha/srmdisk.c,v 1.12 2003/04/04 16:35:14 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/alpha/libalpha/srmdisk.c,v 1.13 2004/01/04 23:21:01 obrien Exp $");
 
 /*
  * SRM disk device handling.
@@ -34,7 +35,6 @@
  *
  * - NetBSD libi386/biosdisk.c
  * - FreeBSD biosboot/disk.c
- *
  */
 
 #include <stand.h>

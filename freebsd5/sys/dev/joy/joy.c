@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/joy/joy.c,v 1.49 2003/08/24 17:49:14 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/joy/joy.c,v 1.53 2004/06/16 09:46:48 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -63,19 +63,19 @@ __FBSDID("$FreeBSD: src/sys/dev/joy/joy.c,v 1.49 2003/08/24 17:49:14 obrien Exp 
 #define JOY_SOFTC(unit) (struct joy_softc *) \
         devclass_get_softc(joy_devclass,(unit))
 
-#define CDEV_MAJOR 51
 static	d_open_t	joyopen;
 static	d_close_t	joyclose;
 static	d_read_t	joyread;
 static	d_ioctl_t	joyioctl;
 
 static struct cdevsw joy_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	joyopen,
 	.d_close =	joyclose,
 	.d_read =	joyread,
 	.d_ioctl =	joyioctl,
 	.d_name =	"joy",
-	.d_maj =	CDEV_MAJOR,
 };
 
 devclass_t joy_devclass;
@@ -103,7 +103,7 @@ joy_attach(device_t dev)
 	struct joy_softc *joy = device_get_softc(dev);
 
 	joy->rid = 0;
-	joy->res = bus_alloc_resource(dev, SYS_RES_IOPORT, &joy->rid, 0, ~0, 1,
+	joy->res = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &joy->rid,
 	    RF_ACTIVE);
 	if (joy->res == NULL)
 		return ENXIO;
@@ -128,7 +128,7 @@ joy_detach(device_t dev)
 
 
 static int
-joyopen(dev_t dev, int flags, int fmt, struct thread *td)
+joyopen(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	int i = joypart (dev);
 	struct joy_softc *joy = JOY_SOFTC(UNIT(dev));
@@ -141,7 +141,7 @@ joyopen(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static int
-joyclose(dev_t dev, int flags, int fmt, struct thread *td)
+joyclose(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	int i = joypart (dev);
 	struct joy_softc *joy = JOY_SOFTC(UNIT(dev));
@@ -151,7 +151,7 @@ joyclose(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static int
-joyread(dev_t dev, struct uio *uio, int flag)
+joyread(struct cdev *dev, struct uio *uio, int flag)
 {
 	struct joy_softc *joy = JOY_SOFTC(UNIT(dev));
 	bus_space_handle_t port = joy->port;
@@ -209,7 +209,7 @@ joyread(dev_t dev, struct uio *uio, int flag)
 }
 
 static int
-joyioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
+joyioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 {
 	struct joy_softc *joy = JOY_SOFTC(UNIT(dev));
 	int i = joypart (dev);

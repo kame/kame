@@ -40,14 +40,13 @@
  */
 
 
-#ident "$FreeBSD: src/sys/dev/dpt/dpt.h,v 1.14 2003/03/29 08:30:45 mdodd Exp $"
+#ident "$FreeBSD: src/sys/dev/dpt/dpt.h,v 1.15 2004/02/21 19:42:50 phk Exp $"
 
 #ifndef _DPT_H
 #define _DPT_H
 
 #include <sys/ioccom.h>
 
-#define DPT_CDEV_MAJOR 88
 
 #undef DPT_USE_DLM_SWI
 

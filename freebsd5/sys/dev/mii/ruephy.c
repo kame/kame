@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/ruephy.c,v 1.2 2003/08/24 17:54:10 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/ruephy.c,v 1.4 2004/05/30 17:57:40 phk Exp $");
 
 /*
  * driver for RealTek RTL8150 internal PHY
@@ -36,6 +36,7 @@ __FBSDID("$FreeBSD: src/sys/dev/mii/ruephy.c,v 1.2 2003/08/24 17:54:10 obrien Ex
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 #include <sys/bus.h>
 
@@ -226,8 +227,8 @@ ruephy_service(struct mii_softc *sc, struct mii_data *mii, int cmd)
 		/*
 		 * Only retry autonegotiation every 5 seconds.
 		 */
-		if (++sc->mii_ticks != 5)
-			return (0);
+		if (++sc->mii_ticks <= 5)
+			break;
 
 		sc->mii_ticks = 0;
 		ruephy_reset(sc);

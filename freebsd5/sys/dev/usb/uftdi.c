@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/uftdi.c,v 1.10 2003/08/24 17:55:55 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/uftdi.c,v 1.18 2004/07/01 17:16:20 brooks Exp $");
 
 /*
  * FTDI FT8U100AX serial adapter driver
@@ -49,6 +49,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/uftdi.c,v 1.10 2003/08/24 17:55:55 obrien Ex
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/ioccom.h>
 #include <sys/fcntl.h>
@@ -69,7 +70,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/uftdi.c,v 1.10 2003/08/24 17:55:55 obrien Ex
 
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
-#include <dev/usb/usbdevs.h>
+#include "usbdevs.h"
 
 #include <dev/usb/ucomvar.h>
 
@@ -152,7 +153,24 @@ USB_MATCH(uftdi)
 
 	if (uaa->vendor == USB_VENDOR_FTDI &&
 	    (uaa->product == USB_PRODUCT_FTDI_SERIAL_8U100AX ||
-	     uaa->product == USB_PRODUCT_FTDI_SERIAL_8U232AM))
+	     uaa->product == USB_PRODUCT_FTDI_SERIAL_8U232AM ||
+	     uaa->product == USB_PRODUCT_FTDI_SEMC_DSS20 ||
+	     uaa->product == USB_PRODUCT_FTDI_CFA_631 ||
+	     uaa->product == USB_PRODUCT_FTDI_CFA_632 ||
+	     uaa->product == USB_PRODUCT_FTDI_CFA_633 ||
+	     uaa->product == USB_PRODUCT_FTDI_CFA_634 ||
+	     uaa->product == USB_PRODUCT_FTDI_USBSERIAL ||
+	     uaa->product == USB_PRODUCT_FTDI_MX2_3 ||
+	     uaa->product == USB_PRODUCT_FTDI_MX4_5 ||
+	     uaa->product == USB_PRODUCT_FTDI_LK202 ||
+	     uaa->product == USB_PRODUCT_FTDI_LK204))
+		return (UMATCH_VENDOR_PRODUCT);
+	if (uaa->vendor == USB_VENDOR_SIIG2 &&
+	    (uaa->product == USB_PRODUCT_SIIG2_US2308))
+		return (UMATCH_VENDOR_PRODUCT);
+	if (uaa->vendor == USB_VENDOR_INTREPIDCS &&
+	    (uaa->product == USB_PRODUCT_INTREPIDCS_VALUECAN ||
+	    uaa->product == USB_PRODUCT_INTREPIDCS_NEOVI))
 		return (UMATCH_VENDOR_PRODUCT);
 
 	return (UMATCH_NONE);
@@ -199,14 +217,56 @@ USB_ATTACH(uftdi)
 
 	id = usbd_get_interface_descriptor(iface);
 	ucom->sc_iface = iface;
-	switch( uaa->product ){
-	case USB_PRODUCT_FTDI_SERIAL_8U100AX:
-		sc->sc_type = UFTDI_TYPE_SIO;
-		sc->sc_hdrlen = 1;
+	switch( uaa->vendor ){
+	case USB_VENDOR_FTDI:
+		switch( uaa->product ){
+		case USB_PRODUCT_FTDI_SERIAL_8U100AX:
+			sc->sc_type = UFTDI_TYPE_SIO;
+			sc->sc_hdrlen = 1;
+			break;
+		case USB_PRODUCT_FTDI_SEMC_DSS20:
+		case USB_PRODUCT_FTDI_SERIAL_8U232AM:
+		case USB_PRODUCT_FTDI_CFA_631:
+		case USB_PRODUCT_FTDI_CFA_632:
+		case USB_PRODUCT_FTDI_CFA_633:
+		case USB_PRODUCT_FTDI_CFA_634:
+		case USB_PRODUCT_FTDI_USBSERIAL:
+		case USB_PRODUCT_FTDI_MX2_3:
+		case USB_PRODUCT_FTDI_MX4_5:
+		case USB_PRODUCT_FTDI_LK202:
+		case USB_PRODUCT_FTDI_LK204:
+			sc->sc_type = UFTDI_TYPE_8U232AM;
+			sc->sc_hdrlen = 0;
+			break;
+
+		default:		/* Can't happen */
+			goto bad;
+		}
 		break;
-	case USB_PRODUCT_FTDI_SERIAL_8U232AM:
-		sc->sc_type = UFTDI_TYPE_8U232AM;
-		sc->sc_hdrlen = 0;
+
+	case USB_VENDOR_INTREPIDCS:
+		switch( uaa->product ){
+		case USB_PRODUCT_INTREPIDCS_VALUECAN:
+		case USB_PRODUCT_INTREPIDCS_NEOVI:
+			sc->sc_type = UFTDI_TYPE_8U232AM;
+			sc->sc_hdrlen = 0;
+			break;
+
+		default:		/* Can't happen */
+			goto bad;
+		}
+		break;
+
+	case USB_VENDOR_SIIG2:
+		switch( uaa->product ){
+		case USB_PRODUCT_SIIG2_US2308:
+			sc->sc_type = UFTDI_TYPE_8U232AM;
+			sc->sc_hdrlen = 0;
+			break;
+
+		default:		/* Can't happen */
+			goto bad;
+		}
 		break;
 
 	default:		/* Can't happen */
@@ -481,6 +541,8 @@ uftdi_param(void *vsc, int portno, struct termios *t)
 		case 230400: rate = ftdi_8u232am_b230400; break;
 		case 460800: rate = ftdi_8u232am_b460800; break;
 		case 921600: rate = ftdi_8u232am_b921600; break;
+		case 2000000: rate = ftdi_8u232am_b2000000; break;
+		case 3000000: rate = ftdi_8u232am_b3000000; break;
 		default:
 			return (EINVAL);
 		}

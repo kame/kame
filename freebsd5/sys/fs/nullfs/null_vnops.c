@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -40,7 +36,7 @@
  *	...and...
  *	@(#)null_vnodeops.c 1.20 92/07/07 UCLA Ficus project
  *
- * $FreeBSD: src/sys/fs/nullfs/null_vnops.c,v 1.63 2003/06/17 08:52:45 tjr Exp $
+ * $FreeBSD: src/sys/fs/nullfs/null_vnops.c,v 1.66 2004/04/07 20:46:01 imp Exp $
  */
 
 /*
@@ -392,7 +388,7 @@ null_lookup(ap)
 	 * Rely only on the PDIRUNLOCK flag which should be carefully
 	 * tracked by underlying filesystem.
 	 */
-	if (cnp->cn_flags & PDIRUNLOCK)
+	if ((cnp->cn_flags & PDIRUNLOCK) && dvp->v_vnlock != ldvp->v_vnlock)
 		VOP_UNLOCK(dvp, LK_THISLAYER, td);
 	if ((error == 0 || error == EJUSTRETURN) && lvp != NULL) {
 		if (ldvp == lvp) {
@@ -650,7 +646,7 @@ null_lock(ap)
 		 * operation.  When that happens, just back out.
 		 */
 		if (error == 0 && (vp->v_iflag & VI_XLOCK) != 0 &&
-		    td != vp->v_vxproc) {
+		    td != vp->v_vxthread) {
 			lockmgr(vp->v_vnlock,
 				(flags & ~LK_TYPE_MASK) | LK_RELEASE,
 				VI_MTX(vp), td);
@@ -668,7 +664,7 @@ null_lock(ap)
 			wakeup(&nn->null_pending_locks);
 		}
 		if (error == ENOENT && (vp->v_iflag & VI_XLOCK) != 0 &&
-		    vp->v_vxproc != curthread) {
+		    vp->v_vxthread != curthread) {
 			vp->v_iflag |= VI_XWANT;
 			msleep(vp, VI_MTX(vp), PINOD, "nulbo", 0);
 		}

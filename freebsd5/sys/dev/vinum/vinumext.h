@@ -34,7 +34,7 @@
  * advised of the possibility of such damage.
  *
  * $Id: vinumext.h,v 1.33 2003/05/23 00:57:48 grog Exp $
- * $FreeBSD: src/sys/dev/vinum/vinumext.h,v 1.40 2003/05/23 01:13:43 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumext.h,v 1.42.2.1 2004/09/24 22:40:01 marius Exp $
  */
 
 /* vinumext.h: external definitions */
@@ -141,13 +141,13 @@ d_close_t vinumclose;
 d_strategy_t vinumstrategy;
 d_ioctl_t vinumioctl;
 
-int vinum_super_ioctl(dev_t, u_long, caddr_t);
+int vinum_super_ioctl(struct cdev *, u_long, caddr_t);
 int vinumstart(struct buf *bp, int reviveok);
 int launch_requests(struct request *rq, int reviveok);
 void sdio(struct buf *bp);
 
 /* XXX Do we need this? */
-int vinumpart(dev_t);
+int vinumpart(struct cdev *);
 
 extern jmp_buf command_fail;				    /* return here if config fails */
 
@@ -172,9 +172,9 @@ struct rqgroup *allocrqg(struct request *rq, int elements);
 void deallocrqg(struct rqgroup *rqg);
 
 /* Device number decoding */
-int Volno(dev_t x);
-int Plexno(dev_t x);
-int Sdno(dev_t x);
+int Volno(struct cdev *x);
+int Plexno(struct cdev *x);
+int Sdno(struct cdev *x);
 
 /* State transitions */
 int set_drive_state(int driveno, enum drivestate state, enum setstateflags flags);
@@ -187,8 +187,6 @@ void forceup(int plexno);
 void update_plex_state(int plexno);
 void update_volume_state(int volno);
 void invalidate_subdisks(struct plex *, enum sdstate);
-void get_volume_label(char *name, int plexes, u_int64_t size, struct disklabel *lp);
-int write_volume_label(int);
 void start_object(struct vinum_ioctl_msg *);
 void stop_object(struct vinum_ioctl_msg *);
 void setstate(struct vinum_ioctl_msg *msg);
@@ -249,7 +247,7 @@ void FFree(void *mem, char *, int);
 #define LOCKDRIVE(d) lockdrive (d, __FILE__, __LINE__)
 #else
 #define Malloc(x)  malloc((x), M_DEVBUF, \
-	curthread->td_proc->p_intr_nesting_level == 0? M_WAITOK: M_NOWAIT)
+	curthread->td_intr_nesting_level == 0? M_WAITOK: M_NOWAIT)
 #define Free(x)    free((x), M_DEVBUF)
 #define LOCKDRIVE(d) lockdrive (d)
 #endif

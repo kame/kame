@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/linux/linux_signal.c,v 1.45 2003/06/10 21:27:39 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/linux/linux_signal.c,v 1.47 2004/08/16 12:15:07 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -38,8 +38,15 @@ __FBSDID("$FreeBSD: src/sys/compat/linux/linux_signal.c,v 1.45 2003/06/10 21:27:
 #include <sys/syscallsubr.h>
 #include <sys/sysproto.h>
 
+#include "opt_compat.h"
+
+#if !COMPAT_LINUX32
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
+#else
+#include <machine/../linux32/linux.h>
+#include <machine/../linux32/linux32_proto.h>
+#endif
 #include <compat/linux/linux_signal.h>
 #include <compat/linux/linux_util.h>
 
@@ -90,7 +97,7 @@ linux_to_bsd_sigaction(l_sigaction_t *lsa, struct sigaction *bsa)
 {
 
 	linux_to_bsd_sigset(&lsa->lsa_mask, &bsa->sa_mask);
-	bsa->sa_handler = lsa->lsa_handler;
+	bsa->sa_handler = PTRIN(lsa->lsa_handler);
 	bsa->sa_flags = 0;
 	if (lsa->lsa_flags & LINUX_SA_NOCLDSTOP)
 		bsa->sa_flags |= SA_NOCLDSTOP;
@@ -113,8 +120,12 @@ bsd_to_linux_sigaction(struct sigaction *bsa, l_sigaction_t *lsa)
 {
 
 	bsd_to_linux_sigset(&bsa->sa_mask, &lsa->lsa_mask);
+#if COMPAT_LINUX32
+	lsa->lsa_handler = (uintptr_t)bsa->sa_handler;
+#else
 	lsa->lsa_handler = bsa->sa_handler;
-	lsa->lsa_restorer = NULL;	/* unsupported */
+#endif
+	lsa->lsa_restorer = 0;		/* unsupported */
 	lsa->lsa_flags = 0;
 	if (bsa->sa_flags & SA_NOCLDSTOP)
 		lsa->lsa_flags |= LINUX_SA_NOCLDSTOP;
@@ -177,7 +188,7 @@ linux_signal(struct thread *td, struct linux_signal_args *args)
 #ifdef DEBUG
 	if (ldebug(signal))
 		printf(ARGS(signal, "%d, %p"),
-		    args->sig, (void *)args->handler);
+		    args->sig, (void *)(uintptr_t)args->handler);
 #endif
 
 	nsa.lsa_handler = args->handler;
@@ -185,7 +196,7 @@ linux_signal(struct thread *td, struct linux_signal_args *args)
 	LINUX_SIGEMPTYSET(nsa.lsa_mask);
 
 	error = linux_do_sigaction(td, args->sig, &nsa, &osa);
-	td->td_retval[0] = (int)osa.lsa_handler;
+	td->td_retval[0] = (int)(intptr_t)osa.lsa_handler;
 
 	return (error);
 }

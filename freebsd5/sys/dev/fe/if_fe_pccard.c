@@ -22,7 +22,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/fe/if_fe_pccard.c,v 1.10 2003/08/24 17:46:06 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/fe/if_fe_pccard.c,v 1.12 2004/05/27 03:49:42 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -47,9 +47,9 @@ __FBSDID("$FreeBSD: src/sys/dev/fe/if_fe_pccard.c,v 1.10 2003/08/24 17:46:06 obr
 #include <dev/fe/if_fevar.h>
 
 #include <dev/pccard/pccardvar.h>
-#include <dev/pccard/pccarddevs.h>
+
 #include "card_if.h"
-#include <pccard/cardinfo.h>
+#include "pccarddevs.h"
 
 /*
  *	PC-Card (PCMCIA) specific code.

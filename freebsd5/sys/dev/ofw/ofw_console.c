@@ -24,15 +24,13 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ofw/ofw_console.c,v 1.17 2003/09/28 06:51:47 jake Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ofw/ofw_console.c,v 1.28 2004/08/04 00:21:19 gad Exp $");
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ofw/ofw_console.c,v 1.17 2003/09/28 06:51:47 jake Exp $");
-
-#include "opt_ddb.h"
 #include "opt_comconsole.h"
+#include "opt_ofw.h"
 
 #include <sys/param.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
 #include <sys/types.h>
@@ -45,23 +43,20 @@ __FBSDID("$FreeBSD: src/sys/dev/ofw/ofw_console.c,v 1.17 2003/09/28 06:51:47 jak
 
 #include <ddb/ddb.h>
 
-#define	OFW_POLL_HZ	4
+#ifndef	OFWCONS_POLL_HZ
+#define	OFWCONS_POLL_HZ	4	/* 50-100 works best on Ultra2 */
+#endif
+#define OFBURSTLEN	128	/* max number of bytes to write in one chunk */
 
 static d_open_t		ofw_dev_open;
 static d_close_t	ofw_dev_close;
-static d_ioctl_t	ofw_dev_ioctl;
-
-#define	CDEV_MAJOR	97
 
 static struct cdevsw ofw_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	ofw_dev_open,
 	.d_close =	ofw_dev_close,
-	.d_read =	ttyread,
-	.d_write =	ttywrite,
-	.d_ioctl =	ofw_dev_ioctl,
-	.d_poll =	ttypoll,
 	.d_name =	"ofw",
-	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_TTY | D_NEEDGIANT,
 };
 
 static struct tty		*ofw_tp = NULL;
@@ -69,7 +64,7 @@ static int			polltime;
 static struct callout_handle	ofw_timeouthandle
     = CALLOUT_HANDLE_INITIALIZER(&ofw_timeouthandle);
 
-#if defined(DDB) && defined(ALT_BREAK_TO_DEBUGGER)
+#if defined(KDB) && defined(ALT_BREAK_TO_DEBUGGER)
 static int			alt_break_state;
 #endif
 
@@ -92,7 +87,7 @@ cn_drvinit(void *unused)
 {
 	phandle_t options;
 	char output[32];
-	dev_t dev;
+	struct cdev *dev;
 
 	if (ofw_consdev.cn_pri != CN_DEAD &&
 	    ofw_consdev.cn_name[0] != '\0') {
@@ -106,13 +101,13 @@ cn_drvinit(void *unused)
 	}
 }
 
-SYSINIT(cndev, SI_SUB_CONFIGURE, SI_ORDER_MIDDLE + CDEV_MAJOR, cn_drvinit, NULL)
+SYSINIT(cndev, SI_SUB_CONFIGURE, SI_ORDER_MIDDLE, cn_drvinit, NULL)
 
 static int	stdin;
 static int	stdout;
 
 static int
-ofw_dev_open(dev_t dev, int flag, int mode, struct thread *td)
+ofw_dev_open(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 	struct	tty *tp;
 	int	unit;
@@ -134,7 +129,7 @@ ofw_dev_open(dev_t dev, int flag, int mode, struct thread *td)
 		ttychars(tp);
 		tp->t_iflag = TTYDEF_IFLAG;
 		tp->t_oflag = TTYDEF_OFLAG;
-		tp->t_cflag = TTYDEF_CFLAG|CLOCAL;
+		tp->t_cflag = TTYDEF_CFLAG | CLOCAL;
 		tp->t_lflag = TTYDEF_LFLAG;
 		tp->t_ispeed = tp->t_ospeed = TTYDEF_SPEED;
 		ttsetwater(tp);
@@ -144,10 +139,10 @@ ofw_dev_open(dev_t dev, int flag, int mode, struct thread *td)
 		return (EBUSY);
 	}
 
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = ttyld_open(tp, dev);
 
 	if (error == 0 && setuptimeout) {
-		polltime = hz / OFW_POLL_HZ;
+		polltime = hz / OFWCONS_POLL_HZ;
 		if (polltime < 1) {
 			polltime = 1;
 		}
@@ -159,7 +154,7 @@ ofw_dev_open(dev_t dev, int flag, int mode, struct thread *td)
 }
 
 static int
-ofw_dev_close(dev_t dev, int flag, int mode, struct thread *td)
+ofw_dev_close(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 	int	unit;
 	struct	tty *tp;
@@ -171,38 +166,14 @@ ofw_dev_close(dev_t dev, int flag, int mode, struct thread *td)
 		return (ENXIO);
 	}
 
-	(*linesw[tp->t_line].l_close)(tp, flag);
-	ttyclose(tp);
+	/* XXX Should be replaced with callout_stop(9) */
+	untimeout(ofw_timeout, tp, ofw_timeouthandle);
+	ttyld_close(tp, flag);
+	tty_close(tp);
 
 	return (0);
 }
 
-static int
-ofw_dev_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
-{
-	int	unit;
-	struct	tty *tp;
-	int	error;
-
-	unit = minor(dev);
-	tp = ofw_tp;
-
-	if (unit != 0) {
-		return (ENXIO);
-	}
-
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, td);
-	if (error != ENOIOCTL) {
-		return (error);
-	}
-
-	error = ttioctl(tp, cmd, data, flag);
-	if (error != ENOIOCTL) {
-		return (error);
-	}
-
-	return (ENOTTY);
-}
 
 static int
 ofw_tty_param(struct tty *tp, struct termios *t)
@@ -214,16 +185,18 @@ ofw_tty_param(struct tty *tp, struct termios *t)
 static void
 ofw_tty_start(struct tty *tp)
 {
+	struct clist *cl;
+	int len;
+	u_char buf[OFBURSTLEN];
 
-	if (tp->t_state & (TS_TIMEOUT | TS_TTSTOP)) {
-		ttwwakeup(tp);
+
+	if (tp->t_state & (TS_TIMEOUT | TS_BUSY | TS_TTSTOP))
 		return;
-	}
 
 	tp->t_state |= TS_BUSY;
-	while (tp->t_outq.c_cc != 0) {
-		ofw_cons_putc(NULL, getc(&tp->t_outq));
-	}
+	cl = &tp->t_outq;
+	len = q_to_b(cl, buf, OFBURSTLEN);
+	OF_write(stdout, buf, len);
 	tp->t_state &= ~TS_BUSY;
 
 	ttwwakeup(tp);
@@ -250,7 +223,7 @@ ofw_timeout(void *v)
 
 	while ((c = ofw_cons_checkc(NULL)) != -1) {
 		if (tp->t_state & TS_ISOPEN) {
-			(*linesw[tp->t_line].l_rint)(c, tp);
+			ttyld_rint(tp, c);
 		}
 	}
 
@@ -303,9 +276,9 @@ ofw_cons_getc(struct consdev *cp)
 		}
 	}
 
-#if defined(DDB) && defined(ALT_BREAK_TO_DEBUGGER)
-	if (db_alt_break(ch, &alt_break_state))
-		breakpoint();
+#if defined(KDB) && defined(ALT_BREAK_TO_DEBUGGER)
+	if (kdb_alt_break(ch, &alt_break_state))
+		kdb_enter("Break sequence on console");
 #endif
 
 	return (ch);
@@ -317,9 +290,9 @@ ofw_cons_checkc(struct consdev *cp)
 	unsigned char ch;
 
 	if (OF_read(stdin, &ch, 1) > 0) {
-#if defined(DDB) && defined(ALT_BREAK_TO_DEBUGGER)
-		if (db_alt_break(ch, &alt_break_state))
-			breakpoint();
+#if defined(KDB) && defined(ALT_BREAK_TO_DEBUGGER)
+		if (kdb_alt_break(ch, &alt_break_state))
+			kdb_enter("Break sequence on console");
 #endif
 		return (ch);
 	}

@@ -30,16 +30,17 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/rgephy.c,v 1.5 2004/05/30 17:57:40 phk Exp $");
+
 /*
  * Driver for the RealTek 8169S/8110S internal 10/100/1000 PHY.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/rgephy.c,v 1.2 2003/09/11 08:28:38 wpaul Exp $");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 #include <sys/bus.h>
 
@@ -298,8 +299,8 @@ setit:
 		/*
 		 * Only retry autonegotiation every 5 seconds.
 		 */
-		if (++sc->mii_ticks != 5/*10*/)
-			return (0);
+		if (++sc->mii_ticks <= 5/*10*/)
+			break;
 		
 		sc->mii_ticks = 0;
 		rgephy_mii_phy_auto(sc);
@@ -317,9 +318,9 @@ setit:
 	if (sc->mii_media_active != mii->mii_media_active || 
 	    sc->mii_media_status != mii->mii_media_status ||
 	    cmd == MII_MEDIACHG) {
-		mii_phy_update(sc, cmd);
 		rgephy_load_dspcode(sc);
 	}
+	mii_phy_update(sc, cmd);
 	return (0);
 }
 

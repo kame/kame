@@ -62,7 +62,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/wi/if_wi.c,v 1.158.2.1 2003/12/11 20:21:20 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/wi/if_wi.c,v 1.168 2004/08/01 23:58:04 mlaier Exp $");
 
 #define WI_HERMES_AUTOINC_WAR	/* Work around data write autoinc bug. */
 #define WI_HERMES_STATS_WAR	/* Work around stats counter bug. */
@@ -113,10 +113,6 @@ __FBSDID("$FreeBSD: src/sys/dev/wi/if_wi.c,v 1.158.2.1 2003/12/11 20:21:20 imp E
 #include <dev/wi/if_wavelan_ieee.h>
 #include <dev/wi/if_wireg.h>
 #include <dev/wi/if_wivar.h>
-
-#define IF_POLL(ifq, m)		((m) = (ifq)->ifq_head)
-#define	IFQ_POLL(ifq, m)	IF_POLL((ifq), (m))
-#define IFQ_DEQUEUE(ifq, m)	IF_DEQUEUE((ifq), (m))
 
 static void wi_start(struct ifnet *);
 static int  wi_reset(struct wi_softc *);
@@ -270,6 +266,7 @@ wi_attach(device_t dev)
 	    MTX_DEF | MTX_RECURSE);
 #endif
 
+	sc->wi_cmd_count = 500;
 	/* Reset the NIC. */
 	if (wi_reset(sc) != 0)
 		return ENXIO;		/* XXX */
@@ -294,7 +291,6 @@ wi_attach(device_t dev)
 		wi_free(dev);
 		return (error);
 	}
-	device_printf(dev, "802.11 address: %6D\n", ic->ic_myaddr, ":");
 
 	/* Read NIC identification */
 	wi_read_nicid(sc);
@@ -306,7 +302,9 @@ wi_attach(device_t dev)
 	ifp->if_start = wi_start;
 	ifp->if_watchdog = wi_watchdog;
 	ifp->if_init = wi_init;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
+	ifp->if_snd.ifq_drv_maxlen = IFQ_MAXLEN;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	ic->ic_phytype = IEEE80211_T_DS;
 	ic->ic_opmode = IEEE80211_M_STA;
@@ -383,6 +381,11 @@ wi_attach(device_t dev)
 		sc->sc_flags |= WI_FLAGS_HAS_FRAGTHR;
 		sc->sc_flags |= WI_FLAGS_HAS_ROAMING;
 		sc->sc_flags |= WI_FLAGS_HAS_SYSSCALE;
+		/*
+		 * Old firmware are slow, so give peace a chance.
+		 */
+		if (sc->sc_sta_firmware_ver < 10000)
+			sc->wi_cmd_count = 5000;
 		if (sc->sc_sta_firmware_ver > 10101)
 			sc->sc_flags |= WI_FLAGS_HAS_DBMADJUST;
 		if (sc->sc_sta_firmware_ver >= 800) {
@@ -477,16 +480,20 @@ wi_attach(device_t dev)
 		&sc->sc_drvbpf);
 	/*
 	 * Initialize constant fields.
+	 * XXX make header lengths a multiple of 32-bits so subsequent
+	 *     headers are properly aligned; this is a kludge to keep
+	 *     certain applications happy.
 	 *
 	 * NB: the channel is setup each time we transition to the
 	 *     RUN state to avoid filling it in for each frame.
 	 */
-	sc->sc_tx_th.wt_ihdr.it_len = sizeof(sc->sc_tx_th);
-	sc->sc_tx_th.wt_ihdr.it_present = WI_TX_RADIOTAP_PRESENT;
+	sc->sc_tx_th_len = roundup(sizeof(sc->sc_tx_th), sizeof(u_int32_t));
+	sc->sc_tx_th.wt_ihdr.it_len = htole16(sc->sc_tx_th_len);
+	sc->sc_tx_th.wt_ihdr.it_present = htole32(WI_TX_RADIOTAP_PRESENT);
 
-	sc->sc_rx_th.wr_ihdr.it_len = sizeof(sc->sc_rx_th);
-	sc->sc_rx_th.wr_ihdr.it_present = WI_RX_RADIOTAP_PRESENT0;
-	sc->sc_rx_th.wr_present1 = WI_RX_RADIOTAP_PRESENT1;
+	sc->sc_rx_th_len = roundup(sizeof(sc->sc_rx_th), sizeof(u_int32_t));
+	sc->sc_rx_th.wr_ihdr.it_len = htole16(sc->sc_rx_th_len);
+	sc->sc_rx_th.wr_ihdr.it_present = htole32(WI_RX_RADIOTAP_PRESENT);
 #endif
 	return (0);
 }
@@ -605,7 +612,7 @@ wi_intr(void *arg)
 		wi_info_intr(sc);
 	if ((ifp->if_flags & IFF_OACTIVE) == 0 &&
 	    (sc->sc_flags & WI_FLAGS_OUTRANGE) == 0 &&
-	    _IF_QLEN(&ifp->if_snd) != 0)
+	    !IFQ_DRV_IS_EMPTY(&ifp->if_snd))
 		wi_start(ifp);
 
 	/* Re-enable interrupts. */
@@ -895,14 +902,14 @@ wi_start(struct ifnet *ifp)
 		} else {
 			if (ic->ic_state != IEEE80211_S_RUN)
 				break;
-			IFQ_POLL(&ifp->if_snd, m0);
+			IFQ_DRV_DEQUEUE(&ifp->if_snd, m0);
 			if (m0 == NULL)
 				break;
 			if (sc->sc_txd[cur].d_len != 0) {
+				IFQ_DRV_PREPEND(&ifp->if_snd, m0);
 				ifp->if_flags |= IFF_OACTIVE;
 				break;
 			}
-			IFQ_DEQUEUE(&ifp->if_snd, m0);
 			ifp->if_opackets++;
 			m_copydata(m0, 0, ETHER_HDR_LEN, 
 			    (caddr_t)&frmhdr.wi_ehdr);
@@ -935,25 +942,18 @@ wi_start(struct ifnet *ifp)
 			}
 			frmhdr.wi_tx_ctl |= htole16(WI_TXCNTL_NOCRYPT);
 		}
+#if NBPFILTER > 0
+		if (sc->sc_drvbpf) {
+			sc->sc_tx_th.wt_rate =
+				ni->ni_rates.rs_rates[ni->ni_txrate];
+			bpf_mtap2(sc->sc_drvbpf,
+				&sc->sc_tx_th, sc->sc_tx_th_len, m0);
+		}
+#endif
 		m_copydata(m0, 0, sizeof(struct ieee80211_frame),
 		    (caddr_t)&frmhdr.wi_whdr);
 		m_adj(m0, sizeof(struct ieee80211_frame));
 		frmhdr.wi_dat_len = htole16(m0->m_pkthdr.len);
-#if NBPFILTER > 0
-		if (sc->sc_drvbpf) {
-			struct mbuf *mb;
-
-			MGETHDR(mb, M_DONTWAIT, m0->m_type);
-			if (mb != NULL) {
-				mb->m_next = m0;
-				mb->m_data = (caddr_t)&sc->sc_tx_th;
-				mb->m_len = sizeof(sc->sc_tx_th);
-				mb->m_pkthdr.len += mb->m_len;
-				bpf_mtap(sc->sc_drvbpf, mb);
-				m_free(mb);
-			}
-		}
-#endif
 		if (IFF_DUMPPKTS(ifp))
 			wi_dump_pkt(&frmhdr, NULL, -1);
 		fid = sc->sc_txd[cur].d_fid;
@@ -1490,29 +1490,15 @@ wi_rx_intr(struct wi_softc *sc)
 
 #if NBPFILTER > 0
 	if (sc->sc_drvbpf) {
-		struct mbuf *mb;
-
-		/* XXX pre-allocate space when setting up recv's */
-		MGETHDR(mb, M_DONTWAIT, m->m_type);
-		if (mb != NULL) {
-			/* XXX replace divide by table */
-			sc->sc_rx_th.wr_rate = frmhdr.wi_rx_rate / 5;
-			sc->sc_rx_th.wr_antsignal =
-				WI_RSSI_TO_DBM(sc, frmhdr.wi_rx_signal);
-			sc->sc_rx_th.wr_antnoise =
-				WI_RSSI_TO_DBM(sc, frmhdr.wi_rx_silence);
-			sc->sc_rx_th.wr_time =
-				htole32((frmhdr.wi_rx_tstamp1 << 16) |
-					frmhdr.wi_rx_tstamp0);
-
-			(void) m_dup_pkthdr(mb, m, M_DONTWAIT);
-			mb->m_next = m;
-			mb->m_data = (caddr_t)&sc->sc_rx_th;
-			mb->m_len = sizeof(sc->sc_rx_th);
-			mb->m_pkthdr.len += mb->m_len;
-			bpf_mtap(sc->sc_drvbpf, mb);
-			m_free(mb);
-		}
+		/* XXX replace divide by table */
+		sc->sc_rx_th.wr_rate = frmhdr.wi_rx_rate / 5;
+		sc->sc_rx_th.wr_antsignal = frmhdr.wi_rx_signal;
+		sc->sc_rx_th.wr_antnoise = frmhdr.wi_rx_silence;
+		sc->sc_rx_th.wr_flags = 0;
+		if (frmhdr.wi_status & WI_STAT_PCF)
+			sc->sc_rx_th.wr_flags |= IEEE80211_RADIOTAP_F_CFP;
+		bpf_mtap2(sc->sc_drvbpf,
+			&sc->sc_rx_th, sc->sc_rx_th_len, m);
 	}
 #endif
 	wh = mtod(m, struct ieee80211_frame *);
@@ -2390,7 +2376,7 @@ wi_cmd(struct wi_softc *sc, int cmd, int val0, int val1, int val2)
 	count++;
 
 	/* wait for the busy bit to clear */
-	for (i = 5000; i > 0; i--) {	/* 5000ms */
+	for (i = sc->wi_cmd_count; i > 0; i--) {	/* 500ms */
 		if (!(CSR_READ_2(sc, WI_COMMAND) & WI_CMD_BUSY))
 			break;
 		DELAY(1*1000);	/* 1ms */
@@ -2855,8 +2841,8 @@ wi_alloc(device_t dev, int rid)
 		sc->wi_bhandle = rman_get_bushandle(sc->iobase);
 	} else {
 		sc->mem_rid = rid;
-		sc->mem = bus_alloc_resource(dev, SYS_RES_MEMORY,
-		    &sc->mem_rid, 0, ~0, 1, RF_ACTIVE);
+		sc->mem = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+		    &sc->mem_rid, RF_ACTIVE);
 
 		if (!sc->mem) {
 			device_printf(dev, "No Mem space on prism2.5?\n");
@@ -2869,8 +2855,8 @@ wi_alloc(device_t dev, int rid)
 
 
 	sc->irq_rid = 0;
-	sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irq_rid,
-	    0, ~0, 1, RF_ACTIVE |
+	sc->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irq_rid,
+	    RF_ACTIVE |
 	    ((sc->wi_bus_type == WI_BUS_PCCARD) ? 0 : RF_SHAREABLE));
 
 	if (!sc->irq) {

@@ -22,12 +22,10 @@ FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 OTHER DEALINGS IN THE SOFTWARE.
 */
 
-#ifndef _KERNEL
 #include <stdlib.h>
 #include <crt0.h>
 #include <dlfcn.h>
 #include <sys/uc_access.h>
-#endif
 
 #include "uwx_env.h"
 #include "uwx_context.h"
@@ -37,6 +35,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 #define UWX_ABI_HPUX_SIGCONTEXT 0x0101	/* abi = HP-UX, context = 1 */
 
 struct uwx_self_info {
+    struct uwx_env *env;
     ucontext_t *ucontext;
     uint64_t bspstore;
     uint64_t rvec[10];
@@ -60,6 +59,7 @@ struct uwx_self_info *uwx_self_init_info(struct uwx_env *env)
     if (info == 0)
 	return 0;
 
+    info->env = env;
     info->ucontext = 0;
     info->bspstore = 0;
     info->sendsig_start = __load_info->li_sendsig_txt;
@@ -155,72 +155,78 @@ int uwx_self_copyin(
     unsigned long *wp;
     uint64_t *dp;
 
+    status = -1;
+
     dp = (uint64_t *) loc;
 
-    if (request == UWX_COPYIN_UINFO ||
-	    request == UWX_COPYIN_MSTACK) {
-	if (len == 4) {
-	    wp = (unsigned long *) loc;
-	    *wp = *(unsigned long *)rem;
-	    TRACE_SELF_COPYIN4(rem, len, wp)
-	}
-	else if (len == 8) {
-	    *dp = *(uint64_t *)rem;
-	    TRACE_SELF_COPYIN4(rem, len, dp)
-	}
-	else
-	    return 0;
-    }
-    else if (request == UWX_COPYIN_RSTACK && len == 8) {
-	if (info->ucontext == 0 || rem < info->bspstore) {
-	    *dp = *(uint64_t *)rem;
-	    TRACE_SELF_COPYIN4(rem, len, dp)
-	}
-	else {
-	    status = __uc_get_rsebs(info->ucontext, (uint64_t *)rem, 1, dp);
-	    if (status != 0)
-		return 0;
-	}
-    }
-    else if (request == UWX_COPYIN_REG && len == 8) {
-	if (info->ucontext == 0)
-	    return 0;
-	regid = (int)rem;
-	if (rem < UWX_REG_GR(0)) {
-	    switch (regid) {
-		case UWX_REG_PREDS:
-		    status = __uc_get_prs(info->ucontext, dp);
-		    break;
-		case UWX_REG_AR_PFS:
-		    status = __uc_get_ar(info->ucontext, 64, dp);
-		    break;
-		case UWX_REG_AR_RNAT:
-		    status = __uc_get_ar(info->ucontext, 19, dp);
-		    break;
-		case UWX_REG_AR_UNAT:
-		    status = __uc_get_ar(info->ucontext, 36, dp);
-		    break;
-		case UWX_REG_AR_FPSR:
-		    status = __uc_get_ar(info->ucontext, 40, dp);
-		    break;
-		case UWX_REG_AR_LC:
-		    status = __uc_get_ar(info->ucontext, 65, dp);
-		    break;
-		default:
-		    return 0;
+    switch (request) {
+	case UWX_COPYIN_UINFO:
+	case UWX_COPYIN_MSTACK:
+	    if (len == 4) {
+		wp = (unsigned long *) loc;
+		*wp = *(unsigned long *)rem;
+		TRACE_SELF_COPYIN4(rem, len, wp)
+		status = 0;
 	    }
-	}
-	else if (regid >= UWX_REG_GR(1) && regid <= UWX_REG_GR(31)) {
-	    status = __uc_get_grs(info->ucontext,
-				regid - UWX_REG_GR(0), 1, dp, &nat);
-	}
-	else if (regid >= UWX_REG_BR(0) && regid <= UWX_REG_BR(7)) {
-	    status = __uc_get_brs(info->ucontext,
-				regid - UWX_REG_BR(0), 1, dp);
-	}
-	if (status != 0)
-	    return 0;
+	    else if (len == 8) {
+		*dp = *(uint64_t *)rem;
+		TRACE_SELF_COPYIN8(rem, len, dp)
+		status = 0;
+	    }
+	    break;
+	case UWX_COPYIN_RSTACK:
+	    if (len == 8) {
+		if (info->ucontext == 0 && rem == (info->bspstore | 0x1f8)) {
+		    *dp = info->env->context.special[UWX_REG_AR_RNAT];
+		    status = 0;
+		}
+		else if (info->ucontext == 0 || rem < info->bspstore) {
+		    *dp = *(uint64_t *)rem;
+		    TRACE_SELF_COPYIN8(rem, len, dp)
+		    status = 0;
+		}
+		else {
+		    status = __uc_get_rsebs(info->ucontext,
+						(uint64_t *)rem, 1, dp);
+		}
+	    }
+	    break;
+	case UWX_COPYIN_REG:
+	    regid = (int)rem;
+	    if (info->ucontext != 0) {
+		if (len == 8) {
+		    if (rem == UWX_REG_PREDS)
+			status = __uc_get_prs(info->ucontext, dp);
+		    else if (rem == UWX_REG_AR_PFS)
+			status = __uc_get_ar(info->ucontext, 64, dp);
+		    else if (rem == UWX_REG_AR_RNAT)
+			status = __uc_get_ar(info->ucontext, 19, dp);
+		    else if (rem == UWX_REG_AR_UNAT)
+			status = __uc_get_ar(info->ucontext, 36, dp);
+		    else if (rem == UWX_REG_AR_FPSR)
+			status = __uc_get_ar(info->ucontext, 40, dp);
+		    else if (rem == UWX_REG_AR_LC)
+			status = __uc_get_ar(info->ucontext, 65, dp);
+		    else if (regid >= UWX_REG_GR(1) &&
+						regid <= UWX_REG_GR(31))
+			status = __uc_get_grs(info->ucontext,
+					    regid - UWX_REG_GR(0), 1, dp, &nat);
+		    else if (regid >= UWX_REG_BR(0) &&
+						regid <= UWX_REG_BR(7))
+			status = __uc_get_brs(info->ucontext,
+					    regid - UWX_REG_BR(0), 1, dp);
+		}
+		else if (len == 16) {
+		    if (regid >= UWX_REG_FR(2) && regid <= UWX_REG_FR(127)) {
+			status = __uc_get_frs(info->ucontext,
+				regid - UWX_REG_FR(0), 1, (fp_regval_t *)dp);
+		    }
+		}
+	    }
+	    break;
     }
+    if (status != 0)
+	return 0;
     return len;
 }
 

@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ips/ips_ioctl.c,v 1.4 2003/08/24 17:49:14 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ips/ips_ioctl.c,v 1.5 2004/05/30 04:01:29 scottl Exp $");
 
 #include <dev/ips/ips.h>
 #include <dev/ips/ips_ioctl.h>
@@ -139,20 +139,20 @@ int ips_ioctl_request(ips_softc_t *sc, u_long ioctl_request, caddr_t addr, int32
 	switch(ioctl_request){
 	case IPS_USER_CMD:
 		user_request = (ips_user_request *)addr;
-		ioctl_cmd = malloc(sizeof(ips_ioctl_t), M_DEVBUF, M_WAITOK);
+		ioctl_cmd = malloc(sizeof(ips_ioctl_t), M_IPSBUF, M_WAITOK);
 		ioctl_cmd->command_buffer = malloc(sizeof(ips_generic_cmd),
-						M_DEVBUF, M_WAITOK);
+						M_IPSBUF, M_WAITOK);
 		if(copyin(user_request->command_buffer, 
 		    ioctl_cmd->command_buffer, sizeof(ips_generic_cmd))){
-			free(ioctl_cmd->command_buffer, M_DEVBUF);
-			free(ioctl_cmd, M_DEVBUF);
+			free(ioctl_cmd->command_buffer, M_IPSBUF);
+			free(ioctl_cmd, M_IPSBUF);
 			break;
 		}
 		ioctl_cmd->readwrite = IPS_IOCTL_READ | IPS_IOCTL_WRITE;
 		ioctl_cmd->datasize = IPS_IOCTL_BUFFER_SIZE;
 		error = ips_ioctl_cmd(sc, ioctl_cmd, user_request);
-		free(ioctl_cmd->command_buffer, M_DEVBUF);
-		free(ioctl_cmd, M_DEVBUF);
+		free(ioctl_cmd->command_buffer, M_IPSBUF);
+		free(ioctl_cmd, M_IPSBUF);
 		break;
 	}
 

@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ichsmb/ichsmb.c,v 1.8 2003/08/24 17:49:12 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ichsmb/ichsmb.c,v 1.9 2004/03/12 21:45:26 trhodes Exp $");
 
 /*
  * Support for the SMBus controller logical device which is part of the
@@ -69,7 +69,7 @@ __FBSDID("$FreeBSD: src/sys/dev/ichsmb/ichsmb.c,v 1.8 2003/08/24 17:49:12 obrien
  * Enable debugging by defining ICHSMB_DEBUG to a non-zero value.
  */
 #define ICHSMB_DEBUG	0
-#if ICHSMB_DEBUG != 0 && defined(__GNUC__)
+#if ICHSMB_DEBUG != 0 && (defined(__GNUC__) || defined(__INTEL_COMPILER))
 #define DBG(fmt, args...)	\
 	do { log(LOG_DEBUG, "%s: " fmt, __func__ , ## args); } while (0)
 #else

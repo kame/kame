@@ -3,6 +3,8 @@
  *	Fraunhofer Institute for Open Communication Systems (FhG Fokus).
  * 	All rights reserved.
  *
+ * Author: Hartmut Brandt <harti@freebsd.org>
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -24,9 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * Author: Hartmut Brandt <harti@freebsd.org>
- *
- * $Begemot: libunimsg/atm/msg/unistruct.h,v 1.4 2003/09/19 11:58:16 hbb Exp $
+ * $Begemot: libunimsg/netnatm/msg/unistruct.h,v 1.7 2004/07/16 18:42:22 brandt Exp $
  *
  * This file defines all structures that are used by
  * API users.
@@ -206,10 +206,11 @@ enum uni_addr_screen {
 	UNI_ADDR_SCREEN_NET	= 0x3,
 };
 
+/* don't use bitfields to get a defined structure layout */
 struct uni_addr {
-	enum uni_addr_type	type;
-	enum uni_addr_plan	plan;
-	u_int			len;
+	uint8_t			type;
+	uint8_t			plan;
+	uint8_t			len;
 	u_char			addr[UNI_ADDR_MAXLEN];
 };
 struct uni_subaddr {

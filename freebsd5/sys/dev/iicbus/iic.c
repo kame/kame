@@ -23,12 +23,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/iicbus/iic.c,v 1.28 2003/08/10 14:28:24 ticso Exp $
+ * $FreeBSD: src/sys/dev/iicbus/iic.c,v 1.32 2004/06/16 09:46:45 phk Exp $
  *
  */
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
+#include <sys/malloc.h>
 #include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
@@ -51,7 +52,7 @@ struct iic_softc {
 	char sc_buffer[BUFSIZE];	/* output buffer */
 	char sc_inbuf[BUFSIZE];		/* input buffer */
 
-	dev_t sc_devnode;
+	struct cdev *sc_devnode;
 };
 
 #define IIC_SOFTC(unit) \
@@ -92,15 +93,15 @@ static	d_write_t	iicwrite;
 static	d_read_t	iicread;
 static	d_ioctl_t	iicioctl;
 
-#define CDEV_MAJOR 105
 static struct cdevsw iic_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	iicopen,
 	.d_close =	iicclose,
 	.d_read =	iicread,
 	.d_write =	iicwrite,
 	.d_ioctl =	iicioctl,
 	.d_name =	"iic",
-	.d_maj =	CDEV_MAJOR,
 };
 
 static void
@@ -145,7 +146,7 @@ iic_detach(device_t dev)
 }
 
 static int
-iicopen (dev_t dev, int flags, int fmt, struct thread *td)
+iicopen (struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	struct iic_softc *sc = IIC_SOFTC(minor(dev));
 
@@ -161,7 +162,7 @@ iicopen (dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static int
-iicclose(dev_t dev, int flags, int fmt, struct thread *td)
+iicclose(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	struct iic_softc *sc = IIC_SOFTC(minor(dev));
 
@@ -180,7 +181,7 @@ iicclose(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static int
-iicwrite(dev_t dev, struct uio * uio, int ioflag)
+iicwrite(struct cdev *dev, struct uio * uio, int ioflag)
 {
 	device_t iicdev = IIC_DEVICE(minor(dev));
 	struct iic_softc *sc = IIC_SOFTC(minor(dev));
@@ -207,7 +208,7 @@ iicwrite(dev_t dev, struct uio * uio, int ioflag)
 }
 
 static int
-iicread(dev_t dev, struct uio * uio, int ioflag)
+iicread(struct cdev *dev, struct uio * uio, int ioflag)
 {
 	device_t iicdev = IIC_DEVICE(minor(dev));
 	struct iic_softc *sc = IIC_SOFTC(minor(dev));
@@ -239,13 +240,14 @@ iicread(dev_t dev, struct uio * uio, int ioflag)
 }
 
 static int
-iicioctl(dev_t dev, u_long cmd, caddr_t data, int flags, struct thread *td)
+iicioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags, struct thread *td)
 {
 	device_t iicdev = IIC_DEVICE(minor(dev));
 	struct iic_softc *sc = IIC_SOFTC(minor(dev));
 	device_t parent = device_get_parent(iicdev);
 	struct iiccmd *s = (struct iiccmd *)data;
 	int error, count;
+	char *buf = NULL;
 
 	if (!sc)
 		return (EINVAL);
@@ -278,19 +280,37 @@ iicioctl(dev_t dev, u_long cmd, caddr_t data, int flags, struct thread *td)
 		break;
 
 	case I2CWRITE:
-		error = iicbus_write(parent, s->buf, s->count, &count, 10);
+		if (s->count <= 0) {
+			error = EINVAL;
+			break;
+		}
+		buf = malloc((unsigned long)s->count, M_TEMP, M_WAITOK);
+		error = copyin(s->buf, buf, s->count);
+		if (error)
+			break;
+		error = iicbus_write(parent, buf, s->count, &count, 10);
 		break;
 
 	case I2CREAD:
-		error = iicbus_read(parent, s->buf, s->count, &count, s->last, 10);
+		if (s->count <= 0) {
+			error = EINVAL;
+			break;
+		}
+		buf = malloc((unsigned long)s->count, M_TEMP, M_WAITOK);
+		error = iicbus_read(parent, buf, s->count, &count, s->last, 10);
+		if (error)
+			break;
+		error = copyout(buf, s->buf, s->count);
 		break;
 
 	default:
-		error = ENODEV;
+		error = ENOTTY;
 	}
 
 	iicbus_release_bus(device_get_parent(iicdev), iicdev);
 
+	if (buf != NULL)
+		free(buf, M_TEMP);
 	return (error);
 }
 

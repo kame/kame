@@ -87,10 +87,11 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/pci/cia.c,v 1.42 2003/11/17 06:10:14 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/pci/cia.c,v 1.43 2004/07/01 15:07:27 gallatin Exp $");
 
 #include "opt_cpu.h"
 
+#define __RMAN_RESOURCE_VISIBLE
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>

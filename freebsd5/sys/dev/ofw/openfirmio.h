@@ -8,11 +8,6 @@
  * at Lawrence Berkeley Laboratory under DARPA contract BG 91-66 and
  * contributed to Berkeley.
  *
- * All advertising materials mentioning features or use of this software
- * must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Lawrence Berkeley Laboratory.
- *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -21,10 +16,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -43,7 +34,7 @@
  *
  *	@(#)openpromio.h	8.1 (Berkeley) 6/11/93
  *
- * $FreeBSD: src/sys/dev/ofw/openfirmio.h,v 1.2 2003/06/11 18:33:03 tmm Exp $
+ * $FreeBSD: src/sys/dev/ofw/openfirmio.h,v 1.4 2004/05/22 16:43:42 marius Exp $
  */
 
 #ifndef _DEV_OFW_OPENFIRMIO_H_
@@ -63,10 +54,8 @@ struct ofiocdesc {
 
 /* Get openprom field. */
 #define	OFIOCGET	_IOWR(OFIOC_BASE, 1, struct ofiocdesc)
-#if 0
 /* Set openprom field. */
-#define	OFIOCSET	_IOW(OFIOC_BASE, 2, struct ofiocdesc)
-#endif
+#define	OFIOCSET	_IOWR(OFIOC_BASE, 2, struct ofiocdesc)
 /* Get next property. */
 #define	OFIOCNEXTPROP	_IOWR(OFIOC_BASE, 3, struct ofiocdesc)
 /* Get options node. */
@@ -79,5 +68,10 @@ struct ofiocdesc {
 #define	OFIOCFINDDEVICE	_IOWR(OFIOC_BASE, 7, struct ofiocdesc)
 /* Retrieve the size of a property. */
 #define	OFIOCGETPROPLEN	_IOWR(OFIOC_BASE, 8, struct ofiocdesc)
+
+/* Maximum accepted name length. */
+#define	OFIOCMAXNAME	8191
+/* Maximum accepted value length (maximum of nvramrc property). */
+#define	OFIOCMAXVALUE	8192
 
 #endif /* _DEV_OFW_OPENFIRMIO_H_ */

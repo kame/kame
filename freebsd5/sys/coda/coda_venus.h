@@ -27,7 +27,7 @@
  * Mellon the rights to redistribute these changes without encumbrance.
  * 
  * 	@(#) src/sys/coda/coda_venus.h,v 1.1.1.1 1998/08/29 21:14:52 rvb Exp $ 
- * $FreeBSD: src/sys/coda/coda_venus.h,v 1.5 2003/09/07 07:43:09 tjr Exp $
+ * $FreeBSD: src/sys/coda/coda_venus.h,v 1.6 2004/06/16 09:46:32 phk Exp $
  * 
  */
 
@@ -39,7 +39,7 @@ venus_root(void *mdp,
 int
 venus_open(void *mdp, CodaFid *fid, int flag,
 	struct ucred *cred, struct proc *p,
-/*out*/	dev_t *dev, ino_t *inode);
+/*out*/	struct cdev **dev, ino_t *inode);
 
 int
 venus_close(void *mdp, CodaFid *fid, int flag,

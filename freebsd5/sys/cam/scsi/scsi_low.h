@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/cam/scsi/scsi_low.h,v 1.6 2002/09/23 18:54:28 alfred Exp $	*/
+/*	$FreeBSD: src/sys/cam/scsi/scsi_low.h,v 1.7 2004/07/10 20:54:01 marcel Exp $	*/
 /*	$NecBSD: scsi_low.h,v 1.24.10.5 2001/06/26 07:31:46 honda Exp $	*/
 /*	$NetBSD$	*/
 
@@ -66,6 +66,7 @@
 
 #ifdef	__FreeBSD__
 #include <sys/device_port.h>
+#include <sys/kdb.h>
 #include <cam/cam.h>
 #include <cam/cam_ccb.h>
 #include <cam/cam_sim.h>
@@ -86,7 +87,7 @@
 
 #ifdef	__FreeBSD__
 #undef	MSG_IDENTIFY
-#define	SCSI_LOW_DEBUGGER(dev)	Debugger((dev))
+#define	SCSI_LOW_DEBUGGER(dev)	kdb_enter(dev)
 #define	SCSI_LOW_DELAY(mu)	DELAY((mu))
 #define	SCSI_LOW_SPLSCSI	splcam
 #define	SCSI_LOW_BZERO(pt, size)	bzero((pt), (size))

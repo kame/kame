@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/ufm.c,v 1.16 2003/10/04 21:41:01 joe Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/ufm.c,v 1.22 2004/08/15 23:39:18 imp Exp $");
 
 
 #include <sys/param.h>
@@ -55,7 +55,6 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/ufm.c,v 1.16 2003/10/04 21:41:01 joe Exp $")
 #else
 #include <sys/select.h>
 #endif
-#include <sys/vnode.h>
 #include <sys/poll.h>
 #include <sys/sysctl.h>
 
@@ -63,7 +62,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/ufm.c,v 1.16 2003/10/04 21:41:01 joe Exp $")
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
 
-#include <dev/usb/usbdevs.h>
+#include "usbdevs.h"
 #include <dev/usb/dsbr100io.h>
 
 #ifdef USB_DEBUG
@@ -89,18 +88,13 @@ d_open_t  ufmopen;
 d_close_t ufmclose;
 d_ioctl_t ufmioctl;
 
-#if __FreeBSD_version >= 500000
-#define UFM_CDEV_MAJOR	MAJOR_AUTO
-#else
-#define UFM_CDEV_MAJOR	200
-#endif
-
 Static struct cdevsw ufm_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	ufmopen,
 	.d_close =	ufmclose,
 	.d_ioctl =	ufmioctl,
 	.d_name =	"ufm",
-	.d_maj =	UFM_CDEV_MAJOR,
 #if (__FreeBSD_version < 500014)
  	.d_bmaj =	-1
 #endif
@@ -166,7 +160,6 @@ USB_ATTACH(ufm)
 	DPRINTFN(10,("ufm_attach: sc=%p\n", sc));
 	usbd_devinfo(uaa->device, 0, devinfo);
 	USB_ATTACH_SETUP;
-	printf("%s: %s\n", USBDEVNAME(sc->sc_dev), devinfo);
 
 	sc->sc_udev = udev = uaa->device;
 
@@ -210,7 +203,7 @@ USB_ATTACH(ufm)
 	sc->sc_epaddr = edesc->bEndpointAddress;
 
 #if defined(__FreeBSD__)
-	/* XXX no error trapping, no storing of dev_t */
+	/* XXX no error trapping, no storing of struct cdev **/
 	(void) make_dev(&ufm_cdevsw, device_get_unit(self),
 			UID_ROOT, GID_OPERATOR,
 			0644, "ufm%d", device_get_unit(self));
@@ -230,7 +223,7 @@ USB_ATTACH(ufm)
 
 
 int
-ufmopen(dev_t dev, int flag, int mode, usb_proc_ptr td)
+ufmopen(struct cdev *dev, int flag, int mode, usb_proc_ptr td)
 {
 	struct ufm_softc *sc;
 
@@ -251,7 +244,7 @@ ufmopen(dev_t dev, int flag, int mode, usb_proc_ptr td)
 }
 
 int
-ufmclose(dev_t dev, int flag, int mode, usb_proc_ptr td)
+ufmclose(struct cdev *dev, int flag, int mode, usb_proc_ptr td)
 {
 	struct ufm_softc *sc;
 
@@ -374,7 +367,7 @@ ufm_get_stat(struct ufm_softc *sc, caddr_t addr)
 }
 
 int
-ufmioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, usb_proc_ptr td)
+ufmioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, usb_proc_ptr td)
 {
 	struct ufm_softc *sc;
 

@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2000 Mark R. V. Murray & Jeroen C. van Gelderen
+ * Copyright (c) 2001-2004 Mark R. V. Murray
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/null/null.c,v 1.23 2003/11/01 09:31:54 markm Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/null/null.c,v 1.30 2004/08/02 19:59:41 markm Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -40,8 +41,8 @@ __FBSDID("$FreeBSD: src/sys/dev/null/null.c,v 1.23 2003/11/01 09:31:54 markm Exp
 #include <machine/bus.h>
 
 /* For use with destroy_dev(9). */
-static dev_t null_dev;
-static dev_t zero_dev;
+static struct cdev *null_dev;
+static struct cdev *zero_dev;
 
 static d_write_t null_write;
 static d_ioctl_t null_ioctl;
@@ -52,35 +53,37 @@ static d_read_t zero_read;
 #define ZERO_MINOR	12
 
 static struct cdevsw null_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_read =	(d_read_t *)nullop,
 	.d_write =	null_write,
 	.d_ioctl =	null_ioctl,
 	.d_name =	"null",
 	.d_maj =	CDEV_MAJOR,
-	.d_flags =	D_NOGIANT,
 };
 
 static struct cdevsw zero_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_read =	zero_read,
 	.d_write =	null_write,
 	.d_name =	"zero",
 	.d_maj =	CDEV_MAJOR,
-	.d_flags =	D_MMAP_ANON | D_NOGIANT,
+	.d_flags =	D_MMAP_ANON,
 };
 
 static void *zbuf;
 
 /* ARGSUSED */
 static int
-null_write(dev_t dev __unused, struct uio *uio, int flags __unused)
+null_write(struct cdev *dev __unused, struct uio *uio, int flags __unused)
 {
 	uio->uio_resid = 0;
-	return 0;
+
+	return (0);
 }
 
 /* ARGSUSED */
 static int
-null_ioctl(dev_t dev __unused, u_long cmd, caddr_t data __unused,
+null_ioctl(struct cdev *dev __unused, u_long cmd, caddr_t data __unused,
     int flags __unused, struct thread *td)
 {
 	int error;
@@ -95,16 +98,14 @@ null_ioctl(dev_t dev __unused, u_long cmd, caddr_t data __unused,
 
 /* ARGSUSED */
 static int
-zero_read(dev_t dev __unused, struct uio *uio, int flags __unused)
+zero_read(struct cdev *dev __unused, struct uio *uio, int flags __unused)
 {
-	int c;
 	int error = 0;
 
-	while (uio->uio_resid > 0 && error == 0) {
-		c = uio->uio_resid < PAGE_SIZE ? uio->uio_resid : PAGE_SIZE;
-		error = uiomove(zbuf, c, uio);
-	}
-	return error;
+	while (uio->uio_resid > 0 && error == 0)
+		error = uiomove(zbuf, MIN(uio->uio_resid, PAGE_SIZE), uio);
+
+	return (error);
 }
 
 /* ARGSUSED */
@@ -116,24 +117,27 @@ null_modevent(module_t mod __unused, int type, void *data __unused)
 		if (bootverbose)
 			printf("null: <null device, zero device>\n");
 		zbuf = (void *)malloc(PAGE_SIZE, M_TEMP, M_WAITOK | M_ZERO);
-		zero_dev = make_dev(&zero_cdevsw, ZERO_MINOR, UID_ROOT,
-			GID_WHEEL, 0666, "zero");
 		null_dev = make_dev(&null_cdevsw, NULL_MINOR, UID_ROOT,
 			GID_WHEEL, 0666, "null");
-		return 0;
+		zero_dev = make_dev(&zero_cdevsw, ZERO_MINOR, UID_ROOT,
+			GID_WHEEL, 0666, "zero");
+		break;
 
 	case MOD_UNLOAD:
 		destroy_dev(null_dev);
 		destroy_dev(zero_dev);
 		free(zbuf, M_TEMP);
-		return 0;
+		break;
 
 	case MOD_SHUTDOWN:
-		return 0;
+		break;
 
 	default:
-		return EOPNOTSUPP;
+		return (EOPNOTSUPP);
 	}
+
+	return (0);
 }
 
 DEV_MODULE(null, null_modevent, NULL);
+MODULE_VERSION(null, 1);

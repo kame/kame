@@ -38,7 +38,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)vmparam.h	5.9 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/amd64/include/vmparam.h,v 1.43 2003/11/08 04:39:22 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/vmparam.h,v 1.44.4.1 2004/10/30 00:11:41 peter Exp $
  */
 
 
@@ -57,7 +57,7 @@
 #define	DFLDSIZ		(128UL*1024*1024)	/* initial data size limit */
 #endif
 #ifndef MAXDSIZ
-#define	MAXDSIZ		(8192UL*1024*1024)	/* max data size */
+#define	MAXDSIZ		(32768UL*1024*1024)	/* max data size */
 #endif
 #ifndef	DFLSSIZ
 #define	DFLSSIZ		(8UL*1024*1024)		/* initial stack size limit */
@@ -133,7 +133,7 @@
  * Ceiling on amount of kmem_map kva space.
  */
 #ifndef VM_KMEM_SIZE_MAX
-#define	VM_KMEM_SIZE_MAX	(200 * 1024 * 1024)
+#define	VM_KMEM_SIZE_MAX	(400 * 1024 * 1024)
 #endif
 
 /* initial pagein size of beginning of executable file */

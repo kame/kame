@@ -23,7 +23,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/boot/common/ufsread.c,v 1.12 2003/08/25 23:30:41 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/boot/common/ufsread.c,v 1.13 2004/07/04 16:11:01 stefanf Exp $");
 
 #include <ufs/ufs/dinode.h>
 #include <ufs/ffs/fs.h>
@@ -68,7 +68,7 @@ static ssize_t fsread(ino_t, void *, size_t);
 static int ls, dsk_meta;
 static uint32_t fs_off;
 
-static __inline__ int
+static __inline int
 fsfind(const char *name, ino_t * ino)
 {
 	char buf[DEV_BSIZE];

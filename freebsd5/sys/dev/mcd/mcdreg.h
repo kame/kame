@@ -41,14 +41,14 @@
  * the manufacturer or anyone else might provide better documentation,
  * so this file (and the driver) will then have a better quality.
  *
- * $FreeBSD: src/sys/dev/mcd/mcdreg.h,v 1.15 2002/10/04 07:14:13 mdodd Exp $
+ * $FreeBSD: src/sys/dev/mcd/mcdreg.h,v 1.16 2004/03/12 21:45:27 trhodes Exp $
  */
 
 #ifndef MCD_H
 #define	MCD_H
 
-#ifdef __GNUC__
-#if __GNUC__ >= 2
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
+#if __GNUC__ >= 2 || defined(__INTEL_COMPILER)
 #pragma pack(1)
 #endif
 #endif
@@ -222,8 +222,8 @@ struct mcd_rawsector {
 	u_char ecc_bits[280];
 };
 
-#ifdef __GNUC__
-#if __GNUC__ >= 2
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
+#if __GNUC__ >= 2 || defined(__INTEL_COMPILER)
 #pragma pack(4)
 #endif
 #endif

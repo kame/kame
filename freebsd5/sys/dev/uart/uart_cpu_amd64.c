@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2003 Marcel Moolenaar
+ * Copyright (c) 2003, 2004 Marcel Moolenaar
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/uart/uart_cpu_amd64.c,v 1.6 2003/09/26 05:14:56 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/uart/uart_cpu_amd64.c,v 1.8 2004/08/14 23:54:27 marius Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -35,6 +35,9 @@ __FBSDID("$FreeBSD: src/sys/dev/uart/uart_cpu_amd64.c,v 1.6 2003/09/26 05:14:56 
 
 #include <dev/uart/uart.h>
 #include <dev/uart/uart_cpu.h>
+
+bus_space_tag_t uart_bus_space_io = AMD64_BUS_SPACE_IO;
+bus_space_tag_t uart_bus_space_mem = AMD64_BUS_SPACE_MEM;
 
 int
 uart_cpu_eqres(struct uart_bas *b1, struct uart_bas *b2)
@@ -47,6 +50,10 @@ int
 uart_cpu_getdev(int devtype, struct uart_devinfo *di)
 {
 	unsigned int i, ivar;
+
+	/* Check the environment. */
+	if (uart_getenv(devtype, di) == 0)
+		return (0);
 
 	/*
 	 * Scan the hints. We only try units 0 to 3 (inclusive). This
@@ -76,7 +83,7 @@ uart_cpu_getdev(int devtype, struct uart_devinfo *di)
 		 */
 		di->ops = uart_ns8250_ops;
 		di->bas.chan = 0;
-		di->bas.bst = AMD64_BUS_SPACE_IO;
+		di->bas.bst = uart_bus_space_io;
 		if (bus_space_map(di->bas.bst, ivar, 8, 0, &di->bas.bsh) != 0)
 			continue;
 		di->bas.regshft = 0;
@@ -91,4 +98,10 @@ uart_cpu_getdev(int devtype, struct uart_devinfo *di)
 	}
 
 	return (ENXIO);
+}
+
+void
+uart_cpu_identify(driver_t *driver, device_t parent)
+{
+ 
 }

@@ -63,7 +63,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_core.c,v 1.132 2003/12/01 19:03:50 truckman Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_core.c,v 1.135 2004/06/16 09:46:38 phk Exp $");
 
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
@@ -138,8 +138,8 @@ __FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_core.c,v 1.132 2003/12/01 19:03:50 tru
 #include <sys/bus.h>
 #endif
 
-#include <machine/ioctl_meteor.h>
-#include <machine/ioctl_bt848.h>	/* extensions to ioctl_meteor.h */
+#include <dev/bktr/ioctl_meteor.h>
+#include <dev/bktr/ioctl_bt848.h>	/* extensions to ioctl_meteor.h */
 #include <dev/bktr/bktr_reg.h>
 #include <dev/bktr/bktr_tuner.h>
 #include <dev/bktr/bktr_card.h>
@@ -1191,7 +1191,7 @@ vbi_close( bktr_ptr_t bktr )
  *
  */
 int
-video_read(bktr_ptr_t bktr, int unit, dev_t dev, struct uio *uio)
+video_read(bktr_ptr_t bktr, int unit, struct cdev *dev, struct uio *uio)
 {
         int             status;
         int             count;
@@ -3890,7 +3890,7 @@ i2cRead( bktr_ptr_t bktr, int addr )
 	return ((int)((unsigned char)result));
 }
 
-#define IICBUS(bktr) ((bktr)->i2c_sc.iicbus)
+#define IICBUS(bktr) ((bktr)->i2c_sc.iicbb)
 
 /* The MSP34xx and DPL35xx Audio chip require i2c bus writes of up */
 /* to 5 bytes which the bt848 automated i2c bus controller cannot handle */

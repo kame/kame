@@ -1,5 +1,5 @@
 /*	$NetBSD: ucomvar.h,v 1.9 2001/01/23 21:56:17 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ucomvar.h,v 1.2 2002/07/31 14:34:35 joe Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ucomvar.h,v 1.4 2004/06/26 09:20:06 phk Exp $	*/
 
 /*-
  * Copyright (c) 2001-2002, Shunsuke Akiyama <akiyama@jp.FreeBSD.org>.
@@ -163,7 +163,6 @@ struct ucom_softc {
 	int			sc_state;
 
 	int			sc_poll;
-	u_char			hotchar;
 
 	u_char			sc_lsr;
 	u_char			sc_msr;
@@ -173,7 +172,7 @@ struct ucom_softc {
 	int			sc_refcnt;
 	u_char			sc_dying;	/* disconnecting */
 
-	dev_t			dev;		/* special device node */
+	struct cdev *dev;		/* special device node */
 };
 
 extern devclass_t ucom_devclass;

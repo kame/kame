@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/utopia/utopia.c,v 1.4 2003/07/30 08:35:58 harti Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/utopia/utopia.c,v 1.7 2004/07/15 08:26:03 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD: src/sys/dev/utopia/utopia.c,v 1.4 2003/07/30 08:35:58 harti 
 #include <sys/proc.h>
 #include <sys/bus.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/sysctl.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
@@ -1512,7 +1513,6 @@ utopia_daemon(void *arg __unused)
 	}
 	wakeup_one(&utopia_list);
 	UTP_RUNLOCK_LIST();
-	mtx_lock(&Giant);
 	kthread_exit(0);
 }
 
@@ -1550,6 +1550,8 @@ utopia_mod_init(module_t mod, int what, void *arg)
 			UTP_WUNLOCK_LIST();
 		mtx_destroy(&utopia_list_mtx);
 		break;
+	  default:
+		return (EOPNOTSUPP);
 	}
 	return (0);
 }

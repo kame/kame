@@ -105,7 +105,7 @@ extern struct ifqueue   ipintrq;		/* ip packet input queue */
 
 #if !defined(lint)
 /* static const char rcsid[] = "@(#)$Id: ip_auth.c,v 2.11.2.12 2001/07/18 14:57:08 darrenr Exp $"; */
-static const char rcsid[] = "@(#)$FreeBSD: src/sys/contrib/ipfilter/netinet/ip_auth.c,v 1.33 2003/03/04 23:19:55 jlemon Exp $";
+static const char rcsid[] = "@(#)$FreeBSD: src/sys/contrib/ipfilter/netinet/ip_auth.c,v 1.36 2004/06/22 05:20:30 darrenr Exp $";
 #endif
 
 
@@ -321,6 +321,9 @@ int cmd;
 {
 	mb_t *m;
 #if defined(_KERNEL) && !SOLARIS
+# if !defined(__FreeBSD_version) || (__FreeBSD_version < 501104)
+	struct ifqueue *ifq;
+# endif
 	int s;
 #endif
 	frauth_t auth, *au = &auth, *fra;
@@ -423,8 +426,8 @@ fr_authioctlloop:
 
 			bzero((char *)&ro, sizeof(ro));
 #  if ((_BSDI_VERSION >= 199802) && (_BSDI_VERSION < 200005)) || \
-       defined(__OpenBSD__) || (defined(IRIX) && (IRIX >= 605)) || \
-       (__FreeBSD_version >= 500042)
+      defined(__OpenBSD__) || (defined(IRIX) && (IRIX >= 605)) || \
+      (__FreeBSD_version >= 470102)
 			error = ip_output(m, NULL, &ro, IP_FORWARDING, NULL,
 					  NULL);
 #  else

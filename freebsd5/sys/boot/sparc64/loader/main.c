@@ -5,9 +5,11 @@
  *
  * As long as the above copyright statement and this notice remain
  * unchanged, you can do what ever you want with this file. 
- *
- * $FreeBSD: src/sys/boot/sparc64/loader/main.c,v 1.21 2003/07/11 16:12:50 tmm Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/sparc64/loader/main.c,v 1.23.2.2 2004/09/09 23:06:55 kensmith Exp $");
+
 /*
  * FreeBSD/sparc64 kernel loader - machine dependent part
  *
@@ -367,7 +369,7 @@ main(int (*openfirm)(void *))
 	phandle_t chosenh;
 
 	/*
-	 * Tell the OpenFirmware functions where they find the ofw gate.
+	 * Tell the Open Firmware functions where they find the ofw gate.
 	 */
 	OF_init(openfirm);
 

@@ -26,15 +26,19 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/critical.c,v 1.13 2003/12/06 23:13:22 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/critical.c,v 1.14 2004/03/05 14:31:21 bde Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
+
 #include <machine/critical.h>
+#include <machine/psl.h>
 
 /*
  * cpu_critical_fork_exit() - cleanup after fork
+ *
+ *	Enable interrupts in the saved copy of eflags.
  */
 void
 cpu_critical_fork_exit(void)

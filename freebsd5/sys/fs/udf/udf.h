@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/udf/udf.h,v 1.6 2003/11/05 06:56:08 scottl Exp $
+ * $FreeBSD: src/sys/fs/udf/udf.h,v 1.8 2004/06/23 19:36:09 scottl Exp $
  */
 
 #define UDF_HASHTBLSIZE 100
@@ -33,7 +33,7 @@ struct udf_node {
 	struct vnode	*i_vnode;
 	struct vnode	*i_devvp;
 	struct udf_mnt	*udfmp;
-	dev_t		i_dev;
+	struct cdev *i_dev;
 	ino_t		hash_id;
 	long		diroff;
 	struct file_entry *fentry;
@@ -42,7 +42,7 @@ struct udf_node {
 struct udf_mnt {
 	int			im_flags;
 	struct mount		*im_mountp;
-	dev_t			im_dev;
+	struct cdev *im_dev;
 	struct vnode		*im_devvp;
 	int			bsize;
 	int			bshift;
@@ -115,7 +115,9 @@ udf_readalblks(struct udf_mnt *udfmp, int lsector, int size, struct buf **bp)
 }
 
 /*
- * Produce a suitable file number from an ICB.
+ * Produce a suitable file number from an ICB.  The passed in ICB is expected
+ * to be in little endian (meaning that it hasn't been swapped for big
+ * endian machines yet).
  * XXX If the fileno resolves to 0, we might be in big trouble.
  * XXX Assumes the ICB is a long_ad.  This struct is compatible with short_ad,
  *     but not ext_ad.
@@ -123,7 +125,7 @@ udf_readalblks(struct udf_mnt *udfmp, int lsector, int size, struct buf **bp)
 static __inline ino_t
 udf_getid(struct long_ad *icb)
 {
-	return (icb->loc.lb_num);
+	return (le32toh(icb->loc.lb_num));
 }
 
 int udf_allocv(struct mount *, struct vnode **, struct thread *);

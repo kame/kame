@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/include/apicvar.h,v 1.6 2003/11/17 08:58:14 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/apicvar.h,v 1.9 2004/07/08 01:42:49 peter Exp $
  */
 
 #ifndef _MACHINE_APICVAR_H_
@@ -93,7 +93,6 @@
 #define	IPI_INVLTLB	(APIC_IPI_INTS + 1)	/* TLB Shootdown IPIs */
 #define	IPI_INVLPG	(APIC_IPI_INTS + 2)
 #define	IPI_INVLRNG	(APIC_IPI_INTS + 3)
-#define	IPI_LAZYPMAP	(APIC_IPI_INTS + 4)	/* Lazy pmap release. */
 #define	IPI_HARDCLOCK	(APIC_IPI_INTS + 8)	/* Inter-CPU clock handling. */
 #define	IPI_STATCLOCK	(APIC_IPI_INTS + 9)
 #define	IPI_RENDEZVOUS	(APIC_IPI_INTS + 10)	/* Inter-CPU rendezvous. */
@@ -114,6 +113,12 @@
 #define	APIC_IPI_DEST_SELF	-1
 #define	APIC_IPI_DEST_ALL	-2
 #define	APIC_IPI_DEST_OTHERS	-3
+
+#define	APIC_BUS_UNKNOWN	-1
+#define	APIC_BUS_ISA		0
+#define	APIC_BUS_EISA		1
+#define	APIC_BUS_PCI		2
+#define	APIC_BUS_MAX		APIC_BUS_PCI
 
 /*
  * An APIC enumerator is a psuedo bus driver that enumerates APIC's including
@@ -138,14 +143,17 @@ u_int	apic_idt_to_irq(u_int vector);
 void	apic_register_enumerator(struct apic_enumerator *enumerator);
 void	*ioapic_create(uintptr_t addr, int32_t id, int intbase);
 int	ioapic_disable_pin(void *cookie, u_int pin);
+void	ioapic_enable_mixed_mode(void);
 int	ioapic_get_vector(void *cookie, u_int pin);
 int	ioapic_next_logical_cluster(void);
 void	ioapic_register(void *cookie);
 int	ioapic_remap_vector(void *cookie, u_int pin, int vector);
+int	ioapic_set_bus(void *cookie, u_int pin, int bus_type);
 int	ioapic_set_extint(void *cookie, u_int pin);
 int	ioapic_set_nmi(void *cookie, u_int pin);
-int	ioapic_set_polarity(void *cookie, u_int pin, char activehi);
-int	ioapic_set_triggermode(void *cookie, u_int pin, char edgetrigger);
+int	ioapic_set_polarity(void *cookie, u_int pin, enum intr_polarity pol);
+int	ioapic_set_triggermode(void *cookie, u_int pin,
+	    enum intr_trigger trigger);
 int	ioapic_set_smi(void *cookie, u_int pin);
 void	lapic_create(u_int apic_id, int boot_cpu);
 void	lapic_disable(void);
@@ -162,8 +170,10 @@ void	lapic_handle_intr(void *cookie, struct intrframe frame);
 void	lapic_set_logical_id(u_int apic_id, u_int cluster, u_int cluster_id);
 int	lapic_set_lvt_mask(u_int apic_id, u_int lvt, u_char masked);
 int	lapic_set_lvt_mode(u_int apic_id, u_int lvt, u_int32_t mode);
-int	lapic_set_lvt_polarity(u_int apic_id, u_int lvt, u_char activehi);
-int	lapic_set_lvt_triggermode(u_int apic_id, u_int lvt, u_char edgetrigger);
+int	lapic_set_lvt_polarity(u_int apic_id, u_int lvt,
+	    enum intr_polarity pol);
+int	lapic_set_lvt_triggermode(u_int apic_id, u_int lvt,
+	    enum intr_trigger trigger);
 void	lapic_setup(void);
 
 #endif /* !LOCORE */

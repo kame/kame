@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/syscons/scterm-dumb.c,v 1.5 2003/08/24 18:17:24 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/syscons/scterm-dumb.c,v 1.6 2004/01/21 05:08:51 grehan Exp $");
 
 #include "opt_syscons.h"
 
@@ -33,7 +33,7 @@ __FBSDID("$FreeBSD: src/sys/dev/syscons/scterm-dumb.c,v 1.5 2003/08/24 18:17:24 
 #include <sys/systm.h>
 #include <sys/consio.h>
 
-#ifdef __sparc64__
+#if __sparc64__ || __powerpc__
 #include <machine/sc_machdep.h>
 #else
 #include <machine/pc/display.h>

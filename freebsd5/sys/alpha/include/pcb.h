@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/pcb.h,v 1.9 2003/08/17 06:42:07 marcel Exp $ */
+/* $FreeBSD: src/sys/alpha/include/pcb.h,v 1.10 2004/07/10 19:55:58 marcel Exp $ */
 /* From: NetBSD: pcb.h,v 1.6 1997/04/06 08:47:33 cgd Exp */
 
 /*
@@ -58,6 +58,7 @@ struct pcb {
 };
 
 #ifdef _KERNEL
+void	makectx(struct trapframe *, struct pcb *);
 void	savectx(struct pcb *);
 #endif
 

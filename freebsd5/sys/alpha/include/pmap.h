@@ -14,10 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -43,7 +39,7 @@
  *	from: hp300: @(#)pmap.h	7.2 (Berkeley) 12/16/90
  *	from: @(#)pmap.h	7.4 (Berkeley) 5/12/91
  *	from: i386 pmap.h,v 1.54 1997/11/20 19:30:35 bde Exp
- * $FreeBSD: src/sys/alpha/include/pmap.h,v 1.24 2003/10/06 01:47:11 bms Exp $
+ * $FreeBSD: src/sys/alpha/include/pmap.h,v 1.33 2004/07/19 18:12:04 alc Exp $
  */
 
 #ifndef _MACHINE_PMAP_H_
@@ -99,6 +95,8 @@
 #ifndef LOCORE
 
 #include <sys/queue.h>
+#include <sys/_lock.h>
+#include <sys/_mutex.h>
 
 typedef alpha_pt_entry_t pt_entry_t;
 
@@ -169,8 +167,8 @@ struct md_page {
 #define	ASNGEN_MASK	((1 << ASNGEN_BITS) - 1)
 
 struct pmap {
+	struct mtx		pm_mtx;
 	pt_entry_t		*pm_lev1;	/* KVA of lev0map */
-	vm_object_t		pm_pteobj;	/* Container for pte's */
 	TAILQ_HEAD(,pv_entry)	pm_pvlist;	/* list of mappings in pmap */
 	u_int32_t		pm_active;	/* active cpus */
 	struct {
@@ -182,16 +180,22 @@ struct pmap {
 	LIST_ENTRY(pmap)	pm_list;	/* list of all pmaps. */
 };
 
-#define	pmap_page_is_mapped(m)	(!TAILQ_EMPTY(&(m)->md.pv_list))
-
-#define PM_FLAG_LOCKED	0x1
-#define PM_FLAG_WANTED	0x2
-
 typedef struct pmap	*pmap_t;
 
 #ifdef _KERNEL
 extern struct pmap	kernel_pmap_store;
 #define kernel_pmap	(&kernel_pmap_store)
+
+#define	PMAP_LOCK(pmap)		mtx_lock(&(pmap)->pm_mtx)
+#define	PMAP_LOCK_ASSERT(pmap, type) \
+				mtx_assert(&(pmap)->pm_mtx, (type))
+#define	PMAP_LOCK_DESTROY(pmap)	mtx_destroy(&(pmap)->pm_mtx)
+#define	PMAP_LOCK_INIT(pmap)	mtx_init(&(pmap)->pm_mtx, "pmap", \
+				    NULL, MTX_DEF)
+#define	PMAP_LOCKED(pmap)	mtx_owned(&(pmap)->pm_mtx)
+#define	PMAP_MTX(pmap)		(&(pmap)->pm_mtx)
+#define	PMAP_TRYLOCK(pmap)	mtx_trylock(&(pmap)->pm_mtx)
+#define	PMAP_UNLOCK(pmap)	mtx_unlock(&(pmap)->pm_mtx)
 #endif
 
 /*
@@ -208,21 +212,18 @@ typedef struct pv_entry {
 
 #ifdef	_KERNEL
 
-extern caddr_t	CADDR1;
-extern pt_entry_t *CMAP1;
-extern vm_offset_t avail_end;
-extern vm_offset_t avail_start;
-extern vm_offset_t clean_eva;
-extern vm_offset_t clean_sva;
 extern vm_offset_t phys_avail[];
 extern vm_offset_t virtual_avail;
 extern vm_offset_t virtual_end;
 
 struct vmspace;
 
+#define	pmap_page_is_mapped(m)	(!TAILQ_EMPTY(&(m)->md.pv_list))
+
 vm_offset_t pmap_steal_memory(vm_size_t);
 void	pmap_bootstrap(vm_offset_t, u_int);
 void	pmap_kenter(vm_offset_t va, vm_offset_t pa);
+void	*pmap_kenter_temporary(vm_offset_t pa, int i);
 void	pmap_kremove(vm_offset_t);
 void	pmap_setdevram(unsigned long long basea, vm_offset_t sizea);
 int	pmap_uses_prom_console(void);

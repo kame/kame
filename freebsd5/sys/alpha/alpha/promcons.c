@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/promcons.c,v 1.31 2003/09/26 10:52:16 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/promcons.c,v 1.40 2004/07/15 20:47:36 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -61,18 +61,13 @@ __FBSDID("$FreeBSD: src/sys/alpha/alpha/promcons.c,v 1.31 2003/09/26 10:52:16 ph
 
 static	d_open_t	promopen;
 static	d_close_t	promclose;
-static	d_ioctl_t	promioctl;
 
-#define CDEV_MAJOR 97
 static struct cdevsw prom_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	promopen,
 	.d_close =	promclose,
-	.d_read =	ttyread,
-	.d_write =	ttywrite,
-	.d_ioctl =	promioctl,
-	.d_poll =	ttypoll,
 	.d_name =	"prom",
-	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_TTY | D_NEEDGIANT,
 };
 
 
@@ -86,9 +81,12 @@ void	promtimeout(void *);
 int	promparam(struct tty *, struct termios *);
 void	promstop(struct tty *, int);
 
+extern	int promcons_dly_mkdev;
+void	promcons_delayed_makedev(void);
+
 int
 promopen(dev, flag, mode, td)
-	dev_t dev;
+	struct cdev *dev;
 	int flag, mode;
 	struct thread *td;
 {
@@ -126,7 +124,7 @@ promopen(dev, flag, mode, td)
 
 	splx(s);
 
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = ttyld_open(tp, dev);
 
 	if (error == 0 && setuptimeout) {
 		polltime = hz / PROM_POLL_HZ;
@@ -139,7 +137,7 @@ promopen(dev, flag, mode, td)
  
 int
 promclose(dev, flag, mode, td)
-	dev_t dev;
+	struct cdev *dev;
 	int flag, mode;
 	struct thread *td;
 {
@@ -150,36 +148,11 @@ promclose(dev, flag, mode, td)
 		return ENXIO;
 
 	untimeout(promtimeout, tp, promtimeouthandle);
-	(*linesw[tp->t_line].l_close)(tp, flag);
-	ttyclose(tp);
+	ttyld_close(tp, flag);
+	tty_close(tp);
 	return 0;
 }
  
-int
-promioctl(dev, cmd, data, flag, td)
-	dev_t dev;
-	u_long cmd;
-	caddr_t data;
-	int flag;
-	struct thread *td;
-{
-	int unit = minor(dev);
-	struct tty *tp = prom_tp;
-	int error;
-
-	if (unit != 0)
-		return ENXIO;
-
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, td);
-	if (error != ENOIOCTL)
-		return error;
-	error = ttioctl(tp, cmd, data, flag);
-	if (error != ENOIOCTL)
-		return error;
-
-	return ENOTTY;
-}
-
 int
 promparam(tp, t)
 	struct tty *tp;
@@ -238,7 +211,7 @@ promtimeout(v)
 
 	while ((c = promcncheckc(NULL)) != -1) {
 		if (tp->t_state & TS_ISOPEN)
-			(*linesw[tp->t_line].l_rint)(c, tp);
+			ttyld_rint(tp, c);
 	}
 	promtimeouthandle = timeout(promtimeout, tp, polltime);
 }
@@ -251,9 +224,21 @@ promcnattach(int alpha_console)
 {
 	prom_consdev.cn_pri = CN_NORMAL;
 	sprintf(prom_consdev.cn_name, "promcons");
-	make_dev(&prom_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600, "promcons");
+	if (promcons_dly_mkdev)
+		promcons_dly_mkdev++;
+	else {
+		make_dev(&prom_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600, "promcons");
+	}
 	cnadd(&prom_consdev);
 	promcn_attached = 1;
+}
+
+void
+promcons_delayed_makedev(void)
+{
+	if (promcn_attached) {
+		make_dev(&prom_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600, "promcons");
+	}
 }
 
 void

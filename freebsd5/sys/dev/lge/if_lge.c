@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/lge/if_lge.c,v 1.26 2003/11/14 17:16:56 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/lge/if_lge.c,v 1.34 2004/08/13 23:18:01 rwatson Exp $");
 
 /*
  * Level 1 LXT1001 gigabit ethernet driver for FreeBSD. Public
@@ -75,6 +75,7 @@ __FBSDID("$FreeBSD: src/sys/dev/lge/if_lge.c,v 1.26 2003/11/14 17:16:56 obrien E
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 
 #include <net/if.h>
@@ -149,7 +150,6 @@ static int lge_miibus_writereg(device_t, int, int, int);
 static void lge_miibus_statchg(device_t);
 
 static void lge_setmulti(struct lge_softc *);
-static u_int32_t lge_mchash(caddr_t);
 static void lge_reset(struct lge_softc *);
 static int lge_list_rx_init(struct lge_softc *);
 static int lge_list_tx_init(struct lge_softc *);
@@ -367,32 +367,6 @@ lge_miibus_statchg(dev)
 	return;
 }
 
-static u_int32_t
-lge_mchash(addr)
-	caddr_t		addr;
-{
-	u_int32_t	crc, carry;
-	int		idx, bit;
-	u_int8_t	data;
-
-	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF; /* initial value */
-
-	for (idx = 0; idx < 6; idx++) {
-		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
-			crc <<= 1;
-			if (carry)
-				crc = (crc ^ 0x04c11db6) | carry;
-		}
-	}
-
-	/*
-	 * return the filter bit position
-	 */
-	return((crc >> 26) & 0x0000003F);
-}
-
 static void
 lge_setmulti(sc)
 	struct lge_softc	*sc;
@@ -420,7 +394,8 @@ lge_setmulti(sc)
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = lge_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = ether_crc32_be(LLADDR((struct sockaddr_dl *)
+		    ifma->ifma_addr), ETHER_ADDR_LEN) >> 26;
 		if (h < 32)
 			hashes[0] |= (1 << h);
 		else
@@ -498,38 +473,13 @@ lge_attach(dev)
 	sc = device_get_softc(dev);
 	unit = device_get_unit(dev);
 	bzero(sc, sizeof(struct lge_softc));
-#ifndef BURN_BRIDGES
-	/*
-	 * Handle power management nonsense.
-	 */
-	if (pci_get_powerstate(dev) != PCI_POWERSTATE_D0) {
-		u_int32_t		iobase, membase, irq;
-
-		/* Save important PCI config data. */
-		iobase = pci_read_config(dev, LGE_PCI_LOIO, 4);
-		membase = pci_read_config(dev, LGE_PCI_LOMEM, 4);
-		irq = pci_read_config(dev, LGE_PCI_INTLINE, 4);
-
-		/* Reset the power state. */
-		printf("lge%d: chip is in D%d power mode "
-		    "-- setting to D0\n", unit,
-		    pci_get_powerstate(dev));
-		pci_set_powerstate(dev, PCI_POWERSTATE_D0);
-
-		/* Restore PCI config data. */
-		pci_write_config(dev, LGE_PCI_LOIO, iobase, 4);
-		pci_write_config(dev, LGE_PCI_LOMEM, membase, 4);
-		pci_write_config(dev, LGE_PCI_INTLINE, irq, 4);
-	}
-#endif
 	/*
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
 
 	rid = LGE_RID;
-	sc->lge_res = bus_alloc_resource(dev, LGE_RES, &rid,
-	    0, ~0, 1, RF_ACTIVE);
+	sc->lge_res = bus_alloc_resource_any(dev, LGE_RES, &rid, RF_ACTIVE);
 
 	if (sc->lge_res == NULL) {
 		printf("lge%d: couldn't map ports/memory\n", unit);
@@ -542,7 +492,7 @@ lge_attach(dev)
 
 	/* Allocate interrupt */
 	rid = 0;
-	sc->lge_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
+	sc->lge_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 	    RF_SHAREABLE | RF_ACTIVE);
 
 	if (sc->lge_irq == NULL) {
@@ -571,11 +521,6 @@ lge_attach(dev)
 	lge_read_eeprom(sc, (caddr_t)&eaddr[0], LGE_EE_NODEADDR_0, 1, 0);
 	lge_read_eeprom(sc, (caddr_t)&eaddr[2], LGE_EE_NODEADDR_1, 1, 0);
 	lge_read_eeprom(sc, (caddr_t)&eaddr[4], LGE_EE_NODEADDR_2, 1, 0);
-
-	/*
-	 * A Level 1 chip was detected. Inform the world.
-	 */
-	printf("lge%d: Ethernet address: %6D\n", unit, eaddr, ":");
 
 	sc->lge_unit = unit;
 	callout_handle_init(&sc->lge_stat_ch);
@@ -611,9 +556,9 @@ lge_attach(dev)
 	ifp->if_softc = sc;
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_NEEDSGIANT;
 	ifp->if_ioctl = lge_ioctl;
-	ifp->if_output = ether_output;
 	ifp->if_start = lge_start;
 	ifp->if_watchdog = lge_watchdog;
 	ifp->if_init = lge_init;

@@ -26,11 +26,12 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ida/ida_eisa.c,v 1.13 2003/08/24 17:49:12 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ida/ida_eisa.c,v 1.16 2004/05/30 20:08:34 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 
 #include <sys/bio.h>
@@ -48,15 +49,15 @@ __FBSDID("$FreeBSD: src/sys/dev/ida/ida_eisa.c,v 1.13 2003/08/24 17:49:12 obrien
 
 #include <dev/eisa/eisaconf.h>
 
-#define IDA_EISA_IOPORT_START	0x0c88
-#define IDA_EISA_IOPORT_LEN	0x0017
+#define	IDA_EISA_IOPORT_START	0x0c88
+#define	IDA_EISA_IOPORT_LEN	0x0017
 
-#define IDA_EISA_IRQ_REG	0x0cc0
-#define IDA_EISA_IRQ_MASK	0xf0
-#define IDA_EISA_IRQ_15		0x80
-#define IDA_EISA_IRQ_14		0x40
-#define IDA_EISA_IRQ_11		0x10
-#define IDA_EISA_IRQ_10		0x20
+#define	IDA_EISA_IRQ_REG	0x0cc0
+#define	IDA_EISA_IRQ_MASK	0xf0
+#define	IDA_EISA_IRQ_15		0x80
+#define	IDA_EISA_IRQ_14		0x40
+#define	IDA_EISA_IRQ_11		0x10
+#define	IDA_EISA_IRQ_10		0x20
 
 static int
 ida_v1_fifo_full(struct ida_softc *ida)
@@ -285,8 +286,8 @@ ida_eisa_attach(device_t dev)
 
 	ida->regs_res_type = SYS_RES_IOPORT;
 	ida->regs_res_id = 0;
-	ida->regs = bus_alloc_resource(dev, ida->regs_res_type,
-	    &ida->regs_res_id, 0, ~0, 1, RF_ACTIVE);
+	ida->regs = bus_alloc_resource_any(dev, ida->regs_res_type,
+	    &ida->regs_res_id, RF_ACTIVE);
 	if (ida->regs == NULL) {
 		device_printf(dev, "can't allocate register resources\n");
 		return (ENOMEM);
@@ -316,8 +317,8 @@ ida_eisa_attach(device_t dev)
 
 	rid = 0;
 	ida->irq_res_type = SYS_RES_IRQ;
-	ida->irq = bus_alloc_resource(dev, ida->irq_res_type, &rid,
-	    0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+	ida->irq = bus_alloc_resource_any(dev, ida->irq_res_type, &rid,
+	    RF_ACTIVE | RF_SHAREABLE);
 	if (ida->irq == NULL) {
 		ida_free(ida);
 		return (ENOMEM);

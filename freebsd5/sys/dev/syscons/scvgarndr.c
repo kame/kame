@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/syscons/scvgarndr.c,v 1.14 2003/08/24 18:17:24 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/syscons/scvgarndr.c,v 1.15 2004/05/30 20:08:42 phk Exp $");
 
 #include "opt_syscons.h"
 #include "opt_vga.h"
@@ -34,6 +34,7 @@ __FBSDID("$FreeBSD: src/sys/dev/syscons/scvgarndr.c,v 1.14 2003/08/24 18:17:24 o
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/fbio.h>
 #include <sys/consio.h>
 

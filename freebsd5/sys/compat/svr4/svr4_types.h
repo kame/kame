@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/compat/svr4/svr4_types.h,v 1.3 1999/08/28 00:51:27 peter Exp $
+ * $FreeBSD: src/sys/compat/svr4/svr4_types.h,v 1.5 2004/06/17 17:16:41 phk Exp $
  */
 
 #ifndef	_SVR4_TYPES_H_

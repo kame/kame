@@ -1,7 +1,7 @@
 /*	$NecBSD: ct.c,v 1.13.12.5 2001/06/26 07:31:53 honda Exp $	*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ct/ct.c,v 1.7 2003/08/24 17:46:03 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ct/ct.c,v 1.9 2004/07/10 20:57:43 marcel Exp $");
 /*	$NetBSD$	*/
 
 #define	CT_DEBUG
@@ -39,8 +39,6 @@ __FBSDID("$FreeBSD: src/sys/dev/ct/ct.c,v 1.7 2003/08/24 17:46:03 obrien Exp $")
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "opt_ddb.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -76,8 +74,8 @@ __FBSDID("$FreeBSD: src/sys/dev/ct/ct.c,v 1.7 2003/08/24 17:46:03 obrien Exp $")
 #ifdef __FreeBSD__
 #include <machine/bus.h>
 
-#include <machine/dvcfg.h>
-#include <machine/physio_proc.h>
+#include <compat/netbsd/dvcfg.h>
+#include <compat/netbsd/physio_proc.h>
 
 #include <cam/scsi/scsi_low.h>
 
@@ -1003,10 +1001,10 @@ again:
 		scsi_low_print(slp, NULL);
 		printf("%s: scsi_status 0x%x\n\n", slp->sl_xname, 
 		       (u_int) scsi_status);
-#ifdef	DDB
+#ifdef	KDB
 		if (ct_debug > 1)
 			SCSI_LOW_DEBUGGER("ct");
-#endif	/* DDB */
+#endif	/* KDB */
 	}
 #endif	/* CT_DEBUG */
 

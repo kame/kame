@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_card.c,v 1.22 2003/08/24 17:46:01 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_card.c,v 1.24 2004/08/08 01:23:39 sanpei Exp $");
 
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
@@ -77,8 +77,8 @@ __FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_card.c,v 1.22 2003/08/24 17:46:01 obri
 #include <dev/pci/bktr/bktr_card.h>
 #include <dev/pci/bktr/bktr_audio.h>
 #else
-#include <machine/ioctl_meteor.h>	/* Traditional location for .h files */
-#include <machine/ioctl_bt848.h>        /* extensions to ioctl_meteor.h */
+#include <dev/bktr/ioctl_meteor.h>
+#include <dev/bktr/ioctl_bt848.h>	/* extensions to ioctl_meteor.h */
 #include <dev/bktr/bktr_reg.h>
 #include <dev/bktr/bktr_core.h>
 #include <dev/bktr/bktr_tuner.h>
@@ -355,6 +355,18 @@ static const struct CARDTYPE cards[] = {
 	   /* Tuner, Extern, Intern, Mute, Enabled */
 	   { 0x10000, 0, 0x10000, 0, 1 },	/* audio MUX values */
 	   0x10f00 },				/* GPIO mask */
+
+	{  CARD_AOPEN_VA1000,			/* the card id */
+	  "AOpen VA1000",			/* the 'name' */
+	   NULL,				/* the tuner */
+	   0,					/* the tuner i2c address */
+	   0,					/* dbx is optional */
+	   0,
+	   0,
+	   0,					/* EEProm unknown */
+	   0,					/* size unknown */
+	   { 0x02, 0x00, 0x00, 0x00, 1 },	/* audio MUX values */
+	   0x18e0 },				/* GPIO mask */
 
 };
 

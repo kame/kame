@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/cam/cam_xpt.c,v 1.135 2003/11/09 02:22:33 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/cam/cam_xpt.c,v 1.142 2004/07/15 08:25:59 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -630,18 +630,18 @@ static struct periph_driver probe_driver =
 PERIPHDRIVER_DECLARE(xpt, xpt_driver);
 PERIPHDRIVER_DECLARE(probe, probe_driver);
 
-#define XPT_CDEV_MAJOR 104
 
 static d_open_t xptopen;
 static d_close_t xptclose;
 static d_ioctl_t xptioctl;
 
 static struct cdevsw xpt_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	xptopen,
 	.d_close =	xptclose,
 	.d_ioctl =	xptioctl,
 	.d_name =	"xpt",
-	.d_maj =	XPT_CDEV_MAJOR,
 };
 
 static struct intr_config_hook *xpt_config_hook;
@@ -936,7 +936,7 @@ xptdone(struct cam_periph *periph, union ccb *done_ccb)
 }
 
 static int
-xptopen(dev_t dev, int flags, int fmt, struct thread *td)
+xptopen(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	int unit;
 
@@ -973,7 +973,7 @@ xptopen(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static int
-xptclose(dev_t dev, int flag, int fmt, struct thread *td)
+xptclose(struct cdev *dev, int flag, int fmt, struct thread *td)
 {
 	int unit;
 
@@ -996,7 +996,7 @@ xptclose(dev_t dev, int flag, int fmt, struct thread *td)
 }
 
 static int
-xptioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
+xptioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
 {
 	int unit, error;
 
@@ -1348,6 +1348,8 @@ cam_module_event_handler(module_t mod, int what, void *arg)
 		xpt_init(NULL);
 	} else if (what == MOD_UNLOAD) {
 		return EBUSY;
+	} else {
+		return EOPNOTSUPP;
 	}
 
 	return 0;
@@ -1882,7 +1884,7 @@ xptdevicematch(struct dev_match_pattern *patterns, u_int num_patterns,
 	 * If there are no match entries, then this device matches no
 	 * matter what.
 	 */
-	if ((patterns == NULL) || (patterns == 0))
+	if ((patterns == NULL) || (num_patterns == 0))
 		return(DM_RET_DESCEND | DM_RET_COPY);
 
 	for (i = 0; i < num_patterns; i++) {

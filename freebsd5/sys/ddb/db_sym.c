@@ -29,13 +29,15 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ddb/db_sym.c,v 1.34 2003/06/10 22:09:23 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/ddb/db_sym.c,v 1.35 2004/02/24 22:51:42 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 
 #include <ddb/ddb.h>
 #include <ddb/db_sym.h>
+
+#include <opt_ddb.h>
 
 /*
  * Multiple symbol tables
@@ -308,7 +310,11 @@ db_printsym(off, strategy)
 		db_printf("%#lr", (unsigned long)off);
 		return;
 	}
+#ifdef DDB_NUMSYM
+	db_printf("%#lr = %s", (unsigned long)off, name);
+#else
 	db_printf("%s", name);
+#endif
 	if (d)
 		db_printf("+%+#lr", (long)d);
 	if (strategy == DB_STGY_PROC) {

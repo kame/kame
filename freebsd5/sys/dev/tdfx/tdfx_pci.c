@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/tdfx/tdfx_pci.c,v 1.30 2003/09/02 17:30:39 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/tdfx/tdfx_pci.c,v 1.35 2004/06/16 09:46:59 phk Exp $");
 
 /* 3dfx driver for FreeBSD 4.x - Finished 11 May 2000, 12:25AM ET
  *
@@ -50,7 +50,8 @@ __FBSDID("$FreeBSD: src/sys/dev/tdfx/tdfx_pci.c,v 1.30 2003/09/02 17:30:39 jhb E
 #include <sys/filio.h>
 #include <sys/ioccom.h>
 #include <sys/kernel.h>
-#include	<sys/malloc.h>
+#include <sys/module.h>
+#include <sys/malloc.h>
 #include <sys/mman.h>
 #include <sys/signalvar.h>
 #include <sys/systm.h>
@@ -104,12 +105,13 @@ LINUX_IOCTL_SET(tdfx, LINUX_IOCTL_TDFX_MIN, LINUX_IOCTL_TDFX_MAX);
 
 /* Char. Dev. file operations structure */
 static struct cdevsw tdfx_cdev = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	tdfx_open,
 	.d_close =	tdfx_close,
 	.d_ioctl =	tdfx_ioctl,
 	.d_mmap =	tdfx_mmap,
 	.d_name =	"tdfx",
-	.d_maj =	CDEV_MAJOR,
 };
 
 static int
@@ -188,8 +190,8 @@ tdfx_attach(device_t dev) {
 	device_printf(dev, "Base0 @ 0x%x\n", tdfx_info->addr0);
 #endif
 	/* Notify the VM that we will be mapping some memory later */
-	tdfx_info->memrange = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid, 0, ~0, 1,
-			RF_ACTIVE | RF_SHAREABLE);
+	tdfx_info->memrange = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+		&rid, RF_ACTIVE | RF_SHAREABLE);
 	if(tdfx_info->memrange == NULL) {
 #ifdef DEBUG
 		device_printf(dev, "Error mapping mem, won't be able to use mmap()\n");
@@ -212,8 +214,8 @@ tdfx_attach(device_t dev) {
 #ifdef DEBUG
 		device_printf(dev, "Base1 @ 0x%x\n", tdfx_info->addr1);
 #endif
-		tdfx_info->memrange2 = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
-			 0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+		tdfx_info->memrange2 = bus_alloc_resource_any(dev,
+			SYS_RES_MEMORY, &rid, RF_ACTIVE | RF_SHAREABLE);
 		if(tdfx_info->memrange2 == NULL) {
 #ifdef DEBUG
 			device_printf(dev, "Mem1 couldn't be allocated, glide may not work.");
@@ -227,8 +229,8 @@ tdfx_attach(device_t dev) {
 		rid = PCIR_IOBASE0_2;
 		tdfx_info->pio0 = pci_read_config(dev, 0x2c, 2);
 		tdfx_info->pio0max = pci_read_config(dev, 0x30, 2) + tdfx_info->pio0;
-		tdfx_info->piorange = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-			 0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+		tdfx_info->piorange = bus_alloc_resource_any(dev,
+			SYS_RES_IOPORT, &rid, RF_ACTIVE | RF_SHAREABLE);
 		if(tdfx_info->piorange == NULL) {
 #ifdef DEBUG
 			device_printf(dev, "Couldn't map PIO range.");
@@ -400,7 +402,7 @@ tdfx_setmtrr(device_t dev) {
 }
 		
 static int
-tdfx_open(dev_t dev, int flags, int fmt, struct thread *td)
+tdfx_open(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	/* 
 	 *	The open cdev method handles open(2) calls to /dev/3dfx[n] 
@@ -418,7 +420,7 @@ tdfx_open(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static int 
-tdfx_close(dev_t dev, int fflag, int devtype, struct thread *td) 
+tdfx_close(struct cdev *dev, int fflag, int devtype, struct thread *td) 
 {
 	/* 
 	 *	The close cdev method handles close(2) calls to /dev/3dfx[n] 
@@ -435,7 +437,7 @@ tdfx_close(dev_t dev, int fflag, int devtype, struct thread *td)
 }
 
 static int
-tdfx_mmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
+tdfx_mmap(struct cdev *dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
 {
 	/* 
 	 * mmap(2) is called by a user process to request that an area of memory
@@ -791,7 +793,7 @@ tdfx_do_pio(u_int cmd, struct tdfx_pio_data *piod)
  * can return -retval and the error should be properly handled.
  */
 static int
-tdfx_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
+tdfx_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 {
 	int retval = 0;
 	struct tdfx_pio_data *piod = (struct tdfx_pio_data*)data;

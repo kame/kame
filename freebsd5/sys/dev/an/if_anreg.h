@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/an/if_anreg.h,v 1.20 2003/11/14 19:00:30 sam Exp $
+ * $FreeBSD: src/sys/dev/an/if_anreg.h,v 1.21 2003/12/30 01:07:12 ambrisko Exp $
  */
 
 #define AN_TIMEOUT	65536
@@ -513,6 +513,7 @@ int	an_probe	(device_t);
 void	an_shutdown	(device_t);
 void	an_resume	(device_t);
 int	an_attach		(struct an_softc *, int, int);
+int	an_detach	(device_t);
 void    an_stop		(struct an_softc *);
 
 driver_intr_t	an_intr;

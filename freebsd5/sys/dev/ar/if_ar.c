@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ar/if_ar.c,v 1.60 2003/10/31 18:31:56 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ar/if_ar.c,v 1.65 2004/08/13 22:52:11 rwatson Exp $");
 
 /*
  * Programming assumptions and other issues.
@@ -125,7 +125,7 @@ struct ar_softc {
 	int	running;	/* something is attached so we are running */
 	int	dcd;		/* do we have dcd? */
 	/* ---netgraph bits --- */
-	char		nodename[NG_NODELEN + 1]; /* store our node name */
+	char		nodename[NG_NODESIZ]; /* store our node name */
 	int		datahooks;	/* number of data hooks attached */
 	node_p		node;		/* netgraph node */
 	hook_p		hook;		/* data hook */
@@ -227,18 +227,15 @@ static ng_rcvdata_t	ngar_rcvdata;
 static ng_disconnect_t	ngar_disconnect;
 	
 static struct ng_type typestruct = {
-	NG_ABI_VERSION,
-	NG_AR_NODE_TYPE,
-	NULL,
-	ngar_constructor,
-	ngar_rcvmsg,
-	ngar_shutdown,
-	ngar_newhook,
-	NULL,
-	ngar_connect,
-	ngar_rcvdata,
-	ngar_disconnect,
-	NULL
+	.version =	NG_ABI_VERSION,
+	.name =		NG_AR_NODE_TYPE,
+	.constructor =	ngar_constructor,
+	.rcvmsg =	ngar_rcvmsg,
+	.shutdown =	ngar_shutdown,
+	.newhook =	ngar_newhook,
+	.connect =	ngar_connect,
+	.rcvdata =	ngar_rcvdata,
+	.disconnect =	ngar_disconnect,
 };
 
 static int	ngar_done_init = 0;
@@ -296,7 +293,8 @@ ar_attach(device_t device)
 		if_initname(ifp, device_get_name(device),
 		    device_get_unit(device));
 		ifp->if_mtu = PP_MTU;
-		ifp->if_flags = IFF_POINTOPOINT | IFF_MULTICAST;
+		ifp->if_flags = IFF_POINTOPOINT | IFF_MULTICAST |
+		    IFF_NEEDSGIANT;
 		ifp->if_ioctl = arioctl;
 		ifp->if_start = arstart;
 		ifp->if_watchdog = arwatchdog;
@@ -402,8 +400,8 @@ ar_allocate_irq(device_t device, int rid, u_long size)
 	struct ar_hardc *hc = device_get_softc(device);
 
 	hc->rid_irq = rid;
-	hc->res_irq = bus_alloc_resource(device, SYS_RES_IRQ,
-			&hc->rid_irq, 0ul, ~0ul, 1, RF_SHAREABLE|RF_ACTIVE);
+	hc->res_irq = bus_alloc_resource_any(device, SYS_RES_IRQ,
+			&hc->rid_irq, RF_SHAREABLE|RF_ACTIVE);
 	if (hc->res_irq == NULL) {
 		goto errexit;
 	}
@@ -2231,10 +2229,9 @@ ngar_rcvdata(hook_p hook, item_p item)
 	struct ar_softc * sc = NG_NODE_PRIVATE(NG_HOOK_NODE(hook));
 	struct ifqueue	*xmitq_p;
 	struct mbuf *m;
-	meta_p meta;
+	struct ng_tag_prio *ptag;
 	
 	NGI_GET_M(item, m);
-	NGI_GET_META(item, meta);
 	NG_FREE_ITEM(item);
 	/*
 	 * data doesn't come in from just anywhere (e.g control hook)
@@ -2247,11 +2244,12 @@ ngar_rcvdata(hook_p hook, item_p item)
 	/* 
 	 * Now queue the data for when it can be sent
 	 */
-	if (meta && meta->priority > 0) {
+	if ((ptag = (struct ng_tag_prio *)m_tag_locate(m, NGM_GENERIC_COOKIE,
+	    NG_TAG_PRIO, NULL)) != NULL && (ptag->priority > NG_PRIO_CUTOFF) )
 		xmitq_p = (&sc->xmitq_hipri);
-	} else {
+	else
 		xmitq_p = (&sc->xmitq);
-	}
+
 	s = splimp();
 	IF_LOCK(xmitq_p);
 	if (_IF_QFULL(xmitq_p)) {
@@ -2273,7 +2271,6 @@ bad:
 	 * check if we need to free the mbuf, and then return the error
 	 */
 	NG_FREE_M(m);
-	NG_FREE_META(meta);
 	return (error);
 }
 

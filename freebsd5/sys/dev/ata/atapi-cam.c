@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ata/atapi-cam.c,v 1.29.2.1 2004/01/27 05:53:19 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ata/atapi-cam.c,v 1.35 2004/06/17 07:29:56 green Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -62,7 +62,7 @@ struct atapi_hcb {
     union ccb		*ccb;
     int			flags;
 #define QUEUED		0x0001
-
+#define AUTOSENSE       0x0002
     char		*dxfer_alloc;
     TAILQ_ENTRY(atapi_hcb) chain;
 };
@@ -496,7 +496,7 @@ atapi_action(struct cam_sim *sim, union ccb *ccb)
 	request->data = buf;
 	request->bytecount = len;
 	request->transfersize = min(request->bytecount, 65534);
-	request->timeout = ccb_h->timeout;
+	request->timeout = ccb_h->timeout / 1000; /* XXX lost granularity */
 	request->retries = 2;
 	request->callback = &atapi_cb;
 	request->flags = request_flags;
@@ -556,7 +556,7 @@ atapi_cb(struct ata_request *request)
     csio = &hcb->ccb->csio;
 
 #ifdef CAMDEBUG
-# define err (request->error)
+# define err (request->u.atapi.sense_key)
     if (CAM_DEBUGGED(csio->ccb_h.path, CAM_DEBUG_CDB)) {
 	printf("atapi_cb: hcb@%p error = %02x: (sk = %02x%s%s%s)\n",
 	       hcb, err, err >> 4,
@@ -569,26 +569,42 @@ atapi_cb(struct ata_request *request)
     }
 #endif
 
-    if (request->result != 0) {
+    if ((hcb->flags & AUTOSENSE) != 0) {
+	rc = CAM_SCSI_STATUS_ERROR;
+	if (request->result == 0) {
+	    csio->ccb_h.status |= CAM_AUTOSNS_VALID;
+	}
+    } else if (request->result != 0) {
 	rc = CAM_SCSI_STATUS_ERROR;
 	csio->scsi_status = SCSI_STATUS_CHECK_COND;
-#if 0
-	/*
-         * XXX Temporarily disable autosense, as this seems to cause
-	 * a missed ATA interrupt.
-	 */
+
 	if ((csio->ccb_h.flags & CAM_DIS_AUTOSENSE) == 0) {
-	    int8_t ccb[16] = { ATAPI_REQUEST_SENSE, 0, 0, 0,
+#if 0
+	    static const int8_t ccb[16] = { ATAPI_REQUEST_SENSE, 0, 0, 0,
 		sizeof(struct atapi_sense), 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0 };
 
-	    if (ata_atapicmd(request->device, ccb, (caddr_t)&csio->sense_data,
-		sizeof(struct atapi_sense), ATA_R_READ, 30) == 0)
-	    {
+	    bcopy (ccb, request->u.atapi.ccb, sizeof ccb);
+	    request->data = (caddr_t)&csio->sense_data;
+	    request->bytecount = sizeof(struct atapi_sense);
+	    request->transfersize = min(request->bytecount, 65534);
+	    request->timeout = csio->ccb_h.timeout / 1000;
+	    request->retries = 2;
+	    request->flags = ATA_R_QUIET|ATA_R_ATAPI|ATA_R_IMMEDIATE;
+	    hcb->flags |= AUTOSENSE;
+
+	    mtx_unlock (&Giant);
+	    ata_queue_request(request);
+	    return;
+#else
+	    /* The ATA driver has already requested sense for us. */
+	    if (request->error == 0) {
+		/* The ATA autosense suceeded. */
+		bcopy (&request->u.atapi.sense_data, &csio->sense_data, sizeof(struct atapi_sense));
 		csio->ccb_h.status |= CAM_AUTOSNS_VALID;
 	    }
-	}
 #endif
+	}
     } else {
 	rc = CAM_REQ_CMP;
 	csio->scsi_status = SCSI_STATUS_OK;

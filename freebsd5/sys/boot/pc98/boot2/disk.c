@@ -40,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/boot/pc98/boot2/disk.c,v 1.10 2003/09/08 09:11:20 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/boot/pc98/boot2/disk.c,v 1.11 2004/07/30 09:42:04 nyan Exp $");
 
 #include "boot.h"
 #include <sys/disklabel.h>
@@ -163,7 +163,7 @@ devread(char *iodest, int sector, int cnt)
 	{
 		dosdev_copy = dosdev;
 		p = Bread(dosdev_copy, sector++);
-		bcopy(p, iodest+offset, BPS);
+		memcpy(p, iodest+offset, BPS);
 	}
 }
 

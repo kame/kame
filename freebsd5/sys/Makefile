@@ -1,9 +1,13 @@
-# $FreeBSD: src/sys/Makefile,v 1.28 2003/06/26 03:52:48 peter Exp $
+# $FreeBSD: src/sys/Makefile,v 1.30.2.1 2004/08/22 14:19:53 des Exp $
 
 # The boot loader
+.if !defined(NO_BOOT)
+.if ${MACHINE_ARCH} != "arm"
 SUBDIR=	boot
+.endif
+.endif
 
-# KLD modules build for both a.out and ELF
+# Loadable kernel modules
 .if defined(MODULES_WITH_WORLD)
 SUBDIR+=modules
 .endif

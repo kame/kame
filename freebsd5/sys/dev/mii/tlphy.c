@@ -37,9 +37,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/tlphy.c,v 1.15 2003/08/24 17:54:10 obrien Exp $");
-
 /*
  * Copyright (c) 1997 Manuel Bouyer.  All rights reserved.
  *
@@ -69,12 +66,12 @@ __FBSDID("$FreeBSD: src/sys/dev/mii/tlphy.c,v 1.15 2003/08/24 17:54:10 obrien Ex
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/tlphy.c,v 1.17 2004/05/29 18:09:10 marius Exp $");
+
 /*
  * Driver for Texas Instruments's ThunderLAN PHYs
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/tlphy.c,v 1.15 2003/08/24 17:54:10 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -325,8 +322,8 @@ tlphy_service(self, mii, cmd)
 		/*
 		 * Only retry autonegotiation every 5 seconds.
 		 */
-		if (++sc->sc_mii.mii_ticks != 5)
-			return (0);
+		if (++sc->sc_mii.mii_ticks <= 5)
+			break;
 
 		sc->sc_mii.mii_ticks = 0;
 		mii_phy_reset(&sc->sc_mii);

@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/uvscom.c,v 1.19 2003/11/16 12:26:10 akiyama Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/uvscom.c,v 1.23 2004/06/27 12:41:44 imp Exp $");
 
 /*
  * uvscom: SUNTAC Slipper U VS-10U driver.
@@ -42,6 +42,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/uvscom.c,v 1.19 2003/11/16 12:26:10 akiyama 
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/fcntl.h>
 #include <sys/conf.h>
 #include <sys/tty.h>
@@ -59,7 +60,6 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/uvscom.c,v 1.19 2003/11/16 12:26:10 akiyama 
 #include <sys/device.h>
 #endif
 #include <sys/proc.h>
-#include <sys/vnode.h>
 #include <sys/poll.h>
 #include <sys/sysctl.h>
 
@@ -68,7 +68,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/uvscom.c,v 1.19 2003/11/16 12:26:10 akiyama 
 
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
-#include <dev/usb/usbdevs.h>
+#include "usbdevs.h"
 #include <dev/usb/usb_quirks.h>
 
 #include <dev/usb/ucomvar.h>
@@ -218,6 +218,8 @@ struct ucom_callback uvscom_callback = {
 };
 
 static const struct usb_devno uvscom_devs [] = {
+	/* SUNTAC U-Cable type A4 */
+	{ USB_VENDOR_SUNTAC, USB_PRODUCT_SUNTAC_AS144L4 },
 	/* SUNTAC U-Cable type D2 */
 	{ USB_VENDOR_SUNTAC, USB_PRODUCT_SUNTAC_DS96L },
 	/* SUNTAC Ir-Trinity */

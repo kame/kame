@@ -35,7 +35,7 @@
  *
  *	from: NetBSD: hmevar.h,v 1.5 2000/06/25 01:10:04 eeh Exp
  *
- * $FreeBSD: src/sys/dev/hme/if_hmevar.h,v 1.4 2003/01/09 00:45:10 tmm Exp $
+ * $FreeBSD: src/sys/dev/hme/if_hmevar.h,v 1.6 2004/08/12 20:37:02 marius Exp $
  */
 
 #include <sys/callout.h>
@@ -131,15 +131,11 @@ struct hme_softc {
 	bus_space_tag_t	sc_etxt;	/* HME ETX registers */
 	bus_space_tag_t	sc_mact;	/* HME MAC registers */
 	bus_space_tag_t	sc_mift;	/* HME MIF registers */
-	bus_addr_t	sc_sebo;	/* HME Global registers */
-	bus_addr_t	sc_erxo;	/* HME ERX registers */
-	bus_addr_t	sc_etxo;	/* HME ETX registers */
-	bus_addr_t	sc_maco;	/* HME MAC registers */
-	bus_addr_t	sc_mifo;	/* HME MIF registers */
 	int		sc_burst;	/* DVMA burst size in effect */
 	int		sc_phys[2];	/* MII instance -> PHY map */
 
 	int		sc_pci;		/* XXXXX -- PCI buses are LE. */
+	int		sc_csum_features;
 
 	/* Ring descriptor */
 	struct hme_ring		sc_rb;

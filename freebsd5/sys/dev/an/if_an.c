@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/an/if_an.c,v 1.56 2003/11/14 19:00:29 sam Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/an/if_an.c,v 1.63 2004/08/01 23:58:03 mlaier Exp $");
 
 /*
  * The Aironet 4500/4800 series cards come in PCMCIA, ISA and PCI form.
@@ -432,8 +432,8 @@ an_alloc_irq(dev, rid, flags)
 	struct an_softc *sc = device_get_softc(dev);
 	struct resource *res;
 
-	res = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
-				 0ul, ~0ul, 1, (RF_ACTIVE | flags));
+	res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
+				     (RF_ACTIVE | flags));
 	if (res) {
 		sc->irq_rid = rid;
 		sc->irq_res = res;
@@ -503,6 +503,7 @@ an_dma_free(sc, dma)
 {
 	bus_dmamap_unload(sc->an_dtag, dma->an_dma_map);
 	bus_dmamem_free(sc->an_dtag, dma->an_dma_vaddr, dma->an_dma_map);
+	dma->an_dma_vaddr = 0;
 	bus_dmamap_destroy(sc->an_dtag, dma->an_dma_map);
 }
 
@@ -748,9 +749,6 @@ an_attach(sc, unit, flags)
 	bcopy((char *)&sc->an_caps.an_oemaddr,
 	   (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
 
-	printf("an%d: Ethernet address: %6D\n", sc->an_unit,
-	    sc->arpcom.ac_enaddr, ":");
-
 	ifp->if_softc = sc;
 	sc->an_unit = unit;
 	if_initname(ifp, device_get_name(sc->an_dev),
@@ -758,12 +756,13 @@ an_attach(sc, unit, flags)
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = an_ioctl;
-	ifp->if_output = ether_output;
 	ifp->if_start = an_start;
 	ifp->if_watchdog = an_watchdog;
 	ifp->if_init = an_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
+	ifp->if_snd.ifq_drv_maxlen = IFQ_MAXLEN;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	bzero(sc->an_config.an_nodename, sizeof(sc->an_config.an_nodename));
 	bcopy(AN_DEFAULT_NODENAME, sc->an_config.an_nodename,
@@ -814,6 +813,29 @@ an_attach(sc, unit, flags)
 fail:;
 	mtx_destroy(&sc->an_mtx);
 	return(error);
+}
+
+int
+an_detach(device_t dev)
+{
+	struct an_softc		*sc = device_get_softc(dev);
+	struct ifnet		*ifp = &sc->arpcom.ac_if;
+
+	if (sc->an_gone) {
+		device_printf(dev,"already unloaded\n");
+		return(0);
+	}
+	AN_LOCK(sc);
+	an_stop(sc);
+	ifmedia_removeall(&sc->an_ifmedia);
+	ifp->if_flags &= ~IFF_RUNNING;
+	ether_ifdetach(ifp);
+	sc->an_gone = 1;
+	AN_UNLOCK(sc);
+	bus_teardown_intr(dev, sc->irq_res, sc->irq_handle);
+	an_release_resources(dev);
+	mtx_destroy(&sc->an_mtx);
+	return (0);
 }
 
 static void
@@ -1234,7 +1256,7 @@ an_intr(xsc)
 	/* Re-enable interrupts. */
 	CSR_WRITE_2(sc, AN_INT_EN(sc->mpi350), AN_INTRS(sc->mpi350));
 
-	if ((ifp->if_flags & IFF_UP) && (ifp->if_snd.ifq_head != NULL))
+	if ((ifp->if_flags & IFF_UP) && !IFQ_DRV_IS_EMPTY(&ifp->if_snd))
 		an_start(ifp);
 
 	AN_UNLOCK(sc);
@@ -1417,6 +1439,8 @@ an_read_record(sc, ltv)
 			*ptr2 = CSR_READ_1(sc, AN_DATA1);
 		}
 	} else { /* MPI-350 */
+		if (!sc->an_rid_buffer.an_dma_vaddr)
+			return(EIO);
 		an_rid_desc.an_valid = 1;
 		an_rid_desc.an_len = AN_RID_BUFFER_SIZE;
 		an_rid_desc.an_rid = 0;
@@ -1449,11 +1473,18 @@ an_read_record(sc, ltv)
 			an_rid_desc.an_len = an_ltv->an_len;
 		}
 
-		if (an_rid_desc.an_len > 2)
-			bcopy(&an_ltv->an_type,
-			      &ltv->an_val, 
-			      an_rid_desc.an_len - 2);
-		ltv->an_len = an_rid_desc.an_len + 2;
+		len = an_rid_desc.an_len;
+		if (len > (ltv->an_len - 2)) {
+			printf("an%d: record length mismatch -- expected %d, "
+			       "got %d for Rid %x\n", sc->an_unit,
+			       ltv->an_len - 2, len, ltv->an_type);
+			len = ltv->an_len - 2;
+		} else {
+			ltv->an_len = len + 2;
+		}
+		bcopy(&an_ltv->an_type,
+		    &ltv->an_val, 
+		    len);
 	}
 
 	if (an_dump)
@@ -2626,7 +2657,7 @@ an_start(ifp)
 	/* We can't send in monitor mode so toss any attempts. */
 	if (sc->an_monitor && (ifp->if_flags & IFF_PROMISC)) {
 		for (;;) {
-			IF_DEQUEUE(&ifp->if_snd, m0);
+			IFQ_DRV_DEQUEUE(&ifp->if_snd, m0);
 			if (m0 == NULL)
 				break;
 			m_freem(m0);
@@ -2640,7 +2671,7 @@ an_start(ifp)
 		bzero((char *)&tx_frame_802_3, sizeof(tx_frame_802_3));
 
 		while (sc->an_rdata.an_tx_ring[idx] == 0) {
-			IF_DEQUEUE(&ifp->if_snd, m0);
+			IFQ_DRV_DEQUEUE(&ifp->if_snd, m0);
 			if (m0 == NULL)
 				break;
 
@@ -2696,30 +2727,12 @@ an_start(ifp)
 			ifp->if_timer = 5;
 		}
 	} else { /* MPI-350 */
-/* HACK */
-		{
-			struct an_command	cmd_struct;
-			struct an_reply		reply;
-			/*
-			 * Allocate TX descriptor
-			 */
-			
-			bzero(&reply,sizeof(reply));
-			cmd_struct.an_cmd   = AN_CMD_ALLOC_DESC;
-			cmd_struct.an_parm0 = AN_DESCRIPTOR_TX;
-			cmd_struct.an_parm1 = AN_TX_DESC_OFFSET;
-			cmd_struct.an_parm2 = AN_MAX_TX_DESC;
-			if (an_cmd_struct(sc, &cmd_struct, &reply)) {
-				printf("an%d: failed to allocate TX "
-				    "descriptor\n", 
-				    sc->an_unit);
-				return;
-			}
-		}
-/* HACK */
+		/* Disable interrupts. */
+		CSR_WRITE_2(sc, AN_INT_EN(sc->mpi350), 0);
+
 		while (sc->an_rdata.an_tx_empty ||
 		    idx != sc->an_rdata.an_tx_cons) {
-			IF_DEQUEUE(&ifp->if_snd, m0);
+			IFQ_DRV_DEQUEUE(&ifp->if_snd, m0);
 			if (m0 == NULL) {
 				break;
 			}
@@ -2790,6 +2803,9 @@ an_start(ifp)
 			 */
 			ifp->if_timer = 5;
 		}
+
+		/* Re-enable interrupts. */
+		CSR_WRITE_2(sc, AN_INT_EN(sc->mpi350), AN_INTRS(sc->mpi350));
 	}
 
 	if (m0 != NULL)
@@ -3376,9 +3392,8 @@ writerids(ifp, l_ioctl)
  * Linux driver
  */
 
-#define FLASH_DELAY(_sc, x)	AN_UNLOCK(_sc) ; \
-	tsleep(ifp, PZERO, "flash", ((x) / hz) + 1); \
-	AN_LOCK(_sc) ;
+#define FLASH_DELAY(_sc, x)	msleep(ifp, &(_sc)->an_mtx, PZERO, \
+	"flash", ((x) / hz) + 1);
 #define FLASH_COMMAND	0x7e7e
 #define FLASH_SIZE	32 * 1024
 

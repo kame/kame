@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/rp/rp.c,v 1.51 2003/08/24 17:54:22 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/rp/rp.c,v 1.64 2004/07/15 20:47:38 phk Exp $");
 
 /* 
  * rp.c - for RocketPort FreeBSD
@@ -565,23 +565,21 @@ void sDisInterrupts(CHANNEL_T *ChP,Word_t Flags)
 **********************************************************************/
 
 static timeout_t rpdtrwakeup;
+struct callout_handle rp_callout_handle;
 
 static	d_open_t	rpopen;
 static	d_close_t	rpclose;
 static	d_write_t	rpwrite;
 static	d_ioctl_t	rpioctl;
 
-#define	CDEV_MAJOR	81
 struct cdevsw rp_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	rpopen,
 	.d_close =	rpclose,
-	.d_read =	ttyread,
 	.d_write =	rpwrite,
 	.d_ioctl =	rpioctl,
-	.d_poll =	ttypoll,
 	.d_name =	"rp",
-	.d_maj =	CDEV_MAJOR,
-	.d_flags =	D_TTY,
+	.d_flags =	D_TTY | D_NEEDGIANT,
 };
 
 static int	rp_num_ports_open = 0;
@@ -619,7 +617,6 @@ static	int	rpparam(struct tty *, struct termios *);
 static	void	rpstart(struct tty *);
 static	void	rpstop(struct tty *, int);
 static	void	rphardclose	(struct rp_port *);
-static	void	rp_disc_optim	(struct tty *tp, struct termios *t);
 
 static void rp_do_receive(struct rp_port *rp, struct tty *tp,
 			CHANNEL_t *cp, unsigned int ChanStatus)
@@ -663,7 +660,7 @@ static void rp_do_receive(struct rp_port *rp, struct tty *tp,
 			else if (CharNStat & STMRCVROVRH)
 				rp->rp_overflows++;
 
-			(*linesw[tp->t_line].l_rint)(ch, tp);
+			ttyld_rint(tp, ch);
 			ToRecv--;
 		}
 /*
@@ -705,7 +702,7 @@ static void rp_do_receive(struct rp_port *rp, struct tty *tp,
 				}
 				ch = (u_char) rp_readch1(cp,sGetTxRxDataIO(cp));
 				spl = spltty();
-				(*linesw[tp->t_line].l_rint)(ch, tp);
+				ttyld_rint(tp, ch);
 				splx(spl);
 				ToRecv--;
 			}
@@ -734,12 +731,12 @@ static void rp_handle_port(struct rp_port *rp)
 	if(IntMask & DELTA_CD) {
 		if(ChanStatus & CD_ACT) {
 			if(!(tp->t_state & TS_CARR_ON) ) {
-				(void)(*linesw[tp->t_line].l_modem)(tp, 1);
+				(void)ttyld_modem(tp, 1);
 			}
 		} else {
 			if((tp->t_state & TS_CARR_ON)) {
-				(void)(*linesw[tp->t_line].l_modem)(tp, 0);
-				if((*linesw[tp->t_line].l_modem)(tp, 0) == 0) {
+				(void)ttyld_modem(tp, 0);
+				if(ttyld_modem(tp, 0) == 0) {
 					rphardclose(rp);
 				}
 			}
@@ -787,13 +784,14 @@ static void rp_do_poll(void *not_used)
 				tp->t_state &= ~(TS_BUSY);
 			if(!(tp->t_state & TS_TTSTOP) &&
 				(count <= rp->rp_restart)) {
-				(*linesw[tp->t_line].l_start)(tp);
+				ttyld_start(tp);
 			}
 		}
 	}
 	}
 	if(rp_num_ports_open)
-		timeout(rp_do_poll, (void *)NULL, POLL_INTERVAL);
+		rp_callout_handle = timeout(rp_do_poll, 
+					    (void *)NULL, POLL_INTERVAL);
 }
 
 int
@@ -805,17 +803,17 @@ rp_attachcommon(CONTROLLER_T *ctlp, int num_aiops, int num_ports)
 	int	ChanStatus, line, i, count;
 	int	retval;
 	struct	rp_port *rp;
-	struct	tty	*tty;
-	dev_t	*dev_nodes;
+	struct cdev **dev_nodes;
 
 	unit = device_get_unit(ctlp->dev);
 
 	printf("RocketPort%d (Version %s) %d ports.\n", unit,
 		RocketPortVersion, num_ports);
 	rp_num_ports[unit] = num_ports;
+	callout_handle_init(&rp_callout_handle);
 
 	ctlp->rp = rp = (struct rp_port *)
-		malloc(sizeof(struct rp_port) * num_ports, M_TTYS, M_NOWAIT);
+		malloc(sizeof(struct rp_port) * num_ports, M_TTYS, M_NOWAIT | M_ZERO);
 	if (rp == NULL) {
 		device_printf(ctlp->dev, "rp_attachcommon: Could not malloc rp_ports structures.\n");
 		retval = ENOMEM;
@@ -827,15 +825,6 @@ rp_attachcommon(CONTROLLER_T *ctlp, int num_aiops, int num_ports)
 		minor_to_unit[i] = unit;
 
 	bzero(rp, sizeof(struct rp_port) * num_ports);
-	ctlp->tty = tty = (struct tty *)
-		malloc(sizeof(struct tty) * num_ports, M_TTYS,
-			M_NOWAIT | M_ZERO);
-	if(tty == NULL) {
-		device_printf(ctlp->dev, "rp_attachcommon: Could not malloc tty structures.\n");
-		retval = ENOMEM;
-		goto nogo;
-	}
-
 	oldspl = spltty();
 	rp_addr(unit) = rp;
 	splx(oldspl);
@@ -871,18 +860,17 @@ rp_attachcommon(CONTROLLER_T *ctlp, int num_aiops, int num_ports)
 	port = 0;
 	for(aiop=0; aiop < num_aiops; aiop++) {
 		num_chan = sGetAiopNumChan(ctlp, aiop);
-		for(chan=0; chan < num_chan; chan++, port++, rp++, tty++) {
-			rp->rp_tty = tty;
+		for(chan=0; chan < num_chan; chan++, port++, rp++) {
+			rp->rp_tty = ttymalloc(NULL);
 			rp->rp_port = port;
 			rp->rp_ctlp = ctlp;
 			rp->rp_unit = unit;
 			rp->rp_chan = chan;
 			rp->rp_aiop = aiop;
 
-			tty->t_line = 0;
+			rp->rp_tty->t_line = 0;
 	/*		tty->t_termios = deftermios;
 	*/
-			rp->dtr_wait = 3 * hz;
 			rp->it_in.c_iflag = 0;
 			rp->it_in.c_oflag = 0;
 			rp->it_in.c_cflag = TTYDEF_CFLAG;
@@ -924,8 +912,19 @@ void
 rp_releaseresource(CONTROLLER_t *ctlp)
 {
 	int i, s, unit;
+	struct	rp_port *rp;
+
 
 	unit = device_get_unit(ctlp->dev);
+	if (rp_addr(unit) != NULL) {
+		for (i = 0; i < rp_num_ports[unit]; i++) {
+			rp = rp_addr(unit) + i;
+			s = ttyrel(rp->rp_tty);
+			if (s) {
+				printf("Detaching with active tty (%d refs)!\n", s);
+			}
+		}
+	}
 
 	if (ctlp->rp != NULL) {
 		s = spltty();
@@ -939,10 +938,6 @@ rp_releaseresource(CONTROLLER_t *ctlp)
 		free(ctlp->rp, M_DEVBUF);
 		ctlp->rp = NULL;
 	}
-	if (ctlp->tty != NULL) {
-		free(ctlp->tty, M_DEVBUF);
-		ctlp->tty = NULL;
-	}
 	if (ctlp->dev != NULL) {
 		for (i = 0 ; i < rp_num_ports[unit] * 6 ; i++)
 			destroy_dev(ctlp->dev_nodes[i]);
@@ -951,9 +946,14 @@ rp_releaseresource(CONTROLLER_t *ctlp)
 	}
 }
 
+void
+rp_untimeout(void)
+{
+	untimeout(rp_do_poll, (void *)NULL, rp_callout_handle);
+}
 static int
 rpopen(dev, flag, mode, td)
-	dev_t	dev;
+	struct cdev *dev;
 	int	flag, mode;
 	struct	thread	*td;
 {
@@ -982,7 +982,7 @@ rpopen(dev, flag, mode, td)
 
 open_top:
 	while(rp->state & ~SET_DTR) {
-		error = tsleep(&rp->dtr_wait, TTIPRI | PCATCH, "rpdtr", 0);
+		error = tsleep(&tp->t_dtr_wait, TTIPRI | PCATCH, "rpdtr", 0);
 		if(error != 0)
 			goto out;
 	}
@@ -1071,13 +1071,13 @@ open_top:
 		ChanStatus = sGetChanStatus(&rp->rp_channel);
 		if((IntMask & DELTA_CD) || IS_CALLOUT(dev)) {
 			if((ChanStatus & CD_ACT) || IS_CALLOUT(dev)) {
-					(void)(*linesw[tp->t_line].l_modem)(tp, 1);
+					(void)ttyld_modem(tp, 1);
 			}
 		}
 
 	if(rp_num_ports_open == 1)
-		timeout(rp_do_poll, (void *)NULL, POLL_INTERVAL);
-
+		rp_callout_handle = timeout(rp_do_poll, 
+					    (void *)NULL, POLL_INTERVAL);
 	}
 
 	if(!(flag&O_NONBLOCK) && !(tp->t_cflag&CLOCAL) &&
@@ -1090,9 +1090,9 @@ open_top:
 			goto out;
 		goto open_top;
 	}
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = ttyld_open(tp, dev);
 
-	rp_disc_optim(tp, &tp->t_termios);
+	ttyldoptim(tp);
 	if(tp->t_state & TS_ISOPEN && IS_CALLOUT(dev))
 		rp->active_out = TRUE;
 
@@ -1112,7 +1112,7 @@ out2:
 
 static int
 rpclose(dev, flag, mode, td)
-	dev_t	dev;
+	struct cdev *dev;
 	int	flag, mode;
 	struct	thread	*td;
 {
@@ -1133,13 +1133,12 @@ rpclose(dev, flag, mode, td)
 	tp = rp->rp_tty;
 
 	oldspl = spltty();
-	(*linesw[tp->t_line].l_close)(tp, flag);
-	rp_disc_optim(tp, &tp->t_termios);
-	rpstop(tp, FREAD | FWRITE);
+	ttyld_close(tp, flag);
+	ttyldoptim(tp);
 	rphardclose(rp);
 
 	tp->t_state &= ~TS_BUSY;
-	ttyclose(tp);
+	tty_close(tp);
 
 	splx(oldspl);
 
@@ -1174,8 +1173,8 @@ rphardclose(struct rp_port *rp)
 	if(IS_CALLOUT(tp->t_dev)) {
 		sClrDTR(cp);
 	}
-	if(rp->dtr_wait != 0) {
-		timeout(rpdtrwakeup, rp, rp->dtr_wait);
+	if(tp->t_dtr_wait != 0) {
+		timeout(rpdtrwakeup, rp, tp->t_dtr_wait);
 		rp->state |= ~SET_DTR;
 	}
 
@@ -1187,7 +1186,7 @@ rphardclose(struct rp_port *rp)
 static
 int
 rpwrite(dev, uio, flag)
-	dev_t	dev;
+	struct cdev *dev;
 	struct	uio	*uio;
 	int	flag;
 {
@@ -1211,7 +1210,7 @@ rpwrite(dev, uio, flag)
 			return(error);
 	}
 
-	error = (*linesw[tp->t_line].l_write)(tp, uio, flag);
+	error = ttyld_write(tp, uio, flag);
 	return error;
 }
 
@@ -1222,12 +1221,12 @@ rpdtrwakeup(void *chan)
 
 	rp = (struct rp_port *)chan;
 	rp->state &= SET_DTR;
-	wakeup(&rp->dtr_wait);
+	wakeup(&rp->rp_tty->t_dtr_wait);
 }
 
 static int
 rpioctl(dev, cmd, data, flag, td)
-	dev_t	dev;
+	struct cdev *dev;
 	u_long	cmd;
 	caddr_t data;
 	int	flag;
@@ -1241,9 +1240,11 @@ rpioctl(dev, cmd, data, flag, td)
 	int	error = 0;
 	int	arg, flags, result, ChanStatus;
 	struct	termios *t;
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#ifndef BURN_BRIDGES
+#if defined(COMPAT_43)
 	u_long	oldcmd;
 	struct	termios term;
+#endif
 #endif
 
    umynor = (((minor(dev) >> 16) -1) * 32);    /* SG */
@@ -1289,7 +1290,8 @@ rpioctl(dev, cmd, data, flag, td)
 	tp = rp->rp_tty;
 	cp = &rp->rp_channel;
 
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#ifndef BURN_BRIDGES
+#if defined(COMPAT_43)
 	term = tp->t_termios;
 	oldcmd = cmd;
 	error = ttsetcompat(tp, &cmd, data, &term);
@@ -1298,6 +1300,7 @@ rpioctl(dev, cmd, data, flag, td)
 	if(cmd != oldcmd) {
 		data = (caddr_t)&term;
 	}
+#endif
 #endif
 	if((cmd == TIOCSETA) || (cmd == TIOCSETAW) || (cmd == TIOCSETAF)) {
 		int	cc;
@@ -1324,21 +1327,14 @@ rpioctl(dev, cmd, data, flag, td)
 
 	t = &tp->t_termios;
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, td);
-	if(error != ENOIOCTL) {
+	error = ttyioctl(dev, cmd, data, flag, td);
+	ttyldoptim(tp);
+	if(error != ENOTTY)
 		return(error);
-	}
 	oldspl = spltty();
 
 	flags = rp->rp_channel.TxControl[3];
 
-	error = ttioctl(tp, cmd, data, flag);
-	flags = rp->rp_channel.TxControl[3];
-	rp_disc_optim(tp, &tp->t_termios);
-	if(error != ENOIOCTL) {
-		splx(oldspl);
-		return(error);
-	}
 	switch(cmd) {
 	case TIOCSBRK:
 		sSendBreak(&rp->rp_channel);
@@ -1410,17 +1406,6 @@ rpioctl(dev, cmd, data, flag, td)
 		}
 
 		*(int *)data = result;
-		break;
-	case TIOCMSDTRWAIT:
-		error = suser(td);
-		if(error != 0) {
-			splx(oldspl);
-			return(error);
-		}
-		rp->dtr_wait = *(int *)data * hz/100;
-		break;
-	case TIOCMGDTRWAIT:
-		*(int *)data = rp->dtr_wait * 100/hz;
 		break;
 	default:
 		splx(oldspl);
@@ -1554,7 +1539,7 @@ rpparam(tp, t)
 	} else {
 		sDisRTSFlowCtl(cp);
 	}
-	rp_disc_optim(tp, t);
+	ttyldoptim(tp);
 
 	if((cflag & CLOCAL) || (sGetChanStatusLo(cp) & CD_ACT)) {
 		tp->t_state |= TS_CARR_ON;
@@ -1571,22 +1556,6 @@ rpparam(tp, t)
 	splx(oldspl);
 
 	return(0);
-}
-
-static void
-rp_disc_optim(tp, t)
-struct	tty	*tp;
-struct	termios *t;
-{
-	if(!(t->c_iflag & (ICRNL | IGNCR | IMAXBEL | INLCR | ISTRIP | IXON))
-		&&(!(t->c_iflag & BRKINT) || (t->c_iflag & IGNBRK))
-		&&(!(t->c_iflag & PARMRK)
-		  ||(t->c_iflag & (IGNPAR | IGNBRK)) == (IGNPAR | IGNBRK))
-		&& !(t->c_lflag & (ECHO | ICANON | IEXTEN | ISIG | PENDIN))
-		&& linesw[tp->t_line].l_rint == ttyinput)
-		tp->t_state |= TS_CAN_BYPASS_L_RINT;
-	else
-		tp->t_state &= ~TS_CAN_BYPASS_L_RINT;
 }
 
 static void

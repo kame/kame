@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/fs/msdosfs/msdosfs_vnops.c,v 1.143 2003/10/18 14:10:24 phk Exp $ */
+/* $FreeBSD: src/sys/fs/msdosfs/msdosfs_vnops.c,v 1.149 2004/07/26 07:24:02 cperciva Exp $ */
 /*	$NetBSD: msdosfs_vnops.c,v 1.68 1998/02/10 14:10:04 mrg Exp $	*/
 
 /*-
@@ -50,6 +50,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/lockf.h>
 #include <sys/namei.h>
 #include <sys/resourcevar.h>	/* defines plimit structure in proc struct */
 #include <sys/kernel.h>
@@ -76,11 +77,14 @@
 #include <fs/msdosfs/denode.h>
 #include <fs/msdosfs/fat.h>
 
+#include "opt_msdosfs.h"
+
 #define	DOS_FILESIZE_MAX	0xffffffff
 
 /*
  * Prototypes for MSDOSFS vnode operations
  */
+static int msdosfs_advlock(struct vop_advlock_args *);
 static int msdosfs_create(struct vop_create_args *);
 static int msdosfs_mknod(struct vop_mknod_args *);
 static int msdosfs_close(struct vop_close_args *);
@@ -282,7 +286,7 @@ msdosfs_getattr(ap)
 	mode_t mode;
 	struct timespec ts;
 	u_long dirsperblk = pmp->pm_BytesPerSec / sizeof(struct direntry);
-	u_long fileid;
+	uint64_t fileid;
 
 	getnanotime(&ts);
 	DETIMES(dep, &ts, &ts, &ts);
@@ -293,16 +297,22 @@ msdosfs_getattr(ap)
 	 * doesn't work.
 	 */
 	if (dep->de_Attributes & ATTR_DIRECTORY) {
-		fileid = cntobn(pmp, dep->de_StartCluster) * dirsperblk;
+		fileid = (uint64_t)cntobn(pmp, dep->de_StartCluster) *
+		    dirsperblk;
 		if (dep->de_StartCluster == MSDOSFSROOT)
 			fileid = 1;
 	} else {
-		fileid = cntobn(pmp, dep->de_dirclust) * dirsperblk;
+		fileid = (uint64_t)cntobn(pmp, dep->de_dirclust) *
+		    dirsperblk;
 		if (dep->de_dirclust == MSDOSFSROOT)
-			fileid = roottobn(pmp, 0) * dirsperblk;
-		fileid += dep->de_diroffset / sizeof(struct direntry);
+			fileid = (uint64_t)roottobn(pmp, 0) * dirsperblk;
+		fileid += (uint64_t)dep->de_diroffset / sizeof(struct direntry);
 	}
-	vap->va_fileid = fileid;
+#ifdef MSDOSFS_LARGE
+	vap->va_fileid = msdosfs_fileno_map(pmp->pm_mountp, fileid);
+#else
+	vap->va_fileid = (long)fileid;
+#endif
 	if ((dep->de_Attributes & ATTR_READONLY) == 0)
 		mode = S_IRWXU|S_IRWXG|S_IRWXO;
 	else
@@ -377,7 +387,7 @@ msdosfs_setattr(ap)
 		if (vp->v_mount->mnt_flag & MNT_RDONLY)
 			return (EROFS);
 		if (cred->cr_uid != pmp->pm_uid &&
-		    (error = suser_cred(cred, PRISON_ROOT)))
+		    (error = suser_cred(cred, SUSER_ALLOWJAIL)))
 			return (error);
 		/*
 		 * We are very inconsistent about handling unsupported
@@ -391,7 +401,7 @@ msdosfs_setattr(ap)
 		 * set ATTR_ARCHIVE for directories `cp -pr' from a more
 		 * sensible filesystem attempts it a lot.
 		 */
-		if (suser_cred(cred, PRISON_ROOT)) {
+		if (suser_cred(cred, SUSER_ALLOWJAIL)) {
 			if (vap->va_flags & SF_SETTABLE)
 				return EPERM;
 		}
@@ -418,7 +428,7 @@ msdosfs_setattr(ap)
 			gid = pmp->pm_gid;
 		if ((cred->cr_uid != pmp->pm_uid || uid != pmp->pm_uid ||
 		    (gid != pmp->pm_gid && !groupmember(gid, cred))) &&
-		    (error = suser_cred(cred, PRISON_ROOT)))
+		    (error = suser_cred(cred, SUSER_ALLOWJAIL)))
 			return error;
 		if (uid != pmp->pm_uid || gid != pmp->pm_gid)
 			return EINVAL;
@@ -450,7 +460,7 @@ msdosfs_setattr(ap)
 		if (vp->v_mount->mnt_flag & MNT_RDONLY)
 			return (EROFS);
 		if (cred->cr_uid != pmp->pm_uid &&
-		    (error = suser_cred(cred, PRISON_ROOT)) &&
+		    (error = suser_cred(cred, SUSER_ALLOWJAIL)) &&
 		    ((vap->va_vaflags & VA_UTIMES_NULL) == 0 ||
 		    (error = VOP_ACCESS(ap->a_vp, VWRITE, cred, ap->a_td))))
 			return (error);
@@ -479,7 +489,7 @@ msdosfs_setattr(ap)
 		if (vp->v_mount->mnt_flag & MNT_RDONLY)
 			return (EROFS);
 		if (cred->cr_uid != pmp->pm_uid &&
-		    (error = suser_cred(cred, PRISON_ROOT)))
+		    (error = suser_cred(cred, SUSER_ALLOWJAIL)))
 			return (error);
 		if (vp->v_type != VDIR) {
 			/* We ignore the read and execute bits. */
@@ -644,13 +654,15 @@ msdosfs_write(ap)
 	/*
 	 * If they've exceeded their filesize limit, tell them about it.
 	 */
-	if (td &&
-	    ((uoff_t)uio->uio_offset + uio->uio_resid >
-	    td->td_proc->p_rlimit[RLIMIT_FSIZE].rlim_cur)) {
+	if (td != NULL) {
 		PROC_LOCK(td->td_proc);
-		psignal(td->td_proc, SIGXFSZ);
+		if ((uoff_t)uio->uio_offset + uio->uio_resid >
+		    lim_cur(td->td_proc, RLIMIT_FSIZE)) {
+			psignal(td->td_proc, SIGXFSZ);
+			PROC_UNLOCK(td->td_proc);
+			return (EFBIG);
+		}
 		PROC_UNLOCK(td->td_proc);
-		return (EFBIG);
 	}
 
 	if ((uoff_t)uio->uio_offset + uio->uio_resid > DOS_FILESIZE_MAX)
@@ -1449,7 +1461,7 @@ msdosfs_readdir(ap)
 	int blsize;
 	long on;
 	u_long cn;
-	u_long fileno;
+	uint64_t fileno;
 	u_long dirsperblk;
 	long bias = 0;
 	daddr_t bn, lbn;
@@ -1521,11 +1533,17 @@ msdosfs_readdir(ap)
 			for (n = (int)offset / sizeof(struct direntry);
 			     n < 2; n++) {
 				if (FAT32(pmp))
-					dirbuf.d_fileno = cntobn(pmp,
+					fileno = (uint64_t)cntobn(pmp,
 								 pmp->pm_rootdirblk)
 							  * dirsperblk;
 				else
-					dirbuf.d_fileno = 1;
+					fileno = 1;
+#ifdef MSDOSFS_LARGE
+				dirbuf.d_fileno = msdosfs_fileno_map(
+				    pmp->pm_mountp, fileno);
+#else
+				dirbuf.d_fileno = (uint32_t)fileno;
+#endif
 				dirbuf.d_type = DT_DIR;
 				switch (n) {
 				case 0:
@@ -1636,19 +1654,25 @@ msdosfs_readdir(ap)
 				/* if this is the root directory */
 				if (fileno == MSDOSFSROOT)
 					if (FAT32(pmp))
-						fileno = cntobn(pmp,
+						fileno = (uint64_t)cntobn(pmp,
 								pmp->pm_rootdirblk)
 							 * dirsperblk;
 					else
 						fileno = 1;
 				else
-					fileno = cntobn(pmp, fileno) * dirsperblk;
-				dirbuf.d_fileno = fileno;
+					fileno = (uint64_t)cntobn(pmp, fileno) *
+					    dirsperblk;
 				dirbuf.d_type = DT_DIR;
 			} else {
-				dirbuf.d_fileno = offset / sizeof(struct direntry);
+				fileno = (uint64_t)offset / sizeof(struct direntry);
 				dirbuf.d_type = DT_REG;
 			}
+#ifdef MSDOSFS_LARGE
+			dirbuf.d_fileno = msdosfs_fileno_map(pmp->pm_mountp,
+			    fileno);
+#else
+			dirbuf.d_fileno = (uint32_t)fileno;
+#endif
 			if (chksum != winChksum(dentp->deName)) {
 				dirbuf.d_namlen = dos2unixfn(dentp->deName,
 				    (u_char *)dirbuf.d_name,
@@ -1836,12 +1860,27 @@ msdosfs_pathconf(ap)
 	/* NOTREACHED */
 }
 
+static int
+msdosfs_advlock(ap)
+	struct vop_advlock_args /* {
+		struct vnode *a_vp;
+		u_char a_id;
+		int a_op;
+		struct flock *a_fl;
+		int a_flags;
+	} */ *ap;
+{
+	struct denode *dep = VTODE(ap->a_vp);
+
+	return (lf_advlock(ap, &dep->de_lockf, dep->de_FileSize));
+}
 
 /* Global vfs data structures for msdosfs */
 vop_t **msdosfs_vnodeop_p;
 static struct vnodeopv_entry_desc msdosfs_vnodeop_entries[] = {
 	{ &vop_default_desc,		(vop_t *) vop_defaultop },
 	{ &vop_access_desc,		(vop_t *) msdosfs_access },
+	{ &vop_advlock_desc,            (vop_t *) msdosfs_advlock },
 	{ &vop_bmap_desc,		(vop_t *) msdosfs_bmap },
 	{ &vop_cachedlookup_desc,	(vop_t *) msdosfs_lookup },
 	{ &vop_close_desc,		(vop_t *) msdosfs_close },

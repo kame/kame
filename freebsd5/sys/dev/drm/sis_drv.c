@@ -23,7 +23,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  *
- * $FreeBSD: src/sys/dev/drm/sis_drv.c,v 1.2 2003/10/24 01:48:17 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/sis_drv.c,v 1.3 2004/06/11 03:26:59 anholt Exp $
  */
 
 #include "dev/drm/sis.h"
@@ -47,7 +47,7 @@
 
 #ifdef __FreeBSD__
 /* Avoid clash with sis ethernet */
-DRIVER_MODULE(sisdrm, pci, sis_driver, sis_devclass, 0, 0);
+DRIVER_MODULE(sisdrm, pci, sisdrv_driver, sisdrv_devclass, 0, 0);
 #elif defined(__NetBSD__)
 CFDRIVER_DECL(sis, DV_TTY, NULL);
 #endif /* __FreeBSD__ */

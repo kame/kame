@@ -3,7 +3,7 @@
  *
  * Module Name: hwregs - Read/write access functions for the various ACPI
  *                       control and status registers.
- *              $Revision: 149 $
+ *              $Revision: 156 $
  *
  ******************************************************************************/
 
@@ -11,7 +11,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2003, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -215,7 +215,7 @@ AcpiGetSleepTypeData (
     UINT8                   *SleepTypeB)
 {
     ACPI_STATUS             Status = AE_OK;
-    ACPI_OPERAND_OBJECT     *ObjDesc;
+    ACPI_PARAMETER_INFO     Info;
 
 
     ACPI_FUNCTION_TRACE ("AcpiGetSleepTypeData");
@@ -233,19 +233,20 @@ AcpiGetSleepTypeData (
     /*
      * Evaluate the namespace object containing the values for this state
      */
-    Status = AcpiNsEvaluateByName ((char *) AcpiGbl_DbSleepStates[SleepState],
-                    NULL, &ObjDesc);
+    Info.Parameters = NULL;
+    Status = AcpiNsEvaluateByName ((char *) (uintptr_t) AcpiGbl_SleepStateNames[SleepState],
+                    &Info);
     if (ACPI_FAILURE (Status))
     {
         ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%s while evaluating SleepState [%s]\n",
-            AcpiFormatException (Status), AcpiGbl_DbSleepStates[SleepState]));
+            AcpiFormatException (Status), AcpiGbl_SleepStateNames[SleepState]));
 
         return_ACPI_STATUS (Status);
     }
 
     /* Must have a return object */
 
-    if (!ObjDesc)
+    if (!Info.ReturnObject)
     {
         ACPI_REPORT_ERROR (("Missing Sleep State object\n"));
         Status = AE_NOT_EXIST;
@@ -253,7 +254,7 @@ AcpiGetSleepTypeData (
 
     /* It must be of type Package */
 
-    else if (ACPI_GET_OBJECT_TYPE (ObjDesc) != ACPI_TYPE_PACKAGE)
+    else if (ACPI_GET_OBJECT_TYPE (Info.ReturnObject) != ACPI_TYPE_PACKAGE)
     {
         ACPI_REPORT_ERROR (("Sleep State object not a Package\n"));
         Status = AE_AML_OPERAND_TYPE;
@@ -261,7 +262,7 @@ AcpiGetSleepTypeData (
 
     /* The package must have at least two elements */
 
-    else if (ObjDesc->Package.Count < 2)
+    else if (Info.ReturnObject->Package.Count < 2)
     {
         ACPI_REPORT_ERROR (("Sleep State package does not have at least two elements\n"));
         Status = AE_AML_NO_OPERAND;
@@ -269,12 +270,12 @@ AcpiGetSleepTypeData (
 
     /* The first two elements must both be of type Integer */
 
-    else if ((ACPI_GET_OBJECT_TYPE (ObjDesc->Package.Elements[0]) != ACPI_TYPE_INTEGER) ||
-             (ACPI_GET_OBJECT_TYPE (ObjDesc->Package.Elements[1]) != ACPI_TYPE_INTEGER))
+    else if ((ACPI_GET_OBJECT_TYPE (Info.ReturnObject->Package.Elements[0]) != ACPI_TYPE_INTEGER) ||
+             (ACPI_GET_OBJECT_TYPE (Info.ReturnObject->Package.Elements[1]) != ACPI_TYPE_INTEGER))
     {
         ACPI_REPORT_ERROR (("Sleep State package elements are not both Integers (%s, %s)\n",
-            AcpiUtGetObjectTypeName (ObjDesc->Package.Elements[0]),
-            AcpiUtGetObjectTypeName (ObjDesc->Package.Elements[1])));
+            AcpiUtGetObjectTypeName (Info.ReturnObject->Package.Elements[0]),
+            AcpiUtGetObjectTypeName (Info.ReturnObject->Package.Elements[1])));
         Status = AE_AML_OPERAND_TYPE;
     }
     else
@@ -282,17 +283,19 @@ AcpiGetSleepTypeData (
         /*
          * Valid _Sx_ package size, type, and value
          */
-        *SleepTypeA = (UINT8) (ObjDesc->Package.Elements[0])->Integer.Value;
-        *SleepTypeB = (UINT8) (ObjDesc->Package.Elements[1])->Integer.Value;
+        *SleepTypeA = (UINT8) (Info.ReturnObject->Package.Elements[0])->Integer.Value;
+        *SleepTypeB = (UINT8) (Info.ReturnObject->Package.Elements[1])->Integer.Value;
     }
 
     if (ACPI_FAILURE (Status))
     {
-        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "While evaluating SleepState [%s], bad Sleep object %p type %s\n",
-            AcpiGbl_DbSleepStates[SleepState], ObjDesc, AcpiUtGetObjectTypeName (ObjDesc)));
+        ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+            "While evaluating SleepState [%s], bad Sleep object %p type %s\n",
+            AcpiGbl_SleepStateNames[SleepState], Info.ReturnObject,
+            AcpiUtGetObjectTypeName (Info.ReturnObject)));
     }
 
-    AcpiUtRemoveReference (ObjDesc);
+    AcpiUtRemoveReference (Info.ReturnObject);
     return_ACPI_STATUS (Status);
 }
 
@@ -389,7 +392,7 @@ AcpiGetRegister (
 
         *ReturnValue = RegisterValue;
 
-        ACPI_DEBUG_PRINT ((ACPI_DB_IO, "Read value %8.8X register %X\n", 
+        ACPI_DEBUG_PRINT ((ACPI_DB_IO, "Read value %8.8X register %X\n",
                 RegisterValue, BitRegInfo->ParentRegister));
     }
 
@@ -455,9 +458,9 @@ AcpiSetRegister (
 
     /*
      * Decode the Register ID
-     * Register id = Register block id | bit id
+     * Register ID = [Register block ID] | [bit ID]
      *
-     * Check bit id to fine locate Register offset.
+     * Check bit ID to fine locate Register offset.
      * Check Mask to determine Register offset, and then read-write.
      */
     switch (BitRegInfo->ParentRegister)
@@ -466,9 +469,9 @@ AcpiSetRegister (
 
         /*
          * Status Registers are different from the rest.  Clear by
-         * writing 1, writing 0 has no effect.  So, the only relevant
+         * writing 1, and writing 0 has no effect.  So, the only relevant
          * information is the single bit we're interested in, all others should
-         * be written as 0 so they will be left unchanged
+         * be written as 0 so they will be left unchanged.
          */
         Value = ACPI_REGISTER_PREPARE_BITS (Value,
                     BitRegInfo->BitPosition, BitRegInfo->AccessBitMask);
@@ -494,9 +497,9 @@ AcpiSetRegister (
     case ACPI_REGISTER_PM1_CONTROL:
 
         /*
-         * Read the PM1 Control register.
+         * Write the PM1 Control register.
          * Note that at this level, the fact that there are actually TWO
-         * registers (A and B - and that B may not exist) is abstracted.
+         * registers (A and B - and B may not exist) is abstracted.
          */
         ACPI_DEBUG_PRINT ((ACPI_DB_IO, "PM1 control: Read %X\n", RegisterValue));
 
@@ -504,7 +507,7 @@ AcpiSetRegister (
                 BitRegInfo->AccessBitMask, Value);
 
         Status = AcpiHwRegisterWrite (ACPI_MTX_DO_NOT_LOCK,
-                ACPI_REGISTER_PM1_CONTROL, (UINT16) RegisterValue);
+                        ACPI_REGISTER_PM1_CONTROL, (UINT16) RegisterValue);
         break;
 
 
@@ -519,16 +522,14 @@ AcpiSetRegister (
 
         ACPI_DEBUG_PRINT ((ACPI_DB_IO, "PM2 control: Read %X from %8.8X%8.8X\n",
             RegisterValue,
-            ACPI_HIDWORD (ACPI_GET_ADDRESS (AcpiGbl_FADT->XPm2CntBlk.Address)),
-            ACPI_LODWORD (ACPI_GET_ADDRESS (AcpiGbl_FADT->XPm2CntBlk.Address))));
+            ACPI_FORMAT_UINT64 (ACPI_GET_ADDRESS (AcpiGbl_FADT->XPm2CntBlk.Address))));
 
         ACPI_REGISTER_INSERT_VALUE (RegisterValue, BitRegInfo->BitPosition,
                 BitRegInfo->AccessBitMask, Value);
 
         ACPI_DEBUG_PRINT ((ACPI_DB_IO, "About to write %4.4X to %8.8X%8.8X\n",
             RegisterValue,
-            ACPI_HIDWORD (ACPI_GET_ADDRESS (AcpiGbl_FADT->XPm2CntBlk.Address)),
-            ACPI_LODWORD (ACPI_GET_ADDRESS (AcpiGbl_FADT->XPm2CntBlk.Address))));
+            ACPI_FORMAT_UINT64 (ACPI_GET_ADDRESS (AcpiGbl_FADT->XPm2CntBlk.Address))));
 
         Status = AcpiHwRegisterWrite (ACPI_MTX_DO_NOT_LOCK,
                             ACPI_REGISTER_PM2_CONTROL, (UINT8) (RegisterValue));
@@ -842,7 +843,7 @@ AcpiHwLowLevelRead (
 
     /*
      * Three address spaces supported:
-     * Memory, Io, or PCI config.
+     * Memory, IO, or PCI_Config.
      */
     switch (Reg->AddressSpaceId)
     {
@@ -881,9 +882,8 @@ AcpiHwLowLevelRead (
     }
 
     ACPI_DEBUG_PRINT ((ACPI_DB_IO, "Read:  %8.8X width %2d from %8.8X%8.8X (%s)\n",
-            *Value, Width, 
-            ACPI_HIDWORD (ACPI_GET_ADDRESS (Reg->Address)), 
-            ACPI_LODWORD (ACPI_GET_ADDRESS (Reg->Address)), 
+            *Value, Width,
+            ACPI_FORMAT_UINT64 (ACPI_GET_ADDRESS (Reg->Address)),
             AcpiUtGetRegionName (Reg->AddressSpaceId)));
 
     return (Status);
@@ -928,9 +928,10 @@ AcpiHwLowLevelWrite (
     {
         return (AE_OK);
     }
+
     /*
      * Three address spaces supported:
-     * Memory, Io, or PCI config.
+     * Memory, IO, or PCI_Config.
      */
     switch (Reg->AddressSpaceId)
     {
@@ -969,9 +970,8 @@ AcpiHwLowLevelWrite (
     }
 
     ACPI_DEBUG_PRINT ((ACPI_DB_IO, "Wrote: %8.8X width %2d   to %8.8X%8.8X (%s)\n",
-            Value, Width, 
-            ACPI_HIDWORD (ACPI_GET_ADDRESS (Reg->Address)), 
-            ACPI_LODWORD (ACPI_GET_ADDRESS (Reg->Address)), 
+            Value, Width,
+            ACPI_FORMAT_UINT64 (ACPI_GET_ADDRESS (Reg->Address)),
             AcpiUtGetRegionName (Reg->AddressSpaceId)));
 
     return (Status);

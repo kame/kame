@@ -41,42 +41,41 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/vm_machdep.c,v 1.224 2003/11/21 03:02:00 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/vm_machdep.c,v 1.237 2004/08/16 22:57:13 peter Exp $");
 
 #include "opt_isa.h"
-#include "opt_kstack_pages.h"
+#include "opt_cpu.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/malloc.h>
-#include <sys/proc.h>
-#include <sys/kse.h>
 #include <sys/bio.h>
 #include <sys/buf.h>
-#include <sys/vnode.h>
-#include <sys/vmmeter.h>
+#include <sys/kse.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
+#include <sys/lock.h>
+#include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/mutex.h>
+#include <sys/proc.h>
 #include <sys/sf_buf.h>
 #include <sys/smp.h>
 #include <sys/sysctl.h>
 #include <sys/unistd.h>
+#include <sys/user.h>
+#include <sys/vnode.h>
+#include <sys/vmmeter.h>
 
 #include <machine/cpu.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
 
 #include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <sys/lock.h>
+#include <vm/vm_extern.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_page.h>
 #include <vm/vm_map.h>
-#include <vm/vm_extern.h>
-
-#include <sys/user.h>
+#include <vm/vm_param.h>
 
 #include <amd64/isa/isa.h>
 
@@ -86,19 +85,6 @@ static void	cpu_reset_proxy(void);
 static u_int	cpu_reset_proxyid;
 static volatile u_int	cpu_reset_proxy_active;
 #endif
-static void	sf_buf_init(void *arg);
-SYSINIT(sock_sf, SI_SUB_MBUF, SI_ORDER_ANY, sf_buf_init, NULL)
-
-/*
- * Expanded sf_freelist head. Really an SLIST_HEAD() in disguise, with the
- * sf_freelist head with the sf_lock mutex.
- */
-static struct {
-	SLIST_HEAD(, sf_buf) sf_head;
-	struct mtx sf_lock;
-} sf_freelist;
-
-static u_int	sf_buf_alloc_want;
 
 /*
  * Finish a fork operation, with process p2 nearly set up.
@@ -115,20 +101,17 @@ cpu_fork(td1, p2, td2, flags)
 	register struct proc *p1;
 	struct pcb *pcb2;
 	struct mdproc *mdp2;
-	register_t savecrit;
 
 	p1 = td1->td_proc;
 	if ((flags & RFPROC) == 0)
 		return;
 
 	/* Ensure that p1's pcb is up to date. */
-	savecrit = intr_disable();
-	if (PCPU_GET(fpcurthread) == td1)
-		fpusave(&td1->td_pcb->pcb_save);
-	intr_restore(savecrit);
+	fpuexit(td1);
 
 	/* Point the pcb to the top of the stack */
-	pcb2 = (struct pcb *)(td2->td_kstack + KSTACK_PAGES * PAGE_SIZE) - 1;
+	pcb2 = (struct pcb *)(td2->td_kstack +
+	    td2->td_kstack_pages * PAGE_SIZE) - 1;
 	td2->td_pcb = pcb2;
 
 	/* Copy p1's pcb */
@@ -162,6 +145,7 @@ cpu_fork(td1, p2, td2, flags)
 	pcb2->pcb_rip = (register_t)fork_trampoline;
 	pcb2->pcb_rflags = td2->td_frame->tf_rflags & ~PSL_I; /* ints disabled */
 	/*-
+	 * pcb2->pcb_dr*:	cloned above.
 	 * pcb2->pcb_savefpu:	cloned above.
 	 * pcb2->pcb_flags:	cloned above.
 	 * pcb2->pcb_onfault:	cloned above (always NULL here?).
@@ -202,17 +186,27 @@ cpu_set_fork_handler(td, func, arg)
 void
 cpu_exit(struct thread *td)
 {
-	struct mdproc *mdp;
+	struct pcb *pcb = td->td_pcb;
 
-	mdp = &td->td_proc->p_md;
+	if (pcb->pcb_flags & PCB_DBREGS) {
+		/* disable all hardware breakpoints */
+		reset_dbregs();
+		pcb->pcb_flags &= ~PCB_DBREGS;
+	}
 }
 
 void
 cpu_thread_exit(struct thread *td)
 {
+	struct pcb *pcb = td->td_pcb;
 
 	if (td == PCPU_GET(fpcurthread))
 		fpudrop();
+	if (pcb->pcb_flags & PCB_DBREGS) {
+		/* disable all hardware breakpoints */
+		reset_dbregs();
+		pcb->pcb_flags &= ~PCB_DBREGS;
+	}
 }
 
 void
@@ -231,17 +225,11 @@ cpu_thread_swapout(struct thread *td)
 }
 
 void
-cpu_sched_exit(td)
-	register struct thread *td;
-{
-}
-
-void
 cpu_thread_setup(struct thread *td)
 {
 
-	td->td_pcb =
-	     (struct pcb *)(td->td_kstack + KSTACK_PAGES * PAGE_SIZE) - 1;
+	td->td_pcb = (struct pcb *)(td->td_kstack +
+	    td->td_kstack_pages * PAGE_SIZE) - 1;
 	td->td_frame = (struct trapframe *)td->td_pcb - 1;
 }
 
@@ -296,6 +284,7 @@ cpu_set_upcall(struct thread *td, struct thread *td0)
 	pcb2->pcb_rflags = PSL_KERNEL; /* ints disabled */
 	/*
 	 * If we didn't copy the pcb, we'd need to do the following registers:
+	 * pcb2->pcb_dr*:	cloned above.
 	 * pcb2->pcb_savefpu:	cloned above.
 	 * pcb2->pcb_rflags:	cloned above.
 	 * pcb2->pcb_onfault:	cloned above (always NULL here?).
@@ -325,9 +314,11 @@ cpu_set_upcall_kse(struct thread *td, struct kse_upcall *ku)
 	 * Set the trap frame to point at the beginning of the uts
 	 * function.
 	 */
+	td->td_frame->tf_rbp = 0; 
 	td->td_frame->tf_rsp =
 	    ((register_t)ku->ku_stack.ss_sp + ku->ku_stack.ss_size) & ~0x0f;
 	td->td_frame->tf_rsp -= 8;
+	td->td_frame->tf_rbp = 0;
 	td->td_frame->tf_rip = (register_t)ku->ku_func;
 
 	/*
@@ -431,80 +422,24 @@ cpu_reset_real()
 }
 
 /*
- * Allocate a pool of sf_bufs (sendfile(2) or "super-fast" if you prefer. :-))
- */
-static void
-sf_buf_init(void *arg)
-{
-	struct sf_buf *sf_bufs;
-	int i;
-
-	mtx_init(&sf_freelist.sf_lock, "sf_bufs list lock", NULL, MTX_DEF);
-	SLIST_INIT(&sf_freelist.sf_head);
-	sf_bufs = malloc(nsfbufs * sizeof(struct sf_buf), M_TEMP,
-	    M_NOWAIT | M_ZERO);
-	for (i = 0; i < nsfbufs; i++)
-		SLIST_INSERT_HEAD(&sf_freelist.sf_head, &sf_bufs[i], free_list);
-	sf_buf_alloc_want = 0;
-}
-
-/*
- * Get an sf_buf from the freelist. Will block if none are available.
+ * Allocate an sf_buf for the given vm_page.  On this machine, however, there
+ * is no sf_buf object.  Instead, an opaque pointer to the given vm_page is
+ * returned.
  */
 struct sf_buf *
-sf_buf_alloc(struct vm_page *m)
+sf_buf_alloc(struct vm_page *m, int pri)
 {
-	struct sf_buf *sf;
-	int error;
 
-	mtx_lock(&sf_freelist.sf_lock);
-	while ((sf = SLIST_FIRST(&sf_freelist.sf_head)) == NULL) {
-		sf_buf_alloc_want++;
-		error = msleep(&sf_freelist, &sf_freelist.sf_lock, PVM|PCATCH,
-		    "sfbufa", 0);
-		sf_buf_alloc_want--;
-
-		/*
-		 * If we got a signal, don't risk going back to sleep. 
-		 */
-		if (error)
-			break;
-	}
-	if (sf != NULL) {
-		SLIST_REMOVE_HEAD(&sf_freelist.sf_head, free_list);
-		sf->m = m;
-	}
-	mtx_unlock(&sf_freelist.sf_lock);
-	return (sf);
+	return ((struct sf_buf *)m);
 }
 
 /*
- * Detatch mapped page and release resources back to the system.
+ * Free the sf_buf.  In fact, do nothing because there are no resources
+ * associated with the sf_buf.
  */
 void
-sf_buf_free(void *addr, void *args)
+sf_buf_free(struct sf_buf *sf)
 {
-	struct sf_buf *sf;
-	struct vm_page *m;
-
-	sf = args;
-	m = sf->m;
-	vm_page_lock_queues();
-	vm_page_unwire(m, 0);
-	/*
-	 * Check for the object going away on us. This can
-	 * happen since we don't hold a reference to it.
-	 * If so, we're responsible for freeing the page.
-	 */
-	if (m->wire_count == 0 && m->object == NULL)
-		vm_page_free(m);
-	vm_page_unlock_queues();
-	sf->m = NULL;
-	mtx_lock(&sf_freelist.sf_lock);
-	SLIST_INSERT_HEAD(&sf_freelist.sf_head, sf, free_list);
-	if (sf_buf_alloc_want > 0)
-		wakeup_one(&sf_freelist);
-	mtx_unlock(&sf_freelist.sf_lock);
 }
 
 /*
@@ -525,8 +460,7 @@ swi_vm(void *dummy)
  */
 
 int
-is_physical_memory(addr)
-	vm_offset_t addr;
+is_physical_memory(vm_paddr_t addr)
 {
 
 #ifdef DEV_ISA

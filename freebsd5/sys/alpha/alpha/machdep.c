@@ -88,7 +88,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.215 2003/11/14 04:04:14 jeff Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.222.2.1 2004/09/09 10:03:17 julian Exp $");
 
 #include "opt_compat.h"
 #include "opt_ddb.h"
@@ -100,6 +100,7 @@ __FBSDID("$FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.215 2003/11/14 04:04:14 je
 #include <sys/systm.h>
 #include <sys/eventhandler.h>
 #include <sys/imgact.h>
+#include <sys/kdb.h>
 #include <sys/sysproto.h>
 #include <sys/ktr.h>
 #include <sys/signalvar.h>
@@ -145,7 +146,6 @@ __FBSDID("$FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.215 2003/11/14 04:04:14 je
 #include <machine/chipset.h>
 #include <machine/vmparam.h>
 #include <machine/elf.h>
-#include <ddb/ddb.h>
 #include <alpha/alpha/db_instruction.h>
 #include <sys/vnode.h>
 #include <machine/sigframe.h>
@@ -170,9 +170,7 @@ static char cpu_model[128];
 SYSCTL_STRING(_hw, HW_MODEL, model, CTLFLAG_RD, cpu_model, 0, "");
 
 #ifdef DDB
-/* start and end of kernel symbol table */
-void	*ksym_start, *ksym_end;
-db_regs_t	ddb_regs;
+extern vm_offset_t ksym_start, ksym_end;
 #endif
 
 int	alpha_unaligned_print = 1;	/* warn about unaligned accesses */
@@ -200,6 +198,9 @@ long	resvmem;		/* amount of memory reserved for PROM */
 long	unusedmem;		/* amount of memory for OS that we don't use */
 long	unknownmem;		/* amount of memory with an unknown use */
 int	ncpus;			/* number of cpus */
+
+int	promcons_dly_mkdev = 1;	/* need to delay call to make_dev() */
+void	promcons_delayed_makedev(void);
 
 vm_offset_t phys_avail[10];
 
@@ -582,22 +583,6 @@ alpha_init(pfn, ptb, bim, bip, biv)
 	}
 	snprintf(cpu_model, sizeof(cpu_model), "%s", platform.model);
 
-	/*
-	 * Initalize the real console, so the the bootstrap console is
-	 * no longer necessary.
-	 */
-#ifndef NO_SIO
-	if (platform.cons_init) {
-		platform.cons_init();
-		promcndetach();
-	}
-#else
-	if (platform.cons_init)
-		platform.cons_init();
-	promcndetach();
-	cninit();
-#endif
-
 	/* NO MORE FIRMWARE ACCESS ALLOWED */
 #ifdef _PMAP_MAY_USE_PROM_CONSOLE
 	/*
@@ -620,8 +605,8 @@ alpha_init(pfn, ptb, bim, bip, biv)
 	 */
 	kernstart = trunc_page(kernel_text) - 2 * PAGE_SIZE;
 #ifdef DDB
-	ksym_start = (void *)bootinfo.ssym;
-	ksym_end   = (void *)bootinfo.esym;
+	ksym_start = bootinfo.ssym;
+	ksym_end   = bootinfo.esym;
 	kernend = (vm_offset_t)round_page(ksym_end);
 #else
 	kernend = (vm_offset_t)round_page(_end);
@@ -861,7 +846,7 @@ alpha_init(pfn, ptb, bim, bip, biv)
 
 	}
 
-	proc_linkup(&proc0, &ksegrp0, &kse0, &thread0);
+	proc_linkup(&proc0, &ksegrp0, &thread0);
 	/*
 	 * Init mapping for u page(s) for proc 0
 	 */
@@ -887,6 +872,25 @@ alpha_init(pfn, ptb, bim, bip, biv)
 		thread0.td_md.md_kernnest = 1;
 #endif
 	}
+
+	/*
+	 * Initalize the real console, so the the bootstrap console is
+	 * no longer necessary.  Note this now involves mutexes as part
+	 * of some operations so needs to be after proc0/thread0/curthread
+	 * become valid.
+	 */
+	if (platform.cons_init)
+		platform.cons_init();
+	promcndetach();
+	cninit();
+
+	/*
+	 * Check to see if promcons needs to make_dev() now,
+	 * doing it before now crashes with kernel stack issues.
+	 */
+	if (promcons_dly_mkdev > 1)
+		promcons_delayed_makedev();
+	promcons_dly_mkdev = 0;
 
 	/*
 	 * Initialize the virtual memory system, and set the
@@ -919,11 +923,6 @@ alpha_init(pfn, ptb, bim, bip, biv)
 	/*
 	 * Look at arguments passed to us and compute boothowto.
 	 */
-
-#ifdef KADB
-	boothowto |= RB_KDB;
-#endif
-/*	boothowto |= RB_KDB | RB_GDB; */
 	for (p = bootinfo.boot_flags; p && *p != '\0'; p++) {
 		/*
 		 * Note that we'd really like to differentiate case here,
@@ -943,7 +942,6 @@ alpha_init(pfn, ptb, bim, bip, biv)
 			break;
 #endif
 
-#if defined(DDB)
 		case 'd': /* break into the kernel debugger ASAP */
 		case 'D':
 			boothowto |= RB_KDB;
@@ -952,7 +950,6 @@ alpha_init(pfn, ptb, bim, bip, biv)
 		case 'G':
 			boothowto |= RB_GDB;
 			break;
-#endif
 
 		case 'h': /* always halt, never reboot */
 		case 'H':
@@ -1013,12 +1010,13 @@ alpha_init(pfn, ptb, bim, bip, biv)
 	/*
 	 * Initialize debuggers, and break into them if appropriate.
 	 */
-#ifdef DDB
+	if (getenv("boot_gdb") != NULL)
+		boothowto |= RB_GDB;
 	kdb_init();
-	if (boothowto & RB_KDB) {
-		printf("Boot flags requested debugger\n");
-		breakpoint();
-	}
+
+#ifdef KDB
+	if (boothowto & RB_KDB)
+		kdb_enter("Boot flags requested debugger\n");
 #endif
 
 	/*
@@ -1163,12 +1161,12 @@ osendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	 * will fail if the process has not already allocated
 	 * the space with a `brk'.
 	 */
-	if ((p->p_flag & P_ALTSTACK) && !oonstack &&
+	if ((td->td_pflags & TDP_ALTSTACK) && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		sip = (osiginfo_t *)((caddr_t)p->p_sigstk.ss_sp +
-		    p->p_sigstk.ss_size - rndfsize);
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
-		p->p_sigstk.ss_flags |= SS_ONSTACK;
+		sip = (osiginfo_t *)((caddr_t)td->td_sigstk.ss_sp +
+		    td->td_sigstk.ss_size - rndfsize);
+#if defined(COMPAT_43)
+		td->td_sigstk.ss_flags |= SS_ONSTACK;
 #endif
 	} else
 		sip = (osiginfo_t *)(alpha_pal_rdusp() - rndfsize);
@@ -1263,8 +1261,8 @@ freebsd4_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	/* save user context */
 	bzero(&sf, sizeof(sf));
 	sf.sf_uc.uc_sigmask = *mask;
-	sf.sf_uc.uc_stack = p->p_sigstk;
-	sf.sf_uc.uc_stack.ss_flags = (p->p_flag & P_ALTSTACK)
+	sf.sf_uc.uc_stack = td->td_sigstk;
+	sf.sf_uc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK)
 	    ? ((oonstack) ? SS_ONSTACK : 0) : SS_DISABLE;
 	sf.sf_uc.uc_mcontext.mc_onstack = (oonstack) ? 1 : 0;
 
@@ -1287,12 +1285,12 @@ freebsd4_sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	 * will fail if the process has not already allocated
 	 * the space with a `brk'.
 	 */
-	if ((p->p_flag & P_ALTSTACK) != 0 && !oonstack &&
+	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		sfp = (struct sigframe4 *)((caddr_t)p->p_sigstk.ss_sp +
-		    p->p_sigstk.ss_size - rndfsize);
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
-		p->p_sigstk.ss_flags |= SS_ONSTACK;
+		sfp = (struct sigframe4 *)((caddr_t)td->td_sigstk.ss_sp +
+		    td->td_sigstk.ss_size - rndfsize);
+#if defined(COMPAT_43)
+		td->td_sigstk.ss_flags |= SS_ONSTACK;
 #endif
 	} else
 		sfp = (struct sigframe4 *)(alpha_pal_rdusp() - rndfsize);
@@ -1386,8 +1384,8 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	/* save user context */
 	bzero(&sf, sizeof(struct sigframe));
 	sf.sf_uc.uc_sigmask = *mask;
-	sf.sf_uc.uc_stack = p->p_sigstk;
-	sf.sf_uc.uc_stack.ss_flags = (p->p_flag & P_ALTSTACK)
+	sf.sf_uc.uc_stack = td->td_sigstk;
+	sf.sf_uc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK)
 	    ? ((oonstack) ? SS_ONSTACK : 0) : SS_DISABLE;
 	sf.sf_uc.uc_mcontext.mc_onstack = (oonstack) ? 1 : 0;
 
@@ -1411,12 +1409,12 @@ sendsig(sig_t catcher, int sig, sigset_t *mask, u_long code)
 	 * will fail if the process has not already allocated
 	 * the space with a `brk'.
 	 */
-	if ((p->p_flag & P_ALTSTACK) != 0 && !oonstack &&
+	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		sfp = (struct sigframe *)((caddr_t)p->p_sigstk.ss_sp +
-		    p->p_sigstk.ss_size - rndfsize);
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
-		p->p_sigstk.ss_flags |= SS_ONSTACK;
+		sfp = (struct sigframe *)((caddr_t)td->td_sigstk.ss_sp +
+		    td->td_sigstk.ss_size - rndfsize);
+#if defined(COMPAT_43)
+		td->td_sigstk.ss_flags |= SS_ONSTACK;
 #endif
 	} else
 		sfp = (struct sigframe *)(alpha_pal_rdusp() - rndfsize);
@@ -1530,14 +1528,14 @@ osigreturn(struct thread *td,
 		return (EINVAL);
 
 	PROC_LOCK(p);
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#if defined(COMPAT_43)
 	/*
 	 * Restore the user-supplied information
 	 */
 	if (ksc.sc_onstack)
-		p->p_sigstk.ss_flags |= SS_ONSTACK;
+		td->td_sigstk.ss_flags |= SS_ONSTACK;
 	else
-		p->p_sigstk.ss_flags &= ~SS_ONSTACK;
+		td->td_sigstk.ss_flags &= ~SS_ONSTACK;
 #endif
 
 	/*
@@ -1620,11 +1618,11 @@ freebsd4_sigreturn(struct thread *td,
 	alpha_pal_wrusp(uc.uc_mcontext.mc_regs[R_SP]);
 
 	PROC_LOCK(p);
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#if defined(COMPAT_43)
 	if (uc.uc_mcontext.mc_onstack & 1)
-		p->p_sigstk.ss_flags |= SS_ONSTACK;
+		td->td_sigstk.ss_flags |= SS_ONSTACK;
 	else
-		p->p_sigstk.ss_flags &= ~SS_ONSTACK;
+		td->td_sigstk.ss_flags &= ~SS_ONSTACK;
 #endif
 
 	td->td_sigmask = uc.uc_sigmask;
@@ -1696,11 +1694,11 @@ sigreturn(struct thread *td,
 	alpha_pal_wrusp(uc.uc_mcontext.mc_regs[R_SP]);
 
 	PROC_LOCK(p);
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#if defined(COMPAT_43)
 	if (uc.uc_mcontext.mc_onstack & 1)
-		p->p_sigstk.ss_flags |= SS_ONSTACK;
+		td->td_sigstk.ss_flags |= SS_ONSTACK;
 	else
-		p->p_sigstk.ss_flags &= ~SS_ONSTACK;
+		td->td_sigstk.ss_flags &= ~SS_ONSTACK;
 #endif
 
 	td->td_sigmask = uc.uc_sigmask;
@@ -1901,10 +1899,9 @@ ptrace_single_step(struct thread *td)
 	if (td->td_md.md_flags & (MDTD_STEP1|MDTD_STEP2))
 		panic("ptrace_single_step: step breakpoints not removed");
 
-	PROC_UNLOCK(td->td_proc);
 	error = ptrace_read_int(td, pc, &ins.bits);
 	if (error)
-		goto err;
+		return (error);
 
 	switch (ins.branch_format.opcode) {
 
@@ -1944,20 +1941,18 @@ ptrace_single_step(struct thread *td)
 	td->td_md.md_sstep[0].addr = addr[0];
 	error = ptrace_set_bpt(td, &td->td_md.md_sstep[0]);
 	if (error)
-		goto err;
+		return (error);
 	if (count == 2) {
 		td->td_md.md_sstep[1].addr = addr[1];
 		error = ptrace_set_bpt(td, &td->td_md.md_sstep[1]);
 		if (error) {
 			ptrace_clear_bpt(td, &td->td_md.md_sstep[0]);
-			goto err;
+			return (error);
 		}
 		td->td_md.md_flags |= MDTD_STEP2;
 	} else
 		td->td_md.md_flags |= MDTD_STEP1;
 
-err:
-	PROC_LOCK(td->td_proc);
 	return (error);
 }
 
@@ -1977,6 +1972,29 @@ alpha_pa_access(vm_offset_t pa)
 #else
 	return VM_PROT_READ|VM_PROT_WRITE;
 #endif
+}
+
+/*
+ * Construct a PCB from a trapframe. This is called from kdb_trap() where
+ * we want to start a backtrace from the function that caused us to enter
+ * the debugger. We have the context in the trapframe, but base the trace
+ * on the PCB. The PCB doesn't have to be perfect, as long as it contains
+ * enough for a backtrace.
+ */
+void
+makectx(struct trapframe *tf, struct pcb *pcb)
+{
+
+	pcb->pcb_context[0] = tf->tf_regs[FRAME_S0];
+	pcb->pcb_context[1] = tf->tf_regs[FRAME_S1];
+	pcb->pcb_context[2] = tf->tf_regs[FRAME_S2];
+	pcb->pcb_context[3] = tf->tf_regs[FRAME_S3];
+	pcb->pcb_context[4] = tf->tf_regs[FRAME_S4];
+	pcb->pcb_context[5] = tf->tf_regs[FRAME_S5];
+	pcb->pcb_context[6] = tf->tf_regs[FRAME_S6];
+	pcb->pcb_context[7] = tf->tf_regs[FRAME_PC];
+	pcb->pcb_context[8] = tf->tf_regs[FRAME_PS];
+	pcb->pcb_hw.apcb_ksp = tf->tf_regs[FRAME_SP];
 }
 
 int
@@ -2212,14 +2230,6 @@ set_fpregs(td, fpregs)
 	bcopy(fpregs, &td->td_pcb->pcb_fp, sizeof *fpregs);
 	return (0);
 }
-
-#ifndef DDB
-void
-Debugger(const char *msg)
-{
-	printf("Debugger(\"%s\") called.\n", msg);
-}
-#endif /* no DDB */
 
 static int
 sysctl_machdep_adjkerntz(SYSCTL_HANDLER_ARGS)

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $FreeBSD: src/sys/dev/twe/twereg.h,v 1.10 2003/12/02 07:57:20 ps Exp $
+ *      $FreeBSD: src/sys/dev/twe/twereg.h,v 1.11 2004/05/12 04:10:37 vkashyap Exp $
  */
 
 /* 
@@ -100,7 +100,7 @@
 
 /* PCI related defines */
 #define TWE_IO_CONFIG_REG		0x10
-#define TWE_DEVICE_NAME			"3ware 7000 series Storage Controller"
+#define TWE_DEVICE_NAME			"3ware Storage Controller"
 #define TWE_VENDOR_ID			0x13C1
 #define TWE_DEVICE_ID			0x1000
 #define TWE_DEVICE_ID_ASIC		0x1001

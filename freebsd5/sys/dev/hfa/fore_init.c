@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hfa/fore_init.c,v 1.15 2003/08/22 06:00:26 imp Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_init.c,v 1.16 2004/02/21 19:08:23 harti Exp $
  *
  */
 
@@ -63,7 +63,7 @@
 #include <dev/hfa/fore_include.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_init.c,v 1.15 2003/08/22 06:00:26 imp Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_init.c,v 1.16 2004/02/21 19:08:23 harti Exp $");
 #endif
 
 
@@ -360,8 +360,8 @@ fore_get_prom(fup)
 		cqp = hcp->hcq_cpelem;
 		(*hcp->hcq_status) = QSTAT_PENDING;
 
-		fup->fu_promd = (Fore_prom *)vtophys(fup->fu_prom);
-		if (fup->fu_promd == NULL) {
+		fup->fu_promd = vtophys(fup->fu_prom);
+		if (fup->fu_promd == 0) {
 			fup->fu_stats->st_drv.drv_cm_nodma++;
 			return;
 		}

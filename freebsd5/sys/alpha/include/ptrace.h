@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ptrace.h	8.1 (Berkeley) 6/11/93
- * $FreeBSD: src/sys/alpha/include/ptrace.h,v 1.10 2002/03/16 00:25:50 des Exp $
+ * $FreeBSD: src/sys/alpha/include/ptrace.h,v 1.12 2004/07/13 16:11:04 kensmith Exp $
  */
 
 #ifndef _MACHINE_PTRACE_H_
@@ -39,7 +35,6 @@
 
 #ifdef _KERNEL
 #define FIX_SSTEP(p)	ptrace_clear_single_step(p)
-int	ptrace_clear_single_step(struct thread *_p);
 #endif
 
 #endif

@@ -28,7 +28,7 @@
 #include <dev/sound/pcm/vchan.h>
 #include "feeder_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/vchan.c,v 1.13.2.2 2004/02/15 00:16:53 truckman Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/vchan.c,v 1.16 2004/01/28 08:02:15 truckman Exp $");
 
 struct vchinfo {
 	u_int32_t spd, fmt, blksz, bps, run;
@@ -94,12 +94,14 @@ feed_vchan_s16(struct pcm_feeder *f, struct pcm_channel *c, u_int8_t *b, u_int32
 	bzero(tmp, count);
 	SLIST_FOREACH(cce, &c->children, link) {
 		ch = cce->channel;
+   		CHN_LOCK(ch);
 		if (ch->flags & CHN_F_TRIGGERED) {
 			if (ch->flags & CHN_F_MAPPED)
 				sndbuf_acquire(ch->bufsoft, NULL, sndbuf_getfree(ch->bufsoft));
 			cnt = FEEDER_FEED(ch->feeder, ch, (u_int8_t *)tmp, count, ch->bufsoft);
 			vchan_mix_s16(dst, tmp, cnt / 2);
 		}
+   		CHN_UNLOCK(ch);
 	}
 
 	return count;
@@ -147,13 +149,16 @@ vchan_setformat(kobj_t obj, void *data, u_int32_t format)
 {
 	struct vchinfo *ch = data;
 	struct pcm_channel *parent = ch->parent;
+	struct pcm_channel *channel = ch->channel;
 
 	ch->fmt = format;
 	ch->bps = 1;
 	ch->bps <<= (ch->fmt & AFMT_STEREO)? 1 : 0;
 	ch->bps <<= (ch->fmt & AFMT_16BIT)? 1 : 0;
 	ch->bps <<= (ch->fmt & AFMT_32BIT)? 2 : 0;
+   	CHN_UNLOCK(channel);
 	chn_notify(parent, CHN_N_FORMAT);
+   	CHN_LOCK(channel);
 	return 0;
 }
 
@@ -162,9 +167,12 @@ vchan_setspeed(kobj_t obj, void *data, u_int32_t speed)
 {
 	struct vchinfo *ch = data;
 	struct pcm_channel *parent = ch->parent;
+	struct pcm_channel *channel = ch->channel;
 
 	ch->spd = speed;
+   	CHN_UNLOCK(channel);
 	chn_notify(parent, CHN_N_RATE);
+   	CHN_LOCK(channel);
 	return speed;
 }
 
@@ -173,14 +181,19 @@ vchan_setblocksize(kobj_t obj, void *data, u_int32_t blocksize)
 {
 	struct vchinfo *ch = data;
 	struct pcm_channel *parent = ch->parent;
+	/* struct pcm_channel *channel = ch->channel; */
 	int prate, crate;
 
 	ch->blksz = blocksize;
+   	/* CHN_UNLOCK(channel); */
 	chn_notify(parent, CHN_N_BLOCKSIZE);
+   	CHN_LOCK(parent);
+   	/* CHN_LOCK(channel); */
 
 	crate = ch->spd * ch->bps;
 	prate = sndbuf_getspd(parent->bufhard) * sndbuf_getbps(parent->bufhard);
 	blocksize = sndbuf_getblksz(parent->bufhard);
+   	CHN_UNLOCK(parent);
 	blocksize *= prate;
 	blocksize /= crate;
 
@@ -192,12 +205,15 @@ vchan_trigger(kobj_t obj, void *data, int go)
 {
 	struct vchinfo *ch = data;
 	struct pcm_channel *parent = ch->parent;
+	struct pcm_channel *channel = ch->channel;
 
 	if (go == PCMTRIG_EMLDMAWR || go == PCMTRIG_EMLDMARD)
 		return 0;
 
 	ch->run = (go == PCMTRIG_START)? 1 : 0;
+   	CHN_UNLOCK(channel);
 	chn_notify(parent, CHN_N_TRIGGER);
+   	CHN_LOCK(channel);
 
 	return 0;
 }
@@ -237,8 +253,11 @@ vchan_create(struct pcm_channel *parent)
 	struct pcm_channel *child;
 	int err, first;
 
+   	CHN_UNLOCK(parent);
+
 	pce = malloc(sizeof(*pce), M_DEVBUF, M_WAITOK | M_ZERO);
 	if (!pce) {
+   		CHN_LOCK(parent);
 		return ENOMEM;
 	}
 
@@ -246,14 +265,13 @@ vchan_create(struct pcm_channel *parent)
 	child = pcm_chn_create(d, parent, &vchan_class, PCMDIR_VIRTUAL, parent);
 	if (!child) {
 		free(pce, M_DEVBUF);
+   		CHN_LOCK(parent);
 		return ENODEV;
 	}
 
    	CHN_LOCK(parent);
-	if (!(parent->flags & CHN_F_BUSY)) {
-		CHN_UNLOCK(parent);
+	if (!(parent->flags & CHN_F_BUSY))
 		return EBUSY;
-	}
 
 	first = SLIST_EMPTY(&parent->children);
 	/* add us to our parent channel's children */
@@ -262,12 +280,16 @@ vchan_create(struct pcm_channel *parent)
 	CHN_UNLOCK(parent);
 
 	/* add us to our grandparent's channel list */
-	err = pcm_chn_add(d, child, !first);
+	/*
+	 * XXX maybe we shouldn't always add the dev_t
+ 	 */
+	err = pcm_chn_add(d, child);
 	if (err) {
 		pcm_chn_destroy(child);
 		free(pce, M_DEVBUF);
 	}
 
+   	CHN_LOCK(parent);
 	/* XXX gross ugly hack, murder death kill */
 	if (first && !err) {
 		err = chn_reset(parent, AFMT_STEREO | AFMT_S16_LE);
@@ -314,8 +336,8 @@ gotch:
 	if (last)
 		parent->flags &= ~CHN_F_BUSY;
 
-	/* remove us from our grantparent's channel list */
-	err = pcm_chn_remove(d, c, !last);
+	/* remove us from our grandparent's channel list */
+	err = pcm_chn_remove(d, c);
 	if (err)
 		return err;
 

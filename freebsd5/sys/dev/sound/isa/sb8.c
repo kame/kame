@@ -38,7 +38,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sb8.c,v 1.73 2003/09/07 16:28:02 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sb8.c,v 1.77 2004/07/16 03:59:54 tanimura Exp $");
 
 #define SB_DEFAULT_BUFSZ	4096
 
@@ -286,13 +286,16 @@ sb_alloc_resources(struct sb_info *sb, device_t dev)
 
 	rid = 0;
 	if (!sb->io_base)
-    		sb->io_base = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1, RF_ACTIVE);
+    		sb->io_base = bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+			&rid, RF_ACTIVE);
 	rid = 0;
 	if (!sb->irq)
-    		sb->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1, RF_ACTIVE);
+    		sb->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ,
+			&rid, RF_ACTIVE);
 	rid = 0;
 	if (!sb->drq)
-    		sb->drq = bus_alloc_resource(dev, SYS_RES_DRQ, &rid, 0, ~0, 1, RF_ACTIVE);
+    		sb->drq = bus_alloc_resource_any(dev, SYS_RES_DRQ,
+			&rid, RF_ACTIVE);
 
 	if (sb->io_base && sb->drq && sb->irq) {
 		isa_dma_acquire(rman_get_start(sb->drq));
@@ -713,7 +716,7 @@ sb_attach(device_t dev)
 		goto no;
     	if (mixer_init(dev, (sb->bd_id < 0x300)? &sbmix_mixer_class : &sbpromix_mixer_class, sb))
 		goto no;
-	if (snd_setup_intr(dev, sb->irq, INTR_MPSAFE, sb_intr, sb, &sb->ih))
+	if (snd_setup_intr(dev, sb->irq, 0, sb_intr, sb, &sb->ih))
 		goto no;
 
 	pcm_setflags(dev, pcm_getflags(dev) | SD_F_SIMPLEX);
@@ -730,8 +733,9 @@ sb_attach(device_t dev)
 		goto no;
     	}
 
-    	snprintf(status, SND_STATUSLEN, "at io 0x%lx irq %ld drq %ld bufsz %u",
-    	     	rman_get_start(sb->io_base), rman_get_start(sb->irq), rman_get_start(sb->drq), sb->bufsize);
+    	snprintf(status, SND_STATUSLEN, "at io 0x%lx irq %ld drq %ld bufsz %u %s",
+    	     	rman_get_start(sb->io_base), rman_get_start(sb->irq),
+		rman_get_start(sb->drq), sb->bufsize, PCM_KLDSTRING(snd_sb8));
 
     	if (pcm_register(dev, sb, 1, 1))
 		goto no;
@@ -778,7 +782,7 @@ static driver_t sb_driver = {
 };
 
 DRIVER_MODULE(snd_sb8, sbc, sb_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_sb8, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_sb8, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_DEPEND(snd_sb8, snd_sbc, 1, 1, 1);
 MODULE_VERSION(snd_sb8, 1);
 

@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ppbus/ppi.c,v 1.33 2003/08/24 17:54:16 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ppbus/ppi.c,v 1.38 2004/07/09 16:56:46 cognet Exp $");
 #include "opt_ppb_1284.h"
 
 #include <sys/param.h>
@@ -90,15 +90,15 @@ static	d_ioctl_t	ppiioctl;
 static	d_write_t	ppiwrite;
 static	d_read_t	ppiread;
 
-#define CDEV_MAJOR 82
 static struct cdevsw ppi_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	ppiopen,
 	.d_close =	ppiclose,
 	.d_read =	ppiread,
 	.d_write =	ppiwrite,
 	.d_ioctl =	ppiioctl,
 	.d_name =	"ppi",
-	.d_maj =	CDEV_MAJOR,
 };
 
 #ifdef PERIPH_1284
@@ -133,7 +133,11 @@ static void
 ppi_identify(driver_t *driver, device_t parent)
 {
 
-	BUS_ADD_CHILD(parent, 0, "ppi", -1);
+	device_t dev;
+
+	dev = device_find_child(parent, "ppi", 0);
+	if (!dev)
+		BUS_ADD_CHILD(parent, 0, "ppi", -1);
 }
 
 /*
@@ -148,7 +152,6 @@ ppi_probe(device_t dev)
 	device_set_desc(dev, "Parallel I/O");
 
 	ppi = DEVTOSOFTC(dev);
-	bzero(ppi, sizeof(struct ppi_data));
 
 	return (0);
 }
@@ -251,7 +254,7 @@ ppiintr(void *arg)
 #endif /* PERIPH_1284 */
 
 static int
-ppiopen(dev_t dev, int flags, int fmt, struct thread *td)
+ppiopen(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	u_int unit = minor(dev);
 	struct ppi_data *ppi = UNITOSOFTC(unit);
@@ -284,7 +287,7 @@ ppiopen(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static int
-ppiclose(dev_t dev, int flags, int fmt, struct thread *td)
+ppiclose(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	u_int unit = minor(dev);
 	struct ppi_data *ppi = UNITOSOFTC(unit);
@@ -326,7 +329,7 @@ ppiclose(dev_t dev, int flags, int fmt, struct thread *td)
  * If no data is available, wait for it otherwise transfer as much as possible
  */
 static int
-ppiread(dev_t dev, struct uio *uio, int ioflag)
+ppiread(struct cdev *dev, struct uio *uio, int ioflag)
 {
 #ifdef PERIPH_1284
 	u_int unit = minor(dev);
@@ -410,7 +413,7 @@ error:
  * Once negotiation done, transfer data
  */
 static int
-ppiwrite(dev_t dev, struct uio *uio, int ioflag)
+ppiwrite(struct cdev *dev, struct uio *uio, int ioflag)
 {
 #ifdef PERIPH_1284
 	u_int unit = minor(dev);
@@ -497,7 +500,7 @@ error:
 }
 
 static int
-ppiioctl(dev_t dev, u_long cmd, caddr_t data, int flags, struct thread *td)
+ppiioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags, struct thread *td)
 {
 	u_int unit = minor(dev);
 	device_t ppidev = UNITODEVICE(unit);

@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/vinum/vinumconfig.c,v 1.62 2003/09/29 08:50:03 grog Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/vinum/vinumconfig.c,v 1.67 2004/06/17 17:16:46 phk Exp $");
 
 #define STATIC static
 
@@ -476,6 +476,7 @@ get_empty_drive(void)
     bzero(drive, sizeof(struct drive));
     drive->driveno = driveno;				    /* put number in structure */
     drive->flags |= VF_NEWBORN;				    /* newly born drive */
+    drive->dev = NULL;
     strcpy(drive->devicename, "unknown");		    /* and make the name ``unknown'' */
     return driveno;					    /* return the index */
 }
@@ -594,6 +595,8 @@ free_drive(struct drive *drive)
 	close_locked_drive(drive);			    /* close it */
     if (drive->freelist)
 	Free(drive->freelist);
+    if (drive->dev != NULL)
+	dev_rel(drive->dev);
     bzero(drive, sizeof(struct drive));			    /* this also sets drive_unallocated */
     unlockdrive(drive);
 }
@@ -823,7 +826,8 @@ free_plex(int plexno)
 	Free(plex->sdnos);
     if (plex->lock)
 	Free(plex->lock);
-    destroy_dev(plex->dev);
+    if (plex->dev)
+        destroy_dev(plex->dev);
     bzero(plex, sizeof(struct plex));			    /* and clear it out */
     plex->state = plex_unallocated;
 }
@@ -894,7 +898,8 @@ free_volume(int volno)
     struct volume *vol;
 
     vol = &VOL[volno];
-    destroy_dev(vol->dev);
+    if (vol->dev)
+        destroy_dev(vol->dev);
     bzero(vol, sizeof(struct volume));			    /* and clear it out */
     vol->state = volume_unallocated;
 }
@@ -1230,8 +1235,15 @@ config_subdisk(int update)
 		PLEX[sd->plexno].name,
 		sizeof(sd->name));
 	else {						    /* no way */
-	    if (sd->state == sd_unallocated)		    /* haven't finished allocating the sd, */
-		free_sd(sdno);				    /* free it to return drive space */
+	    if (sd->state == sd_unallocated) {		    /* haven't finished allocating the sd, */
+		if (autosize != 0) {			    /* but we might have allocated drive space */
+		    vinum_conf.subdisks_used++;		    /* ugly hack needed for free_sd() */
+		    free_sd(sdno);			    /* free it to return drive space */
+		} else {				    /* just clear it */
+		    bzero(sd, sizeof(struct sd));
+		    sd->state = sd_unallocated;
+		}
+	    }
 	    throw_rude_remark(EINVAL, "Unnamed sd is not associated with a plex");
 	}
 	sprintf(sdsuffix, ".s%d", sdindex);		    /* form the suffix */
@@ -1279,7 +1291,9 @@ config_plex(int update)
     int namedplexno;
     enum plexstate state = plex_init;			    /* state to set at end */
     int preferme;					    /* set if we want to be preferred access */
+    int stripesize;
 
+    stripesize = 0;
     current_plex = -1;					    /* forget the previous plex */
     preferme = 0;					    /* nothing special yet */
     plexno = get_empty_plex();				    /* allocate a plex */
@@ -1337,52 +1351,53 @@ config_plex(int update)
 
 	    case kw_striped:
 		{
-		    int stripesize = sizespec(token[++parameter]);
-
 		    plex->organization = plex_striped;
-		    if (stripesize % DEV_BSIZE != 0)	    /* not a multiple of block size, */
-			throw_rude_remark(EINVAL, "plex %s: stripe size %d not a multiple of sector size",
-			    plex->name,
-			    stripesize);
+
+		    if (++parameter >= tokens)	/* No stripe size specified. */
+			stripesize = 0;
 		    else
-			plex->stripesize = stripesize / DEV_BSIZE;
+			stripesize = sizespec(token[parameter]);
+
 		    break;
 		}
 
 	    case kw_raid4:
 		{
-		    int stripesize = sizespec(token[++parameter]);
-
 		    plex->organization = plex_raid4;
-		    if (stripesize % DEV_BSIZE != 0)	    /* not a multiple of block size, */
-			throw_rude_remark(EINVAL, "plex %s: stripe size %d not a multiple of sector size",
-			    plex->name,
-			    stripesize);
+
+		    if (++parameter >= tokens)	/* No stripe size specified. */
+			stripesize = 0;
 		    else
-			plex->stripesize = stripesize / DEV_BSIZE;
+			stripesize = sizespec(token[parameter]);
+
 		    break;
 		}
 
 	    case kw_raid5:
 		{
-		    int stripesize = sizespec(token[++parameter]);
-
 		    plex->organization = plex_raid5;
-		    if (stripesize % DEV_BSIZE != 0)	    /* not a multiple of block size, */
-			throw_rude_remark(EINVAL, "plex %s: stripe size %d not a multiple of sector size",
-			    plex->name,
-			    stripesize);
+
+		    if (++parameter >= tokens)	/* No stripe size specified. */
+			stripesize = 0;
 		    else
-			plex->stripesize = stripesize / DEV_BSIZE;
+			stripesize = sizespec(token[parameter]);
+
 		    break;
 		}
 
 	    default:
 		throw_rude_remark(EINVAL, "Invalid plex organization");
 	    }
-	    if (isstriped(plex)
-		&& (plex->stripesize == 0))		    /* didn't specify a valid stripe size */
-		throw_rude_remark(EINVAL, "Need a stripe size parameter");
+	    if (isstriped(plex)) {
+		if (stripesize == 0)		    /* didn't specify a valid stripe size */
+		    throw_rude_remark(EINVAL, "Need a stripe size parameter");
+		else if (stripesize % DEV_BSIZE != 0)
+		    throw_rude_remark(EINVAL, "plex %s: stripe size %d not a multiple of sector size",
+			plex->name,
+			stripesize);
+		else
+		    plex->stripesize = stripesize / DEV_BSIZE;
+	    }
 	    break;
 
 	    /*

@@ -1,5 +1,5 @@
 /*	$NetBSD: usbdivar.h,v 1.70 2002/07/11 21:14:36 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usbdivar.h,v 1.40 2003/07/15 22:42:37 jmg Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usbdivar.h,v 1.41 2004/06/30 02:56:24 imp Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -150,6 +150,7 @@ struct usbd_device {
 	const struct usbd_quirks     *quirks;  /* device quirks, always set */
 	struct usbd_hub	       *hub;           /* only if this is a hub */
 	device_ptr_t	       *subdevs;       /* sub-devices, 0 terminated */
+	uint8_t		       *ifacenums;     /* sub-device interfacenumbers */
 };
 
 struct usbd_interface {

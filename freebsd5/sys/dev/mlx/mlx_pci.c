@@ -25,11 +25,12 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mlx/mlx_pci.c,v 1.17 2003/08/24 17:54:11 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mlx/mlx_pci.c,v 1.19 2004/05/30 20:08:36 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 
 #include <sys/bus.h>
 #include <sys/conf.h>
@@ -164,18 +165,21 @@ mlx_pci_attach(device_t dev)
     case MLX_IFTYPE_3:
 	sc->mlx_mem_type = SYS_RES_MEMORY;
 	sc->mlx_mem_rid = MLX_CFG_BASE1;
-	sc->mlx_mem = bus_alloc_resource(dev, sc->mlx_mem_type, &sc->mlx_mem_rid, 0, ~0, 1, RF_ACTIVE);
+	sc->mlx_mem = bus_alloc_resource_any(dev, sc->mlx_mem_type,
+		&sc->mlx_mem_rid, RF_ACTIVE);
 	if (sc->mlx_mem == NULL) {
 	    sc->mlx_mem_type = SYS_RES_IOPORT;
 	    sc->mlx_mem_rid = MLX_CFG_BASE0;
-	    sc->mlx_mem = bus_alloc_resource(dev, sc->mlx_mem_type, &sc->mlx_mem_rid, 0, ~0, 1, RF_ACTIVE);
+	    sc->mlx_mem = bus_alloc_resource_any(dev, sc->mlx_mem_type,
+		&sc->mlx_mem_rid, RF_ACTIVE);
 	}
 	break;
     case MLX_IFTYPE_4:
     case MLX_IFTYPE_5:
 	sc->mlx_mem_type = SYS_RES_MEMORY;
 	sc->mlx_mem_rid = MLX_CFG_BASE0;
-	sc->mlx_mem = bus_alloc_resource(dev, sc->mlx_mem_type, &sc->mlx_mem_rid, 0, ~0, 1, RF_ACTIVE);
+	sc->mlx_mem = bus_alloc_resource_any(dev, sc->mlx_mem_type,
+		&sc->mlx_mem_rid, RF_ACTIVE);
 	break;
     }
     if (sc->mlx_mem == NULL) {

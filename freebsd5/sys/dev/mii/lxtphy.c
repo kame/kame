@@ -38,9 +38,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/lxtphy.c,v 1.12 2003/08/24 17:54:10 obrien Exp $");
- 
 /*
  * Copyright (c) 1997 Manuel Bouyer.  All rights reserved.
  *
@@ -70,13 +67,13 @@ __FBSDID("$FreeBSD: src/sys/dev/mii/lxtphy.c,v 1.12 2003/08/24 17:54:10 obrien E
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/lxtphy.c,v 1.13 2004/05/29 18:09:10 marius Exp $");
+
 /*
  * driver for Level One's LXT-970 ethernet 10/100 PHY
  * datasheet from www.level1.com
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/lxtphy.c,v 1.12 2003/08/24 17:54:10 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

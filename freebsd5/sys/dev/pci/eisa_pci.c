@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/pci/eisa_pci.c,v 1.5 2003/08/24 17:54:15 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/pci/eisa_pci.c,v 1.6 2004/05/30 20:08:37 phk Exp $");
 
 /*
  * PCI:EISA bridge support
@@ -37,6 +37,7 @@ __FBSDID("$FreeBSD: src/sys/dev/pci/eisa_pci.c,v 1.5 2003/08/24 17:54:15 obrien 
 
 #include <sys/param.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 
 #include <dev/pci/pcivar.h>

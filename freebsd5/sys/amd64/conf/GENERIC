@@ -12,87 +12,73 @@
 # latest information.
 #
 # An exhaustive list of options and more detailed explanations of the
-# device lines is also present in the ../../conf/NOTES and NOTES files. 
-# If you are in doubt as to the purpose or necessity of a line, check first 
+# device lines is also present in the ../../conf/NOTES and NOTES files.
+# If you are in doubt as to the purpose or necessity of a line, check first
 # in NOTES.
 #
-# $FreeBSD: src/sys/amd64/conf/GENERIC,v 1.399.2.3 2004/01/26 19:42:11 nectar Exp $
+# $FreeBSD: src/sys/amd64/conf/GENERIC,v 1.421.2.4.2.1 2004/10/23 20:04:00 kensmith Exp $
 
 machine		amd64
 cpu		HAMMER
 ident		GENERIC
 
-#To statically compile in device wiring instead of /boot/device.hints
-#hints		"GENERIC.hints"		#Default places to look for devices.
+# To statically compile in device wiring instead of /boot/device.hints
+#hints		"GENERIC.hints"		# Default places to look for devices.
 
-#makeoptions	DEBUG=-g		#Build kernel with gdb(1) debug symbols
-makeoptions	NO_MODULES=not_yet
-
-options 	SCHED_4BSD		#4BSD scheduler
-options 	INET			#InterNETworking
-options 	INET6			#IPv6 communications protocols
-options 	FFS			#Berkeley Fast Filesystem
-options 	SOFTUPDATES		#Enable FFS soft updates support
-options 	UFS_ACL			#Support for access control lists
-options 	UFS_DIRHASH		#Improve performance on big directories
-options 	MD_ROOT			#MD is a potential root device
-options 	NFSCLIENT		#Network Filesystem Client
-options 	NFSSERVER		#Network Filesystem Server
-options 	NFS_ROOT		#NFS usable as /, requires NFSCLIENT
-options 	MSDOSFS			#MSDOS Filesystem
-options 	CD9660			#ISO 9660 Filesystem
-options 	PROCFS			#Process filesystem (requires PSEUDOFS)
-options 	PSEUDOFS		#Pseudo-filesystem framework
-options 	IA32			#Compatible with i386 binaries
-options 	COMPAT_FREEBSD4		#Compatible with FreeBSD4
-options 	SCSI_DELAY=15000	#Delay (in ms) before probing SCSI
-options 	KTRACE			#ktrace(1) support
-options 	SYSVSHM			#SYSV-style shared memory
-options 	SYSVMSG			#SYSV-style message queues
-options 	SYSVSEM			#SYSV-style semaphores
-options 	_KPOSIX_PRIORITY_SCHEDULING #Posix P1003_1B real-time extensions
+options 	SCHED_4BSD		# 4BSD scheduler
+options 	INET			# InterNETworking
+options 	INET6			# IPv6 communications protocols
+options 	FFS			# Berkeley Fast Filesystem
+options 	SOFTUPDATES		# Enable FFS soft updates support
+options 	UFS_ACL			# Support for access control lists
+options 	UFS_DIRHASH		# Improve performance on big directories
+options 	MD_ROOT			# MD is a potential root device
+options 	NFSCLIENT		# Network Filesystem Client
+options 	NFSSERVER		# Network Filesystem Server
+options 	NFS_ROOT		# NFS usable as /, requires NFSCLIENT
+options 	NTFS			# NT File System
+options 	MSDOSFS			# MSDOS Filesystem
+options 	CD9660			# ISO 9660 Filesystem
+options 	PROCFS			# Process filesystem (requires PSEUDOFS)
+options 	PSEUDOFS		# Pseudo-filesystem framework
+options 	GEOM_GPT		# GUID Partition Tables.
+options 	COMPAT_IA32		# Compatible with i386 binaries
+options 	COMPAT_FREEBSD4		# Compatible with FreeBSD4
+options 	SCSI_DELAY=15000	# Delay (in ms) before probing SCSI
+options 	KTRACE			# ktrace(1) support
+options 	SYSVSHM			# SYSV-style shared memory
+options 	SYSVMSG			# SYSV-style message queues
+options 	SYSVSEM			# SYSV-style semaphores
+options 	_KPOSIX_PRIORITY_SCHEDULING # Posix P1003_1B real-time extensions
 options 	KBD_INSTALL_CDEV	# install a CDEV entry in /dev
 options 	AHC_REG_PRETTY_PRINT	# Print register bitfields in debug
 					# output.  Adds ~128k to driver.
 options 	AHD_REG_PRETTY_PRINT	# Print register bitfields in debug
 					# output.  Adds ~215k to driver.
-options 	PFIL_HOOKS		# pfil(9) framework
+options 	ADAPTIVE_GIANT		# Giant mutex is adaptive.
 
-# Debugging for use in -current
-#options 	DDB			#Enable the kernel debugger
-#options 	INVARIANTS		#Enable calls of extra sanity checking
-options 	INVARIANT_SUPPORT	#Extra sanity checks of internal structures, required by INVARIANTS
-#options 	WITNESS			#Enable checks to detect deadlocks and cycles
-#options 	WITNESS_SKIPSPIN	#Don't run witness on spinlocks for speed
-
-# Make an SMP-capable kernel by default
-options 	SMP			# Symmetric MultiProcessor Kernel
 # Workarounds for some known-to-be-broken chipsets (nVidia nForce3-Pro150)
-device		atpic			# 8259A compatability
-options 	NO_MIXED_MODE		# Don't penalize working chipsets
+device		atpic		# 8259A compatability
+options 	NO_MIXED_MODE	# Don't penalize working chipsets
 
+# Bus support.  Do not remove isa, even if you have no isa slots
 device		acpi
 device		isa
 device		pci
-
-
-# Sound (no modules)
-device		pcm
 
 # Floppy drives
 device		fdc
 
 # ATA and ATAPI devices
 device		ata
-device		atadisk			# ATA disk drives
-device		ataraid			# ATA RAID drives
-device		atapicd			# ATAPI CDROM drives
-device		atapifd			# ATAPI floppy drives
-device		atapist			# ATAPI tape drives
-options 	ATA_STATIC_ID		#Static device numbering
+device		atadisk		# ATA disk drives
+device		ataraid		# ATA RAID drives
+device		atapicd		# ATAPI CDROM drives
+device		atapifd		# ATAPI floppy drives
+device		atapist		# ATAPI tape drives
+options 	ATA_STATIC_ID	# Static device numbering
 
 # SCSI Controllers
-device		ahb		# EISA AHA1742 family
 device		ahc		# AHA2940 and onboard AIC7xxx devices
 device		ahd		# AHA39320/29320 and onboard AIC79xx devices
 device		amd		# AMD 53C974 (Tekram DC-390(T))
@@ -104,7 +90,6 @@ device		trm		# Tekram DC395U/UW/F DC315U adapters
 
 device		adv		# Advansys SCSI adapters
 device		adw		# Advansys wide SCSI adapters
-device		aha		# Adaptec 154x SCSI adapters
 device		aic		# Adaptec 15[012]x SCSI adapters, AIC-6[23]60.
 device		bt		# Buslogic/Mylex MultiMaster SCSI adapters
 
@@ -120,12 +105,12 @@ device		ses		# SCSI Environmental Services (and SAF-TE)
 
 # RAID controllers interfaced to the SCSI subsystem
 device		amr		# AMI MegaRAID
-device		asr		# DPT SmartRAID V, VI and Adaptec SCSI RAID
 device		ciss		# Compaq Smart RAID 5*
 device		dpt		# DPT Smartcache III, IV - See NOTES for options
 device		iir		# Intel Integrated RAID
 device		ips		# IBM (Adaptec) ServeRAID
 device		mly		# Mylex AcceleRAID/eXtremeRAID
+device		twa		# 3ware 9000 series PATA/SATA RAID
 
 # RAID controllers
 device		aac		# Adaptec FSA RAID
@@ -149,11 +134,10 @@ device		splash		# Splash screen and screen saver support
 device		sc
 
 # PCCARD (PCMCIA) support
-# Pcmcia and cardbus bridge support
-device		cbb			# cardbus (yenta) bridge
-#device		pcic			# ExCA ISA and PCI bridges
-device		pccard			# PC Card (16-bit) bus
-device		cardbus			# CardBus (32-bit) bus
+# PCMCIA and cardbus bridge support
+device		cbb		# cardbus (yenta) bridge
+device		pccard		# PC Card (16-bit) bus
+device		cardbus		# CardBus (32-bit) bus
 
 # Serial (COM) ports
 device		sio		# 8250, 16[45]50 based serial ports
@@ -174,13 +158,14 @@ device		ppi		# Parallel port interface device
 # PCI Ethernet NICs.
 device		de		# DEC/Intel DC21x4x (``Tulip'')
 device		em		# Intel PRO/1000 adapter Gigabit Ethernet Card
+device		ixgb		# Intel PRO/10GbE Ethernet Card
 device		txp		# 3Com 3cR990 (``Typhoon'')
 device		vx		# 3Com 3c590, 3c595 (``Vortex'')
 
 # PCI Ethernet NICs that use the common MII bus controller code.
 # NOTE: Be sure to keep the 'device miibus' line in order to use these NICs!
 device		miibus		# MII bus support
-device		bfe		# Broadcom BCM440x 10/100 ethernet
+device		bfe		# Broadcom BCM440x 10/100 Ethernet
 device		bge		# Broadcom BCM570xx Gigabit Ethernet
 device		dc		# DEC/Intel 21143 and various workalikes
 device		fxp		# Intel EtherExpress PRO/100B (82557, 82558)
@@ -189,16 +174,17 @@ device		re		# RealTek 8139C+/8169/8169S/8110S
 device		rl		# RealTek 8129/8139
 device		sf		# Adaptec AIC-6915 (``Starfire'')
 device		sis		# Silicon Integrated Systems SiS 900/SiS 7016
-device		sk		# SysKonnect SK-984x and SK-982x gigabit ethernet
+device		sk		# SysKonnect SK-984x & SK-982x gigabit Ethernet
 device		ste		# Sundance ST201 (D-Link DFE-550TX)
-device		ti		# Alteon Networks Tigon I/II gigabit ethernet
+device		ti		# Alteon Networks Tigon I/II gigabit Ethernet
 device		tl		# Texas Instruments ThunderLAN
 device		tx		# SMC EtherPower II (83c170 ``EPIC'')
+device		vge		# VIA VT612x gigabit ethernet
 device		vr		# VIA Rhine, Rhine II
 device		wb		# Winbond W89C840F
 device		xl		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
 
-# ISA Ethernet NICs.  pccard nics included.
+# ISA Ethernet NICs.  pccard NICs included.
 device		cs		# Crystal Semiconductor CS89x0 NIC
 # 'device ed' requires 'device miibus'
 # XXX kvtop brokenness, pointer/int warnings
@@ -206,26 +192,22 @@ device		cs		# Crystal Semiconductor CS89x0 NIC
 device		ex		# Intel EtherExpress Pro/10 and Pro/10+
 device		ep		# Etherlink III based cards
 device		fe		# Fujitsu MB8696x based cards
-# XXX kvtop brokenness
-#device		ie		# EtherExpress 8/16, 3C507, StarLAN 10 etc.
 # XXX kvtop brokenness, pointer/int warnings
 #device		lnc		# NE2100, NE32-VL Lance Ethernet cards
-device		sn		# SMC's 9000 series of ethernet chips
-device		xe		# Xircom pccard ethernet
-
-# ISA devices that use the old ISA shims
-#device		le
+device		sn		# SMC's 9000 series of Ethernet chips
+device		xe		# Xircom pccard Ethernet
 
 # Wireless NIC cards
 device		wlan		# 802.11 support
-device		an		# Aironet 4500/4800 802.11 wireless NICs. 
+device		an		# Aironet 4500/4800 802.11 wireless NICs.
 device		awi		# BayStack 660 and others
 device		wi		# WaveLAN/Intersil/Symbol 802.11 wireless NICs.
-#device		wl		# Older non 802.11 Wavelan wireless NIC.
 
-# Pseudo devices - the number indicates how many units to allocate.
-device		random		# Entropy device
+# Pseudo devices.
 device		loop		# Network loopback
+device		mem		# Memory and kernel memory devices
+device		io		# I/O device
+device		random		# Entropy device
 device		ether		# Ethernet support
 device		sl		# Kernel SLIP
 device		ppp		# Kernel PPP
@@ -253,10 +235,11 @@ device		ums		# Mouse
 device		urio		# Diamond Rio 500 MP3 player
 device		uscanner	# Scanners
 # USB Ethernet, requires mii
-device		aue		# ADMtek USB ethernet
-device		axe		# ASIX Electronics USB ethernet
-device		cue		# CATC USB ethernet
-device		kue		# Kawasaki LSI USB ethernet
+device		aue		# ADMtek USB Ethernet
+device		axe		# ASIX Electronics USB Ethernet
+device		cue		# CATC USB Ethernet
+device		kue		# Kawasaki LSI USB Ethernet
+device		rue		# RealTek RTL8150 USB Ethernet
 
 # FireWire support
 device		firewire	# FireWire bus code

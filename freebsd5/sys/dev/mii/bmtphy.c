@@ -35,9 +35,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/bmtphy.c,v 1.6 2003/09/09 18:17:23 wpaul Exp $");
-
 /*
  * Copyright (c) 1997 Manuel Bouyer.  All rights reserved.
  *
@@ -70,6 +67,9 @@ __FBSDID("$FreeBSD: src/sys/dev/mii/bmtphy.c,v 1.6 2003/09/09 18:17:23 wpaul Exp
  *
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/bmtphy.c,v 1.8 2004/05/30 17:57:40 phk Exp $");
+
 /*
  * Driver for the Broadcom BCM5201/BCM5202 "Mini-Theta" PHYs.  This also
  * drives the PHY on the 3Com 3c905C.  The 3c905C's PHY is described in
@@ -79,6 +79,7 @@ __FBSDID("$FreeBSD: src/sys/dev/mii/bmtphy.c,v 1.6 2003/09/09 18:17:23 wpaul Exp
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 #include <sys/bus.h>
 

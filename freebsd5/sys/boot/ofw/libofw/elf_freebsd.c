@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/ofw/libofw/elf_freebsd.c,v 1.5 2003/05/01 03:56:30 peter Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/ofw/libofw/elf_freebsd.c,v 1.8 2004/07/08 06:04:45 grehan Exp $");
 
 #include <sys/param.h>
 #include <sys/linker.h>
@@ -42,7 +43,7 @@ extern char		end[];
 extern vm_offset_t	reloc;	/* From <arch>/conf.c */
 
 int
-__elfN(ofw_loadfile)(char *filename, vm_offset_t dest,
+__elfN(ofw_loadfile)(char *filename, u_int64_t dest,
     struct preloaded_file **result)
 {
 	int	r;
@@ -52,6 +53,9 @@ __elfN(ofw_loadfile)(char *filename, vm_offset_t dest,
 	if (r != 0)
 		return (r);
 
+#if defined(__powerpc__)
+	__syncicache((void *) (*result)->f_addr, (*result)->f_size);
+#endif
 	return (0);
 }
 
@@ -62,11 +66,13 @@ __elfN(ofw_exec)(struct preloaded_file *fp)
 	vm_offset_t		mdp;
 	Elf_Ehdr		*e;
 	int			error;
+	intptr_t		entry;
 
 	if ((fmp = file_findmetadata(fp, MODINFOMD_ELFHDR)) == NULL) {
 		return(EFTYPE);
 	}
 	e = (Elf_Ehdr *)&fmp->md_data;
+	entry = e->e_entry;
 
 	if ((error = md_load(fp->f_args, &mdp)) != 0)
 		return (error);
@@ -75,7 +81,7 @@ __elfN(ofw_exec)(struct preloaded_file *fp)
 
 	dev_cleanup();
 	ofw_release_heap();
-	OF_chain((void *)reloc, end - (char *)reloc, (void *)e->e_entry,
+	OF_chain((void *)reloc, end - (char *)reloc, (void *)entry,
 	    (void *)mdp, sizeof(mdp));
 
 	panic("exec returned");

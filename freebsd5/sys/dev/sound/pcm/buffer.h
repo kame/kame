@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/buffer.h,v 1.8 2003/11/27 19:51:44 matk Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/buffer.h,v 1.9 2004/01/28 08:02:15 truckman Exp $
  */
 
 #define SND_DMA(b) (sndbuf_getflags((b)) & SNDBUF_F_DMA)
@@ -53,10 +53,11 @@ struct snd_dbuf {
 	bus_dma_tag_t dmatag;
 	u_int32_t buf_addr;
 	struct selinfo sel;
+	struct pcm_channel *channel;
 	char name[SNDBUF_NAMELEN];
 };
 
-struct snd_dbuf *sndbuf_create(device_t dev, char *drv, char *desc);
+struct snd_dbuf *sndbuf_create(device_t dev, char *drv, char *desc, struct pcm_channel *channel);
 void sndbuf_destroy(struct snd_dbuf *b);
 
 void sndbuf_dump(struct snd_dbuf *b, char *s, u_int32_t what);

@@ -37,7 +37,7 @@ SUCH DAMAGE.
 See matcd.c for Edit History
 */
 
-/* $FreeBSD: src/sys/dev/matcd/matcd_data.h,v 1.1 2003/06/17 01:20:03 uhclem Exp $
+/* $FreeBSD: src/sys/dev/matcd/matcd_data.h,v 1.2 2004/06/16 09:46:49 phk Exp $
 */
 
 /*----------------------------------------------------------------------------
@@ -50,7 +50,7 @@ See matcd.c for Edit History
 
 struct matcd_softc {
 	device_t		dev;
-	dev_t			matcd_dev_t;
+	struct cdev *matcd_dev_t;
 	struct resource *	port;
 	int			port_rid;
 	int			port_type;

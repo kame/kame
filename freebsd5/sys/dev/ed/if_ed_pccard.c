@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ed/if_ed_pccard.c,v 1.54 2003/10/31 18:31:58 brooks Exp $
+ * $FreeBSD: src/sys/dev/ed/if_ed_pccard.c,v 1.59 2004/07/21 20:38:12 imp Exp $
  */
 
 #include "opt_ed.h"
@@ -51,7 +51,6 @@
 #include <dev/ed/if_edreg.h>
 #include <dev/ed/if_edvar.h>
 #include <dev/pccard/pccardvar.h>
-#include <dev/pccard/pccarddevs.h>
 #ifndef ED_NO_MIIBUS
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
@@ -61,11 +60,13 @@
 #ifndef ED_NO_MIIBUS
 /* "device miibus" required.  See GENERIC if you get errors here. */
 #include "miibus_if.h"
+#endif
+#include "pccarddevs.h"
 
+#ifndef ED_NO_MIIBUS
 MODULE_DEPEND(ed, miibus, 1, 1, 1);
 #endif
 MODULE_DEPEND(ed, ether, 1, 1, 1);
-MODULE_DEPEND(ed, pccard, 1, 1, 1);
 
 /*
  *      PC-Card (PCMCIA) specific code.
@@ -179,6 +180,7 @@ static const struct ed_product {
 	{ PCMCIA_CARD(SVEC, COMBOCARD, 0), 0},
 	{ PCMCIA_CARD(SVEC, LANCARD, 0), 0},
 	{ PCMCIA_CARD(SYNERGY21, S21810, 0), 0},
+	{ PCMCIA_CARD(TDK, LAK_CD031, 0), 0},
 	{ PCMCIA_CARD(TELECOMDEVICE, TCD_HPC100, 0), NE2000DVF_AX88190 },
 	{ PCMCIA_CARD(XIRCOM, CFE_10, 0), 0},
 	{ PCMCIA_CARD(ZONET, ZEN, 0), 0},
@@ -201,7 +203,7 @@ ed_pccard_match(device_t dev)
 			device_set_flags(dev, ED_FLAGS_AX88190);
 		return (0);
 	}
-	return (EIO);
+	return (ENXIO);
 }
 
 /* 

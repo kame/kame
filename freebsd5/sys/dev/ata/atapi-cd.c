@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ata/atapi-cd.c,v 1.156.2.3 2004/02/11 08:47:21 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ata/atapi-cd.c,v 1.170.2.1 2004/09/06 19:36:26 sos Exp $");
 
 #include "opt_ata.h"
 #include <sys/param.h>
@@ -92,13 +92,16 @@ static void acd_get_cap(struct acd_softc *);
 static int acd_read_format_caps(struct acd_softc *, struct cdr_format_capacities *);
 static int acd_format(struct acd_softc *, struct cdr_format_params *);
 static int acd_test_ready(struct ata_device *);
-static int acd_request_sense(struct ata_device *, struct atapi_sense *);
 
 /* internal vars */
 static u_int32_t acd_lun_map = 0;
 static MALLOC_DEFINE(M_ACD, "ACD driver", "ATAPI CD driver buffers");
 static struct g_class acd_class = {
 	.name = "ACD",
+	.version = G_VERSION,
+	.access = acd_geom_access,
+	.ioctl = acd_geom_ioctl,
+	.start = acd_geom_start,
 };
 DECLARE_GEOM_CLASS(acd_class, acd);
 
@@ -122,8 +125,7 @@ acd_attach(struct ata_device *atadev)
 			   sizeof(struct changer)>>8, sizeof(struct changer),
 			   0, 0, 0, 0, 0, 0 };
 
-	chp = malloc(sizeof(struct changer), M_ACD, M_NOWAIT | M_ZERO);
-	if (chp == NULL) {
+	if (!(chp = malloc(sizeof(struct changer), M_ACD, M_NOWAIT | M_ZERO))) {
 	    ata_prtdev(atadev, "out of memory\n");
 	    free(cdp, M_ACD);
 	    return;
@@ -182,8 +184,9 @@ acd_attach(struct ata_device *atadev)
 }
 
 static void
-acd_detach(struct ata_device *atadev)
+acd_geom_detach(void *arg, int flag)
 {   
+    struct ata_device *atadev = arg;
     struct acd_softc *cdp = atadev->softc;
     int subdev;
 
@@ -204,6 +207,7 @@ acd_detach(struct ata_device *atadev)
     mtx_lock(&cdp->queue_mtx);
     bioq_flush(&cdp->queue, NULL, ENXIO);
     mtx_unlock(&cdp->queue_mtx);
+    mtx_destroy(&cdp->queue_mtx);
     ata_prtdev(atadev, "WARNING - removed from configuration\n");
     ata_free_name(atadev);
     ata_free_lun(&acd_lun_map, cdp->lun);
@@ -215,6 +219,12 @@ acd_detach(struct ata_device *atadev)
     free(cdp, M_ACD);
 }
 
+static void
+acd_detach(struct ata_device *atadev)
+{   
+    g_waitfor_event(acd_geom_detach, atadev, M_WAITOK, NULL);
+}
+
 static struct acd_softc *
 acd_init_lun(struct ata_device *atadev)
 {
@@ -223,7 +233,7 @@ acd_init_lun(struct ata_device *atadev)
     if (!(cdp = malloc(sizeof(struct acd_softc), M_ACD, M_NOWAIT | M_ZERO)))
 	return NULL;
     bioq_init(&cdp->queue);
-    mtx_init(&cdp->queue_mtx, "ATAPI CD bioqueue lock", MTX_DEF, 0);
+    mtx_init(&cdp->queue_mtx, "ATAPI CD bioqueue lock", NULL, MTX_DEF);
     cdp->device = atadev;
     cdp->lun = ata_get_lun(&acd_lun_map);
     cdp->block_size = 2048;
@@ -242,9 +252,6 @@ acd_geom_create(void *arg, int flag)
     cdp = arg;
     g_topology_assert();
     gp = g_new_geomf(&acd_class, "acd%d", cdp->lun);
-    gp->access = acd_geom_access;
-    gp->ioctl = acd_geom_ioctl;
-    gp->start = acd_geom_start;
     gp->softc = cdp;
     cdp->gp = gp;
     pp = g_new_providerf(gp, "acd%d", cdp->lun);
@@ -447,7 +454,8 @@ acd_describe(struct acd_softc *cdp)
 		       (cdp->cap.media & MST_READ_DVDROM) ? "DVDROM" : "CDROM");
 	if (cdp->changer_info)
 	    printf("with %d CD changer ", cdp->changer_info->slots);
-	printf("<%.40s> at ata%d-%s %s\n", cdp->device->param->model,
+	printf("<%.40s/%.8s> at ata%d-%s %s\n",
+	       cdp->device->param->model, cdp->device->param->revision,
 	       device_get_unit(cdp->device->channel->dev),
 	       (cdp->device->unit == ATA_MASTER) ? "master" : "slave",
 	       ata_mode2str(cdp->device->mode) );
@@ -475,24 +483,39 @@ static int
 acd_geom_access(struct g_provider *pp, int dr, int dw, int de)
 {
     struct acd_softc *cdp;
+    struct ata_request *request;
+    int8_t ccb[16] = { ATAPI_TEST_UNIT_READY, 0, 0, 0, 0,
+		       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     int timeout = 60, track;
+
     
     cdp = pp->geom->softc;
     if (cdp->device->flags & ATA_D_DETACHING)
 	return ENXIO;
 
+    if (!(request = ata_alloc_request()))
+	return ENOMEM;
+
     /* wait if drive is not finished loading the medium */
     while (timeout--) {
-	struct atapi_sense sense;
-	
-	if (!acd_test_ready(cdp->device))
-	    break;
-	acd_request_sense(cdp->device, &sense);
-	if (sense.sense_key == 2  && sense.asc == 4 && sense.ascq == 1)
+	bzero(request, sizeof(struct ata_request));
+	request->device = cdp->device;
+	request->driver = cdp;
+	bcopy(ccb, request->u.atapi.ccb, 16);
+	request->flags = ATA_R_ATAPI;
+	request->timeout = 5;
+	ata_queue_request(request);
+	if (!request->error &&
+	    (request->u.atapi.sense_data.sense_key == 2 ||
+	     request->u.atapi.sense_data.sense_key == 7) &&
+	    request->u.atapi.sense_data.asc == 4 &&
+	    request->u.atapi.sense_data.ascq == 1)
 	    tsleep(&timeout, PRIBIO, "acdld", hz / 2);
 	else
 	    break;
     }
+    ata_free_request(request);
+
     if (pp->acr == 0) {
 	if (cdp->changer_info && cdp->slot != cdp->changer_info->current_slot) {
 	    acd_select_slot(cdp);
@@ -650,7 +673,10 @@ acd_geom_ioctl(struct g_provider *pp, u_long cmd, void *addr, struct thread *td)
 	    if (te->address_format == CD_MSF_FORMAT) {
 		struct cd_toc_entry *entry;
 
-		toc = malloc(sizeof(struct toc), M_ACD, M_NOWAIT | M_ZERO);
+		if (!(toc = malloc(sizeof(struct toc), M_ACD, M_NOWAIT))) {
+		    error = ENOMEM;
+		    break;
+		}
 		bcopy(&cdp->toc, toc, sizeof(struct toc));
 		entry = toc->tab + (toc->hdr.ending_track + 1 -
 			toc->hdr.starting_track) + 1;
@@ -696,9 +722,11 @@ acd_geom_ioctl(struct g_provider *pp, u_long cmd, void *addr, struct thread *td)
 	    if (te->address_format == CD_MSF_FORMAT) {
 		struct cd_toc_entry *entry;
 
-		toc = malloc(sizeof(struct toc), M_ACD, M_NOWAIT | M_ZERO);
+		if (!(toc = malloc(sizeof(struct toc), M_ACD, M_NOWAIT))) {
+		    error = ENOMEM;
+		    break;
+		}
 		bcopy(&cdp->toc, toc, sizeof(struct toc));
-
 		entry = toc->tab + (track - toc->hdr.starting_track);
 		lba2msf(ntohl(entry->addr.lba), &entry->addr.msf.minute,
 			&entry->addr.msf.second, &entry->addr.msf.frame);
@@ -1521,16 +1549,27 @@ acd_get_progress(struct acd_softc *cdp, int *finished)
 {
     int8_t ccb[16] = { ATAPI_READ_CAPACITY, 0, 0, 0, 0, 0, 0, 0,
 		       0, 0, 0, 0, 0, 0, 0, 0 };
-    struct atapi_sense sense;
+    struct ata_request *request;
     int8_t dummy[8];
 
-    ata_atapicmd(cdp->device, ccb, dummy, sizeof(dummy), ATA_R_READ, 30);
-    acd_request_sense(cdp->device, &sense);
+    if (!(request = ata_alloc_request()))
+	return ENOMEM;
 
-    if (sense.sksv)
-	*finished = ((sense.sk_specific2|(sense.sk_specific1<<8))*100)/65535;
+    request->device = cdp->device;
+    request->driver = cdp;
+    bcopy(ccb, request->u.atapi.ccb, 16);
+    request->data = dummy;
+    request->bytecount = sizeof(dummy);
+    request->transfersize = min(request->bytecount, 65534);
+    request->flags = ATA_R_ATAPI | ATA_R_READ;
+    request->timeout = 30;
+    ata_queue_request(request);
+    if (!request->error && request->u.atapi.sense_data.sksv)
+	*finished = ((request->u.atapi.sense_data.sk_specific2 |
+		     (request->u.atapi.sense_data.sk_specific1<<8))*100)/65535;
     else
 	*finished = 0;
+    ata_free_request(request);
     return 0;
 }
 
@@ -1590,7 +1629,7 @@ acd_send_cue(struct acd_softc *cdp, struct cdr_cuesheet *cuesheet)
 static int
 acd_report_key(struct acd_softc *cdp, struct dvd_authinfo *ai)
 {
-    struct dvd_miscauth *d;
+    struct dvd_miscauth *d = NULL;
     u_int32_t lba = 0;
     int16_t length;
     int8_t ccb[16];
@@ -1629,8 +1668,11 @@ acd_report_key(struct acd_softc *cdp, struct dvd_authinfo *ai)
     ccb[9] = length & 0xff;
     ccb[10] = (ai->agid << 6) | ai->format;
 
-    d = malloc(length, M_ACD, M_NOWAIT | M_ZERO);
-    d->length = htons(length - 2);
+    if (length) {
+	if (!(d = malloc(length, M_ACD, M_NOWAIT | M_ZERO)))
+	    return ENOMEM;
+	d->length = htons(length - 2);
+    }
 
     error = ata_atapicmd(cdp->device, ccb, (caddr_t)d, length,
 			 ai->format == DVD_INVALIDATE_AGID ? 0 : ATA_R_READ,10);
@@ -1692,19 +1734,22 @@ acd_send_key(struct acd_softc *cdp, struct dvd_authinfo *ai)
     switch (ai->format) {
     case DVD_SEND_CHALLENGE:
 	length = 16;
-	d = malloc(length, M_ACD, M_NOWAIT | M_ZERO);
+	if (!(d = malloc(length, M_ACD, M_NOWAIT | M_ZERO)))
+	    return ENOMEM;
 	bcopy(ai->keychal, &d->data[0], 10);
 	break;
 
     case DVD_SEND_KEY2:
 	length = 12;
-	d = malloc(length, M_ACD, M_NOWAIT | M_ZERO);
+	if (!(d = malloc(length, M_ACD, M_NOWAIT | M_ZERO)))
+	    return ENOMEM;
 	bcopy(&ai->keychal[0], &d->data[0], 5);
 	break;
     
     case DVD_SEND_RPC:
 	length = 8;
-	d = malloc(length, M_ACD, M_NOWAIT | M_ZERO);
+	if (!(d = malloc(length, M_ACD, M_NOWAIT | M_ZERO)))
+	    return ENOMEM;
 	d->data[0] = ai->region;
 	break;
 
@@ -1766,7 +1811,8 @@ acd_read_structure(struct acd_softc *cdp, struct dvd_struct *s)
 	return EINVAL;
     }
 
-    d = malloc(length, M_ACD, M_NOWAIT | M_ZERO);
+    if (!(d = malloc(length, M_ACD, M_NOWAIT | M_ZERO)))
+	return ENOMEM;
     d->length = htons(length - 2);
 	
     bzero(ccb, sizeof(ccb));
@@ -1981,14 +2027,4 @@ acd_test_ready(struct ata_device *atadev)
 		       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
     return ata_atapicmd(atadev, ccb, NULL, 0, 0, 30);
-}
-
-static int
-acd_request_sense(struct ata_device *atadev, struct atapi_sense *sense)
-{
-    int8_t ccb[16] = { ATAPI_REQUEST_SENSE, 0, 0, 0, sizeof(struct atapi_sense),
-		       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-
-    return ata_atapicmd(atadev, ccb, (caddr_t)sense,
-			sizeof(struct atapi_sense), ATA_R_READ, 30);
 }

@@ -31,7 +31,7 @@
  *	@(#)kernfs_vfsops.c	8.10 (Berkeley) 5/14/95
  * From: FreeBSD: src/sys/miscfs/kernfs/kernfs_vfsops.c 1.36
  *
- * $FreeBSD: src/sys/fs/devfs/devfs_vfsops.c,v 1.31 2003/06/12 20:48:36 phk Exp $
+ * $FreeBSD: src/sys/fs/devfs/devfs_vfsops.c,v 1.33 2004/07/30 22:08:49 phk Exp $
  */
 
 #include "opt_devfs.h"
@@ -51,7 +51,7 @@
 
 MALLOC_DEFINE(M_DEVFS, "DEVFS", "DEVFS data");
 
-static vfs_nmount_t	devfs_nmount;
+static vfs_mount_t	devfs_mount;
 static vfs_unmount_t	devfs_unmount;
 static vfs_root_t	devfs_root;
 static vfs_statfs_t	devfs_statfs;
@@ -60,10 +60,7 @@ static vfs_statfs_t	devfs_statfs;
  * Mount the filesystem
  */
 static int
-devfs_nmount(mp, ndp, td)
-	struct mount *mp;
-	struct nameidata *ndp;
-	struct thread *td;
+devfs_mount(struct mount *mp, struct thread *td)
 {
 	int error;
 	struct devfs_mount *fmp;
@@ -101,7 +98,7 @@ devfs_nmount(mp, ndp, td)
 	fmp->dm_basedir = fmp->dm_rootdir;
 	devfs_rules_newmount(fmp, td);
 
-	error = devfs_root(mp, &rvp);
+	error = devfs_root(mp, &rvp, td);
 	if (error) {
 		lockdestroy(&fmp->dm_lock);
 		FREE(fmp, M_DEVFS);
@@ -130,7 +127,7 @@ devfs_unmount(mp, mntflags, td)
 	if (mntflags & MNT_FORCE)
 		flags |= FORCECLOSE;
 	/* There is 1 extra root vnode reference from devfs_mount(). */
-	error = vflush(mp, 1, flags);
+	error = vflush(mp, 1, flags, td);
 	if (error)
 		return (error);
 	devfs_purge(fmp->dm_rootdir);
@@ -144,16 +141,15 @@ devfs_unmount(mp, mntflags, td)
 /* Return locked reference to root.  */
 
 static int
-devfs_root(mp, vpp)
+devfs_root(mp, vpp, td)
 	struct mount *mp;
 	struct vnode **vpp;
+	struct thread *td;
 {
 	int error;
-	struct thread *td;
 	struct vnode *vp;
 	struct devfs_mount *dmp;
 
-	td = curthread;					/* XXX */
 	dmp = VFSTODEVFS(mp);
 	error = devfs_allocv(dmp->dm_rootdir, mp, &vp, td);
 	if (error)
@@ -188,7 +184,7 @@ devfs_statfs(mp, sbp, td)
 }
 
 static struct vfsops devfs_vfsops = {
-	.vfs_nmount =		devfs_nmount,
+	.vfs_mount =		devfs_mount,
 	.vfs_root =		devfs_root,
 	.vfs_statfs =		devfs_statfs,
 	.vfs_unmount =		devfs_unmount,

@@ -54,7 +54,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aha/aha_isa.c,v 1.28 2003/11/13 04:14:53 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aha/aha_isa.c,v 1.29 2004/03/17 17:50:24 njl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -204,7 +204,7 @@ aha_isa_attach(device_t dev)
 	}
 
 	aha->irqrid = 0;
-	aha->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &aha->irqrid, 0, ~0, 1,
+	aha->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &aha->irqrid,
 	    RF_ACTIVE);
 	if (!aha->irq) {
 		device_printf(dev, "Unable to allocate excluse use of irq\n");
@@ -213,7 +213,7 @@ aha_isa_attach(device_t dev)
 	}
 
 	aha->drqrid = 0;
-	aha->drq = bus_alloc_resource(dev, SYS_RES_DRQ, &aha->drqrid, 0, ~0, 1,
+	aha->drq = bus_alloc_resource_any(dev, SYS_RES_DRQ, &aha->drqrid,
 	    RF_ACTIVE);
 	if (!aha->drq) {
 		device_printf(dev, "Unable to allocate drq\n");

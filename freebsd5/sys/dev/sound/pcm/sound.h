@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/sound.h,v 1.52 2003/09/07 16:28:03 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/sound.h,v 1.61 2004/07/16 03:59:09 tanimura Exp $
  */
 
 /*
@@ -77,17 +77,12 @@
 
 #define USING_MUTEX
 #define USING_DEVFS
+#else
+#define	INTR_TYPE_AV	INTR_TYPE_TTY
+#define	INTR_MPSAFE	0
 #endif
 
 #define SND_DYNSYSCTL
-
-#ifndef	INTR_MPSAFE
-#define	INTR_TYPE_AV	INTR_TYPE_TTY
-#endif
-
-#ifndef	INTR_MPSAFE
-#define	INTR_MPSAFE	0
-#endif
 
 struct pcm_channel;
 struct pcm_feeder;
@@ -98,17 +93,16 @@ struct snd_mixer;
 #include <dev/sound/pcm/channel.h>
 #include <dev/sound/pcm/feeder.h>
 #include <dev/sound/pcm/mixer.h>
-#include <dev/sound/pcm/dsp.h>
 
 #define	PCM_SOFTC_SIZE	512
 
 #define SND_STATUSLEN	64
 
-#define PCM_MODVER	1
+#define SOUND_MODVER	1
 
-#define PCM_MINVER	1
-#define PCM_PREFVER	PCM_MODVER
-#define PCM_MAXVER	1
+#define SOUND_MINVER	1
+#define SOUND_PREFVER	SOUND_MODVER
+#define SOUND_MAXVER	1
 
 /*
 PROPOSAL:
@@ -202,7 +196,6 @@ extern devclass_t pcm_devclass;
  * DDB/DEB to enable/disable debugging stuff
  * BVDDB   to enable debugging when bootverbose
  */
-#define DDB(x)	x	/* XXX */
 #define BVDDB(x) if (bootverbose) x
 
 #ifndef DEB
@@ -222,8 +215,8 @@ int pcm_inprog(struct snddev_info *d, int delta);
 
 struct pcm_channel *pcm_chn_create(struct snddev_info *d, struct pcm_channel *parent, kobj_class_t cls, int dir, void *devinfo);
 int pcm_chn_destroy(struct pcm_channel *ch);
-int pcm_chn_add(struct snddev_info *d, struct pcm_channel *ch, int mkdev);
-int pcm_chn_remove(struct snddev_info *d, struct pcm_channel *ch, int rmdev);
+int pcm_chn_add(struct snddev_info *d, struct pcm_channel *ch);
+int pcm_chn_remove(struct snddev_info *d, struct pcm_channel *ch);
 
 int pcm_addchan(device_t dev, int dir, kobj_class_t cls, void *devinfo);
 unsigned int pcm_getbuffersize(device_t dev, unsigned int min, unsigned int deflt, unsigned int max);
@@ -233,6 +226,7 @@ int pcm_setstatus(device_t dev, char *str);
 u_int32_t pcm_getflags(device_t dev);
 void pcm_setflags(device_t dev, u_int32_t val);
 void *pcm_getdevinfo(device_t dev);
+
 
 int snd_setup_intr(device_t dev, struct resource *res, int flags,
 		   driver_intr_t hand, void *param, void **cookiep);
@@ -276,12 +270,17 @@ int sndstat_busy(void);
 /*
  * this is rather kludgey- we need to duplicate these struct def'ns from sound.c
  * so that the macro versions of pcm_{,un}lock can dereference them.
+ * we also have to do this now makedev() has gone away.
  */
 
-#ifdef	PCM_DEBUG_MTX
 struct snddev_channel {
 	SLIST_ENTRY(snddev_channel) link;
 	struct pcm_channel *channel;
+	int chan_num;
+	struct cdev *dsp_devt;
+	struct cdev *dspW_devt;
+	struct cdev *audio_devt;
+	struct cdev *dspr_devt;
 };
 
 struct snddev_info {
@@ -297,13 +296,22 @@ struct snddev_info {
 	struct sysctl_ctx_list sysctl_tree;
 	struct sysctl_oid *sysctl_tree_top;
 	struct mtx *lock;
+	struct cdev *mixer_dev;
+
 };
 
+#ifdef	PCM_DEBUG_MTX
 #define	pcm_lock(d) mtx_lock(((struct snddev_info *)(d))->lock)
 #define	pcm_unlock(d) mtx_unlock(((struct snddev_info *)(d))->lock)
 #else
 void pcm_lock(struct snddev_info *d);
 void pcm_unlock(struct snddev_info *d);
+#endif
+
+#ifdef KLD_MODULE
+#define PCM_KLDSTRING(a) ("kld " # a)
+#else
+#define PCM_KLDSTRING(a) ""
 #endif
 
 #endif /* _KERNEL */

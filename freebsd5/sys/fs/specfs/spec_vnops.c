@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)spec_vnops.c	8.14 (Berkeley) 5/21/95
- * $FreeBSD: src/sys/fs/specfs/spec_vnops.c,v 1.214 2003/11/13 09:58:09 phk Exp $
+ * $FreeBSD: src/sys/fs/specfs/spec_vnops.c,v 1.226 2004/08/08 13:23:05 phk Exp $
  */
 
 #include <sys/param.h>
@@ -137,16 +133,18 @@ spec_open(ap)
 {
 	struct thread *td = ap->a_td;
 	struct vnode *vp = ap->a_vp;
-	dev_t dev = vp->v_rdev;
+	struct cdev *dev = vp->v_rdev;
 	int error;
 	struct cdevsw *dsw;
-	const char *cp;
 
 	if (vp->v_type == VBLK)
 		return (ENXIO);
 
 	/* Don't allow open if fs is mounted -nodev. */
 	if (vp->v_mount && (vp->v_mount->mnt_flag & MNT_NODEV))
+		return (ENXIO);
+
+	if (dev == NULL)
 		return (ENXIO);
 
 	dsw = devsw(dev);
@@ -194,7 +192,9 @@ spec_open(ap)
 		vp->v_vflag |= VV_ISTTY;
 
 	VOP_UNLOCK(vp, 0, td);
-	if(dsw->d_flags & D_NOGIANT) {
+	dev_ref(dev);
+	cdevsw_ref(dsw);
+	if(!(dsw->d_flags & D_NEEDGIANT)) {
 		DROP_GIANT();
 		if (dsw->d_fdopen != NULL)
 			error = dsw->d_fdopen(dev, ap->a_mode, td, ap->a_fdidx);
@@ -205,6 +205,9 @@ spec_open(ap)
 		error = dsw->d_fdopen(dev, ap->a_mode, td, ap->a_fdidx);
 	else
 		error = dsw->d_open(dev, ap->a_mode, S_IFCHR, td);
+	cdevsw_rel(dsw);
+	if (error != 0)
+		dev_rel(dev);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 
 	if (error)
@@ -225,14 +228,6 @@ spec_open(ap)
 		if (!dev->si_bsize_phys)
 			dev->si_bsize_phys = DEV_BSIZE;
 	}
-	if ((dsw->d_flags & D_DISK) == 0) {
-		cp = devtoname(dev);
-		if (*cp == '#' && (dsw->d_flags & D_NAGGED) == 0) {
-			printf("WARNING: driver %s should register devices with make_dev() (dev_t = \"%s\")\n",
-			    dsw->d_name, cp);
-			dsw->d_flags |= D_NAGGED;
-		}
-	}
 	return (error);
 }
 
@@ -252,7 +247,7 @@ spec_read(ap)
 	struct vnode *vp;
 	struct thread *td;
 	struct uio *uio;
-	dev_t dev;
+	struct cdev *dev;
 	int error, resid;
 	struct cdevsw *dsw;
 
@@ -267,12 +262,16 @@ spec_read(ap)
 
 	dsw = devsw(dev);
 	VOP_UNLOCK(vp, 0, td);
-	if (dsw->d_flags & D_NOGIANT) {
+	KASSERT(dev->si_refcount > 0,
+	    ("specread() on un-referenced struct cdev *(%s)", devtoname(dev)));
+	cdevsw_ref(dsw);
+	if (!(dsw->d_flags & D_NEEDGIANT)) {
 		DROP_GIANT();
 		error = dsw->d_read(dev, uio, ap->a_ioflag);
 		PICKUP_GIANT();
 	} else
 		error = dsw->d_read(dev, uio, ap->a_ioflag);
+	cdevsw_rel(dsw);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 	if (uio->uio_resid != resid || (error == 0 && resid != 0))
 		vfs_timestamp(&dev->si_atime);
@@ -295,7 +294,7 @@ spec_write(ap)
 	struct vnode *vp;
 	struct thread *td;
 	struct uio *uio;
-	dev_t dev;
+	struct cdev *dev;
 	int error, resid;
 	struct cdevsw *dsw;
 
@@ -307,12 +306,16 @@ spec_write(ap)
 	resid = uio->uio_resid;
 
 	VOP_UNLOCK(vp, 0, td);
-	if (dsw->d_flags & D_NOGIANT) {
+	KASSERT(dev->si_refcount > 0,
+	    ("spec_write() on un-referenced struct cdev *(%s)", devtoname(dev)));
+	cdevsw_ref(dsw);
+	if (!(dsw->d_flags & D_NEEDGIANT)) {
 		DROP_GIANT();
 		error = dsw->d_write(dev, uio, ap->a_ioflag);
 		PICKUP_GIANT();
 	} else
 		error = dsw->d_write(dev, uio, ap->a_ioflag);
+	cdevsw_rel(dsw);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 	if (uio->uio_resid != resid || (error == 0 && resid != 0)) {
 		vfs_timestamp(&dev->si_ctime);
@@ -336,13 +339,16 @@ spec_ioctl(ap)
 		struct thread *a_td;
 	} */ *ap;
 {
-	dev_t dev;
+	struct cdev *dev;
 	int error;
 	struct cdevsw *dsw;
 
 	dev = ap->a_vp->v_rdev;
 	dsw = devsw(dev);
-	if (dsw->d_flags & D_NOGIANT) {
+	KASSERT(dev->si_refcount > 0,
+	    ("spec_ioctl() on un-referenced struct cdev *(%s)", devtoname(dev)));
+	cdevsw_ref(dsw);
+	if (!(dsw->d_flags & D_NEEDGIANT)) {
 		DROP_GIANT();
 		error = dsw->d_ioctl(dev, ap->a_command,
 		    ap->a_data, ap->a_fflag, ap->a_td);
@@ -350,6 +356,7 @@ spec_ioctl(ap)
 	} else 
 		error = dsw->d_ioctl(dev, ap->a_command,
 		    ap->a_data, ap->a_fflag, ap->a_td);
+	cdevsw_rel(dsw);
 	if (error == ENOIOCTL)
 		error = ENOTTY;
 	return (error);
@@ -365,18 +372,22 @@ spec_poll(ap)
 		struct thread *a_td;
 	} */ *ap;
 {
-	dev_t dev;
+	struct cdev *dev;
 	struct cdevsw *dsw;
 	int error;
 
 	dev = ap->a_vp->v_rdev;
 	dsw = devsw(dev);
-	if (dsw->d_flags & D_NOGIANT) {
-		DROP_GIANT();
+	KASSERT(dev->si_refcount > 0,
+	    ("spec_poll() on un-referenced struct cdev *(%s)", devtoname(dev)));
+	cdevsw_ref(dsw);
+	if (!(dsw->d_flags & D_NEEDGIANT)) {
+		/* XXX: not yet DROP_GIANT(); */
 		error = dsw->d_poll(dev, ap->a_events, ap->a_td);
-		PICKUP_GIANT();
+		/* XXX: not yet PICKUP_GIANT(); */
 	} else
 		error = dsw->d_poll(dev, ap->a_events, ap->a_td);
+	cdevsw_rel(dsw);
 	return(error);
 }
 
@@ -388,18 +399,22 @@ spec_kqfilter(ap)
 		struct knote *a_kn;
 	} */ *ap;
 {
-	dev_t dev;
+	struct cdev *dev;
 	struct cdevsw *dsw;
 	int error;
 
 	dev = ap->a_vp->v_rdev;
 	dsw = devsw(dev);
-	if (dsw->d_flags & D_NOGIANT) {
+	KASSERT(dev->si_refcount > 0,
+	    ("spec_kqfilter() on un-referenced struct cdev *(%s)", devtoname(dev)));
+	cdevsw_ref(dsw);
+	if (!(dsw->d_flags & D_NEEDGIANT)) {
 		DROP_GIANT();
 		error = dsw->d_kqfilter(dev, ap->a_kn);
 		PICKUP_GIANT();
 	} else
 		error = dsw->d_kqfilter(dev, ap->a_kn);
+	cdevsw_rel(dsw);
 	return (error);
 }
 
@@ -444,7 +459,6 @@ static int
 spec_xstrategy(struct vnode *vp, struct buf *bp)
 {
 	struct mount *mp;
-	int error;
 	struct cdevsw *dsw;
 	struct thread *td = curthread;
 	
@@ -456,30 +470,11 @@ spec_xstrategy(struct vnode *vp, struct buf *bp)
 	/*
 	 * Slow down disk requests for niced processes.
 	 */
-	if (doslowdown && td && td->td_ksegrp->kg_nice > 0) {
+	if (doslowdown && td && td->td_proc->p_nice > 0) {
 		mtx_lock(&strategy_mtx);
 		msleep(&strategy_mtx, &strategy_mtx,
 		    PPAUSE | PCATCH | PDROP, "ioslow",
-		    td->td_ksegrp->kg_nice);
-	}
-	if (bp->b_iocmd == BIO_WRITE) {
-		if ((bp->b_flags & B_VALIDSUSPWRT) == 0 &&
-		    bp->b_vp != NULL && bp->b_vp->v_mount != NULL &&
-		    (bp->b_vp->v_mount->mnt_kern_flag & MNTK_SUSPENDED) != 0)
-			panic("spec_strategy: bad I/O");
-		bp->b_flags &= ~B_VALIDSUSPWRT;
-		if (LIST_FIRST(&bp->b_dep) != NULL)
-			buf_start(bp);
-		mp_fixme("This should require the vnode lock.");
-		if ((vp->v_vflag & VV_COPYONWRITE) &&
-		    vp->v_rdev->si_copyonwrite &&
-		    (error = (*vp->v_rdev->si_copyonwrite)(vp, bp)) != 0 &&
-		    error != EOPNOTSUPP) {
-			bp->b_io.bio_error = error;
-			bp->b_io.bio_flags |= BIO_ERROR;
-			biodone(&bp->b_io);
-			return (0);
-		}
+		    td->td_proc->p_nice);
 	}
 	/*
 	 * Collect statistics on synchronous and asynchronous read
@@ -498,18 +493,18 @@ spec_xstrategy(struct vnode *vp, struct buf *bp)
 				mp->mnt_stat.f_syncreads++;
 		}
 	}
-	if (devsw(bp->b_dev) == NULL) {
-		bp->b_io.bio_error = ENXIO;
-		bp->b_io.bio_flags |= BIO_ERROR;
-		biodone(&bp->b_io);
+	dsw = devsw(bp->b_dev);
+	if (dsw == NULL) {
+		bp->b_error = ENXIO;
+		bp->b_ioflags |= BIO_ERROR;
+		bufdone(bp);
 		return (0);
 	}
-	dsw = devsw(bp->b_dev);
 	KASSERT(dsw->d_strategy != NULL,
 	   ("No strategy on dev %s responsible for buffer %p\n",
 	   devtoname(bp->b_dev), bp));
 	
-	if (dsw->d_flags & D_NOGIANT) {
+	if (!(dsw->d_flags & D_NEEDGIANT)) {
 		/* XXX: notyet DROP_GIANT(); */
 		DEV_STRATEGY(bp);
 		/* XXX: notyet PICKUP_GIANT(); */
@@ -577,7 +572,7 @@ spec_close(ap)
 {
 	struct vnode *vp = ap->a_vp, *oldvp;
 	struct thread *td = ap->a_td;
-	dev_t dev = vp->v_rdev;
+	struct cdev *dev = vp->v_rdev;
 	struct cdevsw *dsw;
 	int error;
 
@@ -602,7 +597,7 @@ spec_close(ap)
 	if (td && vp == td->td_proc->p_session->s_ttyvp) {
 		SESS_LOCK(td->td_proc->p_session);
 		VI_LOCK(vp);
-		if (vcount(vp) == 2 && (vp->v_iflag & VI_XLOCK) == 0) {
+		if (count_dev(dev) == 2 && (vp->v_iflag & VI_XLOCK) == 0) {
 			td->td_proc->p_session->s_ttyvp = NULL;
 			oldvp = vp;
 		}
@@ -626,17 +621,22 @@ spec_close(ap)
 		/* Forced close. */
 	} else if (dsw->d_flags & D_TRACKCLOSE) {
 		/* Keep device updated on status. */
-	} else if (vcount(vp) > 1) {
+	} else if (count_dev(dev) > 1) {
 		VI_UNLOCK(vp);
 		return (0);
 	}
 	VI_UNLOCK(vp);
-	if (dsw->d_flags & D_NOGIANT) {
+	KASSERT(dev->si_refcount > 0,
+	    ("spec_close() on un-referenced struct cdev *(%s)", devtoname(dev)));
+	cdevsw_ref(dsw);
+	if (!(dsw->d_flags & D_NEEDGIANT)) {
 		DROP_GIANT();
 		error = dsw->d_close(dev, ap->a_fflag, S_IFCHR, td);
 		PICKUP_GIANT();
 	} else
 		error = dsw->d_close(dev, ap->a_fflag, S_IFCHR, td);
+	cdevsw_rel(dsw);
+	dev_rel(dev);
 	return (error);
 }
 
@@ -779,8 +779,6 @@ spec_getpages(ap)
 	for (i = 0, toff = 0; i < pcount; i++, toff = nextoff) {
 		nextoff = toff + PAGE_SIZE;
 		m = ap->a_m[i];
-
-		m->flags &= ~PG_ZERO;
 
 		if (nextoff <= nread) {
 			m->valid = VM_PAGE_BITS_ALL;

@@ -28,7 +28,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  *
- * $FreeBSD: src/sys/dev/drm/drm_os_freebsd.h,v 1.16 2003/11/12 20:56:30 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_os_freebsd.h,v 1.20 2004/06/16 09:46:42 phk Exp $
  */
 
 #include <sys/param.h>
@@ -78,6 +78,8 @@
 #include <sys/mutex.h>
 #endif
 
+#include "dev/drm/drm_linux_list.h"
+
 #if __FreeBSD_version >= 400006
 #define __REALLY_HAVE_AGP	__HAVE_AGP
 #endif
@@ -114,7 +116,6 @@
 #define DRM_DEV_MODE	(S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP)
 #define DRM_DEV_UID	0
 #define DRM_DEV_GID	0
-#define CDEV_MAJOR	145
 
 #if __FreeBSD_version >= 500000
 #define DRM_CURPROC		curthread
@@ -150,7 +151,7 @@
  * of the current process.  It should be a per-open unique pointer, but
  * code for that is not yet written */
 #define DRMFILE			void *
-#define DRM_IOCTL_ARGS		dev_t kdev, u_long cmd, caddr_t data, int flags, DRM_STRUCTPROC *p, DRMFILE filp
+#define DRM_IOCTL_ARGS		struct cdev *kdev, u_long cmd, caddr_t data, int flags, DRM_STRUCTPROC *p, DRMFILE filp
 #define DRM_SUSER(p)		suser(p)
 #define DRM_TASKQUEUE_ARGS	void *arg, int pending
 #define DRM_IRQ_ARGS		void *arg
@@ -179,7 +180,7 @@ typedef void			irqreturn_t;
 
 #define DRM_GET_PRIV_WITH_RETURN(_priv, _filp)			\
 do {								\
-	if (_filp != (DRMFILE)DRM_CURRENTPID) {			\
+	if (_filp != (DRMFILE)(intptr_t)DRM_CURRENTPID) {	\
 		DRM_ERROR("filp doesn't match curproc\n");	\
 		return EINVAL;					\
 	}							\
@@ -292,6 +293,12 @@ for ( ret = 0 ; !ret && !(condition) ; ) {		\
 #define DRM_READMEMORYBARRIER()		alpha_mb();
 #define DRM_WRITEMEMORYBARRIER()	alpha_wmb();
 #define DRM_MEMORYBARRIER()		alpha_mb();
+#elif defined(__amd64__)
+#define DRM_READMEMORYBARRIER()		__asm __volatile( \
+					"lock; addl $0,0(%%rsp)" : : : "memory");
+#define DRM_WRITEMEMORYBARRIER()	__asm __volatile("" : : : "memory");
+#define DRM_MEMORYBARRIER()		__asm __volatile( \
+					"lock; addl $0,0(%%rsp)" : : : "memory");
 #endif
 
 #define PAGE_ALIGN(addr) round_page(addr)
@@ -304,6 +311,11 @@ for ( ret = 0 ; !ret && !(condition) ; ) {		\
 /* The macros conflicted in the MALLOC_DEFINE */
 MALLOC_DECLARE(malloctype);
 #undef malloctype
+
+#if __FreeBSD_version < 502109
+#define bus_alloc_resource_any(dev, type, rid, flags) \
+	bus_alloc_resource(dev, type, rid, 0ul, ~0ul, 1, flags)
+#endif
 
 #if __FreeBSD_version >= 480000
 #define cpu_to_le32(x) htole32(x)
@@ -461,7 +473,7 @@ extern d_close_t	DRM(close);
 extern d_read_t		DRM(read);
 extern d_poll_t		DRM(poll);
 extern d_mmap_t		DRM(mmap);
-extern int		DRM(open_helper)(dev_t kdev, int flags, int fmt, 
+extern int		DRM(open_helper)(struct cdev *kdev, int flags, int fmt, 
 					 DRM_STRUCTPROC *p, drm_device_t *dev);
 extern drm_file_t	*DRM(find_file_by_proc)(drm_device_t *dev, 
 					 DRM_STRUCTPROC *p);

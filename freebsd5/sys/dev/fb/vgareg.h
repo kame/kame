@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fb/vgareg.h,v 1.6 2003/02/25 03:21:19 mux Exp $
+ * $FreeBSD: src/sys/dev/fb/vgareg.h,v 1.7 2004/06/16 09:46:43 phk Exp $
  */
 
 #ifndef _DEV_FB_VGAREG_H_
@@ -78,15 +78,15 @@ int		vga_probe_unit(int unit, struct video_adapter *adp, int flags);
 int		vga_attach_unit(int unit, vga_softc_t *sc, int flags);
 
 #ifdef FB_INSTALL_CDEV
-int		vga_open(dev_t dev, vga_softc_t *sc, int flag, int mode,
+int		vga_open(struct cdev *dev, vga_softc_t *sc, int flag, int mode,
 			 struct thread *td);
-int		vga_close(dev_t dev, vga_softc_t *sc, int flag, int mode,
+int		vga_close(struct cdev *dev, vga_softc_t *sc, int flag, int mode,
 			  struct thread *td);
-int		vga_read(dev_t dev, vga_softc_t *sc, struct uio *uio, int flag);
-int		vga_write(dev_t dev, vga_softc_t *sc, struct uio *uio, int flag);
-int		vga_ioctl(dev_t dev, vga_softc_t *sc, u_long cmd, caddr_t arg,
+int		vga_read(struct cdev *dev, vga_softc_t *sc, struct uio *uio, int flag);
+int		vga_write(struct cdev *dev, vga_softc_t *sc, struct uio *uio, int flag);
+int		vga_ioctl(struct cdev *dev, vga_softc_t *sc, u_long cmd, caddr_t arg,
 			  int flag, struct thread *td);
-int		vga_mmap(dev_t dev, vga_softc_t *sc, vm_offset_t offset,
+int		vga_mmap(struct cdev *dev, vga_softc_t *sc, vm_offset_t offset,
 			 vm_offset_t *paddr, int prot);
 #endif
 

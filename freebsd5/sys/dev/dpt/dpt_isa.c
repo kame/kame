@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/dpt/dpt_isa.c,v 1.7 2003/08/24 17:46:04 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/dpt/dpt_isa.c,v 1.8 2004/03/17 17:50:30 njl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -167,8 +167,8 @@ dpt_isa_attach (device_t dev)
 	}
 
 	dpt->drq_rid = 0;
-	dpt->drq_res = bus_alloc_resource(dev, SYS_RES_DRQ, &dpt->drq_rid,
-					0, ~0, 1, RF_ACTIVE);
+	dpt->drq_res = bus_alloc_resource_any(dev, SYS_RES_DRQ, &dpt->drq_rid,
+					RF_ACTIVE);
 	if (!dpt->drq_res) {
 		device_printf(dev, "No DRQ!\n");
 		error = ENOMEM;

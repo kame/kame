@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/linux/linux_machdep.c,v 1.32 2003/08/22 07:20:26 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/linux/linux_machdep.c,v 1.33.2.1 2004/09/09 09:45:25 julian Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -180,7 +180,7 @@ linux_clone(struct thread *td, struct linux_clone_args *args)
 	 */
 	mtx_lock_spin(&sched_lock);
 	TD_SET_CAN_RUN(td2);
-	setrunqueue(td2);
+	setrunqueue(td2, SRQ_BORING);
 	mtx_unlock_spin(&sched_lock);
 
 	td->td_retval[0] = p2->p_pid;
@@ -382,7 +382,7 @@ linux_setrlimit(td, uap)
 	if ((error =
 	   copyin(uap->rlim, &rlim, sizeof (struct rlimit))))
 		return (error);
-	return dosetrlimit(td,  which, &rlim);
+	return (kern_setrlimit(td,  which, &rlim));
 }
 
 int
@@ -390,7 +390,9 @@ linux_getrlimit(td, uap)
 	struct thread *td;
 	struct linux_getrlimit_args *uap;
 {
+	struct rlimit rlim;
 	u_int which;
+	int error;
 
 #ifdef DEBUG
 	if (ldebug(getrlimit))
@@ -405,6 +407,9 @@ linux_getrlimit(td, uap)
 	if (which == -1)
 		return EINVAL;
 
-	return (copyout(&td->td_proc->p_rlimit[which],
-	    uap->rlim, sizeof (struct rlimit)));
+	PROC_LOCK(td->td_proc);
+	lim_rlimit(td->td_proc, which, &rlim);
+	PROC_UNLOCK(td->td_proc);
+	error = copyout(&rlim, uap->rlim, sizeof (struct rlimit));
+	return (error);
 }

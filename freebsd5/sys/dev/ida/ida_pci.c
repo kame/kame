@@ -25,11 +25,12 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ida/ida_pci.c,v 1.26 2003/09/02 17:30:36 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ida/ida_pci.c,v 1.29 2004/05/30 20:08:34 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 
 #include <sys/bio.h>
 #include <sys/bus.h>
@@ -49,14 +50,14 @@ __FBSDID("$FreeBSD: src/sys/dev/ida/ida_pci.c,v 1.26 2003/09/02 17:30:36 jhb Exp
 #include <dev/ida/idavar.h>
 #include <dev/ida/idareg.h>
 
-#define IDA_PCI_MAX_DMA_ADDR	0xFFFFFFFF
-#define IDA_PCI_MAX_DMA_COUNT	0xFFFFFFFF
+#define	IDA_PCI_MAX_DMA_ADDR	0xFFFFFFFF
+#define	IDA_PCI_MAX_DMA_COUNT	0xFFFFFFFF
 
-#define IDA_PCI_MEMADDR		PCIR_BAR(1)		/* Mem I/O Address */
+#define	IDA_PCI_MEMADDR		PCIR_BAR(1)		/* Mem I/O Address */
 
-#define IDA_DEVICEID_SMART		0xAE100E11
-#define IDA_DEVICEID_DEC_SMART		0x00461011
-#define IDA_DEVICEID_NCR_53C1510	0x00101000
+#define	IDA_DEVICEID_SMART		0xAE100E11
+#define	IDA_DEVICEID_DEC_SMART		0x00461011
+#define	IDA_DEVICEID_NCR_53C1510	0x00101000
 
 static int
 ida_v3_fifo_full(struct ida_softc *ida)
@@ -256,8 +257,8 @@ ida_pci_attach(device_t dev)
 	if (id == IDA_DEVICEID_DEC_SMART)
 		ida->regs_res_id = PCIR_BAR(0);
 
-	ida->regs = bus_alloc_resource(dev, ida->regs_res_type,
-	    &ida->regs_res_id, 0, ~0, 1, RF_ACTIVE);
+	ida->regs = bus_alloc_resource_any(dev, ida->regs_res_type,
+	    &ida->regs_res_id, RF_ACTIVE);
 	if (ida->regs == NULL) {
 		device_printf(dev, "can't allocate memory resources\n");
 		return (ENOMEM);
@@ -277,8 +278,8 @@ ida_pci_attach(device_t dev)
 
 	rid = 0;
         ida->irq_res_type = SYS_RES_IRQ;
-	ida->irq = bus_alloc_resource(dev, ida->irq_res_type, &rid,
-	    0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+	ida->irq = bus_alloc_resource_any(dev, ida->irq_res_type, &rid,
+	    RF_ACTIVE | RF_SHAREABLE);
         if (ida->irq == NULL) {
                 ida_free(ida);
                 return (ENOMEM);

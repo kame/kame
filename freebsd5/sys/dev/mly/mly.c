@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/mly/mly.c,v 1.31 2003/09/02 17:30:36 jhb Exp $
+ *	$FreeBSD: src/sys/dev/mly/mly.c,v 1.36 2004/06/16 09:46:51 phk Exp $
  */
 
 #include <sys/param.h>
@@ -149,14 +149,13 @@ static driver_t mly_pci_driver = {
 static devclass_t	mly_devclass;
 DRIVER_MODULE(mly, pci, mly_pci_driver, mly_devclass, 0, 0);
 
-#define MLY_CDEV_MAJOR  158
-
 static struct cdevsw mly_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	mly_user_open,
 	.d_close =	mly_user_close,
 	.d_ioctl =	mly_user_ioctl,
 	.d_name =	"mly",
-	.d_maj =	MLY_CDEV_MAJOR,
 };
 
 /********************************************************************************
@@ -369,8 +368,8 @@ mly_pci_attach(struct mly_softc *sc)
      * Allocate the PCI register window.
      */
     sc->mly_regs_rid = PCIR_BAR(0);	/* first base address register */
-    if ((sc->mly_regs_resource = bus_alloc_resource(sc->mly_dev, SYS_RES_MEMORY, &sc->mly_regs_rid, 
-						    0, ~0, 1, RF_ACTIVE)) == NULL) {
+    if ((sc->mly_regs_resource = bus_alloc_resource_any(sc->mly_dev, 
+	    SYS_RES_MEMORY, &sc->mly_regs_rid, RF_ACTIVE)) == NULL) {
 	mly_printf(sc, "can't allocate register window\n");
 	goto fail;
     }
@@ -381,8 +380,8 @@ mly_pci_attach(struct mly_softc *sc)
      * Allocate and connect our interrupt.
      */
     sc->mly_irq_rid = 0;
-    if ((sc->mly_irq = bus_alloc_resource(sc->mly_dev, SYS_RES_IRQ, &sc->mly_irq_rid, 
-					  0, ~0, 1, RF_SHAREABLE | RF_ACTIVE)) == NULL) {
+    if ((sc->mly_irq = bus_alloc_resource_any(sc->mly_dev, SYS_RES_IRQ, 
+		    &sc->mly_irq_rid, RF_SHAREABLE | RF_ACTIVE)) == NULL) {
 	mly_printf(sc, "can't allocate interrupt\n");
 	goto fail;
     }
@@ -2031,6 +2030,7 @@ mly_cam_rescan_btl(struct mly_softc *sc, int bus, int target)
     if (xpt_create_path(&sc->mly_cam_path, xpt_periph, 
 			cam_sim_path(sc->mly_cam_sim[bus]), target, 0) != CAM_REQ_CMP) {
 	mly_printf(sc, "rescan failed (can't create path)\n");
+	free(ccb, M_TEMP);
 	return;
     }
     xpt_setup_ccb(&ccb->ccb_h, sc->mly_cam_path, 5/*priority (low)*/);
@@ -2826,7 +2826,7 @@ mly_print_controller(int controller)
  * Accept an open operation on the control device.
  */
 static int
-mly_user_open(dev_t dev, int flags, int fmt, struct thread *td)
+mly_user_open(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
     int			unit = minor(dev);
     struct mly_softc	*sc = devclass_get_softc(devclass_find("mly"), unit);
@@ -2839,7 +2839,7 @@ mly_user_open(dev_t dev, int flags, int fmt, struct thread *td)
  * Accept the last close on the control device.
  */
 static int
-mly_user_close(dev_t dev, int flags, int fmt, struct thread *td)
+mly_user_close(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
     int			unit = minor(dev);
     struct mly_softc	*sc = devclass_get_softc(devclass_find("mly"), unit);
@@ -2852,7 +2852,7 @@ mly_user_close(dev_t dev, int flags, int fmt, struct thread *td)
  * Handle controller-specific control operations.
  */
 static int
-mly_user_ioctl(dev_t dev, u_long cmd, caddr_t addr,
+mly_user_ioctl(struct cdev *dev, u_long cmd, caddr_t addr,
 				int32_t flag, struct thread *td)
 {
     struct mly_softc		*sc = (struct mly_softc *)dev->si_drv1;

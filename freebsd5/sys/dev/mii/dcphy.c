@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/dcphy.c,v 1.23 2003/08/24 17:54:10 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/dcphy.c,v 1.26 2004/05/29 18:13:44 marius Exp $");
 
 /*
  * Pseudo-driver for internal NWAY support on DEC 21143 and workalike
@@ -41,9 +41,6 @@ __FBSDID("$FreeBSD: src/sys/dev/mii/dcphy.c,v 1.23 2003/08/24 17:54:10 obrien Ex
  * and the alternative is to create a fake MII interface in the driver,
  * which is harder to do.
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/dcphy.c,v 1.23 2003/08/24 17:54:10 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -321,10 +318,10 @@ dcphy_service(sc, mii, cmd)
 		 * since real Intel 21143 chips don't show valid link
 		 * status until autonegotiation is switched off, and
 		 * that only happens in dcphy_status().  Without this,
-		 * successful autonegotation is never recognised on
+		 * successful autonegotiation is never recognised on
 		 * these chips.
                  */
-                if (++sc->mii_ticks != 50)
+                if (++sc->mii_ticks <= 50)
 			break;
 
 		sc->mii_ticks = 0;

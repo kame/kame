@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/dev/hfa/fore_output.c,v 1.16 2003/08/22 06:00:26 imp Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_output.c,v 1.18 2004/02/22 16:27:28 mux Exp $
  *
  */
 
@@ -64,7 +64,7 @@
 #include <dev/hfa/fore_include.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_output.c,v 1.16 2003/08/22 06:00:26 imp Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_output.c,v 1.18 2004/02/22 16:27:28 mux Exp $");
 #endif
 
 
@@ -264,7 +264,7 @@ fore_xmit_segment(fup, m, hxp, segp, lenp)
 	H_dma		*sdmap;
 	KBuffer		*m0, *m1, *mprev;
 	caddr_t		cp, bfr;
-	void		*dma;
+	vm_paddr_t	dma;
 	int		pdulen, nsegs, len, align;
 	int		compressed = 0;
 
@@ -404,8 +404,8 @@ retry:
 		/*
 		 * Get a DMA address for the data
 		 */
-		dma = (void *)vtophys(bfr);
-		if (dma == NULL) {
+		dma = vtophys(bfr);
+		if (dma == 0) {
 			fup->fu_stats->st_drv.drv_xm_segdma++;
 			fore_seg_dma_free(hxp, m0, nsegs);
 			KB_FREEALL(m0);

@@ -28,12 +28,13 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ar/if_ar_pci.c,v 1.10 2003/08/24 17:48:04 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ar/if_ar_pci.c,v 1.11 2004/05/30 20:08:26 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <machine/bus.h>
 #include <machine/resource.h>

@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ofw/openpromio.c,v 1.2 2003/08/24 17:54:14 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ofw/openpromio.c,v 1.6 2004/08/16 15:45:26 marius Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -42,8 +42,8 @@ __FBSDID("$FreeBSD: src/sys/dev/ofw/openpromio.c,v 1.2 2003/08/24 17:54:14 obrie
 #include <dev/ofw/openpromio.h>
 
 /*
- * This provides a solaris compatible character device interface to
- * openfirmware.  It exists entirely for compatibility with software
+ * This provides a Solaris compatible character device interface to
+ * Open Firmware.  It exists entirely for compatibility with software
  * like X11, and only the features that are actually needed for that
  * are implemented.  The interface sucks too much to actually use,
  * new code should use the /dev/openfirm device.
@@ -58,6 +58,8 @@ static int openprom_node_valid(phandle_t node);
 static int openprom_node_search(phandle_t root, phandle_t node);
 
 static struct cdevsw openprom_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	openprom_open,
 	.d_close =	openprom_close,
 	.d_ioctl =	openprom_ioctl,
@@ -65,11 +67,11 @@ static struct cdevsw openprom_cdevsw = {
 };
 
 static int openprom_is_open;
-static dev_t openprom_dev;
+static struct cdev *openprom_dev;
 static phandle_t openprom_node;
 
 static int
-openprom_open(dev_t dev, int oflags, int devtype, struct thread *td)
+openprom_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 {
 
 	if (openprom_is_open != 0)
@@ -79,7 +81,7 @@ openprom_open(dev_t dev, int oflags, int devtype, struct thread *td)
 }
 
 static int
-openprom_close(dev_t dev, int fflag, int devtype, struct thread *td)
+openprom_close(struct cdev *dev, int fflag, int devtype, struct thread *td)
 {
 
 	openprom_is_open = 0;
@@ -87,7 +89,7 @@ openprom_close(dev_t dev, int fflag, int devtype, struct thread *td)
 }
 
 static int
-openprom_ioctl(dev_t dev, u_long cmd, caddr_t data, int flags,
+openprom_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags,
     struct thread *td)
 {
 	struct openpromio *oprom;
@@ -213,7 +215,7 @@ openprom_modevent(module_t mode, int type, void *data)
 		destroy_dev(openprom_dev);
 		return (0);
 	default:
-		return (0);
+		return (EOPNOTSUPP);
 	}
 }
 

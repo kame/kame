@@ -31,7 +31,7 @@
  *	@(#)kernfs_vnops.c	8.15 (Berkeley) 5/21/95
  * From: FreeBSD: src/sys/miscfs/kernfs/kernfs_vnops.c 1.43
  *
- * $FreeBSD: src/sys/fs/devfs/devfs_vnops.c,v 1.67 2003/10/20 15:08:10 phk Exp $
+ * $FreeBSD: src/sys/fs/devfs/devfs_vnops.c,v 1.73 2004/07/26 07:24:02 cperciva Exp $
  */
 
 /*
@@ -123,14 +123,13 @@ devfs_allocv(struct devfs_dirent *de, struct mount *mp, struct vnode **vpp, stru
 {
 	int error;
 	struct vnode *vp;
-	dev_t dev;
+	struct cdev *dev;
 
-	if (td == NULL)
-		td = curthread; /* XXX */
+	KASSERT(td == curthread, ("devfs_allocv: td != curthread"));
 loop:
 	vp = de->de_vnode;
 	if (vp != NULL) {
-		if (vget(vp, LK_EXCLUSIVE, td ? td : curthread))
+		if (vget(vp, LK_EXCLUSIVE, td))
 			goto loop;
 		*vpp = vp;
 		return (0);
@@ -140,7 +139,7 @@ loop:
 		if (dev == NULL)
 			return (ENOENT);
 	} else {
-		dev = NODEV;
+		dev = NULL;
 	}
 	error = getnewvnode("devfs", mp, devfs_vnodeop_p, &vp);
 	if (error != 0) {
@@ -213,7 +212,7 @@ devfs_getattr(ap)
 	struct vattr *vap = ap->a_vap;
 	int error = 0;
 	struct devfs_dirent *de;
-	dev_t dev;
+	struct cdev *dev;
 
 	de = vp->v_data;
 	if (vp->v_type == VDIR)
@@ -224,7 +223,7 @@ devfs_getattr(ap)
 	vap->va_gid = de->de_gid;
 	vap->va_mode = de->de_mode;
 	if (vp->v_type == VLNK)
-		vap->va_size = de->de_dirent->d_namlen;
+		vap->va_size = strlen(de->de_symlink);
 	else if (vp->v_type == VDIR)
 		vap->va_size = vap->va_bytes = DEV_BSIZE;
 	else
@@ -279,7 +278,12 @@ devfs_ioctl(ap)
 	} */ *ap;
 {
 	int error;
+	struct devfs_mount *dmp;
 
+	dmp = VFSTODEVFS(ap->a_vp->v_mount);
+	lockmgr(&dmp->dm_lock, LK_SHARED, 0, curthread);
+	devfs_populate(dmp);
+	lockmgr(&dmp->dm_lock, LK_RELEASE, 0, curthread);
 	error = devfs_rules_ioctl(ap->a_vp->v_mount, ap->a_command, ap->a_data,
 	    ap->a_td);
 	return (error);
@@ -299,7 +303,7 @@ devfs_lookupx(ap)
 	struct devfs_dirent *de, *dd;
 	struct devfs_dirent **dde;
 	struct devfs_mount *dmp;
-	dev_t cdev;
+	struct cdev *cdev;
 	int error, flags, nameiop;
 	char specname[SPECNAMELEN + 1], *pname;
 
@@ -377,9 +381,9 @@ devfs_lookupx(ap)
 	if (pname == NULL)
 		goto notfound;
 
-	cdev = NODEV;
+	cdev = NULL;
 	EVENTHANDLER_INVOKE(dev_clone, pname, strlen(pname), &cdev);
-	if (cdev == NODEV)
+	if (cdev == NULL)
 		goto notfound;
 
 	devfs_populate(dmp);
@@ -655,7 +659,7 @@ devfs_reclaim(ap)
 	if (de != NULL)
 		de->de_vnode = NULL;
 	vp->v_data = NULL;
-	if (vp->v_rdev != NODEV && vp->v_rdev != NULL) {
+	if (vp->v_rdev != NULL && vp->v_rdev != NULL) {
 		i = vcount(vp);
 		if ((vp->v_rdev->si_flags & SI_CHEAPCLONE) && i == 0 &&
 		    (vp->v_rdev->si_flags & SI_NAMED))
@@ -762,7 +766,7 @@ devfs_setattr(ap)
 	if (uid != de->de_uid || gid != de->de_gid) {
 		if (((ap->a_cred->cr_uid != de->de_uid) || uid != de->de_uid ||
 		    (gid != de->de_gid && !groupmember(gid, ap->a_cred))) &&
-		    (error = suser_cred(ap->a_td->td_ucred, PRISON_ROOT)) != 0)
+		    (error = suser_cred(ap->a_td->td_ucred, SUSER_ALLOWJAIL)) != 0)
 			return (error);
 		de->de_uid = uid;
 		de->de_gid = gid;
@@ -771,7 +775,7 @@ devfs_setattr(ap)
 
 	if (vap->va_mode != (mode_t)VNOVAL) {
 		if ((ap->a_cred->cr_uid != de->de_uid) &&
-		    (error = suser_cred(ap->a_td->td_ucred, PRISON_ROOT)))
+		    (error = suser_cred(ap->a_td->td_ucred, SUSER_ALLOWJAIL)))
 			return (error);
 		de->de_mode = vap->va_mode;
 		c = 1;
@@ -844,8 +848,11 @@ devfs_symlink(ap)
 	struct devfs_dirent *dd;
 	struct devfs_dirent *de;
 	struct devfs_mount *dmp;
+	struct thread *td;
 
-	error = suser(ap->a_cnp->cn_thread);
+	td = ap->a_cnp->cn_thread;
+	KASSERT(td == curthread, ("devfs_symlink: td != curthread"));
+	error = suser(td);
 	if (error)
 		return(error);
 	dmp = VFSTODEVFS(ap->a_dvp->v_mount);
@@ -859,13 +866,13 @@ devfs_symlink(ap)
 	i = strlen(ap->a_target) + 1;
 	MALLOC(de->de_symlink, char *, i, M_DEVFS, M_WAITOK);
 	bcopy(ap->a_target, de->de_symlink, i);
-	lockmgr(&dmp->dm_lock, LK_EXCLUSIVE, 0, curthread);
+	lockmgr(&dmp->dm_lock, LK_EXCLUSIVE, 0, td);
 #ifdef MAC
 	mac_create_devfs_symlink(ap->a_cnp->cn_cred, dmp->dm_mount, dd, de);
 #endif
 	TAILQ_INSERT_TAIL(&dd->de_dlist, de, de_list);
-	devfs_allocv(de, ap->a_dvp->v_mount, ap->a_vpp, 0);
-	lockmgr(&dmp->dm_lock, LK_RELEASE, 0, curthread);
+	devfs_allocv(de, ap->a_dvp->v_mount, ap->a_vpp, td);
+	lockmgr(&dmp->dm_lock, LK_RELEASE, 0, td);
 	return (0);
 }
 

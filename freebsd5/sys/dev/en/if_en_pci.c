@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/en/if_en_pci.c,v 1.31 2003/10/31 18:31:59 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/en/if_en_pci.c,v 1.33 2004/05/30 20:08:31 phk Exp $");
 
 /*
  * i f _ e n _ p c i . c  
@@ -46,10 +46,11 @@ __FBSDID("$FreeBSD: src/sys/dev/en/if_en_pci.c,v 1.31 2003/10/31 18:31:59 brooks
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/en/if_en_pci.c,v 1.31 2003/10/31 18:31:59 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/en/if_en_pci.c,v 1.33 2004/05/30 20:08:31 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/systm.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
@@ -212,8 +213,8 @@ en_pci_attach(device_t dev)
 	 * Map control/status registers.
 	 */
 	rid = PCI_CBMA;
-	scp->res = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
-	    0, ~0, 1, RF_ACTIVE);
+	scp->res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
+	    RF_ACTIVE);
 	if (scp->res == NULL) {
 		device_printf(dev, "could not map memory\n");
 		error = ENXIO;
@@ -228,7 +229,7 @@ en_pci_attach(device_t dev)
 	 * Allocate our interrupt.
 	 */
 	rid = 0;
-	scp->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
+	scp->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 	    RF_SHAREABLE | RF_ACTIVE);
 	if (scp->irq == NULL) {
 		device_printf(dev, "could not map interrupt\n");

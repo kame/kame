@@ -22,9 +22,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/alpha/libalpha/alpha_copy.c,v 1.5 2000/08/03 09:49:44 jhb Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/alpha/libalpha/alpha_copy.c,v 1.6 2004/01/04 23:21:01 obrien Exp $");
+
 /*
  * MD primitives supporting placement of module data 
  *

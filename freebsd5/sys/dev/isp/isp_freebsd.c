@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/isp/isp_freebsd.c,v 1.94 2003/09/27 12:00:58 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/isp/isp_freebsd.c,v 1.102.2.1 2004/08/27 15:46:56 mjacob Exp $");
 
 #include <dev/isp/isp_freebsd.h>
 #include <sys/unistd.h>
@@ -52,12 +52,11 @@ static void isp_kthread(void *);
 static void isp_action(struct cam_sim *, union ccb *);
 
 
-#define ISP_CDEV_MAJOR	248
 static struct cdevsw isp_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_ioctl =	ispioctl,
 	.d_name =	"isp",
-	.d_maj =	ISP_CDEV_MAJOR,
-	.d_flags =	D_TAPE,
 };
 
 static struct ispsoftc *isplist = NULL;
@@ -201,12 +200,6 @@ isp_attach(struct ispsoftc *isp)
 		isp->isp_path2 = path;
 	}
 
-#ifdef	ISP_TARGET_MODE
-	cv_init(&isp->isp_osinfo.tgtcv0[0], "isp_tgcv0a");
-	cv_init(&isp->isp_osinfo.tgtcv0[1], "isp_tgcv0b");
-	cv_init(&isp->isp_osinfo.tgtcv1[0], "isp_tgcv1a");
-	cv_init(&isp->isp_osinfo.tgtcv1[1], "isp_tgcv1b");
-#endif
 	/*
 	 * Create device nodes
 	 */
@@ -245,10 +238,10 @@ isp_freeze_loopdown(struct ispsoftc *isp, char *msg)
 }
 
 static int
-ispioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct thread *td)
+ispioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags, struct thread *td)
 {
 	struct ispsoftc *isp;
-	int retval = ENOTTY;
+	int nr, retval = ENOTTY;
 
 	isp = isplist;
 	while (isp) {
@@ -304,6 +297,19 @@ ispioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct thread *td)
 		retval = 0;
 		break;
 	}
+	case ISP_GETROLE:
+		*(int *)addr = isp->isp_role;
+		retval = 0;
+		break;
+	case ISP_SETROLE:
+		nr = *(int *)addr;
+		if (nr & ~(ISP_ROLE_INITIATOR|ISP_ROLE_TARGET)) {
+			retval = EINVAL;
+			break;
+		}
+		*(int *)addr = isp->isp_role;
+		isp->isp_role = nr;
+		/* FALLTHROUGH */
 	case ISP_RESETHBA:
 		ISP_LOCK(isp);
 		isp_reinit(isp);
@@ -394,6 +400,9 @@ ispioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct thread *td)
 		struct isp_hba_device *hba = (struct isp_hba_device *) addr;
 		MEMZERO(hba, sizeof (*hba));
 		ISP_LOCK(isp);
+		hba->fc_fw_major = ISP_FW_MAJORX(isp->isp_fwrev);
+		hba->fc_fw_minor = ISP_FW_MINORX(isp->isp_fwrev);
+		hba->fc_fw_micro = ISP_FW_MICROX(isp->isp_fwrev);
 		hba->fc_speed = FCPARAM(isp)->isp_gbspeed;
 		hba->fc_scsi_supported = 1;
 		hba->fc_topology = FCPARAM(isp)->isp_topo + 1;
@@ -506,7 +515,9 @@ isp_intr_enable(void *arg)
 	struct ispsoftc *isp = arg;
 	if (isp->isp_role != ISP_ROLE_NONE) {
 		ENABLE_INTS(isp);
+#if	0
 		isp->isp_osinfo.intsok = 1;
+#endif
 	}
 	/* Release our hook so that the boot can continue. */
 	config_intrhook_disestablish(&isp->isp_osinfo.ehook);
@@ -522,15 +533,12 @@ static INLINE int is_lun_enabled(struct ispsoftc *, int, lun_id_t);
 static INLINE int are_any_luns_enabled(struct ispsoftc *, int);
 static INLINE tstate_t *get_lun_statep(struct ispsoftc *, int, lun_id_t);
 static INLINE void rls_lun_statep(struct ispsoftc *, tstate_t *);
-static INLINE int isp_psema_sig_rqe(struct ispsoftc *, int);
-static INLINE int isp_cv_wait_timed_rqe(struct ispsoftc *, int, int);
-static INLINE void isp_cv_signal_rqe(struct ispsoftc *, int, int);
-static INLINE void isp_vsema_rqe(struct ispsoftc *, int);
 static INLINE atio_private_data_t *isp_get_atpd(struct ispsoftc *, int);
 static cam_status
 create_lun_state(struct ispsoftc *, int, struct cam_path *, tstate_t **);
 static void destroy_lun_state(struct ispsoftc *, tstate_t *);
-static void isp_en_lun(struct ispsoftc *, union ccb *);
+static int isp_en_lun(struct ispsoftc *, union ccb *);
+static void isp_ledone(struct ispsoftc *, lun_entry_t *);
 static cam_status isp_abort_tgt_ccb(struct ispsoftc *, union ccb *);
 static timeout_t isp_refire_putback_atio;
 static void isp_complete_ctio(union ccb *);
@@ -539,6 +547,7 @@ static cam_status isp_target_start_ctio(struct ispsoftc *, union ccb *);
 static int isp_handle_platform_atio(struct ispsoftc *, at_entry_t *);
 static int isp_handle_platform_atio2(struct ispsoftc *, at2_entry_t *);
 static int isp_handle_platform_ctio(struct ispsoftc *, void *);
+static void isp_handle_platform_ctio_fastpost(struct ispsoftc *, u_int32_t);
 static int isp_handle_platform_notify_scsi(struct ispsoftc *, in_entry_t *);
 static int isp_handle_platform_notify_fc(struct ispsoftc *, in_fcentry_t *);
 
@@ -588,6 +597,7 @@ get_lun_statep(struct ispsoftc *isp, int bus, lun_id_t lun)
 			tptr->hold++;
 			return (tptr);
 		}
+		return (NULL);
 	} else {
 		tptr = isp->isp_osinfo.lun_hash[LUN_HASH_FUNC(isp, bus, lun)];
 		if (tptr == NULL) {
@@ -609,65 +619,6 @@ rls_lun_statep(struct ispsoftc *isp, tstate_t *tptr)
 {
 	if (tptr->hold)
 		tptr->hold--;
-}
-
-static INLINE int
-isp_psema_sig_rqe(struct ispsoftc *isp, int bus)
-{
-	while (isp->isp_osinfo.tmflags[bus] & TM_BUSY) {
-		isp->isp_osinfo.tmflags[bus] |= TM_WANTED;
-#ifdef	ISP_SMPLOCK
-		if (cv_wait_sig(&isp->isp_osinfo.tgtcv0[bus], &isp->isp_lock)) {
-			return (-1);
-		}
-#else
-		if (tsleep(&isp->isp_osinfo.tgtcv0[bus], PZERO, "cv_isp", 0)) {
-			return (-1);
-		}
-#endif
-		isp->isp_osinfo.tmflags[bus] |= TM_BUSY;
-	}
-	return (0);
-}
-
-static INLINE int
-isp_cv_wait_timed_rqe(struct ispsoftc *isp, int bus, int timo)
-{
-#ifdef	ISP_SMPLOCK
-	if (cv_timedwait(&isp->isp_osinfo.tgtcv1[bus], &isp->isp_lock, timo)) {
-		return (-1);
-	}
-#else
-	if (tsleep(&isp->isp_osinfo.tgtcv1[bus], PZERO, "cv_isp1", 0)) {
-		return (-1);
-	}
-#endif
-	return (0);
-}
-
-static INLINE void
-isp_cv_signal_rqe(struct ispsoftc *isp, int bus, int status)
-{
-	isp->isp_osinfo.rstatus[bus] = status;
-#ifdef	ISP_SMPLOCK
-	cv_signal(&isp->isp_osinfo.tgtcv1[bus]);
-#else
-	wakeup(&isp->isp_osinfo.tgtcv1[bus]);
-#endif
-}
-
-static INLINE void
-isp_vsema_rqe(struct ispsoftc *isp, int bus)
-{
-	if (isp->isp_osinfo.tmflags[bus] & TM_WANTED) {
-		isp->isp_osinfo.tmflags[bus] &= ~TM_WANTED;
-#ifdef	ISP_SMPLOCK
-		cv_signal(&isp->isp_osinfo.tgtcv0[bus]);
-#else
-		cv_signal(&isp->isp_osinfo.tgtcv0[bus]);
-#endif
-	}
-	isp->isp_osinfo.tmflags[bus] &= ~TM_BUSY;
 }
 
 static INLINE atio_private_data_t *
@@ -734,10 +685,10 @@ destroy_lun_state(struct ispsoftc *isp, tstate_t *tptr)
 	int hfx;
 	tstate_t *lw, *pw;
 
-	hfx = LUN_HASH_FUNC(isp, tptr->bus, tptr->lun);
 	if (tptr->hold) {
 		return;
 	}
+	hfx = LUN_HASH_FUNC(isp, tptr->bus, tptr->lun);
 	pw = isp->isp_osinfo.lun_hash[hfx];
 	if (pw == NULL) {
 		return;
@@ -762,32 +713,37 @@ destroy_lun_state(struct ispsoftc *isp, tstate_t *tptr)
 }
 
 /*
- * we enter with our locks held.
+ * Enable luns.
  */
-static void
+static int
 isp_en_lun(struct ispsoftc *isp, union ccb *ccb)
 {
-	const char lfmt[] = "Lun now %sabled for target mode on channel %d";
 	struct ccb_en_lun *cel = &ccb->cel;
 	tstate_t *tptr;
-	u_int16_t rstat;
-	int bus, cmd, av, wildcard;
+	u_int32_t seq;
+	int bus, cmd, av, wildcard, tm_on;
 	lun_id_t lun;
 	target_id_t tgt;
 
-
-	bus = XS_CHANNEL(ccb) & 0x1;
+	bus = XS_CHANNEL(ccb);
+	if (bus > 1) {
+		xpt_print_path(ccb->ccb_h.path);
+		printf("illegal bus %d\n", bus);
+		ccb->ccb_h.status = CAM_PATH_INVALID;
+		return (-1);
+	}
 	tgt = ccb->ccb_h.target_id;
 	lun = ccb->ccb_h.target_lun;
 
-	/*
-	 * Do some sanity checking first.
-	 */
+	isp_prt(isp, ISP_LOGTDEBUG0,
+	    "isp_en_lun: %sabling lun 0x%x on channel %d",
+	    cel->enable? "en" : "dis", lun, bus);
+
 
 	if ((lun != CAM_LUN_WILDCARD) &&
 	    (lun < 0 || lun >= (lun_id_t) isp->isp_maxluns)) {
 		ccb->ccb_h.status = CAM_LUN_INVALID;
-		return;
+		return (-1);
 	}
 
 	if (IS_SCSI(isp)) {
@@ -796,14 +752,20 @@ isp_en_lun(struct ispsoftc *isp, union ccb *ccb)
 		if (tgt != CAM_TARGET_WILDCARD &&
 		    tgt != sdp->isp_initiator_id) {
 			ccb->ccb_h.status = CAM_TID_INVALID;
-			return;
+			return (-1);
 		}
 	} else {
+		/*
+		 * There's really no point in doing this yet w/o multi-tid
+		 * capability. Even then, it's problematic.
+		 */
+#if	0
 		if (tgt != CAM_TARGET_WILDCARD &&
 		    tgt != FCPARAM(isp)->isp_iid) {
 			ccb->ccb_h.status = CAM_TID_INVALID;
-			return;
+			return (-1);
 		}
+#endif
 		/*
 		 * This is as a good a place as any to check f/w capabilities.
 		 */
@@ -811,7 +773,7 @@ isp_en_lun(struct ispsoftc *isp, union ccb *ccb)
 			isp_prt(isp, ISP_LOGERR,
 			    "firmware does not support target mode");
 			ccb->ccb_h.status = CAM_FUNC_NOTAVAIL;
-			return;
+			return (-1);
 		}
 		/*
 		 * XXX: We *could* handle non-SCCLUN f/w, but we'd have to
@@ -820,6 +782,8 @@ isp_en_lun(struct ispsoftc *isp, union ccb *ccb)
 		if ((FCPARAM(isp)->isp_fwattr & ISP_FW_ATTR_SCCLUN) == 0) {
 			isp_prt(isp, ISP_LOGERR,
 			    "firmware not SCCLUN capable");
+			ccb->ccb_h.status = CAM_FUNC_NOTAVAIL;
+			return (-1);
 		}
 	}
 
@@ -828,11 +792,13 @@ isp_en_lun(struct ispsoftc *isp, union ccb *ccb)
 			wildcard = 1;
 		} else {
 			ccb->ccb_h.status = CAM_LUN_INVALID;
-			return;
+			return (-1);
 		}
 	} else {
 		wildcard = 0;
 	}
+
+	tm_on = (isp->isp_osinfo.tmflags[bus] & TM_TMODE_ENABLED) != 0;
 
 	/*
 	 * Next check to see whether this is a target/lun wildcard action.
@@ -845,10 +811,9 @@ isp_en_lun(struct ispsoftc *isp, union ccb *ccb)
 	if (wildcard) {
 		tptr = &isp->isp_osinfo.tsdflt[bus];
 		if (cel->enable) {
-			if (isp->isp_osinfo.tmflags[bus] &
-			    TM_WILDCARD_ENABLED) {
+			if (tm_on) {
 				ccb->ccb_h.status = CAM_LUN_ALRDY_ENA;
-				return;
+				return (-1);
 			}
 			ccb->ccb_h.status =
 			    xpt_create_path(&tptr->owner, NULL,
@@ -856,20 +821,19 @@ isp_en_lun(struct ispsoftc *isp, union ccb *ccb)
 			    xpt_path_target_id(ccb->ccb_h.path),
 			    xpt_path_lun_id(ccb->ccb_h.path));
 			if (ccb->ccb_h.status != CAM_REQ_CMP) {
-				return;
+				return (-1);
 			}
 			SLIST_INIT(&tptr->atios);
 			SLIST_INIT(&tptr->inots);
 			isp->isp_osinfo.tmflags[bus] |= TM_WILDCARD_ENABLED;
 		} else {
-			if ((isp->isp_osinfo.tmflags[bus] &
-			    TM_WILDCARD_ENABLED) == 0) {
+			if (tm_on == 0) {
 				ccb->ccb_h.status = CAM_REQ_CMP;
-				return;
+				return (-1);
 			}
 			if (tptr->hold) {
 				ccb->ccb_h.status = CAM_SCSI_BUSY;
-				return;
+				return (-1);
 			}
 			xpt_free_path(tptr->owner);
 			isp->isp_osinfo.tmflags[bus] &= ~TM_WILDCARD_ENABLED;
@@ -881,7 +845,7 @@ isp_en_lun(struct ispsoftc *isp, union ccb *ccb)
 	 * enabled/disabled with respect to target mode.
 	 */
 	av = bus << 31;
-	if (cel->enable && !(isp->isp_osinfo.tmflags[bus] & TM_TMODE_ENABLED)) {
+	if (cel->enable && tm_on == 0) {
 		av |= ENABLE_TARGET_FLAG;
 		av = isp_control(isp, ISPCTL_TOGGLE_TMODE, &av);
 		if (av) {
@@ -891,21 +855,20 @@ isp_en_lun(struct ispsoftc *isp, union ccb *ccb)
 				    ~TM_WILDCARD_ENABLED;
 				xpt_free_path(tptr->owner);
 			}
-			return;
+			return (-1);
 		}
 		isp->isp_osinfo.tmflags[bus] |= TM_TMODE_ENABLED;
 		isp_prt(isp, ISP_LOGINFO,
 		    "Target Mode enabled on channel %d", bus);
-	} else if (cel->enable == 0 &&
-	    (isp->isp_osinfo.tmflags[bus] & TM_TMODE_ENABLED) && wildcard) {
+	} else if (cel->enable == 0 && tm_on && wildcard) {
 		if (are_any_luns_enabled(isp, bus)) {
 			ccb->ccb_h.status = CAM_SCSI_BUSY;
-			return;
+			return (-1);
 		}
 		av = isp_control(isp, ISPCTL_TOGGLE_TMODE, &av);
 		if (av) {
 			ccb->ccb_h.status = CAM_FUNC_NOTAVAIL;
-			return;
+			return (-1);
 		}
 		isp->isp_osinfo.tmflags[bus] &= ~TM_TMODE_ENABLED;
 		isp_prt(isp, ISP_LOGINFO,
@@ -914,33 +877,40 @@ isp_en_lun(struct ispsoftc *isp, union ccb *ccb)
 
 	if (wildcard) {
 		ccb->ccb_h.status = CAM_REQ_CMP;
-		return;
+		return (-1);
 	}
+
+	/*
+	 * Find an empty slot
+	 */
+	for (seq = 0; seq < NLEACT; seq++) {
+		if (isp->isp_osinfo.leact[seq] == 0) {
+			break;
+		}
+	}
+	if (seq >= NLEACT) {
+		ccb->ccb_h.status = CAM_RESRC_UNAVAIL;
+		return (-1);
+		
+	}
+	isp->isp_osinfo.leact[seq] = ccb;
 
 	if (cel->enable) {
 		ccb->ccb_h.status =
 		    create_lun_state(isp, bus, ccb->ccb_h.path, &tptr);
 		if (ccb->ccb_h.status != CAM_REQ_CMP) {
-			return;
+			isp->isp_osinfo.leact[seq] = 0;
+			return (-1);
 		}
 	} else {
 		tptr = get_lun_statep(isp, bus, lun);
 		if (tptr == NULL) {
 			ccb->ccb_h.status = CAM_LUN_INVALID;
-			return;
+			return (-1);
 		}
 	}
 
-	if (isp_psema_sig_rqe(isp, bus)) {
-		rls_lun_statep(isp, tptr);
-		if (cel->enable)
-			destroy_lun_state(isp, tptr);
-		ccb->ccb_h.status = CAM_REQ_CMP_ERR;
-		return;
-	}
-
 	if (cel->enable) {
-		u_int32_t seq = isp->isp_osinfo.rollinfo++;
 		int c, n, ulun = lun;
 
 		cmd = RQSTYPE_ENABLE_LUN;
@@ -955,33 +925,15 @@ isp_en_lun(struct ispsoftc *isp, union ccb *ccb)
 			 */
 			ulun = 0;
 		}
-		rstat = LUN_ERR;
-		if (isp_lun_cmd(isp, cmd, bus, tgt, ulun, c, n, seq)) {
-			xpt_print_path(ccb->ccb_h.path);
-			isp_prt(isp, ISP_LOGWARN, "isp_lun_cmd failed");
-			goto out;
-		}
-		if (isp_cv_wait_timed_rqe(isp, bus, 30 * hz)) {
-			xpt_print_path(ccb->ccb_h.path);
-			isp_prt(isp, ISP_LOGERR,
-			    "wait for ENABLE/MODIFY LUN timed out");
-			goto out;
-		}
-		rstat = isp->isp_osinfo.rstatus[bus];
-		if (rstat != LUN_OK) {
-			xpt_print_path(ccb->ccb_h.path);
-			isp_prt(isp, ISP_LOGERR,
-			    "ENABLE/MODIFY LUN returned 0x%x", rstat);
-			goto out;
+		if (isp_lun_cmd(isp, cmd, bus, tgt, ulun, c, n, seq+1) == 0) {
+			rls_lun_statep(isp, tptr);
+			ccb->ccb_h.status = CAM_REQ_INPROG;
+			return (seq);
 		}
 	} else {
 		int c, n, ulun = lun;
-		u_int32_t seq;
 
-		rstat = LUN_ERR;
-		seq = isp->isp_osinfo.rollinfo++;
 		cmd = -RQSTYPE_MODIFY_LUN;
-
 		c = DFLT_CMND_CNT;
 		n = DFLT_INOT_CNT;
 		if (IS_FC(isp) && lun != 0) {
@@ -992,87 +944,115 @@ isp_en_lun(struct ispsoftc *isp, union ccb *ccb)
 			 */
 			ulun = 0;
 		}
-		if (isp_lun_cmd(isp, cmd, bus, tgt, ulun, c, n, seq)) {
-			xpt_print_path(ccb->ccb_h.path);
-			isp_prt(isp, ISP_LOGERR, "isp_lun_cmd failed");
-			goto out;
+		if (isp_lun_cmd(isp, cmd, bus, tgt, ulun, c, n, seq+1) == 0) {
+			rls_lun_statep(isp, tptr);
+			ccb->ccb_h.status = CAM_REQ_INPROG;
+			return (seq);
 		}
-		if (isp_cv_wait_timed_rqe(isp, bus, 30 * hz)) {
-			xpt_print_path(ccb->ccb_h.path);
-			isp_prt(isp, ISP_LOGERR,
-			    "wait for MODIFY LUN timed out");
-			goto out;
-		}
-		rstat = isp->isp_osinfo.rstatus[bus];
-		if (rstat != LUN_OK) {
-			xpt_print_path(ccb->ccb_h.path);
-			isp_prt(isp, ISP_LOGERR,
-			    "MODIFY LUN returned 0x%x", rstat);
-			goto out;
-		}
-		if (IS_FC(isp) && lun) {
-			goto out;
-		}
+	}
+	rls_lun_statep(isp, tptr);
+	xpt_print_path(ccb->ccb_h.path);
+	printf("isp_lun_cmd failed\n");
+	isp->isp_osinfo.leact[seq] = 0;
+	ccb->ccb_h.status = CAM_REQ_CMP_ERR;
+	return (-1);
+}
 
-		seq = isp->isp_osinfo.rollinfo++;
+static void
+isp_ledone(struct ispsoftc *isp, lun_entry_t *lep)
+{
+	const char lfmt[] = "lun %d now %sabled for target mode on channel %d";
+	union ccb *ccb;
+	u_int32_t seq;
+	tstate_t *tptr;
+	int av;
+	struct ccb_en_lun *cel;
 
-		rstat = LUN_ERR;
-		cmd = -RQSTYPE_ENABLE_LUN;
-		if (isp_lun_cmd(isp, cmd, bus, tgt, lun, 0, 0, seq)) {
+	seq = lep->le_reserved - 1;
+	if (seq >= NLEACT) {
+		isp_prt(isp, ISP_LOGERR,
+		    "seq out of range (%u) in isp_ledone", seq);
+		return;
+	}
+	ccb = isp->isp_osinfo.leact[seq];
+	if (ccb == 0) {
+		isp_prt(isp, ISP_LOGERR,
+		    "no ccb for seq %u in isp_ledone", seq);
+		return;
+	}
+	cel = &ccb->cel;
+	tptr = get_lun_statep(isp, XS_CHANNEL(ccb), XS_LUN(ccb));
+	if (tptr == NULL) {
+		xpt_print_path(ccb->ccb_h.path);
+		printf("null tptr in isp_ledone\n");
+		isp->isp_osinfo.leact[seq] = 0;
+		return;
+	}
+
+	if (lep->le_status != LUN_OK) {
+		xpt_print_path(ccb->ccb_h.path);
+		printf("ENABLE/MODIFY LUN returned 0x%x\n", lep->le_status);
+err:
+		ccb->ccb_h.status = CAM_REQ_CMP_ERR;
+		xpt_print_path(ccb->ccb_h.path);
+		rls_lun_statep(isp, tptr);
+		isp->isp_osinfo.leact[seq] = 0;
+		ISPLOCK_2_CAMLOCK(isp);
+		xpt_done(ccb);
+		CAMLOCK_2_ISPLOCK(isp);
+		return;
+	} else {
+		isp_prt(isp, ISP_LOGTDEBUG0,
+		    "isp_ledone: ENABLE/MODIFY done okay");
+	}
+
+
+	if (cel->enable) {
+		ccb->ccb_h.status = CAM_REQ_CMP;
+		isp_prt(isp, /* ISP_LOGINFO */ ISP_LOGALL, lfmt,
+		    XS_LUN(ccb), "en", XS_CHANNEL(ccb));
+		rls_lun_statep(isp, tptr);
+		isp->isp_osinfo.leact[seq] = 0;
+		ISPLOCK_2_CAMLOCK(isp);
+		xpt_done(ccb);
+		CAMLOCK_2_ISPLOCK(isp);
+		return;
+	}
+
+	if (lep->le_header.rqs_entry_type == RQSTYPE_MODIFY_LUN) {
+		if (isp_lun_cmd(isp, -RQSTYPE_ENABLE_LUN, XS_CHANNEL(ccb),
+		    XS_TGT(ccb), XS_LUN(ccb), 0, 0, seq+1)) {
 			xpt_print_path(ccb->ccb_h.path);
-			isp_prt(isp, ISP_LOGERR, "isp_lun_cmd failed");
-			goto out;
+			printf("isp_ledone: isp_lun_cmd failed\n");
+			goto err;
 		}
-		if (isp_cv_wait_timed_rqe(isp, bus, 30 * hz)) {
-			xpt_print_path(ccb->ccb_h.path);
-			isp_prt(isp, ISP_LOGERR,
-			     "wait for DISABLE LUN timed out");
-			goto out;
-		}
-		rstat = isp->isp_osinfo.rstatus[bus];
-		if (rstat != LUN_OK) {
-			xpt_print_path(ccb->ccb_h.path);
+		rls_lun_statep(isp, tptr);
+		return;
+	}
+
+	isp_prt(isp, ISP_LOGINFO, lfmt, XS_LUN(ccb), "dis", XS_CHANNEL(ccb));
+	rls_lun_statep(isp, tptr);
+	destroy_lun_state(isp, tptr);
+	ccb->ccb_h.status = CAM_REQ_CMP;
+	isp->isp_osinfo.leact[seq] = 0;
+	ISPLOCK_2_CAMLOCK(isp);
+	xpt_done(ccb);
+	CAMLOCK_2_ISPLOCK(isp);
+	if (are_any_luns_enabled(isp, XS_CHANNEL(ccb)) == 0) {
+		int bus = XS_CHANNEL(ccb);
+		av = bus << 31;
+		av = isp_control(isp, ISPCTL_TOGGLE_TMODE, &av);
+		if (av) {
 			isp_prt(isp, ISP_LOGWARN,
-			    "DISABLE LUN returned 0x%x", rstat);
-			goto out;
-		}
-		if (are_any_luns_enabled(isp, bus) == 0) {
-			av = isp_control(isp, ISPCTL_TOGGLE_TMODE, &av);
-			if (av) {
-				isp_prt(isp, ISP_LOGWARN,
-				    "disable target mode on channel %d failed",
-				    bus);
-				goto out;
-			}
-			isp->isp_osinfo.tmflags[bus] &= ~TM_TMODE_ENABLED;
-			xpt_print_path(ccb->ccb_h.path);
+			    "disable target mode on channel %d failed", bus);
+		} else {
 			isp_prt(isp, ISP_LOGINFO,
 			    "Target Mode disabled on channel %d", bus);
 		}
-	}
-
-out:
-	isp_vsema_rqe(isp, bus);
-
-	if (rstat != LUN_OK) {
-		xpt_print_path(ccb->ccb_h.path);
-		isp_prt(isp, ISP_LOGWARN,
-		    "lun %sable failed", (cel->enable) ? "en" : "dis");
-		ccb->ccb_h.status = CAM_REQ_CMP_ERR;
-		rls_lun_statep(isp, tptr);
-		if (cel->enable)
-			destroy_lun_state(isp, tptr);
-	} else {
-		xpt_print_path(ccb->ccb_h.path);
-		isp_prt(isp, ISP_LOGINFO, lfmt,
-		    (cel->enable) ? "en" : "dis", bus);
-		rls_lun_statep(isp, tptr);
-		if (cel->enable == 0) {
-			destroy_lun_state(isp, tptr);
-		}
-		ccb->ccb_h.status = CAM_REQ_CMP;
+		isp->isp_osinfo.tmflags[bus] &= ~TM_TMODE_ENABLED;
 	}
 }
+
 
 static cam_status
 isp_abort_tgt_ccb(struct ispsoftc *isp, union ccb *ccb)
@@ -1080,28 +1060,46 @@ isp_abort_tgt_ccb(struct ispsoftc *isp, union ccb *ccb)
 	tstate_t *tptr;
 	struct ccb_hdr_slist *lp;
 	struct ccb_hdr *curelm;
-	int found;
+	int found, *ctr;
 	union ccb *accb = ccb->cab.abort_ccb;
 
+	isp_prt(isp, ISP_LOGTDEBUG0, "aborting ccb %p", accb);
 	if (accb->ccb_h.target_id != CAM_TARGET_WILDCARD) {
+		int badpath = 0;
 		if (IS_FC(isp) && (accb->ccb_h.target_id != 
 		    ((fcparam *) isp->isp_param)->isp_loopid)) {
-			return (CAM_PATH_INVALID);
+			badpath = 1;
 		} else if (IS_SCSI(isp) && (accb->ccb_h.target_id != 
 		    ((sdparam *) isp->isp_param)->isp_initiator_id)) {
+			badpath = 1;
+		}
+		if (badpath) {
+			/*
+			 * Being restrictive about target ids is really about
+			 * making sure we're aborting for the right multi-tid
+			 * path. This doesn't really make much sense at present.
+			 */
+#if	0
 			return (CAM_PATH_INVALID);
+#endif
 		}
 	}
 	tptr = get_lun_statep(isp, XS_CHANNEL(ccb), accb->ccb_h.target_lun);
 	if (tptr == NULL) {
+		isp_prt(isp, ISP_LOGTDEBUG0,
+		    "isp_abort_tgt_ccb: can't get statep");
 		return (CAM_PATH_INVALID);
 	}
 	if (accb->ccb_h.func_code == XPT_ACCEPT_TARGET_IO) {
 		lp = &tptr->atios;
+		ctr = &tptr->atio_count;
 	} else if (accb->ccb_h.func_code == XPT_IMMED_NOTIFY) {
 		lp = &tptr->inots;
+		ctr = &tptr->inot_count;
 	} else {
 		rls_lun_statep(isp, tptr);
+		isp_prt(isp, ISP_LOGTDEBUG0,
+		    "isp_abort_tgt_ccb: bad func %d\n", accb->ccb_h.func_code);
 		return (CAM_UA_ABORT);
 	}
 	curelm = SLIST_FIRST(lp);
@@ -1125,10 +1123,14 @@ isp_abort_tgt_ccb(struct ispsoftc *isp, union ccb *ccb)
 	}
 	rls_lun_statep(isp, tptr);
 	if (found) {
+		*ctr--;
 		accb->ccb_h.status = CAM_REQ_ABORTED;
+		xpt_done(accb);
 		return (CAM_REQ_CMP);
 	}
-	return(CAM_PATH_INVALID);
+	isp_prt(isp, ISP_LOGTDEBUG0,
+	    "isp_abort_tgt_ccb: CCB %p not found\n", ccb);
+	return (CAM_PATH_INVALID);
 }
 
 static cam_status
@@ -1273,7 +1275,7 @@ isp_target_start_ctio(struct ispsoftc *isp, union ccb *ccb)
 		hp = &cto->ct_syshandle;
 	}
 
-	if (isp_save_xs(isp, (XS_T *)ccb, hp)) {
+	if (isp_save_xs_tgt(isp, ccb, hp)) {
 		xpt_print_path(ccb->ccb_h.path);
 		printf("No XFLIST pointers for isp_target_start_ctio\n");
 		return (CAM_RESRC_UNAVAIL);
@@ -1298,11 +1300,11 @@ isp_target_start_ctio(struct ispsoftc *isp, union ccb *ccb)
 
 	case CMD_EAGAIN:
 		ccb->ccb_h.status = CAM_RESRC_UNAVAIL;
-		isp_destroy_handle(isp, save_handle);
+		isp_destroy_tgt_handle(isp, save_handle);
 		return (CAM_RESRC_UNAVAIL);
 
 	default:
-		isp_destroy_handle(isp, save_handle);
+		isp_destroy_tgt_handle(isp, save_handle);
 		return (XS_ERR(ccb));
 	}
 }
@@ -1419,6 +1421,12 @@ isp_handle_platform_atio(struct ispsoftc *isp, at_entry_t *aep)
 	tptr = get_lun_statep(isp, bus, aep->at_lun);
 	if (tptr == NULL) {
 		tptr = get_lun_statep(isp, bus, CAM_LUN_WILDCARD);
+		if (tptr == NULL) {
+			isp_endcmd(isp, aep,
+			    SCSI_STATUS_CHECK_COND | ECMD_SVALID |
+			    (0x5 << 12) | (0x25 << 16), 0);
+			return (0);
+		}
 		iswildcard = 1;
 	} else {
 		iswildcard = 0;
@@ -1460,6 +1468,9 @@ isp_handle_platform_atio(struct ispsoftc *isp, at_entry_t *aep)
 		return (0);
 	}
 	SLIST_REMOVE_HEAD(&tptr->atios, sim_links.sle);
+	tptr->atio_count--;
+	isp_prt(isp, ISP_LOGTDEBUG0, "Take FREE ATIO lun %d, count now %d",
+	    aep->at_lun, tptr->atio_count);
 	if (iswildcard) {
 		atiop->ccb_h.target_id = aep->at_tgt;
 		atiop->ccb_h.target_lun = aep->at_lun;
@@ -1530,42 +1541,21 @@ isp_handle_platform_atio2(struct ispsoftc *isp, at2_entry_t *aep)
 	}
 	tptr = get_lun_statep(isp, 0, lun);
 	if (tptr == NULL) {
-		isp_prt(isp, ISP_LOGWARN, "no state pointer for lun %d", lun);
+		isp_prt(isp, ISP_LOGTDEBUG0,
+		    "[0x%x] no state pointer for lun %d", aep->at_rxid, lun);
 		tptr = get_lun_statep(isp, 0, CAM_LUN_WILDCARD);
-	}
-
-	if (tptr == NULL) {
-		/*
-		 * What we'd like to know is whether or not we have a listener
-		 * upstream that really hasn't configured yet. If we do, then
-		 * we can give a more sensible reply here. If not, then we can
-		 * reject this out of hand.
-		 *
-		 * Choices for what to send were
-		 *
-                 *	Not Ready, Unit Not Self-Configured Yet
-		 *	(0x2,0x3e,0x00)
-		 *
-		 * for the former and
-		 *
-		 *	Illegal Request, Logical Unit Not Supported
-		 *	(0x5,0x25,0x00)
-		 *
-		 * for the latter.
-		 *
-		 * We used to decide whether there was at least one listener
-		 * based upon whether the black hole driver was configured.
-		 * However, recent config(8) changes have made this hard to do
-		 * at this time.
-		 *
-		 */
-		isp_endcmd(isp, aep, SCSI_STATUS_BUSY, 0);
-		return (0);
+		if (tptr == NULL) {
+			isp_endcmd(isp, aep,
+			    SCSI_STATUS_CHECK_COND | ECMD_SVALID |
+			    (0x5 << 12) | (0x25 << 16), 0);
+			return (0);
+		}
 	}
 
 	atp = isp_get_atpd(isp, 0);
 	atiop = (struct ccb_accept_tio *) SLIST_FIRST(&tptr->atios);
 	if (atiop == NULL || atp == NULL) {
+
 		/*
 		 * Because we can't autofeed sense data back with
 		 * a command for parallel SCSI, we can't give back
@@ -1586,7 +1576,7 @@ isp_handle_platform_atio2(struct ispsoftc *isp, at2_entry_t *aep)
 	atp->state = ATPD_STATE_ATIO;
 	SLIST_REMOVE_HEAD(&tptr->atios, sim_links.sle);
 	tptr->atio_count--;
-	isp_prt(isp, ISP_LOGTDEBUG0, "Take FREE ATIO2 lun %d, count now %d",
+	isp_prt(isp, ISP_LOGTDEBUG0, "Take FREE ATIO lun %d, count now %d",
 	    lun, tptr->atio_count);
 
 	if (tptr == &isp->isp_osinfo.tsdflt[0]) {
@@ -1628,6 +1618,7 @@ isp_handle_platform_atio2(struct ispsoftc *isp, at2_entry_t *aep)
 	atp->last_xframt = 0;
 	atp->bytes_xfered = 0;
 	atp->state = ATPD_STATE_CAM;
+	ISPLOCK_2_CAMLOCK(siP);
 	xpt_done((union ccb*)atiop);
 
 	isp_prt(isp, ISP_LOGTDEBUG0,
@@ -1649,9 +1640,9 @@ isp_handle_platform_ctio(struct ispsoftc *isp, void *arg)
 	 * CTIO and CTIO2 are close enough....
 	 */
 
-	ccb = (union ccb *) isp_find_xs(isp, ((ct_entry_t *)arg)->ct_syshandle);
+	ccb = isp_find_xs_tgt(isp, ((ct_entry_t *)arg)->ct_syshandle);
 	KASSERT((ccb != NULL), ("null ccb in isp_handle_platform_ctio"));
-	isp_destroy_handle(isp, ((ct_entry_t *)arg)->ct_syshandle);
+	isp_destroy_tgt_handle(isp, ((ct_entry_t *)arg)->ct_syshandle);
 
 	if (IS_FC(isp)) {
 		ct2_entry_t *ct = arg;
@@ -1746,6 +1737,19 @@ isp_handle_platform_ctio(struct ispsoftc *isp, void *arg)
 	return (0);
 }
 
+static void
+isp_handle_platform_ctio_fastpost(struct ispsoftc *isp, u_int32_t token)
+{
+	union ccb *ccb;
+	ccb = isp_find_xs_tgt(isp, token & 0xffff);
+	KASSERT((ccb != NULL),
+	    ("null ccb in isp_handle_platform_ctio_fastpost"));
+	isp_destroy_tgt_handle(isp, token & 0xffff);
+	isp_prt(isp, ISP_LOGTDEBUG1, "CTIOx[%x] fastpost complete",
+	    token & 0xffff);
+	isp_complete_ctio(ccb);
+}
+
 static int
 isp_handle_platform_notify_scsi(struct ispsoftc *isp, in_entry_t *inp)
 {
@@ -1779,8 +1783,12 @@ isp_handle_platform_notify_fc(struct ispsoftc *isp, in_fcentry_t *inp)
 				inot = (struct ccb_immed_notify *)
 				    SLIST_FIRST(&tptr->inots);
 				if (inot) {
+					tptr->inot_count--;
 					SLIST_REMOVE_HEAD(&tptr->inots,
 					    sim_links.sle);
+					isp_prt(isp, ISP_LOGTDEBUG0,
+					    "Take FREE INOT count now %d",
+					    tptr->inot_count);
 				}
 			}
 			isp_prt(isp, ISP_LOGWARN,
@@ -2141,14 +2149,26 @@ isp_action(struct cam_sim *sim, union ccb *ccb)
 #ifdef	ISP_TARGET_MODE
 	case XPT_EN_LUN:		/* Enable LUN as a target */
 	{
-		int iok;
+		int seq, iok, i;
 		CAMLOCK_2_ISPLOCK(isp);
 		iok = isp->isp_osinfo.intsok;
 		isp->isp_osinfo.intsok = 0;
-		isp_en_lun(isp, ccb);
+		seq = isp_en_lun(isp, ccb);
+		if (seq < 0) {
+			isp->isp_osinfo.intsok = iok;
+			ISPLOCK_2_CAMLOCK(isp);
+			xpt_done(ccb);
+			break;
+		}
+		for (i = 0; isp->isp_osinfo.leact[seq] && i < 30 * 1000; i++) {
+			u_int16_t isr, sema, mbox;
+			if (ISP_READ_ISR(isp, &isr, &sema, &mbox)) {
+				isp_intr(isp, isr, sema, mbox);
+			}
+			DELAY(1000);
+		}
 		isp->isp_osinfo.intsok = iok;
 		ISPLOCK_2_CAMLOCK(isp);
-		xpt_done(ccb);
 		break;
 	}
 	case XPT_NOTIFY_ACK:		/* recycle notify ack */
@@ -2174,15 +2194,19 @@ isp_action(struct cam_sim *sim, union ccb *ccb)
 			 */
 			tptr->atio_count++;
 			isp_prt(isp, ISP_LOGTDEBUG0,
-			    "Put FREE ATIO2, lun %d, count now %d",
+			    "Put FREE ATIO, lun %d, count now %d",
 			    ccb->ccb_h.target_lun, tptr->atio_count);
 			SLIST_INSERT_HEAD(&tptr->atios, &ccb->ccb_h,
 			    sim_links.sle);
 		} else if (ccb->ccb_h.func_code == XPT_IMMED_NOTIFY) {
+			tptr->inot_count++;
+			isp_prt(isp, ISP_LOGTDEBUG0,
+			    "Put FREE INOT, lun %d, count now %d",
+			    ccb->ccb_h.target_lun, tptr->inot_count);
 			SLIST_INSERT_HEAD(&tptr->inots, &ccb->ccb_h,
 			    sim_links.sle);
 		} else {
-			;
+			isp_prt(isp, ISP_LOGWARN, "Got Notify ACK");;
 		}
 		rls_lun_statep(isp, tptr);
 		ccb->ccb_h.status = CAM_REQ_INPROG;
@@ -3011,6 +3035,15 @@ isp_async(struct ispsoftc *isp, ispasync_t cmd, void *arg)
 	case ISPASYNC_TARGET_EVENT:
 	{
 		tmd_event_t *ep = arg;
+		if (ep->ev_event == ASYNC_CTIO_DONE) {
+			/*
+			 * ACK the interrupt first
+			 */
+			ISP_WRITE(isp, BIU_SEMA, 0);
+			ISP_WRITE(isp, HCCR, HCCR_CMD_CLEAR_RISC_INT);
+			isp_handle_platform_ctio_fastpost(isp, ep->ev_bus);
+			break;
+		}
 		isp_prt(isp, ISP_LOGALL,
 		    "bus %d event code 0x%x", ep->ev_bus, ep->ev_event);
 		break;
@@ -3043,14 +3076,7 @@ isp_async(struct ispsoftc *isp, ispasync_t cmd, void *arg)
 			break;
 		case RQSTYPE_ENABLE_LUN:
 		case RQSTYPE_MODIFY_LUN:
-			if (IS_DUALBUS(isp)) {
-				bus =
-				    GET_BUS_VAL(((lun_entry_t *)arg)->le_rsvd);
-			} else {
-				bus = 0;
-			}
-			isp_cv_signal_rqe(isp, bus,
-			    ((lun_entry_t *)arg)->le_status);
+			isp_ledone(isp, (lun_entry_t *) arg);
 			break;
 		}
 		break;

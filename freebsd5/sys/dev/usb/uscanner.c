@@ -5,7 +5,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/uscanner.c,v 1.46 2003/10/01 13:53:51 ticso Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/uscanner.c,v 1.57.2.1 2004/09/20 05:03:28 sanpei Exp $");
 
 /*
  * Copyright (c) 2000 The NetBSD Foundation, Inc.
@@ -76,7 +76,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/uscanner.c,v 1.46 2003/10/01 13:53:51 ticso 
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
 
-#include <dev/usb/usbdevs.h>
+#include "usbdevs.h"
 
 #ifdef USB_DEBUG
 #define DPRINTF(x)	if (uscannerdebug) logprintf x
@@ -121,6 +121,9 @@ static const struct uscan_info uscanner_devs[] = {
 
   /* Canon */
  {{ USB_VENDOR_CANON, USB_PRODUCT_CANON_N656U }, 0 },
+ {{ USB_VENDOR_CANON, USB_PRODUCT_CANON_N676U }, 0 },
+ {{ USB_VENDOR_CANON, USB_PRODUCT_CANON_N1220U }, 0 },
+ {{ USB_VENDOR_CANON, USB_PRODUCT_CANON_N1240U }, 0 },
 
   /* Kye */
  {{ USB_VENDOR_KYE, USB_PRODUCT_KYE_VIVIDPRO }, 0 },
@@ -149,6 +152,9 @@ static const struct uscan_info uscanner_devs[] = {
  {{ USB_VENDOR_MICROTEK, USB_PRODUCT_MICROTEK_V6USL2 }, 0 },
  {{ USB_VENDOR_MICROTEK, USB_PRODUCT_MICROTEK_V6UL }, 0 },
 
+ /* Minolta */
+ {{ USB_VENDOR_MINOLTA, USB_PRODUCT_MINOLTA_5400 }, 0 },
+
   /* Mustek */
  {{ USB_VENDOR_MUSTEK, USB_PRODUCT_MUSTEK_1200CU }, 0 },
  {{ USB_VENDOR_MUSTEK, USB_PRODUCT_MUSTEK_BEARPAW1200F }, 0 },
@@ -163,6 +169,9 @@ static const struct uscan_info uscanner_devs[] = {
   /* National */
  {{ USB_VENDOR_NATIONAL, USB_PRODUCT_NATIONAL_BEARPAW1200 }, 0 },
  {{ USB_VENDOR_NATIONAL, USB_PRODUCT_NATIONAL_BEARPAW2400 }, 0 },
+
+  /* Nikon */
+ {{ USB_VENDOR_NIKON, USB_PRODUCT_NIKON_LS40 }, 0 },
 
   /* Primax */
  {{ USB_VENDOR_PRIMAX, USB_PRODUCT_PRIMAX_G2X300 }, 0 },
@@ -190,7 +199,9 @@ static const struct uscan_info uscanner_devs[] = {
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_640U }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1650 }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1660 }, 0 },
+ {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1670 }, 0 },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_1260 }, 0 },
+ {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_3200 }, USC_KEEP_OPEN },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_GT9700F }, USC_KEEP_OPEN },
  {{ USB_VENDOR_EPSON, USB_PRODUCT_EPSON_GT9300UF }, 0 },
 
@@ -224,7 +235,7 @@ struct uscanner_softc {
 	usbd_device_handle	sc_udev;
 	usbd_interface_handle	sc_iface;
 #if defined(__FreeBSD__)
-	dev_t			dev;
+	struct cdev *dev;
 #endif
 
 	u_int			sc_dev_flags;
@@ -259,16 +270,16 @@ d_read_t  uscannerread;
 d_write_t uscannerwrite;
 d_poll_t  uscannerpoll;
 
-#define USCANNER_CDEV_MAJOR	156
 
 Static struct cdevsw uscanner_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	uscanneropen,
 	.d_close =	uscannerclose,
 	.d_read =	uscannerread,
 	.d_write =	uscannerwrite,
 	.d_poll =	uscannerpoll,
 	.d_name =	"uscanner",
-	.d_maj =	USCANNER_CDEV_MAJOR,
 #if __FreeBSD_version < 500014
 	.d_bmaj		-1
 #endif
@@ -305,7 +316,6 @@ USB_ATTACH(uscanner)
 
 	usbd_devinfo(uaa->device, 0, devinfo);
 	USB_ATTACH_SETUP;
-	printf("%s: %s\n", USBDEVNAME(sc->sc_dev), devinfo);
 
 	sc->sc_dev_flags = uscanner_lookup(uaa->vendor, uaa->product)->flags;
 
@@ -372,7 +382,7 @@ USB_ATTACH(uscanner)
 }
 
 int
-uscanneropen(dev_t dev, int flag, int mode, usb_proc_ptr p)
+uscanneropen(struct cdev *dev, int flag, int mode, usb_proc_ptr p)
 {
 	struct uscanner_softc *sc;
 	int unit = USCANNERUNIT(dev);
@@ -435,7 +445,7 @@ uscanneropen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 }
 
 int
-uscannerclose(dev_t dev, int flag, int mode, usb_proc_ptr p)
+uscannerclose(struct cdev *dev, int flag, int mode, usb_proc_ptr p)
 {
 	struct uscanner_softc *sc;
 
@@ -533,7 +543,7 @@ uscanner_do_read(struct uscanner_softc *sc, struct uio *uio, int flag)
 }
 
 int
-uscannerread(dev_t dev, struct uio *uio, int flag)
+uscannerread(struct cdev *dev, struct uio *uio, int flag)
 {
 	struct uscanner_softc *sc;
 	int error;
@@ -583,7 +593,7 @@ uscanner_do_write(struct uscanner_softc *sc, struct uio *uio, int flag)
 }
 
 int
-uscannerwrite(dev_t dev, struct uio *uio, int flag)
+uscannerwrite(struct cdev *dev, struct uio *uio, int flag)
 {
 	struct uscanner_softc *sc;
 	int error;
@@ -666,7 +676,7 @@ USB_DETACH(uscanner)
 }
 
 int
-uscannerpoll(dev_t dev, int events, usb_proc_ptr p)
+uscannerpoll(struct cdev *dev, int events, usb_proc_ptr p)
 {
 	struct uscanner_softc *sc;
 	int revents = 0;

@@ -23,7 +23,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/hfa/fore_stats.c,v 1.11 2003/08/24 17:46:08 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/hfa/fore_stats.c,v 1.13 2004/02/22 16:27:28 mux Exp $");
 
 /*
  * FORE Systems 200-Series Adapter Support
@@ -59,7 +59,7 @@ __FBSDID("$FreeBSD: src/sys/dev/hfa/fore_stats.c,v 1.11 2003/08/24 17:46:08 obri
 #include <dev/hfa/fore_include.h>
 
 #ifndef lint
-__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_stats.c,v 1.11 2003/08/24 17:46:08 obrien Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_stats.c,v 1.13 2004/02/22 16:27:28 mux Exp $");
 #endif
 
 
@@ -130,7 +130,7 @@ fore_get_stats(fup)
 	 */
 	hcp = fup->fu_cmd_tail;
 	if ((*hcp->hcq_status) & QSTAT_FREE) {
-		void	*dma;
+		vm_paddr_t	dma;
 
 		/*
 		 * Queue entry available, so set our view of things up
@@ -146,8 +146,8 @@ fore_get_stats(fup)
 		cqp = hcp->hcq_cpelem;
 		(*hcp->hcq_status) = QSTAT_PENDING;
 
-		dma = (void *)vtophys(fup->fu_stats);
-		if (dma == NULL) {
+		dma = vtophys(fup->fu_stats);
+		if (dma == 0) {
 			fup->fu_stats->st_drv.drv_cm_nodma++;
 			(void) splx(s);
 			return (EIO);

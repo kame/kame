@@ -28,7 +28,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/mixer.c,v 1.33 2003/11/11 05:38:28 scottl Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/mixer.c,v 1.40 2004/06/25 16:34:33 josef Exp $");
 
 MALLOC_DEFINE(M_MIXER, "mixer", "mixer");
 
@@ -73,6 +73,8 @@ static d_open_t mixer_open;
 static d_close_t mixer_close;
 
 static struct cdevsw mixer_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	mixer_open,
 	.d_close =	mixer_close,
 	.d_ioctl =	mixer_ioctl,
@@ -84,16 +86,14 @@ static struct cdevsw mixer_cdevsw = {
 static eventhandler_tag mixer_ehtag;
 #endif
 
-static dev_t
+static struct cdev *
 mixer_get_devt(device_t dev)
 {
-	dev_t pdev;
-	int unit;
+	struct snddev_info *snddev;
 
-	unit = device_get_unit(dev);
-	pdev = makedev(SND_CDEV_MAJOR, PCMMKMINOR(unit, SND_DEV_CTL, 0));
+	snddev = device_get_softc(dev);
 
-	return pdev;
+	return snddev->mixer_dev;
 }
 
 #ifdef SND_DYNSYSCTL
@@ -187,10 +187,11 @@ mix_getdevinfo(struct snd_mixer *m)
 int
 mixer_init(device_t dev, kobj_class_t cls, void *devinfo)
 {
+	struct snddev_info *snddev;
 	struct snd_mixer *m;
 	u_int16_t v;
-	dev_t pdev;
-	int i, unit;
+	struct cdev *pdev;
+	int i, unit, val;
 
 	m = (struct snd_mixer *)kobj_create(cls, M_MIXER, M_WAITOK | M_ZERO);
 	snprintf(m->name, MIXER_NAMELEN, "%s:mixer", device_get_nameunit(dev));
@@ -204,6 +205,14 @@ mixer_init(device_t dev, kobj_class_t cls, void *devinfo)
 
 	for (i = 0; i < SOUND_MIXER_NRDEVICES; i++) {
 		v = snd_mixerdefaults[i];
+
+		if (resource_int_value(device_get_name(dev),
+		    device_get_unit(dev), snd_mixernames[i], &val) == 0) {
+			if (val >= 0 && val <= 100) {
+				v = (u_int16_t) val;
+			}
+		}
+
 		mixer_set(m, i, v | (v << 8));
 	}
 
@@ -213,6 +222,8 @@ mixer_init(device_t dev, kobj_class_t cls, void *devinfo)
 	pdev = make_dev(&mixer_cdevsw, PCMMKMINOR(unit, SND_DEV_CTL, 0),
 		 UID_ROOT, GID_WHEEL, 0666, "mixer%d", unit);
 	pdev->si_drv1 = m;
+	snddev = device_get_softc(dev);
+	snddev->mixer_dev = pdev;
 
 	return 0;
 
@@ -228,7 +239,7 @@ mixer_uninit(device_t dev)
 {
 	int i;
 	struct snd_mixer *m;
-	dev_t pdev;
+	struct cdev *pdev;
 
 	pdev = mixer_get_devt(dev);
 	m = pdev->si_drv1;
@@ -259,7 +270,7 @@ int
 mixer_reinit(device_t dev)
 {
 	struct snd_mixer *m;
-	dev_t pdev;
+	struct cdev *pdev;
 	int i;
 
 	pdev = mixer_get_devt(dev);
@@ -315,7 +326,7 @@ int
 mixer_hwvol_init(device_t dev)
 {
 	struct snd_mixer *m;
-	dev_t pdev;
+	struct cdev *pdev;
 
 	pdev = mixer_get_devt(dev);
 	m = pdev->si_drv1;
@@ -336,7 +347,7 @@ void
 mixer_hwvol_mute(device_t dev)
 {
 	struct snd_mixer *m;
-	dev_t pdev;
+	struct cdev *pdev;
 
 	pdev = mixer_get_devt(dev);
 	m = pdev->si_drv1;
@@ -357,7 +368,7 @@ mixer_hwvol_step(device_t dev, int left_step, int right_step)
 {
 	struct snd_mixer *m;
 	int level, left, right;
-	dev_t pdev;
+	struct cdev *pdev;
 
 	pdev = mixer_get_devt(dev);
 	m = pdev->si_drv1;
@@ -384,7 +395,7 @@ mixer_hwvol_step(device_t dev, int left_step, int right_step)
 /* ----------------------------------------------------------------------- */
 
 static int
-mixer_open(dev_t i_dev, int flags, int mode, struct thread *td)
+mixer_open(struct cdev *i_dev, int flags, int mode, struct thread *td)
 {
 	struct snd_mixer *m;
 	intrmask_t s;
@@ -401,7 +412,7 @@ mixer_open(dev_t i_dev, int flags, int mode, struct thread *td)
 }
 
 static int
-mixer_close(dev_t i_dev, int flags, int mode, struct thread *td)
+mixer_close(struct cdev *i_dev, int flags, int mode, struct thread *td)
 {
 	struct snd_mixer *m;
 	intrmask_t s;
@@ -423,7 +434,7 @@ mixer_close(dev_t i_dev, int flags, int mode, struct thread *td)
 }
 
 int
-mixer_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
+mixer_ioctl(struct cdev *i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
 {
 	struct snd_mixer *m;
 	intrmask_t s;
@@ -476,16 +487,16 @@ mixer_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
 
 #ifdef USING_DEVFS
 static void
-mixer_clone(void *arg, char *name, int namelen, dev_t *dev)
+mixer_clone(void *arg, char *name, int namelen, struct cdev **dev)
 {
-	dev_t pdev;
+	struct snddev_info *sd;
 
-	if (*dev != NODEV)
+	if (*dev != NULL)
 		return;
 	if (strcmp(name, "mixer") == 0) {
-		pdev = makedev(SND_CDEV_MAJOR, PCMMKMINOR(snd_unit, SND_DEV_CTL, 0));
-		if (pdev->si_flags & SI_NAMED)
-			*dev = pdev;
+		sd = devclass_get_softc(pcm_devclass, snd_unit);
+		if (sd != NULL)
+			*dev = sd->mixer_dev;
 	}
 }
 

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/ieee.h,v 1.2 1999/08/28 00:38:44 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/include/ieee.h,v 1.3 2004/04/05 21:00:50 imp Exp $ */
 /* From: NetBSD: ieee.h,v 1.2 1997/04/06 08:47:27 cgd Exp */
 
 /*
@@ -9,11 +9,6 @@
  * at Lawrence Berkeley Laboratory under DARPA contract BG 91-66 and
  * contributed to Berkeley.
  *
- * All advertising materials mentioning features or use of this software
- * must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Lawrence Berkeley Laboratory.
- *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -22,10 +17,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.

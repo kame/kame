@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ata/ata-cbus.c,v 1.8.2.1 2004/01/27 05:53:18 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ata/ata-cbus.c,v 1.13.2.1 2004/10/10 15:01:47 sos Exp $");
 
 #include "opt_ata.h"
 #include <sys/param.h>
@@ -36,6 +36,8 @@ __FBSDID("$FreeBSD: src/sys/dev/ata/ata-cbus.c,v 1.8.2.1 2004/01/27 05:53:18 sco
 #include <sys/ata.h>
 #include <sys/bus.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
+#include <sys/conf.h>
 #include <sys/sema.h>
 #include <sys/taskqueue.h>
 #include <vm/uma.h>
@@ -53,8 +55,10 @@ struct ata_cbus_controller {
     struct resource *irq;
     void *ih;
     void (*setmode)(struct ata_device *, int);
-    void (*locking)(struct ata_channel *, int);
+    int (*locking)(struct ata_channel *, int);
+    struct mtx bank_mtx;
     int current_bank;
+    int restart_bank;
     struct {
 	void (*function)(void *);
 	void *argument;
@@ -63,7 +67,7 @@ struct ata_cbus_controller {
 
 /* local prototypes */
 static void ata_cbus_intr(void *);
-static void ata_cbus_banking(struct ata_channel *, int);
+static int ata_cbus_banking(struct ata_channel *, int);
 static void ata_cbus_setmode(struct ata_device *, int);
 
 static int
@@ -136,8 +140,8 @@ ata_cbus_attach(device_t dev)
     }
 
     rid = ATA_IRQ_RID;
-    if (!(ctlr->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
-					 0, ~0, 1, RF_ACTIVE | RF_SHAREABLE))) {
+    if (!(ctlr->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
+					     RF_ACTIVE | RF_SHAREABLE))) {
 	device_printf(dev, "unable to alloc interrupt\n");
 	bus_release_resource(dev, SYS_RES_IOPORT, ATA_IOADDR_RID, ctlr->io);
 	bus_release_resource(dev, SYS_RES_IOPORT, ATA_ALTADDR_RID, ctlr->altio);
@@ -157,8 +161,10 @@ ata_cbus_attach(device_t dev)
 	return ENXIO;
     }
 
-    ctlr->locking = ata_cbus_banking;
+    mtx_init(&ctlr->bank_mtx, "ATA cbus bank lock", NULL, MTX_DEF);
     ctlr->current_bank = -1;
+    ctlr->restart_bank = -1;
+    ctlr->locking = ata_cbus_banking;
     ctlr->setmode = ata_cbus_setmode;;
 
     if (!device_add_child(dev, "ata", 0))
@@ -219,35 +225,55 @@ static void
 ata_cbus_intr(void *data)
 {  
     struct ata_cbus_controller *ctlr = data;
+    struct ata_channel *ch;
+    int unit;
 
-    if (ctlr->current_bank != -1 &&
-	ctlr->interrupt[ctlr->current_bank].argument)
-	ctlr->interrupt[ctlr->current_bank].
-	    function(ctlr->interrupt[ctlr->current_bank].argument);
+    for (unit = 0; unit < 2; unit++) {
+        if (!(ch = ctlr->interrupt[unit].argument))
+            continue;
+        if (ch->locking(ch, ATA_LF_WHICH) == unit)
+	    ctlr->interrupt[unit].function(ch);
+    }
 }
 
-static void
+static int
 ata_cbus_banking(struct ata_channel *ch, int flags)
 {
     struct ata_cbus_controller *ctlr =
 	device_get_softc(device_get_parent(ch->dev));
+    int res;
 
+    mtx_lock(&ctlr->bank_mtx);
     switch (flags) {
     case ATA_LF_LOCK:
+	if (ctlr->current_bank == -1)
+	    ctlr->current_bank = ch->unit;
 	if (ctlr->current_bank == ch->unit)
-	    break;
-	while (!atomic_cmpset_acq_int(&ctlr->current_bank, -1, ch->unit))
-	    tsleep((caddr_t)ch->locking, PRIBIO, "atabnk", 1);
-	ATA_OUTB(ctlr->bankio, 0, ch->unit);
+	    ATA_OUTB(ctlr->bankio, 0, ch->unit);
+	else
+	    ctlr->restart_bank = ch->unit;
 	break;
 
     case ATA_LF_UNLOCK:
-	if (ctlr->current_bank == -1 || ctlr->current_bank != ch->unit)
-	    break;
-	atomic_store_rel_int(&ctlr->current_bank, -1);
+	if (ctlr->current_bank == ch->unit) {
+	    ctlr->current_bank = -1;
+	    if (ctlr->restart_bank != -1) {
+		if (ctlr->interrupt[ctlr->restart_bank].argument) {
+    		    mtx_unlock(&ctlr->bank_mtx);
+		    ata_start(ctlr->interrupt[ctlr->restart_bank].argument);
+		    mtx_lock(&ctlr->bank_mtx);
+		}
+		ctlr->restart_bank = -1;
+	    }
+	}
+	break;
+
+    case ATA_LF_WHICH:
 	break;
     }
-    return;
+    res = ctlr->current_bank;
+    mtx_unlock(&ctlr->bank_mtx);
+    return res;
 }
 
 static void
@@ -307,6 +333,7 @@ ata_cbussub_probe(device_t dev)
     ch->locking = ctlr->locking;
     ch->device[MASTER].setmode = ctlr->setmode;
     ch->device[SLAVE].setmode = ctlr->setmode;
+    ata_generic_hw(ch);
     return ata_probe(dev);
 }
 

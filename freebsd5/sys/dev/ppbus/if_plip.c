@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ppbus/if_plip.c,v 1.31 2003/10/31 18:32:03 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ppbus/if_plip.c,v 1.35.2.1 2004/09/15 15:14:18 andre Exp $");
 
 /*
  * Parallel port TCP/IP interfaces added.  I looked at the driver from
@@ -183,8 +183,11 @@ static devclass_t lp_devclass;
 static void
 lp_identify(driver_t *driver, device_t parent)
 {
+	device_t dev;
 
-	BUS_ADD_CHILD(parent, 0, "plip", -1);
+	dev = device_find_child(parent, "plip", 0);
+	if (!dev)
+		BUS_ADD_CHILD(parent, 0, "plip", -1);
 }
 /*
  * lpprobe()
@@ -198,7 +201,6 @@ lp_probe(device_t dev)
 	uintptr_t irq;
 
 	lp = DEVTOSOFTC(dev);
-	bzero(lp, sizeof(struct lp_data));
 
 	/* retrieve the ppbus irq */
 	BUS_READ_IVAR(ppbus, dev, PPBUS_IVAR_IRQ, &irq);
@@ -235,7 +237,8 @@ lp_attach (device_t dev)
 	ifp->if_softc = lp;
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = LPMTU;
-	ifp->if_flags = IFF_SIMPLEX | IFF_POINTOPOINT | IFF_MULTICAST;
+	ifp->if_flags = IFF_SIMPLEX | IFF_POINTOPOINT | IFF_MULTICAST |
+	    IFF_NEEDSGIANT;
 	ifp->if_ioctl = lpioctl;
 	ifp->if_output = lpoutput;
 	ifp->if_type = IFT_PARA;
@@ -445,19 +448,8 @@ clpinbyte (int spin, device_t ppbus)
 static void
 lptap(struct ifnet *ifp, struct mbuf *m)
 {
-	/*
-	 * Send a packet through bpf. We need to prepend the address family
-	 * as a four byte field. Cons up a dummy header to pacify bpf. This
-	 * is safe because bpf will only read from the mbuf (i.e., it won't
-	 * try to free it or keep a pointer to it).
-	 */
 	u_int32_t af = AF_INET;
-	struct mbuf m0;
-	
-	m0.m_next = m;
-	m0.m_len = sizeof(u_int32_t);
-	m0.m_data = (char *)&af;
-	BPF_MTAP(ifp, &m0);
+	BPF_MTAP2(ifp, &af, sizeof(af), m);
 }
 
 static void
@@ -518,7 +510,7 @@ lp_intr (void *arg)
 	    if (top) {
 		if (sc->sc_if.if_bpf)
 		    lptap(&sc->sc_if, top);
-		netisr_queue(NETISR_IP, top);
+		netisr_queue(NETISR_IP, top);	/* mbuf is free'd on failure. */
 	    }
 	    goto done;
 	}
@@ -563,7 +555,7 @@ lp_intr (void *arg)
 	    if (top) {
 		if (sc->sc_if.if_bpf)
 		    lptap(&sc->sc_if, top);
-		netisr_queue(NETISR_IP, top);
+		netisr_queue(NETISR_IP, top);	/* mbuf is free'd on failure. */
 	    }
 	}
 	goto done;

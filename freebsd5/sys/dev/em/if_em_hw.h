@@ -31,7 +31,7 @@
 
 *******************************************************************************/
 
-/*$FreeBSD: src/sys/dev/em/if_em_hw.h,v 1.12 2003/11/14 18:02:25 pdeuskar Exp $*/
+/*$FreeBSD: src/sys/dev/em/if_em_hw.h,v 1.13.2.1 2004/10/15 22:12:59 tackerman Exp $*/
 /* if_em_hw.h
  * Structures, enums, and macros for the MAC
  */
@@ -41,6 +41,9 @@
 
 #include <dev/em/if_em_osdep.h>
 
+#ifndef NO_VERSION_CONTROL
+#ident "@(#)$RCSfile: if_em_hw.h,v $$Revision: 1.41 $$Date: 2004/05/17 15:18:53 $"
+#endif
 
 /* Forward declarations of structures used by the shared code */
 struct em_hw;
@@ -297,7 +300,7 @@ int32_t em_read_mac_addr(struct em_hw * hw);
 
 /* Filters (multicast, vlan, receive) */
 void em_init_rx_addrs(struct em_hw *hw);
-void em_mc_addr_list_update(struct em_hw *hw, uint8_t * mc_addr_list, uint32_t mc_addr_count, uint32_t pad);
+void em_mc_addr_list_update(struct em_hw *hw, uint8_t * mc_addr_list, uint32_t mc_addr_count, uint32_t pad, uint32_t rar_used_count);
 uint32_t em_hash_mc_addr(struct em_hw *hw, uint8_t * mc_addr);
 void em_mta_set(struct em_hw *hw, uint32_t hash_value);
 void em_rar_set(struct em_hw *hw, uint8_t * mc_addr, uint32_t rar_index);
@@ -323,9 +326,9 @@ void em_pci_clear_mwi(struct em_hw *hw);
 void em_read_pci_cfg(struct em_hw *hw, uint32_t reg, uint16_t * value);
 void em_write_pci_cfg(struct em_hw *hw, uint32_t reg, uint16_t * value);
 /* Port I/O is only supported on 82544 and newer */
-uint32_t em_io_read(struct em_hw *hw, uint32_t port);
+uint32_t em_io_read(struct em_hw *hw, unsigned long port);
 uint32_t em_read_reg_io(struct em_hw *hw, uint32_t offset);
-void em_io_write(struct em_hw *hw, uint32_t port, uint32_t value);
+void em_io_write(struct em_hw *hw, unsigned long port, uint32_t value);
 void em_write_reg_io(struct em_hw *hw, uint32_t offset, uint32_t value);
 int32_t em_config_dsp_after_link_change(struct em_hw *hw, boolean_t link_up);
 int32_t em_set_d3_lplu_state(struct em_hw *hw, boolean_t active);
@@ -362,6 +365,7 @@ int32_t em_set_d3_lplu_state(struct em_hw *hw, boolean_t active);
 #define E1000_DEV_ID_82547GI             0x1075
 #define E1000_DEV_ID_82541GI             0x1076
 #define E1000_DEV_ID_82541GI_MOBILE      0x1077
+#define E1000_DEV_ID_82541GI_LF          0x107C
 #define E1000_DEV_ID_82546GB_COPPER      0x1079
 #define E1000_DEV_ID_82546GB_FIBER       0x107A
 #define E1000_DEV_ID_82546GB_SERDES      0x107B
@@ -375,6 +379,9 @@ int32_t em_set_d3_lplu_state(struct em_hw *hw, boolean_t active);
 
 #define E1000_82542_2_0_REV_ID 2
 #define E1000_82542_2_1_REV_ID 3
+#define E1000_REVISION_0       0
+#define E1000_REVISION_1       1
+#define E1000_REVISION_2       2
 
 #define SPEED_10    10
 #define SPEED_100   100
@@ -769,6 +776,7 @@ struct em_ffvt_entry {
 #define E1000_WUPL     0x05900  /* Wakeup Packet Length - RW */
 #define E1000_WUPM     0x05A00  /* Wakeup Packet Memory - RO A */
 #define E1000_FFLT     0x05F00  /* Flexible Filter Length Table - RW Array */
+#define E1000_HOST_IF  0x08800  /* Host Interface */
 #define E1000_FFMT     0x09000  /* Flexible Filter Mask Table - RW Array */
 #define E1000_FFVT     0x09800  /* Flexible Filter Value Table - RW Array */
 
@@ -905,6 +913,7 @@ struct em_ffvt_entry {
 #define E1000_82542_TDFT     0x08018
 #define E1000_82542_FFMT     E1000_FFMT
 #define E1000_82542_FFVT     E1000_FFVT
+#define E1000_82542_HOST_IF  E1000_HOST_IF
 
 /* Statistics counters collected by the MAC */
 struct em_hw_stats {
@@ -984,7 +993,7 @@ struct em_hw {
     em_ms_type master_slave;
     em_ms_type original_master_slave;
     em_ffe_config ffe_config_state;
-    uint32_t io_base;
+    unsigned long io_base;
     uint32_t phy_id;
     uint32_t phy_revision;
     uint32_t phy_addr;
@@ -1027,6 +1036,7 @@ struct em_hw {
     boolean_t speed_downgraded;
     em_dsp_config dsp_config_state;
     boolean_t get_link_status;
+    boolean_t serdes_link_down;
     boolean_t tbi_compatibility_en;
     boolean_t tbi_compatibility_on;
     boolean_t phy_reset_disable;
@@ -1316,6 +1326,7 @@ struct em_hw {
 #define E1000_RCTL_DPF            0x00400000    /* discard pause frames */
 #define E1000_RCTL_PMCF           0x00800000    /* pass MAC control frames */
 #define E1000_RCTL_BSEX           0x02000000    /* Buffer size extension */
+#define E1000_RCTL_SECRC          0x04000000    /* Strip Ethernet CRC */
 
 /* Receive Descriptor */
 #define E1000_RDT_DELAY 0x0000ffff      /* Delay timer (1=1024us) */
@@ -1438,6 +1449,10 @@ struct em_hw {
 #define E1000_MANC_TCO_RESET     0x00010000 /* TCO Reset Occurred */
 #define E1000_MANC_RCV_TCO_EN    0x00020000 /* Receive TCO Packets Enabled */
 #define E1000_MANC_REPORT_STATUS 0x00040000 /* Status Reporting Enabled */
+#define E1000_MANC_EN_MAC_ADDR_FILTER   0x00100000 /* Enable MAC address
+                                                    * filtering */
+#define E1000_MANC_EN_MNG2HOST   0x00200000 /* Enable MNG packets to host
+                                             * memory */
 #define E1000_MANC_SMB_REQ       0x01000000 /* SMBus Request */
 #define E1000_MANC_SMB_GNT       0x02000000 /* SMBus Grant */
 #define E1000_MANC_SMB_CLK_IN    0x04000000 /* SMBus Clock In */
@@ -1484,6 +1499,7 @@ struct em_hw {
 #define EEPROM_COMPAT                 0x0003
 #define EEPROM_ID_LED_SETTINGS        0x0004
 #define EEPROM_SERDES_AMPLITUDE       0x0006 /* For SERDES output amplitude adjustment. */
+#define EEPROM_PHY_CLASS_WORD         0x0007
 #define EEPROM_INIT_CONTROL1_REG      0x000A
 #define EEPROM_INIT_CONTROL2_REG      0x000F
 #define EEPROM_INIT_CONTROL3_PORT_B   0x0014
@@ -1517,6 +1533,9 @@ struct em_hw {
 /* Mask bits for SERDES amplitude adjustment in Word 6 of the EEPROM */
 #define EEPROM_SERDES_AMPLITUDE_MASK  0x000F
 
+/* Mask bit for PHY class in Word 7 of the EEPROM */
+#define EEPROM_PHY_CLASS_A   0x8000
+
 /* Mask bits for fields in Word 0x0a of the EEPROM */
 #define EEPROM_WORD0A_ILOS   0x0010
 #define EEPROM_WORD0A_SWDPIO 0x01E0
@@ -1544,7 +1563,7 @@ struct em_hw {
 #define PBA_SIZE 4
 
 /* Collision related configuration parameters */
-#define E1000_COLLISION_THRESHOLD       16
+#define E1000_COLLISION_THRESHOLD       15
 #define E1000_CT_SHIFT                  4
 #define E1000_COLLISION_DISTANCE        64
 #define E1000_FDX_COLLISION_DISTANCE    E1000_COLLISION_DISTANCE
@@ -2010,7 +2029,7 @@ struct em_hw {
 #define IGP01E1000_PSSR_MDIX_SHIFT             0x000B /* shift right 11 */
 
 /* IGP01E1000 Specific Port Control Register - R/W */
-#define IGP01E1000_PSCR_TP_LOOPBACK            0x0001
+#define IGP01E1000_PSCR_TP_LOOPBACK            0x0010
 #define IGP01E1000_PSCR_CORRECT_NC_SCMBLR      0x0200
 #define IGP01E1000_PSCR_TEN_CRS_SELECT         0x0400
 #define IGP01E1000_PSCR_FLIP_CHIP              0x0800
@@ -2020,16 +2039,18 @@ struct em_hw {
 /* IGP01E1000 Specific Port Link Health Register */
 #define IGP01E1000_PLHR_SS_DOWNGRADE           0x8000
 #define IGP01E1000_PLHR_GIG_SCRAMBLER_ERROR    0x4000
+#define IGP01E1000_PLHR_MASTER_FAULT           0x2000
+#define IGP01E1000_PLHR_MASTER_RESOLUTION      0x1000
 #define IGP01E1000_PLHR_GIG_REM_RCVR_NOK       0x0800 /* LH */
 #define IGP01E1000_PLHR_IDLE_ERROR_CNT_OFLOW   0x0400 /* LH */
 #define IGP01E1000_PLHR_DATA_ERR_1             0x0200 /* LH */
 #define IGP01E1000_PLHR_DATA_ERR_0             0x0100
-#define IGP01E1000_PLHR_AUTONEG_FAULT          0x0010
-#define IGP01E1000_PLHR_AUTONEG_ACTIVE         0x0008
-#define IGP01E1000_PLHR_VALID_CHANNEL_D        0x0004
-#define IGP01E1000_PLHR_VALID_CHANNEL_C        0x0002
-#define IGP01E1000_PLHR_VALID_CHANNEL_B        0x0001
-#define IGP01E1000_PLHR_VALID_CHANNEL_A        0x0000
+#define IGP01E1000_PLHR_AUTONEG_FAULT          0x0040
+#define IGP01E1000_PLHR_AUTONEG_ACTIVE         0x0010
+#define IGP01E1000_PLHR_VALID_CHANNEL_D        0x0008
+#define IGP01E1000_PLHR_VALID_CHANNEL_C        0x0004
+#define IGP01E1000_PLHR_VALID_CHANNEL_B        0x0002
+#define IGP01E1000_PLHR_VALID_CHANNEL_A        0x0001
 
 /* IGP01E1000 Channel Quality Register */
 #define IGP01E1000_MSE_CHANNEL_D        0x000F

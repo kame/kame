@@ -27,12 +27,15 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/syscons/scgfbrndr.c,v 1.18 2003/08/25 21:32:00 jake Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/syscons/scgfbrndr.c,v 1.19 2004/01/21 05:08:51 grehan Exp $");
 
 #include "opt_syscons.h"
 #include "opt_gfb.h"
 #ifdef __sparc64__
 #include "opt_creator.h"
+#endif
+#ifdef __powerpc__
+#include "opt_ofwfb.h"
 #endif
 
 #include <sys/param.h>
@@ -210,7 +213,7 @@ gfb_cursor_shape(scr_stat *scp, int base, int height, int blink)
 
 static int pxlblinkrate = 0;
 
-#ifdef DEV_CREATOR
+#if defined(DEV_CREATOR) || defined(SC_OFWFB)
 static void
 gfb_cursor(scr_stat *scp, int at, int blink, int on, int flip)
 {

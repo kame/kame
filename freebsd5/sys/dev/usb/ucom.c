@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/ucom.c,v 1.35 2003/11/16 11:58:21 akiyama Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/ucom.c,v 1.51 2004/07/15 20:47:40 phk Exp $");
 
 /*
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -66,15 +66,11 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/ucom.c,v 1.35 2003/11/16 11:58:21 akiyama Ex
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/*
- * TODO:
- * 1. How do I handle hotchar?
- */
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/ioccom.h>
 #include <sys/fcntl.h>
@@ -88,7 +84,6 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/ucom.c,v 1.35 2003/11/16 11:58:21 akiyama Ex
 #include <sys/select.h>
 #endif
 #include <sys/proc.h>
-#include <sys/vnode.h>
 #include <sys/poll.h>
 #include <sys/sysctl.h>
 
@@ -97,7 +92,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/ucom.c,v 1.35 2003/11/16 11:58:21 akiyama Ex
 
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
-#include <dev/usb/usbdevs.h>
+#include "usbdevs.h"
 #include <dev/usb/usb_quirks.h>
 
 #include <dev/usb/ucomvar.h>
@@ -127,22 +122,19 @@ Static d_read_t  ucomread;
 Static d_write_t ucomwrite;
 Static d_ioctl_t ucomioctl;
 
-#define UCOM_CDEV_MAJOR  138
 
 static struct cdevsw ucom_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	ucomopen,
 	.d_close =	ucomclose,
 	.d_read =	ucomread,
 	.d_write =	ucomwrite,
 	.d_ioctl =	ucomioctl,
-	.d_poll =	ttypoll,
 	.d_name =	"ucom",
-	.d_maj =	UCOM_CDEV_MAJOR,
-	.d_flags =	D_TTY,
+	.d_flags =	D_TTY | D_NEEDGIANT,
 #if __FreeBSD_version < 500014
 	.d_bmaj =	-1,
 #endif
-	.d_kqfilter =	ttykqfilter,
 };
 
 Static void ucom_cleanup(struct ucom_softc *);
@@ -158,7 +150,6 @@ Static usbd_status ucomstartread(struct ucom_softc *);
 Static void ucomreadcb(usbd_xfer_handle, usbd_private_handle, usbd_status);
 Static void ucomwritecb(usbd_xfer_handle, usbd_private_handle, usbd_status);
 Static void ucomstopread(struct ucom_softc *);
-static void disc_optim(struct tty *, struct termios *, struct ucom_softc *);
 
 devclass_t ucom_devclass;
 
@@ -216,11 +207,8 @@ ucom_detach(struct ucom_softc *sc)
 		if (tp->t_state & TS_ISOPEN) {
 			device_printf(sc->sc_dev,
 				      "still open, forcing close\n");
-			(*linesw[tp->t_line].l_close)(tp, 0);
-			tp->t_gen++;
-			ttyclose(tp);
-			ttwakeup(tp);
-			ttwwakeup(tp);
+			ttyld_close(tp, 0);
+			tty_close(tp);
 		}
 	} else {
 		DPRINTF(("ucom_detach: no tty\n"));
@@ -256,7 +244,7 @@ ucom_shutdown(struct ucom_softc *sc)
 }
 
 Static int
-ucomopen(dev_t dev, int flag, int mode, usb_proc_ptr p)
+ucomopen(struct cdev *dev, int flag, int mode, usb_proc_ptr p)
 {
 	int unit = UCOMUNIT(dev);
 	struct ucom_softc *sc;
@@ -391,7 +379,7 @@ ucomopen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 		 */
 		if (ISSET(sc->sc_msr, UMSR_DCD) ||
 		    (minor(dev) & UCOM_CALLOUT_MASK))
-			(*linesw[tp->t_line].l_modem)(tp, 1);
+			ttyld_modem(tp, 1);
 
 		ucomstartread(sc);
 	}
@@ -400,15 +388,15 @@ ucomopen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 	wakeup(&sc->sc_opening);
 	splx(s);
 
-	error = ttyopen(dev, tp);
+	error = tty_open(dev, tp);
 	if (error)
 		goto bad;
 
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = ttyld_open(tp, dev);
 	if (error)
 		goto bad;
 
-	disc_optim(tp, &tp->t_termios, sc);
+	ttyldoptim(tp);
 
 	DPRINTF(("%s: ucomopen: success\n", USBDEVNAME(sc->sc_dev)));
 
@@ -450,7 +438,7 @@ bad:
 }
 
 static int
-ucomclose(dev_t dev, int flag, int mode, usb_proc_ptr p)
+ucomclose(struct cdev *dev, int flag, int mode, usb_proc_ptr p)
 {
 	struct ucom_softc *sc;
 	struct tty *tp;
@@ -467,9 +455,9 @@ ucomclose(dev_t dev, int flag, int mode, usb_proc_ptr p)
 		goto quit;
 
 	s = spltty();
-	(*linesw[tp->t_line].l_close)(tp, flag);
-	disc_optim(tp, &tp->t_termios, sc);
-	ttyclose(tp);
+	ttyld_close(tp, flag);
+	ttyldoptim(tp);
+	tty_close(tp);
 	splx(s);
 
 	if (sc->sc_dying)
@@ -495,7 +483,7 @@ ucomclose(dev_t dev, int flag, int mode, usb_proc_ptr p)
 }
 
 static int
-ucomread(dev_t dev, struct uio *uio, int flag)
+ucomread(struct cdev *dev, struct uio *uio, int flag)
 {
 	struct ucom_softc *sc;
 	struct tty *tp;
@@ -509,7 +497,7 @@ ucomread(dev_t dev, struct uio *uio, int flag)
 	if (sc->sc_dying)
 		return (EIO);
 
-	error = (*linesw[tp->t_line].l_read)(tp, uio, flag);
+	error = ttyld_read(tp, uio, flag);
 
 	DPRINTF(("ucomread: error = %d\n", error));
 
@@ -517,7 +505,7 @@ ucomread(dev_t dev, struct uio *uio, int flag)
 }
 
 static int
-ucomwrite(dev_t dev, struct uio *uio, int flag)
+ucomwrite(struct cdev *dev, struct uio *uio, int flag)
 {
 	struct ucom_softc *sc;
 	struct tty *tp;
@@ -531,7 +519,7 @@ ucomwrite(dev_t dev, struct uio *uio, int flag)
 	if (sc->sc_dying)
 		return (EIO);
 
-	error = (*linesw[tp->t_line].l_write)(tp, uio, flag);
+	error = ttyld_write(tp, uio, flag);
 
 	DPRINTF(("ucomwrite: error = %d\n", error));
 
@@ -539,14 +527,14 @@ ucomwrite(dev_t dev, struct uio *uio, int flag)
 }
 
 static int
-ucomioctl(dev_t dev, u_long cmd, caddr_t data, int flag, usb_proc_ptr p)
+ucomioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, usb_proc_ptr p)
 {
 	struct ucom_softc *sc;
 	struct tty *tp;
 	int error;
 	int s;
 	int d;
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#if defined(COMPAT_43)
 	u_long oldcmd;
 	struct termios term;
 #endif
@@ -559,7 +547,7 @@ ucomioctl(dev_t dev, u_long cmd, caddr_t data, int flag, usb_proc_ptr p)
 
 	DPRINTF(("ucomioctl: cmd = 0x%08lx\n", cmd));
 
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#if defined(COMPAT_43)
 	term = tp->t_termios;
 	oldcmd = cmd;
 	error = ttsetcompat(tp, &cmd, data, &term);
@@ -569,21 +557,14 @@ ucomioctl(dev_t dev, u_long cmd, caddr_t data, int flag, usb_proc_ptr p)
 		data = (caddr_t)&term;
 #endif
 
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, p);
-	if (error != ENOIOCTL) {
+	error = ttyioctl(dev, cmd, data, flag, p);
+	ttyldoptim(tp);
+	if (error != ENOTTY) {
 		DPRINTF(("ucomioctl: l_ioctl: error = %d\n", error));
 		return (error);
 	}
 
 	s = spltty();
-
-	error = ttioctl(tp, cmd, data, flag);
-	disc_optim(tp, &tp->t_termios, sc);
-	if (error != ENOIOCTL) {
-		splx(s);
-		DPRINTF(("ucomioctl: ttioctl: error = %d\n", error));
-		return (error);
-	}
 
 	if (sc->sc_callback->ucom_ioctl != NULL) {
 		error = sc->sc_callback->ucom_ioctl(sc->sc_parent,
@@ -775,7 +756,7 @@ ucom_status_change(struct ucom_softc *sc)
 			return;
 		onoff = ISSET(sc->sc_msr, UMSR_DCD) ? 1 : 0;
 		DPRINTF(("ucom_status_change: DCD changed to %d\n", onoff));
-		(*linesw[tp->t_line].l_modem)(tp, onoff);
+		ttyld_modem(tp, onoff);
 	}
 }
 
@@ -837,7 +818,7 @@ ucomparam(struct tty *tp, struct termios *t)
 		(void)ucomctl(sc, UMCR_RTS, DMBIS);
 	}
 
-	disc_optim(tp, t, sc);
+	ttyldoptim(tp);
 
 	uerr = ucomstartread(sc);
 	if (uerr != USBD_NORMAL_COMPLETION)
@@ -1006,7 +987,7 @@ ucomwritecb(usbd_xfer_handle xfer, usbd_private_handle p, usbd_status status)
 		CLR(tp->t_state, TS_FLUSH);
 	else
 		ndflush(&tp->t_outq, cc);
-	(*linesw[tp->t_line].l_start)(tp);
+	ttyld_start(tp);
 	splx(s);
 
 	return;
@@ -1050,7 +1031,6 @@ ucomreadcb(usbd_xfer_handle xfer, usbd_private_handle p, usbd_status status)
 {
 	struct ucom_softc *sc = (struct ucom_softc *)p;
 	struct tty *tp = sc->sc_tty;
-	int (*rint) (int c, struct tty *tp) = linesw[tp->t_line].l_rint;
 	usbd_status err;
 	u_int32_t cc;
 	u_char *cp;
@@ -1110,7 +1090,7 @@ ucomreadcb(usbd_xfer_handle xfer, usbd_private_handle p, usbd_status status)
 		/* Give characters to tty layer. */
 		while (cc > 0) {
 			DPRINTFN(7, ("ucomreadcb: char = 0x%02x\n", *cp));
-			if ((*rint)(*cp, tp) == -1) {
+			if (ttyld_rint(tp, *cp) == -1) {
 				/* XXX what should we do? */
 				printf("%s: lost %d chars\n",
 				       USBDEVNAME(sc->sc_dev), cc);
@@ -1181,22 +1161,4 @@ ucomstopread(struct ucom_softc *sc)
 	}
 
 	DPRINTF(("ucomstopread: leave\n"));
-}
-
-static void
-disc_optim(struct tty *tp, struct termios *t, struct ucom_softc *sc)
-{
-	if (!(t->c_iflag & (ICRNL | IGNCR | IMAXBEL | INLCR | ISTRIP | IXON))
-	    && (!(t->c_iflag & BRKINT) || (t->c_iflag & IGNBRK))
-	    && (!(t->c_iflag & PARMRK)
-		|| (t->c_iflag & (IGNPAR | IGNBRK)) == (IGNPAR | IGNBRK))
-	    && !(t->c_lflag & (ECHO | ICANON | IEXTEN | ISIG | PENDIN))
-	    && linesw[tp->t_line].l_rint == ttyinput) {
-		DPRINTF(("disc_optim: bypass l_rint\n"));
-		tp->t_state |= TS_CAN_BYPASS_L_RINT;
-	} else {
-		DPRINTF(("disc_optim: can't bypass l_rint\n"));
-		tp->t_state &= ~TS_CAN_BYPASS_L_RINT;
-	}
-	sc->hotchar = linesw[tp->t_line].l_hotchar;
 }

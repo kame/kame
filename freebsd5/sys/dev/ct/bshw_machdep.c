@@ -1,7 +1,7 @@
 /*	$NecBSD: bshw_machdep.c,v 1.8.12.6 2001/06/29 06:28:05 honda Exp $	*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ct/bshw_machdep.c,v 1.5 2003/08/24 17:46:03 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ct/bshw_machdep.c,v 1.6 2004/03/13 19:46:27 peter Exp $");
 /*	$NetBSD$	*/
 
 /*
@@ -78,8 +78,8 @@ __FBSDID("$FreeBSD: src/sys/dev/ct/bshw_machdep.c,v 1.5 2003/08/24 17:46:03 obri
 #include <machine/clock.h>
 #include <machine/md_var.h>
 
-#include <machine/dvcfg.h>
-#include <machine/physio_proc.h>
+#include <compat/netbsd/dvcfg.h>
+#include <compat/netbsd/physio_proc.h>
 
 #include <cam/scsi/scsi_low.h>
 

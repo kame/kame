@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/pnphy.c,v 1.16 2003/08/24 17:54:10 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/pnphy.c,v 1.17 2004/05/29 18:09:10 marius Exp $");
 
 /*
  * Pseudo-driver for media selection on the Lite-On PNIC 82c168
@@ -39,9 +39,6 @@ __FBSDID("$FreeBSD: src/sys/dev/mii/pnphy.c,v 1.16 2003/08/24 17:54:10 obrien Ex
  * only support manual mode selection. This is lame, but getting
  * NWAY to work right is amazingly difficult.
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/pnphy.c,v 1.16 2003/08/24 17:54:10 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

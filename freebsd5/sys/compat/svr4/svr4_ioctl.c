@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_ioctl.c,v 1.20 2003/06/10 21:35:15 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_ioctl.c,v 1.21 2004/06/21 22:57:10 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -119,10 +119,12 @@ svr4_sys_ioctl(td, uap)
 #endif
 
 	switch (cmd & 0xff00) {
+#ifndef BURN_BRIDGES
 	case SVR4_tIOC:
 	        DPRINTF(("ttold\n"));
 		fun = svr4_ttold_ioctl;
 		break;
+#endif
 
 	case SVR4_TIOC:
 	        DPRINTF(("term\n"));

@@ -59,7 +59,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/es137x.c,v 1.48 2003/09/07 16:28:03 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/es137x.c,v 1.51 2004/07/16 03:59:27 tanimura Exp $");
 
 static int debug = 0;
 SYSCTL_INT(_debug, OID_AUTO, es_debug, CTLFLAG_RW, &debug, 0, "");
@@ -855,8 +855,8 @@ es_pci_attach(device_t dev)
 	if (mapped == 0 && (data & PCIM_CMD_MEMEN)) {
 		es->regid = MEM_MAP_REG;
 		es->regtype = SYS_RES_MEMORY;
-		es->reg = bus_alloc_resource(dev, es->regtype, &es->regid,
-					 0, ~0, 1, RF_ACTIVE);
+		es->reg = bus_alloc_resource_any(dev, es->regtype, &es->regid,
+					 RF_ACTIVE);
 		if (es->reg) {
 			es->st = rman_get_bustag(es->reg);
 			es->sh = rman_get_bushandle(es->reg);
@@ -866,8 +866,8 @@ es_pci_attach(device_t dev)
 	if (mapped == 0 && (data & PCIM_CMD_PORTEN)) {
 		es->regid = PCIR_BAR(0);
 		es->regtype = SYS_RES_IOPORT;
-		es->reg = bus_alloc_resource(dev, es->regtype, &es->regid,
-					 0, ~0, 1, RF_ACTIVE);
+		es->reg = bus_alloc_resource_any(dev, es->regtype, &es->regid,
+					 RF_ACTIVE);
 		if (es->reg) {
 			es->st = rman_get_bustag(es->reg);
 			es->sh = rman_get_bushandle(es->reg);
@@ -906,8 +906,8 @@ es_pci_attach(device_t dev)
 	} else goto bad;
 
 	es->irqid = 0;
-	es->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &es->irqid,
-				 0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+	es->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &es->irqid,
+				 RF_ACTIVE | RF_SHAREABLE);
 	if (!es->irq || snd_setup_intr(dev, es->irq, 0, es_intr, es, &es->ih)) {
 		device_printf(dev, "unable to map interrupt\n");
 		goto bad;
@@ -924,9 +924,9 @@ es_pci_attach(device_t dev)
 		goto bad;
 	}
 
-	snprintf(status, SND_STATUSLEN, "at %s 0x%lx irq %ld",
+	snprintf(status, SND_STATUSLEN, "at %s 0x%lx irq %ld %s",
 		 (es->regtype == SYS_RES_IOPORT)? "io" : "memory",
-		 rman_get_start(es->reg), rman_get_start(es->irq));
+		 rman_get_start(es->reg), rman_get_start(es->irq),PCM_KLDSTRING(snd_es137x));
 
 	if (pcm_register(dev, es, 1, 1)) goto bad;
 	pcm_addchan(dev, PCMDIR_REC, ct, es);
@@ -981,5 +981,5 @@ static driver_t es_driver = {
 };
 
 DRIVER_MODULE(snd_es137x, pci, es_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_es137x, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_es137x, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_es137x, 1);

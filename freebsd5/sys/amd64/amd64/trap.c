@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/trap.c,v 1.271 2003/11/21 03:01:59 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/trap.c,v 1.279.2.2 2004/09/03 06:40:24 julian Exp $");
 
 /*
  * AMD64 Trap and System call handling
@@ -46,7 +46,6 @@ __FBSDID("$FreeBSD: src/sys/amd64/amd64/trap.c,v 1.271 2003/11/21 03:01:59 peter
 
 #include "opt_clock.h"
 #include "opt_cpu.h"
-#include "opt_ddb.h"
 #include "opt_isa.h"
 #include "opt_ktrace.h"
 
@@ -56,6 +55,7 @@ __FBSDID("$FreeBSD: src/sys/amd64/amd64/trap.c,v 1.271 2003/11/21 03:01:59 peter
 #include <sys/proc.h>
 #include <sys/pioctl.h>
 #include <sys/ptrace.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/lock.h>
@@ -87,8 +87,6 @@ __FBSDID("$FreeBSD: src/sys/amd64/amd64/trap.c,v 1.271 2003/11/21 03:01:59 peter
 #include <machine/smp.h>
 #endif
 #include <machine/tss.h>
-
-#include <ddb/ddb.h>
 
 extern void trap(struct trapframe frame);
 extern void syscall(struct trapframe frame);
@@ -130,10 +128,10 @@ static char *trap_msg[] = {
 	"machine check trap",			/* 28 T_MCHK */
 };
 
-#ifdef DDB
-static int ddb_on_nmi = 1;
-SYSCTL_INT(_machdep, OID_AUTO, ddb_on_nmi, CTLFLAG_RW,
-	&ddb_on_nmi, 0, "Go to DDB on NMI");
+#ifdef KDB
+static int kdb_on_nmi = 1;
+SYSCTL_INT(_machdep, OID_AUTO, kdb_on_nmi, CTLFLAG_RW,
+	&kdb_on_nmi, 0, "Go to KDB on NMI");
 #endif
 static int panic_on_nmi = 1;
 SYSCTL_INT(_machdep, OID_AUTO, panic_on_nmi, CTLFLAG_RW,
@@ -167,11 +165,9 @@ trap(frame)
 	atomic_add_int(&cnt.v_trap, 1);
 	type = frame.tf_trapno;
 
-#ifdef DDB
-	if (db_active) {
-		vm_offset_t eva;
-		eva = (type == T_PAGEFLT ? frame.tf_addr : 0);
-		trap_fatal(&frame, eva);
+#ifdef KDB
+	if (kdb_active) {
+		kdb_reenter();
 		goto out;
 	}
 #endif
@@ -262,8 +258,8 @@ trap(frame)
 			break;
 
 		case T_PAGEFLT:		/* page fault */
-			if (td->td_flags & TDF_SA)
-				thread_user_enter(p, td);
+			if (td->td_pflags & TDP_SA)
+				thread_user_enter(td);
 			i = trap_pfault(&frame, TRUE);
 			if (i == -1)
 				goto userout;
@@ -283,16 +279,16 @@ trap(frame)
 			/* machine/parity/power fail/"kitchen sink" faults */
 			/* XXX Giant */
 			if (isa_nmi(code) == 0) {
-#ifdef DDB
+#ifdef KDB
 				/*
 				 * NMI can be hooked up to a pushbutton
 				 * for debugging.
 				 */
-				if (ddb_on_nmi) {
+				if (kdb_on_nmi) {
 					printf ("NMI ... going to debugger\n");
-					kdb_trap (type, 0, &frame);
+					kdb_trap(type, 0, &frame);
 				}
-#endif /* DDB */
+#endif /* KDB */
 				goto userout;
 			} else if (panic_on_nmi)
 				panic("NMI indicates hardware failure");
@@ -371,8 +367,7 @@ trap(frame)
 				frame.tf_rip = (long)doreti_iret_fault;
 				goto out;
 			}
-			if (PCPU_GET(curpcb) != NULL &&
-			    PCPU_GET(curpcb)->pcb_onfault != NULL) {
+			if (PCPU_GET(curpcb)->pcb_onfault != NULL) {
 				frame.tf_rip =
 				    (long)PCPU_GET(curpcb)->pcb_onfault;
 				goto out;
@@ -397,16 +392,35 @@ trap(frame)
 
 		case T_TRCTRAP:	 /* trace trap */
 			/*
+			 * Ignore debug register trace traps due to
+			 * accesses in the user's address space, which
+			 * can happen under several conditions such as
+			 * if a user sets a watchpoint on a buffer and
+			 * then passes that buffer to a system call.
+			 * We still want to get TRCTRAPS for addresses
+			 * in kernel space because that is useful when
+			 * debugging the kernel.
+			 */
+			if (user_dbreg_trap()) {
+				/*
+				 * Reset breakpoint bits because the
+				 * processor doesn't
+				 */
+				/* XXX check upper bits here */
+				load_dr6(rdr6() & 0xfffffff0);
+				goto out;
+			}
+			/*
 			 * FALLTHROUGH (TRCTRAP kernel mode, kernel address)
 			 */
 		case T_BPTFLT:
 			/*
-			 * If DDB is enabled, let it handle the debugger trap.
+			 * If KDB is enabled, let it handle the debugger trap.
 			 * Otherwise, debugger traps "can't happen".
 			 */
-#ifdef DDB
+#ifdef KDB
 			/* XXX Giant */
-			if (kdb_trap (type, 0, &frame))
+			if (kdb_trap(type, 0, &frame))
 				goto out;
 #endif
 			break;
@@ -416,16 +430,16 @@ trap(frame)
 			/* XXX Giant */
 			/* machine/parity/power fail/"kitchen sink" faults */
 			if (isa_nmi(code) == 0) {
-#ifdef DDB
+#ifdef KDB
 				/*
 				 * NMI can be hooked up to a pushbutton
 				 * for debugging.
 				 */
-				if (ddb_on_nmi) {
+				if (kdb_on_nmi) {
 					printf ("NMI ... going to debugger\n");
-					kdb_trap (type, 0, &frame);
+					kdb_trap(type, 0, &frame);
 				}
-#endif /* DDB */
+#endif /* KDB */
 				goto out;
 			} else if (panic_on_nmi == 0)
 				goto out;
@@ -457,9 +471,6 @@ user:
 	userret(td, &frame, sticks);
 	mtx_assert(&Giant, MA_NOTOWNED);
 userout:
-#ifdef DIAGNOSTIC
-	cred_free_thread(td);
-#endif
 out:
 	return;
 }
@@ -536,7 +547,6 @@ trap_pfault(frame, usermode)
 nogo:
 	if (!usermode) {
 		if (td->td_intr_nesting_level == 0 &&
-		    PCPU_GET(curpcb) != NULL &&
 		    PCPU_GET(curpcb)->pcb_onfault != NULL) {
 			frame->tf_rip = (long)PCPU_GET(curpcb)->pcb_onfault;
 			return (0);
@@ -613,11 +623,7 @@ trap_fatal(frame, eva)
 	}
 
 #ifdef KDB
-	if (kdb_trap(&psl))
-		return;
-#endif
-#ifdef DDB
-	if ((debugger_on_panic || db_active) && kdb_trap(type, 0, frame))
+	if (kdb_trap(type, 0, frame))
 		return;
 #endif
 	printf("trap number		= %d\n", type);
@@ -689,7 +695,7 @@ syscall(frame)
 	if (td->td_ucred != p->p_ucred) 
 		cred_update_thread(td);
 	if (p->p_flag & P_SA)
-		thread_user_enter(p, td);
+		thread_user_enter(td);
 	params = (caddr_t)frame.tf_rsp + sizeof(register_t);
 	code = frame.tf_rax;
 	orig_tf_rflags = frame.tf_rflags;
@@ -720,33 +726,26 @@ syscall(frame)
 	/*
 	 * copyin and the ktrsyscall()/ktrsysret() code is MP-aware
 	 */
-	if (narg <= regcnt) {
-		argp = &frame.tf_rdi;
-		argp += reg;
-		error = 0;
-	} else {
-		KASSERT(narg <= sizeof(args) / sizeof(args[0]),
-		    ("Too many syscall arguments!"));
+	KASSERT(narg <= sizeof(args) / sizeof(args[0]),
+	    ("Too many syscall arguments!"));
+	error = 0;
+	argp = &frame.tf_rdi;
+	argp += reg;
+	bcopy(argp, args, sizeof(args[0]) * regcnt);
+	if (narg > regcnt) {
 		KASSERT(params != NULL, ("copyin args with no params!"));
-		argp = &frame.tf_rdi;
-		argp += reg;
-		bcopy(argp, args, sizeof(args[0]) * regcnt);
 		error = copyin(params, &args[regcnt],
-		    (narg - regcnt) * sizeof(args[0]));
-		argp = &args[0];
+	    		(narg - regcnt) * sizeof(args[0]));
 	}
+	argp = &args[0];
 
 #ifdef KTRACE
 	if (KTRPOINT(td, KTR_SYSCALL))
 		ktrsyscall(code, narg, argp);
 #endif
 
-	/*
-	 * Try to run the syscall without Giant if the syscall
-	 * is MP safe.
-	 */
-	if ((callp->sy_narg & SYF_MPSAFE) == 0)
-		mtx_lock(&Giant);
+	CTR4(KTR_SYSC, "syscall enter thread %p pid %d proc %s code %d", td,
+	    td->td_proc->p_pid, td->td_proc->p_comm, code);
 
 	if (error == 0) {
 		td->td_retval[0] = 0;
@@ -756,7 +755,12 @@ syscall(frame)
 
 		PTRACESTOP_SC(p, td, S_PT_SCE);
 
-		error = (*callp->sy_call)(td, argp);
+		if ((callp->sy_narg & SYF_MPSAFE) == 0) {
+			mtx_lock(&Giant);
+			error = (*callp->sy_call)(td, argp);
+			mtx_unlock(&Giant);
+		} else
+			error = (*callp->sy_call)(td, argp);
 	}
 
 	switch (error) {
@@ -794,12 +798,6 @@ syscall(frame)
 	}
 
 	/*
-	 * Release Giant if we previously set it.
-	 */
-	if ((callp->sy_narg & SYF_MPSAFE) == 0)
-		mtx_unlock(&Giant);
-
-	/*
 	 * Traced syscall.
 	 */
 	if (orig_tf_rflags & PSL_T) {
@@ -811,6 +809,9 @@ syscall(frame)
 	 * Handle reschedule and other end-of-syscall issues
 	 */
 	userret(td, &frame, sticks);
+
+	CTR4(KTR_SYSC, "syscall exit thread %p pid %d proc %s code %d", td,
+	    td->td_proc->p_pid, td->td_proc->p_comm, code);
 
 #ifdef KTRACE
 	if (KTRPOINT(td, KTR_SYSRET))
@@ -826,9 +827,6 @@ syscall(frame)
 
 	PTRACESTOP_SC(p, td, S_PT_SCX);
 
-#ifdef DIAGNOSTIC
-	cred_free_thread(td);
-#endif
 	WITNESS_WARN(WARN_PANIC, NULL, "System call %s returning",
 	    (code >= 0 && code < SYS_MAXSYSCALL) ? syscallnames[code] : "???");
 	mtx_assert(&sched_lock, MA_NOTOWNED);

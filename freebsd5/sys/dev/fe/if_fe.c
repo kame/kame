@@ -21,7 +21,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/fe/if_fe.c,v 1.79 2003/11/13 20:55:48 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/fe/if_fe.c,v 1.86 2004/08/13 23:08:08 rwatson Exp $");
 
 /*
  *
@@ -740,7 +740,6 @@ fe_attach (device_t dev)
 	 */
  	sc->sc_if.if_softc    = sc;
 	if_initname(&sc->sc_if, device_get_name(dev), device_get_unit(dev));
-	sc->sc_if.if_output   = ether_output;
 	sc->sc_if.if_start    = fe_start;
 	sc->sc_if.if_ioctl    = fe_ioctl;
 	sc->sc_if.if_watchdog = fe_watchdog;
@@ -755,7 +754,8 @@ fe_attach (device_t dev)
 	/*
 	 * Set fixed interface flags.
 	 */
- 	sc->sc_if.if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+ 	sc->sc_if.if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_NEEDSGIANT;
 
 #if 1
 	/*
@@ -821,8 +821,7 @@ fe_attach (device_t dev)
 	fe_stop(sc);
   
   	/* Print additional info when attached.  */
- 	device_printf(dev, "address %6D, type %s%s\n",
-		      sc->sc_enaddr, ":" , sc->typestr,
+ 	device_printf(dev, "type %s%s\n", sc->typestr,
 		      (sc->proto_dlcr4 & FE_D4_DSC) ? ", full duplex" : "");
 	if (bootverbose) {
 		int buf, txb, bbw, sbw, ram;
@@ -893,8 +892,7 @@ fe_alloc_irq(device_t dev, int flags)
 	int rid;
 
 	rid = 0;
-	res = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
-				 0ul, ~0ul, 1, RF_ACTIVE | flags);
+	res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid, RF_ACTIVE | flags);
 	if (res) {
 		sc->irq_res = res;
 		return (0);
@@ -1008,14 +1006,6 @@ fe_init (void * xsc)
 {
 	struct fe_softc *sc = xsc;
 	int s;
-
-	/* We need an address. */
-	if (TAILQ_EMPTY(&sc->sc_if.if_addrhead)) { /* XXX unlikely */
-#ifdef DIAGNOSTIC
-		printf("%s: init() without any address\n", sc->sc_xname);
-#endif
-		return;
-	}
 
 	/* Start initializing 86960.  */
 	s = splimp();
@@ -2044,29 +2034,6 @@ fe_write_mbufs (struct fe_softc *sc, struct mbuf *m)
 }
 
 /*
- * Compute hash value for an Ethernet address
- */
-static u_int32_t
-fe_mchash (caddr_t addr)
-{
-#define	FE_POLY 0xEDB88320L
-
-	u_long carry, crc = 0xFFFFFFFFL;
-	int idx, bit;
-	u_int8_t data;
-
-	for ( idx = ETHER_ADDR_LEN; --idx >= 0; ) {
-		for (data = *addr++, bit = 8; --bit >= 0; data >>= 1) {
-			carry = crc;
-			crc >>= 1;
-			if ((carry ^ data) & 1)
-				crc ^= FE_POLY;
-		}
-	}
-	return (crc >> 26);
-}
-
-/*
  * Compute the multicast address filter from the
  * list of multicast addresses we need to listen to.
  */
@@ -2081,7 +2048,8 @@ fe_mcaf ( struct fe_softc *sc )
 	TAILQ_FOREACH(ifma, &sc->arpcom.ac_if.if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		index = fe_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		index = ether_crc32_le(LLADDR((struct sockaddr_dl *)
+		    ifma->ifma_addr), ETHER_ADDR_LEN) >> 26;
 #ifdef FE_DEBUG
 		printf("%s: hash(%6D) == %d\n",
 			sc->sc_xname, enm->enm_addrlo , ":", index);

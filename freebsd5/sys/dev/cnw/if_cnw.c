@@ -2,7 +2,7 @@
 
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/cnw/if_cnw.c,v 1.13 2003/10/31 18:31:58 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/cnw/if_cnw.c,v 1.16 2004/05/23 16:11:46 mux Exp $");
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
@@ -1628,8 +1628,6 @@ static int cnw_pccard_attach(device_t dev)
 			 bus_space_read_1(sc->sc_memt, sc->sc_memh,
 				sc->sc_memoff + CNW_EREG_PA + i);
 	}
-	device_printf(dev, "Ethernet address: %6D\n",
-		sc->arpcom.ac_enaddr, ":");
 
 	ifp->if_softc = sc;
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
@@ -1637,7 +1635,6 @@ static int cnw_pccard_attach(device_t dev)
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = (IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST);
 	ifp->if_ioctl = cnw_ioctl;
-	ifp->if_output = ether_output;
 	ifp->if_start = cnw_start;
 /*	ifp->if_watchdog = 0; */
 	ifp->if_watchdog = cnw_watchdog;
@@ -1676,8 +1673,8 @@ static int cnw_alloc(dev)
 	int error;
 
 	rid = 0;
-	sc->mem_res = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
-					0, ~0, 1, RF_ACTIVE);
+	sc->mem_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
+					     RF_ACTIVE);
 	if (!sc->mem_res) {
 		device_printf(dev, "Cannot allocate attribute memory\n");
 		return (ENOMEM);
@@ -1703,8 +1700,7 @@ static int cnw_alloc(dev)
 	}
 
 	rid = 0;
-	sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
-				     0, ~0, 1, RF_ACTIVE);
+	sc->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid, RF_ACTIVE);
 	if (!sc->irq) {
 		device_printf(dev, "No irq?!\n");
 		return (ENXIO);

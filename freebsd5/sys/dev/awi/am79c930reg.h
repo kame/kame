@@ -1,5 +1,5 @@
-/* $NetBSD: am79c930reg.h,v 1.3 2000/03/22 11:22:22 onoe Exp $ */
-/* $FreeBSD: src/sys/dev/awi/am79c930reg.h,v 1.1 2000/04/06 02:48:45 imp Exp $ */
+/* $NetBSD: am79c930reg.h,v 1.4 2003/11/02 11:07:45 wiz Exp $ */
+/* $FreeBSD: src/sys/dev/awi/am79c930reg.h,v 1.2 2004/01/15 10:04:20 onoe Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -99,7 +99,7 @@
 #define AM79C930_LMA_HI_ISAPWRDWN	0x80	
  
 /*
- * mmm, inconsistancy in chip documentation:
+ * mmm, inconsistency in chip documentation:
  * According to page 79--80, all four of the following are equivalent
  * and address the single byte pointed at by BSS_{FS,MBS} | LMA_{HI,LO}
  * According to tables on p63 and p67, they're the LSB through MSB

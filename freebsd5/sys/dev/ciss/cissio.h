@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/ciss/cissio.h,v 1.2 2002/09/23 06:35:32 alfred Exp $
+ *	$FreeBSD: src/sys/dev/ciss/cissio.h,v 1.4 2004/07/29 08:06:22 ps Exp $
  */
 
 /*
@@ -108,18 +108,18 @@ typedef union {
 	u_int8_t	Dev;
 	u_int8_t	Bus:6;
 	u_int8_t	Mode:2;
-    } PeripDev __packed;
+    } __packed PeripDev;
     struct {
 	u_int8_t	DevLSB;
 	u_int8_t	DevMSB:6;
 	u_int8_t	Mode:2;
-    } LogDev __packed;
+    } __packed LogDev;
     struct {
 	u_int8_t	Dev:5;
 	u_int8_t	Bus:3;
 	u_int8_t	Targ:6;
 	u_int8_t	Mode:2;
-    } LogUnit __packed;
+    } __packed LogUnit;
 } SCSI3Addr_struct;
 
 typedef struct {
@@ -127,20 +127,20 @@ typedef struct {
     u_int32_t		Bus:6;
     u_int32_t		Mode:2;
     SCSI3Addr_struct	Target[2];
-} PhysDevAddr_struct __packed;
+} __packed PhysDevAddr_struct;
   
 typedef struct {
     u_int32_t		VolId:30;
     u_int32_t		Mode:2;
     u_int8_t		reserved[4];
-} LogDevAddr_struct __packed;
+} __packed LogDevAddr_struct;
 
 typedef union {
     u_int8_t		LunAddrBytes[8];
     SCSI3Addr_struct	SCSI3Lun[4];
     PhysDevAddr_struct	PhysDev;
     LogDevAddr_struct	LogDev;
-} LUNAddr_struct __packed;
+} __packed LUNAddr_struct;
 
 typedef struct {
     u_int8_t	CDBLen;
@@ -148,24 +148,24 @@ typedef struct {
 	u_int8_t	Type:3;
 	u_int8_t	Attribute:3;
 	u_int8_t	Direction:2;
-    } Type __packed;
+    } __packed Type;
     u_int16_t	Timeout;
     u_int8_t	CDB[16];
-} RequestBlock_struct __packed;
+} __packed RequestBlock_struct;
 
 typedef union {
     struct {
 	u_int8_t	Reserved[3];
 	u_int8_t	Type;
 	u_int32_t	ErrorInfo;
-    } Common_Info __packed;
+    } __packed Common_Info;
     struct {
 	u_int8_t	Reserved[2];
 	u_int8_t	offense_size;
 	u_int8_t	offense_num;
 	u_int32_t	offense_value;
-    } Invalid_Cmd __packed;
-} MoreErrInfo_struct __packed;
+    } __packed Invalid_Cmd;
+} __packed MoreErrInfo_struct;
 
 typedef struct {
     u_int8_t		ScsiStatus;
@@ -174,7 +174,7 @@ typedef struct {
     u_int32_t		ResidualCnt;
     MoreErrInfo_struct	MoreErrInfo;
     u_int8_t		SenseInfo[SENSEINFOBYTES];
-} ErrorInfo_struct __packed;
+} __packed ErrorInfo_struct;
 
 typedef struct {
     LUNAddr_struct	LUN_info;	/* 8 */
@@ -182,7 +182,7 @@ typedef struct {
     ErrorInfo_struct	error_info;	/* 48 */
     u_int16_t		buf_size;	/* 2 */
     u_int8_t		*buf;		/* 4 */
-} IOCTL_Command_struct __packed;
+} __packed IOCTL_Command_struct;
 
 /*
  * Note that we'd normally pass the struct in directly, but

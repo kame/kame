@@ -23,7 +23,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sio/sio_isa.c,v 1.13 2003/08/25 09:48:48 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sio/sio_isa.c,v 1.14 2003/12/27 19:47:10 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -51,6 +51,7 @@ static device_method_t sio_isa_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		sio_isa_probe),
 	DEVMETHOD(device_attach,	sio_isa_attach),
+	DEVMETHOD(device_detach,	siodetach),
 
 	{ 0, 0 }
 };

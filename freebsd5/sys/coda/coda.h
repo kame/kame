@@ -27,7 +27,7 @@
  * Mellon the rights to redistribute these changes without encumbrance.
  * 
  * 	@(#) src/sys/coda/coda.h,v 1.1.1.1 1998/08/29 21:14:52 rvb Exp $ 
- * $FreeBSD: src/sys/coda/coda.h,v 1.10 2003/09/07 07:43:09 tjr Exp $
+ * $FreeBSD: src/sys/coda/coda.h,v 1.12 2004/06/17 17:16:40 phk Exp $
  * 
  */
 
@@ -58,7 +58,7 @@ typedef unsigned long u_long;
 typedef unsigned int u_int;
 typedef unsigned short u_short;
 typedef u_long ino_t;
-typedef u_long dev_t;
+typedef u_long struct cdev *;
 typedef void * caddr_t;
 #ifdef DOS
 typedef unsigned __int64 u_quad_t;
@@ -87,7 +87,7 @@ typedef unsigned long long u_quad_t;
 typedef unsigned long long u_quad_t;
 #endif
 #else
-#define cdev_t udev_t
+#define cdev_t dev_t
 #endif
 
 #ifdef __CYGWIN32__

@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/buslogic/bt_isa.c,v 1.22 2003/08/24 17:46:02 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/buslogic/bt_isa.c,v 1.23 2004/03/17 17:50:29 njl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -68,8 +68,7 @@ bt_isa_alloc_resources(device_t dev, u_long portstart, u_long portend)
 
 	if (isa_get_irq(dev) != -1) {
 		rid = 0;
-		irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
-					 0, ~0, 1, RF_ACTIVE);
+		irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid, RF_ACTIVE);
 		if (!irq) {
 			if (port)
 				bus_release_resource(dev, SYS_RES_IOPORT,
@@ -81,8 +80,7 @@ bt_isa_alloc_resources(device_t dev, u_long portstart, u_long portend)
 
 	if (isa_get_drq(dev) != -1) {
 		rid = 0;
-		drq = bus_alloc_resource(dev, SYS_RES_DRQ, &rid,
-					 0, ~0, 1, RF_ACTIVE);
+		drq = bus_alloc_resource_any(dev, SYS_RES_DRQ, &rid, RF_ACTIVE);
 		if (!drq) {
 			if (port)
 				bus_release_resource(dev, SYS_RES_IOPORT,

@@ -14,10 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -35,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)frame.h	5.2 (Berkeley) 1/18/91
- * $FreeBSD: src/sys/amd64/include/frame.h,v 1.26 2003/11/08 04:39:22 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/frame.h,v 1.28 2004/07/10 22:39:56 marcel Exp $
  */
 
 #ifndef _MACHINE_FRAME_H_
@@ -139,7 +135,5 @@ struct clockframe {
 	register_t	cf_rsp;
 	register_t	cf_ss;
 };
-
-int	kdb_trap(int, int, struct trapframe *);
 
 #endif /* _MACHINE_FRAME_H_ */

@@ -11,10 +11,6 @@
 # 2. Redistributions in binary form must reproduce the above copyright
 #    notice, this list of conditions and the following disclaimer in the
 #    documentation and/or other materials provided with the distribution.
-# 3. All advertising materials mentioning features or use of this software
-#    must display the following acknowledgement:
-#	This product includes software developed by the University of
-#	California, Berkeley and its contributors.
 # 4. Neither the name of the University nor the names of its contributors
 #    may be used to endorse or promote products derived from this software
 #    without specific prior written permission.
@@ -32,12 +28,12 @@
 # SUCH DAMAGE.
 #
 #	@(#)newvers.sh	8.1 (Berkeley) 4/20/94
-# $FreeBSD: src/sys/conf/newvers.sh,v 1.56.2.7 2004/02/23 05:20:41 scottl Exp $
+# $FreeBSD: src/sys/conf/newvers.sh,v 1.62.2.15.2.5 2004/11/04 18:51:30 scottl Exp $
 
 TYPE="FreeBSD"
-REVISION="5.2.1"
+REVISION="5.3"
 BRANCH="RELEASE"
-RELEASE=5.2.1-RELEASE
+RELEASE=5.3-RELEASE
 VERSION="${TYPE} ${RELEASE}"
 
 if [ "X${PARAMFILE}" != "X" ]; then
@@ -56,9 +52,9 @@ for bsd_copyright in ../$b ../../$b ../../../$b /usr/src/$b /usr/$b
 do
 	if [ -r "$bsd_copyright" ]; then
 		COPYRIGHT=`sed \
-		    -e "s/\[year\]/$year/" \
-		    -e 's/\[your name here\]\.* /FreeBSD Inc./' \
-		    -e 's/\[your name\]\.*/FreeBSD Inc./' \
+		    -e "s/\[year\]/1992-$year/" \
+		    -e 's/\[your name here\]\.* /The FreeBSD Project./' \
+		    -e 's/\[your name\]\.*/The FreeBSD Project./' \
 		    -e '/\[id for your version control system, if any\]/d' \
 		    $bsd_copyright` 
 		break
@@ -68,8 +64,8 @@ done
 # no copyright found, use a dummy
 if [ X"$COPYRIGHT" = X ]; then
 	COPYRIGHT="/*
- * Copyright (c) $year
- *	FreeBSD Inc. All rights reserved.
+ * Copyright (c) 1992-$year The FreeBSD Project.
+ * All rights reserved.
  *
  */"
 fi
@@ -85,8 +81,8 @@ then
 fi
 
 touch version
-v=`cat version` u=${USER-root} d=`pwd` h=`hostname` t=`date`
-i=`make -V KERN_IDENT`
+v=`cat version` u=${USER-root} d=`pwd` h=${HOSTNAME-`hostname`} t=`date`
+i=`${MAKE:-make} -V KERN_IDENT`
 cat << EOF > vers.c
 $COPYRIGHT
 char sccspad[32 - 4 /* sizeof(sccs) */] = { '\\0' };

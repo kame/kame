@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/ofw/libofw/ofw_net.c,v 1.6 2002/06/07 11:49:33 benno Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/ofw/libofw/ofw_net.c,v 1.8 2004/08/16 15:45:25 marius Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -206,7 +207,7 @@ ofwn_init(struct iodesc *desc, void *machdep_hint)
 	}
 
 #if defined(NETIF_DEBUG)
-	printf("ofwn_init: OpenFirmware instance handle: %08x\n", netinstance);
+	printf("ofwn_init: Open Firmware instance handle: %08x\n", netinstance);
 #endif
 
 #ifndef __sparc64__

@@ -37,20 +37,22 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ncv/ncr53c500_pccard.c,v 1.18 2003/10/26 00:51:40 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ncv/ncr53c500_pccard.c,v 1.22 2004/05/27 03:49:42 imp Exp $");
 
 #include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/malloc.h>
 #include <sys/errno.h>
+#include <sys/kernel.h>
+#include <sys/malloc.h>
+#include <sys/systm.h>
 
 #include <machine/bus.h>
 #include <machine/bus_pio.h>
-#include <machine/dvcfg.h>
+#include <machine/resource.h>
+#include <sys/rman.h>
+#include <compat/netbsd/dvcfg.h>
 
 #include <sys/device_port.h>
 
-#include <dev/pccard/pccarddevs.h>
 #include <dev/pccard/pccardvar.h>
 
 #include <cam/scsi/scsi_low.h>
@@ -63,13 +65,8 @@ __FBSDID("$FreeBSD: src/sys/dev/ncv/ncr53c500_pccard.c,v 1.18 2003/10/26 00:51:4
 #define KME_KXLC004_01 0x100
 #define OFFSET_KME_KXLC004_01 0x10
 
-#include	<sys/kernel.h>
-#include	<sys/module.h>
-#if !defined(__FreeBSD__) || __FreeBSD_version < 500014
-#include	<sys/select.h>
-#endif
-#include	<pccard/cardinfo.h>
-#include	<pccard/slot.h>
+
+#include "pccarddevs.h"
 
 static int ncvprobe(DEVPORT_PDEVICE devi);
 static int ncvattach(DEVPORT_PDEVICE devi);
@@ -175,8 +172,8 @@ ncv_alloc_resource(DEVPORT_PDEVICE dev)
 	}
 
 	sc->irq_rid = 0;
-	sc->irq_res = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irq_rid,
-					 0, ~0, 1, RF_ACTIVE);
+	sc->irq_res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irq_rid,
+					     RF_ACTIVE);
 	if (sc->irq_res == NULL) {
 		ncv_release_resource(dev);
 		return(ENOMEM);
@@ -193,8 +190,8 @@ ncv_alloc_resource(DEVPORT_PDEVICE dev)
 	}
 
 	sc->mem_rid = 0;
-	sc->mem_res = bus_alloc_resource(dev, SYS_RES_MEMORY, &sc->mem_rid,
-					 0, ~0, 1, RF_ACTIVE);
+	sc->mem_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &sc->mem_rid,
+					     RF_ACTIVE);
 	if (sc->mem_res == NULL) {
 		ncv_release_resource(dev);
 		return(ENOMEM);

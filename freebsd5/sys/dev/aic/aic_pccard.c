@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aic/aic_pccard.c,v 1.11 2003/08/24 17:48:02 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aic/aic_pccard.c,v 1.14 2004/05/27 03:49:39 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -39,9 +39,9 @@ __FBSDID("$FreeBSD: src/sys/dev/aic/aic_pccard.c,v 1.11 2003/08/24 17:48:02 obri
  
 #include <dev/aic/aicvar.h>
 #include <dev/pccard/pccardvar.h>
-#include <dev/pccard/pccarddevs.h>
 
 #include "card_if.h"
+#include "pccarddevs.h"
 
 struct aic_pccard_softc {
 	struct	aic_softc sc_aic;
@@ -82,8 +82,7 @@ aic_pccard_alloc_resources(device_t dev)
 		return (ENOMEM);
 
 	rid = 0;
-	sc->sc_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
-	    0ul, ~0ul, 1, RF_ACTIVE);
+	sc->sc_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid, RF_ACTIVE);
 	if (!sc->sc_irq) {
 		aic_pccard_release_resources(dev);
 		return (ENOMEM);

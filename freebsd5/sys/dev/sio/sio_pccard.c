@@ -23,7 +23,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sio/sio_pccard.c,v 1.11 2003/10/07 04:26:14 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sio/sio_pccard.c,v 1.13 2004/05/27 03:49:43 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -41,11 +41,11 @@ __FBSDID("$FreeBSD: src/sys/dev/sio/sio_pccard.c,v 1.11 2003/10/07 04:26:14 imp 
 #include <sys/timepps.h>
 
 #include <dev/pccard/pccard_cis.h>
-#include <dev/pccard/pccarddevs.h>
-#include <dev/pccard/pccardreg.h>
 #include <dev/pccard/pccardvar.h>
 
 #include <dev/sio/siovar.h>
+
+#include "pccarddevs.h"
 
 static	int	sio_pccard_attach(device_t dev);
 static	int	sio_pccard_match(device_t self);

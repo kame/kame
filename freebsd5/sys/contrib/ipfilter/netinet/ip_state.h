@@ -5,7 +5,7 @@
  *
  * @(#)ip_state.h	1.3 1/12/96 (C) 1995 Darren Reed
  * $Id: ip_state.h,v 2.13.2.1 2000/07/08 02:15:35 darrenr Exp $
- * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_state.h,v 1.14 2002/08/28 13:41:36 darrenr Exp $
+ * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_state.h,v 1.15 2004/06/21 22:46:36 darrenr Exp $
  */
 #ifndef	__IP_STATE_H__
 #define	__IP_STATE_H__
@@ -63,6 +63,7 @@ typedef struct ipstate {
 	frentry_t	*is_rule;
 	U_QUAD_T	is_pkts;
 	U_QUAD_T	is_bytes;
+	U_QUAD_T	is_icmppkts;
 	union	i6addr	is_src;
 	union	i6addr	is_dst;
 	void	*is_ifp[4];

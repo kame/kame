@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ata/atapi-tape.c,v 1.84.2.2 2004/02/11 08:47:22 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ata/atapi-tape.c,v 1.93 2004/08/05 21:11:33 sos Exp $");
 
 #include "opt_ata.h"
 #include <sys/param.h>
@@ -53,6 +53,7 @@ static	d_close_t	ast_close;
 static	d_ioctl_t	ast_ioctl;
 static	d_strategy_t	ast_strategy;
 static struct cdevsw ast_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	ast_open,
 	.d_close =	ast_close,
 	.d_read =	physread,
@@ -61,7 +62,7 @@ static struct cdevsw ast_cdevsw = {
 	.d_strategy =	ast_strategy,
 	.d_name =	"ast",
 	.d_maj =	119,
-	.d_flags =	D_TAPE | D_TRACKCLOSE | D_NOGIANT,
+	.d_flags =	D_TAPE | D_TRACKCLOSE,
 };
 
 /* prototypes */
@@ -93,7 +94,7 @@ ast_attach(struct ata_device *atadev)
 {
     struct ast_softc *stp;
     struct ast_readposition position;
-    dev_t dev;
+    struct cdev *dev;
 
     stp = malloc(sizeof(struct ast_softc), M_AST, M_NOWAIT | M_ZERO);
     if (!stp) {
@@ -105,7 +106,7 @@ ast_attach(struct ata_device *atadev)
     stp->lun = ata_get_lun(&ast_lun_map);
     ata_set_name(atadev, "ast", stp->lun);
     bioq_init(&stp->queue);
-    mtx_init(&stp->queue_mtx, "ATAPI TAPE bioqueue lock", MTX_DEF, 0);
+    mtx_init(&stp->queue_mtx, "ATAPI TAPE bioqueue lock", NULL, MTX_DEF);
 
     if (ast_sense(stp)) {
 	free(stp, M_AST);
@@ -168,6 +169,7 @@ ast_detach(struct ata_device *atadev)
     mtx_lock(&stp->queue_mtx);
     bioq_flush(&stp->queue, NULL, ENXIO);
     mtx_unlock(&stp->queue_mtx);
+    mtx_destroy(&stp->queue_mtx);
     destroy_dev(stp->dev1);
     destroy_dev(stp->dev2);
     devstat_remove_entry(stp->stats);
@@ -254,8 +256,8 @@ ast_describe(struct ast_softc *stp)
 	printf("\n");
     }
     else {
-	ata_prtdev(stp->device, "TAPE <%.40s> at ata%d-%s %s\n",
-		   stp->device->param->model,
+	ata_prtdev(stp->device, "TAPE <%.40s/%.8s> at ata%d-%s %s\n",
+		   stp->device->param->model, stp->device->param->revision,
 		   device_get_unit(stp->device->channel->dev),
 		   (stp->device->unit == ATA_MASTER) ? "master" : "slave",
 		   ata_mode2str(stp->device->mode));
@@ -263,7 +265,7 @@ ast_describe(struct ast_softc *stp)
 }
 
 static int
-ast_open(dev_t dev, int flags, int fmt, struct thread *td)
+ast_open(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
     struct ast_softc *stp = dev->si_drv1;
 
@@ -288,7 +290,7 @@ ast_open(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static int 
-ast_close(dev_t dev, int flags, int fmt, struct thread *td)
+ast_close(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
     struct ast_softc *stp = dev->si_drv1;
 
@@ -317,7 +319,7 @@ ast_close(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static int 
-ast_ioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
+ast_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
 {
     struct ast_softc *stp = dev->si_drv1;
     int error = 0;

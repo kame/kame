@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/snc/if_snc_pccard.c,v 1.4 2003/08/24 18:03:45 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/snc/if_snc_pccard.c,v 1.5 2004/05/08 06:04:06 imp Exp $");
 
 /*
  *	National Semiconductor  DP8393X SONIC Driver
@@ -80,7 +80,6 @@ static driver_t snc_pccard_driver = {
 
 DRIVER_MODULE(snc, pccard, snc_pccard_driver, snc_devclass, 0, 0);
 MODULE_DEPEND(snc, ether, 1, 1, 1);
-MODULE_DEPEND(snc, pccard, 1, 1, 1);
 
 /*
  *      snc_pccard_detach - unload the driver and clear the table.

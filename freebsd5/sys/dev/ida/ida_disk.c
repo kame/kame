@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ida/ida_disk.c,v 1.41 2003/08/08 23:01:12 mdodd Exp $
+ * $FreeBSD: src/sys/dev/ida/ida_disk.c,v 1.45 2004/05/30 20:08:34 phk Exp $
  */
 
 /*
@@ -33,6 +33,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 
 #include <sys/bio.h>
 #include <sys/bus.h>
@@ -177,6 +178,7 @@ idad_attach(device_t dev)
 
 	drv = (struct idad_softc *)device_get_softc(dev);
 	parent = device_get_parent(dev);
+	drv->dev = dev;
 	drv->controller = (struct ida_softc *)device_get_softc(parent);
 	drv->unit = device_get_unit(dev);
 	drv->drive = drv->controller->num_drives;
@@ -189,9 +191,9 @@ idad_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	drv->cylinders = dinfo.ncylinders;
-	drv->heads = dinfo.nheads;
-	drv->sectors = dinfo.nsectors;
+	drv->cylinders = dinfo.dp.ncylinders;
+	drv->heads = dinfo.dp.nheads;
+	drv->sectors = dinfo.dp.nsectors;
 	drv->secsize = dinfo.secsize == 0 ? 512 : dinfo.secsize;
 	drv->secperunit = dinfo.secperunit;
 
@@ -202,16 +204,19 @@ idad_attach(device_t dev)
 	    drv->secperunit / ((1024 * 1024) / drv->secsize),
 	    drv->secperunit, drv->secsize);
 
-	drv->disk.d_strategy = idad_strategy;
-	drv->disk.d_name = "idad";
-	drv->disk.d_dump = idad_dump;
-	drv->disk.d_sectorsize = drv->secsize;
-	drv->disk.d_mediasize = (off_t)drv->secperunit * drv->secsize;
-	drv->disk.d_fwsectors = drv->sectors;
-	drv->disk.d_fwheads = drv->heads;
-	drv->disk.d_drv1 = drv;
-	drv->disk.d_maxsize = DFLTPHYS;		/* XXX guess? */
-	disk_create(drv->unit, &drv->disk, 0, NULL, NULL);
+	drv->disk = disk_alloc();
+	drv->disk->d_strategy = idad_strategy;
+	drv->disk->d_name = "idad";
+	drv->disk->d_dump = idad_dump;
+	drv->disk->d_sectorsize = drv->secsize;
+	drv->disk->d_mediasize = (off_t)drv->secperunit * drv->secsize;
+	drv->disk->d_fwsectors = drv->sectors;
+	drv->disk->d_fwheads = drv->heads;
+	drv->disk->d_drv1 = drv;
+	drv->disk->d_maxsize = DFLTPHYS;		/* XXX guess? */
+	drv->disk->d_unit = drv->unit;
+	drv->disk->d_flags = DISKFLAG_NEEDSGIANT;
+	disk_create(drv->disk, DISK_VERSION);
 
 	return (0);
 }
@@ -222,6 +227,6 @@ idad_detach(device_t dev)
 	struct idad_softc *drv;
 
 	drv = (struct idad_softc *)device_get_softc(dev);
-	disk_destroy(&drv->disk);
+	disk_destroy(drv->disk);
 	return (0);
 }

@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sbsh/if_sbsh.c,v 1.7 2003/10/31 18:32:04 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sbsh/if_sbsh.c,v 1.10 2004/05/30 20:08:40 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -33,6 +33,7 @@ __FBSDID("$FreeBSD: src/sys/dev/sbsh/if_sbsh.c,v 1.7 2003/10/31 18:32:04 brooks 
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/proc.h>
 #include <sys/socket.h>
 #include <sys/random.h>
@@ -238,7 +239,7 @@ sbsh_attach(device_t dev)
 	}
 
 	rid = 0;
-	sc->irq_res = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
+	sc->irq_res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 						RF_SHAREABLE | RF_ACTIVE);
 
 	if (sc->irq_res == NULL) {
@@ -272,7 +273,6 @@ sbsh_attach(device_t dev)
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = sbsh_ioctl;
-	ifp->if_output = ether_output;
 	ifp->if_start = sbsh_start;
 	ifp->if_watchdog = sbsh_watchdog;
 	ifp->if_init = sbsh_init;

@@ -38,7 +38,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sb16.c,v 1.80 2003/09/07 16:28:02 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sb16.c,v 1.87.2.1 2004/09/16 19:02:50 truckman Exp $");
 
 #define SB16_BUFFSIZE	4096
 #define PLAIN_SB16(x) ((((x)->bd_flags) & (BD_F_SB16|BD_F_SB16X)) == BD_F_SB16)
@@ -124,6 +124,12 @@ sb_lock(struct sb_info *sb) {
 }
 
 static void
+sb_lockassert(struct sb_info *sb) {
+
+	sbc_lockassert(device_get_softc(sb->parent_dev));
+}
+
+static void
 sb_unlock(struct sb_info *sb) {
 
 	sbc_unlock(device_get_softc(sb->parent_dev));
@@ -203,7 +209,7 @@ sb_cmd2(struct sb_info *sb, u_char cmd, int val)
 #if 0
     	printf("sb_cmd2: %x, %x\n", cmd, val);
 #endif
-	sb_lock(sb);
+	sb_lockassert(sb);
 	r = 0;
     	if (sb_dspwr(sb, cmd)) {
 		if (sb_dspwr(sb, val & 0xff)) {
@@ -212,7 +218,6 @@ sb_cmd2(struct sb_info *sb, u_char cmd, int val)
 			}
 		}
     	}
-	sb_unlock(sb);
 
 	return r;
 }
@@ -237,12 +242,11 @@ sb_getmixer(struct sb_info *sb, u_int port)
 {
     	int val;
 
-	sb_lock(sb);
+    	sb_lockassert(sb);
     	sb_wr(sb, SB_MIX_ADDR, (u_char) (port & 0xff)); /* Select register */
     	DELAY(10);
     	val = sb_rd(sb, SB_MIX_DATA);
     	DELAY(10);
-	sb_unlock(sb);
 
     	return val;
 }
@@ -266,12 +270,11 @@ sb_reset_dsp(struct sb_info *sb)
 {
 	u_char b;
 
-	sb_lock(sb);
+	sb_lockassert(sb);
     	sb_wr(sb, SBDSP_RST, 3);
     	DELAY(100);
     	sb_wr(sb, SBDSP_RST, 0);
 	b = sb_get_byte(sb);
-	sb_unlock(sb);
     	if (b != 0xAA) {
         	DEB(printf("sb_reset_dsp 0x%lx failed\n",
 			   rman_get_start(sb->io_base)));
@@ -326,6 +329,19 @@ sb16mix_init(struct snd_mixer *m)
 }
 
 static int
+rel2abs_volume(int x, int max)
+{
+	int temp;
+	
+	temp = ((x * max) + 50) / 100;
+	if (temp > max)
+		temp = max;
+	else if (temp < 0)
+		temp = 0;
+	return (temp);
+}
+
+static int
 sb16mix_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned right)
 {
     	struct sb_info *sb = mix_getdevinfo(m);
@@ -335,8 +351,8 @@ sb16mix_set(struct snd_mixer *m, unsigned dev, unsigned left, unsigned right)
 	e = &sb16_mixtab[dev];
 	max = (1 << e->bits) - 1;
 
-	left = (left * max) / 100;
-	right = (right * max) / 100;
+	left = rel2abs_volume(left, max);
+	right = rel2abs_volume(right, max);
 
 	sb_setmixer(sb, e->reg, left << e->ofs);
 	if (e->stereo)
@@ -440,19 +456,23 @@ sb16_alloc_resources(struct sb_info *sb, device_t dev)
 
 	rid = 0;
 	if (!sb->io_base)
-    		sb->io_base = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1, RF_ACTIVE);
+    		sb->io_base = bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+			&rid, RF_ACTIVE);
 
 	rid = 0;
 	if (!sb->irq)
-    		sb->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1, RF_ACTIVE);
+    		sb->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
+			RF_ACTIVE);
 
 	rid = 0;
 	if (!sb->drq1)
-    		sb->drq1 = bus_alloc_resource(dev, SYS_RES_DRQ, &rid, 0, ~0, 1, RF_ACTIVE);
+    		sb->drq1 = bus_alloc_resource_any(dev, SYS_RES_DRQ, &rid,
+			RF_ACTIVE);
 
 	rid = 1;
 	if (!sb->drq2)
-        	sb->drq2 = bus_alloc_resource(dev, SYS_RES_DRQ, &rid, 0, ~0, 1, RF_ACTIVE);
+        	sb->drq2 = bus_alloc_resource_any(dev, SYS_RES_DRQ, &rid,
+			RF_ACTIVE);
 
     	if (sb->io_base && sb->drq1 && sb->irq) {
 		isa_dma_acquire(rman_get_start(sb->drq1));
@@ -793,13 +813,17 @@ sb16_attach(device_t dev)
 	sb->bd_flags = (ver & 0xffff0000) >> 16;
 	sb->bufsize = pcm_getbuffersize(dev, 4096, SB16_BUFFSIZE, 65536);
 
-    	if (sb16_alloc_resources(sb, dev))
+	if (sb16_alloc_resources(sb, dev))
 		goto no;
-    	if (sb_reset_dsp(sb))
+	sb_lock(sb);
+	if (sb_reset_dsp(sb)) {
+		sb_unlock(sb);
 		goto no;
+	}
+	sb_unlock(sb);
 	if (mixer_init(dev, &sb16mix_mixer_class, sb))
 		goto no;
-	if (snd_setup_intr(dev, sb->irq, INTR_MPSAFE, sb_intr, sb, &sb->ih))
+	if (snd_setup_intr(dev, sb->irq, 0, sb_intr, sb, &sb->ih))
 		goto no;
 
 	if (sb->bd_flags & BD_F_SB16X)
@@ -824,9 +848,10 @@ sb16_attach(device_t dev)
 	else
 		status2[0] = '\0';
 
-    	snprintf(status, SND_STATUSLEN, "at io 0x%lx irq %ld drq %ld%s bufsz %ud",
+    	snprintf(status, SND_STATUSLEN, "at io 0x%lx irq %ld drq %ld%s bufsz %ud %s",
     	     	rman_get_start(sb->io_base), rman_get_start(sb->irq),
-		rman_get_start(sb->drq1), status2, sb->bufsize);
+		rman_get_start(sb->drq1), status2, sb->bufsize,
+		PCM_KLDSTRING(snd_sb16));
 
     	if (pcm_register(dev, sb, 1, 1))
 		goto no;
@@ -873,6 +898,6 @@ static driver_t sb16_driver = {
 };
 
 DRIVER_MODULE(snd_sb16, sbc, sb16_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_sb16, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_sb16, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_DEPEND(snd_sb16, snd_sbc, 1, 1, 1);
 MODULE_VERSION(snd_sb16, 1);

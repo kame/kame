@@ -53,9 +53,10 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/ofw/libofw/openfirm.c,v 1.7 2002/07/18 12:39:02 benno Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/ofw/libofw/openfirm.c,v 1.10 2004/08/16 15:45:25 marius Exp $");
 
 #include <machine/stdarg.h>
 
@@ -861,7 +862,7 @@ OF_boot(char *bootspec)
 	for (;;);			/* just in case */
 }
 
-/* Suspend and drop back to the OpenFirmware interface. */
+/* Suspend and drop back to the Open Firmware interface. */
 void
 OF_enter()
 {
@@ -878,7 +879,7 @@ OF_enter()
 	openfirmware(&args);
 }
 
-/* Shut down and drop back to the OpenFirmware interface. */
+/* Shut down and drop back to the Open Firmware interface. */
 void
 OF_exit()
 {
@@ -897,7 +898,7 @@ OF_exit()
 }
 
 /* Free <size> bytes starting at <virt>, then call <entry> with <arg>. */
-#ifdef	__notyet__
+#if 0
 void
 OF_chain(void *virt, u_int size, void (*entry)(), void *arg, u_int len)
 {
@@ -935,8 +936,10 @@ OF_chain(void *virt, u_int size, void (*entry)(), void *arg, u_int len)
 	/*
 	 * This is a REALLY dirty hack till the firmware gets this going
 	 */
+#if 0
 	if (size > 0)
 		OF_release(virt, size);
+#endif
 
 	entry(0, 0, openfirmware, arg, len);
 }

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psargs - Parse AML opcode arguments
- *              $Revision: 73 $
+ *              $Revision: 76 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2003, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -399,8 +399,8 @@ AcpiPsGetNextNamepath (
 
                 if (!MethodDesc)
                 {
-                    ACPI_DEBUG_PRINT ((ACPI_DB_PARSE,
-                        "Control Method - %p has no attached object\n",
+                    ACPI_REPORT_ERROR ((
+                        "PsGetNextNamepath: Control Method %p has no attached object\n",
                         Node));
                     return_ACPI_STATUS (AE_AML_INTERNAL);
                 }
@@ -579,7 +579,7 @@ ACPI_PARSE_OBJECT *
 AcpiPsGetNextField (
     ACPI_PARSE_STATE        *ParserState)
 {
-    UINT32                  AmlOffset = ACPI_PTR_DIFF (ParserState->Aml,
+    UINT32                  AmlOffset = (UINT32) ACPI_PTR_DIFF (ParserState->Aml,
                                                        ParserState->AmlStart);
     ACPI_PARSE_OBJECT       *Field;
     UINT16                  Opcode;
@@ -778,8 +778,8 @@ AcpiPsGetNextArg (
 
             /* Fill in bytelist data */
 
-            Arg->Common.Value.Size = ACPI_PTR_DIFF (ParserState->PkgEnd,
-                                                    ParserState->Aml);
+            Arg->Common.Value.Size = (UINT32) ACPI_PTR_DIFF (ParserState->PkgEnd,
+                                                             ParserState->Aml);
             Arg->Named.Data = ParserState->Aml;
 
             /* Skip to End of byte data */

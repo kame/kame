@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -35,7 +31,7 @@
  *
  *	@(#)portal_vnops.c	8.14 (Berkeley) 5/21/95
  *
- * $FreeBSD: src/sys/fs/portalfs/portal_vnops.c,v 1.59 2003/03/03 19:15:38 njl Exp $
+ * $FreeBSD: src/sys/fs/portalfs/portal_vnops.c,v 1.65 2004/06/24 00:47:23 rwatson Exp $
  */
 
 /*
@@ -43,24 +39,25 @@
  */
 
 #include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/sysproto.h>
-#include <sys/kernel.h>
-#include <sys/time.h>
-#include <sys/proc.h>
-#include <sys/filedesc.h>
-#include <sys/vnode.h>
 #include <sys/fcntl.h>
 #include <sys/file.h>
-#include <sys/stat.h>
-#include <sys/mount.h>
+#include <sys/kernel.h>
+#include <sys/lock.h>
 #include <sys/malloc.h>
-#include <sys/namei.h>
 #include <sys/mbuf.h>
+#include <sys/mount.h>
+#include <sys/mutex.h>
+#include <sys/namei.h>
+#include <sys/proc.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#include <sys/stat.h>
+#include <sys/sysproto.h>
+#include <sys/systm.h>
 #include <sys/un.h>
 #include <sys/unpcb.h>
+#include <sys/vnode.h>
+
 #include <fs/portalfs/portal.h>
 
 static int portal_fileid = PORTAL_ROOTFILEID+1;
@@ -199,10 +196,11 @@ portal_connect(so, so2)
 	unp3 = sotounpcb(so3);
 	if (unp2->unp_addr)
 		unp3->unp_addr = (struct sockaddr_un *)
-			dup_sockaddr((struct sockaddr *)unp2->unp_addr, 0);
+		    sodupsockaddr((struct sockaddr *)unp2->unp_addr,
+		    M_NOWAIT);
 	so2 = so3;
 
-	return (unp_connect2(so, so2));
+	return (uipc_connect2(so, so2));
 }
 
 static int
@@ -218,7 +216,6 @@ portal_open(ap)
 	struct portalnode *pt;
 	struct thread *td = ap->a_td;
 	struct vnode *vp = ap->a_vp;
-	int s;
 	struct uio auio;
 	struct iovec aiov[2];
 	int res;
@@ -286,16 +283,18 @@ portal_open(ap)
 	 * will happen if the server dies.  Sleep for 5 second intervals
 	 * and keep polling the reference count.   XXX.
 	 */
-	s = splnet();
+	/* XXXRW: Locking? */
+	SOCK_LOCK(so);
 	while ((so->so_state & SS_ISCONNECTING) && so->so_error == 0) {
 		if (fmp->pm_server->f_count == 1) {
+			SOCK_UNLOCK(so);
 			error = ECONNREFUSED;
-			splx(s);
 			goto bad;
 		}
-		(void) tsleep((caddr_t) &so->so_timeo, PSOCK, "portalcon", 5 * hz);
+		(void) msleep((caddr_t) &so->so_timeo, SOCK_MTX(so), PSOCK,
+		    "portalcon", 5 * hz);
 	}
-	splx(s);
+	SOCK_UNLOCK(so);
 
 	if (so->so_error) {
 		error = so->so_error;
@@ -305,10 +304,14 @@ portal_open(ap)
 	/*
 	 * Set miscellaneous flags
 	 */
+	SOCKBUF_LOCK(&so->so_rcv);
 	so->so_rcv.sb_timeo = 0;
-	so->so_snd.sb_timeo = 0;
 	so->so_rcv.sb_flags |= SB_NOINTR;
+	SOCKBUF_UNLOCK(&so->so_rcv);
+	SOCKBUF_LOCK(&so->so_snd);
+	so->so_snd.sb_timeo = 0;
 	so->so_snd.sb_flags |= SB_NOINTR;
+	SOCKBUF_UNLOCK(&so->so_snd);
 
 
 	pcred.pcr_flag = ap->a_mode;

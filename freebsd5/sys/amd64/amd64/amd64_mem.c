@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/amd64_mem.c,v 1.24 2003/12/06 23:19:46 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/amd64_mem.c,v 1.25 2004/08/07 06:21:37 scottl Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -111,6 +111,11 @@ static int amd64_mtrrtomrt[] = {
 };
 
 #define MTRRTOMRTLEN (sizeof(amd64_mtrrtomrt) / sizeof(amd64_mtrrtomrt[0]))
+
+/*
+ * Used in /dev/mem drivers and elsewhere
+ */
+MALLOC_DEFINE(M_MEMDESC, "memdesc", "memory range descriptors");
 
 static int
 amd64_mtrr2mrt(int val)

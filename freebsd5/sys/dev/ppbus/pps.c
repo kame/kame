@@ -15,7 +15,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ppbus/pps.c,v 1.38 2003/08/24 17:54:16 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ppbus/pps.c,v 1.43 2004/07/09 13:42:05 cognet Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -39,7 +39,7 @@ __FBSDID("$FreeBSD: src/sys/dev/ppbus/pps.c,v 1.38 2003/08/24 17:54:16 obrien Ex
 struct pps_data {
 	struct	ppb_device pps_dev;	
 	struct	pps_state pps[9];
-	dev_t	devs[9];
+	struct cdev *devs[9];
 	device_t ppsdev;
 	device_t ppbus;
 	int	busy;
@@ -62,20 +62,24 @@ static	d_open_t	ppsopen;
 static	d_close_t	ppsclose;
 static	d_ioctl_t	ppsioctl;
 
-#define CDEV_MAJOR 89
 static struct cdevsw pps_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	ppsopen,
 	.d_close =	ppsclose,
 	.d_ioctl =	ppsioctl,
 	.d_name =	PPS_NAME,
-	.d_maj =	CDEV_MAJOR,
 };
 
 static void
 ppsidentify(driver_t *driver, device_t parent)
 {
 
-	BUS_ADD_CHILD(parent, 0, PPS_NAME, -1);
+	device_t dev;
+
+	dev = device_find_child(parent, PPS_NAME, 0);
+	if (!dev)
+		BUS_ADD_CHILD(parent, 0, PPS_NAME, -1);
 }
 
 static int
@@ -102,11 +106,9 @@ ppsattach(device_t dev)
 {
 	struct pps_data *sc = DEVTOSOFTC(dev);
 	device_t ppbus = device_get_parent(dev);
-	dev_t d;
+	struct cdev *d;
 	intptr_t irq;
 	int i, unit, zero = 0;
-
-	bzero(sc, sizeof(struct pps_data)); /* XXX doesn't newbus do this? */
 
 	/* retrieve the ppbus irq */
 	BUS_READ_IVAR(ppbus, dev, PPBUS_IVAR_IRQ, &irq);
@@ -187,7 +189,7 @@ ppsattach(device_t dev)
 }
 
 static	int
-ppsopen(dev_t dev, int flags, int fmt, struct thread *td)
+ppsopen(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	struct pps_data *sc = dev->si_drv1;
 	int subdev = (intptr_t)dev->si_drv2;
@@ -223,7 +225,7 @@ ppsopen(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static	int
-ppsclose(dev_t dev, int flags, int fmt, struct thread *td)
+ppsclose(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	struct pps_data *sc = dev->si_drv1;
 	int subdev = (intptr_t)dev->si_drv2;
@@ -289,7 +291,7 @@ ppsintr(void *arg)
 }
 
 static int
-ppsioctl(dev_t dev, u_long cmd, caddr_t data, int flags, struct thread *td)
+ppsioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags, struct thread *td)
 {
 	struct pps_data *sc = dev->si_drv1;
 	int subdev = (intptr_t)dev->si_drv2;

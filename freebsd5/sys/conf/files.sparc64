@@ -1,7 +1,7 @@
 # This file tells config what files go into building a kernel,
 # files marked standard are always included.
 #
-# $FreeBSD: src/sys/conf/files.sparc64,v 1.48 2003/11/17 04:38:14 imp Exp $
+# $FreeBSD: src/sys/conf/files.sparc64,v 1.59 2004/08/15 22:59:34 marius Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -12,16 +12,17 @@ crypto/blowfish/bf_enc.c	optional	ipsec ipsec_esp
 crypto/des/des_enc.c		optional	ipsec ipsec_esp
 crypto/blowfish/bf_enc.c	optional	crypto
 crypto/des/des_enc.c		optional	crypto
+dev/esp/esp_sbus.c		optional	esp sbus
+dev/esp/lsi64854.c		optional	esp sbus
 dev/fb/creator.c		optional	creator sc
 dev/fb/fb.c			optional	sc
 dev/fb/splash.c			optional	splash
 dev/kbd/kbd.c			optional	sc
+dev/ofw/ofw_bus_if.m		standard
 dev/ofw/ofw_console.c		optional	ofw_console
 dev/ofw/openfirm.c		standard
 dev/ofw/openfirmio.c		standard
 dev/ofw/openpromio.c		standard
-dev/sio/sio.c			optional	sio
-dev/sio/sio_isa.c		optional	sio isa
 dev/syscons/scgfbrndr.c		optional	sc
 dev/syscons/schistory.c		optional	sc
 dev/syscons/scmouse.c		optional	sc
@@ -38,8 +39,11 @@ geom/geom_bsd.c			standard
 geom/geom_bsd_enc.c		standard
 geom/geom_sunlabel.c		standard
 geom/geom_sunlabel_enc.c	standard
-libkern/ffs.c			standard
 kern/syscalls.c			optional	ktr
+libkern/ffs.c			standard
+libkern/ffsl.c			standard
+libkern/fls.c			standard
+libkern/flsl.c			standard
 sparc64/central/central.c	optional	central
 sparc64/creator/creator_upa.c	optional	creator sc
 sparc64/ebus/ebus.c		optional	ebus
@@ -47,14 +51,16 @@ sparc64/fhc/fhc.c		optional	fhc
 sparc64/fhc/fhc_central.c	optional	fhc central
 sparc64/fhc/fhc_nexus.c		optional	fhc
 sparc64/isa/isa.c		optional	isa
-sparc64/isa/ofw_isa.c		optional	ebus
-sparc64/isa/ofw_isa.c		optional	isa
-sparc64/pci/apb.c		optional	apb
+#sparc64/isa/ofw_isa.c		optional	ebus
+#sparc64/isa/ofw_isa.c		optional	isa
+sparc64/isa/ofw_isa.c		standard
+sparc64/pci/apb.c		optional	pci
 sparc64/pci/ofw_pci.c		optional	pci
-sparc64/pci/ofw_pcib.c		optional	pci ofw_newpci
-sparc64/pci/ofw_pcib_subr.c	optional	pci ofw_newpci
-sparc64/pci/ofw_pcibus.c	optional	pci ofw_newpci
-sparc64/pci/ofw_pci_if.m	optional	pci
+sparc64/pci/ofw_pcib.c		optional	pci
+sparc64/pci/ofw_pcib_subr.c	optional	pci
+sparc64/pci/ofw_pcibus.c	optional	pci
+#sparc64/pci/ofw_pci_if.m	optional	pci
+sparc64/pci/ofw_pci_if.m	standard
 sparc64/pci/psycho.c		optional	pci
 sparc64/sbus/sbus.c		optional	sbus
 sparc64/sparc64/autoconf.c	standard
@@ -73,8 +79,9 @@ sparc64/sparc64/elf_machdep.c	standard
 sparc64/sparc64/exception.S	standard	no-obj
 sparc64/sparc64/eeprom.c	optional	eeprom
 sparc64/sparc64/eeprom_ebus.c	optional	eeprom ebus
-sparc64/sparc64/eeprom_fhc.c	optional	eeprom fhc
+sparc64/sparc64/eeprom_sbus.c	optional	eeprom fhc
 sparc64/sparc64/eeprom_sbus.c	optional	eeprom sbus
+sparc64/sparc64/gdb_machdep.c	optional	gdb
 sparc64/sparc64/identcpu.c	standard
 sparc64/sparc64/in_cksum.c	optional	inet
 sparc64/sparc64/interrupt.S	standard	no-obj
@@ -82,7 +89,7 @@ sparc64/sparc64/intr_machdep.c	standard
 sparc64/sparc64/iommu.c		standard
 sparc64/sparc64/locore.S	standard	no-obj
 sparc64/sparc64/machdep.c	standard
-sparc64/sparc64/mem.c		standard
+sparc64/sparc64/mem.c		optional	mem
 sparc64/sparc64/mp_exception.S	optional	smp
 sparc64/sparc64/mp_locore.S	optional	smp
 sparc64/sparc64/mp_machdep.c	optional	smp
@@ -101,6 +108,7 @@ sparc64/sparc64/tick.c		standard
 sparc64/sparc64/tlb.c		standard
 sparc64/sparc64/trap.c		standard
 sparc64/sparc64/tsb.c		standard
+sparc64/sparc64/uio_machdep.c	standard
 sparc64/sparc64/vm_machdep.c	standard
 #
 ukbdmap.h			optional	ukbd_dflt_keymap	\

@@ -26,7 +26,7 @@
  * Authors:
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/tdfx.h,v 1.3 2003/10/24 01:48:17 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/tdfx.h,v 1.4 2004/06/11 03:26:59 anholt Exp $
  */
 
 #ifndef __TDFX_H__
@@ -50,13 +50,5 @@
 #define DRIVER_MAJOR		1
 #define DRIVER_MINOR		0
 #define DRIVER_PATCHLEVEL	0
-
-#define DRIVER_PCI_IDS							\
-	{0x121a, 0x0003, 0, "3dfx Voodoo Banshee"},			\
-	{0x121a, 0x0004, 0, "3dfx Voodoo3 2000"},			\
-	{0x121a, 0x0005, 0, "3dfx Voodoo3 3000"},			\
-	{0x121a, 0x0007, 0, "3dfx Voodoo4"},				\
-	{0x121a, 0x0009, 0, "3dfx Voodoo5"},				\
-	{0, 0, 0, NULL}
 
 #endif

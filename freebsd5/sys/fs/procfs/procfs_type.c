@@ -14,10 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/procfs/procfs_type.c,v 1.9 2001/12/04 01:33:12 des Exp $
+ * $FreeBSD: src/sys/fs/procfs/procfs_type.c,v 1.11 2004/04/07 20:46:02 imp Exp $
  */
 
 #include <sys/param.h>
@@ -51,11 +47,10 @@ procfs_doproctype(PFS_FILL_ARGS)
 {
 	static const char *none = "Not Available";
 
-	if (p && p->p_sysent && p->p_sysent->sv_name) {
+	if (p != NULL && p->p_sysent && p->p_sysent->sv_name)
 		sbuf_printf(sb, p->p_sysent->sv_name);
-	} else {
+	else
 		sbuf_printf(sb, none);
-	}
 	sbuf_putc(sb, '\n');
 	return (0);
 }

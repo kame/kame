@@ -5,7 +5,7 @@
  *
  * @(#)ip_frag.h	1.5 3/24/96
  * $Id: ip_frag.h,v 2.4.2.2 2000/11/10 13:10:54 darrenr Exp $
- * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_frag.h,v 1.15 2002/08/28 13:41:36 darrenr Exp $
+ * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_frag.h,v 1.16 2004/06/21 22:46:35 darrenr Exp $
  */
 
 #ifndef	__IP_FRAG_H__
@@ -54,6 +54,7 @@ extern	int	ipfr_nat_newfrag __P((ip_t *, fr_info_t *, struct nat *));
 extern	nat_t	*ipfr_nat_knownfrag __P((ip_t *, fr_info_t *));
 extern	frentry_t *ipfr_knownfrag __P((ip_t *, fr_info_t *));
 extern	void	ipfr_forget __P((void *));
+extern	void	ipfr_forgetnat __P((void *));
 extern	void	ipfr_unload __P((void));
 extern	void	ipfr_fragexpire __P((void));
 

@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/linux/linux_sysvec.c,v 1.91 2003/09/25 01:10:22 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/linux/linux_sysvec.c,v 1.93 2004/07/15 08:25:59 phk Exp $");
 
 /* XXX we use functions that might not exist. */
 #include "opt_compat.h"
@@ -210,7 +210,8 @@ static Elf64_Brandinfo linux_brand = {
 					"Linux",
 					"/compat/linux",
 					"/lib/ld-linux.so.1",
-					&elf_linux_sysvec
+					&elf_linux_sysvec,
+					NULL,
 				 };
 
 static Elf64_Brandinfo linux_glibc2brand = {
@@ -219,7 +220,8 @@ static Elf64_Brandinfo linux_glibc2brand = {
 					"Linux",
 					"/compat/linux",
 					"/lib/ld-linux.so.2",
-					&elf_linux_sysvec
+					&elf_linux_sysvec,
+					NULL,
 				 };
 
 Elf64_Brandinfo *linux_brandlist[] = {
@@ -272,6 +274,7 @@ linux_elf_modevent(module_t mod, int type, void *data)
 			printf("Could not deinstall ELF interpreter entry\n");
 		break;
 	default:
+		return (EOPNOTSUPP);
 		break;
 	}
 	return error;

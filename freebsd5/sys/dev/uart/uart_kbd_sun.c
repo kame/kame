@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/uart/uart_kbd_sun.c,v 1.1 2003/11/11 07:33:24 jake Exp $
+ * $FreeBSD: src/sys/dev/uart/uart_kbd_sun.c,v 1.2 2004/04/02 05:59:06 marcel Exp $
  */
 
 #include "opt_kbd.h"
@@ -224,7 +224,9 @@ sunkbd_attach(struct uart_softc *sc)
 	if (sc->sc_sysdev != NULL) {
 		sunkbd_softc.sc_uart = sc;
 
+#ifdef KBD_INSTALL_CDEV
 		kbd_attach(&sunkbd_softc.sc_kbd);
+#endif
 		sunkbd_enable(&sunkbd_softc.sc_kbd);
 
 		swi_add(&tty_ithd, uart_driver_name, sunkbd_uart_intr,

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/isp.c,v 1.108 2003/09/13 01:55:44 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/isp.c,v 1.111 2004/05/24 07:02:24 njl Exp $ */
 /*
  * Machine and OS Independent (well, as best as possible)
  * code for the Qlogic ISP SCSI adapters.
@@ -1219,6 +1219,12 @@ isp_fibre_init(struct ispsoftc *isp)
 		fcp->isp_fwoptions |= ICBOPT_TGT_ENABLE;
 	} else {
 		fcp->isp_fwoptions &= ~ICBOPT_TGT_ENABLE;
+	}
+
+	if (isp->isp_role & ISP_ROLE_INITIATOR) {
+		fcp->isp_fwoptions &= ~ICBOPT_INI_DISABLE;
+	} else {
+		fcp->isp_fwoptions |= ICBOPT_INI_DISABLE;
 	}
 
 	/*
@@ -3452,6 +3458,15 @@ isp_control(struct ispsoftc *isp, ispctl_t ctl, void *arg)
 
 		if (IS_FC(isp) && arg) {
 			return (isp_getmap(isp, arg));
+		}
+		break;
+
+
+	case ISPCTL_GET_PDB:
+		if (IS_FC(isp) && arg) {
+			int id = *((int *)arg);
+			isp_pdb_t *pdb = arg;
+			return (isp_getpdb(isp, id, pdb));
 		}
 		break;
 
@@ -5828,7 +5843,7 @@ void
 isp_reinit(struct ispsoftc *isp)
 {
 	XS_T *xs;
-	u_int16_t handle;
+	int i;
 
 	if (IS_FC(isp)) {
 		isp_mark_getpdb_all(isp);
@@ -5848,11 +5863,13 @@ isp_reinit(struct ispsoftc *isp)
 	}
 	isp->isp_nactive = 0;
 
-	for (handle = 1; (int) handle <= isp->isp_maxcmds; handle++) {
-		xs = isp_find_xs(isp, handle);
+	for (i = 0; i < isp->isp_maxcmds; i++) {
+		u_int16_t handle;
+		xs = isp->isp_xflist[i];
 		if (xs == NULL) {
 			continue;
 		}
+		handle = isp_index_handle(i);
 		isp_destroy_handle(isp, handle);
 		if (XS_XFRLEN(xs)) {
 			ISP_DMAFREE(isp, xs, handle);

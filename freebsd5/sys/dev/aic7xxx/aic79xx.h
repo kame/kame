@@ -37,9 +37,9 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.h#94 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.h#107 $
  *
- * $FreeBSD: src/sys/dev/aic7xxx/aic79xx.h,v 1.16 2003/09/02 17:30:34 jhb Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic79xx.h,v 1.21.2.1 2004/09/02 15:32:05 gibbs Exp $
  */
 
 #ifndef _AIC79XX_H_
@@ -74,9 +74,8 @@ struct scb_platform_data;
 #define ALL_TARGETS_MASK 0xFFFF
 #define INITIATOR_WILDCARD	(~0)
 #define	SCB_LIST_NULL		0xFF00
-#define	SCB_LIST_NULL_LE	(ahd_htole16(SCB_LIST_NULL))
-#define QOUTFIFO_ENTRY_VALID 0x8000
-#define QOUTFIFO_ENTRY_VALID_LE (ahd_htole16(0x8000))
+#define	SCB_LIST_NULL_LE	(aic_htole16(SCB_LIST_NULL))
+#define QOUTFIFO_ENTRY_VALID 0x80
 #define SCBID_IS_NULL(scbid) (((scbid) & 0xFF00 ) == SCB_LIST_NULL)
 
 #define SCSIID_TARGET(ahd, scsiid)	\
@@ -118,7 +117,7 @@ struct scb_platform_data;
 	((lun) | ((target) << 8))
 
 #define SCB_GET_TAG(scb) \
-	ahd_le16toh(scb->hscb->tag)
+	aic_le16toh(scb->hscb->tag)
 
 #ifndef	AHD_TARGET_MODE
 #undef	AHD_TMODE_ENABLE
@@ -202,6 +201,8 @@ do {								\
 #define AHD_BUSRESET_DELAY	25
 
 /******************* Chip Characteristics/Operating Settings  *****************/
+extern uint32_t ahd_attach_to_HostRAID_controllers;
+
 /*
  * Chip Type
  * The chip order is from least sophisticated to most sophisticated.
@@ -229,6 +230,7 @@ typedef enum {
 	AHD_RTI			= 0x04000,/* Retained Training Support */
 	AHD_NEW_IOCELL_OPTS	= 0x08000,/* More Signal knobs in the IOCELL */
 	AHD_NEW_DFCNTRL_OPTS	= 0x10000,/* SCSIENWRDIS bit */
+	AHD_FAST_CDB_DELIVERY	= 0x20000,/* CDB acks released to Output Sync */
 	AHD_REMOVABLE		= 0x00000,/* Hot-Swap supported - None so far*/
 	AHD_AIC7901_FE		= AHD_FENONE,
 	AHD_AIC7901A_FE		= AHD_FENONE,
@@ -374,7 +376,9 @@ typedef enum {
 	AHD_RESET_POLL_ACTIVE = 0x200000,
 	AHD_UPDATE_PEND_CMDS  = 0x400000,
 	AHD_RUNNING_QOUTFIFO  = 0x800000,
-	AHD_HAD_FIRST_SEL     = 0x1000000
+	AHD_HAD_FIRST_SEL     = 0x1000000,
+	AHD_SHUTDOWN_RECOVERY = 0x2000000, /* Terminate recovery thread. */
+	AHD_HOSTRAID_BOARD    = 0x4000000
 } ahd_flag;
 
 /************************* Hardware  SCB Definition ***************************/
@@ -548,7 +552,7 @@ struct ahd_dma64_seg {
 
 struct map_node {
 	bus_dmamap_t		 dmamap;
-	bus_addr_t		 physaddr;
+	bus_addr_t		 busaddr;
 	uint8_t			*vaddr;
 	SLIST_ENTRY(map_node)	 links;
 };
@@ -590,12 +594,16 @@ typedef enum {
 	SCB_PKT_SENSE		= 0x02000,
 	SCB_CMDPHASE_ABORT	= 0x04000,
 	SCB_ON_COL_LIST		= 0x08000,
-	SCB_SILENT		= 0x10000 /*
+	SCB_SILENT		= 0x10000,/*
 					   * Be quiet about transmission type
 					   * errors.  They are expected and we
 					   * don't want to upset the user.  This
 					   * flag is typically used during DV.
 					   */
+	SCB_TIMEDOUT		= 0x20000/*
+					  * SCB has timed out and is on the
+					  * timedout list.
+					  */
 } scb_flag;
 
 struct scb {
@@ -612,8 +620,9 @@ struct scb {
 	} links2;
 #define pending_links links2.le
 #define collision_links links2.le
+	LIST_ENTRY(scb)		  timedout_links;
 	struct scb		 *col_scb;
-	ahd_io_ctx_t		  io_ctx;
+	aic_io_ctx_t		  io_ctx;
 	struct ahd_softc	 *ahd_softc;
 	scb_flag		  flags;
 #ifndef __linux__
@@ -658,12 +667,15 @@ struct scb_data {
 	 */
 	struct	scb *scbindex[AHD_SCB_MAX];
 
+	u_int		 recovery_scbs;	/* Transactions currently in recovery */
+
 	/*
 	 * "Bus" addresses of our data structures.
 	 */
 	bus_dma_tag_t	 hscb_dmat;	/* dmat for our hardware SCB array */
 	bus_dma_tag_t	 sg_dmat;	/* dmat for our sg segments */
 	bus_dma_tag_t	 sense_dmat;	/* dmat for our sense buffers */
+
 	SLIST_HEAD(, map_node) hscb_maps;
 	SLIST_HEAD(, map_node) sg_maps;
 	SLIST_HEAD(, map_node) sense_maps;
@@ -1052,6 +1064,15 @@ typedef uint8_t ahd_mode_state;
 
 typedef void ahd_callback_t (void *);
 
+struct ahd_completion
+{
+	uint16_t	tag;
+	uint8_t		sg_status;
+	uint8_t		valid_tag;
+};
+
+#define AIC_SCB_DATA(softc) (&(softc)->scb_data)
+
 struct ahd_softc {
 	bus_space_tag_t           tags[2];
 	bus_space_handle_t        bshs[2];
@@ -1061,11 +1082,17 @@ struct ahd_softc {
 	struct scb_data		  scb_data;
 
 	struct hardware_scb	 *next_queued_hscb;
+	struct map_node		 *next_queued_hscb_map;
 
 	/*
 	 * SCBs that have been sent to the controller
 	 */
 	LIST_HEAD(, scb)	  pending_scbs;
+
+	/*
+	 * SCBs whose timeout routine has been called.
+	 */
+	LIST_HEAD(, scb)	  timedout_scbs;
 
 	/*
 	 * Current register window mode information.
@@ -1088,7 +1115,7 @@ struct ahd_softc {
 	/*
 	 * Platform specific device information.
 	 */
-	ahd_dev_softc_t		  dev_softc;
+	aic_dev_softc_t		  dev_softc;
 
 	/*
 	 * Bus specific device information.
@@ -1118,8 +1145,8 @@ struct ahd_softc {
 	/*
 	 * Timer handles for timer driven callbacks.
 	 */
-	ahd_timer_t		  reset_timer;
-	ahd_timer_t		  stat_timer;
+	aic_timer_t		  reset_timer;
+	aic_timer_t		  stat_timer;
 
 	/*
 	 * Statistics.
@@ -1139,16 +1166,23 @@ struct ahd_softc {
 	ahd_flag		  flags;
 	struct seeprom_config	 *seep_config;
 
-	/* Values to store in the SEQCTL register for pause and unpause */
-	uint8_t			  unpause;
-	uint8_t			  pause;
-
 	/* Command Queues */
+	struct ahd_completion    *qoutfifo;
 	uint16_t		  qoutfifonext;
 	uint16_t		  qoutfifonext_valid_tag;
 	uint16_t		  qinfifonext;
 	uint16_t		  qinfifo[AHD_SCB_MAX];
-	uint16_t		 *qoutfifo;
+
+	/*
+	 * Our qfreeze count.  The sequencer compares
+	 * this value with its own counter to determine
+	 * whether to allow selections to occur.
+	 */
+	uint16_t		  qfreeze_cnt;
+
+	/* Values to store in the SEQCTL register for pause and unpause */
+	uint8_t			  unpause;
+	uint8_t			  pause;
 
 	/* Critical Section Data */
 	struct cs		 *critical_sections;
@@ -1196,8 +1230,7 @@ struct ahd_softc {
 	 */
 	bus_dma_tag_t		  parent_dmat;
 	bus_dma_tag_t		  shared_data_dmat;
-	bus_dmamap_t		  shared_data_dmamap;
-	bus_addr_t		  shared_data_busaddr;
+	struct map_node		  shared_data_map;
 
 	/* Information saved through suspend/resume cycles */
 	struct ahd_suspend_state  suspend_state;
@@ -1313,19 +1346,6 @@ struct ahd_pci_identity {
 extern struct ahd_pci_identity ahd_pci_ident_table [];
 extern const u_int ahd_num_pci_devs;
 
-/***************************** VL/EISA Declarations ***************************/
-struct aic7770_identity {
-	uint32_t		 full_id;
-	uint32_t		 id_mask;
-	char			*name;
-	ahd_device_setup_t	*setup;
-};
-extern struct aic7770_identity aic7770_ident_table [];
-extern const int ahd_num_aic7770_devs;
-
-#define AHD_EISA_SLOT_OFFSET	0xc00
-#define AHD_EISA_IOSIZE		0x100
-
 /*************************** Function Declarations ****************************/
 /******************************************************************************/
 void			ahd_reset_cmds_pending(struct ahd_softc *ahd);
@@ -1340,7 +1360,7 @@ ahd_unbusy_tcl(struct ahd_softc *ahd, u_int tcl)
 }
 
 /***************************** PCI Front End *********************************/
-struct	ahd_pci_identity *ahd_find_pci_device(ahd_dev_softc_t);
+struct	ahd_pci_identity *ahd_find_pci_device(aic_dev_softc_t);
 int			  ahd_pci_config(struct ahd_softc *,
 					 struct ahd_pci_identity *);
 int	ahd_pci_test_register_access(struct ahd_softc *);
@@ -1410,6 +1430,8 @@ typedef enum {
 	SEARCH_REMOVE,
 	SEARCH_PRINT
 } ahd_search_action;
+void			ahd_done_with_status(struct ahd_softc *ahd,
+					     struct scb *scb, uint32_t status);
 int			ahd_search_qinfifo(struct ahd_softc *ahd, int target,
 					   char channel, int lun, u_int tag,
 					   role_t role, uint32_t status,
@@ -1432,6 +1454,8 @@ void			ahd_handle_scsi_status(struct ahd_softc *ahd,
 					       struct scb *scb);
 void			ahd_calc_residual(struct ahd_softc *ahd,
 					  struct scb *scb);
+void			ahd_timeout(struct scb *scb);
+void			ahd_recover_commands(struct ahd_softc *ahd);
 /*************************** Utility Functions ********************************/
 struct ahd_phase_table_entry*
 			ahd_lookup_phase_entry(int phase);

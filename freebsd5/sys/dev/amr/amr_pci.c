@@ -55,11 +55,12 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/amr/amr_pci.c,v 1.20 2003/09/02 17:30:34 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/amr/amr_pci.c,v 1.23 2004/08/14 02:48:13 ambrisko Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 
 #include <dev/amr/amr_compat.h>
 #include <sys/bus.h>
@@ -129,6 +130,7 @@ static struct
     {0x1000, 0x0407, 0},
     {0x1028, 0x000e, PROBE_SIGNATURE}, /* perc4/di i960 */
     {0x1028, 0x000f, 0}, /* perc4/di Verde*/
+    {0x1028, 0x0013, 0}, /* perc4/di */
     {0, 0, 0}
 };
 
@@ -180,7 +182,8 @@ amr_pci_attach(device_t dev)
      */
     command = pci_read_config(dev, PCIR_COMMAND, 1);
     if ((pci_get_device(dev) == 0x1960) || (pci_get_device(dev) == 0x0407) ||
-	(pci_get_device(dev) == 0x000e) || (pci_get_device(dev) == 0x000f)) {
+	(pci_get_device(dev) == 0x000e) || (pci_get_device(dev) == 0x000f) ||
+	(pci_get_device(dev) == 0x0013)) {
 	/*
 	 * Make sure we are going to be able to talk to this board.
 	 */
@@ -212,7 +215,7 @@ amr_pci_attach(device_t dev)
      */
     rid = PCIR_BAR(0);
     rtype = AMR_IS_QUARTZ(sc) ? SYS_RES_MEMORY : SYS_RES_IOPORT;
-    sc->amr_reg = bus_alloc_resource(dev, rtype, &rid, 0, ~0, 1, RF_ACTIVE);
+    sc->amr_reg = bus_alloc_resource_any(dev, rtype, &rid, RF_ACTIVE);
     if (sc->amr_reg == NULL) {
 	device_printf(sc->amr_dev, "can't allocate register window\n");
 	goto out;
@@ -224,7 +227,8 @@ amr_pci_attach(device_t dev)
      * Allocate and connect our interrupt.
      */
     rid = 0;
-    sc->amr_irq = bus_alloc_resource(sc->amr_dev, SYS_RES_IRQ, &rid, 0, ~0, 1, RF_SHAREABLE | RF_ACTIVE);
+    sc->amr_irq = bus_alloc_resource_any(sc->amr_dev, SYS_RES_IRQ, &rid,
+        RF_SHAREABLE | RF_ACTIVE);
     if (sc->amr_irq == NULL) {
         device_printf(sc->amr_dev, "can't allocate interrupt\n");
 	goto out;

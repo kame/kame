@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -35,7 +31,7 @@
  *
  *	@(#)quota.h	8.3 (Berkeley) 8/19/94
  * %FreeBSD: src/sys/ufs/ufs/quota.h,v 1.15 1999/12/29 04:55:05 peter Exp %
- * $FreeBSD: src/sys/boot/pc98/boot2/quota.h,v 1.1 2002/10/03 16:20:14 nyan Exp $
+ * $FreeBSD: src/sys/boot/pc98/boot2/quota.h,v 1.2 2004/04/05 23:41:29 imp Exp $
  */
 
 #ifndef _UFS_UFS_QUOTA_H_

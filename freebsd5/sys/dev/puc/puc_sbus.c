@@ -25,21 +25,22 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/puc/puc_sbus.c,v 1.1 2003/09/06 21:48:50 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/puc/puc_sbus.c,v 1.4 2004/08/12 17:41:30 marius Exp $");
 
 #include "opt_puc.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
+
+#include <dev/ofw/ofw_bus.h>
+
 #include <machine/bus.h>
 #include <sys/rman.h>
 #include <machine/resource.h>
-
-#include <dev/ofw/openfirm.h>
-#include <sparc64/sbus/sbusvar.h>
 
 #define	PUC_ENTRAILS	1
 #include <dev/puc/pucvar.h>
@@ -49,7 +50,7 @@ puc_sbus_probe(device_t dev)
 {
 	const char *nm;
 
-	nm = sbus_get_name(dev);
+	nm = ofw_bus_get_name(dev);
 	if (!strcmp(nm, "zs")) {
 		device_set_desc(dev, "Zilog Z8530 dual channel SCC");
 		return (0);
@@ -68,7 +69,7 @@ puc_sbus_attach(device_t dev)
 	for (i = 0; i < 2; i++) {
 		dd.ports[i].type = PUC_PORT_TYPE_UART | PUC_PORT_UART_Z8530;
 		dd.ports[i].bar = 0;
-		dd.ports[i].offset = 4 * i;
+		dd.ports[i].offset = 4 - 4 * i;
 		dd.ports[i].serialfreq = 0;
 		dd.ports[i].flags = PUC_FLAGS_MEMORY;
 		dd.ports[i].regshft = 1;

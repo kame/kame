@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/smbus/smb.h,v 1.3 1999/08/28 00:44:24 peter Exp $
+ * $FreeBSD: src/sys/dev/smbus/smb.h,v 1.4 2004/05/16 21:18:45 joerg Exp $
  *
  */
 #ifndef __SMB_H
@@ -49,10 +49,15 @@ struct smbcmd {
 	} data;
 };
 
+/*
+ * SMBus spec 2.0 says block transfers may be at most 32 bytes.
+ */
+#define SMB_MAXBLOCKSIZE	32
+
 #define SMB_QUICK_WRITE	_IOW('i', 1, struct smbcmd)
 #define SMB_QUICK_READ	_IOW('i', 2, struct smbcmd)
 #define SMB_SENDB	_IOW('i', 3, struct smbcmd)
-#define SMB_RECVB	_IOW('i', 4, struct smbcmd)
+#define SMB_RECVB	_IOWR('i', 4, struct smbcmd)
 #define SMB_WRITEB	_IOW('i', 5, struct smbcmd)
 #define SMB_WRITEW	_IOW('i', 6, struct smbcmd)
 #define SMB_READB	_IOW('i', 7, struct smbcmd)

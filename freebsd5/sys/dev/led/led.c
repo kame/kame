@@ -9,7 +9,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/led/led.c,v 1.4.2.1 2003/12/16 20:27:07 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/led/led.c,v 1.13 2004/07/10 15:38:27 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/conf.h>
@@ -26,7 +26,7 @@ struct ledsc {
 	LIST_ENTRY(ledsc)	list;
 	void			*private;
 	led_t			*func;
-	dev_t			dev;
+	struct cdev *dev;
 	struct sbuf		*spec;
 	char			*str;
 	char			*ptr;
@@ -52,11 +52,16 @@ led_timeout(void *p)
 			sc->count--;
 			continue;
 		}
-		if (*sc->ptr >= 'a' && *sc->ptr <= 'j')
+		if (*sc->ptr == '.') {
+			sc->ptr = NULL;
+			continue;
+		} else if (*sc->ptr >= 'a' && *sc->ptr <= 'j') {
 			sc->func(sc->private, 0);
-		else if (*sc->ptr >= 'A' && *sc->ptr <= 'J')
+		} else if (*sc->ptr >= 'A' && *sc->ptr <= 'J') {
 			sc->func(sc->private, 1);
+		}
 		sc->count = *sc->ptr & 0xf;
+		sc->count--;
 		sc->ptr++;
 		if (*sc->ptr == '\0')
 			sc->ptr = sc->str;
@@ -67,7 +72,7 @@ led_timeout(void *p)
 }
 
 static int
-led_write(dev_t dev, struct uio *uio, int ioflag)
+led_write(struct cdev *dev, struct uio *uio, int ioflag)
 {
 	int error;
 	char *s, *s2;
@@ -81,8 +86,6 @@ led_write(dev_t dev, struct uio *uio, int ioflag)
 	if (uio->uio_resid > 512)
 		return (EINVAL);
 	s2 = s = malloc(uio->uio_resid + 1, M_DEVBUF, M_WAITOK);
-	if (s == NULL)
-		return (ENOMEM);
 	s[uio->uio_resid] = '\0';
 	error = uiomove(s, uio->uio_resid, uio);
 	if (error) {
@@ -153,11 +156,10 @@ led_write(dev_t dev, struct uio *uio, int ioflag)
 		 */
 		case 's':
 			for(s++; *s; s++) {
-				if ((*s & 0x0f) > 10)
-					continue;
-				if ((*s & 0xf0) < ' ')
-					continue;
-				sbuf_bcat(sb, s, 1);
+				if ((*s >= 'a' && *s <= 'j') ||
+				    (*s >= 'A' && *s <= 'J') ||
+					*s == '.')
+					sbuf_bcat(sb, s, 1);
 			}
 			break;
 		/*
@@ -211,11 +213,13 @@ led_write(dev_t dev, struct uio *uio, int ioflag)
 }
 
 static struct cdevsw led_cdevsw = {
-        .d_write =      led_write,
-        .d_name =       "LED",
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
+	.d_write =	led_write,
+	.d_name =	"LED",
 };
 
-dev_t
+struct cdev *
 led_create(led_t *func, void *priv, char const *name)
 {
 	struct ledsc	*sc;
@@ -228,13 +232,13 @@ led_create(led_t *func, void *priv, char const *name)
 
 	sb = sbuf_new(NULL, NULL, SPECNAMELEN, SBUF_FIXEDLEN);
 	if (sb == NULL)
-		return (NODEV);
+		return (NULL);
 	sbuf_cpy(sb, "led/");
 	sbuf_cat(sb, name);
 	sbuf_finish(sb);
 	if (sbuf_overflowed(sb)) {
 		sbuf_delete(sb);
-		return (NODEV);
+		return (NULL);
 	}
 		
 	sc = malloc(sizeof *sc, M_LED, M_WAITOK | M_ZERO);
@@ -247,12 +251,13 @@ led_create(led_t *func, void *priv, char const *name)
 	sbuf_delete(sb);
 	mtx_lock(&led_mtx);
 	LIST_INSERT_HEAD(&led_list, sc, list);
+	sc->func(sc->private, 0);
 	mtx_unlock(&led_mtx);
 	return (sc->dev);
 }
 
 void
-led_destroy(dev_t dev)
+led_destroy(struct cdev *dev)
 {
 	struct ledsc *sc;
 

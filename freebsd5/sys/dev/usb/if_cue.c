@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/if_cue.c,v 1.44 2003/11/14 11:09:45 johan Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/if_cue.c,v 1.52 2004/08/11 03:38:55 rwatson Exp $");
 
 /*
  * CATC USB-EL1210A USB to ethernet driver. Used in the CATC Netmate
@@ -57,6 +57,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/if_cue.c,v 1.44 2003/11/14 11:09:45 johan Ex
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 
 #include <net/if.h>
@@ -76,7 +77,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/if_cue.c,v 1.44 2003/11/14 11:09:45 johan Ex
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
 #include <dev/usb/usbdivar.h>
-#include <dev/usb/usbdevs.h>
+#include "usbdevs.h"
 #include <dev/usb/usb_ethersubr.h>
 
 #include <dev/usb/if_cuereg.h>
@@ -90,8 +91,6 @@ Static struct cue_type cue_devs[] = {
 	{ USB_VENDOR_SMARTBRIDGES, USB_PRODUCT_SMARTBRIDGES_SMARTLINK },
 	{ 0, 0 }
 };
-
-Static struct usb_qdat cue_qdat;
 
 Static int cue_match(device_ptr_t);
 Static int cue_attach(device_ptr_t);
@@ -324,23 +323,15 @@ cue_getmac(struct cue_softc *sc, void *buf)
 	return(0);
 }
 
-#define CUE_POLY	0xEDB88320
 #define CUE_BITS	9
 
 Static uint32_t
 cue_mchash(const uint8_t *addr)
 {
-	uint32_t	crc;
-	int		idx, bit;
-	uint8_t		data;
+	uint32_t crc;
 
 	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF; /* initial value */
-
-	for (idx = 0; idx < 6; idx++) {
-		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1)
-			crc = (crc >> 1) ^ (((crc ^ data) & 1) ? CUE_POLY : 0);
-	}
+	crc = ether_crc32_le(addr, ETHER_ADDR_LEN);
 
 	return (crc & ((1 << CUE_BITS) - 1));
 }
@@ -510,28 +501,23 @@ USB_ATTACH(cue)
 	 */
 	cue_getmac(sc, &eaddr);
 
-	/*
-	 * A CATC chip was detected. Inform the world.
-	 */
-	printf("cue%d: Ethernet address: %6D\n", sc->cue_unit, eaddr, ":");
-
 	bcopy(eaddr, (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
 	if_initname(ifp, "cue", sc->cue_unit);
 	ifp->if_mtu = ETHERMTU;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_NEEDSGIANT;
 	ifp->if_ioctl = cue_ioctl;
-	ifp->if_output = ether_output;
 	ifp->if_start = cue_start;
 	ifp->if_watchdog = cue_watchdog;
 	ifp->if_init = cue_init;
 	ifp->if_baudrate = 10000000;
 	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 
-	cue_qdat.ifp = ifp;
-	cue_qdat.if_rxstart = cue_rxstart;
+	sc->cue_qdat.ifp = ifp;
+	sc->cue_qdat.if_rxstart = cue_rxstart;
 
 	/*
 	 * Call MI attach routine.
@@ -746,7 +732,7 @@ cue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 
 	ifp->if_ipackets++;
 	m_adj(m, sizeof(u_int16_t));
-	m->m_pkthdr.rcvif = (struct ifnet *)&cue_qdat;
+	m->m_pkthdr.rcvif = (struct ifnet *)&sc->cue_qdat;
 	m->m_pkthdr.len = m->m_len = total_len;
 
 	/* Put the packet on the special USB input queue. */

@@ -29,7 +29,7 @@
 
 #include <dev/sound/pcm/sound.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/dsp.c,v 1.67 2003/11/11 05:38:28 scottl Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pcm/dsp.c,v 1.77 2004/07/02 15:31:44 netchild Exp $");
 
 #define OLDPCM_IOCTL
 
@@ -41,7 +41,9 @@ static d_ioctl_t dsp_ioctl;
 static d_poll_t dsp_poll;
 static d_mmap_t dsp_mmap;
 
-static struct cdevsw dsp_cdevsw = {
+struct cdevsw dsp_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	dsp_open,
 	.d_close =	dsp_close,
 	.d_read =	dsp_read,
@@ -58,7 +60,7 @@ static eventhandler_tag dsp_ehtag;
 #endif
 
 static struct snddev_info *
-dsp_get_info(dev_t dev)
+dsp_get_info(struct cdev *dev)
 {
 	struct snddev_info *d;
 	int unit;
@@ -72,7 +74,7 @@ dsp_get_info(dev_t dev)
 }
 
 static u_int32_t
-dsp_get_flags(dev_t dev)
+dsp_get_flags(struct cdev *dev)
 {
 	device_t bdev;
 	int unit;
@@ -86,7 +88,7 @@ dsp_get_flags(dev_t dev)
 }
 
 static void
-dsp_set_flags(dev_t dev, u_int32_t flags)
+dsp_set_flags(struct cdev *dev, u_int32_t flags)
 {
 	device_t bdev;
 	int unit;
@@ -106,15 +108,15 @@ dsp_set_flags(dev_t dev, u_int32_t flags)
  * lock channels specified.
  */
 static int
-getchns(dev_t dev, struct pcm_channel **rdch, struct pcm_channel **wrch, u_int32_t prio)
+getchns(struct cdev *dev, struct pcm_channel **rdch, struct pcm_channel **wrch, u_int32_t prio)
 {
 	struct snddev_info *d;
 	u_int32_t flags;
 
 	flags = dsp_get_flags(dev);
 	d = dsp_get_info(dev);
-	pcm_lock(d);
 	pcm_inprog(d, 1);
+	pcm_lock(d);
 	KASSERT((flags & SD_F_PRIO_SET) != SD_F_PRIO_SET, \
 		("getchns: read and write both prioritised"));
 
@@ -150,7 +152,7 @@ getchns(dev_t dev, struct pcm_channel **rdch, struct pcm_channel **wrch, u_int32
 
 /* unlock specified channels */
 static void
-relchns(dev_t dev, struct pcm_channel *rdch, struct pcm_channel *wrch, u_int32_t prio)
+relchns(struct cdev *dev, struct pcm_channel *rdch, struct pcm_channel *wrch, u_int32_t prio)
 {
 	struct snddev_info *d;
 
@@ -159,13 +161,11 @@ relchns(dev_t dev, struct pcm_channel *rdch, struct pcm_channel *wrch, u_int32_t
 		CHN_UNLOCK(wrch);
 	if (rdch && rdch != pcm_getfakechan(d) && (prio & SD_F_PRIO_RD))
 		CHN_UNLOCK(rdch);
-	pcm_lock(d);
 	pcm_inprog(d, -1);
-	pcm_unlock(d);
 }
 
 static int
-dsp_open(dev_t i_dev, int flags, int mode, struct thread *td)
+dsp_open(struct cdev *i_dev, int flags, int mode, struct thread *td)
 {
 	struct pcm_channel *rdch, *wrch;
 	struct snddev_info *d;
@@ -319,7 +319,7 @@ dsp_open(dev_t i_dev, int flags, int mode, struct thread *td)
 }
 
 static int
-dsp_close(dev_t i_dev, int flags, int mode, struct thread *td)
+dsp_close(struct cdev *i_dev, int flags, int mode, struct thread *td)
 {
 	struct pcm_channel *rdch, *wrch;
 	struct snddev_info *d;
@@ -388,7 +388,7 @@ dsp_close(dev_t i_dev, int flags, int mode, struct thread *td)
 }
 
 static int
-dsp_read(dev_t i_dev, struct uio *buf, int flag)
+dsp_read(struct cdev *i_dev, struct uio *buf, int flag)
 {
 	struct pcm_channel *rdch, *wrch;
 	intrmask_t s;
@@ -415,7 +415,7 @@ dsp_read(dev_t i_dev, struct uio *buf, int flag)
 }
 
 static int
-dsp_write(dev_t i_dev, struct uio *buf, int flag)
+dsp_write(struct cdev *i_dev, struct uio *buf, int flag)
 {
 	struct pcm_channel *rdch, *wrch;
 	intrmask_t s;
@@ -442,9 +442,9 @@ dsp_write(dev_t i_dev, struct uio *buf, int flag)
 }
 
 static int
-dsp_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
+dsp_ioctl(struct cdev *i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
 {
-    	struct pcm_channel *wrch, *rdch;
+    	struct pcm_channel *chn, *rdch, *wrch;
 	struct snddev_info *d;
 	intrmask_t s;
 	int kill;
@@ -455,15 +455,11 @@ dsp_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
 	 * on dsp devices.
 	 */
 
-	if (IOCGROUP(cmd) == 'M') {
-		dev_t pdev;
-
-		pdev = makedev(SND_CDEV_MAJOR, PCMMKMINOR(PCMUNIT(i_dev), SND_DEV_CTL, 0));
-		return mixer_ioctl(pdev, cmd, arg, mode, td);
-	}
+	d = dsp_get_info(i_dev);
+	if (IOCGROUP(cmd) == 'M')
+		return mixer_ioctl(d->mixer_dev, cmd, arg, mode, td);
 
     	s = spltty();
-	d = dsp_get_info(i_dev);
 	getchns(i_dev, &rdch, &wrch, 0);
 
 	kill = 0;
@@ -480,18 +476,20 @@ dsp_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
 		wrch = NULL;
 	if (kill & 2)
 		rdch = NULL;
-
+	
     	switch(cmd) {
 #ifdef OLDPCM_IOCTL
     	/*
      	 * we start with the new ioctl interface.
      	 */
     	case AIONWRITE:	/* how many bytes can write ? */
+		CHN_LOCK(wrch);
 /*
 		if (wrch && wrch->bufhard.dl)
 			while (chn_wrfeed(wrch) == 0);
 */
 		*arg_i = wrch? sndbuf_getfree(wrch->bufsoft) : 0;
+		CHN_UNLOCK(wrch);
 		break;
 
     	case AIOSSIZE:     /* set the current blocksize */
@@ -518,40 +516,50 @@ dsp_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
 		{
 	    		struct snd_size *p = (struct snd_size *)arg;
 
-	    		if (wrch)
+	    		if (wrch) {
+				CHN_LOCK(wrch);
 				p->play_size = sndbuf_getblksz(wrch->bufsoft);
-	    		if (rdch)
+				CHN_UNLOCK(wrch);
+			}
+	    		if (rdch) {
+				CHN_LOCK(rdch);
 				p->rec_size = sndbuf_getblksz(rdch->bufsoft);
+				CHN_UNLOCK(rdch);
+			}
 		}
 		break;
 
     	case AIOSFMT:
+    	case AIOGFMT:
 		{
 	    		snd_chan_param *p = (snd_chan_param *)arg;
 
 	    		if (wrch) {
 				CHN_LOCK(wrch);
-				chn_setformat(wrch, p->play_format);
-				chn_setspeed(wrch, p->play_rate);
+				if (cmd == AIOSFMT) {
+					chn_setformat(wrch, p->play_format);
+					chn_setspeed(wrch, p->play_rate);
+				}
+	    			p->play_rate = wrch->speed;
+	    			p->play_format = wrch->format;
 				CHN_UNLOCK(wrch);
+			} else {
+	    			p->play_rate = 0;
+	    			p->play_format = 0;
 	    		}
 	    		if (rdch) {
 				CHN_LOCK(rdch);
-				chn_setformat(rdch, p->rec_format);
-				chn_setspeed(rdch, p->rec_rate);
+				if (cmd == AIOSFMT) {
+					chn_setformat(rdch, p->rec_format);
+					chn_setspeed(rdch, p->rec_rate);
+				}
+				p->rec_rate = rdch->speed;
+				p->rec_format = rdch->format;
 				CHN_UNLOCK(rdch);
+			} else {
+	    			p->rec_rate = 0;
+	    			p->rec_format = 0;
 	    		}
-		}
-		/* FALLTHROUGH */
-
-    	case AIOGFMT:
-		{
-	    		snd_chan_param *p = (snd_chan_param *)arg;
-
-	    		p->play_rate = wrch? wrch->speed : 0;
-	    		p->rec_rate = rdch? rdch->speed : 0;
-	    		p->play_format = wrch? wrch->format : 0;
-	    		p->rec_format = rdch? rdch->format : 0;
 		}
 		break;
 
@@ -559,7 +567,7 @@ dsp_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
 		{
 	    		snd_capabilities *p = (snd_capabilities *)arg;
 			struct pcmchan_caps *pcaps = NULL, *rcaps = NULL;
-			dev_t pdev;
+			struct cdev *pdev;
 
 			if (rdch) {
 				CHN_LOCK(rdch);
@@ -580,23 +588,27 @@ dsp_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
 			 	     (wrch? chn_getformats(wrch) : 0xffffffff);
 			if (rdch && wrch)
 				p->formats |= (dsp_get_flags(i_dev) & SD_F_SIMPLEX)? 0 : AFMT_FULLDUPLEX;
-			pdev = makedev(SND_CDEV_MAJOR, PCMMKMINOR(PCMUNIT(i_dev), SND_DEV_CTL, 0));
+			pdev = d->mixer_dev;
 	    		p->mixers = 1; /* default: one mixer */
 	    		p->inputs = pdev->si_drv1? mix_getdevs(pdev->si_drv1) : 0;
 	    		p->left = p->right = 100;
-			if (wrch)
-				CHN_UNLOCK(wrch);
 			if (rdch)
 				CHN_UNLOCK(rdch);
+			if (wrch)
+				CHN_UNLOCK(wrch);
 		}
 		break;
 
     	case AIOSTOP:
-		if (*arg_i == AIOSYNC_PLAY && wrch)
+		if (*arg_i == AIOSYNC_PLAY && wrch) {
+			CHN_LOCK(wrch);
 			*arg_i = chn_abort(wrch);
-		else if (*arg_i == AIOSYNC_CAPTURE && rdch)
+			CHN_UNLOCK(wrch);
+		} else if (*arg_i == AIOSYNC_CAPTURE && rdch) {
+			CHN_LOCK(rdch);
 			*arg_i = chn_abort(rdch);
-		else {
+			CHN_UNLOCK(rdch);
+		} else {
 	   	 	printf("AIOSTOP: bad channel 0x%x\n", *arg_i);
 	    		*arg_i = 0;
 		}
@@ -611,9 +623,15 @@ dsp_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
 	 * here follow the standard ioctls (filio.h etc.)
 	 */
     	case FIONREAD: /* get # bytes to read */
-/*		if (rdch && rdch->bufhard.dl)
-			while (chn_rdfeed(rdch) == 0);
-*/		*arg_i = rdch? sndbuf_getready(rdch->bufsoft) : 0;
+		if (rdch) {
+			CHN_LOCK(rdch);
+/*			if (rdch && rdch->bufhard.dl)
+				while (chn_rdfeed(rdch) == 0);
+*/
+			*arg_i = sndbuf_getready(rdch->bufsoft);
+			CHN_UNLOCK(rdch);
+		} else
+			*arg_i = 0;
 		break;
 
     	case FIOASYNC: /*set/clear async i/o */
@@ -622,15 +640,21 @@ dsp_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
 
     	case SNDCTL_DSP_NONBLOCK:
     	case FIONBIO: /* set/clear non-blocking i/o */
-		if (rdch)
-			rdch->flags &= ~CHN_F_NBIO;
-		if (wrch)
-			wrch->flags &= ~CHN_F_NBIO;
-		if (*arg_i) {
-		    	if (rdch)
+		if (rdch) {
+			CHN_LOCK(rdch);
+			if (*arg_i)
 				rdch->flags |= CHN_F_NBIO;
-		    	if (wrch)
+			else
+				rdch->flags &= ~CHN_F_NBIO;
+			CHN_UNLOCK(rdch);
+		}
+		if (wrch) {
+			CHN_LOCK(wrch);
+			if (*arg_i)
 				wrch->flags |= CHN_F_NBIO;
+			else
+				wrch->flags &= ~CHN_F_NBIO;
+			CHN_UNLOCK(wrch);
 		}
 		break;
 
@@ -640,12 +664,10 @@ dsp_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
 #define THE_REAL_SNDCTL_DSP_GETBLKSIZE _IOWR('P', 4, int)
     	case THE_REAL_SNDCTL_DSP_GETBLKSIZE:
     	case SNDCTL_DSP_GETBLKSIZE:
-		if (wrch)
-			*arg_i = sndbuf_getblksz(wrch->bufsoft);
-		else if (rdch)
-			*arg_i = sndbuf_getblksz(rdch->bufsoft);
-		else
-			*arg_i = 0;
+		chn = wrch ? wrch : rdch;
+		CHN_LOCK(chn);
+		*arg_i = sndbuf_getblksz(chn->bufsoft);
+		CHN_UNLOCK(chn);
 		break ;
 
     	case SNDCTL_DSP_SETBLKSIZE:
@@ -664,10 +686,18 @@ dsp_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
 
     	case SNDCTL_DSP_RESET:
 		DEB(printf("dsp reset\n"));
-		if (wrch)
+		if (wrch) {
+			CHN_LOCK(wrch);
 			chn_abort(wrch);
-		if (rdch)
+			chn_resetbuf(wrch);
+			CHN_UNLOCK(wrch);
+		}
+		if (rdch) {
+			CHN_LOCK(rdch);
 			chn_abort(rdch);
+			chn_resetbuf(rdch);
+			CHN_UNLOCK(rdch);
+		}
 		break;
 
     	case SNDCTL_DSP_SYNC:
@@ -700,7 +730,10 @@ dsp_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
 		break;
 
     	case SOUND_PCM_READ_RATE:
-		*arg_i = wrch? wrch->speed : rdch->speed;
+		chn = wrch ? wrch : rdch;
+		CHN_LOCK(chn);
+		*arg_i = chn->speed;
+		CHN_UNLOCK(chn);
 		break;
 
     	case SNDCTL_DSP_STEREO:
@@ -742,20 +775,28 @@ dsp_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
 			}
 			*arg_i = tmp;
 		} else {
-			*arg_i = ((wrch? wrch->format : rdch->format) & AFMT_STEREO)? 2 : 1;
+			chn = wrch ? wrch : rdch;
+			CHN_LOCK(chn);
+			*arg_i = (chn->format & AFMT_STEREO) ? 2 : 1;
+			CHN_UNLOCK(chn);
 		}
 		break;
 
     	case SOUND_PCM_READ_CHANNELS:
-		*arg_i = ((wrch? wrch->format : rdch->format) & AFMT_STEREO)? 2 : 1;
+		chn = wrch ? wrch : rdch;
+		CHN_LOCK(chn);
+		*arg_i = (chn->format & AFMT_STEREO) ? 2 : 1;
+		CHN_UNLOCK(chn);
 		break;
 
     	case SNDCTL_DSP_GETFMTS:	/* returns a mask of supported fmts */
-		*arg_i = wrch? chn_getformats(wrch) : chn_getformats(rdch);
+		chn = wrch ? wrch : rdch;
+		CHN_LOCK(chn);
+		*arg_i = chn_getformats(chn);
+		CHN_UNLOCK(chn);
 		break ;
 
     	case SNDCTL_DSP_SETFMT:	/* sets _one_ format */
-		/* XXX locking */
 		if ((*arg_i != AFMT_QUERY)) {
 			tmp = 0;
 			if (wrch) {
@@ -772,12 +813,15 @@ dsp_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
 				CHN_UNLOCK(rdch);
 			}
 			*arg_i = tmp;
-		} else
-			*arg_i = (wrch? wrch->format : rdch->format) & ~AFMT_STEREO;
+		} else {
+			chn = wrch ? wrch : rdch;
+			CHN_LOCK(chn);
+			*arg_i = chn->format & ~AFMT_STEREO;
+			CHN_UNLOCK(chn);
+		}
 		break;
 
     	case SNDCTL_DSP_SETFRAGMENT:
-		/* XXX locking */
 		DEB(printf("SNDCTL_DSP_SETFRAGMENT 0x%08x\n", *(int *)arg));
 		{
 			u_int32_t fragln = (*arg_i) & 0x0000ffff;
@@ -897,7 +941,10 @@ dsp_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
 		break;
 
     	case SOUND_PCM_READ_BITS:
-        	*arg_i = ((wrch? wrch->format : rdch->format) & AFMT_16BIT)? 16 : 8;
+		chn = wrch ? wrch : rdch;
+		CHN_LOCK(chn);
+        	*arg_i = (chn->format & AFMT_16BIT) ? 16 : 8;
+		CHN_UNLOCK(chn);
 		break;
 
     	case SNDCTL_DSP_SETTRIGGER:
@@ -917,16 +964,24 @@ dsp_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
 				chn_start(wrch, 1);
 			else
 				wrch->flags |= CHN_F_NOTRIGGER;
-		 	CHN_UNLOCK(wrch);
+			CHN_UNLOCK(wrch);
 		}
 		break;
 
     	case SNDCTL_DSP_GETTRIGGER:
 		*arg_i = 0;
-		if (wrch && wrch->flags & CHN_F_TRIGGERED)
-			*arg_i |= PCM_ENABLE_OUTPUT;
-		if (rdch && rdch->flags & CHN_F_TRIGGERED)
-			*arg_i |= PCM_ENABLE_INPUT;
+		if (wrch) {
+			CHN_LOCK(wrch);
+			if (wrch->flags & CHN_F_TRIGGERED)
+				*arg_i |= PCM_ENABLE_OUTPUT;
+			CHN_UNLOCK(wrch);
+		}
+		if (rdch) {
+			CHN_LOCK(rdch);
+			if (rdch->flags & CHN_F_TRIGGERED)
+				*arg_i |= PCM_ENABLE_INPUT;
+			CHN_UNLOCK(rdch);
+		}
 		break;
 
 	case SNDCTL_DSP_GETODELAY:
@@ -951,6 +1006,15 @@ dsp_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
 		}
 		break;
 
+	case SNDCTL_DSP_SETDUPLEX:
+		/*
+		 * switch to full-duplex mode if card is in half-duplex
+		 * mode and is able to work in full-duplex mode
+		 */
+		if (rdch && wrch && (dsp_get_flags(i_dev) & SD_F_SIMPLEX))
+			dsp_set_flags(i_dev, dsp_get_flags(i_dev)^SD_F_SIMPLEX);
+		break;
+
     	case SNDCTL_DSP_MAPINBUF:
     	case SNDCTL_DSP_MAPOUTBUF:
     	case SNDCTL_DSP_SETSYNCRO:
@@ -960,6 +1024,7 @@ dsp_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
     	case SOUND_PCM_WRITE_FILTER:
     	case SOUND_PCM_READ_FILTER:
 		/* dunno what these do, don't sound important */
+
     	default:
 		DEB(printf("default ioctl fn 0x%08lx fail\n", cmd));
 		ret = EINVAL;
@@ -971,7 +1036,7 @@ dsp_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td)
 }
 
 static int
-dsp_poll(dev_t i_dev, int events, struct thread *td)
+dsp_poll(struct cdev *i_dev, int events, struct thread *td)
 {
 	struct pcm_channel *wrch = NULL, *rdch = NULL;
 	intrmask_t s;
@@ -998,7 +1063,7 @@ dsp_poll(dev_t i_dev, int events, struct thread *td)
 }
 
 static int
-dsp_mmap(dev_t i_dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
+dsp_mmap(struct cdev *i_dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
 {
 	struct pcm_channel *wrch = NULL, *rdch = NULL, *c;
 	intrmask_t s;
@@ -1048,64 +1113,27 @@ dsp_mmap(dev_t i_dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
 	return 0;
 }
 
-int
-dsp_register(int unit, int channel)
-{
-	make_dev(&dsp_cdevsw, PCMMKMINOR(unit, SND_DEV_DSP, channel),
-		 UID_ROOT, GID_WHEEL, 0666, "dsp%d.%d", unit, channel);
-	make_dev(&dsp_cdevsw, PCMMKMINOR(unit, SND_DEV_DSP16, channel),
-		 UID_ROOT, GID_WHEEL, 0666, "dspW%d.%d", unit, channel);
-	make_dev(&dsp_cdevsw, PCMMKMINOR(unit, SND_DEV_AUDIO, channel),
-		 UID_ROOT, GID_WHEEL, 0666, "audio%d.%d", unit, channel);
-
-	return 0;
-}
-
-int
-dsp_registerrec(int unit, int channel)
-{
-	make_dev(&dsp_cdevsw, PCMMKMINOR(unit, SND_DEV_DSPREC, channel),
-		 UID_ROOT, GID_WHEEL, 0666, "dspr%d.%d", unit, channel);
-
-	return 0;
-}
-
-int
-dsp_unregister(int unit, int channel)
-{
-	dev_t pdev;
-
-	pdev = makedev(SND_CDEV_MAJOR, PCMMKMINOR(unit, SND_DEV_DSP, channel));
-	destroy_dev(pdev);
-	pdev = makedev(SND_CDEV_MAJOR, PCMMKMINOR(unit, SND_DEV_DSP16, channel));
-	destroy_dev(pdev);
-	pdev = makedev(SND_CDEV_MAJOR, PCMMKMINOR(unit, SND_DEV_AUDIO, channel));
-	destroy_dev(pdev);
-
-	return 0;
-}
-
-int
-dsp_unregisterrec(int unit, int channel)
-{
-	dev_t pdev;
-
-	pdev = makedev(SND_CDEV_MAJOR, PCMMKMINOR(unit, SND_DEV_DSPREC, channel));
-	destroy_dev(pdev);
-
-	return 0;
-}
-
 #ifdef USING_DEVFS
+
+/*
+ * Clone logic is this:
+ * x E X = {dsp, dspW, audio}
+ * x -> x${sysctl("hw.snd.unit")}
+ * xN->
+ *    for i N = 1 to channels of device N
+ *    	if xN.i isn't busy, return its dev_t
+ */
 static void
-dsp_clone(void *arg, char *name, int namelen, dev_t *dev)
+dsp_clone(void *arg, char *name, int namelen, struct cdev **dev)
 {
-	dev_t pdev;
-	int i, cont, unit, devtype;
+	struct cdev *pdev;
+	struct snddev_info *pcm_dev;
+	struct snddev_channel *pcm_chan;
+	int i, unit, devtype;
 	int devtypes[3] = {SND_DEV_DSP, SND_DEV_DSP16, SND_DEV_AUDIO};
 	char *devnames[3] = {"dsp", "dspW", "audio"};
 
-	if (*dev != NODEV)
+	if (*dev != NULL)
 		return;
 	if (pcm_devclass == NULL)
 		return;
@@ -1124,16 +1152,30 @@ dsp_clone(void *arg, char *name, int namelen, dev_t *dev)
 	if (unit == -1 || unit >= devclass_get_maxunit(pcm_devclass))
 		return;
 
-	cont = 1;
-	for (i = 0; cont; i++) {
-		pdev = makedev(SND_CDEV_MAJOR, PCMMKMINOR(unit, devtype, i));
-		if (pdev->si_flags & SI_NAMED) {
-			if ((pdev->si_drv1 == NULL) && (pdev->si_drv2 == NULL)) {
-				*dev = pdev;
-				return;
-			}
-		} else {
-			cont = 0;
+	pcm_dev = devclass_get_softc(pcm_devclass, unit);
+
+	if (pcm_dev == NULL)
+		return;
+
+	SLIST_FOREACH(pcm_chan, &pcm_dev->channels, link) {
+
+		switch(devtype) {
+			case SND_DEV_DSP:
+				pdev = pcm_chan->dsp_devt;
+				break;
+			case SND_DEV_DSP16:
+				pdev = pcm_chan->dspW_devt;
+				break;
+			case SND_DEV_AUDIO:
+				pdev = pcm_chan->audio_devt;
+				break;
+			default:
+				panic("Unknown devtype %d", devtype);
+		}
+
+		if ((pdev->si_drv1 == NULL) && (pdev->si_drv2 == NULL)) {
+			*dev = pdev;
+			return;
 		}
 	}
 }

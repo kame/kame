@@ -30,9 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/patm/if_patm.c,v 1.4 2003/08/24 17:54:14 obrien Exp $");
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/patm/if_patm.c,v 1.4 2003/08/24 17:54:14 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/patm/if_patm.c,v 1.6 2004/03/10 17:03:27 bms Exp $");
 
 #include "opt_inet.h"
 #include "opt_natm.h"
@@ -269,10 +267,7 @@ patm_stop(struct patm_softc *sc)
 	 * Give any waiters on closing a VCC a chance. They will stop
 	 * to wait if they see that IFF_RUNNING disappeared.
 	 */
-	while (!(cv_waitq_empty(&sc->vcc_cv))) {
-		cv_broadcast(&sc->vcc_cv);
-		DELAY(100);
-	}
+	cv_broadcast(&sc->vcc_cv);
 
 	/* free large buffers */
 	patm_debug(sc, ATTACH, "freeing large buffers...");

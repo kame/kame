@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/fb/fb.c,v 1.29 2003/09/26 10:41:43 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/fb/fb.c,v 1.32 2004/07/15 08:26:00 phk Exp $");
 
 #include "opt_fb.h"
 
@@ -361,9 +361,10 @@ static d_write_t	fbwrite;
 static d_ioctl_t	fbioctl;
 static d_mmap_t		fbmmap;
 
-#define CDEV_MAJOR	123	/* XXX */
 
 static struct cdevsw fb_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	fbopen,
 	.d_close =	fbclose,
 	.d_read =	fbread,
@@ -371,7 +372,6 @@ static struct cdevsw fb_cdevsw = {
 	.d_ioctl =	fbioctl,
 	.d_mmap =	fbmmap,
 	.d_name =	FB_DRIVER_NAME,
-	.d_maj =	CDEV_MAJOR,
 };
 #endif
 
@@ -386,6 +386,8 @@ fb_modevent(module_t mod, int type, void *data)
 	case MOD_UNLOAD: 
 		printf("fb module unload - not possible for this module type\n"); 
 		return EINVAL; 
+	default:
+		return EOPNOTSUPP;
 	} 
 	return 0; 
 } 

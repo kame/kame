@@ -35,7 +35,7 @@ SUCH DAMAGE.
 -----------------------------------------------------------------------------*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/matcd/matcd_isa.c,v 1.2 2003/08/24 17:54:09 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/matcd/matcd_isa.c,v 1.3 2004/03/17 17:50:36 njl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -149,8 +149,8 @@ static int matcd_alloc_resources (device_t dev)
 
 	sc = device_get_softc(dev);
 	if (sc->port_type) {
-		sc->port=bus_alloc_resource(dev, sc->port_type, &sc->port_rid,
-					    0, ~0, 1, RF_ACTIVE);
+		sc->port=bus_alloc_resource_any(dev, sc->port_type,
+						&sc->port_rid, RF_ACTIVE);
 		if (sc->port == NULL) {
 			device_printf(dev,
 				      "Port resource not available.\n");

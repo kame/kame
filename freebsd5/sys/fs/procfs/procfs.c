@@ -37,7 +37,7 @@
  *
  *	@(#)procfs_vfsops.c	8.7 (Berkeley) 5/10/95
  *
- * $FreeBSD: src/sys/fs/procfs/procfs.c,v 1.9 2003/04/17 22:12:12 jhb Exp $
+ * $FreeBSD: src/sys/fs/procfs/procfs.c,v 1.11 2004/01/07 17:58:51 rwatson Exp $
  */
 
 #include <sys/param.h>
@@ -70,7 +70,9 @@ procfs_doprocfile(PFS_FILL_ARGS)
 	char *fullpath = "unknown";
 	char *freepath = NULL;
 
+	vn_lock(p->p_textvp, LK_EXCLUSIVE | LK_RETRY, td);
 	vn_fullpath(td, p->p_textvp, &fullpath, &freepath);
+	VOP_UNLOCK(p->p_textvp, 0, td);
 	sbuf_printf(sb, "%s", fullpath);
 	if (freepath)
 		free(freepath, M_TEMP);
@@ -93,7 +95,6 @@ procfs_docurproc(PFS_FILL_ARGS)
 int
 procfs_attr(PFS_ATTR_ARGS)
 {
-
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 
 	/* XXX inefficient, split into separate functions */
@@ -111,7 +112,7 @@ procfs_attr(PFS_ATTR_ARGS)
 
 	vap->va_uid = p->p_ucred->cr_uid;
 	vap->va_gid = p->p_ucred->cr_gid;
-	
+
 	return (0);
 }
 
@@ -134,8 +135,7 @@ int
 procfs_candebug(PFS_VIS_ARGS)
 {
 	PROC_LOCK_ASSERT(p, MA_OWNED);
-	return ((p->p_flag & P_SYSTEM) == 0 &&
-	    p_candebug(td, p) == 0);
+	return ((p->p_flag & P_SYSTEM) == 0 && p_candebug(td, p) == 0);
 }
 
 /*
@@ -152,7 +152,7 @@ procfs_init(PFS_INIT_ARGS)
 
 	pfs_create_link(root, "curproc", procfs_docurproc,
 	    NULL, NULL, 0);
-	
+
 	dir = pfs_create_dir(root, "pid",
 	    procfs_attr, NULL, PFS_PROCDEP);
 	pfs_create_file(dir, "cmdline", procfs_doproccmdline,
@@ -181,10 +181,10 @@ procfs_init(PFS_INIT_ARGS)
 	    NULL, NULL, PFS_RD);
 	pfs_create_file(dir, "status", procfs_doprocstatus,
 	    NULL, NULL, PFS_RD);
-	
+
 	pfs_create_link(dir, "file", procfs_doprocfile,
 	    NULL, procfs_notsystem, 0);
-		    
+
 	return (0);
 }
 
@@ -194,7 +194,6 @@ procfs_init(PFS_INIT_ARGS)
 static int
 procfs_uninit(PFS_INIT_ARGS)
 {
-
 	/* nothing to do, pseudofs will GC */
 	return (0);
 }

@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pdq/if_fea.c,v 1.26 2003/10/31 18:32:03 brooks Exp $
+ * $FreeBSD: src/sys/dev/pdq/if_fea.c,v 1.27 2004/03/17 17:50:39 njl Exp $
  */
 
 /*
@@ -192,8 +192,8 @@ pdq_eisa_attach (dev)
 
 	sc->io_rid = 0;
 	sc->io_type = SYS_RES_IOPORT;
-	sc->io = bus_alloc_resource(dev, sc->io_type, &sc->io_rid,
-				    0, ~0, 1, RF_ACTIVE);
+	sc->io = bus_alloc_resource_any(dev, sc->io_type, &sc->io_rid,
+					RF_ACTIVE);
 	if (!sc->io) {
 		device_printf(dev, "Unable to allocate I/O space resource.\n");
 		error = ENXIO;
@@ -204,8 +204,8 @@ pdq_eisa_attach (dev)
 
 	sc->mem_rid = 0;
 	sc->mem_type = SYS_RES_MEMORY;
-	sc->mem = bus_alloc_resource(dev, sc->mem_type, &sc->mem_rid,
-				     0, ~0, 1, RF_ACTIVE);
+	sc->mem = bus_alloc_resource_any(dev, sc->mem_type, &sc->mem_rid,
+					 RF_ACTIVE);
 	if (!sc->mem) {
 		device_printf(dev, "Unable to allocate memory resource.\n");
 		error = ENXIO;
@@ -215,8 +215,8 @@ pdq_eisa_attach (dev)
 	sc->mem_bst = rman_get_bustag(sc->mem);
 
 	sc->irq_rid = 0;
-	sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irq_rid,
-				     0, ~0, 1, RF_SHAREABLE | RF_ACTIVE);
+	sc->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irq_rid,
+					 RF_SHAREABLE | RF_ACTIVE);
 	if (!sc->irq) {
 		device_printf(dev, "Unable to allocate interrupt resource.\n");
 		error = ENXIO;

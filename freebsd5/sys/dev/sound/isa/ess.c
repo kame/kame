@@ -38,7 +38,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/ess.c,v 1.27 2003/09/07 16:28:02 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/ess.c,v 1.31.2.1 2004/10/15 05:14:10 njl Exp $");
 
 #define ESS_BUFFSIZE (4096)
 #define ABS(x) (((x) < 0)? -(x) : (x))
@@ -316,24 +316,20 @@ ess_alloc_resources(struct ess_info *sc, device_t dev)
 
 	rid = 0;
 	if (!sc->io_base)
-    		sc->io_base = bus_alloc_resource(dev, SYS_RES_IOPORT,
-						 &rid, 0, ~0, 1,
-						 RF_ACTIVE);
+    		sc->io_base = bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+						     &rid, RF_ACTIVE);
 	rid = 0;
 	if (!sc->irq)
-    		sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ,
-					     &rid, 0, ~0, 1,
-					     RF_ACTIVE);
+    		sc->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ,
+						 &rid, RF_ACTIVE);
 	rid = 0;
 	if (!sc->drq1)
-    		sc->drq1 = bus_alloc_resource(dev, SYS_RES_DRQ,
-					      &rid, 0, ~0, 1,
-					      RF_ACTIVE);
+    		sc->drq1 = bus_alloc_resource_any(dev, SYS_RES_DRQ,
+						  &rid, RF_ACTIVE);
 	rid = 1;
 	if (!sc->drq2)
-        	sc->drq2 = bus_alloc_resource(dev, SYS_RES_DRQ,
-					      &rid, 0, ~0, 1,
-					      RF_ACTIVE);
+        	sc->drq2 = bus_alloc_resource_any(dev, SYS_RES_DRQ,
+						  &rid, RF_ACTIVE);
 
     	if (sc->io_base && sc->drq1 && sc->irq) {
   		isa_dma_acquire(rman_get_start(sc->drq1));
@@ -845,7 +841,7 @@ ess_attach(device_t dev)
 	if (sc->newspeed)
 		ess_setmixer(sc, 0x71, 0x22);
 
-	snd_setup_intr(dev, sc->irq, INTR_MPSAFE, ess_intr, sc, &sc->ih);
+	snd_setup_intr(dev, sc->irq, 0, ess_intr, sc, &sc->ih);
     	if (!sc->duplex)
 		pcm_setflags(dev, pcm_getflags(dev) | SD_F_SIMPLEX);
 
@@ -866,9 +862,10 @@ ess_attach(device_t dev)
 	else
 		buf[0] = '\0';
 
-    	snprintf(status, SND_STATUSLEN, "at io 0x%lx irq %ld drq %ld%s bufsz %u",
+    	snprintf(status, SND_STATUSLEN, "at io 0x%lx irq %ld drq %ld%s bufsz %u %s",
     	     	rman_get_start(sc->io_base), rman_get_start(sc->irq),
-		rman_get_start(sc->drq1), buf, sc->bufsize);
+		rman_get_start(sc->drq1), buf, sc->bufsize,
+		PCM_KLDSTRING(snd_ess));
 
     	if (pcm_register(dev, sc, 1, 1))
 		goto no;
@@ -935,7 +932,7 @@ static driver_t ess_driver = {
 };
 
 DRIVER_MODULE(snd_ess, sbc, ess_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_ess, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_ess, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_DEPEND(snd_ess, snd_sbc, 1, 1, 1);
 MODULE_VERSION(snd_ess, 1);
 
@@ -967,7 +964,7 @@ esscontrol_attach(device_t dev)
 	int rid, i, x;
 
 	rid = 0;
-    	io = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1, RF_ACTIVE);
+    	io = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid, RF_ACTIVE);
 	x = 0;
 	for (i = 0; i < 0x100; i++) {
 		port_wr(io, 0, i);
@@ -1007,4 +1004,4 @@ static driver_t esscontrol_driver = {
 };
 
 DRIVER_MODULE(esscontrol, isa, esscontrol_driver, esscontrol_devclass, 0, 0);
-
+DRIVER_MODULE(esscontrol, acpi, esscontrol_driver, esscontrol_devclass, 0, 0);

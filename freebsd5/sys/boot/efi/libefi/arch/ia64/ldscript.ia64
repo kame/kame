@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/boot/efi/libefi/arch/ia64/ldscript.ia64,v 1.7 2003/07/17 00:32:08 marcel Exp $ */
+/* $FreeBSD: src/sys/boot/efi/libefi/arch/ia64/ldscript.ia64,v 1.8 2004/07/20 07:01:02 marcel Exp $ */
 OUTPUT_FORMAT("elf64-ia64-little", "elf64-ia64-little", "elf64-ia64-little")
 OUTPUT_ARCH(ia64)
 ENTRY(_start_plabel)
@@ -47,7 +47,7 @@ SECTIONS
   . = ALIGN(4096);
   .dynamic	: { *(.dynamic) }
   . = ALIGN(4096);
-  .rela		: {
+  .rela.dyn	: {
     *(.rela.text .rela.text.* .rela.gnu.linkonce.t.*)
     *(.rela.rodata .rela.rodata.* .rela.gnu.linkonce.r.*)
     *(.rela.data .rela.data.* .rela.gnu.linkonce.d.*)

@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_all.c,v 1.44 2003/12/01 10:13:00 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_all.c,v 1.45 2004/08/13 18:45:04 mjacob Exp $");
 
 #include <sys/param.h>
 
@@ -2103,9 +2103,7 @@ scsi_sense_sbuf(struct cam_device *device, struct ccb_scsiio *csio,
 
 	}
 	default:
-		sbuf_printf(sb, "error code %d",
-			    sense->error_code & SSD_ERRCODE);
-
+		sbuf_printf(sb, "Sense Error Code 0x%x", sense->error_code);
 		if (sense->error_code & SSD_ERRCODE_VALID) {
 			sbuf_printf(sb, " at block no. %d (decimal)",
 				    info = scsi_4btoul(sense->info));

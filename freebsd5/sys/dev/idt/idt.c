@@ -77,7 +77,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/idt/idt.c,v 1.7 2003/11/16 22:33:42 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/idt/idt.c,v 1.9 2004/01/14 06:14:35 alc Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -671,9 +671,9 @@ nicstar_init(nicstar_reg_t * const idt)
 					 * bits) */
 
 	/* allocate space for TSQ, RSQ, SCD for VBR,ABR, UBR */
-	idt->fixbuf = vm_page_alloc_contig(NICSTAR_FIXPAGES * PAGE_SIZE,
-					   0x100000, 0xffffffff, 0x2000);
-	if (idt->fixbuf == NULL)
+	idt->fixbuf = (vm_offset_t)contigmalloc(NICSTAR_FIXPAGES * PAGE_SIZE,
+	    M_DEVBUF, M_NOWAIT | M_ZERO, 0x100000, 0xffffffff, 0x2000, 0);
+	if (idt->fixbuf == 0)
 		return;		/* no space card disabled */
 
 	if (idt_buffer_init(idt))	/* allocate large buffers */
@@ -691,8 +691,6 @@ nicstar_init(nicstar_reg_t * const idt)
 	idt_slots_init(idt);	/* initialize CBR table slots */
 
 	/* initialize variable rate mbuf queues */
-
-	bzero((caddr_t)idt->fixbuf, NICSTAR_FIXPAGES * PAGE_SIZE);
 
 	/* TSQ initialization */
 	for (p = (u_long *)idt->fixbuf; p < (u_long *)(idt->fixbuf + 0x2000);) {
@@ -815,11 +813,11 @@ freemem:
 void
 idt_release_mem(IDT * idt)
 {
-	if (idt->fixbuf != NULL)
+	if (idt->fixbuf != 0)
 		kmem_free(kernel_map, idt->fixbuf,
 			  (NICSTAR_FIXPAGES * PAGE_SIZE));
 
-	if (idt->cbr_base != NULL)
+	if (idt->cbr_base != 0)
 		kmem_free(kernel_map, (vm_offset_t)idt->cbr_base, idt->cbr_size);
 
 	printf("%s() is NOT SAFE!\n", __func__);
@@ -1376,8 +1374,8 @@ idt_mcheck_init(IDT * idt)
 	int x;
 
 	size = round_page(sizeof(struct mbuf *) * 1024);
-	idt->mcheck = (struct mbuf **) vm_page_alloc_contig(size,
-	    0x100000, 0xffffffff, 0x2000);
+	idt->mcheck = contigmalloc(size, M_DEVBUF, M_NOWAIT,
+	    0x100000, 0xffffffff, 0x2000, 0);
 	if (idt->mcheck == NULL)
 		return (1);
 
@@ -1402,8 +1400,8 @@ idt_malloc_contig(int pages)
 {
 	vm_offset_t retval;
 
-	retval = vm_page_alloc_contig(pages * PAGE_SIZE,
-				      0x100000, 0xffffffff, 0x2000);
+	retval = (vm_offset_t)contigmalloc(pages * PAGE_SIZE,
+	    M_DEVBUF, M_NOWAIT, 0x100000, 0xffffffff, 0x2000, 0);
 #ifdef UNDEF
 	printf("idt: vm_offset_t allocated %d pages at %x\n", pages, retval);
 #endif
@@ -1430,7 +1428,7 @@ idt_queue_init(IDT * idt)
 	idt->cbr_size = IDT_MAX_CBRQUEUE * 16 * 64;
 	idt->cbr_base = idt_malloc_contig(idt->cbr_size / PAGE_SIZE);
 	scqbase = idt->cbr_base;
-	if (scqbase == NULL)
+	if (scqbase == 0)
 		return (1);
 	idt->cbr_freect = idt->cbr_size / (16 * 64);
 
@@ -2061,8 +2059,8 @@ idt_connect_init(IDT * idt, int vpibits)
 
 	pages = (sizeof(CONNECTION) * MAX_CONNECTION) + PAGE_SIZE - 1;
 	pages /= PAGE_SIZE;
-	idt->connection = (CONNECTION *) vm_page_alloc_contig(pages * PAGE_SIZE,
-	    0x100000, 0xffffffff, 0x2000);
+	idt->connection = contigmalloc(pages * PAGE_SIZE, M_DEVBUF, M_NOWAIT,
+	    0x100000, 0xffffffff, 0x2000, 0);
 	if (idt->connection == NULL)
 		return (1);
 

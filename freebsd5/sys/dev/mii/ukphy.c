@@ -37,9 +37,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/ukphy.c,v 1.14 2003/08/24 17:54:10 obrien Exp $");
-
 /*
  * Copyright (c) 1997 Manuel Bouyer.  All rights reserved.
  *
@@ -69,12 +66,12 @@ __FBSDID("$FreeBSD: src/sys/dev/mii/ukphy.c,v 1.14 2003/08/24 17:54:10 obrien Ex
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/ukphy.c,v 1.16 2004/05/29 18:09:10 marius Exp $");
+
 /*
  * driver for generic unknown PHYs
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/ukphy.c,v 1.14 2003/08/24 17:54:10 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -167,6 +164,7 @@ ukphy_attach(dev)
 	printf("\n");
 
 	MIIBUS_MEDIAINIT(sc->mii_dev);
+	mii_phy_setmedia(sc);
 
 	return(0);
 }

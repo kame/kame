@@ -31,11 +31,14 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/firewirereg.h,v 1.31 2003/10/31 04:58:03 simokawa Exp $
+ * $FreeBSD: src/sys/dev/firewire/firewirereg.h,v 1.36 2004/06/16 09:46:44 phk Exp $
  *
  */
 
-#if __FreeBSD_version >= 500000
+#ifdef __DragonFly__
+typedef	d_thread_t fw_proc;
+#include <sys/select.h>
+#elif __FreeBSD_version >= 500000
 typedef	struct thread fw_proc;
 #include <sys/selinfo.h>
 #else
@@ -48,19 +51,19 @@ typedef	struct proc fw_proc;
 #define	splfw splimp
 
 struct fw_device{
-	u_int16_t dst;
+	uint16_t dst;
 	struct fw_eui64 eui;
-	u_int8_t speed;
-	u_int8_t maxrec;
-	u_int8_t nport;
-	u_int8_t power;
+	uint8_t speed;
+	uint8_t maxrec;
+	uint8_t nport;
+	uint8_t power;
 #define CSRROMOFF 0x400
 #define CSRROMSIZE 0x400
 	int rommax;	/* offset from 0xffff f000 0000 */
-	u_int32_t csrrom[CSRROMSIZE/4];
+	uint32_t csrrom[CSRROMSIZE/4];
 	int rcnt;
 	struct firewire_comm *fc;
-	u_int32_t status;
+	uint32_t status;
 #define FWDEVINIT	1
 #define FWDEVATTACHED	2
 #define FWDEVINVAL	3
@@ -68,8 +71,8 @@ struct fw_device{
 };
 
 struct firewire_softc {
-#if __FreeBSD_version >= 500000
-	dev_t dev;
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	struct cdev *dev;
 #endif
 	struct firewire_comm *fc;
 };
@@ -81,8 +84,8 @@ struct firewire_softc {
 struct firewire_dev_comm {
 	device_t dev;
 	struct firewire_comm *fc;
-	void (*post_busreset) __P((void *));
-	void (*post_explore) __P((void *));
+	void (*post_busreset) (void *);
+	void (*post_explore) (void *);
 };
 
 struct tcode_info {
@@ -98,7 +101,7 @@ struct tcode_info {
 struct firewire_comm{
 	device_t dev;
 	device_t bdev;
-	u_int16_t busid:10,
+	uint16_t busid:10,
 		  nodeid:6;
 	u_int mode;
 	u_int nport;
@@ -110,7 +113,7 @@ struct firewire_comm{
 	u_int max_asyretry;
 #define FWPHYASYST (1 << 0)
 	u_int retry_count;
-	u_int32_t ongobus:10,
+	uint32_t ongobus:10,
 		  ongonode:6,
 		  ongoaddr:16;
 	struct fw_device *ongodev;
@@ -118,7 +121,7 @@ struct firewire_comm{
 #define	FWMAXCSRDIR     16
 	SLIST_HEAD(, csrdir) ongocsr;
 	SLIST_HEAD(, csrdir) csrfree;
-	u_int32_t status;
+	uint32_t status;
 #define	FWBUSNOTREADY	(-1)
 #define	FWBUSRESET	0
 #define	FWBUSINIT	1
@@ -136,12 +139,11 @@ struct firewire_comm{
 	STAILQ_HEAD(, tlabel) tlabels[0x40];
 	STAILQ_HEAD(, fw_bind) binds;
 	STAILQ_HEAD(, fw_device) devices;
-	STAILQ_HEAD(, fw_xfer)	pending;
 	u_int  sid_cnt;
 #define CSRSIZE 0x4000
-	u_int32_t csr_arc[CSRSIZE/4];
+	uint32_t csr_arc[CSRSIZE/4];
 #define CROMSIZE 0x400
-	u_int32_t *config_rom;
+	uint32_t *config_rom;
 	struct crom_src_buf *crom_src_buf;
 	struct crom_src *crom_src;
 	struct crom_chunk *crom_root;
@@ -151,27 +153,27 @@ struct firewire_comm{
 	struct callout bmr_callout;
 	struct callout timeout_callout;
 	struct callout retry_probe_callout;
-	u_int32_t (*cyctimer) __P((struct  firewire_comm *));
-	void (*ibr) __P((struct firewire_comm *));
-	u_int32_t (*set_bmr) __P((struct firewire_comm *, u_int32_t));
-	int (*ioctl) __P((dev_t, u_long, caddr_t, int, fw_proc *));
-	int (*irx_enable) __P((struct firewire_comm *, int));
-	int (*irx_disable) __P((struct firewire_comm *, int));
-	int (*itx_enable) __P((struct firewire_comm *, int));
-	int (*itx_disable) __P((struct firewire_comm *, int));
-	void (*timeout) __P((void *));
-	void (*poll) __P((struct firewire_comm *, int, int));
-	void (*set_intr) __P((struct firewire_comm *, int));
-	void (*irx_post) __P((struct firewire_comm *, u_int32_t *));
-	void (*itx_post) __P((struct firewire_comm *, u_int32_t *));
+	uint32_t (*cyctimer) (struct  firewire_comm *);
+	void (*ibr) (struct firewire_comm *);
+	uint32_t (*set_bmr) (struct firewire_comm *, uint32_t);
+	int (*ioctl) (struct cdev *, u_long, caddr_t, int, fw_proc *);
+	int (*irx_enable) (struct firewire_comm *, int);
+	int (*irx_disable) (struct firewire_comm *, int);
+	int (*itx_enable) (struct firewire_comm *, int);
+	int (*itx_disable) (struct firewire_comm *, int);
+	void (*timeout) (void *);
+	void (*poll) (struct firewire_comm *, int, int);
+	void (*set_intr) (struct firewire_comm *, int);
+	void (*irx_post) (struct firewire_comm *, uint32_t *);
+	void (*itx_post) (struct firewire_comm *, uint32_t *);
 	struct tcode_info *tcode;
 	bus_dma_tag_t dmat;
 };
 #define CSRARC(sc, offset) ((sc)->csr_arc[(offset)/4])
 
 struct csrdir{
-	u_int32_t ongoaddr;
-	u_int32_t off;
+	uint32_t ongoaddr;
+	uint32_t off;
 	SLIST_ENTRY(csrdir) link;
 };
 
@@ -189,7 +191,7 @@ struct fw_xferq {
 
 #define FWXFERQ_HANDLER (1 << 16)
 #define FWXFERQ_WAKEUP (1 << 17)
-	void (*start) __P((struct firewire_comm*));
+	void (*start) (struct firewire_comm*);
 	int dmach;
 	STAILQ_HEAD(, fw_xfer) q;
 	u_int queued;
@@ -206,7 +208,7 @@ struct fw_xferq {
 	struct fw_bulkxfer *stproc;
 	struct selinfo rsel;
 	caddr_t sc;
-	void (*hand) __P((struct fw_xferq *));
+	void (*hand) (struct fw_xferq *);
 };
 
 struct fw_bulkxfer{
@@ -232,8 +234,8 @@ struct fw_bind{
 #define FWACT_NULL	0
 #define FWACT_XFER	2
 #define FWACT_CH	3
-	u_int8_t act_type;
-	u_int8_t sub;
+	uint8_t act_type;
+	uint8_t sub;
 };
 
 struct fw_xfer{
@@ -249,18 +251,18 @@ struct fw_xfer{
 #define FWXF_SENTERR 4
 #define FWXF_BUSY 8
 #define FWXF_RCVD 10
-	u_int8_t state;
-	u_int8_t retry;
-	u_int8_t tl;
-	void (*retry_req) __P((struct fw_xfer *));
+	uint8_t state;
+	uint8_t retry;
+	uint8_t tl;
+	void (*retry_req) (struct fw_xfer *);
 	union{
-		void (*hand) __P((struct fw_xfer *));
+		void (*hand) (struct fw_xfer *);
 	} act;
 	struct {
 		struct fw_pkt hdr;
-		u_int32_t *payload;
-		u_int16_t pay_len;
-		u_int8_t spd;
+		uint32_t *payload;
+		uint16_t pay_len;
+		uint8_t spd;
 	} send, recv;
 	struct mbuf *mbuf;
 	STAILQ_ENTRY(fw_xfer) link;
@@ -272,49 +274,53 @@ struct fw_rcv_buf {
 	struct fw_xfer *xfer;
 	struct iovec *vec;
 	u_int nvec;
-	u_int8_t spd;
+	uint8_t spd;
 };
 
-void fw_sidrcv __P((struct firewire_comm *, u_int32_t *, u_int));
-void fw_rcv __P((struct fw_rcv_buf *));
-void fw_xfer_unload __P(( struct fw_xfer*));
-void fw_xfer_free_buf __P(( struct fw_xfer*));
-void fw_xfer_free __P(( struct fw_xfer*));
-struct fw_xfer *fw_xfer_alloc __P((struct malloc_type *));
-struct fw_xfer *fw_xfer_alloc_buf __P((struct malloc_type *, int, int));
-void fw_init __P((struct firewire_comm *));
-int fw_tbuf_update __P((struct firewire_comm *, int, int));
-int fw_rbuf_update __P((struct firewire_comm *, int, int));
-void fw_asybusy __P((struct fw_xfer *));
-int fw_bindadd __P((struct firewire_comm *, struct fw_bind *));
-int fw_bindremove __P((struct firewire_comm *, struct fw_bind *));
-int fw_asyreq __P((struct firewire_comm *, int, struct fw_xfer*));
-void fw_busreset __P((struct firewire_comm *));
-u_int16_t fw_crc16 __P((u_int32_t *, u_int32_t));
-void fw_xfer_timeout __P((void *));
-void fw_xfer_done __P((struct fw_xfer *));
-void fw_asy_callback __P((struct fw_xfer *));
-void fw_asy_callback_free __P((struct fw_xfer *));
-struct fw_device *fw_noderesolve_nodeid __P((struct firewire_comm *, int));
-struct fw_device *fw_noderesolve_eui64 __P((struct firewire_comm *, struct fw_eui64 *));
-struct fw_bind *fw_bindlookup __P((struct firewire_comm *, u_int16_t, u_int32_t));
-void fw_drain_txq __P((struct firewire_comm *));
-int fwdev_makedev __P((struct firewire_softc *));
-int fwdev_destroydev __P((struct firewire_softc *));
-void fwdev_clone __P((void *, char *, int, dev_t *));
+void fw_sidrcv (struct firewire_comm *, uint32_t *, u_int);
+void fw_rcv (struct fw_rcv_buf *);
+void fw_xfer_unload ( struct fw_xfer*);
+void fw_xfer_free_buf ( struct fw_xfer*);
+void fw_xfer_free ( struct fw_xfer*);
+struct fw_xfer *fw_xfer_alloc (struct malloc_type *);
+struct fw_xfer *fw_xfer_alloc_buf (struct malloc_type *, int, int);
+void fw_init (struct firewire_comm *);
+int fw_tbuf_update (struct firewire_comm *, int, int);
+int fw_rbuf_update (struct firewire_comm *, int, int);
+void fw_asybusy (struct fw_xfer *);
+int fw_bindadd (struct firewire_comm *, struct fw_bind *);
+int fw_bindremove (struct firewire_comm *, struct fw_bind *);
+int fw_asyreq (struct firewire_comm *, int, struct fw_xfer*);
+void fw_busreset (struct firewire_comm *);
+uint16_t fw_crc16 (uint32_t *, uint32_t);
+void fw_xfer_timeout (void *);
+void fw_xfer_done (struct fw_xfer *);
+void fw_asy_callback (struct fw_xfer *);
+void fw_asy_callback_free (struct fw_xfer *);
+struct fw_device *fw_noderesolve_nodeid (struct firewire_comm *, int);
+struct fw_device *fw_noderesolve_eui64 (struct firewire_comm *, struct fw_eui64 *);
+struct fw_bind *fw_bindlookup (struct firewire_comm *, uint16_t, uint32_t);
+void fw_drain_txq (struct firewire_comm *);
+int fwdev_makedev (struct firewire_softc *);
+int fwdev_destroydev (struct firewire_softc *);
+void fwdev_clone (void *, char *, int, struct cdev **);
 
 extern int firewire_debug;
 extern devclass_t firewire_devclass;
 
-#define		FWPRI		((PZERO+8)|PCATCH)
-
-#if __FreeBSD_version >= 500000
-#define CALLOUT_INIT(x) callout_init(x, 0 /* mpsafe */)
+#ifdef __DragonFly__
+#define		FWPRI		PCATCH
 #else
-#define CALLOUT_INIT(x) callout_init(x)
+#define		FWPRI		((PZERO+8)|PCATCH)
 #endif
 
-#if __FreeBSD_version < 500000
+#if defined(__DragonFly__) || __FreeBSD_version < 500000
+#define CALLOUT_INIT(x) callout_init(x)
+#else
+#define CALLOUT_INIT(x) callout_init(x, 0 /* mpsafe */)
+#endif
+
+#if defined(__DragonFly__) || __FreeBSD_version < 500000
 /* compatibility shim for 4.X */
 #define bio buf
 #define bio_bcount b_bcount

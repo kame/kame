@@ -31,7 +31,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/wi/if_wivar.h,v 1.20 2003/09/05 22:29:30 sam Exp $
+ * $FreeBSD: src/sys/dev/wi/if_wivar.h,v 1.22 2004/04/01 00:38:45 sam Exp $
  */
 
 #if 0
@@ -96,6 +96,7 @@ struct wi_softc	{
 	bus_space_tag_t		wi_bmemtag;
 	void *			wi_intrhand;
 	int			wi_io_addr;
+	int			wi_cmd_count;
 
 	struct bpf_if		*sc_drvbpf;
 	int			sc_flags;
@@ -167,10 +168,12 @@ struct wi_softc	{
 		struct wi_tx_radiotap_header th;
 		u_int8_t	pad[64];
 	} u_tx_rt;
+	int			sc_tx_th_len;
 	union {
 		struct wi_rx_radiotap_header th;
 		u_int8_t	pad[64];
 	} u_rx_rt;
+	int			sc_rx_th_len;
 };
 #define	sc_if			sc_ic.ic_if
 #define	sc_tx_th		u_tx_rt.th

@@ -23,13 +23,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/mixer.h,v 1.12 2003/09/07 16:28:03 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/mixer.h,v 1.13 2004/06/16 09:46:57 phk Exp $
  */
 
 int mixer_init(device_t dev, kobj_class_t cls, void *devinfo);
 int mixer_uninit(device_t dev);
 int mixer_reinit(device_t dev);
-int mixer_ioctl(dev_t i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td);
+int mixer_ioctl(struct cdev *i_dev, u_long cmd, caddr_t arg, int mode, struct thread *td);
 
 int mixer_hwvol_init(device_t dev);
 void mixer_hwvol_mute(device_t dev);

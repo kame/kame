@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbexec - debugger control method execution
- *              $Revision: 54 $
+ *              $Revision: 60 $
  *
  ******************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2003, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -329,8 +329,8 @@ AcpiDbExecutionWalk (
 
     Status = AcpiEvaluateObject (Node, NULL, NULL, &ReturnObj);
 
-    AcpiOsPrintf ("[%4.4s] returned %s\n", Node->Name.Ascii,
-        AcpiFormatException (Status));
+    AcpiOsPrintf ("[%4.4s] returned %s\n", AcpiUtGetNodeName (Node),
+            AcpiFormatException (Status));
     AcpiGbl_MethodExecuting = FALSE;
 
     return (AE_OK);
@@ -408,7 +408,7 @@ AcpiDbExecute (
 
     if (Allocations > 0)
     {
-        AcpiOsPrintf ("Outstanding: %ld allocations after execution\n",
+        AcpiOsPrintf ("Outstanding: %u allocations after execution\n",
                         Allocations);
     }
 #endif
@@ -474,15 +474,17 @@ AcpiDbMethodThread (
 #endif
 
         Status = AcpiDbExecuteMethod (Info, &ReturnObj);
-
         if (ACPI_FAILURE (Status))
         {
             AcpiOsPrintf ("%s During execution of %s at iteration %X\n",
                 AcpiFormatException (Status), Info->Pathname, i);
-            break;
+            if (Status == AE_ABORT_METHOD)
+            {
+                break;
+            }
         }
 
-        if ((i % 1000) == 0)
+        if ((i % 100) == 0)
         {
             AcpiOsPrintf ("%d executions\n", i);
         }

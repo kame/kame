@@ -1,6 +1,5 @@
 /*
- * $FreeBSD: src/sys/boot/arc/loader/conf.c,v 1.4 2002/12/19 19:34:58 jake Exp $
- * From	$NetBSD: conf.c,v 1.2 1997/03/22 09:03:29 thorpej Exp $	 
+ * $NetBSD: conf.c,v 1.2 1997/03/22 09:03:29 thorpej Exp $	 
  */
 
 /*
@@ -34,6 +33,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/arc/loader/conf.c,v 1.5 2004/01/04 23:28:01 obrien Exp $");
 
 #include <stand.h>
 #include "libarc.h"

@@ -1,7 +1,7 @@
 /*	$KAME: des_enc.c,v 1.1 2001/09/10 04:03:58 itojun Exp $	*/
-/*	$FreeBSD: src/sys/crypto/des/des_enc.c,v 1.1 2002/03/05 09:19:02 ume Exp $	*/
 
 /* crypto/des/des_enc.c */
+
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -58,6 +58,9 @@
  * copied and put under another distribution licence
  * [including the GNU Public Licence.]
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/crypto/des/des_enc.c,v 1.2 2004/06/14 00:38:54 obrien Exp $");
 
 #include <sys/types.h>
 #include <crypto/des/des_locl.h>

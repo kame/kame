@@ -23,37 +23,38 @@
  * any improvements or extensions that they make and grant Carnegie Mellon
  * the rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/amd64/include/db_machdep.h,v 1.19 2003/05/30 01:01:07 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/db_machdep.h,v 1.20.2.1 2004/10/10 18:54:30 peter Exp $
  */
 
 #ifndef _MACHINE_DB_MACHDEP_H_
 #define	_MACHINE_DB_MACHDEP_H_
 
 #include <machine/frame.h>
-#include <machine/psl.h>
 #include <machine/trap.h>
-
-#define amd64_saved_state trapframe
 
 typedef	vm_offset_t	db_addr_t;	/* address - unsigned */
 typedef	long		db_expr_t;	/* expression - signed */
 
-typedef struct amd64_saved_state db_regs_t;
-extern db_regs_t	ddb_regs;	/* register state */
-#define	DDB_REGS	(&ddb_regs)
-
-#define	PC_REGS(regs)	((db_addr_t)(regs)->tf_rip)
+#define	PC_REGS()	((db_addr_t)kdb_thrctx->pcb_rip)
 
 #define	BKPT_INST	0xcc		/* breakpoint instruction */
 #define	BKPT_SIZE	(1)		/* size of breakpoint inst */
 #define	BKPT_SET(inst)	(BKPT_INST)
 
-#define BKPT_SKIP		ddb_regs.tf_rip += 1
+#define BKPT_SKIP				\
+do {						\
+	kdb_frame->tf_rip += 1;			\
+	kdb_thrctx->pcb_rip += 1;		\
+} while(0)
 
-#define	FIXUP_PC_AFTER_BREAK	ddb_regs.tf_rip -= 1;
+#define	FIXUP_PC_AFTER_BREAK			\
+do {						\
+	kdb_frame->tf_rip -= 1;			\
+	kdb_thrctx->pcb_rip -= 1;		\
+} while(0);
 
-#define	db_clear_single_step(regs)	((regs)->tf_rflags &= ~PSL_T)
-#define	db_set_single_step(regs)	((regs)->tf_rflags |=  PSL_T)
+#define	db_clear_single_step	kdb_cpu_clear_singlestep
+#define	db_set_single_step	kdb_cpu_set_singlestep
 
 #define	IS_BREAKPOINT_TRAP(type, code)	((type) == T_BPTFLT)
 /*

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_io.c,v 1.25 2003/10/04 23:37:38 alc Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_io.c,v 1.27 2004/05/06 05:03:21 alc Exp $
  *
  */
 #include <sys/param.h>
@@ -277,11 +277,15 @@ smbfs_writevnode(struct vnode *vp, struct uio *uiop,
 	}
 	if (uiop->uio_resid == 0)
 		return 0;
-	if (p && uiop->uio_offset + uiop->uio_resid > p->p_rlimit[RLIMIT_FSIZE].rlim_cur) {
-		PROC_LOCK(td->td_proc);
-		psignal(td->td_proc, SIGXFSZ);
-		PROC_UNLOCK(td->td_proc);
-		return EFBIG;
+	if (p != NULL) {
+		PROC_LOCK(p);
+		if (uiop->uio_offset + uiop->uio_resid >
+		    lim_cur(p, RLIMIT_FSIZE)) {
+			psignal(p, SIGXFSZ);
+			PROC_UNLOCK(p);
+			return EFBIG;
+		}
+		PROC_UNLOCK(p);
 	}
 	smb_makescred(&scred, td, cred);
 	error = smb_write(smp->sm_share, np->n_fid, uiop, &scred);
@@ -512,8 +516,6 @@ smbfs_getpages(ap)
 		vm_page_t m;
 		nextoff = toff + PAGE_SIZE;
 		m = pages[i];
-
-		m->flags &= ~PG_ZERO;
 
 		if (nextoff <= size) {
 			/*

@@ -27,13 +27,13 @@
  * Mellon the rights to redistribute these changes without encumbrance.
  * 
  * 	@(#) src/sys/coda/coda_psdev.c,v 1.1.1.1 1998/08/29 21:14:52 rvb Exp $
- * $FreeBSD: src/sys/coda/coda_psdev.h,v 1.3 2001/09/12 08:36:56 julian Exp $
+ * $FreeBSD: src/sys/coda/coda_psdev.h,v 1.4 2004/06/16 09:46:32 phk Exp $
  * 
  */
 
-int vc_nb_open(dev_t dev, int flag, int mode, struct thread *p);
-int vc_nb_close (dev_t dev, int flag, int mode, struct thread *p);
-int vc_nb_read(dev_t dev, struct uio *uiop, int flag);
-int vc_nb_write(dev_t dev, struct uio *uiop, int flag);
-int vc_nb_ioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *p);
-int vc_nb_poll(dev_t dev, int events, struct thread *p);
+int vc_nb_open(struct cdev *dev, int flag, int mode, struct thread *p);
+int vc_nb_close (struct cdev *dev, int flag, int mode, struct thread *p);
+int vc_nb_read(struct cdev *dev, struct uio *uiop, int flag);
+int vc_nb_write(struct cdev *dev, struct uio *uiop, int flag);
+int vc_nb_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread *p);
+int vc_nb_poll(struct cdev *dev, int events, struct thread *p);

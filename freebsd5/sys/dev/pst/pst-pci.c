@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/pst/pst-pci.c,v 1.5 2003/08/24 17:54:17 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/pst/pst-pci.c,v 1.6.2.1 2004/10/02 14:14:27 scottl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -78,14 +78,14 @@ iop_pci_attach(device_t dev)
     /* get resources */
     rid = 0x10;
     sc->r_mem = 
-	bus_alloc_resource(dev, SYS_RES_MEMORY, &rid, 0, ~0, 1, RF_ACTIVE);
+	bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid, RF_ACTIVE);
 
     if (!sc->r_mem)
 	return 0;
 
     rid = 0x00;
-    sc->r_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0,
-				   1, RF_SHAREABLE | RF_ACTIVE);
+    sc->r_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
+				       RF_SHAREABLE | RF_ACTIVE);
 
     /* now setup the infrastructure to talk to the device */
     pci_write_config(dev, PCIR_COMMAND,
@@ -93,7 +93,6 @@ iop_pci_attach(device_t dev)
 		     PCIM_CMD_MEMEN | PCIM_CMD_BUSMASTEREN, 1);
 
     sc->ibase = rman_get_virtual(sc->r_mem);
-    sc->phys_ibase = vtophys(sc->ibase);
     sc->reg = (struct i2o_registers *)sc->ibase;
     sc->dev = dev;
     mtx_init(&sc->mtx, "pst lock", MTX_DEF, 0);

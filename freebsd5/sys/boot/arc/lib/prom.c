@@ -22,10 +22,10 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/arc/lib/prom.c,v 1.2 1999/08/28 00:39:38 peter Exp $
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/arc/lib/prom.c,v 1.3 2004/01/04 23:28:01 obrien Exp $");
 
 #define	PROM_E_BOOTED_DEV	"XXX1"
 #define	PROM_E_BOOTED_FILE	"XXX2"

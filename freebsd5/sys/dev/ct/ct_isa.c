@@ -1,7 +1,7 @@
 /*	$NecBSD: ct_isa.c,v 1.6 1999/07/26 06:32:01 honda Exp $	*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ct/ct_isa.c,v 1.9 2003/08/24 17:46:03 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ct/ct_isa.c,v 1.11 2004/03/17 17:50:30 njl Exp $");
 /*	$NetBSD$	*/
 
 /*
@@ -81,8 +81,8 @@ __FBSDID("$FreeBSD: src/sys/dev/ct/ct_isa.c,v 1.9 2003/08/24 17:46:03 obrien Exp
 #include <pc98/pc98/pc98.h>
 #include <isa/isavar.h>
 
-#include <machine/dvcfg.h>
-#include <machine/physio_proc.h>
+#include <compat/netbsd/dvcfg.h>
+#include <compat/netbsd/physio_proc.h>
 
 #include <cam/scsi/scsi_low.h>
 
@@ -219,11 +219,11 @@ ct_isa_attach(device_t dev)
 	chp->ch_bus_weight = ct_isa_bus_access_weight;
 
 	irq_rid = 0;
-	ct->irq_res = bus_alloc_resource(dev, SYS_RES_IRQ, &irq_rid, 0, ~0,
-					 1, RF_ACTIVE);
+	ct->irq_res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &irq_rid,
+					     RF_ACTIVE);
 	drq_rid = 0;
-	ct->drq_res = bus_alloc_resource(dev, SYS_RES_DRQ, &drq_rid, 0, ~0,
-					 1, RF_ACTIVE);
+	ct->drq_res = bus_alloc_resource_any(dev, SYS_RES_DRQ, &drq_rid,
+					     RF_ACTIVE);
 	if (ct->irq_res == NULL || ct->drq_res == NULL) {
 		ct_space_unmap(dev, ct);
 		return ENXIO;

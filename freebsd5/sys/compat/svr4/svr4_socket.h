@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/compat/svr4/svr4_socket.h,v 1.7 2003/05/31 20:33:18 phk Exp $
+ * $FreeBSD: src/sys/compat/svr4/svr4_socket.h,v 1.8 2004/06/17 17:16:41 phk Exp $
  */
 
 #ifndef _SVR4_SOCKET_H_
@@ -49,7 +49,7 @@ struct svr4_sockaddr_in {
 };
 
 struct sockaddr_un *svr4_find_socket(struct thread *, struct file *,
-    udev_t, ino_t);
+    dev_t, ino_t);
 void svr4_delete_socket(struct proc *, struct file *);
 int svr4_add_socket(struct thread *, const char *, struct stat *);
 
@@ -57,7 +57,7 @@ struct svr4_sockcache_entry {
 	struct proc *p;		/* Process for the socket		*/
 	void *cookie;		/* Internal cookie used for matching	*/
 	struct sockaddr_un sock;/* Pathname for the socket		*/
-	udev_t dev;		/* Device where the socket lives on	*/
+	dev_t dev;		/* Device where the socket lives on	*/
 	ino_t ino;		/* Inode where the socket lives on	*/
 	TAILQ_ENTRY(svr4_sockcache_entry) entries;
 };

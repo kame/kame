@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/fs/msdosfs/denode.h,v 1.25 2003/06/24 22:11:20 jmg Exp $ */
+/* $FreeBSD: src/sys/fs/msdosfs/denode.h,v 1.27.2.1 2004/09/11 03:19:31 tjr Exp $ */
 /*	$NetBSD: denode.h,v 1.25 1997/11/17 15:36:28 ws Exp $	*/
 
 /*-
@@ -160,6 +160,7 @@ struct denode {
 	u_long de_FileSize;	/* size of file in bytes */
 	struct fatcache de_fc[FC_SIZE];	/* fat cache */
 	u_quad_t de_modrev;	/* Revision level for lease. */
+	struct lockf *de_lockf; /* lockf */
 };
 
 /*
@@ -251,10 +252,10 @@ struct defid {
 	u_short defid_len;	/* length of structure */
 	u_short defid_pad;	/* force long alignment */
 
-	u_long defid_dirclust;	/* cluster this dir entry came from */
-	u_long defid_dirofs;	/* offset of entry within the cluster */
+	u_int32_t defid_dirclust; /* cluster this dir entry came from */
+	u_int32_t defid_dirofs;	/* offset of entry within the cluster */
 #if 0
-	u_long	defid_gen;	/* generation number */
+	u_int32_t defid_gen;	/* generation number */
 #endif
 };
 

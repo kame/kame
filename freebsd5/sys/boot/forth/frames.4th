@@ -1,6 +1,6 @@
 \ Words implementing frame drawing
 \ XXX Filled boxes are left as an exercise for the reader... ;-/
-\ $FreeBSD: src/sys/boot/forth/frames.4th,v 1.1 2003/05/30 09:29:23 scottl Exp $
+\ $FreeBSD: src/sys/boot/forth/frames.4th,v 1.2 2004/01/18 04:13:27 nyan Exp $
 
 marker task-frames.4th
 
@@ -12,27 +12,49 @@ variable rt_el
 variable rb_el
 variable fill
 
-\ Single frames
-196 constant sh_el
-179 constant sv_el
-218 constant slt_el
-192 constant slb_el
-191 constant srt_el
-217 constant srb_el
-\ Double frames
-205 constant dh_el
-186 constant dv_el
-201 constant dlt_el
-200 constant dlb_el
-187 constant drt_el
-188 constant drb_el
-\ Fillings
-0 constant fill_none
-32 constant fill_blank
-176 constant fill_dark
-177 constant fill_med
-178 constant fill_bright
-
+s" arch-pc98" environment? [if]
+	\ Single frames
+	149 constant sh_el
+	150 constant sv_el
+	152 constant slt_el
+	154 constant slb_el
+	153 constant srt_el
+	155 constant srb_el
+	\ Double frames
+	149 constant dh_el
+	150 constant dv_el
+	152 constant dlt_el
+	154 constant dlb_el
+	153 constant drt_el
+	155 constant drb_el
+	\ Fillings
+	0 constant fill_none
+	32 constant fill_blank
+	135 constant fill_dark
+	135 constant fill_med
+	135 constant fill_bright
+[else]
+	\ Single frames
+	196 constant sh_el
+	179 constant sv_el
+	218 constant slt_el
+	192 constant slb_el
+	191 constant srt_el
+	217 constant srb_el
+	\ Double frames
+	205 constant dh_el
+	186 constant dv_el
+	201 constant dlt_el
+	200 constant dlb_el
+	187 constant drt_el
+	188 constant drb_el
+	\ Fillings
+	0 constant fill_none
+	32 constant fill_blank
+	176 constant fill_dark
+	177 constant fill_med
+	178 constant fill_bright
+[then]
 
 : hline	( len x y -- )	\ Draw horizontal single line
 	at-xy		\ move cursor

@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.25 2003/09/02 17:30:34 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.26 2003/12/30 01:07:12 ambrisko Exp $");
 
 /*
  * This is a PCI shim for the Aironet PC4500/4800 wireless network
@@ -111,7 +111,6 @@ static struct an_type an_devs[] = {
 
 static int an_probe_pci		(device_t);
 static int an_attach_pci	(device_t);
-static int an_detach_pci	(device_t);
 static int an_suspend_pci	(device_t);
 static int an_resume_pci	(device_t);
 
@@ -250,21 +249,6 @@ fail:
 }
 
 static int
-an_detach_pci(device_t dev)
-{
-	struct an_softc		*sc = device_get_softc(dev);
-	struct ifnet		*ifp = &sc->arpcom.ac_if;
-
-	an_stop(sc);
-	ifmedia_removeall(&sc->an_ifmedia);
-	ether_ifdetach(ifp);
-	bus_teardown_intr(dev, sc->irq_res, sc->irq_handle);
-	an_release_resources(dev);
-
-	return (0);
-}
-
-static int
 an_suspend_pci(device_t dev)
 {
 	an_shutdown(dev);
@@ -284,7 +268,7 @@ static device_method_t an_pci_methods[] = {
         /* Device interface */
         DEVMETHOD(device_probe,         an_probe_pci),
         DEVMETHOD(device_attach,        an_attach_pci),
-	DEVMETHOD(device_detach,	an_detach_pci),
+	DEVMETHOD(device_detach,	an_detach),
 	DEVMETHOD(device_shutdown,	an_shutdown),
 	DEVMETHOD(device_suspend,	an_suspend_pci),
 	DEVMETHOD(device_resume,	an_resume_pci),

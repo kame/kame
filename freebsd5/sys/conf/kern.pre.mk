@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/kern.pre.mk,v 1.37 2003/11/05 12:20:16 bde Exp $
+# $FreeBSD: src/sys/conf/kern.pre.mk,v 1.56 2004/08/13 14:30:26 ru Exp $
 
 # Part of a unified Makefile for building kernels.  This part contains all
 # of the definitions that need to be before %BEFORE_DEPEND.
@@ -16,18 +16,49 @@ NM?=		nm
 OBJCOPY?=	objcopy
 SIZE?=		size
 
+.if ${CC} == "icc"
+COPTFLAGS?=-O
+.else
+. if ${MACHINE_ARCH} == "amd64"
+COPTFLAGS?=-O2 -frename-registers -pipe
+. elif ${MACHINE_ARCH} == "ia64"
+COPTFLAGS?=-O2 -pipe
+. elif ${MACHINE_ARCH} == "sparc64"
+COPTFLAGS?=-O2 -pipe
+. else
 COPTFLAGS?=-O -pipe
-.if !defined(NO_CPU_COPTFLAGS)
-COPTFLAGS+= ${_CPUCFLAGS}
+. endif
+. if ${COPTFLAGS:M-O[23s]} != ""
+COPTFLAGS+= -fno-strict-aliasing
+. endif
 .endif
-INCLUDES= -nostdinc -I- ${INCLMAGIC} -I. -I$S
+.if !defined(NO_CPU_COPTFLAGS)
+. if ${CC} == "icc"
+COPTFLAGS+= ${_ICC_CPUCFLAGS:C/(-x[^M^K^W]+)[MKW]+|-x[MKW]+/\1/}
+. else
+COPTFLAGS+= ${_CPUCFLAGS}
+. endif
+.endif
+.if ${CC} == "icc"
+NOSTDINC= -X
+.else
+NOSTDINC= -nostdinc
+.endif
 
-# This hack lets us use the Intel ACPICA code without spamming a new 
+INCLUDES= ${NOSTDINC} -I- ${INCLMAGIC} -I. -I$S
+
+# This hack lets us use the Intel ACPICA code without spamming a new
 # include path into 100+ source files.
 INCLUDES+= -I$S/contrib/dev/acpica
 
+# ... and the same for altq
+INCLUDES+= -I$S/contrib/altq
+
 # ... and the same for ipfilter
 INCLUDES+= -I$S/contrib/ipfilter
+
+# ... and the same for pf
+INCLUDES+= -I$S/contrib/pf
 
 # ... and the same for Atheros HAL
 INCLUDES+= -I$S/contrib/dev/ath -I$S/contrib/dev/ath/freebsd
@@ -35,22 +66,38 @@ INCLUDES+= -I$S/contrib/dev/ath -I$S/contrib/dev/ath/freebsd
 # ... and the same for the NgATM stuff
 INCLUDES+= -I$S/contrib/ngatm
 
-COPTS=	${INCLUDES} -D_KERNEL -include opt_global.h
-CFLAGS=	${COPTFLAGS} ${CWARNFLAGS} ${DEBUG} ${COPTS}
-CFLAGS+= -fno-common -finline-limit=${INLINE_LIMIT} -fno-strict-aliasing
+CFLAGS=	${COPTFLAGS} ${CWARNFLAGS} ${DEBUG}
+CFLAGS+= ${INCLUDES} -D_KERNEL -include opt_global.h
+.if ${CC} != "icc"
+CFLAGS+= -fno-common -finline-limit=${INLINE_LIMIT}
+CFLAGS+= --param inline-unit-growth=100
+CFLAGS+= --param large-function-growth=1000
 WERROR?= -Werror
+.endif
 
 # XXX LOCORE means "don't declare C stuff" not "for locore.s".
 ASM_CFLAGS= -x assembler-with-cpp -DLOCORE ${CFLAGS}
 
 .if defined(PROFLEVEL) && ${PROFLEVEL} >= 1
+.if ${CC} == "icc"
+.error Profiling doesn't work with ICC yet.
+.else
 CFLAGS+=	-DGPROF -falign-functions=16
+.endif
 .if ${PROFLEVEL} >= 2
 CFLAGS+=	-DGPROF4 -DGUPROF
-# XXX -Wno-inline is to break some warnings.
+. if ${CC} == "icc"
+# XXX doesn't work yet
+#PROF=	-prof_gen
+. else
 PROF=	-finstrument-functions -Wno-inline
+. endif
 .else
+. if ${CC} == "icc"
+PROF=	-p
+. else
 PROF=	-pg
+. endif
 .endif
 .endif
 DEFINED_PROF=	${PROF}
@@ -72,17 +119,17 @@ NORMAL_M= ${AWK} -f $S/tools/makeobjops.awk ${.IMPSRC} -c ; \
 
 NORMAL_LINT=	${LINT} ${LINTFLAGS} ${CFLAGS:M-[DIU]*} ${.IMPSRC}
 
-GEN_CFILES= $S/$M/$M/genassym.c
+GEN_CFILES= $S/$M/$M/genassym.c ${MFILES:T:S/.m$/.c/}
 SYSTEM_CFILES= config.c env.c hints.c majors.c vnode_if.c
 SYSTEM_DEP= Makefile ${SYSTEM_OBJS}
 SYSTEM_OBJS= locore.o ${MDOBJS} ${OBJS}
 SYSTEM_OBJS+= ${SYSTEM_CFILES:.c=.o}
 SYSTEM_OBJS+= hack.So
-SYSTEM_LD= @${LD} ${FMT} -Bdynamic -T $S/conf/ldscript.$M \
+SYSTEM_LD= @${LD} -Bdynamic -T $S/conf/ldscript.$M \
 	-warn-common -export-dynamic -dynamic-linker /red/herring \
 	-o ${.TARGET} -X ${SYSTEM_OBJS} vers.o
 SYSTEM_LD_TAIL= @${OBJCOPY} --strip-symbol gcc2_compiled. ${.TARGET} ; \
-	${SIZE} ${FMT} ${.TARGET} ; chmod 755 ${.TARGET}
+	${SIZE} ${.TARGET} ; chmod 755 ${.TARGET}
 SYSTEM_DEP+= $S/conf/ldscript.$M
 
 # MKMODULESENV is set here so that port makefiles can augment
@@ -96,5 +143,5 @@ MKMODULESENV+=	ALL_MODULES=LINT
 MKMODULESENV+=	MODULES_OVERRIDE="${MODULES_OVERRIDE}"
 .endif
 .if defined(DEBUG)
-MKMODULESENV+=	DEBUG="${DEBUG}" DEBUG_FLAGS="${DEBUG}"
+MKMODULESENV+=	DEBUG_FLAGS="${DEBUG}"
 .endif

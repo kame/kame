@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbgetall - Get all required ACPI tables
- *              $Revision: 7 $
+ *              $Revision: 9 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2003, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -324,8 +324,7 @@ AcpiTbGetRequiredTables (
         {
             ACPI_REPORT_WARNING (("%s, while getting table at %8.8X%8.8X\n",
                 AcpiFormatException (Status),
-                ACPI_HIDWORD (Address.Pointer.Value),
-                ACPI_LODWORD (Address.Pointer.Value)));
+                ACPI_FORMAT_UINT64 (Address.Pointer.Value)));
         }
     }
 

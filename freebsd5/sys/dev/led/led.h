@@ -6,16 +6,15 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
+ * $FreeBSD: src/sys/dev/led/led.h,v 1.5 2004/06/16 09:46:49 phk Exp $
  */
 
 #ifndef _DEV_LED_H
 #define _DEV_LED_H
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/led/led.h,v 1.3 2003/11/03 15:58:58 phk Exp $");
-
 typedef	void led_t(void *, int);
-dev_t led_create(led_t *func, void *priv, char const *name);
-void led_destroy(dev_t dev);
 
-#endif /* _DEV_LED_H */
+struct cdev *led_create(led_t *, void *, char const *);
+void	led_destroy(struct cdev *);
+
+#endif

@@ -26,7 +26,7 @@
  * Authors:
  *    Sung-Ching Lin <sclin@sis.com.tw>
  * 
- * $FreeBSD: src/sys/dev/drm/sis_ds.h,v 1.1 2003/09/09 00:24:31 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/sis_ds.h,v 1.2 2004/03/03 08:24:31 obrien Exp $
  */
 
 #ifndef __SIS_DS_H__
@@ -36,7 +36,7 @@
 
 #define SET_SIZE 5000
 
-typedef unsigned int ITEM_TYPE;
+typedef unsigned long ITEM_TYPE;
 
 typedef struct {
 	ITEM_TYPE val;

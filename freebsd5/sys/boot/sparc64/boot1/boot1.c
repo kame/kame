@@ -13,11 +13,10 @@
  * implied warranties, including, without limitation, the implied
  * warranties of merchantability and fitness for a particular
  * purpose.
- *
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/boot/sparc64/boot1/boot1.c,v 1.16 2003/04/16 21:09:41 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/boot/sparc64/boot1/boot1.c,v 1.18 2004/08/16 15:45:25 marius Exp $");
 
 #include <sys/param.h>
 #include <sys/dirent.h>
@@ -433,7 +432,7 @@ static int
 dskread(void *buf, u_int64_t lba, int nblk)
 {
 	/*
-	 * The OpenFirmware should open the correct partition for us.
+	 * The Open Firmware should open the correct partition for us.
 	 * That means, if we read from offset zero on an open instance handle,
 	 * we should read from offset zero of that partition.
 	 */

@@ -1,13 +1,11 @@
-# $FreeBSD: src/sys/boot/alpha/netboot/Makefile,v 1.10 2002/05/10 09:26:29 obrien Exp $
+# $FreeBSD: src/sys/boot/alpha/netboot/Makefile,v 1.11 2004/02/11 22:01:17 ru Exp $
 #	$NetBSD: Makefile,v 1.12 1998/02/19 14:18:36 drochner Exp $
 
-BASE= 		netboot
-PROG= 		${BASE}
+BOOT= 		netboot
 NOMAN=
 NEWVERSWHAT=	"SRM net boot" alpha
 LOAD_ADDRESS=	${PRIMARY_LOAD_ADDRESS}
 
-CFLAGS+=	-ffreestanding -DLOADER_NET_SUPPORT
+CFLAGS+=	-DLOADER_NET_SUPPORT
 
-.include	<${.CURDIR}/../common/Makefile.common>
-
+.include "${.CURDIR}/../common/Makefile.common"

@@ -29,12 +29,13 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/pci/fixup_pci.c,v 1.5 2003/08/24 17:54:15 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/pci/fixup_pci.c,v 1.6 2004/05/30 17:57:41 phk Exp $");
 
 #include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/malloc.h>
+#include <sys/module.h>
+#include <sys/systm.h>
 #include <sys/bus.h>
 
 #include <dev/pci/pcivar.h>

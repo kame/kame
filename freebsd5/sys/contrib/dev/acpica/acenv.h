@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acenv.h - Generation environment specific items
- *       $Revision: 104 $
+ *       $Revision: 107 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2003, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -207,6 +207,9 @@
 #elif defined(__FreeBSD__)
 #include "acfreebsd.h"
 
+#elif defined(__NetBSD__)
+#include "acnetbsd.h"
+
 #elif defined(MODESTO)
 #include "acmodesto.h"
 
@@ -222,12 +225,8 @@
 #define COMPILER_DEPENDENT_INT64   long long
 #define COMPILER_DEPENDENT_UINT64  unsigned long long
 
-
-/* Name of host operating system (returned by the _OS_ namespace object) */
-
-#define ACPI_OS_NAME         "Intel ACPI/CA Core Subsystem"
-
-/* This macro is used to tag functions as "printf-like" because
+/* 
+ * This macro is used to tag functions as "printf-like" because
  * some compilers can catch printf format string problems. MSVC
  * doesn't, so this is proprocessed away.
  */
@@ -267,8 +266,7 @@
 #else
 #define DEBUGGER_THREADING          DEBUGGER_MULTI_THREADED
 #endif
-#endif
-
+#endif /* !DEBUGGER_THREADING */
 
 /******************************************************************************
  *

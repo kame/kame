@@ -1,7 +1,7 @@
 /*	$NetBSD: pcmcia_cis_quirks.c,v 1.6 2000/04/12 21:07:55 scw Exp $ */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/pccard/pccard_cis_quirks.c,v 1.10 2003/10/07 03:33:53 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/pccard/pccard_cis_quirks.c,v 1.13 2004/05/27 15:21:51 imp Exp $");
 
 #define	PCCARDDEBUG
 
@@ -35,22 +35,16 @@ __FBSDID("$FreeBSD: src/sys/dev/pccard/pccard_cis_quirks.c,v 1.10 2003/10/07 03:
  */
 
 #include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/malloc.h>
-#include <sys/module.h>
-#include <sys/kernel.h>
-#include <sys/queue.h>
-#include <sys/types.h>
-
 #include <sys/bus.h>
-#include <machine/bus.h>
-#include <sys/rman.h>
-#include <machine/resource.h>
+#include <sys/malloc.h>
+#include <sys/systm.h>
 
-#include <dev/pccard/pccarddevs.h>
-#include <dev/pccard/pccardreg.h>
-#include <dev/pccard/pccardvar.h>
+#include <machine/bus.h>
+
 #include <dev/pccard/pccard_cis.h>
+#include <dev/pccard/pccardvar.h>
+
+#include "pccarddevs.h"
 
 /* There are cards out there whose CIS flat-out lies.  This file
    contains struct pccard_function chains for those devices. */

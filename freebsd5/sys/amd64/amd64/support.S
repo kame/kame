@@ -11,10 +11,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/amd64/support.S,v 1.105 2003/11/27 17:20:44 peter Exp $
+ * $FreeBSD: src/sys/amd64/amd64/support.S,v 1.113 2004/07/10 22:39:17 marcel Exp $
  */
 
 #include "opt_ddb.h"
@@ -76,18 +72,18 @@ ENTRY(bzero)
 
 /* Address: %rdi */
 ENTRY(pagezero)
-	lea	4096(%rdi),%rsi
+	movq	$-PAGE_SIZE,%rdx
+	subq	%rdx,%rdi
 	xorq	%rax,%rax
 1:
-	movnti	%rax,(%rdi)
-	movnti	%rax,8(%rdi)
-	movnti	%rax,16(%rdi)
-	movnti	%rax,24(%rdi)
-	addq	$32,%rdi
-	cmpq	%rsi,%rdi
+	movnti	%rax,(%rdi,%rdx)
+	movnti	%rax,8(%rdi,%rdx)
+	movnti	%rax,16(%rdi,%rdx)
+	movnti	%rax,24(%rdi,%rdx)
+	addq	$32,%rdx
 	jne	1b
 	sfence
-	retq
+	ret
 
 ENTRY(bcmp)
 	xorq	%rax,%rax
@@ -165,6 +161,32 @@ ENTRY(memcpy)
 	andq	$7,%rcx				/* any bytes left? */
 	rep
 	movsb
+	ret
+
+/*
+ * pagecopy(%rdi=from, %rsi=to)
+ */
+ENTRY(pagecopy)
+	movq	$-PAGE_SIZE,%rax
+	movq	%rax,%rdx
+	subq	%rax,%rdi
+	subq	%rax,%rsi
+1:
+	prefetchnta (%rdi,%rax)
+	addq	$64,%rax
+	jne	1b
+2:
+	movq	(%rdi,%rdx),%rax
+	movnti	%rax,(%rsi,%rdx)
+	movq	8(%rdi,%rdx),%rax
+	movnti	%rax,8(%rsi,%rdx)
+	movq	16(%rdi,%rdx),%rax
+	movnti	%rax,16(%rsi,%rdx)
+	movq	24(%rdi,%rdx),%rax
+	movnti	%rax,24(%rsi,%rdx)
+	addq	$32,%rdx
+	jne	2b
+	sfence
 	ret
 
 /* fillw(pat, base, cnt) */  
@@ -330,12 +352,13 @@ ENTRY(casuptr)
 	ret
 
 /*
- * fu{byte,sword,word} - MP SAFE
- *
- *	Fetch a byte (sword, word) from user memory
- *	%rdi
+ * Fetch (load) a 64-bit word, a 32-bit word, a 16-bit word, or an 8-bit
+ * byte from user memory.  All these functions are MPSAFE.
+ * addr = %rdi
  */
-ENTRY(fuword64)
+
+ALTENTRY(fuword64)
+ENTRY(fuword)
 	movq	PCPU(CURPCB),%rcx
 	movq	$fusufault,PCB_ONFAULT(%rcx)
 
@@ -346,9 +369,6 @@ ENTRY(fuword64)
 	movq	(%rdi),%rax
 	movq	$0,PCB_ONFAULT(%rcx)
 	ret
-
-ENTRY(fuword)
-	jmp	fuword64
 
 ENTRY(fuword32)
 	movq	PCPU(CURPCB),%rcx
@@ -363,9 +383,10 @@ ENTRY(fuword32)
 	ret
 
 /*
- * These two routines are called from the profiling code, potentially
- * at interrupt time. If they fail, that's okay, good things will
- * happen later. Fail all the time for now - until the trap code is
+ * fuswintr() and suswintr() are specialized variants of fuword16() and
+ * suword16(), respectively.  They are called from the profiling code,
+ * potentially at interrupt time.  If they fail, that's okay; good things
+ * will happen later.  They always fail for now, until the trap code is
  * able to deal with this.
  */
 ALTENTRY(suswintr)
@@ -373,9 +394,6 @@ ENTRY(fuswintr)
 	movq	$-1,%rax
 	ret
 
-/*
- * fuword16 - MP SAFE
- */
 ENTRY(fuword16)
 	movq	PCPU(CURPCB),%rcx
 	movq	$fusufault,PCB_ONFAULT(%rcx)
@@ -388,9 +406,6 @@ ENTRY(fuword16)
 	movq	$0,PCB_ONFAULT(%rcx)
 	ret
 
-/*
- * fubyte - MP SAFE
- */
 ENTRY(fubyte)
 	movq	PCPU(CURPCB),%rcx
 	movq	$fusufault,PCB_ONFAULT(%rcx)
@@ -412,12 +427,12 @@ fusufault:
 	ret
 
 /*
- * su{byte,sword,word} - MP SAFE
- *
- *	Write a byte (word, longword) to user memory
- * addr = %rdi,  value = %rsi
+ * Store a 64-bit word, a 32-bit word, a 16-bit word, or an 8-bit byte to
+ * user memory.  All these functions are MPSAFE.
+ * addr = %rdi, value = %rsi
  */
-ENTRY(suword64)
+ALTENTRY(suword64)
+ENTRY(suword)
 	movq	PCPU(CURPCB),%rcx
 	movq	$fusufault,PCB_ONFAULT(%rcx)
 
@@ -430,9 +445,6 @@ ENTRY(suword64)
 	movq	PCPU(CURPCB),%rcx
 	movq	%rax,PCB_ONFAULT(%rcx)
 	ret
-
-ENTRY(suword)
-	jmp	suword64
 
 ENTRY(suword32)
 	movq	PCPU(CURPCB),%rcx
@@ -448,9 +460,6 @@ ENTRY(suword32)
 	movq	%rax,PCB_ONFAULT(%rcx)
 	ret
 
-/*
- * suword16 - MP SAFE
- */
 ENTRY(suword16)
 	movq	PCPU(CURPCB),%rcx
 	movq	$fusufault,PCB_ONFAULT(%rcx)
@@ -465,9 +474,6 @@ ENTRY(suword16)
 	movq	%rax,PCB_ONFAULT(%rcx)
 	ret
 
-/*
- * subyte - MP SAFE
- */
 ENTRY(subyte)
 	movq	PCPU(CURPCB),%rcx
 	movq	$fusufault,PCB_ONFAULT(%rcx)
@@ -602,19 +608,19 @@ ENTRY(lgdt)
 	nop
 1:
 	movl	$KDSEL, %eax
-	mov	%ax,%ds
-	mov	%ax,%es
-	mov	%ax,%fs		/* Beware, use wrmsr to set 64 bit base */
-	mov	%ax,%gs
-	mov	%ax,%ss
+	movl	%eax,%ds
+	movl	%eax,%es
+	movl	%eax,%fs	/* Beware, use wrmsr to set 64 bit base */
+	movl	%eax,%gs
+	movl	%eax,%ss
 
 	/* reload code selector by turning return into intersegmental return */
 	popq	%rax
 	pushq	$KCSEL
 	pushq	%rax
+	MEXITCOUNT
 	lretq
 
-#ifdef DDB
 /*****************************************************************************/
 /* setjump, longjump                                                         */
 /*****************************************************************************/
@@ -645,4 +651,22 @@ ENTRY(longjmp)
 	xorl	%eax,%eax			/* return(1); */
 	incl	%eax
 	ret
-#endif
+
+/*
+ * Support for BB-profiling (gcc -a).  The kernbb program will extract
+ * the data from the kernel.
+ */
+
+	.data
+	ALIGN_DATA
+	.globl bbhead
+bbhead:
+	.quad 0
+
+	.text
+NON_GPROF_ENTRY(__bb_init_func)
+	movq	$1,(%rdi)
+	movq	bbhead,%rax
+	movq	%rax,32(%rdi)
+	movq	%rdi,bbhead
+	NON_GPROF_RET

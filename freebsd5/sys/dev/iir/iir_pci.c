@@ -31,7 +31,7 @@
 
 #ident "$Id: iir_pci.c 1.2 2003/08/26 12:29:55 achim Exp $"
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/iir/iir_pci.c,v 1.12 2003/09/26 15:36:47 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/iir/iir_pci.c,v 1.13 2004/03/17 17:50:35 njl Exp $");
 
 /*
  *  iir_pci.c:  PCI Bus Attachment for Intel Integrated RAID Controller driver
@@ -192,7 +192,7 @@ iir_pci_attach(device_t dev)
  
     /* map DPMEM */
     rid = PCI_DPMEM;
-    io = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid, 0, ~0, 1, RF_ACTIVE);
+    io = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid, RF_ACTIVE);
     if (io == NULL) {
         device_printf(dev, "can't allocate register resources\n");
         error = ENOMEM;
@@ -201,8 +201,8 @@ iir_pci_attach(device_t dev)
 
     /* get IRQ */
     rid = 0;
-    irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1, 
-                             RF_ACTIVE | RF_SHAREABLE);
+    irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
+                                 RF_ACTIVE | RF_SHAREABLE);
     if (io == NULL) {
         device_printf(dev, "can't find IRQ value\n");
         error = ENOMEM;

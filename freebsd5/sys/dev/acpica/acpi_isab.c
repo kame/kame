@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/acpica/acpi_isab.c,v 1.4 2003/08/24 17:48:01 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/acpica/acpi_isab.c,v 1.9 2004/06/29 19:02:27 njl Exp $");
 
 /*
  * ISA Bridge driver for Generic ISA Bus Devices.  See section 10.7 of the
@@ -35,17 +35,15 @@ __FBSDID("$FreeBSD: src/sys/dev/acpica/acpi_isab.c,v 1.4 2003/08/24 17:48:01 obr
 #include "opt_acpi.h"
 #include <sys/param.h>
 #include <sys/bus.h>
-#include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/malloc.h>
+#include <sys/module.h>
 
 #include "acpi.h"
-
 #include <dev/acpica/acpivar.h>
 #include <isa/isavar.h>
 
-/*
- * Hooks for the ACPI CA debugging infrastructure
- */
+/* Hooks for the ACPI CA debugging infrastructure. */
 #define _COMPONENT	ACPI_BUS
 ACPI_MODULE_NAME("ISA_ACPI")
 
@@ -53,7 +51,6 @@ struct acpi_isab_softc {
 	device_t	ap_dev;
 	ACPI_HANDLE	ap_handle;
 };
-
 
 static int	acpi_isab_probe(device_t bus);
 static int	acpi_isab_attach(device_t bus);
@@ -88,19 +85,20 @@ static driver_t acpi_isab_driver = {
 };
 
 DRIVER_MODULE(acpi_isab, acpi, acpi_isab_driver, isab_devclass, 0, 0);
+MODULE_DEPEND(acpi_isab, acpi, 1, 1, 1);
 
 static int
 acpi_isab_probe(device_t dev)
 {
+	static char *isa_ids[] = { "PNP0A05", "PNP0A06", NULL };
 
-	if ((acpi_get_type(dev) == ACPI_TYPE_DEVICE) &&
-	    !acpi_disabled("isa") &&
-	    devclass_get_device(isab_devclass, 0) == dev &&
-	    (acpi_MatchHid(dev, "PNP0A05") || acpi_MatchHid(dev, "PNP0A06"))) {
-		device_set_desc(dev, "ACPI Generic ISA bridge");
-		return(0);
-	}
-	return(ENXIO);
+	if (acpi_disabled("isab") ||
+	    ACPI_ID_PROBE(device_get_parent(dev), dev, isa_ids) == NULL ||
+	    devclass_get_device(isab_devclass, 0) != dev)
+		return (ENXIO);
+
+	device_set_desc(dev, "ACPI Generic ISA bridge");
+	return (0);
 }
 
 static int
@@ -123,9 +121,9 @@ acpi_isab_read_ivar(device_t dev, device_t child, int which, uintptr_t *result)
 	struct acpi_isab_softc *sc = device_get_softc(dev);
 
 	switch (which) {
-	case  ACPI_IVAR_HANDLE:
+	case ACPI_IVAR_HANDLE:
 		*result = (uintptr_t)sc->ap_handle;
-		return(0);
+		return (0);
 	}
-	return(ENOENT);
+	return (ENOENT);
 }

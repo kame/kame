@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_pt.c,v 1.39 2003/06/10 18:14:05 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_pt.c,v 1.42 2004/06/16 09:46:31 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/queue.h>
@@ -83,7 +83,7 @@ struct pt_softc {
 	pt_flags flags;	
 	union	 ccb saved_ccb;
 	int	 io_timeout;
-	dev_t	 dev;
+	struct cdev *dev;
 };
 
 static	d_open_t	ptopen;
@@ -116,9 +116,10 @@ static struct periph_driver ptdriver =
 
 PERIPHDRIVER_DECLARE(pt, ptdriver);
 
-#define PT_CDEV_MAJOR 61
 
 static struct cdevsw pt_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	ptopen,
 	.d_close =	ptclose,
 	.d_read =	physread,
@@ -126,7 +127,6 @@ static struct cdevsw pt_cdevsw = {
 	.d_ioctl =	ptioctl,
 	.d_strategy =	ptstrategy,
 	.d_name =	"pt",
-	.d_maj =	PT_CDEV_MAJOR,
 };
 
 #ifndef SCSI_PT_DEFAULT_TIMEOUT
@@ -134,7 +134,7 @@ static struct cdevsw pt_cdevsw = {
 #endif
 
 static int
-ptopen(dev_t dev, int flags, int fmt, struct thread *td)
+ptopen(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	struct cam_periph *periph;
 	struct pt_softc *softc;
@@ -178,7 +178,7 @@ ptopen(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static int
-ptclose(dev_t dev, int flag, int fmt, struct thread *td)
+ptclose(struct cdev *dev, int flag, int fmt, struct thread *td)
 {
 	struct	cam_periph *periph;
 	struct	pt_softc *softc;
@@ -645,7 +645,7 @@ pterror(union ccb *ccb, u_int32_t cam_flags, u_int32_t sense_flags)
 }
 
 static int
-ptioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
+ptioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
 {
 	struct cam_periph *periph;
 	struct pt_softc *softc;

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/hpfs/hpfs_vfsops.c,v 1.35 2003/07/26 07:32:20 phk Exp $
+ * $FreeBSD: src/sys/fs/hpfs/hpfs_vfsops.c,v 1.39 2004/07/30 22:08:49 phk Exp $
  */
 
 
@@ -62,7 +62,7 @@ static vfs_init_t       hpfs_init;
 static vfs_uninit_t     hpfs_uninit;
 static vfs_fhtovp_t     hpfs_fhtovp;
 static vfs_vget_t       hpfs_vget;
-static vfs_mount_t      hpfs_mount;
+static vfs_omount_t     hpfs_omount;
 static vfs_root_t       hpfs_root;
 static vfs_statfs_t     hpfs_statfs;
 static vfs_unmount_t    hpfs_unmount;
@@ -87,11 +87,10 @@ hpfs_uninit (vfsp)
 }
 
 static int
-hpfs_mount ( 
+hpfs_omount ( 
 	struct mount *mp,
 	char *path,
 	caddr_t data,
-	struct nameidata *ndp,
 	struct thread *td )
 {
 	size_t		size;
@@ -99,8 +98,9 @@ hpfs_mount (
 	struct vnode	*devvp;
 	struct hpfs_args args;
 	struct hpfsmount *hpmp = 0;
+	struct nameidata ndp;
 
-	dprintf(("hpfs_mount():\n"));
+	dprintf(("hpfs_omount():\n"));
 	/*
 	 ***
 	 * Mounting non-root filesystem or updating a filesystem
@@ -117,7 +117,7 @@ hpfs_mount (
 	 * read/write; if there is no device name, that's all we do.
 	 */
 	if (mp->mnt_flag & MNT_UPDATE) {
-		dprintf(("hpfs_mount: MNT_UPDATE: "));
+		dprintf(("hpfs_omount: MNT_UPDATE: "));
 
 		hpmp = VFSTOHPFS(mp);
 
@@ -125,7 +125,7 @@ hpfs_mount (
 			dprintf(("export 0x%x\n",args.export.ex_flags));
 			err = vfs_export(mp, &args.export);
 			if (err) {
-				printf("hpfs_mount: vfs_export failed %d\n",
+				printf("hpfs_omount: vfs_export failed %d\n",
 					err);
 			}
 			goto success;
@@ -141,14 +141,14 @@ hpfs_mount (
 	 * Not an update, or updating the name: look up the name
 	 * and verify that it refers to a sensible block device.
 	 */
-	NDINIT(ndp, LOOKUP, FOLLOW, UIO_USERSPACE, args.fspec, td);
-	err = namei(ndp);
+	NDINIT(&ndp, LOOKUP, FOLLOW, UIO_USERSPACE, args.fspec, td);
+	err = namei(&ndp);
 	if (err) {
 		/* can't get devvp!*/
 		goto error_1;
 	}
 
-	devvp = ndp->ni_vp;
+	devvp = ndp.ni_vp;
 
 	if (!vn_isdisk(devvp, &err)) 
 		goto error_2;
@@ -163,7 +163,7 @@ hpfs_mount (
 	 * Since this is a new mount, we want the names for
 	 * the device and the mount point copied in.  If an
 	 * error occurs, the mountpoint is discarded by the
-	 * upper level code.  Note that vfs_mount() handles
+	 * upper level code.  Note that vfs_omount() handles
 	 * copying the mountpoint f_mntonname for us, so we
 	 * don't have to do it here unless we want to set it
 	 * to something other than "path" for some rason.
@@ -196,6 +196,7 @@ error_2:	/* error with devvp held*/
 	vrele(devvp);
 
 error_1:	/* no state to back out*/
+	/* XXX: Missing NDFREE(&ndp, ...) */
 
 success:
 	return( err);
@@ -217,7 +218,7 @@ hpfs_mountfs(devvp, mp, argsp, td)
 	struct hpfsmount *hpmp;
 	struct buf *bp = NULL;
 	struct vnode *vp;
-	dev_t dev = devvp->v_rdev;
+	struct cdev *dev = devvp->v_rdev;
 
 	dprintf(("hpfs_mountfs():\n"));
 	/*
@@ -232,7 +233,7 @@ hpfs_mountfs(devvp, mp, argsp, td)
 	ncount = vcount(devvp);
 	if (devvp->v_object)
 		ncount -= 1;
-	if (ncount > 1 && devvp != rootvp)
+	if (ncount > 1)
 		return (EBUSY);
 
 	vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY, td);
@@ -300,7 +301,7 @@ hpfs_mountfs(devvp, mp, argsp, td)
 		goto failed;
 	}
 
-	error = hpfs_root(mp, &vp);
+	error = hpfs_root(mp, &vp, td);
 	if (error) {
 		hpfs_cpdeinit(hpmp);
 		hpfs_bmdeinit(hpmp);
@@ -344,7 +345,7 @@ hpfs_unmount(
 
 	dprintf(("hpfs_unmount: vflushing...\n"));
 	
-	error = vflush(mp, 0, flags);
+	error = vflush(mp, 0, flags, td);
 	if (error) {
 		printf("hpfs_unmount: vflush failed: %d\n",error);
 		return (error);
@@ -371,7 +372,8 @@ hpfs_unmount(
 static int
 hpfs_root(
 	struct mount *mp,
-	struct vnode **vpp )
+	struct vnode **vpp,
+	struct thread *td )
 {
 	int error = 0;
 	struct hpfsmount *hpmp = VFSTOHPFS(mp);
@@ -572,7 +574,7 @@ hpfs_vget(
 static struct vfsops hpfs_vfsops = {
 	.vfs_fhtovp =		hpfs_fhtovp,
 	.vfs_init =		hpfs_init,
-	.vfs_mount =		hpfs_mount,
+	.vfs_omount =		hpfs_omount,
 	.vfs_root =		hpfs_root,
 	.vfs_statfs =		hpfs_statfs,
 	.vfs_uninit =		hpfs_uninit,

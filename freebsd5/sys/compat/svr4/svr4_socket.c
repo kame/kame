@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_socket.c,v 1.22 2003/06/10 21:35:15 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_socket.c,v 1.23 2004/06/17 17:16:41 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -67,7 +67,7 @@ struct sockaddr_un *
 svr4_find_socket(td, fp, dev, ino)
 	struct thread *td;
 	struct file *fp;
-	udev_t dev;
+	dev_t dev;
 	ino_t ino;
 {
 	struct svr4_sockcache_entry *e;

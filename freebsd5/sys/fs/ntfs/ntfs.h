@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/ntfs/ntfs.h,v 1.15 2003/09/26 20:26:23 fjoe Exp $
+ * $FreeBSD: src/sys/fs/ntfs/ntfs.h,v 1.16 2004/06/16 09:47:04 phk Exp $
  */
 
 /*#define NTFS_DEBUG 1*/
@@ -241,7 +241,7 @@ struct bootfile {
 struct ntfsmount {
 	struct mount   *ntm_mountp;	/* filesystem vfs structure */
 	struct bootfile ntm_bootfile;
-	dev_t           ntm_dev;	/* device mounted */
+	struct cdev *ntm_dev;	/* device mounted */
 	struct vnode   *ntm_devvp;	/* block device mounted vnode */
 	struct vnode   *ntm_sysvn[NTFS_SYSNODESNUM];
 	u_int32_t       ntm_bpmftrec;

@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ips/ips_disk.c,v 1.4 2003/09/22 04:59:07 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ips/ips_disk.c,v 1.6 2004/02/28 19:14:41 scottl Exp $");
 
 #include <dev/ips/ips.h>
 #include <dev/ips/ips_disk.h>
@@ -79,6 +79,9 @@ static int ipsd_close(struct disk *dp)
 /* ipsd_finish is called to clean up and return a completed IO request */
 void ipsd_finish(struct bio *iobuf)
 {
+	ipsdisk_softc_t *dsc;
+	dsc = iobuf->bio_disk->d_drv1;	
+
 	if (iobuf->bio_flags & BIO_ERROR) {
 		ipsdisk_softc_t *dsc;
 		dsc = iobuf->bio_disk->d_drv1; 
@@ -87,6 +90,7 @@ void ipsd_finish(struct bio *iobuf)
 		iobuf->bio_resid = 0;
 
 	biodone(iobuf);	
+	ips_start_io_request(dsc->sc);
 }
 
 
@@ -97,7 +101,10 @@ static void ipsd_strategy(struct bio *iobuf)
 	dsc = iobuf->bio_disk->d_drv1;	
 	DEVICE_PRINTF(8,dsc->dev,"in strategy\n");
 	iobuf->bio_driver1 = (void *)(uintptr_t)dsc->sc->drives[dsc->disk_number].drivenum;
-	ips_start_io_request(dsc->sc, iobuf);
+	mtx_lock(&dsc->sc->queue_mtx);
+	bioq_disksort(&dsc->sc->queue, iobuf);
+	mtx_unlock(&dsc->sc->queue_mtx);
+	ips_start_io_request(dsc->sc);
 }
 
 static int ipsd_probe(device_t dev)
@@ -122,25 +129,28 @@ static int ipsd_attach(device_t dev)
 	dsc->sc = device_get_softc(adapter);
 	dsc->unit = device_get_unit(dev);
 	dsc->disk_number = (uintptr_t) device_get_ivars(dev);
-	dsc->ipsd_disk.d_drv1 = dsc;
-	dsc->ipsd_disk.d_name = "ipsd";
-	dsc->ipsd_disk.d_maxsize = IPS_MAX_IO_SIZE;
-	dsc->ipsd_disk.d_open = ipsd_open;
-	dsc->ipsd_disk.d_close = ipsd_close;
-	dsc->ipsd_disk.d_strategy = ipsd_strategy;
+	dsc->ipsd_disk = disk_alloc();
+	dsc->ipsd_disk->d_drv1 = dsc;
+	dsc->ipsd_disk->d_name = "ipsd";
+	dsc->ipsd_disk->d_maxsize = IPS_MAX_IO_SIZE;
+	dsc->ipsd_disk->d_open = ipsd_open;
+	dsc->ipsd_disk->d_close = ipsd_close;
+	dsc->ipsd_disk->d_strategy = ipsd_strategy;
 
 	totalsectors = dsc->sc->drives[dsc->disk_number].sector_count;
    	if ((totalsectors > 0x400000) &&
        			((dsc->sc->adapter_info.miscflags & 0x8) == 0)) {
-      		dsc->ipsd_disk.d_fwheads = IPS_NORM_HEADS;
-      		dsc->ipsd_disk.d_fwsectors = IPS_NORM_SECTORS;
+      		dsc->ipsd_disk->d_fwheads = IPS_NORM_HEADS;
+      		dsc->ipsd_disk->d_fwsectors = IPS_NORM_SECTORS;
    	} else {
-      		dsc->ipsd_disk.d_fwheads = IPS_COMP_HEADS;
-      		dsc->ipsd_disk.d_fwsectors = IPS_COMP_SECTORS;
+      		dsc->ipsd_disk->d_fwheads = IPS_COMP_HEADS;
+      		dsc->ipsd_disk->d_fwsectors = IPS_COMP_SECTORS;
    	}
-	dsc->ipsd_disk.d_sectorsize = IPS_BLKSIZE;
-	dsc->ipsd_disk.d_mediasize = (off_t)totalsectors * IPS_BLKSIZE;
-	disk_create(dsc->unit, &dsc->ipsd_disk, 0, NULL, NULL);
+	dsc->ipsd_disk->d_sectorsize = IPS_BLKSIZE;
+	dsc->ipsd_disk->d_mediasize = (off_t)totalsectors * IPS_BLKSIZE;
+	dsc->ipsd_disk->d_unit = dsc->unit;
+	dsc->ipsd_disk->d_flags = DISKFLAG_NEEDSGIANT;
+	disk_create(dsc->ipsd_disk, DISK_VERSION);
 
 	device_printf(dev, "Logical Drive  (%dMB)\n",
 		      dsc->sc->drives[dsc->disk_number].sector_count >> 11);
@@ -155,7 +165,6 @@ static int ipsd_detach(device_t dev)
 	dsc = (ipsdisk_softc_t *)device_get_softc(dev);
 	if(dsc->state & IPS_DEV_OPEN)
 		return (EBUSY);
-	disk_destroy(&dsc->ipsd_disk);
+	disk_destroy(dsc->ipsd_disk);
 	return 0;
 }
-

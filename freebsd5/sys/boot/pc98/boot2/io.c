@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/boot/pc98/boot2/io.c,v 1.5 2003/09/08 09:11:20 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/boot/pc98/boot2/io.c,v 1.6 2004/07/30 09:42:04 nyan Exp $");
 
 #include "boot.h"
 #include <machine/cpufunc.h>
@@ -54,7 +54,7 @@ gateA20(void)
 void
 printf(const char *format, ...)
 {
-	int *dataptr = (int *)&format;
+	int *dataptr = (void *)&format;
 	char c;
 
 	dataptr++;
@@ -289,7 +289,7 @@ strcasecmp(const char *s1, const char *s2)
 #endif /* !CDBOOT */
 
 void
-bcopy(const void *from, void *to, size_t len)
+memcpy(const void *from, void *to, size_t len)
 {
 	const char *fp = (const char *)from;
 	char *tp = (char *)to;
@@ -358,7 +358,7 @@ void putc(int c)
 	if (crtat >= Crtat + col * row) {
 		cp = Crtat;
 		for (i = 1; i < row; i++) {
-			bcopy((void *)(cp+col), (void *)cp, col*2);
+			memcpy((void *)(cp+col), (void *)cp, col*2);
 			cp += col;
 		}
 		for (i = 0; i < col; i++) {

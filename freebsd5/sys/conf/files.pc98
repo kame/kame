@@ -3,7 +3,7 @@
 #
 # modified for PC-9801
 #
-# $FreeBSD: src/sys/conf/files.pc98,v 1.281 2003/12/03 21:44:44 imp Exp $
+# $FreeBSD: src/sys/conf/files.pc98,v 1.305 2004/08/16 13:59:01 rwatson Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -43,12 +43,6 @@ trlld.o				optional	oltr			\
 	compile-with	"uudecode < $S/contrib/dev/oltr/i386-elf.trlld.o.uu"	\
 	no-implicit-rule
 #
-hal.o				optional	ath_hal			\
-	dependency	"$S/contrib/dev/ath/freebsd/i386-elf.hal.o.uu"	\
-	compile-with	"uudecode < $S/contrib/dev/ath/freebsd/i386-elf.hal.o.uu" \
-	no-implicit-rule
-#
-#
 compat/linux/linux_file.c	optional	compat_linux
 compat/linux/linux_getcwd.c	optional	compat_linux
 compat/linux/linux_ioctl.c	optional	compat_linux
@@ -61,24 +55,24 @@ compat/linux/linux_stats.c	optional	compat_linux
 compat/linux/linux_sysctl.c	optional	compat_linux
 compat/linux/linux_uid16.c	optional	compat_linux
 compat/linux/linux_util.c	optional	compat_linux
-compat/pecoff/imgact_pecoff.c		optional	pecoff_support
-compat/svr4/imgact_svr4.c		optional	compat_svr4
-compat/svr4/svr4_fcntl.c		optional	compat_svr4
-compat/svr4/svr4_filio.c		optional	compat_svr4
-compat/svr4/svr4_ioctl.c		optional	compat_svr4
-compat/svr4/svr4_ipc.c			optional	compat_svr4
-compat/svr4/svr4_misc.c			optional	compat_svr4
-compat/svr4/svr4_resource.c		optional	compat_svr4
-compat/svr4/svr4_signal.c		optional	compat_svr4
-compat/svr4/svr4_socket.c		optional	compat_svr4
-compat/svr4/svr4_sockio.c		optional	compat_svr4
-compat/svr4/svr4_stat.c			optional	compat_svr4
-compat/svr4/svr4_stream.c		optional	compat_svr4
-compat/svr4/svr4_syscallnames.c		optional	compat_svr4
-compat/svr4/svr4_sysent.c		optional	compat_svr4
-compat/svr4/svr4_sysvec.c		optional	compat_svr4
-compat/svr4/svr4_termios.c		optional	compat_svr4
-compat/svr4/svr4_ttold.c		optional	compat_svr4
+compat/pecoff/imgact_pecoff.c	optional	pecoff_support
+compat/svr4/imgact_svr4.c	optional	compat_svr4
+compat/svr4/svr4_fcntl.c	optional	compat_svr4
+compat/svr4/svr4_filio.c	optional	compat_svr4
+compat/svr4/svr4_ioctl.c	optional	compat_svr4
+compat/svr4/svr4_ipc.c		optional	compat_svr4
+compat/svr4/svr4_misc.c		optional	compat_svr4
+compat/svr4/svr4_resource.c	optional	compat_svr4
+compat/svr4/svr4_signal.c	optional	compat_svr4
+compat/svr4/svr4_socket.c	optional	compat_svr4
+compat/svr4/svr4_sockio.c	optional	compat_svr4
+compat/svr4/svr4_stat.c		optional	compat_svr4
+compat/svr4/svr4_stream.c	optional	compat_svr4
+compat/svr4/svr4_syscallnames.c	optional	compat_svr4
+compat/svr4/svr4_sysent.c	optional	compat_svr4
+compat/svr4/svr4_sysvec.c	optional	compat_svr4
+compat/svr4/svr4_termios.c	optional	compat_svr4
+compat/svr4/svr4_ttold.c	optional	compat_svr4
 contrib/dev/oltr/if_oltr.c	optional	oltr
 contrib/dev/oltr/trlldbm.c	optional	oltr
 contrib/dev/oltr/trlldhm.c	optional	oltr
@@ -101,10 +95,11 @@ crypto/des/des_setkey.c			optional	crypto
 dev/aic/aic_cbus.c		optional	aic isa
 dev/ar/if_ar.c			optional	ar
 dev/ar/if_ar_pci.c		optional	ar pci
+dev/cp/cpddk.c			optional	cp
+dev/cp/if_cp.c			optional	cp
 dev/ct/bshw_machdep.c		optional	ct
 dev/ct/ct.c			optional	ct
 dev/ct/ct_isa.c			optional	ct isa
-dev/dgb/dgb.c			count		dgb
 dev/ed/if_ed_cbus.c		optional	ed isa
 dev/fb/fb.c			optional	fb
 dev/fb/fb.c			optional	gdc
@@ -115,6 +110,8 @@ dev/kbd/kbd.c			optional	sc
 dev/kbd/kbd.c			optional	ukbd
 dev/kbd/kbd.c			optional	pckbd
 dev/lnc/if_lnc_cbus.c		optional	lnc isa
+dev/io/iodev.c			optional	io
+dev/mem/memutil.c		optional	mem
 dev/ppc/ppc_puc.c		optional	ppc puc pci
 dev/sbni/if_sbni.c		optional	sbni
 dev/sbni/if_sbni_pci.c		optional	sbni pci
@@ -137,7 +134,7 @@ geom/geom_bsd_enc.c		standard
 geom/geom_pc98.c		standard
 geom/geom_pc98_enc.c		standard
 i386/bios/apm.c			optional	apm
-i386/i386/apic_vector.s		optional	apic
+#i386/i386/apic_vector.s		optional	apic
 i386/i386/atomic.c		standard				\
 	compile-with	"${CC} -c ${CFLAGS} ${DEFINED_PROF:S/^$/-fomit-frame-pointer/} ${.IMPSRC}"
 i386/i386/autoconf.c		standard
@@ -151,20 +148,22 @@ i386/i386/db_trace.c		optional	ddb
 i386/i386/dump_machdep.c	standard
 i386/i386/elf_machdep.c		standard
 i386/i386/exception.s		standard
-i386/i386/i386-gdbstub.c	optional	ddb
-i386/i386/i686_mem.c		standard
+i386/i386/gdb_machdep.c		optional	gdb
+i386/i386/i686_mem.c		optional	mem
 i386/i386/identcpu.c		standard
 i386/i386/in_cksum.c		optional	inet
 i386/i386/initcpu.c		standard
 i386/i386/intr_machdep.c	standard
 i386/i386/io_apic.c		optional	apic
-i386/i386/k6_mem.c		standard
+i386/i386/io.c			optional	io
+i386/i386/k6_mem.c		optional	mem
 i386/i386/legacy.c		standard
 i386/i386/local_apic.c		optional	apic
 i386/i386/locore.s		standard	no-obj
-i386/i386/mem.c			standard
+i386/i386/mem.c			optional	mem
 i386/i386/mp_clock.c		optional	smp
 i386/i386/mp_machdep.c		optional	smp
+i386/i386/mp_watchdog.c		optional	mp_watchdog smp
 i386/i386/mpboot.s		optional	smp
 i386/i386/mptable.c		optional	apic
 i386/i386/mptable_pci.c		optional	apic pci
@@ -177,6 +176,7 @@ i386/i386/swtch.s		standard
 i386/i386/sys_machdep.c		standard
 i386/i386/trap.c		standard
 i386/i386/tsc.c			standard
+i386/i386/uio_machdep.c		standard
 i386/i386/vm86.c		standard
 i386/i386/vm_machdep.c		standard
 i386/ibcs2/ibcs2_errno.c	optional	ibcs2
@@ -199,31 +199,14 @@ i386/ibcs2/ibcs2_xenix.c	optional	ibcs2
 i386/ibcs2/ibcs2_xenix_sysent.c	optional	ibcs2
 i386/ibcs2/imgact_coff.c	optional	ibcs2
 i386/isa/atpic.c		standard
-i386/isa/atpic_vector.s		standard
-i386/isa/bs/bs.c		optional	bs
-i386/isa/bs/bsfunc.c		optional	bs
-i386/isa/bs/bshw.c		optional	bs
-i386/isa/bs/bsif.c		count		bs
-i386/isa/ctx.c			optional	ctx
-i386/isa/cy.c			count		cy
+#i386/isa/atpic_vector.s		standard
 i386/isa/elink.c		optional	ep
 i386/isa/elink.c		optional	ie
-i386/isa/gpib.c			optional	gp
-i386/isa/if_el.c		count		el
-i386/isa/if_le.c		count		le
-i386/isa/if_rdp.c		count		rdp
 i386/isa/isa.c			optional	isa
-i386/isa/isa_compat.c		optional	isa compat_oldisa	\
-	warning "Old ISA driver compatibility shims present."
-i386/isa/istallion.c		optional	stli nowerror
-i386/isa/loran.c		optional	loran
 i386/isa/npx.c			optional	npx
 i386/isa/pmtimer.c		optional	pmtimer
 i386/isa/prof_machdep.c		optional	profiling-routine
 i386/isa/spkr.c			optional	speaker
-i386/isa/spigot.c		count		spigot
-i386/isa/stallion.c		optional	stl nowerror
-i386/isa/wt.c			count		wt
 i386/linux/imgact_linux.c	optional	compat_linux
 i386/linux/linux_dummy.c	optional	compat_linux
 i386/linux/linux_locore.s	optional	compat_linux		\
@@ -232,8 +215,9 @@ i386/linux/linux_machdep.c	optional	compat_linux
 i386/linux/linux_ptrace.c	optional	compat_linux
 i386/linux/linux_sysent.c	optional	compat_linux
 i386/linux/linux_sysvec.c	optional	compat_linux
-i386/pci/pci_cfgreg.c		optional	pci
 i386/pci/pci_bus.c		optional	pci
+i386/pci/pci_cfgreg.c		optional	pci
+i386/pci/pci_pir.c		optional	pci
 i386/svr4/svr4_locore.s		optional	compat_svr4		\
 	dependency	"svr4_assym.h"	\
 	warning "COMPAT_SVR4 is broken and should be avoided"
@@ -330,6 +314,8 @@ i4b/layer1/itjc/i4b_itjc_l1fsm.c	optional	itjc
 kern/imgact_aout.c		optional	compat_aout
 kern/imgact_gzip.c		optional	gzip
 libkern/divdi3.c		standard
+libkern/ffsl.c			standard
+libkern/flsl.c			standard
 libkern/moddi3.c		standard
 libkern/qdivrem.c		standard
 libkern/ucmpdi2.c		standard
@@ -345,6 +331,7 @@ pc98/pc98/canbus.c		optional        canbus
 pc98/pc98/canbus_if.m		optional	canbus
 pc98/pc98/clock.c		standard
 pc98/pc98/fd.c			optional	fdc
+pc98/pc98/fdc_cbus.c		optional	fdc isa
 pc98/pc98/isa_dma.c		optional	isa
 pc98/pc98/mse.c			optional	mse
 pc98/pc98/nmi.c			standard
@@ -363,11 +350,10 @@ pc98/pc98/syscons_pc98.c	optional	sc
 pc98/pc98/wd.c			count		wdc
 pc98/pc98/wd_cd.c		count		wcd wdc
 pccard/mecia.c			optional	mecia card
-pci/cy_pci.c			optional	cy pci
-pci/agp_intel.c			optional	agp
-pci/agp_via.c			optional	agp
-pci/agp_sis.c			optional	agp
 pci/agp_ali.c			optional	agp
 pci/agp_amd.c			optional	agp
 pci/agp_i810.c			optional	agp
+pci/agp_intel.c			optional	agp
 pci/agp_nvidia.c		optional	agp
+pci/agp_sis.c			optional	agp
+pci/agp_via.c			optional	agp

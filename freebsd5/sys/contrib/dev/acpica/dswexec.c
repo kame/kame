@@ -2,7 +2,7 @@
  *
  * Module Name: dswexec - Dispatcher method execution callbacks;
  *                        dispatch to interpreter.
- *              $Revision: 103 $
+ *              $Revision: 106 $
  *
  *****************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2003, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -518,10 +518,26 @@ AcpiDsExecEndOp (
         }
         else
         {
-            ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-                "[%s]: Could not resolve operands, %s\n",
-                AcpiPsGetOpcodeName (WalkState->Opcode),
-                AcpiFormatException (Status)));
+            /*
+             * Treat constructs of the form "Store(LocalX,LocalX)" as noops when the
+             * Local is uninitialized.
+             */
+            if  ((Status == AE_AML_UNINITIALIZED_LOCAL) &&
+                (WalkState->Opcode == AML_STORE_OP) &&
+                (WalkState->Operands[0]->Common.Type == ACPI_TYPE_LOCAL_REFERENCE) &&
+                (WalkState->Operands[1]->Common.Type == ACPI_TYPE_LOCAL_REFERENCE) &&
+                (WalkState->Operands[0]->Reference.Opcode ==
+                 WalkState->Operands[1]->Reference.Opcode))
+            {
+                Status = AE_OK;
+            }
+            else
+            {
+                ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+                    "[%s]: Could not resolve operands, %s\n",
+                    AcpiPsGetOpcodeName (WalkState->Opcode),
+                    AcpiFormatException (Status)));
+            }
         }
 
         /* Always delete the argument objects and clear the operand stack */

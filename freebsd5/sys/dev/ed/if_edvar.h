@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ed/if_edvar.h,v 1.16 2003/10/31 18:31:58 brooks Exp $
+ * $FreeBSD: src/sys/dev/ed/if_edvar.h,v 1.18 2004/03/03 07:33:43 obrien Exp $
  */
 
 #ifndef SYS_DEV_ED_IF_EDVAR_H
@@ -206,7 +206,7 @@ int	ed_probe_HP_pclanp	(device_t, int, int);
 
 int	ed_attach		(device_t);
 void	ed_stop			(struct ed_softc *);
-void	ed_pio_readmem		(struct ed_softc *, int, unsigned char *,
+void	ed_pio_readmem		(struct ed_softc *, long, unsigned char *,
 				     unsigned short);
 void	ed_pio_writemem		(struct ed_softc *, char *,
 				     unsigned short, unsigned short);

@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ata/atapi-fd.c,v 1.89.2.2 2004/02/11 08:47:22 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ata/atapi-fd.c,v 1.97 2004/08/05 21:11:33 sos Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -82,7 +82,7 @@ afd_attach(struct ata_device *atadev)
     fdp->lun = ata_get_lun(&afd_lun_map);
     ata_set_name(atadev, "afd", fdp->lun);
     bioq_init(&fdp->queue);
-    mtx_init(&fdp->queue_mtx, "ATAPI FD bioqueue lock", MTX_DEF, 0);  
+    mtx_init(&fdp->queue_mtx, "ATAPI FD bioqueue lock", NULL, MTX_DEF);  
 
     if (afd_sense(fdp)) {
 	free(fdp, M_AFD);
@@ -96,19 +96,21 @@ afd_attach(struct ata_device *atadev)
     atadev->flags |= ATA_D_MEDIA_CHANGED;
 
     /* lets create the disk device */
-    fdp->disk.d_open = afd_open;
-    fdp->disk.d_close = afd_close;
+    fdp->disk = disk_alloc();
+    fdp->disk->d_open = afd_open;
+    fdp->disk->d_close = afd_close;
 #ifdef notyet
-    fdp->disk.d_ioctl = afd_ioctl;
+    fdp->disk->d_ioctl = afd_ioctl;
 #endif
-    fdp->disk.d_strategy = afdstrategy;
-    fdp->disk.d_name = "afd";
-    fdp->disk.d_drv1 = fdp;
+    fdp->disk->d_strategy = afdstrategy;
+    fdp->disk->d_name = "afd";
+    fdp->disk->d_drv1 = fdp;
     if (atadev->channel->dma)
-	fdp->disk.d_maxsize = atadev->channel->dma->max_iosize;
+	fdp->disk->d_maxsize = atadev->channel->dma->max_iosize;
     else
-	fdp->disk.d_maxsize = DFLTPHYS;
-    disk_create(fdp->lun, &fdp->disk, DISKFLAG_NOGIANT, NULL, NULL);
+	fdp->disk->d_maxsize = DFLTPHYS;
+    fdp->disk->d_unit = fdp->lun;
+    disk_create(fdp->disk, DISK_VERSION);
 
     /* announce we are here */
     afd_describe(fdp);
@@ -122,7 +124,8 @@ afd_detach(struct ata_device *atadev)
     mtx_lock(&fdp->queue_mtx);
     bioq_flush(&fdp->queue, NULL, ENXIO);
     mtx_unlock(&fdp->queue_mtx);
-    disk_destroy(&fdp->disk);
+    mtx_destroy(&fdp->queue_mtx);  
+    disk_destroy(fdp->disk);
     ata_prtdev(atadev, "WARNING - removed from configuration\n");
     ata_free_name(atadev);
     ata_free_lun(&afd_lun_map, fdp->lun);
@@ -208,8 +211,8 @@ afd_describe(struct afd_softc *fdp)
 	}
     }
     else {
-	ata_prtdev(fdp->device, "REMOVABLE <%.40s> at ata%d-%s %s\n",
-		   fdp->device->param->model,
+	ata_prtdev(fdp->device, "REMOVABLE <%.40s/%.8s> at ata%d-%s %s\n",
+		   fdp->device->param->model, fdp->device->param->revision,
 		   device_get_unit(fdp->device->channel->dev),
 		   (fdp->device->unit == ATA_MASTER) ? "master" : "slave",
 		   ata_mode2str(fdp->device->mode));
@@ -233,11 +236,11 @@ afd_open(struct disk *dp)
 
     fdp->device->flags &= ~ATA_D_MEDIA_CHANGED;
 
-    fdp->disk.d_sectorsize = fdp->cap.sector_size;
-    fdp->disk.d_mediasize = (off_t)fdp->cap.sector_size * fdp->cap.sectors *
+    fdp->disk->d_sectorsize = fdp->cap.sector_size;
+    fdp->disk->d_mediasize = (off_t)fdp->cap.sector_size * fdp->cap.sectors *
 	fdp->cap.heads * fdp->cap.cylinders;
-    fdp->disk.d_fwsectors = fdp->cap.sectors;
-    fdp->disk.d_fwheads = fdp->cap.heads;
+    fdp->disk->d_fwsectors = fdp->cap.sectors;
+    fdp->disk->d_fwheads = fdp->cap.heads;
   
     return 0;
 }

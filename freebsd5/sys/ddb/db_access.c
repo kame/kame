@@ -29,9 +29,10 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ddb/db_access.c,v 1.17 2003/08/12 13:24:21 harti Exp $");
+__FBSDID("$FreeBSD: src/sys/ddb/db_access.c,v 1.18 2004/07/10 23:47:18 marcel Exp $");
 
 #include <sys/param.h>
+#include <sys/kdb.h>
 
 #include <ddb/ddb.h>
 #include <ddb/db_access.h>
@@ -58,7 +59,11 @@ db_get_value(addr, size, is_signed)
 	register db_expr_t value;
 	register int	i;
 
-	db_read_bytes(addr, size, data);
+	if (db_read_bytes(addr, size, data) != 0) {
+		db_printf("*** error reading from address %llx ***\n",
+		    (long long)addr);
+		kdb_reenter();
+	}
 
 	value = 0;
 #if	BYTE_MSF
@@ -96,6 +101,9 @@ db_put_value(addr, size, value)
 	    value >>= 8;
 	}
 
-	db_write_bytes(addr, size, data);
+	if (db_write_bytes(addr, size, data) != 0) {
+		db_printf("*** error writing to address %llx ***\n",
+		    (long long)addr);
+		kdb_reenter();
+	}
 }
-

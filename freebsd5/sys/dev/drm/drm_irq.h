@@ -26,7 +26,7 @@
  * Authors:
  *    Eric Anholt <anholt@FreeBSD.org>
  *
- * $FreeBSD: src/sys/dev/drm/drm_irq.h,v 1.2 2003/11/12 20:56:30 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_irq.h,v 1.3 2004/03/17 17:50:31 njl Exp $
  */
 
 int DRM(irq_by_busid)( DRM_IOCTL_ARGS )
@@ -98,8 +98,8 @@ int DRM(irq_install)(drm_device_t *dev)
 				/* Install handler */
 #ifdef __FreeBSD__
 	dev->irqrid = 0;
-	dev->irqr = bus_alloc_resource(dev->device, SYS_RES_IRQ, &dev->irqrid,
-				      0, ~0, 1, RF_SHAREABLE);
+	dev->irqr = bus_alloc_resource_any(dev->device, SYS_RES_IRQ, 
+				      &dev->irqrid, RF_SHAREABLE);
 	if (!dev->irqr) {
 		retcode = ENOENT;
 		goto err;

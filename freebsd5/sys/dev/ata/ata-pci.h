@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2003 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 2003, 2004 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,41 +25,43 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-pci.h,v 1.19.2.3 2004/02/11 08:47:21 scottl Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-pci.h,v 1.32.2.2 2004/10/10 15:01:47 sos Exp $
  */
 
 /* structure holding chipset config info */
 struct ata_chip_id {
-    u_int32_t		 chipid;
-    u_int8_t		 chiprev;
-    int			 cfg1;
-    int			 cfg2;
-    u_int8_t		 max_dma;
+    u_int32_t		chipid;
+    u_int8_t		chiprev;
+    int			cfg1;
+    int			cfg2;
+    u_int8_t		max_dma;
     char		*text;
 };
 
 /* structure describing a PCI ATA controller */
 struct ata_pci_controller {
-    struct resource	 *r_io1;
-    struct resource	 *r_io2;
-    struct resource	 *r_irq;
-    void		 *handle;
-    struct ata_chip_id	 *chip;
+    int			r_type1;
+    int			r_rid1;
+    struct resource	*r_res1;
+    int			r_type2;
+    int			r_rid2;
+    struct resource	*r_res2;
+    struct resource	*r_irq;
+    void		*handle;
+    struct ata_chip_id	*chip;
+    int			channels;
     int			(*chipinit)(device_t);
     int			(*allocate)(device_t, struct ata_channel *);
+    void		(*reset)(struct ata_channel *);
     void		(*dmainit)(struct ata_channel *);
     void		(*setmode)(struct ata_device *, int);
-    void		(*locking)(struct ata_channel *, int);
-    int			  locked_ch;
-    int			  channels;
+    int			(*locking)(struct ata_channel *, int);
     struct {
     void		(*function)(void *);
-    void		 *argument;
-    } interrupt[4];	/* SOS max ch# for now XXX */
+    void		*argument;
+    } interrupt[8];	/* SOS max ch# for now XXX */
+    void		*driver;
 };
-
-#define ATA_MASTERDEV(dev)	((pci_get_progif(dev) & 0x80) && \
-				 (pci_get_progif(dev) & 0x05) != 0x05)
 
 /* defines for known chipset PCI id's */
 #define ATA_ACARD_ID		0x1191
@@ -114,7 +116,14 @@ struct ata_pci_controller {
 #define ATA_I82801DB		0x24cb8086
 #define ATA_I82801DB_1		0x24ca8086
 #define ATA_I82801EB		0x24db8086
-#define ATA_I82801EB_1		0x24d18086
+#define ATA_I82801EB_S1		0x24d18086
+#define ATA_I82801EB_R1		0x24df8086
+#define ATA_I6300ESB		0x25a28086
+#define ATA_I6300ESB_S1		0x25a38086
+#define ATA_I6300ESB_R1		0x25b08086
+#define ATA_I82801FB		0x266f8086
+#define ATA_I82801FB_S1		0x26518086
+#define ATA_I82801FB_R1		0x26528086
 
 #define ATA_NATIONAL_ID		0x100b
 #define ATA_SC1100		0x0502100b
@@ -122,7 +131,18 @@ struct ata_pci_controller {
 #define ATA_NVIDIA_ID		0x10de
 #define ATA_NFORCE1		0x01bc10de
 #define ATA_NFORCE2		0x006510de
+#define ATA_NFORCE2_MCP		0x008510de
 #define ATA_NFORCE3		0x00d510de
+#define ATA_NFORCE3_PRO		0x00e510de
+#define ATA_NFORCE3_PRO_S1	0x00e310de
+#define ATA_NFORCE3_PRO_S2	0x00ee10de
+#define ATA_NFORCE3_MCP		0x003510de
+#define ATA_NFORCE3_MCP_S1	0x003610de
+#define ATA_NFORCE3_MCP_S2	0x003e10de
+#define ATA_NFORCE4		0x005310de
+#define ATA_NFORCE4_S1		0x005410de
+#define ATA_NFORCE4_S2		0x005510de
+
 
 #define ATA_PROMISE_ID		0x105a
 #define ATA_PDC20246		0x4d33105a
@@ -150,6 +170,7 @@ struct ata_pci_controller {
 #define ATA_PDC20619		0x6629105a
 #define ATA_PDC20620		0x6620105a
 #define ATA_PDC20621		0x6621105a
+#define ATA_PDC20622		0x6622105a
 
 #define ATA_SERVERWORKS_ID	0x1166
 #define ATA_ROSB4_ISA		0x02001166
@@ -160,6 +181,7 @@ struct ata_pci_controller {
 
 #define ATA_SILICON_IMAGE_ID	0x1095
 #define ATA_SII3114		0x31141095
+#define ATA_SII3512		0x35121095
 #define ATA_SII3112		0x31121095
 #define ATA_SII3112_1		0x02401095
 #define ATA_SII0680		0x06801095
@@ -171,6 +193,7 @@ struct ata_pci_controller {
 #define ATA_SISSOUTH		0x00081039
 #define ATA_SIS5511		0x55111039
 #define ATA_SIS5513		0x55131039
+#define ATA_SIS5517		0x55171039
 #define ATA_SIS5518		0x55181039
 #define ATA_SIS5571		0x55711039
 #define ATA_SIS5591		0x55911039
@@ -210,7 +233,7 @@ struct ata_pci_controller {
 #define ATA_SIS962		0x09621039
 #define ATA_SIS963		0x09631039
 #define ATA_SIS964		0x09641039
-#define ATA_SIS964_1		0x01801039
+#define ATA_SIS964_S		0x01801039
 
 #define ATA_VIA_ID		0x1106
 #define ATA_VIA82C571		0x05711106
@@ -223,11 +246,12 @@ struct ata_pci_controller {
 #define ATA_VIA8233C		0x31091106
 #define ATA_VIA8235		0x31771106
 #define ATA_VIA8237		0x32271106
-#define ATA_VIA8237_1		0x31491106
 #define ATA_VIA8361		0x31121106
 #define ATA_VIA8363		0x03051106
 #define ATA_VIA8371		0x03911106
 #define ATA_VIA8662		0x31021106
+#define ATA_VIA6410		0x31641106
+#define ATA_VIA6420		0x31491106
 
 /* chipset setup related defines */
 #define ATPOLD		1
@@ -246,7 +270,7 @@ struct ata_pci_controller {
 #define PRTX		2
 #define PRMIO		3
 #define PRTX4		0x01
-#define PRSX4K		0x02
+#define PRSX4X		0x02
 #define PRSX6K		0x04
 #define PRSATA		0x08
 #define PRDUAL		0x10
@@ -282,6 +306,8 @@ struct ata_pci_controller {
 #define VIABUG		0x10
 
 /* global prototypes */
+int ata_legacy(device_t);
+
 void ata_dmainit(struct ata_channel *);
 int ata_dmastart(struct ata_channel *, caddr_t, int32_t, int);
 int ata_dmastop(struct ata_channel *);

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)comreg.h	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/dev/sio/sioreg.h,v 1.23 2003/09/16 08:08:08 bde Exp $
+ * $FreeBSD: src/sys/dev/sio/sioreg.h,v 1.24 2004/04/07 20:45:58 imp Exp $
  */
 
 /* Receiver clock frequency for "standard" pc serial ports. */

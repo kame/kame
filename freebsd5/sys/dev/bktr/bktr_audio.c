@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_audio.c,v 1.12 2003/08/24 17:46:01 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_audio.c,v 1.13 2003/12/08 07:59:18 obrien Exp $");
 
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
@@ -80,8 +80,8 @@ __FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_audio.c,v 1.12 2003/08/24 17:46:01 obr
 #include <dev/pci/bktr/bktr_card.h>
 #include <dev/pci/bktr/bktr_audio.h>
 #else
-#include <machine/ioctl_meteor.h>	/* Traditional location of .h files */
-#include <machine/ioctl_bt848.h>        /* extensions to ioctl_meteor.h */
+#include <dev/bktr/ioctl_meteor.h>
+#include <dev/bktr/ioctl_bt848.h>	/* extensions to ioctl_meteor.h */
 #include <dev/bktr/bktr_reg.h>
 #include <dev/bktr/bktr_core.h>
 #include <dev/bktr/bktr_tuner.h>

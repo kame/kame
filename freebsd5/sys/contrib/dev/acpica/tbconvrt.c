@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbconvrt - ACPI Table conversion utilities
- *              $Revision: 52 $
+ *              $Revision: 56 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2003, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -149,14 +149,11 @@ AcpiTbGetTableCount (
     ACPI_FUNCTION_ENTRY ();
 
 
-#if ACPI_MACHINE_WIDTH != 64
-
     if (RSDP->Revision < 2)
     {
         PointerSize = sizeof (UINT32);
     }
     else
-#endif
     {
         PointerSize = sizeof (UINT64);
     }
@@ -211,7 +208,7 @@ AcpiTbConvertToXsdt (
     /* Copy the header and set the length */
 
     ACPI_MEMCPY (NewTable, TableInfo->Pointer, sizeof (ACPI_TABLE_HEADER));
-    NewTable->Header.Length = (UINT32) TableSize;
+    NewTable->Length = (UINT32) TableSize;
 
     /* Copy the table pointers */
 
@@ -220,12 +217,12 @@ AcpiTbConvertToXsdt (
         if (AcpiGbl_RSDP->Revision < 2)
         {
             ACPI_STORE_ADDRESS (NewTable->TableOffsetEntry[i],
-                ((RSDT_DESCRIPTOR_REV1 *) TableInfo->Pointer)->TableOffsetEntry[i]);
+                (ACPI_CAST_PTR (RSDT_DESCRIPTOR_REV1, TableInfo->Pointer))->TableOffsetEntry[i]);
         }
         else
         {
             NewTable->TableOffsetEntry[i] =
-                ((XSDT_DESCRIPTOR *) TableInfo->Pointer)->TableOffsetEntry[i];
+                (ACPI_CAST_PTR (XSDT_DESCRIPTOR, TableInfo->Pointer))->TableOffsetEntry[i];
         }
     }
 
@@ -235,7 +232,7 @@ AcpiTbConvertToXsdt (
 
     /* Point the table descriptor to the new table */
 
-    TableInfo->Pointer      = (ACPI_TABLE_HEADER *) NewTable;
+    TableInfo->Pointer      = ACPI_CAST_PTR (ACPI_TABLE_HEADER, NewTable);
     TableInfo->Length       = TableSize;
     TableInfo->Allocation   = ACPI_MEM_ALLOCATED;
 
@@ -526,20 +523,20 @@ AcpiTbConvertTableFadt (void)
      * FADT length and version validation.  The table must be at least as
      * long as the version 1.0 FADT
      */
-    if (AcpiGbl_FADT->Header.Length < sizeof (FADT_DESCRIPTOR_REV1))
+    if (AcpiGbl_FADT->Length < sizeof (FADT_DESCRIPTOR_REV1))
     {
-        ACPI_REPORT_ERROR (("Invalid FADT table length: 0x%X\n", AcpiGbl_FADT->Header.Length));
+        ACPI_REPORT_ERROR (("Invalid FADT table length: 0x%X\n", AcpiGbl_FADT->Length));
         return_ACPI_STATUS (AE_INVALID_TABLE_LENGTH);
     }
 
-    if (AcpiGbl_FADT->Header.Revision >= FADT2_REVISION_ID)
+    if (AcpiGbl_FADT->Revision >= FADT2_REVISION_ID)
     {
-        if (AcpiGbl_FADT->Header.Length < sizeof (FADT_DESCRIPTOR_REV2))
+        if (AcpiGbl_FADT->Length < sizeof (FADT_DESCRIPTOR_REV2))
         {
             /* Length is too short to be a V2.0 table */
 
             ACPI_REPORT_WARNING (("Inconsistent FADT length (0x%X) and revision (0x%X), using FADT V1.0 portion of table\n",
-                        AcpiGbl_FADT->Header.Length, AcpiGbl_FADT->Header.Revision));
+                        AcpiGbl_FADT->Length, AcpiGbl_FADT->Revision));
 
             AcpiTbConvertFadt1 (LocalFadt, (void *) AcpiGbl_FADT);
         }
@@ -561,7 +558,7 @@ AcpiTbConvertTableFadt (void)
      * Global FADT pointer will point to the new common V2.0 FADT
      */
     AcpiGbl_FADT = LocalFadt;
-    AcpiGbl_FADT->Header.Length = sizeof (FADT_DESCRIPTOR);
+    AcpiGbl_FADT->Length = sizeof (FADT_DESCRIPTOR);
 
     /* Free the original table */
 
@@ -570,7 +567,7 @@ AcpiTbConvertTableFadt (void)
 
     /* Install the new table */
 
-    TableDesc->Pointer      = (ACPI_TABLE_HEADER *) AcpiGbl_FADT;
+    TableDesc->Pointer      = ACPI_CAST_PTR (ACPI_TABLE_HEADER, AcpiGbl_FADT);
     TableDesc->Allocation   = ACPI_MEM_ALLOCATED;
     TableDesc->Length       = sizeof (FADT_DESCRIPTOR_REV2);
 
@@ -578,8 +575,8 @@ AcpiTbConvertTableFadt (void)
 
     ACPI_DEBUG_PRINT ((ACPI_DB_TABLES,
         "Hex dump of common internal FADT, size %d (%X)\n",
-        AcpiGbl_FADT->Header.Length, AcpiGbl_FADT->Header.Length));
-    ACPI_DUMP_BUFFER ((UINT8 *) (AcpiGbl_FADT), AcpiGbl_FADT->Header.Length);
+        AcpiGbl_FADT->Length, AcpiGbl_FADT->Length));
+    ACPI_DUMP_BUFFER ((UINT8 *) (AcpiGbl_FADT), AcpiGbl_FADT->Length);
 
     return_ACPI_STATUS (AE_OK);
 }

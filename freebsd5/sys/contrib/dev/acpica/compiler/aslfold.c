@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: aslfold - Constant folding
- *              $Revision: 7 $
+ *              $Revision: 9 $
  *
  *****************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2003, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -461,8 +461,7 @@ OpcAmlConstantWalk (
             OpcSetOptimalIntegerSize (Op);
 
             DbgPrint (ASL_PARSE_OUTPUT, "Constant expression reduced to (INTEGER) %8.8X%8.8X\n",
-                ACPI_HIDWORD (ObjDesc->Integer.Value),
-                ACPI_LODWORD (ObjDesc->Integer.Value));
+                ACPI_FORMAT_UINT64 (ObjDesc->Integer.Value));
             break;
 
 

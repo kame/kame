@@ -53,7 +53,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/exca/exca.c,v 1.15 2003/10/07 04:29:04 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/exca/exca.c,v 1.17 2004/08/16 01:57:06 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -195,7 +195,8 @@ exca_do_mem_map(struct exca_softc *sc, int win)
 	exca_putb(sc, map->sysmem_stop_msb,
 	    (((mem->addr + mem->realsize - 1) >>
 	    (EXCA_SYSMEM_ADDRX_SHIFT + 8)) &
-	    EXCA_SYSMEM_ADDRX_STOP_MSB_ADDR_MASK));
+	    EXCA_SYSMEM_ADDRX_STOP_MSB_ADDR_MASK) |
+	    EXCA_SYSMEM_ADDRX_STOP_MSB_WAIT2);
 
 	exca_putb(sc, map->sysmem_win,
 	    (mem->addr >> EXCA_MEMREG_WIN_SHIFT) & 0xff);
@@ -208,14 +209,14 @@ exca_do_mem_map(struct exca_softc *sc, int win)
 	    ((mem->kind == PCCARD_A_MEM_ATTR) ?
 	    EXCA_CARDMEM_ADDRX_MSB_REGACTIVE_ATTR : 0));
 
-	exca_setb(sc, EXCA_ADDRWIN_ENABLE, map->memenable);
 #ifdef EXCA_DEBUG
 	if (mem->kind == PCCARD_A_MEM_ATTR)
 		printf("attribtue memory\n");
 	else
 		printf("common memory\n");
 #endif
-	exca_setb(sc, EXCA_ADDRWIN_ENABLE, EXCA_ADDRWIN_ENABLE_MEMCS16);
+	exca_setb(sc, EXCA_ADDRWIN_ENABLE, map->memenable |
+	    EXCA_ADDRWIN_ENABLE_MEMCS16);
 
 	DELAY(100);
 #ifdef EXCA_DEBUG
@@ -228,8 +229,8 @@ exca_do_mem_map(struct exca_softc *sc, int win)
 		r5 = exca_getb(sc, map->cardmem_msb);
 		r6 = exca_getb(sc, map->cardmem_lsb);
 		r7 = exca_getb(sc, map->sysmem_win);
-		printf("exca_do_mem_map window %d: %02x%02x %02x%02x "
-		    "%02x%02x %02x (%08x+%08x.%08x*%08x)\n",
+		printf("exca_do_mem_map win %d: %02x%02x %02x%02x "
+		    "%02x%02x %02x (%08x+%06x.%06x*%06x)\n",
 		    win, r1, r2, r3, r4, r5, r6, r7,
 		    mem->addr, mem->size, mem->realsize,
 		    mem->cardaddr);
@@ -823,6 +824,73 @@ exca_deactivate_resource(struct exca_softc *exca, device_t child, int type,
 	return (BUS_DEACTIVATE_RESOURCE(device_get_parent(exca->dev), child,
 	    type, rid, res));
 }
+
+#if 0
+static struct resource *
+exca_alloc_resource(struct exca_softc *sc, device_t child, int type, int *rid,
+    u_long start, u_long end, u_long count, uint flags)
+{
+	struct resource *res = NULL;
+	int tmp;
+
+	switch (type) {
+	case SYS_RES_MEMORY:
+		if (start < cbb_start_mem)
+			start = cbb_start_mem;
+		if (end < start)
+			end = start;
+		flags = (flags & ~RF_ALIGNMENT_MASK) |
+		    rman_make_alignment_flags(CBB_MEMALIGN);
+		break;
+	case SYS_RES_IOPORT:
+		if (start < cbb_start_16_io)
+			start = cbb_start_16_io;
+		if (end < start)
+			end = start;
+		break;
+	case SYS_RES_IRQ:
+		tmp = rman_get_start(sc->irq_res);
+		if (start > tmp || end < tmp || count != 1) {
+			device_printf(child, "requested interrupt %ld-%ld,"
+			    "count = %ld not supported by cbb\n",
+			    start, end, count);
+			return (NULL);
+		}
+		flags |= RF_SHAREABLE;
+		start = end = rman_get_start(sc->irq_res);
+		break;
+	}
+	res = BUS_ALLOC_RESOURCE(up, child, type, rid,
+	    start, end, count, flags & ~RF_ACTIVE);
+	if (res == NULL)
+		return (NULL);
+	cbb_insert_res(sc, res, type, *rid);
+	if (flags & RF_ACTIVE) {
+		if (bus_activate_resource(child, type, *rid, res) != 0) {
+			bus_release_resource(child, type, *rid, res);
+			return (NULL);
+		}
+	}
+
+	return (res);
+}
+
+static int
+exca_release_resource(struct exca_softc *sc, device_t child, int type,
+    int rid, struct resource *res)
+{
+	int error;
+
+	if (rman_get_flags(res) & RF_ACTIVE) {
+		error = bus_deactivate_resource(child, type, rid, res);
+		if (error != 0)
+			return (error);
+	}
+	cbb_remove_res(sc, res);
+	return (BUS_RELEASE_RESOURCE(device_get_parent(brdev), child,
+	    type, rid, res));
+}
+#endif
 
 static int
 exca_modevent(module_t mod, int cmd, void *arg)

@@ -30,13 +30,15 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/linux/linux_util.c,v 1.23 2003/06/10 21:27:40 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/linux/linux_util.c,v 1.26 2004/06/23 06:35:43 bde Exp $");
 
 #include <sys/param.h>
-#include <sys/systm.h>
+#include <sys/lock.h>
+#include <sys/malloc.h>
+#include <sys/mutex.h>
 #include <sys/namei.h>
 #include <sys/proc.h>
-#include <sys/malloc.h>
+#include <sys/systm.h>
 #include <sys/vnode.h>
 
 #include <machine/stdarg.h>
@@ -96,12 +98,12 @@ linux_emul_convpath(td, path, pathseg, pbuf, cflag)
 {
 	struct nameidata	 nd;
 	struct nameidata	 ndroot;
-	struct vattr		 vat;
-	struct vattr		 vatroot;
 	int			 error;
 	const char		*prefix;
 	char			*ptr, *buf, *cp;
 	size_t			 len, sz;
+
+	GIANT_REQUIRED;
 
 	buf = (char *) malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
 	*pbuf = buf;
@@ -169,17 +171,7 @@ linux_emul_convpath(td, path, pathseg, pbuf, cflag)
 			goto keeporig;
 		}
 
-		if ((error = VOP_GETATTR(nd.ni_vp, &vat, td->td_ucred, td)) != 0) {
-			goto bad;
-		}
-
-		if ((error = VOP_GETATTR(ndroot.ni_vp, &vatroot, td->td_ucred, td))
-		    != 0) {
-			goto bad;
-		}
-
-		if (vat.va_fsid == vatroot.va_fsid &&
-		    vat.va_fileid == vatroot.va_fileid) {
+		if (nd.ni_vp == ndroot.ni_vp) {
 			error = ENOENT;
 			goto bad;
 		}

@@ -1,19 +1,33 @@
 #
-# Copyright (c) 2001 John Baldwin
+# Copyright (c) 2001 John Baldwin <jhb@FreeBSD.org>
 # All rights reserved.
 #
-# Redistribution and use in source and binary forms are freely
-# permitted provided that the above copyright notice and this
-# paragraph and the following disclaimer are duplicated in all
-# such forms.
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+# 3. Neither the name of the author nor the names of any co-contributors
+#    may be used to endorse or promote products derived from this software
+#    without specific prior written permission.
 #
-# This software is provided "AS IS" and without any express or
-# implied warranties, including, without limitation, the implied
-# warranties of merchantability and fitness for a particular
-# purpose.
+# THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
 #
 
-# $FreeBSD: src/sys/boot/i386/cdboot/cdboot.s,v 1.9.8.1 2004/01/25 01:20:36 jhb Exp $
+# $FreeBSD: src/sys/boot/i386/cdboot/cdboot.s,v 1.13 2004/06/22 21:55:22 jhb Exp $
 
 #
 # This program is a freestanding boot program to load an a.out binary
@@ -139,17 +153,32 @@ load_vd:	push %eax			# Save %eax
 		jmp error			# Halt
 have_vd:					# Have Primary VD
 #
-# Lookup the loader binary.
+# Try to look up the loader binary using the paths in the loader_paths
+# array.
 #
-		mov $loader_path,%si		# File to lookup
-		call lookup			# Try to find it
+		mov $loader_paths,%si		# Point to start of array
+lookup_path:	push %si			# Save file name pointer
+		call lookup			# Try to find file
+		pop %di				# Restore file name pointer
+		jnc lookup_found		# Found this file
+		xor %al,%al			# Look for next
+		mov $0xffff,%cx			#  path name by
+		repnz				#  scanning for
+		scasb				#  nul char
+		mov %di,%si			# Point %si at next path
+		mov (%si),%al			# Get first char of next path
+		or %al,%al			# Is it double nul?
+		jnz lookup_path			# No, try it.
+		mov $msg_failed,%si		# Failed message
+		jmp error			# Halt
+lookup_found:					# Found a loader file
 #
 # Load the binary into the buffer.  Due to real mode addressing limitations
 # we have to read it in in 64k chunks.
 #
 		mov DIR_SIZE(%bx),%eax		# Read file length
 		add $SECTOR_SIZE-1,%eax		# Convert length to sectors
-		shr $11,%eax
+		shr $SECTOR_SHIFT,%eax
 		cmp $BUFFER_LEN,%eax
 		jbe load_sizeok
 		mov $msg_load2big,%si		# Error message
@@ -266,7 +295,8 @@ pm_end:		sti				# Turn interrupts back on now
 # Lookup the file in the path at [SI] from the root directory.
 #
 # Trashes: All but BX
-# Returns: BX = pointer to record
+# Returns: CF = 0 (success), BX = pointer to record
+#          CF = 1 (not found)
 #
 lookup:		mov $VD_ROOTDIR+MEM_VOLDESC,%bx	# Root directory record
 		push %si
@@ -286,17 +316,21 @@ lookup_dir:	lodsb				# Get first char of path
 		dec %si				# Undo lodsb side effect
 		call find_file			# Lookup first path item
 		jnc lookup_dir			# Try next component
-		mov $msg_lookupfail,%si		# Not found.
+		mov $msg_lookupfail,%si		# Not found message
+		call putstr
+		stc				# Set carry
+		ret
 		jmp error
 lookup_done:	mov $msg_lookupok,%si		# Success message
 		call putstr
+		clc				# Clear carry
 		ret
 
 #
 # Lookup file at [SI] in directory whose record is at [BX].
 #
 # Trashes: All but returns
-# Returns: CF = 0 (success), BX = pointer to record, SX = next path item
+# Returns: CF = 0 (success), BX = pointer to record, SI = next path item
 #          CF = 1 (not found), SI = preserved
 #
 find_file:	mov DIR_EXTENT(%bx),%eax	# Load extent
@@ -539,7 +573,7 @@ name_len:	.byte 0x0			# Length of current name
 
 twiddle_index:	.byte 0x0
 
-msg_welcome:	.asciz	"CD Loader 1.01\r\n\n"
+msg_welcome:	.asciz	"CD Loader 1.2\r\n\n"
 msg_bootinfo:	.asciz	"Building the boot loader arguments\r\n"
 msg_relocate:	.asciz	"Relocating the loader and the BTX\r\n"
 msg_jump:	.asciz	"Starting the BTX loader\r\n"
@@ -551,6 +585,9 @@ msg_lookup2:	.asciz  "... "
 msg_lookupok:	.asciz  "Found\r\n"
 msg_lookupfail:	.asciz  "File not found\r\n"
 msg_load2big:	.asciz  "File too big\r\n"
-loader_path:	.asciz  "/BOOT/LOADER"
+msg_failed:	.asciz	"Boot failed\r\n"
 twiddle_chars:	.ascii	"|/-\\"
+loader_paths:	.asciz  "/BOOT/LOADER"
+		.asciz	"/boot/loader"
+		.byte 0
 

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/joy/joyvar.h,v 1.2 2002/06/02 20:05:47 schweikh Exp $
+ * $FreeBSD: src/sys/dev/joy/joyvar.h,v 1.3 2004/06/16 09:46:48 phk Exp $
  */
 
 struct joy_softc {
@@ -35,7 +35,7 @@ struct joy_softc {
 	int timeout[2];
 	struct resource *res;
 	int rid;
-	dev_t d;
+	struct cdev *d;
 };
 
 int joy_probe(device_t);

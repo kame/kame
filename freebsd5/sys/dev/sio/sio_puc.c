@@ -24,10 +24,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sio/sio_puc.c,v 1.6 2003/08/24 18:03:44 obrien Exp $");
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sio/sio_puc.c,v 1.6 2003/08/24 18:03:44 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sio/sio_puc.c,v 1.8 2003/12/27 19:47:10 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -55,6 +52,7 @@ static device_method_t sio_puc_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		sio_puc_probe),
 	DEVMETHOD(device_attach,	sio_puc_attach),
+	DEVMETHOD(device_detach,	siodetach),
 
 	{ 0, 0 }
 };

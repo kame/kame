@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/tdkphy.c,v 1.14 2003/08/24 17:54:10 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/tdkphy.c,v 1.15 2004/05/29 18:09:10 marius Exp $");
 
 /*
  * Driver for the TDK 78Q2120 MII
@@ -42,9 +42,6 @@ __FBSDID("$FreeBSD: src/sys/dev/mii/tdkphy.c,v 1.14 2003/08/24 17:54:10 obrien E
  * like any other normal phy, except it does auto negotiation in a different
  * way.
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/tdkphy.c,v 1.14 2003/08/24 17:54:10 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

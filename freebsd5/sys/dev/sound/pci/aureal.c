@@ -31,7 +31,7 @@
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/aureal.c,v 1.26 2003/09/07 16:28:02 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/aureal.c,v 1.29 2004/07/16 03:59:27 tanimura Exp $");
 
 /* PCI IDs of supported chips */
 #define AU8820_PCI_ID 0x000112eb
@@ -584,12 +584,12 @@ au_pci_attach(device_t dev)
 #endif
 		regid[j] = PCIR_BAR(i);
 		type[j] = SYS_RES_MEMORY;
-		reg[j] = bus_alloc_resource(dev, type[j], &regid[j],
-					    0, ~0, 1, RF_ACTIVE);
+		reg[j] = bus_alloc_resource_any(dev, type[j], &regid[j],
+						RF_ACTIVE);
 		if (!reg[j]) {
 			type[j] = SYS_RES_IOPORT;
-			reg[j] = bus_alloc_resource(dev, type[j], &regid[j],
-						    0, ~0, 1, RF_ACTIVE);
+			reg[j] = bus_alloc_resource_any(dev, type[j], 
+							&regid[j], RF_ACTIVE);
 		}
 		if (reg[j]) {
 			au->st[i] = rman_get_bustag(reg[j]);
@@ -618,8 +618,8 @@ au_pci_attach(device_t dev)
 	au_wr(au, 0, AU_REG_IRQEN, 0, 4);
 
 	irqid = 0;
-	irq = bus_alloc_resource(dev, SYS_RES_IRQ, &irqid,
-				 0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+	irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &irqid,
+				     RF_ACTIVE | RF_SHAREABLE);
 	if (!irq || snd_setup_intr(dev, irq, 0, au_intr, au, &ih)) {
 		device_printf(dev, "unable to map interrupt\n");
 		goto bad;
@@ -647,9 +647,9 @@ au_pci_attach(device_t dev)
 		goto bad;
 	}
 
-	snprintf(status, SND_STATUSLEN, "at %s 0x%lx irq %ld",
+	snprintf(status, SND_STATUSLEN, "at %s 0x%lx irq %ld %s",
 		 (type[0] == SYS_RES_IOPORT)? "io" : "memory",
-		 rman_get_start(reg[0]), rman_get_start(irq));
+		 rman_get_start(reg[0]), rman_get_start(irq),PCM_KLDSTRING(snd_aureal));
 
 	if (pcm_register(dev, au, 1, 1)) goto bad;
 	/* pcm_addchan(dev, PCMDIR_REC, &au_chantemplate, au); */
@@ -682,5 +682,5 @@ static driver_t au_driver = {
 };
 
 DRIVER_MODULE(snd_aureal, pci, au_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_aureal, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_aureal, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_aureal, 1);

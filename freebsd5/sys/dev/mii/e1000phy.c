@@ -1,7 +1,4 @@
 /*
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/e1000phy.c,v 1.10 2003/09/20 10:53:08 wilko Exp $");
  * Principal Author: Parag Patel
  * Copyright (c) 2001
  * All rights reserved.
@@ -32,6 +29,9 @@ __FBSDID("$FreeBSD: src/sys/dev/mii/e1000phy.c,v 1.10 2003/09/20 10:53:08 wilko 
  * Secondary Author: Matthew Jacob
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/e1000phy.c,v 1.13 2004/05/30 17:57:40 phk Exp $");
+
 /*
  * driver for the Marvell 88E1000 series external 1000/100/10-BT PHY.
  */
@@ -46,6 +46,7 @@ __FBSDID("$FreeBSD: src/sys/dev/mii/e1000phy.c,v 1.10 2003/09/20 10:53:08 wilko 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 #include <sys/bus.h>
 
@@ -333,8 +334,8 @@ e1000phy_service(struct mii_softc *sc, struct mii_data *mii, int cmd)
 		/*
 		 * Only retry autonegotiation every 5 seconds.
 		 */
-		if (++sc->mii_ticks != 5)
-			return (0);
+		if (++sc->mii_ticks <= 5)
+			break;
 
 		sc->mii_ticks = 0;
 		e1000phy_reset(sc);

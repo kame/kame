@@ -28,11 +28,12 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/cardbus/cardbus.c,v 1.42 2003/11/01 12:45:03 dfr Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/cardbus/cardbus.c,v 1.44 2004/06/27 13:07:02 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/kernel.h>
 #include <sys/sysctl.h>
 
@@ -154,25 +155,11 @@ cardbus_attach_card(device_t cbdev)
 {
 	device_t brdev = device_get_parent(cbdev);
 	int cardattached = 0;
-	static int curr_bus_number = 2; /* XXX EVILE BAD (see below) */
 	int bus, slot, func;
 
 	cardbus_detach_card(cbdev); /* detach existing cards */
-
 	POWER_ENABLE_SOCKET(brdev, cbdev);
 	bus = pcib_get_bus(cbdev);
-	if (bus == 0) {
-		/*
-		 * XXX EVILE BAD XXX
-		 * Not all BIOSes initialize the secondary bus number properly,
-		 * so if the default is bad, we just put one in and hope it
-		 * works.
-		 */
-		bus = curr_bus_number;
-		pci_write_config(brdev, PCIR_SECBUS_2, curr_bus_number, 1);
-		pci_write_config(brdev, PCIR_SUBBUS_2, curr_bus_number + 2, 1);
-		curr_bus_number += 3;
-	}
 	/* For each function, set it up and try to attach a driver to it */
 	for (slot = 0; slot <= CARDBUS_SLOTMAX; slot++) {
 		int cardbusfunchigh = 0;

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/channel.h,v 1.28 2003/09/07 16:28:03 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/channel.h,v 1.30 2004/02/28 19:47:02 truckman Exp $
  */
 
 struct pcmchan_children {
@@ -76,7 +76,7 @@ int chn_sync(struct pcm_channel *c, int threshold);
 int chn_flush(struct pcm_channel *c);
 int chn_poll(struct pcm_channel *c, int ev, struct thread *td);
 
-int chn_init(struct pcm_channel *c, void *devinfo, int dir);
+int chn_init(struct pcm_channel *c, void *devinfo, int dir, int direction);
 int chn_kill(struct pcm_channel *c);
 int chn_setdir(struct pcm_channel *c, int dir);
 int chn_reset(struct pcm_channel *c, u_int32_t fmt);
@@ -99,11 +99,13 @@ void chn_wrupdate(struct pcm_channel *c);
 void chn_rdupdate(struct pcm_channel *c);
 
 int chn_notify(struct pcm_channel *c, u_int32_t flags);
+void chn_lock(struct pcm_channel *c);
+void chn_unlock(struct pcm_channel *c);
 
 #ifdef	USING_MUTEX
 #define CHN_LOCK(c) mtx_lock((struct mtx *)((c)->lock))
 #define CHN_UNLOCK(c) mtx_unlock((struct mtx *)((c)->lock))
-#define CHN_LOCKASSERT(c)
+#define CHN_LOCKASSERT(c) mtx_assert((struct mtx *)((c)->lock), MA_OWNED)
 #else
 #define CHN_LOCK(c)
 #define CHN_UNLOCK(c)
@@ -134,6 +136,7 @@ int fmtvalid(u_int32_t fmt, u_int32_t *fmtlist);
 #define CHN_F_MAPPED		0x00010000  /* has been mmap()ed */
 #define CHN_F_DEAD		0x00020000
 #define CHN_F_BADSETTING	0x00040000
+#define CHN_F_SETBLOCKSIZE	0x00080000
 
 #define	CHN_F_VIRTUAL		0x10000000  /* not backed by hardware */
 

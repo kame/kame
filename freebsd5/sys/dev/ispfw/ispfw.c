@@ -1,7 +1,4 @@
-/*
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ispfw/ispfw.c,v 1.10 2003/08/24 17:49:14 obrien Exp $");
+/*-
  * ISP Firmware Helper Pseudo Device for FreeBSD
  *
  * Copyright (c) 2000, 2001, by Matthew Jacob
@@ -29,9 +26,13 @@ __FBSDID("$FreeBSD: src/sys/dev/ispfw/ispfw.c,v 1.10 2003/08/24 17:49:14 obrien 
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/ispfw/ispfw.c,v 1.13 2004/07/15 08:26:01 phk Exp $");
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 
 #include <dev/ispfw/asm_1040.h>
 #include <dev/ispfw/asm_1080.h>
@@ -163,6 +164,7 @@ isp_module_handler(module_t mod, int what, void *arg)
 		}
 		break;
 	default:
+		return (EOPNOTSUPP);
 		break;
 	}
 	return (0);

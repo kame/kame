@@ -27,8 +27,9 @@
  * SUCH DAMAGE.
  */
 
+#ident "$FreeBSD: src/sys/dev/dpt/dpt_scsi.c,v 1.48 2004/03/17 17:50:30 njl Exp $"
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/dpt/dpt_scsi.c,v 1.45 2003/08/24 17:46:04 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/dpt/dpt_scsi.c,v 1.48 2004/03/17 17:50:30 njl Exp $");
 
 /*
  * dpt_scsi.c: SCSI dependant code for the DPT driver
@@ -45,8 +46,6 @@ __FBSDID("$FreeBSD: src/sys/dev/dpt/dpt_scsi.c,v 1.45 2003/08/24 17:46:04 obrien
  *	       NiceTry, M$-Doze, Win-Dog, Slowlaris, etc., in recognizing RAID
  *	       arrays that span controllers (Wow!).
  */
-
-#ident "$FreeBSD: src/sys/dev/dpt/dpt_scsi.c,v 1.45 2003/08/24 17:46:04 obrien Exp $"
 
 #define _DPT_C_
 
@@ -1226,16 +1225,16 @@ dpt_alloc_resources (device_t dev)
 
 	dpt = device_get_softc(dev);
 
-	dpt->io_res = bus_alloc_resource(dev, dpt->io_type, &dpt->io_rid,
-					 0, ~0, 1, RF_ACTIVE);
+	dpt->io_res = bus_alloc_resource_any(dev, dpt->io_type, &dpt->io_rid,
+					     RF_ACTIVE);
 	if (dpt->io_res == NULL) {
 		device_printf(dev, "No I/O space?!\n");
 		error = ENOMEM;
 		goto bad;
 	}
 
-	dpt->irq_res = bus_alloc_resource(dev, SYS_RES_IRQ, &dpt->irq_rid,
-					  0, ~0, 1, RF_ACTIVE);
+	dpt->irq_res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &dpt->irq_rid,
+					      RF_ACTIVE);
 	if (dpt->irq_res == NULL) {
 		device_printf(dev, "No IRQ!\n");
 		error = ENOMEM;
@@ -1553,8 +1552,19 @@ dpt_attach(dpt_softc_t *dpt)
 		dpt->sims[i] = cam_sim_alloc(dpt_action, dpt_poll, "dpt",
 					     dpt, dpt->unit, /*untagged*/2,
 					     /*tagged*/dpt->max_dccbs, devq);
+		if (dpt->sims[i] == NULL) {
+			if (i == 0)
+				cam_simq_free(devq);
+			else
+				printf(	"%s(): Unable to attach bus %d "
+					"due to resource shortage\n",
+					__func__, i);
+			break;
+		}
+
 		if (xpt_bus_register(dpt->sims[i], i) != CAM_SUCCESS) {
 			cam_sim_free(dpt->sims[i], /*free_devq*/i == 0);
+			dpt->sims[i] = NULL;
 			break;
 		}
 
@@ -1564,6 +1574,7 @@ dpt_attach(dpt_softc_t *dpt)
 				    CAM_LUN_WILDCARD) != CAM_REQ_CMP) {
 			xpt_bus_deregister(cam_sim_path(dpt->sims[i]));
 			cam_sim_free(dpt->sims[i], /*free_devq*/i == 0);
+			dpt->sims[i] = NULL;
 			break;
 		}
 

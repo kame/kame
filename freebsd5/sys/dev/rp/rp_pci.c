@@ -34,7 +34,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/rp/rp_pci.c,v 1.6 2003/08/24 17:54:22 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/rp/rp_pci.c,v 1.9 2004/06/21 13:02:25 gallatin Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -43,6 +43,7 @@ __FBSDID("$FreeBSD: src/sys/dev/rp/rp_pci.c,v 1.6 2003/08/24 17:54:22 obrien Exp
 #include <sys/tty.h>
 #include <sys/conf.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <machine/resource.h>
 #include <machine/bus.h>
 #include <sys/bus.h>
@@ -177,7 +178,8 @@ rp_pciattach(device_t dev)
 	ctlp->bus_ctlp = NULL;
 
 	ctlp->io_rid[0] = 0x10;
-	ctlp->io[0] = bus_alloc_resource(dev, SYS_RES_IOPORT, &ctlp->io_rid[0], 0, ~0, 1, RF_ACTIVE);
+	ctlp->io[0] = bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+		&ctlp->io_rid[0], RF_ACTIVE);
 	if(ctlp->io[0] == NULL) {
 		device_printf(dev, "ioaddr mapping failed for RocketPort(PCI).\n");
 		retval = ENXIO;
@@ -206,7 +208,6 @@ nogo:
 	return (retval);
 }
 
-#if notdef
 static int
 rp_pcidetach(device_t dev)
 {
@@ -236,20 +237,22 @@ rp_pcishutdown(device_t dev)
 
 	return (0);
 }
-#endif /* notdef */
 
 static void
 rp_pcireleaseresource(CONTROLLER_t *ctlp)
 {
-	rp_releaseresource(ctlp);
-
+	rp_untimeout();
 	if (ctlp->io != NULL) {
 		if (ctlp->io[0] != NULL)
 			bus_release_resource(ctlp->dev, SYS_RES_IOPORT, ctlp->io_rid[0], ctlp->io[0]);
 		free(ctlp->io, M_DEVBUF);
+		ctlp->io = NULL;
 	}
-	if (ctlp->io_rid != NULL)
+	if (ctlp->io_rid != NULL) {
 		free(ctlp->io_rid, M_DEVBUF);
+		ctlp->io = NULL;
+	}
+	rp_releaseresource(ctlp);
 }
 
 static int
@@ -349,10 +352,8 @@ static device_method_t rp_pcimethods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		rp_pciprobe),
 	DEVMETHOD(device_attach,	rp_pciattach),
-#if notdef
 	DEVMETHOD(device_detach,	rp_pcidetach),
 	DEVMETHOD(device_shutdown,	rp_pcishutdown),
-#endif /* notdef */
 
 	{ 0, 0 }
 };

@@ -1,7 +1,7 @@
-/*	$FreeBSD: src/sys/crypto/des/des_ecb.c,v 1.5 2002/03/05 09:19:02 ume Exp $	*/
 /*	$KAME: des_ecb.c,v 1.6 2001/09/10 04:03:58 itojun Exp $	*/
 
 /* crypto/des/ecb_enc.c */
+
 /* Copyright (C) 1995-1998 Eric Young (eay@mincom.oz.au)
  * All rights reserved.
  *
@@ -47,6 +47,9 @@
  * copied and put under another distribution licence
  * [including the GNU Public Licence.]
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/crypto/des/des_ecb.c,v 1.6 2004/06/14 00:38:54 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -25,8 +25,9 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/pci/tsunami_pci.c,v 1.16 2003/08/22 07:20:27 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/pci/tsunami_pci.c,v 1.17 2004/07/01 15:07:27 gallatin Exp $");
 
+#define __RMAN_RESOURCE_VISIBLE
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>

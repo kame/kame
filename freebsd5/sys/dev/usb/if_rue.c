@@ -56,7 +56,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/if_rue.c,v 1.7 2003/11/13 20:55:51 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/if_rue.c,v 1.16 2004/08/11 03:38:55 rwatson Exp $");
 
 /*
  * RealTek RTL8150 USB to fast ethernet controller driver.
@@ -70,6 +70,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/if_rue.c,v 1.7 2003/11/13 20:55:51 obrien Ex
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 
@@ -91,7 +92,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/if_rue.c,v 1.7 2003/11/13 20:55:51 obrien Ex
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
 #include <dev/usb/usbdivar.h>
-#include <dev/usb/usbdevs.h>
+#include "usbdevs.h"
 #include <dev/usb/usb_ethersubr.h>
 
 #include <dev/mii/mii.h>
@@ -127,8 +128,6 @@ Static struct rue_type rue_devs[] = {
 	{ 0, 0 }
 };
 
-Static struct usb_qdat rue_qdat;
-
 Static int rue_match(device_ptr_t);
 Static int rue_attach(device_ptr_t);
 Static int rue_detach(device_ptr_t);
@@ -157,7 +156,6 @@ Static int rue_miibus_readreg(device_ptr_t, int, int);
 Static int rue_miibus_writereg(device_ptr_t, int, int, int);
 Static void rue_miibus_statchg(device_ptr_t);
 
-Static u_int32_t rue_mchash(caddr_t);
 Static void rue_setmulti(struct rue_softc *);
 Static void rue_reset(struct rue_softc *);
 
@@ -461,33 +459,6 @@ rue_miibus_statchg(device_ptr_t dev)
 }
 
 /*
- * Calculate CRC of a multicast group address, return the upper 6 bits.
- */
-
-Static u_int32_t
-rue_mchash(caddr_t addr)
-{
-	u_int32_t	crc, carry;
-	int		idx, bit;
-	u_int8_t	data;
-
-	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF;	/* initial value */
-
-	for (idx = 0; idx < 6; idx++) {
-		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
-			crc <<= 1;
-			if (carry)
-				crc = (crc ^ 0x04c11db6) | carry;
-		}
-	}
-
-	/* return the filter bit position */
-	return (crc >> 26);
-}
-
-/*
  * Program the 64-bit multicast hash filter.
  */
 
@@ -527,7 +498,8 @@ rue_setmulti(struct rue_softc *sc)
 	{
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = rue_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = ether_crc32_be(LLADDR((struct sockaddr_dl *)
+		    ifma->ifma_addr), ETHER_ADDR_LEN) >> 26;
 		if (h < 32)
 			hashes[0] |= (1 << h);
 		else
@@ -682,18 +654,15 @@ USB_ATTACH(rue)
 		goto error1;
 	}
 
-	/* RealTek RTL8150 was detected */
-	printf("rue%d: Ethernet address: %6D\n", sc->rue_unit, eaddr, ":");
-
 	bcopy(eaddr, (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
 	if_initname(ifp, "rue", sc->rue_unit);
 	ifp->if_mtu = ETHERMTU;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_NEEDSGIANT;
 	ifp->if_ioctl = rue_ioctl;
-	ifp->if_output = ether_output;
 	ifp->if_start = rue_start;
 	ifp->if_watchdog = rue_watchdog;
 	ifp->if_init = rue_init;
@@ -707,8 +676,8 @@ USB_ATTACH(rue)
 		goto error1;
 	}
 
-	rue_qdat.ifp = ifp;
-	rue_qdat.if_rxstart = rue_rxstart;
+	sc->rue_qdat.ifp = ifp;
+	sc->rue_qdat.if_rxstart = rue_rxstart;
 
 	/* Call MI attach routine */
 #if __FreeBSD_version >= 500000
@@ -779,14 +748,14 @@ rue_newbuf(struct rue_softc *sc, struct rue_chain *c, struct mbuf *m)
 	struct mbuf	*m_new = NULL;
 
 	if (m == NULL) {
-		MGETHDR(m_new, M_NOWAIT, MT_DATA);
+		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
 		if (m_new == NULL) {
 			printf("rue%d: no memory for rx list "
 				"-- packet dropped!\n", sc->rue_unit);
 			return (ENOBUFS);
 		}
 
-		MCLGET(m_new, M_NOWAIT);
+		MCLGET(m_new, M_DONTWAIT);
 		if (!(m_new->m_flags & M_EXT)) {
 			printf("rue%d: no memory for rx list "
 				"-- packet dropped!\n", sc->rue_unit);
@@ -978,7 +947,7 @@ rue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	total_len -= ETHER_CRC_LEN;
 
 	ifp->if_ipackets++;
-	m->m_pkthdr.rcvif = (struct ifnet *)&rue_qdat;
+	m->m_pkthdr.rcvif = (struct ifnet *)&sc->rue_qdat;
 	m->m_pkthdr.len = m->m_len = total_len;
 
 	/* Put the packet on the special USB input queue. */

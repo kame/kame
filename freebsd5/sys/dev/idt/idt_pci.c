@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/idt/idt_pci.c,v 1.3 2003/08/24 17:49:13 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/idt/idt_pci.c,v 1.4 2004/03/17 17:50:35 njl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -141,8 +141,8 @@ idt_attach(device_t dev)
 	/* Map IDT registers */
 	sc->mem_rid = 0x14;
 	sc->mem_type = SYS_RES_MEMORY;
-	sc->mem = bus_alloc_resource(dev, sc->mem_type, &sc->mem_rid,
-				     0, ~0, 1, RF_ACTIVE);
+	sc->mem = bus_alloc_resource_any(dev, sc->mem_type, &sc->mem_rid,
+					 RF_ACTIVE);
 	if (sc->mem == NULL) {
 		device_printf(dev, "could not map registers.\n");
 		error = ENXIO;
@@ -153,8 +153,8 @@ idt_attach(device_t dev)
 
 	/* Map interrupt */
 	sc->irq_rid = 0;
-	sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irq_rid,
-				     0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+	sc->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irq_rid,
+					 RF_ACTIVE | RF_SHAREABLE);
 	if (sc->irq == NULL) {
 		device_printf(dev, "could not map interrupt.\n");
 		error = ENXIO;

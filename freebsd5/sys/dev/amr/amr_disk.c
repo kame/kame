@@ -56,7 +56,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/amr/amr_disk.c,v 1.30 2003/10/10 22:49:40 ps Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/amr/amr_disk.c,v 1.33 2004/05/30 20:08:25 phk Exp $");
 
 /*
  * Disk driver for AMI MegaRaid controllers
@@ -65,6 +65,7 @@ __FBSDID("$FreeBSD: src/sys/dev/amr/amr_disk.c,v 1.30 2003/10/10 22:49:40 ps Exp
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 
 #include <dev/amr/amr_compat.h>
 #include <sys/bus.h>
@@ -134,10 +135,10 @@ amrd_open(struct disk *dp)
     label->d_secpercyl  = sc->amrd_drive->al_sectors * sc->amrd_drive->al_heads;
     label->d_secperunit = sc->amrd_drive->al_size;
 #else
-    sc->amrd_disk.d_sectorsize = AMR_BLKSIZE;
-    sc->amrd_disk.d_mediasize = (off_t)sc->amrd_drive->al_size * AMR_BLKSIZE;
-    sc->amrd_disk.d_fwsectors = sc->amrd_drive->al_sectors;
-    sc->amrd_disk.d_fwheads = sc->amrd_drive->al_heads;
+    sc->amrd_disk->d_sectorsize = AMR_BLKSIZE;
+    sc->amrd_disk->d_mediasize = (off_t)sc->amrd_drive->al_size * AMR_BLKSIZE;
+    sc->amrd_disk->d_fwsectors = sc->amrd_drive->al_sectors;
+    sc->amrd_disk->d_fwheads = sc->amrd_drive->al_heads;
 #endif
 
     return (0);
@@ -157,9 +158,9 @@ amrd_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size_t l
 
     dp = arg;
     amrd_sc = (struct amrd_softc *)dp->d_drv1;
-    amr_sc  = (struct amr_softc *)amrd_sc->amrd_controller;
-    if (!amrd_sc || !amr_sc)
+    if (amrd_sc == NULL)
 	return(ENXIO);
+    amr_sc  = (struct amr_softc *)amrd_sc->amrd_controller;
 
     if (length > 0) {
 	int	driveno = amrd_sc->amrd_drive - amr_sc->amr_drive;
@@ -247,13 +248,16 @@ amrd_attach(device_t dev)
 		  sc->amrd_drive->al_size, sc->amrd_drive->al_properties & AMR_DRV_RAID_MASK, 
 		  amr_describe_code(amr_table_drvstate, AMR_DRV_CURSTATE(sc->amrd_drive->al_state)));
 
-    sc->amrd_disk.d_drv1 = sc;
-    sc->amrd_disk.d_maxsize = (AMR_NSEG - 1) * PAGE_SIZE;
-    sc->amrd_disk.d_open = amrd_open;
-    sc->amrd_disk.d_strategy = amrd_strategy;
-    sc->amrd_disk.d_name = "amrd";
-    sc->amrd_disk.d_dump = (dumper_t *)amrd_dump;
-    disk_create(sc->amrd_unit, &sc->amrd_disk, 0, NULL, NULL);
+    sc->amrd_disk = disk_alloc();
+    sc->amrd_disk->d_drv1 = sc;
+    sc->amrd_disk->d_maxsize = (AMR_NSEG - 1) * PAGE_SIZE;
+    sc->amrd_disk->d_open = amrd_open;
+    sc->amrd_disk->d_strategy = amrd_strategy;
+    sc->amrd_disk->d_name = "amrd";
+    sc->amrd_disk->d_dump = (dumper_t *)amrd_dump;
+    sc->amrd_disk->d_unit = sc->amrd_unit;
+    sc->amrd_disk->d_flags = DISKFLAG_NEEDSGIANT;
+    disk_create(sc->amrd_disk, DISK_VERSION);
 #ifdef FREEBSD_4
     disks_registered++;
 #endif
@@ -268,14 +272,14 @@ amrd_detach(device_t dev)
 
     debug_called(1);
 
-    if (sc->amrd_disk.d_flags & DISKFLAG_OPEN)
+    if (sc->amrd_disk->d_flags & DISKFLAG_OPEN)
 	return(EBUSY);
 
 #ifdef FREEBSD_4
     if (--disks_registered == 0)
 	cdevsw_remove(&amrddisk_cdevsw);
 #else
-    disk_destroy(&sc->amrd_disk);
+    disk_destroy(sc->amrd_disk);
 #endif
     return(0);
 }

@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ata/ata-card.c,v 1.20.2.1 2004/01/27 05:53:18 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ata/ata-card.c,v 1.25.2.1.2.1 2004/10/23 19:05:17 le Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -45,9 +45,10 @@ __FBSDID("$FreeBSD: src/sys/dev/ata/ata-card.c,v 1.20.2.1 2004/01/27 05:53:18 sc
 #include <sys/rman.h>
 #include <dev/ata/ata-all.h>
 #include <dev/pccard/pccard_cis.h>
-#include <dev/pccard/pccarddevs.h>
 #include <dev/pccard/pccardreg.h>
 #include <dev/pccard/pccardvar.h>
+
+#include "pccarddevs.h"
 
 static const struct pccard_product ata_pccard_products[] = {
 	PCMCIA_CARD(FREECOM, PCCARDIDE, 0),
@@ -87,9 +88,10 @@ ata_pccard_match(device_t dev)
     return(ENXIO);
 }
 
-static void
+static int
 ata_pccard_locknoop(struct ata_channel *ch, int type)
 {
+    return ch->unit;
 }
 
 static void
@@ -146,6 +148,7 @@ ata_pccard_probe(device_t dev)
     ch->flags |= (ATA_USE_16BIT | ATA_NO_SLAVE);
     ch->locking = ata_pccard_locknoop;
     ch->device[MASTER].setmode = ata_pccard_setmode;
+    ata_generic_hw(ch);
     return ata_probe(dev);
 }
 

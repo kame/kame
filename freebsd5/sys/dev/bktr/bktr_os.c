@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_os.c,v 1.40 2003/12/01 19:03:50 truckman Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_os.c,v 1.47 2004/06/16 09:46:38 phk Exp $");
 
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
@@ -62,7 +62,9 @@ __FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_os.c,v 1.40 2003/12/01 19:03:50 truckm
 #include <sys/conf.h>
 #include <sys/uio.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/signalvar.h>
+#include <sys/malloc.h>
 #include <sys/mman.h>
 #include <sys/poll.h>
 #if __FreeBSD_version >= 500014
@@ -185,8 +187,8 @@ int bktr_debug = 0;
 #include <dev/pci/bktr/bktr_core.h>
 #include <dev/pci/bktr/bktr_os.h>
 #else					/* Traditional location for .h files */
-#include <machine/ioctl_meteor.h>
-#include <machine/ioctl_bt848.h>	/* extensions to ioctl_meteor.h */
+#include <dev/bktr/ioctl_meteor.h>
+#include <dev/bktr/ioctl_bt848.h>	/* extensions to ioctl_meteor.h */
 #include <dev/bktr/bktr_reg.h>
 #include <dev/bktr/bktr_tuner.h>
 #include <dev/bktr/bktr_card.h>
@@ -256,8 +258,9 @@ static	d_ioctl_t	bktr_ioctl;
 static	d_mmap_t	bktr_mmap;
 static	d_poll_t	bktr_poll;
 
-#define CDEV_MAJOR 92 
 static struct cdevsw bktr_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	bktr_open,
 	.d_close =	bktr_close,
 	.d_read =	bktr_read,
@@ -266,7 +269,6 @@ static struct cdevsw bktr_cdevsw = {
 	.d_poll =	bktr_poll,
 	.d_mmap =	bktr_mmap,
 	.d_name =	"bktr",
-	.d_maj =	CDEV_MAJOR,
 };
 
 DRIVER_MODULE(bktr, pci, bktr_driver, bktr_devclass, 0, 0);
@@ -344,9 +346,8 @@ bktr_attach( device_t dev )
 	 * Map control/status registers.
 	 */
 	bktr->mem_rid = PCIR_BAR(0);
-	bktr->res_mem = bus_alloc_resource(dev, SYS_RES_MEMORY, &bktr->mem_rid,
-					0, ~0, 1, RF_ACTIVE);
-
+	bktr->res_mem = bus_alloc_resource_any(dev, SYS_RES_MEMORY, 
+					&bktr->mem_rid, RF_ACTIVE);
 
 	if (!bktr->res_mem) {
 		device_printf(dev, "could not map memory\n");
@@ -376,8 +377,8 @@ bktr_attach( device_t dev )
 	 * Allocate our interrupt.
 	 */
 	bktr->irq_rid = 0;
-	bktr->res_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &bktr->irq_rid,
-				0, ~0, 1, RF_SHAREABLE | RF_ACTIVE);
+	bktr->res_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, 
+				&bktr->irq_rid, RF_SHAREABLE | RF_ACTIVE);
 	if (bktr->res_irq == NULL) {
 		device_printf(dev, "could not map interrupt\n");
 		error = ENXIO;
@@ -547,9 +548,11 @@ get_bktr_mem( int unit, unsigned size )
 {
 	vm_offset_t	addr = 0;
 
-	addr = vm_page_alloc_contig(size, 0, 0xffffffff, 1<<24);
+	addr = (vm_offset_t)contigmalloc(size, M_DEVBUF, M_NOWAIT, 0,
+	    0xffffffff, 1<<24, 0);
 	if (addr == 0)
-		addr = vm_page_alloc_contig(size, 0, 0xffffffff, PAGE_SIZE);
+		addr = (vm_offset_t)contigmalloc(size, M_DEVBUF, M_NOWAIT, 0,
+		    0xffffffff, PAGE_SIZE, 0);
 	if (addr == 0) {
 		printf("bktr%d: Unable to allocate %d bytes of memory.\n",
 			unit, size);
@@ -577,7 +580,7 @@ get_bktr_mem( int unit, unsigned size )
  * 
  */
 static int
-bktr_open( dev_t dev, int flags, int fmt, struct thread *td )
+bktr_open( struct cdev *dev, int flags, int fmt, struct thread *td )
 {
 	bktr_ptr_t	bktr;
 	int		unit;
@@ -677,7 +680,7 @@ bktr_open( dev_t dev, int flags, int fmt, struct thread *td )
  * 
  */
 static int
-bktr_close( dev_t dev, int flags, int fmt, struct thread *td )
+bktr_close( struct cdev *dev, int flags, int fmt, struct thread *td )
 {
 	bktr_ptr_t	bktr;
 	int		unit;
@@ -716,7 +719,7 @@ bktr_close( dev_t dev, int flags, int fmt, struct thread *td )
  * 
  */
 static int
-bktr_read( dev_t dev, struct uio *uio, int ioflag )
+bktr_read( struct cdev *dev, struct uio *uio, int ioflag )
 {
 	bktr_ptr_t	bktr;
 	int		unit;
@@ -744,7 +747,7 @@ bktr_read( dev_t dev, struct uio *uio, int ioflag )
  * 
  */
 static int
-bktr_write( dev_t dev, struct uio *uio, int ioflag )
+bktr_write( struct cdev *dev, struct uio *uio, int ioflag )
 {
 	return( EINVAL ); /* XXX or ENXIO ? */
 }
@@ -754,7 +757,7 @@ bktr_write( dev_t dev, struct uio *uio, int ioflag )
  * 
  */
 static int
-bktr_ioctl( dev_t dev, ioctl_cmd_t cmd, caddr_t arg, int flag, struct thread *td )
+bktr_ioctl( struct cdev *dev, ioctl_cmd_t cmd, caddr_t arg, int flag, struct thread *td )
 {
 	bktr_ptr_t	bktr;
 	int		unit;
@@ -786,7 +789,7 @@ bktr_ioctl( dev_t dev, ioctl_cmd_t cmd, caddr_t arg, int flag, struct thread *td
  * 
  */
 static int
-bktr_mmap( dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot )
+bktr_mmap( struct cdev *dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot )
 {
 	int		unit;
 	bktr_ptr_t	bktr;
@@ -817,7 +820,7 @@ bktr_mmap( dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot )
 }
 
 static int
-bktr_poll( dev_t dev, int events, struct thread *td)
+bktr_poll( struct cdev *dev, int events, struct thread *td)
 {
 	int		unit;
 	bktr_ptr_t	bktr;

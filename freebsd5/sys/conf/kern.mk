@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/kern.mk,v 1.37 2003/11/04 23:29:17 peter Exp $
+# $FreeBSD: src/sys/conf/kern.mk,v 1.42 2004/05/14 13:35:46 cognet Exp $
 
 #
 # Warning flags for compiling the kernel and components of the kernel.
@@ -6,9 +6,14 @@
 # Note that the newly added -Wcast-qual is responsible for generating 
 # most of the remaining warnings.  Warnings introduced with -Wall will
 # also pop up, but are easier to fix.
+.if ${CC} == "icc"
+#CWARNFLAGS=	-w2	# use this if you are terribly bored
+CWARNFLAGS=
+.else
 CWARNFLAGS?=	-Wall -Wredundant-decls -Wnested-externs -Wstrict-prototypes \
 		-Wmissing-prototypes -Wpointer-arith -Winline -Wcast-qual \
 		-fformat-extensions -std=c99
+.endif
 #
 # The following flags are next up for working on:
 #	-W
@@ -22,9 +27,9 @@ CWARNFLAGS?=	-Wall -Wredundant-decls -Wnested-externs -Wstrict-prototypes \
 # use of code cache tag lines) and uses more stack (less efficient use of data
 # cache tag lines)
 #
-.if ${MACHINE_ARCH} == "i386"
+.if ${MACHINE_ARCH} == "i386" && ${CC} != "icc"
 CFLAGS+=	-mno-align-long-strings -mpreferred-stack-boundary=2
-INLINE_LIMIT?=	15000
+INLINE_LIMIT?=	8000
 .endif
 
 #
@@ -37,6 +42,9 @@ CFLAGS+=	-mno-fp-regs -ffixed-8 -Wa,-mev6
 INLINE_LIMIT?=	15000
 .endif
 
+.if ${MACHINE_ARCH} == "arm"
+INLINE_LIMIT?=	8000
+.endif
 #
 # For IA-64, we use r13 for the kernel globals pointer and we only use
 # a very small subset of float registers for integer divides.
@@ -64,11 +72,28 @@ INLINE_LIMIT?=	15000
 CFLAGS+=	-mcmodel=kernel -mno-red-zone \
 		-mfpmath=387 -mno-sse -mno-sse2 -mno-mmx -mno-3dnow \
 		-msoft-float -fno-asynchronous-unwind-tables
-INLINE_LIMIT?=	20000
+INLINE_LIMIT?=	8000
+.endif
+
+#
+# For PowerPC we tell gcc to use floating point emulation.  This avoids using
+# floating point registers for integer operations which it has a tendency to do.
+#
+.if ${MACHINE_ARCH} == "powerpc"
+CFLAGS+=	-msoft-float
+INLINE_LIMIT?=	15000
 .endif
 
 #
 # GCC 3.0 and above like to do certain optimizations based on the
 # assumption that the program is linked against libc.  Stop this.
 #
+.if ${CC} == "icc"
+CFLAGS+=	-nolib_inline
+.else
 CFLAGS+=	-ffreestanding
+.endif
+
+.if ${CC} == "icc"
+CFLAGS+=	-restrict
+.endif

@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/initcpu.c,v 1.47 2003/11/21 03:01:59 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/initcpu.c,v 1.48 2004/06/08 01:02:51 peter Exp $");
 
 #include "opt_cpu.h"
 
@@ -41,7 +41,8 @@ __FBSDID("$FreeBSD: src/sys/amd64/amd64/initcpu.c,v 1.47 2003/11/21 03:01:59 pet
 #include <machine/md_var.h>
 #include <machine/specialreg.h>
 
-void initializecpu(void);
+#include <vm/vm.h>
+#include <vm/pmap.h>
 
 static int	hw_instruction_sse;
 SYSCTL_INT(_hw, OID_AUTO, instruction_sse, CTLFLAG_RD,
@@ -49,31 +50,30 @@ SYSCTL_INT(_hw, OID_AUTO, instruction_sse, CTLFLAG_RD,
 
 int	cpu;			/* Are we 386, 386sx, 486, etc? */
 u_int	cpu_feature;		/* Feature flags */
+u_int	cpu_feature2;		/* Feature flags */
+u_int	amd_feature;		/* Feature flags */
 u_int	cpu_high;		/* Highest arg to CPUID */
+u_int	cpu_exthigh;		/* Highest arg to extended CPUID */
 u_int	cpu_id;			/* Stepping ID */
 u_int	cpu_procinfo;		/* HyperThreading Info / Brand Index / CLFUSH */
 char	cpu_vendor[20];		/* CPU Origin code */
 u_int	cpu_fxsr;		/* SSE enabled */
 
 /*
- * Initialize CR4 (Control register 4) to enable SSE instructions.
+ * Initialize CPU control registers
  */
 void
-enable_sse(void)
+initializecpu(void)
 {
+	uint64_t msr;
+
 	if ((cpu_feature & CPUID_XMM) && (cpu_feature & CPUID_FXSR)) {
 		load_cr4(rcr4() | CR4_FXSR | CR4_XMM);
 		cpu_fxsr = hw_instruction_sse = 1;
 	}
-}
-
-void
-initializecpu(void)
-{
-
-	switch (cpu) {
-	default:
-		break;
+	if ((amd_feature & AMDID_NX) != 0) {
+		msr = rdmsr(MSR_EFER) | EFER_NXE;
+		wrmsr(MSR_EFER, msr);
+		pg_nx = PG_NX;
 	}
-	enable_sse();
 }

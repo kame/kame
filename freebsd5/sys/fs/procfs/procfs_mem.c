@@ -15,10 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  *
  *	@(#)procfs_mem.c	8.5 (Berkeley) 6/15/94
  *
- * $FreeBSD: src/sys/fs/procfs/procfs_mem.c,v 1.58 2002/05/19 00:14:47 jhb Exp $
+ * $FreeBSD: src/sys/fs/procfs/procfs_mem.c,v 1.59 2004/04/07 20:46:02 imp Exp $
  */
 
 #include <sys/param.h>

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/ntfs/ntfs_inode.h,v 1.11 2002/10/14 03:20:33 mckusick Exp $
+ * $FreeBSD: src/sys/fs/ntfs/ntfs_inode.h,v 1.12 2004/06/16 09:47:04 phk Exp $
  */
 
 /* These flags are kept in i_flag. */
@@ -43,7 +43,7 @@
 
 struct ntnode {
 	struct vnode   *i_devvp;	/* vnode of blk dev we live on */
-	dev_t           i_dev;		/* Device associated with the inode. */
+	struct cdev *i_dev;		/* Device associated with the inode. */
 
 	LIST_ENTRY(ntnode)	i_hash;
 	struct ntnode  *i_next;

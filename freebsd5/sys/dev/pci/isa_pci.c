@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/pci/isa_pci.c,v 1.10 2003/08/24 17:54:15 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/pci/isa_pci.c,v 1.12 2004/05/30 17:57:42 phk Exp $");
 
 /*
  * PCI:ISA bridge support
@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD: src/sys/dev/pci/isa_pci.c,v 1.10 2003/08/24 17:54:15 obrien 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <machine/bus.h>
 #include <machine/resource.h>
 #include <sys/bus.h>
@@ -175,7 +176,7 @@ pci_isab_attach(device_t dev)
 	 */
 	rid = 0;
 	bus_set_resource(dev, SYS_RES_IOPORT, rid, ELCR_IOADDR, ELCR_IOLEN);
-	sc->elcr_res = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1,
+	sc->elcr_res = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid,
 	    RF_ACTIVE);
 	if (sc->elcr_res == NULL)
 	    device_printf(dev, "failed to allocate ELCR resource\n");

@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/bge/if_bgereg.h,v 1.25 2003/11/11 17:57:03 sam Exp $
+ * $FreeBSD: src/sys/dev/bge/if_bgereg.h,v 1.28.2.1 2004/09/29 14:31:49 ps Exp $
  */
 
 /*
@@ -169,6 +169,10 @@
 #define BGE_PCI_MSI_ADDR_LO		0x60
 #define BGE_PCI_MSI_DATA		0x64
 
+/* PCI MSI. ??? */
+#define BGE_PCIE_CAPID_REG		0xD0
+#define BGE_PCIE_CAPID			0x10
+
 /*
  * PCI registers specific to the BCM570x family.
  */
@@ -233,6 +237,8 @@
 #define BGE_CHIPID_BCM5705_A1		0x30010000
 #define BGE_CHIPID_BCM5705_A2		0x30020000
 #define BGE_CHIPID_BCM5705_A3		0x30030000
+#define BGE_CHIPID_BCM5750_A0		0x40000000
+#define BGE_CHIPID_BCM5750_A1		0x40010000
 
 /* shorthand one */
 #define BGE_ASICREV(x)			((x) >> 28)
@@ -241,6 +247,7 @@
 #define BGE_ASICREV_BCM5703		0x01
 #define BGE_ASICREV_BCM5704		0x02
 #define BGE_ASICREV_BCM5705		0x03
+#define BGE_ASICREV_BCM5750		0x04
 
 /* chip revisions */
 #define BGE_CHIPREV(x)			((x) >> 24)
@@ -525,6 +532,10 @@
 #define BGE_RX_BD_RULES_CTL15		0x04F8
 #define BGE_RX_BD_RULES_MASKVAL15	0x04FC
 #define BGE_RX_RULES_CFG		0x0500
+#define BGE_SERDES_CFG			0x0590
+#define BGE_SERDES_STS			0x0594
+#define BGE_SGDIG_CFG			0x05B0
+#define BGE_SGDIG_STS			0x05B4
 #define BGE_RX_STATS			0x0800
 #define BGE_TX_STATS			0x0880
 
@@ -654,6 +665,40 @@
 /* Receive Rules Mask register */
 #define BGE_RXRULEMASK_VALUE		0x0000FFFF
 #define BGE_RXRULEMASK_MASKVAL		0xFFFF0000
+
+/* SERDES configuration register */
+#define BGE_SERDESCFG_RXR		0x00000007 /* phase interpolator */
+#define BGE_SERDESCFG_RXG		0x00000018 /* rx gain setting */
+#define BGE_SERDESCFG_RXEDGESEL		0x00000040 /* rising/falling egde */
+#define BGE_SERDESCFG_TX_BIAS		0x00000380 /* TXDAC bias setting */
+#define BGE_SERDESCFG_IBMAX		0x00000400 /* bias current +25% */
+#define BGE_SERDESCFG_IBMIN		0x00000800 /* bias current -25% */
+#define BGE_SERDESCFG_TXMODE		0x00001000
+#define BGE_SERDESCFG_TXEDGESEL		0x00002000 /* rising/falling edge */
+#define BGE_SERDESCFG_MODE		0x00004000 /* TXCP/TXCN disabled */
+#define BGE_SERDESCFG_PLLTEST		0x00008000 /* PLL test mode */
+#define BGE_SERDESCFG_CDET		0x00010000 /* comma detect enable */
+#define BGE_SERDESCFG_TBILOOP		0x00020000 /* local loopback */
+#define BGE_SERDESCFG_REMLOOP		0x00040000 /* remote loopback */
+#define BGE_SERDESCFG_INVPHASE		0x00080000 /* Reverse 125Mhz clock */
+#define BGE_SERDESCFG_12REGCTL		0x00300000 /* 1.2v regulator ctl */
+#define BGE_SERDESCFG_REGCTL		0x00C00000 /* regulator ctl (2.5v) */
+
+/* SERDES status register */
+#define BGE_SERDESSTS_RXSTAT		0x0000000F /* receive status bits */
+#define BGE_SERDESSTS_CDET		0x00000010 /* comma code detected */
+
+/* SGDIG config (not documented) */
+#define BGE_SGDIGCFG_PAUSE_CAP		0x00000800
+#define BGE_SGDIGCFG_ASYM_PAUSE		0x00001000
+#define BGE_SGDIGCFG_SEND		0x40000000
+#define BGE_SGDIGCFG_AUTO		0x80000000
+
+/* SGDIG status (not documented) */
+#define BGE_SGDIGSTS_PAUSE_CAP		0x00080000
+#define BGE_SGDIGSTS_ASYM_PAUSE		0x00100000
+#define BGE_SGDIGSTS_DONE		0x00000002
+
 
 /* MI communication register */
 #define BGE_MICOMM_DATA			0x0000FFFF
@@ -1819,8 +1864,12 @@ struct bge_status_block {
 #define BCOM_DEVICEID_BCM5704C		0x1648
 #define BCOM_DEVICEID_BCM5704S		0x16A8
 #define BCOM_DEVICEID_BCM5705		0x1653
+#define BCOM_DEVICEID_BCM5705K		0x1654
 #define BCOM_DEVICEID_BCM5705M		0x165D
 #define BCOM_DEVICEID_BCM5705M_ALT	0x165E
+#define BCOM_DEVICEID_BCM5750		0x1676
+#define BCOM_DEVICEID_BCM5750M		0x167C
+#define BCOM_DEVICEID_BCM5751		0x1677
 #define BCOM_DEVICEID_BCM5782		0x1696
 #define BCOM_DEVICEID_BCM5788		0x169C
 #define BCOM_DEVICEID_BCM5901		0x170D
@@ -1855,6 +1904,7 @@ struct bge_status_block {
  */
 #define ALTIMA_VENDORID			0x173b
 #define ALTIMA_DEVICE_AC1000		0x03e8
+#define ALTIMA_DEVICE_AC1002		0x03e9
 #define ALTIMA_DEVICE_AC9100	 	0x03ea			
 
 /*
@@ -2276,6 +2326,7 @@ struct bge_softc {
 	u_int8_t		bge_asicrev;
 	u_int8_t		bge_chiprev;
 	u_int8_t		bge_no_3_led;
+	u_int8_t		bge_pcie;
 	struct bge_ring_data	bge_ldata;	/* rings */
 	struct bge_chain_data	bge_cdata;	/* mbufs */
 	u_int16_t		bge_tx_saved_considx;

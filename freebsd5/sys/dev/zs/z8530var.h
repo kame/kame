@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/zs/z8530var.h,v 1.1 2003/01/08 23:36:16 jake Exp $
+ * $FreeBSD: src/sys/dev/zs/z8530var.h,v 1.2 2004/06/16 09:47:02 phk Exp $
  */
 
 #ifndef _DEV_ZS_ZSVAR_H_
@@ -43,7 +43,7 @@ struct zstty_softc {
 	bus_space_tag_t		sc_bt;
 	bus_space_handle_t	sc_csr;
 	bus_space_handle_t	sc_data;
-	dev_t			sc_si;
+	struct cdev *sc_si;
 	struct tty		*sc_tty;
 	int			sc_icnt;
 	uint8_t			*sc_iput;

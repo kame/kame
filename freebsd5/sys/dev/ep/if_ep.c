@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ep/if_ep.c,v 1.129 2003/11/02 20:10:09 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ep/if_ep.c,v 1.133 2004/05/23 16:11:47 mux Exp $");
 
 /*
  *	Modified from the FreeBSD 1.1.5.1 version by:
@@ -59,9 +59,6 @@ __FBSDID("$FreeBSD: src/sys/dev/ep/if_ep.c,v 1.129 2003/11/02 20:10:09 imp Exp $
  * MAINTAINER: Matthew N. Dodd <winter@jurai.net>
  *                             <mdodd@FreeBSD.org>
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ep/if_ep.c,v 1.129 2003/11/02 20:10:09 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -178,16 +175,15 @@ ep_alloc(device_t dev)
 	u_int16_t result;
 
 	rid = 0;
-	sc->iobase = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-	    0, ~0, 1, RF_ACTIVE);
+	sc->iobase = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid,
+	    RF_ACTIVE);
 	if (!sc->iobase) {
 		device_printf(dev, "No I/O space?!\n");
 		error = ENXIO;
 		goto bad;
 	}
 	rid = 0;
-	sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
-	    0, ~0, 1, RF_ACTIVE);
+	sc->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid, RF_ACTIVE);
 	if (!sc->irq) {
 		device_printf(dev, "No irq?!\n");
 		error = ENXIO;
@@ -287,9 +283,6 @@ ep_attach(struct ep_softc *sc)
 	for (i = 0; i < 3; i++)
 		CSR_WRITE_2(sc, EP_W2_ADDR_0 + (i * 2), ntohs(p[i]));
 
-	device_printf(sc->dev, "Ethernet address %6D\n",
-	    sc->arpcom.ac_enaddr, ":");
-
 	ifp = &sc->arpcom.ac_if;
 	attached = (ifp->if_softc != 0);
 
@@ -297,7 +290,6 @@ ep_attach(struct ep_softc *sc)
 	if_initname(ifp, device_get_name(sc->dev), device_get_unit(sc->dev));
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
-	ifp->if_output = ether_output;
 	ifp->if_start = epstart;
 	ifp->if_ioctl = epioctl;
 	ifp->if_watchdog = epwatchdog;

@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/boot/i386/libi386/elf32_freebsd.c,v 1.13 2003/08/25 23:28:31 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/boot/i386/libi386/elf32_freebsd.c,v 1.13.4.1 2004/09/03 19:25:40 iedowse Exp $");
 
 #include <sys/param.h>
 #include <sys/exec.h>
@@ -40,8 +40,10 @@ __FBSDID("$FreeBSD: src/sys/boot/i386/libi386/elf32_freebsd.c,v 1.13 2003/08/25 
 #include "btxv86.h"
 
 static int	elf32_exec(struct preloaded_file *amp);
+static int	elf32_obj_exec(struct preloaded_file *amp);
 
 struct file_format i386_elf = { elf32_loadfile, elf32_exec };
+struct file_format i386_elf_obj = { elf32_obj_loadfile, elf32_obj_exec };
 
 /*
  * There is an a.out kernel and one or more a.out modules loaded.  
@@ -73,4 +75,10 @@ elf32_exec(struct preloaded_file *fp)
     __exec((void *)entry, boothowto, bootdev, 0, 0, 0, bootinfop, modulep, kernend);
 
     panic("exec returned");
+}
+
+static int
+elf32_obj_exec(struct preloaded_file *fp)
+{
+	return (EFTYPE);
 }

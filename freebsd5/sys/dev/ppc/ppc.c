@@ -26,13 +26,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ppc/ppc.c,v 1.42 2003/08/01 02:25:32 ambrisko Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ppc/ppc.c,v 1.44 2004/05/30 20:08:37 phk Exp $");
 
 #include "opt_ppc.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/malloc.h>
   
@@ -1913,10 +1914,12 @@ ppc_probe(device_t dev)
 	ppc->ppc_flags = device_get_flags(dev);
 
 	if (!(ppc->ppc_flags & 0x20)) {
-		ppc->res_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &ppc->rid_irq,
-						  0ul, ~0ul, 1, RF_SHAREABLE);
-		ppc->res_drq = bus_alloc_resource(dev, SYS_RES_DRQ, &ppc->rid_drq,
-						  0ul, ~0ul, 1, RF_ACTIVE);
+		ppc->res_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ,
+						      &ppc->rid_irq,
+						      RF_SHAREABLE);
+		ppc->res_drq = bus_alloc_resource_any(dev, SYS_RES_DRQ,
+						      &ppc->rid_drq,
+						      RF_ACTIVE);
 	}
 
 	if (ppc->res_irq)

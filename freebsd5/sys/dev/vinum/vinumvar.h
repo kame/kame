@@ -38,7 +38,7 @@
  * advised of the possibility of such damage.
  *
  * $Id: vinumvar.h,v 1.33 2003/05/23 01:09:23 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumvar.h,v 1.46 2003/09/29 08:19:06 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumvar.h,v 1.49 2004/03/19 10:28:34 le Exp $
  */
 
 #include <sys/time.h>
@@ -66,8 +66,6 @@ enum constants {
     VINUM_HEADER = 512,					    /* size of header on disk */
     MAXCONFIGLINE = 1024,				    /* maximum size of a single config line */
     MINVINUMSLICE = 1048576,				    /* minimum size of a slice */
-
-    VINUM_CDEV_MAJOR = 91,				    /* major number for character device */
 
     ROUND_ROBIN_READPOL = -1,				    /* round robin read policy */
 
@@ -125,16 +123,6 @@ enum constants {
 
 
 #define OBJTYPE(x)	((minor(x) >> VINUM_TYPE_SHIFT) & 3)
-
-    /* Create device minor numbers */
-#define VINUMDEV(o, t)		makedev (VINUM_CDEV_MAJOR, VINUMMINOR (o, t))
-
-#define VINUM_VOL(v)		makedev (VINUM_CDEV_MAJOR, \
-					 VINUMMINOR (v, VINUM_VOLUME_TYPE))
-#define VINUM_PLEX(p)		makedev (VINUM_CDEV_MAJOR, \
-					 VINUMMINOR (p, VINUM_PLEX_TYPE))
-#define VINUM_SD(s)		makedev (VINUM_CDEV_MAJOR, \
-					 VINUMMINOR (s, VINUM_SD_TYPE))
 
     /* extract device type */
 #define DEVTYPE(x) ((minor (x) >> VINUM_TYPE_SHIFT) & 3)
@@ -372,6 +360,13 @@ enum parityop {
     rebuildparity,
     rebuildandcheckparity,				    /* rebuildparity with the -v option */
 };
+
+/*
+ * When doing round-robin reads from a multi-plex volume, switch to the
+ * next plex if the difference of the last read sector and the next sector
+ * to be read is this many sectors.
+ */
+#define ROUNDROBIN_SWITCH	128			    /* 64k */
 
 #ifdef VINUMDEBUG
 /* Debugging stuff */

@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/uart/uart_dev_ns8250.c,v 1.5 2003/09/17 03:11:32 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/uart/uart_dev_ns8250.c,v 1.10 2004/08/06 15:51:31 marcel Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -304,6 +304,7 @@ ns8250_putc(struct uart_bas *bas, int c)
 	while ((uart_getreg(bas, REG_LSR) & LSR_THRE) == 0 && --limit)
 		DELAY(delay);
 	uart_setreg(bas, REG_DATA, c);
+	uart_barrier(bas);
 	limit = 40;
 	while ((uart_getreg(bas, REG_LSR) & LSR_TEMT) == 0 && --limit)
 		DELAY(delay);
@@ -398,9 +399,9 @@ ns8250_bus_attach(struct uart_softc *sc)
 	ns8250_bus_flush(sc, UART_FLUSH_RECEIVER|UART_FLUSH_TRANSMITTER);
 
 	if (ns8250->mcr & MCR_DTR)
-		sc->sc_hwsig |= UART_SIG_DTR;
+		sc->sc_hwsig |= SER_DTR;
 	if (ns8250->mcr & MCR_RTS)
-		sc->sc_hwsig |= UART_SIG_RTS;
+		sc->sc_hwsig |= SER_RTS;
 	ns8250_bus_getsig(sc);
 
 	ns8250_clrint(bas);
@@ -454,10 +455,10 @@ ns8250_bus_getsig(struct uart_softc *sc)
 		mtx_lock_spin(&sc->sc_hwmtx);
 		msr = uart_getreg(&sc->sc_bas, REG_MSR);
 		mtx_unlock_spin(&sc->sc_hwmtx);
-		SIGCHG(msr & MSR_DSR, sig, UART_SIG_DSR, UART_SIG_DDSR);
-		SIGCHG(msr & MSR_CTS, sig, UART_SIG_CTS, UART_SIG_DCTS);
-		SIGCHG(msr & MSR_DCD, sig, UART_SIG_DCD, UART_SIG_DDCD);
-		SIGCHG(msr & MSR_RI,  sig, UART_SIG_RI,  UART_SIG_DRI);
+		SIGCHG(msr & MSR_DSR, sig, SER_DSR, SER_DDSR);
+		SIGCHG(msr & MSR_CTS, sig, SER_CTS, SER_DCTS);
+		SIGCHG(msr & MSR_DCD, sig, SER_DCD, SER_DDCD);
+		SIGCHG(msr & MSR_RI,  sig, SER_RI,  SER_DRI);
 		new = sig & ~UART_SIGMASK_DELTA;
 	} while (!atomic_cmpset_32(&sc->sc_hwsig, old, new));
 	return (sig);
@@ -574,7 +575,7 @@ ns8250_bus_probe(struct uart_softc *sc)
 {
 	struct uart_bas *bas;
 	int count, delay, error, limit;
-	uint8_t mcr;
+	uint8_t lsr, mcr;
 
 	bas = &sc->sc_bas;
 
@@ -597,16 +598,15 @@ ns8250_bus_probe(struct uart_softc *sc)
 	 * Set loopback mode. This avoids having garbage on the wire and
 	 * also allows us send and receive data. We set DTR and RTS to
 	 * avoid the possibility that automatic flow-control prevents
-	 * any data from being sent. We clear IE to avoid raising interrupts.
+	 * any data from being sent.
 	 */
-	uart_setreg(bas, REG_MCR, MCR_LOOPBACK | MCR_DTR | MCR_RTS);
+	uart_setreg(bas, REG_MCR, MCR_LOOPBACK | MCR_IE | MCR_DTR | MCR_RTS);
 	uart_barrier(bas);
 
 	/*
 	 * Enable FIFOs. And check that the UART has them. If not, we're
-	 * done. Otherwise we set DMA mode with the highest trigger level
-	 * so that we can determine the FIFO size. Since this is the first
-	 * time we enable the FIFOs, we reset them.
+	 * done. Since this is the first time we enable the FIFOs, we reset
+	 * them.
 	 */
 	uart_setreg(bas, REG_FCR, FCR_ENABLE);
 	uart_barrier(bas);
@@ -622,8 +622,7 @@ ns8250_bus_probe(struct uart_softc *sc)
 		return (0);
 	}
 
-	uart_setreg(bas, REG_FCR, FCR_ENABLE | FCR_DMA | FCR_RX_HIGH |
-	    FCR_XMT_RST | FCR_RCV_RST);
+	uart_setreg(bas, REG_FCR, FCR_ENABLE | FCR_XMT_RST | FCR_RCV_RST);
 	uart_barrier(bas);
 
 	count = 0;
@@ -638,23 +637,26 @@ ns8250_bus_probe(struct uart_softc *sc)
 		goto describe;
 	}
 
-	uart_setreg(bas, REG_IER, IER_ERXRDY);
-	uart_barrier(bas);
-
 	/*
 	 * We should have a sufficiently clean "pipe" to determine the
 	 * size of the FIFOs. We send as much characters as is reasonable
-	 * and wait for the the RX interrupt to be asserted, counting the
-	 * characters as we send them. Based on that count we know the
-	 * FIFO size.
+	 * and wait for the the overflow bit in the LSR register to be
+	 * asserted, counting the characters as we send them. Based on
+	 * that count we know the FIFO size.
 	 */
-	while ((uart_getreg(bas, REG_IIR) & IIR_RXRDY) == 0 && count < 1030) {
+	do {
 		uart_setreg(bas, REG_DATA, 0);
 		uart_barrier(bas);
 		count++;
 
 		limit = 30;
-		while ((uart_getreg(bas, REG_LSR) & LSR_TEMT) == 0 && --limit)
+		lsr = 0;
+		/*
+		 * LSR bits are cleared upon read, so we must accumulate
+		 * them to be able to test LSR_OE below.
+		 */
+		while (((lsr |= uart_getreg(bas, REG_LSR)) & LSR_TEMT) == 0 &&
+		    --limit)
 			DELAY(delay);
 		if (limit == 0) {
 			uart_setreg(bas, REG_IER, 0);
@@ -664,25 +666,25 @@ ns8250_bus_probe(struct uart_softc *sc)
 			count = 0;
 			goto describe;
 		}
-	}
+	} while ((lsr & LSR_OE) == 0 && count < 130);
+	count--;
 
-	uart_setreg(bas, REG_IER, 0);
 	uart_setreg(bas, REG_MCR, mcr);
 
 	/* Reset FIFOs. */
 	ns8250_flush(bas, UART_FLUSH_RECEIVER|UART_FLUSH_TRANSMITTER);
 
  describe:
-	if (count >= 14 && count < 16) {
+	if (count >= 14 && count <= 16) {
 		sc->sc_rxfifosz = 16;
 		device_set_desc(sc->sc_dev, "16550 or compatible");
-	} else if (count >= 28 && count < 32) {
+	} else if (count >= 28 && count <= 32) {
 		sc->sc_rxfifosz = 32;
 		device_set_desc(sc->sc_dev, "16650 or compatible");
-	} else if (count >= 56 && count < 64) {
+	} else if (count >= 56 && count <= 64) {
 		sc->sc_rxfifosz = 64;
 		device_set_desc(sc->sc_dev, "16750 or compatible");
-	} else if (count >= 112 && count < 128) {
+	} else if (count >= 112 && count <= 128) {
 		sc->sc_rxfifosz = 128;
 		device_set_desc(sc->sc_dev, "16950 or compatible");
 	} else {
@@ -698,11 +700,19 @@ ns8250_bus_probe(struct uart_softc *sc)
 	 */
 	sc->sc_txfifosz = 16;
 
+#if 0
+	/*
+	 * XXX there are some issues related to hardware flow control and
+	 * it's likely that uart(4) is the cause. This basicly needs more
+	 * investigation, but we avoid using for hardware flow control
+	 * until then.
+	 */
 	/* 16650s or higher have automatic flow control. */
 	if (sc->sc_rxfifosz > 16) {
 		sc->sc_hwiflow = 1;
 		sc->sc_hwoflow = 1;
 	}
+#endif
 
 	return (0);
 }
@@ -751,20 +761,20 @@ ns8250_bus_setsig(struct uart_softc *sc, int sig)
 	do {
 		old = sc->sc_hwsig;
 		new = old;
-		if (sig & UART_SIG_DDTR) {
-			SIGCHG(sig & UART_SIG_DTR, new, UART_SIG_DTR,
-			    UART_SIG_DDTR);
+		if (sig & SER_DDTR) {
+			SIGCHG(sig & SER_DTR, new, SER_DTR,
+			    SER_DDTR);
 		}
-		if (sig & UART_SIG_DRTS) {
-			SIGCHG(sig & UART_SIG_RTS, new, UART_SIG_RTS,
-			    UART_SIG_DRTS);
+		if (sig & SER_DRTS) {
+			SIGCHG(sig & SER_RTS, new, SER_RTS,
+			    SER_DRTS);
 		}
 	} while (!atomic_cmpset_32(&sc->sc_hwsig, old, new));
 	mtx_lock_spin(&sc->sc_hwmtx);
 	ns8250->mcr &= ~(MCR_DTR|MCR_RTS);
-	if (new & UART_SIG_DTR)
+	if (new & SER_DTR)
 		ns8250->mcr |= MCR_DTR;
-	if (new & UART_SIG_RTS)
+	if (new & SER_RTS)
 		ns8250->mcr |= MCR_RTS;
 	uart_setreg(bas, REG_MCR, ns8250->mcr);
 	uart_barrier(bas);

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Name: acobject.h - Definition of ACPI_OPERAND_OBJECT  (Internal object only)
- *       $Revision: 120 $
+ *       $Revision: 125 $
  *
  *****************************************************************************/
 
@@ -10,7 +10,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2003, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -187,7 +187,7 @@
 #define ACPI_COMMON_NOTIFY_INFO \
     union acpi_operand_object       *SystemNotify;      /* Handler for system notifies */\
     union acpi_operand_object       *DeviceNotify;      /* Handler for driver notifies */\
-    union acpi_operand_object       *AddressSpace;      /* Handler for Address space */
+    union acpi_operand_object       *Handler;           /* Handler for Address space */
 
 
 /******************************************************************************
@@ -259,7 +259,11 @@ typedef struct acpi_object_event
 } ACPI_OBJECT_EVENT;
 
 
-#define INFINITE_CONCURRENCY        0xFF
+#define ACPI_INFINITE_CONCURRENCY   0xFF
+
+typedef
+ACPI_STATUS (*ACPI_INTERNAL_METHOD) (
+    struct acpi_walk_state  *WalkState);
 
 typedef struct acpi_object_method
 {
@@ -269,6 +273,7 @@ typedef struct acpi_object_method
     UINT32                          AmlLength;
     void                            *Semaphore;
     UINT8                           *AmlStart;
+    ACPI_INTERNAL_METHOD            Implementation;
     UINT8                           Concurrency;
     UINT8                           ThreadCount;
     ACPI_OWNER_ID                   OwningId;
@@ -279,13 +284,14 @@ typedef struct acpi_object_method
 typedef struct acpi_object_mutex
 {
     ACPI_OBJECT_COMMON_HEADER
-    UINT16                          SyncLevel;
-    UINT16                          AcquisitionDepth;
-    struct acpi_thread_state        *OwnerThread;
-    void                            *Semaphore;
+    UINT8                           SyncLevel;          /* 0-15, specified in Mutex() call */
+    UINT16                          AcquisitionDepth;   /* Allow multiple Acquires, same thread */
+    struct acpi_thread_state        *OwnerThread;       /* Current owner of the mutex */
+    void                            *Semaphore;         /* Actual OS synchronization object */
     union acpi_operand_object       *Prev;              /* Link for list of acquired mutexes */
     union acpi_operand_object       *Next;              /* Link for list of acquired mutexes */
-    ACPI_NAMESPACE_NODE             *Node;              /* containing object */
+    ACPI_NAMESPACE_NODE             *Node;              /* Containing namespace node */
+    UINT8                           OriginalSyncLevel;  /* Owner's original sync level (0-15) */
 
 } ACPI_OBJECT_MUTEX;
 
@@ -295,8 +301,8 @@ typedef struct acpi_object_region
     ACPI_OBJECT_COMMON_HEADER
 
     UINT8                           SpaceId;
-    union acpi_operand_object       *AddressSpace;      /* Handler for region access */
-    ACPI_NAMESPACE_NODE             *Node;              /* containing object */
+    union acpi_operand_object       *Handler;           /* Handler for region access */
+    ACPI_NAMESPACE_NODE             *Node;              /* Containing namespace node */
     union acpi_operand_object       *Next;
     UINT32                          Length;
     ACPI_PHYSICAL_ADDRESS           Address;
@@ -562,21 +568,22 @@ typedef union acpi_operand_object
 
 /* Object descriptor types */
 
-#define ACPI_DESC_TYPE_CACHED           0x11        /* Used only when object is cached */
-#define ACPI_DESC_TYPE_STATE            0x20
-#define ACPI_DESC_TYPE_STATE_UPDATE     0x21
-#define ACPI_DESC_TYPE_STATE_PACKAGE    0x22
-#define ACPI_DESC_TYPE_STATE_CONTROL    0x23
-#define ACPI_DESC_TYPE_STATE_RPSCOPE    0x24
-#define ACPI_DESC_TYPE_STATE_PSCOPE     0x25
-#define ACPI_DESC_TYPE_STATE_WSCOPE     0x26
-#define ACPI_DESC_TYPE_STATE_RESULT     0x27
-#define ACPI_DESC_TYPE_STATE_NOTIFY     0x28
-#define ACPI_DESC_TYPE_STATE_THREAD     0x29
-#define ACPI_DESC_TYPE_WALK             0x44
-#define ACPI_DESC_TYPE_PARSER           0x66
-#define ACPI_DESC_TYPE_OPERAND          0x88
-#define ACPI_DESC_TYPE_NAMED            0xAA
+#define ACPI_DESC_TYPE_CACHED           0x01        /* Used only when object is cached */
+#define ACPI_DESC_TYPE_STATE            0x02
+#define ACPI_DESC_TYPE_STATE_UPDATE     0x03
+#define ACPI_DESC_TYPE_STATE_PACKAGE    0x04
+#define ACPI_DESC_TYPE_STATE_CONTROL    0x05
+#define ACPI_DESC_TYPE_STATE_RPSCOPE    0x06
+#define ACPI_DESC_TYPE_STATE_PSCOPE     0x07
+#define ACPI_DESC_TYPE_STATE_WSCOPE     0x08
+#define ACPI_DESC_TYPE_STATE_RESULT     0x09
+#define ACPI_DESC_TYPE_STATE_NOTIFY     0x0A
+#define ACPI_DESC_TYPE_STATE_THREAD     0x0B
+#define ACPI_DESC_TYPE_WALK             0x0C
+#define ACPI_DESC_TYPE_PARSER           0x0D
+#define ACPI_DESC_TYPE_OPERAND          0x0E
+#define ACPI_DESC_TYPE_NAMED            0x0F
+#define ACPI_DESC_TYPE_MAX              0x0F
 
 
 typedef union acpi_descriptor

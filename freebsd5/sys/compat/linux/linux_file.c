@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/linux/linux_file.c,v 1.83 2003/11/19 04:12:31 kan Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/linux/linux_file.c,v 1.87 2004/08/16 07:28:16 tjr Exp $");
 
 #include "opt_compat.h"
 #include "opt_mac.h"
@@ -54,8 +54,15 @@ __FBSDID("$FreeBSD: src/sys/compat/linux/linux_file.c,v 1.83 2003/11/19 04:12:31
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/ufsmount.h>
 
+#include "opt_compat.h"
+
+#if !COMPAT_LINUX32
 #include <machine/../linux/linux.h>
 #include <machine/../linux/linux_proto.h>
+#else
+#include <machine/../linux32/linux.h>
+#include <machine/../linux32/linux32_proto.h>
+#endif
 #include <compat/linux/linux_util.h>
 
 #ifndef __alpha__
@@ -734,17 +741,16 @@ linux_mount(struct thread *td, struct linux_mount_args *args)
 	char mntonname[MNAMELEN], mntfromname[MNAMELEN];
 	int error;
 	int fsflags;
-	const char *fstype;
 	void *fsdata;
 
 	error = copyinstr(args->filesystemtype, fstypename, MFSNAMELEN - 1,
 	    NULL);
 	if (error)
 		return (error);
-	error = copyinstr(args->specialfile, mntfromname, MFSNAMELEN - 1, NULL);
+	error = copyinstr(args->specialfile, mntfromname, MNAMELEN - 1, NULL);
 	if (error)
 		return (error);
-	error = copyinstr(args->dir, mntonname, MFSNAMELEN - 1, NULL);
+	error = copyinstr(args->dir, mntonname, MNAMELEN - 1, NULL);
 	if (error)
 		return (error);
 
@@ -755,7 +761,7 @@ linux_mount(struct thread *td, struct linux_mount_args *args)
 #endif
 
 	if (strcmp(fstypename, "ext2") == 0) {
-		fstype = "ext2fs";
+		strcpy(fstypename, "ext2fs");
 		fsdata = &ufs;
 		ufs.fspec = mntfromname;
 #define DEFAULT_ROOTID		-2
@@ -763,7 +769,7 @@ linux_mount(struct thread *td, struct linux_mount_args *args)
 		ufs.export.ex_flags =
 		    args->rwflag & LINUX_MS_RDONLY ? MNT_EXRDONLY : 0;
 	} else if (strcmp(fstypename, "proc") == 0) {
-		fstype = "linprocfs";
+		strcpy(fstypename, "linprocfs");
 		fsdata = NULL;
 	} else {
 		return (ENODEV);
@@ -788,7 +794,14 @@ linux_mount(struct thread *td, struct linux_mount_args *args)
 			fsflags |= MNT_UPDATE;
 	}
 
-	return (vfs_mount(td, fstype, mntonname, fsflags, fsdata));
+	if (strcmp(fstypename, "linprocfs") == 0) {
+		error = kernel_vmount(fsflags,
+			"fstype", fstypename,
+			"fspath", mntonname,
+			NULL);
+	} else
+		error = vfs_mount(td, fstypename, mntonname, fsflags, fsdata);
+	return (error);
 }
 
 int
@@ -821,7 +834,11 @@ struct l_flock {
 	l_off_t		l_start;
 	l_off_t		l_len;
 	l_pid_t		l_pid;
-};
+}
+#if __amd64__ && COMPAT_LINUX32
+__packed
+#endif
+;
 
 static void
 linux_to_bsd_flock(struct l_flock *linux_flock, struct flock *bsd_flock)
@@ -866,14 +883,18 @@ bsd_to_linux_flock(struct flock *bsd_flock, struct l_flock *linux_flock)
 	linux_flock->l_pid = (l_pid_t)bsd_flock->l_pid;
 }
 
-#if defined(__i386__)
+#if defined(__i386__) || (defined(__amd64__) && COMPAT_LINUX32)
 struct l_flock64 {
 	l_short		l_type;
 	l_short		l_whence;
 	l_loff_t	l_start;
 	l_loff_t	l_len;
 	l_pid_t		l_pid;
-};
+}
+#if __amd64__ && COMPAT_LINUX32
+__packed
+#endif
+;
 
 static void
 linux_to_bsd_flock64(struct l_flock64 *linux_flock, struct flock *bsd_flock)
@@ -917,7 +938,7 @@ bsd_to_linux_flock64(struct flock *bsd_flock, struct l_flock64 *linux_flock)
 	linux_flock->l_len = (l_loff_t)bsd_flock->l_len;
 	linux_flock->l_pid = (l_pid_t)bsd_flock->l_pid;
 }
-#endif /* __i386__ */
+#endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */
 
 #if defined(__alpha__)
 #define	linux_fcntl64_args	linux_fcntl_args
@@ -1045,7 +1066,7 @@ linux_fcntl(struct thread *td, struct linux_fcntl_args *args)
 	return (fcntl_common(td, &args64));
 }
 
-#if defined(__i386__)
+#if defined(__i386__) || (defined(__amd64__) && COMPAT_LINUX32)
 int
 linux_fcntl64(struct thread *td, struct linux_fcntl64_args *args)
 {
@@ -1093,7 +1114,7 @@ linux_fcntl64(struct thread *td, struct linux_fcntl64_args *args)
 
 	return (fcntl_common(td, args));
 }
-#endif /* __i386__ */
+#endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */
 
 int
 linux_chown(struct thread *td, struct linux_chown_args *args)

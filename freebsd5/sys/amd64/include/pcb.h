@@ -14,10 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -35,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)pcb.h	5.10 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/amd64/include/pcb.h,v 1.56 2003/11/08 04:39:22 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/pcb.h,v 1.60 2004/07/10 19:55:58 marcel Exp $
  */
 
 #ifndef _AMD64_PCB_H_
@@ -64,16 +60,27 @@ struct pcb {
 	u_int32_t	pcb_es;
 	u_int32_t	pcb_fs;
 	u_int32_t	pcb_gs;
+	u_int64_t	pcb_dr0;
+	u_int64_t	pcb_dr1;
+	u_int64_t	pcb_dr2;
+	u_int64_t	pcb_dr3;
+	u_int64_t	pcb_dr6;
+	u_int64_t	pcb_dr7;
 
 	struct	savefpu	pcb_save;
 	u_long	pcb_flags;
-#define	PCB_FPUINITDONE	0x01	/* fpu state is initialized */
-#define	PCB_FULLCTX	0x02	/* full context restore on sysret */
+#define	PCB_DBREGS	0x02	/* process using debug registers */
+#define	PCB_FPUINITDONE	0x08	/* fpu state is initialized */
+#define	PCB_32BIT	0x40	/* process has 32 bit context (segs etc) */
+#define	PCB_FULLCTX	0x80	/* full context restore on sysret */
 
 	caddr_t	pcb_onfault;	/* copyin/out fault recovery */
 };
 
 #ifdef _KERNEL
+struct trapframe;
+
+void	makectx(struct trapframe *, struct pcb *);
 void	savectx(struct pcb *);
 #endif
 

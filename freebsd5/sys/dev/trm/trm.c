@@ -12,7 +12,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/trm/trm.c,v 1.17 2003/09/02 17:30:39 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/trm/trm.c,v 1.23 2004/05/30 20:08:43 phk Exp $");
 
 /*
  *	HISTORY:					
@@ -64,9 +64,6 @@ __FBSDID("$FreeBSD: src/sys/dev/trm/trm.c,v 1.17 2003/09/02 17:30:39 jhb Exp $")
  * <doginou@ci0.org>, 2002-03-04
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/trm/trm.c,v 1.17 2003/09/02 17:30:39 jhb Exp $");
-
 #include <sys/param.h>
 
 #include <sys/systm.h>
@@ -78,6 +75,7 @@ __FBSDID("$FreeBSD: src/sys/dev/trm/trm.c,v 1.17 2003/09/02 17:30:39 jhb Exp $")
 #include <sys/buf.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -1090,7 +1088,7 @@ trm_action(struct cam_sim *psim, union ccb *pccb)
 static void 
 trm_poll(struct cam_sim *psim)
 {       
-	
+	trm_Interrupt(cam_sim_softc(psim));	
 }
 
 static void
@@ -1337,11 +1335,10 @@ void *vpACB;
 
 	if (scsi_intstatus & (INT_BUSSERVICE | INT_CMDDONE)) {
 		pDCB = pACB->pActiveDCB;
+		KASSERT(pDCB != NULL, ("no active DCB"));
 		pSRB = pDCB->pActiveSRB;
-		if (pDCB) {
-			if (pDCB->DCBFlag & ABORT_DEV_)
+		if (pDCB->DCBFlag & ABORT_DEV_)
 				trm_EnableMsgOutAbort1(pACB, pSRB);
-		}
 		phase = (u_int16_t) pSRB->ScsiPhase;  /* phase: */
 		stateV = (void *) trm_SCSI_phase0[phase];
 		stateV(pACB, pSRB, &scsi_status);
@@ -2996,6 +2993,25 @@ trm_srbmapSG(void *arg, bus_dma_segment_t *segs, int nseg, int error)
 	return;
 }
 
+static void
+trm_destroySRB(PACB pACB)
+{
+	PSRB pSRB;
+
+	pSRB = pACB->pFreeSRB;
+	while (pSRB) {
+		if (pSRB->sg_dmamap) {
+			bus_dmamap_unload(pACB->sg_dmat, pSRB->sg_dmamap);
+			bus_dmamem_free(pACB->sg_dmat, pSRB->pSRBSGL,
+			    pSRB->sg_dmamap);
+			bus_dmamap_destroy(pACB->sg_dmat, pSRB->sg_dmamap);
+		}
+		if (pSRB->dmamap)
+			bus_dmamap_destroy(pACB->buffer_dmat, pSRB->dmamap);
+		pSRB = pSRB->pNextSRB;
+	}
+}
+
 static int
 trm_initSRB(PACB pACB)
 {
@@ -3006,29 +3022,11 @@ trm_initSRB(PACB pACB)
 	for (i = 0; i < TRM_MAX_SRB_CNT; i++) {
 	       	pSRB = (PSRB)&pACB->pFreeSRB[i];
 
-		/* DMA tag for our S/G structures */
-		if (bus_dma_tag_create(                    
-		    /*parent_dmat*/pSRB->parent_dmat, 
-		    /*alignment*/  1,
-		    /*boundary*/   0,
-		    /*lowaddr*/    BUS_SPACE_MAXADDR,
-		    /*highaddr*/   BUS_SPACE_MAXADDR,
-		    /*filter*/     NULL, 
-		    /*filterarg*/  NULL,
-		    /*maxsize*/    TRM_MAX_SG_LISTENTRY * sizeof(SGentry), 
-		    /*nsegments*/  1,
-		    /*maxsegsz*/   TRM_MAXTRANSFER_SIZE,
-		    /*flags*/      0, 
-		    /*lockfunc*/   busdma_lock_mutex,
-		    /*lockarg*/    &Giant,
-		    /*dmat*/       &pSRB->sg_dmat) != 0) {
-			return ENXIO;
-		}
-		if (bus_dmamem_alloc(pSRB->sg_dmat, (void **)&pSRB->pSRBSGL,
+		if (bus_dmamem_alloc(pACB->sg_dmat, (void **)&pSRB->pSRBSGL,
 		    BUS_DMA_NOWAIT, &pSRB->sg_dmamap) !=0 ) {
 			return ENXIO;
 		}
-		bus_dmamap_load(pSRB->sg_dmat, pSRB->sg_dmamap, pSRB->pSRBSGL,
+		bus_dmamap_load(pACB->sg_dmat, pSRB->sg_dmamap, pSRB->pSRBSGL,
 		    TRM_MAX_SG_LISTENTRY * sizeof(SGentry),
 		    trm_srbmapSG, pSRB, /*flags*/0);
 		if (i != TRM_MAX_SRB_CNT - 1) {
@@ -3046,9 +3044,6 @@ trm_initSRB(PACB pACB)
 
 		/*
 		 * Create the dmamap.  This is no longer optional!
-		 *
-		 * XXX This is not freed on unload!  None of the other
-		 * allocations in this function are either!
 		 */
 		if ((error = bus_dmamap_create(pACB->buffer_dmat, 0,
 					       &pSRB->dmamap)) != 0)
@@ -3403,8 +3398,8 @@ trm_init(u_int16_t unit, device_t dev)
 		printf("trm%d: cannot allocate ACB !\n", unit);
 		return (NULL);
 	}
-	pACB->iores = bus_alloc_resource(dev, SYS_RES_IOPORT, 
-	    &rid, 0, ~0, 1, RF_ACTIVE);
+	pACB->iores = bus_alloc_resource_any(dev, SYS_RES_IOPORT, 
+	    &rid, RF_ACTIVE);
     	if (pACB->iores == NULL) {
 		printf("trm_init: bus_alloc_resource failed!\n");
 		return (NULL);
@@ -3503,6 +3498,23 @@ trm_init(u_int16_t unit, device_t dev)
 		}
 	}
 	bzero(pACB->pFreeSRB, TRM_MAX_SRB_CNT * sizeof(TRM_SRB));
+	if (bus_dma_tag_create(                    
+		    /*parent_dmat*/NULL, 
+		    /*alignment*/  1,
+		    /*boundary*/   0,
+		    /*lowaddr*/    BUS_SPACE_MAXADDR,
+		    /*highaddr*/   BUS_SPACE_MAXADDR,
+		    /*filter*/     NULL, 
+		    /*filterarg*/  NULL,
+		    /*maxsize*/    TRM_MAX_SG_LISTENTRY * sizeof(SGentry), 
+		    /*nsegments*/  1,
+		    /*maxsegsz*/   TRM_MAXTRANSFER_SIZE,
+		    /*flags*/      0, 
+		    /*lockfunc*/   busdma_lock_mutex,
+		    /*lockarg*/    &Giant,
+		    /*dmat*/       &pACB->sg_dmat) != 0)
+		goto bad;
+
 	if (trm_initSRB(pACB)) {
 		printf("trm_initSRB: error\n");
 		goto bad;
@@ -3524,6 +3536,10 @@ bad:
 	}
 	if (pACB->sense_dmat)
 		bus_dma_tag_destroy(pACB->sense_dmat);
+	if (pACB->sg_dmat) {
+		trm_destroySRB(pACB);
+		bus_dma_tag_destroy(pACB->sg_dmat);
+	}
 	if (pACB->srb_dmamap) {
 		bus_dmamap_unload(pACB->srb_dmat, pACB->srb_dmamap);
 		bus_dmamem_free(pACB->srb_dmat, pACB->pFreeSRB, 
@@ -3562,8 +3578,8 @@ trm_attach(device_t dev)
 	 * Create device queue of SIM(s)
 	 * (MAX_START_JOB - 1) : max_sim_transactions
 	 */
-	pACB->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0,
-	    ~0, 1, RF_SHAREABLE | RF_ACTIVE);
+	pACB->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
+	    RF_SHAREABLE | RF_ACTIVE);
     	if (pACB->irq == NULL ||
 	    bus_setup_intr(dev, pACB->irq, 
 	    INTR_TYPE_CAM, trm_Interrupt, pACB, &pACB->ih)) {
@@ -3632,6 +3648,11 @@ bad:
 	if (pACB->iores)
 		bus_release_resource(dev, SYS_RES_IOPORT, PCIR_BAR(0),
 		    pACB->iores);
+	if (pACB->sg_dmat) {		
+		trm_destroySRB(pACB);
+		bus_dma_tag_destroy(pACB->sg_dmat);
+	}
+	
 	if (pACB->srb_dmamap) {
 		bus_dmamap_unload(pACB->srb_dmat, pACB->srb_dmamap);
 		bus_dmamem_free(pACB->srb_dmat, pACB->pFreeSRB, 
@@ -3689,6 +3710,8 @@ trm_detach(device_t dev)
 	PACB pACB = device_get_softc(dev);
 
 	bus_release_resource(dev, SYS_RES_IOPORT, PCIR_BAR(0), pACB->iores);
+	trm_destroySRB(pACB);
+	bus_dma_tag_destroy(pACB->sg_dmat);
 	bus_dmamap_unload(pACB->srb_dmat, pACB->srb_dmamap);
 	bus_dmamem_free(pACB->srb_dmat, pACB->pFreeSRB,
 	    pACB->srb_dmamap);
@@ -3722,3 +3745,4 @@ static driver_t trm_driver = {
 
 static devclass_t trm_devclass;
 DRIVER_MODULE(trm, pci, trm_driver, trm_devclass, 0, 0);
+MODULE_DEPEND(trm, cam, 1, 1, 1);

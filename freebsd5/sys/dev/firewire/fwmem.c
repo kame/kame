@@ -33,8 +33,10 @@
  * 
  */
 
+#ifdef __FreeBSD__
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/firewire/fwmem.c,v 1.25 2003/11/07 12:39:39 simokawa Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/firewire/fwmem.c,v 1.29 2004/06/16 09:46:44 phk Exp $");
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -44,7 +46,7 @@ __FBSDID("$FreeBSD: src/sys/dev/firewire/fwmem.c,v 1.25 2003/11/07 12:39:39 simo
 #include <sys/malloc.h>
 #include <sys/conf.h>
 #include <sys/sysctl.h>
-#if __FreeBSD_version < 500000
+#if defined(__DragonFly__) || __FreeBSD_version < 500000
 #include <sys/buf.h>
 #else
 #include <sys/bio.h>
@@ -58,9 +60,15 @@ __FBSDID("$FreeBSD: src/sys/dev/firewire/fwmem.c,v 1.25 2003/11/07 12:39:39 simo
 #include <sys/ioccom.h>
 #include <sys/fcntl.h>
 
+#ifdef __DragonFly__
+#include "firewire.h"
+#include "firewirereg.h"
+#include "fwmem.h"
+#else
 #include <dev/firewire/firewire.h>
 #include <dev/firewire/firewirereg.h>
 #include <dev/firewire/fwmem.h>
+#endif
 
 static int fwmem_speed=2, fwmem_debug=0;
 static struct fw_eui64 fwmem_eui64;
@@ -75,6 +83,8 @@ SYSCTL_INT(_hw_firewire_fwmem, OID_AUTO, speed, CTLFLAG_RW, &fwmem_speed, 0,
 	"Fwmem link speed");
 SYSCTL_INT(_debug, OID_AUTO, fwmem_debug, CTLFLAG_RW, &fwmem_debug, 0,
 	"Fwmem driver debug flag");
+
+MALLOC_DEFINE(M_FWMEM, "fwmem", "fwmem/FireWire");
 
 #define MAXLEN (512 << fwmem_speed)
 
@@ -94,7 +104,7 @@ fwmem_xfer_req(
 {
 	struct fw_xfer *xfer;
 
-	xfer = fw_xfer_alloc(M_FWXFER);
+	xfer = fw_xfer_alloc(M_FWMEM);
 	if (xfer == NULL)
 		return NULL;
 
@@ -117,9 +127,9 @@ struct fw_xfer *
 fwmem_read_quad(
 	struct fw_device *fwdev,
 	caddr_t	sc,
-	u_int8_t spd,
-	u_int16_t dst_hi,
-	u_int32_t dst_lo,
+	uint8_t spd,
+	uint16_t dst_hi,
+	uint32_t dst_lo,
 	void *data,
 	void (*hand)(struct fw_xfer *))
 {
@@ -137,7 +147,7 @@ fwmem_read_quad(
 	fp->mode.rreqq.dest_lo = dst_lo;
 
 	xfer->send.payload = NULL;
-	xfer->recv.payload = (u_int32_t *)data;
+	xfer->recv.payload = (uint32_t *)data;
 
 	if (fwmem_debug)
 		printf("fwmem_read_quad: %d %04x:%08x\n", fwdev->dst,
@@ -154,9 +164,9 @@ struct fw_xfer *
 fwmem_write_quad(
 	struct fw_device *fwdev,
 	caddr_t	sc,
-	u_int8_t spd,
-	u_int16_t dst_hi,
-	u_int32_t dst_lo,
+	uint8_t spd,
+	uint16_t dst_hi,
+	uint32_t dst_lo,
 	void *data,
 	void (*hand)(struct fw_xfer *))
 {
@@ -171,13 +181,13 @@ fwmem_write_quad(
 	fp->mode.wreqq.tcode = FWTCODE_WREQQ;
 	fp->mode.wreqq.dest_hi = dst_hi;
 	fp->mode.wreqq.dest_lo = dst_lo;
-	fp->mode.wreqq.data = *(u_int32_t *)data;
+	fp->mode.wreqq.data = *(uint32_t *)data;
 
 	xfer->send.payload = xfer->recv.payload = NULL;
 
 	if (fwmem_debug)
 		printf("fwmem_write_quad: %d %04x:%08x %08x\n", fwdev->dst,
-			dst_hi, dst_lo, *(u_int32_t *)data);
+			dst_hi, dst_lo, *(uint32_t *)data);
 
 	if (fw_asyreq(xfer->fc, -1, xfer) == 0)
 		return xfer;
@@ -190,9 +200,9 @@ struct fw_xfer *
 fwmem_read_block(
 	struct fw_device *fwdev,
 	caddr_t	sc,
-	u_int8_t spd,
-	u_int16_t dst_hi,
-	u_int32_t dst_lo,
+	uint8_t spd,
+	uint16_t dst_hi,
+	uint32_t dst_lo,
 	int len,
 	void *data,
 	void (*hand)(struct fw_xfer *))
@@ -228,9 +238,9 @@ struct fw_xfer *
 fwmem_write_block(
 	struct fw_device *fwdev,
 	caddr_t	sc,
-	u_int8_t spd,
-	u_int16_t dst_hi,
-	u_int32_t dst_lo,
+	uint8_t spd,
+	uint16_t dst_hi,
+	uint32_t dst_lo,
 	int len,
 	void *data,
 	void (*hand)(struct fw_xfer *))
@@ -264,7 +274,7 @@ fwmem_write_block(
 
 
 int
-fwmem_open (dev_t dev, int flags, int fmt, fw_proc *td)
+fwmem_open (struct cdev *dev, int flags, int fmt, fw_proc *td)
 {
 	struct fwmem_softc *fms;
 
@@ -275,7 +285,7 @@ fwmem_open (dev_t dev, int flags, int fmt, fw_proc *td)
 		fms->refcount ++;
 	} else {
 		fms = (struct fwmem_softc *)malloc(sizeof(struct fwmem_softc),
-							M_FW, M_WAITOK);
+							M_FWMEM, M_WAITOK);
 		if (fms == NULL)
 			return ENOMEM;
 		bcopy(&fwmem_eui64, &fms->eui, sizeof(struct fw_eui64));
@@ -284,20 +294,20 @@ fwmem_open (dev_t dev, int flags, int fmt, fw_proc *td)
 		fms->refcount = 1;
 	}
 	if (fwmem_debug)
-		printf("%s: refcount=%d\n", __FUNCTION__, fms->refcount);
+		printf("%s: refcount=%d\n", __func__, fms->refcount);
 
 	return (0);
 }
 
 int
-fwmem_close (dev_t dev, int flags, int fmt, fw_proc *td)
+fwmem_close (struct cdev *dev, int flags, int fmt, fw_proc *td)
 {
 	struct fwmem_softc *fms;
 
 	fms = (struct fwmem_softc *)dev->si_drv1;
 	fms->refcount --;
 	if (fwmem_debug)
-		printf("%s: refcount=%d\n", __FUNCTION__, fms->refcount);
+		printf("%s: refcount=%d\n", __func__, fms->refcount);
 	if (fms->refcount < 1) {
 		free(dev->si_drv1, M_FW);
 		dev->si_drv1 = NULL;
@@ -317,7 +327,7 @@ fwmem_biodone(struct fw_xfer *xfer)
 
 	if (bp->bio_error != 0) {
 		if (fwmem_debug)
-			printf("%s: err=%d\n", __FUNCTION__, bp->bio_error);
+			printf("%s: err=%d\n", __func__, bp->bio_error);
 		bp->bio_flags |= BIO_ERROR;
 		bp->bio_resid = bp->bio_bcount;
 	}
@@ -333,7 +343,7 @@ fwmem_strategy(struct bio *bp)
 	struct fwmem_softc *fms;
 	struct fw_device *fwdev;
 	struct fw_xfer *xfer;
-	dev_t dev;
+	struct cdev *dev;
 	int unit, err=0, s, iolen;
 
 	dev = bp->bio_dev;
@@ -387,7 +397,7 @@ error:
 	splx(s);
 	if (err != 0) {
 		if (fwmem_debug)
-			printf("%s: err=%d\n", __FUNCTION__, err);
+			printf("%s: err=%d\n", __func__, err);
 		bp->bio_error = err;
 		bp->bio_flags |= BIO_ERROR;
 		bp->bio_resid = bp->bio_bcount;
@@ -396,7 +406,7 @@ error:
 }
 
 int
-fwmem_ioctl (dev_t dev, u_long cmd, caddr_t data, int flag, fw_proc *td)
+fwmem_ioctl (struct cdev *dev, u_long cmd, caddr_t data, int flag, fw_proc *td)
 {
 	struct fwmem_softc *fms;
 	int err = 0;
@@ -415,15 +425,15 @@ fwmem_ioctl (dev_t dev, u_long cmd, caddr_t data, int flag, fw_proc *td)
 	return(err);
 }
 int
-fwmem_poll (dev_t dev, int events, fw_proc *td)
+fwmem_poll (struct cdev *dev, int events, fw_proc *td)
 {  
 	return EINVAL;
 }
 int
-#if __FreeBSD_version < 500102
-fwmem_mmap (dev_t dev, vm_offset_t offset, int nproto)
+#if defined(__DragonFly__) || __FreeBSD_version < 500102
+fwmem_mmap (struct cdev *dev, vm_offset_t offset, int nproto)
 #else
-fwmem_mmap (dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nproto)
+fwmem_mmap (struct cdev *dev, vm_offset_t offset, vm_paddr_t *paddr, int nproto)
 #endif
 {  
 	return EINVAL;

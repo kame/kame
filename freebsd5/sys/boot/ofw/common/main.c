@@ -23,9 +23,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/ofw/common/main.c,v 1.3 2002/11/10 19:17:35 jake Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/ofw/common/main.c,v 1.7 2004/08/16 15:45:24 marius Exp $");
 
 #include <stand.h>
 #include "openfirm.h"
@@ -41,8 +42,11 @@ extern char bootprog_date[];
 extern char bootprog_maker[];
 
 phandle_t	chosen;
+u_int32_t	acells;
 
-#define	HEAP_SIZE	0x40000
+static char bootargs[128];
+
+#define	HEAP_SIZE	0x80000
 
 void
 init_heap(void)
@@ -54,37 +58,59 @@ init_heap(void)
 		OF_enter();
 	}
 
-	setheap(base, base + (HEAP_SIZE / sizeof(base)));
+	setheap(base, (void *)((int)base + HEAP_SIZE));
 }
 
-uint32_t
+uint64_t
 memsize(void)
 {
 	ihandle_t	meminstance;
 	phandle_t	memory;
-	struct ofw_reg	reg;
+	struct ofw_reg	reg[4];
+	struct ofw_reg2	reg2[8];
+	int		i;
+	u_int64_t	sz, memsz;
 
 	OF_getprop(chosen, "memory", &meminstance, sizeof(meminstance));
 	memory = OF_instance_to_package(meminstance);
 
-	OF_getprop(memory, "reg", &reg, sizeof(reg));
+	if (acells == 1) {
+		sz = OF_getprop(memory, "reg", &reg, sizeof(reg));
+		sz /= sizeof(struct ofw_reg);
 
-	return (reg.size);
+		for (i = 0, memsz = 0; i < sz; i++)
+			memsz += reg[i].size;
+	} else if (acells == 2) {
+		sz = OF_getprop(memory, "reg", &reg2, sizeof(reg2));
+		sz /= sizeof(struct ofw_reg2);
+
+		for (i = 0, memsz = 0; i < sz; i++)
+			memsz += reg2[i].size;
+	}
+
+	return (memsz);
 }
 
 int
 main(int (*openfirm)(void *))
 {
+	phandle_t	root;
 	int		i;
 	char		bootpath[64];
 	char		*ch;
+	int		bargc;
+	char		**bargv;
 
 	/*
-	 * Initalise the OpenFirmware routines by giving them the entry point.
+	 * Initalise the Open Firmware routines by giving them the entry point.
 	 */
 	OF_init(openfirm);
 
+	root = OF_finddevice("/");
 	chosen = OF_finddevice("/chosen");
+
+	acells = 1;
+	OF_getprop(root, "#address-cells", &acells, sizeof(acells));
 
 	/*
          * Set up console.
@@ -113,7 +139,7 @@ main(int (*openfirm)(void *))
 	printf("\n");
 	printf("%s, Revision %s\n", bootprog_name, bootprog_rev);
 	printf("(%s, %s)\n", bootprog_maker, bootprog_date);
-	printf("Memory: %dKB\n", memsize() / 1024);
+	printf("Memory: %lldKB\n", memsize() / 1024);
 
 	OF_getprop(chosen, "bootpath", bootpath, 64);
 	ch = index(bootpath, ':');
@@ -122,8 +148,19 @@ main(int (*openfirm)(void *))
 
 	printf("\n");
 
-	env_setenv("currdev", EV_VOLATILE, bootpath,
-	    ofw_setcurrdev, env_nounset);
+	/*
+	 * Only parse the first bootarg if present. It should
+	 * be simple to handle extra arguments
+	 */
+	OF_getprop(chosen, "bootargs", bootargs, sizeof(bootargs));
+	bargc = 0;
+	parse(&bargc, &bargv, bootargs);
+	if (bargc == 1)
+		env_setenv("currdev", EV_VOLATILE, bargv[0], ofw_setcurrdev,
+		    env_nounset);
+	else
+		env_setenv("currdev", EV_VOLATILE, bootpath,
+			   ofw_setcurrdev, env_nounset);
 	env_setenv("loaddev", EV_VOLATILE, bootpath, env_noset,
 	    env_nounset);
 	setenv("LINES", "24", 1);		/* optional */
@@ -157,6 +194,6 @@ int
 command_memmap(int argc, char **argv)
 {
 
-	ofw_memmap();
+	ofw_memmap(acells);
 	return (CMD_OK);
 }

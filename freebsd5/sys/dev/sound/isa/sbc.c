@@ -30,7 +30,7 @@
 
 #include <isa/isavar.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sbc.c,v 1.38 2003/02/07 14:05:33 nyan Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sbc.c,v 1.42.2.1 2004/10/15 05:14:10 njl Exp $");
 
 #define IO_MAX	3
 #define IRQ_MAX	1
@@ -129,6 +129,12 @@ void
 sbc_lock(struct sbc_softc *scp)
 {
 	snd_mtxlock(scp->lock);
+}
+
+void
+sbc_lockassert(struct sbc_softc *scp)
+{
+	snd_mtxassert(scp->lock);
 }
 
 void
@@ -430,7 +436,7 @@ sbc_attach(device_t dev)
 	err = "setup_intr";
 	for (i = 0; i < IRQ_MAX; i++) {
 		scp->ihl[i].parent = scp;
-		if (snd_setup_intr(dev, scp->irq[i], INTR_MPSAFE, sbc_intr, &scp->ihl[i], &scp->ih[i]))
+		if (snd_setup_intr(dev, scp->irq[i], 0, sbc_intr, &scp->ihl[i], &scp->ih[i]))
 			goto bad;
 	}
 
@@ -700,8 +706,10 @@ alloc_resource(struct sbc_softc *scp)
 	for (i = 0 ; i < DRQ_MAX ; i++) {
 		if (scp->drq[i] == NULL) {
 			scp->drq_rid[i] = i;
-			scp->drq[i] = bus_alloc_resource(scp->dev, SYS_RES_DRQ, &scp->drq_rid[i],
-							 0, ~0, 1, RF_ACTIVE);
+			scp->drq[i] = bus_alloc_resource_any(scp->dev,
+							     SYS_RES_DRQ,
+							     &scp->drq_rid[i],
+							     RF_ACTIVE);
 			if (i == 0 && scp->drq[i] == NULL)
 				return (1);
 			scp->drq_alloced[i] = 0;
@@ -710,8 +718,10 @@ alloc_resource(struct sbc_softc *scp)
 	for (i = 0 ; i < IRQ_MAX ; i++) {
 	 	if (scp->irq[i] == NULL) {
 			scp->irq_rid[i] = i;
-			scp->irq[i] = bus_alloc_resource(scp->dev, SYS_RES_IRQ, &scp->irq_rid[i],
-							 0, ~0, 1, RF_ACTIVE);
+			scp->irq[i] = bus_alloc_resource_any(scp->dev,
+							     SYS_RES_IRQ,
+							     &scp->irq_rid[i],
+							     RF_ACTIVE);
 			if (i == 0 && scp->irq[i] == NULL)
 				return (1);
 			scp->irq_alloced[i] = 0;
@@ -780,5 +790,6 @@ static driver_t sbc_driver = {
 
 /* sbc can be attached to an isa bus. */
 DRIVER_MODULE(snd_sbc, isa, sbc_driver, sbc_devclass, 0, 0);
-MODULE_DEPEND(snd_sbc, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+DRIVER_MODULE(snd_sbc, acpi, sbc_driver, sbc_devclass, 0, 0);
+MODULE_DEPEND(snd_sbc, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_sbc, 1);

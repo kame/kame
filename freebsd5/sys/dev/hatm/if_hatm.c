@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/hatm/if_hatm.c,v 1.18 2003/11/05 11:47:31 harti Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/hatm/if_hatm.c,v 1.20 2004/03/17 17:50:34 njl Exp $");
 
 #include "opt_inet.h"
 #include "opt_natm.h"
@@ -1698,8 +1698,8 @@ hatm_attach(device_t dev)
 		goto failed;
 	}
 	sc->memid = PCIR_BAR(0);
-	sc->memres = bus_alloc_resource(dev, SYS_RES_MEMORY, &sc->memid,
-	    0, ~0, 1, RF_ACTIVE);
+	sc->memres = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &sc->memid,
+	    RF_ACTIVE);
 	if (sc->memres == NULL) {
 		device_printf(dev, "could not map memory\n");
 		error = ENXIO;
@@ -1753,8 +1753,8 @@ hatm_attach(device_t dev)
 	 * Setup the interrupt
 	 */
 	sc->irqid = 0;
-	sc->irqres = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irqid,
-	    0, ~0, 1, RF_SHAREABLE | RF_ACTIVE);
+	sc->irqres = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irqid,
+	    RF_SHAREABLE | RF_ACTIVE);
 	if (sc->irqres == 0) {
 		device_printf(dev, "could not allocate irq\n");
 		error = ENXIO;
@@ -2312,13 +2312,8 @@ hatm_stop(struct hatm_softc *sc)
 	 * Give any waiters on closing a VCC a chance. They will stop
 	 * to wait if they see that IFF_RUNNING disappeared.
 	 */
-	while (!(cv_waitq_empty(&sc->vcc_cv))) {
-		cv_broadcast(&sc->vcc_cv);
-		DELAY(100);
-	}
-	while (!(cv_waitq_empty(&sc->cv_rcclose))) {
-		cv_broadcast(&sc->cv_rcclose);
-	}
+	cv_broadcast(&sc->vcc_cv);
+	cv_broadcast(&sc->cv_rcclose);
 
 	/*
 	 * Now free all resources.

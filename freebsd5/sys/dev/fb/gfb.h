@@ -26,7 +26,7 @@
  *
  * Copyright (c) 2000 Andrew Miklic
  *
- * $FreeBSD: src/sys/dev/fb/gfb.h,v 1.1 2001/11/01 08:26:29 obrien Exp $
+ * $FreeBSD: src/sys/dev/fb/gfb.h,v 1.2 2004/06/16 09:46:43 phk Exp $
  */
 
 #ifndef _FB_GFB_H_
@@ -166,7 +166,7 @@ typedef struct gfb_softc {
 	int type;
 	int model;
 	struct cdevsw *cdevsw;
-	dev_t devt;
+	struct cdev *devt;
 } *gfb_softc_t;
 
 #endif /* _FB_GFB_H_ */

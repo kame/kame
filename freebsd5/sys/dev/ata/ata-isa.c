@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ata/ata-isa.c,v 1.18.2.1 2004/01/27 05:53:18 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ata/ata-isa.c,v 1.22.2.1 2004/10/10 15:01:47 sos Exp $");
 
 #include "opt_ata.h"
 #include <sys/param.h>
@@ -58,9 +58,10 @@ static struct isa_pnp_id ata_ids[] = {
     {0}
 };
 
-static void
-ata_isa_lock(struct ata_channel *ch, int type)
+static int
+ata_isa_locknoop(struct ata_channel *ch, int type)
 {
+    return ch->unit;
 }
 
 static void
@@ -114,9 +115,10 @@ ata_isa_probe(device_t dev)
     /* initialize softc for this channel */
     ch->unit = 0;
     ch->flags |= ATA_USE_16BIT;
-    ch->locking = ata_isa_lock;
+    ch->locking = ata_isa_locknoop;
     ch->device[MASTER].setmode = ata_isa_setmode;
     ch->device[SLAVE].setmode = ata_isa_setmode;
+    ata_generic_hw(ch);
     return ata_probe(dev);
 }
 

@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/arc/lib/devicename.c,v 1.3 2003/04/16 21:09:41 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/arc/lib/devicename.c,v 1.4 2004/01/04 23:28:01 obrien Exp $");
 
 #include <stand.h>
 #include <string.h>

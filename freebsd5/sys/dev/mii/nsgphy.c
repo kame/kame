@@ -38,7 +38,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/nsgphy.c,v 1.16 2003/08/24 17:54:10 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mii/nsgphy.c,v 1.18 2004/05/30 17:57:40 phk Exp $");
 
 /*
  * Driver for the National Semiconductor DP83891 and DP83861
@@ -54,12 +54,10 @@ __FBSDID("$FreeBSD: src/sys/dev/mii/nsgphy.c,v 1.16 2003/08/24 17:54:10 obrien E
  * access to its internal RAM via indirect register access.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/nsgphy.c,v 1.16 2003/08/24 17:54:10 obrien Exp $");
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 #include <sys/bus.h>
 

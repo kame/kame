@@ -68,7 +68,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_ch.c,v 1.37 2003/06/10 18:14:04 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_ch.c,v 1.40 2004/06/16 09:46:31 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/queue.h>
@@ -145,7 +145,7 @@ struct ch_softc {
 	ch_quirks	quirks;
 	union ccb	saved_ccb;
 	struct devstat	*device_stats;
-	dev_t		dev;
+	struct cdev *dev;
 
 	int		sc_picker;	/* current picker */
 
@@ -174,7 +174,6 @@ struct ch_softc {
 };
 
 #define CHUNIT(x)       (minor((x)))
-#define CH_CDEV_MAJOR	17
 
 static	d_open_t	chopen;
 static	d_close_t	chclose;
@@ -213,11 +212,12 @@ static struct periph_driver chdriver =
 PERIPHDRIVER_DECLARE(ch, chdriver);
 
 static struct cdevsw ch_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	chopen,
 	.d_close =	chclose,
 	.d_ioctl =	chioctl,
 	.d_name =	"ch",
-	.d_maj =	CH_CDEV_MAJOR,
 };
 
 static void
@@ -405,7 +405,7 @@ chregister(struct cam_periph *periph, void *arg)
 }
 
 static int
-chopen(dev_t dev, int flags, int fmt, struct thread *td)
+chopen(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	struct cam_periph *periph;
 	struct ch_softc *softc;
@@ -453,7 +453,7 @@ chopen(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static int
-chclose(dev_t dev, int flag, int fmt, struct thread *td)
+chclose(struct cdev *dev, int flag, int fmt, struct thread *td)
 {
 	struct	cam_periph *periph;
 	struct	ch_softc *softc;
@@ -702,7 +702,7 @@ cherror(union ccb *ccb, u_int32_t cam_flags, u_int32_t sense_flags)
 }
 
 static int
-chioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
+chioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread *td)
 {
 	struct cam_periph *periph;
 	struct ch_softc *softc;

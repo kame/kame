@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pci/pcivar.h,v 1.63 2003/09/14 19:30:00 scottl Exp $
+ * $FreeBSD: src/sys/dev/pci/pcivar.h,v 1.64 2004/04/07 20:45:58 imp Exp $
  *
  */
 
@@ -67,9 +67,11 @@ struct pcicfg_msi {
 };
 
 /* config header information common to all header types */
-
 typedef struct pcicfg {
     struct device *dev;		/* device which owns this */
+
+    uint32_t	bar[PCI_MAXMAPS_0]; /* BARs */
+    uint32_t	bios;		/* BIOS mapping */
 
     uint16_t	subvendor;	/* card vendor ID */
     uint16_t	subdevice;	/* card device ID, assigned by card vendor */

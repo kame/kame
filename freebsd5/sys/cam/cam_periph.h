@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_periph.h,v 1.13 2003/03/08 08:01:26 phk Exp $
+ * $FreeBSD: src/sys/cam/cam_periph.h,v 1.14 2004/07/15 08:25:59 phk Exp $
  */
 
 #ifndef _CAM_CAM_PERIPH_H
@@ -53,6 +53,8 @@ void periphdriver_register(void *);
 		case MOD_UNLOAD: \
 			printf(#name " module unload - not possible for this module type\n"); \
 			return EINVAL; \
+		default: \
+			return EOPNOTSUPP; \
 		} \
 		return 0; \
 	} \

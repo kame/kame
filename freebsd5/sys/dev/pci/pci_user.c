@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/pci/pci_user.c,v 1.14 2003/10/11 22:20:34 se Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/pci/pci_user.c,v 1.17 2004/06/16 09:46:53 phk Exp $");
 
 #include "opt_bus.h"	/* XXX trim includes */
 
@@ -74,6 +74,8 @@ static d_ioctl_t	pci_ioctl;
 #endif
 
 struct cdevsw pcicdev = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	pci_open,
 	.d_close =	pci_close,
 	.d_ioctl =	pci_ioctl,
@@ -82,7 +84,7 @@ struct cdevsw pcicdev = {
 };
   
 static int
-pci_open(dev_t dev, int oflags, int devtype, struct thread *td)
+pci_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 {
 	int error;
 
@@ -96,7 +98,7 @@ pci_open(dev_t dev, int oflags, int devtype, struct thread *td)
 }
 
 static int
-pci_close(dev_t dev, int flag, int devtype, struct thread *td)
+pci_close(struct cdev *dev, int flag, int devtype, struct thread *td)
 {
 	return 0;
 }
@@ -169,7 +171,7 @@ pci_conf_match(struct pci_match_conf *matches, int num_matches,
 }
 
 static int
-pci_ioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
+pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 {
 	device_t pci, pcib;
 	struct pci_io *io;
@@ -429,4 +431,3 @@ getconfexit:
 
 	return (error);
 }
-

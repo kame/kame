@@ -28,7 +28,7 @@
  *    Rickard E. (Rik) Faith <faith@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/drmP.h,v 1.8 2003/11/12 20:56:30 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drmP.h,v 1.11 2004/06/16 09:46:42 phk Exp $
  */
 
 #ifndef _DRM_P_H_
@@ -197,11 +197,6 @@ typedef struct drm_buf_entry {
 	drm_freelist_t	  freelist;
 } drm_buf_entry_t;
 
-typedef struct drm_hw_lock {
-	__volatile__ unsigned int lock;
-	char			  padding[60]; /* Pad to cache line */
-} drm_hw_lock_t;
-
 typedef TAILQ_HEAD(drm_file_list, drm_file) drm_file_list_t;
 struct drm_file {
 	TAILQ_ENTRY(drm_file) link;
@@ -268,7 +263,7 @@ typedef struct drm_agp_head {
 	int                enabled;
 	int                acquired;
 	unsigned long      base;
-   	int 		   agp_mtrr;
+   	int 		   mtrr;
 	int		   cant_use_aperture;
 	unsigned long	   page_mask;
 } drm_agp_head_t;
@@ -288,7 +283,7 @@ typedef struct drm_local_map {
 	drm_map_flags_t flags;	 /* Flags				    */
 	void		*handle; /* User-space: "Handle" to pass to mmap    */
 				 /* Kernel-space: kernel-virtual address    */
-	int		mtrr;	 /* MTRR slot used			    */
+	int		mtrr;	 /* Boolean: MTRR used */
 				 /* Private data			    */
 	bus_space_tag_t iot;
 	bus_space_handle_t ioh;
@@ -318,7 +313,7 @@ struct drm_device {
 #ifdef __FreeBSD__
 	device_t	  device;	/* Device instance from newbus     */
 #endif
-	dev_t		  devnode;	/* Device number for mknod	   */
+	struct cdev *devnode;	/* Device number for mknod	   */
 	int		  if_version;	/* Highest interface version set */
 
 	int		  flags;	/* Flags to open(2)		   */

@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/joy/joy_pccard.c,v 1.3 2003/08/24 17:49:14 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/joy/joy_pccard.c,v 1.5 2004/05/27 03:49:42 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -40,9 +40,9 @@ __FBSDID("$FreeBSD: src/sys/dev/joy/joy_pccard.c,v 1.3 2003/08/24 17:49:14 obrie
 #include <sys/rman.h>
 #include <dev/joy/joyvar.h>
 
-#include <dev/pccard/pccardreg.h>
 #include <dev/pccard/pccardvar.h>
-#include <dev/pccard/pccarddevs.h>
+
+#include "pccarddevs.h"
 
 static int
 joy_pccard_match(device_t dev)

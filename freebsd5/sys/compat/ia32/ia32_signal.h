@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/compat/ia32/ia32_signal.h,v 1.4 2003/11/08 07:43:44 peter Exp $
+ * $FreeBSD: src/sys/compat/ia32/ia32_signal.h,v 1.6 2004/04/14 23:20:14 peter Exp $
  */
 
 struct ia32_sigaltstack {
@@ -113,6 +113,32 @@ struct ia32_ucontext4 {
 };
 #endif
 
+#ifdef COMPAT_FREEBSD3
+struct ia32_sigcontext3 {
+	int	sc_onstack;
+	u_int32_t sc_mask;
+	int	sc_esp;	
+	int	sc_ebp;
+	int	sc_isp;
+	int	sc_eip;
+	int	sc_eflags;
+	int	sc_es;
+	int	sc_ds;
+	int	sc_cs;
+	int	sc_ss;
+	int	sc_edi;
+	int	sc_esi;
+	int	sc_ebx;
+	int	sc_edx;
+	int	sc_ecx;
+	int	sc_eax;
+	int	sc_gs;
+	int	sc_fs;
+	int	sc_trapno;
+	int	sc_err;
+};
+#endif
+
 /*
  * Signal frames, arguments passed to application signal handlers.
  */
@@ -151,9 +177,27 @@ struct ia32_sigframe {
 	u_int32_t		sf_ucontext;	/* points to sf_uc */
 	u_int32_t		sf_addr;	/* undocumented 4th arg */
 	u_int32_t		sf_ah;		/* action/handler pointer */
+	/* Beware, hole due to ucontext being 16 byte aligned! */
 	struct ia32_ucontext	sf_uc;		/* = *sf_ucontext */
 	struct ia32_siginfo	sf_si;		/* = *sf_siginfo (SA_SIGINFO case) */
 };
+
+#ifdef COMPAT_FREEBSD3
+struct ia32_siginfo3 {
+	struct ia32_sigcontext3 si_sc;
+	int			si_signo;
+	int			si_code;
+	union ia32_sigval si_value;
+};
+struct ia32_sigframe3 {
+	int			sf_signum;
+	u_int32_t		sf_arg2;	/* int or siginfo_t */
+	u_int32_t		sf_scp;
+	u_int32_t		sf_addr;
+	u_int32_t		sf_ah;		/* action/handler pointer */
+	struct ia32_siginfo3	sf_siginfo;
+};
+#endif
 
 extern char ia32_sigcode[];
 extern char freebsd4_ia32_sigcode[];

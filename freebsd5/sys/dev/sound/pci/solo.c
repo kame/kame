@@ -33,7 +33,7 @@
 
 #include "mixer_if.h"
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/solo.c,v 1.29 2003/09/07 16:28:03 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/solo.c,v 1.32 2004/07/16 03:59:27 tanimura Exp $");
 
 #define SOLO_DEFAULT_BUFSZ 16384
 #define ABS(x) (((x) < 0)? -(x) : (x))
@@ -850,22 +850,23 @@ ess_alloc_resources(struct ess_info *sc, device_t dev)
 	int rid;
 
 	rid = PCIR_BAR(0);
-    	sc->io = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1, RF_ACTIVE);
+    	sc->io = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid, RF_ACTIVE);
 
 	rid = PCIR_BAR(1);
-    	sc->sb = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1, RF_ACTIVE);
+    	sc->sb = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid, RF_ACTIVE);
 
 	rid = PCIR_BAR(2);
-    	sc->vc = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1, RF_ACTIVE);
+    	sc->vc = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid, RF_ACTIVE);
 
 	rid = PCIR_BAR(3);
-    	sc->mpu = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1, RF_ACTIVE);
+    	sc->mpu = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid, RF_ACTIVE);
 
 	rid = PCIR_BAR(4);
-    	sc->gp = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid, 0, ~0, 1, RF_ACTIVE);
+    	sc->gp = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid, RF_ACTIVE);
 
 	rid = 0;
-	sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+	sc->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
+		RF_ACTIVE | RF_SHAREABLE);
 
 	return (sc->irq && sc->io && sc->sb && sc->vc && sc->mpu && sc->gp)? 0 : ENXIO;
 }
@@ -997,9 +998,9 @@ ess_attach(device_t dev)
 		goto no;
     	}
 
-    	snprintf(status, SND_STATUSLEN, "at io 0x%lx,0x%lx,0x%lx irq %ld",
+    	snprintf(status, SND_STATUSLEN, "at io 0x%lx,0x%lx,0x%lx irq %ld %s",
     	     	rman_get_start(sc->io), rman_get_start(sc->sb), rman_get_start(sc->vc),
-		rman_get_start(sc->irq));
+		rman_get_start(sc->irq),PCM_KLDSTRING(snd_solo));
 
     	if (pcm_register(dev, sc, 1, 1))
 		goto no;
@@ -1047,7 +1048,7 @@ static driver_t ess_driver = {
 };
 
 DRIVER_MODULE(snd_solo, pci, ess_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_solo, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_solo, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_solo, 1);
 
 

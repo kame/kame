@@ -31,7 +31,7 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/dev/firewire/fwdev.c,v 1.35 2003/11/07 12:30:57 simokawa Exp $
+ * $FreeBSD: src/sys/dev/firewire/fwdev.c,v 1.44 2004/06/17 17:16:44 phk Exp $
  *
  */
 
@@ -39,7 +39,7 @@
 #include <sys/systm.h>
 #include <sys/types.h>
 #include <sys/mbuf.h>
-#if __FreeBSD_version < 500000
+#if defined(__DragonFly__) || __FreeBSD_version < 500000
 #include <sys/buf.h>
 #else
 #include <sys/bio.h>
@@ -56,13 +56,20 @@
 
 #include <sys/ioccom.h>
 
+#ifdef __DragonFly__
+#include "firewire.h"
+#include "firewirereg.h"
+#include "fwdma.h"
+#include "fwmem.h"
+#include "iec68113.h"
+#else
 #include <dev/firewire/firewire.h>
 #include <dev/firewire/firewirereg.h>
 #include <dev/firewire/fwdma.h>
 #include <dev/firewire/fwmem.h>
 #include <dev/firewire/iec68113.h>
+#endif
 
-#define CDEV_MAJOR 127
 #define	FWNODE_INVAL 0xffff
 
 static	d_open_t	fw_open;
@@ -74,9 +81,14 @@ static	d_write_t	fw_write;
 static	d_mmap_t	fw_mmap;
 static	d_strategy_t	fw_strategy;
 
-struct cdevsw firewire_cdevsw = 
-{
-#if __FreeBSD_version >= 500104
+struct cdevsw firewire_cdevsw = {
+#ifdef __DragonFly__
+#define CDEV_MAJOR 127
+	"fw", CDEV_MAJOR, D_MEM, NULL, 0,
+	fw_open, fw_close, fw_read, fw_write, fw_ioctl,
+	fw_poll, fw_mmap, fw_strategy, nodump, nopsize,
+#elif __FreeBSD_version >= 500104
+	.d_version =	D_VERSION,
 	.d_open =	fw_open,
 	.d_close =	fw_close,
 	.d_read =	fw_read,
@@ -86,9 +98,9 @@ struct cdevsw firewire_cdevsw =
 	.d_mmap =	fw_mmap,
 	.d_strategy =	fw_strategy,
 	.d_name =	"fw",
-	.d_maj =	CDEV_MAJOR,
-	.d_flags =	D_MEM
+	.d_flags =	D_MEM | D_NEEDGIANT
 #else
+#define CDEV_MAJOR 127
 	fw_open, fw_close, fw_read, fw_write, fw_ioctl,
 	fw_poll, fw_mmap, fw_strategy, "fw", CDEV_MAJOR,
 	nodump, nopsize, D_MEM, -1
@@ -116,8 +128,8 @@ fwdev_allocbuf(struct firewire_comm *fc, struct fw_xferq *q,
 	if (q->bulkxfer == NULL)
 		return(ENOMEM);
 
-	b->psize = roundup2(b->psize, sizeof(u_int32_t));
-	q->buf = fwdma_malloc_multiseg(fc, sizeof(u_int32_t),
+	b->psize = roundup2(b->psize, sizeof(uint32_t));
+	q->buf = fwdma_malloc_multiseg(fc, sizeof(uint32_t),
 			b->psize, b->nchunk * b->npacket, BUS_DMA_WAITOK);
 
 	if (q->buf == NULL) {
@@ -166,7 +178,7 @@ fwdev_freebuf(struct fw_xferq *q)
 
 
 static int
-fw_open (dev_t dev, int flags, int fmt, fw_proc *td)
+fw_open (struct cdev *dev, int flags, int fmt, fw_proc *td)
 {
 	int err = 0;
 
@@ -176,7 +188,7 @@ fw_open (dev_t dev, int flags, int fmt, fw_proc *td)
 	if (dev->si_drv1 != NULL)
 		return (EBUSY);
 
-#if __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	if ((dev->si_flags & SI_NAMED) == 0) {
 		int unit = DEV2UNIT(dev);
 		int sub = DEV2SUB(dev);
@@ -193,7 +205,7 @@ fw_open (dev_t dev, int flags, int fmt, fw_proc *td)
 }
 
 static int
-fw_close (dev_t dev, int flags, int fmt, fw_proc *td)
+fw_close (struct cdev *dev, int flags, int fmt, fw_proc *td)
 {
 	struct firewire_softc *sc;
 	struct firewire_comm *fc;
@@ -267,7 +279,7 @@ fw_close (dev_t dev, int flags, int fmt, fw_proc *td)
  * read request.
  */
 static int
-fw_read (dev_t dev, struct uio *uio, int ioflag)
+fw_read (struct cdev *dev, struct uio *uio, int ioflag)
 {
 	struct firewire_softc *sc;
 	struct fw_xferq *ir;
@@ -335,7 +347,7 @@ readloop:
 			return err;
 		}
 		err = uiomove((caddr_t)fp,
-			fp->mode.stream.len + sizeof(u_int32_t), uio);
+			fp->mode.stream.len + sizeof(uint32_t), uio);
 		ir->queued ++;
 		if(ir->queued >= ir->bnpacket){
 			s = splfw();
@@ -353,7 +365,7 @@ readloop:
 }
 
 static int
-fw_write (dev_t dev, struct uio *uio, int ioflag)
+fw_write (struct cdev *dev, struct uio *uio, int ioflag)
 {
 	int err = 0;
 	struct firewire_softc *sc;
@@ -416,7 +428,7 @@ isoloop:
  * ioctl support.
  */
 int
-fw_ioctl (dev_t dev, u_long cmd, caddr_t data, int flag, fw_proc *td)
+fw_ioctl (struct cdev *dev, u_long cmd, caddr_t data, int flag, fw_proc *td)
 {
 	struct firewire_softc *sc;
 	struct firewire_comm *fc;
@@ -565,7 +577,7 @@ fw_ioctl (dev_t dev, u_long cmd, caddr_t data, int flag, fw_proc *td)
 		bcopy(fp, (void *)&xfer->send.hdr, tinfo->hdr_len);
 		if (pay_len > 0)
 			bcopy((char *)fp + tinfo->hdr_len,
-			    (void *)&xfer->send.payload, pay_len);
+			    (void *)xfer->send.payload, pay_len);
 		xfer->send.spd = asyreq->req.sped;
 		xfer->act.hand = fw_asy_callback;
 
@@ -582,13 +594,21 @@ fw_ioctl (dev_t dev, u_long cmd, caddr_t data, int flag, fw_proc *td)
 
 		/* copy response */
 		tinfo = &sc->fc->tcode[xfer->recv.hdr.mode.hdr.tcode];
-		if (asyreq->req.len >= xfer->recv.pay_len + tinfo->hdr_len)
-			asyreq->req.len = xfer->recv.pay_len;
-		else
-			err = EINVAL;
+		if (xfer->recv.hdr.mode.hdr.tcode == FWTCODE_RRESB ||
+		    xfer->recv.hdr.mode.hdr.tcode == FWTCODE_LRES) {
+			pay_len = xfer->recv.pay_len;
+			if (asyreq->req.len >= xfer->recv.pay_len + tinfo->hdr_len) {
+				asyreq->req.len = xfer->recv.pay_len +
+					tinfo->hdr_len;
+			} else {
+				err = EINVAL;
+				pay_len = 0;
+			}
+		} else {
+			pay_len = 0;
+		}
 		bcopy(&xfer->recv.hdr, fp, tinfo->hdr_len);
-		bcopy(xfer->recv.payload, (char *)fp + tinfo->hdr_len,
-		    MAX(0, asyreq->req.len - tinfo->hdr_len));
+		bcopy(xfer->recv.payload, (char *)fp + tinfo->hdr_len, pay_len);
 out:
 		fw_xfer_free_buf(xfer);
 		break;
@@ -631,8 +651,8 @@ out:
 		/* XXX alloc buf */
 		xfer = fw_xfer_alloc(M_FWXFER);
 		if(xfer == NULL){
-			err = ENOMEM;
-			return err;
+			free(fwb, M_FW);
+			return (ENOMEM);
 		}
 		xfer->fc = sc->fc;
 
@@ -682,7 +702,7 @@ out:
 			ptr = malloc(CROMSIZE, M_FW, M_WAITOK);
 			len = CROMSIZE;
 			for (i = 0; i < CROMSIZE/4; i++)
-				((u_int32_t *)ptr)[i]
+				((uint32_t *)ptr)[i]
 					= ntohl(sc->fc->config_rom[i]);
 		} else {
 			/* found */
@@ -708,7 +728,7 @@ out:
 	return err;
 }
 int
-fw_poll(dev_t dev, int events, fw_proc *td)
+fw_poll(struct cdev *dev, int events, fw_proc *td)
 {
 	struct firewire_softc *sc;
 	struct fw_xferq *ir;
@@ -739,17 +759,17 @@ fw_poll(dev_t dev, int events, fw_proc *td)
 }
 
 static int
-#if __FreeBSD_version < 500102
-fw_mmap (dev_t dev, vm_offset_t offset, int nproto)
+#if defined(__DragonFly__) || __FreeBSD_version < 500102
+fw_mmap (struct cdev *dev, vm_offset_t offset, int nproto)
 #else
-fw_mmap (dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nproto)
+fw_mmap (struct cdev *dev, vm_offset_t offset, vm_paddr_t *paddr, int nproto)
 #endif
 {  
 	struct firewire_softc *sc;
 	int unit = DEV2UNIT(dev);
 
 	if (DEV_FWMEM(dev))
-#if __FreeBSD_version < 500102
+#if defined(__DragonFly__) || __FreeBSD_version < 500102
 		return fwmem_mmap(dev, offset, nproto);
 #else
 		return fwmem_mmap(dev, offset, paddr, nproto);
@@ -763,7 +783,7 @@ fw_mmap (dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nproto)
 static void
 fw_strategy(struct bio *bp)
 {
-	dev_t dev;
+	struct cdev *dev;
 
 	dev = bp->bio_dev;
 	if (DEV_FWMEM(dev)) {
@@ -782,8 +802,10 @@ fwdev_makedev(struct firewire_softc *sc)
 {
 	int err = 0;
 
-#if __FreeBSD_version >= 500000
-	dev_t d;
+#if defined(__DragonFly__) || __FreeBSD_version < 500000
+	cdevsw_add(&firewire_cdevsw);
+#else
+	struct cdev *d;
 	int unit;
 
 	unit = device_get_unit(sc->fc->bdev);
@@ -797,8 +819,6 @@ fwdev_makedev(struct firewire_softc *sc)
 	dev_depends(sc->dev, d);
 	make_dev_alias(sc->dev, "fw%d", unit);
 	make_dev_alias(d, "fwmem%d", unit);
-#else
-	cdevsw_add(&firewire_cdevsw);
 #endif
 
 	return (err);
@@ -809,18 +829,18 @@ fwdev_destroydev(struct firewire_softc *sc)
 {
 	int err = 0;
 
-#if __FreeBSD_version >= 500000
-	destroy_dev(sc->dev);
-#else
+#if defined(__DragonFly__) || __FreeBSD_version < 500000
 	cdevsw_remove(&firewire_cdevsw);
+#else
+	destroy_dev(sc->dev);
 #endif
 	return (err);
 }
 
-#if __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 #define NDEVTYPE 2
 void
-fwdev_clone(void *arg, char *name, int namelen, dev_t *dev)
+fwdev_clone(void *arg, char *name, int namelen, struct cdev **dev)
 {
 	struct firewire_softc *sc;
 	char *devnames[NDEVTYPE] = {"fw", "fwmem"};
@@ -828,7 +848,7 @@ fwdev_clone(void *arg, char *name, int namelen, dev_t *dev)
 	int devflag[NDEVTYPE] = {0, FWMEM_FLAG};
 	int i, unit = 0, sub = 0;
 
-	if (*dev != NODEV)
+	if (*dev != NULL)
 		return;
 
 	for (i = 0; i < NDEVTYPE; i++)

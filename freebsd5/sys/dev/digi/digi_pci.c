@@ -28,12 +28,13 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/digi/digi_pci.c,v 1.9 2003/08/24 17:46:03 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/digi/digi_pci.c,v 1.11 2004/05/30 20:08:30 phk Exp $");
 
 #include <sys/param.h>
 
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/tty.h>
 #include <sys/bus.h>
 #include <machine/bus.h>
@@ -177,13 +178,13 @@ digi_pci_attach(device_t dev)
 	pci_write_config(dev, 0x40, 0, 4);
 	pci_write_config(dev, 0x46, 0, 4);
 
-	sc->res.mem = bus_alloc_resource(dev, SYS_RES_MEMORY, &sc->res.mrid,
-	    0, ~0, 1, RF_ACTIVE);
+	sc->res.mem = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &sc->res.mrid,
+	    RF_ACTIVE);
 
 #ifdef DIGI_INTERRUPT
 	sc->res.irqrid = 0;
-	sc->res.irq = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->res.irqrid,
-	    0, ~0, 1, RF_SHAREABLE | RF_ACTIVE);
+	sc->res.irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->res.irqrid,
+	    RF_SHAREABLE | RF_ACTIVE);
 	if (sc->res.irq == NULL) {
 		device_printf(dev, "couldn't map interrupt\n");
 		return (ENXIO);

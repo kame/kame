@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sbni/if_sbni_pci.c,v 1.10 2003/09/02 17:30:37 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sbni/if_sbni_pci.c,v 1.11 2004/03/17 17:50:41 njl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -131,8 +131,8 @@ sbni_pci_attach(device_t dev)
 	printf("sbni%d: <Granch SBNI12/PCI%sadapter> port 0x%lx",
 	       next_sbni_unit, sc->slave_sc ? " Dual " : " ",
 	       rman_get_start(sc->io_res));
-	sc->irq_res = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irq_rid,
-					 0ul, ~0ul, 1, RF_SHAREABLE);
+	sc->irq_res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irq_rid,
+					     RF_SHAREABLE);
 
 	if (sc->irq_res) {
 		printf(" irq %ld\n", rman_get_start(sc->irq_res));

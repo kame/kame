@@ -28,13 +28,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/adlink/adlink.c,v 1.6 2003/09/27 12:00:58 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/adlink/adlink.c,v 1.11 2004/06/16 09:46:36 phk Exp $");
 
 #ifdef _KERNEL
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/kthread.h>
 #include <sys/conf.h>
 #include <sys/bus.h>
@@ -103,7 +104,7 @@ struct softc {
 	struct resource		*r0, *r1, *ri;
 	bus_space_tag_t		t0, t1;
 	bus_space_handle_t	h0, h1;
-	dev_t			dev;
+	struct cdev *dev;
 	off_t			mapvir;
 
 	struct proc		*procp;
@@ -221,6 +222,7 @@ adlink_loran(void *arg)
 
 	sc = arg;
 	idx = 0;
+	mtx_lock(&Giant);
 	for (;;) {
 		while (sc->stat[idx] == 0)
 			msleep(sc, NULL, PRIBIO, "loran", 1);
@@ -234,11 +236,12 @@ adlink_loran(void *arg)
 		idx++;
 		idx %= NRING;
 	}
+	mtx_unlock(&Giant);
 	kthread_exit(0);
 }
 
 static int
-adlink_open(dev_t dev, int oflags, int devtype, struct thread *td)
+adlink_open(struct cdev *dev, int oflags, int devtype, struct thread *td)
 {
 	static int once;
 	struct softc *sc;
@@ -304,7 +307,7 @@ adlink_open(dev_t dev, int oflags, int devtype, struct thread *td)
 }
 
 static int
-adlink_ioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct thread *td)
+adlink_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread *td)
 {
 	struct softc *sc;
 	struct wave *wp;
@@ -338,7 +341,7 @@ adlink_ioctl(dev_t dev, u_long cmd, caddr_t data, int fflag, struct thread *td)
 }
 
 static int
-adlink_mmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
+adlink_mmap(struct cdev *dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
 {
 	struct softc *sc;
 	struct wave *wp;
@@ -393,6 +396,8 @@ adlink_intr(void *arg)
 }
 
 static struct cdevsw adlink_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	adlink_open,
 	.d_ioctl =	adlink_ioctl,
 	.d_mmap =	adlink_mmap,
@@ -426,8 +431,7 @@ adlink_attach(device_t self)
 	 * chip.
 	 */
 	rid = 0x10;
-	sc->r0 = bus_alloc_resource(self, SYS_RES_IOPORT, &rid,
-	    0, ~0, 1, RF_ACTIVE);
+	sc->r0 = bus_alloc_resource_any(self, SYS_RES_IOPORT, &rid, RF_ACTIVE);
 	if (sc->r0 == NULL)
 		return(ENODEV);
 	sc->t0 = rman_get_bustag(sc->r0);
@@ -439,8 +443,7 @@ adlink_attach(device_t self)
 	 * are described in the manual which comes with the card.
 	 */
 	rid = 0x14;
-	sc->r1 =  bus_alloc_resource(self, SYS_RES_IOPORT, &rid, 
-            0, ~0, 1, RF_ACTIVE);
+	sc->r1 =  bus_alloc_resource_any(self, SYS_RES_IOPORT, &rid, RF_ACTIVE);
 	if (sc->r1 == NULL)
 		return(ENODEV);
 	sc->t1 = rman_get_bustag(sc->r1);
@@ -448,8 +451,8 @@ adlink_attach(device_t self)
 	printf("Res1 %x %x\n", sc->t1, sc->h1);
 
 	rid = 0x0;
-	sc->ri =  bus_alloc_resource(self, SYS_RES_IRQ, &rid, 
-            0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+	sc->ri =  bus_alloc_resource_any(self, SYS_RES_IRQ, &rid, 
+            RF_ACTIVE | RF_SHAREABLE);
 	if (sc->ri == NULL)
 		return (ENODEV);
 

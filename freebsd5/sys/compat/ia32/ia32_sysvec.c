@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/ia32/ia32_sysvec.c,v 1.12.2.1 2003/12/13 22:20:03 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/ia32/ia32_sysvec.c,v 1.19 2004/08/11 02:35:05 marcel Exp $");
 
 #include "opt_compat.h"
 
@@ -68,9 +68,15 @@ __FBSDID("$FreeBSD: src/sys/compat/ia32/ia32_sysvec.c,v 1.12.2.1 2003/12/13 22:2
 #include <compat/freebsd32/freebsd32_proto.h>
 #include <compat/freebsd32/freebsd32_syscall.h>
 #include <compat/ia32/ia32_signal.h>
+#ifdef __amd64__
 #include <machine/psl.h>
 #include <machine/segments.h>
 #include <machine/specialreg.h>
+#else
+#include <i386/include/psl.h>
+#include <i386/include/segments.h>
+#include <i386/include/specialreg.h>
+#endif
 #include <machine/frame.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
@@ -111,7 +117,7 @@ struct sysentvec ia32_freebsd_sysvec = {
 	elf32_coredump,
 	NULL,
 	MINSIGSTKSZ,
-	PAGE_SIZE,
+	IA32_PAGE_SIZE,
 	0,
 	FREEBSD32_USRSTACK,
 	FREEBSD32_USRSTACK,
@@ -123,20 +129,41 @@ struct sysentvec ia32_freebsd_sysvec = {
 };
 
 
-const char freebsd32_emul_path[] = "/compat/ia32";
-
 static Elf32_Brandinfo ia32_brand_info = {
 						ELFOSABI_FREEBSD,
 						EM_386,
 						"FreeBSD",
-						"/compat/ia32",
-						"/usr/libexec/ld-elf.so.1",
-						&ia32_freebsd_sysvec
+						NULL,
+						"/libexec/ld-elf.so.1",
+						&ia32_freebsd_sysvec,
+						"/libexec/ld-elf32.so.1",
 					  };
 
 SYSINIT(ia32, SI_SUB_EXEC, SI_ORDER_ANY,
 	(sysinit_cfunc_t) elf32_insert_brand_entry,
 	&ia32_brand_info);
+
+static Elf32_Brandinfo ia32_brand_oinfo = {
+						ELFOSABI_FREEBSD,
+						EM_386,
+						"FreeBSD",
+						NULL,
+						"/usr/libexec/ld-elf.so.1",
+						&ia32_freebsd_sysvec,
+						"/libexec/ld-elf32.so.1",
+					  };
+
+SYSINIT(oia32, SI_SUB_EXEC, SI_ORDER_ANY,
+	(sysinit_cfunc_t) elf32_insert_brand_entry,
+	&ia32_brand_oinfo);
+
+
+void
+elf32_dump_thread(struct thread *td __unused, void *dst __unused,
+    size_t *off __unused)
+{
+}
+
 
 /* XXX may be freebsd32 MI */
 static register_t *
@@ -254,50 +281,33 @@ static void
 ia32_fixlimits(struct image_params *imgp)
 {
 	struct proc *p = imgp->proc;
+	struct plimit *oldlim, *newlim;
 
+	if (ia32_maxdsiz == 0 && ia32_maxssiz == 0 && ia32_maxvmem == 0)
+		return;
+	newlim = lim_alloc();
+	PROC_LOCK(p);
+	oldlim = p->p_limit;
+	lim_copy(newlim, oldlim);
 	if (ia32_maxdsiz != 0) {
-		if (p->p_rlimit[RLIMIT_DATA].rlim_cur > ia32_maxdsiz ||
-		    p->p_rlimit[RLIMIT_DATA].rlim_max > ia32_maxdsiz) {
-			if (p->p_limit->p_refcnt > 1) {
-				p->p_limit->p_refcnt--;
-				p->p_limit = limcopy(p->p_limit);
-			}
-			if (p->p_rlimit[RLIMIT_DATA].rlim_cur > ia32_maxdsiz)
-				p->p_rlimit[RLIMIT_DATA].rlim_cur =
-				    ia32_maxdsiz;
-			if (p->p_rlimit[RLIMIT_DATA].rlim_max > ia32_maxdsiz)
-				p->p_rlimit[RLIMIT_DATA].rlim_max =
-				    ia32_maxdsiz;
-		}
+		if (newlim->pl_rlimit[RLIMIT_DATA].rlim_cur > ia32_maxdsiz)
+		    newlim->pl_rlimit[RLIMIT_DATA].rlim_cur = ia32_maxdsiz;
+		if (newlim->pl_rlimit[RLIMIT_DATA].rlim_max > ia32_maxdsiz)
+		    newlim->pl_rlimit[RLIMIT_DATA].rlim_max = ia32_maxdsiz;
 	}
 	if (ia32_maxssiz != 0) {
-		if (p->p_rlimit[RLIMIT_STACK].rlim_cur > ia32_maxssiz ||
-		    p->p_rlimit[RLIMIT_STACK].rlim_max > ia32_maxssiz) {
-			if (p->p_limit->p_refcnt > 1) {
-				p->p_limit->p_refcnt--;
-				p->p_limit = limcopy(p->p_limit);
-			}
-			if (p->p_rlimit[RLIMIT_STACK].rlim_cur > ia32_maxssiz)
-				p->p_rlimit[RLIMIT_STACK].rlim_cur =
-				    ia32_maxssiz;
-			if (p->p_rlimit[RLIMIT_STACK].rlim_max > ia32_maxssiz)
-				p->p_rlimit[RLIMIT_STACK].rlim_max =
-				    ia32_maxssiz;
-		}
+		if (newlim->pl_rlimit[RLIMIT_STACK].rlim_cur > ia32_maxssiz)
+		    newlim->pl_rlimit[RLIMIT_STACK].rlim_cur = ia32_maxssiz;
+		if (newlim->pl_rlimit[RLIMIT_STACK].rlim_max > ia32_maxssiz)
+		    newlim->pl_rlimit[RLIMIT_STACK].rlim_max = ia32_maxssiz;
 	}
 	if (ia32_maxvmem != 0) {
-		if (p->p_rlimit[RLIMIT_VMEM].rlim_cur > ia32_maxvmem ||
-		    p->p_rlimit[RLIMIT_VMEM].rlim_max > ia32_maxvmem) {
-			if (p->p_limit->p_refcnt > 1) {
-				p->p_limit->p_refcnt--;
-				p->p_limit = limcopy(p->p_limit);
-			}
-			if (p->p_rlimit[RLIMIT_VMEM].rlim_cur > ia32_maxvmem)
-				p->p_rlimit[RLIMIT_VMEM].rlim_cur =
-				    ia32_maxvmem;
-			if (p->p_rlimit[RLIMIT_VMEM].rlim_max > ia32_maxvmem)
-				p->p_rlimit[RLIMIT_VMEM].rlim_max =
-				    ia32_maxvmem;
-		}
+		if (newlim->pl_rlimit[RLIMIT_VMEM].rlim_cur > ia32_maxvmem)
+		    newlim->pl_rlimit[RLIMIT_VMEM].rlim_cur = ia32_maxvmem;
+		if (newlim->pl_rlimit[RLIMIT_VMEM].rlim_max > ia32_maxvmem)
+		    newlim->pl_rlimit[RLIMIT_VMEM].rlim_max = ia32_maxvmem;
 	}
+	p->p_limit = newlim;
+	PROC_UNLOCK(p);
+	lim_free(oldlim);
 }

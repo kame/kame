@@ -51,7 +51,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ie/if_ie.c,v 1.97 2003/10/31 18:32:02 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ie/if_ie.c,v 1.100 2004/08/13 23:15:44 rwatson Exp $");
 
 /*
  * Intel 82586 Ethernet chip
@@ -309,7 +309,8 @@ ie_attach(device_t dev)
 	ifp->if_softc = sc;
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_NEEDSGIANT;
 	ifp->if_start = iestart;
 	ifp->if_ioctl = ieioctl;
 	ifp->if_init = ieinit;
@@ -318,9 +319,6 @@ ie_attach(device_t dev)
 	if (sc->hard_type == IE_EE16)
 		EVENTHANDLER_REGISTER(shutdown_post_sync, ee16_shutdown,
 				      sc, SHUTDOWN_PRI_DEFAULT);
-
-	device_printf(sc->dev, "Ethernet address %6D\n",
-		      sc->arpcom.ac_enaddr, ":");
 
 	ether_ifattach(ifp, sc->arpcom.ac_enaddr);
 	return (0);
@@ -1717,8 +1715,8 @@ ie_alloc_resources (device_t dev)
 	error = 0;
 	sc = device_get_softc(dev);
 
-	sc->io_res = bus_alloc_resource(dev, SYS_RES_IOPORT, &sc->io_rid,
-					0, ~0, 1, RF_ACTIVE);
+	sc->io_res = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &sc->io_rid,
+					    RF_ACTIVE);
 	if (!sc->io_res) {
 		device_printf(dev, "No I/O space?!\n");
 		error = ENOMEM;
@@ -1727,8 +1725,8 @@ ie_alloc_resources (device_t dev)
 	sc->io_bt = rman_get_bustag(sc->io_res);
 	sc->io_bh = rman_get_bushandle(sc->io_res);
 
-	sc->mem_res = bus_alloc_resource(dev, SYS_RES_MEMORY, &sc->mem_rid,
-					 0, ~0, 1, RF_ACTIVE);
+	sc->mem_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &sc->mem_rid,
+					     RF_ACTIVE);
 	if (!sc->mem_res) {
                 device_printf(dev, "No Memory!\n");
 		error = ENOMEM;
@@ -1737,8 +1735,8 @@ ie_alloc_resources (device_t dev)
 	sc->mem_bt = rman_get_bustag(sc->mem_res);
 	sc->mem_bh = rman_get_bushandle(sc->mem_res);
 
-	sc->irq_res = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irq_rid,
-					 0, ~0, 1, RF_ACTIVE);
+	sc->irq_res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irq_rid,
+					     RF_ACTIVE);
 	if (!sc->irq_res) {
 		device_printf(dev, "No IRQ!\n");
 		error = ENOMEM;

@@ -1,4 +1,3 @@
-/* $FreeBSD: src/sys/boot/alpha/libalpha/prom.c,v 1.3 1999/08/28 00:39:28 peter Exp $ */
 /* $NetBSD: prom.c,v 1.3 1997/09/06 14:03:58 drochner Exp $ */
 
 /*  
@@ -26,6 +25,9 @@
  * any improvements or extensions that they make and grant Carnegie Mellon
  * the rights to redistribute these changes.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/alpha/libalpha/prom.c,v 1.4 2004/01/04 23:21:01 obrien Exp $");
 
 #include <sys/types.h>
 

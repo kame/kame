@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/vinum/vinummemory.c,v 1.34 2003/08/24 17:55:56 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/vinum/vinummemory.c,v 1.35.2.1 2004/09/24 22:40:01 marius Exp $");
 
 #include <dev/vinum/vinumhdr.h>
 
@@ -92,7 +92,6 @@ LongJmp(jmp_buf buf, int retval)
 #else /* not i386 */
 #define LongJmp longjmp					    /* just use the kernel function */
 #endif /* i386 */
-#endif /* VINUMDEBUG */
 
 /* find the base name of a path name */
 char *
@@ -105,6 +104,7 @@ basename(char *file)
     else
 	return ++f;					    /* skip the / */
 }
+#endif /* VINUMDEBUG */
 
 #ifdef VINUMDEBUG
 void
@@ -175,7 +175,7 @@ MMalloc(int size, char *file, int line)
 	for (i = 0; i < malloccount; i++) {
 	    if (((result + size) > malloced[i].address)
 		&& (result < malloced[i].address + malloced[i].size)) /* overlap */
-		Debugger("Malloc overlap");
+		kdb_enter("Malloc overlap");
 	}
 	if (result) {
 	    char *f = basename(file);
@@ -238,7 +238,7 @@ FFree(void *mem, char *file, int line)
 	mem,
 	file,
 	line);
-    Debugger("Free");
+    kdb_enter("Free");
 }
 
 void

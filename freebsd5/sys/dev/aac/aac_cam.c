@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aac/aac_cam.c,v 1.14 2003/12/03 15:42:12 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aac/aac_cam.c,v 1.17 2004/08/12 05:05:06 scottl Exp $");
 
 /*
  * CAM front-end for communicating with non-DASD devices
@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD: src/sys/dev/aac/aac_cam.c,v 1.14 2003/12/03 15:42:12 scottl 
 #include <sys/kernel.h>
 #include <sys/sysctl.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 
 #include <cam/cam.h>
 #include <cam/cam_ccb.h>
@@ -289,9 +290,9 @@ aac_cam_action(struct cam_sim *sim, union ccb *ccb)
 
 	/* Async ops that require communcation with the controller */
 
-	AAC_LOCK_ACQUIRE(&sc->aac_io_lock);
+	mtx_lock(&sc->aac_io_lock);
 	if (aac_alloc_command(sc, &cm)) {
-		AAC_LOCK_RELEASE(&sc->aac_io_lock);
+		mtx_unlock(&sc->aac_io_lock);
 		xpt_freeze_simq(sim, 1);
 		ccb->ccb_h.status = CAM_REQUEUE_REQ;
 		xpt_done(ccb);
@@ -412,7 +413,7 @@ aac_cam_action(struct cam_sim *sim, union ccb *ccb)
 	aac_enqueue_ready(cm);
 	aac_startio(cm->cm_sc);
 
-	AAC_LOCK_RELEASE(&sc->aac_io_lock);
+	mtx_unlock(&sc->aac_io_lock);
 
 	return;
 }
@@ -495,11 +496,11 @@ aac_cam_complete(struct aac_command *cm)
 
 	aac_release_command(cm);
 
-	AAC_LOCK_RELEASE(&sc->aac_io_lock);
+	mtx_unlock(&sc->aac_io_lock);
 	mtx_lock(&Giant);
 	xpt_done(ccb);
 	mtx_unlock(&Giant);
-	AAC_LOCK_ACQUIRE(&sc->aac_io_lock);
+	mtx_lock(&sc->aac_io_lock);
 
 	return;
 }
@@ -522,7 +523,7 @@ aac_cam_reset_bus(struct cam_sim *sim, union ccb *ccb)
 		return (CAM_REQ_ABORTED);
 	}
 
-	aac_alloc_sync_fib(sc, &fib, 0);
+	aac_alloc_sync_fib(sc, &fib);
 
 	vmi = (struct aac_vmioctl *)&fib->data[0];
 	bzero(vmi, sizeof(struct aac_vmioctl));
@@ -569,7 +570,7 @@ aac_cam_get_tran_settings(struct aac_softc *sc, struct ccb_trans_settings *cts, 
 	struct aac_vmi_devinfo_resp *vmi_resp;
 	int error;
 
-	aac_alloc_sync_fib(sc, &fib, 0);
+	aac_alloc_sync_fib(sc, &fib);
 	vmi = (struct aac_vmioctl *)&fib->data[0];
 	bzero(vmi, sizeof(struct aac_vmioctl));
 

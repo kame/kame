@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *      $FreeBSD: src/sys/fs/procfs/procfs_ioctl.c,v 1.9 2003/04/17 22:13:46 jhb Exp $
+ *      $FreeBSD: src/sys/fs/procfs/procfs_ioctl.c,v 1.10 2003/12/07 17:40:00 des Exp $
  */
 
 #include <sys/param.h>
@@ -112,7 +112,7 @@ procfs_ioctl(PFS_IOCTL_ARGS)
 		error = (ENOTTY);
 	}
 	PROC_UNLOCK(p);
-	
+
 	return (error);
 }
 

@@ -1,7 +1,7 @@
-/*	$NetBSD: usbdi.c,v 1.103 2002/09/27 15:37:38 provos Exp $	*/
+/*	$NetBSD: usbdi.c,v 1.104 2004/07/17 20:16:13 mycroft Exp $	*/
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/usbdi.c,v 1.84 2003/11/09 23:56:19 joe Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/usbdi.c,v 1.86.2.1 2004/09/03 20:01:32 iedowse Exp $");
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -241,7 +241,7 @@ usbd_open_pipe_intr(usbd_interface_handle iface, u_int8_t address,
 	ipipe->repeat = 1;
 	err = usbd_transfer(xfer);
 	*pipe = ipipe;
-	if (err != USBD_IN_PROGRESS)
+	if (err != USBD_IN_PROGRESS && err)
 		goto bad2;
 	return (USBD_NORMAL_COMPLETION);
 
@@ -758,6 +758,9 @@ usb_transfer_complete(usbd_xfer_handle xfer)
 {
 	usbd_pipe_handle pipe = xfer->pipe;
 	usb_dma_t *dmap = &xfer->dmabuf;
+	int sync = xfer->flags & USBD_SYNCHRONOUS;
+	int erred = xfer->status == USBD_CANCELLED ||
+	    xfer->status == USBD_TIMEOUT;
 	int repeat = pipe->repeat;
 	int polling;
 
@@ -842,14 +845,12 @@ usb_transfer_complete(usbd_xfer_handle xfer)
 	pipe->methods->done(xfer);
 #endif
 
-	if ((xfer->flags & USBD_SYNCHRONOUS) && !polling)
+	if (sync && !polling)
 		wakeup(xfer);
 
 	if (!repeat) {
 		/* XXX should we stop the queue on all errors? */
-		if ((xfer->status == USBD_CANCELLED ||
-		     xfer->status == USBD_TIMEOUT) &&
-		    pipe->iface != NULL)		/* not control pipe */
+		if (erred && pipe->iface != NULL)	/* not control pipe */
 			pipe->running = 0;
 		else
 			usbd_start_next(pipe);
@@ -1051,7 +1052,7 @@ usbd_do_request_async(usbd_device_handle dev, usb_device_request_t *req,
 	usbd_setup_default_xfer(xfer, dev, 0, USBD_DEFAULT_TIMEOUT, req,
 	    data, UGETW(req->wLength), 0, usbd_do_request_async_cb);
 	err = usbd_transfer(xfer);
-	if (err != USBD_IN_PROGRESS) {
+	if (err != USBD_IN_PROGRESS && err) {
 		usbd_free_xfer(xfer);
 		return (err);
 	}
@@ -1117,11 +1118,9 @@ usbd_get_endpoint_descriptor(usbd_interface_handle iface, u_int8_t address)
 int
 usbd_ratecheck(struct timeval *last)
 {
-#if 0
-	static struct timeval errinterval = { 0, 250000 }; /* 0.25 s*/
-
-	return (ratecheck(last, &errinterval));
-#endif
+	if (last->tv_sec == time_second)
+		return (0);
+	last->tv_sec = time_second;
 	return (1);
 }
 

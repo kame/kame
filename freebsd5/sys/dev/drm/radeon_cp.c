@@ -27,7 +27,7 @@
  *    Kevin E. Martin <martin@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/radeon_cp.c,v 1.10 2003/11/12 20:56:30 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/radeon_cp.c,v 1.11 2004/01/06 04:34:53 anholt Exp $
  */
 
 #include "dev/drm/radeon.h"
@@ -1120,13 +1120,6 @@ static int radeon_do_init_cp( drm_device_t *dev, drm_radeon_init_t *init )
 		return DRM_ERR(EINVAL);
 	}
 
-	DRM_FIND_MAP( dev_priv->fb, init->fb_offset );
-	if(!dev_priv->fb) {
-		DRM_ERROR("could not find framebuffer!\n");
-		dev->dev_private = (void *)dev_priv;
-		radeon_do_cleanup_cp(dev);
-		return DRM_ERR(EINVAL);
-	}
 	DRM_FIND_MAP( dev_priv->mmio, init->mmio_offset );
 	if(!dev_priv->mmio) {
 		DRM_ERROR("could not find mmio region!\n");

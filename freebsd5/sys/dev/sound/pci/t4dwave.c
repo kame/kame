@@ -31,7 +31,7 @@
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/t4dwave.c,v 1.40 2003/09/07 16:28:03 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/t4dwave.c,v 1.44 2004/07/16 03:59:27 tanimura Exp $");
 
 /* -------------------------------------------------------------------- */
 
@@ -820,7 +820,8 @@ tr_pci_attach(device_t dev)
 
 	tr->regid = PCIR_BAR(0);
 	tr->regtype = SYS_RES_IOPORT;
-	tr->reg = bus_alloc_resource(dev, tr->regtype, &tr->regid, 0, ~0, 1, RF_ACTIVE);
+	tr->reg = bus_alloc_resource_any(dev, tr->regtype, &tr->regid,
+		RF_ACTIVE);
 	if (tr->reg) {
 		tr->st = rman_get_bustag(tr->reg);
 		tr->sh = rman_get_bushandle(tr->reg);
@@ -842,9 +843,9 @@ tr_pci_attach(device_t dev)
 	if (mixer_init(dev, ac97_getmixerclass(), codec) == -1) goto bad;
 
 	tr->irqid = 0;
-	tr->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &tr->irqid,
-				 0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
-	if (!tr->irq || snd_setup_intr(dev, tr->irq, INTR_MPSAFE, tr_intr, tr, &tr->ih)) {
+	tr->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &tr->irqid,
+				 RF_ACTIVE | RF_SHAREABLE);
+	if (!tr->irq || snd_setup_intr(dev, tr->irq, 0, tr_intr, tr, &tr->ih)) {
 		device_printf(dev, "unable to map interrupt\n");
 		goto bad;
 	}
@@ -860,8 +861,8 @@ tr_pci_attach(device_t dev)
 		goto bad;
 	}
 
-	snprintf(status, 64, "at io 0x%lx irq %ld",
-		 rman_get_start(tr->reg), rman_get_start(tr->irq));
+	snprintf(status, 64, "at io 0x%lx irq %ld %s",
+		 rman_get_start(tr->reg), rman_get_start(tr->irq),PCM_KLDSTRING(snd_t4dwave));
 
 	if (pcm_register(dev, tr, TR_MAXPLAYCH, 1)) goto bad;
 	pcm_addchan(dev, PCMDIR_REC, &trrchan_class, tr);
@@ -974,5 +975,5 @@ static driver_t tr_driver = {
 };
 
 DRIVER_MODULE(snd_t4dwave, pci, tr_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_t4dwave, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_t4dwave, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_t4dwave, 1);

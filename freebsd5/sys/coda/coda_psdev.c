@@ -49,7 +49,7 @@
 /* These routines are the device entry points for Venus. */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/coda/coda_psdev.c,v 1.29 2003/11/09 09:17:20 tanimura Exp $");
+__FBSDID("$FreeBSD: src/sys/coda/coda_psdev.c,v 1.30 2004/06/16 09:46:32 phk Exp $");
 
 
 extern int coda_nc_initialized;    /* Set if cache has been initialized */
@@ -117,7 +117,7 @@ vcodaattach(n)
 
 int 
 vc_nb_open(dev, flag, mode, td)    
-    dev_t        dev;      
+    struct cdev *dev;      
     int          flag;     
     int          mode;     
     struct thread *td;             /* NetBSD only */
@@ -149,7 +149,7 @@ vc_nb_open(dev, flag, mode, td)
 
 int 
 vc_nb_close (dev, flag, mode, td)    
-    dev_t        dev;      
+    struct cdev *dev;      
     int          flag;     
     int          mode;     
     struct thread *td;
@@ -233,7 +233,7 @@ vc_nb_close (dev, flag, mode, td)
 
 int 
 vc_nb_read(dev, uiop, flag)   
-    dev_t        dev;  
+    struct cdev *dev;  
     struct uio  *uiop; 
     int          flag;
 {
@@ -287,7 +287,7 @@ vc_nb_read(dev, uiop, flag)
 
 int
 vc_nb_write(dev, uiop, flag)   
-    dev_t        dev;  
+    struct cdev *dev;  
     struct uio  *uiop; 
     int          flag;
 {
@@ -387,7 +387,7 @@ vc_nb_write(dev, uiop, flag)
 
 int
 vc_nb_ioctl(dev, cmd, addr, flag, td) 
-    dev_t         dev;       
+    struct cdev *dev;       
     u_long        cmd;       
     caddr_t       addr;      
     int           flag;      
@@ -441,7 +441,7 @@ vc_nb_ioctl(dev, cmd, addr, flag, td)
 
 int
 vc_nb_poll(dev, events, td)         
-    dev_t         dev;    
+    struct cdev *dev;    
     int           events;   
     struct thread *td;
 {

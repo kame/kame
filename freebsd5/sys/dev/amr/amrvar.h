@@ -53,7 +53,7 @@
  * SUCH DAMAGE.
  *
  *
- *      $FreeBSD: src/sys/dev/amr/amrvar.h,v 1.19 2003/10/10 22:49:40 ps Exp $
+ *      $FreeBSD: src/sys/dev/amr/amrvar.h,v 1.22 2004/07/01 06:56:10 ps Exp $
  */
 
 #if __FreeBSD_version >= 500005
@@ -187,6 +187,7 @@ struct amr_softc
 #define AMR_STATE_SUSPEND	(1<<1)
 #define AMR_STATE_INTEN		(1<<2)
 #define AMR_STATE_SHUTDOWN	(1<<3)
+#define AMR_STATE_CRASHDUMP	(1<<4)
 
     /* per-controller queues */
     struct bio_queue_head 	amr_bioq;		/* pending I/O with no commands */
@@ -202,7 +203,7 @@ struct amr_softc
     TAILQ_HEAD(, ccb_hdr)	amr_cam_ccbq;
 
     /* control device */
-    dev_t			amr_dev_t;
+    struct cdev *amr_dev_t;
 
     /* controller type-specific support */
     int				amr_type;
@@ -253,7 +254,7 @@ struct amrd_softc
     device_t		amrd_dev;
     struct amr_softc	*amrd_controller;
     struct amr_logdrive	*amrd_drive;
-    struct disk		amrd_disk;
+    struct disk		*amrd_disk;
     int			amrd_unit;
 };
 

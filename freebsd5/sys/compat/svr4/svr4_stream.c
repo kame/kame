@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_stream.c,v 1.46 2003/10/20 10:38:48 tjr Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_stream.c,v 1.49.2.1 2004/09/03 15:30:20 jhb Exp $");
 
 #define COMPAT_43 1
 
@@ -60,6 +60,7 @@ __FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_stream.c,v 1.46 2003/10/20 10:38:48
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/stat.h>
+#include <sys/syscallsubr.h>
 #include <sys/sysproto.h>
 #include <sys/uio.h>
 #include <sys/ktrace.h>		/* Must come after sys/uio.h */
@@ -163,15 +164,16 @@ svr4_sendit(td, s, mp, flags)
 	int len, error;
 	struct socket *so;
 #ifdef KTRACE
-	struct iovec *ktriov = NULL;
-	struct uio ktruio;
+	struct uio *ktruio = NULL;
 #endif
 
 	if ((error = fgetsock(td, s, &so, NULL)) != 0)
 		return (error);
 
 #ifdef MAC
+	SOCK_LOCK(so);
 	error = mac_check_socket_send(td->td_ucred, so);
+	SOCK_UNLOCK(so);
 	if (error)
 		goto done1;
 #endif
@@ -210,13 +212,8 @@ svr4_sendit(td, s, mp, flags)
 		control = 0;
 	}
 #ifdef KTRACE
-	if (KTRPOINT(td, KTR_GENIO)) {
-		int iovlen = auio.uio_iovcnt * sizeof (struct iovec);
-
-		MALLOC(ktriov, struct iovec *, iovlen, M_TEMP, M_WAITOK);
-		bcopy((caddr_t)auio.uio_iov, (caddr_t)ktriov, iovlen);
-		ktruio = auio;
-	}
+	if (KTRPOINT(td, KTR_GENIO))
+		ktruio = cloneuio(&auio);
 #endif
 	len = auio.uio_resid;
 	error = so->so_proto->pr_usrreqs->pru_sosend(so, to, &auio, 0, control,
@@ -234,13 +231,9 @@ svr4_sendit(td, s, mp, flags)
 	if (error == 0)
 		td->td_retval[0] = len - auio.uio_resid;
 #ifdef KTRACE
-	if (ktriov != NULL) {
-		if (error == 0) {
-			ktruio.uio_iov = ktriov;
-			ktruio.uio_resid = td->td_retval[0];
-			ktrgenio(s, UIO_WRITE, &ktruio, error);
-		}
-		FREE(ktriov, M_TEMP);
+	if (ktruio != NULL) {
+		ktruio->uio_resid = td->td_retval[0];
+		ktrgenio(s, UIO_WRITE, ktruio, error);
 	}
 #endif
 bad:
@@ -267,15 +260,16 @@ svr4_recvit(td, s, mp, namelenp)
 	struct socket *so;
 	struct sockaddr *fromsa = 0;
 #ifdef KTRACE
-	struct iovec *ktriov = NULL;
-	struct uio ktruio;
+	struct uio *ktruio = NULL;
 #endif
 
 	if ((error = fgetsock(td, s, &so, NULL)) != 0)
 		return (error);
 
 #ifdef MAC
+	SOCK_LOCK(so);
 	error = mac_check_socket_receive(td->td_ucred, so);
+	SOCK_UNLOCK(so);
 	if (error)
 		goto done1;
 #endif
@@ -295,13 +289,8 @@ svr4_recvit(td, s, mp, namelenp)
 		}
 	}
 #ifdef KTRACE
-	if (KTRPOINT(td, KTR_GENIO)) {
-		int iovlen = auio.uio_iovcnt * sizeof (struct iovec);
-
-		MALLOC(ktriov, struct iovec *, iovlen, M_TEMP, M_WAITOK);
-		bcopy((caddr_t)auio.uio_iov, (caddr_t)ktriov, iovlen);
-		ktruio = auio;
-	}
+	if (KTRPOINT(td, KTR_GENIO)) 
+		ktruio = cloneuio(&auio);
 #endif
 	len = auio.uio_resid;
 	error = so->so_proto->pr_usrreqs->pru_soreceive(so, &fromsa, &auio,
@@ -313,13 +302,9 @@ svr4_recvit(td, s, mp, namelenp)
 			error = 0;
 	}
 #ifdef KTRACE
-	if (ktriov != NULL) {
-		if (error == 0) {
-			ktruio.uio_iov = ktriov;
-			ktruio.uio_resid = len - auio.uio_resid;
-			ktrgenio(s, UIO_READ, &ktruio, error);
-		}
-		FREE(ktriov, M_TEMP);
+	if (ktruio != NULL) {
+		ktruio->uio_resid = len - auio.uio_resid;
+		ktrgenio(s, UIO_READ, ktruio, error);
 	}
 #endif
 	if (error)
@@ -1489,7 +1474,6 @@ i_setsig(fp, td, retval, fd, cmd, dat)
 	 * We alse have to fix the O_ASYNC fcntl bit, so the
 	 * process will get SIGPOLLs.
 	 */
-	struct fcntl_args fa;
 	int error;
 	register_t oflags, flags;
 	struct svr4_strm *st = svr4_stream_get(fp);
@@ -1499,10 +1483,9 @@ i_setsig(fp, td, retval, fd, cmd, dat)
 		return EINVAL;
 	}
 	/* get old status flags */
-	fa.fd = fd;
-	fa.cmd = F_GETFL;
-	if ((error = fcntl(td, &fa)) != 0)
-		return error;
+	error = kern_fcntl(td, fd, F_GETFL, 0);
+	if (error)
+		return (error);
 
 	oflags = td->td_retval[0];
 
@@ -1528,19 +1511,15 @@ i_setsig(fp, td, retval, fd, cmd, dat)
 
 	/* set the new flags, if changed */
 	if (flags != oflags) {
-		fa.cmd = F_SETFL;
-		fa.arg = (long) flags;
-		if ((error = fcntl(td, &fa)) != 0)
-			  return error;
+		error = kern_fcntl(td, fd, F_SETFL, flags);
+		if (error)
+			return (error);
 		flags = td->td_retval[0];
 	}
 
 	/* set up SIGIO receiver if needed */
-	if (dat != NULL) {
-		fa.cmd = F_SETOWN;
-		fa.arg = (long) td->td_proc->p_pid;
-		return fcntl(td, &fa);
-	}
+	if (dat != NULL)
+		return (kern_fcntl(td, fd, F_SETOWN, td->td_proc->p_pid));
 	return 0;
 }
 
@@ -1869,7 +1848,7 @@ svr4_do_putmsg(td, uap, fp)
 		}
 		else {
 			/* Maybe we've been given a device/inode pair */
-			udev_t *dev = SVR4_ADDROF(&sc);
+			dev_t *dev = SVR4_ADDROF(&sc);
 			ino_t *ino = (ino_t *) &dev[1];
 			skp = svr4_find_socket(td, fp, *dev, *ino);
 			if (skp == NULL) {

@@ -54,14 +54,14 @@
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ofw/openfirm.h,v 1.9 2003/06/07 18:34:04 jake Exp $
+ * $FreeBSD: src/sys/dev/ofw/openfirm.h,v 1.10 2004/08/16 15:45:26 marius Exp $
  */
 
 #ifndef _OPENFIRM_H_
 #define _OPENFIRM_H_
 
 /*
- * Prototypes for Openfirmware Interface Routines
+ * Prototypes for Open Firmware Interface Routines
  */
 
 typedef unsigned long cell_t;
@@ -77,13 +77,13 @@ typedef unsigned int	phandle_t;
 MALLOC_DECLARE(M_OFWPROP);
 
 /*
- * Stuff that is used by the OpenFirmware code.
+ * Stuff that is used by the Open Firmware code.
  */
 void	set_openfirm_callback(int (*)(void *));
 int	openfirmware(void *);
 
 /*
- * This isn't actually an OpenFirmware function, but it seemed like the right
+ * This isn't actually an Open Firmware function, but it seemed like the right
  * place for it to go.
  */
 void		OF_init(int (*openfirm)(void *));

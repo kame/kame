@@ -23,7 +23,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sio/sio_pci.c,v 1.15 2003/11/28 05:28:28 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sio/sio_pci.c,v 1.16 2004/06/07 16:33:47 wpaul Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -79,6 +79,7 @@ static struct pci_ids pci_ids[] = {
 	{ 0x0000151f, "SmartLink 5634PCV SurfRider", 0x10 },
 	{ 0x0103115d, "Xircom Cardbus modem", 0x10 },
 	{ 0x98459710, "Netmos Nm9845 PCI Bridge with Dual UART", 0x10 },
+	{ 0x432214e4, "Broadcom 802.11g/GPRS CardBus (Serial)", 0x10 },
 	{ 0x01c0135c, "Quatech SSCLP-200/300", 0x18 
 		/* 
 		 * NB: You must mount the "SPAD" jumper to correctly detect

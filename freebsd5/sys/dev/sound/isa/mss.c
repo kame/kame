@@ -29,7 +29,7 @@
 
 #include <dev/sound/pcm/sound.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/mss.c,v 1.86 2003/09/07 16:28:02 cg Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/mss.c,v 1.90.2.1 2004/10/15 05:14:10 njl Exp $");
 
 /* board-specific include files */
 #include <dev/sound/isa/mss.h>
@@ -314,20 +314,23 @@ mss_alloc_resources(struct mss_info *mss, device_t dev)
 {
     	int pdma, rdma, ok = 1;
 	if (!mss->io_base)
-    		mss->io_base = bus_alloc_resource(dev, SYS_RES_IOPORT, &mss->io_rid,
-						  0, ~0, 1, RF_ACTIVE);
+    		mss->io_base = bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+						      &mss->io_rid, RF_ACTIVE);
 	if (!mss->irq)
-    		mss->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &mss->irq_rid,
-					      0, ~0, 1, RF_ACTIVE);
+    		mss->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ,
+						  &mss->irq_rid, RF_ACTIVE);
 	if (!mss->drq1)
-    		mss->drq1 = bus_alloc_resource(dev, SYS_RES_DRQ, &mss->drq1_rid,
-					       0, ~0, 1, RF_ACTIVE);
+    		mss->drq1 = bus_alloc_resource_any(dev, SYS_RES_DRQ,
+						   &mss->drq1_rid,
+						   RF_ACTIVE);
     	if (mss->conf_rid >= 0 && !mss->conf_base)
-        	mss->conf_base = bus_alloc_resource(dev, SYS_RES_IOPORT, &mss->conf_rid,
-						    0, ~0, 1, RF_ACTIVE);
+        	mss->conf_base = bus_alloc_resource_any(dev, SYS_RES_IOPORT,
+							&mss->conf_rid,
+							RF_ACTIVE);
     	if (mss->drq2_rid >= 0 && !mss->drq2)
-        	mss->drq2 = bus_alloc_resource(dev, SYS_RES_DRQ, &mss->drq2_rid,
-					       0, ~0, 1, RF_ACTIVE);
+        	mss->drq2 = bus_alloc_resource_any(dev, SYS_RES_DRQ,
+						   &mss->drq2_rid,
+						   RF_ACTIVE);
 
 	if (!mss->io_base || !mss->drq1 || !mss->irq) ok = 0;
 	if (mss->conf_rid >= 0 && !mss->conf_base) ok = 0;
@@ -705,8 +708,8 @@ mss_init(struct mss_info *mss, device_t dev)
     		/* end of reset */
 
 		rid = 0;
-    		alt = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-    				     0, ~0, 1, RF_ACTIVE);
+    		alt = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid,
+					     RF_ACTIVE);
 		if (alt == NULL) {
 			printf("XXX couldn't init GUS PnP/MAX\n");
 			break;
@@ -1101,7 +1104,7 @@ opti931_intr(void *arg)
 		if (reason & 1) {
 	    		DEB(printf("one more try...\n");)
 	    		if (--loops) goto again;
-	    		else DDB(printf("intr, but mc11 not set\n");)
+	    		else BVDDB(printf("intr, but mc11 not set\n");)
 		}
 		if (loops == 0) BVDDB(printf("intr, nothing in mcir11 0x%02x\n", mc11));
 		mss_unlock(mss);
@@ -1708,10 +1711,10 @@ mss_doattach(device_t dev, struct mss_info *mss)
     	mixer_init(dev, (mss->bd_id == MD_YM0020)? &ymmix_mixer_class : &mssmix_mixer_class, mss);
     	switch (mss->bd_id) {
     	case MD_OPTI931:
-		snd_setup_intr(dev, mss->irq, INTR_MPSAFE, opti931_intr, mss, &mss->ih);
+		snd_setup_intr(dev, mss->irq, 0, opti931_intr, mss, &mss->ih);
 		break;
     	default:
-		snd_setup_intr(dev, mss->irq, INTR_MPSAFE, mss_intr, mss, &mss->ih);
+		snd_setup_intr(dev, mss->irq, 0, mss_intr, mss, &mss->ih);
     	}
     	if (pdma == rdma)
 		pcm_setflags(dev, pcm_getflags(dev) | SD_F_SIMPLEX);
@@ -1878,7 +1881,7 @@ static driver_t mss_driver = {
 
 DRIVER_MODULE(snd_mss, isa, mss_driver, pcm_devclass, 0, 0);
 DRIVER_MODULE(snd_mss, acpi, mss_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_mss, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_mss, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_mss, 1);
 
 static int
@@ -1889,8 +1892,7 @@ azt2320_mss_mode(struct mss_info *mss, device_t dev)
 
 	rid = 0;
 	ret = -1;
-	sbport = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-				    0, ~0, 1, RF_ACTIVE);
+	sbport = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid, RF_ACTIVE);
 	if (sbport) {
 		for (i = 0; i < 1000; i++) {
 			if ((port_rd(sbport, SBDSP_STATUS) & 0x80))
@@ -2190,7 +2192,8 @@ static driver_t pnpmss_driver = {
 };
 
 DRIVER_MODULE(snd_pnpmss, isa, pnpmss_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_pnpmss, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+DRIVER_MODULE(snd_pnpmss, acpi, pnpmss_driver, pcm_devclass, 0, 0);
+MODULE_DEPEND(snd_pnpmss, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_pnpmss, 1);
 
 static int
@@ -2274,7 +2277,7 @@ static driver_t guspcm_driver = {
 };
 
 DRIVER_MODULE(snd_guspcm, gusc, guspcm_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_guspcm, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_guspcm, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_guspcm, 1);
 
 

@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pci/pcib_private.h,v 1.5 2003/08/22 03:11:53 imp Exp $
+ * $FreeBSD: src/sys/dev/pci/pcib_private.h,v 1.6 2004/01/11 06:52:31 imp Exp $
  */
 
 #ifndef __PCIB_PRIVATE_H__
@@ -44,6 +44,8 @@
 struct pcib_softc 
 {
     device_t	dev;
+    uint32_t	flags;		/* flags */
+#define PCIB_SUBTRACTIVE	0x1
     uint16_t	command;	/* command register */
     uint8_t	secbus;		/* secondary bus number */
     uint8_t	subbus;		/* subordinate bus number */

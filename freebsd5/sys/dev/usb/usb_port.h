@@ -1,6 +1,6 @@
 /*	$OpenBSD: usb_port.h,v 1.18 2000/09/06 22:42:10 rahnds Exp $ */
 /*	$NetBSD: usb_port.h,v 1.54 2002/03/28 21:49:19 ichiro Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usb_port.h,v 1.65 2003/11/09 23:54:21 joe Exp $       */
+/*	$FreeBSD: src/sys/dev/usb/usb_port.h,v 1.67.2.1 2004/09/26 05:54:28 imp Exp $       */
 
 /* Also already merged from NetBSD:
  *	$NetBSD: usb_port.h,v 1.57 2002/09/27 20:42:01 thorpej Exp $
@@ -134,7 +134,8 @@ void __CONCAT(dname,_attach)(struct device *parent, struct device *self, void *a
 #define USB_ATTACH_ERROR_RETURN	return
 #define USB_ATTACH_SUCCESS_RETURN	return
 
-#define USB_ATTACH_SETUP printf("\n")
+#define USB_ATTACH_SETUP
+	printf("\n%s: %s\n", USBDEVNAME(sc->sc_dev), devinfo);
 
 #define USB_DETACH(dname) \
 int __CONCAT(dname,_detach)(struct device *self, int flags)
@@ -301,7 +302,8 @@ __CONCAT(dname,_attach)(parent, self, aux) \
 #define USB_ATTACH_ERROR_RETURN	return
 #define USB_ATTACH_SUCCESS_RETURN	return
 
-#define USB_ATTACH_SETUP printf("\n")
+#define USB_ATTACH_SETUP
+	printf("\n%s: %s\n", USBDEVNAME(sc->sc_dev), devinfo);
 
 #define USB_DETACH(dname) \
 int \
@@ -417,7 +419,12 @@ typedef struct callout usb_callout_t;
 #define PWR_RESUME 0
 #define PWR_SUSPEND 1
 
-#define config_detach(dev, flag) device_delete_child(device_get_parent(dev), dev)
+#define config_detach(dev, flag) \
+	do { \
+		device_detach(dev); \
+		free(device_get_ivars(dev), M_USB); \
+		device_delete_child(device_get_parent(dev), dev); \
+	} while (0);
 
 typedef struct malloc_type *usb_malloc_type;
 
@@ -470,8 +477,11 @@ __CONCAT(dname,_attach)(device_t self)
 #define USB_ATTACH_SUCCESS_RETURN	return 0
 
 #define USB_ATTACH_SETUP \
-	sc->sc_dev = self; \
-	device_set_desc_copy(self, devinfo)
+	do { \
+		sc->sc_dev = self; \
+		device_set_desc_copy(self, devinfo); \
+		device_printf(self, "%s\n", devinfo); \
+	} while (0);
 
 #define USB_DETACH(dname) \
 Static int \

@@ -37,9 +37,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/exphy.c,v 1.17 2003/08/24 17:54:10 obrien Exp $");
-
 /*
  * Copyright (c) 1997 Manuel Bouyer.  All rights reserved.
  *
@@ -69,12 +66,12 @@ __FBSDID("$FreeBSD: src/sys/dev/mii/exphy.c,v 1.17 2003/08/24 17:54:10 obrien Ex
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/dev/mii/exphy.c,v 1.18 2004/05/29 18:09:10 marius Exp $");
+
 /*
  * driver for 3Com internal PHYs
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mii/exphy.c,v 1.17 2003/08/24 17:54:10 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>

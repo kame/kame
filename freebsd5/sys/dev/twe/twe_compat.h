@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/twe/twe_compat.h,v 1.11 2003/12/02 07:57:20 ps Exp $
+ * $FreeBSD: src/sys/dev/twe/twe_compat.h,v 1.13 2004/06/16 09:47:00 phk Exp $
  */
 /*
  * Portability and compatibility interfaces.
@@ -43,6 +43,7 @@
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/sysctl.h>
 
 #include <sys/bus.h>
@@ -77,7 +78,7 @@
     bus_dmamap_t		twe_cmdmap;	/* DMA map for command */				\
     u_int32_t			twe_cmdphys;	/* address of command in controller space */		\
     device_t			twe_dev;		/* bus device */		\
-    dev_t			twe_dev_t;		/* control device */		\
+    struct cdev *twe_dev_t;		/* control device */		\
     struct resource		*twe_io;		/* register interface window */	\
     bus_space_handle_t		twe_bhandle;		/* bus space handle */		\
     bus_space_tag_t		twe_btag;		/* bus space tag */		\

@@ -30,7 +30,7 @@
  *    Gareth Hughes <gareth@valinux.com>
  *    Michel Dänzer <daenzerm@student.ethz.ch>
  *
- * $FreeBSD: src/sys/dev/drm/r128_drv.h,v 1.7 2003/10/24 01:48:16 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/r128_drv.h,v 1.8 2004/01/06 04:34:53 anholt Exp $
  */
 
 #ifndef __R128_DRV_H__
@@ -99,7 +99,6 @@ typedef struct drm_r128_private {
 	u32 span_pitch_offset_c;
 
 	drm_local_map_t *sarea;
-	drm_local_map_t *fb;
 	drm_local_map_t *mmio;
 	drm_local_map_t *cce_ring;
 	drm_local_map_t *ring_rptr;

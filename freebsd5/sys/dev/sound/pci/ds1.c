@@ -33,7 +33,7 @@
 #include <dev/sound/pci/ds1.h>
 #include <dev/sound/pci/ds1-fw.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/ds1.c,v 1.36 2003/09/02 17:30:37 jhb Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/ds1.c,v 1.40 2004/07/16 03:59:27 tanimura Exp $");
 
 /* -------------------------------------------------------------------- */
 
@@ -954,8 +954,8 @@ ds_pci_attach(device_t dev)
 	data = pci_read_config(dev, PCIR_COMMAND, 2);
 
 	sc->regid = PCIR_BAR(0);
-	sc->reg = bus_alloc_resource(dev, SYS_RES_MEMORY, &sc->regid,
-					     0, ~0, 1, RF_ACTIVE);
+	sc->reg = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &sc->regid,
+					 RF_ACTIVE);
 	if (!sc->reg) {
 		device_printf(dev, "unable to map register space\n");
 		goto bad;
@@ -989,15 +989,15 @@ ds_pci_attach(device_t dev)
 	mixer_init(dev, ac97_getmixerclass(), codec);
 
 	sc->irqid = 0;
-	sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irqid,
-				 0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
-	if (!sc->irq || snd_setup_intr(dev, sc->irq, INTR_MPSAFE, ds_intr, sc, &sc->ih)) {
+	sc->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irqid,
+					 RF_ACTIVE | RF_SHAREABLE);
+	if (!sc->irq || snd_setup_intr(dev, sc->irq, 0, ds_intr, sc, &sc->ih)) {
 		device_printf(dev, "unable to map interrupt\n");
 		goto bad;
 	}
 
-	snprintf(status, SND_STATUSLEN, "at memory 0x%lx irq %ld",
-		 rman_get_start(sc->reg), rman_get_start(sc->irq));
+	snprintf(status, SND_STATUSLEN, "at memory 0x%lx irq %ld %s",
+		 rman_get_start(sc->reg), rman_get_start(sc->irq),PCM_KLDSTRING(snd_ds1));
 
 	if (pcm_register(dev, sc, DS1_CHANS, 2))
 		goto bad;
@@ -1084,5 +1084,5 @@ static driver_t ds1_driver = {
 };
 
 DRIVER_MODULE(snd_ds1, pci, ds1_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_ds1, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_ds1, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_ds1, 1);

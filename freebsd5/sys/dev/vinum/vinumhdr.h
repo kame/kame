@@ -37,13 +37,14 @@
 /* Header files used by all modules */
 /*
  * $Id: vinumhdr.h,v 1.19 2001/05/22 04:07:22 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumhdr.h,v 1.30 2003/02/16 14:13:23 phk Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumhdr.h,v 1.31 2004/07/10 21:17:04 marcel Exp $
  */
 
 #include <sys/param.h>
 #ifdef _KERNEL
 #include "opt_vinum.h"
 #include <sys/systm.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/proc.h>
 #include <sys/conf.h>

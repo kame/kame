@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ata/ata-disk.c,v 1.164.2.2 2004/02/11 08:47:21 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ata/ata-disk.c,v 1.175.2.2 2004/09/30 21:29:19 sos Exp $");
 
 #include "opt_ata.h"
 #include <sys/param.h>
@@ -97,15 +97,14 @@ ad_attach(struct ata_device *atadev)
 	adp->sectors = 17;
 	adp->heads = 8;
     }
-    mtx_init(&adp->queue_mtx, "ATA disk bioqueue lock", MTX_DEF, 0);
+    mtx_init(&adp->queue_mtx, "ATA disk bioqueue lock", NULL, MTX_DEF);
     bioq_init(&adp->queue);
 
     lbasize = (u_int32_t)atadev->param->lba_size_1 |
 	       ((u_int32_t)atadev->param->lba_size_2 << 16);
 
     /* does this device need oldstyle CHS addressing */
-    if (!ad_version(atadev->param->version_major) || 
-	!(atadev->param->atavalid & ATA_FLAG_54_58) || !lbasize)
+    if (!ad_version(atadev->param->version_major) || !lbasize)
 	atadev->flags |= ATA_D_USE_CHS;
 
     /* use the 28bit LBA size if valid or bigger than the CHS mapping */
@@ -131,20 +130,22 @@ ad_attach(struct ata_device *atadev)
     ad_config(atadev);
 
     /* lets create the disk device */
-    adp->disk.d_open = adopen;
-    adp->disk.d_strategy = adstrategy;
-    adp->disk.d_dump = addump;
-    adp->disk.d_name = "ad";
-    adp->disk.d_drv1 = adp;
+    adp->disk = disk_alloc();
+    adp->disk->d_open = adopen;
+    adp->disk->d_strategy = adstrategy;
+    adp->disk->d_dump = addump;
+    adp->disk->d_name = "ad";
+    adp->disk->d_drv1 = adp;
     if (atadev->channel->dma)
-	adp->disk.d_maxsize = atadev->channel->dma->max_iosize;
+	adp->disk->d_maxsize = atadev->channel->dma->max_iosize;
     else
-	adp->disk.d_maxsize = DFLTPHYS;
-    adp->disk.d_sectorsize = DEV_BSIZE;
-    adp->disk.d_mediasize = DEV_BSIZE * (off_t)adp->total_secs;
-    adp->disk.d_fwsectors = adp->sectors;
-    adp->disk.d_fwheads = adp->heads;
-    disk_create(adp->lun, &adp->disk, DISKFLAG_NOGIANT, NULL, NULL);
+	adp->disk->d_maxsize = DFLTPHYS;
+    adp->disk->d_sectorsize = DEV_BSIZE;
+    adp->disk->d_mediasize = DEV_BSIZE * (off_t)adp->total_secs;
+    adp->disk->d_fwsectors = adp->sectors;
+    adp->disk->d_fwheads = adp->heads;
+    adp->disk->d_unit = adp->lun;
+    disk_create(adp->disk, DISK_VERSION);
 
     /* announce we are here */
     ad_print(adp);
@@ -159,16 +160,16 @@ ad_detach(struct ata_device *atadev)
 {
     struct ad_softc *adp = atadev->softc;
 
-    atadev->flags |= ATA_D_DETACHING;
 #ifdef DEV_ATARAID
     if (adp->flags & AD_F_RAID_SUBDISK)
 	ata_raiddisk_detach(adp);
 #endif
+    disk_destroy(adp->disk);
+    ata_prtdev(atadev, "WARNING - removed from configuration\n");
     mtx_lock(&adp->queue_mtx);
     bioq_flush(&adp->queue, NULL, ENXIO);
     mtx_unlock(&adp->queue_mtx);
-    disk_destroy(&adp->disk);
-    ata_prtdev(atadev, "WARNING - removed from configuration\n");
+    mtx_destroy(&adp->queue_mtx);
     ata_free_name(atadev);
     ata_free_lun(&adp_lun_map, adp->lun);
     atadev->attach = NULL;
@@ -208,7 +209,7 @@ adopen(struct disk *dp)
 {
     struct ad_softc *adp = dp->d_drv1;
 
-    if (adp->device->flags & ATA_D_DETACHING)
+    if (adp == NULL || adp->device->flags & ATA_D_DETACHING)
 	return ENXIO;
     return 0;
 }
@@ -218,10 +219,6 @@ adstrategy(struct bio *bp)
 {
     struct ad_softc *adp = bp->bio_disk->d_drv1;
 
-    if (adp->device->flags & ATA_D_DETACHING) {
-	biofinish(bp, NULL, ENXIO);
-	return;
-    }
     mtx_lock(&adp->queue_mtx);
     bioq_disksort(&adp->queue, bp);
     mtx_unlock(&adp->queue_mtx);
@@ -244,6 +241,10 @@ ad_start(struct ata_device *atadev)
     }
     bioq_remove(&adp->queue, bp); 
     mtx_unlock(&adp->queue_mtx);
+    if (adp->device->flags & ATA_D_DETACHING) {
+	biofinish(bp, NULL, ENXIO);
+	return;
+    }
 
     if (!(request = ata_alloc_request())) {
 	ata_prtdev(atadev, "FAILURE - out of memory in start\n");
@@ -353,13 +354,13 @@ addump(void *arg, void *virtual, vm_offset_t physical,
 	request.flags = ATA_R_CONTROL;
     }
 
-    if (request.device->channel->hw.transaction(&request) == ATA_OP_CONTINUES) {
-	while (request.device->channel->running == &request &&
-	       !(request.status & ATA_S_ERROR)) {
+    if (request.device->channel->
+	hw.begin_transaction(&request) == ATA_OP_CONTINUES) {
+	do {
 	    DELAY(20);
-	    request.device->channel->running = &request;
-	    request.device->channel->hw.interrupt(request.device->channel);
-	}
+	} while (request.device->channel->
+		 hw.end_transaction(&request) == ATA_OP_CONTINUES);
+	ata_finish(&request);
     }
     if (request.status & ATA_S_ERROR)
 	return EIO;
@@ -390,11 +391,12 @@ ad_print(struct ad_softc *adp)
 		   (adp->flags & AD_F_TAG_ENABLED) ? "tagged " : "",
 		   ata_mode2str(adp->device->mode));
     }
-    else
-	ata_prtdev(adp->device,"%lluMB <%.40s> [%lld/%d/%d] at ata%d-%s %s%s\n",
+    else {
+	ata_prtdev(adp->device,
+		   "%lluMB <%.40s/%.8s> [%lld/%d/%d] at ata%d-%s %s%s\n",
 		   (unsigned long long)(adp->total_secs /
 					((1024L * 1024L) / DEV_BSIZE)),
-		   adp->device->param->model,
+		   adp->device->param->model, adp->device->param->revision,
 		   (unsigned long long)(adp->total_secs /
 					(adp->heads * adp->sectors)),
 		   adp->heads, adp->sectors,
@@ -402,6 +404,7 @@ ad_print(struct ad_softc *adp)
 		   (adp->device->unit == ATA_MASTER) ? "master" : "slave",
 		   (adp->flags & AD_F_TAG_ENABLED) ? "tagged " : "",
 		   ata_mode2str(adp->device->mode));
+    }
 }
 
 static int

@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/efi/libefi/devicename.c,v 1.2 2001/09/07 08:49:47 dfr Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/efi/libefi/devicename.c,v 1.3 2004/01/04 23:28:16 obrien Exp $");
 
 #include <stand.h>
 #include <string.h>

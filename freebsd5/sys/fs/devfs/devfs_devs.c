@@ -1,6 +1,5 @@
-#define DEBUG 1
 /*
- * Copyright (c) 2000
+ * Copyright (c) 2000,2004
  *	Poul-Henning Kamp.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,7 +25,7 @@
  *
  * From: FreeBSD: src/sys/miscfs/kernfs/kernfs_vfsops.c 1.36
  *
- * $FreeBSD: src/sys/fs/devfs/devfs_devs.c,v 1.28 2003/03/02 13:35:30 phk Exp $
+ * $FreeBSD: src/sys/fs/devfs/devfs_devs.c,v 1.31 2004/06/18 08:08:47 phk Exp $
  */
 
 #include "opt_devfs.h"
@@ -48,8 +47,8 @@
 
 #include <fs/devfs/devfs.h>
 
-static dev_t devfs_inot[NDEVFSINO];
-static dev_t *devfs_overflow;
+static struct cdev *devfs_inot[NDEVFSINO];
+static struct cdev **devfs_overflow;
 static int devfs_ref[NDEVFSINO];
 static int *devfs_refoverflow;
 static int devfs_nextino = 3;
@@ -59,7 +58,6 @@ static int devfs_noverflowwant = NDEVFSOVERFLOW;
 static int devfs_noverflow;
 static unsigned devfs_generation;
 
-static void devfs_attemptoverflow(int insist);
 static struct devfs_dirent *devfs_find (struct devfs_dirent *dd, const char *name, int namelen);
 
 SYSCTL_NODE(_vfs, OID_AUTO, devfs, CTLFLAG_RW, 0, "DEVFS filesystem");
@@ -96,7 +94,7 @@ static int
 devfs_getref(int inode)
 {
 	int *ip, i, j;
-	dev_t *dp;
+	struct cdev **dp;
 
 	ip = devfs_itor(inode);
 	dp = devfs_itod(inode);
@@ -125,7 +123,7 @@ devfs_itode (struct devfs_mount *dm, int inode)
 	return (NULL);
 }
 
-dev_t *
+struct cdev **
 devfs_itod (int inode)
 {
 
@@ -136,43 +134,6 @@ devfs_itod (int inode)
 	if (inode < NDEVFSINO + devfs_noverflow)
 		return (&devfs_overflow[inode - NDEVFSINO]);
 	return (NULL);
-}
-
-static void
-devfs_attemptoverflow(int insist)
-{
-	dev_t **ot;
-	int *or;
-	int n, nb;
-
-	/* Check if somebody beat us to it */
-	if (devfs_overflow != NULL)
-		return;
-	ot = NULL;
-	or = NULL;
-	n = devfs_noverflowwant;
-	nb = sizeof (dev_t *) * n;
-	MALLOC(ot, dev_t **, nb, M_DEVFS, (insist ? M_WAITOK : M_NOWAIT) | M_ZERO);
-	if (ot == NULL)
-		goto bail;
-	nb = sizeof (int) * n;
-	MALLOC(or, int *, nb, M_DEVFS, (insist ? M_WAITOK : M_NOWAIT) | M_ZERO);
-	if (or == NULL)
-		goto bail;
-	if (!atomic_cmpset_ptr(&devfs_overflow, NULL, ot))
-		goto bail;
-	devfs_refoverflow = or;
-	devfs_noverflow = n;
-	printf("DEVFS Overflow table with %d entries allocated when %d in use\n", n, devfs_numino);
-	return;
-
-bail:
-	/* Somebody beat us to it, or something went wrong. */
-	if (ot != NULL)
-		FREE(ot, M_DEVFS);
-	if (or != NULL)
-		FREE(or, M_DEVFS);
-	return;
 }
 
 static struct devfs_dirent *
@@ -283,7 +244,7 @@ int
 devfs_populate(struct devfs_mount *dm)
 {
 	int i, j;
-	dev_t dev, pdev;
+	struct cdev *dev, *pdev;
 	struct devfs_dirent *dd;
 	struct devfs_dirent *de, **dep;
 	char *q, *s;
@@ -368,20 +329,26 @@ devfs_populate(struct devfs_mount *dm)
 			de->de_dir = dd;
 			devfs_rules_apply(dm, de);
 			TAILQ_INSERT_TAIL(&dd->de_dlist, de, de_list);
-#if 0
-			printf("Add ino%d %s\n", i, dev->si_name);
-#endif
 		}
 	}
 	lockmgr(&dm->dm_lock, LK_DOWNGRADE, 0, curthread);
 	return (0);
 }
 
+/*
+ * devfs_create() and devfs_destroy() are called from kern_conf.c and
+ * in both cases the devlock() mutex is held, so no further locking
+ * is necesary and no sleeping allowed.
+ */
+
 void
-devfs_create(dev_t dev)
+devfs_create(struct cdev *dev)
 {
 	int ino, i, *ip;
-	dev_t *dp;
+	struct cdev **dp;
+	struct cdev **ot;
+	int *or;
+	int n;
 
 	for (;;) {
 		/* Grab the next inode number */
@@ -390,66 +357,70 @@ devfs_create(dev_t dev)
 		/* wrap around when we reach the end */
 		if (i >= NDEVFSINO + devfs_noverflow)
 			i = 3;
-		if (!atomic_cmpset_int(&devfs_nextino, ino, i))
-			continue;
+		devfs_nextino = i;
 
 		/* see if it was occupied */
 		dp = devfs_itod(ino);
-		if (dp == NULL)
-			Debugger("dp == NULL\n");
+		KASSERT(dp != NULL, ("DEVFS: No devptr inode %d", ino));
 		if (*dp != NULL)
 			continue;
 		ip = devfs_itor(ino);
-		if (ip == NULL)
-			Debugger("ip == NULL\n");
+		KASSERT(ip != NULL, ("DEVFS: No iptr inode %d", ino));
 		if (*ip != 0)
 			continue;
-
-		if (!atomic_cmpset_ptr(dp, NULL, dev))
-			continue;
-
-		dev->si_inode = ino;
-		for (;;) {
-			i = devfs_topino;
-			if (i >= ino)
-				break;
-			if (atomic_cmpset_int(&devfs_topino, i, ino))
-				break;
-			printf("failed topino %d %d\n", i, ino);
-		}
 		break;
 	}
 
-	atomic_add_int(&devfs_numino, 1);
-	atomic_add_int(&devfs_generation, 1);
-	if (devfs_overflow == NULL && devfs_numino + 100 > NDEVFSINO)
-		devfs_attemptoverflow(0);
+	*dp = dev;
+	dev->si_inode = ino;
+	if (i > devfs_topino)
+		devfs_topino = i;
+
+	devfs_numino++;
+	devfs_generation++;
+
+	if (devfs_overflow != NULL || devfs_numino + 100 < NDEVFSINO)
+		return;
+
+	/*
+	 * Try to allocate overflow table
+	 * XXX: we can probably be less panicy these days and a linked
+	 * XXX: list of PAGESIZE/PTRSIZE entries might be a better idea.
+	 *
+	 * XXX: we may be into witness unlove here.
+	 */
+	n = devfs_noverflowwant;
+	ot = malloc(sizeof(*ot) * n, M_DEVFS, M_NOWAIT | M_ZERO);
+	if (ot == NULL)
+		return;
+	or = malloc(sizeof(*or) * n, M_DEVFS, M_NOWAIT | M_ZERO);
+	if (or == NULL) {
+		free(ot, M_DEVFS);
+		return;
+	}
+	devfs_overflow = ot;
+	devfs_refoverflow = or;
+	devfs_noverflow = n;
+	printf("DEVFS Overflow table with %d entries allocated\n", n);
+	return;
 }
 
 void
-devfs_destroy(dev_t dev)
+devfs_destroy(struct cdev *dev)
 {
-	int ino, i;
+	int ino;
+	struct cdev **dp;
 
 	ino = dev->si_inode;
 	dev->si_inode = 0;
 	if (ino == 0)
 		return;
-	if (atomic_cmpset_ptr(devfs_itod(ino), dev, NULL)) {
-		atomic_add_int(&devfs_generation, 1);
-		atomic_add_int(&devfs_numino, -1);
-		i = devfs_nextino;
-		if (ino < i)
-			atomic_cmpset_int(&devfs_nextino, i, ino);
-	}
+	dp = devfs_itod(ino);
+	KASSERT(*dp == dev,
+	    ("DEVFS: destroying wrong cdev ino %d", ino));
+	*dp = NULL;
+	devfs_numino--;
+	devfs_generation++;
+	if (ino < devfs_nextino)
+		devfs_nextino = ino;
 }
-
-static void
-devfs_init(void *junk)
-{
-
-	devfs_rules_init();
-}
-
-SYSINIT(devfs, SI_SUB_DEVFS, SI_ORDER_FIRST, devfs_init, NULL);
-

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/hfa/hfa_freebsd.c,v 1.7 2003/07/31 14:52:44 harti Exp $
+ * $FreeBSD: src/sys/dev/hfa/hfa_freebsd.c,v 1.9 2004/07/15 08:26:01 phk Exp $
  */
 
 /*
@@ -136,16 +136,16 @@ hfa_alloc (device_t dev)
 	sc = (struct hfa_softc *)device_get_softc(dev);
 	error = 0;
 
-	sc->mem = bus_alloc_resource(dev, sc->mem_type, &sc->mem_rid,
-					   0, ~0, 1, RF_ACTIVE);
+	sc->mem = bus_alloc_resource_any(dev, sc->mem_type, &sc->mem_rid,
+					   RF_ACTIVE);
 	if (sc->mem == NULL) {
 		device_printf(dev, "Unable to allocate memory resource.\n");
 		error = ENXIO;
 		goto fail;
 	}
 
-	sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irq_rid,
-					0, ~0, 1, RF_SHAREABLE | RF_ACTIVE);
+	sc->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irq_rid,
+					RF_SHAREABLE | RF_ACTIVE);
 	if (sc->irq == NULL) {
 		device_printf(dev, "Unable to allocate interrupt resource.\n");
 		error = ENXIO;
@@ -451,6 +451,7 @@ hfa_modevent (module_t mod, int type, void *data)
 
 		break;
 	default:
+		return (EOPNOTSUPP);
 		break;
 	}
 

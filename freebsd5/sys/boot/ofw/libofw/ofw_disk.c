@@ -21,9 +21,10 @@
  * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
  * OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF
  * ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/ofw/libofw/ofw_disk.c,v 1.9 2003/04/16 21:09:41 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/ofw/libofw/ofw_disk.c,v 1.11 2004/01/04 23:27:31 obrien Exp $");
 
 /*
  * Disk I/O routines using Open Firmware
@@ -70,7 +71,7 @@ ofwd_strategy(void *devdata, int flag, daddr_t dblk, size_t size, char *buf,
     size_t *rsize)
 {
 	struct ofw_devdesc *dp = (struct ofw_devdesc *)devdata;
-	unsigned long pos;
+	daddr_t pos;
 	int n;
 	int i, j;
 

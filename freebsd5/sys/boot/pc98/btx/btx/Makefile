@@ -1,9 +1,14 @@
-# $FreeBSD: src/sys/boot/pc98/btx/btx/Makefile,v 1.7 2002/09/17 01:48:56 peter Exp $
+# $FreeBSD: src/sys/boot/pc98/btx/btx/Makefile,v 1.10 2004/04/29 08:24:30 nyan Exp $
 
-M4?=	m4
+PROG=	btx
+INTERNALPROG=
+NOMAN=
+SRCS=	btx.S
+
+CFLAGS+=-DPC98
 
 .if defined(PAGING)
-M4FLAGS+=	-DPAGING
+CFLAGS+=-DPAGING
 .endif
 
 .if defined(BOOT_BTX_NOHANG)
@@ -12,30 +17,19 @@ BOOT_BTX_FLAGS=0x1
 BOOT_BTX_FLAGS=0x0
 .endif
 
-AFLAGS+=	--defsym BTX_FLAGS=${BOOT_BTX_FLAGS}
-AFLAGS+=	--defsym PC98=1
+CFLAGS+=-DBTX_FLAGS=${BOOT_BTX_FLAGS}
 
 .if defined(BTX_SERIAL)
 BOOT_COMCONSOLE_PORT?= 0x238
 BOOT_COMCONSOLE_SPEED?= 9600
 B2SIOFMT?=	0x3
 
-M4FLAGS+=	-DBTX_SERIAL -DSIOPRT=${BOOT_COMCONSOLE_PORT} \
-		-DSIOFMT=${B2SIOFMT} -DSIOSPD=${BOOT_COMCONSOLE_SPEED}
+CFLAGS+=-DBTX_SERIAL -DSIOPRT=${BOOT_COMCONSOLE_PORT} \
+	-DSIOFMT=${B2SIOFMT} -DSIOSPD=${BOOT_COMCONSOLE_SPEED}
 .endif
 
 ORG=	0x9000
 
-all: btx
-
-btx: btx.o
-	${LD} -N -e start -Ttext ${ORG} -o btx.out btx.o
-	objcopy -S -O binary btx.out ${.TARGET}
-
-btx.o: btx.s
-	(cd ${.CURDIR}; ${M4} ${M4FLAGS} btx.s) | \
-	   ${AS} ${AFLAGS} -o ${.TARGET}
-
-CLEANFILES+= btx btx.out btx.o
+LDFLAGS=-N -e start -Ttext ${ORG} -Wl,-S,--oformat,binary
 
 .include <bsd.prog.mk>

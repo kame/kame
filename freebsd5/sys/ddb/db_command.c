@@ -32,17 +32,19 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ddb/db_command.c,v 1.52 2003/08/16 16:57:56 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/ddb/db_command.c,v 1.57 2004/07/21 05:55:51 marcel Exp $");
 
 #include <sys/param.h>
 #include <sys/linker_set.h>
 #include <sys/lock.h>
+#include <sys/kdb.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/reboot.h>
 #include <sys/signalvar.h>
 #include <sys/systm.h>
 #include <sys/cons.h>
+#include <sys/watchdog.h>
 
 #include <ddb/ddb.h>
 #include <ddb/db_command.h>
@@ -57,7 +59,6 @@ __FBSDID("$FreeBSD: src/sys/ddb/db_command.c,v 1.52 2003/08/16 16:57:56 marcel E
  */
 boolean_t	db_cmd_loop_done;
 db_addr_t	db_dot;
-jmp_buf		db_jmpbuf;
 db_addr_t	db_last_addr;
 db_addr_t	db_prev;
 db_addr_t	db_next;
@@ -69,6 +70,8 @@ static db_cmdfcn_t	db_fncall;
 static db_cmdfcn_t	db_gdb;
 static db_cmdfcn_t	db_kill;
 static db_cmdfcn_t	db_reset;
+static db_cmdfcn_t	db_stack_trace;
+static db_cmdfcn_t	db_watchdog;
 
 /* XXX this is actually forward-static. */
 extern struct command	db_show_cmds[];
@@ -373,9 +376,6 @@ db_command(last_cmdp, cmd_table, aux_cmd_tablep, aux_cmd_tablep_end)
  */
 
 static struct command db_show_all_cmds[] = {
-#if 0
-	{ "threads",	db_show_all_threads,	0,	0 },
-#endif
 	{ "procs",	db_ps,			0,	0 },
 	{ (char *)0 }
 };
@@ -384,10 +384,7 @@ static struct command db_show_cmds[] = {
 	{ "all",	0,			0,	db_show_all_cmds },
 	{ "registers",	db_show_regs,		0,	0 },
 	{ "breaks",	db_listbreak_cmd, 	0,	0 },
-	{ "thread",	db_show_one_thread,	0,	0 },
-#if 0
-	{ "port",	ipc_port_print,		0,	0 },
-#endif
+	{ "threads",	db_show_threads,	0,	0 },
 	{ (char *)0, }
 };
 
@@ -414,32 +411,20 @@ static struct command db_command_table[] = {
 	{ "until",	db_trace_until_call_cmd,0,	0 },
 	{ "next",	db_trace_until_matching_cmd,0,	0 },
 	{ "match",	db_trace_until_matching_cmd,0,	0 },
-	{ "trace",	db_stack_trace_cmd,	0,	0 },
-	{ "where",	db_stack_trace_cmd,	0,	0 },
+	{ "trace",	db_stack_trace,		CS_OWN,	0 },
+	{ "where",	db_stack_trace,		CS_OWN,	0 },
 	{ "call",	db_fncall,		CS_OWN,	0 },
 	{ "show",	0,			0,	db_show_cmds },
 	{ "ps",		db_ps,			0,	0 },
 	{ "gdb",	db_gdb,			0,	0 },
 	{ "reset",	db_reset,		0,	0 },
 	{ "kill",	db_kill,		CS_OWN,	0 },
+	{ "watchdog",	db_watchdog,		0,	0 },
+	{ "thread",	db_set_thread,		CS_OWN,	0 },
 	{ (char *)0, }
 };
 
 static struct command	*db_last_command = 0;
-
-#if 0
-void
-db_help_cmd()
-{
-	struct command *cmd = db_command_table;
-
-	while (cmd->name != 0) {
-	    db_printf("%-12s", cmd->name);
-	    db_end_line();
-	    cmd++;
-	}
-}
-#endif
 
 /*
  * At least one non-optional command must be implemented using
@@ -461,8 +446,6 @@ db_command_loop()
 
 	db_cmd_loop_done = 0;
 	while (!db_cmd_loop_done) {
-
-	    (void) setjmp(db_jmpbuf);
 	    if (db_print_position() != 0)
 		db_printf("\n");
 
@@ -481,7 +464,7 @@ db_error(s)
 	if (s)
 	    db_printf("%s", s);
 	db_flush_lex();
-	longjmp(db_jmpbuf, 1);
+	kdb_reenter();
 }
 
 
@@ -550,32 +533,6 @@ db_fncall(dummy1, dummy2, dummy3, dummy4)
 	db_printf("%#lr\n", (long)retval);
 }
 
-/* Enter GDB remote protocol debugger on the next trap. */
-
-void	  *gdb_arg = NULL;
-cn_getc_t *gdb_getc;
-cn_putc_t *gdb_putc;
-
-static void
-db_gdb (dummy1, dummy2, dummy3, dummy4)
-	db_expr_t	dummy1;
-	boolean_t	dummy2;
-	db_expr_t	dummy3;
-	char *		dummy4;
-{
-
-	if (gdb_arg == NULL) {
-		db_printf("No gdb port enabled. Set flag 0x80 on desired port\n");
-		db_printf("in your configuration file (currently sio only).\n");
-		return;
-	}
-	boothowto ^= RB_GDB;
-
-	db_printf("Next trap will enter %s\n",
-		   boothowto & RB_GDB ? "GDB remote protocol mode"
-				      : "DDB debugger");
-}
-
 static void
 db_kill(dummy1, dummy2, dummy3, dummy4)
 	db_expr_t	dummy1;
@@ -638,4 +595,72 @@ db_reset(dummy1, dummy2, dummy3, dummy4)
 {
 
 	cpu_reset();
+}
+
+static void
+db_watchdog(dummy1, dummy2, dummy3, dummy4)
+	db_expr_t	dummy1;
+	boolean_t	dummy2;
+	db_expr_t	dummy3;
+	char *		dummy4;
+{
+	int i;
+
+	/*
+	 * XXX: It might make sense to be able to set the watchdog to a
+	 * XXX: timeout here so that failure or hang as a result of subsequent
+	 * XXX: ddb commands could be recovered by a reset.
+	 */
+
+	EVENTHANDLER_INVOKE(watchdog_list, 0, &i);
+}
+
+static void
+db_gdb(db_expr_t dummy1, boolean_t dummy2, db_expr_t dummy3, char *dummy4)
+{
+
+	if (kdb_dbbe_select("gdb") != 0)
+		db_printf("The remote GDB backend could not be selected.\n");
+	else
+		db_printf("Step to enter the remote GDB backend.\n");
+}
+
+static void
+db_stack_trace(db_expr_t tid, boolean_t hastid, db_expr_t count, char *modif)
+{
+	struct thread *td;
+	db_expr_t radix;
+	int t;
+
+	/*
+	 * We parse our own arguments. We don't like the default radix.
+	 */
+	radix = db_radix;
+	db_radix = 10;
+	hastid = db_expression(&tid);
+	t = db_read_token();
+	if (t == tCOMMA) {
+		if (!db_expression(&count)) {
+			db_printf("Count missing\n");
+			db_flush_lex();
+			return;
+		}
+	} else {
+		db_unread_token(t);
+		count = -1;
+	}
+	db_skip_to_eol();
+	db_radix = radix;
+
+	if (hastid) {
+		td = kdb_thr_lookup((lwpid_t)tid);
+		if (td == NULL)
+			td = kdb_thr_from_pid((pid_t)tid);
+		if (td == NULL) {
+			db_printf("Thread %d not found\n", (int)tid);
+			return;
+		}
+	} else
+		td = kdb_thread;
+	db_trace_thread(td, count);
 }

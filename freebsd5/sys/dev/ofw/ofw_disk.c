@@ -26,14 +26,16 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ofw/ofw_disk.c,v 1.8 2003/10/18 17:25:26 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ofw/ofw_disk.c,v 1.14 2004/08/16 15:45:26 marius Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bio.h>
+#include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
 #include <geom/geom_disk.h>
 
 #include <dev/ofw/openfirm.h>
@@ -47,7 +49,7 @@ __FBSDID("$FreeBSD: src/sys/dev/ofw/ofw_disk.c,v 1.8 2003/10/18 17:25:26 phk Exp
 struct ofwd_softc
 {
 	device_t	ofwd_dev;
-	struct		disk ofwd_disk;
+	struct		disk *ofwd_disk;
 	phandle_t	ofwd_package;
 	ihandle_t	ofwd_instance;
 };
@@ -98,9 +100,10 @@ ofwd_strategy(struct bio *bp)
 		return;
 	}
 
+	bp->bio_resid = bp->bio_bcount;
+
 	r = OF_seek(sc->ofwd_instance, bp->bio_offset);
 	if (r == -1) {
-		bp->bio_resid = bp->bio_bcount;
 		device_printf(sc->ofwd_dev, "seek failed\n");
 		biofinish(bp, NULL, EIO);
 		return;
@@ -124,31 +127,61 @@ ofwd_strategy(struct bio *bp)
 	}
 
 	bp->bio_resid -= r;
-	
+
 	if (r < bp->bio_bcount) {
 		device_printf(sc->ofwd_dev, "r (%ld) < bp->bio_bcount (%ld)\n",
 		    r, bp->bio_bcount);
 		biofinish(bp, NULL, EIO);	/* XXX: probably not an error */
 		return;
-	} 
+	}
 	biodone(bp);
 	return;
 }
 
 /*
- * Probe for an OpenFirmware disk.
+ * Attach the Open Firmware disk to nexus if present.
+ */
+static void
+ofwd_identify(driver_t *driver, device_t parent)
+{
+	device_t child;
+	phandle_t ofd;
+	static char type[8];
+
+	ofd = OF_finddevice("ofwdisk");
+	if (ofd == -1)
+		return;
+
+	OF_getprop(ofd, "device_type", type, sizeof(type));
+
+	child = BUS_ADD_CHILD(parent, INT_MAX, "ofwd", 0);
+	if (child != NULL) {
+		nexus_set_device_type(child, type);
+		nexus_set_node(child, ofd);
+	}
+}
+
+/*
+ * Probe for an Open Firmware disk.
  */
 static int
 ofwd_probe(device_t dev)
 {
 	char		*type;
+	char		fname[32];
+	phandle_t	node;
 
 	type = nexus_get_device_type(dev);
+	node = nexus_get_node(dev);
 
-	if (type == NULL || strcmp(type, "disk") != 0)
+	if (type == NULL ||
+	    (strcmp(type, "disk") != 0 && strcmp(type, "block") != 0))
 		return (ENXIO);
 
-	device_set_desc(dev, "OpenFirmware disk");
+	if (OF_getprop(node, "file", fname, sizeof(fname)) == -1)
+		return (ENXIO);
+
+	device_set_desc(dev, "Open Firmware disk");
 	return (0);
 }
 
@@ -157,34 +190,33 @@ ofwd_attach(device_t dev)
 {
 	struct	ofwd_softc *sc;
 	char	path[128];
-	dev_t	dsk;
+	char	fname[32];
 
 	sc = device_get_softc(dev);
 	sc->ofwd_dev = dev;
 
 	bzero(path, 128);
 	OF_package_to_path(nexus_get_node(dev), path, 128);
-	device_printf(dev, "located at %s\n", path);
+	OF_getprop(nexus_get_node(dev), "file", fname, sizeof(fname));
+	device_printf(dev, "located at %s, file %s\n", path, fname);
 	sc->ofwd_instance = OF_open(path);
 	if (sc->ofwd_instance == -1) {
 		device_printf(dev, "could not create instance\n");
 		return (ENXIO);
 	}
 
-	sc->ofwd_disk.d_strategy = ofwd_strategy;
-	sc->ofwd_disk.d_name = "ofwd";
-	sc->ofwd_disk.d_sectorsize = OFWD_BLOCKSIZE;
-	sc->ofwd_disk.d_mediasize = (off_t)33554432 * OFWD_BLOCKSIZE;
-	sc->ofwd_disk.d_fwsectors = 0;
-	sc->ofwd_disk.d_fwheads = 0;
-	sc->ofwd_disk.d_drv1 = sc;
-	sc->ofwd_disk.d_maxsize = PAGE_SIZE;
-	disk_create(device_get_unit(dev), &sc->ofwd_disk, 0, NULL, NULL);
+	sc->ofwd_disk = disk_alloc();
+	sc->ofwd_disk->d_strategy = ofwd_strategy;
+	sc->ofwd_disk->d_name = "ofwd";
+	sc->ofwd_disk->d_sectorsize = OFWD_BLOCKSIZE;
+	sc->ofwd_disk->d_mediasize = (off_t)33554432 * OFWD_BLOCKSIZE;
+	sc->ofwd_disk->d_fwsectors = 0;
+	sc->ofwd_disk->d_fwheads = 0;
+	sc->ofwd_disk->d_drv1 = sc;
+	sc->ofwd_disk->d_maxsize = PAGE_SIZE;
+	sc->ofwd_disk->d_unit = device_get_unit(dev);
+	sc->ofwd_disk->d_flags = DISKFLAG_NEEDSGIANT;
+	disk_create(sc->ofwd_disk, DISK_VERSION);
 
 	return (0);
-}
-
-static void
-ofwd_identify(driver_t *driver, device_t parent)
-{
 }

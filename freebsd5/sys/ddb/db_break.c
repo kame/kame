@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ddb/db_break.c,v 1.23 2003/06/10 22:09:23 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/ddb/db_break.c,v 1.24 2004/07/10 23:47:18 marcel Exp $");
 
 #include "opt_comconsole.h"
 
@@ -367,46 +367,3 @@ db_map_addr(addr)
 #endif
 	    return kernel_map;
 }
-
-#ifdef ALT_BREAK_TO_DEBUGGER
-/*
- * Solaris implements a new BREAK which is initiated by a character sequence
- * CR ~ ^b which is similar to a familiar pattern used on Sun servers by the
- * Remote Console.
- *
- * Note that this function may be called from almost anywhere, with interrupts
- * disabled and with unknown locks held, so it must not access data other than
- * its arguments.  Its up to the caller to ensure that the state variable is
- * consistent.
- */
-
-#define	KEY_CR		13	/* CR '\r' */
-#define	KEY_TILDE	126	/* ~ */
-#define	KEY_CRTLB	2	/* ^B */
-
-int
-db_alt_break(int data, int *state)
-{
-	int brk = 0;
-
-	switch (data) {
-	case KEY_CR:
-		*state = KEY_TILDE;
-		break;
-	case KEY_TILDE:
-		if (*state == KEY_TILDE)
-			*state = KEY_CRTLB;
-		else
-			*state = 0;
-		break;
-	case KEY_CRTLB:
-		if (*state == KEY_CRTLB)
-			brk = 1;
-		/* FALLTHROUGH */
-	default:
-		*state = 0;
-		break;
-	}
-	return (brk);
-}
-#endif

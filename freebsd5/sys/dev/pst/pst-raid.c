@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/pst/pst-raid.c,v 1.12 2003/09/08 06:28:50 sos Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/pst/pst-raid.c,v 1.13.2.1 2004/10/02 14:14:27 scottl Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -56,7 +56,7 @@ struct pst_softc {
     struct iop_softc		*iop;
     struct i2o_lct_entry	*lct;
     struct i2o_bsa_device	*info;
-    struct disk			disk;
+    struct disk			*disk;
     struct bio_queue_head	queue;
 };
 
@@ -123,11 +123,11 @@ pst_attach(device_t dev)
 
     if (!(psc->info = (struct i2o_bsa_device *)
 	    malloc(sizeof(struct i2o_bsa_device), M_PSTRAID, M_NOWAIT))) {
-	contigfree(reply, PAGE_SIZE, M_PSTRAID);
+	contigfree(reply, PAGE_SIZE, M_PSTIOP);
 	return ENOMEM;
     }
     bcopy(reply->result, psc->info, sizeof(struct i2o_bsa_device));
-    contigfree(reply, PAGE_SIZE, M_PSTRAID);
+    contigfree(reply, PAGE_SIZE, M_PSTIOP);
 
     if (!(reply = iop_get_util_params(psc->iop, psc->lct->local_tid,
 				      I2O_PARAMS_OPERATION_FIELD_GET,
@@ -145,20 +145,23 @@ pst_attach(device_t dev)
     bpack(ident->vendor, ident->vendor, 16);
     bpack(ident->product, ident->product, 16);
     sprintf(name, "%s %s", ident->vendor, ident->product);
-    contigfree(reply, PAGE_SIZE, M_PSTRAID);
+    contigfree(reply, PAGE_SIZE, M_PSTIOP);
 
     bioq_init(&psc->queue);
 
-    psc->disk.d_name = "pst";
-    psc->disk.d_strategy = pststrategy;
-    psc->disk.d_maxsize = 64 * 1024; /*I2O_SGL_MAX_SEGS * PAGE_SIZE;*/
-    psc->disk.d_drv1 = psc;
-    disk_create(lun, &psc->disk, DISKFLAG_NOGIANT, NULL, NULL);
+    psc->disk = disk_alloc();
+    psc->disk->d_name = "pst";
+    psc->disk->d_strategy = pststrategy;
+    psc->disk->d_maxsize = 64 * 1024; /*I2O_SGL_MAX_SEGS * PAGE_SIZE;*/
+    psc->disk->d_drv1 = psc;
+    psc->disk->d_unit = lun;
 
-    psc->disk.d_sectorsize = psc->info->block_size;
-    psc->disk.d_mediasize = psc->info->capacity;
-    psc->disk.d_fwsectors = 63;
-    psc->disk.d_fwheads = 255;
+    psc->disk->d_sectorsize = psc->info->block_size;
+    psc->disk->d_mediasize = psc->info->capacity;
+    psc->disk->d_fwsectors = 63;
+    psc->disk->d_fwheads = 255;
+
+    disk_create(psc->disk, DISK_VERSION);
 
     printf("pst%d: %lluMB <%.40s> [%lld/%d/%d] on %.16s\n", lun,
 	   (unsigned long long)psc->info->capacity / (1024 * 1024),

@@ -24,7 +24,7 @@
  * SUCH DAMAGE.
  *
  *	$Id: if_xe.c,v 1.20 1999/06/13 19:17:40 scott Exp $
- * $FreeBSD: src/sys/dev/xe/if_xevar.h,v 1.4 2003/10/14 22:51:35 rsm Exp $
+ * $FreeBSD: src/sys/dev/xe/if_xevar.h,v 1.5 2004/04/09 17:27:36 rsm Exp $
  */
 #ifndef DEV_XE_IF_XEDEV_H
 #define DEV_XE_IF_XEDEV_H
@@ -39,8 +39,8 @@ struct xe_softc {
   struct callout_handle chand;
   struct ifnet *ifp;
   struct ifmedia *ifm;
-  char *card_type;	/* Card model name */
-  char *vendor;		/* Card manufacturer */
+  const char *card_type;/* Card model name */
+  const char *vendor;	/* Card manufacturer */
   device_t dev;		/* Device */
   bus_space_tag_t bst;	/* Bus space tag for card */
   bus_space_handle_t bsh; /* Bus space handle for card */

@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/scd/scd.c,v 1.78 2003/10/18 17:44:01 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/scd/scd.c,v 1.82 2004/07/28 06:20:57 kan Exp $");
 
 
 #undef	SCD_DEBUG
@@ -145,17 +145,16 @@ static	d_close_t	scdclose;
 static	d_ioctl_t	scdioctl;
 static	d_strategy_t	scdstrategy;
 
-#define CDEV_MAJOR 45
 
 static struct cdevsw scd_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	scdopen,
 	.d_close =	scdclose,
 	.d_read =	physread,
 	.d_ioctl =	scdioctl,
 	.d_strategy =	scdstrategy,
 	.d_name =	"scd",
-	.d_maj =	CDEV_MAJOR,
-	.d_flags =	D_DISK,
+	.d_flags =	D_DISK | D_NEEDGIANT,
 };
 
 int
@@ -179,7 +178,7 @@ scd_attach(struct scd_softc *sc)
 }
 
 static	int
-scdopen(dev_t dev, int flags, int fmt, struct thread *td)
+scdopen(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	struct scd_softc *sc;
 	int rc;
@@ -226,7 +225,7 @@ scdopen(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static	int
-scdclose(dev_t dev, int flags, int fmt, struct thread *td)
+scdclose(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	struct scd_softc *sc;
 
@@ -328,7 +327,7 @@ scd_start(struct scd_softc *sc)
 }
 
 static	int
-scdioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct thread *td)
+scdioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags, struct thread *td)
 {
 	struct scd_softc *sc;
 
@@ -1059,22 +1058,21 @@ get_tl(struct sony_toc *toc, int size)
 
 	if (tl->track != 0xb0)
 		return (tl);
-	(char *)tl += 9;
 	if (tl->track != 0xb1)
 		return (tl);
-	(char *)tl += 9;
+	tl = (struct sony_tracklist *)((char *)tl + 9);
 	if (tl->track != 0xb2)
 		return (tl);
-	(char *)tl += 9;
+	tl = (struct sony_tracklist *)((char *)tl + 9);
 	if (tl->track != 0xb3)
 		return (tl);
-	(char *)tl += 9;
+	tl = (struct sony_tracklist *)((char *)tl + 9);
 	if (tl->track != 0xb4)
 		return (tl);
-	(char *)tl += 9;
+	tl = (struct sony_tracklist *)((char *)tl + 9);
 	if (tl->track != 0xc0)
 		return (tl);
-	(char *)tl += 9;
+	tl = (struct sony_tracklist *)((char *)tl + 9);
 	return (tl);
 }
 

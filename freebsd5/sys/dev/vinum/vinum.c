@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/vinum/vinum.c,v 1.61 2003/08/24 17:55:56 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/vinum/vinum.c,v 1.66 2004/07/15 08:26:04 phk Exp $");
 
 #define STATIC static					    /* nothing while we're testing */
 
@@ -54,28 +54,27 @@ extern struct mc malloced[];
 #endif
 #include <dev/vinum/request.h>
 
-struct cdevsw vinum_cdevsw =
-{
-    .d_open = vinumopen,
-    .d_close = vinumclose,
-    .d_read = physread,
-    .d_write = physwrite,
-    .d_ioctl = vinumioctl,
-    .d_strategy = vinumstrategy,
-    .d_name = "vinum",
-    .d_maj = VINUM_CDEV_MAJOR,
-    .d_flags = D_DISK
+struct cdevsw vinum_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_open =	vinumopen,
+	.d_close =	vinumclose,
+	.d_read =	physread,
+	.d_write =	physwrite,
+	.d_ioctl =	vinumioctl,
+	.d_strategy =	vinumstrategy,
+	.d_name =	"vinum",
+	.d_flags =	D_DISK | D_NEEDGIANT
 };
 
 /* Called by main() during pseudo-device attachment. */
 void vinumattach(void *);
 STATIC int vinum_modevent(module_t mod, modeventtype_t type, void *unused);
-STATIC void vinum_clone(void *arg, char *name, int namelen, dev_t * dev);
+STATIC void vinum_clone(void *arg, char *name, int namelen, struct cdev ** dev);
 
 struct _vinum_conf vinum_conf;				    /* configuration information */
 
-dev_t vinum_daemon_dev;
-dev_t vinum_super_dev;
+struct cdev *vinum_daemon_dev;
+struct cdev *vinum_super_dev;
 
 static eventhandler_tag dev_clone_tag;
 
@@ -319,6 +318,7 @@ vinum_modevent(module_t mod, modeventtype_t type, void *unused)
 	EVENTHANDLER_DEREGISTER(dev_clone, dev_clone_tag);
 	return 0;
     default:
+	return EOPNOTSUPP;
 	break;
     }
     return 0;
@@ -335,7 +335,7 @@ DECLARE_MODULE(vinum, vinum_mod, SI_SUB_RAID, SI_ORDER_MIDDLE);
 /* ARGSUSED */
 /* Open a vinum object */
 int
-vinumopen(dev_t dev,
+vinumopen(struct cdev *dev,
     int flags,
     int fmt,
     struct thread *td)
@@ -438,7 +438,7 @@ vinumopen(dev_t dev,
 
 /* ARGSUSED */
 int
-vinumclose(dev_t dev,
+vinumclose(struct cdev *dev,
     int flags,
     int fmt,
     struct thread *td)
@@ -495,13 +495,22 @@ vinumclose(dev_t dev,
     case VINUM_PLEX_TYPE:
 	if (Volno(dev) >= vinum_conf.volumes_allocated)
 	    return ENXIO;
-	/* FALLTHROUGH */
+	index = Plexno (dev);
+	if (index >= vinum_conf.plexes_allocated)	    /* no such plex */
+	  return ENXIO;
+	PLEX [index].flags &= ~VF_OPEN;			    /* no longer open */
+	return 0;
 
     case VINUM_SD_TYPE:
 	if ((Volno(dev) >= vinum_conf.volumes_allocated) || /* no such volume */
 	    (Plexno(dev) >= vinum_conf.plexes_allocated))   /* or no such plex */
 	    return ENXIO;				    /* no such device */
-	/* FALLTHROUGH */
+	index = Sdno (dev);
+	if (index >= vinum_conf.subdisks_allocated)	    /* no such sd */
+	  return ENXIO;
+	SD [index].flags &= ~VF_OPEN;			    /* no longer open */
+	return 0;
+
 
     default:
 	return ENODEV;					    /* don't know what to do with these */
@@ -509,12 +518,12 @@ vinumclose(dev_t dev,
 }
 
 void
-vinum_clone(void *arg, char *name, int namelen, dev_t * dev)
+vinum_clone(void *arg, char *name, int namelen, struct cdev ** dev)
 {
     struct volume *vol;
     int i;
 
-    if (*dev != NODEV)
+    if (*dev != NULL)
 	return;
     if (strncmp(name, "vinum/", sizeof("vinum/") - 1) != 0)
 	return;

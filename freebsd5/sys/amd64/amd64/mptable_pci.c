@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/mptable_pci.c,v 1.1 2003/11/03 22:12:37 jhb Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/mptable_pci.c,v 1.2 2004/05/16 20:30:46 peter Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -64,10 +64,18 @@ mptable_hostb_probe(device_t dev)
 	return (0);
 }
 
+static int
+mptable_hostb_attach(device_t dev)
+{
+
+	device_add_child(dev, "pci", pcib_get_bus(dev));
+	return (bus_generic_attach(dev));
+}
+
 static device_method_t mptable_hostb_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		mptable_hostb_probe),
-	DEVMETHOD(device_attach,	legacy_pcib_attach),
+	DEVMETHOD(device_attach,	mptable_hostb_attach),
 	DEVMETHOD(device_shutdown,	bus_generic_shutdown),
 	DEVMETHOD(device_suspend,	bus_generic_suspend),
 	DEVMETHOD(device_resume,	bus_generic_resume),

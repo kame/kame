@@ -24,14 +24,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/acpica/Osd/OsdSchedule.c,v 1.26 2003/10/02 05:09:37 njl Exp $
+ *	$FreeBSD: src/sys/dev/acpica/Osd/OsdSchedule.c,v 1.29 2004/08/13 06:22:26 njl Exp $
  */
 
 /*
  * 6.3 : Scheduling services
  */
-
-#include "acpi.h"
 
 #include "opt_acpi.h"
 #include <sys/param.h>
@@ -45,8 +43,7 @@
 #include <sys/taskqueue.h>
 #include <machine/clock.h>
 
-#include <sys/bus.h>
-
+#include "acpi.h"
 #include <dev/acpica/acpivar.h>
 
 #define _COMPONENT	ACPI_OS_SERVICES
@@ -72,7 +69,6 @@ struct acpi_task_queue {
     struct acpi_task		*at;
 };
 
-#if __FreeBSD_version >= 500000
 /*
  * Private task queue definition for ACPI
  */
@@ -95,9 +91,8 @@ TASKQUEUE_DEFINE(acpi, taskqueue_acpi_enqueue, 0,
 		 swi_add(NULL, "acpitaskq", taskqueue_acpi_run, NULL,
 		     SWI_TQ, 0, &taskqueue_acpi_ih));
 
-#ifdef ACPI_USE_THREADS
-STAILQ_HEAD(, acpi_task_queue) acpi_task_queue;
-static struct mtx	acpi_task_mtx;
+static STAILQ_HEAD(, acpi_task_queue) acpi_task_queue;
+ACPI_LOCK_DECL(taskq, "ACPI task queue");
 
 static void
 acpi_task_thread(void *arg)
@@ -106,26 +101,21 @@ acpi_task_thread(void *arg)
     OSD_EXECUTION_CALLBACK	Function;
     void			*Context;
 
+    ACPI_LOCK(taskq);
     for (;;) {
-	mtx_lock(&acpi_task_mtx);
-	if ((atq = STAILQ_FIRST(&acpi_task_queue)) == NULL) {
-	    msleep(&acpi_task_queue, &acpi_task_mtx, PCATCH, "actask", 0);
-	    mtx_unlock(&acpi_task_mtx);
-	    continue;
-	}
-
+	while ((atq = STAILQ_FIRST(&acpi_task_queue)) == NULL)
+	    msleep(&acpi_task_queue, &taskq_mutex, PCATCH, "actask", 0);
 	STAILQ_REMOVE_HEAD(&acpi_task_queue, at_q);
-	mtx_unlock(&acpi_task_mtx);
+	ACPI_UNLOCK(taskq);
 
 	Function = (OSD_EXECUTION_CALLBACK)atq->at->at_function;
 	Context = atq->at->at_context;
 
-	mtx_lock(&Giant);
 	Function(Context);
 
 	free(atq->at, M_ACPITASK);
 	free(atq, M_ACPITASK);
-	mtx_unlock(&Giant);
+	ACPI_LOCK(taskq);
     }
 
     kthread_exit(0);
@@ -139,7 +129,6 @@ acpi_task_thread_init(void)
 
     err = 0;
     STAILQ_INIT(&acpi_task_queue);
-    mtx_init(&acpi_task_mtx, "ACPI task", NULL, MTX_DEF);
 
     for (i = 0; i < ACPI_MAX_THREADS; i++) {
 	err = kthread_create(acpi_task_thread, NULL, &acpi_kthread_proc,
@@ -151,11 +140,11 @@ acpi_task_thread_init(void)
     }
     return (err);
 }
-#endif
-#endif
 
+/* This function is called in interrupt context. */
 ACPI_STATUS
-AcpiOsQueueForExecution(UINT32 Priority, OSD_EXECUTION_CALLBACK Function, void *Context)
+AcpiOsQueueForExecution(UINT32 Priority, OSD_EXECUTION_CALLBACK Function,
+    void *Context)
 {
     struct acpi_task	*at;
     int pri;
@@ -163,12 +152,11 @@ AcpiOsQueueForExecution(UINT32 Priority, OSD_EXECUTION_CALLBACK Function, void *
     ACPI_FUNCTION_TRACE((char *)(uintptr_t)__func__);
 
     if (Function == NULL)
-	return_ACPI_STATUS(AE_BAD_PARAMETER);
+	return_ACPI_STATUS (AE_BAD_PARAMETER);
 
-    at = malloc(sizeof(*at), M_ACPITASK, M_NOWAIT);	/* Interrupt Context */
+    at = malloc(sizeof(*at), M_ACPITASK, M_NOWAIT | M_ZERO);
     if (at == NULL)
-	return_ACPI_STATUS(AE_NO_MEMORY);
-    bzero(at, sizeof(*at));
+	return_ACPI_STATUS (AE_NO_MEMORY);
 
     at->at_function = Function;
     at->at_context = Context;
@@ -187,61 +175,43 @@ AcpiOsQueueForExecution(UINT32 Priority, OSD_EXECUTION_CALLBACK Function, void *
 	break;
     default:
 	free(at, M_ACPITASK);
-	return_ACPI_STATUS(AE_BAD_PARAMETER);
+	return_ACPI_STATUS (AE_BAD_PARAMETER);
     }
     TASK_INIT(&at->at_task, pri, AcpiOsExecuteQueue, at);
 
-#if __FreeBSD_version < 500000
-    taskqueue_enqueue(taskqueue_swi, (struct task *)at);
-#else
     taskqueue_enqueue(taskqueue_acpi, (struct task *)at);
-#endif
-    return_ACPI_STATUS(AE_OK);
+
+    return_ACPI_STATUS (AE_OK);
 }
 
 static void
 AcpiOsExecuteQueue(void *arg, int pending)
 {
-    struct acpi_task		*at;
     struct acpi_task_queue	*atq;
     OSD_EXECUTION_CALLBACK	Function;
     void			*Context;
 
     ACPI_FUNCTION_TRACE((char *)(uintptr_t)__func__);
 
-    at = (struct acpi_task *)arg;
     atq = NULL;
     Function = NULL;
     Context = NULL;
 
-#ifdef ACPI_USE_THREADS
     atq = malloc(sizeof(*atq), M_ACPITASK, M_NOWAIT);
     if (atq == NULL) {
 	printf("%s: no memory\n", __func__);
 	return;
     }
+    atq->at = (struct acpi_task *)arg;
 
-    atq->at = at;
-
-    mtx_lock(&acpi_task_mtx);
+    ACPI_LOCK(taskq);
     STAILQ_INSERT_TAIL(&acpi_task_queue, atq, at_q);
-    mtx_unlock(&acpi_task_mtx);
     wakeup_one(&acpi_task_queue);
-#else
-    Function = (OSD_EXECUTION_CALLBACK)at->at_function;
-    Context = at->at_context;
-
-    Function(Context);
-    free(at, M_ACPITASK);
-#endif
+    ACPI_UNLOCK(taskq);
 
     return_VOID;
 }
 
-/*
- * We don't have any sleep granularity better than hz, so
- * make do with that.
- */
 void
 AcpiOsSleep(UINT32 Seconds, UINT32 Milliseconds)
 {
@@ -277,13 +247,12 @@ UINT32
 AcpiOsGetThreadId(void)
 {
     struct proc *p;
-    /* XXX do not add FUNCTION_TRACE here, results in recursive call */
+
+    /* XXX do not add ACPI_FUNCTION_TRACE here, results in recursive call. */
 
     p = curproc;
-#if __FreeBSD_version < 500000
-    if (p == NULL)
-	p = &proc0;
-#endif
     KASSERT(p != NULL, ("%s: curproc is NULL!", __func__));
-    return(p->p_pid + 1);	/* can't return 0 */
+
+    /* Returning 0 is not allowed. */
+    return (p->p_pid + 1);
 }

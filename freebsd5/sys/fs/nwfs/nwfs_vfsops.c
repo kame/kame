@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/nwfs/nwfs_vfsops.c,v 1.31 2003/11/12 09:54:07 phk Exp $
+ * $FreeBSD: src/sys/fs/nwfs/nwfs_vfsops.c,v 1.34 2004/07/30 22:08:50 phk Exp $
  */
 #include "opt_ncp.h"
 #ifndef NCP
@@ -70,7 +70,7 @@ SYSCTL_INT(_vfs_nwfs, OID_AUTO, debuglevel, CTLFLAG_RW, &nwfs_debuglevel, 0, "")
 MODULE_DEPEND(nwfs, ncp, 1, 1, 1);
 MODULE_DEPEND(nwfs, libmchain, 1, 1, 1);
 
-static vfs_mount_t	nwfs_mount;
+static vfs_omount_t	nwfs_omount;
 static vfs_quotactl_t	nwfs_quotactl;
 static vfs_root_t	nwfs_root;
 static vfs_start_t	nwfs_start;
@@ -81,7 +81,7 @@ static vfs_uninit_t	nwfs_uninit;
 
 static struct vfsops nwfs_vfsops = {
 	.vfs_init =		nwfs_init,
-	.vfs_mount =		nwfs_mount,
+	.vfs_omount =		nwfs_omount,
 	.vfs_quotactl =		nwfs_quotactl,
 	.vfs_root =		nwfs_root,
 	.vfs_start =		nwfs_start,
@@ -136,8 +136,8 @@ nwfs_initnls(struct nwmount *nmp) {
  * mp - path - addr in user space of mount point (ie /usr or whatever)
  * data - addr in user space of mount params 
  */
-static int nwfs_mount(struct mount *mp, char *path, caddr_t data, 
-		      struct nameidata *ndp, struct thread *td)
+static int nwfs_omount(struct mount *mp, char *path, caddr_t data, 
+		      struct thread *td)
 {
 	struct nwfs_args args; 	  /* will hold data from mount request */
 	int error;
@@ -208,7 +208,7 @@ static int nwfs_mount(struct mount *mp, char *path, caddr_t data,
 	/* protect against invalid mount points */
 	nmp->m.mount_point[sizeof(nmp->m.mount_point)-1] = '\0';
 	vfs_getnewfsid(mp);
-	error = nwfs_root(mp, &vp);
+	error = nwfs_root(mp, &vp, td);
 	if (error)
 		goto bad;
 	/*
@@ -238,7 +238,7 @@ nwfs_unmount(struct mount *mp, int mntflags, struct thread *td)
 	if (mntflags & MNT_FORCE)
 		flags |= FORCECLOSE;
 	/* There is 1 extra root vnode reference from nwfs_mount(). */
-	error = vflush(mp, 1, flags);
+	error = vflush(mp, 1, flags, td);
 	if (error)
 		return (error);
 	conn = NWFSTOCONN(nmp);
@@ -257,13 +257,12 @@ nwfs_unmount(struct mount *mp, int mntflags, struct thread *td)
 
 /*  Return locked vnode to root of a filesystem */
 static int
-nwfs_root(struct mount *mp, struct vnode **vpp) {
+nwfs_root(struct mount *mp, struct vnode **vpp, struct thread *td) {
 	struct vnode *vp;
 	struct nwmount *nmp;
 	struct nwnode *np;
 	struct ncp_conn *conn;
 	struct nw_entry_info fattr;
-	struct thread *td = curthread;
 	struct ucred *cred =  td->td_ucred;
 	int error, nsf, opt;
 	u_char vol;
@@ -383,16 +382,6 @@ nwfs_quotactl(mp, cmd, uid, arg, td)
 int
 nwfs_init(struct vfsconf *vfsp)
 {
-#ifndef SMP
-	int name[2];
-	int olen, ncpu, plen, error;
-
-	name[0] = CTL_HW;
-	name[1] = HW_NCPU;
-	error = kernel_sysctl(curthread, name, 2, &ncpu, &olen, NULL, 0, &plen);
-	if (error == 0 && ncpu > 1)
-		printf("warning: nwfs module compiled without SMP support.");
-#endif
 	nwfs_hash_init();
 	nwfs_pbuf_freecnt = nswbuf / 2 + 1;
 	NCPVODEBUG("always happy to load!\n");

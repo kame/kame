@@ -1,7 +1,7 @@
 /*
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mpt/mpt_debug.c,v 1.4 2003/08/24 17:54:11 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mpt/mpt_debug.c,v 1.5 2004/07/13 16:06:19 stefanf Exp $");
  * Debug routines for LSI '909 FC  adapters.
  * FreeBSD Version.
  *
@@ -284,7 +284,7 @@ mpt_state(u_int32_t mb)
 		default: 		  text = "Unknown"; break;
 	}
 	return text;
-};
+}
 
 void
 mpt_print_db(u_int32_t mb)
@@ -536,7 +536,7 @@ mpt_req_state(enum mpt_req_state state)
 	default: 	       text = "Unknown";      break;
 	}
 	return text;
-};
+}
 
 static void
 mpt_dump_sgl(SGE_IO_UNION *su)

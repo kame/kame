@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/contrib/ipfilter/netinet/mlfk_ipl.c,v 1.11 2003/03/03 12:15:40 phk Exp $
+ * $FreeBSD: src/sys/contrib/ipfilter/netinet/mlfk_ipl.c,v 1.13 2004/06/16 09:46:34 phk Exp $
  */
 
 
@@ -55,7 +55,7 @@
 #include <netinet/ip_frag.h>
 #include <netinet/ip_proxy.h>
 
-static dev_t ipf_devs[IPL_LOGMAX + 1];
+static struct cdev *ipf_devs[IPL_LOGMAX + 1];
 
 SYSCTL_DECL(_net_inet);
 SYSCTL_NODE(_net_inet, OID_AUTO, ipf, CTLFLAG_RW, 0, "IPF");
@@ -105,6 +105,8 @@ SYSCTL_INT(_net_inet_ipf, OID_AUTO, fr_minttllog, CTLFLAG_RW,
 
 #define CDEV_MAJOR 79
 static struct cdevsw ipl_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	iplopen,
 	.d_close =	iplclose,
 	.d_read =	iplread,

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_vfsops.c,v 1.22 2003/11/12 09:52:10 phk Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_vfsops.c,v 1.26 2004/07/30 22:08:51 phk Exp $
  */
 #include "opt_netsmb.h"
 #ifndef NETSMB
@@ -78,7 +78,7 @@ static MALLOC_DEFINE(M_SMBFSHASH, "SMBFS hash", "SMBFS hash table");
 
 static vfs_init_t       smbfs_init;
 static vfs_uninit_t     smbfs_uninit;
-static vfs_mount_t      smbfs_mount;
+static vfs_omount_t     smbfs_omount;
 static vfs_start_t      smbfs_start;
 static vfs_root_t       smbfs_root;
 static vfs_quotactl_t   smbfs_quotactl;
@@ -87,7 +87,7 @@ static vfs_unmount_t    smbfs_unmount;
 
 static struct vfsops smbfs_vfsops = {
 	.vfs_init =		smbfs_init,
-	.vfs_mount =		smbfs_mount,
+	.vfs_omount =		smbfs_omount,
 	.vfs_quotactl =		smbfs_quotactl,
 	.vfs_root =		smbfs_root,
 	.vfs_start =		smbfs_start,
@@ -107,8 +107,7 @@ MODULE_DEPEND(smbfs, libmchain, 1, 1, 1);
 int smbfs_pbuf_freecnt = -1;	/* start out unlimited */
 
 static int
-smbfs_mount(struct mount *mp, char *path, caddr_t data, 
-	struct nameidata *ndp, struct thread *td)
+smbfs_omount(struct mount *mp, char *path, caddr_t data, struct thread *td)
 {
 	struct smbfs_args args; 	  /* will hold data from mount request */
 	struct smbmount *smp = NULL;
@@ -189,7 +188,7 @@ smbfs_mount(struct mount *mp, char *path, caddr_t data,
 	/* protect against invalid mount points */
 	smp->sm_args.mount_point[sizeof(smp->sm_args.mount_point) - 1] = '\0';
 	vfs_getnewfsid(mp);
-	error = smbfs_root(mp, &vp);
+	error = smbfs_root(mp, &vp, td);
 	if (error)
 		goto bad;
 	VOP_UNLOCK(vp, 0, td);
@@ -238,7 +237,7 @@ smbfs_unmount(struct mount *mp, int mntflags, struct thread *td)
 	do {
 		smp->sm_didrele = 0;
 		/* There is 1 extra root vnode reference from smbfs_mount(). */
-		error = vflush(mp, 1, flags);
+		error = vflush(mp, 1, flags, td);
 	} while (error == EBUSY && smp->sm_didrele != 0);
 	if (error)
 		return error;
@@ -262,13 +261,12 @@ smbfs_unmount(struct mount *mp, int mntflags, struct thread *td)
  * Return locked root vnode of a filesystem
  */
 static int
-smbfs_root(struct mount *mp, struct vnode **vpp)
+smbfs_root(struct mount *mp, struct vnode **vpp, struct thread *td)
 {
 	struct smbmount *smp = VFSTOSMBFS(mp);
 	struct vnode *vp;
 	struct smbnode *np;
 	struct smbfattr fattr;
-	struct thread *td = curthread;
 	struct ucred *cred = td->td_ucred;
 	struct smb_cred scred;
 	int error;
@@ -330,18 +328,6 @@ smbfs_quotactl(mp, cmd, uid, arg, td)
 int
 smbfs_init(struct vfsconf *vfsp)
 {
-#ifndef SMP
-	int name[2];
-	int ncpu, error;
-	size_t olen, plen;
-
-	name[0] = CTL_HW;
-	name[1] = HW_NCPU;
-	error = kernel_sysctl(curthread, name, 2, &ncpu, &olen, NULL, 0, &plen);
-	if (error == 0 && ncpu > 1)
-		printf("warning: smbfs module compiled without SMP support.");
-#endif
-
 #ifdef SMBFS_USEZONE
 	smbfsmount_zone = zinit("SMBFSMOUNT", sizeof(struct smbmount), 0, 0, 1);
 #endif

@@ -32,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_tuner.c,v 1.11 2003/08/24 17:46:02 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_tuner.c,v 1.13 2004/06/27 09:59:02 schweikh Exp $");
 
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
@@ -73,8 +73,8 @@ __FBSDID("$FreeBSD: src/sys/dev/bktr/bktr_tuner.c,v 1.11 2003/08/24 17:46:02 obr
 #include <dev/pci/bktr/bktr_card.h>
 #include <dev/pci/bktr/bktr_core.h>
 #else
-#include <machine/ioctl_meteor.h>	/* Traditional .h file location */
-#include <machine/ioctl_bt848.h>        /* extensions to ioctl_meteor.h */
+#include <dev/bktr/ioctl_meteor.h>
+#include <dev/bktr/ioctl_bt848.h>	/* extensions to ioctl_meteor.h */
 #include <dev/bktr/bktr_reg.h>
 #include <dev/bktr/bktr_tuner.h>
 #include <dev/bktr/bktr_card.h>
@@ -698,7 +698,9 @@ frequency_lookup( bktr_ptr_t bktr, int channel )
 #undef TBL_CHNL
 
 
-#define TBL_IF	freqTable[ bktr->tuner.chnlset ].ptr[ 1 ]
+#define	TBL_IF	(bktr->format_params == BT848_IFORM_F_NTSCJ || \
+                 bktr->format_params == BT848_IFORM_F_NTSCM ? \
+                 nabcst[1] : weurope[1])
 
 
 /* Initialise the tuner structures in the bktr_softc */

@@ -11,10 +11,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,8 +27,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/amd64/exception.S,v 1.115 2003/11/17 08:58:12 peter Exp $
+ * $FreeBSD: src/sys/amd64/amd64/exception.S,v 1.120 2004/08/16 12:51:32 obrien Exp $
  */
+
+#include "opt_atpic.h"
+#include "opt_compat.h"
 
 #include <machine/asmacros.h>
 #include <machine/psl.h>
@@ -167,8 +166,10 @@ alltraps_pushregs_no_rdi:
 	movq	%r14,TF_R14(%rsp)
 	movq	%r15,TF_R15(%rsp)
 alltraps_with_regs_pushed:
+	FAKE_MCOUNT(TF_RIP(%rsp))
 calltrap:
 	call	trap
+	MEXITCOUNT
 	jmp	doreti			/* Handle any pending ASTs */
 
 	/*
@@ -243,6 +244,7 @@ IDTVEC(fast_syscall)
 	movq	%r13,TF_R13(%rsp)	/* C preserved */
 	movq	%r14,TF_R14(%rsp)	/* C preserved */
 	movq	%r15,TF_R15(%rsp)	/* C preserved */
+	FAKE_MCOUNT(TF_RIP(%rsp))
 	call	syscall
 	movq	PCPU(CURPCB),%rax
 	testq	$PCB_FULLCTX,PCB_FLAGS(%rax)
@@ -257,6 +259,7 @@ IDTVEC(fast_syscall)
 	call	ast
 	jmp	1b
 2:	/* restore preserved registers */
+	MEXITCOUNT
 	movq	TF_RDI(%rsp),%rdi	/* bonus; preserve arg 1 */
 	movq	TF_RSI(%rsp),%rsi	/* bonus: preserve arg 2 */
 	movq	TF_RDX(%rsp),%rdx	/* return value 2 */
@@ -275,6 +278,7 @@ IDTVEC(fast_syscall)
 	sysretq
 3:	/* Requested full context restore, use doreti for that */
 	andq	$~PCB_FULLCTX,PCB_FLAGS(%rax)
+	MEXITCOUNT
 	jmp	doreti
 
 /*
@@ -290,10 +294,47 @@ ENTRY(fork_trampoline)
 	movq	%rbx, %rsi		/* arg1 */
 	movq	%rsp, %rdx		/* trapframe pointer */
 	call	fork_exit
+	MEXITCOUNT
 	jmp	doreti			/* Handle any ASTs */
 
+/*
+ * To efficiently implement classification of trap and interrupt handlers
+ * for profiling, there must be only trap handlers between the labels btrap
+ * and bintr, and only interrupt handlers between the labels bintr and
+ * eintr.  This is implemented (partly) by including files that contain
+ * some of the handlers.  Before including the files, set up a normal asm
+ * environment so that the included files doen't need to know that they are
+ * included.
+ */
+
+#ifdef COMPAT_IA32
 	.data
-	ALIGN_DATA
+	.p2align 4
+	.text
+	SUPERALIGN_TEXT
+
+#include <amd64/ia32/ia32_exception.S>
+#endif
+
+	.data
+	.p2align 4
+	.text
+	SUPERALIGN_TEXT
+MCOUNT_LABEL(bintr)
+
+#include <amd64/amd64/apic_vector.S>
+
+#ifdef DEV_ATPIC
+	.data
+	.p2align 4
+	.text
+	SUPERALIGN_TEXT
+
+#include <amd64/isa/atpic_vector.S>
+#endif
+
+	.text
+MCOUNT_LABEL(eintr)
 
 /*
  * void doreti(struct trapframe)
@@ -302,9 +343,9 @@ ENTRY(fork_trampoline)
  */
 	.text
 	SUPERALIGN_TEXT
-	.globl	doreti
 	.type	doreti,@function
 doreti:
+	FAKE_MCOUNT($bintr)		/* init "from" bintr -> doreti */
 	/*
 	 * Check if ASTs can be handled now.
 	 */
@@ -334,6 +375,7 @@ doreti_ast:
 	 *	registers.  The fault is handled in trap.c.
 	 */
 doreti_exit:
+	MEXITCOUNT
 	movq	TF_RDI(%rsp),%rdi
 	movq	TF_RSI(%rsp),%rsi
 	movq	TF_RDX(%rsp),%rdx

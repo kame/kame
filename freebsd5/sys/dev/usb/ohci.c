@@ -5,10 +5,15 @@
  *	$NetBSD: ohci.c,v 1.141 2003/09/10 20:08:29 mycroft Exp $
  *	$NetBSD: ohci.c,v 1.142 2003/10/11 03:04:26 toshii Exp $
  *	$NetBSD: ohci.c,v 1.143 2003/10/18 04:50:35 simonb Exp $
+ *	$NetBSD: ohci.c,v 1.144 2003/11/23 19:18:06 augustss Exp $
+ *	$NetBSD: ohci.c,v 1.145 2003/11/23 19:20:25 augustss Exp $
+ *	$NetBSD: ohci.c,v 1.146 2003/12/29 08:17:10 toshii Exp $
+ *	$NetBSD: ohci.c,v 1.147 2004/06/22 07:20:35 mycroft Exp $
+ *	$NetBSD: ohci.c,v 1.148 2004/06/22 18:27:46 mycroft Exp $
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/ohci.c,v 1.139 2003/11/25 02:23:29 iedowse Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/ohci.c,v 1.144 2004/08/02 15:37:34 iedowse Exp $");
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -229,6 +234,8 @@ Static void		ohci_abort_xfer(usbd_xfer_handle, usbd_status);
 Static void		ohci_device_clear_toggle(usbd_pipe_handle pipe);
 Static void		ohci_noop(usbd_pipe_handle pipe);
 
+Static usbd_status ohci_controller_init(ohci_softc_t *sc);
+
 #ifdef USB_DEBUG
 Static void		ohci_dumpregs(ohci_softc_t *);
 Static void		ohci_dump_tds(ohci_soft_td_t *);
@@ -375,17 +382,20 @@ ohci_activate(device_ptr_t self, enum devact act)
 	}
 	return (rv);
 }
+#endif
 
 int
 ohci_detach(struct ohci_softc *sc, int flags)
 {
-	int rv = 0;
+	int i, rv = 0;
 
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	if (sc->sc_child != NULL)
 		rv = config_detach(sc->sc_child, flags);
 
 	if (rv != 0)
 		return (rv);
+#endif
 
 	usb_uncallout(sc->sc_tmo_rhsc, ohci_rhsc_enable, sc);
 
@@ -394,13 +404,20 @@ ohci_detach(struct ohci_softc *sc, int flags)
 	shutdownhook_disestablish(sc->sc_shutdownhook);
 #endif
 
+	OWRITE4(sc, OHCI_INTERRUPT_DISABLE, OHCI_ALL_INTRS);
+	OWRITE4(sc, OHCI_CONTROL, OHCI_HCFS_RESET);
+
 	usb_delay_ms(&sc->sc_bus, 300); /* XXX let stray task complete */
 
-	/* free data structures XXX */
+	for (i = 0; i < OHCI_NO_EDS; i++)
+		ohci_free_sed(sc, sc->sc_eds[i]);
+	ohci_free_sed(sc, sc->sc_isoc_head);
+	ohci_free_sed(sc, sc->sc_bulk_head);
+	ohci_free_sed(sc, sc->sc_ctrl_head);
+	usb_freemem(&sc->sc_bus, &sc->sc_hccadma);
 
 	return (rv);
 }
-#endif
 
 ohci_soft_ed_t *
 ohci_alloc_sed(ohci_softc_t *sc)
@@ -697,7 +714,7 @@ ohci_init(ohci_softc_t *sc)
 	ohci_soft_ed_t *sed, *psed;
 	usbd_status err;
 	int i;
-	u_int32_t s, ctl, ival, hcr, fm, per, rev, desca;
+	u_int32_t rev;
 
 	DPRINTF(("ohci_init: start\n"));
 #if defined(__OpenBSD__)
@@ -797,6 +814,44 @@ ohci_init(ohci_softc_t *sc)
 	}
 #endif
 
+	err = ohci_controller_init(sc);
+	if (err != USBD_NORMAL_COMPLETION)
+		goto bad5;
+
+	/* Set up the bus struct. */
+	sc->sc_bus.methods = &ohci_bus_methods;
+	sc->sc_bus.pipe_size = sizeof(struct ohci_pipe);
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	sc->sc_control = sc->sc_intre = 0;
+	sc->sc_powerhook = powerhook_establish(ohci_power, sc);
+	sc->sc_shutdownhook = shutdownhook_establish(ohci_shutdown, sc);
+#endif
+
+	usb_callout_init(sc->sc_tmo_rhsc);
+
+	return (USBD_NORMAL_COMPLETION);
+
+ bad5:
+	for (i = 0; i < OHCI_NO_EDS; i++)
+		ohci_free_sed(sc, sc->sc_eds[i]);
+ bad4:
+	ohci_free_sed(sc, sc->sc_isoc_head);
+ bad3:
+	ohci_free_sed(sc, sc->sc_bulk_head);
+ bad2:
+	ohci_free_sed(sc, sc->sc_ctrl_head);
+ bad1:
+	usb_freemem(&sc->sc_bus, &sc->sc_hccadma);
+	return (err);
+}
+
+Static usbd_status
+ohci_controller_init(ohci_softc_t *sc)
+{
+	int i;
+	u_int32_t s, ctl, ival, hcr, fm, per, desca;
+
 	/* Determine in what context we are running. */
 	ctl = OREAD4(sc, OHCI_CONTROL);
 	if (ctl & OHCI_IR) {
@@ -852,8 +907,7 @@ ohci_init(ohci_softc_t *sc)
 	}
 	if (hcr) {
 		printf("%s: reset timeout\n", USBDEVNAME(sc->sc_bus.bdev));
-		err = USBD_IOERROR;
-		goto bad5;
+		return (USBD_IOERROR);
 	}
 #ifdef USB_DEBUG
 	if (ohcidebug > 15)
@@ -899,40 +953,17 @@ ohci_init(ohci_softc_t *sc)
 	 * The AMD756 requires a delay before re-reading the register,
 	 * otherwise it will occasionally report 0 ports.
 	 */
-	usb_delay_ms(&sc->sc_bus, OHCI_READ_DESC_DELAY);
-	sc->sc_noport = OHCI_GET_NDP(OREAD4(sc, OHCI_RH_DESCRIPTOR_A));
+  	sc->sc_noport = 0;
+ 	for (i = 0; i < 10 && sc->sc_noport == 0; i++) {
+ 		usb_delay_ms(&sc->sc_bus, OHCI_READ_DESC_DELAY);
+ 		sc->sc_noport = OHCI_GET_NDP(OREAD4(sc, OHCI_RH_DESCRIPTOR_A));
+ 	}
 
 #ifdef USB_DEBUG
 	if (ohcidebug > 5)
 		ohci_dumpregs(sc);
 #endif
-
-	/* Set up the bus struct. */
-	sc->sc_bus.methods = &ohci_bus_methods;
-	sc->sc_bus.pipe_size = sizeof(struct ohci_pipe);
-
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-	sc->sc_control = sc->sc_intre = 0;
-	sc->sc_powerhook = powerhook_establish(ohci_power, sc);
-	sc->sc_shutdownhook = shutdownhook_establish(ohci_shutdown, sc);
-#endif
-
-	usb_callout_init(sc->sc_tmo_rhsc);
-
 	return (USBD_NORMAL_COMPLETION);
-
- bad5:
-	for (i = 0; i < OHCI_NO_EDS; i++)
-		ohci_free_sed(sc, sc->sc_eds[i]);
- bad4:
-	ohci_free_sed(sc, sc->sc_isoc_head);
- bad3:
-	ohci_free_sed(sc, sc->sc_ctrl_head);
- bad2:
-	ohci_free_sed(sc, sc->sc_bulk_head);
- bad1:
-	usb_freemem(&sc->sc_bus, &sc->sc_hccadma);
-	return (err);
 }
 
 usbd_status
@@ -1001,7 +1032,6 @@ ohci_freex(struct usbd_bus *bus, usbd_xfer_handle xfer)
 /*
  * Shut down the controller when the system is going down.
  */
-#if defined(__NetBSD__) || defined(__OpenBSD__)
 void
 ohci_shutdown(void *v)
 {
@@ -1031,9 +1061,7 @@ ohci_power(int why, void *v)
 #endif
 
 	s = splhardusb();
-	switch (why) {
-	case PWR_SUSPEND:
-	case PWR_STANDBY:
+	if (why != PWR_RESUME) {
 		sc->sc_bus.use_polling++;
 		ctl = OREAD4(sc, OHCI_CONTROL) & ~OHCI_HCFS_MASK;
 		if (sc->sc_control == 0) {
@@ -1048,13 +1076,12 @@ ohci_power(int why, void *v)
 		OWRITE4(sc, OHCI_CONTROL, ctl);
 		usb_delay_ms(&sc->sc_bus, USB_RESUME_WAIT);
 		sc->sc_bus.use_polling--;
-		break;
-	case PWR_RESUME:
+	} else {
 		sc->sc_bus.use_polling++;
-		/* Some broken BIOSes do not recover these values */
-		OWRITE4(sc, OHCI_HCCA, DMAADDR(&sc->sc_hccadma, 0));
-		OWRITE4(sc, OHCI_CONTROL_HEAD_ED, sc->sc_ctrl_head->physaddr);
-		OWRITE4(sc, OHCI_BULK_HEAD_ED, sc->sc_bulk_head->physaddr);
+
+		/* Some broken BIOSes never initialize Controller chip */
+		ohci_controller_init(sc);
+
 		if (sc->sc_intre)
 			OWRITE4(sc, OHCI_INTERRUPT_ENABLE,
 				sc->sc_intre & (OHCI_ALL_INTRS | OHCI_MIE));
@@ -1070,15 +1097,9 @@ ohci_power(int why, void *v)
 		usb_delay_ms(&sc->sc_bus, USB_RESUME_RECOVERY);
 		sc->sc_control = sc->sc_intre = 0;
 		sc->sc_bus.use_polling--;
-		break;
-	case PWR_SOFTSUSPEND:
-	case PWR_SOFTSTANDBY:
-	case PWR_SOFTRESUME:
-		break;
 	}
 	splx(s);
 }
-#endif
 
 #ifdef USB_DEBUG
 void
@@ -1718,7 +1739,8 @@ ohci_device_request(usbd_xfer_handle xfer)
 	sed = opipe->sed;
 	opipe->u.ctl.length = len;
 
-	/* Update device address and length since they may have changed. */
+	/* Update device address and length since they may have changed
+	   during the setup of the control pipe in usbd_new_device(). */
 	/* XXX This only needs to be done once, but it's too early in open. */
 	/* XXXX Should not touch ED here! */
 	sed->ed.ed_flags = htole32(
@@ -2114,7 +2136,7 @@ ohci_open(usbd_pipe_handle pipe)
 		}
 		sed->ed.ed_flags = htole32(
 			OHCI_ED_SET_FA(addr) |
-			OHCI_ED_SET_EN(ed->bEndpointAddress) |
+			OHCI_ED_SET_EN(UE_GET_ADDR(ed->bEndpointAddress)) |
 			(dev->speed == USB_SPEED_LOW ? OHCI_ED_SPEED : 0) |
 			fmt |
 			OHCI_ED_SET_MAXP(UGETW(ed->wMaxPacketSize)));
@@ -2612,7 +2634,7 @@ ohci_root_ctrl_start(usbd_xfer_handle xfer)
 		}
 		break;
 	case C(UR_GET_DESCRIPTOR, UT_READ_CLASS_DEVICE):
-		if (value != 0) {
+		if ((value & 0xff) != 0) {
 			err = USBD_IOERROR;
 			goto ret;
 		}

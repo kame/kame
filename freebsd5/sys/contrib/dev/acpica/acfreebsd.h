@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acfreebsd.h - OS specific defines, etc.
- *       $Revision: 11 $
+ *       $Revision: 17 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2003, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -117,16 +117,11 @@
 #ifndef __ACFREEBSD_H__
 #define __ACFREEBSD_H__
 
-/*
- * Some systems' ASL may have problems because they look for names 
- * of Microsoft operating systems.  To override this, set hw.acpi.os_name
- * to the appropriate string.
- */
-#define ACPI_OS_NAME                "FreeBSD"
 
 /* FreeBSD uses GCC */
 
 #include "acgcc.h"
+#include <sys/types.h>
 #include <machine/acpica_machdep.h>
 
 #ifdef _KERNEL
@@ -134,7 +129,7 @@
 #endif
 
 #ifdef ACPI_DEBUG
-#define ACPI_DEBUG_OUTPUT	/* for backward compatibility */
+#define ACPI_DEBUG_OUTPUT   /* for backward compatibility */
 #define ACPI_DISASSEMBLER
 #endif
 
@@ -161,7 +156,10 @@
 /* Not building kernel code, so use libc */
 #define ACPI_USE_STANDARD_HEADERS
 #define ACPI_FLUSH_CPU_CACHE()
-#include <sys/types.h>
+
+#if __STDC_HOSTED__
+#include <ctype.h>
+#endif
 
 #define __cli()
 #define __sti()

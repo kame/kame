@@ -32,7 +32,7 @@
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/ich.c,v 1.37 2003/09/15 21:16:47 njl Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/ich.c,v 1.42.2.2 2004/10/07 18:38:55 ps Exp $");
 
 /* -------------------------------------------------------------------- */
 
@@ -44,6 +44,7 @@ SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/ich.c,v 1.37 2003/09/15 21:16:
 #define SIS7012ID       0x70121039      /* SiS 7012 needs special handling */
 #define ICH4ID		0x24c58086	/* ICH4 needs special handling too */
 #define ICH5ID		0x24d58086	/* ICH5 needs to be treated as ICH4 */
+#define ICH6ID		0x266e8086	/* ICH6 needs to be treated as ICH4 */
 
 /* buffer descriptor */
 struct ich_desc {
@@ -580,7 +581,8 @@ ich_init(struct sc_info *sc)
 	if ((stat & ICH_GLOB_STA_PCR) == 0) {
 		/* ICH4/ICH5 may fail when busmastering is enabled. Continue */
 		if ((pci_get_devid(sc->dev) != ICH4ID) &&
-		    (pci_get_devid(sc->dev) != ICH5ID)) {
+		    (pci_get_devid(sc->dev) != ICH5ID) &&
+		    (pci_get_devid(sc->dev) != ICH6ID)) {
 			return ENXIO;
 		}
 	}
@@ -636,20 +638,32 @@ ich_pci_probe(device_t dev)
 		device_set_desc(dev, "Intel ICH5 (82801EB)");
 		return -1000;	/* allow a better driver to override us */
 
+	case ICH6ID:
+		device_set_desc(dev, "Intel ICH6 (82801FB)");
+		return -1000;	/* allow a better driver to override us */
+
 	case SIS7012ID:
 		device_set_desc(dev, "SiS 7012");
 		return 0;
 
 	case 0x01b110de:
-		device_set_desc(dev, "Nvidia nForce");
+		device_set_desc(dev, "nVidia nForce");
 		return 0;
 
 	case 0x006a10de:
-		device_set_desc(dev, "Nvidia nForce2");
+		device_set_desc(dev, "nVidia nForce2");
+		return 0;
+
+	case 0x008a10de:
+		device_set_desc(dev, "nVidia nForce2 400");
 		return 0;
 
 	case 0x00da10de:
-		device_set_desc(dev, "Nvidia nForce3");
+		device_set_desc(dev, "nVidia nForce3");
+		return 0;
+
+	case 0x00ea10de:
+		device_set_desc(dev, "nVidia nForce3 250");
 		return 0;
 
 	case 0x74451022:
@@ -693,12 +707,23 @@ ich_pci_attach(device_t dev)
 	}
 
 	/*
+	 * By default, ich4 has NAMBAR and NABMBAR i/o spaces as
+	 * read-only.  Need to enable "legacy support", by poking into
+	 * pci config space.  The driver should use MMBAR and MBBAR,
+	 * but doing so will mess things up here.  ich4 has enough new
+	 * features it warrants it's own driver. 
+	 */
+	if (pci_get_devid(dev) == ICH4ID) {
+		pci_write_config(dev, PCIR_ICH_LEGACY, ICH_LEGACY_ENABLE, 1);
+	}
+
+	/*
 	 * Enable bus master. On ich4/5 this may prevent the detection of
 	 * the primary codec becoming ready in ich_init().
 	 */
 	pci_enable_busmaster(dev);
 
-	if ((pci_get_devid(dev) == ICH4ID) || (pci_get_devid(dev) == ICH5ID)) {
+	if (pci_get_devid(dev) == ICH5ID || pci_get_devid(dev) == ICH6ID) {
 		sc->nambarid = PCIR_MMBAR;
 		sc->nabmbarid = PCIR_MBBAR;
 		sc->regtype = SYS_RES_MEMORY;
@@ -708,8 +733,10 @@ ich_pci_attach(device_t dev)
 		sc->regtype = SYS_RES_IOPORT;
 	}
 
-	sc->nambar = bus_alloc_resource(dev, sc->regtype, &sc->nambarid, 0, ~0, 1, RF_ACTIVE);
-	sc->nabmbar = bus_alloc_resource(dev, sc->regtype, &sc->nabmbarid, 0, ~0, 1, RF_ACTIVE);
+	sc->nambar = bus_alloc_resource_any(dev, sc->regtype, 
+		&sc->nambarid, RF_ACTIVE);
+	sc->nabmbar = bus_alloc_resource_any(dev, sc->regtype, 
+		&sc->nabmbarid, RF_ACTIVE);
 
 	if (!sc->nambar || !sc->nabmbar) {
 		device_printf(dev, "unable to map IO port space\n");
@@ -730,8 +757,9 @@ ich_pci_attach(device_t dev)
 	}
 
 	sc->irqid = 0;
-	sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irqid, 0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
-	if (!sc->irq || snd_setup_intr(dev, sc->irq, INTR_MPSAFE, ich_intr, sc, &sc->ih)) {
+	sc->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irqid,
+		RF_ACTIVE | RF_SHAREABLE);
+	if (!sc->irq || snd_setup_intr(dev, sc->irq, 0, ich_intr, sc, &sc->ih)) {
 		device_printf(dev, "unable to map interrupt\n");
 		goto bad;
 	}
@@ -761,8 +789,8 @@ ich_pci_attach(device_t dev)
 	if (sc->hasmic)
 		pcm_addchan(dev, PCMDIR_REC, &ichchan_class, sc);	/* record mic */
 
-	snprintf(status, SND_STATUSLEN, "at io 0x%lx, 0x%lx irq %ld bufsz %u",
-		 rman_get_start(sc->nambar), rman_get_start(sc->nabmbar), rman_get_start(sc->irq), sc->bufsz);
+	snprintf(status, SND_STATUSLEN, "at io 0x%lx, 0x%lx irq %ld bufsz %u %s",
+		 rman_get_start(sc->nambar), rman_get_start(sc->nabmbar), rman_get_start(sc->irq), sc->bufsz,PCM_KLDSTRING(snd_ich));
 
 	pcm_setstatus(dev, status);
 
@@ -909,5 +937,5 @@ static driver_t ich_driver = {
 };
 
 DRIVER_MODULE(snd_ich, pci, ich_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_ich, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_ich, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_ich, 1);

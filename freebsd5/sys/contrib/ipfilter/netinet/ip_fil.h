@@ -5,7 +5,7 @@
  *
  * @(#)ip_fil.h	1.35 6/5/96
  * $Id: ip_fil.h,v 2.29.2.4 2000/11/12 11:54:53 darrenr Exp $
- * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_fil.h,v 1.24 2003/02/15 06:23:45 darrenr Exp $
+ * $FreeBSD: src/sys/contrib/ipfilter/netinet/ip_fil.h,v 1.26.2.2 2004/09/22 19:51:03 andre Exp $
  */
 
 #ifndef	__IP_FIL_H__
@@ -152,7 +152,7 @@ typedef	struct	fr_info	{
 	u_short	fin_dlen;		/* length of data portion of packet */
 	u_short	fin_id;			/* IP packet id field */
 	u_int	fin_misc;
-	void	*fin_mp;		/* pointer to pointer to mbuf */
+	mb_t	**fin_mp;		/* pointer to pointer to mbuf */
 #if SOLARIS
 	void	*fin_qfm;		/* pointer to mblk where pkt starts */
 	void	*fin_qif;
@@ -497,7 +497,7 @@ typedef	struct	ipflog	{
 #if (defined(NetBSD) && (NetBSD > 199609) && (NetBSD <= 1991011)) || \
     (defined(NetBSD1_2) && NetBSD1_2 > 1) || (defined(__FreeBSD_version) && \
      (__FreeBSD_version >= 500011))
-# if (NetBSD >= 199905)
+# if (NetBSD >= 199905) || (__FreeBSD_version >= 503000)
 #  define PFIL_HOOKS
 # endif
 # ifdef PFIL_HOOKS
@@ -574,12 +574,12 @@ extern	int	iplidentify __P((char *));
       (NetBSD >= 199511) || defined(__OpenBSD__)
 #    if defined(__NetBSD__) || (_BSDI_VERSION >= 199701) || \
        defined(__OpenBSD__) || (__FreeBSD_version >= 300000)
-extern	int	iplioctl __P((dev_t, u_long, caddr_t, int, struct thread *));
+extern	int	iplioctl __P((struct cdev *, u_long, caddr_t, int, struct thread *));
 #    else
 extern	int	iplioctl __P((dev_t, int, caddr_t, int, struct thread *));
 #    endif
-extern	int	iplopen __P((dev_t, int, int, struct thread *));
-extern	int	iplclose __P((dev_t, int, int, struct thread *));
+extern	int	iplopen __P((struct cdev *, int, int, struct thread *));
+extern	int	iplclose __P((struct cdev *, int, int, struct thread *));
 #   else
 #    ifndef	linux
 extern	int	iplopen __P((dev_t, int));
@@ -592,7 +592,7 @@ extern	void	iplclose __P((struct inode *, struct file *));
 #    endif /* !linux */
 #   endif /* (_BSDI_VERSION >= 199510) */
 #   if	BSD >= 199306
-extern	int	iplread __P((dev_t, struct uio *, int));
+extern	int	iplread __P((struct cdev *, struct uio *, int));
 #   else
 #    ifndef linux
 extern	int	iplread __P((dev_t, struct uio *));
@@ -630,7 +630,7 @@ extern	void	fr_forgetifp __P((void *));
 extern	void	fr_getstat __P((struct friostat *));
 extern	int	fr_ifpaddr __P((int, void *, struct in_addr *));
 extern	int	fr_lock __P((caddr_t, int *));
-extern  void	fr_makefrip __P((int, ip_t *, fr_info_t *));
+extern  int	fr_makefrip __P((int, ip_t *, fr_info_t *));
 extern	u_short	fr_tcpsum __P((mb_t *, ip_t *, tcphdr_t *));
 extern	int	fr_scanlist __P((u_32_t, ip_t *, fr_info_t *, void *));
 extern	int	fr_tcpudpchk __P((frtuc_t *, fr_info_t *));

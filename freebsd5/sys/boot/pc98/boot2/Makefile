@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/pc98/boot2/Makefile,v 1.15 2003/03/02 21:18:40 ru Exp $
+# $FreeBSD: src/sys/boot/pc98/boot2/Makefile,v 1.18.2.1 2004/09/19 05:28:13 nyan Exp $
 #
 
 PROG=	boot
@@ -6,10 +6,10 @@ PROG=	boot
 SRCS=	start.S table.c boot2.S boot.c asm.S bios.S serial.S
 SRCS+=	probe_keyboard.c io.c disk.c sys.c
 
-BINDIR=		/boot
 BINMODE=	444
-CFLAGS=		-elf -Os -mrtd \
-		-ffreestanding -fno-builtin -fno-guess-branch-probability \
+CFLAGS=		-Os -mrtd \
+		-fno-guess-branch-probability \
+		-fno-unit-at-a-time \
 		-D_KERNEL -DPC98 -DBOOTWAIT=${BOOTWAIT} -DTIMEOUT=${TIMEOUT}
 CFLAGS+=	-DBOOTSEG=${BOOTSEG} -DBOOTSTACK=${BOOTSTACK}
 CFLAGS+=	${CWARNFLAGS}
@@ -48,7 +48,7 @@ CFLAGS+=	-DCOMSPEED=${BOOT_COMCONSOLE_SPEED}
 # BOOT_HD_BIAS=1 makes da(0,a) correspond to 1:da(0,a) instead of 0:da(0,a).
 
 CLEANFILES+=	boot.nohdr boot.strip boot.ldr boot1 boot2 sizetest
-LDFLAGS+=	-N -Ttext 0 -nostdlib -e start
+LDFLAGS+=	-N -Ttext 0 -e start
 NOSHARED=	YES
 NOMAN=
 STRIP=

@@ -34,13 +34,16 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Modifications for SUN TYPE 6 USB Keyboard by
+ *  Jörg Peter Schley (jps@scxnet.de)
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/ukbd.c,v 1.45 2003/10/04 21:41:01 joe Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/ukbd.c,v 1.49 2004/08/15 23:39:18 imp Exp $");
 
 /*
- * HID spec: http://www.usb.org/developers/data/devclass/hid1_1.pdf
+ * HID spec: http://www.usb.org/developers/devclass_docs/HID1_11.pdf
  */
 
 #include "opt_kbd.h"
@@ -70,7 +73,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/ukbd.c,v 1.45 2003/10/04 21:41:01 joe Exp $"
 #include <dev/usb/usbhid.h>
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
-#include <dev/usb/usbdevs.h>
+#include "usbdevs.h"
 #include <dev/usb/usb_quirks.h>
 #include <dev/usb/hid.h>
 
@@ -168,10 +171,8 @@ USB_ATTACH(ukbd)
 		USB_ATTACH_ERROR_RETURN;
 
 	id = usbd_get_interface_descriptor(iface);
-	usbd_devinfo(uaa->device, 0, devinfo);
+	usbd_devinfo(uaa->device, USBD_SHOW_INTERFACE_CLASS, devinfo);
 	USB_ATTACH_SETUP;
-	printf("%s: %s, iclass %d/%d\n", USBDEVNAME(sc->sc_dev),
-	       devinfo, id->bInterfaceClass, id->bInterfaceSubClass);
 
 	arg[0] = (void *)uaa;
 	arg[1] = (void *)ukbd_intr;
@@ -301,11 +302,11 @@ Static u_int8_t ukbd_trtab[256] = {
 	 104, 102,  94,  96, 103,  99, 101,  98, /* 48 - 4F */
 	  97, 100,  95,  69,  91,  55,  74,  78, /* 50 - 57 */
 	  89,  79,  80,  81,  75,  76,  77,  71, /* 58 - 5F */
-          72,  73,  82,  83,  86, 107,  NN,  NN, /* 60 - 67 */
+          72,  73,  82,  83,  86, 107, 122,  NN, /* 60 - 67 */
           NN,  NN,  NN,  NN,  NN,  NN,  NN,  NN, /* 68 - 6F */
-          NN,  NN,  NN,  NN,  NN,  NN,  NN,  NN, /* 70 - 77 */
-          NN,  NN,  NN,  NN,  NN,  NN,  NN,  NN, /* 78 - 7F */
-          NN,  NN,  NN,  NN,  NN,  NN,  NN, 115, /* 80 - 87 */
+          NN,  NN,  NN,  NN, 115, 108, 111, 113, /* 70 - 77 */
+         109, 110, 112, 118, 114, 116, 117, 119, /* 78 - 7F */
+         121, 120,  NN,  NN,  NN,  NN,  NN, 115, /* 80 - 87 */
          112, 125, 121, 123,  NN,  NN,  NN,  NN, /* 88 - 8F */
           NN,  NN,  NN,  NN,  NN,  NN,  NN,  NN, /* 90 - 97 */
           NN,  NN,  NN,  NN,  NN,  NN,  NN,  NN, /* 98 - 9F */
@@ -743,10 +744,10 @@ ukbd_interrupt(keyboard_t *kbd, void *arg)
 	for (i = 0; i < NKEYCODE; i++) {
 		key = state->ks_odata.keycode[i];
 		if (key == 0)
-			break;
+			continue;
 		for (j = 0; j < NKEYCODE; j++) {
 			if (ud->keycode[j] == 0)
-				break;
+				continue;
 			if (key == ud->keycode[j])
 				goto rfound;
 		}
@@ -759,11 +760,11 @@ ukbd_interrupt(keyboard_t *kbd, void *arg)
 	for (i = 0; i < NKEYCODE; i++) {
 		key = ud->keycode[i];
 		if (key == 0)
-			break;
+			continue;
 		state->ks_ntime[i] = now + kbd->kb_delay1;
 		for (j = 0; j < NKEYCODE; j++) {
 			if (state->ks_odata.keycode[j] == 0)
-				break;
+				continue;
 			if (key == state->ks_odata.keycode[j]) {
 				state->ks_ntime[i] = state->ks_otime[j];
 				if (state->ks_otime[j] > now)
@@ -1449,6 +1450,10 @@ keycode2scancode(int keycode, int shift, int up)
 		0x50, 0x51, 0x52, 0x53,
 		0x46, 	/* XXX Pause/Break */
 		0x5b, 0x5c, 0x5d,
+		/* SUN TYPE 6 USB KEYBOARD */
+		0x68, 0x5e, 0x5f, 0x60,	0x61, 0x62, 0x63,
+		0x64, 0x65, 0x66, 0x67, 0x25, 0x1f, 0x1e,
+		0x20, 
 	};
 	int scancode;
 

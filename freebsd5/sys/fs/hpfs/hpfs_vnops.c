@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/hpfs/hpfs_vnops.c,v 1.47 2003/10/18 14:10:24 phk Exp $
+ * $FreeBSD: src/sys/fs/hpfs/hpfs_vnops.c,v 1.49 2004/08/08 13:20:43 phk Exp $
  */
 
 #include <sys/param.h>
@@ -501,7 +501,7 @@ hpfs_setattr(ap)
 		if (vp->v_mount->mnt_flag & MNT_RDONLY)
 			return (EROFS);
 		if (cred->cr_uid != hp->h_uid &&
-		    (error = suser_cred(cred, PRISON_ROOT)) &&
+		    (error = suser_cred(cred, SUSER_ALLOWJAIL)) &&
 		    ((vap->va_vaflags & VA_UTIMES_NULL) == 0 ||
 		    (error = VOP_ACCESS(vp, VWRITE, cred, td))))
 			return (error);
@@ -663,14 +663,14 @@ hpfs_strategy(ap)
 			printf("hpfs_strategy: hpfs_bpbmap FAILED %d\n", error);
 			bp->b_error = error;
 			bp->b_ioflags |= BIO_ERROR;
-			biodone(&bp->b_io);
+			bufdone(bp);
 			return (error);
 		}
 		if ((long)bp->b_blkno == -1)
 			vfs_bio_clrbuf(bp);
 	}
 	if ((long)bp->b_blkno == -1) {
-		biodone(&bp->b_io);
+		bufdone(bp);
 		return (0);
 	}
 	bp->b_dev = hp->h_devvp->v_rdev;

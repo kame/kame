@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/acpica/acpi_machdep.c,v 1.12 2003/09/22 22:12:46 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/acpica/acpi_machdep.c,v 1.15 2004/08/16 23:10:18 peter Exp $");
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -40,9 +40,7 @@ acpi_machdep_init(device_t dev)
 {
 	struct	acpi_softc *sc;
 
-	if ((sc = device_get_softc(dev)) == NULL)
-		return (ENXIO);
-
+	sc = devclass_get_softc(devclass_find("acpi"), 0);
 	acpi_install_wakeup_handler(sc);
 
 	if (intr_model != ACPI_INTR_PIC)
@@ -56,4 +54,10 @@ acpi_SetDefaultIntrModel(int model)
 {
 
 	intr_model = model;
+}
+
+int
+acpi_machdep_quirks(int *quirks)
+{
+	return (0);
 }

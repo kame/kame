@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aac/aac_debug.c,v 1.16 2003/08/24 17:48:01 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aac/aac_debug.c,v 1.19 2004/06/13 17:57:15 obrien Exp $");
 
 /*
  * Debugging support.
@@ -120,9 +120,6 @@ aac_print_queues(struct aac_softc *sc)
 	    sc->aac_qstat[AACQ_READY].q_max);
 	device_printf(sc->aac_dev, "AACQ_BUSY      %d/%d\n", 
 	    sc->aac_qstat[AACQ_BUSY].q_length, sc->aac_qstat[AACQ_BUSY].q_max);
-	device_printf(sc->aac_dev, "AACQ_COMPLETE  %d/%d\n", 
-	    sc->aac_qstat[AACQ_COMPLETE].q_length,
-	    sc->aac_qstat[AACQ_COMPLETE].q_max);
 }
 
 /*
@@ -369,10 +366,10 @@ aac_print_aif(struct aac_softc *sc, struct aac_aif_command *aif)
 			break;
 		case AifEnDiskSetEvent:		/* A disk set event occured. */
 			device_printf(sc->aac_dev, "(DiskSetEvent) event %d "
-				      "diskset %lld creator %lld\n",
+				      "diskset %jd creator %jd\n",
 				      aif->data.EN.data.EDS.eventType, 
-				      aif->data.EN.data.EDS.DsNum, 
-				      aif->data.EN.data.EDS.CreatorId);
+				      (intmax_t)aif->data.EN.data.EDS.DsNum, 
+				      (intmax_t)aif->data.EN.data.EDS.CreatorId);
 			break;
 		case AifDenMorphComplete: 	/* A morph operation
 						 * completed */

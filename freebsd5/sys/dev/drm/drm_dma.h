@@ -28,7 +28,7 @@
  *    Rickard E. (Rik) Faith <faith@valinux.com>
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/drm_dma.h,v 1.7 2003/10/24 01:48:16 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/drm_dma.h,v 1.8 2003/12/23 14:38:42 se Exp $
  */
 
 #include "dev/drm/drmP.h"
@@ -75,7 +75,7 @@ void DRM(dma_takedown)(drm_device_t *dev)
 				  dma->bufs[i].buf_count,
 				  dma->bufs[i].seg_count);
 			for (j = 0; j < dma->bufs[i].seg_count; j++) {
-				if (dma->bufs[i].seglist[j] != NULL)
+				if (dma->bufs[i].seglist[j] != 0)
 					DRM(pci_free)(dev, dma->bufs[i].buf_size,
 					    (void *)dma->bufs[i].seglist[j],
 					    dma->bufs[i].seglist_bus[j]);

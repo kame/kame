@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/vinum/vinumutil.c,v 1.18 2003/08/24 17:55:57 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/vinum/vinumutil.c,v 1.19 2004/06/16 09:47:02 phk Exp $");
 
 /* This file contains utility routines used both in kernel and user context */
 
@@ -243,12 +243,17 @@ sizespec(char *spec)
     return -1;
 }
 
+#ifdef _KERNEL
+#define FOOTYPE struct cdev *
+#else
+#define FOOTYPE dev_t
+#endif
 /*
  * Extract the volume number from a device number.  Check that it's
  * the correct type, and that it isn't one of the superdevs.
  */
 int
-Volno(dev_t dev)
+Volno(FOOTYPE dev)
 {
     int volno = minor(dev);
 
@@ -269,7 +274,7 @@ Volno(dev_t dev)
  * type.  Return -1 for invalid types.
  */
 int
-Plexno(dev_t dev)
+Plexno(FOOTYPE dev)
 {
     int plexno = minor(dev);
 
@@ -285,7 +290,7 @@ Plexno(dev_t dev)
  * type.  Return -1 for invalid types.
  */
 int
-Sdno(dev_t dev)
+Sdno(FOOTYPE dev)
 {
     int sdno = minor(dev);
 

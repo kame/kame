@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/bktr/msp34xx.c,v 1.1 2003/08/12 09:45:34 alex Exp $
+ * $FreeBSD: src/sys/dev/bktr/msp34xx.c,v 1.3 2003/12/12 21:18:04 rwatson Exp $
  */
 
 /*
@@ -87,8 +87,8 @@
 
 #include <machine/bus.h>		/* required by bktr_reg.h */
 
-#include <machine/ioctl_meteor.h>
-#include <machine/ioctl_bt848.h>	/* extensions to ioctl_meteor.h */
+#include <dev/bktr/ioctl_meteor.h>
+#include <dev/bktr/ioctl_bt848.h>	/* extensions to ioctl_meteor.h */
 #include <dev/bktr/bktr_reg.h>
 #include <dev/bktr/bktr_tuner.h>
 #include <dev/bktr/bktr_audio.h>

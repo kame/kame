@@ -32,7 +32,7 @@
  * SUCH DAMAGE.
  * 
  * $Id: dcons.h,v 1.15 2003/10/23 15:05:31 simokawa Exp $
- * $FreeBSD: src/sys/dev/dcons/dcons.h,v 1.1 2003/10/24 15:44:09 simokawa Exp $
+ * $FreeBSD: src/sys/dev/dcons/dcons.h,v 1.2 2004/02/16 07:25:46 simokawa Exp $
  */
 
 #ifdef _KERNEL
@@ -90,8 +90,12 @@ struct dcons_ch {
 #define STATE2		2
 
 #ifdef _KERNEL
-extern struct dcons_buf *dcons_buf;
-extern size_t dcons_bufsize;
-extern bus_dma_tag_t dcons_dma_tag;
-extern bus_dmamap_t dcons_dma_map;
+struct dcons_global {
+	struct consdev *cdev;
+	struct dcons_buf *buf;
+	size_t size;
+	bus_dma_tag_t dma_tag;
+	bus_dmamap_t dma_map;
+};
+extern struct dcons_global *dcons_conf;
 #endif

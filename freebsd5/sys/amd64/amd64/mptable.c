@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/mptable.c,v 1.228 2003/11/17 08:58:13 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/mptable.c,v 1.232 2004/07/08 01:42:49 peter Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -47,14 +47,10 @@ __FBSDID("$FreeBSD: src/sys/amd64/amd64/mptable.c,v 1.228 2003/11/17 08:58:13 pe
 
 #include <dev/pci/pcivar.h>
 
-/* EISA Edge/Level trigger control registers */
-#define ELCR0	0x4d0			/* eisa irq 0-7 */
-#define ELCR1	0x4d1			/* eisa irq 8-15 */
-
 /* string defined by the Intel MP Spec as identifying the MP table */
 #define	MP_SIG			0x5f504d5f	/* _MP_ */
 
-#define	NAPICID			32	/* Max number of I/O APIC's */
+#define	NAPICID			32	/* Max number of APIC's */
 
 #define BIOS_BASE		(0xf0000)
 #define BIOS_SIZE		(0x10000)
@@ -147,10 +143,11 @@ static int pci0 = -1;
 
 MALLOC_DEFINE(M_MPTABLE, "MP Table", "MP Table Items");
 
-static u_char	conforming_polarity(u_char src_bus);
-static u_char	conforming_trigger(u_char src_bus, u_char src_bus_irq);
-static u_char	intentry_polarity(int_entry_ptr intr);
-static u_char	intentry_trigger(int_entry_ptr intr);
+static enum intr_polarity conforming_polarity(u_char src_bus,
+	    u_char src_bus_irq);
+static enum intr_trigger conforming_trigger(u_char src_bus, u_char src_bus_irq);
+static enum intr_polarity intentry_polarity(int_entry_ptr intr);
+static enum intr_trigger intentry_trigger(int_entry_ptr intr);
 static int	lookup_bus_type(char *name);
 static void	mptable_count_items(void);
 static void	mptable_count_items_handler(u_char *entry, void *arg);
@@ -340,6 +337,7 @@ mptable_setup_io(void)
 		busses[i].bus_type = NOBUS;
 
 	/* Second, we run through adding I/O APIC's and busses. */
+	ioapic_enable_mixed_mode();
 	mptable_parse_apics_and_busses();	
 
 	/* Third, we run through the table tweaking interrupt sources. */
@@ -539,19 +537,17 @@ mptable_parse_apics_and_busses(void)
 /*
  * Determine conforming polarity for a given bus type.
  */
-static u_char
-conforming_polarity(u_char src_bus)
+static enum intr_polarity
+conforming_polarity(u_char src_bus, u_char src_bus_irq)
 {
 
 	KASSERT(src_bus <= mptable_maxbusid, ("bus id %d too large", src_bus));
 	switch (busses[src_bus].bus_type) {
 	case ISA:
 	case EISA:
-		/* Active Hi */
-		return (1);
+		return (INTR_POLARITY_HIGH);
 	case PCI:
-		/* Active Lo */
-		return (0);
+		return (INTR_POLARITY_LOW);
 	default:
 		panic("%s: unknown bus type %d", __func__,
 		    busses[src_bus].bus_type);
@@ -561,52 +557,43 @@ conforming_polarity(u_char src_bus)
 /*
  * Determine conforming trigger for a given bus type.
  */
-static u_char
+static enum intr_trigger
 conforming_trigger(u_char src_bus, u_char src_bus_irq)
 {
-	static int eisa_int_control = -1;
 
 	KASSERT(src_bus <= mptable_maxbusid, ("bus id %d too large", src_bus));
 	switch (busses[src_bus].bus_type) {
 	case ISA:
-		/* Edge Triggered */
-		return (1);
+		return (INTR_TRIGGER_EDGE);
 	case PCI:
-		/* Level Triggered */
-		return (0);
+		return (INTR_TRIGGER_LEVEL);
 	case EISA:
 		KASSERT(src_bus_irq < 16, ("Invalid EISA IRQ %d", src_bus_irq));
-		if (eisa_int_control == -1)
-			eisa_int_control = inb(ELCR1) << 8 | inb(ELCR0);
-		if (eisa_int_control & (1 << src_bus_irq))
-			/* Level Triggered */
-			return (0);
-		else
-			/* Edge Triggered */
-			return (1);
+		return (elcr_read_trigger(src_bus_irq));
 	default:
 		panic("%s: unknown bus type %d", __func__,
 		    busses[src_bus].bus_type);
 	}
 }
 
-static u_char
+static enum intr_polarity
 intentry_polarity(int_entry_ptr intr)
 {
 
 	switch (intr->int_flags & INTENTRY_FLAGS_POLARITY) {
 	case INTENTRY_FLAGS_POLARITY_CONFORM:
-		return (conforming_polarity(intr->src_bus_id));
+		return (conforming_polarity(intr->src_bus_id,
+			    intr->src_bus_irq));
 	case INTENTRY_FLAGS_POLARITY_ACTIVEHI:
-		return (1);
+		return (INTR_POLARITY_HIGH);
 	case INTENTRY_FLAGS_POLARITY_ACTIVELO:
-		return (0);
+		return (INTR_POLARITY_LOW);
 	default:
 		panic("Bogus interrupt flags");
 	}
 }
 
-static u_char
+static enum intr_trigger
 intentry_trigger(int_entry_ptr intr)
 {
 
@@ -615,9 +602,9 @@ intentry_trigger(int_entry_ptr intr)
 		return (conforming_trigger(intr->src_bus_id,
 			    intr->src_bus_irq));
 	case INTENTRY_FLAGS_TRIGGER_EDGE:
-		return (1);
+		return (INTR_TRIGGER_EDGE);
 	case INTENTRY_FLAGS_TRIGGER_LEVEL:
-		return (0);
+		return (INTR_TRIGGER_LEVEL);
 	default:
 		panic("Bogus interrupt flags");
 	}
@@ -652,14 +639,28 @@ mptable_parse_io_int(int_entry_ptr intr)
 	pin = intr->dst_apic_int;
 	switch (intr->int_type) {
 	case INTENTRY_TYPE_INT:
-		if (busses[intr->src_bus_id].bus_type == NOBUS)
+		switch (busses[intr->src_bus_id].bus_type) {
+		case NOBUS:
 			panic("interrupt from missing bus");
-		if (busses[intr->src_bus_id].bus_type == ISA &&
-		    intr->src_bus_irq != pin) {
+		case ISA:
+		case EISA:
+			if (busses[intr->src_bus_id].bus_type == ISA)
+				ioapic_set_bus(ioapic, pin, APIC_BUS_ISA);
+			else
+				ioapic_set_bus(ioapic, pin, APIC_BUS_EISA);
+			if (intr->src_bus_irq == pin)
+				break;
 			ioapic_remap_vector(ioapic, pin, intr->src_bus_irq);
 			if (ioapic_get_vector(ioapic, intr->src_bus_irq) ==
 			    intr->src_bus_irq)
 				ioapic_disable_pin(ioapic, intr->src_bus_irq);
+			break;
+		case PCI:
+			ioapic_set_bus(ioapic, pin, APIC_BUS_PCI);
+			break;
+		default:
+			ioapic_set_bus(ioapic, pin, APIC_BUS_UNKNOWN);
+			break;
 		}
 		break;
 	case INTENTRY_TYPE_NMI:
@@ -811,7 +812,7 @@ mptable_hyperthread_fixup(u_int id_mask)
 	 * physical processor.  If any of those ID's are
 	 * already in the table, then kill the fixup.
 	 */
-	for (id = 0; id <= MAXCPU; id++) {
+	for (id = 0; id < NAPICID; id++) {
 		if ((id_mask & 1 << id) == 0)
 			continue;
 		/* First, make sure we are on a logical_cpus boundary. */
@@ -957,7 +958,8 @@ mptable_pci_route_interrupt(device_t pcib, device_t dev, int pin)
 		    'A' + pin);
 		return (PCI_INVALID_IRQ);
 	}
-	device_printf(pcib, "slot %d INT%c routed to irq %d\n", slot, 'A' + pin,
-	    args.vector);
+	if (bootverbose)
+		device_printf(pcib, "slot %d INT%c routed to irq %d\n", slot,
+		    'A' + pin, args.vector);
 	return (args.vector);
 }

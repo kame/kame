@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/mlx/mlxvar.h,v 1.20 2003/09/02 08:30:31 scottl Exp $
+ *	$FreeBSD: src/sys/dev/mlx/mlxvar.h,v 1.22 2004/06/16 09:46:50 phk Exp $
  */
 
 /*
@@ -108,7 +108,7 @@ struct mlx_softc
 {
     /* bus connections */
     device_t		mlx_dev;
-    dev_t		mlx_dev_t;
+    struct cdev *mlx_dev_t;
     struct resource	*mlx_mem;	/* mailbox interface window */
     int			mlx_mem_rid;
     int			mlx_mem_type;
@@ -228,7 +228,7 @@ struct mlxd_softc
     device_t		mlxd_dev;
     struct mlx_softc	*mlxd_controller;
     struct mlx_sysdrive	*mlxd_drive;
-    struct disk		mlxd_disk;
+    struct disk		*mlxd_disk;
     int			mlxd_unit;
     int			mlxd_flags;
 #define MLXD_OPEN	(1<<0)		/* drive is open (can't shut down) */

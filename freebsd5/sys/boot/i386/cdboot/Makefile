@@ -1,18 +1,13 @@
-# $FreeBSD: src/sys/boot/i386/cdboot/Makefile,v 1.5 2002/09/17 01:48:55 peter Exp $
+# $FreeBSD: src/sys/boot/i386/cdboot/Makefile,v 1.12 2004/04/28 21:31:20 ru Exp $
 
-MAINTAINER=jhb@FreeBSD.org
-
-ORG=		0x7c00
-
-PROG=		cdboot
-NOMAN=
+PROG=	cdboot
 STRIP=
-BINDIR?=	/boot
+BINMODE=${NOBINMODE}
+NOMAN=
+SRCS=	${PROG}.s
 
-${PROG}: ${PROG}.o
-	${LD} -N -e start -Ttext ${ORG} -o ${PROG}.out ${PROG}.o
-	objcopy -S -O binary ${PROG}.out ${.TARGET}
+ORG=	0x7c00
 
-CLEANFILES+=	${PROG}.o ${PROG}.out
+LDFLAGS=-N -e start -Ttext ${ORG} -Wl,-S,--oformat,binary
 
 .include <bsd.prog.mk>

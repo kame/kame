@@ -31,10 +31,10 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/harp/if_harp.c,v 1.3 2003/10/31 18:32:01 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/harp/if_harp.c,v 1.5 2004/07/15 08:26:01 phk Exp $");
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/harp/if_harp.c,v 1.3 2003/10/31 18:32:01 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/harp/if_harp.c,v 1.5 2004/07/15 08:26:01 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -560,23 +560,27 @@ harp_input(struct ifnet *ifp, struct mbuf **mp, struct atm_pseudohdr *ah,
 
 	/* fit two pointers into the mbuf - assume, that the the data is
 	 * pointer aligned. If it doesn't fit into the first mbuf, prepend
-	 * another one, but leave the packet header where it is. atm_intr
-	 * relies on this. */
+	 * another one.
+	 * Don't count the new fields in the packet length (XXX)
+	 */
 	mlen = m->m_pkthdr.len;
 	pfxlen = sizeof(atm_intr_func_t) + sizeof(void *);
 	if (M_LEADINGSPACE(m) < pfxlen) {
-		MGET(m0, 0, MT_DATA);
+		MGETHDR(m0, 0, MT_DATA);
 		if (m0 == NULL) {
 			printf("%s: no leading space in buffer\n", __func__);
 			goto drop;
 		}
 		m0->m_len = 0;
 		m0->m_next = m;
+
+		M_MOVE_PKTHDR(m0, m);
+
 		m = m0;
 	}
 	m->m_len += pfxlen;
 	m->m_data -= pfxlen;
-	KB_DATASTART(m, cp, char *);
+	cp = mtod(m, char *);
 	*((atm_intr_func_t *)cp) = harp_recv_stack;
 	cp += sizeof(atm_intr_func_t);
 	*((void **)cp) = (void *)vcc;
@@ -642,6 +646,8 @@ harp_modevent(module_t mod, int event, void *data)
 		uma_zdestroy(harp_vcc_zone);
 
 		break;
+	  default:
+		return (EOPNOTSUPP);
 	}
 	return (0);
 }

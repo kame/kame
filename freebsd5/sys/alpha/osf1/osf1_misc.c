@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_misc.c,v 1.43 2003/08/17 06:42:08 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_misc.c,v 1.47.2.1 2004/09/03 15:30:20 jhb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -60,6 +60,7 @@ __FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_misc.c,v 1.43 2003/08/17 06:42:08 ma
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/stat.h>
+#include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
@@ -68,6 +69,7 @@ __FBSDID("$FreeBSD: src/sys/alpha/osf1/osf1_misc.c,v 1.43 2003/08/17 06:42:08 ma
 #include <sys/user.h>
 #include <sys/utsname.h>
 #include <sys/vnode.h>
+#include <sys/wait.h>
 
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
@@ -390,23 +392,25 @@ osf1_getrlimit(td, uap)
 	struct thread *td;
 	struct osf1_getrlimit_args *uap;
 {
-	struct __getrlimit_args /* {
-		syscallarg(u_int) which;
-		syscallarg(struct rlimit *) rlp;
-	} */ a;
+	struct rlimit bsd_rlim;
+	struct proc *p;
+	int which;
 
 	if (uap->which >= OSF1_RLIMIT_NLIMITS)
 		return (EINVAL);
 
 	if (uap->which <= OSF1_RLIMIT_LASTCOMMON)
-		a.which = uap->which;
+		which = uap->which;
 	else if (uap->which == OSF1_RLIMIT_NOFILE)
-		a.which = RLIMIT_NOFILE;
+		which = RLIMIT_NOFILE;
 	else
 		return (0);
-	a.rlp = (struct rlimit *)uap->rlp;
 
-	return getrlimit(td, &a);
+	p = td->td_proc;
+	PROC_LOCK(p);
+	lim_rlimit(p, which, &bsd_rlim);
+	PROC_UNLOCK(p);
+	return (copyout(&bsd_rlim, uap->rlp, sizeof(bsd_rlim)));
 }
 
 
@@ -415,23 +419,24 @@ osf1_setrlimit(td, uap)
 	struct thread *td;
 	struct osf1_setrlimit_args  *uap;
 {
-	struct __setrlimit_args /* {
-		syscallarg(u_int) which;
-		syscallarg(struct rlimit *) rlp;
-	} */ a;
+	struct rlimit bsd_rlim;
+	int error, which;
 
 	if (uap->which >= OSF1_RLIMIT_NLIMITS)
 		return (EINVAL);
 
 	if (uap->which <= OSF1_RLIMIT_LASTCOMMON)
-		a.which = uap->which;
+		which = uap->which;
 	else if (uap->which == OSF1_RLIMIT_NOFILE)
-		a.which = RLIMIT_NOFILE;
+		which = RLIMIT_NOFILE;
 	else
 		return (0);
-	a.rlp = (struct rlimit *)uap->rlp;
 
-	return setrlimit(td, &a);
+	error = copyin(uap->rlp, &bsd_rlim, sizeof(bsd_rlim));
+	if (error)
+		return (error);
+
+	return (kern_setrlimit(td, which, &bsd_rlim));
 }
 
 
@@ -683,16 +688,7 @@ osf1_fstat(td, uap)
 }
 
 
-#if 1
 #define	bsd2osf_dev(dev)	(umajor(dev) << 20 | uminor(dev))
-#define	osf2bsd_dev(dev)	umakedev((umajor(dev) >> 20) & 0xfff, uminor(dev) & 0xfffff)
-#else
-#define	minor(x)		((int)((x)&0xffff00ff))
-#define	major(x)		((int)(((u_int)(x) >> 8)&0xff))
-#define	makedev(x,y)		((dev_t)(((x) << 8) | (y)))
-#define	bsd2osf_dev(dev)	(major(dev) << 20 | minor(dev))
-#define	osf2bsd_dev(dev)	makedev(((dev) >> 20) & 0xfff, (dev) & 0xfffff)
-#endif
 /*
  * Convert from a stat structure to an osf1 stat structure.
  */
@@ -728,19 +724,7 @@ osf1_mknod(td, uap)
 	struct thread *td;
 	struct osf1_mknod_args *uap;
 {
-#if notanymore
-	struct mknod_args a;
-	caddr_t sg;
 
-	sg = stackgap_init();
-        CHECKALTEXIST(td, &sg, uap->path);
-
-	a.path = uap->path;
-	a.mode = uap->mode;
-	a.dev = osf2bsd_dev(uap->dev);
-
-	return mknod(td, &a);
-#endif
 	printf("osf1_mknod no longer implemented\n");
 	return ENOSYS;
 }
@@ -775,19 +759,14 @@ osf1_fcntl(td, uap)
 {
 	int error;
 	long tmp;
-	caddr_t oarg, sg;
-	struct fcntl_args a;
 	struct osf1_flock osf_flock;
 	struct flock bsd_flock;
-	struct flock *nflock;
 
 	error = 0;
 
 	switch (uap->cmd) {
 
 	case F_SETFL:
-		a.fd = uap->fd;
-		a.cmd = F_SETFL;
 		/* need to translate flags here */
 		tmp = 0;
 		if ((long)uap->arg & OSF1_FNONBLOCK)
@@ -808,8 +787,7 @@ osf1_fcntl(td, uap)
 			tmp |= FNDELAY;
 		if ((long)uap->arg & OSF1_FSYNC)
 			tmp |= FFSYNC;
-		a.arg = tmp;
-		error = fcntl(td, &a);
+		error = kern_fcntl(td, uap->fd, F_SETFL, tmp);
 		break;
 
 	case F_SETLK:
@@ -820,20 +798,15 @@ osf1_fcntl(td, uap)
 		 *  the BSD one, but all else is the same.  We must
 		 *  reorder the one we've gotten so that flock() groks it.
 		 */
-		if ((error = copyin(uap->arg, &osf_flock, sizeof(osf_flock))))
-			return error;
+		error = copyin(uap->arg, &osf_flock, sizeof(osf_flock));
+		if (error)
+			return (error);
 		bsd_flock.l_type = osf_flock.l_type;
 		bsd_flock.l_whence = osf_flock.l_whence;
 		bsd_flock.l_start = osf_flock.l_start;
 		bsd_flock.l_len = osf_flock.l_len;
 		bsd_flock.l_pid = osf_flock.l_pid;
-		sg = stackgap_init();
-		nflock = stackgap_alloc(&sg, sizeof(struct flock));
-		if ((error = copyout(&bsd_flock, nflock, sizeof(bsd_flock))) != 0)
-			return error;
-		oarg = uap->arg;
-		uap->arg = nflock;
-		error = fcntl(td, (struct fcntl_args *) uap);
+		error = kern_fcntl(td, uap->fd, uap->cmd, (intptr_t)&bsd_flock);
 /*		if (error) {
 			printf("fcntl called with cmd=%d, args=0x%lx\n returns %d\n",uap->cmd,(long)uap->arg,error);
 			printf("bsd_flock.l_type = 0x%x\n", bsd_flock.l_type);
@@ -844,14 +817,17 @@ osf1_fcntl(td, uap)
 		}
 */
 		if ((uap->cmd == F_GETLK) && !error) {
+			/*
+			 * XXX: Why are we hardcoding F_UNLCK here instead of
+			 * copying the structure members from bsd_flock?
+			 */
 			osf_flock.l_type = F_UNLCK;
-			if ((error = copyout(&osf_flock, oarg,
-			    sizeof(osf_flock))))
-				return error;
+			error = copyout(&osf_flock, uap->arg,
+			    sizeof(osf_flock));
 		}
 		break;
 	default:
-		error = fcntl(td, (struct fcntl_args *) uap);
+		error = kern_fcntl(td, uap->fd, uap->cmd, (intptr_t)uap->arg);
 
 		if ((uap->cmd == OSF1_F_GETFL) && !error ) {
 			tmp = td->td_retval[0] & O_ACCMODE;
@@ -1065,7 +1041,7 @@ osf1_setuid(td, uap)
 	PROC_LOCK(p);
 	oldcred = p->p_ucred;
 
-	if ((error = suser_cred(p->p_ucred, PRISON_ROOT)) != 0 &&
+	if ((error = suser_cred(p->p_ucred, SUSER_ALLOWJAIL)) != 0 &&
 	    uid != oldcred->cr_ruid && uid != oldcred->cr_svuid) {
 		PROC_UNLOCK(p);
 		uifree(uip);
@@ -1119,7 +1095,7 @@ osf1_setgid(td, uap)
 	PROC_LOCK(p);
 	oldcred = p->p_ucred;
 
-	if (((error = suser_cred(p->p_ucred, PRISON_ROOT)) != 0 ) &&
+	if (((error = suser_cred(p->p_ucred, SUSER_ALLOWJAIL)) != 0 ) &&
 	    gid != oldcred->cr_rgid && gid != oldcred->cr_svgid) {
 		PROC_UNLOCK(p);
 		crfree(newcred);
@@ -1394,27 +1370,23 @@ osf1_wait4(td, uap)
 	struct thread *td;
 	struct osf1_wait4_args *uap;
 {
-	int error;
-	caddr_t sg;
-	struct osf1_rusage *orusage, oru;
-	struct rusage *rusage = NULL, ru;
+	int error, status;
+	struct osf1_rusage oru;
+	struct rusage ru;
 
-	orusage = uap->rusage;
-	if (orusage) {
-		sg = stackgap_init();
-		rusage = stackgap_alloc(&sg, sizeof(struct rusage));
-		uap->rusage = (struct osf1_rusage *)rusage;
-	}
-	if ((error = wait4(td, (struct wait_args *)uap)))
-		return error;
-	if (orusage && (error = copyin(rusage, &ru, sizeof(ru)) == 0)){
+	error = kern_wait(td, uap->pid, &status, uap->options, &ru);
+	if (error)
+		return (error);
+	if (uap->status != NULL)
+		error = copyout(&status, uap->status, sizeof(status));
+	if (uap->rusage != NULL && error == 0) {
 		TV_CP(ru.ru_utime, oru.ru_utime);
 		TV_CP(ru.ru_stime, oru.ru_stime);
 		bcopy(&ru.ru_first, &oru.ru_first,
 		    (&(oru.ru_last) - &(oru.ru_first)));
-		copyout(&oru, orusage, sizeof (struct osf1_rusage));
+		error = copyout(&oru, uap->rusage, sizeof (struct osf1_rusage));
 	}
-	return (0);
+	return (error);
 }
 
 

@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/wi/if_wi_pccard.c,v 1.41 2003/09/22 05:33:22 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/wi/if_wi_pccard.c,v 1.47 2004/06/09 06:31:40 imp Exp $");
 
 #include "opt_wi.h"
 
@@ -65,9 +65,7 @@ __FBSDID("$FreeBSD: src/sys/dev/wi/if_wi_pccard.c,v 1.41 2003/09/22 05:33:22 imp
 #include <net80211/ieee80211_radiotap.h>
 
 #include <dev/pccard/pccardvar.h>
-#if __FreeBSD_version >= 500000
-#include <dev/pccard/pccarddevs.h>
-#endif
+#include <dev/pccard/pccard_cis.h>
 
 #include <dev/wi/if_wavelan_ieee.h>
 #include <dev/wi/if_wireg.h>
@@ -77,22 +75,11 @@ __FBSDID("$FreeBSD: src/sys/dev/wi/if_wi_pccard.c,v 1.41 2003/09/22 05:33:22 imp
 #endif
 
 #include "card_if.h"
+#include "pccarddevs.h"
 
 static int wi_pccard_probe(device_t);
 static int wi_pccard_attach(device_t);
 
-#if __FreeBSD_version < 500000
-static device_method_t wi_pccard_methods[] = {
-	/* Device interface */
-	DEVMETHOD(device_probe,		wi_pccard_probe),
-	DEVMETHOD(device_attach,	wi_pccard_attach),
-	DEVMETHOD(device_detach,	wi_detach),
-	DEVMETHOD(device_shutdown,	wi_shutdown),
-
-	{ 0, 0 }
-};
-
-#else
 static int wi_pccard_match(device_t);
 
 static device_method_t wi_pccard_methods[] = {
@@ -110,8 +97,6 @@ static device_method_t wi_pccard_methods[] = {
 	{ 0, 0 }
 };
 
-#endif
-
 static driver_t wi_pccard_driver = {
 	"wi",
 	wi_pccard_methods,
@@ -120,9 +105,7 @@ static driver_t wi_pccard_driver = {
 
 DRIVER_MODULE(wi, pccard, wi_pccard_driver, wi_devclass, 0, 0);
 MODULE_DEPEND(wi, wlan, 1, 1, 1);
-MODULE_DEPEND(wi, pccard, 1, 1, 1);
 
-#if __FreeBSD_version >= 500000
 static const struct pccard_product wi_pccard_products[] = {
 	PCMCIA_CARD(3COM, 3CRWE737A, 0),
 	PCMCIA_CARD(3COM, 3CRWE777A, 0),
@@ -136,8 +119,8 @@ static const struct pccard_product wi_pccard_products[] = {
 	PCMCIA_CARD(BROMAX, IWN, 0),
 	PCMCIA_CARD(BROMAX, IWN3, 0),
 	PCMCIA_CARD(BROMAX, WCF11, 0),
-	PCMCIA_CARD(BUFFALO, WLI_PCM_S11, 0),
 	PCMCIA_CARD(BUFFALO, WLI_CF_S11G, 0),
+	PCMCIA_CARD(BUFFALO, WLI_PCM_S11, 0),
 	PCMCIA_CARD(COMPAQ, NC5004, 0),
 	PCMCIA_CARD(CONTEC, FX_DS110_PCC, 0),
 	PCMCIA_CARD(COREGA, WIRELESS_LAN_PCC_11, 0),
@@ -154,17 +137,18 @@ static const struct pccard_product wi_pccard_products[] = {
 	PCMCIA_CARD(HWN, AIRWAY80211, 0), 
 	PCMCIA_CARD(INTEL, PRO_WLAN_2011, 0),
 	PCMCIA_CARD(INTERSIL, MA401RA, 0),
+	PCMCIA_CARD(INTERSIL, DWL650, 0),
 	PCMCIA_CARD(INTERSIL2, PRISM2, 0),
-	PCMCIA_CARD(IODATA2, WNB11PCM, 0),
 	PCMCIA_CARD(IODATA2, WCF12, 0),
+	PCMCIA_CARD(IODATA2, WNB11PCM, 0),
 	PCMCIA_CARD(FUJITSU, WL110, 0),
 	PCMCIA_CARD(LUCENT, WAVELAN_IEEE, 0),
 	PCMCIA_CARD(MICROSOFT, MN_520, 0),
 	PCMCIA_CARD(NOKIA, C020_WLAN, 0),
 	PCMCIA_CARD(NOKIA, C110_WLAN, 0),
 	PCMCIA_CARD(PLANEX_2, GWNS11H, 0),
-	PCMCIA_CARD(PROXIM, RANGELANDS_8430, 0),
 	PCMCIA_CARD(PROXIM, HARMONY, 0),
+	PCMCIA_CARD(PROXIM, RANGELANDS_8430, 0),
 	PCMCIA_CARD(SAMSUNG, SWL_2000N, 0),
 	PCMCIA_CARD(SIEMENS, SS1021, 0),
 	PCMCIA_CARD(SIMPLETECH, SPECTRUM24_ALT, 0),
@@ -179,6 +163,15 @@ wi_pccard_match(dev)
 	device_t	dev;
 {
 	const struct pccard_product *pp;
+	u_int32_t fcn = PCCARD_FUNCTION_UNSPEC;
+	int error;
+
+	/* Make sure we're a network driver */
+	error = pccard_get_function(dev, &fcn);
+	if (error != 0)
+		return (error);
+	if (fcn != PCCARD_FUNCTION_NETWORK)
+		return (ENXIO);
 
 	if ((pp = pccard_product_lookup(dev, wi_pccard_products,
 	    sizeof(wi_pccard_products[0]), NULL)) != NULL) {
@@ -188,7 +181,6 @@ wi_pccard_match(dev)
 	}
 	return (ENXIO);
 }
-#endif
 
 static int
 wi_pccard_probe(dev)
@@ -231,7 +223,6 @@ wi_pccard_attach(device_t dev)
 		return (error);
 	}
 
-#if __FreeBSD_version > 500000 
 	/*
 	 * The cute little Symbol LA4100-series CF cards need to have
 	 * code downloaded to them.
@@ -253,7 +244,6 @@ wi_pccard_attach(device_t dev)
 		return (ENXIO);
 #endif
 	}
-#endif
 	retval = wi_attach(dev);
 	if (retval != 0)
 		wi_free(dev);

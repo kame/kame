@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ata/ata-pci.c,v 1.71.2.2 2004/01/27 05:53:18 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ata/ata-pci.c,v 1.87.2.3 2004/10/10 15:01:47 sos Exp $");
 
 #include "opt_ata.h"
 #include <sys/param.h>
@@ -60,7 +60,16 @@ static MALLOC_DEFINE(M_ATAPCI, "ATA PCI", "ATA driver PCI");
 /* prototypes */
 static int ata_pci_allocate(device_t, struct ata_channel *);
 static void ata_pci_dmainit(struct ata_channel *);
-static void ata_pci_locknoop(struct ata_channel *, int);
+static int ata_pci_locknoop(struct ata_channel *, int);
+
+int
+ata_legacy(device_t dev)
+{
+    return ((pci_read_config(dev, PCIR_PROGIF, 1)&PCIP_STORAGE_IDE_MASTERDEV) &&
+	    ((pci_read_config(dev, PCIR_PROGIF, 1) &
+	      (PCIP_STORAGE_IDE_MODEPRIM | PCIP_STORAGE_IDE_MODESEC)) !=
+	     (PCIP_STORAGE_IDE_MODEPRIM | PCIP_STORAGE_IDE_MODESEC)));
+}
 
 static int
 ata_pci_probe(device_t dev)
@@ -70,61 +79,61 @@ ata_pci_probe(device_t dev)
 
     switch (pci_get_vendor(dev)) {
     case ATA_ACARD_ID: 
- 	if (!ata_acard_ident(dev))
- 	    return 0;
- 	break;
+	if (!ata_acard_ident(dev))
+	    return 0;
+	break;
     case ATA_ACER_LABS_ID:
- 	if (!ata_ali_ident(dev))
- 	    return 0;
- 	break;
+	if (!ata_ali_ident(dev))
+	    return 0;
+	break;
     case ATA_AMD_ID:
- 	if (!ata_amd_ident(dev))
- 	    return 0;
- 	break;
+	if (!ata_amd_ident(dev))
+	    return 0;
+	break;
     case ATA_CYRIX_ID:
- 	if (!ata_cyrix_ident(dev))
- 	    return 0;
- 	break;
+	if (!ata_cyrix_ident(dev))
+	    return 0;
+	break;
     case ATA_CYPRESS_ID:
- 	if (!ata_cypress_ident(dev))
- 	    return 0;
- 	break;
+	if (!ata_cypress_ident(dev))
+	    return 0;
+	break;
     case ATA_HIGHPOINT_ID: 
- 	if (!ata_highpoint_ident(dev))
- 	    return 0;
- 	break;
+	if (!ata_highpoint_ident(dev))
+	    return 0;
+	break;
     case ATA_INTEL_ID:
- 	if (!ata_intel_ident(dev))
- 	    return 0;
- 	break;
+	if (!ata_intel_ident(dev))
+	    return 0;
+	break;
     case ATA_NATIONAL_ID:
-        if (!ata_national_ident(dev))
+	if (!ata_national_ident(dev))
 	    return 0;
 	break;
     case ATA_NVIDIA_ID:
- 	if (!ata_nvidia_ident(dev))
- 	    return 0;
- 	break;
+	if (!ata_nvidia_ident(dev))
+	    return 0;
+	break;
     case ATA_PROMISE_ID:
- 	if (!ata_promise_ident(dev))
- 	    return 0;
- 	break;
+	if (!ata_promise_ident(dev))
+	    return 0;
+	break;
     case ATA_SERVERWORKS_ID: 
- 	if (!ata_serverworks_ident(dev))
- 	    return 0;
- 	break;
+	if (!ata_serverworks_ident(dev))
+	    return 0;
+	break;
     case ATA_SILICON_IMAGE_ID:
- 	if (!ata_sii_ident(dev))
- 	    return 0;
- 	break;
+	if (!ata_sii_ident(dev))
+	    return 0;
+	break;
     case ATA_SIS_ID:
- 	if (!ata_sis_ident(dev))
- 	    return 0;
- 	break;
+	if (!ata_sis_ident(dev))
+	    return 0;
+	break;
     case ATA_VIA_ID: 
- 	if (!ata_via_ident(dev))
- 	    return 0;
- 	break;
+	if (!ata_via_ident(dev))
+	    return 0;
+	break;
     case 0x16ca:
 	if (pci_get_devid(dev) == 0x000116ca) {
 	    ata_generic_ident(dev);
@@ -154,23 +163,11 @@ static int
 ata_pci_attach(device_t dev)
 {
     struct ata_pci_controller *ctlr = device_get_softc(dev);
-    u_int8_t class, subclass;
-    u_int32_t type, cmd;
+    u_int32_t cmd;
     int unit;
 
-    /* set up vendor-specific stuff */
-    type = pci_get_devid(dev);
-    class = pci_get_class(dev);
-    subclass = pci_get_subclass(dev);
-    cmd = pci_read_config(dev, PCIR_COMMAND, 2);
-
-    if (!(cmd & PCIM_CMD_PORTEN)) {
-	device_printf(dev, "ATA channel disabled by BIOS\n");
-	return 0;
-    }
-
     /* do chipset specific setups only needed once */
-    if (ATA_MASTERDEV(dev) || pci_read_config(dev, 0x18, 4) & IOMASK)
+    if (ata_legacy(dev) || pci_read_config(dev, PCIR_BAR(2), 4) & IOMASK)
 	ctlr->channels = 2;
     else
 	ctlr->channels = 1;
@@ -178,30 +175,64 @@ ata_pci_attach(device_t dev)
     ctlr->dmainit = ata_pci_dmainit;
     ctlr->locking = ata_pci_locknoop;
 
-#ifdef __sparc64__
+    /* if needed try to enable busmastering */
+    cmd = pci_read_config(dev, PCIR_COMMAND, 2);
     if (!(cmd & PCIM_CMD_BUSMASTEREN)) {
 	pci_write_config(dev, PCIR_COMMAND, cmd | PCIM_CMD_BUSMASTEREN, 2);
 	cmd = pci_read_config(dev, PCIR_COMMAND, 2);
     }
-#endif
-    /* if busmastering configured get the I/O resource */
-    if ((cmd & PCIM_CMD_BUSMASTEREN) == PCIM_CMD_BUSMASTEREN) {
-	int rid = ATA_BMADDR_RID;
 
-	ctlr->r_io1 = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-					 0, ~0, 1, RF_ACTIVE);
+    /* if busmastering mode "stuck" use it */
+    if ((cmd & PCIM_CMD_BUSMASTEREN) == PCIM_CMD_BUSMASTEREN) {
+	ctlr->r_type1 = SYS_RES_IOPORT;
+	ctlr->r_rid1 = ATA_BMADDR_RID;
+	ctlr->r_res1 = bus_alloc_resource_any(dev, ctlr->r_type1, &ctlr->r_rid1,
+					      RF_ACTIVE);
     }
 
     ctlr->chipinit(dev);
 
     /* attach all channels on this controller */
-    for (unit = 0; unit < ctlr->channels; unit++)
-	device_add_child(dev, "ata", ATA_MASTERDEV(dev) ?
-			 unit : devclass_find_free_unit(ata_devclass, 2));
-
+    for (unit = 0; unit < ctlr->channels; unit++) {
+	if (unit == 0 && (pci_get_progif(dev) & 0x81) == 0x80) {
+	    device_add_child(dev, "ata", unit);
+	    continue;
+	}
+	if (unit == 1 && (pci_get_progif(dev) & 0x84) == 0x80) {
+	    device_add_child(dev, "ata", unit);
+	    continue;
+	}
+	device_add_child(dev, "ata", devclass_find_free_unit(ata_devclass, 2));
+    }
     return bus_generic_attach(dev);
 }
 
+static int
+ata_pci_detach(device_t dev)
+{
+    struct ata_pci_controller *ctlr = device_get_softc(dev);
+    struct ata_channel *ch;
+    int unit;
+
+    /* mark HW as gone, we dont want to issue commands to HW no longer there */
+    for (unit = 0; unit < ctlr->channels; unit++) {
+	if ((ch = ctlr->interrupt[unit].argument))
+	    ch->flags |= ATA_HWGONE;
+    }
+
+    bus_generic_detach(dev);
+
+    if (ctlr->r_irq) {
+	bus_teardown_intr(dev, ctlr->r_irq, ctlr->handle);
+	bus_release_resource(dev, SYS_RES_IRQ, ATA_IRQ_RID, ctlr->r_irq);
+    }
+    if (ctlr->r_res2)
+	bus_release_resource(dev, ctlr->r_type2, ctlr->r_rid2, ctlr->r_res2);
+    if (ctlr->r_res1)
+	bus_release_resource(dev, ctlr->r_type1, ctlr->r_rid1, ctlr->r_res1);
+
+    return 0;
+}
 
 static int
 ata_pci_print_child(device_t dev, device_t child)
@@ -210,13 +241,8 @@ ata_pci_print_child(device_t dev, device_t child)
     int retval = 0;
 
     retval += bus_print_child_header(dev, child);
-    retval += printf(": at 0x%lx", rman_get_start(ch->r_io[ATA_IDX_ADDR].res));
-
-    if (ATA_MASTERDEV(dev))
-	retval += printf(" irq %d", 14 + ch->unit);
-    
+    retval += printf(": channel #%d", ch->unit);
     retval += bus_print_child_footer(dev, child);
-
     return retval;
 }
 
@@ -232,56 +258,34 @@ ata_pci_alloc_resource(device_t dev, device_t child, int type, int *rid,
     if (type == SYS_RES_IOPORT) {
 	switch (*rid) {
 	case ATA_IOADDR_RID:
-	    if (ATA_MASTERDEV(dev)) {
-		myrid = 0;
+	    if (ata_legacy(dev)) {
 		start = (unit ? ATA_SECONDARY : ATA_PRIMARY);
-		end = start + ATA_IOSIZE - 1;
 		count = ATA_IOSIZE;
-		res = BUS_ALLOC_RESOURCE(device_get_parent(dev), child,
-					 SYS_RES_IOPORT, &myrid,
-					 start, end, count, flags);
+		end = start + count - 1;
 	    }
-	    else {
-		myrid = 0x10 + 8 * unit;
-		res = BUS_ALLOC_RESOURCE(device_get_parent(dev), dev,
-					 SYS_RES_IOPORT, &myrid,
-					 start, end, count, flags);
-	    }
+	    myrid = PCIR_BAR(0) + (unit << 3);
+	    res = BUS_ALLOC_RESOURCE(device_get_parent(dev), dev,
+				     SYS_RES_IOPORT, &myrid,
+				     start, end, count, flags);
 	    break;
 
 	case ATA_ALTADDR_RID:
-	    if (ATA_MASTERDEV(dev)) {
-		myrid = 0;
+	    if (ata_legacy(dev)) {
 		start = (unit ? ATA_SECONDARY : ATA_PRIMARY) + ATA_ALTOFFSET;
-		end = start + ATA_ALTIOSIZE - 1;
 		count = ATA_ALTIOSIZE;
-		res = BUS_ALLOC_RESOURCE(device_get_parent(dev), child,
-					 SYS_RES_IOPORT, &myrid,
-					 start, end, count, flags);
+		end = start + count - 1;
 	    }
-	    else {
-		myrid = 0x14 + 8 * unit;
-		res = BUS_ALLOC_RESOURCE(device_get_parent(dev), dev,
-					 SYS_RES_IOPORT, &myrid,
-					 start, end, count, flags);
-		if (res) {
-			start = rman_get_start(res) + 2;
-			end = start + ATA_ALTIOSIZE - 1;
-			count = ATA_ALTIOSIZE;
-			BUS_RELEASE_RESOURCE(device_get_parent(dev), dev,
-					     SYS_RES_IOPORT, myrid, res);
-			res = BUS_ALLOC_RESOURCE(device_get_parent(dev), dev,
-						 SYS_RES_IOPORT, &myrid,
-						 start, end, count, flags);
-		}
-	    }
+	    myrid = PCIR_BAR(1) + (unit << 3);
+	    res = BUS_ALLOC_RESOURCE(device_get_parent(dev), dev,
+				     SYS_RES_IOPORT, &myrid,
+				     start, end, count, flags);
 	    break;
 	}
 	return res;
     }
 
     if (type == SYS_RES_IRQ && *rid == ATA_IRQ_RID) {
-		if (ATA_MASTERDEV(dev)) {
+	if (ata_legacy(dev)) {
 #ifdef __alpha__
 	    return alpha_platform_alloc_ide_intr(unit);
 #else
@@ -307,21 +311,15 @@ ata_pci_release_resource(device_t dev, device_t child, int type, int rid,
     if (type == SYS_RES_IOPORT) {
 	switch (rid) {
 	case ATA_IOADDR_RID:
-	    if (ATA_MASTERDEV(dev))
-		return BUS_RELEASE_RESOURCE(device_get_parent(dev), child,
-					    SYS_RES_IOPORT, 0x0, r);
-	    else
-		return BUS_RELEASE_RESOURCE(device_get_parent(dev), dev,
-					    SYS_RES_IOPORT, 0x10 + 8 * unit, r);
+	    return BUS_RELEASE_RESOURCE(device_get_parent(dev), dev,
+					SYS_RES_IOPORT,
+					PCIR_BAR(0) + (unit << 3), r);
 	    break;
 
 	case ATA_ALTADDR_RID:
-	    if (ATA_MASTERDEV(dev))
-		return BUS_RELEASE_RESOURCE(device_get_parent(dev), child,
-					    SYS_RES_IOPORT, 0x0, r);
-	    else
-		return BUS_RELEASE_RESOURCE(device_get_parent(dev), dev,
-					    SYS_RES_IOPORT, 0x14 + 8 * unit, r);
+	    return BUS_RELEASE_RESOURCE(device_get_parent(dev), dev,
+					SYS_RES_IOPORT,
+					PCIR_BAR(1) + (unit << 3), r);
 	    break;
 	default:
 	    return ENOENT;
@@ -331,7 +329,7 @@ ata_pci_release_resource(device_t dev, device_t child, int type, int rid,
 	if (rid != ATA_IRQ_RID)
 	    return ENOENT;
 
-	if (ATA_MASTERDEV(dev)) {
+	if (ata_legacy(dev)) {
 #ifdef __alpha__
 	    return alpha_platform_release_ide_intr(unit, r);
 #else
@@ -350,7 +348,7 @@ ata_pci_setup_intr(device_t dev, device_t child, struct resource *irq,
 		   int flags, driver_intr_t *function, void *argument,
 		   void **cookiep)
 {
-    if (ATA_MASTERDEV(dev)) {
+    if (ata_legacy(dev)) {
 #ifdef __alpha__
 	return alpha_platform_setup_ide_intr(child, irq, function, argument,
 					     cookiep);
@@ -374,7 +372,7 @@ static int
 ata_pci_teardown_intr(device_t dev, device_t child, struct resource *irq,
 		      void *cookie)
 {
-    if (ATA_MASTERDEV(dev)) {
+    if (ata_legacy(dev)) {
 #ifdef __alpha__
 	return alpha_platform_teardown_ide_intr(child, irq, cookie);
 #else
@@ -417,24 +415,18 @@ ata_pci_allocate(device_t dev, struct ata_channel *ch)
 	ch->r_io[i].offset = i;
     }
     ch->r_io[ATA_ALTSTAT].res = altio;
-    ch->r_io[ATA_ALTSTAT].offset = 0;
+    ch->r_io[ATA_ALTSTAT].offset = ata_legacy(device_get_parent(dev)) ? 0 : 2;
     ch->r_io[ATA_IDX_ADDR].res = io;
 
-    if (ctlr->r_io1) {
+    if (ctlr->r_res1) {
 	for (i = ATA_BMCMD_PORT; i <= ATA_BMDTP_PORT; i++) {
-	    ch->r_io[i].res = ctlr->r_io1;
+	    ch->r_io[i].res = ctlr->r_res1;
 	    ch->r_io[i].offset = (i - ATA_BMCMD_PORT)+(ch->unit * ATA_BMIOSIZE);
 	}
-
-	/* if simplex controller, only allow DMA on primary channel */
-	ATA_IDX_OUTB(ch, ATA_BMSTAT_PORT, ATA_IDX_INB(ch, ATA_BMSTAT_PORT) &
-		     (ATA_BMSTAT_DMA_MASTER | ATA_BMSTAT_DMA_SLAVE));
-	if (ch->unit > 0 &&
-	    (ATA_IDX_INB(ch, ATA_BMSTAT_PORT) & ATA_BMSTAT_DMA_SIMPLEX))
-	    device_printf(dev, "simplex device, DMA on primary only\n");
-	else 
-	    ctlr->dmainit(ch);
     }
+
+    ata_generic_hw(ch);
+
     return 0;
 }
 
@@ -444,7 +436,9 @@ ata_pci_dmastart(struct ata_channel *ch)
     ATA_IDX_OUTB(ch, ATA_BMSTAT_PORT, (ATA_IDX_INB(ch, ATA_BMSTAT_PORT) | 
 		 (ATA_BMSTAT_INTERRUPT | ATA_BMSTAT_ERROR)));
     ATA_IDX_OUTL(ch, ATA_BMDTP_PORT, ch->dma->mdmatab);
+    ch->dma->flags |= ATA_DMA_ACTIVE;
     ATA_IDX_OUTB(ch, ATA_BMCMD_PORT,
+		 (ATA_IDX_INB(ch, ATA_BMCMD_PORT) & ~ATA_BMCMD_WRITE_READ) |
 		 ((ch->dma->flags & ATA_DMA_READ) ? ATA_BMCMD_WRITE_READ : 0) |
 		 ATA_BMCMD_START_STOP);
     return 0;
@@ -455,9 +449,10 @@ ata_pci_dmastop(struct ata_channel *ch)
 {
     int error;
 
-    error = ATA_IDX_INB(ch, ATA_BMSTAT_PORT) & ATA_BMSTAT_MASK;
     ATA_IDX_OUTB(ch, ATA_BMCMD_PORT, 
 		 ATA_IDX_INB(ch, ATA_BMCMD_PORT) & ~ATA_BMCMD_START_STOP);
+    ch->dma->flags &= ~ATA_DMA_ACTIVE;
+    error = ATA_IDX_INB(ch, ATA_BMSTAT_PORT) & ATA_BMSTAT_MASK;
     ATA_IDX_OUTB(ch, ATA_BMSTAT_PORT, ATA_BMSTAT_INTERRUPT | ATA_BMSTAT_ERROR);
     return error;
 }
@@ -472,15 +467,17 @@ ata_pci_dmainit(struct ata_channel *ch)
     }
 }
 
-static void
+static int
 ata_pci_locknoop(struct ata_channel *ch, int flags)
 {
+    return ch->unit;
 }
 
 static device_method_t ata_pci_methods[] = {
     /* device interface */
     DEVMETHOD(device_probe,		ata_pci_probe),
     DEVMETHOD(device_attach,		ata_pci_attach),
+    DEVMETHOD(device_detach,		ata_pci_detach),
     DEVMETHOD(device_shutdown,		bus_generic_shutdown),
     DEVMETHOD(device_suspend,		bus_generic_suspend),
     DEVMETHOD(device_resume,		bus_generic_resume),
@@ -507,12 +504,14 @@ static devclass_t ata_pci_devclass;
 DRIVER_MODULE(atapci, pci, ata_pci_driver, ata_pci_devclass, 0, 0);
 
 static int
-ata_pcisub_probe(device_t dev)
+ata_channel_probe(device_t dev)
 {
-    struct ata_pci_controller *ctlr = device_get_softc(device_get_parent(dev));
     struct ata_channel *ch = device_get_softc(dev);
     device_t *children;
-    int count, error, i;
+    int count, i;
+
+    /* take care of green memory */
+    bzero(ch, sizeof(struct ata_channel));
 
     /* find channel number on this controller */
     device_get_children(device_get_parent(dev), &children, &count);
@@ -522,29 +521,61 @@ ata_pcisub_probe(device_t dev)
     }
     free(children, M_TEMP);
 
-    if ((error = ctlr->allocate(dev, ch)))
-	return error;
+    return ata_probe(dev);
+}
+
+static int
+ata_channel_attach(device_t dev)
+{
+    struct ata_pci_controller *ctlr = device_get_softc(device_get_parent(dev));
+    struct ata_channel *ch = device_get_softc(dev);
+    int error;
 
     ch->device[MASTER].setmode = ctlr->setmode;
     ch->device[SLAVE].setmode = ctlr->setmode;
     ch->locking = ctlr->locking;
-    return ata_probe(dev);
+    ch->reset = ctlr->reset;
+
+    if (ctlr->r_res1)
+	ctlr->dmainit(ch);
+    if (ch->dma)
+	ch->dma->alloc(ch);
+
+    if ((error = ctlr->allocate(dev, ch)))
+	return error;
+
+    return ata_attach(dev);
 }
 
-static device_method_t ata_pcisub_methods[] = {
+static int
+ata_channel_detach(device_t dev)
+{
+    struct ata_channel *ch = device_get_softc(dev);
+    int error;
+
+    if ((error = ata_detach(dev)))
+	return error;
+
+    if (ch->dma)
+	ch->dma->free(ch);
+
+    return 0;
+}
+
+static device_method_t ata_channel_methods[] = {
     /* device interface */
-    DEVMETHOD(device_probe,	ata_pcisub_probe),
-    DEVMETHOD(device_attach,	ata_attach),
-    DEVMETHOD(device_detach,	ata_detach),
+    DEVMETHOD(device_probe,	ata_channel_probe),
+    DEVMETHOD(device_attach,	ata_channel_attach),
+    DEVMETHOD(device_detach,	ata_channel_detach),
     DEVMETHOD(device_suspend,	ata_suspend),
     DEVMETHOD(device_resume,	ata_resume),
     { 0, 0 }
 };
 
-static driver_t ata_pcisub_driver = {
+static driver_t ata_channel_driver = {
     "ata",
-    ata_pcisub_methods,
+    ata_channel_methods,
     sizeof(struct ata_channel),
 };
 
-DRIVER_MODULE(ata, atapci, ata_pcisub_driver, ata_devclass, 0, 0);
+DRIVER_MODULE(ata, atapci, ata_channel_driver, ata_devclass, 0, 0);

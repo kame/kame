@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/fs/pseudofs/pseudofs.c,v 1.18 2003/02/19 05:47:19 imp Exp $
+ *	$FreeBSD: src/sys/fs/pseudofs/pseudofs.c,v 1.22 2004/07/30 22:08:50 phk Exp $
  */
 
 #include <sys/param.h>
@@ -118,7 +118,7 @@ _pfs_fixup_dir(struct pfs_node *parent)
  * Create a directory
  */
 struct pfs_node	*
-pfs_create_dir(struct pfs_node *parent, char *name,
+pfs_create_dir(struct pfs_node *parent, const char *name,
 	       pfs_attr_t attr, pfs_vis_t vis, int flags)
 {
 	struct pfs_node *dir;
@@ -151,7 +151,7 @@ pfs_create_dir(struct pfs_node *parent, char *name,
  * Create a file
  */
 struct pfs_node	*
-pfs_create_file(struct pfs_node *parent, char *name, pfs_fill_t fill,
+pfs_create_file(struct pfs_node *parent, const char *name, pfs_fill_t fill,
 		pfs_attr_t attr, pfs_vis_t vis, int flags)
 {
 	struct pfs_node *node;
@@ -180,7 +180,7 @@ pfs_create_file(struct pfs_node *parent, char *name, pfs_fill_t fill,
  * Create a symlink
  */
 struct pfs_node	*
-pfs_create_link(struct pfs_node *parent, char *name, pfs_fill_t fill,
+pfs_create_link(struct pfs_node *parent, const char *name, pfs_fill_t fill,
 		pfs_attr_t attr, pfs_vis_t vis, int flags)
 {
 	struct pfs_node *node;
@@ -190,6 +190,20 @@ pfs_create_link(struct pfs_node *parent, char *name, pfs_fill_t fill,
 		return (NULL);
 	node->pn_type = pfstype_symlink;
 	return (node);
+}
+
+/*
+ * Locate a node by name
+ */
+struct pfs_node *
+pfs_find_node(struct pfs_node *parent, const char *name)
+{
+	struct pfs_node *node;
+
+	for (node = parent->pn_nodes; node != NULL; node = node->pn_next)
+		if (strcmp(node->pn_name, name) == 0)
+			return (node);
+	return (NULL);
 }
 
 /*
@@ -243,8 +257,7 @@ pfs_destroy(struct pfs_node *node)
  * Mount a pseudofs instance
  */
 int
-pfs_mount(struct pfs_info *pi, struct mount *mp, struct nameidata *ndp,
-	  struct thread *td)
+pfs_mount(struct pfs_info *pi, struct mount *mp, struct thread *td)
 {
 	struct statfs *sbp;
 
@@ -281,7 +294,7 @@ pfs_unmount(struct mount *mp, int mntflags, struct thread *td)
 
 	/* XXX do stuff with pi... */
 
-	error = vflush(mp, 0, (mntflags & MNT_FORCE) ?  FORCECLOSE : 0);
+	error = vflush(mp, 0, (mntflags & MNT_FORCE) ?  FORCECLOSE : 0, td);
 	return (error);
 }
 
@@ -289,7 +302,7 @@ pfs_unmount(struct mount *mp, int mntflags, struct thread *td)
  * Return a root vnode
  */
 int
-pfs_root(struct mount *mp, struct vnode **vpp)
+pfs_root(struct mount *mp, struct vnode **vpp, struct thread *td)
 {
 	struct pfs_info *pi;
 
@@ -380,7 +393,7 @@ pfs_modevent(module_t mod, int evt, void *arg)
 		pfs_fileno_unload();
 		break;
 	default:
-		printf("pseudofs: unexpected event type %d\n", evt);
+		return EOPNOTSUPP;
 		break;
 	}
 	return 0;

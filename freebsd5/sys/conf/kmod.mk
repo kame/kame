@@ -1,5 +1,5 @@
 #	From: @(#)bsd.prog.mk	5.26 (Berkeley) 6/25/91
-# $FreeBSD: src/sys/conf/kmod.mk,v 1.150 2003/11/19 05:08:26 imp Exp $
+# $FreeBSD: src/sys/conf/kmod.mk,v 1.166 2004/08/14 23:53:04 marius Exp $
 #
 # The include file <bsd.kmod.mk> handles installing Kernel Loadable Device
 # drivers (KLD's).
@@ -70,7 +70,10 @@ OBJCOPY?=	objcopy
 
 .SUFFIXES: .out .o .c .cc .cxx .C .y .l .s .S
 
-CFLAGS+=	${COPTS} -D_KERNEL ${CWARNFLAGS}
+.if ${CC} == "icc"
+CFLAGS:=	${CFLAGS:C/(-x[^M^K^W]+)[MKW]+|-x[MKW]+/\1/}
+.endif
+CFLAGS+=	-D_KERNEL
 CFLAGS+=	-DKLD_MODULE
 
 # Don't use any standard or source-relative include directories.
@@ -78,7 +81,12 @@ CFLAGS+=	-DKLD_MODULE
 # such paths after -nostdinc.  It doesn't seem to be possible to
 # add to the front of `make' variable.
 _ICFLAGS:=	${CFLAGS:M-I*}
-CFLAGS+=	-nostdinc -I- ${INCLMAGIC} ${_ICFLAGS}
+.if ${CC} == "icc"
+NOSTDINC=	-X
+.else
+NOSTDINC=	-nostdinc
+.endif
+CFLAGS+=	${NOSTDINC} -I- ${INCLMAGIC} ${_ICFLAGS}
 .if defined(KERNBUILDDIR)
 CFLAGS+=       -include ${KERNBUILDDIR}/opt_global.h
 .endif
@@ -87,6 +95,10 @@ CFLAGS+=       -include ${KERNBUILDDIR}/opt_global.h
 # need any -I paths for this.  Similar defaults for .PATH can't be
 # set because there are no standard paths for non-headers.
 CFLAGS+=	-I. -I@
+
+# Add -I path for altq headers as they are included via net/if_var.h
+# for example.
+CFLAGS+=	-I@/contrib/altq
 
 # Add a -I path to standard headers like <stddef.h>.  Use a relative
 # path to src/include if possible.  If the @ symlink hasn't been built
@@ -102,11 +114,15 @@ CFLAGS+=	-I${DESTDIR}/usr/include
 CFLAGS+=	-I@/../include -I${DESTDIR}/usr/include
 .endif # @
 
+.if ${CC} != "icc"
 CFLAGS+=	-finline-limit=${INLINE_LIMIT}
+.endif
 
 # Disallow common variables, and if we end up with commons from
 # somewhere unexpected, allocate storage for them in the module itself.
+.if ${CC} != "icc"
 CFLAGS+=	-fno-common
+.endif
 LDFLAGS+=	-d -warn-common
 
 CFLAGS+=	${DEBUG_FLAGS}
@@ -117,7 +133,7 @@ OBJS+=  ${SRCS:N*.h:R:S/$/.o/g}
 PROG=	${KMOD}.ko
 .endif
 
-.if !defined(DEBUG)
+.if !defined(DEBUG_FLAGS)
 FULLPROG=	${PROG}
 .else
 FULLPROG=	${PROG}.debug
@@ -125,15 +141,24 @@ ${PROG}: ${FULLPROG}
 	${OBJCOPY} --strip-debug ${FULLPROG} ${PROG}
 .endif
 
+.if ${MACHINE_ARCH} != amd64
 ${FULLPROG}: ${KMOD}.kld
 	${LD} -Bshareable ${LDFLAGS} -o ${.TARGET} ${KMOD}.kld
+.if !defined(DEBUG_FLAGS)
+	${OBJCOPY} --strip-debug ${.TARGET}
+.endif
+.endif
 
 EXPORT_SYMS?=	NO
 .if ${EXPORT_SYMS} != YES
 CLEANFILES+=	${.OBJDIR}/export_syms
 .endif
 
+.if ${MACHINE_ARCH} != amd64
 ${KMOD}.kld: ${OBJS}
+.else
+${FULLPROG}: ${OBJS}
+.endif
 	${LD} ${LDFLAGS} -r -d -o ${.TARGET} ${OBJS}
 .if defined(EXPORT_SYMS)
 .if ${EXPORT_SYMS} != YES
@@ -148,6 +173,9 @@ ${KMOD}.kld: ${OBJS}
 		${.OBJDIR}/export_syms | \
 	xargs -J% ${OBJCOPY} % ${.TARGET}
 .endif
+.endif
+.if !defined(DEBUG_FLAGS) && ${MACHINE_ARCH} == amd64
+	${OBJCOPY} --strip-debug ${.TARGET}
 .endif
 
 _ILINKS=@ machine
@@ -167,11 +195,11 @@ ${OBJS}: ${_link}
 
 # Search for kernel source tree in standard places.
 .for _dir in ${.CURDIR}/../.. ${.CURDIR}/../../.. /sys /usr/src/sys
-.if !defined(SYSDIR) && exists(${_dir}/kern)
+.if !defined(SYSDIR) && exists(${_dir}/kern/)
 SYSDIR=	${_dir}
 .endif
 .endfor
-.if !defined(SYSDIR) || !exists(${SYSDIR}/kern)
+.if !defined(SYSDIR) || !exists(${SYSDIR}/kern/)
 .error "can't find kernel source tree"
 .endif
 
@@ -188,7 +216,7 @@ ${_ILINKS}:
 
 CLEANFILES+= ${PROG} ${KMOD}.kld ${OBJS} ${_ILINKS} symb.tmp tmp.o
 
-.if defined(DEBUG)
+.if defined(DEBUG_FLAGS)
 CLEANFILES+= ${FULLPROG}
 .endif
 
@@ -199,7 +227,7 @@ _INSTALLFLAGS:=	${INSTALLFLAGS}
 _INSTALLFLAGS:=	${_INSTALLFLAGS${ie}}
 .endfor
 
-.if defined(DEBUG)
+.if defined(DEBUG_FLAGS)
 install.debug:
 	cd ${.CURDIR}; ${MAKE} -DINSTALL_DEBUG install
 .endif
@@ -207,12 +235,11 @@ install.debug:
 .if !target(realinstall)
 realinstall: _kmodinstall
 .ORDER: beforeinstall _kmodinstall
-.if defined(DEBUG) && defined(INSTALL_DEBUG)
 _kmodinstall:
+.if defined(DEBUG_FLAGS) && defined(INSTALL_DEBUG)
 	${INSTALL} -o ${KMODOWN} -g ${KMODGRP} -m ${KMODMODE} \
 	    ${_INSTALLFLAGS} ${FULLPROG} ${DESTDIR}${KMODDIR}
 .else
-_kmodinstall:
 	${INSTALL} -o ${KMODOWN} -g ${KMODGRP} -m ${KMODMODE} \
 	    ${_INSTALLFLAGS} ${PROG} ${DESTDIR}${KMODDIR}
 
@@ -266,12 +293,14 @@ ${_src}:
 MFILES?= kern/bus_if.m kern/device_if.m dev/iicbus/iicbb_if.m \
     dev/iicbus/iicbus_if.m isa/isa_if.m \
     libkern/iconv_converter_if.m \
-    dev/mii/miibus_if.m \
+    dev/acpica/acpi_if.m dev/eisa/eisa_if.m dev/mii/miibus_if.m \
+    dev/ofw/ofw_bus_if.m \
     dev/pccard/card_if.m dev/pccard/power_if.m dev/pci/pci_if.m \
     dev/pci/pcib_if.m dev/ppbus/ppbus_if.m dev/smbus/smbus_if.m \
     dev/usb/usb_if.m dev/sound/pcm/ac97_if.m dev/sound/pcm/channel_if.m \
     dev/sound/pcm/feeder_if.m dev/sound/pcm/mixer_if.m pci/agp_if.m \
-    opencrypto/crypto_if.m pc98/pc98/canbus_if.m dev/uart/uart_if.m
+    opencrypto/crypto_if.m pc98/pc98/canbus_if.m dev/uart/uart_if.m \
+    sparc64/pci/ofw_pci_if.m
 
 .for _srcsrc in ${MFILES}
 .for _ext in c h
@@ -303,15 +332,28 @@ vnode_if.${_ext}: @/tools/vnode_if.awk @/kern/vnode_if.src
 .endif
 .endfor
 
-.if ${SRCS:Mmiidevs.h} != ""
-CLEANFILES+=	miidevs.h
+.for _i in mii pccard usb
+.if ${SRCS:M${_i}devs.h} != ""
+CLEANFILES+=	${_i}devs.h
 .if !exists(@)
-miidevs.h: @
+${_i}devs.h: @
 .endif
 .if exists(@)
-miidevs.h: @/tools/devlist2h.awk @/dev/mii/miidevs
+${_i}devs.h: @/tools/${_i}devs2h.awk @/dev/${_i}/${_i}devs
 .endif
-	${AWK} -f @/tools/devlist2h.awk @/dev/mii/miidevs
+	${AWK} -f @/tools/${_i}devs2h.awk @/dev/${_i}/${_i}devs
+.endif
+.endfor # _i
+
+.if ${SRCS:Macpi_quirks.h} != ""
+CLEANFILES+=	acpi_quirks.h
+.if !exists(@)
+acpi_quirks.h: @
+.endif
+.if exists(@)
+acpi_quirks.h: @/tools/acpi_quirks2h.awk @/dev/acpica/acpi_quirks
+.endif
+	${AWK} -f @/tools/acpi_quirks2h.awk @/dev/acpica/acpi_quirks
 .endif
 
 regress:

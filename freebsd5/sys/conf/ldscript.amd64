@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/conf/ldscript.amd64,v 1.8 2003/05/01 02:59:24 peter Exp $ */
+/* $FreeBSD: src/sys/conf/ldscript.amd64,v 1.9 2004/05/29 01:09:00 tjr Exp $ */
 OUTPUT_FORMAT("elf64-x86-64", "elf64-x86-64", "elf64-x86-64")
 OUTPUT_ARCH(i386:x86-64)
 ENTRY(btext)
@@ -87,6 +87,8 @@ SECTIONS
   .eh_frame       : { KEEP (*(.eh_frame)) }
   .gcc_except_table   : { *(.gcc_except_table) }
   .dynamic        : { *(.dynamic) }
+  _start_ctors = .;
+  PROVIDE (start_ctors = .);
   .ctors          :
   {
     /* gcc uses crtbegin.o to find the start of
@@ -107,6 +109,8 @@ SECTIONS
     KEEP (*(SORT(.ctors.*)))
     KEEP (*(.ctors))
   }
+  _stop_ctors = .;
+  PROVIDE (stop_ctors = .);
   .dtors          :
   {
     KEEP (*crtbegin.o(.dtors))

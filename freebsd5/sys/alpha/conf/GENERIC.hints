@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/alpha/conf/GENERIC.hints,v 1.7 2003/12/05 00:57:11 des Exp $
+# $FreeBSD: src/sys/alpha/conf/GENERIC.hints,v 1.8 2004/07/11 03:07:28 marcel Exp $
 hint.fdc.0.at="isa"
 hint.fdc.0.port="0x3F0"
 hint.fdc.0.irq="6"
@@ -25,8 +25,10 @@ hint.mcclock.0.port="0x70"
 hint.sio.0.at="isa"
 hint.sio.0.port="0x3F8"
 hint.sio.0.irq="4"
+hint.sio.0.flags="0x10"
 hint.sio.1.at="isa"
 hint.sio.1.port="0x2F8"
 hint.sio.1.irq="3"
+hint.sio.1.flags="0x80"
 hint.ppc.0.at="isa"
 hint.ppc.0.irq="7"

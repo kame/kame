@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *   $FreeBSD: src/sys/dev/tdfx/tdfx_vars.h,v 1.7 2002/09/28 20:56:32 phk Exp $
+ *   $FreeBSD: src/sys/dev/tdfx/tdfx_vars.h,v 1.9 2004/06/16 09:46:59 phk Exp $
  */
 
 /* tdfx_vars.h -- constants and structs used in the tdfx driver
@@ -42,7 +42,6 @@
 #include <sys/bus.h>
 #include <sys/cdefs.h>
 
-#define	CDEV_MAJOR	107
 #define  PCI_DEVICE_ALLIANCE_AT3D	0x643d1142
 #define	PCI_DEVICE_3DFX_VOODOO1		0x0001121a
 #define	PCI_DEVICE_3DFX_VOODOO2		0x0002121a
@@ -93,7 +92,7 @@ struct tdfx_softc {
 	unsigned char dv;
 	struct file *curFile;
 	device_t dev;
-	dev_t devt;
+	struct cdev *devt;
 	struct mem_range_desc mrdesc;
 	int busy;
 };

@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,7 +30,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)npx.h	5.3 (Berkeley) 1/18/91
- * $FreeBSD: src/sys/amd64/include/fpu.h,v 1.31 2003/11/08 04:37:54 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/fpu.h,v 1.33 2004/04/05 21:25:51 imp Exp $
  */
 
 /*
@@ -106,7 +102,6 @@ void	fpuexit(struct thread *td);
 int	fpuformat(void);
 int	fpugetregs(struct thread *td, struct savefpu *addr);
 void	fpuinit(void);
-void	fpusave(struct savefpu *addr);
 void	fpusetregs(struct thread *td, struct savefpu *addr);
 int	fputrap(void);
 #endif

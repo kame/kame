@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ep/if_ep_pccard.c,v 1.36 2003/11/02 20:13:39 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ep/if_ep_pccard.c,v 1.38 2004/05/27 03:49:41 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -56,9 +56,9 @@ __FBSDID("$FreeBSD: src/sys/dev/ep/if_ep_pccard.c,v 1.36 2003/11/02 20:13:39 imp
 #include <dev/ep/if_epvar.h>
 
 #include <dev/pccard/pccardvar.h>
-#include <dev/pccard/pccarddevs.h>
 
 #include "card_if.h"
+#include "pccarddevs.h"
 
 static const char *ep_pccard_identify(u_short id);
 

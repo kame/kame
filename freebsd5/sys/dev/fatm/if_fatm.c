@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/fatm/if_fatm.c,v 1.12 2003/10/31 18:32:00 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/fatm/if_fatm.c,v 1.14 2004/03/17 17:50:32 njl Exp $");
 
 #include "opt_inet.h"
 #include "opt_natm.h"
@@ -2282,7 +2282,7 @@ fatm_open_vcc(struct fatm_softc *sc, struct atmio_openvcc *op)
 	sc->open_vccs++;
 
 	error = fatm_load_vc(sc, vc);
-	if (error != NULL) {
+	if (error != 0) {
 		sc->vccs[op->param.vci] = NULL;
 		sc->open_vccs--;
 		goto done;
@@ -2831,8 +2831,8 @@ fatm_attach(device_t dev)
 		goto fail;
 	}
 	sc->memid = 0x10;
-	sc->memres = bus_alloc_resource(dev, SYS_RES_MEMORY, &sc->memid,
-	    0, ~0, 1, RF_ACTIVE);
+	sc->memres = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &sc->memid,
+	    RF_ACTIVE);
 	if (sc->memres == NULL) {
 		if_printf(ifp, "could not map memory\n");
 		error = ENXIO;
@@ -2852,8 +2852,8 @@ fatm_attach(device_t dev)
 	 * Allocate interrupt (activate at the end)
 	 */
 	sc->irqid = 0;
-	sc->irqres = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irqid,
-	    0, ~0, 1, RF_SHAREABLE | RF_ACTIVE);
+	sc->irqres = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irqid,
+	    RF_SHAREABLE | RF_ACTIVE);
 	if (sc->irqres == NULL) {
 		if_printf(ifp, "could not allocate irq\n");
 		error = ENXIO;

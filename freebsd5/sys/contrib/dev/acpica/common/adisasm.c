@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: adisasm - Application-level disassembler routines
- *              $Revision: 58 $
+ *              $Revision: 67 $
  *
  *****************************************************************************/
 
@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2003, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2004, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -145,7 +145,6 @@ AcpiDsIsResultUsed (
     return TRUE;
 }
 #endif
-
 
 ACPI_STATUS
 AcpiDsRestartControlMethod (
@@ -521,12 +520,16 @@ AdAmlDisassemble (
         if (!OutFilename)
         {
             fprintf (stderr, "Could not generate output filename\n");
+            Status = AE_ERROR;
+            goto Cleanup;
         }
 
         File = fopen (DisasmFilename, "w+");
         if (!File)
         {
             fprintf (stderr, "Could not open output file\n");
+            Status = AE_ERROR;
+            goto Cleanup;
         }
 
         AcpiOsRedirectOutput (File);
@@ -544,6 +547,18 @@ AdAmlDisassemble (
         goto Cleanup;
     }
 
+    /*
+     * TBD: We want to cross reference the namespace here, in order to
+     * generate External() statements.  The problem is that the parse
+     * tree is in run-time (interpreter) format, not compiler format,
+     * so we cannot directly use the function below:
+     *
+     *    Status = LkCrossReferenceNamespace ();
+     *
+     * We need to either convert the parse tree or create a new
+     * cross ref function that can handle interpreter parse trees
+     */
+
     /* Optional displays */
 
     if (AcpiGbl_DbOpt_disasm)
@@ -560,7 +575,7 @@ Cleanup:
     }
 
     AcpiPsDeleteParseTree (AcpiGbl_ParsedNamespaceRoot);
-    return AE_OK;
+    return Status;
 }
 
 
@@ -593,7 +608,7 @@ AdCreateTableHeader (
     AcpiOsPrintf (" *\n * Disassembly of %s, %s */\n", Filename, ctime (&Timer));
 
     AcpiOsPrintf (
-        "DefinitionBlock (\"%4.4s.aml\", \"%4.4s\", %hd, \"%.6s\", \"%.8s\", %d)\n",
+        "DefinitionBlock (\"%4.4s.aml\", \"%4.4s\", %hd, \"%.6s\", \"%.8s\", %u)\n",
         Table->Signature, Table->Signature, Table->Revision,
         Table->OemId, Table->OemTableId, Table->OemRevision);
 }
@@ -694,7 +709,7 @@ AdDeferredParse (
     }
 
     Status = AcpiDsInitAmlWalk (WalkState, Op, NULL, Aml,
-                    AmlLength, NULL, NULL, 1);
+                    AmlLength, NULL, 1);
     if (ACPI_FAILURE (Status))
     {
         return_ACPI_STATUS (Status);
@@ -869,12 +884,17 @@ AdGetLocalTables (
 
     if (GetAllTables)
     {
-        ACPI_STRNCPY (TableHeader.Signature, "RSDT", 4);
+        ACPI_STRNCPY (TableHeader.Signature, RSDT_SIG, 4);
         AcpiOsTableOverride (&TableHeader, &NewTable);
+        if (!NewTable)
+        {
+            fprintf (stderr, "Could not obtain RSDT\n");
+            return AE_NO_ACPI_TABLES;
+        }
 
 #if ACPI_MACHINE_WIDTH != 64
 
-        if (!ACPI_STRNCMP (NewTable->Signature, "RSDT", 4))
+        if (!ACPI_STRNCMP (NewTable->Signature, RSDT_SIG, 4))
         {
             PointerSize = sizeof (UINT32);
         }
@@ -896,25 +916,25 @@ AdGetLocalTables (
 
         /* Get the FADT */
 
-        ACPI_STRNCPY (TableHeader.Signature, "FADT", 4);
+        ACPI_STRNCPY (TableHeader.Signature, FADT_SIG, 4);
         AcpiOsTableOverride (&TableHeader, &NewTable);
         if (NewTable)
         {
             AcpiGbl_FADT = (void *) NewTable;
             AdWriteTable (NewTable, NewTable->Length,
-                "FADT", NewTable->OemTableId);
+                FADT_SIG, NewTable->OemTableId);
         }
         AcpiOsPrintf ("\n");
 
         /* Get the FACS */
 
-        ACPI_STRNCPY (TableHeader.Signature, "FACS", 4);
+        ACPI_STRNCPY (TableHeader.Signature, FACS_SIG, 4);
         AcpiOsTableOverride (&TableHeader, &NewTable);
         if (NewTable)
         {
             AcpiGbl_FACS = (void *) NewTable;
             AdWriteTable (NewTable, AcpiGbl_FACS->Length,
-                "FACS", AcpiGbl_FADT->Header.OemTableId);
+                FACS_SIG, AcpiGbl_FADT->OemTableId);
         }
         AcpiOsPrintf ("\n");
     }
@@ -933,7 +953,7 @@ AdGetLocalTables (
     else
     {
         fprintf (stderr, "Could not obtain DSDT\n");
-        Status = AE_NO_ACPI_TABLES;
+        return AE_NO_ACPI_TABLES;
     }
 
     AcpiOsPrintf ("\n");
@@ -949,10 +969,6 @@ AdGetLocalTables (
             Status = AcpiOsTableOverride (&TableHeader, &NewTable);
         }
     }
-
-#ifdef _HPET
-    AfGetHpet ();
-#endif
 
     return AE_OK;
 }
@@ -1010,7 +1026,7 @@ AdParseTable (
     }
 
     Status = AcpiDsInitAmlWalk (WalkState, AcpiGbl_ParsedNamespaceRoot,
-                NULL, AmlStart, AmlLength, NULL, NULL, 1);
+                NULL, AmlStart, AmlLength, NULL, 1);
     if (ACPI_FAILURE (Status))
     {
         return (Status);

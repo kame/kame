@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/aac/aac_ioctl.h,v 1.8 2001/12/02 03:47:32 scottl Exp $
+ *	$FreeBSD: src/sys/dev/aac/aac_ioctl.h,v 1.10 2004/02/07 17:40:38 scottl Exp $
  */
 
 /*
@@ -35,8 +35,7 @@
 #define AACQ_BIO	1
 #define AACQ_READY	2
 #define AACQ_BUSY	3
-#define AACQ_COMPLETE	4
-#define AACQ_COUNT	5	/* total number of queues */
+#define AACQ_COUNT	4	/* total number of queues */
 
 struct aac_qstat {
 	u_int32_t	q_length;
@@ -142,7 +141,7 @@ union aac_statrequest {
 
 #define FSACTL_PROBE_CONTAINERS		_IO('9', 83)	/* Just guessing */
 
-
+#ifdef _KERNEL
 /*
  * Support for faking the "miniport" version.
  */
@@ -177,3 +176,4 @@ struct aac_query_disk {
 	char		diskDeviceName[10];
 	u_int32_t	UnMapped;
 };
+#endif

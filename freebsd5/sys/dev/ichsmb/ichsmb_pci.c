@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ichsmb/ichsmb_pci.c,v 1.10 2003/08/31 19:23:00 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ichsmb/ichsmb_pci.c,v 1.13 2004/06/24 18:21:28 ambrisko Exp $");
 
 /*
  * Support for the SMBus controller logical device which is part of the
@@ -47,6 +47,7 @@ __FBSDID("$FreeBSD: src/sys/dev/ichsmb/ichsmb_pci.c,v 1.10 2003/08/31 19:23:00 n
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/errno.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
@@ -72,6 +73,7 @@ __FBSDID("$FreeBSD: src/sys/dev/ichsmb/ichsmb_pci.c,v 1.10 2003/08/31 19:23:00 n
 #define ID_82801CA			0x24838086
 #define ID_82801DC			0x24C38086
 #define ID_82801EB			0x24D38086
+#define ID_6300ESB			0x25a48086
 
 #define PCIS_SERIALBUS_SMBUS_PROGIF	0x00
 
@@ -136,6 +138,9 @@ ichsmb_pci_probe(device_t dev)
 	case ID_82801EB:
 		device_set_desc(dev, "Intel 82801EB (ICH5) SMBus controller");
 		break;
+	case ID_6300ESB:
+		device_set_desc(dev, "Intel 6300ESB (ICH) SMBus controller");
+		break;
 	default:
 		if (pci_get_class(dev) == PCIC_SERIALBUS
 		    && pci_get_subclass(dev) == PCIS_SERIALBUS_SMBUS
@@ -166,6 +171,9 @@ ichsmb_pci_attach(device_t dev)
 	sc->io_rid = ICH_SMB_BASE;
 	sc->io_res = bus_alloc_resource(dev, SYS_RES_IOPORT,
 	    &sc->io_rid, 0, ~0, 16, RF_ACTIVE);
+	if (sc->io_res == NULL)
+		sc->io_res = bus_alloc_resource(dev, SYS_RES_IOPORT,
+		    &sc->io_rid, 0, ~0, 32, RF_ACTIVE);
 	if (sc->io_res == NULL) {
 		log(LOG_ERR, "%s: can't map I/O\n", device_get_nameunit(dev));
 		error = ENXIO;
@@ -176,8 +184,8 @@ ichsmb_pci_attach(device_t dev)
 
 	/* Allocate interrupt */
 	sc->irq_rid = 0;
-	sc->irq_res = bus_alloc_resource(dev, SYS_RES_IRQ,
-	    &sc->irq_rid, 0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+	sc->irq_res = bus_alloc_resource_any(dev, SYS_RES_IRQ,
+	    &sc->irq_rid, RF_ACTIVE | RF_SHAREABLE);
 	if (sc->irq_res == NULL) {
 		log(LOG_ERR, "%s: can't get IRQ\n", device_get_nameunit(dev));
 		error = ENXIO;

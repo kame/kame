@@ -18,7 +18,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ed/if_ed_pci.c,v 1.34 2003/10/31 18:31:58 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ed/if_ed_pci.c,v 1.36 2004/06/18 01:28:54 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -58,11 +58,11 @@ static struct _pcsid
 	{ 0x00000000,	NULL					}
 };
 
-static int	ed_pci_probe	(device_t);
-static int	ed_pci_attach	(device_t);
+static int	ed_pci_probe(device_t);
+static int	ed_pci_attach(device_t);
 
 static int
-ed_pci_probe (device_t dev)
+ed_pci_probe(device_t dev)
 {
 	u_int32_t	type = pci_get_devid(dev);
 	struct _pcsid	*ep =pci_ids;
@@ -71,10 +71,9 @@ ed_pci_probe (device_t dev)
 		++ep;
 	if (ep->desc) {
 		device_set_desc(dev, ep->desc);
-		return 0;
-	} else {
-		return ENXIO;
+		return (0);
 	}
+	return (ENXIO);
 }
 
 static int

@@ -1,20 +1,21 @@
-# $FreeBSD: src/sys/boot/pc98/boot0/Makefile,v 1.1 2000/08/02 08:46:08 kato Exp $
+# $FreeBSD: src/sys/boot/pc98/boot0/Makefile,v 1.3 2004/02/09 16:01:45 nyan Exp $
 
-PROG=		boot0
-OBJS=		boot0.o
+PROG=	${BOOT}.out
+INTERNALPROG=
+FILES=	${BOOT}
 NOMAN=
-STRIP=
-BINDIR?=	/boot
-BINMODE=	444
+SRCS=	${BOOT}.s
+CLEANFILES= ${BOOT}
 
-ORG=		0x0000
+BOOT=	boot0
 
-boot0: boot0.out
-	objcopy -S -O binary boot0.out ${.TARGET}
+# The base address that we the boot0 code to to run it.  Don't change this
+# unless you are glutton for punishment.
+BOOT_BOOT0_ORG?=	0x0000
 
-boot0.out: ${OBJS}
-	${LD} -N -e start -Ttext ${ORG} -o ${.TARGET} ${OBJS}
+LDFLAGS=-N -e start -Ttext ${BOOT_BOOT0_ORG}
 
-CLEANFILES+= boot0.out
+${BOOT}: ${BOOT}.out
+	objcopy -S -O binary ${BOOT}.out ${.TARGET}
 
 .include <bsd.prog.mk>

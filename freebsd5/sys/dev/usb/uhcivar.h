@@ -1,5 +1,5 @@
 /*	$NetBSD: uhcivar.h,v 1.33 2002/02/11 11:41:30 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/uhcivar.h,v 1.36 2003/07/15 23:19:49 jmg Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uhcivar.h,v 1.37 2004/08/02 15:37:35 iedowse Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -131,8 +131,11 @@ struct uhci_vframe {
 	u_int bandwidth;		/* max bandwidth used by this frame */
 };
 
+#define UHCI_SCFLG_DONEINIT	0x0001	/* uhci_init() done */
+
 typedef struct uhci_softc {
 	struct usbd_bus sc_bus;		/* base device */
+	int sc_flags;
 	bus_space_tag_t iot;
 	bus_space_handle_t ioh;
 	bus_size_t sc_size;
@@ -195,8 +198,8 @@ typedef struct uhci_softc {
 
 usbd_status	uhci_init(uhci_softc_t *);
 int		uhci_intr(void *);
-#if defined(__NetBSD__) || defined(__OpenBSD__)
 int		uhci_detach(uhci_softc_t *, int);
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 int		uhci_activate(device_ptr_t, enum devact);
 #endif
 

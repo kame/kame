@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_ses.c,v 1.26 2003/06/10 18:14:05 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/cam/scsi/scsi_ses.c,v 1.29 2004/06/16 09:46:31 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/queue.h>
@@ -145,7 +145,7 @@ struct ses_softc {
 	ses_encstat	ses_encstat;	/* overall status */
 	u_int8_t	ses_flags;
 	union ccb	ses_saved_ccb;
-	dev_t		ses_dev;
+	struct cdev *ses_dev;
 	struct cam_periph *periph;
 };
 #define	SES_FLAG_INVALID	0x01
@@ -153,7 +153,6 @@ struct ses_softc {
 #define	SES_FLAG_INITIALIZED	0x04
 
 #define SESUNIT(x)       (minor((x)))
-#define SES_CDEV_MAJOR	110
 
 static	d_open_t	sesopen;
 static	d_close_t	sesclose;
@@ -175,13 +174,13 @@ static struct periph_driver sesdriver = {
 
 PERIPHDRIVER_DECLARE(ses, sesdriver);
 
-static struct cdevsw ses_cdevsw = 
-{
+static struct cdevsw ses_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	sesopen,
 	.d_close =	sesclose,
 	.d_ioctl =	sesioctl,
 	.d_name =	"ses",
-	.d_maj =	SES_CDEV_MAJOR,
+	.d_flags =	D_NEEDGIANT,
 };
 
 static void
@@ -406,7 +405,7 @@ sesregister(struct cam_periph *periph, void *arg)
 }
 
 static int
-sesopen(dev_t dev, int flags, int fmt, struct thread *td)
+sesopen(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	struct cam_periph *periph;
 	struct ses_softc *softc;
@@ -462,7 +461,7 @@ out:
 }
 
 static int
-sesclose(dev_t dev, int flag, int fmt, struct thread *td)
+sesclose(struct cdev *dev, int flag, int fmt, struct thread *td)
 {
 	struct cam_periph *periph;
 	struct ses_softc *softc;
@@ -518,7 +517,7 @@ seserror(union ccb *ccb, u_int32_t cflags, u_int32_t sflags)
 }
 
 static int
-sesioctl(dev_t dev, u_long cmd, caddr_t arg_addr, int flag, struct thread *td)
+sesioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag, struct thread *td)
 {
 	struct cam_periph *periph;
 	ses_encstat tmp;

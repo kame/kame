@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/isa/clock.c,v 1.207 2003/11/21 02:53:49 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/isa/clock.c,v 1.214 2004/08/16 22:52:02 peter Exp $");
 
 /*
  * Routines to handle clock hardware.
@@ -57,12 +53,14 @@ __FBSDID("$FreeBSD: src/sys/amd64/isa/clock.c,v 1.207 2003/11/21 02:53:49 peter 
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/lock.h>
+#include <sys/kdb.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/time.h>
 #include <sys/timetc.h>
 #include <sys/kernel.h>
 #include <sys/limits.h>
+#include <sys/module.h>
 #include <sys/sysctl.h>
 #include <sys/cons.h>
 #include <sys/power.h>
@@ -77,7 +75,6 @@ __FBSDID("$FreeBSD: src/sys/amd64/isa/clock.c,v 1.207 2003/11/21 02:53:49 peter 
 #endif
 #include <machine/specialreg.h>
 
-#include <amd64/isa/icu.h>
 #include <amd64/isa/isa.h>
 #include <isa/rtc.h>
 #ifdef DEV_ISA
@@ -111,10 +108,11 @@ struct mtx clock_lock;
 static	int	beeping = 0;
 static	const u_char daysinmonth[] = {31,28,31,30,31,30,31,31,30,31,30,31};
 static	u_int	hardclock_max_count;
+static	struct intsrc *i8254_intsrc;
 static	u_int32_t i8254_lastcount;
 static	u_int32_t i8254_offset;
+static	int	(*i8254_pending)(struct intsrc *);
 static	int	i8254_ticked;
-static	struct intsrc *i8254_intsrc;
 static	u_char	rtc_statusa = RTCSA_DIVIDER | RTCSA_NOPROF;
 static	u_char	rtc_statusb = RTCSB_24HR | RTCSB_PINTR;
 
@@ -214,6 +212,7 @@ release_timer2()
 static void
 rtcintr(struct clockframe *frame)
 {
+
 	while (rtcin(RTC_INTR) & RTCIR_PERIOD) {
 		if (profprocs != 0) {
 			if (--pscnt == 0)
@@ -297,13 +296,13 @@ DELAY(int n)
 	 * multiplications and divisions to scale the count take a while).
 	 *
 	 * However, if ddb is active then use a fake counter since reading
-	 * the i8254 counter involves acquiring a lock.  ddb must not go
+	 * the i8254 counter involves acquiring a lock.  ddb must not do
 	 * locking for many reasons, but it calls here for at least atkbd
 	 * input.
 	 */
-#ifdef DDB
-	if (db_active)
-		prev_tick = 0;
+#ifdef KDB
+	if (kdb_active)
+		prev_tick = 1;
 	else
 #endif
 		prev_tick = getit();
@@ -333,10 +332,12 @@ DELAY(int n)
 			     / 1000000;
 
 	while (ticks_left > 0) {
-#ifdef DDB
-		if (db_active) {
+#ifdef KDB
+		if (kdb_active) {
 			inb(0x84);
-			tick = prev_tick + 1;
+			tick = prev_tick - 1;
+			if (tick <= 0)
+				tick = timer0_max_count;
 		} else
 #endif
 			tick = getit();
@@ -745,6 +746,9 @@ cpu_initclocks()
 	/* Finish initializing 8254 timer 0. */
 	intr_add_handler("clk", 0, (driver_intr_t *)clkintr, NULL,
 	    INTR_TYPE_CLK | INTR_FAST, NULL);
+	i8254_intsrc = intr_lookup_source(0);
+	if (i8254_intsrc != NULL)
+		i8254_pending = i8254_intsrc->is_pic->pic_source_pending;
 
 	/* Initialize RTC. */
 	writertc(RTC_STATUSA, rtc_statusa);
@@ -758,7 +762,6 @@ cpu_initclocks()
 
 		intr_add_handler("rtc", 8, (driver_intr_t *)rtcintr, NULL,
 		    INTR_TYPE_CLK | INTR_FAST, NULL);
-		i8254_intsrc = intr_lookup_source(8);
 
 		writertc(RTC_STATUSB, rtc_statusb);
 	}
@@ -825,8 +828,7 @@ i8254_get_timecount(struct timecounter *tc)
 	if (count < i8254_lastcount ||
 	    (!i8254_ticked && (clkintr_pending ||
 	    ((count < 20 || (!(rflags & PSL_I) && count < timer0_max_count / 2u)) &&
-	    i8254_intsrc != NULL &&
-	    i8254_intsrc->is_pic->pic_source_pending(i8254_intsrc))))) {
+	    i8254_intsrc != NULL && i8254_pending(i8254_intsrc))))) {
 		i8254_ticked = 1;
 		i8254_offset += timer0_max_count;
 	}

@@ -23,15 +23,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/ia32/ia32_exception.S,v 1.2 2003/11/13 02:38:33 peter Exp $
+ * $FreeBSD: src/sys/amd64/ia32/ia32_exception.S,v 1.4 2004/05/24 11:28:11 bde Exp $
  */
 
 #include <machine/asmacros.h>
 
 #include "assym.s"
-
-#define	IDTVEC(name)	ALIGN_TEXT; .globl __CONCAT(X,name); \
-			.type __CONCAT(X,name),@function; __CONCAT(X,name):
 
 	.text
 /*
@@ -63,5 +60,7 @@ IDTVEC(int0x80_syscall)
 	movq	%r13,TF_R13(%rsp)
 	movq	%r14,TF_R14(%rsp)
 	movq	%r15,TF_R15(%rsp)
+	FAKE_MCOUNT(TF_RIP(%rsp))
 	call	ia32_syscall
+	MEXITCOUNT
 	jmp	doreti

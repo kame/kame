@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_misc.c,v 1.68 2003/11/19 04:12:32 kan Exp $");
+__FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_misc.c,v 1.71 2004/03/17 20:00:00 jhb Exp $");
 
 #include "opt_mac.h"
 
@@ -42,7 +42,6 @@ __FBSDID("$FreeBSD: src/sys/compat/svr4/svr4_misc.c,v 1.68 2003/11/19 04:12:32 k
 #include <sys/dirent.h>
 #include <sys/fcntl.h>
 #include <sys/filedesc.h>
-#include <sys/jail.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/mac.h>
@@ -131,29 +130,12 @@ svr4_sys_wait(td, uap)
 	struct thread *td;
 	struct svr4_sys_wait_args *uap;
 {
-	struct wait_args w4;
-	int error, *retval = td->td_retval, st, sig;
-	size_t sz = sizeof(*w4.status);
+	int error, st, sig;
 
-	w4.rusage = NULL;
-	w4.options = 0;
-
-	if (uap->status == NULL) {
-		caddr_t sg = stackgap_init();
-
-		w4.status = stackgap_alloc(&sg, sz);
-	}
-	else
-		w4.status = uap->status;
-
-	w4.pid = WAIT_ANY;
-
-	if ((error = wait4(td, &w4)) != 0)
-		return error;
+	error = kern_wait(td, WAIT_ANY, &st, 0, NULL);
+	if (error)
+		return (error);
       
-	if ((error = copyin(w4.status, &st, sizeof(st))) != 0)
-		return error;
-
 	if (WIFSIGNALED(st)) {
 		sig = WTERMSIG(st);
 		if (sig >= 0 && sig < NSIG)
@@ -168,13 +150,12 @@ svr4_sys_wait(td, uap)
 	 * It looks like wait(2) on svr4/solaris/2.4 returns
 	 * the status in retval[1], and the pid on retval[0].
 	 */
-	retval[1] = st;
+	td->td_retval[1] = st;
 
 	if (uap->status)
-		if ((error = copyout(&st, uap->status, sizeof(st))) != 0)
-			return error;
+		error = copyout(&st, uap->status, sizeof(st));
 
-	return 0;
+	return (error);
 }
 
 int
@@ -821,15 +802,15 @@ svr4_sys_break(td, uap)
 	base = round_page((vm_offset_t) vm->vm_daddr);
 	ns = (vm_offset_t)uap->nsize;
 	new = round_page(ns);
-	/* For p_rlimit. */
-	mtx_assert(&Giant, MA_OWNED);
 	if (new > base) {
-	  if ((new - base) > (unsigned) td->td_proc->p_rlimit[RLIMIT_DATA].rlim_cur) {
+		PROC_LOCK(p);
+		if ((new - base) > (unsigned)lim_cur(p, RLIMIT_DATA)) {
+			PROC_UNLOCK(p);
 			return ENOMEM;
-	  }
-	  if (new >= VM_MAXUSER_ADDRESS) {
-	    return (ENOMEM);
-	  }
+		}
+		PROC_UNLOCK(p);
+		if (new >= VM_MAXUSER_ADDRESS)
+			return (ENOMEM);
 	} else if (new < base) {
 		/*
 		 * This is simply an invalid value.  If someone wants to
@@ -844,8 +825,12 @@ svr4_sys_break(td, uap)
 	if (new > old) {
 		vm_size_t diff;
 		diff = new - old;
-		if (vm->vm_map.size + diff > p->p_rlimit[RLIMIT_VMEM].rlim_cur)
+		PROC_LOCK(p);
+		if (vm->vm_map.size + diff > lim_cur(p, RLIMIT_VMEM)) {
+			PROC_UNLOCK(p);
 			return(ENOMEM);
+		}
+		PROC_UNLOCK(p);
 		rv = vm_map_find(&vm->vm_map, NULL, 0, &old, diff, FALSE,
 			VM_PROT_ALL, VM_PROT_ALL, 0);
 		if (rv != KERN_SUCCESS) {
@@ -923,42 +908,33 @@ svr4_sys_ulimit(td, uap)
 	struct svr4_sys_ulimit_args *uap;
 {
         int *retval = td->td_retval;
+	int error;
 
 	switch (uap->cmd) {
 	case SVR4_GFILLIM:
-		/* For p_rlimit below. */
-		mtx_assert(&Giant, MA_OWNED);
-		*retval = td->td_proc->p_rlimit[RLIMIT_FSIZE].rlim_cur / 512;
+		PROC_LOCK(td->td_proc);
+		*retval = lim_cur(td->td_proc, RLIMIT_FSIZE) / 512;
+		PROC_UNLOCK(td->td_proc);
 		if (*retval == -1)
 			*retval = 0x7fffffff;
 		return 0;
 
 	case SVR4_SFILLIM:
 		{
-			int error;
-			struct __setrlimit_args srl;
 			struct rlimit krl;
-			caddr_t sg = stackgap_init();
-			struct rlimit *url = (struct rlimit *) 
-				stackgap_alloc(&sg, sizeof *url);
 
 			krl.rlim_cur = uap->newlimit * 512;
-			mtx_assert(&Giant, MA_OWNED);
-			krl.rlim_max = td->td_proc->p_rlimit[RLIMIT_FSIZE].rlim_max;
+			PROC_LOCK(td->td_proc);
+			krl.rlim_max = lim_max(td->td_proc, RLIMIT_FSIZE);
+			PROC_UNLOCK(td->td_proc);
 
-			error = copyout(&krl, url, sizeof(*url));
+			error = kern_setrlimit(td, RLIMIT_FSIZE, &krl);
 			if (error)
 				return error;
 
-			srl.which = RLIMIT_FSIZE;
-			srl.rlp = url;
-
-			error = setrlimit(td, &srl);
-			if (error)
-				return error;
-
-			mtx_assert(&Giant, MA_OWNED);
-			*retval = td->td_proc->p_rlimit[RLIMIT_FSIZE].rlim_cur;
+			PROC_LOCK(td->td_proc);
+			*retval = lim_cur(td->td_proc, RLIMIT_FSIZE);
+			PROC_UNLOCK(td->td_proc);
 			if (*retval == -1)
 				*retval = 0x7fffffff;
 			return 0;
@@ -969,12 +945,15 @@ svr4_sys_ulimit(td, uap)
 			struct vmspace *vm = td->td_proc->p_vmspace;
 			register_t r;
 
-			mtx_assert(&Giant, MA_OWNED);
-			r = td->td_proc->p_rlimit[RLIMIT_DATA].rlim_cur;
+			PROC_LOCK(td->td_proc);
+			r = lim_cur(td->td_proc, RLIMIT_DATA);
+			PROC_UNLOCK(td->td_proc);
 
 			if (r == -1)
 				r = 0x7fffffff;
+			mtx_lock(&Giant);	/* XXX */
 			r += (long) vm->vm_daddr;
+			mtx_unlock(&Giant);
 			if (r < 0)
 				r = 0x7fffffff;
 			*retval = r;
@@ -982,8 +961,9 @@ svr4_sys_ulimit(td, uap)
 		}
 
 	case SVR4_GDESLIM:
-		mtx_assert(&Giant, MA_OWNED);
-		*retval = td->td_proc->p_rlimit[RLIMIT_NOFILE].rlim_cur;
+		PROC_LOCK(td->td_proc);
+		*retval = lim_cur(td->td_proc, RLIMIT_NOFILE);
+		PROC_UNLOCK(td->td_proc);
 		if (*retval == -1)
 			*retval = 0x7fffffff;
 		return 0;

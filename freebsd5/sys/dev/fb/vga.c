@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/fb/vga.c,v 1.28 2003/08/24 17:46:06 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/fb/vga.c,v 1.31 2004/06/16 09:46:43 phk Exp $");
 
 #include "opt_vga.h"
 #include "opt_fb.h"
@@ -67,7 +67,7 @@ __FBSDID("$FreeBSD: src/sys/dev/fb/vga.c,v 1.28 2003/08/24 17:46:06 obrien Exp $
 #if !defined(__amd64__)
 #define	BIOS_PADDRTOVADDR(x)	(x)
 #else
-#define BIOS_PADDRTOVADDR(x) (((x) - ISA_HOLE_START) + atdevbase)
+#define BIOS_PADDRTOVADDR(x)	((x) + KERNBASE)
 #endif
 #endif
 
@@ -109,7 +109,7 @@ vga_attach_unit(int unit, vga_softc_t *sc, int flags)
 #ifdef FB_INSTALL_CDEV
 
 int
-vga_open(dev_t dev, vga_softc_t *sc, int flag, int mode, struct thread *td)
+vga_open(struct cdev *dev, vga_softc_t *sc, int flag, int mode, struct thread *td)
 {
 	if (sc == NULL)
 		return ENXIO;
@@ -120,32 +120,32 @@ vga_open(dev_t dev, vga_softc_t *sc, int flag, int mode, struct thread *td)
 }
 
 int
-vga_close(dev_t dev, vga_softc_t *sc, int flag, int mode, struct thread *td)
+vga_close(struct cdev *dev, vga_softc_t *sc, int flag, int mode, struct thread *td)
 {
 	return genfbclose(&sc->gensc, sc->adp, flag, mode, td);
 }
 
 int
-vga_read(dev_t dev, vga_softc_t *sc, struct uio *uio, int flag)
+vga_read(struct cdev *dev, vga_softc_t *sc, struct uio *uio, int flag)
 {
 	return genfbread(&sc->gensc, sc->adp, uio, flag);
 }
 
 int
-vga_write(dev_t dev, vga_softc_t *sc, struct uio *uio, int flag)
+vga_write(struct cdev *dev, vga_softc_t *sc, struct uio *uio, int flag)
 {
 	return genfbread(&sc->gensc, sc->adp, uio, flag);
 }
 
 int
-vga_ioctl(dev_t dev, vga_softc_t *sc, u_long cmd, caddr_t arg, int flag,
+vga_ioctl(struct cdev *dev, vga_softc_t *sc, u_long cmd, caddr_t arg, int flag,
 	  struct thread *td)
 {
 	return genfbioctl(&sc->gensc, sc->adp, cmd, arg, flag, td);
 }
 
 int
-vga_mmap(dev_t dev, vga_softc_t *sc, vm_offset_t offset, vm_offset_t *paddr,
+vga_mmap(struct cdev *dev, vga_softc_t *sc, vm_offset_t offset, vm_offset_t *paddr,
 	 int prot)
 {
 	return genfbmmap(&sc->gensc, sc->adp, offset, paddr, prot);
@@ -2854,7 +2854,8 @@ get_palette(video_adapter_t *adp, int base, int count,
     u_char *g;
     u_char *b;
 
-    if ((base < 0) || (base >= 256) || (base + count > 256))
+    if (count < 0 || base < 0 || count > 256 || base > 256 ||
+	base + count > 256)
 	return EINVAL;
 
     r = malloc(count*3, M_DEVBUF, M_WAITOK);
@@ -2885,7 +2886,8 @@ set_palette(video_adapter_t *adp, int base, int count,
     u_char *b;
     int err;
 
-    if ((base < 0) || (base >= 256) || (base + count > 256))
+    if (count < 0 || base < 0 || count > 256 || base > 256 ||
+	base + count > 256)
 	return EINVAL;
 
     r = malloc(count*3, M_DEVBUF, M_WAITOK);

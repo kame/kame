@@ -27,7 +27,7 @@
  * Authors:
  *    Gareth Hughes <gareth@valinux.com>
  *
- * $FreeBSD: src/sys/dev/drm/mga_drv.h,v 1.6 2003/08/19 02:57:31 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/mga_drv.h,v 1.7 2004/01/06 04:34:53 anholt Exp $
  */
 
 #ifndef __MGA_DRV_H__
@@ -93,7 +93,6 @@ typedef struct drm_mga_private {
 	unsigned int texture_size;
 
 	drm_local_map_t *sarea;
-	drm_local_map_t *fb;
 	drm_local_map_t *mmio;
 	drm_local_map_t *status;
 	drm_local_map_t *warp;

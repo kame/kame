@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -37,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/genassym.c,v 1.151 2003/11/21 03:01:59 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/genassym.c,v 1.154 2004/05/16 22:43:57 peter Exp $");
 
 #include "opt_compat.h"
 #include "opt_kstack_pages.h"
@@ -135,6 +131,14 @@ ASSYM(PCB_DS, offsetof(struct pcb, pcb_ds));
 ASSYM(PCB_ES, offsetof(struct pcb, pcb_es));
 ASSYM(PCB_FS, offsetof(struct pcb, pcb_fs));
 ASSYM(PCB_GS, offsetof(struct pcb, pcb_gs));
+ASSYM(PCB_DR0, offsetof(struct pcb, pcb_dr0));
+ASSYM(PCB_DR1, offsetof(struct pcb, pcb_dr1));
+ASSYM(PCB_DR2, offsetof(struct pcb, pcb_dr2));
+ASSYM(PCB_DR3, offsetof(struct pcb, pcb_dr3));
+ASSYM(PCB_DR6, offsetof(struct pcb, pcb_dr6));
+ASSYM(PCB_DR7, offsetof(struct pcb, pcb_dr7));
+ASSYM(PCB_DBREGS, PCB_DBREGS);
+ASSYM(PCB_32BIT, PCB_32BIT);
 
 ASSYM(PCB_FLAGS, offsetof(struct pcb, pcb_flags));
 ASSYM(PCB_FULLCTX, PCB_FULLCTX);
@@ -205,11 +209,6 @@ ASSYM(KUCSEL, GSEL(GUCODE_SEL, SEL_UPL));
 ASSYM(KUDSEL, GSEL(GUDATA_SEL, SEL_UPL));
 ASSYM(KUC32SEL, GSEL(GUCODE32_SEL, SEL_UPL));
 ASSYM(SEL_RPL_MASK, SEL_RPL_MASK);
-
-ASSYM(MSR_FSBASE, MSR_FSBASE);
-ASSYM(MSR_GSBASE, MSR_GSBASE);
-ASSYM(MSR_KGSBASE, MSR_KGSBASE);
-ASSYM(GPROC0_SEL, GPROC0_SEL);
 
 ASSYM(MTX_LOCK, offsetof(struct mtx, mtx_lock));
 ASSYM(MTX_RECURSECNT, offsetof(struct mtx, mtx_recurse));

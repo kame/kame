@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/tx/if_tx.c,v 1.79 2003/11/14 17:16:57 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/tx/if_tx.c,v 1.86 2004/08/13 23:52:33 rwatson Exp $");
 
 /*
  * EtherPower II 10/100 Fast Ethernet (SMC 9432 serie)
@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD: src/sys/dev/tx/if_tx.c,v 1.79 2003/11/14 17:16:57 obrien Exp
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 #include <sys/queue.h>
 
@@ -101,7 +102,6 @@ static void epic_start_activity(epic_softc_t *);
 static void epic_set_rx_mode(epic_softc_t *);
 static void epic_set_tx_mode(epic_softc_t *);
 static void epic_set_mc_table(epic_softc_t *);
-static u_int32_t tx_mchash(caddr_t);
 static int epic_read_eeprom(epic_softc_t *,u_int16_t);
 static void epic_output_eepromw(epic_softc_t *, u_int16_t);
 static u_int16_t epic_input_eepromw(epic_softc_t *);
@@ -240,7 +240,7 @@ epic_attach(dev)
 	ifp = &sc->sc_if;
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_softc = sc;
-	ifp->if_flags = IFF_BROADCAST|IFF_SIMPLEX|IFF_MULTICAST;
+	ifp->if_flags = IFF_BROADCAST|IFF_SIMPLEX|IFF_MULTICAST|IFF_NEEDSGIANT;
 	ifp->if_ioctl = epic_ifioctl;
 	ifp->if_start = epic_ifstart;
 	ifp->if_watchdog = epic_ifwatchdog;
@@ -253,8 +253,7 @@ epic_attach(dev)
 	pci_enable_busmaster(dev);
 
 	rid = EPIC_RID;
-	sc->res = bus_alloc_resource(dev, EPIC_RES, &rid, 0, ~0, 1,
-	    RF_ACTIVE);
+	sc->res = bus_alloc_resource_any(dev, EPIC_RES, &rid, RF_ACTIVE);
 	if (sc->res == NULL) {
 		device_printf(dev, "couldn't map ports/memory\n");
 		error = ENXIO;
@@ -266,7 +265,7 @@ epic_attach(dev)
 
 	/* Allocate interrupt. */
 	rid = 0;
-	sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
+	sc->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 	    RF_SHAREABLE | RF_ACTIVE);
 	if (sc->irq == NULL) {
 		device_printf(dev, "couldn't map interrupt\n");
@@ -391,9 +390,6 @@ epic_attach(dev)
 		goto fail;
 	}
 
-	/* Display ethernet address ,... */
-	device_printf(dev, "address %6D,", sc->sc_macaddr, ":");
-
 	/* board type and ... */
 	printf(" type ");
 	for(i = 0x2c; i < 0x32; i++) {
@@ -417,6 +413,7 @@ epic_attach(dev)
 
 	ifp->if_hdrlen = sizeof(struct ether_vlan_header);
 	ifp->if_capabilities |= IFCAP_VLAN_MTU;
+	ifp->if_capenable |= IFCAP_VLAN_MTU;
 	callout_handle_init(&sc->stat_ch);
 
 	/* Activate our interrupt handler. */
@@ -1412,7 +1409,8 @@ epic_set_mc_table(sc)
 #endif
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = tx_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = ether_crc32_be(LLADDR((struct sockaddr_dl *)
+		    ifma->ifma_addr), ETHER_ADDR_LEN) >> 26;
 		filter[h >> 4] |= 1 << (h & 0xF);
 	}
 
@@ -1420,32 +1418,6 @@ epic_set_mc_table(sc)
 	CSR_WRITE_4(sc, MC1, filter[1]);
 	CSR_WRITE_4(sc, MC2, filter[2]);
 	CSR_WRITE_4(sc, MC3, filter[3]);
-}
-
-/*
- * Synopsis: calculate EPIC's hash of multicast address.
- */
-static u_int32_t
-tx_mchash(addr)
-	caddr_t addr;
-{
-	u_int32_t crc, carry;
-	int idx, bit;
-	u_int8_t data;
-
-	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF; /* initial value */
-
-	for (idx = 0; idx < 6; idx++) {
-		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
-			crc <<= 1;
-			if (carry)
-				crc = (crc ^ 0x04c11db6) | carry;
-		}
-	}
-
-	return ((crc >> 26) & 0x3F);
 }
 
 

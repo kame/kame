@@ -25,11 +25,10 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/uart/uart_core.c,v 1.7 2003/09/26 05:14:56 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/uart/uart_core.c,v 1.10 2004/07/10 21:16:01 marcel Exp $");
 
 #ifndef KLD_MODULE
 #include "opt_comconsole.h"
-#include "opt_ddb.h"
 #endif
 
 #include <sys/param.h>
@@ -39,6 +38,7 @@ __FBSDID("$FreeBSD: src/sys/dev/uart/uart_core.c,v 1.7 2003/09/26 05:14:56 marce
 #include <sys/cons.h>
 #include <sys/fcntl.h>
 #include <sys/interrupt.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/queue.h>
@@ -49,8 +49,6 @@ __FBSDID("$FreeBSD: src/sys/dev/uart/uart_core.c,v 1.7 2003/09/26 05:14:56 marce
 #include <sys/tty.h>
 #include <machine/resource.h>
 #include <machine/stdarg.h>
-
-#include <ddb/ddb.h>
 
 #include <dev/uart/uart.h>
 #include <dev/uart/uart_bus.h>
@@ -85,9 +83,9 @@ static void
 uart_intr_break(struct uart_softc *sc)
 {
 
-#if defined(DDB) && defined(BREAK_TO_DEBUGGER)
+#if defined(KDB) && defined(BREAK_TO_DEBUGGER)
 	if (sc->sc_sysdev != NULL && sc->sc_sysdev->type == UART_DEV_CONSOLE) {
-		breakpoint();
+		kdb_enter("Line break on console");
 		return;
 	}
 #endif
@@ -133,11 +131,11 @@ uart_intr_rxready(struct uart_softc *sc)
 
 	rxp = sc->sc_rxput;
 	UART_RECEIVE(sc);
-#if defined(DDB) && defined(ALT_BREAK_TO_DEBUGGER)
+#if defined(KDB) && defined(ALT_BREAK_TO_DEBUGGER)
 	if (sc->sc_sysdev != NULL && sc->sc_sysdev->type == UART_DEV_CONSOLE) {
 		while (rxp != sc->sc_rxput) {
-			if (db_alt_break(sc->sc_rxbuf[rxp++], &sc->sc_altbrk))
-				breakpoint();
+			if (kdb_alt_break(sc->sc_rxbuf[rxp++], &sc->sc_altbrk))
+				kdb_enter("Break sequence on console");
 			if (rxp == sc->sc_rxbufsz)
 				rxp = 0;
 		}
@@ -329,16 +327,16 @@ uart_bus_attach(device_t dev)
 	sc->sc_bas.bst = rman_get_bustag(sc->sc_rres);
 
 	sc->sc_irid = 0;
-	sc->sc_ires = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->sc_irid,
-	    0, ~0, 1, RF_ACTIVE);
+	sc->sc_ires = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->sc_irid,
+	    RF_ACTIVE);
 	if (sc->sc_ires != NULL) {
 		error = BUS_SETUP_INTR(device_get_parent(dev), dev,
 		    sc->sc_ires, INTR_TYPE_TTY | INTR_FAST, uart_intr,
 		    sc, &sc->sc_icookie);
 		if (error)
 			error = BUS_SETUP_INTR(device_get_parent(dev), dev,
-			    sc->sc_ires, INTR_TYPE_TTY, uart_intr, sc,
-			    &sc->sc_icookie);
+			    sc->sc_ires, INTR_TYPE_TTY | INTR_MPSAFE,
+			    uart_intr, sc, &sc->sc_icookie);
 		else
 			sc->sc_fastintr = 1;
 

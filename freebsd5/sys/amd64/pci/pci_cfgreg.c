@@ -27,25 +27,16 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/pci/pci_cfgreg.c,v 1.104 2003/12/06 23:19:47 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/pci/pci_cfgreg.c,v 1.106 2004/03/13 19:19:13 peter Exp $");
 
-#include <sys/param.h>		/* XXX trim includes */
+#include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
-#include <sys/kernel.h>
-#include <sys/module.h>
-#include <sys/malloc.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
-#include <vm/vm.h>
-#include <vm/pmap.h>
-#include <machine/md_var.h>
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
-#include <isa/isavar.h>
 #include <machine/pci_cfgreg.h>
-
-#include "pcib_if.h"
 
 static int cfgmech;
 static int devmax;
@@ -106,18 +97,6 @@ pci_cfgregwrite(int bus, int slot, int func, int reg, u_int32_t data, int bytes)
 {
 
 	pcireg_cfgwrite(bus, slot, func, reg, data, bytes);
-}
-
-/*
- * Route a PCI interrupt
- */
-int
-pci_cfgintr(int bus, int device, int pin, int oldirq)
-{
-
-	printf("pci_cfgintr: can't route an interrupt to %d:%d INT%c without ACPI\n", bus, 
-	    device, 'A' + pin - 1);
-	return (PCI_INVALID_IRQ);
 }
 
 /* 
@@ -286,7 +265,7 @@ pcireg_cfgopen(void)
 		devmax = 32;
 
 		outl(CONF1_ADDR_PORT, CONF1_ENABLE_CHK);
-		outb(CONF1_ADDR_PORT + 3, 0);
+		DELAY(1);
 		mode1res = inl(CONF1_ADDR_PORT);
 		outl(CONF1_ADDR_PORT, oldval1);
 

@@ -38,11 +38,12 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/usbdi_util.c,v 1.31 2003/08/24 17:55:55 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/usbdi_util.c,v 1.32 2004/05/30 20:08:45 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/malloc.h>
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <sys/proc.h>

@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/snc/if_snc.c,v 1.5 2003/08/24 18:03:45 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/snc/if_snc.c,v 1.6 2004/03/17 17:50:42 njl Exp $");
 
 /*
  *	National Semiconductor  DP8393X SONIC Driver
@@ -124,8 +124,7 @@ snc_alloc_irq(dev, rid, flags)
 	struct snc_softc *sc = device_get_softc(dev);
 	struct resource *res;
 
-	res = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
-				 0ul, ~0ul, 1, (RF_ACTIVE | flags));
+	res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid, RF_ACTIVE | flags);
 	if (res) {
 		sc->irq = res;
 		sc->irq_rid = rid;

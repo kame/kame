@@ -11,10 +11,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -32,7 +28,7 @@
  * SUCH DAMAGE.
  *
  *	from: vector.s, 386BSD 0.1 unknown origin
- * $FreeBSD: src/sys/amd64/isa/atpic_vector.S,v 1.41 2003/11/17 08:58:15 peter Exp $
+ * $FreeBSD: src/sys/amd64/isa/atpic_vector.S,v 1.45 2004/05/24 12:08:56 bde Exp $
  */
 
 /*
@@ -41,8 +37,6 @@
  */
 
 #include <machine/asmacros.h>
-#include <amd64/isa/icu.h>
-#include <amd64/isa/isa.h>
 
 #include "assym.s"
 
@@ -72,13 +66,12 @@ IDTVEC(vec_name) ;							\
 	movq	%r13,TF_R13(%rsp) ;					\
 	movq	%r14,TF_R14(%rsp) ;					\
 	movq	%r15,TF_R15(%rsp) ;					\
-	FAKE_MCOUNT(13*4(%esp)) ;	/* XXX late to avoid double count */ \
+	FAKE_MCOUNT(TF_RIP(%rsp)) ;					\
 	movq	$irq_num, %rdi; 	/* pass the IRQ */		\
 	call	atpic_handle_intr ;					\
 	MEXITCOUNT ;							\
 	jmp	doreti
 
-MCOUNT_LABEL(bintr)
 	INTR(0, atpic_intr0)
 	INTR(1, atpic_intr1)
 	INTR(2, atpic_intr2)
@@ -95,4 +88,3 @@ MCOUNT_LABEL(bintr)
 	INTR(13, atpic_intr13)
 	INTR(14, atpic_intr14)
 	INTR(15, atpic_intr15)
-MCOUNT_LABEL(eintr)

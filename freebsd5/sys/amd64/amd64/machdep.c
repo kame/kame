@@ -39,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/amd64/machdep.c,v 1.601 2003/12/06 23:19:47 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/amd64/machdep.c,v 1.618.2.1 2004/09/09 10:03:17 julian Exp $");
 
 #include "opt_atalk.h"
 #include "opt_atpic.h"
@@ -59,11 +59,13 @@ __FBSDID("$FreeBSD: src/sys/amd64/amd64/machdep.c,v 1.601 2003/12/06 23:19:47 pe
 #include <sys/sysproto.h>
 #include <sys/signalvar.h>
 #include <sys/imgact.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/linker.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/memrange.h>
 #include <sys/mutex.h>
 #include <sys/pcpu.h>
 #include <sys/proc.h>
@@ -93,6 +95,11 @@ __FBSDID("$FreeBSD: src/sys/amd64/amd64/machdep.c,v 1.601 2003/12/06 23:19:47 pe
 #include <sys/exec.h>
 #include <sys/cons.h>
 
+#ifdef DDB
+#ifndef KDB
+#error KDB must be enabled in order for DDB to work!
+#endif
+#endif
 #include <ddb/ddb.h>
 
 #include <net/netisr.h>
@@ -130,7 +137,6 @@ extern void dblfault_handler(void);
 extern void printcpuinfo(void);	/* XXX header file */
 extern void identify_cpu(void);
 extern void panicifcpuunsupported(void);
-extern void initializecpu(void);
 
 #define	CS_SECURE(cs)		(ISPL(cs) == SEL_UPL)
 #define	EFL_SECURE(ef, oef)	((((ef) ^ (oef)) & ~PSL_USERCHANGE) == 0)
@@ -140,14 +146,17 @@ static void get_fpcontext(struct thread *td, mcontext_t *mcp);
 static int  set_fpcontext(struct thread *td, const mcontext_t *mcp);
 SYSINIT(cpu, SI_SUB_CPU, SI_ORDER_FIRST, cpu_startup, NULL)
 
+#ifdef DDB
+extern vm_offset_t ksym_start, ksym_end;
+#endif
+
 int	_udatasel, _ucodesel, _ucode32sel;
-u_long	atdevbase;
 
 int cold = 1;
 
 long Maxmem = 0;
 
-vm_paddr_t phys_avail[10];
+vm_paddr_t phys_avail[20];
 
 /* must be 2 less so 0 0 can signal end of chunks */
 #define PHYS_AVAIL_ARRAY_END ((sizeof(phys_avail) / sizeof(vm_offset_t)) - 2)
@@ -160,6 +169,8 @@ struct region_descriptor r_gdt, r_idt;
 struct pcpu __pcpu[MAXCPU];
 
 struct mtx icu_lock;
+
+struct mem_range_softc mem_range_softc;
 
 static void
 cpu_startup(dummy)
@@ -246,8 +257,8 @@ sendsig(catcher, sig, mask, code)
 	/* Save user context. */
 	bzero(&sf, sizeof(sf));
 	sf.sf_uc.uc_sigmask = *mask;
-	sf.sf_uc.uc_stack = p->p_sigstk;
-	sf.sf_uc.uc_stack.ss_flags = (p->p_flag & P_ALTSTACK)
+	sf.sf_uc.uc_stack = td->td_sigstk;
+	sf.sf_uc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK)
 	    ? ((oonstack) ? SS_ONSTACK : 0) : SS_DISABLE;
 	sf.sf_uc.uc_mcontext.mc_onstack = (oonstack) ? 1 : 0;
 	bcopy(regs, &sf.sf_uc.uc_mcontext.mc_rdi, sizeof(*regs));
@@ -256,17 +267,17 @@ sendsig(catcher, sig, mask, code)
 	fpstate_drop(td);
 
 	/* Allocate space for the signal handler context. */
-	if ((p->p_flag & P_ALTSTACK) != 0 && !oonstack &&
+	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		sp = p->p_sigstk.ss_sp +
-		    p->p_sigstk.ss_size - sizeof(struct sigframe);
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
-		p->p_sigstk.ss_flags |= SS_ONSTACK;
+		sp = td->td_sigstk.ss_sp +
+		    td->td_sigstk.ss_size - sizeof(struct sigframe);
+#if defined(COMPAT_43)
+		td->td_sigstk.ss_flags |= SS_ONSTACK;
 #endif
 	} else
 		sp = (char *)regs->tf_rsp - sizeof(struct sigframe) - 128;
 	/* Align to 16 bytes. */
-	sfp = (struct sigframe *)((unsigned long)sp & ~0xF);
+	sfp = (struct sigframe *)((unsigned long)sp & ~0xFul);
 
 	/* Translate the signal if appropriate. */
 	if (p->p_sysent->sv_sigtbl && sig <= p->p_sysent->sv_sigsize)
@@ -401,11 +412,11 @@ sigreturn(td, uap)
 	bcopy(&ucp->uc_mcontext.mc_rdi, regs, sizeof(*regs));
 
 	PROC_LOCK(p);
-#if defined(COMPAT_43) || defined(COMPAT_SUNOS)
+#if defined(COMPAT_43)
 	if (ucp->uc_mcontext.mc_onstack & 1)
-		p->p_sigstk.ss_flags |= SS_ONSTACK;
+		td->td_sigstk.ss_flags |= SS_ONSTACK;
 	else
-		p->p_sigstk.ss_flags &= ~SS_ONSTACK;
+		td->td_sigstk.ss_flags &= ~SS_ONSTACK;
 #endif
 
 	td->td_sigmask = ucp->uc_sigmask;
@@ -527,34 +538,37 @@ exec_setregs(td, entry, stack, ps_strings)
 
 	bzero((char *)regs, sizeof(struct trapframe));
 	regs->tf_rip = entry;
-	regs->tf_rsp = ((stack - 8) & ~0xF) + 8;
+	regs->tf_rsp = ((stack - 8) & ~0xFul) + 8;
 	regs->tf_rdi = stack;		/* argv */
 	regs->tf_rflags = PSL_USER | (regs->tf_rflags & PSL_T);
 	regs->tf_ss = _udatasel;
 	regs->tf_cs = _ucodesel;
 
 	/*
-	 * Arrange to trap the next fpu or `fwait' instruction (see fpu.c
-	 * for why fwait must be trapped at least if there is an fpu or an
-	 * emulator).  This is mainly to handle the case where npx0 is not
-	 * configured, since the fpu routines normally set up the trap
-	 * otherwise.  It should be done only at boot time, but doing it
-	 * here allows modifying `fpu_exists' for testing the emulator on
-	 * systems with an fpu.
+	 * Reset the hardware debug registers if they were in use.
+	 * They won't have any meaning for the newly exec'd process.
 	 */
-	load_cr0(rcr0() | CR0_MP | CR0_TS);
+	if (pcb->pcb_flags & PCB_DBREGS) {
+		pcb->pcb_dr0 = 0;
+		pcb->pcb_dr1 = 0;
+		pcb->pcb_dr2 = 0;
+		pcb->pcb_dr3 = 0;
+		pcb->pcb_dr6 = 0;
+		pcb->pcb_dr7 = 0;
+		if (pcb == PCPU_GET(curpcb)) {
+			/*
+			 * Clear the debug registers on the running
+			 * CPU, otherwise they will end up affecting
+			 * the next process we switch to.
+			 */
+			reset_dbregs();
+		}
+		pcb->pcb_flags &= ~PCB_DBREGS;
+	}
 
-	/* Initialize the fpu (if any) for the current process. */
 	/*
-	 * XXX the above load_cr0() also initializes it and is a layering
-	 * violation.  It drops the fpu state partially
-	 * and this would be fatal if we were interrupted now, and decided
-	 * to force the state to the pcb, and checked the invariant
-	 * (CR0_TS clear) if and only if PCPU_GET(fpcurthread) != NULL).
-	 * ALL of this can happen except the check.  The check used to
-	 * happen and be fatal later when we didn't complete the drop
-	 * before returning to user mode.  This should be fixed properly
-	 * soon.
+	 * Drop the FP state if we hold it, so that the process gets a
+	 * clean FP state if it uses the FPU again.
 	 */
 	fpstate_drop(td);
 }
@@ -565,8 +579,11 @@ cpu_setregs(void)
 	register_t cr0;
 
 	cr0 = rcr0();
-	cr0 |= CR0_NE;			/* Done by fpuinit() */
-	cr0 |= CR0_MP | CR0_TS;		/* Done at every execve() too. */
+	/*
+	 * CR0_MP, CR0_NE and CR0_TS are also set by npx_probe() for the
+	 * BSP.  See the comments there about why we set them.
+	 */
+	cr0 |= CR0_MP | CR0_NE | CR0_TS;
 	cr0 |= CR0_WP | CR0_AM;
 	load_cr0(cr0);
 }
@@ -819,7 +836,8 @@ getmemsize(caddr_t kmdp, u_int64_t first)
 	 * "Consumer may safely assume that size value precedes data."
 	 * ie: an int32_t immediately precedes smap.
 	 */
-	smapbase = (struct bios_smap *)preload_search_info(kmdp, MODINFO_METADATA | MODINFOMD_SMAP);
+	smapbase = (struct bios_smap *)preload_search_info(kmdp,
+	    MODINFO_METADATA | MODINFOMD_SMAP);
 	if (smapbase == NULL)
 		panic("No BIOS smap info from loader!");
 
@@ -983,30 +1001,26 @@ next_run:
 			 * Test for alternating 1's and 0's
 			 */
 			*(volatile int *)ptr = 0xaaaaaaaa;
-			if (*(volatile int *)ptr != 0xaaaaaaaa) {
+			if (*(volatile int *)ptr != 0xaaaaaaaa)
 				page_bad = TRUE;
-			}
 			/*
 			 * Test for alternating 0's and 1's
 			 */
 			*(volatile int *)ptr = 0x55555555;
-			if (*(volatile int *)ptr != 0x55555555) {
-			page_bad = TRUE;
-			}
+			if (*(volatile int *)ptr != 0x55555555)
+				page_bad = TRUE;
 			/*
 			 * Test for all 1's
 			 */
 			*(volatile int *)ptr = 0xffffffff;
-			if (*(volatile int *)ptr != 0xffffffff) {
+			if (*(volatile int *)ptr != 0xffffffff)
 				page_bad = TRUE;
-			}
 			/*
 			 * Test for all 0's
 			 */
 			*(volatile int *)ptr = 0x0;
-			if (*(volatile int *)ptr != 0x0) {
+			if (*(volatile int *)ptr != 0x0)
 				page_bad = TRUE;
-			}
 			/*
 			 * Restore original value.
 			 */
@@ -1015,9 +1029,8 @@ next_run:
 			/*
 			 * Adjust array of valid/good pages.
 			 */
-			if (page_bad == TRUE) {
+			if (page_bad == TRUE)
 				continue;
-			}
 			/*
 			 * If this good page is a continuation of the
 			 * previous set of good pages, then just increase
@@ -1040,7 +1053,7 @@ next_run:
 					break;
 				}
 				phys_avail[pa_indx++] = pa;	/* start */
-				phys_avail[pa_indx] = pa + PAGE_SIZE;	/* end */
+				phys_avail[pa_indx] = pa + PAGE_SIZE; /* end */
 			}
 			physmem++;
 		}
@@ -1086,10 +1099,6 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 #error "have you forgotten the isa device?";
 #endif
 
-	/* Turn on PTE NX (no execute) bit */
-	msr = rdmsr(MSR_EFER) | EFER_NXE;
-	wrmsr(MSR_EFER, msr);
-
 	proc0.p_uarea = (struct user *)(physfree + KERNBASE);
 	bzero(proc0.p_uarea, UAREA_PAGES * PAGE_SIZE);
 	physfree += UAREA_PAGES * PAGE_SIZE;
@@ -1099,13 +1108,11 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 	thread0.td_pcb = (struct pcb *)
 	   (thread0.td_kstack + KSTACK_PAGES * PAGE_SIZE) - 1;
 
-	atdevbase = ISA_HOLE_START + KERNBASE;
-
 	/*
  	 * This may be done better later if it gets more high level
  	 * components in it. If so just link td->td_proc here.
 	 */
-	proc_linkup(&proc0, &ksegrp0, &kse0, &thread0);
+	proc_linkup(&proc0, &ksegrp0, &thread0);
 
 	preload_metadata = (caddr_t)(uintptr_t)(modulep + KERNBASE);
 	preload_bootstrap_relocate(KERNBASE);
@@ -1114,6 +1121,10 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 		kmdp = preload_search_by_type("elf64 kernel");
 	boothowto = MD_FETCH(kmdp, MODINFOMD_HOWTO, int);
 	kern_envp = MD_FETCH(kmdp, MODINFOMD_ENVP, char *) + KERNBASE;
+#ifdef DDB
+	ksym_start = MD_FETCH(kmdp, MODINFOMD_SSYM, uintptr_t);
+	ksym_end = MD_FETCH(kmdp, MODINFOMD_ESYM, uintptr_t);
+#endif
 
 	/* Init basic tunables, hz etc */
 	init_param1();
@@ -1127,7 +1138,8 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 		if (x != GPROC0_SEL && x != (GPROC0_SEL + 1))
 			ssdtosd(&gdt_segs[x], &gdt[x]);
 	}
-	ssdtosyssd(&gdt_segs[GPROC0_SEL], (struct system_segment_descriptor *)&gdt[GPROC0_SEL]);
+	ssdtosyssd(&gdt_segs[GPROC0_SEL],
+	    (struct system_segment_descriptor *)&gdt[GPROC0_SEL]);
 
 	r_gdt.rd_limit = NGDT * sizeof(gdt[0]) - 1;
 	r_gdt.rd_base =  (long) gdt;
@@ -1136,11 +1148,12 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 
 	wrmsr(MSR_FSBASE, 0);		/* User value */
 	wrmsr(MSR_GSBASE, (u_int64_t)pc);
-	wrmsr(MSR_KGSBASE, 0);		/* User value while we're in the kernel */
+	wrmsr(MSR_KGSBASE, 0);		/* User value while in the kernel */
 
 	pcpu_init(pc, 0, sizeof(struct pcpu));
 	PCPU_SET(prvspace, pc);
 	PCPU_SET(curthread, &thread0);
+	PCPU_SET(curpcb, thread0.td_pcb);
 	PCPU_SET(tssp, &common_tss[0]);
 
 	/*
@@ -1191,10 +1204,11 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 	atpic_startup();
 #endif
 
-#ifdef DDB
 	kdb_init();
+
+#ifdef KDB
 	if (boothowto & RB_KDB)
-		Debugger("Boot flags requested debugger");
+		kdb_enter("Boot flags requested debugger");
 #endif
 
 	identify_cpu();		/* Final stage of CPU initialization */
@@ -1204,7 +1218,7 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 	common_tss[0].tss_rsp0 = thread0.td_kstack + \
 	    KSTACK_PAGES * PAGE_SIZE - sizeof(struct pcb);
 	/* Ensure the stack is aligned to 16 bytes */
-	common_tss[0].tss_rsp0 &= ~0xF;
+	common_tss[0].tss_rsp0 &= ~0xFul;
 	PCPU_SET(rsp0, common_tss[0].tss_rsp0);
 
 	/* doublefault stack space, runs on ist1 */
@@ -1261,6 +1275,27 @@ cpu_pcpu_init(struct pcpu *pcpu, int cpuid, size_t size)
 	pcpu->pc_acpi_id = 0xffffffff;
 }
 
+/*
+ * Construct a PCB from a trapframe. This is called from kdb_trap() where
+ * we want to start a backtrace from the function that caused us to enter
+ * the debugger. We have the context in the trapframe, but base the trace
+ * on the PCB. The PCB doesn't have to be perfect, as long as it contains
+ * enough for a backtrace.
+ */
+void
+makectx(struct trapframe *tf, struct pcb *pcb)
+{
+
+	pcb->pcb_r12 = tf->tf_r12;
+	pcb->pcb_r13 = tf->tf_r13;
+	pcb->pcb_r14 = tf->tf_r14;
+	pcb->pcb_r15 = tf->tf_r15;
+	pcb->pcb_rbp = tf->tf_rbp;
+	pcb->pcb_rbx = tf->tf_rbx;
+	pcb->pcb_rip = tf->tf_rip;
+	pcb->pcb_rsp = (ISPL(tf->tf_cs)) ? tf->tf_rsp : (long)(tf + 1) - 8;
+}
+
 int
 ptrace_set_pc(struct thread *td, unsigned long addr)
 {
@@ -1272,6 +1307,13 @@ int
 ptrace_single_step(struct thread *td)
 {
 	td->td_frame->tf_rflags |= PSL_T;
+	return (0);
+}
+
+int
+ptrace_clear_single_step(struct thread *td)
+{
+	td->td_frame->tf_rflags &= ~PSL_T;
 	return (0);
 }
 
@@ -1311,10 +1353,11 @@ set_regs(struct thread *td, struct reg *regs)
 {
 	struct pcb *pcb;
 	struct trapframe *tp;
+	register_t rflags;
 
 	tp = td->td_frame;
-	if (!EFL_SECURE(regs->r_rflags, tp->tf_rflags) ||
-	    !CS_SECURE(regs->r_cs))
+	rflags = regs->r_rflags & 0xffffffff;
+	if (!EFL_SECURE(rflags, tp->tf_rflags) || !CS_SECURE(regs->r_cs))
 		return (EINVAL);
 	tp->tf_r15 = regs->r_r15;
 	tp->tf_r14 = regs->r_r14;
@@ -1333,7 +1376,7 @@ set_regs(struct thread *td, struct reg *regs)
 	tp->tf_rax = regs->r_rax;
 	tp->tf_rip = regs->r_rip;
 	tp->tf_cs = regs->r_cs;
-	tp->tf_rflags = regs->r_rflags;
+	tp->tf_rflags = rflags;
 	tp->tf_rsp = regs->r_rsp;
 	tp->tf_ss = regs->r_ss;
 	pcb = td->td_pcb;
@@ -1499,6 +1542,7 @@ set_mcontext(struct thread *td, const mcontext_t *mcp)
 	tp->tf_rflags = rflags;
 	tp->tf_rsp = mcp->mc_rsp;
 	tp->tf_ss = mcp->mc_ss;
+	td->td_pcb->pcb_flags |= PCB_FULLCTX;
 	return (0);
 }
 
@@ -1559,31 +1603,203 @@ fpstate_drop(struct thread *td)
 int
 fill_dbregs(struct thread *td, struct dbreg *dbregs)
 {
+	struct pcb *pcb;
 
+	if (td == NULL) {
+		dbregs->dr[0] = rdr0();
+		dbregs->dr[1] = rdr1();
+		dbregs->dr[2] = rdr2();
+		dbregs->dr[3] = rdr3();
+		dbregs->dr[6] = rdr6();
+		dbregs->dr[7] = rdr7();
+	} else {
+		pcb = td->td_pcb;
+		dbregs->dr[0] = pcb->pcb_dr0;
+		dbregs->dr[1] = pcb->pcb_dr1;
+		dbregs->dr[2] = pcb->pcb_dr2;
+		dbregs->dr[3] = pcb->pcb_dr3;
+		dbregs->dr[6] = pcb->pcb_dr6;
+		dbregs->dr[7] = pcb->pcb_dr7;
+	}
+	dbregs->dr[4] = 0;
+	dbregs->dr[5] = 0;
+	dbregs->dr[8] = 0;
+	dbregs->dr[9] = 0;
+	dbregs->dr[10] = 0;
+	dbregs->dr[11] = 0;
+	dbregs->dr[12] = 0;
+	dbregs->dr[13] = 0;
+	dbregs->dr[14] = 0;
+	dbregs->dr[15] = 0;
 	return (0);
 }
 
 int
 set_dbregs(struct thread *td, struct dbreg *dbregs)
 {
+	struct pcb *pcb;
+	int i;
+	u_int64_t mask1, mask2;
+
+	if (td == NULL) {
+		load_dr0(dbregs->dr[0]);
+		load_dr1(dbregs->dr[1]);
+		load_dr2(dbregs->dr[2]);
+		load_dr3(dbregs->dr[3]);
+		load_dr6(dbregs->dr[6]);
+		load_dr7(dbregs->dr[7]);
+	} else {
+		/*
+		 * Don't let an illegal value for dr7 get set.  Specifically,
+		 * check for undefined settings.  Setting these bit patterns
+		 * result in undefined behaviour and can lead to an unexpected
+		 * TRCTRAP or a general protection fault right here.
+		 */
+		for (i = 0, mask1 = 0x3<<16, mask2 = 0x2<<16; i < 8;
+		     i++, mask1 <<= 2, mask2 <<= 2)
+			if ((dbregs->dr[7] & mask1) == mask2)
+				return (EINVAL);
+
+		pcb = td->td_pcb;
+
+		/*
+		 * Don't let a process set a breakpoint that is not within the
+		 * process's address space.  If a process could do this, it
+		 * could halt the system by setting a breakpoint in the kernel
+		 * (if ddb was enabled).  Thus, we need to check to make sure
+		 * that no breakpoints are being enabled for addresses outside
+		 * process's address space, unless, perhaps, we were called by
+		 * uid 0.
+		 *
+		 * XXX - what about when the watched area of the user's
+		 * address space is written into from within the kernel
+		 * ... wouldn't that still cause a breakpoint to be generated
+		 * from within kernel mode?
+		 */
+
+		if (suser(td) != 0) {
+			if (dbregs->dr[7] & 0x3) {
+				/* dr0 is enabled */
+				if (dbregs->dr[0] >= VM_MAXUSER_ADDRESS)
+					return (EINVAL);
+			}
+			if (dbregs->dr[7] & 0x3<<2) {
+				/* dr1 is enabled */
+				if (dbregs->dr[1] >= VM_MAXUSER_ADDRESS)
+					return (EINVAL);
+			}
+			if (dbregs->dr[7] & 0x3<<4) {
+				/* dr2 is enabled */
+				if (dbregs->dr[2] >= VM_MAXUSER_ADDRESS)
+					return (EINVAL);
+			}
+			if (dbregs->dr[7] & 0x3<<6) {
+				/* dr3 is enabled */
+				if (dbregs->dr[3] >= VM_MAXUSER_ADDRESS)
+					return (EINVAL);
+			}
+		}
+
+		pcb->pcb_dr0 = dbregs->dr[0];
+		pcb->pcb_dr1 = dbregs->dr[1];
+		pcb->pcb_dr2 = dbregs->dr[2];
+		pcb->pcb_dr3 = dbregs->dr[3];
+		pcb->pcb_dr6 = dbregs->dr[6];
+		pcb->pcb_dr7 = dbregs->dr[7];
+
+		pcb->pcb_flags |= PCB_DBREGS;
+	}
 
 	return (0);
 }
 
-#ifndef DDB
 void
-Debugger(const char *msg)
+reset_dbregs(void)
 {
-	printf("Debugger(\"%s\") called.\n", msg);
-}
-#endif /* no DDB */
 
-#ifdef DDB
+	load_dr7(0);	/* Turn off the control bits first */
+	load_dr0(0);
+	load_dr1(0);
+	load_dr2(0);
+	load_dr3(0);
+	load_dr6(0);
+}
+
+/*
+ * Return > 0 if a hardware breakpoint has been hit, and the
+ * breakpoint was in user space.  Return 0, otherwise.
+ */
+int
+user_dbreg_trap(void)
+{
+        u_int64_t dr7, dr6; /* debug registers dr6 and dr7 */
+        u_int64_t bp;       /* breakpoint bits extracted from dr6 */
+        int nbp;            /* number of breakpoints that triggered */
+        caddr_t addr[4];    /* breakpoint addresses */
+        int i;
+        
+        dr7 = rdr7();
+        if ((dr7 & 0x000000ff) == 0) {
+                /*
+                 * all GE and LE bits in the dr7 register are zero,
+                 * thus the trap couldn't have been caused by the
+                 * hardware debug registers
+                 */
+                return 0;
+        }
+
+        nbp = 0;
+        dr6 = rdr6();
+        bp = dr6 & 0x0000000f;
+
+        if (!bp) {
+                /*
+                 * None of the breakpoint bits are set meaning this
+                 * trap was not caused by any of the debug registers
+                 */
+                return 0;
+        }
+
+        /*
+         * at least one of the breakpoints were hit, check to see
+         * which ones and if any of them are user space addresses
+         */
+
+        if (bp & 0x01) {
+                addr[nbp++] = (caddr_t)rdr0();
+        }
+        if (bp & 0x02) {
+                addr[nbp++] = (caddr_t)rdr1();
+        }
+        if (bp & 0x04) {
+                addr[nbp++] = (caddr_t)rdr2();
+        }
+        if (bp & 0x08) {
+                addr[nbp++] = (caddr_t)rdr3();
+        }
+
+        for (i=0; i<nbp; i++) {
+                if (addr[i] <
+                    (caddr_t)VM_MAXUSER_ADDRESS) {
+                        /*
+                         * addr[i] is in user space
+                         */
+                        return nbp;
+                }
+        }
+
+        /*
+         * None of the breakpoints are in user space.
+         */
+        return 0;
+}
+
+#ifdef KDB
 
 /*
  * Provide inb() and outb() as functions.  They are normally only
  * available as macros calling inlined functions, thus cannot be
- * called inside DDB.
+ * called from the debugger.
  *
  * The actual code is stolen from <machine/cpufunc.h>, and de-inlined.
  */
@@ -1622,4 +1838,4 @@ outb(u_int port, u_char data)
 	__asm __volatile("outb %0,%%dx" : : "a" (al), "d" (port));
 }
 
-#endif /* DDB */
+#endif /* KDB */

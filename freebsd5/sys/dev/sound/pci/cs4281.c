@@ -37,7 +37,7 @@
 
 #include <dev/sound/pci/cs4281.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/cs4281.c,v 1.17 2003/09/02 17:30:37 jhb Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/cs4281.c,v 1.20 2004/07/16 03:59:27 tanimura Exp $");
 
 #define CS4281_DEFAULT_BUFSZ 16384
 
@@ -810,8 +810,8 @@ cs4281_pci_attach(device_t dev)
     }
 
     sc->irqid = 0;
-    sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irqid,
-				 0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+    sc->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irqid,
+				     RF_ACTIVE | RF_SHAREABLE);
     if (!sc->irq) {
 	device_printf(dev, "unable to allocate interrupt\n");
 	goto bad;
@@ -858,9 +858,9 @@ cs4281_pci_attach(device_t dev)
     pcm_addchan(dev, PCMDIR_PLAY, &cs4281chan_class, sc);
     pcm_addchan(dev, PCMDIR_REC, &cs4281chan_class, sc);
 
-    snprintf(status, SND_STATUSLEN, "at %s 0x%lx irq %ld",
+    snprintf(status, SND_STATUSLEN, "at %s 0x%lx irq %ld %s",
 	     (sc->regtype == SYS_RES_IOPORT)? "io" : "memory",
-	     rman_get_start(sc->reg), rman_get_start(sc->irq));
+	     rman_get_start(sc->reg), rman_get_start(sc->irq),PCM_KLDSTRING(snd_cs4281));
     pcm_setstatus(dev, status);
 
     return 0;
@@ -976,5 +976,5 @@ static driver_t cs4281_driver = {
 };
 
 DRIVER_MODULE(snd_cs4281, pci, cs4281_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_cs4281, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_cs4281, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_cs4281, 1);

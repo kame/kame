@@ -30,13 +30,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/lnc/if_lnc_isa.c,v 1.16 2003/08/24 17:49:15 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/lnc/if_lnc_isa.c,v 1.18 2004/05/30 20:08:35 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 
 #include <machine/bus.h>
@@ -62,8 +63,8 @@ lnc_legacy_probe(device_t dev)
 	struct lnc_softc *sc = device_get_softc(dev);
 
 	sc->portrid = 0;
-	sc->portres = bus_alloc_resource(dev, SYS_RES_IOPORT, &sc->portrid,
-					 0, ~0, 1, RF_ACTIVE);
+	sc->portres = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &sc->portrid,
+					     RF_ACTIVE);
 
 	if (! sc->portres) {
 		device_printf(dev, "Failed to allocate I/O ports\n");
@@ -141,8 +142,8 @@ lnc_isa_attach(device_t dev)
 	device_printf(dev, "Attaching %s\n", device_get_desc(dev));
 
 	sc->portrid = 0;
-	sc->portres = bus_alloc_resource(dev, SYS_RES_IOPORT, &sc->portrid,
-					 0, ~0, 1, RF_ACTIVE);
+	sc->portres = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &sc->portrid,
+					     RF_ACTIVE);
 
 	if (! sc->portres) {
 		device_printf(dev, "Failed to allocate I/O ports\n");
@@ -151,8 +152,8 @@ lnc_isa_attach(device_t dev)
 	}
 
 	sc->drqrid = 0;
-	sc->drqres = bus_alloc_resource(dev, SYS_RES_DRQ, &sc->drqrid,
-					 0, ~0, 1, RF_ACTIVE);
+	sc->drqres = bus_alloc_resource_any(dev, SYS_RES_DRQ, &sc->drqrid,
+					    RF_ACTIVE);
 
 	if (! sc->drqres) {
 		device_printf(dev, "Failed to allocate DMA channel\n");
@@ -164,8 +165,8 @@ lnc_isa_attach(device_t dev)
 		bus_set_resource(dev, SYS_RES_IRQ, 0, 10, 1);
 
 	sc->irqrid = 0;
-	sc->irqres = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irqrid, 0, ~0, 1,
-	                                RF_ACTIVE);
+	sc->irqres = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irqrid,
+					    RF_ACTIVE);
 
 	if (! sc->irqres) {
 		device_printf(dev, "Failed to allocate irq\n");

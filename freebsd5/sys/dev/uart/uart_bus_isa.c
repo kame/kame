@@ -23,7 +23,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/uart/uart_bus_isa.c,v 1.2 2003/09/26 05:14:56 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/uart/uart_bus_isa.c,v 1.3.2.1 2004/09/24 22:50:57 marius Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -39,11 +39,13 @@ __FBSDID("$FreeBSD: src/sys/dev/uart/uart_bus_isa.c,v 1.2 2003/09/26 05:14:56 ma
 
 #include <dev/uart/uart.h>
 #include <dev/uart/uart_bus.h>
+#include <dev/uart/uart_cpu.h>
 
 static int uart_isa_probe(device_t dev);
 
 static device_method_t uart_isa_methods[] = {
 	/* Device interface */
+	DEVMETHOD(device_identify,	uart_cpu_identify),
 	DEVMETHOD(device_probe,		uart_isa_probe),
 	DEVMETHOD(device_attach,	uart_bus_attach),
 	DEVMETHOD(device_detach,	uart_bus_detach),
@@ -153,15 +155,14 @@ uart_isa_probe(device_t dev)
 	parent = device_get_parent(dev);
 	sc = device_get_softc(dev);
 
-	if (!ISA_PNP_PROBE(parent, dev, isa_ns8250_ids)) {
+	/* Probe PnP _and_ non-PnP ns8250 here. */
+	if (ISA_PNP_PROBE(parent, dev, isa_ns8250_ids) != ENXIO) {
 		sc->sc_class = &uart_ns8250_class;
 		return (uart_bus_probe(dev, 0, 0, 0, 0));
 	}
 
 	/* Add checks for non-ns8250 IDs here. */
-
-	sc->sc_class = &uart_ns8250_class;
-	return (uart_bus_probe(dev, 0, 0, 0, 0));
+	return (ENXIO);
 }
 
 DRIVER_MODULE(uart, isa, uart_isa_driver, uart_devclass, 0, 0);

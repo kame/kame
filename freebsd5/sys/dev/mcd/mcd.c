@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/mcd/mcd.c,v 1.139 2003/10/18 17:44:01 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/mcd/mcd.c,v 1.142 2004/06/16 09:46:49 phk Exp $");
 static const char COPYRIGHT[] = "mcd-driver (C)1993 by H.Veit & B.Moore";
 
 #include <sys/param.h>
@@ -153,24 +153,22 @@ static int	mcd_pause(struct mcd_softc *);
 static int	mcd_resume(struct mcd_softc *);
 static int	mcd_lock_door(struct mcd_softc *, int lock);
 static int	mcd_close_tray(struct mcd_softc *);
-static int	mcd_size(dev_t dev);
+static int	mcd_size(struct cdev *dev);
 
 static d_open_t		mcdopen;
 static d_close_t	mcdclose;
 static d_ioctl_t	mcdioctl;
 static d_strategy_t	mcdstrategy;
 
-#define CDEV_MAJOR 29
-
 static struct cdevsw mcd_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	mcdopen,
 	.d_close =	mcdclose,
 	.d_read =	physread,
 	.d_ioctl =	mcdioctl,
 	.d_strategy =	mcdstrategy,
 	.d_name =	"mcd",
-	.d_maj =	CDEV_MAJOR,
-	.d_flags =	D_DISK,
+	.d_flags =	D_DISK | D_NEEDGIANT,
 };
 
 #define MCD_RETRYS	5
@@ -213,7 +211,7 @@ mcd_attach(struct mcd_softc *sc)
 }
 
 static int
-mcdopen(dev_t dev, int flags, int fmt, struct thread *td)
+mcdopen(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	struct mcd_softc *sc;
 	int r,retry;
@@ -273,7 +271,7 @@ mcdopen(dev_t dev, int flags, int fmt, struct thread *td)
 }
 
 static int
-mcdclose(dev_t dev, int flags, int fmt, struct thread *td)
+mcdclose(struct cdev *dev, int flags, int fmt, struct thread *td)
 {
 	struct mcd_softc *sc;
 
@@ -370,7 +368,7 @@ mcd_start(struct mcd_softc *sc)
 }
 
 static int
-mcdioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct thread *td)
+mcdioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags, struct thread *td)
 {
 	struct mcd_softc *sc;
 	int retry,r;
@@ -468,7 +466,7 @@ MCD_TRACE("ioctl called 0x%lx\n", cmd);
 }
 
 static int
-mcd_size(dev_t dev)
+mcd_size(struct cdev *dev)
 {
 	struct mcd_softc *sc;
 	int size;

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/isp_freebsd.h,v 1.73 2003/10/21 21:52:23 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/isp_freebsd.h,v 1.75.2.1 2004/10/11 23:59:03 mjacob Exp $ */
 /*
  * Qlogic ISP SCSI Host Adapter FreeBSD Wrapper Definitions
  * Copyright (c) 1997, 1998, 1999, 2000, 2001, 2002 by Matthew Jacob
@@ -61,10 +61,9 @@
 #include "opt_ddb.h"
 #include "opt_isp.h"
 
-/*
- * Not quite yet
- */
-/* #define	ISP_DAC_SUPPORTED	1 */
+#ifdef	PAE
+#define	ISP_DAC_SUPPORTED	1
+#endif
 
 /*
  * Efficiency- get rid of SBus code && tests unless we need them.
@@ -113,6 +112,7 @@ typedef struct tstate {
 	int bus;
 	u_int32_t hold;
 	int atio_count;
+	int inot_count;
 } tstate_t;
 
 #define	LUN_HASH_SIZE			32
@@ -147,15 +147,11 @@ struct isposinfo {
 #define	isp_cdmat		isp_osinfo.cdmat
 #define	isp_cdmap		isp_osinfo.cdmap
 #ifdef	ISP_TARGET_MODE
-#define	TM_WANTED		0x80
-#define	TM_BUSY			0x40
 #define	TM_WILDCARD_ENABLED	0x02
 #define	TM_TMODE_ENABLED	0x01
-	struct cv		tgtcv0[2];	/* two busses */
-	struct cv		tgtcv1[2];	/* two busses */
 	u_int8_t		tmflags[2];	/* two busses */
-	u_int8_t		rstatus[2];	/* two bussed */
-	u_int16_t		rollinfo;
+#define	NLEACT	4
+	union ccb *		leact[NLEACT];
 	tstate_t		tsdflt[2];	/* two busses */
 	tstate_t		*lun_hash[LUN_HASH_SIZE];
 	atio_private_data_t	atpdp[ATPDPSIZE];

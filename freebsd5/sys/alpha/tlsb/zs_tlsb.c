@@ -31,13 +31,12 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/alpha/tlsb/zs_tlsb.c,v 1.39 2003/09/26 19:35:49 phk Exp $");
-
-#include "opt_ddb.h"
+__FBSDID("$FreeBSD: src/sys/alpha/tlsb/zs_tlsb.c,v 1.47 2004/07/15 20:47:36 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
+#include <sys/kdb.h>
 #include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
@@ -68,18 +67,13 @@ struct zs_softc {
 
 static	d_open_t	zsopen;
 static	d_close_t	zsclose;
-static	d_ioctl_t	zsioctl;
 
-#define CDEV_MAJOR 135
 static struct cdevsw zs_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	zsopen,
 	.d_close =	zsclose,
-	.d_read =	ttyread,
-	.d_write =	ttywrite,
-	.d_ioctl =	zsioctl,
-	.d_poll =	ttypoll,
 	.d_name =	"zs",
-	.d_maj =	CDEV_MAJOR,
+	.d_flags =	D_TTY | D_NEEDGIANT,
 };
 
 static void	zsstart(struct tty *);
@@ -263,7 +257,7 @@ zs_cnputc(struct consdev *cp, int c)
 
 
 static int
-zsopen(dev_t dev, int flag, int mode, struct thread *td)
+zsopen(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 	struct zs_softc *sc = ZS_SOFTC(minor(dev));
 	struct tty *tp;
@@ -296,7 +290,7 @@ zsopen(dev_t dev, int flag, int mode, struct thread *td)
 
 	splx(s);
 
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = ttyld_open(tp, dev);
 
 	if (error == 0 && setuptimeout) {
 		zspolltime = hz / 50;
@@ -310,7 +304,7 @@ zsopen(dev_t dev, int flag, int mode, struct thread *td)
 }
  
 static int
-zsclose(dev_t dev, int flag, int mode, struct thread *td)
+zsclose(struct cdev *dev, int flag, int mode, struct thread *td)
 {
 	struct zs_softc *sc = ZS_SOFTC(minor(dev));
 	struct tty *tp;
@@ -323,38 +317,13 @@ zsclose(dev_t dev, int flag, int mode, struct thread *td)
 
 	s = spltty();
 	untimeout(zs_poll_intr, sc, sc->zst);
-	(*linesw[tp->t_line].l_close)(tp, flag);
-	ttyclose(tp);
+	ttyld_close(tp, flag);
+	tty_close(tp);
 	splx(s);
 
 	return (0);
 }
  
-static int
-zsioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
-{
-	struct zs_softc *sc = ZS_SOFTC(minor(dev));
-	struct tty *tp;
-	int error;
-	
-	if (sc == NULL)
-		return (ENXIO);
-
-	tp = ZS_SOFTC(minor(dev))->tp;
-
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, td);
-
-	if (error != ENOIOCTL)
-		return (error);
-
-	error = ttioctl(tp, cmd, data, flag);
-
-	if (error != ENOIOCTL)
-		return (error);
-	else
-		return (ENOTTY);
-}
-
 static int
 zsparam(struct tty *tp, struct termios *t)
 {
@@ -527,12 +496,12 @@ zsc_tlsb_intr(void *arg)
 
 		while (zs_get_status(base, 0) & 1) {
 			c = zs_get_data(base, 0);
-#ifdef DDB
+#ifdef KDB
 			if (c == CTRL('\\'))
-				Debugger("manual escape to debugger");
+				kdb_enter("manual escape to debugger");
 #endif
 			if (tp && (tp->t_state & TS_ISOPEN))
-				(*linesw[tp->t_line].l_rint)(c, tp);
+				ttyld_rint(tp, c);
 			DELAY(5);
 		}
 	}
@@ -542,12 +511,12 @@ zsc_tlsb_intr(void *arg)
 
 		while (zs_get_status(base, 1) & 1) {
 			c = zs_get_data(base, 1);
-#ifdef DDB
+#ifdef KDB
 			if (c == CTRL('\\'))
-				Debugger("manual escape to debugger");
+				kdb_enter("manual escape to debugger");
 #endif
 			if (tp && (tp->t_state & TS_ISOPEN))
-				(*linesw[tp->t_line].l_rint)(c, tp);
+				ttyld_rint(tp, c);
 			DELAY(5);
 		}
 	}

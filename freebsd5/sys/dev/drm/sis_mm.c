@@ -26,7 +26,7 @@
  * Authors:
  *    Sung-Ching Lin <sclin@sis.com.tw>
  * 
- * $FreeBSD: src/sys/dev/drm/sis_mm.c,v 1.2 2003/10/24 01:48:17 anholt Exp $
+ * $FreeBSD: src/sys/dev/drm/sis_mm.c,v 1.4 2004/06/11 03:26:59 anholt Exp $
  */
 
 #include "dev/drm/sis.h"
@@ -35,7 +35,11 @@
 #include "dev/drm/sis_drv.h"
 #include "dev/drm/sis_ds.h"
 #if defined(__linux__) && defined(CONFIG_FB_SIS)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
+#include <video/sisfb.h>
+#else
 #include <linux/sisfb.h>
+#endif
 #endif
 
 #define MAX_CONTEXT 100
@@ -368,7 +372,7 @@ int sis_final_context(int context)
 
 	if (i < MAX_CONTEXT) {
 		set_t *set;
-		unsigned int item;
+		ITEM_TYPE item;
 		int retval;
 
 		DRM_DEBUG("find socket %d, context = %d\n", i, context);
@@ -377,7 +381,7 @@ int sis_final_context(int context)
 		set = global_ppriv[i].sets[0];
 		retval = setFirst(set, &item);
 		while (retval) {
-			DRM_DEBUG("free video memory 0x%x\n", item);
+			DRM_DEBUG("free video memory 0x%lx\n", item);
 #if defined(__linux__) && defined(CONFIG_FB_SIS)
 			sis_free(item);
 #else
@@ -391,7 +395,7 @@ int sis_final_context(int context)
 		set = global_ppriv[i].sets[1];
 		retval = setFirst(set, &item);
 		while (retval) {
-			DRM_DEBUG("free agp memory 0x%x\n", item);
+			DRM_DEBUG("free agp memory 0x%lx\n", item);
 			mmFreeMem((PMemBlock)item);
 			retval = setNext(set, &item);
 		}

@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -35,7 +31,7 @@
  *
  *	@(#)null_subr.c	8.7 (Berkeley) 5/14/95
  *
- * $FreeBSD: src/sys/fs/nullfs/null_subr.c,v 1.41 2003/06/17 08:52:45 tjr Exp $
+ * $FreeBSD: src/sys/fs/nullfs/null_subr.c,v 1.43 2004/07/10 21:20:11 marcel Exp $
  */
 
 #include <sys/param.h>
@@ -308,9 +304,8 @@ null_hashrem(xp)
 }
 
 #ifdef DIAGNOSTIC
-#include "opt_ddb.h"
 
-#ifdef DDB
+#ifdef KDB
 #define	null_checkvp_barrier	1
 #else
 #define	null_checkvp_barrier	0

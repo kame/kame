@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/if_kue.c,v 1.52 2003/11/14 11:09:45 johan Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/if_kue.c,v 1.58 2004/08/11 03:38:55 rwatson Exp $");
 
 /*
  * Kawasaki LSI KL5KUSB101B USB to ethernet adapter driver.
@@ -71,6 +71,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/if_kue.c,v 1.52 2003/11/14 11:09:45 johan Ex
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 
 #include <net/if.h>
@@ -91,7 +92,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/if_kue.c,v 1.52 2003/11/14 11:09:45 johan Ex
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
 #include <dev/usb/usbdivar.h>
-#include <dev/usb/usbdevs.h>
+#include "usbdevs.h"
 #include <dev/usb/usb_ethersubr.h>
 
 #include <dev/usb/if_kuereg.h>
@@ -124,8 +125,6 @@ Static struct kue_type kue_devs[] = {
 	{ USB_VENDOR_ABOCOM, USB_PRODUCT_ABOCOM_URE450 },
 	{ 0, 0 }
 };
-
-Static struct usb_qdat kue_qdat;
 
 Static int kue_match(device_ptr_t);
 Static int kue_attach(device_ptr_t);
@@ -475,12 +474,6 @@ USB_ATTACH(kue)
 	sc->kue_mcfilters = malloc(KUE_MCFILTCNT(sc) * ETHER_ADDR_LEN,
 	    M_USBDEV, M_NOWAIT);
 
-	/*
-	 * A KLSI chip was detected. Inform the world.
-	 */
-	printf("kue%d: Ethernet address: %6D\n", sc->kue_unit,
-	    sc->kue_desc.kue_macaddr, ":");
-
 	bcopy(sc->kue_desc.kue_macaddr,
 	    (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
 
@@ -488,17 +481,17 @@ USB_ATTACH(kue)
 	ifp->if_softc = sc;
 	if_initname(ifp, "kue", sc->kue_unit);
 	ifp->if_mtu = ETHERMTU;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_NEEDSGIANT;
 	ifp->if_ioctl = kue_ioctl;
-	ifp->if_output = ether_output;
 	ifp->if_start = kue_start;
 	ifp->if_watchdog = kue_watchdog;
 	ifp->if_init = kue_init;
 	ifp->if_baudrate = 10000000;
 	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 
-	kue_qdat.ifp = ifp;
-	kue_qdat.if_rxstart = kue_rxstart;
+	sc->kue_qdat.ifp = ifp;
+	sc->kue_qdat.if_rxstart = kue_rxstart;
 
 	/*
 	 * Call MI attach routine.
@@ -718,7 +711,7 @@ Static void kue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv,
 	}
 
 	ifp->if_ipackets++;
-	m->m_pkthdr.rcvif = (struct ifnet *)&kue_qdat;
+	m->m_pkthdr.rcvif = (struct ifnet *)&sc->kue_qdat;
 	m->m_pkthdr.len = m->m_len = total_len;
 
 	/* Put the packet on the special USB input queue. */

@@ -20,10 +20,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by the University of
- *      California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -44,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/zs/zs.c,v 1.15 2003/11/09 09:17:23 tanimura Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/zs/zs.c,v 1.26 2004/07/15 20:47:40 phk Exp $");
 /*-
  * Copyright (c) 2003 Jake Burkholder.
  * All rights reserved.
@@ -76,7 +72,6 @@ __FBSDID("$FreeBSD: src/sys/dev/zs/zs.c,v 1.15 2003/11/09 09:17:23 tanimura Exp 
  * Zilog Z8530 Dual UART driver.
  */
 
-#include "opt_ddb.h"
 #include "opt_comconsole.h"
 
 #include <sys/param.h>
@@ -86,6 +81,7 @@ __FBSDID("$FreeBSD: src/sys/dev/zs/zs.c,v 1.15 2003/11/09 09:17:23 tanimura Exp 
 #include <sys/cons.h>
 #include <sys/fcntl.h>
 #include <sys/interrupt.h>
+#include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/mutex.h>
@@ -93,10 +89,9 @@ __FBSDID("$FreeBSD: src/sys/dev/zs/zs.c,v 1.15 2003/11/09 09:17:23 tanimura Exp 
 #include <machine/bus.h>
 #include <machine/resource.h>
 #include <sys/rman.h>
+#include <sys/serial.h>
 #include <sys/syslog.h>
 #include <sys/tty.h>
-
-#include <ddb/ddb.h>
 
 #include <dev/zs/z8530reg.h>
 #include <dev/zs/z8530var.h>
@@ -124,7 +119,6 @@ static void zs_shutdown(void *v);
 
 static int zstty_intr(struct zstty_softc *sc, uint8_t rr3);
 static void zstty_softintr(struct zstty_softc *sc) __unused;
-static int zstty_mdmctrl(struct zstty_softc *sc, int bits, int how);
 static int zstty_param(struct zstty_softc *sc, struct tty *tp,
     struct termios *t);
 static void zstty_flush(struct zstty_softc *sc) __unused;
@@ -145,22 +139,19 @@ static void zstty_cnputc(struct zstty_softc *sc, int c);
 
 static d_open_t zsttyopen;
 static d_close_t zsttyclose;
-static d_ioctl_t zsttyioctl;
 
 static void zsttystart(struct tty *tp);
 static void zsttystop(struct tty *tp, int rw);
 static int zsttyparam(struct tty *tp, struct termios *t);
+static void zsttybreak(struct tty *tp, int brk);
+static int zsttymodem(struct tty *tp, int biton, int bitoff);
 
 static struct cdevsw zstty_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	zsttyopen,
 	.d_close =	zsttyclose,
-	.d_read =	ttyread,
-	.d_write =	ttywrite,
-	.d_ioctl =	zsttyioctl,
-	.d_poll =	ttypoll,
 	.d_name =	"zstty",
-	.d_flags =	D_TTY,
-	.d_kqfilter =	ttykqfilter,
+	.d_flags =	D_TTY | D_NEEDGIANT,
 };
 
 static struct zstty_softc *zstty_cons;
@@ -281,6 +272,8 @@ zstty_attach(device_t dev)
 
 	tp->t_oproc = zsttystart;
 	tp->t_param = zsttyparam;
+	tp->t_modem = zsttymodem;
+	tp->t_break = zsttybreak;
 	tp->t_stop = zsttystop;
 	tp->t_iflag = TTYDEF_IFLAG;
 	tp->t_oflag = TTYDEF_OFLAG;
@@ -367,9 +360,10 @@ zstty_intr(struct zstty_softc *sc, uint8_t rr3)
 
 			if ((rr1 & (ZSRR1_FE | ZSRR1_DO | ZSRR1_PE)) != 0)
 				ZS_WRITE(sc, sc->sc_csr, ZSWR0_RESET_ERRORS);
-#if defined(DDB) && defined(ALT_BREAK_TO_DEBUGGER)
+#if defined(KDB) && defined(ALT_BREAK_TO_DEBUGGER)
 			if (sc->sc_console != 0)
-				brk = db_alt_break(c, &sc->sc_alt_break_state);
+				brk = kdb_alt_break(c,
+				    &sc->sc_alt_break_state);
 #endif
 			*sc->sc_iput++ = c;
 			*sc->sc_iput++ = rr1;
@@ -381,7 +375,7 @@ zstty_intr(struct zstty_softc *sc, uint8_t rr3)
 	if ((rr3 & ZSRR3_IP_B_STAT) != 0) {
 		rr0 = ZS_READ(sc, sc->sc_csr);
 		ZS_WRITE(sc, sc->sc_csr, ZSWR0_RESET_STATUS);
-#if defined(DDB) && defined(BREAK_TO_DEBUGGER)
+#if defined(KDB) && defined(BREAK_TO_DEBUGGER)
 		if (sc->sc_console != 0 && (rr0 & ZSRR0_BREAK) != 0)
 			brk = 1;
 #endif
@@ -443,18 +437,18 @@ zstty_softintr(struct zstty_softc *sc)
 		if (sc->sc_iget == sc->sc_ibuf + sizeof(sc->sc_ibuf))
 			sc->sc_iget = sc->sc_ibuf;
 
-		(*linesw[tp->t_line].l_rint)(data, tp);
+		ttyld_rint(tp, data);
 	}
 
 	if (sc->sc_tx_done != 0) {
 		sc->sc_tx_done = 0;
 		tp->t_state &= ~TS_BUSY;
-		(*linesw[tp->t_line].l_start)(tp);
+		ttyld_start(tp);
 	}
 }
 
 static int
-zsttyopen(dev_t dev, int flags, int mode, struct thread *td)
+zsttyopen(struct cdev *dev, int flags, int mode, struct thread *td)
 {
 	struct zstty_softc *sc;
 	struct tty *tp;
@@ -465,7 +459,7 @@ zsttyopen(dev_t dev, int flags, int mode, struct thread *td)
 
 	if ((tp->t_state & TS_ISOPEN) != 0 &&
 	    (tp->t_state & TS_XCLUDE) != 0 &&
-	    !suser(td))
+	    suser(td) != 0)
 		return (EBUSY);
 
 	if ((tp->t_state & TS_ISOPEN) == 0) {
@@ -498,11 +492,11 @@ zsttyopen(dev_t dev, int flags, int mode, struct thread *td)
 		/* XXX handle initial DCD */
 	}
 
-	error = ttyopen(dev, tp);
+	error = tty_open(dev, tp);
 	if (error != 0)
 		return (error);
 
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = ttyld_open(tp, dev);
 	if (error != 0)
 		return (error);
 
@@ -510,7 +504,7 @@ zsttyopen(dev_t dev, int flags, int mode, struct thread *td)
 }
 
 static int
-zsttyclose(dev_t dev, int flags, int mode, struct thread *td)
+zsttyclose(struct cdev *dev, int flags, int mode, struct thread *td)
 {
 	struct tty *tp;
 
@@ -519,62 +513,10 @@ zsttyclose(dev_t dev, int flags, int mode, struct thread *td)
 	if ((tp->t_state & TS_ISOPEN) == 0)
 		return (0);
 
-	(*linesw[tp->t_line].l_close)(tp, flags);
-	ttyclose(tp);
+	ttyld_close(tp, flags);
+	tty_close(tp);
 
 	return (0);
-}
-
-static int
-zsttyioctl(dev_t dev, u_long cmd, caddr_t data, int flags, struct thread *td)
-{
-	struct zstty_softc *sc;
-	struct tty *tp;
-	int error;
-
-	sc = dev->si_drv1;
-	tp = dev->si_tty;
-
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flags, td);
-	if (error != ENOIOCTL)
-		return (error);
-
-	error = ttioctl(tp, cmd, data, flags);
-	if (error != ENOIOCTL)
-		return (error);
-
-	error = 0;
-	switch (cmd) {
-	case TIOCSBRK:
-		ZS_WRITE_REG(sc, 5, ZS_READ_REG(sc, 5) | ZSWR5_BREAK);
-		break;
-	case TIOCCBRK:
-		ZS_WRITE_REG(sc, 5, ZS_READ_REG(sc, 5) & ~ZSWR5_BREAK);
-		break;
-	case TIOCSDTR:
-		zstty_mdmctrl(sc, TIOCM_DTR, DMBIS);
-		break;
-	case TIOCCDTR:
-		zstty_mdmctrl(sc, TIOCM_DTR, DMBIC);
-		break;
-	case TIOCMBIS:
-		zstty_mdmctrl(sc, *((int *)data), DMBIS);
-		break;
-	case TIOCMBIC:
-		zstty_mdmctrl(sc, *((int *)data), DMBIC);
-		break;
-	case TIOCMGET:
-		*((int *)data) = zstty_mdmctrl(sc, 0, DMGET);
-		break;
-	case TIOCMSET:
-		zstty_mdmctrl(sc, *((int *)data), DMSET);
-		break;
-	default:
-		error = ENOTTY;
-		break;
-	}
-
-	return (error);
 }
 
 static void
@@ -664,8 +606,22 @@ zsttyparam(struct tty *tp, struct termios *t)
 	return (zstty_param(sc, tp, t));
 }
 
+
+static void
+zsttybreak(struct tty *tp, int brk)
+{
+	struct zstty_softc *sc;
+
+	sc = tp->t_dev->si_drv1;
+
+	if (brk)
+		ZS_WRITE_REG(sc, 5, ZS_READ_REG(sc, 5) | ZSWR5_BREAK);
+	else
+		ZS_WRITE_REG(sc, 5, ZS_READ_REG(sc, 5) & ~ZSWR5_BREAK);
+}
+
 static int
-zstty_mdmctrl(struct zstty_softc *sc, int bits, int how)
+zsttymodem(struct tty *tp, int biton, int bitoff)
 {
 	/* XXX implement! */
 	return (0);
@@ -693,8 +649,10 @@ zstty_param(struct zstty_softc *sc, struct tty *tp, struct termios *t)
 	    tp->t_cflag == t->c_cflag)
 		return (0);
 
-	zstty_mdmctrl(sc, TIOCM_DTR,
-	    (t->c_ospeed == 0) ? DMBIC : DMBIS);
+	if (t->c_ospeed != 0)
+		zsttymodem(tp, SER_DTR, 0);
+	else
+		zsttymodem(tp, 0, SER_DTR);
 
 	cflag = t->c_cflag;
 

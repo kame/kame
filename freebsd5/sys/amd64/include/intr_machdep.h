@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/include/intr_machdep.h,v 1.2 2003/11/14 19:10:13 jhb Exp $
+ * $FreeBSD: src/sys/amd64/include/intr_machdep.h,v 1.4 2004/08/16 23:12:30 peter Exp $
  */
 
 #ifndef __MACHINE_INTR_MACHDEP_H__
@@ -50,13 +50,21 @@ struct intsrc;
  */
 struct pic {
 	void (*pic_enable_source)(struct intsrc *);
-	void (*pic_disable_source)(struct intsrc *);
+	void (*pic_disable_source)(struct intsrc *, int);
 	void (*pic_eoi_source)(struct intsrc *);
 	void (*pic_enable_intr)(struct intsrc *);
 	int (*pic_vector)(struct intsrc *);
 	int (*pic_source_pending)(struct intsrc *);
 	void (*pic_suspend)(struct intsrc *);
 	void (*pic_resume)(struct intsrc *);
+	int (*pic_config_intr)(struct intsrc *, enum intr_trigger,
+	    enum intr_polarity);
+};
+
+/* Flags for pic_disable_source() */
+enum {
+	PIC_EOI,
+	PIC_NO_EOI,
 };
 
 /*
@@ -77,8 +85,15 @@ struct intrframe;
 
 extern struct mtx icu_lock;
 
+/* XXX: The elcr_* prototypes probably belong somewhere else. */
+int	elcr_probe(void);
+enum intr_trigger elcr_read_trigger(u_int irq);
+void	elcr_resume(void);
+void	elcr_write_trigger(u_int irq, enum intr_trigger trigger);
 int	intr_add_handler(const char *name, int vector, driver_intr_t handler,
     void *arg, enum intr_type flags, void **cookiep);
+int	intr_config_intr(int vector, enum intr_trigger trig,
+    enum intr_polarity pol);
 void	intr_execute_handlers(struct intsrc *isrc, struct intrframe *iframe);
 struct intsrc *intr_lookup_source(int vector);
 int	intr_register_source(struct intsrc *isrc);

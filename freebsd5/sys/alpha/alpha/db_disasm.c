@@ -46,7 +46,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 /* __KERNEL_RCSID(0, "$NetBSD: db_disasm.c,v 1.4 1997/09/16 22:52:40 thorpej Exp $"); */
-__FBSDID("$FreeBSD: src/sys/alpha/alpha/db_disasm.c,v 1.9 2003/08/22 07:20:25 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/alpha/alpha/db_disasm.c,v 1.10 2004/07/10 23:47:18 marcel Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -813,26 +813,9 @@ register_name (ireg)
  * (optional) alternate format.  Return address of start of
  * next instruction.
  */
-int	alpha_print_instruction(db_addr_t, alpha_instruction, boolean_t);
 
-db_addr_t
-db_disasm(loc, altfmt)
-	db_addr_t	loc;
-	boolean_t	altfmt;
-{
-	alpha_instruction inst;
-
-	inst.bits = db_get_value(loc, 4, 0);
-
-	loc += alpha_print_instruction(loc, inst, altfmt);
-	return (loc);
-}
-
-int
-alpha_print_instruction(iadr, i, showregs)
-	db_addr_t	iadr;
-	alpha_instruction i;
-	boolean_t	showregs;
+static int
+alpha_print_instr(db_addr_t iadr, alpha_instruction i, boolean_t showregs)
 {
 	const char	*opcode;
 	int		ireg;
@@ -1038,7 +1021,7 @@ loadstore_address:
 			if (i.mem_format.opcode == op_ldah)
 				signed_immediate <<= 16;
 			db_printf(" <0x%lx>", signed_immediate +
-			    db_register_value(DDB_REGS, i.mem_format.rs));
+			    db_register_value(i.mem_format.rs));
 		}
 		break;
 	case op_br:
@@ -1084,10 +1067,23 @@ branch_displacement:
 				db_printf(",");
 			db_printf("%s=0x%lx",
 			    name_of_register[regnum[ireg]],
-			    db_register_value(DDB_REGS, regnum[ireg]));
+			    db_register_value(regnum[ireg]));
 		}
 		db_printf(">");
 	}
 	db_printf("\n");
 	return (sizeof(alpha_instruction));
+}
+
+db_addr_t
+db_disasm(loc, altfmt)
+	db_addr_t	loc;
+	boolean_t	altfmt;
+{
+	alpha_instruction inst;
+
+	inst.bits = db_get_value(loc, 4, 0);
+
+	loc += alpha_print_instr(loc, inst, altfmt);
+	return (loc);
 }

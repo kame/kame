@@ -1,6 +1,5 @@
 /* 
- * $FreeBSD: src/sys/boot/alpha/libalpha/srmnet.c,v 1.4 1999/09/06 18:32:40 dfr Exp $
- * From: $NetBSD: if_prom.c,v 1.10 1997/09/06 14:08:33 drochner Exp $ 
+ * $NetBSD: if_prom.c,v 1.10 1997/09/06 14:08:33 drochner Exp $ 
  */
 
 /*
@@ -34,6 +33,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/alpha/libalpha/srmnet.c,v 1.5 2004/01/04 23:21:01 obrien Exp $");
 
 #include <sys/param.h>
 #include <sys/types.h>

@@ -14,10 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -34,10 +30,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/amd64/amd64/cpu_switch.S,v 1.144 2003/11/17 08:58:12 peter Exp $
+ * $FreeBSD: src/sys/amd64/amd64/cpu_switch.S,v 1.151 2004/08/16 22:53:29 peter Exp $
  */
 
 #include <machine/asmacros.h>
+#include <machine/specialreg.h>
 
 #include "assym.s"
 
@@ -47,10 +44,16 @@
 
 	.text
 
+#ifdef SMP
+#define LK	lock ;
+#else
+#define LK
+#endif
+
 /*
  * cpu_throw()
  *
- * This is the second half of cpu_swtch(). It is used when the current
+ * This is the second half of cpu_switch(). It is used when the current
  * thread is either a dummy or slated to die, and we no longer care
  * about its state.  This is only a slight optimization and is probably
  * not worth it anymore.  Note that we need to clear the pm_active bits so
@@ -65,10 +68,7 @@ ENTRY(cpu_throw)
 	/* release bit from old pm_active */
 	movq	TD_PROC(%rdi), %rdx		/* oldtd->td_proc */
 	movq	P_VMSPACE(%rdx), %rdx		/* proc->p_vmspace */
-#ifdef SMP
-	lock
-#endif
-	btrl	%eax, VM_PMAP+PM_ACTIVE(%rdx)	/* clear old */
+	LK btrl	%eax, VM_PMAP+PM_ACTIVE(%rdx)	/* clear old */
 1:
 	movq	TD_PCB(%rsi),%rdx		/* newtd->td_proc */
 	movq	PCB_CR3(%rdx),%rdx
@@ -76,10 +76,7 @@ ENTRY(cpu_throw)
 	/* set bit in new pm_active */
 	movq	TD_PROC(%rsi),%rdx
 	movq	P_VMSPACE(%rdx), %rdx
-#ifdef SMP
-	lock
-#endif
-	btsl	%eax, VM_PMAP+PM_ACTIVE(%rdx)	/* set new */
+	LK btsl	%eax, VM_PMAP+PM_ACTIVE(%rdx)	/* set new */
 	jmp	sw1
 
 /*
@@ -91,13 +88,7 @@ ENTRY(cpu_throw)
  * %rsi = newtd
  */
 ENTRY(cpu_switch)
-
 	/* Switch to new thread.  First, save context. */
-#ifdef INVARIANTS
-	testq	%rdi,%rdi			/* no thread? */
-	jz	badsw2				/* no, panic */
-#endif
-
 	movq	TD_PCB(%rdi),%r8
 
 	movq	(%rsp),%rax			/* Hardware registers */
@@ -112,6 +103,17 @@ ENTRY(cpu_switch)
 	pushfq					/* PSL */
 	popq	PCB_RFLAGS(%r8)
 
+	testl	$PCB_32BIT,PCB_FLAGS(%r8)
+	jz	1f				/* no, skip over */
+
+	/* Save segment selector numbers */
+	movl	%ds,PCB_DS(%r8)
+	movl	%es,PCB_ES(%r8)
+	movl	%fs,PCB_FS(%r8)
+	movl	%gs,PCB_GS(%r8)
+	jmp	2f
+1:
+
 	/* Save userland %fs */
 	movl	$MSR_FSBASE,%ecx
 	rdmsr
@@ -123,52 +125,60 @@ ENTRY(cpu_switch)
 	rdmsr
 	movl	%eax,PCB_GSBASE(%r8)
 	movl	%edx,PCB_GSBASE+4(%r8)
+2:
 
-	/* Save segment selector numbers */
-	movl	%ds,PCB_DS(%r8)
-	movl	%es,PCB_ES(%r8)
-	movl	%fs,PCB_FS(%r8)
-	movl	%gs,PCB_GS(%r8)
+	/* Test if debug registers should be saved. */
+	testl	$PCB_DBREGS,PCB_FLAGS(%r8)
+	jz	1f				/* no, skip over */
+	movq	%dr7,%rax			/* yes, do the save */
+	movq	%rax,PCB_DR7(%r8)
+	andq	$0x0000fc00, %rax		/* disable all watchpoints */
+	movq	%rax,%dr7
+	movq	%dr6,%rax
+	movq	%rax,PCB_DR6(%r8)
+	movq	%dr3,%rax
+	movq	%rax,PCB_DR3(%r8)
+	movq	%dr2,%rax
+	movq	%rax,PCB_DR2(%r8)
+	movq	%dr1,%rax
+	movq	%rax,PCB_DR1(%r8)
+	movq	%dr0,%rax
+	movq	%rax,PCB_DR0(%r8)
+1:
 
 	/* have we used fp, and need a save? */
 	cmpq	%rdi,PCPU(FPCURTHREAD)
 	jne	1f
-	pushq	%rdi
-	pushq	%rsi
-	addq	$PCB_SAVEFPU,%r8		/* h/w bugs make saving complicated */
-	movq	%r8, %rdi
-	call	fpusave				/* do it in a big C function */
-	popq	%rsi
-	popq	%rdi
+	addq	$PCB_SAVEFPU,%r8
+	clts
+	fxsave	(%r8)
+	smsw	%ax
+	orb	$CR0_TS,%al
+	lmsw	%ax
+	xorq	%rax,%rax
+	movq	%rax,PCPU(FPCURTHREAD)
 1:
 
 	/* Save is done.  Now fire up new thread. Leave old vmspace. */
-#ifdef INVARIANTS
-	testq	%rsi,%rsi			/* no thread? */
-	jz	badsw3				/* no, panic */
-#endif
 	movq	TD_PCB(%rsi),%r8
-	movl	PCPU(CPUID), %eax
 
 	/* switch address space */
 	movq	PCB_CR3(%r8),%rdx
+	movq	%cr3,%rax
+	cmpq	%rdx,%rax			/* Same address space? */
+	je	sw1
 	movq	%rdx,%cr3			/* new address space */
 
+	movl	PCPU(CPUID), %eax
 	/* Release bit from old pmap->pm_active */
 	movq	TD_PROC(%rdi), %rdx		/* oldproc */
 	movq	P_VMSPACE(%rdx), %rdx
-#ifdef SMP
-	lock
-#endif
-	btrl	%eax, VM_PMAP+PM_ACTIVE(%rdx)	/* clear old */
+	LK btrl	%eax, VM_PMAP+PM_ACTIVE(%rdx)	/* clear old */
 
 	/* Set bit in new pmap->pm_active */
 	movq	TD_PROC(%rsi),%rdx		/* newproc */
 	movq	P_VMSPACE(%rdx), %rdx
-#ifdef SMP
-	lock
-#endif
-	btsl	%eax, VM_PMAP+PM_ACTIVE(%rdx)	/* set new */
+	LK btsl	%eax, VM_PMAP+PM_ACTIVE(%rdx)	/* set new */
 
 sw1:
 	/*
@@ -176,6 +186,9 @@ sw1:
 	 * to load up the rest of the next context.
 	 */
 	movq	TD_PCB(%rsi),%r8
+
+	testl	$PCB_32BIT,PCB_FLAGS(%r8)
+	jz	1f				/* no, skip over */
 
 	/* Restore segment selector numbers */
 	movl	PCB_DS(%r8),%ds
@@ -187,6 +200,8 @@ sw1:
 	rdmsr
 	movl	PCB_GS(%r8),%gs
 	wrmsr
+	jmp	2f
+1:
 
 	/* Restore userland %fs */
 	movl	$MSR_FSBASE,%ecx
@@ -199,6 +214,7 @@ sw1:
 	movl	PCB_GSBASE(%r8),%eax
 	movl	PCB_GSBASE+4(%r8),%edx
 	wrmsr
+2:
 
 	/* Update the TSS_RSP0 pointer for the next interrupt */
 	movq	PCPU(TSSP), %rax
@@ -223,72 +239,29 @@ sw1:
 	movq	%r8, PCPU(CURPCB)
 	movq	%rsi, PCPU(CURTHREAD)		/* into next thread */
 
+	/* Test if debug registers should be restored. */
+	testl	$PCB_DBREGS,PCB_FLAGS(%r8)
+	jz	1f
+	movq	PCB_DR6(%r8),%rax
+	movq	%rax,%dr6
+	movq	PCB_DR3(%r8),%rax
+	movq	%rax,%dr3
+	movq	PCB_DR2(%r8),%rax
+	movq	%rax,%dr2
+	movq	PCB_DR1(%r8),%rax
+	movq	%rax,%dr1
+	movq	PCB_DR0(%r8),%rax
+	movq	%rax,%dr0
+	/* But preserve reserved bits in %dr7 */
+	movq	%dr7,%rax
+	andq	$0x0000fc00,%rax
+	movq	PCB_DR7(%r8),%rcx
+	andq	$~0x0000fc00,%rcx
+	orq	%rcx,%rax
+	movq	%rax,%dr7
+1:
 	ret
 
-#ifdef INVARIANTS
-badsw1:
-	pushq	%rax
-	pushq	%rcx
-	pushq	%rdx
-	pushq	%rbx
-	pushq	%rbp
-	pushq	%rsi
-	pushq	%rdi
-	pushq	%r8
-	pushq	%r9
-	pushq	%r10
-	pushq	%r11
-	pushq	%r12
-	pushq	%r13
-	pushq	%r14
-	pushq	%r15
-	pushq	$sw0_1
-	call	panic
-sw0_1:	.asciz	"cpu_throw: no newthread supplied"
-
-badsw2:
-	pushq	%rax
-	pushq	%rcx
-	pushq	%rdx
-	pushq	%rbx
-	pushq	%rbp
-	pushq	%rsi
-	pushq	%rdi
-	pushq	%r8
-	pushq	%r9
-	pushq	%r10
-	pushq	%r11
-	pushq	%r12
-	pushq	%r13
-	pushq	%r14
-	pushq	%r15
-	pushq	$sw0_2
-	call	panic
-sw0_2:	.asciz	"cpu_switch: no curthread supplied"
-
-badsw3:
-	pushq	%rax
-	pushq	%rcx
-	pushq	%rdx
-	pushq	%rbx
-	pushq	%rbp
-	pushq	%rsi
-	pushq	%rdi
-	pushq	%r8
-	pushq	%r9
-	pushq	%r10
-	pushq	%r11
-	pushq	%r12
-	pushq	%r13
-	pushq	%r14
-	pushq	%r15
-	pushq	$sw0_3
-	call	panic
-sw0_3:	.asciz	"cpu_switch: no newthread supplied"
-#endif
-
-noswitch:	.asciz	"cpu_switch: called!"
-nothrow:	.asciz	"cpu_throw: called!"
 /*
  * savectx(pcb)
  * Update pcb, saving current processor state.
@@ -332,17 +305,17 @@ ENTRY(savectx)
 	testq	%rax,%rax
 	je	1f
 
-	pushq	%rcx
-	pushq	%rax
 	movq	TD_PCB(%rax),%rdi
 	leaq	PCB_SAVEFPU(%rdi),%rdi
-	call	fpusave
-	popq	%rax
-	popq	%rcx
+	clts
+	fxsave	(%rdi)
+	smsw	%ax
+	orb	$CR0_TS,%al
+	lmsw	%ax
 
 	movq	$PCB_SAVEFPU_SIZE,%rdx	/* arg 3 */
 	leaq	PCB_SAVEFPU(%rcx),%rsi	/* arg 2 */
-	movq	%rax,%rdi		/* arg 1 */
+	/* arg 1 (%rdi) already loaded */
 	call	bcopy
 1:
 	popfq

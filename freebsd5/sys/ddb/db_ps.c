@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -32,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ddb/db_ps.c,v 1.49 2003/08/30 19:06:57 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/ddb/db_ps.c,v 1.52.2.1 2004/09/09 10:03:18 julian Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -104,7 +100,7 @@ db_ps(dummy1, dummy2, dummy3, dummy4)
 		    p->p_ucred != NULL ? p->p_ucred->cr_ruid : 0, pp->p_pid,
 		    p->p_pgrp != NULL ? p->p_pgrp->pg_id : 0, p->p_flag,
 		    state);
-		if (p->p_flag & P_SA) 
+		if (p->p_flag & P_HADTHREADS)
 			db_printf("(threaded)  %s\n", p->p_comm);
 		FOREACH_THREAD_IN_PROC(p, td) {
 			dumpthread(p, td);
@@ -124,22 +120,10 @@ static void
 dumpthread(volatile struct proc *p, volatile struct thread *td)
 {
 
-	if (p->p_flag & P_SA) 
+	if (p->p_flag & P_HADTHREADS)
 		db_printf( "   thread %p ksegrp %p ", td, td->td_ksegrp);
-	if (TD_ON_SLEEPQ(td)) {
-		if (td->td_flags & TDF_CVWAITQ)
-			if (TD_IS_SLEEPING(td))
-				db_printf("[CV]");
-			else
-				db_printf("[CVQ");
-		else
-			if (TD_IS_SLEEPING(td))
-				db_printf("[SLP]");
-			else
-				db_printf("[SLPQ");
-		db_printf("%s %p]", td->td_wmesg,
-		    (void *)td->td_wchan);
-	}
+	if (TD_ON_SLEEPQ(td))
+		db_printf("[SLPQ %s %p]", td->td_wmesg, (void *)td->td_wchan);
 	switch (td->td_state) {
 	case TDS_INHIBITED:
 		if (TD_ON_LOCK(td)) {
@@ -147,11 +131,9 @@ dumpthread(volatile struct proc *p, volatile struct thread *td)
 			    td->td_lockname,
 			    (void *)td->td_blocked);
 		}
-#if 0 /* covered above */
 		if (TD_IS_SLEEPING(td)) {
 			db_printf("[SLP]");
 		}  
-#endif
 		if (TD_IS_SWAPPED(td)) {
 			db_printf("[SWAP]");
 		}
@@ -177,36 +159,12 @@ dumpthread(volatile struct proc *p, volatile struct thread *td)
 	default:
 		db_printf("[UNK: %#x]", td->td_state);
 	}
-	if (p->p_flag & P_SA) {
+	if (p->p_flag & P_HADTHREADS) {
+#ifdef KEF_DIDRUN
 		if (td->td_kse)
 			db_printf("[kse %p]", td->td_kse);
+#endif
 		db_printf("\n");
 	} else
 		db_printf(" %s\n", p->p_comm);
-}
-
-
-#define INKERNEL(va)    (((vm_offset_t)(va)) >= USRSTACK)
-void
-db_show_one_thread(db_expr_t addr, boolean_t have_addr,
-		db_expr_t count, char *modif)
-{
-	struct proc *p;
-	struct thread *td;
-
-	if (!have_addr)
-		td = curthread;
-	else if (!INKERNEL(addr)) {
-		printf("bad thread address");
-		return;
-	} else
-		td = (struct thread *)addr;
-	/* quick sanity check */
-	if ((p = td->td_proc) != td->td_ksegrp->kg_proc)
-		return;
-	printf("Proc %p ",p);
-	dumpthread(p, td);
-#ifdef	__i386__
-	db_stack_thread((db_expr_t)td, 1, count, modif);
-#endif
 }

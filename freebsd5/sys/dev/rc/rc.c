@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/rc/rc.c,v 1.81 2003/08/07 15:04:25 jhb Exp $
+ * $FreeBSD: src/sys/dev/rc/rc.c,v 1.97 2004/07/15 20:47:38 phk Exp $
  */
 
 /*
@@ -45,6 +45,8 @@
 #include <sys/interrupt.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
+#include <sys/serial.h>
 #include <sys/tty.h>
 #include <machine/bus.h>
 #include <machine/resource.h>
@@ -83,17 +85,15 @@
 /* Per-channel structure */
 struct rc_chans  {
 	struct rc_softc *rc_rcb;                /* back ptr             */
-	dev_t		 rc_dev;		/* non-callout device	*/
-	dev_t		 rc_cdev;		/* callout device	*/
+	struct cdev *rc_dev;		/* non-callout device	*/
+	struct cdev *rc_cdev;		/* callout device	*/
 	u_short          rc_flags;              /* Misc. flags          */
 	int              rc_chan;               /* Channel #            */
 	u_char           rc_ier;                /* intr. enable reg     */
 	u_char           rc_msvr;               /* modem sig. status    */
 	u_char           rc_cor2;               /* options reg          */
 	u_char           rc_pendcmd;            /* special cmd pending  */
-	u_int            rc_dtrwait;            /* dtr timeout          */
 	u_int            rc_dcdwaits;           /* how many waits DCD in open */
-	u_char		 rc_hotchar;		/* end packed optimize */
 	struct tty       rc_tp;                 /* tty struct           */
 	u_char          *rc_iptr;               /* Chars input buffer         */
 	u_char          *rc_hiwat;              /* hi-water mark        */
@@ -123,13 +123,14 @@ struct rc_softc {
 };
 
 /* Static prototypes */
+static void rc_break(struct tty *, int);
 static void rc_release_resources(device_t dev);
 static void rc_intr(void *);
 static void rc_hwreset(struct rc_softc *, unsigned int);
 static int  rc_test(struct rc_softc *);
 static void rc_discard_output(struct rc_chans *);
 static void rc_hardclose(struct rc_chans *);
-static int  rc_modctl(struct rc_chans *, int, int);
+static int  rc_modem(struct tty *, int, int);
 static void rc_start(struct tty *);
 static void rc_stop(struct tty *, int rw);
 static int  rc_param(struct tty *, struct termios *);
@@ -138,26 +139,17 @@ static void rc_reinit(struct rc_softc *);
 #ifdef RCDEBUG
 static void printrcflags();
 #endif
-static void rc_dtrwakeup(void *);
-static void disc_optim(struct tty *tp, struct termios *t, struct rc_chans *);
 static void rc_wait0(struct rc_softc *sc, int chan, int line);
 
 static	d_open_t	rcopen;
 static	d_close_t	rcclose;
-static	d_ioctl_t	rcioctl;
 
-#define	CDEV_MAJOR	63
 static struct cdevsw rc_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	rcopen,
 	.d_close =	rcclose,
-	.d_read =	ttyread,
-	.d_write =	ttywrite,
-	.d_ioctl =	rcioctl,
-	.d_poll =	ttypoll,
 	.d_name =	"rc",
-	.d_maj =	CDEV_MAJOR,
-	.d_flags =	D_TTY,
-	.d_kqfilter =	ttykqfilter,
+	.d_flags =	D_TTY | D_NEEDGIANT,
 };
 
 static devclass_t rc_devclass;
@@ -239,7 +231,7 @@ rc_attach(device_t dev)
 	struct rc_softc *sc;
 	u_int port;
 	int base, chan, error, i, x;
-	dev_t cdev;
+	struct cdev *cdev;
 
 	sc = device_get_softc(dev);
 	sc->sc_dev = dev;
@@ -286,8 +278,8 @@ rc_attach(device_t dev)
 	sc->sc_bt = rman_get_bustag(sc->sc_port[0]);
 	sc->sc_bh = rman_get_bushandle(sc->sc_port[0]);
 
-	sc->sc_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->sc_irqrid,
-	    0ul, ~0ul, 1, RF_ACTIVE);
+	sc->sc_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->sc_irqrid,
+	    RF_ACTIVE);
 	if (sc->sc_irq == NULL) {
 		device_printf(dev, "failed to alloc IRQ\n");
 		goto fail;
@@ -320,7 +312,6 @@ rc_attach(device_t dev)
 		rc->rc_bufend  = &rc->rc_ibuf[RC_IBUFSIZE];
 		rc->rc_hiwat   = &rc->rc_ibuf[RC_IHIGHWATER];
 		rc->rc_optr    = rc->rc_obufend  = rc->rc_obuf;
-		rc->rc_dtrwait = 3 * hz;
 		callout_init(&rc->rc_dtrcallout, 0);
 		tp = &rc->rc_tp;
 		ttychars(tp);
@@ -362,7 +353,7 @@ rc_detach(device_t dev)
 {
 	struct rc_softc *sc;
 	struct rc_chans *rc;
-	int error, i, s;
+	int error, i;
 
 	sc = device_get_softc(dev);
 	if (sc->sc_opencount > 0)
@@ -371,16 +362,9 @@ rc_detach(device_t dev)
 
 	rc = sc->sc_channels;
 	for (i = 0; i < CD180_NCHAN; i++, rc++) {
+		ttygone(&rc->rc_tp);
 		destroy_dev(rc->rc_dev);
 		destroy_dev(rc->rc_cdev);
-	}
-
-	rc = sc->sc_channels;
-	s = splsoftclock();
-	for (i = 0; i < CD180_NCHAN; i++) {
-		if ((rc->rc_flags & RC_DTR_OFF) &&
-		    !callout_stop(&rc->rc_dtrcallout))
-			tsleep(&rc->rc_dtrwait, TTIPRI, "rcdtrdet", 0);
 	}
 
 	error = bus_teardown_intr(dev, sc->sc_irq, sc->sc_hwicookie);
@@ -494,7 +478,7 @@ rc_intr(void *arg)
 						optr[INPUT_FLAGS_SHIFT] = 0;
 						optr++;
 						sc->sc_scheduled_event++;
-						if (val != 0 && val == rc->rc_hotchar)
+						if (val != 0 && val == rc->rc_tp.t_hotchar)
 							swi_sched(sc->sc_swicookie, 0);
 					}
 				} else {
@@ -525,7 +509,7 @@ rc_intr(void *arg)
 							    ||  ((iack & RCSR_PE)
 							    &&  (rc->rc_tp.t_iflag & INPCK))))
 								val = 0;
-							else if (val != 0 && val == rc->rc_hotchar)
+							else if (val != 0 && val == rc->rc_tp.t_hotchar)
 								swi_sched(sc->sc_swicookie, 0);
 							optr[0] = val;
 							optr[INPUT_FLAGS_SHIFT] = iack;
@@ -742,7 +726,7 @@ rc_pollcard(void *arg)
 				rc->rc_flags &= ~RC_MODCHG;
 				sc->sc_scheduled_event -= LOTS_OF_EVENTS;
 				critical_exit();
-				(*linesw[tp->t_line].l_modem)(tp, !!(rc->rc_msvr & MSVR_CD));
+				ttyld_modem(tp, !!(rc->rc_msvr & MSVR_CD));
 			}
 			if (rc->rc_flags & RC_DORXFER) {
 				critical_enter();
@@ -802,9 +786,9 @@ rc_pollcard(void *arg)
 					}
 				} else {
 					for (; tptr < eptr; tptr++)
-						(*linesw[tp->t_line].l_rint)
+						ttyld_rint(tp,
 						    (tptr[0] |
-						    rc_rcsrt[tptr[INPUT_FLAGS_SHIFT] & 0xF], tp);
+						    rc_rcsrt[tptr[INPUT_FLAGS_SHIFT] & 0xF]));
 				}
 done1: ;
 			}
@@ -814,7 +798,7 @@ done1: ;
 				rc->rc_flags &= ~RC_DOXXFER;
 				rc->rc_tp.t_state &= ~TS_BUSY;
 				critical_exit();
-				(*linesw[tp->t_line].l_start)(tp);
+				ttyld_start(tp);
 			}
 			if (sc->sc_scheduled_event == 0)
 				break;
@@ -858,7 +842,7 @@ rc_stop(struct tty *tp, int rw)
 }
 
 static int
-rcopen(dev_t dev, int flag, int mode, d_thread_t *td)
+rcopen(struct cdev *dev, int flag, int mode, d_thread_t *td)
 {
 	struct rc_softc *sc;
 	struct rc_chans *rc;
@@ -878,11 +862,9 @@ rcopen(dev_t dev, int flag, int mode, d_thread_t *td)
 	s = spltty();
 
 again:
-	while (rc->rc_flags & RC_DTR_OFF) {
-		error = tsleep(&(rc->rc_dtrwait), TTIPRI | PCATCH, "rcdtr", 0);
-		if (error != 0)
-			goto out;
-	}
+	error = ttydtrwaitsleep(tp);
+	if (error != 0)
+		goto out;
 	if (tp->t_state & TS_ISOPEN) {
 		if (CALLOUT(dev)) {
 			if (!(rc->rc_flags & RC_ACTOUT)) {
@@ -910,6 +892,8 @@ again:
 	} else {
 		tp->t_oproc   = rc_start;
 		tp->t_param   = rc_param;
+		tp->t_modem   = rc_modem;
+		tp->t_break   = rc_break;
 		tp->t_stop    = rc_stop;
 		tp->t_dev     = dev;
 
@@ -921,10 +905,10 @@ again:
 		error = rc_param(tp, &tp->t_termios);
 		if (error)
 			goto out;
-		(void) rc_modctl(rc, TIOCM_RTS|TIOCM_DTR, DMSET);
+		(void) rc_modem(tp, SER_DTR | SER_RTS, 0);
 
 		if ((rc->rc_msvr & MSVR_CD) || CALLOUT(dev))
-			(*linesw[tp->t_line].l_modem)(tp, 1);
+			ttyld_modem(tp, 1);
 	}
 	if (!(tp->t_state & TS_CARR_ON) && !CALLOUT(dev)
 	    && !(tp->t_cflag & CLOCAL) && !(flag & O_NONBLOCK)) {
@@ -935,8 +919,8 @@ again:
 			goto out;
 		goto again;
 	}
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
-	disc_optim(tp, &tp->t_termios, rc);
+	error = ttyld_open(tp, dev);
+	ttyldoptim(tp);
 	if ((tp->t_state & TS_ISOPEN) && CALLOUT(dev))
 		rc->rc_flags |= RC_ACTOUT;
 out:
@@ -949,7 +933,7 @@ out:
 }
 
 static int
-rcclose(dev_t dev, int flag, int mode, d_thread_t *td)
+rcclose(struct cdev *dev, int flag, int mode, d_thread_t *td)
 {
 	struct rc_softc *sc;
 	struct rc_chans *rc;
@@ -964,11 +948,10 @@ rcclose(dev_t dev, int flag, int mode, d_thread_t *td)
 	    rc->rc_chan, dev);
 #endif
 	s = spltty();
-	(*linesw[tp->t_line].l_close)(tp, flag);
-	disc_optim(tp, &tp->t_termios, rc);
-	rc_stop(tp, FREAD | FWRITE);
+	ttyld_close(tp, flag);
+	ttyldoptim(tp);
 	rc_hardclose(rc);
-	ttyclose(tp);
+	tty_close(tp);
 	splx(s);
 	KASSERT(sc->sc_opencount > 0, ("rcclose: non-positive open count"));
 	sc->sc_opencount--;
@@ -997,12 +980,8 @@ rc_hardclose(struct rc_chans *rc)
 	   ) {
 		CCRCMD(sc, rc->rc_chan, CCR_ResetChan);
 		WAITFORCCR(sc, rc->rc_chan);
-		(void) rc_modctl(rc, TIOCM_RTS, DMSET);
-		if (rc->rc_dtrwait) {
-			callout_reset(&rc->rc_dtrcallout, rc->rc_dtrwait,
-			    rc_dtrwakeup, rc);
-			rc->rc_flags |= RC_DTR_OFF;
-		}
+		(void) rc_modem(tp, SER_RTS, 0);
+		ttydtrwaitstart(tp);
 	}
 	rc->rc_flags &= ~RC_ACTOUT;
 	wakeup( &rc->rc_rcb);  /* wake bi */
@@ -1063,7 +1042,7 @@ rc_param(struct tty *tp, struct termios *ts)
 	if (ts->c_ospeed == 0) {
 		CCRCMD(sc, rc->rc_chan, CCR_ResetChan);
 		WAITFORCCR(sc, rc->rc_chan);
-		(void) rc_modctl(rc, TIOCM_DTR, DMBIC);
+		(void) rc_modem(tp, 0, SER_DTR);
 	}
 
 	tp->t_state &= ~TS_CAN_BYPASS_L_RINT;
@@ -1156,7 +1135,7 @@ rc_param(struct tty *tp, struct termios *ts)
 
 	CCRCMD(sc, rc->rc_chan, CCR_CORCHG1 | CCR_CORCHG2 | CCR_CORCHG3);
 
-	disc_optim(tp, ts, rc);
+	ttyldoptim(tp);
 
 	/* modem ctl */
 	val = cflag & CLOCAL ? 0 : MCOR1_CDzd;
@@ -1182,7 +1161,7 @@ rc_param(struct tty *tp, struct termios *ts)
 	if (tp->t_state & TS_BUSY)
 		rc->rc_ier |= IER_TxRdy;
 	if (ts->c_ospeed != 0)
-		rc_modctl(rc, TIOCM_DTR, DMBIS);
+		rc_modem(tp, SER_DTR, 0);
 	if ((cflag & CCTS_OFLOW) && (rc->rc_msvr & MSVR_CTS))
 		rc->rc_flags |= RC_SEND_RDY;
 	rcout(sc, CD180_IER, rc->rc_ier);
@@ -1203,151 +1182,66 @@ rc_reinit(struct rc_softc *sc)
 		(void) rc_param(&rc->rc_tp, &rc->rc_tp.t_termios);
 }
 
-static int
-rcioctl(dev_t dev, u_long cmd, caddr_t data, int flag, d_thread_t *td)
-{
-	struct rc_chans *rc;
-	struct tty *tp;
-	int s, error;
-
-	rc = DEV_TO_RC(dev);
-	tp = &rc->rc_tp;
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, td);
-	if (error != ENOIOCTL)
-		return (error);
-	error = ttioctl(tp, cmd, data, flag);
-	disc_optim(tp, &tp->t_termios, rc);
-	if (error != ENOIOCTL)
-		return (error);
-	s = spltty();
-
-	switch (cmd) {
-	    case TIOCSBRK:
-		rc->rc_pendcmd = CD180_C_SBRK;
-		break;
-
-	    case TIOCCBRK:
-		rc->rc_pendcmd = CD180_C_EBRK;
-		break;
-
-	    case TIOCSDTR:
-		(void) rc_modctl(rc, TIOCM_DTR, DMBIS);
-		break;
-
-	    case TIOCCDTR:
-		(void) rc_modctl(rc, TIOCM_DTR, DMBIC);
-		break;
-
-	    case TIOCMGET:
-		*(int *) data = rc_modctl(rc, 0, DMGET);
-		break;
-
-	    case TIOCMSET:
-		(void) rc_modctl(rc, *(int *) data, DMSET);
-		break;
-
-	    case TIOCMBIC:
-		(void) rc_modctl(rc, *(int *) data, DMBIC);
-		break;
-
-	    case TIOCMBIS:
-		(void) rc_modctl(rc, *(int *) data, DMBIS);
-		break;
-
-	    case TIOCMSDTRWAIT:
-		error = suser(td);
-		if (error != 0) {
-			splx(s);
-			return (error);
-		}
-		rc->rc_dtrwait = *(int *)data * hz / 100;
-		break;
-
-	    case TIOCMGDTRWAIT:
-		*(int *)data = rc->rc_dtrwait * 100 / hz;
-		break;
-
-	    default:
-		(void) splx(s);
-		return ENOTTY;
-	}
-	(void) splx(s);
-	return 0;
-}
-
-
 /* Modem control routines */
 
 static int
-rc_modctl(struct rc_chans *rc, int bits, int cmd)
+rc_modem(struct tty *tp, int biton, int bitoff)
 {
+	struct rc_chans *rc;
 	struct rc_softc *sc;
 	u_char *dtr;
 	u_char msvr;
 
+	rc = DEV_TO_RC(tp->t_dev);
 	sc = rc->rc_rcb;
 	dtr = &sc->sc_dtr;
 	rcout(sc, CD180_CAR, rc->rc_chan);
 
-	switch (cmd) {
-	    case DMSET:
-		rcout(sc, RC_DTREG, (bits & TIOCM_DTR) ?
-				~(*dtr |= 1 << rc->rc_chan) :
-				~(*dtr &= ~(1 << rc->rc_chan)));
-		msvr = rcin(sc, CD180_MSVR);
-		if (bits & TIOCM_RTS)
-			msvr |= MSVR_RTS;
-		else
-			msvr &= ~MSVR_RTS;
-		if (bits & TIOCM_DTR)
-			msvr |= MSVR_DTR;
-		else
-			msvr &= ~MSVR_DTR;
-		rcout(sc, CD180_MSVR, msvr);
-		break;
-
-	    case DMBIS:
-		if (bits & TIOCM_DTR)
-			rcout(sc, RC_DTREG, ~(*dtr |= 1 << rc->rc_chan));
-		msvr = rcin(sc, CD180_MSVR);
-		if (bits & TIOCM_RTS)
-			msvr |= MSVR_RTS;
-		if (bits & TIOCM_DTR)
-			msvr |= MSVR_DTR;
-		rcout(sc, CD180_MSVR, msvr);
-		break;
-
-	    case DMGET:
-		bits = TIOCM_LE;
+	if (biton == 0 && bitoff == 0) {
 		msvr = rc->rc_msvr = rcin(sc, CD180_MSVR);
 
 		if (msvr & MSVR_RTS)
-			bits |= TIOCM_RTS;
+			biton |= SER_RTS;
 		if (msvr & MSVR_CTS)
-			bits |= TIOCM_CTS;
+			biton |= SER_CTS;
 		if (msvr & MSVR_DSR)
-			bits |= TIOCM_DSR;
+			biton |= SER_DSR;
 		if (msvr & MSVR_DTR)
-			bits |= TIOCM_DTR;
+			biton |= SER_DTR;
 		if (msvr & MSVR_CD)
-			bits |= TIOCM_CD;
+			biton |= SER_DCD;
 		if (~rcin(sc, RC_RIREG) & (1 << rc->rc_chan))
-			bits |= TIOCM_RI;
-		return bits;
-
-	    case DMBIC:
-		if (bits & TIOCM_DTR)
-			rcout(sc, RC_DTREG, ~(*dtr &= ~(1 << rc->rc_chan)));
-		msvr = rcin(sc, CD180_MSVR);
-		if (bits & TIOCM_RTS)
-			msvr &= ~MSVR_RTS;
-		if (bits & TIOCM_DTR)
-			msvr &= ~MSVR_DTR;
-		rcout(sc, CD180_MSVR, msvr);
-		break;
+			biton |= SER_RI;
+		return biton;
 	}
-	rc->rc_msvr = rcin(sc, CD180_MSVR);
+	if (biton & SER_DTR)
+		rcout(sc, RC_DTREG, ~(*dtr |= 1 << rc->rc_chan));
+	if (bitoff & SER_DTR)
+		rcout(sc, RC_DTREG, ~(*dtr &= ~(1 << rc->rc_chan)));
+	msvr = rcin(sc, CD180_MSVR);
+	if (biton & SER_DTR)
+		msvr |= MSVR_DTR;
+	if (bitoff & SER_DTR)
+		msvr &= ~MSVR_DTR;
+	if (biton & SER_RTS)
+		msvr |= MSVR_RTS;
+	if (bitoff & SER_RTS)
+		msvr &= ~MSVR_RTS;
+	rcout(sc, CD180_MSVR, msvr);
 	return 0;
+}
+
+static void
+rc_break(struct tty *tp, int brk)
+{
+	struct rc_chans *rc;
+
+	rc = DEV_TO_RC(tp->t_dev);
+
+	if (brk)
+		rc->rc_pendcmd = CD180_C_SBRK;
+	else
+		rc->rc_pendcmd = CD180_C_EBRK;
 }
 
 #define ERR(s) do {							\
@@ -1528,16 +1422,6 @@ printrcflags(struct rc_chans *rc, char *comment)
 #endif /* RCDEBUG */
 
 static void
-rc_dtrwakeup(void *arg)
-{
-	struct rc_chans  *rc;
-
-	rc = (struct rc_chans *)arg;
-	rc->rc_flags &= ~RC_DTR_OFF;
-	wakeup(&rc->rc_dtrwait);
-}
-
-static void
 rc_discard_output(struct rc_chans *rc)
 {
 	critical_enter();
@@ -1549,22 +1433,6 @@ rc_discard_output(struct rc_chans *rc)
 	rc->rc_tp.t_state &= ~TS_BUSY;
 	critical_exit();
 	ttwwakeup(&rc->rc_tp);
-}
-
-static void
-disc_optim(struct tty *tp, struct termios *t, struct rc_chans *rc)
-{
-
-	if (!(t->c_iflag & (ICRNL | IGNCR | IMAXBEL | INLCR | ISTRIP | IXON))
-	    && (!(t->c_iflag & BRKINT) || (t->c_iflag & IGNBRK))
-	    && (!(t->c_iflag & PARMRK)
-		|| (t->c_iflag & (IGNPAR | IGNBRK)) == (IGNPAR | IGNBRK))
-	    && !(t->c_lflag & (ECHO | ICANON | IEXTEN | ISIG | PENDIN))
-	    && linesw[tp->t_line].l_rint == ttyinput)
-		tp->t_state |= TS_CAN_BYPASS_L_RINT;
-	else
-		tp->t_state &= ~TS_CAN_BYPASS_L_RINT;
-	rc->rc_hotchar = linesw[tp->t_line].l_hotchar;
 }
 
 static void

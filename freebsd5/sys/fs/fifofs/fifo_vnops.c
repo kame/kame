@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)fifo_vnops.c	8.10 (Berkeley) 5/27/95
- * $FreeBSD: src/sys/fs/fifofs/fifo_vnops.c,v 1.91 2003/11/16 01:11:11 truckman Exp $
+ * $FreeBSD: src/sys/fs/fifofs/fifo_vnops.c,v 1.101 2004/08/15 06:24:40 jmg Exp $
  */
 
 #include <sys/param.h>
@@ -126,6 +122,9 @@ static struct vnodeopv_desc fifo_vnodeop_opv_desc =
 
 VNODEOP_SET(fifo_vnodeop_opv_desc);
 
+struct mtx fifo_mtx;
+MTX_SYSINIT(fifo, &fifo_mtx, "fifo mutex", MTX_DEF);
+
 int
 fifo_vnoperate(ap)
 	struct vop_generic_args /* {
@@ -201,7 +200,7 @@ fifo_open(ap)
 		if (error)
 			goto fail2;
 		fip->fi_writesock = wso;
-		error = unp_connect2(wso, rso);
+		error = uipc_connect2(wso, rso);
 		if (error) {
 			(void)soclose(wso);
 fail2:
@@ -212,7 +211,9 @@ fail1:
 		}
 		fip->fi_readers = fip->fi_writers = 0;
 		wso->so_snd.sb_lowat = PIPE_BUF;
-		rso->so_state |= SS_CANTRCVMORE;
+		SOCKBUF_LOCK(&rso->so_rcv);
+		rso->so_rcv.sb_state |= SBS_CANTRCVMORE;
+		SOCKBUF_UNLOCK(&rso->so_rcv);
 		vp->v_fifoinfo = fip;
 	}
 
@@ -221,55 +222,55 @@ fail1:
 	 * the vnode lock.
 	 *
 	 * Protect the increment of fi_readers and fi_writers and the
-	 * associated calls to wakeup() with the vnode interlock in
-	 * addition to the vnode lock.  This allows the vnode lock to
-	 * be dropped for the msleep() calls below, and using the vnode
-	 * interlock as the msleep() mutex prevents the wakeup from
-	 * being missed.
+	 * associated calls to wakeup() with the fifo mutex in addition
+	 * to the vnode lock.  This allows the vnode lock to be dropped
+	 * for the msleep() calls below, and using the fifo mutex with
+	 * msleep() prevents the wakeup from being missed.
 	 */
-	VI_LOCK(vp);
+	mtx_lock(&fifo_mtx);
 	if (ap->a_mode & FREAD) {
 		fip->fi_readers++;
 		if (fip->fi_readers == 1) {
-			fip->fi_writesock->so_state &= ~SS_CANTSENDMORE;
+			SOCKBUF_LOCK(&fip->fi_writesock->so_snd);
+			fip->fi_writesock->so_snd.sb_state &= ~SBS_CANTSENDMORE;
+			SOCKBUF_UNLOCK(&fip->fi_writesock->so_snd);
 			if (fip->fi_writers > 0) {
 				wakeup(&fip->fi_writers);
-				VI_UNLOCK(vp);
 				sowwakeup(fip->fi_writesock);
-				VI_LOCK(vp);
 			}
 		}
 	}
 	if (ap->a_mode & FWRITE) {
 		if ((ap->a_mode & O_NONBLOCK) && fip->fi_readers == 0) {
-			VI_UNLOCK(vp);
+			mtx_unlock(&fifo_mtx);
 			return (ENXIO);
 		}
 		fip->fi_writers++;
 		if (fip->fi_writers == 1) {
-			fip->fi_readsock->so_state &= ~SS_CANTRCVMORE;
+			SOCKBUF_LOCK(&fip->fi_writesock->so_rcv);
+			fip->fi_readsock->so_rcv.sb_state &= ~SBS_CANTRCVMORE;
+			SOCKBUF_UNLOCK(&fip->fi_writesock->so_rcv);
 			if (fip->fi_readers > 0) {
 				wakeup(&fip->fi_readers);
-				VI_UNLOCK(vp);
 				sorwakeup(fip->fi_writesock);
-				VI_LOCK(vp);
 			}
 		}
 	}
 	if ((ap->a_mode & O_NONBLOCK) == 0) {
 		if ((ap->a_mode & FREAD) && fip->fi_writers == 0) {
 			VOP_UNLOCK(vp, 0, td);
-			error = msleep(&fip->fi_readers, VI_MTX(vp),
-			    PCATCH | PSOCK, "fifoor", 0);
-			vn_lock(vp, LK_EXCLUSIVE | LK_RETRY | LK_INTERLOCK, td);
+			error = msleep(&fip->fi_readers, &fifo_mtx,
+			    PDROP | PCATCH | PSOCK, "fifoor", 0);
+			vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 			if (error) {
 				fip->fi_readers--;
-				if (fip->fi_readers == 0)
+				if (fip->fi_readers == 0) {
 					socantsendmore(fip->fi_writesock);
-				fifo_cleanup(vp);
+					fifo_cleanup(vp);
+				}
 				return (error);
 			}
-			VI_LOCK(vp);
+			mtx_lock(&fifo_mtx);
 			/*
 			 * We must have got woken up because we had a writer.
 			 * That (and not still having one) is the condition
@@ -278,15 +279,15 @@ fail1:
 		}
 		if ((ap->a_mode & FWRITE) && fip->fi_readers == 0) {
 			VOP_UNLOCK(vp, 0, td);
-			error = msleep(&fip->fi_writers, VI_MTX(vp),
-			    PCATCH | PSOCK, "fifoow", 0);
-			vn_lock(vp,
-			    LK_EXCLUSIVE | LK_RETRY | LK_INTERLOCK, td);
+			error = msleep(&fip->fi_writers, &fifo_mtx,
+			    PDROP | PCATCH | PSOCK, "fifoow", 0);
+			vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, td);
 			if (error) {
 				fip->fi_writers--;
-				if (fip->fi_writers == 0)
+				if (fip->fi_writers == 0) {
 					socantrcvmore(fip->fi_readsock);
-				fifo_cleanup(vp);
+					fifo_cleanup(vp);
+				}
 				return (error);
 			}
 			/*
@@ -297,7 +298,7 @@ fail1:
 			return (0);
 		}
 	}
-	VI_UNLOCK(vp);
+	mtx_unlock(&fifo_mtx);
 	return (0);
 }
 
@@ -317,7 +318,7 @@ fifo_read(ap)
 	struct uio *uio = ap->a_uio;
 	struct socket *rso = ap->a_vp->v_fifoinfo->fi_readsock;
 	struct thread *td = uio->uio_td;
-	int error;
+	int error, flags;
 
 #ifdef DIAGNOSTIC
 	if (uio->uio_rw != UIO_READ)
@@ -325,14 +326,11 @@ fifo_read(ap)
 #endif
 	if (uio->uio_resid == 0)
 		return (0);
-	if (ap->a_ioflag & IO_NDELAY)
-		rso->so_state |= SS_NBIO;
 	VOP_UNLOCK(ap->a_vp, 0, td);
+	flags = (ap->a_ioflag & IO_NDELAY) ? MSG_NBIO : 0;
 	error = soreceive(rso, (struct sockaddr **)0, uio, (struct mbuf **)0,
-	    (struct mbuf **)0, (int *)0);
+	    (struct mbuf **)0, &flags);
 	vn_lock(ap->a_vp, LK_EXCLUSIVE | LK_RETRY, td);
-	if (ap->a_ioflag & IO_NDELAY)
-		rso->so_state &= ~SS_NBIO;
 	return (error);
 }
 
@@ -351,20 +349,17 @@ fifo_write(ap)
 {
 	struct socket *wso = ap->a_vp->v_fifoinfo->fi_writesock;
 	struct thread *td = ap->a_uio->uio_td;
-	int error;
+	int error, flags;
 
 #ifdef DIAGNOSTIC
 	if (ap->a_uio->uio_rw != UIO_WRITE)
 		panic("fifo_write mode");
 #endif
-	if (ap->a_ioflag & IO_NDELAY)
-		wso->so_state |= SS_NBIO;
 	VOP_UNLOCK(ap->a_vp, 0, td);
+	flags = (ap->a_ioflag & IO_NDELAY) ? MSG_NBIO : 0;
 	error = sosend(wso, (struct sockaddr *)0, ap->a_uio, 0,
-		       (struct mbuf *)0, 0, td);
+	    (struct mbuf *)0, flags, td);
 	vn_lock(ap->a_vp, LK_EXCLUSIVE | LK_RETRY, td);
-	if (ap->a_ioflag & IO_NDELAY)
-		wso->so_state &= ~SS_NBIO;
 	return (error);
 }
 
@@ -436,8 +431,10 @@ fifo_kqfilter(ap)
 
 	ap->a_kn->kn_hook = (caddr_t)so;
 
-	SLIST_INSERT_HEAD(&sb->sb_sel.si_note, ap->a_kn, kn_selnext);
+	SOCKBUF_LOCK(sb);
+	knlist_add(&sb->sb_sel.si_note, ap->a_kn, 1);
 	sb->sb_flags |= SB_KNOTE;
+	SOCKBUF_UNLOCK(sb);
 
 	return (0);
 }
@@ -447,23 +444,33 @@ filt_fifordetach(struct knote *kn)
 {
 	struct socket *so = (struct socket *)kn->kn_hook;
 
-	SLIST_REMOVE(&so->so_rcv.sb_sel.si_note, kn, knote, kn_selnext);
-	if (SLIST_EMPTY(&so->so_rcv.sb_sel.si_note))
+	SOCKBUF_LOCK(&so->so_rcv);
+	knlist_remove(&so->so_rcv.sb_sel.si_note, kn, 1);
+	if (knlist_empty(&so->so_rcv.sb_sel.si_note))
 		so->so_rcv.sb_flags &= ~SB_KNOTE;
+	SOCKBUF_UNLOCK(&so->so_rcv);
 }
 
 static int
 filt_fiforead(struct knote *kn, long hint)
 {
 	struct socket *so = (struct socket *)kn->kn_hook;
+	int need_lock, result;
 
+	need_lock = !SOCKBUF_OWNED(&so->so_rcv);
+	if (need_lock)
+		SOCKBUF_LOCK(&so->so_rcv);
 	kn->kn_data = so->so_rcv.sb_cc;
-	if (so->so_state & SS_CANTRCVMORE) {
+	if (so->so_rcv.sb_state & SBS_CANTRCVMORE) {
 		kn->kn_flags |= EV_EOF;
-		return (1);
+		result = 1;
+	} else {
+		kn->kn_flags &= ~EV_EOF;
+		result = (kn->kn_data > 0);
 	}
-	kn->kn_flags &= ~EV_EOF;
-	return (kn->kn_data > 0);
+	if (need_lock)
+		SOCKBUF_UNLOCK(&so->so_rcv);
+	return (result);
 }
 
 static void
@@ -471,23 +478,33 @@ filt_fifowdetach(struct knote *kn)
 {
 	struct socket *so = (struct socket *)kn->kn_hook;
 
-	SLIST_REMOVE(&so->so_snd.sb_sel.si_note, kn, knote, kn_selnext);
-	if (SLIST_EMPTY(&so->so_snd.sb_sel.si_note))
+	SOCKBUF_LOCK(&so->so_snd);
+	knlist_remove(&so->so_snd.sb_sel.si_note, kn, 1);
+	if (knlist_empty(&so->so_snd.sb_sel.si_note))
 		so->so_snd.sb_flags &= ~SB_KNOTE;
+	SOCKBUF_UNLOCK(&so->so_snd);
 }
 
 static int
 filt_fifowrite(struct knote *kn, long hint)
 {
 	struct socket *so = (struct socket *)kn->kn_hook;
+	int need_lock, result;
 
+	need_lock = !SOCKBUF_OWNED(&so->so_snd);
+	if (need_lock)
+		SOCKBUF_LOCK(&so->so_snd);
 	kn->kn_data = sbspace(&so->so_snd);
-	if (so->so_state & SS_CANTSENDMORE) {
+	if (so->so_snd.sb_state & SBS_CANTSENDMORE) {
 		kn->kn_flags |= EV_EOF;
-		return (1);
+		result = 1;
+	} else {
+		kn->kn_flags &= ~EV_EOF;
+	        result = (kn->kn_data >= so->so_snd.sb_lowat);
 	}
-	kn->kn_flags &= ~EV_EOF;
-	return (kn->kn_data >= so->so_snd.sb_lowat);
+	if (need_lock)
+		SOCKBUF_UNLOCK(&so->so_snd);
+	return (result);
 }
 
 /* ARGSUSED */

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/rp/rpvar.h,v 1.5 2001/11/05 12:57:46 gallatin Exp $
+ * $FreeBSD: src/sys/dev/rp/rpvar.h,v 1.6 2004/07/11 15:18:37 phk Exp $
  */
 
 /*
@@ -57,7 +57,6 @@ struct rp_port {
 	unsigned char		state;	/* state of dtr */
 
 /* Time to hold DTR down on close */
-	int			dtr_wait;
 	int			wopeners;	/* processes waiting for DCD */
 
 	int			rp_port;

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)specialreg.h	7.1 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/amd64/include/specialreg.h,v 1.27 2003/11/21 03:02:00 peter Exp $
+ * $FreeBSD: src/sys/amd64/include/specialreg.h,v 1.30 2004/06/08 01:02:52 peter Exp $
  */
 
 #ifndef _MACHINE_SPECIALREG_H_
@@ -116,6 +112,22 @@
 #define	CPUID_B30	0x40000000
 #define	CPUID_PBE	0x80000000
 
+#define CPUID2_SSE3	0x00000001
+#define CPUID2_MON	0x00000008
+#define CPUID2_DS_CPL	0x00000010
+#define CPUID2_EST	0x00000080
+#define CPUID2_TM2	0x00000100
+#define CPUID2_CNTXID	0x00000400
+#define CPUID2_CX16	0x00002000
+
+/*
+ * Important bits in the AMD extended cpuid flags
+ */
+#define AMDID_SYSCALL	0x00000800
+#define AMDID_MP	0x00080000
+#define AMDID_NX	0x00100000
+#define AMDID_LM	0x20000000
+
 /*
  * CPUID instruction 1 ebx info
  */
@@ -159,6 +171,9 @@
 #define MSR_MCG_CTL		0x17b
 #define MSR_EVNTSEL0		0x186
 #define MSR_EVNTSEL1		0x187
+#define MSR_THERM_CONTROL	0x19a
+#define MSR_THERM_INTERRUPT	0x19b
+#define MSR_THERM_STATUS	0x19c
 #define MSR_DEBUGCTLMSR		0x1d9
 #define MSR_LASTBRANCHFROMIP	0x1db
 #define MSR_LASTBRANCHTOIP	0x1dc

@@ -5,7 +5,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/uhid.c,v 1.65 2003/11/09 09:17:22 tanimura Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/uhid.c,v 1.73.2.1 2004/10/13 00:51:01 takawata Exp $");
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -45,7 +45,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/uhid.c,v 1.65 2003/11/09 09:17:22 tanimura E
  */
 
 /*
- * HID spec: http://www.usb.org/developers/data/usbhid10.pdf
+ * HID spec: http://www.usb.org/developers/devclass_docs/HID1_11.pdf
  */
 
 #include <sys/param.h>
@@ -83,7 +83,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/uhid.c,v 1.65 2003/11/09 09:17:22 tanimura E
 #include <dev/usb/usb.h>
 #include <dev/usb/usbhid.h>
 
-#include <dev/usb/usbdevs.h>
+#include "usbdevs.h"
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
 #include <dev/usb/hid.h>
@@ -136,7 +136,7 @@ struct uhid_softc {
 	u_char sc_dying;
 
 #if defined(__FreeBSD__)
-	dev_t dev;
+	struct cdev *dev;
 #endif
 };
 
@@ -154,9 +154,10 @@ d_write_t	uhidwrite;
 d_ioctl_t	uhidioctl;
 d_poll_t	uhidpoll;
 
-#define		UHID_CDEV_MAJOR 122
 
 Static struct cdevsw uhid_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	uhidopen,
 	.d_close =	uhidclose,
 	.d_read =	uhidread,
@@ -164,7 +165,6 @@ Static struct cdevsw uhid_cdevsw = {
 	.d_ioctl =	uhidioctl,
 	.d_poll =	uhidpoll,
 	.d_name =	"uhid",
-	.d_maj =	UHID_CDEV_MAJOR,
 #if __FreeBSD_version < 500014
 	.d_bmaj		-1
 #endif
@@ -191,8 +191,11 @@ USB_MATCH(uhid)
 	id = usbd_get_interface_descriptor(uaa->iface);
 	if (id == NULL || id->bInterfaceClass != UICLASS_HID)
 		return (UMATCH_NONE);
+#if 0
 	if (uaa->matchlvl)
 		return (uaa->matchlvl);
+#endif
+
 	return (UMATCH_IFACECLASS_GENERIC);
 }
 
@@ -210,10 +213,8 @@ USB_ATTACH(uhid)
 	sc->sc_udev = uaa->device;
 	sc->sc_iface = iface;
 	id = usbd_get_interface_descriptor(iface);
-	usbd_devinfo(uaa->device, 0, devinfo);
+	usbd_devinfo(uaa->device, USBD_SHOW_INTERFACE_CLASS, devinfo);
 	USB_ATTACH_SETUP;
-	printf("%s: %s, iclass %d/%d\n", USBDEVNAME(sc->sc_dev),
-	       devinfo, id->bInterfaceClass, id->bInterfaceSubClass);
 
 	ed = usbd_interface2endpoint_descriptor(iface, 0);
 	if (ed == NULL) {
@@ -393,7 +394,7 @@ uhid_intr(usbd_xfer_handle xfer, usbd_private_handle addr, usbd_status status)
 }
 
 int
-uhidopen(dev_t dev, int flag, int mode, usb_proc_ptr p)
+uhidopen(struct cdev *dev, int flag, int mode, usb_proc_ptr p)
 {
 	struct uhid_softc *sc;
 	usbd_status err;
@@ -440,7 +441,7 @@ uhidopen(dev_t dev, int flag, int mode, usb_proc_ptr p)
 }
 
 int
-uhidclose(dev_t dev, int flag, int mode, usb_proc_ptr p)
+uhidclose(struct cdev *dev, int flag, int mode, usb_proc_ptr p)
 {
 	struct uhid_softc *sc;
 
@@ -530,7 +531,7 @@ uhid_do_read(struct uhid_softc *sc, struct uio *uio, int flag)
 }
 
 int
-uhidread(dev_t dev, struct uio *uio, int flag)
+uhidread(struct cdev *dev, struct uio *uio, int flag)
 {
 	struct uhid_softc *sc;
 	int error;
@@ -576,7 +577,7 @@ uhid_do_write(struct uhid_softc *sc, struct uio *uio, int flag)
 }
 
 int
-uhidwrite(dev_t dev, struct uio *uio, int flag)
+uhidwrite(struct cdev *dev, struct uio *uio, int flag)
 {
 	struct uhid_softc *sc;
 	int error;
@@ -710,7 +711,7 @@ uhid_do_ioctl(struct uhid_softc *sc, u_long cmd, caddr_t addr, int flag,
 }
 
 int
-uhidioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, usb_proc_ptr p)
+uhidioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, usb_proc_ptr p)
 {
 	struct uhid_softc *sc;
 	int error;
@@ -725,7 +726,7 @@ uhidioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, usb_proc_ptr p)
 }
 
 int
-uhidpoll(dev_t dev, int events, usb_proc_ptr p)
+uhidpoll(struct cdev *dev, int events, usb_proc_ptr p)
 {
 	struct uhid_softc *sc;
 	int revents = 0;

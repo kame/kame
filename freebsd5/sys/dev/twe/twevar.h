@@ -24,16 +24,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/twe/twevar.h,v 1.9 2003/12/02 07:57:20 ps Exp $
+ *	$FreeBSD: src/sys/dev/twe/twevar.h,v 1.13 2004/06/11 18:42:44 vkashyap Exp $
  */
 
-/*
- * The scheme for the driver version is:
- * <major change>.<external release>.<3ware internal release>.<development release>
- */
-#define TWE_DRIVER_VERSION_STRING	"1.50.00.000"
-#define TWE_CDEV_MAJOR			146
-#define TWED_CDEV_MAJOR			147
+#define TWE_DRIVER_VERSION_STRING	"1.50.01.002"
 
 #ifdef TWE_DEBUG
 #define debug(level, fmt, args...)							\
@@ -91,6 +85,7 @@ struct twe_request
 #define TWE_CMD_SETUP		0	/* being assembled */
 #define TWE_CMD_BUSY		1	/* submitted to controller */
 #define TWE_CMD_COMPLETE	2	/* completed by controller (maybe with error) */
+#define TWE_CMD_ERROR		3	/* encountered error, even before submission to controller */
     int				tr_flags;
 #define TWE_CMD_DATAIN		(1<<0)
 #define TWE_CMD_DATAOUT		(1<<1)
@@ -98,6 +93,7 @@ struct twe_request
 #define TWE_CMD_SLEEPER		(1<<3)	/* owner is sleeping on this command */
 #define TWE_CMD_IMMEDIATE	(1<<4)	/* immediate request */
 #define TWE_CMD_MAPPED		(1<<5)
+#define TWE_CMD_IN_PROGRESS	(1<<6)	/* bus_dmamap_load returned EINPROGRESS */
     void			(* tr_complete)(struct twe_request *tr);	/* completion handler */
     void			*tr_private;	/* submitter-private data or wait channel */
 
@@ -135,7 +131,8 @@ struct twe_softc
 #define TWE_STATE_SHUTDOWN	(1<<1)	/* controller is shut down */
 #define TWE_STATE_OPEN		(1<<2)	/* control device is open */
 #define TWE_STATE_SUSPEND	(1<<3)	/* controller is suspended */
-#define TWE_STATE_FRZN		(1<<4)
+#define TWE_STATE_FRZN		(1<<4)	/* got EINPROGRESS */
+#define TWE_STATE_CTLR_BUSY	(1<<5)	/* controller cmd queue full */
     int			twe_host_id;
     struct twe_qstat	twe_qstat[TWEQ_COUNT];	/* queue statistics */
 

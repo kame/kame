@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/au88x0.c,v 1.5 2003/10/12 11:33:39 des Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/au88x0.c,v 1.8 2004/07/16 03:59:27 tanimura Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -529,9 +529,9 @@ au88x0_set_status(device_t dev)
 	struct au88x0_info *aui;
 
 	aui = pcm_getdevinfo(dev);
-	snprintf(status, sizeof status, "at %s 0x%lx irq %ld",
+	snprintf(status, sizeof status, "at %s 0x%lx irq %ld %s",
 	    (aui->aui_regtype == SYS_RES_IOPORT)? "io" : "memory",
-	    rman_get_start(aui->aui_reg), rman_get_start(aui->aui_irq));
+	    rman_get_start(aui->aui_reg), rman_get_start(aui->aui_irq),PCM_KLDSTRING(snd_au88x0));
 	pcm_setstatus(dev, status);
 }
 
@@ -597,15 +597,15 @@ au88x0_pci_attach(device_t dev)
 		/* try memory-mapped I/O */
 		aui->aui_regid = PCIR_BAR(0);
 		aui->aui_regtype = SYS_RES_MEMORY;
-		aui->aui_reg = bus_alloc_resource(dev, aui->aui_regtype,
-		    &aui->aui_regid, 0, ~0, 1, RF_ACTIVE);
+		aui->aui_reg = bus_alloc_resource_any(dev, aui->aui_regtype,
+		    &aui->aui_regid, RF_ACTIVE);
 	}
 	if (aui->aui_reg == NULL && (config & PCIM_CMD_PORTEN)) {
 		/* fall back on port I/O */
 		aui->aui_regid = PCIR_BAR(0);
 		aui->aui_regtype = SYS_RES_IOPORT;
-		aui->aui_reg = bus_alloc_resource(dev, aui->aui_regtype,
-		    &aui->aui_regid, 0, ~0, 1, RF_ACTIVE);
+		aui->aui_reg = bus_alloc_resource_any(dev, aui->aui_regtype,
+		    &aui->aui_regid, RF_ACTIVE);
 	}
 	if (aui->aui_reg == NULL) {
 		/* both mmio and pio failed... */
@@ -618,8 +618,8 @@ au88x0_pci_attach(device_t dev)
 	/* IRQ mapping */
 	aui->aui_irqid = 0;
 	aui->aui_irqtype = SYS_RES_IRQ;
-	aui->aui_irq = bus_alloc_resource(dev, aui->aui_irqtype,
-	    &aui->aui_irqid, 0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+	aui->aui_irq = bus_alloc_resource_any(dev, aui->aui_irqtype,
+	    &aui->aui_irqid, RF_ACTIVE | RF_SHAREABLE);
 	if (aui->aui_irq == 0) {
 		device_printf(dev, "failed to map IRQ\n");
 		goto failed;
@@ -729,5 +729,5 @@ static driver_t au88x0_driver = {
 };
 
 DRIVER_MODULE(snd_au88x0, pci, au88x0_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_au88x0, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_au88x0, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_au88x0, 1);

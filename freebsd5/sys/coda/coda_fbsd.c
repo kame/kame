@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/coda/coda_fbsd.c,v 1.31 2003/07/26 07:32:20 phk Exp $");
+__FBSDID("$FreeBSD: src/sys/coda/coda_fbsd.c,v 1.36 2004/07/15 08:25:59 phk Exp $");
 
 #include "vcoda.h"
 
@@ -40,6 +40,7 @@ __FBSDID("$FreeBSD: src/sys/coda/coda_fbsd.c,v 1.31 2003/07/26 07:32:20 phk Exp 
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/ucred.h>
 #include <sys/vnode.h>
 
@@ -66,6 +67,8 @@ __FBSDID("$FreeBSD: src/sys/coda/coda_fbsd.c,v 1.31 2003/07/26 07:32:20 phk Exp 
 #define VC_DEV_NO      93
 
 static struct cdevsw codadevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	vc_nb_open,
 	.d_close =	vc_nb_close,
 	.d_read =	vc_nb_read,
@@ -87,9 +90,9 @@ codadev_modevent(module_t mod, int type, void *data)
 	case MOD_LOAD:
 		break;
 	case MOD_UNLOAD:
-		break;
+		return (EBUSY);
 	default:
-		break;
+		return (EOPNOTSUPP);
 	}
 	return 0;
 }
@@ -171,7 +174,7 @@ printf("error = %d\n", error);
 /* for DEVFS, using bpf & tun drivers as examples*/
 static void coda_fbsd_drvinit(void *unused);
 static void coda_fbsd_drvuninit(void *unused);
-static void coda_fbsd_clone(void *arg, char *name, int namelen, dev_t *dev);
+static void coda_fbsd_clone(void *arg, char *name, int namelen, struct cdev **dev);
 
 static eventhandler_tag clonetag;
 
@@ -179,11 +182,11 @@ static void coda_fbsd_clone(arg, name, namelen, dev)
     void *arg;
     char *name;
     int namelen;
-    dev_t *dev;
+    struct cdev **dev;
 {
     int u;
 
-    if (*dev != NODEV)
+    if (*dev != NULL)
 	return;
     if (dev_stdclone(name,NULL,"cfs",&u) != 1)
 	return;

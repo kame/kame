@@ -28,13 +28,14 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/aac/aac_disk.c,v 1.36 2003/10/21 18:28:33 silby Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/aac/aac_disk.c,v 1.41 2004/08/12 05:05:06 scottl Exp $");
 
 #include "opt_aac.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/sysctl.h>
 
 #include <sys/bus.h>
@@ -174,9 +175,9 @@ aac_disk_strategy(struct bio *bp)
 	/* perform accounting */
 
 	/* pass the bio to the controller - it can work out who we are */
-	AAC_LOCK_ACQUIRE(&sc->ad_controller->aac_io_lock);
+	mtx_lock(&sc->ad_controller->aac_io_lock);
 	aac_submit_bio(bp);
-	AAC_LOCK_RELEASE(&sc->ad_controller->aac_io_lock);
+	mtx_unlock(&sc->ad_controller->aac_io_lock);
 
 	return;
 }
@@ -245,7 +246,8 @@ aac_disk_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size
 		}
 	}
 
-	aac_alloc_sync_fib(sc, &fib, AAC_SYNC_LOCK_FORCE);
+	/* Skip aac_alloc_sync_fib().  We don't want to mess with sleep locks */
+	fib = &sc->aac_common->ac_sync_fib;
 	bw = (struct aac_blockwrite *)&fib->data[0];
 
 	while (length > 0) {
@@ -280,7 +282,7 @@ aac_disk_dump(void *arg, void *virtual, vm_offset_t physical, off_t offset, size
 
 		length -= len;
 		offset += len;
-		(vm_offset_t)virtual += len;
+		virtual = (uint8_t *)virtual + len;
 	}
 
 	return (0);
@@ -357,18 +359,20 @@ aac_disk_attach(device_t dev)
 
 	/* attach a generic disk device to ourselves */
 	sc->unit = device_get_unit(dev);
-	sc->ad_disk.d_drv1 = sc;
-	sc->ad_disk.d_name = "aacd";
-	sc->ad_disk.d_maxsize = aac_iosize_max;
-	sc->ad_disk.d_open = aac_disk_open;
-	sc->ad_disk.d_close = aac_disk_close;
-	sc->ad_disk.d_strategy = aac_disk_strategy;
-	sc->ad_disk.d_dump = aac_disk_dump;
-	sc->ad_disk.d_sectorsize = AAC_BLOCK_SIZE;
-	sc->ad_disk.d_mediasize = (off_t)sc->ad_size * AAC_BLOCK_SIZE;
-	sc->ad_disk.d_fwsectors = sc->ad_sectors;
-	sc->ad_disk.d_fwheads = sc->ad_heads;
-	disk_create(sc->unit, &sc->ad_disk, DISKFLAG_NOGIANT, NULL, NULL);
+	sc->ad_disk = disk_alloc();
+	sc->ad_disk->d_drv1 = sc;
+	sc->ad_disk->d_name = "aacd";
+	sc->ad_disk->d_maxsize = aac_iosize_max;
+	sc->ad_disk->d_open = aac_disk_open;
+	sc->ad_disk->d_close = aac_disk_close;
+	sc->ad_disk->d_strategy = aac_disk_strategy;
+	sc->ad_disk->d_dump = aac_disk_dump;
+	sc->ad_disk->d_sectorsize = AAC_BLOCK_SIZE;
+	sc->ad_disk->d_mediasize = (off_t)sc->ad_size * AAC_BLOCK_SIZE;
+	sc->ad_disk->d_fwsectors = sc->ad_sectors;
+	sc->ad_disk->d_fwheads = sc->ad_heads;
+	sc->ad_disk->d_unit = sc->unit;
+	disk_create(sc->ad_disk, DISK_VERSION);
 
 	return (0);
 }
@@ -388,7 +392,7 @@ aac_disk_detach(device_t dev)
 	if (sc->ad_flags & AAC_DISK_OPEN)
 		return(EBUSY);
 
-	disk_destroy(&sc->ad_disk);
+	disk_destroy(sc->ad_disk);
 
 	return(0);
 }

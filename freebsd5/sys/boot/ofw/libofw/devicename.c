@@ -22,9 +22,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/boot/ofw/libofw/devicename.c,v 1.13 2003/04/16 21:09:41 phk Exp $
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/sys/boot/ofw/libofw/devicename.c,v 1.15 2004/01/04 23:27:31 obrien Exp $");
 
 #include <stand.h>
 #include "libofw.h"
@@ -47,7 +48,8 @@ ofw_getdev(void **vdev, const char *devspec, const char **path)
      * device, go with the current device.
      */
     if ((devspec == NULL) || 
-	(strchr(devspec, '@') == NULL)) {
+	((strchr(devspec, '@') == NULL) &&
+	(strchr(devspec, ':') == NULL))) {
 
 	if (((rv = ofw_parsedev(dev, getenv("currdev"), NULL)) == 0) &&
 	    (path != NULL))
@@ -112,7 +114,7 @@ found:
 }
 
 int
-ofw_setcurrdev(struct env_var *ev, int flags, void *value)
+ofw_setcurrdev(struct env_var *ev, int flags, const void *value)
 {
     struct ofw_devdesc	*ncurr;
     int			rv;

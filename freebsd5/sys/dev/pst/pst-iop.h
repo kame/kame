@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pst/pst-iop.h,v 1.4 2003/04/28 08:10:27 sos Exp $
+ * $FreeBSD: src/sys/dev/pst/pst-iop.h,v 1.4.6.1 2004/10/02 14:14:27 scottl Exp $
  */
 
 /* misc defines */
@@ -42,7 +42,6 @@ struct iop_softc {
     struct resource		*r_mem;
     struct resource		*r_irq;
     caddr_t			ibase;
-    u_int32_t			phys_ibase;
     caddr_t			obase;
     u_int32_t			phys_obase;
     struct i2o_registers	*reg;

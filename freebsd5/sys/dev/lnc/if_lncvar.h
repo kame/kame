@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/lnc/if_lncvar.h,v 1.24 2002/03/20 02:07:27 alfred Exp $
+ * $FreeBSD: src/sys/dev/lnc/if_lncvar.h,v 1.27 2004/03/03 08:33:34 obrien Exp $
  */
 
 /*

@@ -37,8 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ncv/ncr53c500.c,v 1.8 2003/08/24 17:54:12 obrien Exp $");
-#include "opt_ddb.h"
+__FBSDID("$FreeBSD: src/sys/dev/ncv/ncr53c500.c,v 1.10 2004/07/10 21:05:14 marcel Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -79,8 +78,8 @@ __FBSDID("$FreeBSD: src/sys/dev/ncv/ncr53c500.c,v 1.8 2003/08/24 17:54:12 obrien
 #include <machine/bus_pio.h>
 #include <machine/bus.h>
 
-#include <machine/dvcfg.h>
-#include <machine/physio_proc.h>
+#include <compat/netbsd/dvcfg.h>
+#include <compat/netbsd/physio_proc.h>
 
 #include <cam/scsi/scsi_low.h>
 
@@ -1036,10 +1035,10 @@ again:
 		scsi_low_print(slp, NULL);
 		printf("%s st %x ist %x\n\n", slp->sl_xname,
 			status, ireason);
-#ifdef	DDB
+#ifdef	KDB
 		if (ncv_debug > 1)
 			SCSI_LOW_DEBUGGER("ncv");
-#endif	/* DDB */
+#endif	/* KDB */
 	}
 #endif	/* NCV_DEBUG */
 

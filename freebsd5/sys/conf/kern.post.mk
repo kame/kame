@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/kern.post.mk,v 1.53 2003/11/25 04:12:43 imp Exp $
+# $FreeBSD: src/sys/conf/kern.post.mk,v 1.68.2.1 2004/09/20 17:39:02 ru Exp $
 
 # Part of a unified Makefile for building kernels.  This part includes all
 # the definitions that need to be after all the % directives except %RULES
@@ -12,6 +12,7 @@
 .if defined(DESTDIR)
 MKMODULESENV+=	DESTDIR="${DESTDIR}"
 .endif
+MKMODULESENV+=	KERNBUILDDIR="${.CURDIR}"
 
 .MAIN: all
 
@@ -54,24 +55,29 @@ ${KERNEL_KO}: ${FULLKERNEL}
 install.debug reinstall.debug: gdbinit
 	cd ${.CURDIR}; ${MAKE} -DINSTALL_DEBUG ${.TARGET:R}
 
+# Install gdbinit files for kernel debugging.
 gdbinit:
-	sed < ${S}/../tools/debugscripts/dot.gdbinit > .gdbinit \
-		"s:MODPATH:${.OBJDIR}/modules:"
+	grep -v '# XXX' ${S}/../tools/debugscripts/dot.gdbinit | \
+	    sed "s:MODPATH:${.OBJDIR}/modules:" > .gdbinit
 	cp ${S}/../tools/debugscripts/gdbinit.kernel \
-		${S}/../tools/debugscripts/gdbinit.vinum ${.CURDIR}
+	    ${S}/../tools/debugscripts/gdbinit.vinum ${.CURDIR}
+.if exists(${S}/../tools/debugscripts/gdbinit.${MACHINE_ARCH})
 	cp ${S}/../tools/debugscripts/gdbinit.${MACHINE_ARCH} \
-		${.CURDIR}/gdbinit.machine
+	    ${.CURDIR}/gdbinit.machine
+.endif
 .endif
 
 ${FULLKERNEL}: ${SYSTEM_DEP} vers.o
 	@rm -f ${.TARGET}
 	@echo linking ${.TARGET}
 	${SYSTEM_LD}
+.if !defined(DEBUG)
+	${OBJCOPY} --strip-debug ${.TARGET}
+.endif
 	${SYSTEM_LD_TAIL}
 
 .if !exists(${.OBJDIR}/.depend)
-${SYSTEM_OBJS}: assym.s miidevs.h vnode_if.h ${BEFORE_DEPEND:M*.h} \
-    ${MFILES:T:S/.m$/.h/}
+${SYSTEM_OBJS}: assym.s vnode_if.h ${BEFORE_DEPEND:M*.h} ${MFILES:T:S/.m$/.h/}
 .endif
 
 LNFILES=	${CFILES:T:S/.c$/.ln/}
@@ -87,14 +93,14 @@ ${mfile:T:S/.m$/.h/}: ${mfile}
 
 kernel-clean:
 	rm -f *.o *.so *.So *.ko *.s eddep errs \
-	      ${FULLKERNEL} ${KERNEL_KO} linterrs makelinks tags \
-	      vers.c vnode_if.c vnode_if.h majors.c \
-	      ${MFILES:T:S/.m$/.c/} ${MFILES:T:S/.m$/.h/} \
-	      ${CLEAN}
+	    ${FULLKERNEL} ${KERNEL_KO} linterrs makelinks tags \
+	    vers.c vnode_if.c vnode_if.h majors.c \
+	    ${MFILES:T:S/.m$/.c/} ${MFILES:T:S/.m$/.h/} \
+	    ${CLEAN}
 
 lint: ${LNFILES}
-	${LINT} ${LINTKERNFLAGS} ${CFLAGS:M-[DILU]*} ${.ALLSRC} \
-	      2>&1 | tee -a linterrs
+	${LINT} ${LINTKERNFLAGS} ${CFLAGS:M-[DILU]*} ${.ALLSRC} 2>&1 | \
+	    tee -a linterrs
 
 # This is a hack.  BFD "optimizes" away dynamic mode if there are no
 # dynamic references.  We could probably do a '-Bforcedynamic' mode like
@@ -102,19 +108,17 @@ lint: ${LNFILES}
 HACK_EXTRA_FLAGS?= -shared
 hack.So: Makefile
 	touch hack.c
-	${CC} ${FMT} ${HACK_EXTRA_FLAGS} -nostdlib hack.c -o hack.So
+	${CC} ${HACK_EXTRA_FLAGS} -nostdlib hack.c -o hack.So
 	rm -f hack.c
 
-# this rule stops ./assym.s in .depend from causing problems
+# This rule stops ./assym.s in .depend from causing problems.
 ./assym.s: assym.s
 
 assym.s: $S/kern/genassym.sh genassym.o
-	NM=${NM} sh $S/kern/genassym.sh genassym.o > ${.TARGET}
+	NM='${NM}' sh $S/kern/genassym.sh genassym.o > ${.TARGET}
 
-# XXX used to force -elf after CFLAGS to work around breakage of cc -aout
-# (genassym.sh makes some assumptions and cc stopped satisfying them).
 genassym.o: $S/$M/$M/genassym.c
-	${CC} -c ${CFLAGS:N-fno-common} -Wno-inline $S/$M/$M/genassym.c
+	${CC} -c ${CFLAGS:N-fno-common} $S/$M/$M/genassym.c
 
 ${SYSTEM_OBJS} genassym.o vers.o: opt_global.h
 
@@ -126,17 +130,14 @@ kernel-depend:
 	if [ -f .depend ]; then mv .depend .olddep; fi
 	${MAKE} _kernel-depend
 
-# XXX this belongs elsewhere (inside GEN_CFILES if possible).
-GEN_M_CFILES=	${MFILES:T:S/.m$/.c/}
-
 # The argument list can be very long, so use make -V and xargs to
 # pass it to mkdep.
-_kernel-depend: assym.s miidevs.h vnode_if.h ${BEFORE_DEPEND} \
-	    ${CFILES} ${SYSTEM_CFILES} ${GEN_CFILES} ${GEN_M_CFILES} \
-	    ${SFILES} ${MFILES:T:S/.m$/.h/}
+_kernel-depend: assym.s vnode_if.h ${BEFORE_DEPEND} ${CFILES} \
+	    ${SYSTEM_CFILES} ${GEN_CFILES} ${SFILES} \
+	    ${MFILES:T:S/.m$/.h/}
 	if [ -f .olddep ]; then mv .olddep .depend; fi
 	rm -f .newdep
-	${MAKE} -V CFILES -V SYSTEM_CFILES -V GEN_CFILES -V GEN_M_CFILES | \
+	${MAKE} -V CFILES -V SYSTEM_CFILES -V GEN_CFILES | \
 	    MKDEP_CPP="${CC} -E" CC="${CC}" xargs mkdep -a -f .newdep ${CFLAGS}
 	${MAKE} -V SFILES | \
 	    MKDEP_CPP="${CC} -E" xargs mkdep -a -f .newdep ${ASM_CFLAGS}
@@ -148,10 +149,10 @@ kernel-cleandepend:
 
 links:
 	egrep '#if' ${CFILES} | sed -f $S/conf/defines | \
-	  sed -e 's/:.*//' -e 's/\.c/.o/' | sort -u > dontlink
+	    sed -e 's/:.*//' -e 's/\.c/.o/' | sort -u > dontlink
 	${MAKE} -V CFILES | tr -s ' ' '\12' | sed 's/\.c/.o/' | \
-	  sort -u | comm -23 - dontlink | \
-	  sed 's,../.*/\(.*.o\),rm -f \1;ln -s ../GENERIC/\1 \1,' > makelinks
+	    sort -u | comm -23 - dontlink | \
+	    sed 's,../.*/\(.*.o\),rm -f \1;ln -s ../GENERIC/\1 \1,' > makelinks
 	sh makelinks; rm -f dontlink
 
 kernel-tags:
@@ -160,8 +161,9 @@ kernel-tags:
 	rm -f tags1
 	sed -e 's,      ../,    ,' tags > tags1
 
-kernel-install:
+.if ${MACHINE_ARCH} != "ia64"
 .if exists(${DESTDIR}/boot)
+kernel-install-check:
 	@if [ ! -f ${DESTDIR}/boot/device.hints ] ; then \
 		echo "You must set up a ${DESTDIR}/boot/device.hints file first." ; \
 		exit 1 ; \
@@ -170,7 +172,12 @@ kernel-install:
 		echo "You must activate /boot/device.hints in loader.conf." ; \
 		exit 1 ; \
 	fi
+
+kernel-install: kernel-install-check
 .endif
+.endif
+
+kernel-install:
 	@if [ ! -f ${FULLKERNEL} ] ; then \
 		echo "You must build a kernel first." ; \
 		exit 1 ; \
@@ -214,7 +221,7 @@ majors.c: $S/conf/majors $S/conf/majors.awk
 	${AWK} -f $S/conf/majors.awk $S/conf/majors > ${.TARGET}
 
 vers.c: $S/conf/newvers.sh $S/sys/param.h ${SYSTEM_DEP}
-	sh $S/conf/newvers.sh ${KERN_IDENT}
+	MAKE=${MAKE} sh $S/conf/newvers.sh ${KERN_IDENT}
 
 vnode_if.c: $S/tools/vnode_if.awk $S/kern/vnode_if.src
 	${AWK} -f $S/tools/vnode_if.awk $S/kern/vnode_if.src -c

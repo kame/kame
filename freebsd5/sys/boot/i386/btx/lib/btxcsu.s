@@ -13,7 +13,7 @@
 # purpose.
 #
 
-# $FreeBSD: src/sys/boot/i386/btx/lib/btxcsu.s,v 1.3 1999/08/28 00:40:07 peter Exp $
+# $FreeBSD: src/sys/boot/i386/btx/lib/btxcsu.s,v 1.4 2004/08/05 06:00:05 kan Exp $
 
 #
 # BTX C startup code (ELF).
@@ -30,7 +30,15 @@
 #
 # Client entry point.
 #
-_start: 	movl %eax,__base		# Set base address
+_start: 	cld
+		pushl %eax
+		movl $_edata,%edi 
+		movl $_end,%ecx 
+		subl %edi, %ecx
+		xorb %al, %al
+		rep
+		stosb
+		popl __base
 		movl %esp,%eax			# Set
 		addl $ARGADJ,%eax		#  argument
 		movl %eax,__args		#  pointer

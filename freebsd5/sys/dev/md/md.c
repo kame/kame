@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/dev/md/md.c,v 1.108.2.1 2003/12/17 19:48:00 phk Exp $
+ * $FreeBSD: src/sys/dev/md/md.c,v 1.127.2.3 2004/09/02 20:08:41 cperciva Exp $
  *
  */
 
@@ -31,10 +31,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -75,6 +71,7 @@
 #include <sys/namei.h>
 #include <sys/proc.h>
 #include <sys/queue.h>
+#include <sys/sf_buf.h>
 #include <sys/sysctl.h>
 #include <sys/vnode.h>
 
@@ -107,21 +104,33 @@ static u_char mfs_root[MD_ROOT_SIZE*1024] = "MFS Filesystem goes here";
 static u_char end_mfs_root[] __unused = "MFS Filesystem had better STOP here";
 #endif
 
-static g_init_t md_drvinit;
+static g_init_t g_md_init;
+static g_fini_t g_md_fini;
+static g_start_t g_md_start;
+static g_access_t g_md_access;
 
-static int	mdrootready;
 static int	mdunits;
-static dev_t	status_dev = 0;
-
-#define CDEV_MAJOR	95
+static struct cdev *status_dev = 0;
 
 static d_ioctl_t mdctlioctl;
 
 static struct cdevsw mdctl_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_ioctl =	mdctlioctl,
 	.d_name =	MD_NAME,
-	.d_maj =	CDEV_MAJOR
 };
+
+struct g_class g_md_class = {
+	.name = "MD",
+	.version = G_VERSION,
+	.init = g_md_init,
+	.fini = g_md_fini,
+	.start = g_md_start,
+	.access = g_md_access,
+};
+
+DECLARE_GEOM_CLASS(g_md_class, g_md);
 
 
 static LIST_HEAD(, md_s) md_softc_list = LIST_HEAD_INITIALIZER(&md_softc_list);
@@ -142,7 +151,7 @@ struct md_s {
 	LIST_ENTRY(md_s) list;
 	struct bio_queue_head bio_queue;
 	struct mtx queue_mtx;
-	dev_t dev;
+	struct cdev *dev;
 	enum md_types type;
 	unsigned nsect;
 	unsigned opencount;
@@ -169,6 +178,7 @@ struct md_s {
 
 	/* MD_SWAP related fields */
 	vm_object_t object;
+	unsigned npage;
 };
 
 static int mddestroy(struct md_s *sc, struct thread *td);
@@ -339,11 +349,6 @@ s_write(struct indir *ip, off_t offset, uintptr_t ptr)
 }
 
 
-struct g_class g_md_class = {
-	.name = "MD",
-	.init = md_drvinit,
-};
-
 static int
 g_md_access(struct g_provider *pp, int r, int w, int e)
 {
@@ -379,7 +384,6 @@ g_md_start(struct bio *bp)
 	wakeup(sc);
 }
 
-DECLARE_GEOM_CLASS(g_md_class, g_md);
 
 
 static int
@@ -503,79 +507,91 @@ mdstart_vnode(struct md_s *sc, struct bio *bp)
 	if (bp->bio_cmd == BIO_READ) {
 		vn_lock(sc->vnode, LK_EXCLUSIVE | LK_RETRY, curthread);
 		error = VOP_READ(sc->vnode, &auio, IO_DIRECT, sc->cred);
+		VOP_UNLOCK(sc->vnode, 0, curthread);
 	} else {
 		(void) vn_start_write(sc->vnode, &mp, V_WAIT);
 		vn_lock(sc->vnode, LK_EXCLUSIVE | LK_RETRY, curthread);
-		error = VOP_WRITE(sc->vnode, &auio, 0, sc->cred);
+		error = VOP_WRITE(sc->vnode, &auio,
+		    sc->flags & MD_ASYNC ? 0 : IO_SYNC, sc->cred);
+		VOP_UNLOCK(sc->vnode, 0, curthread);
 		vn_finished_write(mp);
 	}
-	VOP_UNLOCK(sc->vnode, 0, curthread);
 	bp->bio_resid = auio.uio_resid;
 	return (error);
 }
 
-#include <vm/vm_extern.h>
-#include <vm/vm_kern.h>
-
 static int
 mdstart_swap(struct md_s *sc, struct bio *bp)
 {
-	{
-		int i, o, rv;
-		vm_page_t m;
-		u_char *p;
-		vm_offset_t kva;
+	struct sf_buf *sf;
+	int i, rv;
+	int offs, len, lastp, lastend;
+	vm_page_t m;
+	u_char *p;
 
-		p = bp->bio_data;
-		o = bp->bio_offset / sc->secsize;
-		mtx_lock(&Giant);
-		kva = kmem_alloc_nofault(kernel_map, sc->secsize);
-		
+	p = bp->bio_data;
+
+	/*
+	 * offs is the ofset at whih to start operating on the
+	 * next (ie, first) page.  lastp is the last page on
+	 * which we're going to operate.  lastend is the ending
+	 * position within that last page (ie, PAGE_SIZE if
+	 * we're operating on complete aligned pages).
+	 */
+	offs = bp->bio_offset % PAGE_SIZE;
+	lastp = (bp->bio_offset + bp->bio_length - 1) / PAGE_SIZE;
+	lastend = (bp->bio_offset + bp->bio_length - 1) % PAGE_SIZE + 1;
+
+	VM_OBJECT_LOCK(sc->object);
+	vm_object_pip_add(sc->object, 1);
+	for (i = bp->bio_offset / PAGE_SIZE; i <= lastp; i++) {
+		len = ((i == lastp) ? lastend : PAGE_SIZE) - offs;
+
+		m = vm_page_grab(sc->object, i,
+		    VM_ALLOC_NORMAL|VM_ALLOC_RETRY);
+		VM_OBJECT_UNLOCK(sc->object);
+		sf = sf_buf_alloc(m, 0);
 		VM_OBJECT_LOCK(sc->object);
-		vm_object_pip_add(sc->object, 1);
-		for (i = 0; i < bp->bio_length / sc->secsize; i++) {
-			m = vm_page_grab(sc->object, i + o,
-			    VM_ALLOC_NORMAL|VM_ALLOC_RETRY);
-			pmap_qenter(kva, &m, 1);
-			if (bp->bio_cmd == BIO_READ) {
-				if (m->valid != VM_PAGE_BITS_ALL) {
-					rv = vm_pager_get_pages(sc->object,
-					    &m, 1, 0);
-				}
-				bcopy((void *)kva, p, sc->secsize);
-			} else if (bp->bio_cmd == BIO_WRITE) {
-				bcopy(p, (void *)kva, sc->secsize);
-				m->valid = VM_PAGE_BITS_ALL;
+		if (bp->bio_cmd == BIO_READ) {
+			if (m->valid != VM_PAGE_BITS_ALL)
+				rv = vm_pager_get_pages(sc->object, &m, 1, 0);
+			bcopy((void *)(sf_buf_kva(sf) + offs), p, len);
+		} else if (bp->bio_cmd == BIO_WRITE) {
+			if (len != PAGE_SIZE && m->valid != VM_PAGE_BITS_ALL)
+				rv = vm_pager_get_pages(sc->object, &m, 1, 0);
+			bcopy(p, (void *)(sf_buf_kva(sf) + offs), len);
+			m->valid = VM_PAGE_BITS_ALL;
 #if 0
-			} else if (bp->bio_cmd == BIO_DELETE) {
-				bzero((void *)kva, sc->secsize);
-				vm_page_dirty(m);
-				m->valid = VM_PAGE_BITS_ALL;
-#endif
-			} 
-			pmap_qremove(kva, 1);
-			vm_page_lock_queues();
-			vm_page_wakeup(m);
-			vm_page_activate(m);
-			if (bp->bio_cmd == BIO_WRITE) {
-				vm_page_dirty(m);
-			}
-			vm_page_unlock_queues();
-			p += sc->secsize;
-#if 0
-if (bootverbose || o < 17)
-printf("wire_count %d busy %d flags %x hold_count %d act_count %d queue %d valid %d dirty %d @ %d\n",
-    m->wire_count, m->busy, 
-    m->flags, m->hold_count, m->act_count, m->queue, m->valid, m->dirty, o + i);
+		} else if (bp->bio_cmd == BIO_DELETE) {
+			if (len != PAGE_SIZE && m->valid != VM_PAGE_BITS_ALL)
+				rv = vm_pager_get_pages(sc->object, &m, 1, 0);
+			bzero((void *)(sf_buf_kva(sf) + offs), len);
+			vm_page_dirty(m);
+			m->valid = VM_PAGE_BITS_ALL;
 #endif
 		}
-		vm_object_pip_subtract(sc->object, 1);
-		vm_object_set_writeable_dirty(sc->object);
-		VM_OBJECT_UNLOCK(sc->object);
-		kmem_free(kernel_map, kva, sc->secsize);
-		mtx_unlock(&Giant);
-		return (0);
+		sf_buf_free(sf);
+		vm_page_lock_queues();
+		vm_page_wakeup(m);
+		vm_page_activate(m);
+		if (bp->bio_cmd == BIO_WRITE)
+			vm_page_dirty(m);
+		vm_page_unlock_queues();
+
+		/* Actions on further pages start at offset 0 */
+		p += PAGE_SIZE - offs;
+		offs = 0;
+#if 0
+if (bootverbose || bp->bio_offset / PAGE_SIZE < 17)
+printf("wire_count %d busy %d flags %x hold_count %d act_count %d queue %d valid %d dirty %d @ %d\n",
+    m->wire_count, m->busy, 
+    m->flags, m->hold_count, m->act_count, m->queue, m->valid, m->dirty, i);
+#endif
 	}
+	vm_object_pip_subtract(sc->object, 1);
+	vm_object_set_writeable_dirty(sc->object);
+	VM_OBJECT_UNLOCK(sc->object);
+	return (0);
 }
 
 static void
@@ -589,13 +605,13 @@ md_kthread(void *arg)
 	curthread->td_base_pri = PRIBIO;
 
 	switch (sc->type) {
-	case MD_SWAP:
 	case MD_VNODE:
 		mtx_lock(&Giant);
 		hasgiant = 1;
 		break;
 	case MD_MALLOC:
 	case MD_PRELOAD:
+	case MD_SWAP:
 	default:
 		hasgiant = 0;
 		break;
@@ -611,8 +627,8 @@ md_kthread(void *arg)
 				mtx_unlock(&sc->queue_mtx);
 				sc->procp = NULL;
 				wakeup(&sc->procp);
-				if (!hasgiant)
-					mtx_lock(&Giant);
+				if (hasgiant)
+					mtx_unlock(&Giant);
 				kthread_exit(0);
 			}
 			msleep(sc, &sc->queue_mtx, PRIBIO | PDROP, "mdwait", 0);
@@ -711,8 +727,6 @@ mdinit(struct md_s *sc)
 	DROP_GIANT();
 	g_topology_lock();
 	gp = g_new_geomf(&g_md_class, "md%d", sc->unit);
-	gp->start = g_md_start;
-	gp->access = g_md_access;
 	gp->softc = sc;
 	pp = g_new_providerf(gp, "md%d", sc->unit);
 	pp->mediasize = (off_t)sc->nsect * sc->secsize;
@@ -721,6 +735,8 @@ mdinit(struct md_s *sc)
 	sc->pp = pp;
 	g_error_provider(pp, 0);
 	g_topology_unlock();
+	if (sc->type != MD_PRELOAD)
+		g_waitidle();
 	PICKUP_GIANT();
 }
 
@@ -797,8 +813,7 @@ mdcreate_malloc(struct md_ioctl *mdio)
 		sc->fwsectors = mdio->md_fwsectors;
 	if (mdio->md_fwheads != 0)
 		sc->fwheads = mdio->md_fwheads;
-	sc->nsect = mdio->md_size;
-	sc->nsect /= (sc->secsize / DEV_BSIZE);
+	sc->nsect = (mdio->md_size * DEV_BSIZE) / sc->secsize;
 	sc->flags = mdio->md_options & (MD_COMPRESS | MD_FORCE);
 	sc->indir = dimension(sc->nsect);
 	sc->uma = uma_zcreate(sc->name, sc->secsize,
@@ -906,8 +921,12 @@ mdcreate_vnode(struct md_ioctl *mdio, struct thread *td)
 		return (EBUSY);
 	}
 
+	if (mdio->md_fwsectors != 0)
+		sc->fwsectors = mdio->md_fwsectors;
+	if (mdio->md_fwheads != 0)
+		sc->fwheads = mdio->md_fwheads;
 	sc->type = MD_VNODE;
-	sc->flags = mdio->md_options & MD_FORCE;
+	sc->flags = mdio->md_options & (MD_FORCE | MD_ASYNC);
 	if (!(flags & FWRITE))
 		sc->flags |= MD_READONLY;
 	sc->secsize = DEV_BSIZE;
@@ -1010,18 +1029,24 @@ mdcreate_swap(struct md_ioctl *mdio, struct thread *td)
 	/*
 	 * Allocate an OBJT_SWAP object.
 	 *
-	 * sc_secsize is PAGE_SIZE'd
+	 * sc_nsect is in units of DEV_BSIZE.
+	 * sc_npage is in units of PAGE_SIZE.
 	 *
-	 * mdio->size is in DEV_BSIZE'd chunks.
 	 * Note the truncation.
 	 */
 
-	sc->secsize = PAGE_SIZE;
-	sc->nsect = mdio->md_size / (PAGE_SIZE / DEV_BSIZE);
-	sc->object = vm_pager_allocate(OBJT_SWAP, NULL, sc->secsize * (vm_offset_t)sc->nsect, VM_PROT_DEFAULT, 0);
+	sc->secsize = DEV_BSIZE;
+	sc->npage = mdio->md_size / (PAGE_SIZE / DEV_BSIZE);
+	sc->nsect = sc->npage * (PAGE_SIZE / DEV_BSIZE);
+	if (mdio->md_fwsectors != 0)
+		sc->fwsectors = mdio->md_fwsectors;
+	if (mdio->md_fwheads != 0)
+		sc->fwheads = mdio->md_fwheads;
+	sc->object = vm_pager_allocate(OBJT_SWAP, NULL, PAGE_SIZE * 
+	    (vm_offset_t)sc->npage, VM_PROT_DEFAULT, 0);
 	sc->flags = mdio->md_options & MD_FORCE;
 	if (mdio->md_options & MD_RESERVE) {
-		if (swap_pager_reserve(sc->object, 0, sc->nsect) < 0) {
+		if (swap_pager_reserve(sc->object, 0, sc->npage) < 0) {
 			vm_object_deallocate(sc->object);
 			sc->object = NULL;
 			mddestroy(sc, td);
@@ -1061,7 +1086,7 @@ mddetach(int unit, struct thread *td)
 }
 
 static int
-mdctlioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct thread *td)
+mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags, struct thread *td)
 {
 	struct md_ioctl *mdio;
 	struct md_s *sc;
@@ -1119,7 +1144,7 @@ mdctlioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct thread *td)
 			mdio->md_base = (uint64_t)(intptr_t)sc->pl_ptr;
 			break;
 		case MD_SWAP:
-			mdio->md_size = sc->nsect * (PAGE_SIZE / DEV_BSIZE);
+			mdio->md_size = sc->nsect;
 			break;
 		case MD_VNODE:
 			mdio->md_size = sc->nsect;
@@ -1157,13 +1182,15 @@ md_preloaded(u_char *image, unsigned length)
 	sc->nsect = length / DEV_BSIZE;
 	sc->pl_ptr = image;
 	sc->pl_len = length;
+#ifdef MD_ROOT
 	if (sc->unit == 0)
-		mdrootready = 1;
+		rootdevnames[0] = "ufs:/dev/md0";
+#endif
 	mdinit(sc);
 }
 
 static void
-md_drvinit(struct g_class *mp __unused)
+g_md_init(struct g_class *mp __unused)
 {
 
 	caddr_t mod;
@@ -1171,11 +1198,11 @@ md_drvinit(struct g_class *mp __unused)
 	u_char *ptr, *name, *type;
 	unsigned len;
 
+	mod = NULL;
 	g_topology_unlock();
 #ifdef MD_ROOT_SIZE
 	md_preloaded(mfs_root, MD_ROOT_SIZE*1024);
 #endif
-	mod = NULL;
 	while ((mod = preload_search_next_name(mod)) != NULL) {
 		name = (char *)preload_search_info(mod, MODINFO_NAME);
 		type = (char *)preload_search_info(mod, MODINFO_TYPE);
@@ -1198,47 +1225,10 @@ md_drvinit(struct g_class *mp __unused)
 	g_topology_lock();
 }
 
-static int
-md_modevent(module_t mod, int type, void *data)
-{
-	int error;
-	struct md_s *sc;
-
-	switch (type) {
-	case MOD_LOAD:
-		break;
-	case MOD_UNLOAD:
-		LIST_FOREACH(sc, &md_softc_list, list) {
-			error = mddetach(sc->unit, curthread);
-			if (error != 0)
-				return (error);
-		}
-		if (status_dev)
-			destroy_dev(status_dev);
-		status_dev = 0;
-		break;
-	default:
-		break;
-	}
-	return (0);
-}
-
-static moduledata_t md_mod = {
-	MD_NAME,
-	md_modevent,
-	NULL
-};
-DECLARE_MODULE(md, md_mod, SI_SUB_DRIVERS, SI_ORDER_MIDDLE+CDEV_MAJOR);
-MODULE_VERSION(md, MD_MODVER);
-
-
-#ifdef MD_ROOT
 static void
-md_takeroot(void *junk)
+g_md_fini(struct g_class *mp __unused)
 {
-	if (mdrootready)
-		rootdevnames[0] = "ufs:/dev/md0";
-}
 
-SYSINIT(md_root, SI_SUB_MOUNT_ROOT, SI_ORDER_FIRST, md_takeroot, NULL);
-#endif /* MD_ROOT */
+	if (status_dev != NULL)
+		destroy_dev(status_dev);
+}

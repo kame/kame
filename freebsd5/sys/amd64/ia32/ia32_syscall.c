@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/amd64/ia32/ia32_syscall.c,v 1.6 2003/11/17 08:58:14 peter Exp $");
+__FBSDID("$FreeBSD: src/sys/amd64/ia32/ia32_syscall.c,v 1.6.4.1 2004/09/03 06:11:57 julian Exp $");
 
 /*
  * 386 Trap and System call handling
@@ -247,9 +247,6 @@ ia32_syscall(struct trapframe frame)
 	 */
 	STOPEVENT(p, S_SCX, code);
 
-#ifdef DIAGNOSTIC
-	cred_free_thread(td);
-#endif
 	WITNESS_WARN(WARN_PANIC, NULL, "System call %s returning",
 	    (code >= 0 && code < SYS_MAXSYSCALL) ? freebsd32_syscallnames[code] : "???");
 	mtx_assert(&sched_lock, MA_NOTOWNED);

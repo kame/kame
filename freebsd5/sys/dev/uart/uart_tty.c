@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/uart/uart_tty.c,v 1.4 2003/09/28 18:20:42 marcel Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/uart/uart_tty.c,v 1.16 2004/07/15 20:47:39 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -67,15 +67,12 @@ static d_close_t uart_tty_close;
 static d_ioctl_t uart_tty_ioctl;
 
 static struct cdevsw uart_cdevsw = {
-	.d_open = uart_tty_open,
-	.d_close = uart_tty_close,
-	.d_read = ttyread,
-	.d_write = ttywrite,
-	.d_ioctl = uart_tty_ioctl,
-	.d_poll = ttypoll,
-	.d_name = uart_driver_name,
-	.d_flags = D_TTY,
-	.d_kqfilter = ttykqfilter,
+	.d_version =	D_VERSION,
+	.d_open =	uart_tty_open,
+	.d_close =	uart_tty_close,
+	.d_ioctl =	uart_tty_ioctl,
+	.d_name =	uart_driver_name,
+	.d_flags =	D_TTY | D_NEEDGIANT,
 };
 
 static struct uart_devinfo uart_console;
@@ -167,11 +164,11 @@ uart_tty_oproc(struct tty *tp)
 	 */
 	if ((tp->t_cflag & CRTS_IFLOW) && !sc->sc_hwiflow) {
 		if ((tp->t_state & TS_TBLOCK) &&
-		    (sc->sc_hwsig & UART_SIG_RTS))
-			UART_SETSIG(sc, UART_SIG_DRTS);
+		    (sc->sc_hwsig & SER_RTS))
+			UART_SETSIG(sc, SER_DRTS);
 		else if (!(tp->t_state & TS_TBLOCK) &&
-		    !(sc->sc_hwsig & UART_SIG_RTS))
-			UART_SETSIG(sc, UART_SIG_DRTS|UART_SIG_RTS);
+		    !(sc->sc_hwsig & SER_RTS))
+			UART_SETSIG(sc, SER_DRTS|SER_RTS);
 	}
 
 	if (tp->t_state & TS_TTSTOP)
@@ -210,7 +207,7 @@ uart_tty_param(struct tty *tp, struct termios *t)
 		t->c_cflag &= ~HUPCL;
 	}
 	if (t->c_ospeed == 0) {
-		UART_SETSIG(sc, UART_SIG_DDTR | UART_SIG_DRTS);
+		UART_SETSIG(sc, SER_DDTR | SER_DRTS);
 		return (0);
 	}
 	switch (t->c_cflag & CSIZE) {
@@ -225,14 +222,15 @@ uart_tty_param(struct tty *tp, struct termios *t)
 		    : UART_PARITY_EVEN;
 	else
 		parity = UART_PARITY_NONE;
-	UART_PARAM(sc, t->c_ospeed, databits, stopbits, parity);
-	UART_SETSIG(sc, UART_SIG_DDTR | UART_SIG_DTR);
+	if (UART_PARAM(sc, t->c_ospeed, databits, stopbits, parity) != 0)
+		return (EINVAL);
+	UART_SETSIG(sc, SER_DDTR | SER_DTR);
 	/* Set input flow control state. */
 	if (!sc->sc_hwiflow) {
 		if ((t->c_cflag & CRTS_IFLOW) && (tp->t_state & TS_TBLOCK))
-			UART_SETSIG(sc, UART_SIG_DRTS);
+			UART_SETSIG(sc, SER_DRTS);
 		else
-			UART_SETSIG(sc, UART_SIG_DRTS | UART_SIG_RTS);
+			UART_SETSIG(sc, SER_DRTS | SER_RTS);
 	} else
 		UART_IOCTL(sc, UART_IOCTL_IFLOW, (t->c_cflag & CRTS_IFLOW));
 	/* Set output flow control state. */
@@ -240,6 +238,26 @@ uart_tty_param(struct tty *tp, struct termios *t)
 		UART_IOCTL(sc, UART_IOCTL_OFLOW, (t->c_cflag & CCTS_OFLOW));
 	ttsetwater(tp);
 	return (0);
+}
+
+static int
+uart_tty_modem(struct tty *tp, int biton, int bitoff)
+{
+	struct uart_softc *sc;
+
+	sc = tp->t_dev->si_drv1;
+	if (biton != 0 || bitoff != 0)
+		UART_SETSIG(sc, SER_DELTA(bitoff|biton) | biton);
+	return (sc->sc_hwsig);
+}
+
+static void
+uart_tty_break(struct tty *tp, int state)
+{
+	struct uart_softc *sc;
+
+	sc = tp->t_dev->si_drv1;
+	UART_IOCTL(sc, UART_IOCTL_BREAK, state);
 }
 
 static void
@@ -288,24 +306,24 @@ uart_tty_intr(void *arg)
 				c |= TTY_FE;
 			if (xc & UART_STAT_PARERR)
 				c |= TTY_PE;
-			(*linesw[tp->t_line].l_rint)(c, tp);
+			ttyld_rint(tp, c);
 		}
 	}
 
 	if (pend & UART_IPEND_BREAK) {
 		if (tp != NULL && !(tp->t_iflag & IGNBRK))
-			(*linesw[tp->t_line].l_rint)(0, tp);
+			ttyld_rint(tp, 0);
 	}
 
 	if (pend & UART_IPEND_SIGCHG) {
 		sig = pend & UART_IPEND_SIGMASK;
-		if (sig & UART_SIG_DDCD)
-			(*linesw[tp->t_line].l_modem)(tp, sig & UART_SIG_DCD);
-		if ((sig & UART_SIG_DCTS) && (tp->t_cflag & CCTS_OFLOW) &&
+		if (sig & SER_DDCD)
+			ttyld_modem(tp, sig & SER_DCD);
+		if ((sig & SER_DCTS) && (tp->t_cflag & CCTS_OFLOW) &&
 		    !sc->sc_hwoflow) {
-			if (sig & UART_SIG_CTS) {
+			if (sig & SER_CTS) {
 				tp->t_state &= ~TS_TTSTOP;
-				(*linesw[tp->t_line].l_start)(tp);
+				ttyld_start(tp);
 			} else
 				tp->t_state |= TS_TTSTOP;
 		}
@@ -313,7 +331,7 @@ uart_tty_intr(void *arg)
 
 	if (pend & UART_IPEND_TXIDLE) {
 		tp->t_state &= ~TS_BUSY;
-		(*linesw[tp->t_line].l_start)(tp);
+		ttyld_start(tp);
 	}
 }
 
@@ -339,6 +357,8 @@ uart_tty_attach(struct uart_softc *sc)
 	tp->t_oproc = uart_tty_oproc;
 	tp->t_param = uart_tty_param;
 	tp->t_stop = uart_tty_stop;
+	tp->t_modem = uart_tty_modem;
+	tp->t_break = uart_tty_break;
 
 	if (sc->sc_sysdev != NULL && sc->sc_sysdev->type == UART_DEV_CONSOLE) {
 		sprintf(((struct consdev *)sc->sc_sysdev->cookie)->cn_name,
@@ -363,19 +383,19 @@ int uart_tty_detach(struct uart_softc *sc)
 }
 
 static int
-uart_tty_open(dev_t dev, int flags, int mode, struct thread *td)
+uart_tty_open(struct cdev *dev, int flags, int mode, struct thread *td)
 {
 	struct uart_softc *sc;
 	struct tty *tp;
 	int error;
 
+ loop:
 	sc = dev->si_drv1;
 	if (sc == NULL || sc->sc_leaving)
 		return (ENODEV);
 
 	tp = dev->si_tty;
 
- loop:
 	if (sc->sc_opened) {
 		KASSERT(tp->t_state & TS_ISOPEN, ("foo"));
 		/*
@@ -392,9 +412,6 @@ uart_tty_open(dev_t dev, int flags, int mode, struct thread *td)
 				error =	tsleep(sc, TTIPRI|PCATCH, "uartbi", 0);
 				if (error)
 					return (error);
-				sc = dev->si_drv1;
-				if (sc == NULL || sc->sc_leaving)
-					return (ENODEV);
 				goto loop;
 			}
 		}
@@ -423,8 +440,8 @@ uart_tty_open(dev_t dev, int flags, int mode, struct thread *td)
 		/*
 		 * Handle initial DCD.
 		 */
-		if ((sc->sc_hwsig & UART_SIG_DCD) || sc->sc_callout)
-			(*linesw[tp->t_line].l_modem)(tp, 1);
+		if ((sc->sc_hwsig & SER_DCD) || sc->sc_callout)
+			ttyld_modem(tp, 1);
 	}
 	/*
 	 * Wait for DCD if necessary.
@@ -434,15 +451,12 @@ uart_tty_open(dev_t dev, int flags, int mode, struct thread *td)
 		error = tsleep(TSA_CARR_ON(tp), TTIPRI|PCATCH, "uartdcd", 0);
 		if (error)
 			return (error);
-		sc = dev->si_drv1;
-		if (sc == NULL || sc->sc_leaving)
-			return (ENODEV);
 		goto loop;
 	}
-	error = ttyopen(dev, tp);
+	error = tty_open(dev, tp);
 	if (error)
 		return (error);
-	error = (*linesw[tp->t_line].l_open)(dev, tp);
+	error = ttyld_open(tp, dev);
 	if (error)
 		return (error);
 
@@ -452,7 +466,7 @@ uart_tty_open(dev_t dev, int flags, int mode, struct thread *td)
 }
 
 static int
-uart_tty_close(dev_t dev, int flags, int mode, struct thread *td)
+uart_tty_close(struct cdev *dev, int flags, int mode, struct thread *td)
 {
 	struct uart_softc *sc;
 	struct tty *tp;
@@ -472,13 +486,13 @@ uart_tty_close(dev_t dev, int flags, int mode, struct thread *td)
 	if (sc->sc_hwoflow)
 		UART_IOCTL(sc, UART_IOCTL_OFLOW, 0);
 	if (sc->sc_sysdev == NULL)
-		UART_SETSIG(sc, UART_SIG_DDTR | UART_SIG_DRTS);
+		UART_SETSIG(sc, SER_DDTR | SER_DRTS);
 
 	/* Disable pulse capturing. */
 	sc->sc_pps.ppsparam.mode = 0;
 
-	(*linesw[tp->t_line].l_close)(tp, flags);
-	ttyclose(tp);
+	ttyld_close(tp, flags);
+	tty_close(tp);
 	wakeup(sc);
 	wakeup(TSA_CARR_ON(tp));
 	KASSERT(!(tp->t_state & TS_ISOPEN), ("foo"));
@@ -487,88 +501,24 @@ uart_tty_close(dev_t dev, int flags, int mode, struct thread *td)
 }
 
 static int
-uart_tty_ioctl(dev_t dev, u_long cmd, caddr_t data, int flags,
+uart_tty_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags,
     struct thread *td)
 {
 	struct uart_softc *sc;
 	struct tty *tp;
-	int bits, error, sig;
+	int error;
 
 	sc = dev->si_drv1;
 	if (sc == NULL || sc->sc_leaving)
 		return (ENODEV);
 
 	tp = dev->si_tty;
-	error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flags, td);
-	if (error != ENOIOCTL)
-		return (error);
-	error = ttioctl(tp, cmd, data, flags);
-	if (error != ENOIOCTL)
+	error = ttyioctl(dev, cmd, data, flags, td);
+	if (error != ENOTTY)
 		return (error);
 
-	error = 0;
-	switch (cmd) {
-	case TIOCSBRK:
-		UART_IOCTL(sc, UART_IOCTL_BREAK, 1);
-		break;
-	case TIOCCBRK:
-		UART_IOCTL(sc, UART_IOCTL_BREAK, 0);
-		break;
-	case TIOCSDTR:
-		UART_SETSIG(sc, UART_SIG_DDTR | UART_SIG_DTR);
-		break;
-	case TIOCCDTR:
-		UART_SETSIG(sc, UART_SIG_DDTR);
-		break;
-	case TIOCMSET:
-		bits = *(int*)data;
-		sig = UART_SIG_DDTR | UART_SIG_DRTS;
-		if (bits & TIOCM_DTR)
-			sig |= UART_SIG_DTR;
-		if (bits & TIOCM_RTS)
-			sig |= UART_SIG_RTS;
-		UART_SETSIG(sc, sig);
-		break;
-        case TIOCMBIS:
-		bits = *(int*)data;
-		sig = 0;
-		if (bits & TIOCM_DTR)
-			sig |= UART_SIG_DDTR | UART_SIG_DTR;
-		if (bits & TIOCM_RTS)
-			sig |= UART_SIG_DRTS | UART_SIG_RTS;
-		UART_SETSIG(sc, sig);
-		break;
-        case TIOCMBIC:
-		bits = *(int*)data;
-		sig = 0;
-		if (bits & TIOCM_DTR)
-			sig |= UART_SIG_DDTR;
-		if (bits & TIOCM_RTS)
-			sig |= UART_SIG_DRTS;
-		UART_SETSIG(sc, sig);
-		break;
-        case TIOCMGET:
-		sig = sc->sc_hwsig;
-		bits = TIOCM_LE;
-		if (sig & UART_SIG_DTR)
-			bits |= TIOCM_DTR;
-		if (sig & UART_SIG_RTS)
-			bits |= TIOCM_RTS;
-		if (sig & UART_SIG_DSR)
-			bits |= TIOCM_DSR;
-		if (sig & UART_SIG_CTS)
-			bits |= TIOCM_CTS;
-		if (sig & UART_SIG_DCD)
-			bits |= TIOCM_CD;
-		if (sig & (UART_SIG_DRI | UART_SIG_RI))
-			bits |= TIOCM_RI;
-		*(int*)data = bits;
-		break;
-	default:
-		error = pps_ioctl(cmd, data, &sc->sc_pps);
-		if (error == ENODEV)
-			error = ENOTTY;
-		break;
-	}
+	error = pps_ioctl(cmd, data, &sc->sc_pps);
+	if (error == ENODEV)
+		error = ENOTTY;
 	return (error);
 }

@@ -61,7 +61,7 @@
 #include <gnu/dev/sound/pci/maestro3_reg.h>
 #include <gnu/dev/sound/pci/maestro3_dsp.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/maestro3.c,v 1.22 2003/09/02 17:30:37 jhb Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/maestro3.c,v 1.25 2004/07/16 03:59:27 tanimura Exp $");
 
 /* -------------------------------------------------------------------- */
 
@@ -1111,12 +1111,12 @@ m3_pci_attach(device_t dev)
 
 	sc->regid = PCIR_BAR(0);
 	sc->regtype = SYS_RES_MEMORY;
-	sc->reg = bus_alloc_resource(dev, sc->regtype, &sc->regid,
-				     0, ~0, 1, RF_ACTIVE);
+	sc->reg = bus_alloc_resource_any(dev, sc->regtype, &sc->regid,
+					 RF_ACTIVE);
 	if (!sc->reg) {
 		sc->regtype = SYS_RES_IOPORT;
-		sc->reg = bus_alloc_resource(dev, sc->regtype, &sc->regid,
-					     0, ~0, 1, RF_ACTIVE);
+		sc->reg = bus_alloc_resource_any(dev, sc->regtype, &sc->regid,
+						 RF_ACTIVE);
 	}
 	if (!sc->reg) {
 		device_printf(dev, "unable to allocate register space\n");
@@ -1126,8 +1126,8 @@ m3_pci_attach(device_t dev)
 	sc->sh = rman_get_bushandle(sc->reg);
 
 	sc->irqid = 0;
-	sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irqid,
-				     0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+	sc->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irqid,
+					 RF_ACTIVE | RF_SHAREABLE);
 	if (!sc->irq) {
 		device_printf(dev, "unable to allocate interrupt\n");
 		goto bad;
@@ -1189,9 +1189,9 @@ m3_pci_attach(device_t dev)
 			goto bad;
 		}
 	}
- 	snprintf(status, SND_STATUSLEN, "at %s 0x%lx irq %ld",
+ 	snprintf(status, SND_STATUSLEN, "at %s 0x%lx irq %ld %s",
 		 (sc->regtype == SYS_RES_IOPORT)? "io" : "memory",
-		 rman_get_start(sc->reg), rman_get_start(sc->irq));
+		 rman_get_start(sc->reg), rman_get_start(sc->irq),PCM_KLDSTRING(snd_maestro3));
 	if (pcm_setstatus(dev, status)) {
 		device_printf(dev, "attach: pcm_setstatus error\n");
 		goto bad;
@@ -1523,5 +1523,5 @@ static driver_t m3_driver = {
 };
 
 DRIVER_MODULE(snd_maestro3, pci, m3_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_maestro3, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_maestro3, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_VERSION(snd_maestro3, 1);

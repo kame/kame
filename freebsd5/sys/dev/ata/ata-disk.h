@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1998 - 2003 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 1998 - 2004 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-disk.h,v 1.47 2003/08/24 09:22:26 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-disk.h,v 1.49 2004/04/30 16:21:34 sos Exp $
  */
 
 /* structure describing an ATA disk */
@@ -45,7 +45,7 @@ struct ad_softc {
 #define		AD_F_TAG_ENABLED	0x0008
 #define		AD_F_RAID_SUBDISK	0x0010
 
-    struct mtx			queue_mtx;	/* queue lock */
+    struct mtx			queue_mtx;	/* bio queue lock */
     struct bio_queue_head	queue;		/* head of request queue */
-    struct disk			disk;		/* disklabel/slice stuff */
+    struct disk			*disk;		/* disklabel/slice stuff */
 };

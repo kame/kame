@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/boot/pc98/libpc98/vidconsole.c,v 1.11 2003/09/08 09:11:20 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/boot/pc98/libpc98/vidconsole.c,v 1.12 2004/01/18 04:10:45 nyan Exp $");
 
 #include <stand.h>
 #include <bootstrap.h>
@@ -422,7 +422,7 @@ write_char(int c, int fgcol, int bgcol)
 {
 
 #ifdef PC98
-    *crtat = (c == 0x5c ? 0xfc : c);
+    *crtat = (c == 0x5c ? 0xfc : (c & 0xff));
     *(crtat + 0x1000) = at2pc98(fgcol, bgcol);
 #else
     v86.ctl = 0;

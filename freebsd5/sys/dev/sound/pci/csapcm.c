@@ -38,7 +38,7 @@
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 
-SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/csapcm.c,v 1.27 2003/09/02 17:30:37 jhb Exp $");
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/csapcm.c,v 1.31 2004/07/16 03:59:27 tanimura Exp $");
 
 /* Buffer size on dma transfer. Fixed for CS416x. */
 #define CS461x_BUFFSIZE   (4 * 1024)
@@ -660,17 +660,20 @@ csa_allocres(struct csa_info *csa, device_t dev)
 
 	resp = &csa->res;
 	if (resp->io == NULL) {
-		resp->io = bus_alloc_resource(dev, SYS_RES_MEMORY, &resp->io_rid, 0, ~0, 1, RF_ACTIVE);
+		resp->io = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+			&resp->io_rid, RF_ACTIVE);
 		if (resp->io == NULL)
 			return (1);
 	}
 	if (resp->mem == NULL) {
-		resp->mem = bus_alloc_resource(dev, SYS_RES_MEMORY, &resp->mem_rid, 0, ~0, 1, RF_ACTIVE);
+		resp->mem = bus_alloc_resource_any(dev, SYS_RES_MEMORY,
+			&resp->mem_rid, RF_ACTIVE);
 		if (resp->mem == NULL)
 			return (1);
 	}
 	if (resp->irq == NULL) {
-		resp->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &resp->irq_rid, 0, ~0, 1, RF_ACTIVE | RF_SHAREABLE);
+		resp->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ,
+			&resp->irq_rid, RF_ACTIVE | RF_SHAREABLE);
 		if (resp->irq == NULL)
 			return (1);
 	}
@@ -788,10 +791,11 @@ pcmcsa_attach(device_t dev)
 		return (ENXIO);
 	}
 
-	snprintf(status, SND_STATUSLEN, "at irq %ld", rman_get_start(resp->irq));
+	snprintf(status, SND_STATUSLEN, "at irq %ld %s",
+			rman_get_start(resp->irq),PCM_KLDSTRING(snd_csa));
 
 	/* Enable interrupt. */
-	if (snd_setup_intr(dev, resp->irq, INTR_MPSAFE, csa_intr, csa, &csa->ih)) {
+	if (snd_setup_intr(dev, resp->irq, 0, csa_intr, csa, &csa->ih)) {
 		ac97_destroy(codec);
 		csa_releaseres(csa, dev);
 		return (ENXIO);
@@ -844,6 +848,6 @@ static driver_t pcmcsa_driver = {
 };
 
 DRIVER_MODULE(snd_csapcm, csa, pcmcsa_driver, pcm_devclass, 0, 0);
-MODULE_DEPEND(snd_csapcm, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_csapcm, sound, SOUND_MINVER, SOUND_PREFVER, SOUND_MAXVER);
 MODULE_DEPEND(snd_csapcm, snd_csa, 1, 1, 1);
 MODULE_VERSION(snd_csapcm, 1);

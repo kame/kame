@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/crypto/md5.c,v 1.7 2003/06/10 21:36:57 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/crypto/md5.c,v 1.9 2004/01/27 19:49:19 des Exp $");
 
 #include <sys/types.h>
 #include <sys/cdefs.h>
@@ -229,10 +229,6 @@ void md5_result(digest, ctxt)
 #endif
 }
 
-#if BYTE_ORDER == BIG_ENDIAN
-u_int32_t X[16];
-#endif
-
 static void md5_calc(b64, ctxt)
 	u_int8_t *b64;
 	md5_ctxt *ctxt;
@@ -247,6 +243,7 @@ static void md5_calc(b64, ctxt)
 #if BYTE_ORDER == BIG_ENDIAN
 	/* 4 byte words */
 	/* what a brute force but fast! */
+	u_int32_t X[16];
 	u_int8_t *y = (u_int8_t *)X;
 	y[ 0] = b64[ 3]; y[ 1] = b64[ 2]; y[ 2] = b64[ 1]; y[ 3] = b64[ 0];
 	y[ 4] = b64[ 7]; y[ 5] = b64[ 6]; y[ 6] = b64[ 5]; y[ 7] = b64[ 4];

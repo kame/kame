@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sr/if_sr.c,v 1.57 2003/10/31 18:32:05 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sr/if_sr.c,v 1.63 2004/08/13 23:49:48 rwatson Exp $");
 
 /*
  * Programming assumptions and other issues.
@@ -57,6 +57,7 @@ __FBSDID("$FreeBSD: src/sys/dev/sr/if_sr.c,v 1.57 2003/10/31 18:32:05 brooks Exp
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/sockio.h>
@@ -143,7 +144,7 @@ struct sr_softc {
 	int	running;	/* something is attached so we are running */
 	int	dcd;		/* do we have dcd? */
 	/* ---netgraph bits --- */
-	char		nodename[NG_NODELEN + 1]; /* store our node name */
+	char		nodename[NG_NODESIZ]; /* store our node name */
 	int		datahooks;	/* number of data hooks attached */
 	node_p		node;		/* netgraph node */
 	hook_p		hook;		/* data hook */
@@ -273,18 +274,15 @@ static ng_rcvdata_t	ngsr_rcvdata;
 static ng_disconnect_t	ngsr_disconnect;
 
 static struct ng_type typestruct = {
-	NG_ABI_VERSION,
-	NG_SR_NODE_TYPE,
-	NULL,
-	ngsr_constructor,
-	ngsr_rcvmsg,
-	ngsr_shutdown,
-	ngsr_newhook,
-	NULL,
-	ngsr_connect,
-	ngsr_rcvdata,
-	ngsr_disconnect,
-	NULL
+	.version =	NG_ABI_VERSION,
+	.name =		NG_SR_NODE_TYPE,
+	.constructor =	ngsr_constructor,
+	.rcvmsg =	ngsr_rcvmsg,
+	.shutdown =	ngsr_shutdown,
+	.newhook =	ngsr_newhook,
+	.connect =	ngsr_connect,
+	.rcvdata =	ngsr_rcvdata,
+	.disconnect =	ngsr_disconnect,
 };
 
 static int	ngsr_done_init = 0;
@@ -422,7 +420,8 @@ sr_attach(device_t device)
 		if_initname(ifp, device_get_name(device),
 		    device_get_unit(device));
 		ifp->if_mtu = PP_MTU;
-		ifp->if_flags = IFF_POINTOPOINT | IFF_MULTICAST;
+		ifp->if_flags = IFF_POINTOPOINT | IFF_MULTICAST |
+		    IFF_NEEDSGIANT;
 		ifp->if_ioctl = srioctl;
 		ifp->if_start = srstart;
 		ifp->if_watchdog = srwatchdog;
@@ -518,8 +517,8 @@ sr_allocate_irq(device_t device, int rid, u_long size)
 	struct sr_hardc *hc = device_get_softc(device);
 
 	hc->rid_irq = rid;
-	hc->res_irq = bus_alloc_resource(device, SYS_RES_IRQ,
-			&hc->rid_irq, 0ul, ~0ul, 1, RF_SHAREABLE|RF_ACTIVE);
+	hc->res_irq = bus_alloc_resource_any(device, SYS_RES_IRQ,
+			&hc->rid_irq, RF_SHAREABLE|RF_ACTIVE);
 	if (hc->res_irq == NULL) {
 		goto errexit;
 	}
@@ -2832,10 +2831,9 @@ ngsr_rcvdata(hook_p hook, item_p item)
 	struct sr_softc * sc = NG_NODE_PRIVATE(NG_HOOK_NODE(hook));
 	struct ifqueue	*xmitq_p;
 	struct mbuf *m;
-	meta_p meta;
+	struct ng_tag_prio *ptag;
 	
 	NGI_GET_M(item, m);
-	NGI_GET_META(item, meta);
 	NG_FREE_ITEM(item);
 	/*
 	 * data doesn't come in from just anywhere (e.g control hook)
@@ -2848,11 +2846,12 @@ ngsr_rcvdata(hook_p hook, item_p item)
 	/* 
 	 * Now queue the data for when it can be sent
 	 */
-	if (meta && meta->priority > 0) {
+	if ((ptag = (struct ng_tag_prio *)m_tag_locate(m, NGM_GENERIC_COOKIE,
+	    NG_TAG_PRIO, NULL)) != NULL && (ptag->priority > NG_PRIO_CUTOFF) )
 		xmitq_p = (&sc->xmitq_hipri);
-	} else {
+	else
 		xmitq_p = (&sc->xmitq);
-	}
+
 	s = splimp();
 	IF_LOCK(xmitq_p);
 	if (_IF_QFULL(xmitq_p)) {
@@ -2874,7 +2873,6 @@ bad:
 	 * check if we need to free the mbuf, and then return the error
 	 */
 	NG_FREE_M(m);
-	NG_FREE_META(meta);
 	return (error);
 }
 

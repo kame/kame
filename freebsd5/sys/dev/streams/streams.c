@@ -33,7 +33,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/streams/streams.c,v 1.43 2003/10/19 20:41:06 dwmalone Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/streams/streams.c,v 1.47 2004/07/15 08:26:03 phk Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -88,8 +88,8 @@ enum {
 	dev_unix_ord_stream	= 40
 };
 
-static dev_t dt_ptm, dt_arp, dt_icmp, dt_ip, dt_tcp, dt_udp, dt_rawip,
-	dt_unix_dgram, dt_unix_stream, dt_unix_ord_stream;
+static struct cdev *dt_ptm, *dt_arp, *dt_icmp, *dt_ip, *dt_tcp, *dt_udp, *dt_rawip,
+	*dt_unix_dgram, *dt_unix_stream, *dt_unix_ord_stream;
 
 static struct fileops svr4_netops = {
 	.fo_read = soo_read,
@@ -101,11 +101,11 @@ static struct fileops svr4_netops = {
 	.fo_close =  svr4_soo_close
 };
  
-#define CDEV_MAJOR 103
 static struct cdevsw streams_cdevsw = {
+	.d_version =	D_VERSION,
+	.d_flags =	D_NEEDGIANT,
 	.d_open =	streamsopen,
 	.d_name =	"streams",
-	.d_maj =	CDEV_MAJOR,
 };
  
 struct streams_softc {
@@ -165,6 +165,7 @@ streams_modevent(module_t mod, int type, void *unused)
 
 		return 0;
 	default:
+		return EOPNOTSUPP;
 		break;
 	}
 	return 0;
@@ -186,7 +187,7 @@ MODULE_VERSION(streams, 1);
  * routine.
  */
 static  int
-streamsopen(dev_t dev, int oflags, int devtype, struct thread *td)
+streamsopen(struct cdev *dev, int oflags, int devtype, struct thread *td)
 {
 	int type, protocol;
 	int fd, extraref;

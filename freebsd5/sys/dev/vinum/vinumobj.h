@@ -38,7 +38,7 @@
  * advised of the possibility of such damage.
  *
  * $Id: vinumobj.h,v 1.7 2003/05/23 01:08:58 grog Exp $
- * $FreeBSD: src/sys/dev/vinum/vinumobj.h,v 1.9 2003/05/23 01:15:30 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumobj.h,v 1.11 2004/06/16 09:47:02 phk Exp $
  */
 
 /*
@@ -184,7 +184,7 @@ struct _drive
 #ifdef _KERNEL
     u_int sectorsize;
     off_t mediasize;
-    dev_t dev;						    /* device information */
+    struct cdev *dev;						    /* device information */
 #ifdef VINUMDEBUG
     char lockfilename[16];				    /* name of file from which we were locked */
     int lockline;					    /* and the line number */
@@ -234,7 +234,7 @@ struct _sd
     int init_interval;					    /* and time to wait between transfers */
 #ifdef _KERNEL
     struct request *waitlist;				    /* list of requests waiting on revive op */
-    dev_t dev;						    /* associated device */
+    struct cdev *dev;						    /* associated device */
 #endif
 };
 
@@ -275,7 +275,8 @@ struct _plex
 #ifdef _KERNEL
     struct rangelock *lock;				    /* ranges of locked addresses */
     struct mtx *lockmtx;				    /* lock mutex, one of plexmutex [] */
-    dev_t dev;						    /* associated device */
+    daddr_t last_addr;					    /* last address read from this plex */
+    struct cdev *dev;						    /* associated device */
 #endif
 };
 
@@ -315,6 +316,6 @@ struct _volume
      */
     int plex[MAXPLEX];					    /* index of plexes */
 #ifdef _KERNEL
-    dev_t dev;						    /* associated device */
+    struct cdev *dev;						    /* associated device */
 #endif
 };

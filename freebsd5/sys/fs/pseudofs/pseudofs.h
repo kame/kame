@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *      $FreeBSD: src/sys/fs/pseudofs/pseudofs.h,v 1.25 2003/06/12 20:48:37 phk Exp $
+ *      $FreeBSD: src/sys/fs/pseudofs/pseudofs.h,v 1.28 2004/07/30 22:08:50 phk Exp $
  */
 
 #ifndef _PSEUDOFS_H_INCLUDED
@@ -198,10 +198,11 @@ struct pfs_node {
  * VFS interface
  */
 int		 pfs_mount	(struct pfs_info *pi, struct mount *mp,
-				 struct nameidata *ndp, struct thread *td);
+				 struct thread *td);
 int		 pfs_unmount	(struct mount *mp, int mntflags,
 				 struct thread *td);
-int		 pfs_root	(struct mount *mp, struct vnode **vpp);
+int		 pfs_root	(struct mount *mp, struct vnode **vpp,
+				 struct thread *td);
 int		 pfs_statfs	(struct mount *mp, struct statfs *sbp,
 				 struct thread *td);
 int		 pfs_init	(struct pfs_info *pi, struct vfsconf *vfc);
@@ -210,14 +211,15 @@ int		 pfs_uninit	(struct pfs_info *pi, struct vfsconf *vfc);
 /*
  * Directory structure construction and manipulation
  */
-struct pfs_node	*pfs_create_dir	(struct pfs_node *parent, char *name,
+struct pfs_node	*pfs_create_dir	(struct pfs_node *parent, const char *name,
 				 pfs_attr_t attr, pfs_vis_t vis, int flags);
-struct pfs_node	*pfs_create_file(struct pfs_node *parent, char *name,
+struct pfs_node	*pfs_create_file(struct pfs_node *parent, const char *name,
 				 pfs_fill_t fill, pfs_attr_t attr,
 				 pfs_vis_t vis, int flags);
-struct pfs_node	*pfs_create_link(struct pfs_node *parent, char *name,
+struct pfs_node	*pfs_create_link(struct pfs_node *parent, const char *name,
 				 pfs_fill_t fill, pfs_attr_t attr,
 				 pfs_vis_t vis, int flags);
+struct pfs_node	*pfs_find_node	(struct pfs_node *parent, const char *name);
 int		 pfs_disable	(struct pfs_node *pn);
 int		 pfs_enable	(struct pfs_node *pn);
 int		 pfs_destroy	(struct pfs_node *pn);
@@ -234,9 +236,8 @@ static struct pfs_info name##_info = {					\
 };									\
 									\
 static int								\
-_##name##_mount(struct mount *mp, struct nameidata *ndp,		\
-	     struct thread *td) {					\
-	return pfs_mount(&name##_info, mp, ndp, td);			\
+_##name##_mount(struct mount *mp, struct thread *td) {			\
+	return pfs_mount(&name##_info, mp, td);				\
 }									\
 									\
 static int								\
@@ -251,7 +252,7 @@ _##name##_uninit(struct vfsconf *vfc) {					\
 									\
 static struct vfsops name##_vfsops = {					\
 	.vfs_init =		_##name##_init,				\
-	.vfs_nmount =		_##name##_mount,			\
+	.vfs_mount =		_##name##_mount,			\
 	.vfs_root =		pfs_root,				\
 	.vfs_statfs =		pfs_statfs,				\
 	.vfs_uninit =		_##name##_uninit,			\
