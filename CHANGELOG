@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2344 2003/02/10 14:07:32 jinmei Exp $
+$KAME: CHANGELOG,v 1.2345 2003/02/12 10:10:22 suz Exp $
 
 <200302>
+Wed Feb 12 19:09:04 JST 2003	suz@crl.hitachi.co.jp
+	* kame/kame/pim6sd: fixed a pim6sd crash by SIGHUP
+
 2003-02-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/dhcp6c_ia.c (reestablish_ia): prevented the
 	client from crashing when receiving a NoBinding code in response
