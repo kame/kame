@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.157 2005/03/20 06:46:09 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.158 2005/03/30 06:30:54 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -2123,6 +2123,18 @@ set_auth(ev, optinfo)
 	case DHCP6_AUTHPROTO_UNDEF: /* we simply do not need authentication */
 		return (0);
 	case DHCP6_AUTHPROTO_DELAYED:
+		if (ev->state == DHCP6S_INFOREQ) {
+			/*
+			 * In the current implementation, delayed
+			 * authentication for Information-request and Reply
+			 * exchanges doesn't work.  Specification is also
+			 * unclear on this usage.
+			 */
+			dprintf(LOG_WARNING, FNAME, "delayed authentication "
+			    "cannot be used for Information-request yet");
+			return (-1);
+		}
+
 		if (ev->state == DHCP6S_SOLICIT) {
 			optinfo->authflags |= DHCP6OPT_AUTHFLAG_NOINFO;
 			return (0); /* no auth information is needed */
@@ -2131,7 +2143,7 @@ set_auth(ev, optinfo)
 		if (authparam->key == NULL) {
 			dprintf(LOG_INFO, FNAME, "no authentication for %s",
 			    dhcp6_event_statestr(ev));
-			break;
+			return (-1);
 		}
 
 		if (dhcp6_validate_key(authparam->key)) {
