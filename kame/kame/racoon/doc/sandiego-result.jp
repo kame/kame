@@ -98,3 +98,19 @@ vs intel
 kame
 	kernelのmbuf/key management memoryのleakはほとんど皆無。いくらでも
 	続けられます。racoonは太ったりふんづけたり? とにぎやか。
+
+	bundleについて:
+	- proposalいっこについてtransformいっこになるようなconfig fileでないと
+	  動かない。つまり、
+		proposal { protocol ah; protocol esp; }
+	  はいいが
+		proposal { protocol esp; protocol esp; }
+	  や、strengthの使用は不可。
+
+	ときどきacquireまわりのtroubleでrekeyしなくなることがある。
+	bundle使っていないときも似た症状が出るが、bundleを使うとさらに
+	起きやすい気がする。
+	(socket policyにrequireと書いた場合に、acquireが上がらないことが多い)
+
+	acquireをuserland側でフィルタするところで、フィルタしすぎに
+	なることがある。(ネゴるべきなのにネゴらない)
