@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.8,v 1.16 2000/10/12 00:44:31 itojun Exp $
+.\"	$KAME: racoon.8,v 1.17 2000/11/19 01:23:44 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -38,10 +38,7 @@
 .Sh SYNOPSIS
 .Nm racoon
 .Bk -words
-.Op Fl 46Fv
-.Ek
-.Bk -words
-.Op Fl a Ar admin-port
+.Op Fl Fv
 .Ek
 .Bk -words
 .Op Fl f Ar configfile
@@ -61,39 +58,31 @@
 speaks IKE (ISAKMP/Oakley) key management protocol, to establish
 security association with other hosts.
 .Bl -tag -width Ds
-.It Fl 4
-.It Fl 6
-Set the default address family to
-.Dv AF_INET
-or
-.Dv AF_INET6 .
-Currently they have no effect.
-.It Fl F
-Force running in foreground.
-.It Fl v
-Be verbose.
-.It Fl a Ar admin-port
-.Ar admin-port
-specifies UDP port number for administrative communication.
 .It Fl f Ar configfile
 Use alternate configuration file.
 .It Fl p Ar isakmp-port
-.Ar isakmp-port
 specifies UDP port number for ISAKMP key exchange.
+.Xr racoon 8
+usually uses UDP port number 500.
 .It Fl l Ar logfile
-.Ar logfile
 Use alternate log file.
+.It Fl F
+Force running in foreground.
 .It Fl d Ar dlevel
-Set debugging level to
-.Ar dlevel .
+defines a debugging level from 0 to 0xffffffff.
+0xffffffff is defined to this option and with
+.Fl F ,
+then a lot of messages appears on standard output during a negotiation.
 See
 .Pa debug.h
-for debug levels available.
+for detail debugging information.
+.It Fl v
+causes a packet dump verbose when using high debugging level.
 .El
 .Pp
 .Nm
 assumes the presence of kernel random number device
-.Xr rnd 4 ,
+.Xr rnd 4
 at
 .Pa /dev/urandom .
 .\"

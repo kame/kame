@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.63 2000/11/16 08:31:39 sakane Exp $
+.\"	$KAME: racoon.conf.5,v 1.64 2000/11/19 01:23:44 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -132,11 +132,11 @@ is one of following:
 .It Ic path include Ar path ;
 specifies a path to include file.
 See
-.Ic File Include .
+.Sx File Include .
 .It Ic path pre_shared_key Ar file ;
 specifies a file including pre-shared key for various ID.
 See
-.Ic Pre-shared key File .
+.Sx Pre-shared key File .
 .It Ic path certificate Ar path ;
 .Xr racoon 8
 will search this directory if the certificate or certificate request
@@ -167,7 +167,7 @@ Default count is 5.
 .It Ic interval Ar number Ar timeunit ;
 interval to resend.
 This unit is second.
-Default timer is 20 second.
+Default timer is 10 second.
 .It Ic persend Ar number ;
 the number of packets per a send.
 Default is 1 time.
@@ -459,7 +459,7 @@ define each lifetime of time or bytes which are to be used IPsec-SA.
 Any proposal will be accepted, and the attribute(s) will be not proposed to
 the peer if you don't specify it(them).
 See
-.Ic proposal_check
+.Sx proposal_check
 directive.
 .\"
 .It Ic identifier Ar idtype ;
@@ -472,7 +472,7 @@ directives.
 specifies ID type to use phase 2 negociation.
 The type of address is used as default.
 See
-.Ic my_identifier
+.Sx my_identifier
 directive in
 .Ic remote
 for its usage.
@@ -482,8 +482,12 @@ as responder can handle only IP address type.
 .El
 .\"
 .Pp
-The following three directives define
-the algorithms used in phase 2 proposals.
+.Xr racoon 8
+does not have the list of security protocols to be negotiated.
+The list of security protocols are passed by SPD in the kernel.
+Therefore you have to define all of the potential algorithms
+in phase 2 proposals even if there is a algorithm which will not be used.
+These algorithms are define by using the following three directives.
 .Xr racoon 8
 will compute actual phase 2 proposals by computing permutation of the specified
 algorithms, and then combining them with security protocol specified by SPD.
@@ -491,7 +495,7 @@ For example, if
 .Ic des, 3des, hmac_md5,
 and
 .Ic hmac_sha1
-are specified as algorithms, we have four combination for use with ESP,
+are specified, we have four combination for use with ESP,
 and two for AH.
 Then, based on SPD settings,
 .Xr racoon 8
@@ -519,24 +523,15 @@ Note that the kernel may not support the algorithm you have specified.
 .El
 .El
 .\"
-.Ss Static SA configuration
-.Bl -tag -width Ds -compact
-.It Ic static_sa Ar parameters
-specifies static SA.
-This
-.Ar parameters
-will be passed to
-.Xr setkey 8 .
-Not yet.
-.El
-.\"
 .Ss Specifying log file
 .Bl -tag -width Ds -compact
-.It Ic log ( Ar number \*(Ba Ar level ) ;
+.It Ic log Pq Ar number \*(Ba Ar level ;
 define dump level.
-It is debugging use.
-.Ar is one of following:
-.Ic info , notify , debug , debug2 , debug3 , debug4 .
+.Ar level
+is one of the following:
+.Ic info , notify , debug , debug2 , debug3
+and
+.Ic debug4 .
 .El
 .\"
 .Ss Specifying the way to pad
@@ -565,11 +560,22 @@ Default is off.
 .El
 .El
 .\"
+.Ss Static SA configuration
+.Bl -tag -width Ds -compact
+.It Ic static_sa Ar parameters
+specifies static SA.
+This
+.Ar parameters
+will be passed to
+.Xr setkey 8 .
+Not yet.
+.El
+.\"
 .Ss Pre-shared key File
 Pre-shared key file defines a pair of the identifier and the shared secret key
 which are used at Pre-shared key authentication method in phase 1.
-The pair in each lines are separated by any number of blanks and/or tab
-characters such like
+The pair in each lines are separated by some number of blanks and/or tab
+characters like
 .Xr hosts 5 .
 Key can be included any blanks because all of the words after 2nd column
 are interpreted as a secret key.
@@ -585,39 +591,41 @@ Note that the file must be owned by the user ID running
 and must not be accessible by others.
 .\"
 .Sh EXAMPLE
-The following shows how remote directive should be configured.
+The following is a sample of the configuration file.
 .Bd -literal -offset
-remote 172.168.2.2 [7000]
+path pre_shared_key "/usr/local/v6/etc/psk.txt" ;
+remote anonymous
 {
-	exchange_mode main;
-
-	# specify the identifier type
-	# "address", "fqdn", "user_fqdn", "keyid"
-	identifier user_fqdn;
-	certificate_type x509 "mycert" "mypriv";
-
-	# specify the bytes length of nonce.
-	nonce_size 16;
-
-	# default lifetime, will be copied into each proposals.
-	lifetime time 10 min;	# sec,min,hour
-	lifetime byte 5 MB;	# B,KB,GB
-
+	exchange_mode aggressive,main,base;
+	lifetime time 24 hour;
 	proposal {
 		encryption_algorithm 3des;
-		hash_algorithm md5;
-		authentication_method rsasig ;
-	}
-	proposal {
-		encryption_algorithm 3des;
-		hash_algorithm md5;
-		authentication_method pre_shared_key ;
-
-		# they can be defined explicitly.
-		lifetime time 5 min;
-		lifetime byte 2 MB;
+		hash_algorithm sha1;
+		authentication_method pre_shared_key;
+		dh_group 2;
 	}
 }
+
+sainfo anonymous
+{
+	pfs_group 2;
+	lifetime time 12 hour ;
+	lifetime byte 50 MB ;
+	encryption_algorithm 3des, blowfish, twofish, rijndael ;
+	authentication_algorithm hmac_sha1, hmac_md5 ;
+	compression_algorithm deflate ;
+}
+.Ed
+
+The following is a sample of the file defined pre-shared key.
+.Bd -literal -offset
+10.160.94.3     mekmitasdigoat
+172.16.1.133    0x12345678
+194.100.55.1    whatcertificatereally
+3ffe:501:410:ffff:200:86ff:fe05:80fa    mekmitasdigoat
+3ffe:501:410:ffff:210:4bff:fea2:8baa    mekmitasdigoat
+foo@kame.net    mekmitasdigoat
+foo.kame.net    hoge
 .Ed
 .\"
 .Sh SEE ALSO
