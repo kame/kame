@@ -1,4 +1,4 @@
-/*	$KAME: altq_var.h,v 1.11 2002/11/05 03:48:30 itojun Exp $	*/
+/*	$KAME: altq_var.h,v 1.12 2002/11/06 04:29:49 kjc Exp $	*/
 
 /*
  * Copyright (C) 1998-2002
@@ -103,9 +103,11 @@ extern u_int32_t machclk_freq;
 extern u_int32_t machclk_per_tick;
 extern void init_machclk(void);
 
+#ifdef __OpenBSD__
 #if defined(__i386__) && !defined(I586_CPU) && !defined(I686_CPU)
 #ifndef ALTQ_NOPCC
 #define	ALTQ_NOPCC	/* TSC is not available, ALTQ_NOPCC needed */
+#endif
 #endif
 #endif
 
