@@ -62,12 +62,21 @@ AC_MSG_RESULT($enable_gssapi)
 
 AC_MSG_CHECKING(if --enable-stats option is specified)
 AC_ARG_ENABLE(stats,
-        [  --enable-stats         enable statistics logging function],
+        [  --enable-stats          enable statistics logging function],
         [], [enable_stats=no])
 if test "x$enable_stats" = "xyes"; then
 	AC_DEFINE(ENABLE_STATS)
 fi
 AC_MSG_RESULT($enable_stats)
+
+AC_MSG_CHECKING(if --enable-samode-unspec option is specified)
+AC_ARG_ENABLE(samode-unspec,
+        [  --enable-samode-unspec  enable to use unspecified a mode of SA],
+        [], [enable_samode_unspec=no])
+if test "x$enable_samode_unspec" = "xyes"; then
+	AC_DEFINE(ENABLE_SAMODE_UNSPECIFIED)
+fi
+AC_MSG_RESULT($enable_samode_unspec)
 
 efence_dir=
 AC_MSG_CHECKING(if --with-efence option is specified)

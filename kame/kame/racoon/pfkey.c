@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.122 2001/07/14 14:13:25 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.123 2001/07/27 10:29:06 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -980,12 +980,16 @@ pk_sendupdate(iph2)
 				"invalid proto_id %d\n", pr->proto_id);
 			return -1;
 		}
+#ifdef ENABLE_SAMODE_UNSPECIFIED
+		mode = IPSEC_MODE_ANY;
+#else
 		mode = ipsecdoi2pfkey_mode(pr->encmode);
 		if (mode == ~0) {
 			plog(LLV_ERROR, LOCATION, NULL,
 				"invalid encmode %d\n", pr->encmode);
 			return -1;
 		}
+#endif
 
 		/* set algorithm type and key length */
 		e_keylen = pr->head->encklen;
@@ -1211,12 +1215,16 @@ pk_sendadd(iph2)
 				"invalid proto_id %d\n", pr->proto_id);
 			return -1;
 		}
+#ifdef ENABLE_SAMODE_UNSPECIFIED
+		mode = IPSEC_MODE_ANY;
+#else
 		mode = ipsecdoi2pfkey_mode(pr->encmode);
 		if (mode == ~0) {
 			plog(LLV_ERROR, LOCATION, NULL,
 				"invalid encmode %d\n", pr->encmode);
 			return -1;
 		}
+#endif
 
 		/* set algorithm type and key length */
 		e_keylen = pr->head->encklen;
