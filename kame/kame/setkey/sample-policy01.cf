@@ -1,0 +1,22 @@
+#
+# This is for basic policy test on loopback.
+#
+root setkey -c <<EOF
+spdflush;
+spdadd 127.0.0.1 127.0.0.1 icmp
+	-P out ipsec
+	esp/transport/127.0.0.1-127.0.0.1/require ;
+spdadd ::1 ::1 icmp6
+	-P out ipsec
+	esp/transport/::1-::1/require ;
+
+flush;
+add 127.0.0.1 127.0.0.1 esp 0x1000
+	-m transport
+	-E des-cbc "kamekame";
+add ::1 ::1 esp 0x1001
+	-m transport
+	-E des-cbc "hagehage";
+flush;
+EOF
+
