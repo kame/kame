@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.132 2002/06/26 06:02:29 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.133 2002/06/27 09:52:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2702,7 +2702,7 @@ res_queryN(name, target)
 			rcode = hp->rcode;	/* record most recent error */
 #ifdef DEBUG
 			if (_res.options & RES_DEBUG)
-				printf(";; rcode = %d, ancount=%d\n", hp->rcode,
+				printf(";; rcode = %u, ancount=%u\n", hp->rcode,
 				    ntohs(hp->ancount));
 #endif
 			continue;
@@ -3667,7 +3667,7 @@ res_queryN(name, target)
 			rcode = hp->rcode;	/* record most recent error */
 #ifdef DEBUG
 			if (_res.options & RES_DEBUG)
-				printf(";; rcode = %d, ancount=%d\n", hp->rcode,
+				printf(";; rcode = %u, ancount=%u\n", hp->rcode,
 				    ntohs(hp->ancount));
 #endif
 			continue;
@@ -4790,7 +4790,7 @@ res_queryN(name, target)
 			rcode = hp->rcode;	/* record most recent error */
 #ifdef DEBUG
 			if (_res.options & RES_DEBUG)
-				printf(";; rcode = %d, ancount=%d\n", hp->rcode,
+				printf(";; rcode = %u, ancount=%u\n", hp->rcode,
 				    ntohs(hp->ancount));
 #endif
 			continue;

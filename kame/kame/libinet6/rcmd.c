@@ -1,4 +1,4 @@
-/*	$KAME: rcmd.c,v 1.17 2001/11/13 12:38:46 jinmei Exp $	*/
+/*	$KAME: rcmd.c,v 1.18 2002/06/27 09:52:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -142,7 +142,7 @@ rcmd_af(ahost, rport, locuser, remuser, cmd, fd2p, af)
 	hints.ai_family = af;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = 0;
-	(void)snprintf(num, sizeof(num), "%d", ntohs(rport));
+	(void)snprintf(num, sizeof(num), "%u", ntohs(rport));
 	error = getaddrinfo(*ahost, num, &hints, &res);
 	if (error) {
 		fprintf(stderr, "rcmd: %s\n", gai_strerror(error));
