@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/01/18 11:32:54 $
+			$Date: 2000/01/18 12:27:57 $
 
 1. IPv6
 
@@ -1249,5 +1249,18 @@ KAME kit includes ALTQ 2.1 code, which supports FreeBSD2, FreeBSD3,
 NetBSD and OpenBSD.  For BSD/OS, ALTQ does not work.
 ALTQ in KAME supports (or tries to support) IPv6.
 (actually, ALTQ is developed on KAME repository since ALTQ 2.1 - Jan 2000)
+
+ALTQ occupies single character device nubmer.  For FreeBSD, it is officially
+allocated.  For OpenBSD and NetBSD, we use the number which is not
+currently allocated (will eventually get official number).
+The character device is enabled for i386 architecture only.  To enable and
+compile ALTQ-ready kernel for other archtitectures, take the following steps:
+- assume that your architecture is FOOBAA.
+- modify sys/arch/FOOBAA/FOOBAA/conf.c (or somewhere that defines cdevsw),
+  to include a line for ALTQ.  look at sys/arch/i386/i386/conf.c for
+  example.  The major number must be same as i386 case.
+- copy kernel configuration file (like ALTQ.v6 or GENERIC.v6) from i386,
+  and modify accordingly.
+- build a kernel.
 
 						 <end of IMPLEMENTATION>

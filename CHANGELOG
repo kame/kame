@@ -1,4 +1,4 @@
-$Id: CHANGELOG,v 1.459 2000/01/18 09:51:29 itojun Exp $
+$Id: CHANGELOG,v 1.460 2000/01/18 12:27:58 itojun Exp $
 
 
 <200001>
@@ -11,6 +11,8 @@ Tue Jan 18 16:30:05 JST 2000 kjc@csl.sony.co.jp
 	  to "sys/altq" not to bloat the standard directories.
 	- rename the altq kernel config file from ALTQ to ALTQ.v4 since
 	  it's only for IPv4 and GENERIC.v6 has ALTQ already defined.
+	  for openbsd/netbsd, on non-i386 architecture: read IMPLEMENTATION
+	  section 5 for installation details.
 	userland:
 	- the following altq tools are added to the tree:
 	  lib/altqlib, usr.sbin/altqd, user.bin/altqstat.
