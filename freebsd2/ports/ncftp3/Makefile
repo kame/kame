@@ -4,16 +4,16 @@
 # Date created:         4 Nov 1994
 # Whom:                 ache
 #
-# $Id: Makefile,v 1.5 2000/03/28 12:47:22 sumikawa Exp $
+# $Id: Makefile,v 1.6 2000/04/12 13:02:48 sumikawa Exp $
 #
 
-DISTNAME=       ncftp-3.0.0-src
-PKGNAME=        ncftp-3.0.0
+DISTNAME=       ncftp-3.0.1-src
+PKGNAME=        ncftp-3.0.1
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.ncftp.com/ncftp/
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	ncftp-300-v6-20000327.diff.gz
+PATCHFILES=	ncftp-301-v6-20000412.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	sumikawa@kame.net
