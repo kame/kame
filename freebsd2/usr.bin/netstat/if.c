@@ -74,7 +74,6 @@ static void catchalarm __P((int));
 
 #ifdef INET6
 char *netname6 __P((struct sockaddr_in6 *, struct in6_addr *));
-static char ntop_buf[INET6_ADDRSTRLEN];		/* for inet_ntop() */
 #endif
 
 /*
@@ -103,9 +102,13 @@ intpr(interval, ifnetaddr, pfunc)
 	} ifaddr;
 	u_long ifaddraddr;
 	u_long ifaddrfound;
-	u_long ifnetfound;
-	struct sockaddr *sa;
+	u_long ifnetfound = 0;
+	struct sockaddr *sa = NULL;
 	char name[32], tname[16];
+#ifdef INET6
+	char ntop_buf[INET6_ADDRSTRLEN];
+#endif
+	extern char *ether_ntoa();
 
 	if (ifnetaddr == 0) {
 		printf("ifnet: symbol not defined\n");
@@ -175,7 +178,8 @@ intpr(interval, ifnetaddr, pfunc)
 			}
 #define CP(x) ((char *)(x))
 			cp = (CP(ifaddr.ifa.ifa_addr) - CP(ifaddraddr)) +
-				CP(&ifaddr); sa = (struct sockaddr *)cp;
+				CP(&ifaddr);
+			sa = (struct sockaddr *)cp;
 			switch (sa->sa_family) {
 			case AF_UNSPEC:
 				printf("%-13.13s ", "none");

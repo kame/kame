@@ -217,7 +217,7 @@ atalkprotopr(off, name)
 	ddpcb = cb;
 	prev = (struct ddpcb *)off;
 	for (next = initial ;next != NULL; prev = next) {
-		u_long ppcb;
+		u_long ppcb = 0;
 
 		kread((u_long)next, (char *)&ddpcb, sizeof (ddpcb));
 		next = ddpcb.ddp_next;

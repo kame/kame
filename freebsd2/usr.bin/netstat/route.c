@@ -124,7 +124,6 @@ static void p_rtentry __P((struct rtentry *));
 #ifdef INET6
 char *routename6 __P((struct sockaddr_in6 *));
 char *netname6 __P((struct sockaddr_in6 *, struct in6_addr *));
-static char ntop_buf[INET6_ADDRSTRLEN];
 #endif /*INET6*/
 
 /*

@@ -68,6 +68,7 @@ static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #include "gethostbyname2.h"
 #endif
 #include <netdb.h>
+#include <arpa/inet.h>
 
 #include <stdio.h>
 #include <string.h>
@@ -141,10 +142,10 @@ ip6protopr(off, name)
 		}
 		if (Aflag)
 			if (istcp)
-				printf("%8x ", in6pcb.in6p_ppcb);
+				printf("%8lx ", (u_long)in6pcb.in6p_ppcb);
 			else
-				printf("%8x ", next);
-		printf("%-5.5s %6d %6d ", name, sockb.so_rcv.sb_cc,
+				printf("%8lx ", (u_long)next);
+		printf("%-5.5s %6lu %6lu ", name, sockb.so_rcv.sb_cc,
 			sockb.so_snd.sb_cc);
 		/* xxx */
 		inet6print(&in6pcb.in6p_laddr, (int)in6pcb.in6p_lport, name);
@@ -177,65 +178,71 @@ tcp6_stats(off, name)
 
 #define	p(f, m) if (tcp6stat.f || sflag <= 1) \
     printf(m, tcp6stat.f, plural(tcp6stat.f))
+#define	p1(f, m) if (tcp6stat.f || sflag <= 1) \
+    printf(m, tcp6stat.f)
 #define	p2(f1, f2, m) if (tcp6stat.f1 || tcp6stat.f2 || sflag <= 1) \
     printf(m, tcp6stat.f1, plural(tcp6stat.f1), tcp6stat.f2, plural(tcp6stat.f2))
+#define	p4(f1, f2, m) if (tcp6stat.f1 || tcp6stat.f2 || sflag <= 1) \
+    printf(m, tcp6stat.f1, plural(tcp6stat.f1), tcp6stat.f2)
 #define	p3(f, m) if (tcp6stat.f || sflag <= 1) \
     printf(m, tcp6stat.f, plurales(tcp6stat.f))
 
-	p(tcp6s_sndtotal, "\t%d packet%s sent\n");
+	p(tcp6s_sndtotal, "\t%lu packet%s sent\n");
 	p2(tcp6s_sndpack,tcp6s_sndbyte,
-		"\t\t%d data packet%s (%d byte%s)\n");
+		"\t\t%lu data packet%s (%lu byte%s)\n");
 	p2(tcp6s_sndrexmitpack, tcp6s_sndrexmitbyte,
-		"\t\t%d data packet%s (%d byte%s) retransmitted\n");
-	p2(tcp6s_sndacks, tcp6s_delack,
-		"\t\t%d ack-only packet%s (%d delayed)\n");
-	p(tcp6s_sndurg, "\t\t%d URG only packet%s\n");
-	p(tcp6s_sndprobe, "\t\t%d window probe packet%s\n");
-	p(tcp6s_sndwinup, "\t\t%d window update packet%s\n");
-	p(tcp6s_sndctrl, "\t\t%d control packet%s\n");
-	p(tcp6s_rcvtotal, "\t%d packet%s received\n");
-	p2(tcp6s_rcvackpack, tcp6s_rcvackbyte, "\t\t%d ack%s (for %d byte%s)\n");
-	p(tcp6s_rcvdupack, "\t\t%d duplicate ack%s\n");
-	p(tcp6s_rcvacktoomuch, "\t\t%d ack%s for unsent data\n");
+		"\t\t%lu data packet%s (%lu byte%s) retransmitted\n");
+	p4(tcp6s_sndacks, tcp6s_delack,
+		"\t\t%lu ack-only packet%s (%lu delayed)\n");
+	p(tcp6s_sndurg, "\t\t%lu URG only packet%s\n");
+	p(tcp6s_sndprobe, "\t\t%lu window probe packet%s\n");
+	p(tcp6s_sndwinup, "\t\t%lu window update packet%s\n");
+	p(tcp6s_sndctrl, "\t\t%lu control packet%s\n");
+	p(tcp6s_rcvtotal, "\t%lu packet%s received\n");
+	p2(tcp6s_rcvackpack, tcp6s_rcvackbyte, "\t\t%lu ack%s (for %lu byte%s)\n");
+	p(tcp6s_rcvdupack, "\t\t%lu duplicate ack%s\n");
+	p(tcp6s_rcvacktoomuch, "\t\t%lu ack%s for unsent data\n");
 	p2(tcp6s_rcvpack, tcp6s_rcvbyte,
-		"\t\t%d packet%s (%d byte%s) received in-sequence\n");
+		"\t\t%lu packet%s (%lu byte%s) received in-sequence\n");
 	p2(tcp6s_rcvduppack, tcp6s_rcvdupbyte,
-		"\t\t%d completely duplicate packet%s (%d byte%s)\n");
-	p(tcp6s_pawsdrop, "\t\t%d old duplicate packet%s\n");
+		"\t\t%lu completely duplicate packet%s (%lu byte%s)\n");
+	p(tcp6s_pawsdrop, "\t\t%lu old duplicate packet%s\n");
 	p2(tcp6s_rcvpartduppack, tcp6s_rcvpartdupbyte,
-		"\t\t%d packet%s with some dup. data (%d byte%s duped)\n");
+		"\t\t%lu packet%s with some dup. data (%lu byte%s duped)\n");
 	p2(tcp6s_rcvoopack, tcp6s_rcvoobyte,
-		"\t\t%d out-of-order packet%s (%d byte%s)\n");
+		"\t\t%lu out-of-order packet%s (%lu byte%s)\n");
 	p2(tcp6s_rcvpackafterwin, tcp6s_rcvbyteafterwin,
-		"\t\t%d packet%s (%d byte%s) of data after window\n");
-	p(tcp6s_rcvwinprobe, "\t\t%d window probe%s\n");
-	p(tcp6s_rcvwinupd, "\t\t%d window update packet%s\n");
-	p(tcp6s_rcvafterclose, "\t\t%d packet%s received after close\n");
-	p(tcp6s_rcvbadsum, "\t\t%d discarded for bad checksum%s\n");
-	p(tcp6s_rcvbadoff, "\t\t%d discarded for bad header offset field%s\n");
-	p(tcp6s_rcvshort, "\t\t%d discarded because packet too short\n");
-	p(tcp6s_connattempt, "\t%d connection request%s\n");
-	p(tcp6s_accepts, "\t%d connection accept%s\n");
-	p(tcp6s_badsyn, "\t%d bad connection attempt%s\n");
-	p(tcp6s_connects, "\t%d connection%s established (including accepts)\n");
+		"\t\t%lu packet%s (%lu byte%s) of data after window\n");
+	p(tcp6s_rcvwinprobe, "\t\t%lu window probe%s\n");
+	p(tcp6s_rcvwinupd, "\t\t%lu window update packet%s\n");
+	p(tcp6s_rcvafterclose, "\t\t%lu packet%s received after close\n");
+	p(tcp6s_rcvbadsum, "\t\t%lu discarded for bad checksum%s\n");
+	p(tcp6s_rcvbadoff, "\t\t%lu discarded for bad header offset field%s\n");
+	p1(tcp6s_rcvshort, "\t\t%lu discarded because packet too short\n");
+	p(tcp6s_connattempt, "\t%lu connection request%s\n");
+	p(tcp6s_accepts, "\t%lu connection accept%s\n");
+	p(tcp6s_badsyn, "\t%lu bad connection attempt%s\n");
+	p(tcp6s_connects, "\t%lu connection%s established (including accepts)\n");
 	p2(tcp6s_closed, tcp6s_drops,
-		"\t%d connection%s closed (including %d drop%s)\n");
-	p(tcp6s_conndrops, "\t%d embryonic connection%s dropped\n");
+		"\t%lu connection%s closed (including %lu drop%s)\n");
+	p(tcp6s_conndrops, "\t%lu embryonic connection%s dropped\n");
 	p2(tcp6s_rttupdated, tcp6s_segstimed,
-		"\t%d segment%s updated rtt (of %d attempt%s)\n");
-	p(tcp6s_rexmttimeo, "\t%d retransmit timeout%s\n");
-	p(tcp6s_timeoutdrop, "\t\t%d connection%s dropped by rexmit timeout\n");
-	p(tcp6s_persisttimeo, "\t%d persist timeout%s\n");
-	p(tcp6s_persistdrop, "\t%d connection%s timed out in persist\n");
-	p(tcp6s_keeptimeo, "\t%d keepalive timeout%s\n");
-	p(tcp6s_keepprobe, "\t\t%d keepalive probe%s sent\n");
-	p(tcp6s_keepdrops, "\t\t%d connection%s dropped by keepalive\n");
-	p(tcp6s_predack, "\t%d correct ACK header prediction%s\n");
-	p(tcp6s_preddat, "\t%d correct data packet header prediction%s\n");
-	p3(tcp6s_pcbcachemiss, "\t%d PCB cache miss%s\n");
+		"\t%lu segment%s updated rtt (of %lu attempt%s)\n");
+	p(tcp6s_rexmttimeo, "\t%lu retransmit timeout%s\n");
+	p(tcp6s_timeoutdrop, "\t\t%lu connection%s dropped by rexmit timeout\n");
+	p(tcp6s_persisttimeo, "\t%lu persist timeout%s\n");
+	p(tcp6s_persistdrop, "\t%lu connection%s timed out in persist\n");
+	p(tcp6s_keeptimeo, "\t%lu keepalive timeout%s\n");
+	p(tcp6s_keepprobe, "\t\t%lu keepalive probe%s sent\n");
+	p(tcp6s_keepdrops, "\t\t%lu connection%s dropped by keepalive\n");
+	p(tcp6s_predack, "\t%lu correct ACK header prediction%s\n");
+	p(tcp6s_preddat, "\t%lu correct data packet header prediction%s\n");
+	p3(tcp6s_pcbcachemiss, "\t%lu PCB cache miss%s\n");
 #undef p
+#undef p1
 #undef p2
 #undef p3
+#undef p4
 }
 
 /*
@@ -255,14 +262,16 @@ udp6_stats(off, name)
 	printf("%s:\n", name);
 #define	p(f, m) if (udp6stat.f || sflag <= 1) \
     printf(m, udp6stat.f, plural(udp6stat.f))
-	p(udp6s_ipackets, "\t%u datagram%s received\n");
-	p(udp6s_hdrops, "\t%u with incomplete header\n");
-	p(udp6s_badlen, "\t%u with bad data length field\n");
-	p(udp6s_badsum, "\t%u with bad checksum\n");
-	p(udp6s_nosum, "\t%u with no checksum\n");
-	p(udp6s_noport, "\t%u dropped due to no socket\n");
-	p(udp6s_noportmcast, "\t%u multicast datagram%s dropped due to no socket\n");
-	p(udp6s_fullsock, "\t%u dropped due to full socket buffers\n");
+#define	p1(f, m) if (udp6stat.f || sflag <= 1) \
+    printf(m, udp6stat.f)
+	p(udp6s_ipackets, "\t%lu datagram%s received\n");
+	p1(udp6s_hdrops, "\t%lu with incomplete header\n");
+	p1(udp6s_badlen, "\t%lu with bad data length field\n");
+	p1(udp6s_badsum, "\t%lu with bad checksum\n");
+	p1(udp6s_nosum, "\t%lu with no checksum\n");
+	p1(udp6s_noport, "\t%lu dropped due to no socket\n");
+	p(udp6s_noportmcast, "\t%lu multicast datagram%s dropped due to no socket\n");
+	p1(udp6s_fullsock, "\t%lu dropped due to full socket buffers\n");
 	delivered = udp6stat.udp6s_ipackets -
 		    udp6stat.udp6s_hdrops -
 		    udp6stat.udp6s_badlen -
@@ -271,9 +280,10 @@ udp6_stats(off, name)
 		    udp6stat.udp6s_noportmcast -
 		    udp6stat.udp6s_fullsock;
 	if (delivered || sflag <= 1)
-		printf("\t%u delivered\n", delivered);
-	p(udp6s_opackets, "\t%u datagram%s output\n");
+		printf("\t%lu delivered\n", delivered);
+	p(udp6s_opackets, "\t%lu datagram%s output\n");
 #undef p
+#undef p1
 }
 
 static	char *ip6nh[] = {
@@ -554,41 +564,43 @@ ip6_stats(off, name)
 
 #define	p(f, m) if (ip6stat.f || sflag <= 1) \
     printf(m, ip6stat.f, plural(ip6stat.f))
+#define	p1(f, m) if (ip6stat.f || sflag <= 1) \
+    printf(m, ip6stat.f)
 
-	p(ip6s_total, "\t%u total packet%s received\n");
-	p(ip6s_toosmall, "\t%u with size smaller than minimum\n");
-	p(ip6s_tooshort, "\t%u with data size < data length\n");
-	p(ip6s_badoptions, "\t%u with bad options\n");
-	p(ip6s_badvers, "\t%u with incorrect version number\n");
-	p(ip6s_fragments, "\t%u fragment%s received\n");
-	p(ip6s_fragdropped, "\t%u fragment%s dropped (dup or out of space)\n");
-	p(ip6s_fragtimeout, "\t%u fragment%s dropped after timeout\n");
-	p(ip6s_fragoverflow, "\t%u fragment%s that exceeded limit\n");
-	p(ip6s_reassembled, "\t%u packet%s reassembled ok\n");
-	p(ip6s_delivered, "\t%u packet%s for this host\n");
-	p(ip6s_forward, "\t%u packet%s forwarded\n");
-	p(ip6s_cantforward, "\t%u packet%s not forwardable\n");
-	p(ip6s_redirectsent, "\t%u redirect%s sent\n");
-	p(ip6s_localout, "\t%u packet%s sent from this host\n");
-	p(ip6s_rawout, "\t%u packet%s sent with fabricated ip header\n");
-	p(ip6s_odropped, "\t%u output packet%s dropped due to no bufs, etc.\n");
-	p(ip6s_noroute, "\t%u output packet%s discarded due to no route\n");
-	p(ip6s_fragmented, "\t%u output datagram%s fragmented\n");
-	p(ip6s_ofragments, "\t%u fragment%s created\n");
-	p(ip6s_cantfrag, "\t%u datagram%s that can't be fragmented\n");
-	p(ip6s_badscope, "\t%u packet%s that violated scope rules\n");
-	p(ip6s_notmember, "\t%u multicast packet%s which we don't join\n");
+	p(ip6s_total, "\t%lu total packet%s received\n");
+	p1(ip6s_toosmall, "\t%lu with size smaller than minimum\n");
+	p1(ip6s_tooshort, "\t%lu with data size < data length\n");
+	p1(ip6s_badoptions, "\t%lu with bad options\n");
+	p1(ip6s_badvers, "\t%lu with incorrect version number\n");
+	p(ip6s_fragments, "\t%lu fragment%s received\n");
+	p(ip6s_fragdropped, "\t%lu fragment%s dropped (dup or out of space)\n");
+	p(ip6s_fragtimeout, "\t%lu fragment%s dropped after timeout\n");
+	p(ip6s_fragoverflow, "\t%lu fragment%s that exceeded limit\n");
+	p(ip6s_reassembled, "\t%lu packet%s reassembled ok\n");
+	p(ip6s_delivered, "\t%lu packet%s for this host\n");
+	p(ip6s_forward, "\t%lu packet%s forwarded\n");
+	p(ip6s_cantforward, "\t%lu packet%s not forwardable\n");
+	p(ip6s_redirectsent, "\t%lu redirect%s sent\n");
+	p(ip6s_localout, "\t%lu packet%s sent from this host\n");
+	p(ip6s_rawout, "\t%lu packet%s sent with fabricated ip header\n");
+	p(ip6s_odropped, "\t%lu output packet%s dropped due to no bufs, etc.\n");
+	p(ip6s_noroute, "\t%lu output packet%s discarded due to no route\n");
+	p(ip6s_fragmented, "\t%lu output datagram%s fragmented\n");
+	p(ip6s_ofragments, "\t%lu fragment%s created\n");
+	p(ip6s_cantfrag, "\t%lu datagram%s that can't be fragmented\n");
+	p(ip6s_badscope, "\t%lu packet%s that violated scope rules\n");
+	p(ip6s_notmember, "\t%lu multicast packet%s which we don't join\n");
 	for (first = 1, i = 0; i < 256; i++)
 		if (ip6stat.ip6s_nxthist[i] != 0) {
 			if (first) {
 				printf("\tInput histogram:\n");
 				first = 0;
 			}
-			printf("\t\t%s: %u\n", ip6nh[i],
+			printf("\t\t%s: %lu\n", ip6nh[i],
 			       ip6stat.ip6s_nxthist[i]);
 		}
 	printf("\tMbuf statistics:\n");
-	printf("\t\t%u one mbuf\n", ip6stat.ip6s_m1);
+	printf("\t\t%lu one mbuf\n", ip6stat.ip6s_m1);
 	for (first = 1, i = 0; i < 32; i++) {
 		char ifbuf[IFNAMSIZ];
 		if (ip6stat.ip6s_m2m[i] != 0) {		
@@ -596,17 +608,27 @@ ip6_stats(off, name)
 				printf("\t\ttwo or more mbuf:\n");
 				first = 0;
 			}
-			printf("\t\t\t%s = %d\n",
+			printf("\t\t\t%s = %lu\n",
 			       if_indextoname(i, ifbuf),
 			       ip6stat.ip6s_m2m[i]);
 		}
 	}
-	printf("\t\t%u one ext mbuf\n", ip6stat.ip6s_mext1);
-	printf("\t\t%u two or more ext mbuf\n", ip6stat.ip6s_mext2m);	
-	p(ip6s_exthdrtoolong, "\t%u packet%s whose headers are not continuous\n");
+	printf("\t\t%lu one ext mbuf\n", ip6stat.ip6s_mext1);
+	printf("\t\t%lu two or more ext mbuf\n", ip6stat.ip6s_mext2m);	
+	p(ip6s_exthdrtoolong, "\t%lu packet%s whose headers are not continuous\n");
 	p(ip6s_nogif, "\t%lu tunneling packet%s that can't find gif\n");
 	p(ip6s_toomanyhdr, "\t%lu packet%s discarded due to too may headers\n");
+#if 0
+	p(ip6s_pulldown, "\t%lu call%s to m_pulldown\n");
+	p(ip6s_pulldown_alloc, "\t%lu mbuf allocation%s in m_pulldown\n");
+	if (ip6stat.ip6s_pulldown_copy != 1) {
+		p1(ip6s_pulldown_copy, "\t%lu mbuf copies in m_pulldown\n");
+	} else {
+		p1(ip6s_pulldown_copy, "\t%lu mbuf copy in m_pulldown\n");
+	}
+#endif
 #undef p
+#undef p1
 }
 
 /*
@@ -944,34 +966,34 @@ icmp6_stats(off, name)
 #define	p(f, m) if (icmp6stat.f || sflag <= 1) \
     printf(m, icmp6stat.f, plural(icmp6stat.f))
 
-	p(icp6s_error, "\t%u call%s to icmp_error\n");
+	p(icp6s_error, "\t%lu call%s to icmp_error\n");
 	p(icp6s_canterror,
-	    "\t%u error%s not generated because old message was icmp error or so\n");
+	    "\t%lu error%s not generated because old message was icmp error or so\n");
 	p(icp6s_toofreq,
-	  "\t%u error%s not generated because rate limitation\n");
+	  "\t%lu error%s not generated because rate limitation\n");
 	for (first = 1, i = 0; i < 256; i++)
 		if (icmp6stat.icp6s_outhist[i] != 0) {
 			if (first) {
 				printf("\tOutput histogram:\n");
 				first = 0;
 			}
-			printf("\t\t%s: %u\n", icmp6names[i],
+			printf("\t\t%s: %lu\n", icmp6names[i],
 				icmp6stat.icp6s_outhist[i]);
 		}
-	p(icp6s_badcode, "\t%u message%s with bad code fields\n");
-	p(icp6s_tooshort, "\t%u message%s < minimum length\n");
-	p(icp6s_checksum, "\t%u bad checksum%s\n");
-	p(icp6s_badlen, "\t%u message%s with bad length\n");
+	p(icp6s_badcode, "\t%lu message%s with bad code fields\n");
+	p(icp6s_tooshort, "\t%lu message%s < minimum length\n");
+	p(icp6s_checksum, "\t%lu bad checksum%s\n");
+	p(icp6s_badlen, "\t%lu message%s with bad length\n");
 	for (first = 1, i = 0; i < ICMP6_MAXTYPE; i++)
 		if (icmp6stat.icp6s_inhist[i] != 0) {
 			if (first) {
 				printf("\tInput histogram:\n");
 				first = 0;
 			}
-			printf("\t\t%s: %u\n", icmp6names[i],
+			printf("\t\t%s: %lu\n", icmp6names[i],
 				icmp6stat.icp6s_inhist[i]);
 		}
-	p(icp6s_reflect, "\t%u message response%s generated\n");
+	p(icp6s_reflect, "\t%lu message response%s generated\n");
 #undef p
 #undef p_5
 }

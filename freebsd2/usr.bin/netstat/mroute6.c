@@ -76,11 +76,15 @@
 
 #include <netinet/in.h>
 
+#include <stdio.h>
+
 #define _KERNEL 1
 #include <netinet6/ip6_mroute.h>
 #undef _KERNEL
 
 #include "netstat.h"
+
+extern char *routename6 __P((struct sockaddr_in6 *));
 
 #define	WID_ORG	(lflag ? 39 : (nflag ? 29 : 18)) /* width of origin column */
 #define	WID_GRP	(lflag ? 18 : (nflag ? 16 : 18)) /* width of group column */
@@ -189,7 +193,7 @@ mroute6pr(mrpaddr, mfcaddr, mifaddr)
 				kread((u_long)rtep, (char *)&rte, sizeof(rte));
 				rtep = rte.next;
 			}
-			printf("   %3ld", waitings);
+			printf("   %3d", waitings);
 
 			if (mfc.mf6c_parent == MF6C_INCOMPLETE_PARENT)
 				printf("  ---   ");
