@@ -669,10 +669,12 @@ icmp6_input(mp, offp, proto)
 			IP6_EXTHDR_CHECK(m, off, sizeof(struct icmp6_nodeinfo),
 					 IPPROTO_DONE);
 #endif
-			n = ni6_input(m, off);
-			noff = sizeof(struct ip6_hdr);
-		}
-		else {
+			n = m_copy(m, 0, M_COPYALL);
+			if (n)
+				n = ni6_input(n, off);
+			if (n)
+				noff = sizeof(struct ip6_hdr);
+		} else {
 			u_char *p;
 
 			MGETHDR(n, M_DONTWAIT, m->m_type);
@@ -910,10 +912,6 @@ icmp6_input(mp, offp, proto)
 #define	offsetof(type, member)	((size_t)(&((type *)0)->member))
 #endif 
 
-/*
- * NOTE: it should not modify the source mbuf (m), as it will be 
- * used by the caller (icmp6_input) afterwards.
- */
 static struct mbuf *
 ni6_input(m, off)
 	struct mbuf *m;
@@ -927,20 +925,19 @@ ni6_input(m, off)
 	int addrs;		/* for NI_QTYPE_NODEADDR */
 	struct ifnet *ifp = NULL; /* for NI_QTYPE_NODEADDR */
 
-	if (!icmp6_nodeinfo)
+	if (!icmp6_nodeinfo) {
+		m_freem(m);
 		return NULL;
+	}
 
 #ifndef PULLDOWN_TEST
 	ni6 = (struct icmp6_nodeinfo *)(mtod(m, caddr_t) + off);
 #else
-	n = m_copy(m, 0, M_COPYALL);
-	if (n == NULL)
-		return NULL;
-	m = n;
-	n = NULL;
 	IP6_EXTHDR_GET(ni6, struct icmp6_nodeinfo *, m, off, sizeof(*ni6));
-	if (ni6 == NULL)
+	if (ni6 == NULL) {
+		/* m is already reclaimed */
 		return NULL;
+	}
 #endif
 	qtype = ntohs(ni6->ni_qtype);
 
@@ -978,8 +975,10 @@ ni6_input(m, off)
 
 	/* allocate a mbuf to reply. */
 	MGETHDR(n, M_DONTWAIT, m->m_type);
-	if (n == NULL)
+	if (n == NULL) {
+		m_freem(m);
 		return(NULL);
+	}
 	M_COPY_PKTHDR(n, m); /* just for recvif */
 	if (replylen > MHLEN) {
 		if (replylen > MCLBYTES)
@@ -1045,9 +1044,11 @@ ni6_input(m, off)
 
 	nni6->ni_type = ICMP6_NI_REPLY;
 	nni6->ni_code = ICMP6_NI_SUCESS;
+	m_freem(m);
 	return(n);
 
   bad:
+	m_freem(m);
 	if (n)
 		m_freem(n);
 	return(NULL);
