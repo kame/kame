@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1088 2000/07/04 02:39:15 jinmei Exp $
+$Id: CHANGELOG,v 1.1089 2000/07/04 04:11:23 jinmei Exp $
 
 <200006>
+2000-07-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_control): added several
+	improvements for sharing a single prefix with multiple addresses:
+	- install an interface direct route only when there's no shared
+	  prefix. We'll never see unexpected EEXIST errors with this fix.
+        - call in6_ifaddloop()/in6_ifremloop() whenever necessary.
+        - do not call in6_ifaddloop()/in6_ifremloop() unless necessary.
+        - added several clarifications according to the ipv6 address
+	  architecture.
+
 2000-07-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/bgpd/main.c (main_listen_accept): set the receiving
 	interface when accepting an on-link bgp connection.
