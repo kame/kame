@@ -1,4 +1,4 @@
-/*	$KAME: sctp_input.c,v 1.16 2003/11/25 06:53:34 ono Exp $	*/
+/*	$KAME: sctp_input.c,v 1.17 2003/11/25 07:29:19 ono Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -2481,7 +2481,7 @@ process_chunk_drop(struct sctp_tcb *stcb, struct sctp_chunk_desc *desc,
 				int iii;
 				for (iii=0; iii<sizeof(desc->data_bytes); iii++) {
 					if (ddp[iii] != desc->data_bytes[iii]) {
-						return(-1);
+						return (-1);
 					}
 				}
 			}
@@ -3167,7 +3167,7 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 				) {
 			    sctp_send_shutdown_ack(stcb, stcb->asoc.primary_destination);
 			    *length = 0;
-			    return(NULL);
+			    return (NULL);
 			}
 			sctp_handle_init(m, (struct sctp_init_chunk *)ch,
 					 inp, stcb, *netp, iphlen);
@@ -3330,7 +3330,7 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 			    (inp->sctp_socket->so_qlimit == 0)) {
 				sctp_abort_association(inp, stcb, m, iphlen, NULL);
 				*length = 0;
-				return(NULL);
+				return (NULL);
 			}
 			{
 				struct mbuf *ret_buf;

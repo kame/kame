@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.21 2003/11/25 06:53:34 ono Exp $	*/
+/*	$KAME: sctputil.c,v 1.22 2003/11/25 07:29:20 ono Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -1457,7 +1457,7 @@ sctp_calculate_sum(m, pktlen, offset)
 	register struct mbuf *at;
 
 	if (pktlen == NULL)
-		return(0);
+		return (0);
 	at = m;
 	while (at) {
 		tlen += at->m_len;

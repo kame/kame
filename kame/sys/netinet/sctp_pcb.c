@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.26 2003/11/25 06:53:34 ono Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.27 2003/11/25 07:29:20 ono Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -361,13 +361,13 @@ sctp_findassociation_ep_addr(struct sctp_inpcb **p_ep,
 						       to,  /* this is my peer address */
 						       from, /* this is my address */
 						       netp);
-			return(tcb);
+			return (tcb);
 		} else {
 			tcb = LIST_FIRST(&ep->sctp_asoc_list);
 			if (tcb) {
 				if (tcb->rport != rport)
 					/* remote port does not match. */
-					return(NULL);
+					return (NULL);
 				/* now look at the list of remote addresses */
 				TAILQ_FOREACH(net, &tcb->asoc.nets, sctp_next) {
 					if (((struct sockaddr *)(&net->ra._l_addr))->sa_family !=
@@ -878,7 +878,7 @@ sctp_findassoc_by_vtag(struct sockaddr *from,
 	head = &sctppcbinfo.sctp_asochash[SCTP_PCBHASH_ASOC(vtag, sctppcbinfo.hashasocmark)];
 	if (head == NULL) {
 		/* invalid vtag */
-		return(NULL);
+		return (NULL);
 	}
 	LIST_FOREACH(tcb, head, sctp_asocs) {
 		if (tcb->asoc.my_vtag == vtag) {
@@ -902,11 +902,11 @@ sctp_findassoc_by_vtag(struct sockaddr *from,
 				*netp = tnet;
 				sctp_pegs[SCTP_VTAG_EXPR]++;
 				*inp = tcb->sctp_ep;
-				return(tcb);
+				return (tcb);
 			} else {
 				/* bogus 
 				sctp_pegs[SCTP_VTAG_BOGUS]++;
-				return(NULL);
+				return (NULL);
 				*/
 				/* we could uncomment the above
 				 * if vtags were unique across
@@ -916,7 +916,7 @@ sctp_findassoc_by_vtag(struct sockaddr *from,
 			}
 		}
 	}
-	return(NULL);
+	return (NULL);
 }
 
 
@@ -994,7 +994,7 @@ sctp_findassociation_addr(struct mbuf *pkt, int iphlen,
 		/* we only go down this path if vtag is non-zero */
 		ret = sctp_findassoc_by_vtag(from, ntohl(vtag), inp, netp, port, my_port);
 		if (ret) {
-			return(ret);
+			return (ret);
 		}
 	}
 
@@ -1413,7 +1413,7 @@ sctp_isport_inuse(struct sctp_inpcb *ep, u_short lport)
 				) {
 				if (ep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) {
 					/* collision in V6 space */
-					return(1);
+					return (1);
 				} else {
 					/* ep is BOUND_V4 no conflict */
 					continue;
@@ -1422,7 +1422,7 @@ sctp_isport_inuse(struct sctp_inpcb *ep, u_short lport)
 				/* lep is bound v4 and v6 
 				 * conflict no matter what.
 				 */
-				return(1);
+				return (1);
 			} else {
 				/* lep is bound only V4 */
 				if ((ep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) &&
@@ -2110,7 +2110,7 @@ sctp_is_address_on_local_host(struct sockaddr *addr)
 					sin_c = (struct sockaddr_in *)ifa->ifa_addr;
 					if (sin->sin_addr.s_addr == sin_c->sin_addr.s_addr) {
 						/* we are on the same machine */
-						return(1);
+						return (1);
 					}
 				} else if (addr->sa_family == AF_INET6) {
 					struct sockaddr_in6 *sin6,*sin_c6;
@@ -2119,13 +2119,13 @@ sctp_is_address_on_local_host(struct sockaddr *addr)
 					if (SCTP6_ARE_ADDR_EQUAL(&sin6->sin6_addr,
 								&sin_c6->sin6_addr)) {
 						/* we are on the same machine */
-						return(1);
+						return (1);
 					}
 				}
 			}
 		}
 	}
-	return(0);
+	return (0);
 }
 
 int
@@ -2165,7 +2165,7 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 			netfirst->dest_state = SCTP_ADDR_REACHABLE;
 		}
 
-		return(0);
+		return (0);
 	}
 	addr_inscope = 1;
 	if (newaddr->sa_family == AF_INET) {
@@ -2427,7 +2427,7 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 	if (sctppcbinfo.ipi_count_asoc >= SCTP_MAX_NUM_OF_ASOC) {
 		/* Hit max assoc, sorry no more */
 		*error = ENOBUFS;
-		return(NULL);
+		return (NULL);
 	}
 
 #ifdef SCTP_TCP_MODEL_SUPPORT
@@ -2439,7 +2439,7 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 		 * this.. its an error.
 		 */
 		*error = EINVAL;
-		return(NULL);
+		return (NULL);
  	}
 #endif
 
@@ -3918,7 +3918,7 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb,
 				/* we must add the source address */
 				/* no scope set since we have a tcb already */
 				if (sctp_add_remote_addr(stcb, sa, 0, 4)) {
-					return(-1);
+					return (-1);
 				}
 			} else if (t_tcb == stcb) {
 				if (net != NULL) {
@@ -3949,7 +3949,7 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb,
 						(ep == NULL))) {
 				/* we must add the address, no scope set */
 				if (sctp_add_remote_addr(stcb, sa, 0, 5)) {
-					return(-1);
+					return (-1);
 				}
 			} else if (t_tcb == stcb) {
 				if (net != NULL) {
@@ -4363,7 +4363,7 @@ sctp_add_to_socket_q(struct sctp_inpcb *inp, struct sctp_tcb *tcb)
 
 	if ((inp == NULL) || (tcb == NULL)) {
 		/* I am paranoid */
-		return(0);
+		return (0);
 	}
 #if defined(__FreeBSD__)
 	sq = (struct sctp_socket_q_list *)zalloci(sctppcbinfo.ipi_zone_sockq);
@@ -4373,14 +4373,14 @@ sctp_add_to_socket_q(struct sctp_inpcb *inp, struct sctp_tcb *tcb)
 #endif
 	if (sq == NULL) {
 		/* out of sq structs */
-		return(0);
+		return (0);
 	}
 	sctppcbinfo.ipi_count_sockq++;
 	sctppcbinfo.ipi_gencnt_sockq++;
 
 	sq->tcb = tcb;
 	TAILQ_INSERT_TAIL(&inp->sctp_queue_list, sq, next_sq);
-	return(1);
+	return (1);
 }
 
 
@@ -4392,7 +4392,7 @@ sctp_remove_from_socket_q(struct sctp_inpcb *inp)
 
 	sq = TAILQ_FIRST(&inp->sctp_queue_list);
 	if (sq == NULL)
-		return(tcb);
+		return (tcb);
 
 	tcb = sq->tcb;
 	TAILQ_REMOVE(&inp->sctp_queue_list, sq, next_sq);
@@ -4404,7 +4404,7 @@ sctp_remove_from_socket_q(struct sctp_inpcb *inp)
 #endif
 	sctppcbinfo.ipi_count_sockq--;
 	sctppcbinfo.ipi_gencnt_sockq++;
-	return(tcb);
+	return (tcb);
 }
 
 

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_indata.c,v 1.24 2003/11/25 06:53:34 ono Exp $	*/
+/*	$KAME: sctp_indata.c,v 1.25 2003/11/25 07:29:19 ono Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -206,7 +206,7 @@ sctp_build_ctl_nchunk(struct sctp_tcb *stcb,
 
 	if ((stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_RECVDATAIOEVNT) == 0) {
 		/* user does not want the sndrcv ctl */
-		return(NULL);
+		return (NULL);
 	}
 
 	MGET(ret, M_DONTWAIT, MT_CONTROL);
@@ -260,7 +260,7 @@ sctp_build_ctl(struct sctp_tcb *stcb,
 	struct mbuf *ret;
 	if ((stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_RECVDATAIOEVNT) == 0) {
 		/* user does not want the sndrcv ctl */
-		return(NULL);
+		return (NULL);
 	}
 	MGET(ret, M_DONTWAIT, MT_CONTROL);
 	if (ret == NULL)
@@ -1615,7 +1615,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 		op_err = sctp_generate_invmanparam(SCTP_CAUSE_OUT_OF_RESC);
 		sctp_abort_an_association(stcb->sctp_ep, stcb, 0, op_err);
 		*abort_flag = 1;
-		return(0);
+		return (0);
 	}
 	/* Now before going further we see
 	 * if there is room. If NOT then
@@ -2313,7 +2313,7 @@ sctp_process_data(struct mbuf **mm,
 	    sizeof(chunk_buf), (u_int8_t *)&chunk_buf);
 	if (ch == NULL) {
 		printf("Gag me ... its short\n");
-		return(1);
+		return (1);
 	}
 	/*
 	 * process all DATA chunks...
@@ -2857,7 +2857,7 @@ sctp_try_advance_peer_ack_point(struct sctp_tcb *stcb,
 	struct timeval now;
 
 	if (asoc->peer_supports_prsctp == 0) {
-		return(NULL);
+		return (NULL);
 	}
 	SCTP_GETTIME_TIMEVAL(&now);
 	tp1 = TAILQ_FIRST(&asoc->sent_queue);

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.31 2003/11/25 06:53:34 ono Exp $	*/
+/*	$KAME: sctp_output.c,v 1.32 2003/11/25 07:29:19 ono Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -2345,19 +2345,19 @@ int sctp_is_address_in_scope(struct ifaddr *ifa,
 	    (ifa->ifa_ifp) &&
 	    (ifa->ifa_ifp->if_type == IFT_LOOP)) {
 		/* skip loopback if not in scope */
-		return(0);
+		return (0);
 	}
 	if ((ifa->ifa_addr->sa_family == AF_INET) && ipv4_addr_legal) {
 		struct sockaddr_in *sin;
 		sin = (struct sockaddr_in *)ifa->ifa_addr;
 		if (sin->sin_addr.s_addr == 0) {
 			/* not in scope , unspecified */
-			return(0);
+			return (0);
 		}
 		if ((ipv4_local_scope == 0) &&
 		    (IN4_ISPRIVATE_ADDRESS(&sin->sin_addr))) {
 			/* private address not in scope */
-			return(0);
+			return (0);
 		}
 	} else if ((ifa->ifa_addr->sa_family == AF_INET6) &&
 		   (ipv6_addr_legal)) {
@@ -2369,32 +2369,32 @@ int sctp_is_address_in_scope(struct ifaddr *ifa,
 		if (!ip6_use_deprecated) {
 			if (ifa6->ia6_flags &
 			    IN6_IFF_DEPRECATED) {
-				return(0);
+				return (0);
 			}
 		}
 		if (ifa6->ia6_flags &
 		    (IN6_IFF_DETACHED |
 		     IN6_IFF_ANYCAST |
 		     IN6_IFF_NOTREADY)) {
-			return(0);
+			return (0);
 		}
 		sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
 		if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
 			/* skip unspecifed addresses */
-			return(0);
+			return (0);
 		}
 		if (/*(local_scope == 0) && */
 		    (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))) {
-			return(0);
+			return (0);
 		}
 		if ((site_scope == 0) &&
 		    (IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr))) {
-			return(0);
+			return (0);
 		}
 	} else {
-		return(0);
+		return (0);
 	}
-	return(1);
+	return (1);
 }
 
 void
@@ -3830,7 +3830,7 @@ sctp_get_frag_point(struct sctp_tcb *tcb,
 		/* make it an even word boundary please */
 		siz -= (siz % 4);
 	}
-	return(siz);
+	return (siz);
 }
 
 extern int sctp_max_chunks_on_queue;
@@ -4895,7 +4895,7 @@ sctp_med_chunk_output(struct sctp_inpcb *inp,
 			printf("All wheels empty\n");
 		}
 #endif
-		return(0);
+		return (0);
 	}
 	if (asoc->peers_rwnd <= 0) {
 		/* No room in peers rwnd */
@@ -4977,7 +4977,7 @@ sctp_med_chunk_output(struct sctp_inpcb *inp,
 	/* Nothing to send? */
 	if ((TAILQ_FIRST(&asoc->control_send_queue) == NULL) &&
 	   (TAILQ_FIRST(&asoc->send_queue) == NULL)) {
-		return(0);
+		return (0);
 	}
 	TAILQ_FOREACH(net,&asoc->nets, sctp_next) {
 		/* how much can we send? */
@@ -6159,7 +6159,7 @@ sctp_chunk_retransmission(struct sctp_inpcb *inp,
 		} else {
 			M_PREPEND(m, sizeof(struct sctphdr), M_DONTWAIT);
 			if (m == NULL) {
-				return(ENOBUFS);
+				return (ENOBUFS);
 			}
 		}
 		shdr = mtod(m, struct sctphdr *);
@@ -6191,7 +6191,7 @@ sctp_chunk_retransmission(struct sctp_inpcb *inp,
 		} else {
 			/* Clean up the fwd-tsn list */
 			sctp_clean_up_ctl (asoc);
-			return(0);
+			return (0);
 		}
 	}
 	/* Ok, it is just data retransmission we need to do or
@@ -6209,7 +6209,7 @@ sctp_chunk_retransmission(struct sctp_inpcb *inp,
 	if (((asoc->state & SCTP_STATE_MASK) == SCTP_STATE_COOKIE_ECHOED) ||
 	   ((asoc->state & SCTP_STATE_MASK) == SCTP_STATE_COOKIE_WAIT)) {
 		/* not yet open, resend the cookie and that is it */
-		return(1);
+		return (1);
 	}
 
 
@@ -6358,7 +6358,7 @@ sctp_chunk_retransmission(struct sctp_inpcb *inp,
 			} else {
 				M_PREPEND(m, sizeof(struct sctphdr), M_DONTWAIT);
 				if (m == NULL) {
-					return(ENOBUFS);
+					return (ENOBUFS);
 				}
 			}
 			shdr = mtod(m, struct sctphdr *);
@@ -6437,7 +6437,7 @@ sctp_chunk_retransmission(struct sctp_inpcb *inp,
 #endif
 		} else {
 			/* None will fit */
-			return(1);
+			return (1);
 		}
 		if (asoc->sent_queue_retran_cnt <= 0) {
 			/* all done we have no more to retran */
@@ -6446,7 +6446,7 @@ sctp_chunk_retransmission(struct sctp_inpcb *inp,
 		}
 		if (one_chunk) {
 			/* No more room in rwnd */
-			return(1);
+			return (1);
 		}
 		/* stop the for loop here. we sent out a packet */
 		break;
@@ -7850,13 +7850,13 @@ sctp_send_hb(struct sctp_tcb *tcb, int user_req, struct sctp_nets *u_net)
 			 * start the timer again.
 			 */
 			if (tcb->asoc.state == 0) {
-				return(0);
+				return (0);
 			}
 			sctp_timer_start(SCTP_TIMER_TYPE_HEARTBEAT,
 					 tcb->sctp_ep,
 					 tcb,
 					 net);
-			return(0);
+			return (0);
 		}
 #ifndef SCTP_USE_ALLMAN_BURST
 		else {
@@ -7883,7 +7883,7 @@ sctp_send_hb(struct sctp_tcb *tcb, int user_req, struct sctp_nets *u_net)
 	} else {
 		net = u_net;
 		if (net == NULL) {
-			return(0);
+			return (0);
 		}
 		SCTP_GETTIME_TIMEVAL(&now);
 	}
@@ -7891,7 +7891,7 @@ sctp_send_hb(struct sctp_tcb *tcb, int user_req, struct sctp_nets *u_net)
 	if (sin->sin_family != AF_INET) {
 		if (sin->sin_family != AF_INET6) {
 			/* huh */
-			return(0);
+			return (0);
 		}
 	}
 #if defined(__FreeBSD__)
@@ -7907,7 +7907,7 @@ sctp_send_hb(struct sctp_tcb *tcb, int user_req, struct sctp_nets *u_net)
 			printf("Gak, can't get a chunk for hb\n");
 		}
 #endif
-		return(0);
+		return (0);
 	}
 	sctppcbinfo.ipi_gencnt_chunk++;
 	sctppcbinfo.ipi_count_chunk++;
@@ -7927,7 +7927,7 @@ sctp_send_hb(struct sctp_tcb *tcb, int user_req, struct sctp_nets *u_net)
 			panic("Chunk count is negative");
 		}
 		sctppcbinfo.ipi_gencnt_chunk++;
-		return(0);
+		return (0);
 	}
 	chk->data->m_pkthdr.len = chk->data->m_len = chk->send_size;
 	chk->sent = SCTP_DATAGRAM_UNSENT;
@@ -7971,7 +7971,7 @@ sctp_send_hb(struct sctp_tcb *tcb, int user_req, struct sctp_nets *u_net)
 			printf("Compiler bug bleeds a mbuf and a chunk\n");
 		}
 #endif
-		return(0);
+		return (0);
 	}
 	/* ok we have a destination that needs a beat */
 	/* lets do the theshold management Qiaobing style */
@@ -7999,7 +7999,7 @@ sctp_send_hb(struct sctp_tcb *tcb, int user_req, struct sctp_nets *u_net)
 				panic("Chunk count is negative");
 			}
 			sctppcbinfo.ipi_gencnt_chunk++;
-			return(0);
+			return (0);
 		}
 	}
 	net->hb_responded = 0;
@@ -8021,7 +8021,7 @@ sctp_send_hb(struct sctp_tcb *tcb, int user_req, struct sctp_nets *u_net)
 		sctp_timer_start(SCTP_TIMER_TYPE_HEARTBEAT, tcb->sctp_ep,
 				 tcb, net);
 	}
-	return(1);
+	return (1);
 }
 
 void
@@ -8688,16 +8688,16 @@ sctp_copy_one(struct mbuf *m, struct uio *uio, int cpsz, int resv_upfront, int *
 	
 	if (m == NULL) {
 		/* TSNH */	
-		return(ENOMEM);
+		return (ENOMEM);
 	}
 	m->m_len = 0;
 	if ((left+resv_upfront) > MHLEN) {
 		MCLGET(m,M_WAIT);
 		if (m == NULL) {
-			return(ENOMEM);
+			return (ENOMEM);
 		}
 		if ((m->m_flags & M_EXT) == 0) {
-			return(ENOMEM);
+			return (ENOMEM);
 		}
 	}
 	cancpy = M_TRAILINGSPACE(m);
@@ -8718,7 +8718,7 @@ sctp_copy_one(struct mbuf *m, struct uio *uio, int cpsz, int resv_upfront, int *
 		}
 		error = uiomove(mtod(m, caddr_t), willcpy, uio);
 		if (error) {
-			return(error);
+			return (error);
 		}
 		m->m_len = willcpy;
 		m->m_nextpkt = 0;
@@ -8730,24 +8730,24 @@ sctp_copy_one(struct mbuf *m, struct uio *uio, int cpsz, int resv_upfront, int *
 		if (left > 0) { 
 			MGET(m->m_next, M_WAIT, MT_DATA);
 			if (m->m_next == NULL) {
-				return(ENOMEM);
+				return (ENOMEM);
 			}
 			m = m->m_next;
 			m->m_len = 0;
 			if (left > MHLEN) {
 				MCLGET(m,M_WAIT);
 				if (m == NULL) {
-					return(ENOMEM);
+					return (ENOMEM);
 				}
 				if ((m->m_flags & M_EXT) == 0) {
-					return(ENOMEM);
+					return (ENOMEM);
 				}
 			}
 			cancpy = M_TRAILINGSPACE(m);
 			willcpy = min(cancpy, left);
 		}
 	}
-	return(0);
+	return (0);
 }
 
 static int
@@ -8870,7 +8870,7 @@ sctp_copy_it_in(struct sctp_inpcb *inp,
  		/* not allowed */
  		error = EMSGSIZE;
 		splx(s);
- 		return(error);
+ 		return (error);
  	}
 	/* save off the tag */
 	my_vtag = asoc->my_vtag;
@@ -8916,7 +8916,7 @@ sctp_copy_it_in(struct sctp_inpcb *inp,
 				panic("Chunk count is negative");
 			}
 			m_freem(mm);
-			return(error);
+			return (error);
 		}
 		mm->m_pkthdr.len = tot_out;
 		sctp_prepare_chunk(chk, tcb, srcv, strq, net);
@@ -9015,7 +9015,7 @@ sctp_copy_it_in(struct sctp_inpcb *inp,
 					sctppcbinfo.ipi_gencnt_chunk++;
 					chk = TAILQ_FIRST(&tmp);
 				}
-				return(error);
+				return (error);
 			}
 			sctppcbinfo.ipi_count_chunk++;
 			asoc->chunks_on_out_queue++;
@@ -9147,7 +9147,7 @@ sctp_copy_it_in(struct sctp_inpcb *inp,
 			asoc->state |= SCTP_STATE_SHUTDOWN_PENDING;
 		}
 		splx(s);
-		return(0);
+		return (0);
 	}
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_OUTPUT2) {
@@ -9156,7 +9156,7 @@ sctp_copy_it_in(struct sctp_inpcb *inp,
 		       (int)asoc->total_output_mbuf_queue_size);
 	}
 #endif
-	return(error);
+	return (error);
 }
 
 #define   SBLOCKWAIT(f)   (((f)&MSG_DONTWAIT) ? M_NOWAIT : M_WAITOK)
