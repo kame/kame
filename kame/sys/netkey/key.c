@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.233 2002/03/21 02:26:32 itojun Exp $	*/
+/*	$KAME: key.c,v 1.234 2002/05/13 03:21:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1190,12 +1190,10 @@ key_delsp(sp)
 
 	/* sanity check */
 	if (sp == NULL)
-		panic("key_delsp: NULL pointer is passed.\n");
-
-	sp->state = IPSEC_SPSTATE_DEAD;
+		panic("key_delsp: NULL pointer is passed.");
 
 	if (sp->refcnt > 0)
-		return; /* can't free */
+		panic("key_delsp: called with positive refcnt");
 
 #ifdef __NetBSD__
 	s = splsoftnet();	/*called from softclock()*/
@@ -2366,7 +2364,7 @@ key_spdflush(so, m, mhp)
 	const struct sadb_msghdr *mhp;
 {
 	struct sadb_msg *newmsg;
-	struct secpolicy *sp;
+	struct secpolicy *sp, *nextsp;
 	u_int dir;
 
 	/* sanity check */
@@ -2377,8 +2375,12 @@ key_spdflush(so, m, mhp)
 		return key_senderror(so, m, EINVAL);
 
 	for (dir = 0; dir < IPSEC_DIR_MAX; dir++) {
-		LIST_FOREACH(sp, &sptree[dir], chain) {
+		for (sp = LIST_FIRST(&sptree[dir]); sp != NULL; sp = nextsp) {
+			nextsp = LIST_NEXT(sp, chain);
+			if (sp->state == IPSEC_SPSTATE_DEAD)
+				continue;
 			sp->state = IPSEC_SPSTATE_DEAD;
+			key_freesp(sp);
 		}
 	}
 
@@ -2880,7 +2882,7 @@ key_delsav(sav)
 		panic("key_delsav: NULL pointer is passed.\n");
 
 	if (sav->refcnt > 0)
-		return;		/* can't free */
+		panic("key_delsav: called with positive refcnt");
 
 	/* remove from SA header */
 	if (__LIST_CHAINED(sav))
@@ -4348,24 +4350,22 @@ key_timehandler(arg)
 		for (sp = LIST_FIRST(&sptree[dir]);
 		     sp != NULL;
 		     sp = nextsp) {
-
 			nextsp = LIST_NEXT(sp, chain);
 
-			if (sp->state == IPSEC_SPSTATE_DEAD) {
-				key_freesp(sp);
+			if (sp->state == IPSEC_SPSTATE_DEAD)
 				continue;
-			}
 
 			if (sp->lifetime == 0 && sp->validtime == 0)
 				continue;
 
 			/* the deletion will occur next time */
-			if ((sp->lifetime
-			  && tv.tv_sec - sp->created > sp->lifetime)
-			 || (sp->validtime
-			  && tv.tv_sec - sp->lastused > sp->validtime)) {
+			if ((sp->lifetime &&
+			     tv.tv_sec - sp->created > sp->lifetime) ||
+			    (sp->validtime &&
+			     tv.tv_sec - sp->lastused > sp->validtime)) {
 				sp->state = IPSEC_SPSTATE_DEAD;
 				key_spdexpire(sp);
+				key_freesp(sp);
 				continue;
 			}
 		}
