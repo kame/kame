@@ -1,4 +1,4 @@
-/*	$KAME: vif.h,v 1.27 2004/06/08 10:45:09 suz Exp $	*/
+/*	$KAME: vif.h,v 1.28 2004/06/09 16:29:19 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -130,10 +130,22 @@ struct listaddr {
 	struct listaddr *sources; /* list of sources for this group */
 
 	/* 
-	 * al_timer is used for many purposes.
-	 *	- last-listener-query timer (MLDv1,MLDv2)
-	 *	- old-listener-present timer (MLDv2)
-	 *	- PIM neighboring timeout (PIM)
+	 * al_timer contains a lifetime of this entry regarding MLD.  
+	 * It corrensponds to many kinds of lifetimes.
+	 * [MLDv1]
+	 * - remaining time until the next Query (v->uv_querier->al_timer)
+	 * - group-expiry timer (v->uv_group->al_timer)
+	 * - LLQT value (v->uv_group->al_timer)
+	 * [MLDv2]
+	 * - remaining time until the next query (v->uv_querier->al_timer)
+	 * - filter-timer (v->uv_group->al_timer)
+	 * - source-expiry timer (v->uv_group->sources->al_timer)
+	 * - group LLQT (v->uv_group->al_timer)
+	 * - source LLQT (v->uv_group->sources->al_timer)
+	 *
+	 *  Please keep in mind that the actual timeout is handled by
+	 *  callout-queue corresponding to its al_timerid, except
+	 *  Query transmission.
 	 */
 	u_long al_timer;
 	time_t al_ctime; /* entry creation time */
