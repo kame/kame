@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.191 1999/10/18 04:45:22 itojun Exp $
+$Id: CHANGELOG,v 1.192 1999/10/18 05:34:49 jinmei Exp $
 
 <199910>
 Mon Oct 18 13:43:40 JST 1999  itojun@iijlab.net
@@ -13,16 +13,15 @@ Mon Oct 18 13:43:40 JST 1999  itojun@iijlab.net
 	including:
 	- reflection of change of an IGP route to IBGP routes that use
 	  the IGP route for BGP next-hop resolution.
-	- show per-prefix sorted BGP routes in the dump file
-	- show various timers in the dump file
-	- increased default size of output socket buffers used for BGP
-	  connections. Also, made the size configurable
-	- changed the default filename of the dump file(see bgpd(8))
+	- show per-prefix sorted BGP routes in the dump file.
+	- show various timers in the dump file.
+	- increased the default size of output socket buffers used for BGP
+	  connections. Also, made the size configurable.
 
 1999-10-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_lookup): added a sanity check for
 	the interface at the end of the function. This will prevent
-	invalid redirect messages when there is rooting loop with an
+	invalid redirect messages when there is routing loop with an
 	adjacent router.
 
 1999-10-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
