@@ -1,4 +1,4 @@
-/*	$KAME: sctp_var.h,v 1.14 2003/04/21 06:26:11 itojun Exp $	*/
+/*	$KAME: sctp_var.h,v 1.15 2003/04/21 09:06:28 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_var.h,v 1.46 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -80,8 +80,8 @@ int sctp_usrreq __P((struct socket *, int, struct mbuf *, struct mbuf *,
 
 #define	sctp_sbspace(sb) ((long) ((sb)->sb_hiwat - (sb)->sb_cc))
 
-extern unsigned int	sctp_sendspace;
-extern unsigned int	sctp_recvspace;
+extern int	sctp_sendspace;
+extern int	sctp_recvspace;
 
 struct sctp_nets;
 struct sctp_inpcb;

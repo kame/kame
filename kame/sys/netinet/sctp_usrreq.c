@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.27 2003/04/21 06:26:11 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.28 2003/04/21 09:06:28 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_usrreq.c,v 1.151 2002/04/04 16:49:14 lei Exp	*/
 
 /*
@@ -522,14 +522,14 @@ SYSCTL_PROC(_net_inet_sctp, OID_AUTO, getcred, CTLTYPE_OPAQUE|CTLFLAG_RW,
 
 #endif /* #if defined(__FreeBSD__) */
 
-unsigned int	sctp_sendspace = (128 * 1024);	/* really max datagram size */
+int	sctp_sendspace = (128 * 1024);	/* really max datagram size */
 /* 64 1K datagrams */
 #if defined(__FreeBSD__)
 SYSCTL_INT(_net_inet_sctp, SCTPCTL_MAXDGRAM, maxdgram, CTLFLAG_RW,
 	   &sctp_sendspace, 0, "Maximum outgoing SCTP datagram size");
 #endif
 
-unsigned int	sctp_recvspace = 128 * (1024 +
+int	sctp_recvspace = 128 * (1024 +
 #ifdef INET6
 			       sizeof(struct sockaddr_in6)
 #else
