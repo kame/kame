@@ -153,6 +153,10 @@ in6_gif_output(ifp, family, m, rt)
 		if (!IN6_IS_ADDR_UNSPECIFIED(&sin6_dst->sin6_addr))
 			ip6->ip6_dst = sin6_dst->sin6_addr;
 		else if (rt) {
+			if (family != AF_INET6) {
+				m_freem(m);
+				return EINVAL;	/*XXX*/
+			}
 			ip6->ip6_dst = ((struct sockaddr_in6 *)(rt->rt_gateway))->sin6_addr;
 		} else {
 			m_freem(m);

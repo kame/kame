@@ -163,6 +163,10 @@ in_gif_output(ifp, family, m, rt)
 		if (sin_dst->sin_addr.s_addr != INADDR_ANY)
 			iphdr.ip_dst = sin_dst->sin_addr;
 		else if (rt) {
+			if (family != AF_INET) {
+				m_freem(m);
+				return EINVAL;	/*XXX*/
+			}
 			iphdr.ip_dst = ((struct sockaddr_in *)
 					(rt->rt_gateway))->sin_addr;
 		} else {
