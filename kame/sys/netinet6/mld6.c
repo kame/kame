@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.87 2003/11/02 23:04:02 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.88 2004/01/26 09:37:46 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -484,19 +484,31 @@ mld6_input(m, off)
 
 	/* source address validation */
 	ip6 = mtod(m, struct ip6_hdr *); /* in case mpullup */
-	if (!(IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_src) ||
-	      IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src))) {
-#if 0				/* do not log in an input path */
+	if (!IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_src)) {
+		/*
+		 * RFC3590 allows the IPv6 unspecified address as the source
+		 * address of MLD report and done messages.  However, as this
+		 * same document says, this special rule is for snooping
+		 * switches and the RFC requires routers to discard MLD packets
+		 * with the unspecified source address.  The RFC only talks
+		 * about hosts receiving an MLD query or report in Security
+		 * Considerations, but this is probably the correct intention.
+		 * RFC3590 does not talk about other cases than link-local and
+		 * the unspecified source addresses, but we believe the same
+		 * rule should be applied.
+		 * As a result, we only allow link-local addresses as the
+		 * source address; otherwise, simply discard the packet.
+		 */
+#if 0
+		/*
+		 * XXX: do not log in an input path to avoid log flooding,
+		 * though RFC3590 says "SHOULD log" if the source of a query
+		 * is the unspecified address.
+		 */
 		log(LOG_INFO,
 		    "mld6_input: src %s is not link-local (grp=%s)\n",
-		    ip6_sprintf(&ip6->ip6_src),
-		    ip6_sprintf(&mldh->mld_addr));
+		    ip6_sprintf(&ip6->ip6_src), ip6_sprintf(&mldh->mld_addr));
 #endif
-		/*
-		 * spec (RFC2710) does not explicitly
-		 * specify to discard the packet from a non link-local
-		 * source address. But we believe it's expected to do so.
-		 */
 		m_freem(m);
 		return;
 	}
