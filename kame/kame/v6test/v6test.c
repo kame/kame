@@ -28,6 +28,9 @@
  */
 
 #include "common.h"
+#ifdef HAVE_PCAP
+#include <pcap.h>
+#endif 
 
 u_char buf[65536];
 char *conffile = NULL;
@@ -48,8 +51,8 @@ static void
 usage()
 {
 	fprintf(stderr,
-		"usage: v6test [-d dstaddr] [-f configfile] "
-		"[-n] [-s srcaddr] -i interface testname [testname...]\n");
+		"usage: v6test [-d dstaddr] [-f configfile] [-i interface] "
+		"[-n] [-s srcaddr] testname [testname...]\n");
 	exit(1);
 }
 
@@ -94,7 +97,7 @@ main(argc, argv)
 	argc -= optind;
 	argv += optind;
 
-	if (iface == NULL || argc == 0) {
+	if (argc == 0) {
 		usage();
 		/*NOTREACHED*/
 	}
@@ -123,6 +126,9 @@ bpf_open(char *iface)
 	int n = 0, fd;
 	char dev[16];
 	struct ifreq ifr;
+#ifdef HAVE_PCAP
+	char pcaperrbuf[PCAP_ERRBUF_SIZE];
+#endif 
 	
 #define NBPFILTER 4
 	do {
@@ -140,6 +146,15 @@ bpf_open(char *iface)
 	}
 
 	bzero(&ifr, sizeof(ifr));
+#ifdef HAVE_PCAP
+	if (iface == NULL &&
+	    (iface = pcap_lookupdev(pcaperrbuf)) == NULL) {
+		fprintf(stderr, "pcap_lookupdev: %s\n", pcaperrbuf);
+	}
+#else
+	if (iface == NULL)
+		fprintf(stderr, "interface must be specified\n");
+#endif 
 	strcpy(ifr.ifr_name, iface);
 	if (ioctl(fd, BIOCSETIF, &ifr) < 0) {
 		perror("ioctl(BIOCSETIF)");
