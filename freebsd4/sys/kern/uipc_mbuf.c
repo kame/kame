@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_mbuf.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/kern/uipc_mbuf.c,v 1.51 1999/12/28 06:35:57 msmith Exp $
+ * $FreeBSD: src/sys/kern/uipc_mbuf.c,v 1.51.2.1 2000/07/15 07:14:24 kris Exp $
  */
 
 #include "opt_param.h"
@@ -519,6 +519,15 @@ m_freem(m)
 	if (m == NULL)
 		return;
 	do {
+		/*
+		 * we do need to check non-first mbuf, since some of existing
+		 * code does not call M_PREPEND properly.
+		 * (example: call to bpf_mtap from drivers)
+		 */
+		if ((m->m_flags & M_PKTHDR) != 0 && m->m_pkthdr.aux) {
+			m_freem(m->m_pkthdr.aux);
+			m->m_pkthdr.aux = NULL;
+		}
 		MFREE(m, n);
 		m = n;
 	} while (m);

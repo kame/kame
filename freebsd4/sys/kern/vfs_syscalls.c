@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_syscalls.c	8.13 (Berkeley) 4/15/94
- * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.151 2000/01/10 00:08:53 mckusick Exp $
+ * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.151.2.2 2000/07/10 21:31:58 archie Exp $
  */
 
 /* For 4.3 integer FS ID compatibility */
@@ -224,11 +224,6 @@ mount(p, uap)
 	if (vfsp == NULL) {
 		linker_file_t lf;
 
-		/* Refuse to load modules if securelevel raised */
-		if (securelevel > 0) {
-			vput(vp);
-			return EPERM; 
-		}
 		/* Only load modules for root (very important!) */
 		if ((error = suser(p)) != 0) {
 			vput(vp);
@@ -3000,6 +2995,8 @@ getdents(p, uap)
 
 /*
  * Set the mode mask for creation of filesystem nodes.
+ *
+ * MP SAFE
  */
 #ifndef _SYS_SYSPROTO_H_
 struct umask_args {

@@ -16,7 +16,7 @@
  * 4. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- * $FreeBSD: src/sys/kern/sys_pipe.c,v 1.60 1999/12/26 13:04:52 bde Exp $
+ * $FreeBSD: src/sys/kern/sys_pipe.c,v 1.60.2.2 2000/05/05 03:49:56 jlemon Exp $
  */
 
 /*
@@ -65,6 +65,7 @@
 #include <sys/pipe.h>
 #include <sys/vnode.h>
 #include <sys/uio.h>
+#include <sys/event.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -99,6 +100,16 @@ static int pipe_ioctl __P((struct file *fp, u_long cmd, caddr_t data, struct pro
 
 static struct fileops pipeops =
     { pipe_read, pipe_write, pipe_ioctl, pipe_poll, pipe_stat, pipe_close };
+
+static int	filt_pipeattach(struct knote *kn);
+static void	filt_pipedetach(struct knote *kn);
+static int	filt_piperead(struct knote *kn, long hint);
+static int	filt_pipewrite(struct knote *kn, long hint);
+
+struct filterops pipe_rwfiltops[] = {
+	{ 1, filt_pipeattach, filt_pipedetach, filt_piperead },
+	{ 1, filt_pipeattach, filt_pipedetach, filt_pipewrite },
+};
 
 /*
  * Default pipe buffer size(s), this can be kind-of large now because pipe
@@ -316,6 +327,7 @@ pipeselwakeup(cpipe)
 	}
 	if ((cpipe->pipe_state & PIPE_ASYNC) && cpipe->pipe_sigio)
 		pgsigio(cpipe->pipe_sigio, SIGIO, 0);
+	KNOTE(&cpipe->pipe_sel.si_note, 0);
 }
 
 /* ARGSUSED */
@@ -766,6 +778,9 @@ pipe_write(fp, uio, cred, flags, p)
 		 * we do process-to-process copies directly.
 		 * If the write is non-blocking, we don't use the
 		 * direct write mechanism.
+		 *
+		 * The direct write mechanism will detect the reader going
+		 * away on us.
 		 */
 		if ((uio->uio_iov->iov_len >= PIPE_MINDIRECT) &&
 		    (fp->f_flag & FNONBLOCK) == 0 &&
@@ -783,7 +798,8 @@ pipe_write(fp, uio, cred, flags, p)
 		 * Pipe buffered writes cannot be coincidental with
 		 * direct writes.  We wait until the currently executing
 		 * direct write is completed before we start filling the
-		 * pipe buffer.
+		 * pipe buffer.  We break out if a signal occurs or the
+		 * reader goes away.
 		 */
 	retrywrite:
 		while (wpipe->pipe_state & PIPE_DIRECTW) {
@@ -791,10 +807,15 @@ pipe_write(fp, uio, cred, flags, p)
 				wpipe->pipe_state &= ~PIPE_WANTR;
 				wakeup(wpipe);
 			}
-			error = tsleep(wpipe,
-					PRIBIO|PCATCH, "pipbww", 0);
+			error = tsleep(wpipe, PRIBIO|PCATCH, "pipbww", 0);
+			if (wpipe->pipe_state & PIPE_EOF)
+				break;
 			if (error)
 				break;
+		}
+		if (wpipe->pipe_state & PIPE_EOF) {
+			error = EPIPE;
+			break;
 		}
 
 		space = wpipe->pipe_buffer.size - wpipe->pipe_buffer.cnt;
@@ -818,6 +839,9 @@ pipe_write(fp, uio, cred, flags, p)
 				/* 
 				 * If a process blocked in uiomove, our
 				 * value for space might be bad.
+				 *
+				 * XXX will we be ok if the reader has gone
+				 * away here?
 				 */
 				if (space > wpipe->pipe_buffer.size - 
 				    wpipe->pipe_buffer.cnt) {
@@ -1146,4 +1170,59 @@ pipeclose(cpipe)
 #endif
 		zfree(pipe_zone, cpipe);
 	}
+}
+
+static int
+filt_pipeattach(struct knote *kn)
+{
+	struct pipe *rpipe = (struct pipe *)kn->kn_fp->f_data;
+
+	SLIST_INSERT_HEAD(&rpipe->pipe_sel.si_note, kn, kn_selnext);
+	return (0);
+}
+
+static void
+filt_pipedetach(struct knote *kn)
+{
+	struct pipe *rpipe = (struct pipe *)kn->kn_fp->f_data;
+
+	SLIST_REMOVE(&rpipe->pipe_sel.si_note, kn, knote, kn_selnext);
+}
+
+/*ARGSUSED*/
+static int
+filt_piperead(struct knote *kn, long hint)
+{
+	struct pipe *rpipe = (struct pipe *)kn->kn_fp->f_data;
+	struct pipe *wpipe = rpipe->pipe_peer;
+
+	kn->kn_data = rpipe->pipe_buffer.cnt;
+	if ((kn->kn_data == 0) && (rpipe->pipe_state & PIPE_DIRECTW))
+		kn->kn_data = rpipe->pipe_map.cnt;
+
+	if ((rpipe->pipe_state & PIPE_EOF) ||
+	    (wpipe == NULL) || (wpipe->pipe_state & PIPE_EOF)) {
+		kn->kn_flags |= EV_EOF; 
+		return (1);
+	}
+	return (kn->kn_data > 0);
+}
+
+/*ARGSUSED*/
+static int
+filt_pipewrite(struct knote *kn, long hint)
+{
+	struct pipe *rpipe = (struct pipe *)kn->kn_fp->f_data;
+	struct pipe *wpipe = rpipe->pipe_peer;
+
+	if ((wpipe == NULL) || (wpipe->pipe_state & PIPE_EOF)) {
+		kn->kn_data = 0;
+		kn->kn_flags |= EV_EOF; 
+		return (1);
+	}
+	kn->kn_data = wpipe->pipe_buffer.size - wpipe->pipe_buffer.cnt;
+	if ((wpipe->pipe_state & PIPE_DIRECTW) == 0)
+		kn->kn_data = 0;
+
+	return (kn->kn_data >= PIPE_BUF);
 }

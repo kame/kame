@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tty.c	8.8 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/tty.c,v 1.129 2000/01/28 17:11:07 archie Exp $
+ * $FreeBSD: src/sys/kern/tty.c,v 1.129.2.1 2000/04/11 01:33:35 archie Exp $
  */
 
 /*-
@@ -2114,6 +2114,8 @@ ttwwakeup(tp)
 
 	if (tp->t_wsel.si_pid != 0 && tp->t_outq.c_cc <= tp->t_olowat)
 		selwakeup(&tp->t_wsel);
+	if (ISSET(tp->t_state, TS_ASYNC) && tp->t_sigio != NULL)
+		pgsigio(tp->t_sigio, SIGIO, (tp->t_session != NULL));
 	if (ISSET(tp->t_state, TS_BUSY | TS_SO_OCOMPLETE) ==
 	    TS_SO_OCOMPLETE && tp->t_outq.c_cc == 0) {
 		CLR(tp->t_state, TS_SO_OCOMPLETE);

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_socket2.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/kern/uipc_socket2.c,v 1.55 2000/03/03 11:13:05 shin Exp $
+ * $FreeBSD: src/sys/kern/uipc_socket2.c,v 1.55.2.1 2000/05/05 03:49:57 jlemon Exp $
  */
 
 #include "opt_param.h"
@@ -51,6 +51,7 @@
 #include <sys/signalvar.h>
 #include <sys/sysctl.h>
 #include <sys/aio.h> /* for aio_swake proto */
+#include <sys/event.h>
 
 int	maxsockets;
 
@@ -340,6 +341,7 @@ sowakeup(so, sb)
 		(*so->so_upcall)(so, so->so_upcallarg, M_DONTWAIT);
 	if (sb->sb_flags & SB_AIO)
 		aio_swake(so, sb);
+	KNOTE(&sb->sb_sel.si_note, 0);
 }
 
 /*

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_sig.c	8.7 (Berkeley) 4/18/94
- * $FreeBSD: src/sys/kern/kern_sig.c,v 1.72 1999/12/15 23:01:56 eivind Exp $
+ * $FreeBSD: src/sys/kern/kern_sig.c,v 1.72.2.3 2000/05/16 06:58:11 dillon Exp $
  */
 
 #include "opt_compat.h"
@@ -49,6 +49,7 @@
 #include <sys/resourcevar.h>
 #include <sys/namei.h>
 #include <sys/vnode.h>
+#include <sys/event.h>
 #include <sys/proc.h>
 #include <sys/pioctl.h>
 #include <sys/systm.h>
@@ -62,12 +63,10 @@
 #include <sys/sysctl.h>
 #include <sys/malloc.h>
 
-#include <vm/vm_zone.h>
 
+#include <machine/ipl.h>
 #include <machine/cpu.h>
-#ifdef SMP
 #include <machine/smp.h>
-#endif
 
 #define	ONSIG	32		/* NSIG for osig* syscalls.  XXX. */
 
@@ -81,6 +80,13 @@ static int killpg1	__P((struct proc *cp, int sig, int pgid, int all));
 static int sig_ffs	__P((sigset_t *set));
 static int sigprop	__P((int sig));
 static void stop	__P((struct proc *));
+
+static int	filt_sigattach(struct knote *kn);
+static void	filt_sigdetach(struct knote *kn);
+static int	filt_signal(struct knote *kn, long hint);
+
+struct filterops sig_filtops =
+	{ 0, filt_sigattach, filt_sigdetach, filt_signal };
 
 static int	kern_logsigexit = 1;
 SYSCTL_INT(_kern, KERN_LOGSIGEXIT, logsigexit, CTLFLAG_RW, 
@@ -107,6 +113,10 @@ SYSCTL_INT(_kern, KERN_LOGSIGEXIT, logsigexit, CTLFLAG_RW,
 int sugid_coredump;
 SYSCTL_INT(_kern, OID_AUTO, sugid_coredump, CTLFLAG_RW, 
     &sugid_coredump, 0, "Enable coredumping set user/group ID processes");
+
+static int	do_coredump = 1;
+SYSCTL_INT(_kern, OID_AUTO, coredump, CTLFLAG_RW,
+	&do_coredump, 0, "Enable/Disable coredumps");
 
 /*
  * Signal properties and actions.
@@ -430,10 +440,11 @@ execsigs(p)
 }
 
 /*
- * Manipulate signal mask.
- * Note that we receive new mask, not pointer,
- * and return old mask as return value;
- * the library stub does the rest.
+ * do_sigprocmask() - MP SAFE ONLY IF p == curproc
+ *
+ *	Manipulate signal mask.  This routine is MP SAFE *ONLY* if
+ *	p == curproc.  Also remember that in order to remain MP SAFE
+ *	no spl*() calls may be made.
  */
 static int
 do_sigprocmask(p, how, set, oset, old)
@@ -449,7 +460,6 @@ do_sigprocmask(p, how, set, oset, old)
 
 	error = 0;
 	if (set != NULL) {
-		(void) splhigh();
 		switch (how) {
 		case SIG_BLOCK:
 			SIG_CANTMASK(*set);
@@ -469,10 +479,13 @@ do_sigprocmask(p, how, set, oset, old)
 			error = EINVAL;
 			break;
 		}
-		(void) spl0();
 	}
 	return (error);
 }
+
+/*
+ * sigprocmask() - MP SAFE
+ */
 
 #ifndef _SYS_SYSPROTO_H_
 struct sigprocmask_args {
@@ -503,6 +516,10 @@ sigprocmask(p, uap)
 	}
 	return (error);
 }
+
+/*
+ * osigprocmask() - MP SAFE
+ */
 
 #ifndef _SYS_SYSPROTO_H_
 struct osigprocmask_args {
@@ -991,6 +1008,8 @@ psignal(p, sig)
 		printf("psignal: signal %d\n", sig);
 		panic("psignal signal number");
 	}
+
+	KNOTE(&p->p_klist, NOTE_SIGNAL | sig);
 
 	prop = sigprop(sig);
 
@@ -1585,7 +1604,7 @@ coredump(p)
 	
 	STOPEVENT(p, S_CORE, 0);
 
-	if ((sugid_coredump == 0) && p->p_flag & P_SUGID)
+	if (((sugid_coredump == 0) && p->p_flag & P_SUGID) || do_coredump == 0)
 		return (EFAULT);
 	
 	/*
@@ -1677,4 +1696,45 @@ pgsigio(sigio, sig, checkctty)
 			    (checkctty == 0 || (p->p_flag & P_CONTROLT)))
 				psignal(p, sig);
 	}
+}
+
+static int
+filt_sigattach(struct knote *kn)
+{
+	struct proc *p = curproc;
+
+	kn->kn_ptr.p_proc = p;
+	kn->kn_flags |= EV_CLEAR;		/* automatically set */
+
+	/* XXX lock the proc here while adding to the list? */
+	SLIST_INSERT_HEAD(&p->p_klist, kn, kn_selnext);
+
+	return (0);
+}
+
+static void
+filt_sigdetach(struct knote *kn)
+{
+	struct proc *p = kn->kn_ptr.p_proc;
+
+	SLIST_REMOVE(&p->p_klist, kn, knote, kn_selnext);
+}
+
+/*
+ * signal knotes are shared with proc knotes, so we apply a mask to 
+ * the hint in order to differentiate them from process hints.  This
+ * could be avoided by using a signal-specific knote list, but probably
+ * isn't worth the trouble.
+ */
+static int
+filt_signal(struct knote *kn, long hint)
+{
+
+	if (hint & NOTE_SIGNAL) {
+		hint &= ~NOTE_SIGNAL;
+
+		if (kn->kn_id == hint)
+			kn->kn_data++;
+	}
+	return (kn->kn_data != 0);
 }

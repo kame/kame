@@ -60,7 +60,7 @@
  *
  *	This code can be compiled stand-alone for debugging.
  *
- * $FreeBSD: src/sys/kern/subr_blist.c,v 1.5 1999/12/29 04:54:39 peter Exp $
+ * $FreeBSD: src/sys/kern/subr_blist.c,v 1.5.2.1 2000/03/17 10:47:29 ps Exp $
  */
 
 #ifdef _KERNEL
@@ -545,10 +545,8 @@ blst_meta_free(
 
 	if (scan->u.bmu_avail == radix)
 		return;
-#if !defined(MAX_PERF)
 	if (scan->u.bmu_avail > radix)
 		panic("blst_meta_free: freeing already free blocks (%d) %d/%d", count, scan->u.bmu_avail, radix);
-#endif
 
 	/*
 	 * Break the free down into its components

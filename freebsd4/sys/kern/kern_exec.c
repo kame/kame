@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_exec.c,v 1.107 2000/01/20 07:12:52 imp Exp $
+ * $FreeBSD: src/sys/kern/kern_exec.c,v 1.107.2.3 2000/07/19 06:23:56 kbyanc Exp $
  */
 
 #include <sys/param.h>
@@ -47,7 +47,6 @@
 #include <sys/shm.h>
 #include <sys/sysctl.h>
 #include <sys/vnode.h>
-#include <sys/buf.h>
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -58,7 +57,6 @@
 #include <vm/vm_kern.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_object.h>
-#include <vm/vm_zone.h>
 #include <vm/vm_pager.h>
 
 #include <machine/reg.h>
@@ -67,15 +65,17 @@ MALLOC_DEFINE(M_PARGS, "proc-args", "Process arguments");
 
 static register_t *exec_copyout_strings __P((struct image_params *));
 
-static long ps_strings = PS_STRINGS;
-SYSCTL_LONG(_kern, KERN_PS_STRINGS, ps_strings, CTLFLAG_RD, &ps_strings, "");
+/* XXX This should be vm_size_t. */
+static u_long ps_strings = PS_STRINGS;
+SYSCTL_ULONG(_kern, KERN_PS_STRINGS, ps_strings, CTLFLAG_RD, &ps_strings, 0, "");
 
-static long usrstack = USRSTACK;
-SYSCTL_LONG(_kern, KERN_USRSTACK, usrstack, CTLFLAG_RD, &usrstack, "");
+/* XXX This should be vm_size_t. */
+static u_long usrstack = USRSTACK;
+SYSCTL_ULONG(_kern, KERN_USRSTACK, usrstack, CTLFLAG_RD, &usrstack, 0, "");
 
 u_long ps_arg_cache_limit = PAGE_SIZE / 16;
 SYSCTL_LONG(_kern, OID_AUTO, ps_arg_cache_limit, CTLFLAG_RW, 
-    &ps_arg_cache_limit, "");
+    &ps_arg_cache_limit, 0, "");
 
 int ps_argsopen = 1;
 SYSCTL_INT(_kern, OID_AUTO, ps_argsopen, CTLFLAG_RW, &ps_argsopen, 0, "");
@@ -107,6 +107,7 @@ execve(p, uap)
 	int error, len, i;
 	struct image_params image_params, *imgp;
 	struct vattr attr;
+	int (*img_first) __P((struct image_params *));
 
 	imgp = &image_params;
 
@@ -175,38 +176,46 @@ interpret:
 		goto exec_fail_dealloc;
 
 	/*
-	 * Loop through list of image activators, calling each one.
-	 *	If there is no match, the activator returns -1. If there
-	 *	is a match, but there was an error during the activation,
-	 *	the error is returned. Otherwise 0 means success. If the
-	 *	image is interpreted, loop back up and try activating
-	 *	the interpreter.
+	 *	If the current process has a special image activator it
+	 *	wants to try first, call it.   For example, emulating shell 
+	 *	scripts differently.
 	 */
-	for (i = 0; execsw[i]; ++i) {
-		if (execsw[i]->ex_imgact)
-			error = (*execsw[i]->ex_imgact)(imgp);
-		else
+	error = -1;
+	if ((img_first = imgp->proc->p_sysent->sv_imgact_try) != NULL)
+		error = img_first(imgp);
+
+	/*
+	 *	Loop through the list of image activators, calling each one.
+	 *	An activator returns -1 if there is no match, 0 on success,
+	 *	and an error otherwise.
+	 */
+	for (i = 0; error == -1 && execsw[i]; ++i) {
+		if (execsw[i]->ex_imgact == NULL ||
+		    execsw[i]->ex_imgact == img_first) {
 			continue;
-		if (error == -1)
-			continue;
-		if (error)
-			goto exec_fail_dealloc;
-		if (imgp->interpreted) {
-			exec_unmap_first_page(imgp);
-			/* free name buffer and old vnode */
-			NDFREE(ndp, NDF_ONLY_PNBUF);
-			vrele(ndp->ni_vp);
-			/* set new name to that of the interpreter */
-			NDINIT(ndp, LOOKUP, LOCKLEAF | FOLLOW | SAVENAME,
-			    UIO_SYSSPACE, imgp->interpreter_name, p);
-			goto interpret;
 		}
-		break;
+		error = (*execsw[i]->ex_imgact)(imgp);
 	}
-	/* If we made it through all the activators and none matched, exit. */
-	if (error == -1) {
-		error = ENOEXEC;
+
+	if (error) {
+		if (error == -1)
+			error = ENOEXEC;
 		goto exec_fail_dealloc;
+	}
+
+	/*
+	 * Special interpreter operation, cleanup and loop up to try to
+	 * activate the interpreter.
+	 */
+	if (imgp->interpreted) {
+		exec_unmap_first_page(imgp);
+		/* free name buffer and old vnode */
+		NDFREE(ndp, NDF_ONLY_PNBUF);
+		vrele(ndp->ni_vp);
+		/* set new name to that of the interpreter */
+		NDINIT(ndp, LOOKUP, LOCKLEAF | FOLLOW | SAVENAME,
+		    UIO_SYSSPACE, imgp->interpreter_name, p);
+		goto interpret;
 	}
 
 	/*
@@ -309,6 +318,11 @@ interpret:
 		vrele(p->p_textvp);
 	VREF(ndp->ni_vp);
 	p->p_textvp = ndp->ni_vp;
+
+	/*
+	 * notify others that we exec'd
+	 */
+	KNOTE(&p->p_klist, NOTE_EXEC);
 
 	/*
 	 * If tracing the process, trap to debugger so breakpoints

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_shutdown.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_shutdown.c,v 1.72 2000/01/12 17:26:42 luoqi Exp $
+ * $FreeBSD: src/sys/kern/kern_shutdown.c,v 1.72.2.1 2000/05/16 06:58:11 dillon Exp $
  */
 
 #include "opt_ddb.h"
@@ -63,9 +63,7 @@
 #include <machine/pcb.h>
 #include <machine/clock.h>
 #include <machine/md_var.h>
-#ifdef SMP
 #include <machine/smp.h>		/* smp_active, cpuid */
-#endif
 
 #include <sys/signalvar.h>
 

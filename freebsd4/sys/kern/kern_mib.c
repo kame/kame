@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_sysctl.c	8.4 (Berkeley) 4/14/94
- * $FreeBSD: src/sys/kern/kern_mib.c,v 1.29 2000/02/12 13:41:55 rwatson Exp $
+ * $FreeBSD: src/sys/kern/kern_mib.c,v 1.29.2.1 2000/05/16 06:58:11 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -46,10 +46,7 @@
 #include <sys/sysctl.h>
 #include <sys/proc.h>
 #include <sys/jail.h>
-
-#if defined(SMP)
 #include <machine/smp.h>
-#endif
 
 SYSCTL_NODE(, 0,	  sysctl, CTLFLAG_RW, 0,
 	"Sysctl internal magic");

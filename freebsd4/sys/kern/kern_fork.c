@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_fork.c	8.6 (Berkeley) 4/8/94
- * $FreeBSD: src/sys/kern/kern_fork.c,v 1.72 1999/12/06 11:13:50 peter Exp $
+ * $FreeBSD: src/sys/kern/kern_fork.c,v 1.72.2.1 2000/05/05 03:49:54 jlemon Exp $
  */
 
 #include "opt_ktrace.h"
@@ -507,6 +507,11 @@ again:
 	 * Now can be swapped.
 	 */
 	PRELE(p1);
+
+	/*
+	 * tell any interested parties about the new process
+	 */
+	KNOTE(&p1->p_klist, NOTE_FORK | p2->p_pid);
 
 	/*
 	 * Preserve synchronization semantics of vfork.  If waiting for

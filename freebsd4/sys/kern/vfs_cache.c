@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_cache.c	8.5 (Berkeley) 3/22/95
- * $FreeBSD: src/sys/kern/vfs_cache.c,v 1.42 2000/02/14 06:09:01 peter Exp $
+ * $FreeBSD: src/sys/kern/vfs_cache.c,v 1.42.2.2 2000/07/19 06:23:57 kbyanc Exp $
  */
 
 #include <sys/param.h>
@@ -90,13 +90,13 @@ struct	namecache {
 static LIST_HEAD(nchashhead, namecache) *nchashtbl;	/* Hash Table */
 static TAILQ_HEAD(, namecache) ncneg;	/* Hash Table */
 static u_long	nchash;			/* size of hash table */
-SYSCTL_INT(_debug, OID_AUTO, nchash, CTLFLAG_RD, &nchash, 0, "");
+SYSCTL_ULONG(_debug, OID_AUTO, nchash, CTLFLAG_RD, &nchash, 0, "");
 static u_long	ncnegfactor = 16;	/* ratio of negative entries */
-SYSCTL_INT(_debug, OID_AUTO, ncnegfactor, CTLFLAG_RW, &ncnegfactor, 0, "");
+SYSCTL_ULONG(_debug, OID_AUTO, ncnegfactor, CTLFLAG_RW, &ncnegfactor, 0, "");
 static u_long	numneg;		/* number of cache entries allocated */
-SYSCTL_INT(_debug, OID_AUTO, numneg, CTLFLAG_RD, &numneg, 0, "");
+SYSCTL_ULONG(_debug, OID_AUTO, numneg, CTLFLAG_RD, &numneg, 0, "");
 static u_long	numcache;		/* number of cache entries allocated */
-SYSCTL_INT(_debug, OID_AUTO, numcache, CTLFLAG_RD, &numcache, 0, "");
+SYSCTL_ULONG(_debug, OID_AUTO, numcache, CTLFLAG_RD, &numcache, 0, "");
 struct	nchstats nchstats;		/* cache effectiveness statistics */
 
 static int	doingcache = 1;		/* 1 => enable the cache */
@@ -109,7 +109,7 @@ SYSCTL_INT(_debug, OID_AUTO, ncsize, CTLFLAG_RD, 0, sizeof(struct namecache), ""
  */
 SYSCTL_NODE(_vfs, OID_AUTO, cache, CTLFLAG_RW, 0, "Name cache statistics");
 #define STATNODE(mode, name, var) \
-	SYSCTL_INT(_vfs_cache, OID_AUTO, name, mode, var, 0, "");
+	SYSCTL_ULONG(_vfs_cache, OID_AUTO, name, mode, var, 0, "");
 STATNODE(CTLFLAG_RD, numneg, &numneg);
 STATNODE(CTLFLAG_RD, numcache, &numcache);
 static u_long numcalls; STATNODE(CTLFLAG_RD, numcalls, &numcalls);
@@ -498,9 +498,6 @@ struct  __getcwd_args {
 };
 #endif
 
-#define STATNODE(mode, name, var) \
-	SYSCTL_INT(_vfs_cache, OID_AUTO, name, mode, var, 0, "");
-
 static int disablecwd;
 SYSCTL_INT(_debug, OID_AUTO, disablecwd, CTLFLAG_RW, &disablecwd, 0, "");
 
@@ -587,3 +584,97 @@ __getcwd(p, uap)
 	return (error);
 }
 
+/*
+ * Thus begins the fullpath magic.
+ */
+
+#undef STATNODE
+#define STATNODE(name)							\
+	static u_int name;						\
+	SYSCTL_UINT(_vfs_cache, OID_AUTO, name, CTLFLAG_RD, &name, 0, "")
+
+static int disablefullpath;
+SYSCTL_INT(_debug, OID_AUTO, disablefullpath, CTLFLAG_RW,
+    &disablefullpath, 0, "");
+
+STATNODE(numfullpathcalls);
+STATNODE(numfullpathfail1);
+STATNODE(numfullpathfail2);
+STATNODE(numfullpathfail3);
+STATNODE(numfullpathfail4);
+STATNODE(numfullpathfound);
+
+int
+textvp_fullpath(struct proc *p, char **retbuf, char **retfreebuf) {
+	char *bp, *buf;
+	int i, slash_prefixed;
+	struct filedesc *fdp;
+	struct namecache *ncp;
+	struct vnode *vp, *textvp;
+
+	numfullpathcalls++;
+	if (disablefullpath)
+		return (ENODEV);
+	textvp = p->p_textvp;
+	if (textvp == NULL)
+		return (EINVAL);
+	buf = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
+	bp = buf + MAXPATHLEN - 1;
+	*bp = '\0';
+	fdp = p->p_fd;
+	slash_prefixed = 0;
+	for (vp = textvp; vp != fdp->fd_rdir && vp != rootvnode;) {
+		if (vp->v_flag & VROOT) {
+			if (vp->v_mount == NULL) {	/* forced unmount */
+				free(buf, M_TEMP);
+				return (EBADF);
+			}
+			vp = vp->v_mount->mnt_vnodecovered;
+			continue;
+		}
+		if (vp != textvp && vp->v_dd->v_id != vp->v_ddid) {
+			numfullpathfail1++;
+			free(buf, M_TEMP);
+			return (ENOTDIR);
+		}
+		ncp = TAILQ_FIRST(&vp->v_cache_dst);
+		if (!ncp) {
+			numfullpathfail2++;
+			free(buf, M_TEMP);
+			return (ENOENT);
+		}
+		if (vp != textvp && ncp->nc_dvp != vp->v_dd) {
+			numfullpathfail3++;
+			free(buf, M_TEMP);
+			return (EBADF);
+		}
+		for (i = ncp->nc_nlen - 1; i >= 0; i--) {
+			if (bp == buf) {
+				numfullpathfail4++;
+				free(buf, M_TEMP);
+				return (ENOMEM);
+			}
+			*--bp = ncp->nc_name[i];
+		}
+		if (bp == buf) {
+			numfullpathfail4++;
+			free(buf, M_TEMP);
+			return (ENOMEM);
+		}
+		*--bp = '/';
+		slash_prefixed = 1;
+		vp = ncp->nc_dvp;
+	}
+	if (!slash_prefixed) {
+		if (bp == buf) {
+			numfullpathfail4++;
+			free(buf, M_TEMP);
+			return (ENOMEM);
+		}
+		*--bp = '/';
+	}
+	numfullpathfound++;
+	*retbuf = bp; 
+	*retfreebuf = buf;
+	return (0);
+}

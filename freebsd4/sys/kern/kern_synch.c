@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_synch.c	8.9 (Berkeley) 5/19/95
- * $FreeBSD: src/sys/kern/kern_synch.c,v 1.87 2000/03/02 22:03:44 dufault Exp $
+ * $FreeBSD: src/sys/kern/kern_synch.c,v 1.87.2.1 2000/05/16 06:58:12 dillon Exp $
  */
 
 #include "opt_ktrace.h"
@@ -57,9 +57,8 @@
 #endif
 
 #include <machine/cpu.h>
-#ifdef SMP
+#include <machine/ipl.h>
 #include <machine/smp.h>
-#endif
 
 static void sched_setup __P((void *dummy));
 SYSINIT(sched_setup, SI_SUB_KICK_SCHEDULER, SI_ORDER_FIRST, sched_setup, NULL)

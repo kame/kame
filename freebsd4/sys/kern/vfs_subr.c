@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_subr.c	8.31 (Berkeley) 5/26/95
- * $FreeBSD: src/sys/kern/vfs_subr.c,v 1.249.2.3 2000/03/19 02:49:26 chris Exp $
+ * $FreeBSD: src/sys/kern/vfs_subr.c,v 1.249.2.4 2000/07/16 13:18:55 bp Exp $
  */
 
 /*
@@ -350,9 +350,11 @@ vfs_getnewfsid(mp)
 	simple_lock(&mntid_slock);
 	mtype = mp->mnt_vfc->vfc_typenum;
 	tfsid.val[1] = mtype;
-	mtype = (mtype & 0xFF) << 16;
+	mtype = (mtype & 0xFF) << 24;
 	for (;;) {
-		tfsid.val[0] = makeudev(255, mtype | mntid_base++);
+		tfsid.val[0] = makeudev(255,
+		    mtype | ((mntid_base & 0xFF00) << 8) | (mntid_base & 0xFF));
+		mntid_base++;
 		if (vfs_getvfs(&tfsid) == NULL)
 			break;
 	}

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/subr_devstat.c,v 1.17 1999/11/16 10:56:05 phk Exp $
+ * $FreeBSD: src/sys/kern/subr_devstat.c,v 1.17.2.1 2000/07/19 06:23:57 kbyanc Exp $
  */
 
 #include <sys/param.h>
@@ -304,6 +304,6 @@ SYSCTL_PROC(_kern_devstat, OID_AUTO, all, CTLFLAG_RD|CTLTYPE_OPAQUE,
 SYSCTL_INT(_kern_devstat, OID_AUTO, numdevs, CTLFLAG_RD, 
     &devstat_num_devs, 0, "Number of devices in the devstat list");
 SYSCTL_LONG(_kern_devstat, OID_AUTO, generation, CTLFLAG_RD,
-    &devstat_generation, "Devstat list generation");
+    &devstat_generation, 0, "Devstat list generation");
 SYSCTL_INT(_kern_devstat, OID_AUTO, version, CTLFLAG_RD, 
     &devstat_version, 0, "Devstat list version number");

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/subr_bus.c,v 1.54 2000/02/29 09:36:25 dfr Exp $
+ * $FreeBSD: src/sys/kern/subr_bus.c,v 1.54.2.4 2000/07/19 09:18:48 alc Exp $
  */
 
 #include "opt_bus.h"
@@ -267,7 +267,6 @@ devclass_find_internal(const char *classname, int create)
 	strcpy(dc->name, classname);
 	dc->devices = NULL;
 	dc->maxunit = 0;
-	dc->nextunit = 0;
 	TAILQ_INIT(&dc->drivers);
 	TAILQ_INSERT_TAIL(&devclasses, dc, link);
     }
@@ -482,32 +481,33 @@ devclass_alloc_unit(devclass_t dc, int *unitp)
 
     PDEBUG(("unit %d in devclass %s", unit, DEVCLANAME(dc)));
 
-    /*
-     * If we have been given a wired unit number, check for existing
-     * device.
-     */
+    /* If we have been given a wired unit number, check for existing device */
     if (unit != -1) {
-	device_t dev;
-	dev = devclass_get_device(dc, unit);
-	if (dev) {
+	if (unit >= 0 && unit < dc->maxunit && dc->devices[unit] != NULL) {
 	    if (bootverbose)
-	        printf("devclass_alloc_unit: %s%d already exists, using next available unit number\n", dc->name, unit);
-	    unit = -1;
+		printf("%s-: %s%d exists, using next available unit number\n",
+		       dc->name, dc->name, unit);
+	    /* find the next available slot */
+	    while (++unit < dc->maxunit && dc->devices[unit] != NULL)
+		;
 	}
     }
+    else {
+	/* Unwired device, find the next available slot for it */
+    	unit = 0;
+	while (unit < dc->maxunit && dc->devices[unit] != NULL)
+	    unit++;
+    }
 
-    if (unit == -1) {
-	unit = dc->nextunit;
-	dc->nextunit++;
-    } else if (dc->nextunit <= unit)
-	dc->nextunit = unit + 1;
-
+    /*
+     * We've selected a unit beyond the length of the table, so let's extend
+     * the table to make room for all units up to and including this one.
+     */
     if (unit >= dc->maxunit) {
 	device_t *newlist;
 	int newsize;
 
-	newsize = (dc->maxunit ? 2 * dc->maxunit
-		   : MINALLOCSIZE / sizeof(device_t));
+	newsize = roundup((unit + 1), MINALLOCSIZE / sizeof(device_t));
 	newlist = malloc(sizeof(device_t) * newsize, M_BUS, M_NOWAIT);
 	if (!newlist)
 	    return ENOMEM;
@@ -571,8 +571,6 @@ devclass_delete_device(devclass_t dc, device_t dev)
     dev->devclass = NULL;
     free(dev->nameunit, M_BUS);
     dev->nameunit = NULL;
-    while (dc->nextunit > 0 && dc->devices[dc->nextunit - 1] == NULL)
-	dc->nextunit--;
 
 #ifdef DEVICE_SYSCTLS
     device_unregister_oids(dev);
@@ -1147,7 +1145,10 @@ device_probe_and_attach(device_t dev)
 		dev->state = DS_NOTPRESENT;
 	    }
 	} else {
+	    if (!(dev->flags & DF_DONENOMATCH)) {
 		BUS_PROBE_NOMATCH(bus, dev);
+		dev->flags |= DF_DONENOMATCH;
+	    }
 	}
     } else {
 	if (bootverbose) {
@@ -1172,6 +1173,7 @@ device_detach(device_t dev)
 
     if ((error = DEVICE_DETACH(dev)) != 0)
 	return error;
+    device_printf(dev, "detached\n");
     if (dev->parent)
 	BUS_CHILD_DETACHED(dev->parent, dev);
 
@@ -2430,8 +2432,8 @@ print_devclass_short(devclass_t dc, int indent)
 	if ( !dc )
 		return;
 
-	indentprintf(("devclass %s: max units = %d, next unit = %d\n",
-		dc->name, dc->maxunit, dc->nextunit));
+	indentprintf(("devclass %s: max units = %d\n",
+		dc->name, dc->maxunit));
 }
 
 static void

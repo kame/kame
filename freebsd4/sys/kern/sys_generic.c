@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)sys_generic.c	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/sys_generic.c,v 1.55 2000/02/20 13:36:26 peter Exp $
+ * $FreeBSD: src/sys/kern/sys_generic.c,v 1.55.2.4 2000/07/15 06:32:21 green Exp $
  */
 
 #include "opt_ktrace.h"
@@ -155,6 +155,7 @@ dofileread(p, fp, fd, buf, nbyte, offset, flags)
 	long cnt, error = 0;
 #ifdef KTRACE
 	struct iovec ktriov;
+	struct uio ktruio;
 #endif
 
 	aiov.iov_base = (caddr_t)buf;
@@ -172,8 +173,10 @@ dofileread(p, fp, fd, buf, nbyte, offset, flags)
 	/*
 	 * if tracing, save a copy of iovec
 	 */
-	if (KTRPOINT(p, KTR_GENIO))
+	if (KTRPOINT(p, KTR_GENIO)) {
 		ktriov = aiov;
+		ktruio = auio;
+	}
 #endif
 	cnt = nbyte;
 	if ((error = fo_read(fp, &auio, fp->f_cred, flags, p)))
@@ -182,8 +185,11 @@ dofileread(p, fp, fd, buf, nbyte, offset, flags)
 			error = 0;
 	cnt -= auio.uio_resid;
 #ifdef KTRACE
-	if (KTRPOINT(p, KTR_GENIO) && error == 0)
-		ktrgenio(p->p_tracep, fd, UIO_READ, &ktriov, cnt, error);
+	if (KTRPOINT(p, KTR_GENIO) && error == 0) {
+		ktruio.uio_iov = &ktriov;
+		ktruio.uio_resid = cnt;
+		ktrgenio(p->p_tracep, fd, UIO_READ, &ktruio, error);
+	}
 #endif
 	p->p_retval[0] = cnt;
 	return (error);
@@ -214,6 +220,7 @@ readv(p, uap)
 	u_int iovlen;
 #ifdef KTRACE
 	struct iovec *ktriov = NULL;
+	struct uio ktruio;
 #endif
 
 	if ((fp = getfp(fdp, uap->fd, FREAD)) == NULL)
@@ -253,6 +260,7 @@ readv(p, uap)
 	if (KTRPOINT(p, KTR_GENIO))  {
 		MALLOC(ktriov, struct iovec *, iovlen, M_TEMP, M_WAITOK);
 		bcopy((caddr_t)auio.uio_iov, (caddr_t)ktriov, iovlen);
+		ktruio = auio;
 	}
 #endif
 	cnt = auio.uio_resid;
@@ -263,9 +271,12 @@ readv(p, uap)
 	cnt -= auio.uio_resid;
 #ifdef KTRACE
 	if (ktriov != NULL) {
-		if (error == 0)
-			ktrgenio(p->p_tracep, uap->fd, UIO_READ, ktriov,
-			    cnt, error);
+		if (error == 0) {
+			ktruio.uio_iov = ktriov;
+			ktruio.uio_resid = cnt;
+			ktrgenio(p->p_tracep, uap->fd, UIO_READ, &ktruio,
+			    error);
+		}
 		FREE(ktriov, M_TEMP);
 	}
 #endif
@@ -339,6 +350,7 @@ dofilewrite(p, fp, fd, buf, nbyte, offset, flags)
 	long cnt, error = 0;
 #ifdef KTRACE
 	struct iovec ktriov;
+	struct uio ktruio;
 #endif
 
 	aiov.iov_base = (void *)buf;
@@ -354,10 +366,12 @@ dofilewrite(p, fp, fd, buf, nbyte, offset, flags)
 	auio.uio_procp = p;
 #ifdef KTRACE
 	/*
-	 * if tracing, save a copy of iovec
+	 * if tracing, save a copy of iovec and uio
 	 */
-	if (KTRPOINT(p, KTR_GENIO))
+	if (KTRPOINT(p, KTR_GENIO)) {
 		ktriov = aiov;
+		ktruio = auio;
+	}
 #endif
 	cnt = nbyte;
 	if ((error = fo_write(fp, &auio, fp->f_cred, flags, p))) {
@@ -369,9 +383,11 @@ dofilewrite(p, fp, fd, buf, nbyte, offset, flags)
 	}
 	cnt -= auio.uio_resid;
 #ifdef KTRACE
-	if (KTRPOINT(p, KTR_GENIO) && error == 0)
-		ktrgenio(p->p_tracep, fd, UIO_WRITE,
-		    &ktriov, cnt, error);
+	if (KTRPOINT(p, KTR_GENIO) && error == 0) {
+		ktruio.uio_iov = &ktriov;
+		ktruio.uio_resid = cnt;
+		ktrgenio(p->p_tracep, fd, UIO_WRITE, &ktruio, error);
+	}
 #endif
 	p->p_retval[0] = cnt;
 	return (error);
@@ -402,6 +418,7 @@ writev(p, uap)
 	u_int iovlen;
 #ifdef KTRACE
 	struct iovec *ktriov = NULL;
+	struct uio ktruio;
 #endif
 
 	if ((fp = getfp(fdp, uap->fd, FWRITE)) == NULL)
@@ -440,11 +457,12 @@ writev(p, uap)
 	}
 #ifdef KTRACE
 	/*
-	 * if tracing, save a copy of iovec
+	 * if tracing, save a copy of iovec and uio
 	 */
 	if (KTRPOINT(p, KTR_GENIO))  {
 		MALLOC(ktriov, struct iovec *, iovlen, M_TEMP, M_WAITOK);
 		bcopy((caddr_t)auio.uio_iov, (caddr_t)ktriov, iovlen);
+		ktruio = auio;
 	}
 #endif
 	cnt = auio.uio_resid;
@@ -458,9 +476,12 @@ writev(p, uap)
 	cnt -= auio.uio_resid;
 #ifdef KTRACE
 	if (ktriov != NULL) {
-		if (error == 0)
-			ktrgenio(p->p_tracep, uap->fd, UIO_WRITE,
-				ktriov, cnt, error);
+		if (error == 0) {
+			ktruio.uio_iov = ktriov;
+			ktruio.uio_resid = cnt;
+			ktrgenio(p->p_tracep, uap->fd, UIO_WRITE, &ktruio,
+			    error);
+		}
 		FREE(ktriov, M_TEMP);
 	}
 #endif
@@ -496,7 +517,10 @@ ioctl(p, uap)
 	caddr_t data, memp;
 	int tmp;
 #define STK_PARAMS	128
-	char stkbuf[STK_PARAMS];
+	union {
+	    char stkbuf[STK_PARAMS];
+	    long align;
+	} ubuf;
 
 	fdp = p->p_fd;
 	if ((u_int)uap->fd >= fdp->fd_nfiles ||
@@ -523,11 +547,11 @@ ioctl(p, uap)
 	if (size > IOCPARM_MAX)
 		return (ENOTTY);
 	memp = NULL;
-	if (size > sizeof (stkbuf)) {
+	if (size > sizeof (ubuf.stkbuf)) {
 		memp = (caddr_t)malloc((u_long)size, M_IOCTLOPS, M_WAITOK);
 		data = memp;
 	} else
-		data = stkbuf;
+		data = ubuf.stkbuf;
 	if (com&IOC_IN) {
 		if (size) {
 			error = copyin(uap->data, data, (u_int)size);
@@ -671,8 +695,10 @@ select(p, uap)
 		}
 		getmicrouptime(&rtv);
 		timevaladd(&atv, &rtv);
-	} else
+	} else {
 		atv.tv_sec = 0;
+		atv.tv_usec = 0;
+	}
 	timo = 0;
 retry:
 	ncoll = nselcoll;
@@ -680,7 +706,7 @@ retry:
 	error = selscan(p, ibits, obits, uap->nd);
 	if (error || p->p_retval[0])
 		goto done;
-	if (atv.tv_sec) {
+	if (atv.tv_sec || atv.tv_usec) {
 		getmicrouptime(&rtv);
 		if (timevalcmp(&rtv, &atv, >=)) 
 			goto done;
@@ -804,8 +830,10 @@ poll(p, uap)
 		}
 		getmicrouptime(&rtv);
 		timevaladd(&atv, &rtv);
-	} else
+	} else {
 		atv.tv_sec = 0;
+		atv.tv_usec = 0;
+	}
 	timo = 0;
 retry:
 	ncoll = nselcoll;
@@ -813,7 +841,7 @@ retry:
 	error = pollscan(p, (struct pollfd *)bits, SCARG(uap, nfds));
 	if (error || p->p_retval[0])
 		goto done;
-	if (atv.tv_sec) {
+	if (atv.tv_sec || atv.tv_usec) {
 		getmicrouptime(&rtv);
 		if (timevalcmp(&rtv, &atv, >=))
 			goto done;

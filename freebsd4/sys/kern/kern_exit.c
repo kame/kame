@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_exit.c	8.7 (Berkeley) 2/12/94
- * $FreeBSD: src/sys/kern/kern_exit.c,v 1.92 2000/01/10 04:08:50 sef Exp $
+ * $FreeBSD: src/sys/kern/kern_exit.c,v 1.92.2.1 2000/05/05 03:49:54 jlemon Exp $
  */
 
 #include "opt_compat.h"
@@ -305,6 +305,11 @@ exit1(p, rv)
 	 */
 	microuptime(&switchtime);
 	switchticks = ticks;
+
+	/*
+	 * notify interested parties of our demise.
+	 */
+	KNOTE(&p->p_klist, NOTE_EXIT);
 
 	/*
 	 * Notify parent that we're gone.  If parent has the PS_NOCLDWAIT

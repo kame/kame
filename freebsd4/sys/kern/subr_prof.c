@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)subr_prof.c	8.3 (Berkeley) 9/23/93
- * $FreeBSD: src/sys/kern/subr_prof.c,v 1.32 1999/10/12 02:54:23 bde Exp $
+ * $FreeBSD: src/sys/kern/subr_prof.c,v 1.32.2.1 2000/05/16 06:58:12 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -42,6 +42,7 @@
 #include <sys/resourcevar.h>
 #include <sys/sysctl.h>
 
+#include <machine/ipl.h>
 #include <machine/cpu.h>
 
 #ifdef GPROF

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_vnops.c	8.2 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/vfs_vnops.c,v 1.87 2000/01/10 12:04:16 phk Exp $
+ * $FreeBSD: src/sys/kern/vfs_vnops.c,v 1.87.2.2 2000/05/05 03:49:58 jlemon Exp $
  */
 
 #include <sys/param.h>
@@ -52,7 +52,9 @@
 #include <sys/filio.h>
 #include <sys/ttycom.h>
 #include <sys/conf.h>
-#include <vm/vm_zone.h>
+
+#include <ufs/ufs/quota.h>
+#include <ufs/ufs/inode.h>
 
 static int vn_closefile __P((struct file *fp, struct proc *p));
 static int vn_ioctl __P((struct file *fp, u_long com, caddr_t data, 
@@ -67,6 +69,25 @@ static int vn_write __P((struct file *fp, struct uio *uio,
 
 struct 	fileops vnops =
 	{ vn_read, vn_write, vn_ioctl, vn_poll, vn_statfile, vn_closefile };
+
+static int	filt_nullattach(struct knote *kn);
+static int	filt_vnattach(struct knote *kn);
+static void	filt_vndetach(struct knote *kn);
+static int	filt_vnode(struct knote *kn, long hint);
+static int	filt_vnread(struct knote *kn, long hint);
+
+struct filterops vn_filtops =
+	{ 1, filt_vnattach, filt_vndetach, filt_vnode };
+
+/*
+ * XXX
+ * filt_vnread is ufs-specific, so the attach routine should really
+ * switch out to different filterops based on the vn filetype
+ */
+struct filterops vn_rwfiltops[] = {
+	{ 1, filt_vnattach, filt_vndetach, filt_vnread },
+	{ 1, filt_nullattach, NULL, NULL },
+};
 
 /*
  * Common code for vnode open operations.
@@ -233,6 +254,39 @@ vn_close(vp, flags, cred, p)
 	return (error);
 }
 
+static __inline
+int
+sequential_heuristic(struct uio *uio, struct file *fp)
+{
+	/*
+	 * Sequential heuristic - detect sequential operation
+	 */
+	if ((uio->uio_offset == 0 && fp->f_seqcount > 0) ||
+	    uio->uio_offset == fp->f_nextoff) {
+		int tmpseq = fp->f_seqcount;
+		/*
+		 * XXX we assume that the filesystem block size is
+		 * the default.  Not true, but still gives us a pretty
+		 * good indicator of how sequential the read operations
+		 * are.
+		 */
+		tmpseq += (uio->uio_resid + BKVASIZE - 1) / BKVASIZE;
+		if (tmpseq >= 127)
+			tmpseq = 127;
+		fp->f_seqcount = tmpseq;
+		return(fp->f_seqcount << 16);
+	}
+
+	/*
+	 * Not sequential, quick draw-down of seqcount
+	 */
+	if (fp->f_seqcount > 1)
+		fp->f_seqcount = 1;
+	else
+		fp->f_seqcount = 0;
+	return(0);
+}
+
 /*
  * Package up an I/O request on a vnode into a uio and do it.
  */
@@ -304,36 +358,12 @@ vn_read(fp, uio, cred, flags, p)
 	if ((flags & FOF_OFFSET) == 0)
 		uio->uio_offset = fp->f_offset;
 
-	/*
-	 * Sequential read heuristic.
-	 * If we have been doing sequential input,
-	 * a rewind operation doesn't turn off
-	 * sequential input mode.
-	 */
-	if ((uio->uio_offset == 0 && fp->f_seqcount > 0) ||
-	    uio->uio_offset == fp->f_nextread) {
-		int tmpseq = fp->f_seqcount;
-		/*
-		 * XXX we assume that the filesystem block size is
-		 * the default.  Not true, but still gives us a pretty
-		 * good indicator of how sequential the read operations
-		 * are.
-		 */
-		tmpseq += (uio->uio_resid + BKVASIZE - 1) / BKVASIZE;
-		if (tmpseq >= 127)
-			tmpseq = 127;
-		fp->f_seqcount = tmpseq;
-		ioflag |= fp->f_seqcount << 16;
-	} else {
-		if (fp->f_seqcount > 1)
-			fp->f_seqcount = 1;
-		else
-			fp->f_seqcount = 0;
-	}
+	ioflag |= sequential_heuristic(uio, fp);
+
 	error = VOP_READ(vp, uio, ioflag, cred);
 	if ((flags & FOF_OFFSET) == 0)
 		fp->f_offset = uio->uio_offset;
-	fp->f_nextread = uio->uio_offset;
+	fp->f_nextoff = uio->uio_offset;
 	VOP_UNLOCK(vp, 0, p);
 	return (error);
 }
@@ -370,9 +400,11 @@ vn_write(fp, uio, cred, flags, p)
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
 	if ((flags & FOF_OFFSET) == 0)
 		uio->uio_offset = fp->f_offset;
+	ioflag |= sequential_heuristic(uio, fp);
 	error = VOP_WRITE(vp, uio, ioflag, cred);
 	if ((flags & FOF_OFFSET) == 0)
 		fp->f_offset = uio->uio_offset;
+	fp->f_nextoff = uio->uio_offset;
 	VOP_UNLOCK(vp, 0, p);
 	return (error);
 }
@@ -627,4 +659,59 @@ vn_closefile(fp, p)
 	fp->f_ops = &badfileops;
 	return (vn_close(((struct vnode *)fp->f_data), fp->f_flag,
 		fp->f_cred, p));
+}
+
+static int
+filt_vnattach(struct knote *kn)
+{
+	struct vnode *vp;
+
+	if (kn->kn_fp->f_type != DTYPE_VNODE &&
+	    kn->kn_fp->f_type != DTYPE_FIFO)
+		return (EBADF);
+
+	vp = (struct vnode *)kn->kn_fp->f_data;
+
+        simple_lock(&vp->v_pollinfo.vpi_lock);
+	SLIST_INSERT_HEAD(&vp->v_pollinfo.vpi_selinfo.si_note, kn, kn_selnext);
+        simple_unlock(&vp->v_pollinfo.vpi_lock);
+
+	return (0);
+}
+
+static void
+filt_vndetach(struct knote *kn)
+{
+	struct vnode *vp = (struct vnode *)kn->kn_fp->f_data;
+
+        simple_lock(&vp->v_pollinfo.vpi_lock);
+	SLIST_REMOVE(&vp->v_pollinfo.vpi_selinfo.si_note,
+	    kn, knote, kn_selnext);
+        simple_unlock(&vp->v_pollinfo.vpi_lock);
+}
+
+static int
+filt_vnode(struct knote *kn, long hint)
+{
+
+	if (kn->kn_sfflags & hint)
+		kn->kn_fflags |= hint;
+	return (kn->kn_fflags != 0);
+}
+
+static int
+filt_nullattach(struct knote *kn)
+{
+	return (ENXIO);
+}
+
+/*ARGSUSED*/
+static int
+filt_vnread(struct knote *kn, long hint)
+{
+	struct vnode *vp = (struct vnode *)kn->kn_fp->f_data;
+	struct inode *ip = VTOI(vp);
+
+	kn->kn_data = ip->i_size - kn->kn_fp->f_offset;
+	return (kn->kn_data != 0);
 }

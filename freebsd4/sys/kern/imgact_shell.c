@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/imgact_shell.c,v 1.21 2000/02/15 08:49:57 cracauer Exp $
+ * $FreeBSD: src/sys/kern/imgact_shell.c,v 1.21.2.1 2000/05/09 17:41:23 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -39,15 +39,11 @@
 #define SHELLMAGIC	0x2321
 #endif
 
-#define MAXSHELLCMDLEN	64
-
-static int	exec_shell_imgact __P((struct image_params *imgp));
-
 /*
  * Shell interpreter image activator. A interpreter name beginning
  *	at imgp->stringbase is the minimal successful exit requirement.
  */
-static int
+int
 exec_shell_imgact(imgp)
 	struct image_params *imgp;
 {

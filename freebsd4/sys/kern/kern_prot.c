@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_prot.c	8.6 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_prot.c,v 1.53 2000/01/16 16:34:26 peter Exp $
+ * $FreeBSD: src/sys/kern/kern_prot.c,v 1.53.2.1 2000/05/16 06:58:11 dillon Exp $
  */
 
 /*
@@ -62,6 +62,9 @@ struct getpid_args {
 };
 #endif
 
+/*
+ * NOT MP SAFE due to p_pptr access
+ */
 /* ARGSUSED */
 int
 getpid(p, uap)
@@ -92,7 +95,11 @@ getppid(p, uap)
 	return (0);
 }
 
-/* Get process group ID; note that POSIX getpgrp takes no parameter */
+/* 
+ * Get process group ID; note that POSIX getpgrp takes no parameter 
+ *
+ * MP SAFE
+ */
 #ifndef _SYS_SYSPROTO_H_
 struct getpgrp_args {
         int     dummy;
@@ -162,6 +169,9 @@ found:
 }
 
 
+/*
+ * getuid() - MP SAFE
+ */
 #ifndef _SYS_SYSPROTO_H_
 struct getuid_args {
         int     dummy;
@@ -182,6 +192,9 @@ getuid(p, uap)
 	return (0);
 }
 
+/*
+ * geteuid() - MP SAFE
+ */
 #ifndef _SYS_SYSPROTO_H_
 struct geteuid_args {
         int     dummy;
@@ -199,6 +212,9 @@ geteuid(p, uap)
 	return (0);
 }
 
+/*
+ * getgid() - MP SAFE
+ */
 #ifndef _SYS_SYSPROTO_H_
 struct getgid_args {
         int     dummy;
