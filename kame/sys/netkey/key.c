@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.41 2000/01/10 19:42:56 itojun Exp $ */
+/* KAME $Id: key.c,v 1.42 2000/01/11 02:29:13 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -1515,7 +1515,7 @@ key_spddump(mhp, so, target)
 {
 	struct sadb_msg *msg0;
 	struct secpolicy *sp;
-	int len, cnt, cnt_sanity;
+	int len, cnt;
 	struct sadb_msg *newmsg;
 	u_int dir;
 
@@ -1526,7 +1526,7 @@ key_spddump(mhp, so, target)
 	msg0 = (struct sadb_msg *)mhp[0];
 
 	/* search SPD entry and get buffer size. */
-	cnt = cnt_sanity = 0;
+	cnt = 0;
 	for (dir = 0; dir < IPSEC_DIR_MAX; dir++) {
 		__LIST_FOREACH(sp, &sptree[dir], chain) {
 			cnt++;
@@ -1594,7 +1594,9 @@ key_setdumpsp(newmsg, sp, type, seq, pid)
 	struct sadb_x_policy *tmp;
 
 	if ((tmp = key_sp2msg(sp)) == NULL) {
+#ifdef IPSEC_DEBUG
 		printf("key_setdumpsp: No more memory.\n");
+#endif
 		return ENOBUFS;
 	}
 
@@ -2362,7 +2364,9 @@ key_mature(sav)
 
 	/* check SPI value */
 	if (ntohl(sav->spi) >= 0 && ntohl(sav->spi) <= 255) {
+#ifdef IPSEC_DEBUG
 		printf("key_mature: illegal range of SPI %d.\n", sav->spi);
+#endif
 		return EINVAL;
 	}
 
@@ -2372,8 +2376,10 @@ key_mature(sav)
 		/* check flags */
 		if ((sav->flags & SADB_X_EXT_OLD)
 		 && (sav->flags & SADB_X_EXT_DERIV)) {
+#ifdef IPSEC_DEBUG
 			printf("key_mature: "
 				"invalid flag (derived) given to old-esp.\n");
+#endif
 			return EINVAL;
 		}
 		checkmask = 3;
@@ -2382,13 +2388,17 @@ key_mature(sav)
 	case IPPROTO_AH:
 		/* check flags */
 		if (sav->flags & SADB_X_EXT_DERIV) {
+#ifdef IPSEC_DEBUG
 			printf("key_mature: "
 				"invalid flag (derived) given to AH SA.\n");
+#endif
 			return EINVAL;
 		}
 		if (sav->alg_enc != SADB_EALG_NONE) {
+#ifdef IPSEC_DEBUG
 			printf("key_mature: "
 				"protocol and algorithm mismated.\n");
+#endif
 			return(EINVAL);
 		}
 		checkmask = 2;
@@ -2397,13 +2407,17 @@ key_mature(sav)
 #if 1	/*nonstandard*/
 	case IPPROTO_IPCOMP:
 		if (sav->alg_auth != SADB_AALG_NONE) {
+#ifdef IPSEC_DEBUG
 			printf("key_mature: "
 				"protocol and algorithm mismated.\n");
+#endif
 			return(EINVAL);
 		}
 		if ((sav->flags & SADB_X_EXT_RAWCPI) == 0
 		 && ntohl(sav->spi) >= 0x10000) {
+#ifdef IPSEC_DEBUG
 			printf("key_mature: invalid cpi for IPComp.\n");
+#endif
 			return(EINVAL);
 		}
 		checkmask = 4;
@@ -2411,7 +2425,9 @@ key_mature(sav)
 		break;
 #endif
 	default:
+#ifdef IPSEC_DEBUG
 		printf("key_mature: Invalid satype.\n");
+#endif
 		return EPROTONOSUPPORT;
 	}
 
@@ -2430,8 +2446,10 @@ key_mature(sav)
 		case SADB_AALG_NULL:
 			break;
 		default:
+#ifdef IPSEC_DEBUG
 			printf("key_mature: "
 				"unknown authentication algorithm.\n");
+#endif
 			return EINVAL;
 		}
 
@@ -2443,9 +2461,11 @@ key_mature(sav)
 		else
 			keylen = 0;
 		if (keylen < algo->keymin || algo->keymax < keylen) {
+#ifdef IPSEC_DEBUG
 			printf("key_mature: invalid AH key length %d "
 				"(%d-%d allowed)\n", keylen,
 				algo->keymin, algo->keymax);
+#endif
 			return EINVAL;
 		}
 
@@ -2458,7 +2478,9 @@ key_mature(sav)
 		}
 
 		if ((mustmask & 2) != 0 &&  mature != SADB_SATYPE_AH) {
+#ifdef IPSEC_DEBUG
 			printf("key_mature: no satisfy algorithm for AH\n");
+#endif
 			return EINVAL;
 		}
 	}
@@ -2479,7 +2501,9 @@ key_mature(sav)
 		case SADB_EALG_RC5CBC:
 			break;
 		default:
+#ifdef IPSEC_DEBUG
 			printf("key_mature: unknown encryption algorithm.\n");
+#endif
 			return EINVAL;
 		}
 
@@ -2491,9 +2515,11 @@ key_mature(sav)
 		else
 			keylen = 0;
 		if (keylen < algo->keymin || algo->keymax < keylen) {
+#ifdef IPSEC_DEBUG
 			printf("key_mature: invalid ESP key length %d "
 				"(%d-%d allowed)\n", keylen,
 				algo->keymin, algo->keymax);
+#endif
 			return EINVAL;
 		}
 
@@ -2506,11 +2532,15 @@ key_mature(sav)
 		}
 
 		if ((mustmask & 1) != 0 &&  mature != SADB_SATYPE_ESP) {
+#ifdef IPSEC_DEBUG
 			printf("key_mature: no satisfy algorithm for ESP\n");
+#endif
 			return EINVAL;
 		}
-#else
+#else /*IPSEC_ESP*/
+#ifdef IPSEC_DEBUG
 		printf("key_mature: ESP not supported in this configuration\n");
+#endif
 		return EINVAL;
 #endif
 	}
@@ -2526,7 +2556,9 @@ key_mature(sav)
 		case SADB_X_CALG_LZS:
 			break;
 		default:
+#ifdef IPSEC_DEBUG
 			printf("key_mature: unknown compression algorithm.\n");
+#endif
 			return EINVAL;
 		}
 
@@ -2534,8 +2566,10 @@ key_mature(sav)
 		algo = &ipcomp_algorithms[sav->alg_enc];
 
 		if (!(algo->compress && algo->decompress)) {
+#ifdef IPSEC_DEBUG
 			printf("key_mature: "
 				"unsupported compression algorithm.\n");
+#endif
 			return EINVAL;
 		}
 	}
