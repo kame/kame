@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.549 2000/02/10 05:21:44 itojun Exp $
+$Id: CHANGELOG,v 1.550 2000/02/10 16:49:51 itojun Exp $
 
 <200002>
+Fri Feb 11 01:48:16 JST 2000  itojun@iijlab.net
+	* sys/netinet6/raw_ip6.c: implement rip6_ctlinput(), so that we can
+	  notify of route changes to raw ip6 layer (freebsd2/bsdi3/netbsd only
+	  at this moment).
+	* sys/net/if_gif.c: properly check outer address family during
+	  initialization.
+
 Thu Feb 10 22:56:51 JST 2000  itojun@iijlab.net
 	* bsdi[34]/sys/i386/isa/if_cce.c: fix mbuf allocation on inbound packet.
 	  From: SUZUKI Shinsuke <suz@sdl.hitachi.co.jp>
