@@ -2409,7 +2409,7 @@ ip_freemoptions(imo)
 	if (imo != NULL) {
 		for (i = 0; i < imo->imo_num_memberships; ++i) {
 #ifdef IGMPV3
-			error = ip_getmopt_source_list(imo->imo_msf[i], &numsrc,
+			error = in_getmopt_source_list(imo->imo_msf[i], &numsrc,
 						       &del_ss, &mode);
 			if (error != 0) {
 				/* XXX strange... panic or skip ? */
@@ -2799,62 +2799,5 @@ ip_getmopt_sgaddr(sopt, ifp, ss_grp, ss_src)
 	}
 
 	return error;
-}
-
-/*
- * In order to clean up filtered source list when group leave is requested,
- * each source address is inserted in a buffer.
- */
-int
-ip_getmopt_source_list(msf, numsrc, oss, mode)
-	struct sock_msf *msf;
-	u_int16_t *numsrc;
-	struct sockaddr_storage **oss;
-	u_int *mode;
-{
-	struct sockaddr_storage *ss = NULL;
-	struct sock_msf_source *msfsrc;
-	struct sockaddr_in *sin;
-	int i;
-
-	if (msf->msf_numsrc != 0) {
-		MALLOC(ss, struct sockaddr_storage *,
-		       sizeof(*ss) * msf->msf_numsrc, M_IPMOPTS, M_WAITOK);
-		for (i = 0, msfsrc = LIST_FIRST(msf->msf_head);
-				i < msf->msf_numsrc && msfsrc;
-				i++, msfsrc = LIST_NEXT(msfsrc, list)) {
-			/* Move unneeded sources to ss */
-			sin = SIN(&ss[i]);
-			sin->sin_addr.s_addr
-				= htonl(SIN(&msfsrc->src)->sin_addr.s_addr);
-		}
-		if (i != msf->msf_numsrc || msfsrc != NULL)
-			return EOPNOTSUPP; /* panic ? */
-		*numsrc = msf->msf_numsrc;
-		*mode = MCAST_INCLUDE;
-	} else if (msf->msf_blknumsrc != 0) {
-		MALLOC(ss, struct sockaddr_storage *,
-		       sizeof(*ss) * msf->msf_blknumsrc, M_IPMOPTS, M_WAITOK);
-		for (i = 0, msfsrc = LIST_FIRST(msf->msf_blkhead);
-				i < msf->msf_blknumsrc && msfsrc;
-				i++, msfsrc = LIST_NEXT(msfsrc, list)) {
-			/* Move unneeded sources to ss */
-			sin = SIN(&ss[i]);
-			sin->sin_addr.s_addr
-				= htonl(SIN(&msfsrc->src)->sin_addr.s_addr);
-		}
-		if (i != msf->msf_blknumsrc || msfsrc != NULL)
-			return EOPNOTSUPP; /* panic ? */
-		*numsrc = msf->msf_blknumsrc;
-		*mode = MCAST_EXCLUDE;
-	} else if (msf->msf_grpjoin == 1) {
-		*numsrc = 0;
-		*mode = MCAST_EXCLUDE;
-	} else
-		return EADDRNOTAVAIL;
-
-	/* This allocated buffer must be freed by caller */
-	*oss = ss;
-	return 0;
 }
 #endif /* IGMPV3 */
