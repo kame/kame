@@ -794,11 +794,12 @@ in_rtchange(inp, errno)
  * Lookup a PCB based on the local address and port.
  */
 /*
- * we never select the pcb which has INP_IPV6 flag if we have other
- * candidates those matche the specified address and port number
- * passed as arguments.
+ * we never select the wildcard pcb which has INP_IPV6 flag if we have
+ * INP_IPV4 only wildcard pcb.  INP_LOOKUP_MAPPED_PCB_COST must be
+ * greater than the max value of matchwild (currently 3) in the
+ * condition when no IPv6 pcb exists.
  */
-#define INP_LOOKUP_MAPPED_PCB_COST 10 /* 4 is enough. */
+#define INP_LOOKUP_MAPPED_PCB_COST 4
 struct inpcb *
 in_pcblookup_local(pcbinfo, laddr, lport_arg, wild_okay)
 	struct inpcbinfo *pcbinfo;
@@ -807,15 +808,11 @@ in_pcblookup_local(pcbinfo, laddr, lport_arg, wild_okay)
 	int wild_okay;
 {
 	register struct inpcb *inp;
-	int matchwild = 3 + INP_LOOKUP_MAPPED_PCB_COST;
-	int wildcard;
+	int matchwild = 3 + INP_LOOKUP_MAPPED_PCB_COST, wildcard;
 	u_short lport = lport_arg;
 
 	if (!wild_okay) {
 		struct inpcbhead *head;
-#ifdef INET6
-		struct inpcb *inp_mapped = NULL;
-#endif
 		/*
 		 * Look for an unconnected (wildcard foreign addr) PCB that
 		 * matches the local address and port we're looking for.
@@ -829,22 +826,12 @@ in_pcblookup_local(pcbinfo, laddr, lport_arg, wild_okay)
 			if (inp->inp_faddr.s_addr == INADDR_ANY &&
 			    inp->inp_laddr.s_addr == laddr.s_addr &&
 			    inp->inp_lport == lport) {
-#ifdef INET6
-				if ((inp->inp_vflag & INP_IPV6) != 0) {
-					inp_mapped = inp;
-					continue;
-				}
-#endif
 				/*
 				 * Found.
 				 */
 				return (inp);
 			}
 		}
-#ifdef INET6
-		if ((inp == NULL) && (inp_mapped != NULL))
-			return (inp_mapped);
-#endif
 		/*
 		 * Not found.
 		 */
@@ -917,9 +904,6 @@ in_pcblookup_hash(pcbinfo, faddr, fport_arg, laddr, lport_arg, wildcard,
 {
 	struct inpcbhead *head;
 	register struct inpcb *inp;
-#ifdef INET6
-	struct inpcb *inp_mapped = NULL;
-#endif
 	u_short fport = fport_arg, lport = lport_arg;
 
 	/*
@@ -935,22 +919,12 @@ in_pcblookup_hash(pcbinfo, faddr, fport_arg, laddr, lport_arg, wildcard,
 		    inp->inp_laddr.s_addr == laddr.s_addr &&
 		    inp->inp_fport == fport &&
 		    inp->inp_lport == lport) {
-#ifdef INET6
-			if ((inp->inp_vflag & INP_IPV6) != 0) {
-				inp_mapped = inp;
-				continue;
-			}
-#endif
 			/*
 			 * Found.
 			 */
 			return (inp);
 		}
 	}
-#ifdef INET6
-	if ((inp == NULL) && (inp_mapped != NULL))
-		return (inp_mapped);
-#endif
 	if (wildcard) {
 		struct inpcb *local_wild = NULL;
 #if defined(INET6)
@@ -979,22 +953,22 @@ in_pcblookup_hash(pcbinfo, faddr, fport_arg, laddr, lport_arg, wildcard,
 #endif
 					return (inp);
 				else if (inp->inp_laddr.s_addr == INADDR_ANY) {
-#ifdef INET6
+#if defined(INET6)
 					if (INP_CHECK_SOCKAF(inp->inp_socket,
 							     AF_INET6))
 						local_wild_mapped = inp;
 					else
-#endif
+#endif /* defined(INET6) */
 					local_wild = inp;
 				}
 			}
 		}
-#ifdef INET6
+#if defined(INET6)
 		if (local_match_mapped)
 			return (local_match_mapped);
 		if (local_wild == NULL)
 			return (local_wild_mapped);
-#endif
+#endif /* defined(INET6) */
 		return (local_wild);
 	}
 
