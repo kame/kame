@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2397 2003/05/19 09:51:02 keiichi Exp $
+$KAME: CHANGELOG,v 1.2398 2003/05/20 11:57:15 suz Exp $
 
 <200305>
+Tue May 20 19:44:50 JST 2003	suz@crl.hitachi.co.jp
+	* freebsd[45]/sys/netinet6/udp6_usrreq.c,
+	* {netbsd,openbsd}/sys/netinet/udp_usrreq.c: fixed a bug that UDP 
+	  packet cannot be received if it's bound for linklocal multicast.
+	  (introduced in Apr 28)
+
 Mon May 19 18:47:38 JST 2003	keiichi@iij.ad.jp
 	* kame/kame/rtadvd/advcap.c,config.c,dump.c,rtadvd.[hc]
 	  implemented the rapid router advertisement which is defined in the
