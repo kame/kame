@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.85 2001/11/08 07:47:14 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.86 2001/11/08 08:54:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -212,9 +212,11 @@ in6_gif_output(ifp, family, m)
 #if NBRIDGE > 0
  sendit:
 #endif /* NBRIDGE */
-	/* See if out cached route is still valid */
+	/*
+	 * compare address family just for safety.  other validity checks
+	 * are made in in6_selectsrc() called from ip6_output().
+	 */
 	if (sc->gif_ro6.ro_rt && (dst->sin6_family != sin6_dst->sin6_family ||
-				  !IN6_ARE_ADDR_EQUAL(&dst->sin6_addr, &sin6_dst->sin6_addr) ||
 				  sc->rtcache_expire == 0 ||
 				  time_second >= sc->rtcache_expire)) {
 		RTFREE(sc->gif_ro6.ro_rt);
@@ -334,8 +336,11 @@ in6_gif_output(ifp, family, m)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	time_second = time.tv_sec;
 #endif
+	/*
+	 * compare address family just for safety.  other validity checks
+	 * are made in in6_selectsrc() called from ip6_output().
+	 */
 	if (sc->gif_ro6.ro_rt && (dst->sin6_family != sin6_dst->sin6_family ||
-				  !IN6_ARE_ADDR_EQUAL(&dst->sin6_addr, &sin6_dst->sin6_addr) ||
 				  sc->rtcache_expire == 0 ||
 				  time_second >= sc->rtcache_expire)) {
 		/*
