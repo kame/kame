@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.27 2000/07/03 17:18:56 jinmei Exp $	*/
+/*	$KAME: mip6.c,v 1.28 2000/07/04 11:42:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -1715,7 +1715,7 @@ mip6_add_ifaddr(struct in6_addr *addr,
 		prefixIsNew = 1; /* We lie; but effect's the same */
 	}
 	if (ifra->ifra_addr.sin6_family == AF_INET6) {
-		error = in6_ifinit(ifp, ia, &ifra->ifra_addr, 0,
+		error = in6_ifinit(ifp, ia, &ifra->ifra_addr,
 				   hostIsNew, prefixIsNew);
 		/* XXX: can we proceed even upon an error? */
 	}
