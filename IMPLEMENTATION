@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/01/19 07:58:25 $
+			$Date: 2000/01/19 12:06:16 $
 
 1. IPv6
 
@@ -251,6 +251,11 @@ In IPv6 specification, nodes are separated into two categories:
 routers and hosts.  Routers forward packets addressed to others, hosts does
 not forward the packets.  net.inet6.ip6.forwarding defines whether this
 node is router or host (router if it is 1, host if it is 0).
+
+It is NOT recommended to change net.inet6.ip6.forwarding while the node
+is in operation.   IPv6 specification defines behavior for "host" and "router"
+quite differently, and switching from one to another can cause serious
+troubles.  It is recommended to configure the variable at bootstrap time only.
 
 When a host hears Router Advertisement from the router, a host may
 autoconfigure itself by stateless address autoconfiguration.
