@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.37 2000/11/09 04:22:05 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.38 2000/11/09 04:45:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -678,9 +678,12 @@ findpcb:
 			 * If deprecated address is forbidden,
 			 * we do not accept SYN to deprecated interface
 			 * address to prevent any new inbound connection from
-			 * getting established.  So drop the SYN packet.
-			 * Note that we cannot issue a RST as we cannot use
-			 * the address as the source.
+			 * getting established.
+			 * When we do not accept SYN, we send a TCP RST,
+			 * with deprecated source address (instead of dropping
+			 * it).  We compromise it as it is much better for peer
+			 * to send a RST, and RST will be the final packet
+			 * for the exchange.
 			 *
 			 * If we do not forbid deprecated addresses, we accept
 			 * the SYN packet.  RFC2462 does not suggest dropping
@@ -704,7 +707,7 @@ findpcb:
 			if (!ip6_use_deprecated) {
 				if ((ia6 = ip6_getdstifaddr(m)) &&
 				    (ia6->ia6_flags & IN6_IFF_DEPRECATED))
-					goto drop;
+					goto dropwithreset;
 			}
 
 			oso = so;
