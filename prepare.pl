@@ -1,6 +1,6 @@
 #
 # perl prepare.pl kame <osname>
-# $Id: prepare.pl,v 1.6 1999/08/07 01:03:42 itojun Exp $
+# $Id: prepare.pl,v 1.7 1999/08/09 11:40:40 itojun Exp $
 #
 
 $debug = 1;
@@ -42,7 +42,7 @@ sub dig {
 			}
 		}
 		close(IN);
-		print "exclude in $dst: " . join(keys %exclude) . "\n"
+		print "exclude in $dst: " . join(' ', keys %exclude) . "\n"
 			if ($debug);
 	}
 	foreach $i (@all) {
@@ -73,7 +73,7 @@ sub dig {
 					unlink "$dst/$i" if (!$test);
 				}
 				print "ln -s $src/$i $dst/$i\n" if $debug;
-				symlink "$src/$i", "$dst/$i" if (!$test);
+				symlink("$src/$i", "$dst/$i") if (!$test);
 			}
 		}
 	}
