@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.53 2001/06/22 21:41:37 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.54 2001/06/22 21:47:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -486,6 +486,66 @@ dnsdump(title, buf, len, from)
 		count = ntohs(hp->ancount);
 		if (count)
 			printf("answers section:\n");
+		while (count--) {
+			if (d - buf > len)
+				break;
+			n = decode_name(&d, len - (d - buf));
+			if (!n)
+				break;
+			if (d - buf + 10 > len)
+				break;
+			if (d - buf + 10 + ntohs(*(u_int16_t *)&d[8]) > len)
+				break;
+			printf("%s", n);
+			printf(" qtype %u qclass %u",
+			    ntohs(*(u_int16_t *)&d[0]),
+			    ntohs(*(u_int16_t *)&d[2]));
+			printf(" ttl %d rdlen %u ",
+			    (int32_t)ntohl(*(u_int32_t *)&d[4]),
+			    ntohs(*(u_int16_t *)&d[8]));
+			for (i = 0; i < ntohs(*(u_int16_t *)&d[8]); i++)
+				printf("%02x", d[10 + i] & 0xff);
+			d += 10 + ntohs(*(u_int16_t *)&d[8]);
+			printf("\n");
+
+			/* LINTED const cast */
+			free((char *)n);
+		}
+
+		/* print authority section */
+		count = ntohs(hp->nscount);
+		if (count)
+			printf("authority section:\n");
+		while (count--) {
+			if (d - buf > len)
+				break;
+			n = decode_name(&d, len - (d - buf));
+			if (!n)
+				break;
+			if (d - buf + 10 > len)
+				break;
+			if (d - buf + 10 + ntohs(*(u_int16_t *)&d[8]) > len)
+				break;
+			printf("%s", n);
+			printf(" qtype %u qclass %u",
+			    ntohs(*(u_int16_t *)&d[0]),
+			    ntohs(*(u_int16_t *)&d[2]));
+			printf(" ttl %d rdlen %u ",
+			    (int32_t)ntohl(*(u_int32_t *)&d[4]),
+			    ntohs(*(u_int16_t *)&d[8]));
+			for (i = 0; i < ntohs(*(u_int16_t *)&d[8]); i++)
+				printf("%02x", d[10 + i] & 0xff);
+			d += 10 + ntohs(*(u_int16_t *)&d[8]);
+			printf("\n");
+
+			/* LINTED const cast */
+			free((char *)n);
+		}
+
+		/* print additional section */
+		count = ntohs(hp->arcount);
+		if (count)
+			printf("additional section:\n");
 		while (count--) {
 			if (d - buf > len)
 				break;
