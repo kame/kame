@@ -224,7 +224,7 @@ in_clsroute(struct radix_node *rn, struct radix_node_head *head)
 		rtrequest(RTM_DELETE,
 			  (struct sockaddr *)rt_key(rt),
 			  rt->rt_gateway, rt_mask(rt),
-			  rt->rt_flags, 0);
+			  rt->rt_flags, &dummy);
 	}
 }
 

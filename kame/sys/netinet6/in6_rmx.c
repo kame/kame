@@ -1,4 +1,4 @@
-/*	$KAME: in6_rmx.c,v 1.23 2004/10/05 07:42:01 suz Exp $	*/
+/*	$KAME: in6_rmx.c,v 1.24 2004/10/05 08:49:43 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -336,7 +336,7 @@ in6_clsroute(struct radix_node *rn, struct radix_node_head *head)
 		rtrequest(RTM_DELETE,
 			  (struct sockaddr *)rt_key(rt),
 			  rt->rt_gateway, rt_mask(rt),
-			  rt->rt_flags, 0);
+			  rt->rt_flags, &dummy);
 	}
 }
 
