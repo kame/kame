@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.13 2000/05/05 11:00:57 sumikawa Exp $	*/
+/*	$KAME: esp_core.c,v 1.14 2000/05/22 08:50:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1181,6 +1181,7 @@ mbuf_find_offset(m, off, len)
 
 /*------------------------------------------------------------*/
 
+/* does not free m0 on error */
 int
 esp_auth(m0, skip, length, sav, sum)
 	struct mbuf *m0;
@@ -1195,6 +1196,7 @@ esp_auth(m0, skip, length, sav, sum)
 	u_char sumbuf[AH_MAXSUMSIZE];
 	struct ah_algorithm *algo;
 	size_t siz;
+	int error;
 
 	/* sanity checks */
 	if (m0->m_pkthdr.len < skip) {
@@ -1251,7 +1253,10 @@ esp_auth(m0, skip, length, sav, sum)
 		}
 	}
 
-	(*algo->init)(&s, sav);
+	error = (*algo->init)(&s, sav);
+	if (error)
+		return error;
+
 	while (0 < length) {
 		if (!m)
 			panic("mbuf chain?");

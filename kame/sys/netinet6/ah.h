@@ -1,4 +1,4 @@
-/*	$KAME: ah.h,v 1.6 2000/03/25 07:23:38 sumikawa Exp $	*/
+/*	$KAME: ah.h,v 1.7 2000/05/22 08:50:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -71,7 +71,7 @@ struct ah_algorithm {
 	int (*mature) __P((struct secasvar *));
 	int keymin;	/* in bits */
 	int keymax;	/* in bits */
-	void (*init) __P((struct ah_algorithm_state *, struct secasvar *));
+	int (*init) __P((struct ah_algorithm_state *, struct secasvar *));
 	void (*update) __P((struct ah_algorithm_state *, caddr_t, size_t));
 	void (*result) __P((struct ah_algorithm_state *, caddr_t));
 };
