@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2088 2002/02/25 02:00:06 itojun Exp $
+$KAME: CHANGELOG,v 1.2089 2002/02/25 07:49:16 suz Exp $
 
 <200202>
+2002-02-05 SUZUKI, Shinsuke <suz@sdl.hitachi.co.jp>
+	* sys/netinet6/in6_src.c (in6_selectsrc):
+	fixed a bug that sendmsg() on raw socket sometimes fails by ENXIO,
+	due to the inconsistency between embedded zone-id and the calculated
+	outgoing interface-id.
+
 Mon Feb 25 10:58:09 JST 2002  itojun@iijlab.net
 	* sys/netinet/ip_input.c: enforce ipsec policy checking on forwarding
 	  case (the portion was lost during transition to PR_LASTHDR).

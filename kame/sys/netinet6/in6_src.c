@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.107 2002/02/19 03:40:38 keiichi Exp $	*/
+/*	$KAME: in6_src.c,v 1.108 2002/02/25 07:49:17 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -263,7 +263,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 			return(NULL);
 		}
 		pi->ipi6_addr = srcsock.sin6_addr; /* XXX: this overrides pi */
-		if (*ifpp)
+		if (ifpp)
 			*ifpp = ifp;
 		return(&ia6->ia_addr);
 	}
