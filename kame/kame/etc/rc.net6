@@ -45,7 +45,7 @@ fi
 # just to make sure
 $ifconfig lo0 up
 
-# disallow unicast packets without outgoing scope identifiers, for now.
+# disallow unicast packets without outgoing scope identifiers.
 # if you instead want to route such packets to a "default" interface,
 # comment out the 1st two lines, and enable the lines after them.
 $route add -inet6 fe80:: -prefixlen 10 ::1 -reject
@@ -54,7 +54,7 @@ $route add -inet6 fec0:: -prefixlen 10 ::1 -reject
 #    if [ X"$defaultiface" = X"" ]; then
 #	defaultiface=$iface
 #	$route add -inet6 fe80:: -prefixlen 10 -interface $defaultiface -cloning
-#	$route add -inet6 fec0:: -prefixlen 10 -interface $deafultiface -cloning
+#	$route add -inet6 fec0:: -prefixlen 10 -interface $defaultiface -cloning
 #    fi
 #done
 
