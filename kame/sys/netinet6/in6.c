@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.235 2001/09/25 08:13:45 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.236 2001/09/25 08:15:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1993,11 +1993,7 @@ in6_ifinit(ifp, ia, sin6, newhost)
 	 * direct route.
 	 */
 	plen = in6_mask2len(&ia->ia_prefixmask.sin6_addr, NULL); /* XXX */
-	if (ia->ia_dstaddr.sin6_family == AF_INET6) {
-		if (plen != 128) {
-			log(LOG_INFO, "in6_ifinit: prefixlen must be 128 "
-			    "when dstaddr is specified\n");
-		}
+	if (plen == 128 && ia->ia_dstaddr.sin6_family == AF_INET6) {
 		if ((error = rtinit(&(ia->ia_ifa), (int)RTM_ADD,
 				    RTF_UP | RTF_HOST)) != 0)
 			return(error);
