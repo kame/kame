@@ -1,4 +1,4 @@
-/*	$KAME: esp_output.c,v 1.41 2001/03/01 05:54:46 itojun Exp $	*/
+/*	$KAME: esp_output.c,v 1.42 2001/03/01 07:08:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -458,6 +458,11 @@ esp_output(m, nexthdrp, md, isr, af)
 		randpadmax = (randpadmax / padbound) * padbound;
 		n = (randpadmax - plen + extendsiz) / padbound;
 
+		if (n > 0)
+			n = (random() % n) * padbound;
+		else
+			n = 0;
+
 		/*
 		 * make sure we do not pad too much.
 		 * MLEN limitation comes from the trailer attachment
@@ -467,12 +472,8 @@ esp_output(m, nexthdrp, md, isr, af)
 		 * limitation (but is less strict than sequential padding
 		 * as length field do not count the last 2 octets).
 		 */
-		if (n * padbound > MLEN)
-			n = MLEN / padbound;
-		if (n * padbound >= 256)
-			n = 255 / padbound;
-		if (n > 0)
-			extendsiz += (random() % n) * padbound;
+		if (extendsiz + n <= MLEN && extendsiz + n < 256)
+			extendsiz += n;
 	}
 
 #ifdef DIAGNOSTIC
