@@ -161,7 +161,7 @@ fddi_output(ifp, m0, dst, rt0)
 	struct rtentry *rt0;
 {
 	u_int16_t type;
- 	int s, error = 0, hdrcmplt = 0;
+ 	int s, loop_copy = 0, error = 0, hdrcmplt = 0;
   	u_char esrc[6], edst[6];
 	register struct mbuf *m = m0;
 	register struct rtentry *rt;
