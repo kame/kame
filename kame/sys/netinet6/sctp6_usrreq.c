@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.8 2002/07/30 02:21:43 keiichi Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.9 2002/07/30 04:12:36 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_usrreq.c,v 1.81 2002/04/04 21:53:15 randall Exp	*/
 
 /*
@@ -202,7 +202,7 @@ sctp6_input(mp, offp, proto)
 		return IPPROTO_DONE;
 	}
 #else
-	if(faithprefix(&ip6->ip6_dst)){
+	if (faithprefix(&ip6->ip6_dst)){
 		m_freem(m);
 		return IPPROTO_DONE;
 	}
@@ -775,13 +775,13 @@ sctp6_disconnect(struct socket *so)
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == NULL) {
 		splx(s);
-		return(ENOTCONN);
+		return (ENOTCONN);
 	}
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) {
 		if (LIST_EMPTY(&inp->sctp_asoc_list)) {
 			/* No connection */
 			splx(s);
-			return(ENOTCONN);
+			return (ENOTCONN);
 		} else {
 			int some_on_streamwheel = 0;
 			struct sctp_association *asoc;
@@ -790,7 +790,7 @@ sctp6_disconnect(struct socket *so)
 			tcb = LIST_FIRST(&inp->sctp_asoc_list);
 			if (tcb == NULL) {
 				splx(s);
-				return(EINVAL);
+				return (EINVAL);
 			}
 			asoc = &tcb->asoc;
 			if (!TAILQ_EMPTY(&asoc->out_wheel)) {
@@ -835,7 +835,7 @@ sctp6_disconnect(struct socket *so)
 				asoc->state |= SCTP_STATE_SHUTDOWN_PENDING;
 			}
 			splx(s);
-			return(0);
+			return (0);
 		}
 	} else {
 		/* UDP model does not support this */
@@ -881,7 +881,7 @@ sctp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 			m_freem(control);
 			control = NULL;
 		}
-		return(EDESTADDRREQ);
+		return (EDESTADDRREQ);
 	}
 
 #ifdef INET
@@ -906,7 +906,7 @@ sctp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	}
 
 	if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-		if(ip6_v6only) {
+		if (ip6_v6only) {
 			struct sockaddr_in sin;
 			/* convert v4-mapped into v4 addr and send */
 			in6_sin6_2_sin(&sin, sin6);
@@ -937,7 +937,7 @@ sctp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == 0) {
 		splx(s);
-		return(ECONNRESET);	/* I made the same as TCP since
+		return (ECONNRESET);	/* I made the same as TCP since
 					 * we are not setup? */
 	}
 	if ((inp->sctp_flags & SCTP_PCB_FLAGS_UNBOUND) ==
@@ -950,7 +950,7 @@ sctp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 		error = sctp6_bind(so, (struct sockaddr *)&sin6, p);
 		if (error) {
 			splx(s);
-			return(error);
+			return (error);
 		}
 	}
 #ifdef SCTP_TCP_MODEL_SUPPORT
@@ -958,7 +958,7 @@ sctp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	    (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED)) {
 		/* We are already connected AND the TCP model */
 		splx(s);
-		return(EADDRINUSE);
+		return (EADDRINUSE);
 	}
 #endif
 
@@ -985,7 +985,7 @@ sctp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	}
 
 	if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
-		if(ip6_v6only) {
+		if (ip6_v6only) {
 			/* convert v4-mapped into v4 addr */
 			in6_sin6_2_sin((struct sockaddr_in *)&ss, sin6);
 			addr = (struct sockaddr *)&ss;
@@ -1009,14 +1009,14 @@ sctp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	if (tcb != NULL) {
 		/* Already have or am bring up an association */
 		splx(s);
-		return(EALREADY);
+		return (EALREADY);
 	}
 	/* We are GOOD to go */
-	tcb = sctp_aloc_assoc(inp, addr, 1);
+	tcb = sctp_aloc_assoc(inp, addr, 1, &error);
 	if (tcb == NULL) {
 		/* Gak! no memory */
 		splx(s);
-		return(ENOMEM);
+		return (error);
 	}
 	tcb->asoc.state = SCTP_STATE_COOKIE_WAIT;
 	SCTP_GETTIME_TIMEVAL(&tcb->asoc.time_entered);
@@ -1091,7 +1091,7 @@ sctp6_getaddr(struct socket *so,
 #ifdef __FreeBSD__
 	*nam = (struct sockaddr *)sin6;
 #endif
-	return(0);
+	return (0);
 }
 
 static int
@@ -1114,7 +1114,7 @@ sctp6_peeraddr(struct socket *so,
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if ((inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) == 0) {
 		/* UDP type and listeners will drop out here */
-		return(ENOTCONN);
+		return (ENOTCONN);
 	}
 #ifdef __FreeBSD__
 	MALLOC(sin6, struct sockaddr_in6 *, sizeof *sin6, M_SONAME,
@@ -1135,7 +1135,7 @@ sctp6_peeraddr(struct socket *so,
 		return ECONNRESET;
 	}
 	tcb = LIST_FIRST(&inp->sctp_asoc_list);
-	if(tcb == NULL){
+	if (tcb == NULL){
 #ifdef __FreeBSD__
 		free(sin6, M_SONAME);
 #endif
@@ -1167,7 +1167,7 @@ sctp6_peeraddr(struct socket *so,
 #ifdef __FreeBSD__
 	*nam = (struct sockaddr *)sin6;
 #endif
-	return(0);
+	return (0);
 }
 
 static int
@@ -1193,7 +1193,7 @@ sctp6_in6getaddr(struct socket *so,
 		error = sctp_ingetaddr(so, nam);
 		if (error){
 			splx(s);
-			return(error);
+			return (error);
 		}
 		/* if I'm V6ONLY, convert it to v4-mapped */
 		if (
@@ -1214,7 +1214,7 @@ sctp6_in6getaddr(struct socket *so,
 		}
 	}
 	splx(s);
-	return(error);
+	return (error);
 }
 
 
@@ -1241,7 +1241,7 @@ sctp6_getpeeraddr(struct socket *so,
 		error = sctp_peeraddr(so, nam);
 		if (error){
 			splx(s);
-			return(error);
+			return (error);
 		}
 		/* if I'm V6ONLY, convert it to v4-mapped */
 		if (
@@ -1319,7 +1319,7 @@ sctp6_usrreq(so, req, m, nam, control)
 			error = EAFNOSUPPORT;
 		}
 		splx(s);
-		return(error);
+		return (error);
 	}
 #ifdef __NetBSD__
 	if (req == PRU_PURGEIF) {
@@ -1333,11 +1333,11 @@ sctp6_usrreq(so, req, m, nam, control)
 		}
 		switch (family) {
 		case PF_INET:
-			in_purgeif(ifn);
+			in_purgeif (ifn);
 			break;
 #ifdef INET6
 		case PF_INET6:
-			in6_purgeif(ifn);
+			in6_purgeif (ifn);
 			break;
 #endif
 		default:
@@ -1364,6 +1364,8 @@ sctp6_usrreq(so, req, m, nam, control)
 	case PRU_BIND:
 		{
 			struct sockaddr *name;
+			if (nam == NULL)
+				return (EINVAL);
 			name = mtod(nam, struct sockaddr *);
 			error  = sctp6_bind(so, name,
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -1380,6 +1382,8 @@ sctp6_usrreq(so, req, m, nam, control)
 	case PRU_CONNECT:
 		{
 			struct sockaddr *name;
+			if (nam == NULL)
+				return (EINVAL);
 			name = mtod(nam, struct sockaddr *);
 			error = sctp6_connect(so, name,
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -1396,6 +1400,9 @@ sctp6_usrreq(so, req, m, nam, control)
 	case PRU_ACCEPT:
 		{
 			struct sockaddr *name;
+			if (nam == NULL)
+				return (EINVAL);
+
 			name = mtod(nam, struct sockaddr *);
 			error = sctp_accept(so, name);
 		}
@@ -1412,7 +1419,10 @@ sctp6_usrreq(so, req, m, nam, control)
 	case PRU_SEND:
 		{
 			struct sockaddr *name;
-			name = mtod(nam,struct sockaddr *);
+			if (nam)
+				name = mtod(nam,struct sockaddr *);
+			else
+				name = (struct sockaddr *)NULL;
 			/* Flags are ignored */
 			error = sctp6_send(so, 0, m, name, control,
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -1440,6 +1450,8 @@ sctp6_usrreq(so, req, m, nam, control)
 	case PRU_PEERADDR:
 		{
 			struct sockaddr *name;
+			if (nam == NULL)
+				return (EINVAL);
 			name = mtod(nam, struct sockaddr *);
 			error = sctp6_getpeeraddr(so, name);
 		}
@@ -1447,6 +1459,9 @@ sctp6_usrreq(so, req, m, nam, control)
 	case PRU_SOCKADDR:
 		{
 			struct sockaddr *name;
+			if (nam == NULL)
+				return (EINVAL);
+
 			name = mtod(nam, struct sockaddr *);
 			error = sctp6_in6getaddr(so, name);
 		}

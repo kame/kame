@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.16 2002/06/11 17:54:30 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.17 2002/07/30 04:12:35 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_usrreq.c,v 1.151 2002/04/04 16:49:14 lei Exp	*/
 
 /*
@@ -719,7 +719,7 @@ sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	int error;
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == 0) {
-		if(control){
+		if (control) {
 			m_freem(control);
 			control = NULL;
 		}
@@ -727,14 +727,14 @@ sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		return EINVAL;
 	}
 	/* Got to have an to address if we are NOT a connected socket */
-	if((addr == NULL) &&
+	if ((addr == NULL) &&
 	   (((inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) == SCTP_PCB_FLAGS_CONNECTED) ||
-	    ((inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) == SCTP_PCB_FLAGS_TCPTYPE))){
+	    ((inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) == SCTP_PCB_FLAGS_TCPTYPE))) {
 		return sctp_output(inp, m, addr, control, p);
-	}else if(addr == NULL){
+	} else if (addr == NULL) {
 		error = EDESTADDRREQ;
 		m_freem(m);
-		if(control){
+		if (control) {
 			m_freem(control);
 			control = NULL;
 		}
@@ -744,7 +744,7 @@ sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	if (addr->sa_family != AF_INET) {
 		/* must be a v4 address! */
 		m_freem(m);
-		if(control){
+		if (control) {
 			m_freem(control);
 			control = NULL;
 		}
@@ -782,7 +782,7 @@ sctp_disconnect(struct socket *so)
 			struct sctp_tcb *tcb;
 
 			tcb = LIST_FIRST(&inp->sctp_asoc_list);
-			if(tcb == NULL)
+			if (tcb == NULL)
 				return(EINVAL);
 
 			asoc = &tcb->asoc;
@@ -871,7 +871,7 @@ sctp_shutdown(struct socket *so)
 		socantsendmore(so);
 
 		tcb = LIST_FIRST(&inp->sctp_asoc_list);
-		if(tcb == NULL){
+		if (tcb == NULL) {
 			/* Ok we hit the case that the shutdown
 			 * call was made after an abort or something.
 			 * Nothing to do now.
@@ -1118,7 +1118,7 @@ sctp_count_max_addresses(struct sctp_inpcb *inp)
 				/* Count them if they are the right type */
 				if (ifa->ifa_addr->sa_family == AF_INET)
 					cnt += sizeof(struct sockaddr_in);
-				else if(ifa->ifa_addr->sa_family == AF_INET6)
+				else if (ifa->ifa_addr->sa_family == AF_INET6)
 					cnt += sizeof(struct sockaddr_in6);
 			}
 		}
@@ -1225,18 +1225,18 @@ sctp_optsget(struct socket *so,
 		}
 		break;
 	case SCTP_GET_SNDBUF_USE:
-		if(m->m_len < sizeof(struct sctp_sockstat)){
+		if (m->m_len < sizeof(struct sctp_sockstat)) {
 			error = EINVAL;
-		}else{
+		} else {
 			struct sctp_sockstat *ss;
 			struct sctp_tcb *tcb;
 			struct sctp_association *asoc;
 			ss = mtod(m,struct sctp_sockstat *);
 
 			tcb = sctp_findassociation_associd(ss->ss_assoc_id);
-			if(tcb == NULL){
+			if (tcb == NULL) {
 				error = ENOTCONN;
-			}else{
+			} else {
 				asoc = &tcb->asoc;
 				ss->ss_total_sndbuf = (u_int32_t)asoc->total_output_queue_size;
 				ss->ss_total_mbuf_sndbuf = (u_int32_t)asoc->total_output_mbuf_queue_size;
@@ -1250,7 +1250,7 @@ sctp_optsget(struct socket *so,
 	case SCTP_PRINT_CWND_UPDATES:
 	{
 		int i;
-		for(i=sctp_post_at;i<SCTP_CWND_POSTS_LIST;i++){
+		for (i = sctp_post_at; i < SCTP_CWND_POSTS_LIST; i++) {
 			printf("old:%d->new:%d onQueue:%d sent:%d from:%d rwnd:%d\n",
 			       sctp_cwnd_old[i],
 			       sctp_cwnd_posts[i],
@@ -1260,7 +1260,7 @@ sctp_optsget(struct socket *so,
 			       sctp_rwndval[i]
 				);
 		}
-		for(i=0;i<sctp_post_at;i++){
+		for (i = 0; i < sctp_post_at; i++) {
 			printf("old:%d->new:%d onQueue:%d sent:%d from:%d rwnd:%d\n",
 			       sctp_cwnd_old[i],
 			       sctp_cwnd_posts[i],
@@ -2003,7 +2003,7 @@ sctp_optsset(struct socket *so,
 		struct sctp_association *asoc;
 		LIST_FOREACH(tcb, &inp->sctp_asoc_list, sctp_tcblist) {
 			asoc = &tcb->asoc;
-			for (i=0; i < asoc->streamincnt; i++) {
+			for (i = 0; i < asoc->streamincnt; i++) {
 				strm = &asoc->strmin[i];
 				cnt = 0;
 				TAILQ_FOREACH(chk, &strm->inqueue,
@@ -2797,12 +2797,14 @@ sctp_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 		return(EALREADY);
 	}
 	/* We are GOOD to go */
-	tcb = sctp_aloc_assoc(inp, nam, 1);
+	tcb = sctp_aloc_assoc(inp, nam, 1, &error);
 	if (tcb == NULL) {
 		/* Gak! no memory */
 		splx(s);
+#ifdef SCTP_DEBUG
 		printf("Can't allocate a TCB?\n");
-		return(ENOMEM);
+#endif
+		return(error);
 	}
 #ifdef SCTP_TCP_MODEL_SUPPORT
 	if (tcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) {
@@ -2861,7 +2863,7 @@ sctp_usr_recvd(struct socket *so, int flags)
 		/* if we increase by 1 or more MTU's (smallest MTUs of all nets)
 		 * we send a window update sack
 		 */
-		if (tcb->asoc.my_rwnd >= (rwnd + tcb->asoc.smallest_mtu)){
+		if (tcb->asoc.my_rwnd >= (rwnd + tcb->asoc.smallest_mtu)) {
 			if (callout_pending(&tcb->asoc.dack_timer.timer)) {
 				/* If the timer is up, stop it */
 				sctp_timer_stop(SCTP_TIMER_TYPE_RECV,
@@ -3267,11 +3269,11 @@ sctp_usrreq(so, req, m, nam, control)
 		}
 		switch (family) {
 		case PF_INET:
-			in_purgeif(ifn);
+			in_purgeif (ifn);
 			break;
 #ifdef INET6
 		case PF_INET6:
-			in6_purgeif(ifn);
+			in6_purgeif (ifn);
 			break;
 #endif /* INET6 */
 		default:
@@ -3298,7 +3300,10 @@ sctp_usrreq(so, req, m, nam, control)
 	case PRU_BIND:
 	{
 		struct sockaddr *name;
-		name = mtod(nam, struct sockaddr *);
+		if (nam)
+			name = mtod(nam, struct sockaddr *);
+		else
+			return(EINVAL);
 		error  = sctp_bind(so, name
 #if defined(__NetBSD__)
 				   , p
@@ -3320,7 +3325,10 @@ sctp_usrreq(so, req, m, nam, control)
 	case PRU_CONNECT:
 	{
 		struct sockaddr *name;
-		name = mtod(nam, struct sockaddr *);
+		if (nam)
+			name = mtod(nam, struct sockaddr *);
+		else
+			return(EINVAL);
 		error = sctp_connect(so, name
 #if defined(__NetBSD__)
 				     , p
@@ -3336,7 +3344,10 @@ sctp_usrreq(so, req, m, nam, control)
 	case PRU_ACCEPT:
 	{
 		struct sockaddr *name;
-		name = mtod(nam, struct sockaddr *);
+		if (nam)
+			name = mtod(nam, struct sockaddr *);
+		else
+			return(EINVAL);
 		error = sctp_accept(so, name);
 	}
 	break;
@@ -3352,7 +3363,10 @@ sctp_usrreq(so, req, m, nam, control)
 	case PRU_SEND:
 	{
 		struct sockaddr *name;
-		name = mtod(nam,struct sockaddr *);
+		if (nam)
+			name = mtod(nam, struct sockaddr *);
+		else
+			name = (struct sockaddr *)NULL;
 		/* Flags are ignored */
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_USRREQ1) {
@@ -3385,14 +3399,21 @@ sctp_usrreq(so, req, m, nam, control)
 	case PRU_PEERADDR:
 	{
 		struct sockaddr *name;
-		name = mtod(nam, struct sockaddr *);
+		if (nam)
+			name = mtod(nam, struct sockaddr *);
+		else
+			return(EINVAL);
 		error = sctp_peeraddr(so, name);
 	}
 	break;
 	case PRU_SOCKADDR:
 	{
 		struct sockaddr *name;
-		name = mtod(nam, struct sockaddr *);
+		if (nam)
+			name = mtod(nam, struct sockaddr *);
+		else
+			return(EINVAL);
+
 		error = sctp_ingetaddr(so, name);
 	}
 	break;

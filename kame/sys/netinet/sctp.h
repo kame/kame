@@ -1,5 +1,6 @@
-/*	$KAME: sctp.h,v 1.6 2002/06/09 16:29:54 itojun Exp $	*/
+/*    $KAME: sctp.h,v 1.7 2002/07/30 04:12:33 itojun Exp $    */
 /*	Header: /home/sctpBsd/netinet/sctp.h,v 1.43 2002/04/02 15:34:44 lei Exp	*/
+
 
 #ifndef _NETINET_SCTP_H_
 #define _NETINET_SCTP_H_
@@ -166,10 +167,10 @@ struct sctp_paramhdr {
 /* draft-ietf-tsvwg-sctpimpguide */
 #define SCTP_ERROR_RESTART_NEWADDRS	0x000b
 /* draft-ietf-tsvwg-addip-sctp */
-#define SCTP_ERROR_DELETE_LAST_ADDR	0x000c
-#define SCTP_ERROR_RESOURCE_SHORTAGE	0x000d
-#define SCTP_ERROR_DELETE_SOURCE_ADDR	0x000e
-#define SCTP_ERROR_ILLEGAL_ASCONF_ACK	0x000f
+#define SCTP_ERROR_DELETE_LAST_ADDR	0x0100
+#define SCTP_ERROR_RESOURCE_SHORTAGE	0x0101
+#define SCTP_ERROR_DELETE_SOURCE_ADDR	0x0102
+#define SCTP_ERROR_ILLEGAL_ASCONF_ACK	0x0103
 
 /*
  * error cause parameters (user visisble)

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_header.h,v 1.3 2002/06/09 16:29:54 itojun Exp $	*/
+/*    $KAME: sctp_header.h,v 1.4 2002/07/30 04:12:34 itojun Exp $     */
 /*	Header: /home/sctpBsd/netinet/sctp_header.h,v 1.34 2002/04/03 21:10:19 lei Exp	*/
 
 #ifndef __sctp_header_h__
@@ -91,6 +91,11 @@ struct sctp_unrel_streams {
 struct sctp_unrel_streams_param {
 	struct sctp_paramhdr ph;
 	struct sctp_unrel_streams unrel[0];	/* list of ranges */
+};
+
+struct sctp_strseq {
+	u_int16_t stream;
+	u_int16_t sequence;
 };
 
 

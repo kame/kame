@@ -1,4 +1,4 @@
-/*	$KAME: sctp_sha1.c,v 1.3 2002/06/09 16:29:55 itojun Exp $	*/
+/*	$KAME: sctp_sha1.c,v 1.4 2002/07/30 04:12:35 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_sha1.c,v 1.6 2002/04/04 17:43:19 randall Exp	*/
 
 /*
@@ -62,11 +62,11 @@ sha1_process_a_block(struct sha1_context *ctx, unsigned int *block)
 	int i;
 	/* init the W0-W15 to the block of words being hashed. */
 	/* step a) */
-	for (i=0; i<16; i++) {
+	for (i = 0; i < 16; i++) {
 		ctx->words[i] = ntohl(block[i]);
 	}
 	/* now init the rest based on the SHA-1 formula, step b) */
-	for (i=16; i<80; i++) {
+	for (i = 16; i < 80; i++) {
 		ctx->words[i] = CSHIFT(1, ((ctx->words[(i-3)]) ^
 					   (ctx->words[(i-8)]) ^
 					   (ctx->words[(i-14)]) ^
@@ -80,20 +80,20 @@ sha1_process_a_block(struct sha1_context *ctx, unsigned int *block)
 	ctx->E = ctx->H4;
 
 	/* step d) */
-	for (i=0; i<80; i++) {
+	for (i = 0; i < 80; i++) {
 		if (i < 20) {
 			ctx->TEMP = ((CSHIFT(5, ctx->A)) +
 				     (F1(ctx->B, ctx->C, ctx->D)) +
 				     (ctx->E) +
 				     ctx->words[i] +
 				     K1);
-		}else if (i < 40) {
+		} else if (i < 40) {
 			ctx->TEMP = ((CSHIFT(5, ctx->A)) +
 				     (F2(ctx->B, ctx->C, ctx->D)) +
 				     (ctx->E) +
 				     (ctx->words[i]) +
 				     K2);
-		}else if (i < 60) {
+		} else if (i < 60) {
 			ctx->TEMP = ((CSHIFT(5, ctx->A)) +
 				     (F3(ctx->B, ctx->C, ctx->D)) +
 				     (ctx->E) +
@@ -181,7 +181,7 @@ SHA1_Final(struct sha1_context *ctx, unsigned char *digest)
 					     (unsigned int *)ctx->sha_block);
 			/* init last block, a bit different than the rest */
 			ctx->sha_block[0] = 0x80;
-			for (i=1; i<sizeof(ctx->sha_block); i++) {
+			for (i = 1; i < sizeof(ctx->sha_block); i++) {
 				ctx->sha_block[i] = 0x0;
 			}
 		} else if (left_to_fill == 1) {
@@ -190,9 +190,9 @@ SHA1_Final(struct sha1_context *ctx, unsigned char *digest)
 					     (unsigned int *)ctx->sha_block);
 			/* init last block */
 			memset(ctx->sha_block, 0, sizeof(ctx->sha_block));
-		}else{
+		} else {
 			ctx->sha_block[ctx->how_many_in_block] = 0x80;
-			for (i=(ctx->how_many_in_block+1);
+			for (i =( ctx->how_many_in_block + 1);
 			     i < sizeof(ctx->sha_block);
 			     i++) {
 				ctx->sha_block[i] = 0x0;
@@ -215,7 +215,7 @@ SHA1_Final(struct sha1_context *ctx, unsigned char *digest)
 		 * the block.
 		 */
 		ctx->sha_block[ctx->how_many_in_block] = 0x80;
-		for (i=(ctx->how_many_in_block+1);
+		for (i = (ctx->how_many_in_block + 1);
 		     i < sizeof(ctx->sha_block);
 		     i++) {
 			ctx->sha_block[i] = 0x0;

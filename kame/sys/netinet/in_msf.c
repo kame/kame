@@ -935,7 +935,7 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 			if (error != 0)
 				return error;
 
-			for (i=0, newias=LIST_FIRST(inmm_src->ims_cur->head);
+			for (i = 0, newias = LIST_FIRST(inmm_src->ims_cur->head);
 			     newias; newias = nias) {
 				nias = LIST_NEXT(newias, ias_list);
 				if (newias->ias_refcount == 0) {
@@ -1045,7 +1045,7 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 						  (u_int)0, filter);
 			if (error != 0)
 				return error;
-			for (i=0, newias=LIST_FIRST(inmm_src->ims_cur->head);
+			for (i = 0, newias = LIST_FIRST(inmm_src->ims_cur->head);
 			     newias; newias = nias) {
 				nias = LIST_NEXT(newias, ias_list);
 				if (newias->ias_refcount == 0) {

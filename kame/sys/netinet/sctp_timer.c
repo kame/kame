@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.7 2002/07/04 01:57:02 itojun Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.8 2002/07/30 04:12:35 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_timer.c,v 1.60 2002/04/04 17:47:19 randall Exp	*/
 
 /*
@@ -184,7 +184,7 @@ sctp_threshold_management(struct sctp_inpcb *ep,
 						       net->ra.ro_rt, 0);
 				if (rt != net->ra.ro_rt) {
 #ifdef SCTP_DEBUG
-					if (sctp_debug_on & SCTP_DEBUG_TIMER2){
+					if (sctp_debug_on & SCTP_DEBUG_TIMER2) {
 						printf("Got a new route old:%x ifp:%x new:%x ifp:%x\n",
 						       (u_int)net->ra.ro_rt,
 						       (u_int)net->ra.ro_rt->rt_ifp,
@@ -424,7 +424,7 @@ sctp_mark_all_for_resend(struct sctp_tcb *tcb,
 #endif /* SCTP_DEBUG */
 		tcb->asoc.total_flight = 0;
 		/* Clear all networks flight size */
-		TAILQ_FOREACH(lnets, &tcb->asoc.nets, sctp_next){
+		TAILQ_FOREACH(lnets, &tcb->asoc.nets, sctp_next) {
 			lnets->flight_size = 0;
 #ifdef SCTP_DEBUG
 			if (sctp_debug_on & SCTP_DEBUG_TIMER4) {
@@ -435,7 +435,7 @@ sctp_mark_all_for_resend(struct sctp_tcb *tcb,
 #endif /* SCTP_DEBUG */
 		}
 		TAILQ_FOREACH(chk, &tcb->asoc.sent_queue, sctp_next) {
-			if(chk->sent < SCTP_DATAGRAM_RESEND) {
+			if (chk->sent < SCTP_DATAGRAM_RESEND) {
 				tcb->asoc.total_flight += chk->send_size;
 				chk->whoTo->flight_size += chk->send_size;
 			}
@@ -637,7 +637,7 @@ void sctp_cookie_timer(struct sctp_inpcb *ep,
 	alt->ref_count++;
 
 	/* Now mark the retran info */
-	if(cookie->sent != SCTP_DATAGRAM_RESEND)
+	if (cookie->sent != SCTP_DATAGRAM_RESEND)
 		tcb->asoc.sent_queue_retran_cnt++;
 	cookie->sent = SCTP_DATAGRAM_RESEND;
 	/*
@@ -832,7 +832,7 @@ sctp_getnext_mtu(struct sctp_inpcb *ep,u_int32_t cur_mtu)
 		/* never get bigger than the max of all our interface MTU's */
 		return(ep->sctp_ep.max_mtu);
 	}
-	for (i=0; i < SCTP_NUMBER_OF_MTU_SIZES; i++) {
+	for (i = 0; i < SCTP_NUMBER_OF_MTU_SIZES; i++) {
 		if (cur_mtu < mtu_sizes[i]) {
 			if (ep->sctp_ep.max_mtu < mtu_sizes[i]) {
 				/* is max_mtu smaller? if so return it */

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_hashdriver.c,v 1.2 2002/05/20 05:50:02 itojun Exp $	*/
+/*	$KAME: sctp_hashdriver.c,v 1.3 2002/07/30 04:12:34 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_hashdriver.c,v 1.11 2002/04/03 21:10:19 lei Exp	*/
 
 /*
@@ -114,7 +114,7 @@ void sctp_hash_digest(char *key, int key_len,
 	bcopy(key, k_opad, key_len);
 
 	/* XOR key with ipad and opad values */
-	for (i=0; i<64; i++) {
+	for (i = 0; i < 64; i++) {
 		k_ipad[i] ^= 0x36;
 		k_opad[i] ^= 0x5c;
 	}
@@ -203,7 +203,7 @@ void sctp_hash_digest_m(char *key, int key_len,
 	bcopy(key, k_opad, key_len);
 
 	/* XOR key with ipad and opad values */
-	for (i=0; i<64; i++) {
+	for (i = 0; i < 64; i++) {
 		k_ipad[i] ^= 0x36;
 		k_opad[i] ^= 0x5c;
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.117 2002/06/09 16:15:59 keiichi Exp $	*/
+/*	$KAME: in6_src.c,v 1.118 2002/07/30 04:12:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -95,6 +95,9 @@
 
 #include <net/if.h>
 #include <net/route.h>
+#ifdef RADIX_MPATH
+#include <net/radix_path.h>
+#endif
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
@@ -1566,7 +1569,7 @@ match_addrsel_policy(key)
 			if (m == 0xff) /* short cut for a typical case */
 				matchlen += 8;
 			else {
-				while(m >= 0x80) {
+				while (m >= 0x80) {
 					matchlen++;
 					m <<= 1;
 				}

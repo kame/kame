@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.h,v 1.4 2002/07/04 01:57:02 itojun Exp $	*/
+/*	$KAME: sctputil.h,v 1.5 2002/07/30 04:12:35 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctputil.h,v 1.36 2002/04/01 21:59:20 randall Exp	*/
 
 #ifndef __sctputil_h__
@@ -126,6 +126,8 @@ uint32_t sctp_is_same_scope(struct sockaddr_in6 *addr1,
 			    struct sockaddr_in6 *addr2);
 struct sockaddr_in6 *
 sctp_recover_scope(struct sockaddr_in6 *addr, struct sockaddr_in6 *lsa6);
+
+int sctp_cmpaddr(struct sockaddr *a, struct sockaddr *b);
 
 const char * sctp_ntop4(const u_char *src, char *dst, size_t size);
 const char * sctp_ntop6(const u_char *src, char *dst, size_t size);

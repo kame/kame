@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.10 2002/07/04 01:57:02 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.11 2002/07/30 04:12:35 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.c,v 1.207 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -475,11 +475,11 @@ sctp_findassociation_associd(caddr_t asoc_id)
 {
 	/* This is allows you to look at another sockets info */
 	struct sctp_tcb *tcb;
-	if((asoc_id < sctp_lowest_tcb) && (asoc_id > sctp_highest_tcb)){
+	if ((asoc_id < sctp_lowest_tcb) && (asoc_id > sctp_highest_tcb)) {
 		return(NULL);
 	}
 	tcb = (struct sctp_tcb *)asoc_id;
-	if(tcb->asoc.state == 0)
+	if (tcb->asoc.state == 0)
 		return(NULL);
 	else
 		return(tcb);
@@ -694,7 +694,7 @@ sctp_pcb_findep(struct sockaddr *nam)
 			printf("EP was NULL and TCP model is supported\n");
 		}
 #endif
-		for (i=0; i < sctppcbinfo.hashtblsize; i++) {
+		for (i = 0; i < sctppcbinfo.hashtblsize; i++) {
 			/*
 			 * This is real gross, but we do NOT have a remote
 			 * port at this point depending on who is calling. We
@@ -702,7 +702,7 @@ sctp_pcb_findep(struct sockaddr *nam)
 			 * local port :/
 			 */
 			head = &sctppcbinfo.sctp_tcpephash[i];
-			if(LIST_FIRST(head)){
+			if (LIST_FIRST(head)) {
 			        ep = sctp_endpoint_probe(nam, head, lport);
 			        if (ep) {
 					/* Found one */
@@ -931,14 +931,14 @@ sctp_findassociation_addr(struct mbuf *pkt, int iphlen,
 		 * pool and can't go to the tcp pool.
 		 */
 		to_tcp_pool = 0;
-	}else{
+	} else {
 		to_tcp_pool = 1;
 	}
-	if(to_tcp_pool){
-		if(ret == NULL){
+	if (to_tcp_pool) {
+		if (ret == NULL) {
 			ret = sctp_tcb_special_locate(inp,from,to,netp);
 		}
-		if(ret && *inp){
+		if (ret && *inp) {
 			return(ret);
 		}
 	}
@@ -1092,7 +1092,8 @@ sctp_inpcb_alloc(struct socket *so)
 	so->so_pcb = (caddr_t)inp;
 	inp->lowest_tcb = (caddr_t)0xffffffff;
 
-	if (so->so_type == SOCK_DGRAM) {
+	if ((so->so_type == SOCK_DGRAM) ||
+	    (so->so_type == SOCK_SEQPACKET)) {
 		/* UDP style socket */
 		inp->sctp_flags = (SCTP_PCB_FLAGS_UDPTYPE |
 				   SCTP_PCB_FLAGS_UNBOUND);
@@ -1211,7 +1212,7 @@ sctp_inpcb_alloc(struct socket *so)
 		SCTP_GETTIME_TIMEVAL(&time);
 		m->time_of_secret_change = time.tv_sec;
 
-		for (i=0; i < SCTP_NUMBER_OF_SECRETS; i++) {
+		for (i = 0; i < SCTP_NUMBER_OF_SECRETS; i++) {
 			m->secret_key[0][i] = sctp_select_initial_TSN(m);
 		}
 		sctp_timer_start(SCTP_TIMER_TYPE_NEWCOOKIE, inp, NULL, NULL);
@@ -1341,7 +1342,7 @@ sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 	ip_inp = (struct inpcb *)so->so_pcb;
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-		if(addr){
+		if (addr) {
 			printf("Bind called port:%d\n",
 			       ntohs(((struct sockaddr_in *)addr)->sin_port));
 			printf("Addr :");
@@ -1699,23 +1700,23 @@ sctp_inpcb_free(struct sctp_inpcb *ep,int immediate)
 				   * be nice :> ( i.e. ip_pcb = ep;)
 				   */
 	ep->sctp_flags |= SCTP_PCB_FLAGS_SOCKET_GONE;
-	if(immediate == 0){
+	if (immediate == 0) {
 		int cnt_in_sd;
 		cnt_in_sd = 0;
 		for ((asoc = LIST_FIRST(&ep->sctp_asoc_list)); asoc != NULL;
 		     asoc = nasoc) {
 			nasoc = LIST_NEXT(asoc, sctp_tcblist);
 			if (((asoc->asoc.state & SCTP_STATE_MASK) == SCTP_STATE_COOKIE_WAIT) ||
-			    ((asoc->asoc.state & SCTP_STATE_MASK) == SCTP_STATE_COOKIE_ECHOED)){
+			    ((asoc->asoc.state & SCTP_STATE_MASK) == SCTP_STATE_COOKIE_ECHOED)) {
 				/* Just abandon things in the front states */
 				sctp_free_assoc(ep, asoc);
-			}else{
+			} else {
 				asoc->asoc.state |= SCTP_STATE_CLOSED_SOCKET;
-				if(asoc->asoc.total_output_queue_size == 0){
+				if (asoc->asoc.total_output_queue_size == 0) {
 					/* nothing in queue send an abort */
 					sctp_send_abort_tcb(asoc, NULL);
 					sctp_free_assoc(ep, asoc);
-				}else{
+				} else {
 					/* Ok we have one with data in queue */
 					/* mark into shutdown pending */
 					asoc->asoc.state |= SCTP_STATE_SHUTDOWN_PENDING;
@@ -1724,7 +1725,7 @@ sctp_inpcb_free(struct sctp_inpcb *ep,int immediate)
 			}
 		}
 		/* now is there some left in our SHUTDOWN state? */
-		if(cnt_in_sd){
+		if (cnt_in_sd) {
 			return;
 		}
 	}
@@ -1814,7 +1815,7 @@ sctp_inpcb_free(struct sctp_inpcb *ep,int immediate)
 	{
 		int i;
 		struct sctp_tagblock *tb, *ntb;
-		for (i=0; i < SCTP_NUMBER_IN_VTAG_BLOCK; i++) {
+		for (i = 0; i < SCTP_NUMBER_IN_VTAG_BLOCK; i++) {
 			tb = LIST_FIRST(&ep->vtag_timewait[i]);
 			while (tb) {
 				ntb = LIST_NEXT(tb, sctp_nxt_tagblock);
@@ -2098,12 +2099,13 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
  */
 struct sctp_tcb *
 sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
-		int for_a_init)
+		int for_a_init, int *error)
 {
 	struct sctp_tcb *tasoc;
 	struct sctp_association *asoc;
 	struct sctpasochead *head;
 	u_short rport;
+	int imp_ret;
 	/*
 	 * Assumption made here:
 	 *  Caller has done a sctp_findassociation_ep_addr(ep, addr's);
@@ -2112,7 +2114,7 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PCB3) {
 		printf("Allocate an association for peer:");
-		if(firstaddr)
+		if (firstaddr)
 			sctp_print_address(firstaddr);
 		else
 			printf("None\n");
@@ -2131,6 +2133,7 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 				printf("peer address invalid\n");
 			}
 #endif
+			*error = EINVAL;
 			return(NULL);
 		}
 		rport = sin->sin_port;
@@ -2145,6 +2148,7 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 				printf("peer address invalid\n");
 			}
 #endif
+			*error = EINVAL;
 			return(NULL);
 		}
 		rport = sin6->sin6_port;
@@ -2155,6 +2159,7 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 			printf("BAD family %d\n",firstaddr->sa_family);
 		}
 #endif
+		*error = EINVAL;
 		return(NULL);
 	}
 	if (ep->sctp_flags & SCTP_PCB_FLAGS_UNBOUND) {
@@ -2162,7 +2167,7 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 		 * If you have not performed a bind, then we need to do
 		 * the ephemerial bind for you.
 		 */
-	        int imp_ret;
+
 #ifdef SCTP_DEBUG
 	        if (sctp_debug_on & SCTP_DEBUG_PCB3) {
 		        printf("Doing implicit BIND\n");
@@ -2176,6 +2181,7 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 			        printf("BIND FAILS ret:%d\n",imp_ret);
 			}
 #endif
+			*error = imp_ret;
 			return(NULL);
 		}
 	}
@@ -2195,6 +2201,7 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 			printf("tasoc is NULL?\n");
 	        }
 #endif
+		*error = ENOMEM;
 		return(NULL);
 	}
 	sctppcbinfo.ipi_count_asoc++;
@@ -2222,7 +2229,7 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 
 	/* and the port */
 	tasoc->rport = rport;
-	if (sctp_add_remote_addr(tasoc, firstaddr, 1)) {
+	if ((imp_ret = sctp_add_remote_addr(tasoc, firstaddr, 1))) {
 		/* failure.. memory error? */
 #if defined(__FreeBSD__)
 		zfreei(sctppcbinfo.ipi_zone_asoc, tasoc);
@@ -2232,6 +2239,7 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 		pool_put(&sctppcbinfo.ipi_zone_asoc, tasoc);
 #endif
 		sctppcbinfo.ipi_count_asoc--;
+		*error = imp_ret;
 		return(NULL);
 	}
 
@@ -2351,7 +2359,7 @@ sctp_add_vtag_to_timewait(struct sctp_inpcb *m, u_int32_t tag)
 	if (!LIST_EMPTY(chain)) {
 		/* Block(s) present, lets find space, and expire on the fly */
 		LIST_FOREACH(twait_block, chain, sctp_nxt_tagblock) {
-			for (i=0; i<SCTP_NUMBER_IN_VTAG_BLOCK; i++) {
+			for (i = 0; i < SCTP_NUMBER_IN_VTAG_BLOCK; i++) {
 				if ((twait_block->vtag_block[i].v_tag == 0) &&
 				    !set) {
 					twait_block->vtag_block[0].tv_sec_at_expire = now.tv_sec +
@@ -2415,7 +2423,7 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 #else
 	s = splnet();
 #endif
-	if(ep->sctp_tcb_at_block == (void *)tasoc){
+	if (ep->sctp_tcb_at_block == (void *)tasoc) {
 		ep->error_on_block = ECONNRESET;
 	}
 	LIST_REMOVE(tasoc, sctp_tcbhash);
@@ -2627,7 +2635,7 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 	asoc->streamoutcnt = 0;
 	if (asoc->strmin) {
 		int i;
-		for (i=0; i<asoc->streamincnt; i++) {
+		for (i = 0; i < asoc->streamincnt; i++) {
 			if (!TAILQ_EMPTY(&asoc->strmin[i].inqueue)) {
 				/* We have somethings on the streamin queue */
 				chk = TAILQ_FIRST(&asoc->strmin[i].inqueue);
@@ -3162,7 +3170,7 @@ sctp_pcb_init()
 	sctp_pcb_initialized = 1;
 
 	/* Init all peg counts */
-	for (i=0; i<SCTP_NUMBER_OF_PEGS; i++) {
+	for (i = 0; i < SCTP_NUMBER_OF_PEGS; i++) {
 		sctp_pegs[i] = 0;
 	}
 
@@ -3294,7 +3302,7 @@ sctp_pcb_init()
 #endif
 #ifdef SCTP_VTAG_TIMEWAIT_PER_STACK
 	/* Init the TIMEWAIT list */
-	for (i=0; i<SCTP_STACK_VTAG_HASH_SIZE; i++) {
+	for (i = 0; i < SCTP_STACK_VTAG_HASH_SIZE; i++) {
 		LIST_INIT(&sctppcbinfo.vtag_timewait[i]);
 	}
 #endif
@@ -3571,7 +3579,7 @@ sctp_is_vtag_good(struct sctp_inpcb *m, u_int32_t tag, struct timeval *now)
     if (!LIST_EMPTY(chain)) {
 	/* Block(s) are present, lets see if we have this tag in the list */
 	LIST_FOREACH(twait_block, chain, sctp_nxt_tagblock) {
-	    for (i=0; i<SCTP_NUMBER_IN_VTAG_BLOCK; i++) {
+	    for (i = 0; i < SCTP_NUMBER_IN_VTAG_BLOCK; i++) {
 		if (twait_block->vtag_block[i].v_tag == 0) {
 		    /* not used */
 		    continue;
@@ -3900,7 +3908,7 @@ sctp_fasttim(void)
 		c = n;
 	}
 	/* Now all the ones on the locallist must be called */
-	if(inited){
+	if (inited) {
 		c = TAILQ_FIRST(&locallist);
 		while (c) {
 			/* remove it */

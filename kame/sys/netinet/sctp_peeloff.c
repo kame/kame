@@ -1,4 +1,4 @@
-/*	$KAME: sctp_peeloff.c,v 1.5 2002/06/09 16:29:55 itojun Exp $	*/
+/*	$KAME: sctp_peeloff.c,v 1.6 2002/07/30 04:12:35 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_peeloff.c,v 1.16 2002/04/04 19:12:45 randall Exp	*/
 
 /*
@@ -126,12 +126,12 @@ sctp_get_peeloff(struct socket *head, caddr_t assoc_id, int *error)
 #endif /* SCTP_DEBUG */
 
 	inp = (struct sctp_inpcb *)head->so_pcb;
-	if(inp == NULL){
+	if (inp == NULL) {
 		*error = EFAULT;
 		return(NULL);
 	}
 	tcb = sctp_findassociation_ep_asocid(inp, assoc_id);
-	if (tcb == NULL){
+	if (tcb == NULL) {
 		*error = ENOTCONN;
 		return(NULL);
 	}

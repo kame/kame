@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.h,v 1.4 2002/06/09 16:29:55 itojun Exp $	*/
+/*	$KAME: sctp_pcb.h,v 1.5 2002/07/30 04:12:35 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.h,v 1.92 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef __sctp_pcb_h__
@@ -390,7 +390,7 @@ sctp_inpcb_free(struct sctp_inpcb *ep,int immediate);
 
 struct sctp_tcb *
 sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
-		int for_a_init);
+		int for_a_init, int *error);
 
 void
 sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *asoc);

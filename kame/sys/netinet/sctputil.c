@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.7 2002/07/04 01:57:02 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.8 2002/07/30 04:12:35 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctputil.c,v 1.153 2002/04/04 16:59:01 randall Exp	*/
 
 /*
@@ -174,7 +174,7 @@ find_next_best_mtu(int totsz)
 	 * size of the dg that failed to be sent.
 	 */
 	perfer = 0;
-	for (i=0; i<NUMBER_OF_MTU_SIZES; i++) {
+	for (i = 0; i < NUMBER_OF_MTU_SIZES; i++) {
 		if (totsz < sctp_mtu_sizes[i]) {
 			perfer = i - 1;
 			if (perfer < 0)
@@ -333,7 +333,7 @@ sctp_init_asoc(struct sctp_inpcb *m, struct sctp_association *asoc,
 				sizeof(struct sctp_stream_out)),
 			       M_PCB,
 			       M_NOWAIT);
-	for (i=0; i<asoc->streamoutcnt; i++) {
+	for (i = 0; i < asoc->streamoutcnt; i++) {
 		/*
 		 * inbound side must be set to 0xffff,
 		 * also NOTE when we get the INIT-ACK back (for INIT sender)
@@ -350,7 +350,9 @@ sctp_init_asoc(struct sctp_inpcb *m, struct sctp_association *asoc,
 	}
 	/* Now the init of the other outqueues */
 	TAILQ_INIT(&asoc->out_wheel);
+#ifdef SCTP_OLD_USCTP_COMPAT
 	TAILQ_INIT(&asoc->unrel_wheel);
+#endif
 	TAILQ_INIT(&asoc->control_send_queue);
 	TAILQ_INIT(&asoc->send_queue);
 	TAILQ_INIT(&asoc->sent_queue);
@@ -450,7 +452,7 @@ sctp_timeout_handler(void *t)
 			ep->sctp_ep.current_secret_number = 0;
 		}
 		secret = (int)ep->sctp_ep.current_secret_number;
-		for(i=0; i<SCTP_NUMBER_OF_SECRETS; i++) {
+		for (i = 0; i < SCTP_NUMBER_OF_SECRETS; i++) {
 			ep->sctp_ep.secret_key[secret][i] = sctp_select_initial_TSN(&ep->sctp_ep);
 		}
 		sctp_timer_start(SCTP_TIMER_TYPE_NEWCOOKIE, ep,
@@ -549,7 +551,7 @@ sctp_timer_start(int t_type,
 		tmr = &net->rxt_timer;
 		if (net->RTO == 0) {
 			to_ticks = (tcb->asoc.initial_rto * hz)/1000;
-		}else{
+		} else {
 			to_ticks = (net->RTO * hz)/1000;
 		}
 		break;
@@ -834,7 +836,7 @@ sctp_timer_stop(int t_type,
 #endif /* SCTP_DEBUG */
 		break;
 	};
-	if(tmr->type != t_type){
+	if (tmr->type != t_type) {
 		/* Ok we have a timer that is under
 		 * joint use. Cookie timer per chance with
 		 * the SEND timer. We therefore are NOT
@@ -860,7 +862,7 @@ unsigned int update_adler32(u_int32_t adler,
 	u_int32_t s2 = (adler >> 16) & 0xffff;
 	int n;
 
-	for (n = 0; n < len; n++,buf++) {
+	for (n = 0; n < len; n++, buf++) {
 		/* s1 = (s1 + buf[n]) % BASE */
 		/* first we add */
 		s1 = (s1 + *buf);
@@ -1164,7 +1166,7 @@ sctp_add_pad_tombuf(struct mbuf *m, int padlen)
 	u_int8_t *dp;
 	int i;
 	if (padlen > 3) {
-		return(E2BIG);
+		return(ENOBUFS);
 	}
 	if (M_TRAILINGSPACE(m)) {
 		/*
@@ -1188,7 +1190,7 @@ sctp_add_pad_tombuf(struct mbuf *m, int padlen)
 		dp = mtod(tmp, u_int8_t *);
 	}
 	/* zero out the pad */
-	for (i=0; i<padlen; i++) {
+	for (i=  0; i < padlen; i++) {
 		*dp = 0;
 		dp++;
 	}
@@ -1235,8 +1237,8 @@ sctp_notify_assoc_change(u_int32_t event, struct sctp_tcb *stcb,
          /* First if we are are going down dump everything we
 	  * can to the socket rcv queue.
 	  */
-	if((event == SCTP_SHUTDOWN_COMP) ||
-	   (event == SCTP_COMM_LOST)){
+	if ((event == SCTP_SHUTDOWN_COMP) ||
+	   (event == SCTP_COMM_LOST)) {
 		sctp_deliver_data(stcb,&stcb->asoc,NULL);
 	}
 
@@ -1586,7 +1588,7 @@ void
 sctp_ulp_notify(u_int32_t notification, struct sctp_tcb *stcb,
 		u_int32_t error, void *data)
 {
-	if(stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE){
+	if (stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE) {
 		/* No notifications up when we are in a no socket state */
 		return;
 	}
@@ -2004,6 +2006,41 @@ sctp_recover_scope(struct sockaddr_in6 *addr, struct sockaddr_in6 *store)
 	return(addr);
 }
 
+/*
+ * are the two addresses the same?
+ * FIX ME: should probably fix to handle scopes properly
+ */
+int
+sctp_cmpaddr(struct sockaddr *sa1, struct sockaddr *sa2) {
+	/* must be valid */
+	if ((sa1 == NULL) || (sa2 == NULL))
+		return(0);
+
+	/* must be the same family */
+	if (sa1->sa_family != sa2->sa_family)
+		return(0);
+
+	if (sa1->sa_family == AF_INET6) {
+		/* IPv6 addresses */
+		struct sockaddr_in6 *sin6_1, *sin6_2;
+
+		sin6_1 = (struct sockaddr_in6 *)sa1;
+		sin6_2 = (struct sockaddr_in6 *)sa2;
+		return(memcmp(&sin6_1->sin6_addr, &sin6_2->sin6_addr,
+			      sizeof(struct in6_addr)) == 0);
+	} else if (sa1->sa_family == AF_INET) {
+		/* IPv4 addresses */
+		struct sockaddr_in *sin_1, *sin_2;
+
+		sin_1 = (struct sockaddr_in *)sa1;
+		sin_2 = (struct sockaddr_in *)sa2;
+		return(sin_1->sin_addr.s_addr == sin_2->sin_addr.s_addr);
+	} else {
+		/* we don't do these... */
+		return(0);
+	}
+}
+
 
 /*
  * ntop() routines
@@ -2309,53 +2346,55 @@ static int
 sctp_rn_are_keys_same(struct radix_node *exist,
 		      struct radix_node *cmp)
 {
-	caddr_t e, c, cplim;
-	int len;
-
-	if (exist->rn_key == cmp->rn_key) {
-		/* Mask holds same pointer. Must be same */
-		return(1);
-	}
-	if ((exist->rn_key == NULL) || (cmp->rn_key == NULL)) {
-		/*
-		 * One is null (host route) the other is not. Can't be same.
-		 */
-		return(0);
-	}
-	e = exist->rn_key;
-	c = cmp->rn_key;
-	len = (int)*((u_char *)e);
-	cplim = e + len;
-	while (e < cplim)
-		if (*e++ != *c++)
-			return(0);
-	/* so far the keys are the same */
-	if (exist->rn_mask != cmp->rn_mask) {
-		/* different masks */
-		return(0);
-	}
-	/* They are the same :-) */
+    caddr_t e,c,cplim;
+    int len;
+    if (exist->rn_key == cmp->rn_key) {
+	/* Mask holds same pointer. Must be same */
 	return(1);
+    }
+    if ((exist->rn_key == NULL) || (cmp->rn_key == NULL)) {
+	/*
+	 * One is null (host route) the other is not. Can't be same.
+	 */
+	return(0);
+    }
+    e = exist->rn_key;
+    c = cmp->rn_key;
+    len = (int)*((u_char *)e);
+    cplim = e + len;
+    while (e < cplim)
+	if (*e++ != *c++)
+	    return(0);
+    /* so far the keys are the same */
+    if (exist->rn_mask != cmp->rn_mask) {
+	/* different masks */
+	return(0);
+    }
+    /* They are the same :-) */
+    return(1);
 }
+
+
 
 static struct rtentry *
 sctp_rt_scan_dups(struct sockaddr *dst,struct rtentry *existing,int s)
 {
-	struct radix_node *exist, *cmp;
+    struct radix_node *exist, *cmp;
 
-	exist = (struct radix_node *)existing;
+    exist = (struct radix_node *)existing;
 
-	cmp = exist->rn_dupedkey;
-	while (cmp != NULL) {
-		if (sctp_rn_are_keys_same(exist, cmp)) {
-			/* Keys are no longer the same */
-			return (rtfinalize_route(dst,
-			    (struct rtentry *)cmp, s));
-		} else {
-			cmp = cmp->rn_dupedkey;
-		}
+    cmp = exist->rn_dupedkey;
+    while(cmp != NULL) {
+	if (sctp_rn_are_keys_same(exist, cmp)) {
+	    /* Keys are no longer the same */
+	    return (rtfinalize_route(dst, 
+				     (struct rtentry *)cmp, s));
+
+	} else {
+	    cmp = cmp->rn_dupedkey;
 	}
-	return(NULL);
+    }
+    return(NULL);
 }
 
 /*
@@ -2374,12 +2413,12 @@ sctp_rtalloc_alternate(struct sockaddr *dst,
 	struct sockaddr *sa;
 	s = splnet();
 
-	if (existing == NULL){
+	if (existing == NULL) {
 		/* No existing route, we just to rtalloc1() */
 		goto noexisting;
 	}
 	if ((((struct radix_node *)existing)->rn_dupedkey == NULL)  ||
-	    (peer_dest_route)){
+	    (peer_dest_route)) {
 		/* No duplicated routes that we can access sorry :-< 
 		 * or the existing route is to one of the other
 		 * destinations.
@@ -2411,7 +2450,7 @@ sctp_rtalloc_alternate(struct sockaddr *dst,
 	 */
 	tmp = sctp_rt_scan_dups(dst,
 				(struct rtentry *)&existing->rt_nodes[0],s);
-	if(tmp)
+	if (tmp)
 	    return(tmp);
 
 	/* We have scanned from existing to the end of the
@@ -2421,25 +2460,28 @@ sctp_rtalloc_alternate(struct sockaddr *dst,
 	 * and work our way back around.
 	 */
  atendofchain:
+#ifdef __FreeBSD__
 	tmp = rtalloc1(dst, 0, (RTF_CLONING | RTF_PRCLONING));
+#else
+	tmp = rtalloc1(dst, 0);
+#endif
 	if (tmp == NULL) {
 		goto noexisting;
 	}
 	tmp->rt_refcnt--;
 	while (tmp != existing) {
-		tmp2 = sctp_rt_scan_dups(dst, tmp, s);
-		if (tmp2) {
-			/* found it */
-			return(tmp2);
-		} else {
-			/*
-			 * Move on to next element. 
-			 * If it turns to NULL it won't match existing and
-			 * the while will end.
-			 */
-			cmp = &tmp->rt_nodes[0];
-			tmp = (struct rtentry *)cmp->rn_dupedkey;
-		}
+	    tmp2 = sctp_rt_scan_dups(dst,tmp,s);
+	    if (tmp2) {
+		/* found it */
+		return(tmp2);
+	    } else {
+		/* Move on to next element. 
+		 * If it turns to NULL it won't match existing and
+		 * the while will end.
+		 */
+		cmp = &tmp->rt_nodes[0];
+		tmp = (struct rtentry *)cmp->rn_dupedkey;
+	    }
 	}
 	/*
 	 * There were no rn_dupedkey's on the existing route/
@@ -2463,7 +2505,7 @@ sctp_rtalloc_alternate(struct sockaddr *dst,
 		caddr_t tc;
 		if (curparent->rn_bit < 0) {
 			/* Not a internal node, up man up. */
-			if(curparent->rn_flags & RNF_ROOT){
+			if (curparent->rn_flags & RNF_ROOT) {
 			    /* we are at the ROOT node i.e.
 			     * all routes lead to default.
 			     */
@@ -2490,7 +2532,11 @@ sctp_rtalloc_alternate(struct sockaddr *dst,
 		*tc &= ~curparent->rn_bmask - 1;
 
 		/* now our sa has a shortened dst pointer */
+#ifdef __FreeBSD__
 		tmp = rtalloc1(sa,0,(RTF_CLONING | RTF_PRCLONING));
+#else
+		tmp = rtalloc1(sa,0);
+#endif
 		if (tmp == NULL) {
 			goto noexisting;
 		}
@@ -2498,11 +2544,10 @@ sctp_rtalloc_alternate(struct sockaddr *dst,
 		if (tmp == existing) {
 			/* Got the same result, move up */
 			if (curparent->rn_flags & RNF_ROOT) {
-				/*
-			 	 * we are at the ROOT node i.e.
-				 * all routes lead to default.
-				 */
-				goto noexisting;
+			    /* we are at the ROOT node i.e.
+			     * all routes lead to default.
+			     */
+			    goto noexisting;
 			}
 			curparent = curparent->rn_parent;
 			continue;
@@ -2511,7 +2556,11 @@ sctp_rtalloc_alternate(struct sockaddr *dst,
 		return(rtfinalize_route(dst, tmp, s));
 	}
  noexisting:
+#ifdef __FreeBSD__
 	tmp = rtalloc1(dst, 1, 0);
+#else
+	tmp = rtalloc1(dst, 1);
+#endif
 	splx(s);
 	return(tmp);
 }
@@ -2523,17 +2572,22 @@ rtalloc_alternate (struct sockaddr *dst ,struct rtentry *old,
 		   int peer_dest_route)
 {
 #if defined(SCTP_ALTERNATE_ROUTE) && defined(RADIX_MPATH)
-	/*
-	 * In order for this routine to work the KAME RADIX_MPATH option in
-	 * order for this to work. Right now this is only supported under
-	 * netbsd.
-	 */
-	return(sctp_rtalloc_alternate(dst,old,peer_dest_route));
+    /* In order for this routine to work the KAME RADIX_MPATH option in
+     * order for this to work. Right now this is only supported under
+     * netbsd.
+     */
+   return(sctp_rtalloc_alternate(dst,old,peer_dest_route));
 #else
 #ifdef __FreeBSD__
-	return(rtalloc1(dst, 1, 0UL));
+    return(rtalloc1(dst, 1, 0UL));
 #else
-	return(rtalloc1(dst, 1));
+    return(rtalloc1(dst, 1));
 #endif
 #endif
 }
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_asconf.h,v 1.3 2002/06/09 16:29:54 itojun Exp $	*/
+/*	$KAME: sctp_asconf.h,v 1.4 2002/07/30 04:12:34 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_asconf.h,v 1.15 2002/04/02 15:34:44 lei Exp	*/
 
 #ifndef _NETINET_SCTP_ASCONF_H_
@@ -16,10 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *      This product includes software developed by Cisco Systems, Inc.
- * 4. Neither the name of the project nor the names of its contributors
+ * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -70,6 +67,7 @@ sctp_set_primary_ip_address(struct ifaddr *ifa);
 extern void
 sctp_check_address_list(struct sctp_tcb *stcb,
 			struct mbuf *m, int offset, int length,
+			struct sockaddr *init_addr,
 			uint16_t local_scope, uint16_t site_scope,
 			uint16_t ipv4_scope, uint16_t loopback_scope);
 
