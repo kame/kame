@@ -208,10 +208,6 @@ pk_usrreq(so, req, m, nam, control, p)
 		 * user.
 		 */
 	case PRU_ACCEPT:
-		if ((so->so_state & SS_ISDISCONNECTED) != 0) {
-			error = ECONNABORTED;
-			break;
-		}
 		if (lcp->lcd_craddr == NULL)
 			break;
 		pk_setpeeraddr(lcp, nam);

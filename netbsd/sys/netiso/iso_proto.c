@@ -150,7 +150,7 @@ struct protosw  isosw[] = {
 	},
 
 	/* ISOPROTO_TP */
-	{SOCK_SEQPACKET, &isodomain, ISOPROTO_TP, PR_CONNREQUIRED | PR_WANTRCVD | PR_LISTEN,
+	{SOCK_SEQPACKET, &isodomain, ISOPROTO_TP, PR_CONNREQUIRED | PR_WANTRCVD | PR_LISTEN | PR_ABRTACPTDIS,
 		tpclnp_input, 0, tpclnp_ctlinput, tp_ctloutput,
 		tp_usrreq,
 		tp_init, tp_fasttimo, tp_slowtimo, tp_drain,
@@ -158,7 +158,7 @@ struct protosw  isosw[] = {
 
 #ifdef TPCONS
 	/* ISOPROTO_TP */
-	{SOCK_SEQPACKET, &isodomain, ISOPROTO_TP0, PR_CONNREQUIRED | PR_WANTRCVD | PR_LISTEN,
+	{SOCK_SEQPACKET, &isodomain, ISOPROTO_TP0, PR_CONNREQUIRED | PR_WANTRCVD | PR_LISTEN | PR_ABRTACPTDIS,
 		tpcons_input, 0, 0, tp_ctloutput,
 		tp_usrreq,
 		cons_init, 0, 0, 0,

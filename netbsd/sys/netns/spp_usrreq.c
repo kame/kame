@@ -1473,10 +1473,6 @@ spp_usrreq(so, req, m, nam, control, p)
 	 * of the peer, storing through addr.
 	 */
 	case PRU_ACCEPT:
-		if ((so->so_state & SS_ISDISCONNECTED) != 0) {
-			error = ECONNABORTED;
-			break;
-		}
 		ns_setpeeraddr(nsp, nam);
 		break;
 

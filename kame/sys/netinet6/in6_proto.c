@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.88 2001/03/20 02:44:39 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.89 2001/03/21 06:49:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -197,6 +197,7 @@ static struct pr_usrreqs nousrreqs;
 
 #ifndef __NetBSD__
 #define PR_LISTEN	0
+#define PR_ABRTACPTDIS	0
 #endif
 #ifdef __OpenBSD__
 #define PR_LASTHDR	0
@@ -238,7 +239,7 @@ struct ip6protosw inet6sw[] = {
 #endif
 },
 #ifdef TCP6
-{ SOCK_STREAM,	&inet6domain,	IPPROTO_TCP,	PR_CONNREQUIRED|PR_WANTRCVD|PR_LISTEN,
+{ SOCK_STREAM,	&inet6domain,	IPPROTO_TCP,	PR_CONNREQUIRED|PR_WANTRCVD|PR_LISTEN|PR_ABRTACPTDIS,
   tcp6_input,	0,		tcp6_ctlinput,	tcp6_ctloutput,
   tcp6_usrreq,
   tcp6_init,	tcp6_fasttimo,	tcp6_slowtimo,	tcp6_drain,
