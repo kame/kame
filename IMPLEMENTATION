@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.156 2000/09/06 10:59:45 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.157 2000/09/06 13:09:32 itojun Exp $
 
 1. IPv6
 
@@ -106,10 +106,11 @@ draft-itojun-ipv6-tcp-to-anycast-00.txt:
 	Disconnecting TCP connection toward IPv6 anycast address
 draft-ietf-ipngwg-scopedaddr-format-02.txt:
 	An Extension of Format for IPv6 Scoped Addresses
-draft-ietf-ipngwg-rfc2553bis-00.txt
-	A revised version of the advanced API to support scoped addresses.
+    * A revised version of the basic API to support scoped addresses.
+draft-ietf-ipngwg-rfc2553bis-00.txt:
+	Basic Socket Interface Extensions for IPv6 (revised)
 draft-ietf-ipngwg-rfc2292bis-01.txt:
-	A revised version of the advanced API
+	Advanced Sockets API for IPv6 (revised)
     * Some of the updates in the draft are not implemented yet.  See
       TODO.2292bis for more details.
 draft-ietf-ngtrans-tcpudp-relay-01.txt:
