@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.434 2000/01/13 17:18:19 itojun Exp $
+$Id: CHANGELOG,v 1.435 2000/01/14 03:17:31 itojun Exp $
 
 <200001>
+Fri Jan 14 12:15:27 JST 2000  itojun@iijlab.net
+	* kame/libinet6/rcmd.c: avoid passing dangling pointer to **ahost.
+	  we copy the value (ai_canonname, or hp->h_name) to static buffer
+	  to keep semantics of rcmd() - requires no free() to the caller.
+	  From: Hideaki YOSHIFUJI <yoshfuji@ecei.tohoku.ac.jp>
+
 Fri Jan 14 02:16:16 JST 2000  itojun@itojun.org
 	* kame/libpcap/inet.c: improve warning message when libpcap fails to
 	  get IPv4 address on the interface it runs on.
