@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.153 2000/08/28 16:54:51 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.154 2000/08/29 10:56:12 jinmei Exp $
 
 1. IPv6
 
@@ -418,12 +418,6 @@ To summarize the sysctl knob:
 					multiple interface is out-of-scope)
 	1		1		invalid, or experimental
 					(out-of-scope of spec)
-
-RFC2462 has validation rules against incoming RA prefix information option,
-in 5.5.3 (e).  This is to protect hosts from malicious (or misconfigured)
-routers that advertise very short prefix lifetime.
-There was an update from Jim Bound to ipngwg mailing list (look
-for "(ipng 6712)" in the archive) and KAME implements Jim's update.
 
 See 1.2 in the document for relationship between DAD and autoconfiguration.
 
