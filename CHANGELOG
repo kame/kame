@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.297 1999/11/25 11:01:33 sumikawa Exp $
+$Id: CHANGELOG,v 1.298 1999/11/26 10:51:45 itojun Exp $
 
 <199911>
+Fri Nov 26 19:50:19 JST 1999  itojun@iijlab.net
+	* KAME repository experienced a disk crash last night.  It was
+	  recovered by now.
+	* netbsd/sys/netinet/tcp_input.c, bsdi4/sys/netinet/tcp_input.c:
+	  implement upper-layer reachability confirmation hint to NDP.
+
 Thu Nov 25 19:57:44 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd2/ports/openssh: IPv6-enable openssh.
 	  obtained from fujiwara@rcac.tdi.co.jp
