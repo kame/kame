@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.110 2003/01/27 13:21:52 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.111 2003/02/04 02:59:22 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -537,7 +537,13 @@ client6_timo(arg)
 
 	ifp = ev->ifp;
 	ev->timeouts++;
-	if (ev->max_retrans_cnt && ev->timeouts > ev->max_retrans_cnt) {
+
+	/*
+	 * Unless MRC is zero, the message exchange fails once the client has
+	 * transmitted the message MRC times.
+	 * [dhcpv6-28 14.]
+	 */
+	if (ev->max_retrans_cnt && ev->timeouts >= ev->max_retrans_cnt) {
 		dprintf(LOG_INFO, "%s" "no responses were received", FNAME);
 		dhcp6_remove_event(ev);
 
