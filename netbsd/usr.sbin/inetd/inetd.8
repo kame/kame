@@ -380,6 +380,10 @@ will work as policy specifier.
 The content of the above comment line will be treated as IPsec policy string,
 as described in
 .Xr ipsec_set_policy 3 .
+You can specify multiple IPsec policy string by using semicolon
+as separator.
+If conflicting strings are found in a single line,
+the last string will take effect.
 A
 .Li "#@"
 line will affect all the following lines in

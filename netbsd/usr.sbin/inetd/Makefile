@@ -17,7 +17,7 @@ DPADD+=	${.CURDIR}/../../lib/libwrap/libwrap.a \
 # This is necessary due to be friendly with past API changes... DAMN.
 CPPFLAGS+=-Dss_family=__ss_family -Dss_len=__ss_len
 
-CFLAGS+=-DIPSEC
+CFLAGS+=-DIPSEC -DINET6
 CFLAGS+=-I${.CURDIR}/../../lib/libipsec
 LDADD+= -L${.CURDIR}/../../lib/libipsec -L${.CURDIR}/../../lib/libipsec/obj \
 	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \

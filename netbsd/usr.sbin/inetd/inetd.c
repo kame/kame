@@ -365,6 +365,8 @@ int		setconfig __P((void));
 void		setup __P((struct servtab *));
 #ifdef IPSEC
 int		ipsecsetup __P((struct servtab *));
+int		ipsecsetup_test __P((const char *));
+int		ipsecsetup0 __P((struct servtab *, const char *, int));
 #endif
 char	       *sskip __P((char **));
 char	       *skip __P((char **));
@@ -868,7 +870,9 @@ config(signo)
 				setup(sep);
 			break;
 		case AF_INET:
+#ifdef INET6
 		case AF_INET6:
+#endif
 		    {
 			struct addrinfo hints, *res;
 			char *host, *port;
@@ -979,7 +983,9 @@ retry(signo)
 			switch (sep->se_family) {
 			case AF_LOCAL:
 			case AF_INET:
+#ifdef INET6
 			case AF_INET6:
+#endif
 				setup(sep);
 				if (sep->se_fd != -1 && isrpcservice(sep))
 					register_rpc(sep);
@@ -1004,7 +1010,9 @@ goaway(signo)
 			(void)unlink(sep->se_service);
 			break;
 		case AF_INET:
+#ifdef INET6
 		case AF_INET6:
+#endif
 			if (sep->se_wait == 1 && isrpcservice(sep))
 				unregister_rpc(sep);
 			break;
@@ -1094,85 +1102,107 @@ int
 ipsecsetup(sep)
 	struct servtab *sep;
 {
+	char *p0, *p;
+	int error;
+
+	if (!sep->se_policy || sep->se_policy[0] == '\0')
+		p0 = p = newstr("in entrust; out entrust");
+	else
+		p0 = p = newstr(sep->se_policy);
+
+	error = 0;
+	while (1) {
+		p = strtok(p, ";");
+		if (p == NULL)
+			break;
+		while (*p && isspace(*p))
+			p++;
+		error = ipsecsetup0(sep, p, 1);
+		if (error < 0)
+			break;
+		p = NULL;
+	}
+
+	free(p0);
+	return error;
+}
+
+int
+ipsecsetup_test(policy)
+	const char *policy;
+{
+	char *p0, *p;
 	char *buf;
-	char *policy_in = NULL;
-	char *policy_out = NULL;
+	int error;
+
+	if (!policy)
+		return -1;
+	p0 = p = newstr((char *)policy);
+
+	error = 0;
+	while (1) {
+		p = strtok(p, ";");
+		if (p == NULL)
+			break;
+		while (*p && isspace(*p))
+			p++;
+		buf = ipsec_set_policy((char *)p, strlen(p));
+		if (buf == NULL) {
+			error = -1;
+			break;
+		}
+		free(buf);
+		p = NULL;
+	}
+
+	free(p0);
+	return error;
+}
+
+int
+ipsecsetup0(sep, policy, commit)
+	struct servtab *sep;
+	const char *policy;
+	int commit;
+{
 	int level;
 	int opt;
-	int ret;
+	char *buf;
+	int error;
 
+fprintf(stderr, "%p %s\n", sep, policy);
 	switch (sep->se_family) {
 	case AF_INET:
 		level = IPPROTO_IP;
+		opt = IP_IPSEC_POLICY;
 		break;
 #ifdef INET6
 	case AF_INET6:
 		level = IPPROTO_IPV6;
+		opt = IPV6_IPSEC_POLICY;
 		break;
 #endif
 	default:
 		return -1;
 	}
 
-	if (!sep->se_policy || sep->se_policy[0] == '\0') {
-		policy_in = "in entrust";
-		policy_out = "out entrust";
+	buf = ipsec_set_policy((char *)policy, strlen(policy));
+	if (buf != NULL) {
+		error = 0;
+		if (commit && setsockopt(sep->se_fd, level, opt,
+				buf, ipsec_get_policylen(buf)) < 0) {
+			syslog(LOG_ERR,
+				"%s/%s: ipsec initialization failed; %s",
+				sep->se_service, sep->se_proto, policy);
+			error = -1;
+		}
+		free(buf);
 	} else {
-		if (!strncmp("in", sep->se_policy, 2))
-			policy_in = sep->se_policy;
-		else if (!strncmp("out", sep->se_policy, 3))
-			policy_out = sep->se_policy;
-		else {
-			syslog(LOG_ERR, "invalid security policy \"%s\"",
-				sep->se_policy);
-			return -1;
-		}
+		syslog(LOG_ERR, "invalid security policy \"%s\"",
+			policy);
+		error = -1;
 	}
-
-	ret = 0;
-	if (policy_in != NULL) {
-		opt = (level == IPPROTO_IP) ? IP_IPSEC_POLICY
-					    : IPV6_IPSEC_POLICY;
-		buf = ipsec_set_policy(policy_in, strlen(policy_in));
-		if (buf != NULL) {
-			if (setsockopt(sep->se_fd, level, opt,
-					buf, ipsec_get_policylen(buf)) < 0
-			 && sep->se_policy) {
-				syslog(LOG_ERR,
-					"%s/%s: ipsec initialization failed",
-					sep->se_service, sep->se_proto,
-					policy_in);
-				ret = -1;
-			}
-			free(buf);
-		} else {
-			syslog(LOG_ERR, "invalid security policy \"%s\"",
-				policy_in);
-			ret = -1;
-		}
-	}
-	if (policy_out != NULL) {
-		opt = (level == IPPROTO_IP) ? IP_IPSEC_POLICY
-					    : IPV6_IPSEC_POLICY;
-		buf = ipsec_set_policy(policy_out, strlen(policy_out));
-		if (buf != NULL) {
-			if (setsockopt(sep->se_fd, level, opt,
-					buf, ipsec_get_policylen(buf)) < 0
-			 && sep->se_policy) {
-				syslog(LOG_ERR,
-					"%s/%s: ipsec initialization failed",
-					sep->se_service, sep->se_proto,
-					policy_out);
-				ret = -1;
-			}
-			free(buf);
-		} else {
-			syslog(LOG_ERR, "invalid security policy \"%s\"",
-				policy_out);
-			ret = -1;
-		}
-	}
-	return ret;
+	return error;
 }
 #endif
 
@@ -1322,7 +1352,6 @@ getconfigent()
 	char *hostdelim;
 #ifdef IPSEC
 	char *policy = NULL;
-	char *dummy;
 #endif
 
 more:
@@ -1338,17 +1367,15 @@ more:
 					free(policy);
 				policy = NULL;
 			} else {
-				dummy = ipsec_set_policy(p, strlen(p));
-				if (dummy != NULL) {
-					free(dummy);
-					if (policy)
-						free(policy);
-					policy = newstr(p);
-				} else {
+				if (ipsecsetup_test(p) < 0) {
 					syslog(LOG_ERR,
 						"%s: invalid ipsec policy \"%s\"",
 						CONFIG, p);
 					exit(-1);
+				} else {
+					if (policy)
+						free(policy);
+					policy = newstr(p);
 				}
 			}
 		}
@@ -1553,9 +1580,11 @@ do { \
 		case '4':	/*tcp4 or udp4*/
 			sep->se_family = AF_INET;
 			break;
+#ifdef INET6
 		case '6':	/*tcp6 or udp6*/
 			sep->se_family = AF_INET6;
 			break;
+#endif
 		default:
 			sep->se_family = AF_INET;	/*will become AF_INET6*/
 			break;
@@ -2252,7 +2281,9 @@ dolog(sep, ctrl)
 
 	switch (sep->se_family) {
 	case AF_INET:
+#ifdef INET6
 	case AF_INET6:
+#endif
 		break;
 	default;
 		return;
@@ -2271,7 +2302,9 @@ dolog(sep, ctrl)
 	}
 	switch (sa->sa_family) {
 	case AF_INET:
+#ifdef INET6
 	case AF_INET6:
+#endif
 		break;
 	default;
 		syslog(LOG_ERR, "unexpected address family %u", sa->sa_family);
@@ -2367,17 +2400,21 @@ int	ctrl;
 	case AF_INET:
 		myport = ((struct sockaddr_in *)&here)->sin_port;
 		break;
+#ifdef INET6
 	case AF_INET6:
 		myport = ((struct sockaddr_in6 *)&here)->sin6_port;
 		break;
+#endif
 	}
 	switch (there->sa_family) {
 	case AF_INET:
 		hisport = ((struct sockaddr_in *)sa)->sin_port;
 		break;
+#ifdef INET6
 	case AF_INET6:
 		hisport = ((struct sockaddr_in6 *)sa)->sin6_port;
 		break;
+#endif
 	}
 	/* Set up timer so we won't get stuck. */
 
@@ -2391,9 +2428,11 @@ int	ctrl;
 	case AF_INET:
 		((struct sockaddr_in *)&sin)->sin_port = htons(0);
 		break;
+#ifdef INET6
 	case AF_INET6:
 		((struct sockaddr_in6 *)&sin)->sin6_port = htons(0);
 		break;
+#endif
 	}
 	if (bind(s, (struct sockaddr *) &sin, sin.ss_len) == -1) {
 		syslog(LOG_ERR, "bind: %m");
@@ -2414,9 +2453,11 @@ int	ctrl;
 	case AF_INET:
 		((struct sockaddr_in *)&sin)->sin_port = htons(RFC931_PORT);
 		break;
+#ifdef INET6
 	case AF_INET6:
 		((struct sockaddr_in6 *)&sin)->sin6_port = htons(RFC931_PORT);
 		break;
+#endif
 	}
 	if (connect(s, (struct sockaddr *) &sin, sin.ss_len) == -1) {
 		close(s);
