@@ -1,4 +1,4 @@
-.\"	$KAME: ping6.8,v 1.52 2002/04/24 07:46:57 jinmei Exp $
+.\"	$KAME: ping6.8,v 1.53 2002/05/16 22:56:18 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -217,7 +217,7 @@ Node information multicast group will be computed based on given
 .Ar host ,
 and will be used as the final destination.
 Since node information multicast group is a link-local multicast group,
-destination link needs to be specified by
+outgoing interface needs to be specified by
 .Fl I
 option.
 .It Fl p Ar pattern
