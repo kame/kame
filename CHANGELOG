@@ -1,10 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.727 2000/03/26 11:07:20 itojun Exp $
+$Id: CHANGELOG,v 1.728 2000/03/26 19:17:17 sumikawa Exp $
 
 <200003>
 Sun Mar 26 20:05:55 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/mail/fetchmail: upgrade to 5.3.4.
+
+Sat Mar 25 16:55:37 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd4/sys: import FreeBSD 4.0-RELEASE. This is just
+	  virgin import. Migration does not ended yet.
 
 Sat Mar 25 14:52:06 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd[23]/ports/socks64: upgrade to latest patch.
