@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.22 2000/02/16 08:14:26 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.23 2000/03/24 16:12:46 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -92,9 +92,36 @@ static u_int keylen_ealg __P((u_int t_id, int encklen));
 static int pk_recvgetspi __P((caddr_t *mhp));
 static int pk_recvupdate __P((caddr_t *mhp));
 static int pk_recvadd __P((caddr_t *mhp));
-static int pk_recvexpire __P((caddr_t *mhp));
+static int pk_recvdelete __P((caddr_t *mhp));
 static int pk_recvacquire __P((caddr_t *mhp));
+static int pk_recvexpire __P((caddr_t *mhp));
 static struct sadb_msg *pk_recv __P((int so, int *lenp));
+
+static int (*pkrecvf[]) __P((caddr_t *)) = {
+NULL,
+pk_recvgetspi,
+pk_recvupdate,
+pk_recvadd,
+pk_recvdelete,
+NULL,	/* SADB_GET */
+pk_recvacquire,
+NULL,	/* SADB_REGISTER */
+pk_recvexpire,
+NULL,	/* SADB_FLUSH */
+NULL,	/* SADB_DUMP */
+NULL,	/* SADB_X_PROMISC */
+NULL,	/* SADB_X_PCHANGE */
+NULL,	/* SADB_X_SPDUPDATE */
+NULL,	/* SADB_X_SPDADD */
+NULL,	/* SADB_X_SPDDELETE */
+NULL,	/* SADB_X_SPDGET */
+NULL,	/* SADB_X_SPDACQUIRE */
+NULL,	/* SADB_X_SPDDUMP */
+NULL,	/* SADB_X_SPDFLUSH */
+NULL,	/* SADB_X_SPDSETIDX */
+NULL,	/* SADB_X_SPDEXPIRE */
+NULL,	/* SADB_X_SPDDELETE2 */
+};
 
 /*
  * PF_KEY packet handler
@@ -164,56 +191,16 @@ pfkey_handler()
 	}
 	msg = (struct sadb_msg *)mhp[0];
 
-	switch (msg->sadb_msg_type) {
-	case SADB_ACQUIRE:
-		if (pk_recvacquire(mhp) < 0)
-			goto end;
-		break;
-
-	case SADB_GETSPI:
-		if (pk_recvgetspi(mhp) < 0)
-			goto end;
-		break;
-
-	case SADB_UPDATE:
-		if (pk_recvupdate(mhp) < 0)
-			goto end;
-		break;
-
-	case SADB_ADD:
-		if (pk_recvadd(mhp) < 0)
-			goto end;
-		break;
-
-	case SADB_REGISTER:
-		/* XXX to be check to wait entry of register. */
-		break;
-
-	case SADB_EXPIRE:
-		if (pk_recvexpire(mhp) < 0)
-			goto end;
-		break;
-
-	case SADB_DUMP:
-		/* ignore */
-		break;
-
-	case SADB_FLUSH:
-		/* XXX should be flush ipsec-sa table */
-		/* ignore, now. */
-		break;
-
-	case SADB_DELETE:
-		isakmp_info_send_d2_pf(msg);
-		break;
-
-	default:
+	if (pkrecvf[msg->sadb_msg_type] == NULL) {
 		YIPSDEBUG(DEBUG_PFKEY,
 			plog(logp, LOCATION, NULL,
 				"not supported command %s\n",
 				s_pfkey_type(msg->sadb_msg_type)));
 		goto end;
 	}
+
+	if ((pkrecvf[msg->sadb_msg_type])(mhp) < 0)
+		goto end;
 
 	error = 0;
 end:
@@ -1421,6 +1408,21 @@ pk_recvacquire(mhp)
 		iph2 = NULL;
 		return -1;
 	}
+
+	return 0;
+}
+
+static int
+pk_recvdelete(mhp)
+	caddr_t *mhp;
+{
+	/* sanity check */
+	if (mhp[0] == NULL) {
+		plog(logp, LOCATION, NULL,
+			"inappropriate sadb acquire message passed.\n");
+		return -1;
+	}
+	isakmp_info_send_d2_pf((struct sadb_msg *)mhp[0]);
 
 	return 0;
 }
