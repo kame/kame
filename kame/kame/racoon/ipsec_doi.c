@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.76 2000/06/01 06:16:00 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.77 2000/06/01 06:24:15 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -131,7 +131,7 @@ static int (*check_attributes[]) __P((struct isakmp_pl_t *)) = {
 static int setph1prop __P((struct isakmpsa *props, caddr_t buf));
 static int setph1trns __P((struct isakmpsa *props, caddr_t buf));
 static int setph1attr __P((struct isakmpsa *props, caddr_t buf));
-static vchar_t *ipsecdoi_setph2proposal0 __P((const struct ph2handle *,
+static vchar_t *setph2proposal0 __P((const struct ph2handle *,
 	const struct saprop *, const struct saproto *));
 
 /*%%%*/
@@ -2179,7 +2179,7 @@ setph1attr(sa, buf)
 }
 
 static vchar_t *
-ipsecdoi_setph2proposal0(iph2, pp, pr)
+setph2proposal0(iph2, pp, pr)
 	const struct ph2handle *iph2;
 	const struct saprop *pp;
 	const struct saproto *pr;
@@ -2362,7 +2362,7 @@ ipsecdoi_setph2proposal(iph2)
 	propoff = -1;
 	for (a = proposal; a; a = a->next) {
 		for (b = a->head; b; b = b->next) {
-			q = ipsecdoi_setph2proposal0(iph2, a, b);
+			q = setph2proposal0(iph2, a, b);
 			if (q == NULL) {
 				vfree(mysa);
 				return NULL;
