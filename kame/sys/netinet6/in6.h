@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.74 2001/02/04 05:39:42 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.75 2001/02/06 04:27:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -233,6 +233,14 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
 #else
 #define IN6_ARE_ADDR_EQUAL(a, b)			\
     (memcmp(&(a)->s6_addr[0], &(b)->s6_addr[0], sizeof(struct in6_addr)) == 0)
+#endif
+
+#ifdef _KERNEL			/* non standard */
+/* see if two addresses are equal in a scope-conscious manner. */
+#define SA6_ARE_ADDR_EQUAL(a, b) \
+	(((a)->sin6_scope_id == 0 || (b)->sin6_scope_id == 0 || \
+	  ((a)->sin6_scope_id == (b)->sin6_scope_id)) && \
+	 (bcmp(&(a)->sin6_addr, &(b)->sin6_addr, sizeof(struct in6_addr))))
 #endif
 
 /*
