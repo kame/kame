@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.52 2000/06/19 07:55:32 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.53 2000/06/28 05:29:18 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -160,7 +160,7 @@ pfkey_handler()
 	YIPSDEBUG(DEBUG_PFKEY,
 		plog(logp, LOCATION, NULL, "get pfkey %s message\n",
 			s_pfkey_type(msg->sadb_msg_type)));
-	YIPSDEBUG(DEBUG_SVERB, kdebug_sadb(msg));
+	YIPSDEBUG(DEBUG_PFKEY, kdebug_sadb(msg));
 
 	/* is it mine ? */
 	/* XXX should be handled all message in spite of mine */

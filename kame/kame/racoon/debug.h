@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: debug.h,v 1.11 2000/06/27 16:56:34 sakane Exp $ */
+/* YIPS @(#)$Id: debug.h,v 1.12 2000/06/28 05:29:18 sakane Exp $ */
 
 #define DEBUG_INFO	0x00000002	/* force informational */
 #define DEBUG_NOTIFY	0x00000004	/* force notify */
@@ -53,7 +53,6 @@
 
 #define DEBUG_DSA	(DEBUG_SVERB | DEBUG_SA)
 #define DEBUG_DKEY	(DEBUG_SVERB | DEBUG_KEY)
-#define DEBUG_DPFKEY	(DEBUG_SVERB | DEBUG_PFKEY)
 #define DEBUG_DCERT	(DEBUG_SVERB | DEBUG_CERT)	/* private key */
 #define DEBUG_DMISC	(DEBUG_SVERB | DEBUG_MISC)
 
