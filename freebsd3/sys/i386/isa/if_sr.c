@@ -60,8 +60,6 @@
 #error Device 'sr' requires sppp.
 #endif
 
-#include "opt_inet.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -72,11 +70,6 @@
 
 #include <net/if.h>
 #include <net/if_sppp.h>
-#ifdef INET6
-#include <net/if_types.h>
-#include <netinet/in.h>
-#include <netinet6/in6_ifattach.h>
-#endif
 
 #if NBPFILTER > 0
 #include <net/bpf.h>

@@ -37,8 +37,6 @@
  *
  */
 
-#include "opt_inet.h"
-
 #include "ed.h"
 #include "bpfilter.h"
 #include "pnp.h"
@@ -70,12 +68,6 @@
 #if NBPFILTER > 0
 #include <net/bpf.h>
 #endif
-
-#ifdef INET6
-#include <netinet/in.h>
-#include <netinet6/in6_ifattach.h>
-#endif
-
 #include "opt_bdg.h"
 #ifdef BRIDGE
 #include <net/bridge.h>
@@ -247,10 +239,6 @@ edinit(struct pccard_devinfo *devi)
 			sc->arpcom.ac_enaddr[i] = devi->misc[i];
 	if (ed_attach_isa(&devi->isahd) == 0)
 		return(ENXIO);
-#ifdef INET6
-	in6_ifattach(&sc->arpcom.ac_if, IN6_IFT_802,
-		     (caddr_t)sc->arpcom.ac_enaddr, 0);
-#endif /* INET6 */
 
 	return(0);
 }
