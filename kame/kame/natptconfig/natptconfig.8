@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"	$Id: natptconfig.8,v 1.5 2000/03/21 04:55:16 itojun Exp $
+.\"	$Id: natptconfig.8,v 1.6 2000/04/16 17:58:49 itojun Exp $
 .\"
 .\" Note: The date here should be updated whenever a non-trivial
 .\" change is made to the manual page.
@@ -44,7 +44,7 @@
 .Nm natptconfig
 .Fl f Ar configfile
 .Nm natptconfig
-.Ar show ...
+.Ar subcommand Op Ar args...
 .\"
 .Sh DESCRIPTION
 .Nm Natptconfig
@@ -62,7 +62,7 @@ directives.  By specifying
 standard input is used.
 .Pp
 .El
-The second form is to show various useful information read from kernel.
+The second form is to give single directive directly from the command line.
 .\"
 .Sh DIRECTIVES
 Each rule processed by translater is added in the kernel internal
@@ -76,7 +76,7 @@ The following directives are available in the configuration file.
 .It Xo
 .Li interface
 .Ar interfaceName
-.Li {internal|external}
+.Li (internal|external)
 .Xc
 Mark interface <interfaceName> as external (outside) or internal
 (inside).  External (outside) means that the interface is on the
@@ -85,8 +85,8 @@ the private side.  Only packets arriving on this interface will be
 subject to IPv6-to-IPv4 protocol translation.
 .\"
 .It Xo
-.Li prefix
-.Ar natpt <v6addr> / <prefixlen>
+.Li prefix natpt
+.Ar v6addr Li / Ar prefixlen
 .Xc
 Set NAT-PT prefix, and packet addressed to this prefix will subject to
 translate.  A number followed by a slash (/) represent the number of
@@ -94,20 +94,25 @@ bits significant in the IP address.  96bit prefix is used in case of
 most.
 .\"
 .It Xo
-.Li map {inbound|outbound} from <v6addr> [port] to <v4addr> port
+.Li map (inbound|outbound) from
+.Ar v6addr
+.Op Ar port
+.Li to
+.Ar v4addr
+.Op Ar port
 .Xc
 Add translater rule into the kernel internal lists.  Outgoing or
 incoming packet mathes this rule will subject to translate.  The rules
 for returning packet is not appear in this map list.
 .\"
 .It Xo
-.Li map flush [{static|dynamic}]
+.Li map flush [(static|dynamic)]
 .Xc
 Remove all rules from the kernel.  If static or dynamic was specified,
 corresponding rule will removed.
 .\"
 .It Xo
-.Li map {enable|disable}
+.Li map (enable|disable)
 .Xc
 Enable or disable translation.
 .El
@@ -121,7 +126,7 @@ The following directives are available in interactive use.
 Show available actions on each stage.
 .\"
 .It Xo
-.Li set Ar var = value
+.Li set Ar var Li = Ar value
 .Xc
 This option allows to setting of the following variables:
 .Bl -tag -width XXX
@@ -135,7 +140,7 @@ Value can use decimal or hexadecimal (begin with 0x) notation.
 Currently, blank of each side of '=' is not allowed.
 .\"
 .It Xo
-.Li show [subcommand...]
+.Li show Ar subcommand Op Ar args...
 .Xc
 Show various useful information.
 .Nm natptconfig
@@ -153,10 +158,14 @@ Show NAT-PT prefix and prefix mask.
 Show NAT-PT rules which set by statically.
 .It dynamic
 Show NAT-PT rules which set by dynamically.
-.It xlate [[long] [interval]]
+.It Xo
+.Li xlate
+.Op Li long
+.Op Ar interval
+.Xc
 Show NAT-PT current translation table entry.
-Interval is a
-number, and this option specified,
+.Ar interval
+is a number, and this option specified,
 .Nm natptconfig
 will continuously display the information which is shown with xlate
 subcommand in specified second interval.
@@ -174,7 +183,7 @@ Show variables set with set subcommand.
 .It mapping
 Show current mapping status.  Status is displayed as "enable" or "disable".
 .El
-.It test [subcommand...]
+.It test Ar subcommand Op Ar args...
 Test log system.  You must run natptlog command.  When only log
 specified, send LOGTESTPATTERN to translator, and translator send this
 pattern to log system.  When you running natptlog command, this
@@ -185,9 +194,9 @@ shown.
 Show available subcommands on each stage.
 .It log
 Send predefined pattern LOGTESTPATTERN to the log system.
-.It log NAME
+.It log Ar name
 Send one word to the log system.
-.It log "STRING"
+.It log Ar string
 Send double quoted string to the log system.  String should be double
 quoted.
 .El
@@ -237,7 +246,7 @@ The following is an example of '?' directive.
 	set		Set  value to in-kernel variable.
 	show		Show setting.
 % natptconfig interface ?
-	<interfaceName> {internal|external}
+	<interfaceName> (internal|external)
 %
 .Ed
 .Pp
