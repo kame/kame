@@ -729,16 +729,16 @@ grab_myaddrs()
 	     ifrp < ifr_end;
 	     ifrp = (struct ifreq *)((char *)ifrp + siz)) {
 		memcpy(ifrbuf, ifrp, sizeof(*ifrp));
-		siz = ((struct ifreq *)ifrbuf)->ifr_addr.sa_len;
-		if (siz < sizeof(ifrp->ifr_addr))
-			siz = sizeof(ifrp->ifr_addr);
-		siz += (sizeof(*ifrp) - sizeof(ifrp->ifr_addr));
+		ifr = (struct ifreq *)ifrbuf;
+		siz = ifr->ifr_addr.sa_len;
+		if (siz < sizeof(ifr->ifr_addr))
+			siz = sizeof(ifr->ifr_addr);
+		siz += (sizeof(*ifrp) - sizeof(ifr->ifr_addr));
 		if (siz > sizeof(ifrbuf)) {
 			/* ifr too big */
 			break;
 		}
 		memcpy(ifrbuf, ifrp, siz);
-		ifr = (struct ifreq *)ifrbuf;
 
 		switch (ifr->ifr_addr.sa_family) {
 		case AF_INET:
