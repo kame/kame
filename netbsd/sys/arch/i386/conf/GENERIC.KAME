@@ -44,4 +44,4 @@ options 	ALTQ_PRIQ	#priority queue
 # ART routing table lookup algorithm (inet/inet6)
 #options 	RADIX_ART
 # multipath support in radix routing table
-#options 	RADIX_MPATH
+options 	RADIX_MPATH
