@@ -41,7 +41,6 @@ static struct dhcp6_opt dh6opttab[] = {
 	{ OC6_IPADDR, OL6_N,	"IP Address",			OT6_NONE, },
 
 	/* General Extension */
-	{ OC6_TIMEOFFSET, 4,		"Time Offset",		OT6_NUM, },
 	{ OC6_TIMEZONE, OL6_N,	"IEEE 1003.1 POSIX Timezone",	OT6_STR, },
 	{ OC6_DNS, OL6_16N,	"Domain Name Server",		OT6_V6, },
 	{ OC6_DOMAIN, OL6_N,	"Domain Name",			OT6_STR, },
@@ -64,6 +63,8 @@ static struct dhcp6_opt dh6opttab[] = {
 	{ OC6_MAXSIZE, 4,	"Maximum DHCPv6 Message Size",	OT6_NUM, },
 	{ OC6_CONFPARAM, OL6_N,	"DHCP Retransmission and Configuration Parameter",
 							OT6_NONE, },
+	{ OC6_ERE, OL6_N,	"Extension Request",		OT6_NONE, },
+	{ OC6_PREFIX, OL6_N,	"Subnet Prefix",		OT6_NONE, },
 	{ OC6_PLATSPECIFIC, OL6_N,	"Platform Specific Information",
 	  							OT6_NONE, },
 	{ OC6_PLATCLASSID, OL6_N,	"Platform Class Identifier",
@@ -72,8 +73,6 @@ static struct dhcp6_opt dh6opttab[] = {
 	{ OC6_RECONFMADDR, 16,	"Reconfigure Multicast Address", OT6_V6, },
 	{ OC6_RENUMSERVERADDR, 16,	"Renumber DHCPv6 Server Address",
 							OT6_V6, },
-	{ OC6_DHCPICMPERR, OL6_N,	"DHCP Relay ICMP Error Message",
-	  							OT6_NONE, },
 	{ OC6_CLISVRAUTH, OL6_N,	"Client-Server Authentication",
 	  							OT6_NONE, },
 	{ OC6_CLIKEYSELECT, 4,	"Client Key Selection",		OT6_NUM, },
