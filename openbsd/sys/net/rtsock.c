@@ -1009,5 +1009,5 @@ struct domain routedomain =
       routesw, &routesw[sizeof(routesw)/sizeof(routesw[0])] };
 
 #ifdef MIP6
-#include <net/rtsock_mip6.c>
+#include <net/rtsock_mip.c>
 #endif
