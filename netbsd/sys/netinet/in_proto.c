@@ -155,11 +155,6 @@
 #include <netinet/ip_gre.h>
 #endif
 
-#include "stf.h"
-#if NSTF > 0
-#include <net/if_stf.h>
-#endif
-
 #ifdef NATPT
 void	natpt_init	__P((void));
 int	natpt_usrreq	__P((struct socket *, int,
@@ -310,15 +305,6 @@ struct protosw in_gif_protosw =
   0,            0,              0,              0,
 };
 #endif /*NGIF*/
-
-#if NSTF > 0
-struct protosw in_stf_protosw =
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
-  in_stf_input, rip_output,	0,		rip_ctloutput,
-  rip_usrreq,
-  0,            0,              0,              0
-};
-#endif /*NSTF*/
 
 struct domain inetdomain =
     { PF_INET, "internet", 0, 0, 0, 

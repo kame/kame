@@ -82,11 +82,6 @@
 #include <netinet/in_gif.h>
 #endif
 
-#include "stf.h"
-#if NSTF > 0
-#include <net/if_stf.h>
-#endif
-
 #ifdef IPXIP
 #include <netipx/ipx_ip.h>
 #endif
@@ -230,16 +225,6 @@ struct protosw inetsw[] = {
 struct protosw in_gif_protosw =
 { SOCK_RAW,	&inetdomain,	0/*IPPROTO_IPV[46]*/,	PR_ATOMIC|PR_ADDR,
   in_gif_input, rip_output,	0,		rip_ctloutput,
-  0,
-  0,            0,              0,              0,
-  &rip_usrreqs
-};
-#endif
-
-#if NSTF > 0
-struct protosw in_stf_protosw =
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
-  in_stf_input, rip_output,	0,		rip_ctloutput,
   0,
   0,            0,              0,              0,
   &rip_usrreqs
