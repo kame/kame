@@ -1,6 +1,6 @@
 TODO list for the new advanced API (aka rfc2292bis)
 KAME project
-$Id: TODO.2292bis,v 1.7 2000/01/04 12:00:22 jinmei Exp $
+$Id: TODO.2292bis,v 1.8 2000/01/04 14:18:48 jinmei Exp $
 
 new socket options or ancillary data types:
 - IPV6_RTHDRDSTOPTS	done/20000102	jinmei
@@ -37,7 +37,7 @@ Function		Status		Date		Commiter
 - inet6_rth_add()	worked		20000102	jinmei
 - inet6_rth_getaddr()	worked		19991223	jinmei
 - inet6_rth_init()	worked		20000102	jinmei
-- inet6_rth_reverse()	implemented	20000102	jinmei
+- inet6_rth_reverse()	worked		20000104	jinmei
 - inet6_rth_segments()	worked		19991223	jinmei
 - inet6_rth_space()	worked		20000102	jinmei
 - rresvport_af()
