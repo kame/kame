@@ -1,4 +1,4 @@
-$KAME: README,v 1.1 2004/07/29 19:01:47 jinmei Exp $
+$KAME: README,v 1.2 2004/07/29 22:15:21 jinmei Exp $
 
 kame-dhcp6
 
@@ -16,7 +16,7 @@ kame-dhcp6
 	- RFC3646: DNS Configuration options for Dynamic Host
 	           Configuration Protocol for IPv6 (DHCPv6)
 
-	All the components of the main protocol are provided. i.e.,
+	All the components of the main protocol are provided, i.e.,
 	DHCPv6 clients, servers, and relay agents.
 
 	Supported message types are as follows:
@@ -24,7 +24,7 @@ kame-dhcp6
 	  Information-request, Relay-forward and Relay-reply.
 
 	Note that the current implementation does not support IPv6
-	address allocation via DHCPv6, and there is no plan to
+	address allocation by DHCPv6, and there is no plan to
 	implement that feature at the moment.  The main purpose of
 	this implementation is to provide a way of IPv6 prefix
 	delegation (RFC3633) and to provide some "stateless"
