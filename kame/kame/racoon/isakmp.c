@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.137 2001/04/03 15:51:55 thorpej Exp $	*/
+/*	$KAME: isakmp.c,v 1.138 2001/04/10 15:38:41 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -570,6 +570,13 @@ ph1_main(iph1, msg)
 	if (iph1->status == PHASE1ST_ESTABLISHED)
 		return 0;
 
+	/* add the message to received-list before processing it */
+	if (add_recvedpkt(msg, &iph1->rlist)) {
+		plog(LLV_ERROR, LOCATION, iph1->remote,
+		    "failed to manage a received packet.\n");
+		return -1;
+	}
+
 	/* receive */
 	if (ph1exchange[etypesw1(iph1->etype)]
 		       [iph1->side]
@@ -593,6 +600,7 @@ ph1_main(iph1, msg)
 			"failed to pre-process packet.\n");
 		return -1;
 #else
+		/* ignore the error and keep phase 1 handler */
 		return 0;
 #endif
 	}
@@ -621,12 +629,6 @@ ph1_main(iph1, msg)
 			[iph1->status])(iph1, msg) != 0) {
 		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"failed to process packet.\n");
-		return -1;
-	}
-
-	if (add_recvedpkt(msg, &iph1->rlist)) {
-		plog(LLV_ERROR, LOCATION, iph1->remote,
-			"failed to manage a received packet.\n");
 		return -1;
 	}
 
@@ -677,6 +679,13 @@ quick_main(iph2, msg)
 	 || iph2->status == PHASE2ST_GETSPISENT)
 		return 0;
 
+	/* add the message to received-list before processing it */
+	if (add_recvedpkt(msg, &iph2->rlist)) {
+		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
+		    "failed to manage a received packet.\n");
+		return -1;
+	}
+
 	/* receive */
 	if (ph2exchange[etypesw2(isakmp->etype)]
 		       [iph2->side]
@@ -725,12 +734,6 @@ quick_main(iph2, msg)
 			[iph2->status])(iph2, msg) != 0) {
 		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
 			"failed to process packet.\n");
-		return -1;
-	}
-
-	if (add_recvedpkt(msg, &iph2->rlist)) {
-		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
-			"failed to manage a received packet.\n");
 		return -1;
 	}
 
@@ -1643,7 +1646,6 @@ isakmp_post_acquire(iph2)
 	if ((ph2exchange[etypesw2(ISAKMP_ETYPE_QUICK)]
 	                [iph2->side]
 	                [iph2->status])(iph2, NULL) != 0) {
-		unbindph12(iph2);
 		return -1;
 	}
 
@@ -1831,7 +1833,7 @@ isakmp_newcookie(place, remote, local)
 	struct sockaddr *remote;
 	struct sockaddr *local;
 {
-	vchar_t *buf, *buf2;
+	vchar_t *buf = NULL, *buf2 = NULL;
 	char *p;
 	int blen;
 	int alen;
@@ -1897,14 +1899,13 @@ isakmp_newcookie(place, remote, local)
 	/* copy random value */
 	buf2 = eay_set_random(lcconf->secret_size);
 	if (buf2 == NULL)
-		return -1;
+		goto end;
 	memcpy(p, buf2->v, lcconf->secret_size);
 	p += lcconf->secret_size;
 	vfree(buf2);
 
 	buf2 = eay_sha1_one(buf);
 	memcpy(place, buf2->v, sizeof(cookie_t));
-	vfree(buf2);
 
 	sa1 = val2str(place, sizeof (cookie_t));
 	plog(LLV_DEBUG, LOCATION, NULL, "new cookie:\n%s\n", sa1);
@@ -1912,6 +1913,10 @@ isakmp_newcookie(place, remote, local)
 
 	error = 0;
 end:
+	if (buf != NULL)
+		vfree(buf);
+	if (buf2 != NULL)
+		vfree(buf2);
 	return error;
 }
 
