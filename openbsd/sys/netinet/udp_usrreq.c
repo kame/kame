@@ -75,6 +75,11 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
 
+#include "faith.h"
+#if defined(NFAITH) && 0 < NFAITH
+#include <net/if_faith.h>
+#endif
+
 #ifdef IPSEC
 #include <netinet/ip_ipsp.h>
 
@@ -129,14 +134,15 @@ udp6_input(mp, offp, proto)
 	int *offp, proto;
 {
 	struct mbuf *m = *mp;
+#if defined(NFAITH) && 0 < NFAITH
+	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
+#endif
 
 #if defined(NFAITH) && 0 < NFAITH
-	if (m->m_pkthdr.rcvif) {
-		if (m->m_pkthdr.rcvif->if_type == IFT_FAITH) {
-			/* XXX send icmp6 host/port unreach? */
-			m_freem(m);
-			return IPPROTO_DONE;
-		}
+	if (faithprefix(&ip6->ip6_dst)) {
+		/* XXX send icmp6 host/port unreach? */
+		m_freem(m);
+		return IPPROTO_DONE;
 	}
 #endif
 

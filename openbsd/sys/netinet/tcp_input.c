@@ -93,6 +93,11 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet/icmp6.h>
 #include <netinet6/nd6.h>
 
+#include "faith.h"
+#if defined(NFAITH) && 0 < NFAITH
+#include <net/if_faith.h>
+#endif
+
 struct	tcpiphdr tcp_saveti;
 struct  tcpipv6hdr tcp_saveti6;
 
@@ -324,14 +329,13 @@ tcp6_input(mp, offp, proto)
 	int *offp, proto;
 {
 	struct mbuf *m = *mp;
+	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 
 #if defined(NFAITH) && 0 < NFAITH
-	if (m->m_pkthdr.rcvif) {
-		if (m->m_pkthdr.rcvif->if_type == IFT_FAITH) {
-			/* XXX send icmp6 host/port unreach? */
-			m_freem(m);
-			return IPPROTO_DONE;
-		}
+	if (faithprefix(&ip6->ip6_dst)) {
+		/* XXX send icmp6 host/port unreach? */
+		m_freem(m);
+		return IPPROTO_DONE;
 	}
 #endif
 
@@ -341,7 +345,6 @@ tcp6_input(mp, offp, proto)
 	 */
 	if (m->m_flags & M_ANYCAST6) {
 		if (m->m_len >= sizeof(struct ip6_hdr)) {
-			struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 			icmp6_error(m, ICMP6_DST_UNREACH,
 				ICMP6_DST_UNREACH_ADDR,
 				(caddr_t)&ip6->ip6_dst - (caddr_t)ip6);
