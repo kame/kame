@@ -1,5 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2463 2003/08/26 13:42:04 keiichi Exp $
+$KAME: CHANGELOG,v 1.2464 2003/09/05 08:42:32 suz Exp $
+
+<200309>
+2003-09-05 SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* (freebsd[45],netbsd,openbsd)/usr.sbin/rtsold/Makefile:
+	Fixed a bug that RS message is not advertised on ISATAP interface.
+	If your SNAP is newer than kame-snap-20030414 and you'd like to use
+	ISATAP, you have to rebuild rtsold from scratch.
 
 <200308>
 Tue Aug 26 22:37:38 JST 2003	keiichi@iij.ad.jp
