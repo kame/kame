@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.139 1999/09/26 19:43:53 sumikawa Exp $
+$Id: CHANGELOG,v 1.140 1999/09/27 03:29:22 sumikawa Exp $
 
 <199909>
+Mon Sep 27 12:28:13 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/ethereal: upgrade to 0.7.5.
+
 Mon Sep 27 04:33:31 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd[23]/ports/tcp_wrapper, netbsd/ports/tcp_wrapper:
 	  upgraded to latest IPv6 patch made by ume@mahoroba.org.
