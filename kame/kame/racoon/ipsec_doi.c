@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.154 2001/12/31 20:13:40 thorpej Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.155 2002/01/26 02:50:09 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3140,14 +3140,12 @@ ipsecdoi_setid1(iph1)
 		switch (ipid->sa_family) {
 		case AF_INET:
 			id_b.type = IPSECDOI_ID_IPV4_ADDR;
-			id_b.port = ((struct sockaddr_in *)ipid)->sin_port;
 			l = sizeof(struct in_addr);
 			p = (caddr_t)&((struct sockaddr_in *)ipid)->sin_addr;
 			break;
 #ifdef INET6
 		case AF_INET6:
 			id_b.type = IPSECDOI_ID_IPV6_ADDR;
-			id_b.port = ((struct sockaddr_in6 *)ipid)->sin6_port;
 			l = sizeof(struct in6_addr);
 			p = (caddr_t)&((struct sockaddr_in6 *)ipid)->sin6_addr;
 			break;
@@ -3158,6 +3156,7 @@ ipsecdoi_setid1(iph1)
 			goto err;
 		}
 		id_b.proto_id = IPPROTO_UDP;
+		id_b.port = htons(PORT_ISAKMP);
 		ident = vmalloc(l);
 		if (!ident) {
 			plog(LLV_ERROR, LOCATION, NULL,
