@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.32 2000/08/29 10:51:33 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.33 2000/08/29 11:05:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -76,6 +76,10 @@
 
 #include <net/net_osdep.h>
 
+/*
+ * if you #undef it, re-enable call to ipsec_copypkt() from
+ * esp_output.c:esp_output()
+ */
 #define USE_BLOCKCRYPT
 
 #ifndef USE_BLOCKCRYPT

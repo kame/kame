@@ -1,4 +1,4 @@
-/*	$KAME: esp_output.c,v 1.27 2000/08/27 12:11:37 itojun Exp $	*/
+/*	$KAME: esp_output.c,v 1.28 2000/08/29 11:05:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -320,6 +320,7 @@ esp_output(m, nexthdrp, md, isr, af)
 #endif
 	}
 
+#if 0 /*enable it if you #undef USE_BLOCKCRYPT in esp_core.c*/
 	/* make the packet over-writable */
 	mprev->m_next = NULL;
 	if ((md = ipsec_copypkt(md)) == NULL) {
@@ -328,6 +329,7 @@ esp_output(m, nexthdrp, md, isr, af)
 		goto fail;
 	}
 	mprev->m_next = md;
+#endif
 
 	espoff = m->m_pkthdr.len - plen;
 
@@ -336,7 +338,7 @@ esp_output(m, nexthdrp, md, isr, af)
 	 * before: IP ... payload
 	 * after:  IP ... ESP IV payload
 	 */
-	if (M_LEADINGSPACE(md) < esphlen) {
+	if (M_LEADINGSPACE(md) < esphlen || (md->m_flags & M_EXT) != 0) {
 		MGET(n, M_DONTWAIT, MT_DATA);
 		if (!n) {
 			m_freem(m);
