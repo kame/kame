@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.382 2005/01/14 04:14:40 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.383 2005/01/30 03:13:04 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -194,7 +194,7 @@ RFC3152: Delegation of IP6.ARPA
 RFC3315: Dynamic Host Configuration Protocol for IPv6 (DHCPv6)
     * the implementation is quite compliant to the specification for prefix
       delegation, stateless services, and non-temporary address assignment.
-      However, it intentionally drops the support of temporary address 
+      However, it intentionally drops the support for temporary address 
       assignment.
 RFC3319: Dynamic Host Configuration Protocol (DHCPv6) Options 
          for Session Initiation Protocol (SIP) Servers
