@@ -1,11 +1,12 @@
 include	"arch/i386/conf/GENERIC"
 
-options 	INET6		# IPV6
+option		INET6		# IPV6
 
 # for IPv6
 pseudo-device	gif		4
 #pseudo-device	dummy		1
 #pseudo-device	faith		1
+#pseudo-device	stf
 
 # a pseudo device needed for ALTQ
 pseudo-device	altq		# altq pseudo-device
@@ -31,3 +32,12 @@ option		HFSC_RED	# red for hfsc (needs HFSC and RED)
 option		HFSC_RIO	# rio for hfsc (needs HFSC, RIO, RED, HFSC_RED)
 option		CDNR		# diffserv traffic conditioner
 option		BLUE		# blue by wu-chang feng
+
+# mobile-ip6 options
+# Correspondent node: MIP6
+# Home agent: MIP6 + MIP6_HA
+# Mobile node: MIP6 + MIP6_MN
+#option		MIP6
+#option		MIP6_DEBUG
+#option		MIP6_HA		# only one from MIP6_HA or MIP6_MN
+#option		MIP6_MN		# only one from MIP6_HA or MIP6_MN
