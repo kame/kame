@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: setkey.8,v 1.17 2000/01/13 21:05:07 itojun Exp $
+.\"     $Id: setkey.8,v 1.18 2000/01/14 01:28:27 itojun Exp $
 .\"
 .Dd May 17, 1998
 .Dt SETKEY 8
@@ -276,7 +276,7 @@ is used for esp, it will be treated as ESP payload authentication algorithm.
 Specify compression algorithm.
 If
 .Fl R
-is specified with
+is not specified with
 .Li ipcomp
 line, the kernel will use well-known IPComp CPI
 .Pq compression parameter index
@@ -288,7 +288,7 @@ field is only for kernel internal use in this case.
 .\"Therefore, compression protocol number will appear on IPComp CPI field.
 If
 .Fl R
-is not used,
+is used,
 the value on
 .Ar spi
 field will appear on IPComp CPI field on outgoing packets.
