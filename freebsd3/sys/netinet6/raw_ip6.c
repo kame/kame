@@ -235,7 +235,7 @@ rip6_output(m, va_alist)
 	int error = 0;
 	struct ip6_pktopts opt, *optp = 0;
 	struct ifnet *oifp = NULL;
-	int type, code;		/* for ICMPv6 output statistics only */
+	int type = 0, code = 0;		/* for ICMPv6 output statistics only */
 	int priv = 0;
 	va_list ap;
 
