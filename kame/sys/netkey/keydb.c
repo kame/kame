@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.35 2000/01/04 13:59:11 itojun Exp $ */
+/* KAME $Id: keydb.c,v 1.36 2000/01/05 14:24:51 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -2963,7 +2963,7 @@ key_cmpsaidx_withmode(saidx0, saidx1)
 	 || saidx0->dst.ss_family != saidx1->dst.ss_family)
 		return 0;
 
-	/* If reqid of SPD is equal to 0, unique SA is required. */
+	/* If reqid of SPD is not equal to 0, unique SA is required. */
 	if (saidx1->reqid != 0
 	 && saidx0->reqid != saidx1->reqid)
 		return 0;
