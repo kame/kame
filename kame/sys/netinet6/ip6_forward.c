@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.137 2004/03/12 12:07:21 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.138 2004/04/09 05:37:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -671,8 +671,9 @@ ip6_forward(m, srcrt)
 	    !tunnel_out &&
 #endif
 	    (rt->rt_flags & (RTF_DYNAMIC|RTF_MODIFIED)) == 0) {
-		if ((rt->rt_ifp->if_flags & IFF_POINTOPOINT) &&
-		    nd6_is_addr_neighbor(&ip6->ip6_dst, rt->rt_ifp)) {
+		if ((rt->rt_ifp->if_flags & IFF_POINTOPOINT)) {
+			struct sockaddr_in6 sa6_dst;
+
 			/*
 			 * If the incoming interface is equal to the outgoing
 			 * one, the link attached to the interface is
@@ -688,10 +689,16 @@ ip6_forward(m, srcrt)
 			 * type/code is based on suggestion by Rich Draves.
 			 * not sure if it is the best pick.
 			 */
-			icmp6_error(mcopy, ICMP6_DST_UNREACH,
+			bzero(&sa6_dst, sizeof(sa6_dst));
+			sa6_dst.sin6_family = AF_INET6;
+			sa6_dst.sin6_len = sizeof(sa6_dst);
+			sa6_dst.sin6_addr = ip6->ip6_dst;
+			if (nd6_is_addr_neighbor(&sa6_dst, rt->rt_ifp)) {
+				icmp6_error(mcopy, ICMP6_DST_UNREACH,
 				    ICMP6_DST_UNREACH_ADDR, 0);
-			m_freem(m);
-			return;
+				m_freem(m);
+				return;
+			}
 		}
 		type = ND_REDIRECT;
 	}

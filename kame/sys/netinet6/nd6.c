@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.349 2004/04/09 05:07:58 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.350 2004/04/09 05:37:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1085,7 +1085,7 @@ nd6_lookup(addr6, create, ifp)
  */
 int
 nd6_is_addr_neighbor(addr, ifp)
-	struct in6_addr *addr;
+	struct sockaddr_in6 *addr;
 	struct ifnet *ifp;
 {
 	struct nd_prefix *pr;
@@ -1093,13 +1093,20 @@ nd6_is_addr_neighbor(addr, ifp)
 
 	/*
 	 * A link-local address is always a neighbor.
-	 * XXX: we should use the sin6_scope_id field rather than the embedded
-	 * interface index.
-	 * XXX: a link does not necessarily specify a single interface.
 	 */
-	if (IN6_IS_ADDR_LINKLOCAL(addr) &&
-	    ntohs(addr->s6_addr16[1]) == ifp->if_index)
-		return (1);
+	if (IN6_IS_ADDR_LINKLOCAL(&addr->sin6_addr)) {
+		struct sockaddr_in6 sin6_copy;
+
+		/*
+		 * in6_recoverscope() returns 0 if and only if ifp is attached
+		 * to the link of this address.  We need sin6_copy since
+		 * in6_recoverscope() may modify the content (XXX).
+		 */
+		if (in6_recoverscope(&sin6_copy, &addr->sin6_addr, ifp) == 0)
+			return (1);
+		else
+			return (0);
+	}
 
 	/*
 	 * If the address matches one of our on-link prefixes, it should be a
@@ -1112,8 +1119,8 @@ nd6_is_addr_neighbor(addr, ifp)
 		if (!(pr->ndpr_stateflags & NDPRF_ONLINK))
 			continue;
 
-		if (IN6_ARE_MASKED_ADDR_EQUAL(&pr->ndpr_prefix, addr,
-		    &pr->ndpr_mask))
+		if (IN6_ARE_MASKED_ADDR_EQUAL(&pr->ndpr_prefix,
+		    &addr->sin6_addr, &pr->ndpr_mask))
 			return (1);
 	}
 
@@ -1132,7 +1139,7 @@ nd6_is_addr_neighbor(addr, ifp)
 	 * Even if the address matches none of our addresses, it might be
 	 * in the neighbor cache.
 	 */
-	if ((rt = nd6_lookup(addr, 0, ifp)) != NULL)
+	if ((rt = nd6_lookup(&addr->sin6_addr, 0, ifp)) != NULL)
 		return (1);
 
 	return (0);
@@ -1350,8 +1357,7 @@ nd6_rtrequest(req, rt, sa)
 
 	if (req == RTM_RESOLVE &&
 	    (nd6_need_cache(ifp) == 0 || /* stf case */
-	     !nd6_is_addr_neighbor(&((struct sockaddr_in6 *)rt_key(rt))->sin6_addr,
-	     ifp))) {
+	     !nd6_is_addr_neighbor((struct sockaddr_in6 *)rt_key(rt), ifp))) {
 		/*
 		 * FreeBSD and BSD/OS often make a cloned host route based
 		 * on a less-specific route (e.g. the default route).
@@ -2169,7 +2175,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 {
 	struct mbuf *m = m0;
 	struct rtentry *rt = rt0;
-	struct in6_addr *gw6 = NULL;
+	struct sockaddr_in6 *gw6 = NULL;
 	struct llinfo_nd6 *ln = NULL;
 	int error = 0;
 #if defined(__OpenBSD__) && defined(IPSEC)
@@ -2220,7 +2226,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 		}
 
 		if (rt->rt_flags & RTF_GATEWAY) {
-			gw6 = &((struct sockaddr_in6 *)rt->rt_gateway)->sin6_addr;
+			gw6 = (struct sockaddr_in6 *)rt->rt_gateway;
 
 			/*
 			 * We skip link-layer address resolution and NUD
@@ -2231,7 +2237,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 			 * sometimes used to install a route to a p2p link.
 			 */
 			if (!nd6_is_addr_neighbor(gw6, ifp) ||
-			    in6ifa_ifpwithaddr(ifp, gw6)) {
+			    in6ifa_ifpwithaddr(ifp, &gw6->sin6_addr)) {
 				/*
 				 * We allow this kind of tricky route only
 				 * when the outgoing interface is p2p.
@@ -2287,7 +2293,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 		 * the condition below is not very efficient.  But we believe
 		 * it is tolerable, because this should be a rare case.
 		 */
-		if (nd6_is_addr_neighbor(&dst->sin6_addr, ifp) &&
+		if (nd6_is_addr_neighbor(dst, ifp) &&
 		    (rt = nd6_lookup(&dst->sin6_addr, 1, ifp)) != NULL)
 			ln = (struct llinfo_nd6 *)rt->rt_llinfo;
 	}

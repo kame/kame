@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.381 2004/04/03 12:16:20 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.382 2004/04/09 05:37:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3042,6 +3042,7 @@ icmp6_redirect_output(m0, rt)
 	size_t maxlen;
 	u_char *p;
 	struct in6_ifaddr *ia;
+	struct sockaddr_in6 src_sa;
 
 	icmp6_errcount(&icmp6stat.icp6s_outerrhist, ND_REDIRECT, 0);
 
@@ -3060,7 +3061,11 @@ icmp6_redirect_output(m0, rt)
 	 *  [RFC 2461, sec 8.2]
 	 */
 	sip6 = mtod(m0, struct ip6_hdr *);
-	if (nd6_is_addr_neighbor(&sip6->ip6_src, ifp) == 0)
+	bzero(&src_sa, sizeof(src_sa));
+	src_sa.sin6_family = AF_INET6;
+	src_sa.sin6_len = sizeof(src_sa);
+	src_sa.sin6_addr = sip6->ip6_src;
+	if (nd6_is_addr_neighbor(&src_sa, ifp) == 0)
 		goto fail;
 	if (IN6_IS_ADDR_MULTICAST(&sip6->ip6_dst))
 		goto fail;

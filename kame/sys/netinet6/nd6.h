@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.107 2004/03/12 12:07:22 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.108 2004/04/09 05:37:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -406,7 +406,7 @@ union nd_opts {
 void nd6_init __P((void));
 struct nd_ifinfo *nd6_ifattach __P((struct ifnet *));
 void nd6_ifdetach __P((struct nd_ifinfo *));
-int nd6_is_addr_neighbor __P((struct in6_addr *, struct ifnet *));
+int nd6_is_addr_neighbor __P((struct sockaddr_in6 *, struct ifnet *));
 void nd6_option_init __P((void *, int, union nd_opts *));
 struct nd_opt_hdr *nd6_option __P((union nd_opts *));
 int nd6_options __P((union nd_opts *));
