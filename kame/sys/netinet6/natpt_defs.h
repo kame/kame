@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.34 2002/01/13 06:27:07 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.35 2002/01/17 02:45:06 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -65,8 +65,11 @@
  *	SIOC(GET|SET)VALUE related definitions.
  */
 
+/* I assign semantics to each bit, but even numerical value may be good. */
+
 #define	NATPTCTL_DEFAULT	0x01
 #define	NATPTCTL_TSLOT		0x02
+#define	NATPTCTL_ALL		0x80
 
 #define	NATPTCTL_INT		1
 #define	NATPTCTL_IN6ADDR	2
@@ -86,7 +89,7 @@
 #define	NATPTCTL_NUM		12
 
 #define	NATPTCTL_NAMES	{						\
-	{ "enable",	NATPTCTL_INT,		NATPTCTL_DEFAULT },	\
+	{ "translation", NATPTCTL_INT,		NATPTCTL_DEFAULT },	\
 	{ "debug",	NATPTCTL_INT,		NATPTCTL_DEFAULT },	\
 	{ "dump",	NATPTCTL_INT,		NATPTCTL_DEFAULT },	\
 	{ "prefix",	NATPTCTL_IN6ADDR,	NATPTCTL_DEFAULT },	\
