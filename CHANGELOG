@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1468 2001/01/06 06:24:33 jinmei Exp $
+$KAME: CHANGELOG,v 1.1469 2001/01/06 08:40:50 jinmei Exp $
 
 <200101>
 2001-01-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -15,6 +15,12 @@ $KAME: CHANGELOG,v 1.1468 2001/01/06 06:24:33 jinmei Exp $
 	to update the prefix command and reboot the router (or at least
 	reassign the addresses by the new prefix command). The lifetimes
 	might now be decresing, and will expire in the near future.
+
+	We'd even recommend you not to use the prefix command. It has
+	recently caused many problematic situations, and almost no one
+	understands the kernel prefix management routines well. You can do
+	the same thing by the ordinally ifconfig command. See the latest
+	rc.net6.sample file.
 
 2001-01-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/etc/rc.net6: prohibit the prefix command by default.
