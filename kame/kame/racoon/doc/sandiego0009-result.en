@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.31 2000/09/22 03:59:29 sakane Exp $
+$KAME: sandiego0009-result.en,v 1.32 2000/09/22 16:06:41 itojun Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -82,6 +82,9 @@ vs SSH (IPv6)
 	    IPCOMP deflate + ESP blowfish-cbc+md5 + AH sha1, transport mode
 	    IPCOMP deflate + AH sha1, transport mode
 	    ESP twofish-cbc+sha1, transport mode
+	    ESP rijndael-cbc+sha1, transport mode
+	    IPCOMP deflate + ESP rijndael-cbc+sha1, transport mode
+	    IPCOMP deflate + ESP twofish-cbc+sha1, transport mode
 
 	Notes:
 	- both end had issues with ND, if we configure "encrypt all" policy.
@@ -101,6 +104,8 @@ vs SSH (IPv6)
 	- rekey is working fine.
 	- SSH uses different algorithm number for twofish than the AES draft.
 	- deflate does not look stable enough (memory leak in SSH side).  
+	- twofish/rijndael are variable length cipher, need key length attribute
+	  (fixed)
 
 vs RapidStream
 	phase 1: responder, main
