@@ -235,9 +235,8 @@ void	 pr_iph __P((struct ip6_hdr *));
 void	 pr_nodeaddr __P((struct icmp6_nodeinfo *, int));
 void	 pr_pack __P((u_char *, int, struct msghdr *));
 void	 pr_exthdrs __P((struct msghdr *));
-#ifdef USE_RFC2292BIS
 void	 pr_ip6opt __P((void *));
-#endif 
+void	 pr_rthdr __P((void *));
 void	 pr_retip __P((struct ip6_hdr *, u_char *));
 void	 summary __P((void));
 void	 tvsub __P((struct timeval *, struct timeval *));
@@ -1130,7 +1129,7 @@ pr_exthdrs(mhdr)
 			break;
 		case IPV6_RTHDR:
 			printf("  Routing: ");
-			printf("\n"); /* XXX to be implemented */
+			pr_rthdr(CMSG_DATA(cm));
 			break;
 		}
 	}
@@ -1191,9 +1190,52 @@ pr_ip6opt(void *extbuf)
 void
 pr_ip6opt(void *extbuf)
 {
+	putchar('\n');
 	return;
 }
 #endif /* USE_RFC2292BIS */
+
+#ifdef USE_RFC2292BIS
+void
+pr_rthdr(void *extbuf)
+{
+	struct in6_addr *in6;
+	char ntopbuf[INET6_ADDRSTRLEN];
+	struct ip6_rthdr *rh = (struct ip6_rthdr *)extbuf;
+	int i, segments;
+
+	/* print fixed part of the header */
+	printf("nxt %u, len %u (%d bytes), type %u, ", rh->ip6r_nxt,
+	       rh->ip6r_len, (rh->ip6r_len + 1) << 3, rh->ip6r_type);
+	if ((segments = inet6_rth_segments(extbuf)) >= 0)
+		printf("%d segments, ", segments);
+	else
+		printf("segments unknown, ");
+	printf("%d left\n", rh->ip6r_segleft);
+
+	for (i = 0; i < segments; i++) {
+		in6 = inet6_rth_getaddr(extbuf, i);
+		if (in6 == NULL)
+			printf("   [%d]<NULL>\n", i);
+		else
+			printf("   [%d]%s\n", i,
+			       inet_ntop(AF_INET6, (void *)in6->s6_addr,
+					 ntopbuf, sizeof(ntopbuf)));
+	}
+
+	return;
+	
+}
+#else  /* !USE_RFC2292BIS */
+/* ARGSUSED */
+void
+pr_rthdr(void *extbuf)
+{
+	putchar('\n');
+	return;
+}
+#endif /* USE_RFC2292BIS */
+
 
 void
 pr_nodeaddr(ni, nilen)
