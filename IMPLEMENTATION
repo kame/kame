@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/09/05 03:40:32 $
+			$Date: 1999/09/08 13:32:08 $
 
 1. IPv6
 
@@ -829,16 +829,25 @@ IPsec is mainly organized by three components.
 
 The policy management code is experimental, but this is almostly
 conformed to RFC2401.  You can manage the SPD by both the command
-for administrater and the socket operation.
+for administrater and the socket operation.  Security policy has
+direction of packet stream.  The direction is specified like below.
+
+	"out" means to be for outbound packet.
+	"in" means to be for inbound packet.
+
 By the command "setkey", there are three directive as following:
 
         "discard" means to discard the packet.
         "none" means not to do IPsec.
         "ipsec" means to do IPsec.
 
-"ipsec" is followed by some IPsec requests like "protocol/level".
+"ipsec" is followed by some IPsec requests like "protocol/mode/src-dst/level".
 
 	protocol is to be either "ah" or "esp".
+	mode of security proctocol is defined by "transport" or "tunnel".
+	"src" and "dst" between which `-' is put are specified the end of
+	addresses of the Security assocciation in spite of the mode of
+	security protocol.
 	level is to be either "default", "use" or "require".
 
 	"use" means that if a security association is available, use it
@@ -860,9 +869,6 @@ By the command "setkey", there are three directive as following:
 		net.inet6.ipsec6.ah_net_deflev
 
 		They are 1:use or 2:require.
-
-When you need to setup IPsec tunnel mode, you use the format of
-"procol/level/peer".  "peer" is IP address of the tunnel end-point.
 
 By the socket operation, there are three directive as following:
         "ipsec" means to do IPsec, see above.
