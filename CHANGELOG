@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.553 2000/02/10 18:22:40 itojun Exp $
+$Id: CHANGELOG,v 1.554 2000/02/11 06:04:07 itojun Exp $
 
 <200002>
+Fri Feb 11 15:06:19 JST 2000  itojun@iijlab.net
+	* netbsd/sys/netinet/ip_input.c: fix infinite packet forwarding loop
+	  for packet toward address on !IFF_UP interface.
+	  NetBSD PR9387 from nrt@iij.ad.jp.
+
 Fri Feb 11 02:42:16 JST 2000  itojun@iijlab.net
 	* sys/netinet/ip_encap.c: revisit input logic for tunnelled packets.
 	  split outer address match logic in in{,6}_gif_input() into
