@@ -183,7 +183,9 @@ tcp6_template(t6p)
 	n->i6t_i.ip6_vfc = IPV6_VERSION;
 	n->i6t_i.ip6_plen = htons(sizeof(struct tcp6hdr));
 	n->i6t_i.ip6_nxt = IPPROTO_TCP;
-	n->i6t_i.ip6_hlim = in6p->in6p_ip6.ip6_hlim;
+	n->i6t_i.ip6_hlim = in6_selecthlim(in6p, in6p->in6p_route.ro_rt ?
+					   in6p->in6p_route.ro_rt->rt_ifp :
+					   NULL);
 	n->i6t_i.ip6_src = in6p->in6p_laddr;
 	n->i6t_i.ip6_dst = in6p->in6p_faddr;
 	n->i6t_t.th_sport = in6p->in6p_lport;
@@ -226,10 +228,15 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 	int tlen;
 	int win = 0;
 	struct route_in6 *ro = 0;
+	struct in6pcb *in6p = NULL;
+	struct ifnet *oifp = NULL;
 
 	if (t6p) {
 		win = sbspace(&t6p->t_in6pcb->in6p_socket->so_rcv);
+		in6p = t6p->t_in6pcb;
 		ro = &t6p->t_in6pcb->in6p_route;
+		if (ro->ro_rt)
+			oifp = ro->ro_rt->rt_ifp;
 	}
 	if (m == 0) {
 		m = m_gethdr(M_DONTWAIT, MT_HEADER);
@@ -285,7 +292,7 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 	m->m_pkthdr.rcvif = (struct ifnet *) 0;
 	nip6->ip6_plen = htons((u_short)tlen);
 	nip6->ip6_nxt = IPPROTO_TCP;
-	nip6->ip6_hlim = ip6_defhlim;
+	nip6->ip6_hlim = in6_selecthlim(in6p, oifp);
 	nip6->ip6_flow &= ~IPV6_FLOWLABEL_MASK;
 	if (ip6_auto_flowlabel)
 		nip6->ip6_flow |= (htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
@@ -333,7 +340,10 @@ tcp6_newtcp6cb(in6p)
 	    TCP6TV_MIN, TCP6TV_REXMTMAX);
 	t6p->snd_cwnd = TCP6_MAXWIN << TCP6_MAX_WINSHIFT;
 	t6p->snd_ssthresh = TCP6_MAXWIN << TCP6_MAX_WINSHIFT;
-	in6p->in6p_ip6.ip6_hlim = ip6_defhlim;
+	in6p->in6p_ip6.ip6_hlim = in6_selecthlim(in6p,
+						 in6p->in6p_route.ro_rt ?
+						 in6p->in6p_route.ro_rt->rt_ifp
+						 : NULL);
 	in6p->in6p_ppcb = (caddr_t)t6p;
 	return (t6p);
 }

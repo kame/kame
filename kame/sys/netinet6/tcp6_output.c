@@ -477,6 +477,15 @@ send:
 	if (t6p->t_template == 0)
 		panic("tcp6_output");
 	bcopy((caddr_t)t6p->t_template, (caddr_t)ip6, sizeof(struct ip6tcp));
+	/*
+	 * we separately set hoplimit for every segment, since the user
+	 * might want to change the value via setsockopt. Also, desired
+	 * default hop limit might be changed via Neighbor Discovery.
+	 */
+	ip6->ip6_hlim = in6_selecthlim(t6p->t_in6pcb,
+				       t6p->t_in6pcb->in6p_route.ro_rt ?
+				       t6p->t_in6pcb->in6p_route.ro_rt->rt_ifp
+				       : NULL);
 
 	/*
 	 * Fill in fields, remembering maximum advertised
