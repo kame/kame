@@ -32,7 +32,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $Id: dtcps.rb,v 1.2 2000/03/22 00:00:43 itojun Exp $
+# $Id: dtcps.rb,v 1.3 2000/04/21 14:21:21 jinmei Exp $
 #
 
 require "socket"
@@ -96,7 +96,7 @@ end
 # TODO: check for duplicated tunnel configuration
 def gettunnel(me, her)
   tmpfile = "/tmp/gettunnel#{$$}.#{me}-#{her}"
-  system("ifconfig -a |grep #{TUNIF} | grep -v UP > #{tmpfile}")
+  system("ifconfig -a |grep ^#{TUNIF} | grep -v UP > #{tmpfile}")
   f = open(tmpfile, "r")
   s = f.readline
   f.close
