@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2379 2003/04/11 10:36:55 jinmei Exp $
+$KAME: CHANGELOG,v 1.2380 2003/04/11 11:51:43 t-momose Exp $
 
 <200304>
+2003-04-11  MOMOSE Tsuyoshi  <t-momose@netlab.nec.co.jp>
+
+	* kame/kame/had: a part of handling MPA is divided to another
+	file. Current handling MPA code prevents to port 'had' to 
+	other MIP6 implementations due to accessing kernel internal
+	structures.
+
 2003-04-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtsold: added the "O-bit" support.  When rtsold
 	receives a router advertisement with the OtherConfig flag being
