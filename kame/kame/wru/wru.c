@@ -1,4 +1,4 @@
- /*	$KAME: wru.c,v 1.5 2002/01/23 05:10:17 jinmei Exp $	*/
+ /*	$KAME: wru.c,v 1.6 2002/01/23 06:52:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -50,11 +50,13 @@
 
 #include <netdb.h>
 #include <arpa/nameser.h>
+#include <arpa/inet.h>
 
 #include <stdio.h>
 #include <err.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <ctype.h>
 #include <string.h>
 
 static void update_nonce __P((u_int8_t *, size_t));
@@ -476,7 +478,7 @@ do_reply(buf, len, qtype, nonce, from, fromlen)
 
 		if ((opt_flags & F_VERBOSE) ||
 		    (rflags & NI_NODENAME_FLAG_VALIDTTL))
-			printf(" (TTL=%ld)", ttl);
+			printf(" (TTL=%ld)", (long int)ttl);
 
 		putchar('\n');
 		break;
