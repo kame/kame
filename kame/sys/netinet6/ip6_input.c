@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.290 2002/08/06 11:00:54 k-sugyou Exp $	*/
+/*	$KAME: ip6_input.c,v 1.291 2002/08/27 00:18:06 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1127,7 +1127,7 @@ ip6_input(m)
 #ifdef MIP6
 		/*
 		 * XXX
-		 * check if the packet was tunneled after all extion
+		 * check if the packet was tunneled after all extention
 		 * headers have been processed.  get from Ericsson
 		 * code.  need more consideration.
 		 */
