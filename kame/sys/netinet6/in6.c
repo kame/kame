@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.356 2004/01/13 11:18:04 suz Exp $	*/
+/*	$KAME: in6.c,v 1.357 2004/01/13 11:24:04 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3041,11 +3041,11 @@ in6_addmulti(maddr6, ifp, errorp)
 		/*
 		 * Found it; merge source addresses in in6m_source and send
 		 * State-Change Report if needed, and increment the reference
-		 * count. just increment the refrence count if group address
-		 * is local.
+		 * count. just return if group address is not the target of 
+		 * MLDv2 (i.e. ffx1::/16, ff02::1).  (ifma_refcount is already
+		 * counted up in if_addmulti())
 		 */
 		if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa)) {
-			++ifma->ifma_refcount;
 			splx(s);
 			return in6m;
 		}
@@ -3259,8 +3259,7 @@ in6_delmulti(in6m)
 		return;
 	}
 	if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa)) {
-		if (--ifma->ifma_refcount == 0) {
-
+		if (ifma->ifma_refcount == 1) {
 			ifma->ifma_protospec = 0;
 			LIST_REMOVE(in6m, in6m_entry);
 			free(in6m, M_IPMADDR);
@@ -3298,13 +3297,6 @@ in6_delmulti(in6m)
 		in6m->in6m_source->i6ms_cur->numsrc = newnumsrc;
 	}
 
-	/*
-	 * If this is a final leave request by the socket, decrease
-	 * refcount.
-	 */
-	if (final)
-		--ifma->ifma_refcount;
-
 	if (in6m->in6m_rti->rt6i_type == MLD_V2_ROUTER) {
 		if (curmode != newmode || curnumsrc != newnumsrc) {
 			if (curmode != newmode) {
@@ -3329,8 +3321,7 @@ in6_delmulti(in6m)
 			mld6_stop_listening(in6m);
 		}
 	}
-
-	if (ifma->ifma_refcount == 0) {
+	if (ifma->ifma_refcount == 1) {
 		/*
 		 * We cannot use timer for robstness times report
 		 * transmission when ifma->ifma_refcount becomes 0, since in6m
@@ -3353,8 +3344,12 @@ in6_delmulti(in6m)
 		LIST_REMOVE(in6m, in6m_entry);
 		free(in6m, M_IPMADDR);
 	}
-	/* XXX - should be separate API for when we have an ifma? */
-	if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
+	/*
+	 * If this is a final leave request by the socket, decrease refcount.
+	 */
+	if (final)
+		if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
+
 	*error = 0;
 	if (newhead != NULL)
 		FREE(newhead, M_MSFILTER);
