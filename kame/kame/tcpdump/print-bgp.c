@@ -378,7 +378,7 @@ bgp_attr_print(const struct bgp_attr *attr, const u_char *dat, int len)
 			printf(" invalid len");
 			break;
 		}
-		for (i = 0; i < len; i++) {
+		for (i = 0; i < len; i += 4) {
 			u_int32_t comm;
 			comm = (u_int32_t)ntohl(*(u_int32_t *)&p[i]);
 			switch (comm) {
@@ -393,7 +393,7 @@ bgp_attr_print(const struct bgp_attr *attr, const u_char *dat, int len)
 				break;
 			default:
 				printf(" (AS #%d value 0x%04x)",
-					(comm >> 16) & 0xffff, comm & 0xfffff);
+					(comm >> 16) & 0xffff, comm & 0xffff);
 				break;
 			}
 		}
