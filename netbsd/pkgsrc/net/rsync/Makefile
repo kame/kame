@@ -1,7 +1,7 @@
 # $NetBSD: Makefile,v 1.18 1999/04/13 15:31:06 agc Exp $
 #
 
-DISTNAME=	rsync-2.4.3
+DISTNAME=	rsync-2.4.5
 CATEGORIES=	net
 MASTER_SITES=	ftp://rsync.samba.org/pub/rsync/old-versions/ \
 		ftp://sunsite.auc.dk/pub/unix/rsync/  \
@@ -9,7 +9,7 @@ MASTER_SITES=	ftp://rsync.samba.org/pub/rsync/old-versions/ \
 		ftp://ftp.fu-berlin.de/pub/unix/network/rsync/
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	rsync-243-v6-20000428.diff.gz
+PATCHFILES=	rsync-245-v6-20000820.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=     itojun@itojun.org
