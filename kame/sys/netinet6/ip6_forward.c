@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.128 2004/01/09 03:18:59 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.129 2004/01/16 04:33:29 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -155,7 +155,6 @@ ip6_forward(m, srcrt)
 	u_int32_t dstzone;
 #ifdef IPSEC
 	struct secpolicy *sp = NULL;
-	int ipsecrt = 0;
 #endif
 #ifdef MIP6
 	int tunnel_out = 0;
@@ -328,18 +327,27 @@ ip6_forward(m, srcrt)
 
 	/*
 	 * when the kernel forwards a packet, it is not proper to apply
-	 * IPsec transport mode to the packet.
-	 * the following check avoids such situation.
+	 * IPsec transport mode to the packet is not proper.  this check
+	 * avoid from this.
 	 * at present, if there is even a transport mode SA request in the
 	 * security policy, the kernel does not apply IPsec to the packet.
 	 * this check is not enough because the following case is valid.
 	 *      ipsec esp/tunnel/xxx-xxx/require esp/transport//require;
 	 */
 	for (isr = sp->req; isr; isr = isr->next) {
-		if (isr->saidx.mode == IPSEC_MODE_TRANSPORT)
-			goto skip_ipsec;
+		if (isr->saidx.mode == IPSEC_MODE_ANY)
+			goto doipsectunnel;
+		if (isr->saidx.mode == IPSEC_MODE_TUNNEL)
+			goto doipsectunnel;
 	}
+
+	/*
+	 * if there's no need for tunnel mode IPsec, skip.
+	 */
+	if (!isr)
+		goto skip_ipsec;
 	
+    doipsectunnel:
 	/*
 	 * All the extension headers will become inaccessible
 	 * (since they can be encrypted).
@@ -386,16 +394,16 @@ ip6_forward(m, srcrt)
 		return;
 	}
 
-	/* adjust pointer */
-	ip6 = mtod(m, struct ip6_hdr *);
-	if (ip6_getpktaddrs(m, &sa6_src, &sa6_dst)) {
-		m_freem(m);
-		return;
-	}
-	dst = (struct sockaddr_in6 *)state.dst;
-	rt = state.ro ? state.ro->ro_rt : NULL;
-	if (dst != NULL && rt != NULL)
-		ipsecrt = 1;
+	/*
+	 * now tunnel mode headers are added.  we are originating packet
+	 * instead of forwarding the packet.  
+	 */
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
+	ip6_output(m, NULL, NULL, IPV6_FORWARDING/*XXX*/, NULL, NULL, NULL);
+#else
+	ip6_output(m, NULL, NULL, IPV6_FORWARDING/*XXX*/, NULL, NULL);
+#endif
+	return;
     }
     skip_ipsec:
 #endif /* IPSEC */
@@ -461,11 +469,6 @@ ip6_forward(m, srcrt)
 		}
 	}
 #endif /* MIP6 && MIP6_HOME_AGENT */
-
-#ifdef IPSEC
-	if (ipsecrt)
-		goto skip_routing;
-#endif
 
 	dst = (struct sockaddr_in6 *)&ip6_forward_rt.ro_dst;
 	if (!srcrt) {
@@ -549,11 +552,7 @@ ip6_forward(m, srcrt)
 		m_freem(m);
 		return;
 	}
-	if (sa6_src.sin6_scope_id != dstzone
-#ifdef IPSEC
-	    && !ipsecrt
-#endif
-	    ) {
+	if (sa6_src.sin6_scope_id != dstzone) {
 		ip6stat.ip6s_cantforward++;
 		ip6stat.ip6s_badscope++;
 		in6_ifstat_inc(rt->rt_ifp, ifs6_in_discard);
@@ -644,9 +643,6 @@ ip6_forward(m, srcrt)
 	 * modified by a redirect.
 	 */
 	if (rt->rt_ifp == m->m_pkthdr.rcvif && !srcrt && ip6_sendredirects &&
-#ifdef IPSEC
-	    !ipsecrt &&
-#endif
 #ifdef MIP6
 	    !tunnel_out &&
 #endif
