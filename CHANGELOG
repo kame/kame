@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1276 2000/09/14 01:44:05 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1277 2000/09/15 08:18:29 jinmei Exp $
 
 <200009>
+2000-09-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_redirect_input): examined the
+	gateway (from the routing table) only when the address family of
+	the gateway is AF_INET6.
+	In response to a report from Jacques A. Vidrine <n@nectar.com> in
+	the freebsd-net ML.
+
 Thu Sep 14 10:40:12 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/freebsd3/ports/lfp: upgrade to 2.2.6.
 
