@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.349 1999/12/19 04:13:02 itojun Exp $
+$Id: CHANGELOG,v 1.350 1999/12/19 12:18:19 itojun Exp $
 
 <199912>
+Sun Dec 19 21:19:09 JST 1999  itojun@iijlab.net
+	* share/man/man4/ip6.4: manpage for IPv6 layer.
+
 Sun Dec 19 13:11:11 JST 1999  itojun@iijlab.net
 	* openbsd/sys: disable IPv4 mapped address support (RFC1933: AF_INET6
 	  wildcard bind can accept IPv4 traffic).  This is for possible
