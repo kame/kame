@@ -164,7 +164,9 @@ SYSCTL_INT(_net_inet6_ipsec6, IPSECCTL_ECN,
 static int ipsec_setspidx_mbuf
 	__P((struct secpolicyindex *, u_int, u_int, struct mbuf *, int));
 static void ipsec_setspidx_inpcb __P((struct inpcb *pcb));
+#ifdef INET6
 static void ipsec_setspidx_in6pcb __P((struct in6pcb *pcb));
+#endif
 static int ipsec_set_policy __P((struct secpolicy **pcb_sp,
 	int optname, caddr_t request, int priv));
 static int ipsec_get_policy __P((struct secpolicy *pcb_sp, struct mbuf **mp));
@@ -935,6 +937,7 @@ ipsec_setspidx_inpcb(pcb)
 	return;
 }
 
+#ifdef INET6
 static void
 ipsec_setspidx_in6pcb(pcb)
 	struct in6pcb *pcb;
@@ -969,6 +972,7 @@ ipsec_setspidx_in6pcb(pcb)
 
 	return;
 }
+#endif
 
 /* initialize policy in PCB */
 int
