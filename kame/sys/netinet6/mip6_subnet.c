@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.20 2002/02/19 03:40:39 keiichi Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.21 2002/03/12 11:57:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -59,15 +59,15 @@
 #include <net/route.h>
 #include <net/if_dl.h>
 
-#include <net/if_hif.h>
-
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
-
 #include <netinet6/nd6.h>
+
+#include <net/if_hif.h>
+
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
 

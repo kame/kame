@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.9 2002/02/19 03:40:38 keiichi Exp $	*/
+/*	$KAME: if_hif.h,v 1.10 2002/03/12 11:57:54 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -87,6 +87,8 @@ t.
 #define SIOCAHOMEAGENT_HIF  _IOW('i', 122, struct hif_ifreq)
 #define SIOCGHOMEAGENT_HIF  _IOWR('i', 123, struct hif_ifreq)
 #define SIOCGBU_HIF         _IOWR('i', 125, struct hif_ifreq)
+#define SIOCSIFID_HIF       _IOW('i', 126, struct hif_ifreq)
+#define SIOCGIFID_HIF       _IOWR('i', 127, struct hif_ifreq)
 
 struct hif_ifreq {
 	char     ifr_name[IFNAMSIZ];
@@ -95,6 +97,7 @@ struct hif_ifreq {
 		struct mip6_prefix *ifr_mpfx;
 		struct mip6_ha     *ifr_mha;
 		struct mip6_bu     *ifr_mbu;
+		struct in6_addr    *ifr_ifid;
 	} ifr_ifru;
 };
 
@@ -121,6 +124,7 @@ struct hif_softc {
 	struct hif_subnet      *hif_hs_current;
 	struct hif_subnet      *hif_hs_prev;
 	u_int16_t              hif_hadiscovid;
+	struct in6_addr        hif_ifid;
 };
 
 struct hif_coa {

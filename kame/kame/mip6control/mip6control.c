@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.23 2002/03/01 10:46:55 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.24 2002/03/12 11:57:54 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -45,15 +45,17 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
 #endif
-#define _KERNEL 1
-#include <net/if_hif.h>
-#undef _KERNEL
+
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
+
+#define _KERNEL 1
+#include <net/if_hif.h>
+#undef _KERNEL
 
 #include <fcntl.h>
 #include <kvm.h>
@@ -164,6 +166,8 @@ main(argc, argv)
 	char *ipsecarg = NULL;
 	int authdata = 0;
 	char *authdataarg = NULL;
+	int ifid = 0;
+	char *ifidarg = NULL;
 
 	__progname = strrchr(argv[0], '/');
 	if (__progname == NULL)
@@ -171,7 +175,7 @@ main(argc, argv)
 	else
 		__progname++;
 
-	while ((ch = getopt(argc, argv, "nli:mMgH:hP:A:aL:bcu:v:wD:S:T:")) != -1) {
+	while ((ch = getopt(argc, argv, "nli:mMgH:hP:A:aL:bcu:v:wD:S:T:I:")) != -1) {
 		switch(ch) {
 		case 'm':
 			enablemn = 1;
@@ -241,6 +245,10 @@ main(argc, argv)
 		case 'T':
 			authdata = 1;
 			authdataarg = optarg;
+			break;
+		case 'I':
+			ifid = 1;
+			ifidarg = optarg;
 			break;
 		default:
 			usage();
@@ -627,6 +635,29 @@ main(argc, argv)
 			break;
 		}
 		if(ioctl(s, SIOCSMIP6CFG, (caddr_t)&subcmd) == -1) {
+			perror("ioctl");
+			exit(1);
+		}
+	}
+
+	if (ifid && ifidarg) {
+		struct hif_ifreq *ifr;
+		struct sockaddr_in6 ifid_sa;
+		struct in6_addr *ifid;
+
+		ifr = malloc(sizeof(struct hif_ifreq) + sizeof(*ifid));
+		if (ifr == NULL) {
+			perror("malloc");
+			exit(1);
+		}
+		strcpy(ifr->ifr_name, ifnarg);
+		ifr->ifr_count = 1;
+		ifid = (struct in6_addr *)((caddr_t)ifr 
+					   + sizeof(struct hif_ifreq));
+		ifr->ifr_ifru.ifr_ifid = ifid;
+		getaddress(ifidarg, &ifid_sa);
+		*ifid = ifid_sa.sin6_addr;
+		if (ioctl(s, SIOCSIFID_HIF, (caddr_t)ifr) == -1) {
 			perror("ioctl");
 			exit(1);
 		}

@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.20 2002/02/19 03:40:38 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.21 2002/03/12 11:57:54 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -222,6 +222,8 @@ hifattach(dummy)
 
 		sc->hif_hadiscovid = 0;
 
+		sc->hif_ifid = in6addr_any;
+
 		/* create hif_softc list */
 		TAILQ_INSERT_TAIL(&hif_softc_list, sc, hif_entry);
 	}
@@ -381,6 +383,18 @@ hif_ioctl(ifp, cmd, data)
 			hifr->ifr_count = i;
 		}
 		break;
+
+	case SIOCSIFID_HIF:
+	{
+		if (hifr == NULL) {
+			error = EINVAL;
+			goto hif_ioctl_done;
+		}
+		sc->hif_ifid = *hifr->ifr_ifru.ifr_ifid;
+		
+		break;
+	}
+
 	default:
 		error = EINVAL;
 		break;
@@ -1036,7 +1050,7 @@ contiguousfail:
 #endif
 	ifp->if_opackets++;
 	ifp->if_obytes += m->m_pkthdr.len;
-#if 1
+
 	switch (dst->sa_family) {
 	case AF_INET6:
 		break;
@@ -1045,8 +1059,14 @@ contiguousfail:
 		m_freem(m);
 		return (EAFNOSUPPORT);
 	}
-#endif
-	/* XXX encapsulate to our home link ? */
+
+	/*
+	 * XXX TODO:
+	 *
+	 * if ! link-local, prepend an outer ip header and send it.
+	 * if link-local, discard it.
+	 */
+
 	m_freem(m);
 	return(0);
 

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.94 2002/03/06 03:56:09 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.95 2002/03/12 11:57:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -69,8 +69,6 @@
 #include <net/if_dl.h>
 #include <net/net_osdep.h>
 
-#include <net/if_hif.h>
-
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #include <netinet6/in6_var.h>
@@ -87,6 +85,9 @@
 #endif /* IPSEC && !__OpenBSD__ */
 
 #include <netinet/ip_encap.h>
+
+#include <net/if_hif.h>
+
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
 

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.120 2002/03/02 15:51:35 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.121 2002/03/12 11:57:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -877,6 +877,9 @@ mip6_select_coa2(void)
 
 			if (ia6->ia6_flags &
 			    (IN6_IFF_ANYCAST
+#ifdef MIP6_STATIC_HADDR
+			     | IN6_IFF_HOME
+#endif
 			     /* | IN6_IFF_TENTATIVE */
 			     | IN6_IFF_DETACHED
 			     | IN6_IFF_DUPLICATED
@@ -1100,6 +1103,21 @@ mip6_detach_haddrs(sc)
 			return (error);
 		}
 	}
+#ifdef MIP6_STATIC_HADDR
+	{
+		struct nd_prefix *pr;
+		for (pr = nd_prefix.lh_first;
+		     pr;
+		     pr = pr->ndpr_next) {
+			if (hif_subnet_list_find_withprefix(
+				    &sc->hif_hs_list_home, &pr->ndpr_prefix,
+				    pr->ndpr_plen))
+				break;
+		}
+		if (pr != NULL)
+			mip6_add_haddrs(sc, pr->ndpr_ifp);
+	}
+#endif
 
 	return (error);
 }
@@ -1290,6 +1308,20 @@ mip6_ioctl(cmd, data)
 		subcmd = *(int *)data;
 		switch (subcmd) {
 		case SIOCSMIP6CFG_ENABLEMN:
+#ifdef MIP6_STATIC_HADDR
+			for (sc = TAILQ_FIRST(&hif_softc_list);
+			     sc;
+			     sc = TAILQ_NEXT(sc, hif_entry)) {
+				if (IN6_IS_ADDR_UNSPECIFIED(&sc->hif_ifid)) {
+					mip6log((LOG_INFO,
+						 "%s:%d: "
+						 "You must specify the IFID.\n",
+						 __FILE__, __LINE__));
+					splx(s);
+					return (EINVAL);
+				}
+			}
+#endif
 			mip6log((LOG_INFO,
 				 "%s:%d: MN function enabled\n",
 				 __FILE__, __LINE__));
