@@ -2,14 +2,14 @@
 # $FreeBSD: src/usr.sbin/lpr/lpd/Makefile,v 1.10 1999/08/28 01:16:52 peter Exp $
 
 PROG=	lpd
-CFLAGS+=-I${.CURDIR}/../common_source -DINET6 ${CWARNFLAGS}
+CFLAGS+=-I${.CURDIR}/../common_source ${CWARNFLAGS}
 MAN8=	lpd.8
 SRCS=	lpd.c printjob.c recvjob.c lpdchar.c modes.c
 DPADD=	${LIBLPR}
 LDADD=	${LIBLPR}
 LDADD+= -L${.OBJDIR}/../../../lib/libinet6 \
-        -L/usr/local/v6/lib -linet6
-DPADD+= ${.OBJDIR}/../../../lib/libinet6/libinet6.a \
-        /usr/local/v6/lib/libinet6.a
+	-L/usr/local/v6/lib -linet6
+DPADD+=	${.OBJDIR}/../../../lib/libinet6/libinet6.a \
+	/usr/local/v6/lib/libinet6.a
 
 .include <bsd.prog.mk>

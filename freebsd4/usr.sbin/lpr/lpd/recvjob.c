@@ -79,7 +79,7 @@ static void       frecverr __P((const char *, ...));
 static int        noresponse __P((void));
 static void       rcleanup __P((int));
 static int        read_number __P((char *));
-static int        readfile __P((char *, int));
+static int        readfile __P((struct printer *pp, char *, int));
 static int        readjob __P((struct printer *pp));
 
 
@@ -141,11 +141,14 @@ static int
 readjob(pp)
 	struct printer *pp;
 {
-	register int size, nfiles;
+	register int size;
 	register char *cp;
+	int cfcnt, dfcnt;
+	char givenid[32], givenhost[MAXHOSTNAMELEN];
 
 	ack();
-	nfiles = 0;
+	cfcnt = 0;
+	dfcnt = 0;
 	for (;;) {
 		/*
 		 * Read a command to tell us what to do
@@ -153,14 +156,18 @@ readjob(pp)
 		cp = line;
 		do {
 			if ((size = read(1, cp, 1)) != 1) {
-				if (size < 0)
+				if (size < 0) {
 					frecverr("%s: lost connection",
 					    pp->printer);
-				return(nfiles);
+					/*NOTREACHED*/
+				}
+				return (cfcnt);
 			}
 		} while (*cp++ != '\n' && (cp - line + 1) < sizeof(line));
-		if (cp - line + 1 >= sizeof(line))
-			frecverr("readjob overflow");
+		if (cp - line + 1 >= sizeof(line)) {
+			frecverr("%s: readjob overflow", pp->printer);
+			/*NOTREACHED*/
+		}
 		*--cp = '\0';
 		cp = line;
 		switch (*cp++) {
@@ -170,6 +177,7 @@ readjob(pp)
 
 		case '\2':	/* read cf file */
 			size = 0;
+			dfcnt = 0;
 			while (*cp >= '0' && *cp <= '9')
 				size = size * 10 + (*cp++ - '0');
 			if (*cp++ != ' ')
@@ -192,7 +200,7 @@ readjob(pp)
 				(void) write(1, "\2", 1);
 				continue;
 			}
-			if (!readfile(tfname, size)) {
+			if (!readfile(pp, tfname, size)) {
 				rcleanup(0);
 				continue;
 			}
@@ -200,10 +208,12 @@ readjob(pp)
 				frecverr("%s: %m", tfname);
 			(void) unlink(tfname);
 			tfname[0] = '\0';
-			nfiles++;
+			cfcnt++;
 			continue;
 
 		case '\3':	/* read df file */
+			*givenid = '\0';
+			*givenhost = '\0';
 			size = 0;
 			while (*cp >= '0' && *cp <= '9')
 				size = size * 10 + (*cp++ - '0');
@@ -215,13 +225,20 @@ readjob(pp)
 			}
 			(void) strncpy(dfname, cp, sizeof(dfname) - 1);
 			dfname[sizeof(dfname) - 1] = '\0';
-			if (strchr(dfname, '/'))
+			if (strchr(dfname, '/')) {
 				frecverr("readjob: %s: illegal path name",
 					dfname);
-			(void) readfile(dfname, size);
+				/*NOTREACHED*/
+			}
+			dfcnt++;
+			trstat_init(pp, dfname, dfcnt);
+			(void) readfile(pp, dfname, size);
+			trstat_write(pp, TR_RECVING, size, givenid, from,
+				     givenhost);
 			continue;
 		}
 		frecverr("protocol screwup: %s", line);
+		/*NOTREACHED*/
 	}
 }
 
@@ -229,7 +246,8 @@ readjob(pp)
  * Read files send by lpd and copy them to the spooling directory.
  */
 static int
-readfile(file, size)
+readfile(pp, file, size)
+	struct printer *pp;
 	char *file;
 	int size;
 {
@@ -239,8 +257,11 @@ readfile(file, size)
 	int fd, err;
 
 	fd = open(file, O_CREAT|O_EXCL|O_WRONLY, FILMOD);
-	if (fd < 0)
-		frecverr("readfile: %s: illegal path name: %m", file);
+	if (fd < 0) {
+		frecverr("%s: readfile: error on open(%s): %m",
+			 pp->printer, file);
+		/*NOTREACHED*/
+	}
 	ack();
 	err = 0;
 	for (i = 0; i < size; i += BUFSIZ) {
@@ -250,8 +271,10 @@ readfile(file, size)
 			amt = size - i;
 		do {
 			j = read(1, cp, amt);
-			if (j <= 0)
-				frecverr("lost connection");
+			if (j <= 0) {
+				frecverr("%s: lost connection", pp->printer);
+				/*NOTREACHED*/
+			}
 			amt -= j;
 			cp += j;
 		} while (amt > 0);
@@ -264,15 +287,17 @@ readfile(file, size)
 		}
 	}
 	(void) close(fd);
-	if (err)
-		frecverr("%s: write error", file);
+	if (err) {
+		frecverr("%s: write error on close(%s)", pp->printer, file);
+		/*NOTREACHED*/
+	}
 	if (noresponse()) {		/* file sent had bad data in it */
 		if (strchr(file, '/') == NULL)
 			(void) unlink(file);
-		return(0);
+		return (0);
 	}
 	ack();
-	return(1);
+	return (1);
 }
 
 static int
@@ -280,8 +305,10 @@ noresponse()
 {
 	char resp;
 
-	if (read(1, &resp, 1) != 1)
-		frecverr("lost connection");
+	if (read(1, &resp, 1) != 1) {
+		frecverr("lost connection in noresponse()");
+		/*NOTREACHED*/
+	}
 	if (resp == '\0')
 		return(0);
 	return(1);
@@ -367,10 +394,25 @@ frecverr(msg, va_alist)
 #else
 	va_start(ap);
 #endif
-	rcleanup(0);
-	syslog(LOG_ERR, "%s", fromb);
+	syslog(LOG_ERR, "Error receiving job from %s:", fromb);
 	vsyslog(LOG_ERR, msg, ap);
 	va_end(ap);
+	/*
+	 * rcleanup is not called until AFTER logging the error message,
+	 * because rcleanup will zap some variables which may have been
+	 * supplied as parameters for that msg...
+	 */
+	rcleanup(0);
+	/* 
+	 * Add a minimal delay before returning the final error code to
+	 * the sending host.  This just in case that machine responds
+	 * this error by INSTANTLY retrying (and instantly re-failing...).
+	 * It would be stupid of the sending host to do that, but if there
+	 * was a broken implementation which did it, the result might be
+	 * obscure performance problems and a flood of syslog messages on
+	 * the receiving host.
+	 */ 
+	sleep(2);		/* a paranoid throttling measure */
 	putchar('\1');		/* return error code */
 	exit(1);
 }

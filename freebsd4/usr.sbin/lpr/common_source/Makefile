@@ -11,7 +11,7 @@ SRCS=		common.c displayq.c net.c printcap.c request.c rmjob.c \
 NOMAN=		noman
 NOPROFILE=	noprofile
 NOPIC=		nopic
-CFLAGS+=	-DINET6 ${CWARNFLAGS}
+CFLAGS+=	${CWARNFLAGS}
 
 install:
 

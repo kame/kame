@@ -2,18 +2,17 @@
 # $FreeBSD: src/usr.sbin/lpr/lpq/Makefile,v 1.7 1999/08/28 01:16:53 peter Exp $
 
 PROG=	lpq
-CFLAGS+=-I${.CURDIR}/../common_source -DINET6 ${CWARNFLAGS}
+CFLAGS+=-I${.CURDIR}/../common_source ${CWARNFLAGS}
 DPADD=	${LIBLPR}
 LDADD=	${LIBLPR}
-LDADD+= -L${.OBJDIR}/../../../lib/libinet6 \
-        -L/usr/local/v6/lib -linet6
-DPADD+= ${.OBJDIR}/../../../lib/libinet6/libinet6.a \
-        /usr/local/v6/lib/libinet6.a
+LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \
+	-L/usr/local/v6/lib -linet6
+DPADD+=	${.OBJDIR}/../../../lib/libinet6/libinet6.a \
+	/usr/local/v6/lib/libinet6.a
 
 BINGRP=	daemon
 BINMODE=6555
 #BINDIR=	/usr/bin
 BINDIR=	/usr/local/v6/bin
 
-.include "../../Makefile.inc"
 .include <bsd.prog.mk>
