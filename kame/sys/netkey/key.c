@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.17 1999/10/27 05:41:57 sakane Exp $ */
+/* KAME $Id: key.c,v 1.18 1999/10/27 17:41:41 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -5203,6 +5203,7 @@ key_parse(msgp, so, targetp)
 			 * It's not need to reply because of the message
 			 * that was reporting an error occured from the KMd.
 			 */
+			KFREE(msg);
 			return 0;
 		}
 		break;
@@ -5241,8 +5242,10 @@ key_parse(msgp, so, targetp)
 		if (error) {
 			msg->sadb_msg_errno = error;
 			return orglen;
-		} else
+		} else {
+			KFREE(msg);
 			return 0;
+		}
 	        break;
 
 	case SADB_X_PROMISC:
@@ -5280,8 +5283,10 @@ key_parse(msgp, so, targetp)
 		if (error) {
 			msg->sadb_msg_errno = error;
 			return orglen;
-		} else
+		} else {
+			KFREE(msg);
 			return 0;
+		}
 	        break;
 
 

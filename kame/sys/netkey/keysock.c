@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: keysock.c,v 1.1 1999/08/03 01:02:15 itojun Exp $ */
+/* KAME @(#)$Id: keysock.c,v 1.2 1999/10/27 17:41:42 sakane Exp $ */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
@@ -278,6 +278,7 @@ key_output(m, va_alist)
 #endif
 	if ((len = key_parse(&msg, so, &target)) == 0) {
 		/* discard. i.e. no need to reply. */
+		/* msg has been freed at key_parse() */
 		error = 0;
 		splx(s);
 		goto end;
