@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.63 2001/06/23 03:04:47 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.64 2001/06/23 03:07:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1467,6 +1467,7 @@ relay_icmp6(sd, buf, len, from)
 	struct icmp6_nodeinfo *ni6;
 	struct addrinfo hints, *res;
 	int error;
+	char icmp6buf[RECVBUFSIZ];
 
 	if (sizeof(*hp) > len)
 		return -1;
@@ -1533,7 +1534,8 @@ relay_icmp6(sd, buf, len, from)
 		if (getaddrinfo("ff02::1", NULL, &hints, &res))
 			return -1;
 
-		ni6 = (struct icmp6_nodeinfo *)buf;
+		/* XXX boundary check! */
+		ni6 = (struct icmp6_nodeinfo *)icmp6buf;
 		memset(ni6, 0, sizeof(*ni6));
 		ni6->ni_type = ICMP6_NI_QUERY;
 		ni6->ni_code = ICMP6_NI_SUBJ_IPV6;
@@ -1551,8 +1553,8 @@ relay_icmp6(sd, buf, len, from)
 
 		/* multicast outgoing interface is already configured */
 		sent = 0;
-		if (sendto(sd->s, buf, len, 0, res->ai_addr, res->ai_addrlen)
-		    == len) {
+		if (sendto(sd->s, icmp6buf, len, 0, res->ai_addr,
+		    res->ai_addrlen) == len) {
 #if 0
 			dprintf("sock %d sent\n", i);
 #endif
