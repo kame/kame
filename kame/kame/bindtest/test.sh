@@ -7,6 +7,9 @@ if test "x$platform" = "x"; then
 	platform=foo
 fi
 
+# In the following sequence, the order of TCP tests is important.
+# Since -1 or -2 options would make some TIME_WAIT sockets, tests without the
+# SO_REUSExxx socket options must be done before others.
 ($bindtest -p $port
 $bindtest -A -p $port
 $bindtest -P -p $port
