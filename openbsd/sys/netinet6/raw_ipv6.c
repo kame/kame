@@ -625,8 +625,8 @@ rip6_output(m, so, dst, control)
 
       if (!(m = m_pullup2(m, payload + inp->inp_csumoffset))) {
 	DPRINTF(IDL_ERROR, ("rip6_output: m_pullup2(m, %d) failed\n", payload + inp->inp_csumoffset));
-	m_freem(m);
-	return ENOBUFS;
+	error = ENOBUFS;
+	goto bad;
       };
 
       csum = (uint16_t *)(mtod(m, uint8_t *) + payload + inp->inp_csumoffset);
