@@ -1,8 +1,17 @@
+2000-04-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+
+
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.838 2000/04/29 06:07:34 jinmei Exp $
+$Id: CHANGELOG,v 1.839 2000/04/29 07:34:06 jinmei Exp $
 
 <200004>
+2000-04-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6sd/cfparse.y:
+	* kame/kame/pim6sd/pim6_proto.c (receive_pim6_bootstrap):
+	ignored node-local and link-local group prefixes in the
+	configuration file and received bootstrap messages.
+
 2000-04-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_output): do not try NUD unless the
 	gateway is a real neighbor. We can now enable NUD on a p2p link
