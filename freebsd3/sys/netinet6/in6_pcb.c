@@ -454,6 +454,7 @@ in6_pcbconnect(inp, nam, p)
 	return (0);
 }
 
+#if 0
 /*
  * Return an IPv6 address, which is the most appropriate for given
  * destination and user specified options.
@@ -688,6 +689,7 @@ in6_selecthlim(in6p, ifp)
 	else
 		return(ip6_defhlim);
 }
+#endif
 
 void
 in6_pcbdisconnect(inp)
