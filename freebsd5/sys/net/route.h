@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)route.h	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/net/route.h,v 1.47 2003/03/05 19:24:22 peter Exp $
+ * $FreeBSD: src/sys/net/route.h,v 1.54 2003/11/20 20:07:37 andre Exp $
  */
 
 #ifndef _NET_ROUTE_H_
@@ -70,6 +70,12 @@ struct route {
  * These numbers are used by reliable protocols for determining
  * retransmission behavior and are included in the routing structure.
  */
+struct rt_metrics_lite {
+	u_long	rmx_mtu;	/* MTU for this path */
+	u_long	rmx_expire;	/* lifetime for route, e.g. redirect */
+	u_long	rmx_pksent;	/* packets sent using this route */
+};
+
 struct rt_metrics {
 	u_long	rmx_locks;	/* Kernel must leave these values alone */
 	u_long	rmx_mtu;	/* MTU for this path */
@@ -123,24 +129,22 @@ struct rtentry {
 	long	rt_refcnt;		/* # held references */
 	u_long	rt_flags;		/* up/down?, host/net */
 	struct	ifnet *rt_ifp;		/* the answer: interface to use */
-	struct	ifaddr *rt_ifa;		/* the answer: interface to use */
+	struct	ifaddr *rt_ifa;		/* the answer: interface address to use */
 	struct	sockaddr *rt_genmask;	/* for generation of cloned routes */
 	caddr_t	rt_llinfo;		/* pointer to link level info cache */
-	struct	rt_metrics rt_rmx;	/* metrics used by rx'ing protocols */
+	struct	rt_metrics_lite rt_rmx;	/* metrics used by rx'ing protocols */
 	struct	rtentry *rt_gwroute;	/* implied entry for gatewayed routes */
 	int	(*rt_output)(struct ifnet *, struct mbuf *, struct sockaddr *,
 		    struct rtentry *);
 					/* output routine for this (rt,if) */
 	struct	rtentry *rt_parent; 	/* cloning parent of this route */
+#ifdef _KERNEL
+	/* XXX ugly, user apps use this definition but don't have a mtx def */
+	struct	mtx rt_mtx;		/* mutex for routing entry */
+#endif
 	void	*rt_filler2;		/* more filler */
 	LIST_HEAD(, rttimer) rt_timer;  /* queue of timeouts for misc funcs */
 
-	/* the following entries are for statistics*/
-	time_t rt_createtime;	/* timestamp at creation of this route */
-	time_t rt_lastreftime;	/* timestamp when the latest reference time */
-	u_long rt_usehist[16];	/* histogram of references for every 5 min */
-	u_long rt_reusehist[16]; /* histogram of re-use of this route */
-	u_long rt_releasehist[16]; /* histogram of release of this route*/
 };
 
 /*
@@ -175,7 +179,11 @@ struct ortentry {
 #define RTF_PROTO2	0x4000		/* protocol specific routing flag */
 #define RTF_PROTO1	0x8000		/* protocol specific routing flag */
 
-#define RTF_PRCLONING	0x10000		/* protocol requires cloning */
+/* XXX: temporary to stay API/ABI compatible with userland */
+#ifndef _KERNEL
+#define RTF_PRCLONING	0x10000		/* unused, for compatibility */
+#endif
+
 #define RTF_WASCLONED	0x20000		/* route generated through cloning */
 #define RTF_PROTO3	0x40000		/* protocol specific routing flag */
 /*			0x80000		   unused */
@@ -283,13 +291,6 @@ struct rt_addrinfo {
 	struct	ifnet *rti_ifp;
 };
 
-struct route_cb {
-	int	ip_count;
-	int	ip6_count;
-	int	ipx_count;
-	int	any_count;
-};
-
 /* 
  * This structure, and the prototypes for the rt_timer_{init,remove_all,
  * add,timer} functions all used with the kind permission of BSDI.
@@ -314,44 +315,42 @@ struct rttimer_queue {
 };
 
 #ifdef _KERNEL
-#define	RTFREE(rt) \
-	do { \
-		if ((rt)->rt_refcnt <= 1) \
-			rtfree(rt); \
-		else \
-			(rt)->rt_refcnt--; \
+
+#define	RT_LOCK_INIT(_rt) \
+	mtx_init(&(_rt)->rt_mtx, "rtentry", NULL, MTX_DEF | MTX_DUPOK)
+#define	RT_LOCK(_rt)		mtx_lock(&(_rt)->rt_mtx)
+#define	RT_UNLOCK(_rt)		mtx_unlock(&(_rt)->rt_mtx)
+#define	RT_LOCK_DESTROY(_rt)	mtx_destroy(&(_rt)->rt_mtx)
+#define	RT_LOCK_ASSERT(_rt)	mtx_assert(&(_rt)->rt_mtx, MA_OWNED)
+
+#define	RT_ADDREF(_rt)	do {					\
+	RT_LOCK_ASSERT(_rt);					\
+	KASSERT((_rt)->rt_refcnt >= 0,				\
+		("negative refcnt %ld", (_rt)->rt_refcnt));	\
+	(_rt)->rt_refcnt++;					\
+} while (0);
+#define	RT_REMREF(_rt)	do {					\
+	RT_LOCK_ASSERT(_rt);					\
+	KASSERT((_rt)->rt_refcnt > 0,				\
+		("bogus refcnt %ld", (_rt)->rt_refcnt));	\
+	(_rt)->rt_refcnt--;					\
+} while (0);
+
+#define	RTFREE_LOCKED(_rt) do {					\
+		if ((_rt)->rt_refcnt <= 1)			\
+			rtfree(_rt);				\
+		else {						\
+			RT_REMREF(_rt);				\
+			RT_UNLOCK(_rt);				\
+		}						\
+		/* guard against invalid refs */		\
+		_rt = 0;					\
+	} while (0)
+#define	RTFREE(_rt) do {					\
+		RT_LOCK(_rt);					\
+		RTFREE_LOCKED(_rt);				\
 	} while (0)
 
-#define	RTUSE(rt) \
-	do { \
-		int i; \
-		(rt)->rt_use++; \
-		(rt)->rt_lastreftime = time_second; \
-		i = ((rt)->rt_lastreftime - (rt)->rt_createtime) / 300; \
-		if (i < 0 || i > 12) \
-			i = 12; \
-		(rt)->rt_usehist[i]++; \
-	} while (0)
-
-#define	RTREUSE(rt) \
-	do { \
-		int i; \
-		i = (time_second - (rt)->rt_createtime) / 300; \
-		if (i < 0 || i > 12) \
-			i = 12; \
-		(rt)->rt_reusehist[i]++; \
-	} while (0)
-
-#define	RTRELEASE(rt) \
-	do { \
-		int i; \
-		i = (time_second - (rt)->rt_createtime) / 300; \
-		if (i < 0 || i > 12) \
-			i = 12; \
-		(rt)->rt_releasehist[i]++; \
-	} while (0)
-
-extern struct route_cb route_cb;
 extern struct radix_node_head *rt_tables[AF_MAX+1];
 
 struct ifmultiaddr;
@@ -377,13 +376,14 @@ void	 rt_add_cache(struct rtentry *,
 		      void(*)(struct rtentry *, struct rttimer *));
 void	 rtalloc(struct route *);
 void	 rtalloc_ign(struct route *, u_long);
-struct rtentry *
-	 rtalloc1(struct sockaddr *, int, u_long);
+/* NB: the rtentry is returned locked */
+struct rtentry *rtalloc1(struct sockaddr *, int, u_long);
+int	 rtexpunge(struct rtentry *);
 void	 rtfree(struct rtentry *);
 int	 rtinit(struct ifaddr *, int, int);
 int	 rtioctl(u_long, caddr_t);
 void	 rtredirect(struct sockaddr *, struct sockaddr *,
-	    struct sockaddr *, int, struct sockaddr *, struct rtentry **);
+	    struct sockaddr *, int, struct sockaddr *);
 int	 rtrequest(int, struct sockaddr *,
 	    struct sockaddr *, struct sockaddr *, int, struct rtentry **);
 int	 rtrequest1(int, struct rt_addrinfo *, struct rtentry **);

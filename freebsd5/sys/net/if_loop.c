@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_loop.c	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/net/if_loop.c,v 1.83 2003/05/28 02:04:33 silby Exp $
+ * $FreeBSD: src/sys/net/if_loop.c,v 1.92 2003/11/20 20:07:37 andre Exp $
  */
 
 /*
@@ -147,8 +147,7 @@ lo_clone_create(ifc, unit)
 
 	MALLOC(sc, struct lo_softc *, sizeof(*sc), M_LO, M_WAITOK | M_ZERO);
 
-	sc->sc_if.if_name = LONAME;
-	sc->sc_if.if_unit = unit;
+	if_initname(&sc->sc_if, ifc->ifc_name, unit);
 	sc->sc_if.if_mtu = LOMTU;
 	sc->sc_if.if_flags = IFF_LOOPBACK | IFF_MULTICAST;
 	sc->sc_if.if_ioctl = loioctl;
@@ -190,7 +189,7 @@ static moduledata_t loop_mod = {
 	0
 }; 
 
-DECLARE_MODULE(loop, loop_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
+DECLARE_MODULE(loop, loop_mod, SI_SUB_PROTO_IFATTACHDOMAIN, SI_ORDER_ANY);
 
 int
 looutput(ifp, m, dst, rt)
@@ -199,35 +198,12 @@ looutput(ifp, m, dst, rt)
 	struct sockaddr *dst;
 	register struct rtentry *rt;
 {
-	struct mbuf *n;
-
 	M_ASSERTPKTHDR(m); /* check if we have the packet header */
 
 	if (rt && rt->rt_flags & (RTF_REJECT|RTF_BLACKHOLE)) {
 		m_freem(m);
 		return (rt->rt_flags & RTF_BLACKHOLE ? 0 :
 		        rt->rt_flags & RTF_HOST ? EHOSTUNREACH : ENETUNREACH);
-	}
-	/*
-	 * KAME requires that the packet to be contiguous on the
-	 * mbuf.  We need to make that sure.
-	 * this kind of code should be avoided.
-	 *
-	 * XXX: KAME may no longer need contiguous packets.  Once
-	 * that has been verified, the following code _should_ be
-	 * removed.
-	 */
-
-	if (m && m->m_next != NULL) {
-
-		n = m_defrag(m, M_DONTWAIT);
-
-		if (n == NULL) {
-			m_freem(m);
-			return (ENOBUFS);
-		} else {
-			m = n;
-		}
 	}
 
 	ifp->if_opackets++;
@@ -269,6 +245,7 @@ if_simloop(ifp, m, af, hlen)
 	int isr;
 
 	M_ASSERTPKTHDR(m);
+	m_tag_delete_nonpersistent(m);
 	m->m_pkthdr.rcvif = ifp;
 
 	/* BPF write needs to be handled specially */
@@ -377,7 +354,7 @@ if_simloop(ifp, m, af, hlen)
 	}
 	ifp->if_ipackets++;
 	ifp->if_ibytes += m->m_pkthdr.len;
-	netisr_dispatch(isr, m);
+	netisr_queue(isr, m);
 	return (0);
 }
 
@@ -459,16 +436,9 @@ lortrequest(cmd, rt, info)
 	struct rtentry *rt;
 	struct rt_addrinfo *info;
 {
-	if (rt) {
-		rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu; /* for ISO */
-		/*
-		 * For optimal performance, the send and receive buffers
-		 * should be at least twice the MTU plus a little more for
-		 * overhead.
-		 */
-		rt->rt_rmx.rmx_recvpipe =
-			rt->rt_rmx.rmx_sendpipe = 3 * LOMTU;
-	}
+	RT_LOCK_ASSERT(rt);
+	if (rt)
+		rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu;
 }
 
 /*

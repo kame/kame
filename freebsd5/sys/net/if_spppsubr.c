@@ -17,7 +17,7 @@
  *
  * From: Version 2.4, Thu Apr 30 17:17:21 MSD 1997
  *
- * $FreeBSD: src/sys/net/if_spppsubr.c,v 1.102 2003/03/05 19:24:22 peter Exp $
+ * $FreeBSD: src/sys/net/if_spppsubr.c,v 1.104 2003/10/31 18:32:08 brooks Exp $
  */
 
 #include <sys/param.h>
@@ -264,7 +264,7 @@ static struct sppp *spppq;
 static struct callout_handle keepalive_ch;
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3 && __FreeBSD_version < 501113
 #define	SPP_FMT		"%s%d: "
 #define	SPP_ARGS(ifp)	(ifp)->if_name, (ifp)->if_unit
 #else
@@ -1011,7 +1011,7 @@ sppp_attach(struct ifnet *ifp)
 #ifdef INET6
 	sp->confflags |= CONF_ENABLE_IPV6;
 #endif
-	sp->pp_comp = malloc(sizeof(struct slcompress), M_TEMP, M_WAIT);
+	sp->pp_comp = malloc(sizeof(struct slcompress), M_TEMP, M_WAITOK);
 	sl_compress_init(sp->pp_comp, -1);
 	sppp_lcp_init(sp);
 	sppp_ipcp_init(sp);

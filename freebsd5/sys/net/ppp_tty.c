@@ -70,7 +70,7 @@
  * Paul Mackerras (paulus@cs.anu.edu.au).
  */
 
-/* $FreeBSD: src/sys/net/ppp_tty.c,v 1.56 2003/02/19 05:47:29 imp Exp $ */
+/* $FreeBSD: src/sys/net/ppp_tty.c,v 1.57 2003/10/31 18:32:08 brooks Exp $ */
 
 #include "opt_ppp.h"		/* XXX for ppp_defs.h */
 
@@ -1101,7 +1101,7 @@ ppplogchar(sc, c)
 	sc->sc_rawin[sc->sc_rawin_count++] = c;
     if (sc->sc_rawin_count >= sizeof(sc->sc_rawin)
 	|| (c < 0 && sc->sc_rawin_count > 0)) {
-	printf("ppp%d input: %*D", sc->sc_if.if_unit,
+	printf("%s input: %*D", sc->sc_if.if_xname,
 		sc->sc_rawin_count, sc->sc_rawin, " ");
 	sc->sc_rawin_count = 0;
     }

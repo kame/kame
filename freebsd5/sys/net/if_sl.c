@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_sl.c	8.6 (Berkeley) 2/1/94
- * $FreeBSD: src/sys/net/if_sl.c,v 1.110 2003/03/04 23:19:51 jlemon Exp $
+ * $FreeBSD: src/sys/net/if_sl.c,v 1.111 2003/10/31 18:32:08 brooks Exp $
  */
 
 /*
@@ -288,7 +288,6 @@ slcreate()
 	sl_compress_init(&sc->sc_comp, -1);
 
 	sc->sc_if.if_softc = sc;
-	sc->sc_if.if_name = "sl";
 	sc->sc_if.if_mtu = SLMTU;
 	sc->sc_if.if_flags =
 #ifdef SLIP_IFF_OPTS
@@ -313,12 +312,12 @@ slcreate()
 		if (slisstatic(unit))
 			continue;
 		LIST_FOREACH(nc, &sl_list, sl_next) {
-			if (nc->sc_if.if_unit == unit)
+			if (nc->sc_if.if_dunit == unit)
 				continue;
 		}
 		break;
 	}
-	sc->sc_if.if_unit = unit;
+	if_initname(&sc->sc_if, "sl", unit);
 	LIST_INSERT_HEAD(&sl_list, sc, sl_next);
 
 	if_attach(&sc->sc_if);
@@ -451,7 +450,7 @@ sltioctl(tp, cmd, data, flag, td)
 	s = splimp();
 	switch (cmd) {
 	case SLIOCGUNIT:
-		*(int *)data = sc->sc_if.if_unit;
+		*(int *)data = sc->sc_if.if_dunit;
 		break;
 
 	case SLIOCSUNIT:
@@ -460,9 +459,9 @@ sltioctl(tp, cmd, data, flag, td)
 			splx(s);
 			return (ENXIO);
 		}
-		if (sc->sc_if.if_unit != unit) {
+		if (sc->sc_if.if_dunit != unit) {
 			LIST_FOREACH(nc, &sl_list, sl_next) {
-				if (nc->sc_if.if_unit == *(u_int *)data) {
+				if (nc->sc_if.if_dunit == *(u_int *)data) {
 						splx(s);
 						return (ENXIO);
 				}
@@ -472,7 +471,7 @@ sltioctl(tp, cmd, data, flag, td)
 			bpfdetach(&sc->sc_if);
 			if_detach(&sc->sc_if);
 			LIST_REMOVE(sc, sl_next);
-			sc->sc_if.if_unit = unit;
+			if_initname(&sc->sc_if, "sl", unit);
 			LIST_INSERT_HEAD(&sl_list, sc, sl_next);
 			if_attach(&sc->sc_if);
 			bpfattach(&sc->sc_if, DLT_SLIP, SLIP_HDRLEN);
