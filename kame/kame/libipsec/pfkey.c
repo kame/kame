@@ -28,7 +28,7 @@
  */
 
 #ifndef lint
-static char *rcsid = "@(#) pfkey.c $Revision: 1.7 $";
+static char *rcsid = "@(#) pfkey.c $Revision: 1.8 $";
 #endif
 
 #include <sys/types.h>
@@ -1029,7 +1029,7 @@ pfkey_recv(so)
 	}
 
 	if (len != reallen) {
-		ipsec_errcode = EIPSEC_MAX;
+		ipsec_errcode = EIPSEC_SYSTEM_ERROR;
 		free(newmsg);
 		return NULL;
 	}
