@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_fsm.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/tcp_fsm.h,v 1.10.2.2 1999/08/29 16:29:54 peter Exp $
+ * $FreeBSD: src/sys/netinet/tcp_fsm.h,v 1.10.2.3 1999/11/15 02:52:54 green Exp $
  */
 
 #ifndef _NETINET_TCP_FSM_H_
@@ -92,7 +92,7 @@ static u_char	tcp_outflags[TCP_NSTATES] = {
 	TH_ACK,			/* 4, ESTABLISHED */
 	TH_ACK,			/* 5, CLOSE_WAIT */
 	TH_FIN|TH_ACK,		/* 6, FIN_WAIT_1 */
-	TH_ACK,			/* 7, CLOSING */
+	TH_FIN|TH_ACK,		/* 7, CLOSING */
 	TH_FIN|TH_ACK,		/* 8, LAST_ACK */
 	TH_ACK,			/* 9, FIN_WAIT_2 */
 	TH_ACK,			/* 10, TIME_WAIT */

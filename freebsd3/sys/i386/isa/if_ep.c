@@ -38,7 +38,7 @@
  */
 
 /*
- * $FreeBSD: src/sys/i386/isa/if_ep.c,v 1.78.2.3 1999/08/29 16:07:20 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/if_ep.c,v 1.78.2.4 1999/11/01 03:05:14 dima Exp $
  *
  *  Promiscuous mode added and interrupt logic slightly changed
  *  to reduce the number of adapter failures. Transceiver select
@@ -204,6 +204,7 @@ ep_pccard_init(devi)
     switch (epb->prod_id) {
       case 0x6055: /* 3C556 */
       case 0x4057: /* 3C574 */
+      case 0x0201: /* 3C574BT */
 	epb->mii_trans = 1;
 	break;
       case 0x9058: /* 3C589 */
@@ -241,7 +242,9 @@ ep_pccard_attach(devi)
 	sc->ep_connectors |= UTP;
     }
     if (!(sc->ep_connectors & 7))
-	printf("ep%d: No connectors or MII.\n", is->id_unit);
+	if (bootverbose)
+	    printf("ep%d: No connectors or MII.\n", is->id_unit);
+
     sc->ep_connector = inw(BASE + EP_W0_ADDRESS_CFG) >> ACF_CONNECTOR_BITS;
 
     /* ROM size = 0, ROM base = 0 */

@@ -10,7 +10,7 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
- * $FreeBSD: src/sys/netinet/ip_dummynet.c,v 1.7.2.7 1999/08/29 16:29:40 peter Exp $
+ * $FreeBSD: src/sys/netinet/ip_dummynet.c,v 1.7.2.8 1999/11/26 13:38:38 luigi Exp $
  */
 
 /*
@@ -218,11 +218,11 @@ dn_move(struct dn_pipe *pipe, int immediate)
 	 */
 	switch (pkt->dn_dir) {
 	case DN_TO_IP_OUT: {
-	    struct rtentry *tmp_rt = pkt->ro.ro_rt ;
+	    struct route *ro = &(pkt->ro) ;
 
 	    (void)ip_output((struct mbuf *)pkt, (struct mbuf *)pkt->ifp,
-			&(pkt->ro), pkt->dn_dst, NULL);
-	    rt_unref (tmp_rt) ;
+			ro, pkt->dn_dst, NULL);
+	    rt_unref (ro->ro_rt) ;
 	    }
 	    break ;
 	case DN_TO_IP_IN :

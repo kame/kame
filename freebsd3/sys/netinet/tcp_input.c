@@ -61,12 +61,13 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_input.c	8.12 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_input.c,v 1.82.2.2 1999/08/29 16:29:54 peter Exp $
+ * $FreeBSD: src/sys/netinet/tcp_input.c,v 1.82.2.3 1999/10/14 11:49:38 des Exp $
  */
 
 #include "opt_ipfw.h"		/* for ipfw_fwd		*/
-#include "opt_tcpdebug.h"
 #include "opt_inet.h"
+#include "opt_tcpdebug.h"
+#include "opt_tcp_input.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -153,6 +154,18 @@ int tcp_ecn = 1;
 SYSCTL_INT(_net_inet_tcp, TCPCTL_ECN, ecn,
 	CTLFLAG_RW, &tcp_ecn , 0, "");
 #endif /* ALTQ_ECN */
+
+#ifdef TCP_DROP_SYNFIN
+static int drop_synfin = 0;
+SYSCTL_INT(_net_inet_tcp, OID_AUTO, drop_synfin, CTLFLAG_RW,
+    &drop_synfin, 0, "Drop TCP packets with SYN+FIN set");
+#endif
+
+#ifdef TCP_RESTRICT_RST
+static int restrict_rst = 0;
+SYSCTL_INT(_net_inet_tcp, OID_AUTO, restrict_rst, CTLFLAG_RW,
+    &restrict_rst, 0, "Restrict RST emission");
+#endif
 
 u_long	tcp_now;
 struct inpcbhead tcb;
@@ -561,6 +574,18 @@ tcp_input(m, off, proto)
 		}
 	}
 	thflags = th->th_flags;
+
+#ifdef TCP_DROP_SYNFIN
+	/*
+	 * If the drop_synfin option is enabled, drop all packets with
+	 * both the SYN and FIN bits set. This prevents e.g. nmap from
+	 * identifying the TCP/IP stack.
+	 *
+	 * This is incompatible with RFC1644 extensions (T/TCP).
+	 */
+	if (drop_synfin && (thflags & (TH_SYN|TH_FIN)) == (TH_SYN|TH_FIN))
+		goto drop;
+#endif
 
 	/*
 	 * Convert TCP protocol specific fields to host format.
@@ -2400,6 +2425,10 @@ dropafterack:
 	return;
 
 dropwithreset:
+#ifdef TCP_RESTRICT_RST
+	if (restrict_rst)
+		goto drop;
+#endif
 	/*
 	 * Generate a RST, dropping incoming segment.
 	 * Make ACK acceptable to originator of segment.

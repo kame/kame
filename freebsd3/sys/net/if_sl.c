@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_sl.c	8.6 (Berkeley) 2/1/94
- * $FreeBSD: src/sys/net/if_sl.c,v 1.70.2.2 1999/09/14 09:07:00 ru Exp $
+ * $FreeBSD: src/sys/net/if_sl.c,v 1.70.2.3 1999/12/15 09:17:29 phantom Exp $
  */
 
 /*
@@ -410,6 +410,9 @@ sltioctl(tp, cmd, data, flag, p)
 					sc->sc_flags &= ~SC_STATIC;
 					sc->sc_flags |= (nc->sc_flags & SC_STATIC);
 					tp->t_sc = sc = nc;
+					clist_alloc_cblocks(&tp->t_outq,
+					    SLIP_HIWAT + 2 * sc->sc_if.if_mtu + 1,
+					    SLIP_HIWAT + 2 * sc->sc_if.if_mtu + 1);
 					goto slfound;
 				}
 			}

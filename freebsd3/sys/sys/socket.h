@@ -64,7 +64,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)socket.h	8.4 (Berkeley) 2/21/94
- * $FreeBSD: src/sys/sys/socket.h,v 1.27.2.1 1999/08/29 16:32:44 peter Exp $
+ * $FreeBSD: src/sys/sys/socket.h,v 1.27.2.2 1999/11/22 07:08:12 julian Exp $
  */
 
 #ifndef _SYS_SOCKET_H_
@@ -161,8 +161,12 @@ struct	linger {
 #define	AF_INET6	28		/* IPv6 */
 #define	AF_NATM		29		/* native ATM access */
 #define	AF_ATM		30		/* ATM */
+#define	pseudo_AF_HDRCMPLT 31		/* Used by BPF in 4.x to not rewrite
+					 * headers in interface output routine
+					 */
+#define	AF_NETGRAPH	32		/* Netgraph sockets */
 
-#define	AF_MAX		31
+#define	AF_MAX		33
 
 /*
  * Structure used by kernel to store most
@@ -240,6 +244,7 @@ struct sockaddr_storage {
 #define	PF_INET6	AF_INET6
 #define	PF_NATM		AF_NATM
 #define	PF_ATM		AF_ATM
+#define	PF_NETGRAPH	AF_NETGRAPH
 
 #define	PF_MAX		AF_MAX
 
@@ -284,6 +289,7 @@ struct sockaddr_storage {
 	{ "key", CTLTYPE_NODE }, \
 	{ "inet6", CTLTYPE_NODE }, \
 	{ "natm", CTLTYPE_NODE }, \
+	{ "netgraph", CTLTYPE_NODE } \
 }
 
 /*

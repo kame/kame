@@ -60,7 +60,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_input.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_input.c,v 1.111.2.3 1999/08/29 16:29:46 peter Exp $
+ * $FreeBSD: src/sys/netinet/ip_input.c,v 1.111.2.4 1999/11/01 22:23:53 des Exp $
  *	$ANA: ip_input.c,v 1.5 1996/09/18 14:34:59 wollman Exp $
  */
 
@@ -72,6 +72,7 @@
 #include "opt_ipdivert.h"
 #include "opt_ipfilter.h"
 #include "opt_inet.h"
+#include "opt_ipstealth.h"
 #include "opt_pm.h"
 #include "opt_ptr.h"
 
@@ -186,6 +187,12 @@ static int    maxnipq;
 #ifdef IPCTL_DEFMTU
 SYSCTL_INT(_net_inet_ip, IPCTL_DEFMTU, mtu, CTLFLAG_RW,
 	&ip_mtu, 0, "");
+#endif
+
+#ifdef IPSTEALTH
+static int	ipstealth = 0;
+SYSCTL_INT(_net_inet_ip, OID_AUTO, stealth, CTLFLAG_RW,
+    &ipstealth, 0, "");
 #endif
 
 #if !defined(COMPAT_IPFW) || COMPAT_IPFW == 1
@@ -1556,11 +1563,18 @@ ip_forward(m, srcrt)
 		return;
 	}
 	HTONS(ip->ip_id);
-	if (ip->ip_ttl <= IPTTLDEC) {
-		icmp_error(m, ICMP_TIMXCEED, ICMP_TIMXCEED_INTRANS, dest, 0);
-		return;
+#ifdef IPSTEALTH
+	if (!ipstealth) {
+#endif
+		if (ip->ip_ttl <= IPTTLDEC) {
+			icmp_error(m, ICMP_TIMXCEED, ICMP_TIMXCEED_INTRANS,
+			    dest, 0);
+			return;
+		}
+		ip->ip_ttl -= IPTTLDEC;
+#ifdef IPSTEALTH
 	}
-	ip->ip_ttl -= IPTTLDEC;
+#endif
 
 #if defined(PM)
 	if (doRoute)
@@ -1577,9 +1591,8 @@ ip_forward(m, srcrt)
 				  IP_FORWARDING | IP_PROTOCOLROUTE , 0);
 		goto    clearAway;
 	    }
-	}
-#endif
 
+	}
 	sin = (struct sockaddr_in *)&ipforward_rt.ro_dst;
 	if ((rt = ipforward_rt.ro_rt) == 0 ||
 	    ip->ip_dst.s_addr != sin->sin_addr.s_addr) {

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/files,v 1.190.2.12 1999/09/11 15:46:07 gibbs Exp $
+# $FreeBSD: src/sys/conf/files,v 1.190.2.20 1999/12/08 19:46:57 julian Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -88,6 +88,7 @@ dev/advansys/adwcam.c	optional adw device-driver
 dev/advansys/adwlib.c	optional adw device-driver
 dev/advansys/adwmcode.c	optional adw device-driver
 dev/aha/aha.c		optional aha device-driver
+dev/aic/aic.c		optional aic device-driver
 dev/aic7xxx/aic7xxx.c	optional ahc device-driver		\
 	dependency	"aic7xxx_{reg,seq}.h"
 dev/aic7xxx/93cx6.c	optional ahc device-driver
@@ -508,6 +509,28 @@ netatm/uni/unisig_sigmgr_state.c	optional atm_uni atm_core
 netatm/uni/unisig_subr.c	optional atm_uni atm_core
 netatm/uni/unisig_util.c	optional atm_uni atm_core
 netatm/uni/unisig_vc_state.c	optional atm_uni atm_core
+netgraph/ng_base.c	optional netgraph
+netgraph/ng_parse.c	optional netgraph
+netgraph/ng_async.c	optional netgraph_async
+netgraph/ng_bpf.c	optional netgraph_bpf
+net/bpf_filter.c	optional netgraph_bpf
+netgraph/ng_cisco.c	optional netgraph_cisco
+netgraph/ng_echo.c	optional netgraph_echo
+netgraph/ng_frame_relay.c	optional netgraph_frame_relay
+netgraph/ng_hole.c	optional netgraph_hole
+netgraph/ng_iface.c	optional netgraph_iface
+netgraph/ng_ksocket.c	optional netgraph_ksocket
+netgraph/ng_lmi.c	optional netgraph_lmi
+netgraph/ng_ppp.c	optional netgraph_ppp
+netgraph/ng_pppoe.c	optional netgraph_pppoe
+netgraph/ng_pptpgre.c	optional netgraph_pptpgre
+netgraph/ng_rfc1490.c	optional netgraph_rfc1490
+netgraph/ng_socket.c	optional netgraph_socket
+netgraph/ng_tee.c	optional netgraph_tee
+netgraph/ng_tty.c	optional netgraph_tty
+netgraph/ng_UI.c	optional netgraph_UI
+netgraph/ng_vjc.c	optional netgraph_vjc
+net/slcompress.c	optional netgraph_vjc
 netinet/altq_afmap.c	optional altq
 netinet/altq_blue.c	optional altq
 netinet/altq_cbq.c	optional altq
@@ -611,8 +634,13 @@ pci/adv_pci.c		optional adv device-driver
 pci/adw_pci.c		optional adw device-driver
 pci/ahc_pci.c		optional ahc device-driver			\
 	dependency	"aic7xxx_reg.h $S/pci/ahc_pci.c"
-pci/brooktree848.c	optional bktr device-driver
-pci/bt848_i2c.c		optional bktr device-driver
+dev/bktr/bktr_core.c	optional bktr device-driver
+dev/bktr/bktr_i2c.c	optional bktr device-driver
+dev/bktr/bktr_card.c	optional bktr device-driver
+dev/bktr/bktr_tuner.c	optional bktr device-driver
+dev/bktr/bktr_audio.c	optional bktr device-driver
+dev/bktr/bktr_os.c	optional bktr device-driver
+pci/alpm.c		optional alpm device-driver
 pci/bt_pci.c		optional bt device-driver
 pci/dpt_pci.c		optional pci dpt device-driver
 pci/cy_pci.c		optional cy device-driver
@@ -628,8 +656,10 @@ pci/if_pn.c		optional pn device-driver
 pci/if_fpa.c		optional fpa device-driver
 pci/if_rl.c		optional rl device-driver
 pci/if_sf.c		optional sf device-driver
+pci/if_sis.c		optional sis device-driver
 pci/if_sk.c		optional sk device-driver
 pci/if_sr_p.c		optional sr device-driver
+pci/if_ste.c		optional ste device-driver
 pci/if_ti.c		optional ti device-driver
 pci/if_tl.c		optional tl device-driver
 pci/if_tx.c		optional tx device-driver
@@ -637,6 +667,7 @@ pci/if_vr.c		optional vr device-driver
 pci/if_vx_pci.c		optional vx device-driver
 pci/if_wb.c		optional wb device-driver
 pci/if_xl.c		optional xl device-driver
+pci/intpm.c		optional intpm device-driver
 pci/isp_pci.c		optional isp device-driver
 pci/meteor.c		optional meteor device-driver
 pci/ncr.c		optional ncr device-driver

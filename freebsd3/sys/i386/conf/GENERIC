@@ -15,7 +15,7 @@
 # device lines is also present in the ./LINT configuration file. If you are
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-# $FreeBSD: src/sys/i386/conf/GENERIC,v 1.143.2.22 1999/09/14 22:53:30 jkh Exp $
+# $FreeBSD: src/sys/i386/conf/GENERIC,v 1.143.2.24 1999/12/05 01:56:42 luoqi Exp $
 
 machine		"i386"
 cpu		"I386_CPU"
@@ -99,6 +99,7 @@ controller	adv0	at isa? port ? cam irq ?
 controller	adw0
 controller	bt0	at isa? port ? cam irq ?
 controller	aha0	at isa? port ? cam irq ?
+controller	aic0	at isa? port ? cam irq ?
 
 # SCSI peripherals
 # Only one of each of these is needed, they are dynamically allocated.
@@ -168,6 +169,8 @@ device		mx0		# Macronix 98713/98715/98725 (``PMAC'')
 device		pn0		# Lite-On 82c168/82c169 (``PNIC'')
 device		rl0		# RealTek 8129/8139
 device		sf0		# Adaptec AIC-6915 DuraLAN (``Starfire'')
+device		sis0		# Silicon Integrated Systems SiS 900/SiS 7016
+device		ste0		# Sundance ST201 (D-Link DFE-550)
 device		tl0		# Texas Instruments ThunderLAN
 device		tx0		# SMC 9432TX (83c170 ``EPIC'')
 device		vr0		# VIA Rhine, Rhine II

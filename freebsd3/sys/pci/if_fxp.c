@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_fxp.c,v 1.59.2.4 1999/08/29 16:31:37 peter Exp $
+ * $FreeBSD: src/sys/pci/if_fxp.c,v 1.59.2.5 1999/12/06 20:11:52 peter Exp $
  */
 
 /*
@@ -517,6 +517,9 @@ fxp_probe(config_id, device_id)
 	if (((device_id & 0xffff) == FXP_VENDORID_INTEL) &&
 	    ((device_id >> 16) & 0xffff) == FXP_DEVICEID_i82557)
 		return ("Intel EtherExpress Pro 10/100B Ethernet");
+	if (((device_id & 0xffff) == FXP_VENDORID_INTEL) &&
+	    ((device_id >> 16) & 0xffff) == FXP_DEVICEID_i82559)
+		return ("Intel InBusiness 10/100 Ethernet");
 
 	return NULL;
 }
