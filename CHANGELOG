@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1556 2001/02/16 16:54:00 itojun Exp $
+$KAME: CHANGELOG,v 1.1557 2001/02/16 23:49:35 thorpej Exp $
 
 <200102>
+2001-02-16  Jason R. Thorpe  <thorpej@zembu.com>
+	* sys/netkey/key.c: When processing an SADB_DELETE message,
+	  allow SADB_EXT_SA to be blank.  In this case, we delete
+	  all non-LARVAL SAs that match the src/dst/protocol.  This
+	  is particularly useful in IKE INITIAL-CONTACT processing.
+	  Idea from Bill Sommerfeld <sommerfeld@east.sun.com>, who
+	  implemented it in post-Solaris8.
+	* kame/setkey/parse.y, kame/setkey/token.l,
+	  kame/setkey/setkey.8: Add a "deleteall" command that takes
+	  a src/dst/protocol.
+
 Sat Feb 17 01:51:43 JST 2001  itojun@iijlab.net
 	* sys/netinet6/nd6.c: recover backward binary compatibility for
 	  SIOCGIFINFO_IN6.
