@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.357 2005/03/18 10:23:05 suz Exp $	*/
+/*	$KAME: ip6_input.c,v 1.358 2005/03/18 13:47:26 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2162,7 +2162,7 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		return fill_isatap_rtrlist(oldp, oldlenp,
 					   oldlenp ? *oldlenp : 0);
 #endif
-	case IPV6CTL_MCASTPMTUD:
+	case IPV6CTL_MCAST_PMTU:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &ip6_mcast_pmtu);
 	default:
 		return EOPNOTSUPP;
