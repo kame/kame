@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.131 2002/06/27 08:14:54 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.132 2002/07/01 21:12:20 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -2026,9 +2026,11 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 		    }
 
 		    ats = cv4->ats;
+		    /* v6 client side */
 		    local = ats->local;
 		    local.port[0] = sin6.sin6_port;
 		    local.port[1] = htons(FTP_DATA);
+		    /* v4 server side */
 		    remote = ats->remote;
 		    remote.port[0] = htons(FTP_DATA);
 		    remote.port[1] = sin6.sin6_port;
@@ -2037,7 +2039,8 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 			    return (0);
 		    }
 
-		    if (natpt_openIncomingV4Conn(IPPROTO_TCP, &local, &remote) == NULL)
+		    /* This connection is established from v4 side. */
+		    if (natpt_openIncomingV4Conn(IPPROTO_TCP, &remote, &local) == NULL)
 			    return (0);
 
 		    h = (u_char *)&remote.addr[1];

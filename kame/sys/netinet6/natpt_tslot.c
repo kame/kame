@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.55 2002/07/01 04:20:17 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.56 2002/07/01 21:12:21 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -343,15 +343,16 @@ natpt_openIncomingV4Conn(int proto, struct pAddr *local, struct pAddr *remote)
 	ts->state = TCPS_CLOSED;
 	ats->suit.tcps = ts;
 
-#ifdef NATPT_NAT
 	if (local->sa_family == AF_INET)
 		hvl = natpt_hashPad4(local);
 	else
-#endif
 		hvl = natpt_hashPad6(local);
-
 	thl = &tslhashl[hvl];
-	hvr = natpt_hashPad4(remote);
+
+	if (remote->sa_family == AF_INET)
+		hvr = natpt_hashPad4(remote);
+	else
+		hvr = natpt_hashPad6(remote);
 	thr = &tslhashr[hvr];
 
 	s = splnet();
