@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.135 2004/06/10 07:28:29 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.136 2004/06/10 08:34:50 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1669,19 +1669,35 @@ process_auth(authparam, dh6, len, optinfo)
 		}
 
 		/* identify the secret key */
-		key = find_key(optinfo->delayedauth_realmval,
-		    optinfo->delayedauth_realmlen,
-		    optinfo->delayedauth_keyid);
-		if (key == NULL) {
-			dprintf(LOG_INFO, FNAME, "failed to find key "
-			    "provided by the server (ID: %x)",
-			    optinfo->delayedauth_keyid);
-			break;
+		if ((key = authparam->key) != NULL) {
+			/*
+			 * If we already know a key, its identification should
+			 * match that contained in the received option.
+			 * (from Section 21.4.5.1 of RFC3315)
+			 */
+			if (optinfo->delayedauth_keyid != key->keyid ||
+			    optinfo->delayedauth_realmlen != key->realmlen ||
+			    memcmp(optinfo->delayedauth_realmval, key->realm,
+			    key->realmlen) != 0) {
+				dprintf(LOG_INFO, FNAME,
+				    "authentication key mismatch");
+				break;
+			}
 		} else {
-			dprintf(LOG_DEBUG, FNAME, "found key for "
-			    "authentication: %s", key->name);
+			key = find_key(optinfo->delayedauth_realmval,
+			    optinfo->delayedauth_realmlen,
+			    optinfo->delayedauth_keyid);
+			if (key == NULL) {
+				dprintf(LOG_INFO, FNAME, "failed to find key "
+				    "provided by the server (ID: %x)",
+				    optinfo->delayedauth_keyid);
+				break;
+			} else {
+				dprintf(LOG_DEBUG, FNAME, "found key for "
+				    "authentication: %s", key->name);
+			}
+			authparam->key = key;
 		}
-		authparam->key = key;
 
 		/* check for the key lifetime */
 		if (dhcp6_validate_key(key)) {
