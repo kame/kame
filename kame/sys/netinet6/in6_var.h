@@ -322,8 +322,18 @@ struct	in6_rrenumreq {
 
 #ifdef _KERNEL
 extern struct in6_ifaddr *in6_ifaddr;
+
 extern struct in6_ifstat **in6_ifstat;
 extern size_t in6_ifstatmax;
+#define in6_ifstat_inc(ifp, tag) \
+do {								\
+	if ((ifp) && (ifp)->if_index < if_index			\
+	 && (ifp)->if_index < in6_ifstatmax			\
+	 && in6_ifstat && in6_ifstat[(ifp)->if_index]) {	\
+		in6_ifstat[(ifp)->if_index]->tag++;		\
+	}							\
+} while (0)
+
 extern struct ifqueue ip6intrq;		/* IP6 packet input queue */
 extern struct in6_addr zeroin6_addr;
 extern u_char inet6ctlerrmap[];
