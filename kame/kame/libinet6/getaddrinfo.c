@@ -1005,6 +1005,7 @@ ip6_str2scopeid(scope, sin6)
 {
 	int scopeid;
 	struct in6_addr *a6 = &sin6->sin6_addr;
+	char *ep;
 
 	if (IN6_IS_ADDR_LINKLOCAL(a6) || IN6_IS_ADDR_MC_LINKLOCAL(a6)) {
 		/*
@@ -1026,7 +1027,7 @@ ip6_str2scopeid(scope, sin6)
 
 	/* try to convert to a numeric id as a last resort */
   trynumeric:
-	return(atoi(scope));	/* XXX: validation? */
+	scopeid = (int)strtol(scope, &ep, 10);
+	return (*ep == '\0') ? scopeid : -1;
 }
 #endif 
-
