@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.270 2004/12/09 02:19:26 t-momose Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.271 2004/12/09 10:34:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1334,7 +1334,7 @@ prelist_update(new, dr, m, mcast)
 		/*
 		 * We need to treat lifetimes for temporary addresses
 		 * differently, according to
-		 * draft-ietf-ipngwg-temp-addresses-v2-00.txt 3.3 (1);
+		 * draft-ietf-ipv6-privacy-addrs-v2-01.txt 3.3 (1);
 		 * we only update the lifetimes when they are in the maximum
 		 * intervals.
 		 */
@@ -1342,9 +1342,11 @@ prelist_update(new, dr, m, mcast)
 			u_int32_t maxvltime, maxpltime;
 
 			if (ip6_temp_valid_lifetime >
-			    (u_int32_t)(time_second - ifa6->ia6_createtime)) {
+			    (u_int32_t)((time_second - ifa6->ia6_createtime) +
+			    ip6_desync_factor)) {
 				maxvltime = ip6_temp_valid_lifetime -
-				    (time_second - ifa6->ia6_createtime);
+				    (time_second - ifa6->ia6_createtime) -
+				    ip6_desync_factor;
 			} else
 				maxvltime = 0;
 			if (ip6_temp_preferred_lifetime >
