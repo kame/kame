@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.579 2000/02/20 16:49:47 jinmei Exp $
+$Id: CHANGELOG,v 1.580 2000/02/21 00:20:56 itojun Exp $
 
 <200002>
 2000-02-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -30,10 +30,10 @@ Sat Feb 19 22:12:10 JST 2000  itojun@iijlab.net
 	* bsdi4/sys/netinet/in.c (in_control): added gif related ioctls.
 
 Sat Feb 19 11:40:58 2000  Shin'ichi Fujisawa  <fujisawa@kame.net>
-	* Now, this translator can handle connection from outside v4 (global)
-	  to inside v6 (private).  This translation is done when packet is
-	  coming toward particular address and port, so you must know this
-	  particular port number before making connection.
+	* sys/netinet6/natpt*: Now, this translator can handle connection from
+	  outside v4 (global) to inside v6 (private).  This translation is
+	  done when packet is coming toward particular address and port, so
+	  you must know this particular port number before making connection.
 
 	- kernel:
 		many changes in netinet6/natpt_*.[ch]
