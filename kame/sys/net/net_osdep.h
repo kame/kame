@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.63 2001/08/03 12:02:38 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.64 2001/09/03 08:27:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -268,6 +268,9 @@
  *		to have opt_hoge.h.
  *
  *	therefore, opt_hoge.h is mandatory on freebsd4 only.
+ *
+ * - MALLOC() macro
+ *	use it only if the size of the allocation is constant.
  */
 
 #ifndef __NET_NET_OSDEP_H_DEFINED_
