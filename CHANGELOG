@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.370 1999/12/23 17:19:44 itojun Exp $
+$Id: CHANGELOG,v 1.371 1999/12/24 03:08:07 jinmei Exp $
 
 <199912>
+1999-12-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ping6/ping6.c (main): restricted the -l (preload)
+	option to a privileged user.
+
 Fri Dec 24 02:21:30 JST 1999  itojun@iijlab.net
 	* implement 2292bis IPV6_REACHCONF (trivial).
 
