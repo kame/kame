@@ -1,4 +1,4 @@
-.\"	$KAME: getnameinfo.3,v 1.10 2000/05/11 03:02:45 itojun Exp $
+.\"	$KAME: getnameinfo.3,v 1.11 2000/06/12 04:27:12 itojun Exp $
 .\"
 .\" Copyright (c) 1983, 1987, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -231,6 +231,29 @@ printf("host=%s\\n", hbuf);
 .Sh DIAGNOSTICS
 The function indicates successful completion by a zero return value;
 a non-zero return value indicates failure.
+Error codes are as below:
+.Bl -tag -width Er
+.It Bq Er EAI_AGAIN
+The name could not be resolved at this time.
+Future attempts may succeed.
+.It Bq Er EAI_BADFLAGS
+The flags had an invalid value.
+.It Bq Er EAI_FAIL
+A non-recoverable error occurred.
+.It Bq Er EAI_FAMILY
+The address family was not recognized or the address length was invalid
+for the specified family.
+.It Bq Er EAI_MEMORY
+There was a memory allocation failure.
+.It Bq Er EAI_NONAME
+The name does not resolve for the supplied parameters.
+.Dv NI_NAMEREQD
+is set and the host's name cannot be located,
+or both nodename and servname were null.
+.It Bq Er EAI_SYSTEM
+A system error occurred.
+The error code can be found in errno.
+.El
 .\"
 .Sh SEE ALSO
 .Xr getaddrinfo 3 ,
