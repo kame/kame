@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.994 2000/06/11 12:40:08 itojun Exp $
+$Id: CHANGELOG,v 1.995 2000/06/11 15:31:02 jinmei Exp $
 
 <200006>
+2000-06-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* *bsd*/usr.[s]bin/netstat/inet6.c (ip6_stats): printed new
+	statistic counters of forward cache for incoming packets (see
+	below).
+
+2000-06-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_var.h (ip6stat): added members to count
+	statistics of forward cache for incoming packets.
+	* kame/sys/netinet6/ip6_input.c (ip6_input): counted the
+	statistics.
+
 Sun Jun 11 17:03:07 JST 2000  itojun@iijlab.net
 	* {netbsd/pkgsrc/net,freebsd[23]/ports}/{libpcap,tcpdump}: use
 	  2000/6/5 weekly SNAP from tcpdump.org.
