@@ -959,9 +959,11 @@ in6_pcbrtentry(in6p)
 	struct route_in6 *ro;
 #endif
 	struct sockaddr_in6 *dst6;
+	struct sockaddr_in *dst;
 
 	ro = &in6p->in6p_route;
 	dst6 = (struct sockaddr_in6 *)&ro->ro_dst;
+	dst = (struct sockaddr_in *)&ro->ro_dst;
 
 	if (ro->ro_rt && ((ro->ro_rt->rt_flags & RTF_UP) == 0 ||
 	    !SA6_ARE_ADDR_EQUAL(dst6, &in6p->in6p_fsa))) {
@@ -979,6 +981,17 @@ in6_pcbrtentry(in6p)
 #endif
 		rtalloc((struct route *)ro);
 	}
+#ifdef __NetBSD__
+	else if (ro->ro_rt == (struct rtentry *)NULL &&
+	    IN6_IS_ADDR_V4MAPPED(&in6p->in6p_fsa.sin6_addr)) {
+		bzero(dst, sizeof(*dst));
+		dst->sin_family = AF_INET;
+		dst->sin_len = sizeof(struct sockaddr_in);
+		bcopy(&in6p->in6p_faddr.s6_addr32[3], &dst->sin_addr,
+		    sizeof(dst->sin_addr));
+		rtalloc((struct route *)ro);
+	}
+#endif
 	return (ro->ro_rt);
 }
 
