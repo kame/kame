@@ -654,6 +654,9 @@ icmp6_input(mp, offp, proto)
 
 		if (code != 0)
 			goto badcode;
+		if (!icmp6_nodeinfo)
+			break;
+
 		if (icmp6len == sizeof(struct icmp6_hdr) + 4)
 			mode = WRU;
 		else if (icmp6len >= sizeof(struct icmp6_hdr) + 8) /* XXX */
@@ -924,11 +927,6 @@ ni6_input(m, off)
 	struct ni_reply_fqdn *fqdn;
 	int addrs;		/* for NI_QTYPE_NODEADDR */
 	struct ifnet *ifp = NULL; /* for NI_QTYPE_NODEADDR */
-
-	if (!icmp6_nodeinfo) {
-		m_freem(m);
-		return NULL;
-	}
 
 #ifndef PULLDOWN_TEST
 	ni6 = (struct icmp6_nodeinfo *)(mtod(m, caddr_t) + off);
