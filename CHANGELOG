@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2667 2004/09/14 08:09:15 jinmei Exp $
+$KAME: CHANGELOG,v 1.2668 2004/09/29 08:37:23 suz Exp $
 
 <200409>
+2004-09-29  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/sys/net,netinet,netinet6: removed a "Bad malloc flag" warning
+	on freebsd5.
+
 2004-09-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: provided a new command "dhcp6ctl", deprecating
 	dhcp6sctl.  This new command controls the client as well as the
