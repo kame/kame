@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.384 2003/07/01 03:36:09 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.385 2003/07/01 04:05:07 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2841,7 +2841,7 @@ do { \
 					return (ENOTCONN);
 				/*
 				 * XXX: we dot not consider the case of source
-				 * routing, nor optional information to specify
+				 * routing, or optional information to specify
 				 * the outgoing interface.
 				 */
 				error = ip6_getpmtu(ro, NULL, NULL,
