@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.5 2000/01/12 20:57:27 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.6 2000/01/12 21:00:04 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -408,7 +408,7 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 	int len;
 	int error = -1;
 	int pfs = 0;
-	int dupkeymat = 3;	/* generate K[1-dupkeymat] */
+	int dupkeymat;	/* generate K[1-dupkeymat] */
 	struct ipsecsakeys *k;
 
 	pfs = ((iph2->spidx->policy->pfs_group && iph2->dhgxy) ? 1 : 0);
@@ -459,6 +459,12 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 		if (res == NULL)
 			goto end;
 
+		/* a guess: ESP: 128bit minimum, AH: 128 bit minimum */
+		dupkeymat = ((k->len ? k->len : 128)+ 128) / 8 / res->l;
+		if (dupkeymat < 3)
+			dupkeymat = 3;
+		YIPSDEBUG(DEBUG_DKEY,
+			plog(logp, LOCATION, NULL, "dupkeymat=%d\n", dupkeymat));
 		if (0 < --dupkeymat) {
 			vchar_t *prev = res;	/* K(n-1) */
 			vchar_t *this = NULL;	/* Kn */

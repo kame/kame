@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.29 2000/01/12 20:28:31 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.30 2000/01/12 21:00:03 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2545,18 +2545,20 @@ setph1attr(sa, buf)
 	case OAKLEY_ATTR_GRP_DESC_MODP768:
 	case OAKLEY_ATTR_GRP_DESC_MODP1024:
 	case OAKLEY_ATTR_GRP_DESC_MODP1536:
-		attrlen += sizeof(struct isakmp_data) + sizeof(struct isakmp_data);
+		/* don't attach group type for known groups */
+		attrlen += sizeof(struct isakmp_data);
 		if (buf) {
-			p = isakmp_set_attr_l(p, OAKLEY_ATTR_GRP_DESC, sa->dh_group);
-			p = isakmp_set_attr_l(p, OAKLEY_ATTR_GRP_TYPE, OAKLEY_ATTR_GRP_TYPE_MODP);
+			p = isakmp_set_attr_l(p, OAKLEY_ATTR_GRP_DESC,
+				sa->dh_group);
 		}
 		break;
 	case OAKLEY_ATTR_GRP_DESC_EC2N155:
 	case OAKLEY_ATTR_GRP_DESC_EC2N185:
-		attrlen += sizeof(struct isakmp_data) + sizeof(struct isakmp_data);
+		/* don't attach group type for known groups */
+		attrlen += sizeof(struct isakmp_data);
 		if (buf) {
-			p = isakmp_set_attr_l(p, OAKLEY_ATTR_GRP_DESC, sa->dh_group);
-			p = isakmp_set_attr_l(p, OAKLEY_ATTR_GRP_TYPE, OAKLEY_ATTR_GRP_TYPE_EC2N);
+			p = isakmp_set_attr_l(p, OAKLEY_ATTR_GRP_TYPE,
+				OAKLEY_ATTR_GRP_TYPE_EC2N);
 		}
 		break;
 	case 0:
@@ -3399,6 +3401,7 @@ mksakeys(b, keys, dst, src)
 	v->dst = dst;
 	v->src = src;
 	v->next = *keys;
+	v->len = b->encklen;
 	*keys = v;
 
 	YIPSDEBUG(DEBUG_MISC,

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.9 2000/01/12 17:23:07 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.10 2000/01/12 21:00:03 itojun Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -279,6 +279,8 @@ struct ipsecsakeys {
 	u_int32_t spi_p;		/* SPI defined by peer. i.e. me -SA-> */
 	vchar_t *keymat;		/* KEYMAT */
 	vchar_t *keymat_p;		/* peer's KEYMAT */
+
+	int len;			/* length, in bits */
 
 	int ok;				/* if 1, success to set SA in kenrel */
 
