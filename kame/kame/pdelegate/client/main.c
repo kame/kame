@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.11 2001/09/07 08:38:58 itojun Exp $	*/
+/*	$KAME: main.c,v 1.12 2001/09/07 09:25:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -62,6 +62,7 @@ static int cmpsockaddr __P((const struct sockaddr *, int,
 	const struct sockaddr *, int));
 
 int dflag = 0;
+int vflag = 0;
 int prefixlen = 64;
 const char *iface;
 
@@ -75,7 +76,7 @@ main(argc, argv)
 	unsigned long v;
 	char *ep;
 
-	while ((c = getopt(argc, argv, "dl:")) != EOF) {
+	while ((c = getopt(argc, argv, "dl:v")) != EOF) {
 		switch (c) {
 		case 'd':
 			dflag++;
@@ -88,6 +89,9 @@ main(argc, argv)
 				/*NOTREACHED*/
 			}
 			prefixlen = (int)v;
+			break;
+		case 'v':
+			vflag++;
 			break;
 		default:
 			usage();
@@ -129,7 +133,7 @@ static void
 usage()
 {
 
-	fprintf(stderr, "usage: pdelegate [-d] [-l prefixlen] iface\n");
+	fprintf(stderr, "usage: pdelegate [-vd] [-l prefixlen] iface\n");
 }
 
 static void
@@ -175,7 +179,8 @@ mainloop(s)
 			break;
 		case 1:
 			if (n == 0) {
-				warnx("discovery retry");
+				if (vflag)
+					warnx("discovery retry");
 				if (retry-- > 0) {
 					send_discover(s);
 					state = 1;
@@ -206,7 +211,8 @@ mainloop(s)
 			break;
 		case 2:
 			if (n == 0) {
-				warnx("initreq retry");
+				if (vflag)
+					warnx("initreq retry");
 				if (retry-- > 0) {
 					send_initreq(s,
 					    (struct sockaddr *)&serv, servlen);
@@ -235,12 +241,14 @@ mainloop(s)
 				if (!cmpsockaddr((struct sockaddr *)&serv,
 				    servlen, (struct sockaddr *)&from,
 				    fromlen)) {
-					warnx("a reply from different server");
+					if (vflag)
+						warnx("a reply from different server");
 					state = 2;
 					break;
 				}
 
-				warnx("successful");
+				if (vflag)
+					warnx("successful");
 				exit(0);
 			}
 			break;
@@ -265,12 +273,15 @@ mainloop(s)
 				tvp = NULL;
 		} else
 			tvp = NULL;
-		warnx("select, timeout=%ld.%06ld", tvp ? tvp->tv_sec : -1,
-		    tvp ? tvp->tv_usec : 0);
-		warnx("state: %d retry: %d", state, retry);
+		if (vflag) {
+			warnx("select, timeout=%ld.%06ld",
+			    tvp ? tvp->tv_sec : -1, tvp ? tvp->tv_usec : 0);
+			warnx("state: %d retry: %d", state, retry);
+		}
 		gettimeofday(&prev, NULL);
 		n = select(s + 1, fds, NULL, NULL, tvp);
-		warnx("select, n=%d", n);
+		if (vflag)
+			warnx("select, n=%d", n);
 		if (n < 0) {
 			if (errno == EINTR)
 				goto again;
@@ -290,7 +301,8 @@ send_discover(s)
 	char dest[NI_MAXHOST];
 	int error;
 
-	warnx("send_discover");
+	if (vflag)
+		warnx("send_discover");
 
 	if (sethops(s, 1) < 0) {
 		errx(1, "sethops");
@@ -367,7 +379,8 @@ send_initreq(s, serv, servlen)
 {
 	struct icmp6_prefix_request req;
 
-	warnx("send_initreq");
+	if (vflag)
+		warnx("send_initreq");
 
 	if (sethops(s, 1) < 0) {
 		errx(1, "sethops");
@@ -418,19 +431,22 @@ receive_initreq(s, from, fromlenp, ecode)
 	switch (p->icmp6_pd_hdr.icmp6_code) {
 	case ICMP6_PD_AUTH_REQUIRED:
 	case ICMP6_PD_AUTH_FAILED:
-		warnx("authentication failed");
+		if (vflag)
+			warnx("authentication failed");
 		*ecode = p->icmp6_pd_hdr.icmp6_code;
 		return -1;
 	case ICMP6_PD_PREFIX_UNAVAIL:
-		warnx("prefix unavailable");
+		if (vflag)
+			warnx("prefix unavailable");
 		*ecode = p->icmp6_pd_hdr.icmp6_code;
 		return -1;
 	case ICMP6_PD_PREFIX_DELEGATED:
 		/* we assume prefixlen to match up */
 		plen = p->icmp6_pd_hdr.icmp6_pd_flaglen & ICMP6_PD_LEN_MASK;
 		if (plen != prefixlen) {
-			warnx("bogus prefixlen %u != requested %d",
-			    plen, prefixlen);
+			if (vflag)
+				warnx("bogus prefixlen %u != requested %d",
+				    plen, prefixlen);
 			return -1;
 		}
 		memset(&sin6, 0, sizeof(sin6));
@@ -440,11 +456,13 @@ receive_initreq(s, from, fromlenp, ecode)
 		if (getnameinfo((struct sockaddr *)&sin6, sizeof(sin6),
 		    hbuf, sizeof(hbuf), NULL, 0, niflags) != 0)
 			return -1;
-		printf("%s/%u", hbuf, plen);
+		printf("%s/%u\n", hbuf, plen);
 		return 0;
 	default:
 		*ecode = p->icmp6_pd_hdr.icmp6_code;
-		warnx("unexpected reply %u\n", p->icmp6_pd_hdr.icmp6_code);
+		if (vflag)
+			warnx("unexpected reply %u\n",
+			    p->icmp6_pd_hdr.icmp6_code);
 		return -1;
 	}
 }
@@ -468,17 +486,20 @@ receive(s, buf, blen, from, fromlenp)
 		return -1;
 	/* XXX we need a global prefix */
 	if ((p->icmp6_pd_hdr.icmp6_pd_flaglen & ICMP6_PD_FLAGS_SCOPE) != 0) {
-		warnx("address scope is not global");
+		if (vflag)
+			warnx("address scope is not global");
 		return -1;
 	}
 	/* routing protocol field is yet to be standardized */
 	if (p->icmp6_pd_hdr.icmp6_pd_rtproto) {
-		warnx("bogus routing protocol field");
+		if (vflag)
+			warnx("bogus routing protocol field");
 		return -1;
 	}
 	/* routing information field is yet to be standardized */
 	if (p->icmp6_pd_rtlen || l != sizeof(*p)) {
-		warnx("bogus routing information field");
+		if (vflag)
+			warnx("bogus routing information field");
 		return -1;
 	}
 
