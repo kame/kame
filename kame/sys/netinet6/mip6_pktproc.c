@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.10 2002/06/18 07:30:32 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.11 2002/06/18 13:52:13 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -103,6 +103,18 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 		return (EINVAL);
 	}
 
+	/* packet length check. */
+	if (ip6mhilen < sizeof(struct ip6m_home_test_init)) {
+		mip6log((LOG_NOTICE,
+			 "%s:%d: too short home test init (len = %d) "
+			 "from host %s.\n",
+			 __FILE__, __LINE__,
+			 ip6mhilen,
+			 ip6_sprintf(&src_sa->sin6_addr)));
+		/* discard */
+		return (EINVAL);
+	}
+
 	init_ip6pktopts(&opt);
 
 	m = mip6_create_ip6hdr(dst_sa, src_sa, IPPROTO_NONE, 0);
@@ -186,6 +198,18 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 
 	if (ip6_getpktaddrs(m0, &src_sa, &dst_sa)) {
 		/* must not happen. */
+		return (EINVAL);
+	}
+
+	/* packet length check. */
+	if (ip6mcilen < sizeof(struct ip6m_careof_test_init)) {
+		mip6log((LOG_NOTICE,
+			 "%s:%d: too short care-of test init (len = %d) "
+			 "from host %s.\n",
+			 __FILE__, __LINE__,
+			 ip6mcilen,
+			 ip6_sprintf(&src_sa->sin6_addr)));
+		/* discard */
 		return (EINVAL);
 	}
 
@@ -275,6 +299,18 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 		return (EINVAL);
 	}
 
+	/* packet length check. */
+	if (ip6mhlen < sizeof(struct ip6m_home_test)) {
+		mip6log((LOG_NOTICE,
+			 "%s:%d: too short home test (len = %d) "
+			 "from host %s.\n",
+			 __FILE__, __LINE__,
+			 ip6mhlen,
+			 ip6_sprintf(&src_sa->sin6_addr)));
+		/* discard */
+		return (EINVAL);
+	}
+
 	sc = hif_list_find_withhaddr(dst_sa);
 	if (sc == NULL) {
                 mip6log((LOG_NOTICE,
@@ -324,6 +360,18 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 
 	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
 		/* must not happen. */
+		return (EINVAL);
+	}
+
+	/* packet length check. */
+	if (ip6mclen < sizeof(struct ip6m_careof_test)) {
+		mip6log((LOG_NOTICE,
+			 "%s:%d: too short care-of test (len = %d) "
+			 "from host %s.\n",
+			 __FILE__, __LINE__,
+			 ip6mclen,
+			 ip6_sprintf(&src_sa->sin6_addr)));
+		/* discard */
 		return (EINVAL);
 	}
 
@@ -388,6 +436,18 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		return (EINVAL);
 	}
 
+	/* packet length check. */
+	if (ip6mulen < sizeof(struct ip6m_binding_update)) {
+		mip6log((LOG_NOTICE,
+			 "%s:%d: too short binding update (len = %d) "
+			 "from host %s.\n",
+			 __FILE__, __LINE__,
+			 ip6mulen,
+			 ip6_sprintf(&src_sa->sin6_addr)));
+		/* discard */
+		return (EINVAL);
+	}
+
 	ip6mu_flags = isprotected = haseen = 0;
 
 	ip6mu_flags = ip6mu->ip6mu_flags;
@@ -430,18 +490,6 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	return (EINVAL);
 
  accept_binding_update:
-
-	/* packet length check. */
-	if (ip6mulen < sizeof(struct ip6m_binding_update)) {
-		mip6log((LOG_NOTICE,
-			 "%s:%d: too short binding update (len = %d) "
-			 "from host %s.\n",
-			 __FILE__, __LINE__,
-			 ip6mulen,
-			 ip6_sprintf(&src_sa->sin6_addr)));
-		/* discard */
-		return (EINVAL);
-	}
 
 	/* get home address. */
 	if (haseen) {
@@ -604,8 +652,6 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 		return (EINVAL);
 	}
 
-	/* XXX autorization */
-
 	/* packet length check. */
 	if (ip6malen < sizeof(struct ip6m_binding_ack)) {
 		mip6log((LOG_NOTICE,
@@ -617,6 +663,8 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 		/* discard */
 		return (EINVAL);
 	}
+
+	/* XXX autorization */
 
 	/*
          * check if the sequence number of the binding update sent ==

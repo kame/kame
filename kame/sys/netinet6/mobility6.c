@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.4 2002/06/18 07:30:32 k-sugyou Exp $	*/
+/*	$KAME: mobility6.c,v 1.5 2002/06/18 13:52:13 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -112,64 +112,48 @@ mobility6_input(mp, offp, proto)
 
 	switch (mh6->ip6m_type) {
 	case IP6M_HOME_TEST_INIT:
-		if (mh6len < sizeof(struct ip6m_home_test_init)) {
-			/* too small */
-			goto bad;
-		}
 		if (mip6_ip6mhi_input(m, (struct ip6m_home_test_init *)mh6,
 		    mh6len) < 0)
 			goto bad;
 		break;
 
 	case IP6M_CAREOF_TEST_INIT:
-		if (mh6len < sizeof(struct ip6m_careof_test_init)) {
-			/* too small */
-			goto bad;
-		}
 		if (mip6_ip6mci_input(m, (struct ip6m_careof_test_init *)mh6,
 		    mh6len) < 0)
 			goto bad;
 		break;
 
 	case IP6M_HOME_TEST:
-		if (mh6len < sizeof(struct ip6m_home_test)) {
-			/* too small */
-			goto bad;
-		}
+		if (!MIP6_IS_MN)
+			break;
 		if (mip6_ip6mh_input(m, (struct ip6m_home_test *)mh6,
 		    mh6len) < 0)
 			goto bad;
 		break;
 
 	case IP6M_CAREOF_TEST:
-		if (mh6len < sizeof(struct ip6m_careof_test)) {
-			/* too small */
-			goto bad;
-		}
+		if (!MIP6_IS_MN)
+			break;
 		if (mip6_ip6mc_input(m, (struct ip6m_careof_test *)mh6,
 		    mh6len) < 0)
 			goto bad;
 		break;
 
 	case IP6M_BINDING_REQUEST:
+		if (!MIP6_IS_MN)
+			break;
 		/* XXX */
 		break;
 
 	case IP6M_BINDING_UPDATE:
-		if (mh6len < sizeof(struct ip6m_binding_update)) {
-			/* too small */
-			goto bad;
-		}
 		if (mip6_ip6mu_input(m, (struct ip6m_binding_update *)mh6,
 		    mh6len) < 0)
 			goto bad;
 		break;
 
 	case IP6M_BINDING_ACK:
-		if (mh6len < sizeof(struct ip6m_binding_ack)) {
-			/* too small */
-			goto bad;
-		}
+		if (!MIP6_IS_MN)
+			break;
 		if (mip6_ip6ma_input(m, (struct ip6m_binding_ack *)mh6,
 		    mh6len) < 0)
 			goto bad;
