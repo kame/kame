@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.47 2000/10/09 09:40:00 sumikawa Exp $	*/
+/*	$KAME: ndp.c,v 1.48 2000/10/09 22:08:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -647,6 +647,11 @@ again:;
 			 case ND6_LLINFO_NOSTATE:
 				 printf(" N");
 				 break;
+#ifdef ND6_LLINFO_WAITDELETE
+			 case ND6_LLINFO_WAITDELETE:
+				 printf(" W");
+				 break;
+#endif
 			 case ND6_LLINFO_INCOMPLETE:
 				 printf(" I");
 				 break;
