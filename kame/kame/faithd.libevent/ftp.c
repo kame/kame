@@ -645,7 +645,6 @@ cmdin(s, event, arg)
 
 	memcpy(cmd, relay->cli.buf, p - relay->cli.buf);
 	cmd[p - relay->cli.buf] = '\0';
-	logmsg(LOG_ERR, "<%s>", cmd);
 
 	/* commands that are not relayed */
 	if (strcasecmp(cmd, "EPSV") == 0 && strcasestr(relay->cli.buf, "ALL")) {
