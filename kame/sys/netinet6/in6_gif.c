@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.99 2002/09/11 02:34:17 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.100 2002/11/11 18:25:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -37,9 +37,6 @@
 #include "opt_inet.h"
 #include "opt_iso.h"
 #endif
-
-/* define it if you want to use encap_attach_func (it helps *BSD merge) */
-/*#define USE_ENCAPCHECK*/
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -400,7 +397,7 @@ int in6_gif_input(mp, offp, proto)
 		ip6stat.ip6s_nogif++;
 		return IPPROTO_DONE;
 	}
-#ifndef USE_ENCAPCHECK
+#ifndef GIF_ENCAPCHECK
 	if (!gif_validate6((const struct mbuf *)m, (struct gif_softc *)gifp,
 			   m->m_pkthdr.rcvif)) {
 		m_freem(m);
@@ -539,6 +536,7 @@ gif_validate6(m, sc, ifp)
 	return 128 * 2;
 }
 
+#ifdef GIF_ENCAPCHECK
 /*
  * we know that we are in IFF_UP, outer address available, and outer family
  * matched the physical addr family.  see gif_encapcheck().
@@ -558,12 +556,13 @@ gif_encapcheck6(m, off, proto, arg)
 
 	return gif_validate6(m, (struct gif_softc *)arg, m->m_pkthdr.rcvif);
 }
+#endif
 
 int
 in6_gif_attach(sc)
 	struct gif_softc *sc;
 {
-#ifndef USE_ENCAPCHECK
+#ifndef GIF_ENCAPCHECK
 	struct sockaddr_in6 mask6;
 
 	bzero(&mask6, sizeof(mask6));

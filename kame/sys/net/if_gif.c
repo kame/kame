@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.96 2002/10/08 07:18:09 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.97 2002/11/11 18:25:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -265,6 +265,7 @@ gif_start(ifp)
 }
 #endif
 
+#ifdef GIF_ENCAPCHECK
 int
 gif_encapcheck(m, off, proto, arg)
 	const struct mbuf *m;
@@ -331,6 +332,7 @@ gif_encapcheck(m, off, proto, arg)
 		return 0;
 	}
 }
+#endif
 
 int
 gif_output(ifp, m, dst, rt)
