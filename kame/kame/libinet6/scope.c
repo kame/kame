@@ -1,4 +1,4 @@
-/*	$KAME: scope.c,v 1.5 2001/11/13 10:25:09 jinmei Exp $ */
+/*	$KAME: scope.c,v 1.6 2001/11/13 10:26:19 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -53,7 +53,6 @@ addr2scopetype(sa)
 #ifdef INET6
 	struct sockaddr_in6 *sa6;
 #endif
-	struct sockaddr_in *sa4;
 	u_int8_t *addr4;
 
 	switch(sa->sa_family) {
