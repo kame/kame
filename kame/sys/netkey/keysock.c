@@ -1,4 +1,4 @@
-/*	$KAME: keysock.c,v 1.19 2000/05/12 13:10:31 itojun Exp $	*/
+/*	$KAME: keysock.c,v 1.20 2000/05/12 15:43:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -411,6 +411,7 @@ key_sendup(so, msg, len, target)
 	return key_sendup_mbuf(so, m, target);
 }
 
+/* so can be NULL if target != KEY_SENDUP_ONE */
 int
 key_sendup_mbuf(so, m, target)
 	struct socket *so;
@@ -423,7 +424,9 @@ key_sendup_mbuf(so, m, target)
 	struct rawcb *rp;
 	int error;
 
-	if (so == NULL || m == NULL)
+	if (m == NULL)
+		panic("key_sendup_mbuf: NULL pointer was passed.\n");
+	if (so == NULL && target == KEY_SENDUP_ONE)
 		panic("key_sendup_mbuf: NULL pointer was passed.\n");
 
 	pfkeystat.in_total++;
@@ -475,14 +478,14 @@ key_sendup_mbuf(so, m, target)
 		}
 
 		/* the exact target will be processed later */
-		if (sotorawcb(so) == rp)
+		if (so && sotorawcb(so) == rp)
 			continue;
 
 		sendup = 0;
 		switch (target) {
 		case KEY_SENDUP_ONE:
 			/* the statement has no effect */
-			if (sotorawcb(so) == rp)
+			if (so && sotorawcb(so) == rp)
 				sendup++;
 			break;
 		case KEY_SENDUP_ALL:
@@ -515,8 +518,11 @@ key_sendup_mbuf(so, m, target)
 		n = NULL;
 	}
 
-	error = key_sendup0(sotorawcb(so), m, 0);
-	m = NULL;
+	if (so) {
+		error = key_sendup0(sotorawcb(so), m, 0);
+		m = NULL;
+	} else
+		m_freem(m);
 	return error;
 }
 
