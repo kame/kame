@@ -1,0 +1,10 @@
+# The followings are a sample configuration to provide a DNS server address
+# for every client as well as to delegate a permanent IPv6 prefix
+# 2001:db8:1111::/48 to a client whose DUID is 00:01:00:01:aa:bb.
+
+option domain-name-servers 2001:db8::35;
+
+host kame {
+	duid 00:01:00:01:aa:bb;
+	prefix 2001:db8:1111::/48 infinity;
+};
