@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1819 2001/07/26 16:32:53 jinmei Exp $
+$KAME: CHANGELOG,v 1.1820 2001/07/27 03:52:19 itojun Exp $
 
 <200107>
+Fri Jul 27 12:49:47 JST 2001  itojun@iijlab.net
+	* sys/netinet6/ipsec.c: cache ipsec policy on pcbs, try to avoid
+	  per-packet SPD lookup.  idea from thorpej
+
 2001-07-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/net/if_loop.c (looutput): set M_LOOP for IPv6 packets.
 
