@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.773 2000/04/14 08:40:50 itojun Exp $
+$Id: CHANGELOG,v 1.774 2000/04/14 09:18:36 itojun Exp $
 
 <200003>
+Fri Apr 14 18:18:18 JST 2000  itojun@iijlab.net
+	* ports/pkgsrc for libpcap and tcpdump (freebsd[23], netbsd):
+	  upgrade to use 2000/4/3 snapshot.
+
 Fri Apr 14 17:39:27 JST 2000  itojun@iijlab.net
 	* sys/net/if_gif.c: simplify gif interface attachment to ip_encap
 	  dispatcher.  add martian/ingress filters against outer source,
