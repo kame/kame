@@ -10,4 +10,6 @@ SUBDIR+=altqd tbrconfig
 #SUBDIR+=inet6d
 SUBDIR+=racoon
 
+SUBDIR+=pppd
+
 .include <bsd.subdir.mk>
