@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2105 2002/03/25 05:12:08 jinmei Exp $
+$KAME: CHANGELOG,v 1.2106 2002/03/25 08:01:15 jinmei Exp $
 
 <200203>
+2002-03-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_purge): zero-cleard the
+	corresponding ND info.  Otherwise, parameters for removed
+	interfaces could be reused for a newly-created interface.
+
 2002-03-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ah_input.c (ah6_ctlinput):
 	* kame/sys/netinet6/esp_input.c (esp6_ctlinput):
