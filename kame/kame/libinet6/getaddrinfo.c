@@ -176,6 +176,9 @@ static int get_portmatch __P((const struct addrinfo *, const char *));
 static int get_port __P((struct addrinfo *, const char *, int));
 static const struct afd *find_afd __P((int));
 static int addrconfig __P((const struct addrinfo *));
+#ifdef INET6
+static int ip6_str2scopeid __P((char *, struct sockaddr_in6 *));
+#endif 
 
 static char *ai_errlist[] = {
 	"Success",
@@ -498,7 +501,7 @@ explore_fqdn(pai, hostname, servname, res)
 	int naddrs;
 #endif
 	const struct afd *afd;
-	int error;
+	int error = 0;
 
 	*res = NULL;
 	sentinel.ai_next = NULL;
@@ -775,8 +778,7 @@ explore_numeric_scope(pai, hostname, servname, res)
 	const struct afd *afd;
 	struct addrinfo *cur;
 	int error;
-	char *cp, *hostname2 = NULL;
-	int scope;
+	char *cp, *hostname2 = NULL, *scope;
 	struct sockaddr_in6 *sin6;
 
 	/*
@@ -794,36 +796,29 @@ explore_numeric_scope(pai, hostname, servname, res)
 		return explore_numeric(pai, hostname, servname, res);
 
 	/*
-	 * Handle special case of <scoped_address><delimiter><scope id>
+	 * Handle special case of <scope id><delimiter><scoped_address>
 	 */
 	hostname2 = strdup(hostname);
 	if (hostname2 == NULL)
 		return EAI_MEMORY;
 	/* terminate at the delimiter */
 	hostname2[cp - hostname] = '\0';
-
+	scope = hostname2;
 	cp++;
-	switch (pai->ai_family) {
-#ifdef INET6
-	case AF_INET6:
-		scope = if_nametoindex(cp);
-		if (scope == 0) {
-			free(hostname2);
-			return (EAI_NONAME);
-		}
-		break;
-#endif
-	}
 
-	error = explore_numeric(pai, hostname2, servname, res);
+	error = explore_numeric(pai, cp, servname, res);
 	if (error == 0) {
+		int scopeid;
+
 		for (cur = *res; cur; cur = cur->ai_next) {
 			if (cur->ai_family != AF_INET6)
 				continue;
 			sin6 = (struct sockaddr_in6 *)cur->ai_addr;
-			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr) ||
-			    IN6_IS_ADDR_MC_LINKLOCAL(&sin6->sin6_addr))
-				sin6->sin6_scope_id = scope;
+			if ((scopeid = ip6_str2scopeid(scope, sin6)) == -1) {
+				free(hostname2);
+				return(EAI_NONAME); /* XXX: is return OK? */
+			}
+			sin6->sin6_scope_id = scopeid;
 		}
 	}
 
@@ -1000,3 +995,38 @@ addrconfig(pai)
 	return 1;
 #endif
 }
+
+#ifdef INET6
+/* convert a string to a scope identifier. XXX: IPv6 specific */
+static int
+ip6_str2scopeid(scope, sin6)
+	char *scope;
+	struct sockaddr_in6 *sin6;
+{
+	int scopeid;
+	struct in6_addr *a6 = &sin6->sin6_addr;
+
+	if (IN6_IS_ADDR_LINKLOCAL(a6) || IN6_IS_ADDR_MC_LINKLOCAL(a6)) {
+		/*
+		 * We currently assume a one-to-one mapping between links
+		 * and interfaces, so we simply use interface indices for
+		 * like-local scopes.
+		 */
+		scopeid = if_nametoindex(scope);
+		if (scopeid == 0)
+			goto trynumeric;
+		return(scopeid);
+	}
+	if (IN6_IS_ADDR_SITELOCAL(a6) || IN6_IS_ADDR_MC_SITELOCAL(a6))
+		return(0);	/* XXX */
+	if (IN6_IS_ADDR_MC_ORGLOCAL(a6))
+		return(0);
+
+	return(0);	/* scope id of a global address is always 0. */
+
+	/* try to convert to a numeric id as a last resort */
+  trynumeric:
+	return(atoi(scope));	/* XXX: validation? */
+}
+#endif 
+

@@ -87,6 +87,10 @@ struct sockinet {
 	u_short	si_port;
 };
 
+#ifdef INET6
+static char *ip6_sa2str __P((struct sockaddr_in6 *, char *, int));
+#endif 
+
 #define ENI_NOSOCKET 	0
 #define ENI_NOSERVNAME	1
 #define ENI_NOHOSTNAME	2
@@ -209,13 +213,16 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 		 * means that the caller does not want the result.
 		 */
 	} else if (flags & NI_NUMERICHOST) {
+		int numaddrlen;
+
 		/* NUMERICHOST and NAMEREQD conflicts with each other */
 		if (flags & NI_NAMEREQD)
 			return ENI_NOHOSTNAME;
 		if (inet_ntop(afd->a_af, addr, numaddr, sizeof(numaddr))
 		    == NULL)
 			return ENI_SYSTEM;
-		if (strlen(numaddr) > hostlen)
+		numaddrlen = strlen(numaddr);
+		if (numaddrlen + 1 > hostlen) /* don't forget terminator */
 			return ENI_MEMORY;
 		strcpy(host, numaddr);
 #if defined(INET6) && defined(NI_WITHSCOPEID)
@@ -227,14 +234,28 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 			if (flags & NI_WITHSCOPEID)
 #endif /* !ALWAYS_WITHSCOPE */
 			{
-				char *ep = strchr(host, '\0');
-				unsigned int ifindex =
-					((struct sockaddr_in6 *)sa)->sin6_scope_id;
+				char scopebuf[MAXHOSTNAMELEN], *s;
+				int scopelen;
 
-				*ep = SCOPE_DELIMITER;
-				if ((if_indextoname(ifindex, ep + 1)) == NULL)
+				if ((s = ip6_sa2str((struct sockaddr_in6 *)sa,
+						    scopebuf, 0)) == NULL)
 					/* XXX what should we do? */
-					strncpy(ep + 1, "???", 3);
+					strcpy(scopebuf, "0");
+
+				scopelen = strlen(scopebuf);
+				if (scopelen + 1 + numaddrlen + 1 > hostlen)
+					return ENI_MEMORY;
+
+				/*
+				 * Shift the host string to allocate
+				 * space for the scope ID part.
+				 */
+				memmove(host + scopelen + 1, host,
+					numaddrlen);
+				/* copy the scope ID and the delimiter */
+				memcpy(host, scopebuf, scopelen);
+				host[scopelen] = SCOPE_DELIMITER;
+				host[scopelen + 1 + numaddrlen] = '\0';
 			}
 		}
 #endif /* INET6 */
@@ -278,3 +299,33 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 	}
 	return SUCCESS;
 }
+
+#ifdef INET6
+/* ARGSUSED */
+static char *
+ip6_sa2str(sa6, buf, flags)
+	struct sockaddr_in6 *sa6;
+	char *buf;
+	int flags;
+{
+	unsigned int ifindex = (unsigned int)sa6->sin6_scope_id;
+	struct in6_addr *a6 = &sa6->sin6_addr;
+
+#ifdef notyet
+	if (flags & NI_NUMERICSCOPE) {
+		sprintf(buf, "%d", sa6->sin6_scope_id);
+		return(buf);
+	}
+#endif
+ 
+	if (IN6_IS_ADDR_LINKLOCAL(a6) || IN6_IS_ADDR_MC_LINKLOCAL(a6))
+		return(if_indextoname(ifindex, buf));
+
+	if (IN6_IS_ADDR_SITELOCAL(a6) || IN6_IS_ADDR_MC_SITELOCAL(a6))
+		return(NULL);	/* XXX */
+	if (IN6_IS_ADDR_MC_ORGLOCAL(a6))
+		return(NULL);	/* XXX */
+
+	return(NULL);		/* XXX */
+}
+#endif 
