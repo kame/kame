@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1602 2001/03/15 08:40:12 jinmei Exp $
+$KAME: CHANGELOG,v 1.1603 2001/03/15 08:46:00 jinmei Exp $
 
 <200103>
 2001-03-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -21,9 +21,9 @@ $KAME: CHANGELOG,v 1.1602 2001/03/15 08:40:12 jinmei Exp $
 	could cause an intentional host route propagated.  The new kernel,
 	instead, installs
 	2001:200::c049:d099:ab4b:b637 0:a0:12:34:ab:cd UHL lo0
-	just like far older versions of the kernel, which installed the
-	host route as a cloned route from the corresponding interface
-	direct route.
+	just like far older versions of the kernel (except for the
+	existance of the cloned bit), which installed the host route as a
+	cloned route from the corresponding interface direct route.
 
 2001-03-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd2/ports/wu-ftpd: upgraded to wu-ftpd 2.6.1.  Since there
