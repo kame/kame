@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.32 2004/02/13 02:52:10 keiichi Exp $	*/
+/*	$KAME: mobility6.c,v 1.33 2004/02/24 21:43:46 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -276,7 +276,6 @@ mobility6_input(mp, offp, proto)
 			(void)mobility6_send_be(&ip6->ip6_dst, &src,
 			    IP6_MH_BES_UNKNOWN_MH, &home);
 		}
-		m_freem(m);
 		mip6stat.mip6s_unknowntype++;
 		break;
 	}
