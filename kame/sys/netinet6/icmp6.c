@@ -116,7 +116,7 @@ extern u_char ip6_protox[];
 
 struct icmp6stat icmp6stat;
 
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 extern struct in6pcb rawin6pcb;
 #else
 extern struct inpcbhead ripcb;

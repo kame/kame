@@ -67,7 +67,7 @@
 #endif
 
 #include <sys/param.h>
-#if !defined(__FreeBSD__) && __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/ioctl.h>
 #endif
 #include <sys/errno.h>
@@ -1293,7 +1293,7 @@ in6_ifinit(ifp, ia, sin6, scrub)
 	/* Add ownaddr as loopback rtentry, if necessary(ex. on p2p link). */
 	in6_ifaddloop(&(ia->ia_ifa));
 
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	if (ifp->if_flags & IFF_MULTICAST)
 		in6_restoremkludge(ia, ifp);
 #endif

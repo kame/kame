@@ -296,10 +296,10 @@ extern size_t ipsec4_hdrsiz_tcp __P((struct tcpcb *));
 extern size_t ipsec6_hdrsiz __P((struct mbuf *, struct inpcb *));
 #else
 extern size_t ipsec6_hdrsiz __P((struct mbuf *, struct in6pcb *));
-#if !defined(__NetBSD__) || defined(TCP6)
-extern size_t ipsec6_hdrsiz_tcp __P((struct tcp6cb *));
-#else
+#if defined(__NetBSD__) && !defined(TCP6)
 extern size_t ipsec6_hdrsiz_tcp __P((struct tcpcb *));
+#else
+extern size_t ipsec6_hdrsiz_tcp __P((struct tcp6cb *));
 #endif
 #endif
 #endif

@@ -204,7 +204,7 @@ extern int	ip6_dad_count;		/* DupAddrDetectionTransmits */
 extern u_int32_t ip6_flow_seq;
 extern int ip6_auto_flowlabel;
 
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 struct in6pcb;
 #endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3

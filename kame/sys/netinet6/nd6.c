@@ -44,7 +44,7 @@
 #include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/errno.h>
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/ioctl.h>
 #endif
 #include <sys/syslog.h>
@@ -87,10 +87,6 @@ extern struct ifnet loif[NLOOP];
 
 #define ND6_SLOWTIMER_INTERVAL (60 * 60) /* 1 hour */
 #define ND6_RECALC_REACHTM_INTERVAL (60 * 120) /* 2 hours */
-
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
-#define time_second time.tv_sec
-#endif
 
 #define SIN6(s) ((struct sockaddr_in6 *)s)
 #define SDL(s) ((struct sockaddr_dl *)s)
@@ -375,6 +371,9 @@ nd6_timer(ignored_arg)
 	register struct llinfo_nd6 *ln;
 	register struct nd_defrouter *dr;
 	register struct nd_prefix *pr;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 	
 #ifdef __NetBSD__
 	s = splsoftnet();
@@ -738,6 +737,9 @@ nd6_nud_hint(rt, dst6)
 	struct in6_addr *dst6;
 {
 	struct llinfo_nd6 *ln;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	/*
 	 * If the caller specified "rt", use that.  Otherwise, resolve the
@@ -789,6 +791,9 @@ nd6_resolve(ifp, rt, m, dst, desten)
 {
 	struct llinfo_nd6 *ln = (struct llinfo_nd6 *)NULL;
 	struct sockaddr_dl *sdl;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	if (m->m_flags & M_MCAST) {
 		switch (ifp->if_type) {
@@ -876,6 +881,9 @@ nd6_rtrequest(req, rt, sa)
 	static struct sockaddr_dl null_sdl = {sizeof(null_sdl), AF_LINK};
 	struct ifnet *ifp = rt->rt_ifp;
 	struct ifaddr *ifa;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	if (rt->rt_flags & RTF_GATEWAY)
 		return;
@@ -1301,6 +1309,9 @@ nd6_cache_lladdr(ifp, from, lladdr, lladdrlen, type, code)
 	int olladdr;
 	int llchange;
 	int newstate = 0;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	if (!ifp)
 		panic("ifp == NULL in nd6_cache_lladdr");
@@ -1526,6 +1537,9 @@ nd6_output(ifp, m0, dst, rt0)
 	register struct rtentry *rt = rt0;
 	struct llinfo_nd6 *ln = NULL;
 	int error = 0;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	if (IN6_IS_ADDR_MULTICAST(&dst->sin6_addr))
 		goto sendpkt;

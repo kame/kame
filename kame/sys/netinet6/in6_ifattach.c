@@ -490,7 +490,7 @@ in6_ifattach(ifp, type, laddr, noloop)
 	if (ifp->if_flags & IFF_MULTICAST) {
 		int error;	/* not used */
 
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		/* Restore saved multicast addresses(if any). */
 		in6_restoremkludge(ia, ifp);
 #endif

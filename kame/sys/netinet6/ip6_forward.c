@@ -88,7 +88,7 @@ ip6_forward(m, srcrt)
 	   in6_canforward(&ip6->ip6_src, &ip6->ip6_dst) == 0) {
 		ip6stat.ip6s_cantforward++;
 		ip6stat.ip6s_badscope++;
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		if (ip6_log_time + ip6_log_interval < time.tv_sec) {
 			ip6_log_time = time.tv_sec;
 #else

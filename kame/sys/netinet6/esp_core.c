@@ -49,7 +49,7 @@
 #include <netinet/in_var.h>
 #ifdef INET6
 #include <netinet6/ip6.h>
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet6/ip6_var.h>
@@ -1107,7 +1107,7 @@ esp_increment_iv(sa)
 	u_int8_t y;
 	int i;
 
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	y = time.tv_sec & 0xff;
 #else
 	y = time_second & 0xff;

@@ -36,7 +36,7 @@
 #include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/errno.h>
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/ioctl.h>
 #endif
 #include <sys/syslog.h>
@@ -55,10 +55,6 @@
 #include <netinet6/icmp6.h>
 
 #include <net/net_osdep.h>
-
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
-#define time_second time.tv_sec
-#endif
 
 #define SDL(s)	((struct sockaddr_dl *)s)
 
@@ -216,6 +212,9 @@ nd6_ra_input(m, off, icmp6len)
     {
 	struct nd_defrouter dr0;
 	u_int32_t advreachable = nd_ra->nd_ra_reachable;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	dr0.rtaddr = saddr6;
 	dr0.flags  = nd_ra->nd_ra_flags_reserved;
@@ -1270,7 +1269,7 @@ in6_ifadd(ifp, in6, addr, prefixlen)
 		int error;	/* not used */
 		struct in6_addr sol6;
 
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		/* Restore saved multicast addresses(if any). */
 		in6_restoremkludge(ia, ifp);
 #endif
@@ -1444,6 +1443,10 @@ in6_prefixlen2mask(maskp, len)
 int
 in6_init_prefix_ltimes(struct nd_prefix *ndpr)
 {
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
+
 	/* check if preferred lifetime > valid lifetime */
 	if (ndpr->ndpr_pltime > ndpr->ndpr_vltime) {
 		log(LOG_INFO, "in6_init_prefix_ltimes: preferred lifetime"
@@ -1468,6 +1471,10 @@ in6_init_prefix_ltimes(struct nd_prefix *ndpr)
 static void
 in6_init_address_ltimes(struct nd_prefix *new, struct in6_addrlifetime *lt6)
 {
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
+
 	/* init ia6t_expire */
 	if (lt6->ia6t_vltime == ND6_INFINITE_LIFETIME ||
 	    (new->ndpr_origin >= PR_ORIG_RR && new->ndpr_rrf_decrvalid == 0))

@@ -55,7 +55,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: in6_rmx.c,v 1.2 1999/08/06 14:17:28 itojun Exp $
+ * $Id: in6_rmx.c,v 1.3 1999/08/16 13:42:53 itojun Exp $
  */
 
 /*
@@ -94,7 +94,7 @@
 
 #include <netinet6/icmp6.h>
 
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <netinet6/tcp6.h>
 #include <netinet6/tcp6_seq.h>
 #include <netinet6/tcp6_timer.h>
@@ -106,7 +106,7 @@
 #include <netinet/tcp_var.h>
 #endif
 
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #define tcp_sendspace tcp6_sendspace
 #define tcp_recvspace tcp6_recvspace
 #define time_second time.tv_sec

@@ -75,7 +75,7 @@ void
 frag6_init()
 {
 	ip6q.ip6q_next = ip6q.ip6q_prev = &ip6q;
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	ip6_id = time.tv_sec & 0xffff;
 #else
 	ip6_id = time_second & 0xffff;

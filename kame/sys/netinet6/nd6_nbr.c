@@ -43,7 +43,7 @@
 #include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/errno.h>
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/ioctl.h>
 #endif 
 #include <sys/syslog.h>
@@ -586,7 +586,7 @@ nd6_na_input(m, off, icmp6len)
 		if (is_solicited) {
 			ln->ln_state = ND6_LLINFO_REACHABLE;
 			if (ln->ln_expire)
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 				ln->ln_expire = time.tv_sec +
 #else
 				ln->ln_expire = time_second +
@@ -659,7 +659,7 @@ nd6_na_input(m, off, icmp6len)
 			if (is_solicited) {
 				ln->ln_state = ND6_LLINFO_REACHABLE;
 				if (ln->ln_expire) {
-#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 					ln->ln_expire = time.tv_sec +
 #else
 					ln->ln_expire = time_second +
