@@ -1,4 +1,4 @@
-/*	$KAME: pfkey_dump.c,v 1.36 2002/05/13 05:30:08 itojun Exp $	*/
+/*	$KAME: pfkey_dump.c,v 1.37 2002/05/14 10:50:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -518,10 +518,12 @@ str_prefport(family, pref, port, ulp)
 
 	if (ulp == IPPROTO_ICMPV6)
 		memset(portbuf, 0, sizeof(portbuf));
-	else if (ulp != IPPROTO_ICMPV6 && port == IPSEC_PORT_ANY)
-		snprintf(portbuf, sizeof(portbuf), "[%s]", "any");
-	else
-		snprintf(portbuf, sizeof(portbuf), "[%u]", port);
+	else {
+		if (port == IPSEC_PORT_ANY)
+			snprintf(portbuf, sizeof(portbuf), "[%s]", "any");
+		else
+			snprintf(portbuf, sizeof(portbuf), "[%u]", port);
+	}
 
 	snprintf(buf, sizeof(buf), "%s%s", prefbuf, portbuf);
 
