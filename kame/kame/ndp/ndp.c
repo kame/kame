@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.54 2001/02/08 07:17:03 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.55 2001/02/08 07:34:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -876,7 +876,9 @@ ifinfo(argc, argv)
 	int i, s;
 	char *ifname = argv[0];
 	u_int32_t newflags;
+#ifdef IPV6CTL_USETEMPADDR
 	u_int8_t nullbuf[8];
+#endif
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
 		perror("ndp: socket");
@@ -924,6 +926,7 @@ ifinfo(argc, argv)
 	       ND.basereachable / 1000, ND.basereachable % 1000);
 	printf(", reachable=%ds", ND.reachable);
 	printf(", retrans=%ds%dms", ND.retrans / 1000, ND.retrans % 1000);
+#ifdef IPV6CTL_USETEMPADDR
 	memset(nullbuf, 0, sizeof(nullbuf));
 	if (memcmp(nullbuf, ND.randomid, sizeof(nullbuf)) != 0) {
 		int j;
@@ -948,6 +951,7 @@ ifinfo(argc, argv)
 				printf("%02x", rbuf[j]);
 		}
 	}
+#endif
 	if (ND.flags) {
 		printf("\nFlags: ");
 		if ((ND.flags & ND6_IFF_PERFORMNUD) != 0)
@@ -1025,9 +1029,18 @@ plist()
  	}
 #define PR pr.prefix[i]
 	for (i = 0; PR.if_index && i < PRLSTSIZ ; i++) {
-		struct sockaddr_in6 p6 = PR.prefix;
+		struct sockaddr_in6 p6;
 		char namebuf[NI_MAXHOST];
 		int niflags;
+
+#ifdef NDPRF_ONLINK
+		p6 = PR.prefix;
+#else
+		memset(&p6, 0, sizeof(p6));
+		p6.sin6_family = AF_INET6;
+		p6.sin6_len = sizeof(p6);
+		p6.sin6_addr = PR.prefix;
+#endif
 
 		/*
 		 * copy link index to sin6_scope_id field.
@@ -1063,11 +1076,17 @@ plist()
 		 * by origin.  notify the difference to the users.
 		 */
 		printf("  %s", PR.origin == PR_ORIG_RA ? "" : "advertise: ");
+#ifdef NDPRF_ONLINK
 		printf("flags=%s%s%s%s",
 		       PR.raflags.onlink ? "L" : "",
 		       PR.raflags.autonomous ? "A" : "",
 		       (PR.flags & NDPRF_ONLINK) != 0 ? "O" : "",
 		       (PR.flags & NDPRF_DETACHED) != 0 ? "D" : "");
+#else
+		printf("flags=%s%s",
+		       PR.raflags.onlink ? "L" : "",
+		       PR.raflags.autonomous ? "A" : "");
+#endif
 		if (PR.vltime == ND6_INFINITE_LIFETIME)
 			printf(" vltime=infinity");
 		else
@@ -1083,7 +1102,9 @@ plist()
 				sec2str(PR.expire - time.tv_sec));
 		else
 			printf(", expired");
+#ifdef NDPRF_ONLINK
 		printf(", ref=%d", PR.refcnt);
+#endif
 		switch (PR.origin) {
 		case PR_ORIG_RA:
 			printf(", origin=RA");
