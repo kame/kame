@@ -40,7 +40,7 @@
 #define	_SYS_SOCKET_H_
 
 /*
- * needed for CMSG_ALIGN
+ * needed for __CMSG_ALIGN
  */
 #include <machine/param.h>
 
@@ -348,15 +348,15 @@ struct cmsghdr {
 
 /* given pointer to struct cmsghdr, return pointer to data */
 #define	CMSG_DATA(cmsg) \
-	((u_char *)(cmsg) + CMSG_ALIGN(sizeof(struct cmsghdr)))
+	((u_char *)(cmsg) + __CMSG_ALIGN(sizeof(struct cmsghdr)))
 
 /* given pointer to struct cmsghdr, return pointer to next cmsghdr */
 #define	CMSG_NXTHDR(mhdr, cmsg)	\
-	(((caddr_t)(cmsg) + CMSG_ALIGN((cmsg)->cmsg_len) + \
-			    CMSG_ALIGN(sizeof(struct cmsghdr)) > \
+	(((caddr_t)(cmsg) + __CMSG_ALIGN((cmsg)->cmsg_len) + \
+			    __CMSG_ALIGN(sizeof(struct cmsghdr)) > \
 	    (mhdr)->msg_control + (mhdr)->msg_controllen) ? \
 	    (struct cmsghdr *)NULL : \
-	    (struct cmsghdr *)((caddr_t)(cmsg) + CMSG_ALIGN((cmsg)->cmsg_len)))
+	    (struct cmsghdr *)((caddr_t)(cmsg) + __CMSG_ALIGN((cmsg)->cmsg_len)))
 
 #define	CMSG_FIRSTHDR(mhdr)	((struct cmsghdr *)(mhdr)->msg_control)
 
@@ -370,13 +370,16 @@ struct cmsghdr {
  * (2) Also, it may not be correct to add dependency from sys/socket.h to
  * machine/param.h.
  */
-#define	CMSG_ALIGN(len)	(((len)+ ALIGNBYTES) & ~ALIGNBYTES)
+#define	__CMSG_ALIGN(len)	(((len)+ ALIGNBYTES) & ~ALIGNBYTES)
+#ifdef _KERNEL
+#define CMSG_ALIGN(n)	__CMSG_ALIGN(n)
+#endif
 
 /* Length of the contents of a control message of length len */
-#define	CMSG_LEN(len)	(CMSG_ALIGN(sizeof(struct cmsghdr)) + (len))
+#define	CMSG_LEN(len)	(__CMSG_ALIGN(sizeof(struct cmsghdr)) + (len))
 
 /* Length of the space taken up by a padded control message of length len */
-#define	CMSG_SPACE(len)	(CMSG_ALIGN(sizeof(struct cmsghdr)) + CMSG_ALIGN(len))
+#define	CMSG_SPACE(len)	(__CMSG_ALIGN(sizeof(struct cmsghdr)) + __CMSG_ALIGN(len))
 
 /* "Socket"-level control message types: */
 #define	SCM_RIGHTS	0x01		/* access rights (array of int) */
