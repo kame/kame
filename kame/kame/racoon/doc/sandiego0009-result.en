@@ -1,11 +1,11 @@
-$KAME: sandiego0009-result.en,v 1.3 2000/09/17 04:29:38 itojun Exp $
+$KAME: sandiego0009-result.en,v 1.4 2000/09/17 05:23:37 sakane Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
 
 Goals:
 - kernel IPsec: rijndael-cbc, twofish-cbc, blowfish-cbc
-- racoon: <TBD>
+- racoon: RSA signature, verify cert chain
 
 Things to look at during tests:
 IPsec:
