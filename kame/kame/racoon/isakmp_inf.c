@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.68 2001/03/21 15:57:59 sakane Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.69 2001/03/21 15:59:42 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -820,7 +820,7 @@ purge_isakmp_spi(proto, spi, n)
 			continue;
 
 		plog(LLV_INFO, LOCATION, NULL,
-			"proto_id %s purging spi:%s.\n",
+			"proto_id %s purging spi=%s.\n",
 			s_ipsecdoi_proto(proto),
 			isakmp_pindex(&spi[i], 0));
 
@@ -899,7 +899,7 @@ purge_ipsec_spi(dst0, proto, spi, n)
 
 		for (i = 0; i < n; i++) {
 			plog(LLV_DEBUG, LOCATION, NULL,
-				"check spi: packet %u against SA %u.\n",
+				"check spi(packet)=%u spi(db)=%u.\n",
 				ntohl(spi[i]), ntohl(sa->sadb_sa_spi));
 			if (spi[i] != sa->sadb_sa_spi)
 				continue;
@@ -922,7 +922,7 @@ purge_ipsec_spi(dst0, proto, spi, n)
 			}
 
 			plog(LLV_INFO, LOCATION, NULL,
-				"proto_id %s purging spi:%u.\n",
+				"proto_id %s purging spi=%u.\n",
 				s_ipsecdoi_proto(proto),
 				ntohl(spi[i]));
 		}
