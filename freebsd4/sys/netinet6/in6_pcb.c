@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.2 2000/07/15 07:14:33 kris Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.28 2001/01/06 07:03:00 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.29 2001/01/23 08:59:36 itojun Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1050,10 +1050,8 @@ in6_pcblookup_hash(pcbinfo, faddr, fport_arg, laddr, lport_arg, wildcard, ifp)
 				continue;
 			if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr) &&
 			    inp->inp_lport == lport) {
-#if defined(NFAITH) && NFAITH > 0
 				if (faith && (inp->inp_flags & INP_FAITH) == 0)
 					continue;
-#endif
 				if (IN6_ARE_ADDR_EQUAL(&inp->in6p_laddr,
 						       laddr))
 					return (inp);
