@@ -413,7 +413,7 @@ in6_pcbconnect(in6p, nam)
 	} else
 #endif
 	{
-		src6 = in6_selectsrc(&sin6->sin6_addr, in6p->in6p_outputopts,
+		src6 = in6_selectsrc(sin6, in6p->in6p_outputopts,
 		    in6p->in6p_moptions, &in6p->in6p_route, &in6p->in6p_laddr,
 		    &ifp, &error);
 		if (src6 == NULL) {

@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.148 2004/02/09 18:55:33 t-momose Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.149 2004/02/10 04:02:03 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -853,7 +853,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 			break;
 
 		/* Source address selection. XXX: need pcblookup? */
-		src = in6_selectsrc(&addr, in6p->in6p_outputopts,
+		src = in6_selectsrc(addr, in6p->in6p_outputopts,
 		    in6p->in6p_moptions, &in6p->in6p_route,
 		    &in6p->in6p_laddr, &ifp, &error);
 		if (src == NULL) {
