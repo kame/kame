@@ -1,4 +1,4 @@
- /*	$KAME: wru.c,v 1.6 2002/01/23 06:52:35 itojun Exp $	*/
+ /*	$KAME: wru.c,v 1.7 2002/01/25 07:58:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -58,6 +58,14 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
+
+/* for compatibility with old definitions */
+#ifndef NI_QTYPE_NODENAME
+#define NI_QTYPE_NODENAME NI_QTYPE_DNSNAME
+#endif
+#ifndef NI_NODENAME_FLAG_VALIDTTL
+#define NI_NODENAME_FLAG_VALIDTTL NI_FQDN_FLAG_VALIDTTL
+#endif
 
 static void update_nonce __P((u_int8_t *, size_t));
 static int do_reply __P((char *, int, int, char *, struct sockaddr *,
