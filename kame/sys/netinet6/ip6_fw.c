@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.17 2000/10/19 00:37:50 itojun Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.18 2000/11/21 12:29:55 kawa Exp $	*/
 
 /*
  * Copyright (c) 1993 Daniel Boulet
@@ -20,10 +20,12 @@
  */
 
 #ifdef __FreeBSD__
+#if __FreeBSD__ < 4 || !defined(KLD_MODULE)
 #include "opt_ip6fw.h"
 #if __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#endif
 #endif
 #endif
 
@@ -107,6 +109,10 @@ LIST_HEAD (ip6_fw_head, ip6_fw_chain) ip6_fw_chain;
 SYSCTL_DECL(_net_inet6_ip6);
 #endif
 SYSCTL_NODE(_net_inet6_ip6, OID_AUTO, fw, CTLFLAG_RW, 0, "Firewall");
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+SYSCTL_INT(_net_inet6_ip6_fw, OID_AUTO, enable, CTLFLAG_RW,
+	&ip6_fw_enable, 0, "Enable ip6fw");
+#endif
 SYSCTL_INT(_net_inet6_ip6_fw, OID_AUTO, debug, CTLFLAG_RW, &fw6_debug, 0, "");
 SYSCTL_INT(_net_inet6_ip6_fw, OID_AUTO, verbose, CTLFLAG_RW, &fw6_verbose, 0, "");
 SYSCTL_INT(_net_inet6_ip6_fw, OID_AUTO, verbose_limit, CTLFLAG_RW, &fw6_verbose_limit, 0, "");
@@ -1268,3 +1274,52 @@ ip6_fw_init(void)
 		    fw6_verbose_limit);
 #endif
 }
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+static ip6_fw_chk_t *old_chk_ptr;
+static ip6_fw_ctl_t *old_ctl_ptr;
+
+static int
+ip6fw_modevent(module_t mod, int type, void *unused)
+{
+        int s;
+
+        switch (type) {
+        case MOD_LOAD:
+                s = splnet();
+
+                old_chk_ptr = ip6_fw_chk_ptr;
+                old_ctl_ptr = ip6_fw_ctl_ptr;
+
+                ip6_fw_init();
+                splx(s);
+                return 0;
+        case MOD_UNLOAD:
+                s = splnet();
+                ip6_fw_chk_ptr =  old_chk_ptr;
+                ip6_fw_ctl_ptr =  old_ctl_ptr;
+                while (LIST_FIRST(&ip6_fw_chain) != NULL) {
+                        struct ip6_fw_chain *fcp = LIST_FIRST(&ip6_fw_chain);
+                        LIST_REMOVE(LIST_FIRST(&ip6_fw_chain), chain);
+                        free(fcp->rule, M_IP6FW);
+                        free(fcp, M_IP6FW);
+                }
+
+                splx(s);
+                printf("IPv6 firewall unloaded\n");
+                return 0;
+        default:
+                break;
+        }
+        return 0;
+}
+
+static moduledata_t ip6fwmod = {
+        "ip6fw",
+        ip6fw_modevent,
+        0
+};
+DECLARE_MODULE(ip6fw, ip6fwmod, SI_SUB_PSEUDO, SI_ORDER_ANY);
+#endif
+
+

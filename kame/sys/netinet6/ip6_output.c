@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.131 2000/11/15 04:35:11 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.132 2000/11/21 12:29:55 kawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -130,7 +130,7 @@
 
 #include <net/net_osdep.h>
 
-#ifdef IPV6FIREWALL
+#if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #include <netinet6/ip6_fw.h>
 #endif
 
@@ -923,11 +923,15 @@ skip_ipsec2:;
 			ip6->ip6_dst.s6_addr16[1] = 0;
 	}
 
-#ifdef IPV6FIREWALL
+#if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	/*
 	 * Check with the firewall...
 	 */
-	if (ip6_fw_chk_ptr) {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+        if (ip6_fw_enable && ip6_fw_chk_ptr) {
+#else
+        if (ip6_fw_chk_ptr) {
+#endif
 		u_short port = 0;
 		m->m_pkthdr.rcvif = NULL;	/*XXX*/
 		/* If ipfw says divert, we have to just drop packet */
@@ -1909,7 +1913,7 @@ do { \
 				break;
 #endif /* IPSEC */
 
-#ifdef IPV6FIREWALL
+#if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 			case IPV6_FW_ADD:
 			case IPV6_FW_DEL:
 			case IPV6_FW_FLUSH:
@@ -2233,7 +2237,7 @@ do { \
 			  }
 #endif /* IPSEC */
 
-#ifdef IPV6FIREWALL
+#if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 			case IPV6_FW_GET:
 			  {
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3

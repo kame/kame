@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.57 2000/10/05 03:34:51 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.58 2000/11/21 12:29:55 kawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -78,7 +78,7 @@
 #include <netkey/key.h>
 #endif /* IPSEC */
 
-#ifdef IPV6FIREWALL
+#if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #include <netinet6/ip6_fw.h>
 #endif
 
@@ -550,11 +550,15 @@ ip6_forward(m, srcrt)
 		type = ND_REDIRECT;
 	}
 
-#ifdef IPV6FIREWALL
+#if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	/*
 	 * Check with the firewall...
 	 */
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+	if (ip6_fw_enable && ip6_fw_chk_ptr) {
+#else
 	if (ip6_fw_chk_ptr) {
+#endif
 		u_short port = 0;
 		/* If ipfw says divert, we have to just drop packet */
 		if ((*ip6_fw_chk_ptr)(&ip6, rt->rt_ifp, &port, &m)) {
