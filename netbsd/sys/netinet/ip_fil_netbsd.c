@@ -1352,10 +1352,6 @@ frdest_t *fdp;
 		dst6->sin6_addr.s6_addr16[1] = htons(ifp->if_index);
 
 	{
-#if (__NetBSD_Version__ >= 106010000)
-		struct in6_addr finaldst = fin->fin_dst6;
-		int frag;
-#endif
 		if (ro->ro_rt->rt_flags & RTF_GATEWAY)
 			dst6 = (struct sockaddr_in6 *)ro->ro_rt->rt_gateway;
 		ro->ro_rt->rt_use++;
@@ -1363,10 +1359,9 @@ frdest_t *fdp;
 #if (__NetBSD_Version__ <= 106009999)
 		mtu = nd_ifinfo[ifp->if_index].linkmtu;
 #else
-		/* Determine path MTU. */
-		error = ip6_getpmtu(ro, ro, ifp, &finaldst, &mtu, &frag);
+		mtu = ND_IFINFO(ifp)->linkmtu;
 #endif
-		if ((error == 0) && (m0->m_pkthdr.len <= mtu)) {
+		if (m0->m_pkthdr.len <= mtu) {
 			*mpp = NULL;
 			error = nd6_output(ifp, fin->fin_ifp, m0,
 						   dst6, ro->ro_rt);
