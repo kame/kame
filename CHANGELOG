@@ -1,6 +1,9 @@
-$Id: CHANGELOG,v 1.489 2000/01/26 21:20:33 sumikawa Exp $
+$Id: CHANGELOG,v 1.490 2000/01/27 06:04:36 itojun Exp $
 
 <200001>
+Thu Jan 27 15:04:12 JST 2000  itojun@iiljab.net
+	* netbsd/pkgsrc/net/rsync: upgrade to 2.3.2 with latest IPv6 patch.
+
 Thu Jan 27 06:20:08 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/irc: upgrade to 2.10.3.
 
