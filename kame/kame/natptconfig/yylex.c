@@ -1,4 +1,4 @@
-/*	$KAME: yylex.c,v 1.18 2002/05/15 13:49:32 fujisawa Exp $	*/
+/*	$KAME: yylex.c,v 1.19 2002/05/17 05:56:39 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -77,6 +77,7 @@ struct
 	{ "show",	SSHOW,		"SSHOW",	},
 	{ "tcp",	STCP,		"STCP",		},
 	{ "test",	STEST,		"STEST",	},
+	{ "timer",	STIMER,		"STIMER",	},
 	{ "ttl",	STTL,		"STTL",		},
 	{ "to",		STO,		"STO",		},
 	{ "udp",	SUDP,		"SUDP",		},

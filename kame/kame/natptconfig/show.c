@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.25 2002/05/15 13:49:32 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.26 2002/05/17 05:56:39 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -219,6 +219,20 @@ writeXlateHeader(int type)
 		printf("\n");
 	}
 
+}
+
+
+void
+showTimer()
+{
+	const char *fn = __FUNCTION__;
+
+	int	timer;
+
+	if (getValue(NATPTCTL_TSLOTTIMER, (caddr_t)&timer) <= 0)
+		err(1, "%s(): failure on read", fn);
+
+	printf("timer: tslot=%d\n", timer);
 }
 
 

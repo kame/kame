@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.30 2002/05/15 13:49:31 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.31 2002/05/17 05:56:39 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -115,8 +115,8 @@ yyerror(char *msg, ...)
 %token		SALL
 %token		SANY4
 %token		SANY6
-%token		SBREAK
 %token		SBIDIR
+%token		SBREAK
 %token		SCUI
 %token		SDADDR
 %token		SDELETE
@@ -141,8 +141,9 @@ yyerror(char *msg, ...)
 %token		SSYSLOG
 %token		STCP
 %token		STEST
-%token		STTL
+%token		STIMER
 %token		STO
+%token		STTL
 %token		SUDP
 %token		SVARIABLES
 %token		SXLATE
@@ -413,6 +414,8 @@ show
 		    { showVariable(NATPTCTL_PREFIX); }
 		| SSHOW SRULES opt_cui
 		    { showRules($3); }
+		| SSHOW STIMER
+		    { showTimer(); }
 		| SSHOW STTL
 		    { showTTLs(); }
 		| SSHOW SXLATE opt_long opt_decimal
