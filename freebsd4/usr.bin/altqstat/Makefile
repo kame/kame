@@ -7,6 +7,11 @@ MAN1=	altqstat.1
 
 CFLAGS+=-DALTQ -DINET6 -Wall -I${.CURDIR}/../../kame/libaltq
 
+LDADD+=	-L${.OBJDIR}/../../lib/libinet6 \
+	-L/usr/local/v6/lib -linet6
+DPADD+=	${.OBJDIR}/../../lib/libinet6/libinet6.a \
+	/usr/local/v6/lib/libinet6.a
+
 LDADD+=	-lcurses
 DPADD+=	${LIBCURSES}
 
