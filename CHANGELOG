@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.372 1999/12/25 13:58:47 itojun Exp $
+$Id: CHANGELOG,v 1.373 1999/12/26 15:38:21 sumikawa Exp $
 
 <199912>
+Mon Dec 27 00:37:04 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd[23]/ports/emacs20: upgrade to 20.5. 
+
 Sat Dec 25 23:00:09 JST 1999  itojun@iijlab.net
 	* freebsd2/usr.bin/fetch: apply y2k patch.  this should be okay to
 	  apply it as freebsd228 is not maintained by freebsd project any more.
