@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.50 1999/08/24 07:46:16 itojun Exp $
+$Id: CHANGELOG,v 1.51 1999/08/24 08:48:34 itojun Exp $
 
 <199908>
+Tue Aug 24 08:18:00 GMT 1999  itojun@iijlab.net
+	* bsdi3: fix manpage installation procedure to conform to
+	  BSDI3 practice.
+
 Tue Aug 24 16:42:54 JST 1999  itojun@iijlab.net
 	* usr.sbin/rtsold, sbin/rtsol: Integrate rtsold and rtsol source code.
 	  Behavior is switched by argv[0].  sbin/rtsol needs to be statically
