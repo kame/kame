@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.106 2002/06/07 07:42:39 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.107 2002/06/08 06:57:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -163,10 +163,10 @@ nd6_ns_input(m, off, icmp6len)
 
 	if (SA6_IS_ADDR_UNSPECIFIED(saddr6)) {
 		/* dst has to be a solicited node multicast address. */
-		if (daddr6->sin6_addr.s6_addr16[0] == IPV6_ADDR_INT16_MLL
-		    && daddr6->sin6_addr.s6_addr32[1] == 0
-		    && daddr6->sin6_addr.s6_addr32[2] == IPV6_ADDR_INT32_ONE
-		    && daddr6->sin6_addr.s6_addr8[12] == 0xff) {
+		if (daddr6->sin6_addr.s6_addr16[0] == IPV6_ADDR_INT16_MLL &&
+		    daddr6->sin6_addr.s6_addr32[1] == 0 &&
+		    daddr6->sin6_addr.s6_addr32[2] == IPV6_ADDR_INT32_ONE &&
+		    daddr6->sin6_addr.s6_addr8[12] == 0xff) {
 			; /* good */
 		} else {
 			nd6log((LOG_INFO, "nd6_ns_input: bad DAD packet "
@@ -340,10 +340,9 @@ nd6_ns_input(m, off, icmp6len)
 		}
 		in6_embedscope(&sa6_all.sin6_addr, &sa6_all);
 		nd6_na_output(ifp, &sa6_all, &taddr6,
-			      ((anycast || proxy || !tlladdr)
-				      ? 0 : ND_NA_FLAG_OVERRIDE)
-			      	| (router ? ND_NA_FLAG_ROUTER : 0),
-			      tlladdr, (struct sockaddr *)proxydl);
+		    ((anycast || proxy || !tlladdr) ? 0 : ND_NA_FLAG_OVERRIDE) |
+		    (router ? ND_NA_FLAG_ROUTER : 0),
+		    tlladdr, (struct sockaddr *)proxydl);
 		goto freeit;
 	}
 
@@ -510,8 +509,8 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 	/* determine the source and destination addresses */
 	bzero(&src_sa, sizeof(src_sa));
 	bzero(&dst_sa, sizeof(dst_sa));
-	src_sa.sin6_family =dst_sa.sin6_family = AF_INET6;
-	src_sa.sin6_len =dst_sa.sin6_len = sizeof(struct sockaddr_in6);
+	src_sa.sin6_family = dst_sa.sin6_family = AF_INET6;
+	src_sa.sin6_len = dst_sa.sin6_len = sizeof(struct sockaddr_in6);
 	if (daddr6)
 		dst_sa = *daddr6;
 #ifdef MIP6
@@ -725,7 +724,6 @@ nd6_na_input(m, off, icmp6len)
 	if (ip6_getpktaddrs(m, &saddr6, NULL))
 		goto bad;	/* should be impossible */
 
-
 	flags = nd_na->nd_na_flags_reserved;
 	is_router = ((flags & ND_NA_FLAG_ROUTER) != 0);
 	is_solicited = ((flags & ND_NA_FLAG_SOLICITED) != 0);
@@ -748,7 +746,7 @@ nd6_na_input(m, off, icmp6len)
 	}
 	if (is_solicited && IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
 		nd6log((LOG_ERR,
-			"nd6_na_input: a solicited adv is multicasted\n"));
+		    "nd6_na_input: a solicited adv is multicasted\n"));
 		goto bad;
 	}
 
@@ -943,7 +941,7 @@ nd6_na_input(m, off, icmp6len)
 			s = splnet();
 #endif
 			dr = defrouter_lookup((struct sockaddr_in6 *)rt_key(rt),
-					      rt->rt_ifp);
+			    rt->rt_ifp);
 			if (dr)
 				defrtrlist_del(dr);
 			else if (!ip6_forwarding && ip6_accept_rtadv) {

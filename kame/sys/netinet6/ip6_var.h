@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.95 2002/06/07 21:54:00 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.96 2002/06/08 06:57:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -475,23 +475,18 @@ int	none_input __P((struct mbuf **, int *, int));
 
 #ifdef NEW_STRUCT_ROUTE
 struct sockaddr_in6 *in6_selectsrc __P((struct sockaddr_in6 *,
-					struct ip6_pktopts *,
-					struct ip6_moptions *,
-					struct route *, struct sockaddr_in6 *,
-					struct ifnet **, int *));
+	struct ip6_pktopts *, struct ip6_moptions *, struct route *,
+	struct sockaddr_in6 *, struct ifnet **, int *));
 int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
-			 struct ip6_moptions *, struct route *,
-			 struct ifnet **, struct rtentry **, int));
+	struct ip6_moptions *, struct route *, struct ifnet **,
+	struct rtentry **, int));
 #else
 struct sockaddr_in6 *in6_selectsrc __P((struct sockaddr_in6 *,
-					struct ip6_pktopts *,
-					struct ip6_moptions *,
-					struct route_in6 *,
-					struct sockaddr_in6 *,
-					struct ifnet **, int *));
+	struct ip6_pktopts *, struct ip6_moptions *, struct route_in6 *,
+	struct sockaddr_in6 *, struct ifnet **, int *));
 int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
-			 struct ip6_moptions *, struct route_in6 *,
-			 struct ifnet **, struct rtentry **, int));
+	struct ip6_moptions *, struct route_in6 *, struct ifnet **,
+	struct rtentry **, int));
 #endif
 #endif /* _KERNEL */
 

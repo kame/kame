@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.203 2002/06/07 07:58:38 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.204 2002/06/08 06:57:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -95,8 +95,8 @@ static void defrouter_addifreq __P((struct ifnet *));
 static void defrouter_delifreq __P((void));
 static void nd6_rtmsg __P((int, struct rtentry *));
 
-static void in6_init_address_ltimes __P((struct nd_prefix *ndpr,
-	struct in6_addrlifetime *lt6));
+static void in6_init_address_ltimes __P((struct nd_prefix *,
+	struct in6_addrlifetime *));
 
 static int rt6_deleteroute __P((struct radix_node *, void *));
 
@@ -991,7 +991,7 @@ rtpref(struct nd_defrouter *dr)
 	}
 	/* NOTREACHED */
 #else
-	return RTPREF_MEDIUM;
+	return 0;
 #endif
 }
 
@@ -1166,7 +1166,7 @@ nd6_prelist_add(pr, dr, newp)
 	/* make prefix in the canonical form */
 	for (i = 0; i < 4; i++)
 		new->ndpr_prefix.sin6_addr.s6_addr32[i] &=
-			new->ndpr_mask.s6_addr32[i];
+		    new->ndpr_mask.s6_addr32[i];
 
 #ifdef __NetBSD__
 	s = splsoftnet();
@@ -1960,8 +1960,7 @@ nd6_prefix_offlink(pr)
 				}
 			}
 		}
-	}
-	else {
+	} else {
 		/* XXX: can we still set the NDPRF_ONLINK flag? */
 		nd6log((LOG_ERR,
 		    "nd6_prefix_offlink: failed to delete route: "

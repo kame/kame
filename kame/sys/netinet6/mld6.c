@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.43 2002/02/18 12:27:53 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.44 2002/06/08 06:57:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -116,7 +116,7 @@ static const struct sockaddr_in6 *all_nodes_linklocal;
 static const struct sockaddr_in6 *all_routers_linklocal;
 
 static void mld6_sendpkt __P((struct in6_multi *, int,
-			      const struct sockaddr_in6 *));
+	const struct sockaddr_in6 *));
 
 void
 mld6_init()
@@ -184,7 +184,7 @@ mld6_start_listening(in6m)
 	 */
 	all_sa = *all_nodes_linklocal;
 	if (in6_addr2zoneid(in6m->in6m_ifp, &all_sa.sin6_addr,
-			    &all_sa.sin6_scope_id) ||
+	    &all_sa.sin6_scope_id) ||
 	    in6_embedscope(&all_sa.sin6_addr, &all_sa)) {
 		/* XXX: this should not happen! */
 		in6m->in6m_timer = 0;
@@ -197,8 +197,9 @@ mld6_start_listening(in6m)
 		in6m->in6m_state = MLD6_OTHERLISTENER;
 	} else {
 		mld6_sendpkt(in6m, MLD_LISTENER_REPORT, NULL);
-		in6m->in6m_timer = MLD6_RANDOM_DELAY(
-			MLD6_UNSOLICITED_REPORT_INTERVAL * PR_FASTHZ);
+		in6m->in6m_timer =
+		    MLD6_RANDOM_DELAY(MLD6_UNSOLICITED_REPORT_INTERVAL *
+		    PR_FASTHZ);
 		in6m->in6m_state = MLD6_IREPORTEDLAST;
 		mld6_timers_are_running = 1;
 	}
@@ -213,7 +214,7 @@ mld6_stop_listening(in6m)
 
 	all_sa = *all_nodes_linklocal;
 	if (in6_addr2zoneid(in6m->in6m_ifp, &all_sa.sin6_addr,
-			    &all_sa.sin6_scope_id) ||
+	    &all_sa.sin6_scope_id) ||
 	    in6_embedscope(&all_sa.sin6_addr, &all_sa)) {
 		/* XXX: this should not happen! */
 		return;
@@ -221,7 +222,7 @@ mld6_stop_listening(in6m)
 	/* XXX: necessary when mrouting */
 	allrouter_sa = *all_routers_linklocal;
 	if (in6_addr2zoneid(in6m->in6m_ifp, &allrouter_sa.sin6_addr,
-			    &allrouter_sa.sin6_scope_id)) {
+	    &allrouter_sa.sin6_scope_id)) {
 		/* XXX impossible */
 		return;
 	}
@@ -318,7 +319,7 @@ mld6_input(m, off)
 
 		all_sa = *all_nodes_linklocal;
 		if (in6_addr2zoneid(ifp, &all_sa.sin6_addr,
-				    &all_sa.sin6_scope_id) ||
+		    &all_sa.sin6_scope_id) ||
 		    in6_embedscope(&all_sa.sin6_addr, &all_sa)) {
 			/* XXX: this should not happen! */
 			break;
@@ -376,14 +377,13 @@ mld6_input(m, off)
 				if (timer == 0) {
 					/* send a report immediately */
 					mld6_sendpkt(in6m, MLD_LISTENER_REPORT,
-						NULL);
+					    NULL);
 					in6m->in6m_timer = 0; /* reset timer */
 					in6m->in6m_state = MLD6_IREPORTEDLAST;
-				}
-				else if (in6m->in6m_timer == 0 || /* idle */
+				} else if (in6m->in6m_timer == 0 || /* idle */
 					in6m->in6m_timer > timer) {
 					in6m->in6m_timer =
-						MLD6_RANDOM_DELAY(timer);
+					    MLD6_RANDOM_DELAY(timer);
 					mld6_timers_are_running = 1;
 				}
 			}
@@ -552,7 +552,7 @@ mld6_sendpkt(in6m, type, dst)
 	mldh->mld_addr = in6m->in6m_sa.sin6_addr;
 	in6_clearscope(&mldh->mld_addr); /* XXX */
 	mldh->mld_cksum = in6_cksum(mh, IPPROTO_ICMPV6, sizeof(struct ip6_hdr),
-				    sizeof(struct mld_hdr));
+	    sizeof(struct mld_hdr));
 
 	/* construct multicast option */
 	bzero(&im6o, sizeof(im6o));

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.284 2002/06/08 00:55:53 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.285 2002/06/08 06:57:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -217,8 +217,7 @@ in6_ifloop_request(int cmd, struct ifaddr *ifa)
 	 * which changes the outgoing interface to the loopback interface.
 	 */
 	e = rtrequest(cmd, ifa->ifa_addr, ifa->ifa_addr,
-		      (struct sockaddr *)&all1_sa,
-		      RTF_UP|RTF_HOST|RTF_LLINFO, &nrt);
+	    (struct sockaddr *)&all1_sa, RTF_UP|RTF_HOST|RTF_LLINFO, &nrt);
 	if (e != 0) {
 		log(LOG_ERR, "in6_ifloop_request: "
 		    "%s operation failed for %s (errno=%d)\n",
@@ -722,35 +721,37 @@ in6_control(so, cmd, data, ifp)
 		ifr->ifr_ifru.ifru_lifetime = ia->ia6_lifetime;
 		if (ia->ia6_lifetime.ia6t_vltime != ND6_INFINITE_LIFETIME) {
 			time_t maxexpire;
-			struct in6_addrlifetime *retlt = &ifr->ifr_ifru.ifru_lifetime;
+			struct in6_addrlifetime *retlt =
+			    &ifr->ifr_ifru.ifru_lifetime;
 
 			/*
 			 * XXX: adjust expiration time assuming time_t is
 			 * signed.
 			 */
 			maxexpire = (-1) &
-				~(1 << ((sizeof(maxexpire) * 8) - 1));
+			    ~(1 << ((sizeof(maxexpire) * 8) - 1));
 			if (ia->ia6_lifetime.ia6t_vltime < 
 			    maxexpire - ia->ia6_updatetime) {
 				retlt->ia6t_expire = ia->ia6_updatetime +
-					ia->ia6_lifetime.ia6t_vltime;
+				    ia->ia6_lifetime.ia6t_vltime;
 			} else
 				retlt->ia6t_expire = maxexpire;
 		}
 		if (ia->ia6_lifetime.ia6t_pltime != ND6_INFINITE_LIFETIME) {
 			time_t maxexpire;
-			struct in6_addrlifetime *retlt = &ifr->ifr_ifru.ifru_lifetime;
+			struct in6_addrlifetime *retlt =
+			    &ifr->ifr_ifru.ifru_lifetime;
 
 			/*
 			 * XXX: adjust expiration time assuming time_t is
 			 * signed.
 			 */
 			maxexpire = (-1) &
-				~(1 << ((sizeof(maxexpire) * 8) - 1));
+			    ~(1 << ((sizeof(maxexpire) * 8) - 1));
 			if (ia->ia6_lifetime.ia6t_pltime < 
 			    maxexpire - ia->ia6_updatetime) {
 				retlt->ia6t_preferred = ia->ia6_updatetime +
-					ia->ia6_lifetime.ia6t_pltime;
+				    ia->ia6_lifetime.ia6t_pltime;
 			} else
 				retlt->ia6t_preferred = maxexpire;
 		}
@@ -811,8 +812,8 @@ in6_control(so, cmd, data, ifp)
 			if (MIP6_IS_MN)
 				if (mip6_process_movement()) {
 					mip6log((LOG_WARNING,
-						 "%s:%d: mip6_process_movement failed.\n",
-						 __FILE__, __LINE__));
+					    "%s:%d: mip6_process_movement failed.\n",
+					    __FILE__, __LINE__));
 					/* ignore this error... */
 				}
 #endif /* MIP6 */
@@ -823,7 +824,7 @@ in6_control(so, cmd, data, ifp)
 		/* apply the mask for safety. */
 		for (i = 0; i < 4; i++) {
 			pr0.ndpr_prefix.sin6_addr.s6_addr32[i] &=
-				ifra->ifra_prefixmask.sin6_addr.s6_addr32[i];
+			    ifra->ifra_prefixmask.sin6_addr.s6_addr32[i];
 		}
 		/*
 		 * XXX: since we don't have an API to set prefix (not address)
@@ -834,7 +835,7 @@ in6_control(so, cmd, data, ifp)
 		 */
 		pr0.ndpr_raf_onlink = 1; /* should be configurable? */
 		pr0.ndpr_raf_auto =
-			((ifra->ifra_flags & IN6_IFF_AUTOCONF) != 0);
+		    ((ifra->ifra_flags & IN6_IFF_AUTOCONF) != 0);
 		pr0.ndpr_vltime = ifra->ifra_lifetime.ia6t_vltime;
 		pr0.ndpr_pltime = ifra->ifra_lifetime.ia6t_pltime;
 
@@ -867,8 +868,7 @@ in6_control(so, cmd, data, ifp)
 				if ((e = in6_tmpifadd(ia, 1)) != 0) {
 					log(LOG_NOTICE, "in6_control: failed "
 					    "to create a temporary address, "
-					    "errno=%d\n",
-					    e);
+					    "errno=%d\n", e);
 				}
 			}
 		}
@@ -899,14 +899,14 @@ in6_control(so, cmd, data, ifp)
 		bzero(&pr0, sizeof(pr0));
 		pr0.ndpr_ifp = ifp;
 		pr0.ndpr_plen = in6_mask2len(&ia->ia_prefixmask.sin6_addr,
-					     NULL);
+		    NULL);
 		if (pr0.ndpr_plen == 128)
 			goto purgeaddr;
 		pr0.ndpr_prefix = ia->ia_addr;
 		pr0.ndpr_mask = ia->ia_prefixmask.sin6_addr;
 		for (i = 0; i < 4; i++) {
 			pr0.ndpr_prefix.sin6_addr.s6_addr32[i] &=
-				ia->ia_prefixmask.sin6_addr.s6_addr32[i];
+			    ia->ia_prefixmask.sin6_addr.s6_addr32[i];
 		}
 		/*
 		 * The logic of the following condition is a bit complicated.
@@ -1378,7 +1378,7 @@ in6_update_ifa(ifp, ifra, ia)
 #endif
 
 		/*
-		 * join interface-local all-nodes address, on loopback.
+		 * join interface-local all-nodes address.
 		 * (ff01::1%ifN, and ff01::%ifN/32)
 		 */
 		mltaddr.sin6_addr = in6addr_nodelocal_allnodes;
@@ -1769,27 +1769,26 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 
 		/* copy args to in6_aliasreq, perform ioctl(SIOCAIFADDR_IN6). */
 		bzero(&ifra, sizeof(ifra));
-		bcopy(iflr->iflr_name, ifra.ifra_name,
-			sizeof(ifra.ifra_name));
+		bcopy(iflr->iflr_name, ifra.ifra_name, sizeof(ifra.ifra_name));
 
 		bcopy(&iflr->addr, &ifra.ifra_addr,
-			((struct sockaddr *)&iflr->addr)->sa_len);
+		    ((struct sockaddr *)&iflr->addr)->sa_len);
 		if (hostid) {
 			/* fill in hostid part */
 			ifra.ifra_addr.sin6_addr.s6_addr32[2] =
-				hostid->s6_addr32[2];
+			    hostid->s6_addr32[2];
 			ifra.ifra_addr.sin6_addr.s6_addr32[3] =
-				hostid->s6_addr32[3];
+			    hostid->s6_addr32[3];
 		}
 
 		if (((struct sockaddr *)&iflr->dstaddr)->sa_family) { /* XXX */
 			bcopy(&iflr->dstaddr, &ifra.ifra_dstaddr,
-				((struct sockaddr *)&iflr->dstaddr)->sa_len);
+			    ((struct sockaddr *)&iflr->dstaddr)->sa_len);
 			if (hostid) {
 				ifra.ifra_dstaddr.sin6_addr.s6_addr32[2] =
-					hostid->s6_addr32[2];
+				    hostid->s6_addr32[2];
 				ifra.ifra_dstaddr.sin6_addr.s6_addr32[3] =
-					hostid->s6_addr32[3];
+				    hostid->s6_addr32[3];
 			}
 		}
 
@@ -1890,20 +1889,19 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 			if (IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr)) {
 				s6->sin6_addr.s6_addr16[1] = 0;
 				if (in6_addr2zoneid(ifp, &s6->sin6_addr,
-						    &s6->sin6_scope_id))
+				    &s6->sin6_scope_id))
 					return(EINVAL);	/* XXX */
 			}
 #endif
 			if ((ifp->if_flags & IFF_POINTOPOINT) != 0) {
 				bcopy(&ia->ia_dstaddr, &iflr->dstaddr,
-					ia->ia_dstaddr.sin6_len);
+				    ia->ia_dstaddr.sin6_len);
 #ifndef SCOPEDROUTING		/* XXX see above */
 				s6 = (struct sockaddr_in6 *)&iflr->dstaddr;
 				if (IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr)) {
 					s6->sin6_addr.s6_addr16[1] = 0;
 					if (in6_addr2zoneid(ifp,
-							    &s6->sin6_addr,
-							    &s6->sin6_scope_id))
+					    &s6->sin6_addr, &s6->sin6_scope_id))
 						return(EINVAL); /* EINVAL */
 				}
 #endif
@@ -1922,27 +1920,27 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 			/* fill in6_aliasreq and do ioctl(SIOCDIFADDR_IN6) */
 			bzero(&ifra, sizeof(ifra));
 			bcopy(iflr->iflr_name, ifra.ifra_name,
-				sizeof(ifra.ifra_name));
+			    sizeof(ifra.ifra_name));
 
 			bcopy(&ia->ia_addr, &ifra.ifra_addr,
-				ia->ia_addr.sin6_len);
+			    ia->ia_addr.sin6_len);
 			if ((ifp->if_flags & IFF_POINTOPOINT) != 0) {
 				bcopy(&ia->ia_dstaddr, &ifra.ifra_dstaddr,
-					ia->ia_dstaddr.sin6_len);
+				    ia->ia_dstaddr.sin6_len);
 			} else {
 				bzero(&ifra.ifra_dstaddr,
 				    sizeof(ifra.ifra_dstaddr));
 			}
 			bcopy(&ia->ia_prefixmask, &ifra.ifra_dstaddr,
-				ia->ia_prefixmask.sin6_len);
+			    ia->ia_prefixmask.sin6_len);
 
 			ifra.ifra_flags = ia->ia6_flags;
 #if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 			return in6_control(so, SIOCDIFADDR_IN6, (caddr_t)&ifra,
-				ifp, p);
+			    ifp, p);
 #else
 			return in6_control(so, SIOCDIFADDR_IN6, (caddr_t)&ifra,
-				ifp);
+			    ifp);
 #endif
 		}
 	    }
@@ -2216,7 +2214,7 @@ in6_addmulti(maddr6, ifp, errorp)
 			*errorp = ENXIO; /* XXX: appropriate? */
 		else
 			*errorp = (*ifp->if_ioctl)(ifp, SIOCADDMULTI,
-						   (caddr_t)&ifr);
+			    (caddr_t)&ifr);
 		if (*errorp) {
 			LIST_REMOVE(in6m, in6m_entry);
 			free(in6m, M_IPMADDR);
@@ -2524,8 +2522,7 @@ in6_localaddr(sa6)
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
 		if (sa6->sin6_scope_id == ia->ia_addr.sin6_scope_id &&
 		    IN6_ARE_MASKED_ADDR_EQUAL(&sa6->sin6_addr,
-					      &ia->ia_addr.sin6_addr,
-					      &ia->ia_prefixmask.sin6_addr)) {
+		    &ia->ia_addr.sin6_addr, &ia->ia_prefixmask.sin6_addr)) {
 			return 1;
 		}
 	}
@@ -2541,7 +2538,7 @@ in6_is_addr_deprecated(sa6)
 
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
 		if (IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr,
-				       &sa6->sin6_addr) &&
+		    &sa6->sin6_addr) &&
 #ifdef SCOPEDROUTING
 		    ia->ia_addr.sin6_scope_id == sa6->sin6_scope_id &&
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.277 2002/06/08 01:02:15 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.278 2002/06/08 06:57:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -897,7 +897,7 @@ nd6_lookup(addr6, create, ifp)
 			 * be covered by our own prefix.
 			 */
 			struct ifaddr *ifa =
-				ifaof_ifpforaddr((struct sockaddr *)addr6, ifp);
+			    ifaof_ifpforaddr((struct sockaddr *)addr6, ifp);
 			if (ifa == NULL)
 				return(NULL);
 
@@ -910,11 +910,9 @@ nd6_lookup(addr6, create, ifp)
 			 * will be subject to cached route management.
 			 */
 			if ((e = rtrequest(RTM_ADD, (struct sockaddr *)addr6,
-					   ifa->ifa_addr,
-					   (struct sockaddr *)&all1_sa,
-					   (ifa->ifa_flags | RTF_HOST |
-					    RTF_LLINFO | RTF_CACHE) &
-					   ~RTF_CLONING, &rt)) != 0) {
+			    ifa->ifa_addr, (struct sockaddr *)&all1_sa,
+			    (ifa->ifa_flags | RTF_HOST | RTF_LLINFO | RTF_CACHE) &
+			    ~RTF_CLONING, &rt)) != 0) {
 #if 0
 				log(LOG_ERR,
 				    "nd6_lookup: failed to add route for a "
@@ -971,7 +969,6 @@ nd6_is_addr_neighbor(addr, ifp)
 {
 	struct nd_prefix *pr;
 	struct rtentry *rt;
-	int i;
 
 	/*
 	 * A link-local address is always a neighbor.
@@ -988,21 +985,15 @@ nd6_is_addr_neighbor(addr, ifp)
 	 * neighbor.
 	 */
 	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
-
 		if (pr->ndpr_ifp != ifp)
 			continue;
 
 		if (!(pr->ndpr_stateflags & NDPRF_ONLINK))
 			continue;
 
-		for (i = 0; i < 4; i++) {
-			if ((pr->ndpr_mask.s6_addr32[i] &
-			     addr->sin6_addr.s6_addr32[i]) !=
-			    pr->ndpr_prefix.sin6_addr.s6_addr32[i])
-				break;
-		}
-		if (i == 4)	/* full match */
-			return(1);
+		if (IN6_ARE_MASKED_ADDR_EQUAL(&pr->ndpr_prefix.sin6_addr,
+		    &addr->sin6_addr, &pr->ndpr_mask))
+			return (1);
 	}
 
 	/*
@@ -1223,7 +1214,7 @@ nd6_rtrequest(req, rt, sa)
 #endif
 	int mine = 0;
 
-	if ((rt->rt_flags & RTF_GATEWAY))
+	if ((rt->rt_flags & RTF_GATEWAY) != 0)
 		return;
 
 	if (nd6_need_cache(ifp) == 0 && (rt->rt_flags & RTF_HOST) == 0) {
@@ -1291,7 +1282,7 @@ nd6_rtrequest(req, rt, sa)
 				ln->ln_expire = 1;
 			}
 #endif
-			if ((rt->rt_flags & RTF_CLONING))
+			if ((rt->rt_flags & RTF_CLONING) != 0)
 				break;
 		}
 		/*
@@ -1382,7 +1373,7 @@ nd6_rtrequest(req, rt, sa)
 		 * to the interface.
 		 */
 		ifa = (struct ifaddr *)in6ifa_ifpwithaddr(rt->rt_ifp,
-					  &SIN6(rt_key(rt))->sin6_addr);
+		    &SIN6(rt_key(rt))->sin6_addr);
 		if (ifa) {
 			caddr_t macp = nd6_ifptomac(ifp);
 			ln->ln_expire = 0;
@@ -1438,17 +1429,16 @@ nd6_rtrequest(req, rt, sa)
 				llsol.sin6_addr.s6_addr32[2] = htonl(1);
 				llsol.sin6_addr.s6_addr8[12] = 0xff;
 				error = in6_addr2zoneid(ifp, &llsol.sin6_addr,
-							&llsol.sin6_scope_id);
+				    &llsol.sin6_scope_id);
 				if (error)
 					break;
 				in6_embedscope(&llsol.sin6_addr,
 					       &llsol); /* XXX */
 				if (in6_addmulti(&llsol, ifp, &error)) {
 					nd6log((LOG_ERR, "%s: failed to join "
-						"%s (errno=%d)\n",
-						if_name(ifp),
-						ip6_sprintf(&llsol.sin6_addr),
-						error));
+					    "%s (errno=%d)\n", if_name(ifp),
+					    ip6_sprintf(&llsol.sin6_addr),
+					    error));
 				}
 			}
 		}
@@ -1478,7 +1468,7 @@ nd6_rtrequest(req, rt, sa)
 			llsol.sin6_addr.s6_addr32[2] = htonl(1);
 			llsol.sin6_addr.s6_addr8[12] = 0xff;
 			if (in6_addr2zoneid(ifp, &llsol.sin6_addr,
-					    &llsol.sin6_scope_id) == 0) {
+			    &llsol.sin6_scope_id) == 0) {
 				IN6_LOOKUP_MULTI(&llsol, ifp, in6m);
 				if (in6m)
 					in6_delmulti(in6m);
@@ -1606,7 +1596,7 @@ nd6_ioctl(cmd, data, ifp)
 			int j;
 
 			(void)in6_embedscope(&oprl->prefix[i].prefix,
-					     &pr->ndpr_prefix);
+			    &pr->ndpr_prefix);
 			oprl->prefix[i].raflags = pr->ndpr_raf;
 			oprl->prefix[i].prefixlen = pr->ndpr_plen;
 			oprl->prefix[i].vltime = pr->ndpr_vltime;
@@ -1619,7 +1609,7 @@ nd6_ioctl(cmd, data, ifp)
 
 				/* XXX: we assume time_t is signed. */
 				maxexpire = (-1) &
-					~(1 << ((sizeof(maxexpire) * 8) - 1));
+				    ~(1 << ((sizeof(maxexpire) * 8) - 1));
 				if (pr->ndpr_vltime <
 				    maxexpire - pr->ndpr_lastupdate) {
 					oprl->prefix[i].expire =
@@ -1735,7 +1725,7 @@ nd6_ioctl(cmd, data, ifp)
 		nb_addr.sin6_len = sizeof(nb_addr);
 		nb_addr.sin6_addr = nbi->addr;
 		if ((error = in6_addr2zoneid(ifp, &nb_addr.sin6_addr,
-					     &nb_addr.sin6_scope_id)) != 0) {
+		    &nb_addr.sin6_scope_id)) != 0) {
 			return(error);
 		}
 		if ((error = in6_embedscope(&nb_addr.sin6_addr, &nb_addr))
@@ -1879,8 +1869,8 @@ fail:
 	}
 
 	if (!is_newentry) {
-		if ((!olladdr && lladdr)		/* (3) */
-		 || (olladdr && lladdr && llchange)) {	/* (5) */
+		if ((!olladdr && lladdr) ||		/* (3) */
+		    (olladdr && lladdr && llchange)) {	/* (5) */
 			do_update = 1;
 			newstate = ND6_LLINFO_STALE;
 		} else					/* (1-2,4) */
@@ -1914,8 +1904,7 @@ fail:
 				 * set the 2nd argument as the 1st one.
 				 */
 				nd6_output(ifp, ifp, ln->ln_hold,
-					   (struct sockaddr_in6 *)rt_key(rt),
-					   rt);
+				    (struct sockaddr_in6 *)rt_key(rt), rt);
 				ln->ln_hold = NULL;
 			}
 		} else if (ln->ln_state == ND6_LLINFO_INCOMPLETE) {
@@ -1982,8 +1971,8 @@ fail:
 		/*
 		 * Mark an entry with lladdr as a router.
 		 */
-		if ((!is_newentry && (olladdr || lladdr))	/* (2-5) */
-		 || (is_newentry && lladdr)) {			/* (7) */
+		if ((!is_newentry && (olladdr || lladdr)) ||	/* (2-5) */
+		    (is_newentry && lladdr)) {			/* (7) */
 			ln->ln_router = 1;
 		}
 		break;
@@ -2086,18 +2075,18 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	if (rt) {
 		if ((rt->rt_flags & RTF_UP) == 0) {
 #ifdef __FreeBSD__
-			if ((rt0 = rt = rtalloc1((struct sockaddr *)dst, 1, 0UL)) !=
-				NULL)
+			if ((rt0 = rt = rtalloc1((struct sockaddr *)dst,
+			    1, 0UL)) != NULL)
 #else
-			if ((rt0 = rt = rtalloc1((struct sockaddr *)dst, 1)) !=
-				NULL)
+			if ((rt0 = rt = rtalloc1((struct sockaddr *)dst,
+			    1)) != NULL)
 #endif
 			{
 				rt->rt_refcnt--;
 				if (rt->rt_ifp != ifp) {
 					/* XXX: loop care? */
 					return nd6_output(ifp, origifp, m0,
-							  dst, rt);
+					    dst, rt);
 				}
 			} else
 				senderr(EHOSTUNREACH);
@@ -2374,7 +2363,7 @@ nd6_storelladdr(ifp, rt, m, dst, desten)
 	if (sdl->sdl_alen == 0) {
 		/* this should be impossible, but we bark here for debugging */
 		printf("nd6_storelladdr: sdl_alen == 0, dst=%s, if=%s\n",
-		       ip6_sprintf(&SIN6(dst)->sin6_addr), if_name(ifp));
+		    ip6_sprintf(&SIN6(dst)->sin6_addr), if_name(ifp));
 		m_freem(m);
 		return(0);
 	}
