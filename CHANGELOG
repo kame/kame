@@ -1,7 +1,10 @@
-$Id: CHANGELOG,v 1.475 2000/01/23 04:25:11 itojun Exp $
-
+$Id: CHANGELOG,v 1.476 2000/01/24 03:53:18 sumikawa Exp $
 
 <200001>
+Mon Jan 24 12:49:34 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/irssi: new port: irssi-0.7.22, GTK based irc
+	  client.
+
 Sun Jan 23 13:24:00 JST 2000  itojun@iijlab.net
 	* kame/libinet6/getaddrinfo.c: remove #ifdef FAITH (and use of
 	  environment varaible GAI).  this has been broken for a long time
@@ -25,7 +28,7 @@ Fri Jan 21 12:59:51 JST 2000  itojun@iijlab.net
 	  From: Feico Dillema
 
 Thu Jan 20 18:41:40 JST 2000  itojun@iijlab.net
-	* netbsd/pkgsrc/lang/python, freebsd2/ports/python:
+	* netbsd/pkgsrc/lang/python, freebsd[23]/ports/python:
 	  upgrade to latest IPv6 patch.
 
 Wed Jan 19 22:04:22 2000 kjc@csl.sony.co.jp
