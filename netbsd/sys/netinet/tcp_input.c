@@ -900,7 +900,8 @@ findpcb:
 
 		bzero(&opts, sizeof(opts));
 		ip6_savecontrol(in6p, ip6, m, &opts, &in6p->in6p_inputopts);
-		ip6_update_recvpcbopt(&in6p->in6p_inputopts, &opts);
+		if (in6p->in6p_inputopts)
+			ip6_update_recvpcbopt(in6p->in6p_inputopts, &opts);
 		if (opts.head) {
 			if (sbappendcontrol(&in6p->in6p_socket->so_rcv,
 					    NULL, opts.head) == 0)
@@ -2860,8 +2861,10 @@ syn_cache_get(src, dst, th, hlen, tlen, so, m)
 			bzero(&newopts, sizeof(newopts));
 			ip6 = mtod(m, struct ip6_hdr *);
 			ip6_savecontrol(in6p, ip6, m, &newopts,
-			    &in6p->in6p_inputopts);
-			ip6_update_recvpcbopt(&in6p->in6p_inputopts, &newopts);
+					&in6p->in6p_inputopts);
+			if (in6p->in6p_inputopts)
+				ip6_update_recvpcbopt(in6p->in6p_inputopts,
+						      &newopts);
 			if (newopts.head) {
 				if (sbappendcontrol(&so->so_rcv, NULL,
 						    newopts.head) == 0)
