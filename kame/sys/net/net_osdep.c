@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.c,v 1.8 2000/12/03 00:39:27 itojun Exp $	*/
+/*	$KAME: net_osdep.c,v 1.9 2001/04/06 09:22:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -56,11 +56,12 @@ const char *
 if_name(ifp)
 	struct ifnet *ifp;
 {
-	static char nam[8][IFNAMSIZ + 10];	/*enough?*/
+#define MAXNUMBUF	8
+	static char nam[MAXNUMBUF][IFNAMSIZ + 10];	/*enough?*/
 	static int ifbufround = 0;
 	char *cp;
 
-	ifbufround = (ifbufround + 1) & 7;
+	ifbufround = (ifbufround + 1) % MAXNUMBUF;
 	cp = nam[ifbufround];
 
 #ifdef __bsdi__
@@ -69,5 +70,6 @@ if_name(ifp)
 	snprintf(cp, sizeof(nam), "%s%d", ifp->if_name, ifp->if_unit);
 #endif
 	return((const char *)cp);
+#undef MAXNUMBUF
 }
 #endif
