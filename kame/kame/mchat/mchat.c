@@ -304,12 +304,11 @@ main(argc, argv)
 		char *buf;
 		int level, optname;
 
-		if ((len = ipsec_get_policylen(session->s_upolicy)) < 0)
+		buf = ipsec_set_policy(session->s_upolicy,
+			strlen(session->s_upolicy));
+		if (buf == NULL)
 			errx(1, ipsec_strerror());
-		if ((buf = malloc(len)) == NULL)
-			err(1, "malloc");
-		if ((len = ipsec_set_policy(buf, len, session->s_upolicy)) < 0)
-			errx(1, ipsec_strerror());
+		len = ipsec_get_policylen(buf);
 		switch (res->ai_family) {
 		case AF_INET6:
 			level = IPPROTO_IPV6;
