@@ -1106,8 +1106,9 @@ nd6_rtrequest(req, rt, sa)
 		}
 		/*
 		 * In IPv4 code, we try to annonuce new RTF_ANNOUNCE entry here.
-		 * We don't do that here since llinfo is not ready yet here.
-		 * There are also couple of reasons:
+		 * We don't do that here since llinfo is not ready yet.
+		 *
+		 * There are also couple of other things to be discussed:
 		 * - unsolicited NA code needs improvement beforehand
 		 * - RFC2461 says we MAY send multicast unsolicited NA
 		 *   (7.2.6 paragraph 4), however, it also says that we
@@ -1116,8 +1117,10 @@ nd6_rtrequest(req, rt, sa)
 		 *   note that the mechanism need a mutual agreement
 		 *   between proxies, which means that we need to implement
 		 *   a new protocol, or new kludge.
-		 * - from RFC2461 6.2.4, host MUST NOT do that.  if we do,
-		 *   we need to check ip6forwarding to be sure.
+		 * - from RFC2461 6.2.4, host MUST NOT send unsolicited NA.
+		 *   we need to check ip6forwarding before sending it.
+		 *   (or should we allow proxy ND configuration only for
+		 *   routers?  there's no mention about proxy ND from hosts)
 		 */
 #if 0
 		/* XXX it does not work */
