@@ -148,96 +148,93 @@ struct protox {
 	u_char	pr_wanted;		/* 1 if wanted, 0 otherwise */
 	void	(*pr_cblocks)();	/* control blocks printing routine */
 	void	(*pr_stats)();		/* statistics printing routine */
+	void	(*pr_istats)();		/* per/if statistics printing routine */
 	char	*pr_name;		/* well-known name */
 	int	pr_usesysctl;		/* true if we use sysctl, not kvm */
 } protox[] = {
 	{ -1,		-1,		1,	protopr,
-	  tcp_stats,	"tcp",		IPPROTO_TCP },
+	  tcp_stats,	NULL,		"tcp",	IPPROTO_TCP },
 	{ -1,		-1,		1,	protopr,
-	  udp_stats,	"udp",		IPPROTO_UDP },
+	  udp_stats,	NULL,		"udp",	IPPROTO_UDP },
 	{ -1,		-1,		1,	protopr,
-	  NULL,		"divert",	IPPROTO_DIVERT },
+	  NULL,		NULL,		"divert",IPPROTO_DIVERT },
 	{ -1,		-1,		1,	protopr,
-	  ip_stats,	"ip",		IPPROTO_RAW },
+	  ip_stats,	NULL,		"ip",	IPPROTO_RAW },
 	{ -1,		-1,		1,	protopr,
-	  icmp_stats,	"icmp",		IPPROTO_ICMP },
+	  icmp_stats,	NULL,		"icmp",	IPPROTO_ICMP },
 	{ -1,		-1,		1,	protopr,
-	  igmp_stats,	"igmp",		IPPROTO_IGMP },
+	  igmp_stats,	NULL,		"igmp",	IPPROTO_IGMP },
 #ifdef IPSEC
 	{ -1,		N_IPSECSTAT,	1,	0,
-	  ipsec_stats,	"ipsec", 	0},
+	  ipsec_stats,	NULL,		"ipsec",	0},
 #endif
 	{ -1,		-1,		1,	protopr,
-	  bdg_stats,	"bdg",		1 /* bridging... */ },
+	  bdg_stats,	NULL,		"bdg",	1 /* bridging... */ },
 	{ -1,		-1,		0,	0,
-	  0,		0 }
-};
+	  0,		NULL,		0 }};
 
 #ifdef INET6
 struct protox ip6protox[] = {
 	{ -1,		-1,		1,	protopr,
-	  tcp_stats,	"tcp",		IPPROTO_TCP },
+	  tcp_stats,	NULL,		"tcp",	IPPROTO_TCP },
 	{ -1,		-1,		1,	protopr,
-	  udp_stats,	"udp",		IPPROTO_UDP },
+	  udp_stats,	NULL,		"udp",	IPPROTO_UDP },
 	{ -1,		N_IP6STAT,	1,	0,
-	  ip6_stats,	"ip6",		0 },
+	  ip6_stats,	ip6_ifstat,	"ip6",	0 },
 	{ -1,		N_ICMP6STAT,	1,	0,
-	  icmp6_stats,	"icmp6",	0 },
+	  icmp6_stats,	NULL,		"icmp6",0 },
 #ifdef IPSEC
 	{ -1,		N_IPSEC6STAT,	1,	0,
-	  ipsec_stats,	"ipsec6",	0 },
+	  ipsec_stats,	NULL,		"ipsec6",0 },
 #endif
 	{ -1,		N_PIM6STAT,	1,	0,
-	  pim6_stats,	"pim6",		0 },
+	  pim6_stats,	NULL,		"pim6",	0 },
 	{ -1,		-1,		1,	protopr,
-	  bdg_stats,	"bdg",		1 /* bridging... */ },
+	  bdg_stats,	NULL,		"bdg",	1 /* bridging... */ },
 	{ -1,		-1,		0,	0,
-	  0,		0,		0 }
+	  0,		NULL,		0,	0 }
 };
 #endif /*INET6*/
 
 struct protox atalkprotox[] = {
 	{ N_DDPCB,	N_DDPSTAT,	1,	atalkprotopr,
-	  ddp_stats,	"ddp" },
+	  ddp_stats,	NULL,		"ddp" ,
 	{ -1,		-1,		0,	0,
-	  0,		0 }
-};
+	  0,		NULL,		0 }};
 
 struct protox ipxprotox[] = {
 	{ N_IPX,	N_IPXSTAT,	1,	ipxprotopr,
-	  ipx_stats,	"ipx",		0 },
+	  ipx_stats,	NULL,		"ipx",	0 },
 	{ N_IPX,	N_SPXSTAT,	1,	ipxprotopr,
-	  spx_stats,	"spx",		0 },
+	  spx_stats,	NULL,		"spx",	0 },
 	{ -1,		-1,		0,	0,
-	  0,		0,		0 }
+	  0,		NULL,		0,	0 }
 };
 
 #ifdef NS
 struct protox nsprotox[] = {
 	{ N_IDP,	N_IDPSTAT,	1,	nsprotopr,
-	  idp_stats,	"idp" },
+	  idp_stats,	NULL,		"idp" ,
 	{ N_IDP,	N_SPPSTAT,	1,	nsprotopr,
-	  spp_stats,	"spp" },
+	  spp_stats,	NULL,		"spp" ,
 	{ -1,		N_NSERR,	1,	0,
-	  nserr_stats,	"ns_err" },
+	  nserr_stats,	NULL,		"ns_err" ,
 	{ -1,		-1,		0,	0,
-	  0,		0 }
-};
+	  0,		NULL,		0 }};
 #endif
 
 #ifdef ISO
 struct protox isoprotox[] = {
 	{ ISO_TP,	N_TPSTAT,	1,	iso_protopr,
-	  tp_stats,	"tp" },
+	  tp_stats,	NULL,		"tp" ,
 	{ N_CLTP,	N_CLTPSTAT,	1,	iso_protopr,
-	  cltp_stats,	"cltp" },
+	  cltp_stats,	NULL,		"cltp" ,
 	{ -1,		N_CLNPSTAT,	1,	 0,
-	  clnp_stats,	"clnp"},
+	  clnp_stats,	NULL,		"clnp"}
 	{ -1,		N_ESISSTAT,	1,	 0,
-	  esis_stats,	"esis"},
+	  esis_stats,	NULL,		"esis"}
 	{ -1,		-1,		0,	0,
-	  0,		0 }
-};
+	  0,		NULL,		0 }};
 #endif
 
 struct protox *protoprotox[] = {
@@ -405,6 +402,10 @@ main(argc, argv)
 		exit(0);
 	}
 	if (pflag) {
+		if (iflag && tp->pr_istats) {
+			intpr(interval, nl[N_IFNET].n_value, tp->pr_istats);
+			exit(0);
+		}
 		if (!tp->pr_stats) {
 			printf("%s: no stats routine\n", tp->pr_name);
 			exit(0);
@@ -418,6 +419,7 @@ main(argc, argv)
 		}
 		exit(0);
 	}
+
 #if 0
 	/*
 	 * Keep file descriptors open to avoid overhead
@@ -433,8 +435,11 @@ main(argc, argv)
 	 */
 #endif
 	if (iflag) {
+		if (af != AF_UNSPEC)
+			goto protostat;
+
 		kread(0, 0, 0);
-		intpr(interval, nl[N_IFNET].n_value);
+		intpr(interval, nl[N_IFNET].n_value, NULL);
 		exit(0);
 	}
 	if (rflag) {
@@ -463,6 +468,8 @@ main(argc, argv)
 		}
 		exit(0);
 	}
+
+  protostat:
 	kread(0, 0, 0);
 #if 0
 	if (af == AF_INET || af == AF_UNSPEC) {
@@ -524,9 +531,17 @@ printproto(tp, name)
 	u_long off;
 
 	if (sflag) {
-		pr = tp->pr_stats;
-		off = tp->pr_usesysctl ? tp->pr_usesysctl 
-			: nl[tp->pr_sindex].n_value;
+		if (iflag) {
+			if (tp->pr_istats)
+				intpr(interval, nl[N_IFNET].n_value,
+				      tp->pr_istats);
+			return;
+		}
+		else {
+			pr = tp->pr_stats;
+			off = tp->pr_usesysctl ? tp->pr_usesysctl 
+				: nl[tp->pr_sindex].n_value;
+		}
 	} else {
 		pr = tp->pr_cblocks;
 		off = tp->pr_usesysctl ? tp->pr_usesysctl
