@@ -22,7 +22,7 @@
  */
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/optimize.c,v 1.1 1999/08/08 23:30:15 itojun Exp $ (LBL)";
+    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/optimize.c,v 1.2 1999/10/12 11:46:06 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/types.h>
@@ -1894,7 +1894,7 @@ convert_code_r(p)
 	int slen;
 	u_int off;
 	int extrajmps;		/* number of extra jumps inserted */
-	struct slist **offset;
+	struct slist **offset = NULL;
 
 	if (p == 0 || isMarked(p))
 		return (1);
@@ -1912,10 +1912,12 @@ convert_code_r(p)
 	p->offset = dst - fstart;
 
 	/* generate offset[] for convenience  */
-	offset = (struct slist **)calloc(sizeof(struct slist *), slen);
-	if (!offset) {
-		bpf_error("not enough core");
-		/*NOTREACHED*/
+	if (slen) {
+		offset = (struct slist **)calloc(sizeof(struct slist *), slen);
+		if (!offset) {
+			bpf_error("not enough core");
+			/*NOTREACHED*/
+		}
 	}
 	src = p->stmts;
 	for (off = 0; off < slen && src; off++) {
@@ -1990,7 +1992,8 @@ filled:
 		++dst;
 		++off;
 	}
-	free(offset);
+	if (offset)
+		free(offset);
 
 #ifdef BDEBUG
 	bids[dst - fstart] = p->id + 1;
