@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.96 2000/05/08 05:35:48 itojun Exp $	*/
+/*	$KAME: key.c,v 1.97 2000/05/08 08:02:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -205,6 +205,10 @@ static const int maxsize[] = {
 };
 
 #ifdef __FreeBSD__
+#ifdef SYSCTL_DECL
+SYSCTL_DECL(_net_key);
+#endif
+
 #if defined(IPSEC_DEBUG)
 SYSCTL_INT(_net_key, KEYCTL_DEBUG_LEVEL,	debug,	CTLFLAG_RW, \
 	&key_debug_level,	0,	"");
@@ -3651,7 +3655,7 @@ key_ismyaddr6(sin6)
 		 */
 		in6m = NULL;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		IN6_LOOKUP_MULTI(*(struct in6_addr *)addr, ia->ia_ifp, in6m);
+		IN6_LOOKUP_MULTI(sin6->sin6_addr, ia->ia_ifp, in6m);
 #else
 		for ((in6m) = ia->ia6_multiaddrs.lh_first;
 		     (in6m) != NULL &&
@@ -4943,7 +4947,6 @@ key_getmsgbuf_x1(m, mhp)
 {
 	struct mbuf *n;
 	int len, off;
-	caddr_t p;
 
 	/* sanity check */
 	if (m == NULL || mhp == NULL || mhp->msg == NULL)
@@ -6656,9 +6659,6 @@ key_parse(m, so)
 		KFREE(newmsg);
 	m_freem(m);
 	return error;
-
-sendback:
-	return key_sendup_mbuf(so, m, target);
 
 senderror:
 	msg->sadb_msg_errno = error;
