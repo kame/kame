@@ -41,6 +41,7 @@
 #include <unistd.h>
 #include <err.h>
 #include <errno.h>
+#include <ifaddrs.h>
 
 #ifndef IPV6_ADDR_SCOPE_RESERVED
 #define IPV6_ADDR_SCOPE_RESERVED	0x00
@@ -70,8 +71,8 @@ int scope_limit = IPV6_ADDR_SCOPE_RESERVED;
 u_int debug = 0;
 
 void Usage __P((void));
-int parse __P((int ac, char **av));
-int bind_srcaddr __P((int so, char *ifname, int scope_limit));
+int parse __P((int, char **));
+int bind_srcaddr __P((struct addrinfo *, int, char *, int));
 
 void
 Usage()
@@ -136,13 +137,9 @@ main(ac, av)
 			break;
 		}
 
-		switch (res->ai_family) {
-		case AF_INET6:
-			error = bind_srcaddr(s, ifname, scope_limit);
-			if (error < 0)
-				errx(1, "Failed to bind source address.");
-			break;
-		}
+		error = bind_srcaddr(res, s, ifname, scope_limit);
+		if (error < 0)
+			errx(1, "Failed to bind source address.");
 	}
 
 	/* set hop-limit */
@@ -195,91 +192,72 @@ main(ac, av)
 }
 
 int
-bind_srcaddr(so, ifname, scope_limit)
+bind_srcaddr(res, so, ifname, scope_limit)
+	struct addrinfo *res;
 	int so;
 	char *ifname;
 	int scope_limit;
 {
-	int so_tmp;
-	static struct ifconf ifc;
-	static char buf[32768];
-
-	so_tmp = socket(AF_INET, SOCK_DGRAM, 0);
-	if (so_tmp < 0)
-		return(-1);
-
-	ifc.ifc_len = sizeof(buf);
-	ifc.ifc_buf = buf;
-
-	if (ioctl(so_tmp, SIOCGIFCONF, (char *)&ifc) < 0)
-		return(-1);
-
-	(void)close(so_tmp);
-
-    {
-	struct sockaddr *saddr;
+	struct ifaddrs *ifa, *ifap, *match;
+	struct in6_addr *a;
 	int scope_max;
-	caddr_t p;
-	int error;
 
-#define _IFREQ_NAME(p) (((struct ifreq *)p)->ifr_name)
-#define _IFREQ_NAMELEN(p) (sizeof(((struct ifreq *)p)->ifr_name))
+	/* XXX no scope support for IPv4 yet */
+	if (res->ai_family != AF_INET6)
+		return 0;
 
-#define _IFREQ_SADDR(p) ((struct sockaddr *)&((struct ifreq *)p)->ifr_addr)
-#define _IFREQ_S6ADDR(p) \
-	(&((struct sockaddr_in6 *)_IFREQ_SADDR(p))->sin6_addr)
+	if (getifaddrs(&ifap) != 0)
+		return -1;
 
-#define _IFREQ_ADDRLEN(p) (((struct ifreq *)p)->ifr_addr.sa_len)
-#define _IFREQ_LEN(p) \
-  (_IFREQ_NAMELEN(p) + _IFREQ_ADDRLEN(p) > sizeof(struct ifreq) \
-    ? _IFREQ_NAMELEN(p) + _IFREQ_ADDRLEN(p) : sizeof(struct ifreq))
-
-	saddr = NULL;
+	match = NULL;
 	scope_max = IPV6_ADDR_SCOPE_NODELOCAL;
 
-	for (p = (caddr_t)(ifc.ifc_req);
-	     ifc.ifc_len > 0;
-	     ifc.ifc_len -= _IFREQ_LEN(p), p += _IFREQ_LEN(p)) {
-
-		if (memcmp(_IFREQ_NAME(p), ifname, strlen(ifname)))
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		if (strcmp(ifa->ifa_name, ifname) != 0)
 			continue;
-		if (_IFREQ_SADDR(p)->sa_family != AF_INET6)
-			continue;
-		if (IN6_IS_ADDR_LOOPBACK(_IFREQ_S6ADDR(p)))
+		if (res->ai_family != ifa->ifa_addr->sa_family)
 			continue;
 
-		if (IN6_IS_ADDR_LINKLOCAL(_IFREQ_S6ADDR(p))
-		 && scope_limit >= IPV6_ADDR_SCOPE_LINKLOCAL
-		 && scope_max < IPV6_ADDR_SCOPE_LINKLOCAL) {
+		a = &((struct sockaddr_in6 *)ifa->ifa_addr)->sin6_addr;
+
+		if (IN6_IS_ADDR_LOOPBACK(a))
+			continue;
+
+		if (IN6_IS_ADDR_LINKLOCAL(a) &&
+		    scope_limit >= IPV6_ADDR_SCOPE_LINKLOCAL &&
+		    scope_max < IPV6_ADDR_SCOPE_LINKLOCAL) {
 			scope_max = IPV6_ADDR_SCOPE_LINKLOCAL;
-			saddr = _IFREQ_SADDR(p);
+			match = ifa;
 			continue;
 		}
 
-		if (IN6_IS_ADDR_SITELOCAL(_IFREQ_S6ADDR(p))
-		 && scope_limit >= IPV6_ADDR_SCOPE_SITELOCAL
-		 && scope_max < IPV6_ADDR_SCOPE_SITELOCAL) {
+		if (IN6_IS_ADDR_SITELOCAL(a) &&
+		    scope_limit >= IPV6_ADDR_SCOPE_SITELOCAL &&
+		    scope_max < IPV6_ADDR_SCOPE_SITELOCAL) {
 			scope_max = IPV6_ADDR_SCOPE_SITELOCAL;
-			saddr = _IFREQ_SADDR(p);
+			match = ifa;
 			continue;
 		}
 
-		if (scope_max < IPV6_ADDR_SCOPE_GLOBAL
-		 && scope_limit >= IPV6_ADDR_SCOPE_GLOBAL) {
+		if (scope_max < IPV6_ADDR_SCOPE_GLOBAL &&
+		    scope_limit >= IPV6_ADDR_SCOPE_GLOBAL) {
 			scope_max = IPV6_ADDR_SCOPE_GLOBAL;
-			saddr = _IFREQ_SADDR(p);
+			match = ifa;
 			continue;
 		}
 	}
 
-	if (saddr == NULL)
+	if (!match) {
+		freeifaddrs(ifap);
 		return -1;
+	}
 
-	error = bind(so, saddr, saddr->sa_len);
-	if (error < 0)
+	if (bind(so, match->ifa_addr, match->ifa_addr->sa_len) < 0) {
+		freeifaddrs(ifap);
 		return -1;
-    }
+	}
 
+	freeifaddrs(ifap);
 	return 0;
 }
 
