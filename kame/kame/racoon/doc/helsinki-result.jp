@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.37 2001/08/16 13:42:45 sakane Exp $
+$KAME: helsinki-result.jp,v 1.38 2001/08/16 15:27:41 itojun Exp $
 
 
 generic
@@ -451,3 +451,22 @@ Trustworks TrustedClient v3.2
 
 	先方がresponderのとき、鍵交換が終了した瞬間先方のIKE daemonがpanic。
 	まあ鍵交換自体はできているようだ。
+
+
+Nortel GatewayController/CallServer 2000 (not released yet)
+	Fri Aug 17 00:16:23 JST 2001
+	IPv4, ESP, transport mode
+	phase 1 3DES + SHA1, group 5, lifetime = 3min
+	phase 2 AES + SHA1, group 5, lifetime = 2min
+
+	Nortel側initiator: round=10というattributeをつけてくるのでno proposal
+	chosen
+	KAME側initiator: id payload抜き(ip address使え)だとNortel側は
+	へくるので駄目
+
+	IPv4, ESP, transport mode
+	phase 1 3DES + SHA1, group 5, lifetime = 3min
+	phase 2 3DES + SHA1, group 5, lifetime = 2min
+
+	Nortel側initiator: ok
+	KAME側initiator: id payload抜きだとNortel側はへくるので駄目
