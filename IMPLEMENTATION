@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.180 2001/02/02 18:44:50 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.181 2001/02/02 19:09:43 itojun Exp $
 
 1. IPv6
 
@@ -115,10 +115,7 @@ draft-ietf-ipngwg-rfc2292bis-01.txt:
     * Some of the updates in the draft are not implemented yet.  See
       TODO.2292bis for more details.
 draft-ietf-mobileip-ipv6-09.txt: Mobility Support in IPv6
-    * Default installation recognizes home address option (in destination
-      options header).  No sub-options are supported.  interaction with
-      IPsec, and/or 2292bis API, needs further study.
-    * Ericsson mobile-ip6 code is integrated in the tree.  See section 6.
+    * See section 6.
 draft-ietf-ngtrans-tcpudp-relay-01.txt:
 	An IPv6-to-IPv4 transport relay translator
     * FAITH tcp relay translator (faithd) implements this.  See 3.1 for more
@@ -1738,10 +1735,23 @@ compile ALTQ-ready kernel for other archititectures, take the following steps:
 
 6. mobile-ip6
 
+6.1 KAME node as correspondent node
+
+Default installation recognizes home address option (in destination
+options header).  No sub-options are supported.  interaction with
+IPsec, and/or 2292bis API, needs further study.
+
+6.2 KAME node as home agent/mobile node
+
 KAME kit includes Ericsson mobile-ip6 code.  The integration is just started
 (in Feb 2000), and we will need some more time to integrate it better.
 
 See kame/mip6config/{QUICKSTART,README_MIP6.txt} for more details.
+
+The Ericsson code implements revision 09 of the mobile-ip6 draft.  There
+are other implementations available:
+	NEC: http://www.6bone.nec.co.jp/mipv6/internal-dist/ (-13 draft)
+	SFC: no URL yet (-13 draft)
 
 7. Coding style
 
