@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.68 2003/07/23 00:26:41 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.69 2003/09/10 23:49:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -89,6 +89,7 @@ struct secpolicy {
 				 * 1 - 0x3fff are reserved for user operation.
 				 * 0 are reserved.  Others are for kernel use.
 				 */
+	struct socket *so;		/* backpointer to per-socket policy */
 	u_int state;			/* 0: dead, others: alive */
 #define IPSEC_SPSTATE_DEAD	0
 #define IPSEC_SPSTATE_ALIVE	1
