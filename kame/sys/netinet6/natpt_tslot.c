@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.36 2001/12/12 13:14:33 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.37 2001/12/27 07:24:09 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -584,7 +584,7 @@ natpt_internFragment4(struct pcv *cv4)
 	frg->tstamp = atv.tv_sec;
 
 	s = splnet();
-	TAILQ_INSERT_TAIL(&frg_head, frg, frg_list);
+	TAILQ_INSERT_HEAD(&frg_head, frg, frg_list);
 	splx(s);
 
 	return (frg);
