@@ -111,7 +111,9 @@ static int map4to6 __P((struct sockaddr_in *, struct sockaddr_in6 *));
 static void sig_child __P((int));
 static void sig_terminate __P((int));
 static void start_daemon __P((void));
+#ifndef HAVE_GETIFADDRS
 static unsigned int if_maxindex __P((void));
+#endif
 static void grab_myaddrs __P((void));
 static void free_myaddrs __P((void));
 static void update_myaddrs __P((void));
@@ -679,6 +681,7 @@ exit_success(const char *fmt, ...)
 }
 
 #ifdef USE_ROUTE
+#ifndef HAVE_GETIFADDRS
 static unsigned int
 if_maxindex()
 {
@@ -693,6 +696,7 @@ if_maxindex()
 	if_freenameindex(p0);
 	return max;
 }
+#endif
 
 static void
 grab_myaddrs()
