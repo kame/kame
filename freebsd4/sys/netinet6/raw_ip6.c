@@ -260,7 +260,7 @@ rip6_ctlinput(cmd, sa, d)
 #ifndef SCOPEDROUTING
 		if (in6_embedscope(ip6cp->ip6c_finaldst, &sa6, NULL, NULL)) {
 			/* should be impossbile */
-			printf("udp6_ctlinput: in6_embedscope failed\n");
+			printf("rip6_ctlinput: in6_embedscope failed\n");
 			return;
 		}
 #endif
@@ -274,7 +274,7 @@ rip6_ctlinput(cmd, sa, d)
 #ifndef SCOPEDROUTING
 		if (in6_embedscope(&sa6.sin6_addr, &sa6, NULL, NULL)) {
 			/* should be impossbile */
-			printf("udp6_ctlinput: in6_embedscope failed\n");
+			printf("rip6_ctlinput: in6_embedscope failed\n");
 			return;
 		}
 #endif

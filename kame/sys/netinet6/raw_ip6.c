@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.40 2000/11/18 11:08:15 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.41 2000/11/29 05:03:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -276,7 +276,7 @@ rip6_ctlinput(cmd, sa, d)
 #ifndef SCOPEDROUTING
 		if (in6_embedscope(ip6cp->ip6c_finaldst, &sa6, NULL, NULL)) {
 			/* should be impossbile */
-			printf("udp6_ctlinput: in6_embedscope failed\n");
+			printf("rip6_ctlinput: in6_embedscope failed\n");
 			return;
 		}
 #endif
@@ -290,7 +290,7 @@ rip6_ctlinput(cmd, sa, d)
 #ifndef SCOPEDROUTING
 		if (in6_embedscope(&sa6.sin6_addr, &sa6, NULL, NULL)) {
 			/* should be impossbile */
-			printf("udp6_ctlinput: in6_embedscope failed\n");
+			printf("rip6_ctlinput: in6_embedscope failed\n");
 			return;
 		}
 #endif
