@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.110 2001/12/14 03:45:58 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.111 2001/12/31 20:13:40 thorpej Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -1280,7 +1280,7 @@ expand_isakmpspec(prop_no, trns_no, types,
 				TMPALGTYPE2STR(dh));
 			return -1;
 		}
-#undef TMPALGTYPE2STR(n)
+#undef TMPALGTYPE2STR
 
 	/* set new sa */
 	new = newisakmpsa();

@@ -1,4 +1,4 @@
-/*	$KAME: backupsa.c,v 1.15 2001/11/16 04:08:10 sakane Exp $	*/
+/*	$KAME: backupsa.c,v 1.16 2001/12/31 20:13:40 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -295,7 +295,7 @@ do { \
 		GETNEXTNUM(l_usetime, strtouq);
 		GETNEXTNUM(seq, strtoul);
 
-#undef GETNEXTNUM(n)
+#undef GETNEXTNUM
 
 		keymat = str2val(p, 16, &keymatlen);
 		if (keymat == NULL) {

@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.90 2001/12/13 17:13:02 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.91 2001/12/31 20:13:41 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1988,7 +1988,7 @@ get_proposal_r(iph2)
 		}
 	}
 
-#undef _XIDT(d)
+#undef _XIDT
 
 	plog(LLV_DEBUG, LOCATION, NULL,
 		"get a src address from ID payload "
