@@ -1,3 +1,32 @@
+/*
+ * Copyright (C) 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
 /*-
  * Copyright (c) 1983, 1988, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -112,15 +141,27 @@ int	no_delay;
 
 struct	passwd *pwd;
 
-void	doit __P((int, struct sockaddr_in *));
+union sockunion {
+	struct sockinet {
+		u_char si_len;
+		u_char si_family;
+		u_short si_port;
+	} su_si;
+	struct sockaddr_in  su_sin;
+	struct sockaddr_in6 su_sin6;
+};
+#define su_len		su_si.si_len
+#define su_family	su_si.si_family
+#define su_port		su_si.si_port
+
+void	doit __P((int, union sockunion *));
 int	control __P((int, char *, int));
 void	protocol __P((int, int));
 void	cleanup __P((int));
 void	fatal __P((int, char *, int));
-int	do_rlogin __P((struct sockaddr_in *));
+int	do_rlogin __P((union sockunion *));
 void	getstr __P((char *, int, char *));
 void	setup_term __P((int));
-int	do_krb_login __P((struct sockaddr_in *));
 void	usage __P((void));
 
 int
@@ -129,7 +170,7 @@ main(argc, argv)
 	char *argv[];
 {
 	extern int __check_rhosts_file;
-	struct sockaddr_in from;
+	union sockunion from;
 	int ch, fromlen, on;
 
 	openlog("rlogind", LOG_PID | LOG_CONS, LOG_AUTH);
@@ -176,7 +217,7 @@ main(argc, argv)
 		fatal(STDERR_FILENO, "only one of -k and -v allowed", 0);
 	}
 #endif
-	fromlen = sizeof (from);
+	fromlen = sizeof (from); /* xxx */
 	if (getpeername(0, (struct sockaddr *)&from, &fromlen) < 0) {
 		syslog(LOG_ERR,"Can't get peer name of remote host: %m");
 		fatal(STDERR_FILENO, "Can't get peer name of remote host", 1);
@@ -188,9 +229,14 @@ main(argc, argv)
 	if (no_delay &&
 	    setsockopt(0, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on)) < 0)
 		syslog(LOG_WARNING, "setsockopt (TCP_NODELAY): %m");
-	on = IPTOS_LOWDELAY;
-	if (setsockopt(0, IPPROTO_IP, IP_TOS, (char *)&on, sizeof(int)) < 0)
-		syslog(LOG_WARNING, "setsockopt (IP_TOS): %m");
+#if defined(IPPROTO_IP) && defined(IP_TOS)
+	if (from.su_family == AF_INET) {
+		on = IPTOS_LOWDELAY;
+		if (setsockopt(0, IPPROTO_IP, IP_TOS, (char *)&on, sizeof(int))
+				< 0)
+			syslog(LOG_WARNING, "setsockopt (IP_TOS): %m");
+	}
+#endif
 
 	doit(0, &from);
 	return 0;
@@ -207,11 +253,13 @@ struct winsize win = { 0, 0, 0, 0 };
 void
 doit(f, fromp)
 	int f;
-	struct sockaddr_in *fromp;
+	union sockunion *fromp;
 {
 	int master, pid, on = 1;
 	int authenticated = 0;
-	char hostname[MAXHOSTNAMELEN];
+	int err, result = HOSTNAME_INVALIDADDR;
+	char hostname[2 * MAXHOSTNAMELEN + 1];
+	char nameinfo[INET6_ADDRSTRLEN];
 	char c;
 
 	alarm(60);
@@ -225,60 +273,63 @@ doit(f, fromp)
 #endif
 
 	alarm(0);
-	fromp->sin_port = ntohs((u_short)fromp->sin_port);
-	realhostname(hostname, sizeof(hostname) - 1, &fromp->sin_addr);
-	hostname[sizeof(hostname) - 1] = '\0';
+	err = getnameinfo((struct sockaddr *)fromp, fromp->su_len,
+			  hostname, sizeof(hostname), NULL, 0, 0);
+	if (err == NULL) {
+		struct addrinfo hints, *res, *ores;
+		struct sockaddr *sa;
 
-#ifdef	KERBEROS
-	if (use_kerberos) {
-		retval = do_krb_login(fromp);
-		if (retval == 0)
-			authenticated++;
-		else if (retval > 0)
-			fatal(f, krb_err_txt[retval], 0);
-		write(f, &c, 1);
-		confirmed = 1;		/* we sent the null! */
-	} else
-#endif
-	{
-		if (fromp->sin_family != AF_INET ||
-		    fromp->sin_port >= IPPORT_RESERVED ||
-		    fromp->sin_port < IPPORT_RESERVED/2) {
-			syslog(LOG_NOTICE, "Connection from %s on illegal port",
-				inet_ntoa(fromp->sin_addr));
-			fatal(f, "Permission denied", 0);
-		}
-#ifdef IP_OPTIONS
-		{
-		u_char optbuf[BUFSIZ/3];
-		int optsize = sizeof(optbuf), ipproto, i;
-		struct protoent *ip;
+		bzero(&hints, sizeof(struct addrinfo));
+		hints.ai_family = fromp->su_family;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_protocol = IPPROTO_TCP;
 
-		if ((ip = getprotobyname("ip")) != NULL)
-			ipproto = ip->p_proto;
-		else
-			ipproto = IPPROTO_IP;
-		if (getsockopt(0, ipproto, IP_OPTIONS, (char *)optbuf,
-		    &optsize) == 0 && optsize != 0) {
-			for (i = 0; i < optsize; ) {
-				u_char c = optbuf[i];
-				if (c == IPOPT_LSRR || c == IPOPT_SSRR) {
-					syslog(LOG_NOTICE,
-						"Connection refused from %s with IP option %s",
-						inet_ntoa(fromp->sin_addr),
-						c == IPOPT_LSRR ? "LSRR" : "SSRR");
-					exit(1);
-				}
-				if (c == IPOPT_EOL)
-					break;
-				i += (c == IPOPT_NOP) ? 1 : optbuf[i+1];
+		err = getaddrinfo(hostname, NULL, &hints, &res);
+		if (err) {
+			result = HOSTNAME_INVALIDNAME;
+			goto numeric;
+		} else for (ores = res; ; res = res->ai_next) {
+			if (res == NULL) {
+				freeaddrinfo(ores);
+				result = HOSTNAME_INCORRECTNAME;
+				goto numeric;
+			}
+			sa = res->ai_addr;
+			if (sa == NULL) {
+				freeaddrinfo(ores);
+				result = HOSTNAME_INCORRECTNAME;
+				goto numeric;
+			}
+			if (sa->sa_len == fromp->su_len &&
+			    !bcmp(sa, fromp, sa->sa_len)) {
+				result = HOSTNAME_FOUND;
+				break;	/* OK! */
 			}
 		}
-		}
-#endif
-		if (do_rlogin(fromp) == 0)
-			authenticated++;
+		freeaddrinfo(ores);
+	} else {
+    numeric:
+		err = getnameinfo((struct sockaddr *)fromp, fromp->su_len,
+				  hostname, sizeof(hostname), NULL, 0,
+				  NI_NUMERICHOST);
+		/* XXX: do 'err' check */
 	}
+	fromp->su_port = ntohs((u_short)fromp->su_port);
+	hostname[sizeof(hostname) - 1] = '\0';
+
+	if ((fromp->su_family != AF_INET && fromp->su_family != AF_INET6) ||
+	    fromp->su_port >= IPPORT_RESERVED ||
+	    fromp->su_port < IPPORT_RESERVED/2) {
+		err = getnameinfo((struct sockaddr *)fromp, fromp->su_len,
+				  nameinfo, sizeof(nameinfo), NULL, 0,
+				  NI_NUMERICHOST);
+		syslog(LOG_NOTICE, "Connection from %s on illegal port",
+		       nameinfo);
+		fatal(f, "Permission denied", 0);
+	}
+	if (do_rlogin(fromp) == 0)
+		authenticated++;
+
 	if (confirmed == 0) {
 		write(f, "", 1);
 		confirmed = 1;		/* we sent the null! */
@@ -327,6 +378,7 @@ doit(f, fromp)
 		fatal(STDERR_FILENO, _PATH_LOGIN, 1);
 		/*NOTREACHED*/
 	}
+	ioctl(f, FIONBIO, &on);
 #ifdef	CRYPT
 #ifdef	KERBEROS
 	/*
@@ -337,7 +389,6 @@ doit(f, fromp)
 	if (!doencrypt)
 #endif
 #endif
-		ioctl(f, FIONBIO, &on);
 	ioctl(master, FIONBIO, &on);
 	ioctl(master, TIOCPKT, &on);
 	signal(SIGCHLD, cleanup);
@@ -381,7 +432,7 @@ void
 protocol(f, p)
 	register int f, p;
 {
-	char pibuf[1024+1], fibuf[1024], *pbp, *fbp;
+	char pibuf[1024+1], fibuf[1024], *pbp = NULL, *fbp = NULL;
 	int pcc = 0, fcc = 0;
 	int cc, nfd, n;
 	char cntl;
@@ -523,11 +574,6 @@ protocol(f, p)
 #endif
 				cc = write(f, pbp, pcc);
 			if (cc < 0 && errno == EWOULDBLOCK) {
-				/*
-				 * This happens when we try write after read
-				 * from p, but some old kernels balk at large
-				 * writes even when select returns true.
-				 */
 				if (!FD_ISSET(p, &ibits))
 					sleep(5);
 				continue;
@@ -584,8 +630,11 @@ fatal(f, msg, syserr)
 
 int
 do_rlogin(dest)
-	struct sockaddr_in *dest;
+	union sockunion *dest;
 {
+	int af;
+	char *addr;
+	
 	getstr(rusername, sizeof(rusername), "remuser too long");
 	getstr(lusername, sizeof(lusername), "locuser too long");
 	getstr(term+ENVSIZE, sizeof(term)-ENVSIZE, "Terminal type too long");
@@ -594,8 +643,20 @@ do_rlogin(dest)
 	if (pwd == NULL)
 		return (-1);
 	/* XXX why don't we syslog() failure? */
-	return (iruserok(dest->sin_addr.s_addr, pwd->pw_uid == 0,
-		rusername, lusername));
+
+	af = dest->su_family;
+	switch (af) {
+	case AF_INET:
+		addr = (char *)&dest->su_sin.sin_addr;
+		break;
+	case AF_INET6:
+		addr = (char *)&dest->su_sin6.sin6_addr;
+		break;
+	default:
+		return -1;	/*EAFNOSUPPORT*/
+	}
+	
+	return (iruserok_af(addr, pwd->pw_uid == 0, rusername, lusername, af));
 }
 
 void

@@ -7,10 +7,17 @@ SRCS=	ftpd.c ftpcmd.y logwtmp.c popen.c skey-stuff.c
 
 CFLAGS+=-DSETPROCTITLE -DSKEY -DLOGIN_CAP -DVIRTUAL_HOSTING -Wall \
 	-I${.CURDIR}/../../contrib-crypto/telnet
+CFLAGS+=-DINET6
 YFLAGS=
 
 LDADD=	-lskey -lmd -lcrypt -lutil
 DPADD=	${LIBSKEY} ${LIBMD} ${LIBCRYPT} ${LIBUTIL}
+LDADD+=	-L${.OBJDIR}/../../../src/libinet6 \
+	-L${.OBJDIR}/../../../src/libinet6/obj \
+	-L/usr/local/v6/lib -linet6
+DPADD+=	${.OBJDIR}/../../../src/libinet6/libinet6.a \
+	${.OBJDIR}/../../../src/libinet6/obj/libinet6.a \
+	/usr/local/v6/lib/libinet6.a
 
 .ifdef FTPD_INTERNAL_LS
 LSDIR=	../../bin/ls

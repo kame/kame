@@ -1,4 +1,33 @@
 /*
+ * Copyright (C) 1997 and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+/*
  * Copyright (c) 1985, 1988, 1990, 1992, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -113,12 +142,12 @@ static char version[] = "Version 6.00";
 extern	off_t restart_point;
 extern	char cbuf[];
 
-struct	sockaddr_in server_addr;
-struct	sockaddr_in ctrl_addr;
-struct	sockaddr_in data_source;
-struct	sockaddr_in data_dest;
-struct	sockaddr_in his_addr;
-struct	sockaddr_in pasv_addr;
+union sockunion server_addr;
+union sockunion ctrl_addr;
+union sockunion data_source;
+union sockunion data_dest;
+union sockunion his_addr;
+union sockunion pasv_addr;
 
 int	daemon_mode;
 int	data;
@@ -142,6 +171,7 @@ int	stru;			/* avoid C keyword */
 int	mode;
 int	usedefault = 1;		/* for data transfers */
 int	pdata = -1;		/* for passive mode */
+int	family = AF_INET;
 sig_atomic_t transflag;
 off_t	file_size;
 off_t	byte_count;
@@ -155,9 +185,11 @@ char	*hostname;
 #ifdef VIRTUAL_HOSTING
 char	*ftpuser;
 
+int	epsvall = 0;
+
 static struct ftphost {
 	struct ftphost	*next;
-	struct in_addr	hostaddr;
+	union sockunion	hostaddr;
 	char		*hostname;
 	char		*anonuser;
 	char		*statfile;
@@ -176,7 +208,6 @@ char	*tty = ttyline;		/* for klogin */
 int	 klogin __P((struct passwd *, char *, char *, char *));
 #endif
 
-struct	in_addr bind_address;
 char	*pid_file = NULL;
 
 #if defined(KERBEROS)
@@ -206,7 +237,7 @@ char	proctitle[LINE_MAX];	/* initial part of title */
 
 #ifdef SKEY
 int	pwok = 0;
-char	addr_string[20];	/* XXX */
+char	addr_string[INET6_ADDRSTRLEN];
 #endif
 
 #define LOGCMD(cmd, file) \
@@ -230,13 +261,13 @@ char	addr_string[20];	/* XXX */
 
 #ifdef VIRTUAL_HOSTING
 static void	 inithosts __P((void));
-static void	selecthost __P((struct in_addr *));
+static void	selecthost __P((union sockunion *));
 #endif
 static void	 ack __P((char *));
 static void	 myoob __P((int));
 static int	 checkuser __P((char *, char *, int));
 static FILE	*dataconn __P((char *, off_t, char *));
-static void	 dolog __P((struct sockaddr_in *));
+static void	 dolog __P((struct sockaddr *));
 static char	*curdir __P((void));
 static void	 end_login __P((void));
 static FILE	*getdatasock __P((char *));
@@ -269,7 +300,7 @@ main(argc, argv, envp)
 	char *argv[];
 	char **envp;
 {
-	int addrlen, ch, on = 1, tos;
+	int addrlen, ch, on = 1;
 	char *cp, line[LINE_MAX];
 	FILE *fd;
 
@@ -286,8 +317,7 @@ main(argc, argv, envp)
 #endif /* OLD_SETPROCTITLE */
 
 
-	bind_address.s_addr = htonl(INADDR_ANY);
-	while ((ch = getopt(argc, argv, "AdlDSURt:T:u:va:p:")) != -1) {
+	while ((ch = getopt(argc, argv, "AdlDSURt:T:u:va:p:46")) != -1) {
 		switch (ch) {
 		case 'D':
 			daemon_mode++;
@@ -325,11 +355,6 @@ main(argc, argv, envp)
 			restricted_data_ports = 0;
 			break;
 
-		case 'a':
-			if (!inet_aton(optarg, &bind_address))
-				errx(1, "invalid address for -a");
-			break;
-
 		case 'p':
 			pid_file = optarg;
 			break;
@@ -353,15 +378,20 @@ main(argc, argv, envp)
 			debug = 1;
 			break;
 
+		case '4':
+			family = AF_INET;
+			break;
+
+		case '6':
+			family = AF_INET6;
+			break;
+
 		default:
 			warnx("unknown flag -%c ignored", optopt);
 			break;
 		}
 	}
 
-#ifdef VIRTUAL_HOSTING
-	inithosts();
-#endif
 	(void) freopen(_PATH_DEVNULL, "w", stderr);
 
 	/*
@@ -371,9 +401,9 @@ main(argc, argv, envp)
 	openlog("ftpd", LOG_PID | LOG_NDELAY, LOG_FTP);
 
 	if (daemon_mode) {
-		int ctl_sock, fd;
-		struct servent *sv;
-
+		int ctl_sock, fd, error;
+		struct addrinfo hints, *res;
+		
 		/*
 		 * Detach from parent.
 		 */
@@ -382,19 +412,19 @@ main(argc, argv, envp)
 			exit(1);
 		}
 		(void) signal(SIGCHLD, reapchild);
-		/*
-		 * Get port number for ftp/tcp.
-		 */
-		sv = getservbyname("ftp", "tcp");
-		if (sv == NULL) {
-			syslog(LOG_ERR, "getservbyname for ftp failed");
+
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = family;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_protocol = 0;
+		error = getaddrinfo(NULL, "ftp", &hints, &res);
+
+		if (error) {
+			syslog(LOG_ERR, gai_strerror(error));
 			exit(1);
 		}
-		/*
-		 * Open a socket, bind it to the FTP port, and start
-		 * listening.
-		 */
-		ctl_sock = socket(AF_INET, SOCK_STREAM, 0);
+		
+		ctl_sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 		if (ctl_sock < 0) {
 			syslog(LOG_ERR, "control socket: %m");
 			exit(1);
@@ -402,10 +432,10 @@ main(argc, argv, envp)
 		if (setsockopt(ctl_sock, SOL_SOCKET, SO_REUSEADDR,
 		    (char *)&on, sizeof(on)) < 0)
 			syslog(LOG_ERR, "control setsockopt: %m");;
-		server_addr.sin_family = AF_INET;
-		server_addr.sin_addr = bind_address;
-		server_addr.sin_port = sv->s_port;
-		if (bind(ctl_sock, (struct sockaddr *)&server_addr, sizeof(server_addr))) {
+
+		memcpy(&server_addr, res->ai_addr, res->ai_addrlen);
+		if (bind(ctl_sock, (struct sockaddr *)&server_addr,
+			 server_addr.su_len) < 0) {
 			syslog(LOG_ERR, "control bind: %m");
 			exit(1);
 		}
@@ -440,7 +470,7 @@ main(argc, argv, envp)
 		 * children to handle them.
 		 */
 		while (1) {
-			addrlen = sizeof(his_addr);
+			addrlen = server_addr.su_len;
 			fd = accept(ctl_sock, (struct sockaddr *)&his_addr, &addrlen);
 			if (fork() == 0) {
 				/* child */
@@ -452,7 +482,7 @@ main(argc, argv, envp)
 			close(fd);
 		}
 	} else {
-		addrlen = sizeof(his_addr);
+		addrlen = sizeof(his_addr); /* xxx */
 		if (getpeername(0, (struct sockaddr *)&his_addr, &addrlen) < 0) {
 			syslog(LOG_ERR, "getpeername (%s): %m",argv[0]);
 			exit(1);
@@ -464,8 +494,13 @@ main(argc, argv, envp)
 	if (signal(SIGURG, myoob) == SIG_ERR)
 		syslog(LOG_ERR, "signal: %m");
 
+#ifdef VIRTUAL_HOSTING
+	inithosts();
+#endif
+
 #ifdef SKEY
-	strncpy(addr_string, inet_ntoa(his_addr.sin_addr), sizeof(addr_string));
+	getnameinfo((struct sockaddr *)&his_addr, his_addr.su_len,
+		    addr_string, sizeof(addr_string), NULL, 0, NI_NUMERICHOST);
 #endif
 	addrlen = sizeof(ctrl_addr);
 	if (getsockname(0, (struct sockaddr *)&ctrl_addr, &addrlen) < 0) {
@@ -474,12 +509,16 @@ main(argc, argv, envp)
 	}
 #ifdef VIRTUAL_HOSTING
 	/* select our identity from virtual host table */
-	selecthost(&ctrl_addr.sin_addr);
+	selecthost(&ctrl_addr);
 #endif
 #ifdef IP_TOS
-	tos = IPTOS_LOWDELAY;
-	if (setsockopt(0, IPPROTO_IP, IP_TOS, (char *)&tos, sizeof(int)) < 0)
-		syslog(LOG_WARNING, "setsockopt (IP_TOS): %m");
+	if (ctrl_addr.su_family == AF_INET) {
+		int tos = IPTOS_LOWDELAY;
+		if (setsockopt(0, IPPROTO_IP, IP_TOS, (char *)&tos,
+				sizeof(int)) < 0) {
+			syslog(LOG_WARNING, "setsockopt (IP_TOS): %m");
+		}
+	}
 #endif
 	/*
 	 * Disable Nagle on the control channel so that we don't have to wait
@@ -488,7 +527,7 @@ main(argc, argv, envp)
 	if (setsockopt(0, IPPROTO_TCP, TCP_NODELAY, &on, sizeof(on)) < 0)
 		syslog(LOG_WARNING, "control setsockopt TCP_NODELAY: %m");
 
-	data_source.sin_port = htons(ntohs(ctrl_addr.sin_port) - 1);
+	data_source.su_port = htons(ntohs(ctrl_addr.su_port) - 1);
 
 	/* set this here so klogin can use it... */
 	(void)snprintf(ttyline, sizeof(ttyline), "ftp%d", getpid());
@@ -503,7 +542,7 @@ main(argc, argv, envp)
 	if (fcntl(fileno(stdin), F_SETOWN, getpid()) == -1)
 		syslog(LOG_ERR, "fcntl F_SETOWN: %m");
 #endif
-	dolog(&his_addr);
+	dolog((struct sockaddr *)&his_addr);
 	/*
 	 * Set up default state
 	 */
@@ -571,12 +610,10 @@ lostconn(signo)
 static void
 inithosts()
 {
-	FILE *fp;
-	char *cp;
-	struct hostent *hp;
 	struct ftphost *hrp, *lhrp;
 	char line[1024];
-
+	struct addrinfo hints, *res;
+	
 	/*
 	 * Fill in the default host information
 	 */
@@ -585,114 +622,32 @@ inithosts()
 	if ((hrp = malloc(sizeof(struct ftphost))) == NULL ||
 	    (hrp->hostname = strdup(line)) == NULL)
 		fatal("Ran out of memory.");
-	memset(&hrp->hostaddr, 0, sizeof hrp->hostaddr);
-	if ((hp = gethostbyname(hrp->hostname)) != NULL)
-		(void) memcpy(&hrp->hostaddr,
-			      hp->h_addr_list[0],
-			      sizeof(hrp->hostaddr));
+	memset(&hrp->hostaddr, 0, sizeof(hrp->hostaddr));
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_flags = AI_CANONNAME;
+	hints.ai_family = his_addr.su_family;
+	getaddrinfo(hrp->hostname, NULL, &hints, &res);
+	if (res)
+		memcpy(&hrp->hostaddr, res->ai_addr, res->ai_addrlen);
 	hrp->statfile = _PATH_FTPDSTATFILE;
 	hrp->welcome  = _PATH_FTPWELCOME;
 	hrp->loginmsg = _PATH_FTPLOGINMESG;
 	hrp->anonuser = "ftp";
 	hrp->next = NULL;
 	thishost = firsthost = lhrp = hrp;
-	if ((fp = fopen(_PATH_FTPHOSTS, "r")) != NULL) {
-		while (fgets(line, sizeof(line), fp) != NULL) {
-			int	i;
-
-			if ((cp = strchr(line, '\n')) == NULL) {
-				/* ignore long lines */
-				while (fgets(line, sizeof(line), fp) != NULL &&
-					strchr(line, '\n') == NULL)
-					;
-				continue;
-			}
-			*cp = '\0';
-			cp = strtok(line, " \t");
-			/* skip comments and empty lines */
-			if (cp == NULL || line[0] == '#')
-				continue;
-			/* first, try a standard gethostbyname() */
-			if ((hp = gethostbyname(cp)) == NULL)
-				continue;
-			for (hrp = firsthost; hrp != NULL; hrp = hrp->next) {
-				if (memcmp(&hrp->hostaddr,
-					   hp->h_addr_list[0],
-					   sizeof(hrp->hostaddr)) == 0)
-					break;
-			}
-			if (hrp == NULL) {
-				if ((hrp = malloc(sizeof(struct ftphost))) == NULL)
-					continue;
-				/* defaults */
-				hrp->statfile = _PATH_FTPDSTATFILE;
-				hrp->welcome  = _PATH_FTPWELCOME;
-				hrp->loginmsg = _PATH_FTPLOGINMESG;
-				hrp->anonuser = "ftp";
-				hrp->next     = NULL;
-				lhrp->next = hrp;
-				lhrp = hrp;
-			}
-			(void) memcpy(&hrp->hostaddr,
-				      hp->h_addr_list[0],
-				      sizeof(hrp->hostaddr));
-			/*
-			 * determine hostname to use.
-			 * force defined name if it is a valid alias
-			 * otherwise fallback to primary hostname
-			 */
-			if ((hp = gethostbyaddr((char*)&hrp->hostaddr,
-						sizeof(hrp->hostaddr),
-						AF_INET)) != NULL) {
-				if (strcmp(cp, hp->h_name) != 0) {
-					if (hp->h_aliases == NULL)
-						cp = hp->h_name;
-					else {
-						i = 0;
-						while (hp->h_aliases[i] &&
-						       strcmp(cp, hp->h_aliases[i]) != 0)
-							++i;
-						if (hp->h_aliases[i] == NULL)
-							cp = hp->h_name;
-					}
-				}
-			}
-			hrp->hostname = strdup(cp);
-			/* ok, now we now peel off the rest */
-			i = 0;
-			while (i < 4 && (cp = strtok(NULL, " \t")) != NULL) {
-				if (*cp != '-' && (cp = strdup(cp)) != NULL) {
-					switch (i) {
-					case 0:	/* anon user permissions */
-						hrp->anonuser = cp;
-						break;
-					case 1: /* statistics file */
-						hrp->statfile = cp;
-						break;
-					case 2: /* welcome message */
-						hrp->welcome  = cp;
-						break;
-					case 3: /* login message */
-						hrp->loginmsg = cp;
-						break;
-					}
-				}
-				++i;
-			}
-		}
-		(void) fclose(fp);
-	}
+	/* xxx getaddrinfo */
 }
 
 static void
-selecthost(a)
-	struct in_addr *a;
+selecthost(sa)
+	union sockunion *sa;
 {
 	struct ftphost	*hrp;
-
+	
 	hrp = thishost = firsthost;	/* default */
 	while (hrp != NULL) {
-		if (memcmp(a, &hrp->hostaddr, sizeof(hrp->hostaddr)) == 0) {
+		if (memcmp(sa, &hrp->hostaddr, sizeof(hrp->hostaddr)) == 0) {
 			thishost = hrp;
 			break;
 		}
@@ -987,8 +942,9 @@ skip:
 	if ((lc = login_getpwclass(pw)) != NULL) {
 		char	remote_ip[MAXHOSTNAMELEN];
 
-		strncpy(remote_ip, inet_ntoa(his_addr.sin_addr),
-			sizeof(remote_ip) - 1);
+		getnameinfo((struct sockaddr *)&his_addr, his_addr.su_len,
+			remote_ip, sizeof(remote_ip), NULL, 0,
+			NI_NUMERICHOST);
 		remote_ip[sizeof(remote_ip) - 1] = 0;
 		if (!auth_hostok(lc, remotehost, remote_ip)) {
 			syslog(LOG_INFO|LOG_AUTH,
@@ -1282,30 +1238,25 @@ getdatasock(mode)
 	if (data >= 0)
 		return (fdopen(data, mode));
 	(void) seteuid((uid_t)0);
-	s = socket(AF_INET, SOCK_STREAM, 0);
+
+	s = socket(data_dest.su_family, SOCK_STREAM, 0);
 	if (s < 0)
 		goto bad;
 	if (setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
 	    (char *) &on, sizeof(on)) < 0)
 		goto bad;
 	/* anchor socket to avoid multi-homing problems */
-	data_source.sin_len = sizeof(struct sockaddr_in);
-	data_source.sin_family = AF_INET;
-	data_source.sin_addr = ctrl_addr.sin_addr;
+	data_source = ctrl_addr;
+	data_source.su_port = htons(20); /* ftp-data port */
 	for (tries = 1; ; tries++) {
 		if (bind(s, (struct sockaddr *)&data_source,
-		    sizeof(data_source)) >= 0)
+			 data_source.su_len) >= 0)
 			break;
 		if (errno != EADDRINUSE || tries > 10)
 			goto bad;
 		sleep(tries);
 	}
 	(void) seteuid((uid_t)pw->pw_uid);
-#ifdef IP_TOS
-	on = IPTOS_THROUGHPUT;
-	if (setsockopt(s, IPPROTO_IP, IP_TOS, (char *)&on, sizeof(int)) < 0)
-		syslog(LOG_WARNING, "setsockopt (IP_TOS): %m");
-#endif
 #ifdef TCP_NOPUSH
 	/*
 	 * Turn off push flag to keep sender TCP from sending short packets
@@ -1313,9 +1264,13 @@ getdatasock(mode)
 	 * to set the send buffer size as well, but that may not be desirable
 	 * in heavy-load situations.
 	 */
-	on = 1;
-	if (setsockopt(s, IPPROTO_TCP, TCP_NOPUSH, (char *)&on, sizeof on) < 0)
-		syslog(LOG_WARNING, "setsockopt (TCP_NOPUSH): %m");
+	{
+		on = 1;
+		if (setsockopt(s, IPPROTO_TCP, TCP_NOPUSH, (char *)&on,
+				sizeof on) < 0) {
+			syslog(LOG_WARNING, "setsockopt (TCP_NOPUSH): %m");
+		}
+	}
 #endif
 #ifdef SO_SNDBUF
 	on = 65536;
@@ -1341,7 +1296,7 @@ dataconn(name, size, mode)
 {
 	char sizebuf[32];
 	FILE *file;
-	int retry = 0, tos;
+	int retry = 0;
 
 	file_size = size;
 	byte_count = 0;
@@ -1350,8 +1305,8 @@ dataconn(name, size, mode)
 	else
 		*sizebuf = '\0';
 	if (pdata >= 0) {
-		struct sockaddr_in from;
-		int s, fromlen = sizeof(from);
+		union sockunion from;
+		int s, fromlen = ctrl_addr.su_len;
 		struct timeval timeout;
 		fd_set set;
 
@@ -1370,11 +1325,6 @@ dataconn(name, size, mode)
 		}
 		(void) close(pdata);
 		pdata = s;
-#ifdef IP_TOS
-		tos = IPTOS_THROUGHPUT;
-		(void) setsockopt(s, IPPROTO_IP, IP_TOS, (char *)&tos,
-		    sizeof(int));
-#endif
 		reply(150, "Opening %s mode data connection for '%s'%s.",
 		     type == TYPE_A ? "ASCII" : "BINARY", name, sizebuf);
 		return (fdopen(pdata, mode));
@@ -1390,14 +1340,18 @@ dataconn(name, size, mode)
 	usedefault = 1;
 	file = getdatasock(mode);
 	if (file == NULL) {
-		reply(425, "Can't create data socket (%s,%d): %s.",
-		    inet_ntoa(data_source.sin_addr),
-		    ntohs(data_source.sin_port), strerror(errno));
+		char hostbuf[BUFSIZ], portbuf[BUFSIZ];
+		getnameinfo((struct sockaddr *)&data_source,
+			data_source.su_len, hostbuf, sizeof(hostbuf),
+			portbuf, sizeof(portbuf),
+			NI_NUMERICHOST | NI_NUMERICSERV);
+		reply(425, "Can't create data socket (%s,%s): %s.",
+			hostbuf, portbuf, strerror(errno));
 		return (NULL);
 	}
 	data = fileno(file);
 	while (connect(data, (struct sockaddr *)&data_dest,
-	    sizeof(data_dest)) < 0) {
+	    data_dest.su_len) < 0) {
 		if (errno == EADDRINUSE && retry < swaitmax) {
 			sleep((unsigned) swaitint);
 			retry += swaitint;
@@ -1648,14 +1602,19 @@ statfilecmd(filename)
 void
 statcmd()
 {
-	struct sockaddr_in *sin;
+	union sockunion *su;
 	u_char *a, *p;
+	char hname[INET6_ADDRSTRLEN];
+	int ispassive;
 
 	lreply(211, "%s FTP server status:", hostname, version);
 	printf("     %s\r\n", version);
 	printf("     Connected to %s", remotehost);
-	if (!isdigit(remotehost[0]))
-		printf(" (%s)", inet_ntoa(his_addr.sin_addr));
+	if (!getnameinfo((struct sockaddr *)&his_addr, his_addr.su_len,
+			hname, sizeof(hname), NULL, 0, NI_NUMERICHOST)) {
+		if (strcmp(hname, remotehost) != 0)
+			printf(" (%s)", hname);
+	}
 	printf("\r\n");
 	if (logged_in) {
 		if (guest)
@@ -1680,18 +1639,85 @@ statcmd()
 	if (data != -1)
 		printf("     Data connection open\r\n");
 	else if (pdata != -1) {
-		printf("     in Passive mode");
-		sin = &pasv_addr;
+		ispassive = 1;
+		su = &pasv_addr;
 		goto printaddr;
 	} else if (usedefault == 0) {
-		printf("     PORT");
-		sin = &data_dest;
+		ispassive = 0;
+		su = &data_dest;
 printaddr:
-		a = (u_char *) &sin->sin_addr;
-		p = (u_char *) &sin->sin_port;
 #define UC(b) (((int) b) & 0xff)
-		printf(" (%d,%d,%d,%d,%d,%d)\r\n", UC(a[0]),
-			UC(a[1]), UC(a[2]), UC(a[3]), UC(p[0]), UC(p[1]));
+		if (epsvall) {
+			printf("     EPSV only mode (EPSV ALL)\r\n");
+			goto epsvonly;
+		}
+
+		/* PORT/PASV */
+		if (su->su_family == AF_INET) {
+			a = (u_char *) &su->su_sin.sin_addr;
+			p = (u_char *) &su->su_sin.sin_port;
+			printf("     %s (%d,%d,%d,%d,%d,%d)\r\n",
+				ispassive ? "PASV" : "PORT",
+				UC(a[0]), UC(a[1]), UC(a[2]), UC(a[3]),
+				UC(p[0]), UC(p[1]));
+		}
+
+		/* LPRT/LPSV */
+	    {
+		int alen, af, i;
+
+		switch (su->su_family) {
+		case AF_INET:
+			a = (u_char *) &su->su_sin.sin_addr;
+			p = (u_char *) &su->su_sin.sin_port;
+			alen = sizeof(su->su_sin.sin_addr);
+			af = 4;
+			break;
+		case AF_INET6:
+			a = (u_char *) &su->su_sin6.sin6_addr;
+			p = (u_char *) &su->su_sin6.sin6_port;
+			alen = sizeof(su->su_sin6.sin6_addr);
+			af = 6;
+			break;
+		default:
+			af = 0;
+			break;
+		}
+		if (af) {
+			printf("     %s (%d,%d,", ispassive ? "LPSV" : "LPRT",
+				af, alen);
+			for (i = 0; i < alen; i++)
+				printf("%d,", UC(a[i]));
+			printf("%d,%d,%d)\r\n", 2, UC(p[0]), UC(p[1]));
+		}
+	    }
+
+epsvonly:;
+		/* EPRT/EPSV */
+	    {
+		int af;
+
+		switch (su->su_family) {
+		case AF_INET:
+			af = 1;
+			break;
+		case AF_INET6:
+			af = 2;
+			break;
+		default:
+			af = 0;
+			break;
+		}
+		if (af) {
+			if (!getnameinfo((struct sockaddr *)su, su->su_len,
+					hname, sizeof(hname), NULL, 0,
+					NI_NUMERICHOST)) {
+				printf("     %s |%d|%s|%d|\r\n",
+					ispassive ? "EPSV" : "EPRT",
+					af, hname, htons(su->su_port));
+			}
+		}
+	    }
 #undef UC
 	} else
 		printf("     No data connection\r\n");
@@ -1895,11 +1921,51 @@ renamecmd(from, to)
 }
 
 static void
-dolog(sin)
-	struct sockaddr_in *sin;
+dolog(who)
+	struct sockaddr *who;
 {
-	realhostname(remotehost, sizeof(remotehost) - 1, &sin->sin_addr);
+	int err, result = HOSTNAME_INVALIDADDR;
 
+	err = getnameinfo(who, who->sa_len, remotehost, sizeof(remotehost),
+			  NULL, 0, 0);
+	if (err == NULL) {
+		struct addrinfo hints, *res, *ores;
+		struct sockaddr *sa;
+
+		bzero(&hints, sizeof(struct addrinfo));
+		hints.ai_family = who->sa_family;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_protocol = IPPROTO_TCP;
+
+		err = getaddrinfo(remotehost, NULL, &hints, &res);
+		if (err) {
+			result = HOSTNAME_INVALIDNAME;
+			goto numeric;
+		} else for (ores = res; ; res = res->ai_next) {
+			if (res == NULL) {
+				freeaddrinfo(ores);
+				result = HOSTNAME_INCORRECTNAME;
+				goto numeric;
+			}
+			sa = res->ai_addr;
+			if (sa == NULL) {
+				freeaddrinfo(ores);
+				result = HOSTNAME_INCORRECTNAME;
+				goto numeric;
+			}
+			if (sa->sa_len == who->sa_len &&
+			    !bcmp(sa, who, sa->sa_len)) {
+				result = HOSTNAME_FOUND;
+				break;	/* OK! */
+			}
+		}
+		freeaddrinfo(ores);
+	} else {
+    numeric:
+		err = getnameinfo(who, who->sa_len, remotehost,
+				  sizeof(remotehost), NULL, 0, NI_NUMERICHOST);
+		/* XXX: do 'err' check */
+	}
 #ifdef SETPROCTITLE
 #ifdef VIRTUAL_HOSTING
 	if (thishost != firsthost)
@@ -1919,8 +1985,7 @@ dolog(sin)
 			       remotehost, hostname);
 		else
 #endif
-			syslog(LOG_INFO, "connection from %s (%s)", remotehost,
-				inet_ntoa(sin->sin_addr));
+			syslog(LOG_INFO, "connection from %s", remotehost);
 	}
 }
 
@@ -1995,7 +2060,7 @@ passive()
 	if (pdata >= 0)		/* close old port if one set */
 		close(pdata);
 
-	pdata = socket(AF_INET, SOCK_STREAM, 0);
+	pdata = socket(ctrl_addr.su_family, SOCK_STREAM, 0);
 	if (pdata < 0) {
 		perror_reply(425, "Can't open passive connection");
 		return;
@@ -2004,7 +2069,7 @@ passive()
 	(void) seteuid((uid_t)0);
 
 #ifdef IP_PORTRANGE
-	{
+	if (ctrl_addr.su_family == AF_INET) {
 	    int on = restricted_data_ports ? IP_PORTRANGE_HIGH
 					   : IP_PORTRANGE_DEFAULT;
 
@@ -2013,12 +2078,22 @@ passive()
 		    goto pasv_error;
 	}
 #endif
+#ifdef IPV6_PORTRANGE
+	if (ctrl_addr.su_family == AF_INET6) {
+	    int on = restricted_data_ports ? IPV6_PORTRANGE_HIGH
+					   : IPV6_PORTRANGE_DEFAULT;
+
+	    if (setsockopt(pdata, IPPROTO_IPV6, IPV6_PORTRANGE,
+			   (char *)&on, sizeof(on)) < 0)
+		    goto pasv_error;
+	}
+#endif
 
 	pasv_addr = ctrl_addr;
-	pasv_addr.sin_port = 0;
-	if (bind(pdata, (struct sockaddr *)&pasv_addr,
-		 sizeof(pasv_addr)) < 0)
+	pasv_addr.su_port = 0;
+	if (bind(pdata, (struct sockaddr *)&pasv_addr, pasv_addr.su_len) < 0)
 		goto pasv_error;
+
 
 	(void) seteuid((uid_t)pw->pw_uid);
 
@@ -2027,14 +2102,131 @@ passive()
 		goto pasv_error;
 	if (listen(pdata, 1) < 0)
 		goto pasv_error;
-	a = (char *) &pasv_addr.sin_addr;
-	p = (char *) &pasv_addr.sin_port;
+	if (pasv_addr.su_family == AF_INET)
+		a = (char *) &pasv_addr.su_sin.sin_addr;
+	else if (pasv_addr.su_family == AF_INET6 &&
+		 IN6_IS_ADDR_V4MAPPED(&pasv_addr.su_sin6.sin6_addr))
+		a = (char *) &pasv_addr.su_sin6.sin6_addr + 12;
+	else
+		goto pasv_error;
+		
+	p = (char *) &pasv_addr.su_port;
 
 #define UC(b) (((int) b) & 0xff)
 
 	reply(227, "Entering Passive Mode (%d,%d,%d,%d,%d,%d)", UC(a[0]),
 		UC(a[1]), UC(a[2]), UC(a[3]), UC(p[0]), UC(p[1]));
 	return;
+
+pasv_error:
+	(void) seteuid((uid_t)pw->pw_uid);
+	(void) close(pdata);
+	pdata = -1;
+	perror_reply(425, "Can't open passive connection");
+	return;
+}
+
+/*
+ * Long Passive defined in RFC 1639.
+ *     228 Entering Long Passive Mode
+ *         (af, hal, h1, h2, h3,..., pal, p1, p2...)
+ */
+
+void
+long_passive(cmd, pf)
+	char *cmd;
+	int pf;
+{
+	int len;
+	char *p, *a;
+
+	if (pdata >= 0)		/* close old port if one set */
+		close(pdata);
+
+	if (pf != PF_UNSPEC) {
+		if (ctrl_addr.su_family != pf) {
+			switch (ctrl_addr.su_family) {
+			case AF_INET:
+				pf = 1;
+				break;
+			case AF_INET6:
+				pf = 2;
+				break;
+			default:
+				pf = 0;
+				break;
+			}
+			/*
+			 * XXX
+			 * only EPRT/EPSV ready clients will understand this
+			 */
+			if (strcmp(cmd, "EPSV") == 0 && pf) {
+				reply(522, "Network protocol mismatch, "
+					"use (%d)", pf);
+			} else
+				reply(501, "Network protocol mismatch"); /*XXX*/
+
+			return;
+		}
+	}
+		
+	pdata = socket(ctrl_addr.su_family, SOCK_STREAM, 0);
+	if (pdata < 0) {
+		perror_reply(425, "Can't open passive connection");
+		return;
+	}
+
+	(void) seteuid((uid_t)0);
+
+	pasv_addr = ctrl_addr;
+	pasv_addr.su_port = 0;
+	len = pasv_addr.su_len;
+
+	if (bind(pdata, (struct sockaddr *)&pasv_addr, len) < 0)
+		goto pasv_error;
+
+	(void) seteuid((uid_t)pw->pw_uid);
+
+	if (getsockname(pdata, (struct sockaddr *) &pasv_addr, &len) < 0)
+		goto pasv_error;
+	if (listen(pdata, 1) < 0)
+		goto pasv_error;
+
+#define UC(b) (((int) b) & 0xff)
+
+	if (strcmp(cmd, "LPSV") == 0) {
+		p = (char *)&pasv_addr.su_port;
+		switch (pasv_addr.su_family) {
+		case AF_INET:
+			a = (char *) &pasv_addr.su_sin.sin_addr;
+			reply(228,
+"Entering Long Passive Mode (%d,%d,%d,%d,%d,%d,%d,%d,%d)",
+			      4, 4, UC(a[0]), UC(a[1]), UC(a[2]), UC(a[3]),
+			      2, UC(p[0]), UC(p[1]));
+			return;
+		case AF_INET6:
+			a = (char *) &pasv_addr.su_sin6.sin6_addr;
+			reply(228,
+"Entering Long Passive Mode "
+"(%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d)",
+			      6, 16, UC(a[0]), UC(a[1]), UC(a[2]), UC(a[3]),
+			      UC(a[4]), UC(a[5]), UC(a[6]), UC(a[7]),
+			      UC(a[8]), UC(a[9]), UC(a[10]), UC(a[11]),
+			      UC(a[12]), UC(a[13]), UC(a[14]), UC(a[15]),
+			      2, UC(p[0]), UC(p[1]));
+			return;
+		}
+	} else if (strcmp(cmd, "EPSV") == 0) {
+		switch (pasv_addr.su_family) {
+		case AF_INET:
+		case AF_INET6:
+			reply(229, "Entering Extended Passive Mode (|||%d|)",
+				ntohs(pasv_addr.su_port));
+			return;
+		}
+	} else {
+		/* more proper error code? */
+	}
 
 pasv_error:
 	(void) seteuid((uid_t)pw->pw_uid);
