@@ -128,8 +128,8 @@ extern int ip6_defhlim;
 #endif /* INET6 */
 
 #if defined(INET6) && !defined(TCP6)
-void	tcp6_mtudisc_callback __P((struct in6_addr *));
-void	tcp6_mtudisc __P((struct inpcb *, int));
+void	tcp_mtudisc_callback __P((struct in6_addr *));
+void	tcp_mtudisc __P((struct inpcb *, int));
 #endif
 
 struct tcpstat tcpstat;		/* tcp statistics */
@@ -160,7 +160,7 @@ tcp_init()
 #endif /* INET6 */
 
 #if defined(INET6) && !defined(TCP6)
-	icmp6_mtudisc_callback_register(tcp6_mtudisc_callback);
+	icmp6_mtudisc_callback_register(tcp_mtudisc_callback);
 #endif
 }
 
@@ -909,7 +909,7 @@ tcp_quench(inp, errno)
  * Path MTU Discovery handlers.
  */
 void
-tcp6_mtudisc_callback(faddr)
+tcp_mtudisc_callback(faddr)
 	struct in6_addr *faddr;
 {
 	struct sockaddr_in6 sin6;
@@ -919,50 +919,7 @@ tcp6_mtudisc_callback(faddr)
 	sin6.sin6_len = sizeof(struct sockaddr_in6);
 	sin6.sin6_addr = *faddr;
 	(void) in6_pcbnotify(&tcbtable, (struct sockaddr *)&sin6, 0,
-	    (struct sockaddr *)&sa6_any, 0, EMSGSIZE, NULL, tcp6_mtudisc);
-}
-
-void
-tcp6_mtudisc(inp, errno)
-	struct inpcb *inp;
-	int errno;
-{
-	struct tcpcb *tp = intotcpcb(inp);
-	struct rtentry *rt = inp->inp_route.ro_rt;
-
-	if (tp != 0) {
-		if (rt != 0) {
-			/*
-			 * If this was not a host route, remove and realloc.
-			 */
-			if ((rt->rt_flags & RTF_HOST) == 0) {
-				in_rtchange(inp, errno);
-				if ((rt = inp->inp_route.ro_rt) == 0)
-					return;
-			}
-
-#if 0
-			/*
-			 * Slow start out of the error condition.  We
-			 * use the MTU because we know it's smaller
-			 * than the previously transmitted segment.
-			 *
-			 * Note: This is more conservative than the
-			 * suggestion in draft-floyd-incr-init-win-03.
-			 */
-			if (rt->rt_rmx.rmx_mtu != 0)
-				tp->snd_cwnd =
-				    TCP_INITIAL_WINDOW(tcp_init_win,
-				    rt->rt_rmx.rmx_mtu);
-#endif
-		}
-
-		/*
-		 * Resend unacknowledged packets.
-		 */
-		tp->snd_nxt = tp->snd_una;
-		tcp_output(tp);
-	}
+	    (struct sockaddr *)&sa6_any, 0, EMSGSIZE, NULL, tcp_mtudisc);
 }
 #endif /* INET6 && !TCP6 */
 
