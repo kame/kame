@@ -1,4 +1,4 @@
-/*	$KAME: dns6conv.c,v 1.9 2001/11/16 08:04:07 itojun Exp $ */
+/*	$KAME: dns6conv.c,v 1.10 2002/03/27 03:01:35 jinmei Exp $ */
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -103,7 +103,7 @@ main(argc, argv)
 			errx(1, "unknown format type: %s", fmtstr);
 	}
 	else
-		fmttype = a6;
+		fmttype = nibble;
 
 	if ((error = getaddrinfo((const char *)addr, NULL, &hints, &res))
 	    != 0)
