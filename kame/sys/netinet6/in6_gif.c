@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.94 2002/02/04 13:40:08 jinmei Exp $	*/
+/*	$KAME: in6_gif.c,v 1.95 2002/02/05 12:23:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -576,6 +576,7 @@ in6_gif_attach(sc)
 	mask6.sin6_len = sizeof(struct sockaddr_in6);
 	mask6.sin6_addr.s6_addr32[0] = mask6.sin6_addr.s6_addr32[1] = 
 	    mask6.sin6_addr.s6_addr32[2] = mask6.sin6_addr.s6_addr32[3] = ~0;
+	mask6.sin6_scope_id = ~0;
 
 	if (!sc->gif_psrc || !sc->gif_pdst)
 		return EINVAL;
