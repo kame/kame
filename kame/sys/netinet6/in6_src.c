@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.141 2004/02/13 02:52:09 keiichi Exp $	*/
+/*	$KAME: in6_src.c,v 1.142 2004/02/16 07:32:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -858,8 +858,10 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 			/* No route yet, so try to acquire one */
 			bzero(&ro->ro_dst, sizeof(struct sockaddr_in6));
 			sa6 = (struct sockaddr_in6 *)&ro->ro_dst;
-			in6_embedscope(&dstsock->sin6_addr, dstsock);
 			*sa6 = *dstsock;
+#ifndef SCOPEDROUTING		/* XXX */
+			sa6->sin6_scope_id = 0;
+#endif
 			if (clone) {
 #ifdef __bsdi__
 				rtcalloc((struct route *)ro);
