@@ -486,7 +486,7 @@ server6_react_solicit(buf, siz, rcvpi)
 
 	agent = !IN6_IS_ADDR_UNSPECIFIED(&dh6s->dh6sol_relayaddr);
 	if (agent) {
-		int plen = (dh6s->dh6sol_plen_id >> 1) & 0x7f;
+		int plen = DH6SOL_SOLICIT_PLEN(ntohs(dh6s->dh6sol_plen_id));
 
 		if (plen == 0) {
 			dprintf((stderr,
