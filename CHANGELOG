@@ -1,13 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2040 2002/01/10 13:58:44 jinmei Exp $
+$KAME: CHANGELOG,v 1.2041 2002/01/10 14:05:18 jinmei Exp $
 
 <200201>
 2002-01-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* (many kernel files): cleaned up the code to receive extension
-	headers (and other optional information) on TCP sockets.  The
-	kernel TCP stack does not pass the information to applications.
-	All related functions were removed with this change, while the
-	"imputopts" member in the PCB structure was remained just in case.
+	headers (and other optional information) on TCP sockets.  As a
+	result, the kernel TCP stack does not pass the information to
+	applications. All related functions were removed with this change,
+	while the "imputopts" member in the PCB structure was remained
+	just in case.
 
 2002-01-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_clearpktopts): avoided NULL
