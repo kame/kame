@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2189 2002/06/21 12:09:35 suz Exp $
+$KAME: CHANGELOG,v 1.2190 2002/06/23 11:57:34 fujisawa Exp $
 
 <200206>
+2002-06-23 Shin'ichi Fujisawa <fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_*.c:
+	- Fix a bug that port number does not changed when translator
+	  has a lots of TCP/UDP sessions and use one IPv4 source
+	  address for outgoing packet with IPv6->IPv4 translation.
+	- Re-calculate TCP checksum when TCP payload was modified with
+	  IPv6->IPv4 translation.
+	- Change IPv6 MTU which looked from IPv4 in 1260[octet] from
+	  1280[octet].
+
 Fri Jun 21 21:07:40 JST 2002	suz@crl.hitachi.co.jp
 	* freebsd4: sync with FreeBSD-4.6 RELEASE
 
