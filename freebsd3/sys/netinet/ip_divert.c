@@ -434,7 +434,7 @@ div_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 	 struct mbuf *control, struct proc *p)
 {
 	/* Packet must have a header (but that's about it) */
-	if (m->m_len < sizeof (struct ip) ||
+	if (m->m_len < sizeof (struct ip) &&
 	    (m = m_pullup(m, sizeof (struct ip))) == 0) {
 		ipstat.ips_toosmall++;
 		m_freem(m);
