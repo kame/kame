@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.52 2001/01/22 12:05:36 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.53 2001/01/22 12:14:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.52 2001/01/22 12:05:36 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.53 2001/01/22 12:14:44 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -2353,11 +2353,14 @@ rtflags(rtm)
 {
 	static char buf[BUFSIZ];
 
-	strcpy(buf, "");
+	/*
+	 * letter conflict should be okay.  painful when *BSD diverges...
+	 */
+	strlcpy(buf, "", sizeof(buf));
 #define	RTFLAG(s, f) \
 do { \
 	if (rtm->rtm_flags & (f)) \
-		strcat(buf, (s)); \
+		strlcat(buf, (s), sizeof(buf)); \
 } while (0)
 	RTFLAG("U", RTF_UP);
 	RTFLAG("G", RTF_GATEWAY);
@@ -2388,6 +2391,24 @@ do { \
 #endif
 	RTFLAG("2", RTF_PROTO2);
 	RTFLAG("1", RTF_PROTO1);
+#ifdef RTF_BROADCAST
+	RTFLAG("b", RTF_BROADCAST);
+#endif
+#ifdef RTF_DEFAULT
+	RTFLAG("d", RTF_DEFAULT);
+#endif
+#ifdef RTF_ISAROUTER
+	RTFLAG("r", RTF_ISAROUTER);
+#endif
+#ifdef RTF_TUNNEL
+	RTFLAG("T", RTF_TUNNEL);
+#endif
+#ifdef RTF_AUTH
+	RTFLAG("A", RTF_AUTH);
+#endif
+#ifdef RTF_CRYPT
+	RTFLAG("E", RTF_CRYPT);
+#endif
 #undef RTFLAG
 	return buf;
 }
