@@ -11,7 +11,9 @@
  */
 
 #include <sys/types.h>
+#if 0
 #include <sys/random.h>
+#endif
 #include <sys/libkern.h>
 #include <sys/time.h>
 
@@ -69,7 +71,7 @@ arc4_randomstir (void)
 	}
 
 	/* Reset for next reseed cycle. */
-	getmicrotime(&arc4_tv_nextreseed);
+	microtime(&arc4_tv_nextreseed);
 	arc4_tv_nextreseed.tv_sec += ARC4_RESEED_SECONDS;
 	arc4_numruns = 0;
 }
@@ -125,7 +127,7 @@ arc4random(void)
 	if (!arc4_initialized)
 		arc4_init();
 
-	getmicrotime(&tv_now);
+	microtime(&tv_now);
 	if ((++arc4_numruns > ARC4_MAXRUNS) || 
 	    (tv_now.tv_sec > arc4_tv_nextreseed.tv_sec))
 	{
