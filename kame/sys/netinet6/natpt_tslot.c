@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.52 2002/06/13 07:22:39 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.53 2002/06/21 09:09:44 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1021,8 +1021,8 @@ natpt_init_tslot()
 	tSlotEntryMax = MAXTSLOTENTRY;
 	tSlotEntryUsed = 0;
 
-	tSlotTimer = 32;
-	frgmntTimer = 32;
+	tSlotTimer = 10;
+	frgmntTimer = 10;
 	timeout(natpt_expireTSlot, (caddr_t)0, tSlotTimer * hz);
 	timeout(natpt_expireFragment, (caddr_t)0, frgmntTimer * hz);
 
