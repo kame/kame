@@ -522,7 +522,6 @@ icmp6_input(mp, offp, proto)
 			 * Prepare an internal mbuf. m_pullup() doesn't
 			 * always copy the length we specified.
 			 */
-			MGETHDR(n, M_DONTWAIT, n0->m_type);
 			if (maxlen >= MCLBYTES) {
 #ifdef DIAGNOSTIC
 				printf("MCLBYTES too small\n");
@@ -531,6 +530,7 @@ icmp6_input(mp, offp, proto)
 				m_freem(n0);
 				break;
 			}
+			MGETHDR(n, M_DONTWAIT, n0->m_type);
 			if (n && maxlen >= MHLEN) {
 				MCLGET(n, M_DONTWAIT);
 				if ((n->m_flags & M_EXT) == 0) {
