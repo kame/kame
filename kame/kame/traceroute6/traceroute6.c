@@ -272,7 +272,6 @@ static char sccsid[] = "@(#)traceroute.c	8.1 (Berkeley) 6/6/93";
 #include <netinet6/ipsec.h>
 #endif
 
-#define	freehostent(hp)
 #define DUMMY_PORT 10010
 
 #define	MAXPACKET	65535	/* max ip packet size */
@@ -329,7 +328,7 @@ int rcvhlim;
 struct in6_pktinfo *rcvpktinfo;
 
 struct sockaddr_in6 Src, Dst, Rcv;
-struct sockaddr_in6 *src = &Src, *dst = &Dst, *rcv = &Rcv;
+struct sockaddr_in6 *src = &Src, *rcv = &Rcv;
 int datalen;			/* How much data */
 /* XXX: 2064 = 127(max hops in type 0 rthdr) * sizeof(ip6_hdr) + 16(margin) */
 char rtbuf[2064];
@@ -353,14 +352,22 @@ int lflag;			/* print both numerical address & hostname */
 
 char ntop_buf[INET6_ADDRSTRLEN]; /* for inet_ntop() */
 
+#ifdef KAME_SCOPEID
+const int niflag = NI_WITHSCOPEID;
+#else
+const int niflag = 0;
+#endif
+
 int
 main(argc, argv)
 	int argc;
 	char *argv[];
 {
+	struct hostent *hp;
+	int error;
+	struct addrinfo hints, *res;
 	extern char *optarg;
 	extern int optind;
-	struct hostent *hp;
 	int ch, i, on, probe, seq, hops;
 	static u_char rcvcmsgbuf[CMSG_SPACE(sizeof(struct in6_pktinfo))
 				+ CMSG_SPACE(sizeof(int))];
@@ -410,6 +417,7 @@ main(argc, argv)
 				cmsg = inet6_rthdr_init(rtbuf, IPV6_RTHDR_TYPE_0);
 			inet6_rthdr_add(cmsg, (struct in6_addr *)hp->h_addr, IPV6_RTHDR_LOOSE);
 #endif
+			freehostent(hp);
 			break;
 		case 'm':
 			max_hops = atoi(optarg);
@@ -474,23 +482,25 @@ main(argc, argv)
 	setlinebuf (stdout);
 #endif
 
-	(void) bzero((char *)dst, sizeof(Dst));
-	Dst.sin6_family = AF_INET6;
-
-	hp = (struct hostent *)gethostbyname2(*argv, AF_INET6);
-	if (hp == NULL) {
-		if (inet_pton(AF_INET6, *argv, &Dst.sin6_addr) != 1) {
-			(void)fprintf(stderr,
-				      "traceroute6: unknown host %s\n", *argv);
-			exit(1);
-		}
-		hostname = *argv;
-	} else {
-		bcopy(hp->h_addr, (caddr_t)&Dst.sin6_addr, hp->h_length);
-		hostname = strdup(hp->h_name);
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_INET6;
+	hints.ai_socktype = SOCK_RAW;
+	hints.ai_protocol = IPPROTO_ICMPV6;
+	hints.ai_flags = AI_CANONNAME;
+	error = getaddrinfo(*argv, NULL, &hints, &res);
+	if (error) {
+		(void)fprintf(stderr,
+			      "traceroute6: %s\n", gai_strerror(error));
+		exit(1);
 	}
-	freehostent(hp);
-	
+	if (res->ai_addrlen != sizeof(Dst)) {
+		(void)fprintf(stderr,
+			      "traceroute6: size of sockaddr mismatch\n");
+		exit(1);
+	}
+	memcpy(&Dst, res->ai_addr, res->ai_addrlen);
+	hostname = res->ai_canonname ? strdup(res->ai_canonname) : *argv;
+
 	if (*++argv)
 		datalen = atoi(*argv);
 	if (datalen < 0 || datalen >= MAXPACKET - sizeof(struct opacket)) {
@@ -700,9 +710,10 @@ main(argc, argv)
 	/*
 	 * Message to users
 	 */
-	Fprintf(stderr, "traceroute to %s (%s)", hostname,
-		inet_ntop(AF_INET6, &Dst.sin6_addr,
-			  ntop_buf, sizeof(ntop_buf)));
+	if (getnameinfo((struct sockaddr *)&Dst, Dst.sin6_len, ntop_buf,
+			sizeof(ntop_buf), NULL, 0, NI_NUMERICHOST | niflag))
+		strcpy(ntop_buf, "(invalid)");
+	Fprintf(stderr, "traceroute to %s (%s)", hostname, ntop_buf);
 	if (source)
 		Fprintf(stderr, " from %s", source);
 	Fprintf(stderr, ", %d hops max, %d byte packets\n", max_hops, datalen);
@@ -837,7 +848,7 @@ send_probe(seq, hops)
 	(void) gettimeofday(&op->tv, &tz);
 
 	i = sendto(sndsock, (char *)outpacket, datalen , 0,
-		   (struct sockaddr *)dst, sizeof(Dst));
+		   (struct sockaddr *)&Dst, Dst.sin6_len);
 	if (i < 0 || i != datalen)  {
 		if (i<0)
 			perror("sendto");
@@ -1160,7 +1171,6 @@ inetname(in)
 			    !strcmp(cp + 1, domain))
 				*cp = 0;
 			cp = hp->h_name;
-			freehostent(hp);
 		}
 	}
 	if (cp)
