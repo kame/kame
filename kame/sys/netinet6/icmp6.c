@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.83 2000/05/09 17:06:50 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.84 2000/05/09 17:25:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1058,7 +1058,7 @@ icmp6_mtudisc_update(dst, icmp6, m)
  * draft-ietf-ipngwg-icmp-name-lookups-05.
  * 
  * Spec incompatibilities:
- * - IPv6 destionation address validation
+ * - IPv6 destination address validation
  * - IPv6 Subject address handling
  * - FQDN Subject name handling (drop it if it's not for me)
  * - IPv4 Subject address handling support missing
@@ -1101,15 +1101,15 @@ ni6_input(m, off)
 	/*
 	 * Validate IPv6 destination address.
 	 *
-	 * At this moment, we accept packets with any IPv6 destionation address.
+	 * At this moment, we accept packets with any IPv6 destination address.
 	 * This is a violation to last paragraph in icmp-name-lookups-05
-	 * page 4, which restricts IPv6 destionation address of a query to:
+	 * page 4, which restricts IPv6 destination address of a query to:
 	 * - Responder's unicast/anycast address,
 	 * - NI group address for a name belongs to the Responder, or
 	 * - NI group address for a name for which the Responder is providing
 	 *   proxy service.
 	 *
-	 * We allow any IPv6 destionation addrss, since "ping6 -w ff02::1" has
+	 * We allow any IPv6 destination address, since "ping6 -w ff02::1" has
 	 * been really useful for us debugging our network.  Also this is
 	 * still questionable if the above restriction buy us security at all,
 	 * since RFC2463 permits echo packet to multicast destination.
@@ -1125,8 +1125,11 @@ ni6_input(m, off)
 	bcopy(&ip6->ip6_dst, &sin6.sin6_addr, sizeof(sin6.sin6_addr));
 	/* XXX scopeid */
 	if (ifa_ifwithaddr((struct sockaddr *)&sin6))
-		break;
-	/* XXX check for NI group address */
+		; /*fine*/
+	else if (0 /*NI group check*/)
+		; /*fine*/
+	else
+		goto bad;
 #endif
 
 	/* guess reply length */
