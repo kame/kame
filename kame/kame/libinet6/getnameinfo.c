@@ -341,8 +341,12 @@ ip6_sa2str(sa6, buf, bufsiz, flags)
 	}
 #endif
  
-	if (IN6_IS_ADDR_LINKLOCAL(a6) || IN6_IS_ADDR_MC_LINKLOCAL(a6))
-		return(if_indextoname(ifindex, buf));
+	if (IN6_IS_ADDR_LINKLOCAL(a6) || IN6_IS_ADDR_MC_LINKLOCAL(a6)) {
+		char *p = if_indextoname(ifindex, buf);
+
+		if (p)
+			return(p);
+	}
 
 	/* last resort */
 	snprintf(buf, bufsiz, "%d", sa6->sin6_scope_id);
