@@ -382,8 +382,9 @@ struct syn_cache_head {
 #ifndef INET6
 #define	sototcpcb(so)	(intotcpcb(sotoinpcb(so)))
 #else
-#define	sototcpcb(so)	(sotoinpcb(so) ? intotcpcb(sotoinpcb(so)) \
-				       : in6totcpcb(sotoin6pcb(so)))
+#define	sototcpcb(so)	(((so)->so_proto->pr_domain->dom_family == AF_INET) \
+				? intotcpcb(sotoinpcb(so)) \
+				: in6totcpcb(sotoin6pcb(so)))
 #endif
 
 /*
