@@ -1117,6 +1117,10 @@ ipsecsetup(sep)
 			break;
 		while (*p && isspace(*p))
 			p++;
+		if (!*p) {
+			p = NULL;
+			continue;
+		}
 		error = ipsecsetup0(sep, p, 1);
 		if (error < 0)
 			break;
@@ -1146,6 +1150,10 @@ ipsecsetup_test(policy)
 			break;
 		while (*p && isspace(*p))
 			p++;
+		if (!*p) {
+			p = NULL;
+			continue;
+		}
 		buf = ipsec_set_policy((char *)p, strlen(p));
 		if (buf == NULL) {
 			error = -1;
