@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.323 1999/12/08 13:27:50 sakane Exp $
+$Id: CHANGELOG,v 1.324 1999/12/09 00:58:59 itojun Exp $
 
 <199912>
+Thu Dec  9 09:46:58 JST 1999  itojun@iiljab.net
+	* kame/sys/netinet6/ip6_input.c (non-bsdi):
+	  don't initialize non-lo0 loopback interface.  they will be
+	  initialized when they are made IFF_UP.
+
 Wed Dec  8 22:26:42 JST 1999 sakane@ydc.co.jp
 	* kame/kame/setkey:
 	Check the port number in SP entry when the policy is for icmp.
