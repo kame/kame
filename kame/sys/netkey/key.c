@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.308 2003/09/07 20:35:59 itojun Exp $	*/
+/*	$KAME: key.c,v 1.309 2003/09/08 01:47:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3069,11 +3069,14 @@ key_setspi(sav, spi)
 	struct secasvar *sav;
 	u_int32_t spi;
 {
+	int s;
 
+	s = splsoftnet();
 	sav->spi = spi;
 	if (sav->spihash.le_prev || sav->spihash.le_next)
 		LIST_REMOVE(sav, spihash);
 	LIST_INSERT_HEAD(&spihash[spi % SPIHASHSIZE], sav, spihash);
+	splx(s);
 }
 
 /*
