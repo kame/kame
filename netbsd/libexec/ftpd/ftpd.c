@@ -1426,8 +1426,8 @@ printaddr:
 				printf("211- LPRT ");
 			printf("(%d,%d", af, alen);
 			for (i = 0; i < alen; i++)
-				printf("%d,", UC(a[alen]));
-			printf("%d,%d,%d)\r\n", 2, UC(p[0]), UC(p[1]));
+				printf(",%d", UC(a[i]));
+			printf(",%d,%d,%d)\r\n", 2, UC(p[0]), UC(p[1]));
 #undef UC
 		}
 	    }
