@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.48 2001/05/03 14:51:48 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.49 2001/05/14 14:02:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -105,12 +105,6 @@ in6_gif_output(ifp, family, m, rt)
 	    sin6_dst->sin6_family != AF_INET6) {
 		m_freem(m);
 		return EAFNOSUPPORT;
-	}
-
-	/* multi-destination mode is not supported */
-	if (ifp->if_flags & IFF_LINK0) {
-		m_freem(m);
-		return ENETUNREACH;
 	}
 
 	/* setup dummy tdb.  it highly depends on ipip_output() code. */
@@ -269,28 +263,12 @@ in6_gif_output(ifp, family, m, rt)
 	ip6->ip6_nxt	= proto;
 	ip6->ip6_hlim	= ip6_gif_hlim;
 	ip6->ip6_src	= sin6_src->sin6_addr;
-	if (ifp->if_flags & IFF_LINK0) {
-		/* multi-destination mode */
-		if (!IN6_IS_ADDR_UNSPECIFIED(&sin6_dst->sin6_addr))
-			ip6->ip6_dst = sin6_dst->sin6_addr;
-		else if (rt) {
-			if (family != AF_INET6) {
-				m_freem(m);
-				return EINVAL;	/*XXX*/
-			}
-			ip6->ip6_dst = ((struct sockaddr_in6 *)(rt->rt_gateway))->sin6_addr;
-		} else {
-			m_freem(m);
-			return ENETUNREACH;
-		}
-	} else {
-		/* bidirectional configured tunnel mode */
-		if (!IN6_IS_ADDR_UNSPECIFIED(&sin6_dst->sin6_addr))
-			ip6->ip6_dst = sin6_dst->sin6_addr;
-		else  {
-			m_freem(m);
-			return ENETUNREACH;
-		}
+	/* bidirectional configured tunnel mode */
+	if (!IN6_IS_ADDR_UNSPECIFIED(&sin6_dst->sin6_addr))
+		ip6->ip6_dst = sin6_dst->sin6_addr;
+	else  {
+		m_freem(m);
+		return ENETUNREACH;
 	}
 	if (ifp->if_flags & IFF_LINK1)
 		ip_ecn_ingress(ECN_ALLOWED, &otos, &itos);
@@ -461,10 +439,6 @@ gif_encapcheck6(m, off, proto, arg)
 		addrmatch |= 1;
 	if (IN6_ARE_ADDR_EQUAL(&dst->sin6_addr, &ip6.ip6_src))
 		addrmatch |= 2;
-	else if ((sc->gif_if.if_flags & IFF_LINK0) != 0 &&
-		 IN6_IS_ADDR_UNSPECIFIED(&dst->sin6_addr)) {
-		addrmatch |= 2; /* we accept any source */
-	}
 	if (addrmatch != 3)
 		return 0;
 
@@ -499,6 +473,5 @@ gif_encapcheck6(m, off, proto, arg)
 		rtfree(rt);
 	}
 
-	/* prioritize: IFF_LINK0 mode is less preferred */
-	return (sc->gif_if.if_flags & IFF_LINK0) ? 128 : 128 * 2;
+	return 128 * 2;
 }
