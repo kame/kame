@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.31 2002/06/28 02:17:26 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.32 2002/07/01 12:21:10 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -153,7 +153,8 @@ showXlate(int type, int interval)
 			readKvm(&tsl, sizeof(struct tSlot),
 				TAILQ_FIRST(&tsl_head));
 			while (TRUE) {
-				if (tsl.suit.tcps){
+				if ((tsl.ip_p == IPPROTO_TCP)
+				    && (tsl.suit.tcps)) {
 					readKvm(&ts, sizeof(struct tcpstate),
 						tsl.suit.tcps);
 					makeTSlotLine(Wow, sizeof(Wow),
