@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.154 2001/07/23 15:34:01 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.155 2001/07/23 15:35:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1986,7 +1986,7 @@ in6_ifadd(pr)
 
 	ia = in6ifa_ifpwithaddr(ifp, &ifra.ifra_addr.sin6_addr);
 
-	return(ia);		/* this must NOT be NULL. */
+	return(ia);		/* this is always non-NULL */
 }
 
 int
