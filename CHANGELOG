@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.376 1999/12/27 07:31:20 itojun Exp $
+$Id: CHANGELOG,v 1.377 1999/12/27 11:38:30 sumikawa Exp $
 
 <199912>
+Mon Dec 27 20:34:20 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/sys: sync with FreeBSD 3.4-current. zp0 works
+	  correctly, and ep0/cnw0 also works with PAO. However, many
+	  applications are based on FreeBSD-3.3 yet.
+
 Mon Dec 27 16:33:20 JST 1999  itojun@iijlab.net
 	* freebsd2/ports/mnews: add IPv6-ready port directory for version 1.22.
 	  note that this configuration is Japanese-message enabled version;
