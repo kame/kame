@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.50 2000/03/25 07:23:57 sumikawa Exp $	*/
+/*	$KAME: nd6.c,v 1.51 2000/04/07 15:36:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2044,8 +2044,11 @@ nd6_storelladdr(ifp, rt, m, dst, desten)
 		return(0);
 	}
 	sdl = SDL(rt->rt_gateway);
-	if (sdl->sdl_alen != 0)
-		bcopy(LLADDR(sdl), desten, sdl->sdl_alen);
+	if (sdl->sdl_alen == 0) {
+		printf("nd6_storelladdr: sdl_alen == 0\n");
+		return(0);
+	}
 
+	bcopy(LLADDR(sdl), desten, sdl->sdl_alen);
 	return(1);
 }
