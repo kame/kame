@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.90 2002/11/17 16:21:50 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.91 2002/11/17 16:24:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -774,6 +774,7 @@ stf_checkaddr6(sc, in6, inifp)
 	struct in6_addr *in6;
 	struct ifnet *inifp;	/* incoming interface */
 {
+
 	/*
 	 * check 6to4 addresses
 	 */
@@ -787,6 +788,20 @@ stf_checkaddr6(sc, in6, inifp)
 	 * (2) to be safe against future ip6_input change.
 	 */
 	if (IN6_IS_ADDR_V4COMPAT(in6) || IN6_IS_ADDR_V4MAPPED(in6))
+		return -1;
+
+	/*
+	 * reject link-local and site-local unicast
+	 * as suggested in draft-savola-v6ops-6to4-security-00.txt
+	 */
+	if (IN6_IS_ADDR_LINKLOCAL(in6) || IN6_IS_ADDR_SITELOCAL(in6))
+		return -1;
+
+	/*
+	 * reject node-local and link-local multicast
+	 * as suggested in draft-savola-v6ops-6to4-security-00.txt
+	 */
+	if (IN6_IS_ADDR_MC_NODELOCAL(in6) || IN6_IS_ADDR_MC_LINKLOCAL(in6))
 		return -1;
 
 	return 0;
