@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1563 2001/02/21 03:51:48 itojun Exp $
+$KAME: CHANGELOG,v 1.1564 2001/02/21 05:26:15 sakane Exp $
 
 <200102>
+Wed Feb 21 14:25:55 JST 2001 sakane@ydc.co.jp
+	* racoon:
+	changed the proposal order of the protocol in the phase 2.
+	If we want to make a packet "IP2 AH ESP IP1 ULP", the SPD in KAME
+	expresses AH transport + ESP tunnel.  racoon sent the proposal
+	contained such the order.  But lots of implementation interprets
+	AH tunnel + ESP tunnel in this case.  racoon changes the order,
+	and usually uses this format.  If the option, 'complex_bundle'
+	is enable, racoon uses old format.
+
 Wed Feb 21 13:04:17 JST 2001  itojun@iijlab.net
 	* openbsd/usr.sbin/pim6{sd,dd}: compile these on openbsd.
 	  not really tested.
