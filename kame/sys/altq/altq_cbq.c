@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.c,v 1.17 2003/07/11 03:14:38 kjc Exp $	*/
+/*	$KAME: altq_cbq.c,v 1.18 2003/08/20 23:34:09 itojun Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -337,7 +337,7 @@ cbq_add_queue(struct pf_altq *a)
 
 	opts = &a->pq_u.cbq_opts;
 	/* check parameters */
-	if (a->priority >= RM_MAXPRIO)
+	if (a->priority >= CBQ_MAXPRI)
 		return (EINVAL);
 
 	/* Get pointers to parent and borrow classes.  */
@@ -637,7 +637,7 @@ cbq_add_class(acp)
 		return (EBADF);
 
 	/* check parameters */
-	if (acp->cbq_class.priority >= RM_MAXPRIO ||
+	if (acp->cbq_class.priority >= CBQ_MAXPRI ||
 	    acp->cbq_class.maxq > CBQ_MAXQSIZE)
 		return (EINVAL);
 
