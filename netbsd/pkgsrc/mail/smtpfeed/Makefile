@@ -1,5 +1,5 @@
 # $NetBSD$
-# KAME $Id: Makefile,v 1.1 1999/11/29 07:53:52 itojun Exp $
+# KAME $Id: Makefile,v 1.1.1.1 1999/11/29 07:53:52 itojun Exp $
 # Based on FreeBSD Id: Makefile,v 1.27 1999/04/03 08:25:18 itojun Exp
 #
 
