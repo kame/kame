@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.345 2004/06/01 01:54:02 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.346 2004/06/01 02:21:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1501,7 +1501,7 @@ ip6_savecontrol(in6p, m, mp)
 	}
 
 	/*
-	 * IPV6_HOPOPTS socket option.  Recall that we require super-user
+	 * IPV6_HOPOPTS socket option.  Recall that we required super-user
 	 * privilege for the option (see ip6_ctloutput), but it might be too
 	 * strict, since there might be some hop-by-hop options which can be
 	 * returned to normal user.
