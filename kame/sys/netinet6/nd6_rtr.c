@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.265 2004/10/26 06:53:23 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.266 2004/10/26 07:01:31 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2318,11 +2318,6 @@ nd6_setdefaultiface(ifindex)
 #endif
 		} else
 			nd6_defifp = NULL;
-
-		/*
-		 * Rescan default router list, refresh default route(s).
-		 */
-		defrouter_select();
 
 		/*
 		 * Our current implementation assumes one-to-one maping between
