@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.42 2000/01/14 06:37:38 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.43 2000/01/27 06:03:25 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -3349,7 +3349,7 @@ ipsecdoi_setid2(iph2)
 		return -1;
 	}
 	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL, "use local ID type %s: ",
+		plog(logp, LOCATION, NULL, "use local ID type %s\n",
 			s_ipsecdoi_ident(((struct ipsecdoi_id_b *)iph2->id->v)->type)));
 
 	iph2->id_p = sockaddr2id((struct sockaddr *)&spidx->dst,
