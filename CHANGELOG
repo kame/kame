@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1407 2000/11/29 12:51:03 jinmei Exp $
+$KAME: CHANGELOG,v 1.1408 2000/11/29 16:48:24 jinmei Exp $
 
 <200011>
+2000-11-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* {kame,bsdi4,openbsd,freebsd[34]}/sys/netinet6/in6_pcb.c
+	(in6_pcbnotify): removed a special treatment for rtchange cases,
+	which was necessary only when we used the ND6_WAITDELETE neighbor
+	cache state for	an unreachable neighbor. This removal would not
+	affect the behavior, but make the code simpler.
+
 2000-11-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6sd/mld6.c (init_mld6): allow multicasted packet
 	sent to the MLD6 socket to be loop-backed by default. We can do
