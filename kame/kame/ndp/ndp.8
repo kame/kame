@@ -1,4 +1,4 @@
-.\"	$KAME: ndp.8,v 1.14 2000/11/24 12:00:46 itojun Exp $
+.\"	$KAME: ndp.8,v 1.15 2001/02/08 07:17:03 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -38,10 +38,10 @@
 .Sh SYNOPSIS
 .Nm ndp
 .Fl a
-.Op Fl ntl
+.Op Fl nt
 .Nm ndp
 .Fl A Ar wait
-.Op Fl ntl
+.Op Fl nt
 .Nm ndp
 .Fl c
 .Op Fl nt
@@ -135,8 +135,6 @@ turn on or off NUD (Neighbor Unreachability Detection) on the
 interface.
 NUD is usually turned on by default.
 .El
-.It Fl l
-Do not truncate numeric IPv6 address.
 .It Fl n
 Do not try to resolve numeric address to hostname.
 .It Fl p

@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.53 2001/02/08 06:54:39 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.54 2001/02/08 07:17:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -132,7 +132,6 @@ static int tflag;
 static int32_t thiszone;	/* time difference with gmt */
 static int s = -1;
 static int repeat = 0;
-static int lflag = 1;
 
 char ntop_buf[INET6_ADDRSTRLEN];	/* inet_ntop() */
 char host_buf[NI_MAXHOST];		/* getnameinfo() */
@@ -217,7 +216,7 @@ main(argc, argv)
 			file(argv[2]);
 			exit(0);
 		case 'l' :
-			lflag = 1;
+			/* obsolete, ignored */
 			break;
 		case 'r' :
 			rflag = 1;
@@ -541,6 +540,10 @@ delete:
 	return 0;
 }
 
+#define W_ADDR	31
+#define W_LL	17
+#define W_IF	6
+
 /*
  * Dump the entire neighbor cache
  */
@@ -558,13 +561,15 @@ dump(addr)
 	struct in6_nbrinfo *nbi;
 	struct timeval time;
 	int addrwidth;
+	int llwidth;
+	int ifwidth;
 	char flgbuf[8];
 
 	/* Print header */
 	if (!tflag && !cflag)
-		printf("%-31.31s %-17.17s %6.6s %-9.9s %2s %4s %4s\n",
-		       "Neighbor", "Linklayer Address", "Netif", "Expire",
-		       "St", "Flgs", "Prbs");
+		printf("%-*.*s %-*.*s %*.*s %-9.9s %2s %4s %4s\n",
+		    W_ADDR, W_ADDR, "Neighbor", W_LL, W_LL, "Linklayer Address",
+		    W_IF, W_IF, "Netif", "Expire", "St", "Flgs", "Prbs");
 
 again:;
 	mib[0] = CTL_NET;
@@ -617,16 +622,20 @@ again:;
 		if (tflag)
 			ts_print(&time);
 
-		if (lflag) {
-			addrwidth = strlen(host_buf);
-			if (addrwidth < 31)
-				addrwidth = 31;
-		} else
-			addrwidth = 31;
+		addrwidth = strlen(host_buf);
+		if (addrwidth < W_ADDR)
+			addrwidth = W_ADDR;
+		llwidth = strlen(ether_str(sdl));
+		if (W_ADDR + W_LL - addrwidth > llwidth)
+			llwidth = W_ADDR + W_LL - addrwidth;
+		ifwidth = strlen(if_indextoname(sdl->sdl_index,
+		    ifix_buf));
+		if (W_ADDR + W_LL + W_IF - addrwidth - llwidth > ifwidth)
+			ifwidth = W_ADDR + W_LL + W_IF - addrwidth - llwidth;
 
-		printf("%-*.*s %-17.17s %6.6s", addrwidth, addrwidth, host_buf,
-		       ether_str(sdl),
-		       if_indextoname(sdl->sdl_index, ifix_buf));
+		printf("%-*.*s %-*.*s %*.*s", addrwidth, addrwidth, host_buf,
+		    llwidth, llwidth, ether_str(sdl), ifwidth, ifwidth,
+		    if_indextoname(sdl->sdl_index, ifix_buf));
 
 		/* Print neighbor discovery specific informations */
 		nbi = getnbrinfo(&sin->sin6_addr, sdl->sdl_index, 1);
