@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.65 2004/05/16 02:13:39 jinmei Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.66 2004/05/16 03:43:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -229,11 +229,19 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 
 		if (hp) {
 #if 0
-			/*
-			 * commented out, since "for local host" is not
-			 * implemented here - see RFC3493 section 6.2.
-			 */
 			if (flags & NI_NOFQDN) {
+				/*
+				 * According to RFC3493 section 6.2, NI_NOFQDN
+				 * means "node name portion of the FQDN shall
+				 * be returned for local hosts."  The following
+				 * code tries to implement it by returning the
+				 * first label (the part before the first
+				 * period) of the FQDN.  However, it is not
+				 * clear if this always makes sense, since the
+				 * given address may be outside of "local
+				 * hosts."  Due to the unclear description, we
+				 * disable the code in this implementation.
+				 */
 				char *p;
 				p = strchr(hp->h_name, '.');
 				if (p)
