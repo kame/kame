@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.336 2003/02/19 03:19:16 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.337 2003/03/03 00:56:13 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -837,10 +837,6 @@ icmp6_input(mp, offp, proto)
 			goto badlen;
 		if (code != 0)
 			goto badcode;
-		if (mip6_icmp6_input(m, off, icmp6len)) {
-			m = NULL;
-			goto freeit;
-		}
 		break;
 
 	case ICMP6_MOBILEPREFIX_ADVERT:

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.63 2003/02/20 12:06:16 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.64 2003/03/03 00:56:13 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -181,12 +181,6 @@ mip6_icmp6_input(m, off, icmp6len)
 				 __FILE__, __LINE__));
 			return (error);
 		}
-		break;
-
-	case ICMP6_MOBILEPREFIX_SOLICIT:
-		if (!MIP6_IS_HA)
-			break;
-		/* XXX: TODO */
 		break;
 
 	case ICMP6_MOBILEPREFIX_ADVERT:
