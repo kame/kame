@@ -177,6 +177,9 @@ softnet()
 #endif
 	if (isr & (1 << NETISR_IP)) ipintr();
 #endif
+#ifdef INET6
+	if (isr & (1 << NETISR_IPV6)) ip6intr();
+#endif
 #ifdef NETATALK
 	if (isr & (1 << NETISR_ATALK)) atintr();
 #endif

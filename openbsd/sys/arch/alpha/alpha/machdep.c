@@ -95,6 +95,15 @@
 #include <netinet/if_ether.h>
 #include <netinet/ip_var.h>
 #endif
+
+#ifdef INET6
+# ifndef INET
+#  include <netinet/in.h>
+# endif
+#include <netinet6/ip6.h>
+#include <netinet6/ip6_var.h>
+#endif
+
 #include "ppp.h"
 
 #include "le_ioasic.h"			/* for le_iomem creation */
@@ -1474,7 +1483,7 @@ netintr()
 	DONETISR(NETISR_IP, ipintr());
 #endif
 #ifdef INET6
-	DONETISR(NETISR_IPV6, ipv6intr());
+	DONETISR(NETISR_IPV6, ip6intr());
 #endif
 #ifdef NETATALK
 	DONETISR(NETISR_ATALK, atintr());

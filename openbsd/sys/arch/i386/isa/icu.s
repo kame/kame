@@ -158,7 +158,7 @@ IDTVEC(softnet)
 	DONET(NETISR_IP, _ipintr)
 #endif
 #ifdef INET6
-	DONET(NETISR_IPV6, _ipv6intr)
+	DONET(NETISR_IPV6, _ip6intr)
 #endif /* INET6 */
 #ifdef NETATALK
 	DONET(NETISR_ATALK, _atintr)

@@ -871,7 +871,7 @@ netintr()
 #ifdef INET6
 	if (netisr & (1 << NETISR_IPV6)) {
 		netisr &= ~(1 << NETISR_IPV6);
-		ipv6intr();
+		ip6intr();
 	}
 #endif
 #ifdef NETATALK

@@ -689,7 +689,7 @@ softnet(isr)
 #endif
 #ifdef INET6
 	if (isr & (1 << NETISR_IPV6))
-		ipv6intr();
+		ip6intr();
 #endif
 #ifdef NETATALK
 	if (isr & (1 << NETISR_ATALK))
