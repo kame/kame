@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.25 2004/05/31 12:03:47 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.26 2004/05/31 12:06:17 suz Exp $
  */
 
 /*
@@ -606,16 +606,17 @@ accept_multicast_record(vifi, mard, src, grp)
 
 	case BLOCK_OLD_SOURCES:
 	    /*
-	     * Routers in Non-Querier state MUST ignore BLOCK_OLD_SOURCES message ? 
-	     * like rfc 2710 ? assume yes
+	     * Routers in Non-Querier state MUST ignore BLOCK_OLD_SOURCES
+	     * message like RFC2710? assume yes.
 	     */
-	    if (!(v->uv_flags & (VIFF_QUERIER)) || v->uv_flags & VIFF_NOLISTENER)
+	    if (!(v->uv_flags & VIFF_QUERIER) || v->uv_flags & VIFF_NOLISTENER)
 		break;
 
 	    for (j = 0; j < numsrc; j++) {
 		/*
 		 * Look for the src/group 
-		 * in our src/group list; in order to set up a short-timeout group/source specific query.
+		 * in our src/group list; in order to set up a short-timeout
+		 * group/source specific query.
 		 */
 
 		source_sa.sin6_addr = mard->src[j];
@@ -644,14 +645,14 @@ accept_multicast_record(vifi, mard, src, grp)
             /* => send a m-a-s	*/
             /* start rxmt timer */
 	    if (s) {
-	    	cbk=(cbk_t *)malloc(sizeof(cbk_t));
+	    	cbk = (cbk_t *)malloc(sizeof(cbk_t));
 		if (cbk == NULL)
-			log_msg(LOG_ERR, 0, "ran out of memory");	/*fatal */
-		g->al_rob=MLD6_ROBUSTNESS_VARIABLE;
-	    	cbk->g=g;
-	    	cbk->s=NULL;
-	    	cbk->q_time=MLD6_LAST_LISTENER_QUERY_INTERVAL;
- 	    	cbk->mifi=vifi;
+			log_msg(LOG_ERR, 0, "ran out of memory"); /* fatal */
+		g->al_rob = MLD6_ROBUSTNESS_VARIABLE;
+	    	cbk->g = g;
+	    	cbk->s = NULL;
+	    	cbk->q_time = MLD6_LAST_LISTENER_QUERY_INTERVAL;
+ 	    	cbk->mifi = vifi;
 
 	    	SendQueryV2spec(cbk);
 	    }
