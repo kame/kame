@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1067 2000/06/27 14:50:30 suz Exp $
+$Id: CHANGELOG,v 1.1068 2000/06/27 16:18:05 itojun Exp $
 
 <200006>
+Wed Jun 28 01:12:59 JST 2000  itojun@iijlab.net
+	* libinet6/name6.c: correct error handling in DNS name lookups.
+
 Tue Jun 27 23:12:54 JST 2000	SUZUKI Shinsuke <suz@sdl.hitachi.co.jp>
 	* bsdi3/sbin/ifconfig/ifconfig.c: fixed error trap when given name 
 	corresponds to multiple v6 addresses.
