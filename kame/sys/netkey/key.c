@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.273 2003/06/26 05:54:35 itojun Exp $	*/
+/*	$KAME: key.c,v 1.274 2003/06/26 05:55:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1717,8 +1717,8 @@ key_spdadd(so, m, mhp)
 
 	/* check policy */
 	/* key_spdadd() accepts DISCARD, NONE and IPSEC. */
-	if (xpl0->sadb_x_policy_type == IPSEC_POLICY_ENTRUST
-	 || xpl0->sadb_x_policy_type == IPSEC_POLICY_BYPASS) {
+	if (xpl0->sadb_x_policy_type == IPSEC_POLICY_ENTRUST ||
+	    xpl0->sadb_x_policy_type == IPSEC_POLICY_BYPASS) {
 		ipseclog((LOG_DEBUG, "key_spdadd: Invalid policy type.\n"));
 		return key_senderror(so, m, EINVAL);
 	}

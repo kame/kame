@@ -1,4 +1,4 @@
-/*	$KAME: keysock.c,v 1.30 2003/02/07 10:17:11 suz Exp $	*/
+/*	$KAME: keysock.c,v 1.31 2003/06/26 05:54:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -354,8 +354,8 @@ key_sendup_mbuf(so, m, target)
 	{
 		if (rp->rcb_proto.sp_family != PF_KEY)
 			continue;
-		if (rp->rcb_proto.sp_protocol
-		 && rp->rcb_proto.sp_protocol != PF_KEY_V2) {
+		if (rp->rcb_proto.sp_protocol &&
+		    rp->rcb_proto.sp_protocol != PF_KEY_V2) {
 			continue;
 		}
 
