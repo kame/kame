@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.97 2003/01/22 10:10:19 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.98 2003/01/23 03:06:21 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1261,20 +1261,28 @@ make_binding_ia(iapd, retlist, optinfo)
 		/* see if each information to be renewed is still valid. */
 		for (lv = TAILQ_FIRST(&iapd->sublist); lv;
 		    lv = TAILQ_NEXT(lv, link)) {
+			struct dhcp6_listval *blv;
+
 			switch (iapd->type) {
 			case DHCP6_LISTVAL_IAPD:
 				if (lv->type != DHCP6_LISTVAL_PREFIX6)
 					continue;
 
 				prefix = lv->val_prefix6;
-				if (!dhcp6_find_listval(&binding->val_list,
-				    DHCP6_LISTVAL_PREFIX6, &prefix, 0)) {
+				blv = dhcp6_find_listval(&binding->val_list,
+				    DHCP6_LISTVAL_PREFIX6, &prefix, 0);
+				if (blv == NULL) {
 					dprintf(LOG_DEBUG, "%s"
 					    "%s/%d is not found in %s", FNAME,
 					    in6addr2str(&prefix.addr, 0),
 					    prefix.plen, bindingstr(binding));
 					prefix.pltime = 0;
 					prefix.vltime = 0;
+				} else {
+					prefix.pltime =
+					    blv->val_prefix6.pltime;
+					prefix.vltime =
+					    blv->val_prefix6.vltime;
 				}
 
 				if (dhcp6_add_listval(&ialist,
