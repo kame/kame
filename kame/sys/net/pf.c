@@ -148,7 +148,6 @@ struct pf_palist	 pf_pabuf;
 struct pf_altqqueue	*pf_altqs_active;
 struct pf_altqqueue	*pf_altqs_inactive;
 struct pf_status	 pf_status;
-struct pf_tagnames	 pf_tagnames;
 struct ifnet		*status_ifp;
 
 u_int32_t		 ticket_altqs_active;
