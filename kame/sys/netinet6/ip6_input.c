@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.245 2002/01/10 12:21:32 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.246 2002/01/10 12:30:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1758,10 +1758,10 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 				ctl->hbh = *mp;
 				mp = &(*mp)->m_next;
 			}
-		}
 #ifdef PULLDOWN_TEST
-		m_freem(ext);
+			m_freem(ext);
 #endif
+		}
 	}
 
 	if ((in6p->in6p_flags & (IN6P_RTHDR | IN6P_DSTOPTS)) != 0) {
