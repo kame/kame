@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2702 2004/12/07 14:14:52 jinmei Exp $
+$KAME: CHANGELOG,v 1.2703 2004/12/09 03:57:25 sakane Exp $
 
 <200412>
+Thu Dec  9 12:55:19 JST 2004 <sakane@tanu.org>
+	* kame/kame/racoon/ipsec_doi.c:
+	In main mode with pre-shared key, the address type is only allowed
+	in the Interop consensus.  however Cisco PIX uses the FQDN type often.
+	so the FQDN type is allowed as the phase1 ID.
+
 2004-12-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/getaddrinfo.c (getaddrinfo): fixed missing
 	initialization of the addrconfig structure.  KAME snaps since
