@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.26 2001/10/22 12:10:36 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.27 2001/10/24 06:10:44 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -148,6 +148,10 @@ struct pAddr					/* sizeof():  40[byte]	*/
 struct mAddr					/* sizeof(): 60[byte]	*/
 {
 	struct pAddr	saddr;
+#define	Local			local.saddr
+#define	Remote			remote.saddr
+#define	Port			saddr.port
+
 	union inaddr	daddr;
 	u_short		dport;
 };

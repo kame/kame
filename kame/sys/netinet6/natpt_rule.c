@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.27 2001/10/19 05:29:17 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.28 2001/10/24 06:10:44 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -91,7 +91,7 @@ natpt_lookForRule6(struct pcv *cv6)
 	for (acs = TAILQ_FIRST(&csl_head);
 	     acs;
 	     acs = TAILQ_NEXT(acs, csl_list)) {
-		if (acs->local.saddr.sa_family != AF_INET6)
+		if (acs->Local.sa_family != AF_INET6)
 			continue;
 
 		if (acs->proto != 0) {
@@ -106,7 +106,7 @@ natpt_lookForRule6(struct pcv *cv6)
 				continue;
 		}
 
-		if (natpt_matchIn6addr(cv6, &acs->local.saddr) != 0) {
+		if (natpt_matchIn6addr(cv6, &acs->Local) != 0) {
 			if (isDump(D_MATCHINGRULE6))
 				natpt_logIp6(LOG_DEBUG, cv6->ip.ip6, "%s():", fn);
 			cv6->fromto = NATPT_FROM;
@@ -131,7 +131,7 @@ natpt_lookForRule4(struct pcv *cv4)
 	for (csl = TAILQ_FIRST(&csl_head);
 	     csl;
 	     csl = TAILQ_NEXT(csl, csl_list)) {
-		if (csl->local.saddr.sa_family != AF_INET)
+		if (csl->Local.sa_family != AF_INET)
 			continue;
 
 		if (csl->proto != 0) {
@@ -146,7 +146,7 @@ natpt_lookForRule4(struct pcv *cv4)
 				continue;
 		}
 
-		if (natpt_matchIn4addr(cv4, &csl->local.saddr) != 0) {
+		if (natpt_matchIn4addr(cv4, &csl->Local) != 0) {
 			if (isDump(D_MATCHINGRULE4))
 				natpt_logIp4(LOG_DEBUG, cv4->ip.ip4, "%s():", fn);
 			cv4->fromto = NATPT_FROM;
@@ -298,7 +298,7 @@ natpt_setRules(caddr_t addr)
 		return (ENOBUFS);
 
 	copyin(mbx->freight, cst, sizeof(struct cSlot));
-	from = &cst->local.saddr;
+	from = &cst->Local;
 	if (from->aType == ADDR_MASK) {
 		switch (from->sa_family) {
 		case AF_INET:
