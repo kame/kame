@@ -33,7 +33,7 @@
  *  Questions concerning this software should be directed to 
  *  Kurt Windisch (kurtw@antc.uoregon.edu)
  *
- *  $Id: timer.c,v 1.2 1999/08/24 10:04:57 jinmei Exp $
+ *  $Id: timer.c,v 1.3 1999/09/15 07:45:12 jinmei Exp $
  */
 /*
  * Part of this program has been derived from PIM sparse-mode pimd.
@@ -155,8 +155,10 @@ age_vifs()
 	    query_groups(v);
     }
 
-    IF_DEBUG(DEBUG_IF)
+    IF_DEBUG(DEBUG_IF) {
 	dump_vifs(stderr);
+	dump_lcl_grp(stderr);
+    }
 }
 
 
