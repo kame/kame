@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1807 2001/07/24 05:54:40 jinmei Exp $
+$KAME: CHANGELOG,v 1.1808 2001/07/24 05:57:41 jinmei Exp $
 
 <200107>
+2001-07-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ping6/ping6.c: use bind(2) to specify the source
+	address with the -S option.  (Unfortunately) IPV6_PKTINFO is not a
+	good idea, because it cannot handle scoped addresses very well.
+
 2001-07-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/raw_ip6.c (rip6_usrreq):
 	* freebsd4/sys/netinet6/raw_ip6.c (rip6_bind):
