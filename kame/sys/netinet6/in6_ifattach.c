@@ -64,7 +64,6 @@
 
 static	struct in6_addr llsol;
 
-struct in6_addr **in6_iflladdr = NULL;
 struct in6_ifstat **in6_ifstat = NULL;
 struct icmp6_ifstat **icmp6_ifstat = NULL;
 size_t in6_ifstatmax = 0;
@@ -339,11 +338,10 @@ in6_ifattach(ifp, type, laddr, noloop)
 	/*
 	 * We have some arrays that should be indexed by if_index.
 	 * since if_index will grow dynamically, they should grow too.
-	 *	struct in6_addr **in6_iflladdr
 	 *	struct in6_ifstat **in6_ifstat
 	 *	struct icmp6_ifstat **icmp6_ifstat
 	 */
-	if (in6_iflladdr == NULL || in6_ifstat == NULL || icmp6_ifstat == NULL
+	if (in6_ifstat == NULL || icmp6_ifstat == NULL
 	 || if_index >= if_indexlim) {
 		size_t n;
 		caddr_t q;
@@ -352,17 +350,6 @@ in6_ifattach(ifp, type, laddr, noloop)
 		olim = if_indexlim;
 		while (if_index >= if_indexlim)
 			if_indexlim <<= 1;
-
-		/* grow in6_iflladdr */
-		n = if_indexlim * sizeof(struct in6_addr *);
-		q = (caddr_t)malloc(n, M_IFADDR, M_WAITOK);
-		bzero(q, n);
-		if (in6_iflladdr) {
-			bcopy((caddr_t)in6_iflladdr, q,
-				olim * sizeof(struct in6_addr *));
-			free((caddr_t)in6_iflladdr, M_IFADDR);
-		}
-		in6_iflladdr = (struct in6_addr **)q;
 
 		/* grow in6_ifstat */
 		n = if_indexlim * sizeof(struct in6_ifstat *);
@@ -679,7 +666,6 @@ in6_ifattach(ifp, type, laddr, noloop)
 	}
 
 	/* update dynamically. */
-	in6_iflladdr[ifp->if_index] = &ia->ia_addr.sin6_addr;
 	if (in6_maxmtu < ifp->if_mtu)
 		in6_maxmtu = ifp->if_mtu;
 
