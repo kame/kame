@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.66 2001/09/21 10:44:48 sakane Exp $	*/
+/*	$KAME: parse.y,v 1.67 2001/09/21 12:26:44 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -458,6 +458,22 @@ spdadd_command
 			int status;
 			struct addrinfo *src, *dst;
 
+			/* fixed port fields */
+			if (strcmp($5.buf, "any") == 0) {
+				free($5.buf);
+				if ($9 == IPPROTO_ICMPV6)
+					$5.buf = strdup("65535");
+				else
+					$5.buf = strdup("0");
+			}
+			if (strcmp($8.buf, "any") == 0) {
+				free($8.buf);
+				if ($9 == IPPROTO_ICMPV6)
+					$8.buf = strdup("65535");
+				else
+					$8.buf = strdup("0");
+			}
+
 			src = parse_addr($3.buf, $5.buf);
 			dst = parse_addr($6.buf, $8.buf);
 			if (!src || !dst) {
@@ -485,6 +501,22 @@ spddelete_command
 		{
 			int status;
 			struct addrinfo *src, *dst;
+
+			/* fixed port fields */
+			if (strcmp($5.buf, "any") == 0) {
+				free($5.buf);
+				if ($9 == IPPROTO_ICMPV6)
+					$5.buf = strdup("65535");
+				else
+					$5.buf = strdup("0");
+			}
+			if (strcmp($8.buf, "any") == 0) {
+				free($8.buf);
+				if ($9 == IPPROTO_ICMPV6)
+					$8.buf = strdup("65535");
+				else
+					$8.buf = strdup("0");
+			}
 
 			src = parse_addr($3.buf, $5.buf);
 			dst = parse_addr($6.buf, $8.buf);
@@ -578,12 +610,12 @@ prefix
 portstr
 	:	/*NOTHING*/
 		{
-			$$.buf = strdup("0");
+			$$.buf = strdup("any");
 			$$.len = strlen($$.buf);
 		}
 	|	BLCL ANY ELCL
 		{
-			$$.buf = strdup("0");
+			$$.buf = strdup("any");
 			$$.len = strlen($$.buf);
 		}
 	|	BLCL DECSTRING ELCL
