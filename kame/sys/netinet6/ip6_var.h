@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.52 2001/01/23 06:47:51 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.53 2001/01/23 09:08:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -245,6 +245,7 @@ struct	ip6stat {
 /*
  * IPv6 onion peeling state.
  * it will be initialized when we come into ip6_input().
+ * XXX do not make it a kitchen sink!
  */
 struct ip6aux {
 	u_int32_t ip6a_flags;
