@@ -32,7 +32,7 @@
  * Sun Jan  9 06:23:42 JST 2000
  *    Merged into new racoon with trivial modification.
  */
-/* $Id: signing.c,v 1.6 2000/02/07 11:26:19 sakane Exp $ */
+/* $Id: signing.c,v 1.7 2000/02/08 12:52:07 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -56,6 +56,16 @@
 #endif
 #endif
 
+#ifdef INCLUDE_PATH_OPENSSL
+#include <openssl/rsa.h>
+#include <openssl/evp.h>
+#include <openssl/objects.h>
+#include <openssl/x509.h>
+#include <openssl/bio.h>
+#include <openssl/err.h>
+#include <openssl/pem.h>
+#include <openssl/ssl.h>
+#else
 #include <rsa.h>
 #include <evp.h>
 #include <objects.h>
@@ -64,6 +74,7 @@
 #include <err.h>
 #include <pem.h>
 #include <ssl.h>
+#endif
 
 #include "var.h"
 #include "misc.h"

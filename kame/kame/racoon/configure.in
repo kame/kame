@@ -91,20 +91,32 @@ if test "x$crypto_dir" = "x"; then
 fi
 dnl for some reason, past version of freebsd port requires us to set -I for
 dnl BOTH openssl/cast.h and cast.h.  who should I blame (or am I mistaken?)
-RACOON_SEARCH_HEADER(cast.h,
-	/usr/include/openssl /usr/include/ssleay ${crypto_dir}/include ${crypto_dir}/include/openssl ${crypto_dir}/include/ssleay)
-RACOON_SEARCH_HEADER(openssl/cast.h,
-	/usr/include/openssl /usr/include/ssleay ${crypto_dir}/include ${crypto_dir}/include/openssl ${crypto_dir}/include/ssleay)
 RACOON_PATH_LIBS(CAST_cfb64_encrypt, crypto,
 	${crypto_dir}/lib ${crypto_dir}/lib ${crypto_dir}/lib)
-AC_TRY_COMPILE(dnl
-[#include <sys/types.h>
+RACOON_SEARCH_OPENSSL(${crypto_dir}/include)
+if test "x$include_path_openssl" = "x"; then
+	RACOON_SEARCH_HEADER(cast.h,
+		/usr/include/openssl /usr/include/ssleay ${crypto_dir}/include ${crypto_dir}/include/openssl ${crypto_dir}/include/ssleay)
+	RACOON_SEARCH_HEADER(openssl/cast.h,
+		/usr/include/openssl /usr/include/ssleay ${crypto_dir}/include ${crypto_dir}/include/openssl ${crypto_dir}/include/ssleay)
+	AC_TRY_COMPILE([#include <sys/types.h>
 #include <stdio.h>
 #include <bn.h>
 #include <dh.h>
 #include <md5.h>
 #include <sha.h>
-#include <des.h>], [], [], [dnl
+#include <des.h>], [], [], [openssl_compile_failed=yes])
+else
+	AC_TRY_COMPILE([#include <sys/types.h>
+#include <stdio.h>
+#include <openssl/bn.h>
+#include <openssl/dh.h>
+#include <openssl/md5.h>
+#include <openssl/sha.h>
+#include <openssl/des.h>], [], [], [openssl_compile_failed=yes])
+fi
+
+if test "x$openssl_compile_failed" = "xyes"; then
 	echo
 	echo "Fatal: crypto library and headers not found."
 	echo Specify proper directory by using --with-ssleay.
@@ -117,7 +129,8 @@ AC_TRY_COMPILE(dnl
 	fi
 	echo ftp://psych.psy.uq.oz.au/pub/Crypto/SSL/, or visit
 	echo http://www.openssl.org/
-	exit 1])
+	exit 1
+fi
 dnl AC_MSG_RESULT("$ssleay_lib and $ssleay_include")
 
 dnl AC_MSG_CHECKING(for libssl)
@@ -127,14 +140,6 @@ AC_CHECK_LIB(ssl, ssl_ok, [dnl
 	echo "	consult http://www.openssl.org/ for workarounds."
 	echo
 	], [], -lcrypto)
-
-dnl AC_MSG_CHECKING(SSLeay version number)
-dnl ssleay_version="`$ssleay_cmd version | cut -d' ' -f2 | tr -d '[a-zA-Z\.]' | tr -d '^0'`"
-dnl if test -z "$ssleay_version"; then
-dnl 	ssleay_version="0"
-dnl fi;
-dnl AC_DEFINE_UNQUOTED(SSLVER, $ssleay_version)
-dnl AC_MSG_RESULT("$ssleay_version")
 
 AC_CHECK_LIB(crypto, des_cbc_encrypt)
 AC_CHECK_LIB(l, yywrap)
@@ -460,12 +465,21 @@ AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
 AC_CHECK_HEADERS(limits.h sys/time.h unistd.h stdarg.h varargs.h)
 signing=yes
-AC_CHECK_HEADERS(idea.h rc5.h rsa.h, [], [signing=no])
+if test "x$include_path_openssl" = "x"; then
+	AC_CHECK_HEADERS(idea.h rc5.h rsa.h, [], [signing=no])
+else
+	AC_CHECK_HEADERS(openssl/idea.h openssl/rc5.h openssl/rsa.h,
+		[], [signing=no])
+fi
 if test $signing = "yes"; then
 	LIBOBJS="$LIBOBJS signing.o"
 	AC_DEFINE(HAVE_SIGNING_C)
 fi
-AC_CHECK_HEADERS(cversion.h opensslv.h)
+if test "x$include_path_openssl" = "x"; then
+	AC_CHECK_HEADERS(cversion.h opensslv.h)
+else
+	AC_CHECK_HEADERS(openssl/cversion.h openssl/opensslv.h)
+fi
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.45 2000/02/02 07:37:37 sumikawa Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.46 2000/02/08 12:52:06 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -194,12 +194,16 @@ static vchar_t *sockaddr2id __P((struct sockaddr *saddr,
 static int mksakeys __P((struct ipsecsa *b, struct ipsecsakeys **keys,
 	struct sockaddr *dst, struct sockaddr *src));
 
+#ifdef YIPS_DEBUG
 static void ipsecdoi_printsa_bundle __P((const struct ipsecsa *));
+#endif
 static void ipsecdoi_printsa_bundle0 __P((const struct ipsecsa *, int));
 static void ipsecdoi_printsa_1 __P((const struct ipsecsa *));
 
+#ifdef YIPS_DEBUG
 static void print_proppair0 __P((struct prop_pair *, int));
 static void print_proppair __P((struct prop_pair *));
+#endif
 
 /*%%%*/
 /*
@@ -334,7 +338,9 @@ get_ph1approvalx(p, proposal)
 	struct prop_pair *p;
 	struct isakmpsa *proposal;
 {
+#ifdef YIPS_DEBUG
 	struct isakmp_pl_p *prop = p->prop;
+#endif
 	struct isakmp_pl_t *trns = p->trns;
 	struct isakmpsa sa, *s;
 
@@ -3750,6 +3756,7 @@ ipsecdoi_printsa(s0)
 	printf("\n");
 }
 
+#ifdef YIPS_DEBUG
 static void
 ipsecdoi_printsa_bundle(s0)
 	const struct ipsecsa *s0;
@@ -3757,6 +3764,7 @@ ipsecdoi_printsa_bundle(s0)
 	ipsecdoi_printsa_bundle0(s0, 0);
 	printf("\n");
 }
+#endif
 
 static void
 ipsecdoi_printsa_bundle0(s0, level)
@@ -3804,6 +3812,7 @@ ipsecdoi_printsa_1(s)
 		s_ipsecdoi_trns(IPSECDOI_PROTO_IPCOMP, s->comptype));
 }
 
+#ifdef YIPS_DEBUG
 static void
 print_proppair0(p, level)
 	struct prop_pair *p;
@@ -3825,3 +3834,4 @@ print_proppair(p)
 {
 	print_proppair0(p, 1);
 }
+#endif

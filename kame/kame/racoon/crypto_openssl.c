@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.9 2000/02/07 11:23:56 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.10 2000/02/08 12:52:06 itojun Exp $ */
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -35,16 +35,21 @@
 #include <string.h>
 
 /* get openssl/ssleay version number */
-#ifdef HAVE_OPENSSLV_H
-#include <opensslv.h>
-#define SSLVER        OPENSSL_VERSION_NUMBER
+#ifdef INCLUDE_PATH_OPENSSL
+#include <openssl/bn.h>
+#include <openssl/dh.h>
+#include <openssl/md5.h>
+#include <openssl/sha.h>
+#include <openssl/des.h>
+#ifdef HAVE_OPENSSL_IDEA_H
+#include <openssl/idea.h>
+#endif
+#include <openssl/blowfish.h>
+#ifdef HAVE_OPENSSL_RC5_H
+#include <openssl/rc5.h>
+#endif
+#include <openssl/cast.h>
 #else
-#ifdef HAVE_CVERSION_H
-#include <cversion.h>
-#define SSLVER        SSLEAY_VERSION_NUMBER
-#endif
-#endif
-
 #include <bn.h>
 #include <dh.h>
 #include <md5.h>
@@ -58,6 +63,7 @@
 #include <rc5.h>
 #endif
 #include <cast.h>
+#endif
 
 #include "var.h"
 #include "vmbuf.h"

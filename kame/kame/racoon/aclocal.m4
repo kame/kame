@@ -45,3 +45,38 @@ if test "$ac_add_path" != "no"; then
 fi
 AC_MSG_RESULT($ac_add_path)
 ])])
+
+AC_DEFUN(RACOON_SEARCH_OPENSSL,
+[AC_PREREQ([2.13])
+AC_MSG_CHECKING(for openssl include path)
+AC_TRY_CPP([#include <openssl/opensslv.h>],
+	[AC_EGREP_CPP(yes, [#include <openssl/opensslv.h>
+#if OPENSSL_VERSION_NUMBER >= 0x0940
+yes
+#endif], [include_path_openssl=yes])], [
+ac_func_search_save_CPPFLAGS="$CPPFLAGS"
+ac_add_path="no"
+for i in $1; do
+	CPPFLAGS="-I$i $CPPFLAGS"
+	AC_TRY_CPP([#include <openssl/opensslv.h>],
+		[AC_EGREP_CPP(yes, [#include <openssl/opensslv.h>
+#if OPENSSL_VERSION_NUMBER >= 0x0940
+yes
+#endif], [ac_add_path=$i])])
+	CPPFLAGS="$ac_func_search_save_CPPFLAGS"
+	if test "$ac_add_path" != "no"; then
+		break
+	fi
+done
+if test "$ac_add_path" != "no"; then
+	CPPFLAGS="-I$ac_add_path $CPPFLAGS"
+	include_path_openssl=yes
+fi
+])
+if test "x$include_path_openssl" = "xyes"; then
+	AC_MSG_RESULT(include path needs openssl)
+	AC_DEFINE(INCLUDE_PATH_OPENSSL)
+else
+	AC_MSG_RESULT(pre-0.94 include path)
+fi
+])
