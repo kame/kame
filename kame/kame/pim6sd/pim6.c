@@ -137,20 +137,26 @@ void init_pim6()
 	k_set_hlim(pim6_socket,MINHLIM);
 	k_set_loop(pim6_socket,FALSE);
 
-	allpim6routers_group.sin6_len = sizeof (allpim6routers_group);
+	memset(&allpim6routers_group, 0, sizeof(allpim6routers_group));
+	allpim6routers_group.sin6_len = sizeof(allpim6routers_group);
 	allpim6routers_group.sin6_family = AF_INET6;
-	if ( inet_pton (AF_INET6 ,"ff02::d",(void *)&allpim6routers_group.sin6_addr) < 1 )
-		        log(LOG_ERR, 0, "inet_pton failed for ff02::d");
+	if (inet_pton(AF_INET6, "ff02::d",
+		      (void *)&allpim6routers_group.sin6_addr) < 1 )
+		log(LOG_ERR, 0, "inet_pton failed for ff02::d");
+	memset(&sockaddr6_d, 0, sizeof(sockaddr6_d));
+	sockaddr6_d.sin6_len = sizeof(sockaddr6_d);
+	sockaddr6_d.sin6_family = AF_INET6;
+	if (inet_pton(AF_INET6, "ff00::",
+		      (void *)&sockaddr6_d.sin6_addr) < 1)
+		log(LOG_ERR, 0, "inet_pton failed for ff00::");
 
-    /* specify to tell receiving interface */
-    on = 1;
-    if (setsockopt(pim6_socket, IPPROTO_IPV6, IPV6_PKTINFO, &on,
-           sizeof(on)) < 0)
-    log(LOG_ERR, errno, "setsockopt(IPV6_PKTINFO)");
+	/* specify to tell receiving interface */
+	on = 1;
+	if (setsockopt(pim6_socket, IPPROTO_IPV6, IPV6_PKTINFO, &on,
+		       sizeof(on)) < 0)
+		log(LOG_ERR, errno, "setsockopt(IPV6_PKTINFO)");
 
-
-
-/* initialize msghdr for receiving packets */
+	/* initialize msghdr for receiving packets */
 	rcviovpim[0].iov_base = (caddr_t) pim6_recv_buf;
 	rcviovpim[0].iov_len = RECV_BUF_SIZE;
 	rcvmhpim.msg_name = (caddr_t ) &from;
@@ -174,12 +180,9 @@ void init_pim6()
 	if ( register_input_handler(pim6_socket, pim6_read) <0) 
 		log(LOG_ERR,0,"Registering pim6 socket");
 
-   /* Initialize the building Join/Prune messages working area */
-    build_jp_message_pool = (build_jp_message_t *)NULL;
-    build_jp_message_pool_counter = 0;
-
-
-
+	/* Initialize the building Join/Prune messages working area */
+	build_jp_message_pool = (build_jp_message_t *)NULL;
+	build_jp_message_pool_counter = 0;
 }
 
 /* Read a PIM message */

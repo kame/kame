@@ -503,8 +503,15 @@ uv_global(vifi)
 	vifi_t vifi;
 {
 	struct uvif *v = &uvifs[vifi];
+	struct phaddr *p;
 
-	return(NULL);		/* XXX: tmp. */
+	for (p = v->uv_addrs; p; p = p->pa_next) {
+		if (!IN6_IS_ADDR_LINKLOCAL(&p->pa_addr.sin6_addr) &&
+		    !IN6_IS_ADDR_SITELOCAL(&p->pa_addr.sin6_addr))
+			return(&p->pa_addr);
+	}
+
+	return(NULL);
 }
 
 /*

@@ -62,7 +62,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: trace.c,v 1.1 1999/09/02 12:53:57 jinmei Exp $
+ *  $Id: trace.c,v 1.2 1999/09/02 16:35:48 jinmei Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -462,13 +462,19 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 				parent_address =
 					mrt->upstream->address.sin6_addr;
 			else
-				parent_address = in6addr_any;
+				parent_address = allrouters_group.sin6_addr;
 			resp_sa6.sin6_addr = parent_address;
+			if (IN6_IS_ADDR_LINKLOCAL(&parent_address) ||
+			    IN6_IS_ADDR_MC_LINKLOCAL(&parent_address))
+				resp_sa6.sin6_scope_id =
+					uvifs[mrt->incoming].uv_ifindex;
+			else
+				resp_sa6.sin6_scope_id = 0;
 			resptype = MLD6_MTRACE;
 		}
 	}
-	if (IN6_IS_ADDR_LINKLOCAL(&resp_sa6.sin6_addr)
-	 || IN6_IS_ADDR_MC_LINKLOCAL(&resp_sa6.sin6_addr))
+	if (IN6_IS_ADDR_LINKLOCAL(&resp_sa6.sin6_addr) ||
+	    IN6_IS_ADDR_MC_LINKLOCAL(&resp_sa6.sin6_addr))
 		resp_sa6.sin6_scope_id = ifindex;
 	else
 		resp_sa6.sin6_scope_id = 0;
@@ -483,14 +489,6 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 		 */
 		if (phys_vif != -1 &&
 		    (sa6 = uv_global(phys_vif)) != NULL) {
-			if ((sa6 = uv_global(mrt->incoming)) != NULL &&
-			    (sa6 = max_global_address()) == NULL) {
-					/* impossible! */
-					log(LOG_INFO, 0,
-					    "accept_mtrace: max_global_address"
-					    " returned NULL");
-					return;
-			}
 			IF_DEBUG(DEBUG_TRACE)
 				log(LOG_DEBUG, 0,
 				    "Sending reply to %s from %s",
@@ -498,7 +496,8 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 				    inet6_fmt(&sa6->sin6_addr));
 			k_set_hlim(mld6_socket, qry->tr_rhlim);
 			send_mld6(resptype, no, sa6,
-				  &dst_sa6, group, ifindex, 0, datalen);
+				  &dst_sa6, group, uvifs[phys_vif].uv_ifindex,
+				  0, datalen);
 			k_set_hlim(mld6_socket, 1);
 		} else
 			log(LOG_INFO, 0, "No enabled phyints -- %s",

@@ -150,12 +150,7 @@ static int compare_metrics 			__P((u_int32 local_preference,
 build_jp_message_t 	*build_jp_message_pool;
 int			build_jp_message_pool_counter;
 struct sockaddr_in6 sockaddr6_any = {sizeof(struct sockaddr_in6) , AF_INET6 ,0,0, IN6ADDR_ANY_INIT};
-
-#if BYTE_ORDER == BIG_ENDIAN
-struct sockaddr_in6 sockaddr6_d = { sizeof(struct sockaddr_in6) , AF_INET6 ,0,0, {{{0xff000000,0,0,0}}} };
-#elif BYTE_ORDER == LITTLE_ENDIAN
-struct sockaddr_in6 sockaddr6_d = { sizeof(struct sockaddr_in6) , AF_INET6 ,0,0, {{{0x000000ff,0,0,0}}} };
-#endif
+struct sockaddr_in6 sockaddr6_d;
 
 /************************************************************************
  *                        PIM_HELLO

@@ -170,36 +170,36 @@ struct listaddr {
 
 
 struct uvif {
-	u_int					uv_flags;		
-	u_char 					uv_metric;		/* VIFF_ flags defined below            */
-	u_char 					uv_admetric;		/* advertised cost of this vif          */
-	u_int  					uv_rate_limit;		/* rate limit on this vif               */
+	u_int uv_flags;		
+	u_char uv_metric;		/* VIFF_ flags defined below            */
+	u_char uv_admetric;		/* advertised cost of this vif          */
+	u_int uv_rate_limit;		/* rate limit on this vif               */
 
-	struct phaddr 			*uv_linklocal;			/* link-local address of this vif      */
-	struct sockaddr_in6 	uv_rmt_addr;				/* remote end-point addr (tunnels only) */	
-	struct sockaddr_in6 	uv_dst_addr;				/* destination for PIM messages         */	
-	struct sockaddr_in6 	uv_prefix;				/* prefix                (phyints only) */	
-	struct in6_addr			uv_subnetmask;			/* subnet mask           (phyints only) */	
+	struct phaddr *uv_linklocal;	/* link-local address of this vif      */
+	struct sockaddr_in6 uv_rmt_addr;/* remote end-point addr (tunnels only) */	
+	struct sockaddr_in6 uv_dst_addr;/* destination for PIM messages         */	
+	struct sockaddr_in6 uv_prefix;	/* prefix (phyints only) */	
+	struct in6_addr	uv_subnetmask;	/* subnet mask (phyints only) */	
 
-	char 					uv_name[IFNAMSIZ];	/* interface name                   */	
-	u_int					uv_ifindex;		/* index of the interface */
-	u_int					uv_siteid;		/* index of the site on the interface */
+	char uv_name[IFNAMSIZ];	/* interface name */	
+	u_int uv_ifindex;	/* index of the interface */
+	u_int uv_siteid;	/* index of the site on the interface */
 
-	struct listaddr 		*uv_groups;			/* list of local groups  (phyints only) */
-	struct lisaddr 			*uv_dvmrp_neighbors;
-	nbrbitmap_t				uv_nbrmap;		/* bitmap of active neighboring routers */
-	struct listaddr 		*uv_querier;			/* MLD querier on vif                   */	
-	int 					uv_prune_lifetime;	/* Prune lifetime or 0 for default  */
-	struct vif_acl			*uv_acl;			/* access control list of groups        */	
-	int 					uv_leaftimer;		/* time until this vif is considrd leaf */
-	struct phaddr 			*uv_addrs;			/* Additional addresses on this vif     */
-	struct vif_filter 		*uvfilter;			/* Route filters on this vif            */
-	u_int16 				uv_pim_hello_timer;	/* timer for sending PIM hello msgs  */
-	u_int16 				uv_gq_timer;		/* Group Query timer                    */
-	u_int16 				uv_jp_timer;		/* Join/Prune timer 			*/	
-	int 					uv_local_pref;		/* default local preference for assert  */	
-	int 					uv_local_metric;	/* default local metric for assert     */
-	struct pim_nbr_entry 	*uv_pim_neighbors;			/* list of PIM neighbor routers */	
+	struct listaddr *uv_groups; /* list of local groups  (phyints only) */
+	struct lisaddr *uv_dvmrp_neighbors;
+	nbrbitmap_t uv_nbrmap;	/* bitmap of active neighboring routers */
+	struct listaddr	*uv_querier; /* MLD querier on vif */	
+	int uv_prune_lifetime;	/* Prune lifetime or 0 for default  */
+	struct vif_acl *uv_acl;	/* access control list of groups        */	
+	int uv_leaftimer;	/* time until this vif is considrd leaf */
+	struct phaddr *uv_addrs; /* Additional addresses on this vif     */
+	struct vif_filter *uvfilter; /* Route filters on this vif            */
+	u_int16 uv_pim_hello_timer; /* timer for sending PIM hello msgs  */
+	u_int16	uv_gq_timer;	/* Group Query timer                    */
+	u_int16	uv_jp_timer;	/* Join/Prune timer 			*/	
+	int uv_local_pref;	/* default local preference for assert  */	
+	int uv_local_metric;	/* default local metric for assert     */
+	struct pim_nbr_entry *uv_pim_neighbors;	/* list of PIM nbr routers */	
 };
 
 struct phaddr {
