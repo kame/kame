@@ -1,4 +1,4 @@
-/*	$KAME: dccp6_var.h,v 1.2 2003/11/04 11:38:40 ono Exp $	*/
+/*	$KAME: dccp6_var.h,v 1.3 2003/11/18 04:55:43 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark
@@ -54,7 +54,8 @@ int	dccp6_listen(struct socket *, struct proc *);
 int	dccp6_connect(struct socket *, struct sockaddr *, struct proc *);
 int	dccp6_accept(struct socket *, struct sockaddr **);
 #else
-int	dccp6_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *);
+int	dccp6_usrreq(struct socket *, int, struct mbuf *, struct mbuf *,
+		     struct mbuf *, struct proc *);
 int	dccp6_bind(struct socket *, struct mbuf *, struct proc *);
 int	dccp6_listen(struct socket *, struct proc *);
 int	dccp6_connect(struct socket *, struct mbuf *, struct proc *);

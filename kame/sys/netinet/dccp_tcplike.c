@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.c,v 1.9 2003/10/31 08:47:11 ono Exp $	*/
+/*	$KAME: dccp_tcplike.c,v 1.10 2003/11/18 04:55:42 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -31,7 +31,9 @@
  * TCP-like congestion control for DCCP
  */
 
+#ifndef __OpenBSD__
 #include "opt_dccp.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -84,6 +86,10 @@
 #define INP_INFO_RUNLOCK(x)
 #define	INP_LOCK(x)
 #define INP_UNLOCK(x)
+#endif
+
+#ifdef __OpenBSD__
+#define M_ZERO 0
 #endif
 
 /* Sender side */

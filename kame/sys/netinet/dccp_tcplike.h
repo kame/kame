@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.h,v 1.7 2003/10/23 05:44:35 ono Exp $	*/
+/*	$KAME: dccp_tcplike.h,v 1.8 2003/11/18 04:55:43 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -69,9 +69,14 @@ struct tcplike_send_ccb
 
 	u_int32_t ack_last; /* Last ok Ack packet */
 	u_int32_t ack_miss; /* oldest missing Ack packet */
-	
+
+#ifdef __OpenBSD__	
+	struct timeout free_timer;
+	struct timeout rto_timer;
+#else
 	struct callout free_timer;
 	struct callout rto_timer;
+#endif
 	u_int rto_timer_callout;
 
 	u_char *cwndvector;  /* 2 bits per packet */
@@ -137,7 +142,11 @@ struct tcplike_recv_ccb {
 	/* No ack ratio or vector here. it's a global feature */
 	struct ack_list *av_list;
 	u_int16_t unacked; /* no of unacked packets */
+#ifdef __OpenBSD__
+	struct timeout free_timer;
+#else
 	struct callout free_timer;
+#endif
 };
 
 #ifdef _KERNEL

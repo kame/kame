@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.12 2003/11/06 08:25:59 ono Exp $	*/
+/*	$KAME: dccp_var.h,v 1.13 2003/11/18 04:55:43 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -44,10 +44,17 @@ struct dccpcb {
 				  closing, closed etc */
 	u_int8_t	who;	/* undef, server, client, listener */
 
+#ifdef __OpenBSD__
+	struct timeout	connect_timer;	/* Connection timer */
+	struct timeout	retrans_timer;	/* Retransmit timer */
+	struct timeout	close_timer;	/* Closing timer */
+	struct timeout	timewait_timer;	/* Time wait timer */
+#else
 	struct callout	connect_timer;	/* Connection timer */
 	struct callout	retrans_timer;	/* Retransmit timer */
 	struct callout	close_timer;	/* Closing timer */
 	struct callout	timewait_timer;	/* Time wait timer */
+#endif
 
 	u_int32_t	retrans;
 
@@ -121,14 +128,14 @@ struct xdccpcb {
 };
 #endif
 
-#define	intodccpcb(ip)	((struct dccpcb *)(ip)->inp_ppcb)
-#define	in6todccpcb(ip)	((struct dccpcb *)(ip)->in6p_ppcb)
+#define	intodccpcb(ip)	((struct dccpcb *)((ip)->inp_ppcb))
+#define	in6todccpcb(ip)	((struct dccpcb *)((ip)->in6p_ppcb))
 
-#ifdef __FreeBSD__
-#define	dptosocket(dp)	((dp)->d_inpcb->inp_socket)
-#else
+#ifdef __NetBSD__
 #define	dptosocket(dp)	(((dp)->d_inpcb) ? (dp)->d_inpcb->inp_socket : \
 			(((dp)->d_in6pcb) ? (dp)->d_in6pcb->in6p_socket : NULL))
+#else
+#define	dptosocket(dp)	((dp)->d_inpcb->inp_socket)
 #endif
 
 struct	dccpstat {
@@ -250,6 +257,16 @@ extern const char *dccpstates[];
 SYSCTL_DECL(_net_inet_dccp);
 #endif
 
+#ifdef __OpenBSD__
+#define callout_init(args)
+#define callout_reset(c, ticks, func, arg) \
+	{ \
+		timeout_set(c, func, arg); \
+		timeout_add(c, ticks); \
+	}
+#define callout_stop(c)	timeout_del(c);
+#endif
+
 extern struct	pr_usrreqs dccp_usrreqs;
 extern struct	inpcbhead dccpb;
 extern struct	inpcbinfo dccpbinfo;
@@ -284,7 +301,7 @@ struct inpcb *
 void
 #endif
 	dccp_notify(struct inpcb *, int);
-#ifdef __FreeBSD__
+#ifndef __NetBSD__
 struct dccpcb *
 	dccp_newdccpcb(struct inpcb *);
 #else
@@ -293,12 +310,10 @@ struct dccpcb *
 #endif
 int	dccp_shutdown(struct socket *);
 int	dccp_output(struct dccpcb *, u_int8_t);
-#ifdef __FreeBSD__
-#if __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 int	dccp_doconnect(struct socket *, struct sockaddr *, struct thread *, int);
-#else
+#elif defined(__FreeBSD__)
 int	dccp_doconnect(struct socket *, struct sockaddr *, struct proc *, int);
-#endif
 #else
 int	dccp_doconnect(struct socket *, struct mbuf *, struct proc *, int);
 #endif
@@ -314,12 +329,13 @@ int	dccp_abort(struct socket *);
 int	dccp_disconnect(struct socket *);
 #ifdef __FreeBSD__
 int	dccp_send(struct socket *, int, struct mbuf *, struct sockaddr *,
-		  struct mbuf *, 
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-		  struct thread *);
+    		  struct mbuf *, 
+#if __FreeBSD_version >= 500000
+		  struct thread *
 #else
-		  struct proc *);
+		  struct proc *
 #endif
+		 );
 #else
 int	dccp_send(struct socket *, int, struct mbuf *, struct mbuf *,
 		  struct mbuf *, struct proc *);

@@ -1,4 +1,4 @@
-/*	$KAME: dccp_cc_sw.c,v 1.5 2003/10/30 07:36:53 ono Exp $	*/
+/*	$KAME: dccp_cc_sw.c,v 1.6 2003/11/18 04:55:42 ono Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
@@ -30,7 +30,9 @@
  * Id: dccp_cc_sw.c,v 1.10 2003/05/14 08:14:46 nilmat-8 Exp
  */
 
+#ifndef __OpenBSD__
 #include "opt_dccp.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
