@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.96 2001/04/03 15:51:54 thorpej Exp $	*/
+/*	$KAME: cfparse.y,v 1.97 2001/04/04 02:35:18 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -152,6 +152,7 @@ static int fix_lifebyte __P((u_long));
 %token POST_COMMAND
 %token EXEC_PATH EXEC_COMMAND EXEC_SUCCESS EXEC_FAILURE
 %token GSSAPI_ID
+%token COMPLEX_BUNDLE
 
 %token PREFIX PORT PORTANY UL_PROTO ANY
 %token PFS_GROUP LIFETIME LIFETYPE_TIME LIFETYPE_BYTE STRENGTH
