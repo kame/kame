@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.31 2000/03/25 07:23:46 sumikawa Exp $	*/
+/*	$KAME: in6_var.h,v 1.32 2000/04/18 08:03:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -240,6 +240,7 @@ struct	in6_ifreq {
 		struct in6_addrlifetime ifru_lifetime;
 		struct in6_ifstat ifru_stat;
 		struct icmp6_ifstat ifru_icmp6stat;
+		u_int32_t ifru_scope_id[16];
 	} ifr_ifru;
 };
 
@@ -397,6 +398,9 @@ struct	in6_rrenumreq {
 #define SIOCGDEFIFACE_IN6	_IOWR('i', 86, struct in6_ndifreq)
 
 #define SIOCSIFINFO_FLAGS	_IOWR('i', 87, struct in6_ndireq) /* XXX */
+
+#define SIOCSSCOPE6		_IOW('i', 88, struct in6_ifreq)
+#define SIOCGSCOPE6		_IOWR('i', 89, struct in6_ifreq)
 
 #define SIOCSIFPREFIX_IN6	_IOW('i', 100, struct in6_prefixreq) /* set */
 #define SIOCGIFPREFIX_IN6	_IOWR('i', 101, struct in6_prefixreq) /* get */
