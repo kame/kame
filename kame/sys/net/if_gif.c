@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.81 2001/09/26 09:51:56 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.82 2001/10/01 10:42:13 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -199,6 +199,7 @@ gif_clone_create(ifc, unit)
 
 	gifattach0(sc);
 	TAILQ_INSERT_TAIL(&gifs, sc, gif_link);
+	ngif++;
 	return (0);
 }
 
@@ -210,6 +211,7 @@ gif_clone_destroy(ifp)
 	struct gif_softc *sc = ifp->if_softc;
 
 	gif_delete_tunnel(ifp);
+	ngif--;
 	TAILQ_REMOVE(&gifs, sc, gif_link);
 	if (sc->encap_cookie4 != NULL) {
 		err = encap_detach(sc->encap_cookie4);
@@ -553,10 +555,19 @@ gif_output(ifp, m, dst, rt)
 void
 gifnetisr()
 {
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	int i;
 
 	for (i = 0; i < ngif; i++)
 		gifintr(gif_softc + i);
+#else
+	struct gif_softc *sc;
+
+	for (sc = TAILQ_FIRST(&gifs);
+	     sc;
+	     sc = TAILQ_NEXT(sc, gif_link))
+		gifintr(sc);
+#endif
 }
 #endif
 
@@ -1000,7 +1011,10 @@ gif_set_tunnel(ifp, src, dst)
 	struct gif_softc *sc = (struct gif_softc *)ifp;
 	struct gif_softc *sc2;
 	struct sockaddr *osrc, *odst, *sa;
-	int s, i;
+	int s;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+	int i;
+#endif
 	int error = 0; 
 
 #ifdef __NetBSD__
@@ -1009,8 +1023,14 @@ gif_set_tunnel(ifp, src, dst)
 	s = splnet();
 #endif
 
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	for (i = 0; i < ngif; i++) {
 		sc2 = gif_softc + i;
+#else
+	for (sc2 = TAILQ_FIRST(&gifs);
+	     sc2;
+	     sc2 = TAILQ_NEXT(sc2, gif_link)) {
+#endif
 		if (sc2 == sc)
 			continue;
 		if (!sc2->gif_pdst || !sc2->gif_psrc)
