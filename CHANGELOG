@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.361 1999/12/22 07:32:17 itojun Exp $
+$Id: CHANGELOG,v 1.362 1999/12/22 08:17:26 sakane Exp $
 
 <199912>
+Wed Dec 22 17:16:21 JST 1999 sakane@ydc.co.jp
+	* kame/kame/setkey:
+	By default of manual keying, cyclic sequence number is allowed.
+	"cyclic-seq" option is changed to "nocyclic-seq".  This means no
+	allowance to cycle sequence number.
+
 Wed Dec 22 16:30:56 JST 1999  itojun@iijlab.net
 	* kame/sys/netinet6/ip6_forward.c: (IPv6 IPsec tunnelling)
 	  when returning icmp6 too big, never return mtu value < 1280.
