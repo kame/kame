@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.350 2002/11/19 19:02:02 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.351 2002/11/27 12:13:57 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1514,17 +1514,15 @@ skip_ipsec2:;
 			nextproto = *mtod(exthdrs.ip6e_haddr, u_char *);
 			*mtod(exthdrs.ip6e_haddr, u_char *) = IPPROTO_FRAGMENT;
 		} else
-#endif /* MIP6 */
-		if (exthdrs.ip6e_rthdr) {
-			nextproto = *mtod(exthdrs.ip6e_rthdr, u_char *);
-			*mtod(exthdrs.ip6e_rthdr, u_char *) = IPPROTO_FRAGMENT;
-		} else
-#ifdef MIP6
 		if (exthdrs.ip6e_rthdr2) {
 			nextproto = *mtod(exthdrs.ip6e_rthdr2, u_char *);
 			*mtod(exthdrs.ip6e_rthdr2, u_char *) = IPPROTO_FRAGMENT;
 		} else
 #endif /* MIP6 */
+		if (exthdrs.ip6e_rthdr) {
+			nextproto = *mtod(exthdrs.ip6e_rthdr, u_char *);
+			*mtod(exthdrs.ip6e_rthdr, u_char *) = IPPROTO_FRAGMENT;
+		} else
 		if (exthdrs.ip6e_dest1) {
 			nextproto = *mtod(exthdrs.ip6e_dest1, u_char *);
 			*mtod(exthdrs.ip6e_dest1, u_char *) = IPPROTO_FRAGMENT;
