@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.168 2001/02/07 07:45:10 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.169 2001/02/07 07:47:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2385,8 +2385,9 @@ pfctlinput2(cmd, sa, ctlparam)
 		return;
 	for (dp = domains; dp; dp = dp->dom_next) {
 		/*
-		 * the check must be made by xx_ctlinput() anyways.  it is
-		 * kept here for safety
+		 * the check must be made by xx_ctlinput() anyways, to
+		 * make sure we use data item pointed to by ctlparam in
+		 * correct way.  the following check is made just for safety.
 		 */
 		if (dp->dom_family != sa->sa_family)
 			continue;
