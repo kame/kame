@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.216 2001/09/05 03:20:05 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.217 2001/09/05 03:22:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2758,6 +2758,11 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 			return(EINVAL);
 		}
 		return(error);
+#if _BSDI_VERSION < 199802
+	case IPV6CTL_V6ONLY:
+		/* bsdi3: the variable is readonly */
+		return sysctl_rdint(oldp, oldlenp, newp, ip6_v6only);
+#endif
 	case IPV6CTL_RIP6STATS:
 		return sysctl_rdtrunc(oldp, oldlenp, newp, &rip6stat,
 		    sizeof(rip6stat));
