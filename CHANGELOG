@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1264 2000/09/11 05:54:41 itojun Exp $
+$KAME: CHANGELOG,v 1.1265 2000/09/11 15:53:07 sakane Exp $
 
 <200009>
+Tue Sep 12 00:37:48 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	Enabled to negotiate unique SAs.  For example, you can configured
+	each SAs of TCP and UDP between two nodes.
+
 Mon Sep 11 14:54:04 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/bind9: use bind 9.0.0rc5.
 
