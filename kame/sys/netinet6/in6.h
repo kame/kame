@@ -120,9 +120,11 @@ struct in6_addr {
 	} __u6_addr;			/* 128-bit IP6 address */
 };
 
+#if 1	/*XXX nonstandard*/
 #define s6_addr32 __u6_addr.__u6_addr32
 #define s6_addr16 __u6_addr.__u6_addr16
 #define s6_addr8  __u6_addr.__u6_addr8
+#endif
 #define s6_addr   __u6_addr.__u6_addr8
 
 #define INET6_ADDRSTRLEN	46
@@ -145,11 +147,13 @@ struct sockaddr_in6 {
 /*
  * Local definition for masks
  */
+#if 1	/*XXX nonstandard*/
 #define IN6MASK0	{{{ 0, 0, 0, 0 }}}
 #define IN6MASK32	{{{ 0xffffffff, 0, 0, 0 }}}
 #define IN6MASK64	{{{ 0xffffffff, 0xffffffff, 0, 0 }}}
 #define IN6MASK96	{{{ 0xffffffff, 0xffffffff, 0xffffffff, 0 }}}
 #define IN6MASK128	{{{ 0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff }}}
+#endif
 
 #ifdef _KERNEL
 extern const struct in6_addr in6mask0;
@@ -162,7 +166,7 @@ extern const struct in6_addr in6mask128;
 /*
  * Macros started with IPV6_ADDR is KAME local
  */
-
+#if 1	/*XXX nonstandard*/
 #if BYTE_ORDER == BIG_ENDIAN
 #define IPV6_ADDR_INT32_ONE	1
 #define IPV6_ADDR_INT32_TWO	2
@@ -181,6 +185,7 @@ extern const struct in6_addr in6mask128;
 #define IPV6_ADDR_INT16_ULL	0x80fe
 #define IPV6_ADDR_INT16_USL	0xc0fe
 #define IPV6_ADDR_INT16_MLL	0x02ff
+#endif
 #endif
 
 /*
@@ -250,11 +255,13 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
  * KAME Scope Values
  */
 
+#if 1	/*XXX nonstandard*/
 #define IPV6_ADDR_SCOPE_NODELOCAL	0x01
 #define IPV6_ADDR_SCOPE_LINKLOCAL	0x02
 #define IPV6_ADDR_SCOPE_SITELOCAL	0x05
 #define IPV6_ADDR_SCOPE_ORGLOCAL	0x08	/* just used in this file */
 #define IPV6_ADDR_SCOPE_GLOBAL		0x0e
+#endif
 
 /*
  * Unicast Scope
@@ -267,9 +274,11 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
 /*
  * Multicast
  */
-#define IN6_IS_ADDR_MULTICAST(a)	((a)->s6_addr8[0] == 0xff)
+#define IN6_IS_ADDR_MULTICAST(a)	((a)->s6_addr[0] == 0xff)
 
-#define IPV6_ADDR_MC_SCOPE(a)		((a)->s6_addr8[1] & 0x0f)
+#if 1	/*XXX nonstandard*/
+#define IPV6_ADDR_MC_SCOPE(a)		((a)->s6_addr[1] & 0x0f)
+#endif
 
 /*
  * Multicast Scope
@@ -300,9 +309,11 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
 /*
  * KAME Scope
  */
+#ifdef _KERNEL	/*nonstandard*/
 #define IN6_IS_SCOPE_LINKLOCAL(a)	\
 	((IN6_IS_ADDR_LINKLOCAL(a)) ||	\
 	 (IN6_IS_ADDR_MC_LINKLOCAL(a)))
+#endif
 
 /*
  * IP6 route structure
