@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.341 2003/07/30 23:35:04 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.342 2003/07/30 23:36:15 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -221,7 +221,7 @@ draft-ietf-ipngwg-router-selection-01.txt:
 	Default Router Preferences and More-Specific Routes
     * router-side: both router preference and specific routes are supported.
     * host-side: only router preference is supported.
-draft-ietf-ipngwg-scoping-arch-03.txt:
+draft-ietf-ipv6-scoping-arch-00.txt:
 	The architecture, text representation, and usage of IPv6
 	scoped addresses.
     * some part of the documentation (especially about the routing
@@ -421,7 +421,7 @@ packet to the scoped address.  KAME code tries to address the issue in
 several ways.
 
 The entire architecture of scoped addresses is documented in
-draft-ietf-ipngwg-scoping-arch-xx.txt.  One non-trivial point of the
+draft-ietf-ipv6-scoping-arch-xx.txt.  One non-trivial point of the
 architecture is that the link scope is (theoretically) larger than the
 interface scope.  That is, two different interfaces can belong to a
 same single link.  However, in a normal operation, we can assume that
@@ -522,7 +522,7 @@ use these APIs have to be prepared about differences in kernels
 anyway.
 
 getaddrinfo(3) and getnameinfo(3) support an extended numeric IPv6
-syntax, as documented in draft-ietf-ipngwg-scoping-arch-xx.txt.  You can
+syntax, as documented in draft-ietf-ipv6-scoping-arch-xx.txt.  You can
 specify the outgoing link, by using the name of the outgoing interface
 as the link, like "fe80::1%ne0" (again, note that we assume there is
 1-to-1 relationship between links and interfaces.)  This way you will
