@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.10 2000/12/04 06:45:02 itojun Exp $
+#	$KAME: Makefile,v 1.11 2001/06/25 02:25:45 itojun Exp $
 #
 # Copyright (c) 1999 WIDE Project. All rights reserved.
 #
@@ -110,6 +110,9 @@ DPADD+=	${.OBJDIR}/../libinet6/libinet6.a \
 
 .if (${OPSYS} == "FreeBSD")
 SRCS+= y.tab.h
+.endif
+.if (${OPSYS} == "NetBSD")
+YFLAGS+=-d
 .endif
 
 .if (${OPSYS} != "NetBSD")
