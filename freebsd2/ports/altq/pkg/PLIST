@@ -1,26 +1,35 @@
+bin/altqd
+bin/blued
+bin/bluestat
 bin/cbqd
 bin/cbqprobe
 bin/cbqstat
+bin/cdnrstat
 bin/fifoqd
 bin/fifoqstat
+bin/hfscstat
 bin/redd
 bin/redstat
 bin/riod
 bin/riostat
 bin/wfqd
 bin/wfqstat
-man/man4/en.4.gz
-man/man4/natm.4.gz
-man/man4/pvc.4.gz
-man/man8/cbqd.8.gz
-man/man8/fifoqd.8.gz
-man/man8/pvcsif.8.gz
-man/man8/pvctxctl.8.gz
-man/man8/redd.8.gz
-man/man8/riod.8.gz
-man/man8/wfqd.8.gz
+@comment man/man4/en.4.gz
+@comment man/man4/natm.4.gz
+@comment man/man4/pvc.4.gz
+@comment man/man5/altq.conf.5.gz
+@comment man/man8/altqd.8.gz
+@comment man/man8/cbqd.8.gz
+@comment man/man8/fifoqd.8.gz
+@comment man/man8/pvcbridge.8.gz
+@comment man/man8/pvcsif.8.gz
+@comment man/man8/pvctxctl.8.gz
+@comment man/man8/redd.8.gz
+@comment man/man8/riod.8.gz
+@comment man/man8/wfqd.8.gz
 sbin/pvcsif
 sbin/pvctxctl
+sbin/pvcbridge
 share/doc/altq/CHANGES
 share/doc/altq/INSTALL
 share/doc/altq/MAKEDEV.altq
@@ -29,8 +38,10 @@ share/doc/altq/README
 share/doc/altq/TIPS.txt
 share/doc/altq/cbq-howto.txt
 share/doc/altq/how-to-modify-drivers.txt
+share/doc/altq/qop_api.txt
 share/doc/altq/rsvp-and-cbq-by-sally.txt
 share/doc/altq/wfq.txt
+lib/libaltq.a
 @exec echo "making devices"
 @exec sh %D/share/doc/altq/MAKEDEV.altq all
 @dirrm share/doc/altq

@@ -1,12 +1,12 @@
 # New ports collection makefile for:	altq userland
-# Version required:			1.2
+# Version required:			2.0
 # Date created:				Wed Jul  1 12:50:42 JST 1998
 # Whom:					itojun
 #
-# $Id: Makefile,v 1.1 1999/08/09 01:36:50 itojun Exp $
+# $Id: Makefile,v 1.2 1999/10/02 07:18:46 itojun Exp $
 #
 
-DISTNAME=	altq-1.2
+DISTNAME=	altq-2.0
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.csl.sony.co.jp/pub/kjc/
 
@@ -16,23 +16,28 @@ MAKE_ENV=	PREFIX=/usr/local/v6 SYS_DEFINES=-DINET6 \
 		SYS_LIBS="-L/usr/local/v6/lib -linet6"
 
 MAN4=	en.4 pvc.4 natm.4
-MAN8=	pvcsif.8 pvctxctl.8 cbqd.8 fifoqd.8 redd.8 riod.8 wfqd.8
+MAN5=	altq.conf.5
+MAN8=	pvcbridge.8 pvcsif.8 pvctxctl.8 \
+	altqd.8 cbqd.8 fifoqd.8 redd.8 riod.8 wfqd.8
 
 post-install:
 	# manpages
 	for i in en.4 natm.4 pvc.4; do\
 		${INSTALL_MAN} ${WRKSRC}/atm-tools/$$i ${PREFIX}/man/man4;\
 	done
-	for i in pvcsif.8 pvctxctl.8; do\
+	for i in pvcbridge.8 pvcsif.8 pvctxctl.8; do\
 		${INSTALL_MAN} ${WRKSRC}/atm-tools/$$i ${PREFIX}/man/man8;\
 	done
-	for i in cbqd.8 fifoqd.8 redd.8 riod.8 wfqd.8; do\
+	for i in altq.conf.5; do\
+		${INSTALL_MAN} ${WRKSRC}/docs/$$i ${PREFIX}/man/man5;\
+	done
+	for i in altqd.8 cbqd.8 fifoqd.8 redd.8 riod.8 wfqd.8; do\
 		${INSTALL_MAN} ${WRKSRC}/docs/$$i ${PREFIX}/man/man8;\
 	done
 	# docs
 	${MKDIR} ${PREFIX}/share/doc/altq
 	for i in PERF.txt TIPS.txt cbq-howto.txt how-to-modify-drivers.txt \
-		rsvp-and-cbq-by-sally.txt wfq.txt; do\
+		qop_api.txt rsvp-and-cbq-by-sally.txt wfq.txt; do\
 		${INSTALL_DATA} ${WRKSRC}/docs/$$i ${PREFIX}/share/doc/altq;\
 	done
 	for i in CHANGES INSTALL MAKEDEV.altq README; do\
