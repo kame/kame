@@ -1,4 +1,4 @@
-/*	$KAME: debug.c,v 1.51 2002/06/26 10:24:47 jinmei Exp $	*/
+/*	$KAME: debug.c,v 1.52 2002/09/19 01:12:01 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -77,6 +77,7 @@
 #include "rp.h"
 #include "inet6.h"
 #include "mld6.h"
+#include "mld6v2_proto.h"
 
 #ifdef __STDC__
 #include <stdarg.h>
@@ -509,10 +510,11 @@ dump_vifs(fp)
 	}
 
 	fprintf(fp, "  %3s %6s ", "", "");
-	fprintf(fp, "Timers: PIM hello = %d:%02d, MLD query = %d:%02d,  MLD version = %d\n",
+	fprintf(fp, "Timers: PIM hello = %d:%02d, MLD query = %d:%02d,  possible MLD version = %s%s\n",
 		v->uv_pim_hello_timer / 60, v->uv_pim_hello_timer % 60,
 		v->uv_gq_timer / 60, v->uv_gq_timer % 60,
-		v->uv_mld_version);
+		v->uv_mld_version & MLDv1 ? "1 " : "",
+		v->uv_mld_version & MLDv2 ? "2 " : "");
     }
     fprintf(fp, "\n");
 }
