@@ -1675,6 +1675,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_BINDV6ONLY:
 #endif
 #endif /* MAPPED_ADDR_ENABLED */
+#ifndef __bsdi__
+			case IPV6_PORTRANGE:
+#endif
 				switch (optname) {
 
 				case IPV6_UNICAST_HOPS:
