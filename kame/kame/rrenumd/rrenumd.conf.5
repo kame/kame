@@ -1,4 +1,4 @@
-.\"	$KAME: rrenumd.conf.5,v 1.4 2000/11/10 12:12:12 itojun Exp $
+.\"	$KAME: rrenumd.conf.5,v 1.5 2001/02/06 02:07:58 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -250,16 +250,16 @@ fec0:0:0::/48 and with its own subnet number.
 (in this case,
 subnet number is 7th and 8th octet value of the prefix)
 .Pp
-If you want to assign prefixes beginning with fec0:1:1::/48
+If you want to assign prefixes beginning with 3ffe:501:ffff::/48
 to each subnet, then following configuration will be enough,
 if each of your routers supports IPv6 multicast forwarding.
 The subnet number of the existing fec0:0:0::/48 prefix and the
-newly assigned fec0:1:1::/48 prefix will be same.
+newly assigned 3ffe:501:ffff::/48 prefix will be same.
 .\"
 .Bd -literal -offset indent
 dest ff05::2;
 
-add match-prefix fec0:0:0:: /48 use-prefix fec0:1:1:: /48 keeplen 16;
+add match-prefix fec0:0:0:: /48 use-prefix 3ffe:501:ffff:: /48 keeplen 16;
 .Ed
 .\"
 
@@ -271,7 +271,7 @@ command.
 .Bd -literal -offset indent
 dest fec0:0:0:1:260:8ff:fe24:fb3a fec0:0:0:2:200:eff:fe2e:dfe1 fec0:0:0:3:5254:ff:fedc:5217;
 
-add match-prefix fec0:0:0:: /48 use-prefix fec0:1:1:: /48 keeplen 16;
+add match-prefix fec0:0:0:: /48 use-prefix 3ffe:501:ffff:: /48 keeplen 16;
 .Ed
 .\"
 
@@ -301,11 +301,11 @@ The following configuration file will do 1 and 2.
 dest ff05::2;
 
 seqnum 0 {
-	add match-prefix fec0:0:0:: /48 use-prefix fec0:2:2:: /48 keeplen 16;
+	add match-prefix fec0:0:0:: /48 use-prefix 3ffe:501:fffe:: /48 keeplen 16;
 	};
 
 seqnum 1 {
-	change match-prefix fec0:1:1:: /48 use-prefix fec0:1:1:: /48 keeplen 16 vltime d7 pltime 0 rrf_decrvalid on rrf_decrprefd on;
+	change match-prefix 3ffe:501:ffff:: /48 use-prefix 3ffe:501:ffff:: /48 keeplen 16 vltime d7 pltime 0 rrf_decrvalid on rrf_decrprefd on;
 	};
 .Ed
 .\"
@@ -318,7 +318,7 @@ afterward)
 .Bd -literal -offset indent
 dest ff05::2;
 
-change match-prefix fec0:1:1:: /48;
+change match-prefix 3ffe:501:ffff:: /48;
 .Ed
 .\"
 
