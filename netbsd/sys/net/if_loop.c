@@ -219,12 +219,14 @@ looutput(ifp, m, dst, rt)
 	 * this kind of code should be avoided.
 	 * XXX other conditions to avoid running this part?
 	 */
-	if (m && m->m_next != NULL) {
-		struct mbuf *n;
+	if (m->m_len != m->m_pkthdr.len) {
+		struct mbuf *n = NULL;
 		int maxlen;
 
 		MGETHDR(n, M_DONTWAIT, MT_HEADER);
 		maxlen = MHLEN;
+		if (n)
+			M_COPY_PKTHDR(n, m);
 		if (n && m->m_pkthdr.len > maxlen) {
 			MCLGET(n, M_DONTWAIT);
 			maxlen = MCLBYTES;
@@ -239,8 +241,6 @@ looutput(ifp, m, dst, rt)
 			return ENOBUFS;
 		}
 
-		n->m_pkthdr.rcvif = m->m_pkthdr.rcvif;
-		n->m_pkthdr.len = m->m_pkthdr.len;
 		if (m->m_pkthdr.len <= maxlen) {
 			m_copydata(m, 0, m->m_pkthdr.len, mtod(n, caddr_t));
 			n->m_len = m->m_pkthdr.len;
