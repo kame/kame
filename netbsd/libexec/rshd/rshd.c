@@ -226,9 +226,11 @@ doit(fromp)
 	case AF_INET:
 		portp = &((struct sockaddr_in *)fromp)->sin_port;
 		break;
+#ifdef INET6
 	case AF_INET6:
 		portp = &((struct sockaddr_in6 *)fromp)->sin6_port;
 		break;
+#endif
 	default:
 		syslog(LOG_ERR, "malformed \"from\" address (af %d)\n", af);
 		exit(1);
