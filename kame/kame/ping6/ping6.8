@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: ping6.8,v 1.4 1999/10/07 05:29:03 itojun Exp $
+.\"     $Id: ping6.8,v 1.5 1999/12/01 12:51:04 jinmei Exp $
 .\"
 .Dd May 17, 1998
 .Dt PING6 8
@@ -46,6 +46,7 @@ packets to network hosts
 .Op Fl i Ar wait
 .Op Fl l Ar preload
 .Op Fl p Ar pattern
+.Op Fl S Ar sourceaddr
 .Op Fl s Ar packetsize
 .Ar host
 .Sh DESCRIPTION
@@ -174,6 +175,13 @@ that has no route through it
 e.g., after the interface was dropped by
 .Xr routed 8
 .Pc .
+.It Fl S Ar sourceaddr
+Specifies the source address of request packets.
+The source address must be one of the unicast addresses of the sending
+node.
+If the outgoing interface is specified by the
+.Fl I
+option as well, the address must be assinged to the specified interface.
 .It Fl s Ar packetsize
 Specifies the number of data bytes to be sent.  
 The default is 56, which translates into 64
