@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.271 2003/05/01 13:35:29 keiichi Exp $	*/
+/*	$KAME: key.c,v 1.272 2003/06/04 02:40:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -7734,7 +7734,7 @@ key_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 }
 #endif /*__NetBSD__*/
 
-#if defined(MIP6) && defined(MIP6_HAIPSEC)
+#if defined(MIP6) && defined(MIP6_HAIPSEC) && (defined(MIP6_HOME_AGENT) || defined(MIP6_MOBILE_NODE))
 int
 key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr)
 	struct sockaddr_in6 *haddr;
@@ -7965,4 +7965,4 @@ key_mip6_find_sp(dir, src, dst)
 	}
 	return (sp);
 }
-#endif /* MIP6 && MIP6_HAIPSEC */
+#endif /* MIP6 && MIP6_HAIPSEC && (MIP6_HOME_AGENT || MIP6_MOBILE_NODE) */
