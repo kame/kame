@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.368 1999/12/23 06:03:38 jinmei Exp $
+$Id: CHANGELOG,v 1.369 1999/12/23 06:17:07 jinmei Exp $
 
 <199912>
+1999-12-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_free): call pfctlinput with
+	PRC_HOSTDEAD in order to remove all cached routes to the
+	unreachable neighbor.
+	* kame/sys/netinet6/in6_pcb.c (in6_pcbnotify): call in6_rtchange
+	upon PRC_HOSTDEAD as well.
+
 1999-12-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/tcp6_subr.c (tcp6_ctlinput):
 	* kame/sys/netinet6/udp6_usrreq.c (udp6_ctlinput):
