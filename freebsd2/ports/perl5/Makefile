@@ -3,7 +3,7 @@
 # Date created:		16 April 1995
 # Whom:			markm
 #
-# $Id: Makefile,v 1.1.1.1 1999/08/09 01:37:15 itojun Exp $
+# $Id: Makefile,v 1.1.1.1.2.1 1999/10/06 10:08:29 k-sugyou Exp $
 #
 
 DISTNAME=	perl5.005_55
@@ -13,7 +13,7 @@ MASTER_SITES= ftp://ftp.digital.com/pub/plan/perl/CPAN/authors/id/GSAR/ \
 		ftp://ftp.cdrom.com/pub/perl/CPAN/authors/id/GSAR/
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	perl5.005_55-v6-19990324.diff.gz
+PATCHFILES=	perl5.005_55-v6-19990721.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	markm@FreeBSD.ORG
