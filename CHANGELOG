@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1846 2001/08/16 20:37:15 itojun Exp $
+$KAME: CHANGELOG,v 1.1847 2001/08/18 05:53:50 jinmei Exp $
 
 <200108>
+2001-08-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_src.c (in6_selectsrc): changed the number
+	of longest matching rule in source address selection from 8 to 14,
+	so that it is easy to assign smaller numbers to more preferred
+	rules.  Additionally, a new rule to prefer addresses on alive
+	(i.e. IFF_UP) interfaces, based on a suggestion from
+	kato@wide.ad.jp.
+	*bsd/netstat were also changed accordingly.
+
 Fri Aug 17 05:24:45 JST 2001  itojun@iijlab.net
 	* kame/setkey/parse.y: handle FQDN address in SPD/SAD configurations.
 	  when an FQDN resolves into multiple addresses, setkey(8) will
