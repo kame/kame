@@ -100,7 +100,7 @@ int
 in6_cksum(m, nxt, off, len)
 	register struct mbuf *m;
 	u_int8_t nxt;
-	register int off, len;
+	u_int32_t off, len;
 {
 	register u_int16_t *w;
 	register int sum = 0;
