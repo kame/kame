@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.116 2000/12/16 14:16:25 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.117 2000/12/18 04:12:01 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2036,59 +2036,6 @@ etypesw2(etype)
 /* for print-isakmp.c */
 char *snapend;
 extern void isakmp_print __P((const u_char *, u_int, const u_char *));
-
-char *getname __P((const u_char *));
-#ifdef INET6
-char *getname6 __P((const u_char *));
-#endif
-
-/*
- * Return a name for the IP address pointed to by ap.  This address
- * is assumed to be in network byte order.
- */
-char *
-getname(ap)
-	const u_char *ap;
-{
-	struct sockaddr_in addr;
-	static char ntop_buf[NI_MAXHOST];
-
-	memset(&addr, 0, sizeof(addr));
-	addr.sin_len = sizeof(struct sockaddr_in);
-	addr.sin_family = AF_INET;
-	memcpy(&addr.sin_addr, ap, sizeof(addr.sin_addr));
-	if (getnameinfo((struct sockaddr *)&addr, addr.sin_len,
-			ntop_buf, sizeof(ntop_buf), NULL, 0,
-			NI_NUMERICHOST | niflags))
-		strncpy(ntop_buf, "?", sizeof(ntop_buf));
-
-	return ntop_buf;
-}
-
-#ifdef INET6
-/*
- * Return a name for the IP6 address pointed to by ap.  This address
- * is assumed to be in network byte order.
- */
-char *
-getname6(ap)
-	const u_char *ap;
-{
-	struct sockaddr_in6 addr;
-	static char ntop_buf[NI_MAXHOST];
-
-	memset(&addr, 0, sizeof(addr));
-	addr.sin6_len = sizeof(struct sockaddr_in6);
-	addr.sin6_family = AF_INET6;
-	memcpy(&addr.sin6_addr, ap, sizeof(addr.sin6_addr));
-	if (getnameinfo((struct sockaddr *)&addr, addr.sin6_len,
-			ntop_buf, sizeof(ntop_buf), NULL, 0,
-			NI_NUMERICHOST | niflags))
-		strncpy(ntop_buf, "?", sizeof(ntop_buf));
-
-	return ntop_buf;
-}
-#endif /* INET6 */
 
 void
 isakmp_printpacket(msg, from, my, decoded)
