@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.950 2000/05/28 23:37:22 itojun Exp $
+$Id: CHANGELOG,v 1.951 2000/05/29 15:14:38 itojun Exp $
 
 <200005>
+Tue May 30 00:11:17 JST 2000  itojun@iijlab.net
+	* {bsdi4,netbsd}/usr.bin/ftp: internally convert IPv4 mapped address
+	  into real IPv4 address.  IPv4 mapped address adds too much confusion
+	  to FTP protocol handling.
+	  Suggested by: ume
+
 Mon May 29 08:34:58 JST 2000  itojun@iijlab.net
 	* kame/sys/netinet/in6_pcb.c (affects netbsd only):
 	  bind(2) on AF_INET6 socket with IPv4 mapped address will raise error,
