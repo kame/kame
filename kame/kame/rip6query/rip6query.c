@@ -1,4 +1,4 @@
-/*	$KAME: rip6query.c,v 1.15 2001/11/16 07:01:21 itojun Exp $	*/
+/*	$KAME: rip6query.c,v 1.16 2002/09/08 01:22:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -76,7 +76,8 @@ main(argc, argv)
 {
 	struct netinfo6 *np;
 	struct sockaddr_in6 fsock;
-	int i, n, len, flen;
+	int i, n, len;
+	socklen_t flen;
 	int c;
 	int ifidx = -1;
 	int error;

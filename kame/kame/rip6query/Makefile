@@ -6,12 +6,13 @@
 .endif
 
 PROG=	rip6query
-.if (${OPSYS} != "NetBSD")
-MAN8=	rip6query.8
-.else
+.if (${OPSYS} == "NetBSD") || (${OPSYS} == "OpenBSD")
 MAN=	rip6query.8
+.else
+MAN8=	rip6query.8
 .endif
 
+CFLAGS+=-ansi -pedantic -Wall -Werror
 .if (${OPSYS} == NetBSD)
 CPPFLAGS+=	-DINET6 -I${.CURDIR}/../route6d
 .else
