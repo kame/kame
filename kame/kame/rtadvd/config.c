@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.65 2002/06/08 18:08:34 itojun Exp $	*/
+/*	$KAME: config.c,v 1.66 2002/06/09 02:46:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -727,7 +727,7 @@ makeentry(buf, len, id, string, add)
 	if (add) {
 		char *cp;
 
-		cp = (char *)index(buf, '\0');
+		cp = (char *)strchr(buf, '\0');
 		snprintf(cp, ep - cp, "%d", id);
 	}
 }
