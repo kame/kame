@@ -1705,10 +1705,9 @@ noport:
 		warn("listen");
 
 	if (sendport) {
-#ifdef INET6
-		char hname[INET6_ADDRSTRLEN];
+		char hname[NI_MAXHOST], sname[NI_MAXSERV];
 		int af;
-#endif
+		union sockunion tmp;
 
 		switch (data_addr.su_family) {
 		case AF_INET:
@@ -1719,14 +1718,18 @@ noport:
 			/* FALLTHROUGH */
 #ifdef INET6
 		case AF_INET6:
+#endif
 			af = (data_addr.su_family == AF_INET) ? 1 : 2;
-			if (getnameinfo((struct sockaddr *)&data_addr,
-					data_addr.su_len, hname, sizeof(hname),
-					NULL, 0, NI_NUMERICHOST)) {
+			tmp = data_addr;
+			if (tmp.su_family == AF_INET6)
+				tmp.su_sin6.sin6_scope_id = 0;
+			if (getnameinfo((struct sockaddr *)&tmp,
+			    tmp.su_len, hname, sizeof(hname), sname,
+			    sizeof(sname), NI_NUMERICHOST | NI_NUMERICSERV)) {
 				result = ERROR;
 			} else {
-				result = command("EPRT |%d|%s|%d|", af, hname,
-						ntohs(data_addr.su_port));
+				result = command("EPRT |%d|%s|%s|", af, hname,
+				    sname);
 				if (!connected)
 					return (1);
 				if (result != COMPLETE) {
@@ -1738,7 +1741,6 @@ noport:
 				}
 			}
 			break;
-#endif
 		default:
 			result = COMPLETE + 1;
 			break;
