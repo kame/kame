@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2387 2003/04/21 06:27:04 itojun Exp $
+$KAME: CHANGELOG,v 1.2388 2003/04/22 07:28:23 itojun Exp $
 
 <200304>
+Wed Apr 23 01:24:32 JST 2003  itojun@iijlab.net
+	* netbsd: use 1.6.1
+
 Mon Apr 21 16:39:26 JST 2003  itojun@iijlab.net
 	* sctp patch 8 from randall
 
