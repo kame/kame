@@ -118,19 +118,15 @@ config_vifs_from_kernel()
 	while (ifc.ifc_buf) {
 		if (ioctl(udp_socket,SIOCGIFCONF,(char *)&ifc) <0)
 		      log(LOG_ERR, errno, "ioctl SIOCGIFCONF");	
-	
-
-    /*
-     * If the buffer was large enough to hold all the addresses
-     * then break out, otherwise increase the buffer size and
-     * try again.
-     *
-     * The only way to know that we definitely had enough space
-     * is to know that there was enough space for at least one
-     * more struct ifreq. ???
-     */
-
-
+		/*
+		 * If the buffer was large enough to hold all the addresses
+		 * then break out, otherwise increase the buffer size and
+		 * try again.
+		 *
+		 * The only way to know that we definitely had enough space
+		 * is to know that there was enough space for at least one
+		 * more struct ifreq. ???
+		 */
 		if( (num_ifreq * sizeof (struct ifreq)) >=
 		    ifc.ifc_len + sizeof(struct ifreq))
 			break;
@@ -147,11 +143,9 @@ config_vifs_from_kernel()
 	ifrp = (struct ifreq *) ifc.ifc_buf;
 	ifend = (struct ifreq * ) (ifc.ifc_buf + ifc.ifc_len);
 
-    /*
-     * Loop through all of the interfaces.
-     */
-
-
+	/*
+	 * Loop through all of the interfaces.
+	 */
 	for(;ifrp < ifend;ifrp = (struct ifreq *)((char *)ifrp+n))
 	{
 		struct ifreq ifr;
@@ -178,13 +172,12 @@ config_vifs_from_kernel()
 
 		memcpy(&addr,&ifrp->ifr_addr,sizeof(struct sockaddr_in6));
 
-    /*
-     * Need a template to preserve address info that is
-     * used below to locate the next entry.  (Otherwise,
-     * SIOCGIFFLAGS stomps over it because the requests
-     * are returned in a union.)
-     */
-
+		/*
+		 * Need a template to preserve address info that is
+		 * used below to locate the next entry.  (Otherwise,
+		 * SIOCGIFFLAGS stomps over it because the requests
+		 * are returned in a union.)
+		 */
 		memcpy(ifr.ifr_name,ifrp->ifr_name,sizeof(ifr.ifr_name));
 		memcpy(ifr6.ifr_name,ifrp->ifr_name,sizeof(ifr6.ifr_name));
 
@@ -192,19 +185,16 @@ config_vifs_from_kernel()
         	log(LOG_ERR, errno, "ioctl SIOCGIFFLAGS for %s", ifr.ifr_name);
 		flags = ifr.ifr_flags;
 
-    /*
-     * Ignore loopback interfaces and interfaces that do not
-     * support multicast.
-     */
-
-
+		/*
+		 * Ignore loopback interfaces and interfaces that do not
+		 * support multicast.
+		 */
 		if((flags & (IFF_LOOPBACK | IFF_MULTICAST ))!= IFF_MULTICAST)
 			continue;
 
-    /*
-     * Get netmask of the address.
-     */
-
+		/*
+		 * Get netmask of the address.
+		 */
 		ifr6.ifr_addr = *(struct sockaddr_in6 *)&ifrp->ifr_addr;
 		if(ioctl(udp_socket,SIOCGIFNETMASK_IN6,(char *)&ifr6) <0)
 			        log(LOG_ERR, errno,
@@ -213,11 +203,11 @@ config_vifs_from_kernel()
 
 		memcpy(&mask,&ifr6.ifr_addr.sin6_addr,sizeof(mask));
 
-    /*
-     * Hack for KAME kernel. Set sin6_scope_id field of a link local
-     * address and clear the index embedded in the address.
-     */
-
+		/*
+		 * Hack for KAME kernel.
+		 * Set sin6_scope_id field of a link local address and clear
+		 * the index embedded in the address.
+		 */
 		if (IN6_IS_ADDR_LINKLOCAL(&addr.sin6_addr))
 		{
 			addr.sin6_scope_id =
@@ -226,12 +216,11 @@ config_vifs_from_kernel()
 			addr.sin6_addr.s6_addr[3] = 0;
 		}
 
-    /*
-     * If the address is connected to the same subnet as one already
-     * installed in the uvifs array, just add the address to the list
-     * of addresses of the uvif.
-     */
-
+		/*
+		 * If the address is connected to the same subnet as one
+		 * already installed in the uvifs array, just add the address
+		 * to the list of addresses of the uvif.
+		 */
 		for(vifi = 0,v=uvifs;vifi < numvifs ; ++vifi,++v)
 		{
 			if( strcmp(v->uv_name , ifr.ifr_name) == 0 )
@@ -244,10 +233,9 @@ config_vifs_from_kernel()
 		if( vifi != numvifs )
 			continue;
 
-    /*
-     * If there is room in the uvifs array, install this interface.
-     */
-
+		/*
+		 * If there is room in the uvifs array, install this interface.
+		 */
 		if( numvifs == MAXMIFS )
 		{
 			log(LOG_WARNING, 0,
@@ -255,13 +243,11 @@ config_vifs_from_kernel()
 			continue;
 		}		
 
-    /*
-     * Everyone below is a potential vif interface.
-     * We don't care if it has wrong configuration or not configured
-     * at all.
-     */
-
-
+		/*
+		 * Everyone below is a potential vif interface.
+		 * We don't care if it has wrong configuration or not
+		 * configured at all.
+		 */
 		total_interfaces++;
 
 		v  = &uvifs[numvifs];
@@ -271,15 +257,13 @@ config_vifs_from_kernel()
 		v->uv_ifindex = if_nametoindex(v->uv_name);
 		add_phaddr(v,&addr,&mask);
 	
-/* prefix local calc. (and what about add_phaddr?...) */
-
+		/* prefix local calc. (and what about add_phaddr?...) */
 		for (i = 0; i < sizeof(struct in6_addr); i++)
 			v->uv_prefix.sin6_addr.s6_addr[i] =
 				addr.sin6_addr.s6_addr[i] & mask.s6_addr[i];
 	
 		if(flags & IFF_POINTOPOINT)
 			v->uv_flags |=(VIFF_REXMIT_PRUNES | VIFF_POINT_TO_POINT);
-
 
 		IF_DEBUG(DEBUG_IF)
 			log(LOG_DEBUG,0,

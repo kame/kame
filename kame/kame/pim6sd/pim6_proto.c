@@ -2856,7 +2856,6 @@ pack_jp6_message(pim_nbr)
     }
 }
 
-
 void
 pack_and_send_jp6_message(pim_nbr)
     pim_nbr_entry_t *pim_nbr;
@@ -2878,7 +2877,6 @@ pack_and_send_jp6_message(pim_nbr)
 	/* Add the (*,*,RP) at the end */
 	data_ptr = bjpm->jp_message + bjpm->jp_message_size;
 
-
 	PUT_EGADDR6(sockaddr6_d.sin6_addr, STAR_STAR_RP_MSK6LEN, 0, data_ptr);
 	PUT_HOSTSHORT(bjpm->rp_list_join_number, data_ptr);
 	PUT_HOSTSHORT(bjpm->rp_list_prune_number, data_ptr);
@@ -2896,7 +2894,6 @@ pack_and_send_jp6_message(pim_nbr)
     send_jp6_message(pim_nbr);
 }
 
-
 static void
 send_jp6_message(pim_nbr)
     pim_nbr_entry_t *pim_nbr;
@@ -2909,11 +2906,10 @@ send_jp6_message(pim_nbr)
     bcopy(pim_nbr->build_jp_message->jp_message,
 	  pim6_send_buf+sizeof(struct pim), datalen);
 
-    send_pim6(pim6_send_buf, &uvifs[mifi].uv_linklocal->pa_addr , &allpim6routers_group , PIM_JOIN_PRUNE,
-	     datalen);
+    send_pim6(pim6_send_buf, &uvifs[mifi].uv_linklocal->pa_addr,
+	      &allpim6routers_group , PIM_JOIN_PRUNE, datalen);
     return_jp6_working_buff(pim_nbr);
 }
-
 
 /************************************************************************
  *                        PIM_ASSERT
