@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2049 2002/01/18 07:36:52 fujisawa Exp $
+$KAME: CHANGELOG,v 1.2050 2002/01/20 10:25:19 suz Exp $
 
 <200201>
+2002-01-20 SUZUKI, Shinsuke <suz@sdl.hitachi.co.jp>
+	* kame/kame/pim6{dd,sd}/mld6.c:
+	fixed a bug that (*,G) entry diminishes due to a failure of
+	MLD Query advertisement.
+
 2002-01-18 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_*.[chly]:
 	  kame/kame/natptconfig/natpt_{defs,dispatch}.[ch]:

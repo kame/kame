@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.38 2001/12/18 03:10:42 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.39 2002/01/20 10:25:20 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -570,6 +570,12 @@ send_mld6(type, code, src, dst, group, index, delay, datalen, alert)
 	
     make_mld6_msg(type, code, src, dst, group, index, delay, datalen, alert);
     dstp = (struct sockaddr_in6 *)sndmh.msg_name;
+
+#ifdef __KAME__
+    if (IN6_IS_ADDR_LINKLOCAL(&dstp->sin6_addr) || 
+	IN6_IS_ADDR_MC_LINKLOCAL(&dstp->sin6_addr))
+	dstp->sin6_scope_id = index;
+#endif
 
     if (sendmsg(mld6_socket, &sndmh, 0) < 0) {
 	if (errno == ENETDOWN)
