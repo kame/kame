@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.51 2000/12/12 05:12:38 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.52 2000/12/12 10:54:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,7 +80,6 @@
 #include <sys/proc.h>
 #endif
 
-#include <net/net_osdep.h>
 #include <net/if.h>
 #include <net/route.h>
 #include <net/if_types.h>
@@ -91,7 +90,7 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet/icmp6.h>
-#ifdef HAVE_NRL_INPCB
+#if defined(__OpenBSD__) || defined(__OpenBSD__)
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/in_pcb.h>
@@ -118,6 +117,8 @@
 #if defined(NFAITH) && 0 < NFAITH
 #include <net/if_faith.h>
 #endif
+
+#include <net/net_osdep.h>
 
 /*
  * Raw interface to IP6 protocol.

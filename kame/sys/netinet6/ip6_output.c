@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.142 2000/12/05 14:40:29 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.143 2000/12/12 10:54:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -142,11 +142,11 @@ extern int ipsec_esp_network_default_level;
 #include "loop.h"
 #endif
 
-#include <net/net_osdep.h>
-
 #if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #include <netinet6/ip6_fw.h>
 #endif
+
+#include <net/net_osdep.h>
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 static MALLOC_DEFINE(M_IPMOPTS, "ip6_moptions", "internet multicast options");

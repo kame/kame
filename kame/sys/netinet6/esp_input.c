@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.46 2000/12/08 23:28:02 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.47 2000/12/12 10:54:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -62,8 +62,6 @@
 #include <net/netisr.h>
 #include <machine/cpu.h>
 
-#include <net/net_osdep.h>
-
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
@@ -76,7 +74,7 @@
 
 #ifdef INET6
 #include <netinet/ip6.h>
-#ifdef HAVE_NRL_INPCB
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <netinet/in_pcb.h>
 #else
 #include <netinet6/in6_pcb.h>

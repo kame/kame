@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.27 2000/11/10 23:54:38 itojun Exp $	*/
+/*	$KAME: frag6.c,v 1.28 2000/12/12 10:54:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -53,11 +53,11 @@
 #endif
 #include <netinet/icmp6.h>
 
-#include <net/net_osdep.h>
-
 #ifdef __OpenBSD__
 #include <dev/rndvar.h>
 #endif
+
+#include <net/net_osdep.h>
 
 /*
  * Define it to get a correct behavior on per-interface statistics.

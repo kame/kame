@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.119 2000/12/05 15:57:51 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.120 2000/12/12 10:54:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -115,14 +115,14 @@
 #include <net/if_gif.h>
 #endif
 
-#include <net/net_osdep.h>
-
 #ifdef MIP6
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_common.h>
 
 struct nd_prefix *(*mip6_get_home_prefix_hook) __P((void));
 #endif /* MIP6 */
+
+#include <net/net_osdep.h>
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 MALLOC_DEFINE(M_IPMADDR, "in6_multi", "internet multicast address");
