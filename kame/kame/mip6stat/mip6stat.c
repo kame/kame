@@ -1,4 +1,4 @@
-/*	$KAME: mip6stat.c,v 1.14 2002/08/28 12:17:54 keiichi Exp $	*/
+/*	$KAME: mip6stat.c,v 1.15 2002/08/28 13:34:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -578,11 +578,11 @@ static const char *binding_error_status_desc[] = {
 	"#255"
 };
 
-static int showdetail (struct mip6stat *);
-static int tmpshow(struct ip6stat *, struct mip6stat *);
+static int showdetail(void);
+static int tmpshow(void);
 
-struct mip6stat mip6stat;
-struct ip6stat ip6stat;
+static struct mip6stat mip6stat;
+static struct ip6stat ip6stat;
 
 int
 main(argc, argv)
@@ -627,19 +627,20 @@ main(argc, argv)
 
 #ifdef KEIICHI
 	if (keiichi == 1)
-		tmpshow(&ip6stat, &mip6stat);
+		tmpshow();
 	else
 #endif
-	showdetail(&mip6stat);
+	showdetail();
+
+	(void)kvm_close(kvm);
 
 	exit(0);
 }
 
 
-#define PS(msg, variable) printf("\t%qu " msg "\n", mip6stat->variable)
+#define PS(msg, variable) printf("\t%qu " msg "\n", (&mip6stat)->variable)
 static int
-showdetail(mip6stat)
-	struct mip6stat *mip6stat;
+showdetail()
 {
 	int i;
 
@@ -652,16 +653,16 @@ showdetail(mip6stat)
 	PS("BU messages", mip6s_bu);
 	PS("BA messages", mip6s_ba);
 	for (i =0; i < 256; i++) {
-		if (mip6stat->mip6s_ba_hist[i] != 0) {
-			printf("\t\t%qu %s\n", mip6stat->mip6s_ba_hist[i],
+		if ((&mip6stat)->mip6s_ba_hist[i] != 0) {
+			printf("\t\t%qu %s\n", (&mip6stat)->mip6s_ba_hist[i],
 			    binding_ack_status_desc[i]);
 		}
 	}
 	PS("BR messages", mip6s_br);
 	PS("BE messages", mip6s_be);
 	for (i =0; i < 256; i++) {
-		if (mip6stat->mip6s_be_hist[i] != 0) {
-			printf("\t\t%qu %s\n", mip6stat->mip6s_be_hist[i],
+		if ((&mip6stat)->mip6s_be_hist[i] != 0) {
+			printf("\t\t%qu %s\n", (&mip6stat)->mip6s_be_hist[i],
 			    binding_error_status_desc[i]);
 		}
 	}
@@ -691,16 +692,16 @@ showdetail(mip6stat)
 	PS("BU messages", mip6s_obu);
 	PS("BA messages", mip6s_oba);
 	for (i =0; i < 256; i++) {
-		if (mip6stat->mip6s_oba_hist[i] != 0) {
-			printf("\t\t%qu %s\n", mip6stat->mip6s_oba_hist[i],
+		if ((&mip6stat)->mip6s_oba_hist[i] != 0) {
+			printf("\t\t%qu %s\n", (&mip6stat)->mip6s_oba_hist[i],
 			    binding_ack_status_desc[i]);
 		}
 	}
 	PS("BR messages", mip6s_obr);
 	PS("BE messages", mip6s_obe);
 	for (i =0; i < 256; i++) {
-		if (mip6stat->mip6s_obe_hist[i] != 0) {
-			printf("\t\t%qu %s\n", mip6stat->mip6s_obe_hist[i],
+		if ((&mip6stat)->mip6s_obe_hist[i] != 0) {
+			printf("\t\t%qu %s\n", (&mip6stat)->mip6s_obe_hist[i],
 			    binding_error_status_desc[i]);
 		}
 	}
@@ -712,15 +713,13 @@ showdetail(mip6stat)
 #undef PS
 
 #ifdef KEIICHI
-#define M(variable) printf(#variable ":%qu,", mip6stat->variable)
+#define M(variable) printf(#variable ":%qu,", (&mip6stat)->variable)
 int
-tmpshow(ip6stat, mip6stat)
-	struct ip6stat *ip6stat;
-	struct mip6stat *mip6stat;
+tmpshow()
 {
 	int i;
 
-	printf("ip6:%qu,", ip6stat->ip6s_total);
+	printf("ip6:%qu,", (&ip6stat)->ip6s_total);
 	M(mip6s_mobility);
 	M(mip6s_hoti);
 	M(mip6s_coti);
@@ -729,16 +728,16 @@ tmpshow(ip6stat, mip6stat)
 	M(mip6s_bu);
 	M(mip6s_ba);
 	for (i = 0; i < 256; i++) {
-		if (mip6stat->mip6s_ba_hist[i] != 0)
+		if ((&mip6stat)->mip6s_ba_hist[i] != 0)
 			printf("mip6s_ba_hist_%03u:%qu,",
-			    i, mip6stat->mip6s_ba_hist[i]);
+			    i, (&mip6stat)->mip6s_ba_hist[i]);
 	}
 	M(mip6s_br);
 	M(mip6s_be);
 	for (i = 0; i < 256; i++) {
-		if (mip6stat->mip6s_be_hist[i] != 0)
+		if ((&mip6stat)->mip6s_be_hist[i] != 0)
 			printf("mip6s_be_hist_%03u:%qu,",
-			    i, mip6stat->mip6s_be_hist[i]);
+			    i, (&mip6stat)->mip6s_be_hist[i]);
 	}
 	M(mip6s_hao);
 	M(mip6s_unverifiedhao);
@@ -746,7 +745,7 @@ tmpshow(ip6stat, mip6stat)
 	M(mip6s_paramprobhao);
 	M(mip6s_paramprobmh);
 
-	printf("oip6:%qu,", ip6stat->ip6s_localout);
+	printf("oip6:%qu,", (&ip6stat)->ip6s_localout);
 	M(mip6s_omobility);
 	M(mip6s_ohoti);
 	M(mip6s_ocoti);
@@ -755,16 +754,16 @@ tmpshow(ip6stat, mip6stat)
 	M(mip6s_obu);
 	M(mip6s_oba);
 	for (i = 0; i < 256; i++) {
-		if (mip6stat->mip6s_oba_hist[i] != 0)
+		if ((&mip6stat)->mip6s_oba_hist[i] != 0)
 			printf("mip6s_oba_hist_%03u:%qu,",
-			    i, mip6stat->mip6s_oba_hist[i]);
+			    i, (&mip6stat)->mip6s_oba_hist[i]);
 	}
 	M(mip6s_obr);
 	M(mip6s_obe);
 	for (i = 0; i < 256; i++) {
-		if (mip6stat->mip6s_obe_hist[i] != 0)
+		if ((&mip6stat)->mip6s_obe_hist[i] != 0)
 			printf("mip6s_obe_hist_%03u:%qu,",
-			    i, mip6stat->mip6s_obe_hist[i]);
+			    i, (&mip6stat)->mip6s_obe_hist[i]);
 	}
 	M(mip6s_ohao);
 	M(mip6s_orthdr2);
