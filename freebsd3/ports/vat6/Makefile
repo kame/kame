@@ -3,18 +3,18 @@
 # Date created:		Fri Jul 10 17:29:13 JST 1998
 # Whom:			itojun
 #
-# $Id: Makefile,v 1.3 1999/12/27 12:37:20 sumikawa Exp $
+# $Id: Makefile,v 1.4 2000/05/07 17:10:12 sumikawa Exp $
 #
 
 DISTNAME=	vat6
-PKGNAME=	vat6-19981109
+PKGNAME=	vat6-20000506
 CATEGORIES=	mbone tk82
 MASTER_SITES=	http://irl.cs.ucla.edu/software/IPv6/ \
 		ftp://ftp.cs.tu-berlin.de/pub/local/kbs/tubmik/gsm/
 DISTFILES=	${DISTNAME}${EXTRACT_SUFX} ${GSM}${EXTRACT_SUFX}
 
 PATCH_SITES=	http://www.v6.csi2.net/setup/mcast/patch/
-PATCHFILES=	vat6-kame-19990420.patch
+PATCHFILES=	vat6-kame-20000506.patch
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@itojun.org
