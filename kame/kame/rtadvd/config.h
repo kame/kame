@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.7 2003/04/16 11:02:21 ono Exp $	*/
+/*	$KAME: config.h,v 1.8 2003/06/17 08:26:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -47,3 +47,14 @@ extern void delete_prefix_from_kernel __P((struct rainfo *));
  */
 #define MAXPREFIX	100
 #define MAXROUTE	100
+
+
+/*
+ * portability
+ */
+#ifndef ND_RA_FLAG_RTPREF_HIGH
+#define ND_RA_FLAG_RTPREF_HIGH	0x08
+#endif
+#ifndef ND_RA_FLAG_RTPREF_LOW
+#define ND_RA_FLAG_RTPREF_LOW	0x18
+#endif
