@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$KAME: PORTABILITY,v 1.54 2000/10/10 00:23:06 itojun Exp $
+	$KAME: PORTABILITY,v 1.55 2000/11/15 16:44:47 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -334,3 +334,12 @@ across those possibilities.
   applications.  there's buffer overrun possibility with FD_SET().
   use poll(2) whenever available (note that KAME still support platforms
   without poll(2)).  see openbsd select(2) manpage.
+
+- strlcpy/strlcat.
+	comes with strlcpy/cat: netbsd15 openbsd freebsd3[3-5] freebsd4
+	does not come with them: freebsd2 freebsd3[0-2] bsdi[34] netbsd142
+
+  strlcpy and strlcat -- consistent, safe, string copy and concatenation.
+  Usenix 1999, by Todd C. Miller, Theo de Raadt.
+	http://www.openbsd.org/papers/strlcpy-paper.ps
+	http://www.openbsd.org/papers/strlcpy-slides.ps
