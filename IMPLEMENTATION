@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/07/26 02:32:12 $
+			$Date: 2000/07/27 07:40:56 $
 
 1. IPv6
 
@@ -1079,9 +1079,23 @@ or bypass security controls:
 Also, since KAME does not support RFC1933 auto tunnels, seeing IPv4 compatible
 is very rare.  You should take caution if you see those on the wire.
 
-If we see IPv6 Packets with IPv4 mapped address (::ffff:0.0.0.0/96) in the
+If we see IPv6 packets with IPv4 mapped address (::ffff:0.0.0.0/96) in the
 header in dual-stack environment (not in SIIT environment), they indicate
 that someone is trying to inpersonate IPv4 peer.  The packet should be dropped.
+
+IPv6 specifications do not talk very much about IPv6 unspecified address (::)
+in the IPv6 source address field.  Clarification is in progress.
+Here are couple of comments:
+- IPv6 unspecified address must be put into IPv6 source address field, if and
+  only if we have no legal source address for the node.  The legal situations
+  include, but may not be limited to, (1) MLD while no IPv6 address is assigned
+  to the node and (2) DAD.
+- If IPv6 TCP packet has IPv6 unspecified address, it is an attack attempt.
+  The form can be used as a trigger for TCP DoS attack.  KAME code already
+  filters them out.
+- The following examples are illegal cases.  It seems that there's general
+  consensus among ipngwg for those.  (1) mobile-ip6 home address option,
+  (2) offlink packets (so routers should not forward them).
 
 KAME code is carefully written to avoid such incidents.  More specifically,
 KAME kernel will reject packets with certain source/dstination address in IPv6
