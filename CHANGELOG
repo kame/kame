@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.700 2000/03/18 01:27:45 itojun Exp $
+$Id: CHANGELOG,v 1.701 2000/03/18 02:48:41 itojun Exp $
 
 <200003>
 Sat Mar 18 10:27:03 JST 2000  itojun@iijlab.net
@@ -11,6 +11,13 @@ Sat Mar 18 01:16:26 JST 2000  itojun@iiljab.net
 	* ports/packages for mtr and lynx: mark them BROKEN for vulnerability
 	  reported on bugtraq.  we recommend you to remove them from your KAME
 	  box by using pkg_delete(8), if you have installed them.
+
+Sat Mar 18 JST 2000  itojun@iiljab.net
+	* {netbsd,openbsd}/sys/netinet/in.c, sys/netinet6/in6.c: backout
+	  memory leak fix on interface address addition failure, added
+	  Mar 11 2000.  the fix was too strict and made it impossible to
+	  add two interface addresses in same prefix.
+	  KAME PR 218.  From: Kazuto Ushioda <x-y-z@3si.co.jp>
 
 Thu Mar 16 22:33:52 JST 2000  itojun@iijlab.net
 	* {netbsd,openbsd}/lib/libinet6/getaddrinfo.c: in res_queryN,
