@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.29 2001/07/26 06:53:18 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.30 2001/07/29 09:23:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -419,15 +419,16 @@ mld6_sendpkt(in6m, type, dst)
 	struct ip6_moptions im6o;
 	struct in6_ifaddr *ia;
 	struct ifnet *ifp = in6m->in6m_ifp;
-	struct ifnet *outif = NULL;
 
 	/*
 	 * At first, find a link local address on the outgoing interface
 	 * to use as the source address of the MLD packet.
 	 */
-	if ((ia = in6ifa_ifpforlinklocal(ifp, IN6_IFF_NOTREADY|IN6_IFF_ANYCAST))
-	    == NULL)
+	if ((ia = in6ifa_ifpforlinklocal(ifp,
+					 IN6_IFF_NOTREADY|IN6_IFF_ANYCAST))
+	    == NULL) {
 		return;
+	}
 
 	/*
 	 * Allocate mbufs to store ip6 header and MLD header.
@@ -472,7 +473,8 @@ mld6_sendpkt(in6m, type, dst)
 	mldh->mld6_addr = in6m->in6m_addr;
 	if (IN6_IS_ADDR_MC_LINKLOCAL(&mldh->mld6_addr))
 		mldh->mld6_addr.s6_addr16[1] = 0; /* XXX */
-	mldh->mld6_cksum = in6_cksum(mh, IPPROTO_ICMPV6, sizeof(struct ip6_hdr),
+	mldh->mld6_cksum = in6_cksum(mh, IPPROTO_ICMPV6,
+				     sizeof(struct ip6_hdr),
 				     sizeof(struct mld6_hdr));
 
 	/* construct multicast option */
@@ -488,20 +490,18 @@ mld6_sendpkt(in6m, type, dst)
 
 	/* increment output statictics */
 	icmp6stat.icp6s_outhist[type]++;
-
-	ip6_output(mh, &ip6_opts, NULL, 0, &im6o, &outif);
-	if (outif) {
-		icmp6_ifstat_inc(outif, ifs6_out_msg);
-		switch (type) {
-		case MLD6_LISTENER_QUERY:
-			icmp6_ifstat_inc(outif, ifs6_out_mldquery);
-			break;
-		case MLD6_LISTENER_REPORT:
-			icmp6_ifstat_inc(outif, ifs6_out_mldreport);
-			break;
-		case MLD6_LISTENER_DONE:
-			icmp6_ifstat_inc(outif, ifs6_out_mlddone);
-			break;
-		}
+	icmp6_ifstat_inc(ifp, ifs6_out_msg);
+	switch (type) {
+	case MLD6_LISTENER_QUERY:
+		icmp6_ifstat_inc(ifp, ifs6_out_mldquery);
+		break;
+	case MLD6_LISTENER_REPORT:
+		icmp6_ifstat_inc(ifp, ifs6_out_mldreport);
+		break;
+	case MLD6_LISTENER_DONE:
+		icmp6_ifstat_inc(ifp, ifs6_out_mlddone);
+		break;
 	}
+
+	ip6_output(mh, &ip6_opts, NULL, 0, &im6o, NULL);
 }

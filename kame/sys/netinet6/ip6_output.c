@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.204 2001/07/26 08:36:53 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.205 2001/07/29 09:23:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -219,6 +219,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #else
 	struct route_in6 ip6route;
 #endif
+	struct rtentry *rt = NULL;
 	struct sockaddr_in6 *dst;
 	int error = 0;
 	struct in6_ifaddr *ia = NULL;
@@ -791,167 +792,131 @@ skip_ipsec2:;
 #endif /* OpenBSD */
 #endif /* IPSEC */
 
-	if (!IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
-		/* Unicast */
+	/* if specified, fill in the traffic class field. */
+	if (opt) {
+		ip6->ip6_flow &= ~htonl(0xff << 20);
+		ip6->ip6_flow |= htonl(opt->ip6po_tclass << 20);
+	}
+	/* fill in or override the hop limit field, if necessary. */
+	if (opt && opt->ip6po_hlim != -1)
+		ip6->ip6_hlim = opt->ip6po_hlim & 0xff;
+	else if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
+		if (im6o != NULL)
+			ip6->ip6_hlim = im6o->im6o_multicast_hlim;
+		else
+			ip6->ip6_hlim = ip6_defmcasthlim;
+	}
 
-#define ifatoia6(ifa)	((struct in6_ifaddr *)(ifa))
-#define sin6tosa(sin6)	((struct sockaddr *)(sin6))
-		/* xxx
-		 * interface selection comes here
-		 * if an interface is specified from an upper layer,
-		 * ifp must point it.
+	{
+		/*
+		 * XXX: using a block just to define a local variables is not
+		 * a good style....
 		 */
-		if (ro->ro_rt == 0) {
-#ifndef __bsdi__
-			/*
-			 * non-bsdi always clone routes, if parent is
-			 * PRF_CLONING.
-			 */
-#ifdef RADIX_MPATH
-			rtalloc_mpath((struct route *)ro,
-			    ntohl(ip6->ip6_src.s6_addr32[3] ^
-			    ip6->ip6_dst.s6_addr32[3]));
-#else
-			rtalloc((struct route *)ro);
+		struct ifnet *ifp0 = NULL;
+		struct sockaddr_in6 src;
+		struct sockaddr_in6 dst0 = *dst;
+		int zone, clone = 0;
+
+#if defined(__bsdi__) || defined(__FreeBSD__)
+		if (ro != &ip6route && !IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
+			clone = 1;
 #endif
-#else
-			if (ro == &ip6route)	/* xxx kazu */
-				rtalloc((struct route *)ro);
-			else
-				rtcalloc((struct route *)ro);
-#endif
-		}
-		if (ro->ro_rt == 0) {
-			ip6stat.ip6s_noroute++;
-			error = EHOSTUNREACH;
-			/* XXX in6_ifstat_inc(ifp, ifs6_out_discard); */
+
+		if ((error = in6_selectroute(&dst0, opt, im6o, ro,
+					     &ifp, &rt, clone)) != 0) {
+			switch(error) {
+			case EHOSTUNREACH:
+				ip6stat.ip6s_noroute++;
+				break;
+			case EADDRNOTAVAIL:
+			default:
+				break; /* XXX statistics? */
+			}
+			if (ifp != NULL)
+				in6_ifstat_inc(ifp, ifs6_out_discard);
 			goto bad;
 		}
-		ia = ifatoia6(ro->ro_rt->rt_ifa);
-		ifp = ro->ro_rt->rt_ifp;
-		ro->ro_rt->rt_use++;
-		if (ro->ro_rt->rt_flags & RTF_GATEWAY)
-			dst = (struct sockaddr_in6 *)ro->ro_rt->rt_gateway;
-		m->m_flags &= ~(M_BCAST | M_MCAST);	/* just in case */
-
-		in6_ifstat_inc(ifp, ifs6_out_request);
 
 		/*
-		 * Check if the outgoing interface conflicts with
-		 * the interface specified by ifi6_ifindex (if specified).
-		 * Note that loopback interface is always okay.
-		 * (this may happen when we are sending a packet to one of
-		 *  our own addresses.)
+		 * then rt (for unicast) and ifp must be non-NULL valid values.
 		 */
-		if (opt && opt->ip6po_pktinfo
-		 && opt->ip6po_pktinfo->ipi6_ifindex) {
-			if (!(ifp->if_flags & IFF_LOOPBACK)
-			 && ifp->if_index != opt->ip6po_pktinfo->ipi6_ifindex) {
-				ip6stat.ip6s_noroute++;
-				in6_ifstat_inc(ifp, ifs6_out_discard);
-				error = EHOSTUNREACH;
-				goto bad;
-			}
+		if ((flags & IPV6_FORWARDING) == 0) {
+			/* XXX: the FORWARDING flag can be set for mrouting. */
+			in6_ifstat_inc(ifp, ifs6_out_request);
+		}
+		if (rt != NULL) {
+			ia = (struct in6_ifaddr *)(rt->rt_ifa);
+			rt->rt_use++;
 		}
 
-		if (opt && opt->ip6po_hlim != -1)
-			ip6->ip6_hlim = opt->ip6po_hlim & 0xff;
-		if (opt) {
-			ip6->ip6_flow &= ~htonl(0xff << 20);
-			ip6->ip6_flow |= htonl(opt->ip6po_tclass << 20);
+		/*
+		 * The outgoing interface must be in the zone of source and
+		 * destination addresses.  We should use ia_ifp to support the
+		 * case of sending packets to an address of our own.
+		 */
+		if (ia != NULL && ia->ia_ifp)
+			ifp0 = ia->ia_ifp;
+		else
+			ifp0 = ifp;
+		/* XXX: we should not do this conversion for every packet. */
+		bzero(&src, sizeof(src));
+		src.sin6_family = AF_INET6;
+		src.sin6_len = sizeof(src);
+		src.sin6_addr = ip6->ip6_src;
+		if ((error = in6_recoverscope(&src, &ip6->ip6_src, NULL))
+		    != 0) {
+			goto badscope;
 		}
+		if ((zone = in6_addr2zoneid(ifp0, &src.sin6_addr)) < 0 ||
+		    zone != src.sin6_scope_id) {
+#ifdef SCOPEDEBUG		/* will be removed shortly */
+			printf("ip6 output: bad source scope %s on %s\n",
+			       ip6_sprintf(&ip6->ip6_src), if_name(ifp0));
+#endif
+			goto badscope;
+		}
+		/* XXX: in6_recoverscope will clear the embedded ID */
+		if ((error = in6_recoverscope(&dst0, &ip6->ip6_dst, NULL))
+		    != 0) {
+			goto badscope;
+		}
+		if ((zone = in6_addr2zoneid(ifp0, &dst0.sin6_addr)) < 0 ||
+		    zone != dst0.sin6_scope_id) {
+#ifdef SCOPEDEBUG		/* will be removed shortly */
+			printf("ip6 output: bad dst scope %s on %s\n",
+			       ip6_sprintf(&dst0.sin6_addr), if_name(ifp0));
+#endif
+			goto badscope;
+		}
+
+		/* scope check is done. */
+		goto routefound;
+
+	  badscope:
+		ip6stat.ip6s_badscope++;
+		in6_ifstat_inc(ifp0, ifs6_out_discard);
+		if (error == 0)
+			error = EHOSTUNREACH; /* XXX */
+		goto bad;
+	}
+
+  routefound:
+	if (rt != NULL && (rt->rt_flags & RTF_GATEWAY)) /* XXX NEXTHOP case */
+		dst = (struct sockaddr_in6 *)rt->rt_gateway;
+
+	if (!IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
+		m->m_flags &= ~(M_BCAST | M_MCAST); /* just in case */
 	} else {
-		/* Multicast */
 		struct	in6_multi *in6m;
-		u_int32_t zoneid;
 
 		m->m_flags = (m->m_flags & ~M_BCAST) | M_MCAST;
 
-		/*
-		 * See if the caller provided any multicast options
-		 */
-		ifp = NULL;
-		if (im6o != NULL) {
-			ip6->ip6_hlim = im6o->im6o_multicast_hlim;
-			if (im6o->im6o_multicast_ifp != NULL)
-				ifp = im6o->im6o_multicast_ifp;
-		} else
-			ip6->ip6_hlim = ip6_defmcasthlim;
-
-		/*
-		 * See if the caller provided the outgoing interface
-		 * as an ancillary data.
-		 * Boundary check for ifindex is assumed to be already done.
-		 */
-		if (opt && opt->ip6po_pktinfo && opt->ip6po_pktinfo->ipi6_ifindex)
-			ifp = ifindex2ifnet[opt->ip6po_pktinfo->ipi6_ifindex];
-
-		if (opt && opt->ip6po_hlim != -1)
-			ip6->ip6_hlim = opt->ip6po_hlim & 0xff;
-		if (opt) {
-			ip6->ip6_flow &= ~htonl(0xff << 20);
-			ip6->ip6_flow |= htonl(opt->ip6po_tclass << 20);
-		}
-
-		/*
-		 * If caller did not provide an interface lookup a
-		 * default in the routing table.  This is either a
-		 * default for the specified group (i.e. a host
-		 * route), or a multicast default (a route for the
-		 * ``net'' ff00::/8).
-		 */
-		if (ifp == NULL) {
-			if (ro->ro_rt == 0) {
-				ro->ro_rt = rtalloc1((struct sockaddr *)
-						&ro->ro_dst, 0
-#ifdef __FreeBSD__
-						, 0UL
-#endif
-						);
-			}
-			if (ro->ro_rt == 0) {
-				ip6stat.ip6s_noroute++;
-				error = EHOSTUNREACH;
-				/* XXX in6_ifstat_inc(ifp, ifs6_out_discard) */
-				goto bad;
-			}
-			ia = ifatoia6(ro->ro_rt->rt_ifa);
-			ifp = ro->ro_rt->rt_ifp;
-			ro->ro_rt->rt_use++;
-		}
-
-		if ((flags & IPV6_FORWARDING) == 0)
-			in6_ifstat_inc(ifp, ifs6_out_request);
 		in6_ifstat_inc(ifp, ifs6_out_mcast);
-
-		/*
-		 * The outgoing interface must be in the scope zone of the
-		 * destination.
-		 * dst->sin6_scope_id might be 0 in !SCOPEDROUTING cases.
-		 */
-		if ((zoneid = dst->sin6_scope_id) == 0) {
-			struct sockaddr_in6 dst0 = *dst;
-
-			error = in6_recoverscope(&dst0, &dst->sin6_addr, ifp);
-			if (error != 0) {
-				ip6stat.ip6s_badscope++;
-				in6_ifstat_inc(ifp, ifs6_out_discard);
-				goto bad;
-			}
-			zoneid = dst0.sin6_scope_id;
-		}
-		if (in6_addr2scopeid(ifp, &dst->sin6_addr) != zoneid) {
-			/* on which interface should we count the error? */
-			ip6stat.ip6s_badscope++;
-			in6_ifstat_inc(ifp, ifs6_out_discard);
-			error = ENETUNREACH; /* XXX better error? */
-			goto bad;
-		}
 
 		/*
 		 * Confirm that the outgoing interface supports multicast.
 		 */
-		if ((ifp->if_flags & IFF_MULTICAST) == 0) {
+		if (!(ifp->if_flags & IFF_MULTICAST)) {
 			ip6stat.ip6s_noroute++;
 			in6_ifstat_inc(ifp, ifs6_out_discard);
 			error = ENETUNREACH;
@@ -1012,7 +977,7 @@ skip_ipsec2:;
 	 * Upper-layer reachability confirmation
 	 */
 	if (opt && (opt->ip6po_flags & IP6PO_REACHCONF))
-		nd6_nud_hint(ro->ro_rt, NULL, 0);
+		nd6_nud_hint(rt, NULL, 0);
 
 	/*
 	 * Determine path MTU.
@@ -1021,7 +986,7 @@ skip_ipsec2:;
 		/* The first hop and the final destination may differ. */
 		struct sockaddr_in6 *sin6_fin =
 			(struct sockaddr_in6 *)&ro_pmtu->ro_dst;
-		if (ro_pmtu->ro_rt && ((ro->ro_rt->rt_flags & RTF_UP) == 0 ||
+		if (ro_pmtu->ro_rt && ((ro_pmtu->ro_rt->rt_flags & RTF_UP) == 0 ||
 				       !IN6_ARE_ADDR_EQUAL(&sin6_fin->sin6_addr,
 							   &finaldst))) {
 			RTFREE(ro_pmtu->ro_rt);
@@ -1244,7 +1209,7 @@ skip_ipsec2:;
 		/* clean ipsec history once it goes out of the node */
 		ipsec_delaux(m);
 #endif
-		error = nd6_output(ifp, origifp, m, dst, ro->ro_rt);
+		error = nd6_output(ifp, origifp, m, dst, rt);
 		goto done;
 	} else if (mtu < IPV6_MMTU) {
 		/*
@@ -1314,7 +1279,8 @@ skip_ipsec2:;
 
 		/*
 		 * Loop through length of segment after first fragment,
-		 * make new header and copy data of each part and link onto chain.
+		 * make new header and copy data of each part and link onto
+		 * chain.
 		 */
 		m0 = m;
 		for (off = hlen; off < tlen; off += len) {
@@ -1394,7 +1360,7 @@ sendorfree:
 			/* clean ipsec history once it goes out of the node */
 			ipsec_delaux(m);
 #endif
-			error = nd6_output(ifp, origifp, m, dst, ro->ro_rt);
+			error = nd6_output(ifp, origifp, m, dst, rt);
 		} else
 			m_freem(m);
 	}
@@ -2820,6 +2786,7 @@ init_ip6pktopts(opt)
 	opt->ip6po_tclass = 0x00;
 }
 
+#define sin6tosa(sin6)	((struct sockaddr *)(sin6)) /* XXX */
 static int
 ip6_pcbopt(optname, buf, len, pktopt, priv)
 	int optname, len, priv;

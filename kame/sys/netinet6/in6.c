@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.222 2001/07/26 06:53:15 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.223 2001/07/29 09:23:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -953,7 +953,7 @@ in6_update_ifa(ifp, ifra, ia)
 					      ifp)) != 0)
 			return(error);
 #endif
-		scopeid = in6_addr2scopeid(ifp, &dst6.sin6_addr);
+		scopeid = in6_addr2zoneid(ifp, &dst6.sin6_addr);
 		if (dst6.sin6_scope_id == 0) /* user omit to specify the ID. */
 			dst6.sin6_scope_id = scopeid;
 		else if (dst6.sin6_scope_id != scopeid)
@@ -1121,6 +1121,19 @@ in6_update_ifa(ifp, ifra, ia)
 		goto unlink;
 
 	/*
+	 * Make the address tentative before joining multicast addresses,
+	 * so that corresponding MLD responses would not have a tentative
+	 * source address.
+	 */
+	ia->ia6_flags = ifra->ifra_flags;
+	ia->ia6_flags &= ~IN6_IFF_DUPLICATED;	/* safety */
+#if 0				/* MIP6 is now temporarily removed */
+	ia->ia6_flags &= ~IN6_IFF_NODAD;	/* Mobile IPv6 */
+#endif
+	if (hostIsNew && in6if_do_dad(ifp))
+		ia->ia6_flags |= IN6_IFF_TENTATIVE;
+
+	/*
 	 * Beyond this point, we should call in6_purgeaddr upon an error,
 	 * not just go to unlink. 
 	 */
@@ -1282,10 +1295,6 @@ in6_update_ifa(ifp, ifra, ia)
 		}
 	}
 
-	ia->ia6_flags = ifra->ifra_flags;
-	ia->ia6_flags &= ~IN6_IFF_DUPLICATED;	/* safety */
-	ia->ia6_flags &= ~IN6_IFF_NODAD;	/* Mobile IPv6 */
-
 	ia->ia6_lifetime = ifra->ifra_lifetime;
 	/* for sanity */
 	if (ia->ia6_lifetime.ia6t_vltime != ND6_INFINITE_LIFETIME) {
@@ -1322,8 +1331,8 @@ in6_update_ifa(ifp, ifra, ia)
 	 * XXX It may be of use, if we can administratively
 	 * disable DAD.
 	 */
-	if (in6if_do_dad(ifp) && (ifra->ifra_flags & IN6_IFF_NODAD) == 0) {
-		ia->ia6_flags |= IN6_IFF_TENTATIVE;
+	if (hostIsNew && in6if_do_dad(ifp) &&
+	    (ifra->ifra_flags & IN6_IFF_NODAD) == 0) {
 		nd6_dad_start((struct ifaddr *)ia, NULL);
 	}
 
@@ -1758,7 +1767,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 			if (IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr)) {
 				s6->sin6_addr.s6_addr16[1] = 0;
 				s6->sin6_scope_id =
-					in6_addr2scopeid(ifp, &s6->sin6_addr);
+					in6_addr2zoneid(ifp, &s6->sin6_addr);
 			}
 #endif
 			if ((ifp->if_flags & IFF_POINTOPOINT) != 0) {
@@ -1769,8 +1778,8 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 				if (IN6_IS_ADDR_LINKLOCAL(&s6->sin6_addr)) {
 					s6->sin6_addr.s6_addr16[1] = 0;
 					s6->sin6_scope_id =
-						in6_addr2scopeid(ifp,
-								 &s6->sin6_addr);
+						in6_addr2zoneid(ifp,
+								&s6->sin6_addr);
 				}
 #endif
 			} else
@@ -2541,7 +2550,7 @@ in6_ifawithscope(oifp, dst)
 		 * We can never take an address that breaks the scope zone
 		 * of the destination.
 		 */
-		if (in6_addr2scopeid(ifp, dst) != in6_addr2scopeid(oifp, dst))
+		if (in6_addr2zoneid(ifp, dst) != in6_addr2zoneid(oifp, dst))
 			continue;
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)

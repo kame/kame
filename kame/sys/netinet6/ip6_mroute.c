@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.49 2001/07/25 09:21:18 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.50 2001/07/29 09:23:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1584,12 +1584,12 @@ ip6_mdq(m, ifp, rt)
 			if ((mif6table[rt->mf6c_parent].m6_flags &
 			     MIFF_REGISTER) == 0 &&
 			    (mif6table[mifi].m6_flags & MIFF_REGISTER) == 0 &&
-			    (in6_addr2scopeid(ifp, &ip6->ip6_dst) !=
-			     in6_addr2scopeid(mif6table[mifi].m6_ifp,
-					      &ip6->ip6_dst) ||
-			     in6_addr2scopeid(ifp, &ip6->ip6_src) !=
-			     in6_addr2scopeid(mif6table[mifi].m6_ifp,
-					      &ip6->ip6_src))) {
+			    (in6_addr2zoneid(ifp, &ip6->ip6_dst) !=
+			     in6_addr2zoneid(mif6table[mifi].m6_ifp,
+					     &ip6->ip6_dst) ||
+			     in6_addr2zoneid(ifp, &ip6->ip6_src) !=
+			     in6_addr2zoneid(mif6table[mifi].m6_ifp,
+					     &ip6->ip6_src))) {
 				ip6stat.ip6s_badscope++;
 				continue;
 			}

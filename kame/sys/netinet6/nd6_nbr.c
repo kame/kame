@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.73 2001/07/26 06:53:19 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.74 2001/07/29 09:23:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -366,7 +366,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	int icmp6len;
 	int maxlen;
 	caddr_t mac;
-	struct ifnet *outif = NULL;
+	struct sockaddr_in6 sin6_in;
 	
 	if (IN6_IS_ADDR_MULTICAST(taddr6))
 		return;
@@ -446,8 +446,22 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 		if (ln && ln->ln_hold) {
 			hip6 = mtod(ln->ln_hold, struct ip6_hdr *);
 			/* XXX pullup? */
-			if (sizeof(*hip6) < ln->ln_hold->m_len)
-				saddr6 = &hip6->ip6_src;
+			if (sizeof(*hip6) < ln->ln_hold->m_len) {
+				int zone;
+
+				bzero(&sin6_in, sizeof(sin6_in));
+				sin6_in.sin6_family = AF_INET6;
+				sin6_in.sin6_len = sizeof(sin6_in);
+				sin6_in.sin6_addr = hip6->ip6_src;
+				zone = in6_addr2zoneid(ifp,
+						       &sin6_in.sin6_addr);
+				if (zone < 0) /* XXX: should not happen! */
+					goto bad;
+				sin6_in.sin6_scope_id = zone;
+				in6_embedscope(&sin6_in.sin6_addr, &sin6_in,
+					       NULL, NULL);
+				saddr6 = &sin6_in.sin6_addr;
+			}
 			else
 				saddr6 = NULL;
 		} else
@@ -514,12 +528,16 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	/* Don't lookup socket */
 	(void)ipsec_setsocket(m, NULL);
 #endif
-	ip6_output(m, NULL, NULL, dad ? IPV6_DADOUTPUT : 0, &im6o, &outif);
-	if (outif) {
-		icmp6_ifstat_inc(outif, ifs6_out_msg);
-		icmp6_ifstat_inc(outif, ifs6_out_neighborsolicit);
-	}
+	ip6_output(m, NULL, NULL, dad ? IPV6_DADOUTPUT : 0, &im6o, NULL);
+	icmp6_ifstat_inc(ifp, ifs6_out_msg);
+	icmp6_ifstat_inc(ifp, ifs6_out_neighborsolicit);
 	icmp6stat.icp6s_outhist[ND_NEIGHBOR_SOLICIT]++;
+
+	return;
+
+  bad:
+	m_freem(m);
+	return;
 }
 
 /*

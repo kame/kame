@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.233 2001/07/26 08:44:17 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.234 2001/07/29 09:23:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1162,8 +1162,8 @@ icmp6_notify_error(m, off, icmp6len, code)
 			icmp6dst.sin6_addr = eip6->ip6_dst;
 		else
 			icmp6dst.sin6_addr = *finaldst;
-		icmp6dst.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
-							  &icmp6dst.sin6_addr);
+		icmp6dst.sin6_scope_id = in6_addr2zoneid(m->m_pkthdr.rcvif,
+							 &icmp6dst.sin6_addr);
 #ifndef SCOPEDROUTING
 		if (in6_embedscope(&icmp6dst.sin6_addr, &icmp6dst,
 				   NULL, NULL)) {
@@ -1182,8 +1182,8 @@ icmp6_notify_error(m, off, icmp6len, code)
 		icmp6src.sin6_len = sizeof(struct sockaddr_in6);
 		icmp6src.sin6_family = AF_INET6;
 		icmp6src.sin6_addr = eip6->ip6_src;
-		icmp6src.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
-							  &icmp6src.sin6_addr);
+		icmp6src.sin6_scope_id = in6_addr2zoneid(m->m_pkthdr.rcvif,
+							 &icmp6src.sin6_addr);
 #ifndef SCOPEDROUTING
 		if (in6_embedscope(&icmp6src.sin6_addr, &icmp6src,
 				   NULL, NULL)) {
@@ -1456,8 +1456,8 @@ ni6_input(m, off)
 			/* m_pulldown instead of copy? */
 			m_copydata(m, off + sizeof(struct icmp6_nodeinfo),
 			    subjlen, (caddr_t)&sin6.sin6_addr);
-			sin6.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
-							      &sin6.sin6_addr);
+			sin6.sin6_scope_id = in6_addr2zoneid(m->m_pkthdr.rcvif,
+							     &sin6.sin6_addr);
 #ifndef SCOPEDROUTING
 			in6_embedscope(&sin6.sin6_addr, &sin6, NULL, NULL);
 #endif
@@ -1465,8 +1465,8 @@ ni6_input(m, off)
 			sin6_d.sin6_family = AF_INET6; /* not used, actually */
 			sin6_d.sin6_len = sizeof(sin6_d); /* ditto */
 			sin6_d.sin6_addr = ip6->ip6_dst;
-			sin6_d.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
-								&ip6->ip6_dst);
+			sin6_d.sin6_scope_id = in6_addr2zoneid(m->m_pkthdr.rcvif,
+							       &ip6->ip6_dst);
 #ifndef SCOPEDROUTING
 			in6_embedscope(&sin6_d.sin6_addr, &sin6_d, NULL, NULL);
 #endif
@@ -2698,7 +2698,7 @@ icmp6_redirect_output(m0, rt)
 	src_sa.sin6_len = sizeof(src_sa);
 	src_sa.sin6_addr = sip6->ip6_src;
 	/* we don't currently use sin6_scope_id, but eventually use it */
-	src_sa.sin6_scope_id = in6_addr2scopeid(ifp, &sip6->ip6_src);
+	src_sa.sin6_scope_id = in6_addr2zoneid(ifp, &sip6->ip6_src);
 	if (nd6_is_addr_neighbor(&src_sa, ifp) == 0)
 		goto fail;
 	if (IN6_IS_ADDR_MULTICAST(&sip6->ip6_dst))

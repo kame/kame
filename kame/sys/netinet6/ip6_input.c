@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.208 2001/07/26 06:53:17 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.209 2001/07/29 09:23:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -850,7 +850,7 @@ ip6_input(m)
 		dst6->sin6_addr = ip6->ip6_dst;
 #ifdef SCOPEDROUTING
 		ip6_forward_rt.ro_dst.sin6_scope_id =
-			in6_addr2scopeid(m->m_pkthdr.rcvif, &ip6->ip6_dst);
+			in6_addr2zoneid(m->m_pkthdr.rcvif, &ip6->ip6_dst);
 #endif
 
 #ifdef __FreeBSD__

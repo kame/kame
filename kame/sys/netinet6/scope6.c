@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.13 2001/07/25 05:18:02 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.14 2001/07/29 09:23:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -236,23 +236,44 @@ struct in6_addr *addr;
 		if (addr->s6_addr8[15] == 1) /* loopback */
 			return IPV6_ADDR_SCOPE_INTFACELOCAL;
 		if (addr->s6_addr8[15] == 0) /* unspecified */
-			return IPV6_ADDR_SCOPE_LINKLOCAL; /* XXX: correct? */
+			return IPV6_ADDR_SCOPE_GLOBAL; /* XXX: correct? */
 	}
 
 	return IPV6_ADDR_SCOPE_GLOBAL;
 }
 
 int
-in6_addr2scopeid(ifp, addr)
+in6_addr2zoneid(ifp, addr)
 	struct ifnet *ifp;	/* must not be NULL */
 	struct in6_addr *addr;	/* must not be NULL */
 {
-	int scope = in6_addrscope(addr);
+	int scope;
 
-	if (scope6_ids == NULL)	/* paranoid? */
-		return(0);	/* XXX */
-	if (ifp->if_index >= if_indexlim)
-		return(0);	/* XXX */
+	if (scope6_ids == NULL) { /* should not happen */
+#ifdef DIAGNOSTIC
+		panic("in6_addr2zoneid: scope array is NULL");
+#endif
+		return(-1);	/* XXX */
+	}
+	if (ifp->if_index >= if_indexlim) {
+#ifdef DIAGNOSTIC
+		panic("in6_addr2zoneid: invalid interface");
+#endif
+		return(-1);	/* XXX */
+	}
+
+	/*
+	 * special case: the loopback address can only belong to a loopback
+	 * interface.
+	 */
+	if (IN6_IS_ADDR_LOOPBACK(addr)) {
+		if (!(ifp->if_flags & IFF_LOOPBACK))
+			return(-1);
+		else
+			return(0); /* there's no ambiguity */
+	}
+
+	scope = in6_addrscope(addr);
 
 #define SID scope6_ids[ifp->if_index]
 	switch(scope) {

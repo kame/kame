@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.62 2001/07/24 17:31:12 suz Exp $	*/
+/*	$KAME: in6_var.h,v 1.63 2001/07/29 09:23:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -697,7 +697,7 @@ struct in6_ifaddr *in6ifa_ifpforlinklocal __P((struct ifnet *, int));
 struct in6_ifaddr *in6ifa_ifpwithaddr __P((struct ifnet *,
 					     struct in6_addr *));
 char	*ip6_sprintf __P((const struct in6_addr *));
-int	in6_addr2scopeid __P((struct ifnet *, struct in6_addr *));
+int	in6_addr2zoneid __P((struct ifnet *, struct in6_addr *));
 int	in6_matchlen __P((struct in6_addr *, struct in6_addr *));
 int	in6_are_prefix_equal __P((struct in6_addr *p1, struct in6_addr *p2,
 				  int len));
