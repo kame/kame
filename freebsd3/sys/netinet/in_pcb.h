@@ -166,13 +166,14 @@ struct inpcb {
 		/* IPV6_CHECKSUM setsockopt */
 		int inp6_cksum;
 		u_short	inp6_ifindex;
+		short	inp6_hops;
 		u_int8_t inp6_hlim;
 	} inp_depend6;
 #define in6p_faddr	inp_dependfaddr.inp6_foreign
 #define in6p_laddr	inp_dependladdr.inp6_local
 #define in6p_route	inp_dependroute.inp6_route
 #define in6p_ip6_hlim	inp_depend6.inp6_hlim
-#define in6p_hops	inp_ip_ttl		/* default hop limit */
+#define in6p_hops	inp_depend6.inp6_hops	/* default hop limit */
 #define in6p_ip6_nxt	inp_ip_p
 #define in6p_flowinfo	inp_flow
 #define in6p_vflag	inp_vflag
