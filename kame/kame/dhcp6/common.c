@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.59 2002/05/24 09:09:46 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.60 2002/06/11 06:00:23 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1228,13 +1228,9 @@ dhcp6_reset_timer(ev)
 			 * greater than IRT by choosing RAND to be strictly
 			 * greater than 0.
 			 * [dhcpv6-24 17.1.2]
-			 * Note: since RAND is between -0.1 and +0.1, RT is
-			 * always greater than IRT, regardless of the value
-			 * of RAND.  However, the authors of the draft chose
-			 * to leave the spec as is.
 			 */
-			r = (double)(random() % 1000) / 10000;
-			n = 2 * ev->init_retrans + r * ev->init_retrans;
+			r = (double)((random() % 1000) + 1) / 10000;
+			n = ev->init_retrans + r * ev->init_retrans;
 		} else {
 			r = (double)((random() % 2000) - 1000) / 10000;
 
@@ -1242,7 +1238,7 @@ dhcp6_reset_timer(ev)
 				n = 2 * ev->init_retrans +
 					r * ev->init_retrans;
 			} else
-				n = 2 * ev->retrans + r * ev->retrans;
+				n = ev->retrans + r * ev->retrans;
 		}
 		if (ev->max_retrans_time && n > ev->max_retrans_time)
 			n = ev->max_retrans_time + r * ev->max_retrans_time;
