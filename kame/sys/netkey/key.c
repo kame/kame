@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.91 2000/05/08 02:52:59 itojun Exp $	*/
+/*	$KAME: key.c,v 1.92 2000/05/08 03:09:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -435,7 +435,8 @@ static struct secacq *key_getacq __P((struct secasindex *));
 static struct secacq *key_getacqbyseq __P((u_int32_t));
 static struct secspacq *key_newspacq __P((struct secpolicyindex *));
 static struct secspacq *key_getspacq __P((struct secpolicyindex *));
-static struct sadb_msg *key_acquire2 __P((caddr_t *));
+static int key_acquire2 __P((struct socket *, struct mbuf *,
+	struct sadb_msghdr *));
 static struct sadb_msg *key_register __P((caddr_t *, struct socket *));
 static int key_expire __P((struct secasvar *));
 static int key_flush __P((struct socket *, struct mbuf *,
@@ -5568,55 +5569,56 @@ key_getspacq(spidx)
  * OUT:	NULL if fail.
  *	other if success, return pointer to the message to send.
  */
-static struct sadb_msg *
-key_acquire2(mhp)
-	caddr_t *mhp;
+static int
+key_acquire2(so, m, mhp)
+	struct socket *so;
+	struct mbuf *m;
+	struct sadb_msghdr *mhp;
 {
-	struct sadb_msg *msg0;
 	struct sadb_address *src0, *dst0;
 	struct secasindex saidx;
 	struct secashead *sah;
 	u_int16_t proto;
+	int error;
 
 	/* sanity check */
-	if (mhp == NULL || mhp[0] == NULL)
+	if (so == NULL || m == NULL || mhp == NULL || mhp->msg == NULL)
 		panic("key_acquire2: NULL pointer is passed.\n");
-
-	msg0 = (struct sadb_msg *)mhp[0];
 
 	/*
 	 * Error message from KMd.
 	 * We assume that if error was occured in IKEd, the length of PFKEY
 	 * message is equal to the size of sadb_msg structure.
-	 * We return ~0 even if error occured in this function.
+	 * We do not raise error even if error occured in this function.
 	 */
-	if (msg0->sadb_msg_len == PFKEY_UNIT64(sizeof(struct sadb_msg))) {
-
+	if (mhp->msg->sadb_msg_len == PFKEY_UNIT64(sizeof(struct sadb_msg))) {
 #ifndef IPSEC_NONBLOCK_ACQUIRE
 		struct secacq *acq;
 
 		/* check sequence number */
-		if (msg0->sadb_msg_seq == 0) {
+		if (mhp->msg->sadb_msg_seq == 0) {
 #ifdef IPSEC_DEBUG
 			printf("key_acquire2: must specify sequence number.\n");
 #endif
-			return (struct sadb_msg *)~0;
+			m_freem(m);
+			return 0;
 		}
 
-		if ((acq = key_getacqbyseq(msg0->sadb_msg_seq)) == NULL) {
+		if ((acq = key_getacqbyseq(mhp->msg->sadb_msg_seq)) == NULL) {
 #ifdef IPSEC_DEBUG
 			printf("key_acquire2: "
 				"invalid sequence number is passed.\n");
 #endif
-			return (struct sadb_msg *)~0;
+			m_freem(m);
+			return 0;
 		}
 
 		/* reset acq counter in order to deletion by timehander. */
 		acq->tick = key_blockacq_lifetime;
 		acq->count = 0;
 #endif
-		return (struct sadb_msg *)~0;
-		/* NOTREACHED */
+		m_freem(m);
+		return 0;
 	}
 
 	/*
@@ -5624,69 +5626,56 @@ key_acquire2(mhp)
 	 */
 
 	/* map satype to proto */
-	if ((proto = key_satype2proto(msg0->sadb_msg_satype)) == 0) {
+	if ((proto = key_satype2proto(mhp->msg->sadb_msg_satype)) == 0) {
 #ifdef IPSEC_DEBUG
 		printf("key_acquire2: invalid satype is passed.\n");
 #endif
-		msg0->sadb_msg_errno = EINVAL;
-		return NULL;
+		return key_senderror(so, m, EINVAL);
 	}
 
-	if (mhp[SADB_EXT_ADDRESS_SRC] == NULL
-	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
-	 || mhp[SADB_EXT_PROPOSAL] == NULL) {
+	if (mhp->ext[SADB_EXT_ADDRESS_SRC] == NULL ||
+	    mhp->ext[SADB_EXT_ADDRESS_DST] == NULL ||
+	    mhp->ext[SADB_EXT_PROPOSAL] == NULL) {
 		/* error */
 #ifdef IPSEC_DEBUG
 		printf("key_acquire2: invalid message is passed.\n");
 #endif
-		msg0->sadb_msg_errno = EINVAL;
-		return NULL;
+		return key_senderror(so, m, EINVAL);
 	}
-	src0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_SRC]);
-	dst0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_DST]);
+	if (mhp->extlen[SADB_EXT_ADDRESS_SRC] < sizeof(struct sadb_address) ||
+	    mhp->extlen[SADB_EXT_ADDRESS_DST] < sizeof(struct sadb_address) ||
+	    mhp->extlen[SADB_EXT_PROPOSAL] < sizeof(struct sadb_prop)) {
+		/* error */
+#ifdef IPSEC_DEBUG
+		printf("key_acquire2: invalid message is passed.\n");
+#endif
+		return key_senderror(so, m, EINVAL);
+	}
+
+	src0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_SRC];
+	dst0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_DST];
 
 	/* XXX boundary check against sa_len */
-	KEY_SETSECASIDX(proto, msg0, src0+1, dst0+1, &saidx);
+	KEY_SETSECASIDX(proto, mhp->msg, src0+1, dst0+1, &saidx);
 
 	/* get a SA index */
 	if ((sah = key_getsah(&saidx)) != NULL) {
 #ifdef IPSEC_DEBUG
 		printf("key_acquire2: a SA exists already.\n");
 #endif
-		msg0->sadb_msg_errno = EEXIST;
-		return NULL;
+		return key_senderror(so, m, EEXIST);
 	}
 
-	msg0->sadb_msg_errno = key_acquire(&saidx, NULL);
-	if (msg0->sadb_msg_errno != 0) {
+	error = key_acquire(&saidx, NULL);
+	if (error != 0) {
 #ifdef IPSEC_DEBUG
 		printf("key_acquire2: error %d returned "
-			"from key_acquire.\n", msg0->sadb_msg_errno);
+			"from key_acquire.\n", mhp->msg->sadb_msg_errno);
 #endif
-		return NULL;
+		return key_senderror(so, m, error);
 	}
 
-    {
-	struct sadb_msg *newmsg;
-	u_int len;
-
-	/* create new sadb_msg to reply. */
-	len = PFKEY_UNUNIT64(msg0->sadb_msg_len);
-
-	KMALLOC(newmsg, struct sadb_msg *, len);
-	if (newmsg == NULL) {
-#ifdef IPSEC_DEBUG
-		printf("key_acquire2: No more memory.\n");
-#endif
-		msg0->sadb_msg_errno = ENOBUFS;
-		return NULL;
-	}
-	bzero((caddr_t)newmsg, len);
-
-	bcopy(mhp[0], (caddr_t)newmsg, len);
-
-	return newmsg;
-    }
+	return key_sendup_mbuf(so, m, KEY_SENDUP_REGISTERED);
 }
 
 /*
@@ -6552,19 +6541,8 @@ key_parse(m, so)
 	case SADB_GET:	/*almost done*/
 		return key_get(so, m, &mh);
 
-	case SADB_ACQUIRE:
-		if ((newmsg = key_acquire2((caddr_t *)mh.ext)) == NULL)
-			goto sendback;
-
-		if (newmsg == (struct sadb_msg *)~0) {
-			/*
-			 * It's not need to reply because of the message
-			 * that was reporting an error occured from the KMd.
-			 */
-			m_freem(m);
-			return 0;
-		}
-		break;
+	case SADB_ACQUIRE:	/*done*/
+		return key_acquire2(so, m, &mh);
 
 	case SADB_REGISTER:
 		if ((newmsg = key_register((caddr_t *)mh.ext, so)) == NULL)
