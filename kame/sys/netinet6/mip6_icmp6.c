@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.9 2001/09/11 11:25:11 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.10 2001/09/13 16:00:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -198,6 +198,8 @@ mip6_icmp6_input(m, off, icmp6len)
 			/*
 			 * all IPv6 node must support a home address option.
 			 */
+			mip6_icmp6_find_addr((caddr_t)icmp6, icmp6len,
+					     &laddr, &paddr);
 			mip6log((LOG_NOTICE,
 				 "%s: a node (%s) doesn't support "
 				 "a home address destopt.\n",
