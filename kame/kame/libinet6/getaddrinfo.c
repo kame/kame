@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.135 2002/07/01 07:22:22 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.136 2002/07/01 07:38:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -422,6 +422,7 @@ str_isnumber(p)
 	if (*p == '\0')
 		return NO;
 	ep = NULL;
+	errno = 0;
 	(void)strtoul(p, &ep, 10);
 	if (errno == 0 && ep && *ep == '\0')
 		return YES;
@@ -1755,6 +1756,7 @@ ip6_str2scopeid(scope, sin6)
 
 	/* try to convert to a numeric id as a last resort */
 trynumeric:
+	errno = 0;
 	lscopeid = strtoul(scope, &ep, 10);
 	scopeid = lscopeid & 0xffffffff;
 	if (errno == 0 && ep && *ep == '\0' && scopeid == lscopeid)
