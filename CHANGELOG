@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.5 1999/08/11 14:36:15 itojun Exp $
+$Id: CHANGELOG,v 1.6 1999/08/12 05:44:39 itojun Exp $
 
 <199908>
+Thu Aug 12 14:42:25 JST 1999  itojun@iijlab.net
+	* kame/kame/racoon: make idea.h optional.  now you can install SSLeay
+	  without idea, and build racoon (some users need this for patent
+	  issues).
+
 Wed Aug 11 21:18:08 JST 1999  itojun@iijlab.net
 	* netbsd/lib/libwrap: libwrap that handles IPv6 correctly.
 	  IPv6 address should be wrapped in square bracket to avoid
