@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)ifconfig.c	8.2 (Berkeley) 2/16/94";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.51.2.19 2003/01/28 11:02:56 fjoe Exp $";
+  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.51.2.21 2004/03/15 07:25:30 ru Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -242,6 +242,8 @@ struct	cmd {
 	{ "-link1",	-IFF_LINK1,	setifflags },
 	{ "link2",	IFF_LINK2,	setifflags },
 	{ "-link2",	-IFF_LINK2,	setifflags },
+	{ "staticarp",	IFF_STATICARP,	setifflags },
+	{ "-staticarp",	-IFF_STATICARP,	setifflags },
 #ifdef USE_IF_MEDIA
 	{ "media",	NEXTARG,	setmedia },
 	{ "mediaopt",	NEXTARG,	setmediaopt },
@@ -1147,10 +1149,10 @@ setifmtu(val, dummy, s, afp)
 #define	IFFBITS \
 "\020\1UP\2BROADCAST\3DEBUG\4LOOPBACK\5POINTOPOINT\6SMART\7RUNNING" \
 "\10NOARP\11PROMISC\12ALLMULTI\13OACTIVE\14SIMPLEX\15LINK0\16LINK1\17LINK2" \
-"\20MULTICAST"
+"\20MULTICAST\21POLLING\24STATICARP"
 
 #define	IFCAPBITS \
-"\003\1rxcsum\2txcsum\3netcons"
+"\020\1RXCSUM\2TXCSUM\3NETCONS"
 
 /*
  * Print the status of the interface.  If an address family was
