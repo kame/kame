@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.107 2003/12/17 01:04:58 itojun Exp $
+.\"	$KAME: racoon.conf.5,v 1.108 2003/12/17 01:42:25 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -534,8 +534,10 @@ If you do not require PFS then you can omit this directive.
 Any proposal will be accepted if you do not specify one.
 .Ar group
 is one of following:
-.Ic modp768 , modp1024 , modp1536 .
-Or you can define 1, 2, or 5 as the DH group number.
+.Ic modp768 , modp1024 , modp1536 ,
+.Ic modp2048 , modp3072 , modp4096 ,
+.Ic modp6144 , modp8192 .
+Or you can define 1, 2, 5, 14, 15, 16, 17 or 18 as the DH group number.
 .\"
 .It Ic lifetime time Ar number Ar timeunit ;
 define the lifetime of amount of time
