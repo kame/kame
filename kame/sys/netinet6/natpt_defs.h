@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.60 2002/12/04 05:00:32 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.61 2002/12/09 08:21:27 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -89,8 +89,9 @@
 #define	NATPTCTL_FORCEFRAGMENT4	(NATPTCTL_PREFIX+1)
 #define	NATPTCTL_USELOG		(NATPTCTL_FORCEFRAGMENT4+1)
 #define	NATPTCTL_USESYSLOG	(NATPTCTL_USELOG+1)
+#define	NATPTCTL_SESSIONS	(NATPTCTL_USESYSLOG+1)
 
-#define	NATPTCTL_CSLHEAD	(NATPTCTL_USESYSLOG+1)
+#define	NATPTCTL_CSLHEAD	(NATPTCTL_SESSIONS+1)
 #define	NATPTCTL_TSLHEAD	(NATPTCTL_CSLHEAD+1)
 
 #define	NATPTCTL_TSLOTTIMER	(NATPTCTL_TSLHEAD+1)
@@ -112,6 +113,7 @@
 	{ "forcefragment4",	NATPTCTL_INT,	NATPTCTL_DEFAULT },	\
 	{ "uselog",	NATPTCTL_INT,	NATPTCTL_DEFAULT },	\
 	{ "usesyslog",	NATPTCTL_INT,	NATPTCTL_DEFAULT },	\
+	{ "sessions",	NATPTCTL_INT,	NATPTCTL_DEFAULT },	\
 								\
 	{ "cSlotHead",	NATPTCTL_CADDR_T,	NATPTCTL_CADDR },	\
 	{ "tSlotHead",	NATPTCTL_CADDR_T,	NATPTCTL_CADDR },	\
@@ -135,6 +137,7 @@
 	(caddr_t)&natpt_forceFragment4,	\
 	(caddr_t)&natpt_uselog,		\
 	(caddr_t)&natpt_usesyslog,	\
+	(caddr_t)&natpt_dummy,	\
 }
 
 

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.67 2002/12/04 05:00:32 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.68 2002/12/09 08:21:27 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1108,6 +1108,8 @@ natpt_init_tslot()
 		TAILQ_INIT(&tslhashl[iter].tslhead);
 		TAILQ_INIT(&tslhashr[iter].tslhead);
 	}
+
+	natptctl_vars[NATPTCTL_SESSIONS] = (caddr_t)&tSlotEntryUsed;
 
 	natptctl_vars[NATPTCTL_TSLHEAD] = (caddr_t)&tsl_head;
 
