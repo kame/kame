@@ -858,12 +858,15 @@ ifinfo(argc, argv)
 			cp++;
 		}
 
-#define SETFLAG(s, f) if (strcmp(cp, (s)) == 0) {\
+#define SETFLAG(s, f) \
+	do {\
+		if (strcmp(cp, (s)) == 0) {\
 			if (clear)\
 				newflags &= ~(f);\
 			else\
 				newflags |= (f);\
-		}
+		}\
+	} while (0)
 		SETFLAG("nud", ND6_IFF_PERFORMNUD);
 
 		ND.flags = newflags;
