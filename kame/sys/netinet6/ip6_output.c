@@ -603,7 +603,7 @@ skip_ipsec2:;
 		 * Check if the outgoing interface conflicts with
 		 * the interface specified by ifi6_ifindex (if specified).
 		 * Note that loopback interface is always okay.
-		 * (this may happen when we are sending packet to one of
+		 * (this may happen when we are sending a packet to one of
 		 *  our own addresses.)
 		 */
 		if (opt && opt->ip6po_pktinfo
