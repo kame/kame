@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1712 2001/06/07 13:23:54 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1713 2001/06/07 23:31:38 itojun Exp $
 
 <200106>
+Fri Jun  8 08:28:56 JST 2001  itojun@iijlab.net
+	* sys/net/if_stf.c: inject outgoing packet to bpf.  KAME PR 358
+
 2001-06-07  Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_tslot.c (checkTracerouteReturn):
 	- Translate incoming IPv4 ICMP_UNREACH packet when this
