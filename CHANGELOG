@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2569 2004/03/17 15:39:18 jinmei Exp $
+$KAME: CHANGELOG,v 1.2570 2004/03/18 05:21:18 suz Exp $
 
 <200403>
 2004-03-17  MOMOSE Tsuyoshi  <momose@az.jp.nec.com>
@@ -13,8 +13,8 @@ Wed Mar 17 08:47:58 JST 2004  itojun@iijlab.net
 	* netbsd: switch to 1.6.2
 
 2004-03-16  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
-	* kame/sys/netinet6/{ip6_output.c, mldv2.c}: IGMPv3/MLDv2 is 
-	revived!
+	* kame/sys/netinet6/{ip6_output.c, mldv2.c, in6_msf.c}:
+	IGMPv3/MLDv2 is revived!
 
 2004-03-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/kern/uipc_syscalls.c (sockargs): allow more than
