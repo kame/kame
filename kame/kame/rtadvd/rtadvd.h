@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.h,v 1.21 2002/05/31 13:30:38 jinmei Exp $	*/
+/*	$KAME: rtadvd.h,v 1.22 2002/06/06 11:55:36 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -89,7 +89,7 @@ struct prefix {
 	u_int routeraddr;	/* bool: RouterAddress */
 #endif
 	int prefixlen;
-	int origin;		/* from kernel or cofig */
+	int origin;		/* from kernel or config */
 	struct in6_addr prefix;
 };
 
