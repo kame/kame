@@ -604,6 +604,7 @@ if test "$liblwres_dir" != "no"; then
 		exit 1
 	fi
 fi
+AC_CHECK_FUNCS(getrrsetbyname)
 
 dnl Checks for header files.
 AC_HEADER_STDC
