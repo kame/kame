@@ -342,10 +342,8 @@ tcp6_usrreq(so, req, m, nam, control)
 		 * template for a listening socket and hence the kernel
 		 * will panic.
 		 */
-		if ((t6p->t_in6pcb->in6p_socket->so_state &
-		     (SS_ISCONNECTED|SS_ISCONNECTING)) == 0)
-			break;
-		(void) tcp6_output(t6p);
+		if ((so->so_state & (SS_ISCONNECTED|SS_ISCONNECTING)) != 0)
+			(void) tcp6_output(t6p);
 		break;
 
 	/*
