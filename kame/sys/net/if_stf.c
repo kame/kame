@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.88 2002/10/08 07:18:09 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.89 2002/11/05 03:02:28 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -263,12 +263,18 @@ stfattach(dummy)
 		sc->sc_if.if_ioctl  = stf_ioctl;
 		sc->sc_if.if_output = stf_output;
 		sc->sc_if.if_type   = IFT_STF;
+#ifdef __NetBSD__
+		sc->sc_if.if_dlt = DLT_NULL;
+#endif
 		/* turn off ingress filter */
 		sc->sc_if.if_flags  |= IFF_LINK2;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 		sc->sc_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
 #endif
 		if_attach(&sc->sc_if);
+#ifdef __NetBSD__
+		if_alloc_sadl(&sc->sc_if);
+#endif
 #if NBPFILTER > 0
 #ifdef HAVE_NEW_BPFATTACH
 		bpfattach(&sc->sc_if, DLT_NULL, sizeof(u_int));
