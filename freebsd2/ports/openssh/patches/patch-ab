@@ -1,21 +1,11 @@
---- Makefile.inc.orig	Wed Feb  9 01:00:11 2000
-+++ Makefile.inc	Wed Feb  9 01:08:09 2000
-@@ -2,10 +2,14 @@
+--- ssh_config-	Fri Feb  9 22:21:29 2001
++++ ssh_config	Fri Feb  9 22:21:37 2001
+@@ -13,7 +13,7 @@
+ # Site-wide defaults for various options
  
- .include <bsd.obj.mk>
- 
--.if exists(${.CURDIR}/../lib/${__objdir})
--LDADD+=         -L${.CURDIR}/../lib/${__objdir} -lssh
--DPADD+=         ${.CURDIR}/../lib/${__objdir}/libssh.a
--.else
-+AFS?=		no
-+KERBEROS?=	no
-+PAM?=		no
-+SKEY?=		no
-+TCP_WRAPPERS?=	yes
-+.if !defined(MAKEFILE_INC_FIRST_PASS)
-+MAKEFILE_INC_FIRST_PASS=	0
-+CFLAGS+=	-I${PREFIX}/include ${INET6FLAGS}
- LDADD+=         -L${.CURDIR}/../lib -lssh
- DPADD+=         ${.CURDIR}/../lib/libssh.a
- .endif
+ # Host *
+-#   ForwardAgent yes
++#   ForwardAgent no
+ #   ForwardX11 yes
+ #   RhostsAuthentication yes
+ #   RhostsRSAAuthentication yes
