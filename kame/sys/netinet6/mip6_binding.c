@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.78 2002/02/01 04:46:58 jinmei Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.79 2002/02/01 05:38:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2653,7 +2653,13 @@ success:
 			/* XXX or mbu_haddr.  XXX scope consideration  */
 			sa6.sin6_addr = mbu->mbu_coa;
 
-			ifa = ifa_ifwithaddr((struct sockaddr *)&sa6);
+			if ((ifa = ifa_ifwithaddr((struct sockaddr *)&sa6))
+			    == NULL) {
+				mip6log((LOG_ERR,
+					 "%s:%d: can't find CoA interface\n",
+					 __FILE__, __LINE__));
+				return(EINVAL);	/* XXX */
+			}
 
 			bzero(&daddr, sizeof(daddr));
 			daddr.sin6_family = AF_INET6;
