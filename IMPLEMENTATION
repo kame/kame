@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/12/21 11:36:44 $
+			$Date: 1999/12/22 06:31:38 $
 
 1. IPv6
 
@@ -580,8 +580,7 @@ Comments on listening side:
 It looks that RFC2553 talks too little on wildcard bind issue,
 especially on the port space issue, failure mode and relationship
 between AF_INET/INET6 wildcard bind.  There can be several separate
-interpretation for this RFC (see 1.12.2 - we have two different
-implementation for this, and RFC2553 seems to fit to both of them).
+interpretation for this RFC which conform to it but behaves differently.
 So, to implement portable application you should assume nothing
 about the behavior in the kernel.  Using getaddrinfo() is the safest way.
 Port number space and wildcard bind issues were discussed in detail
@@ -593,19 +592,19 @@ kernel bind(2).  The tool will not be compiled by default.
 
 If a server application would like to accept IPv4 and IPv6 connections,
 it should use AF_INET and AF_INET6 socket (you'll need two sockets).
-Applications should use proper socket for connections.  IPv4 connections
-must be made on AF_INET socket, and IPv6 connections must be made
-on AF_INET6 socket.  getaddrinfo() library helps you in writing
-AF-independent application, and managing sockets with different AFs.
 Use getaddrinfo() with AI_PASSIVE into ai_flags, and socket(2) and bind(2)
 to all the addresses returned.
+By opening multiple sockets, you can accept connections onto the socket with
+proper address family.  IPv4 connections will be accepted by AF_INET socket,
+and IPv6 connections will be accepted by AF_INET6 socket (NOTE: KAME/BSDI4
+kernel sometimes violate this - we will fix it).
 
 If you try to support IPv6 traffic only and would like to reject IPv4
 traffic, always check the peer address when a connection is made toward
 AF_INET6 listening socket.  If the address is IPv4 mapped address, you may
 want to reject the connection.  You can check the condition by using
-IN6_IS_ADDR_V4MAPPED() macro.  This is one of the reasons the author (itojun)
-dislikes special behavior of AF_INET6 wildcard bind.
+IN6_IS_ADDR_V4MAPPED() macro.  This is one of the reasons the author of
+the section (itojun) dislikes special behavior of AF_INET6 wildcard bind.
 
 Comments on initiating side:
 
@@ -615,22 +614,18 @@ is the key to the success:
 - NEVER hardcode AF_INET nor AF_INET6.
 - Use getaddrinfo() and getnameinfo() throughout the system.
   Never use gethostby*(), getaddrby*(), inet_*() or getipnodeby*().
-- If you would like to listen to connections, use getaddrinfo() (maybe
-  with AI_PASSIVE), and make sockets for all the "struct addrinfo" returned.
 - If you would like to connect to destination, use getaddrinfo() and try
   all the destination returned, like telnet does.
 - Some of the IPv6 stack is shipped with buggy getaddrinfo().  Ship a minimal
   working version with your application and use that as last resort.
-- Try to avoid use of IPv4 mapped address (waiting for IPv4 connection on
-  AF_INET6 socket).  Listen to both AF_INET socket and AF_INET6 socket,
-  if you support both address families.
 
 If you would like to use AF_INET6 socket for both IPv4 and IPv6 outgoing
 connection, you will need tweaked implementation in DNS support libraries,
 as documented in RFC2553 6.1.  KAME libinet6 includes the tweak in
 getipnodebyname().  Note that getipnodebyname() itself is not recommended as
 it does not handle scoped IPv6 addresses at all.  For IPv6 name resolution
-getaddrinfo() is the preferred API.
+getaddrinfo() is the preferred API.  getaddrinfo() does not implement the
+tweak.
 
 When writing applications that make outgoing connections, story goes much
 simpler if you treat AF_INET and AF_INET6 as totally seaprate address family.
@@ -639,7 +634,7 @@ not recommend you to rely upon IPv4 mapped address.
 
 1.12.1 KAME/BSDI3 and KAME/FreeBSD228
 
-The platform do not support IPv4 mapped address at all (both listening side
+The platforms do not support IPv4 mapped address at all (both listening side
 and initiating side).  AF_INET6 and AF_INET sockets are totally separated.
 
 Port number space is totally separate between AF_INET and
