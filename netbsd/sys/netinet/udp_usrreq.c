@@ -355,8 +355,10 @@ udp6_input(mp, offp, proto)
 #else
 	n = m_pulldown(m, off, sizeof(struct udphdr), &uoff);
 #endif
-	if (n == NULL)
+	if (n == NULL) {
+		ip6stat.ip6s_tooshort++;
 		return IPPROTO_DONE;
+	}
 	if (n->m_len < uoff + sizeof(struct udphdr))
 		panic("m_pulldown malfunction");
 	uh = (struct udphdr *)(mtod(n, caddr_t) + uoff);
