@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_ident.c,v 1.42 2000/09/22 00:27:14 sakane Exp $	*/
+/*	$KAME: isakmp_ident.c,v 1.43 2000/09/22 18:03:09 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.42 2000/09/22 00:27:14 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.43 2000/09/22 18:03:09 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -1218,6 +1218,7 @@ ident_ir2sendmx(iph1)
 
 	/* create CR if need */
 	if (iph1->side == RESPONDER
+	 && iph1->rmconf->send_cr
 	 && oakley_needcr(iph1->approval->authmethod)
 	 && iph1->rmconf->peerscertfile == NULL) {
 		need_cr = 1;
@@ -1350,6 +1351,7 @@ ident_ir3sendmx(iph1)
 
 		/* create CR if need */
 		if (iph1->side == INITIATOR
+		 && iph1->rmconf->send_cr
 	 	 && oakley_needcr(iph1->approval->authmethod)
 		 && iph1->rmconf->peerscertfile == NULL) {
 			need_cr = 1;

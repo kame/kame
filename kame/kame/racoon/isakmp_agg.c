@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_agg.c,v 1.41 2000/09/19 06:49:29 sakane Exp $	*/
+/*	$KAME: isakmp_agg.c,v 1.42 2000/09/22 18:03:09 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.41 2000/09/19 06:49:29 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.42 2000/09/22 18:03:09 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -134,7 +134,8 @@ agg_i1send(iph1, msg)
 		goto end;
 
 	/* create CR if need */
-	if (oakley_needcr(iph1->rmconf->proposal->authmethod)
+	if (iph1->rmconf->send_cr
+	 && oakley_needcr(iph1->rmconf->proposal->authmethod)
 	 && iph1->rmconf->peerscertfile == NULL) {
 		need_cr = 1;
 		cr = oakley_getcr(iph1);
@@ -697,7 +698,8 @@ agg_r1send(iph1, msg)
 		goto end;
 
 	/* create CR if need */
-	if (oakley_needcr(iph1->approval->authmethod)
+	if (iph1->rmconf->send_cr
+	 && oakley_needcr(iph1->approval->authmethod)
 	 && iph1->rmconf->peerscertfile == NULL) {
 		need_cr = 1;
 		cr = oakley_getcr(iph1);

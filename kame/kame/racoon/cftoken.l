@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.37 2000/09/22 17:25:03 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.38 2000/09/22 18:03:09 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -273,6 +273,7 @@ octetstring	{octet}({dot}{octet})+
 <S_RMTS>peers_certfile	{ YYD; return(PEERS_CERTFILE); }
 <S_RMTS>verify_cert	{ YYD; return(VERIFY_CERT); }
 <S_RMTS>send_cert	{ YYD; return(SEND_CERT); }
+<S_RMTS>send_cr		{ YYD; return(SEND_CR); }
 <S_RMTS>dh_group	{ YYD; return(DH_GROUP); }
 <S_RMTS>nonce_size	{ YYD; return(NONCE_SIZE); }
 <S_RMTS>generate_policy	{ YYD; return(GENERATE_POLICY); }

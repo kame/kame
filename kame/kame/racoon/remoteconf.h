@@ -1,4 +1,4 @@
-/*	$KAME: remoteconf.h,v 1.15 2000/09/13 05:58:34 sakane Exp $	*/
+/*	$KAME: remoteconf.h,v 1.16 2000/09/22 18:03:09 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: remoteconf.h,v 1.15 2000/09/13 05:58:34 sakane Exp $ */
+/* YIPS @(#)$Id: remoteconf.h,v 1.16 2000/09/22 18:03:09 sakane Exp $ */
 
 /* remote configuration */
 
@@ -54,6 +54,7 @@ struct remoteconf {
 	char *myprivfile;		/* file name of my private key file */
 	char *peerscertfile;		/* file name of peer's certifcate */
 	int send_cert;			/* send to CERT or not */
+	int send_cr;			/* send to CR or not */
 	int verify_cert;		/* verify a CERT strictly */
 	int nonce_size;			/* the number of bytes of nonce */
 	int keepalive;			/* XXX may not use */

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.69 2000/09/22 17:25:03 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.70 2000/09/22 18:03:09 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -151,7 +151,7 @@ static int expand_isakmpspec __P((int, int, int *,
 	/* remote */
 %token REMOTE ANONYMOUS
 %token EXCHANGE_MODE EXCHANGETYPE DOI DOITYPE SITUATION SITUATIONTYPE
-%token CERTIFICATE_TYPE CERTTYPE PEERS_CERTFILE VERIFY_CERT SEND_CERT
+%token CERTIFICATE_TYPE CERTTYPE PEERS_CERTFILE VERIFY_CERT SEND_CERT SEND_CR
 %token CERT_X509
 %token NONCE_SIZE DH_GROUP KEEPALIVE INITIAL_CONTACT
 %token PROPOSAL_CHECK PROPOSAL_CHECK_LEVEL
@@ -1015,6 +1015,7 @@ remote_spec
 		EOS
 	|	VERIFY_CERT SWITCH EOS { cur_rmconf->verify_cert = $2; }
 	|	SEND_CERT SWITCH EOS { cur_rmconf->send_cert = $2; }
+	|	SEND_CR SWITCH EOS { cur_rmconf->send_cr = $2; }
 	|	IDENTIFIER IDENTIFIERTYPE EOS { cur_rmconf->identtype = $2; }
 	|	NONCE_SIZE NUMBER EOS { cur_rmconf->nonce_size = $2; }
 	|	DH_GROUP
