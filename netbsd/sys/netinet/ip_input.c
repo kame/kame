@@ -1792,9 +1792,9 @@ ip_forward(m, srcrt)
 				 */
 				/*XXX*/
 				destifp = NULL;
-				if (sp->req != NULL
-				 && sp->req->sav != NULL
-				 && sp->req->sav->sah != NULL) {
+				if (sp->req != NULL &&
+				    sp->req->sav != NULL &&
+				    sp->req->sav->sah != NULL) {
 					ro = &sp->req->sav->sah->sa_route;
 					if (ro->ro_rt && ro->ro_rt->rt_ifp) {
 						dummyifp.if_mtu =
