@@ -711,9 +711,6 @@ findpcb:
 					    == 0)
 						m_freem(newopts.head);
 				}
-#if 0
-				in6p->in6p_recvoptions = NULL;
-#endif
 			}
 #ifdef IPSEC
 			/* copy old policy into new socket's */
