@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.45 2002/01/11 02:29:30 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.46 2002/01/24 16:40:42 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -460,9 +460,9 @@ play_child(int s_src, struct sockaddr *srcaddr)
 {
 	struct sockaddr_storage dstaddr6;
 	struct sockaddr_storage dstaddr4;
-	char src[MAXHOSTNAMELEN];
-	char dst6[MAXHOSTNAMELEN];
-	char dst4[MAXHOSTNAMELEN];
+	char src[NI_MAXHOST];
+	char dst6[NI_MAXHOST];
+	char dst4[NI_MAXHOST];
 	int len = sizeof(dstaddr6);
 	int s_dst, error, hport, nresvport, on = 1;
 	struct timeval tv;
