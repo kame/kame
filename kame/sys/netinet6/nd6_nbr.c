@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.105 2002/06/07 07:39:10 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.106 2002/06/07 07:42:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -170,14 +170,13 @@ nd6_ns_input(m, off, icmp6len)
 			; /* good */
 		} else {
 			nd6log((LOG_INFO, "nd6_ns_input: bad DAD packet "
-				"(wrong ip6 dst)\n"));
+			    "(wrong ip6 dst)\n"));
 			goto bad;
 		}
 	}
 
 	if (IN6_IS_ADDR_MULTICAST(&taddr6.sin6_addr)) {
-		nd6log((LOG_INFO,
-			"nd6_ns_input: bad NS target (multicast)\n"));
+		nd6log((LOG_INFO, "nd6_ns_input: bad NS target (multicast)\n"));
 		goto bad;
 	}
 
@@ -281,18 +280,16 @@ nd6_ns_input(m, off, icmp6len)
 		goto freeit;
 
 	if (lladdr && ((ifp->if_addrlen + 2 + 7) & ~7) != lladdrlen) {
-		nd6log((LOG_INFO,
-			"nd6_ns_input: lladdrlen mismatch for %s "
-			"(if %d, NS packet %d)\n",
-			ip6_sprintf(&taddr6.sin6_addr), ifp->if_addrlen,
-			lladdrlen - 2));
+		nd6log((LOG_INFO, "nd6_ns_input: lladdrlen mismatch for %s "
+		    "(if %d, NS packet %d)\n",
+		    ip6_sprintf(&taddr6.sin6_addr),
+		    ifp->if_addrlen, lladdrlen - 2));
 		goto bad;
 	}
 
 	if (SA6_ARE_ADDR_EQUAL(&((struct in6_ifaddr *)ifa)->ia_addr, saddr6)) {
-		nd6log((LOG_INFO,
-			"nd6_ns_input: duplicate IP6 address %s\n",
-			ip6_sprintf(&saddr6->sin6_addr)));
+		nd6log((LOG_INFO, "nd6_ns_input: duplicate IP6 address %s\n",
+		    ip6_sprintf(&saddr6->sin6_addr)));
 		goto freeit;
 	}
 
@@ -351,24 +348,23 @@ nd6_ns_input(m, off, icmp6len)
 	}
 
 	nd6_cache_lladdr(ifp, saddr6, lladdr, lladdrlen,
-			 ND_NEIGHBOR_SOLICIT, 0);
+	    ND_NEIGHBOR_SOLICIT, 0);
 
 	nd6_na_output(ifp, saddr6, &taddr6,
-		      ((anycast || proxy || !tlladdr) ? 0 : ND_NA_FLAG_OVERRIDE)
-			| (router ? ND_NA_FLAG_ROUTER : 0)
-			| ND_NA_FLAG_SOLICITED,
-		      tlladdr, (struct sockaddr *)proxydl);
+	    ((anycast || proxy || !tlladdr) ? 0 : ND_NA_FLAG_OVERRIDE) |
+	    (router ? ND_NA_FLAG_ROUTER : 0) | ND_NA_FLAG_SOLICITED,
+	    tlladdr, (struct sockaddr *)proxydl);
  freeit:
 	m_freem(m);
 	return;
 
  bad:
 	nd6log((LOG_ERR, "nd6_ns_input: src=%s\n",
-		ip6_sprintf(&saddr6->sin6_addr)));
+	    ip6_sprintf(&saddr6->sin6_addr)));
 	nd6log((LOG_ERR, "nd6_ns_input: dst=%s\n",
-		ip6_sprintf(&daddr6->sin6_addr)));
+	    ip6_sprintf(&daddr6->sin6_addr)));
 	nd6log((LOG_ERR, "nd6_ns_input: tgt=%s\n",
-		ip6_sprintf(&taddr6.sin6_addr)));
+	    ip6_sprintf(&taddr6.sin6_addr)));
 	icmp6stat.icp6s_badns++;
 	m_freem(m);
 }
@@ -583,10 +579,9 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 					     NULL, &ro, NULL, NULL, &error);
 			if (src0 == NULL) {
 				nd6log((LOG_DEBUG,
-					"nd6_ns_output: source can't be "
-					"determined: dst=%s, error=%d\n",
-					ip6_sprintf(&dst_sa.sin6_addr),
-					error));
+				    "nd6_ns_output: source can't be "
+				    "determined: dst=%s, error=%d\n",
+				    ip6_sprintf(&dst_sa.sin6_addr), error));
 				goto bad;
 			}
 			src_sa = *src0;
@@ -803,9 +798,8 @@ nd6_na_input(m, off, icmp6len)
 
 	if (lladdr && ((ifp->if_addrlen + 2 + 7) & ~7) != lladdrlen) {
 		nd6log((LOG_INFO, "nd6_na_input: lladdrlen mismatch for %s "
-			"(if %d, NA packet %d)\n",
-			ip6_sprintf(&taddr6.sin6_addr),
-			ifp->if_addrlen, lladdrlen - 2));
+		    "(if %d, NA packet %d)\n", ip6_sprintf(&taddr6.sin6_addr),
+		    ifp->if_addrlen, lladdrlen - 2));
 		goto bad;
 	}
 
@@ -1100,8 +1094,8 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 			     NULL, &ro, NULL, NULL, &error);
 	if (src0 == NULL) {
 		nd6log((LOG_DEBUG, "nd6_na_output: source can't be "
-			"determined: dst=%s, error=%d\n",
-			ip6_sprintf(&dst_sa.sin6_addr), error));
+		    "determined: dst=%s, error=%d\n",
+		    ip6_sprintf(&dst_sa.sin6_addr), error));
 		goto bad;
 	}
 	src_sa = *src0;
@@ -1446,7 +1440,7 @@ nd6_dad_timer(ifa)
 	/* timeouted with IFF_{RUNNING,UP} check */
 	if (dp->dad_ns_tcount > dad_maxtry) {
 		nd6log((LOG_INFO, "%s: could not run DAD, driver problem?\n",
-			if_name(ifa->ifa_ifp)));
+		    if_name(ifa->ifa_ifp)));
 
 		TAILQ_REMOVE(&dadq, (struct dadq *)dp, dad_list);
 		free(dp, M_IP6NDP);
