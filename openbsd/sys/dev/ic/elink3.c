@@ -1237,13 +1237,7 @@ epget(sc, totlen)
 	}
 	m->m_pkthdr.rcvif = ifp;
 	m->m_pkthdr.len = totlen;
-#if old
-	pad = ALIGN(sizeof(struct ether_header)) - sizeof(struct ether_header);
-	m->m_data += pad;
-	len = MHLEN - pad;
-#else
 	len = MHLEN;
-#endif
 	top = 0;
 	mp = &top;
 
