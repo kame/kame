@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.369 2003/06/06 05:57:11 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.370 2003/06/06 06:36:05 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2032,12 +2032,8 @@ ip6_ctloutput(op, so, level, optname, mp)
 	struct mbuf *m = *mp;
 	int error, optval;
 	int optlen;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-	struct thread *td = curthread;	/* XXX */
-#else
+#if defined(__NetBSD__) 
 	struct proc *p = curproc;	/* XXX */
-#endif
 #endif
 
 	optlen = m ? m->m_len : 0;
