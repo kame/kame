@@ -138,7 +138,6 @@ dp8390_config(sc)
 
 	/* Initialize media goo. */
 	(*sc->sc_media_init)(sc);
-	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Attach the interface. */
 	if_attach(ifp);
