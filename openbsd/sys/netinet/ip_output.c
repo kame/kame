@@ -1287,12 +1287,6 @@ ip_ctloutput(op, so, level, optname, mp)
 			*mtod(m, int *) = optval;
 			break;
 
-#if 0 /*KAME IPSEC*/
-		case IP_IPSEC_POLICY:
-			error = ipsec_get_policy(inp->inp_sp, mp);
-			break;
-#endif /*IPSEC*/
-
 		case IP_MULTICAST_IF:
 		case IP_MULTICAST_TTL:
 		case IP_MULTICAST_LOOP:
