@@ -1,4 +1,4 @@
-.\"     $KAME: mdnsd.8,v 1.3 2000/05/30 16:03:56 itojun Exp $
+.\"     $KAME: mdnsd.8,v 1.4 2000/05/30 16:06:11 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -116,9 +116,7 @@ search itojun.org
 nameserver ::
 .Ed
 .Pp
-DNS queries from normal application, like
-.Xr ping 8 ,
-will be routed to
+DNS queries from normal application will be routed to
 .Nm Ns .
 .Nm
 will forward the query to multicast DNS servers.
