@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.69 2000/06/14 17:49:54 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.70 2000/06/14 17:52:08 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -123,6 +123,7 @@ static int (*ph2exchange[][2][PHASE2ST_MAX])
 
 static u_char r_ck0[] = { 0,0,0,0,0,0,0,0 }; /* used to verify the r_ck. */
  
+static int isakmp_main __P((vchar_t *, struct sockaddr *, struct sockaddr *));
 static int ph1_main __P((struct ph1handle *, vchar_t *));
 static int isakmp_ph1begin_r __P((vchar_t *, struct sockaddr *, u_int8_t));
 static int isakmp_ph2begin_r __P((struct ph1handle *, vchar_t *));
@@ -247,7 +248,7 @@ end:
 /*
  * main processing to handle isakmp payload
  */
-int
+static int
 isakmp_main(msg, remote, local)
 	vchar_t *msg;
 	struct sockaddr *remote, *local;
