@@ -586,9 +586,11 @@ printif(ifrm, ifaliases)
 				continue;
 #endif
 			ifr = *ifrp;
+#ifdef INET6
 			/* quickhack: sizeof(ifr) < sizeof(ifr6) */
 			if (ifrp->ifr_addr.sa_family == AF_INET6)
 				bcopy(ifrp, &ifr6, sizeof(ifr6));
+#endif
 			if ((p = afp) != NULL) {
 				if (ifr.ifr_addr.sa_family == p->af_af)
 					(*p->af_status)(1);
