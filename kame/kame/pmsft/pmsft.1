@@ -1,0 +1,136 @@
+.\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
+.\" All rights reserved.
+.\" 
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd Aug 10, 2004
+.Dt PMSFT 1
+.Os KAME
+.\"
+.Sh NAME
+.Nm pmsft
+.Nd protocol-independent Multicast Source Filter Testing Tool
+.\"
+.Sh SYNOPSIS
+.Nm
+.Op Ar file
+.\"
+.Sh DESCRIPTION
+The 
+.Nm
+utility specifies a Multicast Source Filter (MSF) using APIs 
+specified in Socket Interface Extention for MSF (RFC3678).
+Since
+.Nm
+adopts a protocol-independent API, both IPv4 and IPv6 MSF are
+supported.
+.Pp
+.Nm 
+specifies an MSF on command-prompt "pmsft>".
+Here is the list of commands that can be specified:
+
+.Bl -tag -width -compact
+.It Cm j Ar grp Ar ifname
+join a group
+.Ar grp
+on interface
+.Ar ifname.
+
+.It Cm l Ar group Ar ifname
+leave a group
+.Ar grp
+on interface
+.Ar ifname.
+
+.It Cm i Ar grp Ar ifname Ar num
+set an include mode MSF for group
+.Ar grp
+on interface
+.Ar ifname.
+(followed by 
+.Ar num
+lines of source addresses)
+
+.It Cm e Ar grp Ar ifname Ar num
+set an exclude mode MSF for group
+.Ar grp
+on interface
+.Ar ifname.
+(followed by 
+.Ar num
+lines of source addresses)
+
+.It Cm t Ar grp Ar ifname Ar src
+accept multicast packets from
+.Ar src
+to
+.Ar grp
+on interface
+.Ar ifname
+
+.It Cm b Ar grp Ar ifname Ar src
+deny multicast packets from
+.Ar src
+to
+.Ar grp
+on interface
+.Ar ifname
+
+
+.It Cm g Ar grp Ar ifname Ar num
+get and show MSF regarding group
+.Ar grp
+on interface
+.Ar ifname
+(atmost 
+.Ar num
+sources).
+
+.It Cm s Ar seconds
+sleep for the specified
+.Ar seconds.
+
+.It Cm f Ar filename
+read command(s) from file
+.Ar filename.
+
+.It Cm q
+quit
+.Nm
+.El
+
+.Pp
+If there is an optional argument
+.Ar file
+, it is equivalent to the following command:
+.Bd -literal
+pmsft> f \fIfile\fR
+.Ed
+.
+.Sh HISTORY
+The
+.Nm
+command is originally based on wilbertdg@hetnet.nl's pmsft, supporting 
+only IGMPv3.
