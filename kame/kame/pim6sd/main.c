@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.13 2000/12/04 06:45:30 itojun Exp $	*/
+/*	$KAME: main.c,v 1.14 2000/12/04 07:01:08 itojun Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Southern California.
@@ -88,6 +88,7 @@
 #include "rp.h"
 #include "kern.h"
 #include "cfparse.h"
+#include "pim6_proto.h"
 
 char            	configfilename[256] = _PATH_PIM6D_CONF;
 char            	versionstring[100];
