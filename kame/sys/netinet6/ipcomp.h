@@ -42,7 +42,7 @@
 
 struct ipcomp {
 	u_int8_t comp_nxt;	/* Next Header */
-	u_int8_t comp_flags;	/* Length of data, in 32bit */
+	u_int8_t comp_flags;	/* reserved, must be zero */
 	u_int16_t comp_cpi;	/* Compression parameter index */
 };
 
