@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.60 2001/08/03 11:44:09 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.61 2001/08/03 11:44:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -265,6 +265,8 @@
  *		a header file like opt_hoge.h to help make dependencies.
  *	bsdi/openbsd: always use -DHOGE in Makefile.  there's no need/way
  *		to have opt_hoge.h.
+ *
+ *	therefore, opt_hoge.h is mandatory on freebsd4 only.
  */
 
 #ifndef __NET_NET_OSDEP_H_DEFINED_
