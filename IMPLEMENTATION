@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.205 2001/04/24 19:10:26 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.206 2001/04/24 20:24:09 jinmei Exp $
 
 1. IPv6
 
@@ -33,8 +33,7 @@ RFC2283: Multiprotocol Extensions for BGP-4
 RFC2292: Advanced Sockets API for IPv6
     * For supported library functions/kernel APIs, see sys/netinet6/ADVAPI.
 RFC2362: Protocol Independent Multicast-Sparse Mode (PIM-SM)
-    * RFC2362 defines packet formats for PIM-SM.  draft-ietf-pim-ipv6-01.txt
-      is written based on this.
+    * RFC2362 defines the packet formats and the protcol of PIM-SM.
 RFC2373: IPv6 Addressing Architecture
     * KAME supports node required addresses, and conforms to the scope
       requirement.
@@ -107,8 +106,6 @@ RFC3056: Connection of IPv6 Domains via IPv4 Clouds
       draft-itojun-ipv6-transition-abuse-01.txt
       below before configuring it, there can be security issues.
 draft-ietf-ipngwg-icmp-name-lookups-07: IPv6 Name Lookups Through ICMP
-draft-ietf-pim-ipv6-03.txt: PIM for IPv6
-    * pim6dd implements dense mode.  pim6sd implements sparse mode.
 draft-ietf-dhc-dhcpv6-15.txt: DHCPv6
 draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
     * kame/dhcp6 has test implementation, which will not be compiled in
@@ -138,6 +135,9 @@ draft-ietf-ipngwg-scoping-arch-02.txt:
 	scoped addresses.
     * some part of the documentation (especially about the routing
       model) is not supported yet.
+draft-ietf-pim-sm-v2-new-02.txt
+	A revised version of RFC2362, which includes the IPv6 specific
+	packet format and protocol descriptions.
 draft-itojun-ipv6-transition-abuse-01.txt:
 	Possible abuse against IPv6 transition technologies
     * KAME does not implement RFC1933/2893 automatic tunnel.
