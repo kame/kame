@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.128 2002/09/06 08:31:50 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.129 2002/09/06 10:05:30 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1723,7 +1723,7 @@ mip6_bc_proxy_control(target, local, cmd)
 		rt = rtalloc1((struct sockaddr *)&sa6, 1);
 #endif /* __FreeBSD__ */
 		if (rt == NULL || (rt->rt_flags & RTF_ANNOUNCE) == 0)
-			return EHOSTUNREACH;
+			return 0; /* EHOSTUNREACH */
 
 		error = rtrequest(RTM_DELETE, rt_key(rt), (struct sockaddr *)0,
 				  rt_mask(rt), 0, (struct rtentry **)0);
