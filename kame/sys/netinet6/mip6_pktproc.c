@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.50 2002/09/23 10:04:31 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.51 2002/09/23 16:07:32 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -487,10 +487,11 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 }
 
 int
-mip6_ip6mu_input(m, ip6mu, ip6mulen)
+mip6_ip6mu_input(m, ip6mu, ip6mulen, ba_code)
 	struct mbuf *m;
 	struct ip6m_binding_update *ip6mu;
 	int ip6mulen;
+	int ba_code;
 {
 	struct ip6_hdr *ip6;
 	struct sockaddr_in6 *src_sa, *dst_sa, coa_sa, hoa_sa;
@@ -611,7 +612,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		coa_sa.sin6_addr = mopt.mopt_altcoa;
 
 	seqno = ntohs(ip6mu->ip6mu_seqno);
-	lifetime = ntohs(ip6mu->ip6mu_lifetime) << 2;	/* units of 4secs */
+	lifetime = ntohs(ip6mu->ip6mu_lifetime) << 4;	/* units of 16secs */
 
 	/* ip6_src and HAO has been already swapped at this point. */
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &hoa_sa);
