@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.814 2000/04/25 07:53:47 fujisawa Exp $
+$Id: CHANGELOG,v 1.815 2000/04/26 03:02:58 itojun Exp $
 
 <200004>
+Wed Apr 26 12:00:59 JST 2000  itojun@iijlab.net
+	* libinet6/resolv: allow users to switch use of EDNS0 query packet,
+	  by "options edns0" in /etc/resolv.conf.   BIND9 DNS server must be
+	  listed to "nameserver" line if you use EDNS0 query packet, since
+	  BIND4/8 will choke with EDNS0 packets.  very experimental.
+	  (not available in freebsd4 and bsdi4 due to resolver differences)
+
 Tue Apr 25 16:46:56 2000  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* v4 traceroute (in NAT-PT w/ v4NAT) works.
 
