@@ -76,9 +76,7 @@
 
 #include <machine/stdarg.h>
 
-#ifdef __NetBSD__
-#define ovbcopy	bcopy
-#endif
+#include <net/net_osdep.h>
 
 #ifdef INET
 extern struct protosw inetsw[];

@@ -96,6 +96,8 @@
 #include <crypto/sha1.h>
 #endif
 
+#include <net/net_osdep.h>
+
 #define	HMACSIZE	16
 
 #ifdef INET6

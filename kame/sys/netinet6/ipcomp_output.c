@@ -76,9 +76,7 @@
 
 #include <machine/stdarg.h>
 
-#ifdef __NetBSD__
-#define ovbcopy	bcopy
-#endif
+#include <net/net_osdep.h>
 
 static int ipcomp_output __P((struct mbuf *, u_char *, struct mbuf *,
 	struct ipsecrequest *, int));
