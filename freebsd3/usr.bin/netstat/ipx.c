@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)ns.c	8.1 (Berkeley) 6/6/93";
 */
 static const char rcsid[] =
-	"$Id: ipx.c,v 1.10 1998/07/06 21:01:25 bde Exp $";
+  "$FreeBSD: src/usr.bin/netstat/ipx.c,v 1.10.2.2 1999/11/27 03:21:33 bp Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -152,8 +152,10 @@ ipxprotopr(off, name)
 	}
 }
 
-#define ANY(x,y,z) (printf("\t%u %s%s%s\n",x,y,plural(x),z))
-#define ANYl(x,y,z) (printf("\t%lu %s%s%s\n",x,y,plural(x),z))
+#define ANY(x,y,z) \
+	    if (x || sflag <= 1) printf("\t%u %s%s%s\n", x, y, plural(x), z)
+#define ANYl(x,y,z) \
+	    if (x || sflag <= 1) printf("\t%lu %s%s%s\n", x, y, plural(x), z)
 
 /*
  * Dump SPX statistics structure.
