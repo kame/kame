@@ -246,7 +246,6 @@ device		kue		# Kawasaki LSI USB ethernet
 
 options 	IPSEC			#IP security
 options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
-#options 	IPSEC_ESP_TWOFISH	# use twofish, instead of rijndael
 #options 	IPSEC_DEBUG		#debug for IP security
 #options 	NATM			#native mode ATM
 # these options will become the default behavior soon.

@@ -10,7 +10,6 @@ include	"arch/i386/conf/GENERIC"
 options 	INET6		# IPV6
 options 	IPSEC		# IP security
 options 	IPSEC_ESP	# IP security (encryption part; define w/ IPSEC)
-#options 	IPSEC_ESP_TWOFISH	# use twofish, instead of rijndael
 #options 	IPSEC_DEBUG	# debug for IP security
 options 	PULLDOWN_TEST
 # these options will become the default behavior soon.
