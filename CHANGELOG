@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1317 2000/10/03 22:34:28 itojun Exp $
+$KAME: CHANGELOG,v 1.1318 2000/10/04 11:42:46 itojun Exp $
 
 <200010>
+Wed Oct  4 20:39:16 JST 2000  itojun@iijlab.net
+	* sys/netkey/key.c: supply two sysctl variables,
+	  net.key.{esp,ah}_keymin, that control how ACQUIRE messages are
+	  formed.  algorithms/key length smaller than the configured value
+	  will be filtered out.
+
 Wed Oct  4 07:30:10 JST 2000  itojun@iijlab.net
 	* sys/net/pfkeyv2.h, racoon: move AES (rijndael) protocol # to the
 	  official one.  note that you now lost interoperability between old
