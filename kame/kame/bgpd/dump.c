@@ -276,12 +276,14 @@ dump_bgp_exportlist(FILE *fp, struct rt_entry *rte, char *indent)
 	obnp = bgb;
 	while(obnp) {
 		struct rtproto *rtp = obnp->rp_adj_ribs_out;
+		struct rpcb *ebnp;
 
 		if (obnp != srcbnp &&
 		    obnp->rp_state == BGPSTATE_ESTABLISHED) {
 			while(rtp) {
 				if (rtp->rtp_type == RTPROTO_BGP &&
-				    rtp->rtp_bgp == srcbnp) {
+				    (ebnp = find_epeer_by_rpcb(rtp->rtp_bgp)) != NULL &&
+				    ebnp == srcbnp) {
 					if (first == 1) {
 						fprintf(fp, "%s  Exported to:\n",
 							indent);
@@ -582,7 +584,8 @@ show_bgp_route_entry(fp, bre)
 	fprintf(fp, "%s            ID: %s, Type: %s\n", indent,
 		inet_ntop(AF_INET, &bnp->rp_id, inetaddrstr, INET_ADDRSTRLEN),
 		(bnp->rp_mode & BGPO_IGP) ? "IBGP" : "EBGP");
-	dump_bgp_exportlist(fp, bre->rte, indent);
+	if (bre->rte->rt_flags & RTF_INSTALLED)
+		dump_bgp_exportlist(fp, bre->rte, indent);
 }
 
 static struct bgproute_entry *
