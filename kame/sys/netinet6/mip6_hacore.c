@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.4 2003/07/11 06:23:18 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.5 2003/07/24 08:29:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -84,9 +84,6 @@
 /* home registration processing. */
 static int mip6_dad_start(struct mip6_bc *);
 static int mip6_dad_stop(struct mip6_bc *);
-
-/* misc. */
-static int mip6_are_ifid_equal(struct in6_addr *, struct in6_addr *, u_int8_t);
 
 int
 mip6_process_hrbu(bi)
@@ -1151,40 +1148,4 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	}
 
 	return (0);
-}
-
-static int
-mip6_are_ifid_equal(addr1, addr2, prefixlen)
-	struct in6_addr *addr1;
-	struct in6_addr *addr2;
-	u_int8_t prefixlen;
-{
-	int bytelen, bitlen;
-	u_int8_t mask;
-	int i;
-
-	bytelen = prefixlen / 8;
-	bitlen = prefixlen % 8;
-	mask = 0;
-	for (i = 0; i < bitlen; i++) {
-		mask &= (0x80 >> i);
-	}
-
-	if (bitlen) {
-		if ((addr1->s6_addr8[bytelen] & ~mask)
-		    != (addr2->s6_addr8[bytelen] & ~mask))
-			return (0);
-
-		if (bcmp(((caddr_t)addr1) + bytelen,
-			 ((caddr_t)addr2) + bytelen,
-			 16 - bytelen - 1))
-			return (0);
-	} else {
-		if (bcmp(((caddr_t)addr1) + bytelen,
-			 ((caddr_t)addr2) + bytelen,
-			 16 - bytelen))
-			return (0);
-	}
-
-	return (1);
 }
