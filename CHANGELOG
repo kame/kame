@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1981 2001/11/15 03:32:22 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1982 2001/11/15 05:19:43 fujisawa Exp $
 
 <200111>
+2001-11-15 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/kame/natptconfig/showsubs.c:
+	- Invert the source and destination address of the remote side
+	  of "natptconfig show xlate" command output.
+	  Prior to this change, "natptconfig show xlate" command
+	  indicates it in order having with kernel internal table.
+	  However this output is against intuition (and does not fit
+	  header line either).
+
 2001-11-15 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_rule.c:
 	- Adapt a translation rule when packet is TCP and only SYN
