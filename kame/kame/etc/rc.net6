@@ -71,8 +71,8 @@ $route add -inet6 fec0:: -prefixlen 10 ::1 -reject
 #    done
 #fi
 #if [ X"$defaultiface" != X"" ]; then
-#    $route add -inet6 fe80:: -prefixlen 10 -interface $defaultiface -cloning
-#    $route add -inet6 fec0:: -prefixlen 10 -interface $defaultiface -cloning
+#    $route add -inet6 fe80:: ::1 -prefixlen 10 -interface -ifp $defaultiface -cloning
+#    $route add -inet6 fec0:: ::1 -prefixlen 10 -interface -ifp $defaultiface -cloning
 #fi
 
 # disallow "internal" addresses to appear on the wire
