@@ -1287,8 +1287,10 @@ findpcb:
 		 * if both ECE and CWR flag bits are set, peer is ECN capable.
 		 */
 		if (tcp_do_ecn &&
-		    (tiflags & (TH_ECE|TH_CWR)) == (TH_ECE|TH_CWR))
+		    (tiflags & (TH_ECE|TH_CWR)) == (TH_ECE|TH_CWR)) {
 			tp->t_flags |= TF_ECN_PERMIT;
+			tcpstat.tcps_ecn_accepts++;
+		}
 #endif
 		tcp_rcvseqinit(tp);
 		tp->t_flags |= TF_ACKNOW;
