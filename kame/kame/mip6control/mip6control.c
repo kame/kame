@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.18 2002/01/21 11:37:49 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.19 2002/01/22 06:23:01 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -118,12 +118,27 @@ struct nlist nl[] = {
 
 kvm_t *kvmd;
 int numerichost = 0;
+char *__progname;
+
+void
+usage()
+{
+	(void)fprintf(stderr,
+		      "usage: %s [-i ifname] [-abcghlmnw]"
+		      " [-H home_prefix -P prefixlen]"
+		      " [-u address#port] [-v address#port]"
+		      " [-S 0|1] [-T 0|1] [-D 0|1]\n",
+		      __progname);
+	exit(1);
+}
 
 int
 main(argc, argv)
      int argc;
      char **argv;
 {
+	extern char *optarg;
+	extern int optind;
 	int ch, s;
 	int enablemn = 0;
 	int disablemn = 0;
@@ -147,6 +162,12 @@ main(argc, argv)
 	char *ipsecarg = NULL;
 	int authdata = 0;
 	char *authdataarg = NULL;
+
+	__progname = strrchr(argv[0], '/');
+	if (__progname == NULL)
+		__progname = argv[0];
+	else
+		__progname++;
 
 	while ((ch = getopt(argc, argv, "nli:mMgH:hP:A:aL:bcu:v:wD:S:T:")) != -1) {
 		switch(ch) {
@@ -219,7 +240,14 @@ main(argc, argv)
 			authdata = 1;
 			authdataarg = optarg;
 			break;
+		default:
+			usage();
+			/* NOTREACHED */
 		}
+	}
+	if (argc != optind) {
+		usage();
+		/* NOTREACHED */
 	}
 
 	if ((kvmd = kvm_openfiles(NULL, NULL, NULL, O_RDONLY, kvm_err)) == NULL) {
