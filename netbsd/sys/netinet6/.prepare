@@ -11,4 +11,3 @@ exclude tcp6_timer.c
 exclude tcp6_timer.h
 exclude tcp6_usrreq.c
 exclude tcp6_var.h
-exclude in6_src.c
