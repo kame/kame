@@ -1486,7 +1486,14 @@ tcp_mss_to_advertise(ifp, af)
 		mss = ifp->if_mtu;
 
 	if (tcp_mss_ifmtu == 0)
-		mss = max(in_maxmtu, mss);
+		switch (af) {
+		case AF_INET:
+			mss = max(in_maxmtu, mss);
+			break;
+		case AF_INET6:
+			mss = max(in6_maxmtu, mss);
+			break;
+		}
 
 	switch (af) {
 	case AF_INET:
