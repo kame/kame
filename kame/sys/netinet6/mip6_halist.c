@@ -1,4 +1,4 @@
-/*	$KAME: mip6_halist.c,v 1.1 2003/04/23 09:15:51 keiichi Exp $	*/
+/*	$KAME: mip6_halist.c,v 1.2 2003/06/03 06:44:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -86,7 +86,7 @@ mip6_ha_create(lladdr, gaddr, flags, pref, lifetime)
 	struct sockaddr_in6 *lladdr;
 	struct sockaddr_in6 *gaddr;
 	u_int8_t flags;
-	int16_t pref;
+	u_int16_t pref;
 	int32_t lifetime;
 {
 	struct mip6_ha *mha = NULL;

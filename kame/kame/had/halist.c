@@ -1,4 +1,4 @@
-/*	$KAME: halist.c,v 1.7 2003/04/11 11:21:39 t-momose Exp $	*/
+/*	$KAME: halist.c,v 1.8 2003/06/03 06:44:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: halist.c,v 1.7 2003/04/11 11:21:39 t-momose Exp $
+ * $Id: halist.c,v 1.8 2003/06/03 06:44:36 keiichi Exp $
  */
 
 /*
@@ -133,7 +133,7 @@ hal_update(ifindex, ha_addr, ha_lifetime, ha_pref)
     int ifindex;
     struct in6_addr *ha_addr;
     u_int16_t ha_lifetime;
-    int16_t ha_pref;
+    u_int16_t ha_pref;
 {
     struct hagent_entry *halp, *curp, *prevp;
     struct hagent_ifinfo *haif;
@@ -1194,7 +1194,7 @@ void halent_dump(fp, halp)
 		halp->hagent_lifetime, halp->hagent_expire,
 		halp->hagent_expire  > now.tv_sec ?
 		halp->hagent_expire - now.tv_sec : 0);
-	fprintf(fp, "    preference=%d\n", halp->hagent_pref);
+	fprintf(fp, "    preference=%u\n", halp->hagent_pref);
 	fprintf(fp, "    global addresses:\n");
 	for (galp = halp->hagent_galist.hagent_next_gaddr;  galp;
 	     galp = galp->hagent_next_gaddr) {

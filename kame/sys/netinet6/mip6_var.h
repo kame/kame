@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.89 2003/04/24 02:28:39 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.90 2003/06/03 06:44:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -239,7 +239,7 @@ struct mip6_ha {
 	struct sockaddr_in6 mha_lladdr;    /* XXX link-local addr */
 	struct sockaddr_in6 mha_gaddr;     /* XXX global addr */
 	u_int8_t            mha_flags;     /* RA flags */
-	int16_t             mha_pref;      /* preference */
+	u_int16_t           mha_pref;      /* preference */
 	u_int16_t           mha_lifetime;  /* HA lifetime */
 	time_t              mha_expire;    /* expiration time of this HA. */
 };

@@ -1,4 +1,4 @@
-/*	$KAME: halist.h,v 1.6 2003/02/28 07:08:06 t-momose Exp $	*/
+/*	$KAME: halist.h,v 1.7 2003/06/03 06:44:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: halist.h,v 1.6 2003/02/28 07:08:06 t-momose Exp $
+ * $Id: halist.h,v 1.7 2003/06/03 06:44:36 keiichi Exp $
  */
 
 /*
@@ -139,7 +139,7 @@ struct hagent_entry {
 	struct hagent_entry	*hagent_next_expire, *hagent_prev_expire,
 				*hagent_next_pref, *hagent_prev_pref;
 	struct in6_addr		hagent_addr;
-	int16_t			hagent_pref;
+	u_int16_t		hagent_pref;
 	u_int16_t		hagent_lifetime;
 	long			hagent_expire;
 	struct hagent_gaddr	hagent_galist;
@@ -167,7 +167,7 @@ struct hagent_ifa_pair {
 };
 
 struct hagent_entry *hal_update __P((int, struct in6_addr *, u_int16_t,
-				     int16_t));
+				     u_int16_t));
 struct hagent_gaddr *hal_gaddr_add __P((struct hagent_entry *,
 					struct hagent_gaddr *,
 					struct nd_opt_prefix_info *));
