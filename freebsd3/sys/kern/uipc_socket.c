@@ -1039,7 +1039,7 @@ sosetopt(so, sopt)
 			if (error)
 				goto bad;
 
-			if (tv->tv_sec * hz + tv->tv_usec / tick > SHRT_MAX) {
+			if (tv.tv_sec * hz + tv.tv_usec / tick > SHRT_MAX) {
 				error = EDOM;
 				goto bad;
 			}
