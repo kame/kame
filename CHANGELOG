@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1703 2001/06/01 05:42:58 jinmei Exp $
+$KAME: CHANGELOG,v 1.1704 2001/06/02 08:21:48 jinmei Exp $
 
 <200106>
+2001-06-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ndp/ndp.c (dump): skip routes with the LINK flag and
+	a non AF_LINK gateway to suppress bark in getnbrinfo().
+	XXX: such routes should have the GATEWAY flag, not the LINK flag.
+	However, there is rotten routing software that advertises all
+	routes that have the GATEWAY flag without careful examination.
+	Thus, KAME kernel intentionally does not set the LINK flag.  What
+	is to be fixed is not ndp, but such routing software (and the
+	kernel workaround).
+
 2001-06-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/icmp6.c (icmp6_reflect): used the default
 	hoplimit value when rcvif is NULL.  Without the change, icmp6
