@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: bgpd.conf.5,v 1.1 1999/08/08 23:29:12 itojun Exp $
+.\"     $Id: bgpd.conf.5,v 1.2 1999/10/19 08:40:09 jinmei Exp $
 .\"
 .Dd May 17, 1998
 .Dt BGPD.CONF 5
@@ -92,6 +92,9 @@ Sets the autonomous system number of this router to be autonomous
 system.
 This statement is required if BGP is in use.
 The AS number is assigned by the Network Information Center (NIC).
+.\"
+.It Ic bgpsbsize Ar size
+Sets the size of socket write buffer for each BGP socket.
 .\"
 .It Ic routerid Ar router_id;
 Sets the router identifier for use by the BGP and OSPF protocols.
