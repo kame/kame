@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.51 2001/08/05 19:01:59 itojun Exp $
+$KAME: FAQ,v 1.52 2001/08/05 19:05:57 jinmei Exp $
 
 
 GENERAL
@@ -407,7 +407,7 @@ users only, like www.kame.net?)
 			print "not IPv6 " . $ENV{'REMOTE_ADDR'} . "\n";
 		}
 
-Q: Don't you release new IPv6 patch for apache1.3.x?
+Q: Won't you release new IPv6 patch for apache1.3.x?
 	We forcus to develop apache2.x.  Our IPv6 patch never be
 	merged into apache1.3.x original distribution since some include
 	files for mod_xxx are highly depend on IPv4 so our IPv6 patch
