@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.147 2004/11/28 10:48:38 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.148 2004/11/28 10:52:19 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1824,7 +1824,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 
 #ifdef USE_DH6OPT_REFRESHTIME
 	/*
-	 * Set timer if an option lifetime is specified in a reply to
+	 * Set timer if an information refresh time is specified in a reply to
 	 * information-request.  We do not use the value in the stateful
 	 * configuration case (the spec is not clear in such a case).
 	 */
