@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.441 2004/03/16 03:21:59 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.442 2004/03/24 08:47:00 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -5018,7 +5018,7 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		sin6_grp->sin6_family = AF_INET6;
 		sin6_grp->sin6_scope_id = SIN6(&greq->gr_group)->sin6_scope_id;
 
-		if (!SS_IS_ADDR_MULTICAST(ss_grp)) {
+		if (!IN6_IS_ADDR_MULTICAST(&sin6_grp->sin6_addr)) {
 			error = EINVAL;
 			break;
 		}
@@ -5116,8 +5116,8 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 			error = EADDRNOTAVAIL; /* XXX: should not happen */
 			break;
 		}
-		if (SS_IS_ADDR_MULTICAST(ss_src) ||
-		    SS_IS_ADDR_UNSPECIFIED(ss_src)) {
+		if (IN6_IS_ADDR_MULTICAST(&sin6_src->sin6_addr) ||
+		    IN6_IS_ADDR_UNSPECIFIED(&sin6_src->sin6_addr)) {
 #ifdef MLDV2_DEBUG
 			printf("invalid source %s specified\n",
 			       ip6_sprintf(&sin6_src->sin6_addr));
