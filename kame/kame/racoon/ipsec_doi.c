@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.126 2001/01/26 04:02:46 thorpej Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.127 2001/02/26 06:10:12 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3217,7 +3217,7 @@ set_identifier(vpp, type, value)
 		fp = fopen(value->v, "r");
 		if (fp == NULL) {
 			plog(LLV_ERROR, LOCATION, NULL,
-				"can not open %s", value->v);
+				"can not open %s\n", value->v);
 			return -1;
 		}
 		tlen = 0;
