@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.60 2000/05/05 13:27:14 sumikawa Exp $	*/
+/*	$KAME: ipsec.c,v 1.61 2000/05/07 03:51:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -673,7 +673,6 @@ ipsec_setspidx_mbuf(spidx, dir, family, m)
 	u_int dir, family;
 	struct mbuf *m;
 {
-	struct sockaddr *sa1, *sa2;
 
 	/* sanity check */
 	if (spidx == NULL || m == NULL)
@@ -686,11 +685,6 @@ ipsec_setspidx_mbuf(spidx, dir, family, m)
 	bzero(spidx, sizeof(*spidx));
 
 	spidx->dir = dir;
-	sa1 = (struct sockaddr *)&spidx->src;
-	sa2 = (struct sockaddr *)&spidx->dst;
-	sa1->sa_len = sa2->sa_len = _SALENBYAF(family);
-	sa1->sa_family = sa2->sa_family = family;
-	spidx->prefs = spidx->prefd = _INALENBYAF(family) << 3;
 
     {
 	/* sanity check for packet length. */
@@ -715,6 +709,7 @@ ipsec_setspidx_mbuf(spidx, dir, family, m)
 	{
 		struct ip *ip;
 		struct ip ipbuf;
+		struct sockaddr_in *sin;
 
 		/* sanity check 1 for minimum ip header length */
 		if (m->m_pkthdr.len < sizeof(struct ip)) {
@@ -737,15 +732,23 @@ ipsec_setspidx_mbuf(spidx, dir, family, m)
 			ip = &ipbuf;
 		}
 
-		/* some more checks on IPv4 header. */
-		bcopy(&ip->ip_src, _INADDRBYSA(&spidx->src),
-			sizeof(ip->ip_src));
-		bcopy(&ip->ip_dst, _INADDRBYSA(&spidx->dst),
-			sizeof(ip->ip_dst));
+		/* XXX some more checks on IPv4 header. */
+
+		sin = (struct sockaddr_in *)&spidx->src;
+		sin->sin_family = AF_INET;
+		sin->sin_len = sizeof(*sin);
+		bcopy(&ip->ip_src, &sin->sin_addr, sizeof(sin->sin_addr));
+		sin->sin_port = IPSEC_PORT_ANY;
+
+		sin = (struct sockaddr_in *)&spidx->dst;
+		sin->sin_family = AF_INET;
+		sin->sin_len = sizeof(*sin);
+		bcopy(&ip->ip_dst, &sin->sin_addr, sizeof(sin->sin_addr));
+		sin->sin_port = IPSEC_PORT_ANY;
+
+		spidx->prefs = spidx->prefd = sizeof(struct in_addr) << 3;
 
 		spidx->ul_proto = ip->ip_p;
-		_INPORTBYSA(&spidx->src) = IPSEC_PORT_ANY;
-		_INPORTBYSA(&spidx->dst) = IPSEC_PORT_ANY;
 		break;
 	}
 
@@ -754,6 +757,7 @@ ipsec_setspidx_mbuf(spidx, dir, family, m)
 	{
 		struct ip6_hdr *ip6;
 		struct ip6_hdr ip6buf;
+		struct sockaddr_in6 *sin6;
 
 		/* sanity check 1 for minimum ip header length */
 		if (m->m_pkthdr.len < sizeof(struct ip6_hdr)) {
@@ -785,10 +789,19 @@ ipsec_setspidx_mbuf(spidx, dir, family, m)
 			goto bad;
 		}
 
-		bcopy(&ip6->ip6_src, _INADDRBYSA(&spidx->src),
-			sizeof(ip6->ip6_src));
-		bcopy(&ip6->ip6_dst, _INADDRBYSA(&spidx->dst),
-			sizeof(ip6->ip6_dst));
+		sin6 = (struct sockaddr_in6 *)&spidx->src;
+		sin6->sin6_family = AF_INET6;
+		sin6->sin6_len = sizeof(*sin6);
+		bcopy(&ip6->ip6_src, &sin6->sin6_addr, sizeof(sin6->sin6_addr));
+		sin6->sin6_port = IPSEC_PORT_ANY;
+
+		sin6 = (struct sockaddr_in6 *)&spidx->dst;
+		sin6->sin6_family = AF_INET6;
+		sin6->sin6_len = sizeof(*sin6);
+		bcopy(&ip6->ip6_dst, &sin6->sin6_addr, sizeof(sin6->sin6_addr));
+		sin6->sin6_port = IPSEC_PORT_ANY;
+
+		spidx->prefs = spidx->prefd = sizeof(struct in6_addr) << 3;
 
 		ipsec6_get_ulp(m, spidx);
 		break;
@@ -833,8 +846,8 @@ ipsec6_get_ulp(m, spidx)
 
 	/* set default */
 	spidx->ul_proto = IPSEC_ULPROTO_ANY;
-	_INPORTBYSA(&spidx->src) = IPSEC_PORT_ANY;
-	_INPORTBYSA(&spidx->dst) = IPSEC_PORT_ANY;
+	((struct sockaddr_in6 *)&spidx->src)->sin6_port = IPSEC_PORT_ANY;
+	((struct sockaddr_in6 *)&spidx->dst)->sin6_port = IPSEC_PORT_ANY;
 
 	nxt = -1;
 	off = ip6_lasthdr(m, 0, IPPROTO_IPV6, &nxt);
@@ -847,8 +860,10 @@ ipsec6_get_ulp(m, spidx)
 		if (off + sizeof(struct tcphdr) <= m->m_pkthdr.len) {
 			struct tcphdr th;
 			m_copydata(m, off, sizeof(th), (caddr_t)&th);
-			_INPORTBYSA(&spidx->src) = th.th_sport;
-			_INPORTBYSA(&spidx->dst) = th.th_dport;
+			((struct sockaddr_in6 *)&spidx->src)->sin6_port =
+			    th.th_sport;
+			((struct sockaddr_in6 *)&spidx->dst)->sin6_port =
+			    th.th_dport;
 		}
 		break;
 	case IPPROTO_UDP:
@@ -856,8 +871,10 @@ ipsec6_get_ulp(m, spidx)
 		if (off + sizeof(struct udphdr) <= m->m_pkthdr.len) {
 			struct udphdr uh;
 			m_copydata(m, off, sizeof(uh), (caddr_t)&uh);
-			_INPORTBYSA(&spidx->src) = uh.uh_sport;
-			_INPORTBYSA(&spidx->dst) = uh.uh_dport;
+			((struct sockaddr_in6 *)&spidx->src)->sin6_port =
+			    uh.uh_sport;
+			((struct sockaddr_in6 *)&spidx->dst)->sin6_port =
+			    uh.uh_dport;
 		}
 		break;
 	case IPPROTO_ICMPV6:
@@ -875,7 +892,7 @@ ipsec4_setspidx_inpcb(m, pcb)
 	struct inpcb *pcb;
 {
 	struct secpolicyindex *spidx;
-	struct sockaddr *sa1, *sa2;
+	struct sockaddr_in *sin1, *sin2;
 
 	/* sanity check */
 	if (pcb == NULL)
@@ -890,28 +907,28 @@ ipsec4_setspidx_inpcb(m, pcb)
 
 	spidx = &pcb->inp_sp->sp_in->spidx;
 	spidx->dir = IPSEC_DIR_INBOUND;
-	sa1 = (struct sockaddr *)&spidx->src;
-	sa2 = (struct sockaddr *)&spidx->dst;
-	sa1->sa_len = sa2->sa_len = _SALENBYAF(AF_INET);
-	sa1->sa_family = sa2->sa_family = AF_INET;
-	spidx->prefs = _INALENBYAF(AF_INET) << 3;
-	spidx->prefd = _INALENBYAF(AF_INET) << 3;
+	sin1 = (struct sockaddr_in *)&spidx->src;
+	sin2 = (struct sockaddr_in *)&spidx->dst;
+	sin1->sin_len = sin2->sin_len = sizeof(struct sockaddr_in);
+	sin1->sin_family = sin2->sin_family = AF_INET;
+	spidx->prefs = sizeof(struct in_addr) << 3;
+	spidx->prefd = sizeof(struct in_addr) << 3;
 	spidx->ul_proto = pcb->inp_socket->so_proto->pr_protocol;
-	_INPORTBYSA(&spidx->src) = pcb->inp_fport;
-	_INPORTBYSA(&spidx->dst) = pcb->inp_lport;
+	sin1->sin_port = pcb->inp_fport;
+	sin2->sin_port = pcb->inp_lport;
 	ipsec4_setspidx_ipaddr(m, spidx);
 
 	spidx = &pcb->inp_sp->sp_out->spidx;
 	spidx->dir = IPSEC_DIR_OUTBOUND;
-	sa1 = (struct sockaddr *)&spidx->src;
-	sa2 = (struct sockaddr *)&spidx->dst;
-	sa1->sa_len = sa2->sa_len = _SALENBYAF(AF_INET);
-	sa1->sa_family = sa2->sa_family = AF_INET;
-	spidx->prefs = _INALENBYAF(AF_INET) << 3;
-	spidx->prefd = _INALENBYAF(AF_INET) << 3;
+	sin1 = (struct sockaddr_in *)&spidx->src;
+	sin2 = (struct sockaddr_in *)&spidx->dst;
+	sin1->sin_len = sin2->sin_len = sizeof(struct sockaddr_in);
+	sin1->sin_family = sin2->sin_family = AF_INET;
+	spidx->prefs = sizeof(struct in_addr) << 3;
+	spidx->prefd = sizeof(struct in_addr) << 3;
 	spidx->ul_proto = pcb->inp_socket->so_proto->pr_protocol;
-	_INPORTBYSA(&spidx->src) = pcb->inp_lport;
-	_INPORTBYSA(&spidx->dst) = pcb->inp_fport;
+	sin1->sin_port = pcb->inp_lport;
+	sin2->sin_port = pcb->inp_fport;
 	ipsec4_setspidx_ipaddr(m, spidx);
 
 	return;
@@ -945,8 +962,10 @@ ipsec4_setspidx_ipaddr(m, spidx)
 		ip = &ipbuf;
 	}
 
-	bcopy(&ip->ip_src, _INADDRBYSA(&spidx->src), sizeof(ip->ip_src));
-	bcopy(&ip->ip_dst, _INADDRBYSA(&spidx->dst), sizeof(ip->ip_dst));
+	bcopy(&ip->ip_src, &((struct sockaddr_in *)&spidx->src)->sin_addr,
+	    sizeof(ip->ip_src));
+	bcopy(&ip->ip_dst, &((struct sockaddr_in *)&spidx->dst)->sin_addr,
+	    sizeof(ip->ip_dst));
 
 	return;
 }
@@ -958,7 +977,7 @@ ipsec6_setspidx_in6pcb(m, pcb)
 	struct in6pcb *pcb;
 {
 	struct secpolicyindex *spidx;
-	struct sockaddr *sa1, *sa2;
+	struct sockaddr_in6 *sin1, *sin2;
 
 	/* sanity check */
 	if (pcb == NULL)
@@ -973,28 +992,28 @@ ipsec6_setspidx_in6pcb(m, pcb)
 
 	spidx = &pcb->in6p_sp->sp_in->spidx;
 	spidx->dir = IPSEC_DIR_INBOUND;
-	sa1 = (struct sockaddr *)&spidx->src;
-	sa2 = (struct sockaddr *)&spidx->dst;
-	sa1->sa_len = sa2->sa_len = _SALENBYAF(AF_INET6);
-	sa1->sa_family = sa2->sa_family = AF_INET6;
-	spidx->prefs = _INALENBYAF(AF_INET6) << 3;
-	spidx->prefd = _INALENBYAF(AF_INET6) << 3;
+	sin1 = (struct sockaddr_in6 *)&spidx->src;
+	sin2 = (struct sockaddr_in6 *)&spidx->dst;
+	sin1->sin6_len = sin2->sin6_len = sizeof(struct sockaddr_in6);
+	sin1->sin6_family = sin2->sin6_family = AF_INET6;
+	spidx->prefs = sizeof(struct in6_addr) << 3;
+	spidx->prefd = sizeof(struct in6_addr) << 3;
 	spidx->ul_proto = pcb->in6p_socket->so_proto->pr_protocol;
-	_INPORTBYSA(&spidx->src) = pcb->in6p_fport;
-	_INPORTBYSA(&spidx->dst) = pcb->in6p_lport;
+	sin1->sin6_port = pcb->in6p_fport;
+	sin2->sin6_port = pcb->in6p_lport;
 	ipsec6_setspidx_ipaddr(m, spidx);
 
 	spidx = &pcb->in6p_sp->sp_out->spidx;
 	spidx->dir = IPSEC_DIR_OUTBOUND;
-	sa1 = (struct sockaddr *)&spidx->src;
-	sa2 = (struct sockaddr *)&spidx->dst;
-	sa1->sa_len = sa2->sa_len = _SALENBYAF(AF_INET6);
-	sa1->sa_family = sa2->sa_family = AF_INET6;
-	spidx->prefs = _INALENBYAF(AF_INET6) << 3;
-	spidx->prefd = _INALENBYAF(AF_INET6) << 3;
+	sin1 = (struct sockaddr_in6 *)&spidx->src;
+	sin2 = (struct sockaddr_in6 *)&spidx->dst;
+	sin1->sin6_len = sin2->sin6_len = sizeof(struct sockaddr_in6);
+	sin1->sin6_family = sin2->sin6_family = AF_INET6;
+	spidx->prefs = sizeof(struct in6_addr) << 3;
+	spidx->prefd = sizeof(struct in6_addr) << 3;
 	spidx->ul_proto = pcb->in6p_socket->so_proto->pr_protocol;
-	_INPORTBYSA(&spidx->src) = pcb->in6p_lport;
-	_INPORTBYSA(&spidx->dst) = pcb->in6p_fport;
+	sin1->sin6_port = pcb->in6p_lport;
+	sin2->sin6_port = pcb->in6p_fport;
 	ipsec6_setspidx_ipaddr(m, spidx);
 
 	return;
@@ -1036,8 +1055,10 @@ ipsec6_setspidx_ipaddr(m, spidx)
 		return;
 	}
 
-	bcopy(&ip6->ip6_src, _INADDRBYSA(&spidx->src), sizeof(ip6->ip6_src));
-	bcopy(&ip6->ip6_dst, _INADDRBYSA(&spidx->dst), sizeof(ip6->ip6_dst));
+	bcopy(&ip6->ip6_src, &((struct sockaddr_in6 *)&spidx->src)->sin6_addr,
+	    sizeof(ip6->ip6_src));
+	bcopy(&ip6->ip6_dst, &((struct sockaddr_in6 *)&spidx->dst)->sin6_addr,
+	    sizeof(ip6->ip6_dst));
 
 	return;
 }
@@ -1953,7 +1974,7 @@ ipsec4_encapsulate(m, sav)
 	}
 #if 0
 	/* XXX if the dst is myself, perform nothing. */
-	if (key_ismyaddr(AF_INET, _INADDRBYSA(&sav->sah->saidx.dst))) {
+	if (key_ismyaddr((struct sockaddr *)&sav->sah->saidx.dst)) {
 		m_freem(m);
 		return EINVAL;
 	}
@@ -2070,7 +2091,7 @@ ipsec6_encapsulate(m, sav)
 	}
 #if 0
 	/* XXX if the dst is myself, perform nothing. */
-	if (key_ismyaddr(AF_INET6, _INADDRBYSA(&sav->sah->saidx.dst))) {
+	if (key_ismyaddr((struct sockaddr *)&sav->sah->saidx.dst)) {
 		m_freem(m);
 		return EINVAL;
 	}
@@ -2462,7 +2483,7 @@ ipsec4_output(state, sp, flags)
 	struct in_ifaddr *ia;
 #endif
 	struct sockaddr_in *dst4;
-	struct sockaddr *sa;
+	struct sockaddr_in *sin;
 
 	if (!state)
 		panic("state == NULL in ipsec4_output");
@@ -2493,21 +2514,21 @@ ipsec4_output(state, sp, flags)
 		/* make SA index for search proper SA */
 		ip = mtod(state->m, struct ip *);
 		bcopy(&isr->saidx, &saidx, sizeof(saidx));
-		sa = (struct sockaddr *)&saidx.src;
-		if (sa->sa_len == 0) {
-			sa->sa_len = _SALENBYAF(AF_INET);
-			sa->sa_family = AF_INET;
-			_INPORTBYSA(&saidx.src) = IPSEC_PORT_ANY;
-			bcopy(&ip->ip_src, _INADDRBYSA(&saidx.src),
-				sizeof(ip->ip_src));
+		sin = (struct sockaddr_in *)&saidx.src;
+		if (sin->sin_len == 0) {
+			sin->sin_len = sizeof(*sin);
+			sin->sin_family = AF_INET;
+			sin->sin_port = IPSEC_PORT_ANY;
+			bcopy(&ip->ip_src, &sin->sin_addr,
+			    sizeof(sin->sin_addr));
 		}
-		sa = (struct sockaddr *)&saidx.dst;
-		if (sa->sa_len == 0) {
-			sa->sa_len = _SALENBYAF(AF_INET);
-			sa->sa_family = AF_INET;
-			_INPORTBYSA(&saidx.dst) = IPSEC_PORT_ANY;
-			bcopy(&ip->ip_dst, _INADDRBYSA(&saidx.dst),
-				sizeof(ip->ip_dst));
+		sin = (struct sockaddr_in *)&saidx.dst;
+		if (sin->sin_len == 0) {
+			sin->sin_len = sizeof(*sin);
+			sin->sin_family = AF_INET;
+			sin->sin_port = IPSEC_PORT_ANY;
+			bcopy(&ip->ip_dst, &sin->sin_addr,
+			    sizeof(sin->sin_addr));
 		}
 
 		if ((error = key_checkrequest(isr, &saidx)) != 0) {
@@ -2696,7 +2717,7 @@ ipsec6_output_trans(state, nexthdrp, mprev, sp, flags, tun)
 	struct secasindex saidx;
 	int error = 0;
 	int plen;
-	struct sockaddr *sa;
+	struct sockaddr_in6 *sin6;
 
 	if (!state)
 		panic("state == NULL in ipsec6_output");
@@ -2725,21 +2746,23 @@ ipsec6_output_trans(state, nexthdrp, mprev, sp, flags, tun)
 		/* make SA index for search proper SA */
 		ip6 = mtod(state->m, struct ip6_hdr *);
 		bcopy(&isr->saidx, &saidx, sizeof(saidx));
-		sa = (struct sockaddr *)&saidx.src;
-		if (sa->sa_len == 0) {
-			sa->sa_len = _SALENBYAF(AF_INET6);
-			sa->sa_family = AF_INET6;
-			_INPORTBYSA(&saidx.src) = IPSEC_PORT_ANY;
-			bcopy(&ip6->ip6_src, _INADDRBYSA(&saidx.src),
-				sizeof(ip6->ip6_src));
+		sin6 = (struct sockaddr_in6 *)&saidx.src;
+		if (sin6->sin6_len == 0) {
+			sin6->sin6_len = sizeof(*sin6);
+			sin6->sin6_family = AF_INET6;
+			sin6->sin6_port = IPSEC_PORT_ANY;
+			bcopy(&ip6->ip6_src, &sin6->sin6_addr,
+			    sizeof(ip6->ip6_src));
+			/* XXX scope */
 		}
-		sa = (struct sockaddr *)&saidx.dst;
-		if (sa->sa_len == 0) {
-			sa->sa_len = _SALENBYAF(AF_INET6);
-			sa->sa_family = AF_INET6;
-			_INPORTBYSA(&saidx.dst) = IPSEC_PORT_ANY;
-			bcopy(&ip6->ip6_dst, _INADDRBYSA(&saidx.dst),
-				sizeof(ip6->ip6_dst));
+		sin6 = (struct sockaddr_in6 *)&saidx.dst;
+		if (sin6->sin6_len == 0) {
+			sin6->sin6_len = sizeof(*sin6);
+			sin6->sin6_family = AF_INET6;
+			sin6->sin6_port = IPSEC_PORT_ANY;
+			bcopy(&ip6->ip6_dst, &sin6->sin6_addr,
+			    sizeof(ip6->ip6_dst));
+			/* XXX scope */
 		}
 
 		if (key_checkrequest(isr, &saidx) == ENOENT) {
