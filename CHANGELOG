@@ -1,9 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1010 2000/06/13 11:10:21 itojun Exp $
+$Id: CHANGELOG,v 1.1011 2000/06/13 11:21:35 itojun Exp $
 
 <200006>
-Tue Jun 13 20:08:38 JST 2000 itojun@iijlab.net
+Tue Jun 13 20:19:24 JST 2000  itojun@iijlab.net
+	* bsdi4/sys/netinet/udp_usrreq.c,  bsdi4/sys/netinet6/raw_ipv6.c:
+	  honor flowinfo field on inbound/outbound datagrams.  copy from/to
+	  sin6_flowinfo as necessary.
+
+Tue Jun 13 20:08:38 JST 2000  itojun@iijlab.net
 	* openbsd/sys/netinet/udp_usrreq.c,  openbsd/sys/netinet6/raw_ipv6.c:
 	  correct scoped address handling and flowinfo manipulation.
 
