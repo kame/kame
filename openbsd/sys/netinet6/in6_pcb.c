@@ -59,6 +59,9 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <sys/errno.h>
 #include <sys/time.h>
 #include <sys/proc.h>
+#if __OpenBSD__
+#include <dev/rndvar.h>
+#endif /* __OpenBSD__ */
 
 #include <net/if.h>
 #include <net/route.h>
@@ -102,10 +105,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 /*
  * External globals
  */
-
-#if __OpenBSD__
-#include <dev/rndvar.h>
-#endif /* __OpenBSD__ */
 
 #if __FreeBSD__
 /*
