@@ -1,4 +1,4 @@
-.\"	$KAME: natpt.conf.5,v 1.6 2001/11/08 07:50:40 fujisawa Exp $
+.\"	$KAME: natpt.conf.5,v 1.7 2001/11/08 08:39:02 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -93,31 +93,33 @@ translate.  Prefix length is always assumed as 96 bit.
 Add translation rule into the kernel internal list.  The rules for
 returning packet is not appear in this map list.  The following
 formats are available.
-.Bl -tag -width XXX
-.\"	map from any6 to 202.249.11.250 port 28672 - 32767
-.It Xo Sy map from any6 to
-.Ar v4addr
-.Op Sy port Ar num Sy - Ar mum
-.Xc
-Translate the packet which come from arbitrary IPv6 address into
-specified IPv4 address.  If
-.Sy port
-directive is specified, convert source port number into in appointed
-range.  If not, source port number is not converted.
+.Bl -tag -compact -width XXX
+.Pp
+.\"	map from any6               to 202.249.11.250 port 28672 - 32767
 .\"	map from 3ffe:501:4819::/48 to 202.249.11.250 port 28672 - 32767
-.It Xo Sy map from
-.Ar v6addr Op Sy \&/ Ar num
-.Sy to
-.Ar v4addr
+.It Xo Sy map from any6 to Ar v4addr
 .Op Sy port Ar num Sy - Ar mum
 .Xc
-Translate the packet which come from specified IPv6 address or address
-range into specified IPv4 address.  The number after
+.It Xo Sy map from Ar v6addr
+.Op Sy \&/ Ar num
+.Sy to Ar v4addr
+.Op Sy port Ar num Sy - Ar mum
+.Xc
+Translate IPv6 packet to IPv4 packet.
+.Pp
+The former is translate IPv6 packet coming from arbitrary host.  The
+latter is translate IPv4 packet coming from specified host or address
+range.  The number after
 .Sy \&/
 specifies address mask, and when address mask is not specified, it is
 same as
-.Ar v6addr
-.Sy \&/ 128 .
+.Ar v6addr Sy \&/
+128.  If
+.Sy port
+is specified, convert source port number into the number that is not
+used with specified range.  If not, source port number is not
+converted.
+.Pp
 .\"	map from 202.249.11.251 dport 65305 to 3ffe:0501:041c::1 dport 23
 .It Xo Sy map from
 .Ar v4addr Op Sy dport Ar num
@@ -131,6 +133,7 @@ This format was changed to the format using
 .Sy daddr/dport .
 It is recommended not to use this format because this format may be
 abolished in the future.
+.Pp
 .\"	map from 10.0.0.3/8 to 202.249.11.252 port 28672 - 32767
 .It Xo Sy map from
 .Ar v4addr Op Sy \&/ Ar num
