@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.390 2003/07/28 11:58:13 t-momose Exp $	*/
+/*	$KAME: ip6_output.c,v 1.391 2003/07/29 08:08:48 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -428,7 +428,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		 */
 		n = ip6_findaux(m);
 		if (n)
-			ip6a = (struct ip6_aux *) (n + 1);
+			ip6a = (struct ip6aux *) (n + 1);
 		if (!(ip6a && (ip6a->ip6a_flags & IP6A_NOTUSEBC)))
 			if (mip6_exthdr_create(m, opt, &mip6opt))
 				goto freehdrs;
