@@ -1,4 +1,4 @@
-/*	$KAME: schedule.c,v 1.15 2001/04/03 15:51:57 thorpej Exp $	*/
+/*	$KAME: schedule.c,v 1.16 2001/10/02 01:59:40 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -294,10 +294,9 @@ getstdin()
 		sched_dump((caddr_t *)&scbuf, &len);
 		if (buf == NULL)
 			return;
-		for (p = scbuf; ; p++) {
+		for (p = scbuf; len; p++) {
 			printf("xtime=%ld\n", p->xtime);
-			if (p->last)
-				break;
+			len -= sizeof(*p);
 		}
 		racoon_free(scbuf);
 		return;
