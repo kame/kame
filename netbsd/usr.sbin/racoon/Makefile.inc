@@ -44,8 +44,15 @@ DPADD+=	-L${.CURDIR}/../../../lib/libinet6/libinet6.a \
 
 .if exists(/usr/local/ssl/lib/libcrypto.a)
 LDADD+=	-L/usr/local/ssl/lib -lcrypto
+DPADD+=	/usr/local/ssl/lib/libcrypto.a
 .elif exists(/usr/pkg/lib/libcrypto.a) || exists(/usr/pkg/lib/libcrypto.so.1.0)
 LDADD+=	-L/usr/pkg/lib -lcrypto
+DPADD+=	/usr/pkg/lib/libcrypto.a
+.endif
+# for USA resident
+.if exists(/usr/pkg/lib/libRSAglue.a) && exists(/usr/pkg/lib/librsaref.a)
+LDADD+=	-L/usr/pkg/lib -lRSAglue -lrsaref
+DPADD+=	/usr/pkg/lib/libRSAglue.a /usr/pkg/lib/librsaref.a
 .endif
 
 .PATH:	${SRCDIR} ${SRCDIR}/../tcpdump
