@@ -86,11 +86,16 @@
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
+#include <netinet/ip_var.h>
+#include <netinet/in_pcb.h>
+#include <netinet/udp.h>
+#include <netinet/udp_var.h>
 #include <netinet6/ip6.h>
 #include <netinet6/in6_pcb.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/icmp6.h>
-#include <netinet6/udp6.h>
 #include <netinet6/udp6_var.h>
 
 #ifdef IPSEC
@@ -106,7 +111,9 @@
 
 struct	in6pcb *udp6_last_in6pcb = &udb6;
 
+#ifndef __NetBSD__
 static	int in6_mcmatch __P((struct in6pcb *, struct in6_addr *, struct ifnet *));
+#endif
 static	void udp6_detach __P((struct in6pcb *));
 static	void udp6_notify __P((struct in6pcb *, int));
 
@@ -120,6 +127,7 @@ udp6_init()
 	udb6.in6p_next = udb6.in6p_prev = &udb6;
 }
 
+#ifndef __NetBSD__
 static int
 in6_mcmatch(in6p, ia6, ifp)
 	struct in6pcb *in6p;
@@ -448,6 +456,7 @@ bad:
 		m_freem(opts);
 	return IPPROTO_DONE;
 }
+#endif
 
 /*
  * Notify a udp user of an asynchronous error;
@@ -540,6 +549,10 @@ udp6_output(in6p, m, addr6, control)
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct proc *p = curproc;	/* XXX */
 #endif
+	int af, hlen;
+#ifdef __NetBSD__
+	struct ip *ip;
+#endif
 
 	priv = 0;
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -626,11 +639,14 @@ udp6_output(in6p, m, addr6, control)
 					htons(sin6->sin6_scope_id & 0xffff);
 			}
 		}
-		
-		laddr = in6_selectsrc(sin6, in6p->in6p_outputopts,
-				      in6p->in6p_moptions,
-				      &in6p->in6p_route,
-				      &in6p->in6p_laddr, &error);
+
+		if (!IN6_IS_ADDR_V4MAPPED(faddr)) {
+			laddr = in6_selectsrc(sin6, in6p->in6p_outputopts,
+					      in6p->in6p_moptions,
+					      &in6p->in6p_route,
+					      &in6p->in6p_laddr, &error);
+		} else
+			laddr = &in6p->in6p_laddr;	/*XXX*/
 		if (laddr == NULL) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
@@ -649,11 +665,19 @@ udp6_output(in6p, m, addr6, control)
 		fport = in6p->in6p_fport;
 	}
 
+	if (!IN6_IS_ADDR_V4MAPPED(faddr)) {
+		af = AF_INET6;
+		hlen = sizeof(struct ip6_hdr);
+	} else {
+		af = AF_INET;
+		hlen = sizeof(struct ip);
+	}
+
 	/*
 	 * Calculate data length and get a mbuf
 	 * for UDP and IP6 headers.
 	 */
-	M_PREPEND(m, sizeof(struct ip6_hdr) + sizeof(struct udphdr), M_DONTWAIT);
+	M_PREPEND(m, hlen + sizeof(struct udphdr), M_DONTWAIT);
 	if (m == 0) {
 		error = ENOBUFS;
 		goto release;
@@ -662,38 +686,65 @@ udp6_output(in6p, m, addr6, control)
 	/*
 	 * Stuff checksum and output datagram.
 	 */
-	ip6 = mtod(m, struct ip6_hdr *);
-	ip6->ip6_flow	= in6p->in6p_flowinfo & IPV6_FLOWINFO_MASK;
-	ip6->ip6_vfc 	= IPV6_VERSION;
-#if 0				/* ip6_plen will be filled in ip6_output. */
-	ip6->ip6_plen	= htons((u_short)plen);
-#endif
-	ip6->ip6_nxt	= IPPROTO_UDP;
-	ip6->ip6_hlim	= in6_selecthlim(in6p,
-					 in6p->in6p_route.ro_rt ?
-					 in6p->in6p_route.ro_rt->rt_ifp : NULL);
-	ip6->ip6_src	= *laddr;
-	ip6->ip6_dst	= *faddr;
-
-	udp6 = (struct udphdr *)(ip6 + 1);
+	udp6 = (struct udphdr *)(mtod(m, caddr_t) + hlen);
 	udp6->uh_sport = in6p->in6p_lport; /* lport is always set in the PCB */
 	udp6->uh_dport = fport;
 	udp6->uh_ulen  = htons((u_short)plen);
 	udp6->uh_sum   = 0;
 
-	if ((udp6->uh_sum = in6_cksum(m, IPPROTO_UDP,
-					sizeof(struct ip6_hdr), plen)) == 0) {
-		udp6->uh_sum = 0xffff;
-	}
+	switch (af) {
+	case AF_INET6:
+		ip6 = mtod(m, struct ip6_hdr *);
+		ip6->ip6_flow	= in6p->in6p_flowinfo & IPV6_FLOWINFO_MASK;
+		ip6->ip6_vfc 	= IPV6_VERSION;
+#if 0				/* ip6_plen will be filled in ip6_output. */
+		ip6->ip6_plen	= htons((u_short)plen);
+#endif
+		ip6->ip6_nxt	= IPPROTO_UDP;
+		ip6->ip6_hlim	= in6_selecthlim(in6p,
+						 in6p->in6p_route.ro_rt ?
+						 in6p->in6p_route.ro_rt->rt_ifp : NULL);
+		ip6->ip6_src	= *laddr;
+		ip6->ip6_dst	= *faddr;
 
-	udp6stat.udp6s_opackets++;
+		if ((udp6->uh_sum = in6_cksum(m, IPPROTO_UDP,
+				sizeof(struct ip6_hdr), plen)) == 0) {
+			udp6->uh_sum = 0xffff;
+		}
 
+		udp6stat.udp6s_opackets++;
 #ifdef IPSEC
-	m->m_pkthdr.rcvif = (struct ifnet *)in6p->in6p_socket;
+		m->m_pkthdr.rcvif = (struct ifnet *)in6p->in6p_socket;
 #endif /*IPSEC*/
-	error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route,
+		error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route,
 			    0, in6p->in6p_moptions, NULL);
+		break;
+#ifdef __NetBSD__
+	case AF_INET:
+		ip = mtod(m, struct ip *);
 
+		ip->ip_len = plen;
+		ip->ip_p = IPPROTO_UDP;
+		ip->ip_ttl = in6p->in6p_hops;	/*XXX*/
+		ip->ip_tos = 0;			/*XXX*/
+		bcopy(&laddr->s6_addr[12], &ip->ip_src, sizeof(ip->ip_src));
+		bcopy(&faddr->s6_addr[12], &ip->ip_dst, sizeof(ip->ip_dst));
+
+		udp6->uh_sum = 0;
+		if ((udp6->uh_sum = in_cksum(m, ulen)) == 0)
+			udp6->uh_sum = 0xffff;
+
+		udpstat.udps_opackets++;
+#ifdef IPSEC
+		m->m_pkthdr.rcvif = NULL;	/*XXX*/
+#endif /*IPSEC*/
+		error = ip_output(m, NULL, &in6p->in6p_route, 0 /*XXX*/);
+#else
+		error = EAFNOSUPPORT;
+		goto release;
+#endif
+		break;
+	}
 	goto releaseopt;
 
 release:
