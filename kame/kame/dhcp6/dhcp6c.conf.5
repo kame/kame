@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.conf.5,v 1.11 2003/08/01 00:43:57 jinmei Exp $
+.\"	$KAME: dhcp6c.conf.5,v 1.12 2004/03/21 15:03:56 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -158,6 +158,11 @@ requests a DNS search path.
 .Ic ntp-servers
 .Xc
 requests a list of NTP server addresses.
+.It Xo
+.Ic lifetime
+.Xc
+means a lifetime option.
+This is particularly useful when sent with information-request messages.
 .El
 Multiple
 .Ic request

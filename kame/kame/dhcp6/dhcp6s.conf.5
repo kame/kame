@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6s.conf.5,v 1.6 2003/07/31 21:44:11 jinmei Exp $
+.\"	$KAME: dhcp6s.conf.5,v 1.7 2004/03/21 15:02:18 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -95,6 +95,13 @@ Each
 must be a numeric IPv6 address.
 Multiple server addresses can also be specified by a sequence of these
 statements.
+.It Xo
+.Ic lifetime Ar interval ;
+.Xc
+specifies the lifetime of option values that do not have particular
+lease duration in seconds.
+This option is particularly useful for stateless configuration by
+information-request and reply exchanges.
 .El
 .\"
 .Sh Interface statement
