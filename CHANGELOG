@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2392 2003/05/01 06:54:58 itojun Exp $
+$KAME: CHANGELOG,v 1.2393 2003/05/08 14:15:28 jinmei Exp $
 
 <200305>
+2003-05-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (nd6_rtmsg): corrected the pointer
+	value for RTAX_IFP.
+	Pointed out by: KIU Shueng Chuan
+
 Thu May  1 15:53:10 JST 2003  itojun@iijlab.net
 	* openbsd: switch to 3.3.  note that we now use openbsd/sys/altq,
 	  not kame/sys/altq (via symlinks), since ALTQ is integrated into
