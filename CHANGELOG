@@ -1,8 +1,24 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1530 2001/02/04 05:56:13 jinmei Exp $
+$KAME: CHANGELOG,v 1.1531 2001/02/04 11:28:21 jinmei Exp $
 
 <200102>
+2001-02-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6 (bunch of files): completely revisited address
+	and prefix manipulation:
+	- centralize addition or removal of addresses to make code
+	  maintainance easier.
+	- separate address manipulation and prefix manipulation, including
+	  + completely separate address lifetimes and prefix lifetimes.
+	  + separate on-link determination from address autoconfiguration.
+	  + separate route for a node's own address (to a loopback
+	    interface) from an interface's direct route.
+	  + separate the notion of detached addresses and the notion of
+	    detached prefixes.  The latter can now be designated by the
+	    "D" bit of the output from "ndp -p".
+	- more conformance to RFC 2462 address autoconfiguration.
+	- clarify a notion of autoconfigured addresses.
+
 2001-02-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.h (IFA6_IS_{DEPRECATED, INVALID}): added
 	to hide implementation of address lifetimes.  As a middle term
