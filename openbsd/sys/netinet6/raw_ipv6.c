@@ -560,7 +560,8 @@ rip6_output(m, so, dst, control)
       M_PREPEND(m, sizeof(struct ip6_hdr), M_WAIT);
       ip6 = mtod(m, struct ip6_hdr *);
       ip6->ip6_flow = 0;  /* Or possibly user flow label, in host order. */
-      ip6->ip6_vfc = IPV6_VERSION;
+      ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
+      ip6->ip6_vfc |= IPV6_VERSION;
       ip6->ip6_nxt = inp->inp_ipv6.ip6_nxt;
       bcopy(in6a, &ip6->ip6_src, sizeof(*in6a));
       ip6->ip6_dst = dst->sin6_addr;
