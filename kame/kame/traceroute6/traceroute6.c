@@ -516,6 +516,11 @@ main(argc, argv)
     {
 	int len;
 	char buf[16];
+
+	/*
+	 * do not raise error even if setsockopt fails, kernel may have ipsec
+	 * turned off.
+	 */
 	if ((len = ipsec_set_policy(buf, sizeof(buf), "in bypass")) < 0)
 		errx(1, ipsec_strerror());
 	(void)setsockopt(rcvsock, IPPROTO_IPV6, IPV6_IPSEC_POLICY, buf, len);
@@ -576,6 +581,11 @@ main(argc, argv)
     {
 	int len;
 	char buf[16];
+
+	/*
+	 * do not raise error even if setsockopt fails, kernel may have ipsec
+	 * turned off.
+	 */
 	if ((len = ipsec_set_policy(buf, sizeof(buf), "in bypass")) < 0)
 		errx(1, ipsec_strerror());
 	(void)setsockopt(sndsock, IPPROTO_IPV6, IPV6_IPSEC_POLICY, buf, len);
