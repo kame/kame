@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1752 2001/06/29 14:16:58 jinmei Exp $
+$KAME: CHANGELOG,v 1.1753 2001/07/02 14:35:42 itojun Exp $
 
 <200106>
+Mon Jul  2 20:06:28 JST 2001  itojun@iijlab.net
+	* sys/netinet6/in6.c: record multicast groups joined from within the
+	  kernel, into struct in6_ifaddr.  leave from these groups accordingly
+	  on removal of interface addresses.
+	* (netbsd) sys/netinet6/in6_pcb.c: remove multicast group information
+	  from pcb, in the early stage of interface removal processing, in
+	  in6_pcbpurgeif0().  without this change kernel may panic on pcmcia
+	  card removal.  notified by jinmei.
+
 2001-06-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_forward.c (ip6_forward): do not drop the
 	packet (nor send an icmp6 error) on a "p2p redirect" case, unless
