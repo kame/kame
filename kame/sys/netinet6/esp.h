@@ -1,4 +1,4 @@
-/*	$KAME: esp.h,v 1.10 2000/07/20 17:41:01 itojun Exp $	*/
+/*	$KAME: esp.h,v 1.11 2000/07/23 08:23:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -101,10 +101,10 @@ extern int esp6_output __P((struct mbuf *, u_char *, struct mbuf *,
 	struct ipsecrequest *));
 extern int esp6_input __P((struct mbuf **, int *, int));
 #endif /* INET6 */
-#endif /*_KERNEL*/
 
 extern int esp_schedule __P((const struct esp_algorithm *, struct secasvar *));
 extern int esp_auth __P((struct mbuf *, size_t, size_t,
 	struct secasvar *, u_char *));
+#endif /*_KERNEL*/
 
 #endif /*_NETINET6_ESP_H_*/
