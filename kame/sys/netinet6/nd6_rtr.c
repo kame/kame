@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.167 2001/09/21 09:58:38 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.168 2001/09/21 12:35:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -870,6 +870,11 @@ defrouter_select()
 				 */
 				defrouter_addifreq(nd6_defifp);
 			} else {
+				/*
+				 * purge the existing route.
+				 * XXX: is this really correct?
+				 */
+				defrouter_delifreq();
 				nd6log((LOG_INFO, "defrouter_select: "
 				    "there's no default router and no default"
 				    " interface\n"));
