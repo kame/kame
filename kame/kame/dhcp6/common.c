@@ -63,7 +63,7 @@
 #include <common.h>
 
 static unsigned int if_maxindex __P((void));
-static int in6_matchflags __P((struct in6_addr *, char *, int));
+static int in6_matchflags __P((struct sockaddr *, char *, int));
 
 static unsigned int
 if_maxindex()
@@ -116,7 +116,7 @@ getifaddr(addr, ifnam, prefix, plen, strong, ignoreflags)
 		if (ifa->ifa_addr->sa_len > sizeof(sin6))
 			continue;
 
-		if (in6_matchflags(addr, ifnam, ignoreflags))
+		if (in6_matchflags(ifa->ifa_addr, ifnam, ignoreflags))
 			continue;
 
 		memcpy(&sin6, ifa->ifa_addr, ifa->ifa_addr->sa_len);
@@ -428,7 +428,7 @@ in6_scope(addr)
 
 static int
 in6_matchflags(addr, ifnam, flags)
-	struct in6_addr *addr;
+	struct sockaddr *addr;
 	char *ifnam;
 	int flags;
 {
@@ -441,13 +441,10 @@ in6_matchflags(addr, ifnam, flags)
 	}
 	memset(&ifr6, 0, sizeof(ifr6));
 	strncpy(ifr6.ifr_name, ifnam, sizeof(ifr6.ifr_name));
-	ifr6.ifr_addr.sin6_family = AF_INET6;
-	ifr6.ifr_addr.sin6_len = sizeof(struct sockaddr_in6);
-	ifr6.ifr_addr.sin6_addr = *addr;
-	/* XXX: sin6_scope_id?? */
+	ifr6.ifr_addr = *(struct sockaddr_in6 *)addr;
 
 	if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
-		warn("in6_matchflags: ioctl(SIOCGIFAFLAG_IN6)"); /* assert? */
+		warn("in6_matchflags: ioctl(SIOCGIFAFLAG_IN6)");/* assert? */
 		close(s);
 		return(-1);
 	}
