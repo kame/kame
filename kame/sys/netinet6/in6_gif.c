@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.68 2001/09/12 07:03:32 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.69 2001/10/01 11:33:43 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -91,6 +91,10 @@ static int gif_validate6 __P((const struct ip6_hdr *, struct gif_softc *,
 	struct ifnet *));
 
 extern struct ip6protosw in6_gif_protosw;
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+extern TAILQ_HEAD(gifhead, gif_softc) gifs;
+#endif
 
 #ifndef offsetof
 #define offsetof(s, e) ((int)&((s *)0)->e)
@@ -569,7 +573,6 @@ in6_gif_ctlinput(cmd, sa, d)
 	void *d;
 {
 	struct gif_softc *sc;
-	int i;
 	struct ip6ctlparam *ip6cp = NULL;
 	struct mbuf *m;
 	struct ip6_hdr *ip6;
@@ -577,6 +580,9 @@ in6_gif_ctlinput(cmd, sa, d)
 	void *cmdarg;
 	const struct sockaddr_in6 *sa6_src = NULL;
 	struct sockaddr_in6 *dst6;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+	int i;
+#endif
 
 	if (sa->sa_family != AF_INET6 ||
 	    sa->sa_len != sizeof(struct sockaddr_in6))
@@ -612,8 +618,14 @@ in6_gif_ctlinput(cmd, sa, d)
 	 * XXX slow.  sc (or sc->encap_cookie6) should be passed from
 	 * ip_encap.c.
 	 */
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	for (i = 0; i < ngif; i++) {
 		sc = gif_softc + i;
+#else
+	for (sc = TAILQ_FIRST(&gifs);
+	     sc;
+	     sc = TAILQ_NEXT(sc, gif_link)) {
+#endif
 
 		if ((sc->gif_if.if_flags & IFF_RUNNING) == 0)
 			continue;
