@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.306 2002/05/25 17:04:00 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.307 2002/06/10 08:27:13 sakane Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1952,7 +1952,7 @@ Here are (some of) platforms we have tested IPsec/IKE interoperability
 in the past, no particular order.  Note that both ends (KAME and
 others) may have modified their implementation, so use the following
 list just for reference purposes.
-	ACC, Allied-telesis, Altiga, Ashley-laurent (vpcom.com),
+	6WIND, ACC, Allied-telesis, Altiga, Ashley-laurent (vpcom.com),
 	BlueSteel, CISCO IOS, Checkpoint FW-1, Compaq Tru54 UNIX
 	X5.1B-BL4, Cryptek, Data Fellows (F-Secure), Ericsson,
 	F-Secure VPN+ 5.40, Fitec, Fitel, FreeS/WAN, HITACHI, HiFn,
