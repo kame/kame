@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.23 2000/03/29 15:52:18 sumikawa Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.24 2000/03/30 16:47:22 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -65,8 +65,6 @@
  */
 
 #include "opt_inet.h"
-#include "opt_inet6.h"
-#include "opt_ipsec.h"
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -103,7 +101,6 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#include <netinet6/ipsec6.h>
 #endif /*IPSEC*/
 
 #include "faith.h"
