@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.46 2001/04/25 12:31:23 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.47 2001/04/25 12:47:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -80,6 +80,10 @@
 #include <sys/queue.h>
 #include <net/if.h>
 #include <netinet/in.h>
+#ifdef __KAME__
+#include <sys/ioctl.h>
+#include <netinet6/in6_var.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -679,6 +683,10 @@ encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs, scoped, loopback)
 	struct sockaddr_in6 *sin6;
 	struct in6_addr in6;
 	int scopecnt;
+#ifdef __KAME__
+	struct in6_ifreq ifr6;
+	int s;
+#endif
 
 	p = replybuf + off;
 	*naddrs = 0;
@@ -755,6 +763,26 @@ encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs, scoped, loopback)
 				alen = sizeof(sin6->sin6_addr);
 				abuf = (char *)&sin6->sin6_addr;
 			}
+
+#ifdef __KAME__
+			/* check if the address is ready for use */
+			s = socket(AF_INET6, SOCK_DGRAM, 0);
+			if (s < 0)
+				continue;
+			memset(&ifr6, 0, sizeof(ifr6));
+			strncpy(ifr6.ifr_name, ifa->ifa_name,
+			    sizeof(ifr6.ifr_name));
+			ifr6.ifr_addr = *sin6;
+			if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
+				close(s);
+				continue;
+			}
+			if ((ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_NOTREADY) != 0) {
+				close(s);
+				continue;
+			}
+			close(s);
+#endif
 
 			ntype = T_AAAA;
 			nclass = C_IN;
