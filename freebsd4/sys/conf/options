@@ -303,6 +303,7 @@ MIP6_NOHAIPSEC		opt_mip6.h
 NATPT			opt_natpt.h
 NATPT_NAT		opt_natpt.h
 NEW_STRUCT_ROUTE	opt_global.h
+PULLDOWN_TEST
 IGMPV3			opt_inet.h
 MLDV2			opt_inet6.h
 IPSEC			opt_ipsec.h
