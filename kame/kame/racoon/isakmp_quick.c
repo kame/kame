@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.87 2001/12/10 18:08:15 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.88 2001/12/11 20:33:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -84,7 +84,7 @@
 #include "strnames.h"
 
 /* quick mode */
-static vchar_t *quick_ir1sendmx __P((struct ph2handle *, vchar_t *));
+static vchar_t *quick_ir1mx __P((struct ph2handle *, vchar_t *));
 static int get_sainfo_r __P((struct ph2handle *));
 static int get_proposal_r __P((struct ph2handle *));
 static u_int32_t setscopeid __P((struct sockaddr *, struct sockaddr *));
@@ -129,7 +129,7 @@ quick_i1prep(iph2, msg)
 	plog(LLV_DEBUG, LOCATION, NULL, "pfkey getspi sent.\n");
 
 	iph2->sce = sched_new(lcconf->wait_ph2complete,
-	    pfkey_timeover_stub, iph2);
+		pfkey_timeover_stub, iph2);
 
 	error = 0;
 
@@ -275,16 +275,17 @@ quick_i1send(iph2, msg)
 		goto end;
 
 	/* send isakmp payload */
-	iph2->sendbuf = quick_ir1sendmx(iph2, body);
+	iph2->sendbuf = quick_ir1mx(iph2, body);
 	if (iph2->sendbuf == NULL)
 		goto end;
 
-	/* add to the schedule to resend, and seve back pointer. */
-	if (iph2->ph1->rmconf->retry_counter) {
-		iph2->retry_counter = iph2->ph1->rmconf->retry_counter;
-		iph2->scr = sched_new(iph2->ph1->rmconf->retry_interval,
-		    isakmp_ph2resend_stub, iph2);
-	}
+	/* send HDR*;HASH(1);SA;Nr to responder */
+	if (isakmp_send(iph2->ph1, iph2->sendbuf) < 0)
+		goto end;
+
+	/* send the packet, add to the schedule to resend */
+	iph2->retry_counter = iph2->ph1->rmconf->retry_counter;
+	isakmp_ph2resend_stub(iph2);
 
 	/* change status of isakmp status entry */
 	iph2->status = PHASE2ST_MSG1SENT;
@@ -1117,7 +1118,7 @@ quick_r1prep(iph2, msg)
 	plog(LLV_DEBUG, LOCATION, NULL, "pfkey getspi sent.\n");
 
 	iph2->sce = sched_new(lcconf->wait_ph2complete,
-	    pfkey_timeover_stub, iph2);
+		pfkey_timeover_stub, iph2);
 
 	error = 0;
 
@@ -1295,16 +1296,17 @@ quick_r2send(iph2, msg)
     }
 
 	/* send isakmp payload */
-	iph2->sendbuf = quick_ir1sendmx(iph2, body);
+	iph2->sendbuf = quick_ir1mx(iph2, body);
 	if (iph2->sendbuf == NULL)
 		goto end;
 
-	/* add to the schedule to resend, and seve back pointer. */
-	if (iph2->ph1->rmconf->retry_counter) {
-		iph2->retry_counter = iph2->ph1->rmconf->retry_counter;
-		iph2->scr = sched_new(iph2->ph1->rmconf->retry_interval,
-		    isakmp_ph2resend_stub, iph2);
-	}
+	/* send HDR*;HASH(1);SA;Nr to responder */
+	if (isakmp_send(iph2->ph1, iph2->sendbuf) < 0)
+		goto end;
+
+	/* send the packet, add to the schedule to resend */
+	iph2->retry_counter = iph2->ph1->rmconf->retry_counter;
+	isakmp_ph2resend_stub(iph2);
 
 	/* change status of isakmp status entry */
 	iph2->status = PHASE2ST_MSG1SENT;
@@ -1647,7 +1649,7 @@ end:
  * create HASH, body (SA, NONCE) payload with isakmp header.
  */
 static vchar_t *
-quick_ir1sendmx(iph2, body)
+quick_ir1mx(iph2, body)
 	struct ph2handle *iph2;
 	vchar_t *body;
 {
@@ -1696,10 +1698,6 @@ quick_ir1sendmx(iph2, body)
 	vfree(buf);
 
 	buf = new;
-
-	/* send HDR*;HASH(1);SA;Nr to responder */
-	if (isakmp_send(iph2->ph1, buf) < 0)
-		goto end;
 
 	error = 0;
 

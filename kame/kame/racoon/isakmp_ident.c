@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_ident.c,v 1.60 2001/12/10 18:08:15 sakane Exp $	*/
+/*	$KAME: isakmp_ident.c,v 1.61 2001/12/11 20:33:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -74,8 +74,8 @@
 #include "gssapi.h"
 #endif
 
-static vchar_t *ident_ir2sendmx __P((struct ph1handle *));
-static vchar_t *ident_ir3sendmx __P((struct ph1handle *));
+static vchar_t *ident_ir2mx __P((struct ph1handle *));
+static vchar_t *ident_ir3mx __P((struct ph1handle *));
 
 /* %%%
  * begin Identity Protection Mode as initiator.
@@ -298,8 +298,16 @@ ident_i2send(iph1, msg)
 #endif
 
 	/* create buffer to send isakmp payload */
-	iph1->sendbuf = ident_ir2sendmx(iph1);
+	iph1->sendbuf = ident_ir2mx(iph1);
 	if (iph1->sendbuf == NULL)
+		goto end;
+
+#ifdef HAVE_PRINT_ISAKMP_C
+	isakmp_printpacket(iph1->sendbuf, iph1->local, iph1->remote, 0);
+#endif
+
+	/* send HDR;KE;NONCE to responder */
+	if (isakmp_send(iph1, iph1->sendbuf) < 0)
 		goto end;
 
 	/* add to the schedule to resend, and seve back pointer. */
@@ -488,8 +496,12 @@ ident_i3send(iph1, msg)
 	iph1->flags |= ISAKMP_FLAG_E;
 
 	/* create HDR;ID;HASH payload */
-	iph1->sendbuf = ident_ir3sendmx(iph1);
+	iph1->sendbuf = ident_ir3mx(iph1);
 	if (iph1->sendbuf == NULL)
+		goto end;
+
+	/* send HDR;ID;HASH to responder */
+	if (isakmp_send(iph1, iph1->sendbuf) < 0)
 		goto end;
 
 	/* add to the schedule to resend, and seve back pointer. */
@@ -498,6 +510,9 @@ ident_i3send(iph1, msg)
 		iph1->scr = sched_new(iph1->rmconf->retry_interval,
 		    isakmp_ph1resend_stub, iph1);
 	}
+
+	/* see handler.h about IV synchronization. */
+	memcpy(iph1->ivm->ive->v, iph1->ivm->iv->v, iph1->ivm->iv->l);
 
 	iph1->status = PHASE1ST_MSG3SENT;
 
@@ -1018,9 +1033,24 @@ ident_r2send(iph1, msg)
 #endif
 
 	/* create HDR;KE;NONCE payload */
-	iph1->sendbuf = ident_ir2sendmx(iph1);
+	iph1->sendbuf = ident_ir2mx(iph1);
 	if (iph1->sendbuf == NULL)
 		goto end;
+
+#ifdef HAVE_PRINT_ISAKMP_C
+	isakmp_printpacket(iph1->sendbuf, iph1->local, iph1->remote, 0);
+#endif
+
+	/* send HDR;KE;NONCE to responder */
+	if (isakmp_send(iph1, iph1->sendbuf) < 0)
+		goto end;
+
+	/* add to the schedule to resend, and seve back pointer. */
+	if (iph1->rmconf->retry_counter) {
+		iph1->retry_counter = iph1->rmconf->retry_counter;
+		iph1->scr = sched_new(iph1->rmconf->retry_interval,
+		    isakmp_ph1resend_stub, iph1);
+	}
 
 	/* compute sharing secret of DH */
 	if (oakley_dh_compute(iph1->approval->dhgrp, iph1->dhpub,
@@ -1315,9 +1345,23 @@ ident_r3send(iph1, msg0)
 	iph1->flags |= ISAKMP_FLAG_E;
 
 	/* create HDR;ID;HASH payload */
-	iph1->sendbuf = ident_ir3sendmx(iph1);
+	iph1->sendbuf = ident_ir3mx(iph1);
 	if (iph1->sendbuf == NULL)
 		goto end;
+
+	/* add to the schedule to resend, and seve back pointer. */
+	if (iph1->rmconf->retry_counter) {
+		iph1->retry_counter = iph1->rmconf->retry_counter;
+		iph1->scr = sched_new(iph1->rmconf->retry_interval,
+		    isakmp_ph1resend_stub, iph1);
+	}
+
+	/* send HDR;ID;HASH to responder */
+	if (isakmp_send(iph1, iph1->sendbuf) < 0)
+		goto end;
+
+	/* see handler.h about IV synchronization. */
+	memcpy(iph1->ivm->ive->v, iph1->ivm->iv->v, iph1->ivm->iv->l);
 
 	iph1->status = PHASE1ST_ESTABLISHED;
 
@@ -1345,7 +1389,7 @@ end:
  * 	rev: HDR, <Nr_b>PubKey_i, <KE_b>Ke_r, <IDr1_b>Ke_r,
  */
 static vchar_t *
-ident_ir2sendmx(iph1)
+ident_ir2mx(iph1)
 	struct ph1handle *iph1;
 {
 	vchar_t *buf = 0;
@@ -1439,14 +1483,6 @@ ident_ir2sendmx(iph1)
 	if (need_cr)
 		p = set_isakmp_payload(p, cr, ISAKMP_NPTYPE_NONE);
 
-#ifdef HAVE_PRINT_ISAKMP_C
-	isakmp_printpacket(buf, iph1->local, iph1->remote, 0);
-#endif
-
-	/* send HDR;KE;NONCE to responder */
-	if (isakmp_send(iph1, buf) < 0)
-		goto end;
-
 	error = 0;
 
 end:
@@ -1480,7 +1516,7 @@ end:
  * 	rev: HDR*, HASH_R
  */
 static vchar_t *
-ident_ir3sendmx(iph1)
+ident_ir3mx(iph1)
 	struct ph1handle *iph1;
 {
 	vchar_t *buf = NULL, *new = NULL;
@@ -1658,13 +1694,6 @@ ident_ir3sendmx(iph1)
 	vfree(buf);
 
 	buf = new;
-
-	/* send HDR;ID;HASH to responder */
-	if (isakmp_send(iph1, buf) < 0)
-		goto end;
-
-	/* see handler.h about IV synchronization. */
-	memcpy(iph1->ivm->ive->v, iph1->ivm->iv->v, iph1->ivm->iv->l);
 
 	error = 0;
 

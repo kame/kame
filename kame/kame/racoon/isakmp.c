@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.167 2001/12/07 08:39:39 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.168 2001/12/11 20:33:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1484,15 +1484,6 @@ void
 isakmp_ph1resend(iph1)
 	struct ph1handle *iph1;
 {
-	plog(LLV_DEBUG, LOCATION, NULL,
-		"resend phase1 packet %s\n",
-		isakmp_pindex(&iph1->index, iph1->msgid));
-	SCHED_KILL(iph1->scr);
-
-	if (isakmp_send(iph1, iph1->sendbuf) < 0)
-		return;
-
-	iph1->retry_counter--;
 	if (iph1->retry_counter < 0) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"phase1 negotiation failed due to time up. %s\n",
@@ -1503,8 +1494,17 @@ isakmp_ph1resend(iph1)
 		return;
 	}
 
+	if (isakmp_send(iph1, iph1->sendbuf) < 0)
+		return;
+
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"resend phase1 packet %s\n",
+		isakmp_pindex(&iph1->index, iph1->msgid));
+
+	iph1->retry_counter--;
+
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
-	    isakmp_ph1resend_stub, iph1);
+		isakmp_ph1resend_stub, iph1);
 }
 
 /* called from scheduler */
@@ -1520,15 +1520,6 @@ void
 isakmp_ph2resend(iph2)
 	struct ph2handle *iph2;
 {
-	plog(LLV_DEBUG, LOCATION, NULL,
-		"resend phase2 packet %s\n",
-		isakmp_pindex(&iph2->ph1->index, iph2->msgid));
-	SCHED_KILL(iph2->scr);
-
-	if (isakmp_send(iph2->ph1, iph2->sendbuf) < 0)
-		return;
-
-	iph2->retry_counter--;
 	if (iph2->retry_counter < 0) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"phase2 negotiation failed due to time up. %s\n",
@@ -1539,8 +1530,17 @@ isakmp_ph2resend(iph2)
 		return;
 	}
 
+	if (isakmp_send(iph2->ph1, iph2->sendbuf) < 0)
+		return;
+
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"resend phase2 packet %s\n",
+		isakmp_pindex(&iph2->ph1->index, iph2->msgid));
+
+	iph2->retry_counter--;
+
 	iph2->scr = sched_new(iph2->ph1->rmconf->retry_interval,
-	    isakmp_ph2resend_stub, iph2);
+		isakmp_ph2resend_stub, iph2);
 }
 
 /* called from scheduler */

@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_base.c,v 1.46 2001/12/10 18:08:15 sakane Exp $	*/
+/*	$KAME: isakmp_base.c,v 1.47 2001/12/11 20:33:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -151,16 +151,9 @@ base_i1send(iph1, msg)
 	isakmp_printpacket(iph1->sendbuf, iph1->local, iph1->remote, 0);
 #endif
 
-	/* send to responder */
-	if (isakmp_send(iph1, iph1->sendbuf) < 0)
-		goto end;
-
-	/* add to the schedule to resend, and seve back pointer. */
-	if (iph1->rmconf->retry_counter) {
-		iph1->retry_counter = iph1->rmconf->retry_counter;
-		iph1->scr = sched_new(iph1->rmconf->retry_interval,
-		    isakmp_ph1resend_stub, iph1);
-	}
+	/* send the packet, add to the schedule to resend */
+	iph1->retry_counter = iph1->rmconf->retry_counter;
+	isakmp_ph1resend_stub(iph1);
 
 	iph1->status = PHASE1ST_MSG1SENT;
 
@@ -419,16 +412,9 @@ base_i2send(iph1, msg)
 	isakmp_printpacket(iph1->sendbuf, iph1->local, iph1->remote, 0);
 #endif
 
-	/* send HDR;KE;NONCE to responder */
-	if (isakmp_send(iph1, iph1->sendbuf) < 0)
-		goto end;
-
-	/* add to the schedule to resend, and seve back pointer. */
-	if (iph1->rmconf->retry_counter) {
-		iph1->retry_counter = iph1->rmconf->retry_counter;
-		iph1->scr = sched_new(iph1->rmconf->retry_interval,
-		    isakmp_ph1resend_stub, iph1);
-	}
+	/* send the packet, add to the schedule to resend */
+	iph1->retry_counter = iph1->rmconf->retry_counter;
+	isakmp_ph1resend_stub(iph1);
 
 	iph1->status = PHASE1ST_MSG2SENT;
 
@@ -764,16 +750,9 @@ base_r1send(iph1, msg)
 	isakmp_printpacket(iph1->sendbuf, iph1->local, iph1->remote, 0);
 #endif
 
-	/* send to responder */
-	if (isakmp_send(iph1, iph1->sendbuf) < 0)
-		goto end;
-
-	/* add to the schedule to resend, and seve back pointer. */
-	if (iph1->rmconf->retry_counter) {
-		iph1->retry_counter = iph1->rmconf->retry_counter;
-		iph1->scr = sched_new(iph1->rmconf->retry_interval,
-		    isakmp_ph1resend_stub, iph1);
-	}
+	/* send the packet, add to the schedule to resend */
+	iph1->retry_counter = iph1->rmconf->retry_counter;
+	isakmp_ph1resend_stub(iph1);
 
 	iph1->status = PHASE1ST_MSG1SENT;
 
