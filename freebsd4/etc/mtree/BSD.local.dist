@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.local.dist,v 1.55.2.14 2002/01/22 16:46:06 phantom Exp $
+# $FreeBSD: src/etc/mtree/BSD.local.dist,v 1.55.2.18 2002/03/01 15:56:55 phantom Exp $
 #
 # Please see the file src/etc/mtree/README before making changes to this file.
 #
@@ -236,10 +236,18 @@
         ..
         examples
         ..
+        java
+            classes
+            ..
+        ..
         misc
         ..
         nls
             C
+            ..
+            af_ZA.ISO8859-1
+            ..
+            af_ZA.ISO8859-15
             ..
             bg_BG.CP1251
             ..
@@ -260,6 +268,8 @@
             de_DE.ISO8859-1
             ..
             de_DE.ISO8859-15
+            ..
+            el_GR.ISO8859-7
             ..
             en_AU.ISO8859-1
             ..
@@ -292,6 +302,8 @@
             es_ES.ISO8859-1
             ..
             es_ES.ISO8859-15
+            ..
+            et_EE.ISO8859-15
             ..
             fi_FI.ISO8859-1
             ..
@@ -329,11 +341,11 @@
             ..
             it_IT.ISO8859-15
             ..
-            ja_JP.EUC
+            ja_JP.eucJP
             ..
             ja_JP.SJIS
             ..
-            ko_KR.EUC
+            ko_KR.eucKR
             ..
             la_LN.ISO8859-1
             ..
@@ -383,14 +395,20 @@
             ..
             tr_TR.ISO8859-9
             ..
+            uk_UA.ISO8859-5
+            ..
             uk_UA.KOI8-U
             ..
-            zh_CN.EUC
+            zh_CN.eucCN
             ..
             zh_TW.Big5
             ..
         ..
+        sgml
+        ..
         skel
+        ..
+        xml
         ..
     ..
 ..

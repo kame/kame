@@ -1,12 +1,12 @@
 #	@(#)Makefile	8.1 (Berkeley) 6/5/93
-# $FreeBSD: src/sbin/route/Makefile,v 1.11.2.1 2001/04/25 10:58:49 ru Exp $
+# $FreeBSD: src/sbin/route/Makefile,v 1.11.2.2 2002/04/12 11:13:56 ru Exp $
 
 PROG=	route
 MAN=	route.8
 SRCS=	route.c keywords.h
 CFLAGS+=-I. -Wall -DNS
 CFLAGS+=-DINET6
-CLEANFILES+=keywords.h
+CLEANFILES+=keywords.h _keywords.tmp
 BINMODE=4555
 
 keywords.h: keywords
@@ -19,8 +19,4 @@ keywords.h: keywords
 	    > ${.TARGET}
 	rm -f _keywords.tmp
 
-./keywords.h:	keywords.h
-
 .include <bsd.prog.mk>
-
-route .depend lint tags: keywords.h
