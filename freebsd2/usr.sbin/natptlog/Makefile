@@ -5,7 +5,7 @@ SRCS=	natptlog.c showsubs.c
 
 MAN8=	natptlog.8
 
-CFLAGS+= -g -Wall
+CFLAGS+= -g -Wall -I${SRCDIR}/../natptconfig
 
 LDADD+=	-lutil
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 \
