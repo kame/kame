@@ -184,12 +184,14 @@ config_vifs_from_kernel()
         	log(LOG_ERR, errno, "ioctl SIOCGIFFLAGS for %s", ifr.ifr_name);
 		flags = ifr.ifr_flags;
 
+#if 0
 		/*
 		 * Ignore loopback interfaces and interfaces that do not
 		 * support multicast.
 		 */
 		if((flags & (IFF_LOOPBACK | IFF_MULTICAST ))!= IFF_MULTICAST)
 			continue;
+#endif
 
 		/*
 		 * Get netmask of the address.
@@ -263,6 +265,15 @@ config_vifs_from_kernel()
 	
 		if(flags & IFF_POINTOPOINT)
 			v->uv_flags |=(VIFF_REXMIT_PRUNES | VIFF_POINT_TO_POINT);
+
+		/*
+		 * Disable multicast routing on loopback interfaces and
+		 * interfaces that do not support multicast. But they are
+		 * still necessary, since global addresses maybe assigned only
+		 * on such interfaces.
+		 */
+		if ((flags & IFF_LOOPBACK) != 0 || (flags & IFF_MULTICAST) == 0)
+			v->uv_flags |= VIFF_DISABLED;
 
 		IF_DEBUG(DEBUG_IF)
 			log(LOG_DEBUG,0,
