@@ -34,6 +34,10 @@
  *   but INRIA implementation returns EAI_xxx defined for getaddrinfo().
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif 
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <net/if.h>
@@ -44,6 +48,14 @@
 #include <resolv.h>
 #include <string.h>
 #include <stddef.h>
+
+#ifndef HAVE_PORTABLE_PROTOTYPE
+#include "cdecl_ext.h"
+#endif 
+
+#ifndef HAVE_ADDRINFO
+#include "addrinfo.h"
+#endif
 
 #define SUCCESS 0
 #define ANY 0
@@ -103,7 +115,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 	if (sa == NULL)
 		return ENI_NOSOCKET;
 
-#if 1	/*XXX*/
+#ifdef HAVE_SA_LEN	/*XXX*/
 	if (sa->sa_len != salen)
 		return ENI_SALEN;
 #endif

@@ -1,4 +1,4 @@
-/* $Id: name6.c,v 1.3 1999/08/17 08:13:43 itojun Exp $ */
+/* $Id: name6.c,v 1.4 1999/09/26 06:43:34 jinmei Exp $ */
 /*
  *	Atsushi Onoe <onoe@sm.sony.co.jp>
  */
@@ -20,14 +20,39 @@
 #include <sys/time.h>
 #include <netinet/in.h>
 
+#include <arpa/inet.h>
+#include <arpa/nameser.h>
+
 #include <netdb.h>
 #include <resolv.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <arpa/inet.h>
-#include <arpa/nameser.h>
+
+#ifndef HAVE_PORTABLE_PROTOTYPE
+#include "cdecl_ext.h"
+#endif 
+
+#ifndef HAVE_U_INT32_T
+#include "bittypes.h"
+#endif 
+
+#ifndef HAVE_RES_USE_INET6
+#include "resolv6.h"
+#endif 
+
+#ifndef HAVE_SOCKADDR_STORAGE
+#include "sockstorage.h"
+#endif 
+
+#ifndef HAVE_ADDRINFO
+#include "addrinfo.h"
+#endif
+
+#ifndef HAVE_RES_STATE_EXT
+#include "resolv_ext.h"
+#endif 
 
 #ifndef _PATH_HOSTS
 #define	_PATH_HOSTS	"/etc/hosts"
@@ -43,8 +68,13 @@
 #define	MAXDNAME	1025
 #endif
 
+#ifdef INET6
 #define	ADDRLEN(af)	((af) == AF_INET6 ? sizeof(struct in6_addr) : \
 					    sizeof(struct in_addr))
+#else
+#define	ADDRLEN(af)	sizeof(struct in_addr)
+#endif
+
 #define	MAPADDR(ab, ina) {						\
 	memcpy(&(ab)->map_inaddr, ina, sizeof(struct in_addr));		\
 	memset((ab)->map_zero, 0, sizeof((ab)->map_zero));		\
@@ -56,7 +86,9 @@
 
 union inx_addr {
 	struct in_addr	in_addr;
+#ifdef INET6
 	struct in6_addr	in6_addr;
+#endif 
 	struct {
 		u_char	mau_zero[10];
 		u_char	mau_one[2];
@@ -70,7 +102,9 @@ union inx_addr {
 static struct hostent *_hpcopy(struct hostent *hp, int *errp);
 static struct hostent *_hpaddr(int af, const char *name, void *addr, int *errp);
 static struct hostent *_hpmerge(struct hostent *hp1, struct hostent *hp2, int *errp);
+#ifdef INET6
 static struct hostent *_hpmapv6(struct hostent *hp, int *errp);
+#endif 
 static struct hostent *_hpsort(struct hostent *hp);
 static struct hostent *_ghbyname(const char *name, int af, int flags, int *errp);
 static char *_hgetword(char **pp);
@@ -282,11 +316,17 @@ getipnodebyname(const char *name, int af, int flags, int *errp)
 	struct hostent *hp;
 	union inx_addr addrbuf;
 
-	if (af != AF_INET && af != AF_INET6) {
+	if (af != AF_INET
+#ifdef INET6
+	    && af != AF_INET6
+#endif
+		)
+	{
 		*errp = NO_RECOVERY;
 		return NULL;
 	}
 
+#ifdef INET6
 	/* special case for literal address */
 	if (inet_pton(AF_INET6, name, &addrbuf) > 0) {
 		if (af != AF_INET6) {
@@ -295,6 +335,7 @@ getipnodebyname(const char *name, int af, int flags, int *errp)
 		}
 		return _hpaddr(af, name, &addrbuf, errp);
 	}
+#endif 
 	if (inet_pton(AF_INET, name, &addrbuf) > 0) {
 		if (af != AF_INET) {
 			if (MAPADDRENABLED(flags)) {
@@ -315,6 +356,7 @@ getipnodebyname(const char *name, int af, int flags, int *errp)
 	*errp = HOST_NOT_FOUND;
 	hp = _ghbyname(name, af, flags, errp);
 
+#ifdef INET6
 	if (af == AF_INET6
 	&&  ((flags & AI_ALL) || hp == NULL)
 	&&  (MAPADDRENABLED(flags))) {
@@ -329,6 +371,7 @@ getipnodebyname(const char *name, int af, int flags, int *errp)
 			hp = _hpmerge(hp, hp2, errp);
 		}
 	}
+#endif 
 	return _hpsort(hp);
 }
 
@@ -337,7 +380,11 @@ getipnodebyaddr(const void *src, size_t len, int af, int *errp)
 {
 	struct hostent *hp;
 	int i;
+#ifdef INET6
 	struct in6_addr addrbuf;
+#else
+	struct in_addr addrbuf;
+#endif 
 
 	*errp = HOST_NOT_FOUND;
 
@@ -354,6 +401,7 @@ getipnodebyaddr(const void *src, size_t len, int af, int *errp)
 		if (((struct in_addr *)src)->s_addr == 0)
 			return NULL;
 		break;
+#ifdef INET6
 	case AF_INET6:
 		if (len != sizeof(struct in6_addr)) {
 			*errp = NO_RECOVERY;
@@ -373,6 +421,7 @@ getipnodebyaddr(const void *src, size_t len, int af, int *errp)
 			len = sizeof(struct in_addr);
 		}
 		break;
+#endif 
 	default:
 		*errp = NO_RECOVERY;
 		return NULL;
@@ -427,8 +476,10 @@ gethostbyname2(const char *name, int af)
 	if (af == AF_INET && saved_hp != NULL) {
 		if ((_res.options & RES_INIT) == 0)
 			(void)res_init();
+#ifdef INET6
 		if (_res.options & RES_USE_INET6)
 			saved_hp = _hpmapv6(saved_hp, &h_errno);
+#endif 
 	}
 	return saved_hp;
 }
@@ -441,11 +492,13 @@ gethostbyname(const char *name)
 	if ((_res.options & RES_INIT) == 0)
 		(void)res_init();
 
+#ifdef INET6
 	if (_res.options & RES_USE_INET6) {
 		hp = gethostbyname2(name, AF_INET6);
 		if (hp != NULL)
 			return hp;
 	}
+#endif 
 	return gethostbyname2(name, AF_INET);
 }
 
@@ -459,8 +512,10 @@ gethostbyaddr(const char *src, int len, int af)
 	if (af == AF_INET && saved_hp != NULL) {
 		if ((_res.options & RES_INIT) == 0)
 			(void)res_init();
+#ifdef INET6
 		if (_res.options & RES_USE_INET6)
 			saved_hp = _hpmapv6(saved_hp, &h_errno);
+#endif 
 	}
 	return saved_hp;
 }
@@ -635,13 +690,17 @@ _hpmerge(struct hostent *hp1, struct hostent *hp2, int *errp)
 		}
 	}
 	aliases[nalias] = NULL;
+#ifdef INET6
 	if (hp1->h_length != hp2->h_length) {
 		hp->h_addrtype = AF_INET6;
 		hp->h_length = sizeof(struct in6_addr);
 	} else {
+#endif 
 		hp->h_addrtype = hp1->h_addrtype;
 		hp->h_length = hp1->h_length;
+#ifdef INET6
 	}
+#endif 
 	hp->h_addr_list = addrs;
 	naddr = 0;
 	for (i = 1; i <= 2; i++) {
@@ -669,6 +728,7 @@ _hpmerge(struct hostent *hp1, struct hostent *hp2, int *errp)
 /*
  * _hpmapv6: convert IPv4 hostent into IPv4-mapped IPv6 addresses
  */
+#ifdef INET6
 static struct hostent *
 _hpmapv6(struct hostent *hp, int *errp)
 {
@@ -691,6 +751,7 @@ _hpmapv6(struct hostent *hp, int *errp)
 	hp6->h_addr_list = NULL;
 	return _hpmerge(hp6, hp, errp);
 }
+#endif 
 
 /*
  * _hpsort: sort address by sortlist
@@ -702,11 +763,16 @@ _hpsort(struct hostent *hp)
 	u_char *ap, *sp, *mp, **pp;
 	char t;
 	char order[MAXADDRS];
+#ifdef HAVE_NEW_RES_STATE
+	int nsort = _res.nsort;
+#else
+	int nsort = MAXADDRS;
+#endif 
 
-	if (hp == NULL || hp->h_addr_list[1] == NULL || _res.nsort == 0)
+	if (hp == NULL || hp->h_addr_list[1] == NULL || nsort == 0)
 		return hp;
 	for (i = 0; (ap = (u_char *)hp->h_addr_list[i]); i++) {
-		for (j = 0; j < _res.nsort; j++) {
+		for (j = 0; j < nsort; j++) {
 			if (_res_ext.sort_list[j].af != hp->h_addrtype)
 				continue;
 			sp = (u_char *)&_res_ext.sort_list[j].addr;
@@ -1003,7 +1069,11 @@ _dns_ghbyname(const char *name, int af, int *errp)
 	hbuf.h_addr_list = hlist;
 	na = nh = 0;
 
+#ifdef INET6
 	qtype = (af == AF_INET6 ? T_AAAA : T_A);
+#else
+	qtype = T_A;
+#endif 
 	n = res_search(name, C_IN, qtype, answer, sizeof(answer));
 	if (n < 0) {
 		*errp = h_errno;
@@ -1061,7 +1131,9 @@ _dns_ghbyname(const char *name, int af, int *errp)
 			buflen -= n;
 			break;
 		case T_A:
+#ifdef INET6
 		case T_AAAA:
+#endif 
 			DNS_ASSERT(type == qtype);
 			bp = (char *)ALIGN(bp);
 			DNS_ASSERT(n == hbuf.h_length);
@@ -1108,9 +1180,11 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 	int na;
 	static const char hex[] = "0123456789abcdef";
 
+#ifdef INET6
 	/* XXX */
 	if (af == AF_INET6 && IN6_IS_ADDR_LINKLOCAL((struct in6_addr *)addr))
 		return NULL;
+#endif 
 
 	if ((_res.options & RES_INIT) == 0) {
 		if (res_init() < 0) {
@@ -1130,7 +1204,9 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 	n = 0;
 	bp = hostbuf;
 	cp = (u_char *)addr+addrlen-1;
-	if (af == AF_INET6) {
+	switch (af) {
+#ifdef INET6
+	case AF_INET6:
 		for (; n < addrlen; n++, cp--) {
 			c = *cp;
 			*bp++ = hex[c & 0xf];
@@ -1139,7 +1215,9 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 			*bp++ = '.';
 		}
 		strcpy(bp, "ip6.int");
-	} else {
+		break;
+#endif 
+	default:
 		for (; n < addrlen; n++, cp--) {
 			c = *cp;
 			if (c >= 100)
@@ -1150,6 +1228,7 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 			*bp++ = '.';
 		}
 		strcpy(bp, "in-addr.arpa");
+		break;
 	}
 
 	n = res_query(hostbuf, C_IN, T_PTR, answer, sizeof(answer));

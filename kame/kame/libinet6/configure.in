@@ -31,4 +31,84 @@ dnl Checks for library functions.
 AC_FUNC_MEMCMP
 AC_CHECK_FUNCS(gethostname gettimeofday select socket strdup strerror)
 
+dnl
+dnl Check for sa_len
+AC_CHECK_SA_LEN(ac_cv_sockaddr_has_sa_len)
+if test "$ac_cv_sockaddr_has_sa_len" = no; then
+	missing_includes=yes
+fi
+
+dnl
+dnl check __P macro
+AC_CHECK_PORTABLE_PROTO(ac_cv_portable_proto)
+if test "$ac_cv_portable_proto" = no; then
+	missing_includes=yes
+fi
+
+dnl
+dnl check sizeof basic types
+AC_CHECK_SIZEOF(char)
+AC_CHECK_SIZEOF(short)
+AC_CHECK_SIZEOF(int)
+AC_CHECK_SIZEOF(long)
+
+dnl
+dnl Checks for u_intXX_t
+AC_CHECK_BITTYPES(ac_cv_bittypes)
+if test "$ac_cv_bittypes" = no; then
+	missing_includes=yes
+fi
+
+dnl
+dnl Checks for addrinfo structure
+AC_STRUCT_ADDRINFO(ac_cv_addrinfo)
+if test "$ac_cv_addrinfo" = no; then
+	missing_includes=yes
+fi
+
+dnl
+dnl Checks for sockaddr_storage structure
+AC_STRUCT_SA_STORAGE(ac_cv_sa_storage)
+if test "$ac_cv_sa_storage" = no; then
+	missing_includes=yes
+fi
+
+dnl
+dnl Checks for IN[6]ADDRSZ
+AC_CHECK_ADDRSZ(ac_cv_addrsz)
+if test "$ac_cv_addrsz" = no; then
+	missing_includes=yes
+fi
+
+dnl
+dnl Checks for RES_USE_INET6
+AC_CHECK_RES_USE_INET6(ac_cv_res_inet6)
+if test "$ac_cv_res_inet6" = no; then
+	missing_includes=yes
+fi
+
+dnl
+dnl Checks for AAAA
+AC_CHECK_AAAA(ac_cv_aaaa)
+if test "$ac_cv_aaaa" = no; then
+	AC_DEFINE(T_AAAA, 28)
+fi
+
+dnl
+dnl Checks for res_state_ext structure
+AC_STRUCT_RES_STATE_EXT(ac_cv_res_state_ext)
+if test "$ac_cv_res_state_ext" = no; then
+	missing_includes=yes
+fi
+
+dnl
+dnl Checks if res_state structure has nsort member.
+AC_STRUCT_RES_STATE(ac_cv_res_state)
+
+dnl
+dnl set additional include path if necessary
+if test "$missing_includes" = "yes"; then
+	CPPFLAGS="$CPPFLAGS -I./missing"
+fi
+
 AC_OUTPUT(Makefile)

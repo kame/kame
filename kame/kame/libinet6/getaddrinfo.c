@@ -38,9 +38,15 @@
  * - PF_UNSPEC case would be handled in getipnodebyname() with the AI_ALL flag.
  */
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif 
+
 #include <sys/types.h>
 #include <sys/param.h>
+#if 0
 #include <sys/sysctl.h>
+#endif
 #include <sys/socket.h>
 #include <net/if.h>
 #include <netinet/in.h>
@@ -53,6 +59,23 @@
 #include <stddef.h>
 #include <ctype.h>
 #include <unistd.h>
+#include <stdio.h>
+
+#ifndef HAVE_PORTABLE_PROTOTYPE
+#include "cdecl_ext.h"
+#endif 
+
+#ifndef HAVE_U_INT32_T
+#include "bittypes.h"
+#endif 
+
+#ifndef HAVE_SOCKADDR_STORAGE
+#include "sockstorage.h"
+#endif 
+
+#ifndef HAVE_ADDRINFO
+#include "addrinfo.h"
+#endif
 
 #if defined(__KAME__) && defined(INET6)
 # define FAITH
@@ -153,6 +176,12 @@ if (pai->ai_flags & AI_CANONNAME) {\
 	}\
 }
 
+#ifdef HAVE_SOCKADDR_SA_LEN
+#define COPY_ADDRLEN(ai, afd) (ai)->ai_addr->sa_len = (ai)->ai_addrlen = (afd)->a_socklen
+#else
+#define COPY_ADDRLEN(ai, afd) (ai)->ai_addrlen = (afd)->a_socklen
+#endif
+
 #define GET_AI(ai, afd, addr, port) {\
 	char *p;\
 	if (((ai) = (struct addrinfo *)malloc(sizeof(struct addrinfo) +\
@@ -164,7 +193,7 @@ if (pai->ai_flags & AI_CANONNAME) {\
 	memcpy(ai, pai, sizeof(struct addrinfo));\
 	(ai)->ai_addr = (struct sockaddr *)((ai) + 1);\
 	memset((ai)->ai_addr, 0, (afd)->a_socklen);\
-	(ai)->ai_addr->sa_len = (ai)->ai_addrlen = (afd)->a_socklen;\
+	COPY_ADDRLEN(ai, afd);\
 	(ai)->ai_addr->sa_family = (ai)->ai_family = (afd)->a_af;\
 	((struct sockinet *)(ai)->ai_addr)->si_port = port;\
 	p = (char *)((ai)->ai_addr);\
@@ -649,10 +678,12 @@ get_addr0(hostname, af, res, pai, port0)
 	sentinel.ai_next = NULL;
 	cur = &sentinel;
 #ifdef USE_GETIPNODEBY
+#ifdef INET6
 	if (af == AF_UNSPEC) {
 		hp = getipnodebyname(hostname, AF_INET6,
 				AI_ADDRCONFIG|AI_ALL|AI_V4MAPPED, &h_error);
 	} else
+#endif
 		hp = getipnodebyname(hostname, af, AI_ADDRCONFIG, &h_error);
 #else
 	if (af == AF_UNSPEC) {

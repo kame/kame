@@ -16,8 +16,12 @@
  */
 
 #if defined(LIBC_SCCS) && !defined(lint)
-static char rcsid[] = "$Id: inet_pton.c,v 1.1 1999/08/19 06:03:33 itojun Exp $";
+static char rcsid[] = "$Id: inet_pton.c,v 1.2 1999/09/26 06:43:34 jinmei Exp $";
 #endif /* LIBC_SCCS and not lint */
+
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif 
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -27,6 +31,18 @@ static char rcsid[] = "$Id: inet_pton.c,v 1.1 1999/08/19 06:03:33 itojun Exp $";
 #include <arpa/nameser.h>
 #include <string.h>
 #include <errno.h>
+
+#ifndef HAVE_PORTABLE_PROTOTYPE
+#include "cdecl_ext.h"
+#endif 
+
+#ifndef HAVE_U_INT16_T
+#include "bittypes.h"
+#endif 
+
+#if !(defined(HAVE_INADDRSZ) && defined(HAVE_IN6ADDRSZ))
+#include "addrsize.h"
+#endif 
 
 #ifndef NS_INADDRSZ
 #define NS_INADDRSZ	INADDRSZ
@@ -66,8 +82,10 @@ inet_pton(af, src, dst)
 	switch (af) {
 	case AF_INET:
 		return (inet_pton4(src, dst));
+#ifdef INET6
 	case AF_INET6:
 		return (inet_pton6(src, dst));
+#endif 
 	default:
 		errno = EAFNOSUPPORT;
 		return (-1);

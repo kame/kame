@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-#ifndef HAVE_GETADDRINFO
+#ifndef HAVE_ADDRINFO
 
 /*
  * Error return codes from getaddrinfo()
@@ -46,6 +46,9 @@
 #define EAI_BADHINTS	12
 #define EAI_PROTOCOL	13
 #define EAI_MAX		14
+
+/* internal error */
+#define	NETDB_INTERNAL	-1	/* see errno */
 
 /*
  * Flag values for getaddrinfo()
@@ -77,7 +80,6 @@
 #define	NI_NAMEREQD	0x00000004
 #define	NI_NUMERICSERV	0x00000008
 #define	NI_DGRAM	0x00000010
-#define NI_WITHSCOPEID	0x00000020
 
 struct addrinfo {
 	int	ai_flags;	/* AI_PASSIVE, AI_CANONNAME */
@@ -90,12 +92,15 @@ struct addrinfo {
 	struct addrinfo *ai_next;	/* next structure in linked list */
 };
 
-struct sockaddr_storage {
-	u_int8_t __ss_family;
-	u_int8_t __ss_len;
-	u_int8_t fill[126];
-};
-
+extern void freeaddrinfo __P((struct addrinfo *));
 extern void freehostent __P((struct hostent *));
 extern char *gai_strerror __P((int));
-#endif
+extern int getaddrinfo __P((const char *, const char *,
+			    const struct addrinfo *, struct addrinfo **));
+extern int getnameinfo __P((const struct sockaddr *, size_t, char *,
+			    size_t, char *, size_t, int));
+extern struct hostent *getipnodebyaddr __P((const void *, size_t, int, int *));
+extern struct hostent *getipnodebyname __P((const char *, int, int, int *));
+extern int inet_pton __P((int, const char *, void *));
+extern char *inet_ntop __P((int, const void *, char *, size_t));
+#endif /* HAVE_ADDRINFO */
