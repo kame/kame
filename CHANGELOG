@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1174 2000/08/02 18:00:20 sakane Exp $
+$KAME: CHANGELOG,v 1.1175 2000/08/02 20:36:31 sakane Exp $
 
 <200007>
+Thu Aug  3 05:36:23 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	Improved to check a packet which is processed or not.  The way is
+	to compare between the hash of a packet has been processed and the
+	list of hashs which are processed before.
+
 Thu Aug  3 03:00:36 JST 2000 sakane@ydc.co.jp
 	* kame/sys/{netkey/{key.c,keydb.h},netinet6/ipsec.h}:
 	Improved lifetime handling.  It uses real time instead of tick.
