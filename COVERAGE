@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.105 2001/05/10 06:50:01 sumikawa Exp $
+$KAME: COVERAGE,v 1.106 2001/05/11 03:33:47 itojun Exp $
 
 
 x: supported/integrated
@@ -59,8 +59,8 @@ ART routing table lookup algorithm
 		x	x	-	-	-	x	(*1)
     (*1) IPv6 only
 
-Userland PPP	?	?	x	x	-	?	?
-Kernel PPP	?	?	-	-	x	?	?
+Userland PPP	-	?	x	x	-	?	?
+Kernel PPP	x	?	-	-	x	?	?
 
 
 
@@ -283,5 +283,5 @@ default sendmail.cf is IPv6 ready
 racoon		x	x	-	-	-	-	-	x
 racoon version	latest	001229	-	ports	pkgsrc	-	ports	?
 
-Userland PPP	(+)	?	?	-	?	?	-	?
-Kernel PPP	(+)	?	?	-	?	?	-	?
+Userland PPP	(+)	-	?	-	-	?	-	?
+Kernel PPP	(+)	x	?	-	x	?	-	?
