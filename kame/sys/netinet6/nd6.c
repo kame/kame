@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.246 2002/04/22 12:34:20 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.247 2002/04/22 12:41:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -263,7 +263,6 @@ nd6_ifattach(ifp)
 	 */
 	ND.flags = ND6_IFF_PERFORMNUD | ND6_IFF_ACCEPT_RTADV;
 	nd6_setmtu(ifp);
-	ND.linkmtu = ND.maxmtu;
 #undef ND
 }
 
