@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.34 2001/08/09 10:12:40 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.35 2001/08/09 10:33:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -194,7 +194,9 @@ init_mld6()
     ICMP6_FILTER_SETPASS(ICMP6_MEMBERSHIP_REDUCTION, &filt);
     ICMP6_FILTER_SETPASS(MLD6_MTRACE_RESP, &filt);
     ICMP6_FILTER_SETPASS(MLD6_MTRACE, &filt);
+#ifdef MLD6V2_LISTENER_REPORT
     ICMP6_FILTER_SETPASS(MLD6V2_LISTENER_REPORT,&filt);
+#endif
 
     if (setsockopt(mld6_socket, IPPROTO_ICMPV6, ICMP6_FILTER, &filt,
 		   sizeof(filt)) < 0)
@@ -414,9 +416,11 @@ int recvlen;
 		accept_listener_done(src, dst, group);
 		return;
 
+#ifdef MLD6V2_LISTENER_REPORT
 	case MLD6V2_LISTENER_REPORT:
 		accept_listenerV2_report(src,dst,(char *)(mldh),recvlen);
 		return;
+#endif
 
 	default:
 		/* This must be impossible since we set a type filter */
