@@ -972,7 +972,11 @@ tcp6_ctlinput(cmd, sa, d)
 		if (IN6_IS_ADDR_LINKLOCAL(&s))
 			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 
-		if (m->m_len < off + sizeof(*thp)) {
+		/* check if we can safely examine src and dst ports */
+		if (m->m_pkthdr.len < off + sizeof(th))
+			return;
+
+		if (m->m_len < off + sizeof(th)) {
 			/*
 			 * this should be rare case,
 			 * so we compromise on this copy...

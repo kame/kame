@@ -758,6 +758,10 @@ tcp6_ctlinput(cmd, sa, d)
 			ip6_tmp.ip6_dst.s6_addr16[1] =
 				htons(m->m_pkthdr.rcvif->if_index);
 
+		/* check if we can safely examine src and dst ports */
+		if (m->m_pkthdr.len < off + sizeof(th))
+			return;
+
 		if (m->m_len < off + sizeof(th)) {
 			/*
 			 * this should be rare case,

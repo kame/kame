@@ -697,7 +697,7 @@ udp_ctlinput(cmd, sa, v)
 	void *v;
 {
 	register struct ip *ip = v;
-	register struct udphdr *uh;
+	register struct udphdr *uhp;
 	extern int inetctlerrmap[];
 	void (*notify) __P((struct inpcb *, int)) = udp_notify;
 	int errno;
@@ -716,12 +716,14 @@ udp_ctlinput(cmd, sa, v)
 #ifdef INET6
 	if (sa->sa_family == AF_INET6) {
 		if (ip) {
-			struct ip6_hdr *ipv6 = (struct ip6_hdr *)ip;
+			struct ip6_hdr *ip6 = (struct ip6_hdr *)ip;
 		
-			uh = (struct udphdr *)((caddr_t)ipv6 + sizeof(struct ip6_hdr));
+			/* XXX we assume that the mbuf is sane enough */
+
+			uhp = (struct udphdr *)((caddr_t)ip6 + sizeof(*ip6));
 #if 0 /*XXX*/
-			in6_pcbnotify(&udbtable, sa, uh->uh_dport,
-			    &(ipv6->ip6_src), uh->uh_sport, cmd, udp_notify);
+			in6_pcbnotify(&udbtable, sa, uhp->uh_dport,
+			    &(ip6->ip6_src), uhp->uh_sport, cmd, udp_notify);
 #endif
 		} else {
 #if 0 /*XXX*/

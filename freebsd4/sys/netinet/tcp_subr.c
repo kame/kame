@@ -1029,7 +1029,11 @@ tcp6_ctlinput(cmd, sa, d)
 		    m->m_pkthdr.rcvif != NULL)
 			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 
-		if (m->m_len < off + sizeof(*thp)) {
+		/* check if we can safely examine src and dst ports */
+		if (m->m_pkthdr.len < off + sizeof(th))
+			return;
+
+		if (m->m_len < off + sizeof(th)) {
 			/*
 			 * this should be rare case
 			 * because now MINCLSIZE is "(MHLEN + 1)",

@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.23 2000/07/12 12:58:04 jinmei Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.24 2000/10/13 17:46:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -605,6 +605,10 @@ tcp6_ctlinput(cmd, sa, d)
 		if (IN6_IS_ADDR_LINKLOCAL(&ip6_tmp.ip6_dst))
 			ip6_tmp.ip6_dst.s6_addr16[1] =
 				htons(m->m_pkthdr.rcvif->if_index);
+
+		/* check if we can safely examine src and dst ports */
+		if (m->m_pkthdr.len < off + sizeof(th))
+			return;
 
 		if (m->m_len < off + sizeof(th)) {
 			/*
