@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.29 2002/05/24 07:07:53 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.30 2002/05/24 08:48:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -109,9 +109,6 @@ main(argc, argv)
 			foreground++;
 			break;
 		case 'n':
-			if (ni6_nametodns(optarg, dnsbuf, dnsbuf,
-			    sizeof(dnsbuf), 0) < 0)
-				errx(1, "invalid DNS name");
 			strlcpy(hostname, optarg, sizeof(hostname));
 			break;
 		default:
@@ -127,6 +124,9 @@ main(argc, argv)
 		usage();
 		exit(1);
 	}
+
+	if (ni6_nametodns(hostname, dnsbuf, dnsbuf, sizeof(dnsbuf), 0) < 0)
+		errx(1, "invalid hostname");
 
 	memset(func, 0, sizeof(func));
 
