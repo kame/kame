@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1615 2001/03/21 19:17:21 itojun Exp $
+$KAME: CHANGELOG,v 1.1616 2001/03/21 20:01:25 sakane Exp $
 
 <200103>
+Thu Mar 22 04:56:57 JST 2001 sakane@ydc.co.jp
+	* racoon/policy.c:
+	fixed to compare between policies when the responder decides to
+	accept the proposal or not.  the upper layer protocol is represented
+	by 0 in ID payload.
+
 Thu Mar 22 04:15:43 JST 2001  itojun@iijlab.net
 	* sys/netinet6/ip6_input.c (netbsd): inject packet to ipfilter
 	  only if it is wire format (not if it went through ipsec tunnel).
