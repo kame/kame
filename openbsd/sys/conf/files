@@ -395,6 +395,7 @@ pseudo-device gif: ifnet
 pseudo-device gre: ifnet
 pseudo-device crypto: ifnet
 pseudo-device dummy: ifnet
+pseudo-device ist: ifnet
 pseudo-device stf: ifnet
 pseudo-device hif: ifnet
 
@@ -917,6 +918,7 @@ file dev/rd.c				ramdisk_hooks
 # IPv6
 file net/if_faith.c			faith			needs-count
 file net/if_gif.c			gif			needs-count
+file net/if_ist.c			ist			needs-count
 file net/if_stf.c			stf			needs-count
 file net/net_osdep.c
 file netinet/ip_ecn.c			inet | inet6
