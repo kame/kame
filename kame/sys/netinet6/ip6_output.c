@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.304 2002/05/31 04:11:32 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.305 2002/05/31 04:20:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1881,9 +1881,6 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup, alwaysfragp)
 			 * interface was brought up.  Change the MTU in the
 			 * route to match the interface MTU (as long as the
 			 * field isn't locked).
-			 *
-			 * if MTU on the route is 0, we need to fix the MTU.
-			 * this case happens with path MTU discovery timeouts.
 			 */
 			mtu = ifmtu;
 			if (!(ro_pmtu->ro_rt->rt_rmx.rmx_locks & RTV_MTU))
