@@ -28,6 +28,13 @@ CFLAGS+= -Wall
 CFLAGS+= -DYYDEBUG -DPM -DPM_USE_SOCKET -DKAME -I$(.CURDIR) -I$(.OBJDIR)
 
 LDADD+=	-lkvm -ly -ll
+DPADD+=	${LIBKVM} ${LIBY} ${LIBL}
+
+LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
+	-L/usr/local/v6/lib -linet6
+DPADD+=	${.OBJDIR}/../libinet6/libinet6.a \
+	${.OBJDIR}/../libinet6/obj/libinet6.a \
+	/usr/local/v6/lib/libinet6.a \
 
 .if (${OPSYS} != "NetBSD")
 MAN8=	pma.8 pmlog.8
