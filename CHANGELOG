@@ -1,8 +1,25 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.357 1999/12/21 15:46:02 itojun Exp $
+$Id: CHANGELOG,v 1.358 1999/12/22 07:11:28 jinmei Exp $
 
 <199912>
+1999-12-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_pcb.h: clarified IN6P_xxx macros;
+	- removed unused definitions.
+	- avoided hardcoding in a shortcut macro.
+
+1999-12-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_ctloutput): dropped case
+	statements for non-standard socket options (IPV6_RECVOPTS,
+	IPV6_RECVRETOPTS, and IPV6_RECVDSTADDR).
+	Since they are still defined in netinet6/in6.h, applications that
+	use these options should still be compiled. But the applications
+	will not work correctly any more because of this fix.
+	If your applications use these non-standard options, I strognly
+	recommend you to change the applications not to use the options.
+	The definitions in in6.h will be removed after a transition period
+	(maybe two weeks or so).
+	
 Wed Dec 22 00:37:56 JST 1999  itojun@iijlab.net
 	* many platforms:
 	  be paranoid about malicious use of v4 mapped addr on v6 packet.
