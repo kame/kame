@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.x11.dist,v 1.9.2.3 2000/06/29 07:39:14 asami Exp $
+# $FreeBSD: src/etc/mtree/BSD.x11.dist,v 1.9.2.4 2001/03/05 11:59:02 ru Exp $
 #
 # Please see the file README before making changes to this file.
 #
@@ -194,7 +194,7 @@
     libexec
     ..
     man
-/set type=dir uname=man gname=wheel mode=0755
+/set uname=man
         cat1
         ..
         cat2
@@ -240,7 +240,7 @@
             ..
             catn
             ..
-/set type=dir uname=root gname=wheel mode=0755
+/set uname=root
             man1
             ..
             man2

@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)ifconfig.c	8.2 (Berkeley) 2/16/94";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.51.2.2 2000/08/22 18:08:42 archie Exp $";
+  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.51.2.5 2001/02/26 07:37:27 ume Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -645,7 +645,7 @@ ifconfig(argc, argv, afp)
 			newaddr = 0;
 		}
 	}
-	if (newaddr) {
+	if (newaddr && setaddr) {
 		strncpy(afp->af_addreq, name, sizeof ifr.ifr_name);
 		if (ioctl(s, afp->af_aifaddr, afp->af_addreq) < 0)
 			Perror("ioctl (SIOCAIFADDR)");
@@ -975,7 +975,11 @@ status(afp, addrcount, sdl, ifm, ifam)
 		printf("%s", ifs.ascii);
 
 	if (!allfamilies && !p && afp->af_status != media_status &&
-	    afp->af_status != ether_status && afp->af_status != vlan_status)
+	    afp->af_status != ether_status
+#ifdef USE_VLANS
+	    && afp->af_status != vlan_status
+#endif
+		)
 		warnx("%s has no %s interface address!", name, afp->af_name);
 
 	close(s);

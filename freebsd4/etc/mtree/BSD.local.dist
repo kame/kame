@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.local.dist,v 1.55.2.2 2000/09/16 22:26:07 ache Exp $
+# $FreeBSD: src/etc/mtree/BSD.local.dist,v 1.55.2.4 2001/03/10 03:45:22 kris Exp $
 #
 # Please see the file README before making changes to this file.
 #
@@ -39,10 +39,12 @@
             ..
         ..
     ..
+    libdata
+    ..
     libexec
     ..
     man
-/set type=dir uname=man gname=wheel mode=0755
+/set uname=man
         cat1
         ..
         cat2
@@ -65,7 +67,8 @@
         ..
         catn
         ..
-        de_DE.ISO_8859-1    uname=root
+        de_DE.ISO_8859-1 \
+                        uname=root
             cat1
             ..
             cat2
@@ -88,7 +91,7 @@
             ..
             catn
             ..
-/set type=dir uname=root gname=wheel mode=0755
+/set uname=root
             man1
             ..
             man2
@@ -113,7 +116,7 @@
             ..
         ..
         ja
-/set type=dir uname=man gname=wheel mode=0755
+/set uname=man
             cat1
             ..
             cat2
@@ -136,7 +139,7 @@
             ..
             catn
             ..
-/set type=dir uname=root gname=wheel mode=0755
+/set uname=root
             man1
             ..
             man2
@@ -285,8 +288,8 @@
             ..
             sv_SE.ISO_8859-1
             ..
-	    tr_TR.ISO_8859-9
-	    ..
+            tr_TR.ISO_8859-9
+            ..
             uk_UA.KOI8-U
             ..
             zh_CN.EUC

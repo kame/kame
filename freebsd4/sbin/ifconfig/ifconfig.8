@@ -30,7 +30,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     From: @(#)ifconfig.8	8.3 (Berkeley) 1/5/94
-.\" $FreeBSD: src/sbin/ifconfig/ifconfig.8,v 1.27.2.2 2000/08/22 18:08:42 archie Exp $
+.\" $FreeBSD: src/sbin/ifconfig/ifconfig.8,v 1.27.2.6 2001/03/05 19:33:41 ru Exp $
 .\"
 .Dd February 13, 1996
 .Dt IFCONFIG 8
@@ -39,7 +39,7 @@
 .Nm ifconfig
 .Nd configure network interface parameters
 .Sh SYNOPSIS
-.Nm ifconfig
+.Nm
 .Op Fl L
 .Ar interface
 .Op Ar address_family
@@ -48,18 +48,18 @@
 .Op Ar dest_address
 .Oc
 .Op Ar parameters
-.Nm ifconfig
+.Nm
 .Fl a
 .Op Fl L
 .Op Fl d
 .Op Fl u
 .Op Ar address_family
-.Nm ifconfig
+.Nm
 .Fl l
 .Op Fl d
 .Op Fl u
 .Op Ar address_family 
-.Nm ifconfig
+.Nm
 .Op Fl L
 .Op Fl d
 .Op Fl u
@@ -136,10 +136,13 @@ for example,
 .El
 .Pp
 The following parameters may be set with 
-.Nm ifconfig :
+.Nm :
 .Bl -tag -width indent
 .It Cm add
-Another name for the ``alias'' parameter.  Introduced for compatibility
+Another name for the
+.Cm alias
+parameter.
+Introduced for compatibility
 with BSD/OS.
 .It Cm alias
 Establish an additional network address for this interface.
@@ -181,10 +184,15 @@ extra console error logging.
 .It Fl debug
 Disable driver dependent debugging code.
 .It Cm delete
-Another name for the ``-alias'' parameter.
+Another name for the
+.Fl alias
+parameter.
 .It Cm down
-Mark an interface ``down''.  When an interface is
-marked ``down'', the system will not attempt to
+Mark an interface
+.Dq down .
+When an interface is marked
+.Dq down ,
+the system will not attempt to
 transmit messages through that interface. 
 If possible, the interface will be reset to disable reception as well.
 This action does not automatically disable routes using the interface.
@@ -354,22 +362,28 @@ If the parameter is ommitted, 64 is used.
 .\" for
 .\" .Tn AFI
 .\" 37 type addresses.
-.It Cm range
+.It Cm range Ar netrange
 Under appletalk, set the interface to respond to a 
-.Em netrange.
-of the form startnet-endnet.
+.Ar netrange
+of the form
+.Ar startnet Ns - Ns Ar endnet .
 Appletalk uses this scheme instead of 
 netmasks though
 .Fx
 implements it internally as a set of netmasks.
 .It Cm remove
-Another name for the ``-alias'' parameter.  Introduced for compatibility
+Another name for the
+.Fl alias
+parameter.
+Introduced for compatibility
 with BSD/OS.
 .It Cm phase
 The argument following this specifies the version (phase) of the 
 Appletalk network attached to the interface.
 Values of 1 or 2 are permitted.
-.It Cm link[0-2]
+.It Cm link Ns Xo
+.Op Cm 0 Ns - Ns Cm 2
+.Xc
 Enable special processing of the link level of the interface.
 These three options are interface specific in actual effect, however,
 they are in general used to select special modes of operation.
@@ -377,7 +391,9 @@ An example
 of this is to enable SLIP compression, or to select the connector type
 for some Ethernet cards.  Refer to the man page for the specific driver
 for more information.
-.It Fl link[0-2]
+.It Fl link Ns Xo
+.Op Cm 0 Ns - Ns Cm 2
+.Xc
 Disable special processing at the link level with the specified interface.
 .It Cm up
 Mark an interface
@@ -401,7 +417,7 @@ media list will be included in the output.
 .Pp
 If
 .Fl L
-flag is supplied, address lifetime is dislayed for IPv6 addresses,
+flag is supplied, address lifetime is displayed for IPv6 addresses,
 as time offset string.
 .Pp
 Optionally, the
@@ -441,7 +457,7 @@ tried to alter an interface's configuration.
 IPv6 link-local addresses are required for several basic communication
 between IPv6 node.
 If they are deleted by
-.Nm ifconfig
+.Nm
 manually, the kernel might show very strange behavior.
 So, such manual deletions are strongly discouraged.
 .Sh SEE ALSO

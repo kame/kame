@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.x11-4.dist,v 1.13.2.1 2000/08/25 10:08:20 asami Exp $
+# $FreeBSD: src/etc/mtree/BSD.x11-4.dist,v 1.13.2.3 2001/03/24 02:15:31 sf Exp $
 #
 # Please see the file README before making changes to this file.
 #
@@ -27,6 +27,8 @@
             ..
             Xaw
             ..
+            Xft
+            ..
             Xmu
             ..
             bitmaps
@@ -41,6 +43,16 @@
             ..
         ..
         bitmaps
+        ..
+        freetype2
+            freetype
+                cache
+                ..
+                config
+                ..
+                internal
+                ..
+            ..
         ..
     ..
     info
@@ -96,6 +108,8 @@
                 ..
                 misc
                 ..
+                util
+                ..
             ..
             fs
             ..
@@ -116,7 +130,19 @@
                 ..
                 ibm-cp1133
                 ..
+                iscii-dev
+                ..
+                isiri-3342
+                ..
                 iso8859-1
+                ..
+                iso8859-10
+                ..
+                iso8859-13
+                ..
+                iso8859-14
+                ..
+                iso8859-15
                 ..
                 iso8859-2
                 ..
@@ -134,11 +160,7 @@
                 ..
                 iso8859-9
                 ..
-                iso8859-10
-                ..
-                iso8859-14
-                ..
-                iso8859-15
+                iso8859-9e
                 ..
                 ja
                 ..
@@ -148,15 +170,31 @@
                 ..
                 ko
                 ..
+                koi8-c
+                ..
                 koi8-r
                 ..
                 koi8-u
                 ..
+                microsoft-cp1251
+                ..
+                microsoft-cp1255
+                ..
+                microsoft-cp1256
+                ..
+                mk_MK.UTF-8
+                ..
                 mulelao-1
+                ..
+                nokhchi-1
+                ..
+                tatar-cyr
                 ..
                 tbl_data
                 ..
                 th_TH.TACTIS
+                ..
+                tscii-0
                 ..
                 vi_VN.tcvn
                 ..
@@ -268,7 +306,7 @@
     libexec
     ..
     man
-/set type=dir uname=man gname=wheel mode=0755
+/set uname=man
         cat1
         ..
         cat2
@@ -314,7 +352,7 @@
             ..
             catn
             ..
-/set type=dir uname=root gname=wheel mode=0755
+/set uname=root
             man1
             ..
             man2

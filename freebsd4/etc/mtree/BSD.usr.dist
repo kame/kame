@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.usr.dist,v 1.188.2.7 2000/10/19 21:30:25 gshapiro Exp $
+# $FreeBSD: src/etc/mtree/BSD.usr.dist,v 1.188.2.14 2001/03/05 12:08:49 ru Exp $
 #
 # Please see the file README before making changes to this file.
 #
@@ -161,7 +161,7 @@
     ..
     local
     ..
-    obj nochange
+    obj             nochange
     ..
     sbin
     ..
@@ -199,8 +199,6 @@
                 13.rcs
                 ..
                 18.gprof
-                ..
-                19.curses
                 ..
                 20.ipctut
                 ..
@@ -273,11 +271,11 @@
             ..
         ..
         examples
+            BSD_daemon
+            ..
             FreeBSD_version
             ..
             IPv6
-            ..
-            atapi
             ..
             atm
             ..
@@ -387,8 +385,6 @@
                 sort
                 ..
             ..
-            svr4
-            ..
             worm
             ..
         ..
@@ -413,6 +409,8 @@
             ..
             devascii
             ..
+            devcp1047
+            ..
             devdvi
             ..
             devhtml
@@ -421,9 +419,13 @@
             ..
             devlatin1
             ..
+            devlbp
+            ..
             devlj4
             ..
             devps
+            ..
+            devutf8
             ..
         ..
         info
@@ -450,6 +452,8 @@
             de_DE.DIS_8859-15
             ..
             de_DE.ISO_8859-1
+            ..
+            el_GR.ISO_8859-7
             ..
             en_AU.DIS_8859-15
             ..
@@ -557,8 +561,8 @@
             ..
             sv_SE.ISO_8859-1
             ..
-	    tr_TR.ISO_8859-9
-	    ..
+            tr_TR.ISO_8859-9
+            ..
             uk_UA.KOI8-U
             ..
             zh_CN.EUC
@@ -567,7 +571,7 @@
             ..
         ..
         man
-/set type=dir uname=man gname=wheel mode=0755
+/set uname=man
             cat1
             ..
             cat1aout
@@ -577,6 +581,8 @@
             cat3
             ..
             cat4
+                alpha
+                ..
                 i386
                 ..
             ..
@@ -587,6 +593,8 @@
             cat7
             ..
             cat8
+                alpha
+                ..
                 i386
                 ..
             ..
@@ -595,6 +603,40 @@
                 ..
             ..
             catn
+            ..
+            en.ISO_8859-1   uname=root
+                cat1
+                ..
+                cat1aout
+                ..
+                cat2
+                ..
+                cat3
+                ..
+                cat4
+                    alpha
+                    ..
+                    i386
+                    ..
+                ..
+                cat5
+                ..
+                cat6
+                ..
+                cat7
+                ..
+                cat8
+                    alpha
+                    ..
+                    i386
+                    ..
+                ..
+                cat9
+                    i386
+                    ..
+                ..
+                catn
+                ..
             ..
             ja              uname=root
                 cat1
@@ -617,7 +659,7 @@
                 ..
                 catn
                 ..
-/set type=dir uname=root gname=wheel mode=0755
+/set uname=root
                 man1
                 ..
                 man2
@@ -700,6 +742,8 @@
             de_DE.DIS_8859-15
             ..
             de_DE.ISO_8859-1
+            ..
+            el_GR.ISO_8859-7
             ..
             en_AU.DIS_8859-15
             ..
@@ -799,8 +843,8 @@
             ..
             sv_SE.ISO_8859-1
             ..
-	    tr_TR.ISO_8859-9
-	    ..
+            tr_TR.ISO_8859-9
+            ..
             uk_UA.KOI8-U
             ..
             zh_CN.EUC
@@ -881,6 +925,6 @@
             ..
         ..
     ..
-    src             mode=0755 nochange
+    src             nochange
     ..
 ..

@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)route.c	8.3 (Berkeley) 3/19/94";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/sbin/route/route.c,v 1.40.2.1 2000/10/06 08:51:00 ru Exp $";
+  "$FreeBSD: src/sbin/route/route.c,v 1.40.2.3 2001/03/04 08:07:08 kris Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -66,6 +66,7 @@ static const char rcsid[] =
 #include <ctype.h>
 #include <err.h>
 #include <errno.h>
+#include <paths.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -178,7 +179,7 @@ main(argc, argv)
 	pid = getpid();
 	uid = getuid();
 	if (tflag)
-		s = open("/dev/null", O_WRONLY, 0);
+		s = open(_PATH_DEVNULL, O_WRONLY, 0);
 	else
 		s = socket(PF_ROUTE, SOCK_RAW, 0);
 	if (s < 0)
@@ -1152,7 +1153,7 @@ monitor()
 		time_t now;
 		n = read(s, msg, 2048);
 		now = time(NULL);
-		(void) printf("got message of size %d on %s", n, ctime(&now));
+		(void) printf("\ngot message of size %d on %s", n, ctime(&now));
 		print_rtmsg((struct rt_msghdr *)msg, n);
 	}
 }
@@ -1464,8 +1465,10 @@ pmsg_addrs(cp, addrs)
 	register struct sockaddr *sa;
 	int i;
 
-	if (addrs == 0)
+	if (addrs == 0) {
+		(void) putchar('\n');
 		return;
+	}
 	(void) printf("\nsockaddrs: ");
 	bprintf(stdout, addrs, addrnames);
 	(void) putchar('\n');

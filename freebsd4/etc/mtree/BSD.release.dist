@@ -1,22 +1,22 @@
-# $FreeBSD: src/etc/mtree/BSD.release.dist,v 1.6 1999/08/27 23:24:00 peter Exp $
+# $FreeBSD: src/etc/mtree/BSD.release.dist,v 1.6.2.1 2001/03/05 11:59:02 ru Exp $
 #
 # Please see the file README before making changes to this file.
 #
 
 /set type=dir uname=root gname=wheel mode=0755
-.              
-    filesys        
+.
+    filesys
     ..
-    floppies       
+    floppies
     ..
-    tarballs       
-        bindist        
+    tarballs
+        bindist
         ..
-        objdist        
+        objdist
         ..
-        secrdist       
+        secrdist
         ..
-        srcdist        
+        srcdist
         ..
     ..
 ..
