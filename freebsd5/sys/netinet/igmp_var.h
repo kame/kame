@@ -88,7 +88,9 @@
  */
 
 #include <netinet/igmp.h>
+#ifdef IGMPV3
 #include <netinet/in_msf.h>
+#endif
 
 struct igmpstat {
 	u_int	igps_rcv_total;		/* total IGMP messages received */

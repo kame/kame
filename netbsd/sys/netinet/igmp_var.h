@@ -90,7 +90,9 @@
  */
 
 #include <netinet/igmp.h>
+#ifdef IGMPV3
 #include <netinet/in_msf.h>
+#endif
 
 
 struct igmpstat {
