@@ -34,7 +34,7 @@ SRCS=	mld6.c mld6_proto.c\
 CFLAGS+= -g
 CPPFLAGS+=-I.
 CPPFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -DUSE_RFC2292BIS -I${SRCDIR}
-CPPFLAGS+=-DHAVE_STDARG_H -DYY_NO_UNPUT
+CPPFLAGS+=-DHAVE_STDARG_H -DYY_NO_UNPUT -DHAVE_GETIFADDRS
 LDADD+=	-L${.CURDIR}/../../../lib/libinet6 \
 	-L${.CURDIR}/../../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
