@@ -380,7 +380,7 @@ udp_input(m, off)
 			 * Receive multicast data which fits MSF condition.
 			 */
 			if (!IN_MULTICAST(ntohl(ip->ip_dst.s_addr)))
-				goto bypass_msf_condition_check;
+				continue;
 			
 			imo = inp->inp_moptions;
 			src_h = ntohl(ip->ip_src.s_addr);
@@ -404,12 +404,14 @@ udp_input(m, off)
 					     imo->imo_msf[i]->msf_head,
 					     list) {
 					sin = (struct sockaddr_in *)&msfsrc->src;
+					if (sin->sin_family != AF_INET)
+						continue;
 					if (sin->sin_addr.s_addr < src_h)
 						continue;
 					if (sin->sin_addr.s_addr > src_h) {
 						/* terminate search, as there
 						 * will be no match */
-					break;
+						break;
 					}
 					
 					PASS_TO_PCB();
@@ -424,6 +426,8 @@ udp_input(m, off)
 					     imo->imo_msf[i]->msf_blkhead,
 					     list) {
 					sin = (struct sockaddr_in *)&msfsrc->src;
+					if (sin->sin_family != AF_INET)
+						continue;
 					if (sin->sin_addr.s_addr < src_h)
 						continue;
 					if (sin->sin_addr.s_addr == src_h) {
@@ -443,9 +447,10 @@ udp_input(m, off)
 					PASS_TO_PCB();
 				
 			end_of_search:
-				break;
+				goto next_inp;
 			}
-		bypass_msf_condition_check:
+			if (i == imo->imo_num_membership)
+				continue;
 #undef PASS_TO_PCB
 #else
 			if (last != NULL) {
@@ -476,6 +481,8 @@ udp_input(m, off)
 			 */
 			if ((last->inp_socket->so_options&(SO_REUSEPORT|SO_REUSEADDR)) == 0)
 				break;
+
+		next_inp:
 		}
 
 		if (last == NULL) {
