@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.58 2001/04/29 03:29:37 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.59 2001/05/01 05:28:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -245,6 +245,8 @@ stfattach(dummy)
 		sc->sc_if.if_ioctl  = stf_ioctl;
 		sc->sc_if.if_output = stf_output;
 		sc->sc_if.if_type   = IFT_STF;
+		/* turn off ingress filter */
+		sc->sc_if.if_flags  |= IFF_LINK2;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 		sc->sc_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
 #endif
