@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.157 2002/08/14 05:51:48 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.158 2002/08/20 04:46:55 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2775,7 +2775,7 @@ mip6_get_mobility_options(ip6mu, ip6mulen, mopt)
 	mopt->valid_options = 0;
 
 #define check_mopt_len(mopt_len)	\
-	if (*(mh + 1) != mopt_len) break;
+	if (*(mh + 1) != mopt_len) goto bad;
   
 	while (mh < mhend) {
 		valid_option = 0;
@@ -2827,6 +2827,9 @@ mip6_get_mobility_options(ip6mu, ip6mulen, mopt)
 #undef check_mopt_len
 	
 	return (0);
+
+ bad:
+	return (EINVAL);
 }
 
 void
