@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.68 2004/05/16 05:46:42 jinmei Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.69 2004/05/16 05:55:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -157,12 +157,12 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 		}
 		if (sp) {
 			if (strlen(sp->s_name) + 1 > servlen)
-				return EAI_MEMORY;
+				return EAI_OVERFLOW;
 			strlcpy(serv, sp->s_name, servlen);
 		} else {
 			snprintf(numserv, sizeof(numserv), "%u", ntohs(port));
 			if (strlen(numserv) + 1 > servlen)
-				return EAI_MEMORY;
+				return EAI_OVERFLOW;
 			strlcpy(serv, numserv, servlen);
 		}
 	}
@@ -252,7 +252,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 #ifdef USE_GETIPNODEBY
 				freehostent(hp);
 #endif
-				return EAI_MEMORY;
+				return EAI_OVERFLOW;
 			}
 			strlcpy(host, hp->h_name, hostlen);
 #ifdef USE_GETIPNODEBY
@@ -304,7 +304,7 @@ ip6_parsenumeric(sa, addr, host, hostlen, flags)
 
 	numaddrlen = strlen(numaddr);
 	if (numaddrlen + 1 > hostlen) /* don't forget terminator */
-		return EAI_MEMORY;
+		return EAI_OVERFLOW;
 	strlcpy(host, numaddr, hostlen);
 
 	if (((const struct sockaddr_in6 *)sa)->sin6_scope_id) {
@@ -315,9 +315,9 @@ ip6_parsenumeric(sa, addr, host, hostlen, flags)
 		    (const struct sockaddr_in6 *)(const void *)sa,
 		    zonebuf, sizeof(zonebuf), flags);
 		if (zonelen < 0)
-			return EAI_MEMORY;
+			return EAI_OVERFLOW;
 		if (zonelen + 1 + numaddrlen + 1 > hostlen)
-			return EAI_MEMORY;
+			return EAI_OVERFLOW;
 
 		/* construct <numeric-addr><delim><zoneid> */
 		memcpy(host + numaddrlen + 1, zonebuf,
