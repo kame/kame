@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.h,v 1.5 2000/03/25 07:23:44 sumikawa Exp $	*/
+/*	$KAME: in6_ifattach.h,v 1.6 2000/04/11 06:08:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -35,8 +35,6 @@
 #ifdef _KERNEL
 extern int found_first_ifid;
 
-int in6_ifattach_getifid __P((struct ifnet *));
-void in6_ifattach_p2p __P((void));
 void in6_ifattach __P((struct ifnet *, u_int, caddr_t, int));
 void in6_ifdetach __P((struct ifnet *));
 #endif /* _KERNEL */
