@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.57 2002/09/19 01:43:34 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.58 2002/09/24 09:15:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -335,7 +335,7 @@ usage()
 
 	fprintf(stderr,
 "usage: mdnsd [-46DflmN] [-h hostname] [-p srcport] [-P dstport]\n"
-"             -i iface [userv...]\n");
+"             -i iface [server...]\n");
 }
 
 static int
