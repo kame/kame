@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.743 2000/04/03 03:27:49 itojun Exp $
+$Id: CHANGELOG,v 1.744 2000/04/03 04:03:57 itojun Exp $
 
 <200003>
+Mon Apr  3 12:36:01 JST 2000  itojun@iijlab.net
+	* */lib/libpcap, */usr.sbin/tcpdump: remove to avoid duplicated effort
+	  with tcpdump.org.  if you want them, use pkgsrc/ports.
+
 Mon Apr  3 12:15:32 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/security/heimdal: use 0.2r.
 
