@@ -1,4 +1,4 @@
-.\"	$KAME: getaddrinfo.3,v 1.28 2001/01/28 16:08:42 itojun Exp $
+.\"	$KAME: getaddrinfo.3,v 1.29 2001/02/12 09:24:45 itojun Exp $
 .\"
 .\" Copyright (c) 1983, 1987, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -450,7 +450,7 @@ if (s < 0) {
 freeaddrinfo(res0);
 .Ed
 .Pp
-The following example tries to open wildcard listening socket onto service
+The following example tries to open a wildcard listening socket onto service
 .Dq Li http ,
 for all the address families available.
 .Bd -literal -offset indent
@@ -478,11 +478,12 @@ for (res = res0; res && nsock < MAXSOCK; res = res->ai_next) {
 		continue;
 	}
 
-	if (connect(s[nsock], res->ai_addr, res->ai_addrlen) < 0) {
-		cause = "connect";
+	if (bind(s[nsock], res->ai_addr, res->ai_addrlen) < 0) {
+		cause = "bind";
 		close(s[nsock]);
 		continue;
 	}
+	(void) listen(s[nsock], 5);
 
 	nsock++;
 }
