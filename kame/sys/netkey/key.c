@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.94 2000/05/08 04:02:20 itojun Exp $	*/
+/*	$KAME: key.c,v 1.95 2000/05/08 04:39:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -444,7 +444,8 @@ static int key_expire __P((struct secasvar *));
 static int key_flush __P((struct socket *, struct mbuf *,
 	struct sadb_msghdr *));
 static int key_dump __P((struct socket *, struct mbuf *, struct sadb_msghdr *));
-static void key_promisc __P((caddr_t *, struct socket *));
+static int key_promisc __P((struct socket *, struct mbuf *,
+	struct sadb_msghdr *));
 static int key_sendall __P((struct sadb_msg *, u_int));
 static int key_senderror __P((struct socket *, struct mbuf *, int));
 static int key_align __P((struct mbuf *, struct sadb_msghdr *));
@@ -6199,66 +6200,53 @@ key_dump(so, m, mhp)
 /*
  * SADB_X_PROMISC processing
  */
-static void
-key_promisc(mhp, so)
-	caddr_t *mhp;
+static int
+key_promisc(so, m, mhp)
 	struct socket *so;
+	struct mbuf *m;
+	struct sadb_msghdr *mhp;
 {
-	struct sadb_msg *msg0;
 	int olen;
 
 	/* sanity check */
-	if (mhp == NULL || mhp[0] == NULL)
+	if (so == NULL || m == NULL || mhp == NULL || mhp->msg == NULL)
 		panic("key_promisc: NULL pointer is passed.\n");
 
-	msg0 = (struct sadb_msg *)mhp[0];
-	olen = PFKEY_UNUNIT64(msg0->sadb_msg_len);
+	olen = PFKEY_UNUNIT64(mhp->msg->sadb_msg_len);
 
 	if (olen < sizeof(struct sadb_msg)) {
-		return;
+#if 1
+		return key_senderror(so, m, EINVAL);
+#else
+		m_freem(m);
+		return 0;
+#endif
 	} else if (olen == sizeof(struct sadb_msg)) {
 		/* enable/disable promisc mode */
 		struct keycb *kp;
-		int target = 0;
 
-		target = KEY_SENDUP_ONE;
-
-		if (so == NULL) {
-			return;
-		}
-		if ((kp = (struct keycb *)sotorawcb(so)) == NULL) {
-			msg0->sadb_msg_errno = EINVAL;
-			goto sendorig;
-		}
-		msg0->sadb_msg_errno = 0;
-		if (msg0->sadb_msg_satype == 1 || msg0->sadb_msg_satype == 0) {
-			kp->kp_promisc = msg0->sadb_msg_satype;
-		} else {
-			msg0->sadb_msg_errno = EINVAL;
-			goto sendorig;
+		if ((kp = (struct keycb *)sotorawcb(so)) == NULL)
+			return key_senderror(so, m, EINVAL);
+		mhp->msg->sadb_msg_errno = 0;
+		switch (mhp->msg->sadb_msg_satype) {
+		case 0:
+		case 1:
+			kp->kp_promisc = mhp->msg->sadb_msg_satype;
+			break;
+		default:
+			return key_senderror(so, m, EINVAL);
 		}
 
 		/* send the original message back to everyone */
-		msg0->sadb_msg_errno = 0;
-		target = KEY_SENDUP_ALL;
-sendorig:
-		key_sendup(so, msg0, PFKEY_UNUNIT64(msg0->sadb_msg_len), target);
+		mhp->msg->sadb_msg_errno = 0;
+		return key_sendup_mbuf(so, m, KEY_SENDUP_ALL);
 	} else {
 		/* send packet as is */
-		struct sadb_msg *msg;
-		int len;
 
-		len = olen - sizeof(struct sadb_msg);
-		KMALLOC(msg, struct sadb_msg *, len);
-		if (msg == NULL) {
-			msg0->sadb_msg_errno = ENOBUFS;
-			key_sendup(so, msg0, PFKEY_UNUNIT64(msg0->sadb_msg_len),
-				KEY_SENDUP_ONE);	/*XXX*/
-		}
+		m_adj(m, PFKEY_ALIGN8(sizeof(struct sadb_msg)));
 
-		/* XXX if sadb_msg_seq is specified, send to specific pid */
-		key_sendup(so, msg, len, KEY_SENDUP_ALL);
-		KFREE(msg);
+		/* TODO: if sadb_msg_seq is specified, send to specific pid */
+		return key_sendup_mbuf(so, m, KEY_SENDUP_ALL);
 	}
 }
 
@@ -6564,7 +6552,7 @@ key_parse(m, so)
 	case SADB_ACQUIRE:	/*done*/
 		return key_acquire2(so, m, &mh);
 
-	case SADB_REGISTER:
+	case SADB_REGISTER:	/*almost done*/
 		return key_register(so, m, &mh);
 
 	case SADB_EXPIRE:
@@ -6581,11 +6569,8 @@ key_parse(m, so)
 	case SADB_DUMP:	/*almost done*/
 		return key_dump(so, m, &mh);
 
-	case SADB_X_PROMISC:
-		/* everything is handled in key_promisc() */
-		key_promisc((caddr_t *)mh.ext, so);
-		m_freem(m);
-		return 0;	/*nothing to reply*/
+	case SADB_X_PROMISC:	/*done*/
+		return key_promisc(so, m, &mh);
 
 	case SADB_X_PCHANGE:
 #ifdef IPSEC_DEBUG
