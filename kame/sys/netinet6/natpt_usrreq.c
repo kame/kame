@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_usrreq.c,v 1.2 1999/12/25 02:35:32 fujisawa Exp $
+ *	$Id: natpt_usrreq.c,v 1.3 2000/01/06 14:27:06 itojun Exp $
  */
 
 #include <sys/types.h>
@@ -72,7 +72,7 @@ LIST_HEAD(, rawcb)		ptrcb;
 #endif
 
 static struct sockaddr	natpt_dst = {2, PF_INET};
-#if defined(notused)
+#ifdef notused
 static struct sockaddr	natpt_src = {2, PF_INET};
 #endif
 
@@ -87,7 +87,7 @@ static	int	_natptSetValue	__P((caddr_t));
 
 void	natpt_init	__P((void));
 
-#if defined(__bsdi__)
+#ifdef __bsdi__
 int	natpt_usrreq	__P((struct socket *, int,
 			     struct mbuf *, struct mbuf *, struct mbuf *));
 #elif defined(__NetBSD__)
@@ -109,7 +109,7 @@ int	natpt_control	__P((struct socket *, int, caddr_t, struct ifnet *));
 #endif	/* defined(__FreeBSD__) && __FreeBSD__ >= 3	*/
 
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 struct pr_usrreqs natpt_usrreqs =
 {
 	NULL,		NULL,	natpt_attach,	NULL,
@@ -209,7 +209,7 @@ natpt_input(struct mbuf *m0, struct sockproto *proto,
 int
 natpt_usrreq(struct socket *so, int req,
 	     struct mbuf *m, struct mbuf *nam, struct mbuf *control
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 	     ,struct proc *p
 #endif
 	     )

@@ -173,7 +173,7 @@ static void ip6_init2 __P((void *));
 
 static int ip6_hopopts_input __P((u_int32_t *, u_int32_t *, struct mbuf **, int *));
 
-#if defined(NATPT)
+#ifdef NATPT
 extern	int		ip6_protocol_tr;
 
 int	natpt_in6	__P((struct mbuf *, struct mbuf **));
@@ -541,7 +541,7 @@ ip6_input(m)
 	}
 #endif
 
-#if defined(NATPT)
+#ifdef NATPT
 	/*
 	 * NAT-PT (Network Address Translation - Protocol Translation)
 	 */

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_soctl.h,v 1.3 2000/01/02 19:21:40 itojun Exp $
+ *	$Id: natpt_soctl.h,v 1.4 2000/01/06 14:27:05 itojun Exp $
  */
 
 /* cmd for use with ioctl at the socket						*/
@@ -58,7 +58,7 @@ typedef	struct msgBox
 #define	IF_INTERNAL		(0x02)
 
 /* in case SIOT(SET|GET)RULE		*/
-#if !defined(NATPT_STATIC)
+#ifndef NATPT_STATIC
 #define	NATPT_STATIC		(0x01)
 #define	NATPT_DYNAMIC		(0x02)
 #define NATPT_FAITH		(0x04)

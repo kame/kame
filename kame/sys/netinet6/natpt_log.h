@@ -26,10 +26,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_log.h,v 1.2 1999/12/25 02:35:31 fujisawa Exp $
+ *	$Id: natpt_log.h,v 1.3 2000/01/06 14:27:05 itojun Exp $
  */
 
-#if !defined(_NATPT_LOG_H)
+#ifndef _NATPT_LOG_H
 #define	_NATPT_LOG_H
 
 
@@ -65,7 +65,7 @@ struct	l_att
 
 /*  Header at beginning of each lbuf.					*/
 
-#if !defined(IN6ADDRSZ)
+#ifndef IN6ADDRSZ
 #define	IN6ADDRSZ		16	/* IPv6 T_AAAA */
 #define	INT16SZ			2	/* for systems without 16-bit ints	*/
 #endif	/* !defined(IN6ADDRSZ)	*/
@@ -112,7 +112,7 @@ struct	lbuf
     struct	l_hdr	l_hdr;
     union
     {
-#if defined(_KERNEL)
+#ifdef _KERNEL
 	struct	l_pkt	l_pkt;
 	struct	l_att	l_att;
 #endif	/* defined(_KERNEL)	*/

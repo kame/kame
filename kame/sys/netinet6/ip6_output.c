@@ -663,7 +663,7 @@ skip_ipsec2:;
 				goto bad;
 			}
 			else {
-#if defined(__bsdi__)
+#ifdef __bsdi__
 				ifp = loifp;
 #else
 				ifp = &loif[0];
@@ -2576,7 +2576,7 @@ ip6_setmoptions(optname, im6op, m)
 			 *   XXX: is it a good approach?
 			 */
 			if (IN6_IS_ADDR_MC_NODELOCAL(&mreq->ipv6mr_multiaddr)) {
-#if defined(__bsdi__)
+#ifdef __bsdi__
 				ifp = loifp;
 #else
 				ifp = &loif[0];

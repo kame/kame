@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_list.h,v 1.2 1999/12/25 02:35:30 fujisawa Exp $
+ *	$Id: natpt_list.h,v 1.3 2000/01/06 14:27:05 itojun Exp $
  */
 
 #define	CELL_FREE_MARKER	((Cell *)0xdeadface)
@@ -41,13 +41,13 @@ Cell	*LST_hookup_list	__P((Cell **, void *));
 Cell	*LST_remove_elem	__P((Cell **, void *));
 
 
-#if defined(INCLUDE_NATPT_LIST_C)
+#ifdef INCLUDE_NATPT_LIST_C
 
 /*
  *	Typedefs and Miscellaneous definitions
  */
 
-#if !defined(NULL)
+#ifndef NULL
 #define	NULL			0
 #endif
 
@@ -68,7 +68,7 @@ static	Cell	*_getCell	__P((void));
 static	Cell	*_getEmptyCell	__P((void));
 
 
-#if defined(_KERNEL)
+#ifdef _KERNEL
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 static	MALLOC_DEFINE(M_NATPT, "NATPT", "Network Address Translation - Protocol Translation");
 #endif	/* defined(__FreeBSD__) && __FreeBSD__ >= 3	*/

@@ -2121,7 +2121,7 @@ icmp6_ctloutput(op, so, level, optname, mp)
 	} else
 		level = op = optname = optlen = 0;
 #else
-#if defined(__OpenBSD__)
+#ifdef __OpenBSD__
 	register struct inpcb *inp = sotoinpcb(so);
 #else
 	register struct in6pcb *in6p = sotoin6pcb(so);

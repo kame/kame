@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_dispatch.c,v 1.2 1999/12/25 02:35:30 fujisawa Exp $
+ *	$Id: natpt_dispatch.c,v 1.3 2000/01/06 14:27:04 itojun Exp $
  */
 
 #include <sys/param.h>
@@ -36,7 +36,7 @@
 #include <sys/syslog.h>
 #include <sys/systm.h>
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 # include <sys/kernel.h>
 #endif
 
@@ -550,7 +550,7 @@ checkMTU(struct _cv *cv4)
 	    bzero(&destif, sizeof(struct ifnet));
 	    destif.if_mtu = mmtu;
 
-#if defined(fixSuMiReICMPBug)
+#ifdef fixSuMiReICMPBug
 	    ip4->ip_dst.s_addr = IPDST;					/* XXX	*/
 #endif
 
@@ -598,7 +598,7 @@ natpt_setIfBox(char *ifName)
     for (p = TAILQ_FIRST(&ifnet); p; p = TAILQ_NEXT(p, if_list))
 #endif
     {
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 	sprintf(Wow, "%s%c",  p->if_xname, '\0');
 #else
 	sprintf(Wow, "%s%d%c", p->if_name, p->if_unit, '\0');
@@ -612,7 +612,7 @@ natpt_setIfBox(char *ifName)
 	bzero(q, sizeof(struct ifBox));
 
 	q->ifnet = p;
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 	sprintf(q->ifName, "%s%c",  p->if_xname, '\0');
 #else
 	sprintf(q->ifName, "%s%d%c", p->if_name, p->if_unit, '\0');
@@ -679,7 +679,7 @@ natpt_initialize()
 		|| ((ifa->ifa_addr->sa_family) == AF_INET6))
 	    {
 		MALLOC(ibox, struct ifBox *, sizeof(struct ifBox), M_TEMP, M_WAITOK);
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 		sprintf(ibox->ifName, "%s",  ifn->if_xname);
 #else
 		sprintf(ibox->ifName, "%s%d", ifn->if_name, ifn->if_unit);

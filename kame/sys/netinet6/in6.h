@@ -65,7 +65,7 @@
 #ifndef _NETINET6_IN6_H_
 #define _NETINET6_IN6_H_
 
-#if !defined(_XOPEN_SOURCE)
+#ifndef _XOPEN_SOURCE
 #include <sys/queue.h>
 #endif
 
@@ -132,7 +132,7 @@ struct in6_addr {
 /*
  * Socket address for IPv6
  */
-#if !defined(_XOPEN_SOURCE)
+#ifndef _XOPEN_SOURCE
 #define SIN6_LEN
 #endif
 struct sockaddr_in6 {
@@ -361,7 +361,7 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
 /*
  * IP6 route structure
  */
-#if !defined(_XOPEN_SOURCE)
+#ifndef _XOPEN_SOURCE
 struct route_in6 {
 	struct	rtentry *ro_rt;
 	struct	sockaddr_in6 ro_dst;
@@ -462,7 +462,7 @@ struct in6_pktinfo {
 #define	IPV6_PORTRANGE_HIGH	1	/* "high" - request firewall bypass */
 #define	IPV6_PORTRANGE_LOW	2	/* "low" - vouchsafe security */
 
-#if !defined(_XOPEN_SOURCE)
+#ifndef _XOPEN_SOURCE
 /*
  * Definitions for inet6 sysctl operations.
  *
@@ -548,7 +548,7 @@ struct in6_pktinfo {
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #define IPV6CTL_MAPPED_ADDR	23
 #endif
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 #define IPV6CTL_BINDV6ONLY	24
 #endif
 /* New entries should be added here from current IPV6CTL_MAXID value. */

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_list.c,v 1.2 1999/12/25 02:35:30 fujisawa Exp $
+ *	$Id: natpt_list.c,v 1.3 2000/01/06 14:27:04 itojun Exp $
  */
 
 #if (defined(KERNEL)) || (defined(_KERNEL))
@@ -36,7 +36,7 @@
 #include <sys/socket.h>
 #include <sys/systm.h>
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 # include <sys/kernel.h>
 #endif
 

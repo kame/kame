@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_trans.c,v 1.3 1999/12/25 02:35:31 fujisawa Exp $
+ *	$Id: natpt_trans.c,v 1.4 2000/01/06 14:27:05 itojun Exp $
  */
 
 #include <sys/param.h>
@@ -36,12 +36,12 @@
 #include <sys/syslog.h>
 #include <sys/systm.h>
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 # include <sys/kernel.h>
 #endif
 
 #include <net/if.h>
-#if defined(__bsdi__)
+#ifdef __bsdi__
 #include <net/route.h>
 #endif
 
@@ -486,7 +486,7 @@ translatingTCPv4To6(struct _cv *cv4, struct _pat *pata)
     updateTcpStatus(cv4);
     adjustUpperLayerChecksum(IPPROTO_IPV4, IPPROTO_TCP, &cv6, cv4);
 
-#if defined(recalculateTCP6Checksum)
+#ifdef recalculateTCP6Checksum
     {
 	int		 cksumAdj, cksumCks;
 	struct tcp6hdr	*th;
@@ -965,7 +965,7 @@ translatingTCPv6To4(struct _cv *cv6, struct _pat *pata)
     updateTcpStatus(cv6);
     adjustUpperLayerChecksum(IPPROTO_IPV6, IPPROTO_TCP, cv6, &cv4);
 
-#if	defined(recalculateTCP4Checksum)
+#ifdef recalculateTCP4Checksum
     {
 	int		 cksumAdj, cksumCks;
 	int		 iphlen;

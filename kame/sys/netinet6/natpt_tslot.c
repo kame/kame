@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_tslot.c,v 1.2 1999/12/25 02:35:32 fujisawa Exp $
+ *	$Id: natpt_tslot.c,v 1.3 2000/01/06 14:27:05 itojun Exp $
  */
 
 #include <sys/param.h>
@@ -494,7 +494,7 @@ checkTraceroute6Return(struct _cv *cv4)
     if (icmpip4->ip_p != IPPROTO_UDP)
 	return (NULL);
 
-#if defined(fixSuMiReICMPBug)
+#ifdef fixSuMiReICMPBug
     icmpip4->ip_src.s_addr = ICMPSRC;					/* XXX	*/
 #endif
 

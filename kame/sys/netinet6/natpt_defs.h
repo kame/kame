@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_defs.h,v 1.2 1999/12/25 02:35:30 fujisawa Exp $
+ *	$Id: natpt_defs.h,v 1.3 2000/01/06 14:27:04 itojun Exp $
  */
 
 #define	SAME		(0)
@@ -44,7 +44,7 @@
 #define	CDAR(p)		(CDR(CAR(p)))
 #define	CDDR(p)		(CDR(CDR(p)))
 
-#if !defined(TCP6)
+#ifndef TCP6
 #define	tcp6hdr		tcphdr
 #endif
 
@@ -83,7 +83,7 @@ extern u_int		natpt_debug;
 
 #define	fixSuMiReICMPBug	(1)
 
-#if defined(fixSuMiReICMPBug)
+#ifdef fixSuMiReICMPBug
 #define	IPDST		(0xc48db2cb)		/* == 203.178.141.196	XXX	*/
 #define	ICMPSRC		(0x02c410ac)		/* == 172.16.196.2	XXX	*/
 #endif
@@ -99,7 +99,7 @@ extern u_int		natpt_debug;
 #define	rcb_list		list
 #endif
 
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 /*
  * Macros for type conversion
  * dtom(x) -	convert data pointer within mbuf to mbuf pointer (XXX)

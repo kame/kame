@@ -71,7 +71,7 @@
 
 #include <sys/param.h>
 #include <sys/socket.h>
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #include <sys/socketvar.h>
 #endif
 #include <sys/protosw.h>
