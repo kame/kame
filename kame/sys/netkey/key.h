@@ -1,4 +1,4 @@
-/*	$KAME: key.h,v 1.20 2001/03/22 08:09:32 itojun Exp $	*/
+/*	$KAME: key.h,v 1.21 2001/07/27 03:51:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -60,6 +60,10 @@ extern struct secpolicy *key_msg2sp __P((struct sadb_x_policy *,
 	size_t, int *));
 extern struct mbuf *key_sp2msg __P((struct secpolicy *));
 extern int key_ismyaddr __P((struct sockaddr *));
+extern int key_cmpspidx_exactly
+	__P((struct secpolicyindex *, struct secpolicyindex *));
+extern int key_cmpspidx_withmask
+	__P((struct secpolicyindex *, struct secpolicyindex *));
 extern int key_spdacquire __P((struct secpolicy *));
 extern void key_timehandler __P((void));
 extern u_long key_random __P((void));

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.45 2001/07/26 06:53:18 jinmei Exp $	*/
+/*	$KAME: ipsec.h,v 1.46 2001/07/27 03:51:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -105,6 +105,7 @@ struct secpolicy {
 };
 
 /* Request for IPsec */
+struct ifnet;
 struct ipsecrequest {
 	struct ipsecrequest *next;
 				/* pointer to next structure */
@@ -115,6 +116,8 @@ struct ipsecrequest {
 
 	struct secasvar *sav;	/* place holder of SA for use */
 	struct secpolicy *sp;	/* back pointer to SP */
+
+	struct ifnet *tunifp;	/* interface for tunnelling */
 };
 
 /* security policy in PCB */
@@ -122,6 +125,11 @@ struct inpcbpolicy {
 	struct secpolicy *sp_in;
 	struct secpolicy *sp_out;
 	int priv;			/* privileged socket ? */
+
+	/* cached policy */
+	/* XXX 3 == IPSEC_DIR_MAX */
+	struct secpolicy *cache[3];
+	time_t cachetime[3]; /* the time we filled the cache */
 };
 
 /* SP acquiring list table. */
@@ -352,6 +360,8 @@ extern int ip6_esp_randpad;
 #endif
 
 #define ipseclog(x)	do { if (ipsec_debug) log x; } while (0)
+
+extern int ipsec_invalpcbcacheall __P((void));
 
 extern struct secpolicy *ipsec4_getpolicybysock
 	__P((struct mbuf *, u_int, struct socket *, int *));
