@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.44 2001/03/28 07:08:29 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.45 2001/04/25 12:29:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -131,7 +131,7 @@ mainloop()
 	int i, fdmax;
 	fd_set rfds, wfds;
 	struct timeval timeo;
-	struct sockdb *sd;
+	struct sockdb *sd, *nsd;
 
 	while (1) {
 		FD_ZERO(&rfds);
@@ -163,10 +163,25 @@ mainloop()
 			if (!FD_ISSET(i, &rfds))
 				continue;
 			sd = sock2sockdb(i);
-			if (sd->type == S_MEDIATOR)
+			switch (sd->type) {
+			case S_MEDIATOR:
 				conf_mediator(sd);
-			else
+				break;
+			case S_TCP:
+				nsd = newsockdb(accept(sd->s, NULL, 0), sd->af);
+				if (nsd) {
+					nsd->type = sd->type;
+					if (nsd->s >= 0) {
+						mainloop0(nsd);
+						close(nsd->s);
+					}
+					delsockdb(nsd);
+				}
+				break;
+			default:
 				mainloop0(sd);
+				break;
+			}
 		}
 	}
 }
@@ -178,8 +193,13 @@ mainloop0(sd)
 	struct sockaddr_storage from;
 	int fromlen;
 	char buf[8 * 1024];
-	int l;
+	ssize_t l;
 	struct nsdb *ns;
+
+	if (sd->type == S_TCP) {
+		/* XXX dummy read for length */
+		(void)read(sd->s, buf, 2);
+	}
 
 	/*
 	 * XXX we need to get destination address of incoming packet.
@@ -245,7 +265,7 @@ conf_mediator(sd)
 	struct sockaddr_storage from;
 	int fromlen;
 	char buf[8 * 1024];
-	int l;
+	ssize_t l;
 	struct mediator_control_msg *msg;
 	char *p;
 
@@ -859,7 +879,12 @@ getans(buf, len, from)
 	hp->ra = 1;	/* XXX recursion?? */
 	if (dflag)
 		dnsdump("getans O", buf, len, (struct sockaddr *)&qc->from);
-	if (len > PACKETSZ) {
+	if (qc->sd->type == S_TCP) {
+		u_int16_t l;
+
+		l = htons(len & 0xffff);
+		(void)write(qc->sd->s, &l, sizeof(l));
+	} else if (len > PACKETSZ) {
 		len = PACKETSZ;
 		hp->tc = 1;
 	}
@@ -974,6 +999,12 @@ relay(sd, buf, len, from)
 
 			if (dflag)
 				dnsdump("relay O", buf, len, sa);
+			if (sd->type == S_TCP) {
+				u_int16_t l;
+
+				l = htons(len & 0xffff);
+				(void)write(sd->s, &l, sizeof(l));
+			}
 			if (sendto(sd->s, buf, len, 0, sa, sa->sa_len) == len) {
 #if 0
 				dprintf("sock %d sent\n", i);
@@ -1075,7 +1106,12 @@ serve(sd, buf, len, from)
 		if (dflag)
 			dnsdump("serve O", replybuf, p - replybuf, from);
 
-		if (p - replybuf > PACKETSZ) {
+		if (sd->type == S_TCP) {
+			u_int16_t l;
+
+			l = htons((p - replybuf) & 0xffff);
+			(void)write(sd->s, &l, sizeof(l));
+		} else if (p - replybuf > PACKETSZ) {
 			p = replybuf + PACKETSZ;
 			hp->tc = 1;
 		}
@@ -1121,7 +1157,12 @@ serve(sd, buf, len, from)
 		if (dflag)
 			dnsdump("serve P", replybuf, p - replybuf, from);
 
-		if (p - replybuf > PACKETSZ) {
+		if (sd->type == S_TCP) {
+			u_int16_t l;
+
+			l = htons((p - replybuf) & 0xffff);
+			(void)write(sd->s, &l, sizeof(l));
+		} else if (p - replybuf > PACKETSZ) {
 			p = replybuf + PACKETSZ;
 			hp->tc = 1;
 		}

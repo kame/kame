@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.34 2001/04/24 08:56:32 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.35 2001/04/25 12:29:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -180,6 +180,12 @@ main(argc, argv)
 		/*NOTREACHED*/
 	}
 
+	if (getsock(family, NULL, srcport, SOCK_STREAM, AI_PASSIVE, S_TCP)
+	    != 0) {
+		err(1, "getsock");
+		/*NOTREACHED*/
+	}
+
 	if (mflag) {
 		if (getsock(AF_INET, NULL, MEDIATOR_CTRL_PORT, SOCK_DGRAM, 0,
 		    S_MEDIATOR) != 0) {
@@ -196,6 +202,7 @@ main(argc, argv)
 		switch (sd->type) {
 		case S_MEDIATOR:
 		case S_UNICAST:
+		case S_TCP:
 			continue;
 		case S_MULTICAST:
 			break;
@@ -348,6 +355,10 @@ getsock0(ai)
 	if (bind(s, ai->ai_addr, ai->ai_addrlen) < 0) {
 		dprintf("bind: %s\n", strerror(errno));
 		close(s);
+		return -1;
+	}
+	if (ai->ai_socktype == SOCK_STREAM && listen(s, 5) < 0) {
+		dprintf("listen: %s\n", strerror(errno));
 		return -1;
 	}
 
@@ -752,6 +763,9 @@ status()
 			break;
 		case S_MEDIATOR:
 			p = "mediator";
+			break;
+		case S_TCP:
+			p = "tcp";
 			break;
 		default:
 			p = "invalid type";
