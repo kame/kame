@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.25 2004/02/06 10:06:42 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.26 2004/02/10 12:18:02 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -431,66 +431,69 @@ mip6_bc_proxy_control(target, local, cmd)
 	struct in6_addr *local;
 	int cmd;
 {
-	struct sockaddr_in6 mask; /* = {sizeof(mask), AF_INET6 } */
-	struct sockaddr_in6 taddr, sa6;
+	struct sockaddr_in6 target_sa, local_sa, mask_sa;
 	struct sockaddr_dl *sdl;
         struct rtentry *rt, *nrt;
 	struct ifaddr *ifa;
 	struct ifnet *ifp;
 	int flags, error = 0;
 
-	/* Create sa6 */
-	bzero(&sa6, sizeof(sa6));
-	sa6.sin6_len = sizeof(sa6);
-	sa6.sin6_family = AF_INET6;
-	/* XXX */ in6_recoverscope(&sa6, local, NULL);
-	/* XXX */ in6_embedscope(&sa6.sin6_addr, &sa6);
+	/* create a sockaddr_in6 structure for my address. */
+	bzero(&local_sa, sizeof(local_sa));
+	local_sa.sin6_len = sizeof(local_sa);
+	local_sa.sin6_family = AF_INET6;
+	/* XXX */ in6_recoverscope(&local_sa, local, NULL);
+	/* XXX */ in6_embedscope(&local_sa.sin6_addr, &local_sa);
 
-	ifa = ifa_ifwithaddr((struct sockaddr *)&sa6);
+	ifa = ifa_ifwithaddr((struct sockaddr *)&local_sa);
 	if (ifa == NULL)
 		return (EINVAL);
 	ifp = ifa->ifa_ifp;
 
-	bzero(&taddr, sizeof(taddr));
-	taddr.sin6_len = sizeof(taddr);
-	taddr.sin6_family = AF_INET6;
-	taddr.sin6_addr = *target;
-	if (in6_addr2zoneid(ifp, &taddr.sin6_addr,
-			    &taddr.sin6_scope_id)) {
+	bzero(&target_sa, sizeof(target_sa));
+	target_sa.sin6_len = sizeof(target_sa);
+	target_sa.sin6_family = AF_INET6;
+	target_sa.sin6_addr = *target;
+	if (in6_addr2zoneid(ifp, &target_sa.sin6_addr,
+		&target_sa.sin6_scope_id)) {
 		mip6log((LOG_ERR,
-			 "%s:%d: in6_addr2zoneid failed\n",
-			 __FILE__, __LINE__));
+		    "mip6_proxy_control:%d: in6_addr2zoneid failed\n",
+		    __LINE__));
 		return(EIO);
 	}
-	error = in6_embedscope(&taddr.sin6_addr, &taddr);
+	error = in6_embedscope(&target_sa.sin6_addr, &target_sa);
 	if (error != 0) {
 		return(error);
 	}
 	/* clear sin6_scope_id before looking up a routing table. */
-	taddr.sin6_scope_id = 0;
+	target_sa.sin6_scope_id = 0;
 
 	switch (cmd) {
 	case RTM_DELETE:
 #ifdef __FreeBSD__
-		rt = rtalloc1((struct sockaddr *)&taddr, 0, 0UL);
+		rt = rtalloc1((struct sockaddr *)&target_sa, 0, 0UL);
 #else /* __FreeBSD__ */
-		rt = rtalloc1((struct sockaddr *)&taddr, 0);
+		rt = rtalloc1((struct sockaddr *)&target_sa, 0);
 #endif /* __FreeBSD__ */
 		if (rt)
 			rt->rt_refcnt--;
-		if (rt == NULL ||
-		    (rt->rt_flags & RTF_HOST) == 0 ||
+		if (rt == NULL)
+			return (0);
+		if ((rt->rt_flags & RTF_HOST) == 0 ||
 		    (rt->rt_flags & RTF_ANNOUNCE) == 0) {
-			return 0; /* EHOSTUNREACH */
+			/*
+			 * there is a rtentry, but is not a host nor
+			 * a proxy entry.
+			 */
+			return (0);
 		}
 		error = rtrequest(RTM_DELETE, rt_key(rt), (struct sockaddr *)0,
 		    rt_mask(rt), 0, (struct rtentry **)0);
 		if (error) {
 			mip6log((LOG_ERR,
-				 "%s:%d: RTM_DELETE for %s returned "
-				 "error = %d\n",
-				 __FILE__, __LINE__,
-				 ip6_sprintf(target), error));
+			    "mip6_proxy_control:%d: RTM_DELETE for %s "
+			    "returned error = %d\n",
+			    __LINE__, ip6_sprintf(target), error));
 		}
 		rt = NULL;
 
@@ -498,19 +501,20 @@ mip6_bc_proxy_control(target, local, cmd)
 
 	case RTM_ADD:
 #ifdef __FreeBSD__
-		rt = rtalloc1((struct sockaddr *)&taddr, 0, 0UL);
+		rt = rtalloc1((struct sockaddr *)&target_sa, 0, 0UL);
 #else /* __FreeBSD__ */
-		rt = rtalloc1((struct sockaddr *)&taddr, 0);
+		rt = rtalloc1((struct sockaddr *)&target_sa, 0);
 #endif /* __FreeBSD__ */
 		if (rt)
 			rt->rt_refcnt--;
-		if (rt && (rt->rt_flags & RTF_HOST) != 0) {
-			if ((rt->rt_flags & RTF_ANNOUNCE) != 0 &&
+		if (rt) {
+			if (((rt->rt_flags & RTF_HOST) != 0) &&
+			    ((rt->rt_flags & RTF_ANNOUNCE) != 0) &&
 			    rt->rt_gateway->sa_family == AF_LINK) {
 				mip6log((LOG_NOTICE,
-					 "%s:%d: RTM_ADD: we are already proxy for %s\n",
-					 __FILE__, __LINE__,
-					 ip6_sprintf(target)));
+				    "mip6_proxy_control:%d: RTM_ADD: "
+				    "we are already proxy for %s\n",
+				    __LINE__, ip6_sprintf(target)));
 				return (EEXIST);
 			}
 			if ((rt->rt_flags & RTF_LLINFO) != 0) {
@@ -522,10 +526,10 @@ mip6_bc_proxy_control(target, local, cmd)
 			} else {
 				/* XXX Path MTU entry? */
 				mip6log((LOG_ERR,
-					 "%s:%d: entry exist %s: rt_flags=0x%x\n",
-					 __FILE__, __LINE__,
-					 ip6_sprintf(target),
-					 (int)rt->rt_flags));
+				    "mip6_proxy_control:%d: entry exist "
+				    "%s: rt_flags=0x%x\n",
+				    __LINE__, ip6_sprintf(target),
+				    (int)rt->rt_flags));
 			}
 		}
 
@@ -552,17 +556,17 @@ mip6_bc_proxy_control(target, local, cmd)
 	}
 #endif /* __NetBSD__ */
 
-		/* Create mask */
-		bzero(&mask, sizeof(mask));
-		mask.sin6_family = AF_INET6;
-		mask.sin6_len = sizeof(mask);
+		/* create a mask. */
+		bzero(&mask_sa, sizeof(mask_sa));
+		mask_sa.sin6_family = AF_INET6;
+		mask_sa.sin6_len = sizeof(mask_sa);
 
-		in6_prefixlen2mask(&mask.sin6_addr, 128);
+		in6_prefixlen2mask(&mask_sa.sin6_addr, 128);
 		flags = (RTF_STATIC | RTF_HOST | RTF_ANNOUNCE);
 
-		error = rtrequest(RTM_ADD, (struct sockaddr *)&taddr,
-				  (struct sockaddr *)sdl,
-				  (struct sockaddr *)&mask, flags, &nrt);
+		error = rtrequest(RTM_ADD, (struct sockaddr *)&target_sa,
+		    (struct sockaddr *)sdl, (struct sockaddr *)&mask_sa, flags,
+		    &nrt);
 
 		if (error == 0) {
 			/* Avoid expiration */
@@ -573,36 +577,36 @@ mip6_bc_proxy_control(target, local, cmd)
 				error = EINVAL;
 		} else {
 			mip6log((LOG_ERR,
-				 "%s:%d: RTM_ADD for %s returned "
-				 "error = %d\n",
-				 __FILE__, __LINE__,
-				 ip6_sprintf(target), error));
+			    "mip6_proxy_control:%d: RTM_ADD for %s returned "
+			    "error = %d\n",
+			    __LINE__, ip6_sprintf(target), error));
 		}
 
 		{
 			/* very XXX */
-			struct sockaddr_in6 daddr;
+			struct sockaddr_in6 daddr_sa;
 
-			bzero(&daddr, sizeof(daddr));
-			daddr.sin6_family = AF_INET6;
-			daddr.sin6_len = sizeof(daddr);
-			daddr.sin6_addr = in6addr_linklocal_allnodes;
-			if (in6_addr2zoneid(ifp, &daddr.sin6_addr,
-				&daddr.sin6_scope_id)) {
+			bzero(&daddr_sa, sizeof(daddr_sa));
+			daddr_sa.sin6_family = AF_INET6;
+			daddr_sa.sin6_len = sizeof(daddr_sa);
+			daddr_sa.sin6_addr = in6addr_linklocal_allnodes;
+			if (in6_addr2zoneid(ifp, &daddr_sa.sin6_addr,
+			    &daddr_sa.sin6_scope_id)) {
 				/* XXX: should not happen */
 				mip6log((LOG_ERR,
-					 "%s:%d: in6_addr2zoneid failed\n",
-					 __FILE__, __LINE__));
+				    "mip6_proxy_control:%d: "
+				    "in6_addr2zoneid failed\n",
+				    __LINE__));
 				error = EIO; /* XXX */
 			}
 			if (error == 0) {
-				error = in6_embedscope(&daddr.sin6_addr,
-				    &daddr);
+				error = in6_embedscope(&daddr_sa.sin6_addr,
+				    &daddr_sa);
 			}
 			if (error == 0) {
-				nd6_na_output(ifp, &daddr.sin6_addr,
-				    &taddr.sin6_addr, ND_NA_FLAG_OVERRIDE, 1,
-				    (struct sockaddr *)sdl);
+				nd6_na_output(ifp, &daddr_sa.sin6_addr,
+				    &target_sa.sin6_addr, ND_NA_FLAG_OVERRIDE,
+				    1, (struct sockaddr *)sdl);
 			}
 		}
 
@@ -610,8 +614,9 @@ mip6_bc_proxy_control(target, local, cmd)
 
 	default:
 		mip6log((LOG_ERR,
-			 "%s:%d: we only support RTM_ADD/DELETE operation.\n",
-			 __FILE__, __LINE__));
+		    "mip6_proxy_control:%d: we only support "
+		    "RTM_ADD/DELETE operation.\n",
+		    __LINE__));
 		error = -1;
 		break;
 	}
