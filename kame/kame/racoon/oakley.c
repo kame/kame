@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.9 2000/01/14 19:22:25 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.10 2000/01/31 13:39:13 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1063,6 +1063,7 @@ oakley_validate_auth(iph1)
 		plog(logp, LOCATION, NULL, "HASH for PSK validated.\n");
 	    }
 		break;
+#ifdef HAVE_SIGNING_C
 	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
 	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
 	    {
@@ -1187,6 +1188,7 @@ oakley_validate_auth(iph1)
 		plog(logp, LOCATION, NULL, "Signature authenticated\n");
 	    }
 		break;
+#endif
 	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
 	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
 		if (iph1->id_p == NULL || iph1->pl_hash == NULL) {
@@ -1208,6 +1210,7 @@ oakley_validate_auth(iph1)
 	return 0;
 }
 
+#ifdef HAVE_SIGNING_C
 /* get certificate */
 int
 oakley_getcert(iph1)
@@ -1273,6 +1276,7 @@ oakley_getcert(iph1)
 
 	return 0;
 }
+#endif
 
 /*
  * compute SKEYID

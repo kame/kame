@@ -70,8 +70,11 @@ AC_ARG_WITH(ssleay, [  --with-ssleay=DIR       specify SSLeay directory],
 	[crypto_dir=$withval])
 AC_MSG_RESULT(${crypto_dir-"default"})
 
-AC_MSG_CHECKING(for libcrypto)
-for dir in $crypto_dir /usr/local/v6 /usr/local/ssl /usr/local /usr/pkg; do
+AC_CHECK_LIB(crypto, CAST_cfb64_encrypt)
+AC_CHECK_FUNCS(CAST_cfb64_encrypt, [needcrypto=no], [needcrypto=yes])
+if test $needcrypto = "yes"; then
+    AC_MSG_CHECKING(for libcrypto)
+    for dir in $crypto_dir /usr/local/v6 /usr/local/ssl /usr/local /usr/pkg; do
 	ssleay_lib=no
 	ssleay_include=no
 	ssleay_cmd=no
@@ -104,7 +107,16 @@ for dir in $crypto_dir /usr/local/v6 /usr/local/ssl /usr/local /usr/pkg; do
 		CPPFLAGS="$ssleay_include $CPPFLAGS"
 		break;
 	fi
-done
+    done
+else
+	AC_MSG_CHECKING(for libcrypto)
+	ssleay_lib="default libcrypto"
+	ssleay_include=default path
+	if test -d /usr/include/openssl -a -f /usr/include/openssl/des.h; then
+		CPPFLAGS="-I/usr/include/openssl $CPPFLAGS"
+		ssleay_include=/usr/include/openssl
+	fi
+fi
 AC_TRY_COMPILE(dnl
 [#include <sys/types.h>
 #include <stdio.h>
@@ -164,10 +176,10 @@ fi
 
 ipsectype=unknown
 ipseclib=none
-ipsectrylibc=no
 ipseclibdir=none
 AC_MSG_CHECKING([ipsec library path])
 for i in inria kame; do
+	ipsectrylibc=no
 	case $i in
 	inria)
 		dnl http://www.kame.net/
@@ -204,9 +216,13 @@ if test "$ipseclib" != "none"; then
 		echo "using lib$ipseclib"
 		dnl don't check items that require get{addr,name}info
 		AC_CHECK_LIB($ipseclib, ipsec_strerror,
-			[LIBS="$LIBS -L$ipseclibdir -l$ipseclib"],
-			[echo "Fatal: no ipsec library found."; exit 1],
-			[-L$ipseclibdir])
+			[LIBS="$LIBS -l$ipseclib"
+			echo "found in default location"], [
+			AC_CHECK_LIB($ipseclib, ipsec_strerror,
+				[LIBS="$LIBS -L$ipseclibdir -l$ipseclib"
+				echo "found in $ipseclibdir"],
+				[echo "Fatal: no ipsec library found."; exit 1],
+				[-L$ipseclibdir])])
 	else
 		if test "$ipsectrylibc" = "yes"; then
 			echo 'using libc'
@@ -262,12 +278,12 @@ main()
 
 ipv6type=unknown
 ipv6lib=none
-ipv6trylibc=no
 ipv6libdir=none
 
 if test "$ipv6" = "yes"; then
 	AC_MSG_CHECKING([ipv6 stack type])
 	for i in inria kame linux toshiba v6d zeta; do
+		ipv6trylibc=no
 		case $i in
 		inria)
 			dnl http://www.kame.net/
@@ -483,7 +499,13 @@ AC_REPLACE_FUNCS(getaddrinfo getnameinfo)
 dnl Checks for header files.
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS(limits.h sys/time.h unistd.h stdarg.h varargs.h idea.h rc5.h)
+AC_CHECK_HEADERS(limits.h sys/time.h unistd.h stdarg.h varargs.h)
+signing=yes
+AC_CHECK_HEADERS(idea.h rc5.h rsa.h, [], [signing=no])
+if test $signing = "yes"; then
+	LIBOBJS="$LIBOBJS signing.o"
+	AC_DEFINE(HAVE_SIGNING_C)
+fi
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.15 2000/01/18 22:04:16 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.16 2000/01/31 13:39:13 itojun Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -1300,6 +1300,7 @@ ident_ir3sendmx(iph1)
 		/* create isakmp HASH payload */
 		p = set_isakmp_payload(p, iph1->hash, ISAKMP_NPTYPE_NONE);
 		break;
+#ifdef HAVE_SIGNING_C
 	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
 	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
 	{
@@ -1334,6 +1335,7 @@ ident_ir3sendmx(iph1)
 		p = set_isakmp_payload(p, iph1->sig, ISAKMP_NPTYPE_NONE);
 	}
 		break;
+#endif
 	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
 	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
 		tlen += sizeof(*gen) + iph1->hash->l;
