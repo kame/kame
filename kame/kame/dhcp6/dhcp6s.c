@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.141 2004/11/28 11:29:36 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.142 2004/11/28 11:36:38 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -154,7 +154,7 @@ static void server6_recv __P((int));
 static void free_relayinfo __P((struct relayinfo *));
 static int process_relayforw __P((struct dhcp6 **, struct dhcp6opt **,
     struct relayinfolist *, struct sockaddr *));
-static int set_statelessinfo __P((struct dhcp6_optinfo *));
+static int set_statelessinfo __P((int, struct dhcp6_optinfo *));
 static int react_solicit __P((struct dhcp6_if *, struct dhcp6 *, ssize_t,
     struct dhcp6_optinfo *, struct sockaddr *, int, struct relayinfolist *));
 static int react_request __P((struct dhcp6_if *, struct in6_pktinfo *,
@@ -1044,7 +1044,8 @@ process_relayforw(dh6p, optendp, relayinfohead, from)
  * It is the caller's responsibility to deal with error cases.
  */
 static int
-set_statelessinfo(optinfo)
+set_statelessinfo(type, optinfo)
+	int type;
 	struct dhcp6_optinfo *optinfo;
 {
 	/* SIP server domain name */
@@ -1078,9 +1079,14 @@ set_statelessinfo(optinfo)
 		return (-1);
 	}
 
-	/* Lifetime */
-	if (optrefreshtime != -1)
+	/*
+	 * Information refresh time.  Only include in a response to
+	 * an Information-request message.
+	 */
+	if (type == DH6_INFORM_REQ &&
+	    optrefreshtime != DH6OPT_REFRESHTIME_UNDEF) {
 		optinfo->refreshtime = (int64_t)optrefreshtime;
+	}
 
 	return (0);
 }
@@ -1149,7 +1155,7 @@ react_solicit(ifp, dh6, len, optinfo, from, fromlen, relayinfohead)
 		roptinfo.pref = ifp->server_pref;
 
 	/* add other configuration information */
-	if (set_statelessinfo(&roptinfo)) {
+	if (set_statelessinfo(DH6_SOLICIT, &roptinfo)) {
 		dprintf(LOG_ERR, FNAME,
 		    "failed to set other stateless information");
 		goto fail;
@@ -1408,7 +1414,7 @@ react_request(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 	 * Add options to the Reply message for any other configuration
 	 * information to be assigned to the client.
 	 */
-	if (set_statelessinfo(&roptinfo)) {
+	if (set_statelessinfo(DH6_REQUEST, &roptinfo)) {
 		dprintf(LOG_ERR, FNAME,
 		    "failed to set other stateless information");
 		goto fail;
@@ -1530,7 +1536,7 @@ react_renew(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 	}
 
 	/* add other configuration information */
-	if (set_statelessinfo(&roptinfo)) {
+	if (set_statelessinfo(DH6_RENEW, &roptinfo)) {
 		dprintf(LOG_ERR, FNAME,
 		    "failed to set other stateless information");
 		goto fail;
@@ -1633,7 +1639,7 @@ react_rebind(ifp, dh6, len, optinfo, from, fromlen, relayinfohead)
 	}
 
 	/* add other configuration information */
-	if (set_statelessinfo(&roptinfo)) {
+	if (set_statelessinfo(DH6_REBIND, &roptinfo)) {
 		dprintf(LOG_ERR, FNAME,
 		    "failed to set other stateless information");
 		goto fail;
@@ -1825,7 +1831,7 @@ react_informreq(ifp, dh6, len, optinfo, from, fromlen, relayinfohead)
 	}
 
 	/* set stateless information */
-	if (set_statelessinfo(&roptinfo)) {
+	if (set_statelessinfo(DH6_INFORM_REQ, &roptinfo)) {
 		dprintf(LOG_ERR, FNAME,
 		    "failed to set other stateless information");
 		goto fail;
