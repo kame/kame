@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.c,v 1.10 2002/04/03 05:38:50 kjc Exp $	*/
+/*	$KAME: altq_hfsc.c,v 1.11 2002/04/20 08:18:02 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -872,9 +872,9 @@ init_v(cl, len)
 			 */
 			max_cl = actlist_last(cl->cl_parent->cl_actc);
 			vt = (min_cl->cl_vt + max_cl->cl_vt) / 2;
-			if (cl->cl_parent->cl_vtperiod == cl->cl_parentperiod)
-				vt = max(cl->cl_vt, vt);
-			cl->cl_vt = vt;
+			if (cl->cl_parent->cl_vtperiod != cl->cl_parentperiod
+			    || vt > cl->cl_vt)
+				cl->cl_vt = vt;
 		} else {
 			/* no packet is backlogged.  set vt to 0 */
 			cl->cl_vt = 0;
