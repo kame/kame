@@ -586,6 +586,48 @@ udp6_output(in6p, m, addr6, control)
 
 		faddr = &sin6->sin6_addr;
 		fport = sin6->sin6_port; /* allow 0 port */
+		/*
+		 * If the scope of the destination is link-local,
+		 * embed the interface
+		 * index in the address.
+		 *
+		 * XXX advanced-api value overrides sin6_scope_id 
+		 */
+		if (IN6_IS_ADDR_LINKLOCAL(faddr) ||
+		    IN6_IS_ADDR_MC_LINKLOCAL(faddr)) {
+			struct ip6_pktopts *optp = in6p->in6p_outputopts;
+			struct in6_pktinfo *pi = NULL;
+			struct ifnet *oifp = NULL;
+			struct ip6_moptions *mopt = NULL;
+
+			/*
+			 * XXX Boundary check is assumed to be already done in
+			 * ip6_setpktoptions().
+			 */
+			if (optp && (pi = optp->ip6po_pktinfo) &&
+			    pi->ipi6_ifindex) {
+				ip6->ip6_dst.s6_addr16[1] =
+					htons(pi->ipi6_ifindex);
+				oifp = ifindex2ifnet[pi->ipi6_ifindex];
+			}
+			else if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) &&
+				 (mopt = in6p->in6p_moptions) &&
+				 mopt->im6o_multicast_ifp) {
+				oifp = mopt->im6o_multicast_ifp;
+				ip6->ip6_dst.s6_addr16[1] = oifp->if_index;
+			} else if (sin6->sin6_scope_id) {
+				/* boundary check */
+				if (sin6->sin6_scope_id < 0 
+				    || if_index < sin6->sin6_scope_id) {
+					error = ENXIO;  /* XXX EINVAL? */
+					goto release;
+				}
+				/* XXX */
+				ip6->ip6_dst.s6_addr16[1]
+					= htons(sin6->sin6_scope_id & 0xffff);
+			}
+		}
+		
 		laddr = in6_selectsrc(sin6, in6p->in6p_outputopts,
 				      in6p->in6p_moptions,
 				      &in6p->in6p_route,
