@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.h,v 1.11 2003/08/25 11:28:40 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.h,v 1.12 2003/08/26 04:27:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -93,7 +93,7 @@ int mip6_bu_send_cbu(struct mip6_bu *);
 /* home agent list processing. */
 struct mip6_ha *mip6_ha_create(struct sockaddr_in6 *, u_int8_t, u_int16_t,
     int32_t);
-int mip6_ha_list_insert(struct mip6_ha_list *, struct mip6_ha *mha);
+void mip6_ha_list_insert(struct mip6_ha_list *, struct mip6_ha *mha);
 int mip6_ha_list_remove(struct mip6_ha_list*, struct mip6_ha *mha);
 struct mip6_ha *mip6_ha_list_find_withaddr(struct mip6_ha_list *,
     struct sockaddr_in6 *);

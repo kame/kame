@@ -1,4 +1,4 @@
-/*	$KAME: mip6_halist.c,v 1.4 2003/08/25 11:28:40 keiichi Exp $	*/
+/*	$KAME: mip6_halist.c,v 1.5 2003/08/26 04:27:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -78,7 +78,7 @@ struct mip6_ha_list mip6_ha_list;
 void
 mip6_halist_init()
 {
-	LIST_INIT(&mip6_ha_list);
+	TAILQ_INIT(&mip6_ha_list);
 }
 
 struct mip6_ha *
@@ -134,18 +134,27 @@ mip6_ha_print(mha)
 		 mha->mha_expire - time_second));
 }
 
-int
+void
 mip6_ha_list_insert(mha_list, mha)
 	struct mip6_ha_list *mha_list;
 	struct mip6_ha *mha;
 {
+	struct mip6_ha *tgtmha;
+
 	if ((mha_list == NULL) || (mha == NULL)) {
-		return (EINVAL);
+		panic("mip6_ha_list_insert: NULL pointer.");
 	}
 
-	LIST_INSERT_HEAD(mha_list, mha, mha_entry);
+	for (tgtmha = TAILQ_FIRST(mha_list); tgtmha;
+	    tgtmha = TAILQ_NEXT(tgtmha, mha_entry)) {
+		if (tgtmha->mha_pref > mha->mha_pref)
+			continue;
+		TAILQ_INSERT_BEFORE(tgtmha, mha, mha_entry);
+		return;
+	}
+	TAILQ_INSERT_TAIL(mha_list, mha, mha_entry);
 
-	return (0);
+	return;
 }
 
 int
@@ -174,7 +183,7 @@ mip6_ha_list_remove(mha_list, mha)
 		}
 	}
 
-	LIST_REMOVE(mha, mha_entry);
+	TAILQ_REMOVE(mha_list, mha, mha_entry);
 	FREE(mha, M_TEMP);
 
 	return (0);
@@ -236,8 +245,8 @@ mip6_ha_list_find_withaddr(mha_list, addr)
 {
 	struct mip6_ha *mha;
 
-	for (mha = LIST_FIRST(mha_list); mha;
-	     mha = LIST_NEXT(mha, mha_entry)) {
+	for (mha = TAILQ_FIRST(mha_list); mha;
+	    mha = TAILQ_NEXT(mha, mha_entry)) {
 		if (SA6_ARE_ADDR_EQUAL(&mha->mha_addr, addr))
 			return (mha);
 	}

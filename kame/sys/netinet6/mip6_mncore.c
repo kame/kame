@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.28 2003/08/25 12:02:00 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.29 2003/08/26 04:27:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -485,14 +485,7 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 			    __FILE__, __LINE__));
 			goto haaddr_update;
 		}
-		error = mip6_ha_list_insert(&mip6_ha_list, mha);
-		if (error) {
-			mip6log((LOG_ERR,
-			    "%s:%d "
-			    "mip6_ha_list_insert failed(%d).\n",
-			    __FILE__, __LINE__, error));
-			goto haaddr_update;
-		}
+		mip6_ha_list_insert(&mip6_ha_list, mha);
 	}
 	for (i = 0; i < nprefix; i++) {
 		mip6_prefix_ha_list_insert(&prefix_list[i]->mpfx_ha_list, mha);
@@ -532,14 +525,7 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 				    __FILE__, __LINE__));
 				goto skip_ha_update;
 			}
-			error = mip6_ha_list_insert(&mip6_ha_list, mha);
-			if (error) {
-				mip6log((LOG_ERR,
-				    "%s:%d "
-				    "mip6_ha_list_insert failed(%d).\n",
-				    __FILE__, __LINE__, error));
-				goto skip_ha_update;
-			}
+			mip6_ha_list_insert(&mip6_ha_list, mha);
 
 			mha_is_new = 1;
 			mip6log((LOG_INFO,

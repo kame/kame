@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.57 2003/08/25 11:28:39 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.58 2003/08/26 04:27:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -156,6 +156,8 @@ t.
 static int hif_site_prefix_list_update_withioctl(struct hif_softc *, caddr_t);
 static int hif_prefix_list_update_withprefix(struct hif_softc *, caddr_t);
 static int hif_prefix_list_update_withhaaddr(struct hif_softc *, caddr_t);
+static struct hif_prefix *hif_prefix_list_find_withmha(
+    struct hif_prefix_list *, struct mip6_ha *);
 
 struct hif_softc_list hif_softc_list;
 
@@ -431,20 +433,17 @@ hif_find_preferable_ha(hif, mpfx)
 	struct hif_softc *hif;
 	struct mip6_prefix *mpfx;
 {
-	struct mip6_prefix_ha *mpfxha;
 	struct mip6_ha *mha;
 
-	/* XXX shoud consider home agents related to other prefixes. */
-	for (mpfxha = LIST_FIRST(&mpfx->mpfx_ha_list); mpfxha != NULL;
-	    mpfxha = LIST_NEXT(mpfxha, mpfxha_entry)) {
-		mha = mpfxha->mpfxha_mha;
-		if ((mha->mha_flags & ND_RA_FLAG_HOME_AGENT) == 0)
+	/*
+	 * we assume mip6_ha_list is ordered by a preference value.
+	 */
+	for (mha = TAILQ_FIRST(&mip6_ha_list); mha;
+	    mha = TAILQ_NEXT(mha, mha_entry)) {
+		if (!hif_prefix_list_find_withmha(&hif->hif_prefix_list_home,
+		    mha))
 			continue;
-		if (IN6_IS_ADDR_UNSPECIFIED(&mha->mha_addr.sin6_addr)
-		    || IN6_IS_ADDR_LOOPBACK(&mha->mha_addr.sin6_addr)
-		    || IN6_IS_ADDR_LINKLOCAL(&mha->mha_addr.sin6_addr)
-		    || IN6_IS_ADDR_SITELOCAL(&mha->mha_addr.sin6_addr))
-			continue;
+		/* return the entry we have found first. */
 		return (mha);
 	}
 	/* not found. */
@@ -580,10 +579,7 @@ hif_prefix_list_update_withhaaddr(sc, data)
 			    __FILE__, __LINE__));
 			return (ENOMEM);
 		}
-		error = mip6_ha_list_insert(&mip6_ha_list, mha);
-		if (error) {
-			return (error);
-		}
+		mip6_ha_list_insert(&mip6_ha_list, mha);
 	}
 
 	mha->mha_addr = nmha->mha_addr;
@@ -721,6 +717,28 @@ hif_prefix_list_find_withmpfx(hif_prefix_list, mpfx)
 	    hpfx = LIST_NEXT(hpfx, hpfx_entry)) {
 		if (hpfx->hpfx_mpfx == mpfx)
 			return (hpfx);
+	}
+	/* not found. */
+	return (NULL);
+}
+
+static struct hif_prefix *
+hif_prefix_list_find_withmha(hpfx_list, mha)
+	struct hif_prefix_list *hpfx_list;
+	struct mip6_ha *mha;
+{
+	struct hif_prefix *hpfx;
+	struct mip6_prefix *mpfx;
+	struct mip6_prefix_ha *mpfxha;
+
+	for (hpfx = LIST_FIRST(hpfx_list); hpfx;
+	    hpfx = LIST_NEXT(hpfx, hpfx_entry)) {
+		mpfx = hpfx->hpfx_mpfx;
+		for (mpfxha = LIST_FIRST(&mpfx->mpfx_ha_list); mpfxha;
+		    mpfxha = LIST_NEXT(mpfxha, mpfxha_entry)) {
+			if (mpfxha->mpfxha_mha == mha)
+				return (hpfx);
+		}
 	}
 	/* not found. */
 	return (NULL);
