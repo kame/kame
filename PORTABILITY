@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$KAME: PORTABILITY,v 1.53 2000/07/30 15:29:22 itojun Exp $
+	$KAME: PORTABILITY,v 1.54 2000/10/10 00:23:06 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -329,3 +329,8 @@ across those possibilities.
   your program will be compromised by malicious party.
 	BAD: syslog(foo);
 	GOOD: syslog("%s", foo);
+
+- SECURITY: be careful using fd_set, specifically when you are in setuid'ed
+  applications.  there's buffer overrun possibility with FD_SET().
+  use poll(2) whenever available (note that KAME still support platforms
+  without poll(2)).  see openbsd select(2) manpage.
