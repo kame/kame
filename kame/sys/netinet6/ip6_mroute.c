@@ -664,7 +664,11 @@ add_m6if(mifcp)
 #else
 		s = splnet();
 #endif
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+		error = if_allmulti(ifp, 1);
+#else
 		error = (*ifp->if_ioctl)(ifp, SIOCADDMULTI, (caddr_t)&ifr);
+#endif
 		splx(s);
 		if (error)
 			return error;
