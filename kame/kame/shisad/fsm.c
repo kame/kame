@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.22 2005/03/08 09:39:17 mitsuya Exp $	*/
+/*	$KAME: fsm.c,v 1.23 2005/03/08 09:48:19 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -123,7 +123,8 @@ bul_kick_fsm_by_mh(src, dst, hoa, rtaddr, mh, mhlen)
 	switch(mh->ip6mh_type) {
 	case IP6_MH_TYPE_BRR:
 		/* Shisa Statistics: BRR messages */
-		mip6stat.mip6s_brr++;
+		/* XXX: br or brr?? */
+		mip6stat.mip6s_br++;
 
 		hinfo = hoainfo_find_withhoa(dst);
 		if (hinfo == NULL) {

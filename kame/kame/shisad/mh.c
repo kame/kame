@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.18 2005/03/08 09:39:17 mitsuya Exp $  */
+/*      $KAME: mh.c,v 1.19 2005/03/08 09:48:19 mitsuya Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -223,9 +223,6 @@ mh_input_common(fd)
 	char rthdr_on = 0;
 	char adata[1024], buf[1024];
 	int i, mhlen;
-
-	/* Shisa Statistics: Mobility Headers */
-	mip6stat.mip6s_mobility++;
 
 #ifdef MIP_MN
 #define mh_input(src, dst, hoa, rtaddr, mh, mhlen)	\
@@ -953,7 +950,6 @@ send_brr(src, dst)
 
 	/* Shisa Statistics: BRR messages */
 	/* XXX: br or brr?? */
-	mip6stat.mip6s_omobility++;
 	mip6stat.mip6s_obr++;
 
 	error = sendmessage((char *)&brr, sizeof(brr), 0, src, dst, NULL, NULL);
@@ -996,7 +992,6 @@ send_hoti(bul)
 	    &bul->bul_hoainfo->hinfo_hoa, &bul->bul_peeraddr, NULL, NULL);
 
 	/* Shisa Statistics: HoTI messages */
-	mip6stat.mip6s_omobility++;
 	mip6stat.mip6s_ohoti++;
 
 	return (err);
@@ -1037,7 +1032,6 @@ send_coti(bul)
 		0, &bul->bul_coa, &bul->bul_peeraddr, NULL, NULL);
 
 	/* Shisa Statistics: CoTI messages */
-	mip6stat.mip6s_omobility++;
 	mip6stat.mip6s_ocoti++;
 
 	return (err);
@@ -1088,7 +1082,6 @@ send_hot(hoti, dst, src)
 	err = sendmessage((char *)&hot, sizeof(hot), 0, src, dst, NULL, NULL);
 
 	/* Shisa Statistics: HoT messages */
-	mip6stat.mip6s_omobility++;
 	mip6stat.mip6s_ohot++;
 
 	return (err);
@@ -1136,7 +1129,6 @@ send_cot(coti, dst, src)
 	err = sendmessage((char *)&cot, sizeof(cot), 0, src, dst, NULL, NULL);
 
 	/* Shisa Statistics: CoT messages */
-	mip6stat.mip6s_omobility++;
 	mip6stat.mip6s_ocot++;
 
 	return (err);
@@ -1386,7 +1378,6 @@ send_bu(bul)
 	}
 
 	/* Shisa Statistics: BU messages */
-	mip6stat.mip6s_omobility++;
 	mip6stat.mip6s_obu++;
 
 	return (error);
@@ -1562,7 +1553,6 @@ send_ba(src, coa, acoa, hoa, recv_bu, kbm_p, status, seqno, lifetime, refresh, b
 	}
 
 	/* Shisa Statistics: BA messages */
-	mip6stat.mip6s_omobility++;
 	mip6stat.mip6s_oba++;
 	
 	return (err);
@@ -1611,7 +1601,6 @@ send_be(dst, src, home, status)
 	}
 
 	/* Shisa Statistics: BE messages */
-	mip6stat.mip6s_omobility++;
 	mip6stat.mip6s_obe++;
 	
 	return (err);
