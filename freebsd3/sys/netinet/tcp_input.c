@@ -448,11 +448,16 @@ tcp_input(m, off, proto)
 
 #ifdef INET6
 	/* XXX not a good place to put this into... */
-	if (isipv6 &&
-	    m && (m->m_flags & M_ANYCAST6)) {
-		icmp6_error(m, ICMP6_DST_UNREACH, ICMP6_DST_UNREACH_ADDR,
-			(caddr_t)&ip6->ip6_dst - (caddr_t)ip6);
-		return;
+	if (isipv6) {
+		struct in6_ifaddr *ia6;
+
+		ia6 = ip6_getdstifaddr(m);
+		if (ia6 && (ia6->ia6_flags & IN6_IFF_ANYCAST)) {
+			icmp6_error(m, ICMP6_DST_UNREACH,
+				    ICMP6_DST_UNREACH_ADDR,
+				    (caddr_t)&ip6->ip6_dst - (caddr_t)ip6);
+			return;
+		}
 	}
 
 	/*
