@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.351 2002/11/27 12:13:57 k-sugyou Exp $	*/
+/*	$KAME: ip6_output.c,v 1.352 2002/12/10 09:35:38 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -185,10 +185,10 @@ struct ip6_exthdrs {
 	struct mbuf *ip6e_hbh;
 	struct mbuf *ip6e_dest1;
 	struct mbuf *ip6e_rthdr;
-	struct mbuf *ip6e_rthdr2; /* for MIP6 */
-	struct mbuf *ip6e_haddr; /* for MIP6 */
+	struct mbuf *ip6e_rthdr2;	/* for MIP6 */
+	struct mbuf *ip6e_haddr;	/* for MIP6 */
 	struct mbuf *ip6e_dest2;
-	struct mbuf *ip6e_mobility; /* for MIP6 */
+	struct mbuf *ip6e_mobility;	/* for MIP6 */
 };
 
 static int ip6_pcbopt __P((int, u_char *, int, struct ip6_pktopts **,
@@ -298,11 +298,6 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #ifdef MIP6
 	struct mip6_pktopts mip6opt;
 	int have_hao = 0;
-#ifdef NEW_STRUCT_ROUTE
-	struct route mip6_ip6route;
-#else
-	struct route_in6 mip6_ip6route;
-#endif
 #endif /* MIP6 */
 #ifdef IPSEC
 #ifdef __OpenBSD__
@@ -936,13 +931,10 @@ skip_ipsec2:;
 	if (opt && opt->ip6po_rthdr)
 		ro = &opt->ip6po_route;
 #ifdef MIP6
-	else if (exthdrs.ip6e_rthdr2) {
-		ro = &mip6_ip6route;
+	if (exthdrs.ip6e_rthdr2) {
+		ro = &ip6route;
 		bzero((caddr_t)ro, sizeof(*ro));
-		*(struct sockaddr_in6 *)&ro->ro_dst = *src_sa;
-#ifndef SCOPEDROUTING		/* XXX */
-		((struct sockaddr_in6 *)&ro->ro_dst)->sin6_scope_id = 0;
-#endif
+		ro_pmtu = ro;
 	}
 #endif /* MIP6 */
 	dst = (struct sockaddr_in6 *)&ro->ro_dst;
@@ -1084,9 +1076,6 @@ skip_ipsec2:;
 	ip6 = mtod(m, struct ip6_hdr *);
 
 #if defined(__bsdi__) || defined(__FreeBSD__)
-#ifdef MIP6
-	if (ro != &mip6_ip6route)
-#endif
 	if (ro != &ip6route && !IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
 		clone = 1;
 #endif
@@ -1633,11 +1622,6 @@ sendorfree:
 		ip6stat.ip6s_fragmented++;
 
 done:
-#ifdef MIP6
-	if (ro == &mip6_ip6route && ro->ro_rt) {
-		RTFREE(ro->ro_rt);
-	} else
-#endif
 	if (ro == &ip6route && ro->ro_rt) { /* brace necessary for RTFREE */
 		RTFREE(ro->ro_rt);
 	} else if (ro_pmtu == &ip6route && ro_pmtu->ro_rt) {
