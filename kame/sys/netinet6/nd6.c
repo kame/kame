@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.269 2002/05/29 13:57:12 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.270 2002/05/29 21:48:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -87,7 +87,6 @@
 #include <net/if_ether.h>
 #include <netinet/if_inarp.h>
 #include <net/if_fddi.h>
-#include <netinet/if_ieee80211.h>
 #endif /* __NetBSD__ */
 #include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
