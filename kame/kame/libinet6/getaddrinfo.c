@@ -506,7 +506,7 @@ explore_fqdn(pai, hostname, servname, res)
 	struct hostent *hp;
 	int h_error;
 	int af;
-	char *ap;
+	char *ap = NULL;
 	struct addrinfo sentinel, *cur;
 	int i;
 	const struct afd *afd;
@@ -574,9 +574,19 @@ explore_fqdn(pai, hostname, servname, res)
 	if (hp == NULL)
 		goto free;
 
+	ap = malloc(hp->h_length);
+	if (ap == NULL) {
+		error = EAI_MEMORY;
+		goto free;
+	}
+
 	for (i = 0; hp->h_addr_list[i] != NULL; i++) {
+		/*
+		 * hp will be overwritten if we use gethostbyname2().
+		 * always deep copy for simplification.
+		 */
 		af = hp->h_addrtype;
-		ap = hp->h_addr_list[i];
+		memcpy(ap, hp->h_addr_list[i], hp->h_length);
 		if (af == AF_INET6
 		 && IN6_IS_ADDR_V4MAPPED((struct in6_addr *)ap)) {
 			af = AF_INET;
@@ -617,6 +627,8 @@ free:
 	if (hp)
 		freehostent(hp);
 #endif
+	if (ap)
+		free(ap);
 	if (sentinel.ai_next)
 		freeaddrinfo(sentinel.ai_next);
 	return error;
@@ -855,9 +867,10 @@ get_name(addr, afd, res, numaddr, pai, servname)
 	const struct addrinfo *pai;
 	const char *servname;
 {
-	struct hostent *hp;
-	struct addrinfo *cur;
+	struct hostent *hp = NULL;
+	struct addrinfo *cur = NULL;
 	int error = 0;
+	char *ap = NULL, *cn = NULL;
 #ifdef USE_GETIPNODEBY
 	int h_error;
 
@@ -866,9 +879,28 @@ get_name(addr, afd, res, numaddr, pai, servname)
 	hp = gethostbyaddr(addr, afd->a_addrlen, afd->a_af);
 #endif
 	if (hp && hp->h_name && hp->h_name[0] && hp->h_addr_list[0]) {
+#ifdef USE_GETIPNODEBY
 		GET_AI(cur, afd, hp->h_addr_list[0]);
 		GET_PORT(cur, servname);
 		GET_CANONNAME(cur, hp->h_name);
+#else
+		/* hp will be damaged if we use gethostbyaddr() */
+		if ((ap = (char *)malloc(hp->h_length)) == NULL) {
+			error = EAI_MEMORY;
+			goto free;
+		}
+		memcpy(ap, hp->h_addr_list[0], hp->h_length);
+		if ((cn = strdup(hp->h_name)) == NULL) {
+			error = EAI_MEMORY;
+			goto free;
+		}
+
+		GET_AI(cur, afd, ap);
+		GET_PORT(cur, servname);
+		GET_CANONNAME(cur, cn);
+		free(ap); ap = NULL;
+		free(cn); cn = NULL;
+#endif
 	} else {
 		GET_AI(cur, afd, numaddr);
 		GET_PORT(cur, servname);
@@ -883,11 +915,14 @@ get_name(addr, afd, res, numaddr, pai, servname)
  free:
 	if (cur)
 		freeaddrinfo(cur);
+	if (ap)
+		free(ap);
+	if (cn)
+		free(cn);
 #ifdef USE_GETIPNODEBY
 	if (hp)
 		freehostent(hp);
 #endif
- /* bad: */
 	*res = NULL;
 	return error;
 }
