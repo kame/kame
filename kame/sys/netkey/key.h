@@ -1,4 +1,4 @@
-/*	$KAME: key.h,v 1.11 2000/03/25 07:24:12 sumikawa Exp $	*/
+/*	$KAME: key.h,v 1.12 2000/03/27 05:11:05 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,8 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-/* $Id: key.h,v 1.11 2000/03/25 07:24:12 sumikawa Exp $ */
 
 #ifndef _NETKEY_KEY_H_
 #define _NETKEY_KEY_H_

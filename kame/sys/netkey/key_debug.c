@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.15 2000/03/25 07:24:12 sumikawa Exp $	*/
+/*	$KAME: key_debug.c,v 1.16 2000/03/27 05:11:05 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,8 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-/* KAME @(#)$Id: key_debug.c,v 1.15 2000/03/25 07:24:12 sumikawa Exp $ */
 
 #ifdef _KERNEL
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)

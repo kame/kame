@@ -1,4 +1,4 @@
-/*	$KAME: keysock.c,v 1.13 2000/03/25 07:24:13 sumikawa Exp $	*/
+/*	$KAME: keysock.c,v 1.14 2000/03/27 05:11:06 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,8 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-/* KAME @(#)$Id: keysock.c,v 1.13 2000/03/25 07:24:13 sumikawa Exp $ */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"

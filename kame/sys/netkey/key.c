@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.75 2000/03/25 07:24:11 sumikawa Exp $	*/
+/*	$KAME: key.c,v 1.76 2000/03/27 05:11:04 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,8 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-/* KAME $Id: key.c,v 1.75 2000/03/25 07:24:11 sumikawa Exp $ */
 
 /*
  * This code is referd to RFC 2367

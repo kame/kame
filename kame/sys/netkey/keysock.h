@@ -1,4 +1,4 @@
-/*	$KAME: keysock.h,v 1.7 2000/03/25 07:24:14 sumikawa Exp $	*/
+/*	$KAME: keysock.h,v 1.8 2000/03/27 05:11:06 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,8 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-/* $Id: keysock.h,v 1.7 2000/03/25 07:24:14 sumikawa Exp $ */
 
 #ifndef _NETKEY_KEYSOCK_H_
 #define _NETKEY_KEYSOCK_H_
