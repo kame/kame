@@ -89,7 +89,6 @@
 #include <net/route.h>
 
 #include <netinet/in.h>
-#include <netinet6/in6_systm.h>
 #include <netinet6/ip6.h>
 #include <netinet6/in6_pcb.h>
 #include <netinet6/ip6_var.h>

@@ -55,7 +55,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: in6_rmx.c,v 1.1 1999/08/05 14:32:43 itojun Exp $
+ * $Id: in6_rmx.c,v 1.2 1999/08/06 14:17:28 itojun Exp $
  */
 
 /*
@@ -88,7 +88,6 @@
 #include <netinet/ip_var.h>
 #endif
 #include <netinet/in_var.h>
-#include <netinet6/in6_systm.h>
 
 #include <netinet6/ip6.h>
 #include <netinet6/ip6_var.h>
