@@ -1175,28 +1175,73 @@ ipsecsetup(sep)
 {
 	int len;
 	char *buf;
-	char *policy;
-	int level = (sep->se_family == AF_INET6) ? IPPROTO_IPV6 : IPPROTO_IP;
-	int optname = (sep->se_family == AF_INET6) ? IPV6_IPSEC_POLICY
-						   : IP_IPSEC_POLICY;
-	char *optname_string = (sep->se_family == AF_INET6)
-			               ? "IPV6_IPSEC_POLICY"
-				       : "IP_IPSEC_POLICY";
+	char *policy_in = NULL;
+	char *policy_out = NULL;
+	int level;
+	int opt;
 
-	if (!sep->se_policy || sep->se_policy[0] == '\0')
-		policy = "entrust";
-	else
-		policy = sep->se_policy;
+	switch (sep->se_family) {
+	case AF_INET:
+		level = IPPROTO_IP;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		level = IPPROTO_IPV6;
+		break;
+#endif
+	default:
+		return;
+	}
 
-	len = ipsec_get_policylen(policy);
-	if (len >= 0 && (buf = (char *)malloc(len)) != NULL) {
-		ipsec_set_policy(buf, len, policy);
-		if (setsockopt(sep->se_fd, level, optname, buf, len) < 0)
-			syslog(LOG_ERR, "setsockopt (%s, %s): %m",
-			       optname_string, policy);
-		free(buf);
-	} else
-		syslog(LOG_ERR, "invalid security policy \"%s\"", policy);
+	if (!sep->se_policy || sep->se_policy[0] == '\0') {
+		policy_in = "in entrust";
+		policy_out = "out entrust";
+	} else {
+		if (!strncmp("in", sep->se_policy, 2))
+			policy_in = sep->se_policy;
+		else if (!strncmp("out", sep->se_policy, 3))
+			policy_out = sep->se_policy;
+		else {
+			syslog(LOG_ERR, "invalid security policy \"%s\"",
+				sep->se_policy);
+			return;
+		}
+	}
+
+	if (policy_in != NULL) {
+		opt = (level == IPPROTO_IP) ? IP_IPSEC_POLICY_IN
+					    : IPV6_IPSEC_POLICY_IN;
+		len = ipsec_get_policylen(policy_in);
+		if (len >= 0 && (buf = (char *)malloc(len)) != NULL) {
+			ipsec_set_policy(buf, len, policy_in);
+			if (setsockopt(sep->se_fd, level, opt, buf, len) < 0) {
+				syslog(LOG_ERR,
+					"%s/%s: ipsec initialization failed; %s",
+					sep->se_service, sep->se_proto,
+					policy_in);
+			}
+			free(buf);
+		} else
+			syslog(LOG_ERR, "invalid security policy \"%s\"",
+				policy_in);
+	}
+	if (policy_out != NULL) {
+		opt = (level == IPPROTO_IP) ? IP_IPSEC_POLICY_OUT
+					    : IPV6_IPSEC_POLICY_OUT;
+		len = ipsec_get_policylen(policy_out);
+		if (len >= 0 && (buf = (char *)malloc(len)) != NULL) {
+			ipsec_set_policy(buf, len, policy_out);
+			if (setsockopt(sep->se_fd, level, opt, buf, len) < 0) {
+				syslog(LOG_ERR,
+					"%s/%s: ipsec initialization failed; %s",
+					sep->se_service, sep->se_proto,
+					policy_out);
+			}
+			free(buf);
+		} else
+			syslog(LOG_ERR, "invalid security policy \"%s\"",
+				policy_out);
+	}
 }
 #endif
 
