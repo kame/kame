@@ -1,4 +1,4 @@
-# YIPS $Id: Makefile.in,v 1.15 2000/01/10 21:27:41 itojun Exp $
+# YIPS $Id: Makefile.in,v 1.16 2000/01/11 17:59:29 itojun Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -76,7 +76,7 @@ install:
 	$(INSTALL) -s -o bin -g bin -m 555 racoon $(prefix)/sbin
 	$(INSTALL) -o bin -g bin -m 444 racoon.8 $(mandir)/man8
 	$(INSTALL) -o bin -g bin -m 444 racoon.conf.5 $(mandir)/man5
-	mkdir -p ${sysconfdir}/racoon
+	-mkdir -p ${sysconfdir}/racoon
 	for i in $(CONF); do \
 		if test ! -f ${sysconfdir}/racoon/$$i; then \
 			$(INSTALL) -o bin -g bin -m 444 samples/$$i \
