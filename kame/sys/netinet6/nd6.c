@@ -567,6 +567,62 @@ nd6_timer(ignored_arg)
 	splx(s);
 }
 
+/*
+ * nuke neighbor cache/prefix/default router management table, right before
+ * ifp goes away.
+ */
+void
+nd6_purge(ifp)
+	struct ifnet *ifp;
+{
+	struct llinfo_nd6 *ln;
+	struct nd_defrouter *dr;
+	struct nd_prefix *pr;
+	int s;
+
+#ifdef __NetBSD__
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+
+	/* nuke neighbor cache entries toward ifp */
+	while (ln && ln != &llinfo_nd6) {
+		struct rtentry *rt;
+		struct llinfo_nd6 *next;
+
+		next = ln->ln_next;
+		rt = ln->ln_rt;
+		if (rt != NULL && rt->rt_ifp == ifp)
+			nd6_free(rt);
+		ln = next;
+	}
+		
+	/* nuke default router list entries toward ifp */
+	dr = TAILQ_FIRST(&nd_defrouter);
+	while (dr) {
+		struct nd_defrouter *next;
+
+		next = TAILQ_NEXT(dr, dr_entry);
+		if (dr->ifp == ifp)
+			defrtrlist_del(dr);
+		dr = next;
+	}
+
+	/* nuke prefix list entries toward ifp */
+	pr = nd_prefix.lh_first;
+	while (pr) {
+		struct nd_prefix *next;
+
+		next = pr->ndpr_next;
+		if (pr->ndpr_ifp == ifp)
+			prelist_remove(pr);
+		pr = next;
+	}
+
+	splx(s);
+}
+
 struct rtentry *
 nd6_lookup(addr6, create, ifp)
 	struct in6_addr *addr6;

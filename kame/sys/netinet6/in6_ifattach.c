@@ -775,6 +775,9 @@ in6_ifdetach(ifp)
 	in6_purgemkludge(ifp);
 #endif
 
+	/* remove neighbor management table */
+	nd6_purge(ifp);
+
 	/* remove route to link-local allnodes multicast (ff02::1) */
 	bzero(&sin6, sizeof(sin6));
 	sin6.sin6_len = sizeof(struct sockaddr_in6);
