@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.120 2001/07/02 11:23:39 sumikawa Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.121 2001/07/10 06:30:48 inoue Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -58,10 +58,14 @@
 #ifndef __NetBSD__
 #include <netinet/if_ether.h>
 #endif
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#include <netinet/in_pcb.h>
+#endif
 
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_var.h>
+#include <netinet6/in6_pcb.h>
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
@@ -87,6 +91,11 @@ struct callout in6_tmpaddrtimer_ch = CALLOUT_INITIALIZER;
 struct callout in6_tmpaddrtimer_ch;
 #elif defined(__OpenBSD__)
 struct timeout in6_tmpaddrtimer_ch;
+#endif
+
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+extern struct inpcbinfo udbinfo;
+extern struct inpcbinfo ripcbinfo;
 #endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -1098,6 +1107,10 @@ in6_ifdetach(ifp)
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	/* leave from all multicast groups joined */
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+	in6_pcbpurgeif0(LIST_FIRST(udbinfo.listhead), ifp);
+	in6_pcbpurgeif0(LIST_FIRST(ripcbinfo.listhead), ifp);
+#else
 	for (in6m = LIST_FIRST(&in6_multihead); in6m; in6m = in6m_next) {
 		in6m_next = LIST_NEXT(in6m, in6m_entry);
 		if (in6m->in6m_ifp != ifp)
@@ -1105,6 +1118,7 @@ in6_ifdetach(ifp)
 		in6_delmulti(in6m);
 		in6m = NULL;
 	}
+#endif
 #endif
 
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)

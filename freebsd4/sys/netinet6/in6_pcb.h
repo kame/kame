@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.h,v 1.2.2.1 2000/07/15 07:14:33 kris Exp $	*/
-/*	$KAME: in6_pcb.h,v 1.13 2001/02/06 09:16:53 itojun Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.14 2001/07/10 06:31:37 inoue Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -74,6 +74,7 @@
 #define	sin6tosa(sin6)	((struct sockaddr *)(sin6))
 #define	ifatoia6(ifa)	((struct in6_ifaddr *)(ifa))
 
+void	in6_pcbpurgeif0 __P((struct in6pcb *, struct ifnet *));
 void	in6_losing __P((struct inpcb *));
 int	in6_pcballoc __P((struct socket *, struct inpcbinfo *, struct proc *));
 int	in6_pcbbind __P((struct inpcb *, struct sockaddr *, struct proc *));
