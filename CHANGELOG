@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2183 2002/06/10 12:00:16 jinmei Exp $
+$KAME: CHANGELOG,v 1.2184 2002/06/12 01:21:27 itojun Exp $
 
 <200206>
+Wed Jun 12 10:17:50 JST 2002  itojun@iijlab.net
+	* sys/netinet6/ipsec.c: avoid copying per-socket policy.  saves memory
+	  when a lot of pcbs are present (like busy webservers).  requested
+	  by markus@openbsd.org.
+
 2002-06-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/ports/ppp/: made the interface ID selection more
 	compliant to RFC 2472;
