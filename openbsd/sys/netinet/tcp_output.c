@@ -904,7 +904,7 @@ send:
 		case AF_INET6:
 			sa.sa.sa_len = sizeof(struct sockaddr_in6);
 			sa.sa.sa_family = AF_INET6;
-			sa.sin6.sin6_addr = mtod(m, struct ip6_hdr *)->ip6_dst;
+			sa6_copy_addr(&tp->t_inpcb->in6p_fsa, &sa.sin6);
 			break;
 #endif /* INET6 */
 		}
