@@ -397,13 +397,18 @@ am7990_get(sc, boff, totlen)
 	int len, pad;
 
 	MGETHDR(m, M_DONTWAIT, MT_DATA);
+	if (m && totlen >= MINCLSIZE)
+		MCLGET(m, M_DONTWAIT);
 	if (m == 0)
 		return (0);
 	m->m_pkthdr.rcvif = ifp;
 	m->m_pkthdr.len = totlen;
 	pad = ALIGN(sizeof(struct ether_header)) - sizeof(struct ether_header);
 	m->m_data += pad;
-	len = MHLEN - pad;
+	if (m->m_flags & M_EXT)
+		len = MCLBYTES - pad;
+	else
+		len = MHLEN - pad;
 	top = 0;
 	mp = &top;
 
