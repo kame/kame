@@ -263,6 +263,10 @@ pk_ctlinput(code, src, addr)
 	register struct pkcb *pkp = (struct pkcb *) addr;
 	struct rtentry *llrt;
 
+	/* addr may not be valid if src is not ccitt */
+	if (src->sa_family != AF_CCITT)
+		return (0);
+
 	switch (code) {
 	case PRC_LINKUP:
 		if (pkp->pk_state == DTE_WAITING)

@@ -164,6 +164,9 @@ tpcons_ctlinput(cmd, siso, v)
 	struct isopcb  *isop = v;
 	register struct tp_pcb *tpcb = 0;
 
+	if (siso->sa_family != AF_ISO)
+		return NULL;
+
 	if (isop->isop_socket)
 		tpcb = (struct tp_pcb *) isop->isop_socket->so_pcb;
 	switch (cmd) {

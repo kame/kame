@@ -1184,6 +1184,9 @@ esis_ctlinput(req, siso, dummy)
 {
 	register struct iso_ifaddr *ia;	/* scan through interface addresses */
 
+	if (siso->sa_family != AF_ISO)
+		return NULL;
+
 	if (req == PRC_IFDOWN)
 		for (ia = iso_ifaddr.tqh_first; ia != 0;
 		     ia = ia->ia_list.tqe_next) {
