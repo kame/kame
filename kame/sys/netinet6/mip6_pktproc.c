@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.100 2003/01/22 09:54:18 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.101 2003/01/23 07:56:25 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -537,7 +537,6 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	struct m_tag *n;
 	struct ip6aux *ip6a = NULL;
 	u_int8_t isprotected = 0;
-	u_int8_t haseen = 0;
 	struct mip6_bc *mbc;
 
 	int error = 0;
@@ -599,12 +598,8 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		return (EINVAL);
 	}
 	ip6a = (struct ip6aux *) (n + 1);
-	if ((ip6a->ip6a_flags & IP6A_HASEEN) == 0) {
-		m_freem(m);
-		return (EINVAL);
-	}
-	if ((ip6a->ip6a_flags & IP6A_SWAP) != 0) {
-		haseen = 1;
+	if (((ip6a->ip6a_flags & IP6A_HASEEN) != 0) && 
+	    ((ip6a->ip6a_flags & IP6A_SWAP) != 0)) {
 		bi.mbc_pcoa.sin6_addr = ip6a->ip6a_coa;
 	}
 
@@ -613,11 +608,11 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		goto accept_binding_update;
 	}
 
-	if (isprotected && haseen) {
+	if (isprotected) {
 		bu_safe = 1;
 		goto accept_binding_update;
 	}
-	if ((haseen == 1) && ((bi.mbc_flags & IP6MU_HOME) == 0))
+	if ((bi.mbc_flags & IP6MU_HOME) == 0)
 		goto accept_binding_update;	/* Must be checked its safety
 						 * with RR later */
 
@@ -629,12 +624,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
  accept_binding_update:
 
 	/* get home address. */
-	if (haseen) {
-		bi.mbc_phaddr = *src_sa;
-	} else {
-		bi.mbc_phaddr = *src_sa;
-		bi.mbc_phaddr.sin6_addr = ip6a->ip6a_coa;
-	}
+	bi.mbc_phaddr = *src_sa;
 
 	if ((error = mip6_get_mobility_options((struct ip6_mobility *)ip6mu,
 					       sizeof(*ip6mu),
