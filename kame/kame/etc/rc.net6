@@ -126,9 +126,11 @@ if [ X"${ip6router}" = X"YES" ]; then
 			continue
 		fi
 		for j in $prefix; do
-			if [ -x $prefixconfig ]; then
-				$prefixconfig $i $j::
-			else
+		    	#XXX: the prefix command seems even problematic.
+			#     we should reconsider this mechanism.
+			#if [ -x $prefixconfig ]; then
+			#	$prefixconfig $i $j::
+			#else
 				# NetBSD *requires* inet6
 				laddr=`$ifconfig $i inet6 | grep 'inet6 fe80:' | head -1 | \
 					awk '{print $2}'`
@@ -139,7 +141,7 @@ if [ X"${ip6router}" = X"YES" ]; then
 				eval address_$i=$address
 
 				$ifconfig $i inet6 $address prefixlen 64 alias
-			fi
+			#fi
 
 			# subnet-router anycast address (rfc2373)
 			$ifconfig $i inet6 $j:: prefixlen 64 alias anycast
