@@ -50,6 +50,10 @@
 #ifdef IGMP_V3_MEMBERSHIP_REPORT
 #include <netinet/in_msf.h>
 #endif
+#ifdef MCAST_JOIN_SOURCE_GROUP
+#include <net/route.h>
+#include <netinet6/in6_msf.h>
+#endif
 #ifndef __NetBSD__
 # ifdef	__FreeBSD__
 #  define	KERNEL
@@ -93,6 +97,9 @@ void in_multilist(struct in_multi *);
 struct in_multi * in_multientry(struct in_multi *);
 #ifdef IGMP_V3_MEMBERSHIP_REPORT
 void in_addr_slistentry(struct in_addr_slist *ias, char *heading);
+#endif
+#ifdef MCAST_JOIN_SOURCE_GROUP
+void in6_addr_slistentry(struct in6_addr_slist *ias, char *heading);
 #endif
 
 #if !defined(__NetBSD__) && !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__)
@@ -390,12 +397,72 @@ in6_multientry(mc)
 	struct in6_multi *mc;
 {
 	struct in6_multi multi;
+#ifdef MCAST_JOIN_SOURCE_GROUP
+	struct in6_multi_source src;
+#endif
 
 	KREAD(mc, &multi, struct in6_multi);
 	printf("\t\tgroup %s", inet6_n2a(&multi.in6m_sa));
-	printf(" refcnt %u\n", multi.in6m_refcount);
+	printf(" refcnt %u", multi.in6m_refcount);
+
+#ifdef MCAST_JOIN_SOURCE_GROUP
+	if (multi.in6m_source == NULL) {
+		printf("\n");
+		return(multi.in6m_entry.le_next);
+	}
+
+	KREAD(multi.in6m_source, &src, struct in6_multi_source);
+	printf("\tmode=%s\tgroup join=%d\n",
+		src.i6ms_mode == MCAST_INCLUDE ? "include" :
+		src.i6ms_mode == MCAST_EXCLUDE ? "exclude" :
+		"???",
+		src.i6ms_grpjoin);
+	in6_addr_slistentry(src.i6ms_cur, "current");
+	in6_addr_slistentry(src.i6ms_rec, "recorded");
+	in6_addr_slistentry(src.i6ms_in, "included");
+	in6_addr_slistentry(src.i6ms_ex, "excluded");
+	in6_addr_slistentry(src.i6ms_alw, "allowed");
+	in6_addr_slistentry(src.i6ms_blk, "blocked");
+	in6_addr_slistentry(src.i6ms_toin, "to-include");
+	in6_addr_slistentry(src.i6ms_ex, "to-exclude");
+#else
+	printf("\n");
+#endif
 	return(multi.in6m_entry.le_next);
 }
+
+#ifdef MCAST_JOIN_SOURCE_GROUP
+void
+in6_addr_slistentry(struct in6_addr_slist *ias, char *heading)
+{
+	struct in6_addr_slist slist;
+	struct i6as_head head;
+	struct in6_addr_source src;
+
+	if (ias == NULL) {
+		printf("\t\t\t%s (none)\n", heading);
+		return;
+	}
+	memset(&slist, 0, sizeof(slist));
+	KREAD(ias, &slist, struct in6_addr_source);
+	printf("\t\t\t%s (entry num=%d)\n", heading, slist.numsrc);
+	if (slist.numsrc == 0) {
+		return;
+	}
+	KREAD(slist.head, &head, struct i6as_head);
+
+	KREAD(head.lh_first, &src, struct in6_addr_source);
+	while (1) {
+		printf("\t\t\t\tsource %s (ref=%d)\n",
+			inet6_n2a(&src.i6as_addr),
+			src.i6as_refcount);
+		if (src.i6as_list.le_next == NULL)
+			break;
+		KREAD(src.i6as_list.le_next, &src, struct in6_addr_source);
+	}
+	return;
+}
+#endif
 
 void
 in6_multilist(mc)
