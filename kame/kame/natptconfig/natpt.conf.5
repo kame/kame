@@ -1,4 +1,4 @@
-.\"	$KAME: natpt.conf.5,v 1.11 2001/11/09 02:23:58 fujisawa Exp $
+.\"	$KAME: natpt.conf.5,v 1.12 2001/11/16 08:11:47 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -139,11 +139,24 @@ abolished in the future.  Use the following rule instead.
 .It Xo Sy map from daddr Ar v4addr
 .Sy to daddr Ar v6addr
 .Xc
+.It Xo Sy map from daddr Ar v4addr Sy dport Ar v4port
+.Sy to daddr Ar v6addr Sy dport Ar v6port
+.Xc
 Translate IPv4 packet to IPv6 packet.
 .Pp
-IPv4 packet destined to specified IPv4 address is translated to IPv6
-packet going to specified address.  This rule translate both source
-and destination address.
+The former is translate IPv4 packet destined to specified IPv4 address
+to IPv6 packet going to specified address.  Port number is not
+changed.
+.Pp
+The latter is translate IPv4 packet destined to
+.Em v4addr
+and
+.Em v4port
+to IPv6 packet destined to
+.Em v6addr
+and
+.Em v6port .
+Both rules translate both source and destination address.
 .Pp
 .\"	map from 10.0.0.3/8 to 202.249.11.252 port 28672 - 32767
 .It Xo Sy map from Ar v4addr
