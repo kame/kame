@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.12 2001/10/22 05:40:21 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.13 2001/10/22 05:54:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -666,8 +666,8 @@ ni6_input(from, fromlen, buf, l)
 		u_int32_t v;
 		nni6->ni_code = ICMP6_NI_SUCCESS;
 		nni6->ni_flags = htons(0x0000);	/* raw bitmap */
-		/* supports NOOP, SUPTYPES, FQDN, and NODEADDR */
-		v = (u_int32_t)htonl(0x0000000f);
+		/* supports NOOP, SUPTYPES, FQDN, NODEADDR and IPV4ADDR */
+		v = (u_int32_t)htonl(0x0000001f);
 		memcpy(nni6 + 1, &v, sizeof(u_int32_t));
 		break;
 	}
