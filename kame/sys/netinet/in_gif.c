@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.94 2004/05/21 08:35:48 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.95 2004/06/02 06:01:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -383,7 +383,7 @@ in_gif_input(m, va_alist)
 	struct mbuf *m;
 	va_dcl
 #endif
-#endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
+#endif
 {
 #ifndef __FreeBSD__
 	int off, proto;
@@ -535,7 +535,7 @@ gif_validate4(ip, sc, ifp)
 	/* reject packets with broadcast on source */
 #if defined(__OpenBSD__) || defined(__NetBSD__)
 	for (ia4 = in_ifaddr.tqh_first; ia4; ia4 = ia4->ia_list.tqe_next)
-#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#elif defined(__FreeBSD__)
 	for (ia4 = TAILQ_FIRST(&in_ifaddrhead); ia4;
 	     ia4 = TAILQ_NEXT(ia4, ia_link))
 #else

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.39 2004/05/26 10:08:01 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.40 2004/06/02 06:01:24 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -109,7 +109,7 @@
 #include <sys/pool.h>
 #endif
 
-#if defined(HAVE_NRL_INPCB) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(HAVE_NRL_INPCB) || defined(__FreeBSD__)
 #ifndef in6pcb
 #define in6pcb		inpcb
 #endif

@@ -1120,7 +1120,7 @@ pf_normalize_ip(struct mbuf **m0, int dir, struct ifnet *ifp, u_short *reason)
 		h->ip_ttl = r->min_ttl;
 
 	if (r->rule_flag & PFRULE_RANDOMID) {
-#if defined(__OpenBSD__) || defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4 && defined(RANDOM_IP_ID))
+#if defined(__OpenBSD__) || defined(__NetBSD__) || (defined(__FreeBSD__) && defined(RANDOM_IP_ID))
 		h->ip_id = ip_randomid();
 #else
 		h->ip_id = htons(ip_id++);
