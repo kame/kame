@@ -1,6 +1,6 @@
 TODOs for KAME/OpenBSD
 KAME project
-$Id: TODO,v 1.8 1999/09/27 09:20:44 itojun Exp $
+$Id: TODO,v 1.9 1999/09/27 09:21:33 itojun Exp $
 
 
 Things we can do with the current code:
@@ -15,6 +15,7 @@ Things we can do with the current code:
 - "options IPSEC" compiles (enabled by default in sys/conf/files), but
   it means OpenBSD IPsec.  KAME IPsec is not available (and will never be 
   available as OpenBSD group will not be switching IPsec code).
+  Because of this IPv6 IPsec is not available.
 
 Things we can't do with the current code:
 - setsockopt(), ioctl and advapi needs checking
