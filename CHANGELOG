@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.755.2.2 2000/04/13 14:16:35 itojun Exp $
+$Id: CHANGELOG,v 1.755.2.3 2000/04/14 13:51:46 itojun Exp $
 
 <200003>
+Fri Apr 14 01:00:41 JST 2000  itojun@iijlab.net
+	* sys/netinet6/ip6_output.c: require root privilege on IPV6_REACHCONF
+	  ancillary message (experimental, from jinmei).
+
 Thu Apr 13 23:13:52 JST 2000  itojun@iijlab.net
 	* sys/netinet6/icmp6.c: correct icmp6 extension header traversal,
 	  to avoid sending icmp6 error against icmp6 error.  found by
