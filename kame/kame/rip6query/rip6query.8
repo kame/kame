@@ -1,4 +1,4 @@
-.\"	$KAME: rip6query.8,v 1.4 2001/03/15 12:35:24 itojun Exp $
+.\"	$KAME: rip6query.8,v 1.5 2001/11/14 03:51:18 onoe Exp $
 .\"
 .\" Copyright (C) 1998 and 1999 WIDE Project.
 .\" All rights reserved.
@@ -37,6 +37,7 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl I Ar interface
+.Op Fl w Ar time
 .Ar destination
 .\"
 .Sh DESCRIPTION
@@ -50,6 +51,9 @@ lets you specify outgoing
 for the query packet,
 and is useful when link-local address is specified for
 .Ar destination .
+.Fl w
+specifies the time in seconds to wait for the initial
+response from a gateway. The default value is 5 seconds.
 .\"
 .Sh SEE ALSO
 .Xr route6d 8
