@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.3 2001/07/20 07:06:21 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.4 2001/07/20 07:11:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -145,6 +145,10 @@ sockinit()
 		errx(1, "%s", gai_strerror(error));
 		/* NOTREACHED */
 	}
+	if (res->ai_next) {
+		errx(1, "unexpected result from getaddrinfo");
+		/* NOTREACHED */
+	}
 
 	s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (s < 0) {
@@ -157,6 +161,8 @@ sockinit()
 	}
 
 	/* XXX filter setup */
+
+	freeaddrinfo(res);
 }
 
 int
@@ -169,7 +175,6 @@ joingroups(name)
 	unsigned int ifidx;
 	struct ipv6_mreq m6;
 	struct sockaddr_in6 *sin6;
-	int sock;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET6;
@@ -179,6 +184,10 @@ joingroups(name)
 	error = getaddrinfo(nigroup(name), NULL, &hints, &res);
 	if (error) {
 		errx(1, "%s", gai_strerror(error));
+		/* NOTREACHED */
+	}
+	if (res->ai_next) {
+		errx(1, "unexpected result from getaddrinfo");
 		/* NOTREACHED */
 	}
 
@@ -210,22 +219,15 @@ joingroups(name)
 
 		m6.ipv6mr_interface = ifidx;
 
-		sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-		if (sock < 0) {
-			err(1, "socket");
-			/* NOTREACHED */
-		}
-
-		if (setsockopt(sock, IPPROTO_IPV6, IPV6_JOIN_GROUP, &m6,
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP, &m6,
 		    sizeof(m6)) < 0) {
 			err(1, "setsockopt(IPV6_JOIN_GROUP)");
 			/* NOTREACHED */
 		}
-
-		(void)shutdown(sock, SHUT_RD);
 	}
 
 	freeifaddrs(ifap);
+	freeaddrinfo(res);
 
 	return 0;
 }
