@@ -62,7 +62,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <net/route.h>
 
 #include <netinet/in.h>
-#include <netinet/ip_mroute.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/in_pcb.h>
@@ -71,6 +70,7 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
+#include <netinet6/ip6_mroute.h>
 #include <netinet6/ip6protosw.h>
 #ifdef ENABLE_DEFAULT_SCOPE
 #include <netinet6/scope6_var.h>
@@ -537,6 +537,7 @@ rip6_ctloutput(op, so, level, optname, m)
 	struct mbuf **m;
 {
 	register struct inpcb *inp = sotoinpcb(so);
+	int error;
 
 	if ((level != IPPROTO_IPV6) && (level != IPPROTO_ICMPV6)) {
 		if (op == PRCO_SETOPT && *m)
@@ -545,6 +546,29 @@ rip6_ctloutput(op, so, level, optname, m)
 	}
 
 	switch (optname) {
+	case MRT6_INIT:
+	case MRT6_DONE:
+	case MRT6_ADD_MIF:
+	case MRT6_DEL_MIF:
+	case MRT6_ADD_MFC:
+	case MRT6_DEL_MFC:
+	case MRT6_PIM:
+		if (level != IPPROTO_IPV6) {
+			if (op == PRCO_SETOPT && *m)
+				(void)m_free(*m);
+			return EINVAL;
+		}
+
+		if (op == PRCO_SETOPT) {
+			error = ip6_mrouter_set(optname, so, *m);
+			if (*m)
+				(void)m_free(*m);
+		} else if (op == PRCO_GETOPT)
+			error = ip6_mrouter_get(optname, so, m);
+		else
+			error = EINVAL;
+		return (error);
+
 	case IPV6_CHECKSUM:
 		if (op == PRCO_SETOPT || op == PRCO_GETOPT) {
 			if (op == PRCO_SETOPT) {
@@ -560,6 +584,7 @@ rip6_ctloutput(op, so, level, optname, m)
 			return 0;
 		}
 		break;
+
 	case ICMP6_FILTER:
 		if (level != IPPROTO_ICMPV6) {
 			if (op == PRCO_SETOPT && *m)
