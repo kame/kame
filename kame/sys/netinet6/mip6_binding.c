@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.49 2001/12/14 03:52:09 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.50 2001/12/17 03:14:54 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -732,6 +732,7 @@ mip6_validate_bu(m, opt)
 	u_int8_t *opt;
 {
 	struct ip6_hdr *ip6;
+	struct in6_addr *ip6_coa;
 	struct mbuf *n;
 	struct ip6aux *ip6a = NULL;
 	struct ip6_opt_binding_update *bu_opt;
@@ -751,12 +752,12 @@ mip6_validate_bu(m, opt)
 #ifndef __OpenBSD__
 	if (!mip6_use_ipsec &&
 	    !((m->m_flags & M_AUTHIPHDR) && (m->m_flags & M_AUTHIPDGM))) {
+#ifdef MIP6_DRAFT13
 		mip6log((LOG_NOTICE,
-			 "%s:%d: a binding update not protected by ipsec "
-			 "from %s.\n",
+			 "%s:%d: an unprotected binding update from %s.\n",
 			 __FILE__, __LINE__,
 			 ip6_sprintf(&ip6->ip6_src)));
-#ifdef MIP6_DRAFT13
+
 		/* silently ignore */
 		return (1);
 #else
@@ -790,6 +791,15 @@ mip6_validate_bu(m, opt)
 			 __FILE__, __LINE__,
 			 ip6_sprintf(&ip6->ip6_src)));
 		return (1);
+	}
+	if ((ip6a->ip6a_flags & IP6A_SWAP) == 0) {
+		mip6log((LOG_NOTICE,
+			 "%s:%d: "
+			 "the home address option is not processed yet.\n",
+			 __FILE__, __LINE__));
+		ip6_coa = &ip6->ip6_src;
+	} else {
+		ip6_coa = &ip6a->ip6a_careof;
 	}
 
 	/*
@@ -914,9 +924,17 @@ mip6_validate_bu(m, opt)
 			 seqno,
 			 mbc->mbc_seqno, ip6_sprintf(&ip6->ip6_src)));
 #ifndef MIP6_DRAFT13
-		/* seqno is too small.  send TOO_SMALL error. */
+		/*
+		 * the seqno of this bingin update is smaller than the
+		 * corresponding binding cache.  we send TOO_SMALL
+		 * binding ack as an error.  in this case, we use the
+		 * coa of the incoming packet instead of the coa
+		 * stored in the binding cache as a destination
+		 * addrress.  because the sending mobile node's coa
+		 * might have changed after it had registered before.
+		 */
 		error = mip6_bc_send_ba(&mbc->mbc_addr,
-					&mbc->mbc_phaddr, &mbc->mbc_pcoa,
+					&mbc->mbc_phaddr, ip6_coa,
 					MIP6_BA_STATUS_SEQNO_TOO_SMALL,
 					mbc->mbc_seqno,
 					0, 0);
@@ -2025,12 +2043,11 @@ mip6_validate_ba(m, opt)
 #ifndef __OpenBSD__
 	if (!mip6_use_ipsec &&
 	    !((m->m_flags & M_AUTHIPHDR) && (m->m_flags & M_AUTHIPDGM))) {
+#ifdef MIP6_DRAFT13
 		mip6log((LOG_NOTICE,
-			 "%s:%d: a binding ack not protected by ipsec "
-			 "from %s.\n",
+			 "%s:%d: an unprotected binding ack from %s.\n",
 			 __FILE__, __LINE__,
 			 ip6_sprintf(&ip6->ip6_src)));
-#ifdef MIP6_DRAFT13
 		/* silently ignore */
 		return (1);
 #else
