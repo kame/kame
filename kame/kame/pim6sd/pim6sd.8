@@ -1,4 +1,4 @@
-.\"	$KAME: pim6sd.8,v 1.13 2001/08/09 08:34:43 suz Exp $
+.\"	$KAME: pim6sd.8,v 1.14 2002/11/11 02:48:47 suz Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -169,4 +169,7 @@ variable to 1 with
 .Pp
 .Nm
 requires the node running the daemon to have an IPv6 global address.
+.Pp
+.Nm
+does not work properly when interface is dynamically added or deleted (e.g. ifconfig gif0 create).
 .\"
