@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.44 2001/08/22 03:05:30 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.45 2001/08/22 03:07:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -238,7 +238,7 @@ main(argc, argv)
 				 */
 				warn("join");
 				close(sd->s);
-				LIST_REMOVE(sd, link);
+				delsockdb(sd);
 				continue;
 			}
 			if (setif(sd->s, sd->af, intface) < 0) {
@@ -256,7 +256,7 @@ main(argc, argv)
 				 */
 				warn("join");
 				close(sd->s);
-				LIST_REMOVE(sd, link);
+				delsockdb(sd);
 				continue;
 			}
 			if (setif(sd->s, sd->af, intface) < 0) {
