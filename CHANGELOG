@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1301 2000/09/26 08:44:18 itojun Exp $
+$KAME: CHANGELOG,v 1.1302 2000/09/26 21:26:41 sakane Exp $
 
 <200009>
 Tue Sep 26 17:40:30 JST 2000  itojun@iijlab.net
@@ -26,6 +26,24 @@ Sun Sep 24 04:15:52 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 Sun Sep 24 00:38:51 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/tcp_wrapper: upgrade to latest IPv6 patch.
 	* freebsd3/ports/lynx: upgrade to 2.8.4dev10
+
+Fri Sep 23 JST 2000 sakane@ydc.co.jp
+	* racoon:
+	- Converted to binary from string if need.  openssl returns a string
+	  even if object should be a binary.
+	- fixed to attach the notify of responder life time.  It always was
+	  sent.
+	- enabled to get multiple subjectAltNames.  verified the ID in the
+	  ID payload and one of the subjectAltNames.
+	- don't send the attribute of lifetime as bytes when it is not defined
+	  in configuration file.
+	- nuke certaltname.  It always define explicitly name in the
+	  racoon.conf, for example fqdn, user_fqdn.  don't get identifier
+	  from the subjectAltName.
+	- fixed base mode with RSA signature in initiator case.
+	- enable to switch sending CR payload or not.
+	- ignored multiple cert payload.  at the moment, racoon take first cert.
+	  But it should be took all cert payload.
 
 Sat Sep 23 JST 2000  itojun@iijlab.net
 	* racoon: (1) attach key length attribute to rijndael/twofish.
