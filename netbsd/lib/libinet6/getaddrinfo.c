@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.36 2001/01/05 12:19:28 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.37 2001/01/05 12:27:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -76,6 +76,11 @@
  *	  friends.
  */
 
+#include <sys/cdefs.h>
+#if defined(LIBC_SCCS) && !defined(lint)
+__RCSID("$NetBSD$");
+#endif /* LIBC_SCCS and not lint */
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -104,6 +109,12 @@
 #include <rpcsvc/ypclnt.h>
 #endif
 
+#ifdef __weak_alias
+__weak_alias(getaddrinfo,_getaddrinfo)
+__weak_alias(freeaddrinfo,_freeaddrinfo)
+__weak_alias(gai_strerror,_gai_strerror)
+#endif
+  
 /*
  * if we enable it, we will see duplicated addrinfo entries on reply if both
  * AAAA and A6 records are found.  disable it for default installation.
@@ -116,13 +127,15 @@
 #define NO  0
 
 static const char in_addrany[] = { 0, 0, 0, 0 };
+static const char in_loopback[] = { 127, 0, 0, 1 };
+#ifdef INET6
 static const char in6_addrany[] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
-static const char in_loopback[] = { 127, 0, 0, 1 };
 static const char in6_loopback[] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
 };
+#endif
 
 static const struct afd {
 	int a_af;
@@ -366,6 +379,11 @@ getaddrinfo(hostname, servname, hints, res)
 	const struct afd *afd;
 	const struct explore *ex;
 	struct addrinfo *afai[sizeof(afdl)/sizeof(afdl[0])];
+
+	/* hostname is allowed to be NULL */
+	/* servname is allowed to be NULL */
+	/* hints is allowed to be NULL */
+	_DIAGASSERT(res != NULL);
 
 	memset(&sentinel, 0, sizeof(sentinel));
 	cur = &sentinel;
@@ -676,6 +694,10 @@ explore_copy(pai, src, res)
 	int error;
 	struct addrinfo sentinel, *cur;
 
+	_DIAGASSERT(pai != NULL);
+	/* src may be NULL */
+	_DIAGASSERT(res != NULL);
+
 	error = 0;
 	sentinel.ai_next = NULL;
 	cur = &sentinel;
@@ -723,6 +745,10 @@ explore_null(pai, servname, res)
 	struct addrinfo *cur;
 	struct addrinfo sentinel;
 	int error;
+
+	_DIAGASSERT(pai != NULL);
+	/* servname may be NULL */
+	_DIAGASSERT(res != NULL);
 
 	*res = NULL;
 	sentinel.ai_next = NULL;
