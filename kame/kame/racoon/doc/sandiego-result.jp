@@ -69,7 +69,7 @@ vs ibm
 	先方で試したところ、agressive modeにinterop issueがあるらしい。
 	(これは追ってBull側の問題であることが確認された)
 
-	IPv4: ok
+	IPv4: main/aggressive両方ok
 		phase 1 3des/md5/dh1/3600sec
 		phase 2 esp/transport/des/sha1/dh2/1800sec
 
@@ -141,7 +141,20 @@ vs ire
 	phase 1: 3des/sha1/dh1/600s
 	phase 2: esp/transport/3des/sha1/300s, ipcomp/deflate/300s
 
-	いちおう動きそう。再試験予定。
+	とりあえずipcompはok。やってみた組合せ:
+	ip esp ipcomp payload
+	ip ah ipcomp payload
+	ip esp ipcomp ip payload
+	ip ah ipcomp ip payload
+
+	- kame側のwindow sizeがちいさすて伸長できない。
+	  sys/netinet6/ipcomp_core.c 1.3 -> 1.4が悪影響しているので戻す。
+	- ire側はtransport modeのとき、圧縮前サイズ > MTUを解釈しない。
+	  のでテストでping -s 2000とかやると返ってこない。これ困んないか?
+	- ireは「ip esp ipcomp ip payload」のとき、IKE的にesp ipcompとも
+	  tunnelとproposeしてくる。kame側はそうではない。
+	  kame側で無理矢理あわせようとしてIKE的にtunnel+tunnel、kernel的に
+	  tunnel+transportとすると、無限にacquireがあがる。
 
 vs fitel
 	あっさり。tunnel/transport ok.  rekey にちょっと問題あり。
