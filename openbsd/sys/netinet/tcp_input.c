@@ -725,7 +725,7 @@ findpcb:
 			 *        with sufficient scope is available"
 			 *   (2b) nothing mentioned otherwise.
 			 * Here we fall into (2b) case as we have no choice in
-			 * our souce address selection - we must obey the peer.
+			 * our source address selection - we must obey the peer.
 			 *
 			 * The wording in RFC2462 is confusing, and there are
 			 * multiple description text for deprecated address

@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.36 2000/11/09 01:57:45 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.37 2000/11/09 04:22:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -694,7 +694,7 @@ findpcb:
 			 *        with sufficient scope is available"
 			 *   (2b) nothing mentioned otherwise.
 			 * Here we fall into (2b) case as we have no choice in
-			 * our souce address selection - we must obey the peer.
+			 * our source address selection - we must obey the peer.
 			 *
 			 * The wording in RFC2462 is confusing, and there are
 			 * multiple description text for deprecated address
