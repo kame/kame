@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1351 2000/10/24 07:30:12 jinmei Exp $
+$KAME: CHANGELOG,v 1.1352 2000/10/24 09:38:22 jinmei Exp $
 
 <200010>
+2000-10-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/v6test/getconfig.c (make_{tcp,udp}): TCP/UDP data
+	buffer can be specified.
+	based on a patch from: Tomomi Suzuki <stomomi@ebina.hitachi.co.jp>
+
 2000-10-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_ifscrub): checked the existence of
 	dstaddr before calling rtinit(). This fix will solve the KAME PR
