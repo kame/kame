@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.116 2001/07/05 04:29:19 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.117 2001/07/18 12:47:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -672,13 +672,13 @@ globcopy:
 	 */
 	if (error == 0) {
 		if (sentinel.ai_next) {
-#ifndef USE_LOG_REORDER
-			if (getenv("GAI_USE_ORDERING") != NULL &&
-#else
-			if (
-#endif
-			    (hints == NULL ||
-			     !(hints->ai_flags & AI_PASSIVE))) {
+			/*
+			 * If the returned entry is for an active connection,
+			 * and the given name is not numeric, reorder the
+			 * list, so that the application would try the list
+			 * in the most efficient order. 
+			 */
+			if (hints == NULL || !(hints->ai_flags & AI_PASSIVE)) {
 				int n;
 #ifdef USE_LOG_REORDER
 				struct timeval start, end;
@@ -687,7 +687,8 @@ globcopy:
 #ifdef USE_LOG_REORDER
 				gettimeofday(&start, NULL);
 #endif
-				n = reorder(&sentinel);
+				if (!numeric)
+					n = reorder(&sentinel);
 #ifdef USE_LOG_REORDER
 				gettimeofday(&end, NULL);
 				log_reorder(&start, &end, numeric, n);
