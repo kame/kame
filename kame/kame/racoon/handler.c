@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.10 2000/01/10 21:08:06 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.11 2000/01/11 22:29:19 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -291,6 +291,12 @@ getph2byspidx(spidx)
 	struct ph2handle *p;
 
 	LIST_FOREACH(p, &ph2tree, chain) {
+		/*
+		 * there are ph2handle independent on policy
+		 * such like informational exchange.
+		 */
+		if (p->spidx == NULL)
+			continue;
 		if (cmpspidx(p->spidx, spidx) == 0)
 			return p;
 	}
