@@ -54,7 +54,8 @@ MLINKS+=	getipnodebyname.3 getipnodebyaddr.3 \
 		inet6_rth_space.3 inet6_rth_add.3 \
 		inet6_rth_space.3 inet6_rth_reverse.3 \
 		inet6_rth_space.3 inet6_rth_segments.3 \
-		inet6_rth_space.3 inet6_rth_getaddr.3
+		inet6_rth_space.3 inet6_rth_getaddr.3 \
+		getifaddrs.3 freeifaddrs.3
 
 .PATH:	${SRCDIR} ${SRCDIR}/resolv
 
