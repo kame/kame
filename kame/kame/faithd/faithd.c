@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.51 2002/05/26 01:17:02 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.52 2002/05/27 12:11:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -438,7 +438,7 @@ again:
 		}
 
 		child_pid = fork();
-		
+
 		if (child_pid == 0) {
 			/* child process */
 			close(s_wld);
