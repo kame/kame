@@ -1,4 +1,4 @@
-#     $Id: BSD.local.dist,v 1.44 1998/12/18 08:06:34 asami Exp $
+# $FreeBSD: src/etc/mtree/BSD.local.dist,v 1.44.2.3 1999/08/29 14:19:25 peter Exp $
 #
 
 /set type=dir uname=root gname=wheel mode=0755
@@ -221,6 +221,8 @@
             ..
             ja_JP.SJIS
             ..
+            ja_JP.Shift_JIS
+            ..
 	    ko_KR.EUC
             ..
 	    lt_LN.ASCII
@@ -251,7 +253,7 @@
             ..
 	    zh_CN.EUC
             ..
-            zh_TW.BIG5
+            zh_TW.Big5
             ..
         ..
         skel

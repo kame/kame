@@ -1,4 +1,4 @@
-#	$Id: BSD.usr.dist,v 1.146.2.3 1999/05/05 13:26:39 markm Exp $
+#	$FreeBSD: src/etc/mtree/BSD.usr.dist,v 1.146.2.10 1999/09/12 00:09:29 jkh Exp $
 #
 
 /set type=dir uname=root gname=wheel mode=0755
@@ -169,20 +169,6 @@
         dict
         ..
         doc
-            FAQ
-            ..
-            handbook
-            ..
-            es
-                FAQ
-                ..
-            ..
-            ja
-                FAQ
-                ..
-                handbook
-                ..
-            ..
             papers
             ..
             psd
@@ -215,10 +201,6 @@
                 28.cvs
                 ..
             ..
-            ru
-                FAQ
-                ..
-            ..
             smm
                 01.setup
                 ..
@@ -247,28 +229,6 @@
                 18.net
                 ..
             ..
-            tutorials
-		ddwg
-		..
-		mh
-		..
-		devel
-		..
-		diskformat
-		..
-		disklessx
-		..
-		fonts
-		..
-		ppp
-		..
-		multios
-		..
-		newuser
-		..
-		upgrade
-		..
-            ..
             usd
                 04.csh
                 ..
@@ -291,10 +251,6 @@
                 30.rogue
                 ..
                 31.trek
-                ..
-            ..
-            zh
-                FAQ
                 ..
             ..
         ..
@@ -320,6 +276,8 @@
             drivers
             ..
             etc
+		defaults
+		..
 	    ..
 	    find_interface
             ..
@@ -505,6 +463,8 @@
             ..
             ja_JP.SJIS
             ..
+            ja_JP.Shift_JIS
+            ..
 	    ko_KR.EUC
             ..
 	    lt_LN.ASCII
@@ -545,7 +505,7 @@
 	    ..
 	    zh_CN.EUC
             ..
-	    zh_TW.BIG5
+	    zh_TW.Big5
             ..
         ..
         man
@@ -657,8 +617,6 @@
             ..
             pcvtfonts
             ..
-            pkg_manage
-            ..
         ..
         mk
         ..
@@ -706,6 +664,8 @@
             ja_JP.EUC
             ..
             ja_JP.SJIS
+            ..
+            ja_JP.Shift_JIS
             ..
 	    ko_KR.EUC
             ..
@@ -810,3 +770,4 @@
     src             mode=0755 nochange
     ..
 ..
+
