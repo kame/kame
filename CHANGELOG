@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1235 2000/08/27 17:30:17 itojun Exp $
+$KAME: CHANGELOG,v 1.1236 2000/08/28 14:28:47 itojun Exp $
 
 <200008>
+Mon Aug 28 23:22:59 JST 2000  itojun@iijlab.net
+	* sys/netinet6/esp_core.c: revisit ESP crypto algorithm handling.
+	  use block cipher code from esp_cbc_{en,de}crypt(), so that we can
+	  easily switch the block cipher code, and reuse mbuf chasing part.
+	* sys/netinet6/esp_core.c: it looks that the old blowfish support code
+	  has some bug.  switch to the new codebase.  old codebase and
+	  new codebase does not interop with each other.  the code will be
+	  bringed into *BSD after we go through real interop tests.
+
 Mon Aug 28 02:25:14 JST 2000  itojun@iijlab.net
 	* sys/netkey/key.c: stir ESP IV better.  on some of operating system
 	  platforms, kernel malloc() gives region with almost constant content.
