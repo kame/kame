@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.16 2002/05/15 12:40:51 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.17 2002/05/22 06:26:41 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -174,15 +174,16 @@ makeCUI64Line(struct logmsg *lmsg, struct cSlot *csl)
 			concat(lmsg, "masquerade");
 		else
 			concat(lmsg, "static");
-		appendPAddr6(lmsg, csl, (struct mAddr *)&csl->local);
-		appendPAddr4(lmsg, csl, (struct mAddr *)&csl->remote);
-		appendProto(lmsg, csl);
 
 		if (csl->map & NATPT_BIDIR) {
 			concat(lmsg, " bidir");
 		} else {
 			concat(lmsg, " 6to4");
 		}
+
+		appendPAddr6(lmsg, csl, (struct mAddr *)&csl->local);
+		appendPAddr4(lmsg, csl, (struct mAddr *)&csl->remote);
+		appendProto(lmsg, csl);
 	}
 }
 
@@ -194,10 +195,10 @@ makeCUI46Line(struct logmsg *lmsg, struct cSlot *csl)
 
 	if (csl->remote.dport == 0) {
 		concat(lmsg, "static");
+		concat(lmsg, " 4to6");
 		appendPAddr4(lmsg, csl, (struct mAddr *)&csl->local);
 		appendPAddr6(lmsg, csl, (struct mAddr *)&csl->remote);
 		appendProto(lmsg, csl);
-		concat(lmsg, " 4to6");
 	} else {
 		concat(lmsg, "redirect");
 		appendPAddr4(lmsg, csl, (struct mAddr *)&csl->local);
