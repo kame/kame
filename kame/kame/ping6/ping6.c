@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.135 2001/07/28 06:18:47 suz Exp $	*/
+/*	$KAME: ping6.c,v 1.136 2001/08/16 13:41:18 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -588,7 +588,7 @@ main(argc, argv)
 
 	ret_ga = getaddrinfo(target, NULL, &hints, &res);
 	if (ret_ga)
-		errx(1, "ping6: %s\n", gai_strerror(ret_ga));
+		errx(1, "%s", gai_strerror(ret_ga));
 	if (res->ai_canonname)
 		hostname = res->ai_canonname;
 	else
