@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.37 2001/08/13 12:45:16 itojun Exp $	*/
+/*	$KAME: main.c,v 1.38 2001/08/13 12:53:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -339,14 +339,16 @@ parse(ac, av)
 			break;
 		default:
 			Usage();
-			break;
+			/* NOTREACHED */
 		}
 	}
 	ac -= optind;
 	av += optind;
 
-	optind = 1;
-	optarg = 0;
+	if (ac != 0) {
+		Usage();
+		/* NOTREACHED */
+	}
 
 	return;
 }
