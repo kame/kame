@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.48 2001/08/16 19:01:02 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.49 2001/08/16 20:35:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -54,11 +54,8 @@
 #define ATOX(c) \
   (isdigit(c) ? (c - '0') : (isupper(c) ? (c - 'A' + 10) : (c - 'a' + 10)))
 
-u_int p_type;
 u_int32_t p_spi;
-int p_no_spi;
-struct sockaddr *p_src, *p_dst;
-u_int p_satype, p_ext, p_alg_enc, p_alg_auth, p_replay, p_mode;
+u_int p_ext, p_alg_enc, p_alg_auth, p_replay, p_mode;
 u_int32_t p_reqid;
 u_int p_key_enc_len, p_key_auth_len;
 caddr_t p_key_enc, p_key_auth;
@@ -80,6 +77,8 @@ int setkeymsg0 __P((struct sadb_msg *, unsigned int, unsigned int, size_t));
 static int setkeymsg_spdaddr __P((unsigned int, unsigned int, vchar_t *,
 	struct addrinfo *, unsigned int, struct addrinfo *, unsigned int));
 static int setkeymsg_addr __P((unsigned int, unsigned int,
+	struct addrinfo *, struct addrinfo *, int));
+static int setkeymsg_add __P((unsigned int, unsigned int,
 	struct addrinfo *, struct addrinfo *, int));
 extern int setkeymsg __P((char *, size_t *));
 extern int sendkeymsg __P((char *, size_t));
@@ -138,17 +137,6 @@ commands
 
 command
 	:	add_command
-		{
-			char buf[BUFSIZ];
-			size_t len;
-
-			len = sizeof(buf);
-			if (setkeymsg(buf, &len) < 0) {
-				yyerror("insufficient buffer size");
-				return -1;
-			}
-			sendkeymsg(buf, len);
-		}
 	|	get_command
 	|	delete_command
 	|	deleteall_command
@@ -163,9 +151,13 @@ command
 
 	/* add command */
 add_command
-	:	ADD sa_selector_spec extension_spec algorithm_spec EOT
+	:	ADD ipaddropts ipaddr ipaddr protocol_spec spi extension_spec algorithm_spec EOT
 		{
-			p_type = SADB_ADD;
+			int status;
+
+			status = setkeymsg_add(SADB_ADD, $5, $3, $4, 0);
+			if (status < 0)
+				return -1;
 		}
 	;
 
@@ -182,8 +174,7 @@ delete_command
 			if (p_mode != IPSEC_MODE_ANY)
 				yyerror("WARNING: mode is obsoleted.");
 
-			status = setkeymsg_addr(SADB_DELETE, p_satype,
-			    $3, $4, 0);
+			status = setkeymsg_addr(SADB_DELETE, $5, $3, $4, 0);
 			if (status < 0)
 				return -1;
 		}
@@ -195,8 +186,7 @@ deleteall_command
 		{
 			int status;
 
-			status = setkeymsg_addr(SADB_DELETE, p_satype,
-			    $3, $4, 1);
+			status = setkeymsg_addr(SADB_DELETE, $5, $3, $4, 1);
 			if (status < 0)
 				return -1;
 		}
@@ -211,7 +201,7 @@ get_command
 			if (p_mode != IPSEC_MODE_ANY)
 				yyerror("WARNING: mode is obsoleted.");
 
-			status = setkeymsg_addr(SADB_GET, p_satype, $3, $4, 0);
+			status = setkeymsg_addr(SADB_GET, $5, $3, $4, 0);
 			if (status < 0)
 				return -1;
 		}
@@ -237,23 +227,14 @@ dump_command
 		}
 	;
 
-	/* sa_selector_spec */
-sa_selector_spec
-	:	ipaddropts ipaddress ipaddress protocol_spec spi
-		{
-			p_src = $2;
-			p_dst = $3;
-		}
-	;
-
 protocol_spec
 	:	/*NOTHING*/
 		{
-			$$ = p_satype = SADB_SATYPE_UNSPEC;
+			$$ = SADB_SATYPE_UNSPEC;
 		}
 	|	PR_ESP
 		{
-			$$ = p_satype = SADB_SATYPE_ESP;
+			$$ = SADB_SATYPE_ESP;
 			if ($1 == 1)
 				p_ext |= SADB_X_EXT_OLD;
 			else
@@ -261,7 +242,7 @@ protocol_spec
 		}
 	|	PR_AH
 		{
-			$$ = p_satype = SADB_SATYPE_AH;
+			$$ = SADB_SATYPE_AH;
 			if ($1 == 1)
 				p_ext |= SADB_X_EXT_OLD;
 			else
@@ -269,7 +250,7 @@ protocol_spec
 		}
 	|	PR_IPCOMP
 		{
-			$$ = p_satype = SADB_X_SATYPE_IPCOMP;
+			$$ = SADB_X_SATYPE_IPCOMP;
 		}
 	;
 	
@@ -921,179 +902,183 @@ setkeymsg_addr(type, satype, srcs, dsts, no_spi)
 }
 
 /* XXX NO BUFFER OVERRUN CHECK! BAD BAD! */
-int
-setkeymsg(buf, lenp)
-	char *buf;
-	size_t *lenp;
+static int
+setkeymsg_add(type, satype, srcs, dsts, no_spi)
+	unsigned int type;
+	unsigned int satype;
+	struct addrinfo *srcs;
+	struct addrinfo *dsts;
+	int no_spi;
 {
-	int l;
+	struct sadb_msg *msg;
+	char buf[BUFSIZ];
+	int l, l0, len;
+	struct sadb_sa m_sa;
+	struct sadb_x_sa2 m_sa2;
+	struct sadb_address m_addr;
+	struct addrinfo *s, *d;
+	int n;
+	int plen;
+	struct sockaddr *sa;
+	int salen;
 
-	setkeymsg0((struct sadb_msg *)buf, p_type, p_satype, 0);
+	msg = (struct sadb_msg *)buf;
 
+	if (!srcs || !dsts)
+		return -1;
+
+	/* fix up length afterwards */
+	setkeymsg0(msg, type, satype, 0);
 	l = sizeof(struct sadb_msg);
 
-	switch (p_type) {
-	case SADB_ADD:
-		/* set encryption algorithm, if present. */
-		if (p_satype != SADB_X_SATYPE_IPCOMP && p_alg_enc != SADB_EALG_NONE) {
-			struct sadb_key m_key;
+	/* set encryption algorithm, if present. */
+	if (satype != SADB_X_SATYPE_IPCOMP && p_alg_enc != SADB_EALG_NONE) {
+		struct sadb_key m_key;
 
-			m_key.sadb_key_len =
-				PFKEY_UNIT64(sizeof(m_key)
-				           + PFKEY_ALIGN8(p_key_enc_len));
-			m_key.sadb_key_exttype = SADB_EXT_KEY_ENCRYPT;
-			m_key.sadb_key_bits = p_key_enc_len * 8;
-			m_key.sadb_key_reserved = 0;
-
-			setvarbuf(buf, &l,
-				(struct sadb_ext *)&m_key, sizeof(m_key),
-				(caddr_t)p_key_enc, p_key_enc_len);
-		}
-
-		/* set authentication algorithm, if present. */
-		if (p_alg_auth != SADB_AALG_NONE) {
-			struct sadb_key m_key;
-
-			m_key.sadb_key_len =
-				PFKEY_UNIT64(sizeof(m_key)
-				           + PFKEY_ALIGN8(p_key_auth_len));
-			m_key.sadb_key_exttype = SADB_EXT_KEY_AUTH;
-			m_key.sadb_key_bits = p_key_auth_len * 8;
-			m_key.sadb_key_reserved = 0;
-
-			setvarbuf(buf, &l,
-				(struct sadb_ext *)&m_key, sizeof(m_key),
-				(caddr_t)p_key_auth, p_key_auth_len);
-		}
-
-		/* set lifetime for HARD */
-		if (p_lt_hard != 0) {
-			struct sadb_lifetime m_lt;
-			u_int len = sizeof(struct sadb_lifetime);
-
-			m_lt.sadb_lifetime_len = PFKEY_UNIT64(len);
-			m_lt.sadb_lifetime_exttype = SADB_EXT_LIFETIME_HARD;
-			m_lt.sadb_lifetime_allocations = 0;
-			m_lt.sadb_lifetime_bytes = 0;
-			m_lt.sadb_lifetime_addtime = p_lt_hard;
-			m_lt.sadb_lifetime_usetime = 0;
-
-			memcpy(buf + l, &m_lt, len);
-			l += len;
-		}
-
-		/* set lifetime for SOFT */
-		if (p_lt_soft != 0) {
-			struct sadb_lifetime m_lt;
-			u_int len = sizeof(struct sadb_lifetime);
-
-			m_lt.sadb_lifetime_len = PFKEY_UNIT64(len);
-			m_lt.sadb_lifetime_exttype = SADB_EXT_LIFETIME_SOFT;
-			m_lt.sadb_lifetime_allocations = 0;
-			m_lt.sadb_lifetime_bytes = 0;
-			m_lt.sadb_lifetime_addtime = p_lt_soft;
-			m_lt.sadb_lifetime_usetime = 0;
-
-			memcpy(buf + l, &m_lt, len);
-			l += len;
-		}
-
-	    {
-		struct sadb_sa m_sa;
-		struct sadb_x_sa2 m_sa2;
-		struct sadb_address m_addr;
-		u_int len;
-
-		if (p_no_spi == 0) {
-			len = sizeof(struct sadb_sa);
-			m_sa.sadb_sa_len = PFKEY_UNIT64(len);
-			m_sa.sadb_sa_exttype = SADB_EXT_SA;
-			m_sa.sadb_sa_spi = htonl(p_spi);
-			m_sa.sadb_sa_replay = p_replay;
-			m_sa.sadb_sa_state = 0;
-			m_sa.sadb_sa_auth = p_alg_auth;
-			m_sa.sadb_sa_encrypt = p_alg_enc;
-			m_sa.sadb_sa_flags = p_ext;
-
-			memcpy(buf + l, &m_sa, len);
-			l += len;
-
-			len = sizeof(struct sadb_x_sa2);
-			m_sa2.sadb_x_sa2_len = PFKEY_UNIT64(len);
-			m_sa2.sadb_x_sa2_exttype = SADB_X_EXT_SA2;
-			m_sa2.sadb_x_sa2_mode = p_mode;
-			m_sa2.sadb_x_sa2_reqid = p_reqid;
-
-			memcpy(buf + l, &m_sa2, len);
-			l += len;
-		}
-
-		/* set src */
-		m_addr.sadb_address_len =
-			PFKEY_UNIT64(sizeof(m_addr)
-			           + PFKEY_ALIGN8(p_src->sa_len));
-		m_addr.sadb_address_exttype = SADB_EXT_ADDRESS_SRC;
-		m_addr.sadb_address_proto = IPSEC_ULPROTO_ANY;
-		switch (p_src->sa_family) {
-		case AF_INET:
-			m_addr.sadb_address_prefixlen =
-			    sizeof(struct in_addr) << 3;
-			break;
-#ifdef INET6
-		case AF_INET6:
-			m_addr.sadb_address_prefixlen =
-			    sizeof(struct in6_addr) << 3;
-			break;
-#endif
-		default:
-			yyerror("unsupported address family");
-			exit(1);	/*XXX*/
-		}
-		m_addr.sadb_address_reserved = 0;
+		m_key.sadb_key_len =
+			PFKEY_UNIT64(sizeof(m_key)
+				   + PFKEY_ALIGN8(p_key_enc_len));
+		m_key.sadb_key_exttype = SADB_EXT_KEY_ENCRYPT;
+		m_key.sadb_key_bits = p_key_enc_len * 8;
+		m_key.sadb_key_reserved = 0;
 
 		setvarbuf(buf, &l,
-			(struct sadb_ext *)&m_addr, sizeof(m_addr),
-			(caddr_t)p_src, p_src->sa_len);
-
-		/* set dst */
-		m_addr.sadb_address_len =
-			PFKEY_UNIT64(sizeof(m_addr)
-			           + PFKEY_ALIGN8(p_dst->sa_len));
-		m_addr.sadb_address_exttype = SADB_EXT_ADDRESS_DST;
-		m_addr.sadb_address_proto = IPSEC_ULPROTO_ANY;
-		switch (p_dst->sa_family) {
-		case AF_INET:
-			m_addr.sadb_address_prefixlen =
-			    sizeof(struct in_addr) << 3;
-			break;
-#ifdef INET6
-		case AF_INET6:
-			m_addr.sadb_address_prefixlen =
-			    sizeof(struct in6_addr) << 3;
-			break;
-#endif
-		default:
-			yyerror("unsupported address family");
-			exit(1);	/*XXX*/
-		}
-		m_addr.sadb_address_reserved = 0;
-
-		setvarbuf(buf, &l,
-			(struct sadb_ext *)&m_addr, sizeof(m_addr),
-			(caddr_t)p_dst, p_dst->sa_len);
-	    }
-		break;
-
-	default:
-		yyerror("should not reach here");
-		return -1;
+			(struct sadb_ext *)&m_key, sizeof(m_key),
+			(caddr_t)p_key_enc, p_key_enc_len);
 	}
 
-	((struct sadb_msg *)buf)->sadb_msg_len = PFKEY_UNIT64(l);
+	/* set authentication algorithm, if present. */
+	if (p_alg_auth != SADB_AALG_NONE) {
+		struct sadb_key m_key;
 
-	*lenp = l;
+		m_key.sadb_key_len =
+			PFKEY_UNIT64(sizeof(m_key)
+				   + PFKEY_ALIGN8(p_key_auth_len));
+		m_key.sadb_key_exttype = SADB_EXT_KEY_AUTH;
+		m_key.sadb_key_bits = p_key_auth_len * 8;
+		m_key.sadb_key_reserved = 0;
 
-	return 0;
+		setvarbuf(buf, &l,
+			(struct sadb_ext *)&m_key, sizeof(m_key),
+			(caddr_t)p_key_auth, p_key_auth_len);
+	}
+
+	/* set lifetime for HARD */
+	if (p_lt_hard != 0) {
+		struct sadb_lifetime m_lt;
+		u_int len = sizeof(struct sadb_lifetime);
+
+		m_lt.sadb_lifetime_len = PFKEY_UNIT64(len);
+		m_lt.sadb_lifetime_exttype = SADB_EXT_LIFETIME_HARD;
+		m_lt.sadb_lifetime_allocations = 0;
+		m_lt.sadb_lifetime_bytes = 0;
+		m_lt.sadb_lifetime_addtime = p_lt_hard;
+		m_lt.sadb_lifetime_usetime = 0;
+
+		memcpy(buf + l, &m_lt, len);
+		l += len;
+	}
+
+	/* set lifetime for SOFT */
+	if (p_lt_soft != 0) {
+		struct sadb_lifetime m_lt;
+		u_int len = sizeof(struct sadb_lifetime);
+
+		m_lt.sadb_lifetime_len = PFKEY_UNIT64(len);
+		m_lt.sadb_lifetime_exttype = SADB_EXT_LIFETIME_SOFT;
+		m_lt.sadb_lifetime_allocations = 0;
+		m_lt.sadb_lifetime_bytes = 0;
+		m_lt.sadb_lifetime_addtime = p_lt_soft;
+		m_lt.sadb_lifetime_usetime = 0;
+
+		memcpy(buf + l, &m_lt, len);
+		l += len;
+	}
+
+	len = sizeof(struct sadb_sa);
+	m_sa.sadb_sa_len = PFKEY_UNIT64(len);
+	m_sa.sadb_sa_exttype = SADB_EXT_SA;
+	m_sa.sadb_sa_spi = htonl(p_spi);
+	m_sa.sadb_sa_replay = p_replay;
+	m_sa.sadb_sa_state = 0;
+	m_sa.sadb_sa_auth = p_alg_auth;
+	m_sa.sadb_sa_encrypt = p_alg_enc;
+	m_sa.sadb_sa_flags = p_ext;
+
+	memcpy(buf + l, &m_sa, len);
+	l += len;
+
+	len = sizeof(struct sadb_x_sa2);
+	m_sa2.sadb_x_sa2_len = PFKEY_UNIT64(len);
+	m_sa2.sadb_x_sa2_exttype = SADB_X_EXT_SA2;
+	m_sa2.sadb_x_sa2_mode = p_mode;
+	m_sa2.sadb_x_sa2_reqid = p_reqid;
+
+	memcpy(buf + l, &m_sa2, len);
+	l += len;
+
+	l0 = l;
+	n = 0;
+
+	/* do it for all src/dst pairs */
+	for (s = srcs; s; s = s->ai_next) {
+		for (d = dsts; d; d = d->ai_next) {
+			/* rewind pointer */
+			l = l0;
+
+			if (s->ai_addr->sa_family != d->ai_addr->sa_family)
+				continue;
+			switch (s->ai_addr->sa_family) {
+			case AF_INET:
+				plen = sizeof(struct in_addr) << 3;
+				break;
+#ifdef INET6
+			case AF_INET6:
+				plen = sizeof(struct in6_addr) << 3;
+				break;
+#endif
+			default:
+				continue;
+			}
+
+			/* set src */
+			sa = s->ai_addr;
+			salen = s->ai_addr->sa_len;
+			m_addr.sadb_address_len = PFKEY_UNIT64(sizeof(m_addr) +
+			    PFKEY_ALIGN8(salen));
+			m_addr.sadb_address_exttype = SADB_EXT_ADDRESS_SRC;
+			m_addr.sadb_address_proto = IPSEC_ULPROTO_ANY;
+			m_addr.sadb_address_prefixlen = plen;
+			m_addr.sadb_address_reserved = 0;
+
+			setvarbuf(buf, &l, (struct sadb_ext *)&m_addr,
+			    sizeof(m_addr), (caddr_t)sa, salen);
+
+			/* set dst */
+			sa = s->ai_addr;
+			salen = d->ai_addr->sa_len;
+			m_addr.sadb_address_len = PFKEY_UNIT64(sizeof(m_addr) +
+			    PFKEY_ALIGN8(salen));
+			m_addr.sadb_address_exttype = SADB_EXT_ADDRESS_DST;
+			m_addr.sadb_address_proto = IPSEC_ULPROTO_ANY;
+			m_addr.sadb_address_prefixlen = plen;
+			m_addr.sadb_address_reserved = 0;
+
+			setvarbuf(buf, &l, (struct sadb_ext *)&m_addr,
+			    sizeof(m_addr), (caddr_t)sa, salen);
+
+			msg->sadb_msg_len = PFKEY_UNIT64(l);
+
+			sendkeymsg(buf, l);
+
+			n++;
+		}
+	}
+
+	if (n == 0)
+		return -1;
+	else
+		return 0;
 }
 
 static struct addrinfo *
@@ -1136,13 +1121,8 @@ setvarbuf(buf, off, ebuf, elen, vbuf, vlen)
 void
 parse_init()
 {
-	p_type = 0;
 	p_spi = 0;
-	p_no_spi = 0;
 
-	p_src = 0, p_dst = 0;
-
-	p_satype = 0;
 	p_ext = SADB_X_EXT_CYCSEQ;
 	p_alg_enc = SADB_EALG_NONE;
 	p_alg_auth = SADB_AALG_NONE;
@@ -1164,8 +1144,6 @@ parse_init()
 void
 free_buffer()
 {
-	if (p_src) free(p_src);
-	if (p_dst) free(p_dst);
 	if (p_key_enc) free(p_key_enc);
 	if (p_key_auth) free(p_key_auth);
 

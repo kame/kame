@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.59 2001/08/16 17:46:34 itojun Exp $
+.\"	$KAME: setkey.8,v 1.60 2001/08/16 20:35:29 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -201,11 +201,11 @@ Meta-arguments are as follows:
 Source/destination of the secure communication is specified as
 IPv4/v6 address.
 .Nm
-can resolve a FQDN into a numeric address.
-The FQDN must resolve into a single address.
-If there are multiple address registered for the FQDN,
+can resolve a FQDN into numeric addresses.
+If the FQDN resolves into multiple addresses,
 .Nm
-will raise error.
+will install multiple SAD/SPD entries into the kernel
+by trying all possible combinations.
 .Fl 4 ,
 .Fl 6
 and
