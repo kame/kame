@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.64 2000/06/20 16:20:27 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.65 2000/10/10 13:34:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -246,8 +246,8 @@ struct ip6protosw inet6sw[] = {
 #else
   tcp_usrreq,
 #endif
-#ifdef INET	/* don't call timeout routines twice */
-  tcp_init,	0,		0,		tcp_drain,
+#ifdef INET	/* don't call initialization and timeout routines twice */
+  0,		0,		0,		tcp_drain,
 #else
   tcp_init,	tcp_fasttimo,	tcp_slowtimo,	tcp_drain,
 #endif
