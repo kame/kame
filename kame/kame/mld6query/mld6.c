@@ -231,7 +231,7 @@ make_msg(int index, struct in6_addr *addr, u_int type)
 #else  /* old advanced API */
 	if (inet6_option_init((void *)cmsgp, &cmsgp, IPV6_HOPOPTS))
 		errx(1, "inet6_option_init failed\n");
-	raopt[0] = IP6OPT_ROUTER_ALERT;
+	raopt[0] = IP6OPT_RTALERT;
 	raopt[1] = IP6OPT_RTALERT_LEN - 2;
 	memcpy(&raopt[2], (caddr_t)&rtalert_code, sizeof(u_short));
 	if (inet6_option_append(cmsgp, raopt, 4, 0))
