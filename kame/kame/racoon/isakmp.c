@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.91 2000/08/09 18:29:07 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.92 2000/08/09 19:30:32 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1723,12 +1723,14 @@ isakmp_add_attr_v(buf0, type, val, len)
 	vchar_t *buf = NULL;
 	struct isakmp_data *data;
 	int tlen;
+	int oldlen = 0;
 
 	tlen = sizeof(*data) + len;
 
-	if (buf0)
-		buf = vrealloc(buf0, buf0->l + tlen);
-	else
+	if (buf0) {
+		oldlen = buf0->l;
+		buf = vrealloc(buf0, oldlen + tlen);
+	} else
 		buf = vmalloc(tlen);
 	if (!buf) {
 		plog(logp, LOCATION, NULL,
@@ -1736,7 +1738,7 @@ isakmp_add_attr_v(buf0, type, val, len)
 		return NULL;
 	}
 
-	data = (struct isakmp_data *)(buf->v + (buf0 ? buf0->l : 0));
+	data = (struct isakmp_data *)(buf->v + oldlen);
 	data->type = htons((u_int16_t)type | ISAKMP_GEN_TLV);
 	data->lorv = htons((u_int16_t)len);
 	memcpy(data + 1, val, len);
@@ -1754,12 +1756,14 @@ isakmp_add_attr_l(buf0, type, val)
 	vchar_t *buf = NULL;
 	struct isakmp_data *data;
 	int tlen;
+	int oldlen = 0;
 
 	tlen = sizeof(*data);
 
-	if (buf0)
-		buf = vrealloc(buf0, buf0->l + tlen);
-	else
+	if (buf0) {
+		oldlen = buf0->l;
+		buf = vrealloc(buf0, oldlen + tlen);
+	} else
 		buf = vmalloc(tlen);
 	if (!buf) {
 		plog(logp, LOCATION, NULL,
@@ -1767,7 +1771,7 @@ isakmp_add_attr_l(buf0, type, val)
 		return NULL;
 	}
 
-	data = (struct isakmp_data *)(buf->v + (buf0 ? buf0->l : 0));
+	data = (struct isakmp_data *)(buf->v + oldlen);
 	data->type = htons((u_int16_t)type | ISAKMP_GEN_TV);
 	data->lorv = htons((u_int16_t)val);
 
