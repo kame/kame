@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_newg.c,v 1.7 2000/10/04 17:41:01 itojun Exp $	*/
+/*	$KAME: isakmp_newg.c,v 1.8 2000/12/15 13:43:55 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -75,8 +75,6 @@ isakmp_newgroup_r(iph1, msg)
 	struct oakley_sa *osa;
 	int len;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validate the type of next payload */
 	/*
 	 * ISAKMP_ETYPE_NEWGRP,
@@ -98,7 +96,7 @@ isakmp_newgroup_r(iph1, msg)
 		case ISAKMP_NPTYPE_HASH:
 			if (hash) {
 				isakmp_info_send_n1(iph1, ISAKMP_NTYPE_INVALID_PAYLOAD_TYPE, NULL);
-				plog(logp, LOCATION, iph1->remote,
+				plog(LLV_ERROR, LOCATION, iph1->remote,
 					"received multiple payload type %d.\n",
 					pa->type);
 				vfree(pbuf);
@@ -109,7 +107,7 @@ isakmp_newgroup_r(iph1, msg)
 		case ISAKMP_NPTYPE_SA:
 			if (sa) {
 				isakmp_info_send_n1(iph1, ISAKMP_NTYPE_INVALID_PAYLOAD_TYPE, NULL);
-				plog(logp, LOCATION, iph1->remote,
+				plog(LLV_ERROR, LOCATION, iph1->remote,
 					"received multiple payload type %d.\n",
 					pa->type);
 				vfree(pbuf);
@@ -118,14 +116,11 @@ isakmp_newgroup_r(iph1, msg)
 			sa = (struct isakmp_pl_sa *)pa->ptr;
 			break;
 		case ISAKMP_NPTYPE_VID:
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Vendor ID.\n"));
 			(void)check_vendorid(pa->ptr);
 			break;
 		default:
 			isakmp_info_send_n1(iph1, ISAKMP_NTYPE_INVALID_PAYLOAD_TYPE, NULL);
-			plog(logp, LOCATION, iph1->remote,
+			plog(LLV_ERROR, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
@@ -137,7 +132,7 @@ isakmp_newgroup_r(iph1, msg)
 
 	if (!hash || !sa) {
 		isakmp_info_send_n1(iph1, ISAKMP_NTYPE_INVALID_PAYLOAD_TYPE, NULL);
-		plog(logp, LOCATION, iph1->remote,
+		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"no HASH, or no SA payload.\n");
 		goto end;
 	}
@@ -149,40 +144,39 @@ isakmp_newgroup_r(iph1, msg)
 	vchar_t *my_hash = NULL;
 	int result;
 
-	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "validate HASH\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "validate HASH\n");
 
 	len = sizeof(isakmp->msgid) + ntohs(sa->h.len);
 	buf = vmalloc(len);
 	if (buf == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get buffer to send.\n");
 		goto end;
 	}
 	memcpy(buf->v, &isakmp->msgid, sizeof(isakmp->msgid));
 	memcpy(buf->v + sizeof(isakmp->msgid), sa, ntohs(sa->h.len));
 
-	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "hash source\n"));
-	YIPSDEBUG(DEBUG_DKEY, hexdump(buf->v, buf->l));
+	plog(LLV_DEBUG, LOCATION, NULL, "hash source\n");
+	hexdump(LLV_DEBUG, buf->v, buf->l);
 
 	my_hash = isakmp_prf(iph1->skeyid_a, buf, iph1);
 	vfree(buf);
 	if (my_hash == NULL)
 		goto end;
 
-	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "hash result\n"));
-	YIPSDEBUG(DEBUG_DKEY, hexdump(my_hash->v, my_hash->l));
+	plog(LLV_DEBUG, LOCATION, NULL, "hash result\n");
+	hexdump(LLV_DEBUG, my_hash->v, my_hash->l);
 
 	r_hash = (char *)hash + sizeof(*hash);
 
-	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "original hash\n"));
-	YIPSDEBUG(DEBUG_DKEY,
-	    hexdump(r_hash, ntohs(hash->h.len) - sizeof(*hash)));
+	plog(LLV_DEBUG, LOCATION, NULL, "original hash\n"));
+	hexdump(LLV_DEBUG, r_hash, ntohs(hash->h.len) - sizeof(*hash)));
 
 	result = memcmp(my_hash->v, r_hash, my_hash->l);
 	vfree(my_hash);
 
 	if (result) {
-		plog(logp, LOCATION, iph1->remote,
+		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"HASH mismatch.\n");
 		isakmp_info_send_n1(iph1, ISAKMP_NTYPE_INVALID_HASH_INFORMATION, NULL);
 		goto end;
@@ -212,12 +206,12 @@ isakmp_newgroup_r(iph1, msg)
 		/*XXX*/
 	default:
 		isakmp_info_send_n1(iph1, ISAKMP_NTYPE_ATTRIBUTES_NOT_SUPPORTED, NULL);
-		plog(logp, LOCATION, NULL,
-		    "dh group %d isn't supported.\n", osa->dhgrp);
+		plog(LLV_ERROR, LOCATION, NULL,
+			"dh group %d isn't supported.\n", osa->dhgrp);
 		goto end;
 	}
 
-	plog(logp, LOCATION, iph1->remote,
+	plog(LLV_INFO, LOCATION, iph1->remote,
 		"got new dh group %s.\n", isakmp_pindex(&iph1->index, 0));
 
 	error = 0;

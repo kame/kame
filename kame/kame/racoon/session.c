@@ -1,4 +1,4 @@
-/*	$KAME: session.c,v 1.19 2000/11/07 17:11:54 sakane Exp $	*/
+/*	$KAME: session.c,v 1.20 2000/12/15 13:43:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -136,7 +136,7 @@ session(void)
 			case EINTR:
 				continue;
 			default:
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"failed to select (%s)\n",
 					strerror(errno));
 				return -1;
@@ -251,15 +251,15 @@ check_sigreq()
 
 	case SIGHUP:
 		if (cfreparse()) {
-			plog(logp, LOCATION, NULL,
-				"ERROR: configuration read failed\n");
+			plog(LLV_ERROR, LOCATION, NULL,
+				"configuration read failed\n");
 			exit(1);
 		}
 		sigreq = 0;
 		break;
 
 	default:
-		plog(logp, LOCATION, NULL, "caught signal %d\n", sigreq);
+		plog(LLV_DEBUG, LOCATION, NULL, "caught signal %d\n", sigreq);
 		pfkey_send_flush(lcconf->sock_pfkey, SADB_SATYPE_UNSPEC);
 		sched_new(1, check_flushsa_stub, NULL);
 		sigreq = 0;
@@ -305,7 +305,8 @@ check_flushsa()
 		}
 
 		if (pfkey_align(msg, mhp) || pfkey_check(mhp)) {
-			plog(logp, LOCATION, NULL, "pfkey_check (%s)\n", ipsec_strerror());
+			plog(LLV_ERROR, LOCATION, NULL,
+				"pfkey_check (%s)\n", ipsec_strerror());
 			msg = next;
 			continue;
 		}
@@ -342,7 +343,7 @@ init_signal()
 
 	for (i = 0; signals[i] != 0; i++)
 		if (set_signal(signals[i], signal_handler) < 0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to set_signal (%s)\n",
 				strerror(errno));
 			exit(1);

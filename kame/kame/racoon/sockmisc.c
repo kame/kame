@@ -1,4 +1,4 @@
-/*	$KAME: sockmisc.c,v 1.19 2000/10/04 17:41:04 itojun Exp $	*/
+/*	$KAME: sockmisc.c,v 1.20 2000/12/15 13:43:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -169,29 +169,28 @@ getlocaladdr(remote)
 
 	/* allocate buffer */
 	if ((local = CALLOC(local_len, struct sockaddr *)) == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get address buffer.\n");
 		goto err;
 	}
 	
 	/* get real interface received packet */
 	if ((s = socket(remote->sa_family, SOCK_DGRAM, 0)) < 0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"socket (%s)\n", strerror(errno));
 		goto err;
 	}
 	
 	if (connect(s, remote, remote->sa_len) < 0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"connect (%s)\n", strerror(errno));
 		close(s);
 		goto err;
 	}
 
 	if (getsockname(s, local, &local_len) < 0) {
-		YIPSDEBUG(DEBUG_NET,
-			plog(logp, LOCATION, NULL,
-				"getsockname (%s)\n", strerror(errno)));
+		plog(LLV_ERROR, LOCATION, NULL,
+			"getsockname (%s)\n", strerror(errno));
 		close(s);
 		return NULL;
 	}
@@ -237,9 +236,8 @@ recvfromto(s, buf, buflen, flags, from, fromlen, to, tolen)
 
 	len = sizeof(ss);
 	if (getsockname(s, (struct sockaddr *)&ss, &len) < 0) {
-		YIPSDEBUG(DEBUG_NET,
-			plog(logp, LOCATION, NULL,
-				"getsockname (%s)\n", strerror(errno)));
+		plog(LLV_ERROR, LOCATION, NULL,
+			"getsockname (%s)\n", strerror(errno));
 		return -1;
 	}
 
@@ -254,7 +252,7 @@ recvfromto(s, buf, buflen, flags, from, fromlen, to, tolen)
 	m.msg_control = (caddr_t)cm;
 	m.msg_controllen = sizeof(cmsgbuf);
 	if ((len = recvmsg(s, &m, flags)) < 0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"recvmsg (%s)\n", strerror(errno));
 		return -1;
 	}
@@ -266,7 +264,7 @@ recvfromto(s, buf, buflen, flags, from, fromlen, to, tolen)
 	     m.msg_controllen != 0 && cm;
 	     cm = (struct cmsghdr *)CMSG_NXTHDR(&m, cm)) {
 #if 0
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"cmsg %d %d\n", cm->cmsg_level, cm->cmsg_type);)
 #endif
 #if defined(INET6) && defined(ADVAPI)
@@ -344,28 +342,25 @@ sendfromto(s, buf, buflen, src, dst)
 	int len;
 
 	if (src->sa_family != dst->sa_family) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"address family mismatch\n");
 		return -1;
 	}
 
 	len = sizeof(ss);
 	if (getsockname(s, (struct sockaddr *)&ss, &len) < 0) {
-		YIPSDEBUG(DEBUG_NET,
-			plog(logp, LOCATION, NULL,
-				"getsockname (%s)\n", strerror(errno)));
+		plog(LLV_ERROR, LOCATION, NULL,
+			"getsockname (%s)\n", strerror(errno));
 		return -1;
 	}
 
-	YIPSDEBUG(DEBUG_NET,
-		plog(logp, LOCATION, NULL,
-			"sockname %s\n", saddr2str((struct sockaddr *)&ss)));
-	YIPSDEBUG(DEBUG_NOTIFY,
-		plog(logp, LOCATION, src,
-			"send packet to %s\n", saddr2str(dst)));
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"sockname %s\n", saddr2str((struct sockaddr *)&ss));
+	plog(LLV_DEBUG, LOCATION, src,
+		"send packet to %s\n", saddr2str(dst));
 
 	if (src->sa_family != ss.ss_family) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"address family mismatch\n");
 		return -1;
 	}
@@ -417,19 +412,18 @@ sendfromto(s, buf, buflen, src, dst)
 		memcpy(&pi->ipi6_addr, &src6.sin6_addr, sizeof(src6.sin6_addr));
 		pi->ipi6_ifindex = ifindex;
 
-		YIPSDEBUG(DEBUG_NET,
-			plog(logp, LOCATION, NULL,
-				"src6 %s %d\n",
-				saddr2str((struct sockaddr *)&src6),
-				src6.sin6_scope_id);
-			plog(logp, LOCATION, NULL,
-				"dst6 %s %d\n",
-				saddr2str((struct sockaddr *)&dst6),
-				dst6.sin6_scope_id););
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"src6 %s %d\n",
+			saddr2str((struct sockaddr *)&src6),
+			src6.sin6_scope_id);
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"dst6 %s %d\n",
+			saddr2str((struct sockaddr *)&dst6),
+			dst6.sin6_scope_id);
 
 		len = sendmsg(s, &m, 0 /*MSG_DONTROUTE*/);
 		if (len < 0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"sendmsg (%s)\n", strerror(errno));
 			return -1;
 		}
@@ -455,13 +449,13 @@ sendfromto(s, buf, buflen, src, dst)
 			 */
 			sendsock = socket(src->sa_family, SOCK_DGRAM, 0);
 			if (sendsock < 0) {
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"socket (%s)\n", strerror(errno));
 				return -1;
 			}
 			if (setsockopt(sendsock, SOL_SOCKET, SO_REUSEPORT,
 				       (void *)&yes, sizeof(yes)) < 0) {
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"setsockopt (%s)\n", strerror(errno));
 				return -1;
 			}
@@ -469,7 +463,7 @@ sendfromto(s, buf, buflen, src, dst)
 			if (src->sa_family == AF_INET6 &&
 			    setsockopt(sendsock, IPPROTO_IPV6, IPV6_USE_MIN_MTU,
 			    (void *)&yes, sizeof(yes)) < 0) {
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"setsockopt (%s)\n", strerror(errno));
 				return -1;
 			}
@@ -478,7 +472,7 @@ sendfromto(s, buf, buflen, src, dst)
 				return -1;
 
 			if (bind(sendsock, (struct sockaddr *)src, src->sa_len) < 0) {
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"bind 1 (%s)\n", strerror(errno));
 				return -1;
 			}
@@ -487,7 +481,7 @@ sendfromto(s, buf, buflen, src, dst)
 
 		len = sendto(sendsock, buf, buflen, 0, dst, dst->sa_len);
 		if (len < 0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"sendto (%s)\n", strerror(errno));
 			return len;
 		}
@@ -517,7 +511,7 @@ setsockopt_bypass(so, family)
 		break;
 #endif
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"unsupported address family %d\n", family);
 		return -1;
 	}
@@ -525,7 +519,7 @@ setsockopt_bypass(so, family)
 	policy = "in bypass";
 	buf = ipsec_set_policy(policy, strlen(policy));
 	if (buf == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"ipsec_set_policy (%s)\n",
 			ipsec_strerror());
 		return -1;
@@ -534,7 +528,7 @@ setsockopt_bypass(so, family)
 	               (level == IPPROTO_IP ?
 	                         IP_IPSEC_POLICY : IPV6_IPSEC_POLICY),
 	               buf, ipsec_get_policylen(buf)) < 0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"setsockopt (%s)\n",
 			strerror(errno));
 		return -1;
@@ -544,7 +538,7 @@ setsockopt_bypass(so, family)
 	policy = "out bypass";
 	buf = ipsec_set_policy(policy, strlen(policy));
 	if (buf == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"ipsec_set_policy (%s)\n",
 			ipsec_strerror());
 		return -1;
@@ -553,7 +547,7 @@ setsockopt_bypass(so, family)
 	               (level == IPPROTO_IP ?
 	                         IP_IPSEC_POLICY : IPV6_IPSEC_POLICY),
 	               buf, ipsec_get_policylen(buf)) < 0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"setsockopt (%s)\n",
 			strerror(errno));
 		return -1;
@@ -571,7 +565,7 @@ newsaddr(len)
 
 	new = CALLOC(len, struct sockaddr *);
 	if (new == NULL)
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"%s\n", strerror(errno)); 
 
 	/* initial */
@@ -588,7 +582,7 @@ dupsaddr(src)
 
 	dst = CALLOC(src->sa_len, struct sockaddr *);
 	if (dst == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"%s\n", strerror(errno)); 
 		return NULL;
 	}
@@ -604,6 +598,13 @@ saddr2str(saddr)
 {
 	static char buf[NI_MAXHOST + NI_MAXSERV + 10];
 	char addr[NI_MAXHOST], port[NI_MAXSERV];
+#if 0
+#ifdef NI_WITHSCOPEID
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
+#else   
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
+#endif      
+#endif
 
 	if (saddr == NULL)
 		return NULL;
@@ -620,6 +621,13 @@ saddrwop2str(saddr)
 {
 	static char buf[NI_MAXHOST + NI_MAXSERV + 10];
 	char addr[NI_MAXHOST];
+#if 0
+#ifdef NI_WITHSCOPEID
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
+#else   
+	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
+#endif      
+#endif
 
 	if (saddr == NULL)
 		return NULL;
@@ -651,13 +659,13 @@ mask_sockaddr(a, b, l)
 		break;
 #endif
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"invalid family: %d\n", b->sa_family);
 		exit(1);
 	}
 
 	if ((alen << 3) < l) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"unexpected inconsistency: %d %d\n", b->sa_family, l);
 		exit(1);
 	}

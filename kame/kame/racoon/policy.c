@@ -1,4 +1,4 @@
-/*	$KAME: policy.c,v 1.32 2000/10/04 17:41:03 itojun Exp $	*/
+/*	$KAME: policy.c,v 1.33 2000/12/15 13:43:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -102,11 +102,10 @@ getsp_r(spidx, iph2)
 	struct secpolicy *p;
 	u_int8_t prefixlen;
 
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL, "checking for transport mode\n"););
+	plog(LLV_DEBUG, LOCATION, NULL, "checking for transport mode\n");
 
 	if (spidx->src.ss_family != spidx->dst.ss_family) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"address family mismatch, src:%d dst:%d\n",
 				spidx->src.ss_family,
 				spidx->dst.ss_family);
@@ -122,34 +121,29 @@ getsp_r(spidx, iph2)
 		break;
 #endif
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"invalid family: %d\n", spidx->src.ss_family);
 		return NULL;
 	}
 
 	/* is it transport mode SA negotiation? */
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL, "src1: %s\n",
-			saddr2str(iph2->src)););
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL, "src2: %s\n",
-			saddr2str((struct sockaddr *)&spidx->src)););
+	plog(LLV_DEBUG, LOCATION, NULL, "src1: %s\n",
+		saddr2str(iph2->src));
+	plog(LLV_DEBUG, LOCATION, NULL, "src2: %s\n",
+		saddr2str((struct sockaddr *)&spidx->src));
 	if (cmpsaddrwop(iph2->src, (struct sockaddr *)&spidx->src)
 	 || spidx->prefs != prefixlen)
 		return NULL;
 
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL, "dst1: %s\n",
-			saddr2str(iph2->dst)););
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL, "dst2: %s\n",
-			saddr2str((struct sockaddr *)&spidx->dst)););
+	plog(LLV_DEBUG, LOCATION, NULL, "dst1: %s\n",
+		saddr2str(iph2->dst));
+	plog(LLV_DEBUG, LOCATION, NULL, "dst2: %s\n",
+		saddr2str((struct sockaddr *)&spidx->dst));
 	if (cmpsaddrwop(iph2->dst, (struct sockaddr *)&spidx->dst)
 	 || spidx->prefd != prefixlen)
 		return NULL;
 
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL, "looks to be transport mode\n"););
+	plog(LLV_DEBUG, LOCATION, NULL, "looks to be transport mode\n");
 
 	for (p = TAILQ_FIRST(&sptree); p; p = TAILQ_NEXT(p, chain)) {
 		if (!cmpspidx_wild(spidx, &p->spidx))
@@ -184,9 +178,8 @@ int
 cmpspidx(a, b)
 	struct policyindex *a, *b;
 {
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL, "sub:%p: %s\n", a, spidx2str(a));
-		plog(logp, LOCATION, NULL, "db :%p: %s\n", b, spidx2str(b)););
+	plog(LLV_DEBUG, LOCATION, NULL, "sub:%p: %s\n", a, spidx2str(a));
+	plog(LLV_DEBUG, LOCATION, NULL, "db :%p: %s\n", b, spidx2str(b));
 
 	/* XXX don't check direction now, but it's to be checked carefully. */
 	if (a->dir != b->dir
@@ -215,9 +208,8 @@ cmpspidx_wild(a, b)
 {
 	struct sockaddr_storage sa1, sa2;
 
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL, "sub:%p: %s\n", a, spidx2str(a));
-		plog(logp, LOCATION, NULL, "db: %p: %s\n", b, spidx2str(b)););
+	plog(LLV_DEBUG, LOCATION, NULL, "sub:%p: %s\n", a, spidx2str(a));
+	plog(LLV_DEBUG, LOCATION, NULL, "db: %p: %s\n", b, spidx2str(b));
 
 	if (!(b->dir == IPSEC_DIR_ANY || a->dir == b->dir))
 		return 1;
@@ -234,8 +226,8 @@ cmpspidx_wild(a, b)
 
 	/* compare src address */
 	if (sizeof(sa1) < a->src.ss_len || sizeof(sa2) < b->src.ss_len) {
-		plog(logp, LOCATION, NULL,
-			"ERROR: unexpected error: "
+		plog(LLV_ERROR, LOCATION, NULL,
+			"unexpected error: "
 			"src.ss_len:%d dst.ss_len:%d\n",
 			a->src.ss_len, b->src.ss_len);
 		return 1;
@@ -244,28 +236,26 @@ cmpspidx_wild(a, b)
 		b->prefs);
 	mask_sockaddr((struct sockaddr *)&sa2, (struct sockaddr *)&b->src,
 		b->prefs);
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL, "%p masked with /%d: %s\n",
-			a, b->prefs, saddr2str((struct sockaddr *)&sa1));
-		plog(logp, LOCATION, NULL, "%p masked with /%d: %s\n",
-			b, b->prefs, saddr2str((struct sockaddr *)&sa2)););
+	plog(LLV_DEBUG, LOCATION, NULL, "%p masked with /%d: %s\n",
+		a, b->prefs, saddr2str((struct sockaddr *)&sa1));
+	plog(LLV_DEBUG, LOCATION, NULL, "%p masked with /%d: %s\n",
+		b, b->prefs, saddr2str((struct sockaddr *)&sa2));
 	if (cmpsaddr((struct sockaddr *)&sa1, (struct sockaddr *)&sa2))
 		return 1;
 
 	/* compare dst address */
 	if (sizeof(sa1) < a->dst.ss_len || sizeof(sa2) < b->dst.ss_len) {
-		plog(logp, LOCATION, NULL, "unexpected error\n");
+		plog(LLV_ERROR, LOCATION, NULL, "unexpected error\n");
 		exit(1);
 	}
 	mask_sockaddr((struct sockaddr *)&sa1, (struct sockaddr *)&a->dst,
 		b->prefd);
 	mask_sockaddr((struct sockaddr *)&sa2, (struct sockaddr *)&b->dst,
 		b->prefd);
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL, "%p masked with /%d: %s\n",
-			a, b->prefd, saddr2str((struct sockaddr *)&sa1));
-		plog(logp, LOCATION, NULL, "%p masked with /%d: %s\n",
-			b, b->prefd, saddr2str((struct sockaddr *)&sa2)););
+	plog(LLV_DEBUG, LOCATION, NULL, "%p masked with /%d: %s\n",
+		a, b->prefd, saddr2str((struct sockaddr *)&sa1));
+	plog(LLV_DEBUG, LOCATION, NULL, "%p masked with /%d: %s\n",
+		b, b->prefd, saddr2str((struct sockaddr *)&sa2));
 	if (cmpsaddr((struct sockaddr *)&sa1, (struct sockaddr *)&sa2))
 		return 1;
 

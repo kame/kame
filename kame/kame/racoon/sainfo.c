@@ -1,4 +1,4 @@
-/*	$KAME: sainfo.c,v 1.12 2000/10/11 19:54:08 sakane Exp $	*/
+/*	$KAME: sainfo.c,v 1.13 2000/12/15 13:43:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -94,11 +94,10 @@ getsainfo(src, dst)
 			return s;
 	}
 
-	YIPSDEBUG(DEBUG_MISC,
-		if (anonymous) {
-			plog(logp, LOCATION, NULL,
-				"anonymous sainfo selected.\n");
-		});
+	if (anonymous) {
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"anonymous sainfo selected.\n");
+	}
 	return anonymous;
 }
 

@@ -1,4 +1,4 @@
-/*	$KAME: plog.c,v 1.7 2000/10/04 17:41:02 itojun Exp $	*/
+/*	$KAME: plog.c,v 1.8 2000/12/15 13:43:56 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -60,121 +60,145 @@
 #include "logger.h"
 #include "debug.h"
 
-/* logging pointer */
-struct log *logp;
+char *pname = NULL;
+u_int32_t loglevel = 4;
+
+static struct log *logp = NULL;
 static char *logfile = NULL;
 
-static void plog_common __P((struct log *, const char *, struct sockaddr *));
+static char *plog_common __P((int, const char *, const char *));
 
-static void
-plog_common(struct log *lp, const char *func, struct sockaddr *sa)
+static char *pritag[] = {
+	"(not defined)",
+	"INFO",
+	"NOTIFY",
+	"WARNING",
+	"ERROR",
+	"DEBUG",
+	"DEBUG2",
+};
+
+static char *
+plog_common(pri, fmt, func)
+	int pri;
+	const char *fmt, *func;
 {
-	time_t t;
-	char tbuf[56];
-	struct tm *tm;
-	char addr[NI_MAXHOST], port[NI_MAXSERV];
+	static char buf[100];	/* XXX */
+	char *p;
+	int reslen, len;
 
-	t = time(0);
-	tm = localtime(&t);
-	strftime(tbuf, sizeof(tbuf), "%Y-%m-%d %T", tm);
+	p = buf;
+	reslen = sizeof(buf);
 
-	if (f_foreground)
-		printf("%s: ", tbuf);
-	if (log_vprint(lp, "%s: ", tbuf) < 0)
-		warn("logging failed.");
+	if (logfile || f_foreground) {
+		time_t t;
+		struct tm *tm;
 
-	YIPSDEBUG(DEBUG_FUNC,
-		if (f_foreground)
-			printf("%s: ", func);
-		log_vprint(lp, "%s: ", func));
+		t = time(0);
+		tm = localtime(&t);
+		len = strftime(p, reslen, "%Y-%m-%d %T: ", tm);
+		p += len;
+		reslen -= len;
+	}
 
-	if (sa != NULL) {
-		/* don't use saddr2str() in order not to buffer overwrite */
-		GETNAMEINFO(sa, addr, port);
-		if (f_foreground)
-			printf("%s[%s] ", addr, port);
-	        if (log_vprint(lp, "%s ", addr, port) < 0)
-			warn("logging failed.");
-	};
+	if (pri < ARRAYLEN(pritag)) {
+		len = snprintf(p, reslen, "%s: ", pritag[pri]);
+		p += len;
+		reslen -= len;
+	}
+
+	len = snprintf(p, reslen, "%s: %s", func, fmt);
+
+	return buf;
 }
 
 void
-plog(struct log *lp, const char *func, struct sockaddr *sa,
-	const char *fmt, ...)
+plog(int pri, const char *func, struct sockaddr *sa, const char *fmt, ...)
 {
 	va_list ap;
+	char *newfmt;
 
-	plog_common(lp, func, sa);
+	if (pri > loglevel)
+		return;
+
+	newfmt = plog_common(pri, fmt, func);
 
 	va_start(ap, fmt);
 	if (f_foreground)
-		vprintf(fmt, ap);
-	log_vaprint(lp, fmt, ap);
+		vprintf(newfmt, ap);
+	else if (logfile)
+		log_vaprint(logp, newfmt, ap);
+	else
+		vsyslog(pri, newfmt, ap);
 	va_end(ap);
-
-	return;
 }
 
 void
-plogv(struct log *lp, const char *func, struct sockaddr *sa,
+plogv(int pri, const char *func, struct sockaddr *sa,
 	const char *fmt, va_list ap)
 {
-	plog_common(lp, func, sa);
+	char *newfmt;
+
+	if (pri > loglevel)
+		return;
+
+	newfmt = plog_common(pri, fmt, func);
 
 	if (f_foreground)
-		vprintf(fmt, ap);
-	log_vaprint(lp, fmt, ap);
-
-	return;
+		vprintf(newfmt, ap);
+	else if (logfile)
+		log_vaprint(logp, newfmt, ap);
+	else
+		vsyslog(pri, newfmt, ap);
 }
 
 void
-plognl()
+plogdump(pri, data, len)
+	int pri;
+	void *data;
+	size_t len;
 {
-	if (f_foreground)
-		printf("\n");
-	if (log_print(logp, "\n") < 0)
-		warn("logging failed.");
-}
+	caddr_t buf;
+	size_t buflen;
+	int i, j;
 
-void
-plogsp()
-{
-	if (f_foreground)
-		printf(" ");
-	if (log_print(logp, " ") < 0)
-		warn("logging failed.");
-}
+	if (pri > loglevel)
+		return;
 
-void
-plogc(struct log *lp, unsigned char c)
-{
-	if (f_foreground)
-		printf("%c", c);
-	if (log_vprint(lp, "%c", c) < 0)
-		warn("logging failed.");
-}
+	buflen = (len * 2) + (len / 4) + (len / 32) + 2;
+	buf = malloc(buflen);
 
-void
-plogh(struct log *lp, unsigned char c)
-{
-	if (f_foreground)
-		printf("%02x", c);
-	if (log_vprint(lp, "%02x", c) < 0)
-		warn("logging failed.");
+	i = 0;
+	j = 0;
+	while (i < buflen) {
+		if (j % 32 == 0)
+			buf[i++] = '\n';
+		if (j % 4 == 0)
+			buf[i++] = ' ';
+		snprintf(&buf[i], buflen - i, "%02x",
+			((unsigned char *)data)[j] & 0xff);
+		i += 2;
+		j++;
+	}
+	buf[i] = '\0';
+	plog(pri, LOCATION, NULL, "%s", buf);
+
+	free(buf);
 }
 
 void
 ploginit()
 {
-	if (logfile == NULL)
-		logfile = strdup(LC_DEFAULT_LOGF);
-
-	logp = log_open(250, logfile);
-	if (logp == NULL) {
-		fprintf(stderr, "failed to open log file %s.", logfile);
-		exit(1);
+	if (logfile) {
+		logp = log_open(250, logfile);
+		if (logp == NULL) {
+			fprintf(stderr, "failed to open log file %s.", logfile);
+			exit(1);
+		}
+		return;
 	}
+
+        openlog(pname, LOG_NDELAY, LOG_DAEMON);
 }
 
 void
@@ -185,3 +209,4 @@ plogset(file)
 		free(logfile);
 	logfile = strdup(file);
 }
+

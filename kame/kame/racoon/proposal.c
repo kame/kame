@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.23 2000/11/07 15:39:25 itojun Exp $	*/
+/*	$KAME: proposal.c,v 1.24 2000/12/15 13:43:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -181,7 +181,7 @@ cmpsaprop_alloc(ph1, pp1, pp2, side)
 
 	newpp = newsaprop();
 	if (newpp == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to allocate saprop.\n");
 		return NULL;
 	}
@@ -198,19 +198,17 @@ cmpsaprop_alloc(ph1, pp1, pp2, side)
 		break;
 	case PROP_CHECK_STRICT:
 		if (pp1->lifetime > pp2->lifetime) {
-			YIPSDEBUG(DEBUG_SA,
-				plog(logp, LOCATION, NULL,
-					"ERROR: long lifetime proposed: "
-					"my:%d peer:%d\n",
-					pp2->lifetime, pp1->lifetime));
+			plog(LLV_ERROR, LOCATION, NULL,
+				"long lifetime proposed: "
+				"my:%d peer:%d\n",
+				pp2->lifetime, pp1->lifetime);
 			goto err;
 		}
 		if (pp1->lifebyte > pp2->lifebyte) {
-			YIPSDEBUG(DEBUG_SA,
-				plog(logp, LOCATION, NULL,
-					"ERROR: long lifebyte proposed: "
-					"my:%d peer:%d\n",
-					pp2->lifebyte, pp1->lifebyte));
+			plog(LLV_ERROR, LOCATION, NULL,
+				"long lifebyte proposed: "
+				"my:%d peer:%d\n",
+				pp2->lifebyte, pp1->lifebyte);
 			goto err;
 		}
 		newpp->lifetime = pp1->lifetime;
@@ -218,11 +216,10 @@ cmpsaprop_alloc(ph1, pp1, pp2, side)
 
     prop_pfs_check:
 		if (pp2->pfs_group != 0 && pp1->pfs_group != pp2->pfs_group) {
-			YIPSDEBUG(DEBUG_SA,
-				plog(logp, LOCATION, NULL,
-					"ERROR: pfs group mismatched: "
-					"my:%d peer:%d\n",
-					pp2->pfs_group, pp1->pfs_group));
+			plog(LLV_ERROR, LOCATION, NULL,
+				"pfs group mismatched: "
+				"my:%d peer:%d\n",
+				pp2->pfs_group, pp1->pfs_group);
 			goto err;
 		}
 		newpp->pfs_group = pp1->pfs_group;
@@ -234,11 +231,10 @@ cmpsaprop_alloc(ph1, pp1, pp2, side)
 		} else {
 			newpp->lifetime = pp2->lifetime;
 			newpp->claim |= IPSECDOI_ATTR_SA_LD_TYPE_SEC;
-			YIPSDEBUG(DEBUG_SA,
-				plog(logp, LOCATION, NULL,
-					"NOTICE: use own lifetime: "
-					"my:%d peer:%d\n",
-					pp2->lifetime, pp1->lifetime));
+			plog(LLV_NOTIFY, LOCATION, NULL,
+				"use own lifetime: "
+				"my:%d peer:%d\n",
+				pp2->lifetime, pp1->lifetime);
 		}
 
 		/* lifebyte */
@@ -248,38 +244,34 @@ cmpsaprop_alloc(ph1, pp1, pp2, side)
 		} else {
 			newpp->lifebyte = pp2->lifebyte;
 			newpp->claim |= IPSECDOI_ATTR_SA_LD_TYPE_SEC;
-			YIPSDEBUG(DEBUG_SA,
-				plog(logp, LOCATION, NULL,
-					"NOTICE: use own lifebyte: "
-					"my:%d peer:%d\n",
-					pp2->lifebyte, pp1->lifebyte));
+			plog(LLV_NOTIFY, LOCATION, NULL,
+				"use own lifebyte: "
+				"my:%d peer:%d\n",
+				pp2->lifebyte, pp1->lifebyte);
 		}
 
     		goto prop_pfs_check;
 		break;
 	case PROP_CHECK_EXACT:
 		if (pp1->lifetime != pp2->lifetime) {
-			YIPSDEBUG(DEBUG_SA,
-				plog(logp, LOCATION, NULL,
-					"ERROR: lifetime mismatched: "
-					"my:%d peer:%d\n",
-					pp2->lifetime, pp1->lifetime));
+			plog(LLV_ERROR, LOCATION, NULL,
+				"lifetime mismatched: "
+				"my:%d peer:%d\n",
+				pp2->lifetime, pp1->lifetime);
 			goto err;
 		}
 		if (pp1->lifebyte != pp2->lifebyte) {
-			YIPSDEBUG(DEBUG_SA,
-				plog(logp, LOCATION, NULL,
-					"ERROR: lifebyte mismatched: "
-					"my:%d peer:%d\n",
-					pp2->lifebyte, pp1->lifebyte));
+			plog(LLV_ERROR, LOCATION, NULL,
+				"lifebyte mismatched: "
+				"my:%d peer:%d\n",
+				pp2->lifebyte, pp1->lifebyte);
 			goto err;
 		}
 		if (pp1->pfs_group != pp2->pfs_group) {
-			YIPSDEBUG(DEBUG_SA,
-				plog(logp, LOCATION, NULL,
-					"ERROR: pfs group mismatched: "
-					"my:%d peer:%d\n",
-					pp2->pfs_group, pp1->pfs_group));
+			plog(LLV_ERROR, LOCATION, NULL,
+				"pfs group mismatched: "
+				"my:%d peer:%d\n",
+				pp2->pfs_group, pp1->pfs_group);
 			goto err;
 		}
 		newpp->lifebyte = pp1->lifebyte;
@@ -287,8 +279,8 @@ cmpsaprop_alloc(ph1, pp1, pp2, side)
 		newpp->pfs_group = pp1->pfs_group;
 		break;
 	default:
-		plog(logp, LOCATION, NULL,
-			"FATAL: invalid pcheck_level why?.\n");
+		plog(LLV_ERROR, LOCATION, NULL,
+			"invalid pcheck_level why?.\n");
 		goto err;
 	}
 
@@ -333,11 +325,10 @@ cmpsaprop_alloc(ph1, pp1, pp2, side)
 			break;
 
 		if (pr1->proto_id != pr2->proto_id) {
-			YIPSDEBUG(DEBUG_SA,
-				plog(logp, LOCATION, NULL,
-					"proto_id mismatched: "
-					"my:%d peer:%d\n",
-					pr2->proto_id, pr1->proto_id));
+			plog(LLV_ERROR, LOCATION, NULL,
+				"proto_id mismatched: "
+				"my:%d peer:%d\n",
+				pr2->proto_id, pr1->proto_id);
 			goto err;
 		}
 		spisizematch = 0;
@@ -356,26 +347,23 @@ cmpsaprop_alloc(ph1, pp1, pp2, side)
 				spisizematch = 1;
 			}
 			if (spisizematch) {
-				YIPSDEBUG(DEBUG_SA,
-					plog(logp, LOCATION, NULL,
-					    "IPComp SPI size promoted "
-					    "from 16bit to 32bit\n"));
+				plog(LLV_ERROR, LOCATION, NULL,
+				    "IPComp SPI size promoted "
+				    "from 16bit to 32bit\n");
 			}
 		}
 		if (!spisizematch) {
-			YIPSDEBUG(DEBUG_SA,
-				plog(logp, LOCATION, NULL,
-					"spisize mismatched: "
-					"my:%d peer:%d\n",
-					pr2->spisize, pr1->spisize));
+			plog(LLV_ERROR, LOCATION, NULL,
+				"spisize mismatched: "
+				"my:%d peer:%d\n",
+				pr2->spisize, pr1->spisize);
 			goto err;
 		}
 		if (pr1->encmode != pr2->encmode) {
-			YIPSDEBUG(DEBUG_SA,
-				plog(logp, LOCATION, NULL,
-					"encmode mismatched: "
-					"my:%d peer:%d\n",
-					pr2->encmode, pr1->encmode));
+			plog(LLV_ERROR, LOCATION, NULL,
+				"encmode mismatched: "
+				"my:%d peer:%d\n",
+				pr2->encmode, pr1->encmode);
 			goto err;
 		}
 
@@ -391,7 +379,7 @@ cmpsaprop_alloc(ph1, pp1, pp2, side)
 	    found:
 		newpr = newsaproto();
 		if (newpr == NULL) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to allocate saproto.\n");
 			goto err;
 		}
@@ -405,7 +393,7 @@ cmpsaprop_alloc(ph1, pp1, pp2, side)
 
 		newtr = newsatrns();
 		if (newtr == NULL) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to allocate satrns.\n");
 			goto err;
 		}
@@ -452,21 +440,21 @@ cmpsaprop(pp1, pp2)
 	const struct saprop *pp1, *pp2;
 {
 	if (pp1->pfs_group != pp2->pfs_group) {
-		plog(logp, LOCATION, NULL,
-			"WARNING: pfs_group mismatch. mine:%d peer:%d\n",
+		plog(LLV_WARNING, LOCATION, NULL,
+			"pfs_group mismatch. mine:%d peer:%d\n",
 			pp1->pfs_group, pp2->pfs_group);
 		/* FALLTHRU */
 	}
 
 	if (pp1->lifetime > pp2->lifetime) {
-		plog(logp, LOCATION, NULL,
-			"WARNING: less lifetime proposed. mine:%d peer:%d\n",
+		plog(LLV_WARNING, LOCATION, NULL,
+			"less lifetime proposed. mine:%d peer:%d\n",
 			pp1->lifetime, pp2->lifetime);
 		/* FALLTHRU */
 	}
 	if (pp1->lifebyte > pp2->lifebyte) {
-		plog(logp, LOCATION, NULL,
-			"WARNING: less lifebyte proposed. mine:%d peer:%d\n",
+		plog(LLV_WARNING, LOCATION, NULL,
+			"less lifebyte proposed. mine:%d peer:%d\n",
 			pp1->lifebyte, pp2->lifebyte);
 		/* FALLTHRU */
 	}
@@ -484,19 +472,17 @@ cmpsatrns(tr1, tr2)
 	const struct satrns *tr1, *tr2;
 {
 	if (tr1->trns_id != tr2->trns_id) {
-		YIPSDEBUG(DEBUG_SA,
-			plog(logp, LOCATION, NULL,
-				"trns_id mismatched: "
-				"my:%d peer:%d\n",
-				tr1->trns_id, tr2->trns_id));
+		plog(LLV_ERROR, LOCATION, NULL,
+			"trns_id mismatched: "
+			"my:%d peer:%d\n",
+			tr1->trns_id, tr2->trns_id);
 		return 1;
 	}
 	if (tr1->authtype != tr2->authtype) {
-		YIPSDEBUG(DEBUG_SA,
-			plog(logp, LOCATION, NULL,
-				"authtype mismatched: "
-				"my:%d peer:%d\n",
-				tr1->authtype, tr2->authtype));
+		plog(LLV_ERROR, LOCATION, NULL,
+			"authtype mismatched: "
+			"my:%d peer:%d\n",
+			tr1->authtype, tr2->authtype);
 		return 1;
 	}
 
@@ -505,8 +491,8 @@ cmpsatrns(tr1, tr2)
 	 * the initiator.  It should be defined a notify message.
 	 */
 	if (tr1->encklen > tr2->encklen) {
-		plog(logp, LOCATION, NULL,
-			"WARNING: less key length proposed, "
+		plog(LLV_WARNING, LOCATION, NULL,
+			"less key length proposed, "
 			"mine:%d peer:%d.  Use initiaotr's one.\n",
 			tr1->encklen, tr2->encklen);
 		/* FALLTHRU */
@@ -527,7 +513,7 @@ set_satrnsbysainfo(pr, sainfo)
 	switch (pr->proto_id) {
 	case IPSECDOI_PROTO_IPSEC_AH:
 		if (sainfo->algs[algclass_ipsec_auth] == NULL) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"no auth algorithm found\n");
 			goto err;
 		}
@@ -540,7 +526,7 @@ set_satrnsbysainfo(pr, sainfo)
 			/* allocate satrns */
 			newtr = newsatrns();
 			if (newtr == NULL) {
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"failed to allocate satrns.\n");
 				goto err;
 			}
@@ -554,7 +540,7 @@ set_satrnsbysainfo(pr, sainfo)
 		break;
 	case IPSECDOI_PROTO_IPSEC_ESP:
 		if (sainfo->algs[algclass_ipsec_enc] == NULL) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"no encryption algorithm found\n");
 			goto err;
 		}
@@ -564,7 +550,7 @@ set_satrnsbysainfo(pr, sainfo)
 				/* allocate satrns */
 				newtr = newsatrns();
 				if (newtr == NULL) {
-					plog(logp, LOCATION, NULL,
+					plog(LLV_ERROR, LOCATION, NULL,
 						"failed to allocate satrns.\n");
 					goto err;
 				}
@@ -580,7 +566,7 @@ set_satrnsbysainfo(pr, sainfo)
 		break;
 	case IPSECDOI_PROTO_IPCOMP:
 		if (sainfo->algs[algclass_ipsec_comp] == NULL) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"no ipcomp algorithm found\n");
 			goto err;
 		}
@@ -590,7 +576,7 @@ set_satrnsbysainfo(pr, sainfo)
 			/* allocate satrns */
 			newtr = newsatrns();
 			if (newtr == NULL) {
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"failed to allocate satrns.\n");
 				goto err;
 			}
@@ -603,14 +589,14 @@ set_satrnsbysainfo(pr, sainfo)
 		}
 		break;
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"unknown proto_id (%d).\n", pr->proto_id);
 		goto err;
 	}
 
 	/* no proposal found */
 	if (pr->head == NULL) {
-		plog(logp, LOCATION, NULL, "no algorithms found.\n");
+		plog(LLV_ERROR, LOCATION, NULL, "no algorithms found.\n");
 		return -1;
 	}
 
@@ -637,7 +623,7 @@ aproppair2saprop(p0)
 	/* allocate ipsec a sa proposal */
 	newpp = newsaprop();
 	if (newpp == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to allocate saprop.\n");
 		return NULL;
 	}
@@ -649,7 +635,7 @@ aproppair2saprop(p0)
 		/* allocate ipsec sa protocol */
 		newpr = newsaproto();
 		if (newpr == NULL) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to allocate saproto.\n");
 			goto err;
 		}
@@ -657,7 +643,7 @@ aproppair2saprop(p0)
 		/* check spi size */
 		/* XXX should be handled isakmp cookie */
 		if (sizeof(newpr->spi) < p->prop->spi_size) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"invalid spi size %d.\n", p->prop->spi_size);
 			goto err;
 		}
@@ -678,21 +664,20 @@ aproppair2saprop(p0)
 
 		for (t = p; t; t = t->tnext) {
 
-			YIPSDEBUG(DEBUG_SA,
-				plog(logp, LOCATION, NULL,
-					"prop#=%d prot-id=%s spi-size=%d "
-					"#trns=%d trns#=%d trns-id=%s\n",
-					t->prop->p_no,
-					s_ipsecdoi_proto(t->prop->proto_id),
-					t->prop->spi_size, t->prop->num_t,
-					t->trns->t_no,
-					s_ipsecdoi_trns(t->prop->proto_id,
-					t->trns->t_id)));
+			plog(LLV_DEBUG, LOCATION, NULL,
+				"prop#=%d prot-id=%s spi-size=%d "
+				"#trns=%d trns#=%d trns-id=%s\n",
+				t->prop->p_no,
+				s_ipsecdoi_proto(t->prop->proto_id),
+				t->prop->spi_size, t->prop->num_t,
+				t->trns->t_no,
+				s_ipsecdoi_trns(t->prop->proto_id,
+				t->trns->t_id));
 
 			/* allocate ipsec sa transform */
 			newtr = newsatrns();
 			if (newtr == NULL) {
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"failed to allocate satrns.\n");
 				goto err;
 			}
@@ -763,19 +748,19 @@ flushsatrns(head)
  * print multiple proposals
  */
 void
-printsaprop(pp)
+printsaprop(pri, pp)
+	const int pri;
 	const struct saprop *pp;
 {
 	const struct saprop *p;
 
 	if (pp == NULL) {
-		plog(logp, LOCATION, NULL, "(null)");
+		plog(pri, LOCATION, NULL, "(null)");
 		return;
 	}
 
 	for (p = pp; p; p = p->next) {
-		printsaprop0(p);
-		plognl();
+		printsaprop0(pri, p);
 	}
 
 	return;
@@ -785,7 +770,8 @@ printsaprop(pp)
  * print one proposal.
  */
 void
-printsaprop0(pp)
+printsaprop0(pri, pp)
+	int pri;
 	const struct saprop *pp;
 {
 	const struct saproto *p;
@@ -794,14 +780,15 @@ printsaprop0(pp)
 		return;
 
 	for (p = pp->head; p; p = p->next) {
-		printsaproto(p);
+		printsaproto(pri, p);
 	}
 
 	return;
 }
 
 void
-printsaproto(pr)
+printsaproto(pri, pr)
+	const int pri;
 	const struct saproto *pr;
 {
 	struct satrns *tr;
@@ -809,7 +796,7 @@ printsaproto(pr)
 	if (pr == NULL)
 		return;
 
-	plog(logp, LOCATION, NULL,
+	plog(pri, LOCATION, NULL,
 		" (proto_id=%s spisize=%d spi=%08x spi_p=%08x "
 		"encmode=%s reqid=%d:%d)\n",
 		s_ipsecdoi_proto(pr->proto_id),
@@ -820,14 +807,15 @@ printsaproto(pr)
 		pr->reqid_in, pr->reqid_out);
 
 	for (tr = pr->head; tr; tr = tr->next) {
-		printsatrns(pr->proto_id, tr);
+		printsatrns(pri, pr->proto_id, tr);
 	}
 
 	return;
 }
 
 void
-printsatrns(proto_id, tr)
+printsatrns(pri, proto_id, tr)
+	const int pri;
 	const int proto_id;
 	const struct satrns *tr;
 {
@@ -836,25 +824,25 @@ printsatrns(proto_id, tr)
 
 	switch (proto_id) {
 	case IPSECDOI_PROTO_IPSEC_AH:
-		plog(logp, LOCATION, NULL,
+		plog(pri, LOCATION, NULL,
 			"  (trns_id=%s authtype=%s)\n",
 			s_ipsecdoi_trns(proto_id, tr->trns_id),
 			s_ipsecdoi_attr_v(IPSECDOI_ATTR_AUTH, tr->authtype));
 		break;
 	case IPSECDOI_PROTO_IPSEC_ESP:
-		plog(logp, LOCATION, NULL,
+		plog(pri, LOCATION, NULL,
 			"  (trns_id=%s encklen=%d authtype=%s)\n",
 			s_ipsecdoi_trns(proto_id, tr->trns_id),
 			tr->encklen,
 			s_ipsecdoi_attr_v(IPSECDOI_ATTR_AUTH, tr->authtype));
 		break;
 	case IPSECDOI_PROTO_IPCOMP:
-		plog(logp, LOCATION, NULL,
+		plog(pri, LOCATION, NULL,
 			"  (trns_id=%s)\n",
 			s_ipsecdoi_trns(proto_id, tr->trns_id));
 		break;
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(pri, LOCATION, NULL,
 			"(unknown proto_id %d)\n", proto_id);
 	}
 
@@ -862,7 +850,8 @@ printsatrns(proto_id, tr)
 }
 
 void
-print_proppair0(p, level)
+print_proppair0(pri, p, level)
+	int pri; 
 	struct prop_pair *p;
 	int level;
 {
@@ -874,18 +863,19 @@ print_proppair0(p, level)
 		spc[level] = '\0';
 	}
 
-	plog(logp, LOCATION, NULL,
+	plog(pri, LOCATION, NULL,
 		"%s%p: next=%p tnext=%p\n", spc, p, p->next, p->tnext);
 	if (p->next)
-		print_proppair0(p->next, level + 1);
+		print_proppair0(pri, p->next, level + 1);
 	if (p->tnext)
-		print_proppair0(p->tnext, level + 1);
+		print_proppair0(pri, p->tnext, level + 1);
 }
 
 void
-print_proppair(p)
+print_proppair(pri, p)
+	int pri;
 	struct prop_pair *p;
 {
-	print_proppair0(p, 1);
+	print_proppair0(pri, p, 1);
 }
 

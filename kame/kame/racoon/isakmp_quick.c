@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.68 2000/10/24 08:37:35 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.69 2000/12/15 13:43:56 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -101,11 +101,9 @@ quick_i1prep(iph2, msg)
 {
 	int error = ISAKMP_INTERNAL_ERROR;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph2->status != PHASE2ST_STATUS2) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph2->status);
 		goto end;
 	}
@@ -127,8 +125,7 @@ quick_i1prep(iph2, msg)
 	if (pk_sendgetspi(iph2) < 0)
 		goto end;
 
-	YIPSDEBUG(DEBUG_STAMP,
-		plog(logp, LOCATION, NULL, "pfkey getspi sent.\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "pfkey getspi sent.\n");
 
 	iph2->sce = sched_new(lcconf->wait_ph2complete,
 	    pfkey_timeover_stub, iph2);
@@ -157,11 +154,9 @@ quick_i1send(iph2, msg)
 	int np;
 	struct ipsecdoi_id_b *id, *id_p;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph2->status != PHASE2ST_GETSPIDONE) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph2->status);
 		goto end;
 	}
@@ -185,7 +180,7 @@ quick_i1send(iph2, msg)
 	if (pfsgroup) {
 		/* DH group settting if PFS is required. */
 		if (oakley_setdhgroup(pfsgroup, &iph2->pfsgrp) < 0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to set DH value.\n");
 			goto end;
 		}
@@ -197,16 +192,14 @@ quick_i1send(iph2, msg)
 
 	/* generate ID value */
 	if (ipsecdoi_setid2(iph2) < 0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get ID.\n");
 		goto end;
 	}
-	YIPSDEBUG(DEBUG_KEY,
-		plog(logp, LOCATION, NULL, "IDci:");
-		PVDUMP(iph2->id););
-	YIPSDEBUG(DEBUG_KEY,
-		plog(logp, LOCATION, NULL, "IDcr:");
-		PVDUMP(iph2->id_p););
+	plog(LLV_DEBUG, LOCATION, NULL, "IDci:");
+	plogdump(LLV_DEBUG, iph2->id->v, iph2->id->l);
+	plog(LLV_DEBUG, LOCATION, NULL, "IDcr:");
+	plogdump(LLV_DEBUG, iph2->id_p->v, iph2->id_p->l);
 
 	/*
 	 * we do not attach IDci nor IDcr, under the following condition:
@@ -221,7 +214,6 @@ quick_i1send(iph2, msg)
 	 && id_p->proto_id == 0
 	 && iph2->ph1->rmconf->support_mip6 == 0
 	 && ipsecdoi_transportmode(iph2)) {
-		/* XXX debug message? */
 		idci = idcr = 0;
 	} else
 		idci = idcr = 1;
@@ -238,7 +230,7 @@ quick_i1send(iph2, msg)
 
 	body = vmalloc(tlen);
 	if (body == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get buffer to send.\n");
 		goto end;
 	}
@@ -318,18 +310,16 @@ quick_i2recv(iph2, msg0)
 	int tlen;
 	int error = ISAKMP_INTERNAL_ERROR;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph2->status != PHASE2ST_MSG1SENT) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph2->status);
 		goto end;
 	}
 
 	/* decrypt packet */
 	if (!ISSET(((struct isakmp *)msg0->v)->flags, ISAKMP_FLAG_E)) {
-		plog(logp, LOCATION, iph2->ph1->remote,
+		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
 			"Packet wasn't encrypted.\n");
 		goto end;
 	}
@@ -351,7 +341,7 @@ quick_i2recv(iph2, msg0)
 
 	/* HASH payload is fixed postion */
 	if (pa->type != ISAKMP_NPTYPE_HASH) {
-		plog(logp, LOCATION, iph2->ph1->remote,
+		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
 			"received invalid next payload type %d, "
 			"expecting %d.\n",
 			pa->type, ISAKMP_NPTYPE_HASH);
@@ -360,7 +350,6 @@ quick_i2recv(iph2, msg0)
 	hash = (struct isakmp_pl_hash *)pa->ptr;
 	pa++;
 
-#if 0
 	/*
 	 * this restriction was introduced in isakmp-oakley-05.
 	 * we do not check this for backward compatibility.
@@ -368,20 +357,18 @@ quick_i2recv(iph2, msg0)
 	 */
 	/* HASH payload is fixed postion */
 	if (pa->type != ISAKMP_NPTYPE_SA) {
-		plog(logp, LOCATION, iph2->ph1->remote,
+		plog(LLV_WARNING, LOCATION, iph2->ph1->remote,
 			"received invalid next payload type %d, "
 			"expecting %d.\n",
 			pa->type, ISAKMP_NPTYPE_HASH);
-		goto end;
 	}
-#endif
 
 	/* allocate buffer for computing HASH(2) */
 	tlen = iph2->nonce->l
 		+ ntohl(isakmp->len) - sizeof(*isakmp);
 	hbuf = vmalloc(tlen);
 	if (hbuf == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get hash buffer.\n");
 		goto end;
 	}
@@ -403,7 +390,7 @@ quick_i2recv(iph2, msg0)
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_SA:
 			if (iph2->sa_ret != NULL) {
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"Ignored, multiple SA "
 					"isn't supported.\n");
 				break;
@@ -438,7 +425,7 @@ quick_i2recv(iph2, msg0)
 
 			if (memcmp(vp->v, (caddr_t)pa->ptr + sizeof(struct isakmp_gen), vp->l)) {
 
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"mismatched ID was returned.\n");
 				error = ISAKMP_NTYPE_ATTRIBUTES_NOT_SUPPORTED;
 				goto end;
@@ -447,14 +434,12 @@ quick_i2recv(iph2, msg0)
 			break;
 
 		case ISAKMP_NPTYPE_N:
-			plog(logp, LOCATION, iph2->ph1->remote,
-				"peer transmitted Notify Message.\n");
 			isakmp_check_notify(pa->ptr, iph2->ph1);
 			break;
 
 		default:
 			/* don't send information, see ident_r1recv() */
-			plog(logp, LOCATION, iph2->ph1->remote,
+			plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
@@ -469,17 +454,16 @@ quick_i2recv(iph2, msg0)
 
 	/* payload existency check */
 	if (hash == NULL || iph2->sa_ret == NULL || iph2->nonce_p == NULL) {
-		plog(logp, LOCATION, iph2->ph1->remote,
+		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
 			"few isakmp message received.\n");
 		goto end;
 	}
 
 	/* Fixed buffer for calculating HASH */
 	memcpy(hbuf->v, iph2->nonce->v, iph2->nonce->l);
-	YIPSDEBUG(DEBUG_KEY,
-		plog(logp, LOCATION, NULL,
-			"HASH allocated:hbuf->l=%d actual:tlen=%d\n",
-			hbuf->l, tlen + iph2->nonce->l));
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"HASH allocated:hbuf->l=%d actual:tlen=%d\n",
+		hbuf->l, tlen + iph2->nonce->l);
 	/* adjust buffer length for HASH */
 	hbuf->l = iph2->nonce->l + tlen;
 
@@ -491,9 +475,8 @@ quick_i2recv(iph2, msg0)
 
 	r_hash = (char *)hash + sizeof(*hash);
 
-	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "HASH(2) received:"));
-	YIPSDEBUG(DEBUG_DKEY,
-		hexdump(r_hash, ntohs(hash->h.len) - sizeof(*hash)));
+	plog(LLV_DEBUG, LOCATION, NULL, "HASH(2) received:");
+	plogdump(LLV_DEBUG, r_hash, ntohs(hash->h.len) - sizeof(*hash));
 
 	my_hash = oakley_compute_hash1(iph2->ph1, iph2->msgid, hbuf);
 	if (my_hash == NULL)
@@ -503,7 +486,8 @@ quick_i2recv(iph2, msg0)
 	vfree(my_hash);
 
 	if (result) {
-		plog(logp, LOCATION, iph2->ph1->remote, "HASH(2) mismatch.\n");
+		plog(LLV_DEBUG, LOCATION, iph2->ph1->remote,
+			"HASH(2) mismatch.\n");
 		error = ISAKMP_NTYPE_INVALID_HASH_INFORMATION;
 		goto end;
 	}
@@ -554,11 +538,9 @@ quick_i2send(iph2, msg0)
 	int tlen;
 	int error = ISAKMP_INTERNAL_ERROR;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph2->status != PHASE2ST_STATUS6) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph2->status);
 		goto end;
 	}
@@ -567,11 +549,11 @@ quick_i2send(iph2, msg0)
     {
 	vchar_t *tmp = NULL;
 
-	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "HASH(3) generate\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "HASH(3) generate\n");
 
 	tmp = vmalloc(iph2->nonce->l + iph2->nonce_p->l);
 	if (tmp == NULL) { 
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get hash buffer.\n");
 		goto end;
 	}
@@ -590,7 +572,7 @@ quick_i2send(iph2, msg0)
 		+ sizeof(struct isakmp_gen) + iph2->hash->l;
 	buf = vmalloc(tlen);
 	if (buf == NULL) { 
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get buffer to send.\n");
 		goto end;
 	}
@@ -638,22 +620,19 @@ quick_i2send(iph2, msg0)
 	}
 
 	/* Do UPDATE for initiator */
-	YIPSDEBUG(DEBUG_PFKEY, plog(logp, LOCATION, NULL,
-		"call pk_sendupdate\n"););
+	plog(LLV_DEBUG, LOCATION, NULL, "call pk_sendupdate\n");
 	if (pk_sendupdate(iph2) < 0) {
-		plog(logp, LOCATION, NULL, "pfkey update failed.\n");
+		plog(LLV_ERROR, LOCATION, NULL, "pfkey update failed.\n");
 		goto end;
 	}
-	YIPSDEBUG(DEBUG_STAMP,
-		plog(logp, LOCATION, NULL, "pfkey update sent.\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "pfkey update sent.\n");
 
 	/* Do ADD for responder */
 	if (pk_sendadd(iph2) < 0) {
-		plog(logp, LOCATION, NULL, "pfkey add failed.\n");
+		plog(LLV_ERROR, LOCATION, NULL, "pfkey add failed.\n");
 		goto end;
 	}
-	YIPSDEBUG(DEBUG_STAMP,
-		plog(logp, LOCATION, NULL, "pfkey add sent.\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "pfkey add sent.\n");
 
 	error = 0;
 
@@ -682,18 +661,16 @@ quick_i3recv(iph2, msg0)
 	vchar_t *notify = NULL;
 	int error = ISAKMP_INTERNAL_ERROR;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph2->status != PHASE2ST_COMMIT) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph2->status);
 		goto end;
 	}
 
 	/* decrypt packet */
 	if (!ISSET(((struct isakmp *)msg0->v)->flags, ISAKMP_FLAG_E)) {
-		plog(logp, LOCATION, iph2->ph1->remote,
+		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
 			"Packet wasn't encrypted.\n");
 		goto end;
 	}
@@ -718,7 +695,7 @@ quick_i3recv(iph2, msg0)
 			isakmp_check_notify(pa->ptr, iph2->ph1);
 			notify = vmalloc(pa->len);
 			if (notify == NULL) {
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"failed to get notify buffer.\n");
 				goto end;
 			}
@@ -726,7 +703,7 @@ quick_i3recv(iph2, msg0)
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
-			plog(logp, LOCATION, iph2->ph1->remote,
+			plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
@@ -736,7 +713,7 @@ quick_i3recv(iph2, msg0)
 
 	/* payload existency check */
 	if (hash == NULL) {
-		plog(logp, LOCATION, iph2->ph1->remote,
+		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
 			"few isakmp message received.\n");
 		goto end;
 	}
@@ -750,9 +727,8 @@ quick_i3recv(iph2, msg0)
 
 	r_hash = (char *)hash + sizeof(*hash);
 
-	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "HASH(4) validate:"));
-	YIPSDEBUG(DEBUG_DKEY,
-		hexdump(r_hash, ntohs(hash->h.len) - sizeof(*hash)));
+	plog(LLV_DEBUG, LOCATION, NULL, "HASH(4) validate:");
+	plogdump(LLV_DEBUG, r_hash, ntohs(hash->h.len) - sizeof(*hash));
 
 	my_hash = oakley_compute_hash1(iph2->ph1, iph2->msgid, notify);
 	vfree(tmp);
@@ -763,7 +739,8 @@ quick_i3recv(iph2, msg0)
 	vfree(my_hash);
 
 	if (result) {
-		plog(logp, LOCATION, iph2->ph1->remote, "HASH(4) mismatch.\n");
+		plog(LLV_DEBUG, LOCATION, iph2->ph1->remote,
+			"HASH(4) mismatch.\n");
 		error = ISAKMP_NTYPE_INVALID_HASH_INFORMATION;
 		goto end;
 	}
@@ -779,22 +756,19 @@ quick_i3recv(iph2, msg0)
 	}
 
 	/* Do UPDATE for initiator */
-	YIPSDEBUG(DEBUG_PFKEY, plog(logp, LOCATION, NULL,
-		"call pk_sendupdate\n"););
+	plog(LLV_DEBUG, LOCATION, NULL, "call pk_sendupdate\n");
 	if (pk_sendupdate(iph2) < 0) {
-		plog(logp, LOCATION, NULL, "pfkey update failed.\n");
+		plog(LLV_ERROR, LOCATION, NULL, "pfkey update failed.\n");
 		goto end;
 	}
-	YIPSDEBUG(DEBUG_STAMP,
-		plog(logp, LOCATION, NULL, "pfkey update sent.\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "pfkey update sent.\n");
 
 	/* Do ADD for responder */
 	if (pk_sendadd(iph2) < 0) {
-		plog(logp, LOCATION, NULL, "pfkey add failed.\n");
+		plog(LLV_ERROR, LOCATION, NULL, "pfkey add failed.\n");
 		goto end;
 	}
-	YIPSDEBUG(DEBUG_STAMP,
-		plog(logp, LOCATION, NULL, "pfkey add sent.\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "pfkey add sent.\n");
 
 	error = 0;
 
@@ -829,18 +803,16 @@ quick_r1recv(iph2, msg0)
 	int f_id_order;	/* for ID payload detection */
 	int error = ISAKMP_INTERNAL_ERROR;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph2->status != PHASE2ST_START) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph2->status);
 		goto end;
 	}
 
 	/* decrypting */
 	if (!ISSET(((struct isakmp *)msg0->v)->flags, ISAKMP_FLAG_E)) {
-		plog(logp, LOCATION, iph2->ph1->remote,
+		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
 			"Packet wasn't encrypted.\n");
 		error = ISAKMP_NTYPE_PAYLOAD_MALFORMED;
 		goto end;
@@ -864,7 +836,7 @@ quick_r1recv(iph2, msg0)
 
 	/* HASH payload is fixed postion */
 	if (pa->type != ISAKMP_NPTYPE_HASH) {
-		plog(logp, LOCATION, iph2->ph1->remote,
+		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
 			"received invalid next payload type %d, "
 			"expecting %d.\n",
 			pa->type, ISAKMP_NPTYPE_HASH);
@@ -874,7 +846,6 @@ quick_r1recv(iph2, msg0)
 	hash = (struct isakmp_pl_hash *)pa->ptr;
 	pa++;
 
-#if 0
 	/*
 	 * this restriction was introduced in isakmp-oakley-05.
 	 * we do not check this for backward compatibility.
@@ -882,20 +853,18 @@ quick_r1recv(iph2, msg0)
 	 */
 	/* HASH payload is fixed postion */
 	if (pa->type != ISAKMP_NPTYPE_SA) {
-		plog(logp, LOCATION, iph2->ph1->remote,
+		plog(LLV_WARNING, LOCATION, iph2->ph1->remote,
 			"received invalid next payload type %d, "
 			"expecting %d.\n",
 			pa->type, ISAKMP_NPTYPE_HASH);
 		error = ISAKMP_NTYPE_BAD_PROPOSAL_SYNTAX;
-		goto end;
 	}
-#endif
 
 	/* allocate buffer for computing HASH(1) */
 	tlen = ntohl(isakmp->len) - sizeof(*isakmp);
 	hbuf = vmalloc(tlen);
 	if (hbuf == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get hash buffer.\n");
 		goto end;
 	}
@@ -931,7 +900,7 @@ quick_r1recv(iph2, msg0)
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_SA:
 			if (iph2->sa != NULL) {
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"Multi SAs isn't supported.\n");
 				goto end;
 			}
@@ -956,15 +925,11 @@ quick_r1recv(iph2, msg0)
 
 				if (isakmp_p2ph(&iph2->id_p, pa->ptr) < 0)
 					goto end;
-				YIPSDEBUG(DEBUG_KEY,
-					plog(logp, LOCATION, NULL,
-						"received IDci:");
-					PVDUMP(iph2->id_p));
 
 			} else if (iph2->id == NULL) {
 				/* for IDcr */
 				if (f_id_order == 0) {
-					plog(logp, LOCATION, NULL,
+					plog(LLV_ERROR, LOCATION, NULL,
 						"IDr2 payload is not "
 						"immediatelly followed "
 						"by IDi2. We allowed.\n");
@@ -973,28 +938,21 @@ quick_r1recv(iph2, msg0)
 
 				if (isakmp_p2ph(&iph2->id, pa->ptr) < 0)
 					goto end;
-				YIPSDEBUG(DEBUG_KEY,
-					plog(logp, LOCATION, NULL,
-						"received IDci:");
-					PVDUMP(iph2->id));
 			} else {
-				YIPSDEBUG(DEBUG_KEY,
-					plog(logp, LOCATION, NULL,
-						"received too many ID payloads.\n");
-					PVDUMP(iph2->id));
+				plog(LLV_ERROR, LOCATION, NULL,
+					"received too many ID payloads.\n");
+				plogdump(LLV_ERROR, iph2->id->v, iph2->id->l);
 				error = ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 				goto end;
 			}
 			break;
 
 		case ISAKMP_NPTYPE_N:
-			plog(logp, LOCATION, iph2->ph1->remote,
-				"peer transmitted Notify Message.\n");
 			isakmp_check_notify(pa->ptr, iph2->ph1);
 			break;
 
 		default:
-			plog(logp, LOCATION, iph2->ph1->remote,
+			plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
@@ -1010,10 +968,19 @@ quick_r1recv(iph2, msg0)
 
 	/* payload existency check */
 	if (hash == NULL || iph2->sa == NULL || iph2->nonce_p == NULL) {
-		plog(logp, LOCATION, iph2->ph1->remote,
+		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
 			"few isakmp message received.\n");
 		error = ISAKMP_NTYPE_PAYLOAD_MALFORMED;
 		goto end;
+	}
+
+	if (iph2->id_p) {
+		plog(LLV_DEBUG, LOCATION, NULL, "received IDci2:");
+		plogdump(LLV_DEBUG, iph2->id_p->v, iph2->id_p->l);
+	}
+	if (iph2->id) {
+		plog(LLV_DEBUG, LOCATION, NULL, "received IDcr2:");
+		plogdump(LLV_DEBUG, iph2->id->v, iph2->id->l);
 	}
 
 	/* adjust buffer length for HASH */
@@ -1027,9 +994,8 @@ quick_r1recv(iph2, msg0)
 
 	r_hash = (caddr_t)hash + sizeof(*hash);
 
-	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "HASH(1) validate:"));
-	YIPSDEBUG(DEBUG_DKEY,
-		hexdump(r_hash, ntohs(hash->h.len) - sizeof(*hash)));
+	plog(LLV_DEBUG, LOCATION, NULL, "HASH(1) validate:");
+	plogdump(LLV_DEBUG, r_hash, ntohs(hash->h.len) - sizeof(*hash));
 
 	my_hash = oakley_compute_hash1(iph2->ph1, iph2->msgid, hbuf);
 	if (my_hash == NULL)
@@ -1039,7 +1005,8 @@ quick_r1recv(iph2, msg0)
 	vfree(my_hash);
 
 	if (result) {
-		plog(logp, LOCATION, iph2->ph1->remote, "HASH(1) mismatch.\n");
+		plog(LLV_DEBUG, LOCATION, iph2->ph1->remote,
+			"HASH(1) mismatch.\n");
 		error = ISAKMP_NTYPE_INVALID_HASH_INFORMATION;
 		goto end;
 	}
@@ -1047,7 +1014,7 @@ quick_r1recv(iph2, msg0)
 
 	/* get sainfo */
 	if (get_sainfo_r(iph2) != 0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get sainfo.\n");
 		error = ISAKMP_NTYPE_NO_PROPOSAL_CHOSEN;
 		goto end;
@@ -1055,7 +1022,7 @@ quick_r1recv(iph2, msg0)
 
 	/* check the existence of ID payload and create responder's proposal */
 	if (get_proposal_r(iph2) < 0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get proposal for responder.\n");
 		error = ISAKMP_NTYPE_NO_PROPOSAL_CHOSEN;
 		goto end;
@@ -1070,7 +1037,7 @@ quick_r1recv(iph2, msg0)
 	/* check KE and attribute of PFS */
 	if ((iph2->dhpub_p != NULL && iph2->approval->pfs_group == 0)
 	 || (iph2->dhpub_p == NULL && iph2->approval->pfs_group != 0)) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"KE payload and PFS attribute mismatched.\n");
 		error = ISAKMP_NTYPE_NO_PROPOSAL_CHOSEN;
 		goto end;
@@ -1110,11 +1077,9 @@ quick_r1prep(iph2, msg)
 {
 	int error = ISAKMP_INTERNAL_ERROR;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph2->status != PHASE2ST_STATUS2) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph2->status);
 		goto end;
 	}
@@ -1125,8 +1090,7 @@ quick_r1prep(iph2, msg)
 	if (pk_sendgetspi(iph2) < 0)
 		goto end;
 
-	YIPSDEBUG(DEBUG_STAMP,
-		plog(logp, LOCATION, NULL, "pfkey getspi sent.\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "pfkey getspi sent.\n");
 
 	iph2->sce = sched_new(lcconf->wait_ph2complete,
 	    pfkey_timeover_stub, iph2);
@@ -1154,18 +1118,16 @@ quick_r2send(iph2, msg)
 	int pfsgroup;
 	u_int8_t *np_p = NULL;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph2->status != PHASE2ST_GETSPIDONE) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph2->status);
 		goto end;
 	}
 
 	/* update responders SPI */
 	if (ipsecdoi_updatespi(iph2) < 0) {
-		plog(logp, LOCATION, NULL, "failed to update spi.\n");
+		plog(LLV_ERROR, LOCATION, NULL, "failed to update spi.\n");
 		goto end;
 	}
 
@@ -1179,7 +1141,7 @@ quick_r2send(iph2, msg)
 	if (iph2->dhpub_p != NULL && pfsgroup != 0) {
 		/* DH group settting if PFS is required. */
 		if (oakley_setdhgroup(pfsgroup, &iph2->pfsgrp) < 0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to set DH value.\n");
 			goto end;
 		}
@@ -1201,7 +1163,7 @@ quick_r2send(iph2, msg)
 
 	body = vmalloc(tlen);
 	if (body == NULL) { 
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get buffer to send.\n");
 		goto end;
 	}
@@ -1287,7 +1249,7 @@ quick_r2send(iph2, msg)
 
 	tmp = vmalloc(iph2->nonce_p->l + body->l);
 	if (tmp == NULL) { 
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get hash buffer.\n");
 		goto end;
 	}
@@ -1338,18 +1300,16 @@ quick_r3recv(iph2, msg0)
 	struct isakmp_pl_hash *hash = NULL;
 	int error = ISAKMP_INTERNAL_ERROR;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph2->status != PHASE2ST_MSG1SENT) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph2->status);
 		goto end;
 	}
 
 	/* decrypt packet */
 	if (!ISSET(((struct isakmp *)msg0->v)->flags, ISAKMP_FLAG_E)) {
-		plog(logp, LOCATION, iph2->ph1->remote,
+		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
 			"Packet wasn't encrypted.\n");
 		goto end;
 	}
@@ -1371,13 +1331,11 @@ quick_r3recv(iph2, msg0)
 			hash = (struct isakmp_pl_hash *)pa->ptr;
 			break;
 		case ISAKMP_NPTYPE_N:
-			plog(logp, LOCATION, iph2->ph1->remote,
-				"peer transmitted Notify Message.\n");
 			isakmp_check_notify(pa->ptr, iph2->ph1);
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
-			plog(logp, LOCATION, iph2->ph1->remote,
+			plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
@@ -1387,7 +1345,7 @@ quick_r3recv(iph2, msg0)
 
 	/* payload existency check */
 	if (hash == NULL) {
-		plog(logp, LOCATION, iph2->ph1->remote,
+		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
 			"few isakmp message received.\n");
 		goto end;
 	}
@@ -1402,13 +1360,12 @@ quick_r3recv(iph2, msg0)
 
 	r_hash = (char *)hash + sizeof(*hash);
 
-	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "HASH(3) validate:"));
-	YIPSDEBUG(DEBUG_DKEY,
-	    hexdump(r_hash, ntohs(hash->h.len) - sizeof(*hash)));
+	plog(LLV_DEBUG, LOCATION, NULL, "HASH(3) validate:");
+	plogdump(LLV_DEBUG, r_hash, ntohs(hash->h.len) - sizeof(*hash));
 
 	tmp = vmalloc(iph2->nonce_p->l + iph2->nonce->l);
 	if (tmp == NULL) { 
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get hash buffer.\n");
 		goto end;
 	}
@@ -1424,7 +1381,8 @@ quick_r3recv(iph2, msg0)
 	vfree(my_hash);
 
 	if (result) {
-		plog(logp, LOCATION, iph2->ph1->remote, "HASH(3) mismatch.\n");
+		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
+			"HASH(3) mismatch.\n");
 		error = ISAKMP_NTYPE_INVALID_HASH_INFORMATION;
 		goto end;
 	}
@@ -1464,24 +1422,22 @@ quick_r3send(iph2, msg0)
 	int tlen;
 	int error = ISAKMP_INTERNAL_ERROR;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph2->status != PHASE2ST_COMMIT) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph2->status);
 		goto end;
 	}
 
 	/* generate HASH(4) */
 	/* XXX What can I do in the case of multiple different SA */
-	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "HASH(4) generate\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "HASH(4) generate\n");
 
 	/* XXX What should I do if there are multiple SAs ? */
 	tlen = sizeof(struct isakmp_pl_n) + iph2->approval->head->spisize;
 	notify = vmalloc(tlen);
 	if (notify == NULL) { 
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get notify buffer.\n");
 		goto end;
 	}
@@ -1504,7 +1460,7 @@ quick_r3send(iph2, msg0)
 		+ notify->l;
 	buf = vmalloc(tlen);
 	if (buf == NULL) { 
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get buffer to send.\n");
 		goto end;
 	}
@@ -1561,11 +1517,9 @@ quick_r3prep(iph2, msg0)
 	vchar_t *msg = NULL;
 	int error = ISAKMP_INTERNAL_ERROR;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph2->status != PHASE2ST_STATUS6) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph2->status);
 		goto end;
 	}
@@ -1584,22 +1538,19 @@ quick_r3prep(iph2, msg0)
 	}
 
 	/* Do UPDATE as responder */
-	YIPSDEBUG(DEBUG_PFKEY, plog(logp, LOCATION, NULL,
-		"call pk_sendupdate\n"););
+	plog(LLV_DEBUG, LOCATION, NULL, "call pk_sendupdate\n");
 	if (pk_sendupdate(iph2) < 0) {
-		plog(logp, LOCATION, NULL, "pfkey update failed.\n");
+		plog(LLV_ERROR, LOCATION, NULL, "pfkey update failed.\n");
 		goto end;
 	}
-	YIPSDEBUG(DEBUG_STAMP,
-		plog(logp, LOCATION, NULL, "pfkey update sent.\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "pfkey update sent.\n");
 
 	/* Do ADD for responder */
 	if (pk_sendadd(iph2) < 0) {
-		plog(logp, LOCATION, NULL, "pfkey add failed.\n");
+		plog(LLV_ERROR, LOCATION, NULL, "pfkey add failed.\n");
 		goto end;
 	}
-	YIPSDEBUG(DEBUG_STAMP,
-		plog(logp, LOCATION, NULL, "pfkey add sent.\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "pfkey add sent.\n");
 
 	error = 0;
 
@@ -1631,7 +1582,7 @@ quick_ir1sendmx(iph2, body)
 		+ body->l;
 	buf = vmalloc(tlen);
 	if (buf == NULL) { 
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get buffer to send.\n");
 		goto end;
 	}
@@ -1700,7 +1651,7 @@ get_sainfo_r(iph2)
 			prefixlen = sizeof(struct in6_addr) << 3;
 			break;
 		default:
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"invalid family: %d\n", iph2->src->sa_family);
 			goto end;
 		}
@@ -1710,7 +1661,7 @@ get_sainfo_r(iph2)
 		idsrc = vdup(iph2->id);
 	}
 	if (idsrc == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to set ID for source.\n");
 		goto end;
 	}
@@ -1724,7 +1675,7 @@ get_sainfo_r(iph2)
 			prefixlen = sizeof(struct in6_addr) << 3;
 			break;
 		default:
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"invalid family: %d\n", iph2->dst->sa_family);
 			goto end;
 		}
@@ -1734,21 +1685,20 @@ get_sainfo_r(iph2)
 		iddst = vdup(iph2->id_p);
 	}
 	if (iddst == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to set ID for destination.\n");
 		goto end;
 	}
 
 	iph2->sainfo = getsainfo(idsrc, iddst);
 	if (iph2->sainfo == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get sainfo.\n");
 		goto end;
 	}
 
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL,
-			"get sa info: %s\n", sainfo2str(iph2->sainfo)));
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"get sa info: %s\n", sainfo2str(iph2->sainfo));
 
 	error = 0;
 end:
@@ -1784,15 +1734,15 @@ get_proposal_r(iph2)
 	/* check the existence of ID payload */
 	if ((iph2->id_p != NULL && iph2->id == NULL)
 	 || (iph2->id_p == NULL && iph2->id != NULL)) {
-		plog(logp, LOCATION, NULL,
-			"ERROR: Both IDs wasn't found in payload.\n");
+		plog(LLV_ERROR, LOCATION, NULL,
+			"Both IDs wasn't found in payload.\n");
 		return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 	}
 
 	/* make sure if id[src,dst] is null. */
 	if (iph2->src_id || iph2->dst_id) {
-		plog(logp, LOCATION, NULL,
-			"FATAL: Why do ID[src,dst] exist already.\n");
+		plog(LLV_ERROR, LOCATION, NULL,
+			"Why do ID[src,dst] exist already.\n");
 		return ISAKMP_INTERNAL_ERROR;
 	}
 
@@ -1823,12 +1773,11 @@ get_proposal_r(iph2)
 			idi2type = _XIDT(iph2->id);
 	} else {
 
-		YIPSDEBUG(DEBUG_MISC,
-			plog(logp, LOCATION, NULL,
-				"get a destination address of SP index "
-				"from phase1 address "
-				"due to no ID payloads found "
-				"OR because ID type is not address.\n"));
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"get a destination address of SP index "
+			"from phase1 address "
+			"due to no ID payloads found "
+			"OR because ID type is not address.\n");
 
 		/*
 		 * copy the SOURCE address of IKE into the DESTINATION address
@@ -1871,12 +1820,11 @@ get_proposal_r(iph2)
 			iph2->dst_id = dupsaddr((struct sockaddr *)&spidx.src);
 		}
 	} else {
-		YIPSDEBUG(DEBUG_MISC,
-			plog(logp, LOCATION, NULL,
-				"get a source address of SP index "
-				"from phase1 address "
-				"due to no ID payloads found "
-				"OR because ID type is not address.\n"));
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"get a source address of SP index "
+			"from phase1 address "
+			"due to no ID payloads found "
+			"OR because ID type is not address.\n");
 
 		/* see above comment. */
 		memcpy(&spidx.src, iph2->dst, iph2->dst->sa_len);
@@ -1897,23 +1845,21 @@ get_proposal_r(iph2)
 
 #undef _XIDT(d)
 
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL,
-			"get a src address from ID payload "
-			"%s prefixlen=%u ul_proto=%u\n",
-			saddr2str((struct sockaddr *)&spidx.src),
-			spidx.prefs, spidx.ul_proto));
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL,
-			"get dst address from ID payload "
-			"%s prefixlen=%u ul_proto=%u\n",
-			saddr2str((struct sockaddr *)&spidx.dst),
-			spidx.prefd, spidx.ul_proto));
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"get a src address from ID payload "
+		"%s prefixlen=%u ul_proto=%u\n",
+		saddr2str((struct sockaddr *)&spidx.src),
+		spidx.prefs, spidx.ul_proto);
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"get dst address from ID payload "
+		"%s prefixlen=%u ul_proto=%u\n",
+		saddr2str((struct sockaddr *)&spidx.dst),
+		spidx.prefd, spidx.ul_proto);
 
 	sp = getsp_r(&spidx);
 	if (sp == NULL) {
-		plog(logp, LOCATION, NULL,
-			"ERROR: no policy found: %s\n", spidx2str(&spidx));
+		plog(LLV_ERROR, LOCATION, NULL,
+			"no policy found: %s\n", spidx2str(&spidx));
 		return ISAKMP_INTERNAL_ERROR;
 	}
 
@@ -1932,21 +1878,19 @@ get_proposal_r(iph2)
 
 	sp_out = getsp_r(&spidx);
 	if (!sp_out) {
-		YIPSDEBUG(DEBUG_MISC,
-			plog(logp, LOCATION, NULL,
-				"ERROR: no outbound policy found: %s\n",
-				spidx2str(&spidx)));
+		plog(LLV_ERROR, LOCATION, NULL,
+			"ERROR: no outbound policy found: %s\n",
+			spidx2str(&spidx));
 	}
     }
 
-	YIPSDEBUG(DEBUG_SA,
-		plog(logp, LOCATION, NULL,
-			"DEBUG: suitable SP found:%s\n", spidx2str(&spidx)));
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"suitable SP found:%s\n", spidx2str(&spidx));
 
 	/* require IPsec ? */
 	if (!(sp->policy == IPSEC_POLICY_IPSEC && sp_out->policy == IPSEC_POLICY_IPSEC)) {
-		plog(logp, LOCATION, NULL,
-			"NOTICE: policy found, but no IPsec required: %s\n",
+		plog(LLV_ERROR, LOCATION, NULL,
+			"policy found, but no IPsec required: %s\n",
 			spidx2str(&spidx));
 		return ISAKMP_INTERNAL_ERROR;
 	}
@@ -1954,8 +1898,8 @@ get_proposal_r(iph2)
 	/* allocate ipsec sa proposal */
 	newpp = newsaprop();
 	if (newpp == NULL) {
-		plog(logp, LOCATION, NULL,
-			"FATAL: failed to allocate saprop.\n");
+		plog(LLV_ERROR, LOCATION, NULL,
+			"failed to allocate saprop.\n");
 		goto err;
 	}
 	newpp->prop_no = 1;
@@ -1993,7 +1937,7 @@ get_proposal_r(iph2)
 		/* allocate ipsec sa protocol */
 		newpr = newsaproto();
 		if (newpr == NULL) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to allocate saproto.\n");
 			goto err;
 		}
@@ -2022,17 +1966,15 @@ get_proposal_r(iph2)
 			req = req->next;
 		}
 		if (pr || req) {
-			plog(logp, LOCATION, NULL,
-				"ERROR: There is a difference "
+			plog(LLV_ERROR, LOCATION, NULL,
+				"There is a difference "
 				"between the policies.\n");
 			goto err;
 		}
 	}
 
-	YIPSDEBUG(DEBUG_DSA,
-		plog(logp, LOCATION, NULL,
-			"my single bundle:\n");
-			printsaprop0(newpp););
+	plog(LLV_DEBUG, LOCATION, NULL, "my single bundle:\n");
+	printsaprop0(LLV_DEBUG, newpp);
 
 	iph2->proposal = newpp;
 

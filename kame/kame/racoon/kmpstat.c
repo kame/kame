@@ -1,4 +1,4 @@
-/*	$KAME: kmpstat.c,v 1.22 2000/10/04 17:41:01 itojun Exp $	*/
+/*	$KAME: kmpstat.c,v 1.23 2000/12/15 13:43:56 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -146,7 +146,7 @@ static char _addr1_[NI_MAXHOST], _addr2_[NI_MAXHOST];
 
 char *pname;
 int long_format = 0;
-u_int32_t debug = 0;
+u_int32_t loglevel = 0;
 
 void dump_isakmp_sa __P((char *, int));
 void dump_internal __P((char *, int));
@@ -199,7 +199,7 @@ main(ac, av)
 			break;
 
 		case 'd':
-			debug = 0xffffffff;
+			loglevel = 0xffffffff;
 			break;
 
 		default:
@@ -215,7 +215,7 @@ main(ac, av)
 	if (!combuf)
 		err(1, "kmpstat");
 
-	if (debug)
+	if (loglevel)
 		hexdump(combuf, ((struct admin_com *)combuf)->ac_len);
 
 	if (com_init() < 0)

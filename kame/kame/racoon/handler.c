@@ -1,4 +1,4 @@
-/*	$KAME: handler.c,v 1.40 2000/12/12 16:59:36 thorpej Exp $	*/
+/*	$KAME: handler.c,v 1.41 2000/12/15 13:43:55 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -145,10 +145,9 @@ purgeph1(iph1)
 		if (memcmp(&iph1->index, &p->index, sizeof(isakmp_index)) == 0)
 			continue;	/* don't delete current phase 1 SA */
 
-		YIPSDEBUG(DEBUG_SA,
-			plog(logp, LOCATION, NULL,
-				"proto_id ISAKMP purging spi:%s.\n",
-				isakmp_pindex(&p->index, 0)));
+		plog(LLV_INFO, LOCATION, iph1->remote,
+			"proto_id ISAKMP purging spi:%s.\n",
+			isakmp_pindex(&p->index, 0));
 
 		if (p->sce)
 			SCHED_KILL(p->sce);
@@ -174,7 +173,7 @@ dumpph1()
 
 	buf = vmalloc(cnt * sizeof(struct ph1dump));
 	if (buf == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get buffer\n");
 		return NULL;
 	}
@@ -293,7 +292,7 @@ insph1(iph1)
 {
 	/* validity check */
 	if (iph1->remote == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"invalid isakmp SA handler. no remote address.\n");
 		return -1;
 	}
@@ -683,8 +682,8 @@ check_recvedpkt(msg, list)
 
 	buf = eay_md5_one(msg);
 	if (!buf) {
-		plog(logp, LOCATION, NULL,
-			"FATAL: failed to allocate buffer.\n");
+		plog(LLV_ERROR, LOCATION, NULL,
+			"failed to allocate buffer.\n");
 		return 1;
 	}
 
@@ -713,14 +712,14 @@ add_recvedpkt(msg, list)
 
 	new = CALLOC(sizeof(*new), struct recvedpkt *);
 	if (!new) {
-		plog(logp, LOCATION, NULL,
-			"FATAL: failed to allocate buffer.\n");
+		plog(LLV_ERROR, LOCATION, NULL,
+			"failed to allocate buffer.\n");
 		return -1;
 	}
 	new->hash = eay_md5_one(msg);
 	if (!new->hash) {
-		plog(logp, LOCATION, NULL,
-			"FATAL: failed to allocate buffer.\n");
+		plog(LLV_ERROR, LOCATION, NULL,
+			"failed to allocate buffer.\n");
 		free(new);
 		return -1;
 	}

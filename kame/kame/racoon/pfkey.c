@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.91 2000/12/06 06:27:39 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.92 2000/12/15 13:43:56 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -177,7 +177,7 @@ pfkey_handler()
 	msg = (struct sadb_msg *)pk_recv(lcconf->sock_pfkey, &len);
 	if (msg == NULL) {
 		if (len < 0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to recv from pfkey (%s)\n",
 				strerror(errno));
 			goto end;
@@ -187,25 +187,23 @@ pfkey_handler()
 		}
 	}
 
-	YIPSDEBUG(DEBUG_PFKEY,
-		plog(logp, LOCATION, NULL, "get pfkey %s message\n",
-			s_pfkey_type(msg->sadb_msg_type)));
-	YIPSDEBUG(DEBUG_PFKEY, kdebug_sadb(msg));
+	plog(LLV_DEBUG, LOCATION, NULL, "get pfkey %s message\n",
+		s_pfkey_type(msg->sadb_msg_type));
+	plogdump(LLV_DEBUG, msg, msg->sadb_msg_len << 3);
 
 	/* is it mine ? */
 	/* XXX should be handled all message in spite of mine */
 	if ((msg->sadb_msg_type == SADB_DELETE && msg->sadb_msg_pid == getpid())
 	 && (msg->sadb_msg_pid != 0 && msg->sadb_msg_pid != getpid())) {
-		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL,
-				"pfkey message pid %d not interesting.\n",
-				msg->sadb_msg_pid));
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"pfkey message pid %d not interesting.\n",
+			msg->sadb_msg_pid);
 		goto end;
 	}
 
 	/* validity check */
 	if (msg->sadb_msg_errno) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"pfkey %s failed %s\n",
 			s_pfkey_type(msg->sadb_msg_type),
 			strerror(msg->sadb_msg_errno));
@@ -214,13 +212,13 @@ pfkey_handler()
 
 	/* check pfkey message. */
 	if (pfkey_align(msg, mhp)) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"libipsec failed pfkey align (%s)\n",
 			ipsec_strerror());
 		goto end;
 	}
 	if (pfkey_check(mhp)) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"libipsec failed pfkey check (%s)\n",
 			ipsec_strerror());
 		goto end;
@@ -228,10 +226,9 @@ pfkey_handler()
 	msg = (struct sadb_msg *)mhp[0];
 
 	if (pkrecvf[msg->sadb_msg_type] == NULL) {
-		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL,
-				"not supported command %s\n",
-				s_pfkey_type(msg->sadb_msg_type)));
+		plog(LLV_ERROR, LOCATION, NULL,
+			"not supported command %s\n",
+			s_pfkey_type(msg->sadb_msg_type));
 		goto end;
 	}
 
@@ -260,17 +257,16 @@ pfkey_dump_sadb(satype)
 	int len;
 
 	if ((s = pfkey_open()) < 0) {
-		plog(logp, LOCATION, NULL,
-			"ERROR: libipsec failed pfkey open: %s\n",
+		plog(LLV_ERROR, LOCATION, NULL,
+			"libipsec failed pfkey open: %s\n",
 			ipsec_strerror());
 		return NULL;
 	}
 
-	YIPSDEBUG(DEBUG_PFKEY,
-		plog(logp, LOCATION, NULL, "call pfkey_send_dump\n"););
+	plog(LLV_DEBUG, LOCATION, NULL, "call pfkey_send_dump\n");
 	if (pfkey_send_dump(s, satype) < 0) {
-		plog(logp, LOCATION, NULL,
-			"ERROR: libipsec failed dump: %s\n", ipsec_strerror());
+		plog(LLV_ERROR, LOCATION, NULL,
+			"libipsec failed dump: %s\n", ipsec_strerror());
 		goto fail;
 	}
 
@@ -292,7 +288,7 @@ pfkey_dump_sadb(satype)
 		bl = buf ? buf->l : 0;
 		buf = vrealloc(buf, bl + ml);
 		if (buf == NULL) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to reallocate buffer to dump.\n");
 			goto fail;
 		}
@@ -328,10 +324,9 @@ pfkey_flush_sadb(proto)
 	if ((satype = admin2pfkey_proto(proto)) < 0)
 		return;
 
-	YIPSDEBUG(DEBUG_PFKEY,
-		plog(logp, LOCATION, NULL, "call pfkey_send_flush\n"););
+	plog(LLV_DEBUG, LOCATION, NULL, "call pfkey_send_flush\n");
 	if (pfkey_send_flush(lcconf->sock_pfkey, satype) < 0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"libipsec failed send flush (%s)\n", ipsec_strerror());
 		return;
 	}
@@ -348,43 +343,40 @@ pfkey_init()
 	int reg_fail = 0;
 
 	if ((lcconf->sock_pfkey = pfkey_open()) < 0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"libipsec failed pfkey open (%s)", ipsec_strerror());
 		return -1;
 	}
 
-	YIPSDEBUG(DEBUG_PFKEY,
-		plog(logp, LOCATION, NULL, "call pfkey_send_register\n"););
+	plog(LLV_DEBUG, LOCATION, NULL, "call pfkey_send_register\n");
 	if (pfkey_send_register(lcconf->sock_pfkey, SADB_SATYPE_ESP) < 0
 	 || pfkey_recv_register(lcconf->sock_pfkey) < 0) {
-		plog(logp, LOCATION, NULL,
-			"WARNING: failed to regist esp (%s)", ipsec_strerror());
+		plog(LLV_WARNING, LOCATION, NULL,
+			"failed to regist esp (%s)", ipsec_strerror());
 		reg_fail++;
 		/*FALLTHROUGH*/
 	}
 
-	YIPSDEBUG(DEBUG_PFKEY,
-		plog(logp, LOCATION, NULL, "call pfkey_send_register\n"););
+	plog(LLV_DEBUG, LOCATION, NULL, "call pfkey_send_register\n");
 	if (pfkey_send_register(lcconf->sock_pfkey, SADB_SATYPE_AH) < 0
 	 || pfkey_recv_register(lcconf->sock_pfkey) < 0) {
-		plog(logp, LOCATION, NULL,
-			"WARNING: failed to regist ah (%s)", ipsec_strerror());
+		plog(LLV_WARNING, LOCATION, NULL,
+			"failed to regist ah (%s)", ipsec_strerror());
 		reg_fail++;
 		/*FALLTHROUGH*/
 	}
 
-	YIPSDEBUG(DEBUG_PFKEY,
-		plog(logp, LOCATION, NULL, "call pfkey_send_register\n"););
+	plog(LLV_DEBUG, LOCATION, NULL, "call pfkey_send_register\n");
 	if (pfkey_send_register(lcconf->sock_pfkey, SADB_X_SATYPE_IPCOMP) < 0
 	 || pfkey_recv_register(lcconf->sock_pfkey) < 0) {
-		plog(logp, LOCATION, NULL,
-			"WARNING: failed to regist ipcomp (%s)", ipsec_strerror());
+		plog(LLV_WARNING, LOCATION, NULL,
+			"failed to regist ipcomp (%s)", ipsec_strerror());
 		reg_fail++;
 		/*FALLTHROUGH*/
 	}
 
 	if (reg_fail == 3) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to regist any protocol.");
 		pfkey_close(lcconf->sock_pfkey);
 		return -1;
@@ -393,7 +385,7 @@ pfkey_init()
 	initsp();
 
 	if (pfkey_send_spddump(lcconf->sock_pfkey) < 0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"libipsec failed regist ipcomp (%s)", ipsec_strerror());
 		pfkey_close(lcconf->sock_pfkey);
 		return -1;
@@ -423,7 +415,7 @@ ipsecdoi2pfkey_aalg(hashtype)
 
 	/* not supported */
 	case IPSECDOI_ATTR_AUTH_DES_MAC:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"Not supported hash type: %u\n", hashtype);
 		return ~0;
 
@@ -431,7 +423,7 @@ ipsecdoi2pfkey_aalg(hashtype)
 	default:
 		return SADB_AALG_NONE;
 
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"Invalid hash type: %u\n", hashtype);
 		return ~0;
 	}
@@ -476,13 +468,13 @@ ipsecdoi2pfkey_ealg(t_id)
 	case IPSECDOI_ESP_3IDEA:
 	case IPSECDOI_ESP_IDEA:
 	case IPSECDOI_ESP_RC4:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"Not supported transform: %u\n", t_id);
 		return ~0;
 
 	case 0: /* reserved */
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"Invalid transform id: %u\n", t_id);
 		return ~0;
 	}
@@ -504,7 +496,7 @@ ipsecdoi2pfkey_calg(t_id)
 
 	case 0: /* reserved */
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"Invalid transform id: %u\n", t_id);
 		return ~0;
 	}
@@ -525,7 +517,7 @@ ipsecdoi2pfkey_proto(proto)
 		return SADB_X_SATYPE_IPCOMP;
 
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"Invalid ipsec_doi proto: %u\n", proto);
 		return ~0;
 	}
@@ -544,7 +536,7 @@ ipsecdoi2pfkey_alg(algclass, type)
 	case IPSECDOI_PROTO_IPCOMP:
 		return ipsecdoi2pfkey_calg(type);
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"Invalid ipsec_doi algclass: %u\n", algclass);
 		return ~0;
 	}
@@ -565,7 +557,7 @@ pfkey2ipsecdoi_proto(satype)
 		return IPSECDOI_PROTO_IPCOMP;
 
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"Invalid pfkey proto: %u\n", satype);
 		return ~0;
 	}
@@ -583,7 +575,7 @@ ipsecdoi2pfkey_mode(mode)
 	case IPSECDOI_ATTR_ENC_MODE_TRNS:
 		return IPSEC_MODE_TRANSPORT;
 	default:
-		plog(logp, LOCATION, NULL, "Invalid mode type: %u\n", mode);
+		plog(LLV_ERROR, LOCATION, NULL, "Invalid mode type: %u\n", mode);
 		return ~0;
 	}
 	/*NOTREACHED*/
@@ -602,7 +594,7 @@ pfkey2ipsecdoi_mode(mode)
 	case IPSEC_MODE_ANY:
 		return IPSECDOI_ATTR_ENC_MODE_ANY;
 	default:
-		plog(logp, LOCATION, NULL, "Invalid mode type: %u\n", mode);
+		plog(LLV_ERROR, LOCATION, NULL, "Invalid mode type: %u\n", mode);
 		return ~0;
 	}
 	/*NOTREACHED*/
@@ -623,7 +615,7 @@ keylen_aalg(hashtype)
 
 	/* not supported */
 	case IPSECDOI_ATTR_AUTH_DES_MAC:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"Not supported hash type: %u\n", hashtype);
 		return ~0;
 
@@ -631,7 +623,7 @@ keylen_aalg(hashtype)
 	default:
 		return SADB_AALG_NONE;
 
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"Invalid hash type: %u\n", hashtype);
 		return ~0;
 	}
@@ -671,13 +663,13 @@ keylen_ealg(t_id, encklen)
 	case IPSECDOI_ESP_3IDEA:
 	case IPSECDOI_ESP_IDEA:
 	case IPSECDOI_ESP_RC4:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"Not supported transform: %u\n", t_id);
 		return ~0;
 
 	case 0: /* reserved */
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"Invalid transform id: %u\n", t_id);
 		return ~0;
 	}
@@ -712,7 +704,7 @@ pfkey_convertfromipsecdoi(proto_id, t_id, hashtype,
 		*a_keylen >>= 3;
 
 		if (*e_type == SADB_EALG_NONE) {
-			plog(logp, LOCATION, NULL, "no ESP algorithm.\n");
+			plog(LLV_ERROR, LOCATION, NULL, "no ESP algorithm.\n");
 			goto bad;
 		}
 		break;
@@ -733,7 +725,7 @@ pfkey_convertfromipsecdoi(proto_id, t_id, hashtype,
 		*e_type = SADB_EALG_NONE;
 		*e_keylen = 0;
 		if (*a_type == SADB_AALG_NONE) {
-			plog(logp, LOCATION, NULL, "no AH algorithm.\n");
+			plog(LLV_ERROR, LOCATION, NULL, "no AH algorithm.\n");
 			goto bad;
 		}
 		break;
@@ -748,13 +740,13 @@ pfkey_convertfromipsecdoi(proto_id, t_id, hashtype,
 		*a_type = SADB_AALG_NONE;
 		*a_keylen = 0;
 		if (*e_type == SADB_X_CALG_NONE) {
-			plog(logp, LOCATION, NULL, "no IPCOMP algorithm.\n");
+			plog(LLV_ERROR, LOCATION, NULL, "no IPCOMP algorithm.\n");
 			goto bad;
 		}
 		break;
 
 	default:
-		plog(logp, LOCATION, NULL, "unknown IPsec protocol.\n");
+		plog(LLV_ERROR, LOCATION, NULL, "unknown IPsec protocol.\n");
 		goto bad;
 	}
 
@@ -778,7 +770,7 @@ void
 pfkey_timeover(iph2)
 	struct ph2handle *iph2;
 {
-	plog(logp, LOCATION, NULL,
+	plog(LLV_ERROR, LOCATION, NULL,
 		"%s give up to get IPsec-SA due to time up to wait.\n",
 		saddrwop2str(iph2->dst));
 	SCHED_INIT(iph2->sce);
@@ -818,20 +810,18 @@ pk_sendgetspi(iph2)
 		/* validity check */
 		satype = ipsecdoi2pfkey_proto(pr->proto_id);
 		if (satype == ~0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"invalid proto_id %d\n", pr->proto_id);
 			return -1;
 		}
 		mode = ipsecdoi2pfkey_mode(pr->encmode);
 		if (mode == ~0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"invalid encmode %d\n", pr->encmode);
 			return -1;
 		}
 
-		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL,
-				"call pfkey_send_getspi\n"););
+		plog(LLV_DEBUG, LOCATION, NULL, "call pfkey_send_getspi\n");
 		if (pfkey_send_getspi(
 				lcconf->sock_pfkey,
 				satype,
@@ -839,16 +829,14 @@ pk_sendgetspi(iph2)
 				iph2->dst,		/* src of SA */
 				iph2->src,		/* dst of SA */
 				0, 0, pr->reqid_in, iph2->seq) < 0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"ipseclib failed send getspi (%s)\n",
 				ipsec_strerror());
 			return -1;
 		}
-		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL,
-				"pfkey GETSPI sent: %s\n",
-				sadbsecas2str(iph2->dst, iph2->src,
-					satype, 0, mode)));
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"pfkey GETSPI sent: %s\n",
+			sadbsecas2str(iph2->dst, iph2->src, satype, 0, mode));
 	}
 
 	return 0;
@@ -873,7 +861,7 @@ pk_recvgetspi(mhp)
 	/* validity check */
 	if (mhp[SADB_EXT_SA] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"inappropriate sadb getspi message passed.\n");
 		return -1;
 	}
@@ -883,7 +871,7 @@ pk_recvgetspi(mhp)
 
 	iph2 = getph2byseq(msg->sadb_msg_seq);
 	if (iph2 == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"seq %d of %s message not interesting.\n",
 			msg->sadb_msg_seq,
 			s_pfkey_type(msg->sadb_msg_type));
@@ -891,7 +879,7 @@ pk_recvgetspi(mhp)
 	}
 
 	if (iph2->status != PHASE2ST_GETSPISENT) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatch (db:%d msg:%d)\n",
 			iph2->status, PHASE2ST_GETSPISENT);
 		return -1;
@@ -907,20 +895,19 @@ pk_recvgetspi(mhp)
 		if (pr->proto_id == proto_id && pr->spi == 0) {
 			pr->spi = sa->sadb_sa_spi;
 			notfound = 0;
-			YIPSDEBUG(DEBUG_PFKEY,
-				plog(logp, LOCATION, NULL,
-					"pfkey GETSPI succeeded: %s\n",
-					sadbsecas2str(iph2->dst, iph2->src,
-					    msg->sadb_msg_satype,
-					    sa->sadb_sa_spi,
-					    ipsecdoi2pfkey_mode(pr->encmode))));
+			plog(LLV_DEBUG, LOCATION, NULL,
+				"pfkey GETSPI succeeded: %s\n",
+				sadbsecas2str(iph2->dst, iph2->src,
+				    msg->sadb_msg_satype,
+				    sa->sadb_sa_spi,
+				    ipsecdoi2pfkey_mode(pr->encmode)));
 		}
 		if (pr->spi == 0)
 			allspiok = 0;	/* not get all spi */
 	}
 
 	if (notfound) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"get spi for unknown address %s\n",
 			saddrwop2str(iph2->dst));
 		return -1;
@@ -930,7 +917,7 @@ pk_recvgetspi(mhp)
 		/* update status */
 		iph2->status = PHASE2ST_GETSPIDONE;
 		if (isakmp_post_getspi(iph2) < 0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to start post getspi.\n");
 			unbindph12(iph2);
 			remph2(iph2);
@@ -957,7 +944,7 @@ pk_sendupdate(iph2)
 
 	/* sanity check */
 	if (iph2->approval == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"no approvaled SAs found.\n");
 	}
 
@@ -974,13 +961,13 @@ pk_sendupdate(iph2)
 		/* validity check */
 		satype = ipsecdoi2pfkey_proto(pr->proto_id);
 		if (satype == ~0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"invalid proto_id %d\n", pr->proto_id);
 			return -1;
 		}
 		mode = ipsecdoi2pfkey_mode(pr->encmode);
 		if (mode == ~0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"invalid encmode %d\n", pr->encmode);
 			return -1;
 		}
@@ -995,8 +982,7 @@ pk_sendupdate(iph2)
 				&a_type, &a_keylen, &flags) < 0)
 			return -1;
 
-		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL, "call pfkey_send_update\n"));
+		plog(LLV_DEBUG, LOCATION, NULL, "call pfkey_send_update\n");
 
 		if (pfkey_send_update(
 				lcconf->sock_pfkey,
@@ -1012,7 +998,7 @@ pk_sendupdate(iph2)
 				0, iph2->approval->lifebyte * 1024,
 				iph2->approval->lifetime, 0,
 				iph2->seq) < 0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"libipsec failed send update (%s)\n",
 				ipsec_strerror());
 			return -1;
@@ -1043,7 +1029,7 @@ pk_recvupdate(mhp)
 	 || mhp[SADB_EXT_SA] == NULL
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"inappropriate sadb update message passed.\n");
 		return -1;
 	}
@@ -1058,7 +1044,7 @@ pk_recvupdate(mhp)
 
 	iph2 = getph2byseq(msg->sadb_msg_seq);
 	if (iph2 == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"seq %d of %s message not interesting.\n",
 			msg->sadb_msg_seq,
 			s_pfkey_type(msg->sadb_msg_type));
@@ -1066,7 +1052,7 @@ pk_recvupdate(mhp)
 	}
 
 	if (iph2->status != PHASE2ST_ADDSA) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatch (db:%d msg:%d)\n",
 			iph2->status, PHASE2ST_ADDSA);
 		return -1;
@@ -1076,13 +1062,13 @@ pk_recvupdate(mhp)
 	for (pr = iph2->approval->head; pr != NULL; pr = pr->next) {
 		proto_id = pfkey2ipsecdoi_proto(msg->sadb_msg_satype);
 		if (proto_id == ~0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"invalid proto_id %d\n", msg->sadb_msg_satype);
 			return -1;
 		}
 		encmode = pfkey2ipsecdoi_mode(sa_mode);
 		if (encmode == ~0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"invalid encmode %d\n", sa_mode);
 			return -1;
 		}
@@ -1090,15 +1076,14 @@ pk_recvupdate(mhp)
 		if (pr->proto_id == proto_id
 		 && pr->spi == sa->sadb_sa_spi) {
 			pr->ok = 1;
-			YIPSDEBUG(DEBUG_PFKEY,
-				plog(logp, LOCATION, NULL,
-					"pfkey UPDATE succeeded: %s\n",
-					sadbsecas2str(iph2->dst, iph2->src,
-					    msg->sadb_msg_satype,
-					    sa->sadb_sa_spi,
-					    sa_mode)));
+			plog(LLV_DEBUG, LOCATION, NULL,
+				"pfkey UPDATE succeeded: %s\n",
+				sadbsecas2str(iph2->dst, iph2->src,
+				    msg->sadb_msg_satype,
+				    sa->sadb_sa_spi,
+				    sa_mode));
 
-			plog(logp, LOCATION, NULL,
+			plog(LLV_INFO, LOCATION, NULL,
 				"IPsec-SA established: %s\n",
 				sadbsecas2str(iph2->dst, iph2->src,
 					msg->sadb_msg_satype, sa->sadb_sa_spi,
@@ -1130,7 +1115,7 @@ pk_recvupdate(mhp)
 	iph2->sce = sched_new(iph2->approval->lifetime,
 	    isakmp_ph2expire_stub, iph2);
 
-	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "===\n");
 	return 0;
 }
 
@@ -1148,7 +1133,7 @@ pk_sendadd(iph2)
 
 	/* sanity check */
 	if (iph2->approval == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"no approvaled SAs found.\n");
 	}
 
@@ -1165,13 +1150,13 @@ pk_sendadd(iph2)
 		/* validity check */
 		satype = ipsecdoi2pfkey_proto(pr->proto_id);
 		if (satype == ~0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"invalid proto_id %d\n", pr->proto_id);
 			return -1;
 		}
 		mode = ipsecdoi2pfkey_mode(pr->encmode);
 		if (mode == ~0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"invalid encmode %d\n", pr->encmode);
 			return -1;
 		}
@@ -1186,8 +1171,7 @@ pk_sendadd(iph2)
 				&a_type, &a_keylen, &flags) < 0)
 			return -1;
 
-		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL, "call pfkey_send_add\n"));
+		plog(LLV_DEBUG, LOCATION, NULL, "call pfkey_send_add\n");
 
 		if (pfkey_send_add(
 				lcconf->sock_pfkey,
@@ -1203,8 +1187,9 @@ pk_sendadd(iph2)
 				0, iph2->approval->lifebyte * 1024,
 				iph2->approval->lifetime, 0,
 				iph2->seq) < 0) {
-			plog(logp, LOCATION, NULL,
-				"libipsec failed send add (%s)\n", ipsec_strerror());
+			plog(LLV_ERROR, LOCATION, NULL,
+				"libipsec failed send add (%s)\n",
+				ipsec_strerror());
 			return -1;
 		}
 	}
@@ -1231,7 +1216,7 @@ pk_recvadd(mhp)
 	 || mhp[SADB_EXT_SA] == NULL
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"inappropriate sadb add message passed.\n");
 		return -1;
 	}
@@ -1246,7 +1231,7 @@ pk_recvadd(mhp)
 
 	iph2 = getph2byseq(msg->sadb_msg_seq);
 	if (iph2 == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"seq %d of %s message not interesting.\n",
 			msg->sadb_msg_seq,
 			s_pfkey_type(msg->sadb_msg_type));
@@ -1258,12 +1243,12 @@ pk_recvadd(mhp)
 	 * because they must be updated by SADB_UPDATE message
 	 */
 
-	plog(logp, LOCATION, NULL,
+	plog(LLV_ERROR, LOCATION, NULL,
 		"IPsec-SA established: %s\n",
 		sadbsecas2str(iph2->src, iph2->dst,
 			msg->sadb_msg_satype, sa->sadb_sa_spi, sa_mode));
 
-	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "===\n");
 	return 0;
 }
 
@@ -1284,7 +1269,7 @@ pk_recvexpire(mhp)
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
 	 || (mhp[SADB_EXT_LIFETIME_HARD] != NULL
 	  && mhp[SADB_EXT_LIFETIME_SOFT] != NULL)) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"inappropriate sadb expire message passed.\n");
 		return -1;
 	}
@@ -1300,12 +1285,12 @@ pk_recvexpire(mhp)
 
 	proto_id = pfkey2ipsecdoi_proto(msg->sadb_msg_satype);
 	if (proto_id == ~0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"ERROR: invalid proto_id %d\n", msg->sadb_msg_satype);
 		return -1;
 	}
 
-	plog(logp, LOCATION, NULL,
+	plog(LLV_ERROR, LOCATION, NULL,
 		"IPsec-SA expired: %s\n",
 		sadbsecas2str(src, dst,
 			msg->sadb_msg_satype, sa->sadb_sa_spi, sa_mode));
@@ -1317,12 +1302,11 @@ pk_recvexpire(mhp)
 		 * phase2 handler has been deleted already when 2nd message
 		 * is received.
 		 */
-		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL,
-				"no such a SA found: %s\n",
-				sadbsecas2str(src, dst,
-				    msg->sadb_msg_satype, sa->sadb_sa_spi,
-				    sa_mode)));
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"no such a SA found: %s\n",
+			sadbsecas2str(src, dst,
+			    msg->sadb_msg_satype, sa->sadb_sa_spi,
+			    sa_mode));
 		return 0;
 	}
 	if (iph2->status != PHASE2ST_ESTABLISHED) {
@@ -1334,10 +1318,9 @@ pk_recvexpire(mhp)
 		 * without receiving a expire message.  Another is that racoon
 		 * may receive the multiple expire messages from the kernel.
 		 */
-		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL,
-				"the expire message is received "
-				"but the handler has not been established.\n"));
+		plog(LLV_WARNING, LOCATION, NULL,
+			"the expire message is received "
+			"but the handler has not been established.\n");
 		return 0;
 	}
 
@@ -1357,7 +1340,7 @@ pk_recvexpire(mhp)
 
 		/* start isakmp initiation by using ident exchange */
 		if (isakmp_post_acquire(iph2) < 0) {
-			plog(logp, LOCATION, iph2->dst,
+			plog(LLV_ERROR, LOCATION, iph2->dst,
 				"failed to begin ipsec sa "
 				"re-negotication.\n");
 			unbindph12(iph2);
@@ -1402,7 +1385,7 @@ pk_recvacquire(mhp)
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
 	 || mhp[SADB_X_EXT_POLICY] == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"inappropriate sadb acquire message passed.\n");
 		return -1;
 	}
@@ -1411,9 +1394,8 @@ pk_recvacquire(mhp)
 
 	/* ignore if type is not IPSEC_POLICY_IPSEC */
 	if (xpl->sadb_x_policy_type != IPSEC_POLICY_IPSEC) {
-		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL,
-				"ignore SPDGET message. type is not IPsec.\n"));
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"ignore SPDGET message. type is not IPsec.\n");
 		return 0;
 	}
 
@@ -1428,10 +1410,9 @@ pk_recvacquire(mhp)
 	  && IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6 *)sa)->sin6_addr))
 #endif
 	) {
-		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL,
-				"ignore due to multicast address: %s.\n",
-				saddrwop2str(sa)));
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"ignore due to multicast address: %s.\n",
+			saddrwop2str(sa));
 		return 0;
 	}
     }
@@ -1451,14 +1432,13 @@ pk_recvacquire(mhp)
 	iph2[0] = getph2byspid(xpl->sadb_x_policy_id);
 	if (iph2[0] != NULL) {
 		if (iph2[0]->status < PHASE2ST_ESTABLISHED) {
-			YIPSDEBUG(DEBUG_PFKEY,
-				plog(logp, LOCATION, NULL,
-					"ph2 found. ignore it.\n"));
+			plog(LLV_DEBUG, LOCATION, NULL,
+				"ignore the acquire becuase ph2 found\n");
 			return -1;
 		}
 		if (iph2[0]->status == PHASE2ST_EXPIRED) {
-			plog(logp, LOCATION, NULL,
-				"FATAL: why ph2 is expired ?.\n");
+			plog(LLV_ERROR, LOCATION, NULL,
+				"why ph2 is expired ?.\n");
 			return -1;
 		}
 	}
@@ -1466,7 +1446,7 @@ pk_recvacquire(mhp)
 	/* search for proper policyindex */
 	sp = getspbyspid(xpl->sadb_x_policy_id);
 	if (sp == NULL) {
-		plog(logp, LOCATION, NULL, "no policy found: id:%d.\n",
+		plog(LLV_ERROR, LOCATION, NULL, "no policy found: id:%d.\n",
 			xpl->sadb_x_policy_id);
 		return -1;
 	}
@@ -1484,16 +1464,14 @@ pk_recvacquire(mhp)
 
 	sp_in = getsp_r(&spidx);
 	if (!sp_in) {
-		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL,
-				"WARNING: no in-bound policy found: %s\n",
-				spidx2str(&spidx)));
+		plog(LLV_ERROR, LOCATION, NULL,
+			"no in-bound policy found: %s\n",
+			spidx2str(&spidx));
 	}
     }
 
-	YIPSDEBUG(DEBUG_PFKEY,
-		plog(logp, LOCATION, NULL,
-			"policy found: %s.\n", spidx2str(&sp->spidx)));
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"policy found: %s.\n", spidx2str(&sp->spidx));
 
 	memset(iph2, 0, MAXNESTEDSA);
 
@@ -1502,7 +1480,7 @@ pk_recvacquire(mhp)
 	/* allocate a phase 2 */
 	iph2[n] = newph2();
 	if (iph2[n] == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to allocate phase2 entry.\n");
 		return -1;
 	}
@@ -1522,9 +1500,8 @@ pk_recvacquire(mhp)
 		return -1;
 	}
 
-	YIPSDEBUG(DEBUG_NOTIFY,
-		plog(logp, LOCATION, NULL,
-			"new acquire %s\n", spidx2str(&sp->spidx)));
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"new acquire %s\n", spidx2str(&sp->spidx));
 
 	/* get sainfo */
     {
@@ -1533,7 +1510,7 @@ pk_recvacquire(mhp)
 	idsrc = ipsecdoi_sockaddr2id((struct sockaddr *)&sp->spidx.src,
 				sp->spidx.prefs, sp->spidx.ul_proto);
 	if (idsrc == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get ID for %s\n",
 			spidx2str(&sp->spidx));
 		delph2(iph2[n]);
@@ -1542,7 +1519,7 @@ pk_recvacquire(mhp)
 	iddst = ipsecdoi_sockaddr2id((struct sockaddr *)&sp->spidx.dst,
 				sp->spidx.prefd, sp->spidx.ul_proto);
 	if (iddst == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get ID for %s\n",
 			spidx2str(&sp->spidx));
 		vfree(idsrc);
@@ -1553,7 +1530,7 @@ pk_recvacquire(mhp)
 	vfree(idsrc);
 	vfree(iddst);
 	if (iph2[n]->sainfo == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get sainfo.\n");
 		delph2(iph2[n]);
 		return -1;
@@ -1564,7 +1541,7 @@ pk_recvacquire(mhp)
 	/* allocate first proposal */
 	newpp = newsaprop();
 	if (newpp == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to allocate saprop.\n");
 		delph2(iph2[n]);
 		return -1;
@@ -1602,14 +1579,14 @@ pk_recvacquire(mhp)
 
 				/* check first ph2's proposal */
 				if (iph2[0]->proposal == NULL) {
-					plog(logp, LOCATION, NULL,
+					plog(LLV_ERROR, LOCATION, NULL,
 						"SA addresses mismatch.\n");
 					goto err;
 				}
 
 				/* XXX new ph2 should be alloated. */
 				
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"not supported nested SA. Ignore.\n");
 				break;
 			}
@@ -1618,7 +1595,7 @@ pk_recvacquire(mhp)
 		/* allocate ipsec sa protocol */
 		newpr = newsaproto();
 		if (newpr == NULL) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to allocate saproto.\n");
 			goto err;
 		}
@@ -1629,7 +1606,7 @@ pk_recvacquire(mhp)
 		newpr->reqid_out = req->saidx.reqid;
 
 		if (set_satrnsbysainfo(newpr, iph2[n]->sainfo) < 0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to get algorithms.\n");
 			goto err;
 		}
@@ -1650,8 +1627,8 @@ pk_recvacquire(mhp)
 			req = req->next;
 		}
 		if (pr || req) {
-			plog(logp, LOCATION, NULL,
-				"ERROR: There is a difference "
+			plog(LLV_ERROR, LOCATION, NULL,
+				"There is a difference "
 				"between the policies.\n");
 			goto err;
 		}
@@ -1660,7 +1637,7 @@ pk_recvacquire(mhp)
 	/* start isakmp initiation by using ident exchange */
 	/* XXX should be looped if there are multiple phase 2 handler. */
 	if (isakmp_post_acquire(iph2[n]) < 0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to begin ipsec sa negotication.\n");
 		unbindph12(iph2[n]);
 		goto err;
@@ -1697,7 +1674,7 @@ pk_recvdelete(mhp)
 	 || mhp[SADB_EXT_SA] == NULL
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"inappropriate sadb acquire message passed.\n");
 		return -1;
 	}
@@ -1708,23 +1685,22 @@ pk_recvdelete(mhp)
 
 	proto_id = pfkey2ipsecdoi_proto(msg->sadb_msg_satype);
 	if (proto_id == ~0) {
-		plog(logp, LOCATION, NULL,
-			"ERROR: invalid proto_id %d\n", msg->sadb_msg_satype);
+		plog(LLV_ERROR, LOCATION, NULL,
+			"invalid proto_id %d\n", msg->sadb_msg_satype);
 		return -1;
 	}
 
 	iph2 = getph2bysaidx(src, dst, proto_id, sa->sadb_sa_spi);
 	if (iph2 == NULL) {
 		/* ignore */
-		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL,
-				"no iph2 found: %s\n",
-				sadbsecas2str(src, dst, msg->sadb_msg_satype,
-					sa->sadb_sa_spi, IPSEC_MODE_ANY)));
+		plog(LLV_ERROR, LOCATION, NULL,
+			"no iph2 found: %s\n",
+			sadbsecas2str(src, dst, msg->sadb_msg_satype,
+				sa->sadb_sa_spi, IPSEC_MODE_ANY));
 		return 0;
 	}
 
-	plog(logp, LOCATION, NULL,
+	plog(LLV_ERROR, LOCATION, NULL,
 		"pfkey DELETE received: %s\n",
 		sadbsecas2str(iph2->src, iph2->dst,
 			msg->sadb_msg_satype, sa->sadb_sa_spi, IPSEC_MODE_ANY));
@@ -1750,7 +1726,7 @@ pk_recvflush(mhp)
 
 	/* sanity check */
 	if (mhp[0] == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"inappropriate sadb acquire message passed.\n");
 		return -1;
 	}
@@ -1766,7 +1742,7 @@ pk_recvspdupdate(mhp)
 {
 	/* sanity check */
 	if (mhp[0] == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"inappropriate sadb spdupdate message passed.\n");
 		return -1;
 	}
@@ -1788,7 +1764,7 @@ pk_recvspdadd(mhp)
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
 	 || mhp[SADB_X_EXT_POLICY] == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"inappropriate sadb spdadd message passed.\n");
 		return -1;
 	}
@@ -1806,7 +1782,7 @@ pk_recvspdadd(mhp)
 
 	sp = getsp(&spidx);
 	if (sp != NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"such policy already exists. "
 			"anyway replace it: %s\n",
 			spidx2str(&spidx));
@@ -1834,7 +1810,7 @@ pk_recvspddelete(mhp)
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
 	 || mhp[SADB_X_EXT_POLICY] == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"inappropriate sadb spddelete message passed.\n");
 		return -1;
 	}
@@ -1852,7 +1828,7 @@ pk_recvspddelete(mhp)
 
 	sp = getsp(&spidx);
 	if (sp == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"no policy found: %s\n",
 			spidx2str(&spidx));
 		return -1;
@@ -1870,7 +1846,7 @@ pk_recvspdget(mhp)
 {
 	/* sanity check */
 	if (mhp[0] == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"inappropriate sadb spdget message passed.\n");
 		return -1;
 	}
@@ -1890,7 +1866,7 @@ pk_recvspddump(mhp)
 
 	/* sanity check */
 	if (mhp[0] == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"inappropriate sadb spddump message passed.\n");
 		return -1;
 	}
@@ -1910,7 +1886,7 @@ pk_recvspddump(mhp)
 
 	sp = getsp(&spidx);
 	if (sp != NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"such policy already exists. "
 			"anyway replace it: %s\n",
 			spidx2str(&spidx));
@@ -1930,7 +1906,7 @@ pk_recvspdflush(mhp)
 {
 	/* sanity check */
 	if (mhp[0] == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"inappropriate sadb spdflush message passed.\n");
 		return -1;
 	}
@@ -1953,7 +1929,7 @@ pk_sendeacquire(iph2)
 	len = sizeof(struct sadb_msg);
 	newmsg = CALLOC(len, struct sadb_msg *);
 	if (newmsg == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get buffer to send acquire.\n");
 		return -1;
 	}
@@ -1997,13 +1973,12 @@ pk_checkalg(class, calg, keylen)
 		sup = SADB_EXT_SUPPORTED_AUTH;
 		break;
 	case IPSECDOI_PROTO_IPCOMP:
-		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL,
-				"WARNING: compression algorithm "
-				"can not be checked.\n"));
+		plog(LLV_WARNING, LOCATION, NULL,
+			"compression algorithm can not be checked.\n");
 		return 0;
 	default:
-		plog(logp, LOCATION, NULL, "ERROR: invalid algorithm class.\n");
+		plog(LLV_ERROR, LOCATION, NULL,
+			"invalid algorithm class.\n");
 		return -1;
 	}
 	alg = ipsecdoi2pfkey_alg(algclass2doi(class), algtype2doi(class, calg));
@@ -2012,8 +1987,8 @@ pk_checkalg(class, calg, keylen)
 
 	if (keylen == 0) {
 		if (ipsec_get_keylen(sup, alg, &alg0)) {
-			plog(logp, LOCATION, NULL,
-				"ERROR: %s.\n", ipsec_strerror());
+			plog(LLV_ERROR, LOCATION, NULL,
+				"%s.\n", ipsec_strerror());
 			return -1;
 		}
 		keylen = alg0.sadb_alg_minbits;
@@ -2021,7 +1996,8 @@ pk_checkalg(class, calg, keylen)
 
 	error = ipsec_check_keylen(sup, alg, keylen);
 	if (error)
-		plog(logp, LOCATION, NULL, "ERROR: %s.\n", ipsec_strerror());
+		plog(LLV_ERROR, LOCATION, NULL,
+			"%s.\n", ipsec_strerror());
 
 	return error;
 }
@@ -2091,7 +2067,7 @@ addnewsp(mhp)
 	if (mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
 	 || mhp[SADB_X_EXT_POLICY] == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"inappropriate sadb spd management message passed.\n");
 		return -1;
 	}
@@ -2102,7 +2078,7 @@ addnewsp(mhp)
 
 	new = newsp();
 	if (new == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to allocate buffer\n");
 		return -1;
 	}
@@ -2128,7 +2104,7 @@ addnewsp(mhp)
 
 		/* validity check */
 		if (PFKEY_EXTLEN(xpl) < sizeof(*xpl)) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"invalid msg length.\n");
 			return -1;
 		}
@@ -2140,7 +2116,7 @@ addnewsp(mhp)
 
 			/* length check */
 			if (xisr->sadb_x_ipsecrequest_len < sizeof(*xisr)) {
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"invalid msg length.\n");
 				return -1;
 			}
@@ -2148,7 +2124,7 @@ addnewsp(mhp)
 			/* allocate request buffer */
 			*p_isr = newipsecreq();
 			if (*p_isr == NULL) {
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"failed to get new ipsecreq.\n");
 				return -1;
 			}
@@ -2162,7 +2138,7 @@ addnewsp(mhp)
 			case IPPROTO_IPCOMP:
 				break;
 			default:
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"invalid proto type: %u\n",
 					xisr->sadb_x_ipsecrequest_proto);
 				return -1;
@@ -2175,7 +2151,7 @@ addnewsp(mhp)
 				break;
 			case IPSEC_MODE_ANY:
 			default:
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"invalid mode: %u\n",
 					xisr->sadb_x_ipsecrequest_mode);
 				return -1;
@@ -2193,7 +2169,7 @@ addnewsp(mhp)
 				break;
 
 			default:
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"invalid level: %u\n",
 					xisr->sadb_x_ipsecrequest_level);
 				return -1;
@@ -2222,7 +2198,7 @@ addnewsp(mhp)
 
 			/* validity check */
 			if (tlen < 0) {
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"becoming tlen < 0\n");
 			}
 
@@ -2232,7 +2208,7 @@ addnewsp(mhp)
 	    }
 		break;
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"invalid policy type.\n");
 		return -1;
 	}

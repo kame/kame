@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.45 2000/10/18 13:19:07 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.46 2000/12/15 13:43:54 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -317,7 +317,7 @@ cb_check_cert(ok, ctx)
 			alarm = "ERROR";
 		}
 #ifndef EAYDEBUG
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"%s: %s(%d) at depth:%d SubjectName:%s\n",
 			alarm,
 			X509_verify_cert_error_string(ctx->error),
@@ -375,7 +375,7 @@ eay_get_x509asn1subjectname(cert)
 			name = NULL;
 		}
 #ifndef EAYDEBUG
-		plog(logp, LOCATION, NULL, "%s\n", eay_strerror());
+		plog(LLV_ERROR, LOCATION, NULL, "%s\n", eay_strerror());
 #else
 		printf("%s\n", eay_strerror());
 #endif
@@ -464,7 +464,7 @@ eay_get_x509subjectaltname(cert, altname, type, pos)
 			*altname = NULL;
 		}
 #ifndef EAYDEBUG
-		plog(logp, LOCATION, NULL, "%s\n", eay_strerror());
+		plog(LLV_ERROR, LOCATION, NULL, "%s\n", eay_strerror());
 #else
 		printf("%s\n", eay_strerror());
 #endif
@@ -541,7 +541,7 @@ eay_get_x509text(cert)
 			text = NULL;
 		}
 #ifndef EAYDEBUG
-		plog(logp, LOCATION, NULL, "%s\n", eay_strerror());
+		plog(LLV_ERROR, LOCATION, NULL, "%s\n", eay_strerror());
 #else
 		printf("%s\n", eay_strerror());
 #endif

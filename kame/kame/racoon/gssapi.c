@@ -1,4 +1,4 @@
-/*	$KAME: gssapi.c,v 1.2 2000/12/12 19:11:26 sakane Exp $	*/
+/*	$KAME: gssapi.c,v 1.3 2000/12/15 13:43:55 sakane Exp $	*/
 
 /*
  * Copyright 2000 Wasabi Systems, Inc.
@@ -84,7 +84,7 @@ gssapi_error(OM_uint32 status_code, const char *where,
 	va_list ap;
 
 	va_start(ap, fmt);
-	plogv(logp, where, NULL, fmt, ap);
+	plogv(LOGTAB_ERROR, where, NULL, fmt, ap);
 	va_end(ap);
 
 	message_context = 0;
@@ -94,7 +94,8 @@ gssapi_error(OM_uint32 status_code, const char *where,
 		    GSS_C_GSS_CODE, GSS_C_NO_OID, &message_context,
 		    &status_string);
 		if (!GSS_ERROR(maj_stat))
-			plog(logp, where, NULL, "%s\n", status_string.value);
+			plog(LLV_ERROR, where, NULL,
+				"%s\n", status_string.value);
 		gss_release_buffer(&min_stat, &status_string);
 	} while (message_context != 0);
 }
@@ -110,7 +111,7 @@ gssapi_init(struct ph1handle *iph1)
 
 	gps = calloc(1, sizeof (struct gssapi_ph1_state));
 	if (gps == NULL) {
-		plog(logp, LOCATION, NULL, "calloc failed\n");
+		plog(LLV_ERROR, LOCATION, NULL, "calloc failed\n");
 		return -1;
 	}
 	gps->gss_context = GSS_C_NO_CONTEXT;
@@ -132,7 +133,7 @@ gssapi_init(struct ph1handle *iph1)
 
 	maj_stat = gss_export_name(&min_stat, canon_princ, cred);
 
-	plog(logp, LOCATION, NULL, "will try to acquire '%*s' creds\n",
+	plog(LLV_DEBUG, LOCATION, NULL, "will try to acquire '%*s' creds\n",
 	    cred->length, cred->value);
 
 	if (GSS_ERROR(maj_stat)) {
@@ -172,7 +173,7 @@ gssapi_get_itoken(struct ph1handle *iph1, int *lenp)
 	dummy = &empty;
 
 	if (iph1->approval != NULL && iph1->approval->gssid != NULL) {
-		plog(logp, LOCATION, NULL, "using provided service '%s'\n",
+		plog(LLV_DEBUG, LOCATION, NULL, "using provided service '%s'\n",
 		    iph1->approval->gssid->v);
 		name_token.length = iph1->approval->gssid->l;
 		name_token.value = iph1->approval->gssid->v;
@@ -202,7 +203,7 @@ gssapi_get_itoken(struct ph1handle *iph1, int *lenp)
 		return -1;
 	}
 
-	plog(logp, LOCATION, NULL, "gss_init_sec_context status %x\n",
+	plog(LLV_DEBUG, LOCATION, NULL, "gss_init_sec_context status %x\n",
 	    gps->gss_status);
 
 	if (lenp)
@@ -244,8 +245,9 @@ gssapi_get_rtoken(struct ph1handle *iph1, int *lenp)
 	}
 
 	maj_stat = gss_display_name(&min_stat, client_name, &name_token, NULL);
-	plog(logp, LOCATION, NULL, "gss_accept_sec_context: other side is %s\n",
-	    name_token.value);
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"gss_accept_sec_context: other side is %s\n",
+		name_token.value);
 
 	if (itoken->length != 0)
 		gps->gsscnt++;
@@ -323,7 +325,8 @@ gssapi_get_token_to_send(struct ph1handle *iph1, vchar_t **token)
 
 	gps = gssapi_get_state(iph1);
 	if (gps == NULL) {
-		plog(logp, LOCATION, NULL, "gssapi not yet initialized?\n");
+		plog(LLV_ERROR, LOCATION, NULL,
+			"gssapi not yet initialized?\n");
 		return -1;
 	}
 	gsstoken = &gps->gss[gps->gsscnt - 1];
@@ -344,7 +347,7 @@ gssapi_get_itokens(struct ph1handle *iph1, vchar_t **tokens)
 
 	gps = gssapi_get_state(iph1);
 	if (gps == NULL) {
-		plog(logp, LOCATION, NULL, "gssapi not yet initialized?\n");
+		plog(LLV_ERROR, LOCATION, NULL, "gssapi not yet initialized?\n");
 		return -1;
 	}
 
@@ -362,8 +365,8 @@ gssapi_get_itokens(struct ph1handle *iph1, vchar_t **tokens)
 
 	*tokens = toks;
 
-	plog(logp, LOCATION, NULL, "%d itokens of length %d\n", gps->gsscnt,
-	    (*tokens)->l);
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"%d itokens of length %d\n", gps->gsscnt, (*tokens)->l);
 
 	return 0;
 }
@@ -378,12 +381,14 @@ gssapi_get_rtokens(struct ph1handle *iph1, vchar_t **tokens)
 
 	gps = gssapi_get_state(iph1);
 	if (gps == NULL) {
-		plog(logp, LOCATION, NULL, "gssapi not yet initialized?\n");
+		plog(LLV_ERROR, LOCATION, NULL,
+			"gssapi not yet initialized?\n");
 		return -1;
 	}
 
 	if (gssapi_more_tokens(iph1)) {
-		plog(logp, LOCATION, NULL, "gssapi roundtrips not complete\n");
+		plog(LLV_ERROR, LOCATION, NULL,
+			"gssapi roundtrips not complete\n");
 		return -1;
 	}
 
@@ -415,12 +420,14 @@ gssapi_wraphash(struct ph1handle *iph1)
 
 	gps = gssapi_get_state(iph1);
 	if (gps == NULL) {
-		plog(logp, LOCATION, NULL, "gssapi not yet initialized?\n");
+		plog(LLV_ERROR, LOCATION, NULL,
+			"gssapi not yet initialized?\n");
 		return NULL;
 	}
 
 	if (gssapi_more_tokens(iph1)) {
-		plog(logp, LOCATION, NULL, "gssapi roundtrips not complete\n");
+		plog(LLV_ERROR, LOCATION, NULL,
+			"gssapi roundtrips not complete\n");
 		return NULL;
 	}
 
@@ -433,7 +440,7 @@ gssapi_wraphash(struct ph1handle *iph1)
 		return NULL;
 	}
 
-	plog(logp, LOCATION, NULL, "wrapped HASH, ilen %d olen %d\n",
+	plog(LLV_DEBUG, LOCATION, NULL, "wrapped HASH, ilen %d olen %d\n",
 	    hash_in->length, hash_out->length);
 
 	gssapi_gss2vmbuf(hash_out, &outbuf);
@@ -452,7 +459,8 @@ gssapi_unwraphash(struct ph1handle *iph1)
 
 	gps = gssapi_get_state(iph1);
 	if (gps == NULL) {
-		plog(logp, LOCATION, NULL, "gssapi not yet initialized?\n");
+		plog(LLV_ERROR, LOCATION, NULL,
+			"gssapi not yet initialized?\n");
 		return NULL;
 	}
 
@@ -460,7 +468,7 @@ gssapi_unwraphash(struct ph1handle *iph1)
 	hashbuf.length = ntohs(iph1->pl_hash->h.len) - sizeof(*iph1->pl_hash);
 	hashbuf.value = (char *)(iph1->pl_hash + 1);
 
-	plog(logp, LOCATION, NULL, "unwrapping HASH of len %d\n",
+	plog(LLV_DEBUG, LOCATION, NULL, "unwrapping HASH of len %d\n",
 	    hashbuf.length);
 
 	maj_stat = gss_unwrap(&min_stat, gps->gss_context, hash_in, hash_out,
@@ -577,7 +585,7 @@ gssapi_get_default_id(struct ph1handle *iph1)
 		return NULL;
 	}
 
-	plog(logp, LOCATION, NULL, "will try to acquire '%*s' creds\n",
+	plog(LLV_DEBUG, LOCATION, NULL, "will try to acquire '%*s' creds\n",
 	    id->length, id->value);
 
 	vmbuf = vmalloc(id->length);

@@ -1,4 +1,4 @@
-/*	$KAME: admin.c,v 1.20 2000/10/04 17:40:58 itojun Exp $	*/
+/*	$KAME: admin.c,v 1.21 2000/12/15 13:43:54 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -84,8 +84,8 @@ admin_handler()
 
 	so2 = accept(lcconf->sock_admin, (struct sockaddr *)&from, &fromlen);
 	if (so2 < 0) {
-		plog(logp, LOCATION, NULL,
-			"failed to accept admin command (%s)\n",
+		plog(LLV_ERROR, LOCATION, NULL,
+			"failed to accept admin command: %s\n",
 			strerror(errno));
 		return -1;
 	}
@@ -94,22 +94,22 @@ admin_handler()
 	while ((len = recv(so2, (char *)&com, sizeof(com), MSG_PEEK)) < 0) {
 		if (errno == EINTR)
 			continue;
-		plog(logp, LOCATION, NULL,
-			"failed to recv admin command (%s)\n",
+		plog(LLV_ERROR, LOCATION, NULL,
+			"failed to recv admin command: %s\n",
 			strerror(errno));
 		goto end;
 	}
 
 	/* sanity check */
 	if (len < sizeof(com)) {
-		plog(logp, LOCATION, NULL,
-			"Invalid header length of admin command.\n");
+		plog(LLV_ERROR, LOCATION, NULL,
+			"invalid header length of admin command\n");
 		goto end;
 	}
 
 	/* get buffer to receive */
 	if ((combuf = malloc(com.ac_len)) == 0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to alloc buffer for admin command\n");
 		goto end;
 	}
@@ -118,8 +118,8 @@ admin_handler()
 	while ((len = recv(so2, combuf, com.ac_len, 0)) < 0) {
 		if (errno == EINTR)
 			continue;
-		plog(logp, LOCATION, NULL,
-			"failed to recv admin command (%s)\n",
+		plog(LLV_ERROR, LOCATION, NULL,
+			"failed to recv admin command: %s\n",
 			strerror(errno));
 		goto end;
 	}
@@ -132,10 +132,10 @@ admin_handler()
 	}
 
 	/* fork for processing */
-	if (!(debug & DEBUG_ADMIN)) {
+	if (!f_foreground) {
 		if ((pid = fork()) < 0) {
-			plog(logp, LOCATION, NULL,
-				"failed to fork for admin processing (%s)\n",
+			plog(LLV_ERROR, LOCATION, NULL,
+				"failed to fork for admin processing: %s\n",
 				strerror(errno));
 			goto end;
 		}
@@ -159,7 +159,7 @@ admin_handler()
 		free(combuf);
 
 	/* exit if child's process. */
-	if (pid == 0 && !(debug & DEBUG_ADMIN))
+	if (pid == 0 && !f_foreground)
 		exit(error);
 
 	return error;
@@ -182,7 +182,7 @@ admin_process(so2, combuf)
 	switch (com->ac_cmd) {
 	case ADMIN_RELOAD_CONF:
 		/* don't entered because of proccessing it in other place. */
-		plog(logp, LOCATION, NULL, "should never reach here.\n");
+		plog(LLV_ERROR, LOCATION, NULL, "should never reach here\n");
 		goto bad;
 
 	case ADMIN_SHOW_SCHED:
@@ -279,9 +279,9 @@ admin_process(so2, combuf)
 			/* search appropreate configuration */
 			rmconf = getrmconf(dst);
 			if (rmconf == NULL) {
-				plog(logp, LOCATION, dst,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"no configuration found "
-					"for peer address.\n");
+					"for %s\n", saddrwop2str(dst));
 				com->ac_errno = -1;
 				break;
 			}
@@ -304,8 +304,9 @@ admin_process(so2, combuf)
 				break;
 #endif
 			default:
-				plog(logp, LOCATION, dst,
-					"invalid family: %d\n", remote->sa_family);
+				plog(LLV_ERROR, LOCATION, NULL,
+					"invalid family: %d\n",
+					remote->sa_family);
 				com->ac_errno = -1;
 				break;
 			}
@@ -328,18 +329,17 @@ admin_process(so2, combuf)
 				break;
 #endif
 			default:
-				plog(logp, LOCATION, dst,
-					"invalid family: %d\n", local->sa_family);
+				plog(LLV_ERROR, LOCATION, NULL,
+					"invalid family: %d\n",
+					local->sa_family);
 				com->ac_errno = -1;
 				break;
 			}
 
 
-			YIPSDEBUG(DEBUG_INFO,
-				plog(logp, LOCATION, local,
-					"local address\n");
-				plog(logp, LOCATION, remote,
-					"remote address\n"));
+			plog(LLV_INFO, LOCATION, NULL,
+				"accept a request to establish IKE-SA: "
+				"%s\n", saddrwop2str(remote));
 
 			/* begin ident mode */
 			if (isakmp_ph1begin_i(rmconf, remote) < 0) {
@@ -359,8 +359,8 @@ admin_process(so2, combuf)
 		break;
 
 	default:
-		plog(logp, LOCATION, NULL,
-			"illegal command\n");
+		plog(LLV_ERROR, LOCATION, NULL,
+			"invalid command: %d\n", com->ac_cmd);
 		com->ac_errno = -1;
 	}
 
@@ -394,7 +394,7 @@ admin_reply(so, combuf, buf)
 
 	retbuf = CALLOC(tlen, char *);
 	if (retbuf == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to allocate admin buffer\n");
 		return -1;
 	}
@@ -408,8 +408,8 @@ admin_reply(so, combuf, buf)
 	tlen = send(so, retbuf, tlen, 0);
 	free(retbuf);
 	if (tlen < 0) {
-		plog(logp, LOCATION, NULL,
-			"failed to send admin command (%s)\n",
+		plog(LLV_ERROR, LOCATION, NULL,
+			"failed to send admin command: %s\n",
 			strerror(errno));
 		return -1;
 	}
@@ -430,7 +430,7 @@ admin2pfkey_proto(proto)
 	case ADMIN_PROTO_ESP:
 		return SADB_SATYPE_ESP;
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"unsupported proto for admin: %d\n", proto);
 		return -1;
 	}
@@ -465,37 +465,37 @@ admin_init()
 	hints.ai_flags = AI_PASSIVE;
 	error = getaddrinfo(paddr, pbuf, &hints, &res);
 	if (error) {
-		plog(logp, LOCATION, NULL,
-			"getaddrinfo (%s)\n", gai_strerror(error));
+		plog(LLV_ERROR, LOCATION, NULL,
+			"getaddrinfo: %s\n", gai_strerror(error));
 		return -1;
 	}
 	if (res->ai_next) {
 		/* warning */
-		plog(logp, LOCATION, NULL,
+		plog(LLV_WARNING, LOCATION, NULL,
 			"resolved to multiple addresses, "
 			"using the first one\n");
 	}
 
 	lcconf->sock_admin = socket(res->ai_family, res->ai_socktype, 0);
 	if (lcconf->sock_admin < 0) {
-		plog(logp, LOCATION, NULL,
-			"socket (%s)\n", strerror(errno));
+		plog(LLV_ERROR, LOCATION, NULL,
+			"socket: %s\n", strerror(errno));
 		freeaddrinfo(res);
 		return -1;
 	}
 
 	if (setsockopt(lcconf->sock_admin, SOL_SOCKET, SO_REUSEPORT,
 		       (void *)&yes, sizeof(yes)) < 0) {
-		plog(logp, LOCATION, NULL,
-			"setsockopt (%s)\n", strerror(errno));
+		plog(LLV_ERROR, LOCATION, NULL,
+			"setsockopt: %s\n", strerror(errno));
 		freeaddrinfo(res);
 		return -1;
 	}
 
 	if (bind(lcconf->sock_admin, res->ai_addr, res->ai_addrlen) < 0) {
-		plog(logp, LOCATION, NULL,
-			"bind (%s) port=%u\n",
-			strerror(errno), lcconf->port_admin);
+		plog(LLV_ERROR, LOCATION, NULL,
+			"bind(port:%u): %s\n",
+			lcconf->port_admin, strerror(errno));
 		(void)close(lcconf->sock_admin);
 		freeaddrinfo(res);
 		return -1;
@@ -503,16 +503,14 @@ admin_init()
 	freeaddrinfo(res);
 
 	if (listen(lcconf->sock_admin, 5) < 0) {
-		plog(logp, LOCATION, NULL,
-			"listen (%s) port=%u\n",
-			strerror(errno), lcconf->port_admin);
+		plog(LLV_ERROR, LOCATION, NULL,
+			"listen(port:%u): %s\n",
+			lcconf->port_admin, strerror(errno));
 		(void)close(lcconf->sock_admin);
 		return -1;
 	}
-	YIPSDEBUG(DEBUG_INFO,
-		plog(logp, LOCATION, NULL,
-			"open %s[%s] as racoon management.\n",
-			paddr, pbuf));
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"open %s[%s] as racoon management.\n", paddr, pbuf);
 
 	return 0;
 }

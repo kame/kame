@@ -1,4 +1,4 @@
-/*	$KAME: schedule.c,v 1.12 2000/10/04 17:41:03 itojun Exp $	*/
+/*	$KAME: schedule.c,v 1.13 2000/12/15 13:43:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -127,7 +127,6 @@ sched_new(tick, func, param)
 	new->func = func;
 	new->param = param;
 
-	/* for debug */
 	new->id = id++;
 	time(&new->created);
 	new->tick = tick;

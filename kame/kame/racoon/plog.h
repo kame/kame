@@ -1,4 +1,4 @@
-/*	$KAME: plog.h,v 1.4 2000/10/04 17:41:03 itojun Exp $	*/
+/*	$KAME: plog.h,v 1.5 2000/12/15 13:43:56 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -36,17 +36,30 @@
 #else
 #include <varargs.h>
 #endif
+#include <syslog.h>
 
-extern struct log *logp;
+/*
+ * INFO: begin negotiation, SA establishment/deletion/expiration.
+ * NOTIFY: not error but notifiable.
+ * WARNING:
+ * ERROR: system call error. also invalid parameter/format.
+ * DEBUG1: debugging informatioin.
+ * DEBUG2: too more verbose. e.g. parsing config.
+ */
+#define LLV_INFO	1
+#define LLV_NOTIFY	2
+#define LLV_WARNING	3
+#define LLV_ERROR	4
+#define LLV_DEBUG	5
+#define LLV_DEBUG2	6
+ 
+extern char *pname;
+extern u_int32_t loglevel;
+extern int f_foreground;
 
-extern void plog __P((struct log *, const char *, struct sockaddr *,
-	const char *, ...));
-extern void plogv __P((struct log *, const char *, struct sockaddr *,
+extern void plog __P((int, const char *, struct sockaddr *, const char *, ...));
+extern void plogv __P((int, const char *, struct sockaddr *,
 	const char *, va_list));
-extern void plognl __P((void));
-extern void plogsp __P((void));
-extern void plogh __P((struct log *, unsigned char));
-extern void plogc __P((struct log *, unsigned char));
+extern void plogdump __P((int, void *, size_t));
 extern void ploginit __P((void));
 extern void plogset __P((char *));
-

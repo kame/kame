@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.76 2000/12/12 16:59:34 thorpej Exp $	*/
+/*	$KAME: cfparse.y,v 1.77 2000/12/15 13:43:54 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -288,7 +288,7 @@ log_level
 				u_int32_t v;
 
 				v = strtoul($1->v, NULL, 16);
-				debug |= v;
+				loglevel |= v;
 			}
 			vfree($1);
 		}
@@ -296,7 +296,7 @@ log_level
 		{
 			/* command line option has a priority than it. */
 			if (!f_debugcmd)
-				debug = $1;
+				loglevel = $1;
 		}
 	;
 
@@ -1579,16 +1579,22 @@ set_ipsec_proposal(spidx, prspec)
 		for (s = p->spspec; s->next != NULL; s = s->next)
 			;
 		while (s != NULL) {
-			YIPSDEBUG(DEBUG_CONF,
-				printf("lifetime = %ld\n", (long)p->lifetime);
-				printf("lifebyte = %d\n", p->lifebyte);
-				printf("level=%s\n", s_ipsec_level(s->ipsec_level));
-				printf("mode=%s\n", s_ipsecdoi_encmode(s->encmode));
-				printf("remote=%s\n", saddrwop2str(s->remote));
-				printf("proto=%s\n", s_ipsecdoi_proto(s->proto_id));
-				printf("strength=%s\n", s_algstrength(s->strength));
-				printf("encklen=%d\n", s->encklen);
-			);
+			plog(LLV_DEBUG2, LOCATION, NULL,
+				"lifetime = %ld\n", (long)p->lifetime);
+			plog(LLV_DEBUG2, LOCATION, NULL,
+				"lifebyte = %d\n", p->lifebyte);
+			plog(LLV_DEBUG2, LOCATION, NULL,
+				"level=%s\n", s_ipsec_level(s->ipsec_level));
+			plog(LLV_DEBUG2, LOCATION, NULL,
+				"mode=%s\n", s_ipsecdoi_encmode(s->encmode));
+			plog(LLV_DEBUG2, LOCATION, NULL,
+				"remote=%s\n", saddrwop2str(s->remote));
+			plog(LLV_DEBUG2, LOCATION, NULL,
+				"proto=%s\n", s_ipsecdoi_proto(s->proto_id));
+			plog(LLV_DEBUG2, LOCATION, NULL,
+				"strength=%s\n", s_algstrength(s->strength));
+			plog(LLV_DEBUG2, LOCATION, NULL,
+				"encklen=%d\n", s->encklen);
 
 			switch (s->proto_id) {
 			case IPSECDOI_PROTO_IPSEC_ESP:
@@ -1606,7 +1612,7 @@ set_ipsec_proposal(spidx, prspec)
 						algclass_ipsec_auth + 1,
 						p, s, spidx->policy);
 				if (trns_no == -1) {
-					plog(logp, LOCATION, NULL,
+					plog(LLV_ERROR, LOCATION, NULL,
 						"failed to expand "
 						"ipsec proposal.\n");
 					return -1;
@@ -1626,7 +1632,7 @@ set_ipsec_proposal(spidx, prspec)
 						algclass_ipsec_auth + 1,
 						p, s, spidx->policy);
 				if (trns_no == -1) {
-					plog(logp, LOCATION, NULL,
+					plog(LLV_ERROR, LOCATION, NULL,
 						"failed to expand "
 						"ipsec proposal.\n");
 					return -1;
@@ -1646,7 +1652,7 @@ set_ipsec_proposal(spidx, prspec)
 						algclass_ipsec_comp + 1,
 						p, s, spidx->policy);
 				if (trns_no == -1) {
-					plog(logp, LOCATION, NULL,
+					plog(LLV_ERROR, LOCATION, NULL,
 						"failed to expand "
 						"ipsec proposal.\n");
 					return -1;
@@ -1683,7 +1689,7 @@ set_isakmp_proposal(rmconf, prspec)
 
 	p = prspec;
 	if (p->next != 0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"multiple proposal definition.\n");
 		return -1;
 	}
@@ -1719,14 +1725,16 @@ set_isakmp_proposal(rmconf, prspec)
 		;
 
 	while (s != NULL) {
-		YIPSDEBUG(DEBUG_CONF,
-			printf("lifetime = %ld\n", (long)
-				(s->lifetime ? s->lifetime : p->lifetime));
-			printf("lifebyte = %d\n",
-				s->lifebyte ? s->lifebyte : p->lifebyte);
-			printf("strength=%s\n", s_algstrength(s->strength));
-			printf("encklen=%d\n", s->encklen);
-		);
+		plog(LLV_DEBUG2, LOCATION, NULL,
+			"lifetime = %ld\n", (long)
+			(s->lifetime ? s->lifetime : p->lifetime));
+		plog(LLV_DEBUG2, LOCATION, NULL,
+			"lifebyte = %d\n",
+			s->lifebyte ? s->lifebyte : p->lifebyte);
+		plog(LLV_DEBUG2, LOCATION, NULL,
+			"strength=%s\n", s_algstrength(s->strength));
+		plog(LLV_DEBUG2, LOCATION, NULL,
+			"encklen=%d\n", s->encklen);
 
 #if 0
 		types[algclass_isakmp_enc] =
@@ -1755,7 +1763,7 @@ set_isakmp_proposal(rmconf, prspec)
 				s->encklen, s->gssid,
 				rmconf);
 		if (trns_no == -1) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to expand isakmp proposal.\n");
 			return -1;
 		}
@@ -1764,7 +1772,7 @@ set_isakmp_proposal(rmconf, prspec)
 	}
 
 	if (rmconf->proposal == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"no proposal found.\n");
 		return -1;
 	}
@@ -1785,8 +1793,8 @@ set_algtypes(s, class)
 	else
 		algtype = lcconf->algstrength[class]->algtype[s->strength];
 
-	YIPSDEBUG(DEBUG_CONF,
-		printf("%s=\t%s\n", s_algclass(class), BIT2STR(algtype)));
+	plog(LLV_DEBUG2, LOCATION, NULL,
+		"%s=\t%s\n", s_algclass(class), BIT2STR(algtype));
 
 	return algtype;
 }
@@ -1817,20 +1825,22 @@ expand_ipsecspec(prop_no, trns_no, types,
 	if (class == last) {
 		struct ipsecsa *new = NULL;
 
-		YIPSDEBUG(DEBUG_CONF,
+		{
 			int j;
 			char tb[4];
-			printf("p:%d t:%d ", prop_no, trns_no);
+			plog(LLV_DEBUG2, LOCATION, NULL,
+				"p:%d t:%d ", prop_no, trns_no);
 			for (j = 0; j < MAXALGCLASS; j++) {
 				snprintf(tb, sizeof(tb), "%d", tmpalgtype[j]);
-				printf("%s%s%s%s ",
+				plog(LLV_DEBUG2, LOCATION, NULL,
+					"%s%s%s%s%s",
 					s_algtype(j, tmpalgtype[j]),
 					tmpalgtype[j] ? "(" : "",
 					tb[0] == '0' ? "" : tb,
-					tmpalgtype[j] ? ")" : "");
+					tmpalgtype[j] ? ")" : "",
+					j == MAXALGCLASS ? "\n", " ");
 			}
-			printf("\n");
-		);
+		}
 
 		/* check mandatory values */
 		if (ipsecdoi_checkalgtypes(s->proto_id, 
@@ -1901,20 +1911,23 @@ expand_isakmpspec(prop_no, trns_no, types,
 {
 	struct isakmpsa *new;
 
-	YIPSDEBUG(DEBUG_CONF,
-		int j;
-		char tb[10];
-		printf("p:%d t:%d ", prop_no, trns_no);
-		for (j = class; j < MAXALGCLASS; j++) {
-			snprintf(tb, sizeof(tb), "%d", types[j]);
-			printf("%s%s%s%s ",
-				s_algtype(j, types[j]),
-				types[j] ? "(" : "",
-				tb[0] == '0' ? "" : tb,
-				types[j] ? ")" : "");
-		}
-		printf("\n");
-	);
+	/* debugging */
+    {
+	int j;
+	char tb[10];
+	plog(LLV_DEBUG2, LOCATION, NULL,
+		"p:%d t:%d ", prop_no, trns_no);
+	for (j = class; j < MAXALGCLASS; j++) {
+		snprintf(tb, sizeof(tb), "%d", types[j]);
+		plog(LLV_DEBUG2, LOCATION, NULL,
+			"%s%s%s%s ",
+			s_algtype(j, types[j]),
+			types[j] ? "(" : "",
+			tb[0] == '0' ? "" : tb,
+			types[j] ? ")" : "");
+	}
+	plog(LLV_DEBUG2, LOCATION, NULL, "\n");
+    }
 
 #define TMPALGTYPE2STR(n) \
 	s_algtype(algclass_isakmp_##n, types[algclass_isakmp_##n])
@@ -1976,18 +1989,18 @@ cfparse()
 	error = yyparse();
 	if (error != 0) {
 		if (yyerrorcount) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"fatal parse failure (%d errors)\n",
 				yyerrorcount);
 		} else {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"fatal parse failure.\n");
 		}
 		return -1;
 	}
 
 	if (error == 0 && yyerrorcount) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"parse error is nothing, but yyerrorcount is %d.\n",
 				yyerrorcount);
 		exit(1);
@@ -1995,7 +2008,7 @@ cfparse()
 
 	yycf_clean_buffer();
 
-	YIPSDEBUG(DEBUG_CONF, printf("parse successed.\n"));
+	plog(LLV_DEBUG2, LOCATION, NULL, "parse successed.\n");
 
 	return 0;
 }

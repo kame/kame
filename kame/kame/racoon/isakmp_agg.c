@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_agg.c,v 1.47 2000/12/12 16:59:39 thorpej Exp $	*/
+/*	$KAME: isakmp_agg.c,v 1.48 2000/12/15 13:43:55 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -69,6 +69,7 @@
 #include "isakmp_agg.h"
 #include "isakmp_inf.h"
 #include "vendorid.h"
+#include "strnames.h"
 
 #ifdef HAVE_GSSAPI
 #include "gssapi.h"
@@ -102,11 +103,9 @@ agg_i1send(iph1, msg)
 	int len;
 #endif
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph1->status != PHASE1ST_START) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}
@@ -126,7 +125,7 @@ agg_i1send(iph1, msg)
 
 	/* consistency check of proposals */
 	if (iph1->rmconf->dhgrp == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"configuration failure about DH group.\n");
 		goto end;
 	}
@@ -149,14 +148,14 @@ agg_i1send(iph1, msg)
 		need_cr = 1;
 		cr = oakley_getcr(iph1);
 		if (cr == NULL) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to get cr buffer.\n");
 			goto end;
 		}
 	}
 #endif
-	plog(logp, LOCATION, NULL, "authmethod is %d\n",
-	    iph1->rmconf->proposal->authmethod);
+	plog(LLV_DEBUG, LOCATION, NULL, "authmethod is %s\n",
+		s_oakley_attr_method(iph1->rmconf->proposal->authmethod));
 	/* create buffer to send isakmp payload */
 	tlen = sizeof(struct isakmp)
 		+ sizeof(*gen) + iph1->sa->l
@@ -175,7 +174,7 @@ agg_i1send(iph1, msg)
 
 	iph1->sendbuf = vmalloc(tlen);
 	if (iph1->sendbuf == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get buffer to send.\n");
 		goto end;
 	}
@@ -265,11 +264,9 @@ agg_i2recv(iph1, msg)
 	vchar_t *gsstoken = NULL;
 #endif
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph1->status != PHASE1ST_MSG1SENT) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}
@@ -284,7 +281,7 @@ agg_i2recv(iph1, msg)
 
 	/* SA payload is fixed postion */
 	if (pa->type != ISAKMP_NPTYPE_SA) {
-		plog(logp, LOCATION, iph1->remote,
+		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"received invalid next payload type %d, "
 			"expecting %d.\n",
 			pa->type, ISAKMP_NPTYPE_SA);
@@ -329,15 +326,9 @@ agg_i2recv(iph1, msg)
 			break;
 #endif
 		case ISAKMP_NPTYPE_VID:
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Vendor ID.\n"));
 			(void)check_vendorid(pa->ptr);
 			break;
 		case ISAKMP_NPTYPE_N:
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Notify Message.\n"));
 			isakmp_check_notify(pa->ptr, iph1);
 			break;
 #ifdef HAVE_GSSAPI
@@ -349,7 +340,7 @@ agg_i2recv(iph1, msg)
 #endif
 		default:
 			/* don't send information, see isakmp_ident_r1() */
-			plog(logp, LOCATION, iph1->remote,
+			plog(LLV_ERROR, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
@@ -362,13 +353,14 @@ agg_i2recv(iph1, msg)
 
 	/* verify identifier */
 	if (ipsecdoi_checkid1(iph1) < 0) {
-		plog(logp, LOCATION, iph1->remote, "invalid ID payload.\n");
+		plog(LLV_ERROR, LOCATION, iph1->remote,
+			"invalid ID payload.\n");
 		goto end;
 	}
 
 	/* check SA payload and set approval SA for use */
 	if (ipsecdoi_checkph1proposal(satmp, iph1) < 0) {
-		plog(logp, LOCATION, iph1->remote,
+		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"failed to get valid proposal.\n");
 		/* XXX send information */
 		goto end;
@@ -464,17 +456,15 @@ agg_i2send(iph1, msg)
 	int error = -1;
 	vchar_t *gsshash = NULL;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph1->status != PHASE1ST_MSG2RECEIVED) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}
 
 	/* generate HASH to send */
-	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "generate HASH_I\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "generate HASH_I\n");
 	iph1->hash = oakley_ph1hash_common(iph1, GENERATE);
 	if (iph1->hash == NULL) {
 #ifdef HAVE_GSSAPI
@@ -493,7 +483,7 @@ agg_i2send(iph1, msg)
 
 		iph1->sendbuf = vmalloc(tlen);
 		if (iph1->sendbuf == NULL) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to get buffer to send.\n");
 			goto end;
 		}
@@ -526,7 +516,7 @@ agg_i2send(iph1, msg)
 
 		iph1->sendbuf = vmalloc(tlen);
 		if (iph1->sendbuf == NULL) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to get buffer to send.\n");
 			goto end;
 		}
@@ -553,17 +543,17 @@ agg_i2send(iph1, msg)
 	case OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB:
 		gsshash = gssapi_wraphash(iph1);
 		if (gsshash == NULL) {
-			plog(logp, LOCATION, NULL,
-			    "failed to wrap hash\n");
+			plog(LLV_ERROR, LOCATION, NULL,
+				"failed to wrap hash\n");
 			isakmp_info_send_n1(iph1,
-			    ISAKMP_NTYPE_INVALID_EXCHANGE_TYPE, NULL);
+				ISAKMP_NTYPE_INVALID_EXCHANGE_TYPE, NULL);
 			goto end;
 		}
 		tlen += sizeof(*gen) + gsshash->l;
 
 		iph1->sendbuf = vmalloc(tlen);
 		if (iph1->sendbuf == NULL) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to get buffer to send.\n");
 			goto end;
 		}
@@ -618,11 +608,9 @@ agg_r1recv(iph1, msg)
 	vchar_t *gsstoken = NULL;
 #endif
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph1->status != PHASE1ST_START) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}
@@ -635,7 +623,7 @@ agg_r1recv(iph1, msg)
 
 	/* SA payload is fixed postion */
 	if (pa->type != ISAKMP_NPTYPE_SA) {
-		plog(logp, LOCATION, iph1->remote,
+		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"received invalid next payload type %d, "
 			"expecting %d.\n",
 			pa->type, ISAKMP_NPTYPE_SA);
@@ -649,8 +637,9 @@ agg_r1recv(iph1, msg)
 	     pa->type != ISAKMP_NPTYPE_NONE;
 	     pa++) {
 
-		plog(logp, LOCATION, NULL, "received payload of type %d\n",
-		    pa->type);
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"received payload of type %s\n",
+			s_isakmp_nptype(pa->type));
 
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_KE:
@@ -666,9 +655,6 @@ agg_r1recv(iph1, msg)
 				goto end;
 			break;
 		case ISAKMP_NPTYPE_VID:
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Vendor ID.\n"));
 			(void)check_vendorid(pa->ptr);
 			break;
 #ifdef HAVE_SIGNING_C
@@ -686,7 +672,7 @@ agg_r1recv(iph1, msg)
 #endif
 		default:
 			/* don't send information, see isakmp_ident_r1() */
-			plog(logp, LOCATION, iph1->remote,
+			plog(LLV_ERROR, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
@@ -699,13 +685,14 @@ agg_r1recv(iph1, msg)
 
 	/* verify identifier */
 	if (ipsecdoi_checkid1(iph1) < 0) {
-		plog(logp, LOCATION, iph1->remote, "invalid ID payload.\n");
+		plog(LLV_ERROR, LOCATION, iph1->remote,
+			"invalid ID payload.\n");
 		goto end;
 	}
 
 	/* check SA payload and set approval SA for use */
 	if (ipsecdoi_checkph1proposal(iph1->sa, iph1) < 0) {
-		plog(logp, LOCATION, iph1->remote,
+		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"failed to get valid proposal.\n");
 		/* XXX send information */
 		goto end;
@@ -763,11 +750,9 @@ agg_r1send(iph1, msg)
 	vchar_t *gss_sa = NULL;
 #endif
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph1->status != PHASE1ST_MSG1RECEIVED) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}
@@ -811,7 +796,7 @@ agg_r1send(iph1, msg)
 #endif
 
 	/* generate HASH to send */
-	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "generate HASH_R\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "generate HASH_R\n");
 	iph1->hash = oakley_ph1hash_common(iph1, GENERATE);
 	if (iph1->hash == NULL) {
 #ifdef HAVE_GSSAPI
@@ -830,7 +815,7 @@ agg_r1send(iph1, msg)
 		need_cr = 1;
 		cr = oakley_getcr(iph1);
 		if (cr == NULL) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to get cr buffer.\n");
 			goto end;
 		}
@@ -854,7 +839,7 @@ agg_r1send(iph1, msg)
 
 		iph1->sendbuf = vmalloc(tlen);
 		if (iph1->sendbuf == NULL) { 
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to get buffer to send\n");
 			goto end;
 		}
@@ -920,7 +905,7 @@ agg_r1send(iph1, msg)
 
 		iph1->sendbuf = vmalloc(tlen);
 		if (iph1->sendbuf == NULL) { 
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to get buffer to send.\n");
 			goto end;
 		}
@@ -973,8 +958,8 @@ agg_r1send(iph1, msg)
 		/* create buffer to send isakmp payload */
 		gsshash = gssapi_wraphash(iph1);
 		if (gsshash == NULL) {
-			plog(logp, LOCATION, NULL,
-			    "failed to wrap hash\n");
+			plog(LLV_ERROR, LOCATION, NULL,
+				"failed to wrap hash\n");
 			/*
 			 * This is probably due to the GSS roundtrips not
 			 * being finished yet. Return this error in
@@ -998,7 +983,7 @@ agg_r1send(iph1, msg)
 			+ sizeof(*gen) + gsshash->l;
 		iph1->sendbuf = vmalloc(tlen);
 		if (iph1->sendbuf == NULL) { 
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to get buffer to send\n");
 			goto end;
 		}
@@ -1081,11 +1066,9 @@ agg_r2recv(iph1, msg0)
 	struct isakmp_parse_t *pa;
 	int error = -1;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph1->status != PHASE1ST_MSG1SENT) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}
@@ -1116,9 +1099,6 @@ agg_r2recv(iph1, msg0)
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
 			break;
 		case ISAKMP_NPTYPE_VID:
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Vendor ID.\n"));
 			(void)check_vendorid(pa->ptr);
 			break;
 #ifdef HAVE_SIGNING_C
@@ -1132,14 +1112,11 @@ agg_r2recv(iph1, msg0)
 			break;
 #endif
 		case ISAKMP_NPTYPE_N:
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Notify Message.\n"));
 			isakmp_check_notify(pa->ptr, iph1);
 			break;
 		default:
 			/* don't send information, see isakmp_ident_r1() */
-			plog(logp, LOCATION, iph1->remote,
+			plog(LLV_ERROR, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
@@ -1191,11 +1168,9 @@ agg_r2send(iph1, msg)
 {
 	int error = -1;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph1->status != PHASE1ST_MSG2RECEIVED) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}

@@ -1,6 +1,6 @@
-/*	$KAME: safefile.c,v 1.3 2000/10/04 03:30:43 itojun Exp $	*/
+/*	$KAME: safefile.c,v 1.4 2000/12/15 13:43:57 sakane Exp $	*/
 
-/*	$KAME: safefile.c,v 1.3 2000/10/04 03:30:43 itojun Exp $	*/
+/*	$KAME: safefile.c,v 1.4 2000/12/15 13:43:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -52,7 +52,7 @@ safefile(path, secret)
 
 	/* no setuid */
 	if (getuid() != geteuid()) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 		    "setuid'ed execution not allowed\n");
 		return -1;
 	}
@@ -63,7 +63,7 @@ safefile(path, secret)
 	/* the file must be owned by the running uid */
 	me = getuid();
 	if (s.st_uid != me) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 		    "%s has invalid owner uid\n", path);
 		return -1;
 	}
@@ -72,7 +72,7 @@ safefile(path, secret)
 	case S_IFREG:
 		break;
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 		    "%s is an invalid file type 0x%x\n", path,
 		    (s.st_mode & S_IFMT));
 		return -1;
@@ -81,7 +81,7 @@ safefile(path, secret)
 	/* secret file should not be read by others */
 	if (secret) {
 		if ((s.st_mode & S_IRWXG) != 0 || (s.st_mode & S_IRWXO) != 0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 			    "%s has weak file permission\n", path);
 			return -1;
 		}

@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.62 2000/12/14 01:36:37 sakane Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.63 2000/12/15 13:43:55 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -111,8 +111,7 @@ isakmp_info_recv(iph1, msg0)
 	u_int8_t np;
 	int encrypted;
 
-	YIPSDEBUG(DEBUG_STAMP,
-	    plog(logp, LOCATION, NULL, "receive Information.\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "receive Information.\n");
 
 	encrypted = ISSET(((struct isakmp *)msg0->v)->flags, ISAKMP_FLAG_E);
 
@@ -153,7 +152,7 @@ isakmp_info_recv(iph1, msg0)
 			}
 			/*FALLTHRU*/
 		default:
-			plog(logp, LOCATION, iph1->remote,
+			plog(LLV_ERROR, LOCATION, iph1->remote,
 				"%s message must be encrypted\n",
 				s_isakmp_nptype(np));
 			goto end;
@@ -172,14 +171,14 @@ isakmp_info_recv(iph1, msg0)
 	case ISAKMP_NPTYPE_NONCE:
 		/* XXX to be 6.4.2 ike-01.txt */
 		/* XXX IV is to be synchronized. */
-		plog(logp, LOCATION, iph1->remote,
+		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"ignore Acknowledged Informational\n");
 		break;
 	default:
 		/* don't send information, see isakmp_ident_r1() */
 		error = 0;
-		plog(logp, LOCATION, iph1->remote,
-			"ignore the packet, "
+		plog(LLV_ERROR, LOCATION, iph1->remote,
+			"reject the packet, "
 			"received unexpecting payload type %d.\n",
 			gen->np);
 		goto end;
@@ -214,7 +213,7 @@ isakmp_info_send_d1(iph1)
 	tlen = sizeof(*d) + sizeof(isakmp_index);
 	payload = vmalloc(tlen);
 	if (payload == NULL) {
-		plog(logp, LOCATION, NULL, 
+		plog(LLV_ERROR, LOCATION, NULL, 
 			"failed to get buffer for payload.\n");
 		return errno;
 	}
@@ -275,7 +274,7 @@ isakmp_info_send_d2(iph2)
 		tlen = sizeof(*d) + pr->spisize;
 		payload = vmalloc(tlen);
 		if (payload == NULL) {
-			plog(logp, LOCATION, NULL, 
+			plog(LLV_ERROR, LOCATION, NULL, 
 				"failed to get buffer for payload.\n");
 			return errno;
 		}
@@ -321,24 +320,12 @@ isakmp_info_send_nx(isakmp, remote, local, type, data)
 	int error = -1;
 	struct isakmp_pl_n *n;
 	int spisiz = 0;		/* see below */
-#ifdef YIPS_DEBUG
-	char h1[NI_MAXHOST], h2[NI_MAXHOST];
-	char s1[NI_MAXSERV], s2[NI_MAXSERV];
-#ifdef NI_WITHSCOPEID
-	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
-#else
-	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
-#endif
-#endif
-
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
 	/* search appropreate configuration */
 	rmconf = getrmconf(remote);
 	if (rmconf == NULL) {
-		plog(logp, LOCATION, remote,
-			"no configuration found "
-			"for peer address.\n");
+		plog(LLV_ERROR, LOCATION, remote,
+			"no configuration found for peer address.\n");
 		goto end;
 	}
 
@@ -360,22 +347,12 @@ isakmp_info_send_nx(isakmp, remote, local, type, data)
 	if (copy_ph1addresses(iph1, rmconf, remote, local) < 0)
 		return -1;
 
-	YIPSDEBUG(DEBUG_NOTIFY,
-		h1[0] = s1[0] = h2[0] = s2[0] = '\0';
-		getnameinfo(iph1->local, iph1->local->sa_len,
-		    h1, sizeof(h1), s1, sizeof(s1), niflags);
-		getnameinfo(iph1->remote, iph1->remote->sa_len,
-		    h2, sizeof(h2), s2, sizeof(s2), niflags);
-		plog(logp, LOCATION, NULL,
-			"new initiator iph1 %p: local %s %s remote %s %s\n",
-			iph1, h1, s1, h2, s2));
-
 	tlen = sizeof(*n) + spisiz;
 	if (data)
 		tlen += data->l;
 	payload = vmalloc(tlen);
 	if (payload == NULL) { 
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get buffer to send.\n");
 		goto end;
 	}
@@ -394,8 +371,6 @@ isakmp_info_send_nx(isakmp, remote, local, type, data)
 
 	error = isakmp_info_send_common(iph1, payload, ISAKMP_NPTYPE_N, 0);
 	vfree(payload);
-
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "end.\n"));
 
     end:
 	if (iph1 != NULL)
@@ -419,8 +394,6 @@ isakmp_info_send_n1(iph1, type, data)
 	struct isakmp_pl_n *n;
 	int spisiz;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/*
 	 * note on SPI size: which description is correct?  I have chosen
 	 * this to be 0.
@@ -441,7 +414,7 @@ isakmp_info_send_n1(iph1, type, data)
 		tlen += data->l;
 	payload = vmalloc(tlen);
 	if (payload == NULL) { 
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get buffer to send.\n");
 		return errno;
 	}
@@ -460,8 +433,6 @@ isakmp_info_send_n1(iph1, type, data)
 
 	error = isakmp_info_send_common(iph1, payload, ISAKMP_NPTYPE_N, iph1->flags);
 	vfree(payload);
-
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "end.\n"));
 
 	return error;
 }
@@ -482,8 +453,6 @@ isakmp_info_send_n2(iph2, type, data)
 	struct isakmp_pl_n *n;
 	struct saproto *pr;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	if (!iph2->approval)
 		return EINVAL;
 
@@ -495,7 +464,7 @@ isakmp_info_send_n2(iph2, type, data)
 		tlen += data->l;
 	payload = vmalloc(tlen);
 	if (payload == NULL) { 
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get buffer to send.\n");
 		return errno;
 	}
@@ -515,7 +484,6 @@ isakmp_info_send_n2(iph2, type, data)
 	error = isakmp_info_send_common(iph1, payload, ISAKMP_NPTYPE_N, iph2->flags);
 	vfree(payload);
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "end.\n"));
 	return error;
 }
 
@@ -537,17 +505,6 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	char *p;
 	int tlen;
 	int error = -1;
-#ifdef YIPS_DEBUG
-	char h1[NI_MAXHOST], h2[NI_MAXHOST];
-	char s1[NI_MAXSERV], s2[NI_MAXSERV];
-#ifdef NI_WITHSCOPEID
-	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
-#else
-	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
-#endif
-#endif
-
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
 	/* add new entry to isakmp status table */
 	iph2 = newph2();
@@ -568,7 +525,7 @@ isakmp_info_send_common(iph1, payload, np, flags)
 		break;
 #endif
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"invalid family: %d\n", iph1->remote->sa_family);
 		delph2(iph2);
 		goto end;
@@ -608,16 +565,6 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	else
 		iph2->flags = (hash == NULL ? 0 : ISAKMP_FLAG_A);
 
-	YIPSDEBUG(DEBUG_NOTIFY,
-		h1[0] = s1[0] = h2[0] = s2[0] = '\0';
-		getnameinfo(iph2->src, iph2->src->sa_len,
-		    h1, sizeof(h1), s1, sizeof(s1), niflags);
-		getnameinfo(iph2->dst, iph2->dst->sa_len,
-		    h2, sizeof(h2), s2, sizeof(s2), niflags);
-		plog(logp, LOCATION, NULL,
-			"new initiator iph2 %p: src %s %s dst %s %s iph1 %p\n",
-			iph2, h1, s1, h2, s2, iph1));
-
 	insph2(iph2);
 	bindph12(iph1, iph2);
 
@@ -626,7 +573,7 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	/* create buffer for isakmp payload */
 	iph2->sendbuf = vmalloc(tlen);
 	if (iph2->sendbuf == NULL) { 
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get buffer to send.\n");
 		goto err;
 	}
@@ -683,9 +630,8 @@ isakmp_info_send_common(iph1, payload, np, flags)
 		goto err;
 	}
 
-	YIPSDEBUG(DEBUG_STAMP,
-		plog(logp, LOCATION, NULL,
-			"sendto Information %s.\n", s_isakmp_nptype(np)));
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"sendto Information %s.\n", s_isakmp_nptype(np));
 
 	/*
 	 * don't resend notify message because peer can use Acknowledged
@@ -742,7 +688,7 @@ isakmp_add_pl_n(buf0, np_p, type, pr, data)
 	} else
 		buf = vmalloc(tlen);
 	if (!buf) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get a payload buffer.\n");
 		return NULL;
 	}
@@ -777,8 +723,6 @@ isakmp_info_recv_n(iph1, msg)
 	vchar_t *pbuf;
 	struct isakmp_parse_t *pa, *pap;
 	char *spi;
-
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
 	if (!(pbuf = isakmp_parse(msg)))
 		return -1;
@@ -822,14 +766,14 @@ isakmp_info_recv_n(iph1, msg)
 		/* XXX there is a potential of dos attack. */
 		if (msgid == 0) {
 			/* delete ph1 */
-			plog(logp, LOCATION, iph1->remote,
+			plog(LLV_ERROR, LOCATION, iph1->remote,
 				"delete phase1 handle.\n");
 			remph1(iph1);
 			delph1(iph1);
 		} else {
 			iph2 = getph2bymsgid(iph1, msgid);
 			if (iph2 == NULL) {
-				plog(logp, LOCATION, iph1->remote,
+				plog(LLV_ERROR, LOCATION, iph1->remote,
 					"unknown notify message, "
 					"no phase2 handle found.\n");
 			} else {
@@ -845,12 +789,12 @@ isakmp_info_recv_n(iph1, msg)
 
 	/* get spi and allocate */
 	if (ntohs(n->h.len) != sizeof(*n) + n->spi_size) {
-		plog(logp, LOCATION, iph1->remote,
+		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"invalid spi_size in notification payload.\n");
 	}
 	spi = val2str((u_char *)(n + 1), n->spi_size);
 
-	plog(logp, LOCATION, iph1->remote,
+	plog(LLV_DEBUG, LOCATION, iph1->remote,
 		"notification message %d:%s, "
 		"doi=%d proto_id=%d spi=%s(size=%d).\n",
 		type, s_isakmp_notify_msg(type),
@@ -875,11 +819,10 @@ purge_isakmp_spi(proto, spi, n)
 		if (!iph1)
 			continue;
 
-		YIPSDEBUG(DEBUG_SA,
-			plog(logp, LOCATION, NULL,
-				"proto_id %s purging spi:%s.\n",
-				s_ipsecdoi_proto(proto),
-				isakmp_pindex(&spi[i], 0)));
+		plog(LLV_INFO, LOCATION, NULL,
+			"proto_id %s purging spi:%s.\n",
+			s_ipsecdoi_proto(proto),
+			isakmp_pindex(&spi[i], 0));
 
 		if (iph1->sce)
 			SCHED_KILL(iph1->sce);
@@ -905,8 +848,8 @@ purge_ipsec_spi(dst0, proto, spi, n)
 
 	buf = pfkey_dump_sadb(ipsecdoi2pfkey_proto(proto));
 	if (buf == NULL) {
-		YIPSDEBUG(DEBUG_MISC, plog(logp, LOCATION, NULL,
-			"pfkey_dump_adb returned nothing.\n"));
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"pfkey_dump_sadb returned nothing.\n");
 		return;
 	}
 
@@ -923,7 +866,8 @@ purge_ipsec_spi(dst0, proto, spi, n)
 		}
 
 		if (pfkey_align(msg, mhp) || pfkey_check(mhp)) {
-			plog(logp, LOCATION, NULL, "pfkey_check (%s)\n", ipsec_strerror());
+			plog(LLV_ERROR, LOCATION, NULL,
+				"pfkey_check (%s)\n", ipsec_strerror());
 			msg = next;
 			continue;
 		}
@@ -954,10 +898,9 @@ purge_ipsec_spi(dst0, proto, spi, n)
 		}
 
 		for (i = 0; i < n; i++) {
-			YIPSDEBUG(DEBUG_DMISC,
-				plog(logp, LOCATION, NULL,
-					"check spi: packet %u against SA %u.\n",
-					ntohl(spi[i]), ntohl(sa->sadb_sa_spi)));
+			plog(LLV_DEBUG, LOCATION, NULL,
+				"check spi: packet %u against SA %u.\n",
+				ntohl(spi[i]), ntohl(sa->sadb_sa_spi));
 			if (spi[i] != sa->sadb_sa_spi)
 				continue;
 
@@ -978,7 +921,7 @@ purge_ipsec_spi(dst0, proto, spi, n)
 				delph2(iph2);
 			}
 
-			plog(logp, LOCATION, NULL,
+			plog(LLV_INFO, LOCATION, NULL,
 				"proto_id %s purging spi:%d.\n",
 				s_ipsecdoi_proto(proto),
 				ntohl(spi[i]));
@@ -1022,8 +965,8 @@ info_recv_initialcontact(iph1)
 	/* purge IPsec-SA(s) */
 	buf = pfkey_dump_sadb(SADB_SATYPE_UNSPEC);
 	if (buf == NULL) {
-		YIPSDEBUG(DEBUG_MISC, plog(logp, LOCATION, NULL,
-			"pfkey_dump_sadb returned nothing.\n"));
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"pfkey_dump_sadb returned nothing.\n");
 		return;
 	}
 
@@ -1040,7 +983,8 @@ info_recv_initialcontact(iph1)
 		}
 
 		if (pfkey_align(msg, mhp) || pfkey_check(mhp)) {
-			plog(logp, LOCATION, NULL, "pfkey_check (%s)\n", ipsec_strerror());
+			plog(LLV_ERROR, LOCATION, NULL,
+				"pfkey_check (%s)\n", ipsec_strerror());
 			msg = next;
 			continue;
 		}
@@ -1071,9 +1015,8 @@ info_recv_initialcontact(iph1)
 			continue;
 		}
 
-		YIPSDEBUG(DEBUG_DMISC,
-			plog(logp, LOCATION, NULL, "purging spi=%u.\n",
-					ntohl(sa->sadb_sa_spi)));
+		plog(LLV_INFO, LOCATION, NULL,
+			"purging spi=%u.\n", ntohl(sa->sadb_sa_spi));
 		pfkey_send_delete(lcconf->sock_pfkey,
 			msg->sadb_msg_satype,
 			IPSEC_MODE_ANY, src, dst, sa->sadb_sa_spi);
@@ -1132,7 +1075,7 @@ isakmp_info_recv_d(iph1, msg)
 				protected++;
 				break;
 			}
-			plog(logp, LOCATION, iph1->remote,
+			plog(LLV_ERROR, LOCATION, iph1->remote,
 				"received next payload type %d "
 				"in wrong place (must be the first payload).\n",
 				pap->type);
@@ -1140,8 +1083,8 @@ isakmp_info_recv_d(iph1, msg)
 			return -1;
 		default:
 			/* don't send information, see isakmp_ident_r1() */
-			plog(logp, LOCATION, iph1->remote,
-				"ignore the packet, "
+			plog(LLV_ERROR, LOCATION, iph1->remote,
+				"reject the packet, "
 				"received unexpecting payload type %d.\n",
 				pap->type);
 			vfree(pbuf);
@@ -1150,8 +1093,8 @@ isakmp_info_recv_d(iph1, msg)
 	}
 
 	if (!protected) {
-		plog(logp, LOCATION, NULL,
-			"ERROR: delete payload is not proteted, "
+		plog(LLV_ERROR, LOCATION, NULL,
+			"delete payload is not proteted, "
 			"ignored.\n");
 		vfree(pbuf);
 		return -1;
@@ -1165,7 +1108,7 @@ isakmp_info_recv_d(iph1, msg)
 		d = (struct isakmp_pl_d *)pap->ptr;
 
 		if (ntohl(d->doi) != IPSEC_DOI) {
-			plog(logp, LOCATION, iph1->remote,
+			plog(LLV_ERROR, LOCATION, iph1->remote,
 				"delete payload with invalid doi:%d.\n",
 				ntohl(d->doi));
 			continue;
@@ -1175,7 +1118,7 @@ isakmp_info_recv_d(iph1, msg)
 		tlen = ntohs(d->h.len) - sizeof(struct isakmp_pl_d);
 
 		if (tlen != num_spi * d->spi_size) {
-			plog(logp, LOCATION, iph1->remote,
+			plog(LLV_ERROR, LOCATION, iph1->remote,
 				"deletion payload with invalid length.\n");
 			vfree(pbuf);
 			return -1;
@@ -1184,7 +1127,7 @@ isakmp_info_recv_d(iph1, msg)
 		switch (d->proto_id) {
 		case IPSECDOI_PROTO_ISAKMP:
 			if (d->spi_size != sizeof(isakmp_index)) {
-				plog(logp, LOCATION, iph1->remote,
+				plog(LLV_ERROR, LOCATION, iph1->remote,
 					"delete payload with strange spi "
 					"size %d(proto_id:%d)\n",
 					d->spi_size, d->proto_id);
@@ -1197,7 +1140,7 @@ isakmp_info_recv_d(iph1, msg)
 		case IPSECDOI_PROTO_IPSEC_AH:
 		case IPSECDOI_PROTO_IPSEC_ESP:
 			if (d->spi_size != sizeof(u_int32_t)) {
-				plog(logp, LOCATION, iph1->remote,
+				plog(LLV_ERROR, LOCATION, iph1->remote,
 					"delete payload with strange spi "
 					"size %d(proto_id:%d)\n",
 					d->spi_size, d->proto_id);
@@ -1216,7 +1159,7 @@ isakmp_info_recv_d(iph1, msg)
 			} else if (d->spi_size == sizeof(spi.spi32))
 				memcpy(&spi.spi32, d + 1, sizeof(spi.spi32));
 			else {
-				plog(logp, LOCATION, iph1->remote,
+				plog(LLV_ERROR, LOCATION, iph1->remote,
 					"delete payload with strange spi "
 					"size %d(proto_id:%d)\n",
 					d->spi_size, d->proto_id);
@@ -1227,15 +1170,15 @@ isakmp_info_recv_d(iph1, msg)
 			break;
 
 		default:
-			plog(logp, LOCATION, iph1->remote,
+			plog(LLV_ERROR, LOCATION, iph1->remote,
 				"deletion message received, "
 				"invalid proto_id: %d\n",
 				d->proto_id);
 			continue;
 		}
 
-		YIPSDEBUG(DEBUG_NOTIFY, plog(logp, LOCATION, NULL,
-			"packet properly proteted, purge SPIs.\n"));
+		plog(LLV_INFO, LOCATION, NULL,
+			"packet properly proteted, purge SPIs.\n");
 	}
 
 	vfree(pbuf);
@@ -1250,26 +1193,29 @@ isakmp_check_notify(gen, iph1)
 {
 	struct isakmp_pl_n *notify = (struct isakmp_pl_n *)gen;
 
+	plog(LLV_DEBUG, LOCATION, iph1->remote,
+		"Notify Message received\n");
+
 	switch (ntohs(notify->type)) {
 	case ISAKMP_NTYPE_CONNECTED:
-		plog(logp, LOCATION, iph1->remote,
-			"ignoring CONNECTED notification.\n");
+		plog(LLV_WARNING, LOCATION, iph1->remote,
+			"ignore CONNECTED notification.\n");
 		break;
 	case ISAKMP_NTYPE_RESPONDER_LIFETIME:
-		plog(logp, LOCATION, iph1->remote,
-			"ignoring RESPONDER-LIFETIME notification.\n");
+		plog(LLV_WARNING, LOCATION, iph1->remote,
+			"ignore RESPONDER-LIFETIME notification.\n");
 		break;
 	case ISAKMP_NTYPE_REPLAY_STATUS:
-		plog(logp, LOCATION, iph1->remote,
-			"ignoring REPLAY-STATUS notification.\n");
+		plog(LLV_WARNING, LOCATION, iph1->remote,
+			"ignore REPLAY-STATUS notification.\n");
 		break;
 	case ISAKMP_NTYPE_INITIAL_CONTACT:
-		plog(logp, LOCATION, iph1->remote,
-			"ignoring INITIAL-CONTACT notification.\n");
+		plog(LLV_WARNING, LOCATION, iph1->remote,
+			"ignore INITIAL-CONTACT notification.\n");
 		break;
 	default:
 		isakmp_info_send_n1(iph1, ISAKMP_NTYPE_INVALID_PAYLOAD_TYPE, NULL);
-		plog(logp, LOCATION, iph1->remote,
+		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"received unknown notification type %u.\n",
 		    ntohs(notify->type));
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: debug.h,v 1.15 2000/10/04 17:40:59 itojun Exp $	*/
+/*	$KAME: debug.h,v 1.16 2000/12/15 13:43:54 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,52 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#define DEBUG_INFO	0x00000002	/* force informational */
-#define DEBUG_NOTIFY	0x00000004	/* force notify */
-
-#define DEBUG_DATE	0x00000010	/*XX*/
-#define DEBUG_ADDR	0x00000020	/*XX*/
-#define DEBUG_STAMP	0x10000080	/* stamp */
-#define DEBUG_USEFUL	0x20000000	/* use better during debugging */
-#define DEBUG_SVERB	0x80000000	/* super verbose */
-
-#define DEBUG_CONF	0x08000000	/* configuration. not output to log */
-#define DEBUG_FUNC	0x04000000	/* print function name */
-#define DEBUG_CRYPT	0x00800000	/*XX*/
-#define DEBUG_PFKEY	0x00400000	/* PF_KEY */
-#define DEBUG_KEY	0x00200000	/*XX*/
-#define DEBUG_IPSEC	0x00100000	/*XX*/
-#define DEBUG_SA	0x00080000	/* proposal & payload debugging */
-#define DEBUG_NET	0x00040000	/* network interface & packet dump */
-#define DEBUG_CERT	0x00001000	/* certificate */
-#define DEBUG_PCOMM	0x00000800	/*XX*/
-#define DEBUG_ADMIN	0x00000400	/*XX*/
-#define DEBUG_MISC	0x00000200	/*XX*/
-
-#define DEBUG_DSA	(DEBUG_SVERB | DEBUG_SA)
-#define DEBUG_DKEY	(DEBUG_SVERB | DEBUG_KEY)
-#define DEBUG_DCERT	(DEBUG_SVERB | DEBUG_CERT)	/* private key */
-#define DEBUG_DMISC	(DEBUG_SVERB | DEBUG_MISC)
-
-#ifdef YIPS_DEBUG
-#define YIPSDEBUG(lev,arg) \
-	do { if ((debug & (lev)) == (lev)) { arg; } } while (0)
-#else
-#define YIPSDEBUG(lev,arg)
-#endif /* defined(YIPS_DEBUG) */
-
-#define YIPSLOG(lev,arg) \
-	do { if ((debug & (lev)) == (lev)) { arg; } } while (0)
-
-#ifdef HAVE_FUNCTION_MACRO
-#define LOCATION	debug_location(__FILE__, __LINE__, __FUNCTION__)
-#else
-#define LOCATION	debug_location(__FILE__, __LINE__, NULL)
-#endif
-
 /* define by main.c */
-extern u_int32_t debug;
-extern int f_foreground;
 extern int f_debugcmd;
 extern int f_local;
 extern int vflag;

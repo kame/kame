@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.41 2000/12/12 16:59:34 thorpej Exp $	*/
+/*	$KAME: cftoken.l,v 1.42 2000/12/15 13:43:54 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -44,15 +44,15 @@
 int yyerrorcount = 0;
 
 #if defined(YIPS_DEBUG)
-#  define YYDB                                                                 \
-	YIPSDEBUG(DEBUG_CONF,                                                  \
-		printf("begin <%d>%s\n",                                       \
-		yy_start, yytext));
+#  define YYDB plog(LLV_DEBUG2, LOCATION, NULL,                                \
+		"begin <%d>%s\n", yy_start, yytext);
 #  define YYD {                                                                \
-	YIPSDEBUG(DEBUG_CONF, printf("<%d>", yy_start);                        \
+	plog(LLV_DEBUG2, LOCATION, NULL, "<%d>", yy_start);                    \
+	if (loglevel >= LLV_DEBUG2) {                                          \
 		ECHO ;                                                         \
-		printf("\n"));                                                 \
-	}
+		printf("\n");                                                  \
+	}                                                                      \
+}
 #else
 #  define YYDB
 #  define YYD
@@ -526,10 +526,9 @@ yyerror(char *s, ...)
 #endif
 	snprintf(fmt, sizeof(fmt), "%d: \"%s\" %s\n",
 		incstack[incstackp].lineno, yytext, s);
-	plogv(logp, LOCATION, NULL,
-		fmt, ap);
+	plogv(LLV_ERROR, LOCATION, NULL, fmt, ap);
 	va_end(ap);
-	plog(logp, LOCATION, NULL,
+	plog(LLV_ERROR, LOCATION, NULL,
 		"in %s\n", incstack[incstackp].path);
 
 	yyerrorcount++;
@@ -548,10 +547,9 @@ yywarn(char *s, ...)
 #endif
 	snprintf(fmt, sizeof(fmt), "%d: \"%s\" %s\n",
 		incstack[incstackp].lineno, yytext, s);
-	plogv(logp, LOCATION, NULL,
-		fmt, ap);
+	plogv(LLV_ERROR, LOCATION, NULL, fmt, ap);
 	va_end(ap);
-	plog(logp, LOCATION, NULL,
+	plog(LLV_ERROR, LOCATION, NULL,
 		"in %s\n", incstack[incstackp].path);
 }
 
@@ -561,7 +559,7 @@ yycf_switch_buffer(path)
 {
 	/* got the include file name */
 	if (incstackp >= MAX_INCLUDE_DEPTH) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"Includes nested too deeply");
 		return -1;
 	}
@@ -586,7 +584,7 @@ yycf_set_buffer(path)
 	if (yyin == NULL) {
 		fprintf(stderr, "failed to open file %s (%s)\n",
 			path, strerror(errno));
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to open file %s (%s)\n",
 			path, strerror(errno));
 		return -1;

@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.15 2000/10/18 13:19:07 sakane Exp $	*/
+/*	$KAME: eaytest.c,v 1.16 2000/12/15 13:43:55 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -47,7 +47,7 @@
 #include "oakley.h"
 #include "crypto_openssl.h"
 
-u_int32_t debug = 0;
+u_int32_t loglevel = 0;
 
 char *capath = "/usr/local/openssl/certs";
 char *certs[] = {

@@ -1,4 +1,4 @@
-/*	$KAME: remoteconf.c,v 1.17 2000/10/11 19:54:08 sakane Exp $	*/
+/*	$KAME: remoteconf.c,v 1.18 2000/12/15 13:43:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -99,7 +99,7 @@ getrmconf(remote)
 		break;
 #endif
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"invalid family: %d\n", remote->sa_family);
 		exit(1);
 	}
@@ -113,9 +113,8 @@ getrmconf(remote)
 	LIST_FOREACH(p, &rmtree, chain) {
 		if ((!withport && cmpsaddrwop(remote, p->remote) == 0)
 		 || (withport && cmpsaddr(remote, p->remote) == 0)) {
-			YIPSDEBUG(DEBUG_MISC,
-				plog(logp, LOCATION, NULL,
-					"configuration found for %s.\n", buf));
+			plog(LLV_DEBUG, LOCATION, NULL,
+				"configuration found for %s.\n", buf);
 			return p;
 		}
 
@@ -125,16 +124,13 @@ getrmconf(remote)
 	}
 
 	if (anon != NULL) {
-		YIPSDEBUG(DEBUG_MISC,
-			plog(logp, LOCATION, NULL,
-				"anonymous configuration selected for %s.\n",
-				buf));
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"anonymous configuration selected for %s.\n", buf);
 		return anon;
 	}
 
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL,
-			"no remote configuration found.\n"));
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"no remote configuration found.\n");
 	return NULL;
 }
 

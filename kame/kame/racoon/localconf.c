@@ -1,4 +1,4 @@
-/*	$KAME: localconf.c,v 1.27 2000/10/11 19:54:08 sakane Exp $	*/
+/*	$KAME: localconf.c,v 1.28 2000/12/15 13:43:56 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -143,7 +143,7 @@ getpskbyname(id0)
 
 	id = CALLOC(1 + id0->l - sizeof(struct ipsecdoi_id_b), char *);
 	if (id == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get psk buffer.\n");
 		goto end;
 	}
@@ -193,7 +193,7 @@ getpsk(str, len)
 	else
 		fp = NULL;
 	if (fp == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to open pre_share_key file %s\n",
 			lcconf->pathinfo[LC_PATHTYPE_PSK]);
 		return NULL;
@@ -227,7 +227,7 @@ getpsk(str, len)
 			if (strncmp(p, "0x", 2) == 0) {
 				k = str2val(p + 2, 16, &keylen);
 				if (k == NULL) {
-					plog(logp, LOCATION, NULL,
+					plog(LLV_ERROR, LOCATION, NULL,
 						"failed to get psk buffer.\n");
 					goto end;
 				}
@@ -236,7 +236,7 @@ getpsk(str, len)
 
 			key = vmalloc(keylen);
 			if (key == NULL) {
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"failed to allocate key buffer.\n");
 				goto end;
 			}
@@ -266,8 +266,7 @@ getpathname(path, len, type, name)
 		name[0] == '/' ? "" : "/",
 		name);
 
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL, "filename: %s\n", path));
+	plog(LLV_DEBUG, LOCATION, NULL, "filename: %s\n", path);
 }
 
 #if 0 /* DELETEIT */

@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.c,v 1.11 2000/12/12 16:59:33 thorpej Exp $	*/
+/*	$KAME: algorithm.c,v 1.12 2000/12/15 13:43:54 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -156,7 +156,8 @@ check_keylen(class, type, len)
 		break;
 	default:
 		/* unknown class, punt */
-		plog(logp, LOCATION, NULL, "unknown algclass %d\n", class);
+		plog(LLV_ERROR, LOCATION, NULL,
+			"unknown algclass %d\n", class);
 		return -1;
 	}
 
@@ -168,9 +169,8 @@ check_keylen(class, type, len)
 	case algtype_rijndael:
 	case algtype_twofish:
 		if (len % 8 != 0) {
-			plog(logp, LOCATION, NULL,
-				"key length %d is not multiple of 8\n",
-				len);
+			plog(LLV_ERROR, LOCATION, NULL,
+				"key length %d is not multiple of 8\n", len);
 			return -1;
 		}
 		break;
@@ -201,14 +201,14 @@ check_keylen(class, type, len)
 		break;
 	default:
 		if (len) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"key length is not allowed");
 			return -1;
 		}
 		break;
 	}
 	if (badrange) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"key length out of range\n");
 		return -1;
 	}
@@ -297,7 +297,7 @@ initalgstrength()
 
 	new = CALLOC(MAXALGCLASS * sizeof(*new), struct algorithm_strength **);
 	if (new == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get buffer.\n");
 		return NULL;
 	}
@@ -305,7 +305,7 @@ initalgstrength()
 	for (i = 0; i < MAXALGCLASS; i++) {
 		new[i] = CALLOC(sizeof(*new[i]), struct algorithm_strength *);
 		if (new[i] == NULL) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to get buffer.\n");
 			return NULL;
 		}

@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_ident.c,v 1.50 2000/12/12 23:22:18 itojun Exp $	*/
+/*	$KAME: isakmp_ident.c,v 1.51 2000/12/15 13:43:55 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -97,11 +97,9 @@ ident_i1send(iph1, msg)
 	int tlen;
 	int error = -1;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph1->status != PHASE1ST_START) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}
@@ -121,7 +119,7 @@ ident_i1send(iph1, msg)
 
 	iph1->sendbuf = vmalloc(tlen);
 	if (iph1->sendbuf == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get buffer to send.\n");
 		goto end;
 	}
@@ -172,11 +170,9 @@ ident_i2recv(iph1, msg)
 	vchar_t *satmp = NULL;
 	int error = -1;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph1->status != PHASE1ST_MSG1SENT) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}
@@ -198,7 +194,7 @@ ident_i2recv(iph1, msg)
 
 	/* SA payload is fixed postion */
 	if (pa->type != ISAKMP_NPTYPE_SA) {
-		plog(logp, LOCATION, iph1->remote,
+		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"received invalid next payload type %d, "
 			"expecting %d.\n",
 			pa->type, ISAKMP_NPTYPE_SA);
@@ -214,14 +210,11 @@ ident_i2recv(iph1, msg)
 
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_VID:
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Vendor ID.\n"));
 			(void)check_vendorid(pa->ptr);
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
-			plog(logp, LOCATION, iph1->remote,
+			plog(LLV_ERROR, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
@@ -231,7 +224,7 @@ ident_i2recv(iph1, msg)
 
 	/* check SA payload and set approval SA for use */
 	if (ipsecdoi_checkph1proposal(satmp, iph1) < 0) {
-		plog(logp, LOCATION, iph1->remote,
+		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"failed to get valid proposal.\n");
 		/* XXX send information */
 		goto end;
@@ -269,11 +262,9 @@ ident_i2send(iph1, msg)
 {
 	int error = -1;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph1->status != PHASE1ST_MSG2RECEIVED) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}
@@ -335,11 +326,9 @@ ident_i3recv(iph1, msg)
 	vchar_t *gsstoken = NULL;
 #endif
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph1->status != PHASE1ST_MSG2SENT) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}
@@ -363,9 +352,6 @@ ident_i3recv(iph1, msg)
 				goto end;
 			break;
 		case ISAKMP_NPTYPE_VID:
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Vendor ID.\n"));
 			(void)check_vendorid(pa->ptr);
 			break;
 #ifdef HAVE_SIGNING_C
@@ -383,7 +369,7 @@ ident_i3recv(iph1, msg)
 #endif
 		default:
 			/* don't send information, see ident_r1recv() */
-			plog(logp, LOCATION, iph1->remote,
+			plog(LLV_ERROR, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
@@ -393,7 +379,7 @@ ident_i3recv(iph1, msg)
 
 	/* payload existency check */
 	if (iph1->dhpub_p == NULL || iph1->nonce_p == NULL) {
-		plog(logp, LOCATION, iph1->remote,
+		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"few isakmp message received.\n");
 		goto end;
 	}
@@ -442,11 +428,9 @@ ident_i3send(iph1, msg)
 	int len;
 #endif
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph1->status != PHASE1ST_MSG3RECEIVED) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}
@@ -473,7 +457,7 @@ ident_i3send(iph1, msg)
 #ifdef HAVE_GSSAPI
 	if (iph1->approval->authmethod == OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB &&
 	    gssapi_more_tokens(iph1)) {
-		plog(logp, LOCATION, NULL, "calling get_itoken\n");
+		plog(LLV_DEBUG, LOCATION, NULL, "calling get_itoken\n");
 		gssapi_get_itoken(iph1, &len);
 		if (len != 0)
 			dohash = 0;
@@ -530,18 +514,16 @@ ident_i4recv(iph1, msg0)
 	vchar_t *gsstoken = NULL;
 #endif
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph1->status != PHASE1ST_MSG3SENT) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}
 
 	/* decrypting */
 	if (!ISSET(((struct isakmp *)msg0->v)->flags, ISAKMP_FLAG_E)) {
-		plog(logp, LOCATION, iph1->remote,
+		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"ignore the packet, "
 			"expecting the packet encrypted.\n");
 		goto end;
@@ -587,20 +569,14 @@ ident_i4recv(iph1, msg0)
 			break;
 #endif
 		case ISAKMP_NPTYPE_VID:
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Vendor ID.\n"));
 			(void)check_vendorid(pa->ptr);
 			break;
 		case ISAKMP_NPTYPE_N:
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Notify Message.\n"));
 			isakmp_check_notify(pa->ptr, iph1);
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
-			plog(logp, LOCATION, iph1->remote,
+			plog(LLV_ERROR, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
@@ -615,7 +591,8 @@ ident_i4recv(iph1, msg0)
 
 	/* verify identifier */
 	if (ipsecdoi_checkid1(iph1) < 0) {
-		plog(logp, LOCATION, iph1->remote, "invalid ID payload.\n");
+		plog(LLV_ERROR, LOCATION, iph1->remote,
+			"invalid ID payload.\n");
 		goto end;
 	}
 
@@ -641,9 +618,8 @@ ident_i4recv(iph1, msg0)
 	 * payload's.
 	 */
 
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, iph1->remote, "ID ");
-		PVDUMP(iph1->id_p));
+	plog(LLV_DEBUG, LOCATION, iph1->remote, "peer's ID:");
+	plogdump(LLV_DEBUG, iph1->id_p->v, iph1->id_p->l);
 
 	/*
 	 * If we got a GSS token, we need to this roundtrip again.
@@ -689,11 +665,9 @@ ident_i4send(iph1, msg)
 {
 	int error = -1;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph1->status != PHASE1ST_MSG4RECEIVED) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}
@@ -725,11 +699,9 @@ ident_r1recv(iph1, msg)
 	struct isakmp_parse_t *pa;
 	int error = -1;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph1->status != PHASE1ST_START) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}
@@ -745,7 +717,7 @@ ident_r1recv(iph1, msg)
 
 	/* check the position of SA payload */
 	if (pa->type != ISAKMP_NPTYPE_SA) {
-		plog(logp, LOCATION, iph1->remote,
+		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"received invalid next payload type %d, "
 			"expecting %d.\n",
 			pa->type, ISAKMP_NPTYPE_SA);
@@ -761,9 +733,6 @@ ident_r1recv(iph1, msg)
 
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_VID:
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Vendor ID.\n"));
 			(void)check_vendorid(pa->ptr);
 			break;
 		default:
@@ -774,7 +743,7 @@ ident_r1recv(iph1, msg)
 			 * the re-sent packet.  And we do same behavior
 			 * when we expect encrypted packet.
 			 */
-			plog(logp, LOCATION, iph1->remote,
+			plog(LLV_ERROR, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
@@ -784,7 +753,7 @@ ident_r1recv(iph1, msg)
 
 	/* check SA payload and set approval SA for use */
 	if (ipsecdoi_checkph1proposal(iph1->sa, iph1) < 0) {
-		plog(logp, LOCATION, iph1->remote,
+		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"failed to get valid proposal.\n");
 		/* XXX send information */
 		goto end;
@@ -822,11 +791,9 @@ ident_r1send(iph1, msg)
 	int error = -1;
 	vchar_t *gss_sa = NULL;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph1->status != PHASE1ST_MSG1RECEIVED) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}
@@ -845,7 +812,7 @@ ident_r1send(iph1, msg)
 
 	iph1->sendbuf = vmalloc(tlen);
 	if (iph1->sendbuf == NULL) { 
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get buffer to send.\n");
 		goto end;
 	}
@@ -901,11 +868,9 @@ ident_r2recv(iph1, msg)
 	vchar_t *gsstoken = NULL;
 #endif
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph1->status != PHASE1ST_MSG1SENT) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}
@@ -929,14 +894,11 @@ ident_r2recv(iph1, msg)
 				goto end;
 			break;
 		case ISAKMP_NPTYPE_VID:
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Vendor ID.\n"));
 			(void)check_vendorid(pa->ptr);
 			break;
 		case ISAKMP_NPTYPE_CR:
-			plog(logp, LOCATION, iph1->remote,
-				"NOTICE: CR received, ignore it."
+			plog(LLV_WARNING, LOCATION, iph1->remote,
+				"CR received, ignore it. "
 				"It should be in other exchange.\n");
 			break;
 #ifdef HAVE_GSSAPI
@@ -948,7 +910,7 @@ ident_r2recv(iph1, msg)
 #endif
 		default:
 			/* don't send information, see ident_r1recv() */
-			plog(logp, LOCATION, iph1->remote,
+			plog(LLV_ERROR, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
@@ -958,7 +920,7 @@ ident_r2recv(iph1, msg)
 
 	/* payload existency check */
 	if (iph1->dhpub_p == NULL || iph1->nonce_p == NULL) {
-		plog(logp, LOCATION, iph1->remote,
+		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"few isakmp message received.\n");
 		goto end;
 	}
@@ -999,11 +961,9 @@ ident_r2send(iph1, msg)
 {
 	int error = -1;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph1->status != PHASE1ST_MSG2RECEIVED) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}
@@ -1077,19 +1037,17 @@ ident_r3recv(iph1, msg0)
 	vchar_t *gsstoken = NULL;
 #endif
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph1->status != PHASE1ST_MSG2SENT) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}
 
 	/* decrypting */
 	if (!ISSET(((struct isakmp *)msg0->v)->flags, ISAKMP_FLAG_E)) {
-		plog(logp, LOCATION, iph1->remote,
-			"ignore the packet, "
+		plog(LLV_ERROR, LOCATION, iph1->remote,
+			"reject the packet, "
 			"expecting the packet encrypted.\n");
 		goto end;
 	}
@@ -1138,20 +1096,14 @@ ident_r3recv(iph1, msg0)
 			break;
 #endif
 		case ISAKMP_NPTYPE_VID:
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Vendor ID.\n"));
 			(void)check_vendorid(pa->ptr);
 			break;
 		case ISAKMP_NPTYPE_N:
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Notify Message.\n"));
 			isakmp_check_notify(pa->ptr, iph1);
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
-			plog(logp, LOCATION, iph1->remote,
+			plog(LLV_ERROR, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
@@ -1186,13 +1138,13 @@ ident_r3recv(iph1, msg0)
 		break;
 #endif
 	default:
-		plog(logp, LOCATION, iph1->remote,
+		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"invalid authmethod %d why ?\n",
 			iph1->approval->authmethod);
 		goto end;
 	}
 	if (ng) {
-		plog(logp, LOCATION, iph1->remote,
+		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"few isakmp message received.\n");
 		goto end;
 	}
@@ -1203,7 +1155,8 @@ ident_r3recv(iph1, msg0)
 
 	/* verify identifier */
 	if (ipsecdoi_checkid1(iph1) < 0) {
-		plog(logp, LOCATION, iph1->remote, "invalid ID payload.\n");
+		plog(LLV_ERROR, LOCATION, iph1->remote,
+			"invalid ID payload.\n");
 		goto end;
 	}
 
@@ -1236,9 +1189,8 @@ ident_r3recv(iph1, msg0)
 	 * payload's.
 	 */
 
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, iph1->remote, "ID ");
-		PVDUMP(iph1->id_p));
+	plog(LLV_DEBUG, LOCATION, iph1->remote, "peer's ID ");
+	plogdump(LLV_DEBUG, iph1->id_p->v, iph1->id_p->l);
 
 #ifdef HAVE_GSSAPI
 	iph1->status = gsstoken != NULL ? PHASE1ST_MSG2RECEIVED :
@@ -1293,11 +1245,9 @@ ident_r3send(iph1, msg0)
 	int len;
 #endif
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
 	/* validity check */
 	if (iph1->status != PHASE1ST_MSG3RECEIVED) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}
@@ -1317,8 +1267,7 @@ ident_r3send(iph1, msg0)
 
 	if (dohash) {
 		/* generate HASH to send */
-		YIPSDEBUG(DEBUG_KEY,
-		    plog(logp, LOCATION, NULL, "generate HASH_R\n"));
+		plog(LLV_DEBUG, LOCATION, NULL, "generate HASH_R\n");
 		iph1->hash = oakley_ph1hash_common(iph1, GENERATE);
 		if (iph1->hash == NULL)
 			goto end;
@@ -1383,7 +1332,7 @@ ident_ir2sendmx(iph1)
 		need_cr = 1;
 		cr = oakley_getcr(iph1);
 		if (cr == NULL) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to get cr buffer.\n");
 			goto end;
 		}
@@ -1410,7 +1359,7 @@ ident_ir2sendmx(iph1)
 
 	buf = vmalloc(tlen);
 	if (buf == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get buffer to send.\n");
 		goto end;
 	}
@@ -1513,7 +1462,7 @@ ident_ir3sendmx(iph1)
 
 		buf = vmalloc(tlen);
 		if (buf == NULL) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to get buffer to send.\n");
 			goto end;
 		}
@@ -1546,7 +1495,7 @@ ident_ir3sendmx(iph1)
 			need_cr = 1;
 			cr = oakley_getcr(iph1);
 			if (cr == NULL) {
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"failed to get cr buffer.\n");
 				goto end;
 			}
@@ -1564,7 +1513,7 @@ ident_ir3sendmx(iph1)
 
 		buf = vmalloc(tlen);
 		if (buf == NULL) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to get buffer to send.\n");
 			goto end;
 		}
@@ -1607,7 +1556,7 @@ ident_ir3sendmx(iph1)
 
 		buf = vmalloc(tlen);
 		if (buf == NULL) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to get buffer to send.\n");
 			goto end;
 		}
@@ -1642,12 +1591,12 @@ ident_ir3sendmx(iph1)
 #endif
 	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
 	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"not supported authentication type %d\n",
 			iph1->approval->authmethod);
 		goto end;
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"invalid authentication type %d\n",
 			iph1->approval->authmethod);
 		goto end;

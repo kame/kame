@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.113 2000/12/12 16:59:38 thorpej Exp $	*/
+/*	$KAME: isakmp.c,v 1.114 2000/12/15 13:43:55 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -166,19 +166,19 @@ isakmp_handler(so_isakmp)
 		    (struct sockaddr *)&local, &local_len)) < 0) {
 		if (errno == EINTR)
 			continue;
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to receive isakmp packet\n");
 		goto end;
 	}
 
 	/* check isakmp header length */
 	if (len < sizeof(isakmp)) {
-		plog(logp, LOCATION, (struct sockaddr *)&remote,
+		plog(LLV_ERROR, LOCATION, (struct sockaddr *)&remote,
 			"packet shorter than isakmp header size.\n");
 		/* dummy receive */
 		if ((len = recvfrom(so_isakmp, (char *)&isakmp, sizeof(isakmp),
 			    0, (struct sockaddr *)&remote, &remote_len)) < 0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to receive isakmp packet\n");
 		}
 		goto end;
@@ -187,12 +187,12 @@ isakmp_handler(so_isakmp)
 #if 0 /*MSG_PEEK does not return total length*/
 	/* check bogus length */
 	if (ntohl(isakmp.len) > len) {
-		plog(logp, LOCATION, (struct sockaddr *)&remote,
+		plog(LLV_ERROR, LOCATION, (struct sockaddr *)&remote,
 			"packet shorter than isakmp header length field.\n");
 		/* dummy receive */
 		if ((len = recvfrom(so_isakmp, (char *)&isakmp, sizeof(isakmp),
 			    0, (struct sockaddr *)&remote, &remote_len)) < 0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to receive isakmp packet\n");
 		}
 		goto end;
@@ -201,12 +201,12 @@ isakmp_handler(so_isakmp)
 
 	/* read real message */
 	if ((buf = vmalloc(ntohl(isakmp.len))) == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to allocate reading buffer\n");
 		/* dummy receive */
 		if ((len = recvfrom(so_isakmp, (char *)&isakmp, sizeof(isakmp),
 			    0, (struct sockaddr *)&remote, &remote_len)) < 0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to receive isakmp packet\n");
 		}
 		goto end;
@@ -217,23 +217,22 @@ isakmp_handler(so_isakmp)
 	                    (struct sockaddr *)&local, &local_len)) < 0) {
 		if (errno == EINTR)
 			continue;
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to receive isakmp packet\n");
 		goto end;
 	}
 
 	if (len != buf->l) {
-		plog(logp, LOCATION, (struct sockaddr *)&remote,
+		plog(LLV_ERROR, LOCATION, (struct sockaddr *)&remote,
 			"received invalid length, why ?\n");
 		goto end;
 	}
 
-	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
-	YIPSDEBUG(DEBUG_NOTIFY,
-		plog(logp, LOCATION, (struct sockaddr *)&local,
-			"%d bytes message received from %s\n",
-			len, saddr2str((struct sockaddr *)&remote)));
-	YIPSDEBUG(DEBUG_NET, PVDUMP(buf));
+	plog(LLV_DEBUG, LOCATION, NULL, "===\n");
+	plog(LLV_DEBUG, LOCATION, (struct sockaddr *)&local,
+		"%d bytes message received from %s\n",
+		len, saddr2str((struct sockaddr *)&remote));
+	plogdump(LLV_DEBUG, buf->v, buf->l);
 
 	/* avoid packets with malicious port/address */
 	switch (remote.ss_family) {
@@ -246,19 +245,19 @@ isakmp_handler(so_isakmp)
 		break;
 #endif
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"invalid family: %d\n", remote.ss_family);
 		goto end;
 	}
 	if (port == 0) {
-		plog(logp, LOCATION, (struct sockaddr *)&remote,
+		plog(LLV_ERROR, LOCATION, (struct sockaddr *)&remote,
 			"possible attack: src port == 0 "
 			"(valid as UDP but not with IKE)\n");
 		goto end;
 	}
 	if (cmpsaddr((struct sockaddr *)&local,
 			(struct sockaddr *)&remote) == 0) {
-		plog(logp, LOCATION, (struct sockaddr *)&remote,
+		plog(LLV_ERROR, LOCATION, (struct sockaddr *)&remote,
 			"possible attack: "
 			"local addr/port == remote addr/port\n");
 		goto end;
@@ -306,18 +305,16 @@ isakmp_main(msg, remote, local)
 	 */
 	if (isakmp->v < ISAKMP_VERSION_NUMBER) {
 		if (ISAKMP_GETMAJORV(isakmp->v) < ISAKMP_MAJOR_VERSION) {
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, remote,
-					"invalid major version %d.\n",
-					ISAKMP_GETMAJORV(isakmp->v)));
+			plog(LLV_ERROR, LOCATION, remote,
+				"invalid major version %d.\n",
+				ISAKMP_GETMAJORV(isakmp->v));
 			return -1;
 		}
 #if ISAKMP_MINOR_VERSION > 0
 		if (ISAKMP_GETMINORV(isakmp->v) < ISAKMP_MINOR_VERSION) {
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, remote,
-					"invalid minor version %d.\n",
-					ISAKMP_GETMINORV(isakmp->v)));
+			plog(LLV_ERROR, LOCATION, remote,
+				"invalid minor version %d.\n",
+				ISAKMP_GETMINORV(isakmp->v));
 			return -1;
 		}
 #endif
@@ -326,9 +323,8 @@ isakmp_main(msg, remote, local)
 	/* check the Flags field. */
 	/* XXX How is the exclusive check, E and A ? */
 	if (isakmp->flags & ~(ISAKMP_FLAG_E | ISAKMP_FLAG_C | ISAKMP_FLAG_A)) {
-		YIPSDEBUG(DEBUG_NOTIFY,
-			plog(logp, LOCATION, remote,
-				"invalid flag 0x%02x.\n", isakmp->flags));
+		plog(LLV_ERROR, LOCATION, remote,
+			"invalid flag 0x%02x.\n", isakmp->flags);
 		return -1;
 	}
 
@@ -337,7 +333,7 @@ isakmp_main(msg, remote, local)
 		if (isakmp->msgid == 0) {
 			isakmp_info_send_nx(isakmp, remote, local,
 				ISAKMP_NTYPE_INVALID_FLAGS, NULL);
-			plog(logp, LOCATION, remote,
+			plog(LLV_ERROR, LOCATION, remote,
 				"Commit bit on phase1 forbidden.\n");
 			return -1;
 		}
@@ -347,7 +343,7 @@ isakmp_main(msg, remote, local)
 	if (iph1 != NULL) {
 		/* must be same addresses in one stream of a phase at least. */
 		if (cmpsaddr(iph1->remote, remote) != 0) {
-			plog(logp, LOCATION, remote,
+			plog(LLV_ERROR, LOCATION, remote,
 				"remote address mismatched. db=%s\n",
 				saddr2str(iph1->remote));
 		}
@@ -365,7 +361,7 @@ isakmp_main(msg, remote, local)
 	case ISAKMP_ETYPE_BASE:
 		/* phase 1 validity check */
 		if (isakmp->msgid != 0) {
-			plog(logp, LOCATION, remote,
+			plog(LLV_ERROR, LOCATION, remote,
 				"message id should be zero in phase1.\n");
 			return -1;
 		}
@@ -388,9 +384,8 @@ isakmp_main(msg, remote, local)
 				 || memcmp(&isakmp->i_ck, r_ck0,
 					sizeof(cookie_t)) == 0) {
 
-					YIPSDEBUG(DEBUG_NOTIFY,
-						plog(logp, LOCATION, remote,
-							"malformed cookie.\n"));
+					plog(LLV_ERROR, LOCATION, remote,
+						"malformed cookie.\n");
 					return -1;
 				}
 
@@ -412,27 +407,25 @@ isakmp_main(msg, remote, local)
 		 * authencication completed.
 		 */
 		if (iph1->etype != isakmp->etype) {
-			plog(logp, LOCATION, iph1->remote,
-				"NOTICE: exchange type is mismatched: "
+			plog(LLV_ERROR, LOCATION, iph1->remote,
+				"exchange type is mismatched: "
 				"db=%s packet=%s, ignore it.\n",
 				s_isakmp_etype(iph1->etype),
 				s_isakmp_etype(isakmp->etype));
-			/* ignore it */
 			return -1;
 		}
 
 		/* check a packet retransmited. */
 		if (check_recvedpkt(msg, iph1->rlist)) {
-			YIPSDEBUG(DEBUG_NET,
-				plog(logp, LOCATION, iph1->remote,
-					"the packet retransmited by peer.\n"));
+			plog(LLV_DEBUG, LOCATION, iph1->remote,
+				"the packet retransmited by peer.\n");
 			return -1;
 		}
 
 		/* call main process of phase 1 */
 		if (ph1_main(iph1, msg) < 0) {
-			plog(logp, LOCATION, iph1->remote,
-				"ERROR: delete phase1 handler due to error.\n");
+			plog(LLV_ERROR, LOCATION, iph1->remote,
+				"delete phase1 handler due to error.\n");
 			remph1(iph1);
 			delph1(iph1);
 			return -1;
@@ -440,10 +433,9 @@ isakmp_main(msg, remote, local)
 		break;
 
 	case ISAKMP_ETYPE_AUTH:
-		YIPSDEBUG(DEBUG_NOTIFY,
-			plog(logp, LOCATION, remote,
-				"unsupported exchange %d received.\n",
-				isakmp->etype));
+		plog(LLV_INFO, LOCATION, remote,
+			"unsupported exchange %d received.\n",
+			isakmp->etype);
 		break;
 
 	case ISAKMP_ETYPE_INFO:
@@ -458,15 +450,14 @@ isakmp_main(msg, remote, local)
 		if (iph1 == NULL) {
 			iph1 = getph1byindex0(index);
 			if (iph1 == NULL) {
-				YIPSDEBUG(DEBUG_NOTIFY,
-					plog(logp, LOCATION, remote,
-						"unknown Informationnal "
-						"exchange received.\n"));
+				plog(LLV_ERROR, LOCATION, remote,
+					"unknown Informationnal "
+					"exchange received.\n");
 				return -1;
 			}
 			if (cmpsaddr(iph1->remote, remote) != 0) {
-				plog(logp, LOCATION, remote,
-					"WARNING: remote address mismatched. "
+				plog(LLV_WARNING, LOCATION, remote,
+					"remote address mismatched. "
 					"db=%s\n",
 					saddr2str(iph1->remote));
 			}
@@ -483,19 +474,17 @@ isakmp_main(msg, remote, local)
 		if (iph1 == NULL) {
 			isakmp_info_send_nx(isakmp, remote, local,
 				ISAKMP_NTYPE_INVALID_COOKIE, NULL);
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, remote,
-					"Unknown quick mode exchange, "
-					"there is no ISAKMP-SA.\n"));
+			plog(LLV_ERROR, LOCATION, remote,
+				"Unknown quick mode exchange, "
+				"there is no ISAKMP-SA.\n");
 			return -1;
 		}
 
 		/* check status of phase 1 whether negotiated or not. */
 		if (iph1->status != PHASE1ST_ESTABLISHED) {
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, remote,
-					"Unknown quick mode exchange, "
-					"there is no valid ISAKMP-SA.\n"));
+			plog(LLV_ERROR, LOCATION, remote,
+				"Unknown quick mode exchange, "
+				"there is no valid ISAKMP-SA.\n");
 			return -1;
 		}
 
@@ -511,9 +500,8 @@ isakmp_main(msg, remote, local)
 
 		/* check a packet retransmited. */
 		if (check_recvedpkt(msg, iph2->rlist)) {
-			YIPSDEBUG(DEBUG_NET,
-				plog(logp, LOCATION, remote,
-					"the packet retransmited by peer.\n"));
+			plog(LLV_DEBUG, LOCATION, remote,
+				"the packet retransmited by peer.\n");
 			return -1;
 		}
 
@@ -529,8 +517,8 @@ isakmp_main(msg, remote, local)
 
 		/* call main process of quick mode */
 		if (quick_main(iph2, msg) < 0) {
-			plog(logp, LOCATION, iph1->remote,
-				"ERROR: delete phase2 handler due to error.\n");
+			plog(LLV_ERROR, LOCATION, iph1->remote,
+				"delete phase2 handler due to error.\n");
 			unbindph12(iph2);
 			remph2(iph2);
 			delph2(iph2);
@@ -541,10 +529,9 @@ isakmp_main(msg, remote, local)
 
 	case ISAKMP_ETYPE_NEWGRP:
 		if (iph1 == NULL) {
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, remote,
-					"Unknown new group mode exchange, "
-					"there is no ISAKMP-SA.\n"));
+			plog(LLV_ERROR, LOCATION, remote,
+				"Unknown new group mode exchange, "
+				"there is no ISAKMP-SA.\n");
 			return -1;
 		}
 		isakmp_newgroup_r(iph1, msg);
@@ -552,10 +539,8 @@ isakmp_main(msg, remote, local)
 
 	case ISAKMP_ETYPE_NONE:
 	default:
-		YIPSDEBUG(DEBUG_NOTIFY,
-			plog(logp, LOCATION, remote,
-				"Invalid exchange type %d.\n",
-				isakmp->etype));
+		plog(LLV_ERROR, LOCATION, remote,
+			"Invalid exchange type %d.\n", isakmp->etype);
 		return -1;
 	}
 
@@ -580,8 +565,8 @@ ph1_main(iph1, msg)
 	if (ph1exchange[etypesw1(iph1->etype)]
 		       [iph1->side]
 		       [iph1->status] == NULL) {
-		plog(logp, LOCATION, iph1->remote,
-			"ERROR: why isn't the function defined.\n");
+		plog(LLV_ERROR, LOCATION, iph1->remote,
+			"why isn't the function defined.\n");
 		return -1;
 	}
 	error = (ph1exchange[etypesw1(iph1->etype)]
@@ -595,8 +580,8 @@ ph1_main(iph1, msg)
 		 * with a notify and delete phase 1 handler, OR not to respond
 		 * and keep phase 1 handler.
 		 */
-		plog(logp, LOCATION, iph1->remote,
-			"ERROR: failed to pre-process packet.\n");
+		plog(LLV_ERROR, LOCATION, iph1->remote,
+			"failed to pre-process packet.\n");
 		return -1;
 #else
 		return 0;
@@ -605,8 +590,8 @@ ph1_main(iph1, msg)
 
 	/* free resend buffer */
 	if (iph1->sendbuf == NULL) {
-		plog(logp, LOCATION, NULL,
-			"ERROR: no buffer found as sendbuf\n"); 
+		plog(LLV_ERROR, LOCATION, NULL,
+			"no buffer found as sendbuf\n"); 
 		return -1;
 	}
 	vfree(iph1->sendbuf);
@@ -614,25 +599,25 @@ ph1_main(iph1, msg)
 
 	/* turn off schedule */
 	if (iph1->scr == NULL) {
-		plog(logp, LOCATION, NULL,
-			"ERROR: nothing scheduled.\n"); 
+		plog(LLV_ERROR, LOCATION, NULL,
+			"nothing scheduled.\n"); 
 		return -1;
 	}
 	SCHED_KILL(iph1->scr);
 
 	/* send */
-	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "===\n");
 	if ((ph1exchange[etypesw1(iph1->etype)]
 			[iph1->side]
 			[iph1->status])(iph1, msg) != 0) {
-		plog(logp, LOCATION, iph1->remote,
-			"ERROR: failed to process packet.\n");
+		plog(LLV_ERROR, LOCATION, iph1->remote,
+			"failed to process packet.\n");
 		return -1;
 	}
 
 	if (add_recvedpkt(msg, &iph1->rlist)) {
-		plog(logp, LOCATION, iph1->remote,
-			"ERROR: failed to manage a received packet.\n");
+		plog(LLV_ERROR, LOCATION, iph1->remote,
+			"failed to manage a received packet.\n");
 		return -1;
 	}
 
@@ -654,14 +639,14 @@ ph1_main(iph1, msg)
 					ISAKMP_NTYPE_INITIAL_CONTACT, NULL);
 			/* insert a node into contacted list. */
 			if (inscontacted(iph1->remote) == -1) {
-				plog(logp, LOCATION, iph1->remote,
-					"ERROR: failed to add contacted list.\n");
+				plog(LLV_ERROR, LOCATION, iph1->remote,
+					"failed to add contacted list.\n");
 				/* ignore */
 			}
 		}
 
 		log_ph1established(iph1);
-		YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "===\n"));
+		plog(LLV_DEBUG, LOCATION, NULL, "===\n");
 	}
 
 	return 0;
@@ -687,16 +672,16 @@ quick_main(iph2, msg)
 	if (ph2exchange[etypesw2(isakmp->etype)]
 		       [iph2->side]
 		       [iph2->status] == NULL) {
-		plog(logp, LOCATION, iph2->ph1->remote,
-			"ERROR: why isn't the function defined.\n");
+		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
+			"why isn't the function defined.\n");
 		return -1;
 	}
 	error = (ph2exchange[etypesw2(isakmp->etype)]
 			    [iph2->side]
 			    [iph2->status])(iph2, msg);
 	if (error != 0) {
-		plog(logp, LOCATION, iph2->ph1->remote,
-			"ERROR: failed to pre-process packet.\n");
+		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
+			"failed to pre-process packet.\n");
 		if (error == ISAKMP_INTERNAL_ERROR)
 			return 0;
 		isakmp_info_send_n2(iph2, error, NULL);
@@ -709,8 +694,8 @@ quick_main(iph2, msg)
 
 	/* free resend buffer */
 	if (iph2->sendbuf == NULL) {
-		plog(logp, LOCATION, NULL,
-			"ERROR: no buffer found as sendbuf\n"); 
+		plog(LLV_ERROR, LOCATION, NULL,
+			"no buffer found as sendbuf\n"); 
 		return -1;
 	}
 	vfree(iph2->sendbuf);
@@ -718,25 +703,25 @@ quick_main(iph2, msg)
 
 	/* turn off schedule */
 	if (iph2->scr == NULL) {
-		plog(logp, LOCATION, NULL,
-			"ERROR: no buffer found as sendbuf\n"); 
+		plog(LLV_ERROR, LOCATION, NULL,
+			"no buffer found as sendbuf\n"); 
 		return -1;
 	}
 	SCHED_KILL(iph2->scr);
 
 	/* send */
-	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "===\n");
 	if ((ph2exchange[etypesw2(isakmp->etype)]
 			[iph2->side]
 			[iph2->status])(iph2, msg) != 0) {
-		plog(logp, LOCATION, iph2->ph1->remote,
-			"ERROR: failed to process packet.\n");
+		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
+			"failed to process packet.\n");
 		return -1;
 	}
 
 	if (add_recvedpkt(msg, &iph2->rlist)) {
-		plog(logp, LOCATION, iph2->ph1->remote,
-			"ERROR: failed to manage a received packet.\n");
+		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
+			"failed to manage a received packet.\n");
 		return -1;
 	}
 
@@ -750,15 +735,6 @@ isakmp_ph1begin_i(rmconf, remote)
 	struct sockaddr *remote;
 {
 	struct ph1handle *iph1;
-#ifdef YIPS_DEBUG
-	char h1[NI_MAXHOST], h2[NI_MAXHOST];
-	char s1[NI_MAXSERV], s2[NI_MAXSERV];
-#ifdef NI_WITHSCOPEID
-	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
-#else
-	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
-#endif
-#endif
 
 	/* get new entry to isakmp status table. */
 	iph1 = newph1();
@@ -777,26 +753,24 @@ isakmp_ph1begin_i(rmconf, remote)
 	if (copy_ph1addresses(iph1, rmconf, remote, NULL) < 0)
 		return -1;
 
-	YIPSDEBUG(DEBUG_NOTIFY,
-		h1[0] = s1[0] = h2[0] = s2[0] = '\0';
-		getnameinfo(iph1->local, iph1->local->sa_len,
-		    h1, sizeof(h1), s1, sizeof(s1), niflags);
-		getnameinfo(iph1->remote, iph1->remote->sa_len,
-		    h2, sizeof(h2), s2, sizeof(s2), niflags);
-		plog(logp, LOCATION, NULL,
-			"new initiator iph1 %p: local %s %s remote %s %s\n",
-			iph1, h1, s1, h2, s2));
-
 	(void)insph1(iph1);
 
 	/* start phase 1 exchange */
 	iph1->etype = rmconf->etypes->type;
 
-	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
-	YIPSDEBUG(DEBUG_NOTIFY,
-		plog(logp, LOCATION, NULL,
-			"begin %s mode.\n",
-			s_isakmp_etype(iph1->etype)));
+	plog(LLV_DEBUG, LOCATION, NULL, "===\n");
+    {
+	char *a;
+
+	a = strdup(saddr2str(iph1->local));
+	plog(LLV_INFO, LOCATION, NULL,
+		"initiate new phase 1 nagotiation: %s<=>%s\n",
+		a, saddr2str(iph1->remote));
+	free(a);
+    }
+	plog(LLV_INFO, LOCATION, NULL,
+		"begin %s mode.\n",
+		s_isakmp_etype(iph1->etype));
 
 	/* start exchange */
 	if ((ph1exchange[etypesw1(iph1->etype)]
@@ -825,20 +799,11 @@ isakmp_ph1begin_r(msg, remote, local, etype)
 	struct remoteconf *rmconf;
 	struct ph1handle *iph1;
 	struct etypes *etypeok;
-#ifdef YIPS_DEBUG
-	char h1[NI_MAXHOST], h2[NI_MAXHOST];
-	char s1[NI_MAXSERV], s2[NI_MAXSERV];
-#ifdef NI_WITHSCOPEID
-	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
-#else
-	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
-#endif
-#endif
 
 	/* look for my configuration */
 	rmconf = getrmconf(remote);
 	if (rmconf == NULL) {
-		plog(logp, LOCATION, remote,
+		plog(LLV_ERROR, LOCATION, remote,
 			"couldn't find "
 			"configuration.\n");
 		return -1;
@@ -847,7 +812,7 @@ isakmp_ph1begin_r(msg, remote, local, etype)
 	/* check to be acceptable exchange type */
 	etypeok = check_etypeok(rmconf, etype);
 	if (etypeok == NULL) {
-		plog(logp, LOCATION, remote,
+		plog(LLV_ERROR, LOCATION, remote,
 			"not acceptable %s mode\n", s_isakmp_etype(etype));
 		return -1;
 	}
@@ -870,22 +835,20 @@ isakmp_ph1begin_r(msg, remote, local, etype)
 	if (copy_ph1addresses(iph1, rmconf, remote, local) < 0)
 		return -1;
 
-	YIPSDEBUG(DEBUG_NOTIFY,
-		h1[0] = s1[0] = h2[0] = s2[0] = '\0';
-		getnameinfo(iph1->local, iph1->local->sa_len,
-		    h1, sizeof(h1), s1, sizeof(s1), niflags);
-		getnameinfo(iph1->remote, iph1->remote->sa_len,
-		    h2, sizeof(h2), s2, sizeof(s2), niflags);
-		plog(logp, LOCATION, NULL,
-			"new responder iph1 %p: local %s %s remote %s %s\n",
-			iph1, h1, s1, h2, s2));
-
 	(void)insph1(iph1);
 
-	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
-	YIPSDEBUG(DEBUG_NOTIFY,
-		plog(logp, LOCATION, NULL,
-			"begin %s mode.\n", s_isakmp_etype(etype)));
+	plog(LLV_DEBUG, LOCATION, NULL, "===\n");
+    {
+	char *a;
+
+	a = strdup(saddr2str(iph1->local));
+	plog(LLV_INFO, LOCATION, NULL,
+		"responde new phase 1 nagotiation: %s<=>%s\n",
+		a, saddr2str(iph1->remote));
+	free(a);
+    }
+	plog(LLV_INFO, LOCATION, NULL,
+		"begin %s mode.\n", s_isakmp_etype(etype));
 
 	/* start exchange */
 	if ((ph1exchange[etypesw1(iph1->etype)]
@@ -894,9 +857,8 @@ isakmp_ph1begin_r(msg, remote, local, etype)
 	 || (ph1exchange[etypesw1(iph1->etype)]
 			[iph1->side]
 			[iph1->status])(iph1, msg) < 0) {
-		YIPSDEBUG(DEBUG_NOTIFY,
-			plog(logp, LOCATION, remote,
-				"failed to process packet.\n"));
+		plog(LLV_ERROR, LOCATION, remote,
+			"failed to process packet.\n");
 		remph1(iph1);
 		delph1(iph1);
 		return -1;
@@ -904,8 +866,8 @@ isakmp_ph1begin_r(msg, remote, local, etype)
 
 
 	if (add_recvedpkt(msg, &iph1->rlist)) {
-		plog(logp, LOCATION, remote,
-			"ERROR: failed to manage a received packet.\n");
+		plog(LLV_ERROR, LOCATION, remote,
+			"failed to manage a received packet.\n");
 		return -1;
 	}
 
@@ -921,15 +883,6 @@ isakmp_ph2begin_r(iph1, msg)
 	struct isakmp *isakmp = (struct isakmp *)msg->v;
 	struct ph2handle *iph2 = 0;
 	int error;
-#ifdef YIPS_DEBUG
-	char h1[NI_MAXHOST], h2[NI_MAXHOST];
-	char s1[NI_MAXSERV], s2[NI_MAXSERV];
-#ifdef NI_WITHSCOPEID
-	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
-#else
-	const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
-#endif
-#endif
 
 	iph2 = newph2();
 	if (iph2 == NULL)
@@ -961,7 +914,7 @@ isakmp_ph2begin_r(iph1, msg)
 		break;
 #endif
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"invalid family: %d\n", iph2->dst->sa_family);
 		delph2(iph2);
 		return -1;
@@ -982,34 +935,33 @@ isakmp_ph2begin_r(iph1, msg)
 		break;
 #endif
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"invalid family: %d\n", iph2->src->sa_family);
 		delph2(iph2);
 		return -1;
 	}
 
-	YIPSDEBUG(DEBUG_NOTIFY,
-		h1[0] = s1[0] = h2[0] = s2[0] = '\0';
-		getnameinfo(iph2->src, iph2->src->sa_len,
-		    h1, sizeof(h1), s1, sizeof(s1), niflags);
-		getnameinfo(iph2->dst, iph2->dst->sa_len,
-		    h2, sizeof(h2), s2, sizeof(s2), niflags);
-		plog(logp, LOCATION, NULL,
-			"new responder iph2 %p: src %s %s dst %s %s iph1 %p\n",
-			iph2, h1, s1, h2, s2, iph1));
-
 	/* add new entry to isakmp status table */
 	insph2(iph2);
 	bindph12(iph1, iph2);
 
-	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "===\n");
+    {
+	char *a;
+
+	a = strdup(saddr2str(iph2->src));
+	plog(LLV_INFO, LOCATION, NULL,
+		"responde new phase 2 nagotiation: %s<=>%s\n",
+		a, saddr2str(iph2->dst));
+	free(a);
+    }
+
 	error = (ph2exchange[etypesw2(ISAKMP_ETYPE_QUICK)]
 	                   [iph2->side]
 	                   [iph2->status])(iph2, msg);
 	if (error != 0) {
-		YIPSDEBUG(DEBUG_NOTIFY,
-			plog(logp, LOCATION, iph1->remote,
-				"failed to pre-process packet.\n"));
+		plog(LLV_ERROR, LOCATION, iph1->remote,
+			"failed to pre-process packet.\n");
 		if (error != ISAKMP_INTERNAL_ERROR)
 			isakmp_info_send_n2(iph2, error, NULL);
 		/*
@@ -1023,20 +975,19 @@ isakmp_ph2begin_r(iph1, msg)
 	}
 
 	/* send */
-	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "===\n");
 	if ((ph2exchange[etypesw2(isakmp->etype)]
 			[iph2->side]
 			[iph2->status])(iph2, msg) < 0) {
-		YIPSDEBUG(DEBUG_NOTIFY,
-			plog(logp, LOCATION, iph2->ph1->remote,
-				"failed to process packet.\n"));
+		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
+			"failed to process packet.\n");
 		/* don't release handler */
 		return -1;
 	}
 
 	if (add_recvedpkt(msg, &iph2->rlist)) {
-		plog(logp, LOCATION, iph2->ph1->remote,
-			"ERROR: failed to manage a received packet.\n");
+		plog(LLV_ERROR , LOCATION, iph2->ph1->remote,
+			"failed to manage a received packet.\n");
 		return -1;
 	}
 
@@ -1057,7 +1008,7 @@ isakmp_parsewoh(np0, gen, len)
 	vchar_t *result;
 	struct isakmp_parse_t *p, *ep;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "begin.\n");
 
 	/*
 	 * 5 is a magic number, but any value larger than 2 should be fine
@@ -1065,7 +1016,7 @@ isakmp_parsewoh(np0, gen, len)
 	 */
 	result = vmalloc(sizeof(struct isakmp_parse_t) * 5);
 	if (result == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get buffer.\n");
 		return NULL;
 	}
@@ -1078,22 +1029,19 @@ isakmp_parsewoh(np0, gen, len)
 	while (0 < tlen && np != ISAKMP_NPTYPE_NONE) {
 		if (tlen <= sizeof(struct isakmp_gen)) {
 			/* don't send information, see isakmp_ident_r1() */
-			YIPSDEBUG(DEBUG_NOTIFY,
-				plog(logp, LOCATION, NULL,
-					"invalid length of payload\n"));
+			plog(LLV_ERROR, LOCATION, NULL,
+				"invalid length of payload\n");
 			vfree(result);
 			return NULL;
 		}
 
-		YIPSDEBUG(DEBUG_SA,
-			plog(logp, LOCATION, NULL,
-				"seen nptype=%u(%s)\n", np,
-				s_isakmp_nptype(np)));
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"seen nptype=%u(%s)\n", np, s_isakmp_nptype(np));
 
 		p->type = np;
 		p->len = ntohs(gen->len);
 		if (p->len == 0 || p->len > tlen) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_DEBUG, LOCATION, NULL,
 				"invalid length of payload\n");
 			vfree(result);
 			return NULL;
@@ -1105,7 +1053,7 @@ isakmp_parsewoh(np0, gen, len)
 
 			off = p - (struct isakmp_parse_t *)result->v;
 			if (!VREALLOC(result, result->l * 2)) {
-				plog(logp, LOCATION, NULL,
+				plog(LLV_DEBUG, LOCATION, NULL,
 					"failed to realloc buffer.\n");
 				vfree(result);
 				return NULL;
@@ -1125,8 +1073,7 @@ isakmp_parsewoh(np0, gen, len)
 	p->len = 0;
 	p->ptr = NULL;
 
-	YIPSDEBUG(DEBUG_STAMP,
-		plog(logp, LOCATION, NULL, "succeed.\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "succeed.\n");
 
 	return result;
 }
@@ -1144,16 +1091,11 @@ isakmp_parse(buf)
 	vchar_t *result;
 	u_char np;
 
-	YIPSDEBUG(DEBUG_STAMP,
-		plog(logp, LOCATION, NULL, "begin.\n"));
-
 	np = isakmp->np;
 	gen = (struct isakmp_gen *)(buf->v + sizeof(*isakmp));
 	tlen = buf->l - sizeof(struct isakmp);
-
 	result = isakmp_parsewoh(np, gen, tlen);
-	YIPSDEBUG(DEBUG_STAMP,
-		plog(logp, LOCATION, NULL, "end.\n"));
+
 	return result;
 }
 
@@ -1227,32 +1169,34 @@ isakmp_open()
 		switch (p->addr->sa_family) {
 		case AF_INET:
 			if (((struct sockaddr_in *)p->addr)->sin_addr.s_addr == 0)
-				plog(logp, LOCATION, NULL,
-"WARNING: listening to wildcard address, broadcast IKE packet may kill you\n");
+				plog(LLV_WARNING, LOCATION, NULL,
+					"listening to wildcard address,"
+					"broadcast IKE packet may kill you\n");
 			break;
 #ifdef INET6
 		case AF_INET6:
 			if (IN6_IS_ADDR_UNSPECIFIED(&((struct sockaddr_in6 *)p->addr)->sin6_addr))
-				plog(logp, LOCATION, NULL,
-"WARNING: listening to wildcard address, broadcast IKE packet may kill you\n");
+				plog(LLV_WARNING, LOCATION, NULL,
+					"listening to wildcard address, "
+					"broadcast IKE packet may kill you\n");
 			break;
 #endif
 		default:
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"unsupported address family %d\n",
 				lcconf->default_af);
 			goto err_and_next;
 		}
 
 		if ((p->sock = socket(p->addr->sa_family, SOCK_DGRAM, 0)) < 0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"socket (%s)\n", strerror(errno));
 			goto err_and_next;
 		}
 
 		if (setsockopt(p->sock, SOL_SOCKET, SO_REUSEPORT,
 		               (void *)&yes, sizeof(yes)) < 0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"setsockopt (%s)\n", strerror(errno));
 			goto err_and_next;
 		}
@@ -1262,7 +1206,7 @@ isakmp_open()
 		case AF_INET:
 			if (setsockopt(p->sock, IPPROTO_IP, IP_RECVDSTADDR,
 					(void *)&yes, sizeof(yes)) < 0) {
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"setsockopt (%s)\n", strerror(errno));
 				goto err_and_next;
 			}
@@ -1282,7 +1226,7 @@ isakmp_open()
 					(void *)&yes, sizeof(yes)) < 0)
 #endif
 			{
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"setsockopt (%s)\n", strerror(errno));
 				goto err_and_next;
 			}
@@ -1294,7 +1238,7 @@ isakmp_open()
 		if (p->addr->sa_family == AF_INET6 &&
 		    setsockopt(p->sock, IPPROTO_IPV6, IPV6_USE_MIN_MTU,
 		    (void *)&yes, sizeof(yes)) < 0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 			    "setsockopt (%s)\n", strerror(errno));
 			return -1;
 		}
@@ -1304,13 +1248,13 @@ isakmp_open()
 			goto err_and_next;
 
 		if (bind(p->sock, p->addr, p->addr->sa_len) < 0) {
-			plog(logp, LOCATION, p->addr,
+			plog(LLV_ERROR, LOCATION, p->addr,
 				"failed to bind (%s).\n", strerror(errno));
 			close(p->sock);
 			goto err_and_next;
 		}
 
-		plog(logp, LOCATION, p->addr,
+		plog(LLV_ERROR, LOCATION, p->addr,
 			"used as isakmp port (fd=%d).\n", p->sock);
 
 		continue;
@@ -1370,7 +1314,7 @@ isakmp_send(iph1, buf)
 	if (!p)
 		p = lastresort;
 	if (!p) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"no socket matches address family %d\n",
 			sa->sa_family);
 		return -1;
@@ -1380,17 +1324,16 @@ isakmp_send(iph1, buf)
 		len = sendfromto(p->sock, buf->v, buf->l,
 				iph1->local, iph1->remote);
 		if (len < 0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"sendfromto failed\n");
 			return -1;
 		}
 	}
 
-	YIPSDEBUG(DEBUG_NOTIFY,
-		plog(logp, LOCATION, iph1->local,
-			"%d times of %d bytes message will be sent.\n",
-			iph1->rmconf->count_persend, len));
-	YIPSDEBUG(DEBUG_NET, PVDUMP(buf));
+	plog(LLV_DEBUG, LOCATION, iph1->local,
+		"%d times of %d bytes message will be sent.\n",
+		iph1->rmconf->count_persend, len);
+	plogdump(LLV_DEBUG, buf->v, buf->l);
 
 	return 0;
 }
@@ -1407,10 +1350,9 @@ void
 isakmp_ph1resend(iph1)
 	struct ph1handle *iph1;
 {
-	YIPSDEBUG(DEBUG_STAMP,
-		plog(logp, LOCATION, NULL,
-			"resend phase1 packet %s\n",
-			isakmp_pindex(&iph1->index, iph1->msgid)));
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"resend phase1 packet %s\n",
+		isakmp_pindex(&iph1->index, iph1->msgid));
 	SCHED_INIT(iph1->scr);
 
 	if (isakmp_send(iph1, iph1->sendbuf) < 0)
@@ -1418,10 +1360,9 @@ isakmp_ph1resend(iph1)
 
 	iph1->retry_counter--;
 	if (iph1->retry_counter < 0) {
-		YIPSDEBUG(DEBUG_STAMP,
-			plog(logp, LOCATION, NULL,
-				"give up phase1 negotiation %s\n",
-				isakmp_pindex(&iph1->index, iph1->msgid)));
+		plog(LLV_ERROR, LOCATION, NULL,
+			"give up phase1 negotiation %s\n",
+			isakmp_pindex(&iph1->index, iph1->msgid));
 
 		remph1(iph1);
 		delph1(iph1);
@@ -1445,10 +1386,9 @@ void
 isakmp_ph2resend(iph2)
 	struct ph2handle *iph2;
 {
-	YIPSDEBUG(DEBUG_STAMP,
-		plog(logp, LOCATION, NULL,
-			"resend phase2 packet %s\n",
-			isakmp_pindex(&iph2->ph1->index, iph2->msgid)));
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"resend phase2 packet %s\n",
+		isakmp_pindex(&iph2->ph1->index, iph2->msgid));
 	SCHED_INIT(iph2->scr);
 
 	if (isakmp_send(iph2->ph1, iph2->sendbuf) < 0)
@@ -1456,10 +1396,9 @@ isakmp_ph2resend(iph2)
 
 	iph2->retry_counter--;
 	if (iph2->retry_counter < 0) {
-		YIPSDEBUG(DEBUG_STAMP,
-			plog(logp, LOCATION, NULL,
-				"give up phase2 negotiation %s\n",
-				isakmp_pindex(&iph2->ph1->index, iph2->msgid)));
+		plog(LLV_ERROR, LOCATION, NULL,
+			"give up phase2 negotiation %s\n",
+				isakmp_pindex(&iph2->ph1->index, iph2->msgid));
 		unbindph12(iph2);
 		remph2(iph2);
 		delph2(iph2);
@@ -1487,7 +1426,7 @@ isakmp_ph1expire(iph1)
 
 	src = strdup(saddr2str(iph1->local));
 	dst = strdup(saddr2str(iph1->remote));
-	plog(logp, LOCATION, NULL,
+	plog(LLV_INFO, LOCATION, NULL,
 		"ISAKMP-SA expired %s-%s spi:%s\n",
 		src, dst,
 		isakmp_pindex(&iph1->index, 0));
@@ -1529,11 +1468,9 @@ isakmp_ph1delete(iph1)
 
 	src = strdup(saddr2str(iph1->local));
 	dst = strdup(saddr2str(iph1->remote));
-	YIPSDEBUG(DEBUG_STAMP,
-		plog(logp, LOCATION, NULL,
-			"ISAKMP-SA deleted %s-%s spi:%s\n",
-			src, dst,
-			isakmp_pindex(&iph1->index, 0)));
+	plog(LLV_INFO, LOCATION, NULL,
+		"ISAKMP-SA deleted %s-%s spi:%s\n",
+		src, dst, isakmp_pindex(&iph1->index, 0));
 	free(src);
 	free(dst);
 
@@ -1567,10 +1504,8 @@ isakmp_ph2expire(iph2)
 
 	src = strdup(saddrwop2str(iph2->src));
 	dst = strdup(saddrwop2str(iph2->dst));
-	YIPSDEBUG(DEBUG_STAMP,
-		plog(logp, LOCATION, NULL,
-			"phase2 sa expired %s-%s\n",
-			src, dst));
+	plog(LLV_INFO, LOCATION, NULL,
+		"phase2 sa expired %s-%s\n", src, dst);
 	free(src);
 	free(dst);
 
@@ -1598,10 +1533,8 @@ isakmp_ph2delete(iph2)
 
 	src = strdup(saddrwop2str(iph2->src));
 	dst = strdup(saddrwop2str(iph2->dst));
-	YIPSDEBUG(DEBUG_STAMP,
-		plog(logp, LOCATION, NULL,
-			"phase2 sa deleted %s-%s\n",
-			src, dst));
+	plog(LLV_INFO, LOCATION, NULL,
+		"phase2 sa deleted %s-%s\n", src, dst);
 	free(src);
 	free(dst);
 
@@ -1629,7 +1562,7 @@ isakmp_post_acquire(iph2)
 	/* search appropreate configuration with masking port. */
 	rmconf = getrmconf(iph2->dst);
 	if (rmconf == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"no configuration found for %s.\n",
 			saddrwop2str(iph2->dst));
 		return -1;
@@ -1642,11 +1575,10 @@ isakmp_post_acquire(iph2)
 	if (iph1 == NULL) {
 		iph2->retry_checkph1 = lcconf->retry_checkph1;
 		sched_new(1, isakmp_chkph1there_stub, iph2);
-		YIPSDEBUG(DEBUG_STAMP,
-			plog(logp, LOCATION, NULL,
-				"IPsec-SA request for %s queued "
-				"due to no phase1 found.\n",
-				saddrwop2str(iph2->dst)));
+		plog(LLV_INFO, LOCATION, NULL,
+			"IPsec-SA request for %s queued "
+			"due to no phase1 found.\n",
+			saddrwop2str(iph2->dst));
 
 		/* begin ident mode */
 		if (isakmp_ph1begin_i(rmconf, iph2->dst) < 0)
@@ -1660,10 +1592,9 @@ isakmp_post_acquire(iph2)
 	if (iph1->status != PHASE1ST_ESTABLISHED) {
 		iph2->retry_checkph1 = lcconf->retry_checkph1;
 		sched_new(1, isakmp_chkph1there_stub, iph2);
-		YIPSDEBUG(DEBUG_STAMP,
-			plog(logp, LOCATION, iph2->dst,
-				"request for establishing IPsec-SA was queued "
-				"due to no phase1 found.\n"));
+		plog(LLV_INFO, LOCATION, iph2->dst,
+			"request for establishing IPsec-SA was queued "
+			"due to no phase1 found.\n");
 		return 0;
 		/*NOTREACHED*/
 	}
@@ -1672,9 +1603,7 @@ isakmp_post_acquire(iph2)
 	/* i.e. iph1->status == PHASE1ST_ESTABLISHED */
 
 	/* found ISAKMP-SA. */
-	YIPSDEBUG(DEBUG_STAMP,
-		plog(logp, LOCATION, NULL,
-			"begin QUICK mode.\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "begin QUICK mode.\n");
 
 	/* begin quick mode */
 	bindph12(iph1, iph2);
@@ -1720,11 +1649,10 @@ isakmp_chkph1there(iph2)
 	iph2->retry_checkph1--;
 	if (iph2->retry_checkph1 < 0) {
 		/* give up phase 1 */
-		plog(logp, LOCATION, iph2->dst,
+		plog(LLV_ERROR, LOCATION, iph2->dst,
 			"give up to wait isakmp-sa negotiation.\n");
-		YIPSDEBUG(DEBUG_MISC,
-			plog(logp, LOCATION, NULL,
-				"delete phase 2 handler.\n"));
+		plog(LLV_INFO, LOCATION, NULL,
+			"delete phase 2 handler.\n");
 
 		/* send acquire to kernel as error */
 		pk_sendeacquire(iph2);
@@ -1817,7 +1745,7 @@ isakmp_add_attr_v(buf0, type, val, len)
 	} else
 		buf = vmalloc(tlen);
 	if (!buf) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get a attribute buffer.\n");
 		return NULL;
 	}
@@ -1850,7 +1778,7 @@ isakmp_add_attr_l(buf0, type, val)
 	} else
 		buf = vmalloc(tlen);
 	if (!buf) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get a attribute buffer.\n");
 		return NULL;
 	}
@@ -1882,7 +1810,7 @@ isakmp_newcookie(place, remote, local)
 
 
 	if (remote->sa_family != local->sa_family) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"address family mismatch, remote:%d local:%d\n",
 			remote->sa_family, local->sa_family);
 		goto end;
@@ -1901,7 +1829,7 @@ isakmp_newcookie(place, remote, local)
 		break;
 #endif
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"invalid family: %d\n", remote->sa_family);
 		goto end;
 	}
@@ -1909,7 +1837,7 @@ isakmp_newcookie(place, remote, local)
 		+ sizeof(time_t) + lcconf->secret_size;
 	buf = vmalloc(blen);
 	if (buf == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get a cookie.\n");
 		goto end;
 	}
@@ -1947,7 +1875,7 @@ isakmp_newcookie(place, remote, local)
 	vfree(buf2);
 
 	sa1 = val2str(place, sizeof (cookie_t));
-	plog(logp, LOCATION, NULL, "new cookie:\n%s\n", sa1);
+	plog(LLV_DEBUG, LOCATION, NULL, "new cookie:\n%s\n", sa1);
 	free(sa1);
 
 	error = 0;
@@ -1965,14 +1893,14 @@ isakmp_p2ph(buf, gen)
 {
 	/* XXX to be checked in each functions for logging. */
 	if (*buf) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_WARNING, LOCATION, NULL,
 			"ignore this payload, same payload type exist.\n");
 		return -1;
 	}
 
 	*buf = vmalloc(ntohs(gen->len) - sizeof(*gen));
 	if (*buf == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get buffer.\n");
 		return -1;
 	}
@@ -2060,7 +1988,7 @@ set_isakmp_payload(buf, src, nptype)
 	struct isakmp_gen *gen;
 	caddr_t p = buf;
 
-	plog(logp, LOCATION, NULL, "add payload of len %d, next type %d\n",
+	plog(LLV_DEBUG, LOCATION, NULL, "add payload of len %d, next type %d\n",
 	    src->l, nptype);
 
 	gen = (struct isakmp_gen *)p;
@@ -2177,12 +2105,12 @@ isakmp_printpacket(msg, from, my, decoded)
 	vchar_t *buf;
 #endif
 
-	YIPSDEBUG(DEBUG_NET, goto doit);
-	return;
+	if (loglevel < LLV_DEBUG)
+		return;
 
 #ifdef YIPS_DEBUG
 doit:
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "begin.\n");
 
 	gettimeofday(&tv, NULL);
 	s = tv.tv_sec % 3600;
@@ -2283,7 +2211,7 @@ copy_ph1addresses(iph1, rmconf, remote, local)
 		break;
 #endif
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"invalid family: %d\n", iph1->remote->sa_family);
 		return -1;
 	}
@@ -2308,7 +2236,7 @@ copy_ph1addresses(iph1, rmconf, remote, local)
 		break;
 #endif
 	default:
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"invalid family: %d\n", iph1->remote->sa_family);
 		delph1(iph1);
 		return -1;
@@ -2322,9 +2250,8 @@ nostate1(iph1, msg)
 	struct ph1handle *iph1;
 	vchar_t *msg;
 {
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, iph1->remote, "wrong state %u.\n",
-			iph1->status));
+	plog(LLV_ERROR, LOCATION, iph1->remote, "wrong state %u.\n",
+			iph1->status);
 	return -1;
 }
 
@@ -2333,9 +2260,8 @@ nostate2(iph2, msg)
 	struct ph2handle *iph2;
 	vchar_t *msg;
 {
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, iph2->ph1->remote, "wrong state %u.\n",
-			iph2->status));
+	plog(LLV_ERROR, LOCATION, iph2->ph1->remote, "wrong state %u.\n",
+		iph2->status);
 	return -1;
 }
 
@@ -2347,7 +2273,7 @@ log_ph1established(iph1)
 
 	src = strdup(saddr2str(iph1->local));
 	dst = strdup(saddr2str(iph1->remote));
-	plog(logp, LOCATION, NULL,
+	plog(LLV_INFO, LOCATION, NULL,
 		"ISAKMP-SA established %s-%s spi:%s\n",
 		src, dst,
 		isakmp_pindex(&iph1->index, 0));

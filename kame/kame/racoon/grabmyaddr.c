@@ -1,4 +1,4 @@
-/*	$KAME: grabmyaddr.c,v 1.24 2000/11/19 23:48:20 sakane Exp $	*/
+/*	$KAME: grabmyaddr.c,v 1.25 2000/12/15 13:43:55 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -153,7 +153,7 @@ grab_myaddrs()
 #endif
 
 	if (getifaddrs(&ifa0)) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"getifaddrs failed: %s\n", strerror(errno));
 		exit(1);
 		/*NOTREACHED*/
@@ -171,10 +171,9 @@ grab_myaddrs()
 			continue;
 
 		if (!suitable_ifaddr(ifap->ifa_name, ifap->ifa_addr)) {
-			YIPSDEBUG(DEBUG_NET,
-				plog(logp, LOCATION, NULL,
-					"unsuitable ifaddr %s\n",
-					saddr2str(ifap->ifa_addr)));
+			plog(LLV_ERROR, LOCATION, NULL,
+				"unsuitable ifaddr: %s\n",
+				saddr2str(ifap->ifa_addr));
 			continue;
 		}
 
@@ -202,15 +201,14 @@ grab_myaddrs()
 		}
 #endif
 #endif
-		YIPSDEBUG(DEBUG_NET,
-			if (getnameinfo(p->addr, p->addr->sa_len,
-					_addr1_, sizeof(_addr1_),
-					NULL, 0,
-					NI_NUMERICHOST | niflags))
-				strcpy(_addr1_, "(invalid)");
-			plog(logp, LOCATION, NULL,
-				"my interface: %s (%s)\n",
-				_addr1_, ifap->ifa_name));
+		if (getnameinfo(p->addr, p->addr->sa_len,
+				_addr1_, sizeof(_addr1_),
+				NULL, 0,
+				NI_NUMERICHOST | niflags))
+		strcpy(_addr1_, "(invalid)");
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"my interface: %s (%s)\n",
+			_addr1_, ifap->ifa_name);
 		q = find_myaddr(old, p);
 		if (q)
 			p->sock = q->sock;
@@ -247,14 +245,14 @@ grab_myaddrs()
 
 	iflist = (struct ifreq *)malloc(len);
 	if (!iflist) {
-		plog(logp, LOCATION, NULL,
-			"not enough core\n");
+		plog(LLV_ERROR, LOCATION, NULL,
+			"failed to allocate buffer\n");
 		exit(1);
 		/*NOTREACHED*/
 	}
 
 	if ((s = socket(PF_INET, SOCK_DGRAM, 0)) < 0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"socket(SOCK_DGRAM) failed: %s\n",
 			strerror(errno));
 		exit(1);
@@ -264,7 +262,7 @@ grab_myaddrs()
 	ifconf.ifc_req = iflist;
 	ifconf.ifc_len = len;
 	if (ioctl(s, SIOCGIFCONF, &ifconf) < 0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"ioctl(SIOCGIFCONF) failed: %s\n",
 			strerror(errno));
 		exit(1);
@@ -291,9 +289,8 @@ grab_myaddrs()
 		case AF_INET6:
 #endif
 			if (!suitable_ifaddr(ifr->ifr_name, &ifr->ifr_addr)) {
-				YIPSDEBUG(DEBUG_NET,
-					plog(logp, LOCATION, NULL,
-						"unsuitable ifaddr %s\n"));
+				plog(LLV_DEBUG, LOCATION, NULL,
+					"unsuitable ifaddr %s\n");
 				continue;
 			}
 
@@ -319,15 +316,14 @@ grab_myaddrs()
 			}
 #endif
 #endif
-			YIPSDEBUG(DEBUG_NET,
-				if (getnameinfo(p->addr, p->addr->sa_len,
-						_addr1_, sizeof(_addr1_),
-						NULL, 0,
-						NI_NUMERICHOST | niflags))
-					strcpy(_addr1_, "(invalid)");
-				plog(logp, LOCATION, NULL,
-					"my interface: %s (%s)\n",
-					_addr1_, ifr->ifr_name));
+			if (getnameinfo(p->addr, p->addr->sa_len,
+					_addr1_, sizeof(_addr1_),
+					NULL, 0,
+					NI_NUMERICHOST | niflags))
+			strcpy(_addr1_, "(invalid)");
+			plog(LLV_DEBUG, LOCATION, NULL,
+				"my interface: %s (%s)\n",
+				_addr1_, ifr->ifr_name);
 			q = find_myaddr(old, p);
 			if (q)
 				p->sock = q->sock;
@@ -382,7 +378,7 @@ suitable_ifaddr6(ifname, ifaddr)
 
 	s = socket(PF_INET6, SOCK_DGRAM, 0);
 	if (s == -1) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"socket(SOCK_DGRAM) failed:%s\n", strerror(errno));
 		return 0;
 	}
@@ -393,7 +389,7 @@ suitable_ifaddr6(ifname, ifaddr)
 	ifr6.ifr_addr = *(struct sockaddr_in6 *)ifaddr;
 
 	if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"ioctl(SIOCGIFAFLAG_IN6) failed:%s\n", strerror(errno));
 		close(s);
 		return 0;
@@ -419,19 +415,19 @@ update_myaddrs()
 
 	len = read(lcconf->rtsock, msg, sizeof(msg));
 	if (len < 0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"read(PF_ROUTE) failed: %s\n",
 			strerror(errno));
 		return 0;
 	}
 	if (len < sizeof(*rtm)) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"read(PF_ROUTE) short read\n");
 		return 0;
 	}
 	rtm = (struct rt_msghdr *)msg;
 	if (rtm->rtm_version != RTM_VERSION) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"routing socket version mismatch\n");
 		close(lcconf->rtsock);
 		lcconf->rtsock = 0;
@@ -447,16 +443,15 @@ update_myaddrs()
 		/* ignore this message silently */
 		return 0;
 	default:
-		YIPSDEBUG(DEBUG_SVERB,
-			plog(logp, LOCATION, NULL,
-				"msg %d not interesting\n", rtm->rtm_type));
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"msg %d not interesting\n", rtm->rtm_type);
 		return 0;
 	}
 	/* XXX more filters here? */
 
-	YIPSDEBUG(DEBUG_NET,
-		plog(logp, LOCATION, NULL,
-			"need update interface address list\n"));
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"caught rtm:%d, need update interface address list\n",
+		rtm->rtm_type);
 	return 1;
 }
 
@@ -478,7 +473,7 @@ autoconf_myaddrsport()
 #endif
 	int n;
 
-	plog(logp, LOCATION, NULL,
+	plog(LLV_DEBUG, LOCATION, NULL,
 		"configuring default isakmp port.\n");
 	n = 0;
 	for (p = lcconf->myaddrs; p; p = p->next) {
@@ -494,19 +489,18 @@ autoconf_myaddrsport()
 			break;
 #endif
 		default:
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"unsupported AF %d\n", p->addr->sa_family);
 			goto err;
 		}
 		n++;
 	}
-	YIPSDEBUG(DEBUG_NET,
-		plog(logp, LOCATION, NULL,
-			"isakmp_autoconf success, %d addrs\n", n));
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"%d addrs are configured successfully\n", n);
 
 	return 0;
 err:
-	plog(logp, LOCATION, NULL, "isakmp_autoconf fail\n");
+	plog(LLV_ERROR, LOCATION, NULL, "address autoconfiguration failed\n");
 	return -1;
 }
 
@@ -533,7 +527,7 @@ getmyaddrsport(local)
 				return ((struct sockaddr_in6 *)p->addr)->sin6_port;
 #endif
 			default:
-				plog(logp, LOCATION, NULL,
+				plog(LLV_ERROR, LOCATION, NULL,
 					"invalid family: %d\n",
 					p->addr->sa_family);
 				return -1;
@@ -552,7 +546,7 @@ newmyaddr()
 
 	new = CALLOC(sizeof(*new), struct myaddrs *);
 	if (new == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to allocate buffer for myaddrs.\n");
 		return NULL;
 	}
@@ -587,7 +581,7 @@ initmyaddr()
 	/* initialize routing socket */
 	lcconf->rtsock = socket(PF_ROUTE, SOCK_RAW, PF_UNSPEC);
 	if (lcconf->rtsock < 0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"socket(PF_ROUTE) failed: %s",
 			strerror(errno));
 		return -1;

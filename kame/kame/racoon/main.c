@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.19 2000/12/13 23:24:41 sakane Exp $	*/
+/*	$KAME: main.c,v 1.20 2000/12/15 13:43:56 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -61,15 +61,12 @@
 #include "crypto_openssl.h"
 #include "random.h"
 
-/* debug flags */
-u_int32_t debug = 0;
 int f_foreground = 0;	/* force running in foreground. */
 int f_debugcmd = 0;	/* specifyed debug level by command line. */
 int f_local = 0;	/* local test mode.  behave like a wall. */
 int vflag = 1;		/* for print-isakmp.c */
 
 static char version[] = "@(#)racoon 20001111 sakane@ydc.co.jp";
-static char *pname;
 
 int main __P((int, char **));
 static void Usage __P((void));
@@ -116,10 +113,8 @@ main(ac, av)
 	ploginit();
 	random_init();
 
-	plog(logp, LOCATION, NULL,
-		"%s\n", version);
-	plog(logp, LOCATION, NULL,
-	"@(#)"
+	plog(LLV_INFO, LOCATION, NULL, "%s\n", version);
+	plog(LLV_INFO, LOCATION, NULL, "@(#)"
 	"This product linked software developed by the OpenSSL Project "
 	"for use in the OpenSSL Toolkit. (http://www.openssl.org/)"
 	"\n");
@@ -129,7 +124,7 @@ main(ac, av)
 
 	error = cfparse();
 	if (error != 0) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to parse configuration file.\n");
 		exit(1);
 	}
@@ -145,7 +140,7 @@ main(ac, av)
 		FILE *fp;
 
 		if (daemon(0, 0) < 0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"failed to be daemon. (%s)\n", strerror(errno));
 			exit(1);
 		}
@@ -155,7 +150,7 @@ main(ac, av)
 		 * get the user's logname..
 		 */
 		if (setlogin("") < 0) {
-			plog(logp, LOCATION, NULL,
+			plog(LLV_ERROR, LOCATION, NULL,
 				"cannot clear logname: %s\n", strerror(errno));
 			/* no big deal if it fails.. */
 		}
@@ -165,7 +160,8 @@ main(ac, av)
 			fprintf(fp, "%ld\n", (long)pid);
 			fclose(fp);
 		} else {
-			plog(logp, LOCATION, NULL, "cannot open %s", pid_file);
+			plog(LLV_ERROR, LOCATION, NULL,
+				"cannot open %s", pid_file);
 		}
 	}
 
@@ -203,14 +199,12 @@ parse(ac, av)
 			)) != EOF) {
 		switch (c) {
 		case 'd':
-			debug = strtoul(optarg, &p, 16);
+			loglevel = strtoul(optarg, &p, 16);
 			f_debugcmd = 1;
 			if (*p != '\0') {
 				printf("invalid flag (%s)\n", optarg);
 				exit(1);
 			}
-			YIPSDEBUG(DEBUG_INFO,
-				printf("debug = 0x%08x\n", debug));
 			break;
 		case 'F':
 			printf("Foreground mode.\n");

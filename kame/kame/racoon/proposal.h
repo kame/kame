@@ -1,4 +1,4 @@
-/*	$KAME: proposal.h,v 1.11 2000/10/04 17:41:03 itojun Exp $	*/
+/*	$KAME: proposal.h,v 1.12 2000/12/15 13:43:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -191,9 +191,9 @@ extern void free_proppair __P((struct prop_pair **));
 extern void flushsaprop __P((struct saprop *));
 extern void flushsaproto __P((struct saproto *));
 extern void flushsatrns __P((struct satrns *));
-extern void printsaprop __P((const struct saprop *));
-extern void printsaprop0 __P((const struct saprop *));
-extern void printsaproto __P((const struct saproto *));
-extern void printsatrns __P((const int, const struct satrns *));
-extern void print_proppair0 __P((struct prop_pair *, int));
-extern void print_proppair __P((struct prop_pair *));
+extern void printsaprop __P((const int, const struct saprop *));
+extern void printsaprop0 __P((const int, const struct saprop *));
+extern void printsaproto __P((const int, const struct saproto *));
+extern void printsatrns __P((const int, const int, const struct satrns *));
+extern void print_proppair0 __P((int, struct prop_pair *, int));
+extern void print_proppair __P((int, struct prop_pair *));

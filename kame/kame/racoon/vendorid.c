@@ -1,4 +1,4 @@
-/*	$KAME: vendorid.c,v 1.6 2000/10/04 17:41:04 itojun Exp $	*/
+/*	$KAME: vendorid.c,v 1.7 2000/12/15 13:43:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -76,25 +76,24 @@ check_vendorid(gen)
 {
 	vchar_t *vidhash = lcconf->vendorid;
 
+	plog(LLV_DEBUG, LOCATION, NULL, "Vender ID received\n");
+
 	if (!gen)
 		return -1;
 	if (vidhash == NULL) {
-		plog(logp, LOCATION, NULL,
+		plog(LLV_ERROR, LOCATION, NULL,
 			"ignoring Vendor ID as I don't have one.\n");
 		return 0;
 	}
 
 	if (vidhash->l == ntohs(gen->len) - sizeof(*gen)
 	 && memcmp(vidhash->v, gen + 1, vidhash->l) == 0) {
-		YIPSDEBUG(DEBUG_SA,
-			plog(logp, LOCATION, NULL,
-				"Vendor ID matched.\n"));
+		plog(LLV_INFO, LOCATION, NULL,
+			"Vendor ID matched.\n");
 		return 0;
 	}
 
-	YIPSDEBUG(DEBUG_SA,
-		plog(logp, LOCATION, NULL,
-			"Vendor ID mismatch.\n"));
+	plog(LLV_DEBUG, LOCATION, NULL, "Vendor ID mismatch.\n");
 
 	return -1;
 }

@@ -1,4 +1,4 @@
-/*	$KAME: misc.c,v 1.18 2000/10/04 17:41:01 itojun Exp $	*/
+/*	$KAME: misc.c,v 1.19 2000/12/15 13:43:56 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -37,38 +37,24 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <syslog.h>
 
 #include "var.h"
 #include "misc.h"
 #include "debug.h"
 
-#ifndef NOUSE_PLOG
-#include "plog.h"
-#define PLOG(p, l, a, f, v)	plog((p), (l), (a), (f), (v))
-#define PLOGNL()		plognl()
-#define PLOGSP()		plogsp()
-#define PLOGC(p, c)		plogc((p), (c));
-#define PLOGH(p, c)		plogh((p), (c));
-#else
-#define PLOG(p, l, a, f, v)	printf((f), (v))
-#define PLOGNL()		printf("\n")
-#define PLOGSP()		printf(" ")
-#define PLOGC(p, c)		printf("%c", (c))
-#define PLOGH(p, c)		printf("%02x", (c));
-#endif
-
 int
 bindump(buf0, len)
-	void *buf0;
-	size_t len;
+        void *buf0;
+        size_t len;
 {
 	caddr_t buf = (caddr_t)buf0;
 	size_t i;
 
 	for (i = 0; i < len; i++) {
-		PLOGC(logp, (unsigned char)buf[i]);
+		printf("%c", (unsigned char)buf[i]);
 	}
-	PLOGNL();
+	printf("\n");
 
 	return 0;
 }
@@ -83,12 +69,12 @@ hexdump(buf0, len)
 
 	for (i = 0; i < len; i++) {
 		if (i != 0 && i % 32 == 0)
-			PLOGNL();
+			printf("\n");
 		if (i % 4 == 0)
-			PLOGSP();
-		PLOGH(logp, (unsigned char)buf[i]);
+			printf(" ");
+		printf("%02x", (unsigned char)buf[i]);
 	}
-	PLOGNL();
+	printf("\n");
 
 	return 0;
 }
@@ -122,11 +108,6 @@ debug_location(file, line, func)
 {
 	static char buf[1024];
 	char *p;
-
-#ifdef YIPS_DEBUG
-	if (!(debug & DEBUG_FUNC))
-		return "";
-#endif
 
 	/* truncate pathname */
 	p = strrchr(file, '/');
