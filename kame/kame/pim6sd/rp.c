@@ -754,7 +754,7 @@ delete_grp_mask_entry(used_cand_rp_list, used_grp_mask_list, grp_mask_delete)
     /* Remove from the grp_mask_list first */
 
     if (grp_mask_delete->prev != (grp_mask_t *) NULL)
-	grp_mask_delete->prev = grp_mask_delete->next;
+	grp_mask_delete->prev->next = grp_mask_delete->next;
     else
 	*used_grp_mask_list = grp_mask_delete->next;
 
