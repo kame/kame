@@ -1860,9 +1860,6 @@ cfreparse()
 	flushph2();
 	flushph1();
 	flushrmconf();
-#if 0
-	flushspidx();
-#endif
 	cleanprhead();
 	clean_tmpalgtype();
 	yycf_init_buffer();
