@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.321 2003/06/20 13:23:40 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.322 2003/06/25 03:21:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -477,19 +477,22 @@ skip1:
 void
 nd6_llinfo_settimer(ln, tick)
 	struct llinfo_nd6 *ln;
-	int tick;
+	long tick;
 {
-
-	if (tick >= 0) {
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-		callout_reset(&ln->ln_timer_ch, tick, nd6_llinfo_timer, ln);
-#elif defined(__OpenBSD__)
-		timeout_set(&ln->ln_timer_ch, nd6_llinfo_timer, ln);
-		timeout_add(&ln->ln_timer_ch, tick);
-#else
-		timeout(nd6_llinfo_timer, ln, tick);
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
 #endif
-	} else {
+	int s;
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+
+	if (tick < 0) {
+		ln->ln_expire = 0;
+		ln->ln_ntick = 0;
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		callout_stop(&ln->ln_timer_ch);
 #elif defined(__OpenBSD__)
@@ -497,7 +500,34 @@ nd6_llinfo_settimer(ln, tick)
 #else
 		untimeout(nd6_llinfo_timer, ln);
 #endif
+	} else {
+		ln->ln_expire = time_second + tick / hz;
+		if (tick > INT_MAX) {
+			ln->ln_ntick = tick - INT_MAX;
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+			callout_reset(&ln->ln_timer_ch, INT_MAX,
+			    nd6_llinfo_timer, ln);
+#elif defined(__OpenBSD__)
+			timeout_set(&ln->ln_timer_ch, nd6_llinfo_timer, ln);
+			timeout_add(&ln->ln_timer_ch, INT_MAX);
+#else
+			timeout(nd6_llinfo_timer, ln, INT_MAX);
+#endif
+		} else {
+			ln->ln_ntick = 0;
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+			callout_reset(&ln->ln_timer_ch, tick,
+			    nd6_llinfo_timer, ln);
+#elif defined(__OpenBSD__)
+			timeout_set(&ln->ln_timer_ch, nd6_llinfo_timer, ln);
+			timeout_add(&ln->ln_timer_ch, tick);
+#else
+			timeout(nd6_llinfo_timer, ln, tick);
+#endif
+		}
 	}
+
+	splx(s);
 }
 
 static void
@@ -511,9 +541,6 @@ nd6_llinfo_timer(arg)
 	struct ifnet *ifp;
 	/* XXX: used for the DELAY case only: */
 	struct nd_ifinfo *ndi = NULL;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
-#endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
@@ -522,6 +549,18 @@ nd6_llinfo_timer(arg)
 #endif
 
 	ln = (struct llinfo_nd6 *)arg;
+
+	if (ln->ln_ntick > 0) {
+		if (ln->ln_ntick > INT_MAX) {
+			ln->ln_ntick -= INT_MAX;
+			nd6_llinfo_settimer(ln, INT_MAX);
+		} else {
+			ln->ln_ntick = 0;
+			nd6_llinfo_settimer(ln, ln->ln_ntick);
+		}
+		splx(s);
+		return;
+	}
 
 	if ((rt = ln->ln_rt) == NULL)
 		panic("ln->ln_rt == NULL");
@@ -541,10 +580,7 @@ nd6_llinfo_timer(arg)
 	case ND6_LLINFO_INCOMPLETE:
 		if (ln->ln_asked < nd6_mmaxtries) {
 			ln->ln_asked++;
-			ln->ln_expire = time_second +
-			    ND6_RETRANS_SEC(ndi->retrans);
-			nd6_llinfo_settimer(ln,
-			    (int)((long)ndi->retrans * hz / 1000));
+			nd6_llinfo_settimer(ln, (long)ndi->retrans * hz / 1000);
 			nd6_ns_output(ifp, NULL, dst, ln, 0);
 		} else {
 			struct mbuf *m = ln->ln_hold;
@@ -569,8 +605,7 @@ nd6_llinfo_timer(arg)
 	case ND6_LLINFO_REACHABLE:
 		if (ln->ln_expire) {
 			ln->ln_state = ND6_LLINFO_STALE;
-			ln->ln_expire = time_second + nd6_gctimer;
-			nd6_llinfo_settimer(ln, nd6_gctimer * hz);
+			nd6_llinfo_settimer(ln, (long)nd6_gctimer * hz);
 		}
 		break;
 
@@ -587,24 +622,17 @@ nd6_llinfo_timer(arg)
 			/* We need NUD */
 			ln->ln_asked = 1;
 			ln->ln_state = ND6_LLINFO_PROBE;
-			ln->ln_expire = time_second +
-			    ND6_RETRANS_SEC(ndi->retrans);
-			nd6_llinfo_settimer(ln,
-			    (int)((long)ndi->retrans * hz / 1000));
+			nd6_llinfo_settimer(ln, (long)ndi->retrans * hz / 1000);
 			nd6_ns_output(ifp, dst, dst, ln, 0);
 		} else {
 			ln->ln_state = ND6_LLINFO_STALE; /* XXX */
-			ln->ln_expire = time_second + nd6_gctimer;
-			nd6_llinfo_settimer(ln, nd6_gctimer * hz);
+			nd6_llinfo_settimer(ln, (long)nd6_gctimer * hz);
 		}
 		break;
 	case ND6_LLINFO_PROBE:
 		if (ln->ln_asked < nd6_umaxtries) {
 			ln->ln_asked++;
-			ln->ln_expire = time_second +
-			    ND6_RETRANS_SEC(ndi->retrans);
-			nd6_llinfo_settimer(ln,
-			    (int)((long)ndi->retrans * hz / 1000));
+			nd6_llinfo_settimer(ln, (long)ndi->retrans * hz / 1000);
 			nd6_ns_output(ifp, dst, dst, ln, 0);
 		} else {
 			(void)nd6_free(rt, 0);
@@ -1129,8 +1157,11 @@ nd6_free(rt, gc)
 			 * XXX: the check for ln_state would be redundant,
 			 *      but we intentionally keep it just in case.
 			 */
-			ln->ln_expire = dr->expire;
-			nd6_llinfo_settimer(ln, dr->expire - time_second * hz);
+			if (dr->expire > time_second * hz)
+				nd6_llinfo_settimer(ln,
+				    dr->expire - time_second * hz);
+			else
+				nd6_llinfo_settimer(ln, (long)nd6_gctimer * hz);
 			splx(s);
 			return (ln->ln_next);
 		}
@@ -1219,9 +1250,6 @@ nd6_nud_hint(rt, dst6, force)
 	int force;
 {
 	struct llinfo_nd6 *ln;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
-#endif
 
 	/*
 	 * If the caller specified "rt", use that.  Otherwise, resolve the
@@ -1258,8 +1286,8 @@ nd6_nud_hint(rt, dst6, force)
 
 	ln->ln_state = ND6_LLINFO_REACHABLE;
 	if (ln->ln_expire) {
-		ln->ln_expire = time_second + ND_IFINFO(rt->rt_ifp)->reachable;
-		nd6_llinfo_settimer(ln, ND_IFINFO(rt->rt_ifp)->reachable * hz);
+		nd6_llinfo_settimer(ln,
+		    (long)ND_IFINFO(rt->rt_ifp)->reachable * hz);
 	}
 }
 
@@ -1281,9 +1309,6 @@ nd6_rtrequest(req, rt, sa)
 	static struct sockaddr_dl null_sdl = {sizeof(null_sdl), AF_LINK};
 	struct ifnet *ifp = rt->rt_ifp;
 	struct ifaddr *ifa;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
-#endif
 	int mine = 0;
 
 	if ((rt->rt_flags & RTF_GATEWAY) != 0)
@@ -1343,10 +1368,8 @@ nd6_rtrequest(req, rt, sa)
 			gate = rt->rt_gateway;
 			SDL(gate)->sdl_type = ifp->if_type;
 			SDL(gate)->sdl_index = ifp->if_index;
-			if (ln) {
-				ln->ln_expire = time_second;
-				nd6_llinfo_timer((void *)ln);
-			}
+			if (ln)
+				nd6_llinfo_settimer(ln, 0);
 			if ((rt->rt_flags & RTF_CLONING) != 0)
 				break;
 		}
@@ -1430,7 +1453,7 @@ nd6_rtrequest(req, rt, sa)
 			 * initialized in rtrequest(), so rt_expire is 0.
 			 */
 			ln->ln_state = ND6_LLINFO_NOSTATE;
-			ln->ln_expire = time_second;
+			nd6_llinfo_settimer(ln, 0);
 		}
 		rt->rt_flags |= RTF_LLINFO;
 		ln->ln_next = llinfo_nd6.ln_next;
@@ -1446,7 +1469,6 @@ nd6_rtrequest(req, rt, sa)
 		    &SIN6(rt_key(rt))->sin6_addr);
 		if (ifa) {
 			caddr_t macp = nd6_ifptomac(ifp);
-			ln->ln_expire = 0;
 			nd6_llinfo_settimer(ln, -1);
 			ln->ln_state = ND6_LLINFO_REACHABLE;
 			ln->ln_byhint = 0;
@@ -1484,7 +1506,6 @@ nd6_rtrequest(req, rt, sa)
 				}
 			}
 		} else if (rt->rt_flags & RTF_ANNOUNCE) {
-			ln->ln_expire = 0;
 			nd6_llinfo_settimer(ln, -1);
 			ln->ln_state = ND6_LLINFO_REACHABLE;
 			ln->ln_byhint = 0;
@@ -1863,9 +1884,6 @@ nd6_cache_lladdr(ifp, from, lladdr, lladdrlen, type, code)
 	int olladdr;
 	int llchange;
 	int newstate = 0;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
-#endif
 
 	if (!ifp)
 		panic("ifp == NULL in nd6_cache_lladdr");
@@ -1976,8 +1994,7 @@ fail:
 			 * we must set the timer now, although it is actually
 			 * meaningless.
 			 */
-			ln->ln_expire = time_second + nd6_gctimer;
-			nd6_llinfo_settimer(ln, nd6_gctimer * hz);
+			nd6_llinfo_settimer(ln, (long)nd6_gctimer * hz);
 
 			if (ln->ln_hold) {
 				/*
@@ -1990,8 +2007,7 @@ fail:
 			}
 		} else if (ln->ln_state == ND6_LLINFO_INCOMPLETE) {
 			/* probe right away */
-			ln->ln_expire = time_second;
-			nd6_llinfo_timer((void *)ln);
+			nd6_llinfo_settimer((void *)ln, 0);
 		}
 	}
 
@@ -2138,9 +2154,6 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	struct sockaddr_in6 *gw6 = NULL;
 	struct llinfo_nd6 *ln = NULL;
 	int error = 0;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
-#endif
 #if defined(__OpenBSD__) && defined(IPSEC)
 	struct m_tag *mtag;
 #endif /* IPSEC */
@@ -2281,8 +2294,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	if ((ifp->if_flags & IFF_POINTOPOINT) != 0 &&
 	    ln->ln_state < ND6_LLINFO_REACHABLE) {
 		ln->ln_state = ND6_LLINFO_STALE;
-		ln->ln_expire = time_second + nd6_gctimer;
-		nd6_llinfo_settimer(ln, nd6_gctimer * hz);
+		nd6_llinfo_settimer(ln, (long)nd6_gctimer * hz);
 	}
 
 	/*
@@ -2295,7 +2307,6 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	if (ln->ln_state == ND6_LLINFO_STALE) {
 		ln->ln_asked = 0;
 		ln->ln_state = ND6_LLINFO_DELAY;
-		ln->ln_expire = time_second + nd6_delay;
 		nd6_llinfo_settimer(ln, nd6_delay * hz);
 	}
 
@@ -2323,10 +2334,8 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	 */
 	if (ln->ln_expire && ln->ln_asked == 0) {
 		ln->ln_asked++;
-		ln->ln_expire = time_second +
-		    ND6_RETRANS_SEC(ND_IFINFO(ifp)->retrans);
 		nd6_llinfo_settimer(ln,
-		    (int)((long)ND_IFINFO(ifp)->retrans * hz / 1000));
+		    (long)ND_IFINFO(ifp)->retrans * hz / 1000);
 		nd6_ns_output(ifp, NULL, dst, ln, 0);
 	}
 	return (0);

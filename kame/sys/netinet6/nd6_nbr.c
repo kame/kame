@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.124 2003/06/18 08:29:04 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.125 2003/06/25 03:21:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -713,9 +713,6 @@ nd6_na_input(m, off, icmp6len)
 	struct rtentry *rt;
 	struct sockaddr_dl *sdl;
 	union nd_opts ndopts;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
-#endif
 
 	if (ip6->ip6_hlim != 255) {
 		nd6log((LOG_ERR,
@@ -843,15 +840,12 @@ nd6_na_input(m, off, icmp6len)
 			ln->ln_state = ND6_LLINFO_REACHABLE;
 			ln->ln_byhint = 0;
 			if (ln->ln_expire) {
-				ln->ln_expire = time_second +
-				    ND_IFINFO(rt->rt_ifp)->reachable;
 				nd6_llinfo_settimer(ln,
-				    ND_IFINFO(rt->rt_ifp)->reachable * hz);
+				    (long)ND_IFINFO(rt->rt_ifp)->reachable * hz);
 			}
 		} else {
 			ln->ln_state = ND6_LLINFO_STALE;
-			ln->ln_expire = time_second + nd6_gctimer;
-			nd6_llinfo_settimer(ln, nd6_gctimer * hz);
+			nd6_llinfo_settimer(ln, (long)nd6_gctimer * hz);
 		}
 		if ((ln->ln_router = is_router) != 0) {
 			/*
@@ -905,8 +899,7 @@ nd6_na_input(m, off, icmp6len)
 			 */
 			if (ln->ln_state == ND6_LLINFO_REACHABLE) {
 				ln->ln_state = ND6_LLINFO_STALE;
-				ln->ln_expire = time_second + nd6_gctimer;
-				nd6_llinfo_settimer(ln, nd6_gctimer * hz);
+				nd6_llinfo_settimer(ln, (long)nd6_gctimer * hz);
 			}
 			goto freeit;
 		} else if (is_override				   /* (2a) */
@@ -929,17 +922,14 @@ nd6_na_input(m, off, icmp6len)
 				ln->ln_state = ND6_LLINFO_REACHABLE;
 				ln->ln_byhint = 0;
 				if (ln->ln_expire) {
-					ln->ln_expire = time_second +
-					    ND_IFINFO(ifp)->reachable;
 					nd6_llinfo_settimer(ln,
-					    ND_IFINFO(ifp)->reachable * hz);
+					    (long)ND_IFINFO(ifp)->reachable * hz);
 				}
 			} else {
 				if (lladdr && llchange) {
 					ln->ln_state = ND6_LLINFO_STALE;
-					ln->ln_expire = time_second + nd6_gctimer;
 					nd6_llinfo_settimer(ln,
-					    nd6_gctimer * hz);
+					    (long)nd6_gctimer * hz);
 				}
 			}
 		}

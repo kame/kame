@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.102 2003/06/18 08:29:04 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.103 2003/06/25 03:21:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -55,6 +55,7 @@ struct	llinfo_nd6 {
 	short	ln_router;	/* 2^0: ND6 router bit */
 	int	ln_byhint;	/* # of times we made it reachable by UL hint */
 
+	long	ln_ntick;
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct callout ln_timer_ch;
 #elif defined(__OpenBSD__)
@@ -416,7 +417,7 @@ struct nd_opt_hdr *nd6_option __P((union nd_opts *));
 int nd6_options __P((union nd_opts *));
 struct	rtentry *nd6_lookup __P((struct sockaddr_in6 *, int, struct ifnet *));
 void nd6_setmtu __P((struct ifnet *));
-void nd6_llinfo_settimer __P((struct llinfo_nd6 *, int));
+void nd6_llinfo_settimer __P((struct llinfo_nd6 *, long));
 void nd6_timer __P((void *));
 void nd6_purge __P((struct ifnet *));
 void nd6_nud_hint __P((struct rtentry *, struct sockaddr_in6 *, int));
