@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.89 2000/09/05 13:35:59 sumikawa Exp $	*/
+/*	$KAME: ping6.c,v 1.90 2000/09/06 14:51:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1717,8 +1717,9 @@ pr_nodeaddr(ni, nilen)
 	struct icmp6_nodeinfo *ni; /* ni->qtype must be NODEADDR */
 	int nilen;
 {
-	struct in6_addr *ia6 = (struct in6_addr *)(ni + 1);
+	u_char *cp = (u_char *)(ni + 1);
 	char ntop_buf[INET6_ADDRSTRLEN];
+	int withttl = 0;
 
 	nilen -= sizeof(struct icmp6_nodeinfo);
 
@@ -1737,10 +1738,43 @@ pr_nodeaddr(ni, nilen)
 	putchar('\n');
 	if (nilen <= 0)
 		printf("  no address\n");
-	for (; nilen > 0; nilen -= sizeof(*ia6), ia6 += 1) {
-		if (!inet_ntop(AF_INET6, ia6, ntop_buf, sizeof(ntop_buf)))
+
+	/*
+	 * In icmp-name-lookups 05 and later, TTL of each returned address
+	 * is contained in the resposne. We try to detect the version
+	 * by the length of the data, but note that the detection algorithm
+	 * is incomplete. We assume the latest draft by default.
+	 */
+	if (nilen % (sizeof(u_int32_t) + sizeof(struct in6_addr)) == 0)
+		withttl = 1;
+	while (nilen > 0) {
+		u_int32_t ttl;
+
+		if (withttl) {
+			ttl = ntohl(*(u_int32_t *)cp); /* XXX: alignment? */
+			cp += sizeof(u_int32_t);
+			nilen -= sizeof(u_int32_t);
+		}
+
+		if (inet_ntop(AF_INET6, cp, ntop_buf, sizeof(ntop_buf)) ==
+		    NULL)
 			strncpy(ntop_buf, "?", sizeof(ntop_buf));
-		printf("  %s\n", ntop_buf);
+		printf("  %s", ntop_buf);
+		if (withttl) {
+			if (ttl == 0xffffffff) {
+				/*
+				 * XXX: can this convention be applied to all
+				 * type of TTL (i.e. non-ND TTL)?
+				 */
+				printf("(TTL=infty)");
+			}
+			else
+				printf("(TTL=%u)", ttl);
+		}
+		putchar('\n');
+
+		nilen -= sizeof(struct in6_addr);
+		cp += sizeof(struct in6_addr);
 	}
 }
 
