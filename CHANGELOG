@@ -1,7 +1,21 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2056 2002/01/21 07:41:20 jinmei Exp $
+$KAME: CHANGELOG,v 1.2057 2002/01/21 09:33:32 jinmei Exp $
 
 <200201>
+2002-01-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_pcb.h:
+	* {bsdi4, freebsd, openbsd}/sys/netinet/in_pcb.h:
+	- added foreign/local socket address structures to in[6]pcb{} in order
+	  to have scope zone information of IPv6 addresses
+	- changed [fl]addr and [fl]port as shortcut macro
+	* kame/sys/netinet6/in6_pcb.c (in6_pcballoc): 
+	* {bsdi4, freebsd, openbsd}/sys/netinet/in_pcb.c (in_pcballoc):
+	- set sin6_family and sin6_len when allocating an AF_INET6 pcb
+
+	Note: this change implicitly affected applications that referred
+	to the in[6]pcb structure (e.g. netstat).  Be sure to update
+	header files and recompile all KAME applications.
+
 2002-01-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/wru: allowed the user to omit the hostname, in which
 	case the command used ff02::1 disambiguating the link zone using
