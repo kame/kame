@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.153 2001/06/27 17:30:06 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.154 2001/06/29 05:23:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1955,8 +1955,11 @@ fail:
 	 * defrtrlist_update called the function as well.  However, I believe
 	 * we can compromise the overhead, since it only happens the first
 	 * time.
+	 * XXX: although defrouter_select() should not have a bad effect
+	 * for those are not autoconfigured hosts, we explicitly avoid such
+	 * cases for safety.
 	 */
-	if (do_update && ln->ln_router)
+	if (do_update && ln->ln_router && !ip6_forwarding && ip6_accept_rtadv)
 		defrouter_select();
 
 	return rt;
