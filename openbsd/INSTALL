@@ -1,6 +1,6 @@
 Installation procedure - OpenBSD
 KAME project
-$Id: INSTALL,v 1.1 1999/09/20 13:04:42 itojun Exp $
+$Id: INSTALL,v 1.2 1999/09/20 13:26:52 itojun Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -86,31 +86,18 @@ E-2. If you would like to use IPv6-ready inetd, you will need to stop using
      /usr/sbin/inetd and switch to /usr/local/v6/sbin/inetd.
      To do this, please replace the following section in /etc/rc:
 
->if checkyesno inetd; then
->	if [ -r /etc/inetd.conf ]; then
->		echo -n ' inetd'
->		inetd $inetd_flags
->	else
->		echo
->		logger -s "WARNING: /etc/inetd.conf not readable; " \
->		    "inetd not started."
->	fi
+>if [ X${inetd} = X"YES" ]; then
+>	echo -n ' inetd';		inetd
 >fi
 
      into this:
 
->if checkyesno inetd; then
->	if [ -r /etc/inetd.conf ]; then
->		echo -n ' inetd'
->		if [ -x /usr/local/v6/sbin/inetd ]; then
->			/usr/local/v6/sbin/inetd $inetd_flags
->		else
->			inetd $inetd_flags
->		fi
+>if [ X${inetd} = X"YES" ]; then
+>	echo -n ' inetd'
+>	if [ -x /usr/local/v6/sbin/inetd ]; then
+>		/usr/local/v6/sbin/inetd
 >	else
->		echo
->		logger -s "WARNING: /etc/inetd.conf not readable; " \
->		    "inetd not started."
+>		inetd
 >	fi
 >fi
 
