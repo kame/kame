@@ -440,7 +440,7 @@ rip6_output(m, so, dst, control)
   struct ifnet *forceif = NULL;
 #endif
   struct ip6_pktopts opt, *optp = NULL;
-  struct ifnet *oifp;
+  struct ifnet *oifp = NULL;
 #if __OpenBSD__
   va_list ap;
   struct socket *so;

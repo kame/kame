@@ -171,6 +171,7 @@ in_pcballoc(so, v)
 	    &inp->inp_laddr, inp->inp_lport), inp, inp_hash);
 	splx(s);
 	so->so_pcb = inp;
+	inp->inp_hops = -1;
 
 #ifdef INET6
 	/*
