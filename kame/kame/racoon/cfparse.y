@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.70 2000/09/22 18:03:09 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.71 2000/09/22 18:13:10 itojun Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -706,7 +706,7 @@ sainfo_statement
 			/* duplicate check */
 			check = getsainfo(cur_sainfo->idsrc, cur_sainfo->iddst);
 			if (check && (!check->idsrc && !cur_sainfo->idsrc)) {
-				yyerror("such sainfo duplicated: %s",
+				yyerror("duplicated sainfo: %s",
 					sainfo2str(cur_sainfo));
 				return -1;
 			}
@@ -780,7 +780,7 @@ sainfo_id
 			struct ipsecdoi_id_b *id_b;
 
 			if ($1 == LC_IDENTTYPE_CERTNAME) {
-				yyerror("forbidden using such id type: %d", $1);
+				yyerror("id type forbidden: %d", $1);
 				return -1;
 			}
 
@@ -838,7 +838,7 @@ sainfo_spec
 	|	IDENTIFIER IDENTIFIERTYPE
 		{
 			if ($2 == LC_IDENTTYPE_CERTNAME) {
-				yyerror("forbidden using such id type: %d", $2);
+				yyerror("id type forbidden: %d", $2);
 				return -1;
 			}
 
