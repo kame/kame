@@ -1,4 +1,4 @@
-# YIPS $Id: Makefile.in,v 1.24 2000/08/09 20:04:06 sakane Exp $
+# YIPS $Id: Makefile.in,v 1.25 2000/08/10 12:27:47 sakane Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -44,11 +44,13 @@ kmpstat: kmpstat.o misc_noplog.o vmbuf.o str2val.o
 pfkey: dummy.o
 	$(CC) $(LDFLAGS) -o $@ dummy.o
 
-eaytest: eaytest.o crypto_openssl.o misc_noplog.o vmbuf.o str2val.o
-	$(CC) $(LDFLAGS) -o $@ eaytest.o crypto_openssl.o misc_noplog.o \
+eaytest: eaytest.o crypto_openssl_test.o misc_noplog.o vmbuf.o str2val.o
+	$(CC) $(LDFLAGS) -o $@ eaytest.o crypto_openssl_test.o misc_noplog.o \
 		vmbuf.o str2val.o $(LIBS)
 
 # special object rules
+crypto_openssl_test.o: crypto_openssl.c
+	$(CC) $(CFLAGS) -DEAYDEBUG -o crypto_openssl_test.o -c crypto_openssl.c
 misc_noplog.o: misc.c
 	$(CC) -DNOUSE_PLOG -o misc_noplog.o -c misc.c
 

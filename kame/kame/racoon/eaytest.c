@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: eaytest.c,v 1.4 2000/08/09 20:14:58 sakane Exp $ */
+/* YIPS @(#)$Id: eaytest.c,v 1.5 2000/08/10 12:27:47 sakane Exp $ */
 
 #include <sys/types.h>
 
@@ -48,7 +48,48 @@
 
 u_int32_t debug = 0;
 
+char *capath = "/usr/local/openssl/certs";
+char cert1[] =
+"-----BEGIN X509 CERTIFICATE-----\n"
+"MIICzDCCAjWgAwIBAgIEOXGTAjANBgkqhkiG9w0BAQUFADBaMQswCQYDVQQGEwJG\n"
+"STEkMCIGA1UEChMbU1NIIENvbW11bmljYXRpb25zIFNlY3VyaXR5MREwDwYDVQQL\n"
+"EwhXZWIgdGVzdDESMBAGA1UEAxMJVGVzdCBDQSAxMB4XDTAwMDcxNjAwMDAwMFoX\n"
+"DTAwMDkwMTAwMDAwMFowgZsxCzAJBgNVBAYTAkpQMREwDwYDVQQIEwhLYW5hZ2F3\n"
+"YTERMA8GA1UEBxMIRnVqaXNhd2ExFTATBgNVBAoTDFdJREUgUHJvamVjdDEVMBMG\n"
+"A1UECxMMS0FNRSBQcm9qZWN0MRcwFQYDVQQDEw5TaG9pY2hpIFNha2FuZTEfMB0G\n"
+"CSqGSIb3DQEJAQwQc2FrYW5lQHlkYy5jby5qcDCBnzANBgkqhkiG9w0BAQEFAAOB\n"
+"jQAwgYkCgYEAuWE1jKVD8AvuM5x8Z6JzJlYeR+V+FZkFxv65Y8TQGyiZPOlvlb9J\n"
+"acaLJFYBjSuuno/t111tu3thggQwC80SUos0irG31i6SSusQMGmkoT1m/QHckZ4d\n"
+"lfxHyFLqwkV97qYGp/h55PuG8WwW+Imcbtd/RJHqD7gEWxPFhy9rmsMCAwEAAaNd\n"
+"MFswCwYDVR0PBAQDAgWgMBoGA1UdEQQTMBGBD3Nha2FuZUBrYW1lLm5ldDAwBgNV\n"
+"HR8EKTAnMCWgI6Ahhh9odHRwOi8vbGRhcC5zc2guZmkvY3Jscy9jYTEuY3JsMA0G\n"
+"CSqGSIb3DQEBBQUAA4GBAFVbX9xotcHmtI96iXGNuzXqAObUBDAg4hDymi2RLitv\n"
+"uVJYPH5t6qDqu499FbwPsatoRc/l62cmc0qmFStmvg0p5s+/dW2gtBeV1+cfdv+O\n"
+"1GrjSmhAPPiwQFarhJzJeNo5PHplcj9ICNzDfcLZtqhiZFLq0wl5pNQM4UqWuFNl\n"
+"-----END X509 CERTIFICATE-----\n\n"
+;
+
 /* test */
+
+void
+certtest()
+{
+	int error;
+	vchar_t CApath, c;
+
+	printf("\n**Test for Certificate.**\n");
+
+	eay_init_error();
+
+	CApath.v = capath;
+	CApath.l = strlen(capath);
+	c.v = cert1;
+	c.l = strlen(cert1);
+
+	error = eay_check_x509cert(&c, &CApath);
+	printf("cert is %s\n", error ? "bad" : "good");
+}
+
 void
 ciphertest()
 {
@@ -365,7 +406,7 @@ main(ac, av)
 	char **av;
 {
 	if (strcmp(*av, "-h") == 0) {
-		printf("Usage: eaytest [dh|md5|sha1|hmac|cipher]\n");
+		printf("Usage: eaytest [dh|md5|sha1|hmac|cipher|cert]\n");
 		exit(0);
 	}
 
@@ -376,6 +417,7 @@ main(ac, av)
 		sha1test();
 		hmactest();
 		ciphertest();
+		certtest();
 	} else {
 		for (av++; *av != '\0'; av++) {
 			if (strcmp(*av, "random") == 0)
@@ -390,6 +432,8 @@ main(ac, av)
 				hmactest();
 			else if (strcmp(*av, "cipher") == 0)
 				ciphertest();
+			else if (strcmp(*av, "cert") == 0)
+				certtest();
 		}
 	}
 
