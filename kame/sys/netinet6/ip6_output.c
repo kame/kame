@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.213 2001/08/09 07:55:20 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.214 2001/08/11 10:54:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3746,7 +3746,6 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 			if (cm->cmsg_len != CMSG_LEN(sizeof(struct in6_pktinfo)))
 				return(EINVAL);
 			if (needcopy) {
-				/* XXX: Is it really WAITOK? */
 				opt->ip6po_pktinfo =
 					malloc(sizeof(struct in6_pktinfo),
 					       M_IP6OPT, M_WAITOK);
