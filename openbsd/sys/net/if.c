@@ -167,25 +167,28 @@ if_attachsetup(ifp)
 		size_t n;
 		caddr_t q;
 		
+		oldlim = if_indexlim;
 		while (if_index >= if_indexlim)
 			if_indexlim <<= 1;
 
 		/* grow ifnet_addrs */
+		m = oldlim * sizeof(ifa);
 		n = if_indexlim * sizeof(ifa);
 		q = (caddr_t)malloc(n, M_IFADDR, M_WAITOK);
 		bzero(q, n);
 		if (ifnet_addrs) {
-			bcopy((caddr_t)ifnet_addrs, q, n/2);
+			bcopy((caddr_t)ifnet_addrs, q, m);
 			free((caddr_t)ifnet_addrs, M_IFADDR);
 		}
 		ifnet_addrs = (struct ifaddr **)q;
 
 		/* grow ifindex2ifnet */
+		m = oldlim * sizeof(struct ifnet *);
 		n = if_indexlim * sizeof(struct ifnet *);
 		q = (caddr_t)malloc(n, M_IFADDR, M_WAITOK);
 		bzero(q, n);
 		if (ifindex2ifnet) {
-			bcopy((caddr_t)ifindex2ifnet, q, n/2);
+			bcopy((caddr_t)ifindex2ifnet, q, m);
 			free((caddr_t)ifindex2ifnet, M_IFADDR);
 		}
 		ifindex2ifnet = (struct ifnet **)q;

@@ -176,7 +176,6 @@ if_attach(ifp)
 	LIST_INIT(&ifp->if_multiaddrs);
 	getmicrotime(&ifp->if_lastchange);
 	if (ifnet_addrs == 0 || if_index >= if_indexlim) {
-		unsigned n;
 		caddr_t q;
 
 		if_indexlim <<= 1;
