@@ -1,4 +1,4 @@
-/* $Id: name6.c,v 1.18 2000/05/01 02:36:28 itojun Exp $ */
+/* $Id: name6.c,v 1.19 2000/05/01 03:22:31 itojun Exp $ */
 /*
  *	Atsushi Onoe <onoe@sm.sony.co.jp>
  */
@@ -1220,6 +1220,7 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 #ifdef INET6
 	static const char hex[] = "0123456789abcdef";
 #endif
+	char *tname = NULL;
 
 #ifdef INET6
 	/* XXX */
@@ -1242,6 +1243,7 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 	hlist[1] = NULL;
 	na = 0;
 
+	/* XXX assumes that MAXDNAME is big enough */
 	n = 0;
 	bp = hostbuf;
 	cp = (u_char *)addr+addrlen-1;
@@ -1271,10 +1273,13 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 		strcpy(bp, "in-addr.arpa");
 		break;
 	}
+	tname = strdup(hostbuf);
 
 	n = res_query(hostbuf, C_IN, T_PTR, answer, sizeof(answer));
 	if (n < 0) {
 		*errp = h_errno;
+		if (tname)
+			free(tname);
 		return NULL;
 	}
 	hp = (HEADER *)answer;
@@ -1289,6 +1294,9 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 	n = dn_expand(answer, eom, cp, bp, buflen);
 	DNS_ASSERT(n >= 0);
 	cp += n + QFIXEDSZ;
+	if (tname)
+		free(tname);
+	tname = strdup(bp);
 	while (ancount-- > 0 && cp < eom) {
 		n = dn_expand(answer, eom, cp, bp, buflen);
 		DNS_ASSERT(n >= 0);
@@ -1304,6 +1312,8 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 		DNS_ASSERT(class == C_IN);
 		switch (type) {
 		case T_PTR:
+			if (tname)
+				DNS_ASSERT(strcasecmp(tname, bp) == 0);
 			n = dn_expand(answer, eom, cp, bp, buflen);
 			DNS_ASSERT(n >= 0);
 			cp += n;
@@ -1318,14 +1328,21 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 			buflen -= n;
 			break;
 		case T_CNAME:
+			if (tname)
+				free(tname);
+			tname = strdup(bp);
 			cp += n;
 			break;
 		default:
   badanswer:
 			*errp = NO_RECOVERY;
+			if (tname)
+				free(tname);
 			return NULL;
 		}
 	}
+	if (tname)
+		free(tname);
 	if (hbuf.h_name == NULL) {
 		*errp = h_errno;
 		return NULL;
