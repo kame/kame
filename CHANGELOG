@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.594 2000/02/23 07:03:18 jinmei Exp $
+$Id: CHANGELOG,v 1.595 2000/02/23 12:29:37 sakane Exp $
 
 <200002>
+Wed Feb 23 21:26:21 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	  fixed to compute RSA signature.  SIGN was computed including OID.
+	  Now, racoon gets a interoperability with isakmp-test.ssh.fi.
+	  TODO: must be check the signer of certificate.
+
 2000-02-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* (all OSes)/usr.sbin/{bgpd, pim6[ds]d}/Makefile: added the
 	-DHAVE_GETIFADDRS compile option.
