@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.4 2002/05/01 14:46:07 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.5 2002/05/01 15:20:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -30,8 +30,8 @@
  */
 
 /* per-interface information */
-struct dhcp_if {
-	struct dhcp_if *next;
+struct dhcp6_if {
+	struct dhcp6_if *next;
 
 	/* internal status */
 	int state;
@@ -57,14 +57,14 @@ struct dhcp_if {
 #define DHCIFF_INFO_ONLY 0x1
 #define DHCIFF_RAPID_COMMIT 0x2
 
-	struct dhcp_optconf *send_options;
+	struct dhcp6_optconf *send_options;
 };
 
 /* client status code */
 enum {DHCP6S_INIT, DHCP6S_SOLICIT, DHCP6S_INFOREQ, DHCP6S_IDLE};
 
-struct dhcp_ifconf {
-	struct dhcp_ifconf *next;
+struct dhcp6_ifconf {
+	struct dhcp6_ifconf *next;
 
 	char *ifname;
 
@@ -72,8 +72,8 @@ struct dhcp_ifconf {
 	u_long send_flags;
 	u_long allow_flags;
 
-	struct dhcp_optconf *send_options;
-	struct dhcp_optconf *allow_options;
+	struct dhcp6_optconf *send_options;
+	struct dhcp6_optconf *allow_options;
 };
 
 struct prefix_ifconf {
@@ -88,8 +88,8 @@ struct prefix_ifconf {
 };
 
 /* DHCP option information */
-struct dhcp_optconf {
-	struct dhcp_optconf *next;
+struct dhcp6_optconf {
+	struct dhcp6_optconf *next;
 	int type;
 	int len;
 	char *val;
@@ -116,12 +116,12 @@ enum {DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY};
 enum {IFPARAM_SLA_ID};
 enum {DHCPOPT_RAPID_COMMIT};
 
-extern struct dhcp_ifconf *dhcp_iflist;
+extern struct dhcp6_ifconf *dhcp6_iflist;
 
 extern void ifinit __P((char *));
 extern int configure_interface __P((struct cf_iflist *));
 extern void configure_cleanup __P((void));
 extern void configure_commit __P((void));
 extern int cfparse __P((char *));
-extern struct dhcp_if *find_ifconf __P((char *));
+extern struct dhcp6_if *find_ifconf __P((char *));
 extern struct prefix_ifconf *find_prefixifconf __P((char *));

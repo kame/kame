@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.3 2002/05/01 14:46:06 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.4 2002/05/01 15:20:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -39,30 +39,30 @@
 
 extern int errno;
 
-struct dhcp_if *dhcp_if;
+struct dhcp6_if *dhcp6_if;
 
-static struct dhcp_ifconf *dhcp_ifconflist;
+static struct dhcp6_ifconf *dhcp6_ifconflist;
 static struct prefix_ifconf *prefix_ifconflist0, *prefix_ifconflist;
 
-static int add_options __P((struct dhcp_ifconf *, struct dhcp_optconf **,
+static int add_options __P((struct dhcp6_ifconf *, struct dhcp6_optconf **,
 			    u_long *, struct cf_list *));
 
-static void clear_ifconf __P((struct dhcp_ifconf *));
+static void clear_ifconf __P((struct dhcp6_ifconf *));
 static void clear_prefixifconf __P((struct prefix_ifconf *));
-static void clear_options __P((struct dhcp_optconf *));
+static void clear_options __P((struct dhcp6_optconf *));
 
 void
 ifinit(ifname)
 	char *ifname;
 {
-	struct dhcp_if *ifp;
+	struct dhcp6_if *ifp;
 
 	if ((ifp = find_ifconf(ifname)) != NULL) {
 		dprintf(LOG_NOTICE, "duplicated interface: %s", ifname);
 		return;
 	}
 
-	if ((ifp = (struct dhcp_if *)malloc(sizeof(*ifp))) == NULL) {
+	if ((ifp = (struct dhcp6_if *)malloc(sizeof(*ifp))) == NULL) {
 		dprintf(LOG_ERR, "malloc failed");
 		goto die;
 	}
@@ -89,8 +89,8 @@ ifinit(ifname)
 	ifp->linkid = ifp->ifid; /* XXX */
 #endif
 
-	ifp->next = dhcp_if;
-	dhcp_if = ifp;
+	ifp->next = dhcp6_if;
+	dhcp6_if = ifp;
 	return;
 
   die:
@@ -102,19 +102,19 @@ configure_interface(iflist)
 	struct cf_iflist *iflist;
 {
 	struct cf_iflist *ifp;
-	struct dhcp_ifconf *ifc;
+	struct dhcp6_ifconf *ifc;
 
 	for (ifp = iflist; ifp; ifp = ifp->next) {
 		struct cf_list *cfl;
 
-		if ((ifc = (struct dhcp_ifconf *)malloc(sizeof(*ifc)))
+		if ((ifc = (struct dhcp6_ifconf *)malloc(sizeof(*ifc)))
 		    == NULL) {
 			dprintf(LOG_ERR, "malloc failed");
 			goto bad;
 		}
 		memset(ifc, 0, sizeof(*ifc));
-		ifc->next = dhcp_ifconflist;
-		dhcp_ifconflist = ifc;
+		ifc->next = dhcp6_ifconflist;
+		dhcp6_ifconflist = ifc;
 
 		if ((ifc->ifname = strdup(ifp->ifname)) == NULL) {
 			dprintf(LOG_ERR, "failed to copy ifname");
@@ -151,8 +151,8 @@ configure_interface(iflist)
 	return(0);
 
   bad:
-	clear_ifconf(dhcp_ifconflist);
-	dhcp_ifconflist = NULL;
+	clear_ifconf(dhcp6_ifconflist);
+	dhcp6_ifconflist = NULL;
 	return(-1);
 }
 
@@ -211,18 +211,18 @@ configure_prefix_interface(iflist)
 void
 configure_cleanup()
 {
-	clear_ifconf(dhcp_ifconflist);
-	dhcp_ifconflist = NULL;
+	clear_ifconf(dhcp6_ifconflist);
+	dhcp6_ifconflist = NULL;
 }
 
 void
 configure_commit()
 {
-	struct dhcp_ifconf *ifc;
-	struct dhcp_if *ifp;
+	struct dhcp6_ifconf *ifc;
+	struct dhcp6_if *ifp;
 
 	/* commit interface configuration */
-	for (ifc = dhcp_ifconflist; ifc; ifc = ifc->next) {
+	for (ifc = dhcp6_ifconflist; ifc; ifc = ifc->next) {
 		if ((ifp = find_ifconf(ifc->ifname)) != NULL) {
 			ifp->send_flags = ifc->send_flags;
 			ifp->allow_flags = ifc->allow_flags;
@@ -231,7 +231,7 @@ configure_commit()
 			ifc->send_options = NULL;
 		}
 	}
-	clear_ifconf(dhcp_ifconflist);
+	clear_ifconf(dhcp6_ifconflist);
 
 	/* commit prefix configuration */
 	if (prefix_ifconflist) {
@@ -244,9 +244,9 @@ configure_commit()
 
 static void
 clear_ifconf(iflist)
-	struct dhcp_ifconf *iflist;
+	struct dhcp6_ifconf *iflist;
 {
-	struct dhcp_ifconf *ifc, *ifc_next;
+	struct dhcp6_ifconf *ifc, *ifc_next;
 
 	for (ifc = iflist; ifc; ifc = ifc_next) {
 		ifc_next = ifc->next;
@@ -274,9 +274,9 @@ clear_prefixifconf(iflist)
 
 static void
 clear_options(opt0)
-	struct dhcp_optconf *opt0;
+	struct dhcp6_optconf *opt0;
 {
-	struct dhcp_optconf *opt, *opt_next;
+	struct dhcp6_optconf *opt, *opt_next;
 
 	for (opt = opt0; opt; opt = opt_next) {
 		opt_next = opt->next;
@@ -288,12 +288,12 @@ clear_options(opt0)
 
 static int
 add_options(ifc, optp0, flagp, cfl0)
-	struct dhcp_ifconf *ifc;
-	struct dhcp_optconf **optp0;
+	struct dhcp6_ifconf *ifc;
+	struct dhcp6_optconf **optp0;
 	u_long *flagp;
 	struct cf_list *cfl0;
 {
-	struct dhcp_optconf *opt, **optp;
+	struct dhcp6_optconf *opt, **optp;
 	struct cf_list *cfl;
 
 	optp = optp0;
@@ -311,13 +311,13 @@ add_options(ifc, optp0, flagp, cfl0)
 	return(0);
 }
 
-struct dhcp_if *
+struct dhcp6_if *
 find_ifconf(ifname)
 	char *ifname;
 {
-	struct dhcp_if *ifp;
+	struct dhcp6_if *ifp;
 
-	for (ifp = dhcp_if; ifp; ifp = ifp->next) {
+	for (ifp = dhcp6_if; ifp; ifp = ifp->next) {
 		if (strcmp(ifp->ifname, ifname) == NULL)
 			return(ifp);
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.73 2002/05/01 10:58:36 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.74 2002/05/01 15:20:30 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -91,17 +91,17 @@ static struct duid client_duid;
 static void usage __P((void));
 static void client6_init __P((void));
 static void client6_mainloop __P((void));
-static void client6_send __P((struct dhcp_if *, int));
+static void client6_send __P((struct dhcp6_if *, int));
 static int client6_getreply __P((void));
-static int client6_recv __P((struct dhcp_if *));
-static int client6_recvreply __P((struct dhcp_if *, struct dhcp6 *, ssize_t));
+static int client6_recv __P((struct dhcp6_if *));
+static int client6_recvreply __P((struct dhcp6_if *, struct dhcp6 *, ssize_t));
 static void client6_sleep __P((void));
 void client6_hup __P((int));
 static int sa2plen __P((struct sockaddr_in6 *));
 static void get_rtaddrs __P((int, struct sockaddr *, struct sockaddr **));
 static void tvfix __P((struct timeval *));
-static void reset_timer __P((struct dhcp_if *));
-static void set_timeoparam __P((struct dhcp_if *));
+static void reset_timer __P((struct dhcp6_if *));
+static void set_timeoparam __P((struct dhcp6_if *));
 
 #define DHCP6C_CONF "/usr/local/v6/etc/dhcp6c.conf"
 #define DHCP6C_PIDFILE "/var/run/dhcp6c.pid"
@@ -286,7 +286,7 @@ client6_init()
 static void
 client6_mainloop()
 {
-	struct dhcp_if *ifp;	/* XXX: multiple-interface support */
+	struct dhcp6_if *ifp;	/* XXX: multiple-interface support */
 	struct timeval finish, w;
 	int ret;
 	fd_set r;
@@ -582,7 +582,7 @@ get_rtaddrs(int addrs, struct sockaddr *sa, struct sockaddr **rti_info)
 
 static void
 client6_send(ifp, s)
-	struct dhcp_if *ifp;
+	struct dhcp6_if *ifp;
 {
 	char buf[BUFSIZ];
 	struct sockaddr_in6 dst;
@@ -657,7 +657,7 @@ client6_send(ifp, s)
 
 static int
 client6_recv(ifp)
-	struct dhcp_if *ifp;
+	struct dhcp6_if *ifp;
 {
 	int s = insock;		/* XXX */
 	char rbuf[BUFSIZ];
@@ -707,7 +707,7 @@ client6_recv(ifp)
 /* 18.1.6. Receipt of Reply message */
 static int
 client6_recvreply(ifp, dh6, len)
-	struct dhcp_if *ifp;
+	struct dhcp6_if *ifp;
 	struct dhcp6 *dh6;
 	ssize_t len;
 {
@@ -784,7 +784,7 @@ tvfix(tv)
 
 static void
 set_timeoparam(ifp)
-	struct dhcp_if *ifp;
+	struct dhcp6_if *ifp;
 {
 	ifp->retrans = 0;
 	ifp->init_retrans = 0;
@@ -806,7 +806,7 @@ set_timeoparam(ifp)
 
 static void
 reset_timer(ifp)
-	struct dhcp_if *ifp;
+	struct dhcp6_if *ifp;
 {
 	long t;
 	double n, r;

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.66 2002/05/01 10:54:54 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.67 2002/05/01 15:20:30 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -99,15 +99,15 @@ static void usage __P((void));
 static void server6_init __P((void));
 static void server6_mainloop __P((void));
 static ssize_t server6_recv __P((int, struct sockaddr *, int *));
-static void server6_react __P((struct dhcp_if *, size_t,
+static void server6_react __P((struct dhcp6_if *, size_t,
 			       struct sockaddr *, int));
-static int server6_react_informreq __P((struct dhcp_if *, char *, size_t,
+static int server6_react_informreq __P((struct dhcp6_if *, char *, size_t,
 					struct dhcp6_optinfo *,
 					struct sockaddr *, int));
-static int server6_react_solicit __P((struct dhcp_if *, char *, size_t,
+static int server6_react_solicit __P((struct dhcp6_if *, char *, size_t,
 				      struct dhcp6_optinfo *,
 				      struct sockaddr *, int));
-static int server6_send_reply __P((struct dhcp_if *, struct dhcp6 *,
+static int server6_send_reply __P((struct dhcp6_if *, struct dhcp6 *,
 				   struct dhcp6_optinfo *,
 				   struct sockaddr *, int));
 
@@ -350,7 +350,7 @@ server6_mainloop()
 	ssize_t l;
 	struct sockaddr_storage from;
 	int fromlen;
-	struct dhcp_if *ifp;	/* XXX: multiple-interface support */
+	struct dhcp6_if *ifp;	/* XXX: multiple-interface support */
 
 	if ((ifp = find_ifconf(device)) == NULL) {
 		dprintf(LOG_ERR, "interface %s not configured", device);
@@ -403,7 +403,7 @@ server6_recv(s, from, fromlen)
 
 static void
 server6_react(ifp, siz, from, fromlen)
-	struct dhcp_if *ifp;
+	struct dhcp6_if *ifp;
 	size_t siz;
 	struct sockaddr *from;
 	int fromlen;
@@ -452,7 +452,7 @@ server6_react(ifp, siz, from, fromlen)
 
 static int
 server6_react_solicit(ifp, buf, siz, optinfo, from, fromlen)
-	struct dhcp_if *ifp;
+	struct dhcp6_if *ifp;
 	char *buf;
 	size_t siz;
 	struct dhcp6_optinfo *optinfo;
@@ -491,7 +491,7 @@ server6_react_solicit(ifp, buf, siz, optinfo, from, fromlen)
 
 static int
 server6_react_informreq(ifp, buf, siz, optinfo, from, fromlen)
-	struct dhcp_if *ifp;
+	struct dhcp6_if *ifp;
 	char *buf;
 	size_t siz;
 	struct dhcp6_optinfo *optinfo;
@@ -514,7 +514,7 @@ server6_react_informreq(ifp, buf, siz, optinfo, from, fromlen)
 
 static int
 server6_send_reply(ifp, origmsg, optinfo, from, fromlen)
-	struct dhcp_if *ifp;
+	struct dhcp6_if *ifp;
 	struct dhcp6 *origmsg;
 	struct dhcp6_optinfo *optinfo;
 	struct sockaddr *from;
