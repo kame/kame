@@ -1,4 +1,4 @@
-/*	$KAME: altq_var.h,v 1.4 2000/10/18 09:15:24 kjc Exp $	*/
+/*	$KAME: altq_var.h,v 1.5 2000/12/02 06:41:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998-2000
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_var.h,v 1.4 2000/10/18 09:15:24 kjc Exp $
+ * $Id: altq_var.h,v 1.5 2000/12/02 06:41:40 itojun Exp $
  */
 #ifndef _ALTQ_ALTQ_VAR_H_
 #define	_ALTQ_ALTQ_VAR_H_
@@ -176,7 +176,9 @@ typedef u_long ioctlcmd_t;
 #endif
 
 /* macro for timeout/untimeout */
-#if (__FreeBSD_version > 300000)
+#ifdef __NetBSD__
+#error notyet
+#elif (__FreeBSD_version > 300000)
 #define	CALLOUT_HANDLE_INIT(h)	callout_handle_init((h))
 #define	TIMEOUT(f,a,t,h)	(h) = timeout((f),(a),(t))
 #define	UNTIMEOUT(f,a,h)	untimeout((f),(a),(h))
