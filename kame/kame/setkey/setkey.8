@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.35 2000/11/10 12:12:12 itojun Exp $
+.\"	$KAME: setkey.8,v 1.36 2000/11/19 15:41:42 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -227,7 +227,7 @@ attached
 .\"
 .Pp
 .It Ar extensions
-take some of the following:
+takes some of the following:
 .Bl -tag -width Fl -compact
 .\"
 .It Fl m Ar mode
@@ -249,35 +249,43 @@ If
 is zero or not specified, replay check don't take place.
 .\"
 .It Fl u Ar id
-Specify the identifier of policy.
-See also
-.Xr ipsec_set_policy 3 .
+Specify the identifier of the policy entry in SPD.
+See
+.Ar policy .
 .\"
 .It Fl f Ar pad_option
+defines the content of the ESP padding.
 .Ar pad_option
 is one of following:
-.Li zero-pad , random-pad
-or
-.Li seq-pad
+.Bl -tag -width random-pad -compact
+.It Li zero-pad
+All of the padding are zero.
+.It Li random-pad
+A series of randomized values are set.
+.It Li seq-pad
+A series of sequencial increasing numbers started from 1 are set.
+.El
 .\"
 .It Fl f Li nocyclic-seq
 Don't allow cyclic sequence number.
 .\"
 .It Fl lh Ar time
 .It Fl ls Ar time
-Specify hard/soft lifetime.
+Specify hard/soft life time duration of the SA.
 .El
 .\"
 .Pp
 .It Ar algorithm
 .Bl -tag -width Fl -compact
 .It Fl E Ar ealgo Ar key
-Specify encryption algorithm.
+Specify a encryption algorithm.
 .It Fl A Ar aalgo Ar key
-Specify authentication algorithm.
+Specify a authentication algorithm.
 If
 .Fl A
-is used for esp, it will be treated as ESP payload authentication algorithm.
+is used with
+.Ar protocol Li esp ,
+it will be treated as ESP payload authentication algorithm.
 .It Fl C Ar calgo Op Fl R
 Specify compression algorithm.
 If
@@ -304,23 +312,23 @@ field needs to be smaller than
 in this case.
 .El
 .Pp
-.Li esp
-SAs accept
+.Ar protocol Li esp
+accepts
 .Fl E
 and
 .Fl A .
-.Li esp-old
-SAs accept
+.Ar protocol Li esp-old
+accepts
 .Fl E
 only.
-.Li ah
+.Ar protocol Li ah
 and
 .Li ah-old
-SAs accept
+accept
 .Fl A
 only.
-.Li ipcomp
-SAs accept
+.Ar protocol Li ipcomp
+accepts
 .Fl C
 only.
 .Pp
@@ -437,9 +445,9 @@ with
 between these addresses which is used to specify the SA to use.
 .Ar level
 is to be one of the following:
-.Li default , use
+.Li default , use , require
 or
-.Li require .
+.Li unique .
 .Li default
 means the kernel consults to the system wide default against protocol you
 specified, e.g.
@@ -449,7 +457,23 @@ sysctl variable, when the kernel processes the packet.
 means that the kernel use a SA if it's available,
 otherwise the kernel keeps normal operation.
 .Li require
-means SA is required whenever the kernel deals with the packet.
+means SA is required whenever the kernel sends a packet matched
+with the policy.
+.Li unique
+is the same to require.
+In addition, it allows the policy to bind with the unique out-bound SA.
+If you use the SA by manual keying,
+you can put the decimal number as the policy identifier after
+.Li unique
+separated by colon
+.Sq \:
+like the following;
+.Li unique:number .
+.Li number
+must be between 1 and 32767.
+It corresponds to
+.Ar extensions Fl u .
+.Pp
 Note that
 .Dq Li discard
 and
