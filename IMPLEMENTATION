@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.355 2003/09/24 23:44:16 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.356 2003/10/15 01:50:31 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -2371,14 +2371,14 @@ right (IPR) restriction.  KAME's stance is stated below.
     The goal of KAME is to provide freely redistributable, BSD-licensed,
     implementation of Internet protocol technologies.
     For this purpose, we implement protocols that (1) do not need license
-    contract with IPR holder, and (2) are royality-free.
+    contract with IPR holder, and (2) are royalty-free.
     The reason for (1) is, even if KAME contracts with the IPR holder in
     question, the users of KAME stack (usually implementers of some other
     codebase) would need to make a license contract with the IPR holder.
     it would damage "freely redistributable" status of KAME codebase.
 
     By doing so KAME is (implicitly) trying to advocate no-license-contract,
-    royality-free, release of IPRs.
+    royalty-free, release of IPRs.
 
 Note however, as documented in README, we do not guarantee that KAME code
 is free of IPR infringement, you MUST check it if you are to integrate
