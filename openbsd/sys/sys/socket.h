@@ -146,7 +146,7 @@ struct sockaddr {
  * in the system.
  *
  * Note: __ss_{len,family} is defined in RFC2553.  During RFC2553 discussion
- * there the field name went back and forth between ss_len and __ss_len,
+ * the field name went back and forth between ss_len and __ss_len,
  * and RFC2553 specifies it to be __ss_len.  openbsd picked ss_len.
  * For maximum portability, userland programmer would need to
  * (1) make the code never touch ss_len portion (cast it into sockaddr and
