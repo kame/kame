@@ -161,8 +161,12 @@ network6_pass1() {
 	# 6to4 setup
 	network6_stf_setup
 
-	# mobile setup
-	network6_mobile_setup
+	# mobile ipv6 setup
+	case ${ipv6_mobile_enable} in
+	[Yy][Ee][Ss])
+		network6_mobile_setup
+		;;
+	esac
 
 	# install the "default interface" to kernel, which will be used
 	# as the default route when there's no router.

@@ -4,8 +4,10 @@ ip6router=NO
 ip6mrouter=NO
 inet6d_enable=NO
 ipv6rtsold=NO
-mip6_enable=NO
-mip6_home_prefix="2001:200:0:4819::/64"
+ipv6_mobile_enable=NO
+ipv6_mobile_nodetype=mobilenode
+#ipv6_mobile_nodetype=homeagent
+ipv6_mobile_prefixes="2001:200:0:4819::/64"
 
 if [ X"${ip6router}" = X"YES" ]; then
 	#
@@ -43,6 +45,7 @@ prefixconfig=/usr/local/v6/sbin/prefix
 route6d=/usr/local/v6/sbin/route6d
 mroute6d=/usr/local/v6/sbin/pim6dd
 rtsol=/usr/local/v6/sbin/rtsol
+rtsold=/usr/local/v6/sbin/rtsold
 rtadvd=/usr/local/v6/sbin/rtadvd
 gifconfig=/usr/local/v6/sbin/gifconfig
 route=/usr/local/v6/sbin/route
@@ -200,10 +203,31 @@ else
 
 	$ifconfig $iface up
 
-	if [ X"${mip6_enable}" = X"YES" ]; then
-		$mip6control -H `echo $mip6_home_prefix | cut -d/ -f1` \
-			-P `echo $mip6_home_prefix | cut -d/ -f2`
-		$mip6control -m
+	# mobile ipv6 setup
+	if [ X"${ipv6_mobile_enable}" = X"YES" ]; then
+	    case ${ipv6_mobile_nodetype} in
+	    [Mm][Oo][Bb][Ii][Ll][Ee][Nn][Oo][Dd][Ee])
+		case ${ipv6_mobile_home_prefixes} in
+		'')
+		    ;;
+		*)
+		    for home_prefix in ${ipv6_mobile_home_prefixes}
+		    do
+			prefix=`expr "${home_prefix}" : "\(.*\)/.*"`
+			prefixlen=`expr "${home_prefix}" : ".*/\(.*\)"`
+			$mip6control -H ${prefix} -P ${prefixlen}
+		    done
+		    $mip6control -m
+		    $rtsold -a -m
+		    ;;
+		esac
+		;;
+	    [Hh][Oo][Mm][Ee][Aa][Gg][Ee][Nn][Tt])
+		$mip6control -g
+		;;
+	    *)
+		;;
+	    esac
 	fi
 
 	# send router solicitation messages.
