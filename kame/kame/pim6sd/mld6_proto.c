@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.39 2004/06/09 15:52:57 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.40 2004/06/09 19:09:21 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -392,6 +392,7 @@ recv_listener_report(mifi, src, grp, mld_version)
 	/** set a timer for expiration **/
 	g->al_query = 0;
 	g->al_timer = MLD6_LISTENER_INTERVAL;
+	g->al_comp = 0;	/* specified by mld_shift_to_v1mode() */
 	g->al_reporter = *src;
 	g->al_timerid = SetTimer(mifi, g);
 	g->al_next = v->uv_groups;
@@ -569,6 +570,8 @@ DelVif(arg)
 	 */
 	if (g->al_query)
 		DeleteTimer(g->al_query);
+	if (g->al_comp)
+		DeleteTimer(g->al_comp);
 
 	delete_leaf(mifi, NULL, &g->al_addr);
 

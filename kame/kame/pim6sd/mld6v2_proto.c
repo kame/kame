@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.38 2004/06/09 15:52:58 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.39 2004/06/09 19:09:22 suz Exp $
  */
 
 /*
@@ -93,7 +93,7 @@
 static void Send_GSS_QueryV2 __P((void *arg));
 static void DelVifV2 __P((void *arg));
 
-static int SetTimerV1compat __P((mifi_t, struct listaddr * g));
+static int SetTimerV1compat __P((mifi_t, struct listaddr *, int));
 static int DeleteTimerV1compat __P((int));
 
 static void accept_multicast_record(mifi_t, struct mld_group_record_hdr *,
@@ -1032,10 +1032,9 @@ mld_shift_to_v1mode(mifi, src, grp)
 
 	/* set timer to disable v1-compat-mode later */
 update_timer:
-	if (g->al_timerid)
-		g->al_timerid = DeleteTimerV1compat(g->al_timerid);
-	SET_TIMER(g->al_timer, MLD6_OLDER_VERSION_HOST_PRESENT);
-	g->al_timerid = SetTimerV1compat(mifi, g);
+	if (g->al_comp)
+		g->al_comp = DeleteTimerV1compat(g->al_comp);
+	g->al_comp = SetTimerV1compat(mifi, g, MLD6_OLDER_VERSION_HOST_PRESENT);
 	return;
 }
 
@@ -1070,13 +1069,15 @@ mld_shift_to_v2mode(arg)
 	DelVif(cbk);
 
 	g->comp_mode = MLDv2;
+	g->al_comp = 0;
+	free(cbk);
 
 	/* won't continue this timer and just return */
 	return;
 }
 
 static int
-SetTimerV1compat(mifi, g)
+SetTimerV1compat(mifi, g, interval)
 	mifi_t mifi;
 	struct listaddr *g;
 {
@@ -1086,7 +1087,7 @@ SetTimerV1compat(mifi, g)
 	cbk->mifi = mifi;
 	cbk->g = g;
 	cbk->s = NULL;
-	return timer_setTimer(g->al_timer, mld_shift_to_v2mode, cbk);
+	return timer_setTimer(interval, mld_shift_to_v2mode, cbk);
 }
 
 static int

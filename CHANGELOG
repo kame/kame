@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2623 2004/06/09 15:52:57 suz Exp $
+$KAME: CHANGELOG,v 1.2624 2004/06/09 19:09:21 suz Exp $
 
 <200406>
 2004-06-09  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
+	* kame/pim6sd/vif.[ch], mld6v2_proto.c mld6_proto.c:
+	- fixed a bug that pim6sd never return from MLDv1-compat-mode
+	  to MLDv2-mode if MLDv1 listener disappears but MLDv2 listener
+	  remains.
+
 	* kame/pim6sd/mld6_proto.[ch], mld6v2.[ch], mld6v2_proto.[ch]:
 	- transmits MLDv2 Group-Specific Query, if necessary.
 	- doesn't increment MLD statistics counter when an MLD packet 

@@ -1,4 +1,4 @@
-/*	$KAME: vif.h,v 1.28 2004/06/09 16:29:19 suz Exp $	*/
+/*	$KAME: vif.h,v 1.29 2004/06/09 19:09:22 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -162,6 +162,7 @@ struct listaddr {
 	u_char al_index; /* neighbor index */
 	u_long al_timerid; /* timer for group membership */
 	u_long al_query; /* timer for repeated leave query */
+	u_long al_comp; /* timer to return from mldv1-compatibility mode */
 	u_long al_checklist; /* TRUE I'm in checking listener state */
 	int32_t al_rob;	  /* robustness */
 	u_int16 al_flags; /* flags related to this neighbor */

@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.42 2004/06/09 17:57:10 suz Exp $	*/
+/*	$KAME: vif.c,v 1.43 2004/06/09 19:09:22 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -413,6 +413,9 @@ stop_vif(mifi_t vifi)
 			/* reset all the timers */
 			if (a->al_query) {
 			    timer_clearTimer(a->al_query);
+			}
+			if (a->al_comp) {
+			    timer_clearTimer(a->al_comp);
 			}
 			if (a->al_timerid) {
 			    timer_clearTimer(a->al_timerid);
