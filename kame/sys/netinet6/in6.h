@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.78 2001/02/26 08:02:44 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.79 2001/02/26 08:51:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -619,7 +619,7 @@ struct ip6_mtuinfo {
 #define IPV6CTL_KAME_VERSION	20
 #define IPV6CTL_USE_DEPRECATED	21	/* use deprecated addr (RFC2462 5.5.4) */
 #define IPV6CTL_RR_PRUNE	22	/* walk timer for router renumbering */
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if 0	/*obsolete*/
 #define IPV6CTL_MAPPED_ADDR	23
 #endif
 #define IPV6CTL_V6ONLY		24
@@ -642,16 +642,6 @@ struct ip6_mtuinfo {
 /* New entries should be added here from current IPV6CTL_MAXID value. */
 /* to define items, should talk with KAME guys first, for *BSD compatibility */
 #define IPV6CTL_MAXID		36
-
-#ifdef IPV6CTL_MAPPED_ADDR
-#define __IPV6CTL_NAMES_MAPPED_ADDR	"mapped_addr"
-#define __IPV6CTL_TYPE_MAPPED_ADDR	CTLTYPE_INT
-#define __IPV6CTL_VARS_MAPPED_ADDR	&ip6_mapped_addr
-#else
-#define __IPV6CTL_NAMES_MAPPED_ADDR	0
-#define __IPV6CTL_TYPE_MAPPED_ADDR	0
-#define __IPV6CTL_VARS_MAPPED_ADDR	0
-#endif
 
 #ifdef IPV6CTL_RTEXPIRE
 #define __IPV6CTL_NAMES_RTEXPIRE	"rtexpire"
@@ -748,7 +738,7 @@ struct ip6_mtuinfo {
 	{ "kame_version", CTLTYPE_STRING }, \
 	{ "use_deprecated", CTLTYPE_INT }, \
 	{ "rr_prune", CTLTYPE_INT }, \
-	{ __IPV6CTL_NAMES_MAPPED_ADDR, __IPV6CTL_TYPE_MAPPED_ADDR }, \
+	{ 0, 0 }, \
 	{ "v6only", CTLTYPE_INT }, \
 	{ __IPV6CTL_NAMES_RTEXPIRE, __IPV6CTL_TYPE_RTEXPIRE }, \
 	{ __IPV6CTL_NAMES_MINEXPIRE, __IPV6CTL_TYPE_MINEXPIRE }, \
@@ -788,7 +778,7 @@ struct ip6_mtuinfo {
 	0, \
 	&ip6_use_deprecated, \
 	&ip6_rr_prune, \
-	__IPV6CTL_VARS_MAPPED_ADDR, \
+	0, \
 	&ip6_v6only, \
 	__IPV6CTL_VARS_RTEXPIRE, \
 	__IPV6CTL_VARS_MINEXPIRE, \

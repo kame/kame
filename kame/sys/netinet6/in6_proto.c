@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.85 2001/02/26 08:02:45 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.86 2001/02/26 08:51:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -533,15 +533,11 @@ int	ip6_gif_hlim = 0;
 int	ip6_use_deprecated = 1;	/* allow deprecated addr (RFC2462 5.5.4) */
 int	ip6_rr_prune = 5;	/* router renumbering prefix
 				 * walk list every 5 sec.    */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-int	ip6_mapped_addr_on = 1;
-#endif
 #if defined(__NetBSD__)
 int	ip6_v6only = 1;
 #elif defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 2) || (defined(__bsdi__) && _BSDI_VERSION < 199802)
 const int	ip6_v6only = 1;
 #else
-/* XXX freebsd[34]: redundancy with ip6_mapped_addr_on */
 int	ip6_v6only = 0;
 #endif
 
@@ -757,13 +753,13 @@ SYSCTL_OID(_net_inet6_ip6, IPV6CTL_TEMPVLTIME, tempvltime,
 	   CTLTYPE_INT|CTLFLAG_RW, &ip6_temp_valid_lifetime, 0,
 	   sysctl_ip6_tempvltime, "I", "");
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-SYSCTL_INT(_net_inet6_ip6, IPV6CTL_MAPPED_ADDR,
-	mapped_addr, CTLFLAG_RW,	&ip6_mapped_addr_on,	0, "");
-#endif
-/* XXX freebsd[34]: set RD until redundancy with ip6_mapped_addr_on is fixed */
+SYSCTL_INT(_net_inet6_ip6, IPV6CTL_V6ONLY,
+	v6only,	CTLFLAG_RW,	&ip6_v6only,			0, "");
+#else
 /* LINTED const drop */
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_V6ONLY,
 	v6only,	CTLFLAG_RD,	(int *)&ip6_v6only,		0, "");
+#endif
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_AUTO_LINKLOCAL,
 	auto_linklocal, CTLFLAG_RW, &ip6_auto_linklocal,	0, "");
 
