@@ -230,10 +230,9 @@ do { \
 	goto bad; \
 } while (0)
 
-#define MATCH_FAMILY1(x, y) \
+#define MATCH_FAMILY(x, y) \
 	((x) == PF_UNSPEC || (y) == PF_UNSPEC || (x) == (y))
-#define MATCH_FAMILY(x, y)	((x) == PF_UNSPEC || (x) == (y))
-#define MATCH(x, y)		((x) == ANY || (x) == (y))
+#define MATCH(x, y)	((x) == ANY || (y) == ANY || (x) == (y))
 
 char *
 gai_strerror(ecode)
@@ -432,7 +431,7 @@ getaddrinfo(hostname, servname, hints, res)
 			if (pai->ai_family == PF_UNSPEC)
 				pai->ai_family = afd->a_af;
 
-			if (!MATCH_FAMILY1(pai->ai_family, ex->e_af))
+			if (!MATCH_FAMILY(pai->ai_family, ex->e_af))
 				continue;
 			if (!MATCH(pai->ai_socktype, ex->e_socktype))
 				continue;
