@@ -1052,12 +1052,15 @@ findpcb:
 			goto dropwithreset_ratelim;
 		}
 #ifdef IPSEC
-		if (inp && ipsec4_in_reject(m, inp)) {
+		if (inp && (inp->inp_socket->so_options & SO_ACCEPTCONN) == 0 &&
+		    ipsec4_in_reject(m, inp)) {
 			ipsecstat.in_polvio++;
 			goto drop;
 		}
 #ifdef INET6
-		else if (in6p && ipsec4_in_reject_so(m, in6p->in6p_socket)) {
+		else if (in6p &&
+		    (in6p->in6p_socket->so_options & SO_ACCEPTCONN) == 0 &&
+		    ipsec4_in_reject_so(m, in6p->in6p_socket)) {
 			ipsecstat.in_polvio++;
 			goto drop;
 		}
@@ -1106,7 +1109,8 @@ findpcb:
 			goto dropwithreset_ratelim;
 		}
 #ifdef IPSEC
-		if (ipsec6_in_reject(m, in6p)) {
+		if ((in6p->in6p_socket->so_options & SO_ACCEPTCONN) == 0 &&
+		    ipsec6_in_reject(m, in6p)) {
 			ipsec6stat.in_polvio++;
 			goto drop;
 		}
@@ -1411,6 +1415,26 @@ findpcb:
 						goto dropwithreset;
 					}
 				}
+#endif
+
+#ifdef IPSEC
+				switch (af) {
+				case AF_INET:
+					if (ipsec4_in_reject_so(m, so)) {
+						ipsecstat.in_polvio++;
+						tp = NULL;
+						goto dropwithreset;
+					}
+					break;
+#ifdef INET6
+				case AF_INET6:
+					if (ipsec6_in_reject_so(m, so)) {
+						ipsec6stat.in_polvio++;
+						tp = NULL;
+						goto dropwithreset;
+					}
+					break;
+#endif
 #endif
 
 				/*
