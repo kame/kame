@@ -3,7 +3,7 @@ $NetBSD$
 --- configure.in.tk.orig	Thu May 16 04:06:05 1996
 +++ configure.in.tk	Wed Jan 26 16:03:04 2000
 @@ -2,6 +2,8 @@
- dnl $Header: /usr/home/sumikawa/kame/kame/netbsd/pkgsrc/mbone/vat6/patches/Attic/patch-ah,v 1.1 2000/04/12 04:26:29 itojun Exp $ (LBL)
+ dnl $Header: /usr/home/sumikawa/kame/kame/netbsd/pkgsrc/mbone/vat6/patches/Attic/patch-ah,v 1.1.1.1 2000/04/12 04:26:29 itojun Exp $ (LBL)
  
  AC_ARG_WITH(tcl,	--with-tcl=path	specify a pathname for tcl, d=$withval, d="")
 +tcldir=tcl8.0
