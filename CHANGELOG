@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2418 2003/06/27 11:52:09 sakane Exp $
+$KAME: CHANGELOG,v 1.2419 2003/06/27 23:16:39 itojun Exp $
 
 <200306>
+Sat Jun 28 08:13:55 JST 2003  itojun@iijlab.net
+	* sys/netinet6/ipsec.c: policy can be looked up by PF tags.  see
+	  (KAME-snap 7878) for more complete example.
+	* setkey: syntax addition: "spdadd taggged" for PF-and-IPsec interaction
+
 Fri Jun 27 20:47:07 JST 2003 sakane@kame.net
 	* kame/racoon
 	- fixed that the configure program did not work.
