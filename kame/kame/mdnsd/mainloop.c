@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.27 2000/05/31 13:35:10 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.28 2000/05/31 13:41:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -676,11 +676,22 @@ relay(sidx, buf, len, from)
 			printnsdb(ns);
 			for (i = 0; i < nsock; i++) {
 				if (sockaf[i] != ns->addr.ss_family) {
+#if 0
 					printf("sock %d af mismatch\n", i);
+#endif
 					continue;
 				}
 				if (sockflag[i] & SOCK_MEDIATOR) {
+#if 0
 					printf("sock %d mediator\n", i);
+#endif
+					continue;
+				}
+				if ((ns->flags == NSDB_MULTICAST) &&
+				     (sockflag[i] & SOCK_OUTGOING) != 0) {
+#if 0
+					printf("sock %d unicast\n", i);
+#endif
 					continue;
 				}
 
@@ -695,7 +706,9 @@ relay(sidx, buf, len, from)
 					dnsdump("relay O", buf, len, sa);
 				if (sendto(sock[i], buf, len, 0, sa,
 				    sa->sa_len) == len) {
-					dprintf("sock %d sent\n");
+#if 0
+					dprintf("sock %d sent\n", i);
+#endif
 					sent++;
 					gettimeofday(&ns->lasttx, NULL);
 					break;	/* try the next nameserver */

@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.h,v 1.10 2000/05/31 12:16:11 itojun Exp $	*/
+/*	$KAME: mdnsd.h,v 1.11 2000/05/31 13:41:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -50,6 +50,7 @@ extern const int niflags;
 
 /* sockflag[] */
 #define SOCK_MEDIATOR	1
+#define SOCK_OUTGOING	2
 
 /* mdnsd.c */
 extern int addserv __P((const char *, int, const char *));

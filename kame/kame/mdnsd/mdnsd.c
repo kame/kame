@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.17 2000/05/31 12:41:55 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.18 2000/05/31 13:41:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -160,11 +160,23 @@ main(argc, argv)
 		errx(1, "no socket");
 		/*NOTREACHED*/
 	}
-	dprintf("%d sockets available\n", nsock);
+	dprintf("%d listening sockets available\n", nsock);
+
+	i = nsock;
+	if (getsock(family, NULL, "0", SOCK_DGRAM, AI_PASSIVE) != 0) {
+		err(1, "getsock");
+		/*NOTREACHED*/
+	}
+	if (i == nsock) {
+		errx(1, "no outgoing socket");
+		/*NOTREACHED*/
+	}
+	for (/*nothing*/; i < nsock; i++) {
+		sockflag[i] |= SOCK_OUTGOING;
+		dprintf("%d: outgoing socket\n", i);
+	}
 
 	if (mflag) {
-		int i;
-
 		i = nsock;
 		if (getsock(AF_INET, NULL, MEDIATOR_CTRL_PORT, SOCK_DGRAM, 0)
 		    != 0) {
@@ -184,6 +196,8 @@ main(argc, argv)
 	ready4 = ready6 = 0;
 	for (i = 0; i < nsock; i++) {
 		if ((sockflag[i] & SOCK_MEDIATOR) != 0)
+			continue;
+		if ((sockflag[i] & SOCK_OUTGOING) != 0)
 			continue;
 
 		switch (sockaf[i]) {
