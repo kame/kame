@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.h,v 1.27 2003/06/27 12:02:41 sakane Exp $	*/
+/*	$KAME: crypto_openssl.h,v 1.28 2003/06/29 04:46:14 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -31,15 +31,18 @@
 
 #ifdef HAVE_SIGNING_C
 /* X509 Certificate */
-#define GENT_OTHERNAME	0
-#define GENT_EMAIL	1
-#define GENT_DNS	2
-#define GENT_X400	3
-#define GENT_DIRNAME	4
-#define GENT_EDIPARTY	5
-#define GENT_URI	6
-#define GENT_IPADD	7
-#define GENT_RID	8
+
+#include <openssl/x509v3.h>
+
+#define GENT_OTHERNAME	GEN_OTHERNAME
+#define GENT_EMAIL	GEN_EMAIL
+#define GENT_DNS	GEN_DNS
+#define GENT_X400	GEN_X400
+#define GENT_DIRNAME	GEN_DIRNAME
+#define GENT_EDIPARTY	GEN_EDIPARTY
+#define GENT_URI	GEN_URI
+#define GENT_IPADD	GEN_IPADD
+#define GENT_RID	GEN_RID
 
 extern vchar_t *eay_str2asn1dn __P((char *, int));
 extern int eay_cmp_asn1dn __P((vchar_t *, vchar_t *));
