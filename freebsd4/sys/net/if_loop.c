@@ -228,7 +228,7 @@ if_simloop(ifp, m, dst, hlen)
 		m->m_data += sizeof(int);
 	}
 
-	if (ifp->if_bpf) {
+	if (ifp->if_bpf && (ifp->if_flags & IFF_LOOPBACK)) {
 		struct mbuf m0, *n = m;
 		u_int af = dst->sa_family;
 
