@@ -85,7 +85,7 @@ main(argc, argv)
 	int smax;
 	struct addrinfo hints, *res, *res0;
 	int error;
-	int i;
+	int i, t;
 	const int yes = 1;
 
 	while ((ch = getopt(argc, argv, "Df:")) != -1) {
@@ -127,6 +127,7 @@ main(argc, argv)
 			/*NOTREACHED*/
 		}
 
+		t = smax;
 		for (res = res0; res && smax < MAXSOCK; res = res->ai_next) {
 			s[smax] = socket(res->ai_family, res->ai_socktype,
 			    res->ai_protocol);
@@ -147,6 +148,11 @@ main(argc, argv)
 			}
 
 			smax++;
+		}
+
+		if (smax == t) {
+			errx(1, "could not open service %s", *argv);
+			/*NOTREACHED*/
 		}
 
 		argv++;
@@ -326,10 +332,9 @@ outbound(s, event, arg)
 
 	if (r->len > 0) {
 		l = write(w->s, r->buf, r->len);
-		if (l < 0) {
-			logmsg(LOG_ERR, "write fail, errno=%d", errno);
+		if (l < 0 && errno == EAGAIN)
 			event_add(&w->outbound, NULL);
-		} else if (l == 0) {
+		else if (l <= 0) {
 			shutdown(w->s, SHUT_WR);
 			shutdown(r->s, SHUT_RD);
 			r->shutdown++;
