@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1170 2000/08/01 13:59:28 jinmei Exp $
+$KAME: CHANGELOG,v 1.1171 2000/08/01 14:54:19 sumikawa Exp $
 
 <200007>
+Tue Aug  1 23:53:36 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/ja-mnews: upgrade to 1.22PL4.
+
 2000-08-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/netiso/tp_inet.c (tpip_output_dg):
 	* bsdi4/sys/netiso/tp_inet.c (tpip_ctlinput):
