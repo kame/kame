@@ -825,6 +825,11 @@ host_long_port
 			 a[4] = $13;  a[5] = $15;  a[6] = $17;  a[7] = $19;
 			 a[8] = $21;  a[9] = $23; a[10] = $25; a[11] = $27;
 			a[12] = $29; a[13] = $31; a[14] = $33; a[15] = $35;
+			if (his_addr.su_family == AF_INET6) {
+				/* XXX more sanity checks! */
+				data_dest.su_sin6.sin6_scope_id =
+					his_addr.su_sin6.sin6_scope_id;
+			}
 			if ($1 != 6 || $3 != 16 || $37 != 2)
 				memset(&data_dest, 0, sizeof(data_dest));
 		}
@@ -841,14 +846,8 @@ host_long_port
 			p[0] = $15; p[1] = $17;
 			a = (char *)&data_dest.su_sin.sin_addr;
 			a[0] =  $5;  a[1] =  $7;  a[2] =  $9;  a[3] = $11;
-			if ($1 != 4 || $3 != 4 || $13 != 2) {
+			if ($1 != 4 || $3 != 4 || $13 != 2)
 				memset(&data_dest, 0, sizeof(data_dest));
-				if (his_addr.su_family == AF_INET6) {
-					/* XXX more sanity checks! */
-					data_dest.su_sin6.sin6_scope_id =
-						his_addr.su_sin6.sin6_scope_id;
-				}
-			}
 		}
 	;
 
