@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.15 2000/02/15 16:57:15 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.16 2000/02/16 05:51:27 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -244,10 +244,8 @@ eay_check_x509sign(source, sig, cert)
 
 	bp = cert->v;
 	x509 = d2i_X509(&x509, &bp, cert->l);
-	if (x509 == NULL) {
-		X509_free(x509);
+	if (x509 == NULL)
 		return -1;
-	}
 
 	evp = X509_get_pubkey(x509);
 	X509_free(x509);
