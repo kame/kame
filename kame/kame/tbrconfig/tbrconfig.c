@@ -1,4 +1,4 @@
-/*	$KAME: tbrconfig.c,v 1.1 2000/07/26 10:55:19 kjc Exp $	*/
+/*	$KAME: tbrconfig.c,v 1.2 2000/12/03 05:04:55 kjc Exp $	*/
 /*
  * Copyright (C) 2000
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -241,8 +241,11 @@ atobytes(const char *s)
 static u_int
 size_bucket(const char *ifname, const u_int rate)
 {
-	u_int size;
-	int mtu;
+	u_int size, mtu;
+
+	mtu = get_ifmtu(ifname);
+	if (mtu > 1500)
+		mtu = 1500;	/* assume that the path mtu is still 1500 */
 
 	if (rate <= 1*1000*1000)
 		size = 1;
@@ -253,7 +256,6 @@ size_bucket(const char *ifname, const u_int rate)
 	else
 		size = 24;
 
-	mtu = 1500;	/* assume the default mtu is 1500 */
 	size = size * mtu;
 	return (size);
 }
@@ -265,8 +267,7 @@ size_bucket(const char *ifname, const u_int rate)
 static u_int
 autosize_bucket(const char *ifname, const u_int rate)
 {
-	u_int size;
-	int freq, mtu;
+	u_int size, freq, mtu;
 
 	mtu = get_ifmtu(ifname);
 	freq = get_clockfreq();
