@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1125 2000/07/12 13:48:30 jinmei Exp $
+$Id: CHANGELOG,v 1.1126 2000/07/12 16:40:26 itojun Exp $
 
 <200006>
+Thu Jul 13 01:39:26 JST 2000  itojun@iijlab.net
+	* sys/kern/uipc_mbuf2.c: cleanup m_pulldown statistics.
+	  (1) PULLDOWN_STAT is now a global compilation option (should be
+	  put into kernel configuration file).  (2) m_pulldown statistics
+	  now belong to mbstat, and available via netstat -m (instead of
+	  netstat -sn -f inet6).  suggested by jinmei.
+
 2000-07-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* *bsd*/sys/net/route.h: redefined the route structure so that it
 	can support protcols that have large socket address (e.g. IPv6).
