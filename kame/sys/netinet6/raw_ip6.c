@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.128 2002/06/09 14:44:02 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.129 2002/07/20 21:11:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -711,7 +711,6 @@ rip6_usrreq(so, req, m, nam, control, p)
 	struct in6pcb *in6p = sotoin6pcb(so);
 	int s;
 	int error = 0;
-/*	extern	struct socket *ip6_mrouter; */ /* xxx */
 	int priv;
 #ifndef SCOPEDROUTING
 	u_int32_t lzone;
