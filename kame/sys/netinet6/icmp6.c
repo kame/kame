@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.192 2001/02/08 14:25:18 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.193 2001/02/08 14:26:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -209,9 +209,6 @@ static int icmp6_rip6_input __P((struct mbuf **, int));
 static int icmp6_ratelimit __P((const struct in6_addr *, const int, const int));
 static const char *icmp6_redirect_diag __P((struct in6_addr *,
 	struct in6_addr *, struct in6_addr *));
-#if 0 /*ndef HAVE_RATECHECK*/
-static int ratecheck __P((struct timeval *, const struct timeval *));
-#endif
 #ifndef HAVE_PPSRATECHECK
 static int ppsratecheck __P((struct timeval *, int *, int));
 #endif
@@ -3073,43 +3070,6 @@ icmp6_ctloutput(op, so, level, optname, mp)
 		}							\
 	} while (0)
 #endif
-#endif
-
-#if 0 /*ndef HAVE_RATECHECK*/
-/*
- * ratecheck(): simple time-based rate-limit checking.  see ratecheck(9)
- * for usage and rationale.
- */
-static int
-ratecheck(lasttime, mininterval)
-	struct timeval *lasttime;
-	const struct timeval *mininterval;
-{
-	struct timeval tv, delta;
-	int s, rv = 0;
-
-	s = splclock(); 
-#ifndef __FreeBSD__
-	tv = mono_time;
-#else
-	microtime(&tv);
-#endif
-	splx(s);
-
-	timersub(&tv, lasttime, &delta);
-
-	/*
-	 * check for 0,0 is so that the message will be seen at least once,
-	 * even if interval is huge.
-	 */
-	if (timercmp(&delta, mininterval, >=) ||
-	    (lasttime->tv_sec == 0 && lasttime->tv_usec == 0)) {
-		*lasttime = tv;
-		rv = 1;
-	}
-
-	return (rv);
-}
 #endif
 
 #ifndef HAVE_PPSRATECHECK
