@@ -797,7 +797,7 @@ igmp_fasttimo()
 		}
 
 #ifdef IGMPV3
-		if (IN_LOCAL_GROUP(inm->inm_addr))
+		if (IN_LOCAL_GROUP(inm->inm_addr.s_addr))
 			; /* skip */
 		else if (inm->inm_source->ims_timer == 0)
 			; /* do nothing */
