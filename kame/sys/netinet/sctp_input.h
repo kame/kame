@@ -1,4 +1,4 @@
-/*	$KAME: sctp_input.h,v 1.5 2004/08/17 04:06:17 itojun Exp $	*/
+/*	$KAME: sctp_input.h,v 1.6 2005/03/06 16:04:17 itojun Exp $	*/
 
 #ifndef __sctp_input_h__
 #define __sctp_input_h__
@@ -37,8 +37,8 @@ int sctp_common_input_processing(struct mbuf **, int, int, int,
     struct sctphdr *, struct sctp_chunkhdr *, struct sctp_inpcb *,
     struct sctp_tcb *, struct sctp_nets *, u_int8_t);
 
-void sctp_handle_stream_reset(struct sctp_stream_reset_req *sr,
-     struct sctp_tcb *stcb);
+void
+sctp_handle_stream_reset_response(struct sctp_tcb *, struct sctp_stream_reset_response *resp);
 
 #endif
 #endif

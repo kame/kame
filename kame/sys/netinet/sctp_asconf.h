@@ -1,4 +1,4 @@
-/*	$KAME: sctp_asconf.h,v 1.7 2004/08/17 04:06:16 itojun Exp $	*/
+/*	$KAME: sctp_asconf.h,v 1.8 2005/03/06 16:04:16 itojun Exp $	*/
 
 #ifndef _NETINET_SCTP_ASCONF_H_
 #define _NETINET_SCTP_ASCONF_H_
@@ -39,7 +39,7 @@ extern void sctp_asconf_cleanup(struct sctp_tcb *, struct sctp_nets *);
 
 extern struct mbuf *sctp_compose_asconf(struct sctp_tcb *);
 
-extern void sctp_handle_asconf(struct mbuf *, int, struct sctp_asconf_chunk *,
+extern void sctp_handle_asconf(struct mbuf *, unsigned int, struct sctp_asconf_chunk *,
 	struct sctp_tcb *, struct sctp_nets *);
 
 extern void sctp_handle_asconf_ack(struct mbuf *, int,

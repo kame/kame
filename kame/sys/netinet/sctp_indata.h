@@ -1,4 +1,4 @@
-/*	$KAME: sctp_indata.h,v 1.8 2004/08/17 04:06:17 itojun Exp $	*/
+/*	$KAME: sctp_indata.h,v 1.9 2005/03/06 16:04:17 itojun Exp $	*/
 
 #ifndef __sctp_indata_h__
 #define __sctp_indata_h__
@@ -35,7 +35,7 @@
 
 #if defined(_KERNEL) || (defined(__APPLE__) && defined(KERNEL))
 int sctp_deliver_data(struct sctp_tcb *, struct sctp_association *,
-    struct sctp_tmit_chunk *);
+    struct sctp_tmit_chunk *, int);
 
 void sctp_set_rwnd(struct sctp_tcb *, struct sctp_association *);
 
@@ -49,7 +49,7 @@ void sctp_handle_forward_tsn(struct sctp_tcb *,
 struct sctp_tmit_chunk *
 sctp_try_advance_peer_ack_point(struct sctp_tcb *, struct sctp_association *);
 
-void sctp_service_queues(struct sctp_tcb *, struct sctp_association *);
+void sctp_service_queues(struct sctp_tcb *, struct sctp_association *, int have_lock);
 
 void sctp_update_acked(struct sctp_tcb *, struct sctp_shutdown_chunk *,
 	struct sctp_nets *, int *);

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_header.h,v 1.13 2004/08/17 04:06:16 itojun Exp $	*/
+/*	$KAME: sctp_header.h,v 1.14 2005/03/06 16:04:17 itojun Exp $	*/
 
 #ifndef __sctp_header_h__
 #define __sctp_header_h__
@@ -399,6 +399,7 @@ struct sctp_pktdrop_chunk {
 #define SCTP_RECIPRICAL  0x04   /* reset my streams too */
 
 struct sctp_stream_reset_request {
+	struct sctp_paramhdr ph;
 	u_int8_t reset_flags;		   /* actual request */
 	u_int8_t reset_pad[3];
 	u_int32_t reset_req_seq;           /* monotonically increasing seq no */
@@ -409,6 +410,7 @@ struct sctp_stream_reset_request {
 #define SCTP_RESET_DENIED           0x02   /* Asked for but refused       */
 
 struct sctp_stream_reset_response {
+	struct sctp_paramhdr ph;
 	u_int8_t reset_flags;		   /* actual request */
 	u_int8_t reset_pad[3];
 	u_int32_t reset_req_seq_resp;   /* copied from reset_req reset_req_seq */
@@ -418,20 +420,18 @@ struct sctp_stream_reset_response {
 };
 
 /* convience structures, note that if you
- * are making a request for specific streams 
+ * are making a request for specific streams
  * then the request will need to be an overlay
  * structure.
  */
 
 struct sctp_stream_reset_req {
 	struct sctp_chunkhdr ch;
-	struct sctp_paramhdr ph;
 	struct sctp_stream_reset_request sr_req;
 };
 
 struct sctp_stream_reset_resp {
 	struct sctp_chunkhdr ch;
-	struct sctp_paramhdr ph;
 	struct sctp_stream_reset_response sr_resp;
 };
 

@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.h,v 1.14 2004/08/17 04:06:21 itojun Exp $	*/
+/*	$KAME: sctputil.h,v 1.15 2005/03/06 16:04:19 itojun Exp $	*/
 
 #ifndef __sctputil_h__
 #define __sctputil_h__
@@ -36,8 +36,8 @@
 
 #ifdef SCTP_MBUF_DEBUG
 #define sctp_m_freem(m) do { \
-    printf("m_freem(%x) m->nxtpkt:%x at %d\n", \
-	   (u_int)m, m->m_next, __LINE__); \
+    printf("m_freem(%p) m->nxtpkt:%p at %s[%d]\n", \
+	   (m), (m)->m_next, __FILE__, __LINE__); \
     m_freem(m); \
 } while (0);
 #else
@@ -72,7 +72,7 @@ struct mbuf *sctp_m_copym(struct mbuf *m, int off, int len, int wait);
 #if __FreeBSD_version >= 500000
 #define UMA_ZFLAG_FULL	0x0020
 #define SCTP_ZONE_INIT(zone, name, size, number) { \
-	zone = uma_zcreate(name, size, NULL, NULL, NULL, NULL, UMA_ALIGN_PTR,
+	zone = uma_zcreate(name, size, NULL, NULL, NULL, NULL, UMA_ALIGN_PTR,\
 		UMA_ZFLAG_FULL); \
 	uma_zone_set_max(zone, number); \
 }
@@ -131,7 +131,7 @@ struct mbuf *sctp_m_copym(struct mbuf *m, int off, int len, int wait);
 	force_comile_error;
 #endif
 
-#define sctp_get_associd(stcb) ((sctp_assoc_t)stcb)
+#define sctp_get_associd(stcb) ((sctp_assoc_t)stcb->asoc.my_vtag)
 
 /*
  * Function prototypes
@@ -142,7 +142,7 @@ u_int32_t sctp_select_initial_TSN(struct sctp_pcb *);
 
 u_int32_t sctp_select_a_tag(struct sctp_inpcb *);
 
-int sctp_init_asoc(struct sctp_inpcb *, struct sctp_association *, int);
+int sctp_init_asoc(struct sctp_inpcb *, struct sctp_association *, int, uint32_t);
 
 void sctp_fill_random_store(struct sctp_pcb *);
 
@@ -216,7 +216,7 @@ struct mbuf *sctp_generate_invmanparam(int);
  * alone on the tsvwg in this thought... everyone else considers it part
  * of the sockets layer (along with all of the peeloff code :<)
  */
-u_int32_t sctp_get_last_vtag_from_sb(struct socket *);
+u_int32_t sctp_get_first_vtag_from_sb(struct socket *);
 
 
 void sctp_grub_through_socket_buffer(struct sctp_inpcb *, struct socket *,
@@ -230,7 +230,11 @@ void sctp_log_strm_del_alt(u_int32_t, u_int16_t, int);
 
 void sctp_log_strm_del(struct sctp_tmit_chunk *, struct sctp_tmit_chunk *, int);
 void sctp_log_cwnd(struct sctp_nets *, int, uint8_t);
+void sctp_log_maxburst(struct sctp_nets *, int, int, uint8_t);
 void sctp_log_block(uint8_t, struct socket *, struct sctp_association *);
+void sctp_log_rwnd(uint8_t, u_int32_t, u_int32_t, u_int32_t );
+void sctp_log_mbcnt(uint8_t, u_int32_t, u_int32_t, u_int32_t, u_int32_t);
+void sctp_log_rwnd_set(uint8_t, u_int32_t, u_int32_t, u_int32_t, u_int32_t);
 int sctp_fill_stat_log(struct mbuf *);
 void sctp_log_fr(uint32_t, uint32_t, uint32_t, int);
 void sctp_log_map(uint32_t, uint32_t, uint32_t, int);

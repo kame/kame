@@ -1,4 +1,4 @@
-/*	$KAME: sctp_callout.h,v 1.8 2005/01/25 07:35:42 itojun Exp $	*/
+/*	$KAME: sctp_callout.h,v 1.9 2005/03/06 16:04:17 itojun Exp $	*/
 
 #ifndef __SCTP_CALLOUT__
 #define __SCTP_CALLOUT__
@@ -60,7 +60,7 @@ void	callout_init __P((struct callout *));
 #define	callout_pending(c)	((c)->c_flags & CALLOUT_PENDING)
 
 void	callout_reset __P((struct callout *, int, void (*)(void *), void *));
-#ifndef __NetBSD__ 
+#ifndef __NetBSD__
 int	callout_stop __P((struct callout *));
 #endif
 #endif

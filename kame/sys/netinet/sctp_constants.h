@@ -1,4 +1,4 @@
-/*	$KAME: sctp_constants.h,v 1.16 2004/08/17 04:06:16 itojun Exp $	*/
+/*	$KAME: sctp_constants.h,v 1.17 2005/03/06 16:04:17 itojun Exp $	*/
 
 #ifndef __sctp_constants_h__
 #define __sctp_constants_h__
@@ -69,7 +69,17 @@
 #define SCTP_FR_T3_MARKED           27
 #define SCTP_FR_T3_STOPPED          28
 #define SCTP_FR_MARKED              30
-
+#define SCTP_CWND_LOG_NOADV_SS      31
+#define SCTP_CWND_LOG_NOADV_CA      32
+#define SCTP_MAX_BURST_APPLIED      33
+#define SCTP_MAX_IFP_APPLIED        34
+#define SCTP_MAX_BURST_ERROR_STOP   35
+#define SCTP_INCREASE_PEER_RWND     36
+#define SCTP_DECREASE_PEER_RWND     37
+#define SCTP_SET_PEER_RWND_VIA_SACK 38
+#define SCTP_LOG_MBCNT_INCREASE     39
+#define SCTP_LOG_MBCNT_DECREASE     40
+#define SCTP_LOG_MBCNT_CHKSET       41
 /*
  * To turn on various logging, you must first define SCTP_STAT_LOGGING.
  * Then to get something to log you define one of the logging defines i.e.
@@ -86,9 +96,10 @@
 #define SCTP_LOG_EVENT_STRM  3
 #define SCTP_LOG_EVENT_FR    4
 #define SCTP_LOG_EVENT_MAP   5
+#define SCTP_LOG_EVENT_MAXBURST 6
+#define SCTP_LOG_EVENT_RWND  7
+#define SCTP_LOG_EVENT_MBCNT 8
 
-/* if you want to support the TCP model, uncomment the following define */
-#define SCTP_TCP_MODEL_SUPPORT	1
 
 /* number of associations by default for zone allocation */
 #define SCTP_MAX_NUM_OF_ASOC	40000
@@ -139,6 +150,12 @@
 #define MAX_TSN	0xffffffff
 #define MAX_SEQ	0xffff
 
+/* how many executions every N tick's */
+#define SCTP_MAX_ITERATOR_AT_ONCE 20
+
+/* number of clock ticks between iterator executions */
+#define SCTP_ITERATOR_TICKS 1
+
 /* option:
  * If you comment out the following you will receive the old
  * behavior of obeying cwnd for the fast retransmit algorithm.
@@ -156,7 +173,7 @@
 #define SCTP_NO_FR_UNLESS_SEGMENT_SMALLER 1
 
 /* default max I can burst out after a fast retransmit */
-#define SCTP_DEF_MAX_BURST 4
+#define SCTP_DEF_MAX_BURST 8
 
 /* Packet transmit states in the sent field */
 #define SCTP_DATAGRAM_UNSENT		0
@@ -172,55 +189,9 @@
 #define SCTP_FORWARD_TSN_SKIP		30010
 
 /* SCTP chunk types */
-#define SCTP_DATA		0x00
-#define SCTP_INITIATION		0x01
-#define SCTP_INITIATION_ACK	0x02
-#define SCTP_SELECTIVE_ACK	0x03
-#define SCTP_HEARTBEAT_REQUEST	0x04
-#define SCTP_HEARTBEAT_ACK	0x05
-#define SCTP_ABORT_ASSOCIATION	0x06
-#define SCTP_SHUTDOWN		0x07
-#define SCTP_SHUTDOWN_ACK	0x08
-#define SCTP_OPERATION_ERROR	0x09
-#define SCTP_COOKIE_ECHO	0x0a
-#define SCTP_COOKIE_ACK		0x0b
-#define SCTP_ECN_ECHO		0x0c
-#define SCTP_ECN_CWR		0x0d
-#define SCTP_SHUTDOWN_COMPLETE	0x0e
-
-/* draft-ietf-tsvwg-addip-sctp */
-#define SCTP_ASCONF		0xc1
-#define	SCTP_ASCONF_ACK		0x80
-
-/* draft-ietf-stewart-prsctp */
-#define SCTP_FORWARD_CUM_TSN	0xc0
-
-/* draft-ietf-stewart-pktdrpsctp */
-#define SCTP_PACKET_DROPPED	0x81
-
-/* draft-ietf-stewart-strreset-xxx */
-#define SCTP_STREAM_RESET       0x82
-
-/* ABORT and SHUTDOWN COMPLETE FLAG */
-#define SCTP_HAD_NO_TCB		0x01
-
-/* Packet dropped flags */
-#define SCTP_FROM_MIDDLE_BOX	SCTP_HAD_NO_TCB
-#define SCTP_BADCRC		0x02
-#define SCTP_PACKET_TRUNCATED	0x04
-
-#define SCTP_SAT_NETWORK_MIN	     400	/* min ms for RTT to set satellite time */
-#define SCTP_SAT_NETWORK_BURST_INCR  2		/* how many times to multiply maxburst in sat */
-/* Data Chuck Specific Flags */
-#define SCTP_DATA_FRAG_MASK	0x03
-#define SCTP_DATA_MIDDLE_FRAG	0x00
-#define SCTP_DATA_LAST_FRAG	0x01
-#define SCTP_DATA_FIRST_FRAG	0x02
-#define SCTP_DATA_NOT_FRAG	0x03
-#define SCTP_DATA_UNORDERED	0x04
-
-/* ECN Nonce: SACK Chunk Specific Flags */
-#define SCTP_SACK_NONCE_SUM     0x01
+/* Moved to sctp.h so f/w and natd
+ * boxes can find the chunk types.
+ */
 
 /* align to 32-bit sizes */
 #define SCTP_SIZE32(x)	((((x)+3) >> 2) << 2)
@@ -244,8 +215,8 @@
 
 /* ECN Nonce: draft-ladha-sctp-ecn-nonce */
 #define SCTP_ECN_NONCE_SUPPORTED    0x8001
-/* 
- * draft-ietf-stewart-strreset-xxx 
+/*
+ * draft-ietf-stewart-strreset-xxx
  *   param=0x8001  len=0xNNNN
  *   Byte | Byte | Byte | Byte
  *   Byte | Byte ...
@@ -257,11 +228,11 @@
  *  80 01 00 09
  *  C0 C1 80 81
  *  82 00 00 00
- *  
- *  Has the parameter. 
+ *
+ *  Has the parameter.
  *   C0 = PR-SCTP    (RFC3758)
  *   C1, 80 = ASCONF (addip draft)
- *   81 = Packet Drop 
+ *   81 = Packet Drop
  *   82 = Stream Reset
  */
 
@@ -419,6 +390,7 @@
 #define SCTP_TIMER_TYPE_AUTOCLOSE	12
 #define SCTP_TIMER_TYPE_EVENTWAKE	13
 #define SCTP_TIMER_TYPE_STRRESET        14
+#define SCTP_TIMER_TYPE_INPKILL         15
 
 /*
  * Number of ticks before the soxwakeup() event that
@@ -439,6 +411,7 @@
 /* max number of TSN's dup'd that I will hold */
 #define SCTP_MAX_DUP_TSNS	20
 
+#define SCTP_TIMER_TYPE_ITERATOR        16
 /*
  * Here we define the types used when setting the retry amounts.
  */
@@ -453,7 +426,7 @@
 /* How many drop re-attempts we make on  INIT/COOKIE-ECHO */
 #define SCTP_RETRY_DROPPED_THRESH 4
 
-/* And the max we will keep a history of in the tcb 
+/* And the max we will keep a history of in the tcb
  * which MUST be lower than 256.
  */
 
@@ -477,36 +450,43 @@
  */
 #define SCTP_ASOC_MAX_CHUNKS_ON_QUEUE 512
 
+#define MSEC_TO_TICKS(x) (((x) * hz) / 1000)
+#define TICKS_TO_MSEC(x) (((x) * 1000) / hz)
+#define SEC_TO_TICKS(x) ((x) * hz)
+
 /* init timer def = 1 sec */
-#define SCTP_INIT_SEC	(1*hz)
+#define SCTP_INIT_SEC	1
 
 /* send timer def = 1 seconds */
-#define SCTP_SEND_SEC	(1*hz)
+#define SCTP_SEND_SEC	1
 
-/* recv timer def = 200ms (in nsec) */
-#define SCTP_RECV_SEC	(2000/hz)
+/* recv timer def = 200ms  */
+#define SCTP_RECV_MSEC	200
 
 /* 30 seconds + RTO (in ms) */
-#define SCTP_HB_DEFAULT	(30000)
+#define SCTP_HB_DEFAULT_MSEC	30000
 
 /* Max time I will wait for Shutdown to complete */
-#define SCTP_DEF_MAX_SHUTDOWN (180*hz)
+#define SCTP_DEF_MAX_SHUTDOWN_SEC 180
 
 
 /* This is how long a secret lives, NOT how long a cookie lives
  * how many ticks the current secret will live.
  */
-#define SCTP_DEFAULT_SECRET_LIFE (3600 * hz)
+#define SCTP_DEFAULT_SECRET_LIFE_SEC 3600
 
 #define SCTP_RTO_UPPER_BOUND	(60000)	/* 60 sec in ms */
 #define SCTP_RTO_UPPER_BOUND_SEC 60	/* for the init timer */
 #define SCTP_RTO_LOWER_BOUND	(1000)	/* 1 sec in ms */
 #define SCTP_RTO_INITIAL	(3000)	/* 3 sec in ms */
 
+
+#define SCTP_INP_KILL_TIMEOUT 1000 /* number of ms to retry kill of inpcb*/
+
 #define SCTP_DEF_MAX_INIT	8
 #define SCTP_DEF_MAX_SEND	10
 
-#define SCTP_DEF_PMTU_RAISE	(600 * hz)  /* 10 min between raise attempts */
+#define SCTP_DEF_PMTU_RAISE_SEC	600  /* 10 min between raise attempts */
 #define SCTP_DEF_PMTU_MIN	600
 
 #define SCTP_MSEC_IN_A_SEC	1000
@@ -522,7 +502,7 @@
                                  * a window update sack is sent (should be a
                                  * power of 2).
                                  */
-#define SCTP_SCALE_OF_RWND_TO_UPD       4       /* Incr * this > hiwat, send 
+#define SCTP_SCALE_OF_RWND_TO_UPD       4       /* Incr * this > hiwat, send
                                                  * window update. Should be a
                                                  * power of 2.
                                                  */
@@ -592,7 +572,6 @@
 /*  I can handle a 1meg re-assembly */
 #define SCTP_DEFAULT_MAXMSGREASM 1048576
 
-#define SCTP_DEFAULT_MAXWINDOW	32768	/* default rwnd size */
 #define SCTP_DEFAULT_MAXSEGMENT 65535
 
 #define DEFAULT_CHUNK_BUFFER	2048
@@ -670,100 +649,104 @@
 #define SCTP_UNSET_TSN_PRESENT(arry, gap) (arry[(gap >> 3)] &= ((~(0x01 << ((gap & 0x07)))) & 0xff))
 
 /* pegs */
-#define SCTP_NUMBER_OF_PEGS 92
+#define SCTP_NUMBER_OF_PEGS	96
 /* peg index's */
-#define SCTP_PEG_SACKS_SEEN 0 /* XX */
-#define SCTP_PEG_SACKS_SENT 1 /* XX */
-#define SCTP_PEG_TSNS_SENT  2 /* XX */
-#define SCTP_PEG_TSNS_RCVD  3 /* XX */
-#define SCTP_DATAGRAMS_SENT 4 /* XX */
-#define SCTP_DATAGRAMS_RCVD 5 /* XX */
-#define SCTP_RETRANTSN_SENT 6 /* XX */
-#define SCTP_DUPTSN_RECVD   7 /* XX */
-#define SCTP_HB_RECV	    8 /* XX */
-#define SCTP_HB_ACK_RECV    9 /* XX */
-#define SCTP_HB_SENT	   10 /* XX */
-#define SCTP_WINDOW_PROBES 11 /* XX */
-#define SCTP_DATA_DG_RECV  12 /* XX */
-#define SCTP_TMIT_TIMER    13 /* XX */
-#define SCTP_RECV_TIMER    14 /* XX */
-#define SCTP_HB_TIMER      15 /* XX */
-#define SCTP_FAST_RETRAN   16 /* XX */
-#define SCTP_TIMERS_EXP    17 /* XX */
-#define SCTP_FR_INAWINDOW  18 /* XX */
-#define SCTP_RWND_BLOCKED  19 /* XX */
-#define SCTP_CWND_BLOCKED  20 /* XX */
-#define SCTP_RWND_DROPS    21 /* XX */
-#define SCTP_BAD_STRMNO    22 /* XX */
-#define SCTP_BAD_SSN_WRAP  23 /* XX */
-#define SCTP_DROP_NOMEMORY 24 /* XX */
-#define SCTP_DROP_FRAG     25 /* XX */
-#define SCTP_BAD_VTAGS     26 /* XX */
-#define SCTP_BAD_CSUM      27 /* XX */
-#define SCTP_INPKTS        28 /* XX */
-#define SCTP_IN_MCAST      29 /* XX */
-#define SCTP_HDR_DROPS     30 /* XX */
-#define SCTP_NOPORTS	   31 /* XX */
-#define SCTP_CWND_NOFILL   32 /* XX */
-#define SCTP_CALLS_TO_CO   33 /* XX */
-#define SCTP_CO_NODATASNT  34 /* XX */
-#define SCTP_CWND_NOUSE_SS 35 /* XX */
-#define SCTP_MAX_BURST_APL 36 /* XX */
-#define SCTP_EXPRESS_ROUTE 37 /* XX */
-#define SCTP_NO_COPY_IN    38 /* XX */
-#define SCTP_CACHED_SRC    39  
-#define SCTP_CWND_NOCUM	   40
-#define SCTP_CWND_SS	   41
-#define SCTP_CWND_CA	   42
-#define SCTP_CWND_SKIP	   43
-#define SCTP_CWND_NOUSE_CA 44
-#define SCTP_MAX_CWND	   45
-#define SCTP_CWND_DIFF_CA  46
-#define SCTP_CWND_DIFF_SA  47
-#define SCTP_OQS_AT_SS 	   48
-#define SCTP_SQQ_AT_SS 	   49
-#define SCTP_OQS_AT_CA 	   50
-#define SCTP_SQQ_AT_CA 	   51
-#define SCTP_MOVED_MTU     52
-#define SCTP_MOVED_QMAX    53
-#define SCTP_SQC_AT_SS     54
-#define SCTP_SQC_AT_CA     55
-#define SCTP_MOVED_MAX     56
-#define SCTP_MOVED_NLEF    57
-#define SCTP_NAGLE_NOQ     58
-#define SCTP_NAGLE_OFF     59
-#define SCTP_OUTPUT_FRM_SND 60
-#define SCTP_SOS_NOSNT     61   /* some on stream queues when none sent */
-#define SCTP_NOS_NOSNT     62   /* none on stream queues when none sent */
-#define SCTP_SOSE_NOSNT    63   /* some on send queue when none sent */
-#define SCTP_NOSE_NOSNT    64   /* none on send queue when none sent */
-#define SCTP_DATA_OUT_ERR  65
-#define SCTP_DUP_SSN_RCVD  66
-#define SCTP_DUP_FR        67
-#define SCTP_VTAG_EXPR     68
-#define SCTP_VTAG_BOGUS    69
-#define SCTP_T3_SAFEGRD    70
-#define SCTP_PDRP_FMBOX    71
-#define SCTP_PDRP_FEHOS    72
-#define SCTP_PDRP_MB_DA	   73
-#define SCTP_PDRP_MB_CT	   74
-#define SCTP_PDRP_BWRPT	   75
-#define SCTP_PDRP_CRUPT	   76
-#define SCTP_PDRP_NEDAT    77
-#define SCTP_PDRP_PDBRK    78
-#define SCTP_PREPENDS_FAST 79
-#define SCTP_PDRP_DNFND    80
-#define SCTP_PDRP_DIWNP    81
-#define SCTP_PDRP_DIZRW    82
-#define SCTP_PDRP_BADD     83
-#define SCTP_PDRP_MARK     84
-#define SCTP_ECNE_RCVD     85
-#define SCTP_CWR_PERFO     86
-#define SCTP_ECNE_SENT     87
-#define SCTP_MSGC_DROP     88
-#define SCTP_RESV1         89
-#define SCTP_RESV2         90
-#define SCTP_RESV3         91
+#define SCTP_PEG_SACKS_SEEN	0
+#define SCTP_PEG_SACKS_SENT	1
+#define SCTP_PEG_TSNS_SENT	2
+#define SCTP_PEG_TSNS_RCVD	3
+#define SCTP_DATAGRAMS_SENT	4
+#define SCTP_DATAGRAMS_RCVD	5
+#define SCTP_RETRANTSN_SENT	6
+#define SCTP_DUPTSN_RECVD	7
+#define SCTP_HB_RECV		8
+#define SCTP_HB_ACK_RECV	9
+#define SCTP_HB_SENT		10
+#define SCTP_WINDOW_PROBES	11
+#define SCTP_DATA_DG_RECV	12
+#define SCTP_TMIT_TIMER		13
+#define SCTP_RECV_TIMER		14
+#define SCTP_HB_TIMER		15
+#define SCTP_FAST_RETRAN	16
+#define SCTP_TIMERS_EXP		17
+#define SCTP_FR_INAWINDOW	18
+#define SCTP_RWND_BLOCKED	19
+#define SCTP_CWND_BLOCKED	20
+#define SCTP_RWND_DROPS		21
+#define SCTP_BAD_STRMNO		22
+#define SCTP_BAD_SSN_WRAP	23
+#define SCTP_DROP_NOMEMORY	24
+#define SCTP_DROP_FRAG		25
+#define SCTP_BAD_VTAGS		26
+#define SCTP_BAD_CSUM		27
+#define SCTP_INPKTS		28
+#define SCTP_IN_MCAST		29
+#define SCTP_HDR_DROPS		30
+#define SCTP_NOPORTS		31
+#define SCTP_CWND_NOFILL	32
+#define SCTP_CALLS_TO_CO	33
+#define SCTP_CO_NODATASNT	34
+#define SCTP_CWND_NOUSE_SS	35
+#define SCTP_MAX_BURST_APL	36
+#define SCTP_EXPRESS_ROUTE	37
+#define SCTP_NO_COPY_IN		38
+#define SCTP_CACHED_SRC		39
+#define SCTP_CWND_NOCUM		40
+#define SCTP_CWND_SS		41
+#define SCTP_CWND_CA		42
+#define SCTP_CWND_SKIP		43
+#define SCTP_CWND_NOUSE_CA	44
+#define SCTP_MAX_CWND		45
+#define SCTP_CWND_DIFF_CA	46
+#define SCTP_CWND_DIFF_SA	47
+#define SCTP_OQS_AT_SS		48
+#define SCTP_SQQ_AT_SS		49
+#define SCTP_OQS_AT_CA		50
+#define SCTP_SQQ_AT_CA		51
+#define SCTP_MOVED_MTU		52
+#define SCTP_MOVED_QMAX		53
+#define SCTP_SQC_AT_SS		54
+#define SCTP_SQC_AT_CA		55
+#define SCTP_MOVED_MAX		56
+#define SCTP_MOVED_NLEF		57
+#define SCTP_NAGLE_NOQ		58
+#define SCTP_NAGLE_OFF		59
+#define SCTP_OUTPUT_FRM_SND	60
+#define SCTP_SOS_NOSNT		61
+#define SCTP_NOS_NOSNT		62
+#define SCTP_SOSE_NOSNT		63
+#define SCTP_NOSE_NOSNT		64
+#define SCTP_DATA_OUT_ERR	65
+#define SCTP_DUP_SSN_RCVD	66
+#define SCTP_DUP_FR		67
+#define SCTP_VTAG_EXPR		68
+#define SCTP_VTAG_BOGUS		69
+#define SCTP_T3_SAFEGRD		70
+#define SCTP_PDRP_FMBOX		71
+#define SCTP_PDRP_FEHOS		72
+#define SCTP_PDRP_MB_DA		73
+#define SCTP_PDRP_MB_CT		74
+#define SCTP_PDRP_BWRPT		75
+#define SCTP_PDRP_CRUPT		76
+#define SCTP_PDRP_NEDAT		77
+#define SCTP_PDRP_PDBRK		78
+#define SCTP_PDRP_TSNNF		79
+#define SCTP_PDRP_DNFND		80
+#define SCTP_PDRP_DIWNP		81
+#define SCTP_PDRP_DIZRW		82
+#define SCTP_PDRP_BADD		83
+#define SCTP_PDRP_MARK		84
+#define SCTP_ECNE_RCVD		85
+#define SCTP_CWR_PERFO		86
+#define SCTP_ECNE_SENT		87
+#define SCTP_MSGC_DROP		88
+#define SCTP_SEND_QUEUE_POP	89
+#define SCTP_ERROUT_FRM_USR	90
+#define SCTP_SENDTO_FULL_CWND	91
+#define SCTP_QUEONLY_BURSTLMT   92
+#define SCTP_IFP_QUEUE_FULL     93
+#define SCTP_RESV2              94
+#define SCTP_RESV3              95
 
 /*
  * This value defines the number of vtag block time wait entry's
@@ -826,7 +809,6 @@
 #define SCTP_GETTIME_TIMESPEC(x) (nanotime(x))
 #endif /* __FreeBSD__ */
 
-#ifdef SCTP_TCP_MODEL_SUPPORT
 #define sctp_sowwakeup(inp, so) \
 do { \
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_DONT_WAKE) { \
@@ -844,18 +826,6 @@ do { \
 		sorwakeup(so); \
 	} \
 } while (0)
-#else
-
-#define sctp_sowwakeup(inp, so) \
-do { \
-	sowwakeup(so); \
-} while (0)
-
-#define sctp_sorwakeup(inp, so) \
-do { \
-	sorwakeup(so); \
-} while (0)
-#endif /* SCTP_TCP_MODEL_SUPPORT */
 
 #endif /* _KERNEL */
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_peeloff.h,v 1.5 2004/08/17 04:06:19 itojun Exp $	*/
+/*	$KAME: sctp_peeloff.h,v 1.6 2005/03/06 16:04:18 itojun Exp $	*/
 
 #ifndef __sctp_peeloff_h__
 #define __sctp_peeloff_h__
@@ -41,6 +41,8 @@
 #if defined(_KERNEL) || (defined(__APPLE__) && defined(KERNEL))
 
 int sctp_can_peel_off(struct socket *, caddr_t);
+
+int sctp_do_peeloff(struct socket *, struct socket *, caddr_t);
 
 struct socket *sctp_get_peeloff(struct socket *, caddr_t, int *);
 

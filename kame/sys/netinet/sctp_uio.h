@@ -1,4 +1,4 @@
-/*	$KAME: sctp_uio.h,v 1.10 2004/08/17 04:06:20 itojun Exp $	*/
+/*	$KAME: sctp_uio.h,v 1.11 2005/03/06 16:04:18 itojun Exp $	*/
 
 #ifndef __sctp_uio_h__
 #define __sctp_uio_h__
@@ -34,6 +34,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
 #include <sys/types.h>
 #include <sys/socket.h>
 
@@ -78,9 +79,18 @@ struct sctp_sndrcvinfo {
 	sctp_assoc_t sinfo_assoc_id;
 };
 
+struct sctp_snd_all_completes {
+	u_int16_t sall_stream;
+	u_int16_t sall_flags;
+	u_int32_t sall_ppid;
+	u_int32_t sall_context;
+	u_int32_t sall_num_sent;
+	u_int32_t sall_num_failed;
+};
 
 /* send/recv flags */
 /* MSG_EOF (0x0100) is reused from sys/socket.h */
+#define MSG_SENDALL     0x0200
 #define MSG_PR_SCTP_TTL	0x0400	/* Partial Reliable on this msg */
 #define MSG_PR_SCTP_BUF	0x0800	/* Buffer based PR-SCTP */
 #ifndef MSG_EOF
@@ -254,6 +264,14 @@ struct sctp_stream_reset_event {
 #define SCTP_STRRESET_ALL_STREAMS  0x0004
 #define SCTP_STRRESET_STREAM_LIST  0x0008
 
+#define MAX_ASOC_IDS_RET 255
+
+struct sctp_assoc_ids {
+	u_int16_t asls_assoc_start;	/* array of index's start at 0 */
+	u_int8_t asls_numb_present;
+	u_int8_t asls_more_to_get;
+	sctp_assoc_t asls_assoc_id[MAX_ASOC_IDS_RET];
+};
 
 /* notification types */
 #define SCTP_ASSOC_CHANGE		0x0001
@@ -363,27 +381,27 @@ struct sctp_status {
 
 struct sctp_cwnd_args {
 	struct sctp_nets *net;		/* network to */
-	u_int16_t cwnd_new_value;	/* cwnd in k */
-	u_int16_t inflight;		/* flightsize in k */
+	u_int32_t cwnd_new_value;	/* cwnd in k */
+	u_int32_t inflight;		/* flightsize in k */
 	int cwnd_augment;		/* increment to it */
 };
 
 struct sctp_blk_args {
+	u_int32_t onmb;			/* in 1k bytes */
+	u_int32_t onsb;			/* in 1k bytes */
 	u_int16_t maxmb;		/* in 1k bytes */
-	u_int16_t onmb;			/* in 1k bytes */
 	u_int16_t maxsb;		/* in 1k bytes */
-	u_int16_t onsb;			/* in 1k bytes */
 	u_int16_t send_sent_qcnt;	/* chnk cnt */
 	u_int16_t stream_qcnt;		/* chnk cnt */
 };
 
 /*
- * Max we can reset in one setting, note this is dictated not by the 
+ * Max we can reset in one setting, note this is dictated not by the
  * define but the size of a mbuf cluster so don't change this define
  * and think you can specify more. You must do multiple resets if you
  * want to reset more than SCTP_MAX_EXPLICIT_STR_RESET.
  */
-#define SCTP_MAX_EXPLICT_STR_RESET   1000 
+#define SCTP_MAX_EXPLICT_STR_RESET   1000
 
 #define SCTP_RESET_LOCAL_RECV  0x0001
 #define SCTP_RESET_LOCAL_SEND  0x0002
@@ -423,6 +441,20 @@ struct sctp_fr_map {
 	u_int32_t high;
 };
 
+struct sctp_rwnd_log {
+	u_int32_t rwnd;
+	u_int32_t send_size;
+	u_int32_t overhead;
+	u_int32_t new_rwnd;
+};
+
+struct sctp_mbcnt_log {
+	u_int32_t total_queue_size;
+	u_int32_t size_change;
+	u_int32_t total_queue_mb_size;
+	u_int32_t mbcnt_change;
+};
+
 struct sctp_cwnd_log{
 	union {
 		struct sctp_blk_args blk;
@@ -430,6 +462,8 @@ struct sctp_cwnd_log{
 		struct sctp_str_log strlog;
 		struct sctp_fr_log fr;
 		struct sctp_fr_map map;
+		struct sctp_rwnd_log rwnd;
+		struct sctp_mbcnt_log mbcnt;
 	}x;
 	u_int8_t from;
 	u_int8_t event_type;
@@ -461,12 +495,24 @@ int	sctp_getladdrs	__P((int, sctp_assoc_t, struct sockaddr **));
 void	sctp_freeladdrs	__P((struct sockaddr *));
 int     sctp_opt_info   __P((int, sctp_assoc_t, int, void *, size_t *));
 
-int     sctp_sendmsg    __P((int, const void *, size_t,
+ssize_t sctp_sendmsg    __P((int, const void *, size_t,
 	const struct sockaddr *,
 	socklen_t, u_int32_t, u_int32_t, u_int16_t, u_int32_t, u_int32_t));
 
 ssize_t sctp_send       __P((int sd, const void *msg, size_t len,
 	const struct sctp_sndrcvinfo *sinfo,int flags));
+
+ssize_t
+sctp_sendx __P((int sd, const void *msg, size_t len,
+		struct sockaddr *addrs, int addrcnt,
+		struct sctp_sndrcvinfo *sinfo, int flags));
+ssize_t
+sctp_sendmsgx __P((int sd, const void *, size_t,
+	           struct sockaddr *, int,
+	           u_int32_t, u_int32_t, u_int16_t, u_int32_t, u_int32_t));
+
+sctp_assoc_t
+sctp_getassocid __P((int sd, struct sockaddr *sa));
 
 ssize_t sctp_recvmsg	__P((int, void *, size_t, struct sockaddr *,
         socklen_t *, struct sctp_sndrcvinfo *, int *));

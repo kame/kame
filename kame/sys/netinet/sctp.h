@@ -1,5 +1,4 @@
-/*	$KAME: sctp.h,v 1.17 2004/08/17 04:06:15 itojun Exp $	*/
-/* added comment for commit test */
+/*	$KAME: sctp.h,v 1.18 2005/03/06 16:04:16 itojun Exp $	*/
 
 #ifndef _NETINET_SCTP_H_
 #define _NETINET_SCTP_H_
@@ -35,6 +34,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <sys/types.h>
 
 /*
  * SCTP protocol - RFC2960.
@@ -65,7 +65,6 @@ struct sctp_paramhdr {
 	u_int16_t param_type;		/* parameter type */
 	u_int16_t param_length;		/* parameter length */
 };
-
 
 /*
  * user socket options
@@ -132,20 +131,25 @@ struct sctp_paramhdr {
 #define SCTP_GET_STAT_LOG		0x0000001d
 #define SCTP_CONNECT_X			0x0000001e	/* hidden opt for connectx */
 #define SCTP_RESET_STREAMS		0x0000001f
+#define SCTP_CONNECT_X_DELAYED		0x00000020	/* hidden opt for connectx_delayed
+							 * part of sctp_sendx()
+							 */
+#define SCTP_CONNECT_X_COMPLETE         0x00000021
+#define SCTP_GET_ASOC_ID_LIST           0x00000022
+
+/* Other BSD items */
+#define SCTP_GET_NONCE_VALUES           0x00000023
+#define SCTP_DELAYED_ACK_TIME           0x00000024
 
 /* Things for the AUTH draft possibly */
-#define SCTP_PEER_PUBLIC_KEY            0x00000020  /* get the peers public key */
-#define SCTP_MY_PUBLIC_KEY              0x00000021  /* get/set my endpoints public key */
-#define SCTP_SET_AUTH_SECRET            0x00000022  /* get/set my shared secret */
-#define SCTP_SET_AUTH_CHUNKS            0x00000023  /* specify what chunks you want authenticated,
-						     * the system may have additional requirments 
+#define SCTP_PEER_PUBLIC_KEY            0x00000100 /* get the peers public key */
+#define SCTP_MY_PUBLIC_KEY              0x00000101 /* get/set my endpoints public key */
+#define SCTP_SET_AUTH_SECRET            0x00000102 /* get/set my shared secret */
+#define SCTP_SET_AUTH_CHUNKS            0x00000103/* specify what chunks you want
+						    * the system may have additional requirments
 						     * as well. I.e. probably ASCONF/ASCONF-ACK no matter
 						     * if you want it or not.
 						     */
-/* Other debug items */
-#define SCTP_GET_NONCE_VALUES           0x00000024
-
-
 /* Debug things that need to be purged */
 #define SCTP_SET_INITIAL_DBG_SEQ	0x00001f00
 #define SCTP_RESET_PEGS                 0x00002000
@@ -236,6 +240,60 @@ struct sctp_error_unrecognized_chunk {
 #define HAVE_SCTP_MULTIBUF              1
 #define HAVE_SCTP_NOCONNECT             0
 #define HAVE_SCTP_ECN_NONCE             1  /* ECN Nonce option */
+
+/* Main SCTP chunk types, we place
+ * these here since that way natd and f/w's
+ * in user land can find them.
+ */
+#define SCTP_DATA		0x00
+#define SCTP_INITIATION		0x01
+#define SCTP_INITIATION_ACK	0x02
+#define SCTP_SELECTIVE_ACK	0x03
+#define SCTP_HEARTBEAT_REQUEST	0x04
+#define SCTP_HEARTBEAT_ACK	0x05
+#define SCTP_ABORT_ASSOCIATION	0x06
+#define SCTP_SHUTDOWN		0x07
+#define SCTP_SHUTDOWN_ACK	0x08
+#define SCTP_OPERATION_ERROR	0x09
+#define SCTP_COOKIE_ECHO	0x0a
+#define SCTP_COOKIE_ACK		0x0b
+#define SCTP_ECN_ECHO		0x0c
+#define SCTP_ECN_CWR		0x0d
+#define SCTP_SHUTDOWN_COMPLETE	0x0e
+
+/* draft-ietf-tsvwg-addip-sctp */
+#define SCTP_ASCONF		0xc1
+#define	SCTP_ASCONF_ACK		0x80
+
+/* draft-ietf-stewart-prsctp */
+#define SCTP_FORWARD_CUM_TSN	0xc0
+
+/* draft-ietf-stewart-pktdrpsctp */
+#define SCTP_PACKET_DROPPED	0x81
+
+/* draft-ietf-stewart-strreset-xxx */
+#define SCTP_STREAM_RESET       0x82
+
+/* ABORT and SHUTDOWN COMPLETE FLAG */
+#define SCTP_HAD_NO_TCB		0x01
+
+/* Packet dropped flags */
+#define SCTP_FROM_MIDDLE_BOX	SCTP_HAD_NO_TCB
+#define SCTP_BADCRC		0x02
+#define SCTP_PACKET_TRUNCATED	0x04
+
+#define SCTP_SAT_NETWORK_MIN	     400	/* min ms for RTT to set satellite time */
+#define SCTP_SAT_NETWORK_BURST_INCR  2		/* how many times to multiply maxburst in sat */
+/* Data Chuck Specific Flags */
+#define SCTP_DATA_FRAG_MASK	0x03
+#define SCTP_DATA_MIDDLE_FRAG	0x00
+#define SCTP_DATA_LAST_FRAG	0x01
+#define SCTP_DATA_FIRST_FRAG	0x02
+#define SCTP_DATA_NOT_FRAG	0x03
+#define SCTP_DATA_UNORDERED	0x04
+
+/* ECN Nonce: SACK Chunk Specific Flags */
+#define SCTP_SACK_NONCE_SUM     0x01
 
 #include <netinet/sctp_uio.h>
 

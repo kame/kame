@@ -1,4 +1,4 @@
-/*	$KAME: sctp_crc32.c,v 1.11 2004/08/17 04:06:16 itojun Exp $	*/
+/*	$KAME: sctp_crc32.c,v 1.12 2005/03/06 16:04:17 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -136,7 +136,7 @@ update_crc32(u_int32_t crc32,
 	     unsigned char *buffer,
 	     unsigned int length)
 {
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < length; i++) {
 		SCTP_CRC32C(crc32, buffer[i]);
