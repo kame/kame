@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.306 1999/12/01 01:59:01 itojun Exp $
+$Id: CHANGELOG,v 1.307 1999/12/01 02:03:31 itojun Exp $
 
 <199912>
 Wed Dec  1 10:29:16 JST 1999
@@ -22,7 +22,7 @@ Wed Dec  1 10:29:16 JST 1999
 	  compat #define.  I can understand his point (programmers will never
 	  notice if compilation goes fine) so I would make kame/openbsd to
 	  define sockaddr_storage with ss_{len,family}.
-	- for non-openbsd other platforms, I would just obey RFC2553.
+	- for non-openbsd platforms, I would just obey RFC2553.
 
 Wed Dec  1 00:47:16 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/sys/netinet6/{ip6_input.c, in6_ifattach.c}: removed
