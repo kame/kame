@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1331 2000/10/10 23:51:54 itojun Exp $
+$KAME: CHANGELOG,v 1.1332 2000/10/11 19:58:51 sakane Exp $
 
 <200010>
+Thu Oct 12 04:56:24 JST 2000 sakane@ydc.co.jp
+	* kame/racoon: Added two directives, my_identifier and peers_identifer.
+	It can be define the identifiers by each peers.  Identifier directive
+	will obsoleted in near future.
+	XXX peers_identifier should be compared with the value included in ID
+	payload sent from the peer.
+	XXX asn1dn shoule be able to be specified by user.
+
 Wed Oct 11 JST 2000  itojun@iijlab.net
 	* sys/net/if_gif.c: fix uninitialized variable, which can lead to
 	  kernel panic.
