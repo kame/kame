@@ -1027,9 +1027,7 @@ ppp_send_config(unit, mtu, asyncmap, pcomp, accomp)
 	fatal("ioctl (PPPIOCGFLAGS): %m");
     x = pcomp? x | SC_COMP_PROT: x &~ SC_COMP_PROT;
     x = accomp? x | SC_COMP_AC: x &~ SC_COMP_AC;
-#ifdef SC_SYNC
     x = sync_serial ? x | SC_SYNC : x & ~SC_SYNC;
-#endif
     if (ioctl(ppp_fd, PPPIOCSFLAGS, (caddr_t) &x) < 0)
 	fatal("ioctl(PPPIOCSFLAGS): %m");
 }
