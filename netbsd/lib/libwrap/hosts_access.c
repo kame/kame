@@ -301,8 +301,12 @@ struct host_info *host;
     } else if (strncmp(tok, "{RBL}.", 6) == 0) { /* RBL lookup in domain */
 	return rbl_match(tok+6, eval_hostaddr(host));
     } else if ((mask = split_at(tok, '/')) != 0) {	/* net/mask */
+#ifndef INET6
+	return (masked_match(tok, mask, eval_hostaddr(host)));
+#else
 	return (masked_match(tok, mask, eval_hostaddr(host))
 	    || masked_match6(tok, mask, eval_hostaddr(host)));
+#endif
     } else {					/* anything else */
 	return (string_match(tok, eval_hostaddr(host))
 	    || (NOT_INADDR(tok) && string_match(tok, eval_hostname(host))));
