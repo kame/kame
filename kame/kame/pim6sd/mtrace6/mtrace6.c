@@ -1,4 +1,4 @@
-/*	$KAME: mtrace6.c,v 1.16 2000/12/04 06:45:34 itojun Exp $	*/
+/*	$KAME: mtrace6.c,v 1.17 2001/01/12 18:52:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -236,7 +236,7 @@ mtrace_loop()
 		tv_wait.tv_sec = waittime;
 		tv_wait.tv_usec = 0;
 
-		nfdsp = howmany(mldsoc + 1, NFDBITS);
+		nfdsp = howmany(mldsoc + 1, NFDBITS) * sizeof(fd_mask);
 		fdsp = malloc(nfdsp);
 		if (!fdsp)
 			err(1, "malloc");
