@@ -1,4 +1,4 @@
-/*	$KAME: if_nameindex.c,v 1.3 2000/04/24 10:08:41 itojun Exp $	*/
+/*	$KAME: if_nameindex.c,v 1.4 2000/06/15 20:29:21 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1997, 2000
@@ -135,8 +135,10 @@ out:
 	return(ifni);
 }
 
+#ifndef __OpenBSD__
 void
 if_freenameindex(struct if_nameindex *ptr)
 {
 	free(ptr);
 }
+#endif
