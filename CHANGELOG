@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.948 2000/05/28 15:45:23 itojun Exp $
+$Id: CHANGELOG,v 1.949 2000/05/28 17:30:50 itojun Exp $
 
 <200005>
+Mon May 29 02:26:25 JST 2000  itojun@iijlab.net
+	* bsdi4/sys/netinet/tcp_input.c: correct critical typo.  prior to the
+	  change, if we have inbound IPv4 TCP traffic to AF_INET6 socket.
+	  inp_laddr6 will have ::ff0f:xx.yy.zz.uu, not ::ffff:xx.yy.zz.uu.
+	* bsdi4/usr.sbin/netstat/inet.c: do not print IPv4 mapped address
+	  as normal IPv4 address, on netstat -an.  print it as is (as IPv4
+	  mapped).
+
 Mon May 29 00:43:15 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ip6_output.c (affects netbsd only):
 	  correct setsockopt(IPV6_BINDV6ONLY) behavior.
