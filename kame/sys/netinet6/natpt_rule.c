@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.14 2001/02/05 06:47:56 itojun Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.15 2001/03/03 12:17:11 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -554,5 +554,5 @@ natpt_in4_len2mask(mask, len)
     struct in_addr *mask;
     int len;
 {
-	mask->s_addr = 0xffffffff << (32 - len);
+	mask->s_addr = htonl(0xffffffff << (32 - len));
 }
