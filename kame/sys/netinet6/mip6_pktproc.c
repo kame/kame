@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.111 2003/03/04 00:59:16 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.112 2003/03/04 02:09:08 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1739,7 +1739,7 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, dstcoa, status, seqno, lifetime, re
 		refresh_size = 0;
 	}
 	if (mopt && 
-	    (mopt->valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA) == (MOPT_NONCE_IDX | MOPT_AUTHDATA)) &&
+	    ((mopt->valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA)) == (MOPT_NONCE_IDX | MOPT_AUTHDATA)) &&
 	    mip6_calculate_kbm_from_index(dst, dstcoa, 
 		mopt->mopt_ho_nonce_idx, mopt->mopt_co_nonce_idx, 
 		!IS_REQUEST_TO_CACHE(lifetime, dst, dstcoa), key_bm) == 0) {
