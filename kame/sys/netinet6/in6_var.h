@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.83 2002/09/24 14:09:11 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.84 2002/09/24 14:23:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -464,7 +464,7 @@ struct	in6_rrenumreq {
 /* do not input/output */
 #define IN6_IFF_NOTREADY (IN6_IFF_TENTATIVE|IN6_IFF_DUPLICATED)
 
-/* flags which cannot be change by hand */
+/* flags which cannot be changed by hand */
 #define IN6_IFF_READONLY (IN6_IFF_DUPLICATED|IN6_IFF_DETACHED|\
     IN6_IFF_NODAD|IN6_IFF_TEMPORARY)
 
