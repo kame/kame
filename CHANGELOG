@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1187 2000/08/11 14:41:49 jinmei Exp $
+$KAME: CHANGELOG,v 1.1188 2000/08/11 15:07:28 jinmei Exp $
 
 <200007>
+2000-08-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6sd/pim6_proto.c (receive_pim6_bootstrap): added a
+	pair of braces to avoid unintentional failure.
+	In response to the PR kit/279 from Daniel Elphick
+	<de@ecs.soton.ac.uk>
+
 2000-08-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd3/ports/bind9/: upgraded to 9.0.0rc2.
 
