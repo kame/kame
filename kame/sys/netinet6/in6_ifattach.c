@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.151 2002/02/09 06:49:45 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.152 2002/02/09 07:32:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -844,79 +844,6 @@ in6_nigroup(ifp, name, namelen, sa6)
 
 	return 0;
 }
-
-#if 0
-void
-in6_nigroup_attach(name, namelen)
-	const char *name;
-	int namelen;
-{
-	struct ifnet *ifp;
-	struct sockaddr_in6 mltaddr;
-	struct in6_multi *in6m;
-	int error;
-
-	bzero(&mltaddr, sizeof(mltaddr));
-	mltaddr.sin6_family = AF_INET6;
-	mltaddr.sin6_len = sizeof(struct sockaddr_in6);
-	if (in6_nigroup(NULL, name, namelen, &mltaddr) != 0)
-		return;
-
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifp = ifnet; ifp; ifp = ifp->if_next)
-#else
-	for (ifp = ifnet.tqh_first; ifp; ifp = ifp->if_list.tqe_next)
-#endif
-	{
-		if (in6_addr2zoneid(ifp, &mltaddr.sin6_addr,
-				    &mltaddr.sin6_scope_id)) {
-			continue;
-		}
-		in6_embedscope(&mltaddr.sin6_addr, &mltaddr); /* XXX */
-		IN6_LOOKUP_MULTI(&mltaddr, ifp, in6m);
-		if (!in6m) {
-			if (!in6_addmulti(&mltaddr, ifp, &error)) {
-				nd6log((LOG_ERR, "%s: failed to join %s "
-				    "(errno=%d)\n", if_name(ifp),
-				    ip6_sprintf(&mltaddr.sin6_addr), 
-				    error));
-			}
-		}
-	}
-}
-
-void
-in6_nigroup_detach(name, namelen)
-	const char *name;
-	int namelen;
-{
-	struct ifnet *ifp;
-	struct sockaddr_in6 mltaddr;
-	struct in6_multi *in6m;
-
-	bzero(&mltaddr, sizeof(mltaddr));
-	mltaddr.sin6_family = AF_INET6;
-	mltaddr.sin6_len = sizeof(struct sockaddr_in6);
-	if (in6_nigroup(NULL, name, namelen, &mltaddr) != 0)
-		return;
-
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifp = ifnet; ifp; ifp = ifp->if_next)
-#else
-	for (ifp = ifnet.tqh_first; ifp; ifp = ifp->if_list.tqe_next)
-#endif
-	{
-		if (in6_addr2zoneid(ifp, &mltaddr.sin6_addr,
-				    &mltaddr.sin6_scope_id)) {
-			continue; /* XXX: impossible */
-		}
-		in6_embedscope(&mltaddr.sin6_addr, &mltaddr); /* XXX */
-		IN6_LOOKUP_MULTI(&mltaddr, ifp, in6m);
-		if (in6m)
-			in6_delmulti(in6m);
-	}
-}
-#endif
 
 /*
  * XXX multiple loopback interface needs more care.  for instance,
