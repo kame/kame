@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.11 2001/10/22 05:35:03 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.12 2001/10/22 05:40:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1026,7 +1026,9 @@ ni6_addrs(ni6, p, buf, buflen, sa, salen, subj, af)
 			 */
 			expire = getlifetime(ifa->ifa_name, ifa->ifa_addr,
 			    ifa->ifa_addr->sa_len);
-			if (expire == 0)
+			if (expire < 0)
+				ltime = 0;
+			else if (expire == 0)
 				ltime = ND6_INFINITE_LIFETIME;
 			else {
 				if (expire > time(NULL))
