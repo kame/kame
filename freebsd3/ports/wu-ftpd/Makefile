@@ -12,7 +12,7 @@ PORTVERSION=	2.6.1
 CATEGORIES=	ftp ipv6
 MASTER_SITES=	ftp://ftp.wu-ftpd.org/pub/wu-ftpd/
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=     wu-ftpd-261-v6-20001004.diff.gz
+PATCHFILES=     wu-ftpd-261-v6-20001010.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=     sumikawa@kame.net
