@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.118 2002/07/30 04:12:36 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.119 2002/07/30 04:41:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -206,6 +206,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 	int dst_scope = -1, best_scope = -1, best_matchlen = -1;
 	struct in6_addrpolicy *dst_policy = NULL, *best_policy = NULL;
 	u_int32_t odstzone;
+	int prefer_tempaddr;
 #ifdef MIP6
 	struct hif_softc *sc;
 	struct mip6_unuse_hoa *uh;
@@ -550,16 +551,24 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 		 * a sysctl variable, so that privacy conscious users can
 		 * always prefer temporary addresses.
 		 */
+		if (opts == NULL ||
+		    opts->ip6po_prefer_tempaddr == IP6PO_TEMPADDR_SYSTEM) {
+			prefer_tempaddr = ip6_prefer_tempaddr;
+		} else if (opts->ip6po_prefer_tempaddr ==
+		    IP6PO_TEMPADDR_NOTPREFER) {
+			prefer_tempaddr = 0;
+		} else
+			prefer_tempaddr = 1;
 		if (!(ia_best->ia6_flags & IN6_IFF_TEMPORARY) &&
 		    (ia->ia6_flags & IN6_IFF_TEMPORARY)) {
-			if (ip6_prefer_tempaddr)
+			if (prefer_tempaddr)
 				REPLACE(7);
 			else
 				NEXT(7);
 		}
 		if ((ia_best->ia6_flags & IN6_IFF_TEMPORARY) &&
 		    !(ia->ia6_flags & IN6_IFF_TEMPORARY)) {
-			if (ip6_prefer_tempaddr)
+			if (prefer_tempaddr)
 				NEXT(7);
 			else
 				REPLACE(7);

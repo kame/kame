@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.318 2002/07/25 08:42:15 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.319 2002/07/30 04:41:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2254,6 +2254,7 @@ do { \
 			case IPV6_TCLASS:
 			case IPV6_DONTFRAG:
 			case IPV6_USE_MIN_MTU:
+			case IPV6_PREFER_TEMPADDR:
 				if (optlen != sizeof(optval)) {
 					error = EINVAL;
 					break;
@@ -2811,8 +2812,9 @@ do { \
 			case IPV6_NEXTHOP:
 			case IPV6_OTCLASS:
 			case IPV6_TCLASS:
-			case IPV6_USE_MIN_MTU:
 			case IPV6_DONTFRAG:
+			case IPV6_USE_MIN_MTU:
+			case IPV6_PREFER_TEMPADDR:
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				error = ip6_getpcbopt(in6p->in6p_outputopts,
 				    optname, sopt);
@@ -3184,6 +3186,8 @@ init_ip6pktopts(opt)
 	bzero(opt, sizeof(*opt));
 	opt->ip6po_hlim = -1;	/* -1 means default hop limit */
 	opt->ip6po_tclass = -1;	/* -1 means default traffic class */
+	opt->ip6po_minmtu = IP6PO_MINMTU_MCASTONLY;
+	opt->ip6po_prefer_tempaddr = IP6PO_TEMPADDR_SYSTEM;
 }
 
 #define sin6tosa(sin6)	((struct sockaddr *)(sin6)) /* XXX */
@@ -3228,6 +3232,7 @@ ip6_getpcbopt(pktopt, optname, mp)
 	struct in6_pktinfo null_pktinfo;
 	int deftclass = 0, on;
 	int defminmtu = IP6PO_MINMTU_MCASTONLY;
+	int defpreftemp = IP6PO_TEMPADDR_SYSTEM;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct mbuf *m;
 #endif
@@ -3301,6 +3306,13 @@ ip6_getpcbopt(pktopt, optname, mp)
 			on = 0;
 		optdata = (void *)&on;
 		optdatalen = sizeof(on);
+		break;
+	case IPV6_PREFER_TEMPADDR:
+		if (pktopt)
+			optdata = (void *)&pktopt->ip6po_prefer_tempaddr;
+		else
+			optdata = (void *)&defpreftemp;
+		optdatalen = sizeof(int);
 		break;
 	default:		/* should not happen */
 		printf("ip6_getpcbopt: unexpected option: %d\n", optname);
@@ -3936,6 +3948,8 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 	u_char *buf;
 	struct ip6_pktopts *opt;
 {
+	int minmtupolicy, preftemp;
+
 	if (!sticky && !cmsg) {
 #ifdef DIAGNOSTIC
 		printf("ip6_setpktoption: impossible case\n");
@@ -3975,6 +3989,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 		case IPV6_DONTFRAG:
 		case IPV6_OTCLASS:
 		case IPV6_TCLASS:
+		case IPV6_PREFER_TEMPADDR: /* XXX: not an rfc2292bis option */
 			return(ENOPROTOOPT);
 		}
 	}
@@ -4309,9 +4324,6 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 		break;
 
 	case IPV6_USE_MIN_MTU:
-	{
-		int minmtupolicy;
-
 		if (len != sizeof(int))
 			return(EINVAL);
 		minmtupolicy = *(int *)buf;
@@ -4322,7 +4334,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 		}
 		opt->ip6po_minmtu = minmtupolicy;
 		break;
-	}
+
 	case IPV6_DONTFRAG:
 		if (len != sizeof(int))
 			return(EINVAL);
@@ -4335,6 +4347,18 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 			opt->ip6po_flags &= ~IP6PO_DONTFRAG;
 		} else
 			opt->ip6po_flags |= IP6PO_DONTFRAG;
+		break;
+
+	case IPV6_PREFER_TEMPADDR:
+		if (len != sizeof(int))
+			return(EINVAL);
+		preftemp = *(int *)buf;
+		if (preftemp != IP6PO_TEMPADDR_SYSTEM &&
+		    preftemp != IP6PO_TEMPADDR_NOTPREFER &&
+		    preftemp != IP6PO_TEMPADDR_PREFER) {
+			return(EINVAL);
+		}
+		opt->ip6po_prefer_tempaddr = preftemp;
 		break;
 
 	default:

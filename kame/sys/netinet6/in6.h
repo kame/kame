@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.128 2002/06/09 14:43:58 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.129 2002/07/30 04:41:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -523,6 +523,10 @@ struct route_in6 {
 
 #define IPV6_TCLASS		61 /* int; send traffic class value */
 #define IPV6_DONTFRAG		62 /* bool; disable IPv6 fragmentation */
+
+#define IPV6_PREFER_TEMPADDR	63 /* int; prefer temporary addresses as
+				    * the source address.
+				    */
 
 /* to define items, should talk with KAME guys first, for *BSD compatibility */
 
