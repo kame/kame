@@ -34,7 +34,7 @@
  * Author:  Hesham Soliman <Hesham.Soliman@ericsson.com.au>
  *          Magnus Braathen <Magnus.Braathen@era.ericsson.se>
  *
- * $Id: utils.c,v 1.1 2000/02/07 17:27:08 itojun Exp $
+ * $Id: utils.c,v 1.2 2000/02/07 17:48:25 itojun Exp $
  *
  */
 
@@ -53,46 +53,5 @@
 
 void print_err(int error)
 {
-    switch (error) {
-        
-    case ERR_UNKNOWNCMD :
-        printf(PROGNAME "unknown command\n");
-        break;
-
-    case ADDR_NOT_FOUND :
-        printf(PROGNAME "address not found\n");
-        break;
-        
-    case WRITE_ERROR:
-        printf(PROGNAME "write error\n");
-        break;
-        
-    case FILE_OPEN_ERR:
-        printf(PROGNAME "open error\n");
-        break;
-        
-    case SYS_CALL_FAILED:
-        printf(PROGNAME "operation failed in module\n");
-        break;
-        
-    case INVALID_IFNAME:
-        printf(PROGNAME "invalid interface name\n");
-        break;
-        
-    case MN_HA_FUNC_NOT_ALLOWED:
-        printf(PROGNAME "host can not be MN and HA simultaneously\n");
-        break;
-        
-    case FUNC_NOT_ALLOWED:
-        printf(PROGNAME "function configuration is not allowed\n");
-        break;
-        
-    case FUNC_ALREADY_CONFIG:
-        printf(PROGNAME "function was already configured\n");
-        break;
-
-    default:
-        printf(PROGNAME "unknown error %d\n", error);
-        break;
-    }
+	perror(PROGNAME);
 }

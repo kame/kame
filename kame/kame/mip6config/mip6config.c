@@ -34,7 +34,7 @@
  * Author:  Hesham Soliman <Hesham.Soliman@ericsson.com.au>
  *          Magnus Braathen <Magnus.Braathen@era.ericsson.se>
  *
- * $Id: mip6config.c,v 1.1 2000/02/07 17:27:07 itojun Exp $
+ * $Id: mip6config.c,v 1.2 2000/02/07 17:48:25 itojun Exp $
  *
  */
 
@@ -58,10 +58,12 @@ static int s;
 
 static char *configfilename;
 
+extern void print_err __P((int));
+
 static int
-upd_kernel(int cmd, struct input_data *args)
+upd_kernel(int cmd, struct mip6_input_data *args)
 {
-    struct input_data dummy;
+    struct mip6_input_data dummy;
 
     if (args == NULL) {
         bzero(&dummy, sizeof(dummy));
@@ -165,7 +167,7 @@ getaddress(char *address, struct in6_addr *in6addr)
 static int
 set_homeaddr(char *homeaddr, int command)
 {
-    struct input_data input;
+    struct mip6_input_data input;
     char *address, *interface, *homeagent = NULL;
     int   plen;
     int retval;
@@ -215,7 +217,7 @@ set_homeaddr(char *homeaddr, int command)
 static int
 del_coaddr(char *coaddr, int command)
 {
-    struct input_data input;
+    struct mip6_input_data input;
     char *address, *interface;
     int   plen;
     int retval;
@@ -249,7 +251,7 @@ del_coaddr(char *coaddr, int command)
 static int
 set_coaddr(char *coaddr, int command)
 {
-    struct input_data input;
+    struct mip6_input_data input;
     char *address, *interface;
     int   plen;
     int retval;
@@ -283,7 +285,7 @@ set_coaddr(char *coaddr, int command)
 static int
 set_enable(char *enable, int command)
 {
-    struct input_data input;
+    struct mip6_input_data input;
     int retval;
 
 #ifdef DEBUG
@@ -309,7 +311,7 @@ set_enable(char *enable, int command)
 static int
 set_value(char *value, int command)
 {
-    struct input_data input;
+    struct mip6_input_data input;
     int retval;
 
 #ifdef DEBUG

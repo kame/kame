@@ -37,7 +37,7 @@
  *       like Binding cache, HA list, BU list. Other functions should be
  *       moved to config program.
  *
- * $Id: mip6stat.c,v 1.1 2000/02/07 17:27:10 itojun Exp $
+ * $Id: mip6stat.c,v 1.2 2000/02/07 17:48:26 itojun Exp $
  *
  */
 
@@ -90,7 +90,7 @@ struct nlist namelist[] = {
 static int
 upd_kernel(u_long cmd, void *args)
 {
-    struct input_data dummy;
+    struct mip6_input_data dummy;
 
     if (args == NULL) {
         bzero(&dummy, sizeof(dummy));
@@ -98,8 +98,8 @@ upd_kernel(u_long cmd, void *args)
     }
 
     /* Note: max transfer size is PAGE_SIZE (4096 bytes?) */
-	if (ioctl(s, cmd, (caddr_t)args) < 0)
-		perror("ioctl");
+    if (ioctl(s, cmd, (caddr_t)args) < 0)
+	perror("ioctl");
 
     return 0;
 }
