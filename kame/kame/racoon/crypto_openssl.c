@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.70 2001/09/11 14:21:12 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.71 2002/04/25 09:48:32 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1474,6 +1474,13 @@ eay_twofish_keylen(len)
 	if (len < 0 || len > 256)
 		return -1;
 	return len;
+}
+
+int
+eay_null_keylen(len)
+	int len;
+{
+	return 0;
 }
 
 /*

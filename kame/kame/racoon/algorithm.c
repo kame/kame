@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.c,v 1.22 2001/12/12 18:23:41 sakane Exp $	*/
+/*	$KAME: algorithm.c,v 1.23 2002/04/25 09:48:32 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -148,7 +148,7 @@ static struct enc_algorithm ipsec_encdef[] = {
 		NULL,			eay_des_keylen, },
 { "null",	algtype_null_enc,	IPSECDOI_ESP_NULL,		8,
 		NULL,			NULL,
-		NULL,			eay_3des_keylen, },
+		NULL,			eay_null_keylen, },
 { "rijndael",	algtype_rijndael,	IPSECDOI_ESP_RIJNDAEL,		16,
 		NULL,			NULL,
 		NULL,			eay_aes_keylen, },
