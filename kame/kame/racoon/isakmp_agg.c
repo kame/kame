@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.18 2000/02/16 11:28:04 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.19 2000/03/28 11:33:49 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -206,12 +206,6 @@ agg_i2recv(iph1, msg)
 	}
 
 	/* validate the type of next payload */
-	/*
-	 * ISAKMP_ETYPE_AGG, INITIATOR
-	 * ISAKMP_NPTYPE_SA,
-	 * ISAKMP_NPTYPE_KE, ISAKMP_NPTYPE_NONCE, ISAKMP_NPTYPE_ID,
-	 * ISAKMP_NPTYPE_HASH, (ISAKMP_NPTYPE_VID), ISAKMP_NPTYPE_NONE
-	 */
 	pbuf = isakmp_parse(msg);
 	if (pbuf == NULL)
 		goto end;
@@ -272,6 +266,11 @@ agg_i2recv(iph1, msg)
 			plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n");
 			isakmp_check_vendorid(pa->ptr, iph1->remote);
+			break;
+		case ISAKMP_NPTYPE_N:
+			plog(logp, LOCATION, iph1->remote,
+				"peer transmitted Notify Message.\n");
+			isakmp_check_notify(pa->ptr, iph1);
 			break;
 		default:
 			/* don't send information, see isakmp_ident_r1() */
@@ -837,10 +836,6 @@ agg_r2recv(iph1, msg0)
 		msg = vdup(msg0);
 
 	/* validate the type of next payload */
-	/*
-	 * ISAKMP_ETYPE_AGG, RESPONDER
-	 * ISAKMP_NPTYPE_HASH, (ISAKMP_NPTYPE_VID), ISAKMP_NPTYPE_NONE
-	 */
 	pbuf = isakmp_parse(msg);
 	if (pbuf == NULL)
 		goto end;
@@ -867,6 +862,11 @@ agg_r2recv(iph1, msg0)
 		case ISAKMP_NPTYPE_SIG:
 			if (isakmp_p2ph(&iph1->sig_p, pa->ptr) < 0)
 				goto end;
+			break;
+		case ISAKMP_NPTYPE_N:
+			plog(logp, LOCATION, iph1->remote,
+				"peer transmitted Notify Message.\n");
+			isakmp_check_notify(pa->ptr, iph1);
 			break;
 		default:
 			/* don't send information, see isakmp_ident_r1() */
