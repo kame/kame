@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.111 2001/12/20 23:33:22 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.112 2001/12/24 15:05:05 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2028,21 +2028,23 @@ oakley_skeyid(iph1)
 	case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
 		if (iph1->etype != ISAKMP_ETYPE_IDENT) {
 			iph1->authstr = getpskbyname(iph1->id_p);
-			if (iph1->authstr == NULL &&
-			    iph1->rmconf->verify_identifier) {
-				plog(LLV_ERROR, LOCATION, iph1->remote,
-					"couldn't find the pskey.\n");
-				goto end;
+			if (iph1->authstr == NULL) {
+				if (iph1->rmconf->verify_identifier) {
+					plog(LLV_ERROR, LOCATION, iph1->remote,
+						"couldn't find the pskey.\n");
+					goto end;
+				}
+				plog(LLV_NOTIFY, LOCATION, iph1->remote,
+					"couldn't find the proper pskey, "
+					"try to get one by the peer's address.\n");
 			}
-			plog(LLV_NOTIFY, LOCATION, iph1->remote,
-				"couldn't find the proper pskey, "
-				"try to get one by the peer's address.\n");
 		}
 		if (iph1->authstr == NULL) {
 			/*
-			 * If main mode or If failed to get psk by ID,
-			 * we try to get it by remote IP address.
-			 * It's may be nonsense.
+			 * If the exchange type is the main mode or if it's
+			 * failed to get the psk by ID, racoon try to get
+			 * the psk by remote IP address.
+			 * It may be nonsense.
 			 */
 			iph1->authstr = getpskbyaddr(iph1->remote);
 			if (iph1->authstr == NULL) {
