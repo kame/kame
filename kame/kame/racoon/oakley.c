@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.47 2000/08/24 11:08:47 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.48 2000/08/24 12:04:35 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1188,12 +1188,12 @@ oakley_validate_auth(iph1)
 		}
 		if (error != 0) {
 			plog(logp, LOCATION, NULL,
-				"Invalid certificate authority.\n");
+				"Invalid authority of the CERT.\n");
 			return ISAKMP_NTYPE_INVALID_CERT_AUTHORITY;
 		}
 		YIPSDEBUG(DEBUG_CERT,
 			plog(logp, LOCATION, NULL,
-				"certificate authenticated\n"));
+				"CERT authenticated\n"));
 
 		switch (iph1->etype) {
 		case ISAKMP_ETYPE_IDENT:
@@ -1230,12 +1230,12 @@ oakley_validate_auth(iph1)
 		vfree(my_hash);
 		if (error != 0) {
 			plog(logp, LOCATION, NULL,
-				"ERROR: Invalid signature.\n");
+				"ERROR: Invalid SIG.\n");
 			return ISAKMP_NTYPE_INVALID_SIGNATURE;
 		}
 		YIPSDEBUG(DEBUG_CERT,
 			plog(logp, LOCATION, NULL,
-				"signature authenticated\n"));
+				"SIG authenticated\n"));
 	    }
 		break;
 #endif
@@ -1297,7 +1297,7 @@ oakley_getmycert(iph1)
 	}
 
 	if (cert == NULL) {
-		plog(logp, LOCATION, NULL, "failed to get my certificate.\n");
+		plog(logp, LOCATION, NULL, "failed to get my CERT.\n");
 		goto end;
 	}
 
@@ -1399,7 +1399,7 @@ oakley_savecert(iph1, gen)
 		iph1->cert_p = vmalloc(len);
 		if (iph1->cert_p == NULL) {
 			plog(logp, LOCATION, NULL,
-				"Failed to copy certificate from packet.\n");
+				"Failed to copy CERT from packet.\n");
 			return -1;
 		}
 		memcpy(iph1->cert_p->v, data, len);
@@ -1427,7 +1427,7 @@ oakley_savecert(iph1, gen)
 	case ISAKMP_CERT_X509ATTR:
 	case ISAKMP_CERT_ARL:
 		plog(logp, LOCATION, NULL,
-			"No supported CERT type %d\n", type);
+			"No supported such CERT type %d\n", type);
 		return -1;
 	default:
 		plog(logp, LOCATION, NULL,
