@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.367 1999/12/22 16:56:51 jinmei Exp $
+$Id: CHANGELOG,v 1.368 1999/12/23 06:03:38 jinmei Exp $
 
 <199912>
+1999-12-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/tcp6_subr.c (tcp6_ctlinput):
+	* kame/sys/netinet6/udp6_usrreq.c (udp6_ctlinput):
+	* freebsd3/sys/netinet/tcp_subr.c (tcp6_ctlinput):
+	* netbsd/sys/netinet/tcp_subr.c (tcp6_ctlinput):
+	prevented these functions from referring to a dangling pointers
+	to an mbuf or rcvif.
+	
 1999-12-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ping6/ping6.c: when the -v option is given, recevied
 	HbH/Dst options headers and routing headers are printed using
