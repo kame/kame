@@ -1,4 +1,4 @@
-/*	$KAME: pim6_var.h,v 1.7 2000/06/06 02:10:57 jinmei Exp $	*/
+/*	$KAME: pim6_var.h,v 1.8 2000/06/06 08:07:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -59,7 +59,6 @@ int pim6_input __P((struct mbuf **, int*, int));
 /*
  * Names for PIM sysctl objects
  */
-#ifdef notyet			/* actually, we've not used these macros yet */
 #define PIM6CTL_STATS		1	/* statistics (read-only) */
 #define PIM6CTL_MAXID		2
 
@@ -67,5 +66,4 @@ int pim6_input __P((struct mbuf **, int*, int));
 	{ 0, 0 }, \
 	{ 0, 0 }, \
 }
-#endif /* notyet */
 #endif /* _NETINET6_PIM6_VAR_H_ */
