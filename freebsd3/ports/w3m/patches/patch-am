@@ -1,0 +1,14 @@
+--- keybind.c.orig	Mon Dec  6 15:18:33 1999
++++ keybind.c	Mon Dec  6 15:24:31 1999
+@@ -90,9 +90,9 @@
+ /* 8      9       :       ;       <       =       >       ?        */
+   nulcmd, nulcmd, nulcmd, nulcmd, nulcmd, nulcmd, nulcmd, nulcmd,
+ /* @      A       B       C       D       E       F       G        */
+-  nulcmd, movU,   movD,   movR,   movL,   nulcmd, nulcmd, nulcmd,
++  nulcmd, movU,   movD,   movR,   movL,   nulcmd, goLineL,pgFore,
+ /* H      I       J       K       L       M       N       O        */
+-  nulcmd, nulcmd, nulcmd, nulcmd, nulcmd, mouse,  nulcmd, nulcmd,
++  goLineF,pgBack, nulcmd, nulcmd, nulcmd, mouse,  nulcmd, nulcmd,
+ /* P      Q       R       S       T       U       V       W        */
+   nulcmd, nulcmd, nulcmd, nulcmd, nulcmd, nulcmd, nulcmd, nulcmd,
+ /* X      Y       Z       [       \       ]       ^       _        */

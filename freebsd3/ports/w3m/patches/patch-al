@@ -1,0 +1,55 @@
+--- terms.c.orig	Sat Dec 18 16:46:16 1999
++++ terms.c	Sat Dec 18 16:53:51 1999
+@@ -14,8 +14,8 @@
+ #include <string.h>
+ #ifdef USE_GPM
+ #include <gpm.h>
+-static int is_xterm = 0;
+ #endif
++static int is_xterm = 0;
+ 
+ #ifdef AIX
+ #include <sys/select.h>
+@@ -1471,16 +1471,23 @@
+     gpm_handler = gpm_process_mouse;
+   }
+ #endif
++  char *term;
++
++  if (mouseActive) return;
++  term = getenv("TERM");
++  if (!strncmp(term,"kterm",5) || !strncmp(term,"xterm",5)) {
++    is_xterm = 1;
++  }
+   mouseActive = 1;
+ }
+ 
+ void mouse_end()
+ {
+   if (mouseActive == 0) return;
+-#ifdef USE_GPM
+   if (is_xterm) {
+     XTERM_OFF;
+   }
++#ifdef USE_GPM
+   else
+     Gpm_Close();
+ #endif
+@@ -1491,17 +1498,13 @@
+ {
+   if (!mouseActive)
+     mouse_init();
+-#ifdef USE_GPM
+   if (is_xterm)
+-#endif
+     XTERM_ON;
+ }
+ 
+ void mouse_inactive()
+ {
+-#ifdef USE_GPM
+   if (is_xterm)
+-#endif
+     XTERM_OFF;
+ }
+   
