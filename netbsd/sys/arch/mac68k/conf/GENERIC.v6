@@ -1,5 +1,12 @@
 include	"arch/mac68k/conf/GENERIC"
 
+# INET6 and IPSEC are orthogonal.  Therefore:
+#				IPv4	IPv6	IPsec4	IPsec6
+#				---	---	---	---
+#	no INET6 nor IPSEC:	yes	no	no	no
+#	INET6 and no IPSEC:	yes	yes	no	no
+#	IPSEC and no INET6:	yes	no	yes	no
+#	INET6 and IPSEC:	yes	yes	yes	yes
 options 	INET6		# IPV6
 options 	IPSEC		# IP security
 options 	IPSEC_ESP	# IP security (encryption part; define w/ IPSEC)
