@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.224 2001/06/17 04:29:16 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.225 2001/06/30 00:37:41 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -112,6 +112,9 @@ RFC3056: Connection of IPv6 Domains via IPv4 Clouds
     * "stf" interface implements it.  Be sure to read
       draft-itojun-ipv6-transition-abuse-01.txt
       below before configuring it, there can be security issues.
+RFC3142: An IPv6-to-IPv4 transport relay translator
+    * FAITH tcp relay translator (faithd) implements this.  See 3.1 for more
+      details.
 draft-ietf-ipngwg-icmp-name-lookups-07: IPv6 Name Lookups Through ICMP
 draft-ietf-dhc-dhcpv6-15.txt: DHCPv6
 draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
@@ -128,10 +131,6 @@ draft-ietf-ipngwg-rfc2292bis-02.txt:
       TODO.2292bis for more details.
 draft-ietf-mobileip-ipv6-13.txt: Mobility Support in IPv6
     * See section 6.
-draft-ietf-ngtrans-tcpudp-relay-04.txt:
-	An IPv6-to-IPv4 transport relay translator
-    * FAITH tcp relay translator (faithd) implements this.  See 3.1 for more
-      details.
 draft-ietf-ipngwg-router-selection-01.txt:
 	Default Router Preferences and More-Specific Routes
     * router-side: both router preference and specific routes are supported.
@@ -1551,8 +1550,7 @@ the connection will be relayed toward IPv4 destination 163.221.202.12.
 
 faithd must be invoked on FAITH-relay dual stack node.
 
-For more details, consult kame/kame/faithd/README and
-draft-ietf-ngtrans-tcpudp-relay-04.txt.
+For more details, consult kame/kame/faithd/README and RFC3142.
 
 3.2 IPv6-to-IPv4 header translator
 
