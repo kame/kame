@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.63 2002/05/31 13:30:37 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.64 2002/06/06 12:57:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -736,7 +736,7 @@ makeentry(buf, len, id, string, add)
  * Add a prefix to the list of specified interface and reconstruct
  * the outgoing packet.
  * The prefix must not be in the list.
- * XXX: other parameter of the prefix(e.g. lifetime) shoule be
+ * XXX: other parameters of the prefix (e.g. lifetime) shoule be
  * able to be specified.
  */
 static void
@@ -774,13 +774,6 @@ add_prefix(struct rainfo *rai, struct in6_prefixreq *ipr)
 	/* reconstruct the packet */
 	rai->pfxs++;
 	make_packet(rai);
-
-	/*
-	 * reset the timer so that the new prefix will be advertised quickly.
-	 */
-	rai->initcounter = 0;
-	ra_timer_update((void *)rai, &rai->timer->tm);
-	rtadvd_set_timer(&rai->timer->tm, rai->timer);
 }
 
 /*
