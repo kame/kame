@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.57 2002/02/02 07:06:14 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.58 2002/02/04 07:24:36 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -158,8 +158,7 @@ udp6_output(in6p, m, addr6, control)
 	struct mbuf *addr6, *control;
 #endif
 {
-	u_int32_t ulen = m->m_pkthdr.len;
-	u_int32_t plen = sizeof(struct udphdr) + ulen;
+	u_int32_t plen = sizeof(struct udphdr) + m->m_pkthdr.len;
 	struct ip6_hdr *ip6;
 	struct udphdr *udp6;
 	struct sockaddr_in6 *lsa6 = NULL, *fsa6 = NULL;
