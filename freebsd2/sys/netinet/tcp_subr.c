@@ -680,6 +680,7 @@ ipsec4_hdrsiz_tcp(tp)
 	struct inpcb *inp;
 	struct mbuf *m;
 	size_t hdrsiz;
+	struct ip *ip;
 
 	if (!tp || !tp->t_template || !(inp = tp->t_inpcb))
 		return 0;
@@ -688,6 +689,8 @@ ipsec4_hdrsiz_tcp(tp)
 		return 0;
 	m->m_pkthdr.len = m->m_len = sizeof(struct tcpiphdr);
 	bcopy(tp->t_template, mtod(m, u_char *), sizeof(struct tcpiphdr));
+	ip = mtod(m, struct ip *);
+	ip->ip_vhl = IP_VHL_BORING;
 
 	/* XXX: should use currect direction. */
 	hdrsiz = ipsec4_hdrsiz(m, IPSEC_DIR_OUTBOUND, inp);

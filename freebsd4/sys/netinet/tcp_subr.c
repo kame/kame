@@ -1261,6 +1261,7 @@ ipsec_hdrsiz_tcp(tp)
 	      sizeof(struct ip));
 	bcopy((caddr_t)&tp->t_template->tt_t, (caddr_t)th,
 	      sizeof(struct tcphdr));
+	ip->ip_vhl = IP_VHL_BORING;
 	hdrsiz = ipsec4_hdrsiz(m, IPSEC_DIR_OUTBOUND, inp);
       }
 

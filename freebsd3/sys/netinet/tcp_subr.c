@@ -1202,6 +1202,7 @@ ipsec_hdrsiz_tcp(tp, isipv6)
 	bcopy((caddr_t)&tp->t_template->tt_i, (caddr_t)ip, sizeof(struct ip));
 	bcopy((caddr_t)&tp->t_template->tt_t, (caddr_t)th,
 	      sizeof(struct tcphdr));
+	ip->ip_vhl = IP_VHL_BORING;
 #ifdef INET6
 	}
 #endif /* INET6 */
