@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.60 2002/01/17 01:16:42 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.61 2002/01/17 04:56:10 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1823,6 +1823,7 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 	struct mbuf *m;
 	struct ip6_pktopts opt;
 	struct ip6_dest *pktopt_badest2;
+	struct ip6_rthdr *pktopt_rthdr;
 	int error = 0;
 
 	init_ip6pktopts(&opt);
@@ -1841,20 +1842,34 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 		mip6log((LOG_ERR,
 			 "%s:%d: ba destopt creation error (%d)\n",
 			 __FILE__, __LINE__, error));
-		return (error);
+ 		goto free_ip6pktopts;
 	}
 	opt.ip6po_dest2 = pktopt_badest2;
+
+	if (!IN6_ARE_ADDR_EQUAL(dst, dstcoa) &&
+	    mip6_bc_list_find_withphaddr(&mip6_bc_list, dst) == NULL) {
+		error = mip6_rthdr_create(&pktopt_rthdr, dstcoa, NULL);
+		if (error) {
+			mip6log((LOG_ERR,
+				 "%s:%d: ba rthdr creation error (%d)\n",
+				 __FILE__, __LINE__, error));
+ 			goto free_ip6pktopts;
+		}
+		opt.ip6po_rthdr = pktopt_rthdr;
+	}
 
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL);
 	if (error) {
 		mip6log((LOG_ERR,
 			 "%s:%d: sending ip packet error. (%d)\n",
 			 __FILE__, __LINE__, error));
-		free(opt.ip6po_dest2, M_IP6OPT);
-		return (error);
+ 		goto free_ip6pktopts;
 	}
-
-	free(opt.ip6po_dest2, M_IP6OPT);
+ free_ip6pktopts:
+	if (opt.ip6po_dest2)
+		free(opt.ip6po_dest2, M_IP6OPT);
+	if (opt.ip6po_rthdr)
+		free(opt.ip6po_rthdr, M_IP6OPT);
 
 	return (error);
 }

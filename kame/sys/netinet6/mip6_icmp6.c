@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.32 2002/01/17 01:16:42 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.33 2002/01/17 04:56:11 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -108,7 +108,9 @@ static struct in6_addr haanyaddr_ifidnn =
 
 static void mip6_icmp6_find_addr __P((caddr_t, int,
 				      struct in6_addr **, struct in6_addr **));
+#ifdef MIP6_KERNEL_DHAAD
 static int mip6_icmp6_ha_discov_req_input __P((struct mbuf *, int, int));
+#endif
 static int mip6_icmp6_ha_discov_rep_input __P((struct mbuf *, int, int));
 static int mip6_ha_discov_ha_list_insert __P((struct hif_softc *,
 					      struct mip6_ha *));
@@ -156,7 +158,7 @@ mip6_icmp6_input(m, off, icmp6len)
 			mip6_bc_list_remove(&mip6_bc_list, mbc);
 		}
 		break;
-
+#ifdef MIP6_KERNEL_DHAAD
 	case ICMP6_HADISCOV_REQUEST:
 		if (!MIP6_IS_HA)
 			break;
@@ -168,7 +170,7 @@ mip6_icmp6_input(m, off, icmp6len)
 			return (error);
 		}
 		break;
-
+#endif
 	case ICMP6_HADISCOV_REPLY:
 		if (!MIP6_IS_MN)
 			break;
@@ -506,6 +508,7 @@ mip6_icmp6_find_addr(icmp6, icmp6len, laddr, paddr)
 	*paddr = pa;
 }
 
+#ifdef MIP6_KERNEL_DHAAD
 /*
  * dynamic homeagent discovery request input routine.
  */
@@ -660,6 +663,7 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 
 	return (0);
 }
+#endif /* MIP6_KERNEL_DHAAD */
 
 static int
 mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)

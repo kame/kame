@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.273 2002/01/12 12:29:06 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.274 2002/01/17 04:56:10 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -791,8 +791,10 @@ icmp6_input(mp, offp, proto)
 			goto badlen;
 		if (code != 0)
 			goto badcode;
+#ifdef MIP6_KERNEL_DHAAD
 		if (mip6_icmp6_input(m, off, icmp6len))
 			goto freeit;
+#endif
 		break;
 	case ICMP6_HADISCOV_REPLY:
 		if (icmp6len < sizeof(struct ha_discov_rep))

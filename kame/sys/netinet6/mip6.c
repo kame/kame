@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.102 2002/01/17 01:16:42 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.103 2002/01/17 04:56:10 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -126,9 +126,6 @@ static int mip6_remove_haddrs __P((struct hif_softc *, struct ifnet *));
 static int mip6_remove_addr __P((struct ifnet *, struct in6_ifaddr *));
 
 /* ipv6 header manipuration functions */
-static int mip6_rthdr_create __P((struct ip6_rthdr **,
-				  struct in6_addr *,
-				  struct ip6_pktopts *));
 static int mip6_rthdr_create_withdst __P((struct ip6_rthdr **,
 					  struct in6_addr *,
 					  struct ip6_pktopts *));
