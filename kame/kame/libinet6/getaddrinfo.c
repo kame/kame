@@ -370,11 +370,19 @@ getaddrinfo(hostname, servname, hints, res)
 	 * for raw and other inet{,6} sockets.
 	 */
 	if (MATCH_FAMILY(pai->ai_family, PF_INET, 1)
-	 || MATCH_FAMILY(pai->ai_family, PF_INET6, 1)) {
+#ifdef PF_INET6
+	 || MATCH_FAMILY(pai->ai_family, PF_INET6, 1)
+#endif
+	    ) {
 		ai0 = *pai;
 
-		if (pai->ai_family == PF_UNSPEC)
+		if (pai->ai_family == PF_UNSPEC) {
+#ifdef PF_INET6
 			pai->ai_family = PF_INET6;
+#else
+			pai->ai_family = PF_INET;
+#endif
+		}
 		error = get_portmatch(pai, servname);
 		if (error)
 			ERR(error);
@@ -541,9 +549,19 @@ explore_fqdn(pai, hostname, servname, res)
 #ifdef USE_GETIPNODEBY
 	hp = getipnodebyname(hostname, pai->ai_family, AI_ADDRCONFIG, &h_error);
 #else
+#ifdef HAVE_GETHOSTBYNAME2
 	hp = gethostbyname2(hostname, pai->ai_family);
+#else
+	if (pai->ai_family != AF_INET)
+		return 0;
+	hp = gethostbyname(hostname);
+#ifdef HAVE_H_ERRNO
 	h_error = h_errno;
+#else
+	h_error = EINVAL;
 #endif
+#endif /*HAVE_GETHOSTBYNAME2*/
+#endif /*USE_GETIPNODEBY*/
 
 	if (hp == NULL) {
 		switch (h_error) {
@@ -603,12 +621,14 @@ explore_fqdn(pai, hostname, servname, res)
 	for (i = 0; aplist[i] != NULL; i++) {
 		af = hp->h_addrtype;
 		ap = aplist[i];
+#ifdef AF_INET6
 		if (af == AF_INET6
 		 && IN6_IS_ADDR_V4MAPPED((struct in6_addr *)ap)) {
 			af = AF_INET;
 			ap = ap + sizeof(struct in6_addr)
 				- sizeof(struct in_addr);
 		}
+#endif
 
 		if (af != pai->ai_family)
 			continue;
@@ -1014,8 +1034,15 @@ get_port(ai, servname, matchonly)
 
 	if (servname == NULL)
 		return 0;
-	if (ai->ai_family != AF_INET && ai->ai_family != AF_INET6)
+	switch (ai->ai_family) {
+	case AF_INET:
+#ifdef AF_INET6
+	case AF_INET6:
+#endif
+		break;
+	default:
 		return 0;
+	}
 
 	switch (ai->ai_socktype) {
 	case SOCK_RAW:

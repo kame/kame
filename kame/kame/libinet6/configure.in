@@ -120,6 +120,8 @@ if test "$missing_includes" = "yes"; then
 	CPPFLAGS="$CPPFLAGS -I./missing"
 fi
 
+AC_VAR_H_ERRNO
+
 AC_ARG_ENABLE(pedant,
 	[  --enable-pedant         pedantic compilation options],
 	[case "${enableval}" in
