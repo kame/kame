@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.934 2000/05/25 08:39:53 jinmei Exp $
+$Id: CHANGELOG,v 1.935 2000/05/25 12:59:41 itojun Exp $
 
 <200005>
+Thu May 25 21:56:47 JST 2000  itojun@iijlab.net
+	* bsdi4/sys/i386/pci/if_exp.c: do not use interrupt for initializing
+	  multicast filter.  this will make exp driver to be friendly with
+	  IPv6 initialization sequence.  hints from netbsd fxp driver.
+
 2000-05-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/net/route.c (ifa_ifwithroute): reverted a KAME
 	specific change introduced on 2000-02-25 (see this log file).
