@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.175 2003/01/06 21:49:50 sumikawa Exp $	*/
+/*	$KAME: ipsec.c,v 1.176 2003/01/21 06:33:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -256,9 +256,9 @@ static int ipsec6_encapsulate __P((struct mbuf *, struct mbuf **,
 static int ipsec6_encapsulate __P((struct mbuf *, struct secasvar *));
 #endif /* MIP6 */
 #endif
-static struct mbuf *ipsec_addaux __P((struct mbuf *));
-static struct mbuf *ipsec_findaux __P((struct mbuf *));
-static void ipsec_optaux __P((struct mbuf *, struct mbuf *));
+static struct m_tag *ipsec_addaux __P((struct mbuf *));
+static struct m_tag *ipsec_findaux __P((struct mbuf *));
+static void ipsec_optaux __P((struct mbuf *, struct m_tag *));
 #ifdef INET
 static int ipsec4_checksa __P((struct ipsecrequest *,
 	struct ipsec_output_state *));
@@ -3796,6 +3796,7 @@ ipsec_copypkt(m)
 						goto fail;
 					mnew->m_pkthdr = n->m_pkthdr;
 #if 0
+					/* XXX: convert to m_tag or delete? */
 					if (n->m_pkthdr.aux) {
 						mnew->m_pkthdr.aux =
 						    m_copym(n->m_pkthdr.aux,
@@ -3877,62 +3878,55 @@ ipsec_copypkt(m)
 	return (NULL);
 }
 
-static struct mbuf *
+static struct m_tag *
 ipsec_addaux(m)
 	struct mbuf *m;
 {
-	struct mbuf *n;
+	struct m_tag *mtag;
 
-	n = m_aux_find(m, AF_INET, IPPROTO_ESP);
-	if (!n)
-		n = m_aux_add(m, AF_INET, IPPROTO_ESP);
-	if (!n)
-		return n;	/* ENOBUFS */
-	n->m_len = sizeof(struct ipsecaux);
-	bzero(mtod(n, void *), n->m_len);
-	return n;
+	mtag = m_tag_find(m, PACKET_TAG_ESP, NULL);
+	if (mtag == NULL) {
+		mtag = m_tag_get(PACKET_TAG_ESP, sizeof(struct ipsecaux),
+		    M_NOWAIT);
+		if (mtag != NULL)
+			m_tag_prepend(m, mtag);
+	}
+	if (mtag == NULL)
+		return NULL;	/* ENOBUFS */
+	/* XXX is this necessary? */
+	bzero((void *)(mtag + 1), sizeof(struct ipsecaux));
+	return mtag;
 }
 
-static struct mbuf *
+static struct m_tag *
 ipsec_findaux(m)
 	struct mbuf *m;
 {
-	struct mbuf *n;
-
-	n = m_aux_find(m, AF_INET, IPPROTO_ESP);
-#ifdef DIAGNOSTIC
-	if (n && n->m_len < sizeof(struct ipsecaux))
-		panic("invalid ipsec m_aux");
-#endif
-	return n;
+	return m_tag_find(m, PACKET_TAG_ESP, NULL);
 }
 
 void
 ipsec_delaux(m)
 	struct mbuf *m;
 {
-	struct mbuf *n;
+	struct m_tag *mtag;
 
-	n = m_aux_find(m, AF_INET, IPPROTO_ESP);
-	if (n)
-		m_aux_delete(m, n);
+	mtag = m_tag_find(m, PACKET_TAG_ESP, NULL);
+	if (mtag != NULL)
+		m_tag_delete(m, mtag);
 }
 
 /* if the aux buffer is unnecessary, nuke it. */
 static void
-ipsec_optaux(m, n)
+ipsec_optaux(m, mtag)
 	struct mbuf *m;
-	struct mbuf *n;
+	struct m_tag *mtag;
 {
 	struct ipsecaux *aux;
 
-	if (!n)
+	if (mtag == NULL)
 		return;
-	if (sizeof(*aux) > n->m_len) {
-		ipsec_delaux(m);
-		return;
-	}
-	aux = mtod(n, struct ipsecaux *);
+	aux = (struct ipsecaux *)(mtag + 1);
 	if (!aux->so && !aux->sp)
 		ipsec_delaux(m);
 }
@@ -3942,21 +3936,21 @@ ipsec_setsocket(m, so)
 	struct mbuf *m;
 	struct socket *so;
 {
-	struct mbuf *n;
+	struct m_tag *mtag;
 	struct ipsecaux *aux;
 
 	/* if so == NULL, don't insist on getting the aux mbuf */
 	if (so) {
-		n = ipsec_addaux(m);
-		if (!n)
+		mtag = ipsec_addaux(m);
+		if (mtag == NULL)
 			return ENOBUFS;
 	} else
-		n = ipsec_findaux(m);
-	if (n && n->m_len >= sizeof(*aux)) {
-		aux = mtod(n, struct ipsecaux *);
+		mtag = ipsec_findaux(m);
+	if (mtag != NULL) {
+		aux = (struct ipsecaux *)(mtag + 1);
 		aux->so = so;
 	}
-	ipsec_optaux(m, n);
+	ipsec_optaux(m, mtag);
 	return 0;
 }
 
@@ -3964,12 +3958,12 @@ struct socket *
 ipsec_getsocket(m)
 	struct mbuf *m;
 {
-	struct mbuf *n;
+	struct m_tag *mtag;
 	struct ipsecaux *aux;
 
-	n = ipsec_findaux(m);
-	if (n && n->m_len >= sizeof(*aux)) {
-		aux = mtod(n, struct ipsecaux *);
+	mtag = ipsec_findaux(m);
+	if (mtag != NULL) {
+		aux = (struct ipsecaux *)(mtag + 1);
 		return aux->so;
 	} else
 		return NULL;
@@ -3981,15 +3975,13 @@ ipsec_addhist(m, proto, spi)
 	int proto;
 	u_int32_t spi;
 {
-	struct mbuf *n;
+	struct m_tag *mtag;
 	struct ipsecaux *aux;
 
-	n = ipsec_addaux(m);
-	if (!n)
+	mtag = ipsec_addaux(m);
+	if (mtag == NULL)
 		return ENOBUFS;
-	if (sizeof(*aux) > n->m_len)
-		return ENOSPC;	/* XXX */
-	aux = mtod(n, struct ipsecaux *);
+	aux = (struct ipsecaux *)(mtag + 1);
 	aux->hdrs++;
 	return 0;
 }
@@ -3998,15 +3990,13 @@ int
 ipsec_getnhist(m)
 	struct mbuf *m;
 {
-	struct mbuf *n;
+	struct m_tag *mtag;
 	struct ipsecaux *aux;
 
-	n = ipsec_findaux(m);
-	if (!n)
+	mtag = ipsec_findaux(m);
+	if (mtag == NULL)
 		return 0;
-	if (sizeof(*aux) > n->m_len)
-		return 0;
-	aux = mtod(n, struct ipsecaux *);
+	aux = (struct ipsecaux *)(mtag + 1);
 	return aux->hdrs;
 }
 
@@ -4023,12 +4013,10 @@ void
 ipsec_clearhist(m)
 	struct mbuf *m;
 {
-	struct mbuf *n;
+	struct m_tag *mtag;
 
-	n = ipsec_findaux(m);
-	if ((n) && n->m_len > sizeof(struct ipsecaux))
-		n->m_len = sizeof(struct ipsecaux);
-	ipsec_optaux(m, n);
+	mtag = ipsec_findaux(m);
+	ipsec_optaux(m, mtag);
 }
 
 #ifdef __bsdi__

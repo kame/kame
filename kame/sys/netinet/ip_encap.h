@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.h,v 1.12 2001/09/04 08:43:18 itojun Exp $	*/
+/*	$KAME: ip_encap.h,v 1.13 2003/01/21 06:33:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -51,7 +51,7 @@ struct encaptab {
 	struct sockaddr *dstmask;
 	int (*func) __P((const struct mbuf *, int, int, void *));
 	const struct protosw *psw;	/* only pr_input will be used */
-	void *arg;			/* passed via m->m_pkthdr.aux */
+	void *arg;			/* passed via PACKET_TAG_ENCAP */
 };
 
 void	encap_init __P((void));

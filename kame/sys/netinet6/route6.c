@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.40 2002/12/17 07:48:33 k-sugyou Exp $	*/
+/*	$KAME: route6.c,v 1.41 2003/01/21 06:33:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -77,11 +77,11 @@ route6_input(mp, offp, proto)
 	struct mbuf *m = *mp;
 	struct ip6_rthdr *rh;
 	int off = *offp, rhlen;
-	struct mbuf *n;
+	struct m_tag *mtag;
 
-	n = ip6_findaux(m);
-	if (n) {
-		struct ip6aux *ip6a = mtod(n, struct ip6aux *);
+	mtag = ip6_findaux(m);
+	if (mtag) {
+		struct ip6aux *ip6a = (struct ip6aux *)(mtag + 1);
 		/* XXX reject home-address option before rthdr */
 		if (ip6a->ip6a_flags & IP6A_SWAP) {
 			ip6stat.ip6s_badoptions++;
@@ -362,7 +362,7 @@ ip6_rthdr2(m, ip6, rh2)
 			/* XXX should we check a registration status? */
 
 			if (rh2->ip6r2_segleft == 0) {
-				struct mbuf *n;
+				struct m_tag *mtag;
 				struct ip6aux *ip6a;
 
 				/*
@@ -391,9 +391,9 @@ ip6_rthdr2(m, ip6, rh2)
 				 * the route is already optimized.
 				 * set optimized flag in m_aux.
 				 */
-				n = ip6_findaux(m);
-				if (n) {
-					ip6a = mtod(n, struct ip6aux *);
+				mtag = ip6_findaux(m);
+				if (mtag) {
+					ip6a = (struct ip6aux *)(mtag + 1);
 					ip6a->ip6a_flags
 						|= IP6A_ROUTEOPTIMIZED;
 					return (0);

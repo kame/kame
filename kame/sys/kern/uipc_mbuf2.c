@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.39 2002/10/22 06:23:27 itojun Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.40 2003/01/21 06:33:03 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -377,123 +377,6 @@ m_dup1(m, off, len, wait)
 }
 #endif
 
-/*
- * pkthdr.aux chain manipulation.
- * we don't allow clusters at this moment. 
- */
-struct mbuf *
-m_aux_add2(m, af, type, p)
-	struct mbuf *m;
-	int af, type;
-	void *p;
-{
-	struct mbuf *n;
-	struct mauxtag *t;
-
-	if ((m->m_flags & M_PKTHDR) == 0)
-		return NULL;
-
-	n = m_aux_find(m, af, type);
-	if (n)
-		return n;
-
-	MGET(n, M_DONTWAIT, m->m_type);
-	if (n == NULL)
-		return NULL;
-
-	t = mtod(n, struct mauxtag *);
-	bzero(t, sizeof(*t));
-	t->af = af;
-	t->type = type;
-	t->p = p;
-	n->m_data += sizeof(struct mauxtag);
-	n->m_len = 0;
-	n->m_next = m->m_pkthdr.aux;
-	m->m_pkthdr.aux = n;
-	return n;
-}
-
-struct mbuf *
-m_aux_find2(m, af, type, p)
-	struct mbuf *m;
-	int af, type;
-	void *p;
-{
-	struct mbuf *n;
-	struct mauxtag *t;
-
-	if ((m->m_flags & M_PKTHDR) == 0)
-		return NULL;
-
-	for (n = m->m_pkthdr.aux; n; n = n->m_next) {
-		t = (struct mauxtag *)n->m_dat;
-		if (n->m_data != ((caddr_t)t) + sizeof(struct mauxtag)) {
-			printf("m_aux_find: invalid m_data for mbuf=%p (%p %p)\n", n, t, n->m_data);
-			continue;
-		}
-		if (t->af == af && t->type == type && t->p == p)
-			return n;
-	}
-	return NULL;
-}
-
-struct mbuf *
-m_aux_find(m, af, type)
-	struct mbuf *m;
-	int af, type;
-{
-
-	return m_aux_find2(m, af, type, NULL);
-}
-
-struct mbuf *
-m_aux_add(m, af, type)
-	struct mbuf *m;
-	int af, type;
-{
-
-	return m_aux_add2(m, af, type, NULL);
-}
-
-void
-m_aux_delete(m, victim)
-	struct mbuf *m;
-	struct mbuf *victim;
-{
-	struct mbuf *n, *prev, *next;
-	struct mauxtag *t;
-
-	if ((m->m_flags & M_PKTHDR) == 0)
-		return;
-
-	prev = NULL;
-	n = m->m_pkthdr.aux;
-	while (n) {
-		t = (struct mauxtag *)n->m_dat;
-		next = n->m_next;
-		if (n->m_data != ((caddr_t)t) + sizeof(struct mauxtag)) {
-			printf("m_aux_delete: "
-			    "invalid m_data for mbuf=%p (%p %p)\n",
-			    n, t, n->m_data);
-			prev = n;
-			n = next;
-			continue;
-		}
-		if (n == victim) {
-			if (prev)
-				prev->m_next = n->m_next;
-			else
-				m->m_pkthdr.aux = n->m_next;
-			n->m_next = NULL;
-			m_free(n);
-			return;
-		} else
-			prev = n;
-		n = next;
-	}
-}
-
-#ifdef __OpenBSD__
 /* Get a packet tag structure along with specified data following. */
 struct m_tag *
 m_tag_get(type, len, wait)
@@ -505,8 +388,7 @@ m_tag_get(type, len, wait)
 
 	if (len < 0)
 		return (NULL);
-	MALLOC(t, struct m_tag *, len + sizeof(struct m_tag), M_PACKET_TAGS,
-	    wait);
+	t = malloc(len + sizeof(struct m_tag), M_PACKET_TAGS, wait);
 	if (t == NULL)
 		return (NULL);
 	t->m_tag_id = type;
@@ -519,7 +401,8 @@ void
 m_tag_free(t)
 	struct m_tag *t;
 {
-	FREE(t, M_PACKET_TAGS);
+
+	free(t, M_PACKET_TAGS);
 }
 
 /* Prepend a packet tag. */
@@ -528,6 +411,7 @@ m_tag_prepend(m, t)
 	struct mbuf *m;
 	struct m_tag *t;
 {
+
 	SLIST_INSERT_HEAD(&m->m_pkthdr.tags, t, m_tag_link);
 }
 
@@ -537,6 +421,7 @@ m_tag_unlink(m, t)
 	struct mbuf *m;
 	struct m_tag *t;
 {
+
 	SLIST_REMOVE(&m->m_pkthdr.tags, t, m_tag, m_tag_link);
 }
 
@@ -546,6 +431,7 @@ m_tag_delete(m, t)
 	struct mbuf *m;
 	struct m_tag *t;
 {
+
 	m_tag_unlink(m, t);
 	m_tag_free(t);
 }
@@ -626,10 +512,9 @@ m_tag_copy_chain(to, from)
 		}
 		if (tprev == NULL)
 			SLIST_INSERT_HEAD(&to->m_pkthdr.tags, t, m_tag_link);
-		else {
+		else
 			SLIST_INSERT_AFTER(tprev, t, m_tag_link);
-			tprev = t;
-		}
+		tprev = t;
 	}
 	return (1);
 }
@@ -639,6 +524,7 @@ void
 m_tag_init(m)
 	struct mbuf *m;
 {
+
 	SLIST_INIT(&m->m_pkthdr.tags);
 }
 
@@ -647,6 +533,7 @@ struct m_tag *
 m_tag_first(m)
 	struct mbuf *m;
 {
+
 	return (SLIST_FIRST(&m->m_pkthdr.tags));
 }
 
@@ -656,6 +543,6 @@ m_tag_next(m, t)
 	struct mbuf *m;
 	struct m_tag *t;
 {
+
 	return (SLIST_NEXT(t, m_tag_link));
 }
-#endif /* OpenBSD */

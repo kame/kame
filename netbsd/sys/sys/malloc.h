@@ -191,7 +191,8 @@
 #define	M_SMBFSHASH	132	/* SMBFS hash table */
 #define	M_SA		133	/* Scheduler activations */
 #define	M_MSFILTER	134	/* Multicast Source Filters */
-#define	M_LAST		135	/* Must be last type + 1 */
+#define	M_PACKET_TAGS	135	/* Packet-attached information */
+#define	M_LAST		136	/* Must be last type + 1 */
 
 /* added something?  don't forget to update malloc.9 */
 
@@ -331,7 +332,8 @@
 	"smbfshash",	/* 132 M_SMBFSHASH */ \
 	"sa",		/* 133 M_SA */ \
 	"msfilter",	/* 134 M_MSFILTER */ \
-	NULL,		/* 135 */ \
+	"packet tags",	/* 135 M_PACKET_TAGS */ \
+	NULL,		/* 136 */ \
 }
 
 struct kmemstats {

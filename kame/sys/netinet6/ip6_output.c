@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.352 2002/12/10 09:35:38 k-sugyou Exp $	*/
+/*	$KAME: ip6_output.c,v 1.353 2003/01/21 06:33:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4817,23 +4817,16 @@ ip6_mloopback(ifp, m, dst)
 	struct mbuf *m;
 	struct sockaddr_in6 *dst;
 {
-	struct mbuf *copym, *aux;
+	struct mbuf *copym;
 	struct ip6_hdr *ip6;
 
-	if (!(m->m_flags & M_PKTHDR) || !(aux = m->m_pkthdr.aux))
-		panic("ip6_mloopback: null mbuf aux");
+	if (!(m->m_flags & M_PKTHDR))
+		panic("ip6_mloopback: not a M_PKTHDR");
 
 	/*
-	 * Copy the packet.  The process of mbuf aux is sensitive; since
-	 * m_copy moves (not copy) the aux to the new mbuf chain, we
-	 * need to remove the aux before the copy then recover it for the
-	 * new chain.  Generally we need to copy the aux as well, but we don't
-	 * in this case because we'll soon put the copied packet to the
-	 * interface, where the aux is not necessary.
+	 * Duplicate the packet.
 	 */
-	m->m_pkthdr.aux = NULL;
 	copym = m_copy(m, 0, M_COPYALL);
-	m->m_pkthdr.aux = aux;
 	if (copym == NULL)
 		return;
 

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.86 2002/11/27 05:08:43 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.87 2003/01/21 06:33:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -165,8 +165,6 @@ static int socket_send __P((struct socket *, struct mbuf *,
 			    struct sockaddr_in6 *));
 static int register_send __P((struct ip6_hdr *, struct mif6 *, struct mbuf *,
 			      struct sockaddr_in6 *, struct sockaddr_in6 *));
-
-static struct mbuf *m_copy_withpktaddrs __P((struct mbuf *, int, int));
 
 /*
  * Globals.  All but ip6_mrouter, ip6_mrtproto and mrt6stat could be static,
@@ -1262,7 +1260,7 @@ ip6_mforward(ip6, ifp, m)
 			splx(s);
 			return ENOBUFS;
 		}
-		mb0 = m_copy_withpktaddrs(m, 0, M_COPYALL);
+		mb0 = m_copy(m, 0, M_COPYALL);
 		/*
 		 * Pullup packet header if needed before storing it,
 		 * as other references may modify it in the meantime.
@@ -1306,8 +1304,7 @@ ip6_mforward(ip6, ifp, m)
 			 * Make a copy of the header to send to the user
 			 * level process
 			 */
-			mm = m_copy_withpktaddrs(mb0, 0,
-						 sizeof(struct ip6_hdr));
+			mm = m_copy(mb0, 0, sizeof(struct ip6_hdr));
 
 			if (mm == NULL) {
 				free(rte, M_MRTABLE);
@@ -1566,7 +1563,7 @@ ip6_mdq(m, ifp, rt)
 				struct omrt6msg *oim;
 #endif
 
-				mm = m_copy_withpktaddrs(m, 0, sizeof(struct ip6_hdr));
+				mm = m_copy(m, 0, sizeof(struct ip6_hdr));
 				if (mm &&
 				    (M_READONLY(mm) ||
 				     mm->m_len < sizeof(struct ip6_hdr)))
@@ -1715,7 +1712,7 @@ phyint_send(ip6, mifp, m, src, dst)
 	 * the IPv6 header is actually copied, not just referenced,
 	 * so that ip6_output() only scribbles on the copy.
 	 */
-	mb_copy = m_copy_withpktaddrs(m, 0, M_COPYALL);
+	mb_copy = m_copy(m, 0, M_COPYALL);
 	if (mb_copy &&
 	    (M_READONLY(mb_copy) || mb_copy->m_len < sizeof(struct ip6_hdr)))
 		mb_copy = m_pullup(mb_copy, sizeof(struct ip6_hdr));
@@ -2110,35 +2107,4 @@ pim6_input(mp, offp, proto)
   pim6_input_to_daemon:
 	rip6_input(&m, offp, proto);
 	return (IPPROTO_DONE);
-}
-
-/*
- * a local wrapper function of m_copy().  It basically copies a given mbuf
- * by m_copy(), but keeps the aux mbuf in the source mbuf except packet
- * addresses, which are copied to the copied mbuf with a new aux mbuf.
- */
-static struct mbuf *
-m_copy_withpktaddrs(m, off, len)
-	struct mbuf *m;
-	int off, len;
-{
-	struct mbuf *copym, *aux;
-	struct sockaddr_in6 *src, *dst;
-
-	if (!(m->m_flags & M_PKTHDR) || !(aux = m->m_pkthdr.aux))
-		panic("ip6_mloopback: null mbuf aux");
-
-	if (ip6_getpktaddrs(m, &src, &dst))
-		return (NULL);	/* XXX: impossible! */
-
-	m->m_pkthdr.aux = NULL;
-	copym = m_copy(m, off, len);
-	m->m_pkthdr.aux = aux;
-
-	if (copym && !ip6_setpktaddrs(copym, src, dst)) {
-		m_freem(copym);
-		copym = NULL;
-	}
-
-	return (copym);
 }

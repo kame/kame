@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.301 2003/01/17 09:07:43 suz Exp $	*/
+/*	$KAME: ip6_input.c,v 1.302 2003/01/21 06:33:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -227,7 +227,7 @@ int ip6_fw_enable = 1;
 struct ip6stat ip6stat;
 
 static void ip6_init2 __P((void *));
-static struct mbuf *ip6_setdstifaddr __P((struct mbuf *, struct in6_ifaddr *));
+static struct m_tag *ip6_setdstifaddr __P((struct mbuf *, struct in6_ifaddr *));
 static int ip6_hopopts_input __P((u_int32_t *, u_int32_t *, struct mbuf **, int *));
 #ifdef PULLDOWN_TEST
 static struct mbuf *ip6_pullexthdr __P((struct mbuf *, size_t, int));
@@ -431,7 +431,7 @@ ip6_input(m)
 #endif
 
 	/*
-	 * make sure we don't have onion peering information into m_aux.
+	 * make sure we don't have onion peering information into m_tag.
 	 */
 	ip6_delaux(m);
 
@@ -894,7 +894,7 @@ ip6_input(m)
 		}
 #endif
 		/*
-		 * record address information into m_aux.
+		 * record address information into m_tag.
 		 */
 		(void)ip6_setdstifaddr(m, ia6);
 
@@ -996,7 +996,7 @@ ip6_input(m)
 
   hbhcheck:
 	/*
-	 * record address information into m_aux, if we don't have one yet.
+	 * record address information into m_tag, if we don't have one yet.
 	 * note that we are unable to record it, if the address is not listed
 	 * as our interface address (e.g. multicast addresses, addresses
 	 * within FAITH prefixes and such).
@@ -1210,42 +1210,42 @@ ip6_input(m)
  * set/grab in6_ifaddr correspond to IPv6 destination address.
  * XXX backward compatibility wrapper
  */
-static struct mbuf *
+static struct m_tag *
 ip6_setdstifaddr(m, ia6)
 	struct mbuf *m;
 	struct in6_ifaddr *ia6;
 {
-	struct mbuf *n;
+	struct m_tag *mtag;
 
-	n = ip6_addaux(m);
-	if (n)
-		mtod(n, struct ip6aux *)->ip6a_dstia6 = ia6;
-	return n;	/* NULL if failed to set */
+	mtag = ip6_addaux(m);
+	if (mtag)
+		((struct ip6aux *)(mtag + 1))->ip6a_dstia6 = ia6;
+	return mtag;	/* NULL if failed to set */
 }
 
 struct in6_ifaddr *
 ip6_getdstifaddr(m)
 	struct mbuf *m;
 {
-	struct mbuf *n;
+	struct m_tag *mtag;
 
-	n = ip6_findaux(m);
-	if (n)
-		return mtod(n, struct ip6aux *)->ip6a_dstia6;
+	mtag = ip6_findaux(m);
+	if (mtag)
+		return ((struct ip6aux *)(mtag + 1))->ip6a_dstia6;
 	else
 		return NULL;
 }
 
-struct mbuf *
+struct m_tag *
 ip6_setpktaddrs(m, src, dst)
 	struct mbuf *m;
 	struct sockaddr_in6 *src, *dst;
 {
-	struct mbuf *n;
+	struct m_tag *mtag;
 	struct sockaddr_in6 *sin6;
 
-	n = ip6_addaux(m);
-	if (n) {
+	mtag = ip6_addaux(m);
+	if (mtag) {
 		if (src) {
 			if (src->sin6_family != AF_INET6 ||
 			    src->sin6_len != sizeof(*src)) {
@@ -1258,7 +1258,7 @@ ip6_setpktaddrs(m, src, dst)
 			 * we only copy the "address" part to avoid misuse
 			 * the port, flow info, etc.
 			 */
-			sin6 = &mtod(n, struct ip6aux *)->ip6a_src;
+			sin6 = &((struct ip6aux *)(mtag + 1))->ip6a_src;
 			bzero(sin6, sizeof(*sin6));
 			sin6->sin6_family = AF_INET6;
 			sin6->sin6_len = sizeof(*sin6);
@@ -1272,7 +1272,7 @@ ip6_setpktaddrs(m, src, dst)
 				       dst->sin6_family, dst->sin6_len);
 				return (NULL);
 			}
-			sin6 = &mtod(n, struct ip6aux *)->ip6a_dst;
+			sin6 = &((struct ip6aux *)(mtag + 1))->ip6a_dst;
 			bzero(sin6, sizeof(*sin6));
 			sin6->sin6_family = AF_INET6;
 			sin6->sin6_len = sizeof(*sin6);
@@ -1280,7 +1280,7 @@ ip6_setpktaddrs(m, src, dst)
 		}
 	}
 
-	return (n);
+	return (mtag);
 }
 
 int
@@ -1288,12 +1288,12 @@ ip6_getpktaddrs(m, src, dst)
 	struct mbuf *m;
 	struct sockaddr_in6 **src, **dst;
 {
-	struct mbuf *n;
+	struct m_tag *mtag;
 
 	if (src == NULL && dst == NULL)
 		return (-1);
 
-	if ((n = ip6_findaux(m)) == NULL) {
+	if ((mtag = ip6_findaux(m)) == NULL) {
 		struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 
 		printf("ip6_getpktaddrs no aux: src=%s, dst=%s, nxt=%d\n",
@@ -1302,15 +1302,15 @@ ip6_getpktaddrs(m, src, dst)
 		return (-1);
 	}
 
-	if (mtod(n, struct ip6aux *)->ip6a_src.sin6_family != AF_INET6 ||
-	    mtod(n, struct ip6aux *)->ip6a_dst.sin6_family != AF_INET6) {
+	if (((struct ip6aux *)(mtag + 1))->ip6a_src.sin6_family != AF_INET6 ||
+	    ((struct ip6aux *)(mtag + 1))->ip6a_dst.sin6_family != AF_INET6) {
 		printf("ip6_getpktaddrs: src or dst are invalid\n");
 	}
 
 	if (src)
-		*src = &mtod(n, struct ip6aux *)->ip6a_src;
+		*src = &((struct ip6aux *)(mtag + 1))->ip6a_src;
 	if (dst)
-		*dst = &mtod(n, struct ip6aux *)->ip6a_dst;
+		*dst = &((struct ip6aux *)(mtag + 1))->ip6a_dst;
 
 	return (0);
 }
@@ -2172,55 +2172,41 @@ pfctlinput2(cmd, sa, ctlparam)
 }
 #endif
 
-struct mbuf *
+struct m_tag *
 ip6_addaux(m)
 	struct mbuf *m;
 {
-	struct mbuf *n;
+	struct m_tag *mtag;
 
-#ifdef DIAGNOSTIC
-	if (sizeof(struct ip6aux) > MHLEN)
-		panic("assumption failed on sizeof(ip6aux)");
-#endif
-	n = m_aux_find(m, AF_INET6, -1);
-	if (n) {
-		if (n->m_len < sizeof(struct ip6aux)) {
-			printf("conflicting use of ip6aux");
-			return NULL;
-		}
-	} else {
-		n = m_aux_add(m, AF_INET6, -1);
-		if (n) {
-			n->m_len = sizeof(struct ip6aux);
-			bzero(mtod(n, caddr_t), n->m_len);
-		}
+	mtag = m_tag_find(m, PACKET_TAG_INET6, NULL);
+	if (!mtag) {
+		mtag = m_tag_get(PACKET_TAG_INET6, sizeof(struct ip6aux),
+		    M_NOWAIT);
+		if (mtag)
+			bzero(mtag + 1, sizeof(struct ip6aux));
 	}
-	return n;
+	return mtag;
 }
 
-struct mbuf *
+struct m_tag *
 ip6_findaux(m)
 	struct mbuf *m;
 {
-	struct mbuf *n;
+	struct m_tag *mtag;
 
-	n = m_aux_find(m, AF_INET6, -1);
-	if (n && n->m_len < sizeof(struct ip6aux)) {
-		printf("conflicting use of ip6aux");
-		n = NULL;
-	}
-	return n;
+	mtag = m_tag_find(m, PACKET_TAG_INET6, NULL);
+	return mtag;
 }
 
 void
 ip6_delaux(m)
 	struct mbuf *m;
 {
-	struct mbuf *n;
+	struct m_tag *mtag;
 
-	n = m_aux_find(m, AF_INET6, -1);
-	if (n)
-		m_aux_delete(m, n);
+	mtag = m_tag_find(m, PACKET_TAG_INET6, NULL);
+	if (mtag)
+		m_tag_delete(m, mtag);
 }
 
 /*

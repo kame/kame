@@ -1,4 +1,4 @@
-/*	$KAME: sctp_indata.c,v 1.12 2002/11/07 03:23:48 itojun Exp $	*/
+/*	$KAME: sctp_indata.c,v 1.13 2003/01/21 06:33:03 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_indata.c,v 1.124 2002/04/04 18:48:39 randall Exp	*/
 
 /*
@@ -356,12 +356,12 @@ sctp_deliver_data(struct sctp_tcb *stcb,
 			chk->data->m_flags |= M_PKTHDR;
 			chk->data->m_pkthdr.rcvif = 0;
 			chk->data->m_pkthdr.len = chk->send_size;
-			chk->data->m_pkthdr.aux = 0;
 #ifdef __FreeBSD__
 			chk->data->m_pkthdr.header = 0;
 			chk->data->m_pkthdr.csum_flags = 0;
 			chk->data->m_pkthdr.csum_data = 0;
 #endif
+			SLIST_INIT(&chk->data->m_pkthdr.tags);
 		}
 	}
 	if (chk->rec.data.rcv_flags & SCTP_DATA_LAST_FRAG) {
@@ -570,12 +570,12 @@ sctp_service_reassembly(struct sctp_tcb *stcb,
 				chk->data->m_flags |= M_PKTHDR;
 				chk->data->m_pkthdr.rcvif = 0;
 				chk->data->m_pkthdr.len = chk->send_size;
-				chk->data->m_pkthdr.aux = 0;
 #ifdef __FreeBSD__
 				chk->data->m_pkthdr.header = 0;
 				chk->data->m_pkthdr.csum_flags = 0;
 				chk->data->m_pkthdr.csum_data = 0;
 #endif
+				SLIST_INIT(&chk->data->m_pkthdr.tags);
 			}
 		}
 		if (chk->rec.data.rcv_flags & SCTP_DATA_LAST_FRAG) {
