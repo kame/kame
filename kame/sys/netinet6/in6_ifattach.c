@@ -82,6 +82,8 @@ ieee802_to_eui64(dst, src)
 	dst[5] = src[3];
 	dst[6] = src[4];
 	dst[7] = src[5];
+	/* set global bit */
+	dst[0] |= 0x02;
 }
 
 /*
@@ -381,8 +383,6 @@ in6_ifattach(ifp, type, laddr, noloop)
 		if (laddr == NULL)
 			break;
 		ieee802_to_eui64(&ia->ia_addr.sin6_addr.s6_addr8[8], laddr);
-		/* set global bit */
-		ia->ia_addr.sin6_addr.s6_addr8[8] |= 0x02;
 		if (found_first_ifid == 0) {
 			if (in6_ifattach_getifid(ifp) == 0)
 				in6_ifattach_p2p();
