@@ -1,4 +1,4 @@
-/*	$KAME: tcp.c,v 1.7 2001/11/15 09:26:26 itojun Exp $	*/
+/*	$KAME: tcp.c,v 1.8 2001/11/21 07:40:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -58,7 +58,7 @@ static fd_set readfds, writefds, exceptfds;
 static char atmark_buf[2];
 static pid_t cpid = (pid_t)0;
 static pid_t ppid = (pid_t)0;
-static time_t child_lastactive = (time_t)0;
+volatile time_t child_lastactive = (time_t)0;
 static time_t parent_lastactive = (time_t)0;
 
 static void sig_ctimeout __P((int));
