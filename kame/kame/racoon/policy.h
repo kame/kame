@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.h,v 1.4 2000/01/12 04:24:28 sakane Exp $ */
+/* YIPS @(#)$Id: policy.h,v 1.5 2000/01/13 06:26:35 itojun Exp $ */
 
 #include <sys/queue.h>
 
@@ -72,6 +72,9 @@ struct ipsecsa {
 	int comptype;
 
 	int pfs_group;			/* only perpose for acceptable check. */
+
+	size_t spisize;
+	u_int64_t spi;			/* spi from the peer XXX */
 
 	struct sockaddr *dst;		/* peers address of SA */
 

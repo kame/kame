@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.31 2000/01/12 21:42:00 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.32 2000/01/13 06:26:34 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -185,7 +185,9 @@ static int (*check_attributes[]) __P((struct isakmp_pl_t *)) = {
 static int setph1prop __P((struct isakmpsa *props, caddr_t buf));
 static int setph1trns __P((struct isakmpsa *props, caddr_t buf));
 static int setph1attr __P((struct isakmpsa *props, caddr_t buf));
+#if 0
 static int getph2proplen __P((struct ipsecsa *proposal));
+#endif
 static caddr_t setph2attr __P((caddr_t buf, struct ipsecsa *sa, int *len));
 static vchar_t *sockaddr2id __P((struct sockaddr *saddr,
 	u_int prefixlen, u_int ul_proto));
@@ -730,6 +732,15 @@ prop2ipsecsa_emit1(p)
 	if (q->proto_id == IPSECDOI_PROTO_IPCOMP)
 		q->comptype = p->trns->t_id;
 
+	/* XXX this should belong to elsewhere */
+	if (sizeof(q->spi) >= p->prop->spi_size) {
+		q->spisize = p->prop->spi_size;
+		memcpy(&q->spi, p->prop + 1, p->prop->spi_size);
+	} else {
+		free(q);
+		return NULL;
+	}
+
 	if (t2ipsecsa(p->trns, q) < 0) {
 		free(q);
 		return NULL;
@@ -942,23 +953,33 @@ found:
 	/* set peer's spi from proposal payload */
 	struct sockaddr *dst;
 	struct ipsecsakeys *k;
+	struct ipsecsa *q1;
 
-	dst = r->dst ? r->dst : iph2->dst; /* XXX cheat */
-	for (k = iph2->keys; k != NULL; k = k->next) {
-		if (r->proto_id == k->proto_id
-		 && r->encmode == k->encmode
-		 && (cmpsaddrwop(dst, k->dst) == 0))
-			break;
+	for (q1 = r; q1; q1 = q1->bundles) {
+		dst = q1->dst ? q1->dst : iph2->dst; /* XXX cheat */
+		for (k = iph2->keys; k != NULL; k = k->next) {
+			if (q1->proto_id == q1->proto_id
+			 && q1->encmode == q1->encmode
+			 && (cmpsaddrwop(dst, k->dst) == 0))
+				break;
+		}
+		if (k == NULL) {
+			plog(logp, LOCATION, NULL,
+				"no SPI found for %s/%s\n",
+				s_ipsecdoi_proto(q1->proto_id),
+				saddrwop2str(dst));
+			delipsecsa(q1);
+			return -1;
+		}
+		if (q1->spisize != sizeof(k->spi_p)) {
+			plog(logp, LOCATION, NULL,
+				"spi size mismatch, %d/%d\n",
+				q1->spisize, sizeof(k->spi_p));
+			delipsecsa(q1);
+			return -1;
+		}
+		memcpy(&k->spi_p, &q1->spi, q1->spisize);
 	}
-	if (k == NULL) {
-		plog(logp, LOCATION, NULL,
-			"no SPI found for %s/%s\n",
-			s_ipsecdoi_proto(r->proto_id),
-			saddrwop2str(dst));
-		delipsecsa(r);
-		return -1;
-	}
-	memcpy(&k->spi_p, p->prop + 1, sizeof(k->spi_p));
     }
 
 #if 0
@@ -1292,6 +1313,8 @@ get_proppair(sa, mode)
 	struct isakmp_parse_t *pa;
 
 	pbuf = isakmp_parsewoh(ISAKMP_NPTYPE_P, (struct isakmp_gen *)bp, tlen);
+	if (pbuf == NULL)
+		return NULL;
 
 	for (pa = (struct isakmp_parse_t *)pbuf->v;
 	     pa->type != ISAKMP_NPTYPE_NONE;
@@ -2569,6 +2592,7 @@ setph1attr(sa, buf)
 	return attrlen;
 }
 
+#if 0
 /*
  * create phase2 proposal from policy configuration.
  * INCLUDING isakmp general header of SA payload.
@@ -2769,6 +2793,191 @@ getph2proplen(proposal)
 
 	return len;
 }
+#else
+/*
+ * XXX Assumes that there will be no ipsecsa struct with the same proto_id 
+ * on "bundle" chain.  (i.e. single proposal payload will accompany single
+ * transform payload only)
+ */
+vchar_t *
+ipsecdoi_setph2proposal0(iph2, keys, b)
+	const struct ph2handle *iph2;
+	const struct ipsecsakeys *keys;
+	const struct ipsecsa *b;
+{
+	vchar_t *p;
+	const struct sockaddr *dst;
+	const struct ipsecsakeys *k;
+	struct isakmp_pl_p *prop;
+	struct isakmp_pl_t *trns;
+	int len;
+	int attrlen;
+	size_t trnsoff;
+
+	dst = b->dst ? b->dst : iph2->dst;
+	for (k = keys; k != NULL; k = k->next) {
+		if (b->proto_id == k->proto_id && b->encmode == k->encmode
+		 && cmpsaddrwop((struct sockaddr *)dst,
+				 (struct sockaddr *)k->dst) == 0)
+			break;
+	}
+	if (k == NULL) {
+		plog(logp, LOCATION, NULL,
+			"no SPI found for %s/%s\n",
+			s_ipsecdoi_proto(b->proto_id),
+			saddrwop2str((struct sockaddr *)dst));
+		return NULL;
+	}
+
+	p = vmalloc(sizeof(*prop) + sizeof(k->spi) + sizeof(*trns));
+	if (p == NULL)
+		return NULL;
+
+	/* create proposal */
+	prop = (struct isakmp_pl_p *)p->v;
+	prop->h.np = ISAKMP_NPTYPE_NONE;
+	prop->p_no = b->prop_no;
+	prop->proto_id = b->proto_id;
+	prop->num_t = 1;
+
+	prop->spi_size = sizeof(k->spi);
+	memcpy(prop + 1, &k->spi, sizeof(k->spi));
+
+	/* create transform */
+	trnsoff = sizeof(*prop) + sizeof(k->spi);
+	trns = (struct isakmp_pl_t *)(p->v + trnsoff);
+	trns->h.np  = ISAKMP_NPTYPE_NONE;
+	trns->t_no  = b->trns_no;
+	switch (b->proto_id) {
+	case IPSECDOI_PROTO_IPSEC_ESP:
+		trns->t_id  = b->enctype;
+		break;
+	case IPSECDOI_PROTO_IPSEC_AH:
+		switch (b->authtype) {
+		case IPSECDOI_ATTR_AUTH_HMAC_MD5:
+			trns->t_id = IPSECDOI_AH_MD5;
+			break;
+		case IPSECDOI_ATTR_AUTH_HMAC_SHA1:
+			trns->t_id = IPSECDOI_AH_SHA;
+			break;
+		case IPSECDOI_ATTR_AUTH_DES_MAC:
+			trns->t_id = IPSECDOI_AH_DES;
+			break;
+		case IPSECDOI_ATTR_AUTH_KPDK:
+			trns->t_id = 0;
+			break;
+		default:
+			plog(logp, LOCATION, NULL,
+				"invalid authtype %d\n", b->authtype);
+			vfree(p);
+			return NULL;
+		}
+		break;
+	case IPSECDOI_PROTO_IPCOMP:
+		trns->t_id  = b->comptype;
+		break;
+	default:
+		plog(logp, LOCATION, NULL,
+			"invalid proto_id %d\n", b->proto_id);
+		vfree(p);
+		return NULL;
+	}
+
+	len = sizeof(struct isakmp_data);
+	if (b->lifetime) {
+		len += sizeof(struct isakmp_data) +
+			sizeof(struct isakmp_data) + sizeof(b->lifetime);
+	}
+	if (b->lifebyte) {
+		len += sizeof(struct isakmp_data) +
+			sizeof(struct isakmp_data) + sizeof(b->lifebyte);
+	}
+	if (b->encklen)
+		len += sizeof(struct isakmp_data);
+	if (b->authtype)
+		len += sizeof(struct isakmp_data);
+
+	p = vrealloc(p, p->l + len);
+	if (p == NULL)
+		return NULL;
+
+	setph2attr(p->v + p->l - len, (struct ipsecsa *)b, &attrlen);
+
+	trns = (struct isakmp_pl_t *)(p->v + trnsoff);
+	trns->h.len = htons(sizeof(*trns) + attrlen);
+
+	prop = (struct isakmp_pl_p *)p->v;
+	prop->h.len = htons(p->l);
+
+	return p;
+}
+
+/*
+ * create phase2 proposal from policy configuration.
+ * INCLUDING isakmp general header of SA payload.
+ *
+ * XXX the routine disagrees with other code in terms of interpretation of
+ * "bundle" pointer.  we'll need to have more appropriate structure for
+ * ipsecsa.
+ */
+vchar_t *
+ipsecdoi_setph2proposal(iph2, keys)
+	struct ph2handle *iph2;
+	struct ipsecsakeys *keys;
+{
+	struct ipsecsa *proposal;
+	vchar_t *mysa, *q;
+	struct ipsecdoi_pl_sa *sa;
+	struct isakmp_pl_p *prop;
+	struct ipsecsa *n, *b;
+	size_t propoff;
+
+	proposal = iph2->side == INITIATOR
+			? iph2->spidx->policy->proposal
+			: iph2->approval;
+
+	mysa = vmalloc(sizeof(*sa));
+	if (mysa == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to allocate my sa buffer (%s)\n",
+			strerror(errno)); 
+		return NULL;
+	}
+
+	/* create SA payload */
+	sa = (struct ipsecdoi_pl_sa *)mysa->v;
+	sa->b.doi = htonl(IPSEC_DOI);
+	sa->b.sit = htonl(IPSECDOI_SIT_IDENTITY_ONLY);	/* XXX configurable ? */
+
+	prop = NULL;
+	propoff = -1;
+	for (n = proposal; n; n = n->next) {
+		for (b = n; b; b = b->bundles) {
+			q = ipsecdoi_setph2proposal0(iph2, keys, b);
+			if (q == NULL) {
+				vfree(mysa);
+				return NULL;
+			}
+
+			mysa = vrealloc(mysa, mysa->l + q->l);
+			memcpy(mysa->v + mysa->l - q->l, q->v, q->l);
+			if (propoff >= 0) {
+				prop = (struct isakmp_pl_p *)(mysa->v +
+					propoff);
+				prop->h.np = ISAKMP_NPTYPE_P;
+			}
+			propoff = mysa->l - q->l;
+
+			vfree(q);
+		}
+	}
+
+	sa = (struct ipsecdoi_pl_sa *)mysa->v;
+	sa->h.len = htons(mysa->l);
+
+	return mysa;
+}
+#endif
 
 static caddr_t
 setph2attr(buf, sa, len)
@@ -3341,12 +3550,12 @@ ipsecdoi_initsakeys(iph2)
 			? iph2->spidx->policy->proposal
 			: iph2->approval;
 
-	for (p = proposal; p != NULL; p = p->next) {
+	for (p = proposal; p; p = p->next) {
 
 		/* reset dst when next proposal */
 		dst = NULL;
 
-		for (b = p; b != NULL; b = b->bundles) {
+		for (b = p; b; b = b->bundles) {
 			/* dst address */
 			/* when transport, iph2->src is usually used.
 			 * But when there is a tunnel mode, copy its dst
