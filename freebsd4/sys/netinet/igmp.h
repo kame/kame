@@ -148,6 +148,11 @@ struct igmp_group_record_hdr {
 
 #define	IGMP_V3_MEMBERSHIP_REPORT	0x22  /* v3 membership report  */
 
+/* macros provided for the compatibility with other BSDs */
+#define IGMP_v1_MEMBERSHIP_REPORT	IGMP_V1_MEMBERSHIP_REPORT
+#define IGMP_v2_MEMBERSHIP_REPORT	IGMP_V2_MEMBERSHIP_REPORT
+#define IGMP_v3_MEMBERSHIP_REPORT	IGMP_V3_MEMBERSHIP_REPORT
+
 #define	IGMP_V3_GENERAL_QUERY		1
 #define	IGMP_V3_GROUP_QUERY		2
 #define	IGMP_V3_GROUP_SOURCE_QUERY	3
