@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.74 2002/02/14 07:29:44 sakane Exp $	*/
+/*	$KAME: if_stf.c,v 1.75 2002/02/14 07:30:23 sakane Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -214,7 +214,7 @@ static struct rman stfunits[1];
 
 struct if_clone stf_cloner =
     IF_CLONE_INITIALIZER(STFNAME, stf_clone_create, stf_clone_destroy);
-#elif defined(__FreeBSD__) && __FreeBSD < 4
+#elif defined(__FreeBSD__) && __FreeBSD__ < 4
 void stfattach __P((void *));
 #else
 void stfattach __P((int));
