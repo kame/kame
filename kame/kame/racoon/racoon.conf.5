@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.43 2000/09/19 02:31:50 itojun Exp $
+.\"	$KAME: racoon.conf.5,v 1.44 2000/09/19 03:51:24 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -60,22 +60,28 @@ Parameters are specifying with
 .Ar underline .
 Parameters shown in
 square brackets
-.Po
-.Sq [
-and
-.Sq ]
-.Pc
+.Pq `[' and `]'
 are used to show optional keywords and parameters.
+Note that
+you have to pay attention to describing
+.Ar port
+number.
+The
+.Ar port
+number always are enclosed by
+.Pq `[' and `]' .
+They are not optional keyword.
+If it is possible to ommit
+.Ar port
+number,
+the expression becomes
+.Bq Bq Ar port .
 The vertical bar
 .Pq Sq \*(Ba
 is used to indicate
 between a choice of optional parameters.
 Parentheses
-.Po
-.Sq (
-and
-.Sq )
-.Pc
+.Pq `(' and `)'
 are used to group keywords and parameters when necessary.
 Major parameters are listed below.
 .Pp
@@ -93,6 +99,8 @@ means any string enclosed
 means IPv6 and IPv4 address.
 .It Ar port
 means TCP/UDP port number.
+The port number always are enclosed by
+.Pq `[' and `]' .
 .It timeunit
 is one of following:
 sec, secs, second, seconds, min, mins, minute, minutes, hour, hours.
@@ -180,11 +188,14 @@ will listen to all available interface addresses.
 The followings are the list of statements.
 .Pp
 .Bl -tag -width Ds -compact
-.It Ic isakmp Ar address [ Ar port ] ;
-If this(these) is specifyed,
+.\" How do I exress bold brackets; `[' and `]' .
+.\" Is the "Bq Ic [ Ar port ] ;" buggy ?
+.It Ic isakmp Ar address Bq Bq Ar port ;
+If it is specifyed,
 .Xr racoon 8
 will only listen to its address.
 Default port is 500 as IANA defines.
+You can define more than one definition.
 .It Ic admin Ic [ Ar port ] ;
 specify the port for connecting to
 .Xr kmpstat 8 .
@@ -198,8 +209,8 @@ It will be ignored when you don't specify any addresses.
 .Ss Remote Nodes Specifications
 .Bl -tag -width Ds -compact
 .It Xo
-.Ic remote ( Ar address \*(Ba Ic anonymous ) [
-.Ar port ]
+.Ic remote ( Ar address \*(Ba Ic anonymous )
+.Bq Bq Ar port
 .Ic { Ar statements Ic }
 .Xc
 definies the parameters of IKE phase 1 per remote node.
@@ -383,8 +394,10 @@ defines the parameters of IKE phase 2 (IPSec-SA establishment).
 .Ar source_id destination_id
 are constructed like the following.
 .Pp
-.Ic address Ar address [ /
-.Ar prefix ] [ Ar port ] Ar ul_proto
+.Ic address Ar address
+.Bq Ic / Ar prefix
+.Bq Ic [ Ar port ]
+.Ar ul_proto
 .Pp
 or
 .Pp
