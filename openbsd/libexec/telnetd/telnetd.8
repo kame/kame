@@ -138,19 +138,6 @@ This disables the authentication code.
 All user verification will happen through the
 .Xr login 1
 program.
-.It Fl 4
-.It Fl 6
-Specifies address family to be used on
-.Fl debug
-mode.
-During normal operation
-.Po
-called from
-.Xr inetd 8
-.Pc
-.Nm
-will use the file descriptor passed from
-.Xr inetd 8 .
 .El
 .It Fl D Ar debugmode
 This option may be used for debugging purposes.
@@ -319,6 +306,19 @@ authentication, and
 can be used to temporarily disable
 a specific authentication type without having to recompile
 .Nm telnetd .
+.It Fl 4
+.It Fl 6
+Specifies address family to be used on
+.Fl debug
+mode.
+During normal operation
+.Po
+called from
+.Xr inetd 8
+.Pc
+.Nm
+will use the file descriptor passed from
+.Xr inetd 8 .
 .El
 .Pp
 .Nm
