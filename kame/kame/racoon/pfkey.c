@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.83 2000/09/19 06:21:54 itojun Exp $	*/
+/*	$KAME: pfkey.c,v 1.84 2000/09/21 19:02:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.83 2000/09/19 06:21:54 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.84 2000/09/21 19:02:49 itojun Exp $ */
 
 #define _PFKEY_C_
 
@@ -1090,6 +1090,12 @@ pk_recvupdate(mhp)
 					    msg->sadb_msg_satype,
 					    sa->sadb_sa_spi,
 					    sa_mode)));
+
+			plog(logp, LOCATION, NULL,
+				"IPsec-SA established: %s\n",
+				sadbsecas2str(iph2->dst, iph2->src,
+					msg->sadb_msg_satype, sa->sadb_sa_spi,
+					sa_mode));
 		}
 
 		if (pr->ok == 0)
@@ -1116,11 +1122,6 @@ pk_recvupdate(mhp)
 
 	iph2->sce = sched_new(iph2->approval->lifetime,
 				isakmp_ph2expire, iph2);
-
-	plog(logp, LOCATION, NULL,
-		"IPsec-SA established: %s\n",
-		sadbsecas2str(iph2->dst, iph2->src,
-			msg->sadb_msg_satype, sa->sadb_sa_spi, sa_mode));
 
 	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
 	return 0;
