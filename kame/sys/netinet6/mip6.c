@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.137 2002/06/24 13:13:40 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.138 2002/06/26 02:33:35 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2566,7 +2566,6 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa)
 	struct mip6_mobility_options *mopt;
 	struct sockaddr_in6 *hoa_sa;
 {
-	int error;
 	mip6_nonce_t home_nonce, coa_nonce;
 	mip6_nodekey_t home_nodekey, coa_nodekey;
 	mip6_home_cookie_t home_cookie;
@@ -2576,7 +2575,7 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa)
 	SHA1_CTX ctx;
 
 	/* Nonce index & Auth. data mobility options are required */
-	if (mopt->valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA) == 0)
+	if ((mopt->valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA)) == 0)
 		return (EINVAL);
 
 	if ((mip6_get_nonce(mopt->mopt_ho_nonce_idx, &home_nonce) != 0) ||

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.38 2002/06/24 13:13:40 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.39 2002/06/26 02:33:36 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -523,6 +523,7 @@ int mip6_bu_fsm				__P((struct mip6_bu *, int, void *));
 int mip6_bu_send_hoti			__P((struct mip6_bu *));
 int mip6_bu_send_coti			__P((struct mip6_bu *));
 int mip6_bu_send_cbu			__P((struct mip6_bu *));
+int mip6_bu_send_bu			__P((struct mip6_bu *));
 
 /* binding ack management */
 int mip6_validate_ba			__P((struct mbuf *, u_int8_t *));
@@ -534,6 +535,16 @@ int mip6_process_br			__P((struct mbuf *, u_int8_t *));
 
 /* binding cache management */
 void mip6_bc_init			__P((void));
+int mip6_bc_register			__P((struct mip6_bc *,
+					     struct sockaddr_in6 *,
+					     struct sockaddr_in6 *,
+					     struct sockaddr_in6 *,
+					     u_int16_t, u_int16_t, u_int32_t));
+int mip6_bc_update			__P((struct mip6_bc *,
+					     struct sockaddr_in6 *,
+					     struct sockaddr_in6 *,
+					     u_int16_t, u_int16_t, u_int32_t));
+int mip6_bc_delete			__P((struct mip6_bc *));
 int mip6_bc_list_remove			__P((struct mip6_bc_list *,
 					     struct mip6_bc *));
 struct mip6_bc *mip6_bc_list_find_withphaddr

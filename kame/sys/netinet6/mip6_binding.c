@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.108 2002/06/24 13:13:40 t-momose Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.109 2002/06/26 02:33:36 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -120,7 +120,6 @@ static int mip6_bu_count = 0;
 static int mip6_bc_count = 0;
 
 /* binding update functions. */
-static int mip6_bu_send_bu __P((struct mip6_bu *));
 static void mip6_bu_timeout __P((void *));
 static void mip6_bu_starttimer __P((void));
 static void mip6_bu_stoptimer __P((void));
@@ -656,7 +655,7 @@ mip6_bu_timeout(arg)
  * the BU destination, we may have some BUs left in the BU list.  Push
  * them out.
  */
-static int
+int
 mip6_bu_send_bu(mbu)
 	struct mip6_bu *mbu;
 {

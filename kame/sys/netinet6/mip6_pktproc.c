@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.15 2002/06/24 13:13:40 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.16 2002/06/26 02:33:36 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -530,7 +530,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		hoa_sa.sin6_addr = ip6mu->ip6mu_addr;
 	}
 
-	if (error = mip6_get_mobility_options(ip6mu, ip6mulen, &mopt))
+	if ((error = mip6_get_mobility_options(ip6mu, ip6mulen, &mopt)))
 		return (error);
 
 	/* ip6_src and HAO has been already swapped at this point. */
