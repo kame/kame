@@ -254,15 +254,16 @@ cmd
 				reply(500, "Illegal LPRT command rejected");
 				return (NULL);
 			}
-			/* be paranoid, if told so */
+			/*
+			 * be paranoid, if told so.  no need to check scope id
+			 * here since we copy it in host_long_port6.
+			 */
 			if (curclass.checkportcmd &&
 			    ((ntohs(data_dest.su_port) <
 			      IPPORT_RESERVED) ||
 			    memcmp(&data_dest.su_sin6.sin6_addr,
 				   &his_addr.su_sin6.sin6_addr,
-			    sizeof(data_dest.su_sin6.sin6_addr)) != 0 ||
-			    data_dest.su_sin6.sin6_scope_id !=
-				his_addr.su_sin6.sin6_scope_id)) {
+			    sizeof(data_dest.su_sin6.sin6_addr)) != 0)) {
 				reply(500, "Illegal LPRT command rejected");
 				return (NULL);
 			}
@@ -348,10 +349,20 @@ cmd
 			hints.ai_socktype = SOCK_STREAM;
 			if (getaddrinfo(result[1], result[2], &hints, &res))
 				goto parsefail;
+			if (sizeof(data_dest) > res->ai_addrlen) {
+				reply(500,
+				    "Illegal EPRT command rejected");
+				return (NULL);
+			}
 			memcpy(&data_dest, res->ai_addr, res->ai_addrlen);
-			if (his_addr.su_family == AF_INET6
-			 && data_dest.su_family == AF_INET6) {
-				/* XXX more sanity checks! */
+			if (data_dest.su_family == AF_INET6) {
+				/* protocol does not allow scope id */
+				if (data_dest.su_sin6.sin6_scope_id != 0 ||
+				    his_addr.su_family != AF_INET6) {
+					reply(500,
+					    "Illegal EPRT command rejected");
+					return (NULL);
+				}
 				data_dest.su_sin6.sin6_scope_id =
 					his_addr.su_sin6.sin6_scope_id;
 			}
@@ -375,9 +386,10 @@ cmd
 					fail += memcmp(&data_dest.su_sin6.sin6_addr,
 					    &his_addr.su_sin6.sin6_addr,
 					    sizeof(data_dest.su_sin6.sin6_addr));
-			    		if (data_dest.su_sin6.sin6_scope_id !=
-					    his_addr.su_sin6.sin6_scope_id)
-						fail++;
+					/*
+					 * no need to check scope id,
+					 * we have copied them
+					 */
 					break;
 				default:
 					fail++;
