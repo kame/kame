@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: gif.4,v 1.1.1.1 1999/08/08 23:30:37 itojun Exp $
+.\"     $Id: gif.4,v 1.1.1.1.2.1 1999/10/07 03:13:52 itojun Exp $
 .\"
 .Dd April 10, 1999
 .Dt GIF 4
@@ -55,7 +55,17 @@ This can be done by using
 or
 .Dv SIOCSIFPHYADDR
 ioctl.
-Use routing table to route the packets toward
+Also, administrator needs to configure protocol and addresses used for the
+inner header, by using
+.Xr ifconfig 8 .
+Note that IPv6 link-local address
+.Pq those start with Li fe80::
+will be automatically configured whenever possible.
+You may need to remove IPv6 link-local address manually using
+.Xr ifconfig 8 ,
+when you would like to disable the use of IPv6 as inner header
+.Pq like when you need pure IPv4-over-IPv6 tunnel .
+Finally, use routing table to route the packets toward
 .Nm
 interface.
 .Pp
