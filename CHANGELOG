@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1728 2001/06/16 16:28:11 jinmei Exp $
+$KAME: CHANGELOG,v 1.1729 2001/06/18 03:03:59 jinmei Exp $
 
 <200106>
+2001-06-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (in6_tmpifadd): called
+	pfxlist_onlink_check() at the end of this function, to make sure
+	a temporary address generated from a detached public one also
+	detached.  This is redundant when the temporary address is
+	generated when creating a new public address, but is essential
+	when the address is generated due to deprecation of an old
+	temporary address.
+
 2001-06-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c: re-enabled clarification on the
 	dependency between the 1st dst opt header and the routing header,
