@@ -193,7 +193,7 @@ bgp_read_data(bnp)
 				    2, (byte *)&bh->bh_length);
 			 return;
 		 }
-		 bgp_update_stat(bnp, BGPS_UPDATERCVD);
+		 bgp_update_stat(bnp, BGPS_KEEPALIVERCVD);
 		 bgp_process_keepalive(bnp);
 		 break;
 
