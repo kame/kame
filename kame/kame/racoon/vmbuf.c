@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: vmbuf.c,v 1.3 2000/01/09 01:31:34 itojun Exp $ */
+/* YIPS @(#)$Id: vmbuf.c,v 1.4 2000/07/15 05:19:18 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -65,12 +65,14 @@ vrealloc(ptr, size)
 	size_t size;
 {
 	caddr_t v;
+	size_t ol = ptr->l;
 
 	if (ptr != NULL) {
 		if ((v = (caddr_t)realloc(ptr->v, size)) == NULL) {
 			(void)vfree(ptr);
 			return NULL;
 		}
+		memset(v + ptr->l, 0, size - ptr->l);
 		ptr->v = v;
 		ptr->l = size;
 
