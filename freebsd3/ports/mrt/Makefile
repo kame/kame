@@ -6,14 +6,14 @@
 #
 
 PORTNAME=	mrt
-PORTVERSION=	2.1.2a
+PORTVERSION=	2.2.2a
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.merit.edu/net-research/mrt/
-DISTNAME=	${PORTNAME}-${PORTVERSION}-src
+DISTNAME=	${PORTNAME}-${PORTVERSION}-Aug11
 
 MAINTAINER=	itojun@itojun.org
 
-WRKSRC=		${WRKDIR}/mrt-${PORTVERSION}/src
+WRKSRC=		${WRKDIR}/mrt/src
 GNU_CONFIGURE=	yes
 USE_AUTOCONF=	yes
 
@@ -22,8 +22,9 @@ EXAMPLES=	programs/bgpsim/bgpsim.conf programs/bgpsim/bgpsim6.conf \
 		programs/mrtd/mrtd.conf programs/mrtd/mrtd.ripng.conf \
 		programs/mrtd/solaris.ripng.conf
 
-#post-extract:
-#	(${CHDIR} ${WRKSRC}/..; ./make-sym-links kame)
+# nuke yet-to-be-ready directories, configure.in is written in a strange way
+post-extract:
+	(cd ${WRKSRC}/programs; ${RM} -fr route_tracker sospf srip)
 
 post-install:
 	${MKDIR} ${PREFIX}/share/examples/mrt
