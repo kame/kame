@@ -262,6 +262,7 @@ decode_prefix4(const u_char *pd, char *buf, int buflen)
 	return 1 + (plen + 7) / 8;
 }
 
+#ifdef INET6
 static int
 decode_prefix6(const u_char *pd, char *buf, int buflen)
 {
@@ -281,6 +282,7 @@ decode_prefix6(const u_char *pd, char *buf, int buflen)
 	snprintf(buf, buflen, "%s/%d", getname6((char *)&addr), plen);
 	return 1 + (plen + 7) / 8;
 }
+#endif
 
 static void
 bgp_attr_print(const struct bgp_attr *attr, const u_char *dat, int len)
@@ -347,21 +349,32 @@ bgp_attr_print(const struct bgp_attr *attr, const u_char *dat, int len)
 		}
 		p += 3;
 
+		if (af == AFNUM_INET)
+			;
+#ifdef INET6
+		else if (af == AFNUM_INET6)
+			;
+#endif
+		else
+			break;
+
 		tlen = p[0];
 		if (tlen) {
 			printf(" nexthop");
 			if (af == AFNUM_INET)
 				advance = 4;
+#ifdef INET6
 			else if (af == AFNUM_INET6)
 				advance = 16;
-			else
-				break;
+#endif
 
 			for (i = 0; i < tlen; i += advance) {
 				if (af == AFNUM_INET)
 					printf(" %s", getname(p + 1 + i));
+#ifdef INET6
 				else if (af == AFNUM_INET6)
 					printf(" %s", getname6(p + 1 + i));
+#endif
 			}
 			printf(",");
 		}
@@ -382,8 +395,10 @@ bgp_attr_print(const struct bgp_attr *attr, const u_char *dat, int len)
 		while (len - (p - dat) > 0) {
 			if (af == AFNUM_INET)
 				advance = decode_prefix4(p, buf, sizeof(buf));
+#ifdef INET6
 			else if (af == AFNUM_INET6)
 				advance = decode_prefix6(p, buf, sizeof(buf));
+#endif
 			printf(" %s", buf);
 
 			p += advance;
@@ -406,8 +421,10 @@ bgp_attr_print(const struct bgp_attr *attr, const u_char *dat, int len)
 		while (len - (p - dat) > 0) {
 			if (af == AFNUM_INET)
 				advance = decode_prefix4(p, buf, sizeof(buf));
+#ifdef INET6
 			else if (af == AFNUM_INET6)
 				advance = decode_prefix6(p, buf, sizeof(buf));
+#endif
 			printf(" %s", buf);
 
 			p += advance;
