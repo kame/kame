@@ -168,9 +168,12 @@ struct mbuf {
 #define	M_MCAST		0x0200	/* send/received as link-level multicast */
 #define	M_FRAG		0x0400	/* packet is a fragment of a larger packet */
 
+#define M_AUX		0x1000	/* mbufs pointed to by m->m_pkthdr.aux */
+
 /* flags copied when copying m_pkthdr */
 #define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_PROTO1|M_PROTO2|M_PROTO3 | \
-			    M_PROTO4|M_PROTO5|M_PROTO6|M_BCAST|M_MCAST|M_FRAG)
+			    M_PROTO4|M_PROTO5|M_PROTO6|M_BCAST|M_MCAST|M_FRAG| \
+			    M_AUX)
 
 /* mbuf types */
 #define	MT_FREE		0	/* should be on free list */

@@ -128,34 +128,19 @@ struct mbuf {
 #define	M_EOR		0x0004	/* end of record */
 #define	M_PROTO1	0x0008	/* protocol-specific */
 
-#define	M_MIP6TUNNEL	0x0010	/* MIP6 temporary use */
-
 /* mbuf pkthdr flags, also in m_flags */
 #define	M_BCAST		0x0100	/* send/received as link-level broadcast */
 #define	M_MCAST		0x0200	/* send/received as link-level multicast */
 #define M_CONF		0x0400  /* packet was encrypted (ESP-transport) */
 #define M_AUTH		0x0800  /* packet was authenticated (AH) */
 
-#if 0 /* NRL IPv6 */
-#define M_TUNNEL       	0x1000  /* packet was tunneled */
-#define M_DAD		0x2000	/* Used on outbound packets to indicate that
-				 * this is for duplicate address detection */
-#endif
-
 /* KAME IPv6 */
-#if 0 /*KAME IPSEC*/
-#define M_AUTHIPHDR	0x0010	/* data origin authentication for IP header */
-#define M_DECRYPTED	0x0020	/* confidentiality */
-#endif
-
 #define M_LOOP		0x0040	/* for Mbuf statistics */
 
-#if 0 /*KAME IPSEC*/
-#define M_AUTHIPDGM     0x0080  /* data origin authentication */
-#endif
+#define M_AUX		0x0010	/* mbufs pointed to by m->m_pkthdr.aux */
 
 /* flags copied when copying m_pkthdr */
-#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_BCAST|M_MCAST|M_CONF|M_AUTH|M_LOOP)
+#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_BCAST|M_MCAST|M_CONF|M_AUTH|M_LOOP|M_AUX)
 
 /* mbuf types */
 #define	MT_FREE		0	/* should be on free list */

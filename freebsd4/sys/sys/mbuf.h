@@ -139,9 +139,12 @@ struct mbuf {
 #define	M_FIRSTFRAG	0x0800	/* packet is first fragment */
 #define	M_LASTFRAG	0x1000	/* packet is last fragment */
 
+#define M_AUX		0x4000	/* mbufs pointed to by m->m_pkthdr.aux */
+
 /* flags copied when copying m_pkthdr */
 #define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_PROTO1|M_PROTO2|M_PROTO3 | \
-			    M_PROTO4|M_PROTO5|M_PROTO6|M_BCAST|M_MCAST|M_FRAG)
+			    M_PROTO4|M_PROTO5|M_PROTO6|M_BCAST|M_MCAST|M_FRAG \
+			    M_AUX)
 
 /* flags indicating hw checksum support and sw checksum requirements */
 #define CSUM_IP			0x0001		/* will csum IP */
