@@ -1,4 +1,4 @@
-/*	$NetBSD: route.c,v 1.36 2000/03/30 09:45:40 augustss Exp $	*/
+/*	$NetBSD: route.c,v 1.38 2000/12/11 07:52:48 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -156,6 +156,10 @@ route_init()
 	    0, NULL, NULL, M_RTABLE);
 
 	rn_init();	/* initialize all zeroes, all ones, mask table */
+#ifdef RADIX_ART
+	/* must be called after rn_init() */
+	rn_art_init();	/* initialize all zeroes, all ones, mask table */
+#endif
 	rtable_init((void **)rt_tables);
 }
 
