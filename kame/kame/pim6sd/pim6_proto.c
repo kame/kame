@@ -3649,9 +3649,11 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	 * until all segments arrive.
 	 */
 
-    for( i=0 ; i<4 ;i++)
-    prefix_h.sin6_addr.s6_addr32[i] = curr_group_addr.mcast_addr.s6_addr32[i]&curr_group_mask.s6_addr32[i];
-
+	for (i = 0; i < sizeof(struct in6_addr); i++) {
+	    prefix_h.sin6_addr.s6_addr[i] =
+		curr_group_addr.mcast_addr.s6_addr[i]
+		    & curr_group_mask.s6_addr[i];
+	}
 	
 
 	for (grp_mask_ptr = segmented_grp_mask_list;
@@ -3660,8 +3662,11 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	{
 
 
-        for( i=0 ; i<4 ;i++)
-        prefix_h2.sin6_addr.s6_addr32[i] = grp_mask_ptr->group_addr.sin6_addr.s6_addr32[i]&grp_mask_ptr->group_mask.s6_addr32[i];
+	    for (i = 0; i < sizeof(struct in6_addr); i++) {
+		prefix_h2.sin6_addr.s6_addr[i] =
+		    grp_mask_ptr->group_addr.sin6_addr.s6_addr[i]
+			& grp_mask_ptr->group_mask.s6_addr[i];
+	    }
 
 	    if (inet6_greaterthan(&prefix_h2,&prefix_h))
 		continue;

@@ -116,8 +116,8 @@ inet6_lessthan(struct sockaddr_in6 * sa1, struct sockaddr_in6 * sa2)
     {
 	for (i = 0; i < 4; i++)
 	{
-	    s32_1 = ntohl(sa1->sin6_addr.s6_addr32[i]);
-	    s32_2 = ntohl(sa2->sin6_addr.s6_addr32[i]);
+	    s32_1 = ntohl(*(u_int32_t *)&sa1->sin6_addr.s6_addr[i * 4]);
+	    s32_2 = ntohl(*(u_int32_t *)&sa2->sin6_addr.s6_addr[i * 4]);
 
 	    if (s32_1 > s32_2)
 		return (0);
@@ -144,8 +144,8 @@ inet6_greaterthan(struct sockaddr_in6 * sa1, struct sockaddr_in6 * sa2)
     {
 	for (i = 0; i < 4; i++)
 	{
-	    s32_1 = ntohl(sa1->sin6_addr.s6_addr32[i]);
-	    s32_2 = ntohl(sa2->sin6_addr.s6_addr32[i]);
+	    s32_1 = ntohl(*(u_int32_t *)&sa1->sin6_addr.s6_addr[i * 4]);
+	    s32_2 = ntohl(*(u_int32_t *)&sa2->sin6_addr.s6_addr[i * 4]);
 
 	    if (s32_1 < s32_2)
 		return (0);

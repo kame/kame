@@ -356,16 +356,16 @@ add_grp_mask(used_grp_mask_list, group_addr, group_mask, hash_mask)
 	prefix_h.sin6_scope_id = prefix_h2.sin6_scope_id = 0;
 
 
-    for( i=0 ; i<4 ;i++)
-	prefix_h.sin6_addr.s6_addr32[i] = group_addr->sin6_addr.s6_addr32[i]&group_mask.s6_addr32[i];
+    for (i = 0; i < sizeof(struct in6_addr); i++)
+	prefix_h.sin6_addr.s6_addr[i] = group_addr->sin6_addr.s6_addr[i]&group_mask.s6_addr[i];
 
 
     /* The ordering is: bigger first */
     for (grp_mask = *used_grp_mask_list; grp_mask != (grp_mask_t *) NULL;
 	 grp_mask_prev = grp_mask, grp_mask = grp_mask->next)
     {
-	for( i=0 ; i<4 ;i++)
-	    prefix_h2.sin6_addr.s6_addr32[i] = grp_mask->group_addr.sin6_addr.s6_addr32[i]&grp_mask->group_mask.s6_addr32[i];
+	for (i = 0; i < sizeof(struct in6_addr); i++)
+	    prefix_h2.sin6_addr.s6_addr[i] = grp_mask->group_addr.sin6_addr.s6_addr[i]&grp_mask->group_mask.s6_addr[i];
 
 	if (inet6_greaterthan(&prefix_h2 , &prefix_h) )
 	    continue;
@@ -711,16 +711,16 @@ delete_grp_mask(used_cand_rp_list, used_grp_mask_list, group_addr, group_mask)
     struct sockaddr_in6 prefix_h2;
 	int i;
 
-    for( i=0 ; i<4 ;i++)
-	prefix_h.sin6_addr.s6_addr32[i] = group_addr->sin6_addr.s6_addr32[i]&group_mask.s6_addr32[i];
+    for (i = 0; i < sizeof(struct in6_addr); i++)
+	prefix_h.sin6_addr.s6_addr[i] = group_addr->sin6_addr.s6_addr[i]&group_mask.s6_addr[i];
 
     for (grp_mask_ptr = *used_grp_mask_list;
 	 grp_mask_ptr != (grp_mask_t *) NULL;
 	 grp_mask_ptr = grp_mask_ptr->next)
     {
-    	for( i=0 ; i<4 ;i++)
-		prefix_h2.sin6_addr.s6_addr32[i] = 
-		grp_mask_ptr->group_addr.sin6_addr.s6_addr32[i]&grp_mask_ptr->group_mask.s6_addr32[i];
+	for (i = 0; i < sizeof(struct in6_addr); i++)
+	    prefix_h2.sin6_addr.s6_addr[i] = 
+		grp_mask_ptr->group_addr.sin6_addr.s6_addr[i]&grp_mask_ptr->group_mask.s6_addr[i];
 
 	if (inet6_greaterthan(&prefix_h2 , &prefix_h ))
 	    continue;
@@ -1028,12 +1028,12 @@ rp_grp_match(group)
     for (grp_mask_ptr = grp_mask_list; grp_mask_ptr != (grp_mask_t *) NULL;
 	 grp_mask_ptr = grp_mask_ptr->next)
     {
-   	for( i=0 ; i<4 ;i++)
-		prefix_h2.sin6_addr.s6_addr32[i] = 
-		grp_mask_ptr->group_addr.sin6_addr.s6_addr32[i]&grp_mask_ptr->group_mask.s6_addr32[i];
-   	for( i=0 ; i<4 ;i++)
-		prefix_h.sin6_addr.s6_addr32[i] = 
-		group->sin6_addr.s6_addr32[i]&grp_mask_ptr->group_mask.s6_addr32[i];
+	for (i = 0; i < sizeof(struct in6_addr); i++)
+	    prefix_h2.sin6_addr.s6_addr[i] = 
+		grp_mask_ptr->group_addr.sin6_addr.s6_addr[i]&grp_mask_ptr->group_mask.s6_addr[i];
+	for (i = 0; i < sizeof(struct in6_addr); i++)
+	    prefix_h.sin6_addr.s6_addr[i] = 
+		group->sin6_addr.s6_addr[i]&grp_mask_ptr->group_mask.s6_addr[i];
 
 
 	/* Search the grp_mask (group_prefix) list */
@@ -1067,10 +1067,10 @@ rp_grp_match(group)
 		    struct in6_addr masked_grp;
 		    int i;
 
-		    for (i = 0; i < 4; i++)
-			    masked_grp.s6_addr32[i] =
-				    group->sin6_addr.s6_addr32[i] &
-				    grp_mask_ptr->hash_mask.s6_addr32[i];
+		    for (i = 0; i < sizeof(struct in6_addr); i++)
+			    masked_grp.s6_addr[i] =
+				    group->sin6_addr.s6_addr[i] &
+				    grp_mask_ptr->hash_mask.s6_addr[i];
 		    curr_hash_value = RP_HASH_VALUE2(crc((char *)&masked_grp,
 							 sizeof(struct in6_addr)),
 						     crc((char *)&curr_address_h.sin6_addr,

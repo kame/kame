@@ -364,8 +364,9 @@ getmsg(rtm, msglen, rpfinfop)
 	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
 	{
 	    rpfinfop->rpfneighbor.sin6_scope_id =
-		ntohs(sin6->sin6_addr.s6_addr16[1]);
-	    rpfinfop->rpfneighbor.sin6_addr.s6_addr16[1] = 0;
+		ntohs(*(u_int16_t *)&sin6->sin6_addr.s6_addr[2]);
+	    rpfinfop->rpfneighbor.sin6_addr.s6_addr[2] = 0;
+	    rpfinfop->rpfneighbor.sin6_addr.s6_addr[3] = 0;
 	}
     }
 

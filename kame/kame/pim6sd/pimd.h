@@ -279,7 +279,7 @@ do { \
 			int kl; \
 			for(i=0;i<4;i++)									\
 			{													\
-				tmp_mask=ntohl((mask.s6_addr32[i])); \
+				tmp_mask=ntohl(*(u_int32_t *)&mask.s6_addr[i * 4]); \
 				for(kl=32; tmp_masklen >0 && kl>0 ; tmp_masklen--, kl-- , tmp_mask >>=1) \
 					if( tmp_mask & 0x1)			\
 						break;   	\

@@ -34,7 +34,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: config.c,v 1.1 1999/08/08 23:30:51 itojun Exp $
+ *  $Id: config.c,v 1.2 1999/08/17 13:38:03 itojun Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -171,7 +171,9 @@ config_vifs_from_kernel()
 		 * link local address and clear the index embedded in
 		 * the address.
 		 */
-		addr.sin6_addr.s6_addr16[1] = 0; /* clear interface index */
+		/* clear interface index */
+		addr.sin6_addr.s6_addr[2] = 0;
+		addr.sin6_addr.s6_addr[3] = 0;
 #endif
 	}
 
@@ -274,9 +276,9 @@ add_phaddr(v, addr, mask)
 	 * install the prefix of the address derived from the address
 	 * and the mask.
 	 */
-	for (i = 0; i < 4; i++)	/* 4 = 128 / 32 */
-		pa->pa_prefix.sin6_addr.s6_addr32[i] =
-			addr->sin6_addr.s6_addr32[i] & mask->s6_addr32[i];
+	for (i = 0; i < sizeof(struct in6_addr); i++)
+		pa->pa_prefix.sin6_addr.s6_addr[i] =
+			addr->sin6_addr.s6_addr[i] & mask->s6_addr[i];
 	pa->pa_prefix.sin6_scope_id = addr->sin6_scope_id;
 
 	if (IN6_IS_ADDR_LINKLOCAL(&addr->sin6_addr)) {

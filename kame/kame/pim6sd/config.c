@@ -220,8 +220,10 @@ config_vifs_from_kernel()
 
 		if (IN6_IS_ADDR_LINKLOCAL(&addr.sin6_addr))
 		{
-			addr.sin6_scope_id = ntohs(addr.sin6_addr.s6_addr16[1]);
-			addr.sin6_addr.s6_addr16[1] = 0;
+			addr.sin6_scope_id =
+				ntohs(*(u_int16_t *)&addr.sin6_addr.s6_addr[2]);
+			addr.sin6_addr.s6_addr[2] = 0;
+			addr.sin6_addr.s6_addr[3] = 0;
 		}
 
     /*
@@ -271,9 +273,9 @@ config_vifs_from_kernel()
 	
 /* prefix local calc. (and what about add_phaddr?...) */
 
-		for(i =0;i <4 ;i++)
-			v->uv_prefix.sin6_addr.s6_addr32[i] =
-			addr.sin6_addr.s6_addr32[i] & mask.s6_addr32[i];
+		for (i = 0; i < sizeof(struct in6_addr); i++)
+			v->uv_prefix.sin6_addr.s6_addr[i] =
+				addr.sin6_addr.s6_addr[i] & mask.s6_addr[i];
 	
 		if(flags & IFF_POINTOPOINT)
 			v->uv_flags |=(VIFF_REXMIT_PRUNES | VIFF_POINT_TO_POINT);
@@ -313,9 +315,9 @@ add_phaddr(struct uvif *v,struct sockaddr_in6 *addr,struct in6_addr *mask)
 	pa->pa_addr= *addr;
 	pa->pa_subnetmask = *mask;
 
-	for(i =0;i <4 ;i++)
-		pa->pa_prefix.sin6_addr.s6_addr32[i] =
-		addr->sin6_addr.s6_addr32[i] & mask->s6_addr32[i];
+	for(i = 0; i < sizeof(struct in6_addr); i++)
+		pa->pa_prefix.sin6_addr.s6_addr[i] =
+			addr->sin6_addr.s6_addr[i] & mask->s6_addr[i];
 	pa->pa_prefix.sin6_scope_id = addr->sin6_scope_id;
 
 
