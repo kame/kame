@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)route.c	8.6 (Berkeley) 4/28/95";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/sbin/route/route.c,v 1.40.2.9 2002/07/24 12:55:09 ru Exp $";
+  "$FreeBSD: src/sbin/route/route.c,v 1.40.2.11 2003/02/27 23:10:10 ru Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -100,13 +100,14 @@ union	sockunion {
 } so_dst, so_gate, so_mask, so_genmask, so_ifa, so_ifp;
 
 typedef union sockunion *sup;
-int	pid, rtm_addrs, uid;
+int	pid, rtm_addrs;
 int	s;
 int	forcehost, forcenet, doflush, nflag, af, qflag, tflag, keyword();
 int	iflag, verbose, aflen = sizeof (struct sockaddr_in);
 int	locking, lockrest, debugonly;
 struct	rt_metrics rt_metrics;
 u_long  rtm_inits;
+uid_t	uid;
 int	atalk_aton __P((const char *, struct at_addr *));
 char	*atalk_ntoa __P((struct at_addr));
 const char	*routename(), *netname();
@@ -172,14 +173,13 @@ main(argc, argv)
 	argv += optind;
 
 	pid = getpid();
-	uid = getuid();
+	uid = geteuid();
 	if (tflag)
 		s = open(_PATH_DEVNULL, O_WRONLY, 0);
 	else
 		s = socket(PF_ROUTE, SOCK_RAW, 0);
 	if (s < 0)
 		err(EX_OSERR, "socket");
-	setuid(uid);
 	if (*argv)
 		switch (keyword(*argv)) {
 		case K_GET:

@@ -1,5 +1,5 @@
 #	@(#)Makefile	8.1 (Berkeley) 6/5/93
-# $FreeBSD: src/sbin/route/Makefile,v 1.11.2.2 2002/04/12 11:13:56 ru Exp $
+# $FreeBSD: src/sbin/route/Makefile,v 1.11.2.3 2002/12/04 14:05:42 ru Exp $
 
 PROG=	route
 MAN=	route.8
@@ -7,7 +7,6 @@ SRCS=	route.c keywords.h
 CFLAGS+=-I. -Wall -DNS
 CFLAGS+=-DINET6
 CLEANFILES+=keywords.h _keywords.tmp
-BINMODE=4555
 
 keywords.h: keywords
 	sed -e '/^#/d' -e '/^$$/d' ${.CURDIR}/keywords > _keywords.tmp

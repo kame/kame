@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.include.dist,v 1.32.2.11 2002/07/22 14:21:43 ru Exp $
+# $FreeBSD: src/etc/mtree/BSD.include.dist,v 1.32.2.14 2003/01/24 09:47:07 roam Exp $
 #
 # Please see the file src/etc/mtree/README before making changes to this file.
 #
@@ -11,8 +11,12 @@
         scsi
         ..
     ..
+    crypto
+    ..
     dev
         an
+        ..
+        firewire
         ..
         ppbus
         ..
@@ -62,6 +66,8 @@
     netinet
     ..
     netinet6
+    ..
+    netipsec
     ..
     netipx
     ..

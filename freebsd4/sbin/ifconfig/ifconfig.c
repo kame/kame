@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)ifconfig.c	8.2 (Berkeley) 2/16/94";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.51.2.18 2002/08/30 14:23:38 sobomax Exp $";
+  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.51.2.19 2003/01/28 11:02:56 fjoe Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -1580,16 +1580,18 @@ link_status(s, info)
 	int s __unused;
 	struct rt_addrinfo *info;
 {
-	int n;
 	struct sockaddr_dl *sdl = (struct sockaddr_dl *)info;
 
-	if ((n = sdl->sdl_alen) > 0) {
+	if (sdl->sdl_alen > 0) {
 		if (sdl->sdl_type == IFT_ETHER &&
 		    sdl->sdl_alen == ETHER_ADDR_LEN)
 			printf("\tether %s\n",
 			    ether_ntoa((struct ether_addr *)LLADDR(sdl)));
-		else
-			printf("\tlladdr %s\n", link_ntoa(sdl) + n + 1);
+		else {
+			int n = sdl->sdl_nlen > 0 ? sdl->sdl_nlen + 1 : 0;
+
+			printf("\tlladdr %s\n", link_ntoa(sdl) + n);
+		}
 	}
 }
 
