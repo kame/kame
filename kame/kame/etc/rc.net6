@@ -178,7 +178,7 @@ if [ X"${ip6router}" = X"YES" ]; then
 else
 	# act as endhost - automatically configured
 
-	# whether to use the privacy extension for autoconf
+	# whether to use the privacy extension for autoconf.
         # the parameters should be set before accepting RAs.
 	if [ X"${ip6tempaddr}" = X"YES" ]; then
 	    $sysctl -w net.inet6.ip6.use_tempaddr=1
