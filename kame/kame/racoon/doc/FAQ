@@ -1,17 +1,19 @@
 racoon FAQ
 KAME team
-$KAME: FAQ,v 1.3 2000/09/13 05:53:31 itojun Exp $
+$KAME: FAQ,v 1.4 2000/09/13 06:35:54 itojun Exp $
 
 
 Q: With what other IKE/IPsec implementation racoon is known to be interoperable?
 
 A:
-	see "IMPLEMENTATION" document supplied with KAME kit, or:
+	See "IMPLEMENTATION" document supplied with KAME kit, or:
 	http://www.kame.net/dev/cvsweb.cgi/kame/IMPLMENTATION
 	As we have tested/got test reports in the past, and our end and
-	the other end may have changed their implemenation, we are not sure
-	if they interoperate today (we hope them to interoperate, but we are
-	not sure).
+	the other end may have changed their implemenations, we are not sure
+	if we can interoperate with them today (we hope them to interoperate,
+	but we are not sure).
+	Also note that, IKE interoperability highly depends on configuration
+	on both ends.  You must configure both ends exactly the same.
 
 Q: How can I make racoon interoperate with <IKE/IPsec implementation>?
 
@@ -63,7 +65,7 @@ A:
 	- as KAME problem report from http://orange.kame.net/dev/send-pr.html
 	- snap-users@kame.net
 		users mailing list, subscription guildeline: seewww.kame.net.
-	- NOT TO THE INDIVIDUAL DEVELOPERS.
+	- NOT TO INDIVIDUAL DEVELOPERS.
 
 	If your question is confidential, send your questions to:
 	- core@kame.net
