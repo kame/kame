@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.149 2003/04/17 08:37:17 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.150 2003/04/17 13:08:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -116,10 +116,6 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
-#ifdef USE_LOG_REORDER
-#include <sys/un.h>
-#include <time.h>
-#endif
 
 #if defined(__bsdi__) && _BSDI_VERSION >= 199802
 #include <irs.h>
@@ -233,7 +229,6 @@ struct ai_order {
 	struct policyqueue *aio_dstpolicy;
 	struct addrinfo *aio_ai;
 	int aio_matchlen;
-	int *aio_rulestat;	/* XXX for statistics only */
 };
 
 /* types for OS dependent portion */
@@ -295,26 +290,12 @@ static int explore_fqdn __P((const struct addrinfo *, const char *,
 #undef USE_FQDN_UNSPEC_LOOKUP
 #endif
 
-struct gai_orderstat		/* XXX: for statistics only */
-{
-	struct timeval start0;
-	struct timeval end0;
-	struct timeval start1;
-	struct timeval end1;
-	pid_t pid;
-	int numeric;
-	int entries;
-	int rulestat[16];
-};
-static int reorder __P((struct addrinfo *, struct gai_orderstat *));
+static int reorder __P((struct addrinfo *));
 static void get_addrselectpolicy __P((struct policyhead *));
 static void free_addrselectpolicy __P((struct policyhead *));
 static struct policyqueue *match_addrselectpolicy __P((struct sockaddr *,
 						       struct policyhead *));
 static int matchlen __P((struct sockaddr *, struct sockaddr *));
-#ifdef USE_LOG_REORDER
-static void log_reorder __P((struct gai_orderstat *));
-#endif
 
 static struct ai_errlist {
 	const char *str;
@@ -715,8 +696,6 @@ globcopy:
 	 */
 	if (error == 0) {
 		if (sentinel.ai_next) {
-			struct gai_orderstat gstat; /* XXX for statistics */
-
 			/*
 			 * If the returned entry is for an active connection,
 			 * and the given name is not numeric, reorder the
@@ -724,23 +703,8 @@ globcopy:
 			 * in the most efficient order. 
 			 */
 			if (hints == NULL || !(hints->ai_flags & AI_PASSIVE)) {
-				int n;
-
-				memset(&gstat, 0, sizeof(gstat));
-				gstat.numeric = numeric;
-
-#ifdef USE_LOG_REORDER
-				gettimeofday(&gstat.start0, NULL);
-#endif
-#if 0 /* XXX: see comments at the head of reorder() */
 				if (!numeric)
-#endif
-					n = reorder(&sentinel, &gstat);
-#ifdef USE_LOG_REORDER
-				gettimeofday(&gstat.end0, NULL);
-				gstat.entries = n;
-				log_reorder(&gstat);
-#endif
+					(void)reorder(&sentinel);
 			}
 			*res = sentinel.ai_next;
 			error = 0;
@@ -761,16 +725,9 @@ bad:
 	return error;
 }
 
-/*
- * XXX: the argument "gstat" is only for statistics collection; for example,
- *      we should just skip calling this function in "numeric" cases.
- *      "rulestat" array is for statistics only, too.
- *      After the evaluation period, we should clarify them.
- */
 static int
-reorder(sentinel, gstat)
+reorder(sentinel)
 	struct addrinfo *sentinel;
-	struct gai_orderstat *gstat;
 {
 	struct addrinfo *ai, **aip;
 	struct ai_order *aio;
@@ -787,9 +744,6 @@ reorder(sentinel, gstat)
 	if (n <= 1)
 		return(n);
 
-	if (gstat->numeric)	/* XXX see the beginning comments */
-		return(n);
-
 	/* allocate a temporary array for sort and initialization of it. */
 	if ((aio = malloc(sizeof(*aio) * n)) == NULL)
 		return(n);	/* give up reordering */
@@ -802,20 +756,9 @@ reorder(sentinel, gstat)
 	for (i = 0, ai = sentinel->ai_next; i < n; ai = ai->ai_next, i++) {
 		aio[i].aio_ai = ai;
 		aio[i].aio_dstscope = gai_addr2scopetype(ai->ai_addr);
-		aio[i].aio_rulestat = gstat->rulestat;
 		aio[i].aio_dstpolicy = match_addrselectpolicy(ai->ai_addr,
 							      &policyhead);
-#ifndef USE_LOG_REORDER
-		set_source(&aio[i], &policyhead);
-#endif
 	}
-#ifdef USE_LOG_REORDER
-	gettimeofday(&gstat->start1, NULL);
-	for (i = 0, ai = sentinel->ai_next; i < n; ai = ai->ai_next, i++) {
-		set_source(&aio[i], &policyhead);
-	}
-	gettimeofday(&gstat->end1, NULL);	
-#endif
 
 	/* perform sorting. */
 	qsort(aio, n, sizeof(*aio), comp_dst);
@@ -837,7 +780,7 @@ static void
 get_addrselectpolicy(head)
 	struct policyhead *head;
 {
-#if defined(INET6)
+#ifdef INET6
 	int mib[] = { CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_ADDRCTLPOLICY };
 	size_t l;
 	char *buf;
@@ -1060,10 +1003,6 @@ matchlen(src, dst)
 	return(match);
 }
 
-/*
- * XXX: incrementing aio_rulestat is just for statistics collection.
- * we should eventually cleanup the code after the evaluation process.
- */
 static int
 comp_dst(arg1, arg2)
 	const void *arg1, *arg2;
@@ -1076,24 +1015,20 @@ comp_dst(arg1, arg2)
 	 */
 	if (dst1->aio_srcsa.sa_family != AF_UNSPEC &&
 	    dst2->aio_srcsa.sa_family == AF_UNSPEC) {
-		dst1->aio_rulestat[1]++;
 		return(-1);
 	}
 	if (dst1->aio_srcsa.sa_family == AF_UNSPEC &&
 	    dst2->aio_srcsa.sa_family != AF_UNSPEC) {
-		dst1->aio_rulestat[1]++;
 		return(1);
 	}
 
 	/* Rule 2: Prefer matching scope. */
 	if (dst1->aio_dstscope == dst1->aio_srcscope &&
 	    dst2->aio_dstscope != dst2->aio_srcscope) {
-		dst1->aio_rulestat[2]++;
 		return(-1);
 	}
 	if (dst1->aio_dstscope != dst1->aio_srcscope &&
 	    dst2->aio_dstscope == dst2->aio_srcscope) {
-		dst1->aio_rulestat[2]++;
 		return(1);
 	}
 
@@ -1102,12 +1037,10 @@ comp_dst(arg1, arg2)
 	    dst2->aio_srcsa.sa_family != AF_UNSPEC) {
 		if (!(dst1->aio_srcflag & AIO_SRCFLAG_DEPRECATED) &&
 		    (dst2->aio_srcflag & AIO_SRCFLAG_DEPRECATED)) {
-			dst1->aio_rulestat[3]++;
 			return(-1);
 		}
 		if ((dst1->aio_srcflag & AIO_SRCFLAG_DEPRECATED) &&
 		    !(dst2->aio_srcflag & AIO_SRCFLAG_DEPRECATED)) {
-			dst1->aio_rulestat[3]++;
 			return(1);
 		}
 	}
@@ -1123,7 +1056,6 @@ comp_dst(arg1, arg2)
 	    (dst2->aio_srcpolicy == NULL || dst2->aio_dstpolicy == NULL ||
 	     dst2->aio_srcpolicy->pc_policy.label !=
 	     dst2->aio_dstpolicy->pc_policy.label)) {
-		dst1->aio_rulestat[5]++;
 		return(-1);
 	}
 	if (dst2->aio_srcpolicy && dst2->aio_dstpolicy &&
@@ -1132,7 +1064,6 @@ comp_dst(arg1, arg2)
 	    (dst1->aio_srcpolicy == NULL || dst1->aio_dstpolicy == NULL ||
 	     dst1->aio_srcpolicy->pc_policy.label !=
 	     dst1->aio_dstpolicy->pc_policy.label)) {
-		dst1->aio_rulestat[5]++;
 		return(1);
 	}
 #endif
@@ -1143,14 +1074,12 @@ comp_dst(arg1, arg2)
 	    (dst2->aio_dstpolicy == NULL ||
 	     dst1->aio_dstpolicy->pc_policy.preced >
 	     dst2->aio_dstpolicy->pc_policy.preced)) {
-		dst1->aio_rulestat[6]++;
 		return(-1);
 	}
 	if (dst2->aio_dstpolicy &&
 	    (dst1->aio_dstpolicy == NULL ||
 	     dst2->aio_dstpolicy->pc_policy.preced >
 	     dst1->aio_dstpolicy->pc_policy.preced)) {
-		dst1->aio_rulestat[6]++;
 		return(1);
 	}
 #endif
@@ -1161,12 +1090,10 @@ comp_dst(arg1, arg2)
 	/* Rule 8: Prefer smaller scope. */
 	if (dst1->aio_dstscope >= 0 &&
 	    dst1->aio_dstscope < dst2->aio_dstscope) {
-		dst1->aio_rulestat[8]++;
 		return(-1);
 	}
 	if (dst2->aio_dstscope >= 0 &&
 	    dst2->aio_dstscope < dst1->aio_dstscope) {
-		dst1->aio_rulestat[8]++;
 		return(1);
 	}
 
@@ -1177,44 +1104,16 @@ comp_dst(arg1, arg2)
 	if (dst1->aio_ai->ai_addr->sa_family ==
 	    dst2->aio_ai->ai_addr->sa_family) {
 		if (dst1->aio_matchlen > dst2->aio_matchlen) {
-			dst1->aio_rulestat[9]++;
 			return(-1);
 		}
 		if (dst1->aio_matchlen < dst2->aio_matchlen) {
-			dst1->aio_rulestat[9]++;
 			return(1);
 		}
 	}
 
 	/* Rule 10: Otherwise, leave the order unchanged. */
-	dst1->aio_rulestat[10]++;
 	return(-1);
 }
-
-#ifdef USE_LOG_REORDER
-#define PATH_STATFILE "/var/run/gaistat"
-
-static void
-log_reorder(gstat)
-	struct gai_orderstat *gstat;
-{
-	struct sockaddr_un sun;
-	int s;
-
-	gstat->pid = getpid();
-
-	if ((s = socket(AF_LOCAL, SOCK_DGRAM, 0)) < 0)
-		return;
-	memset(&sun, 0, sizeof(sun));
-	sun.sun_family = AF_LOCAL;
-	sun.sun_len = sizeof(sun);
-	strncpy(sun.sun_path, PATH_STATFILE, sizeof(sun.sun_path));
-	sendto(s, gstat, sizeof(*gstat), 0, (struct sockaddr *)&sun,
-	       sizeof(sun));
-
-	close(s);
-}
-#endif /* USE_LOG_REORDER */
 
 /*
  * Copy from scope.c.
