@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.h,v 1.9 2000/11/18 07:44:52 jinmei Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.10 2000/11/30 12:55:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -88,7 +88,7 @@ struct	inpcb *
 				struct in6_addr *, u_int, struct in6_addr *,
 				u_int, int, struct ifnet *));
 void	in6_pcbnotify __P((struct inpcbhead *, struct sockaddr *,
-			   u_int, struct in6_addr *, u_int, int, void *,
+			   u_int, struct sockaddr *, u_int, int, void *,
 			   void (*)(struct inpcb *, int)));
 void	in6_rtchange __P((struct inpcb *, int));
 int	in6_setpeeraddr __P((struct socket *so, struct sockaddr **nam));

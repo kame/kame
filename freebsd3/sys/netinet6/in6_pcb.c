@@ -754,18 +754,18 @@ in6_mapped_peeraddr(struct socket *so, struct sockaddr **nam)
  * Must be called at splnet.
  */
 void
-in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, cmdarg, notify)
+in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 	struct inpcbhead *head;
-	struct sockaddr *dst;
+	struct sockaddr *dst, *src;
 	u_int fport_arg, lport_arg;
-	struct in6_addr *laddr6;
 	int cmd;
 	void *cmdarg;
 	void (*notify) __P((struct inpcb *, int));
 {
 	struct inpcb *inp, *ninp;
-	struct in6_addr faddr6;
+	struct in6_addr faddr6, laddr6;
 	u_short	fport = fport_arg, lport = lport_arg;
+	u_int32_t flowinfo;
 	int errno, s;
 
 	if ((unsigned)cmd > PRC_NCMDS || dst->sa_family != AF_INET6)
@@ -773,6 +773,8 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, cmdarg, notify)
 	faddr6 = ((struct sockaddr_in6 *)dst)->sin6_addr;
 	if (IN6_IS_ADDR_UNSPECIFIED(&faddr6))
 		return;
+	laddr6 = ((struct sockaddr_in6 *)src)->sin6_addr;
+	flowinfo = ((struct sockaddr_in6 *)src)->sin6_flowinfo;
 
 	/*
 	 * Redirects go to all references to the destination,
@@ -785,7 +787,7 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, cmdarg, notify)
 	if (PRC_IS_REDIRECT(cmd) || cmd == PRC_HOSTDEAD) {
 		fport = 0;
 		lport = 0;
-		bzero((caddr_t)laddr6, sizeof(*laddr6));
+		bzero((caddr_t)&laddr6, sizeof(laddr6));
 
 		if (cmd != PRC_HOSTDEAD)
 			notify = in6_rtchange;
@@ -816,14 +818,28 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, cmdarg, notify)
 					(u_int32_t *)cmdarg);
 		}
 
-		if (!IN6_ARE_ADDR_EQUAL(&inp->in6p_faddr, &faddr6) ||
-		   inp->inp_socket == 0 ||
-		   (lport && inp->inp_lport != lport) ||
-		   (!IN6_IS_ADDR_UNSPECIFIED(laddr6) &&
-		    !IN6_ARE_ADDR_EQUAL(&inp->in6p_laddr, laddr6)) ||
-		   (fport && inp->inp_fport != fport))
+		/*
+		 * Detect if we should notify the error. If no source and
+		 * destination ports are specifed, but non-zero flowinfo and
+		 * local address match, notify the error. This is the case
+		 * when the error is delivered with an encrypted error buffer
+		 * by ESP. Otherwise, just compare addresses and ports
+		 * as usual.
+		 */
+		if (lport == 0 && fport == 0 && flowinfo &&
+		    inp->inp_socket != NULL &&
+		    flowinfo == (inp->in6p_flowinfo & IPV6_FLOWLABEL_MASK) &&
+		    IN6_ARE_ADDR_EQUAL(&inp->in6p_laddr, &laddr6))
+			goto do_notify;
+		else if (!IN6_ARE_ADDR_EQUAL(&inp->in6p_faddr, &faddr6) ||
+			 inp->inp_socket == 0 ||
+			 (lport && inp->inp_lport != lport) ||
+			 (!IN6_IS_ADDR_UNSPECIFIED(&laddr6) &&
+			  !IN6_ARE_ADDR_EQUAL(&inp->in6p_laddr, &laddr6)) ||
+			 (fport && inp->inp_fport != fport))
 			continue;
 
+	  do_notify:
 		if (notify)
 			(*notify)(inp, errno);
 	}
