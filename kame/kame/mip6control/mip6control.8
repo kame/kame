@@ -1,4 +1,4 @@
-.\"	$KAME: mip6control.8,v 1.8 2002/01/25 00:07:31 keiichi Exp $
+.\"	$KAME: mip6control.8,v 1.9 2002/06/18 07:35:14 keiichi Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001 WIDE Project.
 .\" All rights reserved.
@@ -56,6 +56,9 @@
 .Oc
 .Oo -v
 .Ar address#port
+.Oc
+.Oo -F
+.Ar [ifp1[:ifp2[:ifp3]]]
 .Oc
 .Oo -S
 .Ar 0|1
@@ -124,6 +127,9 @@ Add a rule that MN doesn't add a Home Address option to the outgoing packet.
 Delete the rule which specified one.
 .It Fl w
 Show the rule.
+.It Fl F Ar [ifp1[:ifp2[:ifp3]]]
+Set preferrable network interfaces for CoA selection.
+Specify nothing to remove the preferences.
 .It Fl S Ar 0|1
 When set to 0, the IPsec protection check of the incoming binding updates
 and binding acks will not be performed (always pass the check).

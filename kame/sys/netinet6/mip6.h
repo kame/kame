@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.53 2002/06/18 02:32:48 k-sugyou Exp $	*/
+/*	$KAME: mip6.h,v 1.54 2002/06/18 07:35:15 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -41,16 +41,23 @@
 #define SIOCSMIP6CFG_DISABLEAUTHDATA 6
 #define SIOCSMIP6CFG_ENABLEDEBUG     128
 #define SIOCSMIP6CFG_DISABLEDEBUG    129
-#define SIOCGBC      _IOWR('m', 122, struct mip6_req)
-#define SIOCSUNUSEHA _IOW('m', 123, struct mip6_req)
-#define SIOCGUNUSEHA _IOWR('m', 124, struct mip6_req)
-#define SIOCDUNUSEHA _IOW('m', 125, struct mip6_req)
+#define SIOCGBC               _IOWR('m', 122, struct mip6_req)
+#define SIOCSUNUSEHA          _IOW('m', 123, struct mip6_req)
+#define SIOCGUNUSEHA          _IOWR('m', 124, struct mip6_req)
+#define SIOCDUNUSEHA          _IOW('m', 125, struct mip6_req)
+#define SIOCDBC               _IOW('m', 126, struct mip6_req)
+#define SIOCSPREFERREDIFNAMES _IOW('m', 127, struct mip6_req)
 
+struct mip6_preferred_ifnames {
+	char mip6pi_ifname[3][IFNAMSIZ];
+	/* is 3 enough? or should it be dynamic? */
+};
 struct mip6_req {
 	u_int8_t mip6r_count;
 	union {
 		struct mip6_bc *mip6r_mbc;
 		struct sockaddr_in6 mip6r_sin6;
+		struct mip6_preferred_ifnames mip6r_ifnames;
 	} mip6r_ru;
 };
 

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.131 2002/06/18 02:32:48 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.132 2002/06/18 07:35:15 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -144,6 +144,12 @@ extern struct mip6_bc_list mip6_bc_list;
 extern struct mip6_unuse_hoa_list mip6_unuse_hoa;
 
 struct mip6_config mip6_config;
+
+/*
+ * XXX should we dynamically allocate the space to support any number
+ * of ifps?
+ */
+static struct mip6_preferred_ifnames mip6_preferred_ifnames;
 
 #ifdef __NetBSD__
 struct callout mip6_pfx_ch = CALLOUT_INITIALIZER;
@@ -835,9 +841,13 @@ int
 mip6_select_coa2(void)
 {
 	struct ifnet *ifp;
-	struct ifaddr *ia, *ia_next;
-	struct in6_ifaddr *ia6, *samecoa = NULL, *othercoa = NULL;
-	struct sockaddr_in6 ia_addr;
+	struct ifaddr *ia;
+	struct in6_ifaddr *ia6, *ia6_best;
+	struct sockaddr_in6 ia6_addr;
+	int score, score_best;
+
+	score = score_best = -1;
+	ia6 = ia6_best = NULL;
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	for (ifp = ifnet; ifp; ifp = ifp->if_next)
@@ -849,20 +859,19 @@ mip6_select_coa2(void)
 			continue;
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		for (ia = ifp->if_addrlist; ia; ia = ia_next)
+		for (ia = ifp->if_addrlist;
+		     ia;
+		     ia = ia->ifa_next)
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 4
-		for (ia = TAILQ_FIRST(&ifp->if_addrhead); ia; ia = ia_next)
+		for (ia = TAILQ_FIRST(&ifp->if_addrhead);
+		     ia;
+		     ia = TAILQ_NEXT(ia, ifa_link))
 #else
-		for (ia = ifp->if_addrlist.tqh_first; ia; ia = ia_next)
+		for (ia = ifp->if_addrlist.tqh_first;
+		     ia;
+		     ia = ia->ifa_list.tqe_next)
 #endif
 		{
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-			ia_next = ia->ifa_next;
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
-			ia_next = TAILQ_NEXT(ia, ifa_link);
-#else
-			ia_next = ia->ifa_list.tqe_next;
-#endif
 			if (ia->ifa_addr->sa_family != AF_INET6)
 				continue;
 			ia6 = (struct in6_ifaddr *)ia;
@@ -878,55 +887,67 @@ mip6_select_coa2(void)
 			     | IN6_IFF_DEPRECATED))
 				continue;
 
-			ia_addr = ia6->ia_addr;
+			ia6_addr = ia6->ia_addr;
 			if (in6_addr2zoneid(ia6->ia_ifp,
-					    &ia_addr.sin6_addr,
-					    &ia_addr.sin6_scope_id)) {
+					    &ia6_addr.sin6_addr,
+					    &ia6_addr.sin6_scope_id)) {
 				continue; /* XXX */
 			}
-			if (SA6_IS_ADDR_UNSPECIFIED(&ia_addr))
+			if (SA6_IS_ADDR_UNSPECIFIED(&ia6_addr))
 				continue;
-			if (IN6_IS_ADDR_LOOPBACK(&ia_addr.sin6_addr))
+			if (IN6_IS_ADDR_LOOPBACK(&ia6_addr.sin6_addr))
 				continue;
-			if (IN6_IS_ADDR_LINKLOCAL(&ia_addr.sin6_addr))
+			if (IN6_IS_ADDR_LINKLOCAL(&ia6_addr.sin6_addr))
 				continue;
+
+			score = 0;
+
+			/* prefer user specified CoA interfaces. */
+			if (strncmp(if_name(ifp),
+			    mip6_preferred_ifnames.mip6pi_ifname[0], IFNAMSIZ))
+				score += 4;
+			if (strncmp(if_name(ifp),
+			    mip6_preferred_ifnames.mip6pi_ifname[1], IFNAMSIZ))
+				score += 3;
+			if (strncmp(if_name(ifp),
+			    mip6_preferred_ifnames.mip6pi_ifname[2], IFNAMSIZ))
+				score += 2;
 
 			/* keep CoA same as possible. */
-			if (SA6_ARE_ADDR_EQUAL(&hif_coa,
-					       &ia_addr)) {
-			    samecoa = ia6;
-			    break;
+			if (SA6_ARE_ADDR_EQUAL(&hif_coa, &ia6_addr))
+				score += 1;
+
+			if (score > score_best) {
+				score_best = score;
+				ia6_best = ia6;
 			}
-
-			/* next candidate. */
-			othercoa = ia6;
 		}
-		if (samecoa)
-			break;
-	}
-	if (samecoa) {
-		/* CoA didn't change. */
-		return (0);
 	}
 
-	if (othercoa == NULL) {
+	if (ia6_best == NULL) {
 		mip6log((LOG_INFO,
-			 "%s:%d: no available CoA found\n",
-			 __FILE__, __LINE__));
+		    "%s:%d: no available CoA found\n", __FILE__, __LINE__));
 		return (0);
 	}
 
-	ia_addr = othercoa->ia_addr;
-	if (in6_addr2zoneid(othercoa->ia_ifp,
-			    &ia_addr.sin6_addr,
-			    &ia_addr.sin6_scope_id)) {
+	/* recover scope information. */
+	ia6_addr = ia6_best->ia_addr;
+	if (in6_addr2zoneid(ia6_best->ia_ifp, &ia6_addr.sin6_addr,
+	    &ia6_addr.sin6_scope_id)) {
 		return (-1);
 	}
-	hif_coa = ia_addr;
+
+	/* check if the CoA has been changed. */
+	if (SA6_ARE_ADDR_EQUAL(&hif_coa, &ia6_addr)) {
+		/* CoA has not been changed. */
+		return (0);
+	}
+
+	hif_coa = ia6_addr;
 	mip6log((LOG_INFO,
 		 "%s:%d: CoA has changed to %s\n",
 		 __FILE__, __LINE__,
-		 ip6_sprintf(&ia_addr.sin6_addr)));
+		 ip6_sprintf(&ia6_addr.sin6_addr)));
 	return (1);
 }
 
@@ -1478,6 +1499,19 @@ mip6_ioctl(cmd, data)
 		}
 		break;
 
+	case SIOCSPREFERREDIFNAMES:
+	{
+		/*
+		 * set preferrable ifps for selecting CoA.  we must
+		 * keep the name as a string because other information
+		 * (such as a pointer, interface index) may be changed
+		 * when removing the devices.
+		 */
+		bcopy(&mr->mip6r_ru.mip6r_ifnames, &mip6_preferred_ifnames,
+		    sizeof(mr->mip6r_ru.mip6r_ifnames));
+	}
+		
+		break;
 	}
 
 	splx(s);

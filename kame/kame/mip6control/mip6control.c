@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.26 2002/06/10 02:26:22 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.27 2002/06/18 07:35:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -168,6 +168,8 @@ main(argc, argv)
 	char *authdataarg = NULL;
 	int ifid = 0;
 	char *ifidarg = NULL;
+	int ifnames = 0;
+	char *ifname_list = NULL;
 
 	__progname = strrchr(argv[0], '/');
 	if (__progname == NULL)
@@ -175,7 +177,7 @@ main(argc, argv)
 	else
 		__progname++;
 
-	while ((ch = getopt(argc, argv, "nli:mMgH:hP:A:aL:bcu:v:wD:S:T:I:")) != -1) {
+	while ((ch = getopt(argc, argv, "nli:mMgH:hP:A:aL:bcu:v:wD:S:T:I:F:")) != -1) {
 		switch(ch) {
 		case 'm':
 			enablemn = 1;
@@ -249,6 +251,10 @@ main(argc, argv)
 		case 'I':
 			ifid = 1;
 			ifidarg = optarg;
+			break;
+		case 'F':
+			ifnames = 1;
+			ifname_list = optarg;
 			break;
 		default:
 			usage();
@@ -658,6 +664,35 @@ main(argc, argv)
 		getaddress(ifidarg, &ifid_sa);
 		*ifid = ifid_sa.sin6_addr;
 		if (ioctl(s, SIOCSIFID_HIF, (caddr_t)ifr) == -1) {
+			perror("ioctl");
+			exit(1);
+		}
+	}
+
+	if (ifnames && ifname_list) {
+		struct mip6_req mr;
+		char *delimiter = ifname_list;
+		char *ifname = ifname_list;
+		int i = 0;
+
+		bzero (&mr, sizeof(mr));
+
+		while (delimiter != NULL) {
+			delimiter = strchr(ifname, ':');
+			if (delimiter != NULL) {
+				*delimiter = '\0';
+				strncpy(mr.mip6r_ru.mip6r_ifnames.mip6pi_ifname[i++],
+				    ifname, IFNAMSIZ);
+				ifname = delimiter + 1;
+				if (i > 3)
+					break;
+			} else {
+				strncpy(mr.mip6r_ru.mip6r_ifnames.mip6pi_ifname[i],
+				    ifname, IFNAMSIZ);
+				break;
+			}
+		}
+		if (ioctl(s, SIOCSPREFERREDIFNAMES, (caddr_t)&mr) == -1) {
 			perror("ioctl");
 			exit(1);
 		}
