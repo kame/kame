@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.376 2004/07/07 10:16:04 suz Exp $	*/
+/*	$KAME: in6.c,v 1.377 2004/07/09 13:29:49 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -346,11 +346,11 @@ in6_ifaddloop(struct ifaddr *ifa)
 		in6_ifloop_request(RTM_DELETE, ifa);
 	}
 #endif /* MIP6 && MIP6_MOBILE_NODE */
+	if (rt)
+		rtfree(rt);
 	if (need_loop) {
 		in6_ifloop_request(RTM_ADD, ifa);
 	}
-	if (rt)
-		rtfree(rt);
 }
 
 /*
@@ -990,9 +990,7 @@ in6_update_ifa(ifp, ifra, ia, flags)
 #ifndef __FreeBSD__
 	time_t time_second = (time_t)time.tv_sec;
 #endif
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 502010)
 	struct rtentry *rt;
-#endif
 	int delay;
 
 	/* Validate parameters */
@@ -1336,7 +1334,6 @@ in6_update_ifa(ifp, ifra, ia, flags)
 		zoneid = mltaddr.sin6_scope_id;
 		mltaddr.sin6_scope_id = 0;
 
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 502010)
 		/*
 		 * XXX: do we really need this automatic routes?
 		 * We should probably reconsider this stuff.  Most applications
@@ -1356,7 +1353,11 @@ in6_update_ifa(ifp, ifra, ia, flags)
 			if (memcmp(&mltaddr.sin6_addr,
 			    &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr,
 			    32 / 8)) {
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 502010)
+				RTFREE_LOCKED(rt);
+#else
 				RTFREE(rt);
+#endif
 				rt = NULL;
 			}
 		}
@@ -1384,9 +1385,12 @@ in6_update_ifa(ifp, ifra, ia, flags)
 			if (error)
 				goto cleanup;
 		} else {
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 502010)
+			RTFREE_LOCKED(rt);
+#else
 			RTFREE(rt);
+#endif
 		}
-#endif /* if !(FreeBSD_version >= 502010) */
 
 		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error, 0);
 		if (!imm) {
@@ -1447,7 +1451,6 @@ in6_update_ifa(ifp, ifra, ia, flags)
 		zoneid = mltaddr.sin6_scope_id;
 		mltaddr.sin6_scope_id = 0;
 
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 502010)
 		/* XXX: again, do we really need the route? */
 #ifdef __FreeBSD__
 		rt = rtalloc1((struct sockaddr *)&mltaddr, 0, 0UL);
@@ -1486,9 +1489,12 @@ in6_update_ifa(ifp, ifra, ia, flags)
 			if (error)
 				goto cleanup;
 		} else {
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 502010)
+			RTFREE_LOCKED(rt);
+#else
 			RTFREE(rt);
+#endif
 		}
-#endif /* if !(FreeBSD_version >= 502010) */
 
 		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error, 0);
 		if (!imm) {
