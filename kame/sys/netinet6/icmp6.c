@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.235 2001/07/29 10:52:28 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.236 2001/08/02 11:18:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -580,7 +580,7 @@ icmp6_input(mp, offp, proto)
 #else
 		case ICMP6_DST_UNREACH_BEYONDSCOPE:
 			/* I mean "source address was incorrect." */
-			code = PRC_PARAMPROB;
+			code = PRC_UNREACH_NET;
 			break;
 #endif
 		case ICMP6_DST_UNREACH_NOPORT:
