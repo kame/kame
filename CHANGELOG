@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1791 2001/07/20 21:41:36 itojun Exp $
+$KAME: CHANGELOG,v 1.1792 2001/07/21 01:25:32 itojun Exp $
 
 <200107>
 Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
@@ -9,13 +9,13 @@ Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
 	  experimental, netbsd only.
 	  - multipath support will be enabled for inet and inet6 radix table,
 	    if "options RADIX_MPATH" is specified.
-	  - even with multipath enabled, there's no behavior change if you
-	    operate it normally.
+	  - even with multipath support enabled, there's no behavior change if
+	    you operate it normally with single routing entries per rt_key.
 	  - if you issue multiple RTM_ADD requests with the same rt_key, they
 	    will coexist in the routing table (4.4BSD behavior: the latter one
 	    gets rejected with EEXIST).  first one to get added will appear
-	    at the top of rn_dupedkey, so on normal lookups first one got
-	    added will be picked up (i.e. fewer behavior change).
+	    at the top of rn_dupedkey, so on normal lookups the first one 
+	    will be picked up (fewer behavior change).
 	  - on RTM_DELETE/CHANGE/LOCK, it is now required to specify
 	    rt_gateway, if there are multiple route entries with the same
 	    rt_key.  if there's only one entry, no need for rt_gateway
@@ -24,7 +24,7 @@ Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
 	    if you specify rt_gateway.  rt_gateway is still optional,
 	    and the first route is returned if it is not specified.
 	  - IPv4 and IPv6 output logic will pick a route out of multiple
-	    gateways, by very simple hash based on ip{,6}_dst bits.
+	    gateways, based on Modulo-N Hash (RFC2991) using ip{,6}_dst bits.
 	  
 	  DEMO:
 	  (adding multipath routes)
@@ -48,8 +48,9 @@ Sat Jul 21 03:35:20 JST 2001  itojun@iijlab.net
 	  due to multicast routing entries (like ff01::/32).
 	  will fix it soon.
 
-	  L3 TODO: more clever hash/gw selection policy, bypassing failing
-	  gateways, revisit issues with cached route on struct route/sendto(3)
+	  L3 TODO: more clever hash/gw selection policy (-> RFC2991/2992),
+	  avoid faulty gateways/nonworking paths, revisit issues with cached
+	  route on struct route/sendto(3)
 
 Fri Jul 20 14:20:51 JST 2001  itojun@iijlab.net
 	* nodeinfod: a daemon that responds to node information queries.
