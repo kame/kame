@@ -1,4 +1,4 @@
-/*	$KAME: probe.c,v 1.11 2001/09/19 04:48:37 itojun Exp $	*/
+/*	$KAME: probe.c,v 1.12 2001/11/13 09:50:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -110,7 +110,7 @@ defrouter_probe(int ifindex)
 		warnmsg(LOG_ERR, __FUNCTION__, "socket: %s", strerror(errno));
 		return;
 	}
-	bzero(&dr, sizeof(dr));
+	memset(&dr, 0, sizeof(dr));
 	strcpy(dr.ifname, "lo0"); /* dummy interface */
 	if (ioctl(s, SIOCGDRLST_IN6, (caddr_t)&dr) < 0) {
 		warnmsg(LOG_ERR, __FUNCTION__, "ioctl(SIOCGDRLST_IN6): %s",
@@ -148,7 +148,7 @@ sendprobe(struct in6_addr *addr, int ifindex)
 	struct cmsghdr *cm;
 	u_char ntopbuf[INET6_ADDRSTRLEN], ifnamebuf[IFNAMSIZ];;
 
-	bzero(&sa6_probe, sizeof(sa6_probe));
+	memset(&sa6_probe, 0, sizeof(sa6_probe));
 	sa6_probe.sin6_family = AF_INET6;
 	sa6_probe.sin6_len = sizeof(sa6_probe);
 	sa6_probe.sin6_addr = *addr;
