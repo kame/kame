@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.16 2000/08/18 14:15:34 itojun Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.17 2000/08/19 01:58:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -253,20 +253,21 @@ fakeTimxceed(struct _cv *cv4from, struct mbuf *m4)
 
     {
 	int	cksum;
-	u_char	Dum[8], Dee[8];
+	struct {
+		struct in_addr a;
+		u_int16_t p;
+	} Dum, Dee;
 
-	*(u_long *)&Dum[0] = ats->remote.in4src.s_addr;
-	*(u_long *)&Dee[0] = ats->local.in4dst.s_addr;
-	cksum = adjustChecksum(ntohs(innerip4to->ip_sum),
-			       (u_char *)&Dum, 4,
-			       (u_char *)&Dee, 4);
+	bcopy(&ats->remote.in4src, &Dum.a, sizeof(Dum.a));
+	bcopy(&ats->remote.in4dst, &Dee.a, sizeof(Dee.a));
+	cksum = adjustChecksum(ntohs(innerip4to->ip_sum), &Dum.a, sizeof(Dum.a),
+	    &Dee.a, sizeof(Dee.a));
 	innerip4to->ip_sum = htons(cksum);
 
-	*(u_short *)&Dum[4] = ats->remote._sport;
-	*(u_short *)&Dum[4] = ats->local._dport;
-	cksum = adjustChecksum(ntohs(icmp4to->icmp_cksum),
-				(u_char *)&Dum, 6,
-				(u_char *)&Dee, 6);
+	Dum.p = ats->remote._sport;
+	Dum.p = ats->local._sport;	/*XXX BUG? */
+	cksum = adjustChecksum(ntohs(icmp4to->icmp_cksum), &Dum, sizeof(Dum),
+	    &Dee, sizeof(Dee));
 	icmp4to->icmp_cksum = htons(cksum);
     }
     
