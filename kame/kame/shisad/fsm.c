@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.12 2005/02/28 22:39:12 keiichi Exp $	*/
+/*	$KAME: fsm.c,v 1.13 2005/02/28 23:20:41 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -910,7 +910,7 @@ bul_reg_fsm(bul, event, data)
 				}
 
 				bul->bul_retrans_time
-				    = INITIAL_BINDACK_TIMEOUT;
+				    = initial_bindack_timeout_first_reg;
 				bul_set_retrans_timer(bul,
 				    bul->bul_retrans_time);
 
@@ -954,7 +954,7 @@ bul_reg_fsm(bul, event, data)
 				}
 
 				bul->bul_retrans_time
-				    = INITIAL_BINDACK_TIMEOUT;
+				    = initial_bindack_timeout_first_reg;
 				bul_set_retrans_timer(bul,
 				    bul->bul_retrans_time);
 
@@ -994,7 +994,7 @@ bul_reg_fsm(bul, event, data)
 				}
 
 				bul->bul_retrans_time
-				    = INITIAL_BINDACK_TIMEOUT;
+				    = initial_bindack_timeout_first_reg;
 				bul_set_retrans_timer(bul,
 				    bul->bul_retrans_time);
 
@@ -1157,7 +1157,7 @@ bul_reg_fsm(bul, event, data)
 				}
 
 				bul->bul_retrans_time
-				    = INITIAL_BINDACK_TIMEOUT;
+				    = initial_bindack_timeout_first_reg;
 				bul_set_retrans_timer(bul,
 				    bul->bul_retrans_time);
 
@@ -1213,7 +1213,7 @@ bul_reg_fsm(bul, event, data)
 				}
 
 				bul->bul_retrans_time
-				    = INITIAL_BINDACK_TIMEOUT;
+				    = initial_bindack_timeout_first_reg;
 				bul_set_retrans_timer(bul,
 				    bul->bul_retrans_time);
 
@@ -1253,7 +1253,7 @@ bul_reg_fsm(bul, event, data)
 				}
 
 				bul->bul_retrans_time
-				    = INITIAL_BINDACK_TIMEOUT;
+				    = initial_bindack_timeout_first_reg;
 				bul_set_retrans_timer(bul,
 				    bul->bul_retrans_time);
 
@@ -1413,7 +1413,7 @@ bul_reg_fsm(bul, event, data)
 				}
 
 				bul->bul_retrans_time
-				    = INITIAL_BINDACK_TIMEOUT;
+				    = initial_bindack_timeout_first_reg;
 				bul_set_retrans_timer(bul,
 				    bul->bul_retrans_time);
 
@@ -1623,7 +1623,7 @@ bul_reg_fsm(bul, event, data)
 				}
 
 				bul->bul_retrans_time
-				    = INITIAL_BINDACK_TIMEOUT;
+				    = initial_bindack_timeout_first_reg;
 				bul_set_retrans_timer(bul,
 				    bul->bul_retrans_time);
 
@@ -1673,7 +1673,7 @@ bul_reg_fsm(bul, event, data)
 				}
 
 				bul->bul_retrans_time
-				    = INITIAL_BINDACK_TIMEOUT;
+				    = initial_bindack_timeout_first_reg;
 				bul_set_retrans_timer(bul,
 				    bul->bul_retrans_time);
 
@@ -1936,7 +1936,7 @@ bul_reg_fsm(bul, event, data)
 				 * we keep sending DHAAD request. this
 				 * breaks the specification, however
 				 * we believe it is better keep sending than
-				 * stop Mobile IPv6 service.
+				 * stoping Mobile IPv6 service.
 				 */
 				bul->bul_retrans_time = MAX_DHAAD_TIMEOUT;
 			}
@@ -2295,7 +2295,7 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 			syslog(LOG_ERR,
 			    "sending a binding update failed.\n");
 		}
-		bul->bul_retrans_time = INITIAL_BINDACK_TIMEOUT;
+		bul->bul_retrans_time = initial_bindack_timeout_first_reg;
 		bul_set_retrans_timer(bul, bul->bul_retrans_time);
 		/* keep current state. */
 		

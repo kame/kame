@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.9 2005/02/28 01:35:59 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.10 2005/02/28 23:20:41 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -1170,8 +1170,8 @@ mnd_add_mipif(ifname)
 	if (mif)
 		return (mif);
 	
-	mif = malloc(sizeof(*mif));
-	memset(mif, 0, sizeof(*mif));
+	mif = malloc(sizeof(struct mip6_mipif));
+	memset(mif, 0, sizeof(struct mip6_mipif));
 	mif->mipif_ifindex = ifindex;
 
 	/* initialize home prefix head */
