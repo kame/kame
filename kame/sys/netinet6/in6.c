@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.149 2001/01/23 11:43:20 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.150 2001/01/23 15:41:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -117,7 +117,7 @@
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/scope6_var.h>
 #ifndef SCOPEDROUTING
-#if defined(__NetBSD__) || (defined(__bsdi__) && _BSDI_VERSION < 199802) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || (defined(__bsdi__) && _BSDI_VERSION < 199802) || defined(__FreeBSD__)
 #include <netinet6/in6_pcb.h>
 #endif
 #endif
@@ -781,6 +781,9 @@ in6_update_ifa(ifp, ifra, ia)
 {
 	int error = 0, hostIsNew = 1, prefixIsNew = 0, plen = -1;
 	struct in6_ifaddr *oia, *ib;
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	struct ifaddr *ifa;
+#endif
 	struct sockaddr_in6 dst6;
 	struct in6_addrlifetime *lt;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
