@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tfrc.c,v 1.6 2003/11/25 07:34:52 ono Exp $	*/
+/*	$KAME: dccp_tfrc.c,v 1.7 2004/02/12 17:35:31 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson
@@ -30,7 +30,12 @@
  * Id: dccp_tfrc.c,v 1.47 2003/05/28 17:36:15 nilmat-8 Exp
  */
 
-/* This implementation conforms to the drafts of DCCP dated Mars 2003. The options used are window counter, elapsed time, loss event rate and receive rate.  No support for history discounting or oscillation prevention. */
+/*
+ * This implementation conforms to the drafts of DCCP dated Mars 2003.
+ * The options used are window counter, elapsed time, loss event rate
+ * and receive rate.  No support for history discounting or oscillation
+ * prevention.
+ */
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -109,10 +114,10 @@ const struct timeval delta_half = {0, TFRC_OPSYS_TIME_GRAN / 2};
  */
 #define HALFTIMEVAL(tvp) \
         do { \
-            if ((tvp)->tv_sec & 1) \
-	      (tvp)->tv_usec += 1000000; \
-	    (tvp)->tv_sec = (tvp)->tv_sec >> 1; \
-	    (tvp)->tv_usec = (tvp)->tv_usec >> 1; \
+		if ((tvp)->tv_sec & 1)				\
+			(tvp)->tv_usec += 1000000;		\
+		(tvp)->tv_sec = (tvp)->tv_sec >> 1;		\
+		(tvp)->tv_usec = (tvp)->tv_usec >> 1;		\
         } while (0)
 
 /* Sender side */
@@ -122,10 +127,17 @@ const struct timeval delta_half = {0, TFRC_OPSYS_TIME_GRAN / 2};
  * args:  ccbp - pointer to sender ccb block
  * Tested u:OK - Note: No check for x = 0 -> t_ipi = {0xFFF...,0xFFF}
  */
-#define CALCNEWTIPI(ccbp)                              \
-        do{                                            \
-           ccbp->t_ipi.tv_sec = (long) ( ((double) (ccbp->s)) / (ccbp->x) );                    \
-           ccbp->t_ipi.tv_usec = (long) (( ((double)(ccbp->s)) / (ccbp->x) - ccbp->t_ipi.tv_sec)*((double)1000000.0));   \
+#define CALCNEWTIPI(ccbp) \
+        do { \
+		struct fixpoint x, y;					\
+		fixpoint_div(&x, &(ccbp)->s, &(ccbp)->x);		\
+		y->num = (ccbp)->t_ipi.tv_sec = fixpoint_getlong(&x);	\
+		y->denom = 1;						\
+		fixpoint_sub(&x, &x, &y);				\
+		y->num = 1000000;					\
+		y->denom = 1;						\
+		fixpoint_mul(&x, &x, &y);				\
+		(ccbp)->t_ipi.tv_usec = fixpoint_getlong(&x);		\
         } while (0)
 
 /* Calculate new delta by
@@ -133,14 +145,17 @@ const struct timeval delta_half = {0, TFRC_OPSYS_TIME_GRAN / 2};
  * args: ccbp - pointer to sender ccb block
  * Tested u:OK
  */
-#define CALCNEWDELTA(ccbp)                             \
-         do {                                          \
-            ccbp->delta = delta_half;                  \
-            if (ccbp->t_ipi.tv_sec == 0 && ccbp->t_ipi.tv_usec < TFRC_OPSYS_TIME_GRAN) {     \
-	       ccbp->delta = ccbp->t_ipi;              \
-	       HALFTIMEVAL(&(ccbp->delta));            \
-	    }                                          \
+#define CALCNEWDELTA(ccbp) \
+         do { \
+		(ccbp)->delta = delta_half;				\
+		if ((ccbp)->t_ipi.tv_sec == 0 &&			\
+		    (ccbp)->t_ipi.tv_usec < TFRC_OPSYS_TIME_GRAN) {	\
+			(ccbp)->delta = (ccbp)->t_ipi;			\
+			HALFTIMEVAL(&((ccbp)->delta));			\
+		}							\
 	 } while (0)
+
+const struct fixpoint tfrc_smallest_p = { 4LL, 1000000LL };
 
 /* External declarations */
 extern int dccp_get_option(char *, int, int, char *, int);
@@ -150,22 +165,43 @@ void tfrc_time_no_feedback(void *);
 void tfrc_time_send(void *);
 void tfrc_set_send_timer(struct tfrc_send_ccb *, struct timeval);
 void tfrc_updateX(struct tfrc_send_ccb *, struct timeval);
-double tfrc_calcX(u_int16_t, u_int32_t, double);
+const struct fixpint *tfrc_calcX(u_int16_t, u_int32_t, const struct fixpoint *);
 void tfrc_send_term(void *);
 
-/* Calculate the send rate according to TCP throughput eq.
+static void normalize(long long *, long long *);
+struct fixpoint *fixpoint_add(struct fixpoint *, const struct fixpoint *,
+	const struct fixpoint *);
+struct fixpoint *fixpoint_sub(struct fixpoint *, const struct fixpoint *,
+	const struct fixpoint *);
+int fixpoint_cmp(const struct fixpoint *, const struct fixpoint *);
+struct fixpoint *fixpoint_mul(struct fixpoint *, const struct fixpoint *,
+	const struct fixpoint *);
+struct fixpoint *fixpoint_div(struct fixpoint *, const struct fixpoint *,
+	const struct fixpoint *);
+long fixpoint_getlong(const struct fixpoint *);
+
+const struct fixpoint *flookup(const struct fixpoint *);
+const struct fixpoint *tfrc_flookup_reverse(const struct fixpoint *);
+
+/*
+ * Calculate the send rate according to TCP throughput eq.
  * args: s - packet size (in bytes)
  *       R - Round trip time  (in micro seconds)
  *       p - loss event rate  (0<=p<=1)
  * returns:  calculated send rate (in bytes per second)
  * Tested u:OK
  */
-__inline double
-tfrc_calcX(u_int16_t s, u_int32_t R, double p)
+__inline const struct fixpoint *
+tfrc_calcX(u_int16_t s, u_int32_t r, const struct fixpoint *p)
 {
-	FLOOKUPTEST(p);
-	return (((double) (s)) * 1000000.0 / (((double) R) * FLOOKUP(p)));
+	static struct fixpoint x;
+
+	x.num = 1000000 * s;
+	x.denom = 1 * r;
+	fixpoint_div(&x, &x, p);
+	return &result;
 }
+
 /*
  * Function called by the send timer (to send packet)
  * args: cb -  sender congestion control block
@@ -178,11 +214,14 @@ tfrc_time_send(void *ccb)
 	struct inpcb *inp;
 
 	if (cb->state == TFRC_SSTATE_TERM) {
-		TFRC_DEBUG((LOG_INFO, "TFRC - Send timer is ordered to terminate. (tfrc_time_send)\n"));
+		TFRC_DEBUG((LOG_INFO,
+		    "TFRC - Send timer is ordered to terminate. (tfrc_time_send)\n"));
 		return;
 	}
-	if (cb->ch_stimer.callout == NULL || callout_pending(cb->ch_stimer.callout)) {
-		TFRC_DEBUG((LOG_INFO, "TFRC - Callout pending. (tfrc_time_send)\n"));
+	if (cb->ch_stimer.callout == NULL ||
+	    callout_pending(cb->ch_stimer.callout)) {
+		TFRC_DEBUG((LOG_INFO,
+		    "TFRC - Callout pending. (tfrc_time_send)\n"));
 		return;
 	}
 	/* aquire locks for dccp_output */
@@ -194,8 +233,8 @@ tfrc_time_send(void *ccb)
 
 	cb->ch_stimer.callout = NULL;
 	dccp_output(cb->pcb, 1);
-	tfrc_send_packet_sent(cb, 0, -1);	/* make sure we schedule next
-						 * send time */
+	/* make sure we schedule next send time */
+	tfrc_send_packet_sent(cb, 0, -1);
 
 	/* release locks */
 	INP_UNLOCK(inp);
@@ -212,20 +251,23 @@ tfrc_set_send_timer(struct tfrc_send_ccb * cb, struct timeval t_now)
 {
 	struct timeval t_temp;
 	long t_ticks;
+
 	/* set send timer to fire in t_ipi - (t_now-t_nom_old) or in other
 	 * words after t_nom - t_now */
 	t_temp = cb->t_nom;
-	timevalsub(&(t_temp), &(t_now));
+	timersub(&t_temp, &t_temp, &t_now);
 
 #ifdef TFRCDEBUG
 	if (t_temp.tv_sec < 0 || t_temp.tv_usec < 0)
-		panic("TFRC - scheduled a negative time! (tfrc_set_send_timer)\n");
+		panic("TFRC - scheduled a negative time! (tfrc_set_send_timer)");
 #endif
 
 	t_ticks = (t_temp.tv_usec + 1000000 * t_temp.tv_sec) / (1000000 / hz);
 	if (t_ticks == 0)
 		t_ticks = 1;
-	TFRC_DEBUG_TIME((LOG_INFO, "TFRC scheduled send timer to expire in %i ticks (hz=%u)\n", (int) t_ticks, hz));
+	TFRC_DEBUG_TIME((LOG_INFO,
+	    "TFRC scheduled send timer to expire in %ld ticks (hz=%lu)\n",
+	     t_ticks, (unsigned long)hz));
 	cb->ch_stimer = timeout(tfrc_time_send, (void *) cb, t_ticks);
 }
 /*
@@ -244,39 +286,53 @@ tfrc_set_send_timer(struct tfrc_send_ccb * cb, struct timeval t_now)
 void
 tfrc_updateX(struct tfrc_send_ccb * cb, struct timeval t_now)
 {
-	double temp;
+	struct fixpoint temp, temp2;
 	struct timeval t_temp, t_rtt = {0, 0};
-	if (cb->p >= TFRC_SMALLEST_P) {	/* to avoid large error in calcX */
-		cb->x_calc = tfrc_calcX(cb->s, cb->rtt, cb->p);
-		temp = 2 * cb->x_recv;
-		if (cb->x_calc < temp)
+
+	/* to avoid large error in calcX */
+	if (fixpoint_cmp(&cb->p, &tfrc_smallest_p) >= 0) {
+		cb->x_calc = *tfrc_calcX(cb->s, cb->rtt, &cb->p);
+		temp = cb->x_recv;
+		temp.num *= 2;
+		if (fixpoint_cmp(&cb->x_calc, &temp) < 0)
 			temp = cb->x_calc;
 		cb->x = temp;
-		if (temp < ((double) (cb->s)) / TFRC_MAX_BACK_OFF_TIME)
-			cb->x = ((double) (cb->s)) / TFRC_MAX_BACK_OFF_TIME;
+		temp2.num = cb->s;
+		temp2.denom *= TFRC_MAX_BACK_OFF_TIME;
+		if (fixpoint_cmp(&temp, &temp2) < 0)
+			cb->x = temp2;
+		normalize(&cb->x.num, cb->x.denom);
 		TFRC_DEBUG((LOG_INFO, "TFRC updated send rate to "));
-		PRINTFLOAT(cb->x);
+		PRINTFLOAT(&cb->x);
 		TFRC_DEBUG((LOG_INFO, " bytes/s (tfrc_updateX, p>0)\n"));
 	} else {
 		t_rtt.tv_usec = cb->rtt % 1000000;
 		t_rtt.tv_sec = cb->rtt / 1000000;
 		t_temp = t_now;
-		timevalsub(&t_temp, &(cb->t_ld));
-		if (timevalcmp(&t_temp, &t_rtt, >=)) {
-			temp = 2 * cb->x_recv;
-			if (2 * cb->x < temp)
-				temp = 2 * cb->x;
-			cb->x = ((double) (cb->s)) * 1000000.0 / ((double) (cb->rtt));
-			if (temp > cb->x)
+		timersub(&t_temp, &t_temp, &cb->t_ld);
+		if (timercmp(&t_temp, &t_rtt, >=)) {
+			temp = cb->x_recv;
+			temp.num *= 2;
+			temp2 = cb->x;
+			temp2.num *= 2;
+			if (fixpoint_cmp(&temp2, &temp) < 0)
+				temp = temp2;
+			cb->x.num = cb->s;
+			cb->x.denom = 1;
+			cb->x.num *= 1000000;
+			cb->x.denom *= cb->rtt;
+			if (fixpoint_cmp(&temp, &cb->x) > 0)
 				cb->x = temp;
+			normalize(&cb->x.num, &cb->x.denom);
 			cb->t_ld = t_now;
 			TFRC_DEBUG((LOG_INFO, "TFRC updated send rate to "));
-			PRINTFLOAT(cb->x);
+			PRINTFLOAT(&cb->x);
 			TFRC_DEBUG((LOG_INFO, " bytes/s (tfrc_updateX, p==0)\n"));
 		} else
 			TFRC_DEBUG((LOG_INFO, "TFRC didn't update send rate! (tfrc_updateX, p==0)\n"));
 	}
 }
+
 /*
  * Function called by the no feedback timer
  * args:  cb -  sender congestion control block
@@ -288,7 +344,10 @@ tfrc_time_no_feedback(void *ccb)
 	u_int32_t next_time_out = 1;	/* remove init! */
 	struct timeval t_now;
 	struct tfrc_send_ccb *cb = (struct tfrc_send_ccb *) ccb;
+
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_lock(&(cb->mutex));
+#endif
 
 	if (cb->state == TFRC_SSTATE_TERM) {
 		TFRC_DEBUG((LOG_INFO, "TFRC - No feedback timer is ordered to terminate\n"));
@@ -367,7 +426,9 @@ tfrc_time_no_feedback(void *ccb)
 	/* set idle flag */
 	cb->idle = 1;
 nf_release:
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_unlock(&(cb->mutex));
+#endif
 }
 /* Removes ccb from memory
  * args: ccb - ccb of sender
@@ -382,7 +443,9 @@ tfrc_send_term(void *ccb)
 
 	/* free sender */
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_destroy(&(cb->mutex));
+#endif
 
 	free(cb, M_PCB);
 	TFRC_DEBUG((LOG_INFO, "TFRC sender is destroyed\n"));
@@ -408,7 +471,9 @@ tfrc_send_init(struct dccpcb * pcb)
 	}
 	/* init sender */
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_init(&(ccb->mutex), "TFRC Sender mutex", NULL, MTX_DEF | MTX_RECURSE);
+#endif
 
 	ccb->pcb = pcb;
 	if (ccb->pcb->avgpsize >= TFRC_MIN_PACKET_SIZE && ccb->pcb->avgpsize <= TFRC_MAX_PACKET_SIZE)
@@ -454,7 +519,9 @@ tfrc_send_free(void *ccb)
 	/* uninit sender */
 
 	/* get mutex */
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_lock(&(cb->mutex));
+#endif
 	cb->state = TFRC_SSTATE_TERM;
 	/* unschedule timers */
 	if (cb->ch_stimer.callout)
@@ -471,7 +538,9 @@ tfrc_send_free(void *ccb)
 	}
 	STAILQ_INIT(&(cb->hist));
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_unlock(&(cb->mutex));
+#endif
 
 	/* schedule the removal of ccb */
 	timeout(tfrc_send_term, (void *) cb, TFRC_SEND_WAIT_TERM * hz);
@@ -502,7 +571,9 @@ tfrc_send_packet(void *ccb, long datasize)
 		return 0;
 	}
 	/* we have data to send */
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_lock(&(cb->mutex));
+#endif
 
 	/* check to see if we already have allocated memory last time */
 	new_packet = STAILQ_FIRST(&(cb->hist));
@@ -538,7 +609,7 @@ tfrc_send_packet(void *ccb, long datasize)
 
 		/* Calculate new t_ipi */
 		CALCNEWTIPI(cb);
-		timevaladd(&(cb->t_nom), &(cb->t_ipi));	/* t_nom += t_ipi */
+		timeradd(&cb->t_nom, &cb->t_nom, &cb->t_ipi);
 		/* Calculate new delta */
 		CALCNEWDELTA(cb);
 		tfrc_set_send_timer(cb, t_now);	/* if so schedule sendtimer */
@@ -551,9 +622,9 @@ tfrc_send_packet(void *ccb, long datasize)
 			microtime(&t_now);
 
 			t_temp = t_now;
-			timevaladd(&(t_temp), &(cb->delta));	/* t_temp = t_now+delta */
+			timeradd(&t_temp, &t_temp, &cb->delta);
 
-			if ((timevalcmp(&(t_temp), &(cb->t_nom), >))) {
+			if ((timercmp(&(t_temp), &(cb->t_nom), >))) {
 				/* Packet can be sent */
 
 #ifdef TFRCDEBUG
@@ -561,7 +632,7 @@ tfrc_send_packet(void *ccb, long datasize)
 					panic("TFRC - t_last_win_count unitialized (tfrc_send_packet)\n");
 #endif
 				t_temp = t_now;
-				timevalsub(&t_temp, &(cb->t_last_win_count));
+				timersub(&t_temp, &t_temp, &(cb->t_last_win_count));
 
 				/* calculate win_count option */
 				if (cb->state == TFRC_SSTATE_NO_FBACK) {
@@ -601,7 +672,9 @@ tfrc_send_packet(void *ccb, long datasize)
 		}
 	}
 sp_release:
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_unlock(&(cb->mutex));
+#endif
 	return answer;
 }
 /* Notify sender that a packet has been sent
@@ -624,7 +697,9 @@ tfrc_send_packet_sent(void *ccb, int moreToSend, long datasize)
 		TFRC_DEBUG((LOG_INFO, "TFRC - Packet sent when terminating!\n"));
 		return;
 	}
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_lock(&(cb->mutex));
+#endif
 	microtime(&t_now);
 
 	/* check if we have sent a data packet */
@@ -668,7 +743,7 @@ tfrc_send_packet_sent(void *ccb, int moreToSend, long datasize)
 		} else {
 			/* Calculate new t_ipi */
 			CALCNEWTIPI(cb);
-			timevaladd(&(cb->t_nom), &(cb->t_ipi));	/* t_nom += t_ipi */
+			timeradd(&cb->t_nom, &cb->t_nom, &cb->t_ipi);
 			/* Calculate new delta */
 			CALCNEWDELTA(cb);
 		}
@@ -677,25 +752,25 @@ tfrc_send_packet_sent(void *ccb, int moreToSend, long datasize)
 			/* loop until we find a send time in the future */
 			microtime(&t_now);
 			t_temp = t_now;
-			timevaladd(&(t_temp), &(cb->delta));	/* t_temp = t_now+delta */
-			while ((timevalcmp(&(t_temp), &(cb->t_nom), >))) {
+			timeradd(&t_temp, &t_temp, &cb->delta);
+			while ((timercmp(&(t_temp), &(cb->t_nom), >))) {
 				/* Calculate new t_ipi */
 				CALCNEWTIPI(cb);
-				timevaladd(&(cb->t_nom), &(cb->t_ipi));	/* t_nom += t_ipi */
+				timeradd(&cb->t_nom, &cb->t_nom, &cb->t_ipi);
 				/* Calculate new delta */
 				CALCNEWDELTA(cb);
 
 				microtime(&t_now);
 				t_temp = t_now;
-				timevaladd(&(t_temp), &(cb->delta));	/* t_temp = t_now+delta */
+				timeradd(&t_temp, &t_temp, &cb->delta);
 			}
 			tfrc_set_send_timer(cb, t_now);
 		} else {
 			microtime(&t_now);
 			t_temp = t_now;
-			timevaladd(&(t_temp), &(cb->delta));	/* t_temp = t_now+delta */
+			timeradd(&t_temp, &t_temp, &cb->delta);
 			/* Check if next packet can not be sent immediately */
-			if (!(timevalcmp(&(t_temp), &(cb->t_nom), >))) {
+			if (!(timercmp(&(t_temp), &(cb->t_nom), >))) {
 				tfrc_set_send_timer(cb, t_now);	/* if so schedule
 								 * sendtimer */
 			}
@@ -707,7 +782,9 @@ tfrc_send_packet_sent(void *ccb, int moreToSend, long datasize)
 	}
 
 sps_release:
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_unlock(&(cb->mutex));
+#endif
 }
 /* Notify that a an ack package was received (i.e. a feedback packet)
  * args: ccb  -  ccb block for current connection
@@ -766,7 +843,9 @@ tfrc_send_packet_recv(void *ccb, char *options, int optlen)
 
 	TFRC_DEBUG((LOG_INFO, "TFRC - Receieved options on ack %u: pinv=%u, t_elapsed=%u, x_recv=%u ! (tfrc_send_packet_recv)\n", cb->pcb->ack_rcv, pinv, t_elapsed, x_recv));
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_lock(&(cb->mutex));
+#endif
 
 	switch (cb->state) {
 	case TFRC_SSTATE_NO_FBACK:
@@ -788,7 +867,7 @@ tfrc_send_packet_recv(void *ccb, char *options, int optlen)
 		}
 		/* Update RTT */
 		microtime(&t_now);
-		timevalsub(&t_now, &(elm->t_sent));
+		timersub(&t_now, &t_now, &(elm->t_sent));
 		r_sample = t_now.tv_sec * 1000000 + t_now.tv_usec;
 		r_sample = r_sample - ((u_int32_t) t_elapsed) * 1000;	/* t_elapsed in ms */
 
@@ -832,14 +911,13 @@ tfrc_send_packet_recv(void *ccb, char *options, int optlen)
 		tfrc_updateX(cb, t_now);
 
 		/* Update next send time */
-		timevalsub(&(cb->t_nom), &(cb->t_ipi));
+		timersub(&cb->t_nom, &cb->t_nom, &cb->t_ipi);
 
 		/* Calculate new t_ipi */
 		CALCNEWTIPI(cb);
-		timevaladd(&(cb->t_nom), &(cb->t_ipi));	/* t_nom += t_ipi */
+		timeradd(&cb->t_nom, &cb->t_nom, &cb->t_ipi);
 		/* Calculate new delta */
 		CALCNEWDELTA(cb);
-
 
 		if (cb->ch_stimer.callout != NULL)
 			untimeout(tfrc_time_send, (void *) cb, cb->ch_stimer);
@@ -880,7 +958,9 @@ tfrc_send_packet_recv(void *ccb, char *options, int optlen)
 		break;
 	}
 sar_release:
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_unlock(&(cb->mutex));
+#endif
 }
 /* Receiver side */
 
@@ -1007,7 +1087,7 @@ tfrc_recv_send_feedback(struct tfrc_recv_ccb * cb)
 	case TFRC_RSTATE_DATA:
 		/* Calculate x_recv */
 		microtime(&t_temp);
-		timevalsub(&t_temp, &(cb->t_last_feedback));
+		timersub(&t_temp, &t_temp, &cb->t_last_feedback);
 
 		x_recv = (u_int32_t) (((double) (cb->bytes_recv * 8)) /
 		    (((double) t_temp.tv_sec) + ((double) t_temp.tv_usec) / 1000000.0));
@@ -1028,7 +1108,7 @@ tfrc_recv_send_feedback(struct tfrc_recv_ccb * cb)
 
 
 	microtime(&t_now);
-	timevalsub(&t_now, &(elm->t_recv));
+	timersub(&t_now, &t_now, &elm->t_recv);
 	t_elapsed = (u_int16_t) (t_now.tv_sec * 1000 + t_now.tv_usec / 1000);
 
 	/* change byte order */
@@ -1100,7 +1180,7 @@ tfrc_recv_calcFirstLI(struct tfrc_recv_ccb * cb)
 		}
 	}
 	PRINTRCCB(cb, elm, li_elm);
-	timevalsub(&t_temp, &(elm2->t_recv));
+	timersub(&t_temp, &t_temp, &elm2->t_recv);
 	t_rtt = ((double) (t_temp.tv_sec)) + ((double) (t_temp.tv_usec)) / ((double) 1000000);
 
 	if (t_rtt < 0) {
@@ -1115,7 +1195,7 @@ tfrc_recv_calcFirstLI(struct tfrc_recv_ccb * cb)
 
 	/* Calculate x_recv */
 	microtime(&t_temp);
-	timevalsub(&t_temp, &(cb->t_last_feedback));
+	timersub(&t_temp, &t_temp, &cb->t_last_feedback);
 	x_recv = (((double) (cb->bytes_recv)) /
 	    (((double) t_temp.tv_sec) + ((double) t_temp.tv_usec) / 1000000.0));
 
@@ -1423,7 +1503,9 @@ tfrc_recv_init(struct dccpcb * pcb)
 	}
 	/* init recv here */
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_init(&(ccb->mutex), "TFRC Receiver mutex", NULL, MTX_DEF);
+#endif
 
 	ccb->pcb = pcb;
 
@@ -1461,10 +1543,11 @@ tfrc_recv_free(void *ccb)
 
 	/* uninit recv here */
 
-	/* get mutex */
-
 	cb->state = TFRC_RSTATE_TERM;
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	/* get mutex */
 	mtx_lock(&(cb->mutex));
+#endif
 
 	/* Empty packet history */
 	elm = STAILQ_FIRST(&(cb->hist));
@@ -1484,8 +1567,10 @@ tfrc_recv_free(void *ccb)
 	}
 	TAILQ_INIT(&(cb->li_hist));
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_unlock(&(cb->mutex));
 	mtx_destroy(&(cb->mutex));
+#endif
 
 	free(ccb, M_PCB);
 
@@ -1528,7 +1613,9 @@ tfrc_recv_packet_recv(void *ccb, char *options, int optlen)
 		return;
 	}
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_lock(&(cb->mutex));
+#endif
 
 	/* Add packet to history */
 
@@ -1609,5 +1696,203 @@ tfrc_recv_packet_recv(void *ccb, char *options, int optlen)
 
 	}			/* end if not pure ack */
 rp_release:
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_unlock(&(cb->mutex));
+#endif
+}
+
+
+/*
+ * fixpoint routines
+ */
+static void
+normalize(num, denom)
+	long long *num, *denom;
+{
+	static const int prime[] = { 2, 3, 5, 7, 11, 13, 17, 19, 0 };
+	int i;
+
+	if (denom < 0) {
+		*num *= (-1);
+		*denom *= (-1);
+	}
+
+	if (*num % *denom == 0) {
+		*num /= *denom;
+		*denom = 1;
+	}
+	for (i = 0; prime[i]; i++)
+		while (*num % prime[i] == 0 && *denom % prime[i] == 0) {
+			*num /= prime[i];
+			*denom /= prime[i];
+		}
+}
+
+struct fixpoint *
+fixpoint_add(x, a, b)
+	struct fixpoint *x;
+	const struct fixpoint *a, *b;
+{
+	long long num, denom;
+
+	num = a->num * b->denom + a->denom * b->num;
+	denom = a->denom * b->denom;
+	normalize(&num, &denom);
+
+	x->num = num;
+	x->denom = denom;
+	return (x);
+}
+
+struct fixpoint *
+fixpoint_sub(x, a, b)
+	struct fixpoint *x;
+	const struct fixpoint *a, *b;
+{
+	long long num, denom;
+
+	num = a->num * b->denom - a->denom * b->num;
+	denom = a->denom * b->denom;
+	normalize(&num, &denom);
+
+	x->num = num;
+	x->denom = denom;
+	return (x);
+}
+
+int
+fixpoint_cmp(a, b)
+	const struct fixpoint *a, *b;
+{
+	struct fixpoint x;
+
+	fixpoint_sub(&x, a, b);
+	if (x.num > 0)
+		return (1);
+	else if (x.num < 0)
+		return (-1);
+	else
+		return (0);
+}
+
+struct fixpoint *
+fixpoint_mul(x, a, b)
+	struct fixpoint *x;
+	const struct fixpoint *a, *b;
+{
+	long long num, denom;
+
+	num = a->num * b->num;
+	denom = a->denom * b->denom;
+	normalize(&num, &denom);
+
+	x->num = num;
+	x->denom = denom;
+	return (x);
+}
+
+struct fixpoint *
+fixpoint_div(x, a, b)
+	struct fixpoint *x;
+	const struct fixpoint *a, *b;
+{
+	long long num, denom;
+
+	num = a->num * b->denom;
+	denom = a->denom * b->num;
+	normalize(&num, &denom);
+
+	x->num = num;
+	x->denom = denom;
+	return (x);
+}
+
+long
+fixpoint_getlong(x)
+	const struct fixpoint *x;
+{
+
+	if (x->denom == 0)
+		return (0);
+	return (x->num / x->denom);
+}
+
+const struct fixpoint flargex = { 2LL, 1000LL };
+const struct fixpoint fsmallx = { 1LL, 100000LL };
+const struct fixpoint fsmallstep = { 4LL, 1000000LL };
+
+/*
+ * FLOOKUP macro. NOTE! 0<=(int x)<=1 
+ * Tested u:OK
+ */
+const struct fixpoint *
+flookup(x)
+	const struct fixpoint *x;
+{
+	static const struct fixpoint y = { 250000, 1 };
+	struct fixpoint z;
+	int i;
+
+	if (fixpoint_cmp(x, &flargex) >= 0) {
+		if (x->num == 0)
+			return NULL;
+		i = x->denom / x->num;
+#ifdef TFRCDEBUG
+		if (i >= sizeof(flarge_table) / sizeof(flarge_table[0])
+			panic("flarge_table lookup failed");
+#endif
+
+		return &flarge_table[i];
+	} else {
+		fixpoint_mul(&z, x, &y);
+		if (z.num == 0)
+			return NULL;
+		i = fixpoint_getlong(&z);
+#ifdef TFRCDEBUG
+		if (i >= sizeof(fsmall_table) / sizeof(fsmall_table[0])
+			panic("fsmall_table lookup failed");
+#endif
+
+		return &fsmall_table[i];
+	}
+}
+
+/*
+ * Inverse of the FLOOKUP above
+ * args: fvalue - function value to match
+ * returns:  p  closest to that value
+ * Tested u:OK
+ */
+const struct fixpoint *
+tfrc_flookup_reverse(const struct fixpoint *fvalue)
+{
+	static struct fixpoint x;
+	int ctr;
+
+	if (fixpoint_cmp(fvalue, &flarge_table[1]) >= 0) {
+		/* 1.0 */
+		x.num = 1;
+		x.denom = 1;
+		return &x;
+	} else if (fixpoint_cmp(fvalue, &flarge_table[sizeof(flarge_table) /
+	    sizeof(flarge_table[0]) - 1]) >= 0) {
+		ctr = sizeof(flarge_table) / sizeof(flarge_table[0]) - 1;
+		while (ctr > 1 && fixpoint_cmp(fvalue, &flarge_table[ctr]) >= 0)
+			ctr--;
+
+		/* round to smallest */
+		ctr = ctr + 1;
+    
+		/* round to nearest */
+		return &flarge_table[ctr];
+	} else if (fixpoint_cmp(fvalue, &fsmall_table[0]) >= 0) {
+		ctr = 0;
+		while (ctr < sizeof(fsmall_table) / sizeof(fsmall_table[0]) &&
+		    fixpoint_cmp(fvalue, &fsmall_table[ctr]) > 0)
+			ctr++;
+		x = fsmallstep;
+		x.num *= ctr;
+		return &x;
+	}
+	return &fsmallstep;
 }

@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tfrc.h,v 1.5 2003/10/23 05:44:35 ono Exp $	*/
+/*	$KAME: dccp_tfrc.h,v 1.6 2004/02/12 17:35:31 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
@@ -63,75 +63,86 @@
 
 /* Packet history */
 STAILQ_HEAD(s_hist_head,s_hist_entry); 
+
+struct fixpoint {
+	long long num;
+	long long denom;
+};
  
 struct s_hist_entry {
-  STAILQ_ENTRY(s_hist_entry) linfo;    /* Tail queue. */
-  u_int32_t seq;            /* Sequence number */
-  struct timeval t_sent;    /* When the packet was sent */
-  u_int8_t win_count;       /* Windowcounter for packet */
+	STAILQ_ENTRY(s_hist_entry) linfo;	/* Tail queue. */
+	u_int32_t seq;		/* Sequence number */
+	struct timeval t_sent;	/* When the packet was sent */
+	u_int8_t win_count;	/* Windowcounter for packet */
 };
-
 
 /* TFRC sender congestion control block (ccb) */
 struct tfrc_send_ccb {
-  struct mtx mutex;        /* Lock for this structure */
-  struct dccpcb *pcb;       /* Pointer to associated dccpcb */
-  u_int8_t     state;      /* Sender state */
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	struct mtx mutex;	/* Lock for this structure */
+#endif
+	struct dccpcb *pcb;	/* Pointer to associated dccpcb */
+	u_int8_t state;		/* Sender state */
 
-  double        x;          /* Current sending rate */
-  double        x_recv;     /* Receive rate */
-  double        x_calc;     /* Calculated send (?) rate */ 
+	struct fixpoint x;	/* Current sending rate */
+	struct fixpoint x_recv;	/* Receive rate */
+	struct fixpoint x_calc;	/* Calculated send (?) rate */ 
 
-  u_int16_t    s;          /* Packet size */
- 
-  u_int32_t    rtt;        /* Estimate of current round trip time */
-  double        p;          /* Current loss event rate */  
-  u_int8_t     last_win_count; /* Last window counter sent */
-  struct timeval t_last_win_count; /* Timestamp of earliest packet with
-				      last_win_count value sent */
-  struct callout	*ch_nftimer;  /* Handle to no feedback timer */
-  u_int8_t     idle;
-  u_int32_t    t_rto;      /* Time out value = 4*rtt */
-  struct timeval t_ld;        /* Time last doubled during slow start */
+	u_int16_t s;		/* Packet size */
 
-  struct timeval t_nom,    /* Nominal send time of next packet */
-                 t_ipi,    /* Interpacket (send) interval */
-                 delta;    /* Send timer delta */    
+	u_int32_t rtt;		/* Estimate of current round trip time */
+	struct fixpoint p;	/* Current loss event rate */  
+	u_int8_t last_win_count;	/* Last window counter sent */
+	/* Timestamp of earliest packet with last_win_count value sent */
+	struct timeval t_last_win_count;
+	struct callout	*ch_nftimer;	/* Handle to no feedback timer */
+	u_int8_t idle;
+	u_int32_t t_rto;	/* Time out value = 4*rtt */
+	struct timeval t_ld;	/* Time last doubled during slow start */
 
-  struct callout	*ch_stimer;  /* Handle to scheduled send timer */ 
+	struct timeval t_nom;	/* Nominal send time of next packet */
+	struct timeval t_ipi;	/* Interpacket (send) interval */
+	struct timeval delta;	/* Send timer delta */    
 
-  struct s_hist_head hist;        /* Packet history */
+	struct callout *ch_stimer;	/* Handle to scheduled send timer */ 
+
+	struct s_hist_head hist;	/* Packet history */
 };
 
 #ifdef _KERNEL
 
 /* Functions declared in struct dccp_cc_sw */
 
-/* Initialises the sender side
+/*
+ * Initialises the sender side
  * args: pcb  - pointer to dccpcb of associated connection
  * returns: pointer to a tfrc_send_ccb struct on success, otherwise 0
  */ 
 void *tfrc_send_init(struct dccpcb *); 
 
-/* Free the sender side
+/*
+ * Free the sender side
  * args: ccb - ccb of sender
  */
 void tfrc_send_free(void *);
 
-/* Ask TFRC wheter one can send a packet or not 
+/*
+ * Ask TFRC wheter one can send a packet or not 
  * args: ccb  -  ccb block for current connection
  * returns: 1 if ok, else 0.
  */ 
 int tfrc_send_packet(void *, long);
 
-/* Notify sender that a packet has been sent 
+/*
+ * Notify sender that a packet has been sent 
  * args: ccb - ccb block for current connection
  *	 moreToSend - if there exists more packets to send
  *       datasize   - packet size
  */
 void tfrc_send_packet_sent(void *, int, long);
 
-/* Notify that a an ack package was received (i.e. a feedback packet)
+/*
+ * Notify that a an ack package was received (i.e. a feedback packet)
  * args: ccb  -  ccb block for current connection
  */ 
 void tfrc_send_packet_recv(void *, char *, int);
@@ -187,11 +198,13 @@ struct li_hist_entry {
 
 /* TFRC receiver congestion control block (ccb) */
 struct tfrc_recv_ccb {
-	struct mtx	mutex;		/* Lock for this structure */
-	struct dccpcb	*pcb;		/* Pointer to associated dccpcb */
-	u_int8_t	state;		/* Receiver state */
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	struct mtx mutex;	/* Lock for this structure */
+#endif
+	struct dccpcb *pcb;	/* Pointer to associated dccpcb */
+	u_int8_t state;		/* Receiver state */
 
-	double		p;		/* Loss event rate */
+	struct fixpoint p;	/* Loss event rate */
 
 	struct li_hist_head li_hist;	/* Loss interval history */
 
@@ -203,12 +216,13 @@ struct tfrc_recv_ccb {
 	/* Sequence number of the packet above */
 	u_int32_t	seq_last_counter;
 
-	struct timeval t_last_feedback;	/* Timestamp of when last feedback was sent */
-	u_int32_t	bytes_recv;	/* Bytes received since t_last_feedback */
+	/* Timestamp of when last feedback was sent */
+	struct timeval t_last_feedback;
+	u_int32_t bytes_recv;	/* Bytes received since t_last_feedback */
 
 	struct r_hist_head hist;	/* Packet history */
 
-	u_int16_t	s;		/* Packet size */
+	u_int16_t s;		/* Packet size */
 };
 
 #ifdef _KERNEL
