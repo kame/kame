@@ -137,19 +137,23 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 
 	if (serv == NULL || servlen == 0) {
 		/* what we should do? */
-	} else if (flags & NI_NUMERICSERV) {
-		snprintf(numserv, sizeof(numserv), "%d", ntohs(port));
-		if (strlen(numserv) > servlen)
-			return ENI_MEMORY;
-		strcpy(serv, numserv);
 	} else {
-		sp = getservbyport(port, (flags & NI_DGRAM) ? "udp" : "tcp");
+		if (flags & NI_NUMERICSERV)
+			sp = NULL;
+		else {
+			sp = getservbyport(port,
+				(flags & NI_DGRAM) ? "udp" : "tcp");
+		}
 		if (sp) {
 			if (strlen(sp->s_name) > servlen)
 				return ENI_MEMORY;
 			strcpy(serv, sp->s_name);
-		} else
-			return ENI_NOSERVNAME;
+		} else {
+			snprintf(numserv, sizeof(numserv), "%d", ntohs(port));
+			if (strlen(numserv) > servlen)
+				return ENI_MEMORY;
+			strcpy(serv, numserv);
+		}
 	}
 
 	switch (sa->sa_family) {
