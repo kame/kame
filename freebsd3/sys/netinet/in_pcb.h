@@ -252,20 +252,18 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
 #define	INP_RECVIF		0x80	/* receive incoming interface */
 #define	INP_MTUDISC		0x100	/* user can do MTU discovery */
 #define INP_FAITH		0x200	/* accept FAITH'ed connections */
-#define IN6P_PKTINFO		0x010000
-#define IN6P_HOPLIMIT		0x020000
-#define IN6P_NEXTHOP		0x040000
-#define IN6P_HOPOPTS		0x080000
-#define IN6P_DSTOPTS		0x100000
-#define IN6P_RTHDR		0x200000
+#define IN6P_PKTINFO		0x010000 /* receive IP6 dst and I/F */
+#define IN6P_HOPLIMIT		0x020000 /* receive hoplimit */
+#define IN6P_HOPOPTS		0x040000 /* receive hop-by-hop options */
+#define IN6P_DSTOPTS		0x080000 /* receive dst options after rthdr */
+#define IN6P_RTHDR		0x100000 /* receive routing header */
+#define IN6P_RTHDRDSTOPTS	0x200000 /* receive dstoptions before rthdr */
+#define IN6P_CONTROLOPTS	(IN6P_PKTINFO|IN6P_HOPLIMIT|IN6P_HOPOPTS|\
+				 IN6P_DSTOPTS|IN6P_RTHDR|IN6P_RTHDRDSTOPTS)
 #if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
-#define IN6P_BINDV6ONLY		0x400000
+#define IN6P_BINDV6ONLY		0x10000000
 #endif /* defined(INET6) && defined(MAPPED_ADDR_ENABLED) */
-#define IN6P_RTHDRDSTOPTS	0x800000
-#define	INP_CONTROLOPTS		(INP_RECVOPTS|INP_RECVRETOPTS|INP_RECVDSTADDR|\
-					INP_RECVIF|\
-				 IN6P_PKTINFO|IN6P_HOPLIMIT|IN6P_NEXTHOP|\
-				 IN6P_HOPOPTS|IN6P_DSTOPTS|IN6P_RTHDR)
+
 
 #ifdef MAPPED_ADDR_ENABLED
 #define INP_UNMAPPABLEOPTS	(IN6P_HOPOPTS|IN6P_DSTOPTS|IN6P_RTHDR)
