@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.31 2000/05/18 12:32:32 sumikawa Exp $	*/
+/*	$KAME: ipsec.h,v 1.32 2000/06/15 04:08:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -219,7 +219,9 @@ struct ipsecstat {
 #define IPSECCTL_DEF_ESP_NETLEV		4	/* int; ESP tunnel mode */
 #define IPSECCTL_DEF_AH_TRANSLEV	5	/* int; AH transport mode */
 #define IPSECCTL_DEF_AH_NETLEV		6	/* int; AH tunnel mode */
+#if 0	/*obsolete, do not reuse*/
 #define IPSECCTL_INBOUND_CALL_IKE	7
+#endif
 #define	IPSECCTL_AH_CLEARTOS		8
 #define	IPSECCTL_AH_OFFSETMASK		9
 #define	IPSECCTL_DFBIT			10
@@ -235,7 +237,7 @@ struct ipsecstat {
 	{ "esp_net_deflev", CTLTYPE_INT }, \
 	{ "ah_trans_deflev", CTLTYPE_INT }, \
 	{ "ah_net_deflev", CTLTYPE_INT }, \
-	{ "inbound_call_ike", CTLTYPE_INT }, \
+	{ 0, 0 }, \
 	{ "ah_cleartos", CTLTYPE_INT }, \
 	{ "ah_offsetmask", CTLTYPE_INT }, \
 	{ "dfbit", CTLTYPE_INT }, \
@@ -251,7 +253,7 @@ struct ipsecstat {
 	{ "esp_net_deflev", CTLTYPE_INT }, \
 	{ "ah_trans_deflev", CTLTYPE_INT }, \
 	{ "ah_net_deflev", CTLTYPE_INT }, \
-	{ "inbound_call_ike", CTLTYPE_INT }, \
+	{ 0, 0 }, \
 	{ 0, 0 }, \
 	{ 0, 0 }, \
 	{ 0, 0 }, \
@@ -268,7 +270,7 @@ struct ipsecstat {
 	&ip4_esp_net_deflev, \
 	&ip4_ah_trans_deflev, \
 	&ip4_ah_net_deflev, \
-	&ip4_inbound_call_ike, \
+	0, \
 	&ip4_ah_cleartos, \
 	&ip4_ah_offsetmask, \
 	&ip4_ipsec_dfbit, \
@@ -284,7 +286,7 @@ struct ipsecstat {
 	&ip6_esp_net_deflev, \
 	&ip6_ah_trans_deflev, \
 	&ip6_ah_net_deflev, \
-	&ip6_inbound_call_ike, \
+	0, \
 	0, \
 	0, \
 	0, \
@@ -309,7 +311,6 @@ extern int ip4_esp_trans_deflev;
 extern int ip4_esp_net_deflev;
 extern int ip4_ah_trans_deflev;
 extern int ip4_ah_net_deflev;
-extern int ip4_inbound_call_ike;
 extern int ip4_ah_cleartos;
 extern int ip4_ah_offsetmask;
 extern int ip4_ipsec_dfbit;
@@ -323,7 +324,6 @@ extern int ip6_esp_trans_deflev;
 extern int ip6_esp_net_deflev;
 extern int ip6_ah_trans_deflev;
 extern int ip6_ah_net_deflev;
-extern int ip6_inbound_call_ike;
 extern int ip6_ipsec_ecn;
 #endif
 
