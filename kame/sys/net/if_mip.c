@@ -1,4 +1,4 @@
-/*	$Id: if_mip.c,v 1.1 2004/12/09 02:18:56 t-momose Exp $	*/
+/*	$Id: if_mip.c,v 1.2 2005/02/03 14:16:24 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -267,15 +267,23 @@ mip_output(ifp, m, dst, rt)
 		mip6stat.mip6s_orevtunnel++;
 #ifdef IPV6_MINMTU
 		/* XXX */
-		return (ip6_output(m, 0, 0, IPV6_MINMTU, 0, &ifp
+		return (ip6_output(m, 0, 0, IPV6_MINMTU, 0
 #if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-		    , NULL
+		    , &ifp, NULL
+#elif defined(__NetBSD__)
+		    , NULL, &ifp
+#else
+		    , &ifp
 #endif
 		    ));
 #else
-		return (ip6_output(m, 0, 0, 0, 0, &ifp
+		return (ip6_output(m, 0, 0, 0, 0
 #if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-		   , NULL
+		    , &ifp, NULL
+#elif defined(__NetBSD__)
+		    , NULL, &ifp
+#else
+		    , &ifp
 #endif
 		    ));
 #endif

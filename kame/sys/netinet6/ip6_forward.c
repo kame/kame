@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.147 2005/01/20 09:14:05 t-momose Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.148 2005/02/03 14:16:24 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -151,7 +151,7 @@ ip6_forward(m, srcrt)
 #ifdef MIP6 
 	struct mip6_bc_internal *bce;
 #endif
-#if !defined(__FreeBSD__) && !defined(__NetBSD__)
+#if !defined(__FreeBSD__)
 	long time_second = time.tv_sec;
 #endif
 

@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.212 2005/01/31 11:35:51 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.213 2005/02/03 14:16:25 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -145,7 +145,7 @@ static int mhdefaultlen[] = {
 /*
  * sysctl knobs.
  */
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__OpenBSD__)
 int
 mip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	int *name;
@@ -173,7 +173,55 @@ mip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	}
 	/* NOTREACHED */
 }
-#endif /* __NetBSD__ || __OpenBSD__ */
+#endif /* __OpenBSD__ */
+
+#ifdef __NetBSD__
+/*
+ * sysctl for MIP6
+ */
+SYSCTL_SETUP(sysctl_net_inet6_mip6_setup, "sysctl net.inet6.mip6 subtree setup")
+{
+        sysctl_createv(clog, 0, NULL, NULL,
+                       CTLFLAG_PERMANENT,
+                       CTLTYPE_NODE, "net", NULL,
+                       NULL, 0, NULL, 0,
+                       CTL_NET, CTL_EOL);
+        sysctl_createv(clog, 0, NULL, NULL,
+                       CTLFLAG_PERMANENT,
+                       CTLTYPE_NODE, "inet6",
+                       SYSCTL_DESCR("PF_INET6 related settings"),
+                       NULL, 0, NULL, 0,
+                       CTL_NET, PF_INET6, CTL_EOL);
+        sysctl_createv(clog, 0, NULL, NULL,
+                       CTLFLAG_PERMANENT,
+                       CTLTYPE_NODE, "mip6",
+                       SYSCTL_DESCR("MIPv6 related settings"),
+                       NULL, 0, NULL, 0,
+                       CTL_NET, PF_INET6, IPPROTO_MH, CTL_EOL);
+
+        sysctl_createv(clog, 0, NULL, NULL,
+                       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+                       CTLTYPE_INT, "debug",
+                       SYSCTL_DESCR("Enable mip6 debug output"),
+                       NULL, 0, &mip6ctl_debug, 0,
+                       CTL_NET, PF_INET6, IPPROTO_MH,
+                       MIP6CTL_DEBUG, CTL_EOL);
+        sysctl_createv(clog, 0, NULL, NULL,
+                       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+                       CTLTYPE_INT, "use_ipsec",
+                       SYSCTL_DESCR("Enable ipsec of mip6"),
+                       NULL, 0, &mip6ctl_use_ipsec, 0,
+                       CTL_NET, PF_INET6, IPPROTO_MH,
+                       mip6ctl_use_ipsec, CTL_EOL);
+         sysctl_createv(clog, 0, NULL, NULL,
+                       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+                       CTLTYPE_INT, "rr_hint_ppslimit",
+                       SYSCTL_DESCR("Maximum RR hints sent per second"),
+                       NULL, 0, &mip6ctl_rr_hint_ppslim, 0,
+                       CTL_NET, PF_INET6, IPPROTO_MH,
+                       MIP6CTL_RR_HINT_PPSLIM, CTL_EOL);
+}
+#endif /* __NetBSD__ */
 
 #ifdef __FreeBSD__
 SYSCTL_DECL(_net_inet6_mip6);
@@ -512,7 +560,7 @@ mip6_bce_update(cnaddr, hoa, coa, flags, bid)
 		}
 		bce->mbc_encap = encap_attach_func(AF_INET6, IPPROTO_IPV6,
 		    mip6_rev_encapcheck,
-		    (struct protosw *)&mip6_tunnel_protosw, bce);
+		    (void *)&mip6_tunnel_protosw, bce);
 		if (bce->mbc_encap == NULL) {
 			mip6log((LOG_ERR, "mip6_bce_update: "
 			    "attaching an encaptab on a home agent "
@@ -811,7 +859,7 @@ mip6_bul_add(peeraddr, hoa, coa, hoa_ifindex, flags, state, bid)
 	    (mbul->mbul_flags & IP6_MH_BU_ROUTER) == 0) {
 		mbul->mbul_encap = encap_attach_func(AF_INET6, IPPROTO_IPV6,
 		    mip6_bul_encapcheck,
-		    (struct protosw *)&mip6_tunnel_protosw, mbul);
+		    (void *)&mip6_tunnel_protosw, mbul);
 		if (error) {
 			mip6log((LOG_ERR, "tunnel move failed.\n"));
 			/* XXX notifiy to upper XXX */
@@ -1452,18 +1500,26 @@ mip6_encapsulate(mm, osrc, odst)
 
    done:
 #ifdef IPV6_MINMTU
-	/* XXX */
-	return (ip6_output(m, 0, 0, IPV6_MINMTU, 0, /*&ifp*/NULL
+                /* XXX */
+	return (ip6_output(m, 0, 0, IPV6_MINMTU, 0
 #if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-			   , NULL
-#endif
-			));
+		, NULL, NULL
+#elif defined(__NetBSD__)
+		, NULL, NULL
 #else
-	return (ip6_output(m, 0, 0, 0, 0, /*&ifp*/NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-			   , NULL
+		, NULL
 #endif
-			));
+		));
+#else
+	return (ip6_output(m, 0, 0, 0, 0
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
+		, NULL, NULL
+#elif defined(__NetBSD__)
+		, NULL, NULL
+#else
+		, NULL
+#endif
+		));
 #endif
 }
 
