@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.47 2001/06/15 03:40:57 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.48 2001/06/21 03:46:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -285,7 +285,7 @@ extern const char *if_name __P((struct ifnet *));
 #define WITH_CONVERT_IP_LEN
 #endif
 
-#if (defined(__bsdi__) && _BSDI_VERSION < 199802) || defined(__OpenBSD__)
+#if (defined(__bsdi__) && _BSDI_VERSION < 199802) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ < 4)
 #define WITH_CONVERT_IP_ID
 #endif
 
