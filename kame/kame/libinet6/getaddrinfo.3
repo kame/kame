@@ -1,4 +1,4 @@
-.\"	$KAME: getaddrinfo.3,v 1.23 2000/11/16 08:14:49 itojun Exp $
+.\"	$KAME: getaddrinfo.3,v 1.24 2000/11/24 03:12:40 itojun Exp $
 .\"
 .\" Copyright (c) 1983, 1987, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -363,7 +363,7 @@ If the argument is not one of the
 values, the function still returns a pointer to a string whose contents
 indicate an unknown error.
 .\"
-.Sh EXTENSION
+.Ss Extension for scoped IPv6 address
 The implementation allows experimental numeric IPv6 address notation with
 scope identifier.
 By appending atmark and scope identifier to addresses, you can fill
