@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.373 2004/02/16 08:01:23 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.374 2004/02/16 09:00:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2734,10 +2734,8 @@ icmp6_redirect_input(m, off)
 	int is_router;
 	int is_onlink;
 	struct in6_addr src6;
-	struct in6_addr reddst6, redtgt6;
-	struct sockaddr_in6 rodst, sin6;
+	struct sockaddr_in6 rodst, sin6, reddst6, redtgt6;
 	union nd_opts ndopts;
-	u_int32_t zone;
 
 	if (!ifp)
 		return;
@@ -2761,17 +2759,23 @@ icmp6_redirect_input(m, off)
 	}
 #endif
 
-	redtgt6 = nd_rd->nd_rd_target;
-	reddst6 = nd_rd->nd_rd_dst;
-	if (in6_addr2zoneid(m->m_pkthdr.rcvif, &redtgt6, &zone) != 0)
-		goto freeit;
-	if (IN6_IS_ADDR_LINKLOCAL(&redtgt6))
-		redtgt6.s6_addr16[1] = htons(zone);
-	if (in6_addr2zoneid(m->m_pkthdr.rcvif, &reddst6, &zone) != 0)
-		goto freeit;
-	if (IN6_IS_ADDR_LINKLOCAL(&reddst6))
-		reddst6.s6_addr16[1] = htons(zone);
-
+	bzero(&redtgt6, sizeof(redtgt6));
+	bzero(&reddst6, sizeof(reddst6));
+	redtgt6.sin6_family = reddst6.sin6_family = AF_INET6;
+	redtgt6.sin6_len = reddst6.sin6_len = sizeof(struct sockaddr_in6);
+	redtgt6.sin6_addr = nd_rd->nd_rd_target;
+	reddst6.sin6_addr = nd_rd->nd_rd_dst;
+	if (in6_addr2zoneid(m->m_pkthdr.rcvif, &redtgt6.sin6_addr,
+			    &redtgt6.sin6_scope_id) ||
+	    in6_addr2zoneid(m->m_pkthdr.rcvif, &reddst6.sin6_addr,
+			    &reddst6.sin6_scope_id)) {
+		goto freeit;	/* XXX impossible */
+	}
+	if (in6_embedscope(&redtgt6.sin6_addr, &redtgt6) ||
+	    in6_embedscope(&reddst6.sin6_addr, &reddst6)) {
+		goto freeit;	/* XXX impossible */
+	}
+	
 	/* validation */
 	if (!IN6_IS_ADDR_LINKLOCAL(&src6)) {
 		nd6log((LOG_ERR,
@@ -2788,11 +2792,12 @@ icmp6_redirect_input(m, off)
 		goto bad;
 	}
 
-	if (IN6_IS_ADDR_MULTICAST(&reddst6)) {
+	if (IN6_IS_ADDR_MULTICAST(&reddst6.sin6_addr)) {
 		nd6log((LOG_ERR,
 		    "ICMP6 redirect rejected; "
 		    "redirect dst must be unicast: %s\n",
-		    icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
+		    icmp6_redirect_diag(&src6, &reddst6.sin6_addr,
+		    &redtgt6.sin6_addr)));
 		goto bad;
 	}
 
@@ -2800,7 +2805,8 @@ icmp6_redirect_input(m, off)
 	bzero(&rodst, sizeof(rodst));
 	rodst.sin6_family = AF_INET6;
 	rodst.sin6_len = sizeof(struct sockaddr_in6);
-	rodst.sin6_addr = reddst6;
+	rodst.sin6_addr = reddst6.sin6_addr;
+	/* note that sin6_scope_id should not be copied */
 #ifndef __FreeBSD__
 	rt = rtalloc1((struct sockaddr *)&rodst, 0);
 #else
@@ -2814,7 +2820,8 @@ icmp6_redirect_input(m, off)
 			nd6log((LOG_ERR,
 			    "ICMP6 redirect rejected; no route "
 			    "with inet6 gateway found for redirect dst: %s\n",
-			    icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
+			    icmp6_redirect_diag(&src6, &reddst6.sin6_addr,
+			    &redtgt6.sin6_addr)));
 			RTFREE(rt);
 			goto bad;
 		}
@@ -2826,7 +2833,8 @@ icmp6_redirect_input(m, off)
 			    "not equal to gw-for-src=%s (must be same): "
 			    "%s\n",
 			    ip6_sprintf(gw6),
-			    icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
+			    icmp6_redirect_diag(&src6, &reddst6.sin6_addr,
+			    &redtgt6.sin6_addr)));
 			RTFREE(rt);
 			goto bad;
 		}
@@ -2834,22 +2842,24 @@ icmp6_redirect_input(m, off)
 		nd6log((LOG_ERR,
 		    "ICMP6 redirect rejected; "
 		    "no route found for redirect dst: %s\n",
-		    icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
+		    icmp6_redirect_diag(&src6, &reddst6.sin6_addr,
+		    &redtgt6.sin6_addr)));
 		goto bad;
 	}
 	RTFREE(rt);
 	rt = NULL;
 
 	is_router = is_onlink = 0;
-	if (IN6_IS_ADDR_LINKLOCAL(&redtgt6))
+	if (IN6_IS_ADDR_LINKLOCAL(&redtgt6.sin6_addr))
 		is_router = 1;	/* router case */
-	if (IN6_ARE_ADDR_EQUAL(&redtgt6, &reddst6))
+	if (IN6_ARE_ADDR_EQUAL(&redtgt6.sin6_addr, &reddst6.sin6_addr))
 		is_onlink = 1;	/* on-link destination case */
 	if (!is_router && !is_onlink) {
 		nd6log((LOG_ERR,
 		    "ICMP6 redirect rejected; "
 		    "neither router case nor onlink case: %s\n",
-		    icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
+		    icmp6_redirect_diag(&src6, &reddst6.sin6_addr,
+		    &redtgt6.sin6_addr)));
 		goto bad;
 	}
 	/* validation passed */
@@ -2859,7 +2869,8 @@ icmp6_redirect_input(m, off)
 	if (nd6_options(&ndopts) < 0) {
 		nd6log((LOG_INFO, "icmp6_redirect_input: "
 		    "invalid ND option, rejected: %s\n",
-		    icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
+		    icmp6_redirect_diag(&src6, &reddst6.sin6_addr,
+		    &redtgt6.sin6_addr)));
 		/* nd6_options have incremented stats */
 		goto freeit;
 	}
@@ -2878,14 +2889,16 @@ icmp6_redirect_input(m, off)
 		nd6log((LOG_INFO,
 		    "icmp6_redirect_input: lladdrlen mismatch for %s "
 		    "(if %d, icmp6 packet %d): %s\n",
-		    ip6_sprintf(&redtgt6), ifp->if_addrlen, lladdrlen - 2,
-		    icmp6_redirect_diag(&src6, &reddst6, &redtgt6)));
+		    ip6_sprintf(&redtgt6.sin6_addr), ifp->if_addrlen,
+		    lladdrlen - 2,
+		    icmp6_redirect_diag(&src6, &reddst6.sin6_addr,
+		    &redtgt6.sin6_addr)));
 		goto bad;
 	}
 
 	/* RFC 2461 8.3 */
-	nd6_cache_lladdr(ifp, &redtgt6, lladdr, lladdrlen, ND_REDIRECT,
-	    is_onlink ? ND_REDIRECT_ONLINK : ND_REDIRECT_ROUTER);
+	nd6_cache_lladdr(ifp, &redtgt6.sin6_addr, lladdr, lladdrlen,
+	    ND_REDIRECT, is_onlink ? ND_REDIRECT_ONLINK : ND_REDIRECT_ROUTER);
 
 	if (!is_onlink) {	/* better router case.  perform rtredirect. */
 		/* perform rtredirect */
@@ -2927,8 +2940,8 @@ icmp6_redirect_input(m, off)
 		    AF_INET6;
 		sgw.sin6_len = sdst.sin6_len = ssrc.sin6_len =
 		    sizeof(struct sockaddr_in6);
-		sgw.sin6_addr = redtgt6;
-		sdst.sin6_addr = reddst6;
+		sgw.sin6_addr = redtgt6.sin6_addr;
+		sdst.sin6_addr = reddst6.sin6_addr;
 		ssrc.sin6_addr = src6;
 
 		rtredirect((struct sockaddr *)&sdst, (struct sockaddr *)&sgw,
@@ -2956,7 +2969,7 @@ icmp6_redirect_input(m, off)
 	bzero(&sin6, sizeof(sin6));
 	sin6.sin6_family = AF_INET6;
 	sin6.sin6_len = sizeof(struct sockaddr_in6);
-	sin6.sin6_addr = reddst6;
+	sin6.sin6_addr = reddst6.sin6_addr;
 	pfctlinput(PRC_REDIRECT_HOST, (struct sockaddr *)&sin6);
 #ifdef IPSEC
 	key_sa_routechange((struct sockaddr *)&sin6);
