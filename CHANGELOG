@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.240 1999/11/01 13:09:17 itojun Exp $
+$Id: CHANGELOG,v 1.241 1999/11/01 16:46:44 itojun Exp $
 
 <199911>
+Tue Nov  2 01:46:01 JST 1999  itojun@iijlab.net
+	* bsdi3/bin/ping6: move bsdi3/sbin/ping6 into bsdi3/bin/ping6, as
+	  bsdi3 puts ping into bin/ping.
+
 Mon Nov  1 21:29:59 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/net/mrt, freebsd[23]/ports/mrt: upgrade to 2.0.1a.
 
