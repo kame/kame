@@ -24,7 +24,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: print-netbios.c,v 1.10 96/12/10 23:25:12 leres Exp $";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-netbios.c,v 1.1.1.1 1999/08/08 23:32:07 itojun Exp $";
 #endif
 
 #include <sys/param.h>
@@ -37,7 +37,6 @@ static const char rcsid[] =
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
 #include <netinet/tcp.h>
-#include <netinet/tcpip.h>
 
 #ifdef __STDC__
 #include <stdlib.h>
