@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.141 2001/11/09 06:58:41 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.142 2001/11/09 07:04:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -411,6 +411,8 @@ main(argc, argv)
 			break;
 		case 'h':		/* hoplimit */
 			hoplimit = strtol(optarg, &e, 10);
+			if (*optarg == '\0' || *e != '\0')
+				errx(1, "illegal hoplimit %s", optarg);
 			if (255 < hoplimit || hoplimit < -1)
 				errx(1,
 				    "illegal hoplimit -- %s", optarg);
