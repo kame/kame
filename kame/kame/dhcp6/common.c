@@ -65,9 +65,12 @@
 #include <dhcp6.h>
 #include <common.h>
 
+#if 0
 static unsigned int if_maxindex __P((void));
+#endif
 static int in6_matchflags __P((struct sockaddr *, char *, int));
 
+#if 0
 static unsigned int
 if_maxindex()
 {
@@ -82,6 +85,7 @@ if_maxindex()
 	if_freenameindex(p0);
 	return max;
 }
+#endif
 
 int
 getifaddr(addr, ifnam, prefix, plen, strong, ignoreflags)
@@ -356,7 +360,7 @@ random_between(x, y)
 	ratio = 1 << 16;
 	while ((y - x) * ratio < (y - x))
 		ratio = ratio / 2;
-	return x + (y - x) * (ratio - 1) / random() & (ratio - 1);
+	return x + ((y - x) * (ratio - 1) / random() & (ratio - 1));
 }
 
 char *

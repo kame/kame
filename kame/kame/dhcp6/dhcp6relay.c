@@ -201,14 +201,13 @@ static void
 relay6_init()
 {
 	struct addrinfo hints;
-	struct addrinfo *res, *res2, *res3;
+	struct addrinfo *res, *res2;
 	int i, ifidx, error;
 	struct ipv6_mreq mreq6;
 	int type;
 	struct icmp6_filter filt;
 	int on = 1;
 	static struct iovec iov[2];
-	struct prefix_list *pent;
 	struct cmsghdr *cm;
 
 	/* initialize non-link-local prefixes list */
@@ -415,7 +414,6 @@ relay6_recv(s, rdevice)
 {
 	ssize_t len;
 	struct sockaddr_storage from;
-	socklen_t fromlen;
 	struct in6_pktinfo *pi = NULL;
 	struct cmsghdr *cm;
 

@@ -88,7 +88,7 @@ char *dnsdom = NULL;
 int insock;	/* inbound udp port */
 int outsock;	/* outbound udp port */
 
-static struct msghdr rmh, smh;
+static struct msghdr rmh;
 static char rdatabuf[BUFSIZ];
 static int rmsgctllen;
 static char *rmsgctlbuf;
@@ -207,7 +207,6 @@ server6_init()
 	int on = 1;
 	struct ipv6_mreq mreq6;
 	static struct iovec iov[2];
-	struct cmsghdr *cm;
 
 	ifidx = if_nametoindex(device);
 	if (ifidx == 0)
@@ -325,6 +324,7 @@ server6_init()
 	servtab = NULL;
 }
 
+#if 0
 static void
 tvfix(tv)
 	struct timeval *tv;
@@ -334,6 +334,7 @@ tvfix(tv)
 	tv->tv_usec %= (1000 * 1000);
 	tv->tv_sec += s;
 }
+#endif
 
 static void
 server6_mainloop()
@@ -452,7 +453,7 @@ server6_react_solicit(buf, siz, rcvpi)
 	struct sockaddr_in6 dst;
 	struct addrinfo hints, *res;
 	int error;
-	struct in6_addr servaddr, target;
+	struct in6_addr servaddr;
 	int hlim, agent;
 
 	dprintf((stderr, "react_solicit\n"));
@@ -485,7 +486,7 @@ server6_react_solicit(buf, siz, rcvpi)
 		if (plen == 0) {
 			dprintf((stderr,
 				 "react_solicit: 0 prefix length is not "
-				"allowed when relayed\n", plen));
+				"allowed when relayed\n"));
 			return(-1);
 		}
 
@@ -626,7 +627,6 @@ server6_react_request(buf, siz, rcvpi)
 	struct sockaddr_in6 dst;
 	struct addrinfo hints, *res;
 	int error;
-	struct in6_addr *servaddr = NULL;
 	struct in6_addr myaddr, target;
 	struct dhcp6_opt *opt;
 	char *ext;
@@ -862,4 +862,6 @@ server6_react_request(buf, siz, rcvpi)
 		    addr2str((struct sockaddr *)&dst));
 		/* NOTREACHED */
 	}
+
+	return 0;
 }

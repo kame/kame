@@ -303,6 +303,7 @@ client6_init()
 	TAILQ_INIT(&servtab);
 }
 
+#if 0
 static void
 tvfix(tv)
 	struct timeval *tv;
@@ -312,12 +313,12 @@ tvfix(tv)
 	tv->tv_usec %= (1000 * 1000);
 	tv->tv_sec += s;
 }
+#endif
 
 static void
 client6_mainloop()
 {
 	struct servtab *p;
-	char hbuf[BUFSIZ];
 
 	client6_findserv();
 
@@ -359,7 +360,7 @@ client6_findserv()
 	int timeo;
 	int ret;
 	time_t sendtime, delaytime, waittime, t;
-	struct servtab *p, *q;
+	struct servtab *p;
 	enum { WAIT, DELAY } mode;
 
 	/* send solicit, wait for advert */
