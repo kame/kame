@@ -1,3 +1,5 @@
+#	$KAME: Makefile,v 1.3 2000/12/05 09:08:54 itojun Exp $
+#
 # Copyright (c) 1999 WIDE Project. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -23,8 +25,6 @@
 # LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
-
-#	$Id: Makefile,v 1.2 2000/12/05 09:00:05 itojun Exp $
 
 .ifndef PREFIX
 PREFIX=/usr/local/v6

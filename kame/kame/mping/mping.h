@@ -1,3 +1,4 @@
+/*	$KAME: mping.h,v 1.3 2000/12/05 09:08:54 itojun Exp $	*/
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -26,8 +27,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-/*	$Id: mping.h,v 1.2 2000/02/06 09:51:47 itojun Exp $	*/
 
 #include <stdio.h>
 #include <unistd.h>

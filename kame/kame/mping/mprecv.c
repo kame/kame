@@ -1,3 +1,5 @@
+/*	$KAME: mprecv.c,v 1.4 2000/12/05 09:08:54 itojun Exp $	*/
+
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -26,8 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-/*	$Id: mprecv.c,v 1.3 2000/12/05 08:51:35 itojun Exp $	*/
 
 #include "mping.h"
 
