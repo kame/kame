@@ -47,10 +47,10 @@
 #include <net/if_dl.h>
 #include <netinet/in.h>
 #include <netinet/igmp.h>
-#ifdef IGMP_v3_MEMBERSHIP_REPORT
+#ifdef HAVE_IGMPV3
 #include <netinet/in_msf.h>
 #endif
-#ifdef MCAST_JOIN_SOURCE_GROUP
+#ifdef HAVE_MLDV2
 #include <net/route.h>
 #include <netinet6/in6_msf.h>
 #endif
@@ -67,7 +67,12 @@
 #endif
 #include <netinet/in_var.h>
 #include <netinet/icmp6.h>
+#define _KERNEL	
+/* defined _KERNEL only to define IGMP_v?_ROUTER and MLD_V?_ROUTER */
+#include <sys/sysctl.h>
+#include <netinet/igmp_var.h>
 #include <netinet6/mld6_var.h>
+#undef _KERNEL
 #include <arpa/inet.h>
 
 #include <netdb.h>
@@ -97,10 +102,10 @@ struct in6_multi * in6_multientry __P((struct in6_multi *));
 void if_addrlist(struct ifaddr *);
 void in_multilist(struct in_multi *);
 struct in_multi * in_multientry(struct in_multi *);
-#ifdef IGMP_v3_MEMBERSHIP_REPORT
+#ifdef HAVE_IGMPV3
 void in_addr_slistentry(struct in_addr_slist *ias, char *heading);
 #endif
-#ifdef MCAST_JOIN_SOURCE_GROUP
+#ifdef HAVE_MLDV2
 void in6_addr_slistentry(struct in6_addr_slist *ias, char *heading);
 #endif
 
@@ -399,7 +404,7 @@ in6_multientry(mc)
 	struct in6_multi *mc;
 {
 	struct in6_multi multi;
-#ifdef MCAST_JOIN_SOURCE_GROUP
+#ifdef HAVE_MLDV2
 	struct in6_multi_source src;
 #endif
 	struct router6_info rt6i;
@@ -410,11 +415,11 @@ in6_multientry(mc)
 
 	KREAD(multi.in6m_rti, &rt6i, struct router_info);
 	switch (rt6i.rt6i_type) {
-	case MLD_LISTENER_REPORT:
+	case MLD_V1_ROUTER:
 		printf("\tmld_ver 1");
 		break;
-#ifdef MCAST_JOIN_SOURCE_GROUP
-	case MLDV2_LISTENER_REPORT:
+#ifdef HAVE_MLDV2
+	case MLD_V2_ROUTER:
 		printf("\tmld_ver 2");
 		break;
 #endif
@@ -424,7 +429,7 @@ in6_multientry(mc)
 	}
 
 
-#ifdef MCAST_JOIN_SOURCE_GROUP
+#ifdef HAVE_MLDV2
 	if (multi.in6m_source == NULL) {
 		printf("\n");
 		return(multi.in6m_entry.le_next);
@@ -450,7 +455,7 @@ in6_multientry(mc)
 	return(multi.in6m_entry.le_next);
 }
 
-#ifdef MCAST_JOIN_SOURCE_GROUP
+#ifdef HAVE_MLDV2
 void
 in6_addr_slistentry(struct in6_addr_slist *ias, char *heading)
 {
@@ -577,7 +582,7 @@ in_multientry(mc)
 {
 	struct in_multi multi;
 	struct router_info rti;
-#ifdef IGMP_v3_MEMBERSHIP_REPORT
+#ifdef HAVE_IGMPV3
 	struct in_multi_source src;
 #endif
 
@@ -586,14 +591,14 @@ in_multientry(mc)
 
 	KREAD(multi.inm_rti, &rti, struct router_info);
 	switch (rti.rti_type) {
-	case IGMP_v1_MEMBERSHIP_REPORT:
+	case IGMP_v1_ROUTER:
 		printf("\tigmp_ver 1");
 		break;
-	case IGMP_v2_MEMBERSHIP_REPORT:
+	case IGMP_v2_ROUTER:
 		printf("\tigmp_ver 2");
 		break;
-#ifdef IGMP_v3_MEMBERSHIP_REPORT
-	case IGMP_v3_MEMBERSHIP_REPORT:
+#ifdef HAVE_IGMPV3
+	case IGMP_v3_ROUTER:
 		printf("\tigmp_ver 3");
 		break;
 #endif
@@ -602,7 +607,7 @@ in_multientry(mc)
 		break;
 	}
 
-#ifdef IGMP_v3_MEMBERSHIP_REPORT
+#ifdef HAVE_IGMPV3
 	if (multi.inm_source == NULL) {
 		printf("\n");
 		return(multi.inm_list.le_next);
@@ -633,7 +638,7 @@ in_multientry(mc)
 #endif
 }
 
-#ifdef IGMP_v3_MEMBERSHIP_REPORT
+#ifdef HAVE_IGMPV3
 void
 in_addr_slistentry(struct in_addr_slist *ias, char *heading)
 {
