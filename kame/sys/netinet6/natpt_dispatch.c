@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.44 2002/03/08 04:10:35 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.45 2002/03/13 04:53:26 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -271,7 +271,7 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 	 * If IPv4 packet is too big to translate into IPv6, return
 	 * icmp "packet too big" error.
 	 */
-	if ((pad->sa_family == IPPROTO_IPV6)
+	if ((pad->sa_family == AF_INET6)
 	    && needFragment(&cv4)
 	    && isDFset(&cv4)) {
 		n_long		dest = 0;
@@ -470,16 +470,24 @@ natpt_config4(struct mbuf *m, struct pcv *cv4)
 	    && ((ip4end - ip4pyld) < hdrsz))
 		return (IPPROTO_IP);
 
+	hdrsz = sizeof(struct ip6_hdr);
 	cv4->pyld.caddr = ip4pyld;
 	cv4->poff = cv4->pyld.caddr - (caddr_t)cv4->ip.ip4;
 	cv4->plen = (caddr_t)m->m_data + m->m_len - cv4->pyld.caddr;
+
+	/*
+	 * Add fragment header when IPv4 packet does not set DF flag.
+	 * According to RFC2765 3.1.
+	 */
+	if ((ip->ip_off & IP_DF) == 0)
+		hdrsz += sizeof(struct ip6_frag);
 
 	if (((ip->ip_off & IP_OFFMASK) == 0)
 	    && ((ip->ip_off & IP_MF) != 0))
 		cv4->flags |= FIRST_FRAGMENT;
 	if ((ip->ip_off & IP_OFFMASK) != 0)
 		cv4->flags |= NEXT_FRAGMENT;
-	if (NATPT_FRGHDRSZ + cv4->plen > IPV6_MMTU)
+	if (hdrsz + cv4->plen > IPV6_MMTU)
 		cv4->flags |= NEED_FRAGMENT;
 	if ((ip->ip_off & IP_DF) != 0)
 		cv4->flags |= SET_DF;
