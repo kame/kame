@@ -1000,7 +1000,10 @@ bgp_process_update(struct rpcb *bnp)
 		   atrlen, &bnp->rp_inpkt[k]);
 	goto done;
       }
-      /* XXX: Community is not supported yet. Just skipping */
+      if (atrdatalen != 0) {
+	      if ((coml = msg2communitylist(bnp, i, atrdatalen)) == NULL)
+		      goto done;
+      }
       i += atrdatalen;
       break;
 
@@ -1413,6 +1416,19 @@ bgp_process_update(struct rpcb *bnp)
 		   atrlen, &bnp->rp_inpkt[k]);
 	goto done;
       }
+      
+      /*
+       * Optional transitive attributes should be passed to other peers
+       * transparently.
+       */
+      if ((bnp->rp_inpkt[k] & PA_FLAG_OPT) &&
+	  (bnp->rp_inpkt[k] & PA_FLAG_TRANS)) {
+#ifdef DEBUG_BGP
+	syslog(LOG_DEBUG,
+	       "<%s>: BGP+ RECV\t\tUnrecognized Attribute: type=%d,len=%d");
+	optatr = add_optatr(optatr, bnp, i, atrdatalen);
+#endif 
+      }
 
       /* optional non-transitive attributes the Partial bit must be
 	 set to 0. */
@@ -1484,6 +1500,7 @@ bgp_process_update(struct rpcb *bnp)
     asp->asp_atomagg   = aggregated;
     asp->asp_origid    = originatorid;   /* net  order      */
     asp->asp_clstr     = cll;
+    asp->asp_community = coml;
   }
 
   /***                     ***/

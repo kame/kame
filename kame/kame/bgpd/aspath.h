@@ -143,6 +143,7 @@ struct aspath {
   byte              asp_atomagg;
   u_int32_t         asp_origid;
   struct clstrlist *asp_clstr;
+  struct optatr	   *asp_optatr;
   u_short           asp_len;      /* "length" of this path  */
   struct asseg     *asp_segment;
 };
@@ -150,5 +151,12 @@ struct aspath {
 struct clstrlist {
   struct clstrlist *cll_next;
   struct clstrlist *cll_prev;
-  u_int32_t         cll_id;   /* CLUSTER_ID (NOT always equals to ROUTER_ID) */
+  u_int32_t         cll_id;   /* CLUSTER_ID (NOT always equals to ROUTER_ID), network byte order */
+};
+
+
+struct optatr {		/* structure for unrecognized optional attribute */
+  struct optatr *next;
+  int len;			/* attribute length */
+  char *data;			/* attribute data */
 };
