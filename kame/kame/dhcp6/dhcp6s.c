@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.149 2005/03/20 07:54:24 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.150 2005/03/21 07:49:28 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -2461,8 +2461,7 @@ make_match_ia(spec, conflist, retlist)
 			    &spec->uv, MATCHLIST_PREFIXLEN);
 			break;
 		case DHCP6_LISTVAL_STATEFULADDR6:
-			match = dhcp6_find_listval(conflist, spec->type,
-			    &spec->uv, 0);
+			/* No "partial match" for addresses */
 			break;
 		default:
 			dprintf(LOG_ERR, FNAME, "unsupported IA type");
