@@ -65,6 +65,7 @@ int dump = 0;
 int debug = 0;
 #define dprintf(x)	{ if (debug) fprintf x; }
 char *device = NULL;
+char *dnsserv = "3ffe:501:4819::42";
 
 int insock;	/* inbound udp port */
 int outsock;	/* outbound udp port */
@@ -77,6 +78,7 @@ static void server6_mainloop __P((void));
 static ssize_t server6_recv __P((int, char *, size_t));
 static ssize_t server6_react __P((int, char *, size_t));
 static int server6_react_solicit __P((int, char *, size_t));
+static int server6_react_request __P((int, char *, size_t));
 
 int
 main(argc, argv)
@@ -86,15 +88,23 @@ main(argc, argv)
 	extern int optind;
 	extern char *optarg;
 	int ch;
+	struct in6_addr a;
 
 	srandom(time(NULL) & getpid());
-	while ((ch = getopt(argc, argv, "dD")) != EOF) {
+	while ((ch = getopt(argc, argv, "dDn:")) != EOF) {
 		switch (ch) {
 		case 'd':
 			debug++;
 			break;
 		case 'D':
 			dump++;
+			break;
+		case 'n':
+			if (inet_pton(AF_INET6, optarg, &a, sizeof(a)) != 1) {
+				errx(1, "invalid DNS server %s", optarg);
+				/*NOTREACHED*/
+			}
+			dnsserv = optarg;
 			break;
 		default:
 			usage();
@@ -117,7 +127,7 @@ main(argc, argv)
 static void
 usage()
 {
-	fprintf(stderr, "usage: dhcp6s intface\n");
+	fprintf(stderr, "usage: dhcp6s [-dD] [-n serv] intface\n");
 	exit(0);
 }
 
@@ -323,7 +333,7 @@ server6_recv(s, buf, siz)
 
 static ssize_t
 server6_react(agent, buf, siz)
-	int agent;	/* 0: servsock, 1: insock */
+	int agent;	/* 0: via relay, 1: direct */
 	char *buf;
 	size_t siz;
 {
@@ -336,7 +346,10 @@ server6_react(agent, buf, siz)
 		server6_react_solicit(agent, buf, siz);
 		break;
 	case DH6_ADVERT:
+		break;
 	case DH6_REQUEST:
+		server6_react_request(agent, buf, siz);
+		break;
 	case DH6_REPLY:
 	case DH6_RELEASE:
 	case DH6_RECONFIG:
@@ -350,7 +363,7 @@ server6_react(agent, buf, siz)
 /* 6.2. Sending DHCP Advertise Messages */
 static int
 server6_react_solicit(agent, buf, siz)
-	int agent;	/* 0: servsock, 1: insock */
+	int agent;	/* 0: via relay, 1: direct */
 	char *buf;
 	size_t siz;
 {
@@ -396,6 +409,8 @@ server6_react_solicit(agent, buf, siz)
 		server6_flush(&dh6s->dh6sol_cliaddr, NULL);
 #endif
 
+	/* build new client-agent binding if not present */
+
 	if (!agent) {
 		usleep(1000 * random_between(SERVER_MIN_ADV_DELAY,
 			SERVER_MAX_ADV_DELAY));
@@ -423,15 +438,15 @@ server6_react_solicit(agent, buf, siz)
 		memcpy(&dh6a->dh6adv_relayaddr, &dh6s->dh6sol_relayaddr,
 			sizeof(dh6s->dh6sol_relayaddr));
 		dst.sin6_addr = dh6a->dh6adv_relayaddr;
-		inet_pton(AF_INET6, "fec0::", &target, sizeof(target));
-		if (getifaddr(&myaddr, device, &target, 10) != 0) {
-			inet_pton(AF_INET6, "2000::", &target, sizeof(target));
-			if (getifaddr(&myaddr, device, &target, 3) != 0) {
+		inet_pton(AF_INET6, "2000::", &target, sizeof(target));
+		if (getifaddr(&myaddr, device, &target, 3) != 0) {
+			inet_pton(AF_INET6, "fec0::", &target, sizeof(target));
+			if (getifaddr(&myaddr, device, &target, 10) != 0) {
 				errx(1, "no matching address on %s", device);
 				/*NOTREACHED*/
 			}
 		}
-		hlim = 64;
+		hlim = 0;
 	} else {
 		dst.sin6_addr = dh6s->dh6sol_cliaddr;
 		dst.sin6_scope_id = if_nametoindex(device);
@@ -456,101 +471,116 @@ server6_react_solicit(agent, buf, siz)
 	}
 }
 
-#if 0
-static void
-server6_findserv()
+/* 6.3. DHCP Request and Reply Message Processing */
+static int
+server6_react_request(agent, buf, siz)
+	int agent;	/* 0: via relay, 1: direct */
+	char *buf;
+	size_t siz;
 {
-	struct timeval w;
-	fd_set r;
-	int timeo;
-	int ret;
-	time_t sendtime, delaytime, waittime, t;
-	struct servtab *st = NULL;
-	struct servtab *p, *q;
-	enum { WAIT, DELAY } mode;
+	struct dhcp6_request *dh6r;
+	struct dhcp6_reply *dh6p;
+	char sbuf[BUFSIZ];
+	ssize_t len;
+	struct sockaddr_in6 dst;
+	struct addrinfo hints, *res;
+	int error;
+	struct in6_addr *servaddr = NULL;
+	struct in6_addr myaddr, target;
+	int hlim;
+	char *ext;
 
-	/* send solicit, wait for advert */
-	timeo = 0;
-	sendtime = time(NULL);
-	delaytime = MIN_SOLICIT_DELAY;
-	delaytime += (MAX_SOLICIT_DELAY - MIN_SOLICIT_DELAY)
-		* (random() & 0xff) / 0xff;
-	waittime = 0;
-	while (1) {
-		t = time(NULL);
-		dprintf((stderr, "sendtime=%ld waittime=%d delaytime=%d\n",
-			(long)sendtime, (int)waittime, (int)delaytime));
-		if (waittime && waittime < delaytime) {
-			if (sendtime + waittime > t) {
-				w.tv_sec = waittime - (t - sendtime);
-				w.tv_usec = 0;
-				mode = WAIT;
-			} else if (sendtime + delaytime > t) {
-				w.tv_sec = delaytime - (t - sendtime);
-				w.tv_usec = 0;
-				mode = DELAY;
-			}
-		} else {
-			if (sendtime + delaytime > t) {
-				w.tv_sec = delaytime - (t - sendtime);
-				w.tv_usec = 0;
-				mode = DELAY;
-			} else if (sendtime + waittime > t) {
-				w.tv_sec = waittime - (t - sendtime);
-				w.tv_usec = 0;
-				mode = WAIT;
+	dprintf((stderr, "react_request\n"));
+
+	if (siz < sizeof(*dh6r)) {
+		dprintf((stderr, "react_request: short packet\n"));
+		return -1;
+	}
+	dh6r = (struct dhcp6_request *)buf;
+
+	if (!agent) {
+		if (IN6_IS_ADDR_UNSPECIFIED(&dh6r->dh6req_relayaddr)
+		 || IN6_IS_ADDR_LINKLOCAL(&dh6r->dh6req_relayaddr)) {
+			dprintf((stderr, "react_request: invalid relayaddr "
+				"to server addr\n"));
+			return -1;
+		}
+	}
+	if (!IN6_IS_ADDR_LINKLOCAL(&dh6r->dh6req_cliaddr)) {
+		dprintf((stderr, "react_request: invalid cliaddr\n"));
+		return -1;
+	}
+	if ((dh6r->dh6req_flags & DH6REQ_SERVPRESENT) != 0) {
+		if (siz < sizeof(*dh6r) + sizeof(struct in6_addr)) {
+			dprintf((stderr, "react_request: short packet\n"));
+			return -1;
+		}
+		servaddr = (struct in6_addr *)(dh6r + 1);
+	}
+
+#if 0
+	if ((dh6s->dh6sol_flags & DH6SOL_CLOSE) != 0)
+		server6_flush(&dh6s->dh6sol_cliaddr, NULL);
+#endif
+
+	/* build new client-agent binding if not present */
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_INET6;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
+	error = getaddrinfo("::", DH6PORT_DOWNSTREAM, &hints, &res);
+	if (error) {
+		errx(1, "getaddrinfo: %s", gai_strerror(error));
+		/*NOTREACHED*/
+	}
+	memcpy(&dst, res->ai_addr, res->ai_addrlen);
+	freeaddrinfo(res);
+
+	dh6p = (struct dhcp6_reply *)sbuf;
+	len = sizeof(*dh6p);
+	memset(dh6p, 0, sizeof(*dh6p));
+	dh6p->dh6rep_msgtype = DH6_REPLY;
+	if ((dh6r->dh6req_flags & DH6REQ_SERVPRESENT) != 0) {
+		dst.sin6_addr = dh6r->dh6req_relayaddr;
+		inet_pton(AF_INET6, "fec0::", &target, sizeof(target));
+		if (getifaddr(&myaddr, device, &target, 10) != 0) {
+			inet_pton(AF_INET6, "2000::", &target, sizeof(target));
+			if (getifaddr(&myaddr, device, &target, 3) != 0) {
+				errx(1, "no matching address on %s", device);
+				/*NOTREACHED*/
 			}
 		}
-		ret = select(insock + 1, &r, NULL, NULL, &w);
-		switch (ret) {
-		case -1:
-			err(1, "select");
+		hlim = 64;
+	} else {
+		/* XXX should use ip src on request */
+		dst.sin6_addr = dh6r->dh6req_cliaddr;
+		dst.sin6_scope_id = if_nametoindex(device);
+		inet_pton(AF_INET6, "fe80::", &target, sizeof(target));
+		if (getifaddr(&myaddr, device, &target, 10) != 0) {
+			errx(1, "no matching address on %s", device);
 			/*NOTREACHED*/
-		case 0:
-			if (mode == WAIT && st) {
-				/* we have more than 1 reply, receive timeout */
-				goto found;
-			}
-
-			if (mode == WAIT) {
-			} else {
-				if (timeo >= SOLICIT_RETRY)
-					goto found;
-
-				dprintf((stderr, "send solicit\n"));
-				server6_sendsolicit(outsock);
-				timeo++;
-				sendtime = time(NULL);
-				delaytime *= 2;
-				delaytime += (MAX_SOLICIT_DELAY - MIN_SOLICIT_DELAY)
-					* (random() & 0xff) / 0xff;
-				waittime = ADV_CLIENT_WAIT;
-			}
-			break;
-		default:
-			p = (struct servtab *)malloc(sizeof(struct servtab));
-			memset(p, 0, sizeof(*p));
-			if (server6_recvadvert(insock, p) < 0) {
-				free(p);
-				break;
-			}
-			p->next = st;
-			st = p;
-			if (p->pref == ~0)
-				goto found;
-			break;
 		}
+		hlim = 1;
 	}
+#ifdef __KAME__
+	if (IN6_IS_ADDR_LINKLOCAL(&myaddr))
+		myaddr.s6_addr[2] = myaddr.s6_addr[3] = 0;
+#endif
+	dh6p->dh6rep_xid = dh6r->dh6req_xid;
 
-found:
-	q = NULL;
-	for (p = st; p; p = p->next) {
-		if (q == NULL || p->pref > q->pref)
-			q = p;
-	}
-	if (q == NULL) {
-		errx(1, "no dhcp6 server found");
+	/* DNS server */
+	ext = (char *)(dh6p + 1);
+	*(u_int16_t *)&ext[0] = htons(6);
+	*(u_int16_t *)&ext[2] = htons(16);
+	inet_pton(AF_INET6, dnsserv, &ext[4], 16);
+	ext += 4 + 16;
+	len += 4 + 16;
+
+	/* domain name */
+
+	if (transmit_sa(outsock, (struct sockaddr *)&dst, hlim, sbuf, len) != 0) {
+		err(1, "transmit failed");
 		/*NOTREACHED*/
 	}
 }
-#endif
