@@ -1,0 +1,106 @@
+$Id: README.certificate,v 1.1 2000/02/16 04:37:57 sakane Exp $
+
+Description how to use RSA signature authentication method with racoon.
+
+REQUIRED
+========
+OpenSSL0.9.4 or later
+
+CONFIGURATION
+=============
+To use RSA signature authentication method.
+	in "remote" directive.
+	- set "x509" as "certificate_type".
+	- set a type of your subject alt name as "identifier".
+	  "identifier" in "remote" directive which is refered to "identifier"
+	  of personal information.
+	- set "rsasig" as "authentication_method".
+	- set a path for certificates saved to "path certificate" directive.
+
+For example to negotiate with 194.100.55.1 (isakmp-test.ssh.fi).
+"sakane@kame.net" of UserFQDN as subject alt name.
+A directory for certificates saved is /usr/local/openssl/certs.
+
+	path certificate "/usr/local/openssl/certs" ;
+	identifier user_fqdn "sakane@kame.net";
+	remote 194.100.55.1
+	{
+		exchange_mode main;
+		doi ipsec_doi;
+		situation identity_only;
+		identifier user_fqdn;
+		certificate_type x509;
+		nonce_size 16;
+		lifetime time 1 min;    # sec,min,hour
+		lifetime byte 5 MB;     # B,KB,GB
+		dh_group modp768 ;
+		proposal {
+			encryption_algorithm des;
+			hash_algorithm md5;
+			authentication_method rsasig ;
+			dh_group modp768 ;
+		}
+	}
+
+
+TO GET YOUR CERT
+================
+- Make a request to be signed your public key.
+  For example, signature algorithm is SHA1 with RSA 1024bits.
+
+  % openssl req -new -nodes -newkey rsa:1024 -sha1 -keyform PEM -keyout privkey.pem -outform PEM
+  Using configuration from /usr/local/openssl/openssl.cnf
+  Generating a 1024 bit RSA private key
+  .........................+++++
+  ........+++++
+  writing new private key to 'privkey.pem'
+  -----
+  You are about to be asked to enter information that will be incorporated
+  into your certificate request.
+  What you are about to enter is what is called a Distinguished Name or a DN.
+  There are quite a few fields but you can leave some blank
+  For some fields there will be a default value,
+  If you enter '.', the field will be left blank.
+  -----
+  Country Name (2 letter code) [AU]:JP
+  State or Province Name (full name) [Some-State]:Kanagawa
+  Locality Name (eg, city) []:Fujisawa
+  Organization Name (eg, company) [Internet Widgits Pty Ltd]:WIDE Project
+  Organizational Unit Name (eg, section) []:KAME Project
+  Common Name (eg, YOUR name) []:Shoichi Sakane
+  Email Address []:sakane@ydc.co.jp
+  
+  Please enter the following 'extra' attributes
+  to be sent with your certificate request
+  A challenge password []:
+  An optional company name []:
+  -----BEGIN CERTIFICATE REQUEST-----
+  MIIB3DCCAUUCAQAwgZsxCzAJBgNVBAYTAkpQMREwDwYDVQQIEwhLYW5hZ2F3YTER
+  MA8GA1UEBxMIRnVqaXNhd2ExFTATBgNVBAoTDFdJREUgUHJvamVjdDEVMBMGA1UE
+  CxMMS0FNRSBQcm9qZWN0MRcwFQYDVQQDEw5TaG9pY2hpIFNha2FuZTEfMB0GCSqG
+  SIb3DQEJARYQc2FrYW5lQHlkYy5jby5qcDCBnzANBgkqhkiG9w0BAQEFAAOBjQAw
+  gYkCgYEAuWE1jKVD8AvuM5x8Z6JzJlYeR+V+FZkFxv65Y8TQGyiZPOlvlb9JacaL
+  JFYBjSuuno/t111tu3thggQwC80SUos0irG31i6SSusQMGmkoT1m/QHckZ4dlfxH
+  yFLqwkV97qYGp/h55PuG8WwW+Imcbtd/RJHqD7gEWxPFhy9rmsMCAwEAAaAAMA0G
+  CSqGSIb3DQEBBQUAA4GBAIinjgTTew5y1Y9dJg7aqy7jNRvDQC6iaR2s8KH6+TKq
+  mf6prGWglUexG9P14JLZ41hcrHA5D+l2u2GPDsJyxY8qhkT8WATST5H5mg3L/4nt
+  lE6ZtEvEE846jcVxfQuSjSEmbHb54uckb37NDDxOnGoU2FU6/fTP7OHH059iFwRz
+  -----END CERTIFICATE REQUEST-----
+
+- Be signed your public key.
+  http://isakmp-test.ssh.fi/cgi-bin/nph-real-cert/cert.pem
+  Don't forget to input your subject alt name.
+
+- Save your certificate into "cert.pem" in the directory.
+  The directory name is constructed with subject alt name under type of
+  subject alt name under certificates saved directory.  For example of
+  file name,
+
+	/usr/local/openssl/certs/User_FQDN/sakane@kame.net/cert.pem
+
+  The mapping between type of subject alt name and directory name:
+	type			directory name
+	------------------      ----------------
+	Email (rfc822)		UserFQDN
+	Domain name (FQDN)	FQDN
+	IP-number		address
