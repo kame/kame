@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.c,v 1.17 2001/08/14 12:26:05 sakane Exp $	*/
+/*	$KAME: algorithm.c,v 1.18 2001/08/14 13:45:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -337,14 +337,15 @@ alg_oakley_hmacdef_one(doi, key, buf)
 {
 	struct hmac_algorithm *f;
 	vchar_t *res;
+#ifdef ENABLE_STATS
+	struct timeval start, end;
+#endif
 
 	f = alg_oakley_hmacdef(doi);
 	if (f == NULL || f->one == NULL)
 		return NULL;
 
 #ifdef ENABLE_STATS
-    {
-	struct timeval start, end;
 	gettimeofday(&start, NULL);
 #endif
 
@@ -354,7 +355,6 @@ alg_oakley_hmacdef_one(doi, key, buf)
 	gettimeofday(&end, NULL);
 	syslog(LOG_NOTICE, "%s(%s size=%d): %8.6f", __FUNCTION__,
 		f->name, buf->l, timedelta(&start, &end));
-    }
 #endif
 
 	return res;
@@ -423,14 +423,15 @@ alg_oakley_encdef_decrypt(doi, buf, key, iv)
 {
 	vchar_t *res;
 	struct enc_algorithm *f;
+#ifdef ENABLE_STATS
+	struct timeval start, end;
+#endif
 
 	f = alg_oakley_encdef(doi);
 	if (f == NULL || f->decrypt == NULL)
 		return NULL;
 
 #ifdef ENABLE_STATS
-    {
-	struct timeval start, end;
 	gettimeofday(&start, NULL);
 #endif
 
@@ -440,7 +441,6 @@ alg_oakley_encdef_decrypt(doi, buf, key, iv)
 	gettimeofday(&end, NULL);
 	syslog(LOG_NOTICE, "%s(%s size=%d): %8.6f", __FUNCTION__,
 		f->name, buf->l, timedelta(&start, &end));
-    }
 #endif
 	return res;
 }
@@ -452,14 +452,15 @@ alg_oakley_encdef_encrypt(doi, buf, key, iv)
 {
 	vchar_t *res;
 	struct enc_algorithm *f;
+#ifdef ENABLE_STATS
+	struct timeval start, end;
+#endif
 
 	f = alg_oakley_encdef(doi);
 	if (f == NULL || f->encrypt == NULL)
 		return NULL;
 
 #ifdef ENABLE_STATS
-    {
-	struct timeval start, end;
 	gettimeofday(&start, NULL);
 #endif
 
@@ -469,7 +470,6 @@ alg_oakley_encdef_encrypt(doi, buf, key, iv)
 	gettimeofday(&end, NULL);
 	syslog(LOG_NOTICE, "%s(%s size=%d): %8.6f", __FUNCTION__,
 		f->name, buf->l, timedelta(&start, &end));
-    }
 #endif
 	return res;
 }
