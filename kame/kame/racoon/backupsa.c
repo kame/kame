@@ -1,4 +1,4 @@
-/*	$KAME: backupsa.c,v 1.12 2001/08/20 06:46:28 itojun Exp $	*/
+/*	$KAME: backupsa.c,v 1.13 2001/10/26 04:57:20 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -369,6 +369,7 @@ backupsa_clean()
 			lcconf->pathinfo[LC_PATHTYPE_BACKUPSA]);
 		return -1;
 	}
+	fclose(fp);
 	return 0;
 }
 
