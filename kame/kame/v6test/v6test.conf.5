@@ -1,4 +1,4 @@
-.\"	$KAME: v6test.conf.5,v 1.5 2001/06/27 10:08:44 suz Exp $
+.\"	$KAME: v6test.conf.5,v 1.6 2001/08/06 20:22:12 suz Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -477,8 +477,8 @@ UDP data.
 .It Cm \&raw \fI(entry)\fR
 Raw message dump for upper-layer protocols above IPv6, such as OSPFv3, Tunneled packet and so on. The following entries should be specified.
 .Bl -tag -width indent -compact
-.It Cm \&raw_proto \fI(num)\fR
-its protocol type
+.It Cm \&raw_proto \fI(num, optional)\fR
+its protocol type. If not specified, nothing is fulfilled in the next header field of the previos header.
 .It Cm \&raw_data \fI(hex)\fR
 its actual data.
 .El

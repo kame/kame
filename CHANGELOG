@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1829 2001/08/05 05:02:08 itojun Exp $
+$KAME: CHANGELOG,v 1.1830 2001/08/06 20:22:11 suz Exp $
 
 <200108>
+Mon Aug  6 21:18:58 BST 2001	suz@sdl.hitachi.co.jp
+	* kame/kame/v6test/getconfig.c: you can build up a packet from 
+	multiple raw-data entries.
+
 Sun Aug  5 14:00:04 JST 2001  itojun@iijlab.net
 	* sys/netinet6/ipsec.c: improve cached ipsec policy lookup on connected
 	  SOCK_STREAM PCBs.

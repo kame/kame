@@ -1055,8 +1055,12 @@ make_raw(char *name)
 		exit(1);
 	}
 
-	MUSTHAVE(nxt, "raw_proto", rawbuf);
-	if (nxthdrp) 
+	/* 
+	 * fulfills next header field in previous option only when raw_proto
+	 * is specified
+	 */
+	nxt= tgetnum("raw_proto", rawbuf);
+	if (nxthdrp && nxt >= 0)
 		*nxthdrp = nxt;
 	nxthdrp = 0;
 	if ((upper_data = tgetstr("raw_data", &bp, rawbuf)) != NULL) {
