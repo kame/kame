@@ -55,11 +55,6 @@ options 	CDNR		#diffserv traffic conditioner
 options 	BLUE		#blue by wu-chang feng
 
 # mobile-ip6 options
-# Correspondent node: MIP6
-# Home agent: MIP6 + MIP6_HA
-# Mobile node: MIP6 + MIP6_MN
 # NOTE: Don't define with IPsec options
 #options 	MIP6
 ##options 	MIP6_DEBUG
-#options 	MIP6_HA		# only one from MIP6_HA or MIP6_MN
-#options 	MIP6_MN		# only one from MIP6_HA or MIP6_MN
