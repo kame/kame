@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.291 2003/07/01 06:54:37 itojun Exp $	*/
+/*	$KAME: key.c,v 1.292 2003/07/01 06:55:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -388,7 +388,9 @@ static struct secasvar *key_allocsa_policy __P((struct secasindex *));
 static struct secasvar *key_do_allocsa_policy __P((struct secashead *, u_int));
 static void key_delsp __P((struct secpolicy *));
 static struct secpolicy *key_getsp __P((struct secpolicyindex *, int));
+#if NPF > 0
 static struct secpolicy *key_getspbytag __P((u_int16_t, int));
+#endif
 static struct secpolicy *key_getspbyid __P((u_int32_t));
 static u_int32_t key_newreqid __P((void));
 static struct mbuf *key_gather_mbuf __P((struct mbuf *,
@@ -1240,6 +1242,7 @@ key_getsp(spidx, dir)
 	return NULL;
 }
 
+#if NPF > 0
 static struct secpolicy *
 key_getspbytag(tag, dir)
 	u_int16_t tag;
@@ -1260,6 +1263,7 @@ key_getspbytag(tag, dir)
 
 	return NULL;
 }
+#endif
 
 /*
  * get SP by index.
