@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.162 2002/09/02 06:08:58 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.163 2002/09/05 09:50:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1641,6 +1641,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 	struct ip6_pktopts *opt;          /* pktopt passed to ip6_output */
 	struct mip6_pktopts *mip6opt;
 {
+	struct ip6_mobility *mh;
 	struct ip6_hdr *ip6;
 	struct sockaddr_in6 *src;
 	struct sockaddr_in6 *dst;
@@ -1662,6 +1663,16 @@ mip6_exthdr_create(m, opt, mip6opt)
 #else
 	s = splnet();
 #endif
+
+	/* 
+	 * HoT messages must be delivered via a home agent even when
+	 * we have a valid binding cache entry for the mobile node who
+	 * have sent the corresponding HoTI message.
+	 */
+	if ((opt != NULL) && ((mh = opt->ip6po_mobility) != NULL)) {
+		if (mh->ip6m_type == IP6M_HOME_TEST)
+			goto skip_rthdr2;
+	}
 
 	/*
 	 * add the routing header for the route optimization if there
@@ -1694,6 +1705,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 		opt->ip6po_rthdr = mip6opt->mip6po_rthdr;
 		mip6opt->mip6po_rthdr = NULL;
 	}
+ skip_rthdr2:
 
 #ifdef MIP6XXX
 	/XXX check nxt == IPPROTO_NONE *//* not supported piggyback */
