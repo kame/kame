@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1443 2000/12/21 01:44:46 jinmei Exp $
+$KAME: CHANGELOG,v 1.1444 2000/12/21 01:48:59 jinmei Exp $
 
 <200012>
+2000-12-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (init_ip6pktopts): added to avoid
+	forgetting initialization of packet options. This function is
+	called from ip6_pcbopt() and ip6_setpktoptions().
+
 2000-12-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netkey/key.c (key_cmpspidx_withmask): applied the same
 	fix as one introduced on 2000-12-07 (see below) for inbond
