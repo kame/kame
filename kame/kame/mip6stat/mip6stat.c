@@ -37,13 +37,14 @@
  *       like Binding cache, HA list, BU list. Other functions should be
  *       moved to config program.
  *
- * $Id: mip6stat.c,v 1.3 2000/02/07 17:50:56 itojun Exp $
+ * $Id: mip6stat.c,v 1.4 2000/02/08 04:01:14 itojun Exp $
  *
  */
 
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
