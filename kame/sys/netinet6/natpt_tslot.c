@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.44 2002/05/10 11:47:49 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.45 2002/05/16 06:47:46 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -64,8 +64,8 @@ static int		 tSlotEntryMax;
 static int		 tSlotEntryUsed;
 
 static time_t		 maxFragment;
-static time_t		 frgmntTimer;
-static time_t		 tSlotTimer;
+static time_t		 frgmntTimer;		/* [sec] */
+static time_t		 tSlotTimer;		/* [sec] */
 static time_t		 maxTTLany;
 static time_t		 maxTTLicmp;
 static time_t		 maxTTLudp;
@@ -638,7 +638,7 @@ natpt_expireFragment(void *ignored_arg)
 	struct timeval	 atv;
 	struct fragment	*frg, *frgn;
 
-	timeout(natpt_expireFragment, (caddr_t)0, frgmntTimer);
+	timeout(natpt_expireFragment, (caddr_t)0, frgmntTimer * hz);
 	microtime(&atv);
 
 	frg = TAILQ_FIRST(&frg_head);
@@ -870,7 +870,7 @@ natpt_expireTSlot(void *ignored_arg)
 	struct timeval	 atv;
 	struct tSlot	*tsl, *tsln;
 
-	timeout(natpt_expireTSlot, (caddr_t)0, tSlotTimer);
+	timeout(natpt_expireTSlot, (caddr_t)0, tSlotTimer * hz);
 	microtime(&atv);
 
 	tsl = TAILQ_FIRST(&tsl_head);
@@ -968,10 +968,10 @@ natpt_init_tslot()
 	tSlotEntryMax = MAXTSLOTENTRY;
 	tSlotEntryUsed = 0;
 
-	tSlotTimer = 60 * hz;
-	frgmntTimer = 60 * hz;
-	timeout(natpt_expireTSlot, (caddr_t)0, tSlotTimer);
-	timeout(natpt_expireFragment, (caddr_t)0, frgmntTimer);
+	tSlotTimer = 32;
+	frgmntTimer = 32;
+	timeout(natpt_expireTSlot, (caddr_t)0, tSlotTimer * hz);
+	timeout(natpt_expireFragment, (caddr_t)0, frgmntTimer * hz);
 
 	maxFragment = 120;				/* [sec] */
 
@@ -988,6 +988,7 @@ natpt_init_tslot()
 		TAILQ_INIT(&tslhashr[iter].tslhead);
 	}
 
+	natptctl_vars[NATPTCTL_TSLOTTIMER]  = (caddr_t)&tSlotTimer;
 	natptctl_vars[NATPTCTL_MAXTTYANY]   = (caddr_t)&maxTTLany;
 	natptctl_vars[NATPTCTL_MAXTTYICMP]  = (caddr_t)&maxTTLicmp;
 	natptctl_vars[NATPTCTL_MAXTTYUDP]   = (caddr_t)&maxTTLudp;
