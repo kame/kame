@@ -44,6 +44,8 @@ extern struct ifinfo *ifentry;
 extern struct ripif *ripifs;	/* defined in ripng.c */
 extern task *taskhead;
 
+extern time_t bgpd_start_time;
+
 char *dumpfile;
 
 static time_t tloc_now;
@@ -837,12 +839,17 @@ show_bgp_peer(FILE *fp, struct rpcb *bnp, char *indent)
 			/* ctime appends \n */
 			fprintf(fp, "%s Last closed: %s", indent,
 				ctime(&abnp->rp_stat.last_closed));
-			if (bnp->rp_state != BGPSTATE_ESTABLISHED)
-				fprintf(fp,
-					"%s   hasn't been established for %s\n",
-					indent,
-					sec2str(tloc_now -
-						abnp->rp_stat.last_closed));
+		}
+		if (bnp->rp_state != BGPSTATE_ESTABLISHED) {
+			time_t blankperiod;
+
+			if (abnp->rp_stat.last_closed)
+				blankperiod = tloc_now -
+					abnp->rp_stat.last_closed;
+			else
+				blankperiod = tloc_now - bgpd_start_time;
+			fprintf(fp, "%s   hasn't been established for %s\n",
+				indent, sec2str(blankperiod));
 		}
 		fprintf(fp, "%sFilters:\n", indent);
 		dump_filterinfo(fp, indent, &abnp->rp_filterset);
