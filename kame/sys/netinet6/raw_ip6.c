@@ -497,6 +497,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 		splx(s);
 		in6p = sotoin6pcb(so);
 		in6p->in6p_ip6.ip6_nxt = (long)nam;
+		in6p->in6p_ip6.ip6_hlim = ip6_defhlim;
 		in6p->in6p_cksum = -1;
 #ifdef IPSEC
 		if ((error = ipsec_init_policy(&in6p->in6p_sp)) != 0)
