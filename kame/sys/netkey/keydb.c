@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.55 2000/01/17 10:54:23 itojun Exp $ */
+/* KAME $Id: keydb.c,v 1.56 2000/01/17 10:55:59 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -197,10 +197,6 @@ SYSCTL_INT(_net_key, KEYCTL_BLOCKACQ_LIFETIME,	blockacq_lifetime, CTLFLAG_RW, \
 	&key_blockacq_lifetime,	0,	"");
 
 #endif /* __FreeBSD__ */
-
-#if (defined(__bsdi__) && !defined(ALTQ)) || defined(__NetBSD__)
-typedef void (timeout_t)(void *);
-#endif
 
 #ifndef LIST_FOREACH
 #define LIST_FOREACH(elm, head, field)                                     \
