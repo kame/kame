@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.68 2001/08/16 16:26:26 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.69 2001/08/16 16:28:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -407,24 +407,24 @@ gif_output(ifp, m, dst, rt)
 
 #ifndef __OpenBSD__	/* on openbsd, ipip_input() does it instead */
 void
-gif_input(m, af, gifp)
+gif_input(m, af, ifp)
 	struct mbuf *m;
 	int af;
-	struct ifnet *gifp;
+	struct ifnet *ifp;
 {
 	int s, isr;
 	struct ifqueue *ifq = 0;
 
-	if (gifp == NULL) {
+	if (ifp == NULL) {
 		/* just in case */
 		m_freem(m);
 		return;
 	}
 
-	m->m_pkthdr.rcvif = gifp;
+	m->m_pkthdr.rcvif = ifp;
 	
 #if NBPFILTER > 0
-	if (gifp->if_bpf) {
+	if (ifp->if_bpf) {
 		/*
 		 * We need to prepend the address family as
 		 * a four byte field.  Cons up a dummy header
@@ -440,9 +440,9 @@ gif_input(m, af, gifp)
 		m0.m_data = (char *)&af1;
 		
 #ifdef HAVE_OLD_BPF
-		bpf_mtap(gifp, &m0);
+		bpf_mtap(ifp, &m0);
 #else
-		bpf_mtap(gifp->if_bpf, &m0);
+		bpf_mtap(ifp->if_bpf, &m0);
 #endif
 	}
 #endif /*NBPFILTER > 0*/
@@ -473,7 +473,7 @@ gif_input(m, af, gifp)
 #endif
 #if defined(__NetBSD__) && defined(ISO)
 	case AF_ISO:
-		m = gif_eon_decap(gifp, m);
+		m = gif_eon_decap(ifp, m);
 		if (!m)
 			return;
 		ifq = &clnlintrq;
@@ -492,8 +492,8 @@ gif_input(m, af, gifp)
 		splx(s);
 		return;
 	}
-	gifp->if_ipackets++;
-	gifp->if_ibytes += m->m_pkthdr.len;
+	ifp->if_ipackets++;
+	ifp->if_ibytes += m->m_pkthdr.len;
 	IF_ENQUEUE(ifq, m);
 	/* we need schednetisr since the address family may change */
 	schednetisr(isr);
@@ -952,13 +952,13 @@ gif_eon_encap(struct mbuf *m)
  * remove EON header and check checksum
  */
 static struct mbuf *
-gif_eon_decap(struct ifnet *gifp, struct mbuf *m)
+gif_eon_decap(struct ifnet *ifp, struct mbuf *m)
 {
 	struct eonhdr *ehdr;
 
 	if (m->m_len < sizeof(*ehdr) &&
 	    (m = m_pullup(m, sizeof(*ehdr))) == NULL) {
-		gifp->if_ierrors++;
+		ifp->if_ierrors++;
 		return NULL;
 	}
 	if (iso_check_csum(m, sizeof(struct eonhdr))) {
