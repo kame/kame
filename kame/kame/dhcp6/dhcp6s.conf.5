@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6s.conf.5,v 1.9 2004/03/24 05:44:12 suz Exp $
+.\"	$KAME: dhcp6s.conf.5,v 1.10 2004/06/10 12:42:41 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -173,10 +173,7 @@ It does not affect server's behavior but is provided for
 readability of log messages.
 Possible substatements are as follows.
 .Bl -tag -width Ds -compact
-.It Xo
-.Ic duid Ar ID
-;
-.Xc
+.It Ic duid Ar ID ;
 This statement defines the client's DHCP unique identifier
 .Pq DUID .
 .Ar ID
@@ -213,8 +210,37 @@ statement.
 In that case,
 all or some of the specified prefixes will be delegated to the client,
 based on required parameters by the client.
+.It Ic delayedkey Ar keyname ;
+This statement specifies a secret key shared with the client for the DHCPv6
+delayed authentication protocol.
+.Ar keyname
+is a string that identifies a particular key parameters.
+A separate
+.Ic keyinfo
+statement for
+.Ar keyname
+must be provided in the configuration file.
+When this statement is specified and the client includes an
+authentication option for the delayed authentication protocol in a
+Solicit message,
+.Ic dhcp6s
+will perform the authentication protocol for succeeding message
+exchanges.
 .El
 .El
+.\"
+.Sh Keyinfo statement
+This statement defines a secret key shared with a client to
+authenticate DHCPv6 messages.
+The format and the description of this statement is provided in
+.Xr dhcp6c.conf 5 .
+One important difference in the server configuration is,
+however,
+the
+.Ar keyname
+is referred from a
+.Ic host
+statement as described above.
 .\"
 .Sh Examples
 The followings are a sample configuration to provide a DNS server
@@ -228,7 +254,30 @@ host kame {
 	prefix 2001:db8:1111::/48 infinity;
 };
 .Ed
+.Pp
+If a shared secret should be configured in both the server and the
+client for DHCPv6 authentication,
+it would be specified in the configuration file as follows:
+.Bd -literal -offset
+keyinfo kame {
+        realm "kame.net";
+        keyid 1;
+        secret "5pvW2g48OHPvkYMJSw0vZA==";
+};
+.Ed
+.Pp
+And the
+.Ic host
+statement would be modified as follows:
+.Bd -literal -offset
+host kame {
+	duid 00:01:00:01:aa:bb;
+	prefix 2001:db8:1111::/48 infinity;
+        delayedkey kame;
+};
+.Ed
 .Sh SEE ALSO
+.Xr dhcp6c.conf 5
 .Xr dhcp6s 8
 .\"
 .Sh HISTORY
