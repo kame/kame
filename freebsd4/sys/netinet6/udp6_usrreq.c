@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.13 2003/01/24 05:11:35 sam Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.70 2004/02/02 13:22:50 suz Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.71 2004/02/02 13:24:54 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -329,7 +329,8 @@ udp6_input(mp, offp, proto)
 				}
 
 				/* receive data from any source */
-				if (msf->msf_grpjoin != 0) {
+				if (msf->msf_grpjoin != 0 &&
+				    msf->msf_blknumsrc == 0) {
 					pass_to_pcb6(m, opts, last, &src,
 						    in6p, off);
 					break;
