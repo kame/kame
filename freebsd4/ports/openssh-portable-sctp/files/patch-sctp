@@ -1,0 +1,113 @@
+--- channels.c.orig	Mon Mar 10 09:21:17 2003
++++ channels.c	Tue Apr 15 14:49:36 2003
+@@ -2058,7 +2058,7 @@
+ 			continue;
+ 		}
+ 		/* Create a port to listen for the host. */
+-		sock = socket(ai->ai_family, SOCK_STREAM, 0);
++		sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+ 		if (sock < 0) {
+ 			/* this is no error since kernel may not support ipv6 */
+ 			verbose("socket: %.100s", strerror(errno));
+@@ -2280,7 +2280,7 @@
+ 			error("connect_to: getnameinfo failed");
+ 			continue;
+ 		}
+-		sock = socket(ai->ai_family, SOCK_STREAM, 0);
++		sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+ 		if (sock < 0) {
+ 			if (ai->ai_next == NULL)
+ 				error("socket: %.100s", strerror(errno));
+@@ -2381,7 +2381,8 @@
+ 		for (ai = aitop; ai; ai = ai->ai_next) {
+ 			if (ai->ai_family != AF_INET && ai->ai_family != AF_INET6)
+ 				continue;
+-			sock = socket(ai->ai_family, SOCK_STREAM, 0);
++			sock = socket(ai->ai_family, ai->ai_socktype,
++			    ai->ai_protocol);
+ 			if (sock < 0) {
+ 				if ((errno != EINVAL) && (errno != EAFNOSUPPORT)) {
+ 					error("socket: %.100s", strerror(errno));
+@@ -2547,7 +2548,7 @@
+ 	}
+ 	for (ai = aitop; ai; ai = ai->ai_next) {
+ 		/* Create a socket. */
+-		sock = socket(ai->ai_family, SOCK_STREAM, 0);
++		sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+ 		if (sock < 0) {
+ 			debug("socket: %.100s", strerror(errno));
+ 			continue;
+--- sshconnect.c.orig	Mon Dec 23 11:06:20 2002
++++ sshconnect.c	Tue Apr 15 14:56:40 2003
+@@ -163,7 +163,7 @@
+  * Creates a (possibly privileged) socket for use as the ssh connection.
+  */
+ static int
+-ssh_create_socket(int privileged, int family)
++ssh_create_socket(int privileged, struct addrinfo *ai)
+ {
+ 	int sock, gaierr;
+ 	struct addrinfo hints, *res;
+@@ -175,15 +175,15 @@
+ 	if (privileged) {
+ 		int p = IPPORT_RESERVED - 1;
+ 		PRIV_START;
+-		sock = rresvport_af(&p, family);
++		sock = rresvport_af(&p, ai->ai_family);
+ 		PRIV_END;
+ 		if (sock < 0)
+-			error("rresvport: af=%d %.100s", family, strerror(errno));
++			error("rresvport: af=%d %.100s", ai->ai_family, strerror(errno));
+ 		else
+ 			debug("Allocated local port %d.", p);
+ 		return sock;
+ 	}
+-	sock = socket(family, SOCK_STREAM, 0);
++	sock = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+ 	if (sock < 0)
+ 		error("socket: %.100s", strerror(errno));
+ 
+@@ -192,8 +192,9 @@
+ 		return sock;
+ 
+ 	memset(&hints, 0, sizeof(hints));
+-	hints.ai_family = family;
+-	hints.ai_socktype = SOCK_STREAM;
++	hints.ai_family = ai->ai_family;
++	hints.ai_socktype = ai->ai_socktype;
++	hints.ai_socktype = ai->ai_protocol;
+ 	hints.ai_flags = AI_PASSIVE;
+ 	gaierr = getaddrinfo(options.bind_address, "0", &hints, &res);
+ 	if (gaierr) {
+@@ -295,7 +296,7 @@
+ 				host, ntop, strport);
+ 
+ 			/* Create a socket for connecting. */
+-			sock = ssh_create_socket(needpriv, ai->ai_family);
++			sock = ssh_create_socket(needpriv, ai);
+ 			if (sock < 0)
+ 				/* Any error is already output */
+ 				continue;
+--- ssh-keyscan.c.orig	Mon Feb 24 10:03:03 2003
++++ ssh-keyscan.c	Tue Apr 15 14:49:36 2003
+@@ -397,7 +397,7 @@
+ 	if ((gaierr = getaddrinfo(host, strport, &hints, &aitop)) != 0)
+ 		fatal("getaddrinfo %s: %s", host, gai_strerror(gaierr));
+ 	for (ai = aitop; ai; ai = ai->ai_next) {
+-		s = socket(ai->ai_family, SOCK_STREAM, 0);
++		s = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+ 		if (s < 0) {
+ 			error("socket: %s", strerror(errno));
+ 			continue;
+--- sshd.c.orig	Mon Mar 10 09:38:10 2003
++++ sshd.c	Tue Apr 15 14:49:36 2003
+@@ -1153,7 +1153,8 @@
+ 				continue;
+ 			}
+ 			/* Create socket for listening. */
+-			listen_sock = socket(ai->ai_family, SOCK_STREAM, 0);
++			listen_sock = socket(ai->ai_family, ai->ai_socktype,
++			    ai->ai_protocol);
+ 			if (listen_sock < 0) {
+ 				/* kernel may not support ipv6 */
+ 				verbose("socket: %.100s", strerror(errno));
