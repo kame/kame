@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.5 1999/10/19 23:57:48 sakane Exp $ */
+/* KAME $Id: parse.y,v 1.6 1999/10/20 13:11:22 sakane Exp $ */
 
 %{
 #include <sys/types.h>
@@ -499,7 +499,7 @@ policy_spec
 				return -1;
 			}
 
-			p_policy_len += $2.val.len;
+			p_policy_len = ipsec_get_policylen(p_policy);
 
 			free($2.val.buf);
 		}
@@ -657,9 +657,6 @@ setkeymsg()
 
 	case SADB_X_SPDADD:
 	    {
-		((struct sadb_x_policy *)p_policy)->sadb_x_policy_len =
-			PFKEY_UNIT64(p_policy_len);
-
 		memcpy(m_buf + m_len, p_policy, p_policy_len);
 		m_len += p_policy_len;
 		free(p_policy);
