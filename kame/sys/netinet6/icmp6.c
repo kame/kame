@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.87 2000/05/11 00:57:18 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.88 2000/05/11 00:58:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1119,6 +1119,9 @@ ni6_input(m, off)
 	 * same result as "ping6 -w ff02::1" by the following steps:
 	 * - run "ping6 ff02::1", then
 	 * - run "ping6 -w" for all addresses replied.
+	 *
+	 * Maybe conforming to the spec, and additionally allowing
+	 * link-local multicast, is a good compromise...
 	 */
 #if 0
 	bzero(&sin6, sizeof(sin6));
