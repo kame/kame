@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.311 2002/09/24 14:09:11 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.312 2002/09/24 15:27:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1238,7 +1238,7 @@ in6_update_ifa(ifp, ifra, ia)
 	 * configure address flags.
 	 * when changing the flags, preserve read-only flags. 
 	 */
-	ia->ia6_flags = ifra->ifra_flags | (ia->ia6_flags & IN6_IFF_READONLY);
+	ia->ia6_flags = ifra->ifra_flags;
 	/*
 	 * backward compatibility - if IN6_IFF_DEPRECATED is set from the
 	 * userland, make it deprecated.
