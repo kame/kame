@@ -51,7 +51,7 @@
 void
 ip6_subopt_print(const u_char *bp, int len)
 {
-    int i, j;
+    int i;
     int optlen;
     struct in6_addr *in6, *ep;
     /* due to unaligned-ness, we need to copy them */
