@@ -1,4 +1,4 @@
-/*	$NetBSD: if.c,v 1.104.4.1 2002/11/01 10:56:17 tron Exp $	*/
+/*	$NetBSD: if.c,v 1.104.4.3 2003/09/10 19:00:09 tron Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2000, 2001 The NetBSD Foundation, Inc.
@@ -101,7 +101,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if.c,v 1.104.4.1 2002/11/01 10:56:17 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if.c,v 1.104.4.3 2003/09/10 19:00:09 tron Exp $");
 
 #include "opt_inet.h"
 
@@ -508,7 +508,7 @@ if_detach(ifp)
 	struct ifnet *ifp;
 {
 	struct socket so;
-	struct ifaddr *ifa;
+	struct ifaddr *ifa, *next;
 #ifdef IFAREF_DEBUG
 	struct ifaddr *last_ifa = NULL;
 #endif
@@ -541,13 +541,12 @@ if_detach(ifp)
 	(void) pfil_head_unregister(&ifp->if_pfil);
 #endif
 
-	if_free_sadl(ifp);
-
 	/*
 	 * Rip all the addresses off the interface.  This should make
 	 * all of the routes go away.
 	 */
-	while ((ifa = TAILQ_FIRST(&ifp->if_addrlist)) != NULL) {
+	for (ifa = TAILQ_FIRST(&ifp->if_addrlist); ifa; ifa = next) {
+		next = TAILQ_NEXT(ifa, ifa_list);
 		family = ifa->ifa_addr->sa_family;
 #ifdef IFAREF_DEBUG
 		printf("if_detach: ifaddr %p, family %d, refcnt %d\n",
@@ -556,42 +555,36 @@ if_detach(ifp)
 			panic("if_detach: loop detected");
 		last_ifa = ifa;
 #endif
-		if (family == AF_LINK) {
-			/*
-			 * XXX This case may now be obsolete by
-			 * XXX the call to if_free_sadl().
-			 */
-			rtinit(ifa, RTM_DELETE, 0);
-			TAILQ_REMOVE(&ifp->if_addrlist, ifa, ifa_list);
-			IFAFREE(ifa);
-		} else {
-			dp = pffinddomain(family);
+		if (family == AF_LINK)
+			continue;
+		dp = pffinddomain(family);
 #ifdef DIAGNOSTIC
-			if (dp == NULL)
-				panic("if_detach: no domain for AF %d\n",
-				    family);
+		if (dp == NULL)
+			panic("if_detach: no domain for AF %d\n",
+			    family);
 #endif
-			purged = 0;
-			for (pr = dp->dom_protosw;
-			     pr < dp->dom_protoswNPROTOSW; pr++) {
-				so.so_proto = pr;
-				if (pr->pr_usrreq != NULL) {
-					(void) (*pr->pr_usrreq)(&so,
-					    PRU_PURGEIF, NULL, NULL,
-					    (struct mbuf *) ifp, curproc);
-					purged = 1;
-				}
-			}
-			if (purged == 0) {
-				/*
-				 * XXX What's really the best thing to do
-				 * XXX here?  --thorpej@netbsd.org
-				 */
-				printf("if_detach: WARNING: AF %d not purged\n",
-				    family);
+		purged = 0;
+		for (pr = dp->dom_protosw;
+		     pr < dp->dom_protoswNPROTOSW; pr++) {
+			so.so_proto = pr;
+			if (pr->pr_usrreq != NULL) {
+				(void) (*pr->pr_usrreq)(&so,
+				    PRU_PURGEIF, NULL, NULL,
+				    (struct mbuf *) ifp, curproc);
+				purged = 1;
 			}
 		}
+		if (purged == 0) {
+			/*
+			 * XXX What's really the best thing to do
+			 * XXX here?  --thorpej@netbsd.org
+			 */
+			printf("if_detach: WARNING: AF %d not purged\n",
+			    family);
+		}
 	}
+
+	if_free_sadl(ifp);
 
 	/* Walk the routing table looking for straglers. */
 	for (i = 0; i <= AF_MAX; i++) {
@@ -764,32 +757,37 @@ if_clone_lookup(name, unitp)
 {
 	struct if_clone *ifc;
 	const char *cp;
-	int i;
+	int unit;
 
-	for (ifc = LIST_FIRST(&if_cloners); ifc != NULL;) {
-		for (cp = name, i = 0; i < ifc->ifc_namelen; i++, cp++) {
-			if (ifc->ifc_name[i] != *cp)
-				goto next_ifc;
-		}
-		goto found_name;
- next_ifc:
-		ifc = LIST_NEXT(ifc, ifc_list);
+	/* separate interface name from unit */
+	for (cp = name;
+	    cp - name < IFNAMSIZ && *cp && (*cp < '0' || *cp > '9');
+	    cp++)
+		continue;
+
+	if (cp == name || cp - name == IFNAMSIZ || !*cp)
+		return (NULL);	/* No name or unit number */
+
+	LIST_FOREACH(ifc, &if_cloners, ifc_list) {
+		if (strlen(ifc->ifc_name) == cp - name &&
+		    !strncmp(name, ifc->ifc_name, cp - name))
+			break;
 	}
 
-	/* No match. */
-	return (NULL);
+	if (ifc == NULL)
+		return (NULL);
 
- found_name:
-	for (i = 0; *cp != '\0'; cp++) {
-		if (*cp < '0' || *cp > '9') {
+	unit = 0;
+	while (cp - name < IFNAMSIZ && *cp) {
+		if (*cp < '0' || *cp > '9' || unit > INT_MAX / 10) {
 			/* Bogus unit number. */
 			return (NULL);
 		}
-		i = (i * 10) + (*cp - '0');
+		unit = (unit * 10) + (*cp++ - '0');
 	}
 
 	if (unitp != NULL)
-		*unitp = i;
+		*unitp = unit;
 	return (ifc);
 }
 

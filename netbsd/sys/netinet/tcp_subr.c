@@ -1,4 +1,4 @@
-/*	$NetBSD: tcp_subr.c,v 1.127.4.1 2002/07/02 06:55:16 lukem Exp $	*/
+/*	$NetBSD: tcp_subr.c,v 1.127.4.4 2003/10/22 06:05:57 jmc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -102,7 +102,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tcp_subr.c,v 1.127.4.1 2002/07/02 06:55:16 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tcp_subr.c,v 1.127.4.4 2003/10/22 06:05:57 jmc Exp $");
 
 #include "opt_inet.h"
 #include "opt_ipsec.h"
@@ -438,6 +438,7 @@ tcp_template(tp)
 	    {
 		struct ipovly *ipov;
 		mtod(m, struct ip *)->ip_v = 4;
+		mtod(m, struct ip *)->ip_hl = hlen >> 2;
 		ipov = mtod(m, struct ipovly *);
 		ipov->ih_pr = IPPROTO_TCP;
 		ipov->ih_len = htons(sizeof(struct tcphdr));
@@ -844,7 +845,7 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 #ifdef INET
 	case AF_INET:
 		error = ip_output(m, NULL, ro,
-		    (ip_mtudisc ? IP_MTUDISC : 0),
+		    (tp && tp->t_mtudisc ? IP_MTUDISC : 0),
 		    NULL);
 		break;
 #endif
@@ -915,10 +916,13 @@ tcp_newtcpcb(family, aux)
 	switch (family) {
 	case PF_INET:
 		tp->t_inpcb = (struct inpcb *)aux;
+		tp->t_mtudisc = ip_mtudisc;
 		break;
 #ifdef INET6
 	case PF_INET6:
 		tp->t_in6pcb = (struct in6pcb *)aux;
+		/* for IPv6, always try to run path MTU discovery */
+		tp->t_mtudisc = 1;
 		break;
 #endif
 	}
@@ -998,6 +1002,32 @@ tcp_drop(tp, errno)
 		errno = tp->t_softerror;
 	so->so_error = errno;
 	return (tcp_close(tp));
+}
+
+/*
+ * Return whether this tcpcb is marked as dead, indicating
+ * to the calling timer function that no further action should
+ * be taken, as we are about to release this tcpcb.  The release
+ * of the storage will be done if this is the last timer running.
+ *
+ * This is typically called from the callout handler function before
+ * callout_ack() is done, therefore we need to test the number of
+ * running timer functions against 1 below, not 0.
+ */
+int
+tcp_isdead(tp)
+	struct tcpcb *tp;
+{
+	int dead = (tp->t_flags & TF_DEAD);
+
+	if (__predict_false(dead)) {
+		if (tcp_timers_invoking(tp) > 1)
+				/* not quite there yet -- count separately? */
+			return dead;
+		tcpstat.tcps_delayed_free++;
+		pool_put(&tcpcb_pool, tp);
+	}
+	return dead;
 }
 
 /*
@@ -1118,7 +1148,11 @@ tcp_close(tp)
 		m_free(tp->t_template);
 		tp->t_template = NULL;
 	}
-	pool_put(&tcpcb_pool, tp);
+	if (tcp_timers_invoking(tp))
+		tp->t_flags |= TF_DEAD;
+	else
+		pool_put(&tcpcb_pool, tp);
+
 	if (inp) {
 		inp->inp_ppcb = 0;
 		soisdisconnected(so);
@@ -1420,7 +1454,7 @@ tcp_ctlinput(cmd, sa, v)
 		notify = tcp_quench;
 	else if (PRC_IS_REDIRECT(cmd))
 		notify = in_rtchange, ip = 0;
-	else if (cmd == PRC_MSGSIZE && ip_mtudisc && ip && ip->ip_v == 4) {
+	else if (cmd == PRC_MSGSIZE && ip && ip->ip_v == 4) {
 		/*
 		 * Check to see if we have a valid TCP connection
 		 * corresponding to the address in the ICMP message

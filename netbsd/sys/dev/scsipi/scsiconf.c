@@ -1,4 +1,4 @@
-/*	$NetBSD: scsiconf.c,v 1.184.4.1 2002/08/02 08:55:15 lukem Exp $	*/
+/*	$NetBSD: scsiconf.c,v 1.184.4.3 2003/06/02 14:23:26 tron Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
@@ -55,7 +55,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: scsiconf.c,v 1.184.4.1 2002/08/02 08:55:15 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: scsiconf.c,v 1.184.4.3 2003/06/02 14:23:26 tron Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -428,6 +428,8 @@ const struct scsi_quirk_inquiry_pattern scsi_quirk_patterns[] = {
 	{{T_CDROM, T_REMOV,
 	 "MEDIAVIS", "CDR-H93MV       ", "1.3"},  PQUIRK_NOLUNS},
 	{{T_CDROM, T_REMOV,
+	 "NEC     ", "CD-ROM DRIVE:502", ""},     PQUIRK_NOLUNS},
+	{{T_CDROM, T_REMOV,
 	 "NEC     ", "CD-ROM DRIVE:55 ", ""},     PQUIRK_NOLUNS},
 	{{T_CDROM, T_REMOV,
 	 "NEC     ", "CD-ROM DRIVE:83 ", ""},     PQUIRK_NOLUNS},
@@ -461,7 +463,7 @@ const struct scsi_quirk_inquiry_pattern scsi_quirk_patterns[] = {
 	{{T_CDROM, T_REMOV,
 	 "TEXEL   ", "CD-ROM DM-XX24 K", "1.10"}, PQUIRK_NOLUNS},
 	{{T_CDROM, T_REMOV,
-	 "TOSHIBA ", "XM-4101TASUNSLCD", "1755"}, PQUIRK_NOLUNS|PQUIRK_NOSYNC},
+	 "TOSHIBA ", "XM-4101TASUNSLCD", ""}, PQUIRK_NOLUNS|PQUIRK_NOSYNC},
 	/* "IBM CDRM00201     !F" 0724 is an IBM OEM Toshiba XM-4101BME */
 	{{T_CDROM, T_REMOV,
 	 "IBM     ", "CDRM00201     !F", "0724"}, PQUIRK_NOLUNS|PQUIRK_NOSYNC},

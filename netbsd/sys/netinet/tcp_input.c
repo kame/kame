@@ -1,4 +1,4 @@
-/*	$NetBSD: tcp_input.c,v 1.141.4.5 2002/10/23 12:21:24 lukem Exp $	*/
+/*	$NetBSD: tcp_input.c,v 1.141.4.7 2003/10/22 06:05:47 jmc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -152,7 +152,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: tcp_input.c,v 1.141.4.5 2002/10/23 12:21:24 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: tcp_input.c,v 1.141.4.7 2003/10/22 06:05:47 jmc Exp $");
 
 #include "opt_inet.h"
 #include "opt_ipsec.h"
@@ -2790,7 +2790,10 @@ do {									\
 		(void) m_free((sc)->sc_ipopts);				\
 	if ((sc)->sc_route4.ro_rt != NULL)				\
 		RTFREE((sc)->sc_route4.ro_rt);				\
-	pool_put(&syn_cache_pool, (sc));				\
+	if (callout_invoking(&(sc)->sc_timer))				\
+		(sc)->sc_flags |= SCF_DEAD;				\
+	else								\
+		pool_put(&syn_cache_pool, (sc));			\
 } while (/*CONSTCOND*/0)
 
 struct pool syn_cache_pool;
@@ -2937,6 +2940,14 @@ syn_cache_timer(void *arg)
 	int s;
 
 	s = splsoftnet();
+	callout_ack(&sc->sc_timer);
+
+	if (__predict_false(sc->sc_flags & SCF_DEAD)) {
+		tcpstat.tcps_sc_delayed_free++;
+		pool_put(&syn_cache_pool, sc);
+		splx(s);
+		return;
+	}
 
 	if (__predict_false(sc->sc_rxtshift == TCP_MAXRXTSHIFT)) {
 		/* Drop it -- too many retransmissions. */
@@ -3158,6 +3169,10 @@ syn_cache_get(src, dst, th, hlen, tlen, so, m)
 				sizeof(((struct sockaddr_in *)dst)->sin_addr));
 			in6p->in6p_lport = ((struct sockaddr_in *)dst)->sin_port;
 			in6totcpcb(in6p)->t_family = AF_INET;
+			if (sotoin6pcb(oso)->in6p_flags & IN6P_IPV6_V6ONLY)
+				in6p->in6p_flags |= IN6P_IPV6_V6ONLY;
+			else
+				in6p->in6p_flags &= ~IN6P_IPV6_V6ONLY;
 		}
 #endif
 		break;

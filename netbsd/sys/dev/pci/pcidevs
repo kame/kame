@@ -1,4 +1,4 @@
-$NetBSD: pcidevs,v 1.428.2.20 2003/01/28 06:22:37 jmc Exp $
+$NetBSD: pcidevs,v 1.428.2.30 2003/10/20 04:49:34 cyber Exp $
 
 /*
  * Copyright (c) 1995, 1996 Christopher G. Demetriou
@@ -831,6 +831,8 @@ product APPLE GMAC3		0x0032	GMAC Ethernet
 product APPLE UNINORTH_AGP3	0x0034	UniNorth AGP Bridge
 product APPLE UNINORTH5		0x0035	UniNorth Host-PCI Bridge
 product APPLE UNINORTH6		0x0036	UniNorth Host-PCI Bridge
+product APPLE KAUAI		0x003b	Kauai ATA Controller
+product APPLE INTREPID		0x003e	MAC-IO I/O Controller (Intrepid)
 
 /* ARC Logic products */
 product ARC 1000PV	0xa091	1000PV
@@ -1359,6 +1361,9 @@ product INTEL PRO_100_VM_3	0x103b	PRO/100 VM Network Controller with 82562EM/EX 
 product INTEL PRO_100_VM_4	0x103c	PRO/100 VM Network Controller with 82562EM/EX (CNR) PHY
 product INTEL PRO_100_VE_4	0x103d	PRO/100 VE (MOB) Network Controller
 product INTEL PRO_100_VM_5	0x103e	PRO/100 VM (MOB) Network Controller
+product INTEL PRO_WL_2100	0x1043	PRO/Wireless LAN 2100 3B Mini PCI Adapter
+product INTEL PRO_100_VM_6	0x1050  PRO/100 VM Network Controller with 82562ET PHY
+product INTEL PRO_100_M		0x1059	PRO/100 M Network Controller
 product INTEL 82815_DC100_HUB	0x1100	82815 Hub
 product INTEL 82815_DC100_AGP	0x1101	82815 AGP
 product INTEL 82815_DC100_GRAPH	0x1102	82815 Graphics
@@ -1444,7 +1449,20 @@ product INTEL 82801DB_AC	0x24C5	82801DB AC97 Audio Controller
 product INTEL 82801DB_MOD	0x24C6	82801DB AC97 Modem Controller
 product INTEL 82801DB_USB_3	0x24C7	82801DB USB UHCI Controller #3
 product INTEL 82801DB_IDE	0x24CB	82801DB IDE Controller (UltraATA/100)
-product INTEL 82801DB_USBC	0x24CD	82801DB USB EHCI Controller
+product INTEL 82801DB_ISA	0x24CC	82801DB ISA Bridge
+product INTEL 82801DB_USBC	0x24CD	82801DB/DBM USB EHCI Controller
+product INTEL 82801EB_LPC	0x24D0	82801EB LPC Interface Bridge
+product INTEL 82801EB_SATA	0x24D1	82801EB Serial ATA Controller
+product INTEL 82801EB_USB_0	0x24D2	82801EB/ER USB UHCI Controller #0
+product INTEL 82801EB_SMB	0x24D3	82801EB/ER SMBus Controller
+product INTEL 82801EB_USB_1	0x24D4	82801EB/ER USB UHCI Controller #1
+product INTEL 82801EB_AC	0x24D5	82801EB/ER AC'97 Audio Controller
+product INTEL 82801EB_MOD	0x24D6	82801EB/ER AC'97 Modem Controller
+product INTEL 82801EB_USB_2	0x24D7	82801EB/ER USB UHCI Controller #2
+product INTEL 82801EB_IDE	0x24DB	82801EB/ER IDE Controller
+product INTEL 82801EB_EHCI	0x24DD	82801EB/ER USB EHCI Controller
+product INTEL 82801EB_USB_3	0x24DE	82801EB/ER USB UHCI Controller #3
+product INTEL 82801ER_SATA	0x24DF	82801ER Serial ATA Controller
 product INTEL 82820_MCH		0x2501	82820 MCH (Camino)
 product INTEL 82820_AGP		0x250f	82820 AGP
 product INTEL 82850_HB		0x2530	82850 Host
@@ -1466,6 +1484,20 @@ product INTEL E7500_HI_D2	0x2548	E7500 MCH HI_C vppb 2
 product INTEL 82845G_DRAM	0x2560	82845G/GL DRAM Controller / Host-Hub I/F Bridge
 product INTEL 82845G_AGP	0x2561	82845G/GL Host-to-AGP Bridge
 product INTEL 82845G_IGD	0x2562	82845G/GL Integrated Graphics Device
+product INTEL 82865_HB		0x2570	82865 Host
+product INTEL 82865_AGP		0x2571	82865 AGP
+product INTEL 82865_IGD		0x2572	82865G Integrated Graphics Device
+product INTEL 82801EB_HPB	0x2573	82801EB Hub-to-PCI Bridge
+product INTEL 82875P_HB		0x2578  82875P Host
+product INTEL 82875P_AGP	0x2579  82875P AGP
+product INTEL 31244		0x3200	31244 Serial ATA Controller
+product INTEL 82855PM_DDR	0x3340	82855PM MCH Host Controller
+product INTEL 82855PM_AGP	0x3341	82855PM Host-to-AGP Bridge
+product INTEL 82855PM_PM	0x3342	82855PM Power Management Controller
+product INTEL 82855GM_MCH	0x3580	82855GM Host-to-Hub Controller
+product INTEL 82855GM_IGD	0x3582	82855PM GMCH Integrated Graphics Device
+product INTEL 82855GM_MC	0x3584	82855PM GMCH Memory Controller
+product INTEL 82855GM_CP	0x3585	82855PM GMCH Configuration Process
 product INTEL 82830MP_IO_1	0x3575	82830MP CPU to I/O Bridge 1
 product INTEL 82830MP_AGP	0x3576	82830MP CPU to AGP Bridge
 product INTEL 82830MP_IV	0x3577	82830MP Integrated Video
@@ -1643,6 +1675,11 @@ product NS DP83810	0x0001	DP83810 10/100 Ethernet
 product NS DP83815	0x0020	DP83815 10/100 Ethernet
 product NS DP83820	0x0022	DP83820 10/100/1000 Ethernet
 product NS NS87410	0xd001	NS87410
+product NS SC1100_ISA	0x0510	SC1100 PCI-ISA bridge
+product NS SC1100_ACPI	0x0511	SC1100 SMI/ACPI
+product NS SC1100_IDE	0x0512	SC1100 PCI IDE
+product NS SC1100_AUDIO	0x0513	SC1100 XpressAUDIO
+product NS SC1100_XBUS	0x0515	SC1100 X-Bus
 
 /* NCR/Symbios Logic products */
 product SYMBIOS 810	0x0001	53c810
@@ -1905,13 +1942,37 @@ product SIS 5597_VGA		0x0200	5597/5598 integrated VGA
 product SIS 85C501		0x0406	85C501
 product SIS 85C496		0x0496	85C496
 product SIS 530HB		0x0530	530 Host to PCI Bridge
+product SIS 540HB		0x0540	540 Host to PCI Bridge
+product SIS 550HB		0x0550	550 Host to PCI Bridge
 product SIS 85C601		0x0601	85C601
-product SIS 645			0x0645	SiS 645 Host Bridge
+product SIS 620			0x0620	SiS 620 Host Bridge
 product SIS 630			0x0630	SiS 630 Host Bridge
+product SIS 633			0x0633	SiS 633 Host Bridge
+product SIS 635			0x0635	SiS 635 Host Bridge
+product SIS 640			0x0640	SiS 640 Host Bridge
+product SIS 645			0x0645	SiS 645 Host Bridge
+product SIS 646			0x0646	SiS 646 Host Bridge
+product SIS 648			0x0648	SiS 648 Host Bridge
 product SIS 650			0x0650	SiS 650 Host Bridge
+product SIS 651			0x0651	SiS 651 Host Bridge
+product SIS 652			0x0652	SiS 652 Host Bridge
+product SIS 655			0x0655	SiS 655 Host Bridge
+product SIS 658			0x0658	SiS 658 Host Bridge
 product SIS 730			0x0730	SiS 730 Host Bridge
+product SIS 733			0x0733	SiS 733 Host Bridge
 product SIS 735			0x0735	SiS 735 Host Bridge
+product SIS 740			0x0740	SiS 740 Host Bridge
+product SIS 745			0x0745	SiS 745 Host Bridge
+product SIS 746			0x0746	SiS 746 Host Bridge
+product SIS 748			0x0748	SiS 748 Host Bridge
+product SIS 750			0x0750	SiS 750 Host Bridge
+product SIS 751			0x0751	SiS 751 Host Bridge
+product SIS 752			0x0752	SiS 752 Host Bridge
+product SIS 755			0x0755	SiS 755 Host Bridge
 product SIS 900			0x0900	SiS 900 10/100 Ethernet
+product SIS 961			0x0961	SiS 961 Host Bridge
+product SIS 962			0x0962	SiS 962 Host Bridge
+product SIS 963			0x0963	SiS 963 Host Bridge
 product SIS 5597_IDE		0x5513	5597/5598 IDE controller
 product SIS 5597_HB		0x5597	5597/5598 host bridge
 product SIS 530VGA		0x6306	530 GUI Accelerator+3D

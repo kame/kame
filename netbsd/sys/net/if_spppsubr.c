@@ -1,4 +1,4 @@
-/*	$NetBSD: if_spppsubr.c,v 1.46.4.17 2003/02/07 18:40:19 tron Exp $	 */
+/*	$NetBSD: if_spppsubr.c,v 1.46.4.19 2003/07/10 15:40:45 tron Exp $	 */
 
 /*
  * Synchronous PPP/Cisco link level subroutines.
@@ -41,7 +41,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_spppsubr.c,v 1.46.4.17 2003/02/07 18:40:19 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_spppsubr.c,v 1.46.4.19 2003/07/10 15:40:45 tron Exp $");
 
 #include "opt_inet.h"
 #include "opt_ipx.h"
@@ -997,7 +997,9 @@ sppp_detach(struct ifnet *ifp)
 	if (sp->hisauth.name) free(sp->hisauth.name, M_DEVBUF);
 	if (sp->hisauth.secret) free(sp->hisauth.secret, M_DEVBUF);
 
+#if 0	/* done in if_detach() */
 	if_free_sadl(ifp);
+#endif
 }
 
 /*
@@ -1051,7 +1053,7 @@ sppp_dequeue(struct ifnet *ifp)
 	    (sppp_ncp_check(sp) || (sp->pp_flags & PP_CISCO) != 0)) {
 		IF_DEQUEUE(&sp->pp_fastq, m);
 		if (m == NULL)
-			IF_DEQUEUE(&sp->pp_if.if_snd, m);
+			IFQ_DEQUEUE(&sp->pp_if.if_snd, m);
 	}
 	splx(s);
 	return m;

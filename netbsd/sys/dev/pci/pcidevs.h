@@ -1,10 +1,10 @@
-/*	$NetBSD: pcidevs.h,v 1.433.2.18 2003/01/28 06:24:46 jmc Exp $	*/
+/*	$NetBSD: pcidevs.h,v 1.433.2.26 2003/10/20 04:49:35 cyber Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: pcidevs,v 1.428.2.19 2003/01/27 06:21:36 jmc Exp 
+ *	NetBSD
  */
 
 /*
@@ -838,6 +838,8 @@
 #define	PCI_PRODUCT_APPLE_UNINORTH_AGP3	0x0034		/* UniNorth AGP Bridge */
 #define	PCI_PRODUCT_APPLE_UNINORTH5	0x0035		/* UniNorth Host-PCI Bridge */
 #define	PCI_PRODUCT_APPLE_UNINORTH6	0x0036		/* UniNorth Host-PCI Bridge */
+#define	PCI_PRODUCT_APPLE_KAUAI	0x003b		/* Kauai ATA Controller */
+#define	PCI_PRODUCT_APPLE_INTREPID	0x003e		/* MAC-IO I/O Controller (Intrepid) */
 
 /* ARC Logic products */
 #define	PCI_PRODUCT_ARC_1000PV	0xa091		/* 1000PV */
@@ -1366,6 +1368,9 @@
 #define	PCI_PRODUCT_INTEL_PRO_100_VM_4	0x103c		/* PRO/100 VM Network Controller with 82562EM/EX (CNR) PHY */
 #define	PCI_PRODUCT_INTEL_PRO_100_VE_4	0x103d		/* PRO/100 VE (MOB) Network Controller */
 #define	PCI_PRODUCT_INTEL_PRO_100_VM_5	0x103e		/* PRO/100 VM (MOB) Network Controller */
+#define	PCI_PRODUCT_INTEL_PRO_WL_2100	0x1043		/* PRO/Wireless LAN 2100 3B Mini PCI Adapter */
+#define	PCI_PRODUCT_INTEL_PRO_100_VM_6	0x1050		/* PRO/100 VM Network Controller with 82562ET PHY */
+#define	PCI_PRODUCT_INTEL_PRO_100_M	0x1059		/* PRO/100 M Network Controller */
 #define	PCI_PRODUCT_INTEL_82815_DC100_HUB	0x1100		/* 82815 Hub */
 #define	PCI_PRODUCT_INTEL_82815_DC100_AGP	0x1101		/* 82815 AGP */
 #define	PCI_PRODUCT_INTEL_82815_DC100_GRAPH	0x1102		/* 82815 Graphics */
@@ -1451,7 +1456,20 @@
 #define	PCI_PRODUCT_INTEL_82801DB_MOD	0x24C6		/* 82801DB AC97 Modem Controller */
 #define	PCI_PRODUCT_INTEL_82801DB_USB_3	0x24C7		/* 82801DB USB UHCI Controller #3 */
 #define	PCI_PRODUCT_INTEL_82801DB_IDE	0x24CB		/* 82801DB IDE Controller (UltraATA/100) */
-#define	PCI_PRODUCT_INTEL_82801DB_USBC	0x24CD		/* 82801DB USB EHCI Controller */
+#define	PCI_PRODUCT_INTEL_82801DB_ISA	0x24CC		/* 82801DB ISA Bridge */
+#define	PCI_PRODUCT_INTEL_82801DB_USBC	0x24CD		/* 82801DB/DBM USB EHCI Controller */
+#define	PCI_PRODUCT_INTEL_82801EB_LPC	0x24D0		/* 82801EB LPC Interface Bridge */
+#define	PCI_PRODUCT_INTEL_82801EB_SATA	0x24D1		/* 82801EB Serial ATA Controller */
+#define	PCI_PRODUCT_INTEL_82801EB_USB_0	0x24D2		/* 82801EB/ER USB UHCI Controller #0 */
+#define	PCI_PRODUCT_INTEL_82801EB_SMB	0x24D3		/* 82801EB/ER SMBus Controller */
+#define	PCI_PRODUCT_INTEL_82801EB_USB_1	0x24D4		/* 82801EB/ER USB UHCI Controller #1 */
+#define	PCI_PRODUCT_INTEL_82801EB_AC	0x24D5		/* 82801EB/ER AC'97 Audio Controller */
+#define	PCI_PRODUCT_INTEL_82801EB_MOD	0x24D6		/* 82801EB/ER AC'97 Modem Controller */
+#define	PCI_PRODUCT_INTEL_82801EB_USB_2	0x24D7		/* 82801EB/ER USB UHCI Controller #2 */
+#define	PCI_PRODUCT_INTEL_82801EB_IDE	0x24DB		/* 82801EB/ER IDE Controller */
+#define	PCI_PRODUCT_INTEL_82801EB_EHCI	0x24DD		/* 82801EB/ER USB EHCI Controller */
+#define	PCI_PRODUCT_INTEL_82801EB_USB_3	0x24DE		/* 82801EB/ER USB UHCI Controller #3 */
+#define	PCI_PRODUCT_INTEL_82801ER_SATA	0x24DF		/* 82801ER Serial ATA Controller */
 #define	PCI_PRODUCT_INTEL_82820_MCH	0x2501		/* 82820 MCH (Camino) */
 #define	PCI_PRODUCT_INTEL_82820_AGP	0x250f		/* 82820 AGP */
 #define	PCI_PRODUCT_INTEL_82850_HB	0x2530		/* 82850 Host */
@@ -1473,6 +1491,20 @@
 #define	PCI_PRODUCT_INTEL_82845G_DRAM	0x2560		/* 82845G/GL DRAM Controller / Host-Hub I/F Bridge */
 #define	PCI_PRODUCT_INTEL_82845G_AGP	0x2561		/* 82845G/GL Host-to-AGP Bridge */
 #define	PCI_PRODUCT_INTEL_82845G_IGD	0x2562		/* 82845G/GL Integrated Graphics Device */
+#define	PCI_PRODUCT_INTEL_82865_HB	0x2570		/* 82865 Host */
+#define	PCI_PRODUCT_INTEL_82865_AGP	0x2571		/* 82865 AGP */
+#define	PCI_PRODUCT_INTEL_82865_IGD	0x2572		/* 82865G Integrated Graphics Device */
+#define	PCI_PRODUCT_INTEL_82801EB_HPB	0x2573		/* 82801EB Hub-to-PCI Bridge */
+#define	PCI_PRODUCT_INTEL_82875P_HB	0x2578		/* 82875P Host */
+#define	PCI_PRODUCT_INTEL_82875P_AGP	0x2579		/* 82875P AGP */
+#define	PCI_PRODUCT_INTEL_31244	0x3200		/* 31244 Serial ATA Controller */
+#define	PCI_PRODUCT_INTEL_82855PM_DDR	0x3340		/* 82855PM MCH Host Controller */
+#define	PCI_PRODUCT_INTEL_82855PM_AGP	0x3341		/* 82855PM Host-to-AGP Bridge */
+#define	PCI_PRODUCT_INTEL_82855PM_PM	0x3342		/* 82855PM Power Management Controller */
+#define	PCI_PRODUCT_INTEL_82855GM_MCH	0x3580		/* 82855GM Host-to-Hub Controller */
+#define	PCI_PRODUCT_INTEL_82855GM_IGD	0x3582		/* 82855PM GMCH Integrated Graphics Device */
+#define	PCI_PRODUCT_INTEL_82855GM_MC	0x3584		/* 82855PM GMCH Memory Controller */
+#define	PCI_PRODUCT_INTEL_82855GM_CP	0x3585		/* 82855PM GMCH Configuration Process */
 #define	PCI_PRODUCT_INTEL_82830MP_IO_1	0x3575		/* 82830MP CPU to I/O Bridge 1 */
 #define	PCI_PRODUCT_INTEL_82830MP_AGP	0x3576		/* 82830MP CPU to AGP Bridge */
 #define	PCI_PRODUCT_INTEL_82830MP_IV	0x3577		/* 82830MP Integrated Video */
@@ -1650,6 +1682,11 @@
 #define	PCI_PRODUCT_NS_DP83815	0x0020		/* DP83815 10/100 Ethernet */
 #define	PCI_PRODUCT_NS_DP83820	0x0022		/* DP83820 10/100/1000 Ethernet */
 #define	PCI_PRODUCT_NS_NS87410	0xd001		/* NS87410 */
+#define	PCI_PRODUCT_NS_SC1100_ISA	0x0510		/* SC1100 PCI-ISA bridge */
+#define	PCI_PRODUCT_NS_SC1100_ACPI	0x0511		/* SC1100 SMI/ACPI */
+#define	PCI_PRODUCT_NS_SC1100_IDE	0x0512		/* SC1100 PCI IDE */
+#define	PCI_PRODUCT_NS_SC1100_AUDIO	0x0513		/* SC1100 XpressAUDIO */
+#define	PCI_PRODUCT_NS_SC1100_XBUS	0x0515		/* SC1100 X-Bus */
 
 /* NCR/Symbios Logic products */
 #define	PCI_PRODUCT_SYMBIOS_810	0x0001		/* 53c810 */
@@ -1912,13 +1949,37 @@
 #define	PCI_PRODUCT_SIS_85C501	0x0406		/* 85C501 */
 #define	PCI_PRODUCT_SIS_85C496	0x0496		/* 85C496 */
 #define	PCI_PRODUCT_SIS_530HB	0x0530		/* 530 Host to PCI Bridge */
+#define	PCI_PRODUCT_SIS_540HB	0x0540		/* 540 Host to PCI Bridge */
+#define	PCI_PRODUCT_SIS_550HB	0x0550		/* 550 Host to PCI Bridge */
 #define	PCI_PRODUCT_SIS_85C601	0x0601		/* 85C601 */
-#define	PCI_PRODUCT_SIS_645	0x0645		/* SiS 645 Host Bridge */
+#define	PCI_PRODUCT_SIS_620	0x0620		/* SiS 620 Host Bridge */
 #define	PCI_PRODUCT_SIS_630	0x0630		/* SiS 630 Host Bridge */
+#define	PCI_PRODUCT_SIS_633	0x0633		/* SiS 633 Host Bridge */
+#define	PCI_PRODUCT_SIS_635	0x0635		/* SiS 635 Host Bridge */
+#define	PCI_PRODUCT_SIS_640	0x0640		/* SiS 640 Host Bridge */
+#define	PCI_PRODUCT_SIS_645	0x0645		/* SiS 645 Host Bridge */
+#define	PCI_PRODUCT_SIS_646	0x0646		/* SiS 646 Host Bridge */
+#define	PCI_PRODUCT_SIS_648	0x0648		/* SiS 648 Host Bridge */
 #define	PCI_PRODUCT_SIS_650	0x0650		/* SiS 650 Host Bridge */
+#define	PCI_PRODUCT_SIS_651	0x0651		/* SiS 651 Host Bridge */
+#define	PCI_PRODUCT_SIS_652	0x0652		/* SiS 652 Host Bridge */
+#define	PCI_PRODUCT_SIS_655	0x0655		/* SiS 655 Host Bridge */
+#define	PCI_PRODUCT_SIS_658	0x0658		/* SiS 658 Host Bridge */
 #define	PCI_PRODUCT_SIS_730	0x0730		/* SiS 730 Host Bridge */
+#define	PCI_PRODUCT_SIS_733	0x0733		/* SiS 733 Host Bridge */
 #define	PCI_PRODUCT_SIS_735	0x0735		/* SiS 735 Host Bridge */
+#define	PCI_PRODUCT_SIS_740	0x0740		/* SiS 740 Host Bridge */
+#define	PCI_PRODUCT_SIS_745	0x0745		/* SiS 745 Host Bridge */
+#define	PCI_PRODUCT_SIS_746	0x0746		/* SiS 746 Host Bridge */
+#define	PCI_PRODUCT_SIS_748	0x0748		/* SiS 748 Host Bridge */
+#define	PCI_PRODUCT_SIS_750	0x0750		/* SiS 750 Host Bridge */
+#define	PCI_PRODUCT_SIS_751	0x0751		/* SiS 751 Host Bridge */
+#define	PCI_PRODUCT_SIS_752	0x0752		/* SiS 752 Host Bridge */
+#define	PCI_PRODUCT_SIS_755	0x0755		/* SiS 755 Host Bridge */
 #define	PCI_PRODUCT_SIS_900	0x0900		/* SiS 900 10/100 Ethernet */
+#define	PCI_PRODUCT_SIS_961	0x0961		/* SiS 961 Host Bridge */
+#define	PCI_PRODUCT_SIS_962	0x0962		/* SiS 962 Host Bridge */
+#define	PCI_PRODUCT_SIS_963	0x0963		/* SiS 963 Host Bridge */
 #define	PCI_PRODUCT_SIS_5597_IDE	0x5513		/* 5597/5598 IDE controller */
 #define	PCI_PRODUCT_SIS_5597_HB	0x5597		/* 5597/5598 host bridge */
 #define	PCI_PRODUCT_SIS_530VGA	0x6306		/* 530 GUI Accelerator+3D */

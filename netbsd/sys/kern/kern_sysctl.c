@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_sysctl.c,v 1.108 2002/05/14 02:58:32 matt Exp $	*/
+/*	$NetBSD: kern_sysctl.c,v 1.108.4.4 2003/10/02 08:59:10 tron Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kern_sysctl.c,v 1.108 2002/05/14 02:58:32 matt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kern_sysctl.c,v 1.108.4.4 2003/10/02 08:59:10 tron Exp $");
 
 #include "opt_ddb.h"
 #include "opt_insecure.h"
@@ -151,7 +151,6 @@ sys___sysctl(struct proc *p, void *v, register_t *retval)
 	size_t savelen = 0, oldlen = 0;
 	sysctlfn *fn;
 	int name[CTL_MAXNAME];
-	size_t *oldlenp;
 
 	/*
 	 * all top-level sysctl names are non-terminal
@@ -216,11 +215,10 @@ sys___sysctl(struct proc *p, void *v, register_t *retval)
 	 * XXX Hey, we wire `old', but what about `new'?
 	 */
 
-	oldlenp = SCARG(uap, oldlenp);
-	if (oldlenp) {
-		if ((error = copyin(oldlenp, &oldlen, sizeof(oldlen))))
+	if (SCARG(uap, oldlenp)) {
+		if ((error = copyin(SCARG(uap, oldlenp), &oldlen,
+		    sizeof(oldlen))))
 			return (error);
-		oldlenp = &oldlen;
 	}
 	if (SCARG(uap, old) != NULL) {
 		error = lockmgr(&sysctl_memlock, LK_EXCLUSIVE, NULL);
@@ -234,7 +232,7 @@ sys___sysctl(struct proc *p, void *v, register_t *retval)
 		savelen = oldlen;
 	}
 	error = (*fn)(name + 1, SCARG(uap, namelen) - 1, SCARG(uap, old),
-	    oldlenp, SCARG(uap, new), SCARG(uap, newlen), p);
+	    &oldlen, SCARG(uap, new), SCARG(uap, newlen), p);
 	if (SCARG(uap, old) != NULL) {
 		uvm_vsunlock(p, SCARG(uap, old), savelen);
 		(void) lockmgr(&sysctl_memlock, LK_RELEASE, NULL);
@@ -659,7 +657,7 @@ debug_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp,
 	/* all sysctl names at this level are name and field */
 	if (namelen != 2)
 		return (ENOTDIR);		/* overloaded */
-	if (name[0] >= CTL_DEBUG_MAXID)
+	if (name[0] < 0 || name[0] >= CTL_DEBUG_MAXID)
 		return (EOPNOTSUPP);
 	cdp = debugvars[name[0]];
 	if (cdp->debugname == 0)
@@ -681,7 +679,6 @@ proc_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp,
     void *newp, size_t newlen, struct proc *p)
 {
 	struct proc *ptmp = NULL;
-	const struct proclist_desc *pd;
 	int error = 0;
 	struct rlimit alim;
 	struct plimit *newplim;
@@ -693,23 +690,9 @@ proc_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp,
 
 	if (name[0] == PROC_CURPROC) {
 		ptmp = p;
+	} else if ((ptmp = pfind((pid_t)name[0])) == NULL) {
+		return (ESRCH);
 	} else {
-		proclist_lock_read();
-		for (pd = proclists; pd->pd_list != NULL; pd++) {
-			for (ptmp = LIST_FIRST(pd->pd_list); ptmp != NULL;
-			    ptmp = LIST_NEXT(ptmp, p_list)) {
-				/* Skip embryonic processes. */
-				if (ptmp->p_stat == SIDL)
-					continue;
-				if (ptmp->p_pid == (pid_t)name[0])
-					break;
-			}
-			if (ptmp != NULL)
-				break;
-		}
-		proclist_unlock_read();
-		if (ptmp == NULL)
-			return(ESRCH);
 		if (p->p_ucred->cr_uid != 0) {
 			if(p->p_cred->p_ruid != ptmp->p_cred->p_ruid ||
 			    p->p_cred->p_ruid != ptmp->p_cred->p_svuid)
@@ -797,7 +780,8 @@ cleanup:
 		return (error);
 	}
 	if (name[1] == PROC_PID_LIMIT) {
-		if (namelen != 4 || name[2] >= PROC_PID_LIMIT_MAXID)
+		if (namelen != 4 || name[2] < 1 ||
+		    name[2] >= PROC_PID_LIMIT_MAXID)
 			return EINVAL;
 		memcpy(&alim, &ptmp->p_rlimit[name[2] - 1], sizeof(alim));
 		if (name[3] == PROC_PID_LIMIT_TYPE_HARD)

@@ -1,4 +1,4 @@
-/*	$NetBSD: pciide_pdc202xx_reg.h,v 1.7 2002/04/23 20:41:18 bouyer Exp $ */
+/*	$NetBSD: pciide_pdc202xx_reg.h,v 1.7.4.2 2003/08/16 15:58:33 tron Exp $ */
 
 /*
  * Copyright (c) 1999 Manuel Bouyer.
@@ -90,8 +90,9 @@
 #define PDC2xx_SCR_FLOAT	0x08000000
 #define PDC2xx_SCR_RSET		0x10000000
 #define PDC2xx_SCR_TST		0x20000000
-/* Values for "General Purpose Register" (PDC20262 only) */
+/* Values for "General Purpose Register" (PDC2026{2|5} only) */
 #define PDC262_SCR_GEN_LAT	0x20
+#define PDC265_SCR_GEN_LAT	0x03
 
 /* ATAPI port ((PDC20262 only) (4 bytes) */
 #define PDC262_ATAPI(chan) (0x20 + (4 * (chan)))
@@ -99,6 +100,8 @@
 #define PDC262_ATAPI_DMA_READ	0x00001000
 #define PDC262_ATAPI_DMA_WRITE	0x00002000
 #define PDC262_ATAPI_UDMA	0x00004000
+#define PDC262_ATAPI_LBA48_READ  0x05000000
+#define PDC262_ATAPI_LBA48_WRITE 0x06000000
 
 /*
  * The timings provided here cmoes from the PDC20262 docs. I hope they are

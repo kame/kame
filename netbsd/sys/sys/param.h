@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.138.4.4 2003/01/31 09:32:22 jmc Exp $	*/
+/*	$NetBSD: param.h,v 1.138.4.6 2003/10/27 04:44:33 jmc Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -67,7 +67,7 @@
  * Don't forget to change conf/osrelease.sh too.
  */
 
-#define	__NetBSD_Version__	106000100	/* NetBSD 1.6.1 */
+#define	__NetBSD_Version__	106000200	/* NetBSD 1.6.2 */
 
 /*
  * Historical NetBSD #define
@@ -100,7 +100,7 @@
 #include <sys/syslimits.h>
 
 #define	MAXCOMLEN	16		/* max command name remembered */
-#define	MAXINTERP	64		/* max interpreter file name length */
+#define	MAXINTERP	PATH_MAX	/* max interpreter file name length */
 /* DEPRECATED: use LOGIN_NAME_MAX instead. */
 #define	MAXLOGNAME	(LOGIN_NAME_MAX - 1) /* max login name length */
 #define	NCARGS		ARG_MAX		/* max bytes for an exec function */
