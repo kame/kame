@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.47 2003/11/04 04:35:36 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.48 2003/11/11 17:08:10 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -248,8 +248,7 @@ mip6_init()
 		      mip6_update_nonce_nodekey, NULL);
 #elif defined(__OpenBSD__)
 	timeout_set(&mip6_nonce_upd_ch, mip6_update_nonce_nodekey, NULL);
-	timeout_add(&mip6_nonce_upd_ch, mip6_update_nonce_nodekey,
-	    hz * NONCE_UPDATE_PERIOD);
+	timeout_add(&mip6_nonce_upd_ch, hz * NONCE_UPDATE_PERIOD);
 #else
 	timeout(mip6_update_nonce_nodekey, (caddr_t)0,
 		hz * NONCE_UPDATE_PERIOD);
@@ -1340,9 +1339,7 @@ mip6_update_nonce_nodekey(ignored_arg)
 	callout_reset(&mip6_nonce_upd_ch, hz * NONCE_UPDATE_PERIOD,
 		      mip6_update_nonce_nodekey, NULL);
 #elif defined(__OpenBSD__)
-	timeout_set(&mip6_nonce_upd_ch, mip6_update_nonce_nodekey, NULL);
-	timeout_add(&mip6_nonce_upd_ch, mip6_update_nonce_nodekey,
-	    hz * NONCE_UPDATE_PERIOD);
+	timeout_add(&mip6_nonce_upd_ch, hz * NONCE_UPDATE_PERIOD);
 #else
 	timeout(mip6_update_nonce_nodekey, (caddr_t)0,
 		hz * NONCE_UPDATE_PERIOD);
