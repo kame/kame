@@ -75,6 +75,11 @@ __RCSID("$NetBSD: route.c,v 1.36.2.1 1999/04/02 22:38:48 chopps Exp $");
 
 #define kget(p, d) (kread((u_long)(p), (char *)&(d), sizeof (d)))
 
+/* alignment constraint for routing socket */
+#define ROUNDUP(a) \
+	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
+#define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
+
 /*
  * Definitions for showing gateway flags.
  */
@@ -390,9 +395,11 @@ np_rtentry(rtm)
 		p_sockaddr(sa, NULL, 0, 36);
 	else {
 		p_sockaddr(sa, NULL, rtm->rtm_flags, 16);
+#if 0
 		if (sa->sa_len == 0)
 			sa->sa_len = sizeof(long);
-		sa = (struct sockaddr *)(sa->sa_len + (char *)sa);
+#endif
+		sa = (struct sockaddr *)(ROUNDUP(sa->sa_len) + (char *)sa);
 		p_sockaddr(sa, NULL, 0, 18);
 	}
 	p_flags(rtm->rtm_flags & interesting, "%-6.6s ");
