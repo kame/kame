@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.122 2001/07/23 05:57:49 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.123 2001/07/23 06:01:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1492,7 +1492,7 @@ ip6_str2scopeid(scope, sin6)
 		return -1;
 
 	if (IN6_IS_ADDR_LINKLOCAL(a6) || IN6_IS_ADDR_MC_LINKLOCAL(a6) ||
-	    IN6_IS_ADDR_MC_INTFACELOCAL(a6)) {
+	    IN6_IS_ADDR_MC_NODELOCAL(a6)) {
 		/*
 		 * We currently assume a one-to-one mapping between links
 		 * and interfaces, so we simply use interface indices for
