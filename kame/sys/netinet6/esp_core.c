@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.38 2000/08/31 14:54:14 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.39 2000/09/18 20:24:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -849,10 +849,16 @@ esp_blowfish_blockdecrypt(algo, sav, s, d)
 	u_int8_t *s;
 	u_int8_t *d;
 {
+	/* HOLY COW!  BF_encrypt() takes values in host byteorder */
+	BF_LONG t[2];
 
-	/* assumption: d has a good alignment */
-	bcopy(s, d, sizeof(BF_LONG) * 2);
-	BF_encrypt((BF_LONG *)d, (BF_KEY *)sav->sched, BF_DECRYPT);
+	bcopy(s, t, sizeof(t));
+	t[0] = ntohl(t[0]);
+	t[1] = ntohl(t[1]);
+	BF_encrypt(t, (BF_KEY *)sav->sched, BF_DECRYPT);
+	t[0] = htonl(t[0]);
+	t[1] = htonl(t[1]);
+	bcopy(t, d, sizeof(t));
 	return 0;
 }
 
@@ -863,10 +869,16 @@ esp_blowfish_blockencrypt(algo, sav, s, d)
 	u_int8_t *s;
 	u_int8_t *d;
 {
+	/* HOLY COW!  BF_encrypt() takes values in host byteorder */
+	BF_LONG t[2];
 
-	/* assumption: d has a good alignment */
-	bcopy(s, d, sizeof(BF_LONG) * 2);
-	BF_encrypt((BF_LONG *)d, (BF_KEY *)sav->sched, BF_ENCRYPT);
+	bcopy(s, t, sizeof(t));
+	t[0] = ntohl(t[0]);
+	t[1] = ntohl(t[1]);
+	BF_encrypt(t, (BF_KEY *)sav->sched, BF_ENCRYPT);
+	t[0] = htonl(t[0]);
+	t[1] = htonl(t[1]);
+	bcopy(t, d, sizeof(t));
 	return 0;
 }
 
