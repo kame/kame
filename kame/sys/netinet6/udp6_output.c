@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.20 2001/01/23 15:23:36 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.21 2001/02/07 11:51:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -339,7 +339,7 @@ udp6_output(in6p, m, addr6, control)
 		}
 #endif /*IPSEC*/
 		error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route,
-			    flags, in6p->in6p_moptions, NULL);
+		    flags, in6p->in6p_moptions, NULL);
 		break;
 	case AF_INET:
 #if defined(INET) && defined(__NetBSD__)
