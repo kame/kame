@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.241 2001/07/21 06:10:29 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.242 2001/07/21 15:34:13 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1978,9 +1978,10 @@ command argument is considered ambiguous)
 
 TODO:
 - routing: reject same key/gw pair on RTM_ADD
-- L3: more clever hash/gw selection policy (-> RFC2991/2992),
-  avoid faulty gateways/nonworking paths, revisit issues with cached
-  route on struct route/sendto(3)
+- L3: more clever hash/gw selection policy (-> RFC2991/2992)
+- L3: avoid faulty gateways/nonworking paths
+- L3: revisit issues with cached route on struct route/sendto(3)
+- L3: fix in_ifinit for multiple interface address case
 
 RADIX_MPATH kernel compilation option conflicts with RADIX_ART.
 
