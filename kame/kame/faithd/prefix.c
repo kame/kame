@@ -1,4 +1,4 @@
-/*	$KAME: prefix.c,v 1.3 2000/11/15 04:43:55 itojun Exp $	*/
+/*	$KAME: prefix.c,v 1.4 2000/11/19 10:15:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -43,6 +43,7 @@
 #define	offsetof(type, member)	((size_t)(u_long)(&((type *)0)->member))
 #endif
 
+#include "faithd.h"
 #include "prefix.h"
 
 static int prefix_set __P((const char *, struct prefix *, int));
@@ -269,7 +270,7 @@ fail:
 	return NULL;
 }
 
-void
+int
 config_load()
 {
 	FILE *fp;
@@ -279,9 +280,13 @@ config_load()
 
 	config_list = NULL;
 
-	fp = fopen(_PATH_PREFIX_CONF, "r");
-	if (fp == NULL)
-		return;
+	fp = fopen(configfile, "r");
+	if (fp == NULL) {
+		if (strcmp(configfile, _PATH_PREFIX_CONF) == 0)
+			return 0;
+		else
+			return -1;
+	}
 
 	p = &sentinel;
 	while (fgets(buf, sizeof(buf), fp) != NULL) {
@@ -294,6 +299,7 @@ config_load()
 	config_list = sentinel.next;
 
 	fclose(fp);
+	return 0;
 }
 
 #if 0
