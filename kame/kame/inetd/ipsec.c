@@ -1094,7 +1094,6 @@ int
 ipsecsetup(sep)
 	struct servtab *sep;
 {
-	int len;
 	char *buf;
 	char *policy_in = NULL;
 	char *policy_out = NULL;
@@ -1136,8 +1135,8 @@ ipsecsetup(sep)
 					    : IPV6_IPSEC_POLICY;
 		buf = ipsec_set_policy(policy_in, strlen(policy_in));
 		if (buf != NULL) {
-			len = ipsec_get_policylen(buf);
-			if (setsockopt(sep->se_fd, level, opt, buf, len) < 0) {
+			if (setsockopt(sep->se_fd, level, opt,
+					buf, ipsec_get_policylen(buf)) < 0) {
 				syslog(LOG_ERR,
 					"%s/%s: ipsec initialization failed",
 					sep->se_service, sep->se_proto,
@@ -1156,8 +1155,8 @@ ipsecsetup(sep)
 					    : IPV6_IPSEC_POLICY;
 		buf = ipsec_set_policy(policy_out, strlen(policy_out));
 		if (buf != NULL) {
-			len = ipsec_get_policylen(buf);
-			if (setsockopt(sep->se_fd, level, opt, buf, len) < 0) {
+			if (setsockopt(sep->se_fd, level, opt,
+					buf, ipsec_get_policylen(buf)) < 0) {
 				syslog(LOG_ERR,
 					"%s/%s: ipsec initialization failed",
 					sep->se_service, sep->se_proto,
@@ -1335,15 +1334,19 @@ more:
 				if (policy)
 					free(policy);
 				policy = NULL;
-			} else if (ipsec_get_policylen(p) >= 0) {
-				if (policy)
-					free(policy);
-				policy = newstr(p);
 			} else {
-				syslog(LOG_ERR,
-					"%s: invalid ipsec policy \"%s\"",
-					CONFIG, p);
-				exit(-1);
+				dummy = ipsec_get_policylen(p, strlen(p));
+				if (dummy != NULL) {
+					free(dummy);
+					if (policy)
+						free(policy);
+					policy = newstr(p);
+				} else {
+					syslog(LOG_ERR,
+						"%s: invalid ipsec policy \"%s\"",
+						CONFIG, p);
+					exit(-1);
+				}
 			}
 		}
 #endif
