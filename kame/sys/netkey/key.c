@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.150 2000/08/27 17:25:25 itojun Exp $	*/
+/*	$KAME: key.c,v 1.151 2000/08/28 05:24:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2834,7 +2834,7 @@ key_setsaval(sav, m, mhp)
 #ifdef IPSEC_ESP
 		algo = esp_algorithm_lookup(sav->alg_enc);
 		if (algo && algo->ivlen)
-			sav->ivlen = (*algo->ivlen)(sav);
+			sav->ivlen = (*algo->ivlen)(algo, sav);
 		if (sav->ivlen == 0)
 			break;
 		KMALLOC(sav->iv, caddr_t, sav->ivlen);
@@ -6074,7 +6074,8 @@ key_register(so, m, mhp)
 				 * give NULL to get the value preferred by
 				 * algorithm XXX SADB_X_EXT_DERIV ?
 				 */
-				alg->sadb_alg_ivlen = (*ealgo->ivlen)(NULL);
+				alg->sadb_alg_ivlen =
+				    (*ealgo->ivlen)(ealgo, NULL);
 			} else
 				alg->sadb_alg_ivlen = 0;
 			alg->sadb_alg_minbits = ealgo->keymin;

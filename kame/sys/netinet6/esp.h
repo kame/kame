@@ -1,4 +1,4 @@
-/*	$KAME: esp.h,v 1.11 2000/07/23 08:23:29 itojun Exp $	*/
+/*	$KAME: esp.h,v 1.12 2000/08/28 05:24:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -75,12 +75,13 @@ struct secasvar;
 
 struct esp_algorithm {
 	size_t padbound;	/* pad boundary, in byte */
+	int ivlenval;		/* iv length, in byte */
 	int (*mature) __P((struct secasvar *));
 	int keymin;	/* in bits */
 	int keymax;	/* in bits */
 	size_t schedlen;
 	const char *name;
-	int (*ivlen) __P((struct secasvar *));
+	int (*ivlen) __P((const struct esp_algorithm *, struct secasvar *));
 	int (*decrypt) __P((struct mbuf *, size_t,
 		struct secasvar *, const struct esp_algorithm *, int));
 	int (*encrypt) __P((struct mbuf *, size_t, size_t,

@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.22 2000/08/27 16:43:50 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.23 2000/08/28 05:24:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -77,13 +77,13 @@
 static int esp_crypto_sanity __P((const struct esp_algorithm *,
 	struct secasvar *, int));
 static int esp_null_mature __P((struct secasvar *));
-static int esp_null_ivlen __P((struct secasvar *));
 static int esp_null_decrypt __P((struct mbuf *, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_null_encrypt __P((struct mbuf *, size_t, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_descbc_mature __P((struct secasvar *));
-static int esp_descbc_ivlen __P((struct secasvar *));
+static int esp_descbc_ivlen __P((const struct esp_algorithm *,
+	struct secasvar *));
 static int esp_descbc_decrypt __P((struct mbuf *, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_descbc_encrypt __P((struct mbuf *, size_t, size_t,
@@ -97,15 +97,12 @@ static int esp_blowfish_cbc_encrypt __P((struct mbuf *, size_t,
 	size_t, struct secasvar *, const struct esp_algorithm *, int));
 static int esp_blowfish_cbc_schedule __P((const struct esp_algorithm *,
 	struct secasvar *));
-static int esp_blowfish_cbc_ivlen __P((struct secasvar *));
-static int esp_cast128cbc_ivlen __P((struct secasvar *));
 static int esp_cast128cbc_decrypt __P((struct mbuf *, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_cast128cbc_encrypt __P((struct mbuf *, size_t, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_cast128cbc_schedule __P((const struct esp_algorithm *,
 	struct secasvar *));
-static int esp_3descbc_ivlen __P((struct secasvar *));
 static int esp_3descbc_decrypt __P((struct mbuf *, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_3descbc_encrypt __P((struct mbuf *, size_t, size_t,
@@ -113,7 +110,6 @@ static int esp_3descbc_encrypt __P((struct mbuf *, size_t, size_t,
 static int esp_3descbc_schedule __P((const struct esp_algorithm *,
 	struct secasvar *));
 #ifdef SADB_X_EALG_RC5CBC
-static int esp_rc5cbc_ivlen __P((struct secasvar *));
 static int esp_rc5cbc_decrypt __P((struct mbuf *, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_rc5cbc_encrypt __P((struct mbuf *, size_t, size_t,
@@ -121,6 +117,8 @@ static int esp_rc5cbc_encrypt __P((struct mbuf *, size_t, size_t,
 static int esp_rc5cbc_schedule __P((const struct esp_algorithm *,
 	struct secasvar *));
 #endif
+static int esp_cipher_ivlen __P((const struct esp_algorithm *,
+	struct secasvar *));
 static void esp_increment_iv __P((struct secasvar *));
 #if 0
 static caddr_t mbuf_find_offset __P((struct mbuf *, size_t, size_t));
@@ -131,30 +129,31 @@ esp_algorithm_lookup(idx)
 	int idx;
 {
 	static struct esp_algorithm esp_algorithms[] = {
-		{ 8, esp_descbc_mature, 64, 64, sizeof(des_key_schedule),
+		{ 8, -1, esp_descbc_mature, 64, 64, sizeof(des_key_schedule),
 			"des-cbc",
 			esp_descbc_ivlen, esp_descbc_decrypt,
 			esp_descbc_encrypt, esp_descbc_schedule, },
-		{ 8, esp_cbc_mature, 192, 192, sizeof(des_key_schedule) * 3,
+		{ 8, 8, esp_cbc_mature, 192, 192, sizeof(des_key_schedule) * 3,
 			"3des-cbc",
-			esp_3descbc_ivlen, esp_3descbc_decrypt,
+			esp_cipher_ivlen, esp_3descbc_decrypt,
 			esp_3descbc_encrypt, esp_3descbc_schedule, },
-		{ 1, esp_null_mature, 0, 2048, 0, "null",
-			esp_null_ivlen, esp_null_decrypt,
+		{ 1, 0, esp_null_mature, 0, 2048, 0, "null",
+			esp_cipher_ivlen, esp_null_decrypt,
 			esp_null_encrypt, NULL, },
-		{ 8, esp_cbc_mature, 40, 448, sizeof(BF_KEY), "blowfish-cbc",
-			esp_blowfish_cbc_ivlen, esp_blowfish_cbc_decrypt,
+		{ 8, 8, esp_cbc_mature, 40, 448, sizeof(BF_KEY), "blowfish-cbc",
+			esp_cipher_ivlen, esp_blowfish_cbc_decrypt,
 			esp_blowfish_cbc_encrypt, esp_blowfish_cbc_schedule, },
-		{ 8, esp_cbc_mature, 40, 128, sizeof(u_int32_t) * 32,
+		{ 8, 8, esp_cbc_mature, 40, 128, sizeof(u_int32_t) * 32,
 			"cast128-cbc",
-			esp_cast128cbc_ivlen, esp_cast128cbc_decrypt,
+			esp_cipher_ivlen, esp_cast128cbc_decrypt,
 			esp_cast128cbc_encrypt, esp_cast128cbc_schedule, },
 #ifdef SADB_X_EALG_RC5CBC
-		{ 8, esp_cbc_mature, 40, 2040, sizeof(RC5_WORD) * 34, "rc5-cbc",
-			esp_rc5cbc_ivlen, esp_rc5cbc_decrypt,
+		{ 8, 8, esp_cbc_mature, 40, 2040, sizeof(RC5_WORD) * 34,
+			"rc5-cbc",
+			esp_cipher_ivlen, esp_rc5cbc_decrypt,
 			esp_rc5cbc_encrypt, esp_rc5cbc_schedule, },
 #else
-		{ 8, NULL, 40, 2040, 0, "rc5-cbc dummy",
+		{ 8, 8, NULL, 40, 2040, 0, "rc5-cbc dummy",
 			NULL, NULL, NULL, NULL, },
 #endif
 	};
@@ -211,7 +210,8 @@ esp_crypto_sanity(algo, sav, ivlen)
 	int ivlen;
 {
 
-	if (sav->ivlen != ivlen) {
+	if (sav->ivlen != ivlen ||
+	    (algo->ivlenval >= 0 && algo->ivlenval != ivlen)) {
 		ipseclog((LOG_ERR, "esp_decrypt %s: bad ivlen %d/%d\n",
 		    algo->name, ivlen, sav->ivlen));
 		return EINVAL;
@@ -236,14 +236,6 @@ esp_null_mature(sav)
 {
 
 	/* anything is okay */
-	return 0;
-}
-
-static int
-esp_null_ivlen(sav)
-	struct secasvar *sav;
-{
-
 	return 0;
 }
 
@@ -315,7 +307,8 @@ esp_descbc_mature(sav)
 }
 
 static int
-esp_descbc_ivlen(sav)
+esp_descbc_ivlen(algo, sav)
+	const struct esp_algorithm *algo;
 	struct secasvar *sav;
 {
 
@@ -719,22 +712,6 @@ esp_blowfish_cbc_schedule(algo, sav)
 }
 
 static int
-esp_blowfish_cbc_ivlen(sav)
-	struct secasvar *sav;
-{
-
-	return 8;
-}
-
-static int
-esp_cast128cbc_ivlen(sav)
-	struct secasvar *sav;
-{
-
-	return 8;
-}
-
-static int
 esp_cast128cbc_decrypt(m, off, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;
@@ -883,14 +860,6 @@ esp_cast128cbc_schedule(algo, sav)
 }
 
 static int
-esp_3descbc_ivlen(sav)
-	struct secasvar *sav;
-{
-
-	return 8;
-}
-
-static int
 esp_3descbc_decrypt(m, off, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;
@@ -1031,14 +1000,6 @@ esp_3descbc_schedule(algo, sav)
 
 #ifdef SADB_X_EALG_RC5CBC
 static int
-esp_rc5cbc_ivlen(sav)
-	struct secasvar *sav;
-{
-
-	return 8;
-}
-
-static int
 esp_rc5cbc_decrypt(m, off, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;
@@ -1169,6 +1130,17 @@ esp_rc5cbc_schedule(algo, sav)
 	return 0;
 }
 #endif
+
+static int
+esp_cipher_ivlen(algo, sav)
+	const struct esp_algorithm *algo;
+	struct secasvar *sav;
+{
+
+	if (!algo)
+		panic("esp_cipher_ivlen: unknown algorithm");
+	return algo->ivlenval;
+}
 
 /*
  * increment iv.
