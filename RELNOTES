@@ -1,6 +1,6 @@
 	RELNOTES of KAME kit
 	KAME Project
-	$KAME: RELNOTES,v 1.68 2001/02/03 06:50:01 itojun Exp $
+	$KAME: RELNOTES,v 1.69 2001/02/10 05:17:08 itojun Exp $
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
 
@@ -45,6 +45,22 @@ real-world routers and other realworld use, you may want to check *BSD
 advisories and other announcements.
 
 Please let developers know if you notice significant issues.
+
+END OF LIFE
+===========
+We do not maintain KAME kits for older releases on a release branch -
+for example, on FreeBSD 4.x series, KAME kit is supplied and maintained for
+the latest one only (4.2-RELEASE as of this writing).
+
+KAME/FreeBSD 3.5 (or 3.x series) has reached its end of life.  We supply it for
+reference purposes only.  The tree may not compile at all.
+Use newer BSD official releases, or KAME kit on more recent BSD releases.
+
+KAME/FreeBSD 2.2.8 (or 2.2.x series) is not actively maintained well any more
+- for instance, freebsd2/ports contains very obsolete set of software, some of
+functionalities may not compile, security holes may be still there, and such.
+For more recent functionalities use newer BSD official releases, or KAME kit
+on more recent BSD releases.
 
 KNOWN BUGS/TWISTS
 =================

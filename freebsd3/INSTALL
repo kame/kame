@@ -1,6 +1,6 @@
-Installation procedure - FreeBSD 3.4
+Installation procedure - FreeBSD 3.5
 KAME project
-$Id: INSTALL,v 1.15 2000/11/22 10:51:21 itojun Exp $
+$Id: INSTALL,v 1.16 2001/02/10 05:17:09 itojun Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -8,6 +8,10 @@ sections - kernel build and userland build.
 
 Be sure to perform "tree preparation" procedure, described in
 ../INSTALL, prior to taking the steps below.
+
+Note that, KAME/FreeBSD 3.5 has reached its end of life.  We supply it for
+reference purposes only.  The tree may not compile at all.
+Use newer BSD official releases, or KAME kit on more recent BSD releases.
 
 
 A. Backup

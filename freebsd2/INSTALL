@@ -1,6 +1,6 @@
 Installation procedure - FreeBSD 2.2.8
 KAME project
-$Id: INSTALL,v 1.12 2000/11/22 10:51:21 itojun Exp $
+$Id: INSTALL,v 1.13 2001/02/10 05:17:08 itojun Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -8,6 +8,12 @@ sections - kernel build and userland build.
 
 Be sure to perform "tree preparation" procedure, described in
 ../INSTALL, prior to taking the steps below.
+
+Note that, KAME/FreeBSD 2.2.8 is not actively maintained well any more - for
+instance, freebsd2/ports contains very obsolete set of software, some of
+functionalities may not compile, security holes may still be there, and such.
+For more recent functionalities use newer BSD official releases, or KAME kit
+on more recent BSD releases.
 
 
 A. Backup
