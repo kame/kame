@@ -1,4 +1,4 @@
-/*	$KAME: grabmyaddr.c,v 1.21 2000/11/09 11:11:40 sakane Exp $	*/
+/*	$KAME: grabmyaddr.c,v 1.22 2000/11/10 04:44:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -35,7 +35,9 @@
 #include <sys/ioctl.h>
 
 #include <net/if.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
+#endif
 #include <net/route.h>
 #include <netkey/key_var.h>
 #include <netinet/in.h>
