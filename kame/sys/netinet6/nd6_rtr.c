@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.202 2002/06/07 03:26:23 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.203 2002/06/07 07:58:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -96,7 +96,7 @@ static void defrouter_delifreq __P((void));
 static void nd6_rtmsg __P((int, struct rtentry *));
 
 static void in6_init_address_ltimes __P((struct nd_prefix *ndpr,
-					 struct in6_addrlifetime *lt6));
+	struct in6_addrlifetime *lt6));
 
 static int rt6_deleteroute __P((struct radix_node *, void *));
 
@@ -197,13 +197,12 @@ nd6_rs_input(m, off, icmp6len)
 		nd6log((LOG_INFO,
 		    "nd6_rs_input: lladdrlen mismatch for %s "
 		    "(if %d, RS packet %d)\n",
-			ip6_sprintf(&src_sa6->sin6_addr),
-			ifp->if_addrlen, lladdrlen - 2));
+		    ip6_sprintf(&src_sa6->sin6_addr),
+		    ifp->if_addrlen, lladdrlen - 2));
 		goto bad;
 	}
 
-	nd6_cache_lladdr(ifp, src_sa6, lladdr, lladdrlen,
-			 ND_ROUTER_SOLICIT, 0);
+	nd6_cache_lladdr(ifp, src_sa6, lladdr, lladdrlen, ND_ROUTER_SOLICIT, 0);
 
  freeit:
 	m_freem(m);
@@ -382,17 +381,16 @@ nd6_ra_input(m, off, icmp6len)
 			pr.ndpr_ifp = (struct ifnet *)m->m_pkthdr.rcvif;
 
 			pr.ndpr_raf_onlink = (pi->nd_opt_pi_flags_reserved &
-					      ND_OPT_PI_FLAG_ONLINK) ? 1 : 0;
+			    ND_OPT_PI_FLAG_ONLINK) ? 1 : 0;
 			pr.ndpr_raf_auto = (pi->nd_opt_pi_flags_reserved &
-					    ND_OPT_PI_FLAG_AUTO) ? 1 : 0;
+			    ND_OPT_PI_FLAG_AUTO) ? 1 : 0;
 #ifdef MIP6
 			pr.ndpr_raf_router = (pi->nd_opt_pi_flags_reserved &
-					      ND_OPT_PI_FLAG_ROUTER) ? 1 : 0;
+			    ND_OPT_PI_FLAG_ROUTER) ? 1 : 0;
 #endif /* MIP6 */
 			pr.ndpr_plen = pi->nd_opt_pi_prefix_len;
 			pr.ndpr_vltime = ntohl(pi->nd_opt_pi_valid_time);
-			pr.ndpr_pltime =
-				ntohl(pi->nd_opt_pi_preferred_time);
+			pr.ndpr_pltime = ntohl(pi->nd_opt_pi_preferred_time);
 			pr.ndpr_lastupdate = time_second;
 
 			if (in6_init_prefix_ltimes(&pr))
@@ -400,12 +398,10 @@ nd6_ra_input(m, off, icmp6len)
 #ifdef MIP6
 			if (MIP6_IS_MN) {
 				if (mip6_prefix_list_update(src_sa6,
-							    &pr, dr, m)) {
-					mip6log((LOG_ERR,
-						 "%s:%d: "
-						 "prefix info processing "
-						 "failed\n",
-						 __FILE__, __LINE__));
+				    &pr, dr, m)) {
+					mip6log((LOG_ERR, "%s:%d: "
+					    "prefix info processing failed\n",
+					    __FILE__, __LINE__));
 					goto freeit;
 				}
 			}
@@ -543,7 +539,7 @@ nd6_rtmsg(cmd, rt)
 	info.rti_info[RTAX_IFP] = rt->rt_ifp->if_addrlist->ifa_addr;
 #else
 	info.rti_info[RTAX_IFP] =
-		(struct sockaddr *)TAILQ_FIRST(&rt->rt_ifp->if_addrlist);
+	    (struct sockaddr *)TAILQ_FIRST(&rt->rt_ifp->if_addrlist);
 #endif
 	info.rti_info[RTAX_IFA] = rt->rt_ifa->ifa_addr;
 
@@ -576,8 +572,8 @@ defrouter_addreq(new)
 	s = splnet();
 #endif
 	error = rtrequest(RTM_ADD, (struct sockaddr *)&def,
-		(struct sockaddr *)&gate, (struct sockaddr *)&mask,
-		RTF_GATEWAY, &newrt);
+	    (struct sockaddr *)&gate, (struct sockaddr *)&mask,
+	    RTF_GATEWAY, &newrt);
 	if (newrt) {
 		nd6_rtmsg(RTM_ADD, newrt); /* tell user process */
 		newrt->rt_refcnt--;
@@ -635,7 +631,7 @@ defrouter_addifreq(ifp)
 	error = rtrequest1(RTM_ADD, &info, &newrt);
 #else
 	error = rtrequest(RTM_ADD, (struct sockaddr *)&def, ifa->ifa_addr,
-			  (struct sockaddr *)&mask, flags, &newrt);
+	    (struct sockaddr *)&mask, flags, &newrt);
 #endif
 	if (error != 0) {
 		nd6log((LOG_ERR,
@@ -946,12 +942,11 @@ defrouter_select()
 		else
  			selected_dr = TAILQ_NEXT(installed_dr, dr_entry);
 	} else if (installed_dr &&
-		   (rt = nd6_lookup(&installed_dr->rtaddr, 0,
-				    installed_dr->ifp)) &&
-		   (ln = (struct llinfo_nd6 *)rt->rt_llinfo) &&
-		   ND6_IS_LLINFO_PROBREACH(ln) &&
-		   rtpref(selected_dr) <= rtpref(installed_dr)) {
-			selected_dr = installed_dr;
+	    (rt = nd6_lookup(&installed_dr->rtaddr, 0, installed_dr->ifp)) &&
+	    (ln = (struct llinfo_nd6 *)rt->rt_llinfo) &&
+	    ND6_IS_LLINFO_PROBREACH(ln) &&
+	    rtpref(selected_dr) <= rtpref(installed_dr)) {
+		selected_dr = installed_dr;
 	}
 
 	/*
@@ -994,7 +989,7 @@ rtpref(struct nd_defrouter *dr)
 		log(LOG_ERR, "rtpref: impossible RA flag %x", dr->flags);
 		return RTPREF_INVALID;
 	}
-	/* NOT REACH HERE */
+	/* NOTREACHED */
 #else
 	return RTPREF_MEDIUM;
 #endif
@@ -1141,9 +1136,7 @@ nd6_prefix_lookup(pr)
 		if (pr->ndpr_ifp == search->ndpr_ifp &&
 		    pr->ndpr_plen == search->ndpr_plen &&
 		    in6_are_prefix_equal(&pr->ndpr_prefix.sin6_addr,
-					 &search->ndpr_prefix.sin6_addr,
-					 pr->ndpr_plen)
-		    ) {
+		    &search->ndpr_prefix.sin6_addr, pr->ndpr_plen)) {
 			break;
 		}
 	}
@@ -1343,8 +1336,8 @@ prelist_update(new, dr, m)
 			    "nd6_prelist_add failed for %s/%d on %s "
 			    "errno=%d, returnpr=%p\n",
 			    ip6_sprintf(&new->ndpr_prefix.sin6_addr),
-					new->ndpr_plen, if_name(new->ndpr_ifp),
-					error, newpr));
+			    new->ndpr_plen, if_name(new->ndpr_ifp),
+			    error, newpr));
 			goto end; /* we should just give up in this case. */
 		}
 
@@ -1420,8 +1413,7 @@ prelist_update(new, dr, m)
 		ifa_plen = in6_mask2len(&ifa6->ia_prefixmask.sin6_addr, NULL);
 		if (ifa_plen != new->ndpr_plen ||
 		    !in6_are_prefix_equal(&ifa6->ia_addr.sin6_addr,
-					  &new->ndpr_prefix.sin6_addr,
-					  ifa_plen))
+		    &new->ndpr_prefix.sin6_addr, ifa_plen))
 			continue;
 
 		if (ia6_match == NULL) /* remember the first one */
@@ -1508,15 +1500,15 @@ prelist_update(new, dr, m)
 			if (ip6_temp_valid_lifetime >
 			    (u_int32_t)(time_second - ifa6->ia6_createtime)) {
 				maxvltime = ip6_temp_valid_lifetime -
-					(time_second - ifa6->ia6_createtime);
+				    (time_second - ifa6->ia6_createtime);
 			} else
 				maxvltime = 0;
 			if (ip6_temp_preferred_lifetime >
 			    (u_int32_t)((time_second - ifa6->ia6_createtime) +
-					ip6_desync_factor)) {
+			    ip6_desync_factor)) {
 				maxpltime = ip6_temp_preferred_lifetime -
-					(time_second - ifa6->ia6_createtime) -
-					ip6_desync_factor;
+				    (time_second - ifa6->ia6_createtime) -
+				    ip6_desync_factor;
 			} else
 				maxpltime = 0;
 
@@ -1600,14 +1592,13 @@ find_pfxlist_reachable_router(pr)
 	for (pfxrtr = LIST_FIRST(&pr->ndpr_advrtrs); pfxrtr;
 	     pfxrtr = LIST_NEXT(pfxrtr, pfr_entry)) {
 		if ((rt = nd6_lookup(&pfxrtr->router->rtaddr, 0,
-				     pfxrtr->router->ifp)) &&
+		    pfxrtr->router->ifp)) &&
 		    (ln = (struct llinfo_nd6 *)rt->rt_llinfo) &&
 		    ND6_IS_LLINFO_PROBREACH(ln))
 			break;	/* found */
 	}
 
 	return(pfxrtr);
-
 }
 
 /*
@@ -1814,8 +1805,7 @@ nd6_prefix_onlink(pr)
 
 		if (opr->ndpr_plen == pr->ndpr_plen &&
 		    in6_are_prefix_equal(&pr->ndpr_prefix.sin6_addr,
-					 &opr->ndpr_prefix.sin6_addr,
-					 pr->ndpr_plen))
+		    &opr->ndpr_prefix.sin6_addr, pr->ndpr_plen))
 			return(0);
 	}
 
@@ -1824,8 +1814,7 @@ nd6_prefix_onlink(pr)
 	 */
 	/* search for a link-local addr */
 	ifa = (struct ifaddr *)in6ifa_ifpforlinklocal(ifp,
-						      IN6_IFF_NOTREADY|
-						      IN6_IFF_ANYCAST);
+	    IN6_IFF_NOTREADY | IN6_IFF_ANYCAST);
 	if (ifa == NULL) {
 		/* XXX: freebsd does not have ifa_ifwithaf */
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
@@ -1877,14 +1866,12 @@ nd6_prefix_onlink(pr)
 		rtflags &= ~RTF_CLONING;
 	}
 	error = rtrequest(RTM_ADD, (struct sockaddr *)&pr->ndpr_prefix,
-			  ifa->ifa_addr, (struct sockaddr *)&mask6,
-			  rtflags, &rt);
+	    ifa->ifa_addr, (struct sockaddr *)&mask6, rtflags, &rt);
 	if (error == 0) {
 		if (rt != NULL) /* this should be non NULL, though */
 			nd6_rtmsg(RTM_ADD, rt);
 		pr->ndpr_stateflags |= NDPRF_ONLINK;
-	}
-	else {
+	} else {
 		nd6log((LOG_ERR, "nd6_prefix_onlink: failed to add route for a"
 		    " prefix (%s/%d) on %s, gw=%s, mask=%s, flags=%lx "
 		    "errno = %d\n",
@@ -1922,13 +1909,13 @@ nd6_prefix_offlink(pr)
 	sa6.sin6_family = AF_INET6;
 	sa6.sin6_len = sizeof(sa6);
 	bcopy(&pr->ndpr_prefix.sin6_addr, &sa6.sin6_addr,
-	      sizeof(struct in6_addr));
+	    sizeof(struct in6_addr));
 	bzero(&mask6, sizeof(mask6));
 	mask6.sin6_family = AF_INET6;
 	mask6.sin6_len = sizeof(sa6);
 	bcopy(&pr->ndpr_mask, &mask6.sin6_addr, sizeof(struct in6_addr));
 	error = rtrequest(RTM_DELETE, (struct sockaddr *)&sa6, NULL,
-			  (struct sockaddr *)&mask6, 0, &rt);
+	    (struct sockaddr *)&mask6, 0, &rt);
 	if (error == 0) {
 		pr->ndpr_stateflags &= ~NDPRF_ONLINK;
 
@@ -1959,8 +1946,7 @@ nd6_prefix_offlink(pr)
 
 			if (opr->ndpr_plen == pr->ndpr_plen &&
 			    in6_are_prefix_equal(&pr->ndpr_prefix.sin6_addr,
-						 &opr->ndpr_prefix.sin6_addr,
-						 pr->ndpr_plen)) {
+			    &opr->ndpr_prefix.sin6_addr, pr->ndpr_plen)) {
 				int e;
 
 				if ((e = nd6_prefix_onlink(opr)) != 0) {
@@ -2064,7 +2050,7 @@ in6_ifadd(pr)
 	ifra.ifra_addr.sin6_len = sizeof(struct sockaddr_in6);
 	/* prefix */
 	bcopy(&pr->ndpr_prefix.sin6_addr, &ifra.ifra_addr.sin6_addr,
-	      sizeof(ifra.ifra_addr.sin6_addr));
+	    sizeof(ifra.ifra_addr.sin6_addr));
 	ifra.ifra_addr.sin6_addr.s6_addr32[0] &= mask.s6_addr32[0];
 	ifra.ifra_addr.sin6_addr.s6_addr32[1] &= mask.s6_addr32[1];
 	ifra.ifra_addr.sin6_addr.s6_addr32[2] &= mask.s6_addr32[2];
@@ -2084,7 +2070,7 @@ in6_ifadd(pr)
 	ifra.ifra_prefixmask.sin6_len = sizeof(struct sockaddr_in6);
 	ifra.ifra_prefixmask.sin6_family = AF_INET6;
 	bcopy(&mask, &ifra.ifra_prefixmask.sin6_addr,
-	      sizeof(ifra.ifra_prefixmask.sin6_addr));
+	    sizeof(ifra.ifra_prefixmask.sin6_addr));
 
 	/*
 	 * lifetime.
@@ -2135,22 +2121,21 @@ in6_tmpifadd(ia0, forcegen)
 	ifra.ifra_prefixmask = ia0->ia_prefixmask;
 	/* clear the old IFID */
 	for (i = 0; i < 4; i++) {
-		ifra.ifra_addr.sin6_addr.s6_addr32[i]
-			&= ifra.ifra_prefixmask.sin6_addr.s6_addr32[i];
+		ifra.ifra_addr.sin6_addr.s6_addr32[i] &=
+		    ifra.ifra_prefixmask.sin6_addr.s6_addr32[i];
 	}
 
   again:
 	if (in6_get_tmpifid(ifp, (u_int8_t *)randid,
-			    (const u_int8_t *)&ia0->ia_addr.sin6_addr.s6_addr[8],
-			    forcegen)) {
+	    (const u_int8_t *)&ia0->ia_addr.sin6_addr.s6_addr[8], forcegen)) {
 		nd6log((LOG_NOTICE, "in6_tmpifadd: failed to find a good "
-			"random IFID\n"));
+		    "random IFID\n"));
 		return(EINVAL);
 	}
-	ifra.ifra_addr.sin6_addr.s6_addr32[2]
-		|= (randid[0] & ~(ifra.ifra_prefixmask.sin6_addr.s6_addr32[2]));
-	ifra.ifra_addr.sin6_addr.s6_addr32[3]
-		|= (randid[1] & ~(ifra.ifra_prefixmask.sin6_addr.s6_addr32[3]));
+	ifra.ifra_addr.sin6_addr.s6_addr32[2] |=
+	    (randid[0] & ~(ifra.ifra_prefixmask.sin6_addr.s6_addr32[2]));
+	ifra.ifra_addr.sin6_addr.s6_addr32[3] |=
+	    (randid[1] & ~(ifra.ifra_prefixmask.sin6_addr.s6_addr32[3]));
 
 	/*
 	 * in6_get_tmpifid() quite likely provided a unique interface ID.
@@ -2159,15 +2144,14 @@ in6_tmpifadd(ia0, forcegen)
 	 * of the address.  So, we'll do one more sanity check.
 	 */
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
-		if (SA6_ARE_ADDR_EQUAL(&ia->ia_addr,
-				       &ifra.ifra_addr)) {
+		if (SA6_ARE_ADDR_EQUAL(&ia->ia_addr, &ifra.ifra_addr)) {
 			if (trylimit-- == 0) {
 				/*
 				 * Give up.  Something strange should have
 				 * happened.
 				 */
 				nd6log((LOG_NOTICE, "in6_tmpifadd: failed to "
-					"find a unique random IFID\n"));
+				    "find a unique random IFID\n"));
 				return(EEXIST);
 			}
 			forcegen = 1;
@@ -2184,19 +2168,19 @@ in6_tmpifadd(ia0, forcegen)
 	 */
 	if (ia0->ia6_lifetime.ia6t_vltime != ND6_INFINITE_LIFETIME) {
 		vltime0 = IFA6_IS_INVALID(ia0) ? 0 :
-			(ia0->ia6_lifetime.ia6t_vltime -
-			 (time_second - ia0->ia6_updatetime));
+		    (ia0->ia6_lifetime.ia6t_vltime -
+		    (time_second - ia0->ia6_updatetime));
 		if (vltime0 > ip6_temp_valid_lifetime)
 			vltime0 = ip6_temp_valid_lifetime;
 	} else
 		vltime0 = ip6_temp_valid_lifetime;
 	if (ia0->ia6_lifetime.ia6t_pltime != ND6_INFINITE_LIFETIME) {
 		pltime0 = IFA6_IS_DEPRECATED(ia0) ? 0 :
-			(ia0->ia6_lifetime.ia6t_pltime -
-			 (time_second - ia0->ia6_updatetime));
+		    (ia0->ia6_lifetime.ia6t_pltime -
+		    (time_second - ia0->ia6_updatetime));
 		if (pltime0 > ip6_temp_preferred_lifetime - ip6_desync_factor){
 			pltime0 = ip6_temp_preferred_lifetime -
-				ip6_desync_factor;
+			    ip6_desync_factor;
 		}
 	} else
 		pltime0 = ip6_temp_preferred_lifetime - ip6_desync_factor;
@@ -2356,8 +2340,8 @@ rt6_deleteroute(rn, arg)
 	if ((rt->rt_flags & RTF_HOST) == 0)
 		return(0);
 
-	return(rtrequest(RTM_DELETE, rt_key(rt),
-			 rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0));
+	return(rtrequest(RTM_DELETE, rt_key(rt), rt->rt_gateway,
+	    rt_mask(rt), rt->rt_flags, 0));
 #undef SIN6
 }
 
