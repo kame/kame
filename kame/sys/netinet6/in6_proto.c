@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.140 2003/10/17 11:27:19 ono Exp $	*/
+/*	$KAME: in6_proto.c,v 1.141 2003/10/20 11:18:41 ono Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -69,13 +69,13 @@
 #include "opt_ipsec.h"
 #include "opt_mip6.h"
 #include "opt_sctp.h"
+#include "opt_dccp.h"
 #endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
 #include "opt_ipsec.h"
 #include "opt_iso.h"
 #include "opt_sctp.h"
-#include "opt_dccp.h"
 #endif
 
 #include <sys/param.h>
