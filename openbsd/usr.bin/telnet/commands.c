@@ -2496,7 +2496,6 @@ tn(argc, argv)
     }
 
     do {
-fprintf(stderr, "family=%d\n", family);
 	net = socket(family, SOCK_STREAM, 0);
 	seteuid(getuid());
 	setuid(getuid());
@@ -2560,7 +2559,6 @@ fprintf(stderr, "family=%d\n", family);
 		perror("setsockopt (SO_DEBUG)");
 	}
 
-fprintf(stderr, "sa=%p(%d %d) size=%d\n", sa, sa->sa_family, sa->sa_len, sa_size);
 	if (connect(net, sa, sa_size) < 0) {
 	    int retry = 0;
 
