@@ -1,40 +1,15 @@
-*** src/support/apachectl.orig	Fri Jul 17 01:25:54 1998
---- src/support/apachectl	Fri Jul 24 00:34:59 1998
-***************
-*** 39,44 ****
---- 39,46 ----
-  # --------------------                              --------------------
-  # ||||||||||||||||||||   END CONFIGURATION SECTION  ||||||||||||||||||||
-  
-+ eval `limits -e -C daemon` >/dev/null 2>&1
-+ 
-  ERROR=0
-  ARGV="$@"
-  if [ "x$ARGV" = "x" ] ; then 
-***************
-*** 50,56 ****
-      # check for pidfile
-      if [ -f $PIDFILE ] ; then
-  	PID=`cat $PIDFILE`
-! 	if kill -0 $PID; then
-  	    STATUS="httpd (pid $PID) running"
-  	    RUNNING=1
-  	else
---- 52,58 ----
-      # check for pidfile
-      if [ -f $PIDFILE ] ; then
-  	PID=`cat $PIDFILE`
-! 	if kill -0 $PID > /dev/null 2>&1; then
-  	    STATUS="httpd (pid $PID) running"
-  	    RUNNING=1
-  	else
-***************
-*** 82,87 ****
---- 84,90 ----
-  	fi
-  	if kill $PID ; then
-  	    echo "$0 $ARG: httpd stopped"
-+ 	    rm $PIDFILE
-  	else
-  	    echo "$0 $ARG: httpd could not be stopped"
-  	    ERROR=4
+$NetBSD$
+--- src/support/apxs.pl.orig	Thu Dec 16 08:10:30 1999
++++ src/support/apxs.pl	Sun Feb 20 22:14:55 2000
+@@ -424,8 +424,9 @@
+         my $t = $f;
+         $t =~ s|^.+/([^/]+)$|$1|;
+         if ($opt_i) {
+-            push(@cmds, "cp $f $CFG_LIBEXECDIR/$t");
+-            push(@cmds, "chmod 755 $CFG_LIBEXECDIR/$t");
++#           push(@cmds, "cp $f $CFG_LIBEXECDIR/$t");
++#           push(@cmds, "chmod 755 $CFG_LIBEXECDIR/$t");
++	    push(@cmds, "install -c -m 555 -o root -g wheel $f $CFG_LIBEXECDIR/$t");
+         }
+ 
+         #   determine module symbolname and filename

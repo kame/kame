@@ -10,8 +10,8 @@
 # sanity fixes in apache module API (for example, avoid u_long for IPv4 addrs)
 #
 
-DISTNAME=		apache_1.3.9
-PKGNAME=		apache-1.3.9
+DISTNAME=		apache_1.3.11
+PKGNAME=		apache-1.3.11
 CATEGORIES=		www
 MASTER_SITES=		http://www.apache.org/dist/ \
 			ftp://ftp.modssl.org/source/ \
@@ -21,7 +21,7 @@ DISTFILES=		${DISTNAME}${EXTRACT_SUFX} \
 #			${SSL_DISTNAME}${EXTRACT_SUFX}
 
 PATCH_SITES=		ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=		apache-139-v6-19990901a.diff.gz
+PATCHFILES=		apache-1.3.11-v6-20000220a.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=		itojun@itojun.org
