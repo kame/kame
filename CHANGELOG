@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1234 2000/08/25 10:37:05 jinmei Exp $
+$KAME: CHANGELOG,v 1.1235 2000/08/27 17:30:17 itojun Exp $
 
 <200008>
+Mon Aug 28 02:25:14 JST 2000  itojun@iijlab.net
+	* sys/netkey/key.c: stir ESP IV better.  on some of operating system
+	  platforms, kernel malloc() gives region with almost constant content.
+	  IPSEC USERS ARE STRONGLY SUGGESTED TO UPDATE.
+
+Sun Aug 27 21:25:44 JST 2000  itojun@iijlab.net
+	* sys/netinet6/esp_core.c: ESP internal function API change;
+	  algo->{en,de}crypt frees mbuf on error.
+
 2000-08-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_lifaddr_ioctl): made
 	SIOC[DG]LIFADDR scope-aware; fe80::/64 (not /10) will be accepted
