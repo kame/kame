@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.4 2000/10/31 19:07:09 ume Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.31 2001/07/25 05:08:25 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.32 2001/07/25 05:09:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -103,7 +103,7 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#endif /*IPSEC*/
+#endif /* IPSEC */
 
 #include "faith.h"
 #if defined(NFAITH) && NFAITH > 0
@@ -269,7 +269,7 @@ udp6_input(mp, offp, proto)
 					ipsec6stat.in_polvio++;
 					/* do not inject data into pcb */
 				else
-#endif /*IPSEC*/
+#endif /* IPSEC */
 				if ((n = m_copy(m, 0, M_COPYALL)) != NULL) {
 					/*
 					 * KAME NOTE: do not
@@ -328,7 +328,7 @@ udp6_input(mp, offp, proto)
 			ipsec6stat.in_polvio++;
 			goto bad;
 		}
-#endif /*IPSEC*/
+#endif /* IPSEC */
 		if (last->in6p_flags & IN6P_CONTROLOPTS
 		    || last->in6p_socket->so_options & SO_TIMESTAMP)
 			ip6_savecontrol(last, ip6, m, &opts, NULL);
@@ -376,7 +376,7 @@ udp6_input(mp, offp, proto)
 		ipsec6stat.in_polvio++;
 		goto bad;
 	}
-#endif /*IPSEC*/
+#endif /* IPSEC */
 
 	/*
 	 * Construct sockaddr format source address.
@@ -565,7 +565,7 @@ udp6_attach(struct socket *so, int proto, struct proc *p)
 		in6_pcbdetach(inp);
 		return (error);
 	}
-#endif /*IPSEC*/
+#endif /* IPSEC */
 	return 0;
 }
 
