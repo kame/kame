@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_timer.c,v 1.8 2000/03/25 07:24:02 sumikawa Exp $	*/
+/*	$KAME: tcp6_timer.c,v 1.9 2000/08/22 09:41:07 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -39,7 +39,7 @@
  * to contributors in the following notices also apply to Berkeley
  * Software Design, Inc.
  *
- *	BSDI tcp_timer.c,v 2.9 1997/01/16 14:06:35 karels Exp
+ *	BSDI tcp_timer.c,v 2.9.2.1 1998/06/03 16:10:26 tks Exp
  */
 
 /*
@@ -219,7 +219,7 @@ t6pgone:
 			if ((ip6 = ip6nxt) == &tcb6)
 				break;
 			t6p = intotcp6cb(ip6);
-			if (t6p->t_timer[TCP6T_2MSL])
+			if (t6p->t_timer[TCP6T_2MSL] > 0)
 				break;
 		}
 	}
