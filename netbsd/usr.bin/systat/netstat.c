@@ -324,6 +324,8 @@ enter(inp, so, state, proto)
 	 * data structures.
 	 */
 	for (p = netcb.ni_forw; p != (struct netinfo *)&netcb; p = p->ni_forw) {
+		if (p->ni_family != AF_INET)
+			continue;
 		if (!streq(proto, p->ni_proto))
 			continue;
 		if (p->ni_lport != inp->inp_lport ||
@@ -375,6 +377,8 @@ enter6(in6p, so, state, proto)
 	 * data structures.
 	 */
 	for (p = netcb.ni_forw; p != (struct netinfo *)&netcb; p = p->ni_forw) {
+		if (p->ni_family != AF_INET6)
+			continue;
 		if (!streq(proto, p->ni_proto))
 			continue;
 		if (p->ni_lport != in6p->in6p_lport ||
