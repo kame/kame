@@ -1178,7 +1178,6 @@ ipsecsetup0(sep, policy, commit)
 	char *buf;
 	int error;
 
-fprintf(stderr, "%p %s\n", sep, policy);
 	switch (sep->se_family) {
 	case AF_INET:
 		level = IPPROTO_IP;
