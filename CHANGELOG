@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1491 2001/01/21 08:27:39 itojun Exp $
+$KAME: CHANGELOG,v 1.1492 2001/01/21 11:13:17 jinmei Exp $
 
 <200101>
+2001-01-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sbin/ifconfig/ifconfig.c (main): set IPv6 address
+	lifetimes correctly (i.e. set infinite). Without this, ifconfig
+	would not be able to assign IPv6 addresses.
+
 Sun Jan 21 00:26:47 PST 2001  itojun@iijlab.net
 	* sys/netinet6/ip6_input.c: do not accept packet to link-local address
 	  on loopback interface, if the destination address is not assigned
