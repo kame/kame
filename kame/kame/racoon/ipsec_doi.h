@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.h,v 1.23 2000/09/18 22:59:34 sakane Exp $	*/
+/*	$KAME: ipsec_doi.h,v 1.24 2000/09/19 19:00:21 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.23 2000/09/18 22:59:34 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.24 2000/09/19 19:00:21 sakane Exp $ */
 
 /* refered to RFC2407 */
 
@@ -85,6 +85,7 @@
 #define   IPSECDOI_ATTR_SA_LD_TYPE_MAX          3
 #define IPSECDOI_ATTR_SA_LD                   2 /* V */
 #define   IPSECDOI_ATTR_SA_LD_SEC_DEFAULT      28800 /* 8 hours */
+#define   IPSECDOI_ATTR_SA_LD_KB_MAX  (~(1 << ((sizeof(int) << 3) - 1)))
 #define IPSECDOI_ATTR_GRP_DESC                3 /* B */
 #define IPSECDOI_ATTR_ENC_MODE                4 /* B */
 	/* default value: host dependent */

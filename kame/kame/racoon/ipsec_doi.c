@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.102 2000/09/19 18:29:05 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.103 2000/09/19 19:00:21 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.102 2000/09/19 18:29:05 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.103 2000/09/19 19:00:21 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2570,7 +2570,7 @@ setph2proposal0(iph2, pp, pr)
 			if (pp->lifetime > 0xffff)
 				attrlen += sizeof(u_int32_t);
 		}
-		if (pp->lifebyte) {
+		if (pp->lifebyte && pp->lifebyte != IPSECDOI_ATTR_SA_LD_KB_MAX) {
 			attrlen += sizeof(struct isakmp_data)
 				+ sizeof(struct isakmp_data);
 			if (pp->lifebyte > 0xffff)
@@ -2648,7 +2648,7 @@ setph2proposal0(iph2, pp, pr)
 			}
 		}
 
-		if (pp->lifebyte) {
+		if (pp->lifebyte && pp->lifebyte != IPSECDOI_ATTR_SA_LD_KB_MAX) {
 			x = isakmp_set_attr_l(x, IPSECDOI_ATTR_SA_LD_TYPE,
 						IPSECDOI_ATTR_SA_LD_TYPE_KB);
 			if (pp->lifebyte > 0xffff) {
