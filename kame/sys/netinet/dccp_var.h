@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.10 2003/11/05 06:36:11 ono Exp $	*/
+/*	$KAME: dccp_var.h,v 1.11 2003/11/05 09:18:02 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -231,7 +231,7 @@ extern const char *dccpstates[];
 #ifdef _KERNEL
 
 #if defined(DCCP_DEBUG_ON)
-#define DCCP_DEBUG(args) log args
+#define DCCP_DEBUG(args) dccp_log args
 #else
 #define DCCP_DEBUG(args)
 #endif
@@ -257,6 +257,7 @@ extern int	dccp_log_in_vain; /* if we should log connections to
 
 /* These four functions are called from inetsw (in_proto.c) */
 void	dccp_init(void);
+void	dccp_log(int, char *, ...);
 #ifdef __FreeBSD__
 void	dccp_input(struct mbuf *, int);
 void	dccp_ctlinput(int, struct sockaddr *, void *);

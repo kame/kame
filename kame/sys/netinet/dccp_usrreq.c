@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.19 2003/11/04 10:34:52 ono Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.20 2003/11/05 09:18:02 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -226,7 +226,7 @@ dccp_init()
 	    NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
 	uma_zone_set_max(dccpbinfo.ipi_zone, maxsockets);
 #else
-	dccpbinfo.ipi_zone = zinit("udpcb", sizeof(struct inp_dp), maxsockets,
+	dccpbinfo.ipi_zone = zinit("dccpcb", sizeof(struct inp_dp), maxsockets,
 				 ZONE_INTERRUPT, 0);
 #endif
 #else
@@ -990,8 +990,10 @@ dccp_input(struct mbuf *m, ...)
 		if (opts)
 			m_freem(opts);
 	}
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	if (dp)
 		INP_UNLOCK(inp);
+#endif
 
 	return;
 
@@ -1065,7 +1067,11 @@ dccp_ctlinput(int cmd, struct sockaddr *sa, void *vip)
 		return NULL;
 #endif
 	if (ip) {
+#ifdef __FreeBSD__
 		s = splnet();
+#else
+		s = splsoftnet();
+#endif
 		dh = (struct dccphdr *)((caddr_t)ip + (ip->ip_hl << 2));
 		INP_INFO_RLOCK(&dccpbinfo);
 #ifdef __FreeBSD__
@@ -1762,6 +1768,8 @@ again:
 		return(error);
 	}
 
+	DCCP_DEBUG((LOG_INFO, "ip_output6 success\n"));
+
 #if defined(__NetBSD__) && defined(INET6)
 	if (isipv6) {
 		sbdrop(&in6p->in6p_socket->so_snd, len);
@@ -1773,6 +1781,9 @@ again:
 		sowwakeup(inp->inp_socket);
 	}
 #endif
+
+	DCCP_DEBUG((LOG_INFO, "sowwakeup success %d\n", sendalot));
+
 	if (dp->cc_in_use[0] > 0  && dp->state == DCCPS_ESTAB) {
 		DCCP_DEBUG((LOG_INFO, "Calling *cc_sw[%u].cc_send_packet_sent!\n", dp->cc_in_use[0]));
 		if (sendalot) {
@@ -1785,6 +1796,8 @@ again:
 		if (sendalot)
 			goto again;
 	}
+
+	DCCP_DEBUG((LOG_INFO, "dccp_output finished\n"));
 
 	return (0);
 
@@ -3127,7 +3140,7 @@ dccp_pcblist(SYSCTL_HANDLER_ARGS)
 
 	for (inp = LIST_FIRST(dccpbinfo.listhead), i = 0; inp && i < n;
 	     inp = LIST_NEXT(inp, inp_list)) {
-INP_LOCK(inp);
+		INP_LOCK(inp);
 		if (inp->inp_gencnt <= gencnt &&
 #if __FreeBSD_version >= 500000
 		    cr_canseesocket(req->td->td_ucred, inp->inp_socket) == 0)
@@ -3863,3 +3876,17 @@ void
 dccp_nocc_packet_recv(void *ccb, char* options ,int optlen)
 {
 }
+
+#ifdef DCCP_DEBUG_ON
+void
+dccp_log(int level, char *format, ...)
+{
+	va_list ap;
+
+	va_start(ap, format);
+	vprintf(format,  ap);
+	va_end(ap);
+
+	return;
+}
+#endif
