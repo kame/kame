@@ -1,8 +1,0 @@
-sendmail 8.9.0 with IPv6 patch.
-Created by WIDE project.
-Tested on KAME IPv6 stack.
-
-Author contact: v6@wide.ad.jp
-
-If you have received binary distribution ("package"), the source code
-can be found at ftp://ftp.kyoto.wide.ad.jp/pub/mail/sendmail.
