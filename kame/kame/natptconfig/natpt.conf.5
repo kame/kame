@@ -1,4 +1,4 @@
-.\"	$KAME: natpt.conf.5,v 1.21 2002/10/10 08:46:12 fujisawa Exp $
+.\"	$KAME: natpt.conf.5,v 1.22 2004/04/16 04:47:23 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -91,6 +91,10 @@ The following directives are available in the configuration file.
 .Xc
 Set NAT-PT prefix.  Packet addressed to this prefix is subject to
 translate.  Prefix length is always assumed as 96 bits.
+.Pp
+This prefix should be a Global Unicast Addresses.  When you specify a
+link-local or multicast address as a NAT-PT prefix, translator cannot
+send a translated packet to the network.
 .\"
 .It Xo Sy map Op Ar number
 .Sy from ...
