@@ -65,7 +65,9 @@ static void make_jumboopt(char *);
 static void make_unknownopt(char *);
 static void make_rthdr(char *);
 static void make_frghdr(char *);
+#ifdef IPSEC
 static void make_ah(char *);
+#endif
 static void make_icmp6echo(char *, u_char);
 static void make_icmperr(char *);
 static void make_rtsol(char *);
@@ -440,6 +442,7 @@ make_frghdr(char *name)
 	pbp += sizeof(struct ip6_frag);
 }
 
+#ifdef IPSEC
 void
 make_ah(char *name)
 {
@@ -475,6 +478,7 @@ make_ah(char *name)
 
 	pbp += (ah->ah_len + 2) << 2;
 }
+#endif
 
 void
 make_icmp6echo(char *name, u_char type)
@@ -1044,12 +1048,16 @@ getconfig(char *testname, u_char *buf)
 				*nxthdrp = IPPROTO_FRAGMENT;
 			nxthdrp = 0;
 			make_frghdr(hdrtype);
-		} else if (strncmp("authhdr", hdrtype, 7) == 0) {
+		}
+#ifdef IPSEC
+		else if (strncmp("authhdr", hdrtype, 7) == 0) {
 			if (nxthdrp)
 				*nxthdrp = IPPROTO_AH;
 			nxthdrp = 0;
 			make_ah(hdrtype);
-		} else if (strncmp("dstopt", hdrtype, 6) == 0) {
+		}
+#endif
+		else if (strncmp("dstopt", hdrtype, 6) == 0) {
 			if (nxthdrp)
 				*nxthdrp = IPPROTO_DSTOPTS;
 			nxthdrp = 0;
