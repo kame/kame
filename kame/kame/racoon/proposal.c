@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.c,v 1.5 2000/07/18 01:19:41 sakane Exp $ */
+/* YIPS @(#)$Id: proposal.c,v 1.6 2000/08/09 14:51:22 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -165,7 +165,7 @@ cmpsaprop_alloc(pp1, pp2)
 {
 	struct saprop *newpp = NULL;
 	struct saproto *pr1, *pr2, *newpr = NULL;
-	struct satrns *tr1, *t2, *newtr;
+	struct satrns *tr1, *tr2, *newtr;
 
 	newpp = newsaprop();
 	if (newpp == NULL) {
@@ -214,8 +214,8 @@ cmpsaprop_alloc(pp1, pp2)
 		}
 
 		for (tr1 = pr1->head; tr1; tr1 = tr1->next) {
-			for (t2 = pr2->head; t2; t2 = t2->next) {
-				if (cmpsatrns(tr1, t2) == 0)
+			for (tr2 = pr2->head; tr2; tr2 = tr2->next) {
+				if (cmpsatrns(tr1, tr2) == 0)
 					goto found;
 			}
 		}
