@@ -1,4 +1,4 @@
-/*	$KAME: mip6config.c,v 1.10 2001/03/29 05:34:28 itojun Exp $	*/
+/*	$KAME: mip6config.c,v 1.11 2001/05/21 04:14:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -415,6 +415,7 @@ set_enable_ha(char *value, u_long command)
 /* Parsing template */
 struct config_tmpl config_mip6[] = {
 	{ "homeaddr", set_homeaddr, SIOCAHOMEADDR_MIP6},
+	{ "homepref", set_homepref, SIOCAHOMEPREF_MIP6},
 	{ "coaddr", set_coaddr, SIOCACOADDR_MIP6},
 	{ "enable_ha", set_enable_ha, 0},
 	{ "bu_lifetime", set_value, SIOCSBULIFETIME_MIP6},
