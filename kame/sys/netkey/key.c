@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.317 2003/10/13 08:54:17 itojun Exp $	*/
+/*	$KAME: key.c,v 1.318 2003/10/27 07:43:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1838,7 +1838,7 @@ key_spdadd(so, m, mhp)
 	struct mbuf *m;
 	const struct sadb_msghdr *mhp;
 {
-	struct sadb_address *src0, *dst0;
+	struct sadb_address *src0 = NULL, *dst0 = NULL;
 	struct sadb_x_policy *xpl0, *xpl;
 	struct sadb_lifetime *lft = NULL;
 	struct sadb_x_tag *tag = NULL;
@@ -1847,7 +1847,7 @@ key_spdadd(so, m, mhp)
 	struct ipsecrequest *isr;
 	int error;
 #if NPF > 0
-	u_int16_t tagvalue;
+	u_int16_t tagvalue = 0;
 #endif
 	int spidxmode;
 
