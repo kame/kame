@@ -240,7 +240,8 @@ in6_pcbbind(in6p, nam)
 				return EADDRNOTAVAIL;
 		}
 #endif
-		else if (!SA6_IS_ADDR_UNSPECIFIED(sin6)) {
+		else if (!(IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr) &&
+		    sin6->sin6_scope_id == 0)) {
 			struct ifaddr *ia = NULL;
 #ifndef SCOPEDROUTING
 			u_int32_t lzone;
@@ -583,7 +584,8 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		return 0;
 
 	sa6_dst = (struct sockaddr_in6 *)dst;
-	if (SA6_IS_ADDR_UNSPECIFIED(sa6_dst))
+	if (IN6_IS_ADDR_UNSPECIFIED(&sa6_dst->sin6_addr) &&
+	    sa6_dst->sin6_scope_id == 0)
 		return 0;
 
 	/*

@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.146 2004/02/03 07:25:23 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.147 2004/02/03 09:37:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -797,7 +797,8 @@ rip6_usrreq(so, req, m, nam, control, p)
 		lzone = addr->sin6_scope_id;
 		addr->sin6_scope_id = 0; /* for ifa_ifwithaddr */
 #endif
-		if (!SA6_IS_ADDR_UNSPECIFIED(addr) &&
+		if (!(IN6_IS_ADDR_UNSPECIFIED(&addr->sin6_addr) &&
+		      addr->sin6_scope_id == 0) &&
 		    (ia = ifa_ifwithaddr((struct sockaddr *)addr)) == 0) {
 			error = EADDRNOTAVAIL;
 			break;
