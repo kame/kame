@@ -89,8 +89,6 @@ __RCSID("$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $");
 #include <unistd.h>
 #include "netstat.h"
 
-static void print_ipsecstats __P((void));
-
 /*
  * portability issues:
  * - bsdi[34] uses PLURAL(), not plural().
@@ -152,6 +150,7 @@ struct data_info ipsecstat_info = {	/* for bsdi4 only */
 };
 #endif
 
+static void print_ipsecstats __P((void));
 static const char *pfkey_msgtype_names __P((int));
 static void ipsec_hist __P((const u_quad_t *, size_t, const char **, size_t,
 	const char *));
