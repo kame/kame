@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.19 2000/02/16 07:30:10 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.20 2000/02/16 10:57:04 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1086,6 +1086,9 @@ oakley_validate_auth(iph1)
 				"no CERT payload found even though CR sent.\n");
 			return -1;
 		}
+		YIPSDEBUG(DEBUG_CERT,
+			plog(logp, LOCATION, NULL, "SIGN passed:\n"));
+		YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->sig_p));
 
 		idstr = oakley_getidstr(iph1->id_p->v, iph1->id_p->l);
 		if (idstr == NULL) {
@@ -1139,7 +1142,7 @@ oakley_validate_auth(iph1)
 
 			YIPSDEBUG(DEBUG_CERT,
 				plog(logp, LOCATION, NULL, "get peer's CERT:"));
-			YIPSDEBUG(DEBUG_DCERT, PVDUMP(iph1->cert_p));
+			YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->cert_p));
 		}
 
 		/* check certificate */
@@ -1314,6 +1317,9 @@ oakley_getsign(iph1)
 				"failed to get private key.\n");
 			goto end;
 		}
+		YIPSDEBUG(DEBUG_DCERT,
+			plog(logp, LOCATION, NULL, "private key:\n"));
+		YIPSDEBUG(DEBUG_DCERT, PVDUMP(privkey));
 
 		iph1->sig = eay_get_x509sign(iph1->hash, privkey, iph1->cert);
 		break;
