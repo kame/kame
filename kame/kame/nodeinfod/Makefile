@@ -17,6 +17,10 @@ LDADD+=	-L/usr/contrib/lib -lcrypto -L/usr/local/v6/lib -linet6
 DPADD+=	/usr/contrib/lib/libcrypto.a /usr/local/v6/lib/libinet6.a
 .elif ${OPSYS} == "NetBSD"
 CPPFLAGS+=-DHAVE_MD5_H
+.elif ${OPSYS} == "FreeBSD"
+CPPFLAGS+=-DHAVE_MD5_H
+LDADD+=	-lcrypt -L/usr/local/v6/lib -linet6
+DPADD+=	${LIBCRYPT} /usr/local/v6/lib/libinet6.a
 .else
 CFLAGS+=-DHAVE_MD5_H
 .endif
