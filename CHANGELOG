@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1503 2001/01/23 13:19:36 itojun Exp $
+$KAME: CHANGELOG,v 1.1504 2001/01/23 13:58:25 jinmei Exp $
 
 <200101>
+2001-01-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtadvd/config.c (getconfig): made sure to zero-clear
+	manually configured prefix information structures.  Without this,
+	rtadvd would not work when you configure advertised prefixes
+	manually.  Please be sure to update.  This bug seemed to be
+	introduced on around 2000-11-11.
+
 Tue Jan 23 22:14:08 JST 2001  itojun@iijlab.net
 	* freebsd4: share sys/netinet6/ipsec.h.  sys/netinet6/ipsec6.h is gone.
 	  NOTE: "make TARGET=freebsd4 clean" is necessary on upgrade.
