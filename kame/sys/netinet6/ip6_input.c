@@ -337,7 +337,10 @@ ip6_input(m)
 	in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_receive);
 	ip6stat.ip6s_total++;
 
+#ifndef PULLDOWN_TEST
+	/* XXX is the line really necessary? */
 	IP6_EXTHDR_CHECK(m, 0, sizeof(struct ip6_hdr), /*nothing*/);
+#endif
 
 	if (m->m_len < sizeof(struct ip6_hdr)) {
 		struct ifnet *inifp;
@@ -588,6 +591,8 @@ ip6_input(m)
 	 */
 	plen = (u_int32_t)ntohs(ip6->ip6_plen);
 	if (ip6->ip6_nxt == IPPROTO_HOPOPTS) {
+		struct ip6_hbh *hbh;
+
 		if (ip6_hopopts_input(&plen, &rtalert, &m, &off)) {
 #if 0	/*touches NULL pointer*/
 			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_discard);
@@ -596,8 +601,18 @@ ip6_input(m)
 		}
 		/* adjust pointer */
 		ip6 = mtod(m, struct ip6_hdr *);
+#ifndef PULLDOWN_TEST
 		/* ip6_hopopts_input() ensures that mbuf is contiguous */
-		nxt = ((struct ip6_hbh *)(ip6 + 1))->ip6h_nxt;
+		hbh = (struct ip6_hbh *)(ip6 + 1);
+#else
+		IP6_EXTHDR_GET(hbh, struct ip6_hbh *, m, sizeof(struct ip6_hdr),
+			sizeof(struct ip6_hbh));
+		if (hbh == NULL) {
+			ip6stat.ip6s_tooshort++;
+			return;
+		}
+#endif
+		nxt = hbh->ip6h_nxt;
 
 		/*
 		 * accept the packet if a router alert option is included
@@ -709,12 +724,28 @@ ip6_hopopts_input(plenp, rtalertp, mp, offp)
 	u_int8_t *opt;
 
 	/* validation of the length of the header */
+#ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, sizeof(*hbh), -1);
 	hbh = (struct ip6_hbh *)(mtod(m, caddr_t) + off);
 	hbhlen = (hbh->ip6h_len + 1) << 3;
 
 	IP6_EXTHDR_CHECK(m, off, hbhlen, -1);
 	hbh = (struct ip6_hbh *)(mtod(m, caddr_t) + off);
+#else
+	IP6_EXTHDR_GET(hbh, struct ip6_hbh *, m,
+		sizeof(struct ip6_hdr), sizeof(struct ip6_hbh));
+	if (hbh == NULL) {
+		ip6stat.ip6s_tooshort++;
+		return -1;
+	}
+	hbhlen = (hbh->ip6h_len + 1) << 3;
+	IP6_EXTHDR_GET(hbh, struct ip6_hbh *, m, sizeof(struct ip6_hdr),
+		hbhlen);
+	if (hbh == NULL) {
+		ip6stat.ip6s_tooshort++;
+		return -1;
+	}
+#endif
 	off += hbhlen;
 	hbhlen -= sizeof(struct ip6_hbh);
 	opt = (u_int8_t *)hbh + sizeof(struct ip6_hbh);
@@ -888,7 +919,15 @@ ip6_unknown_opt(optp, m, off)
 }
 
 /*
- * Create the "control" list for this pcb
+ * Create the "control" list for this pcb.
+ *
+ * The routine will be called from upper layer handlers like tcp6_input().
+ * Thus the routine assumes that the caller (tcp6_input) have already
+ * called IP6_EXTHDR_CHECK() and all the extension headers are located in the
+ * very first mbuf on the mbuf chain.
+ * We may want to add some infinite loop prevention or sanity checks for safety.
+ * (This applies only when you are using KAME mbuf chain restriction, i.e.
+ * you are using IP6_EXTHDR_CHECK() not m_pulldown())
  */
 void
 ip6_savecontrol(in6p, mp, ip6, m)
@@ -994,8 +1033,27 @@ ip6_savecontrol(in6p, mp, ip6, m)
 		 */
 		struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 		if (ip6->ip6_nxt == IPPROTO_HOPOPTS) {
-			/* XXX sanity check? */
-			struct ip6_hbh *hbh = (struct ip6_hbh *)(ip6 + 1);
+			struct ip6_hbh *hbh;
+			int hbhlen;
+
+#ifndef PULLDOWN_TEST
+			hbh = (struct ip6_hbh *)(ip6 + 1);
+			hbhlen = (hbh->ip6h_len + 1) << 3;
+#else
+			IP6_EXTHDR_GET(hbh, struct ip6_hbh *, m,
+				sizeof(struct ip6_hdr), sizeof(struct ip6_hbh));
+			if (hbh == NULL) {
+				ip6stat.ip6s_tooshort++;
+				return;
+			}
+			hbhlen = (hbh->ip6h_len + 1) << 3;
+			IP6_EXTHDR_GET(hbh, struct ip6_hbh *, m,
+				sizeof(struct ip6_hdr), hbhlen);
+			if (hbh == NULL) {
+				ip6stat.ip6s_tooshort++;
+				return;
+			}
+#endif
 
 			/*
 			 * XXX: We copy whole the header even if a jumbo
@@ -1003,8 +1061,7 @@ ip6_savecontrol(in6p, mp, ip6, m)
 			 * be removed before returning in the RFC 2292.
 			 * But it's too painful operation...
 			 */
-			*mp = sbcreatecontrol((caddr_t)hbh,
-					      (hbh->ip6h_len + 1) << 3,
+			*mp = sbcreatecontrol((caddr_t)hbh, hbhlen,
 					      IPV6_HOPOPTS, IPPROTO_IPV6);
 			if (*mp)
 				mp = &(*mp)->m_next;
@@ -1027,16 +1084,29 @@ ip6_savecontrol(in6p, mp, ip6, m)
 			struct ip6_ext *ip6e;
 			int elen;
 
-			/* XXX more sanity checks? */
-			if (m->m_len < off + sizeof(struct ip6_ext))
-				break;
+#ifndef PULLDOWN_TEST
 			ip6e = (struct ip6_ext *)(mtod(m, caddr_t) + off);
 			if (nxt == IPPROTO_AH)
 				elen = (ip6e->ip6e_len + 2) << 2;
 			else
 				elen = (ip6e->ip6e_len + 1) << 3;
-			if (m->m_len < off + elen)
-				break;
+#else
+			IP6_EXTHDR_GET(ip6e, struct ip6_ext *, m, off,
+				sizeof(struct ip6_ext));
+			if (ip6e == NULL) {
+				ip6stat.ip6s_tooshort++;
+				return;
+			}
+			if (nxt == IPPROTO_AH)
+				elen = (ip6e->ip6e_len + 2) << 2;
+			else
+				elen = (ip6e->ip6e_len + 1) << 3;
+			IP6_EXTHDR_GET(ip6e, struct ip6_ext *, m, off, elen);
+			if (ip6e == NULL) {
+				ip6stat.ip6s_tooshort++;
+				return;
+			}
+#endif
 
 			switch(nxt) {
 		         case IPPROTO_DSTOPTS:
