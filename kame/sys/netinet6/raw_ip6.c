@@ -304,7 +304,8 @@ rip6_output(m, va_alist)
 	 *
 	 * XXX advanced-api value overrides sin6_scope_id 
 	 */
-	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst)) {
+	if (IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_dst) ||
+	    IN6_IS_ADDR_MC_LINKLOCAL(&ip6->ip6_dst)) {
 		struct in6_pktinfo *pi;
 
 		/*
@@ -318,9 +319,8 @@ rip6_output(m, va_alist)
 		else if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) &&
 			 in6p->in6p_moptions &&
 			 in6p->in6p_moptions->im6o_multicast_ifp) {
-			ip6->ip6_dst.s6_addr16[1] =
-				htons(in6p->in6p_moptions->im6o_multicast_ifp->if_index);
-			oifp = ifindex2ifnet[in6p->in6p_moptions->im6o_multicast_ifp->if_index];
+			oifp = in6p->in6p_moptions->im6o_multicast_ifp;
+			ip6->ip6_dst.s6_addr16[1] = htons(oifp->if_index);
 		} else if (dstsock->sin6_scope_id) {
 			/* boundary check */
 			if (dstsock->sin6_scope_id < 0 
