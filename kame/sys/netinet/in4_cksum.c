@@ -67,11 +67,12 @@
 #include <sys/param.h>
 #include <sys/mbuf.h>
 #include <sys/systm.h>
+#include <sys/socket.h>
+#include <net/route.h>
 #include <netinet/in.h>
-#include <netinet/ip_var.h>
-
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
+#include <netinet/ip_var.h>
 
 /*
  * Checksum routine for Internet Protocol family headers (Portable Version).
