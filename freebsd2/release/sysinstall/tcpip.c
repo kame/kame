@@ -39,6 +39,8 @@
 
 #include "sysinstall.h"
 #include <sys/param.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 
 /* The help file for the TCP/IP setup screen */
 #define TCP_HELPFILE		"tcp"
@@ -46,7 +48,7 @@
 /* These are nasty, but they make the layout structure a lot easier ... */
 
 static char	hostname[HOSTNAME_FIELD_LEN], domainname[HOSTNAME_FIELD_LEN],
-		gateway[IPADDR_FIELD_LEN], nameserver[IPADDR_FIELD_LEN];
+		gateway[IPADDR_FIELD_LEN], nameserver[IPV6ADDR_FIELD_LEN];
 static int	okbutton, cancelbutton;
 static char	ipaddr[IPADDR_FIELD_LEN], netmask[IPADDR_FIELD_LEN], extras[EXTRAS_FIELD_LEN];
 
@@ -101,6 +103,36 @@ static Layout layout[] = {
     { NULL },
 };
 
+static Layout layout6[] = {
+#define LAYOUT6_HOSTNAME		0
+    { 1, 2, 25, HOSTNAME_FIELD_LEN - 1,
+      "Host:", "Your fully-qualified hostname, e.g. foo.bar.com",
+      hostname, STRINGOBJ, NULL },
+#define LAYOUT6_DOMAINNAME	1
+    { 1, 35, 20, HOSTNAME_FIELD_LEN - 1,
+      "Domain:",
+      "The name of the domain that your machine is in, e.g. bar.com",
+      domainname, STRINGOBJ, NULL },
+#define LAYOUT6_NAMESERVER	2
+    { 5, 2, 48, IPV6ADDR_FIELD_LEN - 1,
+      "Name server:", "IPv6 address of your local DNS server",
+      nameserver, STRINGOBJ, NULL },
+#define LAYOUT6_EXTRAS		3
+    { 10, 10, 43, HOSTNAME_FIELD_LEN - 1,
+      "Extra options to ifconfig:",
+      "Any interface-specific options to ifconfig you would like to add",
+      extras, STRINGOBJ, NULL },
+#define LAYOUT6_OKBUTTON	4
+    { 15, 15, 0, 0,
+      "OK", "Select this if you are happy with these settings",
+      &okbutton, BUTTONOBJ, NULL },
+#define LAYOUT6_CANCELBUTTON	5
+    { 15, 35, 0, 0,
+      "CANCEL", "Select this if you wish to cancel this screen",
+      &cancelbutton, BUTTONOBJ, NULL },
+    { NULL },
+};
+
 #define _validByte(b) ((b) >= 0 && (b) <= 255)
 
 /* whine */
@@ -120,6 +152,15 @@ verifyIP(char *ip)
     if (ip && sscanf(ip, "%d.%d.%d.%d", &a, &b, &c, &d) == 4 &&
 	_validByte(a) && _validByte(b) && _validByte(c) &&
 	_validByte(d) && (d != 255))
+	return 1;
+    else
+	return 0;
+}
+
+static int
+verifyIPv6(char *ip6)
+{
+    if (ip6 && index(ip6, ':') != NULL)
 	return 1;
     else
 	return 0;
@@ -147,7 +188,7 @@ verifySettings(void)
 
 /* This is it - how to get TCP setup values */
 int
-tcpOpenDialog(Device *devp)
+tcpOpenDialog4(Device *devp)
 {
     WINDOW              *ds_win, *save = NULL;
     ComposeObj          *obj = NULL;
@@ -317,6 +358,190 @@ netconfig:
     else
 	ret = DITEM_FAILURE;
     restorescr(save);
+    return ret;
+}
+
+static int
+verifySettings6(void)
+{
+    if (!hostname[0])
+	feepout("Must specify a host name of some sort!");
+    else if (nameserver[0] && !verifyIPv6(nameserver))
+	feepout("Invalid name server IPv6 address specified");
+    else
+	return 1;
+    return 0;
+}
+
+int
+tcpOpenDialog6(Device *devp)
+{
+    WINDOW              *ds_win, *save = NULL;
+    ComposeObj          *obj = NULL;
+    int                 n = 0, cancel = FALSE;
+    int			max, ret = DITEM_SUCCESS;
+    char                *tmp;
+    char		title[80];
+
+    /* Initialise vars from previous device values */
+    if (devp->private) {
+	DevInfo *di = (DevInfo *)devp->private;
+
+	SAFE_STRCPY(extras, di->extras);
+    }
+    else { /* See if there are any defaults */
+	char *cp;
+
+	if (!extras[0]) {
+	    if ((cp = variable_get(VAR_EXTRAS)) != NULL)
+		SAFE_STRCPY(extras, cp);
+	    else if ((cp = variable_get(string_concat3(devp->name, "_", VAR_EXTRAS))) != NULL)
+		SAFE_STRCPY(extras, cp);
+	}
+    }
+
+    /* Look up values already recorded with the system, or blank the string variables ready to accept some new data */
+    tmp = variable_get(VAR_HOSTNAME);
+    if (tmp)
+	SAFE_STRCPY(hostname, tmp);
+    else
+	bzero(hostname, sizeof(hostname));
+    tmp = variable_get(VAR_DOMAINNAME);
+    if (tmp)
+	SAFE_STRCPY(domainname, tmp);
+    else
+	bzero(domainname, sizeof(domainname));
+    tmp = variable_get(VAR_NAMESERVER);
+    if (tmp)
+	SAFE_STRCPY(nameserver, tmp);
+    else
+	bzero(nameserver, sizeof(nameserver));
+
+    save = savescr();
+    /* If non-interactive, jump straight over the dialog crap and into config section */
+    if (variable_get(VAR_NONINTERACTIVE) &&
+	!variable_get(VAR_NETINTERACTIVE)) {
+	if (!hostname[0])
+	    msgConfirm("WARNING: hostname variable not set and is a non-optional\n"
+		       "parameter.  Please add this to your installation script\n"
+		       "or set the netInteractive variable (see sysinstall man page)");
+	else
+	    goto netconfig;
+    }
+
+    /* Now do all the screen I/O */
+    dialog_clear_norefresh();
+
+    /* We need a curses window */
+    if (!(ds_win = openLayoutDialog(TCP_HELPFILE, " Network Configuration ",
+				    TCP_DIALOG_X, TCP_DIALOG_Y, TCP_DIALOG_WIDTH, TCP_DIALOG_HEIGHT))) {
+	beep();
+	msgConfirm("Cannot open TCP/IP dialog window!!");
+	restorescr(save);
+	return DITEM_FAILURE;
+    }
+
+    /* Draw interface configuration box */
+    draw_box(ds_win, TCP_DIALOG_Y + 9, TCP_DIALOG_X + 8, TCP_DIALOG_HEIGHT - 17, TCP_DIALOG_WIDTH - 17,
+	     dialog_attr, border_attr);
+    wattrset(ds_win, dialog_attr);
+    sprintf(title, " Configuration for Interface %s ", devp->name);
+    mvwaddstr(ds_win, TCP_DIALOG_Y + 9, TCP_DIALOG_X + 14, title);
+
+    /* Some more initialisation before we go into the main input loop */
+    obj = initLayoutDialog(ds_win, layout6, TCP_DIALOG_X, TCP_DIALOG_Y, &max);
+
+reenter:
+    cancelbutton = okbutton = 0;
+    while (layoutDialogLoop(ds_win, layout6, &obj, &n, max, &cancelbutton, &cancel)) {
+	if (!index(hostname, '.') && domainname[0]) {
+	    strcat(hostname, ".");
+	    strcat(hostname, domainname);
+	    RefreshStringObj(layout6[LAYOUT6_HOSTNAME].obj);
+	}
+	else if (((tmp = index(hostname, '.')) != NULL) && !domainname[0]) {
+	    SAFE_STRCPY(domainname, tmp + 1);
+	    RefreshStringObj(layout6[LAYOUT6_DOMAINNAME].obj);
+	}
+    }
+    
+    if (!cancel && !verifySettings6())
+	goto reenter;
+
+    /* Clear this crap off the screen */
+    delwin(ds_win);
+    dialog_clear_norefresh();
+    use_helpfile(NULL);
+
+    /* We actually need to inform the rest of sysinstall about this
+       data now if the user hasn't selected cancel.  Save the stuff
+       out to the environment via the variable_set() mechanism */
+
+netconfig:
+    if (!cancel) {
+	DevInfo *di;
+	char ifn[255];
+
+	variable_set2(VAR_HOSTNAME, hostname);
+	sethostname(hostname, strlen(hostname));
+	if (domainname[0])
+	    variable_set2(VAR_DOMAINNAME, domainname);
+	if (nameserver[0])
+	    variable_set2(VAR_NAMESERVER, nameserver);
+
+	if (!devp->private)
+	    devp->private = (DevInfo *)safe_malloc(sizeof(DevInfo));
+	di = devp->private;
+	SAFE_STRCPY(di->extras, extras);
+
+	sprintf(ifn, "%s%s", VAR_RTSOL, devp->name);
+	variable_set2(ifn, "YES");
+	configResolv(NULL);	/* XXX this will do it on the MFS copy XXX */
+	ret = DITEM_SUCCESS;
+    }
+    else
+	ret = DITEM_FAILURE;
+    restorescr(save);
+    return ret;
+}
+
+
+static int ProtocolFamily;
+
+DMenu MenuProtocolFamily = {
+    DMENU_NORMAL_TYPE | DMENU_SELECTION_RETURNS,
+    "Select protocol family",
+    "Please select the protocol family which should be used.",
+    NULL,
+    NULL,
+    { { "INET ", "Internet Protocol", NULL, dmenuSetValue, NULL,
+	&ProtocolFamily, 0, 0, 0, PF_INET },
+      { "INET6", "Internet Protocol version 6", NULL, dmenuSetValue, NULL,
+	&ProtocolFamily, 0, 0, 0, PF_INET6 },
+      { NULL } },
+};
+
+int
+tcpOpenDialog(Device *devp)
+{
+    int ret = DITEM_FAILURE;
+
+    ProtocolFamily = 0;
+    if (!dmenuOpenSimple(&MenuProtocolFamily, FALSE))
+	return DITEM_FAILURE;
+
+    switch (ProtocolFamily) {
+    case PF_INET:
+	ret = tcpOpenDialog4(devp);
+	break;
+    case PF_INET6:
+	ret = tcpOpenDialog6(devp);
+	break;
+    default:
+	ret = DITEM_FAILURE;
+	break;
+    }
+
     return ret;
 }
 

@@ -35,6 +35,7 @@
  */
 
 #include "sysinstall.h"
+#include "kame_version.h"
 #include <sys/time.h>
 #include <signal.h>
 
@@ -44,6 +45,7 @@ unsigned int SrcDists;
 unsigned int XF86Dists;
 unsigned int XF86ServerDists;
 unsigned int XF86FontDists;
+unsigned int KAMEDists;
 
 typedef struct _dist {
     char *my_name;
@@ -177,6 +179,17 @@ static Distribution XF86FontDistTable[] = {
 { NULL },
 };
 
+/* The KAME distribution */
+static Distribution KameDistTable[] = {
+{ KAME_RELEASE_NAME,	"/usr/src",	&KAMEDists,	DIST_KAME_SRC,		NULL		},
+#define KAME_DIST_TABLE_SRC 0
+{ KAME_BINARY_NAME,	"/usr/local",	&KAMEDists,	DIST_KAME_BIN,		NULL		},
+{ KAME_KERNEL_NAME,	"/",		&KAMEDists,	DIST_KAME_KERN,		NULL		},
+{ PAO_BINARY_NAME,	"/",		&KAMEDists,	DIST_PAO_BIN,		NULL		},
+{ NULL },
+};
+
+
 static int	distMaybeSetDES(dialogMenuItem *self);
 static int	distMaybeSetPorts(dialogMenuItem *self);
 
@@ -292,6 +305,12 @@ distSetUser(dialogMenuItem *self)
 
     distReset(NULL);
     Dists = _DIST_USER;
+#ifdef PCCARD
+    if (pccard_mode) {
+	Dists |= DIST_SRC;
+	SrcDists = DIST_SRC_SYS;
+    }
+#endif
     i = distMaybeSetDES(self) | distMaybeSetPorts(self);
     distVerifyFlags();
     return i;
@@ -304,6 +323,12 @@ distSetXUser(dialogMenuItem *self)
 
     i = distSetUser(self);
     Dists |= DIST_XF86;
+#ifdef PCCARD
+    if (pccard_mode) {
+	Dists |= DIST_SRC;
+	SrcDists = DIST_SRC_SYS;
+    }
+#endif
     XF86ServerDists = DIST_XF86_SERVER_SVGA | DIST_XF86_SERVER_VGA16;
     XF86Dists = DIST_XF86_BIN | DIST_XF86_SET | DIST_XF86_CFG | DIST_XF86_LIB | DIST_XF86_MAN | DIST_XF86_SERVER | DIST_XF86_FONTS;
     XF86FontDists = DIST_XF86_FONTS_MISC;
@@ -803,4 +828,44 @@ distExtractAll(dialogMenuItem *self)
 	status |= DITEM_RESTORE;
     }
     return status;
+}
+
+int
+distExtractKame(dialogMenuItem *self)
+{
+    char buf[512];
+    char *cp;
+
+    /* paranoia */
+    if (!KAMEDists) {
+	if (!dmenuOpenSimple(&MenuKameDistributions, FALSE) || !KAMEDists)
+	    return DITEM_FAILURE | DITEM_RESTORE;
+    }
+
+    cp = variable_get(VAR_KAME_RELNAME);
+    if (cp)
+	KameDistTable[KAME_DIST_TABLE_SRC].my_name = cp;
+
+    if (!mediaVerify() || !mediaDevice->init(mediaDevice))
+	return DITEM_FAILURE;
+
+    dialog_clear_norefresh();
+    msgNotify("Attempting to install all selected distributions..");
+    distExtract("snap", KameDistTable);
+    if (KAMEDists)
+ 	distExtract("stable", KameDistTable);
+     if (KAMEDists)
+ 	distExtract("release", KameDistTable);
+
+    if (KAMEDists) {
+	int col = 0;
+
+	buf[0] = '\0';
+	printSelected(buf, KAMEDists, KameDistTable, &col);
+	dialog_clear_norefresh();
+	msgConfirm("Couldn't extract the following distributions.  This may\n"
+		   "be because they were not available on the installation\n"
+		   "media you've chosen:\n\n\t%s", buf);
+    }
+    return DITEM_SUCCESS | DITEM_RESTORE;
 }

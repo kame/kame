@@ -1,0 +1,39 @@
+# If your laptop have not had Windoze95-Ready BIOS, please update it.
+# Such old BIOS'es sometimes have critical bugs at 32-bit protected
+# mode APM BIOS interface (which have not used by Windoze 3.1).
+
+# PC-card suspend/resume support (experimental)
+options         APM_PCCARD_RESUME
+options         PCIC_RESUME_RESET
+
+# Keep power for serial cards when the system suspends
+# (If your machine hangs up when you try to suspend the system with
+#  FAX/Modem PCMCIA card, uncomment this option).
+#options        SIO_SUSP_KEEP_PWR       
+
+# Detach SCSI devices when the SCSI card is removed
+options         SCSI_DETACH
+
+# Detach ATAPI devices when the ATA card is removed
+options         ATAPI_DETACH
+
+# Japanese version of WaveLAN PCMCIA uses 2.4GHz band instead of 915MHz
+# band that US version uses.  If you want to use Japanese version of
+# WaveLAN, uncomment this line, or edit the corresponding config entry
+# of /etc/pccard.conf.
+#options        "WAVELAN_PCMCIA_24"
+
+# Suspend the system when the battery status is "Low"
+#options        "APM_BATT_LOW_SUSPEND"
+
+# If you want to use NTP on laptop machines, uncomment the following 
+# option.  Current APM implementation affects NTP client.
+#options        "APM_NO_CLOCK_ADJUST"
+
+# For Win98 BIOS of ThinkPad options
+#options        "APM_TP_WIN98BIOS"
+
+# Some X-servers cannot survive suspend/resume on laptop.
+# This option kicks her when the system is resumed from suspended mode.
+#options        SYSCONS_VTY_RESUME
+

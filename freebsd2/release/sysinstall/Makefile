@@ -7,6 +7,15 @@ NOSHARED=YES
 CLEANFILES+=	makedevs.c rtermcap rtermcap.tmp dumpnlist
 CLEANFILES+=	keymap.tmp keymap.h
 
+.if exists(${.CURDIR}/config.mk)
+.include "${.CURDIR}/config.mk"
+.else
+.if exists(/usr/src/kit/release/sysinstall/config.mk)
+.include "/usr/src/kit/release/sysinstall/config.mk"
+.endif
+.endif
+
+
 .PATH: ${.CURDIR}/../disklabel ${.CURDIR}/../../usr.bin/cksum
 
 SRCS=	anonFTP.c attr.c cdrom.c command.c config.c devices.c \
@@ -16,14 +25,21 @@ SRCS=	anonFTP.c attr.c cdrom.c command.c config.c devices.c \
 	msg.c network.c nfs.c options.c package.c register.c system.c \
 	tape.c tcpip.c termcap.c ufs.c user.c variable.c wizard.c \
 	uc_eisa.c uc_isa.c uc_kmem.c uc_list.c uc_main.c uc_pci.c \
-	uc_scsi.c keymap.h
+	uc_scsi.c keymap.h pccard.c
 
-CFLAGS+= -Wall -I${.CURDIR}/../../gnu/lib/libdialog -I${.OBJDIR}
-CFLAGS+= -I${.CURDIR}/../../sys
+.if defined(PCCARD)
+CFLAGS+= -DPCCARD
+SRCS+= pccard.c
+.endif
+
+CFLAGS+= -g -Wall -I/usr/src/gnu/lib/libdialog -I${.OBJDIR}
+CFLAGS+= -I${.CURDIR}/../../../sys
 CFLAGS+= -DUC_PRIVATE -DKERN_NO_SYMBOLS -DSAVE_USERCONFIG	# -DDO_SCSI
+CFLAGS+= -I/sys
 
 DPADD=	${LIBDIALOG} ${LIBNCURSES} ${LIBMYTINFO} ${LIBUTIL} ${LIBDISK} ${LIBFTPIO}
-LDADD=	-ldialog -lncurses -lmytinfo -lutil -ldisk -lftpio
+LDADD=	-ldialog -lncurses -lmytinfo -lutil -ldisk -L/usr/local/v6/lib -lftpio -linet6
+
 
 makedevs.c:	Makefile rtermcap keymap.h
 	rm -f makedevs.tmp

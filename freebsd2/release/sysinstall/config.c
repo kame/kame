@@ -440,6 +440,10 @@ configRC_conf(char *config)
 	free(lines[i]);
     }
     fclose(fp);
+	if (!Fake) {
+		fclose(fp);
+	}
+	sync();
 }
 
 int
@@ -478,8 +482,7 @@ configNTP(dialogMenuItem *self)
 
 	snprintf(tmp, sizeof(tmp), "ntpdate_enable=YES,ntpdate_flags=%s",
 		 variable_get(VAR_NTPDATE_FLAGS));
-	self->data = tmp;
-	dmenuSetVariables(self);
+	self->aux = (int)tmp;
     }
     return status | DITEM_RESTORE;
 }

@@ -110,4 +110,10 @@
 #define DIST_XF86_FONTS_ALL		0x003F
 #define DIST_XF86_ALL		0x1FFFF
 
+/* Subtypes for KAME distribution */
+#define DIST_KAME_KERN		0x0001
+#define DIST_KAME_BIN		0x0002
+#define DIST_KAME_SRC		0x0004
+#define DIST_PAO_BIN		0x0008
+
 #endif	/* _DIST_H_INCLUDE */

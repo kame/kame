@@ -1,0 +1,47 @@
+#!/bin/sh -
+#
+# PC-card startup script
+# HOSOKAWA, Tatsumi <hosokawa@jp.FreeBSD.org>
+#
+
+echo 'Initial rc.pccard configuration:'
+
+if [ "x$pccardc" != "x" ] ; then
+	if [ ! -x $pccardc ] ; then
+		pccardc=/usr/sbin/pccardc
+	fi
+else
+	pccardc=/usr/sbin/pccardc
+fi
+
+if [ "x$pccardd" != "x" ] ; then
+	if [ ! -x $pccardd ] ; then
+		pccardd=/usr/sbin/pccardd
+	fi
+else
+	pccardd=/usr/sbin/pccardd
+fi
+
+if [ "x$pccard_enable" != "xNO" ] ; then
+	if [ "x$pccard_mem" != "xDEFAULT" ] ; then
+		echo " pcic-memory=$pccard_mem"
+		$pccardc pccardmem $pccard_mem
+	else
+		echo " pcic-memory=0xd0000"
+		$pccardc pccardmem 0xd0000
+	fi
+
+	if [ "x$pccardd_flags" = "xNO" ] ; then
+		pccardd_flags=""
+	fi
+
+	echo " execute pccardd" 
+	$pccardd $pccardd_flags &
+fi
+
+if [ "x$pccard_beep" != "xNO" ] ; then
+	echo " pccard-beep=$pccard_beep" 
+	$pccardc beep $pccard_beep
+fi
+
+echo '.'

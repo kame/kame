@@ -103,6 +103,8 @@ mediaCheck(Option opt)
 #define TIMEOUT_PROMPT	"Please specify the number of seconds to wait for slow media:"
 #define GATED_PKG_PROMPT "Please specify the package name for the gated software:"
 #define PCNFSD_PKG_PROMPT "Please specify the package name for the PCNFSD server:"
+#define FAITH_PROMPT	"Please specify the IPv6 prefix for the FAITH:"
+#define KAME_PROMPT	"Please specify the release of KAME kit:"
 
 static Option Options[] = {
 { "NFS Secure",		"NFS server talks only on a secure port",
@@ -117,6 +119,8 @@ static Option Options[] = {
       OPT_IS_VAR,	NULL,			VAR_NO_CONFIRM,		varCheck	},
 { "FTP username",	"Username and password to use instead of anonymous",
       OPT_IS_FUNC,	mediaSetFTPUserPass,	VAR_FTP_USER,		varCheck	},
+{ "FAITH prefix",	"IPv6 address translation prefix",
+      OPT_IS_VAR,	FAITH_PROMPT,		VAR_FAITH,		varCheck	},
 { "Editor",		"Which text editor to use during installation",
       OPT_IS_VAR,	EDITOR_PROMPT,		VAR_EDITOR,		varCheck	},
 { "Tape Blocksize",	"Tape media block size in 512 byte blocks",
@@ -125,6 +129,8 @@ static Option Options[] = {
       OPT_IS_FUNC,	mediaSetCPIOVerbosity,	VAR_CPIO_VERBOSITY,	varCheck	},
 { "Release Name",	"Which release to attempt to load from installation media",
       OPT_IS_VAR,	RELNAME_PROMPT,		VAR_RELNAME,		varCheck	},
+{ "KAME Kit",		"Which release to attempt to load from installation media",
+      OPT_IS_VAR,	KAME_PROMPT,		VAR_KAME_RELNAME,		varCheck	},
 { "Install Root",	"Which directory to unpack distributions or packages relative to",
       OPT_IS_VAR,	INSTROOT_PROMPT,	VAR_INSTALL_ROOT,	varCheck	},
 { "Browser package",	"This is the browser package that will be used for viewing HTML docs",

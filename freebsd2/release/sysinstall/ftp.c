@@ -93,9 +93,9 @@ mediaInitFTP(Device *dev)
 	return FALSE;
 
 try:
-    cp = variable_get(VAR_FTP_PATH);
+    cp = variable_get(FetchKameKit ? VAR_KAME_FTP_PATH : VAR_FTP_PATH);
     if (!cp) {
-	if (DITEM_STATUS(mediaSetFTP(NULL)) == DITEM_FAILURE || (cp = variable_get(VAR_FTP_PATH)) == NULL) {
+	if (DITEM_STATUS(mediaSetFTP(NULL)) == DITEM_FAILURE || (cp = variable_get(FetchKameKit ? VAR_KAME_FTP_PATH : VAR_FTP_PATH)) == NULL) {
 	    msgConfirm("Unable to get proper FTP path.  FTP media not initialized.");
 	    netDown(dev);
 	    return FALSE;
@@ -146,7 +146,7 @@ try:
     /* Give it a shot - can't hurt to try and zoom in if we can, unless the release is set to
        __RELEASE or "none" which signifies that it's not set */
     rel = variable_get(VAR_RELNAME);
-    if (strcmp(rel, "__RELEASE") && strcmp(rel, "none"))
+    if (strcmp(rel, "__RELEASE") && strcmp(rel, "none") && !FetchKameKit)
 	i = ftpChdir(OpenConn, rel);
     else
 	i = 0;
@@ -158,7 +158,7 @@ try:
 		      "available on %s (or set to \"none\").\n\n"
 		      "Would you like to select another FTP server?",
 		      rel, hostname)) {
-	    variable_unset(VAR_FTP_PATH);
+	    variable_unset(FetchKameKit ? VAR_KAME_FTP_PATH : VAR_FTP_PATH);
 	    if (DITEM_STATUS(mediaSetFTP(NULL)) == DITEM_FAILURE)
 		goto punt;
 	    else
@@ -179,7 +179,7 @@ punt:
 	OpenConn = NULL;
     }
     netDown(dev);
-    variable_unset(VAR_FTP_PATH);
+    variable_unset(FetchKameKit ? VAR_KAME_FTP_PATH : VAR_FTP_PATH);
     return FALSE;
 }
 
@@ -202,7 +202,7 @@ mediaGetFTP(Device *dev, char *file, Boolean probe)
 	/* If a hard fail, try to "bounce" the ftp server to clear it */
 	if (ftperr != 550) {
 	    if (ftperr != 421)	/* Timeout? */
-		variable_unset(VAR_FTP_PATH);
+		variable_unset(FetchKameKit ? VAR_KAME_FTP_PATH : VAR_FTP_PATH);
 	    /* If we can't re-initialize, just forget it */
 	    dev->shutdown(dev);
 	    if (!dev->init(dev)) {
@@ -211,12 +211,25 @@ mediaGetFTP(Device *dev, char *file, Boolean probe)
 		    fclose(OpenConn);
 		    OpenConn = NULL;
 		}
-		variable_unset(VAR_FTP_PATH);
+		variable_unset(FetchKameKit ? VAR_KAME_FTP_PATH : VAR_FTP_PATH);
 		return NULL;
 	    }
 	}
 	else if (probe)
 	    return NULL;
+	else if (FetchKameKit) {
+	    /* Try some alternatives */
+	    switch (nretries++) {
+	    case 1:
+		sprintf(buf, "kame/%s", file);
+		try = buf;
+		break;
+
+	    case 2:
+		try = file;
+		break;
+	    }
+	}
 	else {
 	    /* Try some alternatives */
 	    switch (nretries++) {

@@ -160,6 +160,10 @@
 #define VAR_USR_SIZE			"usrSize"
 #define VAR_VAR_SIZE			"varSize"
 #define VAR_XF86_CONFIG			"xf86config"
+#define VAR_FAITH			"GAI"
+#define VAR_RTSOL			"rtsol"
+#define VAR_KAME_RELNAME		"kameReleaseName"
+#define VAR_KAME_FTP_PATH		"kameFtp"
 
 #define DEFAULT_TAPE_BLOCKSIZE	"20"
 
@@ -317,6 +321,7 @@ typedef int (*commandFunc)(char *key, void *data);
 
 #define HOSTNAME_FIELD_LEN	128
 #define IPADDR_FIELD_LEN	16
+#define IPV6ADDR_FIELD_LEN	INET6_ADDRSTRLEN
 #define EXTRAS_FIELD_LEN	128
 
 /* This is the structure that Network devices carry around in their private, erm, structures */
@@ -388,6 +393,19 @@ extern DMenu		MenuHTMLDoc;		/* HTML Documentation menu			*/
 extern DMenu		MenuUsermgmt;		/* User management menu				*/
 extern DMenu		MenuFixit;		/* Fixit floppy/CDROM/shell menu		*/
 extern DMenu		MenuXF86Config;		/* Select XFree86 configuration type		*/
+
+#ifdef PCCARD
+extern DMenu MenuPCICMem;
+extern DMenu MenuCardIRQ;
+extern DMenu MenuPCCardSysconfig;
+#endif
+
+extern Boolean		FetchKameKit;
+extern DMenu		MenuKameInitial;
+extern DMenu		MenuKameDistributions;
+extern DMenu		MenuKame;
+extern DMenu		MenuKameFTP;
+extern unsigned int	KAMEDists;
 
 /* Stuff from libdialog which isn't properly declared outside */
 extern void display_helpfile(void);
@@ -482,6 +500,7 @@ extern int	distSetDES(dialogMenuItem *self);
 extern int	distSetSrc(dialogMenuItem *self);
 extern int	distSetXF86(dialogMenuItem *self);
 extern int	distExtractAll(dialogMenuItem *self);
+extern int	distExtractKame(dialogMenuItem *self);
 
 /* dmenu.c */
 extern int	dmenuDisplayFile(dialogMenuItem *tmp);
@@ -553,6 +572,8 @@ extern int	installFilesystems(dialogMenuItem *self);
 extern int	installVarDefaults(dialogMenuItem *self);
 extern void	installEnvironment(void);
 extern Boolean	copySelf(void);
+extern int	installKameCommit(dialogMenuItem *self);
+extern int	installKameKit(dialogMenuItem *self);
 
 /* keymap.c */
 extern int	loadKeymap(const char *lang);
@@ -672,6 +693,13 @@ extern Boolean	package_exists(char *name);
 
 /* register.c */
 extern int	registerOpenDialog(void);
+#ifdef PCCARD
+/* pccard.c */
+extern int	pccard_mode;
+extern void	pccardInitialize(void);
+extern void	cleanPCcardSockets(void);
+extern int	configPCcard(dialogMenuItem *self);
+#endif
 
 /* system.c */
 extern void	systemInitialize(int argc, char **argv);

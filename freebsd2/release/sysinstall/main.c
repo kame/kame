@@ -62,6 +62,10 @@ main(int argc, char **argv)
 	return 1;
     }
 
+    if (argc > 1 && !strcmp(argv[1], "-fake")) {
+	Fake = TRUE;
+    }
+
     /* Set up whatever things need setting up */
     systemInitialize(argc, argv);
 
@@ -73,7 +77,6 @@ main(int argc, char **argv)
 
     if (argc > 1 && !strcmp(argv[1], "-fake")) {
 	variable_set2(VAR_DEBUG, "YES");
-	Fake = TRUE;
 	msgConfirm("I'll be just faking it from here on out, OK?");
     }
 
@@ -85,6 +88,11 @@ main(int argc, char **argv)
     /* Move stderr aside */
     if (DebugFD)
 	dup2(DebugFD, 2);
+
+#ifdef PCCARD
+    /* Initialize PC-card */
+    pccardInitialize();
+#endif
 
     /* Probe for all relevant devices on the system */
     deviceGetAll();

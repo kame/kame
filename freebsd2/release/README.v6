@@ -1,0 +1,78 @@
+$Id: README.v6,v 1.1 1999/09/13 08:49:55 itojun Exp $
+
+	(1) Checkout the kame-tree 
+	(2) make target
+	(3) install include files
+	(4) extracting PAO package
+	(5) apply /usr/src/PAO/sys-pao.diff
+	(6) update include files
+	(7) makeing the KAME userland tools
+	(8) makeing /usr/obj directory
+	(9) makeing /R directory
+	(10) makeing boot.flp and fixit.flp
+
+	require sources:
+		sbase, sbin, scontrib, setc, sgnu, ssbin, sshare,
+		ssys, subin, susbin
+
+(1) Checkout the kame-tree 
+# cd $somewhere (replace $somewhere with your working directory)
+	Default of "$somewhere" is /usr/src.
+	If you checkout the kame-tree in other place, must change $KAMETREE in Makefile.
+# cvs -d :pserver:anoncvs@cvs.kame.net:/cvsroot/kame login
+     Password is "anoncvs" (doublequote is not the part of password).
+# cvs -d :pserver:anoncvs@cvs.kame.net:/cvsroot/kame co -P kame/Makefile
+# cd kame
+# make TARGET=freebsd2 tree
+
+(2) make target
+# ln -s $somewhere/kame/freebsd2/sys /usr/src/sys
+# cd $somewhere/kame
+# make TARGET=freebsd2 prepare  
+
+(3) install include files
+# cd $somewhere/kame/freebsd2
+# make includes
+# make install-includes
+
+(4) extracting PAO package in /usr/src directory
+# cd $somewhere (replace $somewhere with your working directory)
+	Default of "$somewhere" is /usr/src.
+	If you extract PAO-archive in other place, must change $PAOTREE in Makefile.
+# gzip -c -d PAO-19990405.tgz | tar -xvf -
+# ln -s PAO-19990405 PAO
+
+(5) apply $somewhere/PAO/release/sys-pao.diff
+# cd /usr/src/sys
+# patch -p2 < $somewhere/PAO/release/sys-pao.diff
+
+(6) update include files
+# cd /usr/src/sys/i386/include
+# cp apm_bios.h if_cnwioctl.h clock.h cpu.h scc.h wavelan.h /usr/include/machine
+# cp /usr/src/sys/pccard/*.h /usr/include/pccard
+
+(7) makeing the userland tools
+# cd $somewhere/kame/freebsd2
+# make
+# make install
+
+(8) makeing /usr/obj directory
+# cd /usr/src/bin ; make obj
+# cd /usr/src/usr.bin ; make obj
+# cd /usr/src/usr.sbin ; make obj
+# cd /usr/src/sbin ; make obj
+# cd /usr/src/gnu/usr.bin ; make obj
+# cd /usr/src/release ; make obj
+
+
+(9) makeing /R directory
+# cd /usr/src/release ; make release.1
+# cd /usr/src/etc ; make distribute DISTDIR=/R/stage/trees
+# cd /usr/src/sys/i386/boot ; make ; make distribute DISTDIR=/R/stage/trees
+# cd /usr/src/share/misc ; make distribute DISTDIR=/R/stage/trees
+
+
+(10) makeing boot.flp and fixit.flp
+# cd /usr/src/release
+# cp BOOTFLP_PAO.v6 /usr/src/sys/i386/conf/BOOTFLP_PAO
+# make boot.flp 

@@ -53,7 +53,7 @@ mediaInitNetwork(Device *dev)
 {
     int i;
     char *rp;
-    char *cp, ifconfig[255];
+    char *cp, *cp2, ifconfig[255], rtsol[255];
 
     if (!RunningAsInit || networkInitialized)
 	return TRUE;
@@ -118,10 +118,29 @@ mediaInitNetwork(Device *dev)
 
     snprintf(ifconfig, 255, "%s%s", VAR_IFCONFIG, dev->name);
     cp = variable_get(ifconfig);
-    if (!cp) {
+    snprintf(rtsol, 255, "%s%s", VAR_RTSOL, dev->name);
+    cp2 = variable_get(rtsol);
+    if (!cp && !cp2) {
 	msgConfirm("The %s device is not configured.  You will need to do so\n"
 		   "in the Networking configuration menu before proceeding.", dev->name);
 	return FALSE;
+    }
+    if (cp2) {
+	vsystem("sysctl -w net.inet6.ip6.accept_rtadv=1");
+	vsystem("ifconfig %s up", dev->name);
+	vsystem("ifconfig %s", dev->name);
+	sleep(5);
+	msgNotify("rtsol -d %s", dev->name);
+	i = vsystem("rtsol -d %s", dev->name);
+	sleep(5);
+	if (i) {
+	    msgConfirm("Unable to configure the %s interface!\n"
+		       "This installation method cannot be used.", dev->name);
+	    return FALSE;
+	}
+	vsystem("ifconfig %s", dev->name);
+	if (!cp)
+	    goto success;
     }
     msgNotify("ifconfig %s %s", dev->name, cp);
     i = vsystem("ifconfig %s %s", dev->name, cp);
@@ -140,6 +159,7 @@ mediaInitNetwork(Device *dev)
 	msgNotify("Adding default route to %s.", rp);
 	vsystem("route -n add default %s", rp);
     }
+ success:
     if (isDebug())
 	msgDebug("Network initialized successfully.\n");
     networkInitialized = TRUE;
@@ -254,7 +274,6 @@ startPPP(Device *devp)
     fprintf(fp, " set device %s\n", devp->devname);
     fprintf(fp, " set ifaddr %s %s\n", myaddr, provider);
     fprintf(fp, " set timeout 0\n");
-    fprintf(fp, " enable dns\n");
     fprintf(fp, " set log local phase\n");
     fclose(fp);
 

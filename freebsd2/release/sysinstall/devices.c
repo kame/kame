@@ -96,7 +96,8 @@ static struct _devname {
     { DEVICE_TYPE_NETWORK,	"ix",		"Intel Etherexpress ethernet card"				},
     { DEVICE_TYPE_NETWORK,	"le",		"DEC EtherWorks 2 or 3 ethernet card"				},
     { DEVICE_TYPE_NETWORK,	"lnc",		"Lance/PCnet (Isolan/Novell NE2100/NE32-VL) ethernet"		},
-    { DEVICE_TYPE_NETWORK,	"tl",		"TI ThunderLAN-based ethernet card"				},
+    { DEVICE_TYPE_NETWORK,     "sn",           "Megahertz PCMCIA/X-jack Ethernet"
+	},
     { DEVICE_TYPE_NETWORK,	"tx",		"SMC 9432TX ethernet card"					},
     { DEVICE_TYPE_NETWORK,	"vx",		"3COM 3c590 / 3c595 ethernet card"				},
     { DEVICE_TYPE_NETWORK,	"xl",		"3COM 3c90x / 3c90xB PCI ethernet card"				},
@@ -229,19 +230,19 @@ deviceGetAll(void)
 
 	/* If it's not a link entry, forget it */
 	if (ifptr->ifr_ifru.ifru_addr.sa_family != AF_LINK)
-	    continue;
+	    goto loopend;
 
 	/* Eliminate network devices that don't make sense */
 	if (!strncmp(ifptr->ifr_name, "lo", 2))
-	    continue;
+	    goto loopend;
 
 	/* If we have a slip device, don't register it */
 	if (!strncmp(ifptr->ifr_name, "sl", 2)) {
-	    continue;
+	    goto loopend;
 	}
 	/* And the same for ppp */
 	if (!strncmp(ifptr->ifr_name, "tun", 3) || !strncmp(ifptr->ifr_name, "ppp", 3)) {
-	    continue;
+	    goto loopend;
 	}
 	/* Try and find its description */
 	for (i = 0, descr = NULL; device_names[i].name; i++) {
@@ -265,6 +266,7 @@ deviceGetAll(void)
 	    msgConfirm("ifconfig: socket");
 	    continue;
 	}
+loopend:
 	if (ifptr->ifr_addr.sa_len)	/* I'm not sure why this is here - it's inherited */
 	    ifptr = (struct ifreq *)((caddr_t)ifptr + ifptr->ifr_addr.sa_len - sizeof(struct sockaddr));
     }

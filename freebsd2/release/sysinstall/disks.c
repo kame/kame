@@ -613,6 +613,14 @@ diskPartitionWrite(dialogMenuItem *self)
     int i;
     char *cp;
 
+    if ((cp = variable_get(DISK_PARTITIONED)) && strcmp(cp, "yes"))
+	return DITEM_SUCCESS;
+    else if (!cp) {
+	msgConfirm("You must partition the disk(s) before this option can be used.");
+	return DITEM_FAILURE;
+    }
+
+
     devs = deviceFind(NULL, DEVICE_TYPE_DISK);
     if (!devs) {
 	msgConfirm("Unable to find any disks to write to??");

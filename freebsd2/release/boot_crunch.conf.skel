@@ -1,0 +1,25 @@
+#	$Id: boot_crunch.conf.skel,v 1.1 1999/09/13 08:49:56 itojun Exp $
+
+srcdirs %%KAMETREE%%/kame/freebsd2
+srcdirs %%KAMETREE%%/kame/freebsd2/sbin %%KAMETREE%%/kame/freebsd2/usr.bin %%KAMETREE%%/kame/freebsd2/usr.sbin
+srcdirs /usr/src/release
+srcdirs /usr/src/bin /usr/src/sbin /usr/src/usr.bin
+srcdirs /usr/src/gnu/usr.bin /usr/src/usr.sbin /usr/src/sbin/i386
+srcdirs %%PAOTREE%%/PAO/usr.sbin/pccard
+
+progs sh find
+progs pwd 
+#progs ft
+progs sysinstall newfs gzip cpio bad144 fsck ifconfig route
+#progs mount_nfs
+progs rtsol
+progs sysctl
+
+ln gzip gunzip
+ln gzip zcat
+ln sh -sh
+
+libs -ll -ledit -L%%KAMETREE%%/kame/freebsd2/lib/libutil -lutil -lkvm -lmd -lcrypt -z
+libs -L%%KAMETREE%%/kame/freebsd2/lib/libftpio -lftpio -lz
+libs -ldialog -lncurses -lmytinfo -ldisk -lipx
+libs -L%%KAMETREE%%/kame/freebsd2/lib/libinet6 -linet6

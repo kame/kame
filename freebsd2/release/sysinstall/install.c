@@ -35,6 +35,7 @@
  */
 
 #include "sysinstall.h"
+#include "kame_version.h"
 #include "uc_main.h"
 #include <ctype.h>
 #include <sys/disklabel.h>
@@ -58,6 +59,7 @@ static void	save_userconfig_to_kernel(char *);
 
 #define TERMCAP_FILE	"/usr/share/misc/termcap"
 
+/* static void	fetchKameKit(void); */
 static void	installConfigure(void);
 
 Boolean
@@ -461,6 +463,8 @@ installExpress(dialogMenuItem *self)
     if (DITEM_STATUS((i = installCommit(self))) == DITEM_SUCCESS) {
 	i |= DITEM_LEAVE_MENU;
 	/* Give user the option of one last configuration spree */
+	/* fetchKameKit(); */
+	installKameCommit(NULL);
 	installConfigure();
     }
     return i | DITEM_RESTORE;
@@ -631,7 +635,8 @@ nodisks:
     /* XXX Put whatever other nice configuration questions you'd like to ask the user here XXX */
 
     /* Give user the option of one last configuration spree */
-    dialog_clear_norefresh();
+    /* fetchKameKit(); */
+    installKameCommit(NULL);
     installConfigure();
 
     return DITEM_LEAVE_MENU | DITEM_RESTORE;
@@ -647,6 +652,8 @@ installCustomCommit(dialogMenuItem *self)
     i = installCommit(self);
     if (DITEM_STATUS(i) == DITEM_SUCCESS) {
 	/* Give user the option of one last configuration spree */
+	/* fetchKameKit(); */
+	installKameCommit(NULL);
 	installConfigure();
 	return i;
     }
@@ -712,6 +719,112 @@ try_media:
     variable_set2(SYSTEM_STATE, DITEM_STATUS(i) == DITEM_FAILURE ? "error-install" : "full-install");
 
     return i | DITEM_RESTORE;
+}
+
+/*
+ * static void
+ * fetchKameKit(void)
+ * {
+ *    dialog_clear_norefresh();
+ *   if (!msgYesNo("fetch KAME-stable kit from KAME Site?")) {
+ *	WINDOW *w = savescr();
+ *
+ *	installKameCommit(NULL);
+ *	restorescr(w);
+ *    }
+ *}
+ */
+
+Boolean FetchKameKit = FALSE;
+
+int
+installKameCommit(dialogMenuItem *self)
+{
+    int i;
+
+    if (RunningAsInit && !strstr(variable_get(SYSTEM_STATE), "install")) {
+	msgConfirm("This option may only be used after the system is installed, sorry!");
+	return DITEM_FAILURE;
+    }
+
+    FetchKameKit = TRUE;
+    i = distExtractKame(NULL);
+    FetchKameKit = FALSE;
+
+    if (DITEM_STATUS(i) == DITEM_SUCCESS)
+	mediaClose();
+
+    return i;
+}
+
+int
+installKameKit(dialogMenuItem *self)
+{
+    if (RunningAsInit) {
+	msgConfirm("This option may only be used after the new system.");
+	return DITEM_FAILURE;
+    }
+
+    if (!directory_exists("/usr/src/kame")) {
+	msgConfirm("This option may only be used after the \"Get KAME Kit\".");
+	return DITEM_FAILURE;
+    }
+
+    dialog_clear_norefresh();
+    msgConfirm("Installation is organized as follows:\n"
+"- Backup orignal \"/usr/include\" and \"/usr/src/sys\" file if needed.\n"
+"- Making the KAME kernel.\n"
+"- Update include files.\n"
+"- Making the KAME userland tools.");
+
+    dialog_clear_norefresh();
+    if (!msgYesNo("Are you sure you want to save your current \"/usr/include\"?")) {
+	msgNotify("Preserving /usr/include directory.");
+	if (vsystem("cd /stand/KAME; sh include-backup.sh")) {
+	    if (msgYesNo("Unable to backup your /usr/include.\n"
+			 "Do you want to continue anyway?"))
+		return DITEM_FAILURE;
+	}
+    }
+
+    dialog_clear_norefresh();
+    msgNotify("Rename /usr/src/sys directory.");    
+    if (vsystem("mv /usr/src/sys /usr/src/sys.228.original")) {
+	msgConfirm("Unable to rename your /usr/src/sys");
+        return DITEM_FAILURE;
+    }
+
+    dialog_clear_norefresh();
+    msgNotify("Update include files.");
+    if (vsystem("cd /stand/KAME; sh kame-include-make.sh")) {
+        msgConfirm("kame-include-make returned non-zero status");
+        return DITEM_FAILURE;
+    }
+
+    dialog_clear_norefresh();
+    msgNotify("Making the KAME kernel. Please wait!");
+    if (vsystem("cd /stand/KAME; sh kame-kernel-make.sh")) {
+	msgConfirm("kame-kernel-make returned non-zero status");
+	return DITEM_FAILURE;
+    }
+
+    dialog_clear_norefresh();
+    msgNotify("Making the KAME userland tools. Please wait!");
+    if (vsystem("cd /stand/KAME; sh kame-kit-make.sh")) {
+	msgConfirm("kame-kit-make returned non-zero status");
+	return DITEM_FAILURE;
+    }
+
+    dialog_clear_norefresh();
+    msgConfirm(
+"Add the following line in \"/etc/rc\".\n\n"
+
+"[ -f /usr/local/v6/etc/rc.net6 ] && sh /usr/local/v6/etc/rc.net6\n\n"
+
+"Copy \"/usr/local/v6/etc/rc.net6.sample\" into \"rc.net6\" and edit the\n"
+"content to make it fit into your configuration.");
+
+    return DITEM_FAILURE;
 }
 
 static void
@@ -1003,6 +1116,8 @@ installFilesystems(dialogMenuItem *self)
 static char *
 getRelname(void)
 {
+    return "2.2.8-RELEASE";
+#if 0
     static char buf[64];
     int sz = (sizeof buf) - 1;
 
@@ -1012,6 +1127,7 @@ getRelname(void)
     }
     else
 	return "<unknown>";
+#endif
 }
 
 /* Initialize various user-settable values to their defaults */
@@ -1043,6 +1159,7 @@ installVarDefaults(dialogMenuItem *self)
 	variable_set2(SYSTEM_STATE,		"update");
     else
 	variable_set2(SYSTEM_STATE,		"init");
+    variable_set2(VAR_KAME_RELNAME,		KAME_RELEASE_NAME);
     return DITEM_SUCCESS;
 }
 
@@ -1112,6 +1229,12 @@ save_userconfig_to_kernel(char *kern)
     struct list *c_isa, *b_isa, *c_dev, *b_dev;
     int i, d;
 
+#ifdef PCCARD
+    if (pccard_mode) {
+	msgDebug("save_userconf: PC-card mode.\n");
+	return;
+    }
+#endif
     if ((core = uc_open("-incore")) == NULL) {
 	msgDebug("save_userconf: Can't read in-core information for kernel.\n");
 	return;

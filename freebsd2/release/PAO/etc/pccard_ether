@@ -1,0 +1,82 @@
+#!/bin/sh -
+#
+# pccard_ether interfacename [ifconfig option]
+#
+# example: pccard_ether ep0 link1
+#
+# $Id: pccard_ether,v 1.1 1999/09/13 08:50:01 itojun Exp $
+# HOSOKAWA, Tatsumi <hosokawa@jp.FreeBSD.org>
+#
+
+# Suck in the /etc/rc.conf variables
+if [ -f /etc/rc.conf ]; then
+	. /etc/rc.conf
+fi
+
+interface=$1
+shift
+
+if [ "x$pccard_ether" != "xNO" ]; then
+	eval ifconfig_args=\$ifconfig_${interface}
+	if [ "x$ifconfig_args" = "xDHCP" ]; then
+		if [ -x /usr/local/sbin/dhclient ]; then
+			if [ -s /var/run/dhclient.pid ]; then
+				kill `cat /var/run/dhclient.pid`
+				rm -f /var/run/dhclient.pid
+			fi
+			/usr/local/sbin/dhclient
+		elif [ -x /usr/local/sbin/dhcpc ]; then
+			if [ -s /var/run/dhcpc.$interface.pid ]; then
+				kill `cat /var/run/dhcpc.$interface.pid`
+				rm -f /var/run/dhcpc.$interface.pid
+			fi
+			/usr/local/sbin/dhcpc $dhcp_flags $interface
+		else
+			echo "DHCP client software not available"
+		fi
+	elif [ -n "$ifconfig_args" ]; then
+		# Do the primary ifconfig if specified
+		if [ "x$ifconfig_args" != "xNO" ]; then
+			ifconfig $interface $ifconfig_args $*
+		fi
+		# Check to see if aliases need to be added
+		alias=0
+		while :
+		do
+			eval ifx_args=\$ifconfig_${interface}_alias${alias}
+			if [ -n "$ifx_args" ]; then
+				ifconfig $interface $ifx_args alias
+				alias=`expr ${alias} + 1`
+			else
+				break;
+			fi
+		done
+		# Do ipx address if specified
+		eval ifx_args=\$ifconfig_${interface}_ipx
+		if [ -n "$ifx_args" ]; then
+			ifconfig $interface $ifx_args
+		fi
+		# Add to static route if specified
+		eval ifx_routes=\$static_routes_${interface}
+		if [ -n "$ifx_routes" ]; then
+			for i in ${ifx_routes}; do
+				eval route_args=\$route_${i}
+				route add ${route_args}
+			done
+		fi
+	fi
+fi
+
+if [ -n "$defaultrouter" -a "x$defaultrouter" != "xNO" -a "x$ifconfig_args" != "xDHCP" ]; then
+	static_routes="default ${static_routes}"
+	route_default="default ${defaultrouter}"
+fi
+
+# Set up any static routes.  This should be done before router discovery.
+if [ "x${static_routes}" != "x" ]; then
+	route -n flush
+	for i in ${static_routes}; do
+		eval route_args=\$route_${i}
+		route add ${route_args}
+	done
+fi

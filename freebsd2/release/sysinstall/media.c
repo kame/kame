@@ -318,7 +318,7 @@ mediaSetFTP(dialogMenuItem *self)
     int what = DITEM_RESTORE;
 
     mediaClose();
-    cp = variable_get(VAR_FTP_PATH);
+    cp = variable_get(FetchKameKit ? VAR_KAME_FTP_PATH : VAR_FTP_PATH);
     /* If we've been through here before ... */
     if (!variable_get(VAR_NONINTERACTIVE))
 	if (networkDev && cp && msgYesNo("Re-use old FTP site selection values?"))
@@ -326,18 +326,19 @@ mediaSetFTP(dialogMenuItem *self)
 
     if (!cp) {
 	dialog_clear_norefresh();
-	if (!dmenuOpenSimple(&MenuMediaFTP, FALSE))
+	if (!dmenuOpenSimple((FetchKameKit ? &MenuKameFTP : &MenuMediaFTP), FALSE))
 	    return DITEM_FAILURE | DITEM_RESTORE;
 	else
-	    cp = variable_get(VAR_FTP_PATH);
+	    cp = variable_get(FetchKameKit ? VAR_KAME_FTP_PATH : VAR_FTP_PATH);
 	what = DITEM_RESTORE;
     }
     if (!cp)
 	return DITEM_FAILURE | what;
     else if (!strcmp(cp, "other")) {
-	variable_set2(VAR_FTP_PATH, "ftp://");
+	variable_set2((FetchKameKit ? VAR_KAME_FTP_PATH : VAR_FTP_PATH), "ftp://");
 	dialog_clear_norefresh();
-	cp = variable_get_value(VAR_FTP_PATH, "Please specify the URL of a FreeBSD distribution on a\n"
+	cp = variable_get_value((FetchKameKit ? VAR_KAME_FTP_PATH : VAR_FTP_PATH),
+				"Please specify the URL of a FreeBSD distribution on a\n"
 				"remote ftp site.  This site must accept either anonymous\n"
 				"ftp or you should have set an ftp username and password\n"
 				"in the Options screen.\n\n"
@@ -345,13 +346,13 @@ mediaSetFTP(dialogMenuItem *self)
 				"Where <path> is relative to the anonymous ftp directory or the\n"
 				"home directory of the user being logged in as.");
 	if (!cp || !*cp || !strcmp(cp, "ftp://")) {
-	    variable_unset(VAR_FTP_PATH);
+	    variable_unset(FetchKameKit ? VAR_KAME_FTP_PATH : VAR_FTP_PATH);
 	    return DITEM_FAILURE | what;
 	}
     }
     if (strncmp("ftp://", cp, 6)) {
 	msgConfirm("Sorry, %s is an invalid URL!", cp);
-	variable_unset(VAR_FTP_PATH);
+	variable_unset(FetchKameKit ? VAR_KAME_FTP_PATH : VAR_FTP_PATH);
 	return DITEM_FAILURE | what;
     }
     SAFE_STRCPY(ftpDevice.name, cp);
@@ -363,14 +364,14 @@ mediaSetFTP(dialogMenuItem *self)
 	if (networkDev)
 	    networkDev->shutdown(networkDev);
 	if (!(networkDev = tcpDeviceSelect())) {
-	    variable_unset(VAR_FTP_PATH);
+	    variable_unset(FetchKameKit ? VAR_KAME_FTP_PATH : VAR_FTP_PATH);
 	    return DITEM_FAILURE | what;
 	}
     }
     if (!networkDev->init(networkDev)) {
 	if (isDebug())
 	    msgDebug("mediaSetFTP: Net device init failed.\n");
-	variable_unset(VAR_FTP_PATH);
+	variable_unset(FetchKameKit ? VAR_KAME_FTP_PATH : VAR_FTP_PATH);
 	return DITEM_FAILURE | what;
     }
     if ((cp = index(hostname, ':')) != NULL) {
@@ -394,17 +395,19 @@ mediaSetFTP(dialogMenuItem *self)
     	if (isDebug())
 	    msgDebug("Looking up hostname, %s, using inet_addr().\n", hostname);
 	if (inet_addr(hostname) == INADDR_NONE) {
+	    int err;
     	    if (isDebug())
-		msgDebug("Looking up hostname, %s, using gethostbyname().\n",
+		msgDebug("Looking up hostname, %s, using getipnodebyname().\n",
 			hostname);
-	    if (gethostbyname(hostname) == NULL) {
+	    if (getipnodebyname(hostname, AF_INET, 0, &err) == NULL &&
+		getipnodebyname(hostname, AF_INET6, AI_DEFAULT, &err) == NULL) {
 		msgConfirm("Cannot resolve hostname `%s'!  Are you sure that"
 			" your\nname server, gateway and network interface are"
 			" correctly configured?", hostname);
 		if (networkDev)
 		    networkDev->shutdown(networkDev);
 		networkDev = NULL;
-		variable_unset(VAR_FTP_PATH);
+		variable_unset(FetchKameKit ? VAR_KAME_FTP_PATH : VAR_FTP_PATH);
 		return DITEM_FAILURE | what;
 	    }
 	}
@@ -714,7 +717,7 @@ mediaExtractDist(char *dir, char *dist, FILE *fp)
 int
 mediaGetType(dialogMenuItem *self)
 {
-    return ((dmenuOpenSimple(&MenuMedia, FALSE) && mediaDevice) ? DITEM_SUCCESS : DITEM_FAILURE) | DITEM_RESTORE;
+    return ((dmenuOpenSimple((FetchKameKit ? &MenuKame : &MenuMedia), FALSE) && mediaDevice) ? DITEM_SUCCESS : DITEM_FAILURE) | DITEM_RESTORE;
 }
 
 /* Return TRUE if all the media variables are set up correctly */

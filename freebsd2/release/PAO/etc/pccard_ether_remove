@@ -1,0 +1,72 @@
+#!/bin/sh -
+#
+# pccard_ether_remove interfacename
+#
+# example: pccard_ether_remove ep0
+#
+# $Id: pccard_ether_remove,v 1.1 1999/09/13 08:50:01 itojun Exp $
+# Mar 9, 1996 by Hajimu UMEMOTO <ume@calm.imasy.or.jp>
+# Mar 31, 1997 by Tatsumi Hosokawa <hosokawa@jp.FreeBSD.org>
+
+# Suck in the /etc/rc.conf variables
+if [ -f /etc/rc.conf ]; then
+	. /etc/rc.conf
+fi
+
+interface=$1
+
+if [ "x$pccard_ether" != "xNO" ]; then
+	eval ifconfig_args=\$ifconfig_${interface}
+	if [ "x$ifconfig_args" = "xDHCP" ]; then
+		if [ -s /var/run/dhclient.pid ]; then
+			kill `cat /var/run/dhclient.pid`
+			rm -f /var/run/dhclient.pid
+			rm -f /etc/resolv.conf
+		elif [ -s /var/run/dhcpc.$interface.pid ]; then
+			kill `cat /var/run/dhcpc.$interface.pid`
+			rm -f /var/run/dhcpc.$interface.pid
+		else
+			killarg=`ps xc | awk '$5 ~/^dhc(pc|lient)$/ {print $1}'`
+			if [ "x$killarg" != "x" ] ; then
+				ps xc | grep -q dhclient && rm -f /etc/resolv.conf
+				kill $killarg
+			fi
+		fi
+		ifconfig $interface delete
+		arp -d -a
+	elif [ -n "$ifconfig_args" ]; then
+		# Delelte static route if specified
+		eval ifx_routes=\$static_routes_${interface}
+		if [ -n "$ifx_routes" ]; then
+			for i in ${ifx_routes}; do
+				eval route_args=\$route_${i}
+				route delete ${route_args}
+			done
+		fi
+		# Delete aliases if exist
+		alias=0
+		while :
+		do
+			eval ifx_args=\$ifconfig_${interface}_alias${alias}
+			if [ -n "$ifx_args" ]; then
+				ifconfig $interface $ifx_args alias delete
+				alias=`expr ${alias} + 1`
+			else
+				break;
+			fi
+		done
+		ifconfig $interface delete
+		arp -d -a
+	fi
+fi
+
+# Clean the routing table
+#  $route_flush==YES || $defaultrouter!=NO || $static_routes!=NULL
+
+[ -n "$defaultrouter" -a "x$defaultrouter" != "xNO" ] && route_flush="YES"
+[ "x${static_routes}" != "x" ] && route_flush="YES"
+
+if [ -n "$route_flush" -a "x$route_flush" != "xNO" ]; then
+	route -n flush
+	arp -d -a
+fi

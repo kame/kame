@@ -137,6 +137,11 @@ systemInitialize(int argc, char **argv)
 void
 systemShutdown(int status)
 {
+#ifdef PCCARD
+    /* clean PC-card sockets */
+    cleanPCcardSockets();
+#endif /* PCCARD */
+
     /* If some media is open, close it down */
     if (status >=0 && mediaDevice)
 	mediaDevice->shutdown(mediaDevice);
@@ -180,8 +185,15 @@ systemExecute(char *command)
 	foo.c_cc[VERASE] = '\010';
 	tcsetattr(0, TCSANOW, &foo);
     }
-    if (!Fake)
-	status = system(command);
+    if (!Fake) {
+	char    buf[256];
+	char    *tmpl;
+
+	sprintf(buf, "%s", command);
+	echo();
+	status = system(buf);
+	noecho();
+    }
     else {
 	status = 0;
 	msgDebug("systemExecute:  Faked execution of `%s'\n", command);
@@ -224,6 +236,12 @@ systemHelpFile(char *file, char *buf)
     if (file_readable(buf)) 
 	return expand(buf);
     snprintf(buf, FILENAME_MAX, "/stand/help/%s.TXT.gz", file);
+    if (file_readable(buf)) 
+	return expand(buf);
+    snprintf(buf, FILENAME_MAX, "/stand/KAME/%s.hlp.gz", file);
+    if (file_readable(buf)) 
+	return expand(buf);
+    snprintf(buf, FILENAME_MAX, "/stand/KAME/%s.TXT.gz", file);
     if (file_readable(buf)) 
 	return expand(buf);
     snprintf(buf, FILENAME_MAX, "/usr/src/release/sysinstall/help/%s.hlp", file);
