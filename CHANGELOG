@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1799 2001/07/21 05:49:43 itojun Exp $
+$KAME: CHANGELOG,v 1.1800 2001/07/21 06:03:50 itojun Exp $
 
 <200107>
 Sat Jul 21 13:30:21 JST 2001  itojun@iijlab.net
@@ -1423,7 +1423,7 @@ Wed Feb  7 21:35:26 JST 2001  itojun@iijlab.net
 	cases of ::/plen (plen > 0).  I believe it is better than the
 	original behavior, which printed those routes "v6-in-v4 default".
 
-Wed Feb  7 16:19:19 JST 2001  itojun@iiljab.net
+Wed Feb  7 16:19:19 JST 2001  itojun@iijlab.net
 	* sys/netinet6/raw_ip6.c (netbsd/openbsd): validate/notify path MTU
 	  discovery correctly for raw ip6 sockets.
 	  note: since ping6 does not use connect(2) for the socket for
@@ -1791,7 +1791,7 @@ Thu Jan 18 02:00:32 JST 2001  itojun@iijlab.net
 	physical addresses by "gifconfig delete" after the session. This
 	would prevent a garbage pair.
 
-Tue Jan 16 00:43:19 JST 2001  itojun@iijab.net
+Tue Jan 16 00:43:19 JST 2001  itojun@iijlab.net
 	* sys/netinet6/mld6.c: emit MLD6 packet correctly (MTU setting was
 	  wrong and the packet did not go out of the node).  the bug was
 	  introduced around November 27, 2000.
