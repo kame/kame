@@ -328,6 +328,13 @@ grppfx_statement:
 			       prefix.plen);
 			prefixok = 0;
 		}
+		if (IN6_IS_ADDR_MC_NODELOCAL(&prefix.paddr) ||
+		    IN6_IS_ADDR_MC_LINKLOCAL(&prefix.paddr)) {
+			yywarn("group prefix (%s/%d) has a narrow scope "
+			       "(ignored)",
+			       inet6_fmt(&prefix.paddr), prefix.plen);
+			prefixok = 0;
+		}
 
 		if (prefixok) {
 			struct attr_list *new;
