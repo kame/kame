@@ -2,19 +2,10 @@
 
 			     KAME Project
 
-		     $Date: 1999/10/05 10:11:33 $
+		     $Date: 1999/10/05 10:55:04 $
 
 
-Here is a summary of differences between KAME STABLE 19990809 and STABLE
-199910xx.
-
-<<IPv4>>
-<<IPv6>>
-<<IPv6 API>>
-<<IPsec>>
-<<Userland>>
-<<Others>>
-	(to be written)
+For list of changes from past KAME kit, please refer to CHANGELOG.
 
 KNOWN BUGS/TWISTS
 =================
