@@ -1306,13 +1306,26 @@ nd6_ioctl(cmd, data, ifp)
 	case SIOCGNBRINFO_IN6:
 	    {
 		struct llinfo_nd6 *ln;
+		struct in6_addr nb_addr = nbi->addr; /* make local for safety */
+
+		/*
+		 * XXX: KAME specific hack for scoped addresses
+		 *      XXXX: for other scopes than link-local?
+		 */
+		if (IN6_IS_ADDR_LINKLOCAL(&nbi->addr) ||
+		    IN6_IS_ADDR_MC_LINKLOCAL(&nbi->addr)) {
+			u_int16_t *idp = (u_int16_t *)&nb_addr.s6_addr[2];
+
+			if (*idp == 0)
+				*idp = htons(ifp->if_index);
+		}
 
 #ifdef __NetBSD__
 		s = splsoftnet();
 #else
 		s = splnet();
 #endif
-		if ((rt = nd6_lookup(&nbi->addr, 0, ifp)) == NULL) {
+		if ((rt = nd6_lookup(&nb_addr, 0, ifp)) == NULL) {
 			error = EINVAL;
 			break;
 		}
