@@ -99,7 +99,8 @@ rip_init()
     fatal("<rip_init>: bind");
 
 
-  inet_pton(AF_INET6, RIPNG_DEST, (void *)&ripsin.sin6_addr);
+  if (inet_pton(AF_INET6, RIPNG_DEST, (void *)&ripsin.sin6_addr) != 1)
+    fatal("<rip_init>: inet_pton");
   mreq.ipv6mr_multiaddr = ripsin.sin6_addr;
 
   ife = ifentry;

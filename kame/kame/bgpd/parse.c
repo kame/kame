@@ -1399,7 +1399,7 @@ parse_bgp_yes(char *filename) {
     bnp->rp_addr.sin6_family   = AF_INET6;
     bnp->rp_addr.sin6_port     = htons(BGP_PORT);
     bnp->rp_addr.sin6_flowinfo = 0;
-    if (inet_pton(AF_INET6, atom, &bnp->rp_addr.sin6_addr) < 1) {
+    if (inet_pton(AF_INET6, atom, &bnp->rp_addr.sin6_addr) != 1) {
       syslog(LOG_ERR, "%s:%d inet_pton() failed", filename, line);
       terminate();
     }
@@ -1496,7 +1496,7 @@ parse_bgp_yes(char *filename) {
 	      i += strlen(sysatom[C_LOCALADDR]);
 	      SKIP_WHITE(i); READ_ATOM(i, j);
 	      memcpy(&bnp->rp_lcladdr.sin6_addr, atom, sizeof(struct in6_addr));
-	      if (inet_pton(AF_INET6, atom, &bnp->rp_lcladdr.sin6_addr) < 1) {
+	      if (inet_pton(AF_INET6, atom, &bnp->rp_lcladdr.sin6_addr) != 1) {
 		      syslog(LOG_ERR, "%s:%d inet_pton() failed for %s",
 			     filename, line, atom);
 		      fatalx("<conf_check>: perse failed");

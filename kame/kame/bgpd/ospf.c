@@ -112,7 +112,8 @@ ospf_init()
   if (bind(ospfsock, (struct sockaddr *)&ospfsin, sizeof(ospfsin)) < 0)
     fatal("<ospf_init>: bind");
 
-  inet_pton(AF_INET6, ALLSPFROUTERS, &ospfsin.sin6_addr);
+  if (inet_pton(AF_INET6, ALLSPFROUTERS, &ospfsin.sin6_addr) != 1)
+    fatal("<ospf_init>: inet_pton");
   mreq.ipv6mr_multiaddr = ospfsin.sin6_addr;
 
   ife = ifentry;

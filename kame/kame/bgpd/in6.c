@@ -207,7 +207,7 @@ inet_ptox(int af, const char *src, void *prfx, u_char *plen) {
   if (i > txtlen)
     return 0;
 
-  if ((retval = inet_pton(AF_INET6, in6txt, prfx)) < 1)
+  if ((retval = inet_pton(AF_INET6, in6txt, prfx)) != 1)
     return retval;
 
   i++;
