@@ -1436,6 +1436,7 @@ in6_alias(creq)
 {
 	struct sockaddr_in6 *sin6;
 	char hbuf[NI_MAXHOST];
+	u_int32_t scopeid;
 #ifdef NI_WITHSCOPEID
 	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
 #else
@@ -1453,6 +1454,7 @@ in6_alias(creq)
 	sin6 = (struct sockaddr_in6 *)&creq->ifr_addr;
 
 	in6_fillscopeid(sin6);
+	scopeid = sin6->sin6_scope_id;
 	if (getnameinfo((struct sockaddr *)sin6, sin6->sin6_len,
 			hbuf, sizeof(hbuf), NULL, 0, niflag))
 		strncpy(hbuf, "", sizeof(hbuf));	/* some message? */
@@ -1506,6 +1508,9 @@ in6_alias(creq)
 		if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DETACHED)
 			printf(" detached");
 	}
+
+	if (scopeid)
+		printf(" scopeid 0x%x", scopeid);
 
 	if (Lflag) {
 		struct in6_addrlifetime *lifetime;
