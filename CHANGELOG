@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1542 2001/02/07 12:36:14 itojun Exp $
+$KAME: CHANGELOG,v 1.1543 2001/02/08 11:26:03 jinmei Exp $
 
 <200102>
+2001-02-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_free): returned the pointer to the
+	next entry of the freed one.  Since pfxlist_onlink_check() called
+	from this function could change the link structure, the caller
+	would need the "real" successor of the list to avoid to refer to
+	invalid memory.  This fix actually fixed a problem that the kernel
+	hunged in some (rare) cases.
+
 Wed Feb  7 21:35:26 JST 2001
 	* sys/kern/uipc_socket.c (netbsd/openbsd/freebsd4/bsdi4):
 	  return ECONNABORTED, if the socket (tcp connection for example)
