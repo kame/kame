@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.53 2002/06/09 02:45:52 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.54 2002/06/29 07:38:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -341,8 +341,8 @@ char *hostname;
 int nprobes = 3;
 int first_hop = 1;
 int max_hops = 30;
-u_short srcport;
-u_short port = 32768+666;	/* start udp dest port # for probe packets */
+u_int16_t srcport;
+u_int16_t port = 32768+666;	/* start udp dest port # for probe packets */
 int options;			/* socket options */
 int verbose;
 int waittime = 5;		/* time to wait for response (in seconds) */
@@ -363,6 +363,7 @@ main(argc, argv)
 	char *ep;
 	int mib[4] = { CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_DEFHLIM };
 	size_t size = sizeof(max_hops);
+	u_long lport;
 
 	/*
 	 * Receive ICMP
@@ -484,16 +485,17 @@ main(argc, argv)
 			break;
 		case 'p':
 			ep = NULL;
-			port = strtoul(optarg, &ep, 0);
+			lport = strtoul(optarg, &ep, 0);
 			if (!*argv || *ep) {
 				fprintf(stderr, "traceroute6: port.\n");
 				exit(1);
 			}
-			if (port < 1) {
+			if (lport == 0 || lport != lport & 0xffff) {
 				fprintf(stderr,
-				    "traceroute6: port must be >0.\n");
+				    "traceroute6: port out of range.\n");
 				exit(1);
 			}
+			port = lport & 0xffff;
 			break;
 		case 'q':
 			ep = NULL;
