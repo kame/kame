@@ -1,11 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1768 2001/07/14 06:19:13 sakane Exp $
+$KAME: CHANGELOG,v 1.1769 2001/07/14 14:15:58 sakane Exp $
 
 <200107>
 Sun Jul 15 00:01:44 JST 2001 sakane@kame.net
 	* kame/racoon:
 	the time of execution of several cipher function and the taking time
 	of each phase can be logged when ENABLE_STATS is defined.
+	these messages are passed to syslogd as LOG_NOTICE.
 
 2001-07-12 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_{rule,tslot}.c
