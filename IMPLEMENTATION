@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.300 2002/03/10 10:45:04 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.301 2002/04/03 13:43:12 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -211,7 +211,7 @@ draft-ietf-mobileip-ipv6-14.txt: Mobility Support in IPv6
 draft-ietf-ipngwg-router-selection-01.txt:
 	Default Router Preferences and More-Specific Routes
     * router-side: both router preference and specific routes are supported.
-    * host-side: only router preferences is supported.
+    * host-side: only router preference is supported.
 draft-ietf-ipngwg-scoping-arch-03.txt:
 	The architecture, text representation, and usage of IPv6
 	scoped addresses.
