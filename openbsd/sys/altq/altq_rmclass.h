@@ -45,6 +45,8 @@
 extern "C" {
 #endif
 
+#define	RM_MAXPRIO	8	/* Max priority */
+
 #ifdef _KERNEL
 
 typedef struct mbuf		mbuf_t;
@@ -113,7 +115,6 @@ struct red;
 #else
 #define	RM_MAXQUEUED	16	/* Max number of packets downstream of CBQ */
 #endif
-#define	RM_MAXPRIO	8	/* Max priority */
 #define	RM_MAXQUEUE	64	/* Max queue length */
 #define	RM_FILTER_GAIN	5	/* log2 of gain, e.g., 5 => 31/32 */
 #define	RM_POWER	(1 << RM_FILTER_GAIN)
