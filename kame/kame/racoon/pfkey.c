@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.111 2001/05/02 04:56:38 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.112 2001/05/18 08:09:18 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1551,7 +1551,9 @@ pk_recvacquire(mhp)
     }
 
 	plog(LLV_DEBUG, LOCATION, NULL,
-		"suitable SP found: %s.\n", spidx2str(&sp_out->spidx));
+		"suitable outbound SP found: %s.\n", spidx2str(&sp_out->spidx));
+	plog(LLV_DEBUG, LOCATION, NULL,
+		"suitable inbound SP found: %s.\n", spidx2str(&sp_in->spidx));
 
 	memset(iph2, 0, MAXNESTEDSA);
 
