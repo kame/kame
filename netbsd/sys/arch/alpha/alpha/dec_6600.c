@@ -1,4 +1,4 @@
-/* $NetBSD: dec_6600.c,v 1.1 1999/06/29 07:08:53 ross Exp $ */
+/* $NetBSD: dec_6600.c,v 1.1.4.1 2000/02/06 17:23:12 he Exp $ */
 
 /*
  * Copyright (c) 1995, 1996, 1997 Carnegie-Mellon University.
@@ -29,7 +29,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: dec_6600.c,v 1.1 1999/06/29 07:08:53 ross Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dec_6600.c,v 1.1.4.1 2000/02/06 17:23:12 he Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -56,6 +56,7 @@ __KERNEL_RCSID(0, "$NetBSD: dec_6600.c,v 1.1 1999/06/29 07:08:53 ross Exp $");
 #include <dev/scsipi/scsi_all.h>
 #include <dev/scsipi/scsipi_all.h>
 #include <dev/scsipi/scsiconf.h>
+#include <dev/ata/atavar.h>
 
 #include "pckbd.h"
 
@@ -207,11 +208,12 @@ dec_6600_device_register(dev, aux)
 				return;
 	
 			pcidev = dev;
-			DR_VERBOSE(printf("\npcidev = %s\n", pcidev->dv_xname));
+			DR_VERBOSE(printf("\npcidev = %s\n",
+			    pcidev->dv_xname));
 			return;
 		}
 	}
-	if ((ideboot || scsiboot) && scsipidev == NULL) {
+	if ((ideboot || scsiboot) && (scsipidev == NULL)) {
 		if (parent != pcidev)
 			return;
 		else {
@@ -228,7 +230,7 @@ dec_6600_device_register(dev, aux)
 			return;
 		}
 	}
-	if ((scsiboot || ideboot) &&
+	if (scsiboot &&
 	    (!strcmp(cd->cd_name, "sd") ||
 	     !strcmp(cd->cd_name, "st") ||
 	     !strcmp(cd->cd_name, "cd"))) {
@@ -265,22 +267,26 @@ dec_6600_device_register(dev, aux)
 
 	/*
 	 * Support to boot from IDE drives.
-	 * Should work with all SRM firmware versions, but is at the
-	 * moment limited to hard disks. Support for IDE CD ROM is
-	 * included above, under the theory that it will always be
-	 * via the pci ide controller.
 	 */
 	if ((ideboot || scsiboot) && !strcmp(cd->cd_name, "wd")) {
+		struct ata_atapi_attach *aa_link = aux;
 		if ((strncmp("pciide", parent->dv_xname, 6) != 0)) {
 			return;
 		} else {
 			if (parent != scsipidev)
 				return;
 		}
+		DR_VERBOSE(printf("\nAtapi info: drive: %d, channel %d\n",
+		    aa_link->aa_drv_data->drive, aa_link->aa_channel));
+		DR_VERBOSE(printf("Bootdev info: unit: %d, channel: %d\n",
+		    b->unit, b->channel));
+		if (b->unit != aa_link->aa_drv_data->drive ||
+		    b->channel != aa_link->aa_channel)
+			return;
 
 		/* we've found it! */
 		booted_device = dev;
-		DR_VERBOSE(printf("\nbooted_device = %s\n",
+		DR_VERBOSE(printf("booted_device = %s\n",
 		    booted_device->dv_xname));
 		found = 1;
 	}

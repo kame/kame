@@ -1,4 +1,4 @@
-/*	$NetBSD: systm.h,v 1.89 1999/03/24 05:51:29 mrg Exp $	*/
+/*	$NetBSD: systm.h,v 1.89.2.2 2000/02/01 22:55:30 he Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1988, 1991, 1993
@@ -119,11 +119,12 @@ struct proc;
 struct tty;
 struct uio;
 
+typedef int	sy_call_t __P((struct proc *, void *, register_t *));
+
 extern struct sysent {		/* system call table */
 	short	sy_narg;	/* number of args */
 	short	sy_argsize;	/* total size of arguments */
-				/* implementing function */
-	int	(*sy_call) __P((struct proc *, void *, register_t *));
+	sy_call_t *sy_call;     /* implementing function */
 } sysent[];
 extern int nsysent;
 #if	BYTE_ORDER == BIG_ENDIAN
@@ -273,6 +274,14 @@ void	*mountroothook_establish __P((void (*)(struct device *),
 void	mountroothook_disestablish __P((void *));
 void	mountroothook_destroy __P((void));
 void	domountroothook __P((void));
+
+/*
+ * Exec hooks. Subsystems may want to do cleanup when a process
+ * execs.
+ */
+void	*exechook_establish __P((void (*)(struct proc *, void *), void *));
+void	exechook_disestablish __P((void *));
+void	doexechooks __P((struct proc *));
 
 int	uiomove __P((void *, int, struct uio *));
 

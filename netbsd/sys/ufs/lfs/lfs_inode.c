@@ -1,4 +1,4 @@
-/*	$NetBSD: lfs_inode.c,v 1.22.2.2 1999/06/25 20:51:00 perry Exp $	*/
+/*	$NetBSD: lfs_inode.c,v 1.22.2.5 2000/01/20 21:02:03 he Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -98,18 +98,21 @@ static int lfs_vinvalbuf __P((struct vnode *, struct ucred *, struct proc *, ufs
 
 /* Search a block for a specific dinode. */
 struct dinode *
-lfs_ifind(fs, ino, dip)
+lfs_ifind(fs, ino, bp)
 	struct lfs *fs;
 	ino_t ino;
-	register struct dinode *dip;
+	struct buf *bp;
 {
 	register int cnt;
+	register struct dinode *dip = (struct dinode *)bp->b_data;
 	register struct dinode *ldip;
 	
 	for (cnt = INOPB(fs), ldip = dip + (cnt - 1); cnt--; --ldip)
 		if (ldip->di_inumber == ino)
 			return (ldip);
 	
+	printf("offset is %d (seg %d)\n", fs->lfs_offset, datosn(fs,fs->lfs_offset));
+	printf("block is %d (seg %d)\n", bp->b_blkno, datosn(fs,bp->b_blkno));
 	panic("lfs_ifind: dinode %u not found", ino);
 	/* NOTREACHED */
 }
@@ -128,6 +131,7 @@ lfs_update(v)
 	struct vnode *vp = ap->a_vp;
 	int mod, oflag;
 	struct timespec ts;
+	struct lfs *fs = VFSTOUFS(vp->v_mount)->um_lfs;
 	
 	if (vp->v_mount->mnt_flag & MNT_RDONLY)
 		return (0);
@@ -142,7 +146,7 @@ lfs_update(v)
 	 */
 	while((ap->a_waitfor & LFS_SYNC) && WRITEINPROG(vp)) {
 #ifdef DEBUG_LFS
-		printf("lfs_update: sleeping on inode %d\n",ip->i_number);
+		printf("lfs_update: sleeping on inode %d (in-progress)\n",ip->i_number);
 #endif
 		tsleep(vp, (PRIBIO+1), "lfs_update", 0);
 	}
@@ -159,7 +163,24 @@ lfs_update(v)
 	}
 	
 	/* If sync, push back the vnode and any dirty blocks it may have. */
-	return (ap->a_waitfor & LFS_SYNC ? lfs_vflush(vp) : 0);
+	if(ap->a_waitfor & LFS_SYNC) {
+		/* Avoid flushing VDIROP. */
+		++fs->lfs_diropwait;
+		while(vp->v_flag & VDIROP) {
+#ifdef DEBUG_LFS
+			printf("lfs_update: sleeping on inode %d (dirops)\n",ip->i_number);
+#endif
+			if(fs->lfs_dirops==0)
+				lfs_flush_fs(vp->v_mount,SEGM_SYNC);
+			else
+				tsleep(&fs->lfs_writer, PRIBIO+1, "lfs_fsync", 0);
+			/* XXX KS - by falling out here, are we writing the vn
+			twice? */
+		}
+		--fs->lfs_diropwait;
+		return lfs_vflush(vp);
+        }
+	return 0;
 }
 
 /* Update segment usage information when removing a block. */
@@ -251,7 +272,7 @@ lfs_truncate(v)
 	 *
 	 * XXX KS - too restrictive?  Maybe only when cleaning?
 	 */
-	while(fs->lfs_seglock) {
+	while(fs->lfs_seglock && fs->lfs_lockpid != ap->a_p->p_pid) {
 		tsleep(&fs->lfs_seglock, (PRIBIO+1), "lfs_truncate", 0);
 	}
 	

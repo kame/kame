@@ -1,4 +1,4 @@
-/*	$NetBSD: lfs_vfsops.c,v 1.28.2.1 1999/04/13 21:33:57 perseant Exp $	*/
+/*	$NetBSD: lfs_vfsops.c,v 1.28.2.6 2000/01/20 21:11:46 he Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -130,7 +130,7 @@ struct vfsops lfs_vfsops = {
 	lfs_vptofh,
 	lfs_init,
 	lfs_sysctl,
-	NULL,
+	lfs_mountroot,
 	ufs_check_export,
 	lfs_vnodeopv_descs,
 };
@@ -393,7 +393,7 @@ lfs_mountfs(devvp, mp, p)
 
 	/* Set up the I/O information */
 	fs->lfs_iocount = 0;
-	fs->lfs_dirvcount = 0;
+	fs->lfs_diropwait = 0;
 	fs->lfs_activesb = 0;
 #ifdef LFS_CANNOT_ROLLFW
 	fs->lfs_sbactive = NULL;
@@ -408,6 +408,7 @@ lfs_mountfs(devvp, mp, p)
 	fs->lfs_writer = 0;
 	fs->lfs_dirops = 0;
 	fs->lfs_seglock = 0;
+	lockinit(&fs->lfs_freelock, PINOD, "lfs_freelock", 0, 0);
 
 	/* Set the file system readonly/modify bits. */
 	fs->lfs_ronly = ronly;
@@ -458,7 +459,9 @@ out:
 		brelse(bp);
 	if (abp)
 		brelse(abp);
+	vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY);
 	(void)VOP_CLOSE(devvp, ronly ? FREAD : FREAD|FWRITE, cred, p);
+	VOP_UNLOCK(devvp, 0);
 	if (ump) {
 		free(ump->um_lfs, M_UFSMNT);
 		free(ump, M_UFSMNT);
@@ -516,9 +519,10 @@ lfs_unmount(mp, mntflags, p)
 
 	ronly = !fs->lfs_ronly;
 	ump->um_devvp->v_specflags &= ~SI_MOUNTEDON;
+	vn_lock(ump->um_devvp, LK_EXCLUSIVE | LK_RETRY);
 	error = VOP_CLOSE(ump->um_devvp,
 	    ronly ? FREAD : FREAD|FWRITE, NOCRED, p);
-	vrele(ump->um_devvp);
+	vput(ump->um_devvp);
 
 	/* XXX KS - wake up the cleaner so it can die */
 	wakeup(&fs->lfs_nextseg);
@@ -613,9 +617,7 @@ lfs_sync(mp, waitfor, cred, p)
 	return (error);
 }
 
-#ifdef USE_UFS_HASHLOCK
 extern struct lock ufs_hashlock;
-#endif
 
 /*
  * Look up an LFS dinode number to find its incore vnode.  If not already
@@ -644,14 +646,10 @@ lfs_vget(mp, ino, vpp)
 	ump = VFSTOUFS(mp);
 	dev = ump->um_dev;
 
-#ifdef USE_UFS_HASHLOCK
 	do {
-#endif
 		if ((*vpp = ufs_ihashget(dev, ino)) != NULL)
 			return (0);
-#ifdef USE_UFS_HASHLOCK
 	} while (lockmgr(&ufs_hashlock, LK_EXCLUSIVE|LK_SLEEPFAIL, 0));
-#endif
 
 	/* Translate the inode number to a disk address. */
 	fs = ump->um_lfs;
@@ -665,9 +663,7 @@ lfs_vget(mp, ino, vpp)
 #endif
 		brelse(bp);
 		if (daddr == LFS_UNUSED_DADDR) {
-#ifdef USE_UFS_HASHLOCK
 			lockmgr(&ufs_hashlock, LK_RELEASE, 0);
-#endif
 			return (ENOENT);
 		}
 	}
@@ -675,9 +671,7 @@ lfs_vget(mp, ino, vpp)
 	/* Allocate new vnode/inode. */
 	if ((error = lfs_vcreate(mp, ino, &vp)) != 0) {
 		*vpp = NULL;
-#ifdef USE_UFS_HASHLOCK
 		lockmgr(&ufs_hashlock, LK_RELEASE, 0);
-#endif
 		return (error);
 	}
 
@@ -689,9 +683,7 @@ lfs_vget(mp, ino, vpp)
 	 */
 	ip = VTOI(vp);
 	ufs_ihashins(ip);
-#ifdef USE_UFS_HASHLOCK
 	lockmgr(&ufs_hashlock, LK_RELEASE, 0);
-#endif
 
 	/*
 	 * XXX
@@ -715,7 +707,7 @@ lfs_vget(mp, ino, vpp)
 		*vpp = NULL;
 		return (error);
 	}
-	ip->i_din.ffs_din = *lfs_ifind(fs, ino, (struct dinode *)bp->b_data);
+	ip->i_din.ffs_din = *lfs_ifind(fs, ino, bp);
 #ifdef LFS_ATIME_IFILE
 	ip->i_ffs_atime = ts.tv_sec;
 	ip->i_ffs_atimensec = ts.tv_nsec;

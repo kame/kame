@@ -1,4 +1,4 @@
-/*	$NetBSD: com.c,v 1.159.2.1 1999/04/19 20:37:57 perry Exp $	*/
+/*	$NetBSD: com.c,v 1.159.2.4 2000/02/08 22:14:27 he Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
@@ -1019,20 +1019,20 @@ comioctl(dev, cmd, data, flag, p)
 		*(int *)data = com_to_tiocm(sc);
 		break;
 
-	case PPS_CREATE:
+	case PPS_IOC_CREATE:
 		break;
 
-	case PPS_DESTROY:
+	case PPS_IOC_DESTROY:
 		break;
 
-	case PPS_GETPARAMS: {
+	case PPS_IOC_GETPARAMS: {
 		pps_params_t *pp;
 		pp = (pps_params_t *)data;
 		*pp = sc->ppsparam;
 		break;
 	}
 
-	case PPS_SETPARAMS: {
+	case PPS_IOC_SETPARAMS: {
 	  	pps_params_t *pp;
 		int mode;
 		pp = (pps_params_t *)data;
@@ -1085,21 +1085,16 @@ comioctl(dev, cmd, data, flag, p)
 		break;
 	}
 
-	case PPS_GETCAP:
+	case PPS_IOC_GETCAP:
 		*(int*)data = ppscap;
 		break;
 
-	case PPS_FETCH: {
+	case PPS_IOC_FETCH: {
 		pps_info_t *pi;
 		pi = (pps_info_t *)data;
 		*pi = sc->ppsinfo;
 		break;
 	}
-
-	case PPS_WAIT:
-		/* XXX */
-		error = EOPNOTSUPP;
-		break;
 
 	case TIOCDCDTIMESTAMP:	/* XXX old, overloaded  API used by xntpd v3 */
 		/*
@@ -2014,57 +2009,55 @@ comintr(arg)
 		msr = bus_space_read_1(iot, ioh, com_msr);
 		delta = msr ^ sc->sc_msr;
 		sc->sc_msr = msr;
+		/*
+		 * Pulse-per-second (PSS) signals on edge of DCD?
+		 * Process these even if line discipline is ignoring DCD.
+		 */
+		if (delta & sc->sc_ppsmask) {
+			struct timeval tv;
+		    	if ((msr & sc->sc_ppsmask) == sc->sc_ppsassert) {
+				/* XXX nanotime() */
+				microtime(&tv);
+				TIMEVAL_TO_TIMESPEC(&tv, 
+				    &sc->ppsinfo.assert_timestamp);
+				if (sc->ppsparam.mode & PPS_OFFSETASSERT) {
+					timespecadd(&sc->ppsinfo.assert_timestamp,
+					    &sc->ppsparam.assert_offset,
+						    &sc->ppsinfo.assert_timestamp);
+				}
+
+#ifdef PPS_SYNC
+				if (sc->ppsparam.mode & PPS_HARDPPSONASSERT)
+					hardpps(&tv, tv.tv_usec);
+#endif
+				sc->ppsinfo.assert_sequence++;
+				sc->ppsinfo.current_mode = sc->ppsparam.mode;
+
+			} else if ((msr & sc->sc_ppsmask) == sc->sc_ppsclear) {
+				/* XXX nanotime() */
+				microtime(&tv);
+				TIMEVAL_TO_TIMESPEC(&tv, 
+				    &sc->ppsinfo.clear_timestamp);
+				if (sc->ppsparam.mode & PPS_OFFSETCLEAR) {
+					timespecadd(&sc->ppsinfo.clear_timestamp,
+					    &sc->ppsparam.clear_offset,
+					    &sc->ppsinfo.clear_timestamp);
+				}
+
+#ifdef PPS_SYNC
+				if (sc->ppsparam.mode & PPS_HARDPPSONCLEAR)
+					hardpps(&tv, tv.tv_usec);
+#endif
+				sc->ppsinfo.clear_sequence++;
+				sc->ppsinfo.current_mode = sc->ppsparam.mode;
+			}
+		}
+
+		/*
+		 * Process normal status changes
+		 */
 		if (ISSET(delta, sc->sc_msr_mask)) {
 			SET(sc->sc_msr_delta, delta);
-
-			/*
-			 * Pulse-per-second clock signal on edge of DCD?
-			 */
-			if (ISSET(delta, sc->sc_ppsmask)) {
-				struct timeval tv;
-			    	if (ISSET(msr, sc->sc_ppsmask) ==
-				    sc->sc_ppsassert) {
-					/* XXX nanotime() */
-					microtime(&tv);
-					TIMEVAL_TO_TIMESPEC(&tv, 
-					    &sc->ppsinfo.assert_timestamp);
-					if (sc->ppsparam.mode & PPS_OFFSETASSERT) {
-						timespecadd(&sc->ppsinfo.assert_timestamp,
-						    &sc->ppsparam.assert_offset,
-						    &sc->ppsinfo.assert_timestamp);
-						TIMESPEC_TO_TIMEVAL(&tv, &sc->ppsinfo.assert_timestamp);
-	}
-
-#ifdef PPS_SYNC
-					if (sc->ppsparam.mode & PPS_HARDPPSONASSERT)
-						hardpps(&tv, tv.tv_usec);
-#endif
-					sc->ppsinfo.assert_sequence++;
-					sc->ppsinfo.current_mode = 
-					    sc->ppsparam.mode;
-
-				} else if (ISSET(msr, sc->sc_ppsmask) == 
-				    sc->sc_ppsclear) {
-					/* XXX nanotime() */
-					microtime(&tv);
-					TIMEVAL_TO_TIMESPEC(&tv, 
-					    &sc->ppsinfo.clear_timestamp);
-					if (sc->ppsparam.mode & PPS_OFFSETCLEAR) {
-						timespecadd(&sc->ppsinfo.clear_timestamp,
-						    &sc->ppsparam.clear_offset,
-						    &sc->ppsinfo.clear_timestamp);
-						TIMESPEC_TO_TIMEVAL(&tv, &sc->ppsinfo.clear_timestamp);
-	}
-
-#ifdef PPS_SYNC
-					if (sc->ppsparam.mode & PPS_HARDPPSONCLEAR)
-						hardpps(&tv, tv.tv_usec);
-#endif
-					sc->ppsinfo.clear_sequence++;
-					sc->ppsinfo.current_mode = 
-					    sc->ppsparam.mode;
-				}
-			}
 
 			/*
 			 * Stop output immediately if we lose the output
@@ -2193,7 +2186,7 @@ com_common_putc(iot, ioh, c)
 }
 
 /*
- * Initialize UART to known state.
+ * Initialize UART for use as console or KGDB line.
  */
 int
 cominit(iot, iobase, rate, frequency, cflag, iohp)
@@ -2215,7 +2208,7 @@ cominit(iot, iobase, rate, frequency, cflag, iohp)
 	bus_space_write_1(iot, ioh, com_dlbl, rate);
 	bus_space_write_1(iot, ioh, com_dlbh, rate >> 8);
 	bus_space_write_1(iot, ioh, com_lcr, cflag2lcr(cflag));
-	bus_space_write_1(iot, ioh, com_mcr, 0);
+	bus_space_write_1(iot, ioh, com_mcr, MCR_DTR | MCR_RTS);
 	bus_space_write_1(iot, ioh, com_fifo,
 	    FIFO_ENABLE | FIFO_RCV_RST | FIFO_XMT_RST | FIFO_TRIGGER_1);
 	bus_space_write_1(iot, ioh, com_ier, 0);

@@ -1,4 +1,4 @@
-/*	$NetBSD: scsiconf.c,v 1.122 1998/12/10 18:13:29 mjacob Exp $	*/
+/*	$NetBSD: scsiconf.c,v 1.122.2.3 2000/01/16 17:47:56 he Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -407,6 +407,8 @@ struct scsi_quirk_inquiry_pattern scsi_quirk_patterns[] = {
 	{{T_CDROM, T_REMOV,
 	 "SONY    ", "CD-ROM CDU-55S  ", ""},     SDEV_NOLUNS},
 	{{T_CDROM, T_REMOV,
+	 "SONY    ", "CD-ROM CDU-561  ", ""},     SDEV_NOLUNS},
+	{{T_CDROM, T_REMOV,
 	 "SONY    ", "CD-ROM CDU-8003A", ""},     SDEV_NOLUNS},
 	{{T_CDROM, T_REMOV,
 	 "SONY    ", "CD-ROM CDU-8012 ", ""},     SDEV_NOLUNS},
@@ -431,6 +433,8 @@ struct scsi_quirk_inquiry_pattern scsi_quirk_patterns[] = {
 	{{T_OPTICAL, T_REMOV,
 	 "EPSON   ", "OMD-5010        ", "3.08"}, SDEV_NOLUNS},
 
+	{{T_DIRECT, T_FIXED,
+	"TOSHIBA ", "CD-ROM XM-3401TA", "0283"}, ADEV_CDROM|SDEV_NOLUNS},
 	{{T_DIRECT, T_FIXED,
 	 "ADAPTEC ", "AEC-4412BD",       "1.2A"}, SDEV_NOMODESENSE},
 	{{T_DIRECT, T_FIXED,
@@ -558,7 +562,7 @@ struct scsi_quirk_inquiry_pattern scsi_quirk_patterns[] = {
 	{{T_SCANNER, T_FIXED,
 	 "UMAX    ", "Astra 1200S     ", "V2.9"}, SDEV_NOLUNS},
 	{{T_SCANNER, T_FIXED,
-	 "UMAX    ", "Astra 1220S     ", "V1.2"}, SDEV_NOLUNS},
+	 "UMAX    ", "Astra 1220S     ", ""}, SDEV_NOLUNS},
 	{{T_SCANNER, T_FIXED,
 	 "UMAX    ", "UMAX S-6E       ", "V2.0"}, SDEV_NOLUNS},
 	{{T_SCANNER, T_FIXED,
@@ -630,7 +634,7 @@ scsi_probedev(scsi, target, lun)
 
 	/* Now go ask the device all about itself. */
 	bzero(&inqbuf, sizeof(inqbuf));
-	if (scsipi_inquire(sc_link, &inqbuf, SCSI_AUTOCONF) != 0)
+	if (scsipi_inquire(sc_link, &inqbuf, SCSI_AUTOCONF | SCSI_PROBE) != 0)
 		goto bad;
 
 	{

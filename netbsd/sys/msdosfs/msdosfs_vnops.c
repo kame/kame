@@ -1,4 +1,4 @@
-/*	$NetBSD: msdosfs_vnops.c,v 1.79.2.2 1999/06/21 14:39:46 perry Exp $	*/
+/*	$NetBSD: msdosfs_vnops.c,v 1.79.2.6 2000/02/04 23:00:17 he Exp $	*/
 
 /*-
  * Copyright (C) 1994, 1995, 1997 Wolfgang Solfrank.
@@ -250,7 +250,7 @@ msdosfs_access(v)
 	struct vnode *vp = ap->a_vp;
 	struct denode *dep = VTODE(vp);
 	struct msdosfsmount *pmp = dep->de_pmp;
-	mode_t mode = 0;
+	mode_t mode = ap->a_mode;
 
 	/*
 	 * Disallow write attempts on read-only file systems;
@@ -353,9 +353,10 @@ msdosfs_setattr(v)
 		struct ucred *a_cred;
 		struct proc *a_p;
 	} */ *ap = v;
-	int error = 0;
+	int error = 0, de_changed = 0;
 	struct denode *dep = VTODE(ap->a_vp);
 	struct msdosfsmount *pmp = dep->de_pmp;
+	struct vnode *vp  = ap->a_vp;
 	struct vattr *vap = ap->a_vap;
 	struct ucred *cred = ap->a_cred;
 
@@ -373,7 +374,7 @@ msdosfs_setattr(v)
 		printf("    va_type %d, va_nlink %x, va_fsid %lx, va_fileid %lx\n",
 		    vap->va_type, vap->va_nlink, vap->va_fsid, vap->va_fileid);
 		printf("    va_blocksize %lx, va_rdev %x, va_bytes %qx, va_gen %lx\n",
-		    vap->va_blocksize, vap->va_rdev, vap->va_bytes, vap->va_gen);
+		    vap->va_blocksize, vap->va_rdev, (long long)vap->va_bytes, vap->va_gen);
 		printf("    va_uid %x, va_gid %x\n",
 		    vap->va_uid, vap->va_gid);
 #endif
@@ -386,11 +387,16 @@ msdosfs_setattr(v)
 		return 0;
 
 	if (vap->va_size != VNOVAL) {
+		if (vp->v_mount->mnt_flag & MNT_RDONLY)
+			return (EROFS);
 		error = detrunc(dep, (u_long)vap->va_size, 0, cred, ap->a_p);
 		if (error)
 			return (error);
+		de_changed = 1;
 	}
 	if (vap->va_atime.tv_sec != VNOVAL || vap->va_mtime.tv_sec != VNOVAL) {
+		if (vp->v_mount->mnt_flag & MNT_RDONLY)
+			return (EROFS);
 		if (cred->cr_uid != pmp->pm_uid &&
 		    (error = suser(cred, &ap->a_p->p_acflag)) &&
 		    ((vap->va_vaflags & VA_UTIMES_NULL) == 0 ||
@@ -403,6 +409,7 @@ msdosfs_setattr(v)
 			unix2dostime(&vap->va_mtime, &dep->de_MDate, &dep->de_MTime, NULL);
 		dep->de_Attributes |= ATTR_ARCHIVE;
 		dep->de_flag |= DE_MODIFIED;
+		de_changed = 1;
 	}
 	/*
 	 * DOS files only have the ability to have their writability
@@ -410,6 +417,8 @@ msdosfs_setattr(v)
 	 * attribute.
 	 */
 	if (vap->va_mode != (mode_t)VNOVAL) {
+		if (vp->v_mount->mnt_flag & MNT_RDONLY)
+			return (EROFS);
 		if (cred->cr_uid != pmp->pm_uid &&
 		    (error = suser(cred, &ap->a_p->p_acflag)))
 			return (error);
@@ -419,11 +428,14 @@ msdosfs_setattr(v)
 		else
 			dep->de_Attributes |= ATTR_READONLY;
 		dep->de_flag |= DE_MODIFIED;
+		de_changed = 1;
 	}
 	/*
 	 * Allow the `archived' bit to be toggled.
 	 */
 	if (vap->va_flags != VNOVAL) {
+		if (vp->v_mount->mnt_flag & MNT_RDONLY)
+			return (EROFS);
 		if (cred->cr_uid != pmp->pm_uid &&
 		    (error = suser(cred, &ap->a_p->p_acflag)))
 			return (error);
@@ -432,8 +444,13 @@ msdosfs_setattr(v)
 		else
 			dep->de_Attributes |= ATTR_ARCHIVE;
 		dep->de_flag |= DE_MODIFIED;
+		de_changed = 1;
 	}
-	return (deupdat(dep, 1));
+
+	if (de_changed)
+		return (deupdat(dep, 1));
+	else
+		return (0);
 }
 
 int
@@ -1035,13 +1052,13 @@ abortit:
 				error = ENOTDIR;
 				goto bad;
 			}
-			cache_purge(tdvp);
 		} else if (doingdirectory) {
 			error = EISDIR;
 			goto bad;
 		}
 		if ((error = removede(dp, xp)) != 0)
 			goto bad;
+		cache_purge(tvp);
 		vput(tvp);
 		xp = NULL;
 	}
@@ -1130,6 +1147,7 @@ abortit:
 			VOP_UNLOCK(fvp, 0);
 			goto bad;
 		}
+		cache_purge(fvp);
 		if (!doingdirectory) {
 			error = pcbmap(dp, de_cluster(pmp, to_diroffset), 0,
 				       &ip->de_dirclust, 0);
@@ -1450,7 +1468,7 @@ msdosfs_readdir(v)
 	struct uio *uio = ap->a_uio;
 	off_t *cookies = NULL;
 	int ncookies = 0, nc = 0;
-	off_t offset;
+	off_t offset, uio_off;
 	int chksum = -1;
 
 #ifdef MSDOSFS_DEBUG
@@ -1484,6 +1502,7 @@ msdosfs_readdir(v)
 		return (EINVAL);
 	lost = uio->uio_resid - count;
 	uio->uio_resid = count;
+	uio_off = uio->uio_offset;
 
 	if (ap->a_ncookies) {
 		nc = uio->uio_resid / 16;
@@ -1535,6 +1554,7 @@ msdosfs_readdir(v)
 				if (error)
 					goto out;
 				offset += sizeof(struct direntry);
+				uio_off = offset;
 				if (cookies) {
 					*cookies++ = offset;
 					ncookies++;
@@ -1649,6 +1669,7 @@ msdosfs_readdir(v)
 				brelse(bp);
 				goto out;
 			}
+			uio_off = offset + sizeof(struct direntry);
 			if (cookies) {
 				*cookies++ = offset + sizeof(struct direntry);
 				ncookies++;
@@ -1662,7 +1683,7 @@ msdosfs_readdir(v)
 	}
 
 out:
-	uio->uio_offset = offset;
+	uio->uio_offset = uio_off;
 	uio->uio_resid += lost;
 	if (dep->de_FileSize - (offset - bias) <= 0)
 		*ap->a_eofflag = 1;

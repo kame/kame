@@ -1,4 +1,4 @@
-/*	$NetBSD: kern_exec.c,v 1.100.2.1 1999/08/09 03:08:25 cgd Exp $	*/
+/*	$NetBSD: kern_exec.c,v 1.100.2.3 2000/02/01 22:55:07 he Exp $	*/
 
 /*-
  * Copyright (C) 1993, 1994, 1996 Christopher G. Demetriou
@@ -413,6 +413,10 @@ sys_execve(p, v, retval)
 		    p->p_sigacts->ps_sigcode = (char *)PS_STRINGS - szsigcode,
 		    szsigcode))
 			goto exec_abort;
+#ifdef PMAP_NEED_PROCWR
+		/* This is code. Let the pmap do what is needed. */
+		pmap_procwr(p, (vaddr_t)p->p_sigacts->ps_sigcode, szsigcode);
+#endif
 	}
 
 	stopprofclock(p);	/* stop profiling */
@@ -462,6 +466,8 @@ sys_execve(p, v, retval)
 		p->p_flag &= ~P_SUGID;
 	p->p_cred->p_svuid = p->p_ucred->cr_uid;
 	p->p_cred->p_svgid = p->p_ucred->cr_gid;
+
+	doexechooks(p);
 
 	uvm_km_free_wakeup(exec_map, (vaddr_t) argp, NCARGS);
 

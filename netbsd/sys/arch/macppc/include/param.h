@@ -1,4 +1,4 @@
-/*	$NetBSD: param.h,v 1.4 1999/01/12 10:51:40 tsubai Exp $	*/
+/*	$NetBSD: param.h,v 1.4.2.2 1999/10/20 22:52:20 he Exp $	*/
 
 /*-
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -97,7 +97,7 @@
  * Size of kernel malloc arena in CLBYTES-sized logical pages.
  */
 #ifndef	NKMEMCLUSTERS
-#define	NKMEMCLUSTERS	(128 * 1024 * 1024 / CLBYTES)
+#define	NKMEMCLUSTERS	(8 * 1024 * 1024 / CLBYTES)
 #endif
 
 /*
@@ -128,7 +128,7 @@
  */
 #define	USER_SR		13
 #define	KERNEL_SR	14
-#define	KERNEL_SEGMENT	(0xfffff0 + KERNEL_SR)
+#define	KERNEL_SEGMENT	(0xf00000 + KERNEL_SR)
 #define	EMPTY_SEGMENT	0xfffff0
 #define	USER_ADDR	((void *)(USER_SR << ADDR_SR_SHFT))
 

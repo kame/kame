@@ -1,4 +1,4 @@
-/*	$NetBSD: locore.s,v 1.41.2.3 1999/06/24 15:58:16 perry Exp $	*/
+/*	$NetBSD: locore.s,v 1.41.2.5 2000/01/15 17:35:53 he Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -409,9 +409,17 @@ ENTRY_NOPROFILE(trace)
 	clrl	sp@-			| stack adjust count
 	moveml	#0xFFFF,sp@-
 	moveq	#T_TRACE,d0
+
+	| Check PSW and see what happen.
+	|   T=0 S=0	(should not happen)
+	|   T=1 S=0	trace trap from user mode
+	|   T=0 S=1	trace trap on a trap instruction
+	|   T=1 S=1	trace trap from system mode (kernel breakpoint)
+
 	movw	sp@(FR_HW),d1		| get PSW
-	andw	#PSL_S,d1		| from system mode?
-	jne	Lkbrkpt			| yes, kernel breakpoint
+	notw	d1			| XXX no support for T0 on 680[234]0
+	andw	#PSL_TS,d1		| from system mode (T=1, S=1)?
+	jeq	Lkbrkpt			| yes, kernel breakpoint
 	jra	fault			| no, user-mode fault
 
 /*
@@ -633,17 +641,12 @@ Lnotdma:
 	jra	rei
 
 _timertrap:
-	movw	#SPL4,sr		| XXX?
 	moveml	#0xC0C0,sp@-		| save scratch registers
 	addql	#1,_C_LABEL(intrcnt)+36	| count hardclock interrupts
 	lea	sp@(16),a1		| a1 = &clockframe
 	movl	a1,sp@-
 	jbsr	_hardclock		| hardclock(&frame)
 	addql	#4,sp
-#include "ms.h"
-#if NMS > 0
-	jbsr	_ms_modem
-#endif
 	addql	#1,_C_LABEL(uvmexp)+UVMEXP_INTRS | chalk up another interrupt
 	moveml	sp@+,#0x0303		| restore scratch registers
 	jra	rei			| all done

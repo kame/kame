@@ -1,4 +1,4 @@
-/*	$NetBSD: clmpcc.c,v 1.4.2.1 1999/04/05 17:36:38 scw Exp $ */
+/*	$NetBSD: clmpcc.c,v 1.4.2.4 1999/11/29 21:14:28 he Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -126,6 +126,8 @@ integrate u_int8_t  clmpcc_rdreg __P((struct clmpcc_softc *, u_int));
 integrate void      clmpcc_wrreg __P((struct clmpcc_softc *, u_int, u_int));
 integrate u_int8_t  clmpcc_rdreg_odd __P((struct clmpcc_softc *, u_int));
 integrate void      clmpcc_wrreg_odd __P((struct clmpcc_softc *, u_int, u_int));
+integrate void      clmpcc_wrtx_multi __P((struct clmpcc_softc *, u_int8_t *,
+					u_int));
 integrate u_int8_t  clmpcc_select_channel __P((struct clmpcc_softc *, u_int));
 integrate void      clmpcc_channel_cmd __P((struct clmpcc_softc *,int,int));
 integrate void      clmpcc_enable_transmitter __P((struct clmpcc_chan *));
@@ -191,6 +193,22 @@ clmpcc_wrreg_odd(sc, offset, val)
 	bus_space_write_1(sc->sc_iot, sc->sc_ioh, offset, val);
 }
 
+integrate void
+clmpcc_wrtx_multi(sc, buff, count)
+	struct clmpcc_softc *sc;
+	u_int8_t *buff;
+	u_int count;
+{
+	u_int offset = CLMPCC_REG_TDR;
+
+#if !defined(CLMPCC_ONLY_BYTESWAP_LOW) && !defined(CLMPCC_ONLY_BYTESWAP_HIGH)
+	offset ^= (sc->sc_byteswap & 2);
+#elif defined(CLMPCC_ONLY_BYTESWAP_HIGH)
+	offset ^= (CLMPCC_BYTESWAP_HIGH & 2);
+#endif
+	bus_space_write_multi_1(sc->sc_iot, sc->sc_ioh, offset, buff, count);
+}
+
 integrate u_int8_t
 clmpcc_select_channel(sc, new_chan)
 	struct clmpcc_softc *sc;
@@ -234,13 +252,9 @@ clmpcc_enable_transmitter(ch)
 	old = clmpcc_select_channel(ch->ch_sc, ch->ch_car);
 
 	s = splserial();
-
 	clmpcc_wrreg(ch->ch_sc, CLMPCC_REG_IER,
 		clmpcc_rdreg(ch->ch_sc, CLMPCC_REG_IER) | CLMPCC_IER_TX_EMPTY);
-
-	CLR(ch->ch_flags, CLMPCC_FLG_START);
 	SET(ch->ch_tty->t_state, TS_BUSY);
-
 	splx(s);
 
 	clmpcc_select_channel(ch->ch_sc, old);
@@ -951,7 +965,7 @@ clmpcc_set_params(ch)
 	u_char r1;
 	u_char r2;
 
-	if ( ch->ch_tcor && ch->ch_tbpr ) {
+	if ( ch->ch_tcor || ch->ch_tbpr ) {
 		r1 = clmpcc_rdreg(sc, CLMPCC_REG_TCOR);
 		r2 = clmpcc_rdreg(sc, CLMPCC_REG_TBPR);
 		/* Only write Tx rate if it really has changed */
@@ -961,7 +975,7 @@ clmpcc_set_params(ch)
 		}
 	}
 
-	if ( ch->ch_rcor && ch->ch_rbpr ) {
+	if ( ch->ch_rcor || ch->ch_rbpr ) {
 		r1 = clmpcc_rdreg(sc, CLMPCC_REG_RCOR);
 		r2 = clmpcc_rdreg(sc, CLMPCC_REG_RBPR);
 		/* Only write Rx rate if it really has changed */
@@ -983,10 +997,10 @@ clmpcc_set_params(ch)
 	r1 = clmpcc_rdreg(sc, CLMPCC_REG_COR4);
 	if ( ch->ch_cor4 != (r1 & CLMPCC_COR4_FIFO_MASK) ) {
 		/*
-		 * Note: If the Rx FIFO has changed, we always set it to
+		 * Note: If the FIFO has changed, we always set it to
 		 * zero here and disable the Receive Timeout interrupt.
 		 * It's up to the Rx Interrupt handler to pick the
-		 * appropriate moment to write the Rx FIFO length.
+		 * appropriate moment to write the new FIFO length.
 		 */
 		clmpcc_wrreg(sc, CLMPCC_REG_COR4, r1 & ~CLMPCC_COR4_FIFO_MASK);
 		r1 = clmpcc_rdreg(sc, CLMPCC_REG_IER);
@@ -1007,28 +1021,40 @@ clmpcc_start(tp)
 {
 	struct clmpcc_softc *sc = clmpcc_cd.cd_devs[CLMPCCUNIT(tp->t_dev)];
 	struct clmpcc_chan *ch = &sc->sc_chans[CLMPCCCHAN(tp->t_dev)];
+	u_int oldch;
 	int s;
 
 	s = spltty();
 
-	if ( ISCLR(tp->t_state, TS_TTSTOP | TS_TIMEOUT | TS_BUSY) &&
-	     ISCLR(ch->ch_flags, CLMPCC_FLG_STOP) ) {
+	if ( ISCLR(tp->t_state, TS_TTSTOP | TS_TIMEOUT | TS_BUSY) ) {
 		if ( tp->t_outq.c_cc <= tp->t_lowat ) {
 			if ( ISSET(tp->t_state, TS_ASLEEP) ) {
 				CLR(tp->t_state, TS_ASLEEP);
 				wakeup(&tp->t_outq);
 			}
 			selwakeup(&tp->t_wsel);
-
-			if ( tp->t_outq.c_cc == 0 )
-				goto out;
 		}
-		SET(tp->t_state, TS_BUSY);
-		clmpcc_enable_transmitter(ch);
+
+		if ( ISSET(ch->ch_flags, CLMPCC_FLG_START_BREAK |
+					 CLMPCC_FLG_END_BREAK) ||
+		     tp->t_outq.c_cc > 0 ) {
+
+			if ( ISCLR(ch->ch_flags, CLMPCC_FLG_START_BREAK |
+						 CLMPCC_FLG_END_BREAK) ) {
+				ch->ch_obuf_addr = tp->t_outq.c_cf;
+				ch->ch_obuf_size = ndqb(&tp->t_outq, 0);
+			}
+
+			/* Enable TX empty interrupts */
+			oldch = clmpcc_select_channel(ch->ch_sc, ch->ch_car);
+			clmpcc_wrreg(ch->ch_sc, CLMPCC_REG_IER,
+				clmpcc_rdreg(ch->ch_sc, CLMPCC_REG_IER) |
+					     CLMPCC_IER_TX_EMPTY);
+			clmpcc_select_channel(ch->ch_sc, oldch);
+			SET(tp->t_state, TS_BUSY);
+		}
 	}
 
-out:
-	CLR(ch->ch_flags, CLMPCC_FLG_START);
 	splx(s);
 }
 
@@ -1044,17 +1070,12 @@ clmpccstop(tp, flag)
 	struct clmpcc_chan *ch = &sc->sc_chans[CLMPCCCHAN(tp->t_dev)];
 	int s;
 
-	s = spltty();
+	s = splserial();
 
 	if ( ISSET(tp->t_state, TS_BUSY) ) {
 		if ( ISCLR(tp->t_state, TS_TTSTOP) )
 			SET(tp->t_state, TS_FLUSH);
-
-		/*
-		 * The transmit interrupt routine will disable transmit when it
-		 * notices that CLMPCC_FLG_STOP has been set.
-		 */
-		SET(ch->ch_flags, CLMPCC_FLG_STOP);
+		ch->ch_obuf_size = 0;
 	}
 	splx(s);
 }
@@ -1099,7 +1120,7 @@ clmpcc_rxintr(arg)
 		 * further receive timeout interrupts.
 		 */
 		reg = clmpcc_rdreg(sc, CLMPCC_REG_COR4);
-		clmpcc_wrreg(sc, CLMPCC_REG_COR4, reg & CLMPCC_COR4_FIFO_MASK);
+		clmpcc_wrreg(sc, CLMPCC_REG_COR4, reg & ~CLMPCC_COR4_FIFO_MASK);
 		reg = clmpcc_rdreg(sc, CLMPCC_REG_IER);
 		clmpcc_wrreg(sc, CLMPCC_REG_IER, reg & ~CLMPCC_IER_RET);
 		clmpcc_wrreg(sc, CLMPCC_REG_REOIR, CLMPCC_REOIR_NO_TRANS);
@@ -1224,7 +1245,8 @@ clmpcc_txintr(arg)
 	struct clmpcc_chan *ch;
 	struct tty *tp;
 	u_char ftc, oftc;
-	u_char tir;
+	u_char tir, teoir;
+	int etcmode = 0;
 
 	/* Tx interrupt active? */
 	tir = clmpcc_rdreg(sc, CLMPCC_REG_TIR);
@@ -1243,72 +1265,88 @@ clmpcc_txintr(arg)
 	/* Dummy read of the interrupt status register */
 	(void) clmpcc_rdreg(sc, CLMPCC_REG_TISR);
 
+	/* Make sure embedded transmit commands are disabled */
+	clmpcc_wrreg(sc, CLMPCC_REG_COR2, ch->ch_cor2);
+
 	ftc = oftc = clmpcc_rdreg(sc, CLMPCC_REG_TFTC);
 
 	/* Handle a delayed parameter change */
 	if ( ISSET(ch->ch_flags, CLMPCC_FLG_UPDATE_PARMS) ) {
-		clmpcc_set_params(ch);
 		CLR(ch->ch_flags, CLMPCC_FLG_UPDATE_PARMS);
-		SET(ch->ch_flags, CLMPCC_FLG_START);
-		goto tx_done;
+		clmpcc_set_params(ch);
 	}
 
-	/* Stop transmitting if CLMPCC_FLG_STOP is set */
-	if ( ISSET(ch->ch_flags, CLMPCC_FLG_STOP) )
-		goto tx_done;
+	if ( ch->ch_obuf_size > 0 ) {
+		u_int n = min(ch->ch_obuf_size, ftc);
 
-	CLR(ch->ch_flags, CLMPCC_FLG_UPDATE_PARMS);
+		clmpcc_wrtx_multi(sc, ch->ch_obuf_addr, n);
 
-	if ( tp->t_outq.c_cc > 0 ) {
-		SET(tp->t_state, TS_BUSY);
-		while (tp->t_outq.c_cc > 0 && ftc > 0 ) {
-			clmpcc_wr_txdata(sc, getc(&tp->t_outq));
-			ftc--;
-		}
+		ftc -= n;
+		ch->ch_obuf_size -= n;
+		ch->ch_obuf_addr += n;
+
 	} else {
 		/*
-		 * No data to send -- check if we should
-		 * start/stop a break
-		 */
-		/*
-		 * XXX does this cause too much delay before
-		 * breaks?
+		 * Check if we should start/stop a break
 		 */
 		if ( ISSET(ch->ch_flags, CLMPCC_FLG_START_BREAK) ) {
 			CLR(ch->ch_flags, CLMPCC_FLG_START_BREAK);
+			/* Enable embedded transmit commands */
+			clmpcc_wrreg(sc, CLMPCC_REG_COR2,
+					ch->ch_cor2 | CLMPCC_COR2_ETC);
+			clmpcc_wr_txdata(sc, CLMPCC_ETC_MAGIC);
+			clmpcc_wr_txdata(sc, CLMPCC_ETC_SEND_BREAK);
+			ftc -= 2;
+			etcmode = 1;
 		}
 
 		if ( ISSET(ch->ch_flags, CLMPCC_FLG_END_BREAK) ) {
 			CLR(ch->ch_flags, CLMPCC_FLG_END_BREAK);
+			/* Enable embedded transmit commands */
+			clmpcc_wrreg(sc, CLMPCC_REG_COR2,
+					ch->ch_cor2 | CLMPCC_COR2_ETC);
+			clmpcc_wr_txdata(sc, CLMPCC_ETC_MAGIC);
+			clmpcc_wr_txdata(sc, CLMPCC_ETC_STOP_BREAK);
+			ftc -= 2;
+			etcmode = 1;
 		}
 	}
 
-	if ( tp->t_outq.c_cc == 0 ) {
-tx_done:
+	tir = clmpcc_rdreg(sc, CLMPCC_REG_IER);
+
+	if ( ftc != oftc ) {
 		/*
-		 * No data to send, requested to stop or waiting for
-		 * an INIT following a parameter change.
-		 * Disable transmit interrupt
+		 * Enable/disable the Tx FIFO threshold interrupt
+		 * according to how much data is in the FIFO.
+		 * However, always disable the FIFO threshold if
+		 * we've left the channel in 'Embedded Transmit
+		 * Command' mode.
 		 */
-		clmpcc_wrreg(ch->ch_sc, CLMPCC_REG_IER,
-			clmpcc_rdreg(ch->ch_sc, CLMPCC_REG_IER) &
-						~CLMPCC_IER_TX_EMPTY);
-		CLR(ch->ch_flags, CLMPCC_FLG_STOP);
-		CLR(tp->t_state, TS_BUSY);
+		if ( etcmode || ftc >= ch->ch_cor4 )
+			tir &= ~CLMPCC_IER_TX_FIFO;
+		else
+			tir |= CLMPCC_IER_TX_FIFO;
+		teoir = 0;
+	} else {
+		/*
+		 * No data was sent.
+		 * Disable transmit interrupt.
+		 */
+		tir &= ~(CLMPCC_IER_TX_EMPTY|CLMPCC_IER_TX_FIFO);
+		teoir = CLMPCC_TEOIR_NO_TRANS;
+
+		/*
+		 * Request Tx processing in the soft interrupt handler
+		 */
+		ch->ch_tx_done = 1;
+		if ( ! sc->sc_soft_running ) {
+			sc->sc_soft_running = 1;
+			(sc->sc_softhook)(sc);
+		}
 	}
 
-	if ( tp->t_outq.c_cc <= tp->t_lowat )
-		SET(ch->ch_flags, CLMPCC_FLG_START);
-
-	if ( ISSET(ch->ch_flags, CLMPCC_FLG_START) && ! sc->sc_soft_running ) {
-		sc->sc_soft_running = 1;
-		(sc->sc_softhook)(sc);
-	}
-
-	if ( ftc != oftc )
-		clmpcc_wrreg(sc, CLMPCC_REG_TEOIR, 0);
-	else
-		clmpcc_wrreg(sc, CLMPCC_REG_TEOIR, CLMPCC_TEOIR_NO_TRANS);
+	clmpcc_wrreg(sc, CLMPCC_REG_IER, tir);
+	clmpcc_wrreg(sc, CLMPCC_REG_TEOIR, teoir);
 
 	return 1;
 }
@@ -1365,7 +1403,6 @@ clmpcc_softintr(arg)
 
 	sc->sc_soft_running = 0;
 
-
 	/* Handle Modem state changes too... */
 
 	for (chan = 0; chan < CLMPCC_NUM_CHANS; chan++) {
@@ -1380,8 +1417,8 @@ clmpcc_softintr(arg)
 			c = get[0];
 			c |= ((u_int)get[1]) << 8;
 			if ( (rint)(c, tp) == -1 ) {
-			    ch->ch_ibuf_rd = ch->ch_ibuf_wr;
-			    break;
+				ch->ch_ibuf_rd = ch->ch_ibuf_wr;
+				break;
 			}
 
 			get += 2;
@@ -1391,31 +1428,46 @@ clmpcc_softintr(arg)
 			ch->ch_ibuf_rd = get;
 		}
 
-		if ( ISSET(ch->ch_flags, CLMPCC_FLG_NEED_INIT) ) {
-			clmpcc_channel_cmd(sc, ch->ch_car, CLMPCC_CCR_T0_INIT |
-							   CLMPCC_CCR_T0_RX_EN |
-					   		   CLMPCC_CCR_T0_TX_EN);
-			CLR(ch->ch_flags, CLMPCC_FLG_NEED_INIT);
+		/*
+		 * Is the transmitter idle and in need of attention?
+		 */
+		if ( ch->ch_tx_done ) {
+			ch->ch_tx_done = 0;
 
-			/*
-			 * Allow time for the channel to initialise.
-			 * (Empirically derived duration; the must be
-			 * another way to determine the command
-			 * has completed without busy-waiting...)
-			 */
-			delay(800);
+			if ( ISSET(ch->ch_flags, CLMPCC_FLG_NEED_INIT) ) {
+				clmpcc_channel_cmd(sc, ch->ch_car,
+						       CLMPCC_CCR_T0_INIT  |
+						       CLMPCC_CCR_T0_RX_EN |
+					   	       CLMPCC_CCR_T0_TX_EN);
+				CLR(ch->ch_flags, CLMPCC_FLG_NEED_INIT);
 
-			/*
-			 * Update the tty layer's idea of the carrier bit,
-			 * in case we changed CLOCAL or MDMBUF. We don't
-			 * hang up here; we only do that by explicit request.
-			 */
-			reg = clmpcc_rd_msvr(sc) & CLMPCC_MSVR_CD;
-			(void) (*linesw[tp->t_line].l_modem)(tp, reg != 0);
-		}
+				/*
+				 * Allow time for the channel to initialise.
+				 * (Empirically derived duration; there must
+				 * be another way to determine the command
+				 * has completed without busy-waiting...)
+				 */
+				delay(800);
 
-		if ( ISSET(ch->ch_flags, CLMPCC_FLG_START) )
+				/*
+				 * Update the tty layer's idea of the carrier
+				 * bit, in case we changed CLOCAL or MDMBUF.
+				 * We don't hang up here; we only do that by
+				 * explicit request.
+				 */
+				reg = clmpcc_rd_msvr(sc) & CLMPCC_MSVR_CD;
+				(*linesw[tp->t_line].l_modem)(tp, reg != 0);
+			}
+
+			CLR(tp->t_state, TS_BUSY);
+			if ( ISSET(tp->t_state, TS_FLUSH) )
+				CLR(tp->t_state, TS_FLUSH);
+			else
+				ndflush(&tp->t_outq,
+				     (int)(ch->ch_obuf_addr - tp->t_outq.c_cf));
+
 			(*linesw[tp->t_line].l_start)(tp);
+		}
 	}
 
 	return 0;
@@ -1526,14 +1578,6 @@ clmpcc_common_putc(sc, chan, c)
 
 	/* Save the currently active channel */
 	old_chan = clmpcc_select_channel(sc, chan);
-
-	/*
-	 * We wait here until the Tx FIFO is empty, and
-	 * the chip signifies that the Tx output is idle.
-	 */
-	while ((clmpcc_rdreg(sc,CLMPCC_REG_TISR) & CLMPCC_TISR_TX_EMPTY) ==0 &&
-	       (clmpcc_rdreg(sc,CLMPCC_REG_TFTC) & CLMPCC_TFTC_MASK) != 0 )
-		; /* Do nothing */
 
 	/*
 	 * Since we can only access the Tx Data register from within

@@ -1,4 +1,4 @@
-#	$NetBSD: CATSINST,v 1.1 1999/04/05 07:30:43 mark Exp $
+#	$NetBSD: CATSINST,v 1.1.2.1 2000/03/01 00:06:30 he Exp $
 #
 #	CATSINST -- CHALTECH CATS Install kernel
 #
@@ -105,7 +105,7 @@ options 	SHMMAXPGS=1024	# 1024 pages is the default
 
 options 	MEMORY_DISK_HOOKS	# boottime setup of ramdisk
 #options 	MEMORY_DISK_SIZE=0	# Size in blocks
-options 	MINIROOTSIZE=3400	# Size in blocks
+options 	MINIROOTSIZE=3600	# Size in blocks
 options 	MEMORY_DISK_IS_ROOT	# use memory disk as root
 
 # Miscellaneous kernel options

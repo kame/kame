@@ -1,4 +1,4 @@
-/*	$NetBSD: lfs_segment.c,v 1.23.2.2 1999/06/25 20:51:32 perry Exp $	*/
+/*	$NetBSD: lfs_segment.c,v 1.23.2.10 2000/01/20 21:10:03 he Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -72,6 +72,7 @@
 
 #define ivndebug(vp,str) printf("ino %d: %s\n",VTOI(vp)->i_number,(str))
 
+#include "opt_ddb.h"
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/namei.h>
@@ -136,6 +137,7 @@ int	 lfs_writevnodes __P((struct lfs *fs, struct mount *mp,
 int	lfs_allclean_wakeup;		/* Cleaner wakeup address. */
 int	lfs_writeindir = 1;             /* whether to flush indir on non-ckp */
 int	lfs_clean_vnhead = 0;		/* Allow freeing to head of vn list */
+int	lfs_dirvcount = 0;		/* # active dirops */
 
 /* Statistics Counters */
 int lfs_dostats = 1;
@@ -186,7 +188,8 @@ lfs_vflush(vp)
 	struct inode *ip;
 	struct lfs *fs;
 	struct segment *sp;
-	int error;
+	struct buf *bp, *nbp, *tbp, *tnbp;
+	int error, s;
 
 	ip = VTOI(vp);
 	fs = VFSTOUFS(vp->v_mount)->um_lfs;
@@ -200,6 +203,28 @@ lfs_vflush(vp)
 			fs->lfs_uinodes--;
 		} else
 			ip->i_flag |= IN_MODIFIED;
+		/*
+		 * Toss any cleaning buffers that have real counterparts
+		 * to avoid losing new data
+		 */
+		s = splbio();
+		for(bp=vp->v_dirtyblkhd.lh_first; bp; bp=nbp) {
+			nbp = bp->b_vnbufs.le_next;
+			if(bp->b_flags & B_CALL) {
+				for(tbp=vp->v_dirtyblkhd.lh_first; tbp;
+				    tbp=tnbp)
+				{
+					tnbp = tbp->b_vnbufs.le_next;
+					if(tbp->b_vp == bp->b_vp
+					   && tbp->b_lblkno == bp->b_lblkno
+					   && tbp != bp)
+					{
+						lfs_freebuf(bp);
+					}
+				}
+			}
+		}
+		splx(s);
 	}
 
 	/* If the node is being written, wait until that is done */
@@ -212,6 +237,40 @@ lfs_vflush(vp)
 
 	/* Protect against VXLOCK deadlock in vinvalbuf() */
 	lfs_seglock(fs, SEGM_SYNC);
+
+	/* If we're supposed to flush a freed inode, just toss it */
+	/* XXX - seglock, so these buffers can't be gathered, right? */
+	if(ip->i_ffs_mode == 0) {
+		printf("lfs_vflush: ino %d is freed, not flushing\n",
+			ip->i_number);
+		s = splbio();
+		for(bp=vp->v_dirtyblkhd.lh_first; bp; bp=nbp) {
+			nbp = bp->b_vnbufs.le_next;
+			/* Copied from lfs_writeseg */
+			if (bp->b_flags & B_CALL) {
+				/* if B_CALL, it was created with newbuf */
+				lfs_freebuf(bp);
+			} else {
+				bremfree(bp);
+				bp->b_flags &= ~(B_ERROR | B_READ | B_DELWRI |
+                                         B_LOCKED | B_GATHERED);
+				bp->b_flags |= B_DONE;
+				reassignbuf(bp, vp);
+				brelse(bp);  
+			}
+		}
+		splx(s);
+		if(ip->i_flag & IN_CLEANING)
+			fs->lfs_uinodes--;
+		if(ip->i_flag & IN_MODIFIED)
+			fs->lfs_uinodes--;
+		ip->i_flag &= ~(IN_MODIFIED|IN_UPDATE|IN_ACCESS|IN_CHANGE|IN_CLEANING);
+		printf("lfs_vflush: done not flushing ino %d\n",
+			ip->i_number);
+		lfs_segunlock(fs);
+		return 0;
+	}
+
 	SET_FLUSHING(fs,vp);
 	if (fs->lfs_nactive > LFS_MAX_ACTIVE) {
 		error = lfs_segwrite(vp->v_mount, SEGM_SYNC|SEGM_CKP);
@@ -244,7 +303,7 @@ lfs_vflush(vp)
 		/* panic("VDIROP being flushed...this can\'t happen"); */
 	}
 	if(vp->v_usecount<0) {
-		printf("usecount=%d\n",vp->v_usecount);
+		printf("usecount=%ld\n",vp->v_usecount);
 		panic("lfs_vflush: usecount<0");
 	}
 #endif
@@ -327,6 +386,7 @@ lfs_writevnodes(fs, mp, sp, op)
 		}
 
 		if(op == VN_CLEAN && ip->i_number != LFS_IFILE_INUM
+		   && vp != fs->lfs_flushvp
 		   && !(ip->i_flag & IN_CLEANING)) {
 			vndebug(vp,"cleaning");
 			continue;
@@ -377,13 +437,6 @@ lfs_writevnodes(fs, mp, sp, op)
 			}
 			(void) lfs_writeinode(fs, sp, ip);
 			inodes_written++;
-		}
-
-		if(vp->v_flag & VDIROP) {
-			--fs->lfs_dirvcount;
-			vp->v_flag &= ~VDIROP;
-			wakeup(&fs->lfs_dirvcount);
-			lfs_vunref(vp);
 		}
 
 		if(lfs_clean_vnhead && only_cleaning)
@@ -448,19 +501,17 @@ lfs_segwrite(mp, flags)
 	/*
 	 * If lfs_flushvp is non-NULL, we are called from lfs_vflush,
 	 * in which case we have to flush *all* buffers off of this vnode.
+	 * We don't care about other nodes, but write any non-dirop nodes
+	 * anyway in anticipation of another getnewvnode().
+	 *
+	 * If we're cleaning we only write cleaning and ifile blocks, and
+	 * no dirops, since otherwise we'd risk corruption in a crash.
 	 */
-	if((sp->seg_flags & SEGM_CLEAN) && !(fs->lfs_flushvp))
+	if(sp->seg_flags & SEGM_CLEAN)
 		lfs_writevnodes(fs, mp, sp, VN_CLEAN);
 	else {
 		lfs_writevnodes(fs, mp, sp, VN_REG);
-		/*
-		 * XXX KS - If we're cleaning, we can't wait for dirops,
-		 * because they might be waiting on us.  The downside of this
-		 * is that, if we write anything besides cleaning blocks
-		 * while cleaning, the checkpoint is not completely
-		 * consistent.
-		 */
-		if(!(sp->seg_flags & SEGM_CLEAN)) {
+		if(!fs->lfs_dirops || !fs->lfs_flushvp) {
 			while(fs->lfs_dirops)
 				if((error = tsleep(&fs->lfs_writer, PRIBIO + 1,
 						"lfs writer", 0)))
@@ -582,6 +633,21 @@ lfs_writefile(fs, sp, vp)
 	fip->fi_version = ifp->if_version;
 	brelse(bp);
 	
+	if(sp->seg_flags & SEGM_CLEAN)
+	{
+		lfs_gather(fs, sp, vp, lfs_match_fake);
+		/*
+		 * For a file being flushed, we need to write *all* blocks.
+		 * This means writing the cleaning blocks first, and then
+		 * immediately following with any non-cleaning blocks.
+		 * The same is true of the Ifile since checkpoints assume
+		 * that all valid Ifile blocks are written.
+		 */
+	   	if(IS_FLUSHING(fs,vp) || VTOI(vp)->i_number == LFS_IFILE_INUM)
+			lfs_gather(fs, sp, vp, lfs_match_data);
+	} else
+		lfs_gather(fs, sp, vp, lfs_match_data);
+
 	/*
 	 * It may not be necessary to write the meta-data blocks at this point,
 	 * as the roll-forward recovery code should be able to reconstruct the
@@ -591,23 +657,13 @@ lfs_writefile(fs, sp, vp)
 	 * vnode is being flushed (for reuse by vinvalbuf); or (2) we are
 	 * checkpointing.
 	 */
-	if((sp->seg_flags & SEGM_CLEAN)
-	   && VTOI(vp)->i_number != LFS_IFILE_INUM
-	   && !IS_FLUSHING(fs,vp))
-	{
-		lfs_gather(fs, sp, vp, lfs_match_fake);
-	} else
-		lfs_gather(fs, sp, vp, lfs_match_data);
-
 	if(lfs_writeindir
 	   || IS_FLUSHING(fs,vp)
 	   || (sp->seg_flags & SEGM_CKP))
 	{
 		lfs_gather(fs, sp, vp, lfs_match_indir);
 		lfs_gather(fs, sp, vp, lfs_match_dindir);
-/* XXX KS - when is TRIPLE not true? */ /* #ifdef TRIPLE */
 		lfs_gather(fs, sp, vp, lfs_match_tindir);
-/* #endif */
 	}
 	fip = sp->fip;
 	if (fip->fi_nblocks != 0) {
@@ -721,6 +777,13 @@ lfs_writeinode(fs, sp, ip)
 		LFS_IENTRY(ifp, fs, ino, ibp);
 		daddr = ifp->if_daddr;
 		ifp->if_daddr = bp->b_blkno;
+#ifdef LFS_DEBUG_NEXTFREE
+		if(ino > 3 && ifp->if_nextfree) {
+			vprint("lfs_writeinode",ITOV(ip));
+			printf("lfs_writeinode: updating free ino %d\n",
+				ip->i_number);
+		}
+#endif
 		error = VOP_BWRITE(ibp);
 	}
 	
@@ -735,7 +798,7 @@ lfs_writeinode(fs, sp, ip)
 		if (sup->su_nbytes < DINODE_SIZE) {
 			/* XXX -- Change to a panic. */
 			printf("lfs_writeinode: negative bytes (segment %d short by %d)\n",
-			       datosn(fs, daddr), DINODE_SIZE - sup->su_nbytes);
+			       datosn(fs, daddr), (int)DINODE_SIZE - sup->su_nbytes);
 			panic("lfs_writeinode: negative bytes");
 			sup->su_nbytes = DINODE_SIZE;
 		}
@@ -831,18 +894,39 @@ loop:	for (bp = vp->v_dirtyblkhd.lh_first; bp && bp->b_vnbufs.le_next != NULL;
 #endif /* LFS_NO_BACKBUF_HACK */
 		if ((bp->b_flags & (B_BUSY|B_GATHERED)) || !match(fs, bp))
 			continue;
-#ifdef DIAGNOSTIC
-		if (!(bp->b_flags & B_DELWRI))
-			panic("lfs_gather: bp not B_DELWRI");
-		if (!(bp->b_flags & B_LOCKED))
-			panic("lfs_gather: bp not B_LOCKED");
+		if(vp->v_type == VBLK) {
+			/* For block devices, just write the blocks. */
+			/* XXX Do we really need to even do this? */
+#ifdef DEBUG_LFS
+			if(count==0)
+				printf("BLK(");
+			printf(".");
 #endif
-		count++;
-		if (lfs_gatherblock(sp, bp, &s)) {
-			goto loop;
+			/* Get the block before bwrite, so we don't corrupt the free list */
+			bp->b_flags |= B_BUSY;
+			bremfree(bp);
+			bwrite(bp);
+		} else {
+#ifdef DIAGNOSTIC
+			if (!(bp->b_flags & B_DELWRI))
+				panic("lfs_gather: bp not B_DELWRI");
+			if (!(bp->b_flags & B_LOCKED)) {
+				printf("lfs_gather: lbn %d blk %d not B_LOCKED\n", bp->b_lblkno, bp->b_blkno);
+				VOP_PRINT(bp->b_vp);
+				panic("lfs_gather: bp not B_LOCKED");
+			}
+#endif
+			if (lfs_gatherblock(sp, bp, &s)) {
+				goto loop;
+			}
 		}
+		count++;
 	}
 	splx(s);
+#ifdef DEBUG_LFS
+	if(vp->v_type == VBLK && count)
+		printf(")\n");
+#endif
 	lfs_updatemeta(sp);
 	sp->vp = NULL;
 	return count;
@@ -1225,10 +1309,10 @@ lfs_writeseg(fs, sp)
 		}
 #endif
 
+		s = splbio();
 		if(fs->lfs_iocount >= LFS_THROTTLE) {
 			tsleep(&fs->lfs_iocount, PRIBIO+1, "lfs throttle", 0);
 		}
-		s = splbio();
 		++fs->lfs_iocount;
 #ifdef LFS_TRACK_IOS
 		for(j=0;j<LFS_THROTTLE;j++) {
@@ -1362,13 +1446,13 @@ lfs_writesuper(fs, daddr)
 	 * If we can write one superblock while another is in
 	 * progress, we risk not having a complete checkpoint if we crash.
 	 * So, block here if a superblock write is in progress.
-	 *
-	 * XXX - should be a proper lock, not this hack
 	 */
+	s = splbio();
 	while(fs->lfs_sbactive) {
 		tsleep(&fs->lfs_sbactive, PRIBIO+1, "lfs sb", 0);
 	}
 	fs->lfs_sbactive = daddr;
+	splx(s);
 #endif
 	i_dev = VTOI(fs->lfs_ivnode)->i_dev;
 	strategy = VTOI(fs->lfs_ivnode)->i_devvp->v_op[VOFFSET(vop_strategy)];
@@ -1579,7 +1663,7 @@ lfs_vunref(vp)
 #ifdef DIAGNOSTIC
 	if(vp->v_usecount<=0) {
 		printf("lfs_vunref: flags are 0x%lx\n", vp->v_flag);
-		printf("lfs_vunref: usecount = %d\n", vp->v_usecount);
+		printf("lfs_vunref: usecount = %ld\n", vp->v_usecount);
 		panic("lfs_vunref: v_usecount<0");
 	}
 #endif

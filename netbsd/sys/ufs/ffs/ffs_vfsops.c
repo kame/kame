@@ -1,4 +1,4 @@
-/*	$NetBSD: ffs_vfsops.c,v 1.49 1999/03/05 12:02:18 bouyer Exp $	*/
+/*	$NetBSD: ffs_vfsops.c,v 1.49.2.2 1999/12/20 13:16:30 he Exp $	*/
 
 /*
  * Copyright (c) 1989, 1991, 1993, 1994
@@ -530,6 +530,8 @@ ffs_mountfs(devvp, mp, p)
 	if (needswap)
 		ffs_sb_swap((struct fs*)bp->b_data, fs, 0);
 #endif
+	ffs_oldfscompat(fs);
+
 	if (fs->fs_bsize > MAXBSIZE || fs->fs_bsize < sizeof(struct fs)) {
 		error = EINVAL;
 		goto out;
@@ -610,7 +612,6 @@ ffs_mountfs(devvp, mp, p)
 	for (i = 0; i < MAXQUOTAS; i++)
 		ump->um_quotas[i] = NULLVP;
 	devvp->v_specflags |= SI_MOUNTEDON;
-	ffs_oldfscompat(fs);
 	ump->um_savedmaxfilesize = fs->fs_maxfilesize;		/* XXX */
 	maxfilesize = (u_int64_t)0x80000000 * fs->fs_bsize - 1;	/* XXX */
 	if (fs->fs_maxfilesize > maxfilesize)			/* XXX */
@@ -621,7 +622,9 @@ out2:
 out:
 	if (bp)
 		brelse(bp);
+	vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY);
 	(void)VOP_CLOSE(devvp, ronly ? FREAD : FREAD|FWRITE, cred, p);
+	VOP_UNLOCK(devvp, 0);
 	if (ump) {
 		free(ump, M_UFSMNT);
 		mp->mnt_data = (qaddr_t)0;
@@ -685,9 +688,10 @@ ffs_unmount(mp, mntflags, p)
 		(void) ffs_sbupdate(ump, MNT_WAIT);
 	}
 	ump->um_devvp->v_specflags &= ~SI_MOUNTEDON;
+	vn_lock(ump->um_devvp, LK_EXCLUSIVE | LK_RETRY);
 	error = VOP_CLOSE(ump->um_devvp, fs->fs_ronly ? FREAD : FREAD|FWRITE,
 		NOCRED, p);
-	vrele(ump->um_devvp);
+	vput(ump->um_devvp);
 	free(fs->fs_csp[0], M_UFSMNT);
 	free(fs, M_UFSMNT);
 	free(ump, M_UFSMNT);

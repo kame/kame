@@ -1,4 +1,4 @@
-/*	$NetBSD: clock.c,v 1.19 1998/01/12 18:04:01 thorpej Exp $	*/
+/*	$NetBSD: clock.c,v 1.19.8.2 2000/01/21 00:27:47 he Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -206,13 +206,13 @@ void		*auxp;
 void cpu_initclocks()
 {
 	MFP->mf_tacr  = T_Q200;		/* Start timer			*/
-	MFP->mf_ipra &= ~IA_TIMA;	/* Clear pending interrupts	*/
+	MFP->mf_ipra  = (u_int8_t)~IA_TIMA;/* Clear pending interrupts	*/
 	MFP->mf_iera |= IA_TIMA;	/* Enable timer interrupts	*/
 	MFP->mf_imra |= IA_TIMA;	/*    .....			*/
 
 #ifdef STATCLOCK
 	MFP->mf_tcdcr = (MFP->mf_tcdcr & 0x7) | (T_Q200<<4); /* Start	*/
-	MFP->mf_iprb &= ~IB_TIMC;	/* Clear pending interrupts	*/
+	MFP->mf_iprb  = (u_int8_t)~IB_TIMC;/* Clear pending interrupts	*/
 	MFP->mf_ierb |= IB_TIMC;	/* Enable timer interrupts	*/
 	MFP->mf_imrb |= IB_TIMC;	/*    .....			*/
 #endif /* STATCLOCK */
@@ -491,8 +491,8 @@ rtcread(dev, uio, flags)
 	MC146818_GETTOD(RTC, &clkregs);
 	splx(s);
 
-	sprintf(buffer, "%02d%02d%02d%02d%02d.%02d\n",
-	    clkregs[MC_YEAR] + GEMSTARTOFTIME - 1900,
+	sprintf(buffer, "%4d%02d%02d%02d%02d.%02d\n",
+	    clkregs[MC_YEAR] + GEMSTARTOFTIME,
 	    clkregs[MC_MONTH], clkregs[MC_DOM],
 	    clkregs[MC_HOUR], clkregs[MC_MIN], clkregs[MC_SEC]);
 
@@ -528,7 +528,7 @@ rtcwrite(dev, uio, flags)
 {
 	mc_todregs		clkregs;
 	int			s, length, error;
-	char			buffer[14];
+	char			buffer[16];
 
 	/*
 	 * We require atomic updates!
@@ -548,13 +548,12 @@ rtcwrite(dev, uio, flags)
 	MC146818_GETTOD(RTC, &clkregs);
 	splx(s);
 
-	clkregs[MC_SEC]   = twodigits(buffer, 11);
-	clkregs[MC_MIN]   = twodigits(buffer, 8);
-	clkregs[MC_HOUR]  = twodigits(buffer, 6);
-	clkregs[MC_DOM]   = twodigits(buffer, 4);
-	clkregs[MC_MONTH] = twodigits(buffer, 2);
-	s = twodigits(buffer, 0);
-	s = (s < 70) ? s + 2000 : s + 1900;
+	clkregs[MC_SEC]   = twodigits(buffer, 13);
+	clkregs[MC_MIN]   = twodigits(buffer, 10);
+	clkregs[MC_HOUR]  = twodigits(buffer, 8);
+	clkregs[MC_DOM]   = twodigits(buffer, 6);
+	clkregs[MC_MONTH] = twodigits(buffer, 4);
+	s = twodigits(buffer, 0) * 100 + twodigits(buffer, 2);
 	clkregs[MC_YEAR]  = s - GEMSTARTOFTIME; 
 
 	s = splclock();

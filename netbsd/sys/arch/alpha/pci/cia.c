@@ -1,4 +1,4 @@
-/* $NetBSD: cia.c,v 1.47 1999/04/10 01:21:38 cgd Exp $ */
+/* $NetBSD: cia.c,v 1.47.2.2 2000/02/07 19:35:10 he Exp $ */
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -72,7 +72,7 @@
 
 #include <sys/cdefs.h>			/* RCS ID & Copyright macro defns */
 
-__KERNEL_RCSID(0, "$NetBSD: cia.c,v 1.47 1999/04/10 01:21:38 cgd Exp $");
+__KERNEL_RCSID(0, "$NetBSD: cia.c,v 1.47.2.2 2000/02/07 19:35:10 he Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -314,15 +314,19 @@ ciaattach(parent, self, aux)
 		 * PCI-ISA bridge (i.e. Miata 1.5 and Miata 2) do not
 		 * have the bug, so we use this check.
 		 *
-		 * XXX We also need to deal with this boundary constraint
-		 * XXX in the PCI bus 0 (and ISA) DMA tags, but some
-		 * XXX drivers are going to need to be changed first.
+		 * NOTE: This bug is actually worked around in cia_dma.c,
+		 * when direct-mapped DMA maps are created.
+		 *
+		 * XXX WE NEED TO THINK ABOUT HOW TO HANDLE THIS FOR
+		 * XXX SGMAP DMA MAPPINGS!
 		 */
 		u_int32_t ctrl;
 
 		/* XXX no bets... */
 		printf("%s: WARNING: Pyxis pass 1 DMA bug; no bets...\n",
 		    self->dv_xname);
+
+		ccp->cc_flags |= CCF_PYXISBUG;
 
 		alpha_mb();
 		ctrl = REGVAL(CIA_CSR_CTRL);

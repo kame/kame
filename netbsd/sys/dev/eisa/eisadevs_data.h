@@ -1,10 +1,10 @@
-/*	$NetBSD: eisadevs_data.h,v 1.17 1998/07/01 21:59:21 kleink Exp $	*/
+/*	$NetBSD: eisadevs_data.h,v 1.17.8.3 2000/01/15 17:25:07 he Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: eisadevs,v 1.15 1998/07/01 21:57:32 kleink Exp 
+ *	NetBSD: eisadevs,v 1.15.8.2 2000/01/15 17:24:18 he Exp 
  */
 
 /*
@@ -86,6 +86,11 @@ struct eisa_knowndev eisa_knowndevs[] = {
 	},
 	{
 	    0,
+	    "ATT2408",
+	    EISA_PRODUCT_ATT2408,
+	},
+	{
+	    0,
 	    "BUS4201",
 	    EISA_PRODUCT_BUS4201,
 	},
@@ -121,6 +126,61 @@ struct eisa_knowndev eisa_knowndevs[] = {
 	},
 	{
 	    0,
+	    "DPT2402",
+	    EISA_PRODUCT_DPT2402,
+	},
+	{
+	    0,
+	    "DPTA401",
+	    EISA_PRODUCT_DPTA401,
+	},
+	{
+	    0,
+	    "DPTA402",
+	    EISA_PRODUCT_DPTA402,
+	},
+	{
+	    0,
+	    "DPTA410",
+	    EISA_PRODUCT_DPTA410,
+	},
+	{
+	    0,
+	    "DPTA411",
+	    EISA_PRODUCT_DPTA411,
+	},
+	{
+	    0,
+	    "DPTA412",
+	    EISA_PRODUCT_DPTA412,
+	},
+	{
+	    0,
+	    "DPTA420",
+	    EISA_PRODUCT_DPTA420,
+	},
+	{
+	    0,
+	    "DPTA501",
+	    EISA_PRODUCT_DPTA501,
+	},
+	{
+	    0,
+	    "DPTA502",
+	    EISA_PRODUCT_DPTA502,
+	},
+	{
+	    0,
+	    "DPTA701",
+	    EISA_PRODUCT_DPTA701,
+	},
+	{
+	    0,
+	    "DPTBC01",
+	    EISA_PRODUCT_DPTBC01,
+	},
+	{
+	    0,
 	    "FSI2001",
 	    EISA_PRODUCT_FSI2001,
 	},
@@ -151,6 +211,11 @@ struct eisa_knowndev eisa_knowndevs[] = {
 	},
 	{
 	    0,
+	    "NEC8200",
+	    EISA_PRODUCT_NEC8200,
+	},
+	{
+	    0,
 	    "TCM5091",
 	    EISA_PRODUCT_TCM5091,
 	},
@@ -163,6 +228,11 @@ struct eisa_knowndev eisa_knowndevs[] = {
 	    0,
 	    "TCM5093",
 	    EISA_PRODUCT_TCM5093,
+	},
+	{
+	    0,
+	    "TCM5094",
+	    EISA_PRODUCT_TCM5094,
 	},
 	{
 	    0,
@@ -211,6 +281,11 @@ struct eisa_knowndev eisa_knowndevs[] = {
 	},
 	{
 	    EISA_KNOWNDEV_NOPROD,
+	    "ATT",
+	    "AT&T",
+	},
+	{
+	    EISA_KNOWNDEV_NOPROD,
 	    "BUS",
 	    "BusLogic",
 	},
@@ -218,6 +293,11 @@ struct eisa_knowndev eisa_knowndevs[] = {
 	    EISA_KNOWNDEV_NOPROD,
 	    "DEC",
 	    "Digital Equipment",
+	},
+	{
+	    EISA_KNOWNDEV_NOPROD,
+	    "DPT",
+	    "Distributed Processing Technology",
 	},
 	{
 	    EISA_KNOWNDEV_NOPROD,
@@ -248,6 +328,11 @@ struct eisa_knowndev eisa_knowndevs[] = {
 	    EISA_KNOWNDEV_NOPROD,
 	    "MLX",
 	    "Mylex",
+	},
+	{
+	    EISA_KNOWNDEV_NOPROD,
+	    "NEC",
+	    "NEC",
 	},
 	{
 	    EISA_KNOWNDEV_NOPROD,

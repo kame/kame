@@ -6,7 +6,7 @@ mkdir
 rmdir
 symlink
 */
-/*	$NetBSD: coda_vnops.c,v 1.9 1998/12/10 02:22:52 rvb Exp $	*/
+/*	$NetBSD: coda_vnops.c,v 1.9.4.4 2000/02/12 17:01:32 he Exp $	*/
 
 /*
  * 
@@ -56,6 +56,28 @@ symlink
 /*
  * HISTORY
  * $Log: coda_vnops.c,v $
+ * Revision 1.9.4.4  2000/02/12 17:01:32  he
+ * Apply patch (requested by he):
+ *   Fix a compile problem under CODA_VERBOSE caused by the v_usecount
+ *   widening.
+ *
+ * Revision 1.9.4.3  2000/02/06 17:16:28  he
+ * Apply patch (requested by christos):
+ *   Fix a compilation problem caused by the widening of v_usecount.
+ *
+ * Revision 1.9.4.2  1999/10/18 05:04:48  cgd
+ * pull up rev 1.14 from trunk (requested by wrstuden):
+ *   In spec_close(), call the device's close routine with the vnode
+ *   unlocked if the call might block. Force a non-blocking close if
+ *   VXLOCK is set.  This eliminates a potential deadlock situation, and
+ *   should eliminate the dirty buffers on reboot issue.
+ *
+ * Revision 1.9.4.1  1999/10/10 20:50:52  cgd
+ * pull up rev 1.13 from trunk (requested by mycroft):
+ *   Fix potential overflow of v_usecount and v_writecount (and panics
+ *   resulting from this) by widening them to `long'.  Mostly affects
+ *   systems where maxvnodes>=32768.
+ *
  * Revision 1.9  1998/12/10 02:22:52  rvb
  * Commit a couple of old fixes
  *
@@ -527,14 +549,15 @@ coda_close(v)
     if (IS_UNMOUNTING(cp)) {
 	if (cp->c_ovp) {
 #ifdef	CODA_VERBOSE
-	    printf("coda_close: destroying container ref %d, ufs vp %p of vp %p/cp %p\n",
+	    printf("coda_close: destroying container ref %ld, ufs vp %p of vp %p/cp %p\n",
 		    vp->v_usecount, cp->c_ovp, vp, cp);
 #endif
 #ifdef	hmm
 	    vgone(cp->c_ovp);
 #else
+	    vn_lock(cp->c_ovp, LK_EXCLUSIVE | LK_RETRY);
 	    VOP_CLOSE(cp->c_ovp, flag, cred, p); /* Do errors matter here? */
-	    vrele(cp->c_ovp);
+	    vput(cp->c_ovp);
 #endif
 	} else {
 #ifdef	CODA_VERBOSE
@@ -543,8 +566,9 @@ coda_close(v)
 	}
 	return ENODEV;
     } else {
+	vn_lock(cp->c_ovp, LK_EXCLUSIVE | LK_RETRY);
 	VOP_CLOSE(cp->c_ovp, flag, cred, p); /* Do errors matter here? */
-	vrele(cp->c_ovp);
+	vput(cp->c_ovp);
     }
 
     if (--cp->c_ocount == 0)
@@ -655,7 +679,7 @@ printf("coda_rdwr: Internally Opening %p\n", vp);
     }
 
     /* Have UFS handle the call. */
-    CODADEBUG(CODA_RDWR, myprintf(("indirect rdwr: fid = (%lx.%lx.%lx), refcnt = %d\n",
+    CODADEBUG(CODA_RDWR, myprintf(("indirect rdwr: fid = (%lx.%lx.%lx), refcnt = %ld\n",
 			      cp->c_fid.Volume, cp->c_fid.Vnode, 
 			      cp->c_fid.Unique, CTOV(cp)->v_usecount)); )
 
@@ -1075,9 +1099,9 @@ coda_inactive(v)
 
     if (IS_UNMOUNTING(cp)) {
 #ifdef	DEBUG
-	printf("coda_inactive: IS_UNMOUNTING use %d: vp %p, cp %p\n", vp->v_usecount, vp, cp);
+	printf("coda_inactive: IS_UNMOUNTING use %ld: vp %p, cp %p\n", vp->v_usecount, vp, cp);
 	if (cp->c_ovp != NULL)
-	    printf("coda_inactive: cp->ovp != NULL use %d: vp %p, cp %p\n",
+	    printf("coda_inactive: cp->ovp != NULL use %ld: vp %p, cp %p\n",
 	    	   vp->v_usecount, vp, cp);
 #endif
 	lockmgr(&cp->c_lock, LK_RELEASE, &vp->v_interlock);
@@ -1924,7 +1948,7 @@ printf("coda_readdir: Internally Opening %p\n", vp);
 	}
 	
 	/* Have UFS handle the call. */
-	CODADEBUG(CODA_READDIR, myprintf(("indirect readdir: fid = (%lx.%lx.%lx), refcnt = %d\n",cp->c_fid.Volume, cp->c_fid.Vnode, cp->c_fid.Unique, vp->v_usecount)); )
+	CODADEBUG(CODA_READDIR, myprintf(("indirect readdir: fid = (%lx.%lx.%lx), refcnt = %ld\n",cp->c_fid.Volume, cp->c_fid.Vnode, cp->c_fid.Unique, vp->v_usecount)); )
 	error = VOP_READDIR(cp->c_ovp, uiop, cred, eofflag, cookies,
 			       ncookies);
 	if (error)

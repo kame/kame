@@ -1,4 +1,4 @@
-/*	$NetBSD: atapi_wdc.c,v 1.20.2.2 1999/05/05 22:39:04 perry Exp $	*/
+/*	$NetBSD: atapi_wdc.c,v 1.20.2.5 2000/01/23 12:27:03 he Exp $	*/
 
 /*
  * Copyright (c) 1998 Manuel Bouyer.
@@ -234,10 +234,16 @@ wdc_atapi_start(chp, xfer)
 	    sc_xfer->flags), DEBUG_XFERS);
 	/* Adjust C_DMA, it may have changed if we are requesting sense */
 	if ((drvp->drive_flags & (DRIVE_DMA | DRIVE_UDMA)) &&
-	    (sc_xfer->datalen > 0 || (xfer->c_flags & C_SENSE)))
+	    (sc_xfer->datalen > 0 || (xfer->c_flags & C_SENSE))) {
+		if (drvp->n_xfers <= NXFER)
+			drvp->n_xfers++;
 		xfer->c_flags |= C_DMA;
-	else
+	} else {
 		xfer->c_flags &= ~C_DMA;
+	}
+	/* start timeout machinery */
+	if ((sc_xfer->flags & SCSI_POLL) == 0)
+		timeout(wdctimeout, chp, sc_xfer->timeout * hz / 1000);
 	/* Do control operations specially. */
 	if (drvp->state < READY) {
 		if (drvp->state != PIOMODE) {
@@ -285,7 +291,6 @@ wdc_atapi_start(chp, xfer)
 		wdc_atapi_intr(chp, xfer, 0);
 	} else {
 		chp->ch_flags |= WDCF_IRQ_WAIT;
-		timeout(wdctimeout, chp, hz);
 	}
 	if (sc_xfer->flags & SCSI_POLL) {
 		while ((sc_xfer->flags & ITSDONE) == 0) {
@@ -322,6 +327,16 @@ wdc_atapi_intr(chp, xfer, irq)
 		    drvp->state);
 		panic("wdc_atapi_intr: bad state\n");
 	}
+	/*
+	 * If we missed an interrupt in a PIO transfer, reset and restart.
+	 * Don't try to continue transfer, we may have missed cycles.
+	 */
+	if ((xfer->c_flags & (C_TIMEOU | C_DMA)) == C_TIMEOU) {
+		sc_xfer->error = XS_TIMEOUT;
+		wdc_atapi_reset(chp, xfer);
+		return 1;
+	} 
+
 	/* Ack interrupt done in wait_for_unbusy */
 	bus_space_write_1(chp->cmd_iot, chp->cmd_ioh, wd_sdh,
 	    WDSD_IBM | (xfer->drive << 4));
@@ -333,14 +348,14 @@ wdc_atapi_intr(chp, xfer, irq)
 		    chp->wdc->sc_dev.dv_xname, chp->channel, xfer->drive,
 		    xfer->c_bcount, xfer->c_skip);
 		if (xfer->c_flags & C_DMA)
-			drvp->n_dmaerrs++;
+			ata_dmaerr(drvp);
 		sc_xfer->error = XS_TIMEOUT;
 		wdc_atapi_reset(chp, xfer);
 		return 1;
 	}
 	/* If we missed an IRQ and were using DMA, flag it as a DMA error */
 	if ((xfer->c_flags & C_TIMEOU) && (xfer->c_flags & C_DMA))
-		drvp->n_dmaerrs++;
+		ata_dmaerr(drvp);
 	/* 
 	 * if the request sense command was aborted, report the short sense
 	 * previously recorded, else continue normal processing
@@ -425,7 +440,6 @@ again:
 
 		if ((sc_xfer->flags & SCSI_POLL) == 0) {
 			chp->ch_flags |= WDCF_IRQ_WAIT;
-			timeout(wdctimeout, chp, sc_xfer->timeout * hz / 1000);
 		}
 		return 1;
 
@@ -438,7 +452,7 @@ again:
 			if (xfer->c_flags & C_DMA) {
 				(*chp->wdc->dma_finish)(chp->wdc->dma_arg,
 				    chp->channel, xfer->drive, dma_flags);
-				drvp->n_dmaerrs++;
+				ata_dmaerr(drvp);
 			}
 			sc_xfer->error = XS_TIMEOUT;
 			wdc_atapi_reset(chp, xfer);
@@ -503,7 +517,6 @@ again:
 		}
 		if ((sc_xfer->flags & SCSI_POLL) == 0) {
 			chp->ch_flags |= WDCF_IRQ_WAIT;
-			timeout(wdctimeout, chp, sc_xfer->timeout * hz / 1000);
 		}
 		return 1;
 
@@ -517,7 +530,7 @@ again:
 			if (xfer->c_flags & C_DMA) {
 				(*chp->wdc->dma_finish)(chp->wdc->dma_arg,
 				    chp->channel, xfer->drive, dma_flags);
-				drvp->n_dmaerrs++;
+				ata_dmaerr(drvp);
 			}
 			sc_xfer->error = XS_TIMEOUT;
 			wdc_atapi_reset(chp, xfer);
@@ -580,7 +593,6 @@ again:
 		}
 		if ((sc_xfer->flags & SCSI_POLL) == 0) {
 			chp->ch_flags |= WDCF_IRQ_WAIT;
-			timeout(wdctimeout, chp, sc_xfer->timeout * hz / 1000);
 		}
 		return 1;
 
@@ -603,8 +615,8 @@ again:
 				 * request sense failed ! it's not suppossed
 				 * to be possible
 				 */
-				if (dma_err < 0)
-					drvp->n_dmaerrs++;
+				if (xfer->c_flags & C_DMA)
+					ata_dmaerr(drvp);
 				sc_xfer->error = XS_RESET;
 				wdc_atapi_reset(chp, xfer);
 				return (1);
@@ -636,11 +648,12 @@ again:
 					    sizeof(sc_xfer->sense.scsi_sense);
 					xfer->c_skip = 0;
 					xfer->c_flags |= C_SENSE;
+					untimeout(wdctimeout, chp);
 					wdc_atapi_start(chp, xfer);
 					return 1;
 				}
 			} else if (dma_err < 0) {
-				drvp->n_dmaerrs++;
+				ata_dmaerr(drvp);
 				sc_xfer->error = XS_RESET;
 				wdc_atapi_reset(chp, xfer);
 				return (1);
@@ -672,6 +685,8 @@ again:
 			sc_xfer->error = XS_SHORTSENSE;
 			sc_xfer->sense.atapi_sense = chp->ch_error;
 		} else {
+			if (xfer->c_flags & C_DMA)
+				ata_dmaerr(drvp);
 			sc_xfer->error = XS_RESET;
 			wdc_atapi_reset(chp, xfer);
 			return (1);
@@ -704,6 +719,7 @@ again:
 	    WDSD_IBM | (xfer->drive << 4));
 	switch (drvp->state) {
 	case PIOMODE:
+piomode:
 		/* Don't try to set mode if controller can't be adjusted */
 		if ((chp->wdc->cap & WDC_CAPABILITY_MODE) == 0)
 			goto ready;
@@ -718,8 +734,14 @@ again:
 		errstring = "piomode";
 		if (wait_for_unbusy(chp, delay))
 			goto timeout;
-		if (chp->ch_status & WDCS_ERR)
-			goto error;
+		if (chp->ch_status & WDCS_ERR) {
+			if (drvp->PIO_mode < 3) {
+				drvp->PIO_mode = 3;
+				goto piomode;
+			} else {
+				goto error;
+			}
+		}
 	/* fall through */
 
 	case DMAMODE:
@@ -746,13 +768,13 @@ again:
 	ready:
 		drvp->state = READY;
 		xfer->c_intr = wdc_atapi_intr;
+		untimeout(wdctimeout, chp);
 		wdc_atapi_start(chp, xfer);
 		return 1;
 	}
 	if ((sc_xfer->flags & SCSI_POLL) == 0) {
 		chp->ch_flags |= WDCF_IRQ_WAIT;
 		xfer->c_intr = wdc_atapi_ctrl;
-		timeout(wdctimeout, chp, sc_xfer->timeout * hz / 1000);
 	} else {
 		goto again;
 	}
@@ -785,20 +807,14 @@ wdc_atapi_done(chp, xfer)
 {
 	struct scsipi_xfer *sc_xfer = xfer->cmd;
 	int need_done =  xfer->c_flags & C_NEEDDONE;
-	struct ata_drive_datas *drvp = &chp->ch_drive[xfer->drive];
 
 	WDCDEBUG_PRINT(("wdc_atapi_done %s:%d:%d: flags 0x%x\n",
 	    chp->wdc->sc_dev.dv_xname, chp->channel, xfer->drive,
 	    (u_int)xfer->c_flags), DEBUG_XFERS);
+	untimeout(wdctimeout, chp);
 	/* remove this command from xfer queue */
 	wdc_free_xfer(chp, xfer);
 	sc_xfer->flags |= ITSDONE;
-	if (drvp->n_dmaerrs ||
-	  (sc_xfer->error != XS_NOERROR && sc_xfer->error != XS_SENSE &&
-	  sc_xfer->error != XS_SHORTSENSE)) {
-		drvp->n_dmaerrs = 0;
-		wdc_downgrade_mode(drvp);
-	}
 	    
 	if (need_done) {
 		WDCDEBUG_PRINT(("wdc_atapi_done: scsipi_done\n"), DEBUG_XFERS);

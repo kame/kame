@@ -1,4 +1,4 @@
-/*	$NetBSD: rf_parityscan.c,v 1.4 1999/03/14 22:10:46 oster Exp $	*/
+/*	$NetBSD: rf_parityscan.c,v 1.4.2.2 1999/09/28 04:46:58 cgd Exp $	*/
 /*
  * Copyright (c) 1995 Carnegie-Mellon University.
  * All rights reserved.
@@ -63,14 +63,32 @@ rf_RewriteParity(raidPtr)
 {
 	RF_RaidLayout_t *layoutPtr = &raidPtr->Layout;
 	RF_AccessStripeMapHeader_t *asm_h;
+	int ret_val;
 	int rc;
 	RF_PhysDiskAddr_t pda;
 	RF_SectorNum_t i;
 
+	if (raidPtr->Layout.map->faultsTolerated == 0) {
+		/* There isn't any parity. Call it "okay." */
+		return (RF_PARITY_OKAY);
+	}
+	if (raidPtr->status[0] != rf_rs_optimal) {
+		/*
+		 * We're in degraded mode.  Don't try to verify parity now! 
+		 * XXX: this should be a "we don't want to", not a 
+		 * "we can't" error. 
+		 */
+		return (RF_PARITY_COULD_NOT_VERIFY);
+	}
+
+	ret_val = 0;
+
 	pda.startSector = 0;
 	pda.numSector = raidPtr->Layout.sectorsPerStripeUnit;
+	rc = RF_PARITY_OKAY;
 
-	for (i = 0; i < raidPtr->totalSectors; 
+	for (i = 0; i < raidPtr->totalSectors && 
+		     rc <= RF_PARITY_CORRECTED; 
 	     i += layoutPtr->dataSectorsPerStripe) {
 		asm_h = rf_MapAccess(raidPtr, i, 
 				     layoutPtr->dataSectorsPerStripe, 
@@ -84,23 +102,23 @@ rf_RewriteParity(raidPtr)
 			break;
 		case RF_PARITY_BAD:
 			printf("Parity bad during correction\n");
-			RF_PANIC();
+			ret_val = 1;
 			break;
 		case RF_PARITY_COULD_NOT_CORRECT:
 			printf("Could not correct bad parity\n");
-			RF_PANIC();
+			ret_val = 1;
 			break;
 		case RF_PARITY_COULD_NOT_VERIFY:
 			printf("Could not verify parity\n");
-			RF_PANIC();
+			ret_val = 1;
 			break;
 		default:
 			printf("Bad rc=%d from VerifyParity in RewriteParity\n", rc);
-			RF_PANIC();
+			ret_val = 1;
 		}
 		rf_FreeAccessStripeMap(asm_h);
 	}
-	return (0);
+	return (ret_val);
 }
 /*****************************************************************************************
  *

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_mc.c,v 1.12 1998/12/22 08:47:05 scottr Exp $	*/
+/*	$NetBSD: if_mc.c,v 1.12.4.2 2000/01/05 23:52:31 he Exp $	*/
 
 /*-
  * Copyright (c) 1997 David Huang <khym@bga.com>

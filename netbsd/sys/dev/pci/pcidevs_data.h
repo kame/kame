@@ -1,10 +1,10 @@
-/*	$NetBSD: pcidevs_data.h,v 1.118.2.2 1999/06/22 17:16:09 perry Exp $	*/
+/*	$NetBSD: pcidevs_data.h,v 1.118.2.8 2000/02/10 21:45:50 he Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD
+ *	NetBSD: pcidevs,v 1.113.2.7 2000/02/10 21:44:19 he Exp 
  */
 
 /*
@@ -39,6 +39,12 @@
  */
 
 struct pci_knowndev pci_knowndevs[] = {
+	{
+	    PCI_VENDOR_3COM, PCI_PRODUCT_3COM_3C985,
+	    0,
+	    "3Com",
+	    "3c985 Gigabit Ethernet",
+	},
 	{
 	    PCI_VENDOR_3COM, PCI_PRODUCT_3COM_3C590,
 	    0,
@@ -122,6 +128,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "3Com",
 	    "3c905B-FX 10/100 Ethernet",
+	},
+	{
+	    PCI_VENDOR_3COM, PCI_PRODUCT_3COM_3C905CTX,
+	    0,
+	    "3Com",
+	    "3c905C-TX 10/100 Ethernet with mngmt",
 	},
 	{
 	    PCI_VENDOR_3COM, PCI_PRODUCT_3COM_3C980SRV,
@@ -218,6 +230,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "ACARD",
 	    "AEC6712SUW SCSI",
+	},
+	{
+	    PCI_VENDOR_ACCTON, PCI_PRODUCT_ACCTON_MPX5030,
+	    0,
+	    "Accton Technology",
+	    "MPX 5030/5038 Ethernet",
 	},
 	{
 	    PCI_VENDOR_ACER, PCI_PRODUCT_ACER_M1435,
@@ -406,6 +424,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    "AIC-7896/7",
 	},
 	{
+	    PCI_VENDOR_ADDTRON, PCI_PRODUCT_ADDTRON_8139,
+	    0,
+	    "Addtron Technology",
+	    "8139 Ethernet",
+	},
+	{
 	    PCI_VENDOR_ADVSYS, PCI_PRODUCT_ADVSYS_1200A,
 	    0,
 	    "Advanced System Products",
@@ -434,6 +458,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "Alliance Semiconductor",
 	    "AT24",
+	},
+	{
+	    PCI_VENDOR_ALTEON, PCI_PRODUCT_ALTEON_ACENIC,
+	    0,
+	    "Alteon",
+	    "ACEnic Gigabit Ethernet",
 	},
 	{
 	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_PCNET_PCI,
@@ -1048,6 +1078,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    "DECchip 21154 PCI-PCI Bridge",
 	},
 	{
+	    PCI_VENDOR_DELTA, PCI_PRODUCT_DELTA_8139,
+	    0,
+	    "Delta Electronics",
+	    "8139 Ethernet",
+	},
+	{
 	    PCI_VENDOR_DIAMOND, PCI_PRODUCT_DIAMOND_VIPER,
 	    0,
 	    "Diamond Computer Systems",
@@ -1057,7 +1093,7 @@ struct pci_knowndev pci_knowndevs[] = {
 	    PCI_VENDOR_DPT, PCI_PRODUCT_DPT_SC_RAID,
 	    0,
 	    "Distributed Processing Technology",
-	    "SmartCache/Raid",
+	    "SmartCache/SmartRAID",
 	},
 	{
 	    PCI_VENDOR_DOLPHIN, PCI_PRODUCT_DOLPHIN_PCISCI,
@@ -1708,6 +1744,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    "MagicGraph 128ZV",
 	},
 	{
+	    PCI_VENDOR_NETGEAR, PCI_PRODUCT_NETGEAR_GA620,
+	    0,
+	    "Netgear",
+	    "GA620 Gigabit Ethernet",
+	},
+	{
 	    PCI_VENDOR_NEXGEN, PCI_PRODUCT_NEXGEN_NX82C501,
 	    0,
 	    "NexGen Microsystems",
@@ -2048,6 +2090,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "S3",
 	    "SonicVibes",
+	},
+	{
+	    PCI_VENDOR_SGI, PCI_PRODUCT_SGI_TIGON,
+	    0,
+	    "Silicon Graphics",
+	    "Tigon Gigabit Ethernet",
 	},
 	{
 	    PCI_VENDOR_SGSTHOMSON, PCI_PRODUCT_SGSTHOMSON_2000,
@@ -2480,6 +2528,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "ULSI Systems",
 	    "US201",
+	},
+	{
+	    PCI_VENDOR_USR, PCI_PRODUCT_USR_3CP5609,
+	    0,
+	    "US Robotics (3Com)",
+	    "3CP5609 PCI 16550 Modem",
 	},
 	{
 	    PCI_VENDOR_V3, PCI_PRODUCT_V3_V292PBC,
@@ -5554,6 +5608,18 @@ struct pci_knowndev pci_knowndevs[] = {
 	    NULL,
 	},
 	{
+	    PCI_VENDOR_ALTEON, 0,
+	    PCI_KNOWNDEV_NOPROD,
+	    "Alteon",
+	    NULL,
+	},
+	{
+	    PCI_VENDOR_USR, 0,
+	    PCI_KNOWNDEV_NOPROD,
+	    "US Robotics (3Com)",
+	    NULL,
+	},
+	{
 	    PCI_VENDOR_PICTUREEL, 0,
 	    PCI_KNOWNDEV_NOPROD,
 	    "Picture Elements",
@@ -5569,6 +5635,18 @@ struct pci_knowndev pci_knowndevs[] = {
 	    PCI_VENDOR_LMC, 0,
 	    PCI_KNOWNDEV_NOPROD,
 	    "LAN Media Corporation",
+	    NULL,
+	},
+	{
+	    PCI_VENDOR_NETGEAR, 0,
+	    PCI_KNOWNDEV_NOPROD,
+	    "Netgear",
+	    NULL,
+	},
+	{
+	    PCI_VENDOR_DELTA, 0,
+	    PCI_KNOWNDEV_NOPROD,
+	    "Delta Electronics",
 	    NULL,
 	},
 	{
@@ -5593,6 +5671,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    PCI_VENDOR_AVANCE2, 0,
 	    PCI_KNOWNDEV_NOPROD,
 	    "Avance Logic (2nd PCI Vendor ID)",
+	    NULL,
+	},
+	{
+	    PCI_VENDOR_ADDTRON, 0,
+	    PCI_KNOWNDEV_NOPROD,
+	    "Addtron Technology",
 	    NULL,
 	},
 	{

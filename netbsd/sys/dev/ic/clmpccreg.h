@@ -1,4 +1,4 @@
-/*  $NetBSD: clmpccreg.h,v 1.1 1999/02/13 17:05:20 scw Exp $ */
+/*  $NetBSD: clmpccreg.h,v 1.1.2.2 1999/11/29 21:15:07 he Exp $ */
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -54,6 +54,9 @@
  * The values given here assume BYTESWAP is low. See 'sc_byteswap'
  * <dev/ic/clmpccvar.h>.
  */
+
+/* Number of bytes of FIFO (Rx & Tx) */
+#define CLMPCC_FIFO_DEPTH   16
 
 /* Global Registers */
 #define CLMPCC_REG_GFRCR    0x81    /* Global Firmware Revision Code Register */
@@ -200,6 +203,12 @@
 #define CLMPCC_COR2_RtsAO       (1 << 2)    /* RTS Automatic Output Enable */
 #define CLMPCC_COR2_CtsAE       (1 << 1)    /* CTS Automatic Enable */
 #define CLMPCC_COR2_DsrAE       (1 << 1)    /* DSR Automatic Enable */
+
+/* Embedded transmit commands */
+#define	CLMPCC_ETC_MAGIC		0x00		/* Introduces a command */
+#define	CLMPCC_ETC_SEND_BREAK	0x81		/* Send a BREAK character */
+#define	CLMPCC_ETC_DELAY		0x82		/* Insert a delay */
+#define	CLMPCC_ETC_STOP_BREAK	0x83		/* Stop sending BREAK */
 
 /* Channel Option Register #3 (Async options) */
 #define CLMPCC_COR3_ESCDE       (1 << 7)    /* Ext Special Char Detect Enab */

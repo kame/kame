@@ -1,4 +1,4 @@
-/*	$NetBSD: scsipiconf.h,v 1.29.2.1 1999/04/08 15:52:43 bouyer Exp $	*/
+/*	$NetBSD: scsipiconf.h,v 1.29.2.3 2000/01/23 12:41:49 he Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -304,7 +304,8 @@ struct scsipi_xfer {
 #define	SCSI_TARGET	0x2000	/* This defines a TARGET mode op.	*/
 #define	SCSI_ESCAPE	0x4000	/* Escape operation			*/
 #define	SCSI_URGENT	0x8000	/* Urgent operation (e.g., HTAG)	*/
-		/* 0x00ff0000 reserved for ATAPI. */
+#define SCSI_PROBE   0x1000000	/* We are probing the target		*/
+		 /* 0x00ff0000 reserved for ATAPI. */
 
 /*
  * Error values an adapter driver may return
@@ -364,11 +365,15 @@ struct scsi_quirk_inquiry_pattern {
 	(*(l)->scsipi_cmd)((l), (c), (cl), (da), (dl), (r), (t), (b), (f))
 
 /*
+ * Default number of retries, used for generic routines.
+ */
+#define SCSIPIRETRIES 4
+
+/*
  * Similar, but invoke the controller directly with a scsipi_xfer.
  */
 #define	scsipi_command_direct(xs)					\
 	(*(xs)->sc_link->adapter->scsipi_cmd)((xs))
-
 
 /*
  * Macro to test whether a request will complete asynchronously.

@@ -1,4 +1,4 @@
-/*	$NetBSD: ext2fs_vfsops.c,v 1.24.2.1 1999/06/21 23:03:07 perry Exp $	*/
+/*	$NetBSD: ext2fs_vfsops.c,v 1.24.2.3 2000/02/01 23:38:39 he Exp $	*/
 
 /*
  * Copyright (c) 1997 Manuel Bouyer.
@@ -369,13 +369,31 @@ ext2fs_reload(mountp, cred, p)
 		brelse(bp);
 		return (EIO);		/* XXX needs translation */
 	}
-	if (fs2h32(newfs->e2fs_rev) != E2FS_REV) {
+	if (fs2h32(newfs->e2fs_rev) > E2FS_REV1) {
 #ifdef DIAGNOSTIC
-		printf("Ext2 fs: unsupported revision number: %x (expected %x)\n",
-					fs2h32(newfs->e2fs_rev), E2FS_REV);
+		printf("Ext2 fs: unsupported revision number: %x\n",
+					fs2h32(newfs->e2fs_rev));
 #endif
 		brelse(bp);
 		return (EIO);		/* XXX needs translation */
+	}
+	if (fs2h32(newfs->e2fs_rev) > E2FS_REV0) {
+		if ((fs2h32(newfs->e2fs_features_incompat) &
+		    ~EXT2F_INCOMPAT_SUPP) != 0) {
+#ifdef DIAGNOSTIC
+			printf("Ext2 fs: unsupported features\n");
+#endif
+			return (EINVAL);
+		}
+		if (fs2h32(newfs->e2fs_first_ino) != EXT2_FIRSTINO ||
+		    fs2h16(newfs->e2fs_inode_size) != EXT2_DINODE_SIZE) {
+			printf("Ext2 fs: unsupported inode size\n");
+			return (EINVAL);
+		}
+		/*
+		 * We're sure we are read-only here, no need to check
+		 * e2fs_features_rocompat
+		 */
 	}
 	if (fs2h32(newfs->e2fs_log_bsize) > 2) { /* block size = 1024|2048|4096 */
 #ifdef DIAGNOSTIC
@@ -525,13 +543,38 @@ ext2fs_mountfs(devvp, mp, p)
 		error = EINVAL;		/* XXX needs translation */
 		goto out;
 	}
-	if (fs2h32(fs->e2fs_rev) != E2FS_REV) {
+	if (fs2h32(fs->e2fs_rev) > E2FS_REV1) {
 #ifdef DIAGNOSTIC
-		printf("Ext2 fs: unsupported revision number: %x (expected %x)\n",
-					fs2h32(fs->e2fs_rev), E2FS_REV);
+		printf("Ext2 fs: unsupported revision number: %x\n",
+					fs2h32(fs->e2fs_rev));
 #endif
 		error = EINVAL;		/* XXX needs translation */
 		goto out;
+	}
+	if (fs2h32(fs->e2fs_rev) > E2FS_REV0) {
+		if ((fs2h32(fs->e2fs_features_incompat) &
+		    ~EXT2F_INCOMPAT_SUPP) != 0) {
+#ifdef DIAGNOSTIC
+			printf("Ext2 fs: unsupported features\n");
+#endif
+			error = EINVAL;
+			goto out;
+		}
+		if (fs2h32(fs->e2fs_first_ino) != EXT2_FIRSTINO ||
+		    fs2h16(fs->e2fs_inode_size) != EXT2_DINODE_SIZE) {
+			printf("Ext2 fs: unsupported inode size\n");
+			return (EINVAL);
+		}
+		/* EXT2F_INCOMPAT_FTYPE only supported read-only */
+		if ((fs2h32(fs->e2fs_features_incompat) &
+		    EXT2F_INCOMPAT_FTYPE) != 0 ||
+		    (fs2h32(fs->e2fs_features_rocompat) &
+		    ~EXT2F_ROCOMPAT_SUPP) != 0) {
+			if (!ronly) {
+				error = EROFS;
+				goto out;
+			}
+		}
 	}
 	if (fs2h32(fs->e2fs_log_bsize) > 2) { /* block size = 1024|2048|4096 */
 #ifdef DIAGNOSTIC
@@ -609,7 +652,9 @@ ext2fs_mountfs(devvp, mp, p)
 out:
 	if (bp)
 		brelse(bp);
+	vn_lock(devvp, LK_EXCLUSIVE | LK_RETRY);
 	(void)VOP_CLOSE(devvp, ronly ? FREAD : FREAD|FWRITE, cred, p);
+	VOP_UNLOCK(devvp, 0);
 	if (ump) {
 		free(ump->um_e2fs, M_UFSMNT);
 		free(ump, M_UFSMNT);
@@ -645,9 +690,10 @@ ext2fs_unmount(mp, mntflags, p)
 		(void) ext2fs_sbupdate(ump, MNT_WAIT);
 	}
 	ump->um_devvp->v_specflags &= ~SI_MOUNTEDON;
+	vn_lock(ump->um_devvp, LK_EXCLUSIVE | LK_RETRY);
 	error = VOP_CLOSE(ump->um_devvp, fs->e2fs_ronly ? FREAD : FREAD|FWRITE,
 		NOCRED, p);
-	vrele(ump->um_devvp);
+	vput(ump->um_devvp);
 	free(fs->e2fs_gd, M_UFSMNT);
 	free(fs, M_UFSMNT);
 	free(ump, M_UFSMNT);

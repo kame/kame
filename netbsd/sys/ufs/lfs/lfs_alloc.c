@@ -1,4 +1,4 @@
-/*	$NetBSD: lfs_alloc.c,v 1.18.2.3 1999/06/25 20:50:09 perry Exp $	*/
+/*	$NetBSD: lfs_alloc.c,v 1.18.2.8 2000/01/20 21:01:11 he Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -117,16 +117,14 @@ lfs_valloc(v)
 	ino_t new_ino;
 	u_long i, max;
 	int error;
+	extern int lfs_dirvcount;
 
 	fs = VTOI(ap->a_pvp)->i_lfs;
 	
 	/*
-	 * Prevent a race getting lfs_free - XXX - KS
-	 * (this should be a proper lock, in struct lfs)
+	 * Prevent a race getting lfs_free.
 	 */
-
-	while(lockmgr(&ufs_hashlock, LK_EXCLUSIVE|LK_SLEEPFAIL, 0))
-		;
+	lockmgr(&fs->lfs_freelock, LK_EXCLUSIVE, 0);
 
 	/* Get the head of the freelist. */
 	new_ino = fs->lfs_free;
@@ -150,8 +148,13 @@ lfs_valloc(v)
 	if (ifp->if_daddr != LFS_UNUSED_DADDR)
 		panic("lfs_ialloc: inuse inode %d on the free list", new_ino);
 	fs->lfs_free = ifp->if_nextfree;
+#ifdef LFS_DEBUG_NEXTFREE
+	ifp->if_nextfree = 0;
+	VOP_BWRITE(bp);
+#else
 	brelse(bp);
-	
+#endif
+
 	/* Extend IFILE so that the next lfs_valloc will succeed. */
 	if (fs->lfs_free == LFS_UNUSED_INUM) {
 		vp = fs->lfs_ivnode;
@@ -180,20 +183,22 @@ lfs_valloc(v)
 		ifp->if_nextfree = LFS_UNUSED_INUM;
 		VOP_UNLOCK(vp,0);
 		if ((error = VOP_BWRITE(bp)) != 0) {
-			lockmgr(&ufs_hashlock, LK_RELEASE, 0);
 			return (error);
 		}
 	}
-	lockmgr(&ufs_hashlock, LK_RELEASE, 0);
-
 #ifdef DIAGNOSTIC
 	if(fs->lfs_free == LFS_UNUSED_INUM)
 		panic("inode 0 allocated [3]");
 #endif /* DIAGNOSTIC */
 	
+	lockmgr(&fs->lfs_freelock, LK_RELEASE, 0);
+
+	lockmgr(&ufs_hashlock, LK_EXCLUSIVE, 0);
 	/* Create a vnode to associate with the inode. */
-	if ((error = lfs_vcreate(ap->a_pvp->v_mount, new_ino, &vp)) != 0)
+	if ((error = lfs_vcreate(ap->a_pvp->v_mount, new_ino, &vp)) != 0) {
+		lockmgr(&ufs_hashlock, LK_RELEASE, 0);
 		return (error);
+	}
 	
 	ip = VTOI(vp);
 	/* Zero out the direct and indirect block addresses. */
@@ -205,6 +210,7 @@ lfs_valloc(v)
 	
 	/* Insert into the inode hash table. */
 	ufs_ihashins(ip);
+	lockmgr(&ufs_hashlock, LK_RELEASE, 0);
 	
 	error = ufs_vinit(vp->v_mount, lfs_specop_p, lfs_fifoop_p, &vp);
 	if (error) {
@@ -216,7 +222,7 @@ lfs_valloc(v)
 	*ap->a_vpp = vp;
 	if(!(vp->v_flag & VDIROP)) {
 		lfs_vref(vp);
-		++fs->lfs_dirvcount;
+		++lfs_dirvcount;
 	}
 	vp->v_flag |= VDIROP;
 	VREF(ip->i_devvp);
@@ -289,24 +295,24 @@ lfs_vfree(v)
 	struct buf *bp;
 	struct ifile *ifp;
 	struct inode *ip;
+	struct vnode *vp;
 	struct lfs *fs;
 	ufs_daddr_t old_iaddr;
 	ino_t ino;
-	int already_locked;
+	extern int lfs_dirvcount;
 	
 	/* Get the inode number and file system. */
-	ip = VTOI(ap->a_pvp);
+	vp = ap->a_pvp;
+	ip = VTOI(vp);
 	fs = ip->i_lfs;
 	ino = ip->i_number;
 	
-	/* If we already hold ufs_hashlock, don't panic, just do it anyway */
-	already_locked = lockstatus(&ufs_hashlock) && ufs_hashlock.lk_lockholder == curproc->p_pid;
-	while(WRITEINPROG(ap->a_pvp)
+	while(WRITEINPROG(vp)
 	      || fs->lfs_seglock
-	      || (!already_locked && lockmgr(&ufs_hashlock, LK_EXCLUSIVE|LK_SLEEPFAIL, 0)))
+	      || lockmgr(&fs->lfs_freelock, LK_EXCLUSIVE|LK_SLEEPFAIL, 0))
 	{
-		if (WRITEINPROG(ap->a_pvp)) {
-			tsleep(ap->a_pvp, (PRIBIO+1), "lfs_vfree", 0);
+		if (WRITEINPROG(vp)) {
+			tsleep(vp, (PRIBIO+1), "lfs_vfree", 0);
 		}
 		if (fs->lfs_seglock) {
 			if (fs->lfs_lockpid == curproc->p_pid) {
@@ -317,15 +323,20 @@ lfs_vfree(v)
 		}
 	}
 	
+	if(vp->v_flag & VDIROP) {
+		--lfs_dirvcount;
+		vp->v_flag &= ~VDIROP;
+		wakeup(&lfs_dirvcount);
+		lfs_vunref(vp);
+	}
+
 	if (ip->i_flag & IN_CLEANING) {
 		--fs->lfs_uinodes;
-		ip->i_flag &= ~IN_CLEANING;
 	}
 	if (ip->i_flag & IN_MODIFIED) {
 		--fs->lfs_uinodes;
-		ip->i_flag &=
-			~(IN_ACCESS | IN_CHANGE | IN_MODIFIED | IN_UPDATE);
 	}
+	ip->i_flag &= ~(IN_CLEANING | IN_ACCESS | IN_CHANGE | IN_MODIFIED | IN_UPDATE);
 #ifdef DEBUG_LFS	
 	if((int32_t)fs->lfs_uinodes<0) {
 		printf("U1");
@@ -352,7 +363,7 @@ lfs_vfree(v)
 		LFS_SEGENTRY(sup, fs, datosn(fs, old_iaddr), bp);
 #ifdef DIAGNOSTIC
 		if (sup->su_nbytes < DINODE_SIZE) {
-			printf("lfs_vfree: negative byte count (segment %d short by %d)\n", datosn(fs, old_iaddr), DINODE_SIZE - sup->su_nbytes);
+			printf("lfs_vfree: negative byte count (segment %d short by %d)\n", datosn(fs, old_iaddr), (int)DINODE_SIZE - sup->su_nbytes);
 			panic("lfs_vfree: negative byte count");
 			sup->su_nbytes = DINODE_SIZE;
 		}
@@ -360,8 +371,7 @@ lfs_vfree(v)
 		sup->su_nbytes -= DINODE_SIZE;
 		(void) VOP_BWRITE(bp);
 	}
-	if(!already_locked)
-		lockmgr(&ufs_hashlock, LK_RELEASE, 0);
+	lockmgr(&fs->lfs_freelock, LK_RELEASE, 0);
 	
 	/* Set superblock modified bit and decrement file count. */
 	fs->lfs_fmod = 1;

@@ -1,4 +1,4 @@
-/*	$NetBSD: lfs_extern.h,v 1.13 1999/03/10 00:20:00 perseant Exp $	*/
+/*	$NetBSD: lfs_extern.h,v 1.13.2.2 2000/01/20 21:01:33 he Exp $	*/
 
 /*-
  * Copyright (c) 1999 The NetBSD Foundation, Inc.
@@ -115,6 +115,7 @@ int lfs_balloc __P((struct vnode *, int, u_long, ufs_daddr_t, struct buf **));
 
 /* lfs_bio.c */
 int lfs_bwrite_ext __P((struct buf *, int));
+void lfs_flush_fs __P((struct mount *, int));
 void lfs_flush __P((struct lfs *, int));
 int lfs_check __P((struct vnode *, ufs_daddr_t, int));
 void lfs_freebuf __P((struct buf *));
@@ -134,7 +135,7 @@ void lfs_check_segsum __P((struct lfs *, struct segment *, char *, int));
 
 /* lfs_inode.c */
 void lfs_init __P((void));
-struct dinode *lfs_ifind __P((struct lfs *, ino_t, struct dinode *));
+struct dinode *lfs_ifind __P((struct lfs *, ino_t, struct buf *));
 
 /* lfs_segment.c */
 void lfs_imtime __P((struct lfs *));

@@ -1,4 +1,4 @@
-/*	$NetBSD: wdc.c,v 1.66.2.2 1999/06/24 00:06:01 perry Exp $ */
+/*	$NetBSD: wdc.c,v 1.66.2.8 2000/02/01 23:30:28 he Exp $ */
 
 
 /*
@@ -299,6 +299,12 @@ wdcattach(chp)
 	for (i = 0; i < 2; i++) {
 		chp->ch_drive[i].chnl_softc = chp;
 		chp->ch_drive[i].drive = i;
+		/*
+		 * Init error counter so that an error withing the first xfers
+		 * will trigger a downgrade
+		 */
+		chp->ch_drive[i].n_dmaerrs = NERRS_MAX-1;
+
 		/* If controller can't do 16bit flag the drives as 32bit */
 		if ((chp->wdc->cap &
 		    (WDC_CAPABILITY_DATA16 | WDC_CAPABILITY_DATA32)) ==
@@ -308,6 +314,7 @@ wdcattach(chp)
 			continue;
 
 		/* Issue a IDENTIFY command, to try to detect slave ghost */
+		ata_get_params(&chp->ch_drive[i], AT_POLL, &params);
 		if (ata_get_params(&chp->ch_drive[i], AT_POLL, &params) ==
 		    CMD_OK) {
 			/* If IDENTIFY succeded, this is not an OLD ctrl */
@@ -526,6 +533,7 @@ wdcintr(arg)
 {
 	struct channel_softc *chp = arg;
 	struct wdc_xfer *xfer;
+	int ret;
 
 	if ((chp->ch_flags & WDCF_IRQ_WAIT) == 0) {
 		WDCDEBUG_PRINT(("wdcintr: inactive controller\n"), DEBUG_INTR);
@@ -533,10 +541,12 @@ wdcintr(arg)
 	}
 
 	WDCDEBUG_PRINT(("wdcintr\n"), DEBUG_INTR);
-	untimeout(wdctimeout, chp);
 	chp->ch_flags &= ~WDCF_IRQ_WAIT;
 	xfer = chp->ch_queue->sc_xfer.tqh_first;
-	return xfer->c_intr(chp, xfer, 1);
+	ret = xfer->c_intr(chp, xfer, 1);
+	if (ret == 0) /* irq was not for us, still waiting for irq */
+		chp->ch_flags |= WDCF_IRQ_WAIT;
+	return (ret);
 }
 
 /* Put all disk in RESET state */
@@ -595,16 +605,32 @@ __wdcwait_reset(chp, drv_mask)
 {
 	int timeout;
 	u_int8_t st0, st1;
+#ifdef WDCDEBUG
+	u_int8_t sc0, sn0, cl0, ch0;
+	u_int8_t sc1, sn1, cl1, ch1;
+#endif
 	/* wait for BSY to deassert */
 	for (timeout = 0; timeout < WDCNDELAY_RST;timeout++) {
 		bus_space_write_1(chp->cmd_iot, chp->cmd_ioh, wd_sdh,
 		    WDSD_IBM); /* master */
 		delay(10);
 		st0 = bus_space_read_1(chp->cmd_iot, chp->cmd_ioh, wd_status);
+#ifdef WDCDEBUG
+		sc0 = bus_space_read_1(chp->cmd_iot, chp->cmd_ioh, wd_seccnt);
+		sn0 = bus_space_read_1(chp->cmd_iot, chp->cmd_ioh, wd_sector);
+		cl0 = bus_space_read_1(chp->cmd_iot, chp->cmd_ioh, wd_cyl_lo);
+		ch0 = bus_space_read_1(chp->cmd_iot, chp->cmd_ioh, wd_cyl_hi);
+#endif
 		bus_space_write_1(chp->cmd_iot, chp->cmd_ioh, wd_sdh,
 		    WDSD_IBM | 0x10); /* slave */
 		delay(10);
 		st1 = bus_space_read_1(chp->cmd_iot, chp->cmd_ioh, wd_status);
+#ifdef WDCDEBUG
+		sc1 = bus_space_read_1(chp->cmd_iot, chp->cmd_ioh, wd_seccnt);
+		sn1 = bus_space_read_1(chp->cmd_iot, chp->cmd_ioh, wd_sector);
+		cl1 = bus_space_read_1(chp->cmd_iot, chp->cmd_ioh, wd_cyl_lo);
+		ch1 = bus_space_read_1(chp->cmd_iot, chp->cmd_ioh, wd_cyl_hi);
+#endif
 
 		if ((drv_mask & 0x01) == 0) {
 			/* no master */
@@ -632,6 +658,15 @@ __wdcwait_reset(chp, drv_mask)
 	if (st1 & WDCS_BSY)
 		drv_mask &= ~0x02;
 end:
+	WDCDEBUG_PRINT(("%s:%d:0: after reset, sc=0x%x sn=0x%x "
+	    "cl=0x%x ch=0x%x\n",
+	     chp->wdc ? chp->wdc->sc_dev.dv_xname : "wdcprobe",
+	     chp->channel, sc0, sn0, cl0, ch0), DEBUG_PROBE);
+	WDCDEBUG_PRINT(("%s:%d:1: after reset, sc=0x%x sn=0x%x "
+	    "cl=0x%x ch=0x%x\n",
+	     chp->wdc ? chp->wdc->sc_dev.dv_xname : "wdcprobe",
+	     chp->channel, sc1, sn1, cl1, ch1), DEBUG_PROBE);
+
 	WDCDEBUG_PRINT(("%s:%d: wdcwait_reset() end, st0=0x%x, st1=0x%x\n",
 	    chp->wdc ? chp->wdc->sc_dev.dv_xname : "wdcprobe", chp->channel,
 	    st0, st1), DEBUG_PROBE);
@@ -717,7 +752,11 @@ wdctimeout(arg)
 		 * Call the interrupt routine. If we just missed and interrupt,
 		 * it will do what's needed. Else, it will take the needed
 		 * action (reset the device).
+		 * Before that we need to reinstall the timeout callback,
+		 * in case it will miss another irq while in this transfer
+		 * We arbitray chose it to be 1s
 		 */
+		timeout(wdctimeout, chp, hz);
 		xfer->c_flags |= C_TIMEOU;
 		chp->ch_flags &= ~WDCF_IRQ_WAIT;
 		xfer->c_intr(chp, xfer, 1);
@@ -864,6 +903,7 @@ wdc_probe_caps(drvp)
 			break;
 		}
 		if (params.atap_extensions & WDC_EXT_UDMA_MODES) {
+			printed = 0;
 			for (i = 7; i >= 0; i--) {
 				if ((params.atap_udmamode_supp & (1 << i))
 				    == 0)
@@ -873,8 +913,11 @@ wdc_probe_caps(drvp)
 					if (ata_set_mode(drvp, 0x40 | i,
 					    AT_POLL) != CMD_OK)
 						continue;
-				printf("%s Ultra-DMA mode %d", sep, i);
-				sep = ",";
+				if (!printed) {
+					printf("%s Ultra-DMA mode %d", sep, i);
+					sep = ",";
+					printed = 1;
+				}
 				if (wdc->cap & WDC_CAPABILITY_UDMA) {
 					if ((wdc->cap & WDC_CAPABILITY_MODE) &&
 					    wdc->UDMA_cap < i)
@@ -952,13 +995,24 @@ wdc_downgrade_mode(drvp)
 		return 0;
 
 	/*
+	 * If we were using Ultra-DMA mode > 2, downgrade to mode 2 first.
+	 * Maybe we didn't properly notice the cable type
+	 * If we were using Ultra-DMA mode 2, downgrade to mode 1 first.
+	 * It helps in some cases.
+	 */
+	if ((drvp->drive_flags & DRIVE_UDMA) && drvp->UDMA_mode >= 2) {
+		drvp->UDMA_mode = (drvp->UDMA_mode == 2) ? 1 : 2;
+		printf("%s: transfer error, downgrading to Ultra-DMA mode %d\n",
+		    drv_dev->dv_xname, drvp->UDMA_mode);
+	}
+
+	/*
 	 * If we were using ultra-DMA, don't downgrade to multiword DMA
 	 * if we noticed a CRC error. It has been noticed that CRC errors
 	 * in ultra-DMA lead to silent data corruption in multiword DMA.
 	 * Data corruption is less likely to occur in PIO mode.
 	 */
-
-	if ((drvp->drive_flags & DRIVE_UDMA) &&
+	else if ((drvp->drive_flags & DRIVE_UDMA) &&
 	    (drvp->drive_flags & DRIVE_DMAERR) == 0) {
 		drvp->drive_flags &= ~DRIVE_UDMA;
 		drvp->drive_flags |= DRIVE_DMA;
@@ -1019,7 +1073,9 @@ wdc_exec_command(drvp, wdc_c)
 		ret = WDC_COMPLETE;
 	} else {
 		if (wdc_c->flags & AT_WAIT) {
-			tsleep(wdc_c, PRIBIO, "wdccmd", 0);
+			while ((wdc_c->flags & AT_DONE) == 0) {
+				tsleep(wdc_c, PRIBIO, "wdccmd", 0);
+			}
 			ret = WDC_COMPLETE;
 		} else {
 			ret = WDC_QUEUED;
@@ -1119,6 +1175,9 @@ __wdccommand_done(chp, xfer)
 
 	WDCDEBUG_PRINT(("__wdccommand_done %s:%d:%d\n",
 	    chp->wdc->sc_dev.dv_xname, chp->channel, xfer->drive), DEBUG_FUNCS);
+
+	untimeout(wdctimeout, chp);
+
 	if (chp->ch_status & WDCS_DWF)
 		wdc_c->flags |= AT_DF;
 	if (chp->ch_status & WDCS_ERR) {
