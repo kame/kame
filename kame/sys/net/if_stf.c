@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.61 2001/06/07 22:30:44 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.62 2001/06/07 22:32:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -484,7 +484,7 @@ stf_output(ifp, m, dst, rt)
 
 	/* encapsulate into IPv4 packet */
 	mp = NULL;
-	error = ipip_output(m, &tdb, &mp, hlen, poff);
+	error = ipip_output(m, &tdb, &mp, hlen, poff, NULL);
 	if (error)
 		return error;
 	else if (mp == NULL)
