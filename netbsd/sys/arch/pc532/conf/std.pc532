@@ -1,0 +1,34 @@
+#	$NetBSD: std.pc532,v 1.8 1999/03/24 06:06:11 mrg Exp $
+#
+# Standard configuration info for NetBSD/pc532.
+
+machine pc532
+
+mainbus0 	at root
+clock0 		at mainbus0		# system timer
+rtc0		at mainbus0		# realtime clock
+ncr*		at mainbus0		# ncr SCSI driver
+scsibus0	at ncr? 		# ncr SCSI bus
+#aic*		at mainbus0		# aic SCSI driver
+#scsibus1	at aic?			# aic SCSI bus
+#XXX Wildcards don't work with holes at the moment,
+#XXX so we do a config for every channel.
+#XXX The following is better, but still wrong:
+#scn*		at mainbus0
+#XXX It should look like:
+#scn*		at mainbus0
+#scntty*	at scn? channel?
+scn0		at mainbus? flags 0x1 # addr 0x28000000
+scn1		at mainbus? flags 0x0 # addr 0x28000008
+scn2		at mainbus? flags 0x0 # addr 0x28000010
+scn3		at mainbus? flags 0x0 # addr 0x28000018
+scn4		at mainbus? flags 0x0 # addr 0x28000020
+scn5		at mainbus? flags 0x0 # addr 0x28000028
+scn6		at mainbus? flags 0x0 # addr 0x28000030
+scn7		at mainbus? flags 0x0 # addr 0x28000038
+
+# UVM is the standard VM system on NetBSD/i386.
+options 	PMAP_NEW	# UVM's new pmap interface
+
+options 	EXEC_AOUT	# #! scripts
+options 	EXEC_SCRIPT	# a.out executables

@@ -1,0 +1,10 @@
+# $NetBSD: std.i386,v 1.13 1999/03/24 06:06:10 mrg Exp $
+#
+# standard, required NetBSD/i386 'options'
+
+machine i386
+
+options 	PMAP_NEW	# UVM's new pmap interface
+
+options 	EXEC_AOUT	# exec a.out binaries
+options 	EXEC_SCRIPT	# exec #! scripts
