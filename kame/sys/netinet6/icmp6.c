@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.370 2004/02/13 02:52:09 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.371 2004/02/13 10:38:44 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2465,7 +2465,7 @@ icmp6_reflect(m, off)
 	int type, code;
 	struct ifnet *outif = NULL;
 	struct sockaddr_in6 sa6_src;
-	struct in6_addr t, *src = NULL;
+	struct in6_addr origdst, *src = NULL;
 
 	/* too short to reflect */
 	if (off < sizeof(struct ip6_hdr)) {
@@ -2512,7 +2512,7 @@ icmp6_reflect(m, off)
 	type = icmp6->icmp6_type; /* keep type for statistics */
 	code = icmp6->icmp6_code; /* ditto. */
 
-	t = ip6->ip6_dst;
+	origdst = ip6->ip6_dst;
 	/*
 	 * ip6_input() drops a packet if its src is multicast.
 	 * So, the src is never multicast.
@@ -2534,17 +2534,25 @@ icmp6_reflect(m, off)
 	 * procedure of an outgoing packet of our own, in which case we need
 	 * to search in the ifaddr list.
 	 */
-	if (!IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {	/* just to be sure */
+	if (!IN6_IS_ADDR_MULTICAST(&origdst)) {
 		if ((ia = ip6_getdstifaddr(m))) {
 			if (!(ia->ia6_flags &
 			    (IN6_IFF_ANYCAST|IN6_IFF_NOTREADY)))
 				src = &ia->ia_addr.sin6_addr;
-		} else if (IN6_IS_ADDR_LINKLOCAL(&t) && (m->m_flags & M_LOOP)) {
-			/*
-			 * This is the case if the dst is our link-local address
-			 * and the sender is also ourselves.
-			 */
-			src = &t;
+		} else {
+			struct sockaddr_in6 d;
+
+			bzero(&d, sizeof(d));
+			d.sin6_family = AF_INET6;
+			d.sin6_len = sizeof(d);
+			d.sin6_addr = origdst;
+			ia = (struct in6_ifaddr *)
+			    ifa_ifwithaddr((struct sockaddr *)&d);
+			if (ia &&
+			    !(ia->ia6_flags &
+			    (IN6_IFF_ANYCAST|IN6_IFF_NOTREADY))) {
+				src = &ia->ia_addr.sin6_addr;
+			}
 		}
 	}
 
