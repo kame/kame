@@ -118,8 +118,8 @@ ip6_forward(m, srcrt)
 	}
 #endif /*IPSEC_IPV6FWD*/
 
-	if (m->m_flags & (M_BCAST|M_MCAST) ||
-	    IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) == 0) {
+	if ((m->m_flags & (M_BCAST|M_MCAST)) != 0 ||
+	    IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
 		ip6stat.ip6s_cantforward++;
 		/* XXX in6_ifstat_inc(rt->rt_ifp, ifs6_in_discard) */
 		if (ip6_log_time + ip6_log_interval < time_second) {
