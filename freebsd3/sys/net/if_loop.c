@@ -403,7 +403,6 @@ lo_altqstart(ifp)
 	struct mbuf *m;
 	int32_t af, *afp;
 	int s, isr;
-	struct ip *ip;
 	
 	if (!ALTQ_IS_ON(ifp))
 		return;

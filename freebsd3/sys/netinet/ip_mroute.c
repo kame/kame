@@ -124,7 +124,6 @@ rsvp_input(m, off, proto)		/* XXX must fixup manually */
     int off;
     int proto;
 {
-    int iphlen = off;
     /*
      * Can still get packets with rsvp_on = 0 if there is a local member
      * of the group to which the RSVP packet is addressed.  But in this
