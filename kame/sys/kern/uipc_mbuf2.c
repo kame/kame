@@ -196,6 +196,9 @@ m_pulldown(m, off, len, offp)
 		off -= n->m_len;
 		n = n->m_next;
 	}
+	/* be sure to point non-empty mbuf */
+	while (n != NULL && n->m_len == 0)
+		n = n->m_next;
 	if (!n) {
 		m_freem(m);
 		return NULL;	/* mbuf chain too short */
