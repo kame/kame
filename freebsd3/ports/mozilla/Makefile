@@ -5,12 +5,14 @@
 # $FreeBSD: ports/www/mozilla/Makefile,v 1.42 2000/04/21 02:36:44 reg Exp $
 #
 
-DISTNAME=	mozilla-M15
+PORTNAME=	mozilla
+PORTVERSION= 	M15
+PKGNAME=	${PORTNAME}-${PORTVERSION}
 CATEGORIES=	www #ipv6
 MASTER_SITES=	ftp://ftp.mozilla.org/pub/mozilla/releases/${PORTVERSION:S/M/m/}/src/
 DISTNAME=	${PORTNAME}-source-${PORTVERSION}
 
-MAINTAINER=	reg@FreeBSD.org
+MAINTAINER=	sumikawa@kame.net
 
 LIB_DEPENDS=	gtk12.2:${PORTSDIR}/x11-toolkits/gtk12 \
 		IDL.2:${PORTSDIR}/devel/ORBit
