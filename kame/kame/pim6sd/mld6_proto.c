@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.38 2004/06/09 14:54:23 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.39 2004/06/09 15:52:57 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -139,16 +139,20 @@ query_groups(v)
 	v->uv_gq_timer = MLD6_QUERY_INTERVAL;
 	if (v->uv_flags & VIFF_QUERIER &&
 	    (v->uv_flags & VIFF_NOLISTENER) == 0) {
+	    	int ret;
+
 		if (v->uv_stquery_cnt)
 			v->uv_stquery_cnt--;
 		if (v->uv_stquery_cnt)
 			v->uv_gq_timer = MLD6_STARTUP_QUERY_INTERVAL;
 		else
 			v->uv_gq_timer = MLD6_QUERY_INTERVAL;
-		send_mld6(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
-			  NULL, (struct in6_addr *)&in6addr_any, v->uv_ifindex,
-			  MLD6_QUERY_RESPONSE_INTERVAL, 0, 1);
-		v->uv_out_mld_query++;
+		ret = send_mld6(MLD_LISTENER_QUERY, 0, 
+			&v->uv_linklocal->pa_addr, NULL,
+			(struct in6_addr *)&in6addr_any, v->uv_ifindex,
+			MLD6_QUERY_RESPONSE_INTERVAL, 0, 1);
+		if (ret == TRUE)
+			v->uv_out_mld_query++;
 	}
 }
 
@@ -474,6 +478,7 @@ recv_listener_done(mifi, src, grp)
 {
 	struct uvif *v = &uvifs[mifi];
 	register struct listaddr *g;
+	int ret = FALSE;
 
 	/*
 	 * XXX: in MLDv1-compat mode, non-querier is allowed to ignore MLDv2
@@ -521,23 +526,22 @@ recv_listener_done(mifi, src, grp)
 		 */
 #ifdef MLDV2_LISTENER_REPORT
 		if (v->uv_mld_version & MLDv2) {
-			send_mld6v2(MLD_LISTENER_QUERY, 0,
-				    &v->uv_linklocal->pa_addr, NULL,
-				    &g->al_addr,
-				    v->uv_ifindex,
-				    MLD6_QUERY_RESPONSE_INTERVAL,
-				    0, TRUE, SFLAGNO, v->uv_mld_robustness,
-				    v->uv_mld_query_interval, FALSE);
+			ret = send_mld6v2(MLD_LISTENER_QUERY, 0,
+					  &v->uv_linklocal->pa_addr, NULL,
+					  &g->al_addr, v->uv_ifindex,
+					  MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE,
+					  SFLAGNO, v->uv_mld_robustness,
+					  v->uv_mld_query_interval, FALSE);
 		} else if (v->uv_mld_version & MLDv1) 
 #endif
 		{
-			send_mld6(MLD_LISTENER_QUERY, 0,
-				  &v->uv_linklocal->pa_addr, NULL,
-				  &g->al_addr.sin6_addr,
-				  v->uv_ifindex,
-				  MLD6_LAST_LISTENER_QUERY_INTERVAL, 0, 1);
+			ret = send_mld6(MLD_LISTENER_QUERY, 0,
+				&v->uv_linklocal->pa_addr, NULL,
+				&g->al_addr.sin6_addr, v->uv_ifindex,
+				MLD6_LAST_LISTENER_QUERY_INTERVAL, 0, 1);
 		}
-		v->uv_out_mld_query++;
+		if (ret == TRUE)
+			v->uv_out_mld_query++;
 
 	set_timer:
 		g->al_query = SetQueryTimer(g, mifi,
@@ -635,10 +639,13 @@ SendQuery(arg)
 	}
 	if (v->uv_flags & VIFF_QUERIER &&
 	    (v->uv_flags & VIFF_NOLISTENER) == 0) {
-		send_mld6(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
-			  NULL, &cbk->g->al_addr.sin6_addr, v->uv_ifindex,
-			  cbk->q_time, 0, 1);
-		v->uv_out_mld_query++;
+	    	int ret;
+		ret = send_mld6(MLD_LISTENER_QUERY, 0,
+				&v->uv_linklocal->pa_addr, NULL,
+				&cbk->g->al_addr.sin6_addr, v->uv_ifindex,
+				cbk->q_time, 0, 1);
+		if (ret == TRUE)
+			v->uv_out_mld_query++;
 	}
 	cbk->g->al_query = 0;
 	free(cbk);

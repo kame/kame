@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2.c,v 1.19 2004/06/09 14:54:23 suz Exp $
+ * $KAME: mld6v2.c,v 1.20 2004/06/09 15:52:57 suz Exp $
  */
 
 /*
@@ -326,7 +326,7 @@ make_mld6v2_msg(int type, int code, struct sockaddr_in6 *src,
     return TRUE;
 }
 
-void
+int
 send_mld6v2(int type, int code, struct sockaddr_in6 *src,
 	    struct sockaddr_in6 *dst, struct sockaddr_in6 *group, int index,
 	    unsigned int delay, int datalen, int alert, int sflag, int qrv,
@@ -336,7 +336,7 @@ send_mld6v2(int type, int code, struct sockaddr_in6 *src,
 
     if (make_mld6v2_msg(type, code, src, dst, group, index, delay, 
 			datalen, alert, sflag, qrv, qqic, gss) == FALSE)
-	return;
+	return FALSE;
 
     dstp = (struct sockaddr_in6 *) sndmh.msg_name;
 
@@ -355,12 +355,14 @@ send_mld6v2(int type, int code, struct sockaddr_in6 *src,
 		sa6_fmt(dstp), src ? sa6_fmt(src) : "(unspec)",
 		ifindex2str(index));
 
-	return;
+	return FALSE;
     }
+
     IF_DEBUG(DEBUG_PKT)
 	log_msg(LOG_DEBUG, 0, "SENT %s from %-15s to %s",
 	    packet_kind(IPPROTO_ICMPV6, type, 0),
 	    src ? sa6_fmt(src) : "unspec", sa6_fmt(dstp));
+    return TRUE;
 }
 
 

@@ -1,10 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2622 2004/06/09 14:55:23 suz Exp $
+$KAME: CHANGELOG,v 1.2623 2004/06/09 15:52:57 suz Exp $
 
 <200406>
 2004-06-09  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
 	* kame/pim6sd/mld6_proto.[ch], mld6v2.[ch], mld6v2_proto.[ch]:
 	- transmits MLDv2 Group-Specific Query, if necessary.
+	- doesn't increment MLD statistics counter when an MLD packet 
+	  is not transmitted by some reason.
 
 2004-06-08  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
 	* kame/pim6sd/mld6_proto.c, mld6v2_proto.c:

@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.51 2004/06/06 15:09:20 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.52 2004/06/09 15:52:57 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -574,7 +574,7 @@ make_mld6_msg(type, code, src, dst, group, ifindex, delay, datalen, alert)
 	    sndmh.msg_control = NULL; /* clear for safety */
 }
 
-void
+int
 send_mld6(type, code, src, dst, group, index, delay, datalen, alert)
     int type;
     int code;		/* for trace packets only */
@@ -604,11 +604,12 @@ send_mld6(type, code, src, dst, group, index, delay, datalen, alert)
 		sa6_fmt(dstp), src ? sa6_fmt(src) : "(unspec)",
 		ifindex2str(index));
 
-	return;
+	return FALSE;
     }
     
     IF_DEBUG(DEBUG_PKT|debug_kind(IPPROTO_IGMP, type, 0))
 	log_msg(LOG_DEBUG, 0, "SENT %s from %-15s to %s",
 	    packet_kind(IPPROTO_ICMPV6, type, 0),
 	    src ? sa6_fmt(src) : "unspec", sa6_fmt(dstp));
+    return TRUE;
 }

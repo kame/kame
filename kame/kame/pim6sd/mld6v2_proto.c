@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.37 2004/06/09 14:54:23 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.38 2004/06/09 15:52:58 suz Exp $
  */
 
 /*
@@ -117,6 +117,8 @@ query_groupsV2(v)
     v->uv_gq_timer = v->uv_mld_query_interval;
     if ((v->uv_flags & VIFF_QUERIER) &&
     	(v->uv_flags & VIFF_NOLISTENER) == 0) {
+	int ret;
+
 	if (v->uv_stquery_cnt)
 		v->uv_stquery_cnt--;
 	if (v->uv_stquery_cnt)
@@ -127,11 +129,13 @@ query_groupsV2(v)
 		"sending multicast listener general query V2 on : %s ",
 		v->uv_name);
 
-	send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
-		    NULL, (struct sockaddr_in6 *) NULL, v->uv_ifindex,
-		    MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, SFLAGNO,
-		    v->uv_mld_robustness, v->uv_mld_query_interval, FALSE);
-	v->uv_out_mld_query++;
+	ret = send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
+			  NULL, (struct sockaddr_in6 *) NULL, v->uv_ifindex,
+			  MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, SFLAGNO,
+			  v->uv_mld_robustness, v->uv_mld_query_interval,
+			  FALSE);
+	if (ret == TRUE)
+		v->uv_out_mld_query++;
     }
 }
 
@@ -148,6 +152,7 @@ Send_GSS_QueryV2(arg)
 {
     cbk_t          *cbk = (cbk_t *) arg;
     register struct uvif *v = &uvifs[cbk->mifi];
+    int ret;
 
     if ((v->uv_flags & VIFF_QUERIER) == 0 || (v->uv_flags & VIFF_NOLISTENER)) {
 	log_msg(LOG_DEBUG, 0,
@@ -155,17 +160,19 @@ Send_GSS_QueryV2(arg)
 	return;
     }
 
-    send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
-		NULL, &cbk->g->al_addr, v->uv_ifindex,
-		MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, SFLAGNO,
-		v->uv_mld_robustness, v->uv_mld_query_interval, TRUE);
-    v->uv_out_mld_query++;
+    ret = send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
+    		      NULL, &cbk->g->al_addr, v->uv_ifindex,
+		      MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, SFLAGNO,
+		      v->uv_mld_robustness, v->uv_mld_query_interval, TRUE);
+    if (ret == TRUE)
+    	v->uv_out_mld_query++;
 
-    send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
-		NULL, &cbk->g->al_addr, v->uv_ifindex,
-		MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, SFLAGYES,
-		v->uv_mld_robustness, v->uv_mld_query_interval, TRUE);
-    v->uv_out_mld_query++;
+    ret = send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
+    		      NULL, &cbk->g->al_addr, v->uv_ifindex,
+		      MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, SFLAGYES,
+		      v->uv_mld_robustness, v->uv_mld_query_interval, TRUE);
+    if (ret == TRUE)
+    	v->uv_out_mld_query++;
 
     cbk->g->al_rob--;
 
@@ -190,6 +197,7 @@ Send_GS_QueryV2(arg)
     cbk_t          *cbk = (cbk_t *) arg;
     register struct uvif *v = &uvifs[cbk->mifi];
     int sflag = SFLAGNO;
+    int ret;
 
     if ((v->uv_flags & VIFF_QUERIER) == 0 || (v->uv_flags & VIFF_NOLISTENER)) {
 	log_msg(LOG_DEBUG, 0,
@@ -201,11 +209,12 @@ Send_GS_QueryV2(arg)
         cbk->g->comp_mode == MLDv2)
     	sflag = SFLAGYES;
 
-    send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
-		NULL, &cbk->g->al_addr, v->uv_ifindex,
-		MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, sflag,
-		v->uv_mld_robustness, v->uv_mld_query_interval, FALSE);
-    v->uv_out_mld_query++;
+    ret = send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
+    		      NULL, &cbk->g->al_addr, v->uv_ifindex,
+		      MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, sflag,
+		      v->uv_mld_robustness, v->uv_mld_query_interval, FALSE);
+    if (ret == TRUE)
+	v->uv_out_mld_query++;
     cbk->g->al_rob--;
 
     /*

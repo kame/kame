@@ -1,4 +1,4 @@
-/*	$KAME: mld6.h,v 1.12 2004/04/18 15:03:13 suz Exp $	*/
+/*	$KAME: mld6.h,v 1.13 2004/06/09 15:52:57 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -63,9 +63,9 @@ extern struct sockaddr_in6 allnodes_group;
 extern char *mld6_send_buf;
 
 void init_mld6 __P((void));
-void send_mld6 __P((int type, int code, struct sockaddr_in6 *src,
-		    struct sockaddr_in6 *dst, struct in6_addr *group,
-		    int index, int delay, int datalen, int alert));
+int send_mld6 __P((int type, int code, struct sockaddr_in6 *src,
+		   struct sockaddr_in6 *dst, struct in6_addr *group,
+		   int index, int delay, int datalen, int alert));
 
 /* portability with older KAME headers */
 #ifndef MLD_LISTENER_QUERY
