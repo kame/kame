@@ -1,4 +1,4 @@
-/*	$KAME: debug.c,v 1.53 2002/12/06 05:48:57 suz Exp $	*/
+/*	$KAME: debug.c,v 1.54 2002/12/24 04:43:11 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -751,6 +751,8 @@ dump_pim_mrt(fp)
 		fprintf(fp, " WC");
 	    if (r->flags & MRTF_RP)
 		fprintf(fp, " RP");
+	    if (r->flags & MRTF_1ST)
+		fprintf(fp, " 1ST");
 	    if (r->flags & MRTF_REGISTER)
 		fprintf(fp, " REG");
 	    if (r->flags & MRTF_IIF_REGISTER)

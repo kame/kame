@@ -1,4 +1,4 @@
-/*	$KAME: mrt.h,v 1.12 2001/11/02 04:07:07 suz Exp $	*/
+/*	$KAME: mrt.h,v 1.13 2002/12/24 04:43:12 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -56,6 +56,7 @@
 #define MRTF_WC                 0x0002  /* (*,G) entry                      */
 #define MRTF_RP                 0x0004  /* iif toward RP                    */
 #define MRTF_NEW                0x0008  /* new created routing entry        */
+#define MRTF_1ST		0x0010	/* first hop entry		    */
 #define MRTF_IIF_REGISTER   	0x0020  /* ???                              */
 #define MRTF_REGISTER       	0x0080  /* ???                              */ 
 #define MRTF_KERNEL_CACHE   	0x0200  /* a mirror for the kernel cache    */ 

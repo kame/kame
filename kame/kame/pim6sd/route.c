@@ -1,4 +1,4 @@
-/*	$KAME: route.c,v 1.23 2002/12/09 09:01:53 suz Exp $	*/
+/*	$KAME: route.c,v 1.24 2002/12/24 04:43:12 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -991,7 +991,7 @@ process_cache_miss(im)
     if ((uvifs[iif].uv_flags & VIFF_DR)
 	&& (find_vif_direct_local(&source) == iif))
     {
-	mrtentry_ptr = find_route(&source, &group, MRTF_SG, CREATE);
+	mrtentry_ptr = find_route(&source, &group, MRTF_SG | MRTF_1ST, CREATE);
 	if (mrtentry_ptr == (mrtentry_t *) NULL)
 	{
 	    goto fail;

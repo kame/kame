@@ -1,4 +1,4 @@
-/*	$KAME: mrt.c,v 1.12 2002/12/15 04:36:32 suz Exp $	*/
+/*	$KAME: mrt.c,v 1.13 2002/12/24 04:43:12 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -276,8 +276,18 @@ find_route(source, group, flags, create)
 	}
     }
 
-    /* try to find an RP for mrt using RP */
-    if (flags & (MRTF_RP | MRTF_WC))
+    /*
+     * Try to find an RP for mrt using RP.
+     * First hop (S,G) has to refer to the corresponding RP 
+     * unless G is in SSM range.  However SSM range check is skipped 
+     * here, since this function is never called if G is in SSM range
+     * (cache miss is impossible in SSM world).
+     * Draft-ietf-pim-sm-v2-new-06.txt does not mention explicitly
+     * whether first-hop DR has to create an (S,G) entry without RP(G) 
+     * or not.  However RP(G) existence is checked since PIM register
+     * packet cannot be advertised without RP(G) info.
+     */
+    if (flags & (MRTF_RP | MRTF_WC | MRTF_1ST))
     {
 	if (grpentry_ptr->active_rp_grp == (rp_grp_entry_t *) NULL)
 	{
