@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.75 2001/04/04 02:06:20 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.76 2001/04/04 02:21:54 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1950,26 +1950,26 @@ setscopeid(sp_addr0, sa_addr0)
 	sp_addr = (struct sockaddr_in6 *)sp_addr0;
 	sa_addr = (struct sockaddr_in6 *)sa_addr0;
 
-	/* sanity */
+	if (!IN6_IS_ADDR_LINKLOCAL(&sp_addr->sin6_addr)
+	 && !IN6_IS_ADDR_SITELOCAL(&sp_addr->sin6_addr)
+	 && !IN6_IS_ADDR_MULTICAST(&sp_addr->sin6_addr))
+		return 0;
+
+	/* this check should not be here ? */
 	if (sa_addr->sin6_family != AF_INET6) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"can't get scope ID: family mismatch\n");
 		return -1;
 	}
 
-	/* this check should not be here ? */
-	if (sa_addr->sin6_scope_id
-	 && !IN6_IS_ADDR_LINKLOCAL(&sa_addr->sin6_addr)
-	 && !IN6_IS_ADDR_SITELOCAL(&sa_addr->sin6_addr)
-	 && !IN6_IS_ADDR_MULTICAST(&sa_addr->sin6_addr)) {
-		plog(LLV_WARNING, LOCATION, NULL,
-			"why a scopeid is used as such a SA address, %s ? "
-			"anyway continue.\n", saddr2str(sa_addr0));
+	if (!IN6_IS_ADDR_LINKLOCAL(&sa_addr->sin6_addr)) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"scope ID is not supported except of lladdr.\n");
+		return -1;
 	}
-    
+
 	sp_addr->sin6_scope_id = sa_addr->sin6_scope_id;
 
 	return 0;
 }
 #endif
-
