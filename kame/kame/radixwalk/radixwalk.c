@@ -1,4 +1,4 @@
-/*	$KAME: radixwalk.c,v 1.7 2001/07/20 17:51:56 jinmei Exp $	*/
+/*	$KAME: radixwalk.c,v 1.8 2001/08/20 07:17:57 itojun Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -340,9 +340,8 @@ print_tree(tn, depth, rightp, family)
 	case LINE:
 		plen = strlen(indentbuf);
 		if (indent && plen != indent) {
-			/* XXX: overrun */
-			sprintf(indentbuf + plen, "%*s+",
-				indent - plen - 1, "");
+			snprintf(indentbuf + plen, sizeof(indentbuf) - plen,
+			    "%*s+", indent - plen - 1, "");
 		}
 		printf("%s", indentbuf);
 		break;

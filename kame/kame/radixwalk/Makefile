@@ -1,4 +1,4 @@
-# $KAME: Makefile,v 1.1 2000/08/16 14:40:30 jinmei Exp $
+# $KAME: Makefile,v 1.2 2001/08/20 07:17:57 itojun Exp $
 
 # Copyright (c) 2000 WIDE Project. All rights reserved.
 #
@@ -27,7 +27,7 @@
 # SUCH DAMAGE.
 
 LDFLAGS=-L/usr/local/v6/lib
-LIBS= -lkvm -linet6
+LIBS= -lkvm # -linet6
 
 CFLAGS= -g -Wall -Werror
 TARGET= radixwalk
