@@ -213,7 +213,7 @@ any		{ PREPROC; return(ANY); }
 			char *bp;
 
 			PREPROC;
-			yylval.num = strtol(yytext, &bp, 10);
+			yylval.num = strtoul(yytext, &bp, 10);
 			return(DECSTRING);
 		}
 
