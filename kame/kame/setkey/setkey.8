@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.66 2001/09/04 10:05:07 jinmei Exp $
+.\"	$KAME: setkey.8,v 1.67 2001/09/21 05:16:28 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -386,6 +386,17 @@ For FQDN resolution, the rules applicable to
 and
 .Ar dst
 apply here as well.
+You can specify a type and/or a code of ICMPv6 when
+.Ar upperspec
+is ICMPv6.  In this case, the port field of the
+.Ar src_range
+means ICMPv6 type.
+The port field of the
+.Ar dst_range
+means ICMPv6 code.
+For example, the following means the policy doesn't require IPsec
+for an inbound Neighbor Solicitation.
+.Dl spdadd ::/0[135] ::/0 icmp6 -P in none ;
 .\"
 .Pp
 .It Ar upperspec

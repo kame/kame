@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.64 2001/09/10 23:10:49 sakane Exp $	*/
+/*	$KAME: parse.y,v 1.65 2001/09/21 05:16:28 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
