@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.61 2000/07/12 13:28:17 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.62 2000/07/12 14:10:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -107,6 +107,11 @@ extern struct ifnet loif[NLOOP];
 #endif /* IPSEC */
 
 struct in6_addr zeroin6_addr;
+
+int ip6_anonportmin = IPV6PORT_ANONMIN;
+int ip6_anonportmax = IPV6PORT_ANONMAX;
+int ip6_lowportmin  = IPV6PORT_RESERVEDMIN;
+int ip6_lowportmax  = IPV6PORT_RESERVEDMAX;
 
 int
 in6_pcballoc(so, head)

@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.33 2000/08/02 11:02:26 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.34 2000/08/26 10:00:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -440,17 +440,19 @@ in6_pcbsetport(laddr, in6p)
 
 	if (in6p->in6p_flags & IN6P_LOWPORT) {
 #ifdef __NetBSD__
+#ifndef IPNOPRIVPORTS
 		if (p == 0 || (suser(p->p_ucred, &p->p_acflag) != 0))
 			return (EACCES);
+#endif
 #else
 		if ((so->so_state & SS_PRIV) == 0)
 			return (EACCES);
 #endif
-		min = IPV6PORT_RESERVEDMIN;
-		max = IPV6PORT_RESERVEDMAX;
+		min = ip6_lowportmin;
+		max = ip6_lowportmax;
 	} else {
-		min = IPV6PORT_ANONMIN;
-		max = IPV6PORT_ANONMAX;
+		min = ip6_anonportmin;
+		max = ip6_anonportmax;
 	}
 
 	/* value out of range */
@@ -540,13 +542,11 @@ in6_pcbsetport(laddr, inp, p)
 		last  = ipport_hilastauto;
 		lastport = &pcbinfo->lasthi;
 	} else if (inp->inp_flags & INP_LOWPORT) {
-		if (p &&
 #if __FreeBSD__ >= 4
-		    (error = suser(p))
+		if (p && (error = suser(p)))
 #else
-		    (error = suser(p->p_ucred, &p->p_acflag))
+		if (p && (error = suser(p->p_ucred, &p->p_acflag)))
 #endif
-			)
 			return error;
 		first = ipport_lowfirstauto;	/* 1023 */
 		last  = ipport_lowlastauto;	/* 600 */

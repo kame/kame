@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.41 2000/08/20 04:44:19 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.42 2000/08/26 10:00:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -272,6 +272,11 @@ extern int	ip6_dad_count;		/* DupAddrDetectionTransmits */
 
 extern u_int32_t ip6_flow_seq;
 extern int ip6_auto_flowlabel;
+
+extern int   ip6_anonportmin;		/* minimum ephemeral port */
+extern int   ip6_anonportmax;		/* maximum ephemeral port */
+extern int   ip6_lowportmin;		/* minimum reserved port */
+extern int   ip6_lowportmax;		/* maximum reserved port */
 
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 struct in6pcb;

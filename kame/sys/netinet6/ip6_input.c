@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.118 2000/08/19 02:01:46 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.119 2000/08/26 10:00:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2096,6 +2096,10 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	void *newp;
 	size_t newlen;
 {
+#ifdef __NetBSD__	/*IPV6CTL_ANONPORT{MIN,MAX}, IPV6CTL_LOWPORT{MIN,MAX}*/
+	int old, error;
+#endif
+
 	/* All sysctl names at this level are terminal. */
 	if (namelen != 1)
 		return ENOTDIR;
@@ -2146,6 +2150,66 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case IPV6CTL_BINDV6ONLY:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 				&ip6_bindv6only);
+#endif
+#ifdef IPV6CTL_ANONPORTMIN
+	case IPV6CTL_ANONPORTMIN:
+		old = ip6_anonportmin;
+		error = sysctl_int(oldp, oldlenp, newp, newlen,
+		    &ip6_anonportmin);
+		if (ip6_anonportmin >= ip6_anonportmax || ip6_anonportmin < 0 ||
+		    ip6_anonportmin > 65535
+#if !(defined(__NetBSD__) && defined(IPNOPRIVPORTS))
+		    || ip6_anonportmin < IPV6PORT_RESERVED
+#endif
+		    ) {
+			ip6_anonportmin = old;
+			return (EINVAL);
+		}
+		return (error);
+#endif
+#ifdef IPV6CTL_ANONPORTMAX
+	case IPV6CTL_ANONPORTMAX:
+		old = ip6_anonportmax;
+		error = sysctl_int(oldp, oldlenp, newp, newlen,
+		    &ip6_anonportmax);
+		if (ip6_anonportmin >= ip6_anonportmax || ip6_anonportmax < 0 ||
+		    ip6_anonportmax > 65535
+#if !(defined(__NetBSD__) && defined(IPNOPRIVPORTS))
+		    || ip6_anonportmax < IPV6PORT_RESERVED
+#endif
+		    ) {
+			ip6_anonportmax = old;
+			return (EINVAL);
+		}
+		return (error);
+#endif
+#ifndef IPNOPRIVPORTS
+#ifdef IPV6CTL_LOWPORTMIN
+	case IPV6CTL_LOWPORTMIN:
+		old = ip6_lowportmin;
+		error = sysctl_int(oldp, oldlenp, newp, newlen,
+		    &ip6_lowportmin);
+		if (ip6_lowportmin >= ip6_lowportmax ||
+		    ip6_lowportmin > IPV6PORT_RESERVEDMAX ||
+		    ip6_lowportmin < IPV6PORT_RESERVEDMIN) {
+			ip6_lowportmin = old;
+			return (EINVAL);
+		}
+		return (error);
+#endif
+#ifdef IPV6CTL_LOWPORTMAX
+	case IPV6CTL_LOWPORTMAX:
+		old = ip6_lowportmax;
+		error = sysctl_int(oldp, oldlenp, newp, newlen,
+		    &ip6_lowportmax);
+		if (ip6_lowportmin >= ip6_lowportmax ||
+		    ip6_lowportmax > IPV6PORT_RESERVEDMAX ||
+		    ip6_lowportmax < IPV6PORT_RESERVEDMIN) {
+			ip6_lowportmax = old;
+			return (EINVAL);
+		}
+		return (error);
+#endif
 #endif
 	default:
 		return EOPNOTSUPP;

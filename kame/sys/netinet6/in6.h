@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.56 2000/08/17 01:08:39 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.57 2000/08/26 10:00:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -579,8 +579,15 @@ struct in6_pktinfo {
 #define IPV6CTL_RTMINEXPIRE	26	/* min value for expiration time */
 #define IPV6CTL_RTMAXCACHE	27	/* trigger level for dynamic expire */
 #endif
+#ifdef __NetBSD__
+#define IPV6CTL_ANONPORTMIN	28	/* minimum ephemeral port */
+#define IPV6CTL_ANONPORTMAX	29	/* maximum ephemeral port */
+#define IPV6CTL_LOWPORTMIN	30	/* minimum reserved port */
+#define IPV6CTL_LOWPORTMAX	31	/* maximum reserved port */
+#endif
 /* New entries should be added here from current IPV6CTL_MAXID value. */
-#define IPV6CTL_MAXID		28
+/* to define items, should talk with KAME guys first, for *BSD compatibility */
+#define IPV6CTL_MAXID		32
 
 #ifdef IPV6CTL_MAPPED_ADDR
 #define __IPV6CTL_NAMES_MAPPED_ADDR	"mapped_addr"
@@ -632,6 +639,46 @@ struct in6_pktinfo {
 #define __IPV6CTL_VARS_MAXCACHE		0
 #endif
 
+#ifdef IPV6CTL_ANONPORTMIN
+#define __IPV6CTL_NAMES_ANONPORTMIN	"anonportmin"
+#define __IPV6CTL_TYPE_ANONPORTMIN	CTLTYPE_INT
+#define __IPV6CTL_VARS_ANONPORTMIN	0
+#else
+#define __IPV6CTL_NAMES_ANONPORTMIN	0
+#define __IPV6CTL_TYPE_ANONPORTMIN	0
+#define __IPV6CTL_VARS_ANONPORTMIN	0
+#endif
+
+#ifdef IPV6CTL_ANONPORTMAX
+#define __IPV6CTL_NAMES_ANONPORTMAX	"anonportmax"
+#define __IPV6CTL_TYPE_ANONPORTMAX	CTLTYPE_INT
+#define __IPV6CTL_VARS_ANONPORTMAX	0
+#else
+#define __IPV6CTL_NAMES_ANONPORTMAX	0
+#define __IPV6CTL_TYPE_ANONPORTMAX	0
+#define __IPV6CTL_VARS_ANONPORTMAX	0
+#endif
+
+#ifdef IPV6CTL_LOWPORTMIN
+#define __IPV6CTL_NAMES_LOWPORTMIN	"lowportmin"
+#define __IPV6CTL_TYPE_LOWPORTMIN	CTLTYPE_INT
+#define __IPV6CTL_VARS_LOWPORTMIN	0
+#else
+#define __IPV6CTL_NAMES_LOWPORTMIN	0
+#define __IPV6CTL_TYPE_LOWPORTMIN	0
+#define __IPV6CTL_VARS_LOWPORTMIN	0
+#endif
+
+#ifdef IPV6CTL_LOWPORTMAX
+#define __IPV6CTL_NAMES_LOWPORTMAX	"lowportmax"
+#define __IPV6CTL_TYPE_LOWPORTMAX	CTLTYPE_INT
+#define __IPV6CTL_VARS_LOWPORTMAX	0
+#else
+#define __IPV6CTL_NAMES_LOWPORTMAX	0
+#define __IPV6CTL_TYPE_LOWPORTMAX	0
+#define __IPV6CTL_VARS_LOWPORTMAX	0
+#endif
+
 
 #define IPV6CTL_NAMES { \
 	{ 0, 0 }, \
@@ -662,6 +709,10 @@ struct in6_pktinfo {
 	{ __IPV6CTL_NAMES_RTEXPIRE, __IPV6CTL_TYPE_RTEXPIRE }, \
 	{ __IPV6CTL_NAMES_MINEXPIRE, __IPV6CTL_TYPE_MINEXPIRE }, \
 	{ __IPV6CTL_NAMES_MAXCACHE, __IPV6CTL_TYPE_MAXCACHE }, \
+	{ __IPV6CTL_NAMES_ANONPORTMIN, __IPV6CTL_TYPE_ANONPORTMIN }, \
+	{ __IPV6CTL_NAMES_ANONPORTMAX, __IPV6CTL_TYPE_ANONPORTMAX }, \
+	{ __IPV6CTL_NAMES_LOWPORTMIN, __IPV6CTL_TYPE_LOWPORTMIN }, \
+	{ __IPV6CTL_NAMES_LOWPORTMAX, __IPV6CTL_TYPE_LOWPORTMAX }, \
 }
 
 #ifdef __bsdi__
@@ -694,6 +745,10 @@ struct in6_pktinfo {
 	__IPV6CTL_VARS_RTEXPIRE, \
 	__IPV6CTL_VARS_MINEXPIRE, \
 	__IPV6CTL_VARS_MAXCACHE, \
+	__IPV6CTL_VARS_ANONPORTMIN, \
+	__IPV6CTL_VARS_ANONPORTMAX, \
+	__IPV6CTL_VARS_LOWPORTMIN, \
+	__IPV6CTL_VARS_LOWPORTMAX, \
 }
 #endif
 #endif /* !_XOPEN_SOURCE */
