@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.36 2002/07/30 10:50:15 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.37 2002/08/02 11:27:37 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1236,7 +1236,7 @@ mip6_ip6mhi_create(pktopt_mobility, mbu)
 	ip6mhi->ip6mhi_pproto = IPPROTO_NONE;
 	ip6mhi->ip6mhi_len = ip6mhi_size >> 3;
 	ip6mhi->ip6mhi_type = IP6M_HOME_TEST_INIT;
-	ip6mhi->ip6mhi_mobile_cookie = mbu->mbu_mobile_cookie;
+	ip6mhi->ip6mhi_mobile_cookie = htonl(mbu->mbu_mobile_cookie);
 
 	/* calculate checksum. */
 	ip6mhi->ip6mhi_cksum = mip6_cksum(&mbu->mbu_haddr, &mbu->mbu_paddr,
@@ -1273,7 +1273,7 @@ mip6_ip6mci_create(pktopt_mobility, mbu)
 	ip6mci->ip6mci_pproto = IPPROTO_NONE;
 	ip6mci->ip6mci_len = ip6mci_size >> 3;
 	ip6mci->ip6mci_type = IP6M_CAREOF_TEST_INIT;
-	ip6mci->ip6mci_mobile_cookie = mbu->mbu_mobile_cookie;
+	ip6mci->ip6mci_mobile_cookie = htonl(mbu->mbu_mobile_cookie);
 
 	/* calculate checksum. */
 	ip6mci->ip6mci_cksum = mip6_cksum(&mbu->mbu_coa, &mbu->mbu_paddr,
