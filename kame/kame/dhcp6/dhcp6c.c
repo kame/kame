@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.67 2002/05/01 06:12:41 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.68 2002/05/01 07:01:15 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -694,7 +694,7 @@ client6_recv(ifp)
 		if (ifp->state == DHCP6S_INFOREQ ||
 		    (ifp->state == DHCP6S_SOLICIT &&
 		     (ifp->flags & DHCIFF_RAPID_COMMIT))) {
-			client6_recvreply(ifp, dh6, len);
+			return(client6_recvreply(ifp, dh6, len));
 		} else {
 			dprintf(LOG_INFO, "client6_recv: unexpected reply");
 			return(-1);
@@ -721,6 +721,7 @@ client6_recvreply(ifp, dh6, len)
 	int i;
 	struct in6_addr in6;
 	struct duid reply_duid;
+	struct dhcp6_optinfo optinfo;
 
 	/*
 	 * The ``transaction-ID'' field value MUST match the value we
@@ -732,12 +733,17 @@ client6_recvreply(ifp, dh6, len)
 	}
 
 	/* option processing */
-
+	dhcp6_init_options(&optinfo);
 	p = (struct dhcp6opt *)(dh6 + 1);
 	ep = (struct dhcp6opt *)((char *)dh6 + len);
+	if (dhcp6_get_options(p, ep, &optinfo) < 0) {
+		dprintf(LOG_INFO,
+			"client6_recvreply: failed to parse options");
+		return -1;
+	}
 
 	/* A Reply message must contain a Server ID option */
-	if ((get_dhcp6_option(p, ep, DH6OPT_SERVERID, NULL)) < 0) {
+	if (optinfo.serverID.duid_len == 0) {
 		dprintf(LOG_INFO, "client6_recvreply: no server ID option");
 		return -1;
 	}
@@ -746,48 +752,27 @@ client6_recvreply(ifp, dh6, len)
 	 * DUID in the Client ID option (which must be contained for our
 	 * client implementation) must match ours.
 	 */
-	if ((get_dhcp6_option(p, ep, DH6OPT_CLIENTID, &reply_duid)) < 0) {
+	if (optinfo.clientID.duid_len == 0) {
 		dprintf(LOG_INFO, "client6_recvreply: no client ID option");
 		return -1;
 	}
-	if (reply_duid.duid_len != client_duid.duid_len ||
-	    memcmp(reply_duid.duid_id, client_duid.duid_id,
+	if (optinfo.clientID.duid_len != client_duid.duid_len ||
+	    memcmp(optinfo.clientID.duid_id, client_duid.duid_id,
 		   client_duid.duid_len)) {
 		dprintf(LOG_INFO, "client6_recvreply: client DUID mismatch");
 		return -1;
 	}
 
-	while (p + 1 <= ep) {
-		cp = (char *)(p + 1);
-		np = (struct dhcp6opt *)(cp + ntohs(p->dh6opt_len));
-		/* option length field overrun */
-		if (np > ep)
-			goto malformed;
-
-		switch (ntohs(p->dh6opt_type)) {
-		case DH6OPT_DNS:
-			if (ntohs(p->dh6opt_len) % sizeof(in6) ||
-			    ntohs(p->dh6opt_len) == 0)
-				goto malformed;
-			for (i = 0; i < ntohs(p->dh6opt_len); i += sizeof(in6)) {
-				memcpy(&in6, &cp[i], sizeof(in6));
-				fprintf(stderr, "nameserver %s\n",
-				    inet_ntop(AF_INET6, &in6, buf, sizeof(buf)));
-			}
-			break;
-		default:
-			/* ignore */
-			break;
+	if (optinfo.dns.n) {
+		for (i = 0, cp = optinfo.dns.list;
+		     i < optinfo.dns.n; i++, cp += sizeof(in6)) {
+			memcpy(&in6, cp, sizeof(in6));
+			dprintf(LOG_DEBUG, "nameserver[%d] %s", i,
+				inet_ntop(AF_INET6, &in6, buf, sizeof(buf)));
 		}
-
-		p = np;
 	}
 
 	return 0;
-
- malformed:
-	dprintf(LOG_INFO, "client6_recvreply: malformed option");
-	return -1;
 }
 
 static void

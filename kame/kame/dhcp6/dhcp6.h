@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.18 2002/04/30 14:49:08 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.19 2002/05/01 07:01:15 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -66,6 +66,17 @@
 struct duid {
 	int duid_len;		/* length */
 	char *duid_id;		/* variable length ID value (must be opaque) */
+};
+
+/* option information */
+struct dhcp6_optinfo {
+	struct duid clientID;	/* DUID */
+	struct duid serverID;	/* DUID */
+	int rapidcommit;	/* bool */
+	struct {		/* list of DNS servers */
+		int n;
+		char *list;
+	} dns;
 };
 
 /* DHCP6 base packet format */

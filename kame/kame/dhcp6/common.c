@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.34 2002/05/01 06:00:00 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.35 2002/05/01 07:01:15 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -541,48 +541,75 @@ gethwid(buf, len, ifname, hwtypep)
 	return -1;
 }
 
-int
-get_dhcp6_option(p, ep, opt, retbuf)
-	struct dhcp6opt *p, *ep;
-	int opt;
-	void *retbuf;
+void
+dhcp6_init_options(optinfo)
+	struct dhcp6_optinfo *optinfo;
 {
-	char *cp;
-	struct duid *duid;
+	memset(optinfo, 0, sizeof(*optinfo));
+}
+
+int
+dhcp6_get_options(p, ep, optinfo)
+	struct dhcp6opt *p, *ep;
+	struct dhcp6_optinfo *optinfo;
+{
 	struct dhcp6opt *np;
-	int optlen;
+	int opt, optlen;
+	char *cp;
 
 	for (; p + 1 <= ep; p = np) {
 		cp = (char *)(p + 1);
 		optlen = ntohs(p->dh6opt_len);
+		opt = ntohs(p->dh6opt_type);
 		np = (struct dhcp6opt *)(cp + optlen);
+
+		dprintf(LOG_DEBUG, "DHCP option %s, len %d",
+			dhcpoptstr(opt), optlen);
+
 		/* option length field overrun */
 		if (np > ep) {
-			dprintf(LOG_INFO, "malformed DHCP option");
+			dprintf(LOG_INFO, "malformed DHCP options");
 			return -1;
 		}
 
-		if (ntohs(p->dh6opt_type) != opt)
-			continue;
-
 		switch (opt) {
 		case DH6OPT_CLIENTID:
+			if (optlen == 0)
+				goto malformed;
+			optinfo->clientID.duid_len = optlen;
+			optinfo->clientID.duid_id = cp;
+			break;
 		case DH6OPT_SERVERID:
-			if (retbuf) {
-				duid = (struct duid *)retbuf;
-				duid->duid_len = optlen;
-				duid->duid_id = cp;
-			}
+			if (optlen == 0)
+				goto malformed;
+			optinfo->serverID.duid_len = optlen;
+			optinfo->serverID.duid_id = cp;
+			break;
+		case DH6OPT_RAPID_COMMIT:
+			if (optlen != 0)
+				goto malformed;
+			optinfo->rapidcommit = 1;
+			break;
+		case DH6OPT_DNS:
+			if (optlen % sizeof(struct in6_addr) || optlen == 0)
+				goto malformed;
+			optinfo->dns.n = optlen / sizeof(struct in6_addr);
+			optinfo->dns.list = cp;
 			break;
 		default:
 			/* no option specific behavior */
+			dprintf(LOG_INFO,
+				"unknown DHCP6 option type %d, len %d",
+				opt, optlen);
 			break;
 		}
-
-		return(0);
 	}
 
-	/* not found */
+	return(0);
+
+  malformed:
+	dprintf(LOG_INFO, "malformed DHCP option: type %d, len %d",
+		opt, optlen);
 	return(-1);
 }
 

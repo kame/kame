@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.59 2002/04/25 02:45:56 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.60 2002/05/01 07:01:15 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -371,7 +371,8 @@ server6_react(siz, from, fromlen)
 		server6_react_informreq(rdatabuf, siz, from, fromlen);
 		break;
 	default:
-		dprintf(LOG_INFO, "unknown msgtype %d", dh6->dh6_msgtype);
+		dprintf(LOG_INFO, "unknown or unsupported msgtype %s",
+			dhcpmsgstr(dh6->dh6_msgtype));
 		break;
 	}
 }
@@ -393,11 +394,12 @@ server6_react_informreq(buf, siz, from, fromlen)
 	struct dhcp6opt *opt, *eopt;
 	struct duid client_duid, request_duid;
 	char *ext, *ep, *p;
+	struct dhcp6_optinfo optinfo;
 
-	dprintf(LOG_DEBUG, "react_request");
+	dprintf(LOG_DEBUG, "server6_react_informreq");
 
 	if (siz < sizeof(*dh6r)) {
-		dprintf(LOG_INFO, "react_request: short packet");
+		dprintf(LOG_INFO, "server6_react_informreq: short packet");
 		return(-1);
 	}
 	dh6r = (struct dhcp6 *)buf;
@@ -405,27 +407,19 @@ server6_react_informreq(buf, siz, from, fromlen)
 	/*
 	 * parse and validate options in the request
 	 */
+	dhcp6_init_options(&optinfo);
 	opt = (struct dhcp6opt *)(dh6r + 1);
 	eopt = (struct dhcp6opt *)(buf + siz);
-
-	/* record client information if included */
-	memset(&client_duid, 0, sizeof(client_duid));
-	if (get_dhcp6_option(opt, eopt, DH6OPT_CLIENTID, &client_duid) == 0 &&
-	    client_duid.duid_id == NULL) {
+	if (dhcp6_get_options(opt, eopt, &optinfo) < 0) {
 		dprintf(LOG_INFO,
-			"server6_react_informreq: unexpected client DUID");
-		return(-1);
-	} else if (client_duid.duid_id == NULL)
-		dprintf(LOG_DEBUG, "server6_react_informreq: no client info");
-	else {
-		dprintf(LOG_DEBUG,
-			"server6_react_informreq: client info privided");
+			"server6_react_informreq: failed to parse options");
+		return -1;
 	}
 
 	/* if a server information is included, it must match ours. */
-	if (get_dhcp6_option(opt, eopt, DH6OPT_SERVERID, &request_duid) == 0 &&
-	    (request_duid.duid_len != server_duid.duid_len ||
-	     memcmp(request_duid.duid_id, server_duid.duid_id,
+	if (optinfo.serverID.duid_len &&
+	    (optinfo.serverID.duid_len != server_duid.duid_len ||
+	     memcmp(optinfo.serverID.duid_id, server_duid.duid_id,
 		    server_duid.duid_len))) {
 		dprintf(LOG_INFO,
 			"server6_react_informreq: server DUID mismatch");
