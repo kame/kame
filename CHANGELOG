@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1298 2000/09/23 19:39:16 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1299 2000/09/23 22:34:59 itojun Exp $
 
 <200009>
+Sun Sep 24 07:31:53 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 2000/9/18 weekly snap
+	  from tcpdump.org.
+
 Sun Sep 24 04:15:52 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/wwwoffle: upgrade to 2.5e.
 	* freebsd3/ports/netcat: netcat 1.10. you must select address
