@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.47 2001/01/15 05:50:25 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.48 2001/02/02 13:37:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -249,10 +249,13 @@ main(argc, argv)
 	FD_ZERO(&fdset);
 	FD_SET(sock, &fdset);
 	maxfd = sock;
-	rtsock_open();
-	FD_SET(rtsock, &fdset);
-	if (rtsock > sock)
-		maxfd = rtsock;
+	if (sflag == 0) {
+		rtsock_open();
+		FD_SET(rtsock, &fdset);
+		if (rtsock > sock)
+			maxfd = rtsock;
+	} else
+		rtsock = -1;
 
 	signal(SIGTERM, (void *)set_die);
 	signal(SIGUSR1, (void *)rtadvd_set_dump_file);
