@@ -8,5 +8,6 @@ SUBDIR+=rip6query route6d faithd bgpd hroute6d pvcbridge pvcsif pvctxctl
 .if ${MACHINE_ARCH} == "i386"
 SUBDIR+=altqd
 .endif
+SUBDIR+=mip6stat mip6config
 
 .include <bsd.subdir.mk>
