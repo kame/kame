@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.107 2001/11/10 09:22:17 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.108 2001/11/13 09:42:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -853,6 +853,10 @@ void	in6_sin_2_v4mapsin6 __P((struct sockaddr_in *sin,
 void	in6_sin6_2_sin_in_sock __P((struct sockaddr *nam));
 void	in6_sin_2_v4mapsin6_in_sock __P((struct sockaddr **nam));
 #endif
+#ifndef __FreeBSD__
+extern int in6_src_sysctl __P((void *, size_t *, void *, size_t));
+#endif
+extern void addrsel_policy_init __P((void));
 
 #define	satosin6(sa)	((struct sockaddr_in6 *)(sa))
 #define	sin6tosa(sin6)	((struct sockaddr *)(sin6))
@@ -900,10 +904,6 @@ extern int inet6_rth_reverse __P((const void *, void *));
 extern int inet6_rth_segments __P((const void *));
 extern struct in6_addr *inet6_rth_getaddr __P((const void *, int));
 
-#ifndef __FreeBSD__
-extern int in6_src_sysctl __P((void *, size_t *, void *, size_t));
-#endif
-extern void addrsel_policy_init __P((void));
 __END_DECLS
 
 #endif /* !_NETINET6_IN6_H_ */
