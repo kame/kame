@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2141 2002/04/25 10:03:17 sakane Exp $
+$KAME: CHANGELOG,v 1.2142 2002/04/28 10:40:38 jinmei Exp $
 
 <200204>
+2002-04-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtadvd/config.c (getconfig): if "addrs" was explicitly
+	set to 0, enabled prefix autoconfiguration from the kernel.
+	* kame/kame/rtadvd/rtadvd.c (main): set LOG_PERROR for openlog()
+	when running in the foreground.
+	Suggested by: Andrew White <awhite@arc.corp.mot.com>
+
 Thu Apr 25 19:03:16 JST 2002 sakane@kame.net
 	* kame/kame/racoon:
 	fixed the key length of the null encryption for phase 2.
