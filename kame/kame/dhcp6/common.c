@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.102 2004/05/13 13:57:04 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.103 2004/05/13 14:44:43 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1422,9 +1422,8 @@ copyin_option(type, p, ep, list)
 			/* take care of sub-options */
 			TAILQ_INIT(&sublist);
 			if (copyin_option(opt,
-			    (struct dhcp6opt *)(char *)p +
-			    sizeof(opt_iapd_prefix),
-			    ep, &sublist)) {
+			    (struct dhcp6opt *)((char *)p +
+			    sizeof(opt_iapd_prefix)), np, &sublist)) {
 				goto fail;
 			}
 
