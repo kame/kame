@@ -1,6 +1,6 @@
 	Installation procedure - preparation of the tree
 	KAME project
-	$KAME: INSTALL,v 1.25 2001/03/14 02:16:16 itojun Exp $
+	$KAME: INSTALL,v 1.26 2001/03/14 05:05:29 itojun Exp $
 
 Let's call the entire file-tree under this directory "the KAME tree".
 
@@ -85,27 +85,26 @@ perform "make obj" unless you are ready to tackle those troubles.
 4. Some parts of the KAME tree will be compiled, only if there are
    certain libraries installed beforehand:
 	usr.sbin/racoon:
-		Compiles only when OpenSSL 0.9.5a is installed
+		Compiles only when OpenSSL 0.9.5a (or later) is installed
 		beforehand, and shell search path is configured to
 		reach "openssl" program.
    Please install those libraries before building.
 
    We support the following installations.
 
-   - Your system have OpenSSL installed by default.  FreeBSD 4.2-RELEASE,
+   - Your system has OpenSSL installed by default.  FreeBSD 4.2-RELEASE,
      BSD/OS 4.2 and NetBSD 1.5 fall into this category.
 
-   - You installed OpenSSL, with default installation path.
-	This means that you have given no option to "./configure".  In
-	this case you should have
-	/usr/local/ssl/include/openssl/des.h.
+   - A system with OpenSSL, installed manually with default installation path.
+	This means that you gave no option to "./configure".  In this case
+	you should have /usr/local/ssl/include/openssl/des.h.
 
-   - You installed OpenSSL, via FreeBSD ports/NetBSD pkgsrc system.
-	Note that we do not support ports-current/pkgsrc-current.
-	Please stick to the ports/pkgsrc came the FreeBSD/NetBSD you
-	are using.  In this case you should have
-	/usr/{pkg,local}/include/openssl/des.h.  We do not support
-	ports/pkgsrc with non-standard LOCALBASE/PREFIX.
+   - A system with OpenSSL, installed via FreeBSD ports system.
+	Note that we do not support ports-current.  Please stick to the
+	ports directory came with the FreeBSD revioin you are using, or
+	the one came with KAME kit.  In this case you should have
+	/usr/local/include/openssl/des.h.  We do not support
+	ports with non-standard LOCALBASE/PREFIX.
 
    If you install OpenSSL with some other ways, the KAME tree may fail
    to find OpenSSL and omit compilation of, for example,
