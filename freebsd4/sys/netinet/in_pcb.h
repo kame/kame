@@ -194,7 +194,7 @@ struct inpcb {
 #define	in6p_fsa	inp_inc.inc_ie.ie_dependfaddr.ie6_foreign
 #define	in6p_lsa	inp_inc.inc_ie.ie_dependladdr.ie6_local
 #define	in6p_faddr	inp_inc.inc6_faddr
-#define	in6p_laddr	inp_inc.inc6_faddr
+#define	in6p_laddr	inp_inc.inc6_laddr
 #define	in6p_route	inp_inc.inc6_route
 #define	in6p_ip6_hlim	inp_depend6.inp6_hlim
 #define	in6p_hops	inp_depend6.inp6_hops	/* default hop limit */
