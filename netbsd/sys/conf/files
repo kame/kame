@@ -1327,6 +1327,7 @@ file	netinet/sctp_sha1.c		sctp & inet & inet6
 file	netinet/sctp_timer.c		sctp & inet & inet6
 file	netinet/sctp_usrreq.c		sctp & inet & inet6
 file	netinet/sctputil.c		sctp & inet & inet6
+file	netinet6/sctp6_usrreq.c		sctp & inet & inet6
 file	netinet6/dccp6_usrreq.c		dccp & inet6
 file	netinet6/in6_gif.c		gif & inet6
 
