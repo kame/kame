@@ -767,6 +767,7 @@ ftp_file_op(FTP_t ftp, char *operation, char *file, FILE **fp, char *mode, off_t
 	struct sockaddr_in sin4;
 	struct sockaddr_in6 sin6;
     } sin;
+    char *cmdstr;
 
     if (!fp)
 	return FAILURE;
@@ -795,6 +796,7 @@ ftp_file_op(FTP_t ftp, char *operation, char *file, FILE **fp, char *mode, off_t
 		ftp_close(ftp);
 		return i;
 	    }
+	    cmdstr = "PASV";
 	} else {
             if (ftp->is_verbose)
 		fprintf(stderr, "Sending EPSV\n");
@@ -819,30 +821,59 @@ ftp_file_op(FTP_t ftp, char *operation, char *file, FILE **fp, char *mode, off_t
 		    ftp_close(ftp);
 		    return i;
 		}
-	    }
+		cmdstr = "LPSV";
+	    } else
+		cmdstr = "EPSV";
 	}
-	while (*q && !isdigit(*q))
+	while (*q && *q != '(')		/* ) */
 	    q++;
 	if (!*q) {
 	    ftp_close(ftp);
 	    return FAILURE;
 	}
-	q--;
-	l = (ftp->addrtype == AF_INET ? 6 : 21);
-	for (i = 0; i < l; i++) {
-	    q++;
-	    addr[i] = strtol(q, &q, 10);
-	}
+	if (strcmp(cmdstr, "PASV") == 0 || strcmp(cmdstr, "LPSV") == 0) {
+	    l = (ftp->addrtype == AF_INET ? 6 : 21);
+	    for (i = 0; i < l; i++) {
+		q++;
+		addr[i] = strtol(q, &q, 10);
+	    }
 
-	sin.sin4.sin_family = ftp->addrtype;
-	if (ftp->addrtype == AF_INET6) {
-	    sin.sin6.sin6_len = sizeof(struct sockaddr_in6);
-	    bcopy(addr + 2, (char *)&sin.sin6.sin6_addr, 16);
-	    bcopy(addr + 19, (char *)&sin.sin6.sin6_port, 2);
-	} else {
-	    sin.sin4.sin_len = sizeof(struct sockaddr_in);
-	    bcopy(addr, (char *)&sin.sin4.sin_addr, 4);
-	    bcopy(addr + 4, (char *)&sin.sin4.sin_port, 2);
+	    sin.sin4.sin_family = ftp->addrtype;
+	    if (ftp->addrtype == AF_INET6) {
+		sin.sin6.sin6_len = sizeof(struct sockaddr_in6);
+		bcopy(addr + 2, (char *)&sin.sin6.sin6_addr, 16);
+		bcopy(addr + 19, (char *)&sin.sin6.sin6_port, 2);
+	    } else {
+		sin.sin4.sin_len = sizeof(struct sockaddr_in);
+		bcopy(addr, (char *)&sin.sin4.sin_addr, 4);
+		bcopy(addr + 4, (char *)&sin.sin4.sin_port, 2);
+	    }
+	} else if (strcmp(cmdstr, "EPSV") == 0) {
+	    int port;
+	    int sinlen;
+	    q++;
+	    if (sscanf(q, "%c%c%c%d%c", &addr[0], &addr[1], &addr[2],
+		    &port, &addr[3]) != 5
+	     || addr[0] != addr[1] || addr[0] != addr[2] || addr[0] != addr[3]) {
+		ftp_close(ftp);
+		return FAILURE;
+	    }
+	    sinlen = sizeof(sin);
+	    if (getpeername(ftp->fd_ctrl, (struct sockaddr *)&sin, &sinlen) < 0) {
+		ftp_close(ftp);
+		return FAILURE;
+	    }
+	    switch (sin.sin4.sin_family) {
+	    case AF_INET:
+		sin.sin4.sin_port = htons(port);
+		break;
+	    case AF_INET6:
+		sin.sin6.sin6_port = htons(port);
+		break;
+	    default:
+		ftp_close(ftp);
+		return FAILURE;
+	    }
 	}
 	if (connect(s, (struct sockaddr *)&sin, sin.sin4.sin_len) < 0) {
 	    (void)close(s);
