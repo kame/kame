@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.303 2002/05/20 09:27:54 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.304 2002/05/24 09:03:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1820,6 +1820,11 @@ ni6_input(m, off)
 }
 #undef hostnamelen
 
+#define isupper(x) ('A' <= (x) && (x) <= 'Z')
+#define isalpha(x) (('A' <= (x) && (x) <= 'Z') || ('a' <= (x) && (x) <= 'z'))
+#define isalnum(x) (isalpha(x) || ('0' <= (x) && (x) <= '9'))
+#define tolower(x) (isupper(x) ? (x) + 'a' - 'A' : (x))
+
 /*
  * make a mbuf with DNS-encoded string.  no compression support.
  *
@@ -1897,8 +1902,17 @@ ni6_nametodns(name, namelen, old)
 			if (i <= 0 || i >= 64)
 				goto fail;
 			*cp++ = i;
-			bcopy(p, cp, i);
-			cp += i;
+			if (!isalpha(p[0]) || !isalnum(p[i - 1]))
+				goto fail;
+			while (i > 0) {
+				if (!isalnum(*p) && *p != '-')
+					goto fail;
+				if (isupper(*p))
+					*cp++ = tolower(*p++);
+				else
+					*cp++ = *p++;
+				i--;
+			}
 			p = q;
 			if (p < name + namelen && *p == '.')
 				p++;
