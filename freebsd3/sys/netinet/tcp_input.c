@@ -703,38 +703,6 @@ findpcb:
 	else
 		tiwin = th->th_win;
 
-#ifdef INET6
-	/* save packet options if user wanted */
-	if (inp->in6p_flags & INP_CONTROLOPTS) {
-		struct ip6_recvpktopts opts6;
-
-		/*
-		 * Temporarily re-adjusting the mbuf before ip6_savecontrol(),
-		 * which is necessary for FreeBSD only due to difference from
-		 * other BSD stacks.
-		 * XXX: we'll soon make a more natural fix after getting a
-		 *      consensus.
-		 */
-#ifndef DEFER_MADJ
-		m->m_data -= hdroptlen;
-		m->m_len  += hdroptlen;
-#endif
-		ip6_savecontrol(inp, ip6, m, &opts6, &inp->in6p_inputopts);
-		if (inp->in6p_inputopts)
-			ip6_update_recvpcbopt(inp->in6p_inputopts, &opts6);
-		if (opts6.head) {
-			if (sbappendcontrol(&inp->in6p_socket->so_rcv,
-					    NULL, opts6.head)
-			    == 0)
-				m_freem(opts6.head);
-		}
-#ifndef DEFER_MADJ
-		m->m_data += hdroptlen;	/* XXX */
-		m->m_len  -= hdroptlen;	/* XXX */
-#endif
-	}
-#endif /* INET6 */
-
 	so = inp->inp_socket;
 	if (so->so_options & (SO_DEBUG|SO_ACCEPTCONN)) {
 
@@ -879,38 +847,6 @@ findpcb:
 					inp->in6p_outputopts =
 						ip6_copypktopts(oinp->in6p_outputopts,
 								M_NOWAIT);
-
-				if (inp->inp_flags & INP_CONTROLOPTS) {
-					bzero(&newopts, sizeof(newopts));
-					/*
-					 * Temporarily re-adjusting the mbuf
-					 * before ip6_savecontrol().
-					 * XXX: we'll soon make a more natural
-					 * fix after getting a consensus.
-					 * (see above)
-					 */
-#ifndef DEFER_MADJ
-					m->m_data -= hdroptlen;
-					m->m_len  += hdroptlen;
-#endif
-					ip6_savecontrol(inp, ip6, m,
-							&newopts,
-							&inp->in6p_inputopts);
-					if (inp->in6p_inputopts)
-						ip6_update_recvpcbopt(inp->in6p_inputopts,
-								      &newopts);
-					if (newopts.head) {
-						if (sbappendcontrol(&so->so_rcv,
-								    NULL,
-								    newopts.head)
-						    == 0)
-							m_freem(newopts.head);
-					}
-#ifndef DEFER_MADJ
-					m->m_data += hdroptlen;	/* XXX */
-					m->m_len  -= hdroptlen;	/* XXX */
-#endif
-				}
 			} else
 #endif /* INET6 */
 			inp->inp_options = ip_srcroute();
@@ -931,6 +867,38 @@ findpcb:
 				tp->request_r_scale++;
 		}
 	}
+
+#ifdef INET6
+	/* save packet options if user wanted */
+	if (inp->in6p_flags & INP_CONTROLOPTS) {
+		struct ip6_recvpktopts opts6;
+
+		/*
+		 * Temporarily re-adjusting the mbuf before ip6_savecontrol(),
+		 * which is necessary for FreeBSD only due to difference from
+		 * other BSD stacks.
+		 * XXX: we'll soon make a more natural fix after getting a
+		 *      consensus.
+		 */
+#ifndef DEFER_MADJ
+		m->m_data -= hdroptlen;
+		m->m_len  += hdroptlen;
+#endif
+		ip6_savecontrol(inp, ip6, m, &opts6, &inp->in6p_inputopts);
+		if (inp->in6p_inputopts)
+			ip6_update_recvpcbopt(inp->in6p_inputopts, &opts6);
+		if (opts6.head) {
+			if (sbappendcontrol(&inp->in6p_socket->so_rcv,
+					    NULL, opts6.head)
+			    == 0)
+				m_freem(opts6.head);
+		}
+#ifndef DEFER_MADJ
+		m->m_data += hdroptlen;	/* XXX */
+		m->m_len  -= hdroptlen;	/* XXX */
+#endif
+	}
+#endif /* INET6 */
 
 	/*
 	 * Segment received on connection.
