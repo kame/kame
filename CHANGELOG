@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.42 1999/08/20 06:29:29 itojun Exp $
+$Id: CHANGELOG,v 1.43 1999/08/20 09:16:02 itojun Exp $
 
 <199908>
+Fri Aug 20 18:13:36 JST 1999  itojun@iijlab.net
+	* sys/netinet/in_gif.c, sys/netinet6/in6_gif.c:
+	  do not capture tunnelled packet when gif interface is down
+	  (not IFF_UP).
+
 Fri Aug 20 15:26:59 JST 1999  itojun@iijlab.net
 	* netbsd/sys/netinet/tcp_input.c: tentative fix to dangling pointer
 	  problem in syn cache.  may need updates.
