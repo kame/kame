@@ -1,9 +1,9 @@
-/*	$KAME: ah_input.c,v 1.22 2000/03/09 21:51:39 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.23 2000/03/25 07:23:39 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -253,7 +253,7 @@ ah4_input(m, va_alist)
 	ip->ip_len = htons(ip->ip_len + hlen);
 #if !(defined(__bsdi__) && _BSDI_VERSION >= 199802) /* i.e. !bsdi4 */
 	ip->ip_id = htons(ip->ip_id);
-#endif 
+#endif
 #else
 	ip->ip_len = htons(ip->ip_len);
 #endif
@@ -486,7 +486,7 @@ ah4_input(m, va_alist)
 			m->m_len -= stripsiz;
 			m->m_pkthdr.len -= stripsiz;
 		} else {
-			/* 
+			/*
 			 * this comes with no copy if the boundary is on
 			 * cluster
 			 */
@@ -885,7 +885,7 @@ ah6_input(mp, offp, proto)
 			m->m_len -= stripsiz;
 			m->m_pkthdr.len -= stripsiz;
 		} else {
-			/* 
+			/*
 			 * this comes with no copy if the boundary is on
 			 * cluster
 			 */

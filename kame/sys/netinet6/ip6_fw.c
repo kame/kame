@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.11 2000/03/10 04:22:18 k-sugyou Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.12 2000/03/25 07:23:46 sumikawa Exp $	*/
 
 /*
  * Copyright (c) 1993 Daniel Boulet
@@ -14,7 +14,7 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
- *	$Id: ip6_fw.c,v 1.11 2000/03/10 04:22:18 k-sugyou Exp $
+ *	$Id: ip6_fw.c,v 1.12 2000/03/25 07:23:46 sumikawa Exp $
  */
 
 /*
@@ -146,7 +146,7 @@ __inline
 #else
 inline
 #endif
-int 
+int
 port_match6(u_short *portptr, int nports, u_short port, int range_flag)
 {
 	if (!nports)
@@ -198,7 +198,7 @@ icmp6type_match(struct icmp6_hdr *icmp6, struct ip6_fw *f)
 
 	/* check for matching type in the bitmap */
 	if (type < IPV6_FW_ICMPTYPES_DIM * sizeof(unsigned) * 8 &&
-		(f->fw_icmp6types[type / (sizeof(unsigned) * 8)] & 
+		(f->fw_icmp6types[type / (sizeof(unsigned) * 8)] &
 		(1U << (type % (8 * sizeof(unsigned))))))
 		return(1);
 
@@ -478,7 +478,7 @@ ip6fw_report(struct ip6_fw *f, struct ip6_hdr *ip6,
  *	port	Divert the packet to port.
  */
 
-static int 
+static int
 ip6_fw_chk(struct ip6_hdr **pip6,
 	struct ifnet *oif, u_int16_t *cookie, struct mbuf **m)
 {
@@ -577,7 +577,7 @@ ip6_fw_chk(struct ip6_hdr **pip6,
 			goto got_match;
 
 		/* If different, don't match */
-		if (nxt != f->fw_prot) 
+		if (nxt != f->fw_prot)
 			continue;
 
 #define PULLUP_TO(len)	do {						\
@@ -645,7 +645,7 @@ check_ports:
 				continue;
 			if (!port_match6(&f->fw_pts[IPV6_FW_GETNSRCP(f)],
 			    IPV6_FW_GETNDSTP(f), dst_port,
-			    f->fw_flg & IPV6_FW_F_DRNG)) 
+			    f->fw_flg & IPV6_FW_F_DRNG))
 				continue;
 			break;
 		    }
@@ -909,7 +909,7 @@ del_entry6(struct ip6_fw_head *chainptr, u_short number)
 
 	s = splnet();
 
-	fcp = chainptr->lh_first; 
+	fcp = chainptr->lh_first;
 	if (number != (u_short)-1) {
 		for (; fcp; fcp = fcp->chain.le_next) {
 			if (fcp->rule->fw_number == number) {
@@ -1035,14 +1035,14 @@ check_ip6fw_struct(struct ip6_fw *frwl)
 	}
 
 	/*
-	 *	Rather than modify the entry to make such entries work, 
+	 *	Rather than modify the entry to make such entries work,
 	 *	we reject this rule and require user level utilities
 	 *	to enforce whatever policy they deem appropriate.
 	 */
-	if ((frwl->fw_src.s6_addr32[0] & (~frwl->fw_smsk.s6_addr32[0])) || 
-		(frwl->fw_src.s6_addr32[1] & (~frwl->fw_smsk.s6_addr32[1])) || 
-		(frwl->fw_src.s6_addr32[2] & (~frwl->fw_smsk.s6_addr32[2])) || 
-		(frwl->fw_src.s6_addr32[3] & (~frwl->fw_smsk.s6_addr32[3])) || 
+	if ((frwl->fw_src.s6_addr32[0] & (~frwl->fw_smsk.s6_addr32[0])) ||
+		(frwl->fw_src.s6_addr32[1] & (~frwl->fw_smsk.s6_addr32[1])) ||
+		(frwl->fw_src.s6_addr32[2] & (~frwl->fw_smsk.s6_addr32[2])) ||
+		(frwl->fw_src.s6_addr32[3] & (~frwl->fw_smsk.s6_addr32[3])) ||
 		(frwl->fw_dst.s6_addr32[0] & (~frwl->fw_dmsk.s6_addr32[0])) ||
 		(frwl->fw_dst.s6_addr32[1] & (~frwl->fw_dmsk.s6_addr32[1])) ||
 		(frwl->fw_dst.s6_addr32[2] & (~frwl->fw_dmsk.s6_addr32[2])) ||
@@ -1151,7 +1151,7 @@ ip6_fw_ctl(int stage, struct mbuf **mm)
 		return(EPERM);
 	}
 	if (stage == IPV6_FW_FLUSH) {
-		while (ip6_fw_chain.lh_first != NULL && 
+		while (ip6_fw_chain.lh_first != NULL &&
 		    ip6_fw_chain.lh_first->rule->fw_number != (u_short)-1) {
 			struct ip6_fw_chain *fcp = ip6_fw_chain.lh_first;
 			int s = splnet();

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_io.c,v 1.6 2000/03/18 03:05:41 itojun Exp $	*/
+/*	$KAME: mip6_io.c,v 1.7 2000/03/25 07:23:53 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -35,7 +35,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6_io.c,v 1.6 2000/03/18 03:05:41 itojun Exp $
+ * $Id: mip6_io.c,v 1.7 2000/03/25 07:23:53 sumikawa Exp $
  *
  */
 
@@ -523,7 +523,7 @@ struct ip6_pktopts  **pktopt;  /* Packet Extension headers, options and data */
     struct ip6_hdr      *ip6;      /* IPv6 header */
     struct mip6_bc      *bcp;      /* Binding Cache list entry */
     struct mip6_bul     *bulp;
-    struct mip6_bul     *bulp_hr;    
+    struct mip6_bul     *bulp_hr;
     struct in6_addr     *dst_addr; /* Original dst address for the packet */
     int       error;    /* Error code from function call */
     int       off;      /* Offset from start of Destination Header in bytes */
@@ -1073,7 +1073,7 @@ struct mip6_subbuf  *subopt;  /* BU sub-option data (NULL if not present) */
     tmp32 = htonl(optbu->lifetime);
     bcopy((caddr_t)&tmp32, (caddr_t)dest + *off, sizeof(optbu->lifetime));
     *off += sizeof(optbu->lifetime);
-    
+
     /* If sub-options are present, add them as well. */
     optlen = optbu->len;
     if (subopt) {

@@ -1,9 +1,9 @@
-/*	$KAME: net_osdep.h,v 1.11 2000/02/22 14:01:46 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.12 2000/03/25 07:23:34 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -64,7 +64,7 @@
  *	BSDI [34]	no		old standard	if_name+unit
  * - usrreq
  *	NetBSD, OpenBSD, BSDI [34], FreeBSD 2
- *		single function with PRU_xx, arguments are mbuf 
+ *		single function with PRU_xx, arguments are mbuf
  *	FreeBSD 3
  *		separates functions, non-mbuf arguments
  * - {set,get}sockopt

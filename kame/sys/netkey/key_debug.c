@@ -1,9 +1,9 @@
-/*	$KAME: key_debug.c,v 1.14 2000/03/22 07:03:23 sakane Exp $	*/
+/*	$KAME: key_debug.c,v 1.15 2000/03/25 07:24:12 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: key_debug.c,v 1.14 2000/03/22 07:03:23 sakane Exp $ */
+/* KAME @(#)$Id: key_debug.c,v 1.15 2000/03/25 07:24:12 sumikawa Exp $ */
 
 #ifdef _KERNEL
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
@@ -602,7 +602,7 @@ kdebug_secreplay(rpl)
 		return;
 	}
 
-	printf("\n   bitmap { "); 
+	printf("\n   bitmap { ");
 
 	for (len = 0; len < rpl->wsize; len++) {
 		for (l = 7; l >= 0; l--)

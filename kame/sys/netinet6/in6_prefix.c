@@ -1,9 +1,9 @@
-/*	$KAME: in6_prefix.c,v 1.24 2000/02/22 14:04:19 itojun Exp $	*/
+/*	$KAME: in6_prefix.c,v 1.25 2000/03/25 07:23:45 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -901,7 +901,7 @@ init_newprefix(struct in6_rrenumreq *irr, struct ifprefix *ifpr,
 	rpp->rp_rrf = irr->irr_rrf;
 	rpp->rp_origin = irr->irr_origin;
 
-	return 0;   
+	return 0;
 }
 
 static void

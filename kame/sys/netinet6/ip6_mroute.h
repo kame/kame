@@ -1,9 +1,9 @@
-/*	$KAME: ip6_mroute.h,v 1.7 2000/02/22 14:04:22 itojun Exp $	*/
+/*	$KAME: ip6_mroute.h,v 1.8 2000/03/25 07:23:47 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -57,7 +57,7 @@
 #define MRT6_DEL_MFC		105	/* delete forwarding cache entry */
 #define MRT6_PIM                107     /* enable pim code */
 
-#if BSD >= 199103 
+#if BSD >= 199103
 #define GET_TIME(t)	microtime(&t)
 #elif defined(sun)
 #define GET_TIME(t)	uniqtime(&t)
@@ -183,7 +183,7 @@ struct mif6 {
 	u_int      	m6_rate_limit; 	/* max rate			     */
 #ifdef notyet
 	struct tbf      *m6_tbf;      	/* token bucket structure at intf.   */
-#endif 
+#endif
 	struct in6_addr	m6_lcl_addr;   	/* local interface address           */
 	struct ifnet    *m6_ifp;     	/* pointer to interface              */
 	u_quad_t	m6_pkt_in;	/* # pkts in on interface            */
@@ -194,11 +194,11 @@ struct mif6 {
 #ifdef notyet
 	u_int		m6_rsvp_on;	/* RSVP listening on this vif */
 	struct socket   *m6_rsvpd;	/* RSVP daemon socket */
-#endif 
+#endif
 };
 
 /*
- * The kernel's multicast forwarding cache entry structure 
+ * The kernel's multicast forwarding cache entry structure
  */
 struct mf6c {
 	struct sockaddr_in6  mf6c_origin;	/* IPv6 origin of mcasts     */

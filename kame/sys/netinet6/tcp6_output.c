@@ -1,9 +1,9 @@
-/*	$KAME: tcp6_output.c,v 1.9 2000/02/22 14:04:36 itojun Exp $	*/
+/*	$KAME: tcp6_output.c,v 1.10 2000/03/25 07:24:01 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -271,7 +271,7 @@ again:
 	 * no point in sending out a window update.
 	 */
 	if (win > 0 && !TCP6S_HAVERCVDFIN(t6p->t_state)) {
-		/* 
+		/*
 		 * "adv" is the amount we can increase the window,
 		 * taking into account that we are limited by
 		 * TCP6_MAXWIN << t6p->rcv_scale.
@@ -346,7 +346,7 @@ send:
 	 *	max_linkhdr + sizeof(struct ip6tcp) + optlen <= MHLEN
 	 */
 	optlen = 0;
-	hdrlen = sizeof(struct ip6tcp); 
+	hdrlen = sizeof(struct ip6tcp);
 	if (flags & TH_SYN) {
 		t6p->snd_nxt = t6p->iss;
 		if ((t6p->t_flags & TF_NOOPT) == 0) {
@@ -357,7 +357,7 @@ send:
 			mss = htons((u_short) tcp6_send_mss(t6p));
 			bcopy((caddr_t)&mss, (caddr_t)(opt + 2), sizeof(mss));
 			optlen = 4;
-	 
+	
 			if (t6p->t_flags & TF_USE_SCALE) {
 				*((u_long *) (opt + optlen)) = htonl(
 					TCP6OPT_NOP << 24 |
@@ -376,13 +376,13 @@ send:
 #endif
 
  	/*
-	 * Send a timestamp and echo-reply if this is a SYN and our side 
+	 * Send a timestamp and echo-reply if this is a SYN and our side
 	 * wants to use timestamps (TF_SEND_TSTMP is set) or both our side
 	 * and our peer have sent timestamps in our SYN's.
  	 */
  	if (t6p->t_flags & TF_SEND_TSTMP && (flags & TH_RST) == 0) {
 		u_long *lp = (u_long *)(opt + optlen);
- 
+
  		/* Form timestamp option as shown in appendix A of RFC 1323. */
  		*lp++ = htonl(TCP6OPT_TSTAMP_HDR);
  		*lp++ = htonl(tcp6_now);
@@ -504,7 +504,7 @@ send:
 	 * window for use in delaying messages about window sizes.
 	 * If resending a FIN, be sure not to use a new sequence number.
 	 */
-	if (flags & TH_FIN && t6p->t_flags & TF_SENTFIN && 
+	if (flags & TH_FIN && t6p->t_flags & TF_SENTFIN &&
 	    t6p->snd_nxt == t6p->snd_max)
 		t6p->snd_nxt--;
 	/*
@@ -631,7 +631,7 @@ send:
 
 #if 0				/* ip6_plen will be filled in ip6_output. */
 	ip6->ip6_plen = htons((u_short)(m->m_pkthdr.len - sizeof(struct ip6_hdr)));
-#endif 
+#endif
 	th->th_sum = in6_cksum(m, IPPROTO_TCP, sizeof(struct ip6_hdr),
 			       m->m_pkthdr.len - sizeof(struct ip6_hdr));
 
@@ -644,7 +644,7 @@ send:
 			   &t6p->t_in6pcb->in6p_route,
 			   so->so_options & SO_DONTROUTE, 0, NULL);
 #else
-	error = ip6_output(m, (struct mbuf *)0, &t6p->t_in6pcb->in6p_route, 
+	error = ip6_output(m, (struct mbuf *)0, &t6p->t_in6pcb->in6p_route,
 			   so->so_options & SO_DONTROUTE, NULL);
 #endif
 	if (error) {

@@ -1,9 +1,9 @@
-/*	$KAME: ip6_var.h,v 1.28 2000/03/09 00:46:12 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.29 2000/03/25 07:23:48 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -137,7 +137,7 @@ struct	ip6_pktopts {
 	struct	ip6_hbh *ip6po_hbh; /* Hop-by-Hop options header */
 
 	/* Destination options header (before a routing header) */
-	struct	ip6_dest *ip6po_dest1; 
+	struct	ip6_dest *ip6po_dest1;
 
 	/* Routing header related info. */
 	struct	ip6po_rhinfo ip6po_rhinfo;
@@ -158,7 +158,7 @@ struct ip6_recvpktopts {
 
 #ifdef SO_TIMESTAMP
 	struct mbuf *timestamp;	/* timestamp */
-#endif 
+#endif
 	struct mbuf *hlim;	/* received hop limit */
 	struct mbuf *pktinfo;	/* packet information of rcv packet */
 	struct mbuf *hbh;	/* HbH options header of rcv packet */

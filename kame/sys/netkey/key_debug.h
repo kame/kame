@@ -1,9 +1,9 @@
-/*	$KAME: key_debug.h,v 1.4 2000/02/22 14:06:41 itojun Exp $	*/
+/*	$KAME: key_debug.h,v 1.5 2000/03/25 07:24:12 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: key_debug.h,v 1.4 2000/02/22 14:06:41 itojun Exp $ */
+/* $Id: key_debug.h,v 1.5 2000/03/25 07:24:12 sumikawa Exp $ */
 
 #ifndef _NETKEY_KEY_DEBUG_H_
 #define _NETKEY_KEY_DEBUG_H_

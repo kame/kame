@@ -1,9 +1,9 @@
-/*	$KAME: tcp6.h,v 1.4 2000/02/28 10:59:33 itojun Exp $	*/
+/*	$KAME: tcp6.h,v 1.5 2000/03/25 07:23:59 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -78,11 +78,11 @@ struct tcp6hdr {
 	u_short	th_dport;		/* destination port */
 	tcp6_seq th_seq;		/* sequence number */
 	tcp6_seq th_ack;		/* acknowledgement number */
-#if BYTE_ORDER == LITTLE_ENDIAN 
+#if BYTE_ORDER == LITTLE_ENDIAN
 	u_char	th_x2:4,		/* (unused) */
 		th_off:4;		/* data offset */
 #endif
-#if BYTE_ORDER == BIG_ENDIAN 
+#if BYTE_ORDER == BIG_ENDIAN
 	u_char	th_off:4,		/* data offset */
 		th_x2:4;		/* (unused) */
 #endif

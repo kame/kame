@@ -1,9 +1,9 @@
-/*	$KAME: in6_src.c,v 1.8 2000/03/23 01:12:39 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.9 2000/03/25 07:23:46 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -270,9 +270,9 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	 */
 	if (mip6_get_home_prefix_hook) {	/* Only Mobile Node */
 		struct nd_prefix *pr;
-		if ((pr = (*mip6_get_home_prefix_hook)()) && 
+		if ((pr = (*mip6_get_home_prefix_hook)()) &&
 		    !IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr)) {
-			if (in6_addrscope(dst) == 
+			if (in6_addrscope(dst) ==
 			    in6_addrscope(&pr->ndpr_addr)) {
 #ifdef MIP6_DEBUG
 				/* Noisy but useful */
@@ -466,7 +466,7 @@ in6_pcbsetport(laddr, in6p)
 #else
 			t = in6_pcblookup(head, &zeroin6_addr, 0, laddr,
 					  lport, wild);
-#endif 
+#endif
 		}
 		if (t == 0)
 			break;

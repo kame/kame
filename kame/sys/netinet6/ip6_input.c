@@ -1,9 +1,9 @@
-/*	$KAME: ip6_input.c,v 1.72 2000/03/21 09:23:19 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.73 2000/03/25 07:23:47 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -263,7 +263,7 @@ ip6_init2(dummy)
 
 	/*
 	 * to route local address of p2p link to loopback,
-	 * assign loopback address first. 
+	 * assign loopback address first.
 	 */
 #ifdef __bsdi__
 	in6_ifattach(loifp, IN6_IFT_LOOP, NULL, 0);
@@ -1037,7 +1037,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 
 	/*
 	 * If caller wanted to keep history, allocate space to store the
-	 * history at the first time. 
+	 * history at the first time.
 	 */
 	if (prevctlp) {
 		if (*prevctlp == NULL) {
@@ -1191,7 +1191,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 				 * option is to be removed before returning
 				 * in the RFC 2292.
 				 * Note: this constraint is removed in
-				 * 2292bis. 
+				 * 2292bis.
 				 */
 				*mp = sbcreatecontrol((caddr_t)hbh, hbhlen,
 						      IPV6_HOPOPTS,

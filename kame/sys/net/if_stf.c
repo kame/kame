@@ -1,9 +1,9 @@
-/*	$KAME: if_stf.c,v 1.24 2000/03/12 23:25:53 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.25 2000/03/25 07:23:33 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -139,7 +139,7 @@
 struct stf_softc {
 	struct ifnet	sc_if;	   /* common area */
 	union {
-		struct route  __sc_ro4;   
+		struct route  __sc_ro4;
 		struct route_in6 __sc_ro6; /* just for safety */
 	} __sc_ro46;
 #define sc_ro	__sc_ro46.__sc_ro4

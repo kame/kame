@@ -1,9 +1,9 @@
-/*	$KAME: tcp6_subr.c,v 1.21 2000/02/29 04:24:28 itojun Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.22 2000/03/25 07:24:01 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -180,7 +180,7 @@ tcp6_template(t6p)
 	n->i6t_i.ip6_flow = in6p->in6p_flowinfo & IPV6_FLOWINFO_MASK;
 	if (ip6_auto_flowlabel) {
 		n->i6t_i.ip6_flow &= ~IPV6_FLOWLABEL_MASK;
-		n->i6t_i.ip6_flow |= 
+		n->i6t_i.ip6_flow |=
 			(htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
 	}
 	n->i6t_i.ip6_vfc &= ~IPV6_VERSION_MASK;
@@ -396,7 +396,7 @@ tcp6_close(t6p)
 
 	/*
 	 * If we sent enough data to get some meaningful characteristics,
-	 * save them in the routing entry.  'Enough' is arbitrarily 
+	 * save them in the routing entry.  'Enough' is arbitrarily
 	 * defined as the sendpipesize (default 4K) * 16.  This would
 	 * give us 16 rtt samples assuming we only get one sample per
 	 * window (the usual case on a long haul net).  16 samples is
@@ -538,7 +538,7 @@ tcp6_notify(in6p, error)
 	if (t6p->t_state < TCP6S_ESTABLISHED && t6p->t_rxtshift >= 3 &&
 	    t6p->t_softerror)
 		so->so_error = error;
-	else 
+	else
 		t6p->t_softerror = error;
 	wakeup((caddr_t) &so->so_timeo);
 	sorwakeup(so);
@@ -679,7 +679,7 @@ tcp6_mtudisc(in6p, errno)
 		rtcalloc((struct route *)ro);
 #else
 		rtalloc((struct route *)ro);
-#endif 
+#endif
 
 		if (ro->ro_rt == NULL) {
 			printf("tcp6_mtudisc: no new route?\n");

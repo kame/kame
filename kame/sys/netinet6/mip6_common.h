@@ -1,4 +1,4 @@
-/*	$KAME: mip6_common.h,v 1.8 2000/03/18 03:05:39 itojun Exp $	*/
+/*	$KAME: mip6_common.h,v 1.9 2000/03/25 07:23:50 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -36,7 +36,7 @@
  * Author:     Hesham Soliman <hesham.soliman@ericsson.com.au>
  *             Martti Kuparinen <martti.kuparinen@ericsson.com>
  *
- *  $Id: mip6_common.h,v 1.8 2000/03/18 03:05:39 itojun Exp $
+ *  $Id: mip6_common.h,v 1.9 2000/03/25 07:23:50 sumikawa Exp $
  */
 
 
@@ -120,7 +120,7 @@
 #define SIOCSRELEASE_MIP6        _IOWR('M', 24, struct mip6_input_data)
 
 
-/* 
+/*
  * Information about which module that has been compiled into the kernel or
  * loaded as a module.
  */

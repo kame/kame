@@ -1,9 +1,9 @@
-/*	$KAME: in6_rmx.c,v 1.5 2000/02/22 14:04:19 itojun Exp $	*/
+/*	$KAME: in6_rmx.c,v 1.6 2000/03/25 07:23:45 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -57,7 +57,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: in6_rmx.c,v 1.5 2000/02/22 14:04:19 itojun Exp $
+ * $Id: in6_rmx.c,v 1.6 2000/03/25 07:23:45 sumikawa Exp $
  */
 
 /*
@@ -179,7 +179,7 @@ in6_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 	if (!rt->rt_rmx.rmx_recvpipe && !(rt->rt_rmx.rmx_locks & RTV_RPIPE))
 		rt->rt_rmx.rmx_recvpipe = tcp_recvspace;
 
-	if (!rt->rt_rmx.rmx_mtu && !(rt->rt_rmx.rmx_locks & RTV_MTU) 
+	if (!rt->rt_rmx.rmx_mtu && !(rt->rt_rmx.rmx_locks & RTV_MTU)
 	    && rt->rt_ifp)
 		rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu;
 
@@ -213,7 +213,7 @@ in6_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 		 * We are trying to add a net route, but can't.
 		 * The following case should be allowed, so we'll make a
 		 * special check for this:
-		 *	Two IPv6 addresses with the same prefix is assigned 
+		 *	Two IPv6 addresses with the same prefix is assigned
 		 *	to a single interrface.
 		 *	# ifconfig if0 inet6 3ffe:0501::1 prefix 64 alias (*1)
 		 *	# ifconfig if0 inet6 3ffe:0501::2 prefix 64 alias (*2)
@@ -261,17 +261,17 @@ static int rtq_reallyold = 60*60;
 	/* one hour is ``really old'' */
 SYSCTL_INT(_net_inet_ip, IPCTL_RTEXPIRE, rtexpire,
 	CTLFLAG_RW, &rtq_reallyold , 0, "");
-				   
+				
 static int rtq_minreallyold = 10;
 	/* never automatically crank down to less */
 SYSCTL_INT(_net_inet_ip, IPCTL_RTMINEXPIRE, rtminexpire,
 	CTLFLAG_RW, &rtq_minreallyold , 0, "");
-				   
+				
 static int rtq_toomany = 128;
 	/* 128 cached routes is ``too many'' */
 SYSCTL_INT(_net_inet_ip, IPCTL_RTMAXCACHE, rtmaxcache,
 	CTLFLAG_RW, &rtq_toomany , 0, "");
-				   
+				
 
 /*
  * On last reference drop, mark the route as belong to us so that it can be

@@ -1,9 +1,9 @@
-/*	$KAME: pfkeyv2.h,v 1.10 2000/03/22 07:04:20 sakane Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.11 2000/03/25 07:23:34 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: pfkeyv2.h,v 1.10 2000/03/22 07:04:20 sakane Exp $ */
+/* $Id: pfkeyv2.h,v 1.11 2000/03/25 07:23:34 sumikawa Exp $ */
 
 /*
  * This file has been derived rfc 2367,

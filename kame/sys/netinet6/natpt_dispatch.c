@@ -1,9 +1,9 @@
-/*	$KAME: natpt_dispatch.c,v 1.8 2000/03/09 06:05:42 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.9 2000/03/25 07:23:54 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_dispatch.c,v 1.8 2000/03/09 06:05:42 fujisawa Exp $
+ *	$Id: natpt_dispatch.c,v 1.9 2000/03/25 07:23:54 sumikawa Exp $
  */
 
 #include <sys/param.h>
@@ -292,7 +292,7 @@ natpt_incomingIPv4(int sess, struct mbuf *m4, struct mbuf **m6)
 	if ((*m6 = translatingIPv4To6(&cv, &cv.ats->local)) != NULL)
 	    return (IPPROTO_IPV6);
     }
-    
+
     return (IPPROTO_MAX);				/* discard this packet	*/
 }
 
@@ -338,7 +338,7 @@ natpt_outgoingIPv4(int sess, struct mbuf *m4, struct mbuf **m6)
 	if ((*m6 = translatingIPv4To6(&cv, &cv.ats->remote)) != NULL)
 	    return (IPPROTO_IPV6);
     }
-    
+
     return (IPPROTO_MAX);				/* discard this packet	*/
 }
 
@@ -388,7 +388,7 @@ natpt_outgoingIPv6(int sess, struct mbuf *m6, struct mbuf **m4)
     rv = configCv6(sess, m6, &cv6);
     if ((rv == IPPROTO_IP) || (rv == IPPROTO_MAX) || (rv == IPPROTO_DONE))
 	return (rv);
-    
+
     if ((rv = sanityCheckOut6(&cv6)) != IPPROTO_IPV6)
 	return (IPPROTO_DONE);				/* discard this packet	*/
 
@@ -449,7 +449,7 @@ configCv6(int sess, struct mbuf *m, struct _cv *cv)
     cv->m = m;
     cv->_ip._ip6 = mtod(m, struct ip6_hdr *);
     cv->inout  = sess;
-    
+
     if ((tcpudp = foundFinalPayload(m, &proto, &offset)))
     {
 	switch (proto)
@@ -525,7 +525,7 @@ sanityCheckIn4(struct _cv *cv4)
 {
     struct mbuf	*m4  = cv4->m;
     struct ip	*ip4 = mtod(m4, struct ip *);
-    
+
     if (ip4->ip_ttl <= IPTTLDEC)
     {
 	n_long	dest = 0;
@@ -560,7 +560,7 @@ checkMTU(struct _cv *cv4)
     int		 mmtu;
     struct mbuf	*m4  = cv4->m;
     struct ip	*ip4 = mtod(m4, struct ip *);
-    
+
     mmtu = IPV6_MMTU - sizeof(struct ip6_hdr) - sizeof(struct ip6_frag);
 						/* This should be 1232[byte]	*/
 
@@ -585,7 +585,7 @@ checkMTU(struct _cv *cv4)
 	
 	cv4->flags |= NATPT_NEEDFRAGMENT;	/* fragment, then translate	*/
     }
-    
+
     return (IPPROTO_IPV4);
 }
 
@@ -684,7 +684,7 @@ natpt_initialize()
 
     if (natpt_initialized)
 	return;
-    
+
     natpt_initialized = 1;
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)

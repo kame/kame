@@ -1,9 +1,9 @@
-/*	$KAME: natpt_tslot.c,v 1.7 2000/03/09 06:05:43 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.8 2000/03/25 07:23:56 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_tslot.c,v 1.7 2000/03/09 06:05:43 fujisawa Exp $
+ *	$Id: natpt_tslot.c,v 1.8 2000/03/25 07:23:56 sumikawa Exp $
  */
 
 #include <sys/param.h>
@@ -186,7 +186,7 @@ lookingForIncomingV6Hash(struct _cv *cv)
     register	struct ip6_hdr	*ip6;
 
     int		hv = _hash_ip6(cv);
-    
+
     for (p = _outsideHash[hv]; p; p = CDR(p))
     {
 	ats = (struct _tSlot *)CAR(p);
@@ -219,7 +219,7 @@ lookingForOutgoingV6Hash(struct _cv *cv)
     register	struct ip6_hdr	*ip6;
 
     int		hv = _hash_ip6(cv);
-    
+
     for (p = _insideHash[hv]; p; p = CDR(p))
     {
 	ats = (struct _tSlot *)CAR(p);
@@ -452,7 +452,7 @@ internIncomingV6Hash(int sess, struct _cSlot *acs, struct _cv *cv6)
 	printf("ENOBUFS in internIncomingV6Hash %d\n", __LINE__);
 	return (NULL);
     }
-    
+
     bzero(ats, sizeof(struct _tSlot));
 
     local = &ats->local;
@@ -513,7 +513,7 @@ internOutgoingV6Hash(int sess, struct _cSlot *acs, struct _cv *cv6)
 	printf("ENOBUFS in internOutgoingV6Hash %d\n", __LINE__);
 	return (NULL);
     }
-    
+
     bzero(ats, sizeof(struct _tSlot));
 
     local = fillupOutgoingV6local(acs, cv6, &ats->local);
@@ -824,7 +824,7 @@ _removeTSlotEntry(struct _cell *p, struct _cell *q)
 
     _removeHash(&_insideHash,  hvin,  (caddr_t)tsl);
     _removeHash(&_outsideHash, hvout, (caddr_t)tsl);
-    
+
     if (q != NULL)
 	CDR(q) = CDR(p);
     else
@@ -967,7 +967,7 @@ static int
 _hash_sockaddr4(struct sockaddr_in *sin4)
 {
     int	byte;
-    
+
     byte = sizeof(sin4->sin_port) + sizeof(sin4->sin_addr);
     return (_hash_pjw((char *)&sin4->sin_port, byte));
 }
@@ -977,7 +977,7 @@ static int
 _hash_sockaddr6(struct sockaddr_in6 *sin6)
 {
     int	byte;
-    
+
     sin6->sin6_flowinfo = 0;
     byte = sizeof(sin6->sin6_port)
 	    + sizeof(sin6->sin6_flowinfo)

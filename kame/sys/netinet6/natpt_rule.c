@@ -1,9 +1,9 @@
-/*	$KAME: natpt_rule.c,v 1.8 2000/03/09 06:05:43 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.9 2000/03/25 07:23:56 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_rule.c,v 1.8 2000/03/09 06:05:43 fujisawa Exp $
+ *	$Id: natpt_rule.c,v 1.9 2000/03/25 07:23:56 sumikawa Exp $
  */
 
 #include <sys/errno.h>
@@ -313,7 +313,7 @@ port:;
 	if ((dport >= from->_port0)
 	    && (dport <= from->_port1))				return (1);
     }
-    
+
 
     return (0);
 }
@@ -328,7 +328,7 @@ _natptEnableTrans(caddr_t addr)
 
     sprintf(Wow, "map enable");
     natpt_logMsg(LOG_INFO, Wow, strlen(Wow));
-    
+
     ip6_protocol_tr = 1;
     return (0);
 }
@@ -341,7 +341,7 @@ _natptDisableTrans(caddr_t addr)
 
     sprintf(Wow, "map disable");
     natpt_logMsg(LOG_INFO, Wow, strlen(Wow));
-    
+
     ip6_protocol_tr = 0;
     return (0);
 }
@@ -365,7 +365,7 @@ _natptSetRule(caddr_t addr)
 
     MALLOC(cst, struct _cSlot *, sizeof(struct _cSlot), M_TEMP, M_WAITOK);
     copyin(mbx->freight, cst, sizeof(struct _cSlot));
-    
+
     {
 	struct pAddr	*from;
 

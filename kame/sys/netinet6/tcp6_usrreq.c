@@ -1,9 +1,9 @@
-/*	$KAME: tcp6_usrreq.c,v 1.12 2000/02/22 14:04:37 itojun Exp $	*/
+/*	$KAME: tcp6_usrreq.c,v 1.13 2000/03/25 07:24:02 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -145,7 +145,7 @@ tcp6_usrreq(so, req, m, nam, control)
 	int error = 0;
 	int ostate;
 
-	/* 
+	/*
 	 * Mapped addr support for PRU_CONTROL is not necessary.
 	 * See comments at udp6_usrreq().
 	 */
@@ -196,9 +196,9 @@ tcp6_usrreq(so, req, m, nam, control)
 	 * and an internet control block.
 	 */
 	case PRU_ATTACH:
-		/* 
-		 * MAPPED_ADDR spec: always attach for v6, only when 
-		 * necessary for v4 
+		/*
+		 * MAPPED_ADDR spec: always attach for v6, only when
+		 * necessary for v4
 		 */
 		if (in6p) {
 			error = EISCONN;

@@ -1,9 +1,9 @@
-/*	$KAME: ip6_forward.c,v 1.29 2000/02/26 18:08:38 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.30 2000/03/25 07:23:46 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -424,7 +424,7 @@ ip6_forward(m, srcrt)
 			}
 
 			/*
-			 * if mtu becomes less than minimum MTU, 
+			 * if mtu becomes less than minimum MTU,
 			 * tell minimum MTU (and I'll need to fragment it).
 			 */
 			if (mtu < IPV6_MMTU)
@@ -474,7 +474,7 @@ ip6_forward(m, srcrt)
 					 ip6_forward_rt.ro_rt);
 #else
 	error = nd6_output(rt->rt_ifp, m, dst, rt);
-#endif 
+#endif
 	if (error) {
 		in6_ifstat_inc(rt->rt_ifp, ifs6_out_discard);
 		ip6stat.ip6s_cantforward++;

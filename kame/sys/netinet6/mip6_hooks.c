@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hooks.c,v 1.7 2000/03/21 08:58:11 itojun Exp $	*/
+/*	$KAME: mip6_hooks.c,v 1.8 2000/03/25 07:23:51 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -37,7 +37,7 @@
  *         Hesham Soliman <hesham.soliman@ericsson.com.au>
  *         Martti Kuparinen <martti.kuparinen@ericsson.com>
  *
- * $Id: mip6_hooks.c,v 1.7 2000/03/21 08:58:11 itojun Exp $
+ * $Id: mip6_hooks.c,v 1.8 2000/03/25 07:23:51 sumikawa Exp $
  *
  */
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
@@ -160,7 +160,7 @@ mip6_find_auto_home_addr(void)
 #if 0		/* XXXYYY Add in v2.0 */
 		for (pfxrtr = pr->ndpr_advrtrs.lh_first; pfxrtr;
 		     pfxrtr = pfxrtr->pfr_next) {
-			if ((pfxrtr->router->flags & ND_RA_FLAG_HA) 
+			if ((pfxrtr->router->flags & ND_RA_FLAG_HA)
 			    == ND_RA_FLAG_HA)
 				break;
 		}
@@ -251,7 +251,7 @@ mip6_disable_hooks(int scope)
 	int  s;
 
 	/*
-	 * Deactivate the hook functions. After this some packets might not 
+	 * Deactivate the hook functions. After this some packets might not
 	 * come to the module...
 	 */
 	s = splimp();
@@ -362,7 +362,7 @@ mip6_attach(int module)
 			return 0;
 
 		/*
-		 * If autoconfig state: find a global address to use as Home 
+		 * If autoconfig state: find a global address to use as Home
 		 * Address.
 		 * - Take first available on any interface, else if no found:
 		 * - Enable hook to wait for a Router Advertisement to give

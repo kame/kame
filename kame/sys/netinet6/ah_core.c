@@ -1,9 +1,9 @@
-/*	$KAME: ah_core.c,v 1.29 2000/03/11 09:20:21 itojun Exp $	*/
+/*	$KAME: ah_core.c,v 1.30 2000/03/25 07:23:39 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -228,7 +228,7 @@ ah_keyed_md5_init(state, sav)
 		panic("ah_keyed_md5_init: what?");
 	MD5Init((MD5_CTX *)state->foo);
 	if (state->sav) {
-		MD5Update((MD5_CTX *)state->foo, 
+		MD5Update((MD5_CTX *)state->foo,
 			(u_int8_t *)_KEYBUF(state->sav->key_auth),
 			(u_int)_KEYLEN(state->sav->key_auth));
 
@@ -294,7 +294,7 @@ ah_keyed_md5_result(state, addr)
 		panic("ah_keyed_md5_result: what?");
 
 	if (state->sav) {
-		MD5Update((MD5_CTX *)state->foo, 
+		MD5Update((MD5_CTX *)state->foo,
 			(u_int8_t *)_KEYBUF(state->sav->key_auth),
 			(u_int)_KEYLEN(state->sav->key_auth));
 	}

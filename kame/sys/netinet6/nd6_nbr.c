@@ -1,9 +1,9 @@
-/*	$KAME: nd6_nbr.c,v 1.32 2000/03/21 11:37:30 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.33 2000/03/25 07:23:58 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -47,7 +47,7 @@
 #include <sys/errno.h>
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/ioctl.h>
-#endif 
+#endif
 #include <sys/syslog.h>
 #include <sys/queue.h>
 #ifdef __OpenBSD__
@@ -787,7 +787,7 @@ nd6_na_input(m, off, icmp6len)
 #else
 		nd6_output(ifp, ln->ln_hold,
 			   (struct sockaddr_in6 *)rt_key(rt), rt);
-#endif 
+#endif
 		ln->ln_hold = 0;
 	}
 

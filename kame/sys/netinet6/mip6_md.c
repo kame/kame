@@ -1,4 +1,4 @@
-/*	$KAME: mip6_md.c,v 1.13 2000/03/18 03:05:41 itojun Exp $	*/
+/*	$KAME: mip6_md.c,v 1.14 2000/03/25 07:23:53 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -35,7 +35,7 @@
  *
  * Author:  Mattias Pettersson <mattias.pettersson@era.ericsson.se>
  *
- * $Id: mip6_md.c,v 1.13 2000/03/18 03:05:41 itojun Exp $
+ * $Id: mip6_md.c,v 1.14 2000/03/25 07:23:53 sumikawa Exp $
  *
  */
 
@@ -79,8 +79,8 @@ struct nd_prefix	*mip6_home_prefix;
 struct nd_prefix	*mip6_primary_prefix;
 struct in6_addr		mip6_primary_defrtr;
 int             	mip6_md_state = MIP6_MD_UNDEFINED;
-/* 
- *  Mobile IPv6 Home Address route state for the Mobile Node. 
+/*
+ *  Mobile IPv6 Home Address route state for the Mobile Node.
  *    route_state NET == MD_HOME == network route.
  *    route_state HOST == MD_FOREIGN|UNDEFINED == host route.
  */
@@ -291,7 +291,7 @@ mip6_md_init()
 				}
 			}
 			if (pr) {
-				mip6_primary_prefix = pr;  
+				mip6_primary_prefix = pr;
 				mip6_primary_defrtr = dr->rtaddr;
 				mip6_tell_em(MIP6_MD_FOREIGN, mip6_home_prefix,
 					     pr, dr);
@@ -350,8 +350,8 @@ mip6_select_defrtr()
 
 	pr = mip6_primary_prefix;
 	/* Only for sanity check */
-	dr = mip6_primary_prefix ? 
-		defrouter_lookup(&mip6_primary_defrtr, 
+	dr = mip6_primary_prefix ?
+		defrouter_lookup(&mip6_primary_defrtr,
 				 mip6_primary_prefix->ndpr_ifp) : NULL;
 	state = mip6_md_state;
 
@@ -450,7 +450,7 @@ mip6_select_defrtr()
 #endif
 
 						/*
-						 * Place dr first since 
+						 * Place dr first since
 						 * its prim.
 						 */
 						TAILQ_REMOVE(&nd_defrouter,
@@ -585,7 +585,7 @@ mip6_select_defrtr()
 	 * Second case: coming from UNDEFINED, we might have had a router, but
 	 * we didn't have a care-of address.
 	 */
-	if (IN6_ARE_ADDR_EQUAL(&mip6_primary_defrtr, 
+	if (IN6_ARE_ADDR_EQUAL(&mip6_primary_defrtr,
 			       (dr ? &dr->rtaddr : &in6addr_any)) &&
 	    !(dr && mip6_primary_prefix == NULL)) {
 #ifdef MIP6_DEBUG
@@ -596,7 +596,7 @@ mip6_select_defrtr()
 	}
 
 	/*
-	 * Switch between network and host route for the Home Address 
+	 * Switch between network and host route for the Home Address
 	 * in the following cases:
 	 *
 	 * md_state                route_state
@@ -607,7 +607,7 @@ mip6_select_defrtr()
 	 * FOREIGN -> UNDEFINED    HOST -> NET
 	 */
 
-	if ((state == MIP6_MD_HOME || state == MIP6_MD_UNDEFINED) 
+	if ((state == MIP6_MD_HOME || state == MIP6_MD_UNDEFINED)
 	    && mip6_route_state == MIP6_ROUTE_HOST) {
 		error = mip6_add_ifaddr(&mip6_home_prefix->ndpr_addr,
 					mip6_home_prefix->ndpr_ifp, 64,
@@ -617,7 +617,7 @@ mip6_select_defrtr()
 			       __FUNCTION__, error);
 		mip6_route_state = MIP6_ROUTE_NET;
 	}
-	else if (state == MIP6_MD_FOREIGN && 
+	else if (state == MIP6_MD_FOREIGN &&
 		 mip6_route_state == MIP6_ROUTE_NET) {
 		error = mip6_add_ifaddr(&mip6_home_prefix->ndpr_addr,
 					mip6_home_prefix->ndpr_ifp, 128,
@@ -674,9 +674,9 @@ mip6_select_defrtr()
 #ifdef MIP6_DEBUG
 			mip6_debug("Checking neighbor %s\n", dst ? ip6_sprintf(&dst->sin6_addr) : "NULL");
 #endif
-			if (in6_are_prefix_equal(&dst->sin6_addr, 
+			if (in6_are_prefix_equal(&dst->sin6_addr,
 						 &mip6_primary_prefix->
-						 ndpr_prefix.sin6_addr, 
+						 ndpr_prefix.sin6_addr,
 						 mip6_primary_prefix->
 						 ndpr_plen)) {
 
@@ -760,9 +760,9 @@ mip6_select_defrtr()
 #ifdef MIP6_DEBUG
 			mip6_debug("Checking neighbor %s round 2\n", dst ? ip6_sprintf(&dst->sin6_addr) : "NULL");
 #endif
-			if (in6_are_prefix_equal(&dst->sin6_addr, 
+			if (in6_are_prefix_equal(&dst->sin6_addr,
 						 &mip6_primary_prefix->
-						 ndpr_prefix.sin6_addr, 
+						 ndpr_prefix.sin6_addr,
 						 mip6_primary_prefix->
 						 ndpr_plen)) {
 
@@ -794,7 +794,7 @@ mip6_select_defrtr()
 		}
 	}
 
-	/* 
+	/*
 	 * Make decision permanent.
 	 * Primary Default Router is already set above.
 	 */
@@ -819,9 +819,9 @@ mip6_select_defrtr()
 		mip6_tell_em(mip6_md_state, mip6_home_prefix, pr, dr);
 		break;
 	case MIP6_MD_UNDEFINED:
-		/* 
-		 * Note: we pass dr == NULL, but we might have a Default 
-		 * Router anyway, but with no prefix/Care-of Address 
+		/*
+		 * Note: we pass dr == NULL, but we might have a Default
+		 * Router anyway, but with no prefix/Care-of Address
 		 * associated.
 		 */
 		mip6_tell_em(mip6_md_state, mip6_home_prefix, NULL, NULL);

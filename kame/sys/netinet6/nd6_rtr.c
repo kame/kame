@@ -1,9 +1,9 @@
-/*	$KAME: nd6_rtr.c,v 1.30 2000/03/21 11:37:31 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.31 2000/03/25 07:23:58 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -100,7 +100,7 @@ int nd6_defifindex;
 #ifdef MIP6
 void (*mip6_select_defrtr_hook)(void) = NULL;
 struct nd_prefix * (*mip6_get_home_prefix_hook)(void) = NULL;
-void (*mip6_prelist_update_hook)(struct nd_prefix *pr, 
+void (*mip6_prelist_update_hook)(struct nd_prefix *pr,
 				 struct nd_defrouter *dr) = NULL;
 void (*mip6_probe_pfxrtrs_hook)(void) = NULL;
 void (*mip6_store_advint_hook)(struct nd_opt_advint *ai,
@@ -724,7 +724,7 @@ defrtrlist_update(new)
 	/*
 	 * Insert the new router at the end of the Default Router List.
 	 * If there is no other router, install it anyway. Otherwise,
-	 * just continue to use the current default router. 
+	 * just continue to use the current default router.
 	 */
 	TAILQ_INSERT_TAIL(&nd_defrouter, n, dr_entry);
 	if (TAILQ_FIRST(&nd_defrouter) == n)
@@ -833,7 +833,7 @@ prelist_add(pr, dr)
 		pfxrtr_add(new, dr);
 #ifdef MIP6
 		if (mip6_get_md_state_hook) {
-			/* 
+			/*
 			 * If we are in UNDEFINED state and a router appears,
 			 * select that router and change state.
 			 * This case takes care of transitions from UNDEFINED
@@ -921,7 +921,7 @@ prelist_update(new, dr, m)
 
 #ifdef MIP6
 		if (mip6_get_home_prefix_hook) {
-			/* 
+			/*
 			 * The home prefix should be kept away from updates.
 			 * XXXYYY Tunneled RA? New Home Prefix? Unless
 			 * configured, the code below will be executed.
@@ -1643,7 +1643,7 @@ in6_init_address_ltimes(struct nd_prefix *new,
 /*
  * Delete all the routing table entries that use the specified gateway.
  * XXX: this function causes search through all entries of routing table, so
- * it shouldn't be called when acting as a router. 
+ * it shouldn't be called when acting as a router.
  */
 void
 rt6_flush(gateway, ifp)

@@ -1,9 +1,9 @@
-/*	$KAME: ipcomp_core.c,v 1.10 2000/02/22 14:04:23 itojun Exp $	*/
+/*	$KAME: ipcomp_core.c,v 1.11 2000/03/25 07:23:49 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -78,7 +78,7 @@ static int deflate_decompress __P((struct mbuf *, struct mbuf *, size_t *));
 static int deflate_policy = Z_DEFAULT_COMPRESSION;
 static int deflate_window_out = -12;
 static const int deflate_window_in = -1 * MAX_WBITS;	/* don't change it */
-static int deflate_memlevel = MAX_MEM_LEVEL; 
+static int deflate_memlevel = MAX_MEM_LEVEL;
 
 struct ipcomp_algorithm ipcomp_algorithms[] = {
 	{ NULL, NULL, -1 },

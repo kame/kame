@@ -1,9 +1,9 @@
-/*	$KAME: natpt_trans.c,v 1.11 2000/03/09 06:05:43 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.12 2000/03/25 07:23:56 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_trans.c,v 1.11 2000/03/09 06:05:43 fujisawa Exp $
+ *	$Id: natpt_trans.c,v 1.12 2000/03/25 07:23:56 sumikawa Exp $
  */
 
 #include <sys/param.h>
@@ -202,7 +202,7 @@ translatingICMPv4To4(struct _cv *cv4from, struct pAddr *pad)
 	m_freem(m4);
 	return (NULL);
     }
-    
+
     m4->m_len = cv4from->m->m_len;
     return (m4);
 }
@@ -238,7 +238,7 @@ translatingUDPv4To4(struct _cv *cv4from, struct pAddr *pad)
     bzero(&cv4to, sizeof(struct _cv));
     m4 = translatingTCPUDPv4To4(cv4from, pad, &cv4to);
     cv4to.ip_p = cv4to.ip_payload = IPPROTO_UDP;
-    
+
     adjustUpperLayerChecksum(IPPROTO_IPV4, IPPROTO_UDP, cv4from, &cv4to);
 
     return (m4);
@@ -259,7 +259,7 @@ translatingTCPUDPv4To4(struct _cv *cv4from, struct pAddr *pad, struct _cv *cv4to
 
     ip4to->ip_src = pad->in4src;
     ip4to->ip_dst = pad->in4dst;
-    
+
     tcp4to = (struct tcphdr *)((caddr_t)ip4to + (ip4to->ip_hl << 2));
     tcp4to->th_sport = pad->_sport;
     tcp4to->th_dport = pad->_dport;
@@ -305,7 +305,7 @@ translatingIPv4To6(struct _cv *cv4, struct pAddr *pad)
 	m6 = translatingUDPv4To6(cv4, pad);
 	break;
     }
-    
+
     if (m6)
 	m6->m_pkthdr.rcvif = cv4->m->m_pkthdr.rcvif;
 
@@ -325,7 +325,7 @@ translatingICMPv4To6(struct _cv *cv4, struct pAddr *pad)
 
     ip4 = mtod(cv4->m, struct ip *);
     icmp4 = cv4->_payload._icmp4;
-    
+
     {
 	caddr_t		 icmp4end;
 	int		 icmp4len;
@@ -883,7 +883,7 @@ translatingICMPv6To4(struct _cv *cv6, struct pAddr *pad)
     struct ip6_hdr	*ip6;
     struct icmp		*icmp4;
     struct icmp6_hdr	*icmp6;
-    
+
     ip6 = mtod(cv6->m, struct ip6_hdr *);
     icmp6 = cv6->_payload._icmp6;
 
@@ -979,7 +979,7 @@ tr_icmp6DstUnreach(struct _cv *cv6, struct _cv *cv4)
 {
     struct icmp		*icmp4 = cv4->_payload._icmp4;
     struct icmp6_hdr	*icmp6 = cv6->_payload._icmp6;
-    
+
     icmp4->icmp_type = ICMP_UNREACH;
     icmp4->icmp_code = 0;
     icmp4->icmp_id   = icmp6->icmp6_id;
@@ -1015,7 +1015,7 @@ tr_icmp6PacketTooBig(struct _cv *cv6, struct _cv *cv4)
 {
     struct icmp		*icmp4 = cv4->_payload._icmp4;
     struct icmp6_hdr	*icmp6 = cv6->_payload._icmp6;
-    
+
     icmp4->icmp_type = ICMP_UNREACH;
     icmp4->icmp_code = ICMP_UNREACH_NEEDFRAG;				/* do more	*/
     icmp4->icmp_id   = icmp6->icmp6_id;
@@ -1028,7 +1028,7 @@ tr_icmp6TimeExceed(struct _cv *cv6, struct _cv *cv4)
 {
     struct icmp		*icmp4 = cv4->_payload._icmp4;
     struct icmp6_hdr	*icmp6 = cv6->_payload._icmp6;
-    
+
     icmp4->icmp_type = ICMP_TIMXCEED;
     icmp4->icmp_code = icmp6->icmp6_code;		/* code unchanged.	*/
     icmp4->icmp_id   = icmp6->icmp6_id;
@@ -1041,7 +1041,7 @@ tr_icmp6ParamProb(struct _cv *cv6, struct _cv *cv4)
 {
     struct icmp		*icmp4 = cv4->_payload._icmp4;
     struct icmp6_hdr	*icmp6 = cv6->_payload._icmp6;
-    
+
     icmp4->icmp_type = ICMP_PARAMPROB;					/* do more	*/
     icmp4->icmp_code = 0;
     icmp4->icmp_id   = icmp6->icmp6_id;
@@ -1060,7 +1060,7 @@ tr_icmp6EchoRequest(struct _cv *cv6, struct _cv *cv4)
 {
     struct icmp		*icmp4 = cv4->_payload._icmp4;
     struct icmp6_hdr	*icmp6 = cv6->_payload._icmp6;
-    
+
     icmp4->icmp_type = ICMP_ECHO;
     icmp4->icmp_code = 0;
     icmp4->icmp_id   = icmp6->icmp6_id;
@@ -1089,7 +1089,7 @@ tr_icmp6EchoReply(struct _cv *cv6, struct _cv *cv4)
 {
     struct icmp		*icmp4 = cv4->_payload._icmp4;
     struct icmp6_hdr	*icmp6 = cv6->_payload._icmp6;
-    
+
     icmp4->icmp_type = ICMP_ECHOREPLY;
     icmp4->icmp_code = 0;
     icmp4->icmp_id   = icmp6->icmp6_id;
@@ -1487,7 +1487,7 @@ _natpt_tcpfsmSessIn(int inout, short state, u_char flags)
 	    rv = TCPS_TIME_WAIT;
 	break;
     }
-    
+
     return (rv);
 }
 
@@ -1509,7 +1509,7 @@ adjustUpperLayerChecksum(int header, int proto, struct _cv *cv6, struct _cv *cv4
 	u_char		ulc_zero[3];
 	u_char		ulc_nxt;
     }			ulc;
-    
+
     bzero(&ulc, sizeof(struct ulc));
     bzero(&ip4, sizeof(struct ipovly));
 
@@ -1568,10 +1568,10 @@ static int
 adjustChecksum(int cksum, u_char *optr, int olen, u_char *nptr, int nlen)
 {
     long	x, old, new;
-    
+
     x = ~cksum & 0xffff;
 
-    while (olen) 
+    while (olen)
     {
 	if (olen == 1)
 	{

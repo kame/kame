@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.63 2000/03/21 05:18:38 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.64 2000/03/25 07:23:42 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -375,7 +375,7 @@ in6_control(so, cmd, data, ifp)
 	struct	sockaddr_in6 oldaddr;
 #ifdef COMPAT_IN6IFIOCTL
 	struct sockaddr_in6 net;
-#endif 
+#endif
 	int error = 0, hostIsNew, prefixIsNew;
 	int newifaddr;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -552,7 +552,7 @@ in6_control(so, cmd, data, ifp)
 		 * on a single interface, SIOCSIFxxx ioctls are not suitable
 		 * and should be unused.
 		 */
-#endif 
+#endif
 		if (ifra->ifra_addr.sin6_family != AF_INET6)
 			return(EAFNOSUPPORT);
 		if (!privileged)
@@ -733,7 +733,7 @@ in6_control(so, cmd, data, ifp)
 		}
 		break;
 
-#endif 
+#endif
 	case SIOCGIFALIFETIME_IN6:
 		ifr->ifr_ifru.ifru_lifetime = ia->ia6_lifetime;
 		break;
@@ -824,7 +824,7 @@ in6_control(so, cmd, data, ifp)
 				ia->ia_prefixmask.sin6_addr.s6_addr32[3];
 		ia->ia_net = net;
 		break;
-#endif 
+#endif
 
 	case SIOCAIFADDR_IN6:
 		prefixIsNew = 0;
@@ -2295,7 +2295,7 @@ in6_ifawithifp(ifp, dst)
 	 */
 	if (mip6_get_home_prefix_hook) {	/* Only Mobile Node */
 		struct nd_prefix *pr;
-		if ((pr = (*mip6_get_home_prefix_hook)()) && 
+		if ((pr = (*mip6_get_home_prefix_hook)()) &&
 		    !IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr))
 		{
 			if (dst_scope == in6_addrscope(&pr->ndpr_addr)) {

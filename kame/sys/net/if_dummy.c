@@ -1,4 +1,4 @@
-/*	$KAME: if_dummy.c,v 1.7 2000/02/22 14:01:45 itojun Exp $	*/
+/*	$KAME: if_dummy.c,v 1.8 2000/03/25 07:23:32 sumikawa Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  */
 /*
- * derived from 
+ * derived from
  *	@(#)if_loop.c	8.1 (Berkeley) 6/10/93
  * Id: if_loop.c,v 1.22 1996/06/19 16:24:10 wollman Exp
  */
@@ -311,7 +311,7 @@ dummyrtrequest(cmd, rt, sa)
 		 * should be at least twice the MTU plus a little more for
 		 * overhead.
 		 */
-		rt->rt_rmx.rmx_recvpipe = 
+		rt->rt_rmx.rmx_recvpipe =
 			rt->rt_rmx.rmx_sendpipe = 3 * DUMMYMTU;
 	}
 }

@@ -1,9 +1,9 @@
-/*	$KAME: nd6.c,v 1.49 2000/03/20 14:09:41 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.50 2000/03/25 07:23:57 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -490,7 +490,7 @@ nd6_timer(ignored_arg)
 			if (ln->ln_expire)
 				ln->ln_state = ND6_LLINFO_STALE;
 			break;
-		/* 
+		/*
 		 * ND6_LLINFO_STALE state requires nothing for timer
 		 * routine.
 		 */
@@ -706,7 +706,7 @@ nd6_lookup(addr6, create, ifp)
 	if (rt && (rt->rt_flags & RTF_LLINFO) == 0) {
 		/*
 		 * This is the case for the default route.
-		 * If we want to create a neighbor cache for the address, we 
+		 * If we want to create a neighbor cache for the address, we
 		 * should free the route for the destination and allocate an
 		 * interface route.
 		 */
@@ -735,7 +735,7 @@ nd6_lookup(addr6, create, ifp)
 			 * Create a new route. RTF_LLINFO is necessary
 			 * to create a Neighbor Cache entry for the
 			 * destination in nd6_rtrequest which will be
-			 * called in rtequest via ifa->ifa_rtrequest. 
+			 * called in rtequest via ifa->ifa_rtrequest.
 			 */
 			if ((e = rtrequest(RTM_ADD, (struct sockaddr *)&sin6,
 					   ifa->ifa_addr,
@@ -782,7 +782,7 @@ nd6_lookup(addr6, create, ifp)
 
 /*
  * Detect if a given IPv6 address identifies a neighbor on a given link.
- * XXX: should take care of the destination of a p2p link? 
+ * XXX: should take care of the destination of a p2p link?
  */
 int
 nd6_is_addr_neighbor(addr, ifp)
@@ -1189,7 +1189,7 @@ nd6_rtrequest(req, rt, sa)
 			 */
 			ln->ln_state = ND6_LLINFO_REACHABLE;
 		} else {
-		        /* 
+		        /*
 			 * When req == RTM_RESOLVE, rt is created and
 			 * initialized in rtrequest(), so rt_expire is 0.
 			 */
@@ -1735,7 +1735,7 @@ fail:
 				nd6_output(ifp, ln->ln_hold,
 					   (struct sockaddr_in6 *)rt_key(rt),
 					   rt);
-#endif 
+#endif
 				ln->ln_hold = 0;
 			}
 		} else if (ln->ln_state == ND6_LLINFO_INCOMPLETE) {
@@ -1784,9 +1784,9 @@ fail:
 	case ND_REDIRECT:
 		/*
 		 * If the icmp is a redirect to a better router, always set the
-		 * is_router flag. Otherwise, if the entry is newly created, 
+		 * is_router flag. Otherwise, if the entry is newly created,
 		 * clear the flag. [RFC 2461, sec 8.3]
-		 * 
+		 *
 		 */
 		if (code == ND_REDIRECT_ROUTER)
 			ln->ln_router = 1;
@@ -1884,7 +1884,7 @@ nd6_output(ifp, m0, dst, rt0)
 		goto sendpkt;
 
 	/*
-	 * next hop determination. This routine is derived from ether_outpout. 
+	 * next hop determination. This routine is derived from ether_outpout.
 	 */
 	if (rt) {
 		if ((rt->rt_flags & RTF_UP) == 0) {
@@ -1894,12 +1894,12 @@ nd6_output(ifp, m0, dst, rt0)
 #else
 			if ((rt0 = rt = rtalloc1((struct sockaddr *)dst, 1)) !=
 				NULL)
-#endif 
+#endif
 			{
 				rt->rt_refcnt--;
 				if (rt->rt_ifp != ifp)
 					return nd6_output(ifp, m0, dst, rt); /* XXX: loop care? */
-			} else 
+			} else
 				senderr(EHOSTUNREACH);
 		}
 		if (rt->rt_flags & RTF_GATEWAY) {
@@ -1911,7 +1911,7 @@ nd6_output(ifp, m0, dst, rt0)
 			lookup: rt->rt_gwroute = rtalloc1(rt->rt_gateway, 1, 0UL);
 #else
 			lookup: rt->rt_gwroute = rtalloc1(rt->rt_gateway, 1);
-#endif 
+#endif
 				if ((rt = rt->rt_gwroute) == 0)
 					senderr(EHOSTUNREACH);
 #ifdef __bsdi__
@@ -1922,7 +1922,7 @@ nd6_output(ifp, m0, dst, rt0)
 					rt0->rt_gwroute = 0;
 					senderr(EHOSTUNREACH);
 				}
-#endif 
+#endif
 			}
 		}
 		if (rt->rt_flags & RTF_REJECT)

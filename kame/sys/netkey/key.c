@@ -1,9 +1,9 @@
-/*	$KAME: key.c,v 1.74 2000/03/22 07:03:22 sakane Exp $	*/
+/*	$KAME: key.c,v 1.75 2000/03/25 07:24:11 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.74 2000/03/22 07:03:22 sakane Exp $ */
+/* KAME $Id: key.c,v 1.75 2000/03/25 07:24:11 sumikawa Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -152,7 +152,7 @@ static u_int saorder_state_alive[] = {
 	SADB_SASTATE_MATURE, SADB_SASTATE_DYING, SADB_SASTATE_LARVAL
 };
 static u_int saorder_state_any[] = {
-	SADB_SASTATE_MATURE, SADB_SASTATE_DYING, 
+	SADB_SASTATE_MATURE, SADB_SASTATE_DYING,
 	SADB_SASTATE_LARVAL, SADB_SASTATE_DEAD
 };
 
@@ -1385,7 +1385,7 @@ key_spdadd(mhp)
 	                src0->sadb_address_proto,
 	                &spidx);
 
-	/* checking the direciton. */ 
+	/* checking the direciton. */
 	switch (xpl0->sadb_x_policy_dir) {
 	case IPSEC_DIR_INBOUND:
 	case IPSEC_DIR_OUTBOUND:
@@ -1607,7 +1607,7 @@ key_spddelete(mhp)
 	                src0->sadb_address_proto,
 	                &spidx);
 
-	/* checking the direciton. */ 
+	/* checking the direciton. */
 	switch (xpl0->sadb_x_policy_dir) {
 	case IPSEC_DIR_INBOUND:
 	case IPSEC_DIR_OUTBOUND:
@@ -3459,7 +3459,7 @@ key_ismyaddr(family, addr)
 #ifdef INET6
 	case AF_INET6:
 		return key_ismyaddr6(addr);
-#endif 
+#endif
 	}
 
 	return 0;
@@ -4360,7 +4360,7 @@ key_update(mhp)
 		return NULL;
 	}
 
-	if (mhp[SADB_EXT_SA] == NULL 
+	if (mhp[SADB_EXT_SA] == NULL
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
 	 || (msg0->sadb_msg_satype == SADB_SATYPE_ESP
@@ -4556,7 +4556,7 @@ key_add(mhp)
 		return NULL;
 	}
 
-	if (mhp[SADB_EXT_SA] == NULL 
+	if (mhp[SADB_EXT_SA] == NULL
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
 	 || (msg0->sadb_msg_satype == SADB_SATYPE_ESP
@@ -4846,7 +4846,7 @@ key_delete(mhp)
 		return NULL;
 	}
 
-	if (mhp[SADB_EXT_SA] == NULL 
+	if (mhp[SADB_EXT_SA] == NULL
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
 #ifdef IPSEC_DEBUG
@@ -4959,7 +4959,7 @@ key_get(mhp)
 		return NULL;
 	}
 
-	if (mhp[SADB_EXT_SA] == NULL 
+	if (mhp[SADB_EXT_SA] == NULL
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
 #ifdef IPSEC_DEBUG

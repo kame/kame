@@ -1,9 +1,9 @@
-/*	$KAME: ah_output.c,v 1.17 2000/03/09 08:54:48 itojun Exp $	*/
+/*	$KAME: ah_output.c,v 1.18 2000/03/25 07:23:39 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -195,7 +195,7 @@ ah4_output(m, isr)
 #endif
 
 	if (m->m_len != hlen)
-		panic("ah4_output: assumption failed (first mbuf length)"); 
+		panic("ah4_output: assumption failed (first mbuf length)");
 	if (M_LEADINGSPACE(m->m_next) < ahlen) {
 		struct mbuf *n;
 		MGET(n, M_DONTWAIT, MT_DATA);

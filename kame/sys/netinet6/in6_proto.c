@@ -1,9 +1,9 @@
-/*	$KAME: in6_proto.c,v 1.44 2000/03/10 14:02:01 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.45 2000/03/25 07:23:45 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -282,7 +282,7 @@ struct ip6protosw inet6sw[] = {
 },
 { SOCK_RAW,	&inet6domain,	IPPROTO_DSTOPTS,PR_ATOMIC|PR_ADDR,
   dest6_input,	0,	 	0,		0,
-  0,	  
+  0,	
   0,		0,		0,		0,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   &nousrreqs
@@ -290,7 +290,7 @@ struct ip6protosw inet6sw[] = {
 },
 { SOCK_RAW,	&inet6domain,	IPPROTO_ROUTING,PR_ATOMIC|PR_ADDR,
   route6_input,	0,	 	0,		0,
-  0,	  
+  0,	
   0,		0,		0,		0,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   &nousrreqs
@@ -298,7 +298,7 @@ struct ip6protosw inet6sw[] = {
 },
 { SOCK_RAW,	&inet6domain,	IPPROTO_FRAGMENT,PR_ATOMIC|PR_ADDR,
   frag6_input,	0,	 	0,		0,
-  0,	  
+  0,	
   0,		0,		0,		0,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   &nousrreqs
@@ -307,7 +307,7 @@ struct ip6protosw inet6sw[] = {
 #ifdef IPSEC
 { SOCK_RAW,	&inet6domain,	IPPROTO_AH,	PR_ATOMIC|PR_ADDR,
   ah6_input,	0,	 	0,		0,
-  0,	  
+  0,	
   0,		0,		0,		0,
 #ifndef __FreeBSD__
   ipsec6_sysctl,
@@ -320,7 +320,7 @@ struct ip6protosw inet6sw[] = {
 #ifdef IPSEC_ESP
 { SOCK_RAW,	&inet6domain,	IPPROTO_ESP,	PR_ATOMIC|PR_ADDR,
   esp6_input,	0,	 	0,		0,
-  0,	  
+  0,	
   0,		0,		0,		0,
 #ifndef __FreeBSD__
   ipsec6_sysctl,
@@ -333,7 +333,7 @@ struct ip6protosw inet6sw[] = {
 #endif
 { SOCK_RAW,	&inet6domain,	IPPROTO_IPCOMP,	PR_ATOMIC|PR_ADDR,
   ipcomp6_input, 0,	 	0,		0,
-  0,	  
+  0,	
   0,		0,		0,		0,
 #ifndef __FreeBSD__
   ipsec6_sysctl,
@@ -376,7 +376,7 @@ struct ip6protosw inet6sw[] = {
 },
 #endif /*INET6*/
 { SOCK_RAW,     &inet6domain,	IPPROTO_PIM,	PR_ATOMIC|PR_ADDR,
-  pim6_input,    rip6_output,	0,              rip6_ctloutput, 
+  pim6_input,    rip6_output,	0,              rip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
 #else
@@ -439,7 +439,7 @@ extern int in6_inithead __P((void **, int));
 #endif
 
 struct domain inet6domain =
-    { AF_INET6, "internet6", 0, 0, 0, 
+    { AF_INET6, "internet6", 0, 0, 0,
       (struct protosw *)inet6sw,
       (struct protosw *)&inet6sw[sizeof(inet6sw)/sizeof(inet6sw[0])], 0,
 #ifdef __FreeBSD__

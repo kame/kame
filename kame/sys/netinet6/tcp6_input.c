@@ -1,9 +1,9 @@
-/*	$KAME: tcp6_input.c,v 1.21 2000/02/25 02:05:42 jinmei Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.22 2000/03/25 07:24:00 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -176,7 +176,7 @@ u_long	syn_hash61, syn_hash62;
 #define SYN_HASH6(sa, sp, dp) \
 	((((sa)->s6_addr32[0]^(sa)->s6_addr32[1]^(sa)->s6_addr32[2]^\
 	   (sa)->s6_addr32[3]^syn_hash61) \
-	  *((((dp)<<16)+(sp))^syn_hash62)) & 0x7fffffff) 
+	  *((((dp)<<16)+(sp))^syn_hash62)) & 0x7fffffff)
 
 #define	eptosp(ep, e, s)	((struct s *)((char *)(ep) - \
 			    ((char *)(&((struct s *)0)->e) - (char *)0)))
@@ -336,7 +336,7 @@ tcp6_reass(t6p, i6tr, th, m, len)
 		goto present;
 
 	if (i6tr) {
-		i6tr->i6tr_t = th; 
+		i6tr->i6tr_t = th;
 		i6tr->i6tr_len = (u_short)len;
 	}
 	/*
@@ -520,7 +520,7 @@ tcp6_input(mp, offp, proto)
 
 		optlen = toff - sizeof (struct tcp6hdr);
 		optp = (u_char *)(th + 1);
-		/* 
+		/*
 		 * Do quick retrieval of timestamp options ("options
 		 * prediction?").  If timestamp is the only option and it's
 		 * formatted as recommended in RFC 1323 appendix A, we
@@ -751,7 +751,7 @@ after_listen:
 	if (optp && t6p->t_state != TCP6S_LISTEN)
 		tcp6_dooptions(t6p, optp, optlen, th, &opti);
 
-	/* 
+	/*
 	 * Header prediction: check for the two common cases
 	 * of a uni-directional data xfer.  If the packet has
 	 * no control flags, is in-sequence, the window didn't
@@ -772,7 +772,7 @@ after_listen:
 	    thwin && thwin == t6p->snd_wnd &&
 	    t6p->snd_nxt == t6p->snd_max) {
 
-		/* 
+		/*
 		 * If last ACK falls within this segment's sequence numbers,
 		 *  record the timestamp.
 		 */
@@ -1064,10 +1064,10 @@ trimthenstep6:
 	/*
 	 * States other than LISTEN or SYN_SENT.
 	 * First check timestamp, if present.
-	 * Then check that at least some bytes of segment are within 
+	 * Then check that at least some bytes of segment are within
 	 * receive window.  If segment begins before rcv_nxt,
 	 * drop leading data (and SYN); if nothing left, just ack.
-	 * 
+	 *
 	 * RFC 1323 PAWS: If we have a timestamp reply on this segment
 	 * and it's less than ts_recent, drop it.
 	 */
@@ -1101,7 +1101,7 @@ trimthenstep6:
 		if (thflags & TH_SYN) {
 			thflags &= ~TH_SYN;
 			th->th_seq++;
-			if (th->th_urp > 1) 
+			if (th->th_urp > 1)
 				th->th_urp--;
 			else
 				thflags &= ~TH_URG;
@@ -1360,7 +1360,7 @@ trimthenstep6:
 				 * the new ssthresh).
 				 *
 				 * Dup acks mean that packets have left the
-				 * network (they're now cached at the receiver) 
+				 * network (they're now cached at the receiver)
 				 * so bump cwnd by the amount in the receiver
 				 * to keep a constant cwnd packets in the
 				 * network.
@@ -1580,14 +1580,14 @@ step6:
 		 * If this segment advances the known urgent pointer,
 		 * then mark the data stream.  This should not happen
 		 * in CLOSE_WAIT, CLOSING, LAST_ACK or TIME_WAIT STATES since
-		 * a FIN has been received from the remote side. 
+		 * a FIN has been received from the remote side.
 		 * In these states we ignore the URG.
 		 *
 		 * According to RFC961 (Assigned Protocols),
 		 * the urgent pointer points to the last octet
 		 * of urgent data.  We continue, however,
 		 * to consider it to indicate the first octet
-		 * of data past the urgent section as the original 
+		 * of data past the urgent section as the original
 		 * spec states (in one of two places).
 		 */
 		if (SEQ_GT(th->th_seq+th->th_urp, t6p->rcv_up)) {
@@ -1678,7 +1678,7 @@ dodata:							/* XXX */
 
 	 	/*
 		 * In FIN_WAIT_2 state enter the TIME_WAIT state,
-		 * starting the time-wait timer, turning toff the other 
+		 * starting the time-wait timer, turning toff the other
 		 * standard timers.
 		 */
 		case TCP6S_FIN_WAIT_2:
@@ -1814,7 +1814,7 @@ tcp6_dooptions(t6p, cp, cnt, th, oi)
 					sizeof(oi->ts_ecr));
 			NTOHL(oi->ts_ecr);
 
-			/* 
+			/*
 			 * A timestamp received in a SYN makes
 			 * it ok to send timestamp requests and replies.
 			 */
@@ -1906,7 +1906,7 @@ tcp6_xmit_timer(t6p, rtt)
 		if ((t6p->t_rttvar += delta) <= 0)
 			t6p->t_rttvar = 1;
 	} else {
-		/* 
+		/*
 		 * No rtt measurement yet - use the unsmoothed rtt.
 		 * Set the variance to half the rtt (so our first
 		 * retransmit happens at 3*rtt).
@@ -2071,7 +2071,7 @@ tcp6_rtlookup(in6p)
 		rtcalloc((struct route *)ro);
 #else
 		rtalloc((struct route *)ro);
-#endif 
+#endif
 
 	}
 	return(ro->ro_rt);

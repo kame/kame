@@ -1,9 +1,9 @@
-/*	$KAME: ip6_output.c,v 1.86 2000/03/21 12:50:12 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.87 2000/03/25 07:23:48 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -250,7 +250,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		if (opt->ip6po_rthdr) {
 			/*
 			 * Destination options header(1st part)
-			 * This only makes sence with a routing header. 
+			 * This only makes sence with a routing header.
 			 */
 			MAKE_EXTHDR(opt->ip6po_dest1, &exthdrs.ip6e_dest1);
 		}
@@ -818,7 +818,7 @@ skip_ipsec2:;
 			rtcalloc((struct route *)ro_pmtu);
 #else
 			rtalloc((struct route *)ro_pmtu);
-#endif 
+#endif
 		}
 	}
 	if (ro_pmtu->ro_rt != NULL) {
@@ -904,7 +904,7 @@ skip_ipsec2:;
 
 	/*
 	 * Send the packet to the outgoing interface.
-	 * If necessary, do IPv6 fragmentation before sending. 
+	 * If necessary, do IPv6 fragmentation before sending.
 	 */
 	tlen = m->m_pkthdr.len;
 	if (tlen <= mtu
@@ -918,7 +918,7 @@ skip_ipsec2:;
 	     * larger than the link's MTU.
 	     * XXX: IFF_FRAGMENTABLE (or such) flag has not been defined yet...
 	     */
-	    
+	
 	    || ifp->if_flags & IFF_FRAGMENTABLE
 #endif
 	    )
@@ -1140,7 +1140,7 @@ ip6_copyexthdr(mp, hdr, hlen)
 }
 
 /*
- * Insert jumbo payload option. 
+ * Insert jumbo payload option.
  */
 static int
 ip6_insert_jumboopt(exthdrs, plen)
@@ -1355,7 +1355,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 #else
 #ifdef HAVE_NRL_INPCB
 				error = ip6_pcbopts(&inp->inp_outputopts6,
-						    m, so); 
+						    m, so);
 #else
 				error = ip6_pcbopts(&in6p->in6p_outputopts,
 						    m, so);
@@ -1374,7 +1374,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 			 * KAME specific note:
 			 *  KAME prevents non-privileged users from sending or
 			 *  receiving ANY hbh/dst options in order to avoid
-			 *  overhead of parsing options in the kernel. 
+			 *  overhead of parsing options in the kernel.
 			 */
 			case IPV6_RECVHOPOPTS:
 			case IPV6_RECVDSTOPTS:
@@ -1395,7 +1395,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 #ifdef notyet			/* To be implemented */
 			case IPV6_USE_MIN_MTU:
 			case IPV6_RECVPATHMTU:
-#endif 
+#endif
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
 			case IPV6_BINDV6ONLY:
 #endif
@@ -1476,7 +1476,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 								   optp,
 								   privileged);
 						break;
-#endif 
+#endif
 					}
 
 					case IPV6_RECVHOPLIMIT:
@@ -1789,7 +1789,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				if (in6p->in6p_inputopts &&
 				    in6p->in6p_inputopts->head) {
-					error = soopt_mcopyout(sopt, 
+					error = soopt_mcopyout(sopt,
 							       in6p->in6p_inputopts->head);
 				} else
 					sopt->sopt_valsize = 0;
@@ -1830,7 +1830,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 #ifdef notyet			/* To be implemented */
 			case IPV6_USE_MIN_MTU:
 			case IPV6_RECVPATHMTU:
-#endif 
+#endif
 
 			case IPV6_FAITH:
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3 && defined(MAPPED_ADDR_ENABLED)) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
