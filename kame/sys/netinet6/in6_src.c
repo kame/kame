@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.27 2000/06/21 08:07:13 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.28 2000/07/10 11:32:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -123,9 +123,9 @@ extern struct nd_prefix *(*mip6_get_home_prefix_hook) __P((void));
 #endif
 
 /*
- * Return an IPv6 address, which is the most appropriate for given
+ * Return an IPv6 address, which is the most appropriate for a given
  * destination and user specified options.
- * If necessary, this function lookups the routing table and return
+ * If necessary, this function lookups the routing table and returns
  * an entry to the caller for later use.
  */
 struct in6_addr *
