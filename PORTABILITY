@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.46 2000/05/31 17:03:08 itojun Exp $
+	$Id: PORTABILITY,v 1.47 2000/05/31 17:04:38 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -310,8 +310,8 @@ across those possibilities.
 - mandoc formatting for SYNOPSIS section.
   On netbsd/openbsd, people usually use
 	.Nm ""
-  to indicate new line in SYNOPSIS section.  However, bsdi mandoc chokes with
-  it.  Explicitly write
+  to indicate new line in SYNOPSIS section ("" makes proper hanging indent,
+  while .Nm does not).  However, bsdi mandoc chokes with it.  Explicitly write
 	.Nm foo
   to avoid portability issue (it is unfortunate that we need to place
-  duplicated text...)
+  duplicated text...).
