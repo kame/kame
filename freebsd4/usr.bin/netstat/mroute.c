@@ -39,7 +39,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/mroute.c,v 1.11.2.1 2000/07/15 07:29:30 kris Exp $";
+  "$FreeBSD: src/usr.bin/netstat/mroute.c,v 1.11.2.2 2001/08/10 09:07:09 ru Exp $";
 #endif /* not lint */
 
 /*
@@ -67,8 +67,7 @@ static const char rcsid[] =
 #include "netstat.h"
 
 void
-mroutepr(mfcaddr, vifaddr)
-	u_long mfcaddr, vifaddr;
+mroutepr(u_long mfcaddr, u_long vifaddr)
 {
 	struct mfc *mfctable[MFCTBLSIZ];
 	struct vif viftable[MAXVIFS];
@@ -150,8 +149,7 @@ mroutepr(mfcaddr, vifaddr)
 
 
 void
-mrt_stats(mstaddr)
-	u_long mstaddr;
+mrt_stats(u_long mstaddr)
 {
 	struct mrtstat mrtstat;
 
