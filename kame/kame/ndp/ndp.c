@@ -128,6 +128,7 @@ static int s = -1;
 static int repeat = 0;
 
 char ntop_buf[INET6_ADDRSTRLEN];	/* inet_ntop() */
+char host_buf[NI_MAXHOST];		/* getnameinfo() */
 char ifix_buf[IFNAMSIZ];		/* if_indextoname() */
 
 int main __P((int, char **));
@@ -415,9 +416,10 @@ get(host)
 	sin->sin6_addr = ((struct sockaddr_in6 *)res->ai_addr)->sin6_addr;
 	dump(&sin->sin6_addr);
 	if (found_entry == 0) {
-		printf("%s (%s) -- no entry\n",
-		    host, inet_ntop(AF_INET6, &sin->sin6_addr, ntop_buf,
-				sizeof(ntop_buf)));
+		getnameinfo((struct sockaddr *)&sin, sin->sin6_len, host_buf,
+			    sizeof(host_buf), NULL ,0,
+			    nflag ? NI_NUMERICHOST : 0);
+		printf("%s (%s) -- no entry\n", host, host_buf);
 		exit(1);
 	}
 }
@@ -429,7 +431,7 @@ int
 delete(host)
 	char *host;
 {
-	register struct sockaddr_in6 *sin = &sin_m;
+	struct sockaddr_in6 *sin = &sin_m;
 	register struct rt_msghdr *rtm = &m_rtmsg.m_rtm;
 	struct sockaddr_dl *sdl;
 	struct addrinfo hints, *res;
@@ -470,8 +472,10 @@ delete:
 	}
 	if (rtmsg(RTM_DELETE) == 0)
 		printf("%s (%s) deleted\n", host,
-			inet_ntop(AF_INET6, &sin->sin6_addr, ntop_buf,
-					sizeof(ntop_buf)));
+		       getnameinfo((struct sockaddr *)&sin, 
+				   sin->sin6_len, host_buf,
+				   sizeof(host_buf), NULL ,0,
+				   nflag ? NI_NUMERICHOST : 0));
 	return 0;
 }
 
@@ -531,27 +535,18 @@ again:;
 			continue;
 		if (fflag == 1) {
 			delete((char *)inet_ntop(AF_INET6, &sin->sin6_addr,
-						ntop_buf, sizeof(ntop_buf)));
+						 ntop_buf, sizeof(ntop_buf)));
 			continue;
 		}
-		host = NULL;
-		if (nflag == 0) {
-			hp = gethostbyaddr((char *)&sin->sin6_addr,
-					   sizeof(struct in6_addr), AF_INET6);
-			if (hp)
-				host = hp->h_name;
-		}
-		if (host == NULL) {
-			inet_ntop(AF_INET6, &sin->sin6_addr,
-				  ntop_buf, sizeof(ntop_buf));
-			host = ntop_buf;
-		}
 
+		getnameinfo((struct sockaddr *)sin, sin->sin6_len, host_buf,
+			    sizeof(host_buf), NULL, 0,
+			    nflag ? NI_NUMERICHOST : 0);
 		gettimeofday(&time, 0);
 		if (tflag)
 			ts_print(&time);
 
-		printf("%-29.29s %-18.18s %6.6s", host,
+		printf("%-29.29s %-18.18s %6.6s", host_buf,
 		       ether_str(sdl),
 		       if_indextoname(sdl->sdl_index, ifix_buf));
 
@@ -823,8 +818,16 @@ rtrlist()
  	}
 #define DR dr.defrouter[i]
 	for (i = 0 ; DR.if_index && i < PRLSTSIZ ; i++) {
-		printf("%s if=%s", inet_ntop(AF_INET6, &DR.rtaddr,
-					     ntop_buf, sizeof(ntop_buf)),
+		struct sockaddr_in6 sin6;
+
+		sin6.sin6_family = AF_INET6;
+		sin6.sin6_len = sizeof(sin6);
+		sin6.sin6_addr = DR.rtaddr;
+		getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len, host_buf,
+			    sizeof(host_buf), NULL, 0,
+			    nflag ? NI_NUMERICHOST : 0);
+		
+		printf("%s if=%s", host_buf,
 		       if_indextoname(DR.if_index, ifix_buf));
 		printf(", flags=%s%s",
 		       DR.flags & ND_RA_FLAG_MANAGED ? "M" : "",
@@ -888,10 +891,17 @@ plist()
 			int j;
 			printf("  advertised by\n");
 			for (j = 0; j < PR.advrtrs; j++) {
-				printf("    %s\n",
-				       inet_ntop(AF_INET6, &PR.advrtr[j],
-						 ntop_buf,
-						 sizeof(ntop_buf)));
+				struct sockaddr_in6 sin6;
+
+				sin6.sin6_family = AF_INET6;
+				sin6.sin6_len = sizeof(sin6);
+				sin6.sin6_addr = PR.advrtr[j];
+				getnameinfo((struct sockaddr *)&sin6,
+					    sin6.sin6_len, host_buf,
+					    sizeof(host_buf), NULL, 0,
+					    nflag ? NI_NUMERICHOST : 0);
+
+				printf("    %s\n", host_buf);
 			}
 			if (PR.advrtrs > DRLSTSIZ)
 				printf("    and %d routers\n",
