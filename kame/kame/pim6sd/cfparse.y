@@ -673,11 +673,6 @@ rp_config()
 		    my_cand_rp_adv_period);
 	}
 
-	/* for debug */
-	printf("cand_rp: address=%s, priority=%d, time=%d\n",
-	       inet6_fmt(&sa6_rp->sin6_addr),
-	       my_cand_rp_priority, my_cand_rp_adv_period);
-
 	return(0);
 }
 
@@ -735,11 +730,6 @@ bsr_config()
 		    "Local BSR period is : %u sec.",
 		    my_bsr_period);
 	}  
-
-	/* for debug */
-	printf("bsr: address=%s, priority=%d, time=%d\n",
-	       inet6_fmt(&sa6_bsr->sin6_addr),
-	       my_bsr_priority, my_bsr_period);
 
 	return(0);
 }
