@@ -49,6 +49,11 @@
 
 #include "route6d.h"
 
+/* wrapper for KAME-special getnameinfo() */
+#ifndef NI_WITHSCOPEID
+#define NI_WITHSCOPEID	0
+#endif
+
 int	s;
 extern int errno;
 struct sockaddr_in6 sin6;
@@ -58,22 +63,24 @@ struct rip6	*ripbuf;
 
 int main __P((int, char **));
 static void usage __P((void));
-const char *inet6_n2a __P((struct in6_addr *));
+static const char *sa_n2a __P((struct sockaddr *));
+static const char *inet6_n2a __P((struct in6_addr *));
 
-int main(argc, argv)
+int
+main(argc, argv)
 	int argc;
 	char **argv;
 {
 	struct netinfo6 *np;
 	struct sockaddr_in6 fsock;
-	struct hostent *hp;
-	char *hostname;
 	int i, n, len, flen;
 	int c;
 	extern char *optarg;
 	extern int optind;
-	int ifidx = 0;
+	int ifidx = -1;
 	int error;
+	char pbuf[10];
+	struct addrinfo hints, *res;
 
 	while ((c = getopt(argc, argv, "I:")) != EOF) {
 		switch (c) {
@@ -103,23 +110,27 @@ int main(argc, argv)
 		/*NOTREACHED*/
 	}
 
-	hp = (struct hostent *)gethostbyname2(argv[0], AF_INET6);
-	if (hp == NULL) {
-		if (inet_pton(AF_INET6, argv[0], (u_int32_t *)&sin6.sin6_addr)
-			!= 1) {
-			fprintf(stderr, "rip6query: unknown host %s\n",
-				argv[0]);
-			exit(-1);
-		}
-	} else {
-		bcopy(hp->h_addr, (caddr_t)&sin6.sin6_addr, hp->h_length);
-		hostname = strdup(hp->h_name);
+	/* getaddrinfo is preferred for addr@ifname syntax */
+	snprintf(pbuf, sizeof(pbuf), "%d", RIP6_PORT);
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = SOCK_STREAM;
+	error = getaddrinfo(argv[0], pbuf, &hints, &res);
+	if (error) {
+		errx(1, "%s: %s", argv[0], gai_strerror(error));
+		/*NOTREACHED*/
 	}
-
-	sin6.sin6_len = sizeof(struct sockaddr_in6);
-	sin6.sin6_family = AF_INET6;
-	sin6.sin6_port = htons(RIP6_PORT);
-	sin6.sin6_scope_id = ifidx;
+	if (res->ai_next) {
+		errx(1, "%s: %s", argv[0], "resolved to multiple addrs");
+		/*NOTREACHED*/
+	}
+	if (sizeof(sin6) != res->ai_addrlen) {
+		errx(1, "%s: %s", argv[0], "invalid addrlen");
+		/*NOTREACHED*/
+	}
+	memcpy(&sin6, res->ai_addr, res->ai_addrlen);
+	if (ifidx >= 0)
+		sin6.sin6_scope_id = ifidx;
 
 	if ((ripbuf = (struct rip6 *)malloc(BUFSIZ)) == NULL) {
 		err(1, "malloc");
@@ -140,14 +151,14 @@ int main(argc, argv)
 		/*NOTREACHED*/
 	}
 	do {
-		flen = sizeof(struct sockaddr_in6);
+		flen = sizeof(fsock);
 		if ((len = recvfrom(s, ripbuf, BUFSIZ, 0,
 				(struct sockaddr *)&fsock, &flen)) < 0) {
 			err(1, "recvfrom");
 			/*NOTREACHED*/
 		}
 		printf("Response from %s len %d\n",
-			inet6_n2a(&fsock.sin6_addr), len);
+			sa_n2a((struct sockaddr *)&fsock), len);
 		n = (len - sizeof(struct rip6) + sizeof(struct netinfo6)) /
 			sizeof(struct netinfo6);
 		np = ripbuf->rip6_nets;
@@ -169,10 +180,25 @@ usage()
 	fprintf(stderr, "Usage: rip6query [-I iface] address\n");
 }
 
-const char *inet6_n2a(p)
-	struct in6_addr *p;
+/* getnameinfo() is preferred as we may be able to show ifindex as ifname */
+static const char *
+sa_n2a(sa)
+	struct sockaddr *sa;
 {
 	static char buf[BUFSIZ];
 
-	return inet_ntop(AF_INET6, (u_int32_t *)p, buf, sizeof(buf));
+	if (getnameinfo(sa, sa->sa_len, buf, sizeof(buf),
+			NULL, 0, NI_NUMERICHOST | NI_WITHSCOPEID) != 0) {
+		snprintf(buf, sizeof(buf), "%s", "(invalid)");
+	}
+	return buf;
+}
+
+static const char *
+inet6_n2a(addr)
+	struct in6_addr *addr;
+{
+	static char buf[BUFSIZ];
+
+	return inet_ntop(AF_INET6, addr, buf, sizeof(buf));
 }
