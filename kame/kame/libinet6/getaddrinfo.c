@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.184 2004/04/26 12:17:22 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.185 2004/05/16 05:52:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -309,6 +309,7 @@ static const struct ai_errlist {
 	{ "System error returned in errno", 		EAI_SYSTEM },
 	{ "Invalid value for hints",			EAI_BADHINTS },
 	{ "Resolved protocol is unknown",		EAI_PROTOCOL },
+	{ "Argument buffer overflow",			EAI_OVERFLOW },
 	/* backward compatibility with userland code prior to 2553bis-02 */
 #ifndef __OpenBSD__
 	{ "Address family for hostname not supported",	1 },
