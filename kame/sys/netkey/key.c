@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.202 2001/07/27 14:41:15 itojun Exp $	*/
+/*	$KAME: key.c,v 1.203 2001/07/28 03:12:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1877,6 +1877,9 @@ key_spdadd(so, m, mhp)
 
 			s = splimp();
 			ifp = sec_establish(me, you);
+			/* bring the interface up, we are willing to receive */
+			if (ifp)
+				if_up(ifp);
 			splx(s);
 			if (!ifp) {
 				keydb_delsecpolicy(newsp);
