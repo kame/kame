@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.72 2002/06/10 09:36:11 itojun Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.73 2003/04/24 02:21:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1171,7 +1171,7 @@ eay_bf_keylen(len)
 		return 448;
 	if (len < 40 || len > 448)
 		return -1;
-	return len + 7 / 8;
+	return (len + 7) / 8;
 }
 
 #ifdef HAVE_OPENSSL_RC5_H
@@ -1236,7 +1236,7 @@ eay_rc5_keylen(len)
 		return 128;
 	if (len < 40 || len > 2040)
 		return -1;
-	return len + 7 / 8;
+	return (len + 7) / 8;
 }
 #endif
 
@@ -1378,7 +1378,7 @@ eay_cast_keylen(len)
 		return 128;
 	if (len < 40 || len > 128)
 		return -1;
-	return len + 7 / 8;
+	return (len + 7) / 8;
 }
 
 /*
