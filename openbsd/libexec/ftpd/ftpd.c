@@ -1739,7 +1739,7 @@ printaddr:
 				printf("211- LPRT ");
 			printf("(%u,%u", af, alen);
 			for (i = 0; i < alen; i++)
-				printf("%u,", a[alen]);
+				printf("%u,", a[i]);
 			printf("%u,%u,%u)\r\n", 2, p[0], p[1]);
 		}
 	    }
@@ -2273,7 +2273,7 @@ long_passive(char *cmd, int pf)
 			    "%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u)",
 				6, 16, a[0], a[1], a[2], a[3], a[4],
 				a[5], a[6], a[7], a[8], a[9], a[10],
-				a[11], a[12], a[13], a[14], a[15], 2,
+				a[11], a[12], a[13], a[14], a[15],
 				2, p[0], p[1]);
 			return;
 		}
