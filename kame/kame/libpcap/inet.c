@@ -33,7 +33,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/inet.c,v 1.4 2000/02/23 11:25:28 itojun Exp $ (LBL)";
+    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/inet.c,v 1.5 2000/02/23 11:31:56 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -122,11 +122,13 @@ pcap_lookupdev(errbuf)
 	}
 	if (mp == NULL) {
 		(void)strcpy(errbuf, "no suitable device found");
+		free(ifap);
 		return (NULL);
 	}
 
 	(void)strncpy(device, mp->ifa_name, sizeof(device) - 1);
 	device[sizeof(device) - 1] = '\0';
+	free(ifap);
 	return (device);
 #else
 	register int fd, minunit, n;
