@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_send.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_send.c,v 1.21 2003/05/17 18:25:38 itojun Exp $";
+static char rcsid[] = "$Id: res_send.c,v 1.22 2004/06/26 08:37:01 jinmei Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 	/* change this to "0"
@@ -693,7 +693,7 @@ read_len:
 				if (connected) {
 #if CAN_RECONNECT
 #ifdef INET6
-					/* XXX: any errornous address */
+					/* XXX: any erroneous address */
 #endif /* INET6 */
 					struct sockaddr_in no_addr;
 
