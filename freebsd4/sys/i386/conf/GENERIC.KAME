@@ -279,6 +279,8 @@ options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 
 options 	NEW_STRUCT_ROUTE	# mandatory
 
+#options 	RADIX_MPATH	# equal cost multipath
+
 #options 	SCTP		# adds SCTP stack to kernel - requires INET6
 #options 	SCTP_DEBUG	# adds debugging support for SCTP
 #options 	SCTP_TCP_MODEL_SUPPORT	# adds TCP model support
