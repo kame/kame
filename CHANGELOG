@@ -1,8 +1,22 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.340 1999/12/14 08:21:52 itojun Exp $
+$Id: CHANGELOG,v 1.341 1999/12/15 08:08:02 jinmei Exp $
 
 <199912>
+1999-12-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/{libinet6, tcpdump, v6test}: changed not to use the
+	ip6r0_addr and ip6r0_slmap members of the ip6_rthdr0 structure
+	according to <draft-ietf-ipngwg-rfc2292bis-01.txt>.
+	Note: it is recommented to update both the kernel and all the user
+	applications to avoid troubles due to size mismatch between the
+	kernel and the applications.
+
+1999-12-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/{ip6.h, ip6_output.c, route6.c}:
+	 removed the ip6r0_addr and ip6r0_slmap members from the
+	 ip6_rthdr0 structure according to
+	 <draft-ietf-ipngwg-rfc2292bis-01.txt>.
+
 1999-12-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/icmp6.c (icmp6_input): use
 	PRC_UNREACH_PROTOCOL as notification code upon receiving an ICMPv6 
