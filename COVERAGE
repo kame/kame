@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.130 2002/11/25 05:10:15 itojun Exp $
+$KAME: COVERAGE,v 1.131 2002/12/05 13:14:35 jinmei Exp $
 
 
 x: supported/integrated
@@ -279,6 +279,9 @@ IPv6 PMTUD DoS prevention
 	 table.  PMTUD does not work for other random protocols like ping6.
 
 6to4 intface	x	x	-	x	x	-	x	x
+
+RFC3041 privacy extensions for IPv6 stateless autoconfiguration
+		x	-	-	x	-	-	x	x
 
 basic userland	x	x	x	x	x	x	x	(*1)
     (*1) ftpd is totally broken from standard conformance POV.  it does not
