@@ -1,4 +1,4 @@
-/*	$KAME: addrselect.c,v 1.1 2001/09/24 16:01:23 jinmei Exp $	*/
+/*	$KAME: addrselect.c,v 1.2 2001/09/25 06:31:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -32,6 +32,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/queue.h>
+#include <sys/param.h>
 #include <sys/sysctl.h>
 
 #include <net/if.h>
