@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1778 2001/07/18 08:51:54 itojun Exp $
+$KAME: CHANGELOG,v 1.1779 2001/07/18 09:09:18 jinmei Exp $
 
 <200107>
 Wed Jul 18 18:06:25 JST 2001  itojun@iijlab.net
@@ -39,7 +39,7 @@ Tue Jul 17 10:58:21 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/sys/netinet6/in6.c (in6_update_ifa): do not call malloc
 	with M_WAITOK, since in6_update_ifa() can be called under an
 	interrupt context.
-	Based on a FreeBSD PR 28927 by From Garrett Wollman
+	Based on a FreeBSD PR 28927 from Garrett Wollman
 	<wollman@lcs.mit.edu> via ume.
 
 Sun Jul 15 00:01:44 JST 2001 sakane@kame.net
