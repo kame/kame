@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.130 2000/11/09 09:49:21 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.131 2000/11/09 10:16:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -758,7 +758,9 @@ ip6_input(m)
 			m->m_flags |= M_ANYCAST6;
 #endif
 
-		/* record address information into m_aux. */
+		/*
+		 * record address information into m_aux.
+		 */
 		ip6_setdstifaddr(m, ia6);
 
 		/*
@@ -872,7 +874,12 @@ ip6_input(m)
 	}
 
   hbhcheck:
-	/* record address information into m_aux, if we don't have one yet. */
+	/*
+	 * record address information into m_aux, if we don't have one yet.
+	 * note that we are unable to record it, if the address is not listed
+	 * as our interface address (e.g. multicast addresses, addresses
+	 * within FAITH prefixes and such).
+	 */
 	if (deliverifp && !ip6_getdstifaddr(m)) {
 		struct in6_ifaddr *ia6;
 
