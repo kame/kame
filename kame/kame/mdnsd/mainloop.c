@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.58 2001/06/22 23:07:37 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.59 2001/06/22 23:12:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -118,8 +118,9 @@ static int islocalname __P((const char *));
 #if 0
 static const struct sockaddr *getsa __P((const char *, const char *, int));
 #endif
-static int getans __P((char *, int, struct sockaddr *));
+static int getans_dns __P((char *, int, struct sockaddr *));
 static int relay __P((struct sockdb *, char *, int, struct sockaddr *));
+static int relay_dns __P((struct sockdb *, char *, int, struct sockaddr *));
 static int serve __P((struct sockdb *, char *, int, struct sockaddr *));
 
 #ifndef INADDR_LOOPBACK
@@ -288,7 +289,7 @@ recv_dns0(sd, vclen)
 		 * the reply to the originator.
 		 */
 		if (serve(sd, buf, l, (struct sockaddr *)&from) != 0)
-			getans(buf, l, (struct sockaddr *)&from);
+			getans_dns(buf, l, (struct sockaddr *)&from);
 	}
 
 	return 0;
@@ -984,10 +985,11 @@ getsa(host, port, socktype)
 #endif
 
 /*
- * parse responses to past relay(), and relay them back to the original querier.
+ * parse responses to past relay_dns(), and relay them back to the
+ * original querier.
  */
 static int
-getans(buf, len, from)
+getans_dns(buf, len, from)
 	char *buf;
 	int len;
 	struct sockaddr *from;
@@ -1071,12 +1073,23 @@ fail:
 	return -1;
 }
 
+static int
+relay(sd, buf, len, from)
+	struct sockdb *sd;
+	char *buf;
+	int len;
+	struct sockaddr *from;
+{
+
+	return relay_dns(sd, buf, len, from);
+}
+
 /*
  * relay inbound DNS packet to remote DNS server (unicast UDP, multicast UDP
  * or TCP).
  */
 static int
-relay(sd, buf, len, from)
+relay_dns(sd, buf, len, from)
 	struct sockdb *sd;
 	char *buf;
 	int len;
