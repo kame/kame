@@ -947,8 +947,6 @@ add_optatr(optatr, optdata, len)
 	/* set values */
 	newoptatr->len = len;
 	memcpy(newoptatr->data, optdata, len);
-	/* set partial bit since we don't recognize the attribute */
-	newoptatr->data[0] |= PA_FLAG_PARTIAL;
 
 	/* link into the chain */
 	newoptatr->next = optatr;

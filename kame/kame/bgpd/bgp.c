@@ -1429,7 +1429,7 @@ bgp_process_update(struct rpcb *bnp)
 #ifdef DEBUG_BGP
 	syslog(LOG_DEBUG,
 	       "<%s>: BGP+ RECV\t\tUnrecognized Attribute: type=%d,len=%d");
-	optatr = add_optatr(optatr, &bnp->rp_inpkt[k], atrdatalen);
+	optatr = add_optatr(optatr, &bnp->rp_inpkt[k], atrlen);
 #endif 
       }
 
