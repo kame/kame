@@ -3,7 +3,7 @@
 # Date created:		1 Oct 1997
 # Whom:			itojun@itojun.org
 #
-# $Id: Makefile,v 1.3 1999/11/02 04:18:38 itojun Exp $
+# $Id: Makefile,v 1.4 1999/11/02 09:01:35 itojun Exp $
 #
 
 DISTNAME=	sendmail.${SENDMAILVER}
@@ -34,7 +34,7 @@ WRKSRC=		${WRKDIR}/sendmail-${SENDMAILVER}/src
 
 post-patch:
 	${CAT} ${FILESDIR}/site.config.m4 >> ${WRKSRC}/site.config-v6.kame
-	@(cd ${WRKSRC}/..; ${GUNZIP_CMD} -c ${DISTDIR}/${IPSECHACK} | ${PATCH} -p1 -f --quiet)
+#	@(cd ${WRKSRC}/..; ${GUNZIP_CMD} -c ${DISTDIR}/${IPSECHACK} | ${PATCH} -p1 -f --quiet)
 
 do-build:
 	@(cd ${WRKSRC}; ./Build -f site.config-v6.kame)
