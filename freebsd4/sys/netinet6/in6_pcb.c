@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.9 2003/01/24 05:11:35 sam Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.66 2004/03/14 10:53:15 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.67 2004/04/02 10:28:27 suz Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -951,11 +951,7 @@ init_sin6(struct sockaddr_in6 *sin6, struct mbuf *m)
 	sin6->sin6_len = sizeof(*sin6);
 	sin6->sin6_family = AF_INET6;
 	sin6->sin6_addr = ip->ip6_src;
-	if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
-		sin6->sin6_addr.s6_addr16[1] = 0;
-	sin6->sin6_scope_id =
-		(m->m_pkthdr.rcvif && IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
-		? m->m_pkthdr.rcvif->if_index : 0;
+	(void)in6_recoverscope(sin6, &sin6->sin6_addr, m->m_pkthdr.rcvif);
 
 	return;
 }
