@@ -473,7 +473,15 @@ tcp_usr_rcvd(struct socket *so, int flags)
 	struct tcpcb *tp;
 
 	COMMON_START();
-	tcp_output(tp);
+	/*
+	 * This function is also called when a user receives
+	 * ancillary data on a listening socket. We don't call
+	 * tcp_output in such a case, since there is no header
+	 * template for a listening socket and hence the kernel
+	 * will panic.
+	 */
+	if ((so->so_state & (SS_ISCONNECTED|SS_ISCONNECTING)) != 0)
+		tcp_output(tp);
 	COMMON_END(PRU_RCVD);
 }
 
