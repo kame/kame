@@ -377,7 +377,7 @@ ip_stats(off, name)
 	ps(ips_badlen, "\t%llu with data length < header length\n");
 	ps(ips_badoptions, "\t%llu with bad options\n");
 	ps(ips_badvers, "\t%llu with incorrect version number\n");
-	p(ips_fragments, "\t%llu fragment%s received");
+	p(ips_fragments, "\t%llu fragment%s received\n");
 	p(ips_fragdropped, "\t%llu fragment%s dropped (dup or out of space)\n");
 	p(ips_badfrags, "\t%llu malformed fragment%s dropped\n");
 	p(ips_fragtimeout, "\t%llu fragment%s dropped after timeout\n");
