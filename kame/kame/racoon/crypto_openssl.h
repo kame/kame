@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.h,v 1.25 2002/04/25 09:48:32 sakane Exp $	*/
+/*	$KAME: crypto_openssl.h,v 1.26 2003/06/27 11:47:07 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -114,6 +114,7 @@ extern int eay_kpdk_hashlen __P((void));
 extern int eay_twofish_keylen __P((int));
 
 /* hash */
+#if defined(WITH_SHA2)
 /* HMAC SHA2 */
 extern vchar_t *eay_hmacsha2_512_one __P((vchar_t *, vchar_t *));
 extern caddr_t eay_hmacsha2_512_init __P((vchar_t *));
@@ -127,6 +128,7 @@ extern vchar_t *eay_hmacsha2_256_one __P((vchar_t *, vchar_t *));
 extern caddr_t eay_hmacsha2_256_init __P((vchar_t *));
 extern void eay_hmacsha2_256_update __P((caddr_t, vchar_t *));
 extern vchar_t *eay_hmacsha2_256_final __P((caddr_t));
+#endif
 /* HMAC SHA1 */
 extern vchar_t *eay_hmacsha1_one __P((vchar_t *, vchar_t *));
 extern caddr_t eay_hmacsha1_init __P((vchar_t *));
@@ -138,6 +140,7 @@ extern caddr_t eay_hmacmd5_init __P((vchar_t *));
 extern void eay_hmacmd5_update __P((caddr_t, vchar_t *));
 extern vchar_t *eay_hmacmd5_final __P((caddr_t));
 
+#if defined(WITH_SHA2)
 /* SHA2 functions */
 extern caddr_t eay_sha2_512_init __P((void));
 extern void eay_sha2_512_update __P((caddr_t, vchar_t *));
@@ -156,6 +159,7 @@ extern void eay_sha2_256_update __P((caddr_t, vchar_t *));
 extern vchar_t *eay_sha2_256_final __P((caddr_t));
 extern vchar_t *eay_sha2_256_one __P((vchar_t *));
 extern int eay_sha2_256_hashlen __P((void));
+#endif
 
 /* SHA functions */
 extern caddr_t eay_sha1_init __P((void));

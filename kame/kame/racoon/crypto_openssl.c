@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.73 2003/04/24 02:21:22 itojun Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.74 2003/06/27 11:47:06 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -82,7 +82,9 @@
 #ifdef HAVE_OPENSSL_SHA2_H
 #include <openssl/sha2.h>
 #else
+#if defined(WITH_SHA2)
 #include "crypto/sha2/sha2.h"
+#endif
 #endif
 
 #include "var.h"
@@ -1498,6 +1500,7 @@ eay_hmac_init(key, md)
 	return (caddr_t)c;
 }
 
+#if defined(WITH_SHA2)
 /*
  * HMAC SHA2-512
  */
@@ -1677,6 +1680,7 @@ eay_hmacsha2_256_final(c)
 
 	return(res);
 }
+#endif	/* WITH_SHA2 */
 
 /*
  * HMAC SHA1
@@ -1798,6 +1802,7 @@ eay_hmacmd5_final(c)
 	return(res);
 }
 
+#if defined(WITH_SHA2)
 /*
  * SHA2-512 functions
  */
@@ -1971,6 +1976,7 @@ eay_sha2_256_hashlen()
 {
 	return SHA256_DIGEST_LENGTH << 3;
 }
+#endif	/* WITH_SHA2 */
 
 /*
  * SHA functions
