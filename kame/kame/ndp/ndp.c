@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.85 2002/04/24 02:31:49 jinmei Exp $	*/
+/*	$KAME: ndp.c,v 1.86 2002/05/26 01:16:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -124,7 +124,7 @@
 	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
 #define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
 
-static int pid;
+static pid_t pid;
 static int cflag;
 static int nflag;
 static int tflag;
@@ -956,8 +956,12 @@ ifinfo(argc, argv)
 		}\
 	} while (0)
 		SETFLAG("nud", ND6_IFF_PERFORMNUD);
+#ifdef ND6_IFF_ACCEPT_RTADV
 		SETFLAG("accept_rtadv", ND6_IFF_ACCEPT_RTADV);
+#endif
+#ifdef ND6_IFF_PREFER_SOURCE
 		SETFLAG("prefer_source", ND6_IFF_PREFER_SOURCE);
+#endif
 
 		ND.flags = newflags;
 		if (ioctl(s, SIOCSIFINFO_FLAGS, (caddr_t)&nd) < 0) {
@@ -1008,10 +1012,14 @@ ifinfo(argc, argv)
 		printf("\nFlags: ");
 		if ((ND.flags & ND6_IFF_PERFORMNUD))
 			printf("PERFORMNUD ");
+#ifdef ND6_IFF_ACCEPT_RTADV
 		if ((ND.flags & ND6_IFF_ACCEPT_RTADV))
 			printf("ACCEPT_RA ");
+#endif
+#ifdef ND6_IFF_PREFER_SOURCE
 		if ((ND.flags & ND6_IFF_PREFER_SOURCE))
 			printf("PREFER_SRC ");
+#endif
 	}
 	putc('\n', stdout);
 #undef ND
