@@ -1065,13 +1065,12 @@ bgp_send_withdrawn(bnp, rte, headrte)
     return NULL;
   }
 
+  bgp_update_stat(bnp, BGPS_UPDATESENT);
   bgp_update_stat(bnp, BGPS_WITHDRAWSENT);
   BGP_LOG_SEND(BGP_UPDATE, i);
 
   return rt;   /* the last RTE. */
 }
-
-
 
 void
 bgp_dump(struct rpcb *bnp) {
