@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.32 2000/01/13 06:26:34 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.33 2000/01/13 06:48:14 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -958,8 +958,8 @@ found:
 	for (q1 = r; q1; q1 = q1->bundles) {
 		dst = q1->dst ? q1->dst : iph2->dst; /* XXX cheat */
 		for (k = iph2->keys; k != NULL; k = k->next) {
-			if (q1->proto_id == q1->proto_id
-			 && q1->encmode == q1->encmode
+			if (q1->proto_id == k->proto_id
+			 && q1->encmode == k->encmode
 			 && (cmpsaddrwop(dst, k->dst) == 0))
 				break;
 		}
