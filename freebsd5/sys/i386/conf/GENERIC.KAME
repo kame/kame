@@ -345,3 +345,7 @@ device		stf	1
 device		pf	1
 device		pflog	1
 device		pfsync	1
+
+# Datagram Congestion Control Protocol
+#options	DCCP
+#options	DCCP_TFRC
