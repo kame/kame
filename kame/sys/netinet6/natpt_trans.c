@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.130 2002/06/27 05:13:53 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.131 2002/06/27 08:14:54 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1210,8 +1210,8 @@ natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 
 		ulc4.ulc_tu.uh.uh_sport = ((struct udphdr *)icmpulp4)->uh_sport;
 		ulc4.ulc_tu.uh.uh_dport = ((struct udphdr *)icmpulp4)->uh_dport;
-		ulc6.ulc_tu.uh.uh_sport = ((struct udphdr *)icmpulp4)->uh_sport;
-		ulc6.ulc_tu.uh.uh_dport = ((struct udphdr *)icmpulp4)->uh_dport;
+		ulc6.ulc_tu.uh.uh_sport = ((struct udphdr *)icmpulp6)->uh_sport;
+		ulc6.ulc_tu.uh.uh_dport = ((struct udphdr *)icmpulp6)->uh_dport;
 
 		if (icmpip4->ip_p == IPPROTO_TCP) {
 			in4_cksum = ntohs(((struct tcphdr *)icmpulp4)->th_sum);
