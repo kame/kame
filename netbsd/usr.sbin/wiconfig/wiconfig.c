@@ -246,6 +246,8 @@ void wi_sethex(iface, code, str)
 {
 	struct ether_addr	*addr;
 
+	if (iface == NULL)
+		errx(1, "must specify interface name");
 	if (str == NULL)
 		errx(1, "must specify address");
 
@@ -496,7 +498,7 @@ static void wi_dumpinfo(iface)
 
 		wi_getval(iface, &wreq);
 		printf("%s", w[i].wi_str);
-		switch(w[i].wi_type) {
+		switch (w[i].wi_type) {
 		case WI_STRING:
 			wi_printstr(&wreq);
 			break;
@@ -525,7 +527,7 @@ static void wi_dumpinfo(iface)
 
 			wi_getval(iface, &wreq);
 			printf("%s", w[i].wi_str);
-			switch(w[i].wi_type) {
+			switch (w[i].wi_type) {
 			case WI_STRING:
 				wi_printstr(&wreq);
 				break;
@@ -643,9 +645,9 @@ int main(argc, argv)
 		argc--;
 	}
 
-	while((ch = getopt(argc, argv,
+	while ((ch = getopt(argc, argv,
 	    "hoc:d:f:p:r:q:t:n:s:i:m:P:S:T:e:k:v:")) != -1) {
-		switch(ch) {
+		switch (ch) {
 		case 'o':
 			wi_dumpstats(iface);
 			exit(0);
