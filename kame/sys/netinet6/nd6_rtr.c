@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.267 2004/11/11 22:34:46 suz Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.268 2004/11/17 03:20:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1710,8 +1710,8 @@ nd6_prefix_onlink(pr)
 	if ((pr->ndpr_stateflags & NDPRF_ONLINK) != 0) {
 		nd6log((LOG_ERR,
 		    "nd6_prefix_onlink: %s/%d is already on-link\n",
-		    ip6_sprintf(&pr->ndpr_prefix.sin6_addr), pr->ndpr_plen);
-		return (EEXIST));
+		    ip6_sprintf(&pr->ndpr_prefix.sin6_addr), pr->ndpr_plen));
+		return (EEXIST);
 	}
 
 	/*
