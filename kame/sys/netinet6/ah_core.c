@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.51 2002/09/11 05:58:50 itojun Exp $	*/
+/*	$KAME: ah_core.c,v 1.52 2003/04/22 10:08:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1549,8 +1549,8 @@ ah6_calccksum(m, ahdat, len, algo, sav)
 		break;
 	    }
 
-	 case IPPROTO_HOPOPTS:
-	 case IPPROTO_DSTOPTS:
+	case IPPROTO_HOPOPTS:
+	case IPPROTO_DSTOPTS:
 	 {
 		struct ip6_ext *ip6e;
 		int hdrlen, optlen;
@@ -1625,7 +1625,7 @@ ah6_calccksum(m, ahdat, len, algo, sav)
 		break;
 	 }
 
-	 case IPPROTO_ROUTING:
+	case IPPROTO_ROUTING:
 		/*
 		 * For an input packet, we can just calculate `as is'.
 		 * For an output packet, we assume ip6_output have already
