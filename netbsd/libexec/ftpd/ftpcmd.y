@@ -205,9 +205,9 @@ cmd
 			    sizeof(data_dest.su_sin.sin_addr)) != 0)) {
 				reply(500,
 				    "Illegal PORT command rejected");
-			} else if (epsvall) {
+			} else if (epsvall)
 				reply(501, "PORT disallowed after EPSV ALL");
-			} else {
+			else {
 				usedefault = 0;
 				if (pdata >= 0) {
 					(void) close(pdata);
@@ -233,9 +233,7 @@ cmd
 				    &his_addr.su_sin.sin_addr,
 			     sizeof(data_dest.su_sin.sin_addr)) != 0)) {
 				reply(500, "Illegal LPRT command rejected");
-				return (NULL);
-			}
-			if (epsvall)
+			} else if (epsvall)
 				reply(501, "LPRT disallowed after EPSV ALL");
 			else {
 				usedefault = 0;
@@ -265,9 +263,7 @@ cmd
 				   &his_addr.su_sin6.sin6_addr,
 			    sizeof(data_dest.su_sin6.sin6_addr)) != 0)) {
 				reply(500, "Illegal LPRT command rejected");
-				return (NULL);
-			}
-			if (epsvall)
+			} else if (epsvall)
 				reply(501, "LPRT disallowed after EPSV ALL");
 			else {
 				usedefault = 0;
@@ -281,146 +277,17 @@ cmd
 
 	| EPRT check_login SP STRING CRLF
 		{
-			char *tmp = NULL;
-			char *result[3];
-			char *p, *q;
-			char delim;
-			struct addrinfo hints;
-			struct addrinfo *res = NULL;
-			int i;
-			unsigned long proto;
-
-			if (epsvall) {
-				reply(501, "EPRT disallowed after EPSV ALL");
-				goto eprt_done;
+			if ($2) {
+				extended_port($4);
 			}
-			usedefault = 0;
-			if (pdata >= 0) {
-				(void) close(pdata);
-				pdata = -1;
-			}
-
-			/*XXX checks for login */
-
-			tmp = strdup($4);
-			if (!tmp) {
-				fatal("not enough core.");
-				/*NOTREACHED*/
-			}
-			p = tmp;
-			delim = p[0];
-			p++;
-			memset(result, 0, sizeof(result));
-			for (i = 0; i < 3; i++) {
-				q = strchr(p, delim);
-				if (!q || *q != delim) {
-		parsefail:
-					reply(500, "Invalid argument, rejected.");
-					usedefault = 1;
-					goto eprt_done;
-				}
-				*q++ = '\0';
-				result[i] = p;
-				p = q;
-			}
-
-			/* some more sanity check */
-			p = NULL;
-			proto = strtoul(result[0], &p, 10);
-			if (*result[0] && !*p)
-				;
-			else {
-		protounsupp:
-				protounsupp();
-				usedefault = 1;
-				goto eprt_done;
-			}
-			p = result[2];
-			while (*p) {
-				if (!isdigit(*p))
-					goto parsefail;
-				p++;
-			}
-
-			memset(&hints, 0, sizeof(hints));
-			switch (proto) {
-			case 1:
-				hints.ai_family = PF_INET;
-				break;
-			case 2:
-				hints.ai_family = PF_INET6;
-				break;
-			default:
-				/* XXX other protocol families? */
-				goto protounsupp;
-			}
-			hints.ai_socktype = SOCK_STREAM;
-			hints.ai_flags = AI_NUMERICHOST;	/*no DNS*/
-			if (getaddrinfo(result[1], result[2], &hints, &res))
-				goto parsefail;
-			if (res->ai_next)
-				goto protounsupp;
-			if (sizeof(data_dest) < res->ai_addrlen)
-				goto parsefail;
-			memcpy(&data_dest, res->ai_addr, res->ai_addrlen);
-			if (data_dest.su_family == AF_INET6) {
-				/* protocol does not allow scope id */
-				if (data_dest.su_sin6.sin6_scope_id != 0 ||
-				    his_addr.su_family != AF_INET6)
-					goto parsefail;
-				data_dest.su_sin6.sin6_scope_id =
-					his_addr.su_sin6.sin6_scope_id;
-			}
-			/* be paranoid, if told so */
-			if (curclass.checkportcmd) {
-				int fail;
-				fail = 0;
-				if (ntohs(data_dest.su_port) < IPPORT_RESERVED)
-					fail++;
-				if (data_dest.su_family != his_addr.su_family)
-					fail++;
-				if (data_dest.su_len != his_addr.su_len)
-					fail++;
-				switch (data_dest.su_family) {
-				case AF_INET:
-					fail += memcmp(&data_dest.su_sin.sin_addr,
-					    &his_addr.su_sin.sin_addr,
-					    sizeof(data_dest.su_sin.sin_addr));
-					break;
-				case AF_INET6:
-					fail += memcmp(&data_dest.su_sin6.sin6_addr,
-					    &his_addr.su_sin6.sin6_addr,
-					    sizeof(data_dest.su_sin6.sin6_addr));
-					/*
-					 * no need to check scope id,
-					 * we have copied them
-					 */
-					break;
-				default:
-					fail++;
-				}
-				if (fail)
-					goto parsefail;
-			}
-			if (pdata >= 0) {
-				(void) close(pdata);
-				pdata = -1;
-			}
-			reply(200, "EPRT command successful.");
-		eprt_done:;
-			if (res)
-				freeaddrinfo(res);
-			if (tmp)
-				free(tmp);
 		}
 
 	| PASV check_login CRLF
 		{
-			if (curclass.passive) {
+			if (curclass.passive)
 				passive();
-			} else {
+			else
 				reply(500, "PASV mode not available.");
-			}
 		}
 
 	| LPSV CRLF
@@ -433,17 +300,7 @@ cmd
 
 	| EPSV SP NUMBER CRLF
 		{
-			switch ($3) {
-			case 1:
-				long_passive("EPSV", PF_INET);
-				break;
-			case 2:
-				long_passive("EPSV", PF_INET6);
-				break;
-			default:
-				protounsupp();
-				break;
-			}
+			long_passive("EPSV", epsvproto2af($3));
 		}
 
 	| EPSV SP ALL CRLF

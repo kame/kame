@@ -518,7 +518,7 @@ user(name)
 
 #ifdef SKEY
 	if (skey_haskey(name) == 0) {
-		char *myskey;
+		const char *myskey;
 
 		myskey = skey_keyinfo(name);
 		reply(331, "Password [%s] required for %s.",
@@ -1788,11 +1788,66 @@ pasv_error:
 }
 
 /*
+ * convert protocol identifier to/from AF
+ */
+int
+lpsvproto2af(int proto)
+{
+
+	switch (proto) {
+	case 4:	return AF_INET;
+#ifdef INET6
+	case 6:	return AF_INET6;
+#endif
+	default: return -1;
+	}
+}
+
+int
+af2lpsvproto(int af)
+{
+
+	switch (af) {
+	case AF_INET:	return 4;
+#ifdef INET6
+	case AF_INET6:	return 6;
+#endif
+	default:	return -1;
+	}
+}
+
+int
+epsvproto2af(int proto)
+{
+
+	switch (proto) {
+	case 1:	return AF_INET;
+#ifdef INET6
+	case 2:	return AF_INET6;
+#endif
+	default: return -1;
+	}
+}
+
+int
+af2epsvproto(int af)
+{
+
+	switch (af) {
+	case AF_INET:	return 1;
+#ifdef INET6
+	case AF_INET6:	return 2;
+#endif
+	default:	return -1;
+	}
+}
+
+/*
  * 228 Entering Long Passive Mode (af, hal, h1, h2, h3,..., pal, p1, p2...)
  * 229 Entering Extended Passive Mode (|||port|)
  */
 void
-long_passive(char *cmd, int pf)
+long_passive(const char *cmd, int pf)
 {
 	int len;
 	register char *p, *a;
@@ -1803,31 +1858,17 @@ long_passive(char *cmd, int pf)
 		return;
 	}
 
-	if (pf != PF_UNSPEC) {
-		if (ctrl_addr.su_family != pf) {
-			switch (ctrl_addr.su_family) {
-			case AF_INET:
-				pf = 1;
-				break;
-			case AF_INET6:
-				pf = 2;
-				break;
-			default:
-				pf = 0;
-				break;
-			}
-			/*
-			 * XXX
-			 * only EPRT/EPSV ready clients will understand this
-			 */
-			if (strcmp(cmd, "EPSV") == 0 && pf) {
-				reply(522, "Network protocol mismatch, "
-					    "use (%d)", pf);
-			} else
-				reply(501, "Network protocol mismatch"); /*XXX*/
+	if (pf != PF_UNSPEC && ctrl_addr.su_family != pf) {
+		/*
+		 * XXX
+		 * only EPRT/EPSV ready clients will understand this
+		 */
+		if (strcmp(cmd, "EPSV") != 0)
+			reply(501, "Network protocol mismatch"); /*XXX*/
+		else
+			epsv_protounsupp("Network protocol mismatch");
 
-			return;
-		}
+		return;
 	}
  		
 	if (pdata >= 0)
@@ -1894,29 +1935,150 @@ long_passive(char *cmd, int pf)
 }
 
 /*
- * 522 Protocol not supported (proto,...)
+ * EPRT |proto|addr|port|
  */
 void
-protounsupp()
+extended_port(const char *arg)
 {
-	int proto[] = { 0, AF_INET, AF_INET6, 0 };
-	int *p;
-	unsigned long bitmap = 0;
-	int s;
+	char *tmp = NULL;
+	char *result[3];
+	char *p, *q;
+	char delim;
+	struct addrinfo hints;
+	struct addrinfo *res = NULL;
+	int i;
+	unsigned long proto;
 
-	for (p = &proto[1]; *p; p++) {
-		s = socket(*p, SOCK_STREAM, 0);
-		if (s >= 0) {
-			bitmap |= 1 << (p - &proto[0]);
-			close(s);
-		}
+	if (epsvall) {
+		reply(501, "EPRT disallowed after EPSV ALL");
+		return;
 	}
 
-	/* XXX should be generalized */
-	reply(522, "Protocol not supported, use (%s%s%s)",
-	    (bitmap & (1 << 1)) ? "1" : "",
-	    (bitmap & ((1 << 1) | (1 << 2))) ? "," : "",
-	    (bitmap & (1 << 2)) ? "2" : "");
+	usedefault = 0;
+	if (pdata >= 0) {
+		(void) close(pdata);
+		pdata = -1;
+	}
+
+	tmp = strdup(arg);
+	if (!tmp) {
+		fatal("not enough core.");
+		/*NOTREACHED*/
+	}
+	p = tmp;
+	delim = p[0];
+	p++;
+	memset(result, 0, sizeof(result));
+	for (i = 0; i < 3; i++) {
+		q = strchr(p, delim);
+		if (!q || *q != delim)
+			goto parsefail;
+		*q++ = '\0';
+		result[i] = p;
+		p = q;
+	}
+
+	/* some more sanity check */
+	p = NULL;
+	(void)strtoul(result[2], &p, 10);
+	if (!*result[2] || *p)
+		goto protounsupp;
+	p = NULL;
+	proto = strtoul(result[0], &p, 10);
+	if (!*result[0] || *p)
+		goto protounsupp;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = epsvproto2af((int)proto);
+	if (hints.ai_family < 0)
+		goto protounsupp;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_NUMERICHOST;	/*no DNS*/
+	if (getaddrinfo(result[1], result[2], &hints, &res))
+		goto parsefail;
+	if (res->ai_next)
+		goto parsefail;
+	if (sizeof(data_dest) < res->ai_addrlen)
+		goto parsefail;
+	memcpy(&data_dest, res->ai_addr, res->ai_addrlen);
+	if (data_dest.su_family == AF_INET6) {
+		/* protocol does not allow scope id */
+		if (data_dest.su_sin6.sin6_scope_id != 0 ||
+		    his_addr.su_family != AF_INET6)
+			goto parsefail;
+		data_dest.su_sin6.sin6_scope_id =
+			his_addr.su_sin6.sin6_scope_id;
+	}
+	/* be paranoid, if told so */
+	if (curclass.checkportcmd) {
+		int fail;
+		fail = 0;
+		if (ntohs(data_dest.su_port) < IPPORT_RESERVED)
+			fail++;
+		if (data_dest.su_family != his_addr.su_family)
+			fail++;
+		if (data_dest.su_len != his_addr.su_len)
+			fail++;
+		switch (data_dest.su_family) {
+		case AF_INET:
+			fail += memcmp(&data_dest.su_sin.sin_addr,
+			    &his_addr.su_sin.sin_addr,
+			    sizeof(data_dest.su_sin.sin_addr));
+			break;
+		case AF_INET6:
+			fail += memcmp(&data_dest.su_sin6.sin6_addr,
+			    &his_addr.su_sin6.sin6_addr,
+			    sizeof(data_dest.su_sin6.sin6_addr));
+			/*
+			 * no need to check scope id,
+			 * we have copied them
+			 */
+			break;
+		default:
+			fail++;
+		}
+		if (fail)
+			goto parsefail;
+	}
+	if (pdata >= 0) {
+		(void) close(pdata);
+		pdata = -1;
+	}
+	reply(200, "EPRT command successful.");
+
+eprt_done:;
+	if (res)
+		freeaddrinfo(res);
+	if (tmp)
+		free(tmp);
+	return;
+
+parsefail:
+	reply(500, "Invalid argument, rejected.");
+	usedefault = 1;
+	goto eprt_done;
+protounsupp:
+	epsv_protounsupp("Protocol not supported");
+	usedefault = 1;
+	goto eprt_done;
+}
+
+/*
+ * 522 Protocol not supported (proto,...)
+ * as we assume ctrl_addr and data_addr are the same, we do not return the
+ * list of address families we support - instead, we return the address family
+ * of the control connection.
+ */
+void
+epsv_protounsupp(const char *message)
+{
+	int proto;
+
+	proto = af2epsvproto(ctrl_addr.su_family);
+	if (proto < 0)
+		reply(501, "%s", message);	/*XXX*/
+	else
+		reply(522, "%s, use (%d)", message, proto);
 }
 
 /*
