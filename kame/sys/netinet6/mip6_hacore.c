@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.13 2003/08/14 15:29:37 t-momose Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.14 2003/08/28 07:25:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -103,12 +103,9 @@ mip6_process_hrbu(bi)
 	bi->mbc_status = IP6MA_STATUS_ACCEPTED;
 
 	/* find the home ifp of this homeaddress. */
-	for (pr = nd_prefix.lh_first;
-	    pr;
-	    pr = pr->ndpr_next) {
+	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
 		if (in6_are_prefix_equal(&bi->mbc_phaddr.sin6_addr,
-					 &pr->ndpr_prefix.sin6_addr,
-					 pr->ndpr_plen)) {
+			&pr->ndpr_prefix.sin6_addr, pr->ndpr_plen)) {
 			hifp = pr->ndpr_ifp; /* home ifp. */
 			prlifetime = pr->ndpr_vltime;
 		}
@@ -125,9 +122,7 @@ mip6_process_hrbu(bi)
 
 	/* find the link-local prefix of the home ifp. */
 	if ((bi->mbc_flags & IP6MU_LINK) != 0) {
-		for (pr = nd_prefix.lh_first;
-		     pr;
-		     pr = pr->ndpr_next) {
+		for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
 			if (hifp != pr->ndpr_ifp) {
 				/* this prefix is not a home prefix. */
 				continue;
@@ -143,9 +138,8 @@ mip6_process_hrbu(bi)
 	if (prlifetime < 4) {	/* lifetime in units of 4 sec */
 		/* XXX BA's lifetime is zero */
 		mip6log((LOG_ERR,
-			 "%s:%d: invalid prefix lifetime %lu sec(s).",
-			 __FILE__, __LINE__,
-			 (u_long)prlifetime));
+		    "%s:%d: invalid prefix lifetime %lu sec(s).",
+		    __FILE__, __LINE__, (u_long)prlifetime));
 		bi->mbc_status = IP6MA_STATUS_UNSPECIFIED;
 		bi->mbc_send_ba = 1;
 		bi->mbc_lifetime = 0;
@@ -157,9 +151,8 @@ mip6_process_hrbu(bi)
 		/* XXX lifetime > DAD timer */
 		/* XXX lifetime > 4 (units of 4 secs) */
 		mip6log((LOG_ERR,
-			 "%s:%d: invalid lifetime %lu sec(s).",
-			 __FILE__, __LINE__,
-			 (u_long)bi->mbc_lifetime));
+		    "%s:%d: invalid lifetime %lu sec(s).",
+		    __FILE__, __LINE__, (u_long)bi->mbc_lifetime));
 		return (0); /* XXX is 0 OK? */
 	}
 
@@ -180,8 +173,7 @@ mip6_process_hrbu(bi)
 	 */
 	if ((bi->mbc_flags & IP6MU_LINK) != 0 && llpr != NULL) {
 		mip6_create_addr(&lladdr,
-				 (const struct sockaddr_in6 *)&bi->mbc_phaddr,
-				 llpr);
+		    (const struct sockaddr_in6 *)&bi->mbc_phaddr, llpr);
 		llmbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &lladdr);
 		if (llmbc == NULL) {
 			/*

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.33 2003/08/27 11:53:04 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.34 2003/08/28 07:25:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -312,13 +312,13 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 		if (hpfx != NULL)
 			is_home++;
 
+		/*
+		 * since the global address of a home agent is stored
+		 * in a prefix information option, we can reuse
+		 * prefix_sa as a key to search a mip6_ha entry.
+		 */
 		if (ndopt_pi->nd_opt_pi_flags_reserved
 		    & ND_OPT_PI_FLAG_ROUTER) {
-			bzero(&prefix_sa, sizeof(prefix_sa));
-			prefix_sa.sin6_family = AF_INET6;
-			prefix_sa.sin6_len = sizeof(prefix_sa);
-			prefix_sa.sin6_addr = ndopt_pi->nd_opt_pi_prefix;
-			/* XXX scope? */
 			hpfx = hif_prefix_list_find_withhaaddr(
 			    &sc->hif_prefix_list_home, &prefix_sa);
 			if (hpfx != NULL)
@@ -327,10 +327,10 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 	}
 
 	/* check if the router's lladdr is on our home agent list. */
-	hpfx = hif_prefix_list_find_withhaaddr(&sc->hif_prefix_list_home,
-	    rtaddr);
+	if (hif_prefix_list_find_withhaaddr(&sc->hif_prefix_list_home, rtaddr))
+		is_home++;
 
-	if ((is_home != 0) || (hpfx != NULL)) {
+	if (is_home != 0) {
 		/* we are home. */
 		location = HIF_LOCATION_HOME;
 	} else {
@@ -511,7 +511,11 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 		haaddr.sin6_len = sizeof(haaddr);
 		haaddr.sin6_family = AF_INET6;
 		haaddr.sin6_addr = ndopt_pi->nd_opt_pi_prefix;
-		/* XXX scope. */
+		if (in6_addr2zoneid(m->m_pkthdr.rcvif, &haaddr.sin6_addr,
+		    &haaddr.sin6_scope_id))
+			continue;
+		if (in6_embedscope(&haaddr.sin6_addr, &haaddr))
+			continue;
 		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &haaddr);
 		if (mha) {
 			if (mha->mha_pref == 0 /* XXX */) {
@@ -603,27 +607,25 @@ int
 mip6_process_pfxlist_status_change(sc)
 	struct hif_softc *sc;
 {
-	struct mip6_prefix *mpfx;
+	struct hif_prefix *hpfx;
 	struct sockaddr_in6 hif_coa;
 	int error = 0;
 
-	sc->hif_location = HIF_LOCATION_UNKNOWN;
+	hif_coa = sc->hif_coa_ifa->ia_addr;
+	if (in6_addr2zoneid(sc->hif_coa_ifa->ia_ifp,
+		&hif_coa.sin6_addr, &hif_coa.sin6_scope_id)) {
+		/* must not happen. */
+	}
+	if (in6_embedscope(&hif_coa.sin6_addr, &hif_coa)) {
+		/* must not happen. */
+	}
 
-	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
-	    mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
-		if (hif_prefix_list_find_withmpfx(&sc->hif_prefix_list_home,
-		    mpfx) == NULL)
-			continue;
-		hif_coa = sc->hif_coa_ifa->ia_addr;
-		if (in6_addr2zoneid(sc->hif_coa_ifa->ia_ifp,
-		    &hif_coa.sin6_addr,	&hif_coa.sin6_scope_id)) {
-			/* must not happen. */
-		}
-		if (in6_embedscope(&hif_coa.sin6_addr, &hif_coa)) {
-		    /* must not happen. */
-		}
+	sc->hif_location = HIF_LOCATION_UNKNOWN;
+	for (hpfx = LIST_FIRST(&sc->hif_prefix_list_home); hpfx;
+	    hpfx = LIST_NEXT(hpfx, hpfx_entry)) {
 		if (in6_are_prefix_equal(&hif_coa.sin6_addr,
-		    &mpfx->mpfx_prefix.sin6_addr, mpfx->mpfx_prefixlen)) {
+		    &hpfx->hpfx_mpfx->mpfx_prefix.sin6_addr,
+		    hpfx->hpfx_mpfx->mpfx_prefixlen)) {
 			sc->hif_location = HIF_LOCATION_HOME;
 			goto i_know_where_i_am;
 		}
@@ -631,7 +633,8 @@ mip6_process_pfxlist_status_change(sc)
 	sc->hif_location = HIF_LOCATION_FOREIGN;
  i_know_where_i_am:
 	mip6log((LOG_INFO,
-	    "location = %d\n", sc->hif_location));
+	    "mip6_process_pfxlist_status_change: %s location = %d\n",
+	    if_name((struct ifnet *)sc), sc->hif_location));
 
 	/*
 	 * configure home addresses according to the home
@@ -640,7 +643,8 @@ mip6_process_pfxlist_status_change(sc)
 	error = mip6_haddr_config(sc);
 	if (error) {
 		mip6log((LOG_ERR,
-		    "%s:%d: home address configuration error.\n",
+		    "mip6_process_pfxlist_status_change: "
+		    "home address configuration error.\n",
 		     __FILE__, __LINE__));
 		return (error);
 	}
