@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1325 2000/10/07 13:08:21 itojun Exp $
+$KAME: CHANGELOG,v 1.1326 2000/10/09 18:50:36 sumikawa Exp $
 
 <200010>
 Sat Oct  7 16:01:12 JST 2000  itojun@iijlab.net
@@ -36,6 +36,9 @@ Wed Oct  4 07:30:10 JST 2000  itojun@iijlab.net
 
 Wed Oct  4 00:29:42 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/lftp: upgrade to 2.3.3.
+	* freebsd3/ports/{libpcap,tcpdump}: upgrade to 2000/10/02
+	  weekly snap.
+	* freebsd3/ports/wu-ftpd: upgrade to 2.6.1.
 
 Tue Oct  3 JST 2000  itojun@iijlab.net
 	* libipsec/pfkey.c: tighten header chasing.  we should change some
