@@ -87,7 +87,7 @@ static void set_metric __P((char *, int));
 static void newroute __P((int, char **));
 static void inet_makenetandmask __P((u_int32_t, struct sockaddr_in *));
 #ifdef INET6
-static void inet6_makenetandmask __P((struct sockaddr_in6 *));
+static int inet6_makenetandmask __P((struct sockaddr_in6 *));
 #endif
 static int getaddr __P((int, char *, struct hostent **));
 static void flushroutes __P((int, char *[]));
