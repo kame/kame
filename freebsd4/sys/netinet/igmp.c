@@ -371,9 +371,9 @@ igmp_get_router_alert(m)
 }
 
 void
-igmp_input(m, off, proto)
+igmp_input(m, off)
 	register struct mbuf *m;
-	int off, proto;
+	int off;
 {
 	register int iphlen = off;
 	register struct igmp *igmp;
@@ -676,7 +676,7 @@ igmpv3_query:
 	 * Pass all valid IGMP packets up to any process(es) listening
 	 * on a raw IGMP socket.
 	 */
-	rip_input(m, off, proto);
+	rip_input(m, off);
 }
 
 void

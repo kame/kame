@@ -167,7 +167,7 @@ extern	struct router_info *Head;
 
 void	igmp_init __P((void));
 struct	router_info * rti_init __P((struct ifnet *));
-void	igmp_input __P((struct mbuf *, int, int));
+void	igmp_input __P((struct mbuf *, int));
 void	igmp_joingroup __P((struct in_multi *));
 void	igmp_leavegroup __P((struct in_multi *));
 void	igmp_sendbuf __P((struct mbuf *, struct ifnet *));

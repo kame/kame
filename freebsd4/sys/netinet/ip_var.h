@@ -244,10 +244,10 @@ int	ip_getmopt_msflist(struct sock_msf *, u_int16_t *,
 int	rip_ctloutput(struct socket *, struct sockopt *);
 void	rip_ctlinput(int, struct sockaddr *, void *);
 void	rip_init(void);
-void	rip_input(struct mbuf *, int, int);
+void	rip_input(struct mbuf *, int);
 int	rip_output(struct mbuf *, struct socket *, u_long);
-void	ipip_input(struct mbuf *, int, int);
-void	rsvp_input(struct mbuf *, int, int);
+void	ipip_input(struct mbuf *, int);
+void	rsvp_input(struct mbuf *, int);
 int	ip_rsvp_init(struct socket *);
 int	ip_rsvp_done(void);
 int	ip_rsvp_vif_init(struct socket *, struct sockopt *);
