@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.169 2001/07/23 14:07:28 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.170 2001/07/23 15:13:27 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -934,7 +934,7 @@ nd6_lookup(addr6, create, ifp)
 				return(NULL);
 
 			/*
-			 * Create a new route. RTF_LLINFO is necessary
+			 * Create a new route.  RTF_LLINFO is necessary
 			 * to create a Neighbor Cache entry for the
 			 * destination in nd6_rtrequest which will be
 			 * called in rtequest via ifa->ifa_rtrequest.
@@ -1057,7 +1057,7 @@ nd6_free(rt, gc)
 	struct nd_defrouter *dr;
 
 	/*
-	 * we used to have pfctlinput(PRC_HOSTDEAD) here. 
+	 * we used to have pfctlinput(PRC_HOSTDEAD) here.
 	 * even though it is not harmful, it was not really necessary.
 	 */
 
@@ -1083,7 +1083,7 @@ nd6_free(rt, gc)
 			 * thing, especially when we're using router preference
 			 * values.
 			 * XXX: the check for ln_state would be redundant,
-			 *      but we intentionally keep it just in case. 
+			 *      but we intentionally keep it just in case.
 			 */
 			ln->ln_expire = dr->expire;
 			splx(s);
@@ -1133,7 +1133,7 @@ nd6_free(rt, gc)
 	 * Before deleting the entry, remember the next entry as the
 	 * return value.  We need this because pfxlist_onlink_check() above
 	 * might have freed other entries (particularly the old next entry) as
-	 * a side effect (XXX). 
+	 * a side effect (XXX).
 	 */
 	next = ln->ln_next;
 
@@ -1251,7 +1251,7 @@ nd6_rtrequest(req, rt, sa)
 		if (rt->rt_flags & (RTF_CLONING | RTF_LLINFO)) {
 			/*
 			 * Case 1: This route should come from
-			 * a route to interface. RTF_LLINFO flag is set
+			 * a route to interface.  RTF_LLINFO flag is set
 			 * for a host route whose destination should be
 			 * treated as on-link.
 			 */
@@ -1642,7 +1642,7 @@ nd6_ioctl(cmd, data, ifp)
 
 			/* do we really have to remove addresses as well? */
 			for (ia = in6_ifaddr; ia; ia = ia_next) {
-				/* ia might be removed. keep the next ptr. */
+				/* ia might be removed.  keep the next ptr. */
 				ia_next = ia->ia_next;
 
 				if ((ia->ia6_flags & IN6_IFF_AUTOCONF) == 0)
@@ -1735,7 +1735,7 @@ nd6_ioctl(cmd, data, ifp)
 
 /*
  * Create neighbor cache entry and cache link-layer address,
- * on reception of inbound ND6 packets. (RS/RA/NS/redirect)
+ * on reception of inbound ND6 packets.  (RS/RA/NS/redirect)
  */
 struct rtentry *
 nd6_cache_lladdr(ifp, from, lladdr, lladdrlen, type, code)
@@ -1925,8 +1925,8 @@ fail:
 	case ND_REDIRECT:
 		/*
 		 * If the icmp is a redirect to a better router, always set the
-		 * is_router flag. Otherwise, if the entry is newly created,
-		 * clear the flag. [RFC 2461, sec 8.3]
+		 * is_router flag.  Otherwise, if the entry is newly created,
+		 * clear the flag.  [RFC 2461, sec 8.3]
 		 */
 		if (code == ND_REDIRECT_ROUTER)
 			ln->ln_router = 1;
@@ -2036,7 +2036,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 		goto sendpkt;
 
 	/*
-	 * next hop determination. This routine is derived from ether_outpout.
+	 * next hop determination.  This routine is derived from ether_outpout.
 	 */
 	if (rt) {
 		if ((rt->rt_flags & RTF_UP) == 0) {
@@ -2121,7 +2121,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	else {
 		/*
 		 * Since nd6_is_addr_neighbor() internally calls nd6_lookup(),
-		 * the condition below is not very efficient. But we believe
+		 * the condition below is not very efficient.  But we believe
 		 * it is tolerable, because this should be a rare case.
 		 */
 		if (nd6_is_addr_neighbor(dst, ifp) &&
@@ -2171,7 +2171,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 
 	/*
 	 * There is a neighbor cache entry, but no ethernet address
-	 * response yet. Replace the held mbuf (if any) with this
+	 * response yet.  Replace the held mbuf (if any) with this
 	 * latest one.
 	 *
 	 * XXX Does the code conform to rate-limiting rule?
