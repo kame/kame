@@ -908,7 +908,7 @@ ip_dooptions(m)
 				break;
 			}
 			off--;			/* 0 origin */
-			if (off > optlen - sizeof(struct in_addr)) {
+			if ((off + sizeof(struct in_addr)) > optlen) {
 				/*
 				 * End of source route.  Should be for us.
 				 */
@@ -953,7 +953,7 @@ ip_dooptions(m)
 			 * If no space remains, ignore.
 			 */
 			off--;			/* 0 origin */
-			if (off > optlen - sizeof(struct in_addr))
+			if ((off + sizeof(struct in_addr)) > optlen)
 				break;
 			bcopy((caddr_t)(&ip->ip_dst), (caddr_t)&ipaddr.sin_addr,
 			    sizeof(ipaddr.sin_addr));

@@ -1212,7 +1212,7 @@ ip_dooptions(m)
 				break;
 			}
 			off--;			/* 0 origin */
-			if (off > optlen - sizeof(struct in_addr)) {
+			if ((off + sizeof(struct in_addr)) > optlen) {
 				/*
 				 * End of source route.  Should be for us.
 				 */
@@ -1283,7 +1283,7 @@ nosourcerouting:
 			 * If no space remains, ignore.
 			 */
 			off--;			/* 0 origin */
-			if (off > optlen - sizeof(struct in_addr))
+			if ((off + sizeof(struct in_addr)) > optlen)
 				break;
 			(void)memcpy(&ipaddr.sin_addr, &ip->ip_dst,
 			    sizeof(ipaddr.sin_addr));
