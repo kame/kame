@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.58 2001/07/24 13:06:40 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.59 2001/07/24 13:34:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -452,7 +452,6 @@ gif_encapcheck4(m, off, proto, arg)
 	struct ip ip;
 	struct gif_softc *sc;
 	struct sockaddr_in *src, *dst;
-	int addrmatch;
 	struct in_ifaddr *ia4;
 
 	/* sanity check done in caller */
@@ -464,12 +463,8 @@ gif_encapcheck4(m, off, proto, arg)
 	m_copydata((struct mbuf *)m, 0, sizeof(ip), (caddr_t)&ip);
 
 	/* check for address match */
-	addrmatch = 0;
-	if (src->sin_addr.s_addr == ip.ip_dst.s_addr)
-		addrmatch |= 1;
-	if (dst->sin_addr.s_addr == ip.ip_src.s_addr)
-		addrmatch |= 2;
-	if (addrmatch != 3)
+	if (src->sin_addr.s_addr != ip.ip_dst.s_addr ||
+	    dst->sin_addr.s_addr != ip.ip_src.s_addr)
 		return 0;
 
 	/* martian filters on outer source - NOT done in ip_input! */

@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.54 2001/07/24 13:17:07 sakane Exp $	*/
+/*	$KAME: in6_gif.c,v 1.55 2001/07/24 13:34:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -445,7 +445,6 @@ gif_encapcheck6(m, off, proto, arg)
 	struct ip6_hdr ip6;
 	struct gif_softc *sc;
 	struct sockaddr_in6 *src, *dst;
-	int addrmatch;
 
 	/* sanity check done in caller */
 	sc = (struct gif_softc *)arg;
@@ -456,12 +455,8 @@ gif_encapcheck6(m, off, proto, arg)
 	m_copydata((struct mbuf *)m, 0, sizeof(ip6), (caddr_t)&ip6);
 
 	/* check for address match */
-	addrmatch = 0;
-	if (IN6_ARE_ADDR_EQUAL(&src->sin6_addr, &ip6.ip6_dst))
-		addrmatch |= 1;
-	if (IN6_ARE_ADDR_EQUAL(&dst->sin6_addr, &ip6.ip6_src))
-		addrmatch |= 2;
-	if (addrmatch != 3)
+	if (!IN6_ARE_ADDR_EQUAL(&src->sin6_addr, &ip6.ip6_dst) ||
+	    !IN6_ARE_ADDR_EQUAL(&dst->sin6_addr, &ip6.ip6_src))
 		return 0;
 
 	/* martian filters on outer source - done in ip6_input */
