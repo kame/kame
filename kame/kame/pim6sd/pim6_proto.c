@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.61 2003/05/09 04:16:17 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.62 2003/08/10 17:02:41 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -3943,7 +3943,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 		group_.sin6_scope_id = inet6_uvif2scopeid(&group_,v);
 	
 		add_rp_grp_entry(&cand_rp_list, &grp_mask_list,
-				 &rpp_, curr_rp_priority,
+				 &rpp_, curr_rp_priority, RP_ORIGIN_BSR,
 				 curr_rp_holdtime, &group_,
 				 curr_group_mask,
 				 curr_bsr_hash_mask,
@@ -4000,6 +4000,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 				 &grp_mask_list,
 				 &rpp_,
 				 curr_rp_priority,
+				 RP_ORIGIN_BSR,
 				 curr_rp_holdtime,
 				 &group_,
 				 curr_group_mask,
@@ -4017,6 +4018,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 				 &grp_mask_list,
 				 &grp_rp_entry_ptr->rp->rpentry->address,
 				 grp_rp_entry_ptr->priority,
+				 RP_ORIGIN_BSR,
 				 grp_rp_entry_ptr->holdtime,
 				 &group_,
 				 curr_group_mask,
@@ -4047,6 +4049,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 				 &segmented_grp_mask_list,
 				 &rpp_,
 				 curr_rp_priority,
+				 RP_ORIGIN_BSR,
 				 curr_rp_holdtime,
 				 &group_,
 				 curr_group_mask,
@@ -4210,7 +4213,7 @@ receive_pim6_cand_rp_adv(src, dst, pim_message, datalen)
 	 * the address should be global(see above).
 	 */
 	add_rp_grp_entry(&cand_rp_list, &grp_mask_list,
-			 &rpp_, priority, holdtime,
+			 &rpp_, priority, RP_ORIGIN_BSR, holdtime,
 			 &sockaddr6_d, grp_mask,
 			 my_bsr_hash_mask,
 			 curr_bsr_fragment_tag);
@@ -4240,7 +4243,7 @@ receive_pim6_cand_rp_adv(src, dst, pim_message, datalen)
 	    /* see above note on scope id */
 
 	    add_rp_grp_entry(&cand_rp_list, &grp_mask_list,
-			     &rpp_, priority, holdtime,
+			     &rpp_, priority, RP_ORIGIN_BSR, holdtime,
 			     &group_, grp_mask,
 			     my_bsr_hash_mask,
 			     curr_bsr_fragment_tag);
@@ -4271,6 +4274,7 @@ send_pim6_cand_rp_adv()
 	    MASKLEN_TO_MASK6(ALL_MCAST_GROUPS_LENGTH, grp_mask);
 	    add_rp_grp_entry(&cand_rp_list, &grp_mask_list,
 			     &my_cand_rp_address, my_cand_rp_priority,
+			     RP_ORIGIN_BSR,
 			     my_cand_rp_holdtime,
 			     &sockaddr6_d,
 			     grp_mask,
@@ -4291,6 +4295,7 @@ send_pim6_cand_rp_adv()
 		add_rp_grp_entry(&cand_rp_list,
 			     &grp_mask_list,
 			     &my_cand_rp_address, my_cand_rp_priority,
+			     RP_ORIGIN_BSR,
 			     my_cand_rp_holdtime,
 			     &group_, grp_mask,
 			     my_bsr_hash_mask,

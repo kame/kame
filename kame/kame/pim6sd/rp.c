@@ -1,4 +1,4 @@
-/*	$KAME: rp.c,v 1.27 2003/08/07 20:22:48 suz Exp $	*/
+/*	$KAME: rp.c,v 1.28 2003/08/10 17:02:41 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -514,13 +514,14 @@ add_grp_mask(used_grp_mask_list, group_addr, group_mask, hash_mask)
  */
 rp_grp_entry_t *
 add_rp_grp_entry(used_cand_rp_list, used_grp_mask_list,
-		 rp_addr, rp_priority, rp_holdtime, group_addr, group_mask,
-		 bsr_hash_mask,
-		 fragment_tag)
+		 rp_addr, rp_priority, rp_origin, rp_holdtime,
+		 group_addr, group_mask,
+		 bsr_hash_mask, fragment_tag)
     cand_rp_t     	**used_cand_rp_list;
     grp_mask_t    	**used_grp_mask_list;
     struct sockaddr_in6	*rp_addr;
     u_int8          	rp_priority;
+    u_int8          	rp_origin;
     u_int16         	rp_holdtime;
     struct sockaddr_in6 *group_addr;
     struct in6_addr     group_mask;
@@ -535,6 +536,8 @@ add_rp_grp_entry(used_cand_rp_list, used_grp_mask_list,
     rp_grp_entry_t *grp_rp_entry_prev = (rp_grp_entry_t *) NULL;
     grpentry_t     *grpentry_ptr_prev;
     grpentry_t     *grpentry_ptr_next;
+    u_int8          old_highest_origin = ~0;	/* Smaller value means
+						 * "higher" */
     u_int8          old_highest_priority = ~0;	/* Smaller value means
 						 * "higher" */
 
@@ -543,9 +546,8 @@ add_rp_grp_entry(used_cand_rp_list, used_grp_mask_list,
 	return (rp_grp_entry_t *) NULL;
 
     if (!IN6_IS_ADDR_MULTICAST(&group_addr->sin6_addr))
-    {
 	return (rp_grp_entry_t *) NULL;
-    }
+
     grp_mask_ptr = add_grp_mask(used_grp_mask_list, group_addr, group_mask,
 				bsr_hash_mask);
     if (grp_mask_ptr == (grp_mask_t *) NULL)
@@ -588,8 +590,10 @@ add_rp_grp_entry(used_cand_rp_list, used_grp_mask_list,
 
     /* TODO: improve it */
 
-    if (grp_rp_entry_next != (rp_grp_entry_t *) NULL)
+    if (grp_rp_entry_next != (rp_grp_entry_t *) NULL) {
 	old_highest_priority = grp_rp_entry_next->priority;
+	old_highest_origin = grp_rp_entry_next->origin;
+    }
     for (; grp_rp_entry_next != (rp_grp_entry_t *) NULL;
 	 grp_rp_entry_prev = grp_rp_entry_next,
 	 grp_rp_entry_next = grp_rp_entry_next->grp_rp_next)
@@ -603,6 +607,16 @@ add_rp_grp_entry(used_cand_rp_list, used_grp_mask_list,
 	if (grp_rp_entry_next->priority > rp_priority)
 	    break;
 
+	/* 
+	 * If priority is same, determine the order by its origin; static-
+	 *  config is much more preferred to BSR-config.
+	 * (Smaller origin value means higher priority)
+	 */
+	if (grp_rp_entry_next->origin < rp_origin)
+	    continue;
+	if (grp_rp_entry_next->origin > rp_origin)
+	    break;
+		
 	/*
 	 * Here we don't care about higher/lower addresses, because higher
 	 * address does not guarantee higher hash_value, but anyway we do
@@ -653,6 +667,7 @@ add_rp_grp_entry(used_cand_rp_list, used_grp_mask_list,
 
     grp_rp_entry_new->holdtime = rp_holdtime;
     grp_rp_entry_new->advholdtime = rp_holdtime;
+    grp_rp_entry_new->origin = rp_origin;
     grp_rp_entry_new->fragment_tag = fragment_tag;
     grp_rp_entry_new->priority = rp_priority;
     grp_rp_entry_new->group = grp_mask_ptr;
@@ -661,15 +676,18 @@ add_rp_grp_entry(used_cand_rp_list, used_grp_mask_list,
 
     grp_mask_ptr->group_rp_number++;
 
-    if (grp_mask_ptr->grp_rp_next->priority == rp_priority)
+    if (grp_mask_ptr->grp_rp_next->priority == rp_priority ||
+	grp_mask_ptr->grp_rp_next->origin == rp_origin)
     {
-	/* The first entries are with the best priority. */
+	/* The first entries are with the best priority and origin. */
 	/* Adding this rp_grp_entry may result in group_to_rp remapping */
 	for (grp_rp_entry_next = grp_mask_ptr->grp_rp_next;
 	     grp_rp_entry_next != (rp_grp_entry_t *) NULL;
 	     grp_rp_entry_next = grp_rp_entry_next->grp_rp_next)
 	{
 	    if (grp_rp_entry_next->priority > old_highest_priority)
+		break;
+	    if (grp_rp_entry_next->origin > old_highest_origin)
 		break;
 	    for (grpentry_ptr_prev = grp_rp_entry_next->grplink;
 		 grpentry_ptr_prev != (grpentry_t *) NULL;)
@@ -1119,6 +1137,7 @@ rp_grp_match(group)
     rp_grp_entry_t *grp_rp_entry_ptr;
     rp_grp_entry_t *best_entry = (rp_grp_entry_t *) NULL;
     u_int8          best_priority = ~0;	/* Smaller is better */
+    u_int8          best_origin = ~0;	/* Smaller is better */
     u_int32         best_hash_value = 0;	/* Bigger is better */
     struct sockaddr_in6         best_address_h;	/* Bigger is better */
     u_int32         curr_hash_value = 0;
@@ -1158,6 +1177,10 @@ rp_grp_match(group)
 	    if (best_priority < grp_rp_entry_ptr->priority)
 		break;
 
+	    if (best_priority == grp_rp_entry_ptr->priority &&
+	        best_origin < grp_rp_entry_ptr->origin)
+		break;
+
 	    curr_address_h = grp_rp_entry_ptr->rp->rpentry->address;
 #if 0
 	    curr_hash_value = RP_HASH_VALUE(crc((char *)&group->sin6_addr,
@@ -1182,8 +1205,8 @@ rp_grp_match(group)
 	    }
 #endif
 
-	    if (best_priority == grp_rp_entry_ptr->priority)
-	    {
+	    if (best_priority == grp_rp_entry_ptr->priority &&
+	        best_origin == grp_rp_entry_ptr->origin) {
 		/* Compare the hash_value and then the addresses */
 
 		if (curr_hash_value < best_hash_value)
@@ -1279,6 +1302,10 @@ create_pim6_bootstrap_message(send_buff)
 	     grp_rp_entry_ptr != (rp_grp_entry_t *) NULL;
 	     grp_rp_entry_ptr = grp_rp_entry_ptr->grp_rp_next)
 	{
+	    /* You don't have to redistribute Static-RP configuration by BSR */
+	    if (grp_rp_entry_ptr->origin != RP_ORIGIN_BSR)
+	    	continue;
+
 	    PUT_EUADDR6(grp_rp_entry_ptr->rp->rpentry->address.sin6_addr, data_ptr);
 	    PUT_HOSTSHORT(grp_rp_entry_ptr->advholdtime, data_ptr);
 	    PUT_BYTE(grp_rp_entry_ptr->priority, data_ptr);

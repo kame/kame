@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.32 2003/05/09 04:09:53 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.33 2003/08/10 17:02:41 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -950,7 +950,9 @@ static_rp_config()
 		MASKLEN_TO_MASK6(entry->plen, grp_mask);
 		MASKLEN_TO_MASK6(8, bsr_mask);	/* XXX */
 		add_rp_grp_entry(&cand_rp_list, &grp_mask_list,
-				 &entry->rpaddr, entry->priority, TIMER_INFINITY,
+				 &entry->rpaddr, entry->priority,
+				 RP_ORIGIN_STATIC,
+				 TIMER_INFINITY,
 				 &entry->paddr, grp_mask,
 				 bsr_mask, 0);
 	}

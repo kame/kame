@@ -1,6 +1,11 @@
-$KAME: CHANGELOG,v 1.2455 2003/08/10 16:58:33 suz Exp $
+$KAME: CHANGELOG,v 1.2456 2003/08/10 17:02:40 suz Exp $
 
 <200308>
+2003-08-11  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/kame/pim6sd/{cfparse.y, mrt.h, pim6_proto.c, rp.c}
+	Now static-RP configuration can work together with bootstrap-
+	message-based RP configuration
+
 2003-08-10  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/{freebsd5, kame}
 	sync with FreeBSD-5.1 RELEASE (behaviour is not confirmed yet)

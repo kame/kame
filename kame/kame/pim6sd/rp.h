@@ -1,4 +1,4 @@
-/*	$KAME: rp.h,v 1.7 2003/04/30 05:09:01 suz Exp $	*/
+/*	$KAME: rp.h,v 1.8 2003/08/10 17:02:41 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -99,6 +99,7 @@ extern rp_grp_entry_t *add_rp_grp_entry __P((cand_rp_t  **used_cand_rp_list,
                          grp_mask_t **used_grp_mask_list,
                          struct sockaddr_in6 *rp_addr,
                          u_int8  rp_priority,
+                         u_int8  rp_origin,
                          u_int16 rp_holdtime,
                          struct sockaddr_in6 *group_addr,
                          struct in6_addr group_mask,

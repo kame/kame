@@ -1,4 +1,4 @@
-/*	$KAME: mrt.h,v 1.13 2002/12/24 04:43:12 suz Exp $	*/
+/*	$KAME: mrt.h,v 1.14 2003/08/10 17:02:41 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -197,6 +197,13 @@ typedef struct rp_grp_entry {
 						 */
 	
 	u_int8			priority;	/* The RP priority */
+	u_int8			origin;		/* 
+						 * Where it's learned from
+						 * (smaller one is preferred) 
+						 */
+#define	RP_ORIGIN_STATIC 0
+#define	RP_ORIGIN_BSR    1
+
 	grp_mask_t 		*group;		/* Pointer to (group,mask) entry  */
 	cand_rp_t 		*rp;		/* Pointer to the RP */
 } rp_grp_entry_t;
