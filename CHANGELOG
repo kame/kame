@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1227 2000/08/23 09:18:34 kjc Exp $
+$KAME: CHANGELOG,v 1.1228 2000/08/23 13:42:47 sakane Exp $
 
 <200008>
+Wed Aug 23 22:42:19 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	Added the behavior of PFS selection in the case of "strict"/"claim".
+	If PFS is not required by the responder, the responder obeys the 
+	proposal.  If PFS is required by both sides and if the responder's
+	group is not equal to the initiator's one, then the responder reject
+	the proposal. 
+
 Wed Aug 23 18:13:50 JST 2000 kjc@csl.sony.co.jp
 	* add ALTQ support to the dc driver and ethernet bridging of openbsd.
 
