@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1586 2001/03/04 10:50:14 jinmei Exp $
+$KAME: CHANGELOG,v 1.1587 2001/03/04 22:21:18 itojun Exp $
 
 <200103>
+Mon Mar  5 JST 2001  itojun@iijlab.net
+	* sys/netinet6/raw_ip6.c: avoid 1-byte mbuf buffer overrun, and/or
+	  unalignmed memory access, in rip6_output().  commented by yoshfuji.
+	  it will be tickled only if a evil/buggy root process runs.
+
 2001-03-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_free): moved a line calling
 	pfxlist_onlink_check() before the default router selection part,
