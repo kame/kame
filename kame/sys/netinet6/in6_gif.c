@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.92 2002/02/03 08:09:32 jinmei Exp $	*/
+/*	$KAME: in6_gif.c,v 1.93 2002/02/03 08:27:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -606,42 +606,7 @@ in6_gif_ctlinput(cmd, sa, d)
 	void *d;
 {
 	struct gif_softc *sc;
-	struct ip6ctlparam *ip6cp = NULL;
-	struct mbuf *m;
-	struct ip6_hdr *ip6;
-	int off;
-	void *cmdarg;
-	const struct sockaddr_in6 *sa6_src = NULL;
 	struct sockaddr_in6 *dst6;
-
-	if (sa->sa_family != AF_INET6 ||
-	    sa->sa_len != sizeof(struct sockaddr_in6))
-		return;
-
-	if ((unsigned)cmd >= PRC_NCMDS)
-		return;
-	if (cmd == PRC_HOSTDEAD)
-		d = NULL;
-	else if (inet6ctlerrmap[cmd] == 0)
-		return;
-
-	/* if the parameter is from icmp6, decode it. */
-	if (d != NULL) {
-		ip6cp = (struct ip6ctlparam *)d;
-		m = ip6cp->ip6c_m;
-		ip6 = ip6cp->ip6c_ip6;
-		off = ip6cp->ip6c_off;
-		cmdarg = ip6cp->ip6c_cmdarg;
-		sa6_src = ip6cp->ip6c_src;
-	} else {
-		m = NULL;
-		ip6 = NULL;
-		cmdarg = NULL;
-		sa6_src = &sa6_any;
-	}
-
-	if (!ip6)
-		return;
 
 	/*
 	 * for now we don't care which type it was, just flush the route cache.
@@ -658,8 +623,14 @@ in6_gif_ctlinput(cmd, sa, d)
 			continue;
 
 		dst6 = (struct sockaddr_in6 *)&sc->gif_ro6.ro_dst;
-		/* XXX scope */
-		if (IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &dst6->sin6_addr)) {
+		if (
+#ifdef SCOPEDROUTING
+			SA6_ARE_ADDR_EQUAL((struct sockaddr_in6 *)sa, dst6)
+#else
+			IN6_ARE_ADDR_EQUAL(&((struct sockaddr_in6 *)sa)->sin6_addr,
+					   &dst6->sin6_addr)
+#endif
+			) {
 			/* flush route cache */
 			RTFREE(sc->gif_ro6.ro_rt);
 			sc->gif_ro6.ro_rt = NULL;
