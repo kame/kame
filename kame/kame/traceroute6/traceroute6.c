@@ -711,8 +711,8 @@ main(argc, argv)
 	Src.sin6_family = AF_INET6;
 	Src.sin6_port = htons(ident);
 	if (bind(sndsock, (struct sockaddr *)src, sizeof(Src))  < 0){
-		perror ("bind");
-		exit (1);
+		perror("bind");
+		exit(1);
 	}
 
 	/*
