@@ -1,9 +1,9 @@
-/*	$KAME: getaddrinfo.c,v 1.13 2000/04/26 15:41:49 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.14 2000/04/27 03:01:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -112,16 +112,9 @@ static const char in_addrany[] = { 0, 0, 0, 0 };
 static const char in6_addrany[] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
-static const char in_loopback[] = { 127, 0, 0, 1 }; 
+static const char in_loopback[] = { 127, 0, 0, 1 };
 static const char in6_loopback[] = {
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
-};
-
-struct sockinet {
-	u_char	si_len;
-	u_char	si_family;
-	u_short	si_port;
-	u_int32_t si_scope_id;
 };
 
 static const struct afd {
@@ -228,7 +221,7 @@ static int addrconfig __P((const struct addrinfo *));
 #endif
 #ifdef INET6
 static int ip6_str2scopeid __P((char *, struct sockaddr_in6 *));
-#endif 
+#endif
 
 static struct addrinfo *getanswer __P((const querybuf *, int, const char *, int,
 	const struct addrinfo *));
@@ -733,7 +726,7 @@ explore_numeric(pai, hostname, servname, res)
 				GET_PORT(cur->ai_next, servname);
 				while (cur && cur->ai_next)
 					cur = cur->ai_next;
-			} else 
+			} else
 				ERR(EAI_FAMILY);	/*xxx*/
 		}
 		break;
@@ -746,7 +739,7 @@ explore_numeric(pai, hostname, servname, res)
 				GET_PORT(cur->ai_next, servname);
 				while (cur && cur->ai_next)
 					cur = cur->ai_next;
-			} else 
+			} else
 				ERR(EAI_FAMILY);	/*xxx*/
 		}
 		break;
@@ -1047,7 +1040,7 @@ ip6_str2scopeid(scope, sin6)
 	else
 		return -1;
 }
-#endif 
+#endif
 
 /* code duplicate with gethnamaddr.c */
 
