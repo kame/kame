@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.323 2003/06/25 03:37:20 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.324 2003/06/25 06:10:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -55,6 +55,7 @@
 #include <sys/errno.h>
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/ioctl.h>
+#include <machine/limits.h>
 #endif
 #include <sys/syslog.h>
 #include <sys/queue.h>
