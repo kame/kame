@@ -2,7 +2,7 @@
 .include "${.CURDIR}/../../Makefile.opsys"
 .endif
 
-MAN=	gif.4 inet6.4 ipsec.4 kame.4 faith.4
+MAN=	gif.4 inet6.4 ipsec.4 kame.4 faith.4 icmp6.4
 
 .if (${OPSYS} != "NetBSD")
 MAN4=	$(MAN)
