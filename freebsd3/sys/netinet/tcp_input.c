@@ -705,7 +705,19 @@ findpcb:
 			m_freem(inp->in6p_options);
 			inp->in6p_options = 0;
 		}
+
+		/*
+		 * Temporarily re-adjusting the mbuf before ip6_savecontrol(),
+		 * which is necessary for FreeBSD only due to difference from
+		 * other BSD stacks.
+		 * XXX: we'll soon make a more natural fix after getting a
+		 *      consensus.
+		 */
+		m->m_data -= hdroptlen;
+		m->m_len  += hdroptlen;
 		ip6_savecontrol(inp, &inp->in6p_options, ip6, m);
+		m->m_data += hdroptlen;	/* XXX */
+		m->m_len  -= hdroptlen;	/* XXX */
 	}
 #endif /* INET6 */
 
@@ -843,9 +855,20 @@ findpcb:
 						m_freem(inp->in6p_options);
 						inp->in6p_options = 0;
 					}
+					/*
+					 * Temporarily re-adjusting the mbuf
+					 * before ip6_savecontrol().
+					 * XXX: we'll soon make a more natural
+					 * fix after getting a consensus.
+					 * (see above)
+					 */
+					m->m_data -= hdroptlen;
+					m->m_len  += hdroptlen;
 					ip6_savecontrol(inp,
 							&inp->in6p_options,
 							ip6, m);
+					m->m_data += hdroptlen;	/* XXX */
+					m->m_len  -= hdroptlen;	/* XXX */
 				}
 			} else
 #endif /* INET6 */
