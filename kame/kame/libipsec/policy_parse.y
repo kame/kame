@@ -1,4 +1,4 @@
-/*	$KAME: policy_parse.y,v 1.15 2003/10/02 19:37:49 itojun Exp $	*/
+/*	$KAME: policy_parse.y,v 1.16 2003/10/03 21:51:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -327,7 +327,7 @@ set_x_request(src, dst)
 		+ (dst ? dst->sa_len : 0);
 
 	n = realloc(pbuf, tlen + reqlen);
-	if (pbuf == NULL) {
+	if (n == NULL) {
 		__ipsec_errcode = EIPSEC_NO_BUFS;
 		return -1;
 	}
