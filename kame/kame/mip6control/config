@@ -30,7 +30,6 @@ tunnel_spi_ha_to_mn=2003
 tunnel_uid_mn_to_ha=2002
 tunnel_uid_ha_to_mn=2003
 tunnel_esp_algorithm=blowfish-cbc
-tunnel_esp_secret="THIS_IS_ESP_SECRET!!"
 tunnel_esp_secret=0x0001020304050607080900010203040506070809
 tunnel_auth_algorithm=hmac-sha1
 tunnel_auth_secret=0x0908070605040302010009080706050403020100
