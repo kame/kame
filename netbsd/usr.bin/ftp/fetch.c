@@ -672,6 +672,7 @@ fetch_url(url, proxyenv, proxyauth, wwwauth)
 			host = res0->ai_canonname;
 
 		reason = NULL;
+		s = -1;
 		for (res = res0; res; res = res->ai_next) {
 			if (getnameinfo(res->ai_addr, res->ai_addrlen,
 					hbuf, sizeof(hbuf), NULL, 0,
@@ -684,14 +685,20 @@ fetch_url(url, proxyenv, proxyauth, wwwauth)
 			s = socket(res->ai_family, res->ai_socktype,
 				res->ai_protocol);
 			if (s < 0) {
+				reason = "socket";
 				warn("Can't create socket");
 				continue;
 			}
 
 			if (xconnect(s, res->ai_addr, res->ai_addrlen) < 0) {
+				reason = "connect";
 				warn("Connect to address `%s'", hbuf);
 				close(s);
+				s = -1;
+				continue;
 			}
+
+			/* success */
 			break;
 		}
 		freeaddrinfo(res0);
