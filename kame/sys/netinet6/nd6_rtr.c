@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.132 2001/07/21 04:44:56 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.133 2001/07/21 09:29:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -829,12 +829,12 @@ defrouter_select()
 		installedpref = rtpref(TAILQ_FIRST(&nd_defrouter));
 		for (dr = TAILQ_FIRST(&nd_defrouter); dr;
 		     dr = TAILQ_NEXT(dr, dr_entry)) {
-			/* the list is sorted based on preference */
 			if (installedpref != rtpref(dr))
 				break;
 
 			if (!dr->installed)
 				defrouter_addreq(dr);
+			/* no need to defrouter_delreq(), it's already done */
 
 			if (dr->installed)
 				installcount++;
@@ -848,8 +848,6 @@ defrouter_select()
  empty:
 	if (installcount == 0) {
 		/*
-		 * The Default Router List is empty, so install the default
-		 * route to an interface.
 		 * XXX: The specification does not say this mechanism should
 		 * be restricted to hosts, but this would be not useful
 		 * (even harmful) for routers.
