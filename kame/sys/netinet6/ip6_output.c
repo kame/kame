@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.268 2001/12/25 01:39:36 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.269 2001/12/25 02:23:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2564,11 +2564,6 @@ do { \
 			case IPV6_RECVHOPOPTS:
 			case IPV6_RECVDSTOPTS:
 			case IPV6_RECVRTHDRDSTOPTS:
-				if (!privileged) {
-					error = EPERM;
-					break;
-				}
-				/* fall through */
 			case IPV6_UNICAST_HOPS:
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 			case IPV6_CHECKSUM:
