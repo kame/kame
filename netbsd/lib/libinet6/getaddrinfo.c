@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.30 2000/12/20 05:44:04 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.31 2000/12/20 06:11:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -102,6 +102,12 @@
 #include <rpcsvc/yp_prot.h>
 #include <rpcsvc/ypclnt.h>
 #endif
+
+/*
+ * if we enable it, we will see duplicated addrinfo entries on reply if both
+ * AAAA and A6 records are found.  disable it for default installation.
+ */
+#undef T_A6
 
 #define SUCCESS 0
 #define ANY 0
