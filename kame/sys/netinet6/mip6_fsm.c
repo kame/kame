@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.14 2002/11/01 03:31:30 keiichi Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.15 2002/11/01 05:57:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -65,6 +65,7 @@
 #include <netinet6/mip6.h>
 
 static int mip6_bu_pri_fsm(struct mip6_bu *, int, void *);
+static int mip6_bu_pri_fsm_home_registration(struct mip6_bu *);
 static int mip6_bu_sec_fsm(struct mip6_bu *, int, void *);
 static void mip6_bu_stop_timers(struct mip6_bu *);
 
