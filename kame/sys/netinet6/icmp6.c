@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.271 2002/01/10 12:21:32 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.272 2002/01/12 09:01:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2271,8 +2271,36 @@ icmp6_rip6_input(mp, off)
 				 in6p->in6p_icmp6filt))
 			continue;
 		if (last) {
-			struct	mbuf *n;
-			if ((n = m_copy(m, 0, (int)M_COPYALL)) != NULL) {
+			struct	mbuf *n = NULL;
+
+			/*
+			 * Recent network drivers tend to allocate a single
+			 * mbuf cluster, rather than to make a couple of
+			 * mbufs without clusters.  Also, the IPv6 code path
+			 * tries to avoid m_pullup(), it is highly to probable
+			 * that we still have an mbuf cluster here even though
+			 * the necessary length can be stored in an mbuf's
+			 * internal buffer.
+			 * Meanwhile, the default size of the receive socket
+			 * buffer for raw sockets is not so large.  This means
+			 * the possibility of packet loss is relatively higher
+			 * than before.  To avoid this scenario, we copy the
+			 * received data to a separate mbuf that does not use
+			 * a cluster, if possible.
+			 * XXX: it is better to copy the data after stripping
+			 * intermediate headers.
+			 */
+			if ((m->m_flags & M_EXT) && m->m_next == NULL &&
+			    m->m_len <= MHLEN) {
+				MGET(n, M_DONTWAIT, m->m_type);
+				if (n != NULL) {
+					M_COPY_PKTHDR(n, m);
+					bcopy(m->m_data, n->m_data, m->m_len);
+					n->m_len = m->m_len;
+				}
+			}
+			if (n != NULL ||
+			    (n = m_copy(m, 0, (int)M_COPYALL)) != NULL) {
 				if (last->in6p_flags & IN6P_CONTROLOPTS)
 					ip6_savecontrol(last, ip6, n, &opts);
 				/* strip intermediate headers */
@@ -2297,6 +2325,22 @@ icmp6_rip6_input(mp, off)
 			ip6_savecontrol(last, ip6, m, &opts);
 		/* strip intermediate headers */
 		m_adj(m, off);
+
+		/* avoid using mbuf clusters if possible (see above) */
+		if ((m->m_flags & M_EXT) && m->m_next == NULL &&
+		    m->m_len <= MHLEN) {
+			struct mbuf *n;
+
+			MGET(n, M_DONTWAIT, m->m_type);
+			if (n != NULL) {
+				M_COPY_PKTHDR(n, m);
+				bcopy(m->m_data, n->m_data, m->m_len);
+				n->m_len = m->m_len;
+				
+				m_freem(m);
+				m = n;
+			}
+		}
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
 				 (struct sockaddr *)&rip6src,
 				 m, opts.head) == 0) {
