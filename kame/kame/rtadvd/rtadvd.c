@@ -107,6 +107,7 @@ u_int32_t ndopt_flags[] = {
 };
 
 int main __P((int, char *[]));
+static void die __P((int));
 static void sock_open __P((void));
 static void rtsock_open __P((void));
 static void rtadvd_input __P((void));
@@ -203,6 +204,8 @@ main(argc, argv)
 			maxfd = rtsock;
 	}
 
+	signal(SIGTERM, die);
+
 	while (1) {
 		struct fd_set select_fd = fdset; /* reinitialize */
 
@@ -229,6 +232,32 @@ main(argc, argv)
 			rtadvd_input();
 	}
 	exit(0);		/* NOTREACHED */
+}
+
+static void
+die(sig)
+	int sig;
+{
+	struct rainfo *ra;
+	int i;
+	const int retrans = MAX_FINAL_RTR_ADVERTISEMENTS;
+
+	if (dflag > 1) {
+		syslog(LOG_DEBUG, "<%s> cease to be an advertising router\n",
+		    __FUNCTION__);
+	}
+
+	for (ra = ralist; ra; ra = ra->next) {
+		ra->lifetime = 0;
+		make_packet(ra);
+	}
+	for (i = 0; i < retrans; i++) {
+		for (ra = ralist; ra; ra = ra->next)
+			ra_output(ra);
+		sleep(MIN_DELAY_BETWEEN_RAS);
+	}
+	exit(0);
+	/*NOTREACHED*/
 }
 
 static void

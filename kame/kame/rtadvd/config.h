@@ -30,3 +30,4 @@
 extern void getconfig __P((char *));
 extern void delete_prefix __P((struct rainfo *, struct prefix *));
 extern void make_prefix __P((struct rainfo *, int, struct in6_addr *, int));
+extern void make_packet __P((struct rainfo *));
