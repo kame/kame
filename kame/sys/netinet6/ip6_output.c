@@ -1166,6 +1166,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 	struct mbuf **mp;
 #endif
 {
+	int privileged;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	register struct inpcb *in6p = sotoinpcb(so);
 	int error, optval;
@@ -1180,8 +1181,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 		optlen = sopt->sopt_valsize;
 		p = sopt->sopt_p;
 	} else {
-		level = op = optname = optlen = 0;
-		p = NULL;
+		panic("ip6_ctloutput: arg soopt is NULL");
 	}
 #else
 	register struct in6pcb *in6p = sotoin6pcb(so);
@@ -1194,10 +1194,20 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 	error = optval = 0;
 
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	privileged = (p == 0 || suser(p->p_ucred, &p->p_acflag)) ? 0 : 1;
+#else
+	privileged = (in6p->in6p_socket->so_state & SS_PRIV);
+#endif
+
 	if (level == IPPROTO_IPV6) {
 		switch (op) {
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+		case SOPT_SET:
+#else
 		case PRCO_SETOPT:
+#endif
 			switch (optname) {
 			case IPV6_PKTOPTIONS:
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -1207,8 +1217,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 				error = soopt_getm(sopt, &m); /* XXX */
 				if (error != NULL)
 					break;
-				error = sooptcopyin(sopt, mtod(m, char *), m->m_len,
-						    m->m_len);
+				error = soopt_mcopyin(sopt, m); /* XXX */
+				if (error != NULL)
+					break;
 				return (ip6_pcbopts(&in6p->in6p_outputopts,
 						    m, so, sopt));
 			    }
@@ -1218,7 +1229,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 			case IPV6_HOPOPTS:
 			case IPV6_DSTOPTS:
-				if (p == 0 || suser(p->p_ucred, &p->p_acflag)) {
+				if (!privileged) {
 					error = EPERM;
 					break;
 				}
@@ -1232,6 +1243,11 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_RTHDR:
 			case IPV6_CHECKSUM:
 			case IPV6_FAITH:
+#ifdef MAPPED_ADDR_ENABLED
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+			case IPV6_BINDV6ONLY:
+#endif
+#endif /* MAPPED_ADDR_ENABLED */
 				if (optlen != sizeof(int))
 					error = EINVAL;
 				else {
@@ -1298,6 +1314,14 @@ ip6_ctloutput(op, so, level, optname, mp)
 					case IPV6_FAITH:
 						OPTSET(IN6P_FAITH);
 						break;
+
+#ifdef MAPPED_ADDR_ENABLED
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+					case IPV6_BINDV6ONLY:
+						OPTSET(IN6P_BINDV6ONLY);
+						break;
+#endif
+#endif /* MAPPED_ADDR_ENABLED */
 					}
 				}
 				break;
@@ -1334,12 +1358,41 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 				break;
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+		case IPV6_PORTRANGE:
+			error = sooptcopyin(sopt, &optval, sizeof optval,
+					    sizeof optval);
+			if (error)
+				break;
+
+			switch (optval) {
+			case IPV6_PORTRANGE_DEFAULT:
+				in6p->inp_flags &= ~(INP_LOWPORT);
+				in6p->inp_flags &= ~(INP_HIGHPORT);
+				break;
+
+			case IPV6_PORTRANGE_HIGH:
+				in6p->inp_flags &= ~(INP_LOWPORT);
+				in6p->inp_flags |= INP_HIGHPORT;
+				break;
+
+			case IPV6_PORTRANGE_LOW:
+				in6p->inp_flags &= ~(INP_HIGHPORT);
+				in6p->inp_flags |= INP_LOWPORT;
+				break;
+
+			default:
+				error = EINVAL;
+				break;
+			}
+			break;
+#endif
+
 #ifdef IPSEC
 			case IPV6_IPSEC_POLICY:
 			    {
 				caddr_t req = NULL;
 				int len = 0;
-				int priv = 0;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				struct mbuf *m;
 #endif
@@ -1350,27 +1403,16 @@ ip6_ctloutput(op, so, level, optname, mp)
 				if (error = soopt_mcopyin(sopt, m)) /* XXX */
 					break;
 #endif
-#ifdef __NetBSD__
-				if (p == 0 || suser(p->p_ucred, &p->p_acflag))
-					priv = 0;
-				else
-					priv = 1;
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-				priv = (sopt->sopt_p != NULL &&
-					suser(sopt->sopt_p->p_ucred,
-					      &sopt->sopt_p->p_acflag) != 0)
-					? 0 : 1;
-#else
-				priv = (in6p->in6p_socket->so_state & SS_PRIV);
-#endif
 				if (m != 0) {
 					req = mtod(m, caddr_t);
 					len = m->m_len;
 				}
 				error = ipsec_set_policy(&in6p->in6p_sp,
 				                   optname, req, len,
-				                   priv);
-
+				                   privileged);
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				m_freem(m);
+#endif
 			    }
 				break;
 #endif /* IPSEC */
@@ -1380,12 +1422,28 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_FW_DEL:
 			case IPV6_FW_FLUSH:
 			case IPV6_FW_ZERO:
+			    {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				struct mbuf *m;
+				struct mbuf **mp = &m;
+#endif
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				if (ip6_fw_ctl_ptr == NULL)
+					return EINVAL;
+				if (error = soopt_getm(sopt, &m)) /* XXX */
+					break;
+				if (error = soopt_mcopyin(sopt, m)) /* XXX */
+					break;
+#else
 				if (ip6_fw_ctl_ptr == NULL) {
 					if (m) (void)m_free(m);
 					return EINVAL;
 				}
+#endif
 				error = (*ip6_fw_ctl_ptr)(optname, mp);
 				m = *mp;
+			    }
 				break;
 #endif
 
@@ -1399,12 +1457,17 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 			break;
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+		case SOPT_GET:
+#else
 		case PRCO_GETOPT:
+#endif
 			switch (optname) {
 
 			case IPV6_OPTIONS:
 			case IPV6_RETOPTS:
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if 0
 				if (in6p->inp_options) {
 					error = sooptcopyout(sopt, 
 						     mtod(in6p->inp_options,
@@ -1413,6 +1476,10 @@ ip6_ctloutput(op, so, level, optname, mp)
 				} else
 					sopt->sopt_valsize = 0;
 				break;
+#else
+				error = ENOPROTOOPT;
+				break;
+#endif
 #else
 #if 0
 				*mp = m = m_get(M_WAIT, MT_SOOPTS);
@@ -1433,10 +1500,8 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_PKTOPTIONS:
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				if (in6p->inp_options) {
-					error = sooptcopyout(sopt, 
-						     mtod(in6p->inp_options,
-							  char *),
-						     in6p->inp_options->m_len);
+					error = soopt_mcopyout(sopt, 
+							       in6p->inp_options);
 				} else
 					sopt->sopt_valsize = 0;
 #else
@@ -1452,7 +1517,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 
 			case IPV6_HOPOPTS:
 			case IPV6_DSTOPTS:
-				if (p == 0 || suser(p->p_ucred, &p->p_acflag)) {
+				if (!privileged) {
 					error = EPERM;
 					break;
 				}
@@ -1466,6 +1531,11 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_RTHDR:
 			case IPV6_CHECKSUM:
 			case IPV6_FAITH:
+#ifdef MAPPED_ADDR_ENABLED
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+			case IPV6_BINDV6ONLY:
+#endif
+#endif /* MAPPED_ADDR_ENABLED */
 				switch (optname) {
 
 				case IPV6_UNICAST_HOPS:
@@ -1513,6 +1583,23 @@ ip6_ctloutput(op, so, level, optname, mp)
 				case IPV6_FAITH:
 					optval = OPTBIT(IN6P_FAITH);
 					break;
+
+#ifdef MAPPED_ADDR_ENABLED
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				case IPV6_BINDV6ONLY:
+					optval = OPTBIT(IN6P_BINDV6ONLY);
+					break;
+#endif
+#endif /* MAPPED_ADDR_ENABLED */
+
+				case IPV6_PORTRANGE:
+					if (in6p->inp_flags & INP_HIGHPORT)
+						optval = IPV6_PORTRANGE_HIGH;
+					else if (in6p->inp_flags & INP_LOWPORT)
+						optval = IPV6_PORTRANGE_LOW;
+					else
+						optval = 0;
+					break;
 				}
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				error = sooptcopyout(sopt, &optval,
@@ -1537,6 +1624,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 				if (error == 0)
 					error = sooptcopyout(sopt,
 						mtod(m, char *), m->m_len);
+				m_freem(m);
 			    }
 #else
 				error = ip6_getmoptions(optname, in6p->in6p_moptions, mp);
@@ -1554,6 +1642,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				if (error == 0)
 					error = soopt_mcopyout(sopt, m); /* XXX */
+				m_freem(m);
 #endif
 				break;
 			  }
@@ -1561,12 +1650,28 @@ ip6_ctloutput(op, so, level, optname, mp)
 
 #ifdef IPV6FIREWALL
 			case IPV6_FW_GET:
-				if (ip6_fw_ctl_ptr == NULL) {
+			  {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				struct mbuf *m;
+				struct mbuf **mp = &m;
+#endif
+
+				if (ip6_fw_ctl_ptr == NULL)
+			        {
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 					if (m)
 						(void)m_free(m);
+#endif
 					return EINVAL;
 				}
 				error = (*ip6_fw_ctl_ptr)(optname, mp);
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				if (error == 0)
+					error = soopt_mcopyout(sopt, m); /* XXX */
+				if (m)
+					m_freem(m);
+#endif
+			  }
 				break;
 #endif
 

@@ -84,7 +84,7 @@
 #include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/syslog.h>
-#ifdef __NetBSD__
+#if (defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3))
 #include <sys/proc.h>
 #endif
 
@@ -107,6 +107,7 @@
 #include <netinet6/icmp6.h>
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/nd6.h>
+#include <netinet6/in6_prefix.h>
 
 #ifdef INET
 #include <netinet/ip.h>
@@ -159,6 +160,13 @@ struct ip6stat ip6stat;
 static void ip6_init2 __P((void *));
 
 static int ip6_hopopts_input __P((u_int32_t *, u_int32_t *, struct mbuf **, int *));
+
+#if defined(PTR)
+extern	int		ip6_protocol_tr;
+
+int	ptr_in6		__P((struct mbuf *, struct mbuf **));
+extern void ip_forward __P((struct mbuf *, int));
+#endif
 
 /*
  * IP6 initialization: fill in IP6 protocol switch table.
@@ -228,6 +236,8 @@ ip6_init2(dummy)
 
 	/* nd6_timer_init */
 	timeout(nd6_timer, (caddr_t)0, hz);
+	/* router renumbering prefix list maintenance */
+	timeout(in6_rr_timer, (caddr_t)0, hz);
 }
 
 #ifdef __FreeBSD__
@@ -373,6 +383,32 @@ ip6_input(m)
 			ip6->ip6_dst.s6_addr16[1]
 				= htons(m->m_pkthdr.rcvif->if_index);
 	}
+
+#if defined(PTR)
+	/*
+	 *
+	 */
+	if (ip6_protocol_tr)
+	{
+	    struct mbuf *m1 = NULL;
+
+	    switch (ptr_in6(m, &m1))
+	    {
+	      case IPPROTO_IP:					goto mcastcheck;
+	      case IPPROTO_IPV4:	ip_forward(m1, 0);	break;
+	      case IPPROTO_IPV6:	ip6_forward(m1, 0);	break;
+	      case IPPROTO_MAX:			/* discard this packet	*/
+	      default:
+	    }
+
+	    if (m != m1)
+		m_freem(m);
+
+	    return;
+	}
+
+  mcastcheck:
+#endif
 
 	/*
 	 * Multicast check
@@ -792,7 +828,7 @@ ip6_savecontrol(in6p, mp, ip6, m)
 	register struct ip6_hdr *ip6;
 	register struct mbuf *m;
 {
-#if defined(__NetBSD__)
+#if (defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3))
 	struct proc *p = curproc;	/* XXX */
 #endif
 #ifdef __bsdi__
@@ -801,11 +837,8 @@ ip6_savecontrol(in6p, mp, ip6, m)
 	int privileged;
 
 	privileged = 0;
-#if defined(__NetBSD__)
+#if (defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3))
 	if (p && !suser(p->p_ucred, &p->p_acflag))
-		privileged++;
-#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	if (in6p->in6p_socket->so_uid == 0)
 		privileged++;
 #else
 	if ((in6p->in6p_socket->so_state & SS_PRIV) != 0)
