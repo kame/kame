@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.73 2000/03/15 13:07:59 sakane Exp $	*/
+/*	$KAME: key.c,v 1.74 2000/03/22 07:03:22 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.73 2000/03/15 13:07:59 sakane Exp $ */
+/* KAME $Id: key.c,v 1.74 2000/03/22 07:03:22 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -291,8 +291,9 @@ static struct secpolicy *key_getsp __P((struct secpolicyindex *spidx));
 static struct secpolicy *key_getspbyid __P((u_int32_t id));
 static u_int32_t key_newreqid __P((void));
 static struct sadb_msg *key_spdadd __P((caddr_t *mhp));
-static u_int32_t key_getspid __P((void));
+static u_int32_t key_getnewspid __P((void));
 static struct sadb_msg *key_spddelete __P((caddr_t *mhp));
+static struct sadb_msg *key_spddelete2 __P((caddr_t *mhp));
 static int key_spdget __P((caddr_t *mhp, struct socket *so, int target));
 static struct sadb_msg *key_spdflush __P((caddr_t *mhp));
 static int key_spddump __P((caddr_t *mhp, struct socket *so, int target));
@@ -335,6 +336,8 @@ static caddr_t key_setsadbaddr __P((caddr_t buf, u_int16_t exttype,
 static caddr_t key_setsadbident
 	__P((caddr_t buf, u_int16_t exttype, u_int16_t idtype,
 		caddr_t string, int stringlen, u_int64_t id));
+static caddr_t key_setsadbxpolicy
+	__P((caddr_t buf, u_int16_t type, u_int8_t dir, u_int32_t id));
 static caddr_t key_setsadbext __P((caddr_t p, caddr_t ext));
 static void *key_newbuf __P((void *src, u_int len));
 #ifdef INET6
@@ -368,8 +371,7 @@ static int key_setident __P((struct secashead *sah, caddr_t *mhp));
 static struct sadb_msg *key_getmsgbuf_x1 __P((caddr_t *mhp));
 static struct sadb_msg *key_delete __P((caddr_t *mhp));
 static struct sadb_msg *key_get __P((caddr_t *mhp));
-static int key_acquire __P((struct secasindex *saidx,
-				struct secpolicyindex *spidx));
+static int key_acquire __P((struct secasindex *, struct secpolicy *));
 static struct secacq *key_newacq __P((struct secasindex *saidx));
 static struct secacq *key_getacq __P((struct secasindex *saidx));
 static struct secacq *key_getacqbyseq __P((u_int32_t seq));
@@ -535,7 +537,7 @@ key_checkrequest(isr, saidx)
 		return 0;
 
 	/* there is no SA */
-	if ((error = key_acquire(saidx, &isr->sp->spidx)) != 0) {
+	if ((error = key_acquire(saidx, isr->sp)) != 0) {
 		/* XXX What I do ? */
 #ifdef IPSEC_DEBUG
 		printf("key_checkrequest: error %d returned "
@@ -1291,6 +1293,7 @@ key_sp2msg(sp)
 	xpl->sadb_x_policy_exttype = SADB_X_EXT_POLICY;
 	xpl->sadb_x_policy_type = sp->policy;
 	xpl->sadb_x_policy_dir = sp->spidx.dir;
+	xpl->sadb_x_policy_id = sp->id;
 	p = (caddr_t)xpl + sizeof(*xpl);
 
 	/* if is the policy for ipsec ? */
@@ -1395,6 +1398,28 @@ key_spdadd(mhp)
 		return NULL;
 	}
 
+	/* check policy */
+	/* key_spdadd() accepts DISCARD, NONE and IPSEC. */
+	if (xpl0->sadb_x_policy_type == IPSEC_POLICY_ENTRUST
+	 || xpl0->sadb_x_policy_type == IPSEC_POLICY_BYPASS) {
+#ifdef IPSEC_DEBUG
+		printf("key_spdadd: Invalid policy type.\n");
+#endif
+		msg0->sadb_msg_errno = EINVAL;
+		return NULL;
+	}
+
+	/* policy requests are mandatory when action is ipsec. */
+        if (msg0->sadb_msg_type != SADB_X_SPDSETIDX
+	 && xpl0->sadb_x_policy_type == IPSEC_POLICY_IPSEC
+	 && PFKEY_EXTLEN(xpl0) <= sizeof(*xpl0)) {
+#ifdef IPSEC_DEBUG
+		printf("key_spdadd: some policy requests part required.\n");
+#endif
+		msg0->sadb_msg_errno = EINVAL;
+		return NULL;
+	}
+
 	/*
 	 * checking there is SP already or not.
 	 * If type is SPDUPDATE and no SP found, then error.
@@ -1423,35 +1448,13 @@ key_spdadd(mhp)
 		}
 	}
 
-	/* check policy */
-	/* key_spdadd() accepts DISCARD, NONE and IPSEC. */
-	if (xpl0->sadb_x_policy_type == IPSEC_POLICY_ENTRUST
-	 || xpl0->sadb_x_policy_type == IPSEC_POLICY_BYPASS) {
-#ifdef IPSEC_DEBUG
-		printf("key_spdadd: Invalid policy type.\n");
-#endif
-		msg0->sadb_msg_errno = EINVAL;
-		return NULL;
-	}
-
-	/* SPDADD; policy requests are mandatory when action is ipsec. */
-        if (msg0->sadb_msg_type == SADB_X_SPDADD
-	 && xpl0->sadb_x_policy_type == IPSEC_POLICY_IPSEC
-	 && PFKEY_EXTLEN(xpl0) <= sizeof(*xpl0)) {
-#ifdef IPSEC_DEBUG
-		printf("key_spdadd: some policy requests part required.\n");
-#endif
-		msg0->sadb_msg_errno = EINVAL;
-		return NULL;
-	}
-
 	/* allocation new SP entry */
 	if ((newsp = key_msg2sp(xpl0, PFKEY_EXTLEN(xpl0), &error)) == NULL) {
 		msg0->sadb_msg_errno = error;
 		return NULL;
 	}
 
-	if ((newsp->id = key_getspid()) == 0) {
+	if ((newsp->id = key_getnewspid()) == 0) {
 		msg0->sadb_msg_errno = ENOBUFS;
 		return NULL;
 	}
@@ -1508,6 +1511,7 @@ key_spdadd(mhp)
 	 * reqid may had been updated at key_msg2sp() if reqid's
 	 * range violation.
 	 */
+	((struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY])->sadb_x_policy_id = newsp->id;
 	p = key_setsadbext(p, mhp[SADB_X_EXT_POLICY]);
 
 	p = key_setsadbext(p, mhp[SADB_EXT_ADDRESS_SRC]);
@@ -1524,7 +1528,7 @@ key_spdadd(mhp)
  *	others: success.
  */
 static u_int32_t
-key_getspid()
+key_getnewspid()
 {
 	u_int32_t newid = 0;
 	int count = key_spi_trycnt;	/* XXX */
@@ -1542,7 +1546,7 @@ key_getspid()
 
 	if (count == 0 || newid == 0) {
 #ifdef IPSEC_DEBUG
-		printf("key_getspid: to allocate policy id is failed.\n");
+		printf("key_getnewspid: to allocate policy id is failed.\n");
 #endif
 		return 0;
 	}
@@ -1625,6 +1629,9 @@ key_spddelete(mhp)
 		return NULL;
 	}
 
+	/* save policy id to buffer to be returned. */
+	xpl0->sadb_x_policy_id = sp->id;
+
 	sp->state = IPSEC_SPSTATE_DEAD;
 	key_freesp(sp);
 
@@ -1663,12 +1670,92 @@ key_spddelete(mhp)
 }
 
 /*
+ * SADB_SPDDELETE2 processing
+ * receive
+ *   <base, policy(*)>
+ * from the user(?), and set SADB_SASTATE_DEAD,
+ * and send,
+ *   <base, policy(*)>
+ * to the ikmpd.
+ * policy(*) including direction of policy.
+ *
+ * IN:	mhp: pointer to the pointer to each header.
+ * OUT:	other if success, return pointer to the message to send.
+ *	0 if fail.
+ */
+static struct sadb_msg *
+key_spddelete2(mhp)
+	caddr_t *mhp;
+{
+	struct sadb_msg *msg0;
+	u_int32_t id;
+	struct secpolicy *sp;
+
+	/* sanity check */
+	if (mhp == NULL || mhp[0] == NULL)
+		panic("key_spddelete2: NULL pointer is passed.\n");
+
+	msg0 = (struct sadb_msg *)mhp[0];
+
+	if (mhp[SADB_X_EXT_POLICY] == NULL) {
+#ifdef IPSEC_DEBUG
+		printf("key_spddelete2: invalid message is passed.\n");
+#endif
+		msg0->sadb_msg_errno = EINVAL;
+		return NULL;
+	}
+
+	id = ((struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY])->sadb_x_policy_id;
+
+	/* Is there SP in SPD ? */
+	if ((sp = key_getspbyid(id)) == NULL) {
+#ifdef IPSEC_DEBUG
+		printf("key_spddelete2: no SP found id:%u.\n", id);
+#endif
+		msg0->sadb_msg_errno = ENOENT;
+		return NULL;
+	}
+
+	sp->state = IPSEC_SPSTATE_DEAD;
+	key_freesp(sp);
+
+    {
+	struct sadb_msg *newmsg;
+	u_int len;
+	caddr_t p;
+
+	/* create new sadb_msg to reply. */
+	len = sizeof(struct sadb_msg)
+	    + PFKEY_EXTLEN(mhp[SADB_X_EXT_POLICY]);
+
+	KMALLOC(newmsg, struct sadb_msg *, len);
+	if (newmsg == NULL) {
+#ifdef IPSEC_DEBUG
+		printf("key_spddelete2: No more memory.\n");
+#endif
+		msg0->sadb_msg_errno = ENOBUFS;
+		return NULL;
+	}
+	bzero((caddr_t)newmsg, len);
+
+	bcopy((caddr_t)mhp[0], (caddr_t)newmsg, sizeof(*msg0));
+	newmsg->sadb_msg_errno = 0;
+	newmsg->sadb_msg_len = PFKEY_UNIT64(len);
+	p = (caddr_t)newmsg + sizeof(*msg0);
+
+	p = key_setsadbext(p, mhp[SADB_X_EXT_POLICY]);
+
+	return newmsg;
+    }
+}
+
+/*
  * SADB_X_GET processing
  * receive
- *   <base, address(SD), policy(*)>
+ *   <base, policy(*)>
  * from the user(?),
  * and send,
- *   <base, address(SD), policy(*)>
+ *   <base, address(SD), policy>
  * to the ikmpd.
  * policy(*) including direction of policy.
  *
@@ -1683,9 +1770,7 @@ key_spdget(mhp, so, target)
 	int target;
 {
 	struct sadb_msg *msg0;
-	struct sadb_address *src0, *dst0;
-	struct sadb_x_policy *xpl0;
-	struct secpolicyindex spidx;
+	u_int32_t id;
 	struct secpolicy *sp;
 	struct mbuf *m;
 
@@ -1695,49 +1780,21 @@ key_spdget(mhp, so, target)
 
 	msg0 = (struct sadb_msg *)mhp[0];
 
-	if (mhp[SADB_EXT_ADDRESS_SRC] == NULL
-	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
-	 || mhp[SADB_X_EXT_POLICY] == NULL) {
+	if (mhp[SADB_X_EXT_POLICY] == NULL) {
 #ifdef IPSEC_DEBUG
 		printf("key_spdget: invalid message is passed.\n");
 #endif
-		msg0->sadb_msg_errno = EINVAL;
-		return NULL;
+		return EINVAL;
 	}
 
-	src0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_SRC]);
-	dst0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_DST]);
-	xpl0 = (struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY];
-
-	/* make secindex */
-	KEY_SETSECSPIDX(xpl0->sadb_x_policy_dir,
-	                src0 + 1,
-	                dst0 + 1,
-	                src0->sadb_address_prefixlen,
-	                dst0->sadb_address_prefixlen,
-	                src0->sadb_address_proto,
-	                &spidx);
-
-	/* checking the direciton. */ 
-	switch (xpl0->sadb_x_policy_dir) {
-	case IPSEC_DIR_INBOUND:
-	case IPSEC_DIR_OUTBOUND:
-		break;
-	default:
-#ifdef IPSEC_DEBUG
-		printf("key_spdget: Invalid SP direction.\n");
-#endif
-		msg0->sadb_msg_errno = EINVAL;
-		return NULL;
-	}
+	id = ((struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY])->sadb_x_policy_id;
 
 	/* Is there SP in SPD ? */
-	if ((sp = key_getsp(&spidx)) == NULL) {
+	if ((sp = key_getspbyid(id)) == NULL) {
 #ifdef IPSEC_DEBUG
-		printf("key_spdget: no SP found.\n");
+		printf("key_spdget: no SP found id:%u.\n", id);
 #endif
-		msg0->sadb_msg_errno = ENOENT;
-		return NULL;
+		return ENOENT;
 	}
 
 	m = key_setdumpsp(sp, SADB_X_SPDGET, 0, msg0->sadb_msg_pid);
@@ -2005,7 +2062,7 @@ key_setdumpsp(sp, type, seq, pid)
 
 	/* sadb_msg->sadb_msg_len must be filled afterwards */
 	if (key_setsadbmsg_m(m, type, 0, SADB_SATYPE_UNSPEC, seq, pid,
-		    IPSEC_MODE_ANY, 0, 0, sp->id) != 0) {
+		    IPSEC_MODE_ANY, 0, 0, sp->refcnt) != 0) {
 		m_freem(m);
 		return NULL;
 	}
@@ -3295,6 +3352,33 @@ key_setsadbident(buf, exttype, idtype, string, stringlen, id)
 	p->sadb_ident_id = id;
 
 	bcopy(string, p + 1, stringlen);
+
+	return(buf + len);
+}
+
+/*
+ * set data into sadb_x_policy
+ * `buf' must has been allocated sufficiently.
+ */
+static caddr_t
+key_setsadbxpolicy(buf, type, dir, id)
+	caddr_t buf;
+	u_int16_t type;
+	u_int8_t dir;
+	u_int32_t id;
+{
+	struct sadb_x_policy *p;
+	u_int len;
+
+	p = (struct sadb_x_policy *)buf;
+	len = sizeof(struct sadb_x_policy);
+
+	bzero(p, len);
+	p->sadb_x_policy_len = PFKEY_UNIT64(len);
+	p->sadb_x_policy_exttype = SADB_X_EXT_POLICY;
+	p->sadb_x_policy_type = type;
+	p->sadb_x_policy_dir = dir;
+	p->sadb_x_policy_id = id;
 
 	return(buf + len);
 }
@@ -4961,21 +5045,24 @@ key_get(mhp)
  *    others: error number
  */
 static int
-key_acquire(saidx, spidx)
+key_acquire(saidx, sp)
 	struct secasindex *saidx;
-	struct secpolicyindex *spidx;
+	struct secpolicy *sp;
 {
 #ifndef IPSEC_NONBLOCK_ACQUIRE
 	struct secacq *newacq;
 #endif
+	struct secpolicyindex *spidx = NULL;
 	u_int8_t satype;
 	int error;
 
 	/* sanity check */
-	if (saidx == NULL || spidx == NULL)
+	if (saidx == NULL || sp == NULL)
 		panic("key_acquire: NULL pointer is passed.\n");
 	if ((satype = key_proto2satype(saidx->proto)) == 0)
 		panic("key_acquire: invalid proto is passed.\n");
+
+	spidx = &sp->spidx;
 
 #ifndef IPSEC_NONBLOCK_ACQUIRE
 	/*
@@ -5016,6 +5103,7 @@ key_acquire(saidx, spidx)
 		+ PFKEY_ALIGN8(saidx->src.ss_len)
 		+ sizeof(struct sadb_address)
 		+ PFKEY_ALIGN8(saidx->dst.ss_len)
+		+ sizeof(struct sadb_x_policy)
 		+ sizeof(struct sadb_ident)
 		+ PFKEY_ALIGN8(spidx->src.ss_len)
 		+ sizeof(struct sadb_ident)
@@ -5047,6 +5135,7 @@ key_acquire(saidx, spidx)
 #endif
 
 	newmsg->sadb_msg_pid = 0;
+
 	p = (caddr_t)newmsg + sizeof(struct sadb_msg);
 
 	/* set sadb_address for saidx's. */
@@ -5060,6 +5149,9 @@ key_acquire(saidx, spidx)
 	                    (struct sockaddr *)&saidx->dst,
 	                    _INALENBYAF(saidx->dst.ss_family) << 3,
 	                    IPSEC_ULPROTO_ANY);
+
+	/* set sadb_x_policy */
+	p = key_setsadbxpolicy(p, sp->policy, sp->spidx.dir, sp->id);
 
 	/* set sadb_address for spidx's. */
 	bzero(&id, sizeof(id));
@@ -6106,6 +6198,7 @@ key_parse(msgp, so, targetp)
 		case SADB_X_SPDFLUSH:
 		case SADB_X_SPDSETIDX:
 		case SADB_X_SPDUPDATE:
+		case SADB_X_SPDDELETE2:
 #ifdef IPSEC_DEBUG
 			printf("key_parse: illegal satype=%u\n",
 			    msg->sadb_msg_type);
@@ -6322,6 +6415,13 @@ key_parse(msgp, so, targetp)
 
 	case SADB_X_SPDDELETE:
 		if ((newmsg = key_spddelete(mhp)) == NULL)
+			return orglen;
+		if (targetp)
+			*targetp = KEY_SENDUP_ALL;
+	        break;
+
+	case SADB_X_SPDDELETE2:
+		if ((newmsg = key_spddelete2(mhp)) == NULL)
 			return orglen;
 		if (targetp)
 			*targetp = KEY_SENDUP_ALL;

@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.13 2000/03/09 00:10:11 sakane Exp $	*/
+/*	$KAME: key_debug.c,v 1.14 2000/03/22 07:03:23 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: key_debug.c,v 1.13 2000/03/09 00:10:11 sakane Exp $ */
+/* KAME @(#)$Id: key_debug.c,v 1.14 2000/03/22 07:03:23 sakane Exp $ */
 
 #ifdef _KERNEL
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
@@ -396,9 +396,9 @@ kdebug_sadb_x_policy(ext)
 	if (ext == NULL)
 		panic("kdebug_sadb_x_policy: NULL pointer was passed.\n");
 
-	printf("sadb_x_policy{ type=%u dir=%u reserved=%x }\n",
+	printf("sadb_x_policy{ type=%u dir=%u id=%x }\n",
 		xpl->sadb_x_policy_type, xpl->sadb_x_policy_dir,
-		xpl->sadb_x_policy_reserved);
+		xpl->sadb_x_policy_id);
 
 	if (xpl->sadb_x_policy_type == IPSEC_POLICY_IPSEC) {
 		int tlen;
