@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.70 2002/04/18 08:52:52 itojun Exp $
+.\"	$KAME: setkey.8,v 1.71 2002/05/07 08:05:29 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -506,16 +506,9 @@ otherwise the kernel keeps normal operation.
 means SA is required whenever the kernel sends a packet matched
 with the policy.
 .Li unique
-is the same to require.
-When you want to use SA bundle, you can define multiple rules.
-For example, IP header was followed by AH header followed by ESP header
-followed by an upper layer protocol header, the rule
-would be:
-.Dl esp/transport//require ah/transport//require ;
-The rule order is very important.
-In addition, it allows the policy to bind with the unique out-bound SA.
-If you use the SA by manual keying,
-you can put the decimal number as the policy identifier after
+is the same to require,
+in addition, it allows the policy to bind with the unique out-bound SA.
+You can put the decimal number as the policy identifier after
 .Li unique
 separated by colon
 .Sq \:
@@ -525,6 +518,12 @@ like the following;
 must be between 1 and 32767.
 It corresponds to
 .Ar extensions Fl u .
+When you want to use SA bundle, you can define multiple rules.
+For example, IP header was followed by AH header followed by ESP header
+followed by an upper layer protocol header, the rule
+would be:
+.Dl esp/transport//require ah/transport//require ;
+The rule order is very important.
 .Pp
 Note that
 .Dq Li discard
