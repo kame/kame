@@ -49,6 +49,9 @@
  *   thing to do?  What is the relationship with post-RFC2553 AI_ADDRCONFIG
  *   in ai_flags?
  * - (post-2553) semantics of AI_ADDRCONFIG itself is too vague.
+ *   (1) what should we do against numeric hostname (2) what should we do
+ *   against NULL hostname (3) what is AI_ADDRCONFIG itself.  AF not ready?
+ *   non-loopback address configured?  global address configured?
  * - The code makes use of following calls when asked to resolver with
  *   ai_family  = PF_UNSPEC:
  *	getipnodebyname(host, AF_INET6);
