@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1266 2000/09/12 05:23:00 itojun Exp $
+$KAME: CHANGELOG,v 1.1267 2000/09/12 08:46:04 jinmei Exp $
 
 <200009>
+2000-09-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_forward.c (ip6_forward): if the incoming
+	interface equals to the outgoing one, and the link attached to the
+	interface is point-to-point, then immediately drop the packet and
+	send an ICMPv6 destination unreachable error message.
+	This is currently experimental and needs the PROHIBIT_P2PREDIRECT
+	kernel compilation option.
+
 Tue Sep 12 14:21:27 JST 2000  itojun@iijlab.net
 	* kame/faithd: change default behavior with no arguments.
 	  old behavior (relay telnet session) does not seem like a sensible
