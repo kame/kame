@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.79 2001/10/01 11:06:39 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.80 2001/10/01 11:08:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -357,12 +357,11 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 		 */
 #ifdef MIP6
 		/*
-		 * If Source(DA) is simultaneously a home address and
-		 * care-of address and Source(DB) is not, then sort DA
-		 * before DB. Similarly, if Source(DB) is
-		 * simultaneously a home address and care-of address
-		 * and Source(DA) is not, then sort DB before DA.
-		*/
+		 * If SA is simultaneously a home address and care-of address
+		 * and SB is not, then prefer SA. Similarly, if SB is
+		 * simultaneously a home address and care-of address and SA is
+		 * not, then prefer SB. 
+		 */
 	{
 		struct mip6_bu *mbu_ia_best = NULL, *mbu_ia = NULL;
 		struct hif_softc *sc;
