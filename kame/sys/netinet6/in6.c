@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.155 2001/02/02 04:39:39 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.156 2001/02/02 14:23:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -814,10 +814,10 @@ in6_control(so, cmd, data, ifp)
 				 * the prefix, create a temporary address
 				 * as well (when specified).
 				 */
-				if (ip6_tmpaddr &&
+				if (ip6_usetmpaddr &&
 				    pr->ndpr_refcnt == 1) {
 					int e;
-					if ((e = in6_tmpifadd(ia)) != 0) {
+					if ((e = in6_tmpifadd(ia, 1)) != 0) {
 						log(LOG_NOTICE, "in6_control: "
 						    "failed to create a "
 						    "temporary address, "
@@ -2558,7 +2558,7 @@ in6_ifawithscope(oifp, dst)
 			 * a non-deprecated temporary one, replace the
 			 * candidate with it.
 			 */
-			if (ip6_tmpaddr) {
+			if (ip6_usetmpaddr) {
 				struct in6_ifaddr *ifat;
 
 				ifat = (struct in6_ifaddr *)ifa;

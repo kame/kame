@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.81 2001/02/02 04:44:05 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.82 2001/02/02 14:23:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -99,9 +99,9 @@ struct ifnet *nd6_defifp;
 int nd6_defifindex;
 
 #ifdef IPV6TMPADDR
-int ip6_tmpaddr = IPV6TMPADDR;
+int ip6_usetmpaddr = IPV6TMPADDR;
 #else
-int ip6_tmpaddr = 0;
+int ip6_usetmpaddr = 0;
 #endif
 
 int ip6_anon_delay;
@@ -109,9 +109,10 @@ int ip6_anon_preferred_lifetime = DEF_ANON_PREFERRED_LIFETIME;
 static int ip6_anon_valid_lifetime = DEF_ANON_VALID_LIFETIME;
 /*
  * shorter lifetimes for debugging purposes.
-int ip6_anon_preferred_lifetime = 1200;
-static int ip6_anon_valid_lifetime = 7200;
+int ip6_anon_preferred_lifetime = 800;
+static int ip6_anon_valid_lifetime = 1800;
 */
+int ip6_anon_regen_advance = ANON_REGEN_ADVANCE;
 
 #ifdef MIP6
 void (*mip6_select_defrtr_hook)(struct nd_prefix *,
@@ -1234,32 +1235,26 @@ prelist_update(new, dr, m)
 		/* The 2 hour rule is not imposed for preferred lifetime. */
 		lt6_tmp.ia6t_pltime = new->ndpr_pltime;
 
+		in6_init_address_ltimes(pr, &lt6_tmp);
+
 		/*
 		 * When adjusting the lifetimes of an existing temporary
 		 * address, only lower the lifetimes.
 		 * addrconf-privacy-04 3.3. (1).
+		 * XXX: how should we modify ia6t_[pv]ltime?
 		 */
 		if ((ifa6->ia6_flags & IN6_IFF_TEMPORARY) != 0) {
-			if (lt6_tmp.ia6t_pltime >
-			    ifa6->ia6_lifetime.ia6t_pltime) {
-				lt6_tmp.ia6t_pltime =
-					ifa6->ia6_lifetime.ia6t_pltime;
+			if (lt6_tmp.ia6t_expire >
+			    ifa6->ia6_lifetime.ia6t_expire) {
+				lt6_tmp.ia6t_expire =
+					ifa6->ia6_lifetime.ia6t_expire;
 			}
-			if (lt6_tmp.ia6t_vltime >
-			    ifa6->ia6_lifetime.ia6t_vltime) {
-				lt6_tmp.ia6t_vltime =
-					ifa6->ia6_lifetime.ia6t_vltime;
+			if (lt6_tmp.ia6t_preferred >
+			    ifa6->ia6_lifetime.ia6t_preferred) {
+				lt6_tmp.ia6t_preferred =
+					ifa6->ia6_lifetime.ia6t_preferred;
 			}
 		}
-
-		in6_init_address_ltimes(pr, &lt6_tmp);
-
-		/*
-		 * This update might re-validate an already deprecated address.
-		 * XXX: should this check be centralized?
-		 */
-		if (lt6_tmp.ia6t_vltime != 0)
-			ifa6->ia6_flags &= ~IN6_IFF_DEPRECATED;
 
 		ifa6->ia6_lifetime = lt6_tmp;
 	}
@@ -1276,13 +1271,20 @@ prelist_update(new, dr, m)
 			ia6->ia6_ndpr = pr;
 
 			/*
-			 * When a new public address is created as described
-			 * RFC2462, also create a new temporary address.
 			 * addrconf-privacy-04 3.3 (2).
+			 * When a new public address is created as described
+			 * in RFC2462, also create a new temporary address.
+			 *
+			 * addrconf-privacy-04 3.5.
+			 * When an interface connects to a new link, a new
+			 * randomized interface identifier should be generated
+			 * immediately together with a new set of temporary
+			 * addresses.  Thus, we specifiy 1 as the 2nd arg of
+			 * in6_tmpifadd().
 			 */
-			if (ip6_tmpaddr) {
+			if (ip6_usetmpaddr) {
 				int e;
-				if ((e = in6_tmpifadd(ia6)) != 0) {
+				if ((e = in6_tmpifadd(ia6, 1)) != 0) {
 					log(LOG_NOTICE, "prelist_update: "
 					    "failed to create a temporary "
 					    "address, errno=%d\n",
@@ -1863,15 +1865,19 @@ in6_ifadd(pr)
 }
 
 int
-in6_tmpifadd(ia0)
+in6_tmpifadd(ia0, forcegen)
 	const struct in6_ifaddr *ia0; /* corresponding public address */
 {
 	struct ifnet *ifp = ia0->ia_ifa.ifa_ifp;
 	struct in6_ifaddr *newia;
 	struct in6_aliasreq ifra;
-	int i, forcegen = 0, error;
+	int i, error;
 	int trylimit = 3;	/* XXX: adhoc value */
 	u_int32_t randid[2];
+	time_t vltime0, pltime0;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	time_t time_second = (time_t)time.tv_sec;
+#endif
 
 	bzero(&ifra, sizeof(ifra));
 	strncpy(ifra.ifra_name, if_name(ifp), sizeof(ifra.ifra_name));
@@ -1885,8 +1891,9 @@ in6_tmpifadd(ia0)
 	}
 
   again:
-	in6_get_tmpifid(ifp, (u_int8_t *)randid, forcegen,
-			(const u_int8_t *)&ia0->ia_addr.sin6_addr.s6_addr[8]);
+	in6_get_tmpifid(ifp, (u_int8_t *)randid,
+			(const u_int8_t *)&ia0->ia_addr.sin6_addr.s6_addr[8],
+			forcegen);
 	ifra.ifra_addr.sin6_addr.s6_addr32[2]
 		|= (randid[0] & ~(ifra.ifra_prefixmask.sin6_addr.s6_addr32[2]));
 	ifra.ifra_addr.sin6_addr.s6_addr32[3]
@@ -1915,36 +1922,46 @@ in6_tmpifadd(ia0)
          * of the public address or ANON_PREFERRED_LIFETIME -
          * RANDOM_DELAY.
 	 */
-	if (ia0->ia6_lifetime.ia6t_vltime < ip6_anon_valid_lifetime)
-		ifra.ifra_lifetime.ia6t_vltime = ia0->ia6_lifetime.ia6t_vltime;
-	else
-		ifra.ifra_lifetime.ia6t_vltime = ip6_anon_valid_lifetime;
-	if (ia0->ia6_lifetime.ia6t_pltime <
-	    ip6_anon_preferred_lifetime - ip6_anon_delay) {
-		ifra.ifra_lifetime.ia6t_pltime = ia0->ia6_lifetime.ia6t_pltime;
-	} else {
-		ifra.ifra_lifetime.ia6t_pltime =
-			ip6_anon_preferred_lifetime - ip6_anon_delay;
-	}
+	if (ia0->ia6_lifetime.ia6t_expire != 0) {
+		vltime0 = (ia0->ia6_lifetime.ia6t_expire > time_second) ?
+			(ia0->ia6_lifetime.ia6t_expire - time_second) : 0;
+		if (vltime0 > ip6_anon_valid_lifetime)
+			vltime0 = ip6_anon_valid_lifetime;
+	} else
+		vltime0 = ip6_anon_valid_lifetime;
+	if (ia0->ia6_lifetime.ia6t_preferred != 0) {
+		pltime0 = (ia0->ia6_lifetime.ia6t_preferred > time_second) ?
+			(ia0->ia6_lifetime.ia6t_preferred - time_second) : 0;
+		if (pltime0 > ip6_anon_preferred_lifetime - ip6_anon_delay)
+			pltime0 = ip6_anon_preferred_lifetime - ip6_anon_delay;
+	} else
+		pltime0 = ip6_anon_preferred_lifetime - ip6_anon_delay;
+	ifra.ifra_lifetime.ia6t_vltime = vltime0;
+	ifra.ifra_lifetime.ia6t_pltime = pltime0;
 
 	/*
 	 * A temporary address is created only if this calculated Preferred
 	 * Lifetime is greater than REGEN_ADVANCE time units.
 	 */
-	if (ifra.ifra_lifetime.ia6t_pltime <= ANON_REGEN_ADVANCE)
+	if (ifra.ifra_lifetime.ia6t_pltime <= ip6_anon_regen_advance)
 		return(0);
 
 	/* XXX: scope zone ID? */
 
 	ifra.ifra_flags |= (IN6_IFF_AUTOCONF|IN6_IFF_TEMPORARY);
-	
+
 	/* allocate ifaddr structure, link into chain, etc. */
 	if ((error = in6_update_ifa(ifp, &ifra, NULL)) != 0)
 		return(error);
 
 	newia = in6ifa_ifpwithaddr(ifp, &ifra.ifra_addr.sin6_addr);
+	if (newia == NULL) {	/* XXX: can it happen? */
+		log(LOG_ERR, "in6_tmpifadd: ifa update succeeded, but we got "
+		    "no ifaddr\n");
+		return(EINVAL); /* XXX */
+	}
 	newia->ia6_ndpr = ia0->ia6_ndpr;
-	ia0->ia6_ndpr->ndpr_refcnt++;
+	newia->ia6_ndpr->ndpr_refcnt++;
 
 	return(0);
 }	    

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.95 2001/02/02 04:39:40 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.96 2001/02/02 14:23:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -93,7 +93,6 @@
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
-#include <netinet6/in6_ifattach.h>
 #include <netinet6/in6_prefix.h>
 #include <netinet/icmp6.h>
 
@@ -142,6 +141,7 @@ int nd6_recalc_reachtm_interval = ND6_RECALC_REACHTM_INTERVAL;
 static struct sockaddr_in6 all1_sa;
 
 static void nd6_slowtimo __P((void *));
+static int regen_tmpaddr __P((struct in6_ifaddr *));
 
 #ifdef MIP6
 void (*mip6_expired_defrouter_hook)(struct nd_defrouter *dr) = 0;
@@ -181,16 +181,6 @@ nd6_init()
 #else
 	timeout(nd6_slowtimo, (caddr_t)0, ND6_SLOWTIMER_INTERVAL * hz);
 #endif
-
-#ifdef __NetBSD__
-	callout_reset(&in6_tmpaddrtimer_ch,
-		      (ip6_anon_preferred_lifetime - ip6_anon_delay) * hz,
-		      in6_tmpaddrtimer, NULL);
-#else
-	timeout(in6_tmpaddrtimer, (caddr_t)0,
-		(ip6_anon_preferred_lifetime - ip6_anon_delay) * hz);
-#endif
-
 }
 
 void
@@ -617,10 +607,10 @@ nd6_timer(ignored_arg)
 	/*
 	 * expire interface addresses.
 	 * in the past the loop was inside prefix expiry processing.
-	 * However, as we can specify address lifetime with ifconfig(8),
-	 * it makes more sense for us to check individual interface addresses
-	 * separately from prefix lists.
+	 * However, from a stricter speci-confrmance standpoint, we should
+	 * rather separate address lifetimes and prefix lifetimes.
 	 */
+  addrloop:
 	for (ia6 = in6_ifaddr; ia6; ia6 = nia6) {
 		nia6 = ia6->ia_next;
 		/* check address lifetime */
@@ -634,54 +624,39 @@ nd6_timer(ignored_arg)
 			ia6->ia6_flags |= IN6_IFF_DEPRECATED;
 
 			/*
-			 * If a temporary address has just become deprecated
-			 * and there is a non-deprecated public address,
-			 * create a new temporary address.
+			 * If a temporary address has just become deprecated,
+			 * regenerate a new one if possible.
 			 */
 			if ((ia6->ia6_flags & IN6_IFF_TEMPORARY) != 0 &&
 			    (oldflags & IN6_IFF_DEPRECATED) == 0 &&
-			    ip6_tmpaddr) {
-				struct ifaddr *ifa;
-				struct ifnet *ifp;
-
-				ifp = ia6->ia_ifa.ifa_ifp;
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-				for (ifa = ifp->if_addrlist; ifa;
-				     ifa = ifa->ifa_next)
-#else
-				for (ifa = ifp->if_addrlist.tqh_first;
-				     ifa;
-				     ifa = ifa->ifa_list.tqe_next)
-#endif
-				{
-					struct in6_ifaddr *it6;
-
-					if (ifa->ifa_addr->sa_family !=
-					    AF_INET6)
-						continue;
-
-					it6 = (struct in6_ifaddr *)ifa;
-					if ((it6->ia6_flags &
-					     IN6_IFF_AUTOCONF) == 0)
-						continue;
-
-					if (it6->ia6_ndpr != NULL &&
-					    it6->ia6_ndpr == ia6->ia6_ndpr &&
-					    it6->ia6_lifetime.ia6t_preferred
-					    > time_second) {
-						int e;
-
-						if ((e = in6_tmpifadd(it6))
-						    != 0) {
-							log(LOG_NOTICE,
-							    "nd6_timer: failed"
-							    " to create a new"
-							    " tmp addr (%d)\n",
-							    e);
-						}
-					}
+			    ip6_usetmpaddr) {
+				/*
+				 * XXX: we separated the routine as a function
+				 * just because indentation issue...
+				 */
+				if (regen_tmpaddr(ia6) == 0) {
+					/*
+					 * A new temporary address is
+					 * generated.
+					 * XXX: this means the address chain
+					 * has changed while we are still in
+					 * the loop.  Although the change
+					 * would not cause disaster (because
+					 * it's not an addition, but a
+					 * deletion,) we'd rather restart the
+					 * loop just for safety.  Or does this 
+					 * significantly reduce performance??
+					 */
+					goto addrloop;
 				}
 			}
+		} else if (lt6->ia6t_preferred &&
+			   lt6->ia6t_preferred > time_second) {
+			/*
+			 * A new RA might have made a deprecated address
+			 * preferred.
+			 */
+			ia6->ia6_flags &= ~IN6_IFF_DEPRECATED;
 		}
 	}
 
@@ -716,6 +691,76 @@ nd6_timer(ignored_arg)
 			pr = pr->ndpr_next;
 	}
 	splx(s);
+}
+
+static int
+regen_tmpaddr(ia6)
+	struct in6_ifaddr *ia6; /* deprecated temporary address */
+{
+	struct ifaddr *ifa;
+	struct ifnet *ifp;
+	struct in6_ifaddr *public_ifa6 = NULL;
+
+	ifp = ia6->ia_ifa.ifa_ifp;
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
+#else
+	for (ifa = ifp->if_addrlist.tqh_first; ifa;
+	     ifa = ifa->ifa_list.tqe_next)
+#endif
+	{
+		struct in6_ifaddr *it6;
+
+		if (ifa->ifa_addr->sa_family != AF_INET6)
+			continue;
+
+		it6 = (struct in6_ifaddr *)ifa;
+
+		/* ignore no autoconf addresses. */
+		if ((it6->ia6_flags & IN6_IFF_AUTOCONF) == 0)
+			continue;
+
+		/* ignore autoconf addresses with different prefixes. */
+		if (it6->ia6_ndpr == NULL || it6->ia6_ndpr != ia6->ia6_ndpr)
+			continue;
+
+		/*
+		 * Now we are looking at an autoconf address with the same
+		 * prefix as ours.  If the address is temporary and is
+		 * still preferred (such cases would be rare, though), do not
+		 * create another one.
+		 */
+		if ((it6->ia6_flags & IN6_IFF_TEMPORARY) != 0) {
+			if (ia6->ia6_lifetime.ia6t_preferred == 0 &&
+			    ia6->ia6_lifetime.ia6t_preferred > time_second) {
+				public_ifa6 = NULL;
+				break;
+			}
+		}
+
+		/*
+		 * This is a public autoconf address that has the same prefix
+		 * as ours.  If it is preferred, keep it.  We can't break the
+		 * loop here, because there is a still-preferred temporary
+		 * address with the prefix.
+		 */
+		if (it6->ia6_lifetime.ia6t_preferred == 0 ||
+		    it6->ia6_lifetime.ia6t_preferred > time_second)
+		    public_ifa6 = it6;
+	}
+
+	if (public_ifa6 != NULL) {
+		int e;
+
+		if ((e = in6_tmpifadd(public_ifa6, 0)) != 0) {
+			log(LOG_NOTICE, "regen_tmpaddr: failed to create a new"
+			    "tmp addr,errno=%d\n", e);
+			return(-1);
+		}
+		return(0);
+	}
+
+	return(-1);
 }
 
 /*
@@ -1689,21 +1734,13 @@ nd6_ioctl(cmd, data, ifp)
 
 			/* do we really have to remove addresses as well? */
 			for (ia = in6_ifaddr; ia; ia = ia_next) {
-				struct in6_addr *in6_pfx;
-				int plen_ifa;
-
 				/* ia might be removed. keep the next ptr. */
 				ia_next = ia->ia_next;
 
 				if ((ia->ia6_flags & IN6_IFF_AUTOCONF) == 0)
 					continue;
 
-				in6_pfx = &ia->ia_prefixmask.sin6_addr;
-				plen_ifa = in6_mask2len(in6_pfx, NULL);
-				if (pr->ndpr_plen == plen_ifa &&
-				    in6_are_prefix_equal(in6_pfx,
-							 &pr->ndpr_prefix.sin6_addr,
-							 pr->ndpr_plen))
+				if (ia->ia6_ndpr == pr)
 					in6_purgeaddr(&ia->ia_ifa);
 			}
 			prelist_remove(pr);

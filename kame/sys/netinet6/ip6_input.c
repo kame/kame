@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.151 2001/02/02 04:39:40 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.152 2001/02/02 14:23:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -369,6 +369,18 @@ ip6_init2(dummy)
 	callout_reset(&in6_rr_timer_ch, hz, in6_rr_timer, NULL);
 #else
 	timeout(in6_rr_timer, (caddr_t)0, hz);
+#endif
+
+	/* timer for regeneranation of temporary addresses randomize ID */
+#ifdef __NetBSD__
+	callout_reset(&in6_tmpaddrtimer_ch,
+		      (ip6_anon_preferred_lifetime - ip6_anon_delay -
+		       ip6_anon_regen_advance) * hz,
+		      in6_tmpaddrtimer, NULL);
+#else
+	timeout(in6_tmpaddrtimer, (caddr_t)0,
+		(ip6_anon_preferred_lifetime - ip6_anon_delay -
+			ip6_anon_regen_advance) * hz);
 #endif
 }
 

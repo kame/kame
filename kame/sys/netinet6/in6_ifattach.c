@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.91 2001/02/02 14:15:22 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.92 2001/02/02 14:23:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -84,7 +84,7 @@ static int get_hostid_ifid __P((struct ifnet *, struct in6_addr *));
 struct callout in6_tmpaddrtimer_ch;
 #endif
 static int get_rand_ifid __P((struct ifnet *, struct in6_addr *));
-static int generate_tmp_ifid __P((u_int8_t *, u_int8_t *, u_int8_t *));
+static int generate_tmp_ifid __P((u_int8_t *, const u_int8_t *, u_int8_t *));
 static int get_hw_ifid __P((struct ifnet *, struct in6_addr *));
 static int get_ifid __P((struct ifnet *, struct ifnet *, struct in6_addr *));
 static int in6_ifattach_linklocal __P((struct ifnet *, struct ifnet *));
@@ -189,19 +189,21 @@ get_rand_ifid(ifp, in6)
 }
 
 static int
-generate_tmp_ifid(seed0, curid, ret)
-	u_int8_t *seed0, *curid, *ret;
+generate_tmp_ifid(seed0, seed1, ret)
+	u_int8_t *seed0, *ret;
+	const u_int8_t *seed1;
 {
 	MD5_CTX ctxt;
 	u_int8_t seed[16], digest[16], nullbuf[8];
+	u_int32_t val32;
+#ifndef __OpenBSD__
+	struct timeval tv;
+#endif
 
+	/* If there's no hisotry, start with a random seed. */
 	bzero(nullbuf, sizeof(nullbuf));
 	if (bcmp(nullbuf, seed0, sizeof(nullbuf)) == 0) {
 		int i;
-		u_int32_t val32;
-#ifndef __OpenBSD__
-		struct timeval tv;
-#endif
 
 		for (i = 0; i < 2; i++) {
 #ifndef __OpenBSD__
@@ -217,9 +219,9 @@ generate_tmp_ifid(seed0, curid, ret)
 
 	/* copy the right-most 64-bits of the given address */
 	/* XXX assumption on the size of IFID */
-	bcopy(curid, &seed[8], 8);
+	bcopy(seed1, &seed[8], 8);
 
-	{			/* print it for debug */
+	if (0) {		/* for debugging purposes only */
 		int i;
 
 		printf("generate_tmp_ifid: new randomized ID from: ");
@@ -228,7 +230,7 @@ generate_tmp_ifid(seed0, curid, ret)
 		printf(" ");
 	}
 
-	/* generate 8 bytes of pseudo-random value. */
+	/* generate 16 bytes of pseudo-random value. */
 	bzero(&ctxt, sizeof(ctxt));
 	MD5Init(&ctxt);
 	MD5Update(&ctxt, seed, sizeof(seed));
@@ -243,6 +245,24 @@ generate_tmp_ifid(seed0, curid, ret)
 	ret[0] &= ~EUI64_UBIT;
 
 	/*
+	 * XXX: we'd like to ensure that the generated value is not zero
+	 * for simplicity.  If the caclculated digest happens to be zero,
+	 * use a random non-zero value as the last resort.
+	 */
+	if (bcmp(nullbuf, ret, sizeof(nullbuf)) == 0) {
+		log( LOG_INFO,
+		    "generate_tmp_ifid: computed MD5 value is zero.\n");
+
+#ifndef __OpenBSD__
+		microtime(&tv);
+		val32 = random() ^ tv.tv_usec;
+#else
+		val32 = arc4random();
+#endif
+		val32 = 1 + (val32 % (0xffffffff - 1));
+	}
+
+	/*
 	 * addrconf-privacy-04 3.2.1. (4)
 	 * Take the rightmost 64-bits of the MD5 digest and save them in
 	 * stable storage as the history value to be used in the next
@@ -250,7 +270,7 @@ generate_tmp_ifid(seed0, curid, ret)
 	 */
 	bcopy(&digest[8], seed0, 8);
 
-	{			/* print it for debug */
+	if (0) {		/* for debugging purposes only */
 		int i;
 
 		printf("to: ");
@@ -927,7 +947,7 @@ in6_ifattach(ifp, altifp)
 		 * I believe we should basically do DAD on non-loopback
 		 * interfaces. (20010122 jinmei@kame.net)
 		 * XXX: our DAD routine requires the interface up and running.
-		 * However, some of interfaces can be up before the RUNNING
+		 * However, some interfaces can be up before the RUNNING
 		 * status.  We skip DAD in such a case as a work around.
 		 * (But, is it really correct?)
 		 */
@@ -1220,10 +1240,10 @@ in6_ifdetach(ifp)
 #endif
 
 void
-in6_get_tmpifid(ifp, buf, generate, curid)
+in6_get_tmpifid(ifp, retbuf, baseid, generate)
 	struct ifnet *ifp;
-	u_int8_t *buf;
-	const u_int8_t *curid;
+	u_int8_t *retbuf;
+	const u_int8_t *baseid;
 	int generate;
 {
 	u_int8_t nullbuf[8];
@@ -1232,15 +1252,17 @@ in6_get_tmpifid(ifp, buf, generate, curid)
 	bzero(nullbuf, sizeof(nullbuf));
 	if (bcmp(ndi->randomid, nullbuf, sizeof(nullbuf)) == 0) {
 		/* we've never created a random ID.  Create a new one. */
-		bcopy(curid, ndi->randomid, sizeof(ndi->randomid));
 		generate = 1;
 	}
 
 	if (generate) {
+		bcopy(baseid, ndi->randomseed1, sizeof(ndi->randomseed1));
+
 		/* generate_tmp_ifid will update seedn and buf */
-		(void)generate_tmp_ifid(ndi->randomseed, ndi->randomid, buf);
-	} else
-		bcopy(ndi->randomid, buf, 8);
+		(void)generate_tmp_ifid(ndi->randomseed0, ndi->randomseed1,
+					ndi->randomid);
+	}
+	bcopy(ndi->randomid, retbuf, 8);
 }
 
 void
@@ -1258,11 +1280,13 @@ in6_tmpaddrtimer(ignored_arg)
 
 #ifdef __NetBSD__
 	callout_reset(&in6_tmpaddrtimer_ch,
-		      (ip6_anon_preferred_lifetime - ip6_anon_delay) * hz,
+		      (ip6_anon_preferred_lifetime - ip6_anon_delay -
+		       ip6_anon_regen_advance) * hz,
 		      in6_tmpaddrtimer, NULL);
 #else
 	timeout(in6_tmpaddrtimer, (caddr_t)0,
-		(ip6_anon_preferred_lifetime - ip6_anon_delay) * hz);
+		(ip6_anon_preferred_lifetime - ip6_anon_delay -
+		 ip6_anon_regen_advance) * hz);
 #endif
 
 	bzero(nullbuf, sizeof(nullbuf));
@@ -1270,12 +1294,12 @@ in6_tmpaddrtimer(ignored_arg)
 		ndi = &nd_ifinfo[i];
 		if (bcmp(ndi->randomid, nullbuf, sizeof(nullbuf)) != 0) {
 			/*
-			 * We've been generating random ID on this interface.
+			 * We've been generating a random ID on this interface.
 			 * Create a new one.
 			 */
-			(void )generate_tmp_ifid(ndi->randomseed,
-						 ndi->randomid,
-						 ndi->randomseed);
+			(void)generate_tmp_ifid(ndi->randomseed0,
+						ndi->randomseed1,
+						ndi->randomid);
 		}
 	}
 

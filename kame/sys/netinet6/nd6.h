@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.33 2001/02/02 04:39:40 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.34 2001/02/02 14:23:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -82,8 +82,9 @@ struct nd_ifinfo {
 	u_int8_t chlim;			/* CurHopLimit */
 	u_int8_t receivedra;
 	/* the followings are for privacy extension for addrconf */
-	u_int8_t randomseed[8];
-	u_int8_t randomid[8];
+	u_int8_t randomseed0[8]; /* upper 64 bits of MD5 digest */
+	u_int8_t randomseed1[8]; /* lower 64 bits (usually the EUI64 IFID) */
+	u_int8_t randomid[8];	/* current random ID */
 };
 
 #define ND6_IFF_PERFORMNUD	0x1
@@ -270,6 +271,7 @@ extern struct ifnet *nd6_defifp;  /* XXXYYY */
 extern int nd6_defifindex;
 extern int ip6_anon_delay;	/* seconds */
 extern int ip6_anon_preferred_lifetime; /* seconds */
+extern int ip6_anon_regen_advance; /* seconds */
 
 union nd_opts {
 	struct nd_opt_hdr *nd_opt_array[9];	/*max = home agent info*/
@@ -371,7 +373,7 @@ struct nd_pfxrouter *pfxrtr_lookup __P((struct nd_prefix *,
 int in6_init_prefix_ltimes __P((struct nd_prefix *ndpr));
 void rt6_flush __P((struct in6_addr *, struct ifnet *));
 int nd6_setdefaultiface __P((int));
-int in6_tmpifadd __P((const struct in6_ifaddr *));
+int in6_tmpifadd __P((const struct in6_ifaddr *, int));
 
 #endif /* _KERNEL */
 
