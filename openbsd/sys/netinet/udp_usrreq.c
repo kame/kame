@@ -183,6 +183,8 @@ udp_input(m, va_alist)
 	} srcsa, dstsa;
 #ifdef INET6
 	struct ip6_hdr *ipv6;
+	struct sockaddr_in6 *src_sa6, src_sa6_storage,
+		*dst_sa6, dst_sa6_storage;
 	struct ip6_recvpktopts opts6;
 #endif /* INET6 */
 #ifdef IPSEC
@@ -245,9 +247,24 @@ udp_input(m, va_alist)
 			return;
 		}
 #ifdef INET6
-		if (ipv6)
+		if (ipv6) {
 			ipv6 = mtod(m, struct ip6_hdr *);
-		else
+			/*
+			 * extract full sockaddr structures for the src/dst
+			 * addresses, and make local copies of them.
+			 * The copies are necessary because the memory that
+			 * stores src and dst may be freed during the process
+			 * below.
+			 */
+			if (ip6_getpktaddrs(m, &src_sa6, &dst_sa6)) {
+				m_freem(m);
+				return;
+			}
+			src_sa6_storage = *src_sa6;
+			dst_sa6_storage = *dst_sa6;
+			src_sa6 = &src_sa6_storage;
+			dst_sa6 = &dst_sa6_storage;
+		} else
 #endif /* INET6 */
 			ip = mtod(m, struct ip *);
 	}
@@ -352,17 +369,20 @@ udp_input(m, va_alist)
 #if 0 /*XXX inbound flowinfo */
 		srcsa.sin6.sin6_flowinfo = htonl(0x0fffffff) & ipv6->ip6_flow;
 #endif
-		/* KAME hack: recover scopeid */
-		(void)in6_recoverscope(&srcsa.sin6, &ipv6->ip6_src,
-		    m->m_pkthdr.rcvif);
+		sa6_copy_addr(src_sa6, &srcsa.sin6);
+		/*
+		 * XXX: the address may have embedded scope zone ID, which
+		 * should be hidden from applications.
+		 */
+#ifndef SCOPEDROUTING
+		in6_clearscope(&srcsa.sin6.sin6_addr);
+#endif
 
 		bzero(&dstsa, sizeof(struct sockaddr_in6));
 		dstsa.sin6.sin6_len = sizeof(struct sockaddr_in6);
 		dstsa.sin6.sin6_family = AF_INET6;
 		dstsa.sin6.sin6_port = uh->uh_dport;
-		/* KAME hack: recover scopeid */
-		(void)in6_recoverscope(&dstsa.sin6, &ipv6->ip6_dst,
-		    m->m_pkthdr.rcvif);
+		sa6_copy_addr(dst_sa6, &dstsa.sin6);
 		break;
 #endif /* INET6 */
 	}
@@ -415,8 +435,8 @@ udp_input(m, va_alist)
 #ifdef INET6
 			if (ipv6) {
 				if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6))
-					if (!IN6_ARE_ADDR_EQUAL(&inp->inp_laddr6,
-					    &ipv6->ip6_dst))
+					if (!SA6_ARE_ADDR_EQUAL(&inp->in6p_lsa,
+								dst_sa6))
 						continue;
 			} else
 #endif /* INET6 */
@@ -428,8 +448,8 @@ udp_input(m, va_alist)
 #ifdef INET6
 			if (ipv6) {
 				if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6))
-					if (!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6,
-					    &ipv6->ip6_src) ||
+					if (!SA6_ARE_ADDR_EQUAL(&inp->in6p_fsa,
+								src_sa6)  ||
 					    inp->inp_fport != uh->uh_sport)
 			        continue;
 			} else
@@ -467,6 +487,13 @@ udp_input(m, va_alist)
 					bzero(&opts6, sizeof(opts6));
 #endif 
 				}
+				/*
+				 * XXX: m_copy above removes m_aux that
+				 * contains the packet addresses, while we
+				 * still need them for IPsec.
+				 */
+				if (!ip6_setpktaddrs(m, src_sa6, dst_sa6))
+					goto bad; /* XXX */
 			}
 			last = inp->inp_socket;
 			/*
@@ -512,8 +539,8 @@ udp_input(m, va_alist)
 	 */
 #ifdef INET6
 	if (ipv6)
-		inp = in6_pcbhashlookup(&udbtable, &ipv6->ip6_src, uh->uh_sport,
-		    &ipv6->ip6_dst, uh->uh_dport);
+		inp = in6_pcbhashlookup(&udbtable, src_sa6, uh->uh_sport,
+		    dst_sa6, uh->uh_dport);
 	else
 #endif /* INET6 */
 	inp = in_pcbhashlookup(&udbtable, ip->ip_src, uh->uh_sport,
@@ -523,8 +550,7 @@ udp_input(m, va_alist)
 #ifdef INET6
 		if (ipv6) {
 			inp = in_pcblookup(&udbtable,
-			    (struct in_addr *)&(ipv6->ip6_src),
-			    uh->uh_sport, (struct in_addr *)&(ipv6->ip6_dst),
+			    src_sa6, uh->uh_sport, dst_sa6,
 			    uh->uh_dport, INPLOOKUP_WILDCARD | INPLOOKUP_IPV6);
 		} else
 #endif /* INET6 */
@@ -700,7 +726,6 @@ udp6_ctlinput(cmd, sa, d)
 	void *cmdarg;
 	struct ip6ctlparam *ip6cp = NULL;
 	const struct sockaddr_in6 *sa6_src = NULL;
-	struct in6_addr finaldst;
 	struct udp_portonly {
 		u_int16_t uh_sport;
 		u_int16_t uh_dport;
@@ -764,13 +789,15 @@ udp6_ctlinput(cmd, sa, d)
 			 * corresponding to the address in the ICMPv6 message
 			 * payload.
 			 */
-			if (in6_pcbhashlookup(&udbtable, &finaldst,
-			    uh.uh_dport, (struct in6_addr *)&sa6_src->sin6_addr,
-			    uh.uh_sport))
+			if (in6_pcbhashlookup(&udbtable, sa6,
+					      uh.uh_dport,
+					      (struct sockaddr_in6 *)sa6_src,
+					      uh.uh_sport))
 				valid = 1;
-			else if (in_pcblookup(&udbtable, &sa6->sin6_addr,
-			    uh.uh_dport, (struct in6_addr *)&sa6_src->sin6_addr,
-			    uh.uh_sport, INPLOOKUP_IPV6))
+			else if (in_pcblookup(&udbtable, sa6,
+					      uh.uh_dport,
+					      (struct sockaddr_in6 *)sa6_src,
+					      uh.uh_sport, INPLOOKUP_IPV6))
 				valid = 1;
 #if 0
 			/*
@@ -780,9 +807,9 @@ udp6_ctlinput(cmd, sa, d)
 			 * We should at least check if the local address (= s)
 			 * is really ours.
 			 */
-			else if (in_pcblookup(&udbtable, &sa6->sin6_addr,
-			    uh.uh_dport, (struct in6_addr *)&sa6_src->sin6_addr,
-			    uh.uh_sport, INPLOOKUP_WILDCARD | INPLOOKUP_IPV6))
+			else if (in_pcblookup(&udbtable, sa6,
+			    uh.uh_dport, sa6_src, uh.uh_sport,
+			    INPLOOKUP_WILDCARD | INPLOOKUP_IPV6))
 				valid = 1;
 #endif
 

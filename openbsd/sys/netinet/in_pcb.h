@@ -186,6 +186,8 @@ struct inpcb {
 #define in6p_route inp_route
 #define in6p_fport inp_fport
 #define in6p_flowinfo inp_flowinfo
+#define in6p_lsa inp_lsa6
+#define in6p_fsa inp_fsa6
 
 struct inpcbtable {
 	CIRCLEQ_HEAD(, inpcb) inpt_queue;
@@ -285,8 +287,8 @@ struct inpcb *
 			       u_int, struct in_addr, u_int));
 #ifdef INET6
 struct inpcb *
-	 in6_pcbhashlookup __P((struct inpcbtable *, struct in6_addr *,
-			       u_int, struct in6_addr *, u_int));
+	 in6_pcbhashlookup __P((struct inpcbtable *, struct sockaddr_in6 *,
+			       u_int, struct sockaddr_in6 *, u_int));
 int	 in6_pcbbind __P((struct inpcb *, struct mbuf *));
 int	 in6_pcbconnect __P((struct inpcb *, struct mbuf *));
 int	 in6_setsockaddr __P((struct inpcb *, struct mbuf *));
@@ -314,26 +316,7 @@ struct rtentry *
 int	in6_pcbnotify __P((struct inpcbtable *, struct sockaddr *,
 			   u_int, struct sockaddr *, u_int, int, void *,
 			   void (*)(struct inpcb *, int)));
-#if 1 /*def NEW_STRUCT_ROUTE*/
-struct 	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
-				     struct ip6_pktopts *,
-				     struct ip6_moptions *,
-				     struct route *, struct in6_addr *,
-				     struct ifnet **, int *));
-int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
-			 struct ip6_moptions *, struct route *,
-			 struct ifnet **, struct rtentry **, int));
-#else
-struct 	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
-				     struct ip6_pktopts *,
-				     struct ip6_moptions *,
-				     struct route_in6 *, struct in6_addr *,
-				     struct ifnet **, int *));
-int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
-			 struct ip6_moptions *, struct route_in6 *,
-			 struct ifnet **, struct rtentry **, int));
-#endif
 int	in6_selecthlim __P((struct inpcb *, struct ifnet *));
-int	in6_pcbsetport __P((struct in6_addr *, struct inpcb *));
+int	in6_pcbsetport __P((struct sockaddr_in6 *, struct inpcb *));
 #endif /* _KERNEL */
 #endif /* _NETINET_IN_PCB_H_ */

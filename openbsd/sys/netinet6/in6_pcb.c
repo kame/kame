@@ -213,10 +213,6 @@ in6_pcbbind(inp, nam)
 
 		if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
 			return(error);
-#ifndef SCOPEDROUTING
-		/* this must be cleared for ifa_ifwithaddr() */
-		sin6->sin6_scope_id = 0;
-#endif
 
 		lport = sin6->sin6_port;
 
@@ -236,6 +232,9 @@ in6_pcbbind(inp, nam)
 				reuseport = SO_REUSEADDR | SO_REUSEPORT;
 		} else if (!IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
 			struct ifaddr *ia = NULL;
+#ifndef SCOPEDROUTING
+			u_int32_t lzone; 
+#endif
 
 			sin6->sin6_port = 0;  /*
 					       * Yechhhh, because of upcoming
@@ -244,9 +243,16 @@ in6_pcbbind(inp, nam)
 					       * well.  (What about flow?)
 					       */
 			sin6->sin6_flowinfo = 0;
+#ifndef SCOPEDROUTING
+			lzone = sin6->sin6_scope_id;
+			sin6->sin6_scope_id = 0; /* XXX: for ifa_ifwithaddr */
+#endif
 			if ((ia = ifa_ifwithaddr((struct sockaddr *)sin6))
 			    == NULL)
 				return EADDRNOTAVAIL;
+#ifndef SCOPEDROUTING
+			sin6->sin6_scope_id = lzone;
+#endif
 
 			/*
 			 * XXX: bind to an anycast address might accidentally
@@ -315,15 +321,14 @@ in6_pcbbind(inp, nam)
 #endif
 			{
 				t = in_pcblookup(head,
-				    (struct in_addr *)&zeroin6_addr, 0,
-				    (struct in_addr *)&sin6->sin6_addr, lport,
-				    wild);
+						 (void *)&sa6_any,
+						 0, sin6, lport, wild);
 			}
 
 			if (t && (reuseport & t->inp_socket->so_options) == 0)
 				return EADDRINUSE;
 		}
-		inp->inp_laddr6 = sin6->sin6_addr;
+		sa6_copy_addr(sin6, &inp->in6p_lsa);
 
 #if 0
 		if (!IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
@@ -334,7 +339,7 @@ in6_pcbbind(inp, nam)
 	}
 
 	if (lport == 0) {
-		error = in6_pcbsetport(&inp->inp_laddr6, inp);
+		error = in6_pcbsetport(&inp->in6p_lsa, inp);
 		if (error != 0)
 			return error;
 	} else
@@ -347,7 +352,7 @@ in6_pcbbind(inp, nam)
 
 int
 in6_pcbsetport(laddr, inp)
-	struct in6_addr *laddr;
+	struct sockaddr_in6 *laddr;
 	struct inpcb *inp;
 {
 	struct socket *so = inp->inp_socket;
@@ -415,8 +420,8 @@ portloop:
 				*lastport = first;
 			lport = htons(*lastport);
 		} while (in_baddynamic(*lastport, so->so_proto->pr_protocol) ||
-		    in_pcblookup(table, &zeroin6_addr, 0,
-		    &inp->inp_laddr6, lport, wild));
+		    in_pcblookup(table, (void *)&sa6_any, 0,
+		    &inp->in6p_lsa, lport, wild));
 	} else {
 		/*
 		 * counting up
@@ -442,8 +447,8 @@ portloop:
 				*lastport = first;
 			lport = htons(*lastport);
 		} while (in_baddynamic(*lastport, so->so_proto->pr_protocol) ||
-		    in_pcblookup(table, &zeroin6_addr, 0,
-		    &inp->inp_laddr6, lport, wild));
+		    in_pcblookup(table, (void *)&sa6_any, 0,
+		    &inp->in6p_lsa, lport, wild));
 	}
 
 	inp->inp_lport = lport;
@@ -467,14 +472,16 @@ in6_pcbconnect(inp, nam)
 	struct inpcb *inp;
 	struct mbuf *nam;
 {
-	struct in6_addr *in6a = NULL;
+	struct sockaddr_in6 *src6 = NULL;
+#ifndef SCOPEDROUTING
+	struct sockaddr_in6 src6_storage;
+#endif
 	struct sockaddr_in6 *sin6 = mtod(nam, struct sockaddr_in6 *);
 	struct ifnet *ifp = NULL;	/* outgoing interface */
 	int error = 0;
-	struct in6_addr mapped;
-	struct sockaddr_in6 tmp;
+	struct sockaddr_in6 tmp, mapped_sa6;
 
-	(void)&in6a;				/* XXX fool gcc */
+	(void)&src6;				/* XXX fool gcc */
 
 	if (nam->m_len != sizeof(*sin6))
 		return(EINVAL);
@@ -504,10 +511,6 @@ in6_pcbconnect(inp, nam)
 
 	if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
 		return(error);
-#ifndef SCOPEDROUTING
-	/* this must be cleared for ifa_ifwithaddr() */
-	sin6->sin6_scope_id = 0;
-#endif
 
 	/* Source address selection. */
 	if (IN6_IS_ADDR_V4MAPPED(&inp->inp_laddr6) &&
@@ -526,20 +529,23 @@ in6_pcbconnect(inp, nam)
 				error = EADDRNOTAVAIL;
 			return(error);
 		}
-		bzero(&mapped, sizeof(mapped));
-		mapped.s6_addr16[5] = htons(0xffff);
-		bcopy(&sinp->sin_addr, &mapped.s6_addr32[3], sizeof(sinp->sin_addr));
-		in6a = &mapped;
+		bzero(&mapped_sa6, sizeof(mapped_sa6));
+		mapped_sa6.sin6_family = AF_INET6;
+		mapped_sa6.sin6_len = sizeof(mapped_sa6);
+		mapped_sa6.sin6_addr.s6_addr16[5] = htons(0xffff);
+		bcopy(&sinp->sin_addr, &mapped_sa6.sin6_addr.s6_addr32[3],
+		      sizeof(sinp->sin_addr));
+		src6 = &mapped_sa6;
 	} else {
 		/*
 		 * XXX: in6_selectsrc might replace the bound local address
 		 * with the address specified by setsockopt(IPV6_PKTINFO).
 		 * Is it the intended behavior?
 		 */
-		in6a = in6_selectsrc(sin6, inp->inp_outputopts6,
-		    inp->inp_moptions6, &inp->inp_route6, &inp->inp_laddr6,
+		src6 = in6_selectsrc(sin6, inp->inp_outputopts6,
+		    inp->inp_moptions6, &inp->inp_route6, &inp->in6p_lsa,
 		    &ifp, &error);
-		if (in6a == 0) {
+		if (src6 == 0) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
 			return(error);
@@ -548,14 +554,24 @@ in6_pcbconnect(inp, nam)
 		    (error = scope6_setzoneid(ifp, sin6)) != 0) {
 			return(error);
 		}
+#ifndef SCOPEDROUTING	 /* XXX: addr6 may not have a valid zone id */
+		src6_storage = *src6;
+		if ((error = in6_recoverscope(&src6_storage,
+					      &src6->sin6_addr, NULL)) != 0) {
+			return (error);
+		}
+		/* XXX: also recover the embedded zone ID */
+		src6_storage.sin6_addr = src6->sin6_addr;
+		src6 = &src6_storage;
+#endif
 	}
 	if (ifp == NULL && inp->inp_route6.ro_rt)
 		ifp = inp->inp_route6.ro_rt->rt_ifp;
 
 	inp->inp_ipv6.ip6_hlim = (u_int8_t)in6_selecthlim(inp, ifp);
 
-	if (in_pcblookup(inp->inp_table, &sin6->sin6_addr, sin6->sin6_port,
-	    IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6) ? in6a : &inp->inp_laddr6,
+	if (in_pcblookup(inp->inp_table, sin6, sin6->sin6_port,
+	    IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6) ? src6 : &inp->in6p_lsa,
 	    inp->inp_lport, INPLOOKUP_IPV6)) {
 		return(EADDRINUSE);
 	}
@@ -564,9 +580,9 @@ in6_pcbconnect(inp, nam)
 	     inp->inp_laddr6.s6_addr32[3] == 0)) {
 		if (inp->inp_lport == 0)
 			(void)in6_pcbbind(inp, (struct mbuf *)0);
-		inp->inp_laddr6 = *in6a;
+		inp->inp_laddr6 = src6->sin6_addr;
 	}
-	inp->inp_faddr6 = sin6->sin6_addr;
+	sa6_copy_addr(sin6, &inp->in6p_fsa);
 	inp->inp_fport = sin6->sin6_port;
 	/* update flowinfo - draft-itojun-ipv6-flowlabel-api-00 */
 	inp->inp_flowinfo &= ~IPV6_FLOWLABEL_MASK;
@@ -659,8 +675,8 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		 */
 		if (cmd == PRC_MSGSIZE && (inp->inp_flags & IN6P_MTU) != 0 &&
 		    (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6) ||
-		     IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6,
-					&sa6_dst->sin6_addr))) {
+		     SA6_ARE_ADDR_EQUAL(&inp->in6p_fsa,
+					sa6_dst))) {
 			ip6_notify_pmtu(inp, (struct sockaddr_in6 *)dst,
 			    (u_int32_t *)cmdarg);
 		}
@@ -675,8 +691,12 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 			struct sockaddr_in6 *dst6;
 
 			dst6 = (struct sockaddr_in6 *)&inp->inp_route.ro_dst;
+#ifdef SCOPEDROUTING		/* XXX */
+			if (SA6_ARE_ADDR_EQUAL(dst6, sa6_dst))
+#else
 			if (IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr,
 			    &sa6_dst->sin6_addr))
+#endif
 				goto do_notify;
 		}
 
@@ -691,15 +711,13 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		if (lport == 0 && fport == 0 && flowinfo &&
 		    inp->inp_socket != NULL &&
 		    flowinfo == (inp->inp_flowinfo & IPV6_FLOWLABEL_MASK) &&
-		    IN6_ARE_ADDR_EQUAL(&inp->inp_laddr6, &sa6_src.sin6_addr))
+		    SA6_ARE_ADDR_EQUAL(&inp->in6p_lsa, &sa6_src))
 			goto do_notify;
-		else if (!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6,
-					     &sa6_dst->sin6_addr) ||
+		else if (!SA6_ARE_ADDR_EQUAL(&inp->in6p_fsa, sa6_dst) ||
 			 inp->inp_socket == 0 ||
 			 (lport && inp->inp_lport != lport) ||
 			 (!IN6_IS_ADDR_UNSPECIFIED(&sa6_src.sin6_addr) &&
-			  !IN6_ARE_ADDR_EQUAL(&inp->inp_laddr6,
-					      &sa6_src.sin6_addr)) ||
+			  !SA6_ARE_ADDR_EQUAL(&inp->in6p_lsa, &sa6_src)) ||
 			 (fport && inp->inp_fport != fport)) {
 			continue;
 		}
@@ -729,9 +747,10 @@ in6_setsockaddr(inp, nam)
 	sin6->sin6_family = AF_INET6;
 	sin6->sin6_len = sizeof(struct sockaddr_in6);
 	sin6->sin6_port = inp->inp_lport;
-	sin6->sin6_addr = inp->inp_laddr6;
-	/* KAME hack: recover scopeid */
-	(void)in6_recoverscope(sin6, &inp->inp_laddr6, NULL);
+	sa6_copy_addr(&inp->in6p_lsa, sin6);
+#ifndef SCOPEDROUTING
+	in6_clearscope(&sin6->sin6_addr);
+#endif
 
 	return 0;
 }
@@ -754,9 +773,10 @@ in6_setpeeraddr(inp, nam)
 	sin6->sin6_family = AF_INET6;
 	sin6->sin6_len = sizeof(struct sockaddr_in6);
 	sin6->sin6_port = inp->inp_fport;
-	sin6->sin6_addr = inp->inp_faddr6;
-	/* KAME hack: recover scopeid */
-	(void)in6_recoverscope(sin6, &inp->inp_faddr6, NULL);
+	sa6_copy_addr(&inp->in6p_fsa, sin6);
+#ifndef SCOPEDROUTING
+	in6_clearscope(&sin6->sin6_addr);
+#endif
 
 	return 0;
 }

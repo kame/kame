@@ -193,10 +193,10 @@ in_pcballoc(so, v)
 		inp->inp_flags = INP_IPV6;
 		if (ip6_auto_flowlabel)
 			inp->inp_flags |= IN6P_AUTOFLOWLABEL;
-		inp->inp_fsa6.sin6_family =
-			inp->inp_lsa6.sin6_family = AF_INET6;
-		inp->inp_fsa6.sin6_len =
-			inp->inp_lsa6.sin6_len = sizeof(struct sockaddr_in6);
+		inp->in6p_fsa.sin6_family =
+			inp->in6p_lsa.sin6_family = AF_INET6;
+		inp->in6p_fsa.sin6_len =
+			inp->in6p_lsa.sin6_len = sizeof(struct sockaddr_in6);
 	}
 	inp->in6p_cksum = -1;
 #endif /* INET6 */
@@ -449,7 +449,7 @@ in_pcbdisconnect(v)
 	switch (sotopf(inp->inp_socket)) {
 #ifdef INET6
 	case PF_INET6:
-		inp->inp_faddr6 = in6addr_any;
+		sa6_copy_addr(&sa6_any, &inp->in6p_fsa);
 		/* clear flowinfo - draft-itojun-ipv6-flowlabel-api-00 */
 		inp->inp_flowinfo &= ~IPV6_FLOWLABEL_MASK;
 		break;
@@ -740,8 +740,10 @@ in_pcblookup(table, faddrp, fport_arg, laddrp, lport_arg, flags)
 		wildcard = 0;
 #ifdef INET6
 		if (flags & INPLOOKUP_IPV6) {
-			struct in6_addr *laddr6 = (struct in6_addr *)laddrp;
-			struct in6_addr *faddr6 = (struct in6_addr *)faddrp;
+			struct sockaddr_in6 *lsa6, *fsa6;
+
+			lsa6 = (struct sockaddr_in6 *)laddrp;
+			fsa6 = (struct sockaddr_in6 *)faddrp;
 
 			if (!(inp->inp_flags & INP_IPV6))
 				continue;
@@ -750,23 +752,24 @@ in_pcblookup(table, faddrp, fport_arg, laddrp, lport_arg, flags)
 				continue;
 
 			if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6)) {
-				if (IN6_IS_ADDR_UNSPECIFIED(laddr6))
+				if (IN6_IS_ADDR_UNSPECIFIED(&lsa6->sin6_addr))
 					wildcard++;
-				else if (!IN6_ARE_ADDR_EQUAL(&inp->inp_laddr6, laddr6))
+				else if (!SA6_ARE_ADDR_EQUAL(&inp->in6p_lsa,
+							     lsa6))
 					continue;
 			} else {
-				if (!IN6_IS_ADDR_UNSPECIFIED(laddr6))
+				if (!IN6_IS_ADDR_UNSPECIFIED(&lsa6->sin6_addr))
 					wildcard++;
 			}
 
 			if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6)) {
-				if (IN6_IS_ADDR_UNSPECIFIED(faddr6))
+				if (IN6_IS_ADDR_UNSPECIFIED(&fsa6->sin6_addr))
 					wildcard++;
-				else if (!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6,
-				    faddr6) || inp->inp_fport != fport)
+				else if (!SA6_ARE_ADDR_EQUAL(&inp->in6p_fsa,
+				    fsa6) || inp->inp_fport != fport)
 					continue;
 			} else {
-				if (!IN6_IS_ADDR_UNSPECIFIED(faddr6))
+				if (!IN6_IS_ADDR_UNSPECIFIED(&fsa6->sin6_addr))
 					wildcard++;
 			}
 		} else
@@ -1007,22 +1010,23 @@ in_pcbhashlookup(table, faddr, fport_arg, laddr, lport_arg)
 
 #ifdef INET6
 struct inpcb *
-in6_pcbhashlookup(table, faddr, fport_arg, laddr, lport_arg)
+in6_pcbhashlookup(table, fsa, fport_arg, lsa, lport_arg)
 	struct inpcbtable *table;
-	struct in6_addr *faddr, *laddr;
+	struct sockaddr_in6 *fsa, *lsa;
 	u_int fport_arg, lport_arg;
 {
 	struct inpcbhead *head;
 	register struct inpcb *inp;
 	u_int16_t fport = fport_arg, lport = lport_arg;
 
-	head = IN6PCBHASH(table, faddr, fport, laddr, lport);
+	head = IN6PCBHASH(table, &fsa->sin6_addr, fport,
+			  &lsa->sin6_addr, lport);
 	for (inp = head->lh_first; inp != NULL; inp = inp->inp_hash.le_next) {
 		if (!(inp->inp_flags & INP_IPV6))
 			continue;
-		if (IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6, faddr) &&
+		if (SA6_ARE_ADDR_EQUAL(&inp->in6p_fsa, fsa) &&
 		    inp->inp_fport == fport && inp->inp_lport == lport &&
-		    IN6_ARE_ADDR_EQUAL(&inp->inp_laddr6, laddr)) {
+		    SA6_ARE_ADDR_EQUAL(&inp->in6p_lsa, lsa)) {
 			/*
 			 * Move this PCB to the head of hash chain so that
 			 * repeated accesses are quicker.  This is analogous to

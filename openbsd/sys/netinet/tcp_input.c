@@ -410,8 +410,8 @@ tcp_input(m, va_alist)
 	va_list ap;
 	register struct tcphdr *th;
 #ifdef INET6
-	struct in6_addr laddr6;
 	struct ip6_hdr *ipv6 = NULL;
+	struct sockaddr_in6 *src_sa6, *dst_sa6, lsa6;
 #endif /* INET6 */
 #ifdef IPSEC
 	struct m_tag *mtag;
@@ -638,6 +638,14 @@ tcp_input(m, va_alist)
 	}
 	tiflags = th->th_flags;
 
+#ifdef INET6
+	/* extract full sockaddr structures for the src/dst addresses */
+	if (af == AF_INET6) {
+		if (ip6_getpktaddrs(m, &src_sa6, &dst_sa6))
+			goto drop;
+	}
+#endif
+
 	/*
 	 * Convert TCP protocol specific fields to host format.
 	 */
@@ -653,8 +661,8 @@ findpcb:
 	switch (af) {
 #ifdef INET6
 	case AF_INET6:
-		inp = in6_pcbhashlookup(&tcbtable, &ipv6->ip6_src, th->th_sport,
-		    &ipv6->ip6_dst, th->th_dport);
+		inp = in6_pcbhashlookup(&tcbtable, src_sa6, th->th_sport,
+		    dst_sa6, th->th_dport);
 		break;
 #endif
 	case AF_INET:
@@ -676,8 +684,8 @@ findpcb:
 			if (faithprefix(&ipv6->ip6_dst))
 				flags |= INPLOOKUP_FAITH;
 #endif
-			inp = in_pcblookup(&tcbtable, &ipv6->ip6_src,
-			    th->th_sport, &ipv6->ip6_dst, th->th_dport,
+			inp = in_pcblookup(&tcbtable, src_sa6,
+			    th->th_sport, dst_sa6, th->th_dport,
 			    flags);
 			break;
 #endif /* INET6 */
@@ -862,7 +870,7 @@ findpcb:
 			switch (af) {
 #ifdef INET6
 			case AF_INET6:
-				inp->inp_laddr6 = ipv6->ip6_dst;
+				sa6_copy_addr(dst_sa6, &inp->in6p_lsa);
 				
 				/*inp->inp_options = ip6_srcroute();*/ /* soon. */
 				/*
@@ -1145,8 +1153,7 @@ findpcb:
 			switch (af) {
 #ifdef INET6
 			case AF_INET6:
-				if (IN6_ARE_ADDR_EQUAL(&ipv6->ip6_src,
-				    &ipv6->ip6_dst))
+				if (SA6_ARE_ADDR_EQUAL(src_sa6, dst_sa6))
 					goto drop;
 				break;
 #endif /* INET6 */
@@ -1198,16 +1205,16 @@ findpcb:
 			sin6 = mtod(am, struct sockaddr_in6 *);
 			sin6->sin6_family = AF_INET6;
 			sin6->sin6_len = sizeof(struct sockaddr_in6);
-			sin6->sin6_addr = ipv6->ip6_src;
+			sa6_copy_addr(src_sa6, sin6);
 			sin6->sin6_port = th->th_sport;
 			sin6->sin6_flowinfo = htonl(0x0fffffff) &
 				inp->inp_ipv6.ip6_flow;
-			laddr6 = inp->inp_laddr6;
+			lsa6 = inp->in6p_lsa;
 			if (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6))
-				inp->inp_laddr6 = ipv6->ip6_dst;
+				sa6_copy_addr(dst_sa6, &inp->in6p_lsa);
 			/* This is a good optimization. */
 			if (in6_pcbconnect(inp, am)) {
-				inp->inp_laddr6 = laddr6;
+				sa6_copy_addr(&lsa6, &inp->in6p_lsa);
 				(void) m_free(am);
 				goto drop;
 			}

@@ -801,7 +801,6 @@ tcp_ident(oldp, oldlenp, newp, newlen)
 	struct sockaddr_in *fin, *lin;
 #ifdef INET6
 	struct sockaddr_in6 *fin6, *lin6;
-	struct in6_addr f6, l6;
 #endif
 
 	if (oldp == NULL || newp != NULL || newlen != 0)
@@ -837,8 +836,8 @@ tcp_ident(oldp, oldlenp, newp, newlen)
 	s = splsoftnet();
 	if (is_ipv6) {
 #ifdef INET6
-		inp = in6_pcbhashlookup(&tcbtable, &f6,
-		    fin6->sin6_port, &l6, lin6->sin6_port);
+		inp = in6_pcbhashlookup(&tcbtable, fin6,
+		    fin6->sin6_port, lin6, lin6->sin6_port);
 #else
 		panic("tcp_ident: cannot happen");
 #endif
@@ -851,8 +850,8 @@ tcp_ident(oldp, oldlenp, newp, newlen)
 		++tcpstat.tcps_pcbhashmiss;
 		if (is_ipv6) {
 #ifdef INET6
-			inp = in_pcblookup(&tcbtable, &f6,
-			    fin6->sin6_port, &l6, lin6->sin6_port,
+			inp = in_pcblookup(&tcbtable, fin6,
+			    fin6->sin6_port, lin6, lin6->sin6_port,
 			    INPLOOKUP_WILDCARD | INPLOOKUP_IPV6);
 #else
 			panic("tcp_ident: cannot happen");
