@@ -1037,7 +1037,12 @@ udp_usrreq(so, req, m, addr, control)
 
 	case PRU_BIND:
 		s = splsoftnet();
-		error = in_pcbbind(inp, addr);
+#ifdef INET6
+		if (inp->inp_flags & INP_IPV6)
+			error = in6_pcbbind(inp, addr);
+		else
+#endif
+			error = in_pcbbind(inp, addr);
 		splx(s);
 		break;
 
@@ -1052,16 +1057,21 @@ udp_usrreq(so, req, m, addr, control)
 				error = EISCONN;
 				break;
 			}
+			s = splsoftnet();
+			error = in6_pcbconnect(inp, addr);
+			splx(s);
 		} else
 #endif /* INET6 */
+		{
 			if (inp->inp_faddr.s_addr != INADDR_ANY) {
 				error = EISCONN;
 				break;
 			}
+			s = splsoftnet();
+			error = in_pcbconnect(inp, addr);
+			splx(s);
+		}
 
-		s = splsoftnet();
-		error = in_pcbconnect(inp, addr);
-		splx(s);
 		if (error == 0)
 			soisconnected(so);
 		break;
@@ -1119,11 +1129,21 @@ udp_usrreq(so, req, m, addr, control)
 		break;
 
 	case PRU_SOCKADDR:
-		in_setsockaddr(inp, addr);
+#ifdef INET6
+		if (inp->inp_flags & INP_IPV6)
+			in6_setsockaddr(inp, addr);
+		else
+#endif /* INET6 */
+			in_setsockaddr(inp, addr);
 		break;
 
 	case PRU_PEERADDR:
-		in_setpeeraddr(inp, addr);
+#ifdef INET6
+		if (inp->inp_flags & INP_IPV6)
+			in6_setpeeraddr(inp, addr);
+		else
+#endif /* INET6 */
+			in_setpeeraddr(inp, addr);
 		break;
 
 	case PRU_SENSE:

@@ -848,18 +848,21 @@ MAYBESTATIC MAYBEINLINE int rip6_usrreq_connect(struct socket *so,
 {
   register struct inpcb *inp = sotoinpcb(so);
   register struct sockaddr_in6 *addr = (struct sockaddr_in6 *) nam;
+  int error;
+  struct in6_addr *in6a;
 
    if (addr->sin6_family != AF_INET6)
        return EAFNOSUPPORT;
 
-#if __NetBSD__ || __FreeBSD__ || __OpenBSD__
-     if (ifnet.tqh_first == 0) {
-#else /* __NetBSD__ || __FreeBSD__ || __OpenBSD__ */
-     if (ifnet == 0) {
-#endif /* __NetBSD__ || __FreeBSD__ || __OpenBSD__ */
-       return EADDRNOTAVAIL;  /* This is a weird way to say there
-			          are no interfaces, no? */
-     }
+	in6a = in6_selectsrc(addr, inp->inp_outputopts6,
+		inp->inp_moptions6, &inp->inp_route6, &inp->inp_laddr6,
+		&error);
+	if (in6a == NULL) {
+		if (error == 0)
+			error = EADDRNOTAVAIL;
+		return error;
+	}
+	inp->inp_laddr6 = *in6a;
 
    inp->inp_faddr6 = addr->sin6_addr;  /* Will structure assignment
 				          work with this compiler? */
