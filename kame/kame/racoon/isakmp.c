@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.128 2001/03/05 01:59:04 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.129 2001/03/05 03:08:07 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1171,8 +1171,10 @@ int
 isakmp_open()
 {
 	const int yes = 1;
+	int ifnum;
 	struct myaddrs *p;
 
+	ifnum = 0;
 	for (p = lcconf->myaddrs; p; p = p->next) {
 		if (!p->addr)
 			continue;
@@ -1259,6 +1261,8 @@ isakmp_open()
 			goto err_and_next;
 		}
 
+		ifnum++;
+
 		plog(LLV_INFO, LOCATION, NULL,
 			"%s used as isakmp port (fd=%d)\n",
 			saddr2str(p->addr), p->sock);
@@ -1271,6 +1275,12 @@ isakmp_open()
 		if (! lcconf->autograbaddr && lcconf->strict_address)
 			return -1;
 		continue;
+	}
+
+	if (!ifnum) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"no address could be bound.\n");
+		return -1;
 	}
 
 	return 0;
