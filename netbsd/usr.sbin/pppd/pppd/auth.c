@@ -1,4 +1,4 @@
-/*	$NetBSD: auth.c,v 1.25 1999/08/25 02:07:41 christos Exp $	*/
+/*	$NetBSD: auth.c,v 1.25.8.2 2000/09/30 06:21:41 simonb Exp $	*/
 
 /*
  * auth.c - PPP authentication and phase control.
@@ -37,9 +37,9 @@
 #include <sys/cdefs.h>
 #ifndef lint
 #if 0
-#define RCSID	"Id: auth.c,v 1.57 1999/08/13 06:46:10 paulus Exp "
+#define RCSID	"Id: auth.c,v 1.60 1999/12/23 01:25:13 paulus Exp "
 #else
-__RCSID("$NetBSD: auth.c,v 1.25 1999/08/25 02:07:41 christos Exp $");
+__RCSID("$NetBSD: auth.c,v 1.25.8.2 2000/09/30 06:21:41 simonb Exp $");
 #endif
 #endif
 
@@ -107,6 +107,10 @@ static int logged_in;
 /* List of addresses which the peer may use. */
 static struct permitted_ip *addresses[NUM_PPP];
 
+/* Wordlist giving addresses which the peer may use
+   without authenticating itself. */
+static struct wordlist *noauth_addrs;
+
 /* Extra options to apply, from the secrets file entry for the peer. */
 static struct wordlist *extra_options;
 
@@ -118,6 +122,26 @@ static int num_np_up;
 
 /* Set if we got the contents of passwd[] from the pap-secrets file. */
 static int passwd_from_file;
+
+/* Set if we require authentication only because we have a default route. */
+static bool default_auth;
+
+/* Hook to enable a plugin to control the idle time limit */
+int (*idle_time_hook) __P((struct ppp_idle *)) = NULL;
+
+/* Hook for a plugin to say whether we can possibly authenticate any peer */
+int (*pap_check_hook) __P((void)) = NULL;
+
+/* Hook for a plugin to check the PAP user and password */
+int (*pap_auth_hook) __P((char *user, char *passwd, char **msgp,
+			  struct wordlist **paddrs,
+			  struct wordlist **popts)) = NULL;
+
+/* Hook for a plugin to know about the PAP user logout */
+void (*pap_logout_hook) __P((void)) = NULL;
+
+/* Hook for a plugin to get the PAP password for authenticating us */
+int (*pap_passwd_hook) __P((char *user, char *passwd)) = NULL;
 
 /*
  * This is used to ensure that we don't start an auth-up/down
@@ -131,6 +155,8 @@ enum script_state {
 static enum script_state auth_state = s_down;
 static enum script_state auth_script_state = s_down;
 static pid_t auth_script_pid = 0;
+
+static int used_login;		/* peer authenticated against login database */
 
 /*
  * Option variables.
@@ -158,7 +184,7 @@ extern char *crypt __P((const char *, const char *));
 static void network_phase __P((int));
 static void check_idle __P((void *));
 static void connect_time_expired __P((void *));
-static int  plogin __P((char *, char *, char **, int *));
+static int  plogin __P((char *, char *, char **));
 static void plogout __P((void));
 static int  null_login __P((int));
 static int  get_pap_passwd __P((char *));
@@ -166,15 +192,18 @@ static int  have_pap_secret __P((int *));
 static int  have_chap_secret __P((char *, char *, int, int *));
 static int  ip_addr_check __P((u_int32_t, struct permitted_ip *));
 static int  scan_authfile __P((FILE *, char *, char *, char *,
-			       struct wordlist **, char *));
+			       struct wordlist **, struct wordlist **,
+			       char *));
 static void free_wordlist __P((struct wordlist *));
 static void auth_script __P((char *));
 static void auth_script_done __P((void *));
-static void set_allowed_addrs __P((int, struct wordlist *));
+static void set_allowed_addrs __P((int, struct wordlist *, struct wordlist *));
 static int  some_ip_ok __P((struct wordlist *));
 static int  setupapfile __P((char **));
 static int  privgroup __P((char **));
+static int  set_noauth_addr __P((char **));
 static void check_access __P((FILE *, char *));
+static int  wordlist_count __P((struct wordlist *));
 
 /*
  * Authentication-related options.
@@ -214,13 +243,16 @@ option_t auth_options[] = {
       "Use system password database for PAP", 1 },
     { "papcrypt", o_bool, &cryptpap,
       "PAP passwords are encrypted", 1 },
-    { "+ua", o_special, setupapfile,
+    { "+ua", o_special, (void *)setupapfile,
       "Get PAP user and password from file" },
     { "password", o_string, passwd,
       "Password for authenticating us to the peer", OPT_STATIC,
       NULL, MAXSECRETLEN },
-    { "privgroup", o_special, privgroup,
+    { "privgroup", o_special, (void *)privgroup,
       "Allow group members to use privileged options", OPT_PRIV },
+    { "allow-ip", o_special, (void *)set_noauth_addr,
+      "Set IP address(es) which can be used without authentication",
+      OPT_PRIV },
     { NULL }
 };
 
@@ -292,6 +324,29 @@ privgroup(argv)
 
 
 /*
+ * set_noauth_addr - set address(es) that can be used without authentication.
+ * Equivalent to specifying an entry like `"" * "" addr' in pap-secrets.
+ */
+static int
+set_noauth_addr(argv)
+    char **argv;
+{
+    char *addr = *argv;
+    int l = strlen(addr) + 1;
+    struct wordlist *wp;
+
+    wp = (struct wordlist *) malloc(sizeof(struct wordlist) + l);
+    if (wp == NULL)
+	novm("allow-ip argument");
+    wp->word = (char *) (wp + 1);
+    wp->next = noauth_addrs;
+    BCOPY(addr, wp->word, l);
+    noauth_addrs = wp;
+    return 1;
+}
+
+
+/*
  * An Open on LCP has requested a change from Dead to Establish phase.
  * Do what's necessary to bring the physical layer up.
  */
@@ -311,9 +366,13 @@ link_terminated(unit)
 {
     if (phase == PHASE_DEAD)
 	return;
-    if (logged_in)
-	plogout();
-    phase = PHASE_DEAD;
+    if (pap_logout_hook) {
+	pap_logout_hook();
+    } else {
+	if (logged_in)
+	    plogout();
+    }
+    new_phase(PHASE_DEAD);
     notice("Connection terminated.");
 }
 
@@ -329,6 +388,7 @@ link_down(unit)
 
     auth_state = s_down;
     if (auth_script_state == s_up && auth_script_pid == 0) {
+	update_link_stats(unit);
 	auth_script_state = s_down;
 	auth_script(_PATH_AUTHDOWN);
     }
@@ -343,7 +403,7 @@ link_down(unit)
     num_np_open = 0;
     num_np_up = 0;
     if (phase != PHASE_DEAD)
-	phase = PHASE_TERMINATE;
+	new_phase(PHASE_TERMINATE);
 }
 
 /*
@@ -372,10 +432,14 @@ link_established(unit)
     if (auth_required && !(go->neg_chap || go->neg_upap)) {
 	/*
 	 * We wanted the peer to authenticate itself, and it refused:
-	 * treat it as though it authenticated with PAP using a username
-	 * of "" and a password of "".  If that's not OK, boot it out.
+	 * if we have some address(es) it can use without auth, fine,
+	 * otherwise treat it as though it authenticated with PAP using
+	 * a username * of "" and a password of "".  If that's not OK,
+	 * boot it out.
 	 */
-	if (!wo->neg_upap || !null_login(unit)) {
+	if (noauth_addrs != NULL) {
+	    set_allowed_addrs(unit, NULL, NULL);
+	} else if (!wo->neg_upap || uselogin || !null_login(unit)) {
 	    warn("peer refused to authenticate: terminating link");
 	    lcp_close(unit, "peer refused to authenticate");
 	    status = EXIT_PEER_AUTH_FAILED;
@@ -383,7 +447,8 @@ link_established(unit)
 	}
     }
 
-    phase = PHASE_AUTHENTICATE;
+    new_phase(PHASE_AUTHENTICATE);
+    used_login = 0;
     auth = 0;
     if (go->neg_chap) {
 	ChapAuthPeer(unit, our_name, go->chap_mdtype);
@@ -435,7 +500,7 @@ network_phase(unit)
      * If we negotiated callback, do it now.
      */
     if (go->neg_cbcp) {
-	phase = PHASE_CALLBACK;
+	new_phase(PHASE_CALLBACK);
 	(*cbcp_protent.open)(unit);
 	return;
     }
@@ -458,11 +523,22 @@ start_networks()
     int i;
     struct protent *protp;
 
-    phase = PHASE_NETWORK;
-#if 0
+    new_phase(PHASE_NETWORK);
+
+#ifdef HAVE_MULTILINK
+    if (multilink) {
+	if (mp_join_bundle()) {
+	    if (updetach && !nodetach)
+		detach();
+	    return;
+	}
+    }
+#endif /* HAVE_MULTILINK */
+
+#ifdef PPP_FILTER
     if (!demand)
 	set_filters(&pass_filter_in, &pass_filter_out,
-		    &active_filter_int, &active_filter_out);
+		    &active_filter_in, &active_filter_out);
 #endif
     for (i = 0; (protp = protocols[i]) != NULL; ++i)
         if (protp->protocol < 0xC000 && protp->enabled_flag
@@ -521,7 +597,7 @@ auth_peer_success(unit, protocol, name, namelen)
 	namelen = sizeof(peer_authname) - 1;
     BCOPY(name, peer_authname, namelen);
     peer_authname[namelen] = 0;
-    script_setenv("PEERNAME", peer_authname);
+    script_setenv("PEERNAME", peer_authname, 0);
 
     /*
      * If there is no more authentication still to be done,
@@ -589,15 +665,22 @@ void
 np_up(unit, proto)
     int unit, proto;
 {
+    int tlim;
+
     if (num_np_up == 0) {
 	/*
 	 * At this point we consider that the link has come up successfully.
 	 */
 	status = EXIT_OK;
 	unsuccess = 0;
+	new_phase(PHASE_RUNNING);
 
-	if (idle_time_limit > 0)
-	    TIMEOUT(check_idle, NULL, idle_time_limit);
+	if (idle_time_hook != 0)
+	    tlim = (*idle_time_hook)(NULL);
+	else
+	    tlim = idle_time_limit;
+	if (tlim > 0)
+	    TIMEOUT(check_idle, NULL, tlim);
 
 	/*
 	 * Set a timeout to close the connection once the maximum
@@ -622,8 +705,9 @@ void
 np_down(unit, proto)
     int unit, proto;
 {
-    if (--num_np_up == 0 && idle_time_limit > 0) {
+    if (--num_np_up == 0) {
 	UNTIMEOUT(check_idle, NULL);
+	new_phase(PHASE_NETWORK);
     }
 }
 
@@ -646,22 +730,28 @@ np_finished(unit, proto)
  */
 static void
 check_idle(arg)
-     void *arg;
+    void *arg;
 {
     struct ppp_idle idle;
     time_t itime;
+    int tlim;
 
     if (!get_idle_time(0, &idle))
 	return;
-    itime = MIN(idle.xmit_idle, idle.recv_idle);
-    if (itime >= idle_time_limit) {
+    if (idle_time_hook != 0) {
+	tlim = idle_time_hook(&idle);
+    } else {
+	itime = MIN(idle.xmit_idle, idle.recv_idle);
+	tlim = idle_time_limit - itime;
+    }
+    if (tlim <= 0) {
 	/* link is idle: shut it down. */
 	notice("Terminating connection due to lack of activity.");
 	lcp_close(0, "Link inactive");
 	need_holdoff = 0;
 	status = EXIT_IDLE_TIMEOUT;
     } else {
-	TIMEOUT(check_idle, NULL, idle_time_limit - itime);
+	TIMEOUT(check_idle, NULL, tlim);
     }
 }
 
@@ -695,10 +785,12 @@ auth_check_options()
 
     /*
      * If we have a default route, require the peer to authenticate
-     * unless the noauth option was given.
+     * unless the noauth option was given or the real user is root.
      */
-    if (!auth_required && !allow_any_ip && have_route_to(0))
+    if (!auth_required && !allow_any_ip && have_route_to(0) && !privileged) {
 	auth_required = 1;
+	default_auth = 1;
+    }
 
     /* If authentication is required, ask peer for CHAP or PAP. */
     if (auth_required) {
@@ -722,21 +814,24 @@ auth_check_options()
 				    our_name, 1, &lacks_ip);
     }
 
-    if (auth_required && !can_auth) {
-	if (explicit_remote)
+    if (auth_required && !can_auth && noauth_addrs == NULL) {
+	if (default_auth) {
 	    option_error(
-"The remote system (%s) is required to authenticate itself but I",
+"By default the remote system is required to authenticate itself");
+	    option_error(
+"(because this system has a default route to the internet)");
+	} else if (explicit_remote)
+	    option_error(
+"The remote system (%s) is required to authenticate itself",
 			 remote_name);
 	else
 	    option_error(
-"The remote system is required to authenticate itself but I");
-
-	if (!lacks_ip)
+"The remote system is required to authenticate itself");
+	option_error(
+"but I couldn't find any suitable secret (password) for it to use to do so.");
+	if (lacks_ip)
 	    option_error(
-"couldn't find any suitable secret (password) for it to use to do so.");
-	else
-	    option_error(
-"couldn't find any secret (password) which would let it use an IP address.");
+"(None of the available passwords would let it use an IP address.)");
 
 	exit(1);
     }
@@ -781,38 +876,52 @@ auth_reset(unit)
  * In either case, msg points to an appropriate message.
  */
 int
-check_passwd(unit, auser, userlen, apasswd, passwdlen, msg, msglen)
+check_passwd(unit, auser, userlen, apasswd, passwdlen, msg)
     int unit;
     char *auser;
     int userlen;
     char *apasswd;
     int passwdlen;
     char **msg;
-    int *msglen;
 {
     int ret;
     char *filename;
     FILE *f;
-    struct wordlist *addrs;
+    struct wordlist *addrs = NULL, *opts = NULL;
     char passwd[256], user[256];
     char secret[MAXWORDLEN];
     static int attempts = 0;
 
     /*
      * Make copies of apasswd and auser, then null-terminate them.
+     * If there are unprintable characters in the password, make
+     * them visible.
      */
-    BCOPY(apasswd, passwd, passwdlen);
-    passwd[passwdlen] = '\0';
-    BCOPY(auser, user, userlen);
-    user[userlen] = '\0';
-    *msg = (char *) 0;
+    slprintf(passwd, sizeof(passwd), "%.*v", passwdlen, apasswd);
+    slprintf(user, sizeof(user), "%.*v", userlen, auser);
+    *msg = "";
+
+    /*
+     * Check if a plugin wants to handle this.
+     */
+    if (pap_auth_hook) {
+	ret = (*pap_auth_hook)(user, passwd, msg, &addrs, &opts);
+	if (ret >= 0) {
+	    if (ret)
+		set_allowed_addrs(unit, addrs, opts);
+	    BZERO(passwd, sizeof(passwd));
+	    if (addrs != 0)
+		free_wordlist(addrs);
+	    return ret? UPAP_AUTHACK: UPAP_AUTHNAK;
+	}
+    }
 
     /*
      * Open the file of pap secrets and scan for a suitable secret
      * for authenticating this user.
      */
     filename = _PATH_UPAPFILE;
-    addrs = NULL;
+    addrs = opts = NULL;
     ret = UPAP_AUTHNAK;
     f = fopen(filename, "r");
     if (f == NULL) {
@@ -820,31 +929,38 @@ check_passwd(unit, auser, userlen, apasswd, passwdlen, msg, msglen)
 
     } else {
 	check_access(f, filename);
-	if (scan_authfile(f, user, our_name, secret, &addrs, filename) < 0) {
+	if (scan_authfile(f, user, our_name, secret, &addrs, &opts, filename) < 0) {
 	    warn("no PAP secret found for %s", user);
-	} else if (secret[0] != 0) {
-	    /* password given in pap-secrets - must match */
-	    if ((!cryptpap && strcmp(passwd, secret) == 0)
-		|| strcmp(crypt(passwd, secret), secret) == 0)
-		ret = UPAP_AUTHACK;
-	    else
-		warn("PAP authentication failure for %s", user);
-	} else if (uselogin) {
-	    /* empty password in pap-secrets and login option */
-	    ret = plogin(user, passwd, msg, msglen);
-	    if (ret == UPAP_AUTHNAK)
-		warn("PAP login failure for %s", user);
 	} else {
-	    /* empty password in pap-secrets and login option not used */
+	    /*
+	     * If the secret is "@login", it means to check
+	     * the password against the login database.
+	     */
+	    int login_secret = strcmp(secret, "@login") == 0;
 	    ret = UPAP_AUTHACK;
+	    if (uselogin || login_secret) {
+		/* login option or secret is @login */
+		ret = plogin(user, passwd, msg);
+		if (ret == UPAP_AUTHNAK)
+		    warn("PAP login failure for %s", user);
+		else
+		    used_login = 1;
+	    }
+	    if (secret[0] != 0 && !login_secret) {
+		/* password given in pap-secrets - must match */
+		if ((cryptpap || strcmp(passwd, secret) != 0)
+		    && strcmp(crypt(passwd, secret), secret) != 0) {
+		    ret = UPAP_AUTHNAK;
+		    warn("PAP authentication failure for %s", user);
+		}
+	    }
 	}
 	fclose(f);
     }
 
     if (ret == UPAP_AUTHNAK) {
-        if (*msg == (char *) 0)
+        if (**msg == 0)
 	    *msg = "Login incorrect";
-	*msglen = strlen(*msg);
 	/*
 	 * XXX can we ever get here more than once??
 	 * Frustrate passwd stealer programs.
@@ -857,17 +973,18 @@ check_passwd(unit, auser, userlen, apasswd, passwdlen, msg, msglen)
 	}
 	if (attempts > 3)
 	    sleep((u_int) (attempts - 3) * 5);
-	if (addrs != NULL)
-	    free_wordlist(addrs);
+	if (opts != NULL)
+	    free_wordlist(opts);
 
     } else {
 	attempts = 0;			/* Reset count */
-	if (*msg == (char *) 0)
+	if (**msg == 0)
 	    *msg = "Login ok";
-	*msglen = strlen(*msg);
-	set_allowed_addrs(unit, addrs);
+	set_allowed_addrs(unit, addrs, opts);
     }
 
+    if (addrs != NULL)
+	free_wordlist(addrs);
     BZERO(passwd, sizeof(passwd));
     BZERO(secret, sizeof(secret));
 
@@ -950,11 +1067,10 @@ static struct pam_conv PAM_conversation = {
  */
 
 static int
-plogin(user, passwd, msg, msglen)
+plogin(user, passwd, msg)
     char *user;
     char *passwd;
     char **msg;
-    int *msglen;
 {
     char *tty;
 
@@ -1110,12 +1226,11 @@ null_login(unit)
     char *filename;
     FILE *f;
     int i, ret;
-    struct wordlist *addrs;
+    struct wordlist *addrs, *opts;
     char secret[MAXWORDLEN];
 
     /*
      * Open the file of pap secrets and scan for a suitable secret.
-     * We don't accept a wildcard client.
      */
     filename = _PATH_UPAPFILE;
     addrs = NULL;
@@ -1124,13 +1239,15 @@ null_login(unit)
 	return 0;
     check_access(f, filename);
 
-    i = scan_authfile(f, "", our_name, secret, &addrs, filename);
-    ret = i >= 0 && (i & NONWILD_CLIENT) != 0 && secret[0] == 0;
+    i = scan_authfile(f, "", our_name, secret, &addrs, &opts, filename);
+    ret = i >= 0 && secret[0] == 0;
     BZERO(secret, sizeof(secret));
 
     if (ret)
-	set_allowed_addrs(unit, addrs);
-    else
+	set_allowed_addrs(unit, addrs, opts);
+    else if (opts != 0)
+	free_wordlist(opts);
+    if (addrs != 0)
 	free_wordlist(addrs);
 
     fclose(f);
@@ -1151,18 +1268,25 @@ get_pap_passwd(passwd)
     char *filename;
     FILE *f;
     int ret;
-    struct wordlist *addrs;
     char secret[MAXWORDLEN];
 
+    /*
+     * Check whether a plugin wants to supply this.
+     */
+    if (pap_passwd_hook) {
+	ret = (*pap_passwd_hook)(user, passwd);
+	if (ret >= 0)
+	    return ret;
+    }
+
     filename = _PATH_UPAPFILE;
-    addrs = NULL;
     f = fopen(filename, "r");
     if (f == NULL)
 	return 0;
     check_access(f, filename);
     ret = scan_authfile(f, user,
 			(remote_name[0]? remote_name: NULL),
-			secret, NULL, filename);
+			secret, NULL, NULL, filename);
     fclose(f);
     if (ret < 0)
 	return 0;
@@ -1186,13 +1310,20 @@ have_pap_secret(lacks_ipp)
     char *filename;
     struct wordlist *addrs;
 
+    /* let the plugin decide, if there is one */
+    if (pap_check_hook) {
+	ret = (*pap_check_hook)();
+	if (ret >= 0)
+	    return ret;
+    }
+
     filename = _PATH_UPAPFILE;
     f = fopen(filename, "r");
     if (f == NULL)
 	return 0;
 
     ret = scan_authfile(f, (explicit_remote? remote_name: NULL), our_name,
-			NULL, &addrs, filename);
+			NULL, &addrs, NULL, filename);
     fclose(f);
     if (ret >= 0 && !some_ip_ok(addrs)) {
 	if (lacks_ipp != 0)
@@ -1234,7 +1365,7 @@ have_chap_secret(client, server, need_ip, lacks_ipp)
     else if (server != NULL && server[0] == 0)
 	server = NULL;
 
-    ret = scan_authfile(f, client, server, NULL, &addrs, filename);
+    ret = scan_authfile(f, client, server, NULL, &addrs, NULL, filename);
     fclose(f);
     if (ret >= 0 && need_ip && !some_ip_ok(addrs)) {
 	if (lacks_ipp != 0)
@@ -1265,7 +1396,7 @@ get_secret(unit, client, server, secret, secret_len, am_server)
     FILE *f;
     int ret, len;
     char *filename;
-    struct wordlist *addrs;
+    struct wordlist *addrs, *opts;
     char secbuf[MAXWORDLEN];
 
     if (!am_server && passwd[0] != 0) {
@@ -1282,13 +1413,17 @@ get_secret(unit, client, server, secret, secret_len, am_server)
 	}
 	check_access(f, filename);
 
-	ret = scan_authfile(f, client, server, secbuf, &addrs, filename);
+	ret = scan_authfile(f, client, server, secbuf, &addrs, &opts, filename);
 	fclose(f);
 	if (ret < 0)
 	    return 0;
 
 	if (am_server)
-	    set_allowed_addrs(unit, addrs);
+	    set_allowed_addrs(unit, addrs, opts);
+	else if (opts != 0)
+	    free_wordlist(opts);
+	if (addrs != 0)
+	    free_wordlist(addrs);
     }
 
     len = strlen(secbuf);
@@ -1309,12 +1444,13 @@ get_secret(unit, client, server, secret, secret_len, am_server)
  * and leaves the following words in extra_options.
  */
 static void
-set_allowed_addrs(unit, addrs)
+set_allowed_addrs(unit, addrs, opts)
     int unit;
     struct wordlist *addrs;
+    struct wordlist *opts;
 {
     int n;
-    struct wordlist *ap, **pap;
+    struct wordlist *ap, **plink;
     struct permitted_ip *ip;
     char *ptr_word, *ptr_mask;
     struct hostent *hp;
@@ -1328,26 +1464,22 @@ set_allowed_addrs(unit, addrs)
     addresses[unit] = NULL;
     if (extra_options != NULL)
 	free_wordlist(extra_options);
-    extra_options = NULL;
+    extra_options = opts;
 
     /*
-     * Count the number of IP addresses given, and chop off
-     * any extra options for this peer.
+     * Count the number of IP addresses given.
      */
-    for (n = 0, pap = &addrs; (ap = *pap) != NULL; pap = &ap->next, ++n) {
-	if (strcmp(ap->word, "--") == 0) {
-	    /* rest are options */
-	    *pap = 0;
-	    extra_options = ap->next;
-	    free(ap);
-	    break;
-	}
-    }
+    n = wordlist_count(addrs) + wordlist_count(noauth_addrs);
     if (n == 0)
 	return;
     ip = (struct permitted_ip *) malloc((n + 1) * sizeof(struct permitted_ip));
     if (ip == 0)
 	return;
+
+    /* temporarily append the noauth_addrs list to addrs */
+    for (plink = &addrs; *plink != NULL; plink = &(*plink)->next)
+	;
+    *plink = noauth_addrs;
 
     n = 0;
     for (ap = addrs; ap != NULL; ap = ap->next) {
@@ -1438,6 +1570,7 @@ set_allowed_addrs(unit, addrs)
 	if (~mask == 0 && suggested_ip == 0)
 	    suggested_ip = a;
     }
+    *plink = NULL;
 
     ip[n].permit = 0;		/* make the last entry forbid all addresses */
     ip[n].base = 0;		/* to terminate the list */
@@ -1464,12 +1597,20 @@ auth_ip_addr(unit, addr)
     int unit;
     u_int32_t addr;
 {
-    if (addresses[unit] == NULL) {
-	if (auth_required)
-	    return 0;		/* no addresses authorized */
-	return allow_any_ip || !have_route_to(addr);
+    int ok;
+
+    /* don't allow loopback or multicast address */
+    if (bad_ip_adrs(addr))
+	return 0;
+
+    if (addresses[unit] != NULL) {
+	ok = ip_addr_check(addr, addresses[unit]);
+	if (ok >= 0)
+	    return ok;
     }
-    return ip_addr_check(addr, addresses[unit]);
+    if (auth_required)
+	return 0;		/* no addresses authorized */
+    return allow_any_ip || privileged || !have_route_to(addr);
 }
 
 static int
@@ -1477,10 +1618,6 @@ ip_addr_check(addr, addrs)
     u_int32_t addr;
     struct permitted_ip *addrs;
 {
-    /* don't allow loopback or multicast address */
-    if (bad_ip_adrs(addr))
-	return 0;
-
     for (; ; ++addrs)
 	if ((addr & addrs->mask) == addrs->base)
 	    return addrs->permit;
@@ -1509,7 +1646,7 @@ some_ip_ok(addrs)
     struct wordlist *addrs;
 {
     for (; addrs != 0; addrs = addrs->next) {
-	if (strcmp(addrs->word, "-") == 0)
+	if (addrs->word[0] == '-')
 	    break;
 	if (addrs->word[0] != '!')
 	    return 1;		/* some IP address is allowed */
@@ -1542,29 +1679,34 @@ check_access(f, filename)
  * if no secret is found, otherwise >= 0.  The return value has
  * NONWILD_CLIENT set if the secret didn't have "*" for the client, and
  * NONWILD_SERVER set if the secret didn't have "*" for the server.
- * Any following words on the line (i.e. address authorization
- * info) are placed in a wordlist and returned in *addrs.
+ * Any following words on the line up to a "--" (i.e. address authorization
+ * info) are placed in a wordlist and returned in *addrs.  Any
+ * following words (extra options) are placed in a wordlist and
+ * returned in *opts.
  * We assume secret is NULL or points to MAXWORDLEN bytes of space.
  */
 static int
-scan_authfile(f, client, server, secret, addrs, filename)
+scan_authfile(f, client, server, secret, addrs, opts, filename)
     FILE *f;
     char *client;
     char *server;
     char *secret;
     struct wordlist **addrs;
+    struct wordlist **opts;
     char *filename;
 {
     int newline, xxx;
     int got_flag, best_flag;
     FILE *sf;
-    struct wordlist *ap, *addr_list, *alist, *alast;
+    struct wordlist *ap, *addr_list, *alist, **app;
     char word[MAXWORDLEN];
     char atfile[MAXWORDLEN];
     char lsecret[MAXWORDLEN];
 
     if (addrs != NULL)
 	*addrs = NULL;
+    if (opts != NULL)
+	*opts = NULL;
     addr_list = NULL;
     if (!getword(f, word, &newline, filename))
 	return -1;		/* file is empty??? */
@@ -1618,46 +1760,44 @@ scan_authfile(f, client, server, secret, addrs, filename)
 	if (newline)
 	    continue;
 
-	/*
-	 * Special syntax: @filename means read secret from file.
-	 */
-	if (word[0] == '@') {
-	    strlcpy(atfile, word+1, sizeof(atfile));
-	    if ((sf = fopen(atfile, "r")) == NULL) {
-		warn("can't open indirect secret file %s", atfile);
-		continue;
-	    }
-	    check_access(sf, atfile);
-	    if (!getword(sf, word, &xxx, atfile)) {
-		warn("no secret in indirect secret file %s", atfile);
+	if (secret != NULL) {
+	    /*
+	     * Special syntax: @/pathname means read secret from file.
+	     */
+	    if (word[0] == '@' && word[1] == '/') {
+		strlcpy(atfile, word+1, sizeof(atfile));
+		if ((sf = fopen(atfile, "r")) == NULL) {
+		    warn("can't open indirect secret file %s", atfile);
+		    continue;
+		}
+		check_access(sf, atfile);
+		if (!getword(sf, word, &xxx, atfile)) {
+		    warn("no secret in indirect secret file %s", atfile);
+		    fclose(sf);
+		    continue;
+		}
 		fclose(sf);
-		continue;
 	    }
-	    fclose(sf);
-	}
-	if (secret != NULL)
 	    strlcpy(lsecret, word, sizeof(lsecret));
+	}
 
 	/*
 	 * Now read address authorization info and make a wordlist.
 	 */
-	alist = alast = NULL;
+	app = &alist;
 	for (;;) {
 	    if (!getword(f, word, &newline, filename) || newline)
 		break;
 	    ap = (struct wordlist *) malloc(sizeof(struct wordlist));
 	    if (ap == NULL)
 		novm("authorized addresses");
-	    ap->next = NULL;
 	    ap->word = strdup(word);
 	    if (ap->word == NULL)
-		novm("authorized address");
-	    if (alist == NULL)
-		alist = ap;
-	    else
-		alast->next = ap;
-	    alast = ap;
+		novm("authorized addresses");
+	    *app = ap;
+	    app = &ap->next;
 	}
+	*app = NULL;
 
 	/*
 	 * This is the best so far; remember it.
@@ -1673,12 +1813,40 @@ scan_authfile(f, client, server, secret, addrs, filename)
 	    break;
     }
 
+    /* scan for a -- word indicating the start of options */
+    for (app = &addr_list; (ap = *app) != NULL; app = &ap->next)
+	if (strcmp(ap->word, "--") == 0)
+	    break;
+    /* ap = start of options */
+    if (ap != NULL) {
+	ap = ap->next;		/* first option */
+	free(*app);			/* free the "--" word */
+	*app = NULL;		/* terminate addr list */
+    }
+    if (opts != NULL)
+	*opts = ap;
+    else if (ap != NULL)
+	free_wordlist(ap);
     if (addrs != NULL)
 	*addrs = addr_list;
     else if (addr_list != NULL)
 	free_wordlist(addr_list);
 
     return best_flag;
+}
+
+/*
+ * wordlist_count - return the number of items in a wordlist
+ */
+static int
+wordlist_count(wp)
+    struct wordlist *wp;
+{
+    int n;
+
+    for (n = 0; wp != NULL; wp = wp->next)
+	++n;
+    return n;
 }
 
 /*

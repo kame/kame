@@ -1,8 +1,77 @@
-/*	$NetBSD: ipv6cp.c,v 1.6 2000/04/17 08:55:33 itojun Exp $	*/
+/*	$NetBSD: ipv6cp.c,v 1.6.4.2 2000/09/30 06:21:42 simonb Exp $	*/
 
 /*
- * ipv6cp.c - PPP IPV6 Control Protocol.
- *
+    ipv6cp.c - PPP IPV6 Control Protocol.
+    Copyright (C) 1999  Tommi Komulainen <Tommi.Komulainen@iki.fi>
+
+    Redistribution and use in source and binary forms are permitted
+    provided that the above copyright notice and this paragraph are
+    duplicated in all such forms.  The name of the author may not be
+    used to endorse or promote products derived from this software
+    without specific prior written permission.
+    THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
+    IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
+    WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+*/
+
+/*  Original version, based on RFC2023 :
+
+    Copyright (c) 1995, 1996, 1997 Francis.Dupont@inria.fr, INRIA Rocquencourt,
+    Alain.Durand@imag.fr, IMAG,
+    Jean-Luc.Richier@imag.fr, IMAG-LSR.
+
+    Copyright (c) 1998, 1999 Francis.Dupont@inria.fr, GIE DYADE,
+    Alain.Durand@imag.fr, IMAG,
+    Jean-Luc.Richier@imag.fr, IMAG-LSR.
+
+    Ce travail a été fait au sein du GIE DYADE (Groupement d'Intérêt
+    Économique ayant pour membres BULL S.A. et l'INRIA).
+
+    Ce logiciel informatique est disponible aux conditions
+    usuelles dans la recherche, c'est-à-dire qu'il peut
+    être utilisé, copié, modifié, distribué à l'unique
+    condition que ce texte soit conservé afin que
+    l'origine de ce logiciel soit reconnue.
+
+    Le nom de l'Institut National de Recherche en Informatique
+    et en Automatique (INRIA), de l'IMAG, ou d'une personne morale
+    ou physique ayant participé à l'élaboration de ce logiciel ne peut
+    être utilisé sans son accord préalable explicite.
+
+    Ce logiciel est fourni tel quel sans aucune garantie,
+    support ou responsabilité d'aucune sorte.
+    Ce logiciel est dérivé de sources d'origine
+    "University of California at Berkeley" et
+    "Digital Equipment Corporation" couvertes par des copyrights.
+
+    L'Institut d'Informatique et de Mathématiques Appliquées de Grenoble (IMAG)
+    est une fédération d'unités mixtes de recherche du CNRS, de l'Institut National
+    Polytechnique de Grenoble et de l'Université Joseph Fourier regroupant
+    sept laboratoires dont le laboratoire Logiciels, Systèmes, Réseaux (LSR).
+
+    This work has been done in the context of GIE DYADE (joint R & D venture
+    between BULL S.A. and INRIA).
+
+    This software is available with usual "research" terms
+    with the aim of retain credits of the software. 
+    Permission to use, copy, modify and distribute this software for any
+    purpose and without fee is hereby granted, provided that the above
+    copyright notice and this permission notice appear in all copies,
+    and the name of INRIA, IMAG, or any contributor not be used in advertising
+    or publicity pertaining to this material without the prior explicit
+    permission. The software is provided "as is" without any
+    warranties, support or liabilities of any kind.
+    This software is derived from source code from
+    "University of California at Berkeley" and
+    "Digital Equipment Corporation" protected by copyrights.
+
+    Grenoble's Institute of Computer Science and Applied Mathematics (IMAG)
+    is a federation of seven research units funded by the CNRS, National
+    Polytechnic Institute of Grenoble and University Joseph Fourier.
+    The research unit in Software, Systems, Networks (LSR) is member of IMAG.
+*/
+
+/*
  * Derived from :
  *
  *
@@ -23,24 +92,22 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * Id: ipv6cp.c,v 1.3 1999/08/24 05:31:09 paulus Exp 
- *
- *
- * Original version by Inria (www.inria.fr)
- * Modified to match RFC2472 by Tommi Komulainen <Tommi.Komulainen@iki.fi>
+ * Id: ipv6cp.c,v 1.11 2000/08/05 06:46:47 paulus Exp  
  */
 
 #include <sys/cdefs.h>
 #ifndef lint
 #if 0
-#define RCSID	"Id: ipv6cp.c,v 1.3 1999/08/24 05:31:09 paulus Exp "
+#define RCSID	"Id: ipv6cp.c,v 1.7 1999/10/08 01:08:18 masputra Exp "
 #else
-__RCSID("$NetBSD: ipv6cp.c,v 1.6 2000/04/17 08:55:33 itojun Exp $");
+__RCSID("$NetBSD: ipv6cp.c,v 1.6.4.2 2000/09/30 06:21:42 simonb Exp $");
 #endif
 #endif
 
 /*
  * TODO: 
+ *
+ * Proxy Neighbour Discovery.
  *
  * Better defines for selecting the ordering of
  *   interface up / set address. (currently checks for __linux__,
@@ -48,6 +115,7 @@ __RCSID("$NetBSD: ipv6cp.c,v 1.6 2000/04/17 08:55:33 itojun Exp $");
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <netdb.h>
@@ -122,7 +190,7 @@ static fsm_callbacks ipv6cp_callbacks = { /* IPV6CP callback routines */
 static int setifaceid __P((char **arg));
 
 static option_t ipv6cp_option_list[] = {
-    { "ipv6", o_special, setifaceid,
+    { "ipv6", o_special, (void *)setifaceid,
       "Set interface identifiers for IPV6" },
     { "noipv6", o_bool, &ipv6cp_protent.enabled_flag,
       "Disable IPv6 and IPv6CP" },
@@ -135,7 +203,10 @@ static option_t ipv6cp_option_list[] = {
       "Accept peer's interface identifier for us", 1 },
     { "ipv6cp-use-ipaddr", o_bool, &ipv6cp_allowoptions[0].use_ip,
       "Use (default) IPv4 address as interface identifier", 0 },
-
+#if defined(SOL2)
+    { "ipv6cp-use-persistent", o_bool, &ipv6cp_wantoptions[0].use_persistent,
+      "Use uniquely-available persistent value for link local address", 1 },
+#endif /* defined(SOL2) */
     { "ipv6cp-restart", o_int, &ipv6cp_fsm[0].timeouttime,
       "Set timeout for IPv6CP" },
     { "ipv6cp-max-terminate", o_int, &ipv6cp_fsm[0].maxtermtransmits,
@@ -185,7 +256,7 @@ struct protent ipv6cp_protent = {
     ipv6_active_pkt
 };
 
-static void ipv6cp_clear_addrs __P((int));
+static void ipv6cp_clear_addrs __P((int, eui64_t, eui64_t));
 static void ipv6cp_script __P((char *));
 static void ipv6cp_script_done __P((void *));
 
@@ -213,28 +284,28 @@ static pid_t ipv6cp_script_pid;
  * setifaceid - set the interface identifiers manually
  */
 static int
-setifaceid(arg)
-    char **arg;
+setifaceid(argv)
+    char **argv;
 {
-    char *p, *comma;
+    char *comma, *arg;
     ipv6cp_options *wo = &ipv6cp_wantoptions[0];
     struct in6_addr addr;
 
 #define s6_addr32 __u6_addr.__u6_addr32 /* non-standard */
 #define VALIDID(a) ( (((a).s6_addr32[0] == 0) && ((a).s6_addr32[1] == 0)) && \
 			(((a).s6_addr32[2] != 0) || ((a).s6_addr32[3] != 0)) )
-    p = *arg; 
-    if ((comma = strchr(p, ',')) == NULL)
-	comma = p + strlen(p);
+    arg = *argv;
+    if ((comma = strchr(arg, ',')) == NULL)
+	comma = arg + strlen(arg);
     
     /* 
      * If comma first character, then no local identifier
      */
-    if (comma != p) {
+    if (comma != arg) {
 	*comma = '\0';
 
-	if (inet_pton(AF_INET6, p, &addr) != 1 || !VALIDID(addr)) {
-	    option_error("Illegal interface identifier: %s", p);
+	if (inet_pton(AF_INET6, arg, &addr) == 0 || !VALIDID(addr)) {
+	    option_error("Illegal interface identifier (local): %s", arg);
 	    return 0;
 	}
 	
@@ -247,8 +318,8 @@ setifaceid(arg)
      * If comma last character, the no remote identifier
      */
     if (*comma != 0 && *++comma != '\0') {
-	if (inet_pton(AF_INET6, comma, &addr) != 1 || !VALIDID(addr)) {
-	    option_error("Illegal interface identifier: %s", comma);
+	if (inet_pton(AF_INET6, comma, &addr) == 0 || !VALIDID(addr)) {
+	    option_error("Illegal interface identifier (remote): %s", comma);
 	    return 0;
 	}
 	eui64_copy(addr.s6_addr32[2], wo->hisid);
@@ -856,14 +927,14 @@ ipv6cp_reqci(f, inp, len, reject_if_disagree)
 		orc = CONFREJ;
 		break;
 	    }
-#else
-	    orc = CONFREJ;
-	    break;
-#endif
 
 	    ho->neg_vj = 1;
 	    ho->vj_protocol = cishort;
 	    break;
+#else
+	    orc = CONFREJ;
+	    break;
+#endif
 
 	default:
 	    orc = CONFREJ;
@@ -941,6 +1012,28 @@ ipv6_check_options()
     if (!ipv6cp_protent.enabled_flag)
 	return;
 
+#if defined(SOL2)
+    /*
+     * Persistent link-local id is only used when user has not explicitly
+     * configure/hard-code the id
+     */
+    if ((wo->use_persistent) && (!wo->opt_local) && (!wo->opt_remote)) {
+
+	/* 
+	 * On systems where there are no Ethernet interfaces used, there
+	 * may be other ways to obtain a persistent id. Right now, it
+	 * will fall back to using magic [see eui64_magic] below when
+	 * an EUI-48 from MAC address can't be obtained. Other possibilities
+	 * include obtaining EEPROM serial numbers, or some other unique
+	 * yet persistent number. On Sparc platforms, this is possible,
+	 * but too bad there's no standards yet for x86 machines.
+	 */
+	if (ether_to_eui64(&wo->ourid)) {
+	    wo->opt_local = 1;
+	}
+    }
+#endif
+
     if (!wo->opt_local) {	/* init interface identifier */
 	if (wo->use_ip && eui64_iszero(wo->ourid)) {
 	    eui64_setlo32(wo->ourid, ntohl(ipcp_wantoptions[0].ouraddr));
@@ -977,9 +1070,14 @@ ipv6_demand_conf(u)
 {
     ipv6cp_options *wo = &ipv6cp_wantoptions[u];
 
-#if defined(__linux__) || (defined(SVR4) && (defined(SNI) || defined(__USLC__)))
+#if defined(__linux__) || defined(SOL2) || (defined(SVR4) && (defined(SNI) || defined(__USLC__)))
+#if defined(SOL2)
+    if (!sif6up(u))
+	return 0;
+#else
     if (!sifup(u))
 	return 0;
+#endif /* defined(SOL2) */
 #endif    
     if (!sif6addr(u, wo->ourid, wo->hisid))
 	return 0;
@@ -1036,8 +1134,8 @@ ipv6cp_up(f)
 	    return;
 	}
     }
-    script_setenv("LLLOCAL", llv6_ntoa(go->ourid));
-    script_setenv("LLREMOTE", llv6_ntoa(ho->hisid));
+    script_setenv("LLLOCAL", llv6_ntoa(go->ourid), 0);
+    script_setenv("LLREMOTE", llv6_ntoa(ho->hisid), 0);
 
 #ifdef IPV6CP_COMP
     /* set tcp compression */
@@ -1058,7 +1156,7 @@ ipv6cp_up(f)
 	    if (! eui64_equals(ho->hisid, wo->hisid))
 		warn("Remote LL address changed to %s", 
 		     llv6_ntoa(ho->hisid));
-	    ipv6cp_clear_addrs(f->unit);
+	    ipv6cp_clear_addrs(f->unit, go->ourid, ho->hisid);
 
 	    /* Set the interface to the new addresses */
 	    if (!sif6addr(f->unit, go->ourid, ho->hisid)) {
@@ -1076,7 +1174,7 @@ ipv6cp_up(f)
 	/*
 	 * Set LL addresses
 	 */
-#if !defined(__linux__) && !(defined(SVR4) && (defined(SNI) || defined(__USLC__)))
+#if !defined(__linux__) && !defined(SOL2) && !(defined(SVR4) && (defined(SNI) || defined(__USLC__)))
 	if (!sif6addr(f->unit, go->ourid, ho->hisid)) {
 	    if (debug)
 		warn("sif6addr failed");
@@ -1086,14 +1184,23 @@ ipv6cp_up(f)
 #endif
 
 	/* bring the interface up for IPv6 */
-	if (!sifup(f->unit)) {
+#if defined(SOL2)
+	if (!sif6up(f->unit)) {
 	    if (debug)
-		warn("sif6up failed");
+		warn("sifup failed (IPV6)");
 	    ipv6cp_close(f->unit, "Interface configuration failed");
 	    return;
 	}
+#else
+	if (!sifup(f->unit)) {
+	    if (debug)
+		warn("sifup failed (IPV6)");
+	    ipv6cp_close(f->unit, "Interface configuration failed");
+	    return;
+	}
+#endif /* defined(SOL2) */
 
-#if defined(__linux__) || (defined(SVR4) && (defined(SNI) || defined(__USLC__)))
+#if defined(__linux__) || defined(SOL2) || (defined(SVR4) && (defined(SNI) || defined(__USLC__)))
 	if (!sif6addr(f->unit, go->ourid, ho->hisid)) {
 	    if (debug)
 		warn("sif6addr failed");
@@ -1148,11 +1255,17 @@ ipv6cp_down(f)
     if (demand) {
 	sifnpmode(f->unit, PPP_IPV6, NPMODE_QUEUE);
     } else {
-#if !defined(__linux__) && !(defined(SVR4) && (defined(SNI) || defined(__USLC)))
 	sifnpmode(f->unit, PPP_IPV6, NPMODE_DROP);
+#if !defined(__linux__) && !(defined(SVR4) && (defined(SNI) || defined(__USLC)))
+#if defined(SOL2)
+	sif6down(f->unit);
+#else
 	sifdown(f->unit);
+#endif /* defined(SOL2) */
 #endif
-	ipv6cp_clear_addrs(f->unit);
+	ipv6cp_clear_addrs(f->unit, 
+			   ipv6cp_gotoptions[f->unit].ourid,
+			   ipv6cp_hisoptions[f->unit].hisid);
 #if defined(__linux__) || (defined(SVR4) && (defined(SNI) || defined(__USLC)))
 	sifdown(f->unit);
 #endif
@@ -1168,16 +1281,14 @@ ipv6cp_down(f)
 
 /*
  * ipv6cp_clear_addrs() - clear the interface addresses, routes,
- * proxy arp entries, etc.
+ * proxy neighbour discovery entries, etc.
  */
 static void
-ipv6cp_clear_addrs(unit)
+ipv6cp_clear_addrs(unit, ourid, hisid)
     int unit;
+    eui64_t ourid;
+    eui64_t hisid;
 {
-    eui64_t ourid, hisid;
-
-    ourid = ipv6cp_gotoptions[unit].ourid;
-    hisid = ipv6cp_hisoptions[unit].hisid;
     cif6addr(unit, ourid, hisid);
 }
 
@@ -1326,7 +1437,7 @@ ipv6cp_printpkt(p, plen, printer, arg)
     case TERMREQ:
 	if (len > 0 && *p >= ' ' && *p < 0x7f) {
 	    printer(arg, " ");
-	    print_string(p, len, printer, arg);
+	    print_string((char *)p, len, printer, arg);
 	    p += len;
 	    len = 0;
 	}
