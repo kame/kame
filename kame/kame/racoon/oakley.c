@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.96 2001/08/16 05:02:13 itojun Exp $	*/
+/*	$KAME: oakley.c,v 1.97 2001/08/16 06:01:34 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,6 +108,7 @@ static int oakley_check_certid __P((struct ph1handle *iph1));
 static int check_typeofcertname __P((int, int));
 static cert_t *save_certbuf __P((struct isakmp_gen *));
 #endif
+static int oakley_padlen __P((int));
 
 int
 oakley_get_defaultlifetime()
@@ -2789,7 +2790,7 @@ end:
 }
 
 /* culculate padding length */
-int
+static int
 oakley_padlen(len)
 	int len;
 {

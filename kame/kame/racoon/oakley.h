@@ -1,4 +1,4 @@
-/*	$KAME: oakley.h,v 1.25 2001/08/14 15:21:05 sakane Exp $	*/
+/*	$KAME: oakley.h,v 1.26 2001/08/16 06:01:34 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -188,4 +188,3 @@ extern vchar_t *oakley_do_decrypt __P((struct ph1handle *,
 	vchar_t *, vchar_t *, vchar_t *));
 extern vchar_t *oakley_do_encrypt __P((struct ph1handle *,
 	vchar_t *, vchar_t *, vchar_t *));
-extern int oakley_padlen __P((int));
