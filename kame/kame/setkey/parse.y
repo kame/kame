@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.81 2003/07/01 04:01:48 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.82 2004/04/15 08:03:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -319,6 +319,11 @@ enc_alg
 
 			p_key_enc_len = 0;
 			p_key_enc = NULL;
+			if (ipsec_check_keylen(SADB_EXT_SUPPORTED_ENCRYPT,
+			    p_alg_enc, PFKEY_UNUNIT64(p_key_enc_len)) < 0) {
+				yyerror(ipsec_strerror());
+				return -1;
+			}
 		}
 	|	ALG_ENC key_string {
 			if ($1 < 0) {
@@ -345,6 +350,11 @@ enc_alg
 
 			p_key_enc_len = 0;
 			p_key_enc = NULL;
+			if (ipsec_check_keylen(SADB_EXT_SUPPORTED_ENCRYPT,
+			    p_alg_enc, PFKEY_UNUNIT64(p_key_enc_len)) < 0) {
+				yyerror(ipsec_strerror());
+				return -1;
+			}
 		}
 	|	ALG_ENC_DESDERIV key_string
 		{
