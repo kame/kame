@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.88 2001/11/07 05:26:04 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.89 2001/11/09 03:42:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1394,7 +1394,7 @@ getans_dns(buf, len, from, fromlen)
 	} else {
 		qc->rbuf = malloc(len);
 		if (qc->rbuf == NULL)
-		goto fail;
+			goto fail;
 		qc->rlen = len;
 		memcpy(qc->rbuf, buf, len);
 		ret = sendto(qc->sd->s, buf, len, 0, qc->from,
