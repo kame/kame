@@ -24,7 +24,7 @@ static const char copyright[] =
     "@(#) Copyright (c) 1988, 1989, 1991, 1994, 1995, 1996, 1997\n\
 The Regents of the University of California.  All rights reserved.\n";
 static const char rcsid[] =
-    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.5 1999/09/03 03:04:19 itojun Exp $ (LBL)";
+    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.6 1999/09/03 03:12:11 itojun Exp $ (LBL)";
 #endif
 
 /*
@@ -627,10 +627,52 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
-#if 0 /*defer*/
+#ifdef IPSEC
+#ifdef IPSEC_POLICY_IPSEC
+    {
+	int len;
+	char buf[16];
+
+	/*
+	 * do not raise error even if setsockopt fails, kernel may have ipsec
+	 * turned off.
+	 */
+	if ((len = ipsec_set_policy(buf, sizeof(buf), "in bypass")) < 0) {
+		Fprintf(stderr, "%s: %s\n", prog, ipsec_strerror());
+		exit(1);
+	}
+	(void)setsockopt(sndsock, IPPROTO_IP, IP_IPSEC_POLICY, buf, len);
+	if ((len = ipsec_set_policy(buf, sizeof(buf), "out bypass")) < 0) {
+		Fprintf(stderr, "%s: %s\n", prog, ipsec_strerror());
+		exit(1);
+	}
+	(void)setsockopt(sndsock, IPPROTO_IP, IP_IPSEC_POLICY, buf, len);
+    }
+#else
+    {
+	int level = IPSEC_LEVEL_BYPASS;
+
+	(void)setsockopt(sndsock, IPPROTO_IP, IP_ESP_TRANS_LEVEL, &level,
+		sizeof(level));
+	(void)setsockopt(sndsock, IPPROTO_IP, IP_ESP_NETWORK_LEVEL, &level,
+		sizeof(level));
+#ifdef IP_AUTH_TRANS_LEVEL
+	(void)setsockopt(sndsock, IPPROTO_IP, IP_AUTH_TRANS_LEVEL, &level,
+		sizeof(level));
+#else
+	(void)setsockopt(sndsock, IPPROTO_IP, IP_AUTH_LEVEL, &level,
+		sizeof(level));
+#endif
+#ifdef IP_AUTH_NETWORK_LEVEL
+	(void)setsockopt(sndsock, IPPROTO_IP, IP_AUTH_NETWORK_LEVEL, &level,
+		sizeof(level));
+#endif
+    }
+#endif /*IPSEC_POLICY_IPSEC*/
+#endif /*IPSEC*/
+
 	/* Revert to non-privileged user after opening sockets */
 	setuid(getuid());
-#endif
 
 #if defined(IP_OPTIONS) && !defined(HAVE_RAW_OPTIONS)
 	if (lsrr > 0) {
@@ -694,52 +736,6 @@ main(int argc, char **argv)
 	if (options & SO_DONTROUTE)
 		(void)setsockopt(sndsock, SOL_SOCKET, SO_DONTROUTE, (char *)&on,
 		    sizeof(on));
-#ifdef IPSEC
-#ifdef IPSEC_POLICY_IPSEC
-    {
-	int len;
-	char buf[16];
-
-	/*
-	 * do not raise error even if setsockopt fails, kernel may have ipsec
-	 * turned off.
-	 */
-	if ((len = ipsec_set_policy(buf, sizeof(buf), "in bypass")) < 0) {
-		Fprintf(stderr, "%s: %s\n", prog, ipsec_strerror());
-		exit(1);
-	}
-	(void)setsockopt(sndsock, IPPROTO_IP, IP_IPSEC_POLICY, buf, len);
-	if ((len = ipsec_set_policy(buf, sizeof(buf), "out bypass")) < 0) {
-		Fprintf(stderr, "%s: %s\n", prog, ipsec_strerror());
-		exit(1);
-	}
-	(void)setsockopt(sndsock, IPPROTO_IP, IP_IPSEC_POLICY, buf, len);
-    }
-#else
-    {
-	int level = IPSEC_LEVEL_BYPASS;
-
-	(void)setsockopt(sndsock, IPPROTO_IP, IP_ESP_TRANS_LEVEL, &level,
-		sizeof(level));
-	(void)setsockopt(sndsock, IPPROTO_IP, IP_ESP_NETWORK_LEVEL, &level,
-		sizeof(level));
-#ifdef IP_AUTH_TRANS_LEVEL
-	(void)setsockopt(sndsock, IPPROTO_IP, IP_AUTH_TRANS_LEVEL, &level,
-		sizeof(level));
-#else
-	(void)setsockopt(sndsock, IPPROTO_IP, IP_AUTH_LEVEL, &level,
-		sizeof(level));
-#endif
-#ifdef IP_AUTH_NETWORK_LEVEL
-	(void)setsockopt(sndsock, IPPROTO_IP, IP_AUTH_NETWORK_LEVEL, &level,
-		sizeof(level));
-#endif
-    }
-#endif /*IPSEC_POLICY_IPSEC*/
-#endif /*IPSEC*/
-
-	/* Revert to non-privileged user after opening sockets */
-	setuid(getuid());
 
 	/* Get the interface address list */
 	n = ifaddrlist(&al, errbuf);
