@@ -1,3 +1,5 @@
+/*	$KAME: vrrp_state.c,v 1.3 2002/07/10 04:54:16 itojun Exp $	*/
+
 /*
  * Copyright (c) 2001,2002 Sebastien Petit <spe@bsdfr.org>
  *
@@ -28,8 +30,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: vrrp_state.c,v 1.2 2002/07/09 07:29:00 ono Exp $
  */
 
 #include "vrrp_state.h"

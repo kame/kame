@@ -1,4 +1,4 @@
-# $Id: TODO,v 1.1 2002/07/09 07:19:20 ono Exp $
+#	$KAME: TODO,v 1.2 2002/07/10 04:54:15 itojun Exp $
 
 * Cryptographic Authentification Data
 * Possiblity to set netmask for VIP address(es)

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.2 2002/07/09 07:28:58 ono Exp $
+#	$KAME: Makefile,v 1.3 2002/07/10 04:54:15 itojun Exp $
 
 .if exists(${.CURDIR}/../Makefile.opsys)
 .include "${.CURDIR}/../Makefile.opsys"
