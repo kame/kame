@@ -162,11 +162,11 @@ static int expand_isakmpspec __P((int prop_no, int trns_no, int *types,
 	/* static sa */
 %token STATICSA STATICSA_STATEMENT
 
-%token NUMBER SWITCH
+%token NUMBER SWITCH BOOLEAN
 %token HEXSTRING QUOTEDSTRING ADDRSTRING
 %token EOS BOC EOC COMMA
 
-%type <num> NUMBER SWITCH keylength
+%type <num> NUMBER BOOLEAN SWITCH keylength
 %type <num> PATHTYPE IDENTIFIERTYPE LOGLEV 
 %type <num> ALGORITHM_CLASS algorithm_types algorithm_type dh_group_num
 %type <num> ALGORITHMTYPE STRENGTHTYPE
