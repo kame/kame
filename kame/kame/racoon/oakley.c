@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.60 2000/09/21 04:18:33 itojun Exp $	*/
+/*	$KAME: oakley.c,v 1.61 2000/09/21 20:13:11 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.60 2000/09/21 04:18:33 itojun Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.61 2000/09/21 20:13:11 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1616,6 +1616,13 @@ oakley_savecert(iph1, gen)
 		plog(logp, LOCATION, NULL,
 			"Invalid CERT type %d\n", type);
 		return -1;
+	}
+
+	/* XXX choice the 1th cert, igore after the cert. */ 
+	if (*c) {
+		plog(logp, LOCATION, NULL,
+			"NOTICE: ignore the cert.\n");
+		return 0;
 	}
 
 	*c = save_certbuf(gen);
