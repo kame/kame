@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: setkey.8,v 1.7 1999/09/10 02:20:10 itojun Exp $
+.\"     $Id: setkey.8,v 1.8 1999/09/29 23:10:25 itojun Exp $
 .\"
 .Dd May 17, 1998
 .Dt SETKEY 8
@@ -499,13 +499,15 @@ parameter:
 .\" 
 .Sh EXAMPLES
 .Bd -literal -offset
-add	10.0.11.41 10.0.11.33 esp 0x10001
-		-E des-cbc "hogehoge"
-		-A hmac-md5 "hagehogehogehoge" ;
+add	3ffe:501:4819::1 3ffe:501:481d::1 esp 123457
+		-E des-cbc "ESP SA!!"
 
 add	3ffe:501:4819::1 3ffe:501:481d::1 ah 123456
-		-E blowfish-cbc "kamekame"
-		-A hmac-sha1 "hogehogehogehogehoge" ;
+		-A hmac-sha1 "AH SA configuration!" ;
+
+add	10.0.11.41 10.0.11.33 esp 0x10001
+		-E des-cbc "ESP with"
+		-A hmac-md5 "authentication!!" ;
 
 get	3ffe:501:4819::1 3ffe:501:481d::1 ah 123456 ;
 
