@@ -303,7 +303,9 @@ rip6_input(mp, offp, proto)
   bzero(&srcsa, sizeof(struct sockaddr_in6));
   srcsa.sin6_family = AF_INET6;
   srcsa.sin6_len = sizeof(struct sockaddr_in6);
+#if 0 /*XXX inbound flowinfo */
   srcsa.sin6_flowinfo = ip6->ip6_flow & IPV6_FLOWINFO_MASK;
+#endif
   /* KAME hack: recover scopeid */
   (void)in6_recoverscope(&srcsa, &ip6->ip6_src, m->m_pkthdr.rcvif);
 

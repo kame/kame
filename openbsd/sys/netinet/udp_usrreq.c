@@ -330,7 +330,9 @@ udp_input(m, va_alist)
 		srcsa.sin6.sin6_len = sizeof(struct sockaddr_in6);
 		srcsa.sin6.sin6_family = AF_INET6;
 		srcsa.sin6.sin6_port = uh->uh_sport;
+#if 0 /*XXX inbound flowinfo */
 		srcsa.sin6.sin6_flowinfo = htonl(0x0fffffff) & ipv6->ip6_flow;
+#endif
 		/* KAME hack: recover scopeid */
 		(void)in6_recoverscope(&srcsa.sin6, &ipv6->ip6_src,
 		    m->m_pkthdr.rcvif);
