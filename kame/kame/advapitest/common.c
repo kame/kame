@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.11 2001/12/25 02:53:40 jinmei Exp $ */
+/*	$KAME: common.c,v 1.12 2001/12/27 14:31:48 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -43,6 +43,7 @@
 
 #include <err.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "common.h"
 
@@ -342,7 +343,7 @@ print_icmp6_filter(filter)
 				putchar('0');
 		}
 		if (i < 3)	/* XXX */
-			printf("\n%*s", strlen(indent), "");
+			printf("\n%*s", (int)strlen(indent), "");
 		else
 			printf("]\n");
 	}
@@ -489,8 +490,8 @@ print_opthdr(void *extbuf)
 
 	ext = (struct ip6_hbh *)extbuf;
 	extlen = (ext->ip6h_len + 1) * 8;
-	printf("    nxt %u, len %u (%d bytes)\n", ext->ip6h_nxt,
-	       ext->ip6h_len, extlen);
+	printf("    nxt %d, len %d (%d bytes)\n", ext->ip6h_nxt,
+	       ext->ip6h_len, (int)extlen);
 
 	currentlen = 0;
 	while (1) {
@@ -522,7 +523,7 @@ print_opthdr(void *extbuf)
 			break;
 #endif
 		default:
-			printf("    Opt %u len %u\n", type, len);
+			printf("    Opt %d len %d\n", type, (int)len);
 			break;
 		}
 	}
