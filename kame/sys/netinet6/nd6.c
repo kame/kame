@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.67 2000/06/04 12:54:57 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.68 2000/07/02 14:48:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -269,8 +269,7 @@ nd6_setmtu(ifp)
 				 */
 				if (in6_maxmtu < ndi->linkmtu)
 					in6_maxmtu = ndi->linkmtu;
-			}
-			else
+			} else
 				in6_setmaxmtu();
 		}
 	}
@@ -525,8 +524,7 @@ nd6_timer(ignored_arg)
 				nd6_ns_output(ifp, &dst->sin6_addr,
 					      &dst->sin6_addr,
 					      ln, 0);
-			}
-			else
+			} else
 				ln->ln_state = ND6_LLINFO_STALE; /* XXX */
 			break;
 		case ND6_LLINFO_PROBE:
@@ -779,8 +777,7 @@ nd6_lookup(addr6, create, ifp)
 					(struct llinfo_nd6 *)rt->rt_llinfo;
 				ln->ln_state = ND6_LLINFO_NOSTATE;
 			}
-		}
-		else
+		} else
 			return(NULL);
 	}
 	rt->rt_refcnt--;
@@ -1448,8 +1445,7 @@ nd6_ioctl(cmd, data, ifp)
 			if (IN6_IS_ADDR_LINKLOCAL(&drl->defrouter[i].rtaddr)) {
 				/* XXX: need to this hack for KAME stack */
 				drl->defrouter[i].rtaddr.s6_addr16[1] = 0;
-			}
-			else
+			} else
 				log(LOG_ERR,
 				    "default router list contains a "
 				    "non-linklocal address(%s)\n",
@@ -1498,8 +1494,7 @@ nd6_ioctl(cmd, data, ifp)
 					if (IN6_IS_ADDR_LINKLOCAL(&RTRADDR)) {
 						/* XXX: hack for KAME */
 						RTRADDR.s6_addr16[1] = 0;
-					}
-					else
+					} else
 						log(LOG_ERR,
 						    "a router(%s) advertises "
 						    "a prefix with "
