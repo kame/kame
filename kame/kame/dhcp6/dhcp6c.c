@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.136 2004/06/10 08:34:50 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.137 2004/06/14 05:31:51 itojun Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -421,7 +421,7 @@ client6_ifinit(ifp)
 		dprintf(LOG_WARNING, FNAME, "failed to allocate "
 		    "authentication parameters");
 		dhcp6_remove_event(ev);
-		return (NULL);
+		return (0);
 	}
 
 	if ((ev->timer = dhcp6_add_timer(client6_timo, ev)) == NULL) {
