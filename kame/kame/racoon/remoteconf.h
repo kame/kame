@@ -1,4 +1,4 @@
-/*	$KAME: remoteconf.h,v 1.19 2000/10/11 19:54:08 sakane Exp $	*/
+/*	$KAME: remoteconf.h,v 1.20 2000/12/12 16:59:43 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -92,6 +92,7 @@ struct isakmpsa {
 	int encklen;
 	int authmethod;
 	int hashtype;
+	vchar_t *gssid;
 	int dh_group;			/* don't use it if aggressive mode */
 	struct dhgroup *dhgrp;		/* don't use it if aggressive mode */
 

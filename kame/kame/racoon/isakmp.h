@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.h,v 1.16 2000/10/04 17:41:00 itojun Exp $	*/
+/*	$KAME: isakmp.h,v 1.17 2000/12/12 16:59:38 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -83,6 +83,7 @@ struct isakmp {
 #define ISAKMP_NPTYPE_D		12	/* Delete */
 #define ISAKMP_NPTYPE_VID	13	/* Vendor ID */
 #define ISAKMP_NPTYPE_MAX	14
+#define ISAKMP_NPTYPE_GSS	129	/* GSS token */
 
 #define ISAKMP_MAJOR_VERSION	1
 #define ISAKMP_MINOR_VERSION	0

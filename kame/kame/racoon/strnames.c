@@ -1,4 +1,4 @@
-/*	$KAME: strnames.c,v 1.15 2000/10/04 17:41:04 itojun Exp $	*/
+/*	$KAME: strnames.c,v 1.16 2000/12/12 16:59:43 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -180,6 +180,7 @@ static struct ksmap name_isakmp_nptype[] = {
 { ISAKMP_NPTYPE_N,	"notify",	NULL },
 { ISAKMP_NPTYPE_D,	"delete",	NULL },
 { ISAKMP_NPTYPE_VID,	"vid",		NULL },
+{ ISAKMP_NPTYPE_GSS,	"gss id",	NULL },
 };
 
 char *
@@ -430,6 +431,7 @@ static struct ksmap name_oakley_attr[] = {
 { OAKLEY_ATTR_FIELD_SIZE,	"Field Size",		NULL },
 { OAKLEY_ATTR_GRP_ORDER,	"Group Order",		NULL },
 { OAKLEY_ATTR_BLOCK_SIZE,	"Block Size",		NULL },
+{ OAKLEY_ATTR_GSS_ID,		"GSS-API endpoint name",NULL },
 };
 
 char *
@@ -488,6 +490,7 @@ static struct ksmap name_attr_isakmp_method[] = {
 { OAKLEY_ATTR_AUTH_METHOD_RSAREV,	"Revised encryption with RSA",	NULL },
 { OAKLEY_ATTR_AUTH_METHOD_EGENC,	"Encryption with El-Gamal",	NULL },
 { OAKLEY_ATTR_AUTH_METHOD_EGREV,	"Revised encryption with El-Gamal",	NULL },
+{ OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB,	"GSS-API on Kerberos 5", NULL },
 };
 
 char *

@@ -51,6 +51,16 @@ AC_ARG_ENABLE(idea,
 	[], [enable_idea=no])
 AC_MSG_RESULT($enable_idea)
 
+AC_MSG_CHECKING(if --enable-gssapi option is specified)
+AC_ARG_ENABLE(rc5,
+        [  --enable-gssapi            enable GSS-API authentication],
+        [], [enable_gssapi=no])
+if test $enable_gssapi = "yes"; then
+	AC_DEFINE(HAVE_GSSAPI)
+fi
+AC_MSG_RESULT($enable_gssapi)
+
+
 efence_dir=
 AC_MSG_CHECKING(if --with-efence option is specified)
 AC_ARG_WITH(efence, [  --with-efence=DIR       specify ElectricFence directory],
@@ -123,6 +133,20 @@ if test "x$crypto_dir" = "x"; then
 		fi
 		;;
 	esac
+fi
+if test "x$krb5_incdir" = "x"; then
+	case $host_os in
+	netbsd*)	krb5_incdir="/usr/include/krb5";;
+	esac
+fi
+if test "x$krb5_libs" = "x"; then
+	case $host_os in
+	netbsd*)	krb5_libs="-lgssapi -lkrb5 -lcom_err -lroken -lasn1";;
+	esac
+fi
+if test $enable_gssapi = "yes"; then
+	LIBS="$LIBS $krb5_libs"
+	CPPFLAGS="-I$krb5_incdir $CPPFLAGS"
 fi
 dnl for some reason, past version of freebsd port requires us to set -I for
 dnl BOTH openssl/cast.h and cast.h.  who should I blame (or am I mistaken?)

@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.17 2000/11/11 04:55:07 sakane Exp $	*/
+/*	$KAME: main.c,v 1.18 2000/12/12 16:59:40 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -264,4 +264,3 @@ parse(ac, av)
 
 	return;
 }
-

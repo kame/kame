@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.40 2000/10/12 09:11:05 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.41 2000/12/12 16:59:34 thorpej Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -306,6 +306,7 @@ octetstring	{octet}({dot}{octet})+
 <S_RMTP>authentication_method { YYD; yylval.num = algclass_isakmp_ameth; return(ALGORITHM_CLASS); }
 <S_RMTP>hash_algorithm	{ YYD; yylval.num = algclass_isakmp_hash; return(ALGORITHM_CLASS); }
 <S_RMTP>dh_group	{ YYD; return(DH_GROUP); }
+<S_RMTP>gssapi_id	{ YYD; return(GSSAPI_ID); }
 
 	/* static sa */
 <S_INI>static_sa	{
@@ -396,6 +397,7 @@ rsasig		{ YYD; yylval.num = algtype_rsasig;	return(ALGORITHMTYPE); }
 dsssig		{ YYD; yylval.num = algtype_dsssig;	return(ALGORITHMTYPE); }
 rsaenc		{ YYD; yylval.num = algtype_rsaenc;	return(ALGORITHMTYPE); }
 rsarev		{ YYD; yylval.num = algtype_rsarev;	return(ALGORITHMTYPE); }
+gssapi_krb	{ YYD; yylval.num = algtype_gssapikrb;	return(ALGORITHMTYPE); }
 
 	/* identifier type */
 user_fqdn	{ YYD; yylval.num = IDTYPE_USERFQDN; return(IDENTIFIERTYPE); }

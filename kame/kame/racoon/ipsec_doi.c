@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.120 2000/11/01 10:39:11 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.121 2000/12/12 16:59:37 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,9 +80,13 @@
 #include "crypto_openssl.h"
 #include "strnames.h"
 
+#ifdef HAVE_GSSAPI
+#include "gssapi.h"
+#endif
+
 static vchar_t *get_ph1approval __P((struct ph1handle *, struct prop_pair **));
 static struct isakmpsa *get_ph1approvalx __P((struct prop_pair *,
-	struct isakmpsa *));
+	struct isakmpsa *, struct isakmpsa *));
 static int t2isakmpsa __P((struct isakmp_pl_t *, struct isakmpsa *));
 static int cmp_aproppair_i __P((struct prop_pair *, struct prop_pair *));
 static struct prop_pair *get_ph2approval __P((struct ph2handle *,
@@ -141,6 +145,11 @@ static vchar_t *setph2proposal0 __P((const struct ph2handle *,
 
 static vchar_t *getidval __P((int, vchar_t *));
 
+#ifdef HAVE_GSSAPI
+static struct isakmpsa *fixup_initiator_sa __P((struct isakmpsa *,
+	struct isakmpsa *));
+#endif
+
 /*%%%*/
 /*
  * check phase 1 SA payload.
@@ -187,7 +196,7 @@ get_ph1approval(iph1, pair)
 	struct prop_pair **pair;
 {
 	vchar_t *newsa;
-	struct isakmpsa *sa;
+	struct isakmpsa *sa, tsa;
 	struct prop_pair *s, *p;
 	int prophlen;
 	int i;
@@ -202,7 +211,8 @@ get_ph1approval(iph1, pair)
 					+ s->prop->spi_size;
 			/* compare proposal and select one */
 			for (p = s; p; p = p->tnext) {
-				sa = get_ph1approvalx(p, iph1->rmconf->proposal);
+				sa = get_ph1approvalx(p, iph1->rmconf->proposal,
+				    &tsa);
 				if (sa != NULL)
 					goto found;
 			}
@@ -255,7 +265,37 @@ found:
 	}
 
 saok:
+	if (sa->gssid != NULL)
+		plog(logp, LOCATION, NULL, "gss id in new sa '%s'\n",
+		    sa->gssid->v);
+#ifdef HAVE_GSSAPI
+	if (iph1-> side == INITIATOR) {
+		if (iph1->rmconf->proposal->gssid != NULL)
+			iph1->gi_i = vdup(iph1->rmconf->proposal->gssid);
+		if (tsa.gssid != NULL)
+			iph1->gi_r = vdup(tsa.gssid);
+		iph1->approval = fixup_initiator_sa(sa, &tsa);
+	} else {
+		if (tsa.gssid != NULL) {
+			iph1->gi_r = vdup(tsa.gssid);
+			if (iph1->rmconf->proposal->gssid != NULL)
+				iph1->gi_i = iph1->rmconf->proposal->gssid;
+			else
+				iph1->gi_i = gssapi_get_default_id(iph1);
+		}
+		if (sa->gssid == NULL)
+			sa->gssid = iph1->gi_i;
+		iph1->approval = sa;
+	}
+	if (iph1->gi_i != NULL)
+		plog(logp, LOCATION, NULL, "GIi is %*s\n",
+		    iph1->gi_i->l, iph1->gi_i->v);
+	if (iph1->gi_r != NULL)
+		plog(logp, LOCATION, NULL, "GIr is %*s\n",
+		    iph1->gi_r->l, iph1->gi_r->v);
+#else
 	iph1->approval = sa;
+#endif
 
 	newsa = get_sabyproppair(p, iph1);
 	if (newsa == NULL)
@@ -266,15 +306,15 @@ saok:
 
 /* compare proposal and select one */
 static struct isakmpsa *
-get_ph1approvalx(p, proposal)
+get_ph1approvalx(p, proposal, sap)
 	struct prop_pair *p;
-	struct isakmpsa *proposal;
+	struct isakmpsa *proposal, *sap;
 {
 #ifdef YIPS_DEBUG
 	struct isakmp_pl_p *prop = p->prop;
 #endif
 	struct isakmp_pl_t *trns = p->trns;
-	struct isakmpsa sa, *s;
+	struct isakmpsa sa, *s, *tsap;
 
 	YIPSDEBUG(DEBUG_SA,
 		plog(logp, LOCATION, NULL,
@@ -288,49 +328,51 @@ get_ph1approvalx(p, proposal)
 			trns->t_no,
 			s_ipsecdoi_trns(prop->proto_id, trns->t_id)));
 
-	memset(&sa, 0, sizeof(sa));
-	if (t2isakmpsa(trns, &sa) < 0)
+	tsap = sap != NULL ? sap : &sa;
+
+	memset(tsap, 0, sizeof(*tsap));
+	if (t2isakmpsa(trns, tsap) < 0)
 		return NULL;
 	for (s = proposal; s != NULL; s = s->next) {
 		YIPSDEBUG(DEBUG_SA,
 			plog(logp, LOCATION, NULL, "Compared: DB:Peer\n");
 			plog(logp, LOCATION, NULL, "(lifetime = %ld:%ld)\n",
-				s->lifetime, sa.lifetime);
+				s->lifetime, tsap->lifetime);
 			plog(logp, LOCATION, NULL, "(lifebyte = %ld:%ld)\n",
-				s->lifebyte, sa.lifebyte);
+				s->lifebyte, tsap->lifebyte);
 			plog(logp, LOCATION, NULL, "enctype = %s:%s\n",
 				s_oakley_attr_v(OAKLEY_ATTR_ENC_ALG,
 						s->enctype),
 				s_oakley_attr_v(OAKLEY_ATTR_ENC_ALG,
-						sa.enctype));
+						tsap->enctype));
 			plog(logp, LOCATION, NULL, "(encklen = %d:%d)\n",
-				s->encklen, sa.encklen);
+				s->encklen, tsap->encklen);
 			plog(logp, LOCATION, NULL, "hashtype = %s:%s\n",
 				s_oakley_attr_v(OAKLEY_ATTR_HASH_ALG,
 						s->hashtype),
 				s_oakley_attr_v(OAKLEY_ATTR_HASH_ALG,
-						sa.hashtype));
+						tsap->hashtype));
 			plog(logp, LOCATION, NULL, "authmethod = %s:%s\n",
 				s_oakley_attr_v(OAKLEY_ATTR_AUTH_METHOD,
 						s->authmethod),
 				s_oakley_attr_v(OAKLEY_ATTR_AUTH_METHOD,
-						sa.authmethod));
+						tsap->authmethod));
 			plog(logp, LOCATION, NULL, "dh_group = %s:%s\n",
 				s_oakley_attr_v(OAKLEY_ATTR_GRP_DESC,
 						s->dh_group),
 				s_oakley_attr_v(OAKLEY_ATTR_GRP_DESC,
-						sa.dh_group));
+						tsap->dh_group));
 		);
 #if 0
 		/* XXX to be considered */
-		if (sa.lifetime > s->lifetime) ;
-		if (sa.lifebyte > s->lifebyte) ;
-		if (sa.encklen >= s->encklen) ;
+		if (tsap->lifetime > s->lifetime) ;
+		if (tsap->lifebyte > s->lifebyte) ;
+		if (tsap->encklen >= s->encklen) ;
 #endif
-		if (sa.enctype == s->enctype
-		 && sa.authmethod == s->authmethod
-		 && sa.hashtype == s->hashtype
-		 && sa.dh_group == s->dh_group)
+		if (tsap->enctype == s->enctype
+		 && tsap->authmethod == s->authmethod
+		 && tsap->hashtype == s->hashtype
+		 && tsap->dh_group == s->dh_group)
 			break;
 	}
 
@@ -343,8 +385,8 @@ get_ph1approvalx(p, proposal)
 				"acceptable proposal found.\n");
 		});
 
-	if (sa.dhgrp != NULL)
-		oakley_dhgrp_free(sa.dhgrp);
+	if (tsap->dhgrp != NULL)
+		oakley_dhgrp_free(tsap->dhgrp);
 	return s;
 }
 
@@ -424,7 +466,7 @@ t2isakmpsa(trns, sa)
 			break;
 
 		case OAKLEY_ATTR_AUTH_METHOD:
-			sa->authmethod = (u_int8_t)ntohs(d->lorv);
+			sa->authmethod = ntohs(d->lorv);
 			break;
 
 		case OAKLEY_ATTR_GRP_DESC:
@@ -551,6 +593,17 @@ t2isakmpsa(trns, sa)
 		case OAKLEY_ATTR_GRP_ORDER:
 			sa->dhgrp->order = val;
 			break;
+		case OAKLEY_ATTR_GSS_ID:
+		{
+			int len = ntohs(d->lorv);
+
+			sa->gssid = vmalloc(len);
+			memcpy(sa->gssid->v, d + 1, len);
+			plog(logp, LOCATION, NULL,
+			    "received gss id '%s' (len %d)\n", sa->gssid->v,
+			    sa->gssid->l);
+			break;
+		}
 
 		default:
 			break;
@@ -1855,6 +1908,7 @@ check_attr_isakmp(trns)
 			switch (lorv) {
 			case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
 			case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
+			case OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB:
 				break;
 			case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
 			case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
@@ -1944,6 +1998,9 @@ check_attr_isakmp(trns)
 			return -1;
 
 		case OAKLEY_ATTR_GRP_ORDER:
+			break;
+
+		case OAKLEY_ATTR_GSS_ID:
 			break;
 
 		default:
@@ -2526,6 +2583,19 @@ setph1attr(sa, buf)
 	case 0:
 	default:
 		break;
+	}
+
+	if (sa->authmethod == OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB &&
+	    sa->gssid != NULL) {
+		attrlen += sizeof(struct isakmp_data);
+		attrlen += sa->gssid->l;
+		if (buf) {
+			plog(logp, LOCATION, NULL, "gss id attr: len %d,
+			    val '%s'\n", sa->gssid->l, sa->gssid->v);
+			p = isakmp_set_attr_v(p, OAKLEY_ATTR_GSS_ID,
+				(caddr_t)sa->gssid->v, 
+				sa->gssid->l);
+		}
 	}
 
 	return attrlen;
@@ -3749,6 +3819,32 @@ ipsecdoi_authalg2trnsid(alg)
 	}
 	return -1;
 }
+
+#ifdef HAVE_GSSAPI
+struct isakmpsa *
+fixup_initiator_sa(match, received)
+	struct isakmpsa *match, *received;
+{
+	struct isakmpsa *newsa;
+
+	if (received->gssid == NULL)
+		return match;
+
+	newsa = newisakmpsa();
+	memcpy(newsa, match, sizeof *newsa);
+
+	if (match->dhgrp != NULL) {
+		newsa->dhgrp = CALLOC(sizeof(struct dhgroup), struct dhgroup *);
+		memcpy(newsa->dhgrp, match->dhgrp, sizeof (struct dhgroup));
+	}
+	newsa->next = NULL;
+	newsa->rmconf = NULL;
+
+	newsa->gssid = vdup(received->gssid);
+
+	return newsa;
+}
+#endif
 
 static int rm_idtype2doi[] = {
 	IPSECDOI_ID_FQDN,

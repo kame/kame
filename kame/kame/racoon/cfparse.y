@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.75 2000/10/18 04:13:09 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.76 2000/12/12 16:59:34 thorpej Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -45,6 +45,9 @@
 #ifdef GC
 #include "gcmalloc.h"
 #endif
+#ifdef HAVE_GSSAPI
+#include "gssapi.h"
+#endif
 
 struct proposalspec {
 	time_t lifetime;		/* for isakmp/ipsec */
@@ -64,6 +67,7 @@ struct secprotospec {
 	int proto_id;		/* for ipsec (isakmp?) */
 	int ipsec_level;	/* for ipsec */
 	int encmode;		/* for ipsec */
+	char *gssid;
 	struct sockaddr *remote;
 	int algclass[MAXALGCLASS];
 
@@ -105,14 +109,14 @@ static int set_ipsec_proposal __P((struct policyindex *, struct proposalspec *))
 #endif
 static int set_isakmp_proposal
 	__P((struct remoteconf *, struct proposalspec *));
-static u_int32_t set_algtypes __P((struct secprotospec *, int));
 static void clean_tmpalgtype __P((void));
 #if 0
+static u_int32_t set_algtypes __P((struct secprotospec *, int));
 static int expand_ipsecspec __P((int, int, int *, int, int,
 	struct proposalspec *, struct secprotospec *, struct ipsecpolicy *));
 #endif
 static int expand_isakmpspec __P((int, int, int *,
-	int, int, time_t, int, int, struct remoteconf *));
+	int, int, time_t, int, int, char *, struct remoteconf *));
 %}
 
 %union {
@@ -159,6 +163,7 @@ static int expand_isakmpspec __P((int, int, int *,
 %token GENERATE_POLICY SUPPORT_MIP6
 %token POST_COMMAND
 %token EXEC_PATH EXEC_COMMAND EXEC_SUCCESS EXEC_FAILURE
+%token GSSAPI_ID
 
 %token PREFIX PORT PORTANY UL_PROTO ANY
 %token PFS_GROUP LIFETIME LIFETYPE UNITTYPE STRENGTH
@@ -1211,6 +1216,10 @@ isakmpproposal_spec
 		{
 			prhead->spspec->algclass[algclass_isakmp_dh] = $2;
 		}
+	|	GSSAPI_ID QUOTEDSTRING EOS
+		{
+			prhead->spspec->gssid = strdup($2->v);
+		}
 	|	ALGORITHM_CLASS ALGORITHMTYPE keylength EOS
 		{
 			int doi;
@@ -1218,7 +1227,7 @@ isakmpproposal_spec
 
 			doi = algtype2doi($1, $2);
 			if (doi == -1) {
-				yyerror("algorithm mismatched");
+				yyerror("algorithm mismatched 1");
 				return -1;
 			}
 
@@ -1265,7 +1274,7 @@ isakmpproposal_spec
 				prhead->spspec->algclass[algclass_isakmp_ameth] = doi;
 				break;
 			default:
-				yyerror("algorithm mismatched");
+				yyerror("algorithm mismatched 2");
 				return -1;
 			}
 		}
@@ -1719,6 +1728,7 @@ set_isakmp_proposal(rmconf, prspec)
 			printf("encklen=%d\n", s->encklen);
 		);
 
+#if 0
 		types[algclass_isakmp_enc] =
 			set_algtypes(s, algclass_isakmp_enc);
 		types[algclass_isakmp_hash] =
@@ -1727,6 +1737,14 @@ set_isakmp_proposal(rmconf, prspec)
 			set_algtypes(s, algclass_isakmp_dh);
 		types[algclass_isakmp_ameth] =
 			set_algtypes(s, algclass_isakmp_ameth);
+#else
+		memset(types, 0, ARRAYLEN(types));
+		types[algclass_isakmp_enc] = s->algclass[algclass_isakmp_enc];
+		types[algclass_isakmp_hash] = s->algclass[algclass_isakmp_hash];
+		types[algclass_isakmp_dh] = s->algclass[algclass_isakmp_dh];
+		types[algclass_isakmp_ameth] =
+		    s->algclass[algclass_isakmp_ameth];
+#endif
 
 		/* expanding spspec */
 		clean_tmpalgtype();
@@ -1734,7 +1752,7 @@ set_isakmp_proposal(rmconf, prspec)
 				algclass_isakmp_enc, algclass_isakmp_ameth + 1,
 				s->lifetime ? s->lifetime : p->lifetime,
 				s->lifebyte ? s->lifebyte : p->lifebyte,
-				s->encklen,
+				s->encklen, s->gssid,
 				rmconf);
 		if (trns_no == -1) {
 			plog(logp, LOCATION, NULL,
@@ -1754,6 +1772,7 @@ set_isakmp_proposal(rmconf, prspec)
 	return 0;
 }
 
+#if 0
 static u_int32_t
 set_algtypes(s, class)
 	struct secprotospec *s;
@@ -1771,6 +1790,7 @@ set_algtypes(s, class)
 
 	return algtype;
 }
+#endif
 
 static void
 clean_tmpalgtype()
@@ -1870,43 +1890,39 @@ expand_ipsecspec(prop_no, trns_no, types,
 
 static int
 expand_isakmpspec(prop_no, trns_no, types,
-		class, last, lifetime, lifebyte, encklen, rmconf)
+		class, last, lifetime, lifebyte, encklen, gssid, rmconf)
 	int prop_no, trns_no;
 	int *types, class, last;
 	time_t lifetime;
 	int lifebyte;
 	int encklen;
+	char *gssid;
 	struct remoteconf *rmconf;
 {
-	int b = types[class];
-	int bl = sizeof(lcconf->algstrength[0]->algtype[0]) << 3;
-	int i;
+	struct isakmpsa *new;
 
-	if (class == last) {
-		struct isakmpsa *new;
-
-		YIPSDEBUG(DEBUG_CONF,
-			int j;
-			char tb[4];
-			printf("p:%d t:%d ", prop_no, trns_no);
-			for (j = 0; j < MAXALGCLASS; j++) {
-				snprintf(tb, sizeof(tb), "%d", tmpalgtype[j]);
-				printf("%s%s%s%s ",
-					s_algtype(j, tmpalgtype[j]),
-					tmpalgtype[j] ? "(" : "",
-					tb[0] == '0' ? "" : tb,
-					tmpalgtype[j] ? ")" : "");
-			}
-			printf("\n");
-		);
+	YIPSDEBUG(DEBUG_CONF,
+		int j;
+		char tb[10];
+		printf("p:%d t:%d ", prop_no, trns_no);
+		for (j = class; j < MAXALGCLASS; j++) {
+			snprintf(tb, sizeof(tb), "%d", types[j]);
+			printf("%s%s%s%s ",
+				s_algtype(j, types[j]),
+				types[j] ? "(" : "",
+				tb[0] == '0' ? "" : tb,
+				types[j] ? ")" : "");
+		}
+		printf("\n");
+	);
 
 #define TMPALGTYPE2STR(n) \
-	s_algtype(algclass_isakmp_##n, tmpalgtype[algclass_isakmp_##n])
+	s_algtype(algclass_isakmp_##n, types[algclass_isakmp_##n])
 		/* check mandatory values */
-		if (tmpalgtype[algclass_isakmp_enc] == 0
-		 || tmpalgtype[algclass_isakmp_ameth] == 0
-		 || tmpalgtype[algclass_isakmp_hash] == 0
-		 || tmpalgtype[algclass_isakmp_dh] == 0) {
+		if (types[algclass_isakmp_enc] == 0
+		 || types[algclass_isakmp_ameth] == 0
+		 || types[algclass_isakmp_hash] == 0
+		 || types[algclass_isakmp_dh] == 0) {
 			yyerror("few definition of algorithm "
 				"enc=%s ameth=%s hash=%s dhgroup=%s.\n",
 				TMPALGTYPE2STR(enc),
@@ -1917,38 +1933,30 @@ expand_isakmpspec(prop_no, trns_no, types,
 		}
 #undef TMPALGTYPE2STR(n)
 
-		/* set new sa */
-		new = newisakmpsa();
-		if (new == NULL) {
-			yyerror("failed to allocate isakmp sa");
-			return -1;
-		}
-		new->prop_no = prop_no;
-		new->trns_no = trns_no;
-		new->lifetime = lifetime;
-		new->lifebyte = lifebyte;
-		new->enctype = tmpalgtype[algclass_isakmp_enc];
-		new->encklen = encklen;
-		new->authmethod = tmpalgtype[algclass_isakmp_ameth];
-		new->hashtype = tmpalgtype[algclass_isakmp_hash];
-		new->dh_group = tmpalgtype[algclass_isakmp_dh];
-
-		insisakmpsa(new, rmconf);
-
-		return trns_no + 1;
+	/* set new sa */
+	new = newisakmpsa();
+	if (new == NULL) {
+		yyerror("failed to allocate isakmp sa");
+		return -1;
 	}
-
-	for (i = 0; i < bl; i++) {
-		if (b & 1) {
-			tmpalgtype[class] = i + 1;
-			trns_no = expand_isakmpspec(prop_no, trns_no, types,
-					class + 1, last, lifetime, lifebyte,
-					encklen, rmconf);
-			if (trns_no == -1)
-				return -1;
-		}
-		b >>= 1;
-	}
+	new->prop_no = prop_no;
+	new->trns_no = trns_no;
+	new->lifetime = lifetime;
+	new->lifebyte = lifebyte;
+	new->enctype = types[algclass_isakmp_enc];
+	new->encklen = encklen;
+	new->authmethod = types[algclass_isakmp_ameth];
+	new->hashtype = types[algclass_isakmp_hash];
+	new->dh_group = types[algclass_isakmp_dh];
+#ifdef HAVE_GSSAPI
+	if (gssid != NULL) {
+		new->gssid = vmalloc(strlen(gssid) + 1);
+		memcpy(new->gssid->v, gssid, new->gssid->l);
+		free(gssid);
+	} else
+		new->gssid = NULL;
+#endif
+	insisakmpsa(new, rmconf);
 
 	return trns_no;
 }

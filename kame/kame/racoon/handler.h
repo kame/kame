@@ -1,4 +1,4 @@
-/*	$KAME: handler.h,v 1.33 2000/11/09 06:28:03 sakane Exp $	*/
+/*	$KAME: handler.h,v 1.34 2000/12/12 16:59:37 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -154,6 +154,11 @@ struct ph1handle {
 	vchar_t *sa_ret;		/* SA payload to reply/to be replyed */
 					/* NOT INCLUDING general header. */
 					/* NOTE: Should be release after use. */
+
+	void *gssapi_state;		/* GSS-API specific state. */
+					/* Allocated when needed */
+	vchar_t *gi_i;			/* optional initiator GSS id */
+	vchar_t *gi_r;			/* optional responder GSS id */
 
 	struct isakmp_pl_hash *pl_hash;	/* pointer to hash payload */
 

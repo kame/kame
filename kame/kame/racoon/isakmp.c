@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.112 2000/12/12 08:03:07 itojun Exp $	*/
+/*	$KAME: isakmp.c,v 1.113 2000/12/12 16:59:38 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -89,6 +89,8 @@
 
 static int nostate1 __P((struct ph1handle *, vchar_t *));
 static int nostate2 __P((struct ph2handle *, vchar_t *));
+
+extern caddr_t val2str(const char *, size_t);
 
 static int (*ph1exchange[][2][PHASE1ST_MAX])
 	__P((struct ph1handle *, vchar_t *)) = {
@@ -385,6 +387,7 @@ isakmp_main(msg, remote, local)
 					sizeof(cookie_t)) != 0
 				 || memcmp(&isakmp->i_ck, r_ck0,
 					sizeof(cookie_t)) == 0) {
+
 					YIPSDEBUG(DEBUG_NOTIFY,
 						plog(logp, LOCATION, remote,
 							"malformed cookie.\n"));
@@ -1877,6 +1880,7 @@ isakmp_newcookie(place, remote, local)
 	int error = -1;
 	u_short port;
 
+
 	if (remote->sa_family != local->sa_family) {
 		plog(logp, LOCATION, NULL,
 			"address family mismatch, remote:%d local:%d\n",
@@ -1941,6 +1945,10 @@ isakmp_newcookie(place, remote, local)
 	buf2 = eay_sha1_one(buf);
 	memcpy(place, buf2->v, sizeof(cookie_t));
 	vfree(buf2);
+
+	sa1 = val2str(place, sizeof (cookie_t));
+	plog(logp, LOCATION, NULL, "new cookie:\n%s\n", sa1);
+	free(sa1);
 
 	error = 0;
 end:
@@ -2051,6 +2059,9 @@ set_isakmp_payload(buf, src, nptype)
 {
 	struct isakmp_gen *gen;
 	caddr_t p = buf;
+
+	plog(logp, LOCATION, NULL, "add payload of len %d, next type %d\n",
+	    src->l, nptype);
 
 	gen = (struct isakmp_gen *)p;
 	gen->np = nptype;

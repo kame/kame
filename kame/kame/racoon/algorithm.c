@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.c,v 1.10 2000/10/04 17:40:58 itojun Exp $	*/
+/*	$KAME: algorithm.c,v 1.11 2000/12/12 16:59:33 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -97,6 +97,7 @@ static int isakmpameth2doi[] = {
 	OAKLEY_ATTR_AUTH_METHOD_RSASIG,
 	OAKLEY_ATTR_AUTH_METHOD_RSAENC,
 	OAKLEY_ATTR_AUTH_METHOD_RSAREV,
+	OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB,
 };
 static int isakmpdh2doi[] = {
 	ALGTYPE_NOTHING,

@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_base.c,v 1.38 2000/10/18 09:51:44 sakane Exp $	*/
+/*	$KAME: isakmp_base.c,v 1.39 2000/12/12 16:59:39 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -406,6 +406,9 @@ base_i2send(iph1, msg)
 		p = set_isakmp_payload(p, iph1->sig, ISAKMP_NPTYPE_NONE);
 		break;
 #endif
+	case OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB:
+		/* ... */
+		break;
 	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
 	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
 		tlen += sizeof(*gen) + iph1->hash->l;
@@ -946,6 +949,7 @@ base_r2send(iph1, msg)
 		break;
 	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
 	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
+	case OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB:
 		iph1->hash = oakley_ph1hash_base_r(iph1, GENERATE);
 		break;
 	default:
@@ -1034,6 +1038,9 @@ base_r2send(iph1, msg)
 		p = set_isakmp_payload(p, iph1->sig, ISAKMP_NPTYPE_NONE);
 		break;
 #endif
+	case OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB:
+		/* ... */
+		break;
 	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
 	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
 		tlen += sizeof(*gen) + iph1->hash->l;

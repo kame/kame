@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.71 2000/11/01 11:41:12 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.72 2000/12/12 16:59:42 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -71,6 +71,10 @@
 #include "crypto_openssl.h"
 #include "sockmisc.h"
 #include "strnames.h"
+
+#ifdef HAVE_GSSAPI
+#include "gssapi.h"
+#endif
 
 #define OUTBOUND_SA	0
 #define INBOUND_SA	1
@@ -744,6 +748,7 @@ end:
  * main/aggressive
  *   I-digest = prf(SKEYID, g^i | g^r | CKY-I | CKY-R | SAi_b | ID_i1_b)
  *   R-digest = prf(SKEYID, g^r | g^i | CKY-R | CKY-I | SAi_b | ID_r1_b)
+ * for gssapi, also include all GSS tokens, and call gss_wrap on the result
  */
 vchar_t *
 oakley_ph1hash_common(iph1, sw)
@@ -754,6 +759,9 @@ oakley_ph1hash_common(iph1, sw)
 	char *p, *bp2;
 	int len, bl;
 	int error = -1;
+#ifdef HAVE_GSSAPI
+	vchar_t *gsstokens = NULL;
+#endif
 
 	/* create buffer */
 	len = iph1->dhpub->l
@@ -761,6 +769,23 @@ oakley_ph1hash_common(iph1, sw)
 		+ sizeof(cookie_t) * 2
 		+ iph1->sa->l
 		+ (sw == GENERATE ? iph1->id->l : iph1->id_p->l);
+
+#ifdef HAVE_GSSAPI
+	if (iph1->approval->authmethod == OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB) {
+		if (iph1->gi_i != NULL && iph1->gi_r != NULL) {
+			bp = (sw == GENERATE ? iph1->gi_i : iph1->gi_r);
+			len += bp->l;
+		}
+		if (sw == GENERATE)
+			gssapi_get_itokens(iph1, &gsstokens);
+		else
+			gssapi_get_rtokens(iph1, &gsstokens);
+		if (gsstokens == NULL)
+			return NULL;
+		len += gsstokens->l;
+	}
+#endif
+
 	buf = vmalloc(len);
 	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
@@ -804,6 +829,19 @@ oakley_ph1hash_common(iph1, sw)
 
 	bp = (sw == GENERATE ? iph1->id : iph1->id_p);
 	memcpy(p, bp->v, bp->l);
+	p += bp->l;
+
+#ifdef HAVE_GSSAPI
+	if (iph1->approval->authmethod == OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB) {
+		if (iph1->gi_i != NULL && iph1->gi_r != NULL) {
+			bp = (sw == GENERATE ? iph1->gi_i : iph1->gi_r);
+			memcpy(p, bp->v, bp->l);
+			p += bp->l;
+		}
+		memcpy(p, gsstokens->v, gsstokens->l);
+		p += gsstokens->l;
+	}
+#endif
 
 	YIPSDEBUG(DEBUG_DKEY, plog(logp, LOCATION, NULL, "HASH with:\n");
 		PVDUMP(buf));
@@ -821,6 +859,10 @@ oakley_ph1hash_common(iph1, sw)
 end:
 	if (buf != NULL)
 		vfree(buf);
+#ifdef HAVE_GSSAPI
+	if (gsstokens != NULL)
+		vfree(gsstokens);
+#endif
 	return res;
 }
 
@@ -865,6 +907,7 @@ oakley_ph1hash_base_i(iph1, sw)
 
 	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
 	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
+	case OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB:
 		/* make hash for seed */
 		len = iph1->nonce->l + iph1->nonce_p->l;
 		buf = vmalloc(len);
@@ -1073,13 +1116,16 @@ oakley_validate_auth(iph1)
 	struct ph1handle *iph1;
 {
 	vchar_t *my_hash = NULL;
+	int result;
+#ifdef HAVE_GSSAPI
+	vchar_t *gsshash = NULL;
+#endif
 
 	switch (iph1->approval->authmethod) {
 	case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
 		/* validate HASH */
 	    {
 		char *r_hash;
-		int result;
 
 		if (iph1->id_p == NULL || iph1->pl_hash == NULL) {
 			plog(logp, LOCATION, iph1->remote,
@@ -1230,6 +1276,43 @@ oakley_validate_auth(iph1)
 			plog(logp, LOCATION, NULL,
 				"SIG authenticated\n"));
 	    }
+		break;
+#endif
+#ifdef HAVE_GSSAPI
+	case OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB:
+		switch (iph1->etype) {
+		case ISAKMP_ETYPE_IDENT:
+		case ISAKMP_ETYPE_AGG:
+			my_hash = oakley_ph1hash_common(iph1, VALIDATE);
+			break;
+		default:
+			plog(logp, LOCATION, NULL,
+				"invalid etype %d\n", iph1->etype);
+			return ISAKMP_NTYPE_INVALID_EXCHANGE_TYPE;
+		}
+
+		if (my_hash == NULL) {
+			if (gssapi_more_tokens(iph1))
+				return ISAKMP_NTYPE_INVALID_EXCHANGE_TYPE;
+			else
+				return ISAKMP_NTYPE_INVALID_HASH_INFORMATION;
+		}
+
+		gsshash = gssapi_unwraphash(iph1);
+		if (gsshash == NULL) {
+			vfree(my_hash);
+			return ISAKMP_NTYPE_INVALID_HASH_INFORMATION;
+		}
+
+		result = memcmp(my_hash->v, gsshash->v, my_hash->l);
+		vfree(my_hash);
+		vfree(gsshash);
+
+		if (result) {
+			plog(logp, LOCATION, NULL, "HASH mismatched\n");
+			return ISAKMP_NTYPE_INVALID_HASH_INFORMATION;
+		}
+		plog(logp, LOCATION, NULL, "hash compared OK\n");
 		break;
 #endif
 	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
@@ -1903,6 +1986,8 @@ oakley_skeyid(iph1)
 
 	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
 	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
+#ifdef HAVE_GSSAPI
+	case OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB:
 		len = iph1->nonce->l + iph1->nonce_p->l;
 		buf = vmalloc(len);
 		if (buf == NULL) {
@@ -1928,8 +2013,7 @@ oakley_skeyid(iph1)
 		if (iph1->skeyid == NULL)
 			goto end;
 		break;
-
-		break;
+#endif
 	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
 	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
 		plog(logp, LOCATION, NULL,

@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_agg.c,v 1.46 2000/10/18 09:51:44 sakane Exp $	*/
+/*	$KAME: isakmp_agg.c,v 1.47 2000/12/12 16:59:39 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -70,6 +70,10 @@
 #include "isakmp_inf.h"
 #include "vendorid.h"
 
+#ifdef HAVE_GSSAPI
+#include "gssapi.h"
+#endif
+
 /*
  * begin Aggressive Mode as initiator.
  */
@@ -77,6 +81,7 @@
  * send to responder
  * 	psk: HDR, SA, KE, Ni, IDi1
  * 	sig: HDR, SA, KE, Ni, IDi1 [, CR ]
+ *   gssapi: HDR, SA, KE, Ni, IDi1, GSSi
  * 	rsa: HDR, SA, [ HASH(1),] KE, <IDi1_b>Pubkey_r, <Ni_b>Pubkey_r
  * 	rev: HDR, SA, [ HASH(1),] <Ni_b>Pubkey_r, <KE_b>Ke_i,
  * 	     <IDii_b>Ke_i [, <Cert-I_b>Ke_i ]
@@ -90,8 +95,12 @@ agg_i1send(iph1, msg)
 	caddr_t p;
 	int tlen;
 	int need_cr = 0;
-	vchar_t *cr = NULL;
+	vchar_t *cr = NULL, *gsstoken = NULL;
 	int error = -1;
+	int nptype;
+#ifdef HAVE_GSSAPI
+	int len;
+#endif
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -146,7 +155,8 @@ agg_i1send(iph1, msg)
 		}
 	}
 #endif
-
+	plog(logp, LOCATION, NULL, "authmethod is %d\n",
+	    iph1->rmconf->proposal->authmethod);
 	/* create buffer to send isakmp payload */
 	tlen = sizeof(struct isakmp)
 		+ sizeof(*gen) + iph1->sa->l
@@ -155,6 +165,13 @@ agg_i1send(iph1, msg)
 		+ sizeof(*gen) + iph1->id->l;
 	if (need_cr)
 		tlen += sizeof(*gen) + cr->l;
+#ifdef HAVE_GSSAPI
+	if (iph1->rmconf->proposal->authmethod ==
+	    OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB) {
+		gssapi_get_itoken(iph1, &len);
+		tlen += sizeof (*gen) + len;
+	}
+#endif
 
 	iph1->sendbuf = vmalloc(tlen);
 	if (iph1->sendbuf == NULL) {
@@ -178,11 +195,28 @@ agg_i1send(iph1, msg)
 	p = set_isakmp_payload(p, iph1->nonce, ISAKMP_NPTYPE_ID);
 
 	/* create isakmp ID payload */
-	p = set_isakmp_payload(p, iph1->id,
-		need_cr ? ISAKMP_NPTYPE_CR : ISAKMP_NPTYPE_NONE);
-
-	/* create isakmp CR payload */
+#ifdef HAVE_GSSAPI
+	if (iph1->rmconf->proposal->authmethod ==
+	    OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB)
+		nptype = ISAKMP_NPTYPE_GSS;
+	else
+#endif
 	if (need_cr)
+		nptype = ISAKMP_NPTYPE_CR;
+	else
+		nptype = ISAKMP_NPTYPE_NONE;
+
+	p = set_isakmp_payload(p, iph1->id, nptype);
+
+#ifdef HAVE_GSSAPI
+	if (iph1->rmconf->proposal->authmethod ==
+	    OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB) {
+		gssapi_get_token_to_send(iph1, &gsstoken);
+		p = set_isakmp_payload(p, gsstoken, ISAKMP_NPTYPE_NONE);
+	} else
+#endif
+	if (need_cr)
+		/* create isakmp CR payload */
 		p = set_isakmp_payload(p, cr, ISAKMP_NPTYPE_NONE);
 
 #ifdef HAVE_PRINT_ISAKMP_C
@@ -204,6 +238,8 @@ agg_i1send(iph1, msg)
 end:
 	if (cr)
 		vfree(cr);
+	if (gsstoken)
+		vfree(gsstoken);
 
 	return error;
 }
@@ -212,6 +248,7 @@ end:
  * receive from responder
  * 	psk: HDR, SA, KE, Nr, IDr1, HASH_R
  * 	sig: HDR, SA, KE, Nr, IDr1, [ CR, ] [ CERT, ] SIG_R
+ *   gssapi: HDR, SA, KE, Nr, IDr1, GSSr, HASH_R
  * 	rsa: HDR, SA, KE, <IDr1_b>PubKey_i, <Nr_b>PubKey_i, HASH_R
  * 	rev: HDR, SA, <Nr_b>PubKey_i, <KE_b>Ke_r, <IDir_b>Ke_r, HASH_R
  */
@@ -224,6 +261,9 @@ agg_i2recv(iph1, msg)
 	struct isakmp_parse_t *pa;
 	vchar_t *satmp = NULL;
 	int error = -1;
+#ifdef HAVE_GSSAPI
+	vchar_t *gsstoken = NULL;
+#endif
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -300,6 +340,13 @@ agg_i2recv(iph1, msg)
 				"peer transmitted Notify Message.\n"));
 			isakmp_check_notify(pa->ptr, iph1);
 			break;
+#ifdef HAVE_GSSAPI
+		case ISAKMP_NPTYPE_GSS:
+			if (isakmp_p2ph(&gsstoken, pa->ptr) < 0)
+				goto end;
+			gssapi_save_received_token(iph1, gsstoken);
+			break;
+#endif
 		default:
 			/* don't send information, see isakmp_ident_r1() */
 			plog(logp, LOCATION, iph1->remote,
@@ -400,6 +447,7 @@ end:
 /*
  * send to responder
  * 	psk: HDR, HASH_I
+ *   gssapi: HDR, HASH_I
  * 	sig: HDR, [ CERT, ] SIG_I
  * 	rsa: HDR, HASH_I
  * 	rev: HDR, HASH_I
@@ -414,6 +462,7 @@ agg_i2send(iph1, msg)
 	int tlen;
 	int need_cert = 0;
 	int error = -1;
+	vchar_t *gsshash = NULL;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -427,8 +476,14 @@ agg_i2send(iph1, msg)
 	/* generate HASH to send */
 	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "generate HASH_I\n"));
 	iph1->hash = oakley_ph1hash_common(iph1, GENERATE);
-	if (iph1->hash == NULL)
+	if (iph1->hash == NULL) {
+#ifdef HAVE_GSSAPI
+		if (gssapi_more_tokens(iph1))
+			isakmp_info_send_n1(iph1,
+			    ISAKMP_NTYPE_INVALID_EXCHANGE_TYPE, NULL);
+#endif
 		goto end;
+	}
 
 	tlen = sizeof(struct isakmp);
 
@@ -494,6 +549,31 @@ agg_i2send(iph1, msg)
 	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
 		tlen += sizeof(*gen) + iph1->hash->l;
 		break;
+#ifdef HAVE_GSSAPI
+	case OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB:
+		gsshash = gssapi_wraphash(iph1);
+		if (gsshash == NULL) {
+			plog(logp, LOCATION, NULL,
+			    "failed to wrap hash\n");
+			isakmp_info_send_n1(iph1,
+			    ISAKMP_NTYPE_INVALID_EXCHANGE_TYPE, NULL);
+			goto end;
+		}
+		tlen += sizeof(*gen) + gsshash->l;
+
+		iph1->sendbuf = vmalloc(tlen);
+		if (iph1->sendbuf == NULL) {
+			plog(logp, LOCATION, NULL,
+				"failed to get buffer to send.\n");
+			goto end;
+		}
+		/* set isakmp header */
+		p = set_isakmp_header(iph1->sendbuf, iph1, ISAKMP_NPTYPE_HASH);
+		if (p == NULL)
+			goto end;
+		p = set_isakmp_payload(p, gsshash, ISAKMP_NPTYPE_NONE);
+		break;
+#endif
 	}
 
 #ifdef HAVE_PRINT_ISAKMP_C
@@ -512,6 +592,8 @@ agg_i2send(iph1, msg)
 	error = 0;
 
 end:
+	if (gsshash)
+		vfree(gsshash);
 	return error;
 }
 
@@ -519,6 +601,7 @@ end:
  * receive from initiator
  * 	psk: HDR, SA, KE, Ni, IDi1
  * 	sig: HDR, SA, KE, Ni, IDi1 [, CR ]
+ *   gssapi: HDR, SA, KE, Ni, IDi1 , GSSi
  * 	rsa: HDR, SA, [ HASH(1),] KE, <IDi1_b>Pubkey_r, <Ni_b>Pubkey_r
  * 	rev: HDR, SA, [ HASH(1),] <Ni_b>Pubkey_r, <KE_b>Ke_i,
  * 	     <IDii_b>Ke_i [, <Cert-I_b>Ke_i ]
@@ -531,6 +614,9 @@ agg_r1recv(iph1, msg)
 	int error = -1;
 	vchar_t *pbuf = NULL;
 	struct isakmp_parse_t *pa;
+#ifdef HAVE_GSSAPI
+	vchar_t *gsstoken = NULL;
+#endif
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -563,6 +649,9 @@ agg_r1recv(iph1, msg)
 	     pa->type != ISAKMP_NPTYPE_NONE;
 	     pa++) {
 
+		plog(logp, LOCATION, NULL, "received payload of type %d\n",
+		    pa->type);
+
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_KE:
 			if (isakmp_p2ph(&iph1->dhpub_p, pa->ptr) < 0)
@@ -586,6 +675,13 @@ agg_r1recv(iph1, msg)
 		case ISAKMP_NPTYPE_CR:
 			if (oakley_savecr(iph1, pa->ptr) < 0)
 				goto end;
+			break;
+#endif
+#ifdef HAVE_GSSAPI
+		case ISAKMP_NPTYPE_GSS:
+			if (isakmp_p2ph(&gsstoken, pa->ptr) < 0)
+				goto end;
+			gssapi_save_received_token(iph1, gsstoken);
 			break;
 #endif
 		default:
@@ -645,6 +741,7 @@ end:
  * send to initiator
  * 	psk: HDR, SA, KE, Nr, IDr1, HASH_R
  * 	sig: HDR, SA, KE, Nr, IDr1, [ CR, ] [ CERT, ] SIG_R
+ *   gssapi: HDR, SA, KE, Nr, IDr1, GSSr, HASH_R
  * 	rsa: HDR, SA, KE, <IDr1_b>PubKey_i, <Nr_b>PubKey_i, HASH_R
  * 	rev: HDR, SA, <Nr_b>PubKey_i, <KE_b>Ke_r, <IDir_b>Ke_r, HASH_R
  */
@@ -660,6 +757,11 @@ agg_r1send(iph1, msg)
 	int need_cert = 0;
 	vchar_t *cr = NULL;
 	int error = -1;
+#ifdef HAVE_GSSAPI
+	int gsslen;
+	vchar_t *gsstoken = NULL, *gsshash = NULL;
+	vchar_t *gss_sa = NULL;
+#endif
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -702,11 +804,23 @@ agg_r1send(iph1, msg)
 	if (oakley_newiv(iph1) < 0)
 		goto end;
 
+#ifdef HAVE_GSSAPI
+	if (iph1->rmconf->proposal->authmethod ==	
+	    OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB)
+		gssapi_get_rtoken(iph1, &gsslen);
+#endif
+
 	/* generate HASH to send */
 	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "generate HASH_R\n"));
 	iph1->hash = oakley_ph1hash_common(iph1, GENERATE);
-	if (iph1->hash == NULL)
+	if (iph1->hash == NULL) {
+#ifdef HAVE_GSSAPI
+		if (gssapi_more_tokens(iph1))
+			isakmp_info_send_n1(iph1,
+			    ISAKMP_NTYPE_INVALID_EXCHANGE_TYPE, NULL);
+#endif
 		goto end;
+	}
 
 #ifdef HAVE_SIGNING_C
 	/* create CR if need */
@@ -854,6 +968,67 @@ agg_r1send(iph1, msg)
 	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
 		tlen += sizeof(*gen) + iph1->hash->l;
 		break;
+#ifdef HAVE_GSSAPI
+	case OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB:
+		/* create buffer to send isakmp payload */
+		gsshash = gssapi_wraphash(iph1);
+		if (gsshash == NULL) {
+			plog(logp, LOCATION, NULL,
+			    "failed to wrap hash\n");
+			/*
+			 * This is probably due to the GSS roundtrips not
+			 * being finished yet. Return this error in
+			 * the hope that a fallback to main mode will
+			 * be done.
+			 */
+			isakmp_info_send_n1(iph1,
+			    ISAKMP_NTYPE_INVALID_EXCHANGE_TYPE, NULL);
+			goto end;
+		}
+		if (iph1->approval->gssid != NULL)
+			gss_sa = ipsecdoi_setph1proposal(iph1->approval);  
+		else
+			gss_sa = iph1->sa_ret;
+
+		tlen += sizeof(*gen) + gss_sa->l
+			+ sizeof(*gen) + iph1->dhpub->l
+			+ sizeof(*gen) + iph1->nonce->l
+			+ sizeof(*gen) + iph1->id->l
+			+ sizeof(*gen) + gsslen
+			+ sizeof(*gen) + gsshash->l;
+		iph1->sendbuf = vmalloc(tlen);
+		if (iph1->sendbuf == NULL) { 
+			plog(logp, LOCATION, NULL,
+				"failed to get buffer to send\n");
+			goto end;
+		}
+
+		/* set isakmp header */
+		p = set_isakmp_header(iph1->sendbuf, iph1, ISAKMP_NPTYPE_SA);
+		if (p == NULL)
+			goto end;
+
+		/* set SA payload to reply */
+		p = set_isakmp_payload(p, gss_sa, ISAKMP_NPTYPE_KE);
+
+		/* create isakmp KE payload */
+		p = set_isakmp_payload(p, iph1->dhpub, ISAKMP_NPTYPE_NONCE);
+
+		/* create isakmp NONCE payload */
+		p = set_isakmp_payload(p, iph1->nonce, ISAKMP_NPTYPE_ID);
+
+		/* create isakmp ID payload */
+		p = set_isakmp_payload(p, iph1->id, ISAKMP_NPTYPE_GSS);
+
+		/* create GSS payload */
+		gssapi_get_token_to_send(iph1, &gsstoken);
+		p = set_isakmp_payload(p, gsstoken, ISAKMP_NPTYPE_HASH);
+
+		/* create isakmp HASH payload */
+		p = set_isakmp_payload(p, gsshash, ISAKMP_NPTYPE_NONE);
+
+		break;
+#endif
 	}
 
 
@@ -876,6 +1051,14 @@ agg_r1send(iph1, msg)
 end:
 	if (cr)
 		vfree(cr);
+#ifdef HAVE_GSSAPI
+	if (gsstoken)
+		vfree(gsstoken);
+	if (gsshash)
+		vfree(gsshash);
+	if (gss_sa != iph1->sa_ret)
+		vfree(gss_sa);
+#endif
 
 	return error;
 }
@@ -883,6 +1066,7 @@ end:
 /*
  * receive from initiator
  * 	psk: HDR, HASH_I
+ *   gssapi: HDR, HASH_I
  * 	sig: HDR, [ CERT, ] SIG_I
  * 	rsa: HDR, HASH_I
  * 	rev: HDR, HASH_I

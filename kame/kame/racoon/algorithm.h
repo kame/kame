@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.h,v 1.10 2000/10/04 17:40:58 itojun Exp $	*/
+/*	$KAME: algorithm.h,v 1.11 2000/12/12 16:59:33 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -101,7 +101,7 @@ enum {
 	/* authentication method. */
 	/* 0 is defined as algtype_nothing above. */
 	algtype_psk = 1, algtype_dsssig, algtype_rsasig,
-	algtype_rsaenc, algtype_rsarev,
+	algtype_rsaenc, algtype_rsarev, algtype_gssapikrb
 };
 
 extern int default_keylen __P((int, int));

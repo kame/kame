@@ -1,4 +1,4 @@
-/*	$KAME: handler.c,v 1.39 2000/11/09 06:28:03 sakane Exp $	*/
+/*	$KAME: handler.c,v 1.40 2000/12/12 16:59:36 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -57,6 +57,10 @@
 #include "remoteconf.h"
 #include "handler.h"
 
+#ifdef HAVE_GSSAPI
+#include "gssapi.h"
+#endif
+
 static LIST_HEAD(_ph1tree_, ph1handle) ph1tree;
 static LIST_HEAD(_ph2tree_, ph2handle) ph2tree;
 static LIST_HEAD(_ctdtree_, contacted) ctdtree;
@@ -68,6 +72,9 @@ static LIST_HEAD(_ctdtree_, contacted) ctdtree;
 /*
  * search for isakmpsa handler with isakmp index.
  */
+
+extern caddr_t val2str(const char *, size_t);
+
 struct ph1handle *
 getph1byindex(index)
 	isakmp_index *index;
@@ -266,6 +273,13 @@ delph1(iph1)
 
 	VPTRINIT(iph1->sa);
 	VPTRINIT(iph1->sa_ret);
+
+	VPTRINIT(iph1->gi_i);
+	VPTRINIT(iph1->gi_r);
+
+#ifdef HAVE_GSSAPI
+	gssapi_free_state(iph1);
+#endif
 
 	free(iph1);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_ident.c,v 1.47 2000/10/18 09:51:43 sakane Exp $	*/
+/*	$KAME: isakmp_ident.c,v 1.48 2000/12/12 16:59:40 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -69,6 +69,10 @@
 #include "isakmp_ident.h"
 #include "isakmp_inf.h"
 #include "vendorid.h"
+
+#ifdef HAVE_GSSAPI
+#include "gssapi.h"
+#endif
 
 static vchar_t *ident_ir2sendmx __P((struct ph1handle *));
 static vchar_t *ident_ir3sendmx __P((struct ph1handle *));
@@ -253,6 +257,7 @@ end:
  * send to responder
  * 	psk: HDR, KE, Ni
  * 	sig: HDR, KE, Ni
+ *   gssapi: HDR, KE, Ni, GSSi
  * 	rsa: HDR, KE, [ HASH(1), ] <IDi1_b>PubKey_r, <Ni_b>PubKey_r
  * 	rev: HDR, [ HASH(1), ] <Ni_b>Pubkey_r, <KE_b>Ke_i,
  * 	          <IDi1_b>Ke_i, [<<Cert-I_b>Ke_i]
@@ -287,6 +292,11 @@ ident_i2send(iph1, msg)
 	if (iph1->nonce == NULL)
 		goto end;
 
+#ifdef HAVE_GSSAPI
+	if (iph1->approval->authmethod == OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB)
+		gssapi_get_itoken(iph1, NULL);
+#endif
+
 	/* create buffer to send isakmp payload */
 	iph1->sendbuf = ident_ir2sendmx(iph1);
 	if (iph1->sendbuf == NULL)
@@ -309,6 +319,7 @@ end:
  * receive from responder
  * 	psk: HDR, KE, Nr
  * 	sig: HDR, KE, Nr [, CR ]
+ *   gssapi: HDR, KE, Nr, GSSr
  * 	rsa: HDR, KE, <IDr1_b>PubKey_i, <Nr_b>PubKey_i
  * 	rev: HDR, <Nr_b>PubKey_i, <KE_b>Ke_r, <IDr1_b>Ke_r,
  */
@@ -320,6 +331,9 @@ ident_i3recv(iph1, msg)
 	vchar_t *pbuf = NULL;
 	struct isakmp_parse_t *pa;
 	int error = -1;
+#ifdef HAVE_GSSAPI
+	vchar_t *gsstoken;
+#endif
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -358,6 +372,13 @@ ident_i3recv(iph1, msg)
 		case ISAKMP_NPTYPE_CR:
 			if (oakley_savecr(iph1, pa->ptr) < 0)
 				goto end;
+			break;
+#endif
+#ifdef HAVE_GSSAPI
+		case ISAKMP_NPTYPE_GSS:
+			if (isakmp_p2ph(&gsstoken, pa->ptr) < 0)
+				goto end;
+			gssapi_save_received_token(iph1, gsstoken);
 			break;
 #endif
 		default:
@@ -406,6 +427,7 @@ end:
  * send to responder
  * 	psk: HDR*, IDi1, HASH_I
  * 	sig: HDR*, IDi1, [ CR, ] [ CERT, ] SIG_I
+ *   gssapi: HDR*, IDi1, < Gssi(n) | HASH_I >
  * 	rsa: HDR*, HASH_I
  * 	rev: HDR*, HASH_I
  */
@@ -415,6 +437,10 @@ ident_i3send(iph1, msg)
 	vchar_t *msg;
 {
 	int error = -1;
+	int dohash = 1;
+#ifdef HAVE_GSSAPI
+	int len;
+#endif
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -444,10 +470,23 @@ ident_i3send(iph1, msg)
 	if (ipsecdoi_setid1(iph1) < 0)
 		goto end;
 
+#ifdef HAVE_GSSAPI
+	if (iph1->approval->authmethod == OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB &&
+	    gssapi_more_tokens(iph1)) {
+		plog(logp, LOCATION, NULL, "calling get_itoken\n");
+		gssapi_get_itoken(iph1, &len);
+		if (len != 0)
+			dohash = 0;
+	}
+#endif
+
 	/* generate HASH to send */
-	iph1->hash = oakley_ph1hash_common(iph1, GENERATE);
-	if (iph1->hash == NULL)
-		goto end;
+	if (dohash) {
+		iph1->hash = oakley_ph1hash_common(iph1, GENERATE);
+		if (iph1->hash == NULL)
+			goto end;
+	} else
+		iph1->hash = NULL;
 
 	/* set encryption flag */
 	iph1->flags |= ISAKMP_FLAG_E;
@@ -473,6 +512,7 @@ end:
  * receive from responder
  * 	psk: HDR*, IDr1, HASH_R
  * 	sig: HDR*, IDr1, [ CERT, ] SIG_R
+ *   gssapi: HDR*, IDr1, < GSSr(n) | HASH_R >
  * 	rsa: HDR*, HASH_R
  * 	rev: HDR*, HASH_R
  */
@@ -485,6 +525,10 @@ ident_i4recv(iph1, msg0)
 	struct isakmp_parse_t *pa;
 	vchar_t *msg = NULL;
 	int error = -1;
+	int type;
+#ifdef HAVE_GSSAPI
+	vchar_t *gsstoken = NULL;
+#endif
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -535,6 +579,13 @@ ident_i4recv(iph1, msg0)
 				goto end;
 			break;
 #endif
+#ifdef HAVE_GSSAPI
+		case ISAKMP_NPTYPE_GSS:
+			if (isakmp_p2ph(&gsstoken, pa->ptr) < 0)
+				goto end;
+			gssapi_save_received_token(iph1, gsstoken);
+			break;
+#endif
 		case ISAKMP_NPTYPE_VID:
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
@@ -569,18 +620,21 @@ ident_i4recv(iph1, msg0)
 	}
 
 	/* validate authentication value */
-    {
-	int type;
-	type = oakley_validate_auth(iph1);
-	if (type != 0) {
-		if (type == -1) {
-			/* message printed inner oakley_validate_auth() */
+#ifdef HAVE_GSSAPI
+	if (gsstoken == NULL) {
+#endif
+		type = oakley_validate_auth(iph1);
+		if (type != 0) {
+			if (type == -1) {
+				/* msg printed inner oakley_validate_auth() */
+				goto end;
+			}
+			isakmp_info_send_n1(iph1, type, NULL);
 			goto end;
 		}
-		isakmp_info_send_n1(iph1, type, NULL);
-		goto end;
+#ifdef HAVE_GSSAPI
 	}
-    }
+#endif
 
 	/*
 	 * XXX: Should we do compare two addresses, ph1handle's and ID
@@ -591,7 +645,15 @@ ident_i4recv(iph1, msg0)
 		plog(logp, LOCATION, iph1->remote, "ID ");
 		PVDUMP(iph1->id_p));
 
+	/*
+	 * If we got a GSS token, we need to this roundtrip again.
+	 */
+#ifdef HAVE_GSSAPI
+	iph1->status = gsstoken != 0 ? PHASE1ST_MSG3RECEIVED : 
+	    PHASE1ST_MSG4RECEIVED;
+#else
 	iph1->status = PHASE1ST_MSG4RECEIVED;
+#endif
 
 	error = 0;
 
@@ -600,6 +662,10 @@ end:
 		vfree(pbuf);
 	if (msg)
 		vfree(msg);
+#ifdef HAVE_GSSAPI
+	if (gsstoken)
+		vfree(gsstoken);
+#endif
 
 	if (error) {
 		VPTRINIT(iph1->id_p);
@@ -754,6 +820,7 @@ ident_r1send(iph1, msg)
 	caddr_t p;
 	int tlen;
 	int error = -1;
+	vchar_t *gss_sa;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -767,9 +834,14 @@ ident_r1send(iph1, msg)
 	/* set responder's cookie */
 	isakmp_newcookie((caddr_t)&iph1->index.r_ck, iph1->remote, iph1->local);
 
+	if (iph1->approval->gssid != NULL)
+		gss_sa = ipsecdoi_setph1proposal(iph1->approval);
+	else
+		gss_sa = iph1->sa_ret;
+
 	/* create buffer to send isakmp payload */
 	tlen = sizeof(struct isakmp)
-		+ sizeof(*gen) + iph1->sa_ret->l;
+		+ sizeof(*gen) + gss_sa->l;
 
 	iph1->sendbuf = vmalloc(tlen);
 	if (iph1->sendbuf == NULL) { 
@@ -784,7 +856,7 @@ ident_r1send(iph1, msg)
 		goto end;
 
 	/* set SA payload to reply */
-	p = set_isakmp_payload(p, iph1->sa_ret, ISAKMP_NPTYPE_NONE);
+	p = set_isakmp_payload(p, gss_sa, ISAKMP_NPTYPE_NONE);
 
 #ifdef HAVE_PRINT_ISAKMP_C
 	isakmp_printpacket(iph1->sendbuf, iph1->local, iph1->remote, 0);
@@ -803,6 +875,8 @@ ident_r1send(iph1, msg)
 	error = 0;
 
 end:
+	if (gss_sa != iph1->sa_ret)
+		vfree(gss_sa);
 	return error;
 }
 
@@ -810,6 +884,7 @@ end:
  * receive from initiator
  * 	psk: HDR, KE, Ni
  * 	sig: HDR, KE, Ni
+ *   gssapi: HDR, KE, Ni, GSSi
  * 	rsa: HDR, KE, [ HASH(1), ] <IDi1_b>PubKey_r, <Ni_b>PubKey_r
  * 	rev: HDR, [ HASH(1), ] <Ni_b>Pubkey_r, <KE_b>Ke_i,
  * 	          <IDi1_b>Ke_i, [<<Cert-I_b>Ke_i]
@@ -822,6 +897,9 @@ ident_r2recv(iph1, msg)
 	vchar_t *pbuf = NULL;
 	struct isakmp_parse_t *pa;
 	int error = -1;
+#ifdef HAVE_GSSAPI
+	vchar_t *gsstoken = NULL;
+#endif
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -861,6 +939,13 @@ ident_r2recv(iph1, msg)
 				"NOTICE: CR received, ignore it."
 				"It should be in other exchange.\n");
 			break;
+#ifdef HAVE_GSSAPI
+		case ISAKMP_NPTYPE_GSS:
+			if (isakmp_p2ph(&gsstoken, pa->ptr) < 0)
+				goto end;
+			gssapi_save_received_token(iph1, gsstoken);
+			break;
+#endif
 		default:
 			/* don't send information, see ident_r1recv() */
 			plog(logp, LOCATION, iph1->remote,
@@ -885,6 +970,10 @@ ident_r2recv(iph1, msg)
 end:
 	if (pbuf)
 		vfree(pbuf);
+#ifdef HAVE_GSSAPI
+	if (gsstoken)
+		vfree(gsstoken);
+#endif
 
 	if (error) {
 		VPTRINIT(iph1->dhpub_p);
@@ -899,6 +988,7 @@ end:
  * send to initiator
  * 	psk: HDR, KE, Nr
  * 	sig: HDR, KE, Nr [, CR ]
+ *   gssapi: HDR, KE, Nr, GSSr
  * 	rsa: HDR, KE, <IDr1_b>PubKey_i, <Nr_b>PubKey_i
  * 	rev: HDR, <Nr_b>PubKey_i, <KE_b>Ke_r, <IDr1_b>Ke_r,
  */
@@ -927,6 +1017,11 @@ ident_r2send(iph1, msg)
 	iph1->nonce = eay_set_random(iph1->rmconf->nonce_size);
 	if (iph1->nonce == NULL)
 		goto end;
+
+#ifdef HAVE_GSSAPI
+	if (iph1->approval->authmethod == OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB)
+		gssapi_get_rtoken(iph1, NULL);
+#endif
 
 	/* create HDR;KE;NONCE payload */
 	iph1->sendbuf = ident_ir2sendmx(iph1);
@@ -964,6 +1059,7 @@ end:
  * receive from initiator
  * 	psk: HDR*, IDi1, HASH_I
  * 	sig: HDR*, IDi1, [ CR, ] [ CERT, ] SIG_I
+ *   gssapi: HDR*, [ IDi1, ] < GSSi(n) | HASH_I >
  * 	rsa: HDR*, HASH_I
  * 	rev: HDR*, HASH_I
  */
@@ -976,6 +1072,10 @@ ident_r3recv(iph1, msg0)
 	vchar_t *pbuf = NULL;
 	struct isakmp_parse_t *pa;
 	int error = -1;
+	int type;
+#ifdef HAVE_GSSAPI
+	vchar_t *gsstoken = NULL;
+#endif
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -1030,6 +1130,13 @@ ident_r3recv(iph1, msg0)
 				goto end;
 			break;
 #endif
+#ifdef HAVE_GSSAPI
+		case ISAKMP_NPTYPE_GSS:
+			if (isakmp_p2ph(&gsstoken, pa->ptr) < 0)
+				goto end;
+			gssapi_save_received_token(iph1, gsstoken);
+			break;
+#endif
 		case ISAKMP_NPTYPE_VID:
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, iph1->remote,
@@ -1072,6 +1179,12 @@ ident_r3recv(iph1, msg0)
 		if (iph1->pl_hash == NULL)
 			ng++;
 		break;
+#ifdef HAVE_GSSAPI
+	case OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB:
+		if (gsstoken == NULL && iph1->pl_hash == NULL)
+			ng++;
+		break;
+#endif
 	default:
 		plog(logp, LOCATION, iph1->remote,
 			"invalid authmethod %d why ?\n",
@@ -1095,18 +1208,21 @@ ident_r3recv(iph1, msg0)
 	}
 
 	/* validate authentication value */
-    {
-	int type;
-	type = oakley_validate_auth(iph1);
-	if (type != 0) {
-		if (type == -1) {
-			/* message printed inner oakley_validate_auth() */
+#ifdef HAVE_GSSAPI
+	if (gsstoken == NULL) {
+#endif
+		type = oakley_validate_auth(iph1);
+		if (type != 0) {
+			if (type == -1) {
+				/* msg printed inner oakley_validate_auth() */
+				goto end;
+			}
+			isakmp_info_send_n1(iph1, type, NULL);
 			goto end;
 		}
-		isakmp_info_send_n1(iph1, type, NULL);
-		goto end;
+#ifdef HAVE_GSSAPI
 	}
-    }
+#endif
 
 #ifdef HAVE_SIGNING_C
 	if (oakley_checkcr(iph1) < 0) {
@@ -1124,7 +1240,12 @@ ident_r3recv(iph1, msg0)
 		plog(logp, LOCATION, iph1->remote, "ID ");
 		PVDUMP(iph1->id_p));
 
+#ifdef HAVE_GSSAPI
+	iph1->status = gsstoken != NULL ? PHASE1ST_MSG2RECEIVED :
+	    PHASE1ST_MSG3RECEIVED;
+#else
 	iph1->status = PHASE1ST_MSG3RECEIVED;
+#endif
 
 	error = 0;
 
@@ -1133,6 +1254,10 @@ end:
 		vfree(pbuf);
 	if (msg)
 		vfree(msg);
+#ifdef HAVE_GSSAPI
+	if (gsstoken)
+		vfree(gsstoken);
+#endif
 
 	if (error) {
 		VPTRINIT(iph1->id_p);
@@ -1152,6 +1277,7 @@ end:
  * send to initiator
  * 	psk: HDR*, IDr1, HASH_R
  * 	sig: HDR*, IDr1, [ CERT, ] SIG_R
+ *   gssapi: HDR*, IDr1, < GSSr(n) | HASH_R >
  * 	rsa: HDR*, HASH_R
  * 	rev: HDR*, HASH_R
  */
@@ -1162,6 +1288,10 @@ ident_r3send(iph1, msg0)
 {
 	vchar_t *msg = NULL;
 	int error = -1;
+	int dohash = 1;
+#ifdef HAVE_GSSAPI
+	int len;
+#endif
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -1176,11 +1306,24 @@ ident_r3send(iph1, msg0)
 	if (ipsecdoi_setid1(iph1) < 0)
 		goto end;
 
-	/* generate HASH to send */
-	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "generate HASH_R\n"));
-	iph1->hash = oakley_ph1hash_common(iph1, GENERATE);
-	if (iph1->hash == NULL)
-		goto end;
+#ifdef HAVE_GSSAPI
+	if (iph1->approval->authmethod == OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB &&
+	    gssapi_more_tokens(iph1)) {
+		gssapi_get_rtoken(iph1, &len);
+		if (len != 0)
+			dohash = 0;
+	}
+#endif
+
+	if (dohash) {
+		/* generate HASH to send */
+		YIPSDEBUG(DEBUG_KEY,
+		    plog(logp, LOCATION, NULL, "generate HASH_R\n"));
+		iph1->hash = oakley_ph1hash_common(iph1, GENERATE);
+		if (iph1->hash == NULL)
+			goto end;
+	} else
+		iph1->hash = NULL;
 
 	/* set encryption flag */
 	iph1->flags |= ISAKMP_FLAG_E;
@@ -1226,6 +1369,10 @@ ident_ir2sendmx(iph1)
 	int need_cr = 0;
 	vchar_t *cr = NULL;
 	int error = -1;
+	int nptype;
+#ifdef HAVE_GSSAPI
+	vchar_t *gsstoken = NULL;
+#endif
 
 #ifdef HAVE_SIGNING_C
 	/* create CR if need */
@@ -1243,6 +1390,11 @@ ident_ir2sendmx(iph1)
 	}
 #endif
 
+#ifdef HAVE_GSSAPI
+	if (iph1->approval->authmethod == OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB)
+		gssapi_get_token_to_send(iph1, &gsstoken);
+#endif
+
 	/* create buffer */
 	tlen = sizeof(struct isakmp)
 	     + sizeof(*gen) + iph1->dhpub->l
@@ -1251,6 +1403,10 @@ ident_ir2sendmx(iph1)
 		tlen += sizeof(*gen) + lcconf->vendorid->l;
 	if (need_cr)
 		tlen += sizeof(*gen) + cr->l;
+#ifdef HAVE_GSSAPI
+	if (gsstoken)
+		tlen += sizeof(*gen) + gsstoken->l;
+#endif
 
 	buf = vmalloc(tlen);
 	if (buf == NULL) {
@@ -1268,10 +1424,23 @@ ident_ir2sendmx(iph1)
 	p = set_isakmp_payload(p, iph1->dhpub, ISAKMP_NPTYPE_NONCE);
 
 	/* create isakmp NONCE payload */
-	p = set_isakmp_payload(p, iph1->nonce,
+#ifdef HAVE_GSSAPI
+	if (iph1->approval->authmethod == OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB)
+		nptype = ISAKMP_NPTYPE_GSS;
+	else
+#endif
+		nptype = lcconf->vendorid ? ISAKMP_NPTYPE_VID :
+		    (need_cr ? ISAKMP_NPTYPE_CR : ISAKMP_NPTYPE_NONE);
+	p = set_isakmp_payload(p, iph1->nonce, nptype);
+
+#ifdef HAVE_GSSAPI
+	if (iph1->approval->authmethod == OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB) {
+		p = set_isakmp_payload(p, gsstoken,
 			lcconf->vendorid ? ISAKMP_NPTYPE_VID
 					 : (need_cr ? ISAKMP_NPTYPE_CR
 						    : ISAKMP_NPTYPE_NONE));
+	}
+#endif
 
 	/* append vendor id, if needed */
 	if (lcconf->vendorid)
@@ -1307,11 +1476,13 @@ end:
  * initiator's 4th exchange send to responder
  * 	psk: HDR*, IDi1, HASH_I
  * 	sig: HDR*, IDi1, [ CR, ] [ CERT, ] SIG_I
+ *   gssapi: HDR*, [ IDi1, ] < GSSi(n) | HASH_I >
  * 	rsa: HDR*, HASH_I
  * 	rev: HDR*, HASH_I
  * responders 3rd exchnage send to initiator
  * 	psk: HDR*, IDr1, HASH_R
  * 	sig: HDR*, IDr1, [ CERT, ] SIG_R
+ *   gssapi: HDR*, [ IDr1, ] < GSSr(n) | HASH_R >
  * 	rsa: HDR*, HASH_R
  * 	rev: HDR*, HASH_R
  */
@@ -1327,6 +1498,11 @@ ident_ir3sendmx(iph1)
 	int need_cert = 0;
 	vchar_t *cr = NULL;
 	int error = -1;
+#ifdef HAVE_GSSAPI
+	int nptype;
+	vchar_t *gsstoken = NULL;
+	vchar_t *gsshash = NULL;
+#endif
 
 	tlen = sizeof(struct isakmp);
 
@@ -1413,6 +1589,55 @@ ident_ir3sendmx(iph1)
 		/* create isakmp CR payload */
 		if (need_cr)
 			p = set_isakmp_payload(p, cr, ISAKMP_NPTYPE_NONE);
+		break;
+#endif
+#ifdef HAVE_GSSAPI
+	case OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB:
+		if (!gssapi_id_sent(iph1))
+			tlen += sizeof (*gen) + iph1->id->l;
+		if (iph1->hash != NULL) {
+			gsshash = gssapi_wraphash(iph1);
+			if (gsshash == NULL)
+				goto end;
+			tlen += sizeof (*gen) + gsshash->l;
+		} else {
+			gssapi_get_token_to_send(iph1, &gsstoken);
+			tlen += sizeof (*gen) + gsstoken->l;
+		}
+
+		buf = vmalloc(tlen);
+		if (buf == NULL) {
+			plog(logp, LOCATION, NULL,
+				"failed to get buffer to send.\n");
+			goto end;
+		}
+
+		/* set isakmp header */
+		if (!gssapi_id_sent(iph1))
+			nptype = ISAKMP_NPTYPE_ID;
+		else
+			nptype = iph1->hash != NULL ? ISAKMP_NPTYPE_HASH :
+			    ISAKMP_NPTYPE_GSS;
+		p = set_isakmp_header(buf, iph1, nptype);
+		if (p == NULL)
+			goto end;
+
+		if (!gssapi_id_sent(iph1)) {
+			/* create isakmp ID payload */
+			nptype = iph1->hash != NULL ? ISAKMP_NPTYPE_HASH :
+			    ISAKMP_NPTYPE_GSS;
+			p = set_isakmp_payload(p, iph1->id, nptype);
+			if (p == NULL)
+				goto end;
+			gssapi_set_id_sent(iph1);
+		}
+
+		if (iph1->hash != NULL)
+			/* create isakmp HASH payload */
+			p = set_isakmp_payload(p, gsshash,
+			    ISAKMP_NPTYPE_NONE);
+		else
+			p = set_isakmp_payload(p, gsstoken, ISAKMP_NPTYPE_NONE);
 		break;
 #endif
 	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
