@@ -1,4 +1,4 @@
-/*	$KAME: rthdr.c,v 1.15 2003/06/06 06:34:01 itojun Exp $	*/
+/*	$KAME: rthdr.c,v 1.16 2003/06/06 06:35:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -181,7 +181,7 @@ inet6_rthdr_reverse(in, out)
 	struct cmsghdr *out;
 {
 
-	return -1;
+	return (-1);
 }
 #endif
 
@@ -199,13 +199,13 @@ inet6_rthdr_segments(cmsg)
 		struct ip6_rthdr0 *rt0 = (struct ip6_rthdr0 *)rthdr;
 
 		if (rt0->ip6r0_len % 2 || 46 < rt0->ip6r0_len)
-			return -1;
+			return (-1);
 
 		return (rt0->ip6r0_len * 8) / sizeof(struct in6_addr);
 	}
 
 	default:
-		return -1;
+		return (-1);
 	}
 }
 
@@ -257,11 +257,11 @@ inet6_rthdr_getflags(cmsg, idx)
 		int naddr;
 
 		if (rt0->ip6r0_len % 2 || 46 < rt0->ip6r0_len) {
-			return -1;
+			return (-1);
 		}
 		naddr = (rt0->ip6r0_len * 8) / sizeof(struct in6_addr);
 		if (idx < 0 || naddr < idx)
-			return -1;
+			return (-1);
 #ifdef COMPAT_RFC1883		/* XXX */
 		if (rt0->ip6r0_slmap[idx / 8] & (0x80 >> (idx % 8)))
 			return IPV6_RTHDR_STRICT;
@@ -273,7 +273,7 @@ inet6_rthdr_getflags(cmsg, idx)
 	}
 
 	default:
-		return -1;
+		return (-1);
 	}
 }
 
