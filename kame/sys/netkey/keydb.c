@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.37 2000/01/05 14:27:13 itojun Exp $ */
+/* KAME $Id: keydb.c,v 1.38 2000/01/06 07:41:38 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -592,6 +592,15 @@ key_do_allocsa_policy(sah, state)
  * Must call key_freesav() later.
  * OUT: positive:	pointer to a sav.
  *	NULL:		not found, or error occured.
+ *
+ * In the comparison, source address will be ignored for RFC2401 conformance.
+ * To quote, from section 4.1:
+ *	A security association is uniquely identified by a triple consisting
+ *	of a Security Parameter Index (SPI), an IP Destination Address, and a
+ *	security protocol (AH or ESP) identifier.
+ * Note that, however, we do need to keep source address in IPsec SA.
+ * IPsec SA.  IKE specification and PF_KEY specification do assume that we
+ * keep source address in IPsec SA.  We see a tricky situation here.
  */
 struct secasvar *
 key_allocsa(family, src, dst, proto, spi)
@@ -636,13 +645,18 @@ key_allocsa(family, src, dst, proto, spi)
 				if (spi != sav->spi)
 					continue;
 
-				if (key_bbcmp(src,
+#if 0	/* don't check src */
+				if (!key_bbcmp(src,
 				     _INADDRBYSA(&sav->sah->saidx.src),
-				     _INALENBYAF(sav->sah->saidx.src.ss_family) << 3)
-				 && key_bbcmp(dst,
+				     _INALENBYAF(sav->sah->saidx.src.ss_family) << 3))
+					continue;
+#endif
+				if (!key_bbcmp(dst,
 				     _INADDRBYSA(&sav->sah->saidx.dst),
 				     _INALENBYAF(sav->sah->saidx.dst.ss_family) << 3))
-					goto found;
+					continue;
+
+				goto found;
 			}
 		}
 	}
