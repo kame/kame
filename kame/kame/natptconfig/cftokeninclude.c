@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.4 2001/09/02 19:28:34 fujisawa Exp $	*/
+/*	$KAME: cftokeninclude.c,v 1.1 2001/09/02 19:28:34 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -29,59 +29,76 @@
  * SUCH DAMAGE.
  */
 
-%{
-#include <sys/types.h>
+void
+switchToBuffer(char *Wow)
+{
+	YY_BUFFER_STATE	yyb;
 
-#include <err.h>
-#include <string.h>
-
-#include "cfparse.h"
-#include "defs.h"
-
-#define	YY_DECL		int _yylex(void)
-#define	YY_NO_UNPUT
-
-int		getDecimal		__P((char *));
-int		getHexadecimal		__P((char *));
-int		getDQuoteString		__P((char *));
-int		SNAMEorKeyword		__P((char *));
+	yyb = yy_scan_string(Wow);
+	yy_switch_to_buffer(yyb);
+}
 
 
-%}
+void
+reassembleCommandLine(int argc, char *argv[])
+{
+	const char *fn = __FUNCTION__;
+
+	YY_BUFFER_STATE	 yyb;
+	char		*spc, *s, *d;
+	char		*kk;
+	char		 Wow[BUFSIZ+GETA];
+
+	kk = Wow + BUFSIZ;
+	bzero(Wow, sizeof(Wow));
+	for (d = Wow; argc; argc--, argv++) {
+		s = *(argv);
+		if ((spc = strchr(s, ' ')) == NULL)
+			spc = strchr(s, '\t');
+
+		if (spc)	*d++ = '"';
+		while (*s)	*d++ = *s++;
+		if (spc)	*d++ = '"';
+
+		*d++ = ' ';
+		if (d >= kk)
+			errx(1, "%s: command lien too long", fn);
+	}
+
+	yyb = yy_scan_string(Wow);
+	yy_switch_to_buffer(yyb);
+}
 
 
-letter			[a-zA-Z_]
-digit			[0-9]
-hexdigit		[0-9A-Fa-f]
-letter_or_digit		[0-9a-zA-Z_]
-dot			"."
-colon			":"
-ipv4addr		{digit}{1,3}({dot}{digit}{1,3}){0,3}
-ipv6addr		{hexdigit}{0,4}({colon}{hexdigit}{0,4}){2,7}
+int
+getDecimal(char *yytext)
+{
+	yylval.UInt = strtol(yytext, NULL, 0);
+	return (SDECIMAL);
+}
 
 
-%%
-
-#[^\n]*\n			/* ignore comment line */
-^[ \t]*\n			/* ignore blank line */
-[ \t]+				/* eat up whitespace */
-[\n]				/* toss return */
-{letter}{letter_or_digit}*	return (SNAMEorKeyword(yytext));
-{digit}+			return (getDecimal(yytext));
-0x{hexdigit}+			return (getHexadecimal(yytext));
-{ipv4addr}			return (SIPV4ADDR);
-{ipv6addr}			return (SIPV6ADDR);
-
-"-"				return (SMINUS);
-"/"				return (SSLASH);
-":"				return (SCOLON);
-"="				return (SEQUAL);
-"?"				return (SQUESTION);
-
-\"				return (getDQuoteString(yytext));
-.				return (SOTHER);
-
-%%
+int
+getHexadecimal(char *yytext)
+{
+	yylval.UInt = strtoul(yytext, NULL, 0);
+	return (SHEXADECIMAL);
+}
 
 
-#include "cftokeninclude.c"
+int
+getDQuoteString(char *yytext)
+{
+	int	 ch;
+	char	*p = yytext;
+
+	for (;;) {
+		switch (ch = input()) {
+		case 0:		return (SDQUOTE);
+		case '\"':	*p = 0; return (SSTRING);
+		default:	*p++ = ch;
+		}
+	}
+
+	return (SSTRING);
+}
