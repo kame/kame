@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.16 2000/03/25 07:23:33 sumikawa Exp $	*/
+/*	$KAME: if_gif.c,v 1.17 2000/04/11 10:46:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -408,7 +408,7 @@ gif_ioctl(ifp, cmd, data)
 			ifp->if_mtu = mtu;
 		}
 		break;
-#endif
+#endif /* !OpenBSD */
 #endif /* SIOCSIFMTU */
 
 	case SIOCSIFPHYADDR:
@@ -451,6 +451,20 @@ gif_ioctl(ifp, cmd, data)
 			goto bad;
 			break;
 		}
+		break;
+
+	case SIOCDIFPHYADDR:
+		if (sc->encap_cookie)
+			(void)encap_detach(sc->encap_cookie);
+		if (sc->gif_psrc) {
+			free((caddr_t)sc->gif_psrc, M_IFADDR);
+			sc->gif_psrc = NULL;
+		}
+		if (sc->gif_pdst) {
+			free((caddr_t)sc->gif_pdst, M_IFADDR);
+			sc->gif_pdst = NULL;
+		}
+		/* change the IFF_UP flag as well? */
 		break;
 			
 	case SIOCGIFPSRCADDR:
