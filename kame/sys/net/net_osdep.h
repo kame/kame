@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.25 2000/12/01 15:41:55 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.26 2000/12/02 07:02:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -187,7 +187,7 @@ extern const char *if_name __P((struct ifnet *));
 #define HAVE_RATECHECK
 #endif
 
-#if defined(__OpenBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 #define HAVE_PPSRATECHECK
 #endif
 
