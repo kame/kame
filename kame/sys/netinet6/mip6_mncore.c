@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.12 2003/07/08 03:04:45 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.13 2003/07/08 09:51:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -3542,8 +3542,10 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	struct ip6m_binding_update *ip6mu;
 	struct ip6m_opt_nonce *mopt_nonce = NULL;
 	struct ip6m_opt_authdata *mopt_auth = NULL;
+	struct ip6m_opt_altcoa *mopt_altcoa = NULL;
+	struct sockaddr_in6 altcoa;
 	int ip6mu_size, pad;
-	int bu_size = 0, nonce_size = 0, auth_size = 0;
+	int bu_size = 0, nonce_size = 0, auth_size = 0, altcoa_size = 0;
 	struct mip6_bu *mbu, *hrmbu;
 	int need_rr = 0, ignore_co_nonce = 0;
 	u_int8_t key_bm[MIP6_KBM_LEN]; /* Stated as 'Kbm' in the spec */
@@ -3632,11 +3634,13 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 #ifdef RR_DBG
 printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_size, nonce_size, auth_size, AUTH_SIZE);
 #endif
+		altcoa_size = 0;
 	} else {
-		bu_size += MIP6_PADLEN(bu_size, 8, 0);
+		bu_size += MIP6_PADLEN(bu_size, 8, 6);
+		altcoa_size = sizeof(struct ip6m_opt_altcoa);
 		nonce_size = auth_size = 0;
 	}
-	ip6mu_size = bu_size + nonce_size + auth_size;
+	ip6mu_size = bu_size + nonce_size + auth_size + altcoa_size;
 
 	MALLOC(ip6mu, struct ip6m_binding_update *,
 	       ip6mu_size, M_IP6OPT, M_NOWAIT);
@@ -3646,6 +3650,8 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 	if (need_rr) {
 		mopt_nonce = (struct ip6m_opt_nonce *)((u_int8_t *)ip6mu + bu_size);
 		mopt_auth = (struct ip6m_opt_authdata *)((u_int8_t *)mopt_nonce + nonce_size);
+	} else {
+		mopt_altcoa = (struct ip6m_opt_altcoa *)((u_int8_t *)ip6mu + bu_size);
 	}
 
 	/* update sequence number of this binding update entry. */
@@ -3696,25 +3702,27 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 		*p = IP6MOPT_PADN;
 		*(p + 1) = pad - 2;
 	}
-	if (nonce_size) {
-		if ((pad = nonce_size - sizeof(struct ip6m_opt_nonce)) >= 2) {
-			u_char *p = (u_int8_t *)ip6mu + bu_size
-				+ sizeof(struct ip6m_opt_nonce);
-			*p = IP6MOPT_PADN;
-			*(p + 1) = pad - 2;
-		}
-	}
-	if (auth_size) {
-		if ((pad = auth_size - AUTH_SIZE) >= 2) {
-			u_char *p = (u_int8_t *)ip6mu + bu_size + nonce_size
-				+ AUTH_SIZE;
-			*p = IP6MOPT_PADN;
-			*(p + 1) = pad - 2;
-		}
-	}
 
 	if (need_rr) {
 		/* nonce indices and authdata insertion. */
+		if (nonce_size) {
+			if ((pad = nonce_size - sizeof(struct ip6m_opt_nonce))
+			    >= 2) {
+				u_char *p = (u_int8_t *)ip6mu + bu_size
+				    + sizeof(struct ip6m_opt_nonce);
+				*p = IP6MOPT_PADN;
+				*(p + 1) = pad - 2;
+			}
+		}
+		if (auth_size) {
+			if ((pad = auth_size - AUTH_SIZE) >= 2) {
+				u_char *p = (u_int8_t *)ip6mu
+				    + bu_size + nonce_size + AUTH_SIZE;
+				*p = IP6MOPT_PADN;
+				*(p + 1) = pad - 2;
+			}
+		}
+
 		/* Nonce Indicies */
 		mopt_nonce->ip6mon_type = IP6MOPT_NONCE;
 		mopt_nonce->ip6mon_len = sizeof(struct ip6m_opt_nonce) - 2;
@@ -3758,6 +3766,22 @@ mip6_hexdump("MN: Kbm: ", sizeof(key_bm), key_bm);
 #ifdef RR_DBG
 mip6_hexdump("MN: Authenticator: ", (u_int8_t *)(mopt_auth + 1), MIP6_AUTHENTICATOR_LEN);
 #endif
+	} else {
+		if (altcoa_size) {
+			if ((pad = altcoa_size
+			    - sizeof(struct ip6m_opt_altcoa)) >= 2) {
+				u_char *p = (u_int8_t *)ip6mu + bu_size
+				    + sizeof(struct ip6m_opt_nonce);
+				*p = IP6MOPT_PADN;
+				*(p + 1) = pad - 2;
+			}
+		}
+		mopt_altcoa->ip6moa_type = IP6MOPT_ALTCOA;
+		mopt_altcoa->ip6moa_len = sizeof(struct ip6m_opt_altcoa) - 2;
+		altcoa = mbu->mbu_coa;
+		in6_clearscope(&altcoa.sin6_addr);
+		bcopy(&altcoa.sin6_addr, mopt_altcoa->ip6moa_addr,
+		    sizeof(struct in6_addr));
 	}
 
 	/* calculate checksum. */
