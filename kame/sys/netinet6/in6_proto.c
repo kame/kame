@@ -602,12 +602,8 @@ sysctl_ip6_forwarding SYSCTL_HANDLER_ARGS
 		}
 		splx(s);
 	} else {			/* router becomes host */
-		struct socket so;
-
-		/* XXX: init dummy so */
-		bzero(&so, sizeof(so));
 		while(!LIST_EMPTY(&rr_prefix))
-			delete_each_prefix(&so, LIST_FIRST(&rr_prefix),
+			delete_each_prefix(LIST_FIRST(&rr_prefix),
 					   PR_ORIG_KERNEL);
 	}
 
