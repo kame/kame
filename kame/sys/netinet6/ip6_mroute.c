@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.17 2000/04/18 12:36:03 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.18 2000/04/19 14:45:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1449,7 +1449,7 @@ ip6_mdq(m, ifp, rt)
 					     &ip6->ip6_dst) ||
 			    in6_addr2scopeid(ifp, &ip6->ip6_src) !=
 			    in6_addr2scopeid(mif6table[mifi].m6_ifp,
-					     &ip6->ip6_dst)) {
+					     &ip6->ip6_src)) {
 				ip6stat.ip6s_badscope++;
 				continue;
 			}
