@@ -41,7 +41,9 @@
 #include <ttyent.h>
 #include <unistd.h>
 #include <utmp.h>
+#if 0
 #include <util.h>
+#endif
 
 typedef struct utmp UTMP;
 

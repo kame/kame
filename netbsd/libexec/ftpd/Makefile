@@ -1,7 +1,6 @@
 #	$NetBSD: Makefile,v 1.42 2000/06/20 06:00:34 thorpej Exp $
 #	@(#)Makefile	8.2 (Berkeley) 4/4/94
 
-WARNS?=	1
 PROG=	ftpd
 SRCS=	cmds.c conf.c ftpd.c ftpcmd.y logutmp.c logwtmp.c popen.c
 CPPFLAGS+=-DHASSETPROCTITLE
