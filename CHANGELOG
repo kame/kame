@@ -1,11 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.162 1999/10/06 10:41:53 itojun Exp $
+$Id: CHANGELOG,v 1.163 1999/10/06 10:42:17 itojun Exp $
 
 <199910>
 Wed Oct  6 19:42:56 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/net/totd: totd, a DNS server for translation
 	  services like faithd(8).
+	  NetBSD PR: 8563
 	  From: Feico Dillema <dillema@acm.org>
 
 Wed Oct  6 17:28:05 JST 1999  itojun@iijlab.net
