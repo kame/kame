@@ -1,4 +1,4 @@
-.\"	$KAME: ping6.8,v 1.48 2001/07/14 05:53:05 sumikawa Exp $
+.\"	$KAME: ping6.8,v 1.49 2001/07/24 12:54:36 jinmei Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -241,12 +241,8 @@ The option is meaningful only if the target
 is a neighbor.
 .It Fl S Ar sourceaddr
 Specifies the source address of request packets.
-The source address must be one of the unicast addresses of the sending node.
-If the outgoing interface is specified by the
-.Fl I
-option as well,
-.Ar sourceaddr
-needs to be an address assigned to the specified interface.
+The source address must be one of unicast addresses of the sending node,
+and must be numeric.
 .It Fl s Ar packetsize
 Specifies the number of data bytes to be sent.
 The default is 56, which translates into 64
