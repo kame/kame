@@ -1,4 +1,4 @@
-/*	$NetBSD: kernfs_vfsops.c,v 1.35 1999/02/26 23:44:45 wrstuden Exp $	*/
+/*	$NetBSD: kernfs_vfsops.c,v 1.43 2001/11/15 09:48:22 lukem Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993, 1995
@@ -42,19 +42,22 @@
  * Kernel params Filesystem
  */
 
-#if defined(_KERNEL) && !defined(_LKM)
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: kernfs_vfsops.c,v 1.54 2003/09/08 06:51:54 itojun Exp $");
+
+#ifdef _KERNEL_OPT
 #include "opt_compat_netbsd.h"
 #endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
-#include <sys/types.h>
 #include <sys/proc.h>
 #include <sys/vnode.h>
 #include <sys/mount.h>
 #include <sys/namei.h>
 #include <sys/malloc.h>
+#include <sys/syslog.h>
 
 #include <miscfs/specfs/specdev.h>
 #include <miscfs/kernfs/kernfs.h>
@@ -62,12 +65,13 @@
 dev_t rrootdev = NODEV;
 
 void	kernfs_init __P((void));
+void	kernfs_reinit __P((void));
+void	kernfs_done __P((void));
 void	kernfs_get_rrootdev __P((void));
 int	kernfs_mount __P((struct mount *, const char *, void *,
 	    struct nameidata *, struct proc *));
 int	kernfs_start __P((struct mount *, int, struct proc *));
 int	kernfs_unmount __P((struct mount *, int, struct proc *));
-int	kernfs_root __P((struct mount *, struct vnode **));
 int	kernfs_statfs __P((struct mount *, struct statfs *, struct proc *));
 int	kernfs_quotactl __P((struct mount *, int, uid_t, caddr_t,
 			     struct proc *));
@@ -83,6 +87,22 @@ int	kernfs_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
 void
 kernfs_init()
 {
+
+	kernfs_hashinit();
+}
+
+void
+kernfs_reinit()
+{
+
+	kernfs_hashreinit();
+}
+
+void
+kernfs_done()
+{
+
+	kernfs_hashdone();
 }
 
 void
@@ -119,14 +139,13 @@ kernfs_mount(mp, path, data, ndp, p)
 	struct nameidata *ndp;
 	struct proc *p;
 {
-	int error = 0;
 	size_t size;
 	struct kernfs_mount *fmp;
-	struct vnode *rvp;
 
-#ifdef KERNFS_DIAGNOSTIC
-	printf("kernfs_mount(mp = %p)\n", mp);
-#endif
+	if (UIO_MX & (UIO_MX - 1)) {
+		log(LOG_ERR, "kernfs: invalid directory entry size");
+		return (EINVAL);
+	}
 
 	/*
 	 * Update is a no-op
@@ -134,29 +153,19 @@ kernfs_mount(mp, path, data, ndp, p)
 	if (mp->mnt_flag & MNT_UPDATE)
 		return (EOPNOTSUPP);
 
-	error = getnewvnode(VT_KERNFS, mp, kernfs_vnodeop_p, &rvp);
-	if (error)
-		return (error);
-
 	MALLOC(fmp, struct kernfs_mount *, sizeof(struct kernfs_mount),
 	    M_MISCFSMNT, M_WAITOK);
-	rvp->v_type = VDIR;
-	rvp->v_flag |= VROOT;
-#ifdef KERNFS_DIAGNOSTIC
-	printf("kernfs_mount: root vp = %p\n", rvp);
-#endif
-	fmp->kf_root = rvp;
-	mp->mnt_flag |= MNT_LOCAL;
+	memset(fmp, 0, sizeof(*fmp));
+	TAILQ_INIT(&fmp->nodelist);
+
 	mp->mnt_data = (qaddr_t)fmp;
-	vfs_getnewfsid(mp, MOUNT_KERNFS);
+	mp->mnt_flag |= MNT_LOCAL;
+	vfs_getnewfsid(mp);
 
 	(void) copyinstr(path, mp->mnt_stat.f_mntonname, MNAMELEN - 1, &size);
 	memset(mp->mnt_stat.f_mntonname + size, 0, MNAMELEN - size);
 	memset(mp->mnt_stat.f_mntfromname, 0, MNAMELEN);
 	memcpy(mp->mnt_stat.f_mntfromname, "kernfs", sizeof("kernfs"));
-#ifdef KERNFS_DIAGNOSTIC
-	printf("kernfs_mount: at %s\n", mp->mnt_stat.f_mntonname);
-#endif
 
 	kernfs_get_rrootdev();
 	return (0);
@@ -180,36 +189,13 @@ kernfs_unmount(mp, mntflags, p)
 {
 	int error;
 	int flags = 0;
-	struct vnode *rootvp = VFSTOKERNFS(mp)->kf_root;
 
-#ifdef KERNFS_DIAGNOSTIC
-	printf("kernfs_unmount(mp = %p)\n", mp);
-#endif
-
-	 if (mntflags & MNT_FORCE)
+	if (mntflags & MNT_FORCE)
 		flags |= FORCECLOSE;
 
-	/*
-	 * Clear out buffer cache.  I don't think we
-	 * ever get anything cached at this level at the
-	 * moment, but who knows...
-	 */
-	if (rootvp->v_usecount > 1)
-		return (EBUSY);
-#ifdef KERNFS_DIAGNOSTIC
-	printf("kernfs_unmount: calling vflush\n");
-#endif
-	if ((error = vflush(mp, rootvp, flags)) != 0)
+	if ((error = vflush(mp, 0, flags)) != 0)
 		return (error);
 
-#ifdef KERNFS_DIAGNOSTIC
-	vprint("kernfs root", rootvp);
-#endif
-	/*
-	 * Clean out the old root vnode for reuse.
-	 */
-	vrele(rootvp);
-	vgone(rootvp);
 	/*
 	 * Finally, throw away the kernfs_mount structure
 	 */
@@ -223,20 +209,9 @@ kernfs_root(mp, vpp)
 	struct mount *mp;
 	struct vnode **vpp;
 {
-	struct vnode *vp;
 
-#ifdef KERNFS_DIAGNOSTIC
-	printf("kernfs_root(mp = %p)\n", mp);
-#endif
-
-	/*
-	 * Return locked reference to root.
-	 */
-	vp = VFSTOKERNFS(mp)->kf_root;
-	VREF(vp);
-	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
-	*vpp = vp;
-	return (0);
+	/* setup "." */
+	return (kernfs_allocvp(mp, vpp, Pkern, &kern_targets[0], 0));
 }
 
 int
@@ -258,17 +233,13 @@ kernfs_statfs(mp, sbp, p)
 	struct proc *p;
 {
 
-#ifdef KERNFS_DIAGNOSTIC
-	printf("kernfs_statfs(mp = %p)\n", mp);
-#endif
-
 	sbp->f_bsize = DEV_BSIZE;
 	sbp->f_iosize = DEV_BSIZE;
 	sbp->f_blocks = 2;		/* 1K to keep df happy */
 	sbp->f_bfree = 0;
 	sbp->f_bavail = 0;
-	sbp->f_files = 0;
-	sbp->f_ffree = 0;
+	sbp->f_files = 1024;	/* XXX lie */
+	sbp->f_ffree = 128;	/* XXX lie */
 #ifdef COMPAT_09
 	sbp->f_type = 7;
 #else
@@ -355,9 +326,9 @@ kernfs_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
 	return (EOPNOTSUPP);
 }
 
-extern struct vnodeopv_desc kernfs_vnodeop_opv_desc;
+extern const struct vnodeopv_desc kernfs_vnodeop_opv_desc;
 
-struct vnodeopv_desc *kernfs_vnodeopv_descs[] = {
+const struct vnodeopv_desc * const kernfs_vnodeopv_descs[] = {
 	&kernfs_vnodeop_opv_desc,
 	NULL,
 };
@@ -375,6 +346,8 @@ struct vfsops kernfs_vfsops = {
 	kernfs_fhtovp,
 	kernfs_vptofh,
 	kernfs_init,
+	kernfs_reinit,
+	kernfs_done,
 	kernfs_sysctl,
 	NULL,				/* vfs_mountroot */
 	kernfs_checkexp,

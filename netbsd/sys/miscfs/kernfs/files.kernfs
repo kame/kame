@@ -2,5 +2,6 @@
 
 deffs	fs_kernfs.h			KERNFS		# XXX
 
+file	miscfs/kernfs/kernfs_subr.c	kernfs
 file	miscfs/kernfs/kernfs_vfsops.c	kernfs
 file	miscfs/kernfs/kernfs_vnops.c	kernfs

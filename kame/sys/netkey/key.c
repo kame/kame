@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.310 2003/09/08 02:23:44 itojun Exp $	*/
+/*	$KAME: key.c,v 1.311 2003/09/08 07:23:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -42,6 +42,9 @@
 #ifdef __NetBSD__
 #include "opt_inet.h"
 #include "opt_ipsec.h"
+#include "fs_kernfs.h"
+#else
+#undef KERNFS
 #endif
 
 #include <sys/types.h>
@@ -102,6 +105,11 @@
 #include <netinet6/esp.h>
 #endif
 #include <netinet6/ipcomp.h>
+
+#ifdef KERNFS
+#include <sys/mount.h>
+#include <miscfs/kernfs/kernfs.h>
+#endif
 
 #include <machine/stdarg.h>
 
@@ -399,7 +407,6 @@ static struct secpolicy *key_getsp __P((struct secpolicyindex *, int));
 #if NPF > 0
 static struct secpolicy *key_getspbytag __P((u_int16_t, int));
 #endif
-static struct secpolicy *key_getspbyid __P((u_int32_t));
 static u_int32_t key_newreqid __P((void));
 static struct mbuf *key_gather_mbuf __P((struct mbuf *,
 	const struct sadb_msghdr *, int, int, ...));
@@ -415,8 +422,6 @@ static int key_spdflush __P((struct socket *, struct mbuf *,
 	const struct sadb_msghdr *));
 static int key_spddump __P((struct socket *, struct mbuf *,
 	const struct sadb_msghdr *));
-static struct mbuf *key_setdumpsp __P((struct secpolicy *,
-	u_int8_t, u_int32_t, u_int32_t));
 static u_int key_getspreqmsglen __P((struct secpolicy *));
 static int key_spdexpire __P((struct secpolicy *));
 static struct secashead *key_newsah __P((struct secasindex *));
@@ -1183,6 +1188,7 @@ static void
 key_delsav(sav)
 	struct secasvar *sav;
 {
+	int s;
 
 	/* sanity check */
 	if (sav == NULL)
@@ -1190,6 +1196,16 @@ key_delsav(sav)
 
 	if (sav->refcnt > 0)
 		panic("key_delsav: called with positive refcnt");
+
+#ifdef __NetBSD__
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+
+#ifdef KERNFS
+	kernfs_revoke_sa(sav);
+#endif
 
 	if (__LIST_CHAINED(sav))
 		LIST_REMOVE(sav, chain);
@@ -1234,6 +1250,8 @@ key_delsav(sav)
 	}
 
 	keydb_delsecasvar(sav);
+
+	splx(s);
 }
 
 /* %%% SPD management */
@@ -1257,6 +1275,10 @@ key_delsp(sp)
 	s = splsoftnet();	/*called from softclock()*/
 #else
 	s = splnet();	/*called from softclock()*/
+#endif
+
+#ifdef KERNFS
+	kernfs_revoke_sp(sp);
 #endif
 
     {
@@ -1342,7 +1364,7 @@ key_getspbytag(tag, dir)
  * OUT:	NULL	: not found
  *	others	: found, pointer to a SP.
  */
-static struct secpolicy *
+struct secpolicy *
 key_getspbyid(id)
 	u_int32_t id;
 {
@@ -2574,7 +2596,7 @@ key_spddump(so, m, mhp)
 	return 0;
 }
 
-static struct mbuf *
+struct mbuf *
 key_setdumpsp(sp, type, seq, pid)
 	struct secpolicy *sp;
 	u_int8_t type;
@@ -7023,6 +7045,49 @@ key_dump(so, m, mhp)
 
 	m_freem(m);
 	return 0;
+}
+
+struct mbuf *
+key_setdumpsa_spi(spi)
+	u_int32_t spi;
+{
+	struct mbuf *m, *n;
+	struct secasvar *sav;
+	u_int8_t satype;
+	int cnt;
+
+	cnt = 0;
+	LIST_FOREACH(sav, &spihash[spi % SPIHASHSIZE], spihash) {
+		if (sav->spi != spi)
+			continue;
+		cnt++;
+	}
+
+	if (cnt == 0)
+		return NULL;
+
+	m = NULL;
+	LIST_FOREACH(sav, &spihash[spi % SPIHASHSIZE], spihash) {
+		if (sav->spi != spi)
+			continue;
+		satype = key_proto2satype(sav->sah->saidx.proto);
+		n = key_setdumpsa(sav, SADB_DUMP, satype, --cnt, 0);
+		if (!m)
+			m = n;
+		else if (n)
+			m_cat(m, n);
+	}
+
+	if (!m)
+		return NULL;
+
+	if ((m->m_flags & M_PKTHDR) != 0) {
+		m->m_pkthdr.len = 0;
+		for (n = m; n; n = n->m_next)
+			m->m_pkthdr.len += n->m_len;
+	}
+
+	return m;
 }
 
 /*
