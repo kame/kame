@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.16 2000/07/12 12:58:04 jinmei Exp $	*/
+/*	$KAME: route6.c,v 1.17 2000/07/24 13:29:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -41,6 +41,7 @@
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/systm.h>
+#include <sys/queue.h>
 
 #include <net/if.h>
 #ifdef NEW_STRUCT_ROUTE

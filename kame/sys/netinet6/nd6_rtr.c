@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.44 2000/07/10 12:07:53 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.45 2000/07/24 13:29:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -50,6 +50,7 @@
 #include <sys/ioctl.h>
 #endif
 #include <sys/syslog.h>
+#include <sys/queue.h>
 #ifdef __OpenBSD__
 #include <dev/rndvar.h>
 #endif
