@@ -312,6 +312,7 @@ dump_bgp_exportlist(FILE *fp, struct rt_entry *rte, char *indent)
 		fprintf(fp, "%s  Not exported\n", indent);
 }
 
+#if 0
 static void
 dump_bgp_rtable(FILE *fp, struct rt_entry *base)
 {
@@ -324,6 +325,7 @@ dump_bgp_rtable(FILE *fp, struct rt_entry *base)
 			break;
 	}
 }
+#endif
 
 #if notused
 static void
