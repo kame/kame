@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2227 2002/09/09 07:58:05 itojun Exp $
+$KAME: CHANGELOG,v 1.2228 2002/09/10 02:29:19 itojun Exp $
 
 <200209>
+Tue Sep 10 11:28:12 JST 2002  itojun@iijlab.net
+	* mdnsd: make it compatible with Rendezvous in Apple Jaguar.
+	  (use port 5353 for multicast, attach "local" at the end of local
+	  names)
+
 Mon Sep  9 16:56:45 JST 2002  itojun@iijlab.net
 	* */sys/netinet*/tcp*input.c: always respect shutdown(s, SHUT_RD).
 	  previous (4.4BSD) code did not check it in certain cases, resulting
