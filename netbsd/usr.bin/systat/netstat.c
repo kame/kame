@@ -150,6 +150,12 @@ static struct nlist namelist[] = {
 	{ "_tcbtable" },
 #define	X_UDBTABLE	1
 	{ "_udbtable" },
+#ifdef INET6
+#define	X_TCB6		2
+	{ "_tcb6" },
+#define	X_UDB6		3
+	{ "_udb6" },
+#endif
 	{ "" },
 };
 
@@ -176,6 +182,10 @@ fetchnetstat()
 	struct inpcb *head, *prev, *next;
 	struct netinfo *p;
 	struct inpcb inpcb;
+#ifdef INET6
+	struct in6pcb in6pcb;
+	struct in6pcb *head6, *prev6, *next6;
+#endif
 	struct socket sockb;
 	struct tcpcb tcpcb;
 	void *off;
@@ -232,6 +242,61 @@ printf("prev = %p, head = %p, next = %p, inpcb...prev = %p\n", prev, head, next,
 		off = NPTR(X_UDBTABLE);
 		goto again;
 	}
+
+#ifdef INET6
+again6:
+	if (protos&TCP) {
+		off = NPTR(X_TCB6); 
+		istcp = 1;
+	}
+	else if (protos&UDP) {
+		off = NPTR(X_UDB6); 
+		istcp = 0;
+	}
+	else {
+		error("No protocols to display");
+		return;
+	}
+again:
+	KREAD(off, &in6pcb, sizeof (struct in6pcb));
+	prev6 = head6 = (struct in6pcb *)&((struct in6pcb *)off);
+	next6 = in6pcb.in6p_next;
+	while (next != head) {
+		KREAD(next6, &in6pcb, sizeof (in6pcb));
+#if 0
+		if (inpcb.inp_queue.cqe_prev != prev) {
+printf("prev = %p, head = %p, next = %p, inpcb...prev = %p\n", prev, head, next, inpcb.inp_queue.cqe_prev);
+			p = netcb.ni_forw;
+			for (; p != (struct netinfo *)&netcb; p = p->ni_forw)
+				p->ni_seen = 1;
+			error("Kernel state in transition");
+			return;
+		}
+#endif
+		prev6 = next6;
+		next6 = in6pcb.in6p_next;
+
+		if (!aflag && IN6_IS_ADDR_UNSPECIFIED(&in6pcb.in6p_laddr))
+			continue;
+#if 0
+		if (nhosts && !checkhost(&inpcb))
+			continue;
+		if (nports && !checkport(&inpcb))
+			continue;
+#endif
+		KREAD(in6pcb.in6p_socket, &sockb, sizeof (sockb));
+		if (istcp) {
+			KREAD(in6pcb.in6p_ppcb, &tcpcb, sizeof (tcpcb));
+			enter(&in6pcb, &sockb, tcpcb.t_state, "tcp");
+		} else
+			enter(&in6pcb, &sockb, 0, "udp");
+	}
+	if (istcp && (protos&UDP)) {
+		istcp = 0;
+		off = NPTR(X_UDB6);
+		goto again;
+	}
+#endif /*INET6*/
 }
 
 static void

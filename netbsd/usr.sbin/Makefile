@@ -1,3 +1,8 @@
-SUBDIR=	 sysctl inetd trpt
+SUBDIR+=sysctl inetd trpt
+#SUBDIR+=lpr
+
+SUBDIR+=bgpd dtcp faithd gifconfig hroute6d icmp6dump ifmcstat mld6query \
+	ndp pim6dd pim6sd prefix route6d rrenumd setkey
+#SUBDIR+=inet6d
 
 .include <bsd.subdir.mk>
