@@ -1033,6 +1033,7 @@ in6_status(s, info)
 	struct in6_addrlifetime lifetime;
 	time_t t = time(NULL);
 	char hbuf[NI_MAXHOST];
+	u_int32_t scopeid;
 #ifdef NI_WITHSCOPEID
 	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
 #else
@@ -1065,6 +1066,7 @@ in6_status(s, info)
 	close(s6);
 
 	in6_fillscopeid(sin);
+	scopeid = sin->sin6_scope_id;
 	if (getnameinfo((struct sockaddr *)sin, sin->sin6_len,
 			hbuf, sizeof(hbuf), NULL, 0, niflag))
 		strncpy(hbuf, "", sizeof(hbuf));	/* some message? */
@@ -1105,6 +1107,8 @@ in6_status(s, info)
 	if (flags6 & IN6_IFF_DEPRECATED)
 		printf("deprecated ");
 
+	if (scopeid)
+		printf(" scopeid 0x%x", scopeid);
 
 	if (ip6lifetime && (lifetime.ia6t_preferred || lifetime.ia6t_expire)) {
 		printf("pltime ");
