@@ -351,6 +351,8 @@ ip6_stats(off, name)
 {
 	struct ip6stat ip6stat;
 	int first, i;
+	struct protoent *ep;
+	const char *n;
 
 	if (off == 0)
 		return;
@@ -359,9 +361,9 @@ ip6_stats(off, name)
 	printf("%s:\n", name);
 
 #define	p(f, m) if (ip6stat.f || sflag <= 1) \
-    printf(m, ip6stat.f, plural(ip6stat.f))
+    printf(m, (unsigned long long)ip6stat.f, plural(ip6stat.f))
 #define	p1(f, m) if (ip6stat.f || sflag <= 1) \
-    printf(m, ip6stat.f)
+    printf(m, (unsigned long long)ip6stat.f)
 
 	p(ip6s_total, "\t%llu total packet%s received\n");
 	p1(ip6s_toosmall, "\t%llu with size smaller than minimum\n");
@@ -369,7 +371,8 @@ ip6_stats(off, name)
 	p1(ip6s_badoptions, "\t%llu with bad options\n");
 	p1(ip6s_badvers, "\t%llu with incorrect version number\n");
 	p(ip6s_fragments, "\t%llu fragment%s received\n");
-	p(ip6s_fragdropped, "\t%llu fragment%s dropped (dup or out of space)\n");
+	p(ip6s_fragdropped,
+	    "\t%llu fragment%s dropped (dup or out of space)\n");
 	p(ip6s_fragtimeout, "\t%llu fragment%s dropped after timeout\n");
 	p(ip6s_fragoverflow, "\t%llu fragment%s that exceeded limit\n");
 	p(ip6s_reassembled, "\t%llu packet%s reassembled ok\n");
@@ -379,7 +382,8 @@ ip6_stats(off, name)
 	p(ip6s_redirectsent, "\t%llu redirect%s sent\n");
 	p(ip6s_localout, "\t%llu packet%s sent from this host\n");
 	p(ip6s_rawout, "\t%llu packet%s sent with fabricated ip header\n");
-	p(ip6s_odropped, "\t%llu output packet%s dropped due to no bufs, etc.\n");
+	p(ip6s_odropped,
+	    "\t%llu output packet%s dropped due to no bufs, etc.\n");
 	p(ip6s_noroute, "\t%llu output packet%s discarded due to no route\n");
 	p(ip6s_fragmented, "\t%llu output datagram%s fragmented\n");
 	p(ip6s_ofragments, "\t%llu fragment%s created\n");
@@ -392,8 +396,17 @@ ip6_stats(off, name)
 				printf("\tInput packet histogram:\n");
 				first = 0;
 			}
-			printf("\t\t%s: %llu\n", ip6nh[i],
-			       ip6stat.ip6s_nxthist[i]);
+			n = NULL;
+			if (ip6nh[i])
+				n = ip6nh[i];
+			else if ((ep = getprotobynumber(i)) != NULL)
+				n = ep->p_name;
+			if (n)
+				printf("\t\t%s: %llu\n", n,
+				    (unsigned long long)ip6stat.ip6s_nxthist[i]);
+			else
+				printf("\t\t#%d: %llu\n", i,
+				    (unsigned long long)ip6stat.ip6s_nxthist[i]);
 		}
 	printf("\tMbuf statistics:\n");
 	p(ip6s_m1, "\t\t%llu one mbuf%s\n");
@@ -406,14 +419,16 @@ ip6_stats(off, name)
 			}
 			printf("\t\t\t%s = %llu\n",
 			       if_indextoname(i, ifbuf),
-			       ip6stat.ip6s_m2m[i]);
+			       (unsigned long long)ip6stat.ip6s_m2m[i]);
 		}
 	}
 	p(ip6s_mext1, "\t\t%llu one ext mbuf%s\n");
 	p(ip6s_mext2m, "\t\t%llu two or more ext mbuf%s\n");
-	p(ip6s_exthdrtoolong, "\t%llu packet%s whose headers are not continuous\n");
+	p(ip6s_exthdrtoolong,
+	    "\t%llu packet%s whose headers are not continuous\n");
 	p(ip6s_nogif, "\t%llu tunneling packet%s that can't find gif\n");
-	p(ip6s_toomanyhdr, "\t%llu packet%s discarded due to too many headers\n");
+	p(ip6s_toomanyhdr,
+	    "\t%llu packet%s discarded due to too many headers\n");
 
 	/* for debugging source address selection */
 #define PRINT_SCOPESTAT(s,i) do {\
@@ -422,17 +437,17 @@ ip6_stats(off, name)
 			p(s, "\t\t%llu node-local%s\n");\
 			break;\
 		case 2:\
-			p(s,"\t\t%llu link-local%s\n");\
+			p(s, "\t\t%llu link-local%s\n");\
 			break;\
 		case 5:\
-			p(s,"\t\t%llu site-local%s\n");\
+			p(s, "\t\t%llu site-local%s\n");\
 			break;\
 		case 14:\
-			p(s,"\t\t%llu global%s\n");\
+			p(s, "\t\t%llu global%s\n");\
 			break;\
 		default:\
 			printf("\t\t%llu addresses scope=%x\n",\
-			       ip6stat.s, i);\
+			       (unsigned long long)ip6stat.s, i);\
 		}\
 	} while(0);
 
@@ -500,9 +515,10 @@ ip6_ifstats(ifname)
 	struct in6_ifreq ifr;
 	int s;
 #define	p(f, m) if (ifr.ifr_ifru.ifru_stat.f || sflag <= 1) \
-    printf(m, ifr.ifr_ifru.ifru_stat.f, plural(ifr.ifr_ifru.ifru_stat.f))
+    printf(m, (unsigned long long)ifr.ifr_ifru.ifru_stat.f, \
+	plural(ifr.ifr_ifru.ifru_stat.f))
 #define	p_5(f, m) if (ifr.ifr_ifru.ifru_stat.f || sflag <= 1) \
-    printf(m, ip6stat.f)
+    printf(m, (unsigned long long)ip6stat.f)
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
 		perror("Warning: socket(AF_INET6)");
@@ -522,6 +538,7 @@ ip6_ifstats(ifname)
 	p(ifs6_in_toobig, "\t%llu datagram%s exceeded MTU received\n");
 	p(ifs6_in_noroute, "\t%llu datagram%s with no route received\n");
 	p(ifs6_in_addrerr, "\t%llu datagram%s with invalid dst received\n");
+	p(ifs6_in_truncated, "\t%llu truncated datagram%s received\n");
 	p(ifs6_in_protounknown, "\t%llu datagram%s with unknown proto received\n");
 	p(ifs6_in_discard, "\t%llu input datagram%s discarded\n");
 	p(ifs6_in_deliver,
@@ -822,9 +839,9 @@ icmp6_stats(off, name)
 	printf("%s:\n", name);
 
 #define	p(f, m) if (icmp6stat.f || sflag <= 1) \
-    printf(m, icmp6stat.f, plural(icmp6stat.f))
+    printf(m, (unsigned long long)icmp6stat.f, plural(icmp6stat.f))
 #define p_5(f, m) if (icmp6stat.f || sflag <= 1) \
-    printf(m, icmp6stat.f)
+    printf(m, (unsigned long long)icmp6stat.f)
 
 	p(icp6s_error, "\t%llu call%s to icmp6_error\n");
 	p(icp6s_canterror,
@@ -838,7 +855,7 @@ icmp6_stats(off, name)
 				first = 0;
 			}
 			printf("\t\t%s: %llu\n", icmp6names[i],
-				icmp6stat.icp6s_outhist[i]);
+				(unsigned long long)icmp6stat.icp6s_outhist[i]);
 		}
 	p(icp6s_badcode, "\t%llu message%s with bad code fields\n");
 	p(icp6s_tooshort, "\t%llu message%s < minimum length\n");
@@ -851,7 +868,7 @@ icmp6_stats(off, name)
 				first = 0;
 			}
 			printf("\t\t%s: %llu\n", icmp6names[i],
-				icmp6stat.icp6s_inhist[i]);
+				(unsigned long long)icmp6stat.icp6s_inhist[i]);
 		}
 	printf("\tHistogram of error messages to be generated:\n");
 	p_5(icp6s_odst_unreach_noroute, "\t\t%llu no route\n");
@@ -871,8 +888,8 @@ icmp6_stats(off, name)
 	p(icp6s_reflect, "\t%llu message response%s generated\n");
 	p(icp6s_nd_toomanyopt, "\t%llu message%s with too many ND options\n");
 	p(icp6s_pmtuchg, "\t%llu path MTU change%s\n");
-#undef p_5
 #undef p
+#undef p_5
 }
 
 /*
@@ -885,7 +902,8 @@ icmp6_ifstats(ifname)
 	struct in6_ifreq ifr;
 	int s;
 #define	p(f, m) if (ifr.ifr_ifru.ifru_icmp6stat.f || sflag <= 1) \
-    printf(m, (unsigned long long)ifr.ifr_ifru.ifru_icmp6stat.f, plural(ifr.ifr_ifru.ifru_icmp6stat.f))
+    printf(m, (unsigned long long)ifr.ifr_ifru.ifru_icmp6stat.f, \
+	plural(ifr.ifr_ifru.ifru_icmp6stat.f))
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
 		perror("Warning: socket(AF_INET6)");
@@ -957,7 +975,7 @@ pim6_stats(off, name)
 	printf("%s:\n", name);
 
 #define	p(f, m) if (pim6stat.f || sflag <= 1) \
-    printf(m, pim6stat.f, plural(pim6stat.f))
+    printf(m, (unsigned long long)pim6stat.f, plural(pim6stat.f))
 	p(pim6s_rcv_total, "\t%llu message%s received\n");
 	p(pim6s_rcv_tooshort, "\t%llu message%s received with too few bytes\n");
 	p(pim6s_rcv_badsum, "\t%llu message%s received with bad checksum\n");
@@ -980,19 +998,22 @@ inet6print(in6, port, proto)
 	char *proto;
 {
 #define GETSERVBYPORT6(port, proto, ret)\
-{\
+do {\
 	if (strcmp((proto), "tcp6") == 0)\
 		(ret) = getservbyport((int)(port), "tcp");\
 	else if (strcmp((proto), "udp6") == 0)\
 		(ret) = getservbyport((int)(port), "udp");\
 	else\
 		(ret) = getservbyport((int)(port), (proto));\
-};
+} while (0)
 	struct servent *sp = 0;
 	char line[80], *cp;
 	int width;
 
-	sprintf(line, "%.*s.", (Aflag && !nflag) ? 12 : 16, inet6name(in6));
+	width = Aflag ? 12 : 16;
+	if (vflag && width < strlen(inet6name(in6)))
+		width = strlen(inet6name(in6));
+	sprintf(line, "%.*s.", width, inet6name(in6));
 	cp = index(line, '\0');
 	if (!nflag && port)
 		GETSERVBYPORT6(port, proto, sp);
@@ -1001,6 +1022,8 @@ inet6print(in6, port, proto)
 	else
 		sprintf(cp, "%d", ntohs((u_short)port));
 	width = Aflag ? 18 : 22;
+	if (vflag && width < strlen(line))
+		width = strlen(line);
 	printf(" %-*.*s", width, width, line);
 }
 
@@ -1015,11 +1038,11 @@ inet6name(in6p)
 	struct in6_addr *in6p;
 {
 	register char *cp;
-	static char line[50];
+	static char line[NI_MAXHOST];
 	struct hostent *hp;
 	static char domain[MAXHOSTNAMELEN + 1];
 	static int first = 1;
-	static char hbuf[NI_MAXHOST];
+	char hbuf[NI_MAXHOST];
 	struct sockaddr_in6 sin6;
 #ifdef NI_WITHSCOPEID
 	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
@@ -1046,9 +1069,9 @@ inet6name(in6p)
 		}
 	}
 	if (IN6_IS_ADDR_UNSPECIFIED(in6p))
-		strcpy(line, "*");
+		strlcpy(line, "*", sizeof(line));
 	else if (cp)
-		strcpy(line, cp);
+		strlcpy(line, cp, sizeof(line));
 	else {
 		memset(&sin6, 0, sizeof(sin6));
 		sin6.sin6_len = sizeof(sin6);
@@ -1065,7 +1088,7 @@ inet6name(in6p)
 		if (getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len,
 				hbuf, sizeof(hbuf), NULL, 0, niflag) != 0)
 			strcpy(hbuf, "?");
-		strncpy(line, hbuf, sizeof(line));
+		strlcpy(line, hbuf, sizeof(line));
 	}
 	return (line);
 }

@@ -496,7 +496,7 @@ ip6_stats(off, name)
 	for (first = 1, i = 0; i < 256; i++)
 		if (ip6stat.ip6s_nxthist[i] != 0) {
 			if (first) {
-				printf("\tInput histogram:\n");
+				printf("\tInput packet histogram:\n");
 				first = 0;
 			}
 			n = NULL;
@@ -954,7 +954,7 @@ icmp6_stats(off, name)
 	for (first = 1, i = 0; i < 256; i++)
 		if (icmp6stat.icp6s_outhist[i] != 0) {
 			if (first) {
-				printf("\tOutput histogram:\n");
+				printf("\tOutput packet histogram:\n");
 				first = 0;
 			}
 			printf("\t\t%s: %llu\n", icmp6names[i],
@@ -967,7 +967,7 @@ icmp6_stats(off, name)
 	for (first = 1, i = 0; i < ICMP6_MAXTYPE; i++)
 		if (icmp6stat.icp6s_inhist[i] != 0) {
 			if (first) {
-				printf("\tInput histogram:\n");
+				printf("\tInput packet histogram:\n");
 				first = 0;
 			}
 			printf("\t\t%s: %llu\n", icmp6names[i],
@@ -1141,13 +1141,13 @@ inet6name(in6p)
 	struct in6_addr *in6p;
 {
 	register char *cp;
-	static char line[50];
+	static char line[NI_MAXHOST];
 	struct hostent *hp;
 	static char domain[MAXHOSTNAMELEN + 1];
 	static int first = 1;
 	char hbuf[NI_MAXHOST];
 	struct sockaddr_in6 sin6;
-#ifdef KAME_SCOPEID
+#ifdef NI_WITHSCOPEID
 	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
 #else
 	const int niflag = NI_NUMERICHOST;
@@ -1172,10 +1172,10 @@ inet6name(in6p)
 		}
 	}
 	if (IN6_IS_ADDR_UNSPECIFIED(in6p))
-		strcpy(line, "*");
+		strlcpy(line, "*", sizeof(line));
 	else if (cp)
-		strcpy(line, cp);
-	else  {
+		strlcpy(line, cp, sizeof(line));
+	else {
 		memset(&sin6, 0, sizeof(sin6));
 		sin6.sin6_len = sizeof(sin6);
 		sin6.sin6_family = AF_INET6;
@@ -1189,9 +1189,9 @@ inet6name(in6p)
 		}
 #endif
 		if (getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len,
-				hbuf, sizeof(hbuf), NULL, 0, niflag))
+				hbuf, sizeof(hbuf), NULL, 0, niflag) != 0)
 			strcpy(hbuf, "?");
-		sprintf(line, "%s", hbuf);
+		strlcpy(line, hbuf, sizeof(line));
 	}
 	return (line);
 }
