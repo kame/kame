@@ -28,7 +28,7 @@
  */
 
 /*
- * draft-ietf-dhc-v6exts-10
+ * draft-ietf-dhc-v6exts-11
  */
 
 #ifndef __DHCP6OPT_H_DEFINED
