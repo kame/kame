@@ -1,4 +1,4 @@
-/*	$KAME: qdisc_rio.c,v 1.6 2002/11/08 06:36:18 kjc Exp $	*/
+/*	$KAME: qdisc_rio.c,v 1.7 2004/01/22 09:31:24 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -77,7 +77,7 @@ rio_stat_loop(int fd, const char *ifname, int count, int interval)
 
 		printf("\t\t\tLOW DP\t\tMEDIUM DP\t\tHIGH DP\n");
 
-		printf("thresh (prob):\t\t[%d,%d](1/%d)\t[%d,%d](1/%d)\t\t[%d,%d](%d)\n",
+		printf("thresh (prob):\t\t[%d,%d](1/%d)\t[%d,%d](1/%d)\t\t[%d,%d](1/%d)\n",
 		       rio_stats.q_params[0].th_min,
 		       rio_stats.q_params[0].th_max,
 		       rio_stats.q_params[0].inv_pmax,
