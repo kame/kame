@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1045.2.9 2000/06/27 16:34:52 suz Exp $
+$Id: CHANGELOG,v 1.1045.2.10 2000/06/29 01:22:13 itojun Exp $
 
 <200006>
+Thu Jun 29 10:14:47 JST 2000  itojun@iijlab.net
+	* faithd/faithd.c: be more careful about arg to syslog(3), to
+	  prevent possible buffer overrun.  From: deraadt@openbsd.org
+
 Wed Jun 28 01:16:41 JST 2000	SUZUKI Shinsuke <suz@sdl.hitachi.co.jp>
 	* freebsd4/INSTALL
 	write up configuration-related matters for FreeBSD-4.0
