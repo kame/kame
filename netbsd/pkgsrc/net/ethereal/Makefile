@@ -15,7 +15,7 @@ USE_GMAKE=		yes
 USE_X11=		yes
 GNU_CONFIGURE=		yes
 CONFIGURE_ARGS+=	--with-gtk-prefix=${X11BASE}
-#CONFIGURE_ARGS+=	--disable-zlib
+CONFIGURE_ARGS+=	--disable-zlib
 CONFIGURE_ARGS+=	--disable-snmp
 
 .include "../../mk/bsd.pkg.mk"
