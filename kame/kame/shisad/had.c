@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.9 2005/02/17 12:38:54 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.10 2005/02/18 00:22:32 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -458,64 +458,52 @@ had_add_hal(hpfx_entry, gladdr, lladdr, lifetime, preference, flag)
 	uint16_t preference;
 	int flag;
 {
-	struct home_agent_list *hal = NULL, *haln = NULL, *halnew = NULL;
+	struct home_agent_list *hal = NULL, *h;
 
 	hal = mip6_get_hal(hpfx_entry, gladdr);
-	if (hal) {
+	if (hal && ((hal->hal_preference != preference))) {
 		/* if preference is changed, need to re-arrange order of hal */
-		if (hal->hal_preference != preference) {
-			mip6_delete_hal(hpfx_entry, gladdr);
-		} else {
-			hal->hal_lladdr = *lladdr;
-			hal->hal_flag = flag;
-			hal->hal_lifetime = lifetime;
-
-			if (hal->hal_flag != MIP6_HAL_OWN)
-				hal_set_expire_timer(hal, hal->hal_lifetime);
-			return (hal);
-		}
-	} 
-
-	halnew = malloc(sizeof(*halnew));
-	if (halnew == NULL) {
-		return (NULL);
+		mip6_delete_hal(hpfx_entry, gladdr);
+		hal = NULL;
 	}
-	memset(halnew, 0, sizeof(*halnew));
 
-	halnew->hal_ip6addr = *gladdr;
-	if (lladdr)
-		halnew->hal_lladdr = *lladdr;
-	halnew->hal_lifetime = lifetime;
-	halnew->hal_preference = preference;
-	halnew->hal_flag = flag;
+	if (hal == NULL) {
+		hal = malloc(sizeof(*hal));
+		if (hal == NULL)
+			return (NULL);
+		memset(hal, 0, sizeof(*hal));
 
-	if (LIST_EMPTY(&hpfx_entry->hpfx_hal_head))  {
-		LIST_INSERT_HEAD(&hpfx_entry->hpfx_hal_head, halnew, hal_entry);
-	} else {
-		for (hal = LIST_FIRST(&hpfx_entry->hpfx_hal_head); hal; hal = haln) {
-			haln =  LIST_NEXT(hal, hal_entry);
-			
-			if (halnew->hal_preference >= hal->hal_preference) {
-				LIST_INSERT_BEFORE(hal, halnew, hal_entry);
-				break;
-			} else if (haln == NULL) {
-				LIST_INSERT_AFTER(hal, halnew, hal_entry);
-				break;
+		if (LIST_EMPTY(&hpfx_entry->hpfx_hal_head))  {
+			LIST_INSERT_HEAD(&hpfx_entry->hpfx_hal_head, hal, hal_entry);
+		} else {
+			LIST_FOREACH(h, &hpfx_entry->hpfx_hal_head, hal_entry) {
+				if (preference >= h->hal_preference) {
+					LIST_INSERT_BEFORE(h, hal, hal_entry);
+					break;
+				} else if (LIST_NEXT(h, hal_entry) == NULL) {
+					LIST_INSERT_AFTER(h, hal, hal_entry);
+					break;
+				}
 			}
 		}
 	}
 
-	if (halnew->hal_flag != MIP6_HAL_OWN)
-		hal_set_expire_timer(halnew, halnew->hal_lifetime);
+	hal->hal_ip6addr = *gladdr;
+	if (lladdr)
+		hal->hal_lladdr = *lladdr;
+	hal->hal_lifetime = lifetime;
+	hal->hal_preference = preference;
+	hal->hal_flag = flag;
+
+	if (hal->hal_flag != MIP6_HAL_OWN)
+		hal_set_expire_timer(hal, hal->hal_lifetime);
 
 	if (debug)
 		syslog(LOG_INFO, "Home Agent (%s, %d %d) added into home agent list\n", 
 		       ip6_sprintf(gladdr), lifetime, preference);
 		
-	return (halnew);
+	return (hal);
 }
-
-
 
 struct mip6_hpfxl *
 had_add_hpfxlist(home_prefix, home_prefixlen) 
@@ -562,7 +550,7 @@ send_haadrep(dst, anycastaddr, dhreq, ifindex)
 	struct mip6_dhaad_rep *dhrep;
 	struct mip6_hpfxl *hpfx = NULL;
 	int reqlen = 0;
-        struct home_agent_list *hal = NULL, *haln = NULL;
+        struct home_agent_list *hal = NULL;
 
         memset(&to, 0, sizeof(to));
 	memcpy(&to.sin6_addr, dst, sizeof(struct in6_addr)); /* fill the prefix part */
@@ -611,11 +599,11 @@ send_haadrep(dst, anycastaddr, dhreq, ifindex)
 
 	reqlen = sizeof(struct mip6_dhaad_rep);
 
-        for (hal = LIST_FIRST(&hpfx->hpfx_hal_head); hal; hal = haln) {
-                haln =  LIST_NEXT(hal, hal_entry);
-
+	LIST_FOREACH(hal, &hpfx->hpfx_hal_head, hal_entry) {
 		if (reqlen + sizeof(struct in6_addr) >= sizeof(buf)) {
-			syslog(LOG_INFO, "sorry %s into DHAAD reply \n", ip6_sprintf(&hal->hal_ip6addr));
+			syslog(LOG_INFO,
+			       "adding %s into DHAAD reply was missed\n",
+			       ip6_sprintf(&hal->hal_ip6addr));
 			break;	/* no more space */
 		}
 
@@ -625,7 +613,7 @@ send_haadrep(dst, anycastaddr, dhreq, ifindex)
 		if ((hal->hal_flag == MIP6_HAL_OWN) && !src_decided) {
 			pi->ipi6_addr = hal->hal_ip6addr;
 			syslog(LOG_INFO, "Src addr was deceided as [%s]\n",
-				ip6_sprintf(&pi->ipi6_addr));
+			       ip6_sprintf(&pi->ipi6_addr));
 			src_decided = 1;
 		}
 		reqlen += sizeof(struct in6_addr);
@@ -638,7 +626,7 @@ send_haadrep(dst, anycastaddr, dhreq, ifindex)
 		syslog(LOG_INFO, "send DHAAD reply to %s\n", ip6_sprintf(dst));
 
 	if (sendmsg(icmp6sock, &msg, 0) < 0)
-			perror ("sendmsg icmp6 @haadreply");
+		perror ("sendmsg icmp6 @haadreply");
 	else
 		mip6stat.mip6s_odhreply++;
 
@@ -682,8 +670,6 @@ command_show_hal(s, dummy)
 	show_hal(s, &hpfx_head);
 }
 
-
-
 static void
 terminate(dummy)
 	int dummy;
@@ -710,7 +696,6 @@ send_mpa(dst, mps_id, ifindex)
         struct mip6_prefix_advert *mpa;
 	struct mip6_hpfxl *hpfx = NULL;
 	int reqlen = 0;
-	/*        struct home_agent_list *hal = NULL, *haln = NULL;*/
 
         memset(&to, 0, sizeof(to));
 	memcpy(&to.sin6_addr, dst, sizeof(struct in6_addr));
@@ -749,7 +734,6 @@ send_mpa(dst, mps_id, ifindex)
 	ndopt_pi = (struct nd_opt_prefix_info *)(mpa + 1);
 	reqlen += sizeof(*mpa);
 	LIST_FOREACH(hpfx, &hpfx_head, hpfx_entry) {
-		/* filling the addresses */
 		ndopt_pi->nd_opt_pi_type = ND_OPT_PREFIX_INFORMATION;
 		ndopt_pi->nd_opt_pi_len = 4;
 		ndopt_pi->nd_opt_pi_prefix_len = hpfx->hpfx_prefixlen;

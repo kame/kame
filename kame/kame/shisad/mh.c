@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.15 2005/02/06 10:27:53 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.16 2005/02/18 00:22:32 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -52,18 +52,13 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
 #endif /* __FreeBSD__ >= 3 */
-#include <net/if_dl.h>
-#include <net/route.h>
 #include <net/mipsock.h>
 #include <netinet/in.h>
 #include <netinet/ip6.h>
 #include <netinet/ip6mh.h>
-#include <netinet/icmp6.h>
 #include <netinet6/in6_var.h>
-#include <netinet/in_var.h>
 #include <netinet6/nd6.h>
 #include <netinet/icmp6.h>
-#include <arpa/inet.h>
 
 #include <openssl/sha.h>
 #include <openssl/hmac.h>
