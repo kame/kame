@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.820 2000/04/26 12:24:30 itojun Exp $
+$Id: CHANGELOG,v 1.821 2000/04/26 20:06:15 sakane Exp $
 
 <200004>
+Thu Apr 27 05:06:35 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	vendorid directive is obsoleted.  vendorid should not be configurable.
+
 Wed Apr 26 21:23:49 JST 2000  itojun@iijlab.net
 	* {net,open}bsd/lib/libinet6/getaddrinfo.c:
 	  disable AI_ADDRCONFIG support since it does not handle PF_UNSPEC
