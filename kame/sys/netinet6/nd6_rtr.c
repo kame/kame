@@ -1609,7 +1609,6 @@ nd6_setdefaultiface(ifindex)
 	int ifindex;
 {
 	int error = 0;
-	struct ifnet *ifp;
 
 	if (ifindex < 0 || if_index < ifindex)
 		return(EINVAL);
