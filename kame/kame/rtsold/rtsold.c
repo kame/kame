@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.32 2001/07/09 22:34:07 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.33 2001/09/19 04:16:33 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -89,6 +89,7 @@ static char *dumpfilename = "/var/run/rtsold.dump"; /* XXX: should be configurab
 static char *pidfilename = "/var/run/rtsold.pid"; /* should be configurable */
 
 static int ifconfig __P((char *ifname));
+static void iflist_init __P((void));
 #if 0
 static int ifreconfig __P((char *ifname));
 #endif
@@ -157,25 +158,7 @@ main(argc, argv)
 	argc -= optind;
 	argv += optind;
 
-	if (aflag) {
-		int i;
-
-		if (argc != 0) {
-			usage(argv0);
-			/*NOTREACHED*/
-		}
-
-		argv = autoifprobe();
-		if (!argv) {
-			errx(1, "could not autoprobe interface");
-			/*NOTREACHED*/
-		}
-
-		for (i = 0; argv[i]; i++)
-			;
-		argc = i;
-	}
-	if (argc == 0) {
+	if ((!aflag && argc == 0) || (aflag && argc != 0)) {
 		usage(argv0);
 		/*NOTREACHED*/
 	}
@@ -234,6 +217,14 @@ main(argc, argv)
 	if (ifinit()) {
 		errx(1, "failed to initilizatoin interfaces");
 		/*NOTREACHED*/
+	}
+	if (aflag) {
+		argc = 0;	/* just make sure */
+		argv = autoifprobe();
+		if (argv) {
+			for (argc = 0; argv[argc]; argc++)
+				;
+		}
 	}
 	while (argc--) {
 		if (ifconfig(*argv)) {
@@ -306,8 +297,25 @@ main(argc, argv)
 		}
 
 		/* packet reception */
-		if (FD_ISSET(rtsock, &select_fd))
+		if (FD_ISSET(rtsock, &select_fd)) {
+			if (aflag) {
+				iflist_init();
+				argc = 0;
+				argv = autoifprobe();
+				if (argv) {
+					for (argc = 0; argv[argc]; argc++) {
+						if (ifconfig(*argv)) {
+							errx(1, "failed to "
+							    "initialize %s",
+							    *argv);
+							/*NOTREACHED*/
+						}
+						argv++;
+					}
+				}
+			}
 			rtsock_input(rtsock);
+		}
 		if (FD_ISSET(s, &select_fd))
 			rtsol_input(s);
 	}
@@ -385,6 +393,22 @@ ifconfig(char *ifname)
 	free(ifinfo->sdl);
 	free(ifinfo);
 	return(-1);
+}
+
+static void
+iflist_init()
+{
+	struct ifinfo *ifi, *next;
+
+	for (ifi = iflist; ifi; ifi = next) {
+		next = ifi->next;
+		if (ifi->sdl)
+			free(ifi->sdl);
+		if (ifi->rs_data)
+			free(ifi->rs_data);
+		free(ifi);
+		iflist = NULL;
+	}
 }
 
 #if 0
@@ -731,15 +755,29 @@ warnmsg(priority, func, msg, va_alist)
 	va_end(ap);
 }
 
+/*
+ * return a list of interfaces which is suitable to send RS.
+ */
 static char **
 autoifprobe()
 {
 #ifndef HAVE_GETIFADDRS
 	errx(1, "-a is not available with the configuration");
 #else
-	static char ifname[IFNAMSIZ + 1];
-	static char *argv[2];
+	static char **argv = NULL;
+	static int n = 0;
+	char **a;
+	int i, found;
 	struct ifaddrs *ifap, *ifa, *target;
+
+	/* initialize */
+	while (n--)
+		free(argv[n]);
+	if (argv) {
+		free(argv);
+		argv = NULL;
+	}
+	n = 0;
 
 	if (getifaddrs(&ifap) != 0)
 		return NULL;
@@ -759,12 +797,25 @@ autoifprobe()
 		if (ifa->ifa_addr->sa_family != AF_INET6)
 			continue;
 
-		if (target && strcmp(target->ifa_name, ifa->ifa_name) == 0)
+		found = 0;
+		for (i = 0; i < n; i++) {
+			if (strcmp(argv[i], ifa->ifa_name) == 0) {
+				found++;
+				break;
+			}
+		}
+		if (found)
 			continue;
 
-		if (!target)
-			target = ifa;
-		else {
+		if (n == 0) {
+			a = (char **)realloc(argv, (n + 1) * sizeof(char **));
+			if (a == NULL)
+				err(1, "realloc");
+			argv = a;
+			argv[n] = (char *)malloc(1 + strlen(ifa->ifa_name));
+			strcpy(argv[n], ifa->ifa_name);
+			n++;
+		} else {
 			/* if we find multiple candidates, failure. */
 			if (dflag > 1)
 				warnx("multiple interfaces found");
@@ -773,19 +824,19 @@ autoifprobe()
 		}
 	}
 
-	if (target) {
-		strncpy(ifname, target->ifa_name, sizeof(ifname) - 1);
-		ifname[sizeof(ifname) - 1] = '\0';
-		argv[0] = ifname;
-		argv[1] = NULL;
+	if (n) {
+		a = (char **)realloc(argv, (n + 1) * sizeof(char **));
+		if (a == NULL)
+			err(1, "realloc");
+		argv = a;
+		argv[n] = NULL;
 
-		if (dflag > 0)
-			warnx("probing %s", argv[0]);
+		if (dflag > 0) {
+			for (i = 0; i < n; i++)
+				warnx("probing %s", argv[i]);
+		}
 	}
 	freeifaddrs(ifap);
-	if (target)
-		return argv;
-	else
-		return (char **)NULL;
+	return argv;
 #endif
 }
