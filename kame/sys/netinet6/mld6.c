@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.35 2001/12/18 02:23:44 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.36 2002/01/08 04:26:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -367,7 +367,9 @@ mld6_input(m, off)
 			mldh->mld_addr.s6_addr16[1] = 0; /* XXX */
 		break;
 	default:		/* this is impossible */
+#if 0
 		log(LOG_ERR, "mld6_input: illegal type(%d)", mldh->mld_type);
+#endif
 		break;
 	}
 
