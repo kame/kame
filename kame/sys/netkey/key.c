@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.170 2000/10/07 12:03:02 itojun Exp $	*/
+/*	$KAME: key.c,v 1.171 2000/10/24 08:28:30 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4539,7 +4539,7 @@ key_getspi(so, m, mhp)
 	if (mhp->msg->sadb_msg_seq != 0) {
 		struct secacq *acq;
 		if ((acq = key_getacqbyseq(mhp->msg->sadb_msg_seq)) != NULL) {
-			/* reset counter in order to deletion by timehander. */
+			/* reset counter in order to deletion by timehandler. */
 			struct timeval tv;
 			microtime(&tv);
 			acq->created = tv.tv_sec;
@@ -5545,7 +5545,7 @@ key_getcomb_ipcomp()
 		if (!m) {
 #ifdef DIAGNOSTIC
 			if (l > MLEN)
-				panic("assumption failed in key_getcomb_ah");
+				panic("assumption failed in key_getcomb_ipcomp");
 #endif
 			MGET(m, M_DONTWAIT, MT_DATA);
 			if (m) {
