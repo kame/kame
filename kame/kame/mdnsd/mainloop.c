@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.57 2001/06/22 22:39:39 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.58 2001/06/22 23:07:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -100,7 +100,8 @@
 #include "db.h"
 #include "mediator_compat.h"
 
-static int mainloop0 __P((struct sockdb *));
+static int recv_dns __P((struct sockdb *));
+static int recv_dns0 __P((struct sockdb *, int));
 static int conf_mediator __P((struct sockdb *));
 static char *encode_name __P((char **, int, const char *));
 static char *decode_name __P((const char **, int));
@@ -182,29 +183,25 @@ mainloop()
 				if (nsd) {
 					nsd->type = sd->type;
 					if (nsd->s >= 0) {
-						mainloop0(nsd);
+						recv_dns(nsd);
 						close(nsd->s);
 					}
 					delsockdb(nsd);
 				}
 				break;
 			default:
-				mainloop0(sd);
+				recv_dns(sd);
 				break;
 			}
 		}
 	}
 }
 
+/* the function hides TCP/UDP differences as much as possible. */
 static int
-mainloop0(sd)
+recv_dns(sd)
 	struct sockdb *sd;
 {
-	struct sockaddr_storage from;
-	int fromlen;
-	char buf[RECVBUFSIZ];
-	ssize_t l;
-	struct nsdb *ns;
 	u_int16_t vclen;
 
 	if (sd->type == S_TCP) {
@@ -213,8 +210,27 @@ mainloop0(sd)
 				warn("read");
 			return -1;
 		}
+		vclen = ntohs(vclen);
 	} else
 		vclen = 0;
+
+	return recv_dns0(sd, vclen);
+}
+
+/*
+ * process inbound DNS-formatted packet.  it could be either query/reply,
+ * and could be from remote/local.
+ */
+static int
+recv_dns0(sd, vclen)
+	struct sockdb *sd;
+	int vclen;
+{
+	struct sockaddr_storage from;
+	int fromlen;
+	char buf[RECVBUFSIZ];
+	ssize_t l;
+	struct nsdb *ns;
 
 	/*
 	 * XXX we need to get destination address of incoming packet.
@@ -236,7 +252,7 @@ mainloop0(sd)
 			warn("recvfrom");
 		return -1;
 	}
-	if (vclen && ntohs(vclen) != l) {
+	if (vclen && vclen != l) {
 		if (dflag)
 			warnx("length mismatch");
 		return -1;
@@ -967,6 +983,9 @@ getsa(host, port, socktype)
 }
 #endif
 
+/*
+ * parse responses to past relay(), and relay them back to the original querier.
+ */
 static int
 getans(buf, len, from)
 	char *buf;
@@ -1052,6 +1071,10 @@ fail:
 	return -1;
 }
 
+/*
+ * relay inbound DNS packet to remote DNS server (unicast UDP, multicast UDP
+ * or TCP).
+ */
 static int
 relay(sd, buf, len, from)
 	struct sockdb *sd;
@@ -1199,7 +1222,10 @@ relay(sd, buf, len, from)
 }
 
 /*
- * XXX should defer transmission with random delay, and supress duplicated
+ * parse inbound DNS query packet, and try to respond with answer from
+ * local configuration (like hostname, ifconfig).
+ *
+ * XXX should defer response with random delay, and supress duplicated
  * replies (mdns-00 page 3)
  */
 static int
