@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.733 2000/03/28 14:12:19 itojun Exp $
+$Id: CHANGELOG,v 1.734 2000/03/29 07:02:33 itojun Exp $
 
 <200003>
+Wed Mar 29 16:00:24 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/bind9: use bind 9.0.0beta2.
+
 Tue Mar 28 23:09:59 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ip6_input.c: SIIT assumes that routers forward native
 	  IPv6 packet with IPv4 mapped address just like for normal packets.
