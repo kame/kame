@@ -2,66 +2,75 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/20 01:51:35 $
+		     $Date: 2000/04/21 04:46:42 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
 
 BACKWARD COMPATIBILITY NOTICE
 =============================
-Please understand that the KAME kit is, from its nature, a distribution of
-very experimental set of software.  Do not assume ANY backward copmatibility,
-for source, binary nor configuration file, between different version of
-KAME kits.  This means that MUST recompile everything every time you upgrade
-KAME kit, to ensure it works.  We are not ignoring backward compatibility
-issues, however, we are sometimes unable to provide backward compatibility.
+Please understand that the KAME kit is, from its nature, a
+distribution of very experimental set of software.  Do not assume ANY
+backward copmatibility, for source, binary nor configuration file,
+between different version of KAME kits.  This means that MUST
+recompile everything every time you upgrade KAME kit, to ensure it
+works.  We are not ignoring backward compatibility issues, however, we
+are sometimes unable to maintain backward compatibility.
 
-The caveat does not apply to KAME code merged into *BSD - merged code will
-obey the backward compatibility policy decided by *BSD team.
+The caveat does not apply to KAME code merged into *BSD - merged code
+will maintain the backward compatibility policy decided by *BSD team.
 
 KNOWN BUGS/TWISTS
 =================
-Most of the following problems will be fixed in near-future SNAP releases,
-and the next STABLE release,
+Most of the following problems will be fixed in near-future SNAP
+releases, and the next STABLE release,
 
 You can find problem reports from other KAME users, at
-http://orange.kame.net/dev/query-pr-summary.cgi.  Many of old ones have
-been solved.
+	http://orange.kame.net/dev/query-pr-summary.cgi
+.  Many of old ones have been solved.
 
-- "faithd" sometimes fail to relay rsh/rlogin connection properly.  Some part
-  of data connection seems to be lost.  rlogin session may fail to propagate
-  screen size information to the peer.
-- Some of the userland tool may not work properly, if you configure more than
-  500 interfaces.  (libinet6 is fixed for this, but there are some places
-  where max # of interfaces is hardcoded)
-  Also, some of non-KAME binaries may not be ready to handle tons of
-  interfaces.  If a code uses fixed-size buffer for SIOCGIFCONF, the code
-  is not friendly with tons-of-interface kernel.
-- Notebooks/laptops problem: multicast hardware filter on ethernet card will
-  not be properly initialized after suspend/resume session, and this makes
-  trouble with IPv6 commuincation (which heavily uses multicast).
-  This is not a KAME problem (*BSD problem), but please be warned.
-  Workaround: perform "ifconfig down", then "ifconfig up" after resume.
+- "faithd" sometimes fail to relay rsh/rlogin connection properly.
+  Some part of data connection seems to be lost.  rlogin session may
+  fail to propagate screen size information to the peer.
+
+- Some of the userland tool may not work properly, if you configure
+  more than 500 interfaces.  (libinet6 is fixed for this, but there
+  are some places where max # of interfaces is hardcoded) Also, some
+  of non-KAME binaries may not be ready to handle tons of interfaces.
+  If a code uses fixed-size buffer for SIOCGIFCONF, the code is not
+  friendly with tons-of-interface kernel.
+
+- Notebooks/laptops problem: multicast hardware filter on ethernet
+  card will not be properly initialized after suspend/resume session,
+  and this makes trouble with IPv6 commuincation (which heavily uses
+  multicast).  This is not a KAME problem (*BSD problems), but please
+  be warned.  Workaround: perform "ifconfig down", then "ifconfig up"
+  after resume.
+
 - Intel EtherExpress Pro (fxp driver) has some problem with the
-  initialization sequence KAME is using (a set of ioctl calls).  The driver
-  will become unusable if consequtive calls to fxp_init() are made, or
-  consequtive multicast configurations are made.
-  This problem occurs only with specific revision of the card, and with
+  initialization sequence KAME is using (a set of ioctl calls).  The
+  driver will become unusable if consequtive calls to fxp_init() are
+  made, or consequtive multicast configurations are made.  This
+  problem occurs only with specific revision of the card, and with
   specific operating system platform (openbsd, and maybe freebsd[23]).
-  It is not KAME problem, it is problem in fxp driver.
-  KAME/OpenBSD contains workaround for this.
-  KAME/NetBSD has no problem due to the way driver initializes the card.
-- Alignment constraints were changed in couple of places.  Namely:
-  (1) SIOCGIFCONF: due to introduction of sockaddr_in6.
-  (2) ancillary data: due to RFC2292 and X/Open change in CMSG_xx
-  You may experience some trouble running non-KAME binaries (like those
-  shipped with stock *BSD) on top of KAME kernel.
+  It is not KAME problem, it is problem in fxp driver.  KAME/OpenBSD
+  contains workaround for this.  KAME/NetBSD has no problem due to the
+  way driver initializes the card.
+
+- Alignment constraints were changed in couple of places.  Namely: 
+	(1) SIOCGIFCONF: due to introduction of sockaddr_in6. 
+	(2) ancillary data: due to RFC2292 and X/Open change in CMSG_xx.  
+  You may experience some trouble running non-KAME binaries (like
+  those shipped with stock *BSD) on top of KAME kernel.
+
 - With KAME/NetBSD, ipip pseudo interface does not work at all.
-- In the past we have shipped IPv6-ready tcpdump/libpcap with KAME kit.
-  To make a single effort in tcpdump.org, we have removed the compilation tree
-  (*bsd*/usr.sbin/tcpdump and *bsd*/lib/libpcap).  If you want IPv6-ready
-  tcpdump/libpcap, download them from tcpdump.org.  We supply ports/pkgsrc
-  for easier installation on kame/freebsd[23] and kame/netbsd.
+
+- In the past we have shipped IPv6-ready tcpdump/libpcap with KAME
+  kit.  To make a single effort in tcpdump.org, we have removed the
+  compilation tree (*bsd*/usr.sbin/tcpdump and *bsd*/lib/libpcap).  If
+  you want IPv6-ready tcpdump/libpcap, download them from tcpdump.org.
+  We supply ports/pkgsrc for easier installation on kame/freebsd[23]
+  and kame/netbsd.
 
 
 							<end of RELNOTES>
