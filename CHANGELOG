@@ -1,10 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.930 2000/05/24 16:26:12 sakane Exp $
+$Id: CHANGELOG,v 1.931 2000/05/24 16:36:07 sakane Exp $
 
 <200005>
 Thu May 25 01:25:39 JST 2000 sakane@ydc.co.jp
 	* kame/sys/{netkey/key.c,netinet6/ipsec.c}:
+	* kame/kame/setkey:
 	supported IPsec with link local address.
 	XXX to be supported by racoon.
 
