@@ -148,7 +148,7 @@ get_socket(ai0, ifname, srclist, valid)
 	char *srclist;
 	struct addrinfo **valid;
 {
-	int so = -1;
+	int so = -1, on;
 	struct addrinfo *ai;
 	char *emsg = NULL;
 	char hbuf[1024];
@@ -175,6 +175,12 @@ get_socket(ai0, ifname, srclist, valid)
 			if (vflag)
 				warn("%s", emsg);
 			continue;
+		}
+
+		on = 1;
+		if (setsockopt(so, SOL_SOCKET, SO_REUSEPORT, &on,
+		    sizeof(on))) {
+			err(1, "setsockopt(SO_REUSEPORT)");
 		}
 
 		if (bind(so, ai->ai_addr, ai->ai_addrlen) < 0) {
