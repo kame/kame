@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/06/01 02:42:10 $
+			$Date: 2000/06/04 13:27:39 $
 
 1. IPv6
 
@@ -203,6 +203,27 @@ default.  Before March 2000 KAME stack did not perform NUD on p2p interfaces.
 If the change raises any interoperability issues, you can turn off/on NUD
 by per-interface basis.  Use "ndp -i interface -nud" to turn it off.
 Consult ndp(8) for details.
+
+RFC2461 specifies upper-layer reachability confirmation hint.  Whenever
+upper-layer reachability confirmation hint comes, ND process can use it
+to optimize neighbor discovery process - ND process can omit real ND exchange
+and keep the neighbor cache state in REACHABLE.
+We currently have two sources for hints: (1) setsockopt(IPV6_REACHCONF)
+defined by 2292bis API, and (2) hints from tcp_input.
+It is questionable if they are really trustworthy.  For example, rogue
+userland program can use IPV6_REACHCONF to confuse ND process.  Neighbor
+cache is a system-wide information pool, and it is bad to allow single process
+to affect others.  Also, tcp_input can be hosed by hijack attempts.  It is
+wrong to allow hijack attempts to affect ND process.
+Starting June 2000, ND code has a protection mechanism against incorrect
+upper-layer reachability confirmation.  ND code counts subsequent upper-layer
+hints.  If the number of hints reaches maximum, ND code will ignore further
+upper-layer hints and run real ND process to confirm reachability to the peer.
+sysctl net.inet6.icmp6.nd6_maxnudhint defines maximum # of subsequent
+upper-layer hints to be accepted.
+(from April 2000 to June 2000, we rejected setsockopt(IPV6_REACHCONF) from
+non-root process - after local discussion, it looks that hints are not
+that trustworthy even if they are from privileged processes)
 
 1.3 Scope Index
 
