@@ -431,10 +431,12 @@ __END_DECLS
 /* for IPSEC */
 #define	IP_IPSEC_POLICY		21   /* int; set/get security policy */
 #define	IP_FAITH		22   /* bool; accept FAITH'ed connections */
-#define	IP_BLOCK_SOURCE		23   /* ip_mreq_source; block data from a src */
-#define	IP_UNBLOCK_SOURCE	24   /* ip_mreq_source; undo block filter */
-#define	IP_ADD_SOURCE_MEMBERSHIP 25  /* ip_mreq_source; add a single source */
-#define	IP_DROP_SOURCE_MEMBERSHIP 26 /* ip_mreq_source; drop a single source */
+#define	IP_ONESBCAST		23   /* bool: send all-ones broadcast */
+
+#define	IP_BLOCK_SOURCE		24   /* ip_mreq_source; block data from a src */
+#define	IP_UNBLOCK_SOURCE	25   /* ip_mreq_source; undo block filter */
+#define	IP_ADD_SOURCE_MEMBERSHIP 26  /* ip_mreq_source; add a single source */
+#define	IP_DROP_SOURCE_MEMBERSHIP 27 /* ip_mreq_source; drop a single source */
 
 /* MCAST_* sockopts number should not be duplicated with IPv6-level sockopts */
 #define	MCAST_JOIN_GROUP	70   /* group_req; */
@@ -443,8 +445,6 @@ __END_DECLS
 #define	MCAST_LEAVE_GROUP	73   /* group_req; */
 #define	MCAST_JOIN_SOURCE_GROUP	74   /* group_source_req; */
 #define	MCAST_LEAVE_SOURCE_GROUP 75  /* group_source_req; */
-
-#define	IP_ONESBCAST		23   /* bool: send all-ones broadcast */
 
 #define	IP_FW_ADD     		50   /* add a firewall rule to chain */
 #define	IP_FW_DEL    		51   /* delete a firewall rule from chain */
