@@ -223,9 +223,6 @@ static void
 ip6_init2(dummy)
 	void *dummy;
 {
-#ifndef __bsdi__
-	int i;
-#endif
 	int ret;
 #if defined(__bsdi__) && _BSDI_VERSION < 199802
 	struct ifnet *loifp = &loif;
@@ -241,8 +238,7 @@ ip6_init2(dummy)
 #ifdef __bsdi__
 	in6_ifattach(loifp, IN6_IFT_LOOP, NULL, 0);
 #else
-	for (i = 0; i < NLOOP; i++)
-		in6_ifattach(&loif[i], IN6_IFT_LOOP, NULL, 0);
+	in6_ifattach(&loif[0], IN6_IFT_LOOP, NULL, 0);
 #endif
 
 	/* nd6_timer_init */
