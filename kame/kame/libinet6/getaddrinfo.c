@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.175 2004/04/18 10:57:10 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.176 2004/04/18 11:40:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1265,45 +1265,36 @@ explore_numeric(pai, hostname, servname, res, canonname)
 		/*
 		 * RFC3493 requires getaddrinfo() to accept AF_INET formats
 		 * that are accepted by inet_addr() and its family.  The
-		 * accepted form includes the "classful" one, which inet_pton
+		 * accepted forms include the "classful" one, which inet_pton
 		 * does not accept.  So we need to separate the case for
 		 * AF_INET.
 		 */
-		if (inet_aton(hostname, (struct in_addr *)pton) == 1) {
-			if (pai->ai_family == afd->a_af ||
-			    pai->ai_family == PF_UNSPEC /*?*/) {
-				GET_AI(ai, afd, pton);
-				GET_PORT(ai, servname);
-				if ((pai->ai_flags & AI_CANONNAME)) {
-					/*
-					 * Set the numeric address itself as
-					 * the canonical name, based on a
-					 * clarification in RFC3493.
-					 */
-					GET_CANONNAME(ai, canonname);
-				}
-			} else
-				ERR(EAI_FAMILY);	/*xxx*/
-		}
+		if (inet_aton(hostname, (struct in_addr *)pton) != 1)
+			return 0;
 		break;
 	default:
-		if (inet_pton(afd->a_af, hostname, pton) == 1) {
-			if (pai->ai_family == afd->a_af ||
-			    pai->ai_family == PF_UNSPEC /*?*/) {
-				GET_AI(ai, afd, pton);
-				GET_PORT(ai, servname);
-				if ((pai->ai_flags & AI_CANONNAME)) {
-					/*
-					 * Set the numeric address itself as
-					 * the canonical name, based on a
-					 * clarification in RFC3493.
-					 */
-					GET_CANONNAME(ai, canonname);
-				}
-			} else
-				ERR(EAI_FAMILY);	/* XXX */
-		}
+		if (inet_pton(afd->a_af, hostname, pton) != 1)
+			return 0;
 		break;
+	}
+
+	if (pai->ai_family == afd->a_af) {
+		GET_AI(ai, afd, pton);
+		GET_PORT(ai, servname);
+		if ((pai->ai_flags & AI_CANONNAME)) {
+			/*
+			 * Set the numeric address itself as
+			 * the canonical name, based on a
+			 * clarification in RFC3493.
+			 */
+			GET_CANONNAME(ai, canonname);
+		}
+	} else {
+		/*
+		 * XXX: This should not happen since we already matched the AF
+		 * by find_afd.
+		 */
+		ERR(EAI_FAMILY);
 	}
 
 	*res = ai;
