@@ -1,4 +1,4 @@
-/*	$KAME: quip_client.c,v 1.7 2001/12/28 00:50:28 itojun Exp $	*/
+/*	$KAME: quip_client.c,v 1.8 2002/11/07 09:31:28 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -423,6 +423,11 @@ quip_printfilter(const char *ifname, const u_long handle)
 	char buf[BODY_MAXSIZE], req[REQ_MAXSIZE], *cp;
 	int result_code, len;
 
+	if (server == NULL) {
+		printf("No server available!\n");
+		return;
+	}
+
 	/* get qdisc info from the server */
 	snprintf(req, sizeof(req), "GET filter?%s::%#lx\n", ifname, handle);
 	quip_sendrequest(server, req);
@@ -460,6 +465,11 @@ quip_printconfig(void)
 	int result_code, len;
 	enum nametype type;
 	u_long handle;
+
+	if (server == NULL) {
+		printf("No server available!\n");
+		return;
+	}
 
 	/* get a total list from the server */
 	quip_sendrequest(server, "GET list\n");
