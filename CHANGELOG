@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.943 2000/05/27 11:47:04 jinmei Exp $
+$Id: CHANGELOG,v 1.944 2000/05/27 12:09:43 itojun Exp $
 
 <200005>
 2000-05-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -20,6 +20,9 @@ Sat May 27 19:07:58 JST 2000  itojun@iijlab.net
 	* sys/netinet6/icmp6.c: add net.inet6.icmp6.errppslimit sysctl MIB.
 	  it will let you limit ICMPv6 error messages by pps, not interval.
 	  still not sure what is the best way to perform rate limitation...
+	  change default parameter for icmp6 error rate/pps limitation
+	  to 100usec interval and 200pps (an icmp6 error packet needs to
+	  pass both tests to leave the node).
 
 Sat May 27 15:18:58 JST 2000  itojun@iijlab.net
 	* kame/ping6/ping6.c: support -N option to probe NI group address at
