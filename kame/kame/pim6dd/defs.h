@@ -33,7 +33,7 @@
  *  Questions concerning this software should be directed to 
  *  Kurt Windisch (kurtw@antc.uoregon.edu)
  *
- *  $Id: defs.h,v 1.3 1999/08/24 16:45:23 jinmei Exp $
+ *  $Id: defs.h,v 1.4 1999/09/12 17:00:07 jinmei Exp $
  */
 /*
  * Part of this program has been derived from PIM sparse-mode pimd.
@@ -357,7 +357,7 @@ extern void	dvmrp_accept_g_ack             __P((u_int32 src, u_int32 dst,
 void init_mld6 __P((void));
 void send_mld6 __P((int type, int code, struct sockaddr_in6 *src,
 		    struct sockaddr_in6 *dst, struct in6_addr *group,
-		    int index, int delay, int datalen));
+		    int index, int delay, int datalen, int alert));
 
 /* mld6_proto.c */
 extern void     query_groups            __P((struct uvif *v));
@@ -598,5 +598,5 @@ extern void    check_vif_state         __P((void));
 extern vifi_t  local_address           __P((struct sockaddr_in6 *src));
 extern vifi_t  find_vif_direct         __P((struct sockaddr_in6 *src));
 extern vifi_t  find_vif_direct_local   __P((struct sockaddr_in6 *src));
-extern u_int32 max_local_address       __P((void));
-
+extern struct sockaddr_in6 *max_global_address __P(());
+extern struct sockaddr_in6 *uv_global __P((vifi_t vifi));
