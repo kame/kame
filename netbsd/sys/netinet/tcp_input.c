@@ -3604,8 +3604,11 @@ syn_cache_respond(sc, m)
 
 		ip6oflags = 0;
 		if (sc->sc_tp && sc->sc_tp->t_in6pcb &&
-		    (sc->sc_tp->t_in6pcb->in6p_flags & IN6P_MINMTU))
+		    sc->sc_tp->t_in6pcb->in6p_outputopts &&
+		    (sc->sc_tp->t_in6pcb->in6p_outputopts->ip6po_flags &
+		     IP6PO_MINMTU)) {
 			ip6oflags |= IPV6_MINMTU;
+		}
 
 #ifdef NEW_STRUCT_ROUTE
 		error = ip6_output(m, NULL /*XXX*/, ro, ip6oflags, NULL, NULL);
