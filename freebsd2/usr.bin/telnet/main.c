@@ -57,7 +57,8 @@ static char sccsid[] = "@(#)main.c	8.2 (Berkeley) 12/15/93";
 #endif
 
 #if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
-char *ipsec_policy = NULL;
+char *ipsec_policy_in = NULL;
+char *ipsec_policy_out = NULL;
 #endif
 
 /*
@@ -144,10 +145,13 @@ main(argc, argv)
 	autologin = -1;
 
 #if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
-	while ((ch = getopt(argc, argv, "8EKLS:X:acde:fFk:l:n:rt:xP:")) != -1)
+#define IPSECOPT	"P:"
 #else
-	while ((ch = getopt(argc, argv, "8EKLS:X:acde:fFk:l:n:rt:x")) != -1)
+#define IPSECOPT
 #endif
+	while ((ch = getopt(argc, argv,
+	                    "8EKLS:X:acde:fFk:l:n:rt:x" IPSECOPT)) != -1)
+#undef IPSECOPT
 	{
 		switch(ch) {
 		case '8':
@@ -282,7 +286,12 @@ main(argc, argv)
 			break;
 #if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
 		case 'P':
-			ipsec_policy = strdup(optarg);
+			if (!strncmp("in", optarg, 2))
+				ipsec_policy_in = strdup(optarg);
+			else if (!strncmp("out", optarg, 3))
+				ipsec_policy_out = strdup(optarg);
+			else
+				usage();
 			break;
 #endif
 		case '?':

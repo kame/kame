@@ -65,7 +65,8 @@ __RCSID("$NetBSD: main.c,v 1.8 1998/02/28 12:16:56 enami Exp $");
 #endif
 
 #if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
-char *ipsec_policy = NULL;
+char *ipsec_policy_in = NULL;
+char *ipsec_policy_out = NULL;
 #endif
 
 int main P((int, char *[]));
@@ -159,8 +160,8 @@ main(argc, argv)
 #else
 #define IPSECOPT
 #endif
-	while ((ch = getopt(argc, argv, "8EKLS:X:acde:fFk:l:n:rt:x"
-			IPSECOPT)) != -1) {
+	while ((ch = getopt(argc, argv,
+	                    "8EKLS:X:acde:fFk:l:n:rt:x" IPSECOPT)) != -1) {
 #undef IPSECOPT
 		switch(ch) {
 		case '8':
@@ -295,7 +296,12 @@ main(argc, argv)
 			break;
 #if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
 		case 'P':
-			ipsec_policy = strdup(optarg);
+			if (!strncmp("in", optarg, 2))
+				ipsec_policy_in = strdup(optarg);
+			else if (!strncmp("out", optarg, 3)) 
+				ipsec_policy_out = strdup(optarg);
+			else
+				usage();
 			break;
 #endif
 		case '?':
