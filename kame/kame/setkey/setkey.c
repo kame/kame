@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.26 2002/05/29 10:07:50 sakane Exp $	*/
+/*	$KAME: setkey.c,v 1.27 2003/04/15 07:38:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -479,7 +479,7 @@ shortdump(msg)
 	struct sadb_msg *msg;
 {
 	caddr_t mhp[SADB_EXT_MAX + 1];
-	char buf[1024], pbuf[10];
+	char buf[NI_MAXHOST], pbuf[NI_MAXSERV];
 	struct sadb_sa *sa;
 	struct sadb_address *saddr;
 	struct sadb_lifetime *lts, *lth, *ltc;

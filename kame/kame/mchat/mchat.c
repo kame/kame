@@ -1,4 +1,4 @@
-/*	$KAME: mchat.c,v 1.16 2002/05/26 12:56:34 itojun Exp $	*/
+/*	$KAME: mchat.c,v 1.17 2003/04/15 07:38:42 itojun Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
  * All rights reserved.
@@ -140,7 +140,7 @@ main(argc, argv)
 	char **argv;
 {
 	int c;
-	char pbuf[10];
+	char pbuf[NI_MAXSERV];
 	int s;
 	char *iface = NULL, *policy = NULL;
 	char *addr, *port;
@@ -829,8 +829,8 @@ static int
 set_info(ss)
 	struct session *ss;
 {
-	char buf[256];
-	char host[24], serv[10];
+	char buf[NI_MAXHOST + NI_MAXSERV + BUFSIZ + 10];
+	char host[NI_MAXHOST], serv[NI_MAXSERV];
 	int error;
 
 	error = getnameinfo((struct sockaddr *)&ss->s_mcast,

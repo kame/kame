@@ -1,4 +1,4 @@
-/*	$KAME: test.c,v 1.15 2002/07/05 15:50:11 itojun Exp $	*/
+/*	$KAME: test.c,v 1.16 2003/04/15 07:38:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, and 2002 WIDE Project.
@@ -111,7 +111,7 @@ main(argc, argv)
 	extern int optind;
 	extern char *optarg;
 	int c;
-	char nbuf[10];
+	char nbuf[20];
 
 	memset(&ai, 0, sizeof(ai));
 	ai.ai_family = PF_UNSPEC;

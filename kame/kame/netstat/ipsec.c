@@ -1,5 +1,5 @@
 /*	$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $	*/
-/*	$KAME: ipsec.c,v 1.30 2002/06/02 15:30:33 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.31 2003/04/15 07:38:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -299,7 +299,7 @@ pfkey_msgtype_names(x)
 {
 	const int max =
 	    sizeof(pfkey_msgtypenames)/sizeof(pfkey_msgtypenames[0]);
-	static char buf[10];
+	static char buf[20];
 
 	if (x < max && pfkey_msgtypenames[x])
 		return pfkey_msgtypenames[x];

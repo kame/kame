@@ -1,5 +1,5 @@
 /*	$USAGI: bindtest.c,v 1.12 2001/11/15 15:37:16 yoshfuji Exp $	*/
-/*	$KAME: bindtest.c,v 1.54 2002/05/24 15:57:21 itojun Exp $	*/
+/*	$KAME: bindtest.c,v 1.55 2003/04/15 07:38:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000,2001 USAGI/WIDE Project.
@@ -131,7 +131,7 @@ static int test __P((struct testitem *, struct testitem *));
 static void sendtest __P((int, int, struct addrinfo *));
 static void conntest __P((int, int, struct addrinfo *));
 
-static char *versionstr = "$KAME: bindtest.c,v 1.54 2002/05/24 15:57:21 itojun Exp $"
+static char *versionstr = "$KAME: bindtest.c,v 1.55 2003/04/15 07:38:41 itojun Exp $"
 			  "\n"
 			  "$USAGI: bindtest.c,v 1.12 2001/11/15 15:37:16 yoshfuji Exp $";
 static char *port = NULL;
@@ -410,7 +410,7 @@ printsa(sa, salen)
 	struct sockaddr *sa;
 	socklen_t salen;
 {
-	char hbuf[NI_MAXHOST], pbuf[10];
+	char hbuf[NI_MAXHOST], pbuf[NI_MAXSERV];
 	static char buf[sizeof(hbuf) + sizeof(pbuf)];
 	int error;
 
