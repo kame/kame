@@ -1,4 +1,40 @@
-/*	$NetBSD: popen.c,v 1.13 1999/02/24 16:45:13 explorer Exp $	*/
+/*	$NetBSD: popen.c,v 1.22 2000/05/20 23:34:55 lukem Exp $	*/
+
+/*-
+ * Copyright (c) 1999 The NetBSD Foundation, Inc.
+ * All rights reserved.
+ *
+ * This code is derived from software contributed to The NetBSD Foundation
+ * by Luke Mewburn.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgement:
+ *        This product includes software developed by the NetBSD
+ *        Foundation, Inc. and its contributors.
+ * 4. Neither the name of The NetBSD Foundation nor the names of its
+ *    contributors may be used to endorse or promote products derived
+ *    from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
+ * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
 
 /*
  * Copyright (c) 1988, 1993, 1994
@@ -42,23 +78,27 @@
 #if 0
 static char sccsid[] = "@(#)popen.c	8.3 (Berkeley) 4/6/94";
 #else
-__RCSID("$NetBSD: popen.c,v 1.13 1999/02/24 16:45:13 explorer Exp $");
+__RCSID("$NetBSD: popen.c,v 1.22 2000/05/20 23:34:55 lukem Exp $");
 #endif
 #endif /* not lint */
 
 #include <sys/types.h>
+#include <sys/param.h>
 #include <sys/wait.h>
 
 #include <errno.h>
 #include <glob.h>
+#include <setjmp.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stringlist.h>
+#include <syslog.h>
 #include <unistd.h>
 
 #ifdef KERBEROS5
-#include <krb5.h>
+#include <krb5/krb5.h>
 #endif
 
 #include "extern.h"
@@ -74,24 +114,18 @@ __RCSID("$NetBSD: popen.c,v 1.13 1999/02/24 16:45:13 explorer Exp $");
 static int *pids;
 static int fds;
 
-FILE *
-ftpd_popen(program, type, stderrfd)
-	char *program, *type;
-	int stderrfd;
-{
-	char *cp;
-	FILE *iop = NULL;
-	int argc, gargc, pdes[2], pid;
-	char **pop, **np;
-	char **argv = NULL, **gargv = NULL;
-	size_t nargc = 100, ngargc = 100;
-#ifdef __GNUC__
-	(void) &iop;
-	(void) &gargc;
-	(void) &gargv;
-	(void) &argv;
-#endif
+extern int ls_main(int, char *[]);
 
+FILE *
+ftpd_popen(char *argv[], const char *type, int stderrfd)
+{
+	FILE *iop;
+	int argc, pdes[2], pid, isls;
+	char **pop;
+	StringList *sl;
+
+	iop = NULL;
+	isls = 0;
 	if ((*type != 'r' && *type != 'w') || type[1])
 		return (NULL);
 
@@ -105,51 +139,34 @@ ftpd_popen(program, type, stderrfd)
 	if (pipe(pdes) < 0)
 		return (NULL);
 
-	if ((argv = malloc(nargc * sizeof(char *))) == NULL)
-		return NULL;
-
-#define CHECKMORE(c, v, n) \
-	if (c >= n + 2) { \
-		n += INCR; \
-		if ((np = realloc(v, n * sizeof(char *))) == NULL) \
-			goto pfree; \
-		else \
-			v = np; \
-	}
-
-	/* break up string into pieces */
-	for (argc = 0, cp = program;; cp = NULL) {
-		CHECKMORE(argc, argv, nargc)
-		if (!(argv[argc++] = strtok(cp, " \t\n")))
-			break;
-	}
-
-	if ((gargv = malloc(ngargc * sizeof(char *))) == NULL)
+	if ((sl = sl_init()) == NULL)
 		goto pfree;
 
-	/* glob each piece */
-	gargv[0] = argv[0];
-	for (gargc = argc = 1; argv[argc]; argc++) {
+					/* glob each piece */
+	if (sl_add(sl, xstrdup(argv[0])) == -1)
+		goto pfree;
+	for (argc = 1; argv[argc]; argc++) {
 		glob_t gl;
 		int flags = GLOB_BRACE|GLOB_NOCHECK|GLOB_TILDE;
 
 		memset(&gl, 0, sizeof(gl));
 		if (glob(argv[argc], flags, NULL, &gl)) {
-			CHECKMORE(gargc, gargv, ngargc)
-			if ((gargv[gargc++] = strdup(argv[argc])) == NULL)
+			if (sl_add(sl, xstrdup(argv[argc])) == -1)
 				goto pfree;
-		}
-		else
+		} else
 			for (pop = gl.gl_pathv; *pop; pop++) {
-				CHECKMORE(gargc, gargv, ngargc)
-				if ((gargv[gargc++] = strdup(*pop)) == NULL)
+				if (sl_add(sl, xstrdup(*pop)) == -1)
 					goto pfree;
 			}
 		globfree(&gl);
 	}
-	gargv[gargc] = NULL;
+	if (sl_add(sl, NULL) == -1)
+		goto pfree;
 
-	switch(pid = vfork()) {
+	isls = (strcmp(sl->sl_str[0], INTERNAL_LS) == 0);
+
+	pid = isls ? fork() : vfork();
+	switch (pid) {
 	case -1:			/* error */
 		(void)close(pdes[0]);
 		(void)close(pdes[1]);
@@ -173,7 +190,12 @@ ftpd_popen(program, type, stderrfd)
 			}
 			(void)close(pdes[1]);
 		}
-		execv(gargv[0], gargv);
+		if (isls) {	/* use internal ls */
+			optreset = optind = optopt = 1;
+			closelog();
+			exit(ls_main(sl->sl_cur - 1, sl->sl_str));
+		}
+		execv(sl->sl_str[0], sl->sl_str);
 		_exit(1);
 	}
 	/* parent; assume fdopen can't fail...  */
@@ -186,20 +208,14 @@ ftpd_popen(program, type, stderrfd)
 	}
 	pids[fileno(iop)] = pid;
 
-pfree:	if (gargv) {
-		for (argc = 1; argc < gargc; argc++)
-			free(gargv[argc]);
-		free(gargv);
-	}
-	if (argv)
-		free(argv);
-
+ pfree:
+	if (sl)
+		sl_free(sl, 1);
 	return (iop);
 }
 
 int
-ftpd_pclose(iop)
-	FILE *iop;
+ftpd_pclose(FILE *iop)
 {
 	int fdes, status;
 	pid_t pid;

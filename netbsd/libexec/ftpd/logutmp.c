@@ -1,8 +1,7 @@
-/*	$NetBSD: logwtmp.c,v 1.15 2000/05/20 02:20:19 lukem Exp $	*/
-
 /*
- * Copyright (c) 1988, 1993
+ * Portions Copyright (c) 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
+ * Portions Copyright (c) 1996, Jason Downs.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,61 +30,91 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
  */
-
-
-#include <sys/cdefs.h>
-#ifndef lint
-#if 0
-static char sccsid[] = "@(#)logwtmp.c	8.1 (Berkeley) 6/4/93";
-#else
-__RCSID("$NetBSD: logwtmp.c,v 1.15 2000/05/20 02:20:19 lukem Exp $");
-#endif
-#endif /* not lint */
 
 #include <sys/types.h>
-#include <sys/param.h>
-#include <sys/time.h>
-#include <sys/stat.h>
 
 #include <fcntl.h>
-#include <setjmp.h>
-#include <signal.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <time.h>
+#include <ttyent.h>
 #include <unistd.h>
 #include <utmp.h>
+#include <util.h>
 
-#ifdef KERBEROS5
-#include <krb5/krb5.h>
-#endif
-
-#include "extern.h"
+typedef struct utmp UTMP;
 
 static int fd = -1;
+static int topslot = -1;
 
 /*
- * Modified version of logwtmp that holds wtmp file open
- * after first call, for use with ftp (which may chroot
- * after login, but before logout).
+ * Special versions of login()/logout() which hold the utmp file open,
+ * for use with ftpd.
  */
-void
-logwtmp(const char *line, const char *name, const char *host)
-{
-	struct utmp ut;
-	struct stat buf;
 
-	if (fd < 0 && (fd = open(_PATH_WTMP, O_WRONLY|O_APPEND, 0)) < 0)
-		return;
-	if (fstat(fd, &buf) == 0) {
-		(void)strncpy(ut.ut_line, line, sizeof(ut.ut_line));
-		(void)strncpy(ut.ut_name, name, sizeof(ut.ut_name));
-		(void)strncpy(ut.ut_host, host, sizeof(ut.ut_host));
-		(void)time(&ut.ut_time);
-		if (write(fd, (char *)&ut, sizeof(struct utmp)) !=
-		    sizeof(struct utmp))
-			(void)ftruncate(fd, buf.st_size);
+void
+login(const UTMP *ut)
+{
+	UTMP ubuf;
+
+	/*
+	 * First, loop through /etc/ttys, if needed, to initialize the
+	 * top of the tty slots, since ftpd has no tty.
+	 */
+	if (topslot < 0) {
+		topslot = 0;
+		while (getttyent() != (struct ttyent *)NULL)
+			topslot++;
 	}
+	if ((topslot < 0) || ((fd < 0)
+	    && (fd = open(_PATH_UTMP, O_RDWR|O_CREAT, 0644)) < 0))
+	    	return;
+
+	/*
+	 * Now find a slot that's not in use...
+	 */
+	(void)lseek(fd, (off_t)(topslot * sizeof(UTMP)), SEEK_SET);
+
+	while (1) {
+		if (read(fd, &ubuf, sizeof(UTMP)) == sizeof(UTMP)) {
+			if (!ubuf.ut_name[0]) {
+				(void)lseek(fd, -(off_t)sizeof(UTMP), SEEK_CUR);
+				break;
+			}
+			topslot++;
+		} else {
+			(void)lseek(fd, (off_t)(topslot * sizeof(UTMP)),
+			    SEEK_SET);
+			break;
+		}
+	}
+
+	(void)write(fd, ut, sizeof(UTMP));
+}
+
+int
+logout(const char *line)
+{
+	UTMP ut;
+	int rval;
+
+	rval = 0;
+	if (fd < 0)
+		return(rval);
+
+	(void)lseek(fd, 0, SEEK_SET);
+
+	while (read(fd, &ut, sizeof(UTMP)) == sizeof(UTMP)) {
+		if (!ut.ut_name[0]
+		    || strncmp(ut.ut_line, line, UT_LINESIZE))
+			continue;
+		memset(ut.ut_name, 0, UT_NAMESIZE);
+		memset(ut.ut_host, 0, UT_HOSTSIZE);
+		(void)time(&ut.ut_time);
+		(void)lseek(fd, -(off_t)sizeof(UTMP), SEEK_CUR);
+		(void)write(fd, &ut, sizeof(UTMP));
+		rval = 1;
+	}
+	return(rval);
 }

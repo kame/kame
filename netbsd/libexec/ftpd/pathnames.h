@@ -1,4 +1,4 @@
-/*	$NetBSD: pathnames.h,v 1.8 1998/06/08 07:13:13 lukem Exp $	*/
+/*	$NetBSD: pathnames.h,v 1.10 2000/03/06 21:42:26 lukem Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -37,11 +37,16 @@
 
 #include <paths.h>
 
+#ifndef	_DEFAULT_CONFDIR
 #define	_DEFAULT_CONFDIR	"/etc"
+#endif
 
 #define	_PATH_FTPCHROOT		"ftpchroot"
 #define	_PATH_FTPDCONF		"ftpd.conf"
 #define	_PATH_FTPLOGINMESG	"motd"
 #define	_PATH_FTPUSERS		"ftpusers"
 #define	_PATH_FTPWELCOME	"ftpwelcome"
+
+#define _PATH_CLASSPIDS		"/var/run/ftpd.pids-"
+
 #define	TMPFILE			"/tmp/ftpdXXXXXXX"

@@ -1,15 +1,20 @@
-#	$NetBSD: Makefile,v 1.30 1999/02/18 21:22:51 scottr Exp $
+#	$NetBSD: Makefile,v 1.42 2000/06/20 06:00:34 thorpej Exp $
 #	@(#)Makefile	8.2 (Berkeley) 4/4/94
 
 PROG=	ftpd
-SRCS=	conf.c ftpd.c ftpcmd.y logwtmp.c popen.c util.c
+SRCS=	cmds.c conf.c ftpd.c ftpcmd.y logutmp.c logwtmp.c popen.c
 CPPFLAGS+=-DHASSETPROCTITLE
-DPADD+=	${LIBCRYPT}
-LDADD+=	-lcrypt
-MAN=	ftpd.8
-MLINKS+=ftpd.8 ftpd.conf.5
-.PATH:	${.CURDIR}/../../usr.bin/ftp ${.CURDIR}/../../usr.bin/login
+# CPPFLAGS+=-DDEBUG		# XXX for lukem testing
+DPADD+=	${LIBCRYPT} ${LIBUTIL}
+LDADD+=	-lcrypt -lutil
+MAN=	ftpd.conf.5 ftpusers.5 ftpd.8
+MLINKS=	ftpusers.5 ftpchroot.5
 
+# for `internal' ls
+SRCS+=	ls.c cmp.c print.c stat_flags.c util.c
+.PATH:	${.CURDIR}/../../bin/ls
+
+CPPFLAGS+=-DINET6
 .include <bsd.own.mk>
 
 .ifdef SKEY
@@ -18,9 +23,21 @@ DPADD+= ${LIBSKEY}
 LDADD+= -lskey
 .endif
 
-.include <bsd.prog.mk>
+ftpd.o ftpcmd.o: version.h
 
-# XXX Work-around a compiler bug for now... can't use -O
-.if (${MACHINE_ARCH} == "powerpc")
-COPTS+=-O0
-.endif
+# XXX Kerberos support is broken right now.
+#.PATH:	${.CURDIR}/../../usr.bin/login
+
+#.ifdef KERBEROS5
+#SRCS+=	k5login.c
+#CPPFLAGS+=-DKERBEROS5
+#DPADD+= ${LIBKRB5} ${LIBK5CRYPTO} ${LIBCOM_ERR}
+#LDADD+= -lkrb5 -lk5crypto -lcom_err
+#.else
+#SRCS+=	klogin.c
+#CPPFLAGS+=-DKERBEROS
+#DPADD+= ${LIBKRB} ${LIBDES} ${LIBCOM_ERR}
+#LDADD+= -lkrb -kdes -lcom_err
+#.endif
+
+.include <bsd.prog.mk>

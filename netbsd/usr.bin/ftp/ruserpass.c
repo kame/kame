@@ -1,4 +1,4 @@
-/*	$NetBSD: ruserpass.c,v 1.21 1998/08/08 03:17:40 lukem Exp $	*/
+/*	$NetBSD: ruserpass.c,v 1.26 2000/05/01 10:35:19 lukem Exp $	*/
 
 /*
  * Copyright (c) 1985, 1993, 1994
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)ruserpass.c	8.4 (Berkeley) 4/27/95";
 #else
-__RCSID("$NetBSD: ruserpass.c,v 1.21 1998/08/08 03:17:40 lukem Exp $");
+__RCSID("$NetBSD: ruserpass.c,v 1.26 2000/05/01 10:35:19 lukem Exp $");
 #endif
 #endif /* not lint */
 
@@ -56,14 +56,14 @@ __RCSID("$NetBSD: ruserpass.c,v 1.21 1998/08/08 03:17:40 lukem Exp $");
 
 #include "ftp_var.h"
 
-static	int token __P((void));
+static	int token(void);
 static	FILE *cfile;
 
 #define	DEFAULT	1
 #define	LOGIN	2
 #define	PASSWD	3
-#define	ACCOUNT 4
-#define MACDEF  5
+#define	ACCOUNT	4
+#define	MACDEF	5
 #define	ID	10
 #define	MACH	11
 
@@ -84,9 +84,8 @@ static struct toktab {
 };
 
 int
-ruserpass(host, aname, apass, aacct)
-	const char *host;
-	const char **aname, **apass, **aacct;
+ruserpass(const char *host, const char **aname, const char **apass,
+	    const char **aacct)
 {
 	char *hdir, buf[BUFSIZ], *tmp;
 	char myname[MAXHOSTNAMELEN + 1], *mydomain;
@@ -96,9 +95,8 @@ ruserpass(host, aname, apass, aacct)
 	hdir = getenv("HOME");
 	if (hdir == NULL)
 		hdir = ".";
-	if (strlen(hdir) + sizeof(".netrc") < sizeof(buf)) {
-		(void)snprintf(buf, sizeof(buf), "%s/.netrc", hdir);
-	} else {
+	if (strlcpy(buf, hdir,      sizeof(buf)) >= sizeof(buf) ||
+	    strlcat(buf, "/.netrc", sizeof(buf)) >= sizeof(buf)) {
 		warnx("%s/.netrc: %s", hdir, strerror(ENAMETOOLONG));
 		return (0);
 	}
@@ -266,7 +264,7 @@ bad:
 }
 
 static int
-token()
+token(void)
 {
 	char *cp;
 	int c;
