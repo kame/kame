@@ -938,7 +938,7 @@ int twofish_blockEncrypt(cipherInstance *cipher, keyInstance *key,CONST BYTE *in
 
 	for (n=0;n<inputLen;n+=BLOCK_SIZE,input+=BLOCK_SIZE/8,outBuffer+=BLOCK_SIZE/8)
 		{
-#ifdef DEBUG
+#if 0 /*def DEBUG*/
 		DebugDump(input,"\n",-1,0,0,0,1);
 		if (cipher->mode == MODE_CBC)
 			DebugDump(cipher->iv32,"",IV_ROUND,0,0,0,0);
@@ -997,7 +997,7 @@ int twofish_blockEncrypt(cipherInstance *cipher, keyInstance *key,CONST BYTE *in
 			IV[2]=Bswap(((DWORD *)outBuffer)[2]);
 			IV[3]=Bswap(((DWORD *)outBuffer)[3]);
 			}
-#ifdef DEBUG
+#if 0 /*def DEBUG*/
 		DebugDump(outBuffer,"",rounds+1,0,0,0,1);
 		if (cipher->mode == MODE_CBC)
 			DebugDump(cipher->iv32,"",IV_ROUND,0,0,0,0);

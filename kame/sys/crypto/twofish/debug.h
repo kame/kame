@@ -1,4 +1,5 @@
-#ifdef DEBUG	/* keep these macros common so they are same for both versions */
+/* keep these macros common so they are same for both versions */
+#if 0 /*def DEBUG*/
 CONST int debugCompile	=	1;
 extern  int	debug;
 extern  void DebugIO(CONST char *s);	/* display the debug output */
