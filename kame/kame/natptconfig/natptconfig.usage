@@ -1,8 +1,8 @@
-	$KAME: natptconfig.usage,v 1.1 2001/09/02 21:04:05 fujisawa Exp $
+	$KAME: natptconfig.usage,v 1.2 2002/02/17 15:16:06 fujisawa Exp $
 
 This is simple NAT-PT configuration example.  This shows NAT-PT setup
 between inside IPv6 host and outside IPv4 host
-Sorry, this example is FreeBSD 4.3 specific.
+Sorry, this example is FreeBSD 4.5 specific.
 
 Sample network is as follows.  As shown in the following figure,
 outside interface is "fxp0", inside interface is "ed0".
@@ -31,7 +31,6 @@ How to install and use NAT-PT
 	ipv6_network_interfaces="ed0"
 	ipv6_gateway_enable="YES"
 	ipv6_prefix_ed0="3ffe:0501:041c:6000"
-	prefixcmd_enable="NO"
 	rtadvd_enable="YES"
 	rtadvd_interfaces="ed0"
 
