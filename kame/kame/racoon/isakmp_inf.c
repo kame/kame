@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.33 2000/06/10 06:47:10 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.34 2000/06/28 05:59:33 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -191,174 +191,59 @@ isakmp_info_recv(iph1, msg0)
 
 /*
  * send Delete payload (for IPsec SA) in Informational exchange, based on
- * pfkey msg.
+ * pfkey msg.  It sends always single SPI.
  */
 int
-isakmp_info_send_d2_pf(msg)
-	struct sadb_msg *msg;
+isakmp_info_send_d2(iph2)
+	struct ph2handle *iph2;
 {
-	struct ph1handle *iph1 = NULL;
-	caddr_t mhp[SADB_EXT_MAX + 1];
-	struct sadb_sa *sa;
-	struct sockaddr *src, *dst;
+	struct ph1handle *iph1;
+	struct saproto *pr;
+	struct isakmp_pl_d *d;
 	vchar_t *payload = NULL;
 	int tlen;
-	u_int8_t prefixlen;
 	int error = 0;
-	struct isakmp_pl_d *d;
 
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
+	if (iph2->status != PHASE2ST_ESTABLISHED)
+		return 0;
 
-	switch (msg->sadb_msg_type) {
-	case SADB_DELETE:
-		break;
-	default:
-		YIPSDEBUG(DEBUG_MISC,
-			plog(logp, LOCATION, NULL,
-				"unsupported message type %d\n",
-				msg->sadb_msg_type));
-		return EINVAL;
-	}
-
-	if (pfkey_align(msg, mhp) || pfkey_check(mhp)) {
-		plog(logp, LOCATION, NULL,
-			"pfkey_check (%s)\n", ipsec_strerror());
-		return EINVAL;
-	}
-	sa = (struct sadb_sa *)mhp[SADB_EXT_SA];
-	src = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]);
-	dst = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]);
-
-	if (src == NULL || dst == NULL) {
-		plog(logp, LOCATION, NULL,
-			"few pfkey delete message.\n");
-		return EINVAL;
-	}
-
-	switch (src->sa_family) {
-	case AF_INET:
-		prefixlen = sizeof(struct in_addr) << 3;
-		break;
-#ifdef INET6
-	case AF_INET6:
-		prefixlen = sizeof(struct in6_addr) << 3;
-		break;
-#endif
-	default:
-		plog(logp, LOCATION, NULL,
-			"invalid family: %d\n", src->sa_family);
-		return EINVAL;
-	}
-	/* first try me -> other guy */
-	if (PFKEY_ADDR_PREFIX(mhp[SADB_EXT_ADDRESS_DST]) == prefixlen)
-		iph1 = getph1byaddr(dst);
-
-	/* other guy -> me */
-	if (!iph1) {
-		if (PFKEY_ADDR_PREFIX(mhp[SADB_EXT_ADDRESS_SRC]) == prefixlen)
-			iph1 = getph1byaddr(src);
-	}
-
-	if (!iph1) {
-		YIPSDEBUG(DEBUG_MISC,
-			plog(logp, LOCATION, NULL, "no ISAKMP SA found\n"));
-		return EINVAL;
-	}
-
-	tlen = sizeof(*d) + sizeof(sa->sadb_sa_spi);
-	payload = vmalloc(tlen);
-	if (payload == NULL) {
-		plog(logp, LOCATION, NULL, 
-			"failed to get buffer to send.\n");
-		return errno;
-	}
-
-	d = (struct isakmp_pl_d *)payload->v;
-	d->h.np = ISAKMP_NPTYPE_NONE;
-	d->h.len = htons(tlen);
-	d->doi = htonl(IPSEC_DOI);		/* IPSEC DOI (1) */
-	d->proto_id = pfkey2ipsecdoi_proto(msg->sadb_msg_satype);
-						/* IPSEC AH/ESP/whatever */
-	d->spi_size = sizeof(sa->sadb_sa_spi);
-	d->num_spi = htons(1);
-	memcpy(d + 1, &sa->sadb_sa_spi, sizeof(sa->sadb_sa_spi));
-
-	error = isakmp_info_send_n1(iph1, ISAKMP_NPTYPE_D, payload);
-	vfree(payload);
-
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "end.\n"));
-	return error;
-}
-
-#if 0
-/*
- * send Delete payload (for IPsec SA) in Informational exchange
- * XXX looks incomplete
- */
-int
-isakmp_info_send_d2_pst(pst)
-	struct pfkey_st *pst;
-{
-	struct ph1handle *iph1 = NULL;
-	vchar_t *payload = NULL;
-	int tlen;
-	u_int8_t prefixlen;
-	int error = 0;
-	struct isakmp_pl_d *d;
-
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
-	YIPSDEBUG(DEBUG_DMISC,
-		plog(logp, LOCATION, pst->src, "\n");
-		plog(logp, LOCATION, pst->dst, "\n");
-		);
-
-	switch (saddr->sa_family) {
-	case AF_INET:
-		prefixlen = sizeof(struct in_addr) << 3;
-		break;
-#ifdef INET6
-	case AF_INET6:
-		prefixlen = sizeof(struct in6_addr) << 3;
-		break;
-#endif
-	default:
-		plog(logp, LOCATION, NULL,
-			"invalid family: %d\n", saddr->sa_family);
-		return EINVAL;
-	}
-	if (pst->dst) {
-		if (pst->prefd != prefixlen)
-			return EINVAL;
-		iph1 = getph1byaddr(pst->dst);
-	}
+	/*
+	 * don't send delete information if there is no phase 1 handler.
+	 * It's nonsensical to negotiate phase 1 to send the information.
+	 */
+	iph1 = getph1byaddr(iph2->dst); 
 	if (iph1 == NULL)
-		return EINVAL;
+		return 0;
 
-	tlen = sizeof(*d) + sizeof(pst->spi);
-	payload = vmalloc(tlen);
-	if (payload == NULL) { 
-		plog(logp, LOCATION, NULL,
-			"failed to get buffer to send.\n");
-		return errno;
+	/* create delete payload */
+	for (pr = iph2->approval->head; pr != NULL; pr = pr->next) {
+
+		/* send SPIs of inbound SAs. */
+		/* XXX should send outbound SAs's ? */
+		tlen = sizeof(*d) + sizeof(pr->spi);
+		payload = vmalloc(tlen);
+		if (payload == NULL) {
+			plog(logp, LOCATION, NULL, 
+				"failed to get buffer for payload.\n");
+			return errno;
+		}
+
+		d = (struct isakmp_pl_d *)payload->v;
+		d->h.np = ISAKMP_NPTYPE_NONE;
+		d->h.len = htons(tlen);
+		d->doi = htonl(IPSEC_DOI);
+		d->proto_id = pr->proto_id;
+		d->spi_size = sizeof(pr->spi);
+		d->num_spi = htons(1);
+		memcpy(d + 1, &pr->spi, sizeof(pr->spi));
+
+		error = isakmp_info_send_common(iph1, payload,
+						ISAKMP_NPTYPE_D, 0);
+		vfree(payload);
 	}
 
-	d = (struct isakmp_pl_d *)payload->v;
-	d->h.np = ISAKMP_NPTYPE_NONE;
-	d->h.len = htons(tlen);
-	d->doi = htonl(IPSEC_DOI);		/* IPSEC DOI (1) */
-	d->proto_id = pst->proto_id;	/* IPSEC AH/ESP/whatever */
-	d->spi_size = sizeof(pst->spi);
-	d->num_spi = htons(1);
-	memcpy(d + 1, &pst->spi, sizeof(pst->spi));
-
-	error = isakmp_info_send_common(iph1, payload, ISAKMP_NPTYPE_D, 0);
-	vfree(payload);
-
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "end.\n"));
 	return error;
 }
-#endif
 
 /*
  * send Notification payload (for without ISAKMP SA) in Informational exchange
@@ -938,6 +823,7 @@ isakmp_info_recv_d(iph1, msg)
 	vchar_t *pbuf;
 	struct isakmp_parse_t *pa, *pap;
 	int protected = 0;
+	struct ph2handle *iph2;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -1008,14 +894,27 @@ isakmp_info_recv_d(iph1, msg)
 			return(-1);
 		}
 
-		if (protected) {
-			YIPSDEBUG(DEBUG_NOTIFY, plog(logp, LOCATION, NULL,
-				"packet properly proteted, purge SPIs.\n"));
-			purge_spi(d->proto_id, spi, num_spi);
-		} else {
+		if (!protected) {
 			plog(logp, LOCATION, NULL,
-				"delete payload is not proteted, ignored.\n");
+				"ERROR: delete payload is not proteted, "
+				"ignored.\n");
+			continue;
 		}
+
+		purge_spi(d->proto_id, spi, num_spi);
+
+		/* delete a relative phase 2 handler */
+		/* continue to process if no there is no phase 2 handler. */
+		iph2 = getph2bysaidx(iph1->local, iph1->remote,
+				d->proto_id, *spi);
+		if (iph2) {
+			unbindph12(iph2);
+			remph2(iph2);
+			delph2(iph2);
+		}
+
+		YIPSDEBUG(DEBUG_NOTIFY, plog(logp, LOCATION, NULL,
+			"packet properly proteted, purge SPIs.\n"));
 	}
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "end.\n"));

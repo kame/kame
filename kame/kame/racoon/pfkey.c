@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.53 2000/06/28 05:29:18 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.54 2000/06/28 05:59:33 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -93,6 +93,7 @@ static int pk_recvadd __P((caddr_t *));
 static int pk_recvdelete __P((caddr_t *));
 static int pk_recvacquire __P((caddr_t *));
 static int pk_recvexpire __P((caddr_t *));
+static int pk_recvflush __P((caddr_t *));
 static int pk_recvspdupdate __P((caddr_t *));
 static int pk_recvspdadd __P((caddr_t *));
 static int pk_recvspddelete __P((caddr_t *));
@@ -111,7 +112,7 @@ NULL,	/* SADB_GET */
 pk_recvacquire,
 NULL,	/* SADB_REGISTER */
 pk_recvexpire,
-NULL,	/* SADB_FLUSH */
+pk_recvflush,
 NULL,	/* SADB_DUMP */
 NULL,	/* SADB_X_PROMISC */
 NULL,	/* SADB_X_PCHANGE */
@@ -1505,13 +1506,95 @@ static int
 pk_recvdelete(mhp)
 	caddr_t *mhp;
 {
+	struct sadb_msg *msg;
+	struct sadb_sa *sa;
+	struct sockaddr *src, *dst;
+	struct ph2handle *iph2 = NULL;
+	u_int proto_id;
+
+	/* ignore this message because of local test mode. */
+	if (f_local)
+		return 0;
+
+	/* sanity check */
+	if (mhp[0] == NULL
+	 || mhp[SADB_EXT_SA] == NULL
+	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
+	 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
+		plog(logp, LOCATION, NULL,
+			"inappropriate sadb acquire message passed.\n");
+		return -1;
+	}
+	msg = (struct sadb_msg *)mhp[0];
+	sa = (struct sadb_sa *)mhp[SADB_EXT_SA];
+	src = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]);
+	dst = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]);
+
+	proto_id = pfkey2ipsecdoi_proto(msg->sadb_msg_satype);
+	if (proto_id == ~0) {
+		plog(logp, LOCATION, NULL,
+			"ERROR: invalid proto_id %d\n", msg->sadb_msg_satype);
+		return -1;
+	}
+
+	iph2 = getph2bysaidx(src, dst, proto_id, sa->sadb_sa_spi);
+	if (iph2 == NULL) {
+		/* ignore */
+		YIPSDEBUG(DEBUG_PFKEY,
+			char *xsrc = strdup(saddrwop2str(src));
+			plog(logp, LOCATION, NULL,
+				"pfkey %s received, "
+				"but %s/%s->%s not interesting\n",
+				s_pfkey_type(msg->sadb_msg_type),
+				s_ipsecdoi_proto(proto_id),
+				xsrc,
+				saddrwop2str(dst),
+				ntohl(sa->sadb_sa_spi));
+			free(xsrc));
+		return 0;
+	}
+
+	if (iph2->status != PHASE2ST_ESTABLISHED) {
+		/* ignore */
+		YIPSDEBUG(DEBUG_PFKEY,
+			char *xsrc = strdup(saddrwop2str(iph2->src));
+			plog(logp, LOCATION, NULL,
+				"pfkey %s received, "
+				"but %s/%s->%s not interesting\n",
+				s_pfkey_type(msg->sadb_msg_type),
+				s_ipsecdoi_proto(proto_id),
+				xsrc,
+				saddrwop2str(iph2->dst),
+				ntohl(sa->sadb_sa_spi));
+			free(xsrc));
+		return 0;
+	}
+
+	/* send delete information */
+	isakmp_info_send_d2(iph2);
+
+	remph2(iph2);
+	delph2(iph2);
+
+	return 0;
+}
+
+static int
+pk_recvflush(mhp)
+	caddr_t *mhp;
+{
+	/* ignore this message because of local test mode. */
+	if (f_local)
+		return 0;
+
 	/* sanity check */
 	if (mhp[0] == NULL) {
 		plog(logp, LOCATION, NULL,
-			"inappropriate sadb delete message passed.\n");
+			"inappropriate sadb acquire message passed.\n");
 		return -1;
 	}
-	isakmp_info_send_d2_pf((struct sadb_msg *)mhp[0]);
+
+	flushph2();
 
 	return 0;
 }

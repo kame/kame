@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.24 2000/06/14 09:48:28 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.25 2000/06/28 05:59:32 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -50,6 +50,7 @@
 #include "proposal.h"
 #include "isakmp_var.h"
 #include "isakmp.h"
+#include "isakmp_inf.h"
 #include "oakley.h"
 #include "remoteconf.h"
 #include "handler.h"
@@ -591,6 +592,10 @@ flushph2()
 
 	for (p = LIST_FIRST(&ph2tree); p; p = next) {
 		next = LIST_NEXT(p, chain);
+
+		/* send delete information */
+		isakmp_info_send_d2(p);
+
 		unbindph12(p);
 		remph2(p);
 		delph2(p);
