@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.36 2001/04/10 15:08:31 suz Exp $	*/
+/*	$KAME: config.c,v 1.37 2001/05/25 07:34:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -674,7 +674,7 @@ add_prefix(struct rainfo *rai, struct in6_prefixreq *ipr)
 
 	/* free the previous packet */
 	free(rai->ra_data);
-	rai->ra_data = 0;
+	rai->ra_data = NULL;
 
 	/* reconstruct the packet */
 	rai->pfxs++;
@@ -811,9 +811,11 @@ make_packet(struct rainfo *rainfo)
 	if (mobileip6 && rainfo->hatime)
 		packlen += sizeof(struct nd_opt_homeagent_info);
 #endif
+#ifdef ND_OPT_ROUTE_INFO
 	for (rti = rainfo->route.next; rti != &rainfo->route; rti = rti->next)
 		packlen += sizeof(struct nd_opt_route_info) + 
 			   ((rti->prefixlen + 0x3f) >> 6) * 8;
+#endif
 
 	/* allocate memory for the packet */
 	if ((buf = malloc(packlen)) == NULL) {
@@ -821,6 +823,11 @@ make_packet(struct rainfo *rainfo)
 		       "<%s> can't get enough memory for an RA packet",
 		       __FUNCTION__);
 		exit(1);
+	}
+	if (rainfo->ra_data) {
+		/* free the previous packet */
+		free(rainfo->ra_data);
+		rainfo->ra_data = NULL;
 	}
 	rainfo->ra_data = buf;
 	/* XXX: what if packlen > 576? */
@@ -939,6 +946,7 @@ make_packet(struct rainfo *rainfo)
 		buf += sizeof(struct nd_opt_prefix_info);
 	}
 
+#ifdef ND_OPT_ROUTE_INFO
 	for (rti = rainfo->route.next; rti != &rainfo->route; rti = rti->next) {
 		u_int8_t psize = (rti->prefixlen + 0x3f) >> 6;
 
@@ -951,6 +959,7 @@ make_packet(struct rainfo *rainfo)
 		memcpy(ndopt_rti + 1, &rti->prefix, psize * 8);
 		buf += sizeof(struct nd_opt_route_info) + psize * 8;
 	}
+#endif
 
 	return;
 }
