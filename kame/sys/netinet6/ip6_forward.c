@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.131 2004/01/16 05:01:16 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.132 2004/01/29 12:56:53 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -406,7 +406,7 @@ ip6_forward(m, srcrt)
 #else
 		ip6_output(m, NULL, NULL, IPV6_FORWARDING/*XXX*/, NULL, NULL);
 #endif
-		return;
+		goto freecopy;
 	}
 
 	/* adjust pointer */
