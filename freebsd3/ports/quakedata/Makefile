@@ -29,7 +29,7 @@ do-extract:
 		cd ${WRKDIR}; lha xfq resource.exe id1/pak0.pak
 
 do-install:
-		${MKDIR} ${PREFIX}/share/quake/id1
-		${INSTALL_DATA} ${WRKSRC}/id1/pak0.pak ${PREFIX}/share/quake/id1
+		${MKDIR} ${PREFIX}/share/quake/base
+		${INSTALL_DATA} ${WRKSRC}/id1/pak0.pak ${PREFIX}/share/quake/base
 
 .include "bsd.port.mk"
