@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.71 2000/03/15 09:49:39 sakane Exp $	*/
+/*	$KAME: key.c,v 1.72 2000/03/15 10:30:51 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.71 2000/03/15 09:49:39 sakane Exp $ */
+/* KAME $Id: key.c,v 1.72 2000/03/15 10:30:51 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -3839,7 +3839,7 @@ key_timehandler(void)
     {
 	struct secspacq *acq, *nextacq;
 
-	for (acq = LIST_FIRST(&acqsptree);
+	for (acq = LIST_FIRST(&spacqtree);
 	     acq != NULL;
 	     acq = nextacq) {
 
