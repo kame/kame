@@ -1,4 +1,4 @@
-.\"     $KAME: ip6.4,v 1.21 2004/12/27 05:08:24 itojun Exp $
+.\"     $KAME: ip6.4,v 1.22 2005/01/06 03:22:42 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -522,7 +522,7 @@ The checksum will
 incorporate the IPv6 pseudo-header, defined in Section 8.1 of RFC2460.
 The
 .Dv IPV6_CHECKSUM
- socket option also specifies an integer offset into the user data of
+socket option also specifies an integer offset into the user data of
 where the checksum is located.
 .Bd -literal -offset indent
 int offset = 2;
