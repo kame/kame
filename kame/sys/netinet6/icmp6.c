@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.159 2000/11/29 09:09:06 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.160 2000/11/30 03:36:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -447,6 +447,7 @@ icmp6_input(mp, offp, proto)
 	int icmp6len = m->m_pkthdr.len - *offp;
 	int code, sum, noff;
 	struct sockaddr_in6 icmp6src;
+	u_int32_t notifymtu;
 
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, sizeof(struct icmp6_hdr), IPPROTO_DONE);
@@ -1086,7 +1087,8 @@ icmp6_input(mp, offp, proto)
 		ip6cp.ip6c_finaldst = finaldst;
 
 		if (icmp6type == ICMP6_PACKET_TOO_BIG) {
-			ip6cp.ip6c_cmdarg = (void *)&icmp6->icmp6_mtu;
+			notifymtu = ntohl(icmp6->icmp6_mtu);
+			ip6cp.ip6c_cmdarg = (void *)&notifymtu;
 #if !(defined(__NetBSD__) || defined(__OpenBSD__))
 			icmp6_mtudisc_update(&ip6cp);
 #endif

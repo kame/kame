@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.136 2000/11/21 12:29:32 kawa Exp $	*/
+/*	$KAME: ip6_input.c,v 1.137 2000/11/30 03:36:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1895,7 +1895,7 @@ ip6_notify_pmtu(in6p, dst, mtu)
 #endif
 
 	bzero(&mtuctl, sizeof(mtuctl));	/* zero-clear for safety */
-	mtuctl.ip6m_mtu = ntohl(*mtu);
+	mtuctl.ip6m_mtu = *mtu;
 	mtuctl.ip6m_addr = *dst;
 
 	if ((m_mtu = sbcreatecontrol((caddr_t)&mtuctl, sizeof(mtuctl),
@@ -2294,6 +2294,33 @@ ip6_lasthdr(m, off, proto, nxtp)
 
 		off = newoff;
 		proto = *nxtp;
+	}
+}
+
+void
+pfctlinput2(cmd, sa, ctlparam)
+	int cmd;
+	struct sockaddr *sa;
+	void *ctlparam;
+{
+	register struct domain *dp;
+	register struct protosw *pr;
+
+	for (dp = domains; dp; dp = dp->dom_next) {
+		/*
+		 * XXX: as shown by the name, we should generalize this 
+		 * function to be domain-independent. However, we should keep
+		 * it IPv6-specific at this moment, because each ctlinput
+		 * function has its own assumption about the argument.
+		 * A new type of argument "ctlparam" might cause kernel panic
+		 * due to such assumptions.
+		 */
+		if (dp != &inet6domain)
+			continue;
+
+		for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
+			if (pr->pr_ctlinput)
+				(*pr->pr_ctlinput)(cmd, sa, ctlparam);
 	}
 }
 

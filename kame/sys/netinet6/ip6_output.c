@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.134 2000/11/29 17:04:33 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.135 2000/11/30 03:36:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -111,6 +111,7 @@
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet6/nd6.h>
+#include <netinet6/ip6protosw.h>
 
 #ifdef __OpenBSD__ /*KAME IPSEC*/
 #undef IPSEC
@@ -1040,6 +1041,7 @@ skip_ipsec2:;
 		struct ip6_frag *ip6f;
 		u_int32_t id = htonl(ip6_id++);
 		u_char nextproto;
+		struct ip6ctlparam ip6cp;
 
 		/*
 		 * Too large for the destination or interface;
@@ -1049,6 +1051,21 @@ skip_ipsec2:;
 		hlen = unfragpartlen;
 		if (mtu > IPV6_MAXPACKET)
 			mtu = IPV6_MAXPACKET;
+
+		/*
+		 * Notify a proper path MTU to applications. We skip this
+		 * process if an outgoing MTU is specified, since fragmentation
+		 * can always occur when an application tries to send a larger
+		 * packet than the link MTU even with specifing path MTU.
+		 * Or should we always notify all applications?
+		 */
+		if (opt == NULL || opt->ip6po_mtu == -1) {
+			bzero(&ip6cp, sizeof(ip6cp));
+			ip6cp.ip6c_cmdarg = (void *)&mtu;
+			pfctlinput2(PRC_MSGSIZE, &ro_pmtu->ro_dst,
+				    (void *)&ip6cp);
+		}
+
 		len = (mtu - hlen - sizeof(struct ip6_frag)) & ~7;
 		if (len < 8) {
 			error = EMSGSIZE;

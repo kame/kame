@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.38 2000/10/23 04:07:50 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.39 2000/11/30 03:36:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -62,6 +62,8 @@
 #include <net/netisr.h>
 #include <machine/cpu.h>
 
+#include <net/net_osdep.h>
+
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
@@ -74,6 +76,11 @@
 
 #ifdef INET6
 #include <netinet/ip6.h>
+#ifdef HAVE_NRL_INPCB
+#include <netinet/in_pcb.h>
+#else
+#include <netinet6/in6_pcb.h>
+#endif
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
 #include <netinet6/ip6protosw.h>
@@ -953,12 +960,12 @@ esp6_ctlinput(cmd, sa, d)
 {
 	const struct newesp *espp;
 	struct newesp esp;
+	struct ip6ctlparam *ip6cp = NULL;
 	struct secasvar *sav;
 	struct ip6_hdr *ip6;
 	struct mbuf *m;
 	int off;
-	struct in6_addr finaldst;
-	struct in6_addr s;
+	struct sockaddr_in6 sa6_src, sa6_dst;
 
 	if (sa->sa_family != AF_INET6 ||
 	    sa->sa_len != sizeof(struct sockaddr_in6))
@@ -968,23 +975,47 @@ esp6_ctlinput(cmd, sa, d)
 
 	/* if the parameter is from icmp6, decode it. */
 	if (d != NULL) {
-		struct ip6ctlparam *ip6cp = (struct ip6ctlparam *)d;
+		ip6cp = (struct ip6ctlparam *)d;
 		m = ip6cp->ip6c_m;
 		ip6 = ip6cp->ip6c_ip6;
 		off = ip6cp->ip6c_off;
-
-		/* translate addresses into internal form */
-		bcopy(ip6cp->ip6c_finaldst, &finaldst, sizeof(finaldst));
-		if (IN6_IS_ADDR_LINKLOCAL(&finaldst)) {
-			finaldst.s6_addr16[1] =
-			    htons(m->m_pkthdr.rcvif->if_index);
-		}
-		bcopy(&ip6->ip6_src, &s, sizeof(s));
-		if (IN6_IS_ADDR_LINKLOCAL(&s))
-			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 	} else {
 		m = NULL;
 		ip6 = NULL;
+	}
+
+	if (ip6cp && ip6cp->ip6c_finaldst) {
+		bzero(&sa6_src, sizeof(sa6_src));
+		sa6_src.sin6_family = AF_INET6;
+		sa6_src.sin6_len = sizeof(sa6_src);
+		sa6_src.sin6_addr = *ip6cp->ip6c_finaldst;
+		/* XXX: assuming M is valid in this case */
+		sa6_src.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
+							 ip6cp->ip6c_finaldst);
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(ip6cp->ip6c_finaldst, &sa6_src, NULL,
+				   NULL)) {
+			/* should be impossbile */
+			printf("esp6_ctlinput: in6_embedscope failed\n");
+			return;
+		}
+#endif
+
+		bzero(&sa6_dst, sizeof(sa6_dst));
+		sa6_dst.sin6_family = AF_INET6;
+		sa6_dst.sin6_len = sizeof(sa6_dst);
+		sa6_dst.sin6_addr = *ip6cp->ip6c_finaldst;
+		/* XXX: assuming M is valid in this case */
+		sa6_dst.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
+							 ip6cp->ip6c_finaldst);
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(ip6cp->ip6c_finaldst, &sa6_dst, NULL,
+				   NULL)) {
+			/* should be impossbile */
+			printf("esp6_ctlinput: in6_embedscope failed\n");
+			return;
+		}
+#endif
 	}
 
 	if (ip6) {
@@ -1012,8 +1043,10 @@ esp6_ctlinput(cmd, sa, d)
 			 * Check to see if we have a valid SA corresponding to
 			 * the address in the ICMP message payload.
 			 */
-			sav = key_allocsa(AF_INET6, (caddr_t)&s,
-			    (caddr_t)&finaldst, IPPROTO_ESP, espp->esp_spi);
+			sav = key_allocsa(AF_INET6,
+					  (caddr_t)&sa6_src.sin6_addr,
+					  (caddr_t)&sa6_dst, IPPROTO_ESP,
+					  espp->esp_spi);
 			if (sav == NULL)
 				return;
 			if (sav->state != SADB_SASTATE_MATURE &&
