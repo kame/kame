@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_script.c,v 1.9 2004/01/20 07:24:45 suz Exp $	*/
+/*	$KAME: dhcp6c_script.c,v 1.10 2004/05/13 14:01:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -294,7 +294,7 @@ safefile(path)
 	/* no setuid */
 	if (getuid() != geteuid()) {
 		dprintf(LOG_NOTICE, FNAME,
-		    "setuid'ed execution not allowed\n");
+		    "setuid'ed execution not allowed");
 		return (-1);
 	}
 
@@ -307,7 +307,7 @@ safefile(path)
 	/* the file must be owned by the running uid */
 	myuid = getuid();
 	if (s.st_uid != myuid) {
-		dprintf(LOG_NOTICE, FNAME, "%s has invalid owner uid\n", path);
+		dprintf(LOG_NOTICE, FNAME, "%s has invalid owner uid", path);
 		return (-1);
 	}
 
@@ -315,7 +315,7 @@ safefile(path)
 	case S_IFREG:
 		break;
 	default:
-		dprintf(LOG_NOTICE, FNAME, "%s is an invalid file type 0x%o\n",
+		dprintf(LOG_NOTICE, FNAME, "%s is an invalid file type 0x%o",
 		    path, (s.st_mode & S_IFMT));
 		return (-1);
 	}
