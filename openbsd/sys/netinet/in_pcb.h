@@ -140,7 +140,10 @@ struct inpcb {
 	struct tdb     *inp_tdb;	/* If tdb_dst matches our dst, use */
 #define	inp_flowinfo	inp_hu.hu_ipv6.ip6_flow
 
-	int	inp_csumoffset;
+	int	in6_cksum;
+#ifndef _KERNEL
+#define inp_csumoffset	in6_cksum
+#endif
 	struct	icmp6_filter *inp_icmp6filt;
 };
 

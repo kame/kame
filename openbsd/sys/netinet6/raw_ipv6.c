@@ -458,7 +458,7 @@ rip6_output(struct mbuf *m, ...)
 	ip6->ip6_hlim = in6_selecthlim(inp, oifp);
 
 	if (so->so_proto->pr_protocol == IPPROTO_ICMPV6 ||
-	    inp->inp_csumoffset != -1) {
+	    inp->in6p_cksum != -1) {
 		struct mbuf *n;
 		int off;
 		u_int16_t *p;
@@ -468,7 +468,7 @@ rip6_output(struct mbuf *m, ...)
 		if (so->so_proto->pr_protocol == IPPROTO_ICMPV6)
 			off = offsetof(struct icmp6_hdr, icmp6_cksum);
 		else
-			off = inp->inp_csumoffset;
+			off = inp->in6p_cksum;
 		if (plen < off + 1) {
 			error = EINVAL;
 			goto bad;
@@ -558,12 +558,12 @@ rip6_ctloutput(op, so, level, optname, m)
 			if (op == PRCO_SETOPT) {
 				if (!m || !*m || (*m)->m_len != sizeof(int))
 					return(EINVAL);
-				inp->inp_csumoffset = *(mtod(*m, int *));
+				inp->in6p_cksum = *(mtod(*m, int *));
 				m_freem(*m);
 			} else {
 				*m = m_get(M_WAIT, MT_SOOPTS);
 				(*m)->m_len = sizeof(int);
-				*(mtod(*m, int *)) = inp->inp_csumoffset;
+				*(mtod(*m, int *)) = inp->in6p_cksum;
 			}
 			return 0;
 		}
@@ -635,7 +635,7 @@ rip6_usrreq_attach(struct socket *so, int proto)
 	inp->inp_ipv6.ip6_nxt = (int)proto;
 #endif
 	if (inp->inp_ipv6.ip6_nxt == IPPROTO_ICMPV6)
-		inp->inp_csumoffset = 2;
+		inp->in6p_cksum = 2;
 	inp->inp_icmp6filt = (struct icmp6_filter *)
 	malloc(sizeof(struct icmp6_filter), M_PCB, M_NOWAIT);
 	ICMP6_FILTER_SETPASSALL(inp->inp_icmp6filt);

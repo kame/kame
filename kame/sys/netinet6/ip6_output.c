@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.141 2000/12/04 09:13:55 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.142 2000/12/05 14:40:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1874,7 +1874,7 @@ do { \
 
 				case IPV6_CHECKSUM:
 #ifdef HAVE_NRL_INPCB
-					inp->inp_csumoffset = optval;
+					inp->in6p_cksum = optval;
 #else
 					in6p->in6p_cksum = optval;
 #endif
@@ -2339,7 +2339,7 @@ do { \
 
 				case IPV6_CHECKSUM:
 #ifdef HAVE_NRL_INPCB
-					optval = inp->inp_csumoffset;
+					optval = inp->in6p_cksum;
 #else
 					optval = in6p->in6p_cksum;
 #endif

@@ -182,7 +182,7 @@ in_pcballoc(so, v)
 		if (ip6_auto_flowlabel)
 			inp->inp_flags |= IN6P_AUTOFLOWLABEL;
 	}
-	inp->inp_csumoffset = -1;
+	inp->in6p_cksum = -1;
 #endif /* INET6 */
 	return (0);
 }
