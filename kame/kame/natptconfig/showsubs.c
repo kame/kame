@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.19 2002/06/06 12:33:59 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.20 2002/06/07 02:06:09 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -50,7 +50,8 @@
 
 #include <netinet6/natpt_defs.h>
 
-#include "cfparse.h"
+#include "defs.h"
+
 
 /*
  *
@@ -376,7 +377,7 @@ makeTSlotLine(char *wow, int size, struct tSlot *tsl,
 			break;
 
 		if (ts->state < TCP_NSTATES) {
-			if (type == SSHORT)
+			if (type == XLATE_SHORT)
 				concat(&lmsg, "%s ", tcpstatesshort[ts->state]);
 			else
 				concat(&lmsg, "%s ", tcpstates[ts->state]);
@@ -408,7 +409,7 @@ appendPAddrXL4(struct logmsg *lmsg, struct pAddr *pad, int type, int inv)
 
 	if (inv == 0) {
 		switch (type) {
-		case SSHORT:
+		case XLATE_SHORT:
 			inet_ntop(AF_INET, &pad->in4src, Bow, sizeof(Bow));
 			snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[0]));
 			concat(lmsg, "%-22s", Wow);
@@ -426,7 +427,7 @@ appendPAddrXL4(struct logmsg *lmsg, struct pAddr *pad, int type, int inv)
 		}
 	} else {
 		switch (type) {
-		case SSHORT:
+		case XLATE_SHORT:
 			inet_ntop(AF_INET, &pad->in4dst, Bow, sizeof(Bow));
 			snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[1]));
 			concat(lmsg, "%-22s", Wow);
@@ -451,13 +452,8 @@ appendPAddrXL6(struct logmsg *lmsg, struct pAddr *pad, int type, int inv)
 {
 	if (inv == 0) {
 		switch (type) {
-		case SSHORT:
+		case XLATE_SHORT:
 			appendpAddrXL6short(lmsg, &pad->in6src, pad->port[0]);
-			break;
-
-		case SLONG:
-			appendpAddrXL6long(lmsg, &pad->in6src, pad->port[0]);
-			appendpAddrXL6long(lmsg, &pad->in6dst, pad->port[1]);
 			break;
 
 		default:
@@ -467,13 +463,8 @@ appendPAddrXL6(struct logmsg *lmsg, struct pAddr *pad, int type, int inv)
 		}
 	} else {
 		switch (type) {
-		case SSHORT:
+		case XLATE_SHORT:
 			appendpAddrXL6long(lmsg, &pad->in6dst, pad->port[1]);
-			break;
-
-		case SLONG:
-			appendpAddrXL6long(lmsg, &pad->in6dst, pad->port[1]);
-			appendpAddrXL6long(lmsg, &pad->in6src, pad->port[0]);
 			break;
 
 		default:
