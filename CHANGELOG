@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1536 2001/02/06 02:34:03 jinmei Exp $
+$KAME: CHANGELOG,v 1.1537 2001/02/06 04:11:04 itojun Exp $
 
 <200102>
+Tue Feb  6 13:08:24 JST 2001 itojun@iijlab.net
+	* sys/netinet6/nd6*.c: minimize number of log() or printf() on inbound
+	  packet processing path, to avoid /var from get filluped with with
+	  bogus packet storms.
+	* sys/netinet6/icmp6.c: supply new sysctl net.inet6.icmp6.nd6_debug,
+	  to turn on/off error/warning messages on inbonud ND/ICMPv6 packets.
+	  disabled by default, can be enabled by default if you have
+	  "options ND6_DEBUG".
+	* sys/netinet6: OLD_LOOPBACK_IF is no longer supported (see changelog
+	  on 2000/7/30).
+
 2001-02-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_update_ifa): always set the
 	destination address when specified regardless of the type of the
