@@ -1,12 +1,12 @@
 # New ports collection makefile for:	zebra
-# Version required:	0.79
+# Version required:	0.80
 # Date created:		So  31 Mai 1998 11:00:30 CEST
 # Whom:			Andreas Klemm <andreas@klemm.gtn.com>
 #
-# $Id: Makefile,v 1.4 1999/09/13 16:39:12 itojun Exp $
+# $Id: Makefile,v 1.5 1999/10/26 04:34:16 itojun Exp $
 #
 
-DISTNAME=	zebra-0.79
+DISTNAME=	zebra-0.80
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.zebra.org/pub/zebra/
 # you might need debugging, it's a developer release !
