@@ -1,5 +1,5 @@
 /*
- * $Header: /usr/home/sumikawa/kame/kame/kame/kame/route6d/route6d.c,v 1.2 1999/08/17 12:14:28 itojun Exp $
+ * $Header: /usr/home/sumikawa/kame/kame/kame/kame/route6d/route6d.c,v 1.3 1999/09/02 09:05:18 itojun Exp $
  */
 
 /*
@@ -32,7 +32,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$Id: route6d.c,v 1.2 1999/08/17 12:14:28 itojun Exp $";
+static char _rcsid[] = "$Id: route6d.c,v 1.3 1999/09/02 09:05:18 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -85,6 +85,11 @@ static char _rcsid[] = "$Id: route6d.c,v 1.2 1999/08/17 12:14:28 itojun Exp $";
 #define	INIT_INTERVAL6	10	/* Wait to submit a initial riprequest */
 #endif
 
+/* alignment constraint for routing socket */
+#define ROUNDUP(a) \
+	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
+#define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
+
 /*
  * Following two macros are highly depending on KAME Release
  */
@@ -92,10 +97,10 @@ static char _rcsid[] = "$Id: route6d.c,v 1.2 1999/08/17 12:14:28 itojun Exp $";
 	((addr).s6_addr[2] << 8 | (addr).s6_addr[3])
 
 #define	SET_IN6_LINKLOCAL_IFINDEX(addr, index) \
-	{ \
+	do { \
 		(addr).s6_addr[2] = ((index) >> 8) & 0xff; \
 		(addr).s6_addr[3] = (index) & 0xff; \
-	}
+	} while (0)
 
 struct	ifc {			/* Configuration of an interface */
 	char	*ifc_name;			/* if name */
@@ -1421,7 +1426,7 @@ rtrecv()
 		for (i = 0; i < RTAX_MAX; i++) {
 			if (addrs & (1 << i)) {
 				rta[i] = (struct sockaddr_in6 *)q;
-				q += rta[i]->sin6_len;
+				q += ROUNDUP(rta[i]->sin6_len);
 			}
 		}
 
@@ -2021,19 +2026,19 @@ rt_entry(rtm, again)
 	rtmp += sin6_dst->sin6_len;
 	if (rtm->rtm_addrs & RTA_GATEWAY) {
 		sin6_gw = (struct sockaddr_in6 *)rtmp;
-		rtmp += sin6_gw->sin6_len;
+		rtmp += ROUNDUP(sin6_gw->sin6_len);
 	}
 	if (rtm->rtm_addrs & RTA_NETMASK) {
 		sin6_mask = (struct sockaddr_in6 *)rtmp;
-		rtmp += sin6_mask->sin6_len;
+		rtmp += ROUNDUP(sin6_mask->sin6_len);
 	}
 	if (rtm->rtm_addrs & RTA_GENMASK) {
 		sin6_genmask = (struct sockaddr_in6 *)rtmp;
-		rtmp += sin6_genmask->sin6_len;
+		rtmp += ROUNDUP(sin6_genmask->sin6_len);
 	}
 	if (rtm->rtm_addrs & RTA_IFP) {
 		sin6_ifp = (struct sockaddr_in6 *)rtmp;
-		rtmp += sin6_ifp->sin6_len;
+		rtmp += ROUNDUP(sin6_ifp->sin6_len);
 	}
 
 	/* Destination */
@@ -2171,17 +2176,17 @@ addroute(rrt, gw, ifcp)
 	sin->sin6_len = sizeof(struct sockaddr_in6);
 	sin->sin6_family = AF_INET6;
 	sin->sin6_addr = np->rip6_dest;
-	sin++;
+	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
 	/* Gateway */
 	sin->sin6_len = sizeof(struct sockaddr_in6);
 	sin->sin6_family = AF_INET6;
 	sin->sin6_addr = *gw;
-	sin++;
+	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
 	/* Netmask */
 	sin->sin6_len = sizeof(struct sockaddr_in6);
 	sin->sin6_family = AF_INET6;
 	sin->sin6_addr = *(plen2mask(np->rip6_plen));
-	sin++;
+	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
 	if (write(rtsock, buf, len) > 0)
 		return 0;
 
@@ -2236,17 +2241,17 @@ delroute(np, gw)
 	sin->sin6_len = sizeof(struct sockaddr_in6);
 	sin->sin6_family = AF_INET6;
 	sin->sin6_addr = np->rip6_dest;
-	sin++;
+	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
 	/* Gateway */
 	sin->sin6_len = sizeof(struct sockaddr_in6);
 	sin->sin6_family = AF_INET6;
 	sin->sin6_addr = *gw;
-	sin++;
+	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
 	/* Netmask */
 	sin->sin6_len = sizeof(struct sockaddr_in6);
 	sin->sin6_family = AF_INET6;
 	sin->sin6_addr = *(plen2mask(np->rip6_plen));
-	sin++;
+	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
 	if (write(rtsock, buf, len) >= 0)
 		return 0;
 
@@ -2304,8 +2309,10 @@ getroute(np, gw)
 		rtm = (struct rt_msghdr *)buf;
 	} while (rtm->rtm_seq != myseq || rtm->rtm_pid != pid);
 	sin = (struct sockaddr_in6 *)&buf[sizeof(struct rt_msghdr)];
-	if (rtm->rtm_addrs & RTA_DST)
-		sin++;
+	if (rtm->rtm_addrs & RTA_DST) {
+		sin = (struct sockaddr_in6 *)
+			((char *)sin + ROUNDUP(sin->sin6_len));
+	}
 	if (rtm->rtm_addrs & RTA_GATEWAY) {
 		*gw = sin->sin6_addr;
 		return gw;
