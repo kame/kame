@@ -21,7 +21,7 @@
  */
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/gencode.c,v 1.6 1999/12/13 00:54:47 itojun Exp $ (LBL)";
+    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/gencode.c,v 1.7 2000/01/27 08:09:09 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/types.h>
@@ -2386,11 +2386,11 @@ gen_load(proto, index, size)
 		sappend(index->s, s);
 
 		gen_and(gen_proto_abbrev(proto), b = gen_ipfrag());
-		if (index->b)
-			gen_and(index->b, b);
 #ifdef INET6
 		gen_and(gen_proto_abbrev(Q_IP), b);
 #endif
+		if (index->b)
+			gen_and(index->b, b);
 		index->b = b;
 		break;
 #ifdef INET6
