@@ -33,7 +33,7 @@
  *  Questions concerning this software should be directed to 
  *  Kurt Windisch (kurtw@antc.uoregon.edu)
  *
- *  $Id: defs.h,v 1.2 1999/08/24 10:04:55 jinmei Exp $
+ *  $Id: defs.h,v 1.3 1999/08/24 16:45:23 jinmei Exp $
  */
 /*
  * Part of this program has been derived from PIM sparse-mode pimd.
@@ -328,6 +328,7 @@ extern void     fdump        __P((int i));
 extern void     cdump        __P((int i));
 extern void     dump_vifs    __P((FILE *fp));
 extern void     dump_pim_mrt __P((FILE *fp));
+extern void	dump_lcl_grp __P((FILE *fp));
 
 /* dvmrp_proto.c */
 extern void	dvmrp_accept_probe             __P((u_int32 src, u_int32 dst,

@@ -34,7 +34,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: debug.c,v 1.2 1999/08/24 10:04:55 jinmei Exp $
+ *  $Id: debug.c,v 1.3 1999/08/24 16:45:22 jinmei Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -197,6 +197,7 @@ fdump(i)
     if (fp != NULL) {
 	dump_vifs(fp);
 	dump_pim_mrt(fp);
+	dump_lcl_grp(fp);
 	(void) fclose(fp);
     }
 }
@@ -466,4 +467,33 @@ dump_pim_mrt(fp)
     }/* for all groups */
 
     fprintf(fp, "Number of Groups: %u\n", number_of_groups);
+}
+
+void
+dump_lcl_grp(fp)
+	FILE *fp;
+{
+	vifi_t vifi;
+    	struct uvif *v;
+	struct listaddr *g;
+
+	fprintf(fp, "\nList of local listner information per interface\n");
+	for (vifi = 0, v = uvifs; vifi < numvifs; vifi++, v++) {
+		int first = 1;
+
+		for (g = v->uv_groups; g != NULL; g = g->al_next) {
+			if (first) {
+				fprintf(fp, "  Mif %d(%s)\n", vifi, v->uv_name);
+				first = 0;
+			}
+			fprintf(fp, "    %s", inet6_fmt(&g->al_addr.sin6_addr));
+			if (g->al_timerid)
+				fprintf(fp, " timeout: %d",
+					timer_leftTimer(g->al_timerid));
+			if (g->al_query)
+				fprintf(fp, " querytimer: %d",
+					timer_leftTimer(g->al_timerid));
+			fputc('\n', fp);
+		}
+	}
 }
