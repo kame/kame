@@ -593,7 +593,8 @@ free:
 	if (hp)
 		freehostent(hp);
 #endif
-	freeaddrinfo(sentinel.ai_next);
+	if (sentinel.ai_next)
+		freeaddrinfo(sentinel.ai_next);
 	return error;
 }
 
@@ -655,7 +656,8 @@ explore_null(pai, hostname, servname, res)
 	return 0;
 
 free:
-	freeaddrinfo(sentinel.ai_next);
+	if (sentinel.ai_next)
+		freeaddrinfo(sentinel.ai_next);
 	return error;
 }
 
@@ -743,7 +745,8 @@ explore_numeric(pai, hostname, servname, res)
 
 free:
 bad:
-	freeaddrinfo(sentinel.ai_next);
+	if (sentinel.ai_next)
+		freeaddrinfo(sentinel.ai_next);
 	return error;
 }
 
