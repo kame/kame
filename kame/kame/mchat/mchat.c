@@ -1,4 +1,4 @@
-/*	$KAME: mchat.c,v 1.15 2001/11/09 09:38:57 itojun Exp $	*/
+/*	$KAME: mchat.c,v 1.16 2002/05/26 12:56:34 itojun Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
  * All rights reserved.
@@ -371,7 +371,7 @@ main(argc, argv)
 		if (level) {
 			if (setsockopt(s, level, optname,
 					buf, ipsec_get_policylen(buf)) < 0)
-				warnx("Unable to set IPSec policy");
+				warnx("Unable to set IPsec policy");
 		} else
 			errx(1, "unsupported address family %d", res->ai_family);
 		free(buf);

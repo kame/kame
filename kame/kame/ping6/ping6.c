@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.153 2002/05/26 05:38:14 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.154 2002/05/26 12:56:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2646,7 +2646,7 @@ setpolicy(so, policy)
 		errx(1, "%s", ipsec_strerror());
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_IPSEC_POLICY, buf,
 	    ipsec_get_policylen(buf)) < 0)
-		warnx("Unable to set IPSec policy");
+		warnx("Unable to set IPsec policy");
 	free(buf);
 
 	return 0;
