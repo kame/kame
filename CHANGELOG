@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.668 2000/03/09 08:41:11 sakane Exp $
+$Id: CHANGELOG,v 1.669 2000/03/09 08:49:08 sakane Exp $
 
 <200003>
+Thu Mar  9 17:48:58 JST 2000 sakane@ydc.co.jp
+	* kame/freebsd3/sys/netinet/ip_output.c
+	* kame/kame/sys/netinet6/ip6_output.c:
+	- Fix ipsec_get_policy().
+	- Avoid double free of mbuf.  it has been free when error occured
+	  at soopt_mcopyout().
+	They are only in FreeBSD3.  Not tested yet in Others paltforms.
+
 Thu Mar  9 17:40:46 JST 2000 sakane@ydc.co.jp
 	* kame/kame/libipsec/test-policy.c:
 	  Improved test program for ipsec_{set|get}_policy.
