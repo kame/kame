@@ -862,7 +862,7 @@ ip_reass(ipqe, fp)
 
 	if (ip_maxfrags < 0)
 		;
-	eles if (ip_nfrags >= ip_maxfrags)
+	else if (ip_nfrags >= ip_maxfrags)
 		goto dropfrag;
 
 	/*
