@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.63 2001/08/16 06:09:03 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.64 2001/08/16 13:21:10 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1412,6 +1412,8 @@ int
 eay_aes_keylen(len)
 	int len;
 {
+	if (len == 0)
+		return 128;
 	if (len != 128 && len != 192 && len != 256)
 		return -1;
 	return len;
