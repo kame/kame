@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.55 2002/06/11 17:54:30 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.56 2002/06/11 19:38:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -78,6 +78,7 @@ struct secpolicyindex {
 struct secpolicy {
 	LIST_ENTRY(secpolicy) chain;
 
+	int readonly;			/* write prohibited */
 	int refcnt;			/* reference count */
 	struct secpolicyindex spidx;	/* selector */
 	u_int32_t id;			/* It's unique number on the system. */

@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.241 2002/06/08 07:05:23 jinmei Exp $	*/
+/*	$KAME: key.c,v 1.242 2002/06/11 19:38:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -7471,10 +7471,12 @@ key_init()
 #ifdef INET
 	ip4_def_policy.policy = IPSEC_POLICY_NONE;
 	ip4_def_policy.refcnt++;	/*never reclaim this*/
+	ip4_def_policy.readonly = 1;
 #endif
 #ifdef INET6
 	ip6_def_policy.policy = IPSEC_POLICY_NONE;
 	ip6_def_policy.refcnt++;	/*never reclaim this*/
+	ip6_def_policy.readonly = 1;
 #endif
 
 #ifdef __NetBSD__
