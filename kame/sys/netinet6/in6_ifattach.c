@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.131 2001/07/24 09:56:24 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.132 2001/07/24 09:57:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -578,7 +578,7 @@ in6_ifattach_linklocal(ifp, altifp)
 
 	/*
 	 * Do not let in6_update_ifa() do DAD, since we need a random delay
-	 * before sending an NS at the first time the inteface becomes up.
+	 * before sending an NS at the first time the interface becomes up.
 	 * Instead, in6_if_up() will start DAD with a proper random delay.
 	 */
 	ifra.ifra_flags |= IN6_IFF_NODAD;
