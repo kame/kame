@@ -33,7 +33,7 @@
  * Issues to be discussed:
  * - Thread safe-ness must be checked.
  * - Return values.  There are nonstandard return values defined and used
- *   in the source code.  This is because RFC2133 is silent about which error
+ *   in the source code.  This is because RFC2553 is silent about which error
  *   code must be returned for which situation.
  * - PF_UNSPEC case would be handled in getipnodebyname() with the AI_ALL flag.
  */
@@ -121,24 +121,26 @@ static int get_name __P((const char *, struct afd *,
 			  int));
 static int get_addr __P((const char *, int, struct addrinfo **,
 			struct addrinfo *, int));
+static int get_addr0 __P((const char *, int, struct addrinfo **,
+			struct addrinfo *, int));
 static int str_isnumber __P((const char *));
 	
 static char *ai_errlist[] = {
-	"success.",
-	"address family for hostname not supported.",	/* EAI_ADDRFAMILY */
-	"temporary failure in name resolution.",	/* EAI_AGAIN      */
-	"invalid value for ai_flags.",		       	/* EAI_BADFLAGS   */
-	"non-recoverable failure in name resolution.", 	/* EAI_FAIL       */
-	"ai_family not supported.",			/* EAI_FAMILY     */
-	"memory allocation failure.", 			/* EAI_MEMORY     */
-	"no address associated with hostname.", 	/* EAI_NODATA     */
-	"hostname nor servname provided, or not known.",/* EAI_NONAME     */
-	"servname not supported for ai_socktype.",	/* EAI_SERVICE    */
-	"ai_socktype not supported.", 			/* EAI_SOCKTYPE   */
-	"system error returned in errno.", 		/* EAI_SYSTEM     */
-	"invalid value for hints.",			/* EAI_BADHINTS	  */
-	"resolved protocol is unknown.",		/* EAI_PROTOCOL   */
-	"unknown error.", 				/* EAI_MAX        */
+	"Success",
+	"Address family for hostname not supported",	/* EAI_ADDRFAMILY */
+	"Temporary failure in name resolution",		/* EAI_AGAIN      */
+	"Invalid value for ai_flags",		       	/* EAI_BADFLAGS   */
+	"Non-recoverable failure in name resolution", 	/* EAI_FAIL       */
+	"ai_family not supported",			/* EAI_FAMILY     */
+	"Memory allocation failure", 			/* EAI_MEMORY     */
+	"No address associated with hostname", 		/* EAI_NODATA     */
+	"hostname nor servname provided, or not known",/* EAI_NONAME     */
+	"servname not supported for ai_socktype",	/* EAI_SERVICE    */
+	"ai_socktype not supported", 			/* EAI_SOCKTYPE   */
+	"System error returned in errno", 		/* EAI_SYSTEM     */
+	"Invalid value for hints",			/* EAI_BADHINTS	  */
+	"Resolved protocol is unknown",			/* EAI_PROTOCOL   */
+	"Unknown error", 				/* EAI_MAX        */
 };
 
 #define GET_CANONNAME(ai, str) \
@@ -340,7 +342,7 @@ getaddrinfo(hostname, servname, hints, res)
 			if ((sp = getservbyname(servname, proto)) == NULL)
 				ERR(EAI_SERVICE);
 			port = sp->s_port;
-			if (pai->ai_socktype == ANY)
+			if (pai->ai_socktype == ANY) {
 				if (strcmp(sp->s_proto, "udp") == 0) {
 					pai->ai_socktype = SOCK_DGRAM;
 					pai->ai_protocol = IPPROTO_UDP;
@@ -349,6 +351,7 @@ getaddrinfo(hostname, servname, hints, res)
 					pai->ai_protocol = IPPROTO_TCP;
 				} else
 					ERR(EAI_PROTOCOL);	/*xxx*/
+			}
 		}
 	}
 	
@@ -414,7 +417,7 @@ getaddrinfo(hostname, servname, hints, res)
 				break;
 #ifdef INET6
 			case AF_INET6:
-				pfx = ((struct in6_addr *)pton)->s6_addr8[0];
+				pfx = ((struct in6_addr *)pton)->s6_addr[0];
 				if (pfx == 0 || pfx == 0xfe || pfx == 0xff)
 					pai->ai_flags &= ~AI_CANONNAME;
 				break;
@@ -476,12 +479,13 @@ get_name(addr, afd, res, numaddr, pai, port0)
 	u_short port = port0 & 0xffff;
 	struct hostent *hp;
 	struct addrinfo *cur;
-	int error = 0, h_error;
-	
-#ifdef INET6
+	int error = 0;
+#ifdef USE_GETIPNODEBY
+	int h_error;
+
 	hp = getipnodebyaddr(addr, afd->a_addrlen, afd->a_af, &h_error);
 #else
-	hp = gethostbyaddr(addr, afd->a_addrlen, AF_INET);
+	hp = gethostbyaddr(addr, afd->a_addrlen, afd->a_af);
 #endif
 	if (hp && hp->h_name && hp->h_name[0] && hp->h_addr_list[0]) {
 		GET_AI(cur, afd, hp->h_addr_list[0], port);
@@ -489,7 +493,7 @@ get_name(addr, afd, res, numaddr, pai, port0)
 	} else
 		GET_AI(cur, afd, numaddr, port);
 	
-#ifdef INET6
+#ifdef USE_GETIPNODEBY
 	if (hp)
 		freehostent(hp);
 #endif
@@ -498,7 +502,7 @@ get_name(addr, afd, res, numaddr, pai, port0)
  free:
 	if (cur)
 		freeaddrinfo(cur);
-#ifdef INET6
+#ifdef USE_GETIPNODEBY
 	if (hp)
 		freehostent(hp);
 #endif
@@ -508,7 +512,75 @@ get_name(addr, afd, res, numaddr, pai, port0)
 }
 
 static int
-get_addr(hostname, af, res, pai, port0)
+get_addr(hostname, af, res0, pai, port0)
+	const char *hostname;
+	int af;
+	struct addrinfo **res0;
+	struct addrinfo *pai;
+	int port0;
+{
+#ifdef USE_GETIPNODEBY
+	return get_addr0(hostname, af, res0, pai, port0);
+#else
+	int i, error, ekeep;
+	struct addrinfo *cur;
+	struct addrinfo **res;
+	int retry;
+	int s;
+
+	res = res0;
+	ekeep = 0;
+	error = 0;
+	for (i = 0; afdl[i].a_af; i++) {
+		retry = 0;
+		if (af == AF_UNSPEC) {
+			/*
+			 * filter out AFs that are not supported by the kernel
+			 * XXX errno?
+			 */
+			s = socket(afdl[i].a_af, SOCK_DGRAM, 0);
+			if (s < 0)
+				continue;
+			close(s);
+		} else {
+			if (af != afdl[i].a_af)
+				continue;
+		}
+		/* It is WRONG, we need getipnodebyname(). */
+again:
+		error = get_addr0(hostname, afdl[i].a_af, res, pai, port0);
+		switch (error) {
+		case EAI_AGAIN:
+			if (++retry < 3)
+				goto again;
+			/* FALL THROUGH*/
+		default:
+			if (ekeep == 0)
+				ekeep = error;
+			break;
+		}
+		if (*res) {
+			/* make chain of addrs */
+			for (cur = *res;
+			     cur && cur->ai_next;
+			     cur = cur->ai_next)
+				;
+			if (!cur)
+				return EAI_FAIL;
+			res = &cur->ai_next;
+		}
+	}
+
+	/* if we got something, it's okay */
+	if (*res0)
+		return 0;
+
+	return error ? error : ekeep;
+#endif
+}
+
+static int
+get_addr0(hostname, af, res, pai, port0)
 	const char *hostname;
 	int af;
 	struct addrinfo **res;
@@ -522,21 +594,25 @@ get_addr(hostname, af, res, pai, port0)
 	struct afd *afd;
 	int i, error = 0, h_error;
 	char *ap;
-#ifndef INET6
+#ifndef USE_GETIPNODEBY
 	extern int h_errno;
 #endif
 
 	top = NULL;
 	sentinel.ai_next = NULL;
 	cur = &sentinel;
-#ifdef INET6
+#ifdef USE_GETIPNODEBY
 	if (af == AF_UNSPEC) {
 		hp = getipnodebyname(hostname, AF_INET6,
 				AI_ADDRCONFIG|AI_ALL|AI_V4MAPPED, &h_error);
 	} else
 		hp = getipnodebyname(hostname, af, AI_ADDRCONFIG, &h_error);
 #else
-	hp = gethostbyname(hostname);
+	if (af == AF_UNSPEC) {
+		error = EAI_FAIL;
+		goto bad;
+	}
+	hp = gethostbyname2(hostname, af);
 	h_error = h_errno;
 #endif
 	if (hp == NULL) {
@@ -549,6 +625,7 @@ get_addr(hostname, af, res, pai, port0)
 			error = EAI_AGAIN;
 			break;
 		case NO_RECOVERY:
+		case NETDB_INTERNAL:
 		default:
 			error = EAI_FAIL;
 			break;
@@ -590,9 +667,9 @@ get_addr(hostname, af, res, pai, port0)
 
 			GET_AI(cur->ai_next, &afdl[N_INET6], ap, port);
 			in6 = &((struct sockaddr_in6 *)cur->ai_next->ai_addr)->sin6_addr;
-			memcpy(&in6->s6_addr32[0], &faith_prefix,
+			memcpy(&in6->s6_addr[0], &faith_prefix,
 			    sizeof(struct in6_addr) - sizeof(struct in_addr));
-			memcpy(&in6->s6_addr32[3], ap, sizeof(struct in_addr));
+			memcpy(&in6->s6_addr[12], ap, sizeof(struct in_addr));
 		} else
 #endif /* FAITH */
 		GET_AI(cur->ai_next, afd, ap, port);
@@ -602,7 +679,7 @@ get_addr(hostname, af, res, pai, port0)
 		}
 		cur = cur->ai_next;
 	}
-#ifdef INET6
+#ifdef USE_GETIPNODEBY
 	freehostent(hp);
 #endif
 	*res = top;
@@ -610,7 +687,7 @@ get_addr(hostname, af, res, pai, port0)
  free:
 	if (top)
 		freeaddrinfo(top);
-#ifdef INET6
+#ifdef USE_GETIPNODEBY
 	if (hp)
 		freehostent(hp);
 #endif
