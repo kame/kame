@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.125 2004/02/09 18:55:32 t-momose Exp $	*/
+/*	$KAME: ip6_var.h,v 1.126 2004/05/21 08:17:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -305,7 +305,7 @@ extern int	ip6_forward_srcrt;	/* forward src-routed? */
 extern int	ip6_use_deprecated;	/* allow deprecated addr as source */
 extern int	ip6_rr_prune;		/* router renumbering prefix
 					 * walk list every 5 sec.    */
-#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 2) || (defined(__bsdi__) && _BSDI_VERSION < 199802)
+#ifdef __OpenBSD__
 extern const int	ip6_v6only;
 #else
 extern int	ip6_v6only;
@@ -340,15 +340,15 @@ extern int	ip6_prefer_tempaddr; /* whether to prefer temporary addresses
 extern int	ip6_use_defzone; /* whether to use the default scope zone
 				    when unspecified */
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 struct in6pcb;
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 extern struct	pr_usrreqs rip6_usrreqs;
 struct sockopt;
 #endif
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) /* fbsd3 || HAVE_NRL_INPCB */
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
 struct inpcb;
 #endif
 
@@ -356,7 +356,7 @@ extern int	mldmaxsrcfilter;       /* maximum num .of msf per interface */
 extern int	mldsomaxsrc;           /* maximum num .of msf per socket */
 extern int	mldalways_v2;
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 int	icmp6_ctloutput __P((struct socket *, struct sockopt *sopt));
 #else
 int	icmp6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
@@ -381,7 +381,7 @@ void	ip6_delaux __P((struct mbuf *));
 int	ip6_mforward __P((struct ip6_hdr *, struct ifnet *, struct mbuf *));
 int	ip6_process_hopopts __P((struct mbuf *, u_int8_t *, int, u_int32_t *,
 				 u_int32_t *));
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) /* fbsd3 || HAVE_NRL_INPCB */
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
 void	ip6_savecontrol __P((struct inpcb *, struct mbuf *,
 	struct mbuf **));
 void	ip6_notify_pmtu __P((struct inpcb *, struct sockaddr_in6 *,
@@ -411,25 +411,17 @@ int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
 			struct ip6_moptions *, struct ifnet **));
 #endif
 #else
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
-			struct route_in6 *,
-			int,
-			struct ip6_moptions *, struct ifnet **,
-			struct inpcb *));
-#else
 int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
 			struct route_in6 *,
 			int,
 			struct ip6_moptions *, struct ifnet **));
 #endif
-#endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 int	ip6_ctloutput __P((struct socket *, struct sockopt *sopt));
 #else
 int	ip6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 int	ip6_raw_ctloutput __P((struct socket *, struct sockopt *));
 #else
 int	ip6_raw_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
@@ -439,7 +431,7 @@ int	ip6_setpktopts __P((struct mbuf *, struct ip6_pktopts *,
     struct ip6_pktopts *, int, int));
 void	ip6_clearpktopts __P((struct ip6_pktopts *, int));
 struct ip6_pktopts *ip6_copypktopts __P((struct ip6_pktopts *, int));
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) /* fbsd3 || HAVE_NRL_INPCB */
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
 int	ip6_optlen __P((struct inpcb *));
 #else
 int	ip6_optlen __P((struct in6pcb *));
@@ -455,7 +447,7 @@ void	frag6_drain __P((void));
 void	rip6_init __P((void));
 int	rip6_input __P((struct mbuf **, int *, int));
 void	rip6_ctlinput __P((int, struct sockaddr *, void *));
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 int	rip6_ctloutput __P((struct socket *, struct sockopt *));
 #else
 int	rip6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
@@ -465,7 +457,7 @@ int	rip6_output __P((struct mbuf *, struct socket *,
 			 struct sockaddr_in6 *, struct mbuf *));
 #else
 int	rip6_output __P((struct mbuf *, ...));
-#endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
+#endif /* (defined(__FreeBSD__) && 5 > __FreeBSD__ >= 4) */
 int	rip6_usrreq __P((struct socket *,
 	    int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *));
 

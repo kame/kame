@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.152 2004/04/18 15:14:00 suz Exp $	*/
+/*	$KAME: in6.h,v 1.153 2004/05/21 08:17:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -801,55 +801,9 @@ struct ip6_mtuinfo {
 	{ "maxfrags", CTLTYPE_INT }, \
 	{ "ifq", CTLTYPE_NODE }, \
 }
-
-#ifdef __bsdi__
-#define IPV6CTL_VARS { \
-	0, \
-	&ip6_forwarding, \
-	&ip6_sendredirects, \
-	&ip6_defhlim, \
-	0, \
-	&ip6_forward_srcrt, \
-	0, \
-	0, \
-	0, \
-	&ip6_maxfragpackets, \
-	&ip6_sourcecheck, \
-	&ip6_sourcecheck_interval, \
-	&ip6_accept_rtadv, \
-	&ip6_keepfaith, \
-	&ip6_log_interval, \
-	&ip6_hdrnestlimit, \
-	&ip6_dad_count, \
-	&ip6_auto_flowlabel, \
-	&ip6_defmcasthlim, \
-	&ip6_gif_hlim, \
-	0, \
-	&ip6_use_deprecated, \
-	&ip6_rr_prune, \
-	0, \
-	&ip6_v6only, \
-	__IPV6CTL_VARS_RTEXPIRE, \
-	__IPV6CTL_VARS_RTMINEXPIRE, \
-	__IPV6CTL_VARS_RTMAXCACHE, \
-	__IPV6CTL_VARS_ANONPORTMIN, \
-	__IPV6CTL_VARS_ANONPORTMAX, \
-	__IPV6CTL_VARS_LOWPORTMIN, \
-	__IPV6CTL_VARS_LOWPORTMAX, \
-	&ip6_use_tempaddr, \
-	&ip6_temp_preferred_lifetime, \
-	&ip6_temp_valid_lifetime, \
-	&ip6_auto_linklocal, \
-	0, \
-	&ip6_prefer_tempaddr, \
-	0, \
-	&ip6_use_defzone,\
-	&ip6_maxfrags,\
-}
-#endif
 #endif /* !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 /*
  * Redefinition of mbuf flags
  */
@@ -916,7 +870,7 @@ in6_cksum_phdr(const struct in6_addr *src, const struct in6_addr *dst,
 #endif
 
 int	in6_cksum __P((struct mbuf *, u_int8_t, u_int32_t, u_int32_t));
-#if defined(__FreeBSD__) || defined(__bsdi__)
+#ifdef __FreeBSD__
 int	in6_localaddr __P((struct in6_addr *));
 #endif
 int	in6_addrscope __P((struct in6_addr *));
@@ -924,7 +878,7 @@ struct	in6_ifaddr *in6_ifawithifp __P((struct ifnet *, struct in6_addr *));
 extern void in6_if_up __P((struct ifnet *));
 extern	u_char	ip6_protox[];
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 struct sockaddr;
 
 void	in6_sin6_2_sin __P((struct sockaddr_in *sin,
@@ -943,7 +897,7 @@ extern void addrsel_policy_init __P((void));
 #define	sin6tosa(sin6)	((struct sockaddr *)(sin6))
 #define	ifatoia6(ifa)	((struct in6_ifaddr *)(ifa))
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 extern int      (*faithprefix_p)(struct in6_addr *);
 #endif
 #endif /* _KERNEL */

@@ -1,4 +1,4 @@
-/*	$KAME: esp.h,v 1.21 2003/01/20 00:55:27 itojun Exp $	*/
+/*	$KAME: esp.h,v 1.22 2004/05/21 08:17:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -36,7 +36,7 @@
 #ifndef _NETINET6_ESP_H_
 #define _NETINET6_ESP_H_
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 #if defined(_KERNEL) && !defined(_LKM)
 #include "opt_inet.h"
 #endif
@@ -100,11 +100,11 @@ extern int esp_max_ivlen __P((void));
 
 /* crypt routines */
 extern int esp4_output __P((struct mbuf *, struct ipsecrequest *));
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifdef __FreeBSD__
 extern void esp4_input __P((struct mbuf *, int));
 #else
 extern void esp4_input __P((struct mbuf *, ...));
-#endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
+#endif
 extern size_t esp_hdrsiz __P((struct ipsecrequest *));
 
 #if defined(__NetBSD__) && __NetBSD_Version__ >= 105080000	/* 1.5H */

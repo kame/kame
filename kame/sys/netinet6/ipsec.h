@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.70 2003/09/22 04:50:52 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.71 2004/05/21 08:17:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -37,12 +37,12 @@
 #define _NETINET6_IPSEC_H_
 
 #if defined(_KERNEL) && !defined(_LKM) && !defined(KLD_MODULE)
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
 #endif
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 #include "opt_inet.h"
 #include "opt_ipsec.h"
 #endif
@@ -307,42 +307,6 @@ struct ipsecstat {
 	{ "esp_randpad", CTLTYPE_INT }, \
 }
 
-#ifdef __bsdi__
-#define IPSECCTL_VARS { \
-	0, \
-	0, \
-	0, \
-	&ip4_esp_trans_deflev, \
-	&ip4_esp_net_deflev, \
-	&ip4_ah_trans_deflev, \
-	&ip4_ah_net_deflev, \
-	0, \
-	&ip4_ah_cleartos, \
-	&ip4_ah_offsetmask, \
-	&ip4_ipsec_dfbit, \
-	&ip4_ipsec_ecn, \
-	&ipsec_debug, \
-	&ip4_esp_randpad, \
-}
-
-#define IPSEC6CTL_VARS { \
-	0, \
-	0, \
-	0, \
-	&ip6_esp_trans_deflev, \
-	&ip6_esp_net_deflev, \
-	&ip6_ah_trans_deflev, \
-	&ip6_ah_net_deflev, \
-	0, \
-	0, \
-	0, \
-	0, \
-	&ip6_ipsec_ecn, \
-	&ipsec_debug, \
-	&ip6_esp_randpad, \
-}
-#endif
-
 #ifdef _KERNEL
 struct ipsec_output_state {
 	struct mbuf *m;
@@ -423,7 +387,7 @@ extern int ipsec4_in_reject __P((struct mbuf *, struct inpcb *));
 
 #ifdef INET6
 extern int ipsec6_in_reject_so __P((struct mbuf *, struct socket *));
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#ifdef __FreeBSD__
 extern int ipsec6_delete_pcbpolicy __P((struct inpcb *));
 extern int ipsec6_set_policy __P((struct inpcb *, int, caddr_t, size_t, int));
 extern int ipsec6_get_policy __P((struct inpcb *, caddr_t, size_t,
@@ -445,15 +409,13 @@ extern int ipsec_chkreplay __P((u_int32_t, struct secasvar *));
 extern int ipsec_updatereplay __P((u_int32_t, struct secasvar *));
 
 extern size_t ipsec4_hdrsiz __P((struct mbuf *, u_int, struct inpcb *));
-#if (defined(__FreeBSD__) && __FreeBSD__ == 3) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
-extern size_t ipsec_hdrsiz_tcp __P((struct tcpcb *, int));
-#elif  (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifdef __FreeBSD__
 extern size_t ipsec_hdrsiz_tcp __P((struct tcpcb *));
 #else
 extern size_t ipsec4_hdrsiz_tcp __P((struct tcpcb *));
 #endif
 #ifdef INET6
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#ifdef __FreeBSD__
 extern size_t ipsec6_hdrsiz __P((struct mbuf *, u_int, struct inpcb *));
 #else
 extern size_t ipsec6_hdrsiz __P((struct mbuf *, u_int, struct in6pcb *));
@@ -500,10 +462,10 @@ extern int ipsec_getnhist __P((struct mbuf *));
 extern struct ipsec_history *ipsec_gethist __P((struct mbuf *, int *));
 extern void ipsec_clearhist __P((struct mbuf *));
 
-#if defined(__bsdi__) || defined(__NetBSD__)
+#ifdef __NetBSD__
 extern int ipsec_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 extern int ipsec6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
-#endif /* __bsdi__ || __NetBSD__ */
+#endif
 
 #endif /* _KERNEL */
 

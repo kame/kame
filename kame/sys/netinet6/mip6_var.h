@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.116 2004/02/13 02:52:10 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.117 2004/05/21 08:17:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -40,7 +40,7 @@
 #ifndef _MIP6_VAR_H_
 #define _MIP6_VAR_H_
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 #include <sys/callout.h>
 #elif defined(__OpenBSD__)
 #include <sys/timeout.h>
@@ -110,7 +110,7 @@ struct mip6_bc {
 	struct mip6_bc        *mbc_llmbc;
 	u_int32_t             mbc_refcnt;
 	u_int                 mbc_brr_sent;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	struct callout        mbc_timer_ch;
 #elif defined(__OpenBSD__)
 	struct timeout        mbc_timer_ch;
@@ -263,7 +263,7 @@ struct mip6_ha {
 
 	time_t               mha_timeout;  /* next timeout time. */
 	long                 mha_ntick;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	struct callout       mha_timer_ch;
 #elif defined(__OpenBSD__)
 	struct timeout       mha_timer_ch;
@@ -291,7 +291,7 @@ struct mip6_prefix {
 	int                     mpfx_state;
 	time_t                  mpfx_timeout;
 	long                    mpfx_ntick;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	struct callout          mpfx_timer_ch;
 #elif defined(__OpenBSD__)
 	struct timeout          mpfx_timer_ch;

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.h,v 1.28 2003/12/09 02:22:31 itojun Exp $	*/
+/*	$KAME: ip6_mroute.h,v 1.29 2004/05/21 08:17:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -265,7 +265,7 @@ struct rtdetq {		/* XXX: rtdetq is also defined in ip_mroute.h */
 
 #define MAX_UPQ6	4		/* max. no of pkts in upcall Q */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 int	ip6_mrouter_set __P((struct socket *so, struct sockopt *sopt));
 int	ip6_mrouter_get __P((struct socket *so, struct sockopt *sopt));
 #else

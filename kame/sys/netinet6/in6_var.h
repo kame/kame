@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.96 2004/04/03 15:55:28 suz Exp $	*/
+/*	$KAME: in6_var.h,v 1.97 2004/05/21 08:17:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,7 +108,7 @@ struct	in6_ifaddr {
 	struct	sockaddr_in6 ia_prefixmask; /* prefix mask */
 	u_int32_t ia_plen;		/* prefix length */
 	struct	in6_ifaddr *ia_next;	/* next in6 list of IP6 addresses */
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	LIST_HEAD(in6_multihead, in6_multi) ia6_multiaddrs;
 					/* list of multicast addresses */
 #endif
@@ -493,7 +493,7 @@ extern struct ifqueue ip6intrq;		/* IP6 packet input queue */
 extern struct in6_addr zeroin6_addr;
 extern u_char inet6ctlerrmap[];
 extern unsigned long in6_maxmtu;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #ifdef MALLOC_DECLARE
 MALLOC_DECLARE(M_IPMADDR);
 #endif /* MALLOC_DECLARE */
@@ -503,24 +503,6 @@ MALLOC_DECLARE(M_IPMADDR);
  * Macro for finding the internet address structure (in6_ifaddr) corresponding
  * to a given interface (ifnet structure).
  */
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-
-#define IFP_TO_IA6(ifp, ia)				\
-/* struct ifnet *ifp; */				\
-/* struct in6_ifaddr *ia; */				\
-do {									\
-	struct ifaddr *ifa;						\
-	for (ifa = (ifp)->if_addrlist; ifa; ifa = ifa->ifa_next) {	\
-		if (!ifa->ifa_addr)					\
-			continue;					\
-		if (ifa->ifa_addr->sa_family == AF_INET6)		\
-			break;						\
-	}								\
-	(ia) = (struct in6_ifaddr *)ifa;				\
-} while (/*CONSTCOND*/ 0)
-
-#else
-
 #define IFP_TO_IA6(ifp, ia)				\
 /* struct ifnet *ifp; */				\
 /* struct in6_ifaddr *ia; */				\
@@ -534,7 +516,6 @@ do {									\
 	}								\
 	(ia) = (struct in6_ifaddr *)ifa;				\
 } while (/*CONSTCOND*/ 0)
-#endif
 
 #endif /* _KERNEL */
 
@@ -567,7 +548,7 @@ struct	in6_multi {
 	LIST_ENTRY(in6_multi) in6m_entry; /* list glue */
 	struct	in6_addr in6m_addr;	/* IP6 multicast address */
 	struct	ifnet *in6m_ifp;	/* back pointer to ifnet */
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	struct	in6_ifaddr *in6m_ia;	/* back pointer to in6_ifaddr */
 #else
 	struct	ifmultiaddr *in6m_ifma;	/* back pointer to ifmultiaddr */
@@ -580,7 +561,7 @@ struct	in6_multi {
 };
 
 #ifdef _KERNEL
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 extern LIST_HEAD(in6_multihead, in6_multi) in6_multihead;
 #endif
 
@@ -599,7 +580,7 @@ struct	in6_multistep {
  * returns NULL.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 
 #if __FreeBSD_version >= 500000
 #define IN6_LOOKUP_MULTI(addr, ifp, in6m)			\
@@ -657,7 +638,7 @@ do { \
 		IN6_NEXT_MULTI((step), (in6m)); \
 } while(0)
 
-#else /* not FreeBSD3 */
+#else /* not FreeBSD */
 
 #define IN6_LOOKUP_MULTI(addr, ifp, in6m)			\
 /* struct in6_addr addr; */					\
@@ -710,7 +691,7 @@ do {						\
 	IN6_NEXT_MULTI((step), (in6m));		\
 } while (/*CONSTCOND*/ 0)
 
-#endif /* not FreeBSD3 */
+#endif /* not FreeBSD */
 
 /*
  * Macros for looking up the in6_multi_mship record for a given IP6 multicast
@@ -754,11 +735,9 @@ int	in6_mask2len __P((struct in6_addr *, u_char *));
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 int	in6_control(struct socket *, u_long, caddr_t, struct ifnet *,
 		    struct thread *);
-#elif !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+#else
 int	in6_control __P((struct socket *, u_long, caddr_t, struct ifnet *,
 	struct proc *));
-#else
-int	in6_control __P((struct socket *, u_long, caddr_t, struct ifnet *));
 #endif
 int	in6_update_ifa __P((struct ifnet *, struct in6_aliasreq *,
 	struct in6_ifaddr *));

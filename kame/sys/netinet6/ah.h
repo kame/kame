@@ -1,4 +1,4 @@
-/*	$KAME: ah.h,v 1.20 2003/08/05 12:21:15 itojun Exp $	*/
+/*	$KAME: ah.h,v 1.21 2004/05/21 08:17:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -36,7 +36,7 @@
 #ifndef _NETINET6_AH_H_
 #define _NETINET6_AH_H_
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 #if defined(_KERNEL) && !defined(_LKM)
 #include "opt_inet.h"
 #endif
@@ -86,11 +86,11 @@ extern const struct ah_algorithm *ah_algorithm_lookup __P((int));
 extern int ah_hdrlen __P((struct secasvar *));
 
 extern size_t ah_hdrsiz __P((struct ipsecrequest *));
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifdef __FreeBSD__
 extern void ah4_input __P((struct mbuf *, int));
 #else
 extern void ah4_input __P((struct mbuf *, ...));
-#endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
+#endif
 extern int ah4_output __P((struct mbuf *, struct ipsecrequest *));
 extern int ah4_calccksum __P((struct mbuf *, u_int8_t *, size_t,
 	const struct ah_algorithm *, struct secasvar *));

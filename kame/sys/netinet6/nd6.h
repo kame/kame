@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.109 2004/04/09 06:54:29 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.110 2004/05/21 08:17:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -240,15 +240,9 @@ struct	in6_ndifreq {
 #define DEF_TEMP_PREFERRED_LIFETIME	86400	/* 1 day */
 #define TEMPADDR_REGEN_ADVANCE		5	/* sec */
 #define MAX_TEMP_DESYNC_FACTOR		600	/* 10 min */
-#ifdef __bsdi__
-#define ND_COMPUTE_RTIME(x) \
-		(((MIN_RANDOM_FACTOR * (x >> 10)) + (random() & \
-		((MAX_RANDOM_FACTOR - MIN_RANDOM_FACTOR) * (x >> 10)))) /1000)
-#else
 #define ND_COMPUTE_RTIME(x) \
 		(((MIN_RANDOM_FACTOR * (x >> 10)) + (arc4random() & \
 		((MAX_RANDOM_FACTOR - MIN_RANDOM_FACTOR) * (x >> 10)))) /1000)
-#endif
 
 TAILQ_HEAD(nd_drhead, nd_defrouter);
 struct	nd_defrouter {
@@ -418,11 +412,7 @@ void nd6_purge __P((struct ifnet *));
 void nd6_nud_hint __P((struct rtentry *, struct in6_addr *, int));
 int nd6_resolve __P((struct ifnet *, struct rtentry *, struct mbuf *,
 	struct sockaddr *, u_char *));
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 void nd6_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
-#else
-void nd6_rtrequest __P((int, struct rtentry *, struct sockaddr *));
-#endif
 int nd6_ioctl __P((u_long, caddr_t, struct ifnet *));
 struct rtentry *nd6_cache_lladdr __P((struct ifnet *, struct in6_addr *,
 	char *, int, int, int));

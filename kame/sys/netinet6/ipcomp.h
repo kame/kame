@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp.h,v 1.11 2001/09/04 08:43:19 itojun Exp $	*/
+/*	$KAME: ipcomp.h,v 1.12 2004/05/21 08:17:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -37,11 +37,11 @@
 #define _NETINET6_IPCOMP_H_
 
 #if defined(_KERNEL) && !defined(_LKM)
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #endif
-#if defined(__NetBSD__)
+#ifdef __NetBSD__
 #include "opt_inet.h"
 #endif
 #endif
@@ -69,11 +69,11 @@ struct ipcomp_algorithm {
 
 struct ipsecrequest;
 extern const struct ipcomp_algorithm *ipcomp_algorithm_lookup __P((int));
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifdef __FreeBSD__
 extern void ipcomp4_input __P((struct mbuf *, int));
 #else
 extern void ipcomp4_input __P((struct mbuf *, ...));
-#endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
+#endif
 extern int ipcomp4_output __P((struct mbuf *, struct ipsecrequest *));
 #ifdef INET6
 extern int ipcomp6_input __P((struct mbuf **, int *, int));
