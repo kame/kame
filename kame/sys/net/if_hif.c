@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.62 2003/08/27 11:51:52 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.63 2003/08/27 11:57:26 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -153,6 +153,8 @@ t.
 
 #if NHIF > 0
 
+extern u_int16_t mip6_dhaad_id;
+
 static int hif_site_prefix_list_update_withioctl(struct hif_softc *, caddr_t);
 static int hif_prefix_list_update_withprefix(struct hif_softc *, caddr_t);
 static int hif_prefix_list_update_withhaaddr(struct hif_softc *, caddr_t);
@@ -229,7 +231,7 @@ hifattach(dummy)
 		LIST_INIT(&sc->hif_prefix_list_foreign);
 
 		/* DHAAD related. */
-		sc->hif_dhaad_id = 0;
+		sc->hif_dhaad_id = mip6_dhaad_id++;
 		sc->hif_dhaad_lastsent = 0;
 		sc->hif_dhaad_count = 0;
 
