@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.246 2001/07/23 07:29:06 sakane Exp $
+	$KAME: IMPLEMENTATION,v 1.247 2001/07/23 07:31:40 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -2024,8 +2024,9 @@ and the first route is returned if it is not specified.
 
 IPv4 and IPv6 output logic will pick a route out of multiple
 gateways, based on Modulo-N Hash (RFC2991) using lowermost 32bits
-from ip{,6}_dst.  For example, it is likely that packets to 3ffe::1 and
-3ffe::2 (or 10.0.0.1 and 10.0.0.2) will go through a different gateway.
+from (ip{,6}_src ^ ip{,6}_dst).  For example, it is likely that packets
+to 3ffe::1 and 3ffe::2 (or 10.0.0.1 and 10.0.0.2) will go through a different
+gateway.
 
 DEMO:
 (adding multipath routes)
