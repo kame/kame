@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.43 2001/03/12 11:17:49 itojun Exp $	*/
+/*	$KAME: ah_core.c,v 1.44 2001/03/12 11:24:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -101,9 +101,7 @@
 #else
 #include <crypto/sha1.h>
 #endif
-#ifdef __NetBSD__	/*XXX*/
 #include <crypto/sha2/sha2.h>
-#endif
 
 #include <net/net_osdep.h>
 
@@ -139,7 +137,6 @@ static int ah_hmac_sha1_init __P((struct ah_algorithm_state *,
 static void ah_hmac_sha1_loop __P((struct ah_algorithm_state *, caddr_t,
 	size_t));
 static void ah_hmac_sha1_result __P((struct ah_algorithm_state *, caddr_t));
-#ifdef __NetBSD__	/*XXX*/
 static int ah_hmac_sha2_256_mature __P((struct secasvar *));
 static int ah_hmac_sha2_256_init __P((struct ah_algorithm_state *,
 	struct secasvar *));
@@ -158,7 +155,6 @@ static int ah_hmac_sha2_512_init __P((struct ah_algorithm_state *,
 static void ah_hmac_sha2_512_loop __P((struct ah_algorithm_state *, caddr_t,
 	size_t));
 static void ah_hmac_sha2_512_result __P((struct ah_algorithm_state *, caddr_t));
-#endif
 
 static void ah_update_mbuf __P((struct mbuf *, int, int,
 	const struct ah_algorithm *, struct ah_algorithm_state *));
@@ -183,7 +179,6 @@ ah_algorithm_lookup(idx)
 			ah_keyed_sha1_result, },
 		{ ah_sumsiz_zero, ah_none_mature, 0, 2048, "none",
 			ah_none_init, ah_none_loop, ah_none_result, },
-#ifdef __NetBSD__	/*XXX*/
 		{ ah_sumsiz_1216, ah_hmac_sha2_256_mature, 256, 256,
 			"hmac-sha2-256",
 			ah_hmac_sha2_256_init, ah_hmac_sha2_256_loop,
@@ -196,7 +191,6 @@ ah_algorithm_lookup(idx)
 			"hmac-sha2-512",
 			ah_hmac_sha2_512_init, ah_hmac_sha2_512_loop,
 			ah_hmac_sha2_512_result, },
-#endif
 	};
 
 	switch (idx) {
@@ -210,14 +204,12 @@ ah_algorithm_lookup(idx)
 		return &ah_algorithms[3];
 	case SADB_X_AALG_NULL:
 		return &ah_algorithms[4];
-#ifdef __NetBSD__	/*XXX*/
 	case SADB_X_AALG_SHA2_256:
 		return &ah_algorithms[5];
 	case SADB_X_AALG_SHA2_384:
 		return &ah_algorithms[6];
 	case SADB_X_AALG_SHA2_512:
 		return &ah_algorithms[7];
-#endif
 	default:
 		return NULL;
 	}
@@ -752,7 +744,6 @@ ah_hmac_sha1_result(state, addr)
 	free(state->foo, M_TEMP);
 }
 
-#ifdef __NetBSD__	/*XXX*/
 static int
 ah_hmac_sha2_256_mature(sav)
 	struct secasvar *sav;
@@ -1150,7 +1141,6 @@ ah_hmac_sha2_512_result(state, addr)
 
 	free(state->foo, M_TEMP);
 }
-#endif
 
 /*------------------------------------------------------------*/
 
