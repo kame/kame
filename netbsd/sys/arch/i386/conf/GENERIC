@@ -627,7 +627,7 @@ ste*	at pci? dev ? function ?	# Sundance ST-201 Ethernet
 stge*	at pci? dev ? function ?	# Sundance/Tamarack TC9021 Gigabit
 ti*	at pci? dev ? function ?	# Alteon ACEnic gigabit Ethernet
 tl*	at pci? dev ? function ?	# ThunderLAN-based Ethernet
-tlp*	at pci? dev ? function ?	# DECchip 21x4x and clones
+#tlp*	at pci? dev ? function ?	# DECchip 21x4x and clones
 vr*	at pci? dev ? function ?	# VIA Rhine Fast Ethernet
 wi*	at pci? dev ? function ?	# Intersil Prism Mini-PCI (802.11b)
 wm*	at pci? dev ? function ?	# Intel 82543/82544 gigabit
@@ -635,7 +635,7 @@ wm*	at pci? dev ? function ?	# Intel 82543/82544 gigabit
 # EISA network interfaces
 ep*	at eisa? slot ?			# 3Com 3c579 Ethernet
 fea*	at eisa? slot ?			# DEC DEFEA FDDI
-tlp*	at eisa? slot ?			# DEC DE-425 Ethernet
+#tlp*	at eisa? slot ?			# DEC DE-425 Ethernet
 
 # ISA Plug-and-Play network interfaces
 an*	at isapnp?			# Aironet 802.11
