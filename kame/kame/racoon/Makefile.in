@@ -1,4 +1,4 @@
-#	$KAME: Makefile.in,v 1.42 2004/06/16 11:26:42 sakane Exp $
+#	$KAME: Makefile.in,v 1.43 2004/06/17 02:42:53 itojun Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -52,7 +52,7 @@ pfkey: dummy.o
 	$(CC) $(LDFLAGS) -o $@ dummy.o
 
 eaytest: $(EAYTESTOBJS)
-	$(CC) $(LDFLAGS) -o $@ $(EAYTESTOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(EAYTESTOBJS) $(LIBS)
 
 # special object rules
 crypto_openssl_test.o: crypto_openssl.c
