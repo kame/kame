@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.75 2002/06/29 12:33:08 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.76 2002/07/25 05:13:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1709,7 +1709,7 @@ phyint_send(ip6, mifp, m, src, dst)
 	 * if it would fit in the MTU of the interface.
 	 */
 	linkmtu = IN6_LINKMTU(ifp);
-	if (mb_copy->m_pkthdr.len < linkmtu || linkmtu < IPV6_MMTU) {
+	if (mb_copy->m_pkthdr.len <= linkmtu || linkmtu < IPV6_MMTU) {
 		/*
 		 * We just call if_output instead of nd6_output here, since
 		 * we need no ND for a multicast forwarded packet...right?
