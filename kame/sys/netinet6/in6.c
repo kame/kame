@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.52 2000/02/24 06:51:19 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.53 2000/02/24 07:09:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -457,6 +457,9 @@ in6_control(so, cmd, data, ifp)
 	struct	in6_ifaddr *ia = NULL, *oia;
 	struct	in6_aliasreq *ifra = (struct in6_aliasreq *)data;
 	struct	sockaddr_in6 oldaddr;
+#ifdef COMPAT_IFIOCTL
+	struct sockaddr_in6 net;
+#endif 
 	int	error = 0, hostIsNew, prefixIsNew;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	time_t time_second = (time_t)time.tv_sec;
