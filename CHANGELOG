@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2647 2004/07/19 05:12:23 jinmei Exp $
+$KAME: CHANGELOG,v 1.2648 2004/07/21 04:15:26 itojun Exp $
 
 <200407>
+Wed Jul 21 13:14:08 JST 2004  itojun@iijlab.net
+	* libinet6/name6.c: no need query ip6.int reverse tree any more.
+
 2004-07-16  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/kame/kame/pim6sd/mld6v2_proto.c: fixed a wrong S-flag handling.
 	* kame/sys/netinet6/icmp6.c: uses TCP-hostcache framework for pMTU
