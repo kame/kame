@@ -1,4 +1,4 @@
-/*	$KAME: bf_cbc.c,v 1.3 2000/03/27 04:36:25 sumikawa Exp $	*/
+/*	$KAME: bf_cbc.c,v 1.4 2000/08/31 05:41:02 itojun Exp $	*/
 
 /* crypto/bf/bf_cbc.c */
 /* Copyright (C) 1995-1997 Eric Young (eay@mincom.oz.au)
@@ -58,6 +58,7 @@
  * [including the GNU Public Licence.]
  */
 
+#include <sys/types.h>
 #include <crypto/blowfish/blowfish.h>
 #include <crypto/blowfish/bf_locl.h>
 

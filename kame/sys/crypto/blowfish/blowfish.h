@@ -1,4 +1,4 @@
-/*	$KAME: blowfish.h,v 1.4 2000/06/14 10:41:16 itojun Exp $	*/
+/*	$KAME: blowfish.h,v 1.5 2000/08/31 05:41:03 itojun Exp $	*/
 
 /* crypto/bf/blowfish.h */
 /* Copyright (C) 1995-1997 Eric Young (eay@mincom.oz.au)
@@ -72,7 +72,7 @@ extern "C" {
  * the Alpha, otherwise they will not.  Strangly using the '8 byte'
  * BF_LONG and the default 'non-pointer' inner loop is the best configuration
  * for the Alpha */
-#define BF_LONG unsigned long
+#define BF_LONG u_int32_t
 
 #define BF_ROUNDS	16
 #define BF_BLOCK	8

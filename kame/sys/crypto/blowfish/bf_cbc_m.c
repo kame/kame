@@ -1,4 +1,4 @@
-/*	$KAME: bf_cbc_m.c,v 1.4 2000/06/14 10:41:16 itojun Exp $	*/
+/*	$KAME: bf_cbc_m.c,v 1.5 2000/08/31 05:41:03 itojun Exp $	*/
 
 /*
  * heavily modified to accept mbuf, by Jun-ichiro itojun Itoh
@@ -62,6 +62,7 @@
  * [including the GNU Public Licence.]
  */
 
+#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>

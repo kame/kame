@@ -1,4 +1,4 @@
-/*	$KAME: bf_locl.h,v 1.3 2000/03/27 04:36:26 sumikawa Exp $	*/
+/*	$KAME: bf_locl.h,v 1.4 2000/08/31 05:41:03 itojun Exp $	*/
 
 /* crypto/bf/bf_local.h */
 /* Copyright (C) 1995-1997 Eric Young (eay@mincom.oz.au)
@@ -160,9 +160,17 @@
  * BF_PTR for sparc and MIPS/SGI
  * use nothing for Alpha and HP.
  */
-#if !defined(BF_PTR) && !defined(BF_PTR2)
-#undef BF_PTR
+#undef	BF_PTR
+#undef	BF_PTR2
+#ifdef __NetBSD__
+#ifdef __i386__
+#define	BF_PTR2
+#else
+#ifdef __mips__
+#define	BF_PTR
 #endif
+#endif
+#endif /*NetBSD*/
 
 #define BF_M	0x3fc
 #define BF_0	22L
