@@ -670,6 +670,7 @@ bgp_process_update(struct rpcb *bnp)
   int               aggregated;  /* logical                               */
   u_int32_t         originatorid;/* [rfc1966]          (net-order)        */
   struct clstrlist *cll;         /* [rfc1966]                             */
+  struct optatr *optatr;	 /* list of unrecognized attributes */
   u_int8_t          nhnalen;     /* Next Hop Network Addresses Length (+) */
   struct in6_addr   gnhaddr;     /* "nexthop" address                 (+) */
   struct in6_addr   lnhaddr;     /* "nexthop" address                 (+) */
@@ -989,6 +990,7 @@ bgp_process_update(struct rpcb *bnp)
       i += PA4_LEN_AGGREGATOR;  /* specific for IPv4, so ignored. */
       break;
 
+#ifdef notyet
     case PA4_TYPE_COMMUNITY:
       /* COMMUNITY (Type Code 8) optional transitive       */
       PA4_TYPE_CODE_CHECK;
@@ -1006,6 +1008,7 @@ bgp_process_update(struct rpcb *bnp)
       }
       i += atrdatalen;
       break;
+#endif /* notyet */
 
     case PA4_TYPE_ORIGINATOR:
       /* ORIGINATOR_ID (Type Code 9) optional non-transitive       */
@@ -1426,7 +1429,7 @@ bgp_process_update(struct rpcb *bnp)
 #ifdef DEBUG_BGP
 	syslog(LOG_DEBUG,
 	       "<%s>: BGP+ RECV\t\tUnrecognized Attribute: type=%d,len=%d");
-	optatr = add_optatr(optatr, bnp, i, atrdatalen);
+	optatr = add_optatr(optatr, &bnp->rp_inpkt[k], atrdatalen);
 #endif 
       }
 
@@ -1500,7 +1503,7 @@ bgp_process_update(struct rpcb *bnp)
     asp->asp_atomagg   = aggregated;
     asp->asp_origid    = originatorid;   /* net  order      */
     asp->asp_clstr     = cll;
-    asp->asp_community = coml;
+    asp->asp_optatr    = optatr;
   }
 
   /***                     ***/

@@ -352,6 +352,7 @@ bgp_send_update(bnp, rte, headrte)
   struct rtproto   artp;
   struct rt_entry *rt;     /* return value. the last RTE which advd. */
   struct rt_entry *agg;    /* (1998/06/12) */
+  struct optatr *optatr;
 
   extern byte       outpkt[];
   extern u_int16_t  my_as_number;
@@ -914,8 +915,11 @@ bgp_send_update(bnp, rte, headrte)
   /**********   End of MP_REACH_NLRI   **********/ 
   /**********                          **********/ 
 
-
-
+  /* unrecognized but transitive path attributes */
+  for(optatr = rte->rt_aspath->asp_optatr; optatr; optatr = optatr->next) {
+    memcpy(&outpkt[i], optatr->data, optatr->len); /* XXX: boundary check */
+    i += optatr->len;
+  }
 
   /*** Total Path Attribute Length (2 octets) ***/
   nettpalen = htons(i - topa_p);
@@ -1028,7 +1032,7 @@ bgp_send_withdrawn(bnp, rte, headrte)
   outpkt[i++] =  PA4_TYPE_MPUNREACHNLRI;      /* T */
   BGP_LOG_ATTR;
 
-  i += 2; /*   Extended length (temporaly) */ /* L */
+  i += 2; /*   Extended length (temporary) */ /* L */
 
   mp_p = i;
                                               /* V */

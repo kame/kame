@@ -158,5 +158,5 @@ struct clstrlist {
 struct optatr {		/* structure for unrecognized optional attribute */
   struct optatr *next;
   int len;			/* attribute length */
-  char *data;			/* attribute data */
+  char *data;			/* attribute data(including flag and type) */
 };

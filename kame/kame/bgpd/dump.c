@@ -160,6 +160,7 @@ dump_bgp_rtable(FILE *fp, struct rt_entry *base)
 	struct aspath *ap;
 	char inetaddrstr[INET_ADDRSTRLEN];
 	extern char *origin_str[];
+	struct optatr *optatr;
 
 	while(rte) {
 		ap = rte->rt_aspath;
@@ -193,6 +194,18 @@ dump_bgp_rtable(FILE *fp, struct rt_entry *base)
 			fprintf(fp, "      "); /* more indent */
 			fprintf(fp, "Cluster list: %s\n",
 				cll2str(ap->asp_clstr));
+		}
+
+		/* unrecognized attributes */
+		if (optatr = ap->asp_optatr)
+			fprintf(fp, "      Unrecognized Attributes:");
+		for (optatr = ap->asp_optatr; optatr; optatr = optatr->next) {
+			int c = 0;
+
+			fprintf(fp, "        ");
+			for (c = 0; c < optatr->len && c < 20; c++)
+				fprintf(fp, "%02x ");
+			fputc('\n', fp);
 		}
 
 		if ((rte = rte->rt_next) == base)

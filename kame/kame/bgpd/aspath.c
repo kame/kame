@@ -375,8 +375,7 @@ free_aspath(asp)
 
   free_asseg(asp->asp_segment);
   free_clstrlist(asp->asp_clstr);
-  asp->asp_clstr = NULL;	/* redundant? */
-  asp->asp_segment = NULL;	/* ditto.. */
+  free_optatr_list(asp->asp_optatr);
 
   free(asp);
 }
@@ -445,6 +444,7 @@ aspathcpy(asp)
   memcpy(cpy, asp, sizeof(struct aspath));
   cpy->asp_clstr     = clstrlistcpy(asp->asp_clstr);
   cpy->asp_segment   = assegcpy(asp->asp_segment, asp->asp_len);
+  cpy->asp_optatr    = copy_optatr_list(asp->asp_optatr);
 
   return cpy;
 }
@@ -931,27 +931,41 @@ free_clstrlist(cll)
   return;
 }
 
-#ifdef notyet
 struct optatr *
-add_optatr(optatr, bnp, i, len)
+add_optatr(optatr, optdata, len)
 	struct optatr *optatr;
-	int i;			/* tracer */
+	char *optdata;
 	int len;
 {
 	struct optatr *newoptatr;
 
 	/* allocate memory */
-	MALLOC(newoptatr, sizeof(*newoptatr));
-	MALLOC(newoptatr->data, len);
+	MALLOC(newoptatr, struct optatr);
+	if ((newoptatr->data = malloc(len)) == NULL)
+		fatalx("malloc");
 
 	/* set values */
 	newoptatr->len = len;
-	memcpy(newoptatr->data, newoptatr->databnp->rp_inpkt[i], len);
+	memcpy(newoptatr->data, optdata, len);
+	/* set partial bit since we don't recognize the attribute */
+	newoptatr->data[0] |= PA_FLAG_PARTIAL;
 
 	/* link into the chain */
 	newoptatr->next = optatr;
 	
 	return(newoptatr);
+}
+
+struct optatr *
+copy_optatr_list(src)
+	struct optatr *src;
+{
+	struct optatr *dst = NULL;
+
+	for(; src; src = src->next)
+		dst = add_optatr(dst, src->data, src->len);
+
+	return(dst);
 }
 
 void
@@ -969,4 +983,3 @@ free_optatr_list(optatr)
 
 	return;
 }
-#endif

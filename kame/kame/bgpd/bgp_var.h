@@ -110,6 +110,13 @@ struct clstrlist *bgp_new_clstrlist __P((u_int32_t));
 void              free_clstrlist    __P((struct clstrlist *));
 
 /*
+ * unrecognized attributes
+ */
+struct optatr *add_optatr __P((struct optatr *, char *, int));
+struct optatr *copy_optatr_list __P((struct optatr *));
+void free_optatr_list __P((struct optatr *));
+
+/*
  *    search
  */
 struct rpcb     *find_peer_by_as    __P((u_int16_t));
