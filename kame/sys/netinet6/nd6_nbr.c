@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.58 2001/02/08 10:57:00 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.59 2001/02/08 16:30:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -53,7 +53,7 @@
 #endif
 #include <sys/syslog.h>
 #include <sys/queue.h>
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/callout.h>
 #elif defined(__OpenBSD__)
 #include <sys/timeout.h>
@@ -1036,12 +1036,10 @@ struct dadq {
 	int dad_ns_ocount;	/* NS sent so far */
 	int dad_ns_icount;
 	int dad_na_icount;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct callout dad_timer_ch;
 #elif defined(__OpenBSD__)
 	struct timeout dad_timer_ch;
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-	struct callout_handle dad_timer;
 #endif
 };
 
@@ -1067,7 +1065,7 @@ nd6_dad_starttimer(dp, ticks)
 	int ticks;
 {
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_reset(&dp->dad_timer_ch, ticks,
 	    (void (*) __P((void *)))nd6_dad_timer, (void *)dp->dad_ifa);
 #elif defined(__OpenBSD__)
@@ -1075,9 +1073,6 @@ nd6_dad_starttimer(dp, ticks)
 	    (void *)dp->dad_ifa);
 	timeout_add(&dp->dad_timer_ch, ticks);
 #else
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	dp->dad_timer =
-#endif
 	timeout((void (*) __P((void *)))nd6_dad_timer, (void *)dp->dad_ifa,
 	    ticks);
 #endif
@@ -1088,16 +1083,12 @@ nd6_dad_stoptimer(dp)
 	struct dadq *dp;
 {
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_stop(&dp->dad_timer_ch);
 #elif defined(__OpenBSD__)
 	timeout_del(&dp->dad_timer_ch);
 #else
-	untimeout((void (*) __P((void *)))nd6_dad_timer, (void *)dp->dad_ifa
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		, dp->dad_timer
-#endif
-		);
+	untimeout((void (*) __P((void *)))nd6_dad_timer, (void *)dp->dad_ifa);
 #endif
 }
 
@@ -1157,7 +1148,7 @@ nd6_dad_start(ifa, tick)
 		return;
 	}
 	bzero(dp, sizeof(*dp));
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_init(&dp->dad_timer_ch);
 #elif defined(__OpenBSD__)
 	bzero(&dp->dad_timer_ch, sizeof(dp->dad_timer_ch));

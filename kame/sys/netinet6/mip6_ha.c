@@ -1,4 +1,4 @@
-/*	$KAME: mip6_ha.c,v 1.14 2001/02/03 09:16:46 itojun Exp $	*/
+/*	$KAME: mip6_ha.c,v 1.15 2001/02/08 16:30:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -74,10 +74,10 @@
 
 #include <net/net_osdep.h>
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 /* Declaration of Global variables. */
-struct callout_handle  mip6_timer_ll_handle;
-#elif defined(__NetBSD__)
+#ifdef __NetBSD__
+struct callout mip6_timer_ll_ch = CALLOUT_INITIALIZER;
+#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 struct callout mip6_timer_ll_ch;
 #endif
 
@@ -102,10 +102,6 @@ struct callout mip6_timer_ll_ch;
 void
 mip6_ha_init(void)
 {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	/* Initialize handle for timer functions. */
-	callout_handle_init(&mip6_timer_ll_handle);
-#endif
 	printf("Home Agent initialized\n");
 }
 
@@ -125,10 +121,8 @@ mip6_ha_exit()
 	int                    s;
 
 	/* Cancel outstanding timeout function calls. */
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_stop(&mip6_timer_ll_ch);
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-	untimeout(mip6_timer_ll, (void *)NULL, mip6_timer_ll_handle);
 #else
 	untimeout(mip6_timer_ll, (void *)NULL);
 #endif
@@ -800,12 +794,9 @@ struct ifnet *ifp;
     splx(s);
 
     if (start_timer) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_reset(&mip6_timer_ll_ch, hz, mip6_timer_ll, NULL);
 #else
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-        mip6_timer_ll_handle =
-#endif
         timeout(mip6_timer_ll, (void *)0, hz);
 #endif
     }
@@ -855,11 +846,8 @@ struct mip6_link_list  *llp_del;    /* Link list entry to be deleted */
 
             /* Remove the timer if the BC queue is empty */
             if (mip6_llq == NULL) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		callout_stop(&mip6_timer_ll_ch);
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-                untimeout(mip6_timer_ll, (void *)NULL, mip6_timer_ll_handle);
-                callout_handle_init(&mip6_timer_ll_handle);
 #else
                 untimeout(mip6_timer_ll, (void *)NULL);
 #endif
@@ -1103,13 +1091,10 @@ void  *arg;  /* Not used */
     splx(s);
 
     if (mip6_llq != NULL) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_reset(&mip6_timer_ll_ch, hz, mip6_timer_ll, NULL);
 #else
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-        mip6_timer_ll_handle =
-#endif
-	    timeout(mip6_timer_ll, (void *)0, hz);
+	timeout(mip6_timer_ll, (void *)0, hz);
 #endif
     }
 }

@@ -1,4 +1,4 @@
-/*	$KAME: in6_prefix.c,v 1.45 2001/02/08 11:33:32 itojun Exp $	*/
+/*	$KAME: in6_prefix.c,v 1.46 2001/02/08 16:30:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -98,6 +98,8 @@ static MALLOC_DEFINE(M_RR_ADDR, "rp_addr", "IPv6 Router Renumbering Ifid");
 struct rr_prhead rr_prefix;
 
 #ifdef __NetBSD__
+struct callout in6_rr_timer_ch = CALLOUT_INITIALIZER;
+#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 struct callout in6_rr_timer_ch;
 #elif defined(__OpenBSD__)
 struct timeout in6_rr_timer_ch;
@@ -1358,7 +1360,7 @@ in6_rr_timer(void *ignored_arg)
 	long time_second = time.tv_sec;
 #endif
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_reset(&in6_rr_timer_ch, ip6_rr_prune * hz,
 	    in6_rr_timer, NULL);
 #elif defined(__OpenBSD__)

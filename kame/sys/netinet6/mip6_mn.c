@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mn.c,v 1.21 2001/02/03 09:16:46 itojun Exp $	*/
+/*	$KAME: mip6_mn.c,v 1.22 2001/02/08 16:30:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -79,11 +79,11 @@
 struct mip6_bul  *mip6_bulq = NULL;  /* First entry in Binding Update list */
 struct mip6_esm  *mip6_esmq = NULL;  /* List of event-state machines */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-struct callout_handle  mip6_timer_outqueue_handle;
-struct callout_handle  mip6_timer_bul_handle;
-struct callout_handle  mip6_timer_esm_handle;
-#elif defined(__NetBSD__)
+#ifdef __NetBSD__
+struct callout mip6_timer_outqueue_ch = CALLOUT_INITIALIZER;
+struct callout mip6_timer_bul_ch = CALLOUT_INITIALIZER;
+struct callout mip6_timer_esm_ch = CALLOUT_INITIALIZER;
+#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 struct callout mip6_timer_outqueue_ch;
 struct callout mip6_timer_bul_ch;
 struct callout mip6_timer_esm_ch;
@@ -110,12 +110,6 @@ struct callout mip6_timer_esm_ch;
 void
 mip6_mn_init(void)
 {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	/* Initialize handle for timer functions. */
-	callout_handle_init(&mip6_timer_outqueue_handle);
-	callout_handle_init(&mip6_timer_bul_handle);
-	callout_handle_init(&mip6_timer_esm_handle);
-#endif
 
 	printf("Mobile Node initialized\n");
 }
@@ -138,15 +132,10 @@ mip6_mn_exit()
 	int                  s;
 
 	/* Cancel outstanding timeout function calls. */
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_stop(&mip6_timer_outqueue_ch);
 	callout_stop(&mip6_timer_bul_ch);
 	callout_stop(&mip6_timer_esm_ch);
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-	untimeout(mip6_timer_outqueue, (void *)NULL,
-		  mip6_timer_outqueue_handle);
-	untimeout(mip6_timer_bul, (void *)NULL, mip6_timer_bul_handle);
-	untimeout(mip6_timer_esm, (void *)NULL, mip6_timer_esm_handle);
 #else
 	untimeout(mip6_timer_outqueue, (void *)NULL);
 	untimeout(mip6_timer_bul, (void *)NULL);
@@ -2019,13 +2008,10 @@ u_int8_t              hr;         /* Home registration flag */
 	s = splnet();
 	if (mip6_bulq == NULL) {
 		mip6_bulq = bulp;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		callout_reset(&mip6_timer_bul_ch, hz, mip6_timer_bul, NULL);
 #else
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		mip6_timer_bul_handle =
-#endif
-			timeout(mip6_timer_bul, (void *)0, hz);
+		timeout(mip6_timer_bul, (void *)0, hz);
 #endif
 	} else {
 		bulp->next = mip6_bulq;
@@ -2086,12 +2072,8 @@ struct mip6_bul  *bul_remove;    /* BUL entry to be deleted */
 
 			/* Remove the timer if the BUL queue is empty */
 			if (mip6_bulq == NULL) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 				callout_stop(&mip6_timer_bul_ch);
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-				untimeout(mip6_timer_bul, (void *)NULL,
-					  mip6_timer_bul_handle);
-				callout_handle_init(&mip6_timer_bul_handle);
 #else
 				untimeout(mip6_timer_bul, (void *)NULL);
 #endif
@@ -2202,13 +2184,10 @@ u_int16_t        lifetime;   /* Lifetime for event-state machine */
 	splx(s);
 
 	if (start_timer) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		callout_reset(&mip6_timer_esm_ch, hz, mip6_timer_esm, NULL);
 #else
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		mip6_timer_esm_handle =
-#endif
-			timeout(mip6_timer_esm, (void *)0, hz);
+		timeout(mip6_timer_esm, (void *)0, hz);
 #endif
 	}
 	return esp;
@@ -2266,12 +2245,8 @@ struct mip6_esm  *esm_remove;    /* Event-state machine to be deleted */
 
 			/* Remove the timer if the ESM queue is empty */
 			if (mip6_esmq == NULL) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 				callout_stop(&mip6_timer_esm_ch);
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-				untimeout(mip6_timer_esm, (void *)NULL,
-					  mip6_timer_esm_handle);
-				callout_handle_init(&mip6_timer_esm_handle);
 #else
 				untimeout(mip6_timer_esm, (void *)NULL);
 #endif
@@ -2327,15 +2302,12 @@ enum send_state     flag;      /* Flag indicating the state of the entry */
 	s = splnet();
 	if (mip6_outq == NULL) {
 		mip6_outq = outp;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		callout_reset(&mip6_timer_outqueue_ch,
 		    hz * (MIP6_OUTQ_INTERVAL/10), mip6_timer_outqueue, NULL);
 #else
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		mip6_timer_outqueue_handle =
-#endif
-			timeout(mip6_timer_outqueue, (void *)0,
-				hz * (MIP6_OUTQ_INTERVAL/10));
+		timeout(mip6_timer_outqueue, (void *)0,
+		    hz * (MIP6_OUTQ_INTERVAL/10));
 #endif
 	} else {
 		/* Add this entry as the first entry in the queue. */
@@ -2390,13 +2362,8 @@ struct mip6_output  *oqp_remove;    /* Output queue entry to be deleted */
 
 			/* Remove the timer if the output queue is empty */
 			if (mip6_outq == NULL) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 				callout_stop(&mip6_timer_outqueue_ch);
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-				untimeout(mip6_timer_outqueue, (void *)NULL,
-					  mip6_timer_outqueue_handle);
-				callout_handle_init(
-					&mip6_timer_outqueue_handle);
 #else
 				untimeout(mip6_timer_outqueue, (void *)NULL);
 #endif
@@ -2528,12 +2495,8 @@ mip6_outq_flush()
 
 		/* Remove the timer if the output queue is empty */
 		if (mip6_outq == NULL) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 			callout_stop(&mip6_timer_outqueue_ch);
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-			untimeout(mip6_timer_outqueue, (void *)NULL,
-				  mip6_timer_outqueue_handle);
-			callout_handle_init(&mip6_timer_outqueue_handle);
 #else
 			untimeout(mip6_timer_outqueue, (void *)NULL);
 #endif
@@ -2674,15 +2637,12 @@ void  *arg;  /* Not used */
 	}
 
 	if (mip6_outq != NULL) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		callout_reset(&mip6_timer_outqueue_ch,
 		    hz * (MIP6_OUTQ_INTERVAL/10), mip6_timer_outqueue, NULL);
 #else
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		mip6_timer_outqueue_handle =
-#endif
-			timeout(mip6_timer_outqueue, (void *)0,
-				hz * (MIP6_OUTQ_INTERVAL/10));
+		timeout(mip6_timer_outqueue, (void *)0,
+		    hz * (MIP6_OUTQ_INTERVAL/10));
 #endif
 	}
 }
@@ -2891,13 +2851,10 @@ void  *arg;   /* Not used */
 	}
 	
 	if (mip6_bulq != NULL) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		callout_reset(&mip6_timer_bul_ch, hz, mip6_timer_bul, NULL);
 #else
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		mip6_timer_bul_handle =
-#endif
-			timeout(mip6_timer_bul, (void *)0, hz);
+		timeout(mip6_timer_bul, (void *)0, hz);
 #endif
 	}
 	splx(s);
@@ -2949,13 +2906,10 @@ void  *arg;  /* Not used */
 	}
 	
 	if (start_timer) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		callout_reset(&mip6_timer_esm_ch, hz, mip6_timer_esm, NULL);
 #else
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		mip6_timer_esm_handle =
-#endif
-			timeout(mip6_timer_esm, (void *)0, hz);
+		timeout(mip6_timer_esm, (void *)0, hz);
 #endif
 	}
 	splx(s);

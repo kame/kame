@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.37 2001/02/08 10:57:00 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.38 2001/02/08 16:30:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -60,7 +60,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/callout.h>
 #elif defined(__OpenBSD__)
 #include <sys/timeout.h>
@@ -173,10 +173,6 @@ static mifi_t reg_mif_num = (mifi_t)-1;
 
 static struct pim6stat pim6stat;
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-static struct callout_handle expire_upcalls_ch;
-#endif
-
 /*
  * one-back cache used by ipip_input to locate a tunnel's mif
  * given a datagram's src ip address.
@@ -255,6 +251,8 @@ static int del_m6fc __P((struct mf6cctl *));
 
 #ifdef __NetBSD__
 static struct callout expire_upcalls_ch = CALLOUT_INITIALIZER;
+#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+static struct callout expire_upcalls_ch;
 #elif defined(__OpenBSD__)
 static struct timeout expire_upcalls_ch;
 #endif
@@ -523,16 +521,13 @@ ip6_mrouter_init(so, m, cmd)
 
 	pim6 = 0;/* used for stubbing out/in pim stuff */
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_reset(&expire_upcalls_ch, EXPIRE_TIMEOUT,
 	    expire_upcalls, NULL);
 #elif defined(__OpenBSD__)
 	timeout_set(&expire_upcalls_ch, expire_upcalls, NULL);
 	timeout_add(&expire_upcalls_ch, EXPIRE_TIMEOUT);
 #else
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	expire_upcalls_ch =
-#endif
 	timeout(expire_upcalls, (caddr_t)NULL, EXPIRE_TIMEOUT);
 #endif
 
@@ -600,16 +595,12 @@ ip6_mrouter_done()
 
 	pim6 = 0; /* used to stub out/in pim specific code */
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_stop(&expire_upcalls_ch);
 #elif defined(__OpenBSD__)
 	timeout_del(&expire_upcalls_ch);
 #else
-	untimeout(expire_upcalls, (caddr_t)NULL
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		  , expire_upcalls_ch
-#endif
-		  );
+	untimeout(expire_upcalls, (caddr_t)NULL);
 #endif
 
 	/*
@@ -1421,16 +1412,13 @@ expire_upcalls(unused)
 		}
 	}
 	splx(s);
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_reset(&expire_upcalls_ch, EXPIRE_TIMEOUT,
 	    expire_upcalls, NULL);
 #elif defined(__OpenBSD__)
 	timeout_set(&expire_upcalls_ch, expire_upcalls, NULL);
 	timeout_add(&expire_upcalls_ch, EXPIRE_TIMEOUT);
 #else
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	expire_upcalls_ch =
-#endif
 	timeout(expire_upcalls, (caddr_t)NULL, EXPIRE_TIMEOUT);
 #endif
 }

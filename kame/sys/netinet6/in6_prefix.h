@@ -1,4 +1,4 @@
-/*	$KAME: in6_prefix.h,v 1.9 2001/02/08 10:57:00 itojun Exp $	*/
+/*	$KAME: in6_prefix.h,v 1.10 2001/02/08 16:30:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998 and 1999 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/callout.h>
 #elif defined(__OpenBSD__)
 #include <sys/timeout.h>
@@ -90,7 +90,7 @@ LIST_HEAD(rr_prhead, rr_prefix);
 extern struct rr_prhead rr_prefix;
 
 void in6_rr_timer __P((void *));
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 extern struct callout in6_rr_timer_ch;
 #elif defined(__OpenBSD__)
 extern struct timeout in6_rr_timer_ch;

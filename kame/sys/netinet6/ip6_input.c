@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.172 2001/02/08 11:18:05 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.173 2001/02/08 16:30:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -174,7 +174,7 @@ struct ifqueue ip6intrq;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 extern struct ifnet loif[NLOOP];
 #endif
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 extern struct callout in6_tmpaddrtimer_ch;
 #elif defined(__OpenBSD__)
 extern struct timeout in6_tmpaddrtimer_ch;
@@ -363,7 +363,7 @@ ip6_init2(dummy)
 #endif
 
 	/* nd6_timer_init */
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_init(&nd6_timer_ch);
 	callout_reset(&nd6_timer_ch, hz, nd6_timer, NULL);
 #elif defined(__OpenBSD__)
@@ -375,7 +375,7 @@ ip6_init2(dummy)
 #endif
 
 	/* router renumbering prefix list maintenance */
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_init(&in6_rr_timer_ch);
 	callout_reset(&in6_rr_timer_ch, hz, in6_rr_timer, NULL);
 #elif defined(__OpenBSD__)
@@ -387,7 +387,7 @@ ip6_init2(dummy)
 #endif
 
 	/* timer for regeneranation of temporary addresses randomize ID */
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_reset(&in6_tmpaddrtimer_ch,
 		      (ip6_temp_preferred_lifetime - ip6_desync_factor -
 		       ip6_temp_regen_advance) * hz,

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.11 2001/01/28 10:10:39 itojun Exp $	*/
+/*	$KAME: mip6.h,v 1.12 2001/02/08 16:30:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -850,7 +850,7 @@ extern int mip6_release
 	__P((void));
 
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if 0
 extern struct callout_handle  mip6_timer_na_handle;
 extern struct callout_handle  mip6_timer_bc_handle;
 extern struct callout_handle  mip6_timer_outqueue_handle;

@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.107 2001/02/08 16:23:30 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.108 2001/02/08 16:30:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -83,6 +83,8 @@ int in6_linklocal_auto = 1;
 
 #ifdef __NetBSD__
 struct callout in6_tmpaddrtimer_ch = CALLOUT_INITIALIZER;
+#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+struct callout in6_tmpaddrtimer_ch;
 #elif defined(__OpenBSD__)
 struct timeout in6_tmpaddrtimer_ch;
 #endif
@@ -1180,7 +1182,7 @@ in6_tmpaddrtimer(ignored_arg)
 	int s = splnet();
 #endif
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_reset(&in6_tmpaddrtimer_ch,
 		      (ip6_temp_preferred_lifetime - ip6_desync_factor -
 		       ip6_temp_regen_advance) * hz,

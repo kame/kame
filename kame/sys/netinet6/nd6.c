@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.118 2001/02/08 12:14:33 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.119 2001/02/08 16:30:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -47,7 +47,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/callout.h>
 #elif defined(__OpenBSD__)
 #include <sys/timeout.h>
@@ -159,6 +159,10 @@ void (*mip6_expired_defrouter_hook)(struct nd_defrouter *dr) = 0;
 struct callout nd6_slowtimo_ch = CALLOUT_INITIALIZER;
 struct callout nd6_timer_ch = CALLOUT_INITIALIZER;
 extern struct callout in6_tmpaddrtimer_ch;
+#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+struct callout nd6_slowtimo_ch;
+struct callout nd6_timer_ch;
+extern struct callout in6_tmpaddrtimer_ch;
 #elif defined(__OpenBSD__)
 struct timeout nd6_slowtimo_ch;
 struct timeout nd6_timer_ch;
@@ -187,7 +191,7 @@ nd6_init()
 	nd6_init_done = 1;
 
 	/* start timer */
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_reset(&nd6_slowtimo_ch, ND6_SLOWTIMER_INTERVAL * hz,
 	    nd6_slowtimo, NULL);
 #elif defined(__OpenBSD__)
@@ -483,7 +487,7 @@ nd6_timer(ignored_arg)
 #endif
 #ifdef MIP6
 	if (MIP6_EAGER_PREFIX) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		callout_reset(&nd6_timer_ch, nd6_prune * hz / MIP6_EAGER_FREQ,
 		    nd6_timer, NULL);
 #elif defined(__OpenBSD__)
@@ -495,7 +499,7 @@ nd6_timer(ignored_arg)
 #endif
 	} else
 #endif
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_reset(&nd6_timer_ch, nd6_prune * hz,
 		      nd6_timer, NULL);
 #elif defined(__OpenBSD__)
@@ -1997,7 +2001,7 @@ nd6_slowtimo(ignored_arg)
 	int i;
 	struct nd_ifinfo *nd6if;
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_reset(&nd6_slowtimo_ch, ND6_SLOWTIMER_INTERVAL * hz,
 	    nd6_slowtimo, NULL);
 #elif defined(__OpenBSD__)

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.36 2001/02/03 09:16:46 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.37 2001/02/08 16:30:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -124,11 +124,11 @@ u_int8_t mip6_module = 0;               /* Info about loaded modules */
 extern struct ip6protosw mip6_tunnel_protosw;
 
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-struct callout_handle  mip6_timer_na_handle;
-struct callout_handle  mip6_timer_bc_handle;
-struct callout_handle  mip6_timer_prefix_handle;
-#elif defined(__NetBSD__)
+#ifdef __NetBSD__
+struct callout mip6_timer_na_ch = CALLOUT_INITIALIZER;
+struct callout mip6_timer_bc_ch = CALLOUT_INITIALIZER;
+struct callout mip6_timer_prefix_ch = CALLOUT_INITIALIZER;
+#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 struct callout mip6_timer_na_ch;
 struct callout mip6_timer_bc_ch;
 struct callout mip6_timer_prefix_ch;
@@ -188,13 +188,6 @@ mip6_init(void)
 	in6addr_aha_nn.s6_addr32[2] = 0xffffffff;
 	in6addr_aha_nn.s6_addr32[3] = MIP6_ADDR_INT32_AHA1;
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-	/* Initialize handle for timer functions. */
-	callout_handle_init(&mip6_timer_na_handle);
-	callout_handle_init(&mip6_timer_bc_handle);
-	callout_handle_init(&mip6_timer_prefix_handle);
-#endif
-
 	/* Initialize global variable */
 	bzero(&mip6_config, sizeof(struct mip6_config));
 
@@ -231,14 +224,10 @@ mip6_exit()
 	int                 s;
 
 	/* Cancel outstanding timeout function calls. */
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	callout_stop(&mip6_timer_na_ch);
 	callout_stop(&mip6_timer_bc_ch);
 	callout_stop(&mip6_timer_prefix_ch);
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-	untimeout(mip6_timer_na, (void *)NULL, mip6_timer_na_handle);
-	untimeout(mip6_timer_bc, (void *)NULL , mip6_timer_bc_handle);
-	untimeout(mip6_timer_prefix, (void *)NULL, mip6_timer_prefix_handle);
 #else
 	untimeout(mip6_timer_na, (void *)NULL);
 	untimeout(mip6_timer_bc, (void *)NULL);
@@ -2068,13 +2057,10 @@ u_int16_t        seqno;       /* Sequence number in the received BU */
 	s = splnet();
 	if (mip6_bcq == NULL) {
 		mip6_bcq = bcp;
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		callout_reset(&mip6_timer_bc_ch, hz, mip6_timer_bc, NULL);
 #else
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		mip6_timer_bc_handle =
-#endif
-			timeout(mip6_timer_bc, (void *)0, hz);
+		timeout(mip6_timer_bc, (void *)0, hz);
 #endif
 	} else {
 		bcp->next = mip6_bcq;
@@ -2228,12 +2214,8 @@ struct mip6_bc **bcp_nxt;  /* Returns next entry in the list */
 
 		/* Remove the timer if the BC queue is empty */
 		if (mip6_bcq == NULL) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 			callout_stop(&mip6_timer_bc_ch);
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-			untimeout(mip6_timer_bc, (void *)NULL,
-				  mip6_timer_bc_handle);
-			callout_handle_init(&mip6_timer_bc_handle);
 #else
 			untimeout(mip6_timer_bc, (void *)NULL);
 #endif
@@ -2376,13 +2358,10 @@ int              use_link_opt;  /* Include Target link layer address option or
 	mip6_send_na(nap);
 
 	if (start_timer) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		callout_reset(&mip6_timer_na_ch, hz, mip6_timer_na, NULL);
 #else
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		mip6_timer_na_handle =
-#endif
-			timeout(mip6_timer_na, (void *)0, hz);
+		timeout(mip6_timer_na, (void *)0, hz);
 #endif
 	}
 	return nap;
@@ -2425,12 +2404,8 @@ struct mip6_na  *nap_del;  /* Pointer to NA entry to delete */
 
 			/* Remove the timer if the NA queue is empty */
 			if (mip6_naq == NULL) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 				callout_stop(&mip6_timer_na_ch);
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-				untimeout(mip6_timer_na, (void *)NULL,
-					  mip6_timer_na_handle);
-				callout_handle_init(&mip6_timer_na_handle);
 #else
 				untimeout(mip6_timer_na, (void *)NULL);
 #endif
@@ -2513,14 +2488,11 @@ u_int32_t         valid_time;  /* Time (s) that the prefix is valid */
 #endif
 
 	if (start_timer) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		callout_reset(&mip6_timer_prefix_ch, hz, mip6_timer_prefix,
 		    NULL);
 #else
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		mip6_timer_prefix_handle =
-#endif
-			timeout(mip6_timer_prefix, (void *)0, hz);
+		timeout(mip6_timer_prefix, (void *)0, hz);
 #endif
 	}
 	return pq;
@@ -2563,12 +2535,8 @@ struct mip6_prefix  *pre_del;    /* Prefix list entry to be deleted */
 
 			/* Remove the timer if the prefix queue is empty */
 			if (mip6_pq == NULL) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 				callout_stop(&mip6_timer_prefix_ch);
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-				untimeout(mip6_timer_prefix, (void *)NULL,
-					  mip6_timer_prefix_handle);
-				callout_handle_init(&mip6_timer_prefix_handle);
 #else
 				untimeout(mip6_timer_prefix, (void *)NULL);
 #endif
@@ -2621,13 +2589,10 @@ void  *arg;  /* Not used */
 	splx(s);
 
 	if (mip6_naq != NULL) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		callout_reset(&mip6_timer_na_ch, hz, mip6_timer_na, NULL);
 #else
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		mip6_timer_na_handle =
-#endif
-			timeout(mip6_timer_na, (void *)0, hz);
+		timeout(mip6_timer_na, (void *)0, hz);
 #endif
 	}
 }
@@ -2669,13 +2634,10 @@ void  *arg;  /* Not used */
 	/* We have to send a BR when the mip6_bc.lifetime ==
 	   mip6_bc.bc_info.br_interval. */
 	if (mip6_bcq != NULL) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		callout_reset(&mip6_timer_bc_ch, hz, mip6_timer_bc, NULL);
 #else
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		mip6_timer_bc_handle =
-#endif
-			timeout(mip6_timer_bc, (void *)0, hz);
+		timeout(mip6_timer_bc, (void *)0, hz);
 #endif
 	}
 	return;
@@ -2710,14 +2672,11 @@ void  *arg;  /* Not used */
 	splx(s);
 
 	if (mip6_pq != NULL) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		callout_reset(&mip6_timer_prefix_ch, hz, mip6_timer_prefix,
 		    NULL);
 #else
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-		mip6_timer_prefix_handle =
-#endif
-			timeout(mip6_timer_prefix, (void *)0, hz);
+		timeout(mip6_timer_prefix, (void *)0, hz);
 #endif
 	}
 	return;

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.46 2001/02/08 10:57:00 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.47 2001/02/08 16:30:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -38,7 +38,7 @@
 #endif
 
 #include <sys/queue.h>
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/callout.h>
 #elif defined(__OpenBSD__)
 #include <sys/timeout.h>
@@ -269,7 +269,7 @@ extern int nd6_debug;
 
 #define nd6log(x)	do { if (nd6_debug) log x; } while (0)
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 extern struct callout nd6_timer_ch;
 #elif defined(__OpenBSD__)
 extern struct timeout nd6_timer_ch;
