@@ -2504,6 +2504,7 @@ tn(argc, argv)
 		strcpy(hbuf, "(invalid)");
 	    }
 	    fprintf(stderr, "telnet: connect to address %s: ", hbuf);
+	    perror("");
 
 	    close(net);
 	    net = -1;
