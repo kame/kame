@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.117 2003/10/31 04:40:21 ono Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.118 2003/11/03 00:52:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -142,7 +142,6 @@ udp6_input(mp, offp, proto)
 	struct in6pcb *in6p;
 	int off = *offp;
 	u_int32_t plen, ulen;
-	struct ip6_recvpktopts opts;
 	struct sockaddr_in6 src, dst, fromsa;
 
 	ip6 = mtod(m, struct ip6_hdr *);
