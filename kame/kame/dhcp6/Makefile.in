@@ -1,5 +1,5 @@
 #
-# $Id: Makefile.in,v 1.6 2000/04/17 13:31:43 jinmei Exp $
+# $Id: Makefile.in,v 1.7 2000/04/18 02:38:30 jinmei Exp $
 #
 
 srcdir=	@srcdir@
@@ -41,6 +41,7 @@ install::
 	$(INSTALL_PROGRAM) -s -o bin -g bin $(TARGET) $(sbindir)
 	$(INSTALL_DATA) -o bin -g bin dhcp6c.8 $(mandir)/man8
 	$(INSTALL_DATA) -o bin -g bin dhcp6s.8 $(mandir)/man8
+	$(INSTALL_DATA) -o bin -g bin dhcp6relay.8 $(mandir)/man8
 
 includes::
 
