@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1513 2001/01/27 07:11:45 jinmei Exp $
+$KAME: CHANGELOG,v 1.1514 2001/01/27 07:12:26 jinmei Exp $
 
 <200101>
 2001-01-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -8,7 +8,7 @@ $KAME: CHANGELOG,v 1.1513 2001/01/27 07:11:45 jinmei Exp $
 	EAI_NODATA according to the rfc2553bis-02 draft.
 	* {bsdi3, freebsd4, netbsd, openbsd}/include/netdb.h:
 	* bsdi4/contrib/bind/src/include/netdb.h:
-	removed the definition of the obsoleted error types. In order to
+	removed the definition of the obsoleted error types.  In order to
 	minimize the possibility of binary compatibily breakage, we did
 	not reorder the error number sequence.
 
