@@ -30,7 +30,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.13 2000/09/23 04:43:26 itojun Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.14 2000/10/04 03:51:37 itojun Exp $ (LBL)";
 #endif
 
 #include <string.h>
@@ -94,6 +94,8 @@ static u_char *isakmp_d_print __P((struct isakmp_gen *, u_char *, u_int32_t,
 	u_int32_t, u_int32_t));
 static u_char *isakmp_vid_print __P((struct isakmp_gen *, u_char *, u_int32_t,
 	u_int32_t, u_int32_t));
+static u_char *isakmp_gsstoken_print __P((struct isakmp_gen *, u_char *,
+	u_int32_t, u_int32_t, u_int32_t));
 static u_char *isakmp_sub0_print __P((u_char, struct isakmp_gen *, u_char *,
 	u_int32_t, u_int32_t, u_int32_t));
 static u_char *isakmp_sub_print __P((u_char, struct isakmp_gen *, u_char *,
@@ -115,27 +117,54 @@ static char *protoidstr[] = {
 
 /* isakmp->np */
 static char *npstr[] = {
-	"none", "sa", "p", "t", "ke", "id", "cert", "cr", "hash",
-	"sig", "nonce", "n", "d", "vid"
+/*0*/	NULL, "sa", "p", "t", "ke", "id", "cert", "cr", "hash", "sig",
+/*10*/	"nonce", "n", "d", "vid", NULL,
+/*15*/	NULL, NULL, NULL, NULL, NULL,
+/*20*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*40*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*60*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*80*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*100*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*120*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*129*/	"gssapi-token"
 };
 
 /* isakmp->np */
 static u_char *(*npfunc[]) __P((struct isakmp_gen *, u_char *, u_int32_t,
 		u_int32_t, u_int32_t)) = {
-	NULL,
+/*0*/	NULL,
 	isakmp_sa_print,
 	isakmp_p_print,
 	isakmp_t_print,
 	isakmp_ke_print,
-	isakmp_id_print,
+/*5*/	isakmp_id_print,
 	isakmp_cert_print,
 	isakmp_cr_print,
 	isakmp_hash_print,
 	isakmp_sig_print,
-	isakmp_nonce_print,
+/*10*/	isakmp_nonce_print,
 	isakmp_n_print,
 	isakmp_d_print,
 	isakmp_vid_print,
+	NULL,
+/*15*/	NULL, NULL, NULL, NULL, NULL,
+/*20*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*40*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*60*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*80*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*100*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*120*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*129*/	isakmp_gsstoken_print
 };
 
 /* isakmp->etype */
@@ -326,6 +355,7 @@ rawprint(caddr_t loc, size_t len)
 }
 
 struct attrmap {
+	u_int32_t index;
 	char *type;
 	int nvalue;
 	char *value[30];	/*XXX*/
@@ -348,17 +378,27 @@ isakmp_attrmap_print(u_char *p, u_char *ep, struct attrmap *map, size_t nmap)
 		return ep + 1;
 	}
 
+	if (map) {
+		while (map->type) {
+			if (map->index == t)
+				break;
+			map++;
+		}
+		if (!map->type)
+			map = NULL;
+	}
+
 	printf("(");
 	t = ntohs(q[0]) & 0x7fff;
-	if (map && t < nmap && map[t].type)
-		printf("type=%s ", map[t].type);
+	if (map && map->type)
+		printf("type=%s ", map->type);
 	else
 		printf("type=#%d ", t);
 	if (p[0] & 0x80) {
 		printf("value=");
 		v = ntohs(q[1]);
-		if (map && t < nmap && v < map[t].nvalue && map[t].value[v])
-			printf("%s", map[t].value[v]);
+		if (map && t < nmap && v < map->nvalue && map->value[v])
+			printf("%s", map->value[v]);
 		else
 			rawprint((caddr_t)&q[1], 2);
 	} else {
@@ -492,41 +532,42 @@ static char *ipcomp_p_map[] = {
 };
 
 struct attrmap ipsec_t_map[] = {
-	{ NULL,	0, },
-	{ "lifetype", 3, { NULL, "sec", "kb", }, },
-	{ "life", 0, },
-	{ "group desc", 5,	{ NULL, "modp768", "modp1024", "EC2N 2^155",
+	{ 1, "lifetype", 3, { NULL, "sec", "kb", }, },
+	{ 2, "life", 0, },
+	{ 3, "group desc", 5,	{ NULL, "modp768", "modp1024", "EC2N 2^155",
 				  "EC2N 2^185", }, },
-	{ "enc mode", 3, { NULL, "tunnel", "transport", }, },
-	{ "auth", 5, { NULL, "hmac-md5", "hmac-sha1", "1des-mac", "keyed", }, },
-	{ "keylen", 0, },
-	{ "rounds", 0, },
-	{ "dictsize", 0, },
-	{ "privalg", 0, },
+	{ 4, "enc mode", 3, { NULL, "tunnel", "transport", }, },
+	{ 5, "auth", 5, { NULL, "hmac-md5", "hmac-sha1", "1des-mac", "keyed", }, },
+	{ 6, "keylen", 0, },
+	{ 7, "rounds", 0, },
+	{ 8, "dictsize", 0, },
+	{ 9, "privalg", 0, },
+	{ 0, NULL, 0 },	/*termination*/
 };
 
 struct attrmap oakley_t_map[] = {
-	{ NULL,	0 },
-	{ "enc", 8,	{ NULL, "1des", "idea", "blowfish", "rc5",
+	{ 1, "enc", 8,	{ NULL, "1des", "idea", "blowfish", "rc5",
 		 	  "3des", "cast", "aes", }, },
-	{ "hash", 7,	{ NULL, "md5", "sha1", "tiger",
+	{ 2, "hash", 7,	{ NULL, "md5", "sha1", "tiger",
 			  "sha2-256", "sha2-384", "sha2-512", }, },
-	{ "auth", 6,	{ NULL, "preshared", "dss", "rsa sig", "rsa enc",
+	{ 3, "auth", 6,	{ NULL, "preshared", "dss", "rsa sig", "rsa enc",
 			  "rsa enc revised", }, },
-	{ "group desc", 5,	{ NULL, "modp768", "modp1024", "EC2N 2^155",
+	{ 4, "group desc", 5,	{ NULL, "modp768", "modp1024", "EC2N 2^155",
 				  "EC2N 2^185", }, },
-	{ "group type", 4,	{ NULL, "MODP", "ECP", "EC2N", }, },
-	{ "group prime", 0, },
-	{ "group gen1", 0, },
-	{ "group gen2", 0, },
-	{ "group curve A", 0, },
-	{ "group curve B", 0, },
-	{ "lifetype", 3,	{ NULL, "sec", "kb", }, },
-	{ "lifeduration", 0, },
-	{ "prf", 0, },
-	{ "keylen", 0, },
-	{ "field", 0, },
-	{ "order", 0, },
+	{ 5, "group type", 4,	{ NULL, "MODP", "ECP", "EC2N", }, },
+	{ 6, "group prime", 0, },
+	{ 7, "group gen1", 0, },
+	{ 8, "group gen2", 0, },
+	{ 9, "group curve A", 0, },
+	{ 10, "group curve B", 0, },
+	{ 11, "lifetype", 3,	{ NULL, "sec", "kb", }, },
+	{ 12, "lifeduration", 0, },
+	{ 13, "prf", 0, },
+	{ 14, "keylen", 0, },
+	{ 15, "field", 0, },
+	{ 16, "order", 0, },
+	{ 16384, "gss-identity", 0, },
+	{ 0, NULL, 0 },	/*termination*/
 };
 
 static u_char *
@@ -981,6 +1022,24 @@ isakmp_vid_print(struct isakmp_gen *ext, u_char *ep, u_int32_t phase,
 	if (2 < vflag && 4 < ntohs(ext->len)) {
 		printf(" ");
 		rawprint((caddr_t)(ext + 1), ntohs(ext->len) - 4);
+	}
+	return (u_char *)ext + ntohs(ext->len);
+}
+
+static u_char *
+isakmp_gsstoken_print(struct isakmp_gen *ext, u_char *ep, u_int32_t phase,
+	u_int32_t doi, u_int32_t proto)
+{
+	u_int8_t *p;
+
+	printf("%s:", NPSTR(ISAKMP_NPTYPE_GSS));
+
+	printf(" len=%d", ntohs(ext->len) - 4);
+	if (2 < vflag && 5 < ntohs(ext->len)) {
+		p = (u_int8_t *)(ext + 1);
+		printf(" vendor=0x%x", *p);
+		printf(" ");
+		rawprint(p + 1, ntohs(ext->len) - 5);
 	}
 	return (u_char *)ext + ntohs(ext->len);
 }

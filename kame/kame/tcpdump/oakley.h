@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.h,v 1.1.2.2.4.1 1999/02/12 08:10:03 sumikawa Exp $ */
+/* YIPS @(#)$Id: oakley.h,v 1.1.1.1 1999/08/08 23:32:01 itojun Exp $ */
 
 /* refer to RFC 2409 */
 
@@ -51,6 +51,9 @@
 #define   OAKLEY_ATTR_AUTH_METHOD_RSA           3
 #define   OAKLEY_ATTR_AUTH_METHOD_RSAENC        4
 #define   OAKLEY_ATTR_AUTH_METHOD_RSAREV        5
+#define   OAKLEY_ATTR_AUTH_METHOD_EGENC         6
+#define   OAKLEY_ATTR_AUTH_METHOD_EGREV         7
+#define   OAKLEY_ATTR_AUTH_METHOD_GSSAPI_KRB    65001
 #define OAKLEY_ATTR_GRP_DESC                  4 /* B */
 #define   OAKLEY_ATTR_GRP_DESC_MODP768          1
 #define   OAKLEY_ATTR_GRP_DESC_MODP1024         2
@@ -75,6 +78,8 @@
 #define OAKLEY_ATTR_KEY_LEN                  14 /* B */
 #define OAKLEY_ATTR_FIELD_SIZE               15 /* B */
 #define OAKLEY_ATTR_GRP_ORDER                16 /* V */
+#define OAKLEY_ATTR_BLOCK_SIZE               17 /* B */
+#define OAKLEY_ATTR_GSS_ID                   16384 /* B/V */
 
 #define OAKLEY_ID_IPV4_ADDR          0
 #define OAKLEY_ID_IPV4_ADDR_SUBNET   1
