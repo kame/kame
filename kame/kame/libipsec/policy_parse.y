@@ -1,4 +1,5 @@
-/*	$KAME: policy_parse.y,v 1.21 2003/12/12 08:01:26 itojun Exp $	*/
+/*	$NetBSD: policy_parse.y,v 1.14 2003/11/23 08:33:13 itojun Exp $	*/
+/*	$KAME: policy_parse.y,v 1.22 2004/06/18 17:42:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -39,11 +40,16 @@
  *
  * The following requests are accepted as <requests>:
  *
+ * old syntax:
  *	protocol/mode/src-dst/level
  *	protocol/mode/src-dst		parsed as protocol/mode/src-dst/default
  *	protocol/mode/src-dst/		parsed as protocol/mode/src-dst/default
  *	protocol/transport		parsed as protocol/mode/any-any/default
  *	protocol/transport//level	parsed as protocol/mode/any-any/level
+ *
+ * new syntax:
+ *	protocol/level			(everything is transport mode)
+ *	encap/src-dst			(encapsulation)
  *
  * You can concatenate these requests with either ' '(single space) or '\n'.
  */
@@ -63,27 +69,21 @@
 
 #include "ipsec_strerror.h"
 
-#define ATOX(c) \
-  (isdigit(c) ? (c - '0') : (isupper(c) ? (c - 'A' + 10) : (c - 'a' + 10) ))
-
 static u_int8_t *pbuf = NULL;		/* sadb_x_policy buffer */
 static int tlen = 0;			/* total length of pbuf */
 static int offset = 0;			/* offset of pbuf */
-static int p_dir, p_type, p_protocol, p_mode, p_level, p_reqid;
-static struct sockaddr *p_src = NULL;
-static struct sockaddr *p_dst = NULL;
 
 struct _val;
-extern void yyerror __P((char *msg));
-static struct sockaddr *parse_sockaddr __P((struct _val *buf));
+extern void yyerror __P((char *));
+static struct sockaddr *parse_sockaddr __P((struct _val *));
 static int rule_check __P((void));
-static int init_x_policy __P((void));
-static int set_x_request __P((struct sockaddr *src, struct sockaddr *dst));
-static int set_sockaddr __P((struct sockaddr *addr));
-static void policy_parse_request_init __P((void));
-static caddr_t policy_parse __P((char *msg, int msglen));
+static int set_x_request __P((int, int, struct sockaddr *, struct sockaddr *,
+	int, int));
+static int init_x_policy __P((int, int));
+static int set_sockaddr __P((struct sockaddr *));
+static caddr_t policy_parse __P((char *, int));
 
-extern void __policy__strbuffer__init__ __P((char *msg));
+extern void __policy__strbuffer__init__ __P((char *));
 extern void __policy__strbuffer__free__ __P((void));
 extern int yyparse __P((void));
 extern int yylex __P((void));
@@ -93,117 +93,182 @@ extern char *__libyytext;	/*XXX*/
 %}
 
 %union {
-	u_int num;
-	struct _val {
+	int num;
+	struct {
+		int level;
+		int reqid;
+	} level;
+	struct _val{
 		int len;
 		char *buf;
 	} val;
+	struct sockaddr_storage addr;
+	struct {
+		struct sockaddr_storage src;
+		struct sockaddr_storage dst;
+	} addrrange;
 }
 
-%token DIR ACTION PROTOCOL MODE LEVEL LEVEL_SPECIFY
+%token DIR ACTION
 %token IPADDRESS
 %token ME ANY
 %token SLASH HYPHEN
-%type <num> DIR ACTION PROTOCOL MODE LEVEL
-%type <val> IPADDRESS LEVEL_SPECIFY
+%type <level> level level_specify
+%type <num> DIR ACTION protocol mode PROTOCOL MODE LEVEL
+%type <val> LEVEL_SPECIFY IPADDRESS
+%type <addr> address
+%type <addrrange> addresses
 
 %%
 policy_spec
 	:	DIR ACTION
 		{
-			p_dir = $1;
-			p_type = $2;
-
-			if (init_x_policy())
-				return -1;
+			if ($2 != IPSEC_POLICY_IPSEC) {
+				__ipsec_errcode = EIPSEC_INVAL_ARGUMENT;
+				return (-1);
+			}
+			if (init_x_policy($1, $2))
+				return (-1);
 		}
 		rules
+	|	DIR ACTION
+		{
+			if ($2 == IPSEC_POLICY_IPSEC) {
+				__ipsec_errcode = EIPSEC_INVAL_ARGUMENT;
+				return (-1);
+			}
+		}
 	|	DIR
 		{
-			p_dir = $1;
-			p_type = 0;	/* ignored it by kernel */
-
-			if (init_x_policy())
-				return -1;
+			if (init_x_policy($1, 0))
+				return (-1);
 		}
 	;
 
 rules
-	:	/*NOTHING*/
-	|	rules rule {
-			if (rule_check() < 0)
-				return -1;
-
-			if (set_x_request(p_src, p_dst) < 0)
-				return -1;
-
-			policy_parse_request_init();
-		}
+	:	rules rule
+	|	rule
 	;
 
 rule
-	:	protocol SLASH mode SLASH addresses SLASH level
-	|	protocol SLASH mode SLASH addresses SLASH
-	|	protocol SLASH mode SLASH addresses
-	|	protocol SLASH mode SLASH
-	|	protocol SLASH mode SLASH SLASH level
-	|	protocol SLASH mode
+	:	protocol SLASH mode SLASH addresses SLASH level {
+			if (set_x_request($1, $3, (struct sockaddr *)&$5.src,
+			    (struct sockaddr *)&$5.dst, $7.level, $7.reqid) < 0)
+				return (-1);
+		}
+	|	protocol SLASH mode SLASH addresses SLASH {
+			if (set_x_request($1, $3, (struct sockaddr *)&$5.src,
+			    (struct sockaddr *)&$5.dst,
+			    IPSEC_LEVEL_DEFAULT, 0) < 0)
+				return (-1);
+		}
+	|	protocol SLASH mode SLASH addresses {
+			if (set_x_request($1, $3, (struct sockaddr *)&$5.src,
+			    (struct sockaddr *)&$5.dst,
+			    IPSEC_LEVEL_DEFAULT, 0) < 0)
+				return (-1);
+		}
+	|	protocol SLASH mode SLASH {
+			if ($3 == IPSEC_MODE_TUNNEL) {
+				__ipsec_errcode = EIPSEC_INVAL_MODE;
+				return (-1);
+			}
+			if (set_x_request($1, $3, NULL, NULL,
+			    IPSEC_LEVEL_DEFAULT, 0) < 0)
+				return (-1);
+		}
+	|	protocol SLASH mode SLASH SLASH level {
+			if ($3 == IPSEC_MODE_TUNNEL) {
+				__ipsec_errcode = EIPSEC_INVAL_MODE;
+				return (-1);
+			}
+			if (set_x_request($1, $3, NULL, NULL, $6.level,
+			    $6.reqid) < 0)
+				return (-1);
+		}
+	|	protocol SLASH mode {
+			if ($3 == IPSEC_MODE_TUNNEL) {
+				__ipsec_errcode = EIPSEC_INVAL_MODE;
+				return (-1);
+			}
+			if (set_x_request($1, $3, NULL, NULL,
+			    IPSEC_LEVEL_DEFAULT, 0) < 0)
+				return (-1);
+		}
+		/* new syntax */
+	|	protocol SLASH level {
+			if (set_x_request($1, IPSEC_MODE_TRANSPORT, NULL, NULL,
+			    $3.level, $3.reqid) < 0)
+				return (-1);
+		}
+	|	ENCAP SLASH addresses {
+			int proto;
+
+			switch ($3.src.ss_family) {
+			case AF_INET:
+				proto = IPPROTO_IPV4;
+				break;
+			case AF_INET6:
+				proto = IPPROTO_IPV6;
+				break;
+			default:
+				__ipsec_errcode = EIPSEC_INVAL_FAMILY;
+				return (-1);
+			}
+			if (set_x_request(proto, IPSEC_MODE_TUNNEL,
+			    (struct sockaddr *)&$3.src,
+			    (struct sockaddr *)&$3.dst,
+			    IPSEC_LEVEL_REQUIRE, 0) < 0)
+				return (-1);
+		}
 	|	protocol SLASH {
 			__ipsec_errcode = EIPSEC_FEW_ARGUMENTS;
-			return -1;
+			return (-1);
 		}
 	|	protocol {
 			__ipsec_errcode = EIPSEC_FEW_ARGUMENTS;
-			return -1;
+			return (-1);
 		}
 	;
 
 protocol
-	:	PROTOCOL { p_protocol = $1; }
+	:	PROTOCOL { $$ = $1; }
 	;
 
 mode
-	:	MODE { p_mode = $1; }
+	:	MODE { $$ = $1; }
 	;
 
 level
 	:	LEVEL {
-			p_level = $1;
-			p_reqid = 0;
+			$$.level = $1;
+			$$.reqid = 0;
 		}
 	|	LEVEL_SPECIFY {
-			p_level = IPSEC_LEVEL_UNIQUE;
-			p_reqid = atol($1.buf);	/* atol() is good. */
+			$$.level = IPSEC_LEVEL_UNIQUE;
+			$$.reqid = atol($1.buf);	/* atol() is good. */
 		}
 	;
 
-addresses
+address
 	:	IPADDRESS {
-			p_src = parse_sockaddr(&$1);
-			if (p_src == NULL)
-				return -1;
+			struct sockaddr *sa;
+
+			sa = parse_sockaddr(&$1);
+			if (!sa || sa->sa_len > sizeof($$))
+				return (-1);
+			memcpy(&$$, sa, sa->sa_len);
 		}
-		HYPHEN
-		IPADDRESS {
-			p_dst = parse_sockaddr(&$4);
-			if (p_dst == NULL)
-				return -1;
-		}
-	|	ME HYPHEN ANY {
-			if (p_dir != IPSEC_DIR_OUTBOUND) {
-				__ipsec_errcode = EIPSEC_INVAL_DIR;
-				return -1;
+
+addresses
+	:	address HYPHEN address {
+			if ($1.ss_family != $3.ss_family) {
+				__ipsec_errcode = EIPSEC_FAMILY_MISMATCH;
+				return (-1);
 			}
+			$$.src = $1;
+			$$.dst = $3;
 		}
-	|	ANY HYPHEN ME {
-			if (p_dir != IPSEC_DIR_INBOUND) {
-				__ipsec_errcode = EIPSEC_INVAL_DIR;
-				return -1;
-			}
-		}
-		/*
-	|	ME HYPHEN ME
-		*/
 	;
 
 %%
@@ -258,38 +323,9 @@ parse_sockaddr(buf)
 }
 
 static int
-rule_check()
-{
-	if (p_type == IPSEC_POLICY_IPSEC) {
-		if (p_protocol == IPPROTO_IP) {
-			__ipsec_errcode = EIPSEC_NO_PROTO;
-			return -1;
-		}
-
-		if (p_mode != IPSEC_MODE_TRANSPORT
-		 && p_mode != IPSEC_MODE_TUNNEL) {
-			__ipsec_errcode = EIPSEC_INVAL_MODE;
-			return -1;
-		}
-
-		if (p_src == NULL && p_dst == NULL) {
-			 if (p_mode != IPSEC_MODE_TRANSPORT) {
-				__ipsec_errcode = EIPSEC_INVAL_ADDRESS;
-				return -1;
-			}
-		}
-		else if (p_src->sa_family != p_dst->sa_family) {
-			__ipsec_errcode = EIPSEC_FAMILY_MISMATCH;
-			return -1;
-		}
-	}
-
-	__ipsec_errcode = EIPSEC_NO_ERROR;
-	return 0;
-}
-
-static int
-init_x_policy()
+init_x_policy(dir, action)
+	int dir;
+	int action;
 {
 	struct sadb_x_policy *p;
 
@@ -300,7 +336,7 @@ init_x_policy()
 	pbuf = malloc(sizeof(struct sadb_x_policy));
 	if (pbuf == NULL) {
 		__ipsec_errcode = EIPSEC_NO_BUFS;
-		return -1;
+		return (-1);
 	}
 	tlen = sizeof(struct sadb_x_policy);
 
@@ -308,8 +344,8 @@ init_x_policy()
 	p = (struct sadb_x_policy *)pbuf;
 	p->sadb_x_policy_len = 0;	/* must update later */
 	p->sadb_x_policy_exttype = SADB_X_EXT_POLICY;
-	p->sadb_x_policy_type = p_type;
-	p->sadb_x_policy_dir = p_dir;
+	p->sadb_x_policy_type = action;
+	p->sadb_x_policy_dir = dir;
 	p->sadb_x_policy_id = 0;
 
 	offset = tlen;
@@ -319,34 +355,34 @@ init_x_policy()
 }
 
 static int
-set_x_request(src, dst)
+set_x_request(protocol, mode, src, dst, level, reqid)
+	int protocol;
+	int mode;
 	struct sockaddr *src, *dst;
 {
 	struct sadb_x_ipsecrequest *p;
 	int reqlen;
 	caddr_t n;
 
-	reqlen = sizeof(*p)
-		+ (src ? src->sa_len : 0)
-		+ (dst ? dst->sa_len : 0);
+	reqlen = sizeof(*p) + (src ? src->sa_len : 0) + (dst ? dst->sa_len : 0);
 
 	n = realloc(pbuf, tlen + reqlen);
 	if (n == NULL) {
 		__ipsec_errcode = EIPSEC_NO_BUFS;
-		return -1;
+		return (-1);
 	}
 	tlen += reqlen;
 	pbuf = n;
 	p = (struct sadb_x_ipsecrequest *)&pbuf[offset];
 	p->sadb_x_ipsecrequest_len = reqlen;
-	p->sadb_x_ipsecrequest_proto = p_protocol;
-	p->sadb_x_ipsecrequest_mode = p_mode;
-	p->sadb_x_ipsecrequest_level = p_level;
-	p->sadb_x_ipsecrequest_reqid = p_reqid;
+	p->sadb_x_ipsecrequest_proto = protocol;
+	p->sadb_x_ipsecrequest_mode = mode;
+	p->sadb_x_ipsecrequest_level = level;
+	p->sadb_x_ipsecrequest_reqid = reqid;
 	offset += sizeof(*p);
 
 	if (set_sockaddr(src) || set_sockaddr(dst))
-		return -1;
+		return (-1);
 
 	__ipsec_errcode = EIPSEC_NO_ERROR;
 	return 0;
@@ -371,25 +407,6 @@ set_sockaddr(addr)
 	return 0;
 }
 
-static void
-policy_parse_request_init()
-{
-	p_protocol = IPPROTO_IP;
-	p_mode = IPSEC_MODE_ANY;
-	p_level = IPSEC_LEVEL_DEFAULT;
-	p_reqid = 0;
-	if (p_src != NULL) {
-		free(p_src);
-		p_src = NULL;
-	}
-	if (p_dst != NULL) {
-		free(p_dst);
-		p_dst = NULL;
-	}
-
-	return;
-}
-
 static caddr_t
 policy_parse(msg, msglen)
 	char *msg;
@@ -401,9 +418,6 @@ policy_parse(msg, msglen)
 	tlen = 0;
 
 	/* initialize */
-	p_dir = IPSEC_DIR_INVALID;
-	p_type = IPSEC_POLICY_DISCARD;
-	policy_parse_request_init();
 	__policy__strbuffer__init__(msg);
 
 	error = yyparse();	/* it must be set errcode. */
@@ -440,4 +454,3 @@ ipsec_set_policy(msg, msglen)
 	__ipsec_errcode = EIPSEC_NO_ERROR;
 	return policy;
 }
-

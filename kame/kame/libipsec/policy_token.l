@@ -1,4 +1,4 @@
-/*	$KAME: policy_token.l,v 1.13 2003/05/09 05:19:55 sakane Exp $	*/
+/*	$KAME: policy_token.l,v 1.14 2004/06/18 17:42:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -100,6 +100,7 @@ entrust		{ yylval.num = IPSEC_POLICY_ENTRUST; return(ACTION); }
 esp		{ yylval.num = IPPROTO_ESP; return(PROTOCOL); }
 ah		{ yylval.num = IPPROTO_AH; return(PROTOCOL); }
 ipcomp		{ yylval.num = IPPROTO_IPCOMP; return(PROTOCOL); }
+encap		{ yylval.num = IPPROTO_IPV6; return(ENCAP); }
 
 transport	{ yylval.num = IPSEC_MODE_TRANSPORT; return(MODE); }
 tunnel		{ yylval.num = IPSEC_MODE_TUNNEL; return(MODE); }
