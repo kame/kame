@@ -1,4 +1,4 @@
-.\"	$KAME: mdnsd.8,v 1.35 2001/06/23 01:54:22 itojun Exp $
+.\"	$KAME: mdnsd.8,v 1.36 2001/06/23 02:01:14 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -248,3 +248,6 @@ Also,
 handles DNS queries/replies over virtual connection
 .Pq Tn TCP
 naively.
+.Pp
+.Fl N
+may not be very useful, as DNS responses will contain link-local addresses.
