@@ -16,8 +16,6 @@
 .include "${.CURDIR}/../Makefile.opsys"
 .endif
 
-.PATH:	${.CURDIR}/../tcpdump
-
 BINDIR=	$(PREFIX)/sbin
 PROG=	ndp
 SRCS=	ndp.c gmt2local.c
