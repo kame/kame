@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.9 2002/04/28 05:40:27 suz Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.50 2002/06/21 12:04:19 suz Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.51 2002/07/15 13:44:38 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -553,6 +553,8 @@ udp6_attach(struct socket *so, int proto, struct proc *p)
 		return error;
 	inp = (struct inpcb *)so->so_pcb;
 	inp->inp_vflag |= INP_IPV6;
+	if (ip6_mapped_addr_on)
+		inp->inp_vflag |= INP_IPV4;
 	inp->in6p_hops = -1;	/* use kernel default */
 	inp->in6p_cksum = -1;	/* just to be sure */
 	/*
