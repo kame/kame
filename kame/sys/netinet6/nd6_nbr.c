@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.53 2001/01/30 14:06:20 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.54 2001/02/06 03:45:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -137,12 +137,10 @@ nd6_ns_input(m, off, icmp6len)
 	taddr6 = nd_ns->nd_ns_target;
 
 	if (ip6->ip6_hlim != 255) {
-#ifdef ND6_DEBUG
-		log(LOG_ERR,
+		nd6log((LOG_ERR,
 		    "nd6_ns_input: invalid hlim (%d) from %s to %s on %s\n",
 		    ip6->ip6_hlim, ip6_sprintf(&ip6->ip6_src),
-		    ip6_sprintf(&ip6->ip6_dst), if_name(ifp));
-#endif
+		    ip6_sprintf(&ip6->ip6_dst), if_name(ifp)));
 		goto bad;
 	}
 
@@ -155,14 +153,14 @@ nd6_ns_input(m, off, icmp6len)
 		    && daddr6.s6_addr8[12] == 0xff) {
 			; /*good*/
 		} else {
-			log(LOG_INFO, "nd6_ns_input: bad DAD packet "
-				"(wrong ip6 dst)\n");
+			nd6log((LOG_INFO, "nd6_ns_input: bad DAD packet "
+				"(wrong ip6 dst)\n"));
 			goto bad;
 		}
 	}
 
 	if (IN6_IS_ADDR_MULTICAST(&taddr6)) {
-		log(LOG_INFO, "nd6_ns_input: bad NS target (multicast)\n");
+		nd6log((LOG_INFO, "nd6_ns_input: bad NS target (multicast)\n"));
 		goto bad;
 	}
 
@@ -172,8 +170,10 @@ nd6_ns_input(m, off, icmp6len)
 	icmp6len -= sizeof(*nd_ns);
 	nd6_option_init(nd_ns + 1, icmp6len, &ndopts);
 	if (nd6_options(&ndopts) < 0) {
-		log(LOG_INFO, "nd6_ns_input: invalid ND option, ignored\n");
-		goto bad;
+		nd6log((LOG_INFO,
+		    "nd6_ns_input: invalid ND option, ignored\n"));
+		/* nd6_options have incremented stats */
+		goto freeit;
 	}
 
 	if (ndopts.nd_opts_src_lladdr) {
@@ -182,8 +182,8 @@ nd6_ns_input(m, off, icmp6len)
 	}
 	
 	if (IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src) && lladdr) {
-		log(LOG_INFO, "nd6_ns_input: bad DAD packet "
-			"(link-layer address option)\n");
+		nd6log((LOG_INFO, "nd6_ns_input: bad DAD packet "
+		    "(link-layer address option)\n"));
 		goto bad;
 	}
 
@@ -262,10 +262,11 @@ nd6_ns_input(m, off, icmp6len)
 		goto freeit;
 
 	if (lladdr && ((ifp->if_addrlen + 2 + 7) & ~7) != lladdrlen) {
-		log(LOG_INFO,
+		nd6log((LOG_INFO,
 		    "nd6_ns_input: lladdrlen mismatch for %s "
 		    "(if %d, NS packet %d)\n",
-			ip6_sprintf(&taddr6), ifp->if_addrlen, lladdrlen - 2);
+			ip6_sprintf(&taddr6), ifp->if_addrlen, lladdrlen - 2));
+		goto bad;
 	}
 
 	if (IN6_ARE_ADDR_EQUAL(&myaddr6, &saddr6)) {
@@ -332,9 +333,10 @@ nd6_ns_input(m, off, icmp6len)
 	return;
 
  bad:
-	log(LOG_ERR, "nd6_ns_input: src=%s\n", ip6_sprintf(&saddr6));
-	log(LOG_ERR, "nd6_ns_input: dst=%s\n", ip6_sprintf(&daddr6));
-	log(LOG_ERR, "nd6_ns_input: tgt=%s\n", ip6_sprintf(&taddr6));
+	nd6log((LOG_ERR, "nd6_ns_input: src=%s\n", ip6_sprintf(&saddr6)));
+	nd6log((LOG_ERR, "nd6_ns_input: dst=%s\n", ip6_sprintf(&daddr6)));
+	nd6log((LOG_ERR, "nd6_ns_input: tgt=%s\n", ip6_sprintf(&taddr6)));
+	icmp6stat.icp6s_badns++;
 	m_freem(m);
 }
 
@@ -350,7 +352,7 @@ nd6_ns_input(m, off, icmp6len)
 void
 nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	struct ifnet *ifp;
-	struct in6_addr *daddr6, *taddr6;
+	const struct in6_addr *daddr6, *taddr6;
 	struct llinfo_nd6 *ln;	/* for source address determination */
 	int dad;	/* duplicated address detection */
 {
@@ -567,13 +569,11 @@ nd6_na_input(m, off, icmp6len)
 	union nd_opts ndopts;
 
 	if (ip6->ip6_hlim != 255) {
-#ifdef ND6_DEBUG
-		log(LOG_ERR,
+		nd6log((LOG_ERR,
 		    "nd6_na_input: invalid hlim (%d) from %s to %s on %s\n",
 		    ip6->ip6_hlim, ip6_sprintf(&ip6->ip6_src),
-		    ip6_sprintf(&ip6->ip6_dst), if_name(ifp));
-#endif
-		goto freeit;
+		    ip6_sprintf(&ip6->ip6_dst), if_name(ifp)));
+		goto bad;
 	}
 
 #ifndef PULLDOWN_TEST
@@ -596,22 +596,24 @@ nd6_na_input(m, off, icmp6len)
 		taddr6.s6_addr16[1] = htons(ifp->if_index);
 
 	if (IN6_IS_ADDR_MULTICAST(&taddr6)) {
-		log(LOG_ERR,
+		nd6log((LOG_ERR,
 		    "nd6_na_input: invalid target address %s\n",
-		    ip6_sprintf(&taddr6));
-		goto freeit;
+		    ip6_sprintf(&taddr6)));
+		goto bad;
 	}
 	if (IN6_IS_ADDR_MULTICAST(&daddr6))
 		if (is_solicited) {
-			log(LOG_ERR,
-			    "nd6_na_input: a solicited adv is multicasted\n");
-			goto freeit;
+			nd6log((LOG_ERR,
+			    "nd6_na_input: a solicited adv is multicasted\n"));
+			goto bad;
 		}
 
 	icmp6len -= sizeof(*nd_na);
 	nd6_option_init(nd_na + 1, icmp6len, &ndopts);
 	if (nd6_options(&ndopts) < 0) {
-		log(LOG_INFO, "nd6_na_input: invalid ND option, ignored\n");
+		nd6log((LOG_INFO,
+		    "nd6_na_input: invalid ND option, ignored\n"));
+		/* nd6_options have incremented stats */
 		goto freeit;
 	}
 
@@ -646,10 +648,11 @@ nd6_na_input(m, off, icmp6len)
 	}
 
 	if (lladdr && ((ifp->if_addrlen + 2 + 7) & ~7) != lladdrlen) {
-		log(LOG_INFO,
+		nd6log((LOG_INFO,
 		    "nd6_na_input: lladdrlen mismatch for %s "
 		    "(if %d, NA packet %d)\n",
-			ip6_sprintf(&taddr6), ifp->if_addrlen, lladdrlen - 2);
+			ip6_sprintf(&taddr6), ifp->if_addrlen, lladdrlen - 2));
+		goto bad;
 	}
 
 	/*
@@ -839,6 +842,10 @@ nd6_na_input(m, off, icmp6len)
 		ln->ln_hold = 0;
 	}
 
+	return;
+
+ bad:
+	icmp6stat.icp6s_badna++;
  freeit:
 	m_freem(m);
 }
@@ -855,7 +862,7 @@ nd6_na_input(m, off, icmp6len)
 void
 nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	struct ifnet *ifp;
-	struct in6_addr *daddr6, *taddr6;
+	const struct in6_addr *daddr6, *taddr6;
 	u_long flags;
 	int tlladdr;		/* 1 if include target link-layer address */
 	struct sockaddr *sdl0;	/* sockaddr_dl (= proxy NA) or NULL */
@@ -1141,10 +1148,8 @@ nd6_dad_start(ifa, tick)
 	bzero(dp, sizeof(*dp));
 	TAILQ_INSERT_TAIL(&dadq, (struct dadq *)dp, dad_list);
 
-#ifdef ND6_DEBUG
-	log(LOG_DEBUG, "%s: starting DAD for %s\n", if_name(ifa->ifa_ifp),
-	    ip6_sprintf(&ia->ia_addr.sin6_addr));
-#endif
+	nd6log((LOG_DEBUG, "%s: starting DAD for %s\n", if_name(ifa->ifa_ifp),
+	    ip6_sprintf(&ia->ia_addr.sin6_addr)));
 
 	/*
 	 * Send NS packet for DAD, ip6_dad_count times.
@@ -1321,12 +1326,10 @@ nd6_dad_timer(ifa)
 			 */
 			ia->ia6_flags &= ~IN6_IFF_TENTATIVE;
 
-#ifdef ND6_DEBUG
-			log(LOG_DEBUG,
+			nd6log((LOG_DEBUG,
 			    "%s: DAD complete for %s - no duplicates found\n",
 			    if_name(ifa->ifa_ifp),
-			    ip6_sprintf(&ia->ia_addr.sin6_addr));
-#endif
+			    ip6_sprintf(&ia->ia_addr.sin6_addr)));
 
 			TAILQ_REMOVE(&dadq, (struct dadq *)dp, dad_list);
 			free(dp, M_IP6NDP);
@@ -1406,7 +1409,7 @@ nd6_dad_ns_input(ifa)
 {
 	struct in6_ifaddr *ia;
 	struct ifnet *ifp;
-	struct in6_addr *taddr6;
+	const struct in6_addr *taddr6;
 	struct dadq *dp;
 	int duplicate;
 
@@ -1427,9 +1430,10 @@ nd6_dad_ns_input(ifa)
 
 	/* Quickhack - completely ignore DAD NS packets */
 	if (dad_ignore_ns) {
-		log(LOG_INFO, "nd6_dad_ns_input: ignoring DAD NS packet for "
+		nd6log((LOG_INFO,
+		    "nd6_dad_ns_input: ignoring DAD NS packet for "
 		    "address %s(%s)\n", ip6_sprintf(taddr6),
-		    if_name(ifa->ifa_ifp));
+		    if_name(ifa->ifa_ifp)));
 		return;
 	}
 

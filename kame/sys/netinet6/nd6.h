@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.40 2001/02/04 17:07:26 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.41 2001/02/06 03:45:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -263,6 +263,9 @@ extern struct llinfo_nd6 llinfo_nd6;
 extern struct nd_ifinfo *nd_ifinfo;
 extern struct nd_drhead nd_defrouter;
 extern struct nd_prhead nd_prefix;
+extern int nd6_debug;
+
+#define nd6log(x)	do { if (nd6_debug) log x; } while (0)
 
 extern struct callout nd6_timer_ch;
 
@@ -338,11 +341,11 @@ int nd6_storelladdr __P((struct ifnet *, struct rtentry *, struct mbuf *,
 
 /* nd6_nbr.c */
 void nd6_na_input __P((struct mbuf *, int, int));
-void nd6_na_output __P((struct ifnet *, struct in6_addr *,
- 			struct in6_addr *, u_long, int, struct sockaddr *));
+void nd6_na_output __P((struct ifnet *, const struct in6_addr *,
+	const struct in6_addr *, u_long, int, struct sockaddr *));
 void nd6_ns_input __P((struct mbuf *, int, int));
-void nd6_ns_output __P((struct ifnet *, struct in6_addr *,
-			struct in6_addr *, struct llinfo_nd6 *, int));
+void nd6_ns_output __P((struct ifnet *, const struct in6_addr *,
+	const struct in6_addr *, struct llinfo_nd6 *, int));
 caddr_t nd6_ifptomac __P((struct ifnet *));
 void nd6_dad_start __P((struct ifaddr *, int *));
 void nd6_dad_stop __P((struct ifaddr *));
