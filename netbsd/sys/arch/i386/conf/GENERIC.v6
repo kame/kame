@@ -54,7 +54,7 @@ options 	HFSC_RIO	#rio for hfsc (needs HFSC, RIO, RED, HFSC_RED)
 options 	CDNR		#diffserv traffic conditioner
 options 	BLUE		#blue by wu-chang feng
 
-# mobile-ip6 options
+# mobile-ip6 options - NOT TESTED
 # NOTE: Don't define with IPsec options
 #options 	MIP6
 ##options 	MIP6_DEBUG
