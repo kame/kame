@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.121 2004/06/12 10:46:00 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.122 2004/06/12 11:00:59 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -595,7 +595,7 @@ server6_do_command(buf, len)
 {
 	struct dhcp6ctl *ctlhead;
 	struct dhcp6ctl_iaspec iaspec;
-	u_int16_t command, commandlen;
+	u_int16_t command, commandlen, version;
 	u_int32_t p32, iaid, duidlen;
 	struct duid duid;
 	struct dhcp6_binding *binding;
@@ -606,9 +606,16 @@ server6_do_command(buf, len)
 
 	command = ntohs(ctlhead->command);
 	commandlen = ntohs(ctlhead->len);
+	version = ntohs(ctlhead->version);
 	if (len != commandlen + sizeof(struct dhcp6ctl)) {
 		dprintf(LOG_ERR, FNAME,
 		    "assumption failure: command length mismatch");
+		return (DHCP6CTL_R_FAILURE);
+	}
+
+	if (version > DHCP6CTL_VERSION) {
+		dprintf(LOG_INFO, FNAME, "unsupported version: %d",
+		    version);
 		return (DHCP6CTL_R_FAILURE);
 	}
 

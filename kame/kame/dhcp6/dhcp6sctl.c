@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6sctl.c,v 1.2 2004/06/12 07:29:32 jinmei Exp $	*/
+/*	$KAME: dhcp6sctl.c,v 1.3 2004/06/12 11:01:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -131,6 +131,9 @@ make_command(argc, argv, bufp, lenp)
 		warnx("command is too short");
 		goto fail;
 	}
+
+	memset(&ctl, 0, sizeof(ctl));
+	ctl.version = DHCP6CTL_VERSION;
 
 	if (strcmp(argv[0], "reload") == 0) {
 		ctl.command = htons(DHCP6CTL_COMMAND_RELOAD);

@@ -1,4 +1,4 @@
-/*	$KAME: control.h,v 1.2 2004/06/12 10:43:58 jinmei Exp $	*/
+/*	$KAME: control.h,v 1.3 2004/06/12 11:00:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -33,6 +33,8 @@
 				    * control socket */
 #define DEFAULT_CONTROL_PORT "5546" /* default TCP port for control socket */
 
+#define DHCP6CTL_VERSION 0
+
 #define DHCP6CTL_COMMAND_RELOAD 1
 #define DHCP6CTL_COMMAND_REMOVE 2
 
@@ -47,6 +49,8 @@
 struct dhcp6ctl {
 	u_int16_t command;
 	u_int16_t len;
+	u_int16_t version;
+	u_int16_t reserved;
 } __attribute__ ((__packed__));
 
 struct dhcp6ctl_iaspec {
