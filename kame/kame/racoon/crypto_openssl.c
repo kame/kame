@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.34 2000/08/30 04:40:35 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.35 2000/08/30 05:41:31 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -341,10 +341,12 @@ eay_get_x509subjectaltname(cert)
 		 * XXX What is the subjectAltName which the function should
 		 * return if CERT has multiple subjectlatnames ?
 		 * At this moment, the function only returns 1st subjectaltname.
+		 *
+		 * #define MULTI_SUBJECTALTNAME
 		 */
 	    {
 		int i = 0, tlen = 0, len = 0;
-#if 0
+#ifdef MULTI_SUBJECTALTNAME
 		for(i = 0; i < sk_CONF_VALUE_num(nval); i++) {
 #endif
 			cval = sk_CONF_VALUE_value(nval, i);
@@ -356,7 +358,7 @@ eay_get_x509subjectaltname(cert)
 				goto end;
 			}
 			memcpy(altname->v + tlen, cval->value, len);
-#if 0
+#ifdef MULTI_SUBJECTALTNAME
 			tlen += len;
 		}
 #endif
