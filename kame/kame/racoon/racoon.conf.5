@@ -408,7 +408,7 @@ remote 172.168.2.2 [7000]
 	# means to do keep-a-live.  This should not be used in dial-up.
 	keepalive;
 
-	# default lifetime inlayed each proposals.
+	# default lifetime, will be copied into each proposals.
 	lifetime time 10 min;	# sec,min,hour
 	lifetime byte 5 MB;	# B,KB,GB
 
@@ -422,16 +422,9 @@ remote 172.168.2.2 [7000]
 		hash_algorithm md5;
 		authentication_method pre_shared_key ;
 
-		# they can be defined individually.
+		# they can be defined explicitly.
 		lifetime time 5 min;
 		lifetime byte 2 MB;
-	}
-	proposal {
-		# they can be defined explicitly.
-		encryption_algorithm des;
-		hash_algorithm md5;
-		dh_group modp1024;
-		authentication_method pre_shared_key ;
 	}
 }
 .Ed
