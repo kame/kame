@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.33 2001/11/02 12:21:47 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.34 2001/11/28 06:05:43 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -61,6 +61,8 @@ static int		*tSlotEntry;
 static int		 tSlotEntryMax;
 static int		 tSlotEntryUsed;
 
+static time_t		 maxFragment;
+static time_t		 frgmntTimer;
 static time_t		 tSlotTimer;
 static time_t		 maxTTLany;
 static time_t		 maxTTLicmp;
@@ -83,6 +85,8 @@ TAILQ_HEAD(,tSlot)	 tsl_head;
 struct tslhash		 tslhashl[NATPTHASHSZ];
 struct tslhash		 tslhashr[NATPTHASHSZ];
 
+TAILQ_HEAD(,fragment)	 frg_head;
+
 
 #ifdef __FreeBSD__
 MALLOC_DECLARE(M_NATPT);
@@ -102,6 +106,7 @@ static int	 natpt_hashSin4			__P((struct sockaddr_in *));
 static int	 natpt_hashSin6			__P((struct sockaddr_in6 *));
 static int	 natpt_hashPJW			__P((u_char *, int));
 
+static void	 natpt_expireFragment		__P((void *));
 static void	 natpt_expireTSlot		__P((void *));
 static void	 natpt_removeTSlotEntry		__P((struct tSlot *));
 
@@ -474,6 +479,87 @@ natpt_remapRemote4Port(struct cSlot *acs, struct pAddr *remote)
  *
  */
 
+struct fragment *
+natpt_internFragment6(struct pcv *cv6)
+{
+	int			 s;
+	struct fragment		*frg;
+	struct timeval		 atv;
+
+	MALLOC(frg, struct fragment *, sizeof(struct fragment), M_NATPT, M_NOWAIT);
+	if (frg == NULL) {
+		return (NULL);
+	}
+
+	bzero(frg, sizeof(struct fragment));
+	frg->fg_proto = cv6->ip_p;
+	frg->fg_family = AF_INET6;
+	frg->fg_src.in6 = cv6->ip.ip6->ip6_src;
+	frg->fg_dst.in6 = cv6->ip.ip6->ip6_dst;
+	microtime(&atv);
+	frg->tstamp = atv.tv_sec;
+
+	s = splnet();
+	TAILQ_INSERT_TAIL(&frg_head, frg, frg_list);
+	splx(s);
+
+	return (frg);
+}
+
+
+struct tSlot *
+natpt_lookForFragment6(struct pcv *cv6)
+{
+	struct fragment		 *frg;
+
+	for (frg = TAILQ_FIRST(&frg_head);
+	     frg;
+	     frg = TAILQ_NEXT(frg, frg_list)) {
+		if (frg->fg_family != AF_INET6)
+			continue;
+		if (cv6->ip_p != frg->fg_proto)
+			continue;
+		if (!IN6_ARE_ADDR_EQUAL(&frg->fg_src.in6, &cv6->ip.ip6->ip6_src))
+			continue;
+		if (!IN6_ARE_ADDR_EQUAL(&frg->fg_dst.in6, &cv6->ip.ip6->ip6_dst))
+			continue;
+		return (frg->tslot);
+	}
+
+	return (NULL);
+}
+
+
+static void
+natpt_expireFragment(void *ignored_arg)
+{
+	struct timeval	 atv;
+	struct fragment	*frg, *frgn;
+
+	timeout(natpt_expireFragment, (caddr_t)0, frgmntTimer);
+	microtime(&atv);
+
+	frg = TAILQ_FIRST(&frg_head);
+	while (frg) {
+		frgn = TAILQ_NEXT(frg, frg_list);
+		if ((atv.tv_sec - frg->tstamp) >= maxFragment) {
+			int	 s;
+
+			s = splnet();
+			TAILQ_REMOVE(&frg_head, frg, frg_list);
+			splx(s);
+			FREE(frg, M_NATPT);
+		}
+		frg = frgn;
+	}
+
+}
+
+
+/*
+ *
+ */
+
 struct tSlot *
 natpt_lookForHash(struct pcv *cv, struct tslhash *th, int side)
 {
@@ -767,7 +853,11 @@ natpt_init_tslot()
 	tSlotEntryUsed = 0;
 
 	tSlotTimer = 60 * hz;
+	frgmntTimer = 60 * hz;
 	timeout(natpt_expireTSlot, (caddr_t)0, tSlotTimer);
+	timeout(natpt_expireFragment, (caddr_t)0, frgmntTimer);
+
+	maxFragment = 120;				/* [sec]	*/
 
 	natpt_TCPT_2MSL	  = 120;			/* [sec]	*/
 	natpt_tcp_maxidle = 600;			/* [sec]	*/
@@ -775,6 +865,7 @@ natpt_init_tslot()
 	maxTTLicmp = maxTTLudp = natpt_TCPT_2MSL;
 	maxTTLtcp  = maxTTLany = 86400;			/* [sec]	*/
 
+	TAILQ_INIT(&frg_head);
 	TAILQ_INIT(&tsl_head);
 	for (iter = 0; iter < NATPTHASHSZ; iter++) {
 		TAILQ_INIT(&tslhashl[iter].tslhead);

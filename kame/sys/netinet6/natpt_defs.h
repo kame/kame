@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.30 2001/11/19 12:49:10 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.31 2001/11/28 06:05:42 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -111,6 +111,18 @@ union inaddr					/* sizeof():  16[byte]	*/
 {
 	struct in_addr	in4;
 	struct in6_addr	in6;
+};
+
+
+struct fragment					/* sizeof(): 52[byte]	*/
+{
+	TAILQ_ENTRY(fragment)	frg_list;
+	u_int8_t	 fg_proto;		/* protocol			*/
+	u_int8_t	 fg_family;		/* AF_INET{,6} (sa_family_t)	*/
+	union inaddr	 fg_src;		/* source address		*/
+	union inaddr	 fg_dst;		/* destination address		*/
+	struct tSlot	*tslot;
+	time_t		 tstamp;
 };
 
 

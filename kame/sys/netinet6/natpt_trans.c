@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.59 2001/11/19 13:17:08 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.60 2001/11/28 06:05:43 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -100,6 +100,7 @@ struct ftpparam
 };
 
 
+#define PSEUDOHDRSZ			40	/* sizeof pseudo-header	*/
 struct ulc6
 {
 	struct in6_addr	ulc_src, ulc_dst;
@@ -108,8 +109,9 @@ struct ulc6
 	u_char		ulc_pr;
 	union
 	{
-		struct tcphdr	th;
-		struct udphdr	uh;
+		struct icmp6_hdr ih;
+		struct tcphdr	 th;
+		struct udphdr	 uh;
 	}		ulc_tu;
 };
 
@@ -206,8 +208,8 @@ int		 natpt_tcpfsm			__P((short state, int, u_char flags));
 struct mbuf	*natpt_mgethdr			__P((int, int));
 void		 natpt_composeIPv6Hdr		__P((struct ip *, struct pAddr *,
 						     struct ip6_hdr *));
-void		 natpt_composeIPv4Hdr		__P((struct ip6_hdr *, struct pAddr *,
-						     struct ip *));
+void		 natpt_composeIPv4Hdr		__P((struct pcv *, struct pAddr *,
+						     struct pcv *));
 void		 natpt_fixTCPUDP64cksum		__P((int, int, struct pcv *, struct pcv *));
 void		 natpt_fixTCPUDP44cksum		__P((int, struct pcv *, struct pcv *));
 int		 natpt_fixCksum			__P((int, u_char *, int, u_char *, int));
@@ -288,8 +290,7 @@ natpt_translateICMPv6To4(struct pcv *cv6, struct pAddr *pad)
 	cv4.pyld.caddr = (caddr_t)cv4.ip.ip4 + sizeof(struct ip);
 	cv4.fromto = cv6->fromto;
 
-	ip4->ip_p = IPPROTO_ICMP;
-	natpt_composeIPv4Hdr(ip6, pad, ip4);
+	natpt_composeIPv4Hdr(cv6, pad, &cv4);
 
 	switch (cv6->pyld.icmp6->icmp6_type) {
 	case ICMP6_DST_UNREACH:
@@ -329,7 +330,32 @@ natpt_translateICMPv6To4(struct pcv *cv6, struct pAddr *pad)
 		return (NULL);
 	}
 
-	{
+	if ((cv6->fh != NULL)
+	    && (cv6->pyld.icmp6->icmp6_type != ICMP6_DST_UNREACH)
+	    && (cv6->pyld.icmp6->icmp6_type != ICMP6_TIME_EXCEEDED)) {
+		u_short		  cksum6, cksum4;
+		struct ulc6	  ulc6;
+		struct icmp6_hdr *icmp6hdr;
+		struct icmp	  icmp4hdr;
+
+		bzero(&ulc6, sizeof(struct ulc6));
+		ulc6.ulc_src = cv6->ip.ip6->ip6_src;
+		ulc6.ulc_dst = cv6->ip.ip6->ip6_dst;
+		ulc6.ulc_len = htonl(cv6->plen);
+		ulc6.ulc_pr  = cv6->ip_p;
+
+		icmp6hdr = (struct icmp6_hdr *)&ulc6.ulc_tu.ih;
+		bcopy(cv6->pyld.icmp6, icmp6hdr, sizeof(struct icmp6_hdr));
+		bcopy(cv4.pyld.icmp4, &icmp4hdr, sizeof(struct icmp));
+		cksum6 = ntohs(icmp6hdr->icmp6_cksum);
+		icmp6hdr->icmp6_cksum = 0;
+		icmp4hdr.icmp_cksum   = 0;
+
+		cksum4 = natpt_fixCksum(cksum6,
+					(u_char *)&ulc6, PSEUDOHDRSZ+ICMP_MINLEN,
+					(u_char *)&icmp4hdr, ICMP_MINLEN);
+		cv4.pyld.icmp4->icmp_cksum = htons(cksum4);
+	} else {
 		int		 hlen;
 		struct mbuf	*m4  = cv4.m;
 		struct ip	*ip4 = cv4.ip.ip4;
@@ -562,7 +588,6 @@ natpt_translateTCPv6To4(struct pcv *cv6, struct pAddr *pad)
 		return (NULL);
 
 	cv4.ip_p = IPPROTO_TCP;
-	cv4.ip.ip4->ip_p = IPPROTO_TCP;
 	natpt_updateTcpStatus(&cv4);
 	natpt_translatePYLD6To4(&cv4);
 	natpt_fixTCPUDP64cksum(AF_INET6, IPPROTO_TCP, cv6, &cv4);
@@ -581,7 +606,6 @@ natpt_translateUDPv6To4(struct pcv *cv6, struct pAddr *pad)
 		return (NULL);
 
 	cv4.ip_p = IPPROTO_UDP;
-	cv4.ip.ip4->ip_p = IPPROTO_UDP;
 	natpt_watchUDP6(&cv4);
 	if (udpcksum) {
 		natpt_fixTCPUDP64cksum(AF_INET6, IPPROTO_UDP, cv6, &cv4);
@@ -649,11 +673,60 @@ natpt_translateTCPUDPv6To4(struct pcv *cv6, struct pAddr *pad, struct pcv *cv4)
 
 	ip4 = mtod(m4, struct ip *);
 	ip6 = mtod(cv6->m, struct ip6_hdr *);
-	natpt_composeIPv4Hdr(ip6, pad, ip4);
+	natpt_composeIPv4Hdr(cv6, pad, cv4);
 
 	th = (struct tcphdr *)(ip4 + 1);
 	th->th_sport = pad->port[1];
 	th->th_dport = pad->port[0];
+
+	return (m4);
+}
+
+
+struct mbuf *
+natpt_translateFragment6(struct pcv *cv6, struct pAddr *pad)
+{
+	struct pcv	 cv4;
+	struct mbuf	*m4;
+	struct ip	*ip4;
+	struct ip6_hdr	*ip6 = mtod(cv6->m, struct ip6_hdr *);
+
+	caddr_t		 frag6end = (caddr_t)ip6 + cv6->m->m_pkthdr.len;
+	int		 frag6len = frag6end - cv6->pyld.caddr;
+
+	bzero(&cv4, sizeof(struct pcv));
+	if ((m4 = natpt_mgethdr(sizeof(struct ip), frag6len)) == NULL)
+		return (NULL);
+
+	cv4.m = m4;
+	cv4.ip.ip4 = ip4 = mtod(m4, struct ip *);
+	cv4.pyld.caddr = (caddr_t)cv4.ip.ip4 + sizeof(struct ip);
+	cv4.fromto = cv6->fromto;
+
+	natpt_composeIPv4Hdr(cv6, pad, &cv4);
+
+	bcopy(cv6->pyld.caddr, cv4.pyld.caddr, frag6len);
+	cv4.m->m_len = ip4->ip_len;
+
+	if (m4) {
+		int		 mlen;
+		struct mbuf	*mm;
+		struct ip	*ip4;
+
+		ip4 = mtod(m4, struct ip *);
+		ip4->ip_sum = 0;
+		ip4->ip_sum = in_cksum(m4, sizeof(struct ip));
+		m4->m_pkthdr.rcvif = cv6->m->m_pkthdr.rcvif;
+
+		for (mlen = 0, mm = m4; mm; mm = mm->m_next) {
+			mlen += mm->m_len;
+		}
+
+		m4->m_pkthdr.len = mlen;
+
+		if (isDump(D_TRANSLATEDIPV4))
+			natpt_logIp4(LOG_DEBUG, ip4, NULL);
+	}
 
 	return (m4);
 }
@@ -2250,8 +2323,11 @@ natpt_composeIPv6Hdr(struct ip *ip4, struct pAddr *pad, struct ip6_hdr *ip6)
 
 
 void
-natpt_composeIPv4Hdr(struct ip6_hdr *ip6, struct pAddr *pad, struct ip *ip4)
+natpt_composeIPv4Hdr(struct pcv *cv6, struct pAddr *pad, struct pcv *cv4)
 {
+	struct ip6_hdr	*ip6 = cv6->ip.ip6;
+	struct ip	*ip4 = cv4->ip.ip4;
+
 #ifdef _IP_VHL
 	ip4->ip_vhl = IP_MAKE_VHL(IPVERSION, (sizeof(struct ip) >> 2));
 #else
@@ -2265,6 +2341,24 @@ natpt_composeIPv4Hdr(struct ip6_hdr *ip6, struct pAddr *pad, struct ip *ip4)
 	ip4->ip_ttl = ip6->ip6_hlim;		/* Time To Live				*/
 	ip4->ip_src = pad->in4dst;		/* source addresss			*/
 	ip4->ip_dst = pad->in4src;		/* destination address			*/
+	ip4->ip_p = (ip6->ip6_nxt == IPPROTO_ICMPV6)
+		? IPPROTO_ICMP
+		: ip6->ip6_nxt;
+
+	if (cv6->fh) {
+		u_int16_t	offlg = ntohs(cv6->fh->ip6f_offlg);
+
+		ip4->ip_len = ntohs(ip6->ip6_plen) - sizeof(struct ip6_frag)
+			+ sizeof(struct ip);
+		ip4->ip_id = cv6->fh->ip6f_ident & 0xffff;
+
+		ip4->ip_off = (offlg & 0xfff8) >> 3;
+		if (offlg & 0x0001)
+			ip4->ip_off |= IP_MF;
+		ip4->ip_p = (cv6->fh->ip6f_nxt == IPPROTO_ICMPV6)
+			? IPPROTO_ICMP
+			: cv6->fh->ip6f_nxt;
+	}
 }
 
 

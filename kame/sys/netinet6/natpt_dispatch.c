@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.30 2001/11/19 13:17:08 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.31 2001/11/28 06:05:43 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -48,6 +48,8 @@
 #include <netinet/ip_icmp.h>
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
+#include <netinet/tcp.h>
+#include <netinet/udp.h>
 
 #include <netinet6/natpt_defs.h>
 #include <netinet6/natpt_log.h>
@@ -73,8 +75,8 @@ struct in6_addr	natpt_prefix;
 int		natpt_in6		__P((struct mbuf *, struct mbuf **));
 int		natpt_in4		__P((struct mbuf *, struct mbuf **));
 int		natpt_config6		__P((struct mbuf *, struct pcv *));
-int		natpt_config4		__P((struct mbuf *, struct pcv *));
 caddr_t		natpt_lastpyld		__P((struct mbuf *, int *, int *, struct ip6_frag **));
+int		natpt_config4		__P((struct mbuf *, struct pcv *));
 
 MALLOC_DEFINE(M_NATPT, "NATPT", "Network Address Translation - Protocol Translation");
 
@@ -126,14 +128,35 @@ natpt_in6(struct mbuf *m6, struct mbuf **m4)
 		return (IPPROTO_DONE);	/* discard this packet without free */
 	}
 
-	if ((cv6.ats = natpt_lookForHash6(&cv6)) == NULL) {
+	if (cv6.fh) {
 		struct cSlot	*acs;
+		struct fragment	*frg;
 
-		if ((acs = natpt_lookForRule6(&cv6)) == NULL)
-			return (IPPROTO_IP);
+		if ((cv6.fh->ip6f_offlg & IP6F_OFF_MASK) == 0) {
+			/* first fragmented packet */
+			if ((cv6.ats = natpt_lookForHash6(&cv6)) == NULL) {
+				if ((acs = natpt_lookForRule6(&cv6)) == NULL)
+					return (IPPROTO_IP);
+				if ((cv6.ats = natpt_internHash6(acs, &cv6)) == NULL)
+					return (IPPROTO_IP);
+				if ((frg = natpt_internFragment6(&cv6)) == NULL)
+					return (IPPROTO_IP);
+				frg->tslot = cv6.ats;
+			}
+		} else {
+			/* fragmented packet after the first */
+			if ((cv6.ats = natpt_lookForFragment6(&cv6)) == NULL)
+				return (IPPROTO_MAX);
+		}
+	} else {
+		if ((cv6.ats = natpt_lookForHash6(&cv6)) == NULL) {
+			struct cSlot	*acs;
 
-		if ((cv6.ats = natpt_internHash6(acs, &cv6)) == NULL)
-			return (IPPROTO_IP);
+			if ((acs = natpt_lookForRule6(&cv6)) == NULL)
+				return (IPPROTO_IP);
+			if ((cv6.ats = natpt_internHash6(acs, &cv6)) == NULL)
+				return (IPPROTO_IP);
+		}
 	}
 
 	if (cv6.fromto == NATPT_FROM) {
@@ -144,8 +167,15 @@ natpt_in6(struct mbuf *m6, struct mbuf **m4)
 		cv6.ats->tofrom++;
 	}
 
-	if ((*m4 = natpt_translateIPv6To4(&cv6, pad)) == NULL)
-		return (IPPROTO_MAX);
+	if (cv6.fh && ((cv6.fh->ip6f_offlg & IP6F_OFF_MASK) != 0)) {
+		/* fragmented packet after the first */
+		if ((*m4 = natpt_translateFragment6(&cv6, pad)) == NULL)
+			return (IPPROTO_MAX);
+	} else {
+		/* not fragmented or first fragmented packet */
+		if ((*m4 = natpt_translateIPv6To4(&cv6, pad)) == NULL)
+			return (IPPROTO_MAX);
+	}
 
 	return (IPPROTO_IPV4);
 }
@@ -265,8 +295,9 @@ caddr_t
 natpt_pyldaddr(struct ip6_hdr *ip6, caddr_t ip6end, int *proto, struct ip6_frag **fh)
 {
 	int		 nxt;
+	int		 hdrsz = 0;
 	caddr_t		 ip6ext;
-	struct ip6_frag *ip6fh;
+	struct ip6_frag *ip6fh = NULL;
 
 	if (proto)	*proto = 0;
 	if (fh)		*fh = NULL;
@@ -299,11 +330,16 @@ natpt_pyldaddr(struct ip6_hdr *ip6, caddr_t ip6end, int *proto, struct ip6_frag 
 			break;
 
 		case IPPROTO_ICMPV6:
+			hdrsz = sizeof(struct icmp6_hdr);
+			goto wayOut;
+
 		case IPPROTO_TCP:
+			hdrsz = sizeof(struct tcphdr);
+			goto wayOut;
+
 		case IPPROTO_UDP:
-			if (proto)
-				*proto = nxt;
-			return (ip6ext);
+			hdrsz = sizeof(struct udphdr);
+			goto wayOut;
 
 		default:
 			return (NULL);
@@ -311,6 +347,16 @@ natpt_pyldaddr(struct ip6_hdr *ip6, caddr_t ip6end, int *proto, struct ip6_frag 
 	}
 
 	return (NULL);
+
+ wayOut:;
+	if (ip6fh
+	    && ((ip6fh->ip6f_offlg & IP6F_OFF_MASK) == 0)
+	    && ((ip6end - ip6ext) < hdrsz))
+		return (NULL);
+
+	if (proto)
+		*proto = nxt;
+	return (ip6ext);
 }
 
 
