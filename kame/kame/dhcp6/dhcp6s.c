@@ -72,18 +72,17 @@ struct servtab {
 	struct in6_addr serv;
 };
 
+struct dnslist {
+	TAILQ_ENTRY(dnslist) link;
+	struct in6_addr addr;
+};
+TAILQ_HEAD(, dnslist) dnslist;
+
 static int debug = 0;
 #define dprintf(x)	do { if (debug) fprintf x; } while (0)
 
 char *device = NULL;
-
-#if 0
-char *dnsserv = "3ffe:501:4819::42";
-char *dnsdom = "kame.net."
-#else
-char *dnsserv = NULL;
 char *dnsdom = NULL;
-#endif
 
 int insock;	/* inbound udp port */
 int outsock;	/* outbound udp port */
@@ -116,6 +115,7 @@ main(argc, argv)
 {
 	int ch;
 	struct in6_addr a;
+	struct dnslist *dle;
 
 	srandom(time(NULL) & getpid());
 	while ((ch = getopt(argc, argv, "dn:N:")) != EOF) {
@@ -128,7 +128,12 @@ main(argc, argv)
 				errx(1, "invalid DNS server %s", optarg);
 				/* NOTREACHED */
 			}
-			dnsserv = optarg;
+			if ((dle = malloc(sizeof *dle)) == NULL) {
+				errx(1, "malloca failed for a DNS server");
+				/* NOTREACHED */
+			}
+			dle->addr = a;
+			TAILQ_INSERT_TAIL(&dnslist, dle, link);
 			break;
 		case 'N':
 			dnsdom = optarg;
@@ -801,16 +806,18 @@ server6_react_request(buf, siz, rcvpi)
 	 */
 	/* DNS server */
 	opt = dhcp6opttab_byname("Domain Name Server");
-	if (opt && dnsserv) {
-		extbuf.dh6e_type = htons(opt->code);
-		extbuf.dh6e_len = htons(sizeof(struct in6_addr));
-		memcpy(ext, &extbuf, sizeof(extbuf));
-		if (inet_pton(AF_INET6, dnsserv, ext + sizeof(extbuf)) != 1) {
-			errx(1, "inet_pton failed");
-			/* NOTREACHED */
+	if (opt) {
+		struct dnslist *d;
+
+		for (d = TAILQ_FIRST(&dnslist); d; d = TAILQ_NEXT(d, link)) {
+			extbuf.dh6e_type = htons(opt->code);
+			extbuf.dh6e_len = htons(sizeof(struct in6_addr));
+			memcpy(ext, &extbuf, sizeof(extbuf));
+			memcpy(ext + sizeof(extbuf), &d->addr,
+			       sizeof(struct in6_addr));
+			ext += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
+			len += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
 		}
-		ext += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
-		len += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
 	}
 
 	/* DNS domain */
