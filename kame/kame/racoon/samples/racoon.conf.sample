@@ -1,4 +1,4 @@
-# $KAME: racoon.conf.sample,v 1.7 2000/06/01 02:46:19 sakane Exp $
+# $KAME: racoon.conf.sample,v 1.8 2000/06/01 05:46:03 jinmei Exp $
 
 # "path" must be placed before it should be used.
 # You can overwrite which you defined, but it should not use due to confusing.
@@ -49,4 +49,3 @@ sainfo anonymous
 	authentication_algorithm hmac_sha1, hmac_md5 ;
 	compression_algorithm deflate ;
 }
-
