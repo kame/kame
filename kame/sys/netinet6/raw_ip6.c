@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.72 2001/03/17 17:48:34 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.73 2001/03/22 15:21:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -644,19 +644,37 @@ rip6_ctloutput(op, so, level, optname, mp)
 				error = EINVAL;
 			return (error);
 		case IPV6_CHECKSUM:
-			if (so->so_proto->pr_protocol == IPPROTO_ICMPV6)
-				return EINVAL;
 			in6p = sotoin6pcb(so);
-			if (op == PRCO_SETOPT) {
-				optval = *mtod(m, int *);
-				in6p->in6p_cksum = optval;
-			} else if (op == PRCO_GETOPT) {
-				optval = in6p->in6p_cksum;
-				*mp = m = m_get(M_WAIT, MT_SOOPTS);
-				m->m_len = sizeof(int);
-				*mtod(m, int *) = optval;
-			} else
-				error = EINVAL;
+			if (so->so_proto->pr_protocol == IPPROTO_ICMPV6) {
+				int off;
+
+				/*
+				 * no modification to checksum offset, permit
+				 * "no change" values to help existing apps.
+				 */
+				off = offsetof(struct icmp6_hdr, icmp6_cksum);
+				if (op == PRCO_SETOPT) {
+					optval = *mtod(m, int *);
+					if (optval != off)
+						return EINVAL;
+				} else if (op == PRCO_GETOPT) {
+					*mp = m = m_get(M_WAIT, MT_SOOPTS);
+					m->m_len = sizeof(int);
+					*mtod(m, int *) = off;
+				} else
+					error = EINVAL;
+			} else {
+				if (op == PRCO_SETOPT) {
+					optval = *mtod(m, int *);
+					in6p->in6p_cksum = optval;
+				} else if (op == PRCO_GETOPT) {
+					optval = in6p->in6p_cksum;
+					*mp = m = m_get(M_WAIT, MT_SOOPTS);
+					m->m_len = sizeof(int);
+					*mtod(m, int *) = optval;
+				} else
+					error = EINVAL;
+			}
 			return (error);
 		}
 		return (ip6_ctloutput(op, so, level, optname, mp));
