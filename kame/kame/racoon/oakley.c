@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.97 2001/08/16 06:01:34 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.98 2001/08/16 06:06:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2518,7 +2518,7 @@ oakley_newiv2(iph1, msgid)
 	memcpy(p, &msgid, sizeof(msgid));
 
 	plog(LLV_DEBUG, LOCATION, NULL, "compute IV for phase2\n");
-	plog(LLV_DEBUG, LOCATION, NULL, "phase1 last IV: ");
+	plog(LLV_DEBUG, LOCATION, NULL, "phase1 last IV:\n");
 	plogdump(LLV_DEBUG, buf->v, buf->l);
 
 	/* allocate IVm */
@@ -2626,7 +2626,7 @@ oakley_do_decrypt(iph1, msg, ivdp, ivep)
 	if (new == NULL)
 		goto end;
 
-	plog(LLV_DEBUG, LOCATION, NULL, "decrypted payload by IV: ");
+	plog(LLV_DEBUG, LOCATION, NULL, "decrypted payload by IV:\n");
 	plogdump(LLV_DEBUG, ivdp->v, ivdp->l);
 
 	plog(LLV_DEBUG, LOCATION, NULL,
