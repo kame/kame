@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.56 2001/06/22 22:21:27 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.57 2001/06/22 22:39:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -39,7 +39,7 @@
  * - negative cache on NXRRSET reply on query timeout
  * - attach additional section on reply
  * - random delay before reply
- * - EDNS0 receiver buffer size notification (both send and receive)
+ * - EDNS0 receiver buffer size notification (send/relay case)
  * - as querier, retry by TCP/EDNS0 on truncated response
  * - multiple replies
  *	- how long should we wait for subsequent replies?
