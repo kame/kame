@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.6 2000/01/11 00:15:26 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.7 2000/01/11 04:59:30 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -609,6 +609,8 @@ quick_i2send(iph2, msg0)
 	}
 
 	/* Do UPDATE for initiator */
+	YIPSDEBUG(DEBUG_PFKEY, plog(logp, LOCATION, NULL,
+		"call pk_sendupdate\n"););
 	if (pk_sendupdate(iph2) < 0) {
 		plog(logp, LOCATION, NULL, "pfkey update failed.\n");
 		goto end;
@@ -757,6 +759,8 @@ quick_i3recv(iph2, msg0)
 	}
 
 	/* Do UPDATE for initiator */
+	YIPSDEBUG(DEBUG_PFKEY, plog(logp, LOCATION, NULL,
+		"call pk_sendupdate\n"););
 	if (pk_sendupdate(iph2) < 0) {
 		plog(logp, LOCATION, NULL, "pfkey update failed.\n");
 		goto end;
@@ -1570,7 +1574,9 @@ quick_r3prep(iph2, msg0)
 		goto end;
 	}
 
-	/* Do UPDATE for initiator */
+	/* Do UPDATE as responder */
+	YIPSDEBUG(DEBUG_PFKEY, plog(logp, LOCATION, NULL,
+		"call pk_sendupdate\n"););
 	if (pk_sendupdate(iph2) < 0) {
 		plog(logp, LOCATION, NULL, "pfkey update failed.\n");
 		goto end;

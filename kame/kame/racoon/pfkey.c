@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.9 2000/01/10 16:33:46 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.10 2000/01/11 04:59:31 itojun Exp $ */
 
 #define _PFKEY_C_
 
@@ -289,6 +289,8 @@ pfkey_dump_sadb(satype)
 		return NULL;
 	}
 
+	YIPSDEBUG(DEBUG_PFKEY,
+		plog(logp, LOCATION, NULL, "call pfkey_send_dump\n"););
 	if (pfkey_send_dump(s, satype) < 0) {
 		plog(logp, LOCATION, NULL,
 			"libipsec failed dump (%s)\n", ipsec_strerror());
@@ -348,6 +350,8 @@ pfkey_flush_sadb(proto)
 	if ((satype = admin2pfkey_proto(proto)) < 0)
 		return;
 
+	YIPSDEBUG(DEBUG_PFKEY,
+		plog(logp, LOCATION, NULL, "call pfkey_send_flush\n"););
 	if (pfkey_send_flush(lcconf->sock_pfkey, satype) < 0) {
 		plog(logp, LOCATION, NULL,
 			"libipsec failed send flush (%s)\n", ipsec_strerror());
@@ -369,6 +373,8 @@ pfkey_init()
 		return -1;
 	}
 
+	YIPSDEBUG(DEBUG_PFKEY,
+		plog(logp, LOCATION, NULL, "call pfkey_send_register\n"););
 	if (pfkey_send_register(lcconf->sock_pfkey, SADB_SATYPE_ESP) < 0) {
 		plog(logp, LOCATION, NULL,
 			"libipesc failed regist esp (%s)", ipsec_strerror());
@@ -376,6 +382,8 @@ pfkey_init()
 		return -1;
 	}
 
+	YIPSDEBUG(DEBUG_PFKEY,
+		plog(logp, LOCATION, NULL, "call pfkey_send_register\n"););
 	if (pfkey_send_register(lcconf->sock_pfkey, SADB_SATYPE_AH) < 0) {
 		plog(logp, LOCATION, NULL,
 			"libipsec failed regist ah (%s)", ipsec_strerror());
@@ -383,6 +391,8 @@ pfkey_init()
 		return -1;
 	}
 
+	YIPSDEBUG(DEBUG_PFKEY,
+		plog(logp, LOCATION, NULL, "call pfkey_send_register\n"););
 	if (pfkey_send_register(lcconf->sock_pfkey, SADB_X_SATYPE_IPCOMP) < 0) {
 		plog(logp, LOCATION, NULL,
 			"libipsec failed regist ipcomp (%s)", ipsec_strerror());
@@ -790,6 +800,9 @@ pk_sendgetspi(iph2)
 				"invalid encmode %d\n", k->encmode);
 			return -1;
 		}
+
+		YIPSDEBUG(DEBUG_PFKEY,
+			plog(logp, LOCATION, NULL, "call pfkey_send_getspi\n"););
 		if (pfkey_send_getspi(
 				lcconf->sock_pfkey,
 				satype,
@@ -914,6 +927,8 @@ pk_sendupdate(iph2)
 	}
 
 	for (s = iph2->approval; s != NULL; s = s->bundles) {
+		plog(logp, LOCATION, NULL, "s=%p\n", s);
+
 		/* search key */
 		for (k = iph2->keys; k != NULL; k = k->next) {
 			if (s->proto_id == k->proto_id
@@ -945,6 +960,7 @@ pk_sendupdate(iph2)
 		}
 
 		/* set algorithm type and key length */
+		plog(logp, LOCATION, NULL, "%d %d %d\n", s->proto_id, s->enctype, s->authtype);
 		if (pfkey_convertfromipsecdoi(
 				s->proto_id,
 				s->enctype,
@@ -953,6 +969,8 @@ pk_sendupdate(iph2)
 				&a_type, &a_keylen, &flags) < 0)
 			return -1;
 
+		YIPSDEBUG(DEBUG_PFKEY,
+			plog(logp, LOCATION, NULL, "call pfkey_send_update\n"););
 		if (pfkey_send_update(
 				lcconf->sock_pfkey,
 				satype,
@@ -1015,7 +1033,7 @@ pk_recvupdate(mhp)
 	if (iph2->status != PHASE2ST_ADDSA) {
 		plog(logp, LOCATION, NULL,
 			"status mismatch (db:%d msg:%d)\n",
-			iph2->status, PHASE2ST_GETSPISENT);
+			iph2->status, PHASE2ST_ADDSA);
 		return -1;
 	}
 
@@ -1142,6 +1160,9 @@ pk_sendadd(iph2)
 				&a_type, &a_keylen, &flags) < 0)
 			return -1;
 
+		YIPSDEBUG(DEBUG_PFKEY,
+			plog(logp, LOCATION, NULL, "call pfkey_send_add(%d)\n",
+			k->spi_p););
 		if (pfkey_send_add(
 				lcconf->sock_pfkey,
 				satype,

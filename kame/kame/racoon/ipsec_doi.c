@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.11 2000/01/10 21:08:07 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.12 2000/01/11 04:59:29 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -150,6 +150,9 @@ static vchar_t *sockaddr2id __P((struct sockaddr *saddr,
 	u_int prefixlen, u_int ul_proto));
 static int mksakeys __P((struct ipsecsa *b, struct ipsecsakeys **keys,
 	struct sockaddr *dst, struct sockaddr *src));
+
+static const char *ipsecdoi_printsa_bundle __P((struct ipsecsa *));
+static const char *ipsecdoi_printsa_1 __P((struct ipsecsa *));
 
 /*%%%*/
 /*
@@ -702,25 +705,14 @@ get_ph2approvalx(p, proposal)
 		return NULL;
 
 	YIPSDEBUG(DEBUG_DSA,
-		plog(logp, LOCATION, NULL,
-			"peer's proposal proto_id=%s encmode=%s "
-			"enctype=%s authtype=%s comptype=%s\n",
-			s_ipsecdoi_proto(sa.proto_id),
-			s_ipsecdoi_trns(IPSECDOI_PROTO_IPSEC_ESP, sa.enctype),
-			s_ipsecdoi_attr_v(IPSECDOI_ATTR_ENC_MODE, sa.encmode),
-			s_ipsecdoi_attr_v(IPSECDOI_ATTR_AUTH, sa.authtype),
-			s_ipsecdoi_trns(IPSECDOI_PROTO_IPCOMP, sa.comptype)));
+		plog(logp, LOCATION, NULL, "peer's proposal:\n");
+		plog(logp, LOCATION, NULL, "%s\n", ipsecdoi_printsa(&sa)););
 
 	for (s = proposal; s != NULL; s = s->next) {
 		YIPSDEBUG(DEBUG_DSA,
-			plog(logp, LOCATION, NULL,
-				"my proposal proto_id=%s encmode=%s "
-				"enctype=%s authtype=%s comptype=%s\n",
-				s_ipsecdoi_proto(s->proto_id),
-				s_ipsecdoi_trns(IPSECDOI_PROTO_IPSEC_ESP, s->enctype),
-				s_ipsecdoi_attr_v(IPSECDOI_ATTR_ENC_MODE, s->encmode),
-				s_ipsecdoi_attr_v(IPSECDOI_ATTR_AUTH, s->authtype),
-				s_ipsecdoi_trns(IPSECDOI_PROTO_IPCOMP, s->comptype)));
+			plog(logp, LOCATION, NULL, "my proposal:\n");
+			plog(logp, LOCATION, NULL, "%s\n",
+				ipsecdoi_printsa(s)););
 
 		if (sa.proto_id != s->proto_id)
 			continue;
@@ -3065,3 +3057,96 @@ err:
 	return -1;
 }
 
+const char *
+ipsecdoi_printsa(s0)
+	struct ipsecsa *s0;
+{
+	static char *buf = NULL;
+	char *p;
+	size_t bufsiz = 0;
+	size_t l;
+	struct ipsecsa *s;
+
+	l = 0;
+	for (s = s0; s; s = s->next)
+		l += strlen(ipsecdoi_printsa_bundle(s));
+	if (s0->next)
+		l += 20;
+	if (bufsiz < l) {
+		p = realloc(buf, l);
+		if (p != NULL) {
+			buf = p;
+			bufsiz = l;
+		}
+	}
+	if (buf == NULL)
+		return NULL;
+	memset(buf, 0, bufsiz);
+	if (s0->next)
+		strncpy(buf, "{next ", bufsiz);
+	else
+		strncpy(buf, "", bufsiz);
+	p = buf + strlen(buf);
+	for (s = s0; s; s = s->next) {
+		strncpy(p, ipsecdoi_printsa_bundle(s), bufsiz - (p - buf));
+		p += strlen(p);
+	}
+	if (s0->next)
+		strncpy(p, "}", bufsiz - (p - buf));
+	return buf;
+}
+
+static const char *
+ipsecdoi_printsa_bundle(s0)
+	struct ipsecsa *s0;
+{
+	static char *buf = NULL;
+	char *p;
+	size_t bufsiz = 0;
+	size_t l;
+	struct ipsecsa *s;
+
+	l = 0;
+	for (s = s0; s; s = s->bundles)
+		l += strlen(ipsecdoi_printsa_1(s));
+	if (s0->bundles)
+		l += 20;
+	if (bufsiz < l) {
+		p = realloc(buf, l);
+		if (p != NULL) {
+			buf = p;
+			bufsiz = l;
+		}
+	}
+	if (buf == NULL)
+		return NULL;
+	memset(buf, 0, bufsiz);
+	if (s0->bundles)
+		strncpy(buf, "<bundle ", bufsiz);
+	else
+		strncpy(buf, "", bufsiz);
+	p = buf + strlen(buf);
+	for (s = s0; s; s = s->bundles) {
+		strncpy(p, ipsecdoi_printsa_1(s), bufsiz - (p - buf));
+		p += strlen(p);
+	}
+	if (s0->bundles)
+		strncpy(p, ">", bufsiz - (p - buf));
+	return buf;
+}
+
+static const char *
+ipsecdoi_printsa_1(s)
+	struct ipsecsa *s;
+{
+	static char buf[BUFSIZ];
+
+	snprintf(buf, sizeof(buf),
+		"(proto_id=%s encmode=%s enctype=%s authtype=%s comptype=%s)",
+		s_ipsecdoi_proto(s->proto_id),
+		s_ipsecdoi_trns(IPSECDOI_PROTO_IPSEC_ESP, s->enctype),
+		s_ipsecdoi_attr_v(IPSECDOI_ATTR_ENC_MODE, s->encmode),
+		s_ipsecdoi_attr_v(IPSECDOI_ATTR_AUTH, s->authtype),
+		s_ipsecdoi_trns(IPSECDOI_PROTO_IPCOMP, s->comptype));
+	return buf;
+}
