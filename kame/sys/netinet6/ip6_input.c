@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.73 2000/03/25 07:23:47 sumikawa Exp $	*/
+/*	$KAME: ip6_input.c,v 1.74 2000/03/28 14:11:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -418,20 +418,12 @@ ip6_input(m)
 		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_addrerr);
 		goto bad;
 	}
-#if 1
+
 	/*
-	 * The following check is not documented in the spec.  Malicious party
-	 * may be able to use IPv4 mapped addr to confuse tcp/udp stack and
-	 * bypass security checks (act as if it was from 127.0.0.1 by using
-	 * IPv6 src ::ffff:127.0.0.1).	Be cautious.
+	 * Don't check IPv4 mapped address here.  SIIT assumes that
+	 * routers would forward IPv6 native packets with IPv4 mapped
+	 * address normally.
 	 */
-	if (IN6_IS_ADDR_V4MAPPED(&ip6->ip6_src) ||
-	    IN6_IS_ADDR_V4MAPPED(&ip6->ip6_dst)) {
-		ip6stat.ip6s_badscope++;
-		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_addrerr);
-		goto bad;
-	}
-#endif
 #if 0
 	/*
 	 * Reject packets with IPv4 compatible addresses (auto tunnel).
@@ -724,13 +716,26 @@ ip6_input(m)
 		return;
 	}	
 
+	ip6 = mtod(m, struct ip6_hdr *);
+
+	/*
+	 * Malicious party may be able to use IPv4 mapped addr to confuse
+	 * tcp/udp stack and bypass security checks (act as if it was from
+	 * 127.0.0.1 by using IPv6 src ::ffff:127.0.0.1).  Be cautious.
+	 */
+	if (IN6_IS_ADDR_V4MAPPED(&ip6->ip6_src) ||
+	    IN6_IS_ADDR_V4MAPPED(&ip6->ip6_dst)) {
+		ip6stat.ip6s_badscope++;
+		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_addrerr);
+		goto bad;
+	}
+
 	/*
 	 * Tell launch routine the next header
 	 */
 #if defined(__NetBSD__) && defined(IFA_STATS)
 	if (IFA_STATS && deliverifp != NULL) {
 		struct in6_ifaddr *ia6;
-		ip6 = mtod(m, struct ip6_hdr *);
 		ia6 = in6_ifawithifp(deliverifp, &ip6->ip6_dst);
 		if (ia6)
 			ia6->ia_ifa.ifa_data.ifad_inbytes += m->m_pkthdr.len;
