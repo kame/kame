@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.9 2001/12/16 15:46:07 luigi Exp $
+ * $FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.12 2002/04/21 15:39:57 luigi Exp $
  */
 
 /*
@@ -132,7 +132,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.9 2001/12/16 15:46:07 luigi Exp $";
+  "$FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.12 2002/04/21 15:39:57 luigi Exp $";
 #endif
 
 /*
@@ -151,6 +151,8 @@ static struct rl_type rl_devs[] = {
 		"Addtron Technolgy 8139 10/100BaseTX" },
 	{ DLINK_VENDORID, DLINK_DEVICEID_530TXPLUS,
 		"D-Link DFE-530TX+ 10/100BaseTX" },
+	{ NORTEL_VENDORID, ACCTON_DEVICEID_5030,
+		"Nortel Networks 10/100BaseTX" },
 	{ 0, 0, NULL }
 };
 
@@ -573,6 +575,16 @@ static int rl_miibus_readreg(dev, phy, reg)
 		case MII_PHYIDR1:
 		case MII_PHYIDR2:
 			return(0);
+			break;
+		/*
+		 * Allow the rlphy driver to read the media status
+		 * register. If we have a link partner which does not
+		 * support NWAY, this is the register which will tell
+		 * us the results of parallel detection.
+		 */
+		case RL_MEDIASTAT:
+			rval = CSR_READ_1(sc, RL_MEDIASTAT);
+			return(rval);
 			break;
 		default:
 			printf("rl%d: bad phy register\n", sc->rl_unit);
@@ -1076,6 +1088,13 @@ static void rl_rxeof(sc)
 		max_bytes = limit - cur_rx;
 
 	while((CSR_READ_1(sc, RL_COMMAND) & RL_CMD_EMPTY_RXBUF) == 0) {
+#ifdef DEVICE_POLLING
+		if (ifp->if_ipending & IFF_POLLING) {
+			if (sc->rxcycles <= 0)
+				break;
+			sc->rxcycles--;
+		}
+#endif /* DEVICE_POLLING */
 		rxbufpos = sc->rl_cdata.rl_rx_buf + cur_rx;
 		rxstat = *(u_int32_t *)rxbufpos;
 
@@ -1134,8 +1153,6 @@ static void rl_rxeof(sc)
 			    total_len + RL_ETHER_ALIGN, 0, ifp, NULL);
 			if (m == NULL) {
 				ifp->if_ierrors++;
-				printf("rl%d: out of mbufs, tried to "
-				    "copy %d bytes\n", sc->rl_unit, wrap);
 			} else {
 				m_adj(m, RL_ETHER_ALIGN);
 				m_copyback(m, wrap, total_len - wrap,
@@ -1147,8 +1164,6 @@ static void rl_rxeof(sc)
 			    total_len + RL_ETHER_ALIGN, 0, ifp, NULL);
 			if (m == NULL) {
 				ifp->if_ierrors++;
-				printf("rl%d: out of mbufs, tried to "
-				    "copy %d bytes\n", sc->rl_unit, total_len);
 			} else
 				m_adj(m, RL_ETHER_ALIGN);
 			cur_rx += total_len + 4 + ETHER_CRC_LEN;
@@ -1253,6 +1268,44 @@ static void rl_tick(xsc)
 	return;
 }
 
+#ifdef DEVICE_POLLING
+static poll_handler_t rl_poll;
+
+static void
+rl_poll (struct ifnet *ifp, enum poll_cmd cmd, int count)
+{
+	struct rl_softc *sc = ifp->if_softc;
+
+	if (cmd == POLL_DEREGISTER) { /* final call, enable interrupts */
+		CSR_WRITE_4(sc, RL_IMR, RL_INTRS);
+		return;
+	}
+
+	sc->rxcycles = count;
+	rl_rxeof(sc);
+	rl_txeof(sc);
+	if (ifp->if_snd.ifq_head != NULL)
+                rl_start(ifp);
+
+        if (cmd == POLL_AND_CHECK_STATUS) { /* also check status register */
+                u_int16_t       status;
+ 
+                status = CSR_READ_2(sc, RL_ISR);
+		if (status)
+			CSR_WRITE_2(sc, RL_ISR, status);
+                 
+		/*
+		 * XXX check behaviour on receiver stalls.
+		 */
+
+		if (status & RL_ISR_SYSTEM_ERR) {
+			rl_reset(sc);
+			rl_init(sc);
+		}
+	}
+}
+#endif /* DEVICE_POLLING */
+
 static void rl_intr(arg)
 	void			*arg;
 {
@@ -1267,9 +1320,15 @@ static void rl_intr(arg)
 	}
 
 	ifp = &sc->arpcom.ac_if;
-
-	/* Disable interrupts. */
-	CSR_WRITE_2(sc, RL_IMR, 0x0000);
+#ifdef DEVICE_POLLING
+        if  (ifp->if_ipending & IFF_POLLING)
+                return;
+        if (ether_poll_register(rl_poll, ifp)) { /* ok, disable interrupts */
+                CSR_WRITE_2(sc, RL_IMR, 0x0000);
+                rl_poll(ifp, 0, 1);
+                return;
+        }
+#endif /* DEVICE_POLLING */
 
 	for (;;) {
 
@@ -1295,11 +1354,7 @@ static void rl_intr(arg)
 		}
 
 	}
-
-	/* Re-enable interrupts. */
-	CSR_WRITE_2(sc, RL_IMR, RL_INTRS);
-
-	if (!IFQ_IS_EMPTY(&ifp->if_snd))
+	if (ifp->if_snd.ifq_head != NULL)
 		rl_start(ifp);
 
 	return;
@@ -1489,6 +1544,14 @@ static void rl_init(xsc)
 	 */
 	rl_setmulti(sc);
 
+#ifdef DEVICE_POLLING
+	/*
+	 * Only enable interrupts if we are polling, keep them off otherwise.
+	 */
+	if (ifp->if_ipending & IFF_POLLING)
+		CSR_WRITE_2(sc, RL_IMR, 0);
+	else
+#endif /* DEVICE_POLLING */
 	/*
 	 * Enable interrupts.
 	 */
@@ -1631,6 +1694,10 @@ static void rl_stop(sc)
 	ifp->if_timer = 0;
 
 	untimeout(rl_tick, sc, sc->rl_stat_ch);
+	ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
+#ifdef DEVICE_POLLING
+	ether_poll_deregister(ifp);
+#endif /* DEVICE_POLLING */
 
 	CSR_WRITE_1(sc, RL_COMMAND, 0x00);
 	CSR_WRITE_2(sc, RL_IMR, 0x0000);
@@ -1646,7 +1713,6 @@ static void rl_stop(sc)
 		}
 	}
 
-	ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
 
 	return;
 }

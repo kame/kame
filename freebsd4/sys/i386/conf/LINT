@@ -2,7 +2,7 @@
 # LINT -- config file for checking all the sources, tries to pull in
 #	as much of the source tree as it can.
 #
-# $FreeBSD: src/sys/i386/conf/LINT,v 1.749.2.96 2001/12/23 08:17:37 pirzyk Exp $
+# $FreeBSD: src/sys/i386/conf/LINT,v 1.749.2.115 2002/05/22 17:08:04 pdeuskar Exp $
 #
 # NB: You probably don't want to try running a kernel built from this
 # file.  Instead, you should start from GENERIC, and add options from
@@ -151,6 +151,9 @@ cpu		I686_CPU		# aka Pentium Pro(tm)
 #
 # Options for CPU features.
 #
+# CPU_ATHLON_SSE_HACK tries to enable SSE instructions when the BIOS has
+# forgotten to enable them.
+#
 # CPU_BLUELIGHTNING_FPU_OP_CACHE enables FPU operand cache on IBM
 # BlueLightning CPU.  It works only with Cyrix FPU, and this option
 # should not be used with Intel FPU.
@@ -230,6 +233,7 @@ cpu		I686_CPU		# aka Pentium Pro(tm)
 # NOTE 3: This option may cause failures for software that requires
 # locked cycles in order to operate correctly.
 #
+options 	CPU_ATHLON_SSE_HACK
 options 	CPU_BLUELIGHTNING_FPU_OP_CACHE
 options 	CPU_BLUELIGHTNING_3X
 options 	CPU_BTB_EN
@@ -471,6 +475,7 @@ device		mn	# Munich32x/Falc54 Nx64kbit/sec cards.
 #  Ethernets; it is MANDATORY when a Ethernet device driver is
 #  configured or token-ring is enabled.
 #  The 'fddi' pseudo-device provides generic code to support FDDI.
+#  The `arcnet' pseudo-device provides generic code to support Arcnet.
 #  The `sppp' pseudo-device serves a similar role for certain types
 #  of synchronous PPP links (like `cx', `ar').
 #  The `sl' pseudo-device implements the Serial Line IP (SLIP) service.
@@ -502,6 +507,7 @@ pseudo-device	ether			#Generic Ethernet
 pseudo-device	vlan	1		#VLAN support
 pseudo-device	token			#Generic TokenRing
 pseudo-device	fddi			#Generic FDDI
+pseudo-device	arcnet			#Generic Arcnet
 pseudo-device	sppp			#Generic Synchronous PPP
 pseudo-device	loop			#Network loopback device
 pseudo-device	bpf			#Berkeley packet filter
@@ -600,9 +606,13 @@ options 	TCP_DROP_SYNFIN		#drop TCP packets with SYN+FIN
 options 	ICMP_BANDLIM
 
 # DUMMYNET enables the "dummynet" bandwidth limiter. You need
-# IPFIREWALL as well. See the dummynet(4) manpage for more info.
+# IPFIREWALL as well. See the dummynet(4) and ipfw(8) manpages for more info.
+# When you run DUMMYNET it is advisable to also have "options HZ=1000"
+# to achieve a smoother scheduling of the traffic.
+#
 # BRIDGE enables bridging between ethernet cards -- see bridge(4).
-# You can use IPFIREWALL and dummynet together with bridging.
+# You can use IPFIREWALL and DUMMYNET together with bridging.
+#
 options 	DUMMYNET
 options 	BRIDGE
 
@@ -635,6 +645,24 @@ options 	ATM_SPANS		#SPANS signalling manager
 options 	ATM_UNI			#UNI signalling manager
 device		hea			#Efficient ENI-155p ATM PCI
 device		hfa			#FORE PCA-200E ATM PCI
+
+# DEVICE_POLLING adds support for mixed interrupt-polling handling
+# of network device drivers, which has significant benefits in terms
+# of robustness to overloads and responsivity, as well as permitting
+# accurate scheduling of the CPU time between kernel network processing
+# and other activities. The drawback is a moderate (up to 1/HZ seconds)
+# potential increase in response times.
+# It is strongly recommended to use HZ=1000 or 2000 with DEVICE_POLLING
+# to achieve smoother behaviour.
+# Additionally, you can enable/disable polling at runtime with the
+# sysctl variable kern.polling.enable (defaults off), and select
+# the CPU fraction reserved to userland with the sysctl variable
+# kern.polling.user_frac (default 50, range 0..100).
+#
+# Only the "dc" "fxp" and "sis" devices support this mode of operation at
+# the time of this writing.
+ 
+options         DEVICE_POLLING
 
 
 #####################################################################
@@ -768,18 +796,27 @@ options 	_KPOSIX_VERSION=199309L
 # CLOCK OPTIONS
 
 # The granularity of operation is controlled by the kernel option HZ whose
-# default value (100) means a granularity of 10ms.  For an accurate simulation
-# of high data rates it might be necessary to reduce the timer granularity to
-# 1ms or less.  Consider, however, that some interfaces using programmed I/O
-# may require a considerable time to output packets.  So, reducing the
-# granularity too much might actually cause ticks to be missed thus reducing
+# default value (100) means a granularity of 10ms (1s/HZ).
+# Some subsystems, such as DUMMYNET or DEVICE_POLLING, might benefit from
+# a smaller granularity such as 1ms or less.
+# Consider, however, that reducing the granularity too much might
+# cause excessive overhead in clock interrupt processing,
+# potentially causing ticks to be missed and thus actually reducing
 # the accuracy of operation.
 
 options 	HZ=100
 
-# Other clock options
+# The following options are used for debugging clock behavior only, and
+# should not be used for production systems.
+# 
+# CLK_CALIBRATION_LOOP will run the clock calibration loop at startup
+# until the user presses a key.
 
 options 	CLK_CALIBRATION_LOOP
+
+# The following two options measure the frequency of the corresponding
+# clock relative to the RTC (onboard mc146818a).
+
 options 	CLK_USE_I8254_CALIBRATION
 options 	CLK_USE_TSC_CALIBRATION
 
@@ -915,7 +952,7 @@ pseudo-device	speaker		#Play IBM BASIC-style noises out your speaker
 pseudo-device	gzip		#Exec gzipped a.out's
 pseudo-device	vn		#Vnode driver (turns a file into a device)
 pseudo-device	md		#Memory/malloc disk
-pseudo-device	snp	3	#Snoop device - to look at pty/vty/etc..
+pseudo-device	snp		#Snoop device - to look at pty/vty/etc..
 pseudo-device	ccd	4	#Concatenated disk driver
 
 # Configuring Vinum into the kernel is not necessary, since the kld
@@ -1168,6 +1205,7 @@ device		stg0	at isa? port 0x140 irq 11
 #			support).
 #
 device		aac
+device		aacp	# SCSI Passthrough interface (optional, CAM required)
 
 #
 # Compaq Smart RAID, Mylex DAC960 and AMI MegaRAID controllers.  Only
@@ -1343,10 +1381,23 @@ options 	COM_MULTIPORT		#code for some cards with shared IRQs
 #	0x20000	enable hardware RTS/CTS and larger FIFOs.  Only works for
 #		ST16650A-compatible UARTs.
 
+# PCI Universal Communications driver
+# Supports various single and multi port PCI serial cards. Maybe later
+# also the parallel ports on combination serial/parallel cards. New cards
+# can be added in src/sys/dev/puc/pucdata.c.
+#
+# If the PUC_FASTINTR option is used the driver will try to use fast
+# interrupts. The card must then be the only user of that interrupt.
+# Interrupts cannot be shared when using PUC_FASTINTR.
+device		puc
+options 	PUC_FASTINTR
+
 #
 # Network interfaces: `cx', `ed', `el', `ep', `ie', `is', `le', `lnc'
 #
 # ar: Arnet SYNC/570i hdlc sync 2/4 port V.35/X.21 serial driver (requires sppp)
+# cm: Arcnet SMC COM90c26 / SMC COM90c56
+#     (and SMC COM90c66 in '56 compatibility mode) adapters.
 # cs: IBM Etherjet and other Crystal Semi CS89x0-based adapters
 # cx: Cronyx/Sigma multiport sync/async (with Cisco or PPP framing)
 # ed: Western Digital and SMC 80xx; Novell NE1000 and NE2000; 3Com 3C503
@@ -1374,6 +1425,7 @@ options 	COM_MULTIPORT		#code for some cards with shared IRQs
 #       (no options needed)
 #
 device ar0 at isa? port 0x300 irq 10 iomem 0xd0000
+device cm0 at isa? port 0x2e0 irq 9 iomem 0xdc000
 device cs0 at isa? port 0x300
 device cx0 at isa? port 0x240 irq 15 drq 7
 device ed0 at isa? port 0x280 irq 5 iomem 0xd8000
@@ -1562,6 +1614,7 @@ device		pca0 at isa? port IO_TIMER1
 # rp: Comtrol Rocketport(ISA) - single card
 # tw: TW-523 power line interface for use with X-10 home control products
 # si: Specialix SI/XIO 4-32 port terminal multiplexor
+# spic: Sony Programmable I/O controller (VAIO notebooks)
 # stl: Stallion EasyIO and EasyConnection 8/32 (ISA and PCI), EasyConnection 8/64 PCI
 # stli: Stallion EasyConnection 8/64 ISA/EISA, ONboard, Brumby (intelligent)
 # nmdm: nullmodem terminal driver (see nmdm(4))
@@ -1662,6 +1715,7 @@ device		rp0	at isa? port 0x280
 device		tw0	at isa? port 0x380 irq 11
 device		si0	at isa? iomem 0xd0000 irq 12
 device		asc0	at isa? port IO_ASC1 drq 3 irq 10
+device		spic0	at isa? irq 0 port 0x10a0
 device		stl0	at isa? port 0x2a0 irq 10
 device		stli0	at isa? port 0x2a0 iomem 0xcc000 flags 23 iosiz 0x1000
 # You are unlikely to have the hardware for loran0 <phk@FreeBSD.org>
@@ -1733,6 +1787,8 @@ device		pci
 
 # PCI options
 #
+#Enable pci resources left off by a "lazy" BIOS:
+options 	PCI_ENABLE_IO_MODES
 #options 	PCI_QUIET	#quiets PCI code on chipset settings
 
 
@@ -1744,8 +1800,8 @@ device		pci
 #
 # The `bge' device provides support for gigabit ethernet adapters
 # based on the Broadcom BCM570x familiy of controllers, including the
-# 3Com 3c996-T, the SysKonnect SK-9D21 and SK-9D41, and the embedded
-# gigE NICs on Dell PowerEdge 2550 servers.
+# 3Com 3c996-T, the Netgear GA302T, the SysKonnect SK-9D21 and SK-9D41,
+# and the embedded gigE NICs on Dell PowerEdge 2550 servers.
 #
 # The `ncr' device provides support for the NCR 53C810 and 53C825
 # self-contained SCSI host adapters.
@@ -1769,6 +1825,9 @@ device		pci
 #
 # The `de' device provides support for the Digital Equipment DC21040
 # self-contained Ethernet adapter.
+#
+# The `em' device provides support for the Intel Pro/1000 Family of Gigabit
+# adapters (82542, 82543, 82544, 82540).
 #
 # The `fxp' device provides support for the Intel EtherExpress Pro/100B
 # PCI Fast Ethernet adapters.
@@ -1974,6 +2033,7 @@ device		vx		# 3Com 3c590, 3c595 (``Vortex'')
 
 # Gigabit Ethernet NICs.
 device		bge		# Broadcom BCM570x (``Tigon III'')
+device		em		# Intel Pro/1000 (82542,82543,82544,82540)
 device		gx		# Intel Pro/1000 (82542, 82543)
 device		lge		# Level 1 LXT1001 (``Mercury'')
 device		nge		# NatSemi DP83820 and DP83821
@@ -2038,12 +2098,14 @@ options 	POWERFAIL_NMI	# make it beep instead of panicing
 # intpm		Intel PIIX4 (82371AB, 82443MX) Power Management Unit
 # alpm		Acer Aladdin-IV/V/Pro2 Power Management Unit
 # ichsmb	Intel ICH SMBus controller chips (82801AA, 82801AB, 82801BA)
+# viapm		VIA VT82C586B,596,686A and VT8233 SMBus controllers
 #
 device		smbus		# Bus support, required for smb below.
 
 device		intpm
 device		alpm
 device		ichsmb
+device		viapm
 
 device		smb
 
@@ -2083,6 +2145,7 @@ device		pcf0	at isa? port 0x320 irq 5
 #       isic  - Siemens/Infineon ISDN ISAC/HSCX/IPAC chipset driver
 #       iwic  - Winbond W6692 PCI bus ISDN S/T interface controller
 #       ifpi  - AVM Fritz!Card PCI driver
+#       ifpi2 - AVM Fritz!Card PCI driver Version 2
 #       ihfc  - Cologne Chip HFC ISA/ISA-PnP chipset driver
 #       ifpnp - AVM Fritz!Card PnP driver 
 #       itjc  - Siemens ISAC / TJNet Tiger300/320 chipset
@@ -2207,6 +2270,13 @@ device ihfc
 device  ifpi
 #
 #---------------------------------------------------------------------------
+#       ifpi2 driver for AVM Fritz!Card PCI 2.0
+#---------------------------------------------------------------------------
+#
+# AVM Fritz!Card PCI 2.0
+device  "ifpi2"
+#
+#---------------------------------------------------------------------------
 #       iwic driver for Winbond W6692 chipset
 #---------------------------------------------------------------------------
 #
@@ -2268,7 +2338,7 @@ options 	IPR_VJ
 # enable logging of the first n IP packets to isdnd (n=32 here)
 #options	IPR_LOG=32
 #
-# network driver for sync PPP over ISDN
+# network driver for sync PPP over ISDN - requires sppp
 pseudo-device	"i4bisppp"	4
 
 
@@ -2370,15 +2440,27 @@ options 	NSFBUFS=1024
 
 # Set the size of the buffer cache KVM reservation, in buffers.  This is
 # scaled by approximately 16384 bytes.  The system will auto-size the buffer
-# cache if this option is not specified or set to 0.
+# cache if this option is not specified.
 #
 options 	NBUF=512
 
 # Set the size of the mbuf KVM reservation, in clusters.  This is scaled
 # by approximately 2048 bytes.  The system will auto-size the mbuf area
-# if this options is not specified or set to 0.
+# to (512 + maxusers*16) if this option is not specified.
+# maxusers is in turn computed at boot time depending on available memory
+# or set to the value specified by "options MAXUSERS=x" (x=0 means
+# autoscaling).
+# So, to take advantage of autoscaling, you have to remove both
+# NMBCLUSTERS and MAXUSERS (and NMBUFS) from your kernel config.
 #
 options 	NMBCLUSTERS=1024
+
+# Set the number of mbufs available in the system. Each mbuf
+# consumes 256 bytes. The system will autosize this (to 4 times
+# the number of NMBCLUSTERS, depending on other constraints)
+# if this option is not specified.
+#
+options		NMBUFS=4096
 
 # Tune the kernel malloc area parameters.  VM_KMEM_SIZE represents the 
 # minimum, in bytes, and is typically (12*1024*1024) (12MB). 
@@ -2490,6 +2572,15 @@ options 	DPT_ALLOW_MEMIO
 device		ciss
 
 #
+# Intel Integrated RAID controllers.
+# This driver was developed and is maintained by Intel.  Contacts
+# at Intel for this driver are
+# "Kannanthanam, Boji T" <boji.t.kannanthanam@intel.com> and
+# "Leubner, Achim" <achim.leubner@intel.com>.
+#
+device          iir
+
+#
 # Mylex AcceleRAID and eXtremeRAID controllers with v6 and later
 # firmware.  These controllers have a SCSI-like interface, and require
 # the CAM infrastructure.
@@ -2504,6 +2595,8 @@ device		ohci
 # General USB code (mandatory for USB)
 device		usb
 #
+# Fm Radio
+device		ufm
 # Generic USB device driver
 device		ugen
 # Human Interface Device (anything with buttons and dials)

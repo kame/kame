@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_ti.c,v 1.25.2.13 2001/12/16 15:46:08 luigi Exp $
+ * $FreeBSD: src/sys/pci/if_ti.c,v 1.25.2.14 2002/02/15 04:20:20 silby Exp $
  */
 
 /*
@@ -133,7 +133,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_ti.c,v 1.25.2.13 2001/12/16 15:46:08 luigi Exp $";
+  "$FreeBSD: src/sys/pci/if_ti.c,v 1.25.2.14 2002/02/15 04:20:20 silby Exp $";
 #endif
 
 /*
@@ -821,8 +821,6 @@ static int ti_newbuf_mini(sc, i, m)
 	if (m == NULL) {
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
 		if (m_new == NULL) {
-			printf("ti%d: mbuf allocation failed "
-			    "-- packet dropped!\n", sc->ti_unit);
 			return(ENOBUFS);
 		}
 		m_new->m_len = m_new->m_pkthdr.len = MHLEN;
@@ -864,8 +862,6 @@ static int ti_newbuf_jumbo(sc, i, m)
 		/* Allocate the mbuf. */
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
 		if (m_new == NULL) {
-			printf("ti%d: mbuf allocation failed "
-			    "-- packet dropped!\n", sc->ti_unit);
 			return(ENOBUFS);
 		}
 

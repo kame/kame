@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_icmp.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_icmp.c,v 1.39.2.14 2002/01/14 07:54:35 ru Exp $
+ * $FreeBSD: src/sys/netinet/ip_icmp.c,v 1.39.2.17 2002/05/06 07:29:18 dd Exp $
  */
 
 #include "opt_ipsec.h"
@@ -103,6 +103,10 @@ SYSCTL_INT(_net_inet_icmp, ICMPCTL_ICMPLIM, icmplim, CTLFLAG_RD,
 	
 #endif 
 
+static int	icmplim_output = 1;
+SYSCTL_INT(_net_inet_icmp, OID_AUTO, icmplim_output, CTLFLAG_RW,
+	&icmplim_output, 0, "");
+
 /*
  * ICMP broadcast echo sysctl
  */
@@ -168,11 +172,8 @@ icmp_error(n, type, code, dest, destifp)
 	if (m == NULL)
 		goto freeit;
 	icmplen = min(oiplen + 8, oip->ip_len);
-	if (icmplen < sizeof(struct ip)) {
-		printf("icmp_error: bad length\n");
-		m_free(m);
-		goto freeit;
-	}
+	if (icmplen < sizeof(struct ip))
+		panic("icmp_error: bad length");
 	m->m_len = icmplen + ICMP_MINLEN;
 	MH_ALIGN(m, m->m_len);
 	icp = mtod(m, struct icmp *);
@@ -615,6 +616,8 @@ icmp_reflect(m)
 	}
 	t = ip->ip_dst;
 	ip->ip_dst = ip->ip_src;
+	ro = &rt;
+	bzero(ro, sizeof(*ro));
 	/*
 	 * If the incoming packet was addressed directly to us,
 	 * use dst as the src for the reply.  Otherwise (broadcast
@@ -635,8 +638,6 @@ icmp_reflect(m)
 				goto match;
 		}
 	}
-	ro = &rt;
-	bzero(ro, sizeof(*ro));
 	ia = ip_rtaddr(ip->ip_dst, ro);
 	/* We need a route to do anything useful. */
 	if (ia == NULL) {
@@ -864,7 +865,7 @@ badport_bandlim(int which)
 	 */
 
 	if ((unsigned int)dticks > hz) {
-		if (lpackets[which] > icmplim) {
+		if (lpackets[which] > icmplim && icmplim_output) {
 			printf("%s from %d to %d packets per second\n",
 				bandlimittype[which],
 				lpackets[which],

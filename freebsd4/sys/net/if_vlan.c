@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_vlan.c,v 1.15.2.9 2001/12/04 20:01:54 brooks Exp $
+ * $FreeBSD: src/sys/net/if_vlan.c,v 1.15.2.12 2002/04/04 05:51:55 luigi Exp $
  */
 
 /*
@@ -434,6 +434,26 @@ vlan_input_tag(struct ether_header *eh, struct mbuf *m, u_int16_t t)
 {
 	struct ifvlan *ifv;
 
+	/*
+	 * Fake up a header and send the packet to the physical interface's
+	 * bpf tap if active.
+	 */
+	if (m->m_pkthdr.rcvif->if_bpf != NULL) {
+		struct m_hdr mh;
+		struct ether_vlan_header evh;
+
+		bcopy(eh, &evh, 2*ETHER_ADDR_LEN);
+		evh.evl_encap_proto = htons(ETHERTYPE_VLAN);
+		evh.evl_tag = htons(t);
+		evh.evl_proto = eh->ether_type;
+
+		/* This kludge is OK; BPF treats the "mbuf" as read-only */
+		mh.mh_next = m;
+		mh.mh_data = (char *)&evh;
+		mh.mh_len = ETHER_HDR_LEN + EVL_ENCAPLEN;
+		bpf_mtap(m->m_pkthdr.rcvif, (struct mbuf *)&mh);
+	}
+
 	for (ifv = LIST_FIRST(&ifv_list); ifv != NULL;
 	    ifv = LIST_NEXT(ifv, ifv_list)) {
 		if (m->m_pkthdr.rcvif == ifv->ifv_p
@@ -442,7 +462,7 @@ vlan_input_tag(struct ether_header *eh, struct mbuf *m, u_int16_t t)
 	}
 
 	if (ifv == NULL || (ifv->ifv_if.if_flags & IFF_UP) == 0) {
-		m_free(m);
+		m_freem(m);
 		return -1;	/* So the parent can take note */
 	}
 
@@ -472,6 +492,7 @@ vlan_input(struct ether_header *eh, struct mbuf *m)
 	}
 
 	if (ifv == NULL || (ifv->ifv_if.if_flags & IFF_UP) == 0) {
+		m->m_pkthdr.rcvif->if_noproto++;
 		m_freem(m);
 		return -1;	/* so ether_input can take note */
 	}
@@ -614,7 +635,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		switch (ifa->ifa_addr->sa_family) {
 #ifdef INET
 		case AF_INET:
-			arp_ifinit(&ifv->ifv_ac, ifa);
+			arp_ifinit(&ifv->ifv_if, ifa);
 			break;
 #endif
 		default:

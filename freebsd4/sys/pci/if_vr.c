@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_vr.c,v 1.26.2.8 2001/12/16 15:46:08 luigi Exp $
+ * $FreeBSD: src/sys/pci/if_vr.c,v 1.26.2.9 2002/05/20 01:18:06 silby Exp $
  */
 
 /*
@@ -100,7 +100,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_vr.c,v 1.26.2.8 2001/12/16 15:46:08 luigi Exp $";
+  "$FreeBSD: src/sys/pci/if_vr.c,v 1.26.2.9 2002/05/20 01:18:06 silby Exp $";
 #endif
 
 /*
@@ -1074,8 +1074,8 @@ static void vr_txeof(sc)
 
 	ifp = &sc->arpcom.ac_if;
 
-	/* Clear the timeout timer. */
-	ifp->if_timer = 0;
+	/* Reset the timeout timer; if_txeoc will clear it. */
+	ifp->if_timer = 5;
 
 	/* Sanity check. */
 	if (sc->vr_cdata.vr_tx_head == NULL)
@@ -1132,11 +1132,10 @@ static void vr_txeoc(sc)
 
 	ifp = &sc->arpcom.ac_if;
 
-	ifp->if_timer = 0;
-
 	if (sc->vr_cdata.vr_tx_head == NULL) {
 		ifp->if_flags &= ~IFF_OACTIVE;
 		sc->vr_cdata.vr_tx_tail = NULL;
+		ifp->if_timer = 0;
 	}
 
 	return;

@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/if_lnc.c,v 1.68.2.4 2001/01/08 15:37:59 ume Exp $
+ * $FreeBSD: src/sys/i386/isa/if_lnc.c,v 1.68.2.5 2002/02/13 00:43:10 dillon Exp $
  */
 
 /*
@@ -840,9 +840,9 @@ lnc_tint(struct lnc_softc *sc)
 					sc->mbuf_count++;
 					start->buff.mbuf = 0;
 				} else {
-					struct mbuf *junk;
-					MFREE(start->buff.mbuf, junk);
-					start->buff.mbuf = 0;
+					/* XXX shouldn't this be m_freem ?? */
+					m_free(start->buff.mbuf);
+					start->buff.mbuf = NULL;
 				}
 			}
 			sc->pending_transmits--;
@@ -1704,8 +1704,8 @@ lnc_start(struct ifnet *ifp)
 						m->m_len -= chunk;
 						m->m_data += chunk;
 						if (m->m_len <= 0) {
-							MFREE(m, head->m_next);
-							m = head->m_next;
+							m = m_free(m);
+							head->m_next = m;
 						}
 					}
 				}

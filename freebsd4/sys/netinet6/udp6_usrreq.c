@@ -1,5 +1,5 @@
-/*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.7 2001/12/15 01:06:28 brooks Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.49 2002/03/16 18:30:59 jinmei Exp $	*/
+/*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.9 2002/04/28 05:40:27 suz Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.50 2002/06/21 12:04:19 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.

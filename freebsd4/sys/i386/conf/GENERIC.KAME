@@ -21,7 +21,7 @@
 # device lines is also present in the ./LINT configuration file. If you are
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-# $FreeBSD: src/sys/i386/conf/GENERIC,v 1.246.2.38 2002/01/25 17:41:40 murray Exp $
+# $FreeBSD: src/sys/i386/conf/GENERIC,v 1.246.2.43 2002/05/23 17:04:01 obrien Exp $
 
 machine		i386
 cpu		I386_CPU
@@ -120,10 +120,13 @@ device		pass		# Passthrough device (direct SCSI access)
 # RAID controllers interfaced to the SCSI subsystem
 device		asr		# DPT SmartRAID V, VI and Adaptec SCSI RAID
 device		dpt		# DPT Smartcache - See LINT for options!
+device          iir             # Intel Integrated RAID
 device		mly		# Mylex AcceleRAID/eXtremeRAID
+device		ciss		# Compaq SmartRAID 5* series
 
 # RAID controllers
 device		aac		# Adaptec FSA RAID, Dell PERC2/PERC3
+device		aacp		# SCSI passthrough for aac (requires CAM)
 device		ida		# Compaq Smart RAID
 device		amr		# AMI MegaRAID
 device		mlx		# Mylex DAC960 family
@@ -177,6 +180,7 @@ device		ppi		# Parallel port interface device
 
 # PCI Ethernet NICs.
 device		de		# DEC/Intel DC21x4x (``Tulip'')
+device		em		# Intel PRO/1000 adapter Gigabit Ethernet Card (``Wiseman'')
 device		txp		# 3Com 3cR990 (``Typhoon'')
 device		vx		# 3Com 3c590, 3c595 (``Vortex'')
 
@@ -194,7 +198,6 @@ device		tl		# Texas Instruments ThunderLAN
 device		tx		# SMC EtherPower II (83c170 ``EPIC'')
 device		vr		# VIA Rhine, Rhine II
 device		wb		# Winbond W89C840F
-device		wx		# Intel Gigabit Ethernet Card (``Wiseman'')
 device		xl		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
 device		bge		# Broadcom BCM570x (``Tigon III'')
 

@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/nge/if_nge.c,v 1.13.2.7 2001/12/14 19:44:38 jlemon Exp $
+ * $FreeBSD: src/sys/dev/nge/if_nge.c,v 1.13.2.10 2002/05/06 09:36:25 phk Exp $
  */
 
 /*
@@ -84,7 +84,7 @@
  *   frame larger than 8170 bytes, the transmitter will wedge.
  *
  * To work around the latter problem, TX checksum offload is disabled
- * if the user selects an MTU larger than 8152 (8170 - 18)
+ * if the user selects an MTU larger than 8152 (8170 - 18).
  */
 
 #include <sys/param.h>
@@ -132,7 +132,7 @@ MODULE_DEPEND(nge, miibus, 1, 1, 1);
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/nge/if_nge.c,v 1.13.2.7 2001/12/14 19:44:38 jlemon Exp $";
+  "$FreeBSD: src/sys/dev/nge/if_nge.c,v 1.13.2.10 2002/05/06 09:36:25 phk Exp $";
 #endif
 
 #define NGE_CSUM_FEATURES	(CSUM_IP | CSUM_TCP | CSUM_UDP)
@@ -146,58 +146,53 @@ static struct nge_type nge_devs[] = {
 	{ 0, 0, NULL }
 };
 
-static int nge_probe		__P((device_t));
-static int nge_attach		__P((device_t));
-static int nge_detach		__P((device_t));
+static int nge_probe		(device_t);
+static int nge_attach		(device_t);
+static int nge_detach		(device_t);
 
-static int nge_alloc_jumbo_mem	__P((struct nge_softc *));
-static void nge_free_jumbo_mem	__P((struct nge_softc *));
-static void *nge_jalloc		__P((struct nge_softc *));
-static void nge_jfree		__P((caddr_t, u_int));
-static void nge_jref		__P((caddr_t, u_int));
+static int nge_alloc_jumbo_mem	(struct nge_softc *);
+static void nge_free_jumbo_mem	(struct nge_softc *);
+static void *nge_jalloc		(struct nge_softc *);
+static void nge_jfree		(caddr_t, u_int);
+static void nge_jref		(caddr_t, u_int);
 
-static int nge_newbuf		__P((struct nge_softc *,
-					struct nge_desc *,
-					struct mbuf *));
-static int nge_encap		__P((struct nge_softc *,
-					struct mbuf *, u_int32_t *));
-static void nge_rxeof		__P((struct nge_softc *));
-static void nge_rxeoc		__P((struct nge_softc *));
-static void nge_txeof		__P((struct nge_softc *));
-static void nge_intr		__P((void *));
-static void nge_tick		__P((void *));
-static void nge_start		__P((struct ifnet *));
-static int nge_ioctl		__P((struct ifnet *, u_long, caddr_t));
-static void nge_init		__P((void *));
-static void nge_stop		__P((struct nge_softc *));
-static void nge_watchdog		__P((struct ifnet *));
-static void nge_shutdown		__P((device_t));
-static int nge_ifmedia_upd	__P((struct ifnet *));
-static void nge_ifmedia_sts	__P((struct ifnet *, struct ifmediareq *));
+static int nge_newbuf		(struct nge_softc *,
+					struct nge_desc *, struct mbuf *);
+static int nge_encap		(struct nge_softc *,
+					struct mbuf *, u_int32_t *);
+static void nge_rxeof		(struct nge_softc *);
+static void nge_txeof		(struct nge_softc *);
+static void nge_intr		(void *);
+static void nge_tick		(void *);
+static void nge_start		(struct ifnet *);
+static int nge_ioctl		(struct ifnet *, u_long, caddr_t);
+static void nge_init		(void *);
+static void nge_stop		(struct nge_softc *);
+static void nge_watchdog		(struct ifnet *);
+static void nge_shutdown		(device_t);
+static int nge_ifmedia_upd	(struct ifnet *);
+static void nge_ifmedia_sts	(struct ifnet *, struct ifmediareq *);
 
-static void nge_delay		__P((struct nge_softc *));
-static void nge_eeprom_idle	__P((struct nge_softc *));
-static void nge_eeprom_putbyte	__P((struct nge_softc *, int));
-static void nge_eeprom_getword	__P((struct nge_softc *, int, u_int16_t *));
-static void nge_read_eeprom	__P((struct nge_softc *, caddr_t, int,
-							int, int));
+static void nge_delay		(struct nge_softc *);
+static void nge_eeprom_idle	(struct nge_softc *);
+static void nge_eeprom_putbyte	(struct nge_softc *, int);
+static void nge_eeprom_getword	(struct nge_softc *, int, u_int16_t *);
+static void nge_read_eeprom	(struct nge_softc *, caddr_t, int, int, int);
 
-static void nge_mii_sync	__P((struct nge_softc *));
-static void nge_mii_send	__P((struct nge_softc *, u_int32_t, int));
-static int nge_mii_readreg	__P((struct nge_softc *,
-					struct nge_mii_frame *));
-static int nge_mii_writereg	__P((struct nge_softc *,
-					struct nge_mii_frame *));
+static void nge_mii_sync	(struct nge_softc *);
+static void nge_mii_send	(struct nge_softc *, u_int32_t, int);
+static int nge_mii_readreg	(struct nge_softc *, struct nge_mii_frame *);
+static int nge_mii_writereg	(struct nge_softc *, struct nge_mii_frame *);
 
-static int nge_miibus_readreg	__P((device_t, int, int));
-static int nge_miibus_writereg	__P((device_t, int, int, int));
-static void nge_miibus_statchg	__P((device_t));
+static int nge_miibus_readreg	(device_t, int, int);
+static int nge_miibus_writereg	(device_t, int, int, int);
+static void nge_miibus_statchg	(device_t);
 
-static void nge_setmulti	__P((struct nge_softc *));
-static u_int32_t nge_crc	__P((struct nge_softc *, caddr_t));
-static void nge_reset		__P((struct nge_softc *));
-static int nge_list_rx_init	__P((struct nge_softc *));
-static int nge_list_tx_init	__P((struct nge_softc *));
+static void nge_setmulti	(struct nge_softc *);
+static u_int32_t nge_crc	(struct nge_softc *, caddr_t);
+static void nge_reset		(struct nge_softc *);
+static int nge_list_rx_init	(struct nge_softc *);
+static int nge_list_tx_init	(struct nge_softc *);
 
 #ifdef NGE_USEIOSPACE
 #define NGE_RES			SYS_RES_IOPORT
@@ -713,8 +708,7 @@ static void nge_setmulti(sc)
 	 * that needs to be updated, and the lower 4 bits represent
 	 * which bit within that byte needs to be set.
 	 */
-	for (ifma = ifp->if_multiaddrs.lh_first; ifma != NULL;
-	    ifma = ifma->ifma_link.le_next) {
+	LIST_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		h = nge_crc(sc, LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
@@ -1417,18 +1411,6 @@ static void nge_rxeof(sc)
 	return;
 }
 
-void nge_rxeoc(sc)
-	struct nge_softc	*sc;
-{
-	struct ifnet		*ifp;
-
-	ifp = &sc->arpcom.ac_if;
-	nge_rxeof(sc);
-	ifp->if_flags &= ~IFF_RUNNING;
-	nge_init(sc);
-	return;
-}
-
 /*
  * A frame was downloaded to the chip. It's safe for us to clean up
  * the list buffers.
@@ -1510,7 +1492,6 @@ static void nge_tick(xsc)
 	mii_tick(mii);
 
 	if (!sc->nge_link) {
-		mii_pollstat(mii);
 		if (mii->mii_media_status & IFM_ACTIVE &&
 		    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE) {
 			sc->nge_link++;
@@ -1519,9 +1500,9 @@ static void nge_tick(xsc)
 				    sc->nge_unit);
 			if (!IFQ_IS_EMPTY(&ifp->if_snd))
 				nge_start(ifp);
-		} else
-			sc->nge_stat_ch = timeout(nge_tick, sc, hz);
+		}
 	}
+	sc->nge_stat_ch = timeout(nge_tick, sc, hz);
 
 
 	splx(s);
@@ -1564,12 +1545,13 @@ static void nge_intr(arg)
 		if ((status & NGE_ISR_RX_DESC_OK) ||
 		    (status & NGE_ISR_RX_ERR) ||
 		    (status & NGE_ISR_RX_OFLOW) ||
+		    (status & NGE_ISR_RX_FIFO_OFLOW) ||
+		    (status & NGE_ISR_RX_IDLE) ||
 		    (status & NGE_ISR_RX_OK))
 			nge_rxeof(sc);
-#ifdef notdef
-		if ((status & NGE_ISR_RX_OFLOW))
-			nge_rxeoc(sc);
-#endif
+
+		if ((status & NGE_ISR_RX_IDLE))
+			NGE_SETBIT(sc, NGE_CSR, NGE_CSR_RX_ENABLE);
 
 		if (status & NGE_ISR_SYSERR) {
 			nge_reset(sc);
@@ -1577,10 +1559,13 @@ static void nge_intr(arg)
 			nge_init(sc);
 		}
 
-		if (status & NGE_IMR_PHY_INTR) {
+#ifdef notyet
+		/* mii_tick should only be called once per second */
+		if (status & NGE_ISR_PHY_INTR) {
 			sc->nge_link = 0;
 			nge_tick(sc);
 		}
+#endif
 	}
 
 	/* Re-enable interrupts. */
@@ -1744,6 +1729,7 @@ static void nge_init(xsc)
 	 * Cancel pending I/O and free all RX/TX buffers.
 	 */
 	nge_stop(sc);
+	sc->nge_stat_ch = timeout(nge_tick, sc, hz);
 
 	mii = device_get_softc(sc->nge_miibus);
 
@@ -1863,9 +1849,9 @@ static void nge_init(xsc)
 	NGE_SETBIT(sc, NGE_CFG, NGE_CFG_PHYINTR_SPD|
 	    NGE_CFG_PHYINTR_LNK|NGE_CFG_PHYINTR_DUP|NGE_CFG_EXTSTS_ENB);
 
-	/* 
-	 * Configure interrupt holdoff (moderation). We can 
-	 * have the chip delay interrupt delivery for a certain   
+	/*
+	 * Configure interrupt holdoff (moderation). We can
+	 * have the chip delay interrupt delivery for a certain
 	 * period. Units are in 100us, and the max setting
 	 * is 25500us (0xFF x 100us). Default is a 100us holdoff.
 	 */

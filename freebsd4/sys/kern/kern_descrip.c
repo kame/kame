@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_descrip.c	8.6 (Berkeley) 4/19/94
- * $FreeBSD: src/sys/kern/kern_descrip.c,v 1.81.2.9 2001/12/14 19:26:24 jlemon Exp $
+ * $FreeBSD: src/sys/kern/kern_descrip.c,v 1.81.2.14 2002/04/29 15:14:12 asmodai Exp $
  */
 
 #include "opt_compat.h"
@@ -161,8 +161,6 @@ retry:
 	if (new >= fdp->fd_nfiles) {
 		if ((error = fdalloc(p, new, &i)))
 			return (error);
-		if (new != i)
-			panic("dup2: fdalloc");
 		/*
 		 * fdalloc() may block, retest everything.
 		 */
@@ -238,11 +236,12 @@ fcntl(p, uap)
 		return (do_dup(fdp, uap->fd, i, p->p_retval, p));
 
 	case F_GETFD:
-		p->p_retval[0] = *pop & 1;
+		p->p_retval[0] = (*pop & UF_EXCLOSE) ? FD_CLOEXEC : 0;
 		return (0);
 
 	case F_SETFD:
-		*pop = (*pop &~ 1) | (uap->arg & 1);
+		*pop = (*pop &~ UF_EXCLOSE) |
+		    (uap->arg & FD_CLOEXEC ? UF_EXCLOSE : 0);
 		return (0);
 
 	case F_GETFL:

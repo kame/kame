@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if.c	8.3 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/net/if.c,v 1.85.2.11 2001/12/20 10:30:16 ru Exp $
+ * $FreeBSD: src/sys/net/if.c,v 1.85.2.18 2002/04/28 05:40:25 suz Exp $
  */
 
 #include "opt_compat.h"
@@ -232,6 +232,9 @@ if_attach(ifp)
 
 	if (domains)
 		if_attachdomain1(ifp);
+
+	/* Announce the interface. */
+	rt_ifannouncemsg(ifp, IFAN_ARRIVAL);
 }
 
 static void
@@ -350,6 +353,9 @@ if_detach(ifp)
 			continue;
 		(void) rnh->rnh_walktree(rnh, if_rtdel, ifp);
 	}
+
+	/* Announce that the interface is gone. */
+	rt_ifannouncemsg(ifp, IFAN_DEPARTURE);
 
 	for (dp = domains; dp; dp = dp->dom_next) {
 		if (dp->dom_ifdetach && ifp->if_afdata[dp->dom_family])
@@ -663,11 +669,7 @@ ifa_ifwithnet(addr)
 
 			if (ifa->ifa_addr->sa_family != af)
 next:				continue;
-			if (
-#ifdef INET6 /* XXX: for maching gif tunnel dst as routing entry gateway */
-			    addr->sa_family != AF_INET6 &&
-#endif
-			    ifp->if_flags & IFF_POINTOPOINT) {
+			if (af == AF_INET && ifp->if_flags & IFF_POINTOPOINT) {
 				/*
 				 * This is a bit broken as it doesn't
 				 * take into account that the remote end may
@@ -1660,6 +1662,17 @@ if_setlladdr(struct ifnet *ifp, const u_char *lladdr, int len)
 		ifp->if_flags |= IFF_UP;
 		ifr.ifr_flags = ifp->if_flags;
 		(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
+#ifdef INET
+		/*
+		 * Also send gratuitous ARPs to notify other nodes about
+		 * the address change.
+		 */
+		TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
+			if (ifa->ifa_addr != NULL &&
+			    ifa->ifa_addr->sa_family == AF_INET)
+				arp_ifinit((struct arpcom *)ifp, ifa);
+		}
+#endif
 	}
 	return (0);
 }

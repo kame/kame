@@ -70,7 +70,7 @@
  * Paul Mackerras (paulus@cs.anu.edu.au).
  */
 
-/* $FreeBSD: src/sys/net/ppp_tty.c,v 1.43 2000/01/29 16:56:24 peter Exp $ */
+/* $FreeBSD: src/sys/net/ppp_tty.c,v 1.43.2.1 2002/02/13 00:43:11 dillon Exp $ */
 
 #include "opt_ppp.h"		/* XXX for ppp_defs.h */
 
@@ -574,7 +574,6 @@ pppasyncstart(sc)
     register int len;
     register u_char *start, *stop, *cp;
     int n, ndone, done, idle;
-    struct mbuf *m2;
     int s;
 
     idle = 0;
@@ -712,8 +711,7 @@ pppasyncstart(sc)
 	    }
 
 	    /* Finished with this mbuf; free it and move on. */
-	    MFREE(m, m2);
-	    m = m2;
+	    m = m_free(m);
 	    if (m == NULL) {
 		/* Finished a packet */
 		break;

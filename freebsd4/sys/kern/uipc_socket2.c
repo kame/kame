@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_socket2.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/kern/uipc_socket2.c,v 1.55.2.10 2001/12/27 18:36:10 jlemon Exp $
+ * $FreeBSD: src/sys/kern/uipc_socket2.c,v 1.55.2.15 2002/05/21 18:03:16 silby Exp $
  */
 
 #include "opt_param.h"
@@ -123,6 +123,7 @@ soisconnected(so)
 		head->so_incqlen--;
 		so->so_state &= ~SS_INCOMP;
 		TAILQ_INSERT_TAIL(&head->so_comp, so, so_list);
+		head->so_qlen++;
 		so->so_state |= SS_COMP;
 		sorwakeup(head);
 		wakeup_one(&head->so_timeo);
@@ -155,50 +156,6 @@ soisdisconnected(so)
 	wakeup((caddr_t)&so->so_timeo);
 	sowwakeup(so);
 	sorwakeup(so);
-}
-
-/*
- * Return a random connection that hasn't been serviced yet and
- * is eligible for discard.  There is a one in qlen chance that
- * we will return a null, saying that there are no dropable
- * requests.  In this case, the protocol specific code should drop
- * the new request.  This insures fairness.
- *
- * This may be used in conjunction with protocol specific queue
- * congestion routines.
- */
-struct socket *
-sodropablereq(head)
-	register struct socket *head;
-{
-	register struct socket *so;
-	unsigned int i, j, qlen;
-	static int rnd;
-	static struct timeval old_runtime;
-	static unsigned int cur_cnt, old_cnt;
-	struct timeval tv;
-
-	getmicrouptime(&tv);
-	if ((i = (tv.tv_sec - old_runtime.tv_sec)) != 0) {
-		old_runtime = tv;
-		old_cnt = cur_cnt / i;
-		cur_cnt = 0;
-	}
-
-	so = TAILQ_FIRST(&head->so_incomp);
-	if (!so)
-		return (so);
-
-	qlen = head->so_incqlen;
-	if (++cur_cnt > qlen || old_cnt > qlen) {
-		rnd = (314159 * rnd + 66329) & 0xffff;
-		j = ((qlen + 1) * rnd) >> 16;
-
-		while (j-- && so)
-		    so = TAILQ_NEXT(so, so_list);
-	}
-
-	return (so);
 }
 
 /*
@@ -251,12 +208,17 @@ sonewconn3(head, connstatus, p)
 	if (connstatus) {
 		TAILQ_INSERT_TAIL(&head->so_comp, so, so_list);
 		so->so_state |= SS_COMP;
+		head->so_qlen++;
 	} else {
+		if (head->so_incqlen > head->so_qlimit) {
+			struct socket *sp;
+			sp = TAILQ_FIRST(&head->so_incomp);
+			(void) soabort(sp);
+		}
 		TAILQ_INSERT_TAIL(&head->so_incomp, so, so_list);
 		so->so_state |= SS_INCOMP;
 		head->so_incqlen++;
 	}
-	head->so_qlen++;
 	if (connstatus) {
 		sorwakeup(head);
 		wakeup((caddr_t)&head->so_timeo);
@@ -782,7 +744,7 @@ sbdrop(sb, len)
 	register struct sockbuf *sb;
 	register int len;
 {
-	register struct mbuf *m, *mn;
+	register struct mbuf *m;
 	struct mbuf *next;
 
 	next = (m = sb->sb_mb) ? m->m_nextpkt : 0;
@@ -802,13 +764,11 @@ sbdrop(sb, len)
 		}
 		len -= m->m_len;
 		sbfree(sb, m);
-		MFREE(m, mn);
-		m = mn;
+		m = m_free(m);
 	}
 	while (m && m->m_len == 0) {
 		sbfree(sb, m);
-		MFREE(m, mn);
-		m = mn;
+		m = m_free(m);
 	}
 	if (m) {
 		sb->sb_mb = m;
@@ -825,15 +785,14 @@ void
 sbdroprecord(sb)
 	register struct sockbuf *sb;
 {
-	register struct mbuf *m, *mn;
+	register struct mbuf *m;
 
 	m = sb->sb_mb;
 	if (m) {
 		sb->sb_mb = m->m_nextpkt;
 		do {
 			sbfree(sb, m);
-			MFREE(m, mn);
-			m = mn;
+			m = m_free(m);
 		} while (m);
 	}
 }
@@ -851,13 +810,23 @@ sbcreatecontrol(p, size, type, level)
 	register struct cmsghdr *cp;
 	struct mbuf *m;
 
-	if (CMSG_SPACE((u_int)size) > MLEN)
+	if (CMSG_SPACE((u_int)size) > MCLBYTES)
 		return ((struct mbuf *) NULL);
 	if ((m = m_get(M_DONTWAIT, MT_CONTROL)) == NULL)
 		return ((struct mbuf *) NULL);
+	if (CMSG_SPACE((u_int)size) > MLEN) {
+		MCLGET(m, M_DONTWAIT);
+		if ((m->m_flags & M_EXT) == 0) {
+			m_free(m);
+			return ((struct mbuf *) NULL);
+		}
+	}
 	cp = mtod(m, struct cmsghdr *);
-	/* XXX check size? */
-	(void)memcpy(CMSG_DATA(cp), p, size);
+	m->m_len = 0;
+	KASSERT(CMSG_SPACE((u_int)size) <= M_TRAILINGSPACE(m),
+	    ("sbcreatecontrol: short mbuf"));
+	if (p != NULL)
+		(void)memcpy(CMSG_DATA(cp), p, size);
 	m->m_len = CMSG_SPACE(size);
 	cp->cmsg_len = CMSG_LEN(size);
 	cp->cmsg_level = level;

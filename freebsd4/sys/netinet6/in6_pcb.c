@@ -1,5 +1,5 @@
-/*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.7 2001/12/20 10:30:19 ru Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.49 2002/02/26 10:42:55 jinmei Exp $	*/
+/*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.8 2002/04/28 05:40:26 suz Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.1.1.5 2002/06/21 01:22:04 suz Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.

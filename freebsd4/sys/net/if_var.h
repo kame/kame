@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)if.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_var.h,v 1.18.2.11 2001/12/20 10:30:17 ru Exp $
+ * $FreeBSD: src/sys/net/if_var.h,v 1.18.2.14 2002/02/20 23:34:09 fjoe Exp $
  */
 
 #ifndef	_NET_IF_VAR_H_
@@ -525,7 +525,17 @@ void	if_clone_detach __P((struct if_clone *));
 int	if_clone_create __P((char *, int));
 int	if_clone_destroy __P((const char *));
 
-#endif /* _KERNEL */
+#define IF_LLADDR(ifp)							\
+    LLADDR((struct sockaddr_dl *) ifnet_addrs[ifp->if_index - 1]->ifa_addr)
 
+#ifdef DEVICE_POLLING
+enum poll_cmd { POLL_ONLY, POLL_AND_CHECK_STATUS, POLL_DEREGISTER };
+
+typedef	void poll_handler_t __P((struct ifnet *ifp,
+		enum poll_cmd cmd, int count));
+int	ether_poll_register __P((poll_handler_t *h, struct ifnet *ifp));
+int	ether_poll_deregister __P((struct ifnet *ifp));
+#endif /* DEVICE_POLLING */
+#endif /* _KERNEL */
 
 #endif /* !_NET_IF_VAR_H_ */

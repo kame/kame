@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sis.c,v 1.13.4.18 2002/01/15 02:16:25 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_sis.c,v 1.13.4.20 2002/02/19 15:59:38 ambrisko Exp $
  */
 
 /*
@@ -101,7 +101,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_sis.c,v 1.13.4.18 2002/01/15 02:16:25 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_sis.c,v 1.13.4.20 2002/02/19 15:59:38 ambrisko Exp $";
 #endif
 
 /*
@@ -919,11 +919,11 @@ static int sis_attach(dev)
 		 */
 		if (sc->sis_rev == SIS_REV_630S ||
 		    sc->sis_rev == SIS_REV_630E ||
-		    sc->sis_rev == SIS_REV_630EA1 ||
-		    sc->sis_rev == SIS_REV_630ET)
+		    sc->sis_rev == SIS_REV_630EA1)
 			sis_read_cmos(sc, dev, (caddr_t)&eaddr, 0x9, 6);
 
-		else if (sc->sis_rev == SIS_REV_635)
+		else if (sc->sis_rev == SIS_REV_635 ||
+			 sc->sis_rev == SIS_REV_630ET)
 			sis_read_mac(sc, dev, (caddr_t)&eaddr);
 		else
 #endif
@@ -937,13 +937,6 @@ static int sis_attach(dev)
 	 */
 	printf("sis%d: Ethernet address: %6D\n", unit, eaddr, ":");
 
-	/*
-	 * From the Linux driver:
-	 * 630ET : set the mii access mode as software-mode
-	 */
-	if (sc->sis_rev == SIS_REV_630ET)
-		SIS_SETBIT(sc, SIS_CSR, SIS_CSR_ACCESS_MODE);
-	
 	sc->sis_unit = unit;
 	callout_handle_init(&sc->sis_stat_ch);
 	bcopy(eaddr, (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
@@ -1106,6 +1099,9 @@ static int sis_newbuf(sc, c, m)
 {
 	struct mbuf		*m_new = NULL;
 
+	if (c == NULL)
+		return(EINVAL);
+
 	if (m == NULL) {
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
 		if (m_new == NULL)
@@ -1151,6 +1147,13 @@ static void sis_rxeof(sc)
 
 	while(SIS_OWNDESC(&sc->sis_ldata->sis_rx_list[i])) {
 
+#ifdef DEVICE_POLLING
+		if (ifp->if_ipending & IFF_POLLING) {
+			if (sc->rxcycles <= 0)
+				break;
+			sc->rxcycles--;
+		}
+#endif /* DEVICE_POLLING */
 		cur_rx = &sc->sis_ldata->sis_rx_list[i];
 		rxstat = cur_rx->sis_rxstat;
 		m = cur_rx->sis_mbuf;
@@ -1218,7 +1221,7 @@ void sis_rxeoc(sc)
 	struct sis_softc	*sc;
 {
 	sis_rxeof(sc);
-	sis_init(sc);
+	/* sis_init(sc); */
 	return;
 }
 
@@ -1318,6 +1321,52 @@ static void sis_tick(xsc)
 	return;
 }
 
+#ifdef DEVICE_POLLING
+static poll_handler_t sis_poll;
+
+static void
+sis_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
+{
+	struct  sis_softc *sc = ifp->if_softc;
+
+	if (cmd == POLL_DEREGISTER) {	/* final call, enable interrupts */
+		CSR_WRITE_4(sc, SIS_IER, 1);
+		return;
+	}
+
+	/*
+	 * On the sis, reading the status register also clears it.
+	 * So before returning to intr mode we must make sure that all
+	 * possible pending sources of interrupts have been served.
+	 * In practice this means run to completion the *eof routines,
+	 * and then call the interrupt routine
+	 */
+	sc->rxcycles = count;
+	sis_rxeof(sc);
+	sis_txeof(sc);
+	if (ifp->if_snd.ifq_head != NULL)
+		sis_start(ifp);
+
+	if (sc->rxcycles > 0 || cmd == POLL_AND_CHECK_STATUS) {
+		u_int32_t	status;
+
+		/* Reading the ISR register clears all interrupts. */
+		status = CSR_READ_4(sc, SIS_ISR);
+
+		if (status & (SIS_ISR_RX_ERR|SIS_ISR_RX_OFLOW))
+			sis_rxeoc(sc);
+
+		if (status & (SIS_ISR_RX_IDLE))
+			SIS_SETBIT(sc, SIS_CSR, SIS_CSR_RX_ENABLE);
+
+		if (status & SIS_ISR_SYSERR) {
+			sis_reset(sc);
+			sis_init(sc);
+		}
+	}
+}
+#endif /* DEVICE_POLLING */
+
 static void sis_intr(arg)
 	void			*arg;
 {
@@ -1327,6 +1376,16 @@ static void sis_intr(arg)
 
 	sc = arg;
 	ifp = &sc->arpcom.ac_if;
+
+#ifdef DEVICE_POLLING
+	if (ifp->if_ipending & IFF_POLLING)
+		return;
+	if (ether_poll_register(sis_poll, ifp)) { /* ok, disable interrupts */
+		CSR_WRITE_4(sc, SIS_IER, 0);
+		sis_poll(ifp, 0, 1);
+		return;
+	}
+#endif /* DEVICE_POLLING */
 
 	/* Supress unwanted interrupts */
 	if (!(ifp->if_flags & IFF_UP)) {
@@ -1345,7 +1404,7 @@ static void sis_intr(arg)
 			break;
 
 		if (status &
-		    (SIS_ISR_TX_DESC_OK|SIS_ISR_TX_ERR| \
+		    (SIS_ISR_TX_DESC_OK|SIS_ISR_TX_ERR|
 		     SIS_ISR_TX_OK|SIS_ISR_TX_IDLE) )
 			sis_txeof(sc);
 
@@ -1610,6 +1669,15 @@ static void sis_init(xsc)
 	 * Enable interrupts.
 	 */
 	CSR_WRITE_4(sc, SIS_IMR, SIS_INTRS);
+#ifdef DEVICE_POLLING
+	/*
+	 * ... only enable interrupts if we are not polling, make sure
+	 * they are off otherwise.
+	 */
+	if (ifp->if_ipending & IFF_POLLING)
+		CSR_WRITE_4(sc, SIS_IER, 0);
+	else
+#endif /* DEVICE_POLLING */
 	CSR_WRITE_4(sc, SIS_IER, 1);
 
 	/* Enable receiver and transmitter. */
@@ -1775,7 +1843,9 @@ static void sis_stop(sc)
 	untimeout(sis_tick, sc, sc->sis_stat_ch);
 
 	ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
-
+#ifdef DEVICE_POLLING
+	ether_poll_deregister(ifp);
+#endif
 	CSR_WRITE_4(sc, SIS_IER, 0);
 	CSR_WRITE_4(sc, SIS_IMR, 0);
 	SIS_SETBIT(sc, SIS_CSR, SIS_CSR_TX_DISABLE|SIS_CSR_RX_DISABLE);

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_input.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_input.c,v 1.130.2.31 2001/12/15 01:06:27 brooks Exp $
+ * $FreeBSD: src/sys/netinet/ip_input.c,v 1.130.2.35 2002/03/02 22:43:06 jedgar Exp $
  */
 
 #define	_IP_VHL
@@ -216,7 +216,7 @@ static	struct ip_srcrt {
 struct sockaddr_in *ip_fw_fwd_addr;
 
 static void	save_rte __P((u_char *, struct in_addr));
-static int	ip_dooptions __P((struct mbuf *));
+static int	ip_dooptions __P((struct mbuf *, int));
 #ifdef NATPT
        void	ip_forward __P((struct mbuf *, int));
 #else
@@ -494,7 +494,7 @@ pass:
 	 * to be sent and the original packet to be freed).
 	 */
 	ip_nhops = 0;		/* for source routed packets */
-	if (hlen > sizeof (struct ip) && ip_dooptions(m)) {
+	if (hlen > sizeof (struct ip) && ip_dooptions(m, 0)) {
 #ifdef IPFIREWALL_FORWARD
 		ip_fw_fwd_addr = NULL;
 #endif
@@ -701,11 +701,14 @@ checkaddresses:;
 		m_freem(m);
 	} else {
 #ifdef IPSEC
+		/*
+		 * Enforce inbound IPsec SPD.
+		 */
 		if (ipsec4_in_reject(m, NULL)) {
 			ipsecstat.in_polvio++;
 			goto bad;
 		}
-#endif
+#endif /* IPSEC */
 		ip_forward(m, 0);
 	}
 #ifdef IPFIREWALL_FORWARD
@@ -714,6 +717,19 @@ checkaddresses:;
 	return;
 
 ours:
+#ifdef IPSTEALTH
+	/*
+	 * IPSTEALTH: Process non-routing options only
+	 * if the packet is destined for us.
+	 */
+	if (ipstealth && hlen > sizeof (struct ip) && ip_dooptions(m, 1)) {
+#ifdef IPFIREWALL_FORWARD
+		ip_fw_fwd_addr = NULL;
+#endif
+		return;
+	}
+#endif /* IPSTEALTH */
+
 	/* Count the packet in the ip address stats */
 	if (ia != NULL) {
 		ia->ia_ifa.if_ipackets++;
@@ -870,6 +886,9 @@ found:
 			return;
 		m = clone;
 		ip = mtod(m, struct ip *);
+		ip->ip_len += hlen;
+		divert_info = 0;
+		goto pass;
 	}
 #endif
 
@@ -1248,12 +1267,18 @@ ip_drain()
  * Do option processing on a datagram,
  * possibly discarding it if bad options are encountered,
  * or forwarding it if source-routed.
+ * The pass argument is used when operating in the IPSTEALTH
+ * mode to tell what options to process:
+ * [LS]SRR (pass 0) or the others (pass 1).
+ * The reason for as many as two passes is that when doing IPSTEALTH,
+ * non-routing options should be processed only if the packet is for us.
  * Returns 1 if packet has been forwarded/freed,
  * 0 if the packet should be processed further.
  */
 static int
-ip_dooptions(m)
+ip_dooptions(m, pass)
 	struct mbuf *m;
+	int pass;
 {
 	register struct ip *ip = mtod(m, struct ip *);
 	register u_char *cp;
@@ -1298,6 +1323,10 @@ ip_dooptions(m)
 		 */
 		case IPOPT_LSRR:
 		case IPOPT_SSRR:
+#ifdef IPSTEALTH
+			if (ipstealth && pass > 0)
+				break;
+#endif
 			if (optlen < IPOPT_OFFSET + sizeof(*cp)) {
 				code = &cp[IPOPT_OLEN] - (u_char *)ip;
 				goto bad;
@@ -1333,7 +1362,10 @@ ip_dooptions(m)
 				save_rte(cp, ip->ip_src);
 				break;
 			}
-
+#ifdef IPSTEALTH
+			if (ipstealth)
+				goto dropit;
+#endif
 			if (!ip_dosourceroute) {
 				if (ipforwarding) {
 					char buf[16]; /* aaa.bbb.ccc.ddd\0 */
@@ -1352,6 +1384,9 @@ nosourcerouting:
 					/*
 					 * Not acting as a router, so silently drop.
 					 */
+#ifdef IPSTEALTH
+dropit:
+#endif
 					ipstat.ips_cantforward++;
 					m_freem(m);
 					return (1);
@@ -1387,6 +1422,10 @@ nosourcerouting:
 			break;
 
 		case IPOPT_RR:
+#ifdef IPSTEALTH
+			if (ipstealth && pass == 0)
+				break;
+#endif
 			if (optlen < IPOPT_OFFSET + sizeof(*cp)) {
 				code = &cp[IPOPT_OFFSET] - (u_char *)ip;
 				goto bad;
@@ -1420,6 +1459,10 @@ nosourcerouting:
 			break;
 
 		case IPOPT_TS:
+#ifdef IPSTEALTH
+			if (ipstealth && pass == 0)
+				break;
+#endif
 			code = cp - (u_char *)ip;
 			if (optlen < 4 || optlen > 40) {
 				code = &cp[IPOPT_OLEN] - (u_char *)ip;
@@ -1680,21 +1723,29 @@ ip_forward(m, srcrt)
 	int error, type = 0, code = 0;
 	struct mbuf *mcopy;
 	n_long dest;
+	struct in_addr pkt_dst;
 	struct ifnet *destifp;
 #ifdef IPSEC
 	struct ifnet dummyifp;
 #endif
 
 	dest = 0;
+	/*
+	 * Cache the destination address of the packet; this may be
+	 * changed by use of 'ipfw fwd'.
+	 */
+	pkt_dst = (ip_fw_fwd_addr == NULL) ?
+	    ip->ip_dst : ip_fw_fwd_addr->sin_addr;
+
 #ifdef DIAGNOSTIC
 	if (ipprintfs)
 		printf("forward: src %lx dst %lx ttl %x\n",
-		    (u_long)ip->ip_src.s_addr, (u_long)ip->ip_dst.s_addr,
+		    (u_long)ip->ip_src.s_addr, (u_long)pkt_dst.s_addr,
 		    ip->ip_ttl);
 #endif
 
 
-	if (m->m_flags & (M_BCAST|M_MCAST) || in_canforward(ip->ip_dst) == 0) {
+	if (m->m_flags & (M_BCAST|M_MCAST) || in_canforward(pkt_dst) == 0) {
 		ipstat.ips_cantforward++;
 		m_freem(m);
 		return;
@@ -1713,14 +1764,14 @@ ip_forward(m, srcrt)
 
 	sin = (struct sockaddr_in *)&ipforward_rt.ro_dst;
 	if ((rt = ipforward_rt.ro_rt) == 0 ||
-	    ip->ip_dst.s_addr != sin->sin_addr.s_addr) {
+	    pkt_dst.s_addr != sin->sin_addr.s_addr) {
 		if (ipforward_rt.ro_rt) {
 			RTFREE(ipforward_rt.ro_rt);
 			ipforward_rt.ro_rt = 0;
 		}
 		sin->sin_family = AF_INET;
 		sin->sin_len = sizeof(*sin);
-		sin->sin_addr = ip->ip_dst;
+		sin->sin_addr = pkt_dst;
 
 		rtalloc_ign(&ipforward_rt, RTF_PRCLONING);
 		if (ipforward_rt.ro_rt == 0) {
@@ -1766,7 +1817,7 @@ ip_forward(m, srcrt)
 	if (rt->rt_ifp == m->m_pkthdr.rcvif &&
 	    (rt->rt_flags & (RTF_DYNAMIC|RTF_MODIFIED)) == 0 &&
 	    satosin(rt_key(rt))->sin_addr.s_addr != 0 &&
-	    ipsendredirects && !srcrt) {
+	    ipsendredirects && !srcrt && (ip_fw_fwd_addr == NULL)) {
 #define	RTA(rt)	((struct in_ifaddr *)(rt->rt_ifa))
 		u_long src = ntohl(ip->ip_src.s_addr);
 
@@ -1775,7 +1826,7 @@ ip_forward(m, srcrt)
 		    if (rt->rt_flags & RTF_GATEWAY)
 			dest = satosin(rt->rt_gateway)->sin_addr.s_addr;
 		    else
-			dest = ip->ip_dst.s_addr;
+			dest = pkt_dst.s_addr;
 		    /* Router requirements says to only send host redirects */
 		    type = ICMP_REDIRECT;
 		    code = ICMP_REDIRECT_HOST;
