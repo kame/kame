@@ -1,4 +1,4 @@
-/*	$NetBSD: netstat.h,v 1.18 2000/02/26 09:55:24 itojun Exp $	*/
+/*	$NetBSD: netstat.h,v 1.24 2002/02/27 03:55:14 lukem Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -48,21 +48,20 @@ int	iflag;		/* show interfaces */
 int	Lflag;		/* don't show LLINFO entries */
 int	lflag;		/* show routing table with use and ref */
 int	mflag;		/* show memory stats */
-int	nflag;		/* show addresses numerically */
+int	numeric_addr;	/* show addresses numerically */
+int	numeric_port;	/* show ports numerically */
 int	Pflag;		/* dump a PCB */
 int	pflag;		/* show given protocol */
 int	rflag;		/* show routing tables (or routing stats) */
 int	sflag;		/* show protocol statistics */
 int	tflag;		/* show i/f watchdog timers */
-int	vflag;		/* verbose route information */
+int	vflag;		/* verbose route information or don't truncate names */
 
 int	interval;	/* repeat interval for i/f stats */
 
 char	*interface;	/* desired i/f for stats, or NULL for all i/fs */
 
 int	af;		/* address family */
-
-extern	char *__progname; /* program name, from crt0.o */
 
 
 int	kread __P((u_long addr, char *buf, int size));
@@ -76,6 +75,7 @@ void	udp_stats __P((u_long, char *));
 void	ip_stats __P((u_long, char *));
 void	icmp_stats __P((u_long, char *));
 void	igmp_stats __P((u_long, char *));
+void	arp_stats __P((u_long, char *));
 #ifdef IPSEC
 void	ipsec_stats __P((u_long, char *));
 #endif

@@ -1,4 +1,4 @@
-/*	$NetBSD: inet6.c,v 1.9.2.2 2000/10/18 01:32:48 tv Exp $	*/
+/*	$NetBSD: inet6.c,v 1.23 2001/10/18 09:26:16 itojun Exp $	*/
 /*	BSDI inet.c,v 2.3 1995/10/24 02:19:29 prb Exp	*/
 
 /*
@@ -68,7 +68,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$NetBSD: inet6.c,v 1.9.2.2 2000/10/18 01:32:48 tv Exp $");
+__RCSID("$NetBSD: inet6.c,v 1.23 2001/10/18 09:26:16 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -206,9 +206,9 @@ ip6protopr(off, name)
 		}
 		if (Aflag) {
 			if (istcp)
-				printf("%8p ", in6pcb.in6p_ppcb);
+				printf("%8lx ", (u_long) in6pcb.in6p_ppcb);
 			else
-				printf("%8p ", next);
+				printf("%8lx ", (u_long) next);
 		}
 		printf("%-5.5s %6ld %6ld ", name, sockb.so_rcv.sb_cc,
 			sockb.so_snd.sb_cc);
@@ -430,7 +430,12 @@ static	char *ip6nh[] = {
 /*105*/	NULL, NULL, NULL, NULL, NULL,
 /*110*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 /*120*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+/*130*/	NULL,
+	NULL,
+	"SCTP",
+	NULL,
+	NULL,
+/*135*/	NULL, NULL, NULL, NULL, NULL,
 /*140*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 /*160*/	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
@@ -624,6 +629,7 @@ ip6_stats(off, name)
 
 	p1(ip6s_forward_cachehit, "\t%llu forward cache hit\n");
 	p1(ip6s_forward_cachemiss, "\t%llu forward cache miss\n");
+
 	printf("\tSource addresses selection rule applied:\n");
 	for (i = 0; i < 16; i++) {
 		if (ip6stat.ip6s_sources_rule[i])
@@ -654,8 +660,8 @@ ip6_ifstats(ifname)
 		return;
 	}
 
-	strcpy(ifr.ifr_name, ifname);
-	printf("ip6 on %s:\n", ifr.ifr_name);
+	strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
+	printf("ip6 on %s:\n", ifname);
 
 	if (ioctl(s, SIOCGIFSTAT_IN6, (char *)&ifr) < 0) {
 		perror("Warning: ioctl(SIOCGIFSTAT_IN6)");
@@ -1049,8 +1055,8 @@ icmp6_ifstats(ifname)
 		return;
 	}
 
-	strcpy(ifr.ifr_name, ifname);
-	printf("icmp6 on %s:\n", ifr.ifr_name);
+	strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
+	printf("icmp6 on %s:\n", ifname);
 
 	if (ioctl(s, SIOCGIFSTAT_ICMP6, (char *)&ifr) < 0) {
 		perror("Warning: ioctl(SIOCGIFSTAT_ICMP6)");
@@ -1164,9 +1170,8 @@ rip6_stats(off, name)
 
 /*
  * Pretty print an Internet address (net address + port).
- * If the nflag was specified, use numbers instead of names.
+ * Take numeric_addr and numeric_port into consideration.
  */
-
 void
 inet6print(in6, port, proto)
 	register struct in6_addr *in6;
@@ -1189,14 +1194,16 @@ do {\
 	width = Aflag ? 12 : 16;
 	if (vflag && width < strlen(inet6name(in6)))
 		width = strlen(inet6name(in6));
-	sprintf(line, "%.*s.", width, inet6name(in6));
+	snprintf(line, sizeof(line), "%.*s.", width, inet6name(in6));
 	cp = index(line, '\0');
-	if (!nflag && port)
+	if (!numeric_port && port)
 		GETSERVBYPORT6(port, proto, sp);
 	if (sp || port == 0)
-		sprintf(cp, "%.8s", sp ? sp->s_name : "*");
+		snprintf(cp, sizeof(line) - (cp - line),
+		    "%.8s", sp ? sp->s_name : "*");
 	else
-		sprintf(cp, "%d", ntohs((u_short)port));
+		snprintf(cp, sizeof(line) - (cp - line),
+		    "%d", ntohs((u_short)port));
 	width = Aflag ? 18 : 22;
 	if (vflag && width < strlen(line))
 		width = strlen(line);
@@ -1205,7 +1212,7 @@ do {\
 
 /*
  * Construct an Internet address representation.
- * If the nflag has been supplied, give
+ * If the numeric_addr has been supplied, give
  * numeric value, otherwise try for symbolic name.
  */
 
@@ -1226,16 +1233,16 @@ inet6name(in6p)
 	const int niflag = NI_NUMERICHOST;
 #endif
 
-	if (first && !nflag) {
+	if (first && !numeric_addr) {
 		first = 0;
 		if (gethostname(domain, MAXHOSTNAMELEN) == 0 &&
 		    (cp = index(domain, '.')))
-			(void) strcpy(domain, cp + 1);
+			(void) strlcpy(domain, cp + 1, sizeof(domain));
 		else
 			domain[0] = 0;
 	}
 	cp = 0;
-	if (!nflag && !IN6_IS_ADDR_UNSPECIFIED(in6p)) {
+	if (!numeric_addr && !IN6_IS_ADDR_UNSPECIFIED(in6p)) {
 		hp = gethostbyaddr((char *)in6p, sizeof(*in6p), AF_INET6);
 		if (hp) {
 			if ((cp = index(hp->h_name, '.')) &&
@@ -1263,7 +1270,7 @@ inet6name(in6p)
 #endif
 		if (getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len,
 				hbuf, sizeof(hbuf), NULL, 0, niflag) != 0)
-			strcpy(hbuf, "?");
+			strlcpy(hbuf, "?", sizeof(hbuf));
 		strlcpy(line, hbuf, sizeof(line));
 	}
 	return (line);
