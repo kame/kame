@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.11 2003/06/26 09:30:22 t-momose Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.12 2003/07/08 03:04:45 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -3158,11 +3158,13 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 		/* this is from our home agent. */
 		if (mbu->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITD) {
 			struct sockaddr_in6 daddr; /* XXX */
+			struct sockaddr_in6 lladdr;
 			struct ifaddr *ifa;
 
-			/* home unregsitration has completed. */
-			/* send a unsolicited na. */
-
+			/* 
+			 * home unregsitration has completed.
+			 * send an unsolicited neighbor advertisement.
+			 */
 			if ((ifa = ifa_ifwithaddr((struct sockaddr *)&mbu->mbu_coa))
 			    == NULL) {
 				mip6log((LOG_ERR,
@@ -3200,8 +3202,55 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 					      ND_NA_FLAG_OVERRIDE,
 					      1, NULL);
 			mip6log((LOG_INFO,
-				 "%s:%d: send a unsolicited na to %s\n",
-				 __FILE__, __LINE__, if_name(ifa->ifa_ifp)));
+			    "%s:%d: send a unsolicited na for %s\n",
+			    __FILE__, __LINE__,
+			    ip6_sprintf(&mbu->mbu_haddr.sin6_addr)));
+
+			/*
+			 * if the binding update entry has the L flag on,
+			 * send unsolicited neighbor advertisement to my
+			 * link-local address.
+			 */
+			if (mbu->mbu_flags & IP6MU_LINK) {
+				bzero(&lladdr, sizeof(lladdr));
+				lladdr.sin6_len = sizeof(lladdr);
+				lladdr.sin6_family = AF_INET6;
+				lladdr.sin6_addr.s6_addr16[0]
+				    = IPV6_ADDR_INT16_ULL;
+				lladdr.sin6_addr.s6_addr32[2]
+				    = mbu->mbu_haddr.sin6_addr.s6_addr32[2];
+				lladdr.sin6_addr.s6_addr32[3]
+				    = mbu->mbu_haddr.sin6_addr.s6_addr32[3];
+				
+				if (in6_addr2zoneid(ifa->ifa_ifp,
+					&lladdr.sin6_addr,
+					&lladdr.sin6_scope_id)) {
+					/* XXX: should not happen */
+					mip6log((LOG_ERR,
+					    "%s:%d: in6_addr2zoneid failed\n",
+					    __FILE__, __LINE__));
+					m_freem(m);
+					return (EIO);
+				}
+				if ((error = in6_embedscope(&lladdr.sin6_addr,
+					 &lladdr))) {
+					/* XXX: should not happen */
+					mip6log((LOG_ERR,
+					    "%s:%d: in6_embedscope failed\n",
+					    __FILE__, __LINE__));
+					m_freem(m);
+					return (error);
+				}
+
+				nd6_na_output(ifa->ifa_ifp, &daddr,
+				    &lladdr, ND_NA_FLAG_OVERRIDE, 1,
+				    NULL);
+
+				mip6log((LOG_INFO,
+				    "%s:%d: send a unsolicited na for %s\n",
+				    __FILE__, __LINE__,
+				    ip6_sprintf(&lladdr.sin6_addr)));
+			}
 
 			/* notify all the CNs that we are home. */
 			error = mip6_bu_list_notify_binding_change(sc, 1);
