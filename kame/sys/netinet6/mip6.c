@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.196 2003/01/29 15:57:49 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.197 2003/01/30 08:54:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2748,12 +2748,12 @@ mip6_get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
 
 /* Generate keygen */
 void
-mip6_create_keygen_token(addr, nodekey, nonce, hc, cookie)
+mip6_create_keygen_token(addr, nodekey, nonce, hc, token)
 	struct in6_addr *addr;
 	mip6_nodekey_t *nodekey;
 	mip6_nonce_t *nonce;
 	u_int8_t hc;
-	void *cookie;		/* 64 bit */
+	void *token;		/* 64 bit */
 {
 	/* keygen token = HMAC_SHA1(Kcn, addr | nonce | hc) */
 	HMAC_CTX hmac_ctx;
@@ -2766,7 +2766,7 @@ mip6_create_keygen_token(addr, nodekey, nonce, hc, cookie)
 	hmac_loop(&hmac_ctx, (u_int8_t *)&hc, sizeof(hc));
 	hmac_result(&hmac_ctx, result);
 	/* First64 */
-	bcopy(result, cookie, 8);
+	bcopy(result, token, 8);
 }
 
 /* For CN side function */
@@ -2780,8 +2780,8 @@ mip6_calculate_kbm_from_index(hoa_sa, coa_sa, ho_nonce_idx, co_nonce_idx, key_bm
 {
 	mip6_nonce_t home_nonce, careof_nonce;
 	mip6_nodekey_t home_nodekey, coa_nodekey;
-	mip6_home_cookie_t home_cookie;
-	mip6_careof_cookie_t careof_cookie;
+	mip6_home_token_t home_token;
+	mip6_careof_token_t careof_token;
 
 	if (mip6_get_nonce(ho_nonce_idx, &home_nonce) != 0) {
 		mip6log((LOG_ERR,
@@ -2812,21 +2812,21 @@ mip6_hexdump("CN: Careof Nodekey: ", sizeof(coa_nodekey), &coa_nodekey);
 
 	/* Calculate home keygen token */
 	mip6_create_keygen_token(&hoa_sa->sin6_addr,
-			   &home_nodekey, &home_nonce, 0, &home_cookie);
+			   &home_nodekey, &home_nonce, 0, &home_token);
 #ifdef RR_DBG
-mip6_hexdump("CN: Home keygen token: ", sizeof(home_cookie), (u_int8_t *)&home_cookie);
+mip6_hexdump("CN: Home keygen token: ", sizeof(home_token), (u_int8_t *)&home_token);
 #endif
 
 	/* Calculate care-of keygen token */
 	mip6_create_keygen_token(&coa_sa->sin6_addr,
-			   &coa_nodekey, &careof_nonce, 1, &careof_cookie);
+			   &coa_nodekey, &careof_nonce, 1, &careof_token);
 #ifdef RR_DBG
-mip6_hexdump("CN: Care-of Cookie: ", sizeof(careof_cookie), (u_int8_t *)&careof_cookie);
+mip6_hexdump("CN: Care-of keygen token: ", sizeof(careof_token), (u_int8_t *)&careof_token);
 #endif
 
 	/* Calculate K_bm */
-	mip6_calculate_kbm(&home_cookie,
-			   SA6_ARE_ADDR_EQUAL(hoa_sa, coa_sa) ? NULL : &careof_cookie,
+	mip6_calculate_kbm(&home_token,
+			   SA6_ARE_ADDR_EQUAL(hoa_sa, coa_sa) ? NULL : &careof_token,
 			   key_bm);
 #ifdef RR_DBG
 mip6_hexdump("CN: K_bm: ", sizeof(key_bm), key_bm);
@@ -2836,18 +2836,18 @@ mip6_hexdump("CN: K_bm: ", sizeof(key_bm), key_bm);
 }
 
 void
-mip6_calculate_kbm(home_cookie, careof_cookie, key_bm)
-	mip6_home_cookie_t *home_cookie;
-	mip6_careof_cookie_t *careof_cookie;	/* could be null */
+mip6_calculate_kbm(home_token, careof_token, key_bm)
+	mip6_home_token_t *home_token;
+	mip6_careof_token_t *careof_token;	/* could be null */
 	u_int8_t *key_bm;	/* needs at least MIP6_KBM_LEN bytes */
 {
 	SHA1_CTX sha1_ctx;
 	u_int8_t result[SHA1_RESULTLEN];
 
 	SHA1Init(&sha1_ctx);
-	SHA1Update(&sha1_ctx, (caddr_t)home_cookie, sizeof(*home_cookie));
-	if (careof_cookie)
-		SHA1Update(&sha1_ctx, (caddr_t)careof_cookie, sizeof(*careof_cookie));
+	SHA1Update(&sha1_ctx, (caddr_t)home_token, sizeof(*home_token));
+	if (careof_token)
+		SHA1Update(&sha1_ctx, (caddr_t)careof_token, sizeof(*careof_token));
 	SHA1Final(result, &sha1_ctx);
 	/* First 128 bit */
 	bcopy(result, key_bm, MIP6_KBM_LEN);

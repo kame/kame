@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.81 2003/01/29 12:28:16 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.82 2003/01/30 08:54:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -53,8 +53,8 @@
 
 #define MIP6_COOKIE_MAX_LIFE	240
 #define MIP6_COOKIE_SIZE	8
-#define HOME_COOKIE_SIZE	8
-#define CAREOF_COOKIE_SIZE	8
+#define MIP6_HOME_TOKEN_SIZE	8
+#define MIP6_CAREOF_TOKEN_SIZE	8
 #define MIP6_NONCE_SIZE		8	/* recommended by the spec (5.2.2) */
 					/* must be multiple of size of u_short */
 #define MIP6_NODEKEY_SIZE	20	/* This size is specified at 5.2.1 in mip6 spec */
@@ -62,8 +62,8 @@
 typedef u_int8_t mip6_nonce_t[MIP6_NONCE_SIZE];
 typedef u_int8_t mip6_nodekey_t[MIP6_NODEKEY_SIZE];
 typedef u_int8_t mip6_cookie_t[MIP6_COOKIE_SIZE];
-typedef u_int8_t mip6_home_cookie_t[HOME_COOKIE_SIZE];
-typedef u_int8_t mip6_careof_cookie_t[CAREOF_COOKIE_SIZE];
+typedef u_int8_t mip6_home_token_t[MIP6_HOME_TOKEN_SIZE];
+typedef u_int8_t mip6_careof_token_t[MIP6_CAREOF_TOKEN_SIZE];
 #define MIP6_KBM_LEN		20
 #define MIP6_AUTHENTICATOR_LEN	12
 
@@ -146,15 +146,15 @@ struct mip6_bu {
 	u_int8_t            mbu_flags;      /* BU flags */
 	mip6_cookie_t       mbu_mobile_cookie;
 	u_int16_t           mbu_home_nonce_index;
-	mip6_home_cookie_t  mbu_home_cookie;
+	mip6_home_token_t  mbu_home_token;  /* home keygen token */
 	u_int16_t           mbu_careof_nonce_index;
-        mip6_careof_cookie_t mbu_careof_cookie;
-	u_int8_t            mbu_pri_fsm_state; /* primary fsm state. */
-	u_int8_t            mbu_sec_fsm_state; /* secondary fsm state. */
-	time_t              mbu_expire;     /* expiration time of this BU. */
-	time_t              mbu_retrans;    /* retrans/refresh timo value. */
+        mip6_careof_token_t mbu_careof_token; /* careof keygen token */
+	u_int8_t            mbu_pri_fsm_state; /* primary fsm state */
+	u_int8_t            mbu_sec_fsm_state; /* secondary fsm state */
+	time_t              mbu_expire;     /* expiration time of this BU */
+	time_t              mbu_retrans;    /* retrans/refresh timo value */
 	u_int8_t            mbu_retrans_count;
-	time_t              mbu_failure;    /* failure timo value. */
+	time_t              mbu_failure;    /* failure timo value */
 	u_int8_t            mbu_state;
 	struct hif_softc    *mbu_hif;       /* back pointer to hif */
 	const struct encaptab *mbu_encap;
@@ -362,8 +362,8 @@ struct mip6stat {
 	u_quad_t mip6s_unknowntype;	/* unknown MH type value */
 	u_quad_t mip6s_nohif;		/* not my home address */
 	u_quad_t mip6s_nobue;		/* no related BUE */
-	u_quad_t mip6s_hotcookie;	/* HoT cookie mismatch */
-	u_quad_t mip6s_cotcookie;	/* CoT cookie mismatch */
+	u_quad_t mip6s_hinitcookie;	/* home init cookie mismatch */
+	u_quad_t mip6s_cinitcookie;	/* careof init cookie mismatch */
 	u_quad_t mip6s_unprotected;	/* not IPseced signaling */
 	u_quad_t mip6s_haopolicy;	/* BU is discarded due to bad HAO */
 	u_quad_t mip6s_rrauthfail;	/* RR authentication failed */
@@ -565,7 +565,7 @@ int mip6_get_mobility_options(struct ip6_mobility *, int, int,
     struct mip6_mobility_options *);
 void mip6_create_keygen_token(struct in6_addr *, mip6_nodekey_t *,
 			      mip6_nonce_t *, u_int8_t, void *);
-void mip6_calculate_kbm(mip6_home_cookie_t *, mip6_careof_cookie_t *,
+void mip6_calculate_kbm(mip6_home_token_t *, mip6_careof_token_t *,
     u_int8_t *);
 int  mip6_calculate_kbm_from_index(struct sockaddr_in6 *,
     struct sockaddr_in6 *, u_int16_t, u_int16_t, u_int8_t *);

@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.40 2002/12/10 09:38:39 k-sugyou Exp $	*/
+/*	$KAME: ip6.h,v 1.41 2003/01/30 08:54:15 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -309,7 +309,7 @@ struct ip6m_home_test_init {
 	u_int8_t ip6mhi_reserved0;
 	u_int16_t ip6mhi_cksum;
 	u_int16_t ip6mhi_reserved1;
-	u_int8_t ip6mhi_hot_cookie[8];
+	u_int8_t ip6mhi_cookie[8];	/* home init cookie */
 	/* followed by mobility options */
 } __attribute__((__packed__));
 
@@ -321,7 +321,7 @@ struct ip6m_careof_test_init {
 	u_int8_t ip6mci_reserved0;
 	u_int16_t ip6mci_cksum;
 	u_int16_t ip6mci_reserved1;
-	u_int8_t ip6mci_cot_cookie[8];
+	u_int8_t ip6mci_cookie[8];	/* care-of init cookie */
 	/* followed by mobility options */
 } __attribute__((__packed__));
 
@@ -333,8 +333,8 @@ struct ip6m_home_test {
 	u_int8_t ip6mh_reserved;
 	u_int16_t ip6mh_cksum;
 	u_int16_t ip6mh_nonce_index;	/* idx of the CN nonce list array */
-	u_int8_t ip6mh_hot_cookie[8];
-	u_int8_t ip6mh_cookie[8];	/* K0 cookie */
+	u_int8_t ip6mh_cookie[8];	/* home init cookie */
+	u_int8_t ip6mh_token[8];	/* home keygen token */
 	/* followed by mobility options */
 } __attribute__((__packed__));
 
@@ -346,8 +346,8 @@ struct ip6m_careof_test {
 	u_int8_t ip6mc_reserved;
 	u_int16_t ip6mc_cksum;
 	u_int16_t ip6mc_nonce_index;	/* idx of the CN nonce list array */
-	u_int8_t ip6mc_cot_cookie[8];
-	u_int8_t ip6mc_cookie[8];	/* K1 cookie */
+	u_int8_t ip6mc_cookie[8];	/* care-of init cookie */
+	u_int8_t ip6mc_token[8];	/* care-of keygen token */
 	/* followed by mobility options */
 } __attribute__((__packed__));
 
@@ -358,10 +358,10 @@ struct ip6m_binding_update {
 	u_int8_t ip6mu_type;
 	u_int8_t ip6mu_reserved0;
 	u_int16_t ip6mu_cksum;
-	u_int16_t ip6mu_seqno;
-	u_int8_t ip6mu_flags;
+	u_int16_t ip6mu_seqno;		/* sequence number */
+	u_int8_t ip6mu_flags;		/* IP6MU_* flags */
 	u_int8_t ip6mu_reserved1;
-	u_int16_t ip6mu_lifetime;	/* a unit of 4 seconds */
+	u_int16_t ip6mu_lifetime;	/* in units of 4 seconds */
 	/* followed by mobility options */
 } __attribute__((__packed__));
 
@@ -380,10 +380,10 @@ struct ip6m_binding_ack {
 	u_int8_t ip6ma_type;
 	u_int8_t ip6ma_reserved0;
 	u_int16_t ip6ma_cksum;
-	u_int8_t ip6ma_status;
+	u_int8_t ip6ma_status;		/* status code */
 	u_int8_t ip6ma_reserved1;
-	u_int16_t ip6ma_seqno;
-	u_int16_t ip6ma_lifetime;	/* a unit of 4 seconds */
+	u_int16_t ip6ma_seqno;		/* sequence number */
+	u_int16_t ip6ma_lifetime;	/* in units of 4 seconds */
 	/* followed by mobility options */
 } __attribute__((__packed__));
 
@@ -394,7 +394,7 @@ struct ip6m_binding_error {
 	u_int8_t ip6me_type;
 	u_int8_t ip6me_reserved0;
 	u_int16_t ip6me_cksum;
-	u_int8_t ip6me_status;
+	u_int8_t ip6me_status;		/* status code */
 	u_int8_t ip6me_reserved1;
 	struct in6_addr ip6me_addr;
 	/* followed by mobility options */
@@ -446,7 +446,7 @@ struct ip6m_opt_authdata {
 struct ip6m_opt_refresh {
 	u_int8_t ip6mor_type;
 	u_int8_t ip6mor_len;
-	u_int8_t ip6mor_refresh[2];	/* Refresh Interval */
+	u_int8_t ip6mor_refresh[2];	/* Refresh Interval (units of 4 sec) */
 } __attribute__((__packed__));
 
 /*

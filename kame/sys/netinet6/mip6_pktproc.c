@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.102 2003/01/29 12:28:16 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.103 2003/01/30 08:54:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -153,7 +153,7 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 	}
 
 	error = mip6_ip6mh_create(&opt.ip6po_mobility, dst_sa, src_sa,
-	    ip6mhi->ip6mhi_hot_cookie);
+	    ip6mhi->ip6mhi_cookie);
 	if (error) {
 		mip6log((LOG_ERR,
 		    "%s:%d: HoT creation error (%d)\n",
@@ -182,7 +182,7 @@ int
 mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
 	struct ip6_mobility **pktopt_mobility;
 	struct sockaddr_in6 *src, *dst;
-	u_int8_t *cookie;
+	u_int8_t *cookie;		/* home init cookie */
 {
 	struct ip6m_home_test *ip6mh;
 	int ip6mh_size;
@@ -207,9 +207,9 @@ mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
 	ip6mh->ip6mh_len = (ip6mh_size >> 3) - 1;
 	ip6mh->ip6mh_type = IP6M_HOME_TEST;
 	ip6mh->ip6mh_nonce_index = htons(nonce_index);
-	bcopy(cookie, ip6mh->ip6mh_hot_cookie, sizeof(ip6mh->ip6mh_hot_cookie));
+	bcopy(cookie, ip6mh->ip6mh_cookie, sizeof(ip6mh->ip6mh_cookie));
 	mip6_create_keygen_token(&dst->sin6_addr,
-			   &home_nodekey, &home_nonce, 0, ip6mh->ip6mh_cookie);
+			   &home_nodekey, &home_nonce, 0, ip6mh->ip6mh_token);
 
 	/* calculate checksum. */
 	ip6mh->ip6mh_cksum = mip6_cksum(src, dst,
@@ -287,7 +287,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 	}
 
 	error = mip6_ip6mc_create(&opt.ip6po_mobility, dst_sa, src_sa,
-	    ip6mci->ip6mci_cot_cookie);
+	    ip6mci->ip6mci_cookie);
 	if (error) {
 		mip6log((LOG_ERR,
 		    "%s:%d: HoT creation error (%d)\n",
@@ -316,7 +316,7 @@ int
 mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 	struct ip6_mobility **pktopt_mobility;
 	struct sockaddr_in6 *src, *dst;
-	u_int8_t *cookie;
+	u_int8_t *cookie;		/* careof init cookie */
 {
 	struct ip6m_careof_test *ip6mc;
 	int ip6mc_size;
@@ -341,10 +341,10 @@ mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 	ip6mc->ip6mc_len = (ip6mc_size >> 3) - 1;
 	ip6mc->ip6mc_type = IP6M_CAREOF_TEST;
 	ip6mc->ip6mc_nonce_index = htons(nonce_index);
-	bcopy(cookie, ip6mc->ip6mc_cot_cookie, sizeof(ip6mc->ip6mc_cot_cookie));
+	bcopy(cookie, ip6mc->ip6mc_cookie, sizeof(ip6mc->ip6mc_cookie));
 	mip6_create_keygen_token(&dst->sin6_addr,
 				 &careof_nodekey, &careof_nonce, 1,
-				 ip6mc->ip6mc_cookie);
+				 ip6mc->ip6mc_token);
 
 	/* calculate checksum. */
 	ip6mc->ip6mc_cksum = mip6_cksum(src, dst,
@@ -410,13 +410,13 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 	}
 
 	/* check mobile cookie. */
-	if (bcmp(&mbu->mbu_mobile_cookie, ip6mh->ip6mh_hot_cookie,
-	    sizeof(ip6mh->ip6mh_hot_cookie)) != 0) {
+	if (bcmp(&mbu->mbu_mobile_cookie, ip6mh->ip6mh_cookie,
+	    sizeof(ip6mh->ip6mh_cookie)) != 0) {
 		mip6log((LOG_INFO,
-		    "%s:%d: HoT mobile cookie mismatch from %s.\n",
+		    "%s:%d: home init cookie mismatch from %s.\n",
 		    __FILE__, __LINE__, ip6_sprintf(&src_sa->sin6_addr)));
 		m_freem(m);
-		mip6stat.mip6s_hotcookie++;
+		mip6stat.mip6s_hinitcookie++;
 		return (EINVAL);
 	}
 
@@ -499,13 +499,13 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 	}
 
 	/* check mobile cookie. */
-	if (bcmp(&mbu->mbu_mobile_cookie, ip6mc->ip6mc_cot_cookie,
-	    sizeof(ip6mc->ip6mc_cot_cookie)) != 0) {
+	if (bcmp(&mbu->mbu_mobile_cookie, ip6mc->ip6mc_cookie,
+	    sizeof(ip6mc->ip6mc_cookie)) != 0) {
 		mip6log((LOG_INFO,
-		    "%s:%d: CoT mobile cookie mismatch from %s.\n",
+		    "%s:%d: careof init cookie mismatch from %s.\n",
 		    __FILE__, __LINE__, ip6_sprintf(&src_sa->sin6_addr)));
 		m_freem(m);
-		mip6stat.mip6s_cotcookie++;
+		mip6stat.mip6s_cinitcookie++;
 		return (EINVAL);
 	}
 
@@ -930,8 +930,8 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 		cksum_backup = ip6ma->ip6ma_cksum;
 		ip6ma->ip6ma_cksum = 0;
 		/* Calculate Kbm */
-		mip6_calculate_kbm(&mbu->mbu_home_cookie,
-				   &mbu->mbu_careof_cookie, key_bm);
+		mip6_calculate_kbm(&mbu->mbu_home_token,
+				   &mbu->mbu_careof_token, key_bm);
 		/* Calculate Authenticator */
 		mip6_calculate_authenticator(key_bm, authdata,
 			&mbu->mbu_coa.sin6_addr, &ip6->ip6_dst,
@@ -1419,8 +1419,8 @@ mip6_ip6mhi_create(pktopt_mobility, mbu)
 	ip6mhi->ip6mhi_pproto = IPPROTO_NONE;
 	ip6mhi->ip6mhi_len = (ip6mhi_size >> 3) - 1;
 	ip6mhi->ip6mhi_type = IP6M_HOME_TEST_INIT;
-	bcopy(mbu->mbu_mobile_cookie, ip6mhi->ip6mhi_hot_cookie,
-	      sizeof(ip6mhi->ip6mhi_hot_cookie));
+	bcopy(mbu->mbu_mobile_cookie, ip6mhi->ip6mhi_cookie,
+	      sizeof(ip6mhi->ip6mhi_cookie));
 
 	/* calculate checksum. */
 	ip6mhi->ip6mhi_cksum = mip6_cksum(&mbu->mbu_haddr, &mbu->mbu_paddr,
@@ -1457,8 +1457,8 @@ mip6_ip6mci_create(pktopt_mobility, mbu)
 	ip6mci->ip6mci_pproto = IPPROTO_NONE;
 	ip6mci->ip6mci_len = (ip6mci_size >> 3) - 1;
 	ip6mci->ip6mci_type = IP6M_CAREOF_TEST_INIT;
-	bcopy(mbu->mbu_mobile_cookie, ip6mci->ip6mci_cot_cookie,
-	      sizeof(ip6mci->ip6mci_cot_cookie));
+	bcopy(mbu->mbu_mobile_cookie, ip6mci->ip6mci_cookie,
+	      sizeof(ip6mci->ip6mci_cookie));
 
 	/* calculate checksum. */
 	ip6mci->ip6mci_cksum = mip6_cksum(&mbu->mbu_coa, &mbu->mbu_paddr,
@@ -1585,8 +1585,8 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 		ip6mu->ip6mu_lifetime = 0;
 		if (need_rr) {
 			mbu->mbu_careof_nonce_index = mbu->mbu_home_nonce_index;
-			bcopy(&mbu->mbu_home_cookie, &mbu->mbu_careof_cookie,
-			      sizeof(mbu->mbu_careof_cookie));
+			bcopy(&mbu->mbu_home_token, &mbu->mbu_careof_token,
+			      sizeof(mbu->mbu_careof_token));
 		}
 	} else {
 		struct mip6_prefix *mpfx;
@@ -1659,11 +1659,11 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 		}
 
 #ifdef RR_DBG
-mip6_hexdump("MN: Home Cookie: ", sizeof(mbu->mbu_home_cookie), (caddr_t)&mbu->mbu_home_cookie);
-mip6_hexdump("MN: Care-of Cookie: ", sizeof(mbu->mbu_careof_cookie), (caddr_t)&mbu->mbu_careof_cookie);
+mip6_hexdump("MN: Home keygen token: ", sizeof(mbu->mbu_home_token), (caddr_t)&mbu->mbu_home_token);
+mip6_hexdump("MN: Care-of keygen token: ", sizeof(mbu->mbu_careof_token), (caddr_t)&mbu->mbu_careof_token);
 #endif
 		/* Calculate Kbm */
-		mip6_calculate_kbm(&mbu->mbu_home_cookie, &mbu->mbu_careof_cookie, key_bm);
+		mip6_calculate_kbm(&mbu->mbu_home_token, &mbu->mbu_careof_token, key_bm);
 #ifdef RR_DBG
 mip6_hexdump("MN: Kbm: ", sizeof(key_bm), key_bm);
 #endif

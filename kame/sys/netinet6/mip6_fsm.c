@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.18 2002/11/29 11:19:30 keiichi Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.19 2003/01/30 08:54:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1536,13 +1536,13 @@ mip6_bu_sec_fsm(mbu, event, data)
 		switch (event) {
 		case MIP6_BU_SEC_FSM_EVENT_HOT:
 			/*
-			 * Store cookie, nonce index.
+			 * Store token, nonce index.
 			 */
 			/* XXX */
 			mbu->mbu_home_nonce_index
 			    = htons(ip6mh->ip6mh_nonce_index);
-			bcopy(ip6mh->ip6mh_cookie, mbu->mbu_home_cookie,
-			    sizeof(ip6mh->ip6mh_cookie));
+			bcopy(ip6mh->ip6mh_token, mbu->mbu_home_token,
+			    sizeof(ip6mh->ip6mh_token));
 
 			*mbu_sec_fsm_state = MIP6_BU_SEC_FSM_STATE_WAITC;
 
@@ -1550,13 +1550,13 @@ mip6_bu_sec_fsm(mbu, event, data)
 
 		case MIP6_BU_SEC_FSM_EVENT_COT:
 			/*
-			 * Store cookie, nonce index.
+			 * Store token, nonce index.
 			 */
 			/* XXX */
 			mbu->mbu_careof_nonce_index
 			    = htons(ip6mc->ip6mc_nonce_index);
-			bcopy(ip6mc->ip6mc_cookie, mbu->mbu_careof_cookie,
-			    sizeof(ip6mc->ip6mc_cookie));
+			bcopy(ip6mc->ip6mc_token, mbu->mbu_careof_token,
+			    sizeof(ip6mc->ip6mc_token));
 
 			*mbu_sec_fsm_state = MIP6_BU_SEC_FSM_STATE_WAITH;
 			break;
@@ -1594,14 +1594,14 @@ mip6_bu_sec_fsm(mbu, event, data)
 		switch (event) {
 		case MIP6_BU_SEC_FSM_EVENT_HOT:
 			/*
-			 * Store cookie and nonce index,
+			 * Store token and nonce index,
 			 * Stop timers,
 			 * RR done.
 			 */
 			mbu->mbu_home_nonce_index
 			    = htons(ip6mh->ip6mh_nonce_index);
-			bcopy(ip6mh->ip6mh_cookie, mbu->mbu_home_cookie,
-			    sizeof(ip6mh->ip6mh_cookie));
+			bcopy(ip6mh->ip6mh_token, mbu->mbu_home_token,
+			    sizeof(ip6mh->ip6mh_token));
 
 			mip6_bu_stop_timers(mbu);
 
@@ -1650,14 +1650,14 @@ mip6_bu_sec_fsm(mbu, event, data)
 		switch (event) {
 		case MIP6_BU_SEC_FSM_EVENT_COT:
 			/*
-			 * Store cookie and nonce index,
+			 * Store token and nonce index,
 			 * Stop timers,
 			 * RR done.
 			 */
 			mbu->mbu_careof_nonce_index
 			    = htons(ip6mc->ip6mc_nonce_index);
-			bcopy(ip6mc->ip6mc_cookie, mbu->mbu_careof_cookie,
-			    sizeof(ip6mc->ip6mc_cookie));
+			bcopy(ip6mc->ip6mc_token, mbu->mbu_careof_token,
+			    sizeof(ip6mc->ip6mc_token));
 
 			mip6_bu_stop_timers(mbu);
 
