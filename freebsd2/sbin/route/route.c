@@ -94,6 +94,7 @@ union	sockunion {
 	struct	sockaddr_ns sns;
 #endif
 	struct	sockaddr_dl sdl;
+	struct	sockaddr_storage ss;
 } so_dst, so_gate, so_mask, so_genmask, so_ifa, so_ifp;
 
 typedef union sockunion *sup;
