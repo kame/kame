@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.299 2002/05/24 12:32:51 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.300 2002/05/29 03:27:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1857,11 +1857,11 @@ ip6_getpmtu(ro_pmtu, ro, ifp, dst, mtup)
 			 * if MTU on the route is 0, we need to fix the MTU.
 			 * this case happens with path MTU discovery timeouts.
 			 */
-			 mtu = ifmtu;
-			 if (!(ro_pmtu->ro_rt->rt_rmx.rmx_locks & RTV_MTU)) {
-				 /* XXX */
-				 ro_pmtu->ro_rt->rt_rmx.rmx_mtu = mtu;
-			 }
+			mtu = ifmtu;
+			if (!(ro_pmtu->ro_rt->rt_rmx.rmx_locks & RTV_MTU)) {
+				/* XXX */
+				ro_pmtu->ro_rt->rt_rmx.rmx_mtu = mtu;
+			}
 		}
 	} else if (ifp) {
 		mtu = IN6_LINKMTU(ifp);
