@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.54 2000/12/12 17:29:51 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.55 2000/12/21 01:54:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -182,9 +182,6 @@ rip6_input(mp, offp, proto)
 	struct in6pcb *last = NULL;
 	struct sockaddr_in6 rip6src;
 	struct ip6_recvpktopts opts;
-#ifdef HAVE_NRL_INPCB
-	struct icmp6_hdr *icmp6 = NULL;
-#endif
 
 #if defined(NFAITH) && 0 < NFAITH
 	if (faithprefix(&ip6->ip6_dst)) {
@@ -201,25 +198,6 @@ rip6_input(mp, offp, proto)
 		m_freem(m);
 		return IPPROTO_DONE;
 	}
-
-#ifdef HAVE_NRL_INPCB
-	if (proto == IPPROTO_ICMPV6) {
-#ifndef PULLDOWN_TEST
-		IP6_EXTHDR_CHECK(m, *offp, sizeof(struct icmp6_hdr),
-		    IPPROTO_DONE);
-		/* m might change if M_LOOP.  So, call mtod again */
-		ip6 = mtod(m, struct ip6_hdr *);
-		icmp6 = (struct icmp6_hdr *)((caddr_t)ip6 + *offp);
-#else
-		IP6_EXTHDR_GET(icmp6, struct icmp6_hdr *, m, *offp,
-		    sizeof(*icmp6));
-		if (icmp6 == NULL) {
-			icmp6stat.icp6s_tooshort++;
-			return IPPROTO_DONE;
-		}
-#endif
-	}
-#endif
 
 	bzero(&opts, sizeof(opts));
 	bzero(&rip6src, sizeof(rip6src));
@@ -259,11 +237,6 @@ rip6_input(mp, offp, proto)
 			/* XXX bark something */
 			continue;
 		}
-#ifdef HAVE_NRL_INPCB
-		if (icmp6 && in6p->in6p_icmp6filt &&
-		    ICMP6_FILTER_WILLBLOCK(icmp6->icmp6_type, in6p->in6p_icmp6filt))
-			continue;
-#endif
 		if (last) {
 			struct	mbuf *n;
 			if ((n = m_copy(m, 0, (int)M_COPYALL)) != NULL) {
