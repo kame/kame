@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1271 2000/09/13 06:01:01 sakane Exp $
+$KAME: CHANGELOG,v 1.1272 2000/09/13 07:29:19 jinmei Exp $
 
 <200009>
+2000-09-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/usr.sbin/racoon: was just added for build. It can be
+	compilable (at least in my environment) but has not been tested.
+
 Wed Sep 13 15:01:17 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	Added some switches into racoon.conf;
