@@ -98,6 +98,10 @@ EXTERN int sizemult INIT(1);
 EXTERN char *multname; 
 EXTERN char *doingwhat;
 
+/* KAME installer */
+EXTERN char dns[STRSIZE];
+EXTERN int usev6;
+
 /* loging variables */
 
 EXTERN int logging;
@@ -174,8 +178,8 @@ EXTERN int  clean_dist_dir INIT(0);
 /* Absolute path name where the distribution should be extracted from. */
 
 EXTERN char ext_dir[STRSIZE] INIT("");
-EXTERN char ftp_host[STRSIZE] INIT("ftp.netbsd.org");
-EXTERN char ftp_dir[STRSIZE]  INIT("pub/NetBSD/NetBSD-");
+EXTERN char ftp_host[STRSIZE] INIT("ftp.kame.net");
+EXTERN char ftp_dir[STRSIZE]  INIT("/.mirror1/ftp.imasy.or.jp/NetBSD-IPv6/NetBSD-");
 EXTERN char ftp_prefix[STRSIZE] INIT("/binary/sets");
 EXTERN char ftp_user[STRSIZE] INIT("ftp");
 EXTERN char ftp_pass[STRSIZE] INIT("");
@@ -210,6 +214,9 @@ EXTERN char net_mask[STRSIZE] INIT("");
 EXTERN char net_namesvr[STRSIZE] INIT("");
 EXTERN char net_defroute[STRSIZE] INIT("");
 EXTERN char net_media[STRSIZE] INIT("");
+
+/* KAME installer */
+EXTERN char net_ip6[STRSIZE] INIT("");
 
 /* Variables for upgrade. */
 #if 0

@@ -8,7 +8,7 @@ MKMAN=	no
 DPADD=	${LIBUTIL}
 LDADD=	-lutil
 
-SRCDIR= ${.CURDIR}/../../../sbin/init
+SRCDIR= ${.CURDIR}/../../../../../sbin/init
 CPPFLAGS+= -DLETS_GET_SMALL -I${SRCDIR}
 
 all: ${PROG}

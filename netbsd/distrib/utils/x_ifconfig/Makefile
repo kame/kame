@@ -5,7 +5,7 @@ PROG=	ifconfig
 MKMAN=	no
 
 SRCDIR= ${.CURDIR}/../../../sbin/ifconfig
-CPPFLAGS+= -DINET_ONLY -I${SRCDIR}
+CPPFLAGS+= -DINET6 -I${SRCDIR}
 
 all: ${PROG}
 

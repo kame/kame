@@ -78,6 +78,7 @@ all:	netbsd boot
 
 netbsd.ram.gz: ${KERN} ${RAMDISK}
 	cp ${KERN} netbsd.tmp
+	@echo ${RAMDISK}
 	${DESTDIR}/usr/sbin/mdsetimage -v netbsd.tmp ${RAMDISK}
 	: ${STRIP} netbsd.tmp
 	gzip -9 netbsd.tmp

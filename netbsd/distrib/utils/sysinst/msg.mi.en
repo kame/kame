@@ -56,10 +56,10 @@ message upgrade
 {upgrade}
 
 message hello
-{Welcome to sysinst, the NetBSD-@@VERSION@@ system installation tool.
-This menu-driven tool is designed to help you install NetBSD to a hard
-disk, or upgrade an existing NetBSD system, with a minimum of work.
-In the following menus, you may change the current selection by
+{Welcome to sysinst, the NetBSD-@@VERSION@@ + KAME IPv6 stack system installation 
+tool. This menu-driven tool is designed to help you install NetBSD 
+to a hard disk, or upgrade an existing NetBSD system, with a minimum of work.
+ In the following menus, you may change the current selection by
 either typing the reference letter (a, b, c, ...).  Arrow keys may also work.
 You activate the current selection from the menu by typing the enter key.
 
@@ -482,6 +482,24 @@ Netmask:       %s
 Nameserver IP: %s
 Gateway IP:    %s
 Media type:    %s
+}
+
+/*
+ * IPv6 specific
+ */
+
+message ipv6_yesno
+{Use IPv6 ? }
+
+message net_namesrv6
+{IP of your name server (ex. 3ffe:XXXX:..)}
+message netok6
+{The following are the values you entered.  Are they OK?
+ 
+Domain:			%s
+Host Name:		%s
+Nameserver IP(IPv6):	%s
+Media type:		%s
 }
 
 message netagain

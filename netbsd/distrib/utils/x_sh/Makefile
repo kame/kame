@@ -15,9 +15,9 @@
 
 MKMAN=no
 
-.for i in     ../../bin/sh		\
-	   ../../../bin/sh		\
-	../../../../bin/sh
+.for i in     ../../../../bin/sh		\
+	   ../../../../../bin/sh		\
+	../../../../../../bin/sh
 .if exists(${.CURDIR:H}/$i/Makefile)
 SRCDIR?= ${.CURDIR:H}/$i
 .endif

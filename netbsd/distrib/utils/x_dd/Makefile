@@ -4,7 +4,7 @@
 PROG=	dd
 MKMAN=	no
 
-SRCDIR= ${.CURDIR}/../../../bin/dd
+SRCDIR= ${.CURDIR}/../../../../../bin/dd
 
 SRCS=	args.c conv.c dd.c misc.c position.c
 # SRCS+= conv_tab.c (not used)

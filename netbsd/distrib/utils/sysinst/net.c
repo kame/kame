@@ -321,6 +321,12 @@ config_network()
 	/* Get other net information */
 	msg_display(MSG_netinfo);
 	do {
+	msg_display(MSG_ipv6_yesno);
+		process_menu(MENU_yesno);
+		if (yesno)
+			usev6 = 1;
+		usev6 = 0;
+	if (!usev6) {
 		msg_prompt_add(MSG_net_domain, net_domain, net_domain, STRSIZE);
 		msg_prompt_add(MSG_net_host, net_host, net_host, STRSIZE);
 		msg_prompt_add(MSG_net_ip, net_ip, net_ip, STRSIZE);
@@ -341,11 +347,29 @@ config_network()
 		if (needmedia)
 			msg_prompt_add(MSG_net_media, net_media, net_media,
 				       STRSIZE);
-
 		msg_display(MSG_netok, net_domain, net_host, net_ip, net_mask,
 			     *net_namesvr == '\0' ? "<none>" : net_namesvr,
 			     *net_defroute == '\0' ? "<none>" : net_defroute,
 			     *net_media == '\0' ? "<default>" : net_media);
+	} else {
+		msg_prompt_add(MSG_net_domain, net_domain, net_domain, STRSIZE);
+		msg_prompt_add(MSG_net_host, net_host, net_host, STRSIZE);
+		process_menu(MENU_kame_ra);
+		if(!yesno) {
+			msg_prompt_add(MSG_net_namesrv6, net_namesvr, net_namesvr,
+				STRSIZE);
+		} else {
+			strncpy(net_namesvr, dns, STRSIZE);
+		}
+		if (needmedia)
+			msg_prompt_add(MSG_net_media, net_media, net_media,
+					STRSIZE);
+
+		msg_display(MSG_netok6, net_domain, net_host,
+				*net_namesvr == '\0' ? "<none>" : net_namesvr,
+				*net_media == '\0' ? "<default>" : net_media);
+	}
+
 		process_menu(MENU_yesno);
 		if (!yesno)
 			msg_display(MSG_netagain);
@@ -385,7 +409,15 @@ config_network()
 		fclose(f);
 	}
 
-	run_prog(0, 0, NULL, "/sbin/ifconfig lo0 127.0.0.1");
+	/* Interface Up and go on RTSOL(IPv6) */
+	if (usev6) {
+		run_prog(0, 0, NULL, "/sbin/ifconfig lo0 ::1");
+		run_prog(0, 0, NULL, "/sbin/ifconfig %s up",net_dev);
+		run_prog(0, 0, NULL, "/sbin/sysctl -w net.inet6.ip6.accept_rtadv=1");
+		run_prog(0, 0, NULL, "/sbin/rtsol -D %s",net_dev);
+	} else {
+		run_prog(0, 0, NULL, "/sbin/ifconfig lo0 127.0.0.1");
+	}
 
 	/*
 	 * ifconfig does not allow media specifiers on IFM_MANUAL interfaces.
@@ -404,26 +436,30 @@ config_network()
 		*net_media = '\0';
 	}
 
-	if (*net_media != '\0')
-		run_prog(0, 0, NULL,
-		    "/sbin/ifconfig %s inet %s netmask %s media %s",
-			  net_dev, net_ip, net_mask, net_media);
-	else
-		run_prog(0, 0, NULL, 
-		    "/sbin/ifconfig %s inet %s netmask %s", net_dev,
-			  net_ip, net_mask);
+	if(!usev6) {
+		if (*net_media != '\0')
+			run_prog(0, 0, NULL,
+			  "/sbin/ifconfig %s inet %s netmask %s media %s",
+				net_dev, net_ip, net_mask, net_media);
+		else
+			run_prog(0, 0, NULL, 
+			  "/sbin/ifconfig %s inet %s netmask %s", net_dev,
+				net_ip, net_mask);
+	}
 
 	/* Set host name */
 	if (strcmp(net_host, "") != 0)
 	  	sethostname(net_host, strlen(net_host));
 
+	if(!usev6) {
 	/* Set a default route if one was given */
 	if (strcmp(net_defroute, "") != 0) {
 		run_prog(0, 0, NULL, 
-		    "/sbin/route -n flush");
+			"/sbin/route -n flush");
 		run_prog(0, 0, NULL, 
-		    "/sbin/route -n add default %s",
-			  net_defroute);
+			"/sbin/route -n add default %s",
+				net_defroute);
+		}
 	}
 
 	/*
@@ -431,15 +467,24 @@ config_network()
 	 * of a network failure.
 	 */
 
-	if (strcmp(net_namesvr, "") != 0 && network_up)
-		network_up = !run_prog(0, 1, NULL, 
-		    "/sbin/ping -v -c 5 -w 5 -o -n %s",
+	if (strcmp(net_namesvr, "") != 0 && network_up) {
+		if(usev6) { 
+			network_up = !run_prog(0, 1, NULL,
+				"/sbin/ping6 -c 2 %s",net_namesvr);
+		} else {
+			network_up = !run_prog(0, 1, NULL, 
+		    		"/sbin/ping -v -c 5 -w 5 -o -n %s",
 					net_namesvr);
+		}
+	}
 
-	if (strcmp(net_defroute, "") != 0 && network_up)
-		network_up = !run_prog(0, 1, NULL, 
-		    "/sbin/ping -v -c 5 -w 5 -o -n %s",
-					net_defroute);
+	if(!usev6) {
+		if (strcmp(net_defroute, "") != 0 && network_up)
+			network_up = !run_prog(0, 1, NULL, 
+			    "/sbin/ping -v -c 5 -w 5 -o -n %s",
+						net_defroute);
+	}
+
 	fflush(NULL);
 
 	return network_up;

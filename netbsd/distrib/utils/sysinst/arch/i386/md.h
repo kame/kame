@@ -70,21 +70,23 @@
 EXTERN distinfo dist_list[]
 #ifdef MAIN
 = {
-    {"kern",	1, "ag", "Kernel       : "},
+    {"kern",	1, "ag", "KAME Kernel  : "},
     {"base",	1, "bw", "Base         : "},
     {"etc",	1, "aa", "System (/etc): "},
     {"comp",	1, "bl", "Compiler     : "},
-    {"games",	1, "am", "Games        : "},
+    {"games",	0, "am", "Games        : "},
     {"man",	1, "ar", "Manuals      : "},
     {"misc",	1, "aj", "Miscellaneous: "},
     {"text",	1, "af", "Text tools   : "},
 
     /* XXX no X11 on floppies, what sets are they?*/
-    {"xbase",	1, "al", "X11 clients  : "},
-    {"xfont",	1, "az", "X11 fonts    : "},
-    {"xserver",	1, "cr", "X11 servers  : "},
-    {"xcontrib",1, "aa", "X11 contrib  : "},
-    {"xcomp",	1, "ah", "X programming: "},
+    {"xbase",	0, "al", "X11 clients  : "},
+    {"xfont",	0, "az", "X11 fonts    : "},
+    {"xserver",	0, "cr", "X11 servers  : "},
+    {"xcontrib",0, "aa", "X11 contrib  : "},
+    {"xcomp",	0, "ah", "X programming: "},
+    {"kamebin", 1, "dj", "KAME Userland: "},
+    {"kamesrc", 0, "dk", "KAME source  : "},
     {NULL, 0, NULL, NULL }
 }
 #endif

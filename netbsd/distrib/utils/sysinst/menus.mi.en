@@ -60,12 +60,12 @@ default y=12, no exit, scrollable;
 
 allow dynamic menus;
 
-menu netbsd, title "NetBSD-@@VERSION@@ Install System",
+menu netbsd, title "NetBSD-@@VERSION@@ IPv6 Install System",
     exit, exitstring "Exit Install System";
 	display action  { toplevel(); };
-	option "Install NetBSD to hard disk",
+	option "Install NetBSD+KAME to hard disk",
 		action { do_install(); };
-	option "Upgrade NetBSD on a hard disk",
+	option "Upgrade NetBSD+KAME on a hard disk(Not Yet)",
 		action { do_upgrade(); };
 	option "Re-install sets or install additional sets",
 		action { do_reinstall_sets(); };
@@ -327,4 +327,18 @@ menu localdirbad, title "What do you want to do?";
 	option "Ignore, continue anyway", exit, action
 		{ yesno = 1; ignorerror = 1; };
 
-
+menu kame_ra, title "  Select DNS server";
+	option "paradise.v6.kame.net", exit, action
+		{ strcat(dns, "3ffe:501:4819:2000:5254:ff:fedc:5217"); };
+	option "kiwi.itojun.org", exit, action
+		{ strcat(dns, "3ffe:501:410:100:5254:ff:feda:48bf"); };
+	option "sh1.iijlab.net", exit, action
+		{ strcat(dns, "3ffe:507:0:1:260:97ff:fe07:69ea"); }; 
+	option "ns1.v6.intec.co.jp", exit, action 
+		{ strcat(dns, "3ffe:508:0:1::53"); };
+	option "nttv6.net", exit, action
+		{ strcat(dns, "3ffe:1800:1000::1"); };
+	option "light.imasy.or.jp", exit, action
+		{ strcat(dns, "3ffe:505:0:1:2a0:c9ff:fe61:6521"); };
+	option "other ", exit, action
+		{ yesno = 0; };

@@ -4,6 +4,7 @@
 #
 
 # have to have all of them here for crunch ...
+CPPFLAGS+= -DDEBUG
 
 SRCS=	menu_defs.c msg_defs.c main.c install.c upgrade.c \
 	txtwalk.c run.c factor.c net.c disks.c util.c geom.c \

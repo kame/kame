@@ -3,10 +3,12 @@
 
 PROG=	route
 MKMAN=	no
-SRCS=	route.c show.c keywords.c
+SRCS=   route.c show.c keywords.c ccitt_addr.c
 
 SRCDIR= ${.CURDIR}/../../../sbin/route
-CPPFLAGS+= -DSMALL -I${SRCDIR}
+#CPPFLAGS+= -DSMALL -I${SRCDIR}
+CPPFLAGS+= -I${.CURDIR}/../../../sys -I${.CURDIR}/../../../include -DINET6
+COPTS+= -g
 
 BINOWN=	root
 BINMODE=4555

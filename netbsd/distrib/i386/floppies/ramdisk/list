@@ -22,6 +22,10 @@ LINK	ramdiskbin			bin/stty
 LINK	ramdiskbin			bin/sync
 LINK	ramdiskbin			bin/test
 LINK	ramdiskbin			bin/[
+LINK	ramdiskbin			bin/sleep
+#LINK	ramdiskbin			bin/tcsh
+LINK	ramdiskbin			bin/du
+LINK	ramdiskbin			bin/telnet
 LINK	ramdiskbin			sbin/cd9660
 LINK	ramdiskbin			sbin/disklabel
 LINK	ramdiskbin			sbin/fdisk
@@ -44,6 +48,7 @@ LINK	ramdiskbin			sbin/msdos
 LINK	ramdiskbin			sbin/newfs
 LINK	ramdiskbin			sbin/nfs
 LINK	ramdiskbin			sbin/ping
+LINK	ramdiskbin			sbin/ping6
 LINK	ramdiskbin			sbin/reboot
 LINK	ramdiskbin			sbin/restore
 LINK	ramdiskbin			sbin/route
@@ -52,6 +57,11 @@ LINK	ramdiskbin			sbin/shutdown
 LINK	ramdiskbin			sbin/slattach
 LINK	ramdiskbin			sbin/swapctl
 LINK	ramdiskbin			sbin/umount
+LINK	ramdiskbin			sbin/rtsol
+LINK	ramdiskbin			sbin/prefix
+LINK	ramdiskbin			sbin/sysctl
+LINK	ramdiskbin			sbin/arp
+
 SYMLINK	/bin/cat		usr/bin/chgrp
 SYMLINK	/bin/cat		usr/bin/ftp
 SYMLINK	/bin/cat		usr/bin/gunzip
@@ -60,28 +70,32 @@ SYMLINK	/bin/cat		usr/bin/gzip
 SYMLINK	/bin/cat		usr/bin/less
 SYMLINK	/bin/cat		usr/bin/more
 SYMLINK	/bin/cat		usr/bin/sed
+SYMLINK /bin/cat		usr/bin/awk
 SYMLINK	/bin/cat		usr/bin/tar
 SYMLINK	/bin/cat		usr/bin/tip
+SYMLINK /bin/cat		usr/bin/ldd
 SYMLINK	/bin/cat		usr/mdec/installboot
 SYMLINK	/bin/cat		usr/sbin/bad144
 SYMLINK	/bin/cat		usr/sbin/chown
 SYMLINK	/bin/cat		usr/sbin/chroot
 SYMLINK	/bin/cat		usr/sbin/mbrlabel
 SYMLINK	/bin/cat		usr/sbin/update
+SYMLINK	/bin/cat		usr/sbin/traceroute
+SYMLINK /bin/cat		usr/sbin/traceroute6
 SPECIAL	/bin/rm ramdiskbin
 
 # various files that we need in /etc for the install
-COPY	${CURDIR}/../../../../etc/group		etc/group
-COPY	${CURDIR}/../../../../etc/master.passwd	etc/master.passwd
-COPY	${CURDIR}/../../../../etc/protocols	etc/protocols
-COPY	${CURDIR}/../../../../etc/services	etc/services
+COPY	${CURDIR}/../../../../../../etc/group		etc/group
+COPY	${CURDIR}/../../../../../../etc/master.passwd	etc/master.passwd
+COPY	${CURDIR}/../../../../../../etc/protocols	etc/protocols
+COPY	${CURDIR}/../../../../../../etc/services	etc/services
 
 SPECIAL	pwd_mkdb -p -d ./ etc/master.passwd
 SPECIAL /bin/rm etc/spwd.db
 SPECIAL /bin/rm etc/pwd.db
 
 # copy the MAKEDEV script and make some devices
-COPY	${CURDIR}/../../../../etc/etc.i386/MAKEDEV	dev/MAKEDEV
+COPY	${CURDIR}/../../../../../../etc/etc.i386/MAKEDEV	dev/MAKEDEV
 SPECIAL	cd dev; sh MAKEDEV ramdisk
 SPECIAL	/bin/rm dev/MAKEDEV
 
@@ -91,15 +105,15 @@ COPY	${DESTDIR}/usr/mdec/mbr			usr/mdec/mbr
 COPY	${DESTDIR}/usr/mdec/mbr_bootsel		usr/mdec/mbr_bootsel
 
 # and the common installation tools
-# COPY	${CURDIR}/../../../utils/script-installer/dot.commonutils  .commonutils
-# COPY	${CURDIR}/../../../utils/script-installer/dot.instutils	   .instutils
+# COPY	${CURDIR}/../../../../../utils/script-installer/dot.commonutils  .commonutils
+# COPY	${CURDIR}/../../../../../utils/script-installer/dot.instutils	   .instutils
 COPY	termcap.mini			usr/share/misc/termcap
 
 # the disktab explanation file
 COPY	disktab.preinstall		etc/disktab.preinstall
 
 #the lists of obsolete files used by sysinst
-SPECIAL	sh ${CURDIR}/../../../../distrib/sets/makeobsolete -b -s ${CURDIR}/../../../../distrib/sets -t ./dist 
+SPECIAL	sh ${CURDIR}/../../../../../../distrib/sets/makeobsolete -b -s ${CURDIR}/../../../../../../distrib/sets -t ./dist 
 
 # and the installation tools
 COPY	dot.profile			.profile
