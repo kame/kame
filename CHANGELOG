@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2503 2003/11/12 22:19:43 keiichi Exp $
+$KAME: CHANGELOG,v 1.2504 2003/11/13 20:48:20 sakane Exp $
 
 <200311>
+Fri Nov 14 05:46:33 JST 2003 sakane@tanu.org
+	* kame/kame/racoon/ipsec_doi.c:
+	comparing the content of the ID payload failed when the ID type
+	is IP address and the type is defined in the configuration file
+	explicitly.
+
 Wed Nov 12 16:15:52 CST 2003	keiichi@iij.ad.jp
 	* MIP6
 	changed Mobility Header protocol number and ICMPv6 type numbers
