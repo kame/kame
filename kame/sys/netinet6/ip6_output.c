@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.94 2000/04/04 14:45:44 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.94.2.1 2000/04/14 13:50:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3142,6 +3142,16 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 		}
 
 		case IPV6_REACHCONF:
+#if 1
+			/*
+			 * it looks dangerous to allow IPV6_REACHCONF to
+			 * normal user.  it affects the ND state (system state)
+			 * and can affect communication by others - jinmei
+			 */
+			if (!priv)
+				return(EPERM);
+#endif
+			
 			if (cm->cmsg_len != CMSG_LEN(0))
 				return(EINVAL);
 			opt->ip6po_flags |= IP6PO_REACHCONF;
