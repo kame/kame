@@ -1348,7 +1348,6 @@ expand_ipsecspec(prop_no, trns_no, types,
 		new->proto_id = s->proto_id;
 		new->ipsec_level = s->ipsec_level;
 		new->encmode = s->encmode;
-		new->dst = s->remote;
 		new->enctype = tmpalgtype[algclass_ipsec_enc];
 		new->encklen = s->encklen;
 		new->authtype = tmpalgtype[algclass_ipsec_auth];

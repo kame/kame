@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.h,v 1.6 2000/03/23 09:21:35 sakane Exp $ */
+/* YIPS @(#)$Id: policy.h,v 1.7 2000/03/24 16:32:02 sakane Exp $ */
 
 #include <sys/queue.h>
 
@@ -78,7 +78,9 @@ struct ipsecsa {
 	size_t spisize;
 	u_int64_t spi;			/* spi from the peer XXX */
 
+#if 0
 	struct sockaddr *dst;		/* peers address of SA */
+#endif
 
 	struct ipsecsa *bundles;	/* chain of sa boundle. */
 	struct ipsecsa *next;		/* next other proposal */

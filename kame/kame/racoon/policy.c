@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.13 2000/01/12 19:15:53 itojun Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.14 2000/03/24 16:32:02 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -354,8 +354,6 @@ dupipsecsa(s)
 	if (d == NULL)
 		return NULL;
 	memcpy(d, s, sizeof(*s));
-	if (s->dst)
-		d->dst = dupsaddr(s->dst);
 	if (s->bundles)
 		d->bundles = dupipsecsa(s->bundles);
 	if (s->next)
@@ -370,8 +368,6 @@ delipsecsa(s)
 
 	if (!s)
 		return;
-	if (s->dst)
-		free(s->dst);
 	if (s->bundles)
 		delipsecsa(s->bundles);
 	if (s->next)

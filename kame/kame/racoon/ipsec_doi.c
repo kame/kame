@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.52 2000/02/17 00:27:39 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.53 2000/03/24 16:32:01 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -990,23 +990,21 @@ found:
 
     {
 	/* set peer's spi from proposal payload */
-	struct sockaddr *dst;
 	struct ipsecsakeys *k;
 	struct ipsecsa *q1;
 
 	for (q1 = r; q1; q1 = q1->bundles) {
-		dst = q1->dst ? q1->dst : iph2->dst; /* XXX cheat */
 		for (k = iph2->keys; k != NULL; k = k->next) {
 			if (q1->proto_id == k->proto_id
 			 && q1->encmode == k->encmode
-			 && (cmpsaddrwop(dst, k->dst) == 0))
+			 && (cmpsaddrwop(iph2->dst, k->dst) == 0))
 				break;
 		}
 		if (k == NULL) {
 			plog(logp, LOCATION, NULL,
 				"no SPI found for %s/%s\n",
 				s_ipsecdoi_proto(q1->proto_id),
-				saddrwop2str(dst));
+				saddrwop2str(iph2->dst));
 			delipsecsa(q1);
 			return -1;
 		}
@@ -2726,20 +2724,18 @@ ipsecdoi_setph2proposal(iph2, keys)
 		prop->p_no = n->prop_no;
 		prop->proto_id = n->proto_id;
 	    {
-		struct sockaddr *dst;
 		struct ipsecsakeys *k;
-		dst = n->dst ? n->dst : iph2->dst;
 		for (k = keys; k != NULL; k = k->next) {
 			if (n->proto_id == k->proto_id
 			 && n->encmode == k->encmode
-			 && cmpsaddrwop(dst, k->dst) == 0)
+			 && cmpsaddrwop(iph2->dst, k->dst) == 0)
 				break;
 		}
 		if (k == NULL) {
 			plog(logp, LOCATION, NULL,
 				"no SPI found for %s/%s\n",
 				s_ipsecdoi_proto(n->proto_id),
-				saddrwop2str(dst));
+				saddrwop2str(iph2->dst));
 			vfree(mysa);
 			return NULL;
 		}
@@ -2881,7 +2877,6 @@ ipsecdoi_setph2proposal0(iph2, keys, b)
 	const struct ipsecsa *b;
 {
 	vchar_t *p;
-	const struct sockaddr *dst;
 	const struct ipsecsakeys *k;
 	struct isakmp_pl_p *prop;
 	struct isakmp_pl_t *trns;
@@ -2889,10 +2884,9 @@ ipsecdoi_setph2proposal0(iph2, keys, b)
 	int attrlen;
 	size_t trnsoff;
 
-	dst = b->dst ? b->dst : iph2->dst;
 	for (k = keys; k != NULL; k = k->next) {
 		if (b->proto_id == k->proto_id && b->encmode == k->encmode
-		 && cmpsaddrwop((struct sockaddr *)dst,
+		 && cmpsaddrwop((struct sockaddr *)iph2->dst,
 				 (struct sockaddr *)k->dst) == 0)
 			break;
 	}
@@ -2900,7 +2894,7 @@ ipsecdoi_setph2proposal0(iph2, keys, b)
 		plog(logp, LOCATION, NULL,
 			"no SPI found for %s/%s\n",
 			s_ipsecdoi_proto(b->proto_id),
-			saddrwop2str((struct sockaddr *)dst));
+			saddrwop2str((struct sockaddr *)iph2->dst));
 		return NULL;
 	}
 
@@ -3605,19 +3599,15 @@ ipsecdoi_fixsakeys(iph2)
 	struct ipsecsakeys *original;
 	struct ipsecsa *b;
 	struct ipsecsakeys *v, *o;
-	struct sockaddr *dst, *src;
 
 	/* initialize */
 	original = iph2->keys;
 	iph2->keys = NULL;
-	dst = NULL;
 
 	for (b = iph2->approval; b != NULL; b = b->bundles) {
 		/* see ipsecdoi_initsakeys() */
-		dst = b->dst != NULL ? b->dst : (dst != NULL ? dst : iph2->dst);
-		src = iph2->src;		/* XXX cheat ! */
 
-		if (mksakeys(b, &iph2->keys, dst, src) < 0) {
+		if (mksakeys(b, &iph2->keys, iph2->dst, iph2->src) < 0) {
 			plog(logp, LOCATION, NULL,
 				"failed to create sa keys\n");
 			return -1;
@@ -3652,7 +3642,6 @@ ipsecdoi_initsakeys(iph2)
 	struct ipsecsa *proposal;
 	struct ipsecsa *p, *b;
 	struct ipsecsakeys *v;
-	struct sockaddr *dst, *src;
 
 	/* initialize */
 	if (iph2->keys != NULL) {
@@ -3668,23 +3657,8 @@ ipsecdoi_initsakeys(iph2)
 
 	for (p = proposal; p; p = p->next) {
 
-		/* reset dst when next proposal */
-		dst = NULL;
-
 		for (b = p; b; b = b->bundles) {
-			/* dst address */
-			/* when transport, iph2->src is usually used.
-			 * But when there is a tunnel mode, copy its dst
-			 * address to next transport entries.  */
-			dst = b->dst != NULL
-				? b->dst		/* tunnel mode */
-				: (dst != NULL
-					? dst		/* transport mode */
-					: iph2->dst);	/* first entry */
-
-			src = iph2->src;		/* XXX cheat ! */
-
-			if (mksakeys(b, &iph2->keys, dst, src) < 0)
+			if (mksakeys(b, &iph2->keys, iph2->dst, iph2->src) < 0)
 				return -1;
 		}
 
@@ -3710,8 +3684,7 @@ mksakeys(b, keys, dst, src)
 	for (v = *keys; v != NULL; v = v->next) {
 		if (v->proto_id == b->proto_id
 		 && v->encmode == b->encmode
-		 && (b->dst == NULL
-		  || cmpsaddrwop(v->dst, b->dst) == 0))
+		 && (cmpsaddrwop(v->dst, b->ipsp->spidx->ph2->dst) == 0))
 			break;
 	}
 	/* this sa has already recorded */

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.23 2000/03/24 16:12:46 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.24 2000/03/24 16:32:02 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -925,8 +925,7 @@ pk_sendupdate(iph2)
 		for (k = iph2->keys; k != NULL; k = k->next) {
 			if (s->proto_id == k->proto_id
 			 && s->encmode == k->encmode
-			 && (s->dst == NULL
-			  || cmpsaddrwop(s->dst, k->dst) == 0))
+			 && (cmpsaddrwop(iph2->dst, k->dst) == 0))
 				break;
 		}
 		if (k == NULL) {
@@ -934,7 +933,7 @@ pk_sendupdate(iph2)
 				"why no key found for %s/%s/%s\n",
 				s_ipsecdoi_proto(s->proto_id),
 				s_ipsecdoi_encmode(s->encmode),
-				saddrwop2str(s->dst));
+				saddrwop2str(iph2->dst));
 			return -1;
 		}
 		/* validity check */
@@ -1131,7 +1130,7 @@ pk_sendadd(iph2)
 				"why no key found for %s/%s/%s\n",
 				s_ipsecdoi_proto(s->proto_id),
 				s_ipsecdoi_encmode(s->encmode),
-				saddrwop2str(s->dst));
+				saddrwop2str(iph2->dst));
 			return -1;
 		}
 		/* validity check */
