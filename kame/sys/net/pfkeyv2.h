@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.32 2003/07/19 10:42:36 itojun Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.33 2003/07/20 00:29:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -336,13 +336,12 @@ struct sadb_x_tag {
 #define SADB_X_EALG_AESCTR	249	/* draft-ietf-ipsec-ciph-aes-ctr-03 */
 #define SADB_X_EALG_TWOFISHCBC	253	/* draft-ietf-ipsec-ciph-aes-cbc-00 */
 
-#if 1	/*nonstandard */
+/* private allocations - based on RFC2407/IANA assignment */
 #define SADB_X_CALG_NONE	0
 #define SADB_X_CALG_OUI		1
 #define SADB_X_CALG_DEFLATE	2
 #define SADB_X_CALG_LZS		3
 #define SADB_X_CALG_MAX		4
-#endif
 
 #define SADB_IDENTTYPE_RESERVED   0
 #define SADB_IDENTTYPE_PREFIX     1
