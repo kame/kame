@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.90 2001/01/09 05:10:09 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.91 2001/01/09 05:15:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -998,7 +998,7 @@ static int
 addrconfig(af)
 	int af;
 {
-#ifdef USE_GETIPNODEBY
+#if !defined(__NetBSD__) && defined(USE_GETIPNODEBY)
 	return 1;
 #else
 	int s;
