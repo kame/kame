@@ -252,6 +252,8 @@ rtfree(rt)
 		}
 #endif
 
+		rt_timer_remove_all(rt);
+
 		/*
 		 * release references on items we hold them on..
 		 * e.g other routes and ifaddrs.
