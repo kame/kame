@@ -519,17 +519,28 @@ ether_input(struct ifnet *ifp, struct mbuf *m)
 
 	eh = mtod(m, struct ether_header *);
 
-	ifp->if_lastchange = time;
-	ifp->if_ibytes += m->m_pkthdr.len;
-	if (eh->ether_dhost[0] & 1) {
+	if (ETHER_IS_MULTICAST(eh->ether_dhost)) {
+		/*
+		 * If this is not a simplex interface, drop the packet
+		 * if it came from us.
+		 */
+		if ((ifp->if_flags & IFF_SIMPLEX) == 0 &&
+		    memcmp(LLADDR(ifp->if_sadl), eh->ether_shost,
+		    ETHER_ADDR_LEN) == 0) {
+			m_freem(m);
+			return;
+		}
+
 		if (bcmp((caddr_t)etherbroadcastaddr, (caddr_t)eh->ether_dhost,
 		    sizeof(etherbroadcastaddr)) == 0)
 			m->m_flags |= M_BCAST;
 		else
 			m->m_flags |= M_MCAST;
-	}
-	if (m->m_flags & (M_BCAST|M_MCAST))
 		ifp->if_imcasts++;
+	}
+
+	ifp->if_lastchange = time;
+	ifp->if_ibytes += m->m_pkthdr.len;
 
 	etype = ntohs(eh->ether_type);
 
