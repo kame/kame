@@ -2777,6 +2777,10 @@ syn_cache_get(src, dst, th, hlen, tlen, so, m)
 
 #ifdef IPSEC
     {
+	/*
+	 * we make a copy of policy, instead of sharing the policy,
+	 * for better behavior in terms of SA lookup and dead SA removal.
+	 */
 	struct secpolicy *sp;
 	if (inp) {
 		sp = ipsec_copy_policy(sotoinpcb(oso)->inp_sp_in);
