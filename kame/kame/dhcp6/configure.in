@@ -100,4 +100,12 @@ AC_ARG_WITH(mediator, [  --with-mediator         build with mediator],
 	[CFLAGS="-DMEDIATOR $CFLAGS"; with_mediator=yes], [with_mediator=no])
 AC_MSG_RESULT($with_mediator);
 
+dnl Checks for optinal parameters
+AC_MSG_CHECKING(if --enable-pedant option is specified)
+AC_ARG_ENABLE(pedant, [  --enable-pedant         pedantic compilation],
+	[if test "$enableval" = "yes"; then
+		CFLAGS="-Wall -Werror $CFLAGS"
+	fi], [enableval=no])
+AC_MSG_RESULT($enableval);
+
 AC_OUTPUT(Makefile)
