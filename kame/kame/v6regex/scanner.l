@@ -28,7 +28,7 @@
  * SUCH DAMAGE.
  */
 /*
- * KAME $Id: scanner.l,v 1.5 2000/02/04 05:52:49 itojun Exp $
+ * KAME $Id: scanner.l,v 1.6 2000/05/09 03:47:10 itojun Exp $
  */
 
 /*
@@ -114,7 +114,7 @@
 static char *in_buffer;
 #endif /*YY_MAIN*/
 
-enum foo { T_V6, T_V6KAMEID, T_V6ID, T_V4, T_V4OLD };
+enum foo { T_V6, T_V6ID, T_V4, T_V4OLD };
 
 %}
 
@@ -201,8 +201,7 @@ V6		({V680}|{V670}|{V671}|{V672}|{V673}|{V674}|{V675}|{V676}|{V677}|{V660}|{V661
 
 ID		[A-Za-z0-9][-_A-Za-z0-9]*
 
-V6ID		({NN}\%{V6}|{ID}\%{V6})
-V6KAMEID	({V6}\@{NN}|{V6}\@{ID})
+V6ID		({V6}\%{NN}|{V6}\%{ID})
 
 V4		{N}\.{N}\.{N}\.{N}
 V4OLD		{N}(\.{N})?(\.{N})?(\.{N})?
@@ -212,7 +211,6 @@ V4OLD		{N}(\.{N})?(\.{N})?(\.{N})?
 %%
 
 {V6ID}\n	{ return T_V6ID; }
-{V6KAMEID}\n	{ return T_V6KAMEID; }
 {V6}\n		{ return T_V6; }
 {V4}\n		{ return T_V4; }
 {V4OLD}\n	{ return T_V4OLD; }
@@ -305,9 +303,6 @@ main(argc, argv)
 	switch (i) {
 	case T_V6:
 		printf(" IPv6");
-		break;
-	case T_V6KAMEID:
-		printf(" IPv6 with kame scopeid");
 		break;
 	case T_V6ID:
 		printf(" IPv6 with scopeid");
