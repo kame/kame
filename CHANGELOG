@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1078 2000/07/01 11:48:09 itojun Exp $
+$Id: CHANGELOG,v 1.1079 2000/07/02 02:26:41 itojun Exp $
 
 <200006>
+Sun Jul  2 11:24:52 JST 2000  itojun@iijlab.net
+	* netbsd/sys/netinet/tcp_input.c: repair faith support.  still have
+	  some issue with syn cache behaivior.
+
 Sat Jul  1 20:57:57 JST 2000  itojun@iijlab.net
 	* kame/faithd: make it possible to invoke faithd(8) from inetd(8).
 
