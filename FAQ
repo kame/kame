@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.67 2001/09/26 09:11:13 itojun Exp $
+$KAME: FAQ,v 1.68 2001/09/26 09:12:13 itojun Exp $
 
 
 GENERAL
@@ -545,7 +545,7 @@ Q: Can I download KAME without infringing crypto law?
 	Japan and import to your country.
 
 	For export from Japan, it looks that there's no restriction,
-	for free software.  See faqomatic:37 for more info.
+	for free software.  See the previous item for more info.
 
 	For import to your country, please check "crypto law survey
 	page" for your country.  Please proceed to
