@@ -1,4 +1,4 @@
-/*	$KAME: session.c,v 1.33 2004/08/24 06:52:41 sakane Exp $	*/
+/*	$KAME: session.c,v 1.34 2004/08/25 08:02:48 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -57,6 +57,7 @@
 #include <unistd.h>
 #endif
 #include <signal.h>
+#include <err.h>
 
 #include "libpfkey.h"
 
@@ -65,7 +66,6 @@
 #include "vmbuf.h"
 #include "plog.h"
 #include "debug.h"
-#include "err.h"
 
 #include "schedule.h"
 #include "session.h"
