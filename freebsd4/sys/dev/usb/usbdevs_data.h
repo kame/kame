@@ -1690,6 +1690,24 @@ struct usb_knowndev usb_knowndevs[] = {
 	    "USB Serial Adaptor",
 	},
 	{
+	    USB_VENDOR_PALM, USB_PRODUCT_PALM_M500,
+	    0,
+	    "Palm Computing",
+	    "Palm m500",
+	},
+	{
+	    USB_VENDOR_PALM, USB_PRODUCT_PALM_M505,
+	    0,
+	    "Palm Computing",
+	    "Palm m505",
+	},
+	{
+	    USB_VENDOR_PALM, USB_PRODUCT_PALM_M125,
+	    0,
+	    "Palm Computing",
+	    "Palm m125",
+	},
+	{
 	    USB_VENDOR_PANASONIC, USB_PRODUCT_PANASONIC_SDCAAE,
 	    0,
 	    "Panasonic (Matsushita)",
@@ -2102,6 +2120,24 @@ struct usb_knowndev usb_knowndevs[] = {
 	    0,
 	    "Sony",
 	    "MSC memory stick slot",
+	},
+	{
+	    USB_VENDOR_SONY, USB_PRODUCT_SONY_CLIE_35,
+	    0,
+	    "Sony",
+	    "Sony Clie v3.5",
+	},
+	{
+	    USB_VENDOR_SONY, USB_PRODUCT_SONY_CLIE_40,
+	    0,
+	    "Sony",
+	    "Sony Clie v4.0",
+	},
+	{
+	    USB_VENDOR_SONY, USB_PRODUCT_SONY_CLIE_40_MS,
+	    0,
+	    "Sony",
+	    "Sony Clie v4.0 Memory Stick slot",
 	},
 	{
 	    USB_VENDOR_STMICRO, USB_PRODUCT_STMICRO_COMMUNICATOR,

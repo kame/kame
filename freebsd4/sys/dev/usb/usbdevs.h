@@ -838,6 +838,9 @@
 
 /* Palm Computing, Inc. product */
 #define	USB_PRODUCT_PALM_SERIAL	0x0080		/* USB Serial Adaptor */
+#define	USB_PRODUCT_PALM_M500	0x0001		/* Palm m500 */
+#define	USB_PRODUCT_PALM_M505	0x0002		/* Palm m505 */
+#define	USB_PRODUCT_PALM_M125	0x0040		/* Palm m125 */
 
 /* Panasonic products */
 #define	USB_PRODUCT_PANASONIC_SDCAAE	0x1b00		/* MultiMediaCard Adapter */
@@ -957,6 +960,10 @@
 #define	USB_PRODUCT_SONY_DSC	0x0010		/* DSC cameras */
 #define	USB_PRODUCT_SONY_MSACUS1	0x002d		/* Memorystick MSAC-US1 */
 #define	USB_PRODUCT_SONY_MSC	0x0032		/* MSC memory stick slot */
+#define	USB_PRODUCT_SONY_CLIE_35	0x0038		/* Sony Clie v3.5 */
+#define	USB_PRODUCT_SONY_CLIE_40	0x0066		/* Sony Clie v4.0 */
+#define	USB_PRODUCT_SONY_CLIE_40_MS	0x006d		/* Sony Clie v4.0 Memory Stick slot */
+
 
 /* STMicroelectronics products */
 #define	USB_PRODUCT_STMICRO_COMMUNICATOR	0x7554		/* USB Communicator */
