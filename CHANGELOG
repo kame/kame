@@ -1,10 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1600 2001/03/13 05:00:00 jinmei Exp $
+$KAME: CHANGELOG,v 1.1601 2001/03/13 05:00:48 jinmei Exp $
 
 <200103>
 2001-03-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* freebsd2/ports/wu-ftpd: upgraded to wu-ftpd 2.6.1.
+	* freebsd2/ports/wu-ftpd: upgraded to wu-ftpd 2.6.1.  Since there
+	are security holes in older versions, upgrade is recommended.
 
 Mon Mar 12 20:17:43 JST 2001  itojun@iijlab.net
 	* sys/crypto/sha2/sha2.c: hmac-sha2-{256,384,512} support.  attaches
