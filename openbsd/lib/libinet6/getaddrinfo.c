@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.20 2000/05/04 16:39:49 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.21 2000/05/05 07:40:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1027,7 +1027,6 @@ find_afd(af)
 	return NULL;
 }
 
-#ifdef AI_ADDRCONFIG
 /*
  * post-2553: AI_ADDRCONFIG check.  if we use getipnodeby* as backend, backend
  * will take care of it.
@@ -1049,7 +1048,6 @@ addrconfig(pai)
 	close(s);
 	return 1;
 }
-#endif
 
 #ifdef INET6
 /* convert a string to a scope identifier. XXX: IPv6 specific */
