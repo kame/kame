@@ -67,7 +67,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.24 2000/02/14 08:53:22 itojun Exp $");
+__RCSID("$Id: inet6.c,v 1.25 2000/02/26 09:38:54 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -742,7 +742,7 @@ ip6_stats(off, name)
 	} while(0);
 
 	p(ip6s_sources_none,
-	  "\t%qu failure%s of source address selection\n");
+	  "\t%llu failure%s of source address selection\n");
 	for (first = 1, i = 0; i < 16; i++) {
 		if (ip6stat.ip6s_sources_sameif[i]) {
 			if (first) {
