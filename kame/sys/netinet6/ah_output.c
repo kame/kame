@@ -1,4 +1,4 @@
-/*	$KAME: ah_output.c,v 1.28 2001/02/19 04:23:40 itojun Exp $	*/
+/*	$KAME: ah_output.c,v 1.29 2001/02/21 00:35:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -564,8 +564,8 @@ ah4_finaldst(m)
 			break;
 		case IPOPT_LSRR:
 		case IPOPT_SSRR:
-			if (q[i + IPOPT_OLEN] <= 0
-			 || optlen - i < q[i + IPOPT_OLEN]) {
+			if (q[i + IPOPT_OLEN] < 2 ||
+			    optlen - i < q[i + IPOPT_OLEN]) {
 				ipseclog((LOG_ERR,
 				    "ip_finaldst: invalid IP option "
 				    "(code=%02x len=%02x)\n",
@@ -575,8 +575,8 @@ ah4_finaldst(m)
 			i += q[i + IPOPT_OLEN] - sizeof(struct in_addr);
 			return (struct in_addr *)(q + i);
 		default:
-			if (q[i + IPOPT_OLEN] <= 0
-			 || optlen - i < q[i + IPOPT_OLEN]) {
+			if (q[i + IPOPT_OLEN] < 2 ||
+			    optlen - i < q[i + IPOPT_OLEN]) {
 				ipseclog((LOG_ERR,
 				    "ip_finaldst: invalid IP option "
 				    "(code=%02x len=%02x)\n",
