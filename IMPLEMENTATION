@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.287 2001/12/12 01:31:47 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.288 2001/12/20 09:07:23 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -935,7 +935,7 @@ KAME/FreeBSD3x	configurable		supported
 KAME/FreeBSD4x	configurable		supported
 		default: enabled
 KAME/NetBSD	configurable		supported
-		default: disabled 
+		default: disabled
 KAME/BSDI4	enabled			supported
 KAME/OpenBSD	not supported		not supported
 
