@@ -303,6 +303,8 @@ main(argc, argv)
 		/*
 		 * IPv4 control connection arrived to AF_INET6 socket.
 		 * I hate to do this, but this is the easiest solution.
+		 *
+		 * The assumption is untrue on SIIT environment.
 		 */
 		union sockunion tmp_addr;
 		const int off = sizeof(struct in6_addr) - sizeof(struct in_addr);
