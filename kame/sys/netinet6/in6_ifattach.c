@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.58 2000/05/25 06:43:34 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.59 2000/05/27 02:57:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -75,6 +75,7 @@ static int get_ifid __P((struct ifnet *, struct ifnet *, struct in6_addr *));
 static int in6_ifattach_addaddr __P((struct ifnet *, struct in6_ifaddr *));
 static int in6_ifattach_linklocal __P((struct ifnet *, struct ifnet *));
 static int in6_ifattach_loopback __P((struct ifnet *));
+static int nigroup __P((struct ifnet *, const char *, int, struct in6_addr *));
 
 #define EUI64_GBIT	0x01
 #define EUI64_UBIT	0x02
@@ -642,6 +643,108 @@ in6_ifattach_loopback(ifp)
 }
 
 /*
+ * compute NI group address, based on the current hostname setting.
+ * see draft-ietf-ipngwg-icmp-name-lookup-* (04 and later).
+ *
+ * when ifp == NULL, the caller is responsible for filling scopeid.
+ */
+static int
+nigroup(ifp, name, namelen, in6)
+	struct ifnet *ifp;
+	const char *name;
+	int namelen;
+	struct in6_addr *in6;
+{
+	const char *p;
+	MD5_CTX ctxt;
+	u_int8_t digest[16];
+	char l;
+
+	if (!namelen || !name)
+		return -1;
+
+	p = name;
+	while (p && *p && *p != '.' && p - name < namelen)
+		p++;
+	if (p - name > 63)
+		return -1;	/*label too long*/
+	l = p - name;
+
+	/* generate 8 bytes of pseudo-random value. */
+	bzero(&ctxt, sizeof(ctxt));
+	MD5Init(&ctxt);
+	MD5Update(&ctxt, &l, sizeof(l));
+	MD5Update(&ctxt, name, p - name);
+	MD5Final(digest, &ctxt);
+
+	bzero(in6, sizeof(*in6));
+	in6->s6_addr16[0] = htons(0xff02);
+	if (ifp)
+		in6->s6_addr16[1] = htons(ifp->if_index);
+	in6->s6_addr8[11] = 2;
+	bcopy(digest, &in6->s6_addr32[3], sizeof(in6->s6_addr32[3]));
+
+	return 0;
+}
+
+void
+in6_nigroup_attach(name, namelen)
+	const char *name;
+	int namelen;
+{
+	struct ifnet *ifp;
+	struct sockaddr_in6 mltaddr;
+	struct in6_multi *in6m;
+	int error;
+
+	bzero(&mltaddr, sizeof(mltaddr));
+	mltaddr.sin6_family = AF_INET6;
+	mltaddr.sin6_len = sizeof(struct sockaddr_in6);
+	if (nigroup(NULL, name, namelen, &mltaddr.sin6_addr) != 0)
+		return;
+
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	for (ifp = ifnet; ifp; ifp = ifp->if_next)
+#else
+	for (ifp = ifnet.tqh_first; ifp; ifp = ifp->if_list.tqe_next)
+#endif
+	{
+		mltaddr.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
+		IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
+		if (!in6m)
+			(void)in6_addmulti(&mltaddr.sin6_addr, ifp, &error);
+	}
+}
+
+void
+in6_nigroup_detach(name, namelen)
+	const char *name;
+	int namelen;
+{
+	struct ifnet *ifp;
+	struct sockaddr_in6 mltaddr;
+	struct in6_multi *in6m;
+
+	bzero(&mltaddr, sizeof(mltaddr));
+	mltaddr.sin6_family = AF_INET6;
+	mltaddr.sin6_len = sizeof(struct sockaddr_in6);
+	if (nigroup(NULL, name, namelen, &mltaddr.sin6_addr) != 0)
+		return;
+
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	for (ifp = ifnet; ifp; ifp = ifp->if_next)
+#else
+	for (ifp = ifnet.tqh_first; ifp; ifp = ifp->if_list.tqe_next)
+#endif
+	{
+		mltaddr.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
+		IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
+		if (in6m)
+			in6_delmulti(in6m);
+	}
+}
+
+/*
  * XXX multiple loopback interface needs more care.  for instance,
  * nodelocal address needs to be configured onto only one of them.
  * XXX multiple link-local address case
@@ -658,6 +761,9 @@ in6_ifattach(ifp, altifp)
 	struct sockaddr_in6 mask;
 	struct in6_ifaddr *ia;
 	struct in6_addr in6;
+#ifdef __FreeBSD__
+	int hostnamelen	= strlen(hostname);
+#endif
 
 	/*
 	 * We have some arrays that should be indexed by if_index.
@@ -835,6 +941,18 @@ in6_ifattach(ifp, altifp)
 				  (struct rtentry **)0);
 #endif
 			(void)in6_addmulti(&mltaddr.sin6_addr, ifp, &error);
+		}
+
+		/*
+		 * join node information group address
+		 */
+		if (nigroup(ifp, hostname, hostnamelen, &mltaddr.sin6_addr)
+		    == 0) {
+			IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
+			if (in6m == NULL && ia != NULL) {
+				(void)in6_addmulti(&mltaddr.sin6_addr,
+				    ifp, &error);
+			}
 		}
 
 		if (ifp->if_flags & IFF_LOOPBACK) {

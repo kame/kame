@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.h,v 1.9 2000/04/12 05:35:48 itojun Exp $	*/
+/*	$KAME: in6_ifattach.h,v 1.10 2000/05/27 02:57:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -33,6 +33,8 @@
 #define _NETINET6_IN6_IFATTACH_H_
 
 #ifdef _KERNEL
+void in6_nigroup_attach __P((const char *, int));
+void in6_nigroup_detach __P((const char *, int));
 void in6_ifattach __P((struct ifnet *, struct ifnet *));
 void in6_ifdetach __P((struct ifnet *));
 #endif /* _KERNEL */
