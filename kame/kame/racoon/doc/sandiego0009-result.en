@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.24 2000/09/21 20:11:52 sakane Exp $
+$KAME: sandiego0009-result.en,v 1.25 2000/09/21 22:13:04 itojun Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -147,6 +147,13 @@ vs Linux FreeSWAN
 	phase 2: PFS group 2
 	    ESP 3des-cbc, hmac-md5, tunnel mode, lifetime 20s, PFS 2
 
+	IPv6 test:
+	phase 1: main
+	    preshared, 3des-cbc, md5, DH group 2, lifetime 1h
+	phase 2: PFS group 2
+	    ESP 3des-cbc, hmac-md5, tunnel mode, lifetime 1h, PFS 2
+	    (the IPsec SA did not get installed into linux kernel)
+
 	Notes:
 	- ping with short, long (2k, 32k, 64k)
 	- chargen - FreeSWAN did not consider ESP header size on MSS computation
@@ -155,6 +162,10 @@ vs Linux FreeSWAN
 	  KAME: jenkins draft, uses oldest key possible
 	  linux: uses latest key possible, and assumes that phase 2 responder
 		will install inbound SA on reception of 1st packet
+	- IPv6 test: linux side cannot install IPsec SA into the kernel
+	  (negotiation was successful)
+	- linux side chokes if they gets proposal with algorithm # which linux
+	  side does not know about.
 
 vs HiFn
 	phase 1: initiator, main
