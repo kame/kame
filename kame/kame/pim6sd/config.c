@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.29 2002/06/26 10:24:47 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.30 2002/12/08 10:49:10 jinmei Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -513,14 +513,14 @@ add_phaddr(struct uvif *v, struct sockaddr_in6 *addr, struct in6_addr *mask, str
 	pa->pa_prefix.sin6_scope_id = addr->sin6_scope_id;
 
 
-	if(IN6_IS_ADDR_LINKLOCAL(&addr->sin6_addr)) {
-		if(v->uv_linklocal)
-            log(LOG_WARNING, 0,
-               "add_phaddr: found more than one link-local "
-               "address on %s",
-               v->uv_name);
-
-	v->uv_linklocal = pa;
+	if (IN6_IS_ADDR_LINKLOCAL(&addr->sin6_addr)) {
+		if(v->uv_linklocal) {
+			log(LOG_WARNING, 0,
+			    "add_phaddr: found more than one link-local "
+			    "address on %s",
+			    v->uv_name);
+		}
+		v->uv_linklocal = pa;
 	}
 
 	pa->pa_next = v->uv_addrs;
