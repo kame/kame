@@ -62,21 +62,14 @@ void
 rip_init()
 {
   struct ripif      *ripif;
-  int on;
 #ifndef ADVANCEDAPI
   int hops;
 #endif
   struct ifinfo     *ife;
-  struct ipv6_mreq   mreq;
-  task              *tsk;
   struct timeb      *ttt;              /* random seed   */
 
-  extern fd_set         fdmask;
   extern struct ifinfo *ifentry;
-  extern task          *taskhead;
 
-  memset(&ripsin,   0, sizeof(ripsin));  /* sockaddr_in6  */
-  memset(&mreq,     0, sizeof(mreq));
   ripifs = NULL;
 
   /* random seed */
@@ -84,35 +77,11 @@ rip_init()
   ftime(ttt);
   srandom(ttt->millitm);
 
-
-
-  /* for RIPng */
-  if ((ripsock = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
-    fatal("<rip_init>: socket");
-
-  ripsin.sin6_len      = sizeof(struct sockaddr_in6);
-  ripsin.sin6_family   = AF_INET6;
-  ripsin.sin6_port     = htons(RIPNG_PORT);
-  ripsin.sin6_flowinfo = 0;
-
-  if (bind(ripsock, (struct sockaddr *)&ripsin, sizeof(ripsin)) < 0)
-    fatal("<rip_init>: bind");
-
-
-  if (inet_pton(AF_INET6, RIPNG_DEST, (void *)&ripsin.sin6_addr) != 1)
-    fatal("<rip_init>: inet_pton");
-  mreq.ipv6mr_multiaddr = ripsin.sin6_addr;
-
   ife = ifentry;
   while (ife) {   /*  for each available I/F  */
 	  if (ife->ifi_flags & IFF_UP &&
 	      ife->ifi_flags & IFF_MULTICAST) /* XXX */
 	  {
-		  mreq.ipv6mr_interface = ife->ifi_ifn->if_index;
-		  if (setsockopt(ripsock, IPPROTO_IPV6,
-				 IPV6_JOIN_GROUP, &mreq, sizeof(mreq)) < 0)
-			  fatal("<rip_init>: setsockopt: IPV6_JOIN_GROUP");
-
 		  MALLOC(ripif, struct ripif);
 		  ripif->rip_ife   = ife;
 
@@ -132,6 +101,52 @@ rip_init()
 
 	  if ((ife = ife->ifi_next) == ifentry)
 		  break;
+  }
+
+  /* End of rip_init() */
+}
+
+void
+rip_sockinit()
+{
+  task              *tsk;
+  struct ripif      *ripif;
+  struct ipv6_mreq   mreq;
+  int on;
+  extern task          *taskhead;
+  extern fd_set         fdmask;
+
+  /* for RIPng */
+  if ((ripsock = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
+    fatal("<rip_init>: socket");
+
+  if (bind(ripsock, (struct sockaddr *)&ripsin, sizeof(ripsin)) < 0)
+    fatal("<rip_init>: bind");
+
+  memset(&ripsin,   0, sizeof(ripsin));  /* sockaddr_in6  */
+  memset(&mreq,     0, sizeof(mreq));
+
+  ripsin.sin6_len      = sizeof(struct sockaddr_in6);
+  ripsin.sin6_family   = AF_INET6;
+  ripsin.sin6_port     = htons(RIPNG_PORT);
+  ripsin.sin6_flowinfo = 0;
+
+  if (inet_pton(AF_INET6, RIPNG_DEST, (void *)&ripsin.sin6_addr) != 1)
+    fatal("<rip_init>: inet_pton");
+  mreq.ipv6mr_multiaddr = ripsin.sin6_addr;
+
+  for (ripif = ripifs; ripif; ) { /* XXX: odd loop */
+    if ((ripif->rip_mode & IFS_NORIPIN) != 0)
+      goto nextif;
+
+    mreq.ipv6mr_interface = ripif->rip_ife->ifi_ifn->if_index;
+    if (setsockopt(ripsock, IPPROTO_IPV6,
+		   IPV6_JOIN_GROUP, &mreq, sizeof(mreq)) < 0)
+	    fatal("<rip_init>: setsockopt: IPV6_JOIN_GROUP");
+
+  nextif:
+    if ((ripif = ripif->rip_next) == ripifs)
+	    break;
   }
 
 #ifndef ADVANCEDAPI
@@ -171,7 +186,6 @@ rip_init()
 
   FD_SET(ripsock,  &fdmask);
 
-
   MALLOC(tsk, task);
 
   if (taskhead) {
@@ -188,8 +202,6 @@ rip_init()
 
 
   task_timer_update(tsk);
-
-  /* End of rip_init() */
 }
 
 /*

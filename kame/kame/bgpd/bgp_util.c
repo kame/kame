@@ -880,7 +880,8 @@ bgp_rpcb_isvalid(bnp)
  *
  *       Route Reflector [rfc1966].
  */
-void ibgpconfig()
+void
+ibgpconfig()
 {
   struct rpcb   *ibnp, *bnp;
 #if 0
@@ -1253,4 +1254,55 @@ bgp_output_filter(bnp, rte)
 	}
 
 	return 0;		/* accept it */
+}
+
+void
+bgp_sockinit()
+{
+    struct sockaddr_in6 bgpsin;        /* my address      */
+    int on;
+    extern int bgpsock;
+    extern fd_set fdmask;
+
+    if ((bgpsock = socket(AF_INET6, SOCK_STREAM, 0)) < 0) {
+      dperror("<conf_check>: socket");
+      terminate();
+    }
+
+    on = 1;
+    if (setsockopt(bgpsock, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0) {
+	dperror("<conf_check>: setsockopt(SO_REUSEPORT)");
+	/* error, but not so serious */
+    }
+
+    memset(&bgpsin,   0, sizeof(bgpsin));    /* sockaddr_in6  */
+    bgpsin.sin6_len      = sizeof(struct sockaddr_in6);
+    bgpsin.sin6_family   = AF_INET6;
+    bgpsin.sin6_port     = htons(BGP_PORT);
+    bgpsin.sin6_flowinfo = 0;
+
+    if (bind(bgpsock, (struct sockaddr *)&bgpsin, sizeof(bgpsin)) < 0) {
+      dperror("<conf_check>: bind");
+      terminate();
+    }
+
+    on = 1;
+#ifdef ADVANCEDAPI
+#ifdef IPV6_RECVPKTINFO
+    if (setsockopt(bgpsock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
+		   &on, sizeof(on)) < 0)
+      fatal("<conf_check>: setsockopt(IPV6_RECVPKTINFO)");
+#else  /* old adv. API */
+    if (setsockopt(bgpsock, IPPROTO_IPV6, IPV6_PKTINFO,
+		   &on, sizeof(on)) < 0)
+      fatal("<conf_check>: setsockopt(IPV6_PKTINFO)");
+#endif 
+#endif
+
+    if (listen(bgpsock, 5) < 0) {
+      dperror("<conf_check>: listen");
+      terminate();
+    }
+
+    FD_SET(bgpsock, &fdmask);           /* (global) */
 }

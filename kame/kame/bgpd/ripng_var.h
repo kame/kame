@@ -29,6 +29,7 @@
 
 void          rip_import_init      __P(());
 void          rip_init             __P(());
+void          rip_sockinit         __P(());
 void          rip_input            __P(());
 void          rip_dump             __P(());
 void          rip_life_expired     __P(());

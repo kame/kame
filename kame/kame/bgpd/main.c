@@ -163,6 +163,14 @@ main(argc, argv)
     exit(1);
   if (confcheck)
     exit(0);
+
+  /* initialization after parsing configuration */
+  if (ripyes) {
+    rip_sockinit();
+    rip_import_init();
+  }
+  if (bgpyes)
+    bgp_sockinit();
 #else
   conf_check(conf ? conf : CONFFILENAME);
 #endif

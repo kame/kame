@@ -60,6 +60,11 @@ int              recvfile         __P((int));
 int		 bgp_preferred_rte __P((struct rt_entry *, struct rt_entry *));
 
 /*
+ *   initialization
+ */
+void bgp_sockinit __P((void));
+
+/*
  *   output
  */
 int              bgp_send_open          __P((struct rpcb *));
