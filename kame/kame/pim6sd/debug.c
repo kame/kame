@@ -1,4 +1,4 @@
-/*	$KAME: debug.c,v 1.52 2002/09/19 01:12:01 suz Exp $	*/
+/*	$KAME: debug.c,v 1.53 2002/12/06 05:48:57 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -510,9 +510,12 @@ dump_vifs(fp)
 	}
 
 	fprintf(fp, "  %3s %6s ", "", "");
-	fprintf(fp, "Timers: PIM hello = %d:%02d, MLD query = %d:%02d,  possible MLD version = %s%s\n",
+	fprintf(fp, "Timers: PIM hello = %d:%02d, MLD query = %d:%02d\n",
 		v->uv_pim_hello_timer / 60, v->uv_pim_hello_timer % 60,
-		v->uv_gq_timer / 60, v->uv_gq_timer % 60,
+		v->uv_gq_timer / 60, v->uv_gq_timer % 60);
+
+	fprintf(fp, "  %3s %6s ", "", "");
+	fprintf(fp, "possible MLD version = %s%s\n",
 		v->uv_mld_version & MLDv1 ? "1 " : "",
 		v->uv_mld_version & MLDv2 ? "2 " : "");
     }
