@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.204 2001/09/24 16:29:43 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.205 2001/09/26 16:32:37 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2528,7 +2528,7 @@ fill_prlist(req)
 	struct in6_prefix *p = NULL, *pe = NULL;
 	struct nd_prefix *pr;
 #ifdef __FreeBSD__
-	struct in6_defrouter pbuf[1024]; /* XXX */
+	char pbuf[1024]; /* XXX */
 #else
 	size_t l;
 #endif
