@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.111 2004/11/11 22:34:45 suz Exp $	*/
+/*	$KAME: if_gif.c,v 1.112 2004/11/12 06:00:40 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -337,9 +337,6 @@ gif_output(ifp, m, dst, rt)
 	struct gif_softc *sc = (struct gif_softc*)ifp;
 	int error = 0;
 	static int called = 0;	/* XXX: MUTEX */
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
-	ALTQ_DECL(struct altq_pktattr pktattr;)
-#endif
 	int s;
 	struct m_tag *mtag;
 

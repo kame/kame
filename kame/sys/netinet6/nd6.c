@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.365 2004/11/11 22:34:46 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.366 2004/11/12 06:00:40 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -218,7 +218,11 @@ nd6_init()
 	/* start timer */
 #if defined(__NetBSD__) || defined(__FreeBSD__)
 #ifdef __FreeBSD__
+#if __FreeBSD_version >= 503000
 	callout_init(&nd6_slowtimo_ch, 0);
+#else
+	callout_init(&nd6_slowtimo_ch);
+#endif
 #endif
 	callout_reset(&nd6_slowtimo_ch, ND6_SLOWTIMER_INTERVAL * hz,
 	    nd6_slowtimo, NULL);
