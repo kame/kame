@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1578 2001/03/01 16:49:18 itojun Exp $
+$KAME: CHANGELOG,v 1.1579 2001/03/01 16:57:22 itojun Exp $
 
 <200103>
 Fri Mar  2 01:48:24 JST 2001  itojun@iijlab.net
@@ -33,7 +33,7 @@ Wed Feb 28 23:26:26 JST 2001  itojun@iijlab.net
 
 	  recommeded value for N is like 128, or 256 (if you use a too big
 	  number as N, you may experience inefficiency due to fragmented
-	  packtes).
+	  packets).
 
 Mon Feb 26 22:53:02 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* sys/netinet6/nd6.c : do not overwrite llcache if static ndp is
