@@ -126,16 +126,26 @@ struct	ip6po_rhinfo {
 #define ip6po_route	ip6po_rhinfo.ip6po_rhi_route
 
 struct	ip6_pktopts {
-	struct	mbuf *ip6po_m;	/* Pointer to mbuf storing the data */
-	int	ip6po_hlim;		/* Hoplimit for outgoing packets */
-	struct	in6_pktinfo *ip6po_pktinfo; /* Outgoing IF/address information */
-	struct	sockaddr *ip6po_nexthop;	/* Next-hop address */
+	int	ip6po_hlim;	/* Hoplimit for outgoing packets */
+
+	/* Outgoing IF/address information */
+	struct	in6_pktinfo *ip6po_pktinfo;
+
+	struct	sockaddr *ip6po_nexthop; /* Next-hop address */
+	
 	struct	ip6_hbh *ip6po_hbh; /* Hop-by-Hop options header */
-	struct	ip6_dest *ip6po_dest1; /* Destination options header(1st part) */
-	struct	ip6po_rhinfo ip6po_rhinfo; /* Routing header related info. */
-	struct	ip6_dest *ip6po_dest2; /* Destination options header(2nd part) */
+
+	/* Destination options header (before a routing header) */
+	struct	ip6_dest *ip6po_dest1; 
+
+	/* Routing header related info. */
+	struct	ip6po_rhinfo ip6po_rhinfo;
+
+	/* Destination options header (after a routing header) */
+	struct	ip6_dest *ip6po_dest2;
+
 	int ip6po_flags;
-#define IP6PO_REACHCONF	0x01		/* upper-layer reach. confirmation */
+#define IP6PO_REACHCONF	0x01	/* upper-layer reachability confirmation */
 };
 
 struct	ip6stat {
@@ -231,6 +241,7 @@ int	icmp6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 void	ip6_init __P((void));
 void	ip6intr __P((void));
 void	ip6_input __P((struct mbuf *));
+void	ip6_freepcbopts __P((struct ip6_pktopts *));
 void	ip6_freemoptions __P((struct ip6_moptions *));
 int	ip6_unknown_opt __P((u_int8_t *, struct mbuf *, int));
 char *	ip6_get_prevhdr __P((struct mbuf *, int));
@@ -257,7 +268,8 @@ int	ip6_ctloutput __P((struct socket *, struct sockopt *sopt));
 #else
 int	ip6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 #endif
-int	ip6_setpktoptions __P((struct mbuf *, struct ip6_pktopts *, int));
+int	ip6_setpktoptions __P((struct mbuf *, struct ip6_pktopts *, int, int));
+void	ip6_clearpktopts __P((struct ip6_pktopts *, int, int));
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 int	ip6_optlen __P((struct inpcb *));
 #else

@@ -87,8 +87,8 @@
 #include <netinet/ip.h>
 #include <netinet/in_pcb.h>
 #include <netinet6/ip6.h>
-#include <netinet6/in6_pcb.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/in6_pcb.h>
 #include <netinet6/nd6.h>
 
 #ifndef __bsdi__
@@ -738,17 +738,13 @@ in6_pcbdetach(in6p)
 	sofree(so);
 	if (in6p->in6p_options)
 		m_freem(in6p->in6p_options);
-	if (in6p->in6p_outputopts) {
-		if (in6p->in6p_outputopts->ip6po_rthdr &&
-		    in6p->in6p_outputopts->ip6po_route.ro_rt)
-			RTFREE(in6p->in6p_outputopts->ip6po_route.ro_rt);
-		if (in6p->in6p_outputopts->ip6po_m)
-			(void)m_free(in6p->in6p_outputopts->ip6po_m);
-		free(in6p->in6p_outputopts, M_IP6OPT);
-	}
+
+	ip6_freepcbopts(in6p->in6p_outputopts);
+	ip6_freemoptions(in6p->in6p_moptions);
+
 	if (in6p->in6p_route.ro_rt)
 		rtfree(in6p->in6p_route.ro_rt);
-	ip6_freemoptions(in6p->in6p_moptions);
+
 #if 0
 	remque(in6p);
 #else

@@ -277,7 +277,7 @@ rip6_output(m, va_alist)
 #endif
 	dst = &dstsock->sin6_addr;
 	if (control) {
-		if ((error = ip6_setpktoptions(control, &opt, priv)) != 0)
+		if ((error = ip6_setpktoptions(control, &opt, priv, 0)) != 0)
 			goto bad;
 		optp = &opt;
 	} else
@@ -421,10 +421,11 @@ rip6_output(m, va_alist)
 		m_freem(m);
 
  freectl:
-	if (optp == &opt && optp->ip6po_rthdr && optp->ip6po_route.ro_rt)
-		RTFREE(optp->ip6po_route.ro_rt);
-	if (control)
+	if (control) {
+		if (optp == &opt)
+			ip6_clearpktopts(optp, 0, -1);
 		m_freem(control);
+	}
 	return(error);
 }
 
