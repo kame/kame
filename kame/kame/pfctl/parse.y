@@ -1,4 +1,4 @@
-/*	$OpenBSD: parse.y,v 1.411 2003/08/24 13:02:28 cedric Exp $	*/
+/*	$OpenBSD: parse.y,v 1.413 2003/08/26 18:43:04 dhartmei Exp $	*/
 
 /*
  * Copyright (c) 2001 Markus Friedl.  All rights reserved.
@@ -1977,6 +1977,10 @@ port_item	: port				{
 				    "port operator");
 				YYERROR;
 			}
+			if ($1.a >= $3.a) {
+				yyerror("port arguments invalid");
+				YYERROR;
+			}
 			$$ = calloc(1, sizeof(struct node_port));
 			if ($$ == NULL)
 				err(1, "port_item: calloc");
@@ -2070,6 +2074,10 @@ uid_item	: uid				{
 				    "!=");
 				YYERROR;
 			}
+			if ($1 >= $3) {
+				yyerror("user arguments invalid");
+				YYERROR;
+			}
 			$$ = calloc(1, sizeof(struct node_uid));
 			if ($$ == NULL)
 				err(1, "uid_item: calloc");
@@ -2147,6 +2155,10 @@ gid_item	: gid				{
 			if ($1 == GID_MAX || $3 == GID_MAX) {
 				yyerror("group unknown requires operator = or "
 				    "!=");
+				YYERROR;
+			}
+			if ($1 >= $3) {
+				yyerror("group arguments invalid");
 				YYERROR;
 			}
 			$$ = calloc(1, sizeof(struct node_gid));
