@@ -104,8 +104,10 @@ static struct iovec sndiovpim[2];
 static struct iovec rcviovpim[2];
 static struct msghdr 	sndmhpim,
 			rcvmhpim;
-static u_char sndcmsgbufpim[CMSG_SPACE(sizeof(struct in6_pktinfo))];
-static u_char rcvcmsgbufpim[CMSG_SPACE(sizeof(struct in6_pktinfo))];
+static u_char *sndcmsgbufpim = NULL;
+static int sndcmsglen;
+static u_char *rcvcmsgbufpim = NULL;
+static int rcvcmsglen;
 
 
 /*    
@@ -118,7 +120,8 @@ static int pim6_cksum __P((u_short *, struct in6_addr *,
 
 
 
-void init_pim6()
+void
+init_pim6()
 {
 	struct cmsghdr *cmsgp;
 	int on;
@@ -169,19 +172,26 @@ void init_pim6()
 	rcvmhpim.msg_namelen = sizeof (from);
 	rcvmhpim.msg_iov = rcviovpim;
 	rcvmhpim.msg_iovlen = 1;
+	rcvcmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo));
+	if (rcvcmsgbufpim == NULL &&
+	    (rcvcmsgbufpim = malloc(rcvcmsglen)) == NULL)
+		log(LOG_ERR, 0, "malloc failed");
 	rcvmhpim.msg_control = (caddr_t ) rcvcmsgbufpim;
-	rcvmhpim.msg_controllen = sizeof (rcvcmsgbufpim);
-
+	rcvmhpim.msg_controllen = rcvcmsglen;
 
 	sndmhpim.msg_namelen=sizeof(struct sockaddr_in6);
 	sndmhpim.msg_iov=sndiovpim;
 	sndmhpim.msg_iovlen=1;
-	sndmhpim.msg_control=(caddr_t)sndcmsgbufpim;
-	sndmhpim.msg_controllen=sizeof(sndcmsgbufpim);
+	sndcmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo));
+	if (sndcmsgbufpim == NULL &&
+	    (sndcmsgbufpim = malloc(sndcmsglen)) == NULL)
+		log(LOG_ERR, 0, "malloc failed");
+	sndmhpim.msg_control = (caddr_t)sndcmsgbufpim;
+	sndmhpim.msg_controllen = sndcmsglen;
 	cmsgp=(struct cmsghdr *)sndcmsgbufpim;
-	cmsgp->cmsg_len=CMSG_SPACE(sizeof(struct in6_pktinfo));
-	cmsgp->cmsg_level=IPPROTO_IPV6;
-	cmsgp->cmsg_type=IPV6_PKTINFO;
+	cmsgp->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
+	cmsgp->cmsg_level = IPPROTO_IPV6;
+	cmsgp->cmsg_type = IPV6_PKTINFO;
 
 	if ( register_input_handler(pim6_socket, pim6_read) <0) 
 		log(LOG_ERR,0,"Registering pim6 socket");
@@ -403,8 +413,8 @@ send_pim6(char *buf, struct sockaddr_in6 *src,
 	}
 	else
 	{
-		sndmhpim.msg_control=(caddr_t)sndcmsgbufpim;
-		sndmhpim.msg_controllen=sizeof(sndcmsgbufpim);
+		sndmhpim.msg_control = (caddr_t)sndcmsgbufpim;
+		sndmhpim.msg_controllen = sndcmsglen;
 		sndpktinfo->ipi6_ifindex=src->sin6_scope_id;
 		memcpy(&sndpktinfo->ipi6_addr, &src->sin6_addr,
 		       sizeof(sndpktinfo->ipi6_addr));

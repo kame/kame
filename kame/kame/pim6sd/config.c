@@ -179,7 +179,7 @@ config_vifs_from_kernel()
 		 */
 		for(vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v)
 		{
-			if( strcmp(v->uv_name , ifa->ifa_name) == 0 )
+			if(strcmp(v->uv_name, ifa->ifa_name) == 0 )
 			{
 				add_phaddr(v, &addr, &mask);
 				break;
