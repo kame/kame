@@ -253,6 +253,10 @@ device		uscanner	# Scanners
 device		aue		# ADMtek USB ethernet
 device		cue		# CATC USB ethernet
 device		kue		# Kawasaki LSI USB ethernet
+# Serial adapters
+device		ucom		# Modem and com serial port (generic)
+device		uplcom		# I/O DATA USB-RSAQ2 serial adapter
+device		uvscom		# SUNTAC serial adapter
 
 
 # KAME extensions
