@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tfrc_print.h,v 1.3 2003/10/18 08:16:17 itojun Exp $	*/
+/*	$KAME: dccp_tfrc_print.h,v 1.4 2003/10/22 08:54:15 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
@@ -44,7 +44,7 @@
         else { \
            TFRC_DEBUG((LOG_INFO,"%u+%u*10^-6",(u_int32_t) (num),(u_int32_t) ((num - (double) ((u_int32_t) (num)))*1000000) )); \
 	} \
-        }while(0)
+        } while(0)
 
 #define PRINTTIMEVALu(tvp)    \
         do{  TFRC_DEBUG((LOG_INFO,"%u s, %u us",(u_int32_t) (tvp)->tv_sec,(u_int32_t) (tvp)->tv_usec)); \
@@ -57,7 +57,7 @@
         do {  TFRC_DEBUG((LOG_INFO,"Entry: seq=%u, win_count=%u t_sent=(",(shp)->seq,(shp)->win_count)); \
               PRINTTIMEVALu(&((shp)->t_sent)); \
               TFRC_DEBUG((LOG_INFO,")\n")); \
-        }while(0)
+        } while(0)
 
 #define PRINTSENDHIST(ccbp,elmp) \
         do {    \
@@ -71,14 +71,14 @@
                  (elmp) = STAILQ_NEXT((elmp),linfo); \
 	      }\
 	    }\
-         }while(0)
+         } while(0)
 
 
 #define PRINTRHISTENTRY(rhp) \
         do {  TFRC_DEBUG((LOG_INFO,"Entry: type=%u, seq=%u, win_count=%u, ndp=%u, t_recv=(",(rhp)->type,(rhp)->seq,(rhp)->win_count,(rhp)->ndp)); \
               PRINTTIMEVALu(&((rhp)->t_recv)); \
               TFRC_DEBUG((LOG_INFO,")\n")); \
-        }while(0)
+        } while(0)
 
 #define PRINTRECVHIST(ccbp,elmp) \
         do {    \
@@ -92,11 +92,11 @@
                  (elmp) = STAILQ_NEXT((elmp),linfo); \
 	      }\
 	    }\
-         }while(0)
+         } while(0)
 
 #define PRINTLIHISTENTRY(lihp) \
         do {  TFRC_DEBUG((LOG_INFO,"Entry: seqstart=%u, win_count=%u, interval=%u\n",(lihp)->seq,(lihp)->win_count,(lihp)->interval)); \
-        }while(0)
+        } while(0)
 
 #define PRINTLIHIST(ccbp,elmp) \
         do {    \
@@ -110,7 +110,7 @@
                  (elmp) = TAILQ_NEXT((elmp),linfo); \
 	      }\
 	    }\
-         }while(0)
+         } while(0)
 
 
 #define PRINTSCCB(ccbp,elmp)\
@@ -136,7 +136,7 @@
            TFRC_DEBUG((LOG_INFO, ")\n"));   \
            PRINTSENDHIST(ccbp,elmp); \
            TFRC_DEBUG((LOG_INFO, "\n")); \
-        }while(0)
+        } while(0)
 
 #define PRINTRCCB(ccbp,relmp,lielmp)\
         do{   \
@@ -149,7 +149,6 @@
            PRINTRECVHIST(ccbp,relmp); \
            PRINTLIHIST(ccbp,lielmp); \
            TFRC_DEBUG((LOG_INFO, "\n")); \
-        }while(0)
-
+        } while(0)
 
 #endif

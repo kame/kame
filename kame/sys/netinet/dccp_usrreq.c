@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.13 2003/10/20 12:22:51 ono Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.14 2003/10/22 08:54:16 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -171,7 +171,7 @@ SYSCTL_STRUCT(_net_inet_dccp, DCCPCTL_STATS, stats, CTLFLAG_RW,
 
 static struct	sockaddr_in dccp_in = { sizeof(dccp_in), AF_INET };
 
-static int dccp_detach(struct socket *so);
+static int dccp_detach(struct socket *);
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 static int dccp_doconnect(struct dccpcb *, struct sockaddr *, struct thread *, int);
 #else
@@ -192,12 +192,11 @@ void dccp_connect_t(void *);
 
 /* Ack Vector functions */
 #define DCCP_VECTORSIZE 512 /* initial ack and cwnd-vector size. Multiple of 8 ! */
-void dccp_use_ackvector(struct dccpcb *dp);
-void dccp_update_ackvector(struct dccpcb *dp, u_int32_t seqno);
-void dccp_increment_ackvector(struct dccpcb *dp, u_int32_t seqno);
-u_int16_t dccp_generate_ackvector(struct dccpcb *dp, u_char *);
-u_char dccp_ackvector_state(struct dccpcb *dp, u_int32_t seqnr);
-
+void dccp_use_ackvector(struct dccpcb *);
+void dccp_update_ackvector(struct dccpcb *, u_int32_t);
+void dccp_increment_ackvector(struct dccpcb *, u_int32_t);
+u_int16_t dccp_generate_ackvector(struct dccpcb *, u_char *);
+u_char dccp_ackvector_state(struct dccpcb *, u_int32_t);
 
 /*
  * DCCP initialization
@@ -1430,7 +1429,6 @@ release:
 	return (error);
 }
 
-
 static int
 dccp_abort(struct socket *so)
 {
@@ -1619,7 +1617,6 @@ dccp6_bind(struct socket *so, struct sockaddr *nam, struct proc *td)
 	return error;
 }
 #endif
-
 
 /*
  * Initiates a connection to a server
@@ -1979,11 +1976,11 @@ dccp_disconnect2(struct dccpcb *dp)
 
 static int
 dccp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
-	    struct mbuf *control, 
+    struct mbuf *control, 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-	    struct thread *td)
+    struct thread *td)
 #else
-	    struct proc *td)
+    struct proc *td)
 #endif
 {
 	struct inpcb	*inp;
@@ -2295,7 +2292,8 @@ dccp_newdccpcb(struct inpcb *inp)
 }
 
 int
-dccp_add_option(struct dccpcb *dp, u_int8_t opt, char *val, u_int8_t val_len) {
+dccp_add_option(struct dccpcb *dp, u_int8_t opt, char *val, u_int8_t val_len)
+{
 	return dccp_add_feature_option(dp, opt, 0, val, val_len);
 }
 
@@ -2332,11 +2330,11 @@ dccp_add_feature_option(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, char 
 	return 0;
 }
 
-/**
+/*
  * Searches "options" for given option type. if found, the data is copied to buffer
  * and returns the data length.
  * Returns 0 if option type not found
- **/
+ */
 int
 dccp_get_option(char *options, int optlen, int type, char *buffer, int buflen)
 {
@@ -2740,10 +2738,10 @@ INP_LOCK(inp);
 }
 
 SYSCTL_PROC(_net_inet_dccp, DCCPCTL_PCBLIST, pcblist, CTLFLAG_RD, 0, 0,
-            dccp_pcblist, "S,xdccpcb", "List of active DCCP sockets");
+    dccp_pcblist, "S,xdccpcb", "List of active DCCP sockets");
 
-
-void dccp_timewait_t(void *dcb)
+void
+dccp_timewait_t(void *dcb)
 {
 	struct dccpcb *dp = dcb;
 	int s; 
@@ -2757,7 +2755,8 @@ void dccp_timewait_t(void *dcb)
 	splx(s);
 }
 
-void dccp_connect_t(void *dcb)
+void
+dccp_connect_t(void *dcb)
 {
 	struct dccpcb *dp = dcb;
 	int s;
@@ -2771,7 +2770,8 @@ void dccp_connect_t(void *dcb)
 	splx(s);
 }
 
-void dccp_close_t(void *dcb)
+void
+dccp_close_t(void *dcb)
 {
 	struct dccpcb *dp = dcb;
 	int s;
@@ -2795,7 +2795,8 @@ void dccp_close_t(void *dcb)
 	splx(s);
 }
 
-void dccp_retrans_t(void *dcb)
+void
+dccp_retrans_t(void *dcb)
 {
 	struct dccpcb *dp = dcb;
 	struct inpcb *inp;
@@ -2868,7 +2869,8 @@ struct pr_usrreqs dccp6_usrreqs = {
 /**
  * Initialize and allocate mem for Ack Vector
  **/
-void dccp_use_ackvector(struct dccpcb *dp)
+void
+dccp_use_ackvector(struct dccpcb *dp)
 {
 	ACK_DEBUG((LOG_INFO,"Initializing AckVector\n"));
 	if (dp->ackvector > 0) {
@@ -2892,7 +2894,8 @@ void dccp_use_ackvector(struct dccpcb *dp)
 /**
  * Set 'seqnr' as the new head in ackvector
  **/
-void dccp_update_ackvector(struct dccpcb *dp, u_int32_t seqnr)
+void
+dccp_update_ackvector(struct dccpcb *dp, u_int32_t seqnr)
 {
 	int32_t gap;
 	u_char *t;
@@ -2924,7 +2927,8 @@ void dccp_update_ackvector(struct dccpcb *dp, u_int32_t seqnr)
  * We've received a packet. store in local av so it's included in
  * next Ack Vector sent
  **/
-void dccp_increment_ackvector(struct dccpcb *dp, u_int32_t seqnr)
+void
+dccp_increment_ackvector(struct dccpcb *dp, u_int32_t seqnr)
 {
 	u_int32_t offset, dc;
 	int32_t gap;
@@ -2987,7 +2991,8 @@ void dccp_increment_ackvector(struct dccpcb *dp, u_int32_t seqnr)
  * subsequent are older packets).
  **/
 
-u_int16_t dccp_generate_ackvector(struct dccpcb *dp, u_char *buf)
+u_int16_t
+dccp_generate_ackvector(struct dccpcb *dp, u_char *buf)
 {
 	int32_t j;
 	u_int32_t i;
@@ -3099,7 +3104,8 @@ u_int16_t dccp_generate_ackvector(struct dccpcb *dp, u_char *buf)
 	return cnt;
 }
 
-u_char dccp_ackvector_state(struct dccpcb *dp, u_int32_t seqnr)
+u_char
+dccp_ackvector_state(struct dccpcb *dp, u_int32_t seqnr)
 {
 	u_int32_t gap, offset;
 	u_char *t;
@@ -3129,20 +3135,29 @@ u_char dccp_ackvector_state(struct dccpcb *dp, u_int32_t seqnr)
 /****** End of Ack Vector functions *********/
 
 /* No cc functions */
-void* dccp_nocc_init(struct dccpcb *pcb){
+void *
+dccp_nocc_init(struct dccpcb *pcb)
+{
   return (void*) 1;
 }
 
-void  dccp_nocc_free(void *ccb){
+void
+dccp_nocc_free(void *ccb)
+{
 }
 
-int   dccp_nocc_send_packet(void *ccb, long size){
+int
+dccp_nocc_send_packet(void *ccb, long size)
+{
   return 1;
 }
 
-void  dccp_nocc_send_packet_sent(void *ccb, int moreToSend, long size){
+void
+dccp_nocc_send_packet_sent(void *ccb, int moreToSend, long size)
+{
 }
 
-void  dccp_nocc_packet_recv(void *ccb, char* options ,int optlen){
+void
+dccp_nocc_packet_recv(void *ccb, char* options ,int optlen)
+{
 }
-

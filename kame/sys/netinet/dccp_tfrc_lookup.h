@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tfrc_lookup.h,v 1.3 2003/10/18 08:16:17 itojun Exp $	*/
+/*	$KAME: dccp_tfrc_lookup.h,v 1.4 2003/10/22 08:54:15 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
@@ -1068,7 +1068,7 @@ const double flarge_table[] =
 #define FLOOKUPTEST(x) 
 #endif
 
-double tfrc_flookup_reverse(double fvalue);
+double tfrc_flookup_reverse(double);
 
 /*
  * Inverse of the FLOOKUP above
@@ -1076,7 +1076,9 @@ double tfrc_flookup_reverse(double fvalue);
  * returns:  p  closest to that value
  * Tested u:OK
  */
-double tfrc_flookup_reverse(double fvalue){
+double
+tfrc_flookup_reverse(double fvalue)
+{
   int ctr;
   if(fvalue >= flarge_table[1])
     return 1.0;

@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.h,v 1.5 2003/10/18 08:16:17 itojun Exp $	*/
+/*	$KAME: dccp_tcplike.h,v 1.6 2003/10/22 08:54:15 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -161,7 +161,7 @@ void tcplike_recv_free(void *);
 void tcplike_recv_packet_recv(void *, char *, int);
 
 /*
-int tcplike_option_recv();
+int tcplike_option_recv(void);
 */
 #endif
 

@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.c,v 1.5 2003/10/18 08:16:17 itojun Exp $	*/
+/*	$KAME: dccp_tcplike.c,v 1.6 2003/10/22 08:54:15 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -88,30 +88,30 @@
 
 /* Sender side */
 
-void tcplike_rto_timeout(void *ccb);
-void tcplike_rtt_sample(struct tcplike_send_ccb *cb, u_int16_t sample);
-void _add_to_cwndvector(struct tcplike_send_ccb *cb, u_int32_t seqnr);
-void _remove_from_cwndvector(struct tcplike_send_ccb *cb, u_int32_t seqnr);
-int _chop_cwndvector(struct tcplike_send_ccb *cb, u_int32_t seqnr);
-int _cwndvector_size(struct tcplike_send_ccb *cb);
-u_char _cwndvector_state(struct tcplike_send_ccb *cb, u_int32_t seqnr);
+void tcplike_rto_timeout(void *);
+void tcplike_rtt_sample(struct tcplike_send_ccb *, u_int16_t);
+void _add_to_cwndvector(struct tcplike_send_ccb *, u_int32_t);
+void _remove_from_cwndvector(struct tcplike_send_ccb *, u_int32_t);
+int _chop_cwndvector(struct tcplike_send_ccb *, u_int32_t);
+int _cwndvector_size(struct tcplike_send_ccb *);
+u_char _cwndvector_state(struct tcplike_send_ccb *, u_int32_t);
 
-void tcplike_send_term(void *ccb);
-void tcplike_recv_term(void *ccb);
+void tcplike_send_term(void *);
+void tcplike_recv_term(void *);
 
-void _avlist_add(struct tcplike_recv_ccb *cb, u_int32_t localseq, u_int32_t ackthru);
-u_int32_t _avlist_get(struct tcplike_recv_ccb *cb, u_int32_t localseq);
+void _avlist_add(struct tcplike_recv_ccb *, u_int32_t, u_int32_t);
+u_int32_t _avlist_get(struct tcplike_recv_ccb *, u_int32_t);
 
 /* extern Ack Vector functions */
-extern void dccp_use_ackvector(struct dccpcb *dp);
-extern void dccp_update_ackvector(struct dccpcb *dp, u_int32_t seqno);
-extern void dccp_increment_ackvector(struct dccpcb *dp, u_int32_t seqno);
-extern u_int16_t dccp_generate_ackvector(struct dccpcb *dp, u_char *);
-extern u_char dccp_ackvector_state(struct dccpcb *dp, u_int32_t seqnr);
+extern void dccp_use_ackvector(struct dccpcb *);
+extern void dccp_update_ackvector(struct dccpcb *, u_int32_t);
+extern void dccp_increment_ackvector(struct dccpcb *, u_int32_t);
+extern u_int16_t dccp_generate_ackvector(struct dccpcb *, u_char *);
+extern u_char dccp_ackvector_state(struct dccpcb *, u_int32_t);
 
-extern int dccp_get_option(char *, int, int, char *,int);
-extern int dccp_add_feature(struct dccpcb *dp, u_int8_t type, u_int8_t feature, char *val, u_int8_t val_len);
-extern int dccp_remove_feature(struct dccpcb *dp, u_int8_t type, u_int8_t feature);
+extern int dccp_get_option(char *, int, int, char *, int);
+extern int dccp_add_feature(struct dccpcb *, u_int8_t, u_int8_t, char *, u_int8_t);
+extern int dccp_remove_feature(struct dccpcb *, u_int8_t, u_int8_t);
 
 /**
  * RTO timer activated
@@ -1065,5 +1065,5 @@ u_int32_t _avlist_get(struct tcplike_recv_ccb *cb, u_int32_t localseq)
 }
 
 /*
-int tcplike_option_recv();
+int tcplike_option_recv(void);
 */

@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tfrc.h,v 1.3 2003/10/18 08:16:17 itojun Exp $	*/
+/*	$KAME: dccp_tfrc.h,v 1.4 2003/10/22 08:54:15 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
@@ -111,30 +111,30 @@ struct tfrc_send_ccb {
  * args: pcb  - pointer to dccpcb of associated connection
  * returns: pointer to a tfrc_send_ccb struct on success, otherwise 0
  */ 
-void *tfrc_send_init(struct dccpcb *pcb); 
+void *tfrc_send_init(struct dccpcb *); 
 
 /* Free the sender side
  * args: ccb - ccb of sender
  */
-void tfrc_send_free(void *ccb);
+void tfrc_send_free(void *);
 
 /* Ask TFRC wheter one can send a packet or not 
  * args: ccb  -  ccb block for current connection
  * returns: 1 if ok, else 0.
  */ 
-int tfrc_send_packet(void *ccb, long datasize);
+int tfrc_send_packet(void *, long);
 
 /* Notify sender that a packet has been sent 
  * args: ccb - ccb block for current connection
  *	 moreToSend - if there exists more packets to send
  *       datasize   - packet size
  */
-void tfrc_send_packet_sent(void *ccb, int moreToSend, long datasize);
+void tfrc_send_packet_sent(void *, int, long);
 
 /* Notify that a an ack package was received (i.e. a feedback packet)
  * args: ccb  -  ccb block for current connection
  */ 
-void tfrc_send_packet_recv(void *ccb,char *, int);
+void tfrc_send_packet_recv(void *, char *, int);
 
 #endif
 
@@ -153,58 +153,62 @@ void tfrc_send_packet_recv(void *ccb,char *, int);
 #define TFRC_RSTATE_TERM        127
 
 /* Receiver mechanism parameters */
-#define TFRC_RECV_NEW_SEQ_RANGE 10000000   /* seq_num x,y; 
-					      if y-x is smaller than this 
-					      number (note, wrap around)
-					      then y is newer than x */
-#define TFRC_RECV_NUM_LATE_LOSS 3          /* number of later packets received 
-					      before one is considered lost */
-					      
-#define TFRC_RECV_IVAL_F_LENGTH  8          /* length(w[]) */
+/*
+ * seq_num x,y; if y-x is smaller than this number (note, wrap around) then
+ * y is newer than x
+ */
+#define TFRC_RECV_NEW_SEQ_RANGE 10000000
+/* number of later packets received before one is considered lost */
+#define TFRC_RECV_NUM_LATE_LOSS 3
+/* length(w[]) */
+#define TFRC_RECV_IVAL_F_LENGTH  8
 
 /* Packet history */
 STAILQ_HEAD(r_hist_head,r_hist_entry); 
  
 struct r_hist_entry {
-  STAILQ_ENTRY(r_hist_entry) linfo;    /* Tail queue. */
-  u_int32_t seq;            /* Sequence number */
-  struct timeval t_recv;    /* When the packet was received */
-  u_int8_t win_count;       /* Window counter for that packet */
-  u_int8_t type;            /* Packet type received */
-  u_int8_t ndp;             /* no data packets value */
+	STAILQ_ENTRY(r_hist_entry) linfo;	/* Tail queue. */
+	u_int32_t seq;		/* Sequence number */
+	struct timeval t_recv;	/* When the packet was received */
+	u_int8_t win_count;	/* Window counter for that packet */
+	u_int8_t type;		/* Packet type received */
+	u_int8_t ndp;		/* no data packets value */
 };
 
 /* Loss interval history */
 TAILQ_HEAD(li_hist_head,li_hist_entry); 
  
 struct li_hist_entry {
-  TAILQ_ENTRY(li_hist_entry) linfo;    /* Tail queue. */
-  u_int32_t interval;       /* Loss interval */
-  u_int32_t seq;            /* Sequence number of the packet that started 
-			       the interval */
-  u_int8_t win_count;       /* Window counter for previous received packet */
+	TAILQ_ENTRY(li_hist_entry) linfo;	/* Tail queue. */
+	u_int32_t interval;	/* Loss interval */
+	u_int32_t seq;		/* Sequence number of the packet that started the interval */
+	u_int8_t win_count;	/* Window counter for previous received packet */
 };
 
 /* TFRC receiver congestion control block (ccb) */
 struct tfrc_recv_ccb {
-  struct mtx mutex;                 /* Lock for this structure */
-  struct dccpcb *pcb;               /* Pointer to associated dccpcb */
-  u_int8_t     state;               /* Receiver state */
+	struct mtx	mutex;		/* Lock for this structure */
+	struct dccpcb	*pcb;		/* Pointer to associated dccpcb */
+	u_int8_t	state;		/* Receiver state */
 
-  double        p;                   /* Loss event rate */
- 
-  struct li_hist_head li_hist;      /* Loss interval history */
+	double		p;		/* Loss event rate */
 
-  u_int8_t     last_counter;        /* Highest value of the window counter
-                                       received when last feedback was sent */
-  u_int32_t    seq_last_counter;    /* Sequence number of the packet above */
+	struct li_hist_head li_hist;	/* Loss interval history */
 
-  struct timeval t_last_feedback;   /* Timestamp of when last feedback was sent */
-  u_int32_t    bytes_recv;          /* Bytes received since t_last_feedback */
+	/*
+	 * Highest value of the window counter received when last feedback
+	 * was sent
+	 */
+	u_int8_t	last_counter;
+	/* Sequence number of the packet above */
+	u_int32_t	seq_last_counter;
 
-  struct r_hist_head hist;          /* Packet history */
+	struct timeval t_last_feedback;	/* Timestamp of when last feedback was sent */
+	u_int32_t	bytes_recv;	/* Bytes received since t_last_feedback */
 
-  u_int16_t    s;                   /* Packet size */
+	struct r_hist_head hist;	/* Packet history */
+
+	u_int16_t	s;		/* Packet size */
 };
 
 #ifdef _KERNEL
@@ -215,18 +219,18 @@ struct tfrc_recv_ccb {
  * args: pcb  -  pointer to dccpcb of associated connection
  * returns: pointer to a tfrc_recv_ccb struct on success, otherwise 0
  */ 
-void *tfrc_recv_init(struct dccpcb *pcb); 
+void *tfrc_recv_init(struct dccpcb *); 
 
 /* Free the receiver side
  * args: ccb - ccb of recevier
  */
-void tfrc_recv_free(void *ccb);
+void tfrc_recv_free(void *);
 
 /*
  * Tell TFRC that a packet has been received
  * args: ccb  -  ccb block for current connection 
  */
-void tfrc_recv_packet_recv(void *ccb, char *, int);
+void tfrc_recv_packet_recv(void *, char *, int);
 
 #endif
 

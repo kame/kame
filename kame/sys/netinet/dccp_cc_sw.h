@@ -1,4 +1,4 @@
-/*	$KAME: dccp_cc_sw.h,v 1.4 2003/10/18 08:16:17 itojun Exp $	*/
+/*	$KAME: dccp_cc_sw.h,v 1.5 2003/10/22 08:54:15 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
@@ -41,27 +41,27 @@
  * args: dccpcb of current connection
  * returns: sender ccb
  */
-typedef void*  cc_send_init_t     (struct dccpcb *);
+typedef void *  cc_send_init_t     (struct dccpcb *);
 
 /* Free the sender side */
-typedef void   cc_send_free_t     (void*);
+typedef void   cc_send_free_t     (void *);
 
 /* Ask the cc mechanism if dccp is allowed to send a packet
  * args: the packet size (0 == ACK)
  * returns: 1 if allowed to send, otherwise 0
  */
-typedef int    cc_send_packet_t   (void*, long);
+typedef int    cc_send_packet_t   (void *, long);
 
 /* Inform the cc mechanism that a packet was sent
  * args:  if there exists more to send or not
  *        size of packet sent
  */
-typedef void   cc_send_packet_sent_t (void*, int, long);
+typedef void   cc_send_packet_sent_t (void *, int, long);
 
 /* Inform the cc mechanism (sender) that a packet has been received
  * args:  options and option length
  */
-typedef void   cc_send_packet_recv_t (void*,char *,int);
+typedef void   cc_send_packet_recv_t (void *, char *, int);
 
 
 /* Receiver side */
@@ -70,29 +70,29 @@ typedef void   cc_send_packet_recv_t (void*,char *,int);
  * args: dccpcb of current connection
  * returns: receiver ccb
  */
-typedef void*  cc_recv_init_t   (struct dccpcb *);
+typedef void *  cc_recv_init_t   (struct dccpcb *);
 
 /* Free the receiver side */
-typedef void   cc_recv_free_t   (void*);
+typedef void   cc_recv_free_t   (void *);
 
 /* Inform the cc mechanism (receiver) that a packet was received
  * args:  options and option length
  */
-typedef void   cc_recv_packet_recv_t (void*,char *,int);
+typedef void   cc_recv_packet_recv_t (void *, char *, int);
 
 
 struct dccp_cc_sw {
-  /* Sender side */
-  cc_send_init_t   *cc_send_init;
-  cc_send_free_t   *cc_send_free;
-  cc_send_packet_t *cc_send_packet;
-  cc_send_packet_sent_t *cc_send_packet_sent;
-  cc_send_packet_recv_t *cc_send_packet_recv;
-  
-  /* Receiver side */
-  cc_recv_init_t   *cc_recv_init;
-  cc_recv_free_t   *cc_recv_free;
-  cc_recv_packet_recv_t   *cc_recv_packet_recv;
+	/* Sender side */
+	cc_send_init_t   *cc_send_init;
+	cc_send_free_t   *cc_send_free;
+	cc_send_packet_t *cc_send_packet;
+	cc_send_packet_sent_t *cc_send_packet_sent;
+	cc_send_packet_recv_t *cc_send_packet_recv;
+
+	/* Receiver side */
+	cc_recv_init_t   *cc_recv_init;
+	cc_recv_free_t   *cc_recv_free;
+	cc_recv_packet_recv_t   *cc_recv_packet_recv;
 };
 
 /* Max ccid (i.e. cc_sw has DCCP_CC_MAX_CCID+2 elements) */

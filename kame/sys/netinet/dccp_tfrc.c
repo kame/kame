@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tfrc.c,v 1.4 2003/10/18 08:16:17 itojun Exp $	*/
+/*	$KAME: dccp_tfrc.c,v 1.5 2003/10/22 08:54:15 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
@@ -110,24 +110,24 @@ const struct timeval delta_half = {0,TFRC_OPSYS_TIME_GRAN/2};
  */
 #define HALFTIMEVAL(tvp) \
         do { \
-            if((tvp)->tv_sec & 1) \
+            if ((tvp)->tv_sec & 1) \
 	      (tvp)->tv_usec += 1000000; \
 	    (tvp)->tv_sec = (tvp)->tv_sec >> 1; \
 	    (tvp)->tv_usec = (tvp)->tv_usec >> 1; \
-        }while(0)
+        } while(0)
 
 /* Sender side */
 
 /* Calculate new t_ipi (inter packet interval) by
  *    t_ipi = s/X_inst; 
  * args:  ccbp - pointer to sender ccb block
- * Tested u:OK - Note: No check for x=0 -> t_ipi ={0xFFF...,0xFFF}
+ * Tested u:OK - Note: No check for x = 0 -> t_ipi = {0xFFF...,0xFFF}
  */
 #define CALCNEWTIPI(ccbp)                              \
         do{                                            \
            ccbp->t_ipi.tv_sec = (long) ( ((double) (ccbp->s)) / (ccbp->x) );                    \
            ccbp->t_ipi.tv_usec = (long) (( ((double)(ccbp->s)) / (ccbp->x) - ccbp->t_ipi.tv_sec)*((double)1000000.0));   \
-        }while (0)
+        } while (0)
 
 /* Calculate new delta by 
  *    delta = min(t_ipi/2, t_gran/2);
@@ -147,12 +147,12 @@ const struct timeval delta_half = {0,TFRC_OPSYS_TIME_GRAN/2};
 extern int dccp_get_option(char *, int, int, char *,int);
 
 /* Forward declarations */
-void  tfrc_time_no_feedback(void *ccb);
-void  tfrc_time_send(void *ccb);
-void  tfrc_set_send_timer(struct tfrc_send_ccb *cb, struct timeval t_now);
-void  tfrc_updateX(struct tfrc_send_ccb *cb, struct timeval t_now);
-double tfrc_calcX(u_int16_t s, u_int32_t R, double p);
-void  tfrc_send_term(void *ccb);
+void  tfrc_time_no_feedback(void *);
+void  tfrc_time_send(void *);
+void  tfrc_set_send_timer(struct tfrc_send_ccb *, struct timeval);
+void  tfrc_updateX(struct tfrc_send_ccb *, struct timeval);
+double tfrc_calcX(u_int16_t, u_int32_t, double);
+void  tfrc_send_term(void *);
 
 /* Calculate the send rate according to TCP throughput eq.
  * args: s - packet size (in bytes)
@@ -161,7 +161,9 @@ void  tfrc_send_term(void *ccb);
  * returns:  calculated send rate (in bytes per second)
  * Tested u:OK
  */
-__inline double tfrc_calcX(u_int16_t s, u_int32_t R, double p){
+__inline double
+tfrc_calcX(u_int16_t s, u_int32_t R, double p)
+{
   FLOOKUPTEST(p);
   return  ( ((double) (s)) * 1000000.0 / ( ((double) R) * FLOOKUP(p)) );
 }
@@ -170,17 +172,19 @@ __inline double tfrc_calcX(u_int16_t s, u_int32_t R, double p){
  * Function called by the send timer (to send packet)
  * args: cb -  sender congestion control block
  */
-void tfrc_time_send(void *ccb){
+void
+tfrc_time_send(void *ccb)
+{
   struct tfrc_send_ccb *cb = (struct tfrc_send_ccb *) ccb;
   int s;
   struct inpcb *inp;
 
-  if(cb->state == TFRC_SSTATE_TERM){
+  if (cb->state == TFRC_SSTATE_TERM){
     TFRC_DEBUG((LOG_INFO,"TFRC - Send timer is ordered to terminate. (tfrc_time_send)\n"));
     return;
   }
 
-  if(cb->ch_stimer.callout == NULL || callout_pending(cb->ch_stimer.callout)){
+  if (cb->ch_stimer.callout == NULL || callout_pending(cb->ch_stimer.callout)){
     TFRC_DEBUG((LOG_INFO,"TFRC - Callout pending. (tfrc_time_send)\n"));
     return;
   }
@@ -198,7 +202,7 @@ void tfrc_time_send(void *ccb){
 
   /* release locks */
   INP_UNLOCK(inp);
-    splx(s);
+  splx(s);
 }
 
 /*
@@ -207,7 +211,9 @@ void tfrc_time_send(void *ccb){
  *       t_now - timeval struct containing actual time
  * Tested u:OK
  */
-void tfrc_set_send_timer(struct tfrc_send_ccb *cb, struct timeval t_now){
+void
+tfrc_set_send_timer(struct tfrc_send_ccb *cb, struct timeval t_now)
+{
   struct timeval t_temp;
   long t_ticks;
   /* set send timer to fire in t_ipi - (t_now-t_nom_old) 
@@ -216,7 +222,7 @@ void tfrc_set_send_timer(struct tfrc_send_ccb *cb, struct timeval t_now){
   timevalsub(&(t_temp),&(t_now));
 
 #ifdef TFRCDEBUG
-  if(t_temp.tv_sec < 0 || t_temp.tv_usec < 0)
+  if (t_temp.tv_sec < 0 || t_temp.tv_usec < 0)
     panic("TFRC - scheduled a negative time! (tfrc_set_send_timer)\n");
 #endif 
 
@@ -240,7 +246,9 @@ void tfrc_set_send_timer(struct tfrc_send_ccb *cb, struct timeval t_now){
  *       t_now - timeval struct containing actual time
  * Tested u:OK
  */ 
-void tfrc_updateX(struct tfrc_send_ccb *cb, struct timeval t_now){
+void
+tfrc_updateX(struct tfrc_send_ccb *cb, struct timeval t_now)
+{
   double temp;
   struct timeval t_temp,t_rtt = {0,0};
   if (cb->p >= TFRC_SMALLEST_P){     /* to avoid large error in calcX */
@@ -249,7 +257,7 @@ void tfrc_updateX(struct tfrc_send_ccb *cb, struct timeval t_now){
     if (cb->x_calc < temp)
       temp = cb->x_calc;
     cb->x = temp;
-    if(temp < ((double) (cb->s))/TFRC_MAX_BACK_OFF_TIME)
+    if (temp < ((double) (cb->s))/TFRC_MAX_BACK_OFF_TIME)
       cb->x = ((double) (cb->s))/TFRC_MAX_BACK_OFF_TIME;
     TFRC_DEBUG((LOG_INFO,"TFRC updated send rate to "));
     PRINTFLOAT(cb->x);
@@ -264,7 +272,7 @@ void tfrc_updateX(struct tfrc_send_ccb *cb, struct timeval t_now){
       if (2*cb->x < temp)
 	temp = 2*cb->x;
       cb->x = ((double)(cb->s))*1000000.0/((double) (cb->rtt));
-      if(temp > cb->x)
+      if (temp > cb->x)
 	cb->x = temp;
       cb->t_ld = t_now;
       TFRC_DEBUG((LOG_INFO,"TFRC updated send rate to "));
@@ -280,18 +288,20 @@ void tfrc_updateX(struct tfrc_send_ccb *cb, struct timeval t_now){
  * args:  cb -  sender congestion control block
  * Tested u:OK
  */
-void tfrc_time_no_feedback(void *ccb){
+void
+tfrc_time_no_feedback(void *ccb)
+{
   u_int32_t next_time_out = 1;  /* remove init! */
   struct timeval t_now;
   struct tfrc_send_ccb *cb = (struct tfrc_send_ccb *) ccb;
   mtx_lock(&(cb->mutex));
 
-  if(cb->state == TFRC_SSTATE_TERM){
+  if (cb->state == TFRC_SSTATE_TERM){
     TFRC_DEBUG((LOG_INFO,"TFRC - No feedback timer is ordered to terminate\n"));
     goto nf_release;
   }
 
-  if(cb->ch_nftimer.callout == NULL || callout_pending(cb->ch_nftimer.callout)){
+  if (cb->ch_nftimer.callout == NULL || callout_pending(cb->ch_nftimer.callout)){
     TFRC_DEBUG((LOG_INFO,"TFRC - Callout pending, exiting...(tfrc_time_no_feedback)\n"));
     goto nf_release;
   }
@@ -318,7 +328,7 @@ void tfrc_time_no_feedback(void *ccb){
   case TFRC_SSTATE_FBACK:
     /* Check if IDLE since last timeout and recv rate is less than 4 packets per RTT */ 
  
-    if(!(cb->idle) || (cb->x_recv >= 4.0 * ((double)(cb->s)) / ((double) (cb->rtt))* 1000000.0)){
+    if (!(cb->idle) || (cb->x_recv >= 4.0 * ((double)(cb->s)) / ((double) (cb->rtt))* 1000000.0)){
       TFRC_DEBUG((LOG_INFO, "TFRC - no feedback timer expired, state FBACK, not idle\n"));
       /* Half sending rate */
 
@@ -327,11 +337,11 @@ void tfrc_time_no_feedback(void *ccb){
        *  Else
        *    X_recv = X_calc/4;
        */
-      if(cb->p >= TFRC_SMALLEST_P && cb->x_calc == 0.0)
+      if (cb->p >= TFRC_SMALLEST_P && cb->x_calc == 0.0)
 	panic("TFRC - X_calc is zero! (tfrc_time_no_feedback)\n");
 
       /* check also if p i zero -> x_calc is infinity ?? */
-      if(cb->p < TFRC_SMALLEST_P || cb->x_calc > 2*cb->x_recv){
+      if (cb->p < TFRC_SMALLEST_P || cb->x_calc > 2*cb->x_recv){
 	cb->x_recv = cb->x_recv / 2;
 	if (cb->x_recv < ((double)cb->s)/(2*TFRC_MAX_BACK_OFF_TIME))
 	  cb->x_recv = ((double)cb->s)/(2*TFRC_MAX_BACK_OFF_TIME);
@@ -376,10 +386,12 @@ nf_release:
 /* Removes ccb from memory
  * args: ccb - ccb of sender
  */
-void tfrc_send_term(void *ccb){
+void
+tfrc_send_term(void *ccb)
+{
   struct tfrc_send_ccb *cb = (struct tfrc_send_ccb *) ccb;
   
-  if(ccb == 0)
+  if (ccb == 0)
     panic("TFRC - Sender ccb is null! (free)");
 
   /* free sender */
@@ -398,7 +410,9 @@ void tfrc_send_term(void *ccb){
  * returns: pointer to a tfrc_send_ccb struct on success, otherwise 0
  * Tested u:OK
  */ 
-void *tfrc_send_init(struct dccpcb* pcb){
+void *
+tfrc_send_init(struct dccpcb* pcb)
+{
   struct tfrc_send_ccb *ccb;
 
   ccb = malloc(sizeof (struct tfrc_send_ccb), M_PCB, M_DONTWAIT | M_ZERO);
@@ -441,13 +455,15 @@ void *tfrc_send_init(struct dccpcb* pcb){
  * args: ccb - ccb of sender
  * Tested u:OK
  */
-void tfrc_send_free(void *ccb){
+void
+tfrc_send_free(void *ccb)
+{
   struct s_hist_entry *elm,*elm2;
   struct tfrc_send_ccb *cb = (struct tfrc_send_ccb *) ccb;
 
   TFRC_DEBUG((LOG_INFO, "TFRC send free called!\n"));
   
-  if(ccb == 0)
+  if (ccb == 0)
     panic("TFRC - Sender ccb is null! (free)");
 
   /* uninit sender */
@@ -476,13 +492,14 @@ void tfrc_send_free(void *ccb){
   timeout(tfrc_send_term, (void*)cb, TFRC_SEND_WAIT_TERM*hz); 
 }
 
-
 /* Ask TFRC whether one can send a packet or not 
  * args: ccb  -  ccb block for current connection 
  * returns: 1 if ok, else 0.
  * Tested u:OK
  */ 
-int tfrc_send_packet(void *ccb, long datasize){
+int
+tfrc_send_packet(void *ccb, long datasize)
+{
   struct s_hist_entry *new_packet;
   u_int8_t answer = 0;
   u_int8_t win_count = 0;
@@ -494,7 +511,7 @@ int tfrc_send_packet(void *ccb, long datasize){
 #endif
 
   /* check if pure ACK or Terminating */
-  if(datasize == 0 || cb->state == TFRC_SSTATE_TERM){
+  if (datasize == 0 || cb->state == TFRC_SSTATE_TERM){
     return 1;
   } else if (cb->state == TFRC_SSTATE_TERM) {
     TFRC_DEBUG((LOG_INFO,"TFRC - Asked to send packet when terminating!\n"));
@@ -507,10 +524,10 @@ int tfrc_send_packet(void *ccb, long datasize){
   /* check to see if we already have allocated memory last time */
   new_packet = STAILQ_FIRST(&(cb->hist));
 
-  if((new_packet != NULL && new_packet->t_sent.tv_sec >= 0) || new_packet == NULL){  
+  if ((new_packet != NULL && new_packet->t_sent.tv_sec >= 0) || new_packet == NULL){  
     /* check to see if we have memory to add to packet history */
     new_packet = malloc(sizeof (struct s_hist_entry), M_TEMP, M_DONTWAIT); /*M_TEMP??*/
-    if(new_packet == NULL){
+    if (new_packet == NULL){
       TFRC_DEBUG((LOG_INFO,"TFRC - Not enough memory to add packet to packet history (send refused)! (tfrc_send_packet)\n"));
       answer = 0;
       dccpstat.tfrcs_send_nomem++;
@@ -547,7 +564,7 @@ int tfrc_send_packet(void *ccb, long datasize){
     break;
   case TFRC_SSTATE_NO_FBACK :
   case TFRC_SSTATE_FBACK :
-    if(!(cb->ch_stimer.callout)){
+    if (!(cb->ch_stimer.callout)){
        microtime(&t_now);
        
        t_temp = t_now;
@@ -564,7 +581,7 @@ int tfrc_send_packet(void *ccb, long datasize){
 	timevalsub(&t_temp, &(cb->t_last_win_count));
 	
 	/* calculate win_count option */
-	if(cb->state == TFRC_SSTATE_NO_FBACK){
+	if (cb->state == TFRC_SSTATE_NO_FBACK){
 	  /* Assume RTT= t_rto(initial)/4 */
 	  uw_win_count = (((double) (t_temp.tv_sec)) + (((double) (t_temp.tv_usec))/1000000.0))/ (TFRC_INITIAL_TIMEOUT/(4.0*TFRC_WIN_COUNT_PER_RTT));
 	}else{
@@ -586,7 +603,7 @@ int tfrc_send_packet(void *ccb, long datasize){
   }
   
   /* can we send? if so add options and add to packet history */
-  if(answer){
+  if (answer){
     /* Add packet to history */
     
     new_packet->win_count = win_count;
@@ -594,7 +611,7 @@ int tfrc_send_packet(void *ccb, long datasize){
     /* todo: remove old option */
     
     /* add option */
-    if(dccp_add_option(cb->pcb, TFRC_OPT_WINDOW_COUNT,(char *) &win_count, 1)){
+    if (dccp_add_option(cb->pcb, TFRC_OPT_WINDOW_COUNT,(char *) &win_count, 1)){
       TFRC_DEBUG((LOG_INFO,"TFRC - Add window counter option failed, send refused! (tfrc_send_packet)!\n"));
       answer = 0;
       dccpstat.tfrcs_send_erropt++;
@@ -610,7 +627,9 @@ sp_release:
  *	 moreToSend - if there exists more packets to send
  *       dataSize -   packet size
  */
-void tfrc_send_packet_sent(void *ccb, int moreToSend, long datasize){
+void
+tfrc_send_packet_sent(void *ccb, int moreToSend, long datasize)
+{
   struct timeval t_now, t_temp;
   struct s_hist_entry *packet;
   struct tfrc_send_ccb *cb = (struct tfrc_send_ccb *) ccb;
@@ -628,17 +647,17 @@ void tfrc_send_packet_sent(void *ccb, int moreToSend, long datasize){
   microtime(&t_now);
   
   /* check if we have sent a data packet */
-  if(datasize > 0){
+  if (datasize > 0){
     /* add send time to history */
     packet = STAILQ_FIRST(&(cb->hist));
-    if(packet == NULL)
+    if (packet == NULL)
       panic("TFRC - Packet does not exist in history! (tfrc_send_packet_sent)");
-    else if(packet != NULL && packet->t_sent.tv_sec >= 0)
+    else if (packet != NULL && packet->t_sent.tv_sec >= 0)
       panic("TFRC - No unsent packet in history! (tfrc_send_packet_sent)");
     packet->t_sent = t_now;
     packet->seq = cb->pcb->seq_snd;
     /* check if win_count have changed */
-    if(packet->win_count != cb->last_win_count){
+    if (packet->win_count != cb->last_win_count){
       cb->t_last_win_count = t_now;
       cb->last_win_count = packet->win_count;
     }
@@ -649,21 +668,21 @@ void tfrc_send_packet_sent(void *ccb, int moreToSend, long datasize){
   }
 
   /* if timer is running, do nothing */
-  if(cb->ch_stimer.callout){
+  if (cb->ch_stimer.callout){
     goto sps_release;
   }
   
   switch (cb->state){
   case TFRC_SSTATE_NO_SENT :
     /* if first was pure ack */
-    if(datasize == 0){
+    if (datasize == 0){
       goto sps_release;
     } else
       panic("TFRC - First packet sent is noted as a data packet in tfrc_send_packet_sent\n"); 
     break;
   case TFRC_SSTATE_NO_FBACK :
   case TFRC_SSTATE_FBACK :
-    if(datasize <= 0){ /* we have ack (or simulate a sent packet which never can have moreToSend */
+    if (datasize <= 0){ /* we have ack (or simulate a sent packet which never can have moreToSend */
       moreToSend = 0;
     } else {
       /* Calculate new t_ipi */
@@ -673,7 +692,7 @@ void tfrc_send_packet_sent(void *ccb, int moreToSend, long datasize){
       CALCNEWDELTA(cb);
     }
 
-    if(!moreToSend){
+    if (!moreToSend){
       /* loop until we find a send time in the future */
       microtime(&t_now);
       t_temp = t_now;
@@ -695,7 +714,7 @@ void tfrc_send_packet_sent(void *ccb, int moreToSend, long datasize){
       t_temp = t_now;
       timevaladd(&(t_temp),&(cb->delta)); /* t_temp = t_now+delta */
       /* Check if next packet can not be sent immediately */
-      if(!(timevalcmp(&(t_temp),&(cb->t_nom),>))){
+      if (!(timevalcmp(&(t_temp),&(cb->t_nom),>))){
 	tfrc_set_send_timer(cb,t_now);   /* if so schedule sendtimer */
       }
     }
@@ -712,7 +731,9 @@ void tfrc_send_packet_sent(void *ccb, int moreToSend, long datasize){
 /* Notify that a an ack package was received (i.e. a feedback packet)
  * args: ccb  -  ccb block for current connection
  */ 
-void tfrc_send_packet_recv(void *ccb, char *options, int optlen){
+void
+tfrc_send_packet_recv(void *ccb, char *options, int optlen)
+{
   u_int32_t  next_time_out; 
   struct timeval t_now;
   int res;
@@ -785,7 +806,7 @@ void tfrc_send_packet_recv(void *ccb, char *options, int optlen){
       elm = STAILQ_NEXT(elm, linfo);
     }
 
-    if(elm == NULL){
+    if (elm == NULL){
       TFRC_DEBUG((LOG_INFO,"TFRC - Packet does not exist in history (seq=%u)! (tfrc_send_packet_recv)",cb->pcb->ack_rcv));
       goto sar_release;
     }
@@ -824,14 +845,14 @@ void tfrc_send_packet_recv(void *ccb, char *options, int optlen){
     else {
       cb->p = 1.0 / ((double) pinv);
       
-      if(cb->p < TFRC_SMALLEST_P){
+      if (cb->p < TFRC_SMALLEST_P){
 	cb->p = TFRC_SMALLEST_P;
 	TFRC_DEBUG((LOG_INFO, "TFRC - Smallest p used!\n"));
       }
     }
     
     /* unschedule no feedback timer */
-    if(cb->ch_nftimer.callout != NULL){
+    if (cb->ch_nftimer.callout != NULL){
       untimeout(tfrc_time_no_feedback, (void *) cb, cb->ch_nftimer);
     }
 
@@ -875,7 +896,7 @@ void tfrc_send_packet_recv(void *ccb, char *options, int optlen){
 	next_time_out = cb->t_rto;
     TFRC_DEBUG_TIME((LOG_INFO, "TFRC - Scheduled no feedback timer to expire in %u ticks (%u us) (hz=%u)(tfrc_send_packet_recv)\n",next_time_out/(1000000/hz),next_time_out,hz)); 
     next_time_out = next_time_out/(1000000/hz);
-    if(next_time_out == 0)
+    if (next_time_out == 0)
       next_time_out = 1;
     
     cb->ch_nftimer = timeout(tfrc_time_no_feedback, (void*)cb, next_time_out);
@@ -893,12 +914,12 @@ sar_release:
 /* Receiver side */
 
 /* Forward declarations */
-double tfrc_calcImean(struct tfrc_recv_ccb *cb);
-void tfrc_recv_send_feedback(struct tfrc_recv_ccb *cb);
-int tfrc_recv_add_hist(struct tfrc_recv_ccb *cb, struct r_hist_entry *packet);
-void tfrc_recv_detectLoss(struct tfrc_recv_ccb *cb);
-u_int32_t tfrc_recv_calcFirstLI(struct tfrc_recv_ccb *cb);
-void tfrc_recv_updateLI(struct tfrc_recv_ccb *cb, long seq_loss, u_int8_t win_loss);
+double tfrc_calcImean(struct tfrc_recv_ccb *);
+void tfrc_recv_send_feedback(struct tfrc_recv_ccb *);
+int tfrc_recv_add_hist(struct tfrc_recv_ccb *, struct r_hist_entry *);
+void tfrc_recv_detectLoss(struct tfrc_recv_ccb *);
+u_int32_t tfrc_recv_calcFirstLI(struct tfrc_recv_ccb *);
+void tfrc_recv_updateLI(struct tfrc_recv_ccb *, long, u_int8_t);
 
 /* Weights used to calculate loss event rate */
 const double tfrc_recv_w[] = {1, 1, 1, 1, 0.8, 0.6, 0.4, 0.2};
@@ -914,9 +935,9 @@ const double tfrc_recv_w[] = {1, 1, 1, 1, 0.8, 0.6, 0.4, 0.2};
   do{ \
     elm = STAILQ_FIRST(&((cb)->hist)); \
       while((elm) != NULL){ \
-        if((elm)->type == DCCP_TYPE_DATA || (elm)->type == DCCP_TYPE_DATAACK) \
+        if ((elm)->type == DCCP_TYPE_DATA || (elm)->type == DCCP_TYPE_DATAACK) \
           (num)--; \
-        if(num == 0) \
+        if (num == 0) \
           break; \
         elm = STAILQ_NEXT((elm), linfo); \
       } \
@@ -930,7 +951,7 @@ const double tfrc_recv_w[] = {1, 1, 1, 1, 0.8, 0.6, 0.4, 0.2};
  */
 #define TFRC_RECV_NEXTDATAPACKET(cb,elm) \
   do{ \
-    if(elm != NULL){ \
+    if (elm != NULL){ \
       elm = STAILQ_NEXT(elm, linfo); \
       while((elm) != NULL && (elm)->type != DCCP_TYPE_DATA && (elm)->type != DCCP_TYPE_DATAACK){ \
         elm = STAILQ_NEXT((elm), linfo); \
@@ -944,7 +965,9 @@ const double tfrc_recv_w[] = {1, 1, 1, 1, 0.8, 0.6, 0.4, 0.2};
  * returns: avarage loss interval 
  * Tested u:OK
  */
-double tfrc_calcImean(struct tfrc_recv_ccb *cb){
+double
+tfrc_calcImean(struct tfrc_recv_ccb *cb)
+{
   struct li_hist_entry *elm;
   double I_tot;
   double I_tot0 = 0.0;
@@ -979,7 +1002,7 @@ double tfrc_calcImean(struct tfrc_recv_ccb *cb){
   if (I_tot0 < I_tot1)
     I_tot = I_tot1;
 
-  if(I_tot < W_tot) 
+  if (I_tot < W_tot) 
     I_tot = W_tot;
   
   return (I_tot/W_tot);
@@ -994,7 +1017,9 @@ I_panic:  if (elm == NULL)
  * args: cb - ccb for receiver
  * Tested u:OK
  */
-void tfrc_recv_send_feedback(struct tfrc_recv_ccb *cb){
+void
+tfrc_recv_send_feedback(struct tfrc_recv_ccb *cb)
+{
   u_int32_t x_recv, pinv;
   u_int16_t t_elapsed;
   struct r_hist_entry *elm;
@@ -1028,7 +1053,7 @@ void tfrc_recv_send_feedback(struct tfrc_recv_ccb *cb){
   num = 1;
   TFRC_RECV_FINDDATAPACKET(cb,elm,num);
   
-  if(elm == NULL)
+  if (elm == NULL)
     panic("No data packet in history! (tfrc_recv_send_feedback)");
 
   
@@ -1042,7 +1067,7 @@ void tfrc_recv_send_feedback(struct tfrc_recv_ccb *cb){
   pinv = htonl(pinv);
 
   /* add options from variables above */
-  if(dccp_add_option(cb->pcb, TFRC_OPT_LOSS_RATE, (char*) &pinv, 4)
+  if (dccp_add_option(cb->pcb, TFRC_OPT_LOSS_RATE, (char*) &pinv, 4)
      || dccp_add_option(cb->pcb, TFRC_OPT_ELAPSED_TIME, (char*) &t_elapsed, 2)
      || dccp_add_option(cb->pcb, TFRC_OPT_RECEIVE_RATE, (char*) &x_recv, 4)){
     TFRC_DEBUG((LOG_INFO,"TFRC - Can't add options, aborting send feedback (tfrc_send_feedback)"));
@@ -1062,14 +1087,15 @@ void tfrc_recv_send_feedback(struct tfrc_recv_ccb *cb){
   dccp_output(cb->pcb, 1); 
 }
 
-
 /*
  * Calculate first loss interval
  * args: cb - ccb of the receiver
  * returns: loss interval
  * Tested u:OK
  */
-u_int32_t tfrc_recv_calcFirstLI(struct tfrc_recv_ccb *cb){
+u_int32_t
+tfrc_recv_calcFirstLI(struct tfrc_recv_ccb *cb)
+{
   struct r_hist_entry *elm,*elm2;
   struct li_hist_entry *li_elm;
   struct timeval t_temp;
@@ -1081,7 +1107,7 @@ u_int32_t tfrc_recv_calcFirstLI(struct tfrc_recv_ccb *cb){
   temp = 1;
   TFRC_RECV_FINDDATAPACKET(cb,elm,temp);
   
-  if(elm == NULL)
+  if (elm == NULL)
     panic("Packet history contains no data packets! (tfrc_recv_calcFirstLI)\n");
   t_temp = elm->t_recv;
   win_count = elm->win_count;
@@ -1089,16 +1115,16 @@ u_int32_t tfrc_recv_calcFirstLI(struct tfrc_recv_ccb *cb){
   TFRC_RECV_NEXTDATAPACKET(cb,elm2); 
   while(elm2 != NULL){
     temp = win_count-(int) (elm2->win_count);
-    if(temp < 0)
+    if (temp < 0)
       temp = temp + TFRC_WIN_COUNT_LIMIT;
 
-    if(temp > 4)
+    if (temp > 4)
       break;
     elm = elm2;
     TFRC_RECV_NEXTDATAPACKET(cb,elm2); 
   }
   
-  if(elm2 == NULL){
+  if (elm2 == NULL){
     TFRC_DEBUG((LOG_INFO,"TFRC - Could not find a win_count interval > 4 \n"));
     elm2=elm;
     if (temp == 0){
@@ -1152,7 +1178,9 @@ u_int32_t tfrc_recv_calcFirstLI(struct tfrc_recv_ccb *cb){
  * returns:  1 if the packet was considered lost, 0 otherwise
  * Tested u:OK
  */
-int tfrc_recv_add_hist(struct tfrc_recv_ccb *cb, struct r_hist_entry *packet){
+int
+tfrc_recv_add_hist(struct tfrc_recv_ccb *cb, struct r_hist_entry *packet)
+{
   struct r_hist_entry *elm,*elm2;
   u_int8_t num_later = 0, win_count;
   u_int32_t seq_num = packet->seq;
@@ -1170,7 +1198,7 @@ int tfrc_recv_add_hist(struct tfrc_recv_ccb *cb, struct r_hist_entry *packet){
 	 && elm->seq - seq_num > DCCP_SEQ_NUM_LIMIT - TFRC_RECV_NEW_SEQ_RANGE)){
       STAILQ_INSERT_HEAD(&(cb->hist), packet, linfo);
     } else {
-      if(elm->type == DCCP_TYPE_DATA || elm->type == DCCP_TYPE_DATAACK)
+      if (elm->type == DCCP_TYPE_DATA || elm->type == DCCP_TYPE_DATAACK)
 	num_later = 1;
       
       elm2 = STAILQ_NEXT(elm,linfo);
@@ -1185,7 +1213,7 @@ int tfrc_recv_add_hist(struct tfrc_recv_ccb *cb, struct r_hist_entry *packet){
 	elm = elm2;
 	elm2 = STAILQ_NEXT(elm,linfo);
 
-	if(elm->type == DCCP_TYPE_DATA || elm->type == DCCP_TYPE_DATAACK)
+	if (elm->type == DCCP_TYPE_DATA || elm->type == DCCP_TYPE_DATAACK)
 	  num_later++;
 
 	if (num_later == TFRC_RECV_NUM_LATE_LOSS){
@@ -1196,17 +1224,17 @@ int tfrc_recv_add_hist(struct tfrc_recv_ccb *cb, struct r_hist_entry *packet){
 	}
       }
       
-      if(elm2 == NULL && num_later < TFRC_RECV_NUM_LATE_LOSS){
+      if (elm2 == NULL && num_later < TFRC_RECV_NUM_LATE_LOSS){
 	STAILQ_INSERT_TAIL(&(cb->hist), packet, linfo);
       }
     }
   }
 
   /* trim history (remove all packets after the NUM_LATE_LOSS+1 data packets)*/
-  if(TAILQ_FIRST(&(cb->li_hist)) != NULL){
+  if (TAILQ_FIRST(&(cb->li_hist)) != NULL){
     num_later = TFRC_RECV_NUM_LATE_LOSS+1;
     TFRC_RECV_FINDDATAPACKET(cb,elm,num_later);
-    if(elm != NULL){
+    if (elm != NULL){
       elm2 = STAILQ_NEXT(elm,linfo);
       while(elm2 != NULL){
 	STAILQ_REMOVE(&(cb->hist),elm2,r_hist_entry,linfo);
@@ -1218,7 +1246,7 @@ int tfrc_recv_add_hist(struct tfrc_recv_ccb *cb, struct r_hist_entry *packet){
     /* we have no loss interval history so we need at least one rtt:s of data packets to approximate rtt*/
     num_later = TFRC_RECV_NUM_LATE_LOSS+1;
     TFRC_RECV_FINDDATAPACKET(cb,elm2,num_later);
-    if(elm2 != NULL){
+    if (elm2 != NULL){
       num_later = 1;
       TFRC_RECV_FINDDATAPACKET(cb,elm,num_later);
       win_count = elm->win_count;
@@ -1227,10 +1255,10 @@ int tfrc_recv_add_hist(struct tfrc_recv_ccb *cb, struct r_hist_entry *packet){
       TFRC_RECV_NEXTDATAPACKET(cb,elm2);
       while(elm2 != NULL){
 	temp = win_count-(int) (elm2->win_count);
-	if(temp < 0)
+	if (temp < 0)
 	  temp = temp + TFRC_WIN_COUNT_LIMIT;
 	
-	if(temp > TFRC_WIN_COUNT_PER_RTT+1){
+	if (temp > TFRC_WIN_COUNT_PER_RTT+1){
 	  /* we have found a packet older than one rtt
 	     remove the rest */
 	  elm = STAILQ_NEXT(elm2,linfo);
@@ -1245,7 +1273,7 @@ int tfrc_recv_add_hist(struct tfrc_recv_ccb *cb, struct r_hist_entry *packet){
 	elm = elm2;
 	TFRC_RECV_NEXTDATAPACKET(cb,elm2);
       }
-    } /* end if(exist atleast 4 data packets) */
+    } /* end if (exist atleast 4 data packets) */
   }
   
   return 0;
@@ -1256,7 +1284,9 @@ int tfrc_recv_add_hist(struct tfrc_recv_ccb *cb, struct r_hist_entry *packet){
  * args: cb - ccb of the receiver
  * Tested u:OK
  */
-void tfrc_recv_detectLoss(struct tfrc_recv_ccb *cb){
+void
+tfrc_recv_detectLoss(struct tfrc_recv_ccb *cb)
+{
   struct r_hist_entry *bLoss,*aLoss,*elm,*elm2;
   u_int8_t num_later = TFRC_RECV_NUM_LATE_LOSS;
   long seq_temp = 0;
@@ -1265,13 +1295,13 @@ void tfrc_recv_detectLoss(struct tfrc_recv_ccb *cb){
   
   TFRC_RECV_FINDDATAPACKET(cb,bLoss,num_later);
   
-  if(bLoss == NULL){
+  if (bLoss == NULL){
     /* not enough packets yet to cause the first loss event */
   } else {  /* bloss != NULL */
     num_later = TFRC_RECV_NUM_LATE_LOSS+1; 
     TFRC_RECV_FINDDATAPACKET(cb,aLoss,num_later);
     if (aLoss == NULL){
-      if(TAILQ_EMPTY(&(cb->li_hist))){
+      if (TAILQ_EMPTY(&(cb->li_hist))){
 	/* no loss event have occured yet */
 
 	/* todo: find a lost data packet by comparing to initial seq num*/
@@ -1289,22 +1319,22 @@ void tfrc_recv_detectLoss(struct tfrc_recv_ccb *cb){
 	if (seq_temp < 0)
 	  seq_temp = seq_temp + DCCP_SEQ_NUM_LIMIT;
 	
-	if(seq_temp != 1){
+	if (seq_temp != 1){
 	  /* check no data packets */
-	  if(elm->type == DCCP_TYPE_DATA || elm->type == DCCP_TYPE_DATAACK)
+	  if (elm->type == DCCP_TYPE_DATA || elm->type == DCCP_TYPE_DATAACK)
 	    seq_temp = seq_temp - 1;
-	    if(seq_temp % DCCP_NDP_LIMIT != ((int) elm->ndp - (int) elm2->ndp+DCCP_NDP_LIMIT) % DCCP_NDP_LIMIT)
+	    if (seq_temp % DCCP_NDP_LIMIT != ((int) elm->ndp - (int) elm2->ndp+DCCP_NDP_LIMIT) % DCCP_NDP_LIMIT)
 	  seq_loss = (elm2->seq + 1) % DCCP_SEQ_NUM_LIMIT;
 	}
 	elm = elm2;
 	elm2 = STAILQ_NEXT(elm2,linfo);
       } while (elm != aLoss);
 
-      if(seq_loss != -1){
+      if (seq_loss != -1){
 	win_loss = aLoss->win_count;
       }
     }
-  } /* end if(bLoss == NULL) */
+  } /* end if (bLoss == NULL) */
   tfrc_recv_updateLI(cb,seq_loss,win_loss);
 }
 
@@ -1314,7 +1344,9 @@ void tfrc_recv_detectLoss(struct tfrc_recv_ccb *cb){
  * win_loss  -  window counter for previous (from the lost packet view) packet
  * Tested u:OK
  */
-void tfrc_recv_updateLI(struct tfrc_recv_ccb *cb, long seq_loss, u_int8_t win_loss){
+void
+tfrc_recv_updateLI(struct tfrc_recv_ccb *cb, long seq_loss, u_int8_t win_loss)
+{
   struct r_hist_entry *elm, *elm_temp;
   struct li_hist_entry *li_elm, *li_elm2,*li_elm_temp;
   u_int8_t num_later = TFRC_RECV_NUM_LATE_LOSS;
@@ -1322,15 +1354,15 @@ void tfrc_recv_updateLI(struct tfrc_recv_ccb *cb, long seq_loss, u_int8_t win_lo
   int i;
   u_int8_t win_start;
   int debug_info = 0;
-  if(seq_loss != -1){   /* we have found a packet loss! */
+  if (seq_loss != -1){   /* we have found a packet loss! */
     dccpstat.tfrcs_recv_losts++;
     TFRC_DEBUG((LOG_INFO, "TFRC - seqloss=%i, winloss=%i\n",(int) seq_loss, (int)win_loss));
-    if(TAILQ_EMPTY(&(cb->li_hist))){
+    if (TAILQ_EMPTY(&(cb->li_hist))){
       debug_info = 1;
       /* first loss detected */
       TFRC_DEBUG((LOG_INFO, "TFRC - First loss event detected! (tfrc_recv_updateLI)\n"));
       /* create history */
-      for(i=0; i< TFRC_RECV_IVAL_F_LENGTH+1; i++){
+      for (i = 0; i < TFRC_RECV_IVAL_F_LENGTH + 1; i++){
 	li_elm = malloc(sizeof (struct li_hist_entry),
 			M_TEMP, M_DONTWAIT | M_ZERO); /*M_TEMP??*/
 	if (li_elm == NULL){
@@ -1386,7 +1418,7 @@ void tfrc_recv_updateLI(struct tfrc_recv_ccb *cb, long seq_loss, u_int8_t win_lo
     }
   }
 
-  if(TAILQ_FIRST(&(cb->li_hist)) != NULL){
+  if (TAILQ_FIRST(&(cb->li_hist)) != NULL){
     /* calculate interval to last loss event */
     num_later = 1;
     TFRC_RECV_FINDDATAPACKET(cb,elm,num_later);
@@ -1399,7 +1431,7 @@ void tfrc_recv_updateLI(struct tfrc_recv_ccb *cb, long seq_loss, u_int8_t win_lo
     (TAILQ_FIRST(&(cb->li_hist)))->interval = seq_temp;
     if (debug_info > 0){
       TFRC_DEBUG((LOG_INFO,"TFRC - Highest data packet received %u (tfrc_recv_updateLI)\n",elm->seq));
-      if(debug_info == 1)
+      if (debug_info == 1)
 	PRINTRCCB(cb,elm_temp,li_elm_temp);
       else if (debug_info == 2)
       PRINTLIHIST(cb,li_elm_temp);
@@ -1413,7 +1445,9 @@ void tfrc_recv_updateLI(struct tfrc_recv_ccb *cb, long seq_loss, u_int8_t win_lo
  * returns: pointer to a tfrc_recv_ccb struct on success, otherwise 0
  * Tested u:OK
  */ 
-void *tfrc_recv_init(struct dccpcb *pcb){
+void *
+tfrc_recv_init(struct dccpcb *pcb)
+{
   struct tfrc_recv_ccb *ccb;
   
   ccb = malloc(sizeof (struct tfrc_recv_ccb), M_PCB, M_DONTWAIT | M_ZERO);
@@ -1451,12 +1485,14 @@ void *tfrc_recv_init(struct dccpcb *pcb){
  * args: ccb - ccb of recevier
  * Tested u:OK
  */
-void tfrc_recv_free(void *ccb){
+void
+tfrc_recv_free(void *ccb)
+{
   struct r_hist_entry *elm,*elm2;
   struct li_hist_entry *li_elm,*li_elm2;
   struct tfrc_recv_ccb *cb = (struct tfrc_recv_ccb *) ccb;
 
-  if(ccb == 0)
+  if (ccb == 0)
     panic("TFRC - Receiver ccb is null! (free)");
 
   /* uninit recv here */
@@ -1497,7 +1533,9 @@ void tfrc_recv_free(void *ccb){
  * Tell TFRC that a packet has been received
  * args: ccb  -  ccb block for current connection 
  */
-void tfrc_recv_packet_recv(void *ccb, char *options, int optlen){
+void
+tfrc_recv_packet_recv(void *ccb, char *options, int optlen)
+{
   struct r_hist_entry *packet;
   u_int8_t win_count = 0;
   double p_prev; 
@@ -1508,7 +1546,7 @@ void tfrc_recv_packet_recv(void *ccb, char *options, int optlen){
   return;  
 #endif
   
-  if(!(cb->state == TFRC_RSTATE_NO_DATA || cb->state == TFRC_RSTATE_DATA)){
+  if (!(cb->state == TFRC_RSTATE_NO_DATA || cb->state == TFRC_RSTATE_DATA)){
     panic("TFRC - Illegal state! (tfrc_recv_packet_recv)\n");
     return;
   }
@@ -1516,7 +1554,7 @@ void tfrc_recv_packet_recv(void *ccb, char *options, int optlen){
   /* Check which type */
   switch(cb->pcb->type_rcv){
   case DCCP_TYPE_ACK:
-    if(cb->state == TFRC_RSTATE_NO_DATA)
+    if (cb->state == TFRC_RSTATE_NO_DATA)
       return;
     break;
   case DCCP_TYPE_DATA:
@@ -1545,7 +1583,7 @@ void tfrc_recv_packet_recv(void *ccb, char *options, int optlen){
 
   ins = dccp_get_option(options, optlen, TFRC_OPT_WINDOW_COUNT, (char *)&win_count,1);
   
-  if((packet->type == DCCP_TYPE_DATA || packet->type == DCCP_TYPE_DATAACK) &&
+  if ((packet->type == DCCP_TYPE_DATA || packet->type == DCCP_TYPE_DATAACK) &&
      (ins != 1)){
     TFRC_DEBUG((LOG_INFO,"TFRC - No window counter (size %i) option on data packet! (consider it lost)! (tfrc_recv_packet_recv)",ins));
     free(packet,M_TEMP);
@@ -1568,17 +1606,17 @@ void tfrc_recv_packet_recv(void *ccb, char *options, int optlen){
       break;
     case TFRC_RSTATE_DATA : 
       cb->bytes_recv = cb->bytes_recv + cb->pcb->len_rcv;
-      if(!ins){
+      if (!ins){
 	/* find loss event */
 	tfrc_recv_detectLoss(cb);
 	p_prev = cb->p;
 	
 	/* Calculate loss event rate */
-	if(!TAILQ_EMPTY(&(cb->li_hist))){
+	if (!TAILQ_EMPTY(&(cb->li_hist))){
 	  cb->p = 1/tfrc_calcImean(cb);
 	}  
 	  /* check send conditions then send */
-	  if(cb->p > p_prev){
+	  if (cb->p > p_prev){
 	    TFRC_DEBUG((LOG_INFO, "TFRC - Send a feedback packet because p>p_prev (tfrc_recv_packet_recv)\n"));
 	    tfrc_recv_send_feedback(cb);
 	  } else {
