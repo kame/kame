@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.980 2000/06/06 09:02:28 itojun Exp $
+$Id: CHANGELOG,v 1.981 2000/06/06 10:35:05 jinmei Exp $
 
 <200006>
 2000-06-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -27,7 +27,7 @@ Mon Jun  5 21:56:35 JST 2000  itojun@iijlab.net
 2000-06-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/traceroute6/traceroute6.c (main): set a minimum set of
 	socket options as soon as opning a raw socket to avoid
-	intentionally receiving packets without ancillary data.
+	unintentionally receiving packets without ancillary data.
 	Note: this could actually happen when we used an unreachable IPv6
 	DNS server.
 
