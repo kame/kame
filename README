@@ -1,6 +1,6 @@
 	README of KAME kit
 	KAME Project
-	$KAME: README,v 1.42 2000/09/10 10:17:10 jinmei Exp $
+	$KAME: README,v 1.43 2000/09/19 18:15:11 itojun Exp $
 
 <<<Project Overview>>>
 
@@ -191,7 +191,8 @@ Bruce A. Mah, Masaaki Noro, Hugh Graham, Hubert Feyer, Eric Lemiere,
 Benoit Hilt, Noriaki Takamiya, Olivier TOGNI, Greg Troxel, Bill
 Fenner, Goeran Bengtson, Tomio Narita, Conny Larsson, Ryuji Somegawa,
 Akira Kato, Ronald van der Pol, Graham Wheeler, Kris Kennaway, Kazuo Horikawa,
-larry baird, rimi guyomarch and Makoto MATSUSHITA (in no particular order).
+larry baird, rimi guyomarch, Makoto MATSUSHITA and Kevin Lahey 
+(in no particular order).
 
 We would also like to thank BSDI (http://www.bsdi.com/) for donating
 BSD/OS licenses for development.
