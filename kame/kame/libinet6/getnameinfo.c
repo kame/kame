@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.49 2001/04/26 23:16:03 jinmei Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.50 2001/04/26 23:40:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -344,21 +344,7 @@ ip6_parsenumeric(sa, addr, host, hostlen, flags)
 					      flags);
 			if (scopelen + 1 + numaddrlen + 1 > hostlen)
 				return EAI_MEMORY;
-#if 0
-			/*
-			 * construct <scopeid><delim><numeric-addr>
-			 */
-			/*
-			 * Shift the host string to allocate
-			 * space for the scope ID part.
-			 */
-			memmove(host + scopelen + 1, host,
-				numaddrlen);
-			/* copy the scope ID and the delimiter */
-			memcpy(host, scopebuf, scopelen);
-			host[scopelen] = SCOPE_DELIMITER;
-			host[scopelen + 1 + numaddrlen] = '\0';
-#else
+
 			/*
 			 * construct <numeric-addr><delim><scopeid>
 			 */
@@ -366,7 +352,6 @@ ip6_parsenumeric(sa, addr, host, hostlen, flags)
 			       scopelen);
 			host[numaddrlen] = SCOPE_DELIMITER;
 			host[numaddrlen + 1 + scopelen] = '\0';
-#endif
 		}
 	}
 #endif /* NI_WITHSCOPEID */
