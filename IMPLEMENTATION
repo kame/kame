@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.261 2001/08/16 13:08:39 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.262 2001/08/16 14:19:02 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -658,8 +658,8 @@ sent from a user application as follows:
    If the kernel can find an interface, choose the most appropriate
    address based on the algorithm described in
    draft-ietf-ipngwg-default-addr-select-xx.txt .
-   Addresses that breaks the scope zone of the destination, or
-   addresses whose zone does not contain the outgoing interface are
+   Addresses that break the scope zone of the destination, or
+   addresses whose zone do not contain the outgoing interface are
    never chosen.
 
 When the procedure above fails, the kernel usually returns
