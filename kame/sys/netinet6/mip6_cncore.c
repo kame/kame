@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.52 2003/12/10 21:25:22 t-momose Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.53 2003/12/11 05:02:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -836,14 +836,11 @@ mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
  *
  */
 static void
-mip6_bc_settimer(mbc, time)
+mip6_bc_settimer(mbc, t)
 	struct mip6_bc *mbc;
-	int time;	/* unit: second */
+	int t;	/* unit: second */
 {
 	long tick;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
-#endif
 	int s;
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -852,9 +849,9 @@ mip6_bc_settimer(mbc, time)
 	s = splnet();
 #endif
 
-	if (time != 0) {
-		tick = time * hz;
-		if (time < 0) {
+	if (t != 0) {
+		tick = t * hz;
+		if (t < 0) {
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 			callout_stop(&mbc->mbc_timer_ch);
 #elif defined(__OpenBSD__)
