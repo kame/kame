@@ -1,4 +1,4 @@
-/*	$KAME: mfc.c,v 1.6 2004/07/09 14:18:16 suz Exp $	*/
+/*	$KAME: mfc.c,v 1.7 2004/09/30 08:22:29 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -160,7 +160,7 @@ add_reg_mif6(void)
 		goto end; /* it's already registered */
 	mif6c.mif6c_pifi = ifindex;
 	mif6c.mif6c_flags = MIFF_REGISTER;
-	err =setsockopt(s4, IPPROTO_IPV6, MRT6_ADD_MIF, &mif6c, sizeof(mif6c)); 
+	err =setsockopt(s6, IPPROTO_IPV6, MRT6_ADD_MIF, &mif6c, sizeof(mif6c)); 
 	if (err != 0) {
 		errx(1, "MRT6_ADD_MIF for %s failed: %s",
 		     "reg0", strerror(errno));
