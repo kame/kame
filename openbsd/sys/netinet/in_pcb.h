@@ -171,6 +171,8 @@ struct inpcb {
 #define in6p_moptions inp_moptions6
 #define in6p_flags inp_flags
 #define in6p_route inp_route
+#define in6p_fport inp_fport
+#define in6p_flowinfo inp_flowinfo
 
 struct inpcbtable {
 	CIRCLEQ_HEAD(, inpcb) inpt_queue;
