@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.83 2000/05/07 12:57:29 itojun Exp $	*/
+/*	$KAME: key.c,v 1.84 2000/05/07 13:04:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4186,6 +4186,7 @@ key_getspi(so, m, mhp)
 	_INPORTBYSA((struct sockaddr *)(src0 + 1)) = 0;
 	_INPORTBYSA((struct sockaddr *)(dst0 + 1)) = 0;
 
+	/* XXX boundary check against sa_len */
 	KEY_SETSECASIDX(proto, mhp->msg, src0 + 1, dst0 + 1, &saidx);
 
 	/* SPI allocation */
@@ -4227,7 +4228,7 @@ key_getspi(so, m, mhp)
 #endif
 
     {
-	struct mbuf *m;
+	struct mbuf *n;
 	struct sadb_sa *m_sa;
 	struct sadb_msg *newmsg;
 	int off, len;
@@ -4241,44 +4242,44 @@ key_getspi(so, m, mhp)
 		panic("too big msglen in key_getspi");
 #endif
 
-	MGETHDR(m, M_DONTWAIT, MT_DATA);
+	MGETHDR(n, M_DONTWAIT, MT_DATA);
 	if (len > MHLEN) {
-		MCLGET(m, M_DONTWAIT);
-		if ((m->m_flags & M_EXT) == 0) {
-			m_freem(m);
-			m = NULL;
+		MCLGET(n, M_DONTWAIT);
+		if ((n->m_flags & M_EXT) == 0) {
+			m_freem(n);
+			n = NULL;
 		}
 	}
-	if (!m)
+	if (!n)
 		return key_senderror(so, m, ENOBUFS);
 
-	m->m_pkthdr.len = m->m_len = len;
-	m->m_next = NULL;
+	n->m_pkthdr.len = n->m_len = len;
+	n->m_next = NULL;
 	off = 0;
 
-	m_copydata(m, 0, sizeof(struct sadb_msg), mtod(m, caddr_t) + off);
+	m_copydata(m, 0, sizeof(struct sadb_msg), mtod(n, caddr_t) + off);
 	off += PFKEY_ALIGN8(sizeof(struct sadb_msg));
 
-	m_sa = (struct sadb_sa *)(mtod(m, caddr_t) + off);
+	m_sa = (struct sadb_sa *)(mtod(n, caddr_t) + off);
 	m_sa->sadb_sa_len = PFKEY_UNIT64(sizeof(struct sadb_sa));
 	m_sa->sadb_sa_exttype = SADB_EXT_SA;
 	m_sa->sadb_sa_spi = htonl(spi);
 	off += PFKEY_ALIGN8(m_sa->sadb_sa_len);
 
 	m_copydata(m, mhp->extoff[SADB_EXT_ADDRESS_SRC],
-	    mhp->extlen[SADB_EXT_ADDRESS_SRC], mtod(m, caddr_t) + off);
+	    mhp->extlen[SADB_EXT_ADDRESS_SRC], mtod(n, caddr_t) + off);
 	off += PFKEY_ALIGN8(mhp->extlen[SADB_EXT_ADDRESS_SRC]);
 
 	m_copydata(m, mhp->extoff[SADB_EXT_ADDRESS_DST],
-	    mhp->extlen[SADB_EXT_ADDRESS_DST], mtod(m, caddr_t) + off);
+	    mhp->extlen[SADB_EXT_ADDRESS_DST], mtod(n, caddr_t) + off);
 
-	newmsg = mtod(m, struct sadb_msg *);
+	newmsg = mtod(n, struct sadb_msg *);
 	newmsg->sadb_msg_seq = newsav->seq;
 	newmsg->sadb_msg_errno = 0;
 	newmsg->sadb_msg_len = PFKEY_UNIT64(len);
 
 	m_freem(m);
-	return key_sendup_mbuf(so, m, KEY_SENDUP_ONE);
+	return key_sendup_mbuf(so, n, KEY_SENDUP_ONE);
     }
 }
 
@@ -4419,6 +4420,7 @@ key_update(so, m, mhp)
 	src0 = (struct sadb_address *)(mhp->ext[SADB_EXT_ADDRESS_SRC]);
 	dst0 = (struct sadb_address *)(mhp->ext[SADB_EXT_ADDRESS_DST]);
 
+	/* XXX boundary check against sa_len */
 	KEY_SETSECASIDX(proto, mhp->msg, src0 + 1, dst0 + 1, &saidx);
 
 	/* get a SA header */
@@ -4493,6 +4495,7 @@ key_update(so, m, mhp)
 	}
 
     {
+	/*XXX temporary workaround */
 	struct sadb_msg *newmsg;
 	int error;
 
@@ -4615,6 +4618,7 @@ key_add(mhp)
 	src0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_SRC]);
 	dst0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_DST]);
 
+	/* XXX boundary check against sa_len */
 	KEY_SETSECASIDX(proto, msg0, src0+1, dst0+1, &saidx);
 
 	/* get a SA header */
@@ -5009,6 +5013,7 @@ key_get(mhp)
 	src0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_SRC]);
 	dst0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_DST]);
 
+	/* XXX boundary check against sa_len */
 	KEY_SETSECASIDX(proto, msg0, src0+1, dst0+1, &saidx);
 
 	/* get a SA header */
@@ -5482,6 +5487,7 @@ key_acquire2(mhp)
 	src0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_SRC]);
 	dst0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_DST]);
 
+	/* XXX boundary check against sa_len */
 	KEY_SETSECASIDX(proto, msg0, src0+1, dst0+1, &saidx);
 
 	/* get a SA index */
