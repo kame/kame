@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.66 2001/06/27 08:53:08 sumikawa Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.67 2001/07/21 09:21:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -424,20 +424,6 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 		ip6->ip6_dst.s6_addr8[12] = 0xff;
 	}
 	if (!dad) {
-#if 0	/* KAME way, exact address scope match */
-		/*
-		 * Select a source whose scope is the same as that of the dest.
-		 * Typically, the dest is link-local solicitation multicast
-		 * (i.e. neighbor discovery) or link-local/global unicast
-		 * (i.e. neighbor un-reachability detection).
-		 */
-		ia = in6_ifawithifp(ifp, &ip6->ip6_dst);
-		if (ia == NULL) {
-			m_freem(m);
-			return;
-		}
-		ip6->ip6_src = ia->ia_addr.sin6_addr;
-#else	/* spec-wise correct */
 		/*
 		 * RFC2461 7.2.2:
 		 * "If the source address of the packet prompting the
@@ -475,7 +461,6 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 			}
 			ip6->ip6_src = ia->ia_addr.sin6_addr;
 		}
-#endif
 	} else {
 		/*
 		 * Source address for DAD packet must always be IPv6
