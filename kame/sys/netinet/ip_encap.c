@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.33 2000/04/26 06:18:25 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.34 2000/04/26 06:19:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -514,7 +514,8 @@ mask_match(ep, sp, dp)
 	struct sockaddr_storage s;
 	struct sockaddr_storage d;
 	int i;
-	u_int8_t *p, *q, *r;
+	const u_int8_t *p, *q;
+	u_int8_t *r;
 	int matchlen;
 
 	if (sp->sa_len > sizeof(s) || dp->sa_len > sizeof(d))
@@ -526,8 +527,8 @@ mask_match(ep, sp, dp)
 
 	matchlen = 0;
 
-	p = (u_int8_t *)sp;
-	q = (u_int8_t *)&ep->srcmask;
+	p = (const u_int8_t *)sp;
+	q = (const u_int8_t *)&ep->srcmask;
 	r = (u_int8_t *)&s;
 	for (i = 0 ; i < sp->sa_len; i++) {
 		r[i] = p[i] & q[i];
@@ -535,8 +536,8 @@ mask_match(ep, sp, dp)
 		matchlen += (q[i] ? 8 : 0);
 	}
 
-	p = (u_int8_t *)dp;
-	q = (u_int8_t *)&ep->dstmask;
+	p = (const u_int8_t *)dp;
+	q = (const u_int8_t *)&ep->dstmask;
 	r = (u_int8_t *)&d;
 	for (i = 0 ; i < dp->sa_len; i++) {
 		r[i] = p[i] & q[i];
