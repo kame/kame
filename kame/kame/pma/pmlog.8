@@ -1,0 +1,91 @@
+.\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+.\" All rights reserved.
+.\" 
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\" 
+.\"	$Id: pmlog.8,v 1.1 1999/08/08 23:31:10 itojun Exp $
+.\"
+.Dd Jul 19, 1998
+.Dt PMLOG 8
+.Os KAME
+.\"
+.Sh NAME
+.Nm pmlog
+.Nd monitors for logged packets
+.\"
+.Sh SYNOPSIS
+.Nm pmlog
+.Op Fl socket
+.Op Fl o Ar logfile
+.Op Fl t Li {syslog|unformat}
+.\"
+.Sh DESCRIPTION
+.Nm Pmlog
+read the binary data from kernel by SuMiRe NAT, and reprinted it human
+readable format.  The output goes to standard output by default or a
+filename, if option given on the command line.
+.Pp
+.Nm
+has the following options:
+.Bl -tag -width Ds
+.It Fl socket
+Open socket for reading kernel data.  In case to use this option, it
+is necessary to uncomment
+.Dv PM_USE_SOCKET
+kernel option and recompile kernel.
+If no
+.Fl socket
+option specified, open
+.Li /dev/pmlog
+instead.
+.Po
+In the feature,
+.Fl socket
+will be default option
+.Pc .
+.It Fl o Ar logfile
+Specify the logfile to be opened for formatted data goes to.
+.It Fl t Li {syslog|unformat}
+Specify the output timestamp format.
+.Bl -tag -width Ds
+.It Li syslog
+Use
+.Xr syslog 8
+like timestamp, i.e.
+.Li Dec 11 05:13:25
+.Po
+or
+.Li 05:13:25.778391
+.Pc .
+.It Li unformat
+Use unformatted timestamp, i.e.
+.Li 881785558.860582 .
+.El
+.El
+.\"
+.Sh HISTORY
+.Nm
+and SuMiRe NAT are implemented by Shin-ichi Fujisawa
+.Li <fujisawa@kame.net> .

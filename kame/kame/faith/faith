@@ -1,0 +1,49 @@
+#! /bin/sh
+
+prog=$0
+
+if [ -x /usr/local/v6/sbin/route ]; then
+	route=/usr/local/v6/sbin/route
+else
+	route=route
+fi
+if [ -x /usr/local/v6/sbin/sysctl ]; then
+	sysctl=/usr/local/v6/sbin/sysctl
+else
+	sysctl=sysctl
+fi
+if [ -x /usr/local/v6/sbin/ifconfig ]; then
+	ifconfig=/usr/local/v6/sbin/ifconfig
+else
+	ifconfig=ifconfig
+fi
+interface=faith0
+
+for i
+do
+	case $1 in
+	-i)
+		interface=$1
+		;;
+	-p)
+		shift
+		$route add -inet6 $1 -prefixlen 96 -interface $interface
+		;;
+	-e)
+		$sysctl -w net.inet6.ip6.keepfaith=1
+		$ifconfig $interface up
+		;;
+	-d)
+		$sysctl -w net.inet6.ip6.keepfaith=0
+		$ifconfig $interface down
+		;;
+	-*)	echo "usage: $prog [-ed] [-p prefix] [-i interface]"
+		exit 1
+		;;
+	*)	break
+		;;
+	esac
+	shift
+done
+
+exit 0

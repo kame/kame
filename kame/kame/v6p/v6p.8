@@ -1,0 +1,56 @@
+.\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+.\" All rights reserved.
+.\" 
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"     $Id: v6p.8,v 1.1 1999/08/08 23:32:40 itojun Exp $
+.\"
+.Dd May 17, 1998
+.Dt V6P 8
+.Os KAME
+.Sh NAME
+.Nm v6p
+.Nd check if the kernel is IPv6 ready or not
+.Sh SYNOPSIS
+.Nm
+.Sh DESCRIPTION
+.Nm V6p
+prints "v6" if the kernel supports IPv6, and "v4" if it does not.
+Also, the result will be returned as exit status,
+and therefore
+.Nm
+can be very useful in
+.Li if
+statement in shell scripts.
+There are no options.
+.Sh RETURN VALUES
+.Nm V6p
+exits with 0 if the kernel supports IPv6, with 1 if the kernel does not.
+.Sh SEE ALSO
+.Xr test 1
+.Sh HISTORY
+The
+.Nm
+command first appeared in WIDE hydrangea IPv6 protocol stack kit.

@@ -1,0 +1,116 @@
+<draft-ietf-ipngwg-ipv6-spec-v2-00.txt>
+
+* header の最初の 4 バイトはとりあえず
+	60 00 00 00
+* extension header in general
+	- unknown extension header
+	- たくさんの ext header
+* Hop by Hop
+	- IPv6 header の直後じゃない hop by hop
+	- 65,535 以下の Jumbo
+	- Jumbo なのに payload len != 0
+	- Jumbo なのに Fragment header
+	- null 
+* Routing
+	- unknown type
+	- Strict/Loose はどないしまひょ
+	- 24 より多い hop
+	- 24 より多い Segments Left
+	- Multicast as a hop
+	- Loopback as a hop
+	- Authentic じゃないのに reverse してないか
+* Fragment 
+	- 60 以内に全部揃わない場合
+	- M = 1 なのに 8 バイトの倍数じゃない場合
+	- length と offset が 65,535 を越えている場合
+	- un-fragmentable な部分がそれぞれ異なる場合
+	- Frag header の next header がそれぞれ異なる場合
+	- reassemble不能な大量のfragmentが届いた場合
+* PMTU
+	- 576 より小さい too big (とりあえず 576 だ)
+	- 1500 より大きい too big
+	- local link からの too big
+* No Next Header
+	- destination ではどうするべき？
+	- NNH にあとにゴミがある場合
+* Packet Size
+	- TCP の MSS
+* Upper-Layer Checksum
+	- TCP は ext を除いた length にしているか
+	- UDP は UDP の length を用いているか
+
+<draft-ietf-ipngwg-addr-arch-v2-02.txt>
+
+* IF ID check
+	- global scope bit
+	- prefix len = 64
+
+* Required addresses for host
+	- Its Link-Local Address for each interface
+	- Assigned Unicast Addresses
+	- Loopback Address
+	- All-Nodes Multicast Address
+	- Solicited-Node Multicast Address for each of its assigned
+		unicast and anycast addresses
+	- Multicast Addresses of all other groups to which the host
+		belongs.
+
+* Required addresses for router
+
+	- The Subnet-Router anycast addresses for the interfaces it is
+		configured to act as a router on.
+	- All other Anycast addresses with which the router has been
+		configured.
+	- All-Routers Multicast Address
+	- Solicited-Node Multicast Address for each of its assigned
+		unicast and anycast addresses
+	- Multicast Addresses of all other groups to which the router
+		belongs.
+
+
+ICMPv6(RFC1885)
+
+* Source Determination
+	- Unicast に来たらその Unicast で返すか？
+	- Multicast できたらその IF の Unicast で返すか？
+	- エラーを返す場合、その IF の Unicast で返すか？ (必須でない)
+	- Anycast できたらその IF の Unicast で返すか？
+		- NAは時間待ちしているか？
+		- override flagが立っていないか？
+* Checksum
+	- Pseudo header は ext header を除いた len をいれているか？
+* Msg Processing
+	- unknown error type
+	- unknown informational type
+	- エラーはオリジナルを 576 を越えずにできるだけ多く返すか？
+	- UDP header のない UDP port unreach
+	- ICMPv6 に ICMPv6 を返しはしないか？
+	- rate-limiting はテストできる？
+* Time Exceeded
+	- Hop Limit が 0 になる場合
+	- Fragment reassembly time exceeded を聞いたらどうするか？
+* Echo
+	- path MTU より大きな reply を返さないか
+
+<draft-ietf-ipngwg-addr-arch-v2-02.txt>
+
+* NS&NA
+	- NA返さないときの状態遷移
+	- unknown option
+	- length = 0 optionがきたら無視して捨てる
+	- Duplicate Address Detection
+
+* RS&RA
+	- hlim != 255
+	- 異なる情報のRAが大量に流れた場合
+	- onlink bitの立ったRAが来たらそのprefixはonlinkだと思う(含ルータ)
+	- 578以下のMTU optionがきたら無視
+	- 1500以上のMTU optionがきたら無視
+	- 複数のprefix informationがきたら全部覚える
+	- 複数のsource link-layer addressってどうするの？ -> 実装依存
+	- 64以外のprefixlength
+	- LのたってないRAって何するの？ -> Lbitは十分条件
+
+* 複合
+	- RAが送ったあと，R bitが0のNAが来たとき
+		defalt router listから削除

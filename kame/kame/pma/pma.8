@@ -1,0 +1,322 @@
+.\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+.\" All rights reserved.
+.\" 
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.\"	$Id: pma.8,v 1.1 1999/08/08 23:31:09 itojun Exp $
+.\"
+.Dd Jul 19, 1998
+.Dt PMA 8
+.Os KAME
+.\"
+.Sh NAME
+.Nm pma
+.Nd user interface to the SuMiRe NAT
+.\"
+.Sh SYNOPSIS
+.Nm pma
+.Op Fl d Ar debuglevel
+.Op Fl e Ar configuration
+.Op Fl f Ar configfile
+.Nm pma
+.Op Fl d Ar debuglevel
+.Ar configuration
+.\"
+.Sh DESCRIPTION
+.Nm Pma
+configures and controls SuMiRe NAT implemented in the kernel.
+.Pp
+.Nm
+has two format of command line arguments.
+First one has the following options:
+.Bl -tag -width Ds
+.It Fl d Ar debuglevel
+Configure debug level to
+.Ar debuglevel .
+.It Fl f Ar configfile
+Evaluate the content of file specified by
+.Ar configfile ,
+as configuration directives.
+By specifying
+.Dq Li - ,
+standard input can be used.
+.It Fl e Ar configuration
+Evaluate the configuration string given as
+.Ar configuration .
+.El
+.Pp
+If there's no
+.Fl e
+nor
+.Fl f
+specified,
+.Nm
+assumes
+.Dq Fl f Li - ,
+i.e. read standard input for configuration directives.
+.Pp
+The second form is a shortened form of
+.Do
+.Nm
+.Fl d
+.Ar debuglevel
+.Fl e
+.Ar configuration
+.Dc .
+.\"
+.Sh DIRECTIVES
+Each rule processed by NAT is added to the kernel internal lists if
+there is no parsing problems.  Rules are added to the end of the
+internal lists using "nat" pma directive, matching the order in which
+they appear when given to pma.
+.Pp
+When interface was specified as external, all outbound packet through
+this interface will rewritten its source IP address, and all inbound
+packet will rewritten its destination IP address. 
+.Pp
+The following directives are available.
+.Bl -tag -width Ds
+.\"
+.It Xo
+.Li interface 
+.Ar interfaceName
+.Li {internal|external}
+.Xc
+Mark interface <interfaceName> as external (outside of firewall) or
+internal (inside of firewall).  Only packets arriving on interface
+will be subject to address translation.
+.Pp
+When interface was marked as outside, outgoing packet of this
+interface is outbound and rewrite the source IP address, when marked
+inside, incoming packet of this interface is outbound and rewrite the
+source IP address.
+.\"
+.It Xo
+.Li global
+.Ar interfaceName
+.Ar address-range
+.Xc
+Allocate a pool of global addresses.  The global addresses in the pool
+provide an IP address for each outbound connection, and for those
+inbound connections resulting from outbound connections.
+.Pp
+Address-range is of the form
+.Bd -literal -offset indent
+address
+address / netmask
+address - address
+.Ed
+.Pp
+"show" pma directive can be seen the allocated address.
+.\"
+.It Xo
+.Li global
+.Li remove
+.Ar interfaceName
+.Ar address-range
+.Xc
+Deallocate the specified IP address from global IP address pool.
+.\"
+.It Xo
+.Li global
+.Li flush
+.Op Ar interfaceName
+.Xc
+Deallocate the all global IP address from specified interface.  If no
+interface specified, deallocate global address from all interface.
+.\"
+.It Xo
+.Li nat
+.Ar interfaceName
+.Ar internal-range
+.Li to
+.Ar external-range
+.Xc
+Add nat rule into the kernel internal lists, and nat rule is set to
+each interface.  The address selectd for replacing the orignal is
+chosen form this IP address/netmask pair.
+.Pp
+Global directive must precedes nat directive.  Nat directive can use
+only allocated global IP address as external-reange.
+.Pp
+Internal-range and external-reange is of the form
+.Bd -literal -offset indent
+address [port]
+address / netmask [port]
+address - address [port]
+.Ed
+.Pp
+where netmask is an interger of 1 to 32.  Each range can be followed
+by port number, which is single number or two number tied with '-'.
+.Bd -literal -offset indent
+"port" number
+"port" number - number
+.Ed
+.Pp
+When internal and external range is specified one address only, this
+function is seemed as "static". 
+.Bd -literal -offset indent
+nat 172.16.11.23 to 198.76.28.4
+.Ed
+.Pp
+The above command will set the "static" nat, all the outgoing packet
+from machine 172.16.11.23 will be rewritten its source address to
+209.1.2.3. and all the incoming packet will rewritten its destination
+adddress to 172.16.11.23.  In this case, TCP session can open from
+outside.
+.Pp
+When internal or external range is specified more than two address,
+this function is seemed as "dynamic".
+.Bd -literal -offset indent
+nat 10.0.0.0/8 to 198.76.28.4
+.Ed
+.Pp
+The above command will set the "dynamic" nat, all outgoing packet from
+network 10.0.0.0/8 will be rewritten its source address to 209.1.2.3,
+but differ from "static" nat, TCP session can not open from outside.
+.Bd -literal -offset indent
+nat 10.0.0.0/8 to 198.76.28.4 port 32768 - 65535
+.Ed
+.Pp
+When port is specified at exernal-range like preceding example, NAT
+also change the source port number.  TCP or UDP can not be selected.
+NAT start to use lower port number, and reach upper port number, reuse
+unused port number search from lower port number.  If only one IP
+address specified at external-range, and no port number available, NAT
+gives up to translation and drop packet.
+.\"
+.It Xo
+.Li nat
+.Li remove
+.Ar interfaceName
+.Ar rulenumber...
+.Xc
+Remove nat rule from specified interface.
+.\"
+.It Xo
+.Li nat
+.Li flush
+.Op Ar interfaceName
+.Xc
+Remove all nat rule from specified interface.  If no interface
+specified, remove all rule from all interface.
+.\"
+.It Xo
+.Li nat
+.Li enable|disable
+.Xc
+Enable or disable translation.
+.\"
+.It Xo
+.Li show interface
+.Op Ar interfaceName
+.Xc
+Show interface is outside or inside.
+.\"
+.It Xo
+.Li show global
+.Op Ar interfaceName
+.Xc
+Show allocated global addresses including assigned information.  If
+interface specified, show interface related global address only.
+.\"
+.It Xo
+.Li show static
+.Op Ar interfaceName
+.Xc
+Show "static" nat rule list.  If interface specified, show interface
+related nat rule only.
+.\"
+.It Xo
+.Li show dynamic
+.Op Ar interfaceName
+.Xc
+Show "dynamic" nat rule list.  If interface specified, show interface
+related nat rule only.
+.\"
+.It Xo
+.Li show xlate
+.Op Ar interval
+.Xc
+Show kernel internal address mapping table.  This table is generated
+and removed dynamically.  If no traffic found, no table entry showes.
+The command:
+.Bd -literal -offset indent
+pma show xlate 4
+.Ed
+.Pp
+will show the mapping table every four second.
+.El
+.\"
+.Sh EXAMPLES
+Using SuMiRe nat is done with following steps.
+.Bl -enum
+.It
+Mark interface as outside.
+.Bd -literal -offset indent
+pma interface ef1 external
+.Ed
+.Pp
+This line says interface ef1 is marked as outside.
+.It
+Allocate global address.
+.Bd -literal -offset indent
+pma global ef1 198.76.28.0/24
+.Ed
+.Pp
+This line says global address range 198.76.28.1 - 198.76.28.254 can be
+used as global address.
+.It
+Set IP address mapping.
+.Bd -literal -offset indent
+pma nat 172.16.11.1    to 198.76.28.1
+pma nat 172.16.12.0/24 to 198.76.28.128/26
+pma nat 172.16.13.0/24 to 198.76.28.192/26 port 32768-65535
+.Ed
+.Pp
+First line says a static nat.  Second line says a dynamic nat without
+port number translation, and third line says a dynamic nat with port
+number translation.
+.It
+Enable nat feature.
+.Bd -literal -offset indent
+pma nat enable
+.Ed
+.El
+.\"
+.Sh BUGS
+Address specified by
+.Dq global
+directive must be different from the NAT box's IP address.
+.Pp
+NAT box will not automatically perform proxy ARP.
+Therefore, you may need to configure the NAT box for proxy ARP,
+or configure alias IP address by using
+.Xr ifconfig 8 .
+.\"
+.Sh HISTORY
+.Nm
+and SuMiRe NAT are implemented by Shin-ichi Fujisawa
+.Li <fujisawa@kame.net> .

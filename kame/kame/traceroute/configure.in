@@ -1,0 +1,106 @@
+dnl @(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/configure.in,v 1.1 1999/08/08 23:32:25 itojun Exp $ (LBL)
+dnl
+dnl Copyright (c) 1995, 1996, 1997
+dnl	The Regents of the University of California.  All rights reserved.
+dnl
+dnl Process this file with autoconf to produce a configure script.
+dnl
+
+AC_INIT(traceroute.c)
+
+AC_CANONICAL_SYSTEM
+
+umask 002
+
+if test -z "$PWD" ; then
+	PWD=`pwd`
+fi
+
+AC_LBL_C_INIT(V_CCOPT, V_INCLS)
+
+AC_CHECK_HEADERS(malloc.h sys/select.h sys/sockio.h)
+
+AC_REPLACE_FUNCS(strerror)
+AC_CHECK_FUNCS(setlinebuf)
+
+AC_LBL_LIBRARY_NET
+
+case "$target_os" in
+
+bsd4*)
+	AC_DEFINE(HAVE_RAW_OPTIONS)
+	;;
+
+bsdi*)
+	AC_DEFINE(HAVE_RAW_OPTIONS)
+	;;
+
+freebsd*)
+	AC_DEFINE(HAVE_RAW_OPTIONS)
+	;;
+
+linux*)
+	V_INCLS="$V_INCLS -Ilinux-include"
+	;;
+
+osf3*)
+	dnl Workaround around ip_hl vs. ip_vhl problem in netinet/ip.h
+	AC_DEFINE(__STDC__,2)
+	;;
+
+solaris*)
+	AC_DEFINE(BYTESWAP_IP_LEN)
+	AC_DEFINE(CANT_HACK_CKSUM,)
+	;;
+esac
+
+AC_LBL_CHECK_TYPE(int32_t, int)
+AC_LBL_CHECK_TYPE(u_int32_t, u_int)
+
+AC_LBL_DEVEL(V_CCOPT)
+
+AC_LBL_SOCKADDR_SA_LEN
+
+AC_MSG_CHECKING(for uipiphdr.ui_next)
+AC_EGREP_CPP(yes, [
+#include <sys/types.h>
+#include <netinet/in_var.h>
+#include <netinet/udp_var.h>
+#ifdef ui_next
+	yes
+#endif],
+	[result=yes; AC_DEFINE(HAVE_UDPIPHDR_NEXT)], [result=no])
+AC_MSG_RESULT($result)
+
+if test -r lbl/gnuc.h ; then
+	rm -f gnuc.h
+	ln -s lbl/gnuc.h gnuc.h
+fi
+
+AC_MSG_CHECKING(for libipsec)
+if test -f ../libipsec/libipsec.a; then
+	AC_MSG_RESULT(yes)
+	LIBS="$LIBS -L../libipsec -lipsec"
+else
+	AC_MSG_RESULT(no)
+fi
+AC_MSG_CHECKING(for libinet6)
+if test -f ../libinet6/libinet6.a; then
+	AC_MSG_RESULT(yes)
+	LIBS="$LIBS -L../libinet6 -linet6"
+else
+	AC_MSG_RESULT(no)
+fi
+
+AC_SUBST(V_CCOPT)
+AC_SUBST(V_INCLS)
+
+AC_PROG_INSTALL
+
+AC_OUTPUT(Makefile)
+
+if test -f .devel ; then
+	make depend
+fi
+
+exit 0

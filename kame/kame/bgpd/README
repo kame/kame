@@ -1,0 +1,31 @@
+How to compile
+
+	1. ./configure
+
+	2. Edit Makefile (if needed)
+		DINET6:		recommended
+		DADVANCEDAPI:	recommended
+		DDEBUG:		debugging log of BGP4+
+		DDEBUG_RIP:	debugging log of RIPng
+		DDRAFT_IETF_00:	draft-ietf-idr-bgp4-multiprotocol-00.txt spec
+
+	3. make
+
+	4. You'll get ./bgpd
+
+-----------------------------------------------------------------------------
+How to run
+	1. Edit /usr/local/v6/etc/bgpd.conf
+	   (To write down the file, please read `doc/config-file.jp')
+
+	2. Run ./bgpd
+
+-----------------------------------------------------------------------------
+BUGS
+
+-  No authentification is supported.  Therfore, OPEN message's optional
+   parameter always consists of nothing.
+
+-  No transition of unrecognized optional transitive path-attributes is
+   supported.
+

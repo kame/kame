@@ -1,0 +1,231 @@
+このドキュメントでは、bgpdのコンフィギュレーションファイルについて説明
+する。このドキュメントは、bgpdおよびbgpd.confの最新の仕様にはしたがって
+いない場合がある。このドキュメントとマニュアルの記述の間に矛盾あるいは
+差がある場合、マニュアルの記述の方が正しい仕様に基づいている。
+
+1. ファイル名
+
+デフォルトのファイル名は /usr/local/v6/etc/bgpd.conf である。bgpdのコ
+マンドラインオプションで -c を用いてファイル名を指定すれば、デフォルト
+のファイルの代わりにそちらが用いられる。
+
+例: # bgpd -c /etc/bgpd.conf
+
+2. 書式
+
+コンフィギュレーションファイルは、1つまたは複数の式からなる。各式は、
+末尾の ";" で区切られる。式の中に、"{" および "}" で区切られる複数の部
+分式が含まれる場合もある。
+
+以下、設定可能な式の書式とその意味を示す。
+
+autonomoussystem AS番号;
+  自分のAS番号の設定。BGPを行う場合、この定義は必須である。AS番号とし
+  て0は許されない。
+
+routerid ルータID;
+  自分の32bitルータID(i.e. BGP-ID)の設定。ルータIDは、整数またはIPv4ア
+  ドレスの dotted decimal 形式で指定する。routerid式の記述が無い場合は、
+  bgpdがインタフェースについたIPv4アドレスから適当なものを一つ選んでルー
+  タIDとして使用する。
+
+IamRouteReflector;
+  自分がルートリフレクタになる。この場合、他者と合意のとれた自分のルー
+  タIDを、routerid式にて定義すべきである。
+
+holdtime 秒数;
+  BGPホールドタイマの設定。holdtime文の記述が無い場合、RFC 1771に基づ
+  きデフォルトを240秒(4分)とする。
+
+aggregate プレフィクス {部分式};
+  経路のaggregationの設定。指定したプレフィクスにマッチする経路は
+  aggregateして広告する。プレフィクスは IPv6アドレス/プレフィクス長の
+  形で指定する(例 3ffe:509::/32)。
+  設定可能な部分式を以下に示す。
+
+  proto direct interface I/F {all;};
+	Aggregateした経路を広告するインタフェースを指定する。aggregate式
+	によってプレフィクスを指定した場合にも、この部分式で指定していない
+	インタフェースにはaggregateした経路は広告されないので注意が
+	必要である。
+
+  explicit {プレフィクス1; プレフィクス2; ...};
+	指定されたプレフィクスにマッチするもののうち、aggregationせず
+	に広告するものを指定する。プレフィクスの指定法は上に準ずる。
+	explicit 式では、複数のプレフィクスを指定できる。
+
+bgp yes|no {部分式};
+  EBGPおよび／またはIBGPに関する設定。
+  設定可能な各部分式の書式を以下に示す。
+
+  group type external peeras 相手AS番号 {peer IPv6address [interface I/F];};
+	EBGPピアリングの記述。ピアリングをする相手AS番号を記述する。
+	部分式には、そのASのEBGPルータのIPv6アドレスとの対応を定義する。
+	特にリンクローカルアドレスの場合など、必要なときはインタフェース
+	も指定してもよい。
+
+  group type Internal [routerid ルータID] {部分式};
+	IBGPピアの記述。ピアのルータIDを明示してもよい。
+	設定可能な部分式の書式を以下に示す。
+
+	peer|client IPv6アドレス [interface I/F];
+	  IBGPピアリングをする相手ルータIDと、そのIBGPルータのIPv6アド
+	  レスとの対応を定義する。特にリンクローカルアドレスの場合など、
+	  必要なときはインタフェースも指定してよい。
+
+	  この式で、peerと書いた場合そのルータとは従来定義のIBGPピアリ
+	  ングを行うが、clientと書いた場合そのルータをルートリフレクタ
+	  クライアントとしてピアリングを行う。
+
+rip yes|no {部分式};
+  RIPngに関する設定。
+  設定可能な各部分式の書式を以下に示す。
+
+  interface I/F 制限モード;
+	インタフェース毎のRIPng制限モードを定義する。設定可能な制限モー
+	ドは以下のとおりである。
+	noripin: 本I/FではRIPngデータグラムを全く受信しない
+	noripout: 本I/FではRIPngデータグラムを全く送信しない
+	default restrict: 本I/FではRIPngデフォルトルートを取り扱わない
+
+export proto bgp as AS番号 {部分式};
+  EBGPピアに輸出する経路情報の設定。ピアAS番号の指定は必須である。この
+  式よりも前に External peeras 式にてピアASが定義されていなければなら
+  ない。また、自分自身のAS番号であってはならない。
+  設定可能な部分式を以下に示す。
+  
+  proto direct interface I/F {ALL;};
+	指定したインタフェースに直接付随する経路を輸出するように動作す
+	る。
+
+  proto bgp as AS番号 {ALL;};
+	指定したEBGPピアから輸入した経路を輸出する。
+
+  proto rip {ALL;};
+	RIPng経路を輸出する。
+
+  proto ibgp {ALL;};
+	IBGP経路を輸出する。
+
+3. 設定ファイルの例
+
+以下のようなコンフィギュレーションのもとで、各ルータにbgpdを用いた場合
+のコンフィギュレーションファイルの例を示す。
+
++--------AS 1002 ----------+           +---AS 1003---------------+
+|                          |           |                         |
+
+       ef1: 3ffe:501::1/64
+  Router-3
+     | ef0: 3ffe:502::1/64
+     |
+    IBGP                                     
+     |                                          ef0: 3ffe:506::1/64
+     | ef1: 3ffe:502::2/64                Router-5
+  Router-2(Reflector)                        :  de0: 3ffe:505::2/64
+     | ef0: 3ffe:503::1/64                   :
+     |                                     RIPng
+    IBGP                                     :
+     |                                       :
+     | ef0: 3ffe:503::2/64                   :  ef1: 3ffe:505::1/64
+  Router-1                                 Router-4
+     ||de0: fe80::3/64                       || ef0: fe80::4/64
+     ||                                      ||
+     ++=================EBGP=================++
+
+Router-nのルータIDは10.n.0.1であるとする。また、Router-3およびRouter-4
+のEBGP側のインタフェース(それぞれ、de0とef0)にはグローバルアドレスはつ
+いていないものとする。Router-1, Route-4がASの境界ルータである。
+Router-1はIBGPで得た経路を、Router-4はRIPngで得た経路を、それぞれEBGP
+で輸出する。Router-2はreflectorで、Router-1はそのクライアントとして設
+定される。
+
+以下、このコンフィギュレーションのもとでの各ルータのコンフィギュレーショ
+ンファイルの例を示す。
+3.1 Router-1の設定
+autonomoussystem        1002;
+routerid        10.1.0.1;
+
+bgp yes {
+        group type 
+                External peeras 1003
+        {
+                peer fe80::4 interface de0;
+        };
+        group type
+                Internal routerid 10.1.0.2
+        {
+                peer 3ffe:503::1;
+        };
+};
+
+export proto bgp as 1003 {
+        proto direct interface ef0
+        {
+                all;
+        };
+        proto ibgp
+        {
+                ALL;
+        };
+};
+
+3.2 Router-2の設定
+autonomoussystem        1002;
+routerid        10.2.0.1;
+IamRouteReflector;
+
+bgp yes {
+        group type
+                Internal RouterId 10.1.0.1
+        {
+                peer 3ffe:503::2;
+        };
+        group type
+                Internal RouterId 10.3.0.1
+        {
+                client 3ffe:502::1;
+        };
+};
+
+3.3 Router-3の設定
+autonomoussystem        1002;
+routerid        10.3.0.1;
+
+bgp yes {
+        group type
+                Internal routerid 10.2.0.1
+        {
+                peer 3ffe:502::2;
+        };
+};
+
+3.4 Router-4の設定
+autonomoussystem        1003;
+routerid        10.4.0.1;
+
+bgp yes {
+        group type
+                External peeras 1002
+        {
+                peer fe80::3 interface ef0;
+        };
+};
+
+rip yes {
+        interface ef0 noripin noripout;
+};
+
+export proto bgp as 1002 {
+        proto direct interface ef1
+        {
+                all;
+        };
+        proto rip
+        {
+                all;
+        };
+};
+
+3.5 Router-5の設定
+rip yes {};

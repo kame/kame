@@ -1,0 +1,239 @@
+/*
+//##
+//#------------------------------------------------------------------------
+//# Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+//# All rights reserved.
+//# 
+//# Redistribution and use in source and binary forms, with or without
+//# modification, are permitted provided that the following conditions
+//# are met:
+//# 1. Redistributions of source code must retain the above copyright
+//#    notice, this list of conditions and the following disclaimer.
+//# 2. Redistributions in binary form must reproduce the above copyright
+//#    notice, this list of conditions and the following disclaimer in the
+//#    documentation and/or other materials provided with the distribution.
+//# 3. Neither the name of the project nor the names of its contributors
+//#    may be used to endorse or promote products derived from this software
+//#    without specific prior written permission.
+//# 
+//# THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+//# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+//# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+//# ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+//# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+//# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+//# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+//# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+//# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+//# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+//# SUCH DAMAGE.
+//#
+//#	$SuMiRe: pma.bnf,v 1.2 1998/09/17 01:14:59 shin Exp $
+//#	$Id: pma.bnf,v 1.1 1999/08/08 23:31:09 itojun Exp $
+//#
+//#------------------------------------------------------------------------
+*/
+
+/*  Top level definitions						*/
+
+        <statement> ::= <interface>
+		      | <global>
+		      | <filter>
+		      | <nat>
+		      | <tsd>
+		      | <route>
+		      | <selfaddr>
+		      | <show>
+
+
+/*  Interface definition						*/
+
+        <interface> ::= "interface" <opt_netid> <netdevice> <in_ex>
+
+            <in_ex> ::= "internal"
+		      | "external"
+
+
+/*  Global address definition						*/
+
+           <global> ::= <set_global>
+		      | <remove_global>
+		      | <flush_global>
+
+       <set_global> ::= "global" <netdevice> <address_range>
+		      | "global" <netdevice> <address_range> "force"
+
+    <remove_global> ::= "global" "remove" <netdevice> <address_range>
+
+     <flush_global> ::= "global" "flush" <opt_netdevice>
+
+    <address_range> ::= <range_term>
+		      | <address_range> <range_term>
+
+       <range_term> ::= <ipaddress>
+		      | <ipaddress> "/" <netmask>
+		      | <ipaddress> "-" <ipaddress>
+
+
+/*  IP packet filter							*/
+
+           <filter> ::= <flush_filter>
+		      | <toggle_filter>
+
+     <flush_filter> ::= "filter" "flush" <opt_netdevice>
+
+    <toggle_filter> ::= "filter" "enable"
+		      | "filter" "disable"
+
+
+/*  Network Address Translation definition				*/
+
+              <nat> ::= <natrule>
+		      | <delete_nat>
+		      | <flush_nat>
+		      | <toggle_nat>
+
+          <natrule> ::= "nat" <netdevice> <opt_nattype> <internal_natrange>
+			"to" <external_natrange> <opt_policy>
+
+<internal_natrange> ::= <netaddr>
+		      | <internal_natrange> <netaddr>
+
+<external_natrange> ::= <netaddr>
+		      | <external_natrange> <netaddr>
+
+       <delete_nat> ::= "nat" "delete" <netdevice> <nattype> <rules>
+
+        <flush_nat> ::= "nat" "flush" <opt_netdevice>
+
+       <toggle_nat> ::= "nat" "enable"
+		      | "nat" "disable"
+
+      <opt_nattype> ::= ¦Å
+		      | <nattype>
+
+          <nattype> ::= "static"
+		      | "dynamic"
+
+          <netaddr> ::= <ipaddr_range>
+		      | <ipaddr_range> <ports>
+
+     <ipaddr_range> ::= "any"
+		      | <ipaddress>
+		      | <ipaddress> "/" <netmask>
+		      | <ipaddress> "-" <ipaddress>
+
+            <ports> ::= "port" <port>
+		      | "port" <port> "-" <port>
+
+       <opt_policy> ::= ¦Å
+		      | <policy>
+
+           <policy> ::= "portfirst"
+		      | "addrfirst"
+
+
+/*  TCP Session Distributor						*/
+
+              <tsd> ::= <virtual>
+		      | <real>
+		      | <bind>
+		      | <in_service>
+		      | <out_of_service>
+
+          <virtual> ::= "tsd" <opt_netdevice>      "virtual" <v_ip>
+		      | "tsd" <opt_netdevice> "no" "virtual" <v_ip>
+
+             <real> ::= "tsd" <opt_netdevice>      "real" <r_ip>
+		      | "tsd" <opt_netdevice> "no" "real" <r_ip>
+
+             <bind> ::= "tsd" <opt_netdevice>      "bind" <v_ip> <r_ip>
+		      | "tsd" <opt_netdevice> "no" "bind" <v_ip> <r_ip>
+
+       <in_service> ::= "tsd" "in_service" "virtual" <v_ip>
+		      | "tsd" "in_service" "real"    <r_ip>
+
+   <out_of_service> ::= "tsd" "out_of_service" "virtual" <v_ip>
+		      | "tsd" "out_of_service" "real"    <v_ip>
+
+             <v_ip> ::= <ipaddress>
+
+             <r_ip> ::= <ipaddress>
+
+
+/*  Route								*/
+
+            <route> ::= <config_route>
+		      | <delete_route>
+		      | <flush_route>
+		      | <toggle_route>
+
+     <config_route> ::= "route" <opt_protocol> "from" <netaddr> "to" <netaddr>
+			"via" <ipaddress>
+
+     <opt_protocol> ::= "¦Å
+		      | <protocol>
+
+     <delete_route> ::= "route" "delete" <rules>
+
+      <flush_route> ::= "route" "flush"
+
+     <toggle_route> ::= "route" "enable"
+		      | "route" "disable"
+
+
+/*  Selfaddr ...							*/
+
+         <selfaddr> ::= "selfaddr" "chflags" <ipaddress> <flags>
+
+            <flags> ::= "natglobal"
+		      |	"~" "natglobal"
+		      | "alias"
+		      | "~" "natglobal"
+
+
+/*  Show ...								*/
+
+             <show> ::= "show" "interface" <opt_netdevice>
+		      | "show" "side"
+		      | "show" "global" <opt_netdevice>
+		      | "show" "filrule"
+		      | "show" "static" <opt_netdevice>
+		      | "show" "dynamic" <opt_netdevice> <opt_full>
+		      | "show" "stat"
+		      | "show" "real"
+		      | "shwo" "virtual"
+		      | "show" "bind"
+		      | "show" "tsd" "stat"
+		      | "show" "tsd" "linkstat"
+		      | "show" "route"
+		      | "show" "route" "status"
+		      | "show" "selfaddr"
+		      | "show" "xlate" <opt_interval>
+		      | "show" "cellused"
+		      | "show" "kmembuckets"
+		      | "show" "kmemstats"
+
+
+/*  Miscellaneous definitions.						*/
+
+    <opt_netdevice> ::= ¦Å
+		      | <netdevice>
+
+        <netdevice> ::= <name>
+
+         <opt_full> ::= ¦Å
+		      | "full"
+
+     <opt_interval> ::= ¦Å
+		      | <decimal>
+
+
+/*
+//##
+//#------------------------------------------------------------------------
+//# Local Variables:
+//# version-control: nil
+//# End:
+//#------------------------------------------------------------------------
+*/

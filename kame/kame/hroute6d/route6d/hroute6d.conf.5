@@ -1,0 +1,346 @@
+.Dd May   19, 1998
+.Dt HROUTE6D.CONF 5
+.Os KAME
+.Sh NAME
+.Nm hroute6d.conf
+.Nd configuration file for
+.Xr hroute6d 8 .
+.Sh DESCRIPTION
+The
+.Nm hroute6d.conf
+configuration file consists of a sequence of statements terminated 
+by a newline. Statements are composed of tokens seperated by white 
+spaces, which can be any combination of blanks and tabs. Comments 
+begin with a
+.Nm #
+sign and runs to the end of line.
+.Pp
+Configuration file consists of three parts. They are 
+.Bl -bullet -compact
+.It
+Global Configuration Part
+.It
+Route Configuration Part 
+.It
+Interface Configuration Part
+.El
+and appear in this order on the configuration file.
+.Pp
+Each part have their own set of statements. In general, the order of 
+statements are free and any number of statements may be specified. A
+statement begins with a command and followed by some parameters.
+.Pp
+.Nm hroute6d.conf
+must be present in the directory
+.Pa /usr/local/v6/etc
+before starting 
+.Xr hroute6d 8
+daemon.
+.Sh Common Parameter Syntax
+.Bl -tag -width indent
+.It Ar metric   
+metric value between 1 and 16 (decimal) inclusive.
+.It Ar on/off   
+character string
+.Ar on
+or
+.Ar off .
+.\"
+.It Ar prefix   
+character string 
+.Ar default
+or pair of an
+.Ar address
+and a
+.Ar prefix-length .
+.\"
+.It Ar address   
+IPv6 address in text representation as defined in RFC 1884.
+.\"
+.It Ar prefix-length    
+numerical value between 0 and 128 (decimal) inclusive.
+.El
+.\"
+.Sh Global Configuration Part
+.Bl -tag -width Ds
+.It Ic quiet
+The hroute6d only listen to the advertisements of others and
+never advertise it's routing information to neighbours. If 
+this option is not specified, hroute6d send own routing information 
+to neighbours. 
+.Nm quiet
+is NOT the default.
+.\"
+.It Ic poison
+.It Ic horizon
+.It Ic nohorizon
+Specifies which method to use.
+.Nm posion
+means do posion reverse,
+.Nm horizon 
+means do split horizon (but not posion reverse) and
+.Nm nohorizon
+means do not split horizon. The default method is 
+.Nm poison
+.\"
+.It Ic trace Ar on/off
+Enables/Disables packet tracing. The default is 
+.Ar off 
+.\"
+.It Ic defaultmetric Ar metric
+Set the default value for the metric. If not specified,
+the value is 1.
+.\"
+.It Ic headerlen Ar headerlength
+Set the total length of the IPv6 header and UDP header in
+octets (decimal). Used when the hroute6d calculate the maximum number of 
+RTEs in one message. The default value is 48.
+.\"
+.It Ic "nexthop out"
+Always put a next hop RTE in any outgoing messages. If not
+specified, the hroute6d make messages without next hop
+RTE when the next hop is itself (default case).
+.\"
+.It Ic "nexthop noin"
+Ignore the next hop RTE in any incoming messages and treat
+the neighbour which sends the message as next hop. This is not
+the default.
+.\"
+.It Ic routetag Ar tagvalue
+Use this value (in hexadecimal) in the route tag field of each RTE which is
+made by this hroute6d (i.e direct attached networks). Valid values
+are from 0000 to FFFF in hexadecimal. The default value is 0.
+.\"
+.It Ic compatible
+Advertises and accepts routes for IPv4 compatible addresses.
+This is NOT the default.
+.El
+.\"
+.Sh Route Configuration Part
+.Bl -tag -width Ds
+.It Xo
+.Ic static Ar prefix Ar address Ar interface
+.Op Ic metric Ar metric 
+.Op Ic routetag Ar tagvalue
+.Xc
+Make a static route.
+.Ar prefix
+is the destination prefix.
+.Ar interface
+is the interface name (like
+.Ar lo0
+) which attaches the network next hop gateway belongs to.
+.Ar address
+is the next hop gateway address. Metric
+of the static route can be speicfied.  If not specified,
+the value which is specified by the 
+.Ic defaultmetric
+statement (see previous section) is used. The route tag can be 
+specified too. The default route tag is specified by
+.Ic routetag
+statement (see previous section). To set a default route, use
+.Ar default 
+as prefix.
+.\"
+.It Ic ignore Ar prefix
+Ignore any RTE matches this prefix in any incoming messages. If 
+prefix is 
+.Ar default
+ignore only the default route RTE (not all RTEs).
+.El
+.\"
+.Sh Interface Configuration Part
+In this part, settings per interface are defined as interface by 
+interface manner. Each interface setting begins with
+.Ic interface 
+statement and ends before next
+.Ic interface 
+statement or the end of file.
+The default setting of any of interface not described in Interface
+Configuration Part is 
+.Ic in ,
+.Ic out .
+.Pp
+.Bl -tag -width Ds
+.It Ic interface Ar interfacename
+The interfacename is the character strings in the form of "name 
+unit", such as 
+.Ar lo0 ,
+.Ar de1 .
+.\"
+.It Ic poision
+.It Ic horizon
+.It Ic nohorizon
+Specifies which method to use in creating messages which is sent on
+this interface. This statement overrides default method specified in
+the General Configuration Part.
+.\"
+.It Ic in Op Ar address
+Enable the hroute6d to listen advertisements on this interface.
+If
+.Ar address
+is omitted, all advertisements are received and
+processed. If
+.Ar address
+specified, only messages from the
+.Ar address
+is received and messages from others are ignored. The default is 
+.Ic in
+with no parameters. Note:
+.Ar address
+should be link-local address.
+.\"
+.It Ic noin Op Ar address
+Disable the hroute6d to listen advertisements on this interface. If
+address parameter is omitted, all advertisements received from this
+interface is ignored. Both 
+.Ic noin
+and
+.Ic in
+statements may be used on the same interface. In that case, latter 
+statements overrides former ones. For example,
+.Ic in
+and
+.Ic noin Ar gateway1
+appear in this order, the hroute6d accpets all messages from the
+interface except the ones from the gateway1.
+.\"
+.It Ic out Op Ar address
+Enable hroute6d to advertise it's own routing information to 
+neighbours on this interface. If 
+.Ar address
+parameter is omitted, advertisements are multicasted to
+.Ad FF02::9
+(as defined in RFC). If
+.Ar address
+is specified, advertisements are unicasted to the address. If
+multiple 
+.Ic out
+statements are specified, advertisements are sent to each 
+.Ic address
+specified. For example, 
+.Ic out
+, 
+.Ic out Ar gateway1
+and
+.Ic out Ar gateway2
+appear in this order, advertisements are sent to 
+.Ad FF02::9 ,
+.Ar gateway1
+(unicast) and
+.Ar gateway2
+(unicast). The default is 
+.Ic out
+with no parameters.
+.Ar address
+should be a link-local address.
+.\"
+.It Ic noout
+Disable the hroute6d to advertise it's own routing information to 
+neighbours on this interface. This is not the default.
+.\"
+.It Xo
+.Ic aggregate Ar prefix
+.Op Ic metric Ar metric
+.Op Ic routetag Ar tagvalue
+.Xc
+Every route that matches 
+.Ar prefix
+are aggregated to one RTE with 
+.Ar prefix
+when advertise on this interface.
+For aggregated prefix, a routing table entry toward loopback interface with
+.Dv RTF_REJECT
+will be installed, so that there will be no bogus packet loop.
+Metric can be specified.
+If no metric is specified, aggregated RTE use the default metric.
+Also, route tag can be specified. 
+.\"
+.It Ic nosite
+Define this interface does not belong to any site. The hroute6d 
+should not accpet RTE with site-local address from this interface
+and should not advertise any RTE with site-local addresses. This is
+the default
+.\"
+.It Ic site
+Define that this interface belongs to a site. Accept RTEs with
+site-local addresses from this interface. Advertise RTEs with site-local
+addresses.
+.\"
+.It Xo
+.Ic gendefault
+.Op Ic metric Ar metric
+.Op Ic routetag Ar tagvalue
+.Xc
+Make a default route RTE (i.e prefix length = 0) in the message 
+advertised on this interface. Metric and/or routetag can be specified.
+When this command is specified, messages from this interface contain
+ONLY default route RTE.  This is not the default.
+.\"
+.It Xo
+.Ic filter Ar prefix
+.Op Ic routetag Ar tagvalue
+.Xc
+Ignore any RTEs that matches prefix from this interface. If 
+.Ar prefix 
+is 
+.Ar default
+ignore only the default route RTE (not all RTEs). If route tag
+value is specified, ignore any RTEs that matches both
+.Ar prefix 
+and
+.Ar tagvalue 
+from this interface.
+.\"
+.It Ic metricin Ar metric
+The value
+.Ar metric 
+is added to any incoming RTEs metrics (from this interface) before
+route calculation. The default is to use default metric specified 
+by 
+.Ic defaultmetric .
+.\"
+.It Ic metricout Ar metric
+The value
+.Ar metric
+is added to any outgoing (from this interface) RTEs' metrics. This
+does not affect route calculation of this hroute6d (affect only
+neighbours).
+.\"
+.It Ic nexthop Ar prefix Ar address
+Include next hop RTE of
+.Ar address
+to advertise the
+.Ar prefix
+route.
+.\"
+.It Ic propagate
+Propagate default route entry which hroute6d learned from neighbours.
+.El
+.\"
+.Sh Sample Configuration 
+If
+.Pa /usr/local/v6/etc/hroute6d.conf
+is empty file, hroute6d become active on all interfaces which have
+at least one IPv6 address.
+To make hroute6d to advertise only on the selected interfaces,
+.Bd -unfilled -offset indent
+#General Configuration Part
+quiet
+#Interface Configuration Part
+interface de0
+out
+interface tnl0
+out
+.Ed
+.Sh FILES
+.Bl -tag -width /var/tmp/hroute6d.trace -compact
+.It Pa /usr/local/v6/etc/hroute6d.conf
+Hroute6d configuration file.
+.It Pa /var/tmp/hroute6d.trace
+Trace log file.
+.El
+.Sh SEE ALSO
+.Xr hroute6d 8 ,
+.Xr rip6admin 8 ,
+.Xr rip6query 8
