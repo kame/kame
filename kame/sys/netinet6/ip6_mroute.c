@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.57 2001/12/14 08:29:40 suz Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.58 2001/12/18 02:36:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1145,7 +1145,7 @@ ip6_mforward(ip6, ifp, m)
 			    ip6_sprintf(&ip6->ip6_dst),
 			    ip6->ip6_nxt,
 			    m->m_pkthdr.rcvif ?
-			    if_name(m->m_pkthdr.rcvif) : "");
+			    if_name(m->m_pkthdr.rcvif) : "?");
 		}
 		return 0;
 	}
