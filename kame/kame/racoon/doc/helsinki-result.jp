@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.15 2001/08/15 06:35:39 itojun Exp $
+$KAME: helsinki-result.jp,v 1.16 2001/08/15 07:18:52 itojun Exp $
 
 
 generic
@@ -14,6 +14,11 @@ generic
 	AES/MD5のIVの計算方法。MD5は12bytes。AES16bytes必要。
 
 	IPsecでのSHA2 support確認(添付するbit数)。
+
+	SSH社からtoolkitを買って使っているところが大変多い。なんかSSH社の
+	ためにbakeoffしているような気がしてきた。というか、ipsec自体SSH社の
+	利益のためのプロトコルじゃないかという気すらしてくる。複雑にすれば
+	するほどSSH社は儲かる... (conspiracy theory)
 
 
 latest isakmpd on KAME
@@ -120,6 +125,14 @@ Trilogy AdmitOne 2.6
 	Wed Aug 15 01:53:42 JST 2001
 	明日。
 
+	Wed Aug 15 16:09:50 JST 2001
+	IPv4, ESP, transport mode
+	phase 1 3DES + SHA1, lifetime = 10min
+	phase 2 AES + SHA1, lifetime = 2min
+
+	Trilogy側はIKE phase 2のkey lengthがbyte単位だと思っているらしく
+	negotiation失敗。修正後再挑戦。
+
 
 ZyXEL
 	Tue Aug 14 12:00
@@ -153,4 +166,3 @@ WindowsXP
 Ashley
 	Tue Aug 14 18:00
 	明日 9:00 RSA signature mode 予約
-
