@@ -1490,9 +1490,11 @@ tcp_mss_to_advertise(ifp, af)
 		case AF_INET:
 			mss = max(in_maxmtu, mss);
 			break;
+#ifdef INET6
 		case AF_INET6:
 			mss = max(in6_maxmtu, mss);
 			break;
+#endif
 		}
 
 	switch (af) {
