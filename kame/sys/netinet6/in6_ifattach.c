@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.129 2001/07/24 09:55:38 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.130 2001/07/24 09:56:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -703,8 +703,8 @@ in6_ifattach_loopback(ifp)
 	ifra.ifra_flags |= IN6_IFF_NOPFX;
 
 	/*
-	 * We can set NULL to the 3rd arg. See comments in
-	 * in6_ifattach_linklocal().
+	 * We are sure that this is a newly assigned address, so we can set
+	 * NULL to the 3rd arg.
 	 */
 	if ((error = in6_update_ifa(ifp, &ifra, NULL)) != 0) {
 		log(LOG_ERR, "in6_ifattach_loopback: failed to configure "
