@@ -21,7 +21,7 @@
  */
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/gencode.c,v 1.5 1999/12/13 00:53:02 itojun Exp $ (LBL)";
+    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/gencode.c,v 1.6 1999/12/13 00:54:47 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/types.h>
@@ -153,7 +153,9 @@ static struct block *gen_host(bpf_u_int32, bpf_u_int32, int, int);
 #ifdef INET6
 static struct block *gen_host6(struct in6_addr *, struct in6_addr *, int, int);
 #endif
+#ifndef INET6
 static struct block *gen_gateway(const u_char *, bpf_u_int32 **, int, int);
+#endif
 static struct block *gen_ipfrag(void);
 static struct block *gen_portatom(int, bpf_int32);
 #ifdef INET6
@@ -166,6 +168,7 @@ struct block *gen_portop6(int, int, int);
 static struct block *gen_port6(int, int, int);
 #endif
 static int lookup_proto(const char *, int);
+static struct block *gen_protochain(int, int, int);
 static struct block *gen_proto(int, int, int);
 static struct slist *xfer_to_x(struct arth *);
 static struct slist *xfer_to_a(struct arth *);
@@ -1013,8 +1016,6 @@ gen_host6(addr, mask, proto, dir)
 	int proto;
 	int dir;
 {
-	struct block *b0, *b1;
-
 	switch (proto) {
 
 	case Q_DEFAULT:
@@ -1085,6 +1086,7 @@ gen_host6(addr, mask, proto, dir)
 }
 #endif /*INET6*/
 
+#ifndef INET6
 static struct block *
 gen_gateway(eaddr, alist, proto, dir)
 	const u_char *eaddr;
@@ -1123,6 +1125,7 @@ gen_gateway(eaddr, alist, proto, dir)
 	bpf_error("illegal modifier of 'gateway'");
 	/* NOTREACHED */
 }
+#endif /*INET6*/
 
 struct block *
 gen_proto_abbrev(proto)
@@ -1472,21 +1475,14 @@ lookup_proto(name, proto)
 	return v;
 }
 
-struct stmt *
-gen_joinsp(s, n)
-	struct stmt **s;
-	int n;
-{
-}
-
-struct block *
+static struct block *
 gen_protochain(v, proto, dir)
 	int v;
 	int proto;
 	int dir;
 {
 	struct block *b0, *b;
-	struct slist *s[100], *sp;
+	struct slist *s[100];
 	int fix2, fix3, fix4, fix5;
 	int ahcheck, again, end;
 	int i, max;
@@ -1898,8 +1894,10 @@ gen_scode(name, q)
 	int dir = q.dir;
 	int tproto;
 	u_char *eaddr;
-	bpf_u_int32 mask, addr, **alist;
-#ifdef INET6
+	bpf_u_int32 mask, addr;
+#ifndef INET6
+	bpf_u_int32 **alist;
+#else
 	int tproto6;
 	struct sockaddr_in *sin;
 	struct sockaddr_in6 *sin6;
