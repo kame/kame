@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.156 2003/04/22 05:48:53 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.157 2003/04/22 06:29:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -191,9 +191,7 @@ static const struct explore explore[] = {
 #endif
 #ifdef INET6
 	{ PF_INET6, SOCK_DGRAM, IPPROTO_UDP, "udp", 0x1f },
-#if 0	/*???*/
 	{ PF_INET6, SOCK_DGRAM, IPPROTO_SCTP, "sctp", 0x1f },
-#endif
 	{ PF_INET6, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x0f },	/* !PASSIVE */
 	{ PF_INET6, SOCK_STREAM, IPPROTO_TCP, "sctp", 0x0f },	/* !PASSIVE */
 	{ PF_INET6, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x17 },	/* PASSIVE */
@@ -202,9 +200,7 @@ static const struct explore explore[] = {
 	{ PF_INET6, SOCK_RAW, ANY, NULL, 0x1d },
 #endif
 	{ PF_INET, SOCK_DGRAM, IPPROTO_UDP, "udp", 0x1f },
-#if 0	/*???*/
 	{ PF_INET, SOCK_DGRAM, IPPROTO_SCTP, "sctp", 0x1f },
-#endif
 	{ PF_INET, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x0f },	/* !PASSIVE */
 	{ PF_INET, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x0f },	/* !PASSIVE */
 	{ PF_INET, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x17 },	/* PASSIVE */
