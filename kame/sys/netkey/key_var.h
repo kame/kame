@@ -1,4 +1,4 @@
-/*	$KAME: key_var.h,v 1.13 2003/09/12 03:31:32 itojun Exp $	*/
+/*	$KAME: key_var.h,v 1.14 2003/09/24 06:45:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -51,10 +51,31 @@
 #define KEYCTL_ESP_AUTH			10
 #define KEYCTL_AH_KEYMIN		11
 #define KEYCTL_PREFERED_OLDSA		12
+#ifndef __FreeBSD__
 #define KEYCTL_DUMPSA			13
 #define KEYCTL_DUMPSP			14
+#endif
 #define KEYCTL_MAXID			15
 
+#ifndef __FreeBSD__
+#define KEYCTL_NAMES { \
+	{ 0, 0 }, \
+	{ "debug", CTLTYPE_INT }, \
+	{ "spi_try", CTLTYPE_INT }, \
+	{ "spi_min_value", CTLTYPE_INT }, \
+	{ "spi_max_value", CTLTYPE_INT }, \
+	{ "random_int", CTLTYPE_INT }, \
+	{ "larval_lifetime", CTLTYPE_INT }, \
+	{ "blockacq_count", CTLTYPE_INT }, \
+	{ "blockacq_lifetime", CTLTYPE_INT }, \
+	{ "esp_keymin", CTLTYPE_INT }, \
+	{ "esp_auth", CTLTYPE_INT }, \
+	{ "ah_keymin", CTLTYPE_INT }, \
+	{ "preferred_oldsa", CTLTYPE_INT }, \
+	{ 0, 0 }, \
+	{ 0, 0 }, \
+}
+#else
 #define KEYCTL_NAMES { \
 	{ 0, 0 }, \
 	{ "debug", CTLTYPE_INT }, \
@@ -70,6 +91,7 @@
 	{ "ah_keymin", CTLTYPE_INT }, \
 	{ "preferred_oldsa", CTLTYPE_INT }, \
 }
+#endif
 
 #ifdef __bsdi__
 #define KEYCTL_VARS { \
@@ -86,6 +108,8 @@
 	&ipsec_esp_auth, \
 	&ipsec_ah_keymin, \
 	&key_preferred_oldsa, \
+	0, \
+	0, \
 }
 #endif
 
