@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.h,v 1.18 2001/06/04 12:03:41 itojun Exp $	*/
+/*	$KAME: if_gif.h,v 1.19 2001/07/25 00:55:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -95,5 +95,6 @@ int gif_ioctl __P((struct ifnet *, u_long, caddr_t));
 #ifdef __OpenBSD__
 void gif_start __P((struct ifnet *));
 #endif
+int gif_encapcheck __P((const struct mbuf *, int, int, void *));
 
 #endif /* _NET_IF_GIF_H_ */

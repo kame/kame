@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.57 2001/07/24 14:24:00 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.58 2001/07/25 00:55:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -111,13 +111,6 @@ void gifattach __P((void *));
 #else
 void gifattach __P((int));
 #endif
-static int gif_encapcheck __P((const struct mbuf *, int, int, void *));
-#ifdef INET
-extern struct protosw in_gif_protosw;
-#endif
-#ifdef INET6
-extern struct ip6protosw in6_gif_protosw;
-#endif
 #if defined(__NetBSD__) && defined(ISO)
 static int gif_eon_encap(struct mbuf **);
 static int gif_eon_decap(struct ifnet *, struct mbuf **);
@@ -175,22 +168,17 @@ gifattach(dummy)
 
 		sc->encap_cookie4 = sc->encap_cookie6 = NULL;
 #ifdef INET
-		sc->encap_cookie4 = encap_attach_func(AF_INET, -1,
-		    gif_encapcheck, &in_gif_protosw, sc);
-		if (sc->encap_cookie4 == NULL) {
-			printf("%s: attach failed\n", if_name(&sc->gif_if));
+		if (in_gif_attach(sc) != 0) {
+			printf("%s: inet attach failed\n",
+			    if_name(&sc->gif_if));
 			continue;
 		}
 #endif
 #ifdef INET6
-		sc->encap_cookie6 = encap_attach_func(AF_INET6, -1,
-		    gif_encapcheck, (struct protosw *)&in6_gif_protosw, sc);
-		if (sc->encap_cookie6 == NULL) {
-			if (sc->encap_cookie4) {
-				encap_detach(sc->encap_cookie4);
-				sc->encap_cookie4 = NULL;
-			}
-			printf("%s: attach failed\n", if_name(&sc->gif_if));
+		if (in6_gif_attach(sc) != 0) {
+			in_gif_detach(sc);
+			printf("%s: inet6 attach failed\n",
+			    if_name(&sc->gif_if));
 			continue;
 		}
 #endif
@@ -264,7 +252,7 @@ gif_start(ifp)
 }
 #endif
 
-static int
+int
 gif_encapcheck(m, off, proto, arg)
 	const struct mbuf *m;
 	int off;

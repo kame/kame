@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.57 2001/07/25 00:38:17 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.58 2001/07/25 00:55:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -84,6 +84,8 @@
 
 static int gif_validate6 __P((const struct ip6_hdr *, struct gif_softc *,
 	struct ifnet *));
+
+extern struct ip6protosw in6_gif_protosw;
 
 #ifndef offsetof
 #define offsetof(s, e) ((int)&((s *)0)->e)
@@ -505,4 +507,26 @@ gif_encapcheck6(m, off, proto, arg)
 	ifp = ((m->m_flags & M_PKTHDR) != 0) ? m->m_pkthdr.rcvif : NULL;
 
 	return gif_validate6(&ip6, sc, ifp);
+}
+
+int
+in6_gif_attach(sc)
+	struct gif_softc *sc;
+{
+
+	sc->encap_cookie6 = encap_attach_func(AF_INET6, -1,
+	    gif_encapcheck, (struct protosw *)&in6_gif_protosw, sc);
+	if (sc->encap_cookie6 == NULL)
+		return EEXIST;
+	return 0;
+}
+
+int
+in6_gif_detach(sc)
+	struct gif_softc *sc;
+{
+
+	encap_detach(sc->encap_cookie6);
+	sc->encap_cookie6 = NULL;
+	return 0;
 }

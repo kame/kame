@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.61 2001/07/25 00:38:17 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.62 2001/07/25 00:55:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -107,6 +107,7 @@ int ip_gif_ttl = 0;
 SYSCTL_INT(_net_inet_ip, IPCTL_GIF_TTL, gifttl, CTLFLAG_RW,
 	&ip_gif_ttl,	0, "");
 #endif
+extern struct protosw in_gif_protosw;
 
 #ifndef offsetof
 #define offsetof(s, e) ((int)&((s *)0)->e)
@@ -537,4 +538,26 @@ gif_encapcheck4(m, off, proto, arg)
 	ifp = ((m->m_flags & M_PKTHDR) != 0) ? m->m_pkthdr.rcvif : NULL;
 
 	return gif_validate4(&ip, sc, ifp);
+}
+
+int
+in_gif_attach(sc)
+	struct gif_softc *sc;
+{
+
+	sc->encap_cookie4 = encap_attach_func(AF_INET, -1,
+	    gif_encapcheck, &in_gif_protosw, sc);
+	if (sc->encap_cookie4 == NULL)
+		return EEXIST;
+	return 0;
+}
+
+int
+in_gif_detach(sc)
+	struct gif_softc *sc;
+{
+
+	encap_detach(sc->encap_cookie4);
+	sc->encap_cookie4 = NULL;
+	return 0;
 }
