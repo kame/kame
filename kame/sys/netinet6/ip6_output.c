@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.183 2001/06/16 16:23:34 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.184 2001/06/16 16:24:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -290,7 +290,8 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			/*
 			 * Destination options header(1st part)
 			 * This only makes sence with a routing header.
-			 * See Section 9.2 of draft-ietf-ipngwg-2292bis-02.txt.
+			 * See Section 9.2 of
+			 * draft-ietf-ipngwg-rfc2292bis-02.txt.
 			 * Disabling this part just for MIP6 convenience is
 			 * a bad idea.  We need to think carefully about a
 			 * way to make the advanced API coexist with MIP6
