@@ -1,6 +1,6 @@
 #
 # perl prepare.pl kame <osname>
-# $Id: prepare.pl,v 1.13 2000/04/25 23:57:06 itojun Exp $
+# $KAME: prepare.pl,v 1.14 2000/07/26 08:11:33 itojun Exp $
 #
 
 $debug = 1;

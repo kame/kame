@@ -1,6 +1,6 @@
 	Installation procedure - preparation of the tree
 	KAME project
-	$Id: INSTALL,v 1.22 2000/04/21 06:05:26 kazu Exp $
+	$KAME: INSTALL,v 1.23 2000/07/26 08:09:28 itojun Exp $
 
 Let's call the entire file-tree under this directory "the KAME tree".
 

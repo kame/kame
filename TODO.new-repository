@@ -1,11 +1,10 @@
 TODOs for new repository
 KAME project
-$Id: TODO.new-repository,v 1.8 2000/01/18 15:18:44 itojun Exp $
-
+$KAME: TODO.new-repository,v 1.9 2000/07/26 08:07:08 itojun Exp $
 
 kernel part:
 - share sys/netnatm and other atm stuff across platforms
-- share and support netpm (v4-v4 NAT), natpt (v4-v6 NAT)
+- share and support natpt (v4-v6 NAT)
 	KAME/FreeBSD228 compiles fine
 	KAME/BSDI3 compiles fine
 - update netpm/natpt for KNF

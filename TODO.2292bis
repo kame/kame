@@ -1,6 +1,6 @@
 TODO list for the new advanced API (aka rfc2292bis)
 KAME project
-$Id: TODO.2292bis,v 1.26 2000/06/13 03:09:25 jinmei Exp $
+$KAME: TODO.2292bis,v 1.27 2000/07/26 08:07:08 itojun Exp $
 
 new socket options or ancillary data types:
 - IPV6_RTHDRDSTOPTS	done/20000102	jinmei

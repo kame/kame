@@ -1,6 +1,6 @@
 Installation procedure - grabbing tree via anoncvs
 KAME project
-$Id: INSTALL.anoncvs,v 1.7 2000/02/14 12:11:39 itojun Exp $
+$KAME: INSTALL.anoncvs,v 1.8 2000/07/26 08:09:28 itojun Exp $
 
 
 NOTE: The following description applies only to KAME SNAP kits.
