@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2484 2003/10/01 12:44:50 keiichi Exp $
+$KAME: CHANGELOG,v 1.2485 2003/10/01 13:08:48 keiichi Exp $
 
 <200310>
+Wed Oct  1 22:01:59 JST 2003
+	* kame/sys/netinet6/icmp6.c:
+	when MIP6 route optimizaion is being perfomed, the address in
+	RTHDR2 of the payload of ICMPv6 packet too big message
+	must be considerred as a final destination of path MTU.
+
 Wed Oct  1 21:20:16 JST 2003	keiichi@iij.ad.jp
 	* kame/sys/netinet6/mip6_cncore.c:
 	do not insert Home Address Option to any MH header except
