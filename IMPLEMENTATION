@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/08/11 16:50:35 $
+			$Date: 1999/08/12 06:13:52 $
 
 1. IPv6
 
@@ -703,6 +703,8 @@ The following lists BSD/OS device drivers and its conditions:
 	(Ethernet)
 	cnw	ok		ok		yes
 	de	ok		ok		-
+	df	ok		ok		-
+	eb	ok		ok		-
 	ef	ok		ok		yes
 	exp	ok		ok		-
 	mz	ok		ok		yes
