@@ -87,7 +87,7 @@ struct mld_report_hdr {	/* Multicast Report */
 #define SFLAGYES		0x08
 #define SFLAGNO			0x0
 #ifndef MLD_SFLAG
-#define MLD_SFLAG(x) ((x)->mld_rtval &(0x08))
+#define MLD_SFLAG(x) ((x) &(0x08))
 #endif
 
 /*
