@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.53 2002/06/21 09:09:44 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.54 2002/06/23 08:00:38 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -533,14 +533,44 @@ natpt_remapRemote4Port(struct cSlot *acs, struct pAddr *remote)
 
 	for (;;) {
 		while (++cport <= eport) {
+			int		 s;
+			struct tSlot	*ats;
+			struct pAddr	*atsr;
+
 			pad.port[1] = htons(cport);
 			hvr = natpt_hashPad4(&pad);
 			thr = &tslhashr[hvr];
-			if (TAILQ_EMPTY(&thr->tslhead)) {
+			if ((ats = TAILQ_FIRST(&thr->tslhead)) == NULL) {
 				acs->cport = cport;
 				remote->port[1] = htons(cport);
 				return (remote);
 			}
+
+			/*
+			 * If the port number of the packet I want to
+			 * use from now on is used with outgoing
+			 * packet already, port number should be there
+			 * in this list.
+			 */
+			s = splnet();
+			for (; ats; ats = TAILQ_NEXT(ats, tsl_hashr)) {
+				if ((ats->ip_p != IPPROTO_TCP)
+				    && (ats->ip_p != IPPROTO_UDP))
+					continue;
+				atsr = &ats->remote;
+				if (atsr->sa_family != AF_INET)
+					continue;
+
+				if ((pad.in4dst.s_addr == atsr->in4dst.s_addr)
+				    && (pad.port[1] == atsr->port[1]))
+					continue;
+
+				splx(s);
+				acs->cport = cport;
+				remote->port[1] = htons(cport);
+				return (remote);
+			}
+			splx(s);
 		}
 
 		if (firsttime == 0)
