@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.54 2000/04/05 09:12:05 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.55 2000/04/19 17:48:06 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -790,11 +790,13 @@ isakmp_ph2begin_r(iph1, msg)
 		delph2(iph2);
 		return -1;
 	}
+	_INPORTBYSA(iph2->dst) = 0;
 	iph2->src = dupsaddr(iph1->local);	/* XXX should be considered */
 	if (iph2->src == NULL) {
 		delph2(iph2);
 		return -1;
 	}
+	_INPORTBYSA(iph2->src) = 0;
 
 	YIPSDEBUG(DEBUG_NOTIFY,
 		h1[0] = s1[0] = h2[0] = s2[0] = '\0';
