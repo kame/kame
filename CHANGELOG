@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2445 2003/07/28 11:07:10 keiichi Exp $
+$KAME: CHANGELOG,v 1.2446 2003/07/29 00:51:18 t-momose Exp $
 
 <200307>
+2003-07-28  MOMOSE Tsuyoshi  <t-momose@netlab.nec.co.jp>
+	* sys/netinet6/{ip6_output.c, ip6_var.h, mip6_cncore.c,
+	mip6_hacore.[ch], nd6.c}:
+	CN or HA dosen't add a type2 routing header to a Binding
+	Acknowledgement packet when a deregistration packet was issued
+	on home link and it was failed by some reasons.
+	reported by Yukiyo.Akisada@jp.yokogawa.com and v6pc cert.
+	team.
+
 Mon Jul 28 20:03:46 JST 2003	keiichi@iij.ad.jp
 	* kame/sys/netinet6/mip6_cncore.c,mip6_mncore.[hc],in6.c,nd6_rtr.c
 	  kame/sys/net/if_hif.[hc]
