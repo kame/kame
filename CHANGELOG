@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1241 2000/08/30 06:02:59 itojun Exp $
+$KAME: CHANGELOG,v 1.1242 2000/08/30 07:07:09 jinmei Exp $
 
 <200008>
+2000-08-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (ni6_input):
+	* kame/sys/netinet6/icmp6.c (ni6_addrs):
+	* kame/sys/netinet6/icmp6.c (ni6_store_addrs):
+	some corrections and clarfications about nodeinfo node addresses:
+	- fixed misuse of the A flag
+	- fixed a bug to produce truncated responses
+	- checked the subject address instead of ip6_dst in ni6_addrs
+	- updated comment based on the latest draft(06)
+
 Wed Aug 30 15:02:27 JST 2000  itojun@iijlab.net
 	* kame/ping6/ping6.c, sys/netinet6/in6_ifattach.c:
 	  downcase hostname/DNS name, before computing NI group address.
