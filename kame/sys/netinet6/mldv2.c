@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.9 2004/03/16 00:00:19 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.10 2004/03/16 03:15:33 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1050,17 +1050,13 @@ mld_sendbuf(mh, ifp)
 	md = mh->m_next;
 
 	/* fill src/dst here */
-	ip6 = mtod(mh, struct ip6_hdr *);
-	ip6->ip6_src = ia ? ia->ia_addr.sin6_addr : in6addr_any;
-	ip6->ip6_dst = all_v2routers_linklocal->sin6_addr;
-
 	/* set packet addresses in a full sockaddr_in6 form */
 	bzero(&src_sa, sizeof(src_sa));
 	bzero(&dst_sa, sizeof(dst_sa));
 	src_sa.sin6_family = dst_sa.sin6_family = AF_INET6;
 	src_sa.sin6_len = dst_sa.sin6_len = sizeof(struct sockaddr_in6);
-	src_sa.sin6_addr = ip6->ip6_src;
-	dst_sa.sin6_addr = ip6->ip6_dst;
+	src_sa.sin6_addr = ia ? ia->ia_addr.sin6_addr : in6addr_any;
+	dst_sa.sin6_addr = all_v2routers_linklocal->sin6_addr;
 
 	 /*
 	  * XXX: it's impossible to fail at these functions here,
@@ -1070,11 +1066,14 @@ mld_sendbuf(mh, ifp)
 		return;
 	if (in6_embedscope(&src_sa.sin6_addr, &src_sa))
 		return;
-	if (in6_addr2zoneid(ifp, &src_sa.sin6_addr, &src_sa.sin6_scope_id))
+	if (in6_addr2zoneid(ifp, &dst_sa.sin6_addr, &dst_sa.sin6_scope_id))
 		return;
 	if (in6_embedscope(&dst_sa.sin6_addr, &dst_sa))
 		return;
 
+	ip6 = mtod(mh, struct ip6_hdr *);
+	ip6->ip6_src = src_sa.sin6_addr;
+	ip6->ip6_dst = dst_sa.sin6_addr;
 	mld_rhdr = mtod(md, struct mld_report_hdr *);
 	len = sizeof(struct mld_report_hdr);
 	for (i = 0; i < mld_rhdr->mld_grpnum; i++) {
