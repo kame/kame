@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: setkey.c,v 1.9 2000/02/06 10:56:11 itojun Exp $ */
+/* KAME $Id: setkey.c,v 1.10 2000/04/16 16:11:17 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -63,6 +63,7 @@ void shortdump __P((struct sadb_msg *));
 #define MODE_SCRIPT	1
 #define MODE_CMDDUMP	2
 #define MODE_CMDFLUSH	3
+#define MODE_PROMISC	4
 
 int so;
 
@@ -137,9 +138,8 @@ main(ac, av)
 			f_hexdump = 1;
 			break;
 		case 'x':
-			f_promisc = 1;
-			promisc();
-			/*NOTREACHED*/
+			f_mode = MODE_PROMISC;
+			break;
 		case 'P':
 			f_policy = 1;
 			break;
@@ -171,8 +171,12 @@ main(ac, av)
 		if (parse(&fp))
 			exit (1);
 		break;
+	case MODE_PROMISC:
+		promisc();
+		/*NOTREACHED*/
 	default:
 		Usage();
+		/*NOTREACHED*/
 	}
 
 	exit(0);
