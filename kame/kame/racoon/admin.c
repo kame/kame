@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: admin.c,v 1.7 2000/05/11 09:38:20 sakane Exp $ */
+/* YIPS @(#)$Id: admin.c,v 1.8 2000/05/12 19:50:19 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -297,7 +297,7 @@ admin_process(so2, combuf)
 					"remote address\n"));
 
 			/* begin ident mode */
-			if (isakmp_ph1begin_i(rmconf, remote) == NULL) {
+			if (isakmp_ph1begin_i(rmconf, remote) < 0) {
 				com->ac_errno = -1;
 				break;
 			}
