@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.858 2000/05/08 08:22:00 itojun Exp $
+$Id: CHANGELOG,v 1.859 2000/05/08 14:09:40 itojun Exp $
 
 <200005>
+Mon May  8 23:08:24 JST 2000  itojun@iijlab.net
+	* libinet6/name6.c: correct resolver error code handling (h_errno,
+	  like last arg for getipnodebyname).
+
 Mon May  8 17:20:17 JST 2000  itojun@iijlab.net
 	* freebsd4: ipsec now compiles (not tested at all).
 	  brave testers wanted.
