@@ -2231,18 +2231,58 @@ EOF
 	fi
 
 
+
+	echo $ac_n "checking for if_nameindex""... $ac_c" 1>&6
+echo "configure:2237: checking for if_nameindex" >&5
+	if eval "test \"`echo '$''{'ac_cv_if_nameindex'+set}'`\" = set"; then
+  echo $ac_n "(cached) $ac_c" 1>&6
+else
+  cat > conftest.$ac_ext <<EOF
+#line 2242 "configure"
+#include "confdefs.h"
+
+#		include <sys/types.h>
+#		include <net/if.h>
+int main() {
+struct if_nameindex e; e.if_index = 0
+; return 0; }
+EOF
+if { (eval echo configure:2251: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+  rm -rf conftest*
+  ac_cv_if_nameindex=yes
+else
+  echo "configure: failed program was:" >&5
+  cat conftest.$ac_ext >&5
+  rm -rf conftest*
+  ac_cv_if_nameindex=no
+fi
+rm -f conftest*
+fi
+
+	echo "$ac_t""$ac_cv_if_nameindex" 1>&6
+	if test $ac_cv_if_nameindex = yes; then
+		cat >> confdefs.h <<\EOF
+#define HAVE_IF_NAMEINDEX 1
+EOF
+
+	fi
+
+if test "$ac_cv_if_nameindex" = no; then
+	missing_includes=yes
+fi
+
 if test "$missing_includes" = "yes"; then
 	CPPFLAGS="$CPPFLAGS -I./missing"
 fi
 
 
 	echo $ac_n "checking for h_errno""... $ac_c" 1>&6
-echo "configure:2241: checking for h_errno" >&5
+echo "configure:2281: checking for h_errno" >&5
 	if eval "test \"`echo '$''{'ac_cv_var_h_errno'+set}'`\" = set"; then
   echo $ac_n "(cached) $ac_c" 1>&6
 else
   cat > conftest.$ac_ext <<EOF
-#line 2246 "configure"
+#line 2286 "configure"
 #include "confdefs.h"
 
 #		include <sys/types.h>
@@ -2251,7 +2291,7 @@ int main() {
 int foo = h_errno;
 ; return 0; }
 EOF
-if { (eval echo configure:2255: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
+if { (eval echo configure:2295: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>&5; }; then
   rm -rf conftest*
   ac_cv_var_h_errno=yes
 else

@@ -46,6 +46,10 @@
 	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
 #define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
 
+#ifndef HAVE_IF_NAMEINDEX
+#include "ifname.h"
+#endif
+
 unsigned int
 if_nametoindex(ifname)
 	const char *ifname;

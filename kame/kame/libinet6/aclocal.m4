@@ -279,7 +279,7 @@ AC_DEFUN(AC_STRUCT_RES_STATE_EXT, [
 ])
 
 dnl
-dnl check for struct res_state_ext
+dnl check for nsort in res_state
 AC_DEFUN(AC_STRUCT_RES_STATE, [
 	AC_MSG_CHECKING(for nsort in res_state)
 	AC_CACHE_VAL($1,
@@ -313,3 +313,21 @@ AC_DEFUN(AC_VAR_H_ERRNO, [
 		AC_DEFINE(HAVE_H_ERRNO)
 	fi
 ])
+
+dnl
+dnl check for struct if_nameindex
+AC_DEFUN(AC_STRUCT_IF_NAMEINDEX, [
+	AC_MSG_CHECKING(for if_nameindex)
+	AC_CACHE_VAL($1,
+	AC_TRY_COMPILE([
+#		include <sys/types.h>
+#		include <net/if.h>],
+		[struct if_nameindex e; e.if_index = 0],
+		$1=yes,
+		$1=no))
+	AC_MSG_RESULT($$1)
+	if test $$1 = yes; then
+		AC_DEFINE(HAVE_IF_NAMEINDEX)
+	fi
+])
+

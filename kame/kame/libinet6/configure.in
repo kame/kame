@@ -129,6 +129,13 @@ dnl Checks if res_state structure has nsort member.
 AC_STRUCT_RES_STATE(ac_cv_res_state)
 
 dnl
+dnl Checks for struct if_nameindex 
+AC_STRUCT_IF_NAMEINDEX(ac_cv_if_nameindex)
+if test "$ac_cv_if_nameindex" = no; then
+	missing_includes=yes
+fi
+
+dnl
 dnl set additional include path if necessary
 if test "$missing_includes" = "yes"; then
 	CPPFLAGS="$CPPFLAGS -I./missing"
