@@ -32,8 +32,7 @@
 
 #define IN6_IS_ADDR_ROUTABLE(a) (!IN6_IS_ADDR_MULTICAST((a)) &&\
 			       !IN6_IS_ADDR_LOOPBACK((a)) &&\
-			       !IN6_IS_ADDR_LINKLOCAL((a)) &&\
-			       !IN6_IS_ADDR_SITELOCAL((a)))
+			       !IN6_IS_ADDR_LINKLOCAL((a)))
 
 byte IN6_ARE_PRFX_EQUAL __P((struct in6_addr *, struct in6_addr *, int));
 byte in6_is_addr_onlink __P((struct in6_addr *, struct ifinfo **));

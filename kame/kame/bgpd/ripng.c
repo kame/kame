@@ -39,6 +39,7 @@
 #include "ripng_var.h"
 
 int                  ripsock;              /* socket for RIPng UDP      */
+int                  rip_use_sitelocal = 0;/* if we handle site-local addrs */
 byte                 ripbuf[RIPNG_BUFSIZ];
 byte                 rippkt[RIPNG_MAXPKT]; /* should discover path MTU  */
 struct ripif        *ripifs; 
@@ -833,6 +834,12 @@ rip_process_response(ripif, nn)
 		   __FUNCTION__, ip6str(&np->rip6_dest, 0), np->rip6_plen,
 		   ripif->rip_ife->ifi_ifn->if_name);
 	    continue;  /* ignore */
+    }
+    if (!rip_use_sitelocal && IN6_IS_ADDR_SITELOCAL(&np->rip6_dest)) {
+	    syslog(LOG_NOTICE,
+		   "<%s>: site-local prefix(%s/%d) on %s(discard)",
+		   __FUNCTION__, ip6str(&np->rip6_dest, 0), np->rip6_plen,
+		   ripif->rip_ife->ifi_ifn->if_name);
     }
 
     if (np->rip6_metric == 0 ||
@@ -1938,10 +1945,21 @@ rip_output_filter(struct ripif *ripif, struct ripinfo6 *ripinfo)
 		syslog(LOG_DEBUG, "<%s>: Default route on %s was ignored",
 		       __FUNCTION__, ifname);
 #endif
+		ripif->rip_filtered_outdef++;
 		return(1);
 	}
 
-	/* 4th step: generic filter */
+	/* 4th step: filter site-local */
+	if (!rip_use_sitelocal && IN6_IS_ADDR_SITELOCAL(&ripinfo->rip6_dest)) {
+#ifdef DEBUG_RIP
+		syslog(LOG_DEBUG, "<%s>: site-local prefix(%s/%d) was ignored",
+		       __FUNCTION__, ip6str(&ripinfo->rip6_dest, 0),
+		       ripinfo->rip6_plen);
+#endif
+		return(1);
+	}
+
+	/* 5th step: generic filter */
 	if (ripif->rip_filterout) {
 		struct filtinfo *filter;
 

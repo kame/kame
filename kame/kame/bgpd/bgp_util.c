@@ -1214,3 +1214,43 @@ free_bgpcb_list(head)
 		d = next;
 	}
 }
+
+/*
+ * Check an incoming BGP route to be filtered or not.
+ * XXX: currently only site-local addresses are filtered.
+ */
+int
+bgp_input_filter(bnp, rte)
+	struct rpcb *bnp;	/* unused */
+	struct rt_entry *rte;
+{
+	if (IN6_IS_ADDR_SITELOCAL(&rte->rt_ripinfo.rip6_dest)) {
+		syslog(LOG_NOTICE,
+		       "<%s>: site-local prefix(%s/%d) from %s was discarded",
+		       __FUNCTION__, ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+		       rte->rt_ripinfo.rip6_plen, bgp_peerstr(bnp));
+		return 1;	/* to be filtered */
+	}
+
+	return 0;		/* accept it */
+}
+
+/*
+ * Check an outoging BGP route to be filtered or not.
+ * XXX: currently only site-local addresses are filtered.
+ */
+int
+bgp_output_filter(bnp, rte)
+	struct rpcb *bnp;
+	struct rt_entry *rte;
+{
+	if (IN6_IS_ADDR_SITELOCAL(&rte->rt_ripinfo.rip6_dest)) {
+		syslog(LOG_NOTICE,
+		       "<%s>: site-local prefix(%s/%d) to %s was filtered",
+		       __FUNCTION__, ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+		       rte->rt_ripinfo.rip6_plen, bgp_peerstr(bnp));
+		return 1;	/* to be filtered */
+	}
+
+	return 0;		/* accept it */
+}

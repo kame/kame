@@ -101,7 +101,8 @@ ifconfig()
       }
 
       if (!IN6_IS_ADDR_UNSPECIFIED(&sin->sin6_addr) &&
-	   IN6_IS_ADDR_ROUTABLE(&sin->sin6_addr)) {
+	  !IN6_IS_ADDR_SITELOCAL(&sin->sin6_addr) && /* should keep this? */
+	  IN6_IS_ADDR_ROUTABLE(&sin->sin6_addr)) {
 	if ((ife = find_if_by_name(ifrp->ifr_name)) == NULL) { /* ifreq */
 	  /* new interface */
 	  MALLOC(ife,          struct ifinfo);

@@ -96,7 +96,9 @@
 #define C_NEXTHOPSELF	39
 #define C_LOCALADDR	40
 
-#define C_BGP_SBSIZE	41
+#define C_SITELOCAL	41
+
+#define C_BGP_SBSIZE	42
 
 #define PARSE_MAX_BITS   C_BGP_SBSIZE
 
@@ -149,6 +151,8 @@ char *sysatom[] = {
 
   "nexthopself",
   "lcladdr",
+
+  "sitelocal",
 
   "bgpsbsize"
 };
@@ -717,11 +721,40 @@ conf_check(char *filename)
 	    fatalx("interface misconfigure");
 	  }
 	  SENTENCE_END(i);
-	} else 
+	} else
+	  /* "sitelocal [yes|no]" */
+	  if (strncasecmp(&buf[i], sysatom[C_SITELOCAL],
+			  strlen(sysatom[C_SITELOCAL])) == 0) {
+	    if (bit_test(parsedflag, C_SITELOCAL)) {
+	      syslog(LOG_ERR,
+		     "%s:%d %s doubly defined", filename, line,
+		     sysatom[C_SITELOCAL]);
+	      fatalx("<conf_check>: doubly defined");
+	    }
+	    bit_set(parsedflag, C_SITELOCAL);
+	    
+	    i += strlen(sysatom[C_SITELOCAL]);
+	    SKIP_WHITE(i);
+
+	    if (strncasecmp(&buf[i], sysatom[C_YES], strlen(sysatom[C_YES]))
+		== 0) {
+	      rip_use_sitelocal = 1;
+	      i += strlen(sysatom[C_YES]);
+	    } else if (strncasecmp(&buf[i], sysatom[C_YES],
+				   strlen(sysatom[C_NO])) == 0) {
+	      rip_use_sitelocal = 0;
+	      i += strlen(sysatom[C_NO]);
+	    }
+	    else {
+	      syslog(LOG_ERR, "%s:%d syntax error", filename, line);
+	      fatalx("<conf_check>: syntax error");
+	    }
+
+	    SENTENCE_END(i);
+	}
+	else
 	  break;
       } /* end-of-while */
-
-      
 
       if (buf[i++] != '}') {
 	syslog(LOG_ERR,

@@ -1250,6 +1250,11 @@ bgp_process_update(struct rpcb *bnp)
 	  free(rte);
 	  continue;  /* to next rte */
 	}
+
+	if (bgp_input_filter(bnp, rte)) {
+	  free(rte);
+	  continue;		/* to next rte */
+	}
 	
 	if (rte->rt_ripinfo.rip6_plen == 128) {
 	  ife = ifentry;

@@ -51,3 +51,5 @@ void             rip_erase_rte     __P((struct rt_entry *));
 
 struct ripif    *find_rip_by_index __P((u_int));
 int rip_output_filter __P((struct ripif *ripif, struct ripinfo6 *ripinfo));
+
+extern int rip_use_sitelocal;

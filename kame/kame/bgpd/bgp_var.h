@@ -156,3 +156,9 @@ struct rt_entry *rte_remove   __P((struct rt_entry *, struct rt_entry *));
 
 #define BGP_DEF_LOCALPREF       100   /* like cisco, gated, at least */
 #define BGP_DEF_ASPREPEND	1 /* number of iteration of prepended AS(if enabled) */
+
+/*
+ * filter
+ */
+int bgp_input_filter __P((struct rpcb *, struct rt_entry *));
+int bgp_output_filter __P((struct rpcb *, struct rt_entry *));

@@ -780,6 +780,9 @@ bgp_send_update(bnp, rte, headrte)
 	IN6_IS_ADDR_UNSPECIFIED(&rte->rt_ripinfo.rip6_dest))
       goto next_rte;
 
+    /* generic filter */
+    if (bgp_output_filter(bnp, rte))
+      goto next_rte;
 
     agg = rt->rt_aggr.ag_agg;  /* (1998/06/12) */
 
@@ -1055,6 +1058,9 @@ bgp_send_withdrawn(bnp, rte, headrte)
     while(1) {
       int pbytes;     /* (minimum len in octet bound) */
 
+      if (bgp_output_filter(bnp, rt))
+	goto next_rte;
+
       outpkt[i++] = rt->rt_ripinfo.rip6_plen;
 #ifdef DEBUG_BGP
       syslog(LOG_NOTICE, "BGP+ SEND MP_UNREACH\t\t%s/%d to %s",
@@ -1071,6 +1077,8 @@ bgp_send_withdrawn(bnp, rte, headrte)
       }
       memcpy(&outpkt[i], rt->rt_ripinfo.rip6_dest.s6_addr, pbytes);
       i += pbytes;
+
+    next_rte:
 
       if (rt->rt_next == headrte ||
 	  !equal_aspath(rt->rt_aspath, rt->rt_next->rt_aspath))
