@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.251 2001/12/04 10:25:12 keiichi Exp $	*/
+/*	$KAME: in6.c,v 1.252 2001/12/07 06:10:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1682,7 +1682,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 	/* sanity checks */
 	if (!data || !ifp) {
 		panic("invalid argument to in6_lifaddr_ioctl");
-		/* NOTRECHED */
+		/* NOTREACHED */
 	}
 
 	switch (cmd) {
