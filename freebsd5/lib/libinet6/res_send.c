@@ -942,7 +942,7 @@ res_send(buf, buflen, ans, anssiz)
 	u_char *ans;
 	int anssiz;
 {
-	res_send_timeout(buf, buflen, ans, anssiz, NULL);
+	return (res_send_timeout(buf, buflen, ans, anssiz, NULL));
 }
 
 /*
