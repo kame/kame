@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.85 2002/01/11 10:10:18 k-sugyou Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.86 2002/01/21 02:33:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -876,7 +876,7 @@ nd6_na_input(m, off, icmp6len)
 	ln->ln_asked = 0;
 	if (ln->ln_hold) {
 		/*
-		 * we assume ifp is not a p2p here, so just set the 2nd
+		 * we assume ifp is not a loopback here, so just set the 2nd
 		 * argument as the 1st one.
 		 */
 		nd6_output(ifp, ifp, ln->ln_hold,
