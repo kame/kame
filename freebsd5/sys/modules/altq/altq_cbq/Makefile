@@ -2,7 +2,6 @@
 .PATH:	${.CURDIR}/../../../altq
 KMOD=	altq_cbq
 SRCS=	altq_cbq.c altq_rmclass.c opt_altq.h opt_inet.h opt_inet6.h
-MODULE_DEPEND=	altq_red altq_rio
 
 CFLAGS+= -DALTQ
 CLEANFILES+= opt_altq.h opt_inet.h opt_inet6.h

@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.c,v 1.14 2003/02/08 18:24:16 kjc Exp $	*/
+/*	$KAME: altq_cbq.c,v 1.15 2003/02/13 12:20:29 kjc Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -978,6 +978,8 @@ static struct altqsw cbq_sw =
 	{"cbq", cbqopen, cbqclose, cbqioctl};
 
 ALTQ_MODULE(altq_cbq, ALTQT_CBQ, &cbq_sw);
+MODULE_DEPEND(altq_cbq, altq_red, 1, 1, 1);
+MODULE_DEPEND(altq_cbq, altq_rio, 1, 1, 1);
 
 #endif /* KLD_MODULE */
 

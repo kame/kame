@@ -1,4 +1,4 @@
-/*	$KAME: altq_priq.c,v 1.7 2003/02/08 18:24:16 kjc Exp $	*/
+/*	$KAME: altq_priq.c,v 1.8 2003/02/13 12:20:29 kjc Exp $	*/
 /*
  * Copyright (C) 2000-2002
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -878,6 +878,8 @@ static struct altqsw priq_sw =
 	{"priq", priqopen, priqclose, priqioctl};
 
 ALTQ_MODULE(altq_priq, ALTQT_PRIQ, &priq_sw);
+MODULE_DEPEND(altq_priq, altq_red, 1, 1, 1);
+MODULE_DEPEND(altq_priq, altq_rio, 1, 1, 1);
 
 #endif /* KLD_MODULE */
 

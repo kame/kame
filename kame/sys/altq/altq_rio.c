@@ -1,4 +1,4 @@
-/*	$KAME: altq_rio.c,v 1.15 2003/02/08 18:24:17 kjc Exp $	*/
+/*	$KAME: altq_rio.c,v 1.16 2003/02/13 12:20:29 kjc Exp $	*/
 
 /*
  * Copyright (C) 1998-2002
@@ -836,6 +836,8 @@ static struct altqsw rio_sw =
 	{"rio", rioopen, rioclose, rioioctl};
 
 ALTQ_MODULE(altq_rio, ALTQT_RIO, &rio_sw);
+MODULE_VERSION(altq_rio, 1);
+MODULE_DEPEND(altq_rio, altq_red, 1, 1, 1);
 
 #endif /* KLD_MODULE */
 

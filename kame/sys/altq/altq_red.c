@@ -1,4 +1,4 @@
-/*	$KAME: altq_red.c,v 1.15 2003/02/08 18:24:16 kjc Exp $	*/
+/*	$KAME: altq_red.c,v 1.16 2003/02/13 12:20:29 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -1475,6 +1475,7 @@ static struct altqsw red_sw =
 	{"red", redopen, redclose, redioctl};
 
 ALTQ_MODULE(altq_red, ALTQT_RED, &red_sw);
+MODULE_VERSION(altq_red, 1);
 
 #endif /* KLD_MODULE */
 

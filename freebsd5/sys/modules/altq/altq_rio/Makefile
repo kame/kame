@@ -3,6 +3,12 @@
 KMOD=	altq_rio
 SRCS=	altq_rio.c opt_altq.h opt_inet.h opt_inet6.h
 
+EXPORT_SYMS=	rio_alloc	\
+		rio_destroy	\
+		rio_getstats	\
+		rio_addq	\
+		rio_getq
+
 CFLAGS+= -DALTQ
 CLEANFILES+= opt_altq.h opt_inet.h opt_inet6.h
 

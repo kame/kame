@@ -3,6 +3,17 @@
 KMOD=	altq_red
 SRCS=	altq_red.c opt_altq.h opt_inet.h opt_inet6.h
 
+EXPORT_SYMS=	red_alloc	\
+		red_destroy	\
+		red_getstats	\
+		red_addq	\
+		red_getq	\
+		drop_early	\
+		mark_ecn	\
+		wtab_alloc	\
+		wtab_destroy	\
+		pow_w
+
 CFLAGS+= -DALTQ
 CLEANFILES+= opt_altq.h opt_inet.h opt_inet6.h
 

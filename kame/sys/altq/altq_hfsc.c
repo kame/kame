@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.c,v 1.19 2003/02/08 18:24:16 kjc Exp $	*/
+/*	$KAME: altq_hfsc.c,v 1.20 2003/02/13 12:20:29 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -2059,6 +2059,8 @@ static struct altqsw hfsc_sw =
 	{"hfsc", hfscopen, hfscclose, hfscioctl};
 
 ALTQ_MODULE(altq_hfsc, ALTQT_HFSC, &hfsc_sw);
+MODULE_DEPEND(altq_hfsc, altq_red, 1, 1, 1);
+MODULE_DEPEND(altq_hfsc, altq_rio, 1, 1, 1);
 
 #endif /* KLD_MODULE */
 
