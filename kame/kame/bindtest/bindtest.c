@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.22 2001/05/08 02:12:13 jinmei Exp $	*/
+/*	$KAME: bindtest.c,v 1.23 2001/05/08 02:31:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -188,7 +188,7 @@ main(argc, argv)
 	printf("%s", v6only ? ", V6ONLY" : "");
 #endif
 	if (socktype == SOCK_STREAM && (connect1st != 0 || connect2nd != 0))
-		printf(" , connect to %s", (connect1st != 0) ? "1st" : "2nd");
+		printf(", connect to %s", (connect1st != 0) ? "1st" : "2nd");
 	putchar('\n');
 	if (summary) {
 		for (testi = testitems; testi->name; testi++)
