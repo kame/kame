@@ -823,7 +823,7 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 	int cmd;
 	void (*notify) __P((struct in6pcb *, int));
 {
-	struct in6pcb *in6p, *oin6p;
+	struct in6pcb *in6p, *nin6p;
 	struct in6_addr faddr6;
 	u_short	fport = fport_arg, lport = lport_arg;
 	int errno;
@@ -855,29 +855,46 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 		 * Keep the old notify function to store a soft error
 		 * in each PCB.
 		 */
-		if (cmd == PRC_HOSTDEAD)
+		if (cmd == PRC_HOSTDEAD && notify != in6_rtchange)
 			notify2 = notify;
 
 		notify = in6_rtchange;
 	}
-	if (notify == NULL)
+
+	if (notify == NULL && notify2 == NULL)
 		return 0;
+
 	errno = inet6ctlerrmap[cmd];
-	for (in6p = head->in6p_next; in6p != head;) {
-		if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr,&faddr6) ||
-		   in6p->in6p_socket == 0 ||
-		   (lport && in6p->in6p_lport != lport) ||
-		   (!IN6_IS_ADDR_UNSPECIFIED(laddr6) &&
-		    !IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, laddr6)) ||
-		   (fport && in6p->in6p_fport != fport)) {
+	for (in6p = head->in6p_next; in6p != head; in6p = nin6p) {
+		nin6p = in6p->in6p_next;
+
+		if (notify == in6_rtchange) {
+			/*
+			 * Since a non-connected PCB might have a cached route,
+			 * we always call in6_rtchange without matching
+			 * the PCB to the src/dst pair.
+			 *
+			 * XXX: we assume in6_rtchange does not free the PCB.
+			 */
+			if (IN6_ARE_ADDR_EQUAL(&in6p->in6p_route.ro_dst.sin6_addr,
+					       &faddr6))
+				in6_rtchange(in6p, errno);
+
+			if (notify2 != NULL)
+				continue;
+		}
+
+		if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, &faddr6) ||
+		    in6p->in6p_socket == 0 ||
+		    (lport && in6p->in6p_lport != lport) ||
+		    (!IN6_IS_ADDR_UNSPECIFIED(laddr6) &&
+		     !IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, laddr6)) ||
+		    (fport && in6p->in6p_fport != fport)) {
 			in6p = in6p->in6p_next;
 			continue;
 		}
-		oin6p = in6p;
-		in6p = in6p->in6p_next;
-		(*notify)(oin6p, errno);
 		if (notify2)
-			(*notify2)(oin6p, errno);
+			(*notify2)(in6p, errno);
 		nmatch++;
 	}
 	return nmatch;
