@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.176 2002/11/05 03:48:32 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.177 2003/01/08 05:25:57 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -57,6 +57,7 @@
 #include <net/if_dl.h>
 #include <net/if_types.h>
 #include <net/route.h>
+#include <net/if_stf.h>
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
@@ -614,6 +615,19 @@ in6_ifattach_linklocal(ifp, altifp)
 	if ((ifp->if_flags & IFF_LOOPBACK) != 0) {
 		ifra.ifra_addr.sin6_addr.s6_addr32[2] = 0;
 		ifra.ifra_addr.sin6_addr.s6_addr32[3] = htonl(1);
+	} else if (ifp->if_type == IFT_STF) {
+		if (!STF_IS_ISATAP(ifp)) {
+			nd6log((LOG_ERR,
+			    "%s: 6to4 I/F cannot have linklocal address\n",
+			    if_name(ifp)));
+			return (-1);
+		}
+
+		/* ToDo: automatically fetches an IPv4 address for ISATAP */
+		nd6log((LOG_ERR,
+		    "%s: ISATAP I/F needs static linklocal addressing\n",
+		    if_name(ifp)));
+		return (0);
 	} else {
 		if (get_ifid(ifp, altifp, &ifra.ifra_addr.sin6_addr) != 0) {
 			nd6log((LOG_ERR,
@@ -897,6 +911,7 @@ in6_ifattach(ifp, altifp)
 	switch (ifp->if_type) {
 #ifdef IFT_VRRP
 	case IFT_VRRP:
+		return;
 #endif
 #ifdef IFT_STF
 	case IFT_STF:
@@ -906,7 +921,8 @@ in6_ifattach(ifp, altifp)
 		 * linklocals for 6to4 interface, but there's no use and
 		 * it is rather harmful to have one.
 		 */
-		return;
+		if (STF_IS_6TO4(ifp))
+			return;
 #endif
 	default:
 		break;

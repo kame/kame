@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.135 2002/11/05 03:48:32 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.136 2003/01/08 05:25:56 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -694,10 +694,11 @@ struct ip6_mtuinfo {
 #define IPV6CTL_USE_DEFAULTZONE	39	/* use default scope zone */
 #define IPV6CTL_PMTU_EXPIRE	40	/* path MTU expiration timer */
 #define IPV6CTL_MAXFRAGS	41	/* max fragments */
+#define IPV6CTL_ISATAPRTR	42	/* ISATAP router list */
 
 /* New entries should be added here from current IPV6CTL_MAXID value. */
 /* to define items, should talk with KAME guys first, for *BSD compatibility */
-#define IPV6CTL_MAXID		42
+#define IPV6CTL_MAXID		43
 
 #ifdef IPV6CTL_RTEXPIRE
 #define __IPV6CTL_NAMES_RTEXPIRE	"rtexpire"
