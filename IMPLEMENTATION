@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.368 2004/04/08 03:12:00 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.369 2004/04/13 12:51:34 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -211,6 +211,8 @@ RFC3493: Basic Socket Interface Extensions for IPv6
 	- supported but turned off by default on KAME/NetBSD and KAME/FreeBSD5,
 	- not supported on KAME/FreeBSD228, KAME/OpenBSD and KAME/BSDI3.
       see 1.12 in this document for details.
+    * The AI_ALL and AI_V4MAPPED flags are not supported.  The AI_ADDRCONF flag
+      is not yet implemented.
 RFC3542: Advanced Sockets API for IPv6 (revised)
     * For supported library functions/kernel APIs, see sys/netinet6/ADVAPI.
     * Some of the updates in the draft are not implemented yet.  See
