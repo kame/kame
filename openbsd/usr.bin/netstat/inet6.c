@@ -869,6 +869,7 @@ icmp6_stats(off, name)
 
 	p(icp6s_reflect, "\t%qu message response%s generated\n");
 	p(icp6s_nd_toomanyopt, "\t%qu message%s with too many ND options\n");
+	p(icp6s_pmtuchg, "\t%llu path MTU change%s\n");
 #undef p_5
 #undef p
 }
