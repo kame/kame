@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.42 2003/11/11 19:05:25 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.43 2003/12/05 01:35:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -2146,7 +2146,7 @@ mip6_bu_send_hoti(mbu)
 		return (ENOMEM);
 	}
 
-	error = mip6_ip6mhi_create(&opt.ip6po_mobility, mbu);
+	error = mip6_ip6mhi_create(&opt.ip6po_mh, mbu);
 	if (error) {
 		mip6log((LOG_ERR,
 		    "%s:%d: HoTI creation error (%d)\n",
@@ -2169,8 +2169,8 @@ mip6_bu_send_hoti(mbu)
 	}
 
  free_ip6pktopts:
-	if (opt.ip6po_mobility)
-		FREE(opt.ip6po_mobility, M_IP6OPT);
+	if (opt.ip6po_mh)
+		FREE(opt.ip6po_mh, M_IP6OPT);
 
 	return (0);
 }
@@ -2195,7 +2195,7 @@ mip6_bu_send_coti(mbu)
 		return (ENOMEM);
 	}
 
-	error = mip6_ip6mci_create(&opt.ip6po_mobility, mbu);
+	error = mip6_ip6mci_create(&opt.ip6po_mh, mbu);
 	if (error) {
 		mip6log((LOG_ERR,
 		    "%s:%d: CoTI creation error (%d)\n",
@@ -2218,8 +2218,8 @@ mip6_bu_send_coti(mbu)
 	}
 
  free_ip6pktopts:
-	if (opt.ip6po_mobility)
-		FREE(opt.ip6po_mobility, M_IP6OPT);
+	if (opt.ip6po_mh)
+		FREE(opt.ip6po_mh, M_IP6OPT);
 
 	return (0);
 }
@@ -2276,7 +2276,7 @@ mip6_bu_send_bu(mbu)
 	ip6_initpktopts(&opt);
 
 	/* create a binding update mobility header. */
-	error = mip6_ip6mu_create(&opt.ip6po_mobility, &mbu->mbu_haddr,
+	error = mip6_ip6mu_create(&opt.ip6po_mh, &mbu->mbu_haddr,
 	    &mbu->mbu_paddr, mbu->mbu_hif);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -2307,8 +2307,8 @@ mip6_bu_send_bu(mbu)
 	}
 
  free_ip6pktopts:
-	if (opt.ip6po_mobility)
-		FREE(opt.ip6po_mobility, M_IP6OPT);
+	if (opt.ip6po_mh)
+		FREE(opt.ip6po_mh, M_IP6OPT);
 
  bu_send_bu_end:
 	return (error);
@@ -2335,7 +2335,7 @@ mip6_bu_send_cbu(mbu)
 		return (ENOMEM);
 	}
 
-	error = mip6_ip6mu_create(&opt.ip6po_mobility, &mbu->mbu_haddr,
+	error = mip6_ip6mu_create(&opt.ip6po_mh, &mbu->mbu_haddr,
 	    &mbu->mbu_paddr, mbu->mbu_hif);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -2360,8 +2360,8 @@ mip6_bu_send_cbu(mbu)
 	}
 
  free_ip6pktopts:
-	if (opt.ip6po_mobility)
-		FREE(opt.ip6po_mobility, M_IP6OPT);
+	if (opt.ip6po_mh)
+		FREE(opt.ip6po_mh, M_IP6OPT);
 
 	return (error);
 }
@@ -2789,7 +2789,7 @@ mip6_align_destopt(buf)
 int
 mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 	struct mbuf *m;
-	struct ip6m_home_test *ip6mh;
+	struct ip6_mh_home_test *ip6mh;
 	int ip6mhlen;
 {
 	struct sockaddr_in6 src_sa, dst_sa;
@@ -2806,7 +2806,7 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 	}
 
 	/* packet length check. */
-	if (ip6mhlen < sizeof(struct ip6m_home_test)) {
+	if (ip6mhlen < sizeof(struct ip6_mh_home_test)) {
 		mip6log((LOG_NOTICE,
 			 "%s:%d: too short home test (len = %d) "
 			 "from host %s.\n",
@@ -2816,7 +2816,7 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 		ip6stat.ip6s_toosmall++;
 		/* send ICMP parameter problem. */
 		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
-		    (caddr_t)&ip6mh->ip6mh_len - (caddr_t)mtod(m, struct ip6_hdr *));
+		    (caddr_t)&ip6mh->ip6mhht_len - (caddr_t)mtod(m, struct ip6_hdr *));
 		return (EINVAL);
 	}
 
@@ -2842,8 +2842,8 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 	}
 
 	/* check mobile cookie. */
-	if (bcmp(&mbu->mbu_mobile_cookie, ip6mh->ip6mh_cookie,
-	    sizeof(ip6mh->ip6mh_cookie)) != 0) {
+	if (bcmp(&mbu->mbu_mobile_cookie, ip6mh->ip6mhht_cookie8,
+	    sizeof(ip6mh->ip6mhht_cookie8)) != 0) {
 		mip6log((LOG_INFO,
 		    "%s:%d: home init cookie mismatch from %s.\n",
 		    __FILE__, __LINE__, ip6_sprintf(&src_sa.sin6_addr)));
@@ -2861,7 +2861,7 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 		return (error);
 	}
 
-	mbu->mbu_home_nonce_index = ntohs(ip6mh->ip6mh_nonce_index);
+	mbu->mbu_home_nonce_index = ntohs(ip6mh->ip6mhht_nonce_index);
 	mip6log((LOG_INFO,
 		 "%s:%d: Got HoT Nonce index: %d.\n",
 		 __FILE__, __LINE__,mbu->mbu_home_nonce_index));
@@ -2872,7 +2872,7 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 int
 mip6_ip6mc_input(m, ip6mc, ip6mclen)
 	struct mbuf *m;
-	struct ip6m_careof_test *ip6mc;
+	struct ip6_mh_careof_test *ip6mc;
 	int ip6mclen;
 {
 	struct sockaddr_in6 src_sa, dst_sa;
@@ -2895,7 +2895,7 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 	}
 
 	/* packet length check. */
-	if (ip6mclen < sizeof(struct ip6m_careof_test)) {
+	if (ip6mclen < sizeof(struct ip6_mh_careof_test)) {
 		mip6log((LOG_NOTICE,
 			 "%s:%d: too short care-of test (len = %d) "
 			 "from host %s.\n",
@@ -2905,7 +2905,7 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 		ip6stat.ip6s_toosmall++;
 		/* send ICMP parameter problem. */
 		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
-		    (caddr_t)&ip6mc->ip6mc_len - (caddr_t)mtod(m, struct ip6_hdr *));
+		    (caddr_t)&ip6mc->ip6mhct_len - (caddr_t)mtod(m, struct ip6_hdr *));
 		return (EINVAL);
 	}
 
@@ -2932,8 +2932,8 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 	}
 
 	/* check mobile cookie. */
-	if (bcmp(&mbu->mbu_mobile_cookie, ip6mc->ip6mc_cookie,
-	    sizeof(ip6mc->ip6mc_cookie)) != 0) {
+	if (bcmp(&mbu->mbu_mobile_cookie, ip6mc->ip6mhct_cookie8,
+	    sizeof(ip6mc->ip6mhct_cookie8)) != 0) {
 		mip6log((LOG_INFO,
 		    "%s:%d: careof init cookie mismatch from %s.\n",
 		    __FILE__, __LINE__, ip6_sprintf(&src_sa.sin6_addr)));
@@ -2951,7 +2951,7 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 		return (error);
 	}
 
-	mbu->mbu_careof_nonce_index = ntohs(ip6mc->ip6mc_nonce_index);
+	mbu->mbu_careof_nonce_index = ntohs(ip6mc->ip6mhct_nonce_index);
 	mip6log((LOG_INFO,
 		 "%s:%d: Got CoT Nonce index: %d.\n",
 		 __FILE__, __LINE__, mbu->mbu_careof_nonce_index));
@@ -2962,7 +2962,7 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 int
 mip6_ip6ma_input(m, ip6ma, ip6malen)
 	struct mbuf *m;
-	struct ip6m_binding_ack *ip6ma;
+	struct ip6_mh_binding_ack *ip6ma;
 	int ip6malen;
 {
 	struct ip6_hdr *ip6;
@@ -2999,7 +2999,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	}
 
 	/* packet length check. */
-	if (ip6malen < sizeof(struct ip6m_binding_ack)) {
+	if (ip6malen < sizeof(struct ip6_mh_binding_ack)) {
 		mip6log((LOG_NOTICE,
 			 "%s:%d: too short binding ack (len = %d) "
 			 "from host %s.\n",
@@ -3009,7 +3009,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 		ip6stat.ip6s_toosmall++;
 		/* send ICMP parameter problem. */
 		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
-		    (caddr_t)&ip6ma->ip6ma_len - (caddr_t)ip6);
+		    (caddr_t)&ip6ma->ip6mhba_len - (caddr_t)ip6);
 		return (EINVAL);
 	}
 
@@ -3025,7 +3025,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	}
 #endif
 
-	if ((error = mip6_get_mobility_options((struct ip6_mobility *)ip6ma,
+	if ((error = mip6_get_mobility_options((struct ip6_mh *)ip6ma,
 					       sizeof(*ip6ma),
 					       ip6malen, &mopt))) {
 		m_freem(m);
@@ -3047,7 +3047,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 		 "\20\5REFRESH\4AUTH\3NONCE\2ALTCOA\1UID\n"));
 #endif
 
-	mip6stat.mip6s_ba_hist[ip6ma->ip6ma_status]++;
+	mip6stat.mip6s_ba_hist[ip6ma->ip6mhba_status]++;
 
 	/*
          * check if the sequence number of the binding update sent ==
@@ -3085,8 +3085,8 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 		int ignore_co_nonce;
 		ignore_co_nonce = SA6_ARE_ADDR_EQUAL(&mbu->mbu_haddr, &mbu->mbu_coa);
 
-		cksum_backup = ip6ma->ip6ma_cksum;
-		ip6ma->ip6ma_cksum = 0;
+		cksum_backup = ip6ma->ip6mhba_cksum;
+		ip6ma->ip6mhba_cksum = 0;
 		/* Calculate Kbm */
 		mip6_calculate_kbm(&mbu->mbu_home_token,
 				   ignore_co_nonce ? NULL : &mbu->mbu_careof_token,
@@ -3097,7 +3097,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 			(caddr_t)ip6ma, ip6malen,
 			(caddr_t)mopt.mopt_auth + 2 - (caddr_t)ip6ma,
 			min(MOPT_AUTH_LEN(&mopt) + 2, MIP6_AUTHENTICATOR_LEN)) == 0) {
-			ip6ma->ip6ma_cksum = cksum_backup;
+			ip6ma->ip6mhba_cksum = cksum_backup;
 			if (bcmp(authdata, mopt.mopt_auth + 2,
 				 min(MOPT_AUTH_LEN(&mopt) + 2, MIP6_AUTHENTICATOR_LEN))
 				 == 0)
@@ -3126,8 +3126,8 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 
  accept_binding_ack:
 
-	seqno = htons(ip6ma->ip6ma_seqno);
-	if (ip6ma->ip6ma_status == IP6MA_STATUS_SEQNO_TOO_SMALL) {
+	seqno = htons(ip6ma->ip6mhba_seqno);
+	if (ip6ma->ip6mhba_status == IP6_MH_BAS_SEQNO_BAD) {
                 /*
                  * our home agent has a greater sequence number in its
                  * binging cache entriy of mine.  we should resent
@@ -3163,20 +3163,20 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
                          __FILE__, __LINE__));
 	}
 
-	if (ip6ma->ip6ma_status >= IP6MA_STATUS_ERRORBASE) {
+	if (ip6ma->ip6mhba_status >= IP6_MH_BAS_ERRORBASE) {
                 mip6log((LOG_NOTICE,
                          "%s:%d: a binding update was rejected "
 			 "(error code %d).\n",
-                         __FILE__, __LINE__, ip6ma->ip6ma_status));
-		if (ip6ma->ip6ma_status == IP6MA_STATUS_NOT_HOME_AGENT &&
+                         __FILE__, __LINE__, ip6ma->ip6mhba_status));
+		if (ip6ma->ip6mhba_status == IP6_MH_BAS_NOT_HA &&
 		    mbu->mbu_flags & IP6MU_HOME &&
 		    mbu->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITA) {
 			/* XXX no registration? */
 			goto success;
 		}
-		if (ip6ma->ip6ma_status == IP6MA_STATUS_SEQNO_TOO_SMALL) {
+		if (ip6ma->ip6mhba_status == IP6_MH_BAS_SEQNO_BAD) {
 			/* seqno is too small.  adjust it and resend. */
-			mbu->mbu_seqno = ntohs(ip6ma->ip6ma_seqno) + 1;
+			mbu->mbu_seqno = ntohs(ip6ma->ip6mhba_seqno) + 1;
 			/* XXX */
 			mip6_bu_send_bu(mbu);
 			return (0);
@@ -3201,7 +3201,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	 */
 
 	/* update lifetime and refresh time. */
-	lifetime = htons(ip6ma->ip6ma_lifetime) << 2;	/* units of 4 secs */
+	lifetime = htons(ip6ma->ip6mhba_lifetime) << 2;	/* units of 4 secs */
 	if (lifetime < mbu->mbu_lifetime) {
 		mbu->mbu_expire -= (mbu->mbu_lifetime - lifetime);
 		if (mbu->mbu_expire < time_second)
@@ -3221,7 +3221,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
         if (mbu->mbu_refresh > mbu->mbu_expire)
                 mbu->mbu_refresh = mbu->mbu_expire;
 
-	if (ip6ma->ip6ma_status == IP6MA_STATUS_PREFIX_DISC) {
+	if (ip6ma->ip6mhba_status == IP6_MH_BAS_PRFX_DISCOV) {
 		/* XXX; Need prefix discovery */
 	}
 
@@ -3404,7 +3404,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 int
 mip6_ip6mr_input(m, ip6mr, ip6mrlen)
 	struct mbuf *m;
-	struct ip6m_binding_request *ip6mr;
+	struct ip6_mh_binding_request *ip6mr;
 	int ip6mrlen;
 {
 	struct sockaddr_in6 src_sa, dst_sa;
@@ -3421,7 +3421,7 @@ mip6_ip6mr_input(m, ip6mr, ip6mrlen)
 	}
 
 	/* packet length check. */
-	if (ip6mrlen < sizeof (struct ip6m_binding_request)) {
+	if (ip6mrlen < sizeof (struct ip6_mh_binding_request)) {
 		mip6log((LOG_NOTICE,
 		    "%s:%d: too short binding request (len = %d) "
 		    "from host %s.\n",
@@ -3430,7 +3430,7 @@ mip6_ip6mr_input(m, ip6mr, ip6mrlen)
 		ip6stat.ip6s_toosmall++;
 		/* send ICMP parameter problem. */
 		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
-		    (caddr_t)&ip6mr->ip6mr_len - (caddr_t)mtod(m, struct ip6_hdr *));
+		    (caddr_t)&ip6mr->ip6mhbr_len - (caddr_t)mtod(m, struct ip6_hdr *));
 		return(EINVAL);
 	}
 
@@ -3466,7 +3466,7 @@ mip6_ip6mr_input(m, ip6mr, ip6mrlen)
 int
 mip6_ip6me_input(m, ip6me, ip6melen)
 	struct mbuf *m;
-	struct ip6m_binding_error *ip6me;
+	struct ip6_mh_binding_error *ip6me;
 	int ip6melen;
 {
 	struct sockaddr_in6 src_sa;
@@ -3485,7 +3485,7 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 	}
 
 	/* packet length check. */
-	if (ip6melen < sizeof (struct ip6m_binding_error)) {
+	if (ip6melen < sizeof (struct ip6_mh_binding_error)) {
 		mip6log((LOG_NOTICE,
 		    "%s:%d: too short binding error (len = %d) "
 		    "from host %s.\n",
@@ -3494,7 +3494,7 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 		ip6stat.ip6s_toosmall++;
 		/* send ICMP parameter problem. */
 		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
-		    (caddr_t)&ip6me->ip6me_len - (caddr_t)mtod(m, struct ip6_hdr *));
+		    (caddr_t)&ip6me->ip6mhbe_len - (caddr_t)mtod(m, struct ip6_hdr *));
 		return(EINVAL);
 	}
 
@@ -3502,7 +3502,7 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 	bzero (&hoa, sizeof (hoa));
 	hoa.sin6_len = sizeof (hoa);
 	hoa.sin6_family = AF_INET6;
-	bcopy(&ip6me->ip6me_addr, &hoa.sin6_addr,
+	bcopy(&ip6me->ip6mhbe_homeaddr, &hoa.sin6_addr,
 	    sizeof(struct in6_addr));
 	if (in6_addr2zoneid(m->m_pkthdr.rcvif, &hoa.sin6_addr, &hoazone)) {
 		ip6stat.ip6s_badscope++;
@@ -3523,10 +3523,10 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 	}
 
 	/* find the corresponding binding update entry. */
-	mip6stat.mip6s_be_hist[ip6me->ip6me_status]++;
-	switch (ip6me->ip6me_status) {
-	case IP6ME_STATUS_UNKNOWN_BINDING:
-	case IP6ME_STATUS_UNRECOGNIZED_TYPE:
+	mip6stat.mip6s_be_hist[ip6me->ip6mhbe_status]++;
+	switch (ip6me->ip6mhbe_status) {
+	case IP6_MH_BES_UNKNOWN_HAO:
+	case IP6_MH_BES_UNKNOWN_MH:
 		mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
 		    &src_sa, &hoa);
 		if (mbu == NULL) {
@@ -3540,13 +3540,13 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 		    "%s:%d: unknown BE status code (status = %u) "
 		    "from host %s.\n",
 		    __FILE__, __LINE__,
-		    ip6me->ip6me_status, ip6_sprintf(&src_sa.sin6_addr)));
+		    ip6me->ip6mhbe_status, ip6_sprintf(&src_sa.sin6_addr)));
 		goto bad;
 		break;
 	}
 
-	switch (ip6me->ip6me_status) {
-	case IP6ME_STATUS_UNKNOWN_BINDING:
+	switch (ip6me->ip6mhbe_status) {
+	case IP6_MH_BES_UNKNOWN_HAO:
 		/* the CN doesn't have a binding cache entry.  start RR. */
 		error = mip6_bu_fsm(mbu,
 		    MIP6_BU_PRI_FSM_EVENT_UNVERIFIED_HAO, ip6me);
@@ -3559,7 +3559,7 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 
 		break;
 
-	case IP6ME_STATUS_UNRECOGNIZED_TYPE:
+	case IP6_MH_BES_UNKNOWN_MH:
 		/* XXX future extension? */
 		error = mip6_bu_fsm(mbu,
 		    MIP6_BU_PRI_FSM_EVENT_UNKNOWN_MH_TYPE, ip6me);
@@ -3577,7 +3577,7 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 		    "%s:%d: unknown BE status code (status = %u) "
 		    "from host %s.\n",
 		    __FILE__, __LINE__,
-		    ip6me->ip6me_status, ip6_sprintf(&src_sa.sin6_addr)));
+		    ip6me->ip6mhbe_status, ip6_sprintf(&src_sa.sin6_addr)));
 
 		/* XXX what to do? */
 	}
@@ -3591,10 +3591,10 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 
 int
 mip6_ip6mhi_create(pktopt_mobility, mbu)
-	struct ip6_mobility **pktopt_mobility;
+	struct ip6_mh **pktopt_mobility;
 	struct mip6_bu *mbu;
 {
-	struct ip6m_home_test_init *ip6mhi;
+	struct ip6_mh_home_test_init *ip6mhi;
 	int ip6mhi_size;
 
 	/* sanity check. */
@@ -3604,35 +3604,35 @@ mip6_ip6mhi_create(pktopt_mobility, mbu)
 	*pktopt_mobility = NULL;
 
 	ip6mhi_size =
-	    ((sizeof(struct ip6m_home_test_init) +7) >> 3) * 8;
+	    ((sizeof(struct ip6_mh_home_test_init) +7) >> 3) * 8;
 
-	MALLOC(ip6mhi, struct ip6m_home_test_init *,
+	MALLOC(ip6mhi, struct ip6_mh_home_test_init *,
 	    ip6mhi_size, M_IP6OPT, M_NOWAIT);
 	if (ip6mhi == NULL)
 		return (ENOMEM);
 
 	bzero(ip6mhi, ip6mhi_size);
-	ip6mhi->ip6mhi_pproto = IPPROTO_NONE;
-	ip6mhi->ip6mhi_len = (ip6mhi_size >> 3) - 1;
-	ip6mhi->ip6mhi_type = IP6M_HOME_TEST_INIT;
-	bcopy(mbu->mbu_mobile_cookie, ip6mhi->ip6mhi_cookie,
-	      sizeof(ip6mhi->ip6mhi_cookie));
+	ip6mhi->ip6mhhti_proto = IPPROTO_NONE;
+	ip6mhi->ip6mhhti_len = (ip6mhi_size >> 3) - 1;
+	ip6mhi->ip6mhhti_type = IP6_MH_TYPE_HOTI;
+	bcopy(mbu->mbu_mobile_cookie, ip6mhi->ip6mhhti_cookie8,
+	      sizeof(ip6mhi->ip6mhhti_cookie8));
 
 	/* calculate checksum. */
-	ip6mhi->ip6mhi_cksum = mip6_cksum(&mbu->mbu_haddr, &mbu->mbu_paddr,
+	ip6mhi->ip6mhhti_cksum = mip6_cksum(&mbu->mbu_haddr, &mbu->mbu_paddr,
 	    ip6mhi_size, IPPROTO_MH, (char *)ip6mhi);
 
-	*pktopt_mobility = (struct ip6_mobility *)ip6mhi;
+	*pktopt_mobility = (struct ip6_mh *)ip6mhi;
 
 	return (0);
 }
 
 int
 mip6_ip6mci_create(pktopt_mobility, mbu)
-	struct ip6_mobility **pktopt_mobility;
+	struct ip6_mh **pktopt_mobility;
 	struct mip6_bu *mbu;
 {
-	struct ip6m_careof_test_init *ip6mci;
+	struct ip6_mh_careof_test_init *ip6mci;
 	int ip6mci_size;
 
 	/* sanity check. */
@@ -3642,39 +3642,39 @@ mip6_ip6mci_create(pktopt_mobility, mbu)
 	*pktopt_mobility = NULL;
 
 	ip6mci_size =
-	    ((sizeof(struct ip6m_careof_test_init) + 7) >> 3) * 8;
+	    ((sizeof(struct ip6_mh_careof_test_init) + 7) >> 3) * 8;
 
-	MALLOC(ip6mci, struct ip6m_careof_test_init *,
+	MALLOC(ip6mci, struct ip6_mh_careof_test_init *,
 	    ip6mci_size, M_IP6OPT, M_NOWAIT);
 	if (ip6mci == NULL)
 		return (ENOMEM);
 
 	bzero(ip6mci, ip6mci_size);
-	ip6mci->ip6mci_pproto = IPPROTO_NONE;
-	ip6mci->ip6mci_len = (ip6mci_size >> 3) - 1;
-	ip6mci->ip6mci_type = IP6M_CAREOF_TEST_INIT;
-	bcopy(mbu->mbu_mobile_cookie, ip6mci->ip6mci_cookie,
-	      sizeof(ip6mci->ip6mci_cookie));
+	ip6mci->ip6mhcti_proto = IPPROTO_NONE;
+	ip6mci->ip6mhcti_len = (ip6mci_size >> 3) - 1;
+	ip6mci->ip6mhcti_type = IP6_MH_TYPE_COTI;
+	bcopy(mbu->mbu_mobile_cookie, ip6mci->ip6mhcti_cookie8,
+	      sizeof(ip6mci->ip6mhcti_cookie8));
 
 	/* calculate checksum. */
-	ip6mci->ip6mci_cksum = mip6_cksum(&mbu->mbu_coa, &mbu->mbu_paddr,
+	ip6mci->ip6mhcti_cksum = mip6_cksum(&mbu->mbu_coa, &mbu->mbu_paddr,
 	    ip6mci_size, IPPROTO_MH, (char *)ip6mci);
 
-	*pktopt_mobility = (struct ip6_mobility *)ip6mci;
+	*pktopt_mobility = (struct ip6_mh *)ip6mci;
 
 	return (0);
 }
 
 int
 mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
-	struct ip6_mobility **pktopt_mobility;
+	struct ip6_mh **pktopt_mobility;
 	struct sockaddr_in6 *src, *dst;
 	struct hif_softc *sc;
 {
-	struct ip6m_binding_update *ip6mu;
-	struct ip6m_opt_nonce *mopt_nonce = NULL;
-	struct ip6m_opt_authdata *mopt_auth = NULL;
-	struct ip6m_opt_altcoa *mopt_altcoa = NULL;
+	struct ip6_mh_binding_update *ip6mu;
+	struct ip6_mh_opt_nonce_index *mopt_nonce = NULL;
+	struct ip6_mh_opt_auth_data *mopt_auth = NULL;
+	struct ip6_mh_opt_altcoa *mopt_altcoa = NULL;
 	struct sockaddr_in6 altcoa;
 	int ip6mu_size, pad;
 	int bu_size = 0, nonce_size = 0, auth_size = 0, altcoa_size = 0;
@@ -3729,7 +3729,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	if (mpfx == NULL)
 		return(EINVAL);
 
-	bu_size = sizeof(struct ip6m_binding_update);
+	bu_size = sizeof(struct ip6_mh_binding_update);
 	if (need_rr) {
 		/*
 		  |<- bu_size -> <- nonce_size -> <- auth_size ->
@@ -3737,12 +3737,12 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 		  |  bind. up.  |   nonce opt.   |   auth. opt.  |
 		  +-------------+----------------+---------------+
 		   <------->
-		   sizeof(struct ip6m_binding_update)
+		   sizeof(struct ip6_mh_binding_update)
 		            <-->
 			  Padding for nonce opt. alignment
 		 */
 		bu_size += MIP6_PADLEN(bu_size, 2, 0);
-		nonce_size = sizeof(struct ip6m_opt_nonce);
+		nonce_size = sizeof(struct ip6_mh_opt_nonce_index);
 		nonce_size += MIP6_PADLEN(bu_size + nonce_size, 8, 2);
 		/* (6.2.7)
 		   The Binding Authorization Data option does not
@@ -3758,21 +3758,21 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 		altcoa_size = 0;
 	} else {
 		bu_size += MIP6_PADLEN(bu_size, 8, 6);
-		altcoa_size = sizeof(struct ip6m_opt_altcoa);
+		altcoa_size = sizeof(struct ip6_mh_opt_altcoa);
 		nonce_size = auth_size = 0;
 	}
 	ip6mu_size = bu_size + nonce_size + auth_size + altcoa_size;
 
-	MALLOC(ip6mu, struct ip6m_binding_update *,
+	MALLOC(ip6mu, struct ip6_mh_binding_update *,
 	       ip6mu_size, M_IP6OPT, M_NOWAIT);
 	if (ip6mu == NULL)
 		return (ENOMEM);
 
 	if (need_rr) {
-		mopt_nonce = (struct ip6m_opt_nonce *)((u_int8_t *)ip6mu + bu_size);
-		mopt_auth = (struct ip6m_opt_authdata *)((u_int8_t *)mopt_nonce + nonce_size);
+		mopt_nonce = (struct ip6_mh_opt_nonce_index *)((u_int8_t *)ip6mu + bu_size);
+		mopt_auth = (struct ip6_mh_opt_auth_data *)((u_int8_t *)mopt_nonce + nonce_size);
 	} else {
-		mopt_altcoa = (struct ip6m_opt_altcoa *)((u_int8_t *)ip6mu + bu_size);
+		mopt_altcoa = (struct ip6_mh_opt_altcoa *)((u_int8_t *)ip6mu + bu_size);
 	}
 
 	/* update sequence number of this binding update entry. */
@@ -3780,14 +3780,14 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 
 	bzero(ip6mu, ip6mu_size);
 
-	ip6mu->ip6mu_pproto = IPPROTO_NONE;
-	ip6mu->ip6mu_len = (ip6mu_size >> 3) - 1;
-	ip6mu->ip6mu_type = IP6M_BINDING_UPDATE;
-	ip6mu->ip6mu_flags = mbu->mbu_flags;
-	ip6mu->ip6mu_seqno = htons(mbu->mbu_seqno);
+	ip6mu->ip6mhbu_proto = IPPROTO_NONE;
+	ip6mu->ip6mhbu_len = (ip6mu_size >> 3) - 1;
+	ip6mu->ip6mhbu_type = IP6_MH_TYPE_BU;
+	ip6mu->ip6mhbu_flags = mbu->mbu_flags;
+	ip6mu->ip6mhbu_seqno = htons(mbu->mbu_seqno);
 	if (SA6_ARE_ADDR_EQUAL(&mbu->mbu_haddr, &mbu->mbu_coa)) {
 		/* this binding update is for home un-registration. */
-		ip6mu->ip6mu_lifetime = 0;
+		ip6mu->ip6mhbu_lifetime = 0;
 		if (need_rr) {
 			ignore_co_nonce = 1;
 		}
@@ -3810,25 +3810,25 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 		mbu->mbu_lifetime = lifetime;
 		mbu->mbu_expire = time_second + mbu->mbu_lifetime;
 		mbu->mbu_refresh = mbu->mbu_lifetime;
-		ip6mu->ip6mu_lifetime =
+		ip6mu->ip6mhbu_lifetime =
 		    htons((u_int16_t)(mbu->mbu_lifetime >> 2));	/* units 4 secs */
 	}
 
-	if ((pad = bu_size - sizeof(struct ip6m_binding_update)) >= 2) {
+	if ((pad = bu_size - sizeof(struct ip6_mh_binding_update)) >= 2) {
 		u_char *p =
-			(u_int8_t *)ip6mu + sizeof(struct ip6m_binding_update);
-		*p = IP6MOPT_PADN;
+			(u_int8_t *)ip6mu + sizeof(struct ip6_mh_binding_update);
+		*p = IP6_MHOPT_PADN;
 		*(p + 1) = pad - 2;
 	}
 
 	if (need_rr) {
 		/* nonce indices and authdata insertion. */
 		if (nonce_size) {
-			if ((pad = nonce_size - sizeof(struct ip6m_opt_nonce))
+			if ((pad = nonce_size - sizeof(struct ip6_mh_opt_nonce_index))
 			    >= 2) {
 				u_char *p = (u_int8_t *)ip6mu + bu_size
-				    + sizeof(struct ip6m_opt_nonce);
-				*p = IP6MOPT_PADN;
+				    + sizeof(struct ip6_mh_opt_nonce_index);
+				*p = IP6_MHOPT_PADN;
 				*(p + 1) = pad - 2;
 			}
 		}
@@ -3836,28 +3836,28 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 			if ((pad = auth_size - IP6MOPT_AUTHDATA_SIZE) >= 2) {
 				u_char *p = (u_int8_t *)ip6mu
 				    + bu_size + nonce_size + IP6MOPT_AUTHDATA_SIZE;
-				*p = IP6MOPT_PADN;
+				*p = IP6_MHOPT_PADN;
 				*(p + 1) = pad - 2;
 			}
 		}
 
 		/* Nonce Indicies */
-		mopt_nonce->ip6mon_type = IP6MOPT_NONCE;
-		mopt_nonce->ip6mon_len = sizeof(struct ip6m_opt_nonce) - 2;
-		SET_NETVAL_S(&mopt_nonce->ip6mon_home_nonce_index,
-			     mbu->mbu_home_nonce_index);
+		mopt_nonce->ip6moni_type = IP6_MHOPT_NONCEID;
+		mopt_nonce->ip6moni_len = sizeof(struct ip6_mh_opt_nonce_index) - 2;
+		SET_NETVAL_S(&mopt_nonce->ip6moni_home_nonce,
+		    mbu->mbu_home_nonce_index);
 		if (!ignore_co_nonce) {
-			SET_NETVAL_S(&mopt_nonce->ip6mon_careof_nonce_index,
-				     mbu->mbu_careof_nonce_index);
+			SET_NETVAL_S(&mopt_nonce->ip6moni_coa_nonce,
+			    mbu->mbu_careof_nonce_index);
 		}
 
 		/* Auth. data */
-		mopt_auth->ip6moau_type = IP6MOPT_AUTHDATA;
-		mopt_auth->ip6moau_len = IP6MOPT_AUTHDATA_SIZE - 2;
+		mopt_auth->ip6moad_type = IP6_MHOPT_BAUTH;
+		mopt_auth->ip6moad_len = IP6MOPT_AUTHDATA_SIZE - 2;
 
 		if (auth_size > IP6MOPT_AUTHDATA_SIZE) {
 			*((u_int8_t *)ip6mu + bu_size + nonce_size + IP6MOPT_AUTHDATA_SIZE)
-			    = IP6MOPT_PADN;
+			    = IP6_MHOPT_PADN;
 			*((u_int8_t *)ip6mu + bu_size + nonce_size + IP6MOPT_AUTHDATA_SIZE + 1)
 			    = auth_size - IP6MOPT_AUTHDATA_SIZE - 2;
 		}
@@ -3876,11 +3876,12 @@ mip6_hexdump("MN: Kbm: ", sizeof(key_bm), key_bm);
 
 		/* Calculate authenticator (5.2.6) */
 		/* First(96, HMAC_SHA1(Kbm, (coa, | cn | BU))) */
-		if (mip6_calculate_authenticator(key_bm, (u_int8_t *)(mopt_auth + 1), 
-			&mbu->mbu_coa.sin6_addr, &dst->sin6_addr, 
-			(caddr_t)ip6mu, bu_size + nonce_size + auth_size, 
-			bu_size + nonce_size + sizeof(struct ip6m_opt_authdata) ,
-			MIP6_AUTHENTICATOR_LEN)) {
+		if (mip6_calculate_authenticator(key_bm,
+		    (u_int8_t *)(mopt_auth + 1), &mbu->mbu_coa.sin6_addr,
+		    &dst->sin6_addr, (caddr_t)ip6mu,
+		    bu_size + nonce_size + auth_size,
+		    bu_size + nonce_size + sizeof(struct ip6_mh_opt_auth_data),
+		    MIP6_AUTHENTICATOR_LEN)) {
 			mip6log((LOG_ERR,
 			    "%s:%d: Authenticator caluclation was failed\n",
 			    __FILE__, __LINE__));
@@ -3892,15 +3893,15 @@ mip6_hexdump("MN: Authenticator: ", (u_int8_t *)(mopt_auth + 1), MIP6_AUTHENTICA
 	} else {
 		if (altcoa_size) {
 			if ((pad = altcoa_size
-			    - sizeof(struct ip6m_opt_altcoa)) >= 2) {
+			    - sizeof(struct ip6_mh_opt_altcoa)) >= 2) {
 				u_char *p = (u_int8_t *)ip6mu + bu_size
-				    + sizeof(struct ip6m_opt_nonce);
-				*p = IP6MOPT_PADN;
+				    + sizeof(struct ip6_mh_opt_nonce_index);
+				*p = IP6_MHOPT_PADN;
 				*(p + 1) = pad - 2;
 			}
 		}
-		mopt_altcoa->ip6moa_type = IP6MOPT_ALTCOA;
-		mopt_altcoa->ip6moa_len = sizeof(struct ip6m_opt_altcoa) - 2;
+		mopt_altcoa->ip6moa_type = IP6_MHOPT_ALTCOA;
+		mopt_altcoa->ip6moa_len = sizeof(struct ip6_mh_opt_altcoa) - 2;
 		altcoa = mbu->mbu_coa;
 		in6_clearscope(&altcoa.sin6_addr);
 		bcopy(&altcoa.sin6_addr, mopt_altcoa->ip6moa_addr,
@@ -3908,10 +3909,10 @@ mip6_hexdump("MN: Authenticator: ", (u_int8_t *)(mopt_auth + 1), MIP6_AUTHENTICA
 	}
 
 	/* calculate checksum. */
-	ip6mu->ip6mu_cksum = mip6_cksum(&mbu->mbu_haddr, dst, ip6mu_size,
+	ip6mu->ip6mhbu_cksum = mip6_cksum(&mbu->mbu_haddr, dst, ip6mu_size,
 	    IPPROTO_MH, (char *)ip6mu);
 
-	*pktopt_mobility = (struct ip6_mobility *)ip6mu;
+	*pktopt_mobility = (struct ip6_mh *)ip6mu;
 
 	return (0);
 }

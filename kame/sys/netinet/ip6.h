@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.51 2003/10/21 03:00:32 itojun Exp $	*/
+/*	$KAME: ip6.h,v 1.52 2003/12/05 01:35:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -270,12 +270,12 @@ struct ip6_frag {
 #endif /* BYTE_ORDER == LITTLE_ENDIAN */
 
 /* Mobility header */
-struct ip6_mobility {
-	u_int8_t ip6m_pproto;	/* following payload protocol (for PG) */
-	u_int8_t ip6m_len;	/* length in units of 8 octets */
-	u_int8_t ip6m_type;	/* message type */
-	u_int8_t ip6m_reserved;
-	u_int16_t ip6m_cksum;	/* sum of IPv6 pseudo-header and MH */
+struct ip6_mh {
+	u_int8_t  ip6mh_proto;	  /* following payload protocol (for PG) */
+	u_int8_t  ip6mh_len;	  /* length in units of 8 octets */
+	u_int8_t  ip6mh_type;	  /* message type */
+	u_int8_t  ip6mh_reserved;
+	u_int16_t ip6mh_cksum;    /* sum of IPv6 pseudo-header and MH */
 	/* followed by type specific data */
 } __attribute__((__packed__));
 
@@ -283,190 +283,246 @@ struct ip6_mobility {
 #define IP6M_MINLEN	8
 
 /* Mobility header message types */
-#define IP6M_BINDING_REQUEST	0
-#define IP6M_HOME_TEST_INIT	1
-#define IP6M_CAREOF_TEST_INIT	2
-#define IP6M_HOME_TEST		3
-#define IP6M_CAREOF_TEST	4
-#define IP6M_BINDING_UPDATE	5
-#define IP6M_BINDING_ACK	6
-#define IP6M_BINDING_ERROR	7
-#define IP6M_LAST_TYPE		7
+#define IP6_MH_TYPE_BRR		0
+#define IP6_MH_TYPE_HOTI	1
+#define IP6_MH_TYPE_COTI	2
+#define IP6_MH_TYPE_HOT		3
+#define IP6_MH_TYPE_COT		4
+#define IP6_MH_TYPE_BU		5
+#define IP6_MH_TYPE_BACK	6
+#define IP6_MH_TYPE_BERROR	7
+#define IP6_MH_TYPE_MAX		7
 
 /* Binding Refresh Request (BRR) message */
-struct ip6m_binding_request {
-	u_int8_t ip6mr_pproto;
-	u_int8_t ip6mr_len;
-	u_int8_t ip6mr_type;
-	u_int8_t ip6mr_reserved0;
-	u_int16_t ip6mr_cksum;
-	u_int16_t ip6mr_reserved1;
+struct ip6_mh_binding_request {
+	struct ip6_mh ip6mhbr_hdr;
+	u_int16_t     ip6mhbr_reserved;
 	/* followed by mobility options */
 } __attribute__((__packed__));
+#ifdef _KERNEL
+#define ip6mhbr_proto ip6mhbr_hdr.ip6mh_proto
+#define ip6mhbr_len ip6mhbr_hdr.ip6mh_len
+#define ip6mhbr_type ip6mhbr_hdr.ip6mh_type
+#define ip6mhbr_reserved0 ip6mhbr_hdr.ip6mh_reserved
+#define ip6mhbr_cksum ip6mhbr_hdr.ip6mh_cksum
+#endif /* _KERNEL */
 
 /* Home Test Init (HoTI) message */
-struct ip6m_home_test_init {
-	u_int8_t ip6mhi_pproto;
-	u_int8_t ip6mhi_len;
-	u_int8_t ip6mhi_type;
-	u_int8_t ip6mhi_reserved0;
-	u_int16_t ip6mhi_cksum;
-	u_int16_t ip6mhi_reserved1;
-	u_int8_t ip6mhi_cookie[8];	/* home init cookie */
+struct ip6_mh_home_test_init {
+	struct ip6_mh ip6mhhti_hdr;
+	u_int16_t     ip6mhhti_reserved;
+	union {
+		u_int8_t  __cookie8[8];
+		u_int32_t __cookie32[2];
+	} __ip6mhhti_cookie;
 	/* followed by mobility options */
 } __attribute__((__packed__));
+#ifdef _KERNEL
+#define ip6mhhti_proto ip6mhhti_hdr.ip6mh_proto
+#define ip6mhhti_len ip6mhhti_hdr.ip6mh_len
+#define ip6mhhti_type ip6mhhti_hdr.ip6mh_type
+#define ip6mhhti_reserved0 ip6mhhti_hdr.ip6mh_reserved
+#define ip6mhhti_cksum ip6mhhti_hdr.ip6mh_cksum
+#define ip6mhhti_cookie8 __ip6mhhti_cookie.__cookie8
+#endif /* _KERNEL */
 
 /* Care-of Test Init (CoTI) message */
-struct ip6m_careof_test_init {
-	u_int8_t ip6mci_pproto;
-	u_int8_t ip6mci_len;
-	u_int8_t ip6mci_type;
-	u_int8_t ip6mci_reserved0;
-	u_int16_t ip6mci_cksum;
-	u_int16_t ip6mci_reserved1;
-	u_int8_t ip6mci_cookie[8];	/* care-of init cookie */
+struct ip6_mh_careof_test_init {
+	struct ip6_mh ip6mhcti_hdr;
+	u_int16_t     ip6mhcti_reserved;
+	union {
+		u_int8_t  __cookie8[8];
+		u_int32_t __cookie32[2];
+	} __ip6mhcti_cookie;
 	/* followed by mobility options */
 } __attribute__((__packed__));
+#ifdef _KERNEL
+#define ip6mhcti_proto ip6mhcti_hdr.ip6mh_proto
+#define ip6mhcti_len ip6mhcti_hdr.ip6mh_len
+#define ip6mhcti_type ip6mhcti_hdr.ip6mh_type
+#define ip6mhcti_reserved0 ip6mhcti_hdr.ip6mh_reserved
+#define ip6mhcti_cksum ip6mhcti_hdr.ip6mh_cksum
+#define ip6mhcti_cookie8 __ip6mhcti_cookie.__cookie8
+#endif /* _KERNEL */
 
 /* Home Test (HoT) message */
-struct ip6m_home_test {
-	u_int8_t ip6mh_pproto;
-	u_int8_t ip6mh_len;
-	u_int8_t ip6mh_type;
-	u_int8_t ip6mh_reserved;
-	u_int16_t ip6mh_cksum;
-	u_int16_t ip6mh_nonce_index;	/* idx of the CN nonce list array */
-	u_int8_t ip6mh_cookie[8];	/* home init cookie */
-	u_int8_t ip6mh_token[8];	/* home keygen token */
+struct ip6_mh_home_test {
+	struct ip6_mh ip6mhht_hdr;
+	u_int16_t     ip6mhht_nonce_index; /* idx of the CN nonce list array */
+	union {
+		u_int8_t  __cookie8[8];
+		u_int32_t __cookie32[2];
+	} __ip6mhht_cookie;
+	union {
+		u_int8_t  __token8[8];
+		u_int32_t __token32[2];
+	} __ip6mhht_token;
 	/* followed by mobility options */
 } __attribute__((__packed__));
+#ifdef _KERNEL
+#define ip6mhht_proto ip6mhht_hdr.ip6mh_proto
+#define ip6mhht_len ip6mhht_hdr.ip6mh_len
+#define ip6mhht_type ip6mhht_hdr.ip6mh_type
+#define ip6mhht_reserved0 ip6mhht_hdr.ip6mh_reserved
+#define ip6mhht_cksum ip6mhht_hdr.ip6mh_cksum
+#define ip6mhht_cookie8 __ip6mhht_cookie.__cookie8
+#define ip6mhht_token8 __ip6mhht_token.__token8
+#endif /* _KERNEL */
 
 /* Care-of Test (CoT) message */
-struct ip6m_careof_test {
-	u_int8_t ip6mc_pproto;
-	u_int8_t ip6mc_len;
-	u_int8_t ip6mc_type;
-	u_int8_t ip6mc_reserved;
-	u_int16_t ip6mc_cksum;
-	u_int16_t ip6mc_nonce_index;	/* idx of the CN nonce list array */
-	u_int8_t ip6mc_cookie[8];	/* care-of init cookie */
-	u_int8_t ip6mc_token[8];	/* care-of keygen token */
+struct ip6_mh_careof_test {
+	struct ip6_mh ip6mhct_hdr;
+	u_int16_t     ip6mhct_nonce_index; /* idx of the CN nonce list array */
+	union {
+		u_int8_t  __cookie8[8];
+		u_int32_t __cookie32[2];
+	} __ip6mhct_cookie;
+	union {
+		u_int8_t  __token8[8];
+		u_int32_t __token32[2];
+	} __ip6mhct_token;
 	/* followed by mobility options */
 } __attribute__((__packed__));
+#ifdef _KERNEL
+#define ip6mhct_proto ip6mhct_hdr.ip6mh_proto
+#define ip6mhct_len ip6mhct_hdr.ip6mh_len
+#define ip6mhct_type ip6mhct_hdr.ip6mh_type
+#define ip6mhct_reserved0 ip6mhct_hdr.ip6mh_reserved
+#define ip6mhct_cksum ip6mhct_hdr.ip6mh_cksum
+#define ip6mhct_cookie8 __ip6mhct_cookie.__cookie8
+#define ip6mhct_token8 __ip6mhct_token.__token8
+#endif /* _KERNEL */
 
 /* Binding Update (BU) message */
-struct ip6m_binding_update {
-	u_int8_t ip6mu_pproto;
-	u_int8_t ip6mu_len;
-	u_int8_t ip6mu_type;
-	u_int8_t ip6mu_reserved0;
-	u_int16_t ip6mu_cksum;
-	u_int16_t ip6mu_seqno;		/* sequence number */
-	u_int8_t ip6mu_flags;		/* IP6MU_* flags */
-	u_int8_t ip6mu_reserved1;
-	u_int16_t ip6mu_lifetime;	/* in units of 4 seconds */
+struct ip6_mh_binding_update {
+	struct ip6_mh ip6mhbu_hdr;
+	u_int16_t     ip6mhbu_seqno;	/* sequence number */
+	u_int16_t     ip6mhbu_flags;	/* IP6MU_* flags */
+	u_int16_t     ip6mhbu_lifetime;	/* in units of 4 seconds */
 	/* followed by mobility options */
 } __attribute__((__packed__));
+#ifdef _KERNEL
+#define ip6mhbu_proto ip6mhbu_hdr.ip6mh_proto
+#define ip6mhbu_len ip6mhbu_hdr.ip6mh_len
+#define ip6mhbu_type ip6mhbu_hdr.ip6mh_type
+#define ip6mhbu_reserved0 ip6mhbu_hdr.ip6mh_reserved
+#define ip6mhbu_cksum ip6mhbu_hdr.ip6mh_cksum
+#endif /* _KERNEL */
 
 /* Binding Update flags */
-#define IP6MU_ACK	0x80	/* request a binding ack */
-#define IP6MU_HOME	0x40	/* home registration */
-#define IP6MU_LINK	0x20	/* link-local address compatibility */
-#define IP6MU_KEY	0x10	/* key management mobility compatibility */
-#define IP6MU_CLONED	0x01
+#if BYTE_ORDER == BIG_ENDIAN
+#define IP6MU_ACK	0x8000	/* request a binding ack */
+#define IP6MU_HOME	0x4000	/* home registration */
+#define IP6MU_LINK	0x2000	/* link-local address compatibility */
+#define IP6MU_KEY	0x1000	/* key management mobility compatibility */
+#define IP6MU_CLONED	0x0100
+#endif /* BIG_ENDIAN */
+#if BYTE_ORDER == LITTLE_ENDIAN
+#define IP6MU_ACK	0x0080	/* request a binding ack */
+#define IP6MU_HOME	0x0040	/* home registration */
+#define IP6MU_LINK	0x0020	/* link-local address compatibility */
+#define IP6MU_KEY	0x0010	/* key management mobility compatibility */
+#define IP6MU_CLONED	0x0001
+#endif /* LITTLE_ENDIAN */
 
 /* Binding Acknowledgement (BA) message */
-struct ip6m_binding_ack {
-	u_int8_t ip6ma_pproto;
-	u_int8_t ip6ma_len;
-	u_int8_t ip6ma_type;
-	u_int8_t ip6ma_reserved0;
-	u_int16_t ip6ma_cksum;
-	u_int8_t ip6ma_status;		/* status code */
-	u_int8_t ip6ma_reserved1;
-	u_int16_t ip6ma_seqno;		/* sequence number */
-	u_int16_t ip6ma_lifetime;	/* in units of 4 seconds */
+struct ip6_mh_binding_ack {
+	struct ip6_mh ip6mhba_hdr;
+	u_int8_t      ip6mhba_status;	/* status code */
+	u_int8_t      ip6mhba_flags;
+	u_int16_t     ip6mhba_seqno;	/* sequence number */
+	u_int16_t     ip6mhba_lifetime;	/* in units of 4 seconds */
 	/* followed by mobility options */
 } __attribute__((__packed__));
+#ifdef _KERNEL
+#define ip6mhba_proto ip6mhba_hdr.ip6mh_proto
+#define ip6mhba_len ip6mhba_hdr.ip6mh_len
+#define ip6mhba_type ip6mhba_hdr.ip6mh_type
+#define ip6mhba_reserved0 ip6mhba_hdr.ip6mh_reserved
+#define ip6mhba_cksum ip6mhba_hdr.ip6mh_cksum
+#endif /* _KERNEL */
 
 /* Binding Ack status codes */
-#define IP6MA_STATUS_ACCEPTED              0	/* Binding Update accepted */
-#define IP6MA_STATUS_PREFIX_DISC           1	/* Prefix discovery necessary */
-#define IP6MA_STATUS_ERRORBASE             128	/* ERROR BASE */
-#define IP6MA_STATUS_UNSPECIFIED           128	/* Reason unspecified */
-#define IP6MA_STATUS_PROHIBIT              129	/* Administratively prohibited */
-#define IP6MA_STATUS_RESOURCES             130	/* Insufficient resources */
-#define IP6MA_STATUS_NOT_SUPPORTED         131	/* Home registration not supported */
-#define IP6MA_STATUS_NOT_HOME_SUBNET       132	/* Not home subnet */
-#define IP6MA_STATUS_NOT_HOME_AGENT        133	/* Not home agent for this mobile node */
-#define IP6MA_STATUS_DAD_FAILED            134	/* Duplicate Address Detection failed */
-#define IP6MA_STATUS_SEQNO_TOO_SMALL       135	/* Sequence number out of window */
-#define IP6MA_STATUS_HOME_NONCE_EXPIRED    136	/* Expired Home Nonce Index */
-#define IP6MA_STATUS_CAREOF_NONCE_EXPIRED  137	/* Expired Care-of Nonce Index */
-#define IP6MA_STATUS_NONCE_EXPIRED         138	/* Expired Nonces */
-#define IP6MA_STATUS_REG_NOT_ALLOWED       139	/* Registration type change disallowed */
+#define IP6_MH_BAS_ACCEPTED		0   /* Binding Update accepted */
+#define IP6_MH_BAS_PRFX_DISCOV		1   /* Accepted, but prefix discovery required */
+#define IP6_MH_BAS_ERRORBASE		128 /* ERROR BASE */
+#define IP6_MH_BAS_UNSPECIFIED		128 /* Reason unspecified */
+#define IP6_MH_BAS_PROHIBIT		129 /* Administratively prohibited */
+#define IP6_MH_BAS_INSUFFICIENT		130 /* Insufficient resources */
+#define IP6_MH_BAS_HA_NOT_SUPPORTED	131 /* Home registration not supported */
+#define IP6_MH_BAS_NOT_HOME_SUBNET	132 /* Not home subnet */
+#define IP6_MH_BAS_NOT_HA		133 /* Not home agent for this mobile node */
+#define IP6_MH_BAS_DAD_FAILED		134 /* Duplicate Address Detection failed */
+#define IP6_MH_BAS_SEQNO_BAD		135 /* Sequence number out of window */
+#define IP6_MH_BAS_HOME_NI_EXPIRED	136 /* Expired Home Nonce Index */
+#define IP6_MH_BAS_COA_NI_EXPIRED	137 /* Expired Care-of Nonce Index */
+#define IP6_MH_BAS_NI_EXPIRED		138 /* Expired Nonces */
+#define IP6_MH_BAS_REG_NOT_ALLOWED	139 /* Registration type change disallowed */
 
 /* Binding Error (BE) message */
-struct ip6m_binding_error {
-	u_int8_t ip6me_pproto;
-	u_int8_t ip6me_len;
-	u_int8_t ip6me_type;
-	u_int8_t ip6me_reserved0;
-	u_int16_t ip6me_cksum;
-	u_int8_t ip6me_status;		/* status code */
-	u_int8_t ip6me_reserved1;
-	struct in6_addr ip6me_addr;
+struct ip6_mh_binding_error {
+	struct ip6_mh   ip6mhbe_hdr;
+	u_int8_t        ip6mhbe_status;		/* status code */
+	u_int8_t        ip6mhbe_reserved;
+	struct in6_addr ip6mhbe_homeaddr;
 	/* followed by mobility options */
 } __attribute__((__packed__));
+#ifdef _KERNEL
+#define ip6mhbe_proto ip6mhbe_hdr.ip6mh_proto
+#define ip6mhbe_len ip6mhbe_hdr.ip6mh_len
+#define ip6mhbe_type ip6mhbe_hdr.ip6mh_type
+#define ip6mhbe_reserved0 ip6mhbe_hdr.ip6mh_reserved
+#define ip6mhbe_cksum ip6mhbe_hdr.ip6mh_cksum
+#endif /* _KERNEL */
 
 /* Binding Error status codes */
-#define IP6ME_STATUS_UNKNOWN_BINDING	1
-#define IP6ME_STATUS_UNRECOGNIZED_TYPE	2
+#define IP6_MH_BES_UNKNOWN_HAO		1
+#define IP6_MH_BES_UNKNOWN_MH		2
 
 /* Mobility options */
-struct ip6m_opt {
-	u_int8_t ip6mo_type;
-	u_int8_t ip6mo_len;
+struct ip6_mh_opt {
+	u_int8_t ip6mhopt_type;
+	u_int8_t ip6mhopt_len;
 	/* followed by option data */
 } __attribute__((__packed__));
 
 /* Mobility option type */
-#define IP6MOPT_PAD1		0	/* Pad1 */
-#define IP6MOPT_PADN		1	/* PadN */
-#define IP6MOPT_REFRESH		2	/* Binding Refresh Advice */
-#define IP6MOPT_ALTCOA		3	/* Alternate Care-of Address */
-#define IP6MOPT_NONCE		4	/* Nonce Indices */
-#define IP6MOPT_AUTHDATA	5	/* Binding Authorization Data */
+#define IP6_MHOPT_PAD1		0	/* Pad1 */
+#define IP6_MHOPT_PADN		1	/* PadN */
+#define IP6_MHOPT_BREFRESH	2	/* Binding Refresh Advice */
+#define IP6_MHOPT_ALTCOA	3	/* Alternate Care-of Address */
+#define IP6_MHOPT_NONCEID	4	/* Nonce Indices */
+#define IP6_MHOPT_BAUTH		5	/* Binding Authorization Data */
+
+/* Binding Refresh Advice */
+struct ip6_mh_opt_refresh_advice {
+	u_int8_t ip6mora_type;
+	u_int8_t ip6mora_len;
+	u_int8_t ip6mora_interval[2];	/* Refresh Interval (units of 4 sec) */
+} __attribute__((__packed__));
 
 /* Alternate Care-of Address */
-struct ip6m_opt_altcoa {
+struct ip6_mh_opt_altcoa {
 	u_int8_t ip6moa_type;
 	u_int8_t ip6moa_len;
 	u_int8_t ip6moa_addr[16];	/* Alternate Care-of Address */
 } __attribute__((__packed__));
 
 /* Nonce Indices */
-struct ip6m_opt_nonce {
-	u_int8_t ip6mon_type;
-	u_int8_t ip6mon_len;
-	u_int8_t ip6mon_home_nonce_index[2];
-	u_int8_t ip6mon_careof_nonce_index[2];
+struct ip6_mh_opt_nonce_index {
+	u_int8_t ip6moni_type;
+	u_int8_t ip6moni_len;
+	u_int8_t ip6moni_home_nonce[2];
+	u_int8_t ip6moni_coa_nonce[2];
 } __attribute__((__packed__));
 
 /* Binding Authorization Data */
-struct ip6m_opt_authdata {
-	u_int8_t ip6moau_type;
-	u_int8_t ip6moau_len;
+struct ip6_mh_opt_auth_data {
+	u_int8_t ip6moad_type;
+	u_int8_t ip6moad_len;
 	/* followed by authenticator data */
 } __attribute__((__packed__));
-#define IP6MOPT_AUTHDATA_SIZE (sizeof(struct ip6m_opt_authdata) + MIP6_AUTHENTICATOR_LEN)
-
-/* Binding Refresh Advice */
-struct ip6m_opt_refresh {
-	u_int8_t ip6mor_type;
-	u_int8_t ip6mor_len;
-	u_int8_t ip6mor_refresh[2];	/* Refresh Interval (units of 4 sec) */
-} __attribute__((__packed__));
+#define IP6MOPT_AUTHDATA_SIZE (sizeof(struct ip6_mh_opt_auth_data) + MIP6_AUTHENTICATOR_LEN)
 
 /*
  * Internet implementation parameters.

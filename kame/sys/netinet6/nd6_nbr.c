@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.132 2003/11/02 23:04:02 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.133 2003/12/05 01:35:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1342,14 +1342,14 @@ nd6_dad_start(ifa, tick)
 		panic("nd6_dad_start: ifa->ifa_ifp == NULL");
 	if (!(ifa->ifa_ifp->if_flags & IFF_UP)) {
 #if defined(MIP6) && defined(MIP6_HOME_AGENT)
-		mip6_dad_error(ifa, IP6MA_STATUS_RESOURCES);
+		mip6_dad_error(ifa, IP6_MH_BAS_INSUFFICIENT);
 #endif /* MIP6 && MIP6_HOME_AGENT */
 		return;
 	}
 	if (nd6_dad_find(ifa) != NULL) {
 		/* DAD already in progress */
 #if defined(MIP6) && defined(MIP6_HOME_AGENT)
-		mip6_dad_error(ifa, IP6MA_STATUS_RESOURCES);
+		mip6_dad_error(ifa, IP6_MH_BAS_INSUFFICIENT);
 #endif /* MIP6 && MIP6_HOME_AGENT */
 		return;
 	}

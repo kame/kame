@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.h,v 1.17 2003/10/21 10:53:33 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.h,v 1.18 2003/12/05 01:35:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -137,14 +137,14 @@ int mip6_mobile_node_exthdr_size(struct sockaddr_in6 *, struct sockaddr_in6 *);
 int mip6_addr_exchange(struct mbuf *, struct mbuf *);
 
 /* Mobility Header processing. */
-int mip6_ip6mh_input(struct mbuf *, struct ip6m_home_test *, int);
-int mip6_ip6mc_input(struct mbuf *, struct ip6m_careof_test *, int);
-int mip6_ip6ma_input(struct mbuf *, struct ip6m_binding_ack *, int);
-int mip6_ip6mr_input(struct mbuf *, struct ip6m_binding_request *, int);
-int mip6_ip6me_input(struct mbuf *, struct ip6m_binding_error *, int);
-int mip6_ip6mhi_create(struct ip6_mobility **, struct mip6_bu *);
-int mip6_ip6mci_create(struct ip6_mobility **, struct mip6_bu *);
-int mip6_ip6mu_create(struct ip6_mobility **, struct sockaddr_in6 *,
+int mip6_ip6mh_input(struct mbuf *, struct ip6_mh_home_test *, int);
+int mip6_ip6mc_input(struct mbuf *, struct ip6_mh_careof_test *, int);
+int mip6_ip6ma_input(struct mbuf *, struct ip6_mh_binding_ack *, int);
+int mip6_ip6mr_input(struct mbuf *, struct ip6_mh_binding_request *, int);
+int mip6_ip6me_input(struct mbuf *, struct ip6_mh_binding_error *, int);
+int mip6_ip6mhi_create(struct ip6_mh **, struct mip6_bu *);
+int mip6_ip6mci_create(struct ip6_mh **, struct mip6_bu *);
+int mip6_ip6mu_create(struct ip6_mh **, struct sockaddr_in6 *,
     struct sockaddr_in6 *, struct hif_softc *);
 
 /* ICMPv6 processing. */

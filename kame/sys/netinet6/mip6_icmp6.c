@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.85 2003/11/11 19:05:25 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.86 2003/12/05 01:35:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -179,7 +179,7 @@ mip6_icmp6_input(m, off, icmp6len)
 		break;
 
 #ifdef MIP6_MOBILE_NODE
-	case ICMP6_DHAAD_REPLY:
+	case MIP6_HA_DISCOVERY_REPLY:
 		if (!MIP6_IS_MN)
 			break;
 		error = mip6_icmp6_dhaad_rep_input(m, off, icmp6len);
@@ -191,7 +191,7 @@ mip6_icmp6_input(m, off, icmp6len)
 		}
 		break;
 
-	case ICMP6_MOBILEPREFIX_ADVERT:
+	case MIP6_PREFIX_ADVERT:
 		if (!MIP6_IS_MN)
 			break;
 		error = mip6_icmp6_mp_adv_input(m, off, icmp6len);
@@ -397,7 +397,7 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 {
 	struct ip6_hdr *ip6;
 	struct sockaddr_in6 sin6src;
-	struct dhaad_rep *hdrep;
+	struct mip6_dhaad_rep *hdrep;
 	u_int16_t hdrep_id;
 	struct mip6_ha *mha, *mha_prefered = NULL;
 	struct in6_addr *haaddrs, *haaddrptr;
@@ -420,9 +420,9 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 	}
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, icmp6len, EINVAL);
-	hdrep = (struct dhaad_rep *)((caddr_t)ip6 + off);
+	hdrep = (struct mip6_dhaad_rep *)((caddr_t)ip6 + off);
 #else
-	IP6_EXTHDR_GET(hdrep, struct dhaad_rep *, m, off, icmp6len);
+	IP6_EXTHDR_GET(hdrep, struct mip6_dhaad_rep *, m, off, icmp6len);
 	if (hdrep == NULL) {
 		mip6log((LOG_ERR,
 		    "%s:%d: failed to EXTHDR_GET.\n",
@@ -433,13 +433,13 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 	haaddrs = (struct in6_addr *)(hdrep + 1);
 
 	/* sainty check. */
-	if (hdrep->dhaad_rep_code != 0) {
+	if (hdrep->mip6_dhrep_code != 0) {
 		m_freem(m);
 		return (EINVAL);
 	}
 
 	/* check the number of home agents listed in the message. */
-	hacount = (icmp6len - sizeof(struct dhaad_rep))
+	hacount = (icmp6len - sizeof(struct mip6_dhaad_rep))
 		/ sizeof(struct in6_addr);
 	if (hacount == 0) {
 		mip6log((LOG_ERR,
@@ -450,7 +450,7 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 	}
 
 	/* find hif that matches this receiving hadiscovid of DHAAD reply. */
-	hdrep_id = hdrep->dhaad_rep_id;
+	hdrep_id = hdrep->mip6_dhrep_id;
 	hdrep_id = ntohs(hdrep_id);
 	for (sc = LIST_FIRST(&hif_softc_list); sc;
 	    sc = LIST_NEXT(sc, hif_entry)) {
@@ -582,7 +582,7 @@ mip6_icmp6_dhaad_req_output(sc)
 	struct mip6_prefix *mpfx;
 	struct mbuf *m;
 	struct ip6_hdr *ip6;
-	struct dhaad_req *hdreq;
+	struct mip6_dhaad_req *hdreq;
 	u_int32_t icmp6len, off;
 	int error;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -635,7 +635,7 @@ mip6_icmp6_dhaad_req_output(sc)
 		return (EINVAL);
 
 	/* allocate the buffer for the ip packet and DHAAD request. */
-	icmp6len = sizeof(struct dhaad_req);
+	icmp6len = sizeof(struct mip6_dhaad_req);
 	m = mip6_create_ip6hdr(&hif_coa, &haanyaddr,
 			       IPPROTO_ICMPV6, icmp6len);
 	if (m == NULL) {
@@ -650,15 +650,15 @@ mip6_icmp6_dhaad_req_output(sc)
 	sc->hif_dhaad_id = mip6_dhaad_id++;
 
 	ip6 = mtod(m, struct ip6_hdr *);
-	hdreq = (struct dhaad_req *)(ip6 + 1);
-	bzero((caddr_t)hdreq, sizeof(struct dhaad_req));
-	hdreq->dhaad_req_type = ICMP6_DHAAD_REQUEST;
-	hdreq->dhaad_req_code = 0;
-	hdreq->dhaad_req_id = htons(sc->hif_dhaad_id);
+	hdreq = (struct mip6_dhaad_req *)(ip6 + 1);
+	bzero((caddr_t)hdreq, sizeof(struct mip6_dhaad_req));
+	hdreq->mip6_dhreq_type = MIP6_HA_DISCOVERY_REQUEST;
+	hdreq->mip6_dhreq_code = 0;
+	hdreq->mip6_dhreq_id = htons(sc->hif_dhaad_id);
 
 	/* calculate checksum for this DHAAD request packet. */
 	off = sizeof(struct ip6_hdr);
-	hdreq->dhaad_req_cksum = in6_cksum(m, IPPROTO_ICMPV6, off, icmp6len);
+	hdreq->mip6_dhreq_cksum = in6_cksum(m, IPPROTO_ICMPV6, off, icmp6len);
 
 	/* send the DHAAD request packet to the home agent anycast address. */
 	if (!ip6_setpktaddrs(m, &hif_coa, &haanyaddr)) {
@@ -720,7 +720,7 @@ mip6_icmp6_mp_sol_output(haddr, haaddr)
 {
 	struct mbuf *m;
 	struct ip6_hdr *ip6;
-	struct mobile_prefix_solicit *mp_sol;
+	struct mip6_prefix_solicit *mp_sol;
 	int icmp6len;
 	int maxlen;
 	int error;
@@ -766,16 +766,16 @@ mip6_icmp6_mp_sol_output(haddr, haaddr)
 	in6_clearscope(&ip6->ip6_src);
 	ip6->ip6_dst = haaddr->sin6_addr;
 	in6_clearscope(&ip6->ip6_dst);
-	mp_sol = (struct mobile_prefix_solicit *)(ip6 + 1);
-	mp_sol->mp_sol_type = ICMP6_MOBILEPREFIX_SOLICIT;
-	mp_sol->mp_sol_code = 0;
-	mp_sol->mp_sol_id = 0; /* XXX */
-	mp_sol->mp_sol_reserved = 0;
+	mp_sol = (struct mip6_prefix_solicit *)(ip6 + 1);
+	mp_sol->mip6_ps_type = MIP6_PREFIX_SOLICIT;
+	mp_sol->mip6_ps_code = 0;
+	mp_sol->mip6_ps_id = 0; /* XXX */
+	mp_sol->mip6_ps_reserved = 0;
 
 	/* calculate checksum. */
 	ip6->ip6_plen = htons((u_int16_t)icmp6len);
-	mp_sol->mp_sol_cksum = 0;
-	mp_sol->mp_sol_cksum = in6_cksum(m, IPPROTO_ICMPV6, sizeof(*ip6),
+	mp_sol->mip6_ps_cksum = 0;
+	mp_sol->mip6_ps_cksum = in6_cksum(m, IPPROTO_ICMPV6, sizeof(*ip6),
 	    icmp6len);
 
 	if (!ip6_setpktaddrs(m, haddr, haaddr)) {
@@ -806,7 +806,7 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 	struct m_tag *mtag;
 	struct ip6aux *ip6a;
 	struct sockaddr_in6 src_sa, dst_sa;
-	struct mobile_prefix_advert *mp_adv;
+	struct mip6_prefix_advert *mp_adv;
 	union nd_opts ndopts;
 	struct nd_opt_hdr *ndopt;
 	struct nd_opt_prefix_info *ndopt_pi;
@@ -839,9 +839,9 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 	}
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, icmp6len, EINVAL);
-	mp_adv = (struct mobile_prefix_advert *)((caddr_t)ip6 + off);
+	mp_adv = (struct mip6_prefix_advert *)((caddr_t)ip6 + off);
 #else
-	IP6_EXTHDR_GET(mp_adv, struct mobile_prefix_advert*, m, off, icmp6len);
+	IP6_EXTHDR_GET(mp_adv, struct mip6_prefix_advert*, m, off, icmp6len);
 	if (mp_adv == NULL) {
 		mip6log((LOG_ERR,
 		    "%s:%d: failed to EXTHDR_GET.\n",

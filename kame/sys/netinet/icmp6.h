@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.86 2003/11/11 19:05:25 keiichi Exp $	*/
+/*	$KAME: icmp6.h,v 1.87 2003/12/05 01:35:16 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -170,10 +170,10 @@ struct icmp6_hdr {
 #define IND_ADVERT			142	/* inverse neighbor advertisement */
 
 /* Folloing numbers are defined in the mobile-ip draft. */
-#define ICMP6_DHAAD_REQUEST		143	/* home agent address discovery request */
-#define ICMP6_DHAAD_REPLY		144	/* home agent address discovery reply */
-#define ICMP6_MOBILEPREFIX_SOLICIT	145	/* mobile prefix solicitation */
-#define ICMP6_MOBILEPREFIX_ADVERT	146	/* mobile prefix advertisement */
+#define MIP6_HA_DISCOVERY_REQUEST	143	/* home agent address discovery request */
+#define MIP6_HA_DISCOVERY_REPLY		144	/* home agent address discovery reply */
+#define MIP6_PREFIX_SOLICIT		145	/* mobile prefix solicitation */
+#define MIP6_PREFIX_ADVERT		146	/* mobile prefix advertisement */
 
 /* The definitions below are experimental. TBA */
 #define MLD_MTRACE_RESP			200	/* mtrace resp (to sender) */
@@ -416,50 +416,55 @@ struct ind_neighbor_advert {	/* inverse neighbor advertisement */
 #define ind_na_cksum		ind_na_hdr.icmp6_cksum
 #define ind_na_flags_reserved	ind_na_hdr.icmp6_data32[0]
 
-struct dhaad_req {		/* HA Address Discovery Request */
-	struct icmp6_hdr	dhaad_req_hdr;
+struct mip6_dhaad_req {		/* HA Address Discovery Request */
+	struct icmp6_hdr	mip6_dhreq_hdr;
 } __attribute__((__packed__));
 
-#define dhaad_req_type		dhaad_req_hdr.icmp6_type
-#define dhaad_req_code		dhaad_req_hdr.icmp6_code
-#define dhaad_req_cksum		dhaad_req_hdr.icmp6_cksum
-#define dhaad_req_id		dhaad_req_hdr.icmp6_data16[0]
-#define dhaad_req_reserved1	dhaad_req_hdr.icmp6_data16[1]
+#define mip6_dhreq_type		mip6_dhreq_hdr.icmp6_type
+#define mip6_dhreq_code		mip6_dhreq_hdr.icmp6_code
+#define mip6_dhreq_cksum	mip6_dhreq_hdr.icmp6_cksum
+#define mip6_dhreq_id		mip6_dhreq_hdr.icmp6_data16[0]
+#define mip6_dhreq_reserved	mip6_dhreq_hdr.icmp6_data16[1]
 
-struct dhaad_rep {		/* HA Address Discovery Reply */
-	struct icmp6_hdr	dhaad_rep_hdr;
+struct mip6_dhaad_rep {		/* HA Address Discovery Reply */
+	struct icmp6_hdr	mip6_dhrep_hdr;
 	/* could be followed by home agent addresses */
 } __attribute__((__packed__));
 
-#define dhaad_rep_type		dhaad_rep_hdr.icmp6_type
-#define dhaad_rep_code		dhaad_rep_hdr.icmp6_code
-#define dhaad_rep_cksum		dhaad_rep_hdr.icmp6_cksum
-#define dhaad_rep_id		dhaad_rep_hdr.icmp6_data16[0]
-#define dhaad_rep_reserved1	dhaad_rep_hdr.icmp6_data16[1]
+#define mip6_dhrep_type		mip6_dhrep_hdr.icmp6_type
+#define mip6_dhrep_code		mip6_dhrep_hdr.icmp6_code
+#define mip6_dhrep_cksum	mip6_dhrep_hdr.icmp6_cksum
+#define mip6_dhrep_id		mip6_dhrep_hdr.icmp6_data16[0]
+#define mip6_dhrep_reserved	mip6_dhrep_hdr.icmp6_data16[1]
 
-struct mobile_prefix_solicit {	/* Mobile Prefix Solicitation */
-	struct icmp6_hdr	mp_sol_hdr;
+struct mip6_prefix_solicit {	/* Mobile Prefix Solicitation */
+	struct icmp6_hdr	mip6_ps_hdr;
 } __attribute__((__packed__));
 
-#define mp_sol_type		mp_sol_hdr.icmp6_type
-#define mp_sol_code		mp_sol_hdr.icmp6_code
-#define mp_sol_cksum		mp_sol_hdr.icmp6_cksum
-#define mp_sol_id		mp_sol_hdr.icmp6_data16[0]
-#define mp_sol_reserved		mp_sol_hdr.icmp6_data16[1]
+#define mip6_ps_type		mip6_ps_hdr.icmp6_type
+#define mip6_ps_code		mip6_ps_hdr.icmp6_code
+#define mip6_ps_cksum		mip6_ps_hdr.icmp6_cksum
+#define mip6_ps_id		mip6_ps_hdr.icmp6_data16[0]
+#define mip6_ps_reserved	mip6_ps_hdr.icmp6_data16[1]
 
-struct mobile_prefix_advert {	/* Mobile Prefix Advertisement */
-	struct icmp6_hdr	mp_adv_hdr;
+struct mip6_prefix_advert {	/* Mobile Prefix Advertisement */
+	struct icmp6_hdr	mip6_pa_hdr;
 	/* followed by options */
 } __attribute__((__packed__));
 
-#define mp_adv_type		mp_adv_hdr.icmp6_type
-#define mp_adv_code		mp_adv_hdr.icmp6_code
-#define mp_adv_cksum		mp_adv_hdr.icmp6_cksum
-#define mp_adv_id		mp_adv_hdr.icmp6_data16[0]
-#define mp_adv_flags		mp_adv_hdr.icmp6_data8[2]
-#define mp_adv_reserved		mp_adv_hdr.icmp6_data8[3]
-#define MPADV_MANAGED		0x80
-#define MPADV_OTHER		0x40
+#define mip6_pa_type		mip6_pa_hdr.icmp6_type
+#define mip6_pa_code		mip6_pa_hdr.icmp6_code
+#define mip6_pa_cksum		mip6_pa_hdr.icmp6_cksum
+#define mip6_pa_id		mip6_pa_hdr.icmp6_data16[0]
+#define mip6_pa_flags_reserved	mip6_pa_hdr.icmp6_data16[1]
+#if BYTE_ORDER == BIG_ENDIAN
+#define MIP6_PA_FLAG_MANAGED	0x8000
+#define MIP6_PA_FLAG_OTHER	0x4000
+#endif /* BIG_ENDIAN */
+#if BYTE_ORDER == LITTLE_ENDIAN
+#define MIP6_PA_FLAG_MANAGED	0x0080
+#define MIP6_PA_FLAG_OTHER	0x0040
+#endif /* LITTLE_ENDIAN */
 
 struct nd_opt_hdr {		/* Neighbor discovery option header */
 	u_int8_t	nd_opt_type;
@@ -472,8 +477,8 @@ struct nd_opt_hdr {		/* Neighbor discovery option header */
 #define ND_OPT_PREFIX_INFORMATION	3
 #define ND_OPT_REDIRECTED_HEADER	4
 #define ND_OPT_MTU			5
-#define ND_OPT_ADVINTERVAL		7	/* 2292bis-02 */
-#define ND_OPT_HOMEAGENT_INFO		8	/* 2292bis-02 */
+#define ND_OPT_ADV_INTERVAL		7	/* 2292bis-02 */
+#define ND_OPT_HA_INFORMATION		8	/* 2292bis-02 */
 #define ND_OPT_SOURCE_ADDRLIST		9	/* will be renamed */
 #define ND_OPT_TARGET_ADDRLIST		10	/* will be renamed */
 
@@ -509,11 +514,11 @@ struct nd_opt_mtu {		/* MTU option */
 	u_int32_t	nd_opt_mtu_mtu;
 } __attribute__((__packed__));
 
-struct nd_opt_advinterval {	/* Advertisement interval option */
-	u_int8_t	nd_opt_adv_type;
-	u_int8_t	nd_opt_adv_len;
-	u_int16_t	nd_opt_adv_reserved;
-	u_int32_t	nd_opt_adv_interval;
+struct nd_opt_adv_interval {	/* Advertisement interval option */
+	u_int8_t	nd_opt_ai_type;
+	u_int8_t	nd_opt_ai_len;
+	u_int16_t	nd_opt_ai_reserved;
+	u_int32_t	nd_opt_ai_interval;
 } __attribute__((__packed__));
 
 struct nd_opt_homeagent_info {	/* Home Agent info */

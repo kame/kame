@@ -10,6 +10,7 @@ CPPFLAGS+=-DINET6 -DHAVE_SOCKADDR_SA_LEN \
 	-DHAVE_IF_NAMEINDEX -DFILTER_V4MAPPED -DHAVE_SOCKLEN_T \
 	-DDEBUG
 CPPFLAGS+=-DUSE_LOG_REORDER
+CPPFLAGS+=-DMIP6
 CFLAGS+=	-g -Wall -Werror -Dlint
 
 #SRCS=	getaddrinfo.c getnameinfo.c vars.c rresvport_af.c rcmd.c

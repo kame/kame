@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.61 2003/11/11 19:05:25 keiichi Exp $	*/
+/*	$KAME: dest6.c,v 1.62 2003/12/05 01:35:16 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -314,7 +314,7 @@ dest6_mip6_hao(m, mhoff, nxt)
 	struct m_tag *n;
 	struct sockaddr_in6 home_sa;
 	struct ip6_opt_home_address haopt;
-	struct ip6_mobility mh;
+	struct ip6_mh mh;
 	int newoff, off, proto, swap;
 
 	/* XXX should care about destopt1 and destopt2.  in destopt2,
@@ -362,12 +362,12 @@ dest6_mip6_hao(m, mhoff, nxt)
 		swap = 1;
 	if (nxt == IPPROTO_MH) {
 		m_copydata(m, mhoff, sizeof(mh), (caddr_t)&mh);
-		if (mh.ip6m_type == IP6M_BINDING_UPDATE)
+		if (mh.ip6mh_type == IP6_MH_TYPE_BU)
 			swap = 1;
-		else if (mh.ip6m_type == IP6M_HOME_TEST_INIT ||
-			 mh.ip6m_type == IP6M_CAREOF_TEST_INIT)
+		else if (mh.ip6mh_type == IP6_MH_TYPE_HOTI ||
+			 mh.ip6mh_type == IP6_MH_TYPE_COTI)
 			return (-1);
-		else if (mh.ip6m_type > IP6M_LAST_TYPE)
+		else if (mh.ip6mh_type > IP6_MH_TYPE_MAX)
 			swap = 1;	/* must be sent BE with UNRECOGNIZED_TYPE */
 	}
 
@@ -386,7 +386,7 @@ dest6_mip6_hao(m, mhoff, nxt)
 	home_sa = ip6a->ip6a_src;
 	home_sa.sin6_addr = *(struct in6_addr *)haopt.ip6oh_addr;
 	mobility6_send_be(&ip6a->ip6a_dst, &ip6a->ip6a_src,
-	    IP6ME_STATUS_UNKNOWN_BINDING, &home_sa);
+	    IP6_MH_BES_UNKNOWN_HAO, &home_sa);
 
 	return (-1);
 }

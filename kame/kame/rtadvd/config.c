@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.86 2003/10/10 07:50:25 keiichi Exp $	*/
+/*	$KAME: config.c,v 1.87 2003/12/05 01:35:15 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1004,7 +1004,7 @@ make_packet(struct rainfo *rainfo)
 	struct nd_opt_prefix_info *ndopt_pi;
 	struct nd_opt_mtu *ndopt_mtu;
 #ifdef MIP6
-	struct nd_opt_advinterval *ndopt_advint;
+	struct nd_opt_adv_interval *ndopt_advint;
 	struct nd_opt_homeagent_info *ndopt_hai;
 #endif
 #ifdef ROUTEINFO
@@ -1031,7 +1031,7 @@ make_packet(struct rainfo *rainfo)
 		packlen += sizeof(struct nd_opt_mtu);
 #ifdef MIP6
 	if (mobileip6 && rainfo->maxminterval)
-		packlen += sizeof(struct nd_opt_advinterval);
+		packlen += sizeof(struct nd_opt_adv_interval);
 	if (mobileip6 && rainfo->hatime)
 		packlen += sizeof(struct nd_opt_homeagent_info);
 #endif
@@ -1100,19 +1100,19 @@ make_packet(struct rainfo *rainfo)
 
 #ifdef MIP6
 	if (mobileip6 && rainfo->maxminterval) {
-		ndopt_advint = (struct nd_opt_advinterval *)buf;
-		ndopt_advint->nd_opt_adv_type = ND_OPT_ADVINTERVAL;
-		ndopt_advint->nd_opt_adv_len = 1;
-		ndopt_advint->nd_opt_adv_reserved = 0;
-		ndopt_advint->nd_opt_adv_interval = htonl(rainfo->maxminterval);
-		buf += sizeof(struct nd_opt_advinterval);
+		ndopt_advint = (struct nd_opt_adv_interval *)buf;
+		ndopt_advint->nd_opt_ai_type = ND_OPT_ADV_INTERVAL;
+		ndopt_advint->nd_opt_ai_len = 1;
+		ndopt_advint->nd_opt_ai_reserved = 0;
+		ndopt_advint->nd_opt_ai_interval = htonl(rainfo->maxminterval);
+		buf += sizeof(struct nd_opt_adv_interval);
 	}
 #endif
 	
 #ifdef MIP6
 	if (rainfo->hatime) {
 		ndopt_hai = (struct nd_opt_homeagent_info *)buf;
-		ndopt_hai->nd_opt_hai_type = ND_OPT_HOMEAGENT_INFO;
+		ndopt_hai->nd_opt_hai_type = ND_OPT_HA_INFORMATION;
 		ndopt_hai->nd_opt_hai_len = 1;
 		ndopt_hai->nd_opt_hai_reserved = 0;
 		ndopt_hai->nd_opt_hai_preference = htons(rainfo->hapref);

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.109 2003/10/31 12:19:42 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.110 2003/12/05 01:35:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -95,7 +95,7 @@ struct mip6_bc {
 	u_int8_t              mbc_status;    /* BA statue */
 	u_int8_t	      mbc_send_ba;   /* nonzero means BA should be sent */
 	u_int32_t             mbc_refresh;   /* Using for sending BA */
-	u_int8_t              mbc_flags;     /* recved BU flags */
+	u_int16_t             mbc_flags;     /* recved BU flags */
 	u_int16_t             mbc_seqno;     /* recved BU seqno */
 	u_int32_t             mbc_lifetime;  /* recved BU lifetime */
 	time_t                mbc_expire;    /* expiration time of this BC. */
@@ -149,7 +149,7 @@ struct mip6_bu {
 	u_int16_t           mbu_lifetime;   /* BU lifetime */
 	u_int16_t           mbu_refresh;    /* refresh frequency */
 	u_int16_t           mbu_seqno;      /* sequence number */
-	u_int8_t            mbu_flags;      /* BU flags */
+	u_int16_t           mbu_flags;      /* BU flags */
 	mip6_cookie_t       mbu_mobile_cookie;
 	u_int16_t           mbu_home_nonce_index;
 	mip6_home_token_t   mbu_home_token; /* home keygen token */

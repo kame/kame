@@ -1,4 +1,4 @@
-/*	$KAME: haadisc.h,v 1.2 2003/04/11 11:21:39 t-momose Exp $	*/
+/*	$KAME: haadisc.h,v 1.3 2003/12/05 01:35:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: haadisc.h,v 1.2 2003/04/11 11:21:39 t-momose Exp $
+ * $Id: haadisc.h,v 1.3 2003/12/05 01:35:14 keiichi Exp $
  */
 
 /*
@@ -71,7 +71,7 @@ extern int dump;
 #define DPRINT(s)
 #endif
 
-void mpi_solicit_input __P((struct in6_pktinfo *, struct sockaddr_in6 *, struct mobile_prefix_solicit *));
+void mpi_solicit_input __P((struct in6_pktinfo *, struct sockaddr_in6 *, struct mip6_prefix_solicit *));
 void mpi_advert_output_All __P((struct in6_addr *, struct hagent_ifinfo *));
 void examine_mpaexp_bc(void);
 void kinit __P((void));

@@ -1,4 +1,4 @@
-/*	$KAME: haadisc.c,v 1.13 2003/11/20 08:43:03 keiichi Exp $	*/
+/*	$KAME: haadisc.c,v 1.14 2003/12/05 01:35:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: haadisc.c,v 1.13 2003/11/20 08:43:03 keiichi Exp $
+ * $Id: haadisc.c,v 1.14 2003/12/05 01:35:14 keiichi Exp $
  */
 
 /*
@@ -140,7 +140,7 @@ static void ra_input __P((int, struct nd_router_advert *, struct in6_pktinfo *,
 			  struct sockaddr_in6 *));
 void nd6_option_init __P((void *, int, union nd_opts *));
 int nd6_options __P((union nd_opts *));
-static void haad_request_input __P((int, struct dhaad_req *,
+static void haad_request_input __P((int, struct mip6_dhaad_req *,
 				    struct in6_pktinfo *, struct sockaddr_in6 *,
 				    int));
 static void haad_reply_output __P((u_int16_t, struct sockaddr_in6 *,
@@ -371,11 +371,8 @@ sock_open()
 #ifdef ICMP6_FILTER
     ICMP6_FILTER_SETBLOCKALL(&filt);
     ICMP6_FILTER_SETPASS(ND_ROUTER_ADVERT, &filt);
-    ICMP6_FILTER_SETPASS(ICMP6_DHAAD_REQUEST, &filt);
-    ICMP6_FILTER_SETPASS(ICMP6_MOBILEPREFIX_SOLICIT, &filt);
-#ifdef ICMP6_DHAAD_REQUEST_KAME
-    ICMP6_FILTER_SETPASS(ICMP6_DHAAD_REQUEST_KAME, &filt);
-#endif
+    ICMP6_FILTER_SETPASS(MIP6_HA_DISCOVERY_REQUEST, &filt);
+    ICMP6_FILTER_SETPASS(MIP6_PREFIX_SOLICIT, &filt);
     if (setsockopt(sock, IPPROTO_ICMPV6, ICMP6_FILTER, &filt,
 		   sizeof(filt)) < 0) {
 	syslog(LOG_ERR, "<%s> IICMP6_FILTER: %s",
@@ -571,10 +568,7 @@ icmp6_recv()
 	}
 	ra_input(len, (struct nd_router_advert *)icp, pi, &from);
 	break;
-    case ICMP6_DHAAD_REQUEST:
-#ifdef ICMP6_DHAAD_REQUEST_KAME
-    case ICMP6_DHAAD_REQUEST_KAME:
-#endif
+    case MIP6_HA_DISCOVERY_REQUEST:
 	if (icp->icmp6_code) {
 		syslog(LOG_NOTICE,
 		       "<%s> HAAD Request with invalid ICMP6 code(%d) "
@@ -585,7 +579,7 @@ icmp6_recv()
 		if_indextoname(pi->ipi6_ifindex, ifnamebuf));
 		return;
 	}
-	if (len < sizeof(struct dhaad_req)) {
+	if (len < sizeof(struct mip6_dhaad_req)) {
 		syslog(LOG_NOTICE,
 		       "<%s> HAAD Request from %s on %s does not have enough "
 		       "length (len = %d)",
@@ -595,10 +589,10 @@ icmp6_recv()
 		       if_indextoname(pi->ipi6_ifindex, ifnamebuf), len);
 		return;
 	}
-	haad_request_input(len, (struct dhaad_req *)icp, pi, &from, icp->icmp6_type);
+	haad_request_input(len, (struct mip6_dhaad_req *)icp, pi, &from, icp->icmp6_type);
 	break;
-    case ICMP6_MOBILEPREFIX_SOLICIT:
-        mpi_solicit_input(pi, &from, (struct mobile_prefix_solicit *)icp);
+    case MIP6_PREFIX_SOLICIT:
+        mpi_solicit_input(pi, &from, (struct mip6_prefix_solicit *)icp);
         break;
     default:
 	/* should not occur */
@@ -859,8 +853,8 @@ nd6_options(ndopts)
 	case ND_OPT_TARGET_LINKADDR:
 	case ND_OPT_MTU:
 	case ND_OPT_REDIRECTED_HEADER:
-	case ND_OPT_ADVINTERVAL:
-	case ND_OPT_HOMEAGENT_INFO:
+	case ND_OPT_ADV_INTERVAL:
+	case ND_OPT_HA_INFORMATION:
 	    if (ndopts->nd_opt_array[nd_opt->nd_opt_type]) {
 		printf("duplicated ND6 option found "
 		       "(type=%d)\n", nd_opt->nd_opt_type);
@@ -908,7 +902,7 @@ nd6_options(ndopts)
 static void
 haad_request_input(len, haad_req, pi, src, type)
     int len;
-    struct dhaad_req *haad_req;
+    struct mip6_dhaad_req *haad_req;
     struct in6_pktinfo *pi;
     struct sockaddr_in6 *src;
     int type;
@@ -917,7 +911,7 @@ haad_request_input(len, haad_req, pi, src, type)
     struct hagent_ifinfo *haif;
     int ifga_index = -1;
 
-    msgid = haad_req->dhaad_req_id;
+    msgid = haad_req->mip6_dhreq_id;
 
     /* determine home link by global address */
     haif = haif_findwithanycast(&pi->ipi6_addr, &ifga_index);
@@ -951,7 +945,7 @@ haad_reply_output(msgid, coaddr, reqaddr, haif, type, ifga_index)
 {
     struct cmsghdr *cm;
     struct in6_pktinfo *pi;
-    struct dhaad_rep *hap;
+    struct mip6_dhaad_rep *hap;
     struct in6_addr *hagent_addr;
     struct in6_addr src = in6addr_any;
     int len, nhaa, count;
@@ -968,22 +962,16 @@ haad_reply_output(msgid, coaddr, reqaddr, haif, type, ifga_index)
 	    src = ((struct sockaddr_in6 *)(haif->haif_gavec[ifga_index].global->ifa_addr))->sin6_addr;
 
     /* create ICMPv6 message */
-    hap = (struct dhaad_rep *)buf;
-    bzero(hap, sizeof (struct dhaad_rep));
-#ifdef ICMP6_DHAAD_REQUEST_KAME
-    hap->dhaad_rep_type = (type == ICMP6_DHAAD_REQUEST_KAME ?
-				ICMP6_DHAAD_REPLY_KAME :
-				ICMP6_DHAAD_REPLY);
-#else
-    hap->dhaad_rep_type = ICMP6_DHAAD_REPLY;
-#endif
-    hap->dhaad_rep_code = 0;
-    hap->dhaad_rep_cksum = 0;
-    hap->dhaad_rep_id = msgid;
-    len = sizeof (struct dhaad_rep);
+    hap = (struct mip6_dhaad_rep *)buf;
+    bzero(hap, sizeof (struct mip6_dhaad_rep));
+    hap->mip6_dhrep_type = MIP6_HA_DISCOVERY_REPLY;
+    hap->mip6_dhrep_code = 0;
+    hap->mip6_dhrep_cksum = 0;
+    hap->mip6_dhrep_id = msgid;
+    len = sizeof (struct mip6_dhaad_rep);
     hagent_addr = (struct in6_addr *)(hap + 1);
     count = (IPV6_MMTU - sizeof (struct ip6_hdr) -
-	     sizeof (struct dhaad_rep)) / sizeof (struct in6_addr);
+	     sizeof (struct mip6_dhaad_rep)) / sizeof (struct in6_addr);
     /* pick home agent global addresses for this home address */
      if ((nhaa = hal_pick(reqaddr, hagent_addr, &src, haif, count)) < 0) {
 	syslog(LOG_ERR, __FUNCTION__ "cannot fild any home agents in home agent list.\n");

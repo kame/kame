@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.h,v 1.10 2003/10/31 12:19:41 t-momose Exp $	*/
+/*	$KAME: mip6_cncore.h,v 1.11 2003/12/05 01:35:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -91,7 +91,7 @@ int mip6_get_nonce(u_int16_t, mip6_nonce_t *);
 int mip6_get_nodekey(u_int16_t, mip6_nodekey_t *);
 int mip6_create_keygen_token(struct in6_addr *, mip6_nodekey_t *,
     mip6_nonce_t *, u_int8_t, void *);
-int mip6_is_valid_bu(struct ip6_hdr *, struct ip6m_binding_update *,
+int mip6_is_valid_bu(struct ip6_hdr *, struct ip6_mh_binding_update *,
     int, struct mip6_mobility_options *, struct sockaddr_in6 *,
     struct sockaddr_in6 *, int, u_int8_t *);
 int mip6_calculate_kbm_from_index(struct sockaddr_in6 *, struct sockaddr_in6 *,
@@ -102,15 +102,15 @@ int mip6_calculate_authenticator(u_int8_t *, u_int8_t *, struct in6_addr *,
     struct in6_addr *, caddr_t, size_t, int, size_t);
 
 /* Mobility Header processing. */
-int mip6_ip6mhi_input(struct mbuf *, struct ip6m_home_test_init *, int);
-int mip6_ip6mci_input(struct mbuf *, struct ip6m_careof_test_init *, int);
-int mip6_ip6mu_input(struct mbuf *, struct ip6m_binding_update *, int);
-int mip6_ip6ma_create(struct ip6_mobility **, struct sockaddr_in6 *,
+int mip6_ip6mhi_input(struct mbuf *, struct ip6_mh_home_test_init *, int);
+int mip6_ip6mci_input(struct mbuf *, struct ip6_mh_careof_test_init *, int);
+int mip6_ip6mu_input(struct mbuf *, struct ip6_mh_binding_update *, int);
+int mip6_ip6ma_create(struct ip6_mh **, struct sockaddr_in6 *,
     struct sockaddr_in6 *, struct sockaddr_in6 *, u_int8_t, u_int16_t,
     u_int32_t, u_int32_t, struct mip6_mobility_options *);
-int mip6_ip6me_create(struct ip6_mobility **, struct sockaddr_in6 *,
+int mip6_ip6me_create(struct ip6_mh **, struct sockaddr_in6 *,
     struct sockaddr_in6 *, u_int8_t, struct sockaddr_in6 *);
-int mip6_get_mobility_options(struct ip6_mobility *, int, int,
+int mip6_get_mobility_options(struct ip6_mh *, int, int,
     struct mip6_mobility_options *);
 int mip6_cksum(struct sockaddr_in6 *, struct sockaddr_in6 *, u_int32_t,
     u_int8_t, char *);

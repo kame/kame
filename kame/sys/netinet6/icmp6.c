@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.364 2003/10/21 03:06:54 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.365 2003/12/05 01:35:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -810,14 +810,14 @@ icmp6_input(mp, offp, proto)
 		break;
 
 #if defined(MIP6) && defined(MIP6_HOME_AGENT)
-	case ICMP6_DHAAD_REQUEST:
+	case MIP6_HA_DISCOVERY_REQUEST:
 		if (icmp6len < sizeof(struct dhaad_req))
 			goto badlen;
 		if (code != 0)
 			goto badcode;
 		break;
 
-	case ICMP6_MOBILEPREFIX_SOLICIT:
+	case MIP6_PREFIX_SOLICIT:
 		if (icmp6len < sizeof(struct mobile_prefix_solicit))
 			goto badlen;
 		if (code != 0)
@@ -826,8 +826,8 @@ icmp6_input(mp, offp, proto)
 #endif /* MIP6 && MIP6_HOME_AGENT */
 
 #if defined(MIP6) && defined(MIP6_MOBILE_NODE)
-	case ICMP6_DHAAD_REPLY:
-		if (icmp6len < sizeof(struct dhaad_rep))
+	case MIP6_HA_DISCOVERY_REPLY:
+		if (icmp6len < sizeof(struct mip6_dhaad_rep))
 			goto badlen;
 		if (code != 0)
 			goto badcode;
@@ -837,8 +837,8 @@ icmp6_input(mp, offp, proto)
 		}
 		break;
 
-	case ICMP6_MOBILEPREFIX_ADVERT:
-		if (icmp6len < sizeof (struct mobile_prefix_advert))
+	case MIP6_PREFIX_ADVERT:
+		if (icmp6len < sizeof (struct mip6_prefix_advert))
 			goto badlen;
 		if (code != 0)
 			goto badcode;

@@ -1,4 +1,4 @@
-/*	$KAME: mpa.c,v 1.7 2003/10/02 14:08:42 t-momose Exp $	*/
+/*	$KAME: mpa.c,v 1.8 2003/12/05 01:35:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: mpa.c,v 1.7 2003/10/02 14:08:42 t-momose Exp $
+ * $Id: mpa.c,v 1.8 2003/12/05 01:35:14 keiichi Exp $
  */
 
 #include <sys/param.h>
@@ -122,7 +122,7 @@ void
 mpi_solicit_input(pi, sin6_hoa, mps)
     struct in6_pktinfo *pi;
     struct sockaddr_in6 *sin6_hoa;
-    struct mobile_prefix_solicit *mps; 
+    struct mip6_prefix_solicit *mps; 
 {   
     int ifga_index = -1;
     struct in6_addr ha_addr;
@@ -148,7 +148,7 @@ mpi_solicit_input(pi, sin6_hoa, mps)
     } else
 #endif
     src = ha_addr;
-    mpi_advert_output(sin6_hoa, &src, haif, mps->mp_sol_id);
+    mpi_advert_output(sin6_hoa, &src, haif, mps->mip6_ps_id);
 err:
 }
 
@@ -165,23 +165,23 @@ mpi_advert_output(dst, src, haif, id)
     struct cmsghdr *cm;
     struct nd_opt_prefix_info *prefix_info;
     u_int8_t buf[IPV6_MMTU];
-    struct mobile_prefix_advert *map;
+    struct mip6_prefix_advert *map;
     int len;
     int count;
     int npi;
     struct in6_pktinfo *pi;
     
     /* create ICMPv6 message */
-    map = (struct mobile_prefix_advert *)buf;
-    bzero(map, sizeof (struct mobile_prefix_advert));
-    map->mp_adv_type = ICMP6_MOBILEPREFIX_ADVERT;
-    map->mp_adv_code = 0;
+    map = (struct mip6_prefix_advert *)buf;
+    bzero(map, sizeof (struct mip6_prefix_advert));
+    map->mip6_pa_type = MIP6_PREFIX_ADVERT;
+    map->mip6_pa_code = 0;
 
-    len = sizeof(struct mobile_prefix_advert);
+    len = sizeof(struct mip6_prefix_advert);
     prefix_info = (struct nd_opt_prefix_info *)&map[1];
     /* count number of prefix informations -- to make assurance (not in spec.) */
     count = (IPV6_MMTU - sizeof (struct ip6_hdr) - /* XXX: should include the size of routing header*/
-			 sizeof (struct mobile_prefix_advert)) / sizeof (struct nd_opt_prefix_info);
+			 sizeof (struct mip6_prefix_advert)) / sizeof (struct nd_opt_prefix_info);
 
     /* Pick home agent prefixes */
     /* -- search by dest. address instead of Home Address */
@@ -195,8 +195,8 @@ mpi_advert_output(dst, src, haif, id)
     
     len += npi * sizeof (struct nd_opt_prefix_info);
 
-    map->mp_adv_cksum = 0;
-    map->mp_adv_id = id;
+    map->mip6_pa_cksum = 0;
+    map->mip6_pa_id = id;
     sndmhdr.msg_name = (caddr_t)dst;
     sndmhdr.msg_namelen = dst->sin6_len;
     sndmhdr.msg_iov[0].iov_base = (caddr_t)buf;

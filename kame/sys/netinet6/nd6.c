@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.334 2003/09/29 09:41:06 t-momose Exp $	*/
+/*	$KAME: nd6.c,v 1.335 2003/12/05 01:35:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -431,7 +431,7 @@ nd6_options(ndopts)
 		case ND_OPT_TARGET_LINKADDR:
 		case ND_OPT_MTU:
 		case ND_OPT_REDIRECTED_HEADER:
-		case ND_OPT_ADVINTERVAL:
+		case ND_OPT_ADV_INTERVAL:
 		case ND_OPT_SOURCE_ADDRLIST:
 		case ND_OPT_TARGET_ADDRLIST:
 			if (ndopts->nd_opt_array[nd_opt->nd_opt_type]) {
@@ -452,7 +452,7 @@ nd6_options(ndopts)
 			ndopts->nd_opts_pi_end =
 				(struct nd_opt_prefix_info *)nd_opt;
 			break;
-		case ND_OPT_HOMEAGENT_INFO:
+		case ND_OPT_HA_INFORMATION:
 			break;
 		default:
 			/*

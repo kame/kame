@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.405 2003/11/11 19:05:25 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.406 2003/12/05 01:35:17 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -223,7 +223,7 @@ struct ip6_exthdrs {
 	struct mbuf *ip6e_rthdr2;	/* for MIP6 */
 	struct mbuf *ip6e_haddr;	/* for MIP6 */
 	struct mbuf *ip6e_dest2;
-	struct mbuf *ip6e_mobility;	/* for MIP6 */
+	struct mbuf *ip6e_mh;		/* for MIP6 */
 };
 
 static int ip6_pcbopt __P((int, u_char *, int, struct ip6_pktopts **,
@@ -412,7 +412,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		/* Destination options header(2nd part) */
 		MAKE_EXTHDR(opt->ip6po_dest2, &exthdrs.ip6e_dest2);
 #ifdef MIP6
-		MAKE_EXTHDR(opt->ip6po_mobility, &exthdrs.ip6e_mobility);
+		MAKE_EXTHDR(opt->ip6po_mh, &exthdrs.ip6e_mh);
 #endif /* MIP6 */
 	}
 #ifdef MIP6
@@ -465,7 +465,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		 * ip6_output().
 		 */
 		if ((mip6opt.mip6po_mobility != NULL) &&
-		    (exthdrs.ip6e_mobility == NULL)) {
+		    (exthdrs.ip6e_mh == NULL)) {
 			/*
 			 * insert a mobility header created by
 			 * mip6_exthdr_create() only if no mobility
@@ -473,7 +473,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			 * caller.
 			 */
 			MAKE_EXTHDR(mip6opt.mip6po_mobility,
-			    &exthdrs.ip6e_mobility);
+			    &exthdrs.ip6e_mh);
 		}
 	} else {
 		/*
@@ -482,16 +482,16 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		 */
 	}
 
-	if (exthdrs.ip6e_mobility) {
+	if (exthdrs.ip6e_mh) {
 		mip6stat.mip6s_omobility++;
 		if (ip6->ip6_nxt != IPPROTO_NONE || m->m_next != NULL)
 			panic("not supported piggyback");
-		exthdrs.ip6e_mobility->m_next = m->m_next;
-		m->m_next = exthdrs.ip6e_mobility;
-		*mtod(exthdrs.ip6e_mobility, u_char *) = ip6->ip6_nxt;
+		exthdrs.ip6e_mh->m_next = m->m_next;
+		m->m_next = exthdrs.ip6e_mh;
+		*mtod(exthdrs.ip6e_mh, u_char *) = ip6->ip6_nxt;
 		ip6->ip6_nxt = IPPROTO_MH;
-		m->m_pkthdr.len += exthdrs.ip6e_mobility->m_len;
-		exthdrs.ip6e_mobility = NULL;
+		m->m_pkthdr.len += exthdrs.ip6e_mh->m_len;
+		exthdrs.ip6e_mh = NULL;
 	}
 #endif /* MIP6 */
 
@@ -1710,7 +1710,7 @@ freehdrs:
 #ifdef MIP6
 	m_freem(exthdrs.ip6e_haddr);
 	m_freem(exthdrs.ip6e_rthdr2);
-	m_freem(exthdrs.ip6e_mobility);
+	m_freem(exthdrs.ip6e_mh);
 #endif /* MIP6 */
 	/* FALLTHROUGH */
 bad:

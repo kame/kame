@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.24 2003/08/26 13:37:47 keiichi Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.25 2003/12/05 01:35:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -101,9 +101,9 @@ mip6_bu_pri_fsm(mbu, event, data)
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	struct timeval mono_time;
 #endif
-	struct ip6m_binding_request *ip6mr;
-	struct ip6m_binding_ack *ip6ma;
-	struct ip6m_binding_error *ip6me;
+	struct ip6_mh_binding_request *ip6mr;
+	struct ip6_mh_binding_ack *ip6ma;
+	struct ip6_mh_binding_error *ip6me;
 	struct icmp6_hdr *icmp6;
 	struct hif_softc *hif;
 
@@ -118,9 +118,9 @@ mip6_bu_pri_fsm(mbu, event, data)
 	mbu_pri_fsm_state = &mbu->mbu_pri_fsm_state;
 
 	/* set pointers. */
-	ip6mr = (struct ip6m_binding_request *)data;
-	ip6ma = (struct ip6m_binding_ack *)data;
-	ip6me = (struct ip6m_binding_error *)data;
+	ip6mr = (struct ip6_mh_binding_request *)data;
+	ip6ma = (struct ip6_mh_binding_ack *)data;
+	ip6me = (struct ip6_mh_binding_error *)data;
 	icmp6 = (struct icmp6_hdr *)data;
 	hif = (struct hif_softc *)data;
 
@@ -1515,8 +1515,8 @@ mip6_bu_sec_fsm(mbu, event, data)
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	struct timeval mono_time;
 #endif
-	struct ip6m_home_test *ip6mh;
-	struct ip6m_careof_test *ip6mc;
+	struct ip6_mh_home_test *ip6mh;
+	struct ip6_mh_careof_test *ip6mc;
 
 	/* sanity check. */
 	if (mbu == NULL)
@@ -1530,8 +1530,8 @@ mip6_bu_sec_fsm(mbu, event, data)
 	mbu_sec_fsm_state = &mbu->mbu_sec_fsm_state;
 
 	/* set pointers. */
-	ip6mh = (struct ip6m_home_test *)data;
-	ip6mc = (struct ip6m_careof_test *)data;
+	ip6mh = (struct ip6_mh_home_test *)data;
+	ip6mc = (struct ip6_mh_careof_test *)data;
 
 	error = 0;
 
@@ -1583,9 +1583,9 @@ mip6_bu_sec_fsm(mbu, event, data)
 			 */
 			/* XXX */
 			mbu->mbu_home_nonce_index
-			    = htons(ip6mh->ip6mh_nonce_index);
-			bcopy(ip6mh->ip6mh_token, mbu->mbu_home_token,
-			    sizeof(ip6mh->ip6mh_token));
+			    = htons(ip6mh->ip6mhht_nonce_index);
+			bcopy(ip6mh->ip6mhht_token8, mbu->mbu_home_token,
+			    sizeof(ip6mh->ip6mhht_token8));
 
 			*mbu_sec_fsm_state = MIP6_BU_SEC_FSM_STATE_WAITC;
 
@@ -1597,9 +1597,9 @@ mip6_bu_sec_fsm(mbu, event, data)
 			 */
 			/* XXX */
 			mbu->mbu_careof_nonce_index
-			    = htons(ip6mc->ip6mc_nonce_index);
-			bcopy(ip6mc->ip6mc_token, mbu->mbu_careof_token,
-			    sizeof(ip6mc->ip6mc_token));
+			    = htons(ip6mc->ip6mhct_nonce_index);
+			bcopy(ip6mc->ip6mhct_token8, mbu->mbu_careof_token,
+			    sizeof(ip6mc->ip6mhct_token8));
 
 			*mbu_sec_fsm_state = MIP6_BU_SEC_FSM_STATE_WAITH;
 			break;
@@ -1642,9 +1642,9 @@ mip6_bu_sec_fsm(mbu, event, data)
 			 * RR done.
 			 */
 			mbu->mbu_home_nonce_index
-			    = htons(ip6mh->ip6mh_nonce_index);
-			bcopy(ip6mh->ip6mh_token, mbu->mbu_home_token,
-			    sizeof(ip6mh->ip6mh_token));
+			    = htons(ip6mh->ip6mhht_nonce_index);
+			bcopy(ip6mh->ip6mhht_token8, mbu->mbu_home_token,
+			    sizeof(ip6mh->ip6mhht_token8));
 
 			mip6_bu_stop_timers(mbu);
 
@@ -1698,9 +1698,9 @@ mip6_bu_sec_fsm(mbu, event, data)
 			 * RR done.
 			 */
 			mbu->mbu_careof_nonce_index
-			    = htons(ip6mc->ip6mc_nonce_index);
-			bcopy(ip6mc->ip6mc_token, mbu->mbu_careof_token,
-			    sizeof(ip6mc->ip6mc_token));
+			    = htons(ip6mc->ip6mhct_nonce_index);
+			bcopy(ip6mc->ip6mhct_token8, mbu->mbu_careof_token,
+			    sizeof(ip6mc->ip6mhct_token8));
 
 			mip6_bu_stop_timers(mbu);
 

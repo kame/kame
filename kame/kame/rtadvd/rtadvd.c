@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.87 2003/10/22 09:18:44 suz Exp $	*/
+/*	$KAME: rtadvd.c,v 1.88 2003/12/05 01:35:15 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1341,7 +1341,7 @@ nd6_options(struct nd_opt_hdr *hdr, int limit,
 		}
 
 #ifdef MIP6
-		if (hdr->nd_opt_type > ND_OPT_HOMEAGENT_INFO)
+		if (hdr->nd_opt_type > ND_OPT_HA_INFORMATION)
 #else
 		if (hdr->nd_opt_type > ND_OPT_MTU)
 #endif
@@ -1374,8 +1374,8 @@ nd6_options(struct nd_opt_hdr *hdr, int limit,
 		case ND_OPT_TARGET_LINKADDR:
 		case ND_OPT_REDIRECTED_HEADER:
 #ifdef MIP6
-		case ND_OPT_ADVINTERVAL:
-		case ND_OPT_HOMEAGENT_INFO:
+		case ND_OPT_ADV_INTERVAL:
+		case ND_OPT_HA_INFORMATION:
 #endif
 			break;	/* we don't care about these options */
 		case ND_OPT_SOURCE_LINKADDR:

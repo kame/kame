@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.17 2003/11/21 06:01:49 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.18 2003/12/05 01:35:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -100,7 +100,7 @@ mip6_process_hrbu(bi)
 	long time_second = time.tv_sec;
 #endif
 
-	bi->mbc_status = IP6MA_STATUS_ACCEPTED;
+	bi->mbc_status = IP6_MH_BAS_ACCEPTED;
 
 	/* find the home ifp of this homeaddress. */
 	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
@@ -115,7 +115,7 @@ mip6_process_hrbu(bi)
 		 * the haddr0 doesn't have an online prefix.  return a
 		 * binding ack with an error NOT_HOME_SUBNET.
 		 */
-		bi->mbc_status = IP6MA_STATUS_NOT_HOME_SUBNET;
+		bi->mbc_status = IP6_MH_BAS_NOT_HOME_SUBNET;
 		bi->mbc_send_ba = 1;
 		return (0); /* XXX is 0 OK? */
 	}
@@ -140,7 +140,7 @@ mip6_process_hrbu(bi)
 		mip6log((LOG_ERR,
 		    "%s:%d: invalid prefix lifetime %lu sec(s).",
 		    __FILE__, __LINE__, (u_long)prlifetime));
-		bi->mbc_status = IP6MA_STATUS_UNSPECIFIED;
+		bi->mbc_status = IP6_MH_BAS_UNSPECIFIED;
 		bi->mbc_send_ba = 1;
 		bi->mbc_lifetime = 0;
 		bi->mbc_refresh = 0;
@@ -159,7 +159,7 @@ mip6_process_hrbu(bi)
 	/* adjust lifetime */
 	if (bi->mbc_lifetime > prlifetime) {
 		bi->mbc_lifetime = prlifetime;
-		bi->mbc_status = IP6MA_STATUS_PREFIX_DISC;
+		bi->mbc_status = IP6_MH_BAS_PRFX_DISC;
 	}
 
 	/*
@@ -324,7 +324,7 @@ mip6_process_hurbu(bi)
 		 * the haddr0 doesn't have an online prefix.  return a
 		 * binding ack with an error NOT_HOME_SUBNET.
 		 */
-		bi->mbc_status = IP6MA_STATUS_NOT_HOME_SUBNET;
+		bi->mbc_status = IP6_MH_BAS_NOT_HOME_SUBNET;
 		bi->mbc_send_ba = 1;
 		bi->mbc_lifetime = bi->mbc_refresh = 0;
 		return (0); /* XXX is 0 OK? */
@@ -354,7 +354,7 @@ mip6_process_hurbu(bi)
 			mip6log((LOG_ERR,
 			    "%s:%d: can't remove BC.\n",
 			    __FILE__, __LINE__));
-			bi->mbc_status = IP6MA_STATUS_UNSPECIFIED;
+			bi->mbc_status = IP6_MH_BAS_UNSPECIFIED;
 			bi->mbc_send_ba = 1;
 			bi->mbc_lifetime = bi->mbc_refresh = 0;
 			return (error);
@@ -365,7 +365,7 @@ mip6_process_hurbu(bi)
 		mip6log((LOG_ERR,
 		    "%s:%d: can't remove BC.\n",
 		    __FILE__, __LINE__));
-		bi->mbc_status = IP6MA_STATUS_UNSPECIFIED;
+		bi->mbc_status = IP6_MH_BAS_UNSPECIFIED;
 		bi->mbc_send_ba = 1;
 		bi->mbc_lifetime = bi->mbc_refresh = 0;
 		return (error);
@@ -757,7 +757,7 @@ int
 mip6_dad_duplicated(ifa)
 	struct ifaddr *ifa;
 {
-	return mip6_dad_error(ifa, IP6MA_STATUS_DAD_FAILED);
+	return mip6_dad_error(ifa, IP6_MH_BAS_DAD_FAILED);
 }
 
 int

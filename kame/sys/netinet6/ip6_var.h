@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.121 2003/11/03 04:20:52 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.122 2003/12/05 01:35:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -169,7 +169,7 @@ struct	ip6_pktopts {
 	struct	ip6_dest *ip6po_dest2;
 
 	/* Mobility header (just before an upper layer header) */
-	struct	ip6_mobility *ip6po_mobility;
+	struct	ip6_mh *ip6po_mh;
 
 	int	ip6po_tclass;	/* traffic class */
 
