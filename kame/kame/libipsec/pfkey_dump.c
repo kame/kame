@@ -1,4 +1,4 @@
-/*	$KAME: pfkey_dump.c,v 1.33 2001/09/25 14:29:47 sakane Exp $	*/
+/*	$KAME: pfkey_dump.c,v 1.34 2001/10/02 02:14:42 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -538,7 +538,7 @@ str_upperspec(ulp, p1, p2)
 {
 	if (ulp == IPSEC_ULPROTO_ANY)
 		printf("any");
-	if (ulp == IPPROTO_ICMPV6) {
+	else if (ulp == IPPROTO_ICMPV6) {
 		printf("icmp6");
 		if (!(p1 == IPSEC_PORT_ANY && p2 == IPSEC_PORT_ANY))
 			printf(" %d,%d", p1, p2);
