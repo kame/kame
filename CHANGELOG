@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1162 2000/07/28 10:01:31 kjc Exp $
+$KAME: CHANGELOG,v 1.1163 2000/07/28 23:22:39 sumikawa Exp $
 
 <200007>
+Sat Jul 29 07:57:41 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/{libpcap,tcpdump}: use 2000/7/24 weekly snap
+	  from tcpdump.org.
+
 Fri 28 Jul 18:56:23 JST 2000  kjc@csl.sony.co.jp
 	* make altqd aware of token bucket regulators
 	 - install a token bucket regulator when an interface is
