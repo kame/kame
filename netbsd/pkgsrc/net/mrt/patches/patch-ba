@@ -1,6 +1,17 @@
---- lib/rip/ripng.c-	Tue Jan  5 18:19:37 1999
-+++ lib/rip/ripng.c	Tue Jan  5 18:20:25 1999
-@@ -397,8 +397,13 @@
+--- lib/rip/ripng.c.orig	Fri Feb 12 00:11:09 1999
++++ lib/rip/ripng.c	Tue Aug 24 23:08:52 1999
+@@ -370,8 +370,8 @@
+         memcpy (&ripng.sin6_addr, 
+ 		prefix_toaddr6 (interface->link_local->prefix), 16);
+ #ifdef __KAME__
+-	ripng.sin6_addr.s6_addr8[2] = (interface->index >> 8) & 0xff;
+-	ripng.sin6_addr.s6_addr8[3] = interface->index & 0xff;
++	ripng.sin6_addr.s6_addr[2] = (interface->index >> 8) & 0xff;
++	ripng.sin6_addr.s6_addr[3] = interface->index & 0xff;
+ #endif /* __KAME__ */
+     }
+ 
+@@ -399,8 +399,13 @@
  {
      struct ipv6_mreq mreq;
      char tmp6[INET6_ADDRSTRLEN];
@@ -14,7 +25,18 @@
      interface_t *interface = rip_interface->interface;
  
      /* 
-@@ -442,8 +447,13 @@
+@@ -416,8 +421,8 @@
+ 	/* This is unnessesary when responding to a unicast address which
+ 	   includes an index */
+ 
+-	mreq.ipv6mr_multiaddr.s6_addr8[2] = (interface->index >> 8) & 0xff;
+-	mreq.ipv6mr_multiaddr.s6_addr8[3] = interface->index & 0xff;
++	mreq.ipv6mr_multiaddr.s6_addr[2] = (interface->index >> 8) & 0xff;
++	mreq.ipv6mr_multiaddr.s6_addr[3] = interface->index & 0xff;
+ #endif /* __KAME__ */
+ 
+ #if defined(NRL_IPV6) || defined(SOLARIS_IPV6)
+@@ -444,8 +449,13 @@
  	    }
  	}
  #endif /* SOLARIS_IPV6 */
@@ -28,3 +50,14 @@
      }
  
  	if (rip_interface->sockfd >= 0) {
+@@ -534,8 +544,8 @@
+ 
+ 	    memcpy (&sin6, addr, sizeof (sin6));
+ 	    addr = &sin6;
+-	    addr->sin6_addr.s6_addr8[2] = (interface->index >> 8) & 0xff;
+-	    addr->sin6_addr.s6_addr8[3] = interface->index & 0xff;
++	    addr->sin6_addr.s6_addr[2] = (interface->index >> 8) & 0xff;
++	    addr->sin6_addr.s6_addr[3] = interface->index & 0xff;
+ 	}
+ #endif /* __KAME__ */
+ 	mhdr.msg_name = (char *) addr;
