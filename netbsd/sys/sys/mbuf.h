@@ -253,7 +253,7 @@ struct mbuf {
 		(m)->m_nextpkt = (struct mbuf *)NULL; \
 		(m)->m_data = (m)->m_pktdat; \
 		(m)->m_flags = M_PKTHDR; \
-		(m)->m_pkthdr.aux = (void *)NULL; \
+		(m)->m_pkthdr.aux = (struct mbuf *)NULL; \
 	} else \
 		(m) = m_retryhdr((how), (type)); \
 } while (0)
@@ -414,7 +414,7 @@ do {									\
  */
 #define	M_COPY_PKTHDR(to, from) do { \
 	(to)->m_pkthdr = (from)->m_pkthdr; \
-	(from)->m_pkthdr.aux = (void *)NULL; \
+	(from)->m_pkthdr.aux = (struct mbuf *)NULL; \
 	(to)->m_flags = (from)->m_flags & M_COPYFLAGS; \
 	(to)->m_data = (to)->m_pktdat; \
 } while (0)
