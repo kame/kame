@@ -1,4 +1,4 @@
-/*	$KAME: des_setkey.c,v 1.4 2000/08/31 07:27:27 itojun Exp $	*/
+/*	$KAME: des_setkey.c,v 1.5 2000/11/06 13:58:09 itojun Exp $	*/
 
 /* crypto/des/set_key.c */
 /* Copyright (C) 1995-1996 Eric Young (eay@mincom.oz.au)
@@ -55,8 +55,11 @@
  * 1.0 First working version
  */
 #include <sys/param.h>
-#include <sys/malloc.h>
+#ifdef _KERNEL
 #include <sys/systm.h>
+#else
+#include <string.h>
+#endif
 #include <crypto/des/des_locl.h>
 #include <crypto/des/podd.h>
 #include <crypto/des/sk.h>

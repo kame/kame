@@ -1,4 +1,4 @@
-/*	$KAME: bf_skey.c,v 1.4 2000/09/18 21:21:19 itojun Exp $	*/
+/*	$KAME: bf_skey.c,v 1.5 2000/11/06 13:58:08 itojun Exp $	*/
 
 /* crypto/bf/bf_skey.c */
 /* Copyright (C) 1995-1997 Eric Young (eay@mincom.oz.au)
@@ -60,7 +60,11 @@
 
 #include <sys/types.h>
 #include <sys/time.h>
+#ifdef _KERNEL
 #include <sys/systm.h>
+#else
+#include <string.h>
+#endif
 #include <crypto/blowfish/blowfish.h>
 #include <crypto/blowfish/bf_locl.h>
 #include <crypto/blowfish/bf_pi.h>

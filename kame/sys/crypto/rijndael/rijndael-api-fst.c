@@ -1,4 +1,4 @@
-/*	$KAME: rijndael-api-fst.c,v 1.6 2000/10/03 03:14:52 jinmei Exp $	*/
+/*	$KAME: rijndael-api-fst.c,v 1.7 2000/11/06 13:58:09 itojun Exp $	*/
 
 /*
  * rijndael-api-fst.c   v2.3   April '2000
@@ -16,8 +16,12 @@
  */
 
 #include <sys/param.h>
-#include <sys/systm.h>
 #include <sys/types.h>
+#ifdef _KERNEL
+#include <sys/systm.h>
+#else
+#include <string.h>
+#endif
 #include <crypto/rijndael/rijndael-alg-fst.h>
 #include <crypto/rijndael/rijndael-api-fst.h>
 #include <crypto/rijndael/rijndael_local.h>

@@ -1,4 +1,4 @@
-/*	$KAME: cast128.c,v 1.3 2000/03/27 04:36:29 sumikawa Exp $	*/
+/*	$KAME: cast128.c,v 1.4 2000/11/06 13:58:08 itojun Exp $	*/
 
 /*
  * heavily modified by Tomomi Suzuki <suzuki@grelot.elec.ryukoku.ac.jp>
@@ -36,7 +36,11 @@
  */
 
 #include <sys/param.h>
+#ifdef _KERNEL
 #include <sys/systm.h>
+#else
+#include <string.h>
+#endif
 #include <crypto/cast128/cast128.h>
 #include <crypto/cast128/cast128_subkey.h>
 
