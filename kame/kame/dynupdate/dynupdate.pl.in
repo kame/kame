@@ -1,6 +1,6 @@
 #! @PERL@
 
-#	$KAME: dynupdate.pl.in,v 1.1 2001/02/20 03:26:17 itojun Exp $
+#	$KAME: dynupdate.pl.in,v 1.2 2001/02/20 03:34:16 itojun Exp $
 
 # Copyright (C) 2001 WIDE Project.
 # All rights reserved.
@@ -43,9 +43,22 @@
 $ifconfig = '@IFCONFIG@';
 $nsupdate = '@NSUPDATE@';
 #$tsigkey = 'dyn.your.domain:secret';
-$name = 'yourhost';
-$domain = 'dyn.your.domain';
+#$name = 'yourhost';
+#$domain = 'dyn.your.domain';
 $ttl = 3600;
+
+if (scalar(@ARGV) == 0) {
+	die "no FQDN defined" if (!defined($name) || !defined($domain));
+} elsif (scalar(@ARGV) == 1) {
+	if ($ARGV[0] =~ /^([^\.]*)\.(.*)$/) {
+		($name, $domain) = ($1, $2);
+	} else {
+		die "no domain defined" if (!defined($domain));
+		$name = $ARGV[0];
+	}
+} else {
+	die "invalid number of arguments";
+}
 
 open(ADDRS, "$ifconfig -a |") || die;
 
