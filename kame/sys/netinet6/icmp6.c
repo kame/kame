@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.227 2001/07/24 02:10:44 sumikawa Exp $	*/
+/*	$KAME: icmp6.c,v 1.228 2001/07/24 02:21:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -624,10 +624,13 @@ icmp6_input(mp, offp, proto)
 		/*
 		 * Copy mbuf to send to two data paths: userland socket(s),
 		 * and to the querier (echo reply).
+		 * m: a copy for socket, n: a copy for querier
 		 */
 		if ((n = m_copym(m, 0, M_COPYALL, M_DONTWAIT)) == NULL) {
-			/* Give up remote */
-			break;
+			/* Give up local */
+			n = m;
+			m = NULL;
+			goto deliverecho;
 		}
 		/*
 		 * If the first mbuf is shared, or the first mbuf is too short,
@@ -657,9 +660,11 @@ icmp6_input(mp, offp, proto)
 				}
 			}
 			if (n == NULL) {
-				/* Give up remote */
+				/* Give up local */
 				m_freem(n0);
-				break;
+				n = m;
+				m = NULL;
+				goto deliverecho;
 			}
 			M_COPY_PKTHDR(n, n0);
 			/*
@@ -682,6 +687,7 @@ icmp6_input(mp, offp, proto)
 			n->m_next = n0;
 			n0->m_flags &= ~M_PKTHDR;
 		} else {
+	 deliverecho:
 			nip6 = mtod(n, struct ip6_hdr *);
 			nicmp6 = (struct icmp6_hdr *)((caddr_t)nip6 + off);
 			noff = off;
@@ -693,6 +699,8 @@ icmp6_input(mp, offp, proto)
 			icmp6stat.icp6s_outhist[ICMP6_ECHO_REPLY]++;
 			icmp6_reflect(n, noff);
 		}
+		if (!m)
+			goto freeit;
 		break;
 
 	case ICMP6_ECHO_REPLY:
