@@ -1,7 +1,7 @@
 # $NetBSD$
 #
 
-DISTNAME=	pchar-1.0
+DISTNAME=	pchar-1.1.1
 CATEGORIES=	net
 MASTER_SITES=	http://www.ca.sandia.gov/~bmah/Software/pchar/
 
@@ -9,6 +9,6 @@ MAINTAINER=	itojun@itojun.org
 HOMEPAGE=	http://www.ca.sandia.gov/~bmah/Software/pchar/
 
 GNU_CONFIGURE=	yes
-CONFIGURE_ARGS+=--with-ipv6
+CONFIGURE_ARGS+=--with-ipv6=/usr/local/v6
 
 .include "../../mk/bsd.pkg.mk"
