@@ -273,7 +273,7 @@ in6_pcbbind(in6p, nam)
 			 * address, so we forbid it.
 			 *
 			 * We should allow to bind to a deprecated address,
-			 * since the application dare to use it.
+			 * since the application dares to use it.
 			 * But, can we assume that they are careful enough
 			 * to check if the address is deprecated or not?
 			 * Maybe, as a safeguard, we should have a setsockopt
