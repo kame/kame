@@ -205,13 +205,20 @@ intpr(interval, ifnetaddr, pfunc)
 				printf("%-13.13s ", netname(in.s_addr,
 				    ifaddr.in.ia_subnetmask));
 #else
-				printf("%-13.13s ",
-				    netname(ifaddr.in.ia_subnet,
-				    ifaddr.in.ia_subnetmask));
+				cp = netname(ifaddr.in.ia_subnet,
+				    ifaddr.in.ia_subnetmask);
+				if (vflag)
+					n = strlen(cp) < 13 ? 13 : strlen(cp);
+				else
+					n = 13;
+				printf("%-*.*s ", n, n, cp);
 #endif
-				printf("%-17.17s ",
-				    routename(sin->sin_addr.s_addr));
-
+				cp = routename(sin->sin_addr.s_addr);
+				if (vflag)
+					n = strlen(cp) < 17 ? 17 : strlen(cp);
+				else
+					n = 17;
+				printf("%-*.*s ", n, n, cp);
 				if (aflag) {
 					u_long multiaddr;
 					struct in_multi inm;
