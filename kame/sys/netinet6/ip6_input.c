@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.144 2000/12/04 05:36:09 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.145 2001/01/21 08:26:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -279,6 +279,10 @@ ip6_init()
 	int i;
 #ifndef __OpenBSD__
 	struct timeval tv;
+#endif
+
+#ifdef RADIX_ART
+	rt_tables[AF_INET6]->rnh_addrsize = sizeof(struct in6_addr);
 #endif
 
 #ifdef DIAGNOSTIC
@@ -626,9 +630,17 @@ ip6_input(m)
 	 */
 	if ((m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) != 0) {
 		if (IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_dst)) {
-			ours = 1;
-			deliverifp = m->m_pkthdr.rcvif;
-			goto hbhcheck;
+			if (in6ifa_ifpwithaddr(m->m_pkthdr.rcvif,
+			    &ip6->ip6_dst)) {
+				ours = 1;
+				deliverifp = m->m_pkthdr.rcvif;
+				goto hbhcheck;
+			} else {
+				icmp6_error(m, ICMP6_DST_UNREACH,
+				    ICMP6_DST_UNREACH_ADDR, 0);
+				/* m is already freed */
+				return;
+			}
 		}
 	}
 
