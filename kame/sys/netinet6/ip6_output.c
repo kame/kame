@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.90 2000/03/30 07:16:44 sumikawa Exp $	*/
+/*	$KAME: ip6_output.c,v 1.91 2000/04/04 08:48:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -842,6 +842,14 @@ skip_ipsec2:;
 	}
 
 	/*
+	 * setsockopt(IPv6_USE_MIN_MTU) overrides mtu setting
+	 */
+#ifdef IPV6_MINMTU
+	if ((flags & IPV6_MINMTU) != 0 && mtu > IPV6_MMTU)
+		mtu = IPV6_MMTU;
+#endif
+
+	/*
 	 * Fake link-local scope-class addresses
 	 */
 	if ((ifp->if_flags & IFF_LOOPBACK) == 0) {
@@ -1385,8 +1393,8 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_RECVPKTINFO:
 			case IPV6_RECVHOPLIMIT:
 			case IPV6_RECVRTHDR:
-#ifdef notyet			/* To be implemented */
 			case IPV6_USE_MIN_MTU:
+#ifdef notyet			/* To be implemented */
 			case IPV6_RECVPATHMTU:
 #endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -1513,6 +1521,12 @@ ip6_ctloutput(op, so, level, optname, mp)
 					case IPV6_FAITH:
 						OPTSET(IN6P_FAITH);
 						break;
+
+#ifdef IN6P_MINMTU
+					case IPV6_USE_MIN_MTU:
+						OPTSET(IN6P_MINMTU);
+						break;
+#endif
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
 					case IPV6_BINDV6ONLY:
@@ -1819,8 +1833,8 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_RECVPKTINFO:
 			case IPV6_RECVHOPLIMIT:
 			case IPV6_RECVRTHDR:
-#ifdef notyet			/* To be implemented */
 			case IPV6_USE_MIN_MTU:
+#ifdef notyet			/* To be implemented */
 			case IPV6_RECVPATHMTU:
 #endif
 
@@ -1868,6 +1882,12 @@ ip6_ctloutput(op, so, level, optname, mp)
 					optval = in6p->in6p_cksum;
 #endif
 					break;
+
+#ifdef IN6P_MINMTU
+				case IPV6_USE_MIN_MTU:
+					optval = OPTBIT(IN6P_MINMTU);
+					break;
+#endif
 
 				case IPV6_FAITH:
 					optval = OPTBIT(IN6P_FAITH);

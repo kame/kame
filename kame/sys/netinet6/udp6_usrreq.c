@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.42 2000/03/25 07:24:03 sumikawa Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.43 2000/04/04 08:48:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -596,6 +596,7 @@ udp6_output(in6p, m, addr6, control)
 #ifdef __NetBSD__
 	struct ip *ip;
 #endif
+	int flags;
 
 	priv = 0;
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -759,12 +760,18 @@ udp6_output(in6p, m, addr6, control)
 			udp6->uh_sum = 0xffff;
 		}
 
+		flags = 0;
+#ifdef IN6P_MINMTU
+		if (in6p->in6p_flags & IN6P_MINMTU)
+			flags |= IPV6_MINMTU;
+#endif
+
 		udp6stat.udp6s_opackets++;
 #ifdef IPSEC
 		ipsec_setsocket(m, in6p->in6p_socket);
 #endif /*IPSEC*/
 		error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route,
-			    0, in6p->in6p_moptions, NULL);
+			    flags, in6p->in6p_moptions, NULL);
 		break;
 	case AF_INET:
 #if defined(INET) && defined(__NetBSD__)

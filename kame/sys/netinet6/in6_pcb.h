@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.h,v 1.22 2000/03/22 16:02:58 jinmei Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.23 2000/03/25 07:23:44 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -128,6 +128,7 @@ struct	in6pcb {
 #define IN6P_ANONPORT		0x4000000 /* port chosen for user */
 #define IN6P_FAITH		0x8000000 /* accept FAITH'ed connections */
 #define IN6P_BINDV6ONLY		0x10000000 /* do not grab IPv4 traffic */
+#define IN6P_MINMTU		0x20000000 /* use minimum MTU */
 
 #define IN6P_CONTROLOPTS	(IN6P_PKTINFO|IN6P_HOPLIMIT|IN6P_HOPOPTS|\
 				 IN6P_DSTOPTS|IN6P_RTHDR|IN6P_RTHDRDSTOPTS)

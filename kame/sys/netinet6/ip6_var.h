@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.30 2000/03/29 03:45:57 sumikawa Exp $	*/
+/*	$KAME: ip6_var.h,v 1.31 2000/04/04 08:48:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -243,6 +243,7 @@ struct	ip6stat {
 /* flags passed to ip6_output as last parameter */
 #define	IPV6_DADOUTPUT		0x01	/* DAD */
 #define	IPV6_FORWARDING		0x02	/* most of IPv6 header exists */
+#define	IPV6_MINMTU		0x04	/* use minimum MTU (IPV6_USE_MIN_MTU) */
 
 extern struct	ip6stat ip6stat;	/* statistics */
 extern u_int32_t ip6_id;		/* fragment identifier */
