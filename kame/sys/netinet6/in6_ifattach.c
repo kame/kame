@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.111 2001/02/10 14:30:19 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.112 2001/02/10 15:44:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -61,6 +61,7 @@
 
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/in6_var.h>
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
@@ -513,6 +514,7 @@ in6_ifattach_linklocal(ifp, altifp)
 	struct ifnet *ifp;
 	struct ifnet *altifp;	/* secondary EUI64 source */
 {
+	struct in6_ifaddr *ia;
 	struct in6_aliasreq ifra;
 	struct nd_prefix pr0;
 	int i, error;
@@ -591,6 +593,23 @@ in6_ifattach_linklocal(ifp, altifp)
 	}
 
 	/*
+	 * Adjust ia6_flags so that in6_if_up will perform DAD.
+	 * XXX: Some P2P interfaces seem not to send packets just after
+	 * becoming up, so we skip p2p interfaces for safety.
+	 */
+	ia = in6ifa_ifpforlinklocal(ifp, 0); /* ia must not be NULL */
+#ifdef DIAGNOSTIC
+	if (!ia) {
+		panic("ia == NULL in in6_ifattach_linklocal");
+		/*NOTREACHED*/
+	}
+#endif
+	if (in6if_do_dad(ifp) && (ifp->if_flags & IFF_POINTOPOINT) == 0) {
+		ia->ia6_flags &= ~IN6_IFF_NODAD;
+		ia->ia6_flags |= IN6_IFF_TENTATIVE;
+	}
+
+	/*
 	 * Make the link-local prefix (fe80::/64%link) as on-link.
 	 * Since we'd like to manage prefixes separately from addresses,
 	 * we make an ND6 prefix structure for the link-local prefix,
@@ -618,13 +637,12 @@ in6_ifattach_linklocal(ifp, altifp)
 	pr0.ndpr_pltime = ND6_INFINITE_LIFETIME;
 	/*
 	 * Since there is no other link-local addresses, nd6_prefix_lookup()
-	 * probably returns NULL.  However, we cannot expect the result.
+	 * probably returns NULL.  However, we cannot always expect the result.
 	 * For example, if we first remove the (only) existing link-local
 	 * address, and then reconfigure another one, the prefix is still
 	 * valid with referring to the old link-local address.
 	 */
 	if (nd6_prefix_lookup(&pr0) == NULL) {
-		/* add the prefix if there's one. */
 		if ((error = nd6_prelist_add(&pr0, NULL, NULL)) != 0)
 			return(error);
 	}
@@ -916,43 +934,8 @@ in6_ifattach(ifp, altifp)
 		goto statinit;
 
 	ia = in6ifa_ifpforlinklocal(ifp, 0);
-	if (ia == NULL) {
-		if (in6_ifattach_linklocal(ifp, altifp) != 0)
-			return;
-		ia = in6ifa_ifpforlinklocal(ifp, 0);
-
-		if (ia == NULL) { /* impossible! */
-			log(LOG_ERR, "%s: failed to add link-local address\n",
-			    if_name(ifp));
-
-			/* we can't initialize multicasts without link-local */
-			goto statinit;
-		}
-
-		/*
-		 * Adjust the flags so that in6_if_up will perform DAD.
-		 * I believe we should basically do DAD on non-loopback
-		 * interfaces. (20010122 jinmei@kame.net)
-		 * XXX: our DAD routine requires the interface up and running.
-		 * However, some interfaces can be up before the RUNNING
-		 * status.  We skip DAD in such a case as a work around.
-		 * (But, is it really correct?)
-		 */
-		if ((ifp->if_flags & IFF_LOOPBACK) == 0 &&
-		    (ifp->if_flags & IFF_POINTOPOINT) == 0 &&
-		    (ifp->if_flags & (IFF_UP|IFF_RUNNING)) ==
-		    (IFF_UP|IFF_RUNNING)) {
-			ia->ia6_flags &= ~IN6_IFF_NODAD;
-			ia->ia6_flags |= IN6_IFF_TENTATIVE;
-		}
-	}
-
-#ifdef DIAGNOSTIC
-	if (!ia) {
-		panic("ia == NULL in in6_ifattach");
-		/*NOTREACHED*/
-	}
-#endif
+	if (ia == NULL && in6_ifattach_linklocal(ifp, altifp) != 0)
+		goto statinit;
 
 statinit:
 

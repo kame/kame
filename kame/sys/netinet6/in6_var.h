@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.53 2001/02/10 02:44:27 itojun Exp $	*/
+/*	$KAME: in6_var.h,v 1.54 2001/02/10 15:44:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -681,6 +681,7 @@ int	in6_control __P((struct socket *, u_long, caddr_t, struct ifnet *));
 int	in6_update_ifa __P((struct ifnet *, struct in6_aliasreq *,
 			    struct in6_ifaddr *));
 void	in6_purgeaddr __P((struct ifaddr *));
+int	in6if_do_dad __P((struct ifnet *));
 void	in6_purgeif __P((struct ifnet *));
 void	in6_savemkludge __P((struct in6_ifaddr *));
 void	in6_setmaxmtu   __P((void));
