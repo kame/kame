@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.52 2002/09/23 16:26:43 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.53 2002/09/24 07:20:28 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -861,6 +861,11 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 		ba_safe = 1;
 		goto accept_binding_ack;
 	}
+
+	if (mip6_config.mcfg_use_ipsec
+	    && (mbu->mbu_flags & IP6MU_HOME) != 0
+	    && ba_safe == 1)
+		goto accept_binding_ack;
 
 	if ((mbu->mbu_flags & IP6MU_HOME) == 0) {
 		goto accept_binding_ack;
