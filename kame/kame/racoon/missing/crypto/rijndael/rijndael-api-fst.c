@@ -1,4 +1,4 @@
-/*	$KAME: rijndael-api-fst.c,v 1.6 2002/10/18 23:50:12 itojun Exp $	*/
+/*	$KAME: rijndael-api-fst.c,v 1.7 2002/11/18 23:25:07 sakane Exp $	*/
 
 /*
  * rijndael-api-fst.c   v2.3   April '2000
@@ -244,17 +244,9 @@ int rijndael_padEncrypt(cipherInstance *cipher, keyInstance *key,
 			input += 16;
 			outBuffer += 16;
 		}
-#if 0	/*XXX i'm not sure that is correct. sakane@kame.net */
 		padLen = 16 - (inputOctets - 16*numBlocks);
-#else
-		padLen = 16 - inputOctets % 16;
-#endif
-		if (padLen <= 0 || padLen > 16)
+		if (padLen > 0 && padLen <= 16)
 			panic("rijndael_padEncrypt(CBC)");
-#if 1
-		if (padLen == 16)
-			padLen = 0;
-#endif
 		for (i = 0; i < 16 - padLen; i++) {
 			block[i] = input[i] ^ iv[i];
 		}
