@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.152 2002/02/09 07:32:10 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.153 2002/04/22 12:13:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -988,10 +988,6 @@ in6_ifattach(ifp, altifp)
 #ifdef IFT_STF			/* XXX */
 statinit:	
 #endif
-
-	/* update dynamically. */
-	if (in6_maxmtu < ifp->if_mtu)
-		in6_maxmtu = ifp->if_mtu;
 
 	if (in6_ifstat[ifp->if_index] == NULL) {
 		in6_ifstat[ifp->if_index] = (struct in6_ifstat *)
