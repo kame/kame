@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.56 1999/08/24 14:43:23 jinmei Exp $
+$Id: CHANGELOG,v 1.57 1999/08/24 14:48:25 itojun Exp $
 
 <199908>
+Tue Aug 24 23:45:36 JST 1999  itojun@iijlab.net
+	* freebsd[23]/ports/mrt, netbsd/pkgsrc/net/mrt: upgrade to mrt 2.0.0a.
+
 1999-08-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6dd: fixed a bug that pim6dd with a local listener
 	didn't correctly stop forwarding when it became an assert looser.
