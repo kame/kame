@@ -268,6 +268,9 @@ typedef struct pim_jp_encod_grp_ {
 #define PIM_MESSAGE_HELLO_HOLDTIME_LENGTH       2
 #define PIM_MESSAGE_HELLO_HOLDTIME_FOREVER      0xffff
 
+/* PIM HELLO additional addresses option (experimental) */
+#define PIM_MESSAGE_HELLO_ADDRESSES		65001
+
 /* PIM_REGISTER definitions */
 #define PIM_MESSAGE_REGISTER_BORDER_BIT         0x80000000
 #define PIM_MESSAGE_REGISTER_NULL_REGISTER_BIT  0x40000000

@@ -523,11 +523,12 @@ parse_pim6_hello(pim_message, datalen, src, holdtime)
     u_int16        	*holdtime;
 {
     u_int8         *pim_hello_message;
-    u_int8         *data_ptr;
+    u_int8         *data_ptr, *lim;
     u_int16         option_type;
     u_int16         option_length;
     int             holdtime_received_ok = FALSE;
     int             option_total_length;
+    pim6_encod_uni_addr_t 	encod_uniaddr;
 
     pim_hello_message = (u_int8 *) (pim_message + sizeof(struct pim));
     datalen -= sizeof(struct pim);
@@ -543,13 +544,25 @@ parse_pim6_hello(pim_message, datalen, src, holdtime)
 	    if (PIM_MESSAGE_HELLO_HOLDTIME_LENGTH != option_length)
 	    {
 		IF_DEBUG(DEBUG_PIM_HELLO)
-		    log(LOG_DEBUG, 0,
+		    log(LOG_INFO, 0,
 		    "PIM HELLO Holdtime from %s: invalid OptionLength = %u",
 			inet6_fmt(&src->sin6_addr), option_length);
 		return (FALSE);
 	    }
 	    GET_HOSTSHORT(*holdtime, data_ptr);
 	    holdtime_received_ok = TRUE;
+	    break;
+	case PIM_MESSAGE_HELLO_ADDRESSES:
+	    for (lim = data_ptr + option_length; data_ptr < lim; ) {
+		if (*data_ptr != ADDRF_IPv6 || /* XXX */
+		    data_ptr + 18 >= lim)
+		    return(FALSE);
+
+		GET_EUADDR6(&encod_uniaddr, data_ptr);
+		IF_DEBUG(DEBUG_PIM_HELLO)
+		    log(LOG_DEBUG, 0, "PIM HELLO additional address %s",
+			inet6_fmt(&encod_uniaddr.unicast_addr));
+	    }
 	    break;
 	default:
 	    /* Ignore any unknown options */
@@ -572,9 +585,12 @@ parse_pim6_hello(pim_message, datalen, src, holdtime)
 	datalen -= option_total_length;
 	pim_hello_message += option_total_length;
     }
+
+    if (datalen != 0)		/* malformed packet */
+	return(FALSE);
+    
     return (holdtime_received_ok);
 }
-
 
 int
 send_pim6_hello(v, holdtime)
@@ -582,15 +598,35 @@ send_pim6_hello(v, holdtime)
     u_int16         holdtime;
 {
     char           *buf;
-    u_int8         *data_ptr;
+    u_int8         *data_ptr, *data_ptr0;
+    struct phaddr  *pa;
 
     int             datalen;
 
     buf = pim6_send_buf + sizeof(struct pim);
     data_ptr = (u_int8 *) buf;
+
+    /* encode the holdtime option */
     PUT_HOSTSHORT(PIM_MESSAGE_HELLO_HOLDTIME, data_ptr);
     PUT_HOSTSHORT(PIM_MESSAGE_HELLO_HOLDTIME_LENGTH, data_ptr);
     PUT_HOSTSHORT(holdtime, data_ptr);
+
+    /* encode the additional addresses option (experimental) */
+    data_ptr0 = data_ptr;
+    data_ptr += 4;		/* sizeof(type + length) */
+    for (pa = v->uv_addrs; pa; pa = pa->pa_next) {
+	if (inet6_equal(&v->uv_linklocal->pa_addr, &pa->pa_addr))
+	    continue;
+
+	PUT_EUADDR6(pa->pa_addr.sin6_addr, data_ptr);
+    }
+    if ((datalen = data_ptr - data_ptr0 - 4) > 0) {
+	/* at least one address is encoded. */
+	PUT_HOSTSHORT(PIM_MESSAGE_HELLO_ADDRESSES, data_ptr0);
+	PUT_HOSTSHORT(datalen, data_ptr0);
+    }
+    else
+	data_ptr = data_ptr0;	/* rewind the pointer */
 
     datalen = data_ptr - (u_int8 *) buf;
 
