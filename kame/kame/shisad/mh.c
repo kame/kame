@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.14 2005/02/03 13:22:08 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.15 2005/02/06 10:27:53 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -428,31 +428,11 @@ get_bid_option(ip6mh, hlen, ip6mhlen)
         struct ip6_mh *ip6mh;
         int hlen, ip6mhlen;
 {
-        u_int8_t *mh, *mhend;
-	u_int16_t bid = 0;
+	struct mip6_mobility_options mopts;
 
-        mh = (caddr_t)(ip6mh) + hlen;
-        mhend = (caddr_t)(ip6mh) + ip6mhlen;
-
-        while (mh < mhend) {
-                switch (*mh) {
-		case IP6_MHOPT_PAD1:
-			mh++;
-			continue;
-		case IP6_MHOPT_BID:
-			bid = ntohs(((struct ip6_mh_opt_bid *)mh)->ip6mobid_bid);
-			if (debug)
-				syslog(LOG_INFO, "BID (%d) is found in MH\n", bid);
-
-			return (bid);
-		default:
-			break;
-                }
-
-                mh += *(mh + 1) + 2;
-        }
-
-        return (0);
+	if (get_mobility_options(ip6mh, hlen, ip6mhlen, &mopts) < 0)
+		return (0);
+	return (ntohs(mopts.opt_bid->ip6mobid_bid));
 }
 #endif /* MIP_MCOA */
 
@@ -754,8 +734,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	   in an exsiting Binding Cache entry, ...
 	 */
 	if (!IN6_ARE_ADDR_EQUAL(coa, hoa) &&
-	    mip6_bc_lookup(coa, NULL, bid)
-	)
+	    mip6_bc_lookup(coa, NULL, bid))
 		return (-1);
 
 	/* Get Binding Cache entry */
@@ -770,20 +749,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 		goto sendba;
 	}
 
-#ifdef MIP_CN
-	/*
-	 * Home Registration flag check. 
-	 * Note L and K flags are ignored on cnd if this node acts as HA.
-	 */
-	if (homeagent_mode && (flags & IP6_MH_BU_HOME)) {
-		/* 
-		 * this BU is verified by had.
-		 * silently discard by cnd
-		 */
-		return (-1);
-
-	}
-#elif defined(MIP_HA)
+#ifdef MIP_HA
 	/* 
 	 * requesting node's HoA is belong to its Home
 	 * Agent or not. 
@@ -803,7 +769,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 			return (-1);
 
 	} else if (flags & IP6_MH_BU_LLOCAL) {
-		/* Not Implemented yet */
+		/* Nothing todo here */
 	} else if (flags & IP6_MH_BU_KEYM) {
 		/* Not Implemented yet */
 	} 
