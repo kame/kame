@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.157 2002/06/22 12:03:06 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.158 2002/06/22 12:25:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -456,6 +456,12 @@ ipsec4_getpolicybysock(m, dir, so, error)
 		panic("ipsec4_getpolicybysock: unsupported address family\n");
 	}
 
+#ifdef DIAGNOSTIC
+	/* sanity check */
+	if (pcbsp == NULL)
+		panic("ipsec4_getpolicybysock: pcbsp is NULL.\n");
+#endif
+
 	/* if we have a cached entry, and if it is still valid, use it. */
 	ipsecstat.spdcachelookup++;
 	currsp = ipsec_checkpcbcache(m, pcbsp, dir);
@@ -464,10 +470,6 @@ ipsec4_getpolicybysock(m, dir, so, error)
 		return currsp;
 	}
 	ipsecstat.spdcachemiss++;
-
-	/* sanity check */
-	if (pcbsp == NULL)
-		panic("ipsec4_getpolicybysock: pcbsp is NULL.\n");
 
 	switch (dir) {
 	case IPSEC_DIR_INBOUND:
@@ -658,6 +660,12 @@ ipsec6_getpolicybysock(m, dir, so, error)
 
 	pcbsp = sotoin6pcb(so)->in6p_sp;
 
+#ifdef DIAGNOSTIC
+	/* sanity check */
+	if (pcbsp == NULL)
+		panic("ipsec6_getpolicybysock: pcbsp is NULL.\n");
+#endif
+
 	/* if we have a cached entry, and if it is still valid, use it. */
 	ipsec6stat.spdcachelookup++;
 	currsp = ipsec_checkpcbcache(m, pcbsp, dir);
@@ -666,10 +674,6 @@ ipsec6_getpolicybysock(m, dir, so, error)
 		return currsp;
 	}
 	ipsec6stat.spdcachemiss++;
-
-	/* sanity check */
-	if (pcbsp == NULL)
-		panic("ipsec6_getpolicybysock: pcbsp is NULL.\n");
 
 	switch (dir) {
 	case IPSEC_DIR_INBOUND:
