@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.37 2000/08/30 11:18:33 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.38 2000/09/12 14:35:38 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -313,7 +313,7 @@ agg_i2recv(iph1, msg)
 	/* XXX to be checked each authentication method. */
 
 	/* check SA payload and set approval SA for use */
-	if (ipsecdoi_checkph1proposal(iph1->sa, iph1) < 0) {
+	if (ipsecdoi_checkph1proposal(satmp, iph1) < 0) {
 		plog(logp, LOCATION, iph1->remote,
 			"failed to get valid proposal.\n");
 		/* XXX send information */
