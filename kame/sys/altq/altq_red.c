@@ -1,4 +1,4 @@
-/*	$KAME: altq_red.c,v 1.2 2000/02/22 14:00:34 itojun Exp $	*/
+/*	$KAME: altq_red.c,v 1.3 2000/04/17 10:46:58 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-1999
@@ -58,13 +58,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_red.c,v 1.2 2000/02/22 14:00:34 itojun Exp $
+ * $Id: altq_red.c,v 1.3 2000/04/17 10:46:58 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 #include "opt_altq.h"
 #if !defined(__FreeBSD__) || (__FreeBSD__ > 2)
 #include "opt_inet.h"
+#if (__FreeBSD__ > 3)
+#include "opt_inet6.h"
+#endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
 #ifdef RED	/* red is enabled by RED option in opt_altq.h */
@@ -261,7 +264,11 @@ redioctl(dev, cmd, addr, flag, p)
 	case RED_GETSTATS:
 		break;
 	default:
+#if (__FreeBSD_version > 400000)
+		if ((error = suser(p)) != 0)
+#else
 		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+#endif
 			return (error);
 		break;
 	}

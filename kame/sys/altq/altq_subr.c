@@ -1,4 +1,4 @@
-/*	$KAME: altq_subr.c,v 1.2 2000/02/22 14:00:35 itojun Exp $	*/
+/*	$KAME: altq_subr.c,v 1.3 2000/04/17 10:46:58 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-1999
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_subr.c,v 1.2 2000/02/22 14:00:35 itojun Exp $
+ * $Id: altq_subr.c,v 1.3 2000/04/17 10:46:58 kjc Exp $
  */
 
 #ifdef ALTQ
@@ -33,6 +33,9 @@
 #include "opt_altq.h"
 #if !defined(__FreeBSD__) || (__FreeBSD__ > 2)
 #include "opt_inet.h"
+#if (__FreeBSD__ > 3)
+#include "opt_inet6.h"
+#endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
 

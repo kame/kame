@@ -1,4 +1,4 @@
-/*	$KAME: altq_conf.c,v 1.2 2000/02/22 14:00:32 itojun Exp $	*/
+/*	$KAME: altq_conf.c,v 1.3 2000/04/17 10:46:57 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-1999
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_conf.c,v 1.2 2000/02/22 14:00:32 itojun Exp $
+ * $Id: altq_conf.c,v 1.3 2000/04/17 10:46:57 kjc Exp $
  */
 
 #ifdef ALTQ
@@ -33,6 +33,9 @@
 #include "opt_altq.h"
 #if !defined(__FreeBSD__) || (__FreeBSD__ > 2)
 #include "opt_inet.h"
+#if (__FreeBSD__ > 3)
+#include "opt_inet6.h"
+#endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
 
@@ -44,7 +47,7 @@
 #include <sys/socket.h>
 #include <sys/kernel.h>
 #include <sys/errno.h>
-#if defined(__FreeBSD__) && defined(DEVFS)
+#if defined(__FreeBSD__) && (__FreeBSD_version < 400000) && defined(DEVFS)
 #include <sys/devfsext.h>
 #endif /*DEVFS*/
 #include <net/if.h>
@@ -167,10 +170,17 @@ void	altqattach __P((int));
 #endif
 
 #if defined(__FreeBSD__)
+#if (__FreeBSD_version < 400000)
 static struct cdevsw altq_cdevsw = 
         { altqopen,	altqclose,	noread,	        nowrite,
 	  altqioctl,	nostop,		nullreset,	nodevtotty,
- 	  seltrue,	nommap,		NULL,	"altq",	NULL,	-1 };
+ 	  seltrue,	nommap,		NULL,	"altq",	NULL,	  -1 };
+#else
+static struct cdevsw altq_cdevsw = 
+        { altqopen,	altqclose,	noread,	        nowrite,
+	  altqioctl,	seltrue,	nommap,		nostrategy,	
+	  "altq",	CDEV_MAJOR,	nodump,		nopsize,  0,  -1 };
+#endif
 #elif defined(__NetBSD__)
 static struct cdevsw altq_cdevsw = cdev__oci_init(1,altq);
 #elif defined(__OpenBSD__)
@@ -256,6 +266,7 @@ altqioctl(dev, cmd, addr, flag, p)
 static int altq_devsw_installed = 0;
 
 #ifdef __FreeBSD__
+#if (__FreeBSD_version < 400000)
 #ifdef DEVFS
 static	void *altq_devfs_token[sizeof (altqsw) / sizeof (altqsw[0])];
 #endif
@@ -282,6 +293,26 @@ altq_drvinit(unused)
 		printf("altq: major number is %d\n", CDEV_MAJOR);
 	}
 }
+
+#else /* FreeBSD 4.x */
+
+static void
+altq_drvinit(unused)
+	void *unused;
+{
+	int unit;
+
+	cdevsw_add(&altq_cdevsw);
+	altq_devsw_installed = 1;
+	printf("altq: major number is %d\n", CDEV_MAJOR);
+
+	/* create minor devices */
+	for (unit = 0; unit < naltqsw; unit++)
+		make_dev(&altq_cdevsw, unit, 0, 0, 0644,
+			 altqsw[unit].d_name);
+}
+
+#endif /* FreeBSD 4.x */
 
 SYSINIT(altqdev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE+CDEV_MAJOR,altq_drvinit,NULL)
 

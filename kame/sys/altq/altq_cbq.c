@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.c,v 1.2 2000/02/22 14:00:31 itojun Exp $	*/
+/*	$KAME: altq_cbq.c,v 1.3 2000/04/17 10:46:57 kjc Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -29,13 +29,16 @@
  *  
  * These notices must be retained in any copies of any part of this software.
  *
- * $Id: altq_cbq.c,v 1.2 2000/02/22 14:00:31 itojun Exp $
+ * $Id: altq_cbq.c,v 1.3 2000/04/17 10:46:57 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 #include "opt_altq.h"
 #if !defined(__FreeBSD__) || (__FreeBSD__ > 2)
 #include "opt_inet.h"
+#if (__FreeBSD__ > 3)
+#include "opt_inet6.h"
+#endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
 #ifdef CBQ	/* cbq is enabled by CBQ option in opt_altq.h */
@@ -983,7 +986,11 @@ cbqioctl(dev, cmd, addr, flag, p)
 		/* currently only command that an ordinary user can call */
 		break;
 	default:
+#if (__FreeBSD_version > 400000)
+		error = suser(p);
+#else
 		error = suser(p->p_ucred, &p->p_acflag);
+#endif
 		if (error)
 			return (error);
 		break;

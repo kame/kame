@@ -1,4 +1,4 @@
-/*	$KAME: altq_rio.c,v 1.3 2000/02/22 14:00:34 itojun Exp $	*/
+/*	$KAME: altq_rio.c,v 1.4 2000/04/17 10:46:58 kjc Exp $	*/
 
 /*
  * Copyright (C) 1998-1999
@@ -57,13 +57,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_rio.c,v 1.3 2000/02/22 14:00:34 itojun Exp $
+ * $Id: altq_rio.c,v 1.4 2000/04/17 10:46:58 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 #include "opt_altq.h"
 #if !defined(__FreeBSD__) || (__FreeBSD__ > 2)
 #include "opt_inet.h"
+#if (__FreeBSD__ > 3)
+#include "opt_inet6.h"
+#endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
 #ifdef RIO	/* rio is enabled by RIO option in opt_altq.h */
@@ -238,7 +241,11 @@ rioioctl(dev, cmd, addr, flag, p)
 	case RIO_GETSTATS:
 		break;
 	default:
+#if (__FreeBSD_version > 400000)
+		if ((error = suser(p)) != 0)
+#else
 		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+#endif
 			return (error);
 		break;
 	}

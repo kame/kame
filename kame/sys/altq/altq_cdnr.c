@@ -1,4 +1,4 @@
-/*	$KAME: altq_cdnr.c,v 1.3 2000/02/22 14:00:31 itojun Exp $	*/
+/*	$KAME: altq_cdnr.c,v 1.4 2000/04/17 10:46:57 kjc Exp $	*/
 
 /*
  * Copyright (C) 1999
@@ -25,13 +25,16 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_cdnr.c,v 1.3 2000/02/22 14:00:31 itojun Exp $
+ * $Id: altq_cdnr.c,v 1.4 2000/04/17 10:46:57 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 #include "opt_altq.h"
 #if !defined(__FreeBSD__) || (__FreeBSD__ > 2)
 #include "opt_inet.h"
+#if (__FreeBSD__ > 3)
+#include "opt_inet6.h"
+#endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
 
@@ -1586,7 +1589,11 @@ cdnrioctl(dev, cmd, addr, flag, p)
 	case CDNR_GETSTATS:
 		break;
 	default:
+#if (__FreeBSD_version > 400000)
+		if ((error = suser(p)) != 0)
+#else
 		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+#endif
 			return (error);
 		break;
 	}

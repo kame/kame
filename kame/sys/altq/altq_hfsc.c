@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.c,v 1.3 2000/02/22 14:00:33 itojun Exp $	*/
+/*	$KAME: altq_hfsc.c,v 1.4 2000/04/17 10:46:58 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -32,7 +32,7 @@
  * and to grant Carnegie Mellon the rights to redistribute these
  * changes without encumbrance.
  *
- * $Id: altq_hfsc.c,v 1.3 2000/02/22 14:00:33 itojun Exp $
+ * $Id: altq_hfsc.c,v 1.4 2000/04/17 10:46:58 kjc Exp $
  */
 /*
  * H-FSC is described in Proceedings of SIGCOMM'97,
@@ -45,6 +45,9 @@
 #include "opt_altq.h"
 #if !defined(__FreeBSD__) || (__FreeBSD__ > 2)
 #include "opt_inet.h"
+#if (__FreeBSD__ > 3)
+#include "opt_inet6.h"
+#endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
 
@@ -1579,7 +1582,11 @@ hfscioctl(dev, cmd, addr, flag, p)
 	case HFSC_GETSTATS:
 		break;
 	default:
+#if (__FreeBSD_version > 400000)
+		if ((error = suser(p)) != 0)
+#else
 		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+#endif
 			return (error);
 		break;
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: altq_wfq.c,v 1.2 2000/02/22 14:00:36 itojun Exp $	*/
+/*	$KAME: altq_wfq.c,v 1.3 2000/04/17 10:46:58 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-1999
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_wfq.c,v 1.2 2000/02/22 14:00:36 itojun Exp $
+ * $Id: altq_wfq.c,v 1.3 2000/04/17 10:46:58 kjc Exp $
  */
 /*
  *  March 27, 1997.  Written by Hiroshi Kyusojin of Keio University
@@ -36,6 +36,9 @@
 #include "opt_altq.h"
 #if !defined(__FreeBSD__) || (__FreeBSD__ > 2)
 #include "opt_inet.h"
+#if (__FreeBSD__ > 3)
+#include "opt_inet6.h"
+#endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
 #ifdef WFQ
@@ -672,12 +675,12 @@ wfqioctl(dev, cmd, addr, flag, p)
 	case WFQ_GET_STATS:
 		break;
 	default:
-		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0) {
-#ifdef WFQ_DEBUG
-			printf("wfqioctl()...not super user\n");
+#if (__FreeBSD_version > 400000)
+		if ((error = suser(p)) != 0)
+#else
+		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
 #endif
 			return (error);
-		}
 		break;
 	}
 
