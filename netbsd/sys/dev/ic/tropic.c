@@ -1566,7 +1566,7 @@ caddr_t data;
 			}
 			arp_ifinit(ifp, ifa);
 			break;
-#endif INET
+#endif /*INET*/
 		default:
 			/* XXX if not running */
 			if ((ifp->if_flags & IFF_RUNNING) == 0) {
