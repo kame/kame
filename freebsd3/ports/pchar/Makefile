@@ -7,10 +7,10 @@
 # $FreeBSD: ports/net/pchar/Makefile,v 1.5 2000/01/24 23:20:51 obrien Exp $
 #
 
-DISTNAME=	pchar-1.1.1
+DISTNAME=	pchar-1.2
 #CATEGORIES=	net ipv6
 CATEGORIES=	net
-MASTER_SITES=	http://www.ca.sandia.gov/~bmah/Software/pchar/
+MASTER_SITES=	http://www.employees.org/~bmah/Software/pchar/
 
 MAINTAINER=     obrien@FreeBSD.org
 
