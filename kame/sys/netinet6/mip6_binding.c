@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.86 2002/02/19 00:58:45 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.87 2002/02/19 01:31:26 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1198,6 +1198,7 @@ mip6_process_bu(m, opt)
 				/* sanity check for overflow */
 				if (mbc->mbc_expire < time_second)
 					mbc->mbc_expire = 0x7fffffff;
+				mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
 			}
 			
 			if (bu_opt->ip6ou_flags & IP6_BUF_ACK) {
@@ -1672,6 +1673,7 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 			/* sanity check for overflow */
 			if (mbc->mbc_expire < time_second)
 				mbc->mbc_expire = 0x7fffffff;
+			mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
 
 			/* modify encapsulation entry */
 			if (mip6_tunnel_control(MIP6_TUNNEL_CHANGE,
@@ -1751,6 +1753,7 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 				/* sanity check for overflow */
 				if (mbc->mbc_expire < time_second)
 					mbc->mbc_expire = 0x7fffffff;
+				mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
 
 				if (IN6_IS_ADDR_LINKLOCAL(&haddr))
 					continue;
