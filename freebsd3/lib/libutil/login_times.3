@@ -17,16 +17,16 @@
 .\" 5. Modifications may be freely made to this file providing the above
 .\"    conditions are met.
 .\"
-.\" $FreeBSD: src/lib/libutil/login_times.3,v 1.4.4.1 1999/08/29 14:57:54 peter Exp $
+.\" $FreeBSD: src/lib/libutil/login_times.3,v 1.4.4.3 1999/09/21 19:41:08 phantom Exp $
 .\"
 .Dd January 2, 1997
 .Os FreeBSD
 .Dt LOGIN_TIMES 3
 .Sh NAME
-.Nm parse_lt
-.Nm in_ltm
+.Nm parse_lt ,
+.Nm in_ltm ,
 .Nm in_ltms
-.Nd Functions for parsing and checking login time periods
+.Nd functions for parsing and checking login time periods
 .Sh SYNOPSIS
 .Fd #include <sys/types.h>
 .Fd #include <time.h>
@@ -68,7 +68,7 @@ Note that all time periods reference system local time.
 .Pp
 The
 .Fn parse_lt
-function converts the ascii representation of a time period into
+function converts the ASCII representation of a time period into
 a structure of type
 .Ft login_time_t .
 This is defined as:
@@ -95,8 +95,8 @@ A series
 .Em LTM_*
 macros may be used for testing bits individually and in combination.
 If no bits are set in this field - ie. it contains the value
-.Em LTM_NONE -
-then the entire period is assumed invalid.
+.Em LTM_NONE
+- then the entire period is assumed invalid.
 This is used as a convention to mark the termination of an array
 of login_time_t values.
 If
