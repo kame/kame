@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.65 2002/01/18 08:35:02 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.66 2002/01/21 10:41:40 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1287,6 +1287,8 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 		}
 	}
 	else {
+		int found = 0;
+
 		for(mbc = LIST_FIRST(&mip6_bc_list);
 		    mbc;
 		    mbc = mbc_next) {
@@ -1304,6 +1306,8 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 #endif /* MIP6_DRAFT13 */
 				    ))
 				continue;
+
+			found = 1;
 
 			/* remove rtable for proxy ND */
 			error = mip6_bc_proxy_control(&mbc->mbc_phaddr, haaddr,
@@ -1340,6 +1344,14 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 						0);
 				return (error);
 			}
+		}
+		if (found == 0) {
+			mip6_bc_send_ba(haaddr, haddr0, coa,
+					MIP6_BA_STATUS_NOT_HOME_AGENT,
+					seqno,
+					0,
+					0);
+			return (0);
 		}
 	}
 
@@ -2447,6 +2459,8 @@ success:
 	}
 	GET_NETVAL_L(ba_opt->ip6oa_refresh, mbu->mbu_refresh);
 	mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
+	if (mbu->mbu_refresh > mbu->mbu_expire)
+		mbu->mbu_refresh = mbu->mbu_expire;
 
 	if (mbu->mbu_flags & IP6_BUF_HOME) {
 		/* this is from our home agent */
@@ -2507,6 +2521,12 @@ success:
 		}
 		} else if (mbu->mbu_reg_state
 			   == MIP6_BU_REG_STATE_REGWAITACK) {
+			if (lifetime == 0) {
+				mip6log((LOG_WARNING,
+					 "%s:%d: lifetime are zero.\n",
+					 __FILE__, __LINE__));
+				/* XXX ignored */
+			}
 			/* home registration completed */
 			mbu->mbu_reg_state = MIP6_BU_REG_STATE_REG;
 
