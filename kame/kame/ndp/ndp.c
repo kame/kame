@@ -730,6 +730,7 @@ usage()
 	printf("       ndp -d[nt] hostname\n");
 	printf("       ndp -f[nt] filename\n");
 	printf("       ndp -i interface\n");
+	printf("       ndp -I interface\n");
 	printf("       ndp -p\n");
 	printf("       ndp -r\n");
 	printf("       ndp -s hostname ether_addr [temp]\n");
