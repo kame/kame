@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: kmpstat.c,v 1.12 2000/06/08 06:43:52 sakane Exp $ */
+/* YIPS @(#)$Id: kmpstat.c,v 1.13 2000/06/08 21:28:33 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -55,6 +55,8 @@
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+
+#include "libpfkey.h"
 
 #include "var.h"
 #include "misc.h"

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.45 2000/06/08 15:40:26 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.46 2000/06/08 21:28:33 itojun Exp $ */
 
 #define _PFKEY_C_
 
@@ -55,6 +55,8 @@
 #include <unistd.h>
 #endif
 #include <netdb.h>
+
+#include "libpfkey.h"
 
 #include "var.h"
 #include "misc.h"

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: session.c,v 1.5 2000/01/11 01:06:29 sakane Exp $ */
+/* YIPS @(#)$Id: session.c,v 1.6 2000/06/08 21:28:33 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -56,6 +56,8 @@
 #include <unistd.h>
 #endif
 #include <signal.h>
+
+#include "libpfkey.h"
 
 #include "var.h"
 #include "misc.h"

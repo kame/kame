@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.31 2000/05/23 16:25:08 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.32 2000/06/08 21:28:33 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -56,6 +56,8 @@
 #  include <time.h>
 # endif
 #endif
+
+#include "libpfkey.h"
 
 #include "var.h"
 #include "vmbuf.h"

@@ -1,4 +1,4 @@
-/*	$KAME: pfkey_dump.c,v 1.17 2000/05/23 14:11:14 itojun Exp $	*/
+/*	$KAME: pfkey_dump.c,v 1.18 2000/06/08 21:28:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -49,6 +49,7 @@
 #include <netdb.h>
 
 #include "ipsec_strerror.h"
+#include "libpfkey.h"
 
 #define GETMSGSTR(str, num) \
 do { \

@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.27 2000/05/19 11:04:02 itojun Exp $	*/
+/*	$KAME: pfkey.c,v 1.28 2000/06/08 21:28:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -43,6 +43,7 @@
 #include <errno.h>
 
 #include "ipsec_strerror.h"
+#include "libpfkey.h"
 
 #define CALLOC(size, cast) (cast)calloc(1, (size))
 
