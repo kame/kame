@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.357 2003/10/17 04:07:16 suz Exp $
+	$KAME: IMPLEMENTATION,v 1.358 2003/10/17 04:07:56 suz Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -230,7 +230,7 @@ draft-ietf-ipv6-scoping-arch-00.txt:
 draft-ietf-ipngwg-temp-addresses-v2-00.txt:
 	Privacy Extensions for Stateless Address Autoconfiguration in IPv6
     * a revised version of RFC 3041.
-draft-ietf-pim-sm-v2-new-02.txt
+draft-ietf-pim-sm-v2-new-08.txt
 	A revised version of RFC2362, which includes the IPv6 specific
 	packet format and protocol descriptions.
 draft-ietf-dnsext-mdns-03.txt: Multicast DNS
