@@ -103,6 +103,7 @@
 #endif
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
+#include <netinet6/in6_ifattach.h>
 #endif
 
 #ifdef NS
@@ -829,6 +830,9 @@ ether_ifattach(ifp)
 			      LLADDR(sdl), ifp->if_addrlen);
 			break;
 		}
+#ifdef INET6
+ 	in6_ifattach_getifid(ifp);
+#endif
 }
 
 static u_char ether_ipmulticast_min[6] = 
