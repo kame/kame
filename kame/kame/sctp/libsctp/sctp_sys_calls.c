@@ -1,4 +1,4 @@
-/*	$Header: /usr/home/sumikawa/kame/kame/kame/kame/sctp/libsctp/sctp_sys_calls.c,v 1.4 2003/08/29 06:37:39 itojun Exp $ */
+/*	$Header: /usr/home/sumikawa/kame/kame/kame/kame/sctp/libsctp/sctp_sys_calls.c,v 1.5 2003/08/29 06:40:32 itojun Exp $ */
 
 /*
  * Copyright (C) 2002 Cisco Systems Inc,
@@ -292,11 +292,7 @@ sctp_sendmsg(int s,
 
 	cmsg->cmsg_level = IPPROTO_SCTP;
 	cmsg->cmsg_type = SCTP_SNDRCV;
-#ifdef __FreeBSD__
-	cmsg->cmsg_len = _ALIGN(sizeof(struct cmsghdr)) + sizeof(struct sctp_sndrcvinfo);
-#else
-	cmsg->cmsg_len = __CMSG_ALIGN(sizeof(struct cmsghdr)) + sizeof(struct sctp_sndrcvinfo);
-#endif
+	cmsg->cmsg_len = CMSG_LEN(sizeof(struct sctp_sndrcvinfo));
 	s_info = (struct sctp_sndrcvinfo *)CMSG_DATA(cmsg);
 
 
