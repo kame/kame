@@ -1,4 +1,4 @@
-/*	$KAME: session.c,v 1.12 2000/09/22 18:20:55 itojun Exp $	*/
+/*	$KAME: session.c,v 1.13 2000/09/22 18:35:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: session.c,v 1.12 2000/09/22 18:20:55 itojun Exp $ */
+/* YIPS @(#)$Id: session.c,v 1.13 2000/09/22 18:35:53 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -99,7 +99,7 @@ session(void)
 
 	init_signal();
 
-#if 0
+#ifdef ENABLE_ADMINPORT
 	/* debug port has no authentication, do not open it */
 	if (admin_init() < 0)
 		exit(1);
