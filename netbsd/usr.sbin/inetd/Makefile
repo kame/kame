@@ -8,8 +8,11 @@ MLINKS=	inetd.8 inetd.conf.5
 CPPFLAGS+=-DLIBWRAP
 # Use LIBWRAP_INTERNAL for libwrap checking of inetd's `internal' services.
 #CPPFLAGS+=-DLIBWRAP_INTERNAL
-LDADD+= -lwrap
-DPADD+= ${LIBWRAP}
+LDADD+=	-L${.CURDIR}/../../lib/libwrap -L${.CURDIR}/../../lib/libwrap/obj \
+	-L/usr/local/v6/lib -lwrap
+DPADD+=	${.CURDIR}/../../lib/libwrap/libwrap.a \
+	${.CURDIR}/../../lib/libwrap/obj/libwrap.a \
+	/usr/local/v6/lib/libwrap.a
 
 # This is necessary due to be friendly with past API changes... DAMN.
 CPPFLAGS+=-Dss_family=__ss_family -Dss_len=__ss_len
