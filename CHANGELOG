@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.829 2000/04/28 04:35:57 sumikawa Exp $
+$Id: CHANGELOG,v 1.830 2000/04/28 06:23:50 itojun Exp $
 
 <200004>
 Fri Apr 28 13:34:27 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
-	* freebsd[23]/ports/rsync: upgrade to 2.4.3
+	* freebsd[23]/ports/rsync, netbsd/pkgsrc/net/rsync: upgrade to 2.4.3
 
 Fri Apr 28 00:41:36 JST 2000  itojun@iijlab.net
 	* sys/netinet6/in6_ifattach.c: correct in6_ifdetach().
