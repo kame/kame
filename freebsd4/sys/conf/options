@@ -281,7 +281,6 @@ RTPREF			opt_inet.h
 INET6			opt_inet6.h
 ENABLE_DEFAULT_SCOPE	opt_global.h
 IP6_AUTO_LINKLOCAL	opt_inet6.h
-MEASURE_PERFORMANCE	opt_inet6.h	# just for performance measurement
 SCOPEDEBUG		opt_inet6.h	# for debug only.  don't merge it.
 MIP6			opt_mip6.h
 MIP6_DEBUG		opt_mip6.h
