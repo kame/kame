@@ -1,4 +1,5 @@
-/*	$KAME: in6_pcb.c,v 1.12 2000/07/13 06:41:03 sumikawa Exp $	*/
+/*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.2 2000/07/15 07:14:33 kris Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.13 2000/07/26 15:53:09 itojun Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -63,7 +64,6 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10 2000/01/16 18:00:06 shin Exp $
  */
 
 #include "opt_ipsec.h"
@@ -107,11 +107,6 @@
 #include <netinet6/ipsec.h>
 #include <netinet6/ah.h>
 #include <netkey/key.h>
-#ifdef IPSEC_DEBUG
-#include <netkey/key_debug.h>
-#else
-#define	KEYDEBUG(lev,arg)
-#endif /* IPSEC_DEBUG */
 #endif /* IPSEC */
 
 struct	in6_addr zeroin6_addr;
@@ -810,8 +805,6 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 			continue;
 
  		if (do_rtchange) {
-			struct sockaddr_in6 *dst6;
-
  			/*
  			 * Since a non-connected PCB might have a cached route,
  			 * we always call in6_rtchange without matching
@@ -819,8 +812,8 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
  			 *
  			 * XXX: we assume in6_rtchange does not free the PCB.
  			 */
-			dst6 = (struct sockaddr_in6 *)&inp->in6p_route.ro_dst;
- 			if (IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr, &faddr6))
+ 			if (IN6_ARE_ADDR_EQUAL(&inp->in6p_route.ro_dst.sin6_addr,
+ 					       &faddr6))
  				in6_rtchange(inp, errno);
 
  			if (notify == in6_rtchange)

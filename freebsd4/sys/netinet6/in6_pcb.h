@@ -1,4 +1,5 @@
-/*	$KAME: in6_pcb.h,v 1.6 2000/07/12 13:35:52 jinmei Exp $	*/
+/*	$FreeBSD: src/sys/netinet6/in6_pcb.h,v 1.2.2.1 2000/07/15 07:14:33 kris Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.7 2000/08/05 13:06:02 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +29,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet6/in6_pcb.h,v 1.2 1999/12/29 04:46:04 peter Exp $
  */
 
 /*
