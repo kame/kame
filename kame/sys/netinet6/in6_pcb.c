@@ -209,11 +209,8 @@ in6_pcbbind(in6p, nam)
 		if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr))
 			return (EADDRNOTAVAIL);
 #endif
-
-		if (in6_embedscope(&sin6->sin6_addr, sin6) != 0)
-			return EINVAL;
-		/* this must be cleared for ifa_ifwithaddr() */
-		sin6->sin6_scope_id = 0;
+		if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
+			return (error);
 
 		lport = sin6->sin6_port;
 		if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr)) {
@@ -380,8 +377,8 @@ in6_pcbconnect(in6p, nam)
 	tmp = *sin6;
 	sin6 = &tmp;
 
-	if (in6_embedscope(&sin6->sin6_addr, sin6) != 0)
-		return EINVAL;
+	if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
+		return (error);
 
 	/* Source address selection. */
 #ifndef TCP6
