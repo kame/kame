@@ -658,10 +658,6 @@ if_qflush(ifq)
 {
 	register struct mbuf *m, *n;
 
-#ifdef ALTQ
-	if (ALTQ_IS_ENABLED((struct ifaltq *)ifq))
-		ALTQ_PURGE((struct ifaltq *)ifq);
-#endif
 	n = ifq->ifq_head;
 	while ((m = n) != NULL) {
 		n = m->m_act;
