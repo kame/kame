@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.10 2000/01/12 23:02:56 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.11 2000/02/08 18:36:22 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -409,6 +409,11 @@ base_i3recv(iph1, msg)
 		goto end;
 	}
     }
+
+	/* compute sharing secret of DH */
+	if (oakley_dh_compute(iph1->approval->dhgrp, iph1->dhpub,
+				iph1->dhpriv, iph1->dhpub_p, &iph1->dhgxy) < 0)
+		goto end;
 
 	/* generate SKEYIDs & IV & final cipher key */
 	if (oakley_skeyid_dae(iph1) < 0)
@@ -796,6 +801,11 @@ base_r2send(iph1, msg)
 	/* create HDR;KE;NONCE payload */
 	iph1->sendbuf = base_ir2sendmx(iph1);
 	if (iph1->sendbuf == NULL)
+		goto end;
+
+	/* compute sharing secret of DH */
+	if (oakley_dh_compute(iph1->approval->dhgrp, iph1->dhpub,
+				iph1->dhpriv, iph1->dhpub_p, &iph1->dhgxy) < 0)
 		goto end;
 
 	/* generate SKEYIDs & IV & final cipher key */

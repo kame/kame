@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.13 2000/01/18 20:15:49 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.14 2000/02/08 18:36:22 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -297,6 +297,11 @@ agg_i2recv(iph1, msg)
 	/* fix isakmp index */
 	memcpy(&iph1->index.r_ck, &((struct isakmp *)msg->v)->r_ck,
 		sizeof(cookie_t));
+
+	/* compute sharing secret of DH */
+	if (oakley_dh_compute(iph1->rmconf->dhgrp, iph1->dhpub,
+				iph1->dhpriv, iph1->dhpub_p, &iph1->dhgxy) < 0)
+		goto end;
 
 	/* generate SKEYIDs & IV & final cipher key */
 	if (oakley_skeyid(iph1) < 0)
@@ -585,6 +590,11 @@ agg_r1send(iph1, msg)
 	/* generate NONCE value */
 	iph1->nonce = eay_set_random(iph1->rmconf->nonce_size);
 	if (iph1->nonce == NULL)
+		goto end;
+
+	/* compute sharing secret of DH */
+	if (oakley_dh_compute(iph1->approval->dhgrp, iph1->dhpub,
+				iph1->dhpriv, iph1->dhpub_p, &iph1->dhgxy) < 0)
 		goto end;
 
 	/* generate SKEYIDs & IV & final cipher key */

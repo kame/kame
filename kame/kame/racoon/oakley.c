@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.11 2000/02/06 07:26:41 itojun Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.12 2000/02/08 18:36:23 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1364,7 +1364,7 @@ oakley_skeyid(iph1)
 		memcpy(p, bp->v, bp->l);
 		p += bp->l;
 
-		iph1->skeyid = oakley_prf(iph1->dhgxy, buf, iph1);
+		iph1->skeyid = oakley_prf(buf, iph1->dhgxy, iph1);
 		if (iph1->skeyid == NULL)
 			goto end;
 		break;
@@ -1415,14 +1415,6 @@ oakley_skeyid_dae(iph1)
 			plog(logp, LOCATION, NULL, "no SKEYID found.\n"));
 		goto end;
 	}
-
-	/* compute sharing secret of DH */
-	if (oakley_dh_compute(iph1->etype == ISAKMP_ETYPE_AGG
-					? iph1->rmconf->dhgrp
-					: iph1->approval->dhgrp,
-				iph1->dhpub,
-				iph1->dhpriv, iph1->dhpub_p, &iph1->dhgxy) < 0)
-		goto end;
 
 	/* SKEYID D */
 	/* SKEYID_d = prf(SKEYID, g^xy | CKY-I | CKY-R | 0) */

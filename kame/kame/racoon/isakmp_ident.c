@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.16 2000/01/31 13:39:13 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.17 2000/02/08 18:36:23 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -409,6 +409,11 @@ ident_i3send(iph1, msg)
 			"status mismatched %d.\n", iph1->status);
 		goto end;
 	}
+
+	/* compute sharing secret of DH */
+	if (oakley_dh_compute(iph1->approval->dhgrp, iph1->dhpub,
+				iph1->dhpriv, iph1->dhpub_p, &iph1->dhgxy) < 0)
+		goto end;
 
 	/* generate SKEYIDs & IV & final cipher key */
 	if (oakley_skeyid(iph1) < 0)
@@ -919,6 +924,11 @@ ident_r2send(iph1, msg)
 	/* create HDR;KE;NONCE payload */
 	iph1->sendbuf = ident_ir2sendmx(iph1);
 	if (iph1->sendbuf == NULL)
+		goto end;
+
+	/* compute sharing secret of DH */
+	if (oakley_dh_compute(iph1->approval->dhgrp, iph1->dhpub,
+				iph1->dhpriv, iph1->dhpub_p, &iph1->dhgxy) < 0)
 		goto end;
 
 	/* generate SKEYIDs & IV & final cipher key */
