@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/05/23 11:45:01 $
+			$Date: 2000/05/26 12:23:21 $
 
 1. IPv6
 
@@ -959,6 +959,49 @@ to bypass certain security checks (like using source address of
 KAME code is carefully written to avoid such incidents.  More specifically,
 KAME kernel will reject packets if the above addresses are used in IPv6
 source/dstination address, or IPv6 routing header.
+
+1.15 Node's required addresses
+
+RFC2373 section 2.8 talks about required addresses for the node.  The section talks about how KAME stack assignes, or manages those required addresses.
+
+1.15.1 Host case
+
+The following items are automatically assigned to the node (or the node will
+automatically joins the group), at bootstrap time:
+- Loopback address
+- All-nodes multicast addresses (ff01::1)
+
+The following items will be automatically handled when the interface becomes
+IFF_UP:
+- Its link-local address for each interface
+- Solicited-node multicast address for link-local addresses
+- Link-local allnodes multicast address (ff02::1)
+
+The following items need to be configured manually by ifconfig(8) or prefix(8).
+Alternatively, these can be autoconfigured by using stateless address
+autoconfiguration.
+- Assigned unicast/anycast addresses
+- Solicited-Node multicast address for assigned unicast address
+
+Users can join groups by using appropriate system calls like setsockopt(2).
+
+1.15.2 Router case
+
+In addition to the above, routers needs to handle the following items.
+
+The following items need to be configured manually by using ifconfig(8).
+o The subnet-router anycast addresses for the interfaces it is configured
+  to act as a router on (prefix::/64)
+o All other anycast addresses with which the router has been configured
+
+The router will join the following multicast group when rtadvd(8) is available
+for the interface.
+o All-Routers Multicast Addresses (ff02::2)
+
+Routing daemons will join appropriate multicast groups, as necessary,
+like ff02::9 for RIPng.
+
+Users can join groups by using appropriate system calls like setsockopt(2).
 
 2. Network Drivers
 
