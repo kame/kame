@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.38 2001/02/27 06:46:52 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.39 2001/04/25 11:20:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -545,9 +545,14 @@ play_child(int s_src, struct sockaddr *srcaddr)
 	conf = config_match(srcaddr, sa4);
 	if (!conf || !conf->permit) {
 		close(s_src);
-		exit_failure("translation to %s not permitted for %s", dst4,
-		    prefix_string(&conf->match));
-		/*NOTREACHED*/
+		if (conf) {
+			exit_failure("translation to %s not permitted for %s",
+			    dst4, prefix_string(&conf->match));
+			/*NOTREACHED*/
+		} else {
+			exit_failure("translation to %s not permitted", dst4);
+			/*NOTREACHED*/
+		}
 	}
 
 	syslog(LOG_INFO, "the translator is connecting to %s", dst4);
