@@ -105,7 +105,6 @@ main(argc, argv)
 		/*NOTREACHED*/
 	}
 
-	bzero(buf, sizeof(buf));
 	if (nflag == 0)
 		fd = bpf_open(iface);
 	linkhdr = linkhdrlen(fd, iface);
@@ -114,6 +113,7 @@ main(argc, argv)
 		/*NOTREACHED*/
 	}
 	for (; argc > 0; argv++, argc--) {
+		bzero(buf, sizeof(buf));
 		size = getconfig(*argv, buf + linkhdr);
 		form(fd, iface);
 		if (size && nflag == 0)
