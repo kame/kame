@@ -30,7 +30,7 @@
 #include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
-#include <netinet6/ip6.h>
+#include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet/in_pcb.h>
 #include <netinet/ip.h>
