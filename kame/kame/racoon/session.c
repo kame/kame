@@ -1,4 +1,4 @@
-/*	$KAME: session.c,v 1.34 2004/08/25 08:02:48 sakane Exp $	*/
+/*	$KAME: session.c,v 1.35 2004/08/25 08:04:02 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -193,11 +193,11 @@ exit_program(int code, const char *fmt, ...)
 	oakley_dhclean();
 
 	if (fmt == NULL)
-	      exit(code);
+		exit(code);
 	else {
-	      va_start(ap, fmt);
-	      verrx(code, fmt, ap);
-	      va_end(ap);
+		va_start(ap, fmt);
+		verrx(code, fmt, ap);
+		va_end(ap);
 	}
 }
 
