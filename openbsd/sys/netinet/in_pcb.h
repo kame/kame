@@ -184,17 +184,24 @@ struct inpcbtable {
 #define INP_IPV6_MCAST	0x800	/* Set if inp_moptions points to ipv6 ones */
 
 #if 1	/*KAME*/
-/* flags in in6p_flags */
+/*
+ * Flags in in6p_flags
+ * We define KAME's original flags in higher 16 bits as much as possible
+ * for compatibility with *bsd*s.
+ * XXX: Should IN6P_HIGHPORT and IN6P_LOWPORT be moved as well?  
+ */
 #define IN6P_HIGHPORT		INP_HIGHPORT	/* user wants "high" port */
 #define IN6P_LOWPORT		INP_LOWPORT	/* user wants "low" port */
-#define IN6P_ANONPORT		0x40		/* port chosen for user */
-#define IN6P_FAITH		0x80	/* accept FAITH'ed connections */
 #define IN6P_PKTINFO		0x010000 /* receive IP6 dst and I/F */
 #define IN6P_HOPLIMIT		0x020000 /* receive hoplimit */
 #define IN6P_HOPOPTS		0x040000 /* receive hop-by-hop options */
 #define IN6P_DSTOPTS		0x080000 /* receive dst options after rthdr */
 #define IN6P_RTHDR		0x100000 /* receive routing header */
 #define IN6P_RTHDRDSTOPTS	0x200000 /* receive dstoptions before rthdr */
+
+#define IN6P_ANONPORT		0x4000000 /* port chosen for user */
+#define IN6P_FAITH		0x8000000 /* accept FAITH'ed connections */
+
 #define IN6P_CONTROLOPTS	(IN6P_PKTINFO|IN6P_HOPLIMIT|IN6P_HOPOPTS|\
 				 IN6P_DSTOPTS|IN6P_RTHDR|IN6P_RTHDRDSTOPTS)
 #endif
