@@ -1,4 +1,4 @@
-/*	$NetBSD: rijndael.c,v 1.6 2003/08/27 14:23:27 itojun Exp $	*/
+/*	$KAME: rijndael.c,v 1.2 2003/08/28 08:23:20 itojun Exp $	*/
 
 /**             
  * rijndael-alg-fst.c 

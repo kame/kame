@@ -1,4 +1,4 @@
-/*	$KAME: esp_rijndael.c,v 1.13 2003/07/19 10:42:36 itojun Exp $	*/
+/*	$KAME: esp_rijndael.c,v 1.14 2003/08/28 08:23:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -36,7 +36,6 @@
 
 #include <net/if.h>
 #include <net/route.h>
-
 #include <netinet/in.h>
 
 #include <netinet6/ipsec.h>
@@ -46,13 +45,6 @@
 #include <crypto/rijndael/rijndael.h>
 
 #include <net/net_osdep.h>
-
-/* as rijndael uses asymmetric scheduled keys, we need to do it twice. */
-typedef struct {
-	u_int32_t	r_ek[(RIJNDAEL_MAXNR+1)*4];
-	u_int32_t	r_dk[(RIJNDAEL_MAXNR+1)*4];
-	int		r_nr; /* key-length-dependent number of rounds */
-} rijndael_ctx;
 
 size_t
 esp_rijndael_schedlen(algo)
@@ -70,12 +62,8 @@ esp_rijndael_schedule(algo, sav)
 	rijndael_ctx *ctx;
 
 	ctx = (rijndael_ctx *)sav->sched;
-	if ((ctx->r_nr = rijndaelKeySetupEnc(ctx->r_ek,
-	    (char *)_KEYBUF(sav->key_enc), _KEYLEN(sav->key_enc) * 8)) == 0)
-		return -1;
-	if (rijndaelKeySetupDec(ctx->r_dk, (char *)_KEYBUF(sav->key_enc),
-	    _KEYLEN(sav->key_enc) * 8) == 0)
-		return -1;
+	rijndael_set_key(ctx,
+	    (u_char *)_KEYBUF(sav->key_enc), _KEYLEN(sav->key_enc) * 8);
 	return 0;
 }
 
@@ -89,7 +77,7 @@ esp_rijndael_blockdecrypt(algo, sav, s, d)
 	rijndael_ctx *ctx;
 
 	ctx = (rijndael_ctx *)sav->sched;
-	rijndaelDecrypt(ctx->r_dk, ctx->r_nr, s, d);
+	rijndael_decrypt(ctx, s, d);
 	return 0;
 }
 
@@ -103,6 +91,6 @@ esp_rijndael_blockencrypt(algo, sav, s, d)
 	rijndael_ctx *ctx;
 
 	ctx = (rijndael_ctx *)sav->sched;
-	rijndaelEncrypt(ctx->r_ek, ctx->r_nr, s, d);
+	rijndael_encrypt(ctx, s, d);
 	return 0;
 }
