@@ -1,4 +1,4 @@
-/*	$KAME: if_indextoname.c,v 1.2 2000/04/18 08:39:19 itojun Exp $	*/
+/*	$KAME: if_indextoname.c,v 1.3 2000/04/18 08:40:02 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1997, 2000
@@ -57,7 +57,6 @@ char *
 if_indextoname(unsigned int ifindex, char *ifname)
 {
 	struct ifaddrs *ifaddrs, *ifa;
-	unsigned int ni;
 
 	if (getifaddrs(&ifaddrs) < 0)
 		return(NULL);
