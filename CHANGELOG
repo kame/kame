@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.927 2000/05/24 11:52:41 itojun Exp $
+$Id: CHANGELOG,v 1.928 2000/05/24 12:27:00 jinmei Exp $
 
 <200005>
+2000-05-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6s.c: the "-n dnsserv" option can now be
+	specified multiple times, when a user wants to set more than one
+	server.
+
 Wed May 24 18:59:55 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	fix to check vendor id.  HASH function for vendor id is always MD5.
