@@ -1327,6 +1327,6 @@ mip6_hdrsiz_tcp(tp)
 	if ((tp == NULL) || ((in6p = tp->t_in6pcb) == NULL))
 		return (0);
 
-	return (mip6_exthdr_size(&in6p->in6p_lsa, &in6p->in6p_fsa));
+	return (mip6_exthdr_size(&in6p->in6p_laddr, &in6p->in6p_faddr));
 }
 #endif
