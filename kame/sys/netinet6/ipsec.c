@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.191 2003/06/27 05:44:19 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.192 2003/06/27 08:37:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -671,14 +671,11 @@ ipsec4_getpolicybytag(m, dir, error)
 	u_int dir;
 	int *error;
 {
+#if NPF > 0
 	struct pf_tag *t;
 	struct secpolicy *sp = NULL;
 
-#if NPF > 0
 	t = ipsec_get_tag(m);
-#else
-	t = 0;
-#endif
 	if (!t) {
 		*error = ENOENT;
 		return NULL;
@@ -692,6 +689,7 @@ ipsec4_getpolicybytag(m, dir, error)
 		*error = 0;
 		return sp;
 	}
+#endif
 
 	/* no SP found */
 	*error = ENOENT;
@@ -914,14 +912,11 @@ ipsec6_getpolicybytag(m, dir, error)
 	u_int dir;
 	int *error;
 {
+#if NPF > 0
 	struct pf_tag *t;
 	struct secpolicy *sp = NULL;
 
-#if NPF > 0
 	t = ipsec_get_tag(m);
-#else
-	t = 0;
-#endif
 	if (!t) {
 		*error = ENOENT;
 		return NULL;
@@ -935,6 +930,7 @@ ipsec6_getpolicybytag(m, dir, error)
 		*error = 0;
 		return sp;
 	}
+#endif
 
 	/* no SP found */
 	*error = ENOENT;
