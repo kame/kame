@@ -107,6 +107,13 @@ static const char *ipsec_espnames[] = {
 	"DES derived IV",
 };
 
+static const char *ipsec_compnames[] = {
+	"none",
+	"OUI",
+	"deflate",
+	"LZS",
+};
+
 static const char *pfkey_msgtypenames[] = {
 	"reserved", "getspi", "update", "add", "delete",
 	"get", "acquire", "register", "expire", "flush",
@@ -116,17 +123,46 @@ static const char *pfkey_msgtypenames[] = {
 };
 
 static const char *pfkey_msgtype_names __P((int));
+static void ipsec_hist __P((const u_quad_t *, size_t, const char **, size_t,
+	const char *));
 
 /*
  * Dump IPSEC statistics structure.
  */
+static void
+ipsec_hist(hist, histmax, name, namemax, title)
+	const u_quad_t *hist;
+	size_t histmax;
+	const char **name;
+	size_t namemax;
+	const char *title;
+{
+	int first;
+	size_t proto;
+
+	for (first = 1, proto = 0; proto < histmax; proto++) {
+		if (hist[proto] <= 0)
+			continue;
+		if (first) {
+			printf("\t%s histogram:\n", title);
+			first = 0;
+		}
+		if (proto < namemax && name[proto]) {
+			printf("\t\t%s: %llu\n", name[proto],
+				(unsigned long long)hist[proto]);
+		} else {
+			printf("\t\t#%d: %llu\n", proto,
+				(unsigned long long)hist[proto]);
+		}
+	}
+}
+
 void
 ipsec_stats(off, name)
 	u_long off;
 	char *name;
 {
 	struct ipsecstat ipsecstat;
-	int first, proto;
 
 	if (off == 0)
 		return;
@@ -135,66 +171,36 @@ ipsec_stats(off, name)
 
 #define	p(f, m) if (ipsecstat.f || sflag <= 1) \
     printf(m, (unsigned long long)ipsecstat.f, plural(ipsecstat.f))
+#define hist(f, n, t) \
+    ipsec_hist((f), sizeof(f)/sizeof(f[0]), (n), sizeof(n)/sizeof(n[0]), (t));
 
 	p(in_success, "\t%llu inbound packet%s processed successfully\n");
 	p(in_polvio, "\t%llu inbound packet%s violated process security "
 		"policy\n");
 	p(in_nosa, "\t%llu inbound packet%s with no SA available\n");
-	p(in_inval, "\t%llu inbound packet%s failed processing due to EINVAL\n");
+	p(in_inval, "\t%llu invalid inbound packet%s\n");
+	p(in_nomem, "\t%llu inbound packet%s failed due to insufficient memory\n");
 	p(in_badspi, "\t%llu inbound packet%s failed getting SPI\n");
 	p(in_ahreplay, "\t%llu inbound packet%s failed on AH replay check\n");
 	p(in_espreplay, "\t%llu inbound packet%s failed on ESP replay check\n");
 	p(in_ahauthsucc, "\t%llu inbound packet%s considered authentic\n");
 	p(in_ahauthfail, "\t%llu inbound packet%s failed on authentication\n");
-	for (first = 1, proto = 0; proto < SADB_AALG_MAX; proto++) {
-		if (ipsecstat.in_ahhist[proto] <= 0)
-			continue;
-		if (first) {
-			printf("\tAH input histogram:\n");
-			first = 0;
-		}
-		printf("\t\t%s: %llu\n", ipsec_ahnames[proto],
-			(unsigned long long)ipsecstat.in_ahhist[proto]);
-	}
-	for (first = 1, proto = 0; proto < SADB_EALG_MAX; proto++) {
-		if (ipsecstat.in_esphist[proto] <= 0)
-			continue;
-		if (first) {
-			printf("\tESP input histogram:\n");
-			first = 0;
-		}
-		printf("\t\t%s: %llu\n", ipsec_espnames[proto],
-			(unsigned long long)ipsecstat.in_esphist[proto]);
-	}
+	hist(ipsecstat.in_ahhist, ipsec_ahnames, "AH input");
+	hist(ipsecstat.in_esphist, ipsec_espnames, "ESP input");
+	hist(ipsecstat.in_comphist, ipsec_compnames, "IPComp input");
 
 	p(out_success, "\t%llu outbound packet%s processed successfully\n");
 	p(out_polvio, "\t%llu outbound packet%s violated process security "
 		"policy\n");
 	p(out_nosa, "\t%llu outbound packet%s with no SA available\n");
-	p(out_inval, "\t%llu outbound packet%s failed processing due to "
-		"EINVAL\n");
+	p(out_inval, "\t%llu invalid outbound packet%s\n");
+	p(out_nomem, "\t%llu outbound packet%s failed due to insufficient memory\n");
 	p(out_noroute, "\t%llu outbound packet%s with no route\n");
-	for (first = 1, proto = 0; proto < SADB_AALG_MAX; proto++) {
-		if (ipsecstat.out_ahhist[proto] <= 0)
-			continue;
-		if (first) {
-			printf("\tAH output histogram:\n");
-			first = 0;
-		}
-		printf("\t\t%s: %llu\n", ipsec_ahnames[proto],
-			(unsigned long long)ipsecstat.out_ahhist[proto]);
-	}
-	for (first = 1, proto = 0; proto < SADB_EALG_MAX; proto++) {
-		if (ipsecstat.out_esphist[proto] <= 0)
-			continue;
-		if (first) {
-			printf("\tESP output histogram:\n");
-			first = 0;
-		}
-		printf("\t\t%s: %llu\n", ipsec_espnames[proto],
-			(unsigned long long)ipsecstat.out_esphist[proto]);
-	}
+	hist(ipsecstat.out_ahhist, ipsec_ahnames, "AH output");
+	hist(ipsecstat.out_esphist, ipsec_espnames, "ESP output");
+	hist(ipsecstat.out_comphist, ipsec_compnames, "IPComp output");
 #undef p
+#undef hist
 }
 
 static const char *
