@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.130 2001/01/22 10:01:52 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.131 2001/01/22 11:42:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -280,7 +280,7 @@ in6_ifaddloop(struct ifaddr *ifa)
 			      , 0
 #endif /* __FreeBSD__ */
 			      );
-		if (rt == 0 || (rt->rt_flags & RTF_HOST) == 0 ||
+		if (rt == NULL || (rt->rt_flags & RTF_HOST) == 0 ||
 		    (rt->rt_ifp->if_flags & IFF_LOOPBACK) == 0)
 			in6_ifloop_request(RTM_ADD, ifa);
 		if (rt)
@@ -296,6 +296,7 @@ static void
 in6_ifremloop(struct ifaddr *ifa)
 {
 	struct in6_ifaddr *ia;
+	struct rtentry *rt;
 	int ia_count = 0;
 
 	/*
@@ -309,8 +310,10 @@ in6_ifremloop(struct ifaddr *ifa)
 	 */
 
 	/*
-	 * If only one ifa for the loopback entry, delete it.
-	 * (XXX Is this really necessary? jinmei@kame.net 20000613)
+	 * Delete the entry only if exact one ifa exists. More thane one ifa
+	 * can exist if we assign a same single address to multiple
+	 * (probably p2p) interfaces.
+	 * XXX: we should avoid such a configuration in IPv6...
 	 */
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
 		if (IN6_ARE_ADDR_EQUAL(IFA_IN6(ifa), &ia->ia_addr.sin6_addr)) {
@@ -319,8 +322,19 @@ in6_ifremloop(struct ifaddr *ifa)
 				break;
 		}
 	}
-	if (ia_count == 1)
-		in6_ifloop_request(RTM_DELETE, ifa);
+
+	if (ia_count == 1) {
+		rt = rtalloc1(ifa->ifa_addr, 0
+#ifdef __FreeBSD__
+			      , 0
+#endif /* __FreeBSD__ */
+			);
+		if (rt != NULL && (rt->rt_flags & RTF_HOST) != 0 ||
+		    (rt->rt_ifp->if_flags & IFF_LOOPBACK) != 0) {
+			rt->rt_refcnt--;
+			in6_ifloop_request(RTM_DELETE, ifa);
+		}
+	}
 }
 
 int
