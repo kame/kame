@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.11 1999/12/20 07:30:13 sumikawa Exp $
+# $Id: Makefile,v 1.12 1999/12/27 12:24:27 sumikawa Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -7,7 +7,6 @@ SUBDIR+=	apache12
 SUBDIR+=	apache13
 SUBDIR+=	bind8
 SUBDIR+=	ct
-SUBDIR+=	ethereal
 SUBDIR+=	emacs20
 SUBDIR+=	fetchmail
 SUBDIR+=	fwtk6
