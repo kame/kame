@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.18 2000/01/10 01:23:27 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.19 2000/01/10 16:28:55 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1159,6 +1159,7 @@ isakmp_ph1restart(iph1)
 	/* XXX to do retry counter */
 
 	if (LIST_FIRST(&iph1->ph2tree) != NULL) {
+		/* XXX should I check iph2->status ? */
 		iph1->inuse = 2;	/* sa needed */
 		sched_new(1, isakmp_ph1restart, iph1);
 		return;
