@@ -1,4 +1,4 @@
-/*	$KAME: altq_rmclass.c,v 1.16 2003/07/10 12:07:49 kjc Exp $	*/
+/*	$KAME: altq_rmclass.c,v 1.17 2003/09/05 22:40:36 itojun Exp $	*/
 
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
@@ -1786,7 +1786,7 @@ _getq_random(class_queue_t *q)
 	} else {
 		struct mbuf *prev = NULL;
 
-		n = random() % qlen(q) + 1;
+		n = arc4random() % qlen(q) + 1;
 		for (i = 0; i < n; i++) {
 			prev = m;
 			m = m->m_nextpkt;

@@ -1,4 +1,4 @@
-/*	$KAME: altq_cdnr.c,v 1.13 2003/07/10 12:07:47 kjc Exp $	*/
+/*	$KAME: altq_cdnr.c,v 1.14 2003/09/05 22:40:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999-2002
@@ -837,7 +837,7 @@ tswtcm_input(cb, pktinfo)
 	 * marker
 	 */
 	if (avg_rate > tsw->cmtd_rate) {
-		u_int32_t randval = random() % avg_rate;
+		u_int32_t randval = arc4random() % avg_rate;
 
 		if (avg_rate > tsw->peak_rate) {
 			if (randval < avg_rate - tsw->peak_rate) {

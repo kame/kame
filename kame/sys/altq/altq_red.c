@@ -1,4 +1,4 @@
-/*	$KAME: altq_red.c,v 1.17 2003/07/10 12:07:49 kjc Exp $	*/
+/*	$KAME: altq_red.c,v 1.18 2003/09/05 22:40:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997-2003
@@ -495,7 +495,7 @@ drop_early(int fp_len, int fp_probd, int count)
 	 * drop probability = (avg - TH_MIN) / d
 	 */
 
-	if ((random() % d) < fp_len) {
+	if ((arc4random() % d) < fp_len) {
 		/* drop or mark */
 		return (1);
 	}

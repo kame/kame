@@ -1,4 +1,4 @@
-/*	$KAME: altq_blue.c,v 1.13 2003/07/10 12:07:47 kjc Exp $	*/
+/*	$KAME: altq_blue.c,v 1.14 2003/09/05 22:40:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -519,7 +519,7 @@ static int
 drop_early(rp)
 	blue_t *rp;
 {
-	if ((random() % rp->blue_max_pmark) < rp->blue_pmark) {
+	if ((arc4random() % rp->blue_max_pmark) < rp->blue_pmark) {
 		/* drop or mark */
 		return (1);
 	}
