@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.31 2001/07/29 11:58:16 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.32 2001/09/11 09:00:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -221,7 +221,7 @@ mld6_input(m, off)
 	/* source address validation */
 	ip6 = mtod(m, struct ip6_hdr *); /* in case mpullup */
 	if (!(IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_src) ||
-	      IN6_IS_ADDR_UNSPECIFIED( &ip6->ip6_src))) {
+	      IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src))) {
 #if 0				/* do not log in an input path */
 		log(LOG_INFO,
 		    "mld6_input: src %s is not link-local (grp=%s)\n",
