@@ -239,32 +239,11 @@ udp_input(m, va_alist)
 	 * Checksum extended UDP header and data.
 	 */
 	if (uh->uh_sum) {
-#ifndef PULLDOWN_TEST
-		struct ip save_ip;
-
-		/*
-		 * Save a copy of the IP header in case we want restore it
-		 * for sending an ICMP error message in response.
-		 */
-		save_ip = *ip;
-
-		bzero(((struct ipovly *)ip)->ih_x1,
-		    sizeof ((struct ipovly *)ip)->ih_x1);
-		((struct ipovly *)ip)->ih_len = uh->uh_ulen;
-		if (in_cksum(m, len + sizeof (struct ip)) != 0) {
-			udpstat.udps_badsum++;
-			m_freem(m);
-			return;
-		}
-
-		*ip = save_ip;
-#else
 		if (in4_cksum(m, IPPROTO_UDP, iphlen, len) != 0) {
 			udpstat.udps_badsum++;
 			m_freem(m);
 			return;
 		}
-#endif
 	}
 
 	/* construct source and dst sockaddrs. */
