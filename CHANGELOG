@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1546 2001/02/09 06:55:59 jinmei Exp $
+$KAME: CHANGELOG,v 1.1547 2001/02/09 06:59:54 jinmei Exp $
 
 <200102>
 2001-02-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -33,7 +33,7 @@ Fri Feb  9 00:18:46 JST 2001  itojun@iijlab.net
 	invalid memory.  This fix actually fixed a problem that the kernel
 	hunged in some (rare) cases.
 
-Wed Feb  7 21:35:26 JST 2001
+Wed Feb  7 21:35:26 JST 2001  itojun@iijlab.net
 	* sys/kern/uipc_socket.c (netbsd/openbsd/freebsd4/bsdi4):
 	  return ECONNABORTED, if the socket (tcp connection for example)
 	  is disconnected by RST right before accept(2).  fixes PR 10698/12027.
