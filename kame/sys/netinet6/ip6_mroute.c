@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.66 2002/05/29 03:39:41 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.67 2002/05/30 04:27:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1712,8 +1712,8 @@ phyint_send(ip6, mifp, m, src, dst)
 		 * We just call if_output instead of nd6_output here, since
 		 * we need no ND for a multicast forwarded packet...right?
 		 */
-		error = (*ifp->if_output)(ifp, mb_copy, (struct sockaddr *)dst,
-					  NULL);
+		error = (*ifp->if_output)(ifp, mb_copy,
+		    (struct sockaddr *)dst, NULL);
 #ifdef MRT6DEBUG
 		if (mrt6debug & DEBUG_XMIT)
 			log(LOG_DEBUG, "phyint_send on mif %d err %d\n",
