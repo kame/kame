@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.38 2000/01/11 22:26:12 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.39 2000/01/11 23:18:15 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -485,7 +485,7 @@ isakmp_main(msg, remote, local)
 		/* receive */
 		if (ph2exchange[etypesw(isakmp->etype)]
 		               [iph2->side]
-		               [iph2->status]) {
+		               [iph2->status] == NULL) {
 			/* ignore it */
 			return -1;
 		}
