@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2074 2002/02/09 10:00:14 jinmei Exp $
+$KAME: CHANGELOG,v 1.2075 2002/02/11 00:39:43 sakane Exp $
 
 <200202>
 2002-02-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -11,6 +11,9 @@ $KAME: CHANGELOG,v 1.2074 2002/02/09 10:00:14 jinmei Exp $
 	* {netbsd, openbsd}/usr.bin/netstat/if.c (intpr):
 	Modified according to the change above.  These tools should
 	be rebuilt as well as the kernel.
+
+Mon Feb  8 JST 2002 sakane@kame.net
+	* freebsd4: sync with 4.5-RELEASE
 
 2002-02-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/netinet6/in6_pcb.c (in6_pcbbind): correctly separated
