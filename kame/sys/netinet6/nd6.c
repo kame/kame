@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.114 2001/02/08 10:57:00 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.115 2001/02/08 11:50:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1042,6 +1042,12 @@ nd6_free(rt)
 	struct llinfo_nd6 *ln = (struct llinfo_nd6 *)rt->rt_llinfo, *next;
 	struct in6_addr in6 = ((struct sockaddr_in6 *)rt_key(rt))->sin6_addr;
 	struct nd_defrouter *dr;
+
+	/*
+	 * Clear all destination cache entries for the neighbor.
+	 * XXX: is it better to restrict this to hosts?
+	 */
+	pfctlinput(PRC_HOSTDEAD, rt_key(rt));
 
 	if (!ip6_forwarding && ip6_accept_rtadv) { /* XXX: too restrictive? */
 		int s;
