@@ -185,7 +185,7 @@ static const char *
 sa_n2a(sa)
 	struct sockaddr *sa;
 {
-	static char buf[BUFSIZ];
+	static char buf[NI_MAXHOST];
 
 	if (getnameinfo(sa, sa->sa_len, buf, sizeof(buf),
 			NULL, 0, NI_NUMERICHOST | NI_WITHSCOPEID) != 0) {
@@ -198,7 +198,7 @@ static const char *
 inet6_n2a(addr)
 	struct in6_addr *addr;
 {
-	static char buf[BUFSIZ];
+	static char buf[NI_MAXHOST];
 
 	return inet_ntop(AF_INET6, addr, buf, sizeof(buf));
 }
