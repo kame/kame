@@ -27,7 +27,7 @@ CPPFLAGS+=-I${DESTDIR}/usr/include/krb5
 #LDADD+=-L/usr/pkg/lib -lefence
 #.endif
 
-LIBPFKEYDIR!=	cd ${.CURDIR}/../libpfkey; make print-objdir
+LIBPFKEYDIR!=	cd ${.CURDIR}/../libpfkey; ${MAKE} print-objdir
 LDADD+=	-L${LIBPFKEYDIR} -lpfkey
 DPADD+=	${LIBPFKEYDIR}/libpfkey.a
 .if (${MKKERBEROS} != "no")
