@@ -1031,7 +1031,8 @@ getaddr(which, s, hpp)
 		memcpy(&su->sin6.sin6_addr, &sin6->sin6_addr,
 		    sizeof(su->sin6.sin6_addr));
 #ifdef __KAME__
-		if (IN6_IS_ADDR_LINKLOCAL(&su->sin6.sin6_addr)) {
+		if (IN6_IS_ADDR_LINKLOCAL(&su->sin6.sin6_addr) &&
+		    sin6->sin6_scope_id) {
 			*(u_int16_t *)&su->sin6.sin6_addr.s6_addr[2] =
 				htons(sin6->sin6_scope_id);
 		}
