@@ -1,4 +1,4 @@
-/*	$KAME: db.c,v 1.1 2002/05/22 10:15:17 itojun Exp $	*/
+/*	$KAME: db.c,v 1.2 2002/05/22 10:45:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -80,6 +80,7 @@ dbtimeo()
 		if (qc->nreplies == 0) {
 			/* send NXDOMAIN to querier */
 			hp = (HEADER *)qc->qbuf;
+			hp->qr = 1;	/* response */
 			hp->rcode = NXDOMAIN;
 			if (sendto(qc->sd->s, qc->qbuf, qc->qlen, 0,
 			    qc->from, qc->fromlen) < 0)
