@@ -1,4 +1,4 @@
-/* $KAME: in_msf.h,v 1.4 2002/09/16 05:33:13 suz Exp $	*/
+/* $KAME: in_msf.h,v 1.5 2002/09/19 05:00:57 suz Exp $	*/
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.
@@ -234,26 +234,9 @@ struct in_multi_source {
 	     IN6_IS_ADDR_MC_INTFACELOCAL(SIN6_ADDR(x))) :		\
 	  0)
 
-#define	SS_CMP(a, op, b)						\
-	(((struct sockaddr *)(a))->sa_family == AF_INET ?		\
-		(ntohl(SIN_ADDR(a)) op ntohl(SIN_ADDR(b))) :		\
-	 ((struct sockaddr *)(a))->sa_family == AF_INET6 ?		\
-		((SIN6_ADDR32(a, 0) op SIN6_ADDR32(b, 0)) ||		\
-		 ((SIN6_ADDR32(a, 0) == SIN6_ADDR32(b, 0)) &&		\
-		    (SIN6_ADDR32(a, 1) op SIN6_ADDR32(b, 1))) ||	\
-		 ((SIN6_ADDR32(a, 0) == SIN6_ADDR32(b, 0)) &&		\
-		    (SIN6_ADDR32(a, 1) == SIN6_ADDR32(b, 1)) &&		\
-		    (SIN6_ADDR32(a, 2) op SIN6_ADDR32(b, 2))) ||	\
-		 ((SIN6_ADDR32(a, 0) == SIN6_ADDR32(b, 0)) &&		\
-		    (SIN6_ADDR32(a, 1) == SIN6_ADDR32(b, 1)) &&		\
-		    (SIN6_ADDR32(a, 2) == SIN6_ADDR32(b, 2)) &&		\
-		    (SIN6_ADDR32(a, 3) op SIN6_ADDR32(b, 3))) ||	\
-		 ((SIN6_ADDR32(a, 0) == SIN6_ADDR32(b, 0)) &&		\
-		    (SIN6_ADDR32(a, 1) == SIN6_ADDR32(b, 1)) &&		\
-		    (SIN6_ADDR32(a, 2) == SIN6_ADDR32(b, 2)) &&		\
-		    (SIN6_ADDR32(a, 3) == SIN6_ADDR32(b, 3)) &&		\
-		    (SIN6(a)->sin6_scope_id op SIN6(b)->sin6_scope_id))) : \
-	  0)
+#define SS_CMP(a, op, b) \
+	(sa_cmp((struct sockaddr *)(a), (struct sockaddr *)(b)) op 0)
+
 
 int	in_addmultisrc(struct in_multi *, u_int16_t,
 		struct sockaddr_storage *, u_int, int, struct ias_head **,
@@ -292,5 +275,6 @@ void	in_freemopt_source_list(struct sock_msf *, struct msf_head *,
 void	in_cleanmopt_source_addr(struct sock_msf *, int);
 void	in_undomopt_source_addr(struct sock_msf *, int);
 void	in_undomopt_source_list(struct sock_msf *, u_int);
+int	sa_cmp(struct sockaddr *, struct sockaddr *);
 #endif /* _KERNEL */
 #endif /* _NETINET_INMSF_H_ */

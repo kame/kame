@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2235 2002/09/18 15:00:13 itojun Exp $
+$KAME: CHANGELOG,v 1.2236 2002/09/19 05:00:56 suz Exp $
 
 <200209>
+Thu Sep 19 13:53:18 JST 2002	suz@crl.hitachi.co.jp
+	* kame/sys/netinet/in_msf.[ch]: fixed a bug in SS_CMP() macro
+
 Wed Sep 18 23:54:08 JST 2002  itojun@iijlab.net
 	* lib/libsctp: library for additional SCTP system calls.
 

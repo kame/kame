@@ -3830,6 +3830,58 @@ in_cleanmopt_source_addr(msf, optname)
 	}
 }
 
+int
+sa_cmp(struct sockaddr *a, struct sockaddr *b)
+{
+	char *addr_a, *addr_b;
+	int i, size, diff;
+
+	/* assumes a and b are in the same address family */
+	if (a == NULL || b == NULL || a->sa_family != b->sa_family) {
+		printf("sa_cmp: improper pair of sockaddrs is given\n");
+		return 0;
+	}
+
+	/* extract address part from sockaddr */
+	switch (a->sa_family) {
+	case AF_INET:
+		addr_a = (char *) &(((struct sockaddr_in *) a)->sin_addr);
+		addr_b = (char *) &(((struct sockaddr_in *) b)->sin_addr);
+		size = sizeof(((struct sockaddr_in *) a)->sin_addr);
+		break;
+	case AF_INET6:
+		addr_a = (char *) &(((struct sockaddr_in6 *) a)->sin6_addr);
+		addr_b = (char *) &(((struct sockaddr_in6 *) b)->sin6_addr);
+		size = sizeof(((struct sockaddr_in6 *) a)->sin6_addr);
+		break;
+	default:
+		/* unsupported */
+		printf("ss_cmp: unsupported sockaddr is given\n");
+		return 0;
+	}
+
+	diff = 0;
+	/* compare each byte in these addresses */
+	for (i = 0; i < size; i++) {
+		unsigned char byte_a = *addr_a++ 
+		unsigned char byte_b = *addr_b++ 
+		diff = byte_a - byte_b;
+		if (diff != 0)
+			return diff;
+	}
+	/* if everything is same, check sin6_scope_id (IPv6 only) */
+	if (a->sa_family == AF_INET6) {
+		int scope_a = ((struct sockaddr_in6 *) a)->sin6_scope_id;
+		int scope_b = ((struct sockaddr_in6 *) b)->sin6_scope_id;
+
+		return scope_a - scope_b;
+	}
+
+	/* everything is completely same */
+	return 0;
+}
+
+
 #ifdef __FreeBSD__
 #ifdef IGMPV3_DEBUG
 static void
