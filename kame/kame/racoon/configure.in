@@ -43,6 +43,20 @@ if test "$efence_dir" != "no"; then
 	fi
 fi
 
+gc_dir=
+AC_MSG_CHECKING(if --with-gc option is specified)
+AC_ARG_WITH(gc, [  --with-gc=DIR           specify Bohem GC directory],
+	[gc_dir=$withval], [gc_dir=no])
+AC_MSG_RESULT(${gc_dir})
+if test "$gc_dir" != "no"; then
+	AC_DEFINE(GC)
+	if test "x$gc_dir" = "x"; then
+		RACOON_PATH_LIBS(GC_malloc, gc)
+	else
+		RACOON_PATH_LIBS(GC_malloc, gc, $gc_dir)
+	fi
+fi
+
 AC_MSG_CHECKING(if you have KAME tcpdump in $srcdir/../tcpdump)
 if test -f "$srcdir/../tcpdump/print-isakmp.c"; then
 	LIBOBJS="$LIBOBJS print-isakmp.o"
