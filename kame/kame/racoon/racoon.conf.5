@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.74 2001/01/31 06:08:36 sakane Exp $
+.\"	$KAME: racoon.conf.5,v 1.75 2001/02/05 01:03:24 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -571,6 +571,8 @@ and
 .Ic debug2 .
 The default is
 .Ic notify .
+If you put too high logging level on slower machines,
+IKE negotiation can fail due to timing constraint changes.
 .El
 .\"
 .Ss Specifying the way to pad
