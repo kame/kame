@@ -221,11 +221,6 @@ do { \
 		TCP_SET_DELACK(tp); \
 } while (0)
 
-static struct mbuf *tcp_pullup __P((struct mbuf *, int, int));
-
-/* maximum tcp header size, including tcp options */
-#define TCP_MAXOFF	(16 << 2)
-
 int
 tcp_reass(tp, th, m, tlen)
 	register struct tcpcb *tp;
@@ -494,80 +489,6 @@ present:
 	return (pkt_flags);
 }
 
-/*
- * pullup mbuf chain to gather ip header, tcp header and tcp option
- * into the first mbuf.
- * on return, ip header and tcp header will be made adjacent to each other
- * for simplicity (all extension headers will be stripped).  therefore,
- * iphlen == toff on return.
- * on error, it frees mbuf, gathers stats and returns NULL.
- *
- * stripping extension header may not be good if you need to return icmp
- * errors to the peer.  it should be okay as we never do that in tcp_input.c.
- */
-static struct mbuf *
-tcp_pullup(m, iphlen, toff)
-	struct mbuf *m;
-	int iphlen;
-	int toff;
-{
-	struct tcphdr *th;
-	struct mbuf *n = NULL;
-	int opts;
-
-#if 0 /*sanity*/
-	if (m->m_pkthdr.len < toff + sizeof(struct tcphdr)) {
-		tcpstat.tcps_rcvshort++;
-		goto bad;
-	}
-#endif
-
-	MGETHDR(n, M_DONTWAIT, MT_DATA);
-	if (n != NULL && iphlen + TCP_MAXOFF > MHLEN) {
-		MCLGET(n, M_DONTWAIT);
-		if ((n->m_flags & M_EXT) == 0) {
-			tcpstat.tcps_rcvmemdrop++;
-			goto bad;
-		}
-	}
-	if (n == NULL) {
-		tcpstat.tcps_rcvmemdrop++;
-		goto bad;
-	}
-
-	M_COPY_PKTHDR(n, m);
-	m_copydata(m, 0, iphlen, mtod(n, caddr_t));
-	m_copydata(m, toff, sizeof(struct tcphdr), mtod(n, caddr_t) + iphlen);
-
-	th = (struct tcphdr *)(mtod(n, caddr_t) + iphlen);
-	opts = th->th_off << 2;
-	if (opts < sizeof(struct tcphdr) || m->m_pkthdr.len - toff < opts) {
-		tcpstat.tcps_rcvbadoff++;
-		goto bad;
-	}
-	opts -= sizeof(struct tcphdr);
-	if (0 < opts) {
-		m_copydata(m, toff + sizeof(struct tcphdr), opts,
-			mtod(n, caddr_t) + iphlen + sizeof(struct tcphdr));
-	}
-
-	n->m_len = iphlen + sizeof(struct tcphdr) + opts;
-	m_adj(m, toff + sizeof(struct tcphdr) + opts);
-	n->m_pkthdr.len -= (toff - iphlen);
-	n->m_next = m;
-	m->m_flags &= ~M_PKTHDR;
-	m = n;
-	n = NULL;
-
-	return m;
-
-bad:
-	if (n)
-		m_free(n);
-	m_freem(m);
-	return NULL;
-}
-
 #if defined(INET6) && !defined(TCP6)
 int
 tcp6_input(mp, offp, proto)
@@ -653,11 +574,6 @@ tcp_input(m, va_alist)
 
 	tcpstat.tcps_rcvtotal++;
 
-	if (m->m_pkthdr.len < toff + sizeof (struct tcphdr)) {
-		tcpstat.tcps_rcvshort++;
-		goto drop;
-	}
-
 	bzero(&opti, sizeof(opti));
 	opti.ts_present = 0;
 	opti.maxseg = 0;
@@ -665,19 +581,6 @@ tcp_input(m, va_alist)
 	/*
 	 * Get IP and TCP header together in first mbuf.
 	 * Note: IP leaves IP header in first mbuf.
-	 *
-	 * The following code assumes that the first mbuf contains ip header,
-	 * tcp header and tcp option, so we really need to pull it up.
-	 * tcp_pullup() will do the right thing.  We don't use m_pullup(),
-	 * due to restrictions m_pullup have.
-	 * Okay to compromise copies in tcp_pullup() as tcp_pullup() call
-	 * is rather a rare case (like tcp toward loopback).
-	 *
-	 * Fundamental solution is to remove assumption on first mbuf,
-	 * use m_pulldown() to ensure mbuf alignment and call m_adj() right
-	 * before sbappend().  This avoids all the memory copies in
-	 * tcp_pullup().  We hoped to do that but did not due to too many
-	 * changes we need to make (and possible bugs we may introduce).
 	 */
 	ip = mtod(m, struct ip *);
 #ifdef INET6
@@ -687,30 +590,29 @@ tcp_input(m, va_alist)
 	case 4:
 		af = AF_INET;
 		iphlen = sizeof(struct ip);
+#ifndef PULLDOWN_TEST
+		/* would like to get rid of this... */
 		if (toff > sizeof (struct ip)) {
-			int mlen;
-			mlen = m->m_pkthdr.len;
 			ip_stripoptions(m, (struct mbuf *)0);
-			toff -= mlen - m->m_pkthdr.len;
+			toff = sizeof(struct ip);
 		}
-		if (m->m_len < toff + TCP_MAXOFF) {
-			m = tcp_pullup(m, iphlen, toff);
-			if (m == NULL) {
-				/* stat gathered in tcp_pullup */
-				goto drop;
+		if (m->m_len < toff + sizeof (struct tcphdr)) {
+			if ((m = m_pullup(m, toff + sizeof (struct tcphdr))) == 0) {
+				tcpstat.tcps_rcvshort++;
+				return;
 			}
-
-			ip = mtod(m, struct ip *);
-			ip->ip_len -= (toff - iphlen);
-			ip->ip_p = IPPROTO_TCP;
-			toff = iphlen;
-			th = (struct tcphdr *)(mtod(m, caddr_t) + toff);
-		} else {
-			ip = mtod(m, struct ip *);
-			th = (struct tcphdr *)(mtod(m, caddr_t) + toff);
 		}
-
-		/* th will be set later */
+		ip = mtod(m, struct ip *);
+		th = (struct tcphdr *)(mtod(m, caddr_t) + toff);
+#else
+		ip = mtod(m, struct ip *);
+		IP6_EXTHDR_GET(th, struct tcphdr *, m, toff,
+			sizeof(struct tcphdr));
+		if (th == NULL) {
+			tcpstat.tcps_rcvshort++;
+			return;
+		}
+#endif
 
 		/*
 		 * Checksum extended TCP header and data.
@@ -738,25 +640,27 @@ tcp_input(m, va_alist)
 #ifdef INET6
 	case 6:
 		ip = NULL;
-		af = AF_INET6;
 		iphlen = sizeof(struct ip6_hdr);
-		if (m->m_len < toff + TCP_MAXOFF) {
-			m = tcp_pullup(m, iphlen, toff);
+		af = AF_INET6;
+#ifndef PULLDOWN_TEST
+		if (m->m_len < toff + sizeof(struct tcphdr)) {
+			m = m_pullup(m, toff + sizeof(struct tcphdr));	/*XXX*/
 			if (m == NULL) {
-				/* stat gathered in tcp_pullup */
-				goto drop;
+				tcpstat.tcps_rcvshort++;
+				return;
 			}
-
-			ip6 = mtod(m, struct ip6_hdr *);
-			if (ip6->ip6_plen)	/* not jumbogram */
-				ip6->ip6_plen -= (toff - iphlen);
-			ip6->ip6_nxt = IPPROTO_TCP;
-			toff = iphlen;
-			th = (struct tcphdr *)(mtod(m, caddr_t) + toff);
-		} else {
-			ip6 = mtod(m, struct ip6_hdr *);
-			th = (struct tcphdr *)(mtod(m, caddr_t) + toff);
 		}
+		ip6 = mtod(m, struct ip6_hdr *);
+		th = (struct tcphdr *)(mtod(m, caddr_t) + toff);
+#else
+		ip6 = mtod(m, struct ip6_hdr *);
+		IP6_EXTHDR_GET(th, struct tcphdr *, m, toff,
+			sizeof(struct tcphdr));
+		if (th == NULL) {
+			tcpstat.tcps_rcvshort++;
+			return;
+		}
+#endif
 
 		/*
 		 * Checksum extended TCP header and data.
@@ -794,14 +698,6 @@ tcp_input(m, va_alist)
 
 	if (off > sizeof (struct tcphdr)) {
 		if (m->m_len < toff + off) {
-			/*
-			 * XXX
-			 * As MHLEN usually equals to 100,
-			 * IPv4 header (20) + tcp offset (64 max) < MHLEN
-			 * IPv6 header (40) + tcp offset (64 max) > MHLEN!!!
-			 * so if you have tons of options, the following code
-			 * fails with IPv6.  See above.
-			 */
 			if ((m = m_pullup(m, toff + off)) == 0) {
 				tcpstat.tcps_rcvshort++;
 				return;
