@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.39 2002/05/14 13:31:33 keiichi Exp $	*/
+/*	$KAME: dest6.c,v 1.40 2002/05/29 10:30:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -153,11 +153,7 @@ dest6_input(mp, offp, proto)
 			haopt = (struct ip6_opt_home_address *)opt;
 			optlen = haopt->ip6oh_len + 2;
 
-			/*
-			 * don't complain even if it is larger,
-			 * we don't support suboptions at this moment.
-			 */
-			if (optlen < sizeof(*haopt)) {
+			if (optlen != sizeof(*haopt)) {
 				ip6stat.ip6s_toosmall++;
 				goto bad;
 			}
