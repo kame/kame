@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.48 1999/08/23 17:04:19 jinmei Exp $
+$Id: CHANGELOG,v 1.49 1999/08/23 17:15:42 itojun Exp $
 
 <199908>
+Tue Aug 24 02:11:54 JST 1999  itojun@iijlab.net
+	* etc/rc.net6: disallow multiple interfaces from being autoconfigured
+	  on host case, added some comment on it.
+	  IPv6 specification assumes, in many places, that autoconfigured
+	  node has only single externally-visible network interface.
+	  Autoconfiguring a node with multiple interfaces can cause unexpected
+	  behavior.
+
 1999-08-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* *bsd*/usr.{bin,sbin}/netstat: supported per-interface
 	statistics. Try
