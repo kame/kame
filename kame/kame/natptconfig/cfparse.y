@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.28 2002/04/26 05:42:59 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.29 2002/04/26 06:30:48 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -407,9 +407,9 @@ show
 		: SSHOW SQUESTION
 		    { printHelp(SSHOW, NULL); }
 		| SSHOW SFRAGMENT
-		    { showFragment(); }
+		    { showVariable(NATPTCTL_FORCEFRAGMENT4); }
 		| SSHOW SPREFIX
-		    { showPrefix(); }
+		    { showVariable(NATPTCTL_PREFIX); }
 		| SSHOW SRULES opt_cui
 		    { showRules($3); }
 		| SSHOW SXLATE opt_long opt_decimal
@@ -420,7 +420,7 @@ show
 				yyerror("invalid argument: `%s'", $3);
 		    }
 		| SSHOW SMAPPING
-		    { showMapping(); }
+		    { showVariable(NATPTCTL_ENABLE); }
 		;
 
 

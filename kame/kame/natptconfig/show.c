@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.23 2002/04/26 05:43:00 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.24 2002/04/26 06:30:48 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -114,22 +114,6 @@ showFragment()
 
 
 void
-showPrefix()
-{
-	const char *fn = __FUNCTION__;
-
-	struct in6_addr	prefix;
-	char		in6txt[INET6_ADDRSTRLEN];
-
-	if (getValue(NATPTCTL_PREFIX, (caddr_t)&prefix) <= 0)
-		err(1, "%s(): failure on read prefix", fn);
-
-	inet_ntop(AF_INET6, (char *)&prefix, in6txt, INET6_ADDRSTRLEN);
-	printf("prefix: %s\n", in6txt);
-}
-
-
-void
 showRules(int cui)
 {
 	const char *fn = __FUNCTION__;
@@ -238,6 +222,39 @@ writeXlateHeader(int type)
 }
 
 
+void
+showVariable(int ctlName)
+{
+	const char *fn = __FUNCTION__;
+
+	int	val;
+	char	in6txt[INET6_ADDRSTRLEN];
+	struct in6_addr	prefix;
+	struct natptctl_names ctlnames[] = NATPTCTL_NAMES;
+
+	switch (ctlnames[ctlName].ctl_type) {
+	case NATPTCTL_IN6ADDR:
+		if (getValue(ctlName, (caddr_t)&prefix) <= 0)
+			err(1, "%s(): failure on read prefix", fn);
+
+		inet_ntop(AF_INET6, (char *)&prefix, in6txt, INET6_ADDRSTRLEN);
+		printf("%s: %s\n", ctlnames[ctlName].ctl_name, in6txt);
+		break;
+
+	default:
+		if (getValue(ctlName, (caddr_t)&val) <= 0)
+			err(1, "%s(): failure on read", fn);
+
+		if (ctlName == NATPTCTL_ENABLE)
+			printf("mapping: %s\n", val ? "enable" : "disable");
+		else
+			printf("%s: %d\n", ctlnames[ctlName].ctl_name, val);
+
+		break;
+	}
+}
+
+
 int
 showVariables(char *word)
 {
@@ -299,20 +316,6 @@ showVariables(char *word)
 	}
 
 	return (0);
-}
-
-
-void
-showMapping()
-{
-	const char *fn = __FUNCTION__;
-
-	int	map;
-
-	if (readNL((void *)&map, sizeof(map), NL_TR) <= 0)
-		err(1, "%s(): failure on read mapping", fn);
-
-	printf("mapping: %s\n", map ? "enable" : "disable");
 }
 
 

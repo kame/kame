@@ -1,4 +1,4 @@
-/*	$KAME: showvar.h,v 1.9 2002/04/26 05:43:00 fujisawa Exp $	*/
+/*	$KAME: showvar.h,v 1.10 2002/04/26 06:30:48 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -29,12 +29,10 @@
  * SUCH DAMAGE.
  */
 
-void		showFragment		__P((void));
-void		showPrefix		__P((void));
 void		showRules		__P((int));
 void		showXlate		__P((int, int));
 void		writeXlateHeader	__P((int));
+void		showVariable		__P((int));
 int		showVariables		__P((char *));
-void		showMapping		__P((void));
 
 void		clean_show		__P((void));
