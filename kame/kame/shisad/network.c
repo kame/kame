@@ -1,4 +1,4 @@
-/*      $KAME: network.c,v 1.2 2004/12/21 02:21:16 keiichi Exp $  */
+/*      $KAME: network.c,v 1.3 2005/02/18 05:57:44 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -1007,8 +1007,6 @@ send_na(dest, mif)
 }
 
 #endif
-
-
 
 const char *
 ip6_sprintf(addr)

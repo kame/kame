@@ -1,4 +1,4 @@
-/*      $KAME: mdd.c,v 1.1 2004/12/09 02:18:38 t-momose Exp $  */
+/*      $KAME: mdd.c,v 1.2 2005/02/18 05:57:44 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -78,7 +78,6 @@ int sock_rt, sock_m, sock_dg6, sock_dg, poll_time = -1;
 #ifdef MIP_MCOA
 char ingressif[IFNAMSIZ];
 #endif /* MIP_MCOA */
-
 
 #ifdef MIP_MCOA
 static void dereg_detach_coa(struct ifa_msghdr *);
@@ -241,7 +240,6 @@ main(argc, argv, env)
 			print_bl(stderr);
 		}
 	}
-
 
 	/* Get dynamic parameters, at this moment */
 	get_coacandidate();
@@ -465,8 +463,6 @@ get_coacandidate()
 	}
 }
 
-
-
 int
 in6_matchlen(a1, a2)
 	struct in6_addr *a1;
@@ -489,8 +485,6 @@ in6_matchlen(a1, a2)
 	/* same address */
 	return (8 * i);
 }
-
-
 
 void
 set_coa()
@@ -563,6 +557,11 @@ void
 sync_binding()
 {
 	struct binding *bp;
+	u_int16_t bid = 0;
+
+#ifdef MIP_MCOA
+	bid = bp->bid;
+#endif
 
 	LIST_FOREACH(bp, &bl_head, binding_entries) {
 		if (memcmp(&bp->coa, &bp->pcoa, sizeof(bp->coa)) == 0)
@@ -571,13 +570,8 @@ sync_binding()
 		if (bp->flags & BF_HOME) {
 			/* HOME */
 			returntohome(&bp->hoa, &bp->coa, bp->coaifindex);
-		} else
-		if (bp->flags & BF_BOUND) {
-#ifndef MIP_MCOA
-			chbinding(&bp->hoa, &bp->coa);
-#else
-			chbinding(&bp->hoa, &bp->coa, bp->bid);
-#endif /* MIP_MCOA */
+		} else if (bp->flags & BF_BOUND) {
+			chbinding(&bp->hoa, &bp->coa, bid);
 		}
 	}
 }
@@ -729,7 +723,6 @@ dereg_detach_coa(difam)
 	memset(&dsin6, 0, sizeof(dsin6));
 	memcpy(&dsin6, (struct sockaddr_in6 *) rti_info[RTAX_IFA], sizeof(dsin6)); 
 	
-	
 	/* Detached address must be global */
 	if (in6_addrscope(&dsin6.sin6_addr) !=  __IPV6_ADDR_SCOPE_GLOBAL) 
 		return;
@@ -742,7 +735,6 @@ dereg_detach_coa(difam)
 		perror("ioctl(SIOCGIFAFLAG_IN6)");
 		return;
 	}
-
 
 	/* address is now detached from the link, send
          *  deregfromforeign to mnd 
@@ -847,7 +839,7 @@ mipsock_deregforeign(hoa, deregcoa, newcoa, ifindex, bid)
 	char buf[PA_BUFSIZE];
 
 	len = sizeof(*mdinfo) + sizeof(*hoa) + sizeof(*deregcoa) + sizeof(*newcoa);
-	mdinfo = (struct mipm_md_info *) malloc(len);
+	mdinfo = (struct mipm_md_info *) alloca(len);
 	if (mdinfo == NULL) 
 		return (-1);
 
@@ -886,21 +878,16 @@ mipsock_deregforeign(hoa, deregcoa, newcoa, ifindex, bid)
 #endif /* MIP_MCOA */
 
 int
-#ifndef MIP_MCOA
-chbinding(hoa, coa)
-	struct sockaddr_in6 *hoa, *coa;
-#else
 chbinding(hoa, coa, bid)
 	struct sockaddr_in6 *hoa, *coa;
 	u_int16_t bid;
-#endif /* MIP_MCOA */
 {
 	int len;
 	struct mipm_md_info *mdinfo;
 	char buf[PA_BUFSIZE];
 
 	len = sizeof(*mdinfo) + sizeof(*hoa) + sizeof(*coa);
-	mdinfo = (struct mipm_md_info *) malloc(len);
+	mdinfo = (struct mipm_md_info *) alloca(len);
 	if (mdinfo == NULL)
 		return (-1);
 
@@ -919,7 +906,7 @@ chbinding(hoa, coa, bid)
 
 	if (!mflag) {
 		if (write(sock_m, mdinfo, len) < 0) {
-			perror("wirte");
+			perror("write");
 			return (-1);
 		}
 	}
@@ -948,7 +935,7 @@ returntohome(hoa, coa, ifindex)
 	char buf[PA_BUFSIZE];
 
 	len = sizeof(*mdinfo) + sizeof(*hoa) + sizeof(*coa);
-	mdinfo = (struct mipm_md_info *) malloc(len);
+	mdinfo = (struct mipm_md_info *) alloca(len);
 	if (mdinfo == NULL)
 		return (-1);
 
@@ -965,7 +952,7 @@ returntohome(hoa, coa, ifindex)
 
 	if (!mflag) {
 		if (write(sock_m, mdinfo, len) < 0) {
-			perror("wirte");
+			perror("write");
 			return (-1);
 		}
 	}

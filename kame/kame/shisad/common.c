@@ -1,4 +1,4 @@
-/*      $KAME: common.c,v 1.13 2005/02/17 12:38:54 t-momose Exp $  */
+/*      $KAME: common.c,v 1.14 2005/02/18 05:57:44 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -695,8 +695,6 @@ icmp6_input_common(fd)
 			break;
 		}
 
-
-
 #endif /* MIP_HA */
 		break;
 #endif /* MIP_CN */
@@ -850,7 +848,6 @@ icmp6_input_common(fd)
 		if (mif == NULL)
 			break;
 		
-
 		options = (char *)icp + sizeof(struct mip6_prefix_advert);
                 total = readlen - sizeof(struct mip6_prefix_advert);
 
@@ -952,7 +949,6 @@ mip6_create_addr(addr, ifid, prefix, prefixlen)
 #undef s6_addr8
 	 return;
 }
-
 
 int
 in6_mask2len(mask, lim0)

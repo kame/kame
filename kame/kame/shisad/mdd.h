@@ -1,4 +1,4 @@
-/*      $KAME: mdd.h,v 1.1 2004/12/09 02:18:38 t-momose Exp $  */
+/*      $KAME: mdd.h,v 1.2 2005/02/18 05:57:44 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -80,11 +80,7 @@ void mainloop(void);
 void sync_binding(void);
 int get_addr_with_ifl(struct coacl *, struct cifl *);
 int in6_addrscope(struct in6_addr *);
-#ifndef MIP_MCOA
-int chbinding(struct sockaddr_in6 *, struct sockaddr_in6 *);
-#else
 int chbinding(struct sockaddr_in6 *, struct sockaddr_in6 *, u_int16_t);
-#endif /* MIP_MCOA */
 int returntohome(struct sockaddr_in6 *, struct sockaddr_in6 *, int);
 int get_ifl(struct cifl *);
 int del_if_from_ifl(struct cifl *, int);
