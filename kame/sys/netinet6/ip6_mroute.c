@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.131 2004/09/30 08:45:31 suz Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.132 2004/09/30 09:42:53 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1795,7 +1795,11 @@ phyint_send(ip6, mifp, m)
 		im6o.im6o_multicast_hlim = ip6->ip6_hlim;
 		im6o.im6o_multicast_loop = 1;
 		error = ip6_output(mb_copy, NULL, &ro,
-				   IPV6_FORWARDING, &im6o, NULL, NULL);
+				   IPV6_FORWARDING, &im6o, NULL
+#ifdef __FreeBSD__
+				   , NULL
+#endif
+				  );
 
 #ifdef MRT6DEBUG
 		if (mrt6debug & DEBUG_XMIT)
