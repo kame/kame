@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.2 2000/07/15 07:14:33 kris Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.13 2000/07/26 15:53:09 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.14 2000/08/05 13:06:02 sumikawa Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -805,6 +805,8 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 			continue;
 
  		if (do_rtchange) {
+			struct sockaddr_in6 *dst6;
+
  			/*
  			 * Since a non-connected PCB might have a cached route,
  			 * we always call in6_rtchange without matching
@@ -812,9 +814,9 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
  			 *
  			 * XXX: we assume in6_rtchange does not free the PCB.
  			 */
- 			if (IN6_ARE_ADDR_EQUAL(&inp->in6p_route.ro_dst.sin6_addr,
- 					       &faddr6))
- 				in6_rtchange(inp, errno);
+			dst6 = (struct sockaddr_in6 *)&inp->in6p_route.ro_dst;
+			if (IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr, &faddr6))
+				in6_rtchange(inp, errno);
 
  			if (notify == in6_rtchange)
  				continue; /* there's nothing to do any more */
