@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1885 2001/09/21 11:12:46 jinmei Exp $
+$KAME: CHANGELOG,v 1.1886 2001/09/21 12:05:43 jinmei Exp $
 
 <200109>
+2001-09-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_src.c (in6_selectroute): made sure to fill
+	in retifp and retrt, regardless of the return value.  Without this
+	change, the kernel could panic, since ip6_output() refers to the
+	returned ifp even in error cases.
+	All versions of the kernel after the 20010730 snap should be
+	upgraded to fix this problem.
+
 2001-09-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/(various files): fixed integer overflow for
 	valid and preferred lifetimes;
@@ -391,7 +399,7 @@ Tue Jul 31 sakane@kame.net
 	IPv6 output routine:
 	- added a seprate function in6_selectroute() to centralize the
 	  route and outgoing interface selection algorithm
-	- call in6_selectroute() from in6_selecsrc() and ip6_output(), and
+	- call in6_selectroute() from in6_selectsrc() and ip6_output(), and
 	  use same codebase for both unicast and multicast packets as much
 	  as possible
 	- added stricter (and thorough) scope checks for outgoing packets
