@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.92 2001/02/04 05:54:14 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.93 2001/02/04 17:07:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,7 +108,7 @@ u_int32_t ip6_temp_valid_lifetime = DEF_TEMP_VALID_LIFETIME;
 int ip6_temp_preferred_lifetime = 800;
 static int ip6_temp_valid_lifetime = 1800;
 */
-int ip6_temp_regen_advance = ANON_REGEN_ADVANCE;
+int ip6_temp_regen_advance = TEMPADDR_REGEN_ADVANCE;
 
 #ifdef MIP6
 void (*mip6_select_defrtr_hook)(struct nd_prefix *,
@@ -1916,10 +1916,10 @@ in6_tmpifadd(ia0, forcegen)
 
 	/*
 	 * The Valid Lifetime is the lower of the Valid Lifetime of the
-         * public address or ANON_VALID_LIFETIME.
+         * public address or TEMP_VALID_LIFETIME.
 	 * The Preferred Lifetime is the lower of the Preferred Lifetime
-         * of the public address or ANON_PREFERRED_LIFETIME -
-         * RANDOM_DELAY.
+         * of the public address or TEMP_PREFERRED_LIFETIME -
+         * DESYNC_FACTOR.
 	 */
 	if (ia0->ia6_lifetime.ia6t_expire != 0) {
 		vltime0 = IFA6_IS_INVALID(ia0) ? 0 :
