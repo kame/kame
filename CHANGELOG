@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2302 2003/01/10 08:41:45 suz Exp $
+$KAME: CHANGELOG,v 1.2303 2003/01/11 07:20:19 suz Exp $
 
 <200301>
+Sat Jan 11 16:25:06 JST 2003	suz@crl.hitachi.co.jp
+	* bsdi4/sys/conf/files, bsdi4/sys/sys/sockio.h, bsdi4/sbin/ifconfig:
+	  ISATAP implementation for bsdi4 (just confirmed compilation)
+
 Fri Jan 10 17:27:10 JST 2003	suz@crl.hitachi.co.jp
 	* kame/sys/net/if_*.c:
 	  fixed a bug that some interfaces cannot be manipulated under
