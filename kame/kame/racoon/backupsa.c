@@ -1,4 +1,4 @@
-/*	$KAME: backupsa.c,v 1.2 2001/01/31 05:38:44 sakane Exp $	*/
+/*	$KAME: backupsa.c,v 1.3 2001/01/31 05:54:49 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -323,6 +323,17 @@ do { \
 	}
 
 	fclose(fp);
+
+	/*
+	 * There is a possibility that an abnormal system down will happen
+	 * again.  Any old SA will not be installed because racoon checks
+	 * the lifetime and compare with current time.
+	 */
+#if 0
+	/* clean the file if SA installation succeed. */
+	backupsa_clean();
+#endif
+
 	return 0;
 }
 
