@@ -41,6 +41,15 @@ static void form __P((int, char *));
 static void form_ether __P((void));
 static void form_null __P((void));
 
+static void
+usage()
+{
+	fprintf(stderr,
+		"usage: v6test [-d dstaddr] [-f configfile] [-i interface] "
+		"[-n] [-s srcaddr] testname [testname...]\n");
+	exit(1);
+}
+
 int
 main(argc, argv)
 	int argc;
@@ -77,10 +86,12 @@ main(argc, argv)
 			nflag++;
 			break;
 		default:
-			exit(1);
+			usage();
 		}
 	argc -= optind;
 	argv += optind;
+	if (argc == 0)
+		usage();
 
 	bzero(buf, sizeof(buf));
 	if (nflag == 0)
