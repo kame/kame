@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.320 2002/09/05 08:09:36 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.321 2002/09/05 08:35:29 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -891,6 +891,15 @@ icmp6_input(mp, offp, proto)
 		/* XXX: these two are experimental.  not officially defined. */
 		/* XXX: per-interface statistics? */
 		break;		/* just pass it to applications */
+
+#ifdef MLDV2
+	case MLDV2_LISTENER_REPORT:
+		/*
+		 * just passes the message to userland, since it need not
+		 * be suppressed by REPORT messages from other listeners.
+		 */
+		break;
+#endif
 
 	case ICMP6_WRUREQUEST:	/* ICMP6_FQDN_QUERY */
 	    {
