@@ -127,6 +127,11 @@
 #include <netipsec/key.h>
 #endif
 
+#include "pf.h"
+#if NPF > 0
+#include <net/pfvar.h>
+#endif
+
 int rsvp_on = 0;
 static int ip_rsvp_on;
 struct socket *ip_rsvpd;
@@ -502,6 +507,18 @@ iphack:
 	 * Check if we want to allow this packet to be processed.
 	 * Consider it to be bad if not.
 	 */
+#if NPF > 0
+	/*
+	 * Packet filter
+	 */
+	if (pf_test(PF_IN, m->m_pkthdr.rcvif, &m) != PF_PASS)
+		goto bad;
+	if (m == NULL)
+		return;
+
+	ip = mtod(m, struct ip *);
+	hlen = IP_VHL_HL(ip->ip_vhl) << 2;
+#endif
 	if (fr_checkp) {
 		struct	mbuf	*m1 = m;
 

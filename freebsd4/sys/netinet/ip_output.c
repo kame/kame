@@ -123,6 +123,11 @@ MALLOC_DEFINE(M_IPMOPTS, "ip_moptions", "internet multicast options");
 #include <netinet/ip_fw.h>
 #include <netinet/ip_dummynet.h>
 
+#include "pf.h"
+#if NPF > 0
+#include <net/pfvar.h>
+#endif
+
 #define print_ip(x, a, y)	 printf("%s %d.%d.%d.%d%s",\
 				x, (ntohl(a.s_addr)>>24)&0xFF,\
 				  (ntohl(a.s_addr)>>16)&0xFF,\
@@ -1035,6 +1040,22 @@ pass:
 		sw_csum &= ~CSUM_DELAY_DATA;
 	}
 	m->m_pkthdr.csum_flags &= ifp->if_hwassist;
+
+	/*
+	 * Packet filter
+	 */
+#if NPF > 0
+	if (pf_test(PF_OUT, ifp, &m) != PF_PASS) {
+		error = EHOSTUNREACH;
+		m_freem(m);
+		goto done;
+	}
+	if (m == NULL)
+		goto done;
+
+	ip = mtod(m, struct ip *);
+	hlen = IP_VHL_HL(ip->ip_vhl) << 2;
+#endif
 
 	/*
 	 * If small enough for interface, or the interface will take
