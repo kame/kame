@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.51 2002/09/23 16:07:32 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.52 2002/09/23 16:26:43 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -487,11 +487,10 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 }
 
 int
-mip6_ip6mu_input(m, ip6mu, ip6mulen, ba_code)
+mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	struct mbuf *m;
 	struct ip6m_binding_update *ip6mu;
 	int ip6mulen;
-	int ba_code;
 {
 	struct ip6_hdr *ip6;
 	struct sockaddr_in6 *src_sa, *dst_sa, coa_sa, hoa_sa;
