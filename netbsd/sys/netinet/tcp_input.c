@@ -3476,8 +3476,12 @@ syn_cache_respond(sc, m)
 		ip6->ip6_hlim = in6_selecthlim(NULL,
 				ro->ro_rt ? ro->ro_rt->rt_ifp : NULL);
 
+#ifdef NEW_STRUCT_ROUTE
+		error = ip6_output(m, NULL /*XXX*/, ro, 0, NULL, NULL);
+#else
 		error = ip6_output(m, NULL /*XXX*/, (struct route_in6 *)ro,
 			0, NULL, NULL);
+#endif
 		break;
 #endif
 	default:

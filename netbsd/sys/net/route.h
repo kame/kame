@@ -53,10 +53,21 @@
  * to a routing entry.  These are often held by protocols
  * in their control blocks, e.g. inpcb.
  */
+#ifdef NEW_STRUCT_ROUTE
+struct route {
+	struct	rtentry *ro_rt;
+	union {
+		struct sockaddr_storage rou_dst_ss;
+		struct sockaddr ro_dst_sa;
+	} ro_u;
+};
+#define ro_dst ro_u.ro_dst_sa
+#else
 struct route {
 	struct	rtentry *ro_rt;
 	struct	sockaddr ro_dst;
 };
+#endif
 
 /*
  * These numbers are used by reliable protocols for determining

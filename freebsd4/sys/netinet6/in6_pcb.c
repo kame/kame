@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.9 2000/07/12 11:35:57 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.10 2000/07/12 11:41:39 jinmei Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -390,7 +390,11 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	struct sockaddr_in6 *dstsock;
 	struct ip6_pktopts *opts;
 	struct ip6_moptions *mopts;
+#ifdef NEW_STRUCT_ROUTE
+	struct route *ro;
+#else
 	struct route_in6 *ro;
+#endif
 	struct in6_addr *laddr;
 	int *errorp;
 {

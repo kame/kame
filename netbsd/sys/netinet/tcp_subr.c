@@ -364,7 +364,11 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 #ifndef INET6
 	struct route iproute;
 #else
+#ifdef NEW_STRUCT_ROUTE
+	struct route iproute;
+#else
 	struct route_in6 iproute;	/* sizeof(route_in6) > sizeof(route) */
+#endif
 #endif
 	struct route *ro;
 	struct rtentry *rt;
@@ -714,8 +718,12 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 		break;
 #ifdef INET6
 	case AF_INET6:
+#ifdef NEW_STRUCT_ROUTE
+		error = ip6_output(m, NULL, ro, 0, NULL, NULL);
+#else
 		error = ip6_output(m, NULL, (struct route_in6 *)ro, 0, NULL,
-			NULL);
+				   NULL);
+#endif
 		break;
 #endif
 	default:

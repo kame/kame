@@ -1057,8 +1057,13 @@ send:
 			opts = tp->t_in6pcb->in6p_outputopts;
 		else
 			opts = NULL;
+#ifdef NEW_STRUCT_ROUTE
+		error = ip6_output(m, opts, ro, so->so_options & SO_DONTROUTE,
+				   0, NULL);
+#else
 		error = ip6_output(m, opts, (struct route_in6 *)ro,
-			so->so_options & SO_DONTROUTE, 0, NULL);
+				   so->so_options & SO_DONTROUTE, 0, NULL);
+#endif
 		break;
 	    }
 #endif
