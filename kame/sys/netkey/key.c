@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.163 2000/10/04 11:13:57 itojun Exp $	*/
+/*	$KAME: key.c,v 1.164 2000/10/05 03:25:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -106,11 +106,15 @@
 
 #include <machine/stdarg.h>
 
+/* randomness */
 #ifdef __NetBSD__
 #include "rnd.h"
 #if NRND > 0
 #include <sys/rnd.h>
 #endif
+#endif
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#include <sys/random.h>
 #endif
 
 #include <net/net_osdep.h>
@@ -436,7 +440,6 @@ static int key_cmpspidx_withmask
 static int key_sockaddrcmp __P((struct sockaddr *, struct sockaddr *, int));
 static int key_bbcmp __P((caddr_t, caddr_t, u_int));
 static void key_srandom __P((void));
-static u_long key_random __P((void));
 static u_int16_t key_satype2proto __P((u_int8_t));
 static u_int8_t key_proto2satype __P((u_int16_t));
 
@@ -4316,27 +4319,45 @@ key_srandom()
 	return;
 }
 
-/*
- * to initialize a seed for random()
- */
-static u_long
+u_long
 key_random()
 {
 	u_long value;
-#if defined(__NetBSD__) && NRND > 0
-	int l;
-#endif
 
-#if defined(__NetBSD__) && NRND > 0
-	/* assumes that random number pool has enough entropy */
-	l = rnd_extract_data(&value, sizeof(value), RND_EXTRACT_GOOD);
-	if (l != sizeof(value))
-		value = random();
-#else
-	value = random();
-#endif
-
+	key_randomfill(&value, sizeof(value));
 	return value;
+}
+
+void
+key_randomfill(p, l)
+	void *p;
+	size_t l;
+{
+	size_t n;
+	u_long v;
+	static int warn = 1;
+
+	n = 0;
+#if defined(__NetBSD__) && NRND > 0
+	n = rnd_extract_data(p, l, RND_EXTRACT_ANY);
+#elif defined(__OpenBSD__)
+	get_random_bytes(p, l);
+	n = l;
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+	n = (size_t)read_random_unlimited(p, (u_int)l);
+#endif
+	/* last resort - should we warn? */
+	while (n < l) {
+		v = random();
+		memcpy((u_int8_t *)p + n, &v,
+		    l - n < sizeof(v) ? l - n : sizeof(v));
+		n += sizeof(v);
+
+		if (warn) {
+			printf("WARNING: pseudo-random generator used for IPsec processing\n");
+			warn = 0;
+		}
+	}
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.44 2000/09/20 18:15:22 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.45 2000/10/05 03:25:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -67,9 +67,7 @@
 #include <netinet6/esp_rijndael.h>
 #include <net/pfkeyv2.h>
 #include <netkey/keydb.h>
-#ifdef __FreeBSD__
-#include <netkey/key.h>	/*M_SECA*/
-#endif
+#include <netkey/key.h>
 #include <crypto/des/des.h>
 #include <crypto/blowfish/blowfish.h>
 #include <crypto/cast128/cast128.h>
@@ -119,7 +117,7 @@ static int esp_cbc_decrypt __P((struct mbuf *, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
 static int esp_cbc_encrypt __P((struct mbuf *, size_t, size_t,
 	struct secasvar *, const struct esp_algorithm *, int));
-static void esp_increment_iv __P((struct secasvar *));
+static void esp_stir_iv __P((struct secasvar *));
 
 #define MAXIVLEN	16
 
@@ -1040,7 +1038,7 @@ esp_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	bzero(iv, sizeof(iv));
 	bzero(sbuf, sizeof(sbuf));
 
-	esp_increment_iv(sav);
+	esp_stir_iv(sav);
 
 	return 0;
 }
@@ -1049,24 +1047,11 @@ esp_cbc_encrypt(m, off, plen, sav, algo, ivlen)
  * increment iv.
  */
 static void
-esp_increment_iv(sav)
+esp_stir_iv(sav)
 	struct secasvar *sav;
 {
-	u_int8_t *x;
-	u_int8_t y;
-	int i;
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	y = time.tv_sec & 0xff;
-#else
-	y = time_second & 0xff;
-#endif
-	if (!y) y++;
-	x = (u_int8_t *)sav->iv;
-	for (i = 0; i < sav->ivlen; i++) {
-		*x = (*x + y) & 0xff;
-		x++;
-	}
+	key_randomfill(sav->iv, sav->ivlen);
 }
 
 /*------------------------------------------------------------*/
