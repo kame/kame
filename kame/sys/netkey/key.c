@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.165 2000/10/05 03:37:35 itojun Exp $	*/
+/*	$KAME: key.c,v 1.166 2000/10/05 03:45:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4346,7 +4346,7 @@ key_randomfill(p, l)
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 4
 	n = (size_t)read_random_unlimited(p, (u_int)l);
 #endif
-	/* last resort - should we warn? */
+	/* last resort */
 	while (n < l) {
 		v = random();
 		bcopy(&v, (u_int8_t *)p + n,
@@ -4354,7 +4354,8 @@ key_randomfill(p, l)
 		n += sizeof(v);
 
 		if (warn) {
-			printf("WARNING: pseudo-random generator used for IPsec processing\n");
+			printf("WARNING: pseudo-random number generator "
+			    "used for IPsec processing\n");
 			warn = 0;
 		}
 	}
