@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: grabmyaddr.c,v 1.1 2000/01/09 01:31:22 itojun Exp $ */
+/* YIPS @(#)$Id: grabmyaddr.c,v 1.2 2000/01/09 21:13:36 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -37,9 +37,6 @@
 #include <net/route.h>
 #include <netkey/key_var.h>
 #include <netinet/in.h>
-#if INET6 && !defined(IPV6_INRIA_VERSION)
-#include <netinet6/in6.h>
-#endif
 
 #include <stdlib.h>
 #include <stdio.h>
