@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.2 2000/07/15 07:14:33 kris Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.26 2000/12/01 05:31:28 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.27 2000/12/01 05:32:08 jinmei Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -167,11 +167,12 @@ in6_pcbbind(inp, nam, p)
 			/*
 			 * XXX: bind to an anycast address might accidentally
 			 * cause sending a packet with anycast source address.
+			 * We should allow to bind to a deprecated address, since
+			 * the application dare to use it.
 			 */
 			if (ia &&
 			    ((struct in6_ifaddr *)ia)->ia6_flags &
-			    (IN6_IFF_ANYCAST|IN6_IFF_NOTREADY|
-			     IN6_IFF_DETACHED|IN6_IFF_DEPRECATED)) {
+			    (IN6_IFF_ANYCAST|IN6_IFF_NOTREADY|IN6_IFF_DETACHED)) {
 				return(EADDRNOTAVAIL);
 			}
 		}
