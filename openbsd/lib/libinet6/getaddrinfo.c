@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.19 2000/05/04 03:48:29 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.20 2000/05/04 16:39:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -640,8 +640,8 @@ explore_fqdn(pai, hostname, servname, res)
 	} else {
 		/* translate error code */
 		switch (h_errno) {
-		case NETDB_SUCCESS:	/*XXX strange */
-			error = EAI_FAIL;
+		case NETDB_SUCCESS:
+			error = EAI_FAIL;	/*XXX strange */
 			break;
 		case HOST_NOT_FOUND:
 			error = EAI_NODATA;
@@ -657,6 +657,9 @@ explore_fqdn(pai, hostname, servname, res)
 		case NO_ADDRESS:
 #endif
 			error = EAI_NODATA;
+			break;
+		default:			/* unknown ones */
+			error = EAI_FAIL;
 			break;
 		}
 	}
