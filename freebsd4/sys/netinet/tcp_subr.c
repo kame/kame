@@ -506,6 +506,11 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 			m_freem(m);
 			return;
 		}
+		if (tp && tp->t_inpcb && tp->t_inpcb->in6p_outputopts &&
+		    (tp->t_inpcb->in6p_outputopts->ip6po_minmtu ==
+		     IP6PO_MINMTU_ALL)) {
+			ipflags |= IPV6_MINMTU;
+		}
 		(void)ip6_output(m, NULL, ro6, ipflags, NULL, NULL);
 		if (ro6 == &sro6 && ro6->ro_rt) {
 			RTFREE(ro6->ro_rt);
