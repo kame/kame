@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.11 2000/10/17 14:23:55 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.12 2001/03/18 10:28:26 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -99,15 +99,6 @@
 #define	D_PEEKOUTGOINGV6		0x00080000
 #define	D_TRANSLATINGIPV6		0x00100000
 #define	D_TRANSLATEDIPV6		0x01000000
-
-#ifdef fixSuMiReICMPBug
-#undef fixSuMiReICMPBug
-#endif
-
-#ifdef fixSuMiReICMPBug
-#define	IPDST		(0xc48db2cb)		/* == 203.178.141.196	XXX	*/
-#define	ICMPSRC		(0x02c410ac)		/* == 172.16.196.2	XXX	*/
-#endif
 
 #endif	/* defined(KERNEL)			*/
 

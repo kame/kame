@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.14 2000/12/03 00:54:00 itojun Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.15 2001/03/18 10:28:26 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -515,10 +515,6 @@ checkTracerouteReturn(struct _cv *cv4)
     icmpip4 = &cv4->_payload._icmp4->icmp_ip;
     if (icmpip4->ip_p != IPPROTO_UDP)
 	return (NULL);
-
-#ifdef fixSuMiReICMPBug
-    icmpip4->ip_src.s_addr = ICMPSRC;					/* XXX	*/
-#endif
 
     icmpudp4 = (struct udphdr *)((caddr_t)icmpip4 + (icmpip4->ip_hl << 2));
 

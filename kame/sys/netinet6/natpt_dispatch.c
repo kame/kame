@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.17 2001/03/18 09:58:36 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.18 2001/03/18 10:28:26 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -731,10 +731,6 @@ checkMTU(struct _cv *cv4)
 
 	    bzero(&destif, sizeof(struct ifnet));
 	    destif.if_mtu = mmtu;
-
-#ifdef fixSuMiReICMPBug
-	    ip4->ip_dst.s_addr = IPDST;					/* XXX	*/
-#endif
 
 	    icmp_error(m4, ICMP_UNREACH, ICMP_UNREACH_NEEDFRAG, dest, &destif);
 	    return (IPPROTO_DONE);	/* discard this packet without free	*/
