@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.29 2001/01/23 14:13:08 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.30 2001/01/24 12:52:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -223,12 +223,15 @@ getconfig(intface)
 	}
 	tmp->retranstimer = (u_int32_t)val;
 
-#ifdef MIP6
-	if (!mobileip6)
+#ifndef MIP6
+	if (agetstr("hapref", &bp) || agetstr("hatime", &bp)) {
+		syslog(LOG_ERR,
+		       "<%s> mobile-ip6 configuration not supported",
+		       __FUNCTION__);
+		exit(1);
+	}
 #else
-	if (1)
-#endif
-	{
+	if (!mobileip6) {
 		if (agetstr("hapref", &bp) || agetstr("hatime", &bp)) {
 			syslog(LOG_ERR,
 			       "<%s> mobile-ip6 configuration without "
@@ -236,9 +239,7 @@ getconfig(intface)
 			       __FUNCTION__);
 			exit(1);
 		}
-	}
-#ifdef MIP6
-	else {
+	} else {
 		tmp->hapref = 0;
 		if ((val = agetnum("hapref")) >= 0)
 			tmp->hapref = (int16_t)val;
