@@ -133,7 +133,7 @@ struct inpcbinfo tcbinfo;
 static void	 tcp_dooptions __P((struct tcpcb *,
 	    u_char *, int, struct tcpiphdr *, struct tcpopt *));
 static void	 tcp_pulloutofband __P((struct socket *,
-	    struct tcpiphdr *, struct mbuf *));
+	    struct tcpiphdr *, struct mbuf *, int));
 static int	 tcp_reass __P((struct tcpcb *, struct tcpiphdr *, struct mbuf *));
 static void	 tcp_xmit_timer __P((struct tcpcb *, int));
 
@@ -315,6 +315,7 @@ tcp_input(m, iphlen, proto)
 	register int tiflags;
 	struct socket *so = 0;
 	int todrop, acked, ourfinisacked, needoutput = 0;
+	int hdroptlen = 0;
 	struct in_addr laddr;
 	int dropsocket = 0;
 	int iss = 0;
@@ -415,10 +416,9 @@ findpcb:
 #endif /*IPSEC*/
 
 	/*
-	 * Drop TCP, IP headers and TCP options.
+	 * Compute mbuf offset for TCP data segment.
 	 */
-	m->m_data += sizeof(struct tcpiphdr)+off-sizeof(struct tcphdr);
-	m->m_len  -= sizeof(struct tcpiphdr)+off-sizeof(struct tcphdr);
+	hdroptlen = sizeof(struct tcpiphdr) + off - sizeof(struct tcphdr);
 
 	/*
 	 * If the state is CLOSED (i.e., TCB does not exist) then
@@ -675,6 +675,7 @@ findpcb:
 			/*
 			 * Add data to socket buffer.
 			 */
+			m_adj(m, hdroptlen);
 			sbappend(&so->so_rcv, m);
 			sorwakeup(so);
 #ifdef TCP_ACK_HACK
@@ -1245,7 +1246,7 @@ trimthenstep6:
 			tcpstat.tcps_rcvpartduppack++;
 			tcpstat.tcps_rcvpartdupbyte += todrop;
 		}
-		m_adj(m, todrop);
+		hdroptlen += todrop;	/* drop from head afterwards */
 		ti->ti_seq += todrop;
 		ti->ti_len -= todrop;
 		if (ti->ti_urp > todrop)
@@ -1709,7 +1710,7 @@ step6:
 		     && (so->so_options & SO_OOBINLINE) == 0
 #endif
 		     )
-			tcp_pulloutofband(so, ti, m);
+			tcp_pulloutofband(so, ti, m, hdroptlen);
 	} else
 		/*
 		 * If no out of band data is expected,
@@ -1730,6 +1731,7 @@ dodata:							/* XXX */
 	 */
 	if ((ti->ti_len || (tiflags&TH_FIN)) &&
 	    TCPS_HAVERCVDFIN(tp->t_state) == 0) {
+		m_adj(m, hdroptlen);
 		TCP_REASS(tp, ti, m, so, tiflags);
 		/*
 		 * Note the amount of data that peer has sent into
@@ -2011,12 +2013,13 @@ tcp_dooptions(tp, cp, cnt, ti, to)
  * sequencing purposes.
  */
 static void
-tcp_pulloutofband(so, ti, m)
+tcp_pulloutofband(so, ti, m, off)
 	struct socket *so;
 	struct tcpiphdr *ti;
 	register struct mbuf *m;
+	int off;
 {
-	int cnt = ti->ti_urp - 1;
+	int cnt = off + ti->ti_urp - 1;
 
 	while (cnt >= 0) {
 		if (m->m_len > cnt) {

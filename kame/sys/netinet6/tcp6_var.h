@@ -416,7 +416,7 @@ struct tcp6cb *
 void	 tcp6_notify __P((struct in6pcb *, int));
 int	 tcp6_output __P((struct tcp6cb *));
 void	 tcp6_pulloutofband __P((struct socket *,
-				 struct tcp6hdr *, struct mbuf *));
+				 struct tcp6hdr *, struct mbuf *, int));
 void	 tcp6_quench __P((struct in6pcb *, int));
 void	 tcp6_mtudisc __P((struct in6pcb *, int));
 int	 tcp6_reass __P((struct tcp6cb *, struct ip6tcpreass *,

@@ -457,6 +457,7 @@ tcp6_input(mp, offp, proto)
 	int thflags;
 	struct socket *so = (struct socket *)NULL;
 	int todrop, acked, ourfinisacked, needoutput = 0;
+	int hdroptlen = 0;
 	short ostate = 0; /*just to avoid warning*/
 #if 0
 	struct in6_addr laddr;
@@ -560,6 +561,11 @@ findpcb:
 		goto drop;
 	}
 #endif /*IPSEC*/
+
+	/*
+	 * Compute mbuf offset to TCP data segment.
+	 */
+	hdroptlen = off + toff;
 
 /* found: */
 	/* We can modify IP6 header */
@@ -810,21 +816,14 @@ after_listen:
 			 * Drop TCP6, IP6 headers and TCP6 options then add
 			 * data to socket buffer.
 			 */
-			m->m_data += off + toff;
-			m->m_len  -= off + toff;
 			ND6_HINT(t6p);
+			m_adj(m, hdroptlen);
 			sbappend(&so->so_rcv, m);
 			sorwakeup(so);
 			tcp6_delack(t6p);
 			return IPPROTO_DONE;
 		}
 	}
-
-	/*
-	 * Drop TCP6, IP6 headers and TCP6 options.
-	 */
-	m->m_data += off + toff;
-	m->m_len  -= off + toff;
 
 	/*
 	 * Calculate amount of space in receive window,
@@ -1125,7 +1124,7 @@ trimthenstep6:
 			tcp6stat.tcp6s_rcvpartduppack++;
 			tcp6stat.tcp6s_rcvpartdupbyte += todrop;
 		}
-		m_adj(m, todrop);
+		hdroptlen += todrop;	/* drop from head afterwards */
 		th->th_seq += todrop;
 		len -= todrop;
 		if (th->th_urp > todrop)
@@ -1586,7 +1585,7 @@ step6:
 		     && (so->so_options & SO_OOBINLINE) == 0
 #endif
 		     )
-			tcp6_pulloutofband(so, th, m);
+			tcp6_pulloutofband(so, th, m, hdroptlen);
 	} else
 		/*
 		 * If no out of band data is expected,
@@ -1608,6 +1607,7 @@ dodata:							/* XXX */
 	if ((len || (thflags&TH_FIN)) &&
 	    TCP6S_HAVERCVDFIN(t6p->t_state) == 0) {
 		int xxx;
+		m_adj(m, hdroptlen);
 		TCP6_REASS(t6p, (struct ip6tcpreass *)ip6, th, m, so,
 			   thflags, len);
 		/*
@@ -1815,12 +1815,13 @@ tcp6_dooptions(t6p, cp, cnt, th, oi)
  * sequencing purposes.
  */
 void
-tcp6_pulloutofband(so, th, m)
+tcp6_pulloutofband(so, th, m, off)
 	struct socket *so;
 	struct tcp6hdr *th;
 	register struct mbuf *m;
+	int off;
 {
-	int cnt = th->th_urp - 1;
+	int cnt = off + th->th_urp - 1;
 	
 	while (cnt >= 0) {
 		if (m->m_len > cnt) {
