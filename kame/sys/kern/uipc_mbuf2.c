@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.34 2002/05/30 04:34:52 itojun Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.35 2002/05/30 06:52:10 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -72,22 +72,6 @@
 #include <sys/proc.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
-
-#ifdef M_READONLY
-#define M_SHAREDCLUSTER(m)	M_READONLY(m)
-#elif defined(__bsdi__)
-#define M_SHAREDCLUSTER(m) \
-	(((m)->m_flags & M_EXT) != 0 && \
-	 ((m)->m_ext.ext_func || mclrefcnt[mtocl((m)->m_ext.ext_buf)] > 1))
-#elif defined(__NetBSD__) || defined(__OpenBSD__)
-#define M_SHAREDCLUSTER(m) \
-	(((m)->m_flags & M_EXT) != 0 && \
-	 ((m)->m_ext.ext_free || MCLISREFERENCED((m))))
-#else
-#define M_SHAREDCLUSTER(m) \
-	(((m)->m_flags & M_EXT) != 0 && \
-	 ((m)->m_ext.ext_free || mclrefcnt[mtocl((m)->m_ext.ext_buf)] > 1))
-#endif
 
 #ifndef __NetBSD__
 /* can't call it m_dup(), as freebsd[34] uses m_dup() with different arg */
@@ -216,7 +200,7 @@ m_pulldown(m, off, len, offp)
 		return NULL;	/* mbuf chain too short */
 	}
 
-	sharedcluster = M_SHAREDCLUSTER(n);
+	sharedcluster = M_READONLY(n);
 
 	/*
 	 * the target data is on <n, off>.

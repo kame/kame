@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.136 2002/05/19 00:36:39 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.137 2002/05/30 06:51:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3615,19 +3615,7 @@ ipsec_copypkt(m)
 			 * references to the cluster.
 			 * XXX: is this approach effective?
 			 */
-			if (
-#ifdef __bsdi__
-				n->m_ext.ext_func ||
-#else
-				n->m_ext.ext_free ||
-#endif
-#ifdef __NetBSD__
-				MCLISREFERENCED(n)
-#else
-				mclrefcnt[mtocl(n->m_ext.ext_buf)] > 1
-#endif
-			    )
-			{
+			if (M_READONLY(n)) {
 				int remain, copied;
 				struct mbuf *mm;
 
