@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.114 2001/07/27 18:25:31 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.115 2001/07/27 18:43:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -142,7 +142,7 @@ struct secpolicy ip4_def_policy;
 int ip4_ipsec_ecn = 0;		/* ECN ignore(-1)/forbidden(0)/allowed(1) */
 int ip4_esp_randpad = -1;
 
-static time_t sp_cachetime = 0;	/* latest cache invalidation time */
+static int sp_cachegen = 0;	/* cache generation # */
 
 #ifdef __FreeBSD__
 #ifdef SYSCTL_DECL
@@ -278,13 +278,13 @@ ipsec_checkpcbcache(m, pcbsp, dir)
 		panic("dir too big in ipsec_checkpcbcache");
 #endif
 	/* SPD table change invalidates all the caches */
-	if (pcbsp->cachetime[dir] && sp_cachetime > pcbsp->cachetime[dir]) {
+	if (pcbsp->cachegen[dir] && sp_cachegen > pcbsp->cachegen[dir]) {
 		ipsec_invalpcbcache(pcbsp);
 		return NULL;
 	}
-	if (ipsec_setspidx(m, &spidx, 1) != 0)
-		return NULL;
 	if (!pcbsp->cache[dir])
+		return NULL;
+	if (ipsec_setspidx(m, &spidx, 1) != 0)
 		return NULL;
 	if (!key_cmpspidx_withmask(&pcbsp->cache[dir]->spidx, &spidx))
 		return NULL;
@@ -325,7 +325,7 @@ ipsec_fillpcbcache(pcbsp, sp, dir)
 			printf("DP ipsec_fillpcbcache cause refcnt++:%d SP:%p\n",
 			pcbsp->cache[dir]->refcnt, pcbsp->cache[dir]));
 	}
-	pcbsp->cachetime[dir] = mono_time.tv_sec;
+	pcbsp->cachegen[dir] = ps_cachegen;
 
 	return 0;
 }
@@ -340,7 +340,7 @@ ipsec_invalpcbcache(pcbsp)
 		if (pcbsp->cache[i])
 			key_freesp(pcbsp->cache[i]);
 		pcbsp->cache[i] = NULL;
-		pcbsp->cachetime[i] = 0;
+		pcbsp->cachegen[i] = 0;
 	}
 	return 0;
 }
@@ -349,7 +349,7 @@ int
 ipsec_invalpcbcacheall()
 {
 
-	sp_cachetime = mono_time.tv_sec;
+	sp_cachegen++;
 	return 0;
 }
 
