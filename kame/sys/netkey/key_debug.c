@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.12 2000/02/22 14:06:40 itojun Exp $	*/
+/*	$KAME: key_debug.c,v 1.13 2000/03/09 00:10:11 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME @(#)$Id: key_debug.c,v 1.12 2000/02/22 14:06:40 itojun Exp $ */
+/* KAME @(#)$Id: key_debug.c,v 1.13 2000/03/09 00:10:11 sakane Exp $ */
 
 #ifdef _KERNEL
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
@@ -619,7 +619,7 @@ kdebug_mbufhdr(m)
 {
 	/* sanity check */
 	if (m == NULL)
-		panic("debug_mbufhdr: NULL pointer was passed.\n");
+		return;
 
 	printf("mbuf(%p){ m_next:%p m_nextpkt:%p m_data:%p "
 	       "m_len:%d m_type:0x%02x m_flags:0x%02x }\n",
