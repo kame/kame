@@ -6,7 +6,7 @@ BINMODE=555
 LDADD=	-lkvm
 DPADD=	${LIBKVM}
 
-CPPFLAGS+=	-DINET6
+CPPFLAGS+=	-DINET6 -DHAVE_IGMPV3
 
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
