@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.215 2001/05/25 07:41:54 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.216 2001/05/25 07:43:01 jinmei Exp $
 
 1. IPv6
 
@@ -138,6 +138,10 @@ draft-ietf-ipngwg-scoping-arch-02.txt:
 draft-ietf-pim-sm-v2-new-02.txt
 	A revised version of RFC2362, which includes the IPv6 specific
 	packet format and protocol descriptions.
+draft-ietf-dnsext-mdns-00.txt: Multicast DNS
+    * kame/mdnsd has test implementation, which will not be built in
+      default compilation.  The draft will experience a major change in the
+      near future, so don't rely upon it.
 draft-itojun-ipv6-transition-abuse-02.txt:
 	Possible abuse against IPv6 transition technologies (expired)
     * KAME does not implement RFC1933/2893 automatic tunnel.
@@ -147,10 +151,6 @@ draft-itojun-ipv6-transition-abuse-02.txt:
     * kame/openbsd completely disables IPv4 mapped address support.
     * kame/netbsd makes IPv4 mapped address support off by default.
     * See section 1.12.6 and 1.14 for more details.
-draft-ietf-dnsext-mdns-00.txt: Multicast DNS
-    * kame/mdnsd has test implementation, which will not be built in
-      default compilation.  The draft will experience a major change in the
-      near future, so don't rely upon it.
 draft-itojun-ipv6-tclass-api-02.txt: Socket API for IPv6 traffic class field
 draft-itojun-ipv6-flowlabel-api-01.txt: Socket API for IPv6 flow label field
     * no consideration is made against the use of routing headers and such.
