@@ -1391,7 +1391,9 @@ pr_addr(addr)
 
 	if (options & F_NUMERIC)
 		flag |= NI_NUMERICHOST;
+#ifdef NI_WITHSCOPEID	/*KAME_SCOPEID*/
 	flag |= NI_WITHSCOPEID;
+#endif
 
 	getnameinfo((struct sockaddr *)addr, addr->sin6_len, buf, sizeof(buf),
 		NULL, 0, flag);
