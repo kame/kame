@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.80 2002/01/10 12:21:33 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.81 2002/01/10 13:46:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -385,9 +385,6 @@ void	ip6_savecontrol __P((struct in6pcb *, struct ip6_hdr *, struct mbuf *,
 void	ip6_notify_pmtu __P((struct in6pcb *, struct sockaddr_in6 *,
 			     u_int32_t *));
 #endif
-void	ip6_update_recvpcbopt __P((struct ip6_recvpktopts *,
-				   struct ip6_recvpktopts *));
-void	ip6_reset_rcvopt __P((struct ip6_recvpktopts *, int));
 int	ip6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 
 void	ip6_forward __P((struct mbuf *, int));

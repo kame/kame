@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.275 2002/01/10 12:56:33 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.276 2002/01/10 13:46:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2030,8 +2030,6 @@ do { \
 						break;
 					}
 					OPTSET(IN6P_PKTINFO);
-					if (OPTBIT(IN6P_PKTINFO) == 0)
-						ip6_reset_rcvopt(rcvopts, IPV6_RECVPKTINFO);
 					break;
 
 				case IPV6_HOPLIMIT:
@@ -2059,8 +2057,6 @@ do { \
 						break;
 					}
 					OPTSET(IN6P_HOPLIMIT);
-					if (OPTBIT(IN6P_HOPLIMIT) == 0)
-						ip6_reset_rcvopt(rcvopts, IPV6_RECVHOPLIMIT);
 					break;
 
 				case IPV6_RECVHOPOPTS:
@@ -2070,8 +2066,6 @@ do { \
 						break;
 					}
 					OPTSET(IN6P_HOPOPTS);
-					if (OPTBIT(IN6P_HOPOPTS) == 0)
-						ip6_reset_rcvopt(rcvopts, IPV6_RECVHOPOPTS);
 					break;
 
 				case IPV6_RECVDSTOPTS:
@@ -2081,8 +2075,6 @@ do { \
 						break;
 					}
 					OPTSET(IN6P_DSTOPTS);
-					if (OPTBIT(IN6P_DSTOPTS) == 0)
-						ip6_reset_rcvopt(rcvopts, IPV6_RECVDSTOPTS);
 					break;
 
 				case IPV6_RECVRTHDRDSTOPTS:
@@ -2092,8 +2084,6 @@ do { \
 						break;
 					}
 					OPTSET(IN6P_RTHDRDSTOPTS);
-					if (OPTBIT(IN6P_RTHDRDSTOPTS) == 0)
-						ip6_reset_rcvopt(rcvopts, IPV6_RECVRTHDRDSTOPTS);
 					break;
 
 				case IPV6_RECVRTHDR:
@@ -2103,8 +2093,6 @@ do { \
 						break;
 					}
 					OPTSET(IN6P_RTHDR);
-					if (OPTBIT(IN6P_RTHDR) == 0)
-						ip6_reset_rcvopt(rcvopts, IPV6_RECVRTHDR);
 					break;
 
 				case IPV6_FAITH:
@@ -2232,13 +2220,9 @@ do { \
 				switch (optname) {
 				case IPV6_2292PKTINFO:
 					OPTSET2292(IN6P_PKTINFO);
-					if (OPTBIT(IN6P_PKTINFO) == 0)
-						ip6_reset_rcvopt(rcvopts, IPV6_RECVPKTINFO);
 					break;
 				case IPV6_2292HOPLIMIT:
 					OPTSET2292(IN6P_HOPLIMIT);
-					if (OPTBIT(IN6P_HOPLIMIT) == 0)
-						ip6_reset_rcvopt(rcvopts, IPV6_RECVHOPLIMIT);
 					break;
 				case IPV6_2292HOPOPTS:
 					/*
@@ -2248,22 +2232,14 @@ do { \
 					if (!privileged)
 						return(EPERM);
 					OPTSET2292(IN6P_HOPOPTS);
-					if (OPTBIT(IN6P_HOPOPTS) == 0)
-						ip6_reset_rcvopt(rcvopts, IPV6_RECVHOPOPTS);
 					break;
 				case IPV6_2292DSTOPTS:
 					if (!privileged)
 						return(EPERM);
 					OPTSET2292(IN6P_DSTOPTS|IN6P_RTHDRDSTOPTS); /* XXX */
-					if (OPTBIT(IN6P_DSTOPTS) == 0) {
-						ip6_reset_rcvopt(rcvopts, IPV6_RECVDSTOPTS);
-						ip6_reset_rcvopt(rcvopts, IPV6_RECVRTHDRDSTOPTS);
-					}
 					break;
 				case IPV6_2292RTHDR:
 					OPTSET2292(IN6P_RTHDR);
-					if (OPTBIT(IN6P_RTHDR) == 0)
-						ip6_reset_rcvopt(rcvopts, IPV6_RECVRTHDR);
 					break;
 				}
 				break;
