@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.74 2001/09/24 15:28:52 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.75 2001/09/24 15:32:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1081,7 +1081,9 @@ in6_clearscope(addr)
 void
 addrsel_policy_init()
 {
+#ifndef __FreeBSD__
 	init_policy_queue();
+#endif
 
 	/* initialize the "last resort" policy */
 	bzero(&defaultaddrpolicy, sizeof(defaultaddrpolicy));
