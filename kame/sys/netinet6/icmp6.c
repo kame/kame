@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.188 2001/02/06 04:08:17 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.189 2001/02/06 04:35:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1347,6 +1347,7 @@ ni6_input(m, off)
 	int addrs;		/* for NI_QTYPE_NODEADDR */
 	struct ifnet *ifp = NULL; /* for NI_QTYPE_NODEADDR */
 	struct sockaddr_in6 sin6; /* double meaning; ip6_dst and subjectaddr */
+	struct sockaddr_in6 sin6_d; /* XXX: we should retrieve this from m_aux */
 	struct ip6_hdr *ip6;
 	int oldfqdn = 0;	/* if 1, return pascal string (03 draft) */
 	char *subj = NULL;
@@ -1419,8 +1420,8 @@ ni6_input(m, off)
 			/*
 			 * Validate Subject address.
 			 *
-			 * Not sure what exactly does "address belongs to the
-			 * node" mean in the spec, is it just unicast, or what?
+			 * Not sure what exactly "address belongs to the node"
+			 * means in the spec, is it just unicast, or what?
 			 *
 			 * At this moment we consider Subject address as
 			 * "belong to the node" if the Subject address equals
@@ -1433,16 +1434,22 @@ ni6_input(m, off)
 			/* m_pulldown instead of copy? */
 			m_copydata(m, off + sizeof(struct icmp6_nodeinfo),
 			    subjlen, (caddr_t)&sin6.sin6_addr);
-			/* XXX kame scope hack */
-			if (IN6_IS_SCOPE_LINKLOCAL(&sin6.sin6_addr)) {
-				if ((m->m_flags & M_PKTHDR) != 0 &&
-				    m->m_pkthdr.rcvif) {
-					sin6.sin6_addr.s6_addr16[1] =
-					    htons(m->m_pkthdr.rcvif->if_index);
-				}
-			}
+			sin6.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
+							      &sin6.sin6_addr);
+#ifndef SCOPEDROUTING
+			in6_embedscope(&sin6.sin6_addr, &sin6, NULL, NULL);
+#endif
+			bzero(&sin6_d, sizeof(sin6_d));
+			sin6_d.sin6_family = AF_INET6; /* not used, actually */
+			sin6_d.sin6_len = sizeof(sin6_d); /* ditto */
+			sin6_d.sin6_addr = ip6->ip6_dst;
+			sin6_d.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
+								&ip6->ip6_dst);
+#ifndef SCOPEDROUTING
+			in6_embedscope(&sin6_d.sin6_addr, &sin6_d, NULL, NULL);
+#endif
 			subj = (char *)&sin6;
-			if (IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &sin6.sin6_addr))
+			if (SA6_ARE_ADDR_EQUAL(&sin6, &sin6_d))
 				break;
 
 			/*
