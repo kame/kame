@@ -132,7 +132,6 @@ struct ip6_exthdrs {
 	struct mbuf *ip6e_dest2;
 };
 
-#ifndef __OpenBSD__
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 static int ip6_pcbopts __P((struct ip6_pktopts **, struct mbuf *,
 			    struct socket *, struct sockopt *sopt));
@@ -142,7 +141,6 @@ static int ip6_pcbopts __P((struct ip6_pktopts **, struct mbuf *,
 #endif
 static int ip6_setmoptions __P((int, struct ip6_moptions **, struct mbuf *));
 static int ip6_getmoptions __P((int, struct ip6_moptions *, struct mbuf **));
-#endif /*openbsd*/
 static int ip6_copyexthdr __P((struct mbuf **, caddr_t, int));
 static int ip6_insertfraghdr __P((struct mbuf *, struct mbuf *, int,
 				  struct ip6_frag **));
@@ -1199,9 +1197,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 	struct mbuf **mp;
 #endif
 {
-#ifdef __OpenBSD__
-	return EINVAL;
-#else
 	int privileged;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	register struct inpcb *in6p = sotoinpcb(so);
@@ -1271,7 +1266,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 			    }
 #else
 #ifdef HAVE_NRL_INPCB
-				return(ip6_pcbopts(&inp->inp_outputopts,
+				return(ip6_pcbopts(&inp->inp_outputopts6,
 						   m, so));
 #else
 				return(ip6_pcbopts(&in6p->in6p_outputopts,
@@ -1318,7 +1313,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 						else {
 							/* -1 = kernel default */
 #ifdef HAVE_NRL_INPCB
-							/*in6p->inp_hops = optval; XXX*/
+							inp->inp_hops = optval;
 #else
 							in6p->in6p_hops = optval;
 
@@ -1333,10 +1328,11 @@ ip6_ctloutput(op, so, level, optname, mp)
 						}
 						break;
 #ifdef HAVE_NRL_INPCB
+#define OPTSET(bit) \
 	if (optval) \
-		in6p->inp_flags |= bit; \
+		inp->inp_flags |= bit; \
 	else \
-		in6p->inp_flags &= ~bit;
+		inp->inp_flags &= ~bit;
 #else
 #define OPTSET(bit) \
 	if (optval) \
@@ -1378,7 +1374,11 @@ ip6_ctloutput(op, so, level, optname, mp)
 						break;
 
 					case IPV6_CHECKSUM:
+#ifdef HAVE_NRL_INPCB
+						inp->inp_csumoffset = optval;
+#else
 						in6p->in6p_cksum = optval;
+#endif
 						break;
 
 					case IPV6_FAITH:
@@ -1424,7 +1424,13 @@ ip6_ctloutput(op, so, level, optname, mp)
 				(void)m_free(m);
 			    }
 #else
-				error =	ip6_setmoptions(optname, &in6p->in6p_moptions, m);
+#ifdef HAVE_NRL_INPCB
+				error =	ip6_setmoptions(optname,
+					&inp->inp_moptions6, m);
+#else
+				error =	ip6_setmoptions(optname,
+					&in6p->in6p_moptions, m);
+#endif
 #endif
 				break;
 
@@ -1439,6 +1445,10 @@ ip6_ctloutput(op, so, level, optname, mp)
 			optval = *mtod(m, int *);
 #endif
 
+#ifdef HAVE_NRL_INPCB
+# define in6p		inp
+# define in6p_flags	inp_flags
+#endif
 			switch (optval) {
 			case IPV6_PORTRANGE_DEFAULT:
 				in6p->in6p_flags &= ~(IN6P_LOWPORT);
@@ -1459,6 +1469,10 @@ ip6_ctloutput(op, so, level, optname, mp)
 				error = EINVAL;
 				break;
 			}
+#ifdef HAVE_NRL_INPCB
+# undef in6p
+# undef in6p_flags
+#endif
 			break;
 #endif
 
@@ -1574,6 +1588,14 @@ ip6_ctloutput(op, so, level, optname, mp)
 							       in6p->in6p_options);
 				} else
 					sopt->sopt_valsize = 0;
+#elif defined(HAVE_NRL_INPCB)
+				if (inp->inp_options) {
+					*mp = m_copym(inp->inp_options, 0,
+						      M_COPYALL, M_WAIT);
+				} else {
+					*mp = m_get(M_WAIT, MT_SOOPTS);
+					(*mp)->m_len = 0;
+				}
 #else
 				if (in6p->in6p_options) {
 					*mp = m_copym(in6p->in6p_options, 0,
@@ -1609,10 +1631,18 @@ ip6_ctloutput(op, so, level, optname, mp)
 				switch (optname) {
 
 				case IPV6_UNICAST_HOPS:
+#ifdef HAVE_NRL_INPCB
+					optval = inp->inp_hops;
+#else
 					optval = in6p->in6p_hops;
+#endif
 					break;
 
+#ifdef HAVE_NRL_INPCB
+#define OPTBIT(bit) (inp->inp_flags & bit ? 1 : 0)
+#else
 #define OPTBIT(bit) (in6p->in6p_flags & bit ? 1 : 0)
+#endif
 
 				case IPV6_RECVOPTS:
 					optval = OPTBIT(IN6P_RECVOPTS);
@@ -1647,7 +1677,11 @@ ip6_ctloutput(op, so, level, optname, mp)
 					break;
 
 				case IPV6_CHECKSUM:
+#ifdef HAVE_NRL_INPCB
+					optval = inp->inp_csumoffset;
+#else
 					optval = in6p->in6p_cksum;
+#endif
 					break;
 
 				case IPV6_FAITH:
@@ -1666,7 +1700,11 @@ ip6_ctloutput(op, so, level, optname, mp)
 				case IPV6_PORTRANGE:
 				    {
 					int flags;
+#ifdef HAVE_NRL_INPCB
+					flags = inp->inp_flags;
+#else
 					flags = in6p->in6p_flags;
+#endif
 					if (flags & IN6P_HIGHPORT)
 						optval = IPV6_PORTRANGE_HIGH;
 					else if (flags & IN6P_LOWPORT)
@@ -1702,6 +1740,8 @@ ip6_ctloutput(op, so, level, optname, mp)
 						mtod(m, char *), m->m_len);
 				m_freem(m);
 			    }
+#elif defined(HAVE_NRL_INPCB)
+				error = ip6_getmoptions(optname, inp->inp_moptions6, mp);
 #else
 				error = ip6_getmoptions(optname, in6p->in6p_moptions, mp);
 #endif
@@ -1771,10 +1811,8 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 	}
 	return(error);
-#endif /*__OpenBSD__*/
 }
 
-#ifndef __OpenBSD__
 /*
  * Set up IP6 options in pcb for insertion in output packets.
  * Store in mbuf with pointer in pcbopt, adding pseudo-option
@@ -2172,7 +2210,6 @@ ip6_getmoptions(optname, im6o, mp)
 		return(EOPNOTSUPP);
 	}
 }
-#endif /*OpenBSD*/
 
 /*
  * Discard the IP6 multicast options.
@@ -2408,10 +2445,13 @@ ip6_splithdr(m, exthdrs)
 	return 0;
 }
 
-#ifndef __OpenBSD__
 /*
  * Compute IPv6 extension header length.
  */
+#ifdef HAVE_NRL_INPCB
+# define in6pcb	inpcb
+# define in6p_outputopts	inp_outputopts6
+#endif
 int
 ip6_optlen(in6p)
 	struct in6pcb *in6p;
@@ -2432,4 +2472,7 @@ ip6_optlen(in6p)
 	return len;
 #undef elen
 }
+#ifdef HAVE_NRL_INPCB
+# undef in6pcb
+# undef in6p_outputopts
 #endif

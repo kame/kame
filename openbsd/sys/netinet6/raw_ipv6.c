@@ -374,14 +374,10 @@ rip6_input(mp, offp, proto)
     if ((m2 = m_copym(m, 0, (int)M_COPYALL, M_DONTWAIT))) {
       m_adj(m2, extra);
       DP(FINISHED, m2->m_pkthdr.len, d);
-#if 0
-      if (inp->inp_flags & INP_CONTROLOPTS)
+      if (inp->inp_flags & IN6P_CONTROLOPTS)
 	ip6_savecontrol(inp, &opts, ip6, m);
       else
         opts = NULL;
-#else
-      opts = NULL;
-#endif
       if (sbappendaddr(&inp->inp_socket->so_rcv, (struct sockaddr *)&srcsa, m2,
                        opts)) {
         sorwakeup(inp->inp_socket);
