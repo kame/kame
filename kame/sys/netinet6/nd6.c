@@ -479,9 +479,8 @@ nd6_timer(ignored_arg)
 			}
 			break;
 		case ND6_LLINFO_REACHABLE:
-			if (ln->ln_expire) {
+			if (ln->ln_expire)
 				ln->ln_state = ND6_LLINFO_STALE;
-			}
 			break;
 		/* 
 		 * ND6_LLINFO_STALE state requires nothing for timer
@@ -1078,7 +1077,7 @@ nd6_rtrequest(req, rt, sa)
 		 *     SIN(rt_mask(rt))->sin_addr.s_addr != 0xffffffff)
 		 *	   rt->rt_flags |= RTF_CLONING;
 		 */
-		if (rt->rt_flags & RTF_CLONING || rt->rt_flags & RTF_LLINFO) {
+		if (rt->rt_flags & (RTF_CLONING | RTF_LLINFO)) {
 			/*
 			 * Case 1: This route should come from
 			 * a route to interface. RTF_LLINFO flag is set
@@ -1105,17 +1104,28 @@ nd6_rtrequest(req, rt, sa)
 			if (rt->rt_flags & RTF_CLONING)
 				break;
 		}
-		/* Announce a new entry if requested. */
+		/*
+		 * In IPv4 code, we try to annonuce new RTF_ANNOUNCE entry here.
+		 * We don't do that here since llinfo is not ready yet here.
+		 * There are also couple of reasons:
+		 * - unsolicited NA code needs improvement beforehand
+		 * - RFC2461 does not require it, it seems
+		 * - from RFC2461 6.2.4, host MUST NOT do that.  if we do,
+		 *   we need to check ip6forwarding to be sure.
+		 */
+#if 0
+		/* XXX it does not work */
 		if (rt->rt_flags & RTF_ANNOUNCE)
 			nd6_na_output(ifp,
-				      &SIN6(rt_key(rt))->sin6_addr,
-				      &SIN6(rt_key(rt))->sin6_addr,
-				      ip6_forwarding ? ND_NA_FLAG_ROUTER : 0,
-				      1);
+			      &SIN6(rt_key(rt))->sin6_addr,
+			      &SIN6(rt_key(rt))->sin6_addr,
+			      ip6_forwarding ? ND_NA_FLAG_ROUTER : 0,
+			      1, NULL);
+#endif
 		/* FALLTHROUGH */
 	case RTM_RESOLVE:
 		if (gate->sa_family != AF_LINK ||
-		   gate->sa_len < sizeof(null_sdl)) {
+		    gate->sa_len < sizeof(null_sdl)) {
 			log(LOG_DEBUG, "nd6_rtrequest: bad gateway value\n");
 			break;
 		}
@@ -1199,12 +1209,50 @@ nd6_rtrequest(req, rt, sa)
 					rt->rt_ifa = ifa;
 				}
 			}
+		} else if (rt->rt_flags & RTF_ANNOUNCE) {
+			ln->ln_expire = 0;
+			ln->ln_state = ND6_LLINFO_REACHABLE;
+
+			/* join solicited node multicast for proxy ND */
+			if (ifp->if_flags & IFF_MULTICAST) {
+				struct in6_addr llsol;
+				int error;
+
+				llsol = SIN6(rt_key(rt))->sin6_addr;
+				llsol.s6_addr16[0] = htons(0xff02);
+				llsol.s6_addr16[1] = htons(ifp->if_index);
+				llsol.s6_addr32[1] = 0;
+				llsol.s6_addr32[2] = htonl(1);
+				llsol.s6_addr8[12] = 0xff;
+
+				(void)in6_addmulti(&llsol, ifp, &error);
+				if (error)
+					printf(
+"nd6_rtrequest: could not join solicited node multicast (errno=%d)\n", error);
+			}
 		}
 		break;
 
 	case RTM_DELETE:
 		if (!ln)
 			break;
+		/* leave from solicited node multicast for proxy ND */
+		if ((rt->rt_flags & RTF_ANNOUNCE) != 0 &&
+		    (ifp->if_flags & IFF_MULTICAST) != 0) {
+			struct in6_addr llsol;
+			struct in6_multi *in6m;
+
+			llsol = SIN6(rt_key(rt))->sin6_addr;
+			llsol.s6_addr16[0] = htons(0xff02);
+			llsol.s6_addr16[1] = htons(ifp->if_index);
+			llsol.s6_addr32[1] = 0;
+			llsol.s6_addr32[2] = htonl(1);
+			llsol.s6_addr8[12] = 0xff;
+
+			IN6_LOOKUP_MULTI(llsol, ifp, in6m);
+			if (in6m)
+				in6_delmulti(in6m);
+		}
 		nd6_inuse--;
 		ln->ln_next->ln_prev = ln->ln_prev;
 		ln->ln_prev->ln_next = ln->ln_next;
@@ -1265,7 +1313,7 @@ nd6_p2p_rtrequest(req, rt, sa)
 				      &SIN6(rt_key(rt))->sin6_addr,
 				      &SIN6(rt_key(rt))->sin6_addr,
 				      ip6_forwarding ? ND_NA_FLAG_ROUTER : 0,
-				      1);
+				      1, NULL);
 		/* FALLTHROUGH */
 	case RTM_RESOLVE:
 		/*

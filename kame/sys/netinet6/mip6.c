@@ -33,7 +33,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6.c,v 1.7 2000/02/10 03:50:56 itojun Exp $
+ * $Id: mip6.c,v 1.8 2000/02/17 05:10:01 itojun Exp $
  *
  */
 
@@ -1001,7 +1001,7 @@ struct mip6_na    *nap;         /* Neighbor Advertisement sent */
        Different prefix list is used for HA and MN. */
     if (nap->prefix_len == 0) {
         nd6_na_output(nap->ifp, &nap->dst_addr, &nap->target_addr,
-                      nap->flags, nap->use_link_opt);
+                      nap->flags, nap->use_link_opt, NULL);
 #ifdef MIP6_DEBUG
         mip6_debug("Target Address: %s\n", ip6_sprintf(&nap->target_addr));
 #endif
@@ -1016,7 +1016,7 @@ struct mip6_na    *nap;         /* Neighbor Advertisement sent */
                     mip6_build_in6addr(&new_addr, &nap->target_addr,
                                        &pq->prefix, pq->prefix_len);
                     nd6_na_output(nap->ifp, &nap->dst_addr, &new_addr,
-                                  nap->flags, nap->use_link_opt);
+                                  nap->flags, nap->use_link_opt, NULL);
 #ifdef MIP6_DEBUG
                     mip6_debug("Target Address: %s\n", ip6_sprintf(&new_addr));
 #endif
@@ -1031,7 +1031,7 @@ struct mip6_na    *nap;         /* Neighbor Advertisement sent */
                     mip6_build_in6addr(&new_addr, &nap->target_addr,
                                        &sl_addr, nap->prefix_len);
                     nd6_na_output(nap->ifp, &nap->dst_addr, &new_addr,
-                                  nap->flags, nap->use_link_opt);
+                                  nap->flags, nap->use_link_opt, NULL);
 #ifdef MIP6_DEBUG
                     mip6_debug("Target Address: %s\n", ip6_sprintf(&new_addr));
 #endif
@@ -1041,7 +1041,7 @@ struct mip6_na    *nap;         /* Neighbor Advertisement sent */
                     mip6_build_in6addr(&new_addr, &nap->target_addr,
                                        &in6addr_linklocal, nap->prefix_len);
                     nd6_na_output(nap->ifp, &nap->dst_addr, &new_addr,
-                                  nap->flags, nap->use_link_opt);
+                                  nap->flags, nap->use_link_opt, NULL);
 #ifdef MIP6_DEBUG
                     mip6_debug("Target Address: %s\n", ip6_sprintf(&new_addr));
 #endif
@@ -1056,7 +1056,7 @@ struct mip6_na    *nap;         /* Neighbor Advertisement sent */
                                        &pr->ndpr_prefix.sin6_addr,
                                        pr->ndpr_plen);
                     nd6_na_output(nap->ifp, &nap->dst_addr, &new_addr,
-                                  nap->flags, nap->use_link_opt);
+                                  nap->flags, nap->use_link_opt, NULL);
 #ifdef MIP6_DEBUG
                     mip6_debug("Target Address: %s\n", ip6_sprintf(&new_addr));
 #endif
@@ -1072,7 +1072,7 @@ struct mip6_na    *nap;         /* Neighbor Advertisement sent */
                     mip6_build_in6addr(&new_addr, &nap->target_addr,
                                        &sl_addr, nap->prefix_len);
                     nd6_na_output(nap->ifp, &nap->dst_addr, &new_addr,
-                                  nap->flags, nap->use_link_opt);
+                                  nap->flags, nap->use_link_opt, NULL);
 #ifdef MIP6_DEBUG
                     mip6_debug("Target Address: %s\n", ip6_sprintf(&new_addr));
 #endif
@@ -1082,7 +1082,7 @@ struct mip6_na    *nap;         /* Neighbor Advertisement sent */
                     mip6_build_in6addr(&new_addr, &nap->target_addr,
                                        &in6addr_linklocal, nap->prefix_len);
                     nd6_na_output(nap->ifp, &nap->dst_addr, &new_addr,
-                                  nap->flags, nap->use_link_opt);
+                                  nap->flags, nap->use_link_opt, NULL);
 #ifdef MIP6_DEBUG
                     mip6_debug("Target Address: %s\n", ip6_sprintf(&new_addr));
 #endif

@@ -88,8 +88,6 @@ static int dad_maxtry = 15;	/* max # of *tries* to transmit DAD packet */
  *
  * Based on RFC 2461
  * Based on RFC 2462 (duplicated address detection)
- *
- * XXX proxy advertisement
  */
 void
 nd6_ns_input(m, off, icmp6len)
@@ -109,6 +107,7 @@ nd6_ns_input(m, off, icmp6len)
 	int anycast = 0, proxy = 0, tentative = 0;
 	int tlladdr;
 	union nd_opts ndopts;
+	struct sockaddr_dl *proxydl = NULL;
 
 	if (ip6->ip6_hlim != 255) {
 		log(LOG_ERR,
@@ -200,7 +199,7 @@ nd6_ns_input(m, off, icmp6len)
 	ifa = (struct ifaddr *)in6ifa_ifpwithaddr(ifp, &taddr6);
 
 	/* (2) check. */
-	if (!ifa && nd6_proxyall) {
+	if (!ifa) {
 		struct rtentry *rt;
 		struct sockaddr_in6 tsin6;
 
@@ -214,17 +213,31 @@ nd6_ns_input(m, off, icmp6len)
 			      , 0
 #endif /* __FreeBSD__ */
 			      );
-		if (rt && rt->rt_ifp != ifp) {
+		if (rt && (rt->rt_flags & RTF_ANNOUNCE) != 0 &&
+		    rt->rt_gateway->sa_family == AF_LINK) {
 			/*
-			 * search link local addr for ifp, and use it for
-			 * proxy NA.
+			 * proxy NDP for single entry
 			 */
 			ifa = (struct ifaddr *)in6ifa_ifpforlinklocal(ifp,
-								      IN6_IFF_NOTREADY|IN6_IFF_ANYCAST);
+				IN6_IFF_NOTREADY|IN6_IFF_ANYCAST);
+			if (ifa) {
+				proxy = 1;
+				proxydl = SDL(rt->rt_gateway);
+			}
+		} else if (rt && nd6_proxyall && rt->rt_ifp != ifp) {
+			/*
+			 * proxy NDP for the whole interface
+			 *
+			 * search link local addr for ifp, and use it
+			 * for proxy NA.
+			 */
+			ifa = (struct ifaddr *)in6ifa_ifpforlinklocal(ifp,
+				IN6_IFF_NOTREADY|IN6_IFF_ANYCAST);
 			if (ifa)
 				proxy = 1;
 		}
-		rtfree(rt);
+		if (rt)
+			rtfree(rt);
 	}
 	if (!ifa) {
 		/*
@@ -295,7 +308,7 @@ nd6_ns_input(m, off, icmp6len)
 			      ((anycast || proxy || !tlladdr)
 				      ? 0 : ND_NA_FLAG_OVERRIDE)
 			      	| (ip6_forwarding ? ND_NA_FLAG_ROUTER : 0),
-			      tlladdr);
+			      tlladdr, (struct sockaddr *)proxydl);
 		goto freeit;
 	}
 
@@ -305,7 +318,7 @@ nd6_ns_input(m, off, icmp6len)
 		      ((anycast || proxy || !tlladdr) ? 0 : ND_NA_FLAG_OVERRIDE)
 			| (ip6_forwarding ? ND_NA_FLAG_ROUTER : 0)
 			| ND_NA_FLAG_SOLICITED,
-		      tlladdr);
+		      tlladdr, (struct sockaddr *)proxydl);
  freeit:
 	m_freem(m);
 	return;
@@ -511,6 +524,10 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
  *
  * Based on RFC 2461
  * Based on RFC 2462 (duplicated address detection)
+ *
+ * the following items are not implemented yet:
+ * - proxy advertisement delay rule (RFC2461 7.2.8, last paragraph, SHOULD)
+ * - anycast advertisement delay rule (RFC2461 7.2.7, SHOULD)
  */
 void
 nd6_na_input(m, off, icmp6len)
@@ -784,16 +801,17 @@ nd6_na_input(m, off, icmp6len)
  *
  * Based on RFC 2461
  *
- * XXX NA delay for anycast address is not implemented yet
- *      (RFC 2461 7.2.7)
- * XXX proxy advertisement?
+ * the following items are not implemented yet:
+ * - proxy advertisement delay rule (RFC2461 7.2.8, last paragraph, SHOULD)
+ * - anycast advertisement delay rule (RFC2461 7.2.7, SHOULD)
  */
 void
-nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr)
+nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	struct ifnet *ifp;
 	struct in6_addr *daddr6, *taddr6;
 	u_long flags;
-	int tlladdr;	/* 1 if include target link-layer address */
+	int tlladdr;		/* 1 if include target link-layer address */
+	struct sockaddr *sdl0;	/* sockaddr_dl (= proxy NA) or NULL */
 {
 	struct mbuf *m;
 	struct ip6_hdr *ip6;
@@ -878,7 +896,23 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr)
 	 * Basically, if NS packet is sent to unicast/anycast addr,
 	 * target lladdr option SHOULD NOT be included.
 	 */
-	if (tlladdr && (mac = nd6_ifptomac(ifp))) {
+	if (tlladdr) {
+		mac = NULL;
+		/*
+		 * sdl0 != NULL indicates proxy NA.  If we do proxy, use
+		 * lladdr in sdl0.  If we are not proxying (sending NA for
+		 * my address) use lladdr configured for the interface.
+		 */
+		if (sdl0 == NULL)
+			mac = nd6_ifptomac(ifp);
+		else if (sdl0->sa_family == AF_LINK) {
+			struct sockaddr_dl *sdl;
+			sdl = (struct sockaddr_dl *)sdl0;
+			if (sdl->sdl_alen == ifp->if_addrlen)
+				mac = LLADDR(sdl);
+		}
+	}
+	if (tlladdr && mac) {
 		int optlen = sizeof(struct nd_opt_hdr) + ifp->if_addrlen;
 		struct nd_opt_hdr *nd_opt = (struct nd_opt_hdr *)(nd_na + 1);
 		

@@ -30,6 +30,11 @@
 #ifndef _NETINET6_ND6_H_
 #define _NETINET6_ND6_H_
 
+/* see net/route.h, or net/if_inarp.h */
+#ifndef RTF_ANNOUNCE
+#define RTF_ANNOUNCE	RTF_PROTO2
+#endif
+
 #include <sys/queue.h>
 
 struct	llinfo_nd6 {
@@ -303,7 +308,7 @@ int nd6_storelladdr __P((struct ifnet *, struct rtentry *, struct mbuf *,
 /* nd6_nbr.c */
 void nd6_na_input __P((struct mbuf *, int, int));
 void nd6_na_output __P((struct ifnet *, struct in6_addr *,
- 			struct in6_addr *, u_long, int));
+ 			struct in6_addr *, u_long, int, struct sockaddr *));
 void nd6_ns_input __P((struct mbuf *, int, int));
 void nd6_ns_output __P((struct ifnet *, struct in6_addr *,
 			struct in6_addr *, struct llinfo_nd6 *, int));
