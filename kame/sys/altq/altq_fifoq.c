@@ -1,7 +1,7 @@
-/*	$KAME: altq_fifoq.c,v 1.7 2000/12/14 08:12:45 thorpej Exp $	*/
+/*	$KAME: altq_fifoq.c,v 1.8 2002/04/03 05:38:50 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-2000
+ * Copyright (C) 1997-2002
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -62,12 +62,12 @@
 static fifoq_state_t *fifoq_list = NULL;
 
 /* internal function prototypes */
-static int		fifoq_enqueue __P((struct ifaltq *, struct mbuf *,
-					   struct altq_pktattr *));
-static struct mbuf 	*fifoq_dequeue __P((struct ifaltq *, int));
-static int 		fifoq_detach __P((fifoq_state_t *));
-static int		fifoq_request __P((struct ifaltq *, int, void *));
-static void 		fifoq_purge __P((fifoq_state_t *));
+static int		fifoq_enqueue(struct ifaltq *, struct mbuf *,
+				      struct altq_pktattr *);
+static struct mbuf 	*fifoq_dequeue(struct ifaltq *, int);
+static int 		fifoq_detach(fifoq_state_t *);
+static int		fifoq_request(struct ifaltq *, int, void *);
+static void 		fifoq_purge(fifoq_state_t *);
 
 /*
  * fifoq device interface

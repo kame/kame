@@ -1,7 +1,7 @@
-/*	$KAME: altq_blue.c,v 1.8 2002/01/07 11:25:40 kjc Exp $	*/
+/*	$KAME: altq_blue.c,v 1.9 2002/04/03 05:38:50 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-2000
+ * Copyright (C) 1997-2002
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -109,13 +109,12 @@
 static blue_queue_t *blue_list = NULL;
 
 /* internal function prototypes */
-static int blue_enqueue __P((struct ifaltq *, struct mbuf *,
-			     struct altq_pktattr *));
-static struct mbuf *blue_dequeue __P((struct ifaltq *, int));
-static int drop_early __P((blue_t *));
-static int mark_ecn __P((struct mbuf *, struct altq_pktattr *, int));
-static int blue_detach __P((blue_queue_t *));
-static int blue_request __P((struct ifaltq *, int, void *));
+static int blue_enqueue(struct ifaltq *, struct mbuf *, struct altq_pktattr *);
+static struct mbuf *blue_dequeue(struct ifaltq *, int);
+static int drop_early(blue_t *);
+static int mark_ecn(struct mbuf *, struct altq_pktattr *, int);
+static int blue_detach(blue_queue_t *);
+static int blue_request(struct ifaltq *, int, void *);
 
 /*
  * blue device interface

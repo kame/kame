@@ -1,7 +1,7 @@
-/*	$KAME: if_altq.h,v 1.7 2002/02/19 06:37:39 kjc Exp $	*/
+/*	$KAME: if_altq.h,v 1.8 2002/04/03 05:38:51 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-2000
+ * Copyright (C) 1997-2002
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -53,14 +53,14 @@ struct	ifaltq {
 	void	*altq_disc;		/* for discipline-specific use */
 	struct	ifnet *altq_ifp;	/* back pointer to interface */
 
-	int	(*altq_enqueue) __P((struct ifaltq *, struct mbuf *,
-				     struct altq_pktattr *));
-	struct	mbuf *(*altq_dequeue) __P((struct ifaltq *, int));
-	int	(*altq_request) __P((struct ifaltq *, int, void *));
+	int	(*altq_enqueue)(struct ifaltq *, struct mbuf *,
+				struct altq_pktattr *);
+	struct	mbuf *(*altq_dequeue)(struct ifaltq *, int);
+	int	(*altq_request)(struct ifaltq *, int, void *);
 
 	/* classifier fields */
 	void	*altq_clfier;		/* classifier-specific use */
-	void	*(*altq_classify) __P((void *, struct mbuf *, int));
+	void	*(*altq_classify)(void *, struct mbuf *, int);
 
 	/* token bucket regulator */
 	struct	tb_regulator *altq_tbr;
@@ -147,20 +147,19 @@ struct tb_regulator {
 #define	ALTQ_IS_EMPTY(ifq)		((ifq)->ifq_len == 0)
 #define	TBR_IS_ENABLED(ifq)		((ifq)->altq_tbr != NULL)
 
-extern int altq_attach __P((struct ifaltq *, int, void *,
-			    int (*)(struct ifaltq *, struct mbuf *,
-				    struct altq_pktattr *),
-			    struct mbuf *(*)(struct ifaltq *, int), 
-			    int (*)(struct ifaltq *, int, void *),
-			    void *,
-			    void *(*)(void *, struct mbuf *, int)));
-extern int altq_detach __P((struct ifaltq *));
-extern int altq_enable __P((struct ifaltq *));
-extern int altq_disable __P((struct ifaltq *));
-extern struct mbuf *tbr_dequeue __P((struct ifaltq *, int));
-extern int (*altq_input) __P((struct mbuf *, int));
-void altq_etherclassify __P((struct ifaltq *, struct mbuf *,
-			     struct altq_pktattr *));
+extern int altq_attach(struct ifaltq *, int, void *,
+		       int (*)(struct ifaltq *, struct mbuf *,
+			       struct altq_pktattr *),
+		       struct mbuf *(*)(struct ifaltq *, int), 
+		       int (*)(struct ifaltq *, int, void *),
+		       void *,
+		       void *(*)(void *, struct mbuf *, int));
+extern int altq_detach(struct ifaltq *);
+extern int altq_enable(struct ifaltq *);
+extern int altq_disable(struct ifaltq *);
+extern struct mbuf *tbr_dequeue(struct ifaltq *, int);
+extern int (*altq_input)(struct mbuf *, int);
+void altq_etherclassify(struct ifaltq *, struct mbuf *, struct altq_pktattr *);
 #endif /* _KERNEL */
 
 #endif /* _ALTQ_IF_ALTQ_H_ */

@@ -1,7 +1,7 @@
-/*	$KAME: altq_afmap.c,v 1.7 2000/12/14 08:12:45 thorpej Exp $	*/
+/*	$KAME: altq_afmap.c,v 1.8 2002/04/03 05:38:49 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-2000
+ * Copyright (C) 1997-2002
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -66,9 +66,9 @@
 
 LIST_HEAD(, afm_head) afhead_chain;
 
-static struct afm *afm_match4 __P((struct afm_head *, struct flowinfo_in *));
+static struct afm *afm_match4(struct afm_head *, struct flowinfo_in *);
 #ifdef INET6
-static struct afm *afm_match6 __P((struct afm_head *, struct flowinfo_in6 *));
+static struct afm *afm_match6(struct afm_head *, struct flowinfo_in6 *);
 #endif
 
 /*

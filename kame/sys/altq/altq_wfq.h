@@ -1,7 +1,7 @@
-/*	$KAME: altq_wfq.h,v 1.5 2000/12/14 08:12:46 thorpej Exp $	*/
+/*	$KAME: altq_wfq.h,v 1.6 2002/04/03 05:38:51 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-2000
+ * Copyright (C) 1997-2002
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

@@ -1,7 +1,7 @@
-/*	$KAME: altq_afmap.h,v 1.5 2000/12/14 08:12:45 thorpej Exp $	*/
+/*	$KAME: altq_afmap.h,v 1.6 2002/04/03 05:38:50 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-2000
+ * Copyright (C) 1997-2002
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -89,14 +89,14 @@ struct afm_head {
 	struct ifnet		*afh_ifp;
 };
 
-struct afm	*afm_top __P((struct ifnet *));
-int		afm_alloc __P((struct ifnet *));
-int		afm_dealloc __P((struct ifnet *));
-int		afm_add __P((struct ifnet *, struct atm_flowmap *));
-int		afm_remove __P((struct afm *));
-int		afm_removeall __P((struct ifnet *));
-struct		afm *afm_lookup __P((struct ifnet *, int, int));
-struct afm 	*afm_match __P((struct ifnet *, struct flowinfo *));
+struct afm	*afm_top(struct ifnet *);
+int		afm_alloc(struct ifnet *);
+int		afm_dealloc(struct ifnet *);
+int		afm_add(struct ifnet *, struct atm_flowmap *);
+int		afm_remove(struct afm *);
+int		afm_removeall(struct ifnet *);
+struct		afm *afm_lookup(struct ifnet *, int, int);
+struct afm 	*afm_match(struct ifnet *, struct flowinfo *);
 
 #endif /* _KERNEL */
 

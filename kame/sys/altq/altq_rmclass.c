@@ -1,4 +1,4 @@
-/*	$KAME: altq_rmclass.c,v 1.10 2001/02/09 07:20:40 kjc Exp $	*/
+/*	$KAME: altq_rmclass.c,v 1.11 2002/04/03 05:38:51 kjc Exp $	*/
 
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
@@ -79,24 +79,24 @@
  * Local routines.
  */
 
-static int	rmc_satisfied __P((struct rm_class *, struct timeval *));
-static void	rmc_wrr_set_weights __P((struct rm_ifdat *));
-static void	rmc_depth_compute __P((struct rm_class *));
-static void	rmc_depth_recompute __P((rm_class_t *));
+static int	rmc_satisfied(struct rm_class *, struct timeval *);
+static void	rmc_wrr_set_weights(struct rm_ifdat *);
+static void	rmc_depth_compute(struct rm_class *);
+static void	rmc_depth_recompute(rm_class_t *);
 
-static mbuf_t	*_rmc_wrr_dequeue_next __P((struct rm_ifdat *, int));
-static mbuf_t	*_rmc_prr_dequeue_next __P((struct rm_ifdat *, int));
+static mbuf_t	*_rmc_wrr_dequeue_next(struct rm_ifdat *, int);
+static mbuf_t	*_rmc_prr_dequeue_next(struct rm_ifdat *, int);
 
-static int	_rmc_addq __P((rm_class_t *, mbuf_t *));
-static void	_rmc_dropq __P((rm_class_t *));
-static mbuf_t	*_rmc_getq __P((rm_class_t *));
-static mbuf_t	*_rmc_pollq __P((rm_class_t *));
+static int	_rmc_addq(rm_class_t *, mbuf_t *);
+static void	_rmc_dropq(rm_class_t *);
+static mbuf_t	*_rmc_getq(rm_class_t *);
+static mbuf_t	*_rmc_pollq(rm_class_t *);
 
-static int	rmc_under_limit __P((struct rm_class *, struct timeval *));
-static void	rmc_tl_satisfied __P((struct rm_ifdat *, struct timeval *));
-static void	rmc_drop_action __P((struct rm_class *));
-static void	rmc_restart __P((struct rm_class *));
-static void	rmc_root_overlimit __P((struct rm_class *, struct rm_class *));
+static int	rmc_under_limit(struct rm_class *, struct timeval *);
+static void	rmc_tl_satisfied(struct rm_ifdat *, struct timeval *);
+static void	rmc_drop_action(struct rm_class *);
+static void	rmc_restart(struct rm_class *);
+static void	rmc_root_overlimit(struct rm_class *, struct rm_class *);
 
 #define	BORROW_OFFTIME
 /*
@@ -1481,7 +1481,7 @@ void rmc_dropall(cl)
 
 #if (__FreeBSD_version > 300000)
 /* hzto() is removed from FreeBSD-3.0 */
-static int hzto __P((struct timeval *));
+static int hzto(struct timeval *);
 
 static int
 hzto(tv)

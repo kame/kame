@@ -1,7 +1,7 @@
-/*	$KAME: altq_wfq.c,v 1.7 2000/12/14 08:12:46 thorpej Exp $	*/
+/*	$KAME: altq_wfq.c,v 1.8 2002/04/03 05:38:51 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-2000
+ * Copyright (C) 1997-2002
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -79,7 +79,7 @@ static int		wfq_getqid(struct wfq_getqid *);
 static int		wfq_setweight(struct wfq_setweight *);
 static int		wfq_getstats(struct wfq_getstats *);
 static int		wfq_config(struct wfq_conf *);
-static int		wfq_request __P((struct ifaltq *, int, void *));
+static int		wfq_request(struct ifaltq *, int, void *);
 static int		wfq_flush(struct ifaltq *);
 static void		*wfq_classify(void *, struct mbuf *, int);
 

@@ -1,6 +1,6 @@
-/*	$KAME: altq_priq.h,v 1.1 2000/10/18 09:15:23 kjc Exp $	*/
+/*	$KAME: altq_priq.h,v 1.2 2002/04/03 05:38:51 kjc Exp $	*/
 /*
- * Copyright (C) 2000
+ * Copyright (C) 2000-2002
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

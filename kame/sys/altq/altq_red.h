@@ -1,7 +1,7 @@
-/*	$KAME: altq_red.h,v 1.5 2000/12/14 08:12:46 thorpej Exp $	*/
+/*	$KAME: altq_red.h,v 1.6 2002/04/03 05:38:51 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-2000
+ * Copyright (C) 1997-2002
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -172,17 +172,17 @@ typedef struct red_queue {
 #define	DTYPE_FORCED	1	/* a "forced" drop */
 #define	DTYPE_EARLY	2	/* an "unforced" (early) drop */
 
-extern red_t *red_alloc __P((int, int, int, int, int, int));
-extern void red_destroy __P((red_t *));
-extern void red_getstats __P((red_t *, struct redstats *));
-extern int red_addq __P((red_t *, class_queue_t *, struct mbuf *,
-			 struct altq_pktattr *));
-extern struct mbuf *red_getq __P((red_t *, class_queue_t *));
-extern int drop_early __P((int, int, int));
-extern int mark_ecn __P((struct mbuf *, struct altq_pktattr *, int));
-extern struct wtab *wtab_alloc __P((int));
-extern int wtab_destroy __P((struct wtab *));
-extern int32_t pow_w __P((struct wtab *, int));
+extern red_t *red_alloc(int, int, int, int, int, int);
+extern void red_destroy(red_t *);
+extern void red_getstats(red_t *, struct redstats *);
+extern int red_addq(red_t *, class_queue_t *, struct mbuf *,
+		    struct altq_pktattr *);
+extern struct mbuf *red_getq(red_t *, class_queue_t *);
+extern int drop_early(int, int, int);
+extern int mark_ecn(struct mbuf *, struct altq_pktattr *, int);
+extern struct wtab *wtab_alloc(int);
+extern int wtab_destroy(struct wtab *);
+extern int32_t pow_w(struct wtab *, int);
 
 #endif /* _KERNEL */
 

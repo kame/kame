@@ -1,7 +1,7 @@
-/*	$KAME: altq_conf.c,v 1.13 2002/01/29 10:16:01 kjc Exp $	*/
+/*	$KAME: altq_conf.c,v 1.14 2002/04/03 05:38:50 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-2000
+ * Copyright (C) 1997-2002
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -161,9 +161,9 @@ static	d_close_t	altqclose;
 static	d_ioctl_t	altqioctl;
 #endif
 #ifdef __FreeBSD__
-static void altq_drvinit __P((void *));
+static void altq_drvinit(void *);
 #else
-void	altqattach __P((int));
+void	altqattach(int);
 #endif
 
 #if defined(__FreeBSD__)
@@ -376,8 +376,8 @@ altqattach(int unused)
 /*
  * KLD support
  */
-static int altq_module_register __P((struct altq_module_data *));
-static int altq_module_deregister __P((struct altq_module_data *));
+static int altq_module_register(struct altq_module_data *);
+static int altq_module_deregister(struct altq_module_data *);
 
 static struct altq_module_data *altq_modules[ALTQT_MAX];
 static struct altqsw noqdisc = {"noq", noopen, noclose, noioctl};
