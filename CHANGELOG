@@ -1,11 +1,12 @@
-$Id: CHANGELOG,v 1.481 2000/01/25 18:34:56 itojun Exp $
+$Id: CHANGELOG,v 1.482 2000/01/25 19:57:41 sumikawa Exp $
 
 <200001>
 Wed Jan 26 03:33:41 JST 2000  itojun@iijlab.net
-	* netbsd/pkgsrc/net/{libpcap,tcpdump}: famous packet capturing
-	  tool, from tcpdump.org codebase.  it contains identical code
-	  as kame/{libpcap,tcpdump} so we plan to avoid duplicate maintenance
-	  (put all libpcap/tcpdump efforts into tcpdump.org).
+	* {netbsd/pkgsrc/net,freebsd[23]/ports}/{libpcap,tcpdump}:
+	  famous packet capturing tool, from tcpdump.org codebase.  it
+	  contains identical code as kame/{libpcap,tcpdump} so we plan
+	  to avoid duplicate maintenance (put all libpcap/tcpdump
+	  efforts into tcpdump.org).
 
 Tue Jan 25 20:30:32 JST 2000  itojun@iijlab.net
 	* kame/sys/netinet6/ipcomp_core.c: don't attach Adler32 checksum
