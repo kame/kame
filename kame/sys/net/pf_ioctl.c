@@ -142,7 +142,6 @@ pfattach(int num)
 {
 	u_int32_t *timeout = pf_default_rule.timeout;
 
-#ifndef __FreeBSD__
 	pool_init(&pf_tree_pl, sizeof(struct pf_tree_node), 0, 0, 0, "pftrpl",
 	    NULL);
 	pool_init(&pf_rule_pl, sizeof(struct pf_rule), 0, 0, 0, "pfrulepl",
@@ -158,6 +157,7 @@ pfattach(int num)
 	pfr_initialize();
 	pf_osfp_initialize();
 
+#ifndef __FreeBSD__
 	pool_sethardlimit(&pf_state_pl, pf_pool_limits[PF_LIMIT_STATES].limit,
 	    NULL, 0);
 #endif
