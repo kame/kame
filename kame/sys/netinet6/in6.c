@@ -705,7 +705,6 @@ in6_control(so, cmd, data, ifp)
 
 	case SIOCGIFSTAT_ICMP6:
 		if (ifp == NULL)
-			/* I believe we can omit the check for if_index */
 			return EINVAL;
 		if (icmp6_ifstat == NULL || ifp->if_index >= icmp6_ifstatmax ||
 		    icmp6_ifstat[ifp->if_index] == NULL) {
