@@ -1,8 +1,27 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1340 2000/10/17 14:37:39 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1341 2000/10/18 09:23:35 kjc Exp $
 
 <200010>
+2000/10/18 18:15:25 JST kjc@csl.sony.co.jp
+	the 2nd round of the ALTQ cleanup:
+	* add a new discipline, PRIQ (priority queueing).
+	  its minor device number is 11.
+	* kernel config options:
+	  prepend "ALTQ_" to all the ALTQ kernel config options.
+	  (e.g., CBQ -> ALTQ_CBQ)
+	  eliminate CBQ_RED, CBQ_RIO, HFSC_RED, HFSC_RIO but
+	  enable RED/RIO on HFSC/CBQ/PRIQ when RED/RIO is defined.
+	* change ioctl numbers to be more consistent among disciplines.
+	* altqd:
+	  divide altqd.c into altqd.c and libaltq2.c.
+	  libaltq2.c contains functions and variables required by libaltq.
+	* remove the accounting mode from headers and userland tools.
+	  (it was already removed from the kernel)
+	* other misc cleanup
+	as usual, don't forget to install new include files and rebuild
+	userland tools.
+
 2000-10-17  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* NAT-PT can translate fragmented IPv4 packet to IPv4.        
 	  You need to write 'options NATPT_NAT' and 'options NATPT_FRAGMENT'
