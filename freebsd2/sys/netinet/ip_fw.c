@@ -212,7 +212,7 @@ ipopts_match(struct ip *ip, struct ip_fw *f)
 				return 0; /*XXX*/
 			}
 			optlen = cp[IPOPT_OLEN];
-			if (optlen <= 0 || optlen > cnt) {
+			if (optlen < IPOPT_OLEN + sizeof(*cp) || optlen > cnt) {
 				return 0; /*XXX*/
 			}
 		}
