@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.39 2000/01/11 23:18:15 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.40 2000/01/12 03:42:37 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1252,7 +1252,19 @@ isakmp_ph2expire(iph2)
 		else
 			iph2->inuse = 0;
 
-		/* initialize iph2 */
+
+		/*
+		 * since we are going to reuse the structure, we need to
+		 * refresh all the references between ph1 and ph2
+		 */
+		unbindph12(iph2);
+		remph2(iph2);
+		insph2(iph2);
+
+		/*
+		 * initialize iph2. note that we do not initialize pointers
+		 * here.
+		 */
 		initph2(iph2);
 
 		/* update status for re-use */
