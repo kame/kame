@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.11 2000/05/31 05:46:29 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.12 2000/05/31 05:53:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -32,6 +32,8 @@
 /*
  * TODO:
  * - query timeout
+ * - cache replies seen, honor TTL
+ * - advert cached entries (non-authoritative)
  * - negative cache on explicit failure reply
  * - negative cache on NXRRSET reply on query timeout
  * - attach additional section on reply

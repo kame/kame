@@ -1,4 +1,4 @@
-.\"     $KAME: mdnsd.8,v 1.7 2000/05/31 05:46:29 itojun Exp $
+.\"     $KAME: mdnsd.8,v 1.8 2000/05/31 05:53:38 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -115,6 +115,25 @@ for running two daemons on a single node for debugging
 Specify unicast DNS servers we may want to try sending queries.
 .Fl u
 option can appear multiple times.
+The destination port number is controlled by the
+.Fl P
+option most recently appear.
+For example,
+.Do
+.Fl P
+.Li 10
+.Fl u
+.Li fe80::1
+.Fl P
+.Li 20
+.Fl u
+.Li fe80::2
+.Dc
+will register nameservers at
+.Li fe80::1
+port 10, and
+.Li fe80::2
+port 20.
 .El
 .\"
 .Sh EXAMPLES
