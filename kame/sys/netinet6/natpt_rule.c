@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.31 2001/10/29 06:31:43 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.32 2001/10/29 07:28:28 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -85,32 +85,32 @@ natpt_lookForRule6(struct pcv *cv6)
 	const char	*fn = __FUNCTION__;
 
 	int		 s;
-	struct cSlot	*acs;
+	struct cSlot	*csl;
 
 	s = splnet();
-	for (acs = TAILQ_FIRST(&csl_head);
-	     acs;
-	     acs = TAILQ_NEXT(acs, csl_list)) {
-		if (acs->Local.sa_family != AF_INET6)
+	for (csl = TAILQ_FIRST(&csl_head);
+	     csl;
+	     csl = TAILQ_NEXT(csl, csl_list)) {
+		if (csl->Local.sa_family != AF_INET6)
 			continue;
 
-		if (acs->proto != 0) {
+		if (csl->proto != 0) {
 			if ((cv6->ip_p == IPPROTO_ICMPV6)
-			    && ((acs->proto & NATPT_ICMP) == 0))
+			    && ((csl->proto & NATPT_ICMP) == 0))
 				continue;
 			if ((cv6->ip_p == IPPROTO_TCP)
-			    && ((acs->proto & NATPT_TCP) == 0))
+			    && ((csl->proto & NATPT_TCP) == 0))
 				continue;
 			if ((cv6->ip_p == IPPROTO_UDP)
-			    && ((acs->proto & NATPT_UDP) == 0))
+			    && ((csl->proto & NATPT_UDP) == 0))
 				continue;
 		}
 
-		if (natpt_matchIn6addr(cv6, &acs->local) != 0) {
+		if (natpt_matchIn6addr(cv6, &csl->local) != 0) {
 			if (isDump(D_MATCHINGRULE6))
 				natpt_logIp6(LOG_DEBUG, cv6->ip.ip6, "%s():", fn);
 			cv6->fromto = NATPT_FROM;
-			return (acs);
+			return (csl);
 		}
 	}
 	splx(s);
