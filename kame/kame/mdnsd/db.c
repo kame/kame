@@ -1,4 +1,4 @@
-/*	$KAME: db.c,v 1.3 2000/05/31 10:40:24 itojun Exp $	*/
+/*	$KAME: db.c,v 1.4 2000/05/31 10:54:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -207,7 +207,6 @@ newnsdb(addr, comment, flags)
 	if (comment)
 		ns->comment = strdup(comment);
 	ns->flags = flags;
-	ns->prio = 0;
 
 	LIST_INSERT_HEAD(&nsdb, ns, link);
 	return ns;

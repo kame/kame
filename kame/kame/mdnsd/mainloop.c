@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.15 2000/05/31 10:40:24 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.16 2000/05/31 10:54:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -148,7 +148,8 @@ mainloop0(i)
 		    memcmp(&from, &ns->addr, fromlen) != 0)
 			continue;
 		ns->prio++;
-		dprintf("ns %p prio %d\n", ns, ns->prio);
+		gettimeofday(&ns->lastrx, NULL);
+		dprintf("ns %p prio %d -> %d\n", ns, ns->prio - 1, ns->prio);
 	}
 
 	if (ismyaddr((struct sockaddr *)&from)) {
@@ -626,6 +627,7 @@ relay(buf, len, from)
 				if (sendto(sock[i], buf, len, 0, sa,
 				    sa->sa_len) == len) {
 					sent++;
+					gettimeofday(&ns->lasttx, NULL);
 					break;	/* try the next nameserver */
 				}
 			}
