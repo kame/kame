@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.144 2002/06/12 01:14:01 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.145 2002/06/12 01:19:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3911,13 +3911,7 @@ ipsec_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 				return EINVAL;
 			}
 		}
-	}
-
-	switch (name[0]) {
-
-	case IPSECCTL_STATS:
-		return sysctl_struct(oldp, oldlenp, newp, newlen,
-				     &ipsecstat, sizeof(ipsecstat));
+		break;
 	case IPSECCTL_DEF_POLICY:
 		if (newp != NULL && newlen == sizeof(int)) {
 			switch (*(int *)newp) {
@@ -3929,6 +3923,14 @@ ipsec_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 			}
 			ipsec_invalpcbcacheall();
 		}
+		break;
+	}
+
+	switch (name[0]) {
+	case IPSECCTL_STATS:
+		return sysctl_struct(oldp, oldlenp, newp, newlen,
+				     &ipsecstat, sizeof(ipsecstat));
+	case IPSECCTL_DEF_POLICY:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 				  &ip4_def_policy.policy);
 	case IPSECCTL_DEF_ESP_TRANSLEV:

@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.243 2002/06/12 01:14:02 itojun Exp $	*/
+/*	$KAME: key.c,v 1.244 2002/06/12 01:19:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -621,13 +621,13 @@ key_gettunnel(osrc, odst, isrc, idst)
 
 			if (!r1) {
 				/* here we look at address matches only */
-				spidx = sp->spidx;
+				spidx = *sp->spidx;
 				if (isrc->sa_len > sizeof(spidx.src) ||
 				    idst->sa_len > sizeof(spidx.dst))
 					continue;
 				bcopy(isrc, &spidx.src, isrc->sa_len);
 				bcopy(idst, &spidx.dst, idst->sa_len);
-				if (!key_cmpspidx_withmask(&sp->spidx, &spidx))
+				if (!key_cmpspidx_withmask(sp->spidx, &spidx))
 					continue;
 			} else {
 				is = (struct sockaddr *)&r1->saidx.src;
