@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.183 2004/04/24 08:20:39 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.184 2004/04/26 12:17:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -287,37 +287,37 @@ static struct policyqueue *match_addrselectpolicy __P((struct sockaddr *,
 						       struct policyhead *));
 static int matchlen __P((struct sockaddr *, struct sockaddr *));
 
-static struct ai_errlist {
+static const struct ai_errlist {
 	const char *str;
 	int code;
 } ai_errlist[] = {
-	{ "Success",					0, },
+	{ "Success",					0 },
 #ifdef EAI_ADDRFAMILY
-	{ "Address family for hostname not supported",	EAI_ADDRFAMILY, },
+	{ "Address family for hostname not supported",	EAI_ADDRFAMILY },
 #endif
-	{ "Temporary failure in name resolution",	EAI_AGAIN, },
-	{ "Invalid value for ai_flags",		       	EAI_BADFLAGS, },
-	{ "Non-recoverable failure in name resolution", EAI_FAIL, },
-	{ "ai_family not supported",			EAI_FAMILY, },
-	{ "Memory allocation failure", 			EAI_MEMORY, },
+	{ "Temporary failure in name resolution",	EAI_AGAIN },
+	{ "Invalid value for ai_flags",		       	EAI_BADFLAGS },
+	{ "Non-recoverable failure in name resolution", EAI_FAIL },
+	{ "ai_family not supported",			EAI_FAMILY },
+	{ "Memory allocation failure", 			EAI_MEMORY },
 #ifdef EAI_NODATA
-	{ "No address associated with hostname", 	EAI_NODATA, },
+	{ "No address associated with hostname", 	EAI_NODATA },
 #endif
-	{ "hostname nor servname provided, or not known", EAI_NONAME, },
-	{ "servname not supported for ai_socktype",	EAI_SERVICE, },
-	{ "ai_socktype not supported", 			EAI_SOCKTYPE, },
-	{ "System error returned in errno", 		EAI_SYSTEM, },
-	{ "Invalid value for hints",			EAI_BADHINTS, },
-	{ "Resolved protocol is unknown",		EAI_PROTOCOL, },
+	{ "hostname nor servname provided, or not known", EAI_NONAME },
+	{ "servname not supported for ai_socktype",	EAI_SERVICE },
+	{ "ai_socktype not supported", 			EAI_SOCKTYPE },
+	{ "System error returned in errno", 		EAI_SYSTEM },
+	{ "Invalid value for hints",			EAI_BADHINTS },
+	{ "Resolved protocol is unknown",		EAI_PROTOCOL },
 	/* backward compatibility with userland code prior to 2553bis-02 */
 #ifndef __OpenBSD__
-	{ "Address family for hostname not supported",	1, },
-	{ "No address associated with hostname", 	7, },
+	{ "Address family for hostname not supported",	1 },
+	{ "No address associated with hostname", 	7 },
 #else
-	{ "Address family for hostname not supported",	-9, },
-	{ "No address associated with hostname", 	-5, },
+	{ "Address family for hostname not supported",	-9 },
+	{ "No address associated with hostname", 	-5 },
 #endif
-	{ NULL,						-1, },
+	{ NULL,						-1 },
 };
 
 /* XXX macros that make external reference is BAD. */
@@ -365,7 +365,7 @@ char *
 gai_strerror(ecode)
 	int ecode;
 {
-	struct ai_errlist *p;
+	const struct ai_errlist *p;
 
 	for (p = ai_errlist; p->str; p++) {
 		if (p->code == ecode)
