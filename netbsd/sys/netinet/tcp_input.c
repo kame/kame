@@ -3306,7 +3306,7 @@ syn_cache_respond(sc, m)
 	MGETHDR(m, M_DONTWAIT, MT_DATA);
 	if (m && tlen > MHLEN) {
 		MCLGET(m, M_DONTWAIT);
-		if ((m->m_flags & M_EXT) == NULL) {
+		if ((m->m_flags & M_EXT) == 0) {
 			m_freem(m);
 			m = NULL;
 		}
