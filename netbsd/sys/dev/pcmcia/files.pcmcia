@@ -69,3 +69,11 @@ device wi: arp, ether, ifnet
 attach wi at pcmcia
 file	dev/pcmcia/if_wi.c			wi
 
+# AMD 79c930-based 802.11 cards (including BayStack 650 FH card).
+device awi: arp, ether, ifnet
+attach awi at pcmcia with awi_pcmcia
+
+file	dev/pcmcia/if_awi_pcmcia.c		awi_pcmcia
+file	dev/ic/awi.c				awi
+file	dev/ic/am79c930.c			awi
+

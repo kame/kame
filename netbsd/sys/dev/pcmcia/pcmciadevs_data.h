@@ -318,6 +318,20 @@ struct pcmcia_knowndev pcmcia_knowndevs[] = {
 	    "SMC 8016 EtherCard"	},
 	},
 	{
+	    PCMCIA_VENDOR_LUCENT, PCMCIA_PRODUCT_LUCENT_WAVELAN_IEEE,
+	    PCMCIA_CIS_LUCENT_WAVELAN_IEEE,
+	    0,
+	    "Lucent Technologies",
+	    "WaveLAN/IEEE"	},
+	},
+	{
+	    PCMCIA_VENDOR_BAY, PCMCIA_PRODUCT_BAY_STACK_650,
+	    PCMCIA_CIS_BAY_STACK_650,
+	    0,
+	    "Bay Networks",
+	    "BayStack 650 Wireless LAN"	},
+	},
+	{
 	    PCMCIA_VENDOR_UNKNOWN, PCMCIA_PRODUCT_MEGAHERTZ_XJ2288,
 	    PCMCIA_CIS_MEGAHERTZ_XJ2288,
 	    0,
@@ -330,13 +344,6 @@ struct pcmcia_knowndev pcmcia_knowndevs[] = {
 	    0,
 	    "Premax",
 	    "PreMax PE-200"	},
-	},
-	{
-	    PCMCIA_VENDOR_LUCENT, PCMCIA_PRODUCT_LUCENT_WAVELAN_IEEE,
-	    PCMCIA_CIS_LUCENT_WAVELAN_IEEE,
-	    0,
-	    "Lucent Technologies",
-	    "WaveLAN/IEEE"	},
 	},
 	{
 	    PCMCIA_VENDOR_UNKNOWN, PCMCIA_PRODUCT_PLANET_SMARTCOM2000,
@@ -539,6 +546,13 @@ struct pcmcia_knowndev pcmcia_knowndevs[] = {
 	    PCMCIA_KNOWNDEV_NOPROD,
 	    PCMCIA_CIS_INVALID,
 	    "Dayna Corporation",
+	    NULL,
+	},
+	{
+	    PCMCIA_VENDOR_BAY, 0,
+	    PCMCIA_KNOWNDEV_NOPROD,
+	    PCMCIA_CIS_INVALID,
+	    "Bay Networks",
 	    NULL,
 	},
 	{

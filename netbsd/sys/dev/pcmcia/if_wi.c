@@ -437,7 +437,7 @@ static void wi_rxeof(sc)
 #endif
 
 	/* Receive packet. */
-#if 0
+#if __NetBSD_Version__ > 104010000
 	/* NetBSD-current */
 	(*ifp->if_input)(ifp, m);
 #else
