@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2471 2003/09/12 10:28:02 itojun Exp $
+$KAME: CHANGELOG,v 1.2472 2003/09/12 12:52:21 t-momose Exp $
 
 <200309>
+2003-09-12  Tsuyoshi MOMOSE  <t-momose@netlab.nec.co.jp>
+	* kame/kame/sys/net/if_hif.[ch], kame/kame/sys/netinet6/mip6_var.h,
+	  kame/kame/kame/mip6control/mip6control.c:
+	Some of parameters in hif_ifreq were changed not to use pointers.
+	
 Fri Sep 12 19:27:25 JST 2003  itojun@iijlab.net
 	* netbsd/sys/netinet/udp_usrreq.c: send icmp admin prohibit if
 	  socket policy mismatches.
