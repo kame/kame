@@ -1,4 +1,4 @@
-/*	$KAME: dns6conv.c,v 1.1 2001/01/13 06:26:17 jinmei Exp $ */
+/*	$KAME: dns6conv.c,v 1.2 2001/01/13 06:33:32 itojun Exp $ */
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,6 +30,8 @@
  */
 #include <sys/types.h>
 #include <sys/socket.h>
+
+#include <netinet/in.h>
 
 #include <stdio.h>
 #include <unistd.h>
