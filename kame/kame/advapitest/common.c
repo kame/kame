@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.3 2000/11/18 07:43:12 jinmei Exp $ */
+/*	$KAME: common.c,v 1.4 2000/11/21 08:49:25 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -39,6 +39,8 @@
 
 #include <netdb.h>
 #include <arpa/inet.h>
+
+#include <stdio.h>
 
 #include "common.h"
 
@@ -169,7 +171,7 @@ print_options(mh)
 		printf("  Path MTU: destination=%s, from=%s, mtu=%lu\n",
 		       ip6str(&mtuinfo->ip6m_addr),
 		       ip6str((struct sockaddr_in6 *)mh->msg_name),
-		       mtuinfo->ip6m_mtu);
+		       (u_long)mtuinfo->ip6m_mtu);
 	}
 }
 
