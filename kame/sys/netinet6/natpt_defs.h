@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.17 2001/06/09 12:11:44 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.18 2001/06/13 04:31:18 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -339,6 +339,9 @@ struct _tcpstate				/* sizeof():  32[byte]	*/
 {
     short	_state;
     short	_session;
+
+    u_short	lport;		/* FTP PORT command argument		*/
+    u_short	rport;		/* port to be connected to from outside	*/
 
     int		ftpstate;
     long	delta[2];	/*    [0]: outgoingDelta			*/

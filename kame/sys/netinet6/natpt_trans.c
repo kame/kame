@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.35 2001/06/09 12:53:57 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.36 2001/06/13 04:31:18 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -88,11 +88,13 @@
 #define	FTP_CONTROL			21
 
 #if BYTE_ORDER == BIG_ENDIAN
+#define	FTP4_PORT			0x504f5254
 #define	FTP6_LPSV			0x4c505356
 #define	FTP6_LPRT			0x4c505254
 #define	FTP6_EPRT			0x45505254
 #define	FTP6_EPSV			0x45505356
 #else
+#define	FTP4_PORT			0x54524f50
 #define	FTP6_LPSV			0x5653504c
 #define	FTP6_LPRT			0x5452504c
 #define	FTP6_EPRT			0x54525045
@@ -125,6 +127,8 @@ extern	struct in6_addr	 natpt_prefixmask;
 void		 fakeTimxceed			__P((struct _cv *, struct mbuf *));
 
 struct mbuf	*translatingTCPUDPv4To4		__P((struct _cv *, struct pAddr *, struct _cv *));
+void		 translatingPYLD4To4		__P((struct _cv *));
+struct sockaddr *parsePORT			__P((caddr_t, caddr_t, struct sockaddr_in *));
 
 void		 tr_icmp4EchoReply		__P((struct _cv *, struct _cv *));
 void		 tr_icmp4Unreach		__P((struct _cv *, struct _cv *, struct pAddr *));
@@ -207,13 +211,21 @@ translatingIPv4To4(struct _cv *cv4, struct pAddr *pad)
 
     if (m4)
     {
+	int		 mlen;
+	struct mbuf	*mm;
 	struct ip	*ip4;
 
 	ip4 = mtod(m4, struct ip *);
 	ip4->ip_sum = 0;			/* Header checksum	*/
 	ip4->ip_sum = in_cksum(m4, sizeof(struct ip));
 	m4->m_pkthdr.rcvif = cv4->m->m_pkthdr.rcvif;
-	m4->m_pkthdr.len = cv4->m->m_pkthdr.len;
+
+	for (mlen = 0, mm = m4; mm; mm = mm->m_next)
+	{
+	    mlen += mm->m_len;
+	}
+
+	m4->m_pkthdr.len = mlen;
 
 	if (isDump(D_TRANSLATEDIPV4))
 	    natpt_logIp4(LOG_DEBUG, ip4, NULL);
@@ -350,6 +362,7 @@ translatingTCPv4To4(struct _cv *cv4from, struct pAddr *pad)
     cv4to.inout = cv4from->inout;
 
     updateTcpStatus(&cv4to);
+    translatingPYLD4To4(&cv4to);
     adjustPayloadChecksum(IPPROTO_TCP, cv4from, &cv4to);
 
 #ifdef recalculateTCP4Checksum
@@ -405,6 +418,117 @@ translatingTCPUDPv4To4(struct _cv *cv4from, struct pAddr *pad, struct _cv *cv4to
     cv4to->ats = cv4from->ats;
 
     return (m4);
+}
+
+
+void
+translatingPYLD4To4(struct _cv *cv4to)
+{
+    int			 delta = 0;
+    struct tcphdr	*th4 = cv4to->_payload._tcp4;
+    struct _tcpstate	*ts  = NULL;
+
+    if (cv4to->ats
+	&& (cv4to->ats->session == NATPT_OUTBOUND)
+	&& (((cv4to->inout == NATPT_OUTBOUND)
+	     && (htons(th4->th_dport) == FTP_CONTROL))
+	    || ((cv4to->inout == NATPT_INBOUND)
+		&& htons(th4->th_sport) == FTP_CONTROL)))
+    {
+	tcp_seq	th_seq;
+	tcp_seq	th_ack;
+
+	if ((delta = translatingFTP6CommandTo4(cv4to)) != 0)
+	{
+	    struct mbuf		*mbf = cv4to->m;
+	    struct ip		*ip4 = cv4to->_ip._ip4;
+
+	    ip4->ip_len += delta;
+	    mbf->m_len += delta;
+	    if (mbf->m_flags & M_PKTHDR)
+		mbf->m_pkthdr.len += delta;
+	}
+
+	if ((ts = cv4to->ats->suit.tcp) == NULL))
+	    return ;
+
+	th_seq = th4->th_seq;
+	th_ack = th4->th_ack;
+
+	if (ts->delta[0])
+	{
+	    if ((cv4to->inout == NATPT_INBOUND) && (th4->th_flags & TH_ACK))
+		decrementAck(th4, ts->delta[0]);
+	    else if (cv4to->inout == NATPT_OUTBOUND)
+		incrementSeq(th4, ts->delta[0]);
+	}
+
+	if (ts->delta[1])
+	{
+	    if ((cv4to->inout == NATPT_OUTBOUND) && (th4->th_flags & TH_ACK))
+		decrementAck(th4, ts->delta[1]);
+	    else if (cv4to->inout == NATPT_INBOUND)
+		incrementSeq(th4, ts->delta[1]);
+	}
+	
+	if ((delta != 0)
+	    && ((th_seq != ts->seq[0])
+		|| (th_ack != ts->ack[0])))
+	{
+	    ts->delta[0] += delta;
+	    ts->seq[0] = th_seq;
+	    ts->ack[0] = th_ack;
+	}
+    }
+}
+
+
+struct sockaddr *
+parsePORT(caddr_t kb, caddr_t kk, struct sockaddr_in *sin)
+{
+    int		 cnt, bite;
+    u_char	*d;
+
+    bzero(sin, sizeof(struct sockaddr_in));
+    sin->sin_len = sizeof(struct sockaddr_in);
+    sin->sin_family = AF_INET;
+
+    d = (u_char *)&sin->sin_addr;
+    for (bite = 0, cnt = 4; (kb < kk) && (isdigit(*kb) || (*kb == ',')); kb++)
+    {
+	if (*kb == ',')
+	{
+	    *d++ = (bite & 0xff);
+	    bite = 0;
+	    if (--cnt <= 0)
+		break;
+	}
+	else
+	    bite = bite * 10 + *kb - '0';
+    }
+
+    if (cnt != 0)			return (NULL);
+
+    kb++;
+    d = (u_char *)&sin->sin_port;
+    for (bite = 0, cnt = 2; (kb < kk) && (isdigit(*kb) || (*kb == ',')); kb++)
+    {
+	if (*kb == ',')
+	{
+	    *d++ = (bite & 0xff);
+	    bite = 0;
+	    if (--cnt <= 0)
+		break;
+	}
+	else
+	    bite = bite * 10 + *kb - '0';
+    }
+
+    if (cnt != 1)			return (NULL);
+    if (bite > 0)
+	*d = (bite & 0xff);
+
+    return ((struct sockaddr *)sin);
 }
 
 
@@ -1566,6 +1690,7 @@ translatingFTP6CommandTo4(struct _cv *cv4)
 
     kb = (caddr_t)th4 + (th4->th_off << 2);
     kk = (caddr_t)ip4 + ip4->ip_len;
+
     if (((kk - kb) < FTPMINCMDLEN)
 	|| (parseFTPdialogue(kb, kk, &ftp6) == NULL))
 	return (0);
@@ -1573,6 +1698,53 @@ translatingFTP6CommandTo4(struct _cv *cv4)
     ts = cv4->ats->suit.tcp;
     switch(ftp6.cmd)
     {
+#ifdef NATPT_NAT
+      case FTP4_PORT:
+	{
+	    u_char		*h, *p;
+	    struct _tSlot	*ats;
+	    struct pAddr	 local, remote;
+	    struct sockaddr_in	sin;
+
+	    ts->ftpstate = FTP4_PORT;
+	    if (parsePORT(ftp6.arg, kk, &sin) == NULL)
+		return (0);
+
+	    ats = cv4->ats;
+	    local = ats->local;
+	    local._sport = htons(FTP_DATA);
+	    local._dport = sin.sin_port;
+	    remote = ats->remote;
+	    remote._sport = 0;	/* this port should be remapped	*/
+	    remote._dport = htons(FTP_DATA);
+
+	    if (ts->lport == sin.sin_port)	/* This connection opens already. */
+	    {
+		remote._sport = ts->rport;
+	    }
+	    else
+	    {
+		if (remapRemote4Port(ats->csl, NULL, &remote) == NULL)
+		    return (0);
+
+		if (openIncomingV4Conn(IPPROTO_TCP, &local, &remote) == NULL)
+		    return (0);
+
+		ts->lport = sin.sin_port;
+		ts->rport = remote._sport;
+	    }
+
+	    h = (char *)&remote.addr[0];
+	    p = (char *)&remote.port[0];
+	    snprintf(wow, sizeof(wow), "PORT %u,%u,%u,%u,%u,%u\r\n",
+		     h[0], h[1], h[2], h[3],
+		     p[0], p[1]);
+
+	    delta = rewriteMbuf(cv4->m, kb, (kk-kb), wow, strlen(wow));
+	}
+	break;
+#endif
+
       case FTP6_LPSV:
 	ts->ftpstate = FTP6_LPSV;
 	tstr = "PASV\r\n";

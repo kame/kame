@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.20 2001/06/09 12:11:44 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.21 2001/06/13 04:31:18 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -377,6 +377,7 @@ internOutgoingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
 
     ats->ip_payload = cv4->ip_payload;
     ats->session = sess;
+    ats->csl = acs;
     registTSlotEntry(ats);						/* XXX	*/
 
     hv4 = _hash_pat4(local);
@@ -533,7 +534,12 @@ openIncomingV4Conn(int proto, struct pAddr *local, struct pAddr *remote)
 
     registTSlotEntry(ats);						/* XXX	*/
 
-    hv6 = _hash_pat6(local);
+#ifdef NATPT_NAT
+    if (local->sa_family == AF_INET)
+	hv6 = _hash_pat4(local);
+    else
+#endif
+	hv6 = _hash_pat6(local);
     hv4 = _hash_pat4(remote);
 
     s = splnet();
