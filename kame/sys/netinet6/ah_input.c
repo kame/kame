@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.50 2001/02/07 04:58:47 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.51 2001/02/08 14:24:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1155,8 +1155,6 @@ ah6_ctlinput(cmd, sa, d)
 			 * - ignore the MTU change notification.
 			 */
 			icmp6_mtudisc_update((struct ip6ctlparam *)d, valid);
-
-			return;
 		}
 
 		/* we normally notify single pcb here */

@@ -1224,6 +1224,10 @@ tcp6_ctlinput(cmd, sa, d)
 			 */
 			icmp6_mtudisc_update((struct ip6ctlparam *)d, valid);
 
+			/*
+			 * no need to call in6_pcbnotify, it should have been
+			 * called via callback if necessary
+			 */
 			return;
 		}
 
