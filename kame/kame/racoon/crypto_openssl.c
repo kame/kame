@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.78 2003/07/03 05:29:10 itojun Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.79 2003/07/12 08:44:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1471,7 +1471,7 @@ eay_hmac_init(key, md)
 	return (caddr_t)c;
 }
 
-#if defined(WITH_SHA2)
+#ifdef WITH_SHA2
 /*
  * HMAC SHA2-512
  */
@@ -1773,7 +1773,7 @@ eay_hmacmd5_final(c)
 	return(res);
 }
 
-#if defined(WITH_SHA2)
+#ifdef WITH_SHA2
 /*
  * SHA2-512 functions
  */
@@ -1833,7 +1833,7 @@ eay_sha2_512_hashlen()
 	return SHA512_DIGEST_LENGTH << 3;
 }
 
-#if defined(WITH_SHA2)
+#ifdef WITH_SHA2
 /*
  * SHA2-384 functions
  */
@@ -1893,7 +1893,7 @@ eay_sha2_384_hashlen()
 	return SHA384_DIGEST_LENGTH << 3;
 }
 
-#if defined(WITH_SHA2)
+#ifdef WITH_SHA2
 /*
  * SHA2-256 functions
  */

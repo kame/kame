@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.c,v 1.27 2003/06/27 12:02:40 sakane Exp $	*/
+/*	$KAME: algorithm.c,v 1.28 2003/07/12 08:44:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -57,7 +57,7 @@ static struct hash_algorithm oakley_hashdef[] = {
 		eay_sha1_init,		eay_sha1_update,
 		eay_sha1_final,		eay_sha1_hashlen,
 		eay_sha1_one, },
-#if defined(WITH_SHA2)
+#ifdef WITH_SHA2
 { "sha2_256",	algtype_sha2_256,	OAKLEY_ATTR_HASH_ALG_SHA2_256,
 		eay_sha2_256_init,	eay_sha2_256_update,
 		eay_sha2_256_final,	eay_sha2_256_hashlen,
@@ -82,7 +82,7 @@ static struct hmac_algorithm oakley_hmacdef[] = {
 		eay_hmacsha1_init,	eay_hmacsha1_update,
 		eay_hmacsha1_final,	NULL,
 		eay_hmacsha1_one, },
-#if defined(WITH_SHA2)
+#ifdef WITH_SHA2
 { "hmac_sha2_256",	algtype_sha2_256,	OAKLEY_ATTR_HASH_ALG_SHA2_256,
 		eay_hmacsha2_256_init,	eay_hmacsha2_256_update,
 		eay_hmacsha2_256_final,	NULL,
