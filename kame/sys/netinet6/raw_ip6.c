@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.97 2001/11/12 07:41:12 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.98 2001/11/12 09:00:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -491,7 +491,7 @@ rip6_output(m, va_alist)
 	if ((so->so_state & SS_PRIV) != 0)
 		priv = 1;
 #endif
-	dst = &dstsock->sin6_addr;
+
 	if (control) {
 		if ((error = ip6_setpktoptions(control, &opt, priv, 0)) != 0)
 			goto bad;

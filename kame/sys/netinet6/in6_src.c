@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.90 2001/11/12 07:41:58 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.91 2001/11/12 09:00:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -251,8 +251,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 #endif
 		ia6 = (struct in6_ifaddr *)ifa_ifwithaddr((struct sockaddr *)(&srcsock));
 		if (ia6 == NULL ||
-		    (ia6->ia6_flags & (IN6_IFF_ANYCAST | IN6_IFF_NOTREADY))
-		    != 0) {
+		    (ia6->ia6_flags & (IN6_IFF_ANYCAST | IN6_IFF_NOTREADY))) {
 			*errorp = EADDRNOTAVAIL;
 			return(NULL);
 		}
