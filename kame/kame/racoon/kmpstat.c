@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: kmpstat.c,v 1.14 2000/06/14 09:49:12 sakane Exp $ */
+/* YIPS @(#)$Id: kmpstat.c,v 1.15 2000/06/14 15:53:19 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -792,8 +792,11 @@ char *header3 =
 		}
 
 		/* created date */
-		tm = localtime(&pd->created);
-		strftime(tbuf, sizeof(tbuf), "%Y-%m-%d %T", tm);
+		if (pd->created) {
+			tm = localtime(&pd->created);
+			strftime(tbuf, sizeof(tbuf), "%Y-%m-%d %T", tm);
+		} else
+			snprintf(tbuf, sizeof(tbuf), "                   ");
 		printf("%s ", tbuf);
 
 		/* counter of phase 2 */
