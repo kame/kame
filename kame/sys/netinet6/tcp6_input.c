@@ -1973,9 +1973,7 @@ tcp6_maxseg(t6p, maxseg)
 	 * See whether we (may) need to save space
 	 * for timestamp options.
 	 *
-	 * BSDI3 TCP BUG?: timetstamp option length was decremented twice and
-	 * it wasted 12 bytes on every tcp packet.
-	 * (decremented here and tcp6_output)
+	 * now handled in tcp6_output().
 	 */
 	if (t6p->t_flags & TF_USE_SCALE)
 		maxseg -= TCP6OLEN_TSTAMP_APPA;
