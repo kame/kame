@@ -1,7 +1,26 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1754 2001/07/02 16:38:22 jinmei Exp $
+$KAME: CHANGELOG,v 1.1755 2001/07/03 08:22:00 jinmei Exp $
 
 <200107>
+2001-07-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/getaddrinfo.c: when the GAI_USE_ORDERING
+	environment variable is set, reorder the chain that getaddrinfo(3)
+	would return, based on the logic described in
+	draft-ietf-ipngwg-default-addr-select.  With this extension,
+	things would be happier when
+	+ the underlying kernel supports IPv6,
+	+ "the default interface" is specified by the "ndp -I" command,
+	+ there is no router around the node,
+	+ the destination node has both AAAA (or A6) and A resource
+	  records, and
+	+ the application just tries to connect to all the entries that
+	  getaddrinfo(3) returns.
+	XXX: items to be considered.
+	- some of the logic is not implemented.
+	- this routine opens a socket to get the corresponding source
+	  address for each destination candidate.  This might cause
+	  performance effect.
+	
 2001-07-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/netinet/in_proto.c (inetsw[]): corrected the sysctl
 	callback function for net.inet.ip6.XXX names (from icmp6_sysctl to
