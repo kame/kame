@@ -408,6 +408,7 @@ set(argc, argv)
 		/*
 		 * IPv4 arp command retries with sin_other = SIN_PROXY here.
 		 */
+		fprintf(stderr, "set: cannot configure a new entry\n");
 		return 1;
 	}
 
@@ -496,6 +497,7 @@ delete(host)
 		/*
 		 * IPv4 arp command retries with sin_other = SIN_PROXY here.
 		 */
+		fprintf(stderr, "delete: cannot delete non-NDP entry\n");
 		return 1;
 	}
 
