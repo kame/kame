@@ -51,7 +51,7 @@ fi
 
 gc_dir=
 AC_MSG_CHECKING(if --with-gc option is specified)
-AC_ARG_WITH(gc, [  --with-gc=DIR           specify Bohem GC directory],
+AC_ARG_WITH(gc, [  --with-gc=DIR           specify Bohem GC directory (experimental)],
 	[gc_dir=$withval], [gc_dir=no])
 AC_MSG_RESULT(${gc_dir})
 if test "$gc_dir" != "no"; then
