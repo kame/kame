@@ -100,13 +100,6 @@ AC_CHECK_FUNCS(mktime select socket)
 dnl Checks for arc4random
 AC_REPLACE_FUNCS(arc4random)
 
-dnl Checks for optinal parameters
-AC_MSG_CHECKING(if --enable-mediator option is specified)
-AC_ARG_WITH(mediator, [  --with-mediator         build with mediator (obsolete)],
-	[AC_DEFINE(MEDIATOR)
-	with_mediator=yes], [with_mediator=no])
-AC_MSG_RESULT($with_mediator);
-
 AC_MSG_CHECKING(if --enable-pedant option is specified)
 AC_ARG_ENABLE(pedant, [  --enable-pedant         pedantic compilation],
 	[if test "$enableval" = "yes"; then
