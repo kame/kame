@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.935 2000/05/25 12:59:41 itojun Exp $
+$Id: CHANGELOG,v 1.936 2000/05/25 14:18:31 itojun Exp $
 
 <200005>
+Thu May 25 23:16:01 JST 2000  itojun@iijlab.net
+	* bsdi4/usr.bin/telnet/commands.c: use getaddrinfo to be scoped-address
+	  friendly.
+
 Thu May 25 21:56:47 JST 2000  itojun@iijlab.net
 	* bsdi4/sys/i386/pci/if_exp.c: do not use interrupt for initializing
 	  multicast filter.  this will make exp driver to be friendly with
