@@ -14,7 +14,7 @@ CPPFLAGS+= -I${.CURDIR}/../../sys -I${.CURDIR}/../../include
 CPPFLAGS+= -DINET6
 LDFLAGS+= -static
 
-CFLAGS+=	-g -Wall
+CFLAGS+=	-g -Wall -Werror
 #CPPFLAGS+=	-DTCP6
 
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 \
