@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.86 2000/06/29 07:22:49 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.87 2000/07/03 15:44:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -288,8 +288,11 @@ in6_ifremloop(struct ifaddr *ifa)
 	 * regardless of the result of in6_is_ifloop_auto().
 	 */
 #ifdef __bsdi__
-	if (!in6_is_ifloop_auto(ifa)) {
+	if (!in6_is_ifloop_auto(ifa))
+#else
+	if (1)
 #endif
+	{
 		/* If only one ifa for the loopback entry, delete it. */
 		for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
 			if (IN6_ARE_ADDR_EQUAL(IFA_IN6(ifa),
@@ -301,9 +304,7 @@ in6_ifremloop(struct ifaddr *ifa)
 		}
 		if (ia_count == 1)
 			in6_ifloop_request(RTM_DELETE, ifa);
-#ifdef __bsdi__
 	}
-#endif
 }
 
 int
