@@ -749,7 +749,7 @@ findpcb:
 		ip6_savecontrol(inp, ip6, m, &opts6, &inp->in6p_inputopts);
 		ip6_update_recvpcbopt(&inp->in6p_inputopts, &opts6);
 		if (opts6.head) {
-			if (sbappendcontrol(&in6p->in6p_socket->so_rcv,
+			if (sbappendcontrol(&inp->in6p_socket->so_rcv,
 					    NULL, opts6.head)
 			    == 0)
 				m_freem(opts6.head);
@@ -893,7 +893,7 @@ findpcb:
 				inp->inp_flags |=
 					oinp->inp_flags & INP_CONTROLOPTS;
 				if (inp->inp_flags & INP_CONTROLOPTS) {
-					bzero(&newopts6, sizeof(newopts6));
+					bzero(&newopts, sizeof(newopts));
 					/*
 					 * Temporarily re-adjusting the mbuf
 					 * before ip6_savecontrol().
@@ -906,16 +906,16 @@ findpcb:
 					m->m_len  += hdroptlen;
 #endif
 					ip6_savecontrol(inp, ip6, m,
-							&newopts6,
+							&newopts,
 							&inp->in6p_options);
 					ip6_update_recvpcbopt(&inp->in6p_inputopts,
-							      &newopts6);
+							      &newopts);
 					if (newopts.head) {
 						if (sbappendcontrol(&so->so_rcv,
 								    NULL,
-								    newopts6.head)
+								    newopts.head)
 						    == 0)
-							m_freem(newopts6.head);
+							m_freem(newopts.head);
 					}
 #ifndef DEFER_MADJ
 					m->m_data += hdroptlen;	/* XXX */
