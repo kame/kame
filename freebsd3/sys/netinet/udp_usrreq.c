@@ -300,10 +300,17 @@ udp_input(m, off, proto)
 
 #ifdef IPSEC
 				/* check AH/ESP integrity. */
-				if (last != NULL &&
-				    ipsec4_in_reject_so(m, last->inp_socket)) {
-					ipsecstat.in_polvio++;
-					/* do not inject data to pcb */
+				if (last != NULL) {
+					/* due to different from other BSD stacks */
+					m->m_len += sizeof (struct udpiphdr);
+					m->m_data -= sizeof (struct udpiphdr);
+
+				    	if (ipsec4_in_reject_so(m, last->inp_socket)) {
+						ipsecstat.in_polvio++;
+						/* do not inject data to pcb */
+					}
+					m->m_len -= sizeof (struct udpiphdr);
+					m->m_data += sizeof (struct udpiphdr);
 				} else
 #endif /*IPSEC*/
 				if ((n = m_copy(m, 0, M_COPYALL)) != NULL)
@@ -332,11 +339,18 @@ udp_input(m, off, proto)
 			goto bad;
 		}
 #ifdef IPSEC
+		/* due to different from other BSD stacks */
+		m->m_len += sizeof (struct udpiphdr);
+		m->m_data -= sizeof (struct udpiphdr);
+
 		/* check AH/ESP integrity. */
 		if (last != NULL && ipsec4_in_reject_so(m, last->inp_socket)) {
 			ipsecstat.in_polvio++;
 			goto bad;
 		}
+
+		m->m_len -= sizeof (struct udpiphdr);
+		m->m_data += sizeof (struct udpiphdr);
 #endif /*IPSEC*/
 		udp_append(last, ip, m);
 		return;
@@ -370,10 +384,17 @@ udp_input(m, off, proto)
 		return;
 	}
 #ifdef IPSEC
+	/* due to different from other BSD stacks */
+	m->m_len += sizeof (struct udpiphdr);
+	m->m_data -= sizeof (struct udpiphdr);
+
 	if (inp != NULL && ipsec4_in_reject_so(m, inp->inp_socket)) {
 		ipsecstat.in_polvio++;
 		goto bad;
 	}
+
+	m->m_len -= sizeof (struct udpiphdr);
+	m->m_data += sizeof (struct udpiphdr);
 #endif /*IPSEC*/
 
 	/*

@@ -623,6 +623,9 @@ findpcb:
 	    ip->ip_dst, th->th_dport, 1, m->m_pkthdr.rcvif);
 
 #ifdef IPSEC
+	/* due to difference from other BSD stacks */
+	m->m_data -= hdroptlen;
+	m->m_len  += hdroptlen;
 #ifdef INET6
 	if (isipv6) {
 		if (inp != NULL && ipsec6_in_reject_so(m, inp->inp_socket)) {
@@ -635,6 +638,8 @@ findpcb:
 		ipsecstat.in_polvio++;
 		goto drop;
 	}
+	m->m_data += hdroptlen;
+	m->m_len  -= hdroptlen;
 #endif /*IPSEC*/
 
 #ifdef ALTQ_ECN
