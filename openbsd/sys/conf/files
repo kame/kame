@@ -285,6 +285,7 @@ pseudo-device gif: ifnet
 pseudo-device gre: ifnet
 pseudo-device dummy: ifnet
 pseudo-device stf: ifnet
+pseudo-device hif: ifnet
 
 pseudo-device altq: ifnet
 
@@ -554,6 +555,7 @@ file net/if_arcsubr.c			arc			needs-flag
 file net/if_atmsubr.c			atm			needs-flag
 file net/if_ethersubr.c			ether | fddi | token	needs-flag
 file net/if_fddisubr.c			fddi
+file net/if_hif.c			hif			needs-count
 file net/if_spppsubr.c			sppp
 file net/if_loop.c			loop
 file net/if_media.c			ifmedia
@@ -843,6 +845,12 @@ file netinet6/ip6_forward.c		inet6
 file netinet6/ip6_mroute.c		inet6
 file netinet6/ip6_output.c		inet6
 file netinet6/route6.c			inet6
+file netinet6/mip6.c			inet6 & mip6
+file netinet6/mip6_subnet.c		inet6 & mip6
+file netinet6/mip6_prefix.c		inet6 & mip6
+file netinet6/mip6_ha.c			inet6 & mip6
+file netinet6/mip6_binding.c		inet6 & mip6
+file netinet6/mip6_icmp6.c		inet6 & mip6
 file netinet6/mld6.c			inet6
 file netinet6/nd6.c			inet6
 file netinet6/nd6_nbr.c			inet6
