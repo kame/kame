@@ -137,7 +137,7 @@ ip6_rthdr0(m, ip6, rh0)
 
 	index = addrs - rh0->ip6r0_segleft;
 	rh0->ip6r0_segleft--;
-	nextaddr = rh0->ip6r0_addr + index;
+	nextaddr = ((struct in6_addr *)(rh0 + 1)) + index;
 
 	if (IN6_IS_ADDR_MULTICAST(nextaddr) ||
 	    IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
