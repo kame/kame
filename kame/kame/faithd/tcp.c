@@ -1,4 +1,4 @@
-/*	$KAME: tcp.c,v 1.6 2001/07/02 14:36:49 itojun Exp $	*/
+/*	$KAME: tcp.c,v 1.7 2001/11/15 09:26:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -91,7 +91,7 @@ sig_child(int sig)
 	pid_t pid;
 
 	pid = wait3(&status, WNOHANG, (struct rusage *)0);
-	if (pid && WEXITSTATUS(status))
+	if (pid > 0 && WEXITSTATUS(status))
 		syslog(LOG_WARNING, "child %d exit status 0x%x", pid, status);
 	exit_success("terminate connection due to child termination");
 }
