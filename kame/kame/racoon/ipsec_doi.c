@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.56 2000/04/24 07:39:40 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.57 2000/04/24 10:29:25 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2183,12 +2183,12 @@ ipsecdoi_setph2proposal0(iph2, pp, pr)
 	struct isakmp_pl_p *prop;
 	struct isakmp_pl_t *trns;
 	struct satrns *tr;
-	int len;
 	int attrlen;
 	size_t trnsoff;
 	caddr_t x0, x;
+	u_int8_t *np_t; /* pointer next trns type in previous header */
 
-	p = vmalloc(sizeof(*prop) + sizeof(pr->spi) + sizeof(*trns));
+	p = vmalloc(sizeof(*prop) + sizeof(pr->spi));
 	if (p == NULL)
 		return NULL;
 
@@ -2203,47 +2203,59 @@ ipsecdoi_setph2proposal0(iph2, pp, pr)
 	memcpy(prop + 1, &pr->spi, sizeof(pr->spi));
 
 	/* create transform */
+	trnsoff = sizeof(*prop) + sizeof(pr->spi);
+	np_t = NULL;
+
 	for (tr = pr->head; tr; tr = tr->next) {
 	
-		trnsoff = sizeof(*prop) + sizeof(pr->spi);
-		trns = (struct isakmp_pl_t *)(p->v + trnsoff);
-		trns->h.np  = ISAKMP_NPTYPE_NONE;
-		trns->t_no  = tr->trns_no;
-		trns->t_id  = tr->trns_id;
+		if (np_t) {
+			*np_t = ISAKMP_NPTYPE_T;
+			prop->num_t++;
+		}
 
-		len = sizeof(struct isakmp_data);
+		/* get attribute length */
+		attrlen = 0;
 		if (pp->lifetime) {
-			len += sizeof(struct isakmp_data) + sizeof(struct isakmp_data);
+			attrlen += sizeof(struct isakmp_data)
+				+ sizeof(struct isakmp_data);
 			if (pp->lifetime > 0xffff)
-				len += sizeof(u_int32_t);
+				attrlen += sizeof(u_int32_t);
 		}
 		if (pp->lifebyte) {
-			len += sizeof(struct isakmp_data) + sizeof(struct isakmp_data);
+			attrlen += sizeof(struct isakmp_data)
+				+ sizeof(struct isakmp_data);
 			if (pp->lifebyte > 0xffff)
-				len += sizeof(u_int32_t);
+				attrlen += sizeof(u_int32_t);
 		}
+		attrlen += sizeof(struct isakmp_data);	/* enc mode */
 		if (tr->encklen)
-			len += sizeof(struct isakmp_data);
+			attrlen += sizeof(struct isakmp_data);
 		if (tr->authtype)
-			len += sizeof(struct isakmp_data);
+			attrlen += sizeof(struct isakmp_data);
 
 		switch (iph2->sainfo->pfs_group) {
 		case OAKLEY_ATTR_GRP_DESC_MODP768:
 		case OAKLEY_ATTR_GRP_DESC_MODP1024:
 		case OAKLEY_ATTR_GRP_DESC_MODP1536:
-			len += sizeof(struct isakmp_data);
+			attrlen += sizeof(struct isakmp_data);
 			break;
 		case 0:
 		default:
 			break;
 		}
 
-		p = vrealloc(p, p->l + len);
+		p = vrealloc(p, p->l + sizeof(*trns) + attrlen);
 		if (p == NULL)
 			return NULL;
 
+		/* set transform's values */
+		trns = (struct isakmp_pl_t *)(p->v + trnsoff);
+		trns->h.np  = ISAKMP_NPTYPE_NONE;
+		trns->t_no  = tr->trns_no;
+		trns->t_id  = tr->trns_id;
+
 		/* set attributes */
-		x = x0 = p->v + p->l - len;
+		x = x0 = p->v + trnsoff + sizeof(*trns);
 
 		if (pp->lifetime) {
 			x = isakmp_set_attr_l(x, IPSECDOI_ATTR_SA_LD_TYPE,
@@ -2273,12 +2285,12 @@ ipsecdoi_setph2proposal0(iph2, pp, pr)
 
 		x = isakmp_set_attr_l(x, IPSECDOI_ATTR_ENC_MODE, pr->encmode);
 
+		if (tr->encklen)
+			x = isakmp_set_attr_l(x, IPSECDOI_ATTR_KEY_LENGTH, tr->encklen);
+
 		if ((pr->proto_id == IPSECDOI_PROTO_IPSEC_ESP && tr->authtype)
 		 || pr->proto_id == IPSECDOI_PROTO_IPSEC_AH)
 			x = isakmp_set_attr_l(x, IPSECDOI_ATTR_AUTH, tr->authtype);
-
-		if (tr->encklen)
-			x = isakmp_set_attr_l(x, IPSECDOI_ATTR_KEY_LENGTH, tr->encklen);
 
 		switch (iph2->sainfo->pfs_group) {
 		case OAKLEY_ATTR_GRP_DESC_MODP768:
@@ -2292,12 +2304,17 @@ ipsecdoi_setph2proposal0(iph2, pp, pr)
 			break;
 		}
 
-		attrlen = x - x0;
-
+		/* update length of this transform. */
 		trns = (struct isakmp_pl_t *)(p->v + trnsoff);
 		trns->h.len = htons(sizeof(*trns) + attrlen);
+
+		/* save buffer to pre-next payload */
+		np_t = &trns->h.np;
+
+		trnsoff += (sizeof(*trns) + attrlen);
 	}
 
+	/* update length of this protocol. */
 	prop = (struct isakmp_pl_p *)p->v;
 	prop->h.len = htons(p->l);
 
@@ -3224,7 +3241,8 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 			break;
 
 		case IPSECDOI_ATTR_ENC_MODE:
-			if (pr->encmode != 0) {
+			if (pr->encmode != 0
+			 && pr->encmode != (u_int8_t)ntohs(lorv)) {
 				plog(logp, LOCATION, NULL,
 					"multiple encmode exist "
 					"in a transform.\n");
