@@ -195,8 +195,13 @@ rtalloc1(dst, report, ignflags)
 				info.rti_info[RTAX_IFA] = rt->rt_ifa->ifa_addr;
 			}
 			rt_missmsg(RTM_ADD, &info, rt->rt_flags, 0);
-		} else
+		} else {
+#ifdef RTREUSE			/* for statistics */
+			if (rt->rt_refcnt == 0)
+				RTREUSE(rt);
+#endif
 			rt->rt_refcnt++;
+		}
 	} else {
 		/*
 		 * Either we hit the root or couldn't find any match,

@@ -132,7 +132,8 @@ struct rtentry {
 	/* the following entries are for statistics*/
 	time_t rt_createtime;	/* timestamp at creation of this route */
 	time_t rt_lastreftime;	/* timestamp when the latest reference time */
-	u_long rt_usehist[12];	/* histogram of references for every 5 min */
+	u_long rt_usehist[16];	/* histogram of references for every 5 min */
+	u_long rt_reusehist[16]; /* histogram of re-use of this route */
 };
 
 /*
@@ -320,9 +321,18 @@ struct rttimer_queue {
 		(rt)->rt_use++; \
 		(rt)->rt_lastreftime = time_second; \
 		i = ((rt)->rt_lastreftime - (rt)->rt_createtime) / 300; \
-		if (i > 11) \
-			i = 11; \
+		if (i > 12) \
+			i = 12; \
 		(rt)->rt_usehist[i]++; \
+	} while (0)
+
+#define	RTREUSE(rt) \
+	do { \
+		int i; \
+		i = (time_second - (rt)->rt_createtime) / 300; \
+		if (i > 12) \
+			i = 12; \
+		(rt)->rt_reusehist[i]++; \
 	} while (0)
 
 extern struct route_cb route_cb;
