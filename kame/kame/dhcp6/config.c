@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.29 2003/04/11 07:13:21 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.30 2003/07/20 11:27:54 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -570,7 +570,7 @@ configure_duid(str, duid)
 		return (-1);
 	}
 
-	if ((idbuf = malloc(sizeof(duidlen))) == NULL) {
+	if ((idbuf = malloc(duidlen)) == NULL) {
 		dprintf(LOG_ERR, FNAME, "memory allocation failed");
 		return (-1);
 	}
