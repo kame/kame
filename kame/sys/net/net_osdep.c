@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.c,v 1.5 2000/07/02 14:58:09 itojun Exp $	*/
+/*	$KAME: net_osdep.c,v 1.6 2000/07/02 15:00:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -48,6 +48,8 @@
 #include <net/netisr.h>
 #include <net/route.h>
 #include <net/bpf.h>
+
+#include <net/net_osdep.h>
 
 #if !(defined(__NetBSD__) || defined(__OpenBSD__))
 const char *
