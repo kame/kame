@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.78 2002/12/14 09:43:08 jinmei Exp $
+$KAME: FAQ,v 1.79 2003/01/14 05:32:39 itojun Exp $
 
 
 GENERAL
@@ -123,6 +123,7 @@ Q: How portable is the KAME stack?  Is it possible to port it to embedded
 
 Q: How should "gif" be pronounced?
 	To be answered.
+
 
 INSTALLATION
 ============
@@ -551,6 +552,17 @@ configured with ifconfig(8) immediately disappears.
 	paper:
 	http://www.isoc.org/inet99/4s/4s_2.htm
 
+Q: Why "ifconfig gif* create/destroy" does not work?
+	In KAME kit, we have dropped support for create/destroy interfaces
+	in October 8, 2002.  See the following changelog item for the reason.
+
+	Tue Oct  8 17:05:56 JST 2002  itojun@iijlab.net
+	* sys/net/if_*.c: drop support for cloning interfaces, to free us from
+	  coping with *BSD differences.  it is not our goal to cope with *BSD
+	  differences, our goal is to provide high-quality networking code.
+	  it's pity that *BSDs have a lot of differences...
+
+
 OS SPECIFIC
 ===========
 Q: [FreeBSD] Why do you provide the mozilla+ipv6 port?  Why can't you
@@ -560,6 +572,7 @@ make the plain mozilla port handle IPv6 also?
 	handles IPv4 connection as IPv6 connection using "IPv6 mapped
 	address" e.g. ::ffff:10.0.0.1.  So we must provide IPv6
 	disabled mozilla for the kernel without "options INET6".
+
 
 LICENSE AND CRYPTO EXPORT
 =========================
