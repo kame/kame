@@ -1,0 +1,6 @@
+D CVS                               	CVS
+F MAKEFILE                          	Makefile
+L OBJ                               	obj	/usr/obj/usr.sbin/sysctl
+F PATHCONF.C                        	pathconf.c
+F SYSCTL.8                          	sysctl.8
+F SYSCTL.C                          	sysctl.c
