@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.329 2002/11/06 07:43:55 suz Exp $	*/
+/*	$KAME: in6.c,v 1.330 2002/11/06 08:27:46 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2659,7 +2659,7 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 	struct ifnet *ifp;
 	int *error;			/* return code of each sub routine */
 	u_int16_t numsrc, old_num;
-	struct sockaddr_in6 *src, *old_src;
+	struct sockaddr_storage *src, *old_src;
 	u_int mode, old_mode;		/* requested/current filter mode */
 	int init;			/* indicate initial join by socket */
 	u_int grpjoin;			/* on/off of (*,G) join by socket */

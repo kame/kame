@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.347 2002/11/05 03:48:32 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.348 2002/11/06 08:27:46 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3987,7 +3987,7 @@ ip6_setmoptions(optname, im6op, m)
 		 * the list, undo added msf list from the socket.
 		 */
 		imm->i6mm_maddr = in6_addmulti(SIN6(&ss_grp), ifp, &error, 1,
-				    SIN6(&ss_src), MCAST_INCLUDE, init);
+				    &ss_src, MCAST_INCLUDE, init);
 		if (error != 0) {
 			if (init) {
 				IMO_MSF_FREE(msf);
@@ -4046,7 +4046,7 @@ ip6_setmoptions(optname, im6op, m)
 		 * Give up the multicast address record to which the
 		 * membership points.
 		 */
-		in6_delmulti(imm->i6mm_maddr, &error, 1, SIN6(&ss_src),
+		in6_delmulti(imm->i6mm_maddr, &error, 1, &ss_src,
 			     MCAST_INCLUDE, final);
 		if (error != 0) {
 			printf("ip6_setmoptions: error must be 0! panic!\n");
@@ -4133,7 +4133,7 @@ ip6_setmoptions(optname, im6op, m)
 			/* IN{NULL}/EX{non NULL} -> EX{non NULL} */
 			imm->i6mm_maddr = 
 				in6_addmulti(SIN6(&ss_grp), ifp, &error, 1,
-					     SIN6(&ss_src), MCAST_EXCLUDE,
+					     &ss_src, MCAST_EXCLUDE,
 					     init);
 			if (error != 0) {
 				if (init) {
@@ -4148,7 +4148,7 @@ ip6_setmoptions(optname, im6op, m)
 			/* EX{NULL} -> EX{non NULL} */
 			imm->i6mm_maddr =
 				in6_modmulti(SIN6(&ss_grp), ifp, &error, 1,
-					     SIN6(&ss_src), MCAST_EXCLUDE,
+					     &ss_src, MCAST_EXCLUDE,
 					     0, NULL, MCAST_EXCLUDE, init,
 					     msf->msf_grpjoin);
 			if (imm->i6mm_maddr == NULL) {
@@ -4212,7 +4212,7 @@ ip6_setmoptions(optname, im6op, m)
 		 * Give up the multicast address record to which the
 		 * membership points.
 		 */
-		in6_delmulti(imm->i6mm_maddr, &error, 1, SIN6(&ss_src),
+		in6_delmulti(imm->i6mm_maddr, &error, 1, &ss_src,
 			     MCAST_EXCLUDE, final);
 		if (error != 0) {
 			printf("ip6_setmoptions: error must be 0! panic!\n");
