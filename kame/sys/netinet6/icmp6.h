@@ -301,7 +301,7 @@ struct icmp6_namelookup {
  */
 struct icmp6_nodeinfo {
 	struct icmp6_hdr icmp6_ni_hdr;
-	u_int64_t icmp6_ni_nonce;
+	u_int8_t icmp6_ni_nonce[8];
 	/* could be followed by reply data */
 };
 
