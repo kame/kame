@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.27 2002/01/11 08:36:04 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.28 2002/05/24 07:01:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -814,8 +814,13 @@ ni6_nametodns(name, cp0, buf, buflen, old)
 			if (i <= 0 || i >= 64)
 				goto fail;
 			*cp++ = i;
-			memcpy(cp, p, i);
-			cp += i;
+			while (i > 0) {
+				if (isupper(*p))
+					*cp++ = tolower(*p++);
+				else
+					*cp++ = *p++;
+				i--;
+			}
 			p = q;
 			if (p < name + namelen && *p == '.')
 				p++;
