@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.129 2002/07/30 04:41:35 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.130 2002/07/31 09:28:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -872,6 +872,8 @@ int	in6_localaddr __P((struct sockaddr_in6 *));
 int	in6_addrscope __P((struct in6_addr *));
 struct	in6_ifaddr *in6_ifawithifp __P((struct ifnet *, struct in6_addr *));
 extern void in6_if_up __P((struct ifnet *));
+extern	u_char	ip6_protox[];
+
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 struct sockaddr;
 
