@@ -2,11 +2,12 @@
 # Date created:		5 Apr 1999 17:00 JST
 # Whom:			TANAKA Takashi <tanaka@tahi.org>
 #
-# $KAME: Makefile,v 1.3 2000/06/25 10:58:31 sumikawa Exp $
+# $KAME: Makefile,v 1.4 2000/08/21 04:32:34 sumikawa Exp $
 #
 
 PORTNAME=	ct
-PORTVERSION=	0.6
+PORTVERSION=	1.1
+DISTNAME=	${PORTNAME}-${PORTVERSION}
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.tahi.org/pub/TAHI/ct/
 
@@ -18,10 +19,8 @@ NO_BUILD=	yes
 V6EVALDIR=	${PREFIX}/v6eval
 
 BUILD_DEPENDS=	$(V6EVALDIR)/bin/pktbuf:${.CURDIR}/../v6eval
-RUN_DEPENDS=	$(V6EVALDIR)/bin/pktbuf:${.CURDIR}/../v6eval
+RUN_DEPENDS=	${BUILD_DEPENDS}:${.CURDIR}/../v6eval
 
-post-patch:
-	find ${WRKDIR} -name "*.seq" -or -name "*.rmt" -or -name "*.pm" \
-		| xargs ${PERL} ${SCRIPTDIR}/perlpath.pl ${PERL}
+MAKE_ENV+=      "NUTTYPE=host"
 
 .include <bsd.port.mk>
