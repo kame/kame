@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1095 2000/07/04 11:50:27 jinmei Exp $
+$Id: CHANGELOG,v 1.1096 2000/07/04 12:36:55 sakane Exp $
 
 <200006>
+Tue Jul  4 21:36:16 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	Racoon usually runs in background.  If you specify -F option, you make
+	her running in foreground.
+
 2000-07-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/mip6.c (mip6_add_ifaddr): use in6_update_ifa()
 	to assign an address instead of coping code from in6.c
