@@ -1,4 +1,4 @@
-/*	$KAME: libaltq2.c,v 1.4 2001/08/22 08:47:54 itojun Exp $	*/
+/*	$KAME: libaltq2.c,v 1.5 2002/02/20 01:57:22 kjc Exp $	*/
 /*
  * Copyright (C) 1997-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -37,11 +37,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <syslog.h>
-#ifdef __STDC__
 #include <stdarg.h>
-#else
-#include <varargs.h>
-#endif
 #include <string.h>
 
 #include "altq_qop.h"
@@ -62,11 +58,7 @@ log_write(int severity, int syserr, const char *format, ...)
 {
 	va_list ap;
 
-#ifdef __STDC__
 	va_start(ap, format);
-#else
-	va_start(ap);
-#endif
 
 	if (severity <= l_debug) {
 		if (!daemonize) {
