@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.27 2001/01/19 03:07:18 itojun Exp $	*/
+/*	$KAME: config.c,v 1.28 2001/01/23 13:32:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -291,6 +291,8 @@ getconfig(intface)
 				       __FUNCTION__);
 				exit(1);
 			}
+			memset(pfx, 0, sizeof(*pfx));
+
 			/* link into chain */
 			insque(pfx, &tmp->prefix);
 
