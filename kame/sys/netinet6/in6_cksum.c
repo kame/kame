@@ -1,4 +1,4 @@
-/*	$KAME: in6_cksum.c,v 1.6 2000/03/25 07:23:43 sumikawa Exp $	*/
+/*	$KAME: in6_cksum.c,v 1.7 2000/09/09 11:38:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -88,7 +88,7 @@ static union {
 		u_int32_t	ph_len;
 		u_int8_t	ph_zero[3];
 		u_int8_t	ph_nxt;
-	} ph;
+	} ph __attribute__((__packed__));
 } uph;
 
 /*
