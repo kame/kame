@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.50 2002/02/02 08:27:11 jinmei Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.51 2002/02/02 08:42:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -253,7 +253,7 @@ tcp6_conn_lookup(src, sport, dst, dport)
 {
 	struct in6pcb *in6p;
 	u_long hash;
-	hash = IN6_HASH(&src->sin6_addr, sport, &dst->sin6_addr, dport);
+	hash = IN6_HASH(src, sport, dst, dport);
 	for (in6p = tcp6_conn_hash[hash % tcp6_conn_hash_size].lh_first; in6p;
 	     in6p = in6p->in6p_hlist.le_next) {
 		if (in6p->in6p_hash != hash)
@@ -655,11 +655,11 @@ findpcb:
 			 */
 			if ((thflags & (TH_RST|TH_ACK|TH_SYN)) != TH_SYN) {
 				if (thflags & TH_RST)
-					syn_cache_reset6(ip6, th, src_sa,
-							 dst_sa);
+					syn_cache_reset6(ip6, th, src_sa6,
+							 dst_sa6);
 				else if (thflags & TH_ACK) {
 					so = syn_cache_get6(so, m, off, len,
-							    src_sa, dst_sa);
+							    src_sa6, dst_sa6);
 					if (so == NULL) {
 						tcp6stat.tcp6s_badsyn++;
 						t6p = NULL;
@@ -961,8 +961,8 @@ after_listen:
 			goto drop;
 		}
 #endif
-		in6p->in6p_hash = IN6_HASH(&src_sa6->sin6_addr, th->th_sport,
-					   &dst_sa6->sin6_addr, th->th_dport);
+		in6p->in6p_hash = IN6_HASH(src_sa6, th->th_sport,
+					   dst_sa6, th->th_dport);
 		LIST_INSERT_HEAD(&tcp6_conn_hash[in6p->in6p_hash %
 		    tcp6_conn_hash_size], in6p, in6p_hlist);
 		t6p->t_template = tcp6_template(t6p);
@@ -2458,7 +2458,7 @@ syn_cache_lookup6(ip6, th, prevp, headp, src, dst)
 	struct syn_cache_head6 *head;
 	u_long hash;
 
-	hash = SYN_HASH6(&ip6->ip6_src, th->th_sport, th->th_dport);
+	hash = SYN_HASH6(src, th->th_sport, th->th_dport);
 
 	head = &tcp6_syn_cache[hash % tcp6_syn_cache_size];
 	*headp = head;
@@ -2571,7 +2571,7 @@ syn_cache_get6(so, m, off, len, src, dst)
 		t6p->t_flags &= ~TF_SEND_TSTMP;
 
 	in6p->in6p_hash = IN6_HASH(&sc->sc_src, sc->sc_sport,
-	    &sc->sc_dst, sc->sc_dport);
+				   &sc->sc_dst, sc->sc_dport);
 	LIST_INSERT_HEAD(&tcp6_conn_hash[in6p->in6p_hash %
 	    tcp6_conn_hash_size], in6p, in6p_hlist);
 	t6p->t_template = tcp6_template(t6p);

@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_usrreq.c,v 1.19 2001/12/07 07:07:11 itojun Exp $	*/
+/*	$KAME: tcp6_usrreq.c,v 1.20 2002/02/02 08:42:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -269,8 +269,8 @@ tcp6_usrreq(so, req, m, nam, control)
 			break;
 		if (in6p->in6p_hlist.le_prev)	/* XXX */
 			LIST_REMOVE(in6p, in6p_hlist);
-		in6p->in6p_hash = IN6_HASH(&in6p->in6p_faddr, in6p->in6p_fport,
-		    &in6p->in6p_laddr, in6p->in6p_lport);
+		in6p->in6p_hash = IN6_HASH(&in6p->in6p_fsa, in6p->in6p_fport,
+					   &in6p->in6p_lsa, in6p->in6p_lport);
 		LIST_INSERT_HEAD(&tcp6_conn_hash[in6p->in6p_hash %
 		    tcp6_conn_hash_size], in6p, in6p_hlist);
 		t6p->t_template = tcp6_template(t6p);

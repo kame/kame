@@ -169,13 +169,18 @@ struct	in6pcb {
 #define IN6PLOOKUP_WILDCARD	1
 #define IN6PLOOKUP_SETLOCAL	2
 
-/* compute hash value for foreign and local in6_addr and port */
-#define IN6_HASH(faddr, fport, laddr, lport) 			\
-	(((faddr)->s6_addr32[0] ^ (faddr)->s6_addr32[1] ^	\
-	  (faddr)->s6_addr32[2] ^ (faddr)->s6_addr32[3] ^	\
-	  (laddr)->s6_addr32[0] ^ (laddr)->s6_addr32[1] ^	\
-	  (laddr)->s6_addr32[2] ^ (laddr)->s6_addr32[3])	\
-	 + (fport) + (lport))
+/* compute hash value for foreign and local sockaddr_in6 and port */
+#define IN6_HASH(faddr, fport, laddr, lport) \
+	(((faddr)->sin6_addr.s6_addr32[0] ^ \
+	  (faddr)->sin6_addr.s6_addr32[1] ^ \
+	  (faddr)->sin6_addr.s6_addr32[2] ^ \
+	  (faddr)->sin6_addr.s6_addr32[3] ^ \
+	  (faddr)->sin6_scope_id ^ \
+	  (laddr)->sin6_addr.s6_addr32[0] ^ \
+          (laddr)->sin6_addr.s6_addr32[1] ^ \
+	  (laddr)->sin6_addr.s6_addr32[2] ^ \
+	  (laddr)->sin6_addr.s6_addr32[3] \
+	  (laddr)->sin6_scope_id) + (fport) + (lport)) 
 
 #define sotoin6pcb(so)	((struct in6pcb *)(so)->so_pcb)
 
