@@ -89,15 +89,10 @@
  * at least MINCLSIZE of data must be stored.
  */
 
-/*
- * NOTE: MINCLSIZE is changed to MHLEN + 1, to avoid allocating chained
- * non-external mbufs in the driver.  This has no impact on performance
- * seen from the packet statistics, and avoid header pullups in network code.
- */
 #define	MLEN		(MSIZE - sizeof(struct m_hdr))	/* normal data len */
 #define	MHLEN		(MLEN - sizeof(struct pkthdr))	/* data len w/pkthdr */
 
-#define	MINCLSIZE	(MHLEN + 1)	/* smallest amount to put in cluster */
+#define	MINCLSIZE	(MHLEN+MLEN+1)	/* smallest amount to put in cluster */
 #define	M_MAXCOMPRESS	(MHLEN / 2)	/* max amount to copy for compression */
 
 /*
