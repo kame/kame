@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.20 2001/10/18 05:32:23 itojun Exp $	*/
+/*	$KAME: scope6.c,v 1.21 2001/10/18 05:53:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -58,7 +58,11 @@ void
 scope6_ifattach(ifp)
 	struct ifnet *ifp;
 {
+#ifdef __NetBSD__
+	int s = splsoftnet();
+#else
 	int s = splnet();
+#endif
 
 	/*
 	 * We have some arrays that should be indexed by if_index.
@@ -128,7 +132,11 @@ scope6_set(ifp, idlist)
 	 * interface addresses, routing table entries, PCB entries... 
 	 */
 
+#ifdef __NetBSD__
+	s = splsoftnet();
+#else
 	s = splnet();
+#endif
 
 	for (i = 0; i < 16; i++) {
 		if (idlist[i] &&
