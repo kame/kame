@@ -1957,6 +1957,7 @@ sec2str(total)
 	int days, hours, mins, secs;
 	int first = 1;
 	char *p = result;
+	char *end = &result[sizeof(result)];
 
 	if (0) {	/*XXX*/
 		days = total / 3600 / 24;
@@ -1966,19 +1967,19 @@ sec2str(total)
 
 		if (days) {
 			first = 0;
-			p += sprintf(p, "%dd", days);
+			p += snprintf(p, end - p, "%dd", days);
 		}
 		if (!first || hours) {
 			first = 0;
-			p += sprintf(p, "%dh", hours);
+			p += snprintf(p, end - p, "%dh", hours);
 		}
 		if (!first || mins) {
 			first = 0;
-			p += sprintf(p, "%dm", mins);
+			p += snprintf(p, end - p, "%dm", mins);
 		}
-		sprintf(p, "%ds", secs);
+		snprintf(p, end - p, "%ds", secs);
 	} else
-		sprintf(p, "%lu", (u_long)total);
+		snprintf(p, end - p, "%lu", (u_long)total);
 
 	return(result);
 }
