@@ -1,4 +1,4 @@
-/*	$KAME: grabmyaddr.c,v 1.20 2000/10/04 17:40:59 itojun Exp $	*/
+/*	$KAME: grabmyaddr.c,v 1.21 2000/11/09 11:11:40 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -35,9 +35,11 @@
 #include <sys/ioctl.h>
 
 #include <net/if.h>
+#include <net/if_var.h>
 #include <net/route.h>
 #include <netkey/key_var.h>
 #include <netinet/in.h>
+#include <netinet6/in6_var.h>
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -67,6 +69,10 @@
 static unsigned int if_maxindex __P((void));
 #endif
 static struct myaddrs *find_myaddr __P((struct myaddrs *, struct myaddrs *));
+static int suitable_ifaddr __P((const char *, const struct sockaddr *));
+#ifdef INET6
+static int suitable_ifaddr6 __P((const char *, const struct sockaddr *));
+#endif
 
 #ifndef HAVE_GETIFADDRS
 static unsigned int
@@ -161,6 +167,14 @@ grab_myaddrs()
 #endif
 		)
 			continue;
+
+		if (!suitable_ifaddr(ifap->ifa_name, ifap->ifa_addr)) {
+			YIPSDEBUG(DEBUG_NET,
+				plog(logp, LOCATION, NULL,
+					"unsuitable ifaddr %s\n",
+					saddr2str(ifap->ifa_addr)));
+			continue;
+		}
 
 		p = newmyaddr();
 		if (p == NULL) {
@@ -274,6 +288,13 @@ grab_myaddrs()
 #ifdef INET6
 		case AF_INET6:
 #endif
+			if (!suitable_ifaddr(ifr->ifr_name, &ifr->ifr_addr)) {
+				YIPSDEBUG(DEBUG_NET,
+					plog(logp, LOCATION, NULL,
+						"unsuitable ifaddr %s\n"));
+				continue;
+			}
+
 			p = newmyaddr();
 			if (p == NULL) {
 				exit(1);
@@ -323,6 +344,67 @@ grab_myaddrs()
 	free(iflist);
 #endif /*HAVE_GETIFADDRS*/
 }
+
+/*
+ * check the interface is suitable or not
+ */
+static int
+suitable_ifaddr(ifname, ifaddr)
+	const char *ifname;
+	const struct sockaddr *ifaddr;
+{
+	switch(ifaddr->sa_family) {
+	case AF_INET:
+		return 1;
+#ifdef INET6
+	case AF_INET6:
+		return suitable_ifaddr6(ifname, ifaddr);
+#endif
+	default:
+		return 0;
+	}
+	/*NOTREACHED*/
+}
+
+#ifdef INET6
+static int
+suitable_ifaddr6(ifname, ifaddr)
+	const char *ifname;
+	const struct sockaddr *ifaddr;
+{
+	struct in6_ifreq ifr6;
+	int s;
+
+	if (ifaddr->sa_family != AF_INET6)
+		return 0;
+
+	s = socket(PF_INET6, SOCK_DGRAM, 0);
+	if (s == -1) {
+		plog(logp, LOCATION, NULL,
+			"socket(SOCK_DGRAM) failed:%s\n", strerror(errno));
+		return 0;
+	}
+
+	memset(&ifr6, 0, sizeof(ifr6));
+	strncpy(ifr6.ifr_name, ifname, strlen(ifname));
+
+	ifr6.ifr_addr = *(struct sockaddr_in6 *)ifaddr;
+
+	if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
+		plog(logp, LOCATION, NULL,
+			"ioctl(SIOCGIFAFLAG_IN6) failed:%s\n", strerror(errno));
+		return 0;
+	}
+
+	if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_TENTATIVE
+	 || ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DUPLICATED
+	 || ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DETACHED)
+		return 0;
+
+	/* suitable */
+	return 1;
+}
+#endif
 
 int
 update_myaddrs()
