@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.126 2001/11/16 03:03:31 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.127 2001/11/16 03:05:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2007,18 +2007,17 @@ _dns_getaddrinfo(rv, cb_data, ap)
 	va_list	 ap;
 {
 	struct addrinfo *ai;
-	querybuf buf, buf2, buf3, *bp;
+	querybuf buf, buf2, *bp;
 	const char *name;
 	const struct addrinfo *pai;
 	struct addrinfo sentinel, *cur;
-	struct res_target q, q2, q3, *p;
+	struct res_target q, q2, *p;
 
 	name = va_arg(ap, char *);
 	pai = va_arg(ap, const struct addrinfo *);
 
 	memset(&q, 0, sizeof(q2));
 	memset(&q2, 0, sizeof(q2));
-	memset(&q3, 0, sizeof(q3));
 	memset(&sentinel, 0, sizeof(sentinel));
 	cur = &sentinel;
 
@@ -2030,12 +2029,12 @@ _dns_getaddrinfo(rv, cb_data, ap)
 		q.qtype = T_AAAA;
 		q.answer = buf.buf;
 		q.anslen = sizeof(buf);
-		q.next = &q3;
-		q3.name = name;
-		q3.qclass = C_IN;
-		q3.qtype = T_A;
-		q3.answer = buf3.buf;
-		q3.anslen = sizeof(buf3);
+		q.next = &q2;
+		q2.name = name;
+		q2.qclass = C_IN;
+		q2.qtype = T_A;
+		q2.answer = buf2.buf;
+		q2.anslen = sizeof(buf2);
 		break;
 	case AF_INET:
 		q.name = name;
@@ -2063,8 +2062,6 @@ _dns_getaddrinfo(rv, cb_data, ap)
 			bp = &buf;
 		else if (p == &q2)
 			bp = &buf2;
-		else if (p == &q3)
-			bp = &buf3;
 		else {
 			/* XXX should be abort() */
 			p = p->next;
