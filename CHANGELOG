@@ -1,10 +1,9 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1707 2001/06/04 13:46:25 itojun Exp $
+$KAME: CHANGELOG,v 1.1708 2001/06/04 14:17:41 itojun Exp $
 
 <200106>
 Mon Jun  4 22:45:23 JST 2001  itojun@iijlab.net
-	* openbsd/sys: switch kernel base version to 2.9.  will take a while to
-	  stabilize.  userland upgrade is yet to be done.
+	* openbsd: switch base version to 2.9.
 
 2001-06-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtadvd/config.c (getconfig): forced users to specify
