@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.h,v 1.9 2001/08/05 08:33:25 itojun Exp $	*/
+/*	$KAME: key_debug.h,v 1.10 2001/08/05 08:37:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -32,6 +32,7 @@
 #ifndef _NETKEY_KEY_DEBUG_H_
 #define _NETKEY_KEY_DEBUG_H_
 
+#ifdef _KERNEL
 /* debug flags */
 #define KEYDEBUG_STAMP		0x00000001 /* path */
 #define KEYDEBUG_DATA		0x00000002 /* data */
@@ -54,7 +55,6 @@
 #define KEYDEBUG(lev,arg) \
 	do { if ((key_debug_level & (lev)) == (lev)) { arg; } } while (0)
 
-#ifdef _KERNEL
 extern u_int32_t key_debug_level;
 #endif /*_KERNEL*/
 
