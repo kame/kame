@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.225 2001/07/24 01:52:07 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.226 2001/07/24 02:06:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -688,9 +688,11 @@ icmp6_input(mp, offp, proto)
 		}
 		nicmp6->icmp6_type = ICMP6_ECHO_REPLY;
 		nicmp6->icmp6_code = 0;
-		icmp6stat.icp6s_reflect++;
-		icmp6stat.icp6s_outhist[ICMP6_ECHO_REPLY]++;
-		icmp6_reflect(n, noff);
+		if (n) {
+			icmp6stat.icp6s_reflect++;
+			icmp6stat.icp6s_outhist[ICMP6_ECHO_REPLY]++;
+			icmp6_reflect(n, noff);
+		}
 		break;
 
 	case ICMP6_ECHO_REPLY:
