@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.152 2002/05/26 05:37:27 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.153 2002/05/26 05:38:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1904,7 +1904,7 @@ pr_bitrange(v, soff, ii)
 				break;
 		}
 		if (!ii)
-			printf(" %u", s + off);
+			printf(" %u", soff + off);
 		ii += i;
 		v >>= i; off += i;
 	}
