@@ -1125,12 +1125,7 @@ udp_usrreq(so, req, m, addr, control)
 
 	case PRU_BIND:
 		s = splsoftnet();
-#ifdef INET6
-		if (inp->inp_flags & INP_IPV6)
-			error = in6_pcbbind(inp, addr);
-		else
-#endif
-			error = in_pcbbind(inp, addr);
+		error = in_pcbbind(inp, addr);
 		splx(s);
 		break;
 
@@ -1181,10 +1176,12 @@ udp_usrreq(so, req, m, addr, control)
 			}
 		} else
 #endif /* INET6 */
+		{
 			if (inp->inp_faddr.s_addr == INADDR_ANY) {
 				error = ENOTCONN;
 				break;
 			}
+		}
 
 		s = splsoftnet();
 		in_pcbdisconnect(inp);
