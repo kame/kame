@@ -1,0 +1,37 @@
+--- Makefile.orig	Tue Feb  1 01:06:09 2000
++++ Makefile	Tue Feb  1 01:44:56 2000
+@@ -1,5 +1,5 @@
+ # Choose your C compiler
+-CC = gcc 
++#CC = gcc 
+ #CC = cc 
+ 
+ # Possible options:
+@@ -9,12 +9,12 @@
+ # ICP : supports the ICP protocol (Web proxy/caches). Requires HTTP.
+ # USE_SIGACTION: uses sigaction instead of signal. Necessary on pure BSD
+ # machines because we need to change the semantic of signals.
+-OPTIONS =  -DHTTP -DUSE_SIGACTION
++OPTIONS =  -DHTTP -DUSE_SIGACTION -DTTCP
+ 
+ # Flags for gcc
+-CFLAGS = -c  -O3 $(OPTIONS) -Wall
++#CFLAGS = -c  -O3 $(OPTIONS) -Wall
+ # Flags for cc
+-#CFLAGS = -c -O $(OPTIONS)
++CFLAGS = -c -O $(OPTIONS)
+ 
+ # Flags for the linker
+ LD = $(CC) 
+@@ -23,9 +23,9 @@
+ #LDFLAGS = -o echoping -lsocket -lnsl
+ 
+ # KAME IPv6 stack
+-#LDFLAGS+= -L/usr/local/v6/lib -linet6
++LDFLAGS+= -L/usr/local/v6/lib -linet6
+ 
+-INSTALL=install
++INSTALL=install -c
+ INSTALL_BIN_FLAGS=-m 755
+ INSTALL_MAN_FLAGS=-m 644
+ 
