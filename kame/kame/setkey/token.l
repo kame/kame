@@ -105,9 +105,7 @@ decstring	{digit}+
 hexpair		{hexdigit}{hexdigit}
 hexstring	0[xX]{hexdigit}+
 octetstring	{octet}({dot}{octet})+
-ipaddress	{ipv4addr}|{ipv6addr}
-ipv4addr	{digit}{1,3}({dot}{digit}{1,3}){0,3}
-ipv6addr	({hexdigit}{0,4}({colon}{hexdigit}{0,4}){2,7}|{hexdigit}{0,4}({colon}{hexdigit}{0,4}){2,7}%{letter}+|{hexdigit}{0,4}({colon}{hexdigit}{0,4}){2,5}{colon}{ipv4addr})
+ipaddress	[a-fA-F0-9:]([a-fA-F0-9:\.]*|[a-fA-F0-9:\.]*%[a-zA-Z0-9]*)
 ipaddrmask	{slash}{digit}{1,3}
 ipaddrport	{blcl}{decstring}{elcl}
 keyword		{letter}{letter}+
@@ -218,31 +216,13 @@ any		{ PREPROC; return(ANY); }
 			return(DECSTRING);
 		}
 
-{ipv4addr}	{
-			/*
-			 * I can't supprt the type without dot,
-			 * because it's umbiguous against {decstring}.
-			 * e.g. 127
-			 */
+{ipaddress}	{
 			PREPROC;
 
-			yylval.val.len = sizeof(struct sockaddr_in);
+			yylval.val.len = yyleng;
 			yylval.val.buf = strdup(yytext);
 
-			return(IP4_ADDRESS);
-		}
-
-{ipv6addr}	{
-#ifdef INET6
-			PREPROC;
-
-			yylval.val.len = sizeof(struct sockaddr_in6);
-			yylval.val.buf = strdup(yytext);
-
-			return(IP6_ADDRESS);
-#else
-			yyfatal("IPv6 address not supported");
-#endif
+			return(ADDRESS);
 		}
 
 {ipaddrmask}	{

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.22 2000/05/24 13:35:59 itojun Exp $ */
+/* KAME $Id: parse.y,v 1.23 2000/05/24 16:19:24 sakane Exp $ */
 
 %{
 #include <sys/types.h>
@@ -43,6 +43,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <netdb.h>
 #include <ctype.h>
 #include <errno.h>
 
@@ -95,7 +96,7 @@ extern void yyerror __P((const char *));
 
 %token EOT
 %token ADD GET DELETE FLUSH DUMP
-%token IP4_ADDRESS IP6_ADDRESS PREFIX PORT PORTANY
+%token ADDRESS PREFIX PORT PORTANY
 %token UP_PROTO PR_ESP PR_AH PR_IPCOMP
 %token F_PROTOCOL F_AUTH F_ENC F_REPLAY F_COMP F_RAWCPI
 %token F_MODE MODE F_REQID
@@ -111,7 +112,7 @@ extern void yyerror __P((const char *));
 %type <num> UP_PROTO PR_ESP PR_AH PR_IPCOMP
 %type <num> ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP
 %type <num> DECSTRING
-%type <val> IP4_ADDRESS IP6_ADDRESS PL_REQUESTS
+%type <val> ADDRESS PL_REQUESTS
 %type <val> key_string policy_requests
 %type <val> QUOTEDSTRING HEXSTRING
 
@@ -490,52 +491,25 @@ sp_selector_spec
 	;
 
 ipaddress
-	:	IP4_ADDRESS
+	:	ADDRESS
 		{
-			struct sockaddr_in *in;
-			u_int sa_len = $1.len;
+			struct addrinfo *res;
 
-			if ((in = (struct sockaddr_in *)malloc(sa_len)) == 0) {
-				yyerror("not enough core");
+			res = parse_addr($1.buf, NULL, AI_NUMERICHOST);
+			if (res == NULL) {
 				free($1.buf);
 				return -1;
 			}
-			memset((caddr_t)in, 0, sa_len);
-
-			in->sin_family = PF_INET;
-			in->sin_len = sa_len;
-			in->sin_port = IPSEC_PORT_ANY;
-			(void)inet_pton(PF_INET, $1.buf, &in->sin_addr);
-
-			pp_addr = (struct sockaddr *)in;
-			free($1.buf);
-		}
-	|	IP6_ADDRESS
-		{
-#ifdef INET6
-			struct sockaddr_in6 *in6;
-			u_int sa_len = $1.len;
-
-			if ((in6 = (struct sockaddr_in6 *)malloc(sa_len)) == 0) {
-				free($1.buf);
-				yyerror("not enough core");
-				return -1;
+			pp_addr = (struct sockaddr *)malloc(res->ai_addrlen);
+			if (!pp_addr) {
+				yyerror(ipsec_strerror());
+				goto end;
 			}
-			memset((caddr_t)in6, 0, sa_len);
 
-			in6->sin6_family = PF_INET6;
-			in6->sin6_len = sa_len;
-			in6->sin6_port = IPSEC_PORT_ANY;
-			(void)inet_pton(PF_INET6, $1.buf,
-					&in6->sin6_addr);
-
-			pp_addr = (struct sockaddr *)in6;
+			memcpy(pp_addr, res->ai_addr, res->ai_addrlen);
+		    end:
+			freeaddrinfo(res);
 			free($1.buf);
-#else
-			free($1.buf);
-			yyerror("IPv6 address not supported");
-			return -1;
-#endif
 		}
 	;
 
@@ -824,6 +798,30 @@ setkeymsg()
 	((struct sadb_msg *)m_buf)->sadb_msg_len = PFKEY_UNIT64(m_len);
 
 	return 0;
+}
+
+static struct addrinfo *
+parse_addr(host, port, flag)
+	char *host;
+	char *port;
+	int flag;
+{
+	struct addrinfo hints, *res = NULL;
+	int error;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_UNSPEC;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = flag;
+	error = getaddrinfo(host, port, &hints, &res);
+	if (error != 0) {
+		yyerror(gai_strerror(error));
+		return NULL;
+	}
+	if (res->ai_next != NULL) {
+		yyerror(gai_strerror(error));
+	}
+	return res;
 }
 
 static int
