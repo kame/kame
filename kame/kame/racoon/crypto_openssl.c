@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.19 2000/02/22 12:36:18 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.20 2000/02/22 12:52:21 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -79,7 +79,7 @@
 #endif
 #include <openssl/cast.h>
 #include <openssl/err.h>
-#else
+#else /* INCLUDE_PATH_OPENSSL */
 #ifdef HAVE_PEM_H
 #include <pem.h>
 #endif
@@ -104,7 +104,7 @@
 #endif
 #include <cast.h>
 #include <err.h>
-#endif
+#endif /* INCLUDE_PATH_OPENSSL */
 
 #include "var.h"
 #include "vmbuf.h"
