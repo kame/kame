@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.40 2001/09/19 05:42:23 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.41 2001/09/19 05:46:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -295,16 +295,14 @@ main(argc, argv)
 			if (aflag) {
 				iflist_init();
 				argv = autoifprobe();
-				if (argv) {
-					while (*argv) {
-						if (ifconfig(*argv)) {
-							errx(1, "failed to "
-							    "initialize %s",
-							    *argv);
-							/*NOTREACHED*/
-						}
-						argv++;
+				while (argv && *argv) {
+					if (ifconfig(*argv)) {
+						errx(1, "failed to "
+						    "initialize %s",
+						    *argv);
+						/*NOTREACHED*/
 					}
+					argv++;
 				}
 			}
 			rtsock_input(rtsock);
