@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.103 2000/08/14 17:53:01 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.104 2000/08/14 19:22:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2586,6 +2586,7 @@ in6_sin_2_v4mapsin6_in_sock(struct sockaddr **nam)
 static struct in6hash in6h_hash_any = { NULL, IN6ADDR_ANY_INIT, NULL, 0 };
 struct in6hash *in6hash[IN6_MAXADDRHASH];/* hash buckets for local IPv6 addrs */
 int in6_nhash = IN6_ADDRHASH;		/* number of hash buckets for addrs */
+int in6_hash_nullhit;
 
 #define HASH6(in6) ((in6)->s6_addr32[0]^(in6)->s6_addr32[1]^\
 	(in6)->s6_addr32[2]^(in6)->s6_addr32[3])
@@ -2694,7 +2695,11 @@ in6h_lookup(addr, ifp)
 {
 	struct in6hash *ih, *maybe_ih = NULL;
 
-	for (ih = in6hash[HASH6(addr) % in6_nhash]; ih; ih = ih->in6h_next) {
+	/* just for measurement */
+	if ((ih = in6hash[HASH6(addr) % in6_nhash]) == NULL)
+		in6_hash_nullhit++;
+
+	for (; ih; ih = ih->in6h_next) {
 		if (IN6_ARE_ADDR_EQUAL(&ih->in6h_addr, addr)) {
 			ih->in6h_hit++;
 
