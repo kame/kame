@@ -506,8 +506,7 @@ wlattach(struct isa_device *id)
        ifp->if_reset
        */
     IFQ_SET_READY(&ifp->if_snd);
-    if_attach(ifp);
-    ether_ifattach(ifp);
+    ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 
     bcopy(&sc->wl_addr[0], sc->wl_ac.ac_enaddr, WAVELAN_ADDR_SIZE);
     printf("%s%d: address %6D, NWID 0x%02x%02x", ifp->if_name, ifp->if_unit,
