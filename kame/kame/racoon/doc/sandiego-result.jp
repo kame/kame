@@ -258,3 +258,25 @@ kame
 		kernelにいれる。
 	nai pgp client: lifetimeのネゴは普通に通すが、kernelにいれるのは
 		min(自分のポリシ, ネゴ結果)
+
+	initiate するパラメータと acceptable check に使うパラメータを
+	分けた方が良いかもしれない。
+	少なくとも lifetime や PFS group には範囲が必要。
+
+	DOS対策
+		- 同じ src から、phase 1 の一発目を
+		  n秒間に m発受け取ったらDOSと思うとか？
+		- src は偽造できるから n秒間に m発受け取ったらで十分かも？
+
+	INITIAL CONTACT やんないと。
+
+	phase 1 の最後に CONNECTED 受け取ったら、結局どうするのが正しいの？
+
+	COMMIT BIT の必要性がよくわからん。
+		jenkins rekey 読めばわかるかも。
+
+	IPcomp と ESP を併用する時のlifetimeって？
+		bunndle なら一緒にするはず。
+		通常 ESP の lifetime は 28800(s)
+		けど、 ipcomp の lifetime って∞でも良いくらいなのに。
+		IPcomp のネゴって必要なんだろうか？
