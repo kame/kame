@@ -36,7 +36,7 @@ man/man8/ndc.8
 man/man8/nslookup.8
 sbin/named
 share/misc/nslookup.help
-etc/rc.d/named.sh.sample
+etc/named.sh.sample
 @dirrm include/bind/arpa
 @dirrm include/bind/isc
 @dirrm include/bind/sys

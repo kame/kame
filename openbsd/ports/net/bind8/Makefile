@@ -32,11 +32,11 @@ PATCH_ARGS?=	-d ${WRKDIR} -E ${PATCH_STRIP}
 post-install:
 	${INSTALL_SCRIPT} ${WRKSRC}/bin/named/named-bootconf.pl ${PREFIX}/bin/
 	@(cd ${WRKDIR}/doc/man && ${SETENV} ${MAKE_ENV} ${MAKE} ${MAKE_FLAGS} ${MAKEFILE} clean all ${INSTALL_TARGET})
-	@if [ ! -f ${PREFIX}/etc/rc.d/named.sh.sample ]; then \
-		echo "Creating ${PREFIX}/etc/rc.d/named.sh.sample startup file."; \
-		echo "#!/bin/sh" > ${PREFIX}/etc/rc.d/named.sh.sample; \
-		echo "[ -x ${PREFIX}/sbin/named ] && ${PREFIX}/sbin/named && echo -n ' named'" >> ${PREFIX}/etc/rc.d/named.sh.sample; \
-		chmod 640 ${PREFIX}/etc/rc.d/named.sh.sample; \
+	@if [ ! -f ${PREFIX}/etc/named.sh.sample ]; then \
+		echo "Creating ${PREFIX}/etc/named.sh.sample startup file."; \
+		echo "#!/bin/sh" > ${PREFIX}/etc/named.sh.sample; \
+		echo "[ -x ${PREFIX}/sbin/named ] && ${PREFIX}/sbin/named && echo -n ' named'" >> ${PREFIX}/etc/named.sh.sample; \
+		chmod 640 ${PREFIX}/etc/named.sh.sample; \
 	fi
 
-.include "../../mk/bsd.pkg.mk"
+.include <bsd.port.mk>

@@ -1,5 +1,9 @@
-$NetBSD$
-
+SHA1 (bind-8.1.2-src.tar.gz) = ee3430fcddff08f5fa0b9bee93f5cff4747dfe3a
+RMD160 (bind-8.1.2-src.tar.gz) = 88e7ad5aa4ff65c8777aa85e3073b49472598ecc
 MD5 (bind-8.1.2-src.tar.gz) = 7911bd8f0de7d1047da874d92dd608d7
+SHA1 (bind-8.1.2-doc.tar.gz) = e653978dae54387382dcb15b47b946417cc3c40e
+RMD160 (bind-8.1.2-doc.tar.gz) = 6c52f0773c4c0cf449d37cbd8b37267e04785585
 MD5 (bind-8.1.2-doc.tar.gz) = 329dfd97895d96493ff2850374b2465d
+SHA1 (bind8-812-v6-19990820a.diff.gz) = 9490fa42409e5d0a922d296da81f7cc260b4f3f3
+RMD160 (bind8-812-v6-19990820a.diff.gz) = e8a3bc48a766ed655a7d0c6340af477586aecf7d
 MD5 (bind8-812-v6-19990820a.diff.gz) = c961724dcb46754ed2f303a01863b861
