@@ -297,8 +297,8 @@ udp6_input(mp, offp, proto)
 							(struct sockaddr *)&udp_in6,
 							n, opts.head) == 0) {
 						m_freem(n);
-						if (opts)
-							m_freem(opts);
+						if (opts.head)
+							m_freem(opts.head);
 						udpstat.udps_fullsock++;
 					} else
 						sorwakeup(last->in6p_socket);
