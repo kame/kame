@@ -1244,7 +1244,7 @@ again:
 						 goto bad;
 					 }
 					 /*
-					  * ICV calc. for the immutable
+					  * ICV calc. for the mutable
 					  * option using an all-0 buffer.
 					  */
 					 (algo->update)(&algos, zerobuf,
