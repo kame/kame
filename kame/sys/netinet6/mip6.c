@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.185 2002/11/29 12:31:55 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.186 2002/12/09 10:46:02 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -47,10 +47,6 @@
 #endif
 
 #define HMACSIZE 16
-
-#if defined(MIP6) && !defined(MIP6_DRAFT18)
-#error "MIP6 is not released yet"
-#endif
 
 #ifdef __NetBSD__
 #define HAVE_SHA1

@@ -53,5 +53,4 @@ options 	RADIX_MPATH
 # Mobile IPv6
 #options 	MIP6_DEBUG
 #options 	MIP6
-#options 	MIP6_DRAFT18
 #pseudo-device	hif	1
