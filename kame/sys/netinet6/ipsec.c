@@ -1152,7 +1152,7 @@ ipsec4_set_policy(inp, optname, request, priv)
 		pcb_sp = &inp->inp_sp_out;
 		break;
 	default:
-		printf("ipsec6_set_policy: invalid direction=%u\n",
+		printf("ipsec4_set_policy: invalid direction=%u\n",
 			xpl->sadb_x_policy_dir);
 		return EINVAL;
 	}
@@ -1197,7 +1197,7 @@ ipsec4_delete_pcbpolicy(inp)
 {
 	/* sanity check. */
 	if (inp == NULL)
-		panic("ipsec6_delete_pcbpolicy: NULL pointer was passed.\n");
+		panic("ipsec4_delete_pcbpolicy: NULL pointer was passed.\n");
 
 	if (inp->inp_sp_in != NULL) {
 		key_freesp(inp->inp_sp_in);
@@ -2224,7 +2224,9 @@ ipsec4_output(state, sp, flags)
 	struct ipsecrequest *isr = NULL;
 	int s;
 	int error;
+#ifdef IPSEC_SRCSEL
 	struct in_ifaddr *ia;
+#endif
 	struct sockaddr_in *dst4;
 
 	if (!state)
@@ -2347,12 +2349,19 @@ ipsec4_output(state, sp, flags)
 				goto bad;
 			}
 
+#ifdef IPSEC_SRCSEL
+			/*
+			 * Which address in SA or in routing table should I
+			 * select from ?  But I had set from SA at
+			 * ipsec4_encapsulate().
+			 */
 			ia = (struct in_ifaddr *)(state->ro->ro_rt->rt_ifa);
 			if (state->ro->ro_rt->rt_flags & RTF_GATEWAY) {
 				state->dst = (struct sockaddr *)state->ro->ro_rt->rt_gateway;
 				dst4 = (struct sockaddr_in *)state->dst;
 			}
 			ip->ip_src = IA_SIN(ia)->sin_addr;
+#endif
 		} else
 			splx(s);
 
@@ -2546,7 +2555,9 @@ ipsec6_output_tunnel(state, sp, flags)
 	struct ipsecrequest *isr = NULL;
 	int error = 0;
 	int plen;
+#ifdef IPSEC_SRCSEL
 	struct in6_addr *ia6;
+#endif
 	struct sockaddr_in6* dst6;
 	int s;
 
@@ -2673,12 +2684,19 @@ ipsec6_output_tunnel(state, sp, flags)
 				dst6 = (struct sockaddr_in6 *)state->dst;
 			}
 #endif
+#ifdef IPSEC_SRCSEL
+			/*
+			 * Which address in SA or in routing table should I
+			 * select from ?  But I had set from SA at
+			 * ipsec6_encapsulate().
+			 */
 			ia6 = in6_selectsrc(dst6, NULL, NULL,
 					    (struct route_in6 *)state->ro,
 					    NULL, &error);
 			if (ia6 == NULL)
 				goto bad;
 			ip6->ip6_src = *ia6;
+#endif
 		} else
 			splx(s);
 
