@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1937 2001/10/25 07:17:09 jinmei Exp $
+$KAME: CHANGELOG,v 1.1938 2001/10/25 07:24:39 fujisawa Exp $
 
 <200110>
+2001-10-25 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/kame/natptconfig/{cfparse.y,defs.h,yylex.c}:
+	- Add "daddr" keyword to specify that translator converts
+	  destination address, and add element of struct ruletab{}
+	  to hold this address.
+	- Add translation rule to convert IPv4->IPv6.  I am sorry,
+	  many of them do not work yet.
+
 2001-10-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_is_addr_neighbor): corrected an
 	expression in nd6_is_addr_neighbor to detected whether a given
