@@ -1,4 +1,4 @@
-/*	$KAME: rp.c,v 1.26 2003/04/30 05:09:01 suz Exp $	*/
+/*	$KAME: rp.c,v 1.27 2003/08/07 20:22:48 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -388,7 +388,7 @@ add_cand_rp(used_cand_rp_list, address)
 
 	if (inet6_greaterthan(&cand_rp->rpentry->address, address))
 	    continue;
-	if (inet6_equal(&cand_rp->rpentry->address , address))
+	if (inet6_equal(&cand_rp->rpentry->address, address))
 	    return (cand_rp);
 	else
 	    break;
