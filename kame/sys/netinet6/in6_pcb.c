@@ -650,7 +650,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		 * XXX: should we avoid to notify the value to TCP sockets?
 		 */
 		if (cmd == PRC_MSGSIZE && (in6p->in6p_flags & IN6P_MTU) != 0 &&
-		    (SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fs) ||
+		    (SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa) ||
 		     SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, sa6_dst))) {
 			ip6_notify_pmtu(in6p, (struct sockaddr_in6 *)dst,
 					(u_int32_t *)cmdarg);
