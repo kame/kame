@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet6/tcp6_var.h,v 1.3 2000/01/09 19:17:29 shin Exp $
+ * $FreeBSD: src/sys/netinet6/tcp6_var.h,v 1.3.2.1 2000/07/15 07:14:38 kris Exp $
  */
 
 /*
@@ -62,11 +62,11 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_var.h	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet6/tcp6_var.h,v 1.3 2000/01/09 19:17:29 shin Exp $
+ * $FreeBSD: src/sys/netinet6/tcp6_var.h,v 1.3.2.1 2000/07/15 07:14:38 kris Exp $
  */
 
 #ifndef _NETINET_TCP6_VAR_H_
-#define	_NETINET_TCP6_VAR_H_
+#define _NETINET_TCP6_VAR_H_
 
 #ifdef _KERNEL
 #ifdef SYSCTL_DECL

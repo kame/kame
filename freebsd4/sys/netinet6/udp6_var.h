@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet6/udp6_var.h,v 1.3 1999/12/29 04:46:06 peter Exp $
+ * $FreeBSD: src/sys/netinet6/udp6_var.h,v 1.3.2.1 2000/07/15 07:14:38 kris Exp $
  */
 
 /*
@@ -65,7 +65,7 @@
  */
 
 #ifndef _NETINET6_UDP6_VAR_H_
-#define	_NETINET6_UDP6_VAR_H_
+#define _NETINET6_UDP6_VAR_H_
 
 #ifdef _KERNEL
 SYSCTL_DECL(_net_inet6_udp6);
