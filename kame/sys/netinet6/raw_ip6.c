@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.49 2000/12/05 15:19:34 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.50 2000/12/06 04:05:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -551,39 +551,39 @@ rip6_ctloutput(op, so, level, optname, m)
 	int error = 0;
 
 	switch(level) {
-	 case IPPROTO_IPV6:
-		 switch(optname) {
-		  case MRT6_INIT:
-		  case MRT6_DONE:
-		  case MRT6_ADD_MIF:
-		  case MRT6_DEL_MIF:
-		  case MRT6_ADD_MFC:
-		  case MRT6_DEL_MFC:
-		  case MRT6_PIM:
-			  if (op == PRCO_SETOPT) {
-				  error = ip6_mrouter_set(optname, so, *m);
-				  if (*m)
-					  (void)m_free(*m);
-			  } else if (op == PRCO_GETOPT) {
-				  error = ip6_mrouter_get(optname, so, m);
-			  } else
-				  error = EINVAL;
-			  return (error);
-		 }
-		 return (ip6_ctloutput(op, so, level, optname, m));
-		 /* NOTREACHED */
+	case IPPROTO_IPV6:
+		switch(optname) {
+		case MRT6_INIT:
+		case MRT6_DONE:
+		case MRT6_ADD_MIF:
+		case MRT6_DEL_MIF:
+		case MRT6_ADD_MFC:
+		case MRT6_DEL_MFC:
+		case MRT6_PIM:
+			if (op == PRCO_SETOPT) {
+				error = ip6_mrouter_set(optname, so, *m);
+				if (*m)
+					(void)m_free(*m);
+			} else if (op == PRCO_GETOPT) {
+				error = ip6_mrouter_get(optname, so, m);
+			} else
+				error = EINVAL;
+			return (error);
+		}
+		return (ip6_ctloutput(op, so, level, optname, m));
+		/* NOTREACHED */
 
-	 case IPPROTO_ICMPV6:
-		 /*
-		  * XXX: is it better to call icmp6_ctloutput() directly
-		  * from protosw?
-		  */
-		 return(icmp6_ctloutput(op, so, level, optname, m));
+	case IPPROTO_ICMPV6:
+		/*
+		 * XXX: is it better to call icmp6_ctloutput() directly
+		 * from protosw?
+		 */
+		return(icmp6_ctloutput(op, so, level, optname, m));
 
-	 default:
-		 if (op == PRCO_SETOPT && *m)
-			 (void)m_free(*m);
-		 return(EINVAL);
+	default:
+		if (op == PRCO_SETOPT && *m)
+			(void)m_free(*m);
+		return(EINVAL);
 	}
 }
 
