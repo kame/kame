@@ -337,7 +337,7 @@ void	if_up __P((struct ifnet *));
 int	ifioctl __P((struct socket *, u_long, caddr_t, struct proc *));
 int	ifpromisc __P((struct ifnet *, int));
 struct	ifnet *ifunit __P((char *));
-struct  ifnet *if_withname __P((struct sockaddr *));
+struct	ifnet *if_withname __P((struct sockaddr *));
 
 int	if_poll_recv_slow __P((struct ifnet *ifp, int *quotap));
 void	if_poll_xmit_slow __P((struct ifnet *ifp, int *quotap));
