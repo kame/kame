@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.45 2000/01/14 21:41:42 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.46 2000/01/18 05:00:48 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -422,6 +422,7 @@ isakmp_main(msg, remote, local)
 		break;
 
 	case ISAKMP_ETYPE_INFO:
+	case ISAKMP_ETYPE_ACKINFO:
 		/*
 		 * iph1 must be present for Inoformation message.
 		 * if iph1 is null then trying to get the phase1 status
