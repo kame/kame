@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.58 2001/08/08 22:09:26 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.59 2001/08/13 17:47:59 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1375,6 +1375,126 @@ eay_hmac_init(key, md)
 	HMAC_Init(c, key->v, key->l, md);
 
 	return (caddr_t)c;
+}
+
+/*
+ * HMAC SHA2-512
+ */
+vchar_t *
+eay_hmacsha2_512_one(key, data)
+	vchar_t *key, *data;
+{
+	vchar_t *res;
+	caddr_t ctx;
+
+	ctx = eay_hmacsha2_512_init(key);
+	eay_hmacsha2_512_update(ctx, data);
+	res = eay_hmacsha2_512_final(ctx);
+
+	return(res);
+}
+
+caddr_t
+eay_hmacsha2_512_init(key)
+	vchar_t *key;
+{
+	return eay_hmac_init(key, EVP_sha2_512());
+}
+
+void
+eay_hmacsha2_512_update(c, data)
+	caddr_t c;
+	vchar_t *data;
+{
+	HMAC_Update((HMAC_CTX *)c, data->v, data->l);
+}
+
+vchar_t *
+eay_hmacsha2_512_final(c)
+	caddr_t c;
+{
+	vchar_t *res;
+	unsigned int l;
+
+	if ((res = vmalloc(SHA512_DIGEST_LENGTH)) == 0)
+		return NULL;
+
+	HMAC_Final((HMAC_CTX *)c, res->v, &l);
+	res->l = l;
+	(void)racoon_free(c);
+
+	if (SHA512_DIGEST_LENGTH != res->l) {
+#ifndef EAYDEBUG
+		plog(LLV_ERROR, LOCATION, NULL,
+			"hmac sha2_512 length mismatch %d.\n", res->l);
+#else
+		printf("hmac sha2_512 length mismatch %d.\n", res->l);
+#endif
+		vfree(res);
+		return NULL;
+	}
+
+	return(res);
+}
+
+/*
+ * HMAC SHA2-384
+ */
+vchar_t *
+eay_hmacsha2_384_one(key, data)
+	vchar_t *key, *data;
+{
+	vchar_t *res;
+	caddr_t ctx;
+
+	ctx = eay_hmacsha2_384_init(key);
+	eay_hmacsha2_384_update(ctx, data);
+	res = eay_hmacsha2_384_final(ctx);
+
+	return(res);
+}
+
+caddr_t
+eay_hmacsha2_384_init(key)
+	vchar_t *key;
+{
+	return eay_hmac_init(key, EVP_sha2_384());
+}
+
+void
+eay_hmacsha2_384_update(c, data)
+	caddr_t c;
+	vchar_t *data;
+{
+	HMAC_Update((HMAC_CTX *)c, data->v, data->l);
+}
+
+vchar_t *
+eay_hmacsha2_384_final(c)
+	caddr_t c;
+{
+	vchar_t *res;
+	unsigned int l;
+
+	if ((res = vmalloc(SHA384_DIGEST_LENGTH)) == 0)
+		return NULL;
+
+	HMAC_Final((HMAC_CTX *)c, res->v, &l);
+	res->l = l;
+	(void)racoon_free(c);
+
+	if (SHA384_DIGEST_LENGTH != res->l) {
+#ifndef EAYDEBUG
+		plog(LLV_ERROR, LOCATION, NULL,
+			"hmac sha2_384 length mismatch %d.\n", res->l);
+#else
+		printf("hmac sha2_384 length mismatch %d.\n", res->l);
+#endif
+		vfree(res);
+		return NULL;
+	}
+
+	return(res);
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.63 2001/08/13 13:02:41 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.64 2001/08/13 17:47:59 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -331,11 +331,17 @@ twofish		{ YYD; yylval.num = algtype_twofish;	return(ALGORITHMTYPE); }
 non_auth	{ YYD; yylval.num = algtype_non_auth;	return(ALGORITHMTYPE); }
 hmac_md5	{ YYD; yylval.num = algtype_hmac_md5;	return(ALGORITHMTYPE); }
 hmac_sha1	{ YYD; yylval.num = algtype_hmac_sha1;	return(ALGORITHMTYPE); }
+hmac_sha2_256	{ YYD; yylval.num = algtype_hmac_sha2_256;	return(ALGORITHMTYPE); }
+hmac_sha2_384	{ YYD; yylval.num = algtype_hmac_sha2_384;	return(ALGORITHMTYPE); }
+hmac_sha2_512	{ YYD; yylval.num = algtype_hmac_sha2_512;	return(ALGORITHMTYPE); }
 des_mac		{ YYD; yylval.num = algtype_des_mac;	return(ALGORITHMTYPE); }
 kpdk		{ YYD; yylval.num = algtype_kpdk;	return(ALGORITHMTYPE); }
 md5		{ YYD; yylval.num = algtype_md5;	return(ALGORITHMTYPE); }
 sha1		{ YYD; yylval.num = algtype_sha1;	return(ALGORITHMTYPE); }
 tiger		{ YYD; yylval.num = algtype_tiger;	return(ALGORITHMTYPE); }
+sha2_256	{ YYD; yylval.num = algtype_sha2_256;	return(ALGORITHMTYPE); }
+sha2_384	{ YYD; yylval.num = algtype_sha2_384;	return(ALGORITHMTYPE); }
+sha2_512	{ YYD; yylval.num = algtype_sha2_512;	return(ALGORITHMTYPE); }
 oui		{ YYD; yylval.num = algtype_oui;	return(ALGORITHMTYPE); }
 deflate		{ YYD; yylval.num = algtype_deflate;	return(ALGORITHMTYPE); }
 lzs		{ YYD; yylval.num = algtype_lzs;	return(ALGORITHMTYPE); }

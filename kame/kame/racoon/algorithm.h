@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.h,v 1.15 2001/08/13 13:54:23 sakane Exp $	*/
+/*	$KAME: algorithm.h,v 1.16 2001/08/13 17:47:59 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -72,6 +72,9 @@ enum {
 	algtype_des_mac,
 	algtype_kpdk,
 	algtype_non_auth,
+	algtype_hmac_sha2_256,
+	algtype_hmac_sha2_384,
+	algtype_hmac_sha2_512,
 };
 
 enum {
@@ -88,6 +91,9 @@ enum {
 	algtype_md5 = 1,
 	algtype_sha1,
 	algtype_tiger,
+	algtype_sha2_256,
+	algtype_sha2_384,
+	algtype_sha2_512,
 };
 
 enum {
