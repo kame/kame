@@ -492,7 +492,7 @@ in6_pcbconnect(inp, nam)
 		 * with the address specified by setsockopt(IPV6_PKTINFO).
 		 * Is it the intended behavior?
 		 */
-		in6a = in6_selectsrc(&sin6->sin6_addr, inp->inp_outputopts6,
+		in6a = in6_selectsrc(sin6, inp->inp_outputopts6,
 		    inp->inp_moptions6, &inp->inp_route6, &inp->inp_laddr6,
 		    &ifp, &error);
 		if (in6a == 0) {
