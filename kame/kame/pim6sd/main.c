@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.14 2000/12/04 07:01:08 itojun Exp $	*/
+/*	$KAME: main.c,v 1.15 2000/12/10 08:29:14 itojun Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Southern California.
@@ -75,6 +75,7 @@
 #include <syslog.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <paths.h>
 #include "pathnames.h"
 #include "defs.h"
 #include "debug.h"
@@ -478,7 +479,7 @@ usage:
 	(void) setpgrp();
 #else
 #ifdef TIOCNOTTY
-	t = open("/dev/tty", 2);
+	t = open(_PATH_TTY, 2);
 	if (t >= 0)
 	{
 	    (void) ioctl(t, TIOCNOTTY, (char *) 0);

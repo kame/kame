@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.5 2000/12/04 06:33:10 itojun Exp $	*/
+/*	$KAME: main.c,v 1.6 2000/12/10 08:29:14 itojun Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Oregon.
@@ -51,6 +51,7 @@
  *
  */
 
+#include <paths.h>
 #include "defs.h"
 
 #ifdef SNMP
@@ -423,7 +424,7 @@ main(argc, argv)
 	(void)setpgrp();
 #else 
 #ifdef TIOCNOTTY
-	t = open("/dev/tty", 2);
+	t = open(_PATH_TTY, 2);
 	if (t >= 0) {
 	    (void)ioctl(t, TIOCNOTTY, (char *)0);
 	    (void)close(t);
