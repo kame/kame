@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.114 2004/08/19 12:57:33 suz Exp $	*/
+/*	$KAME: common.c,v 1.115 2004/08/21 10:49:07 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -89,9 +89,11 @@ static char *dnsdecode __P((u_char **, u_char *, char *, size_t));
 static int copyout_option __P((char *, char *, struct dhcp6_listval *));
 static int copyin_option __P((int, struct dhcp6opt *, struct dhcp6opt *,
     struct dhcp6_list *));
+static int copy_option __P((u_int16_t, u_int16_t, void *, struct dhcp6opt **,
+    struct dhcp6opt *, int *));
 static ssize_t gethwid __P((char *, int, const char *, u_int16_t *));
 static int get_delegated_prefixes __P((char *, char *,
-				       struct dhcp6_optinfo *));
+    struct dhcp6_optinfo *));
 static char *sprint_uint64 __P((char *, int, u_int64_t));
 static char *sprint_auth __P((struct dhcp6_optinfo *));
 
@@ -1865,57 +1867,81 @@ sprint_auth(optinfo)
 	return (ret);
 }
 
-#define COPY_OPTION(t, l, v, p) do { \
-	if ((void *)(ep) - (void *)(p) < (l) + sizeof(struct dhcp6opt)) { \
-		dprintf(LOG_INFO, FNAME, "option buffer short for %s", dhcp6optstr((t))); \
-		goto fail; \
-	} \
-	opth.dh6opt_type = htons((t)); \
-	opth.dh6opt_len = htons((l)); \
-	memcpy((p), &opth, sizeof(opth)); \
-	if ((l)) \
-		memcpy((p) + 1, (v), (l)); \
-	(p) = (struct dhcp6opt *)((char *)((p) + 1) + (l)); \
- 	(len) += sizeof(struct dhcp6opt) + (l); \
-	dprintf(LOG_DEBUG, FNAME, "set %s (len %d)", dhcp6optstr((t)), (l)); \
-} while (0)
+static int
+copy_option(type, len, val, optp, ep, totallenp)
+	u_int16_t type, len;
+	void *val;
+	struct dhcp6opt **optp, *ep;
+	int *totallenp;
+{
+	struct dhcp6opt *opt = *optp, opth;
+
+	if ((void *)ep - (void *)optp < len + sizeof(struct dhcp6opt)) {
+		dprintf(LOG_INFO, FNAME,
+		    "option buffer short for %s", dhcp6optstr(type));
+		return (-1);
+	}
+	opth.dh6opt_type = htons(type);
+	opth.dh6opt_len = htons(len);
+	memcpy(opt, &opth, sizeof(opth));
+	if (len != 0)
+		memcpy(opt + 1, val, len);
+
+	*optp = (struct dhcp6opt *)((char *)(opt + 1) + len);
+ 	*totallenp += sizeof(struct dhcp6opt) + len;
+	dprintf(LOG_DEBUG, FNAME, "set %s (len %d)", dhcp6optstr(type), len);
+
+	return (0);
+}
 
 int
-dhcp6_set_options(bp, ep, optinfo)
-	struct dhcp6opt *bp, *ep;
+dhcp6_set_options(optbp, optep, optinfo)
+	struct dhcp6opt *optbp, *optep;
 	struct dhcp6_optinfo *optinfo;
 {
-	struct dhcp6opt *p = bp, opth;
+	struct dhcp6opt *p = optbp;
 	struct dhcp6_listval *stcode, *op, *d;
 	int len = 0, optlen;
 	char *tmpbuf = NULL;
 
 	if (optinfo->clientID.duid_len) {
-		COPY_OPTION(DH6OPT_CLIENTID, optinfo->clientID.duid_len,
-			    optinfo->clientID.duid_id, p);
+		if (copy_option(DH6OPT_CLIENTID, optinfo->clientID.duid_len,
+		    optinfo->clientID.duid_id, &p, optep, &len) != 0) {
+			goto fail;
+		}
 	}
 
 	if (optinfo->serverID.duid_len) {
-		COPY_OPTION(DH6OPT_SERVERID, optinfo->serverID.duid_len,
-			    optinfo->serverID.duid_id, p);
+		if (copy_option(DH6OPT_SERVERID, optinfo->serverID.duid_len,
+		    optinfo->serverID.duid_id, &p, optep, &len) != 0) {
+			goto fail;
+		}
 	}
 
 	if (optinfo->rapidcommit) {
-		char dummy; /* to avoid compilation error in "gcc34 -Werror" */
-		COPY_OPTION(DH6OPT_RAPID_COMMIT, 0, &dummy, p);
+		if (copy_option(DH6OPT_RAPID_COMMIT, 0, NULL, &p,
+		    optep, &len) != 0) {
+			goto fail;
+		}
 	}
 
 	if (optinfo->pref != DH6OPT_PREF_UNDEF) {
 		u_int8_t p8 = (u_int8_t)optinfo->pref;
 
-		COPY_OPTION(DH6OPT_PREFERENCE, sizeof(p8), &p8, p);
+		if (copy_option(DH6OPT_PREFERENCE, sizeof(p8), &p8, &p,
+		    optep, &len) != 0) {
+			goto fail;
+		}
 	}
 
 	if (optinfo->elapsed_time != DH6OPT_ELAPSED_TIME_UNDEF) {
 		u_int16_t p16 = (u_int16_t)optinfo->elapsed_time;
 
 		p16 = htons(p16);
-		COPY_OPTION(DH6OPT_ELAPSED_TIME, sizeof(p16), &p16, p);
+		if (copy_option(DH6OPT_ELAPSED_TIME, sizeof(p16), &p16, &p,
+		    optep, &len) != 0) {
+			goto fail;
+		}
 	}
 
 	for (stcode = TAILQ_FIRST(&optinfo->stcode_list); stcode;
@@ -1923,7 +1949,10 @@ dhcp6_set_options(bp, ep, optinfo)
 		u_int16_t code;
 
 		code = htons(stcode->val_num);
-		COPY_OPTION(DH6OPT_STATUS_CODE, sizeof(code), &code, p);
+		if (copy_option(DH6OPT_STATUS_CODE, sizeof(code), &code, &p,
+		    optep, &len) != 0) {
+			goto fail;
+		}
 	}
 
 	if (!TAILQ_EMPTY(&optinfo->reqopt_list)) {
@@ -1943,7 +1972,10 @@ dhcp6_set_options(bp, ep, optinfo)
 		     opt = TAILQ_NEXT(opt, link), valp++) {
 			*valp = htons((u_int16_t)opt->val_num);
 		}
-		COPY_OPTION(DH6OPT_ORO, optlen, tmpbuf, p);
+		if (copy_option(DH6OPT_ORO, optlen, tmpbuf, &p,
+		    optep, &len) != 0) {
+			goto fail;
+		}
 		free(tmpbuf);
 	}
 
@@ -1985,7 +2017,10 @@ dhcp6_set_options(bp, ep, optinfo)
 			memcpy(cp, name, nlen);
 			cp += nlen;
 		}
-		COPY_OPTION(DH6OPT_SIP_SERVER_D, optlen, tmpbuf, p);
+		if (copy_option(DH6OPT_SIP_SERVER_D, optlen, tmpbuf, &p,
+		    optep, &len) != 0) {
+			goto fail;
+		}
 		free(tmpbuf);
 	}
 	if (!TAILQ_EMPTY(&optinfo->sip_list)) {
@@ -2004,7 +2039,10 @@ dhcp6_set_options(bp, ep, optinfo)
 		     d = TAILQ_NEXT(d, link), in6++) {
 			memcpy(in6, &d->val_addr6, sizeof(*in6));
 		}
-		COPY_OPTION(DH6OPT_SIP_SERVER_A, optlen, tmpbuf, p);
+		if (copy_option(DH6OPT_SIP_SERVER_A, optlen, tmpbuf, &p,
+		    optep, &len) != 0) {
+			goto fail;
+		}
 		free(tmpbuf);
 	}
 
@@ -2024,7 +2062,10 @@ dhcp6_set_options(bp, ep, optinfo)
 		     d = TAILQ_NEXT(d, link), in6++) {
 			memcpy(in6, &d->val_addr6, sizeof(*in6));
 		}
-		COPY_OPTION(DH6OPT_DNS, optlen, tmpbuf, p);
+		if (copy_option(DH6OPT_DNS, optlen, tmpbuf, &p,
+		    optep, &len) != 0) {
+			goto fail;
+		}
 		free(tmpbuf);
 	}
 
@@ -2063,7 +2104,10 @@ dhcp6_set_options(bp, ep, optinfo)
 			memcpy(cp, name, nlen);
 			cp += nlen;
 		}
-		COPY_OPTION(DH6OPT_DNSNAME, optlen, tmpbuf, p);
+		if (copy_option(DH6OPT_DNSNAME, optlen, tmpbuf, &p,
+		    optep, &len) != 0) {
+			goto fail;
+		}
 		free(tmpbuf);
 	}
 
@@ -2084,7 +2128,10 @@ dhcp6_set_options(bp, ep, optinfo)
 		     d = TAILQ_NEXT(d, link), in6++) {
 			memcpy(in6, &d->val_addr6, sizeof(*in6));
 		}
-		COPY_OPTION(DH6OPT_NTP, optlen, tmpbuf, p);
+		if (copy_option(DH6OPT_NTP, optlen, tmpbuf, &p,
+		    optep, &len) != 0) {
+			goto fail;
+		}
 		free(tmpbuf);
 	}
 #endif
@@ -2099,7 +2146,7 @@ dhcp6_set_options(bp, ep, optinfo)
 			    "failed to count option length");
 			goto fail;
 		}
-		if ((void *)ep - (void *)p < optlen) {
+		if ((void *)optep - (void *)p < optlen) {
 			dprintf(LOG_INFO, FNAME, "short buffer");
 			goto fail;
 		}
@@ -2147,19 +2194,26 @@ dhcp6_set_options(bp, ep, optinfo)
 			       sizeof(struct in6_addr));
 			memcpy(tp, &pi, sizeof(pi));
 		}
-		COPY_OPTION(DH6OPT_PREFIX_DELEGATION, optlen, tmpbuf, p);
+		if (copy_option(DH6OPT_PREFIX_DELEGATION, optlen, tmpbuf, &p,
+		    optep, &len) != 0) {
+			goto fail;
+		}
 		free(tmpbuf);
 		     
 	}
 
 	if (optinfo->relaymsg_len) {
-		COPY_OPTION(DH6OPT_RELAY_MSG, optinfo->relaymsg_len,
-			    optinfo->relaymsg_msg, p);
+		if (copy_option(DH6OPT_RELAY_MSG, optinfo->relaymsg_len,
+		    optinfo->relaymsg_msg, &p, optep, &len) != 0) {
+			goto fail;
+		}
 	}
 
 	if (optinfo->ifidopt_id) {
-		COPY_OPTION(DH6OPT_INTERFACE_ID, optinfo->ifidopt_len,
-			    optinfo->ifidopt_id, p);
+		if (copy_option(DH6OPT_INTERFACE_ID, optinfo->ifidopt_len,
+		    optinfo->ifidopt_id, &p, optep, &len) != 0) {
+			goto fail;
+		}
 	}
 
 #ifdef USE_DH6OPT_LIFETIME
@@ -2167,7 +2221,10 @@ dhcp6_set_options(bp, ep, optinfo)
 		u_int32_t p32 = (u_int32_t)optinfo->lifetime;
 
 		p32 = htonl(p32);
-		COPY_OPTION(DH6OPT_LIFETIME, sizeof(p32), &p32, p);
+		if (copy_option(DH6OPT_LIFETIME, sizeof(p32), &p32, &p,
+		    optep, &len) != 0) {
+			goto fail;
+		}
 	}
 #endif
 
@@ -2203,7 +2260,7 @@ dhcp6_set_options(bp, ep, optinfo)
 		}
 
 		memset(auth, 0, authlen);
-		/* COPY_OPTION will take care of type and len later */
+		/* copy_option will take care of type and len later */
 		auth->dh6_auth_proto = (u_int8_t)optinfo->authproto;
 		auth->dh6_auth_alg = (u_int8_t)optinfo->authalgorithm;
 		auth->dh6_auth_rdm = (u_int8_t)optinfo->authrdm;
@@ -2231,7 +2288,7 @@ dhcp6_set_options(bp, ep, optinfo)
 				 * calculate the HMAC.
 				 */
 				optinfo->delayedauth_offset =
-				    ((char *)p - (char *)bp) + authlen - 16;
+				    ((char *)p - (char *)optbp) + authlen - 16;
 
 				dprintf(LOG_DEBUG, FNAME, "key ID %x, offset %d",
 				    optinfo->delayedauth_keyid, optinfo->delayedauth_offset); 
@@ -2246,8 +2303,10 @@ dhcp6_set_options(bp, ep, optinfo)
 			}
 		}
 
-		COPY_OPTION(DH6OPT_AUTH, authlen - 4,
-		    &auth->dh6_auth_proto, p);
+		if (copy_option(DH6OPT_AUTH, authlen - 4,
+		    &auth->dh6_auth_proto, &p, optep, &len) != 0) {
+			goto fail;
+		}
 	}
 
 	return (len);
