@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.34 2000/01/13 07:24:09 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.35 2000/01/13 23:57:08 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -544,9 +544,9 @@ t2isakmpsa(trns, sa)
 			case IPSECDOI_ATTR_SA_LD_TYPE_KB:
 				t = ipsecdoi_set_ld(life_t, val);
 				if (t == ~0)
-					sa->lifebyte = t;
-				else
 					sa->lifebyte = 0;	/*XXX*/
+				else
+					sa->lifebyte = t;
 
 				break;
 			}
