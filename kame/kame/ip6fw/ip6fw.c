@@ -16,7 +16,7 @@
  *
  * NEW command line interface for IP firewall facility
  *
- * $Id: ip6fw.c,v 1.8 2001/03/18 18:46:33 itojun Exp $
+ * $KAME: ip6fw.c,v 1.9 2001/05/08 06:17:21 sumikawa Exp $
  *
  */
 
@@ -98,7 +98,7 @@ mask_bits(u_char *m_ad, int m_len)
 		}
 	}
 	return h_num;
-}                         
+}                       
 
 static int pl2m[9] = { 0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe, 0xff };
 
@@ -243,7 +243,7 @@ show_ip6fw(struct ip6_fw *chain)
 		default:
 			errx(1, "impossible");
 	}
-   
+ 
 	if (chain->fw_flg & IPV6_FW_F_PRN)
 		printf(" log");
 
