@@ -92,10 +92,6 @@ struct dhcp6_solicit {
 	/* XXX: solicit-ID is a 9-bit field...ugly! */
 #define DH6SOL_SOLICIT_ID_MASK 0x1fff
 	u_int16_t dh6sol_plen_id; /* prefix-len and solict-ID */
-#ifdef old			/* dhcpv6-14 and before */
-	u_int8_t dh6sol_prefixsiz;	/* prefix-size */
-	u_int8_t dh6sol_id;	/* solict-ID */
-#endif 
 	struct in6_addr dh6sol_cliaddr;	/* client's lladdr */
 	struct in6_addr dh6sol_relayaddr; /* relay agent's lladdr */
 } __attribute__ ((packed));
