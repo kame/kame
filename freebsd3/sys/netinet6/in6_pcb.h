@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.h,v 1.7 2000/07/12 13:21:52 jinmei Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.8 2000/09/11 12:23:27 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -95,7 +95,7 @@ int	in6_setpeeraddr __P((struct socket *so, struct sockaddr **nam));
 int	in6_setsockaddr __P((struct socket *so, struct sockaddr **nam));
 int	in6_mapped_sockaddr __P((struct socket *so, struct sockaddr **nam));
 int	in6_mapped_peeraddr __P((struct socket *so, struct sockaddr **nam));
-#ifdef NEW_STRUCT_ROUTE
+#if 1 /* def NEW_STRUCT_ROUTE */
 struct	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
 				     struct ip6_pktopts *,
 				     struct ip6_moptions *,
