@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.51 2001/10/17 04:19:34 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.52 2001/10/17 05:47:48 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -51,7 +51,6 @@
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 #include <netinet/tcp.h>
-#include <netinet/tcpip.h>
 #include <netinet/tcp_fsm.h>
 #include <netinet/udp.h>
 
@@ -209,7 +208,6 @@ void		 natpt_composeIPv6Hdr		__P((struct ip *, struct pAddr *,
 						     struct ip6_hdr *));
 void		 natpt_composeIPv4Hdr		__P((struct ip6_hdr *, struct pAddr *,
 						     struct ip *));
-void		 natpt_recalculateTCP4Checksum	__P((struct pcv *));
 void		 natpt_fixTCPUDP64cksum		__P((int, int, struct pcv *, struct pcv *));
 void		 natpt_fixTCPUDP44cksum		__P((int, struct pcv *, struct pcv *));
 int		 natpt_fixCksum			__P((int, u_char *, int, u_char *, int));
@@ -1392,7 +1390,7 @@ natpt_translateTCPv4To4(struct pcv *cv4from, struct pAddr *pad)
 	natpt_updateTcpStatus(&cv4to);
 	natpt_translatePYLD4To4(&cv4to);
 	natpt_fixTCPUDP44cksum(IPPROTO_TCP, cv4from, &cv4to);
-	natpt_recalculateTCP4Checksum(&cv4to);			/* XXX */
+
 	return (m4);
 }
 
@@ -1424,11 +1422,41 @@ natpt_translateTCPUDPv4To4(struct pcv *cv4from, struct pAddr *pad, struct pcv *c
 	struct ip	*ip4to;
 	struct tcphdr	*tcp4to;
 
+	static struct pcvaux	aux;
+	static struct ulc4	ulc;
+
 	if ((m4 = m_copym(cv4from->m, 0, M_COPYALL, M_NOWAIT)) == NULL)
 		return (NULL);
 
-	ip4to = mtod(m4, struct ip *);
+	/*
+	 * There is a case pointing the same data with m4 and cv6->m
+	 * after m_copym, we need to prepare for incremental checksum
+	 * calculation.
+	 */
+	bzero(&aux, sizeof(struct pcvaux));
+	bzero(&ulc, sizeof(struct ulc6));
 
+	ulc.ulc_src = cv4from->ip.ip4->ip_src;
+	ulc.ulc_dst = cv4from->ip.ip4->ip_dst;
+	ulc.ulc_len = htonl(cv4from->plen);
+	ulc.ulc_pr  = cv4from->ip_p;
+	if (cv4from->ip_p == IPPROTO_TCP) {
+		ulc.ulc_tu.th.th_sport = cv4from->pyld.tcp4->th_sport;
+		ulc.ulc_tu.th.th_dport = cv4from->pyld.tcp4->th_dport;
+		aux.cksum4 = ntohs(cv4from->pyld.tcp4->th_sum);
+	} else {
+		ulc.ulc_tu.uh.uh_sport = cv4from->pyld.udp->uh_sport;
+		ulc.ulc_tu.uh.uh_dport = cv4from->pyld.udp->uh_dport;
+		aux.cksum4 = ntohs(cv4from->pyld.udp->uh_sum);
+	}
+
+	aux.ulc4 = &ulc;
+	cv4from->aux = &aux;
+
+	/*
+	 * Start translation
+	 */
+	ip4to = mtod(m4, struct ip *);
 	ip4to->ip_src = pad->in4dst;
 	ip4to->ip_dst = pad->in4src;
 
@@ -2243,46 +2271,11 @@ natpt_composeIPv4Hdr(struct ip6_hdr *ip6, struct pAddr *pad, struct ip *ip4)
  */
 
 void
-natpt_recalculateTCP4Checksum(struct pcv *cv4)			/* XXX */
-{
-	int		 cksumAdj, cksumCks;
-	int		 iphlen;
-	struct ip	*ip4 = cv4->ip.ip4;
-	struct ip	 save_ip;
-	struct tcpiphdr	*ti;
-
-	cksumAdj = cv4->pyld.tcp4->th_sum;
-
-	ti = mtod(cv4->m, struct tcpiphdr *);
-	iphlen = ip4->ip_hl << 2;
-
-	save_ip = *cv4->ip.ip4;
-#ifdef ti_next
-	ti->ti_next = ti->ti_prev = 0;
-	ti->ti_x1 = 0;
-#else
-	bzero(ti->ti_x1, 9);
-#endif
-	ti->ti_pr = IPPROTO_TCP;
-	ti->ti_len = htons(cv4->m->m_pkthdr.len - iphlen);
-	ti->ti_src = save_ip.ip_src;
-	ti->ti_dst = save_ip.ip_dst;
-
-	ti->ti_sum = 0;
-	ti->ti_sum = in_cksum(cv4->m, cv4->m->m_pkthdr.len);
-	*cv4->ip.ip4 = save_ip;
-
-	cksumCks = ti->ti_sum;
-}
-
-
-void
 natpt_fixTCPUDP64cksum(int header, int proto, struct pcv *cv6, struct pcv *cv4)
 {
 	const char	*fn = __FUNCTION__;
 
-	int		cksum;
-	u_short		cksum6, cksum4;
+	u_short		cksum, cksum6;
 	struct ulc6	ulc6;
 	struct ulc4	ulc4;
 
@@ -2364,16 +2357,22 @@ natpt_fixTCPUDP64cksum(int header, int proto, struct pcv *cv6, struct pcv *cv4)
 void
 natpt_fixTCPUDP44cksum(int proto, struct pcv *cv4from, struct pcv *cv4to)
 {
-	int		cksum;
+	u_short		cksum, cksum4;
 	struct ulc4	from, to;
 
 	bzero(&from, sizeof(struct ulc4));
 	bzero(&to,   sizeof(struct ulc4));
 
-	from.ulc_src = cv4from->ip.ip4->ip_src;
-	from.ulc_dst = cv4from->ip.ip4->ip_dst;
-	from.ulc_len = htons(cv4from->plen);
-	from.ulc_pr  = cv4from->ip_p;
+	if (cv4from->aux && cv4from->aux->ulc4) {
+		from = *(cv4from->aux->ulc4);
+		cksum4 = cv4from->aux->cksum4;
+	} else {
+		from.ulc_src = cv4from->ip.ip4->ip_src;
+		from.ulc_dst = cv4from->ip.ip4->ip_dst;
+		from.ulc_len = htons(cv4from->plen);
+		from.ulc_pr  = cv4from->ip_p;
+		cksum4 = ntohs(cv4from->pyld.tcp4->th_sum);
+	}
 
 	to.ulc_src = cv4to->ip.ip4->ip_src;
 	to.ulc_dst = cv4to->ip.ip4->ip_dst;
@@ -2382,22 +2381,26 @@ natpt_fixTCPUDP44cksum(int proto, struct pcv *cv4from, struct pcv *cv4to)
 
 	switch (proto) {
 	case IPPROTO_TCP:
-		from.ulc_tu.th.th_sport = cv4from->pyld.tcp4->th_sport;
-		from.ulc_tu.th.th_dport = cv4from->pyld.tcp4->th_dport;
+		if (!cv4from->aux || !cv4from->aux->ulc4) {
+			from.ulc_tu.th.th_sport = cv4from->pyld.tcp4->th_sport;
+			from.ulc_tu.th.th_dport = cv4from->pyld.tcp4->th_dport;
+		}
 		to.ulc_tu.th.th_sport = cv4to->pyld.tcp4->th_sport;
 		to.ulc_tu.th.th_dport = cv4to->pyld.tcp4->th_dport;
-		cksum = natpt_fixCksum(ntohs(cv4from->pyld.tcp4->th_sum),
+		cksum = natpt_fixCksum(cksum4,
 				       (u_char *)&from, sizeof(struct ulc4),
 				       (u_char *)&to,	sizeof(struct ulc4));
 		cv4to->pyld.tcp4->th_sum = htons(cksum);
 		break;
 
 	case IPPROTO_UDP:
-		from.ulc_tu.uh.uh_sport = cv4from->pyld.udp->uh_sport;
-		from.ulc_tu.uh.uh_dport = cv4from->pyld.udp->uh_dport;
+		if (!cv4from->aux || !cv4from->aux->ulc4) {
+			from.ulc_tu.uh.uh_sport = cv4from->pyld.udp->uh_sport;
+			from.ulc_tu.uh.uh_dport = cv4from->pyld.udp->uh_dport;
+		}
 		to.ulc_tu.uh.uh_sport = cv4to->pyld.udp->uh_sport;
 		to.ulc_tu.uh.uh_dport = cv4to->pyld.udp->uh_dport;
-		cksum = natpt_fixCksum(ntohs(cv4from->pyld.udp->uh_sum),
+		cksum = natpt_fixCksum(cksum4,
 				       (u_char *)&from, sizeof(struct ulc4),
 				       (u_char *)&to,	sizeof(struct ulc4));
 		cv4to->pyld.udp->uh_sum = htons(cksum);
