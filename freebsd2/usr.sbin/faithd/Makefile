@@ -3,9 +3,8 @@ SRCS=	faithd.c tcp.c ftp.c prefix.c
 
 MAN8=	faithd.8
 
-#CFLAGS+= -DFAITH4
-
 LDADD+=	-lutil
+DPADD+=	${LIBUTIL}
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 \
 	-L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
