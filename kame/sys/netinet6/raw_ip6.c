@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.50 2000/12/06 04:05:54 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.51 2000/12/12 05:12:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,6 +80,7 @@
 #include <sys/proc.h>
 #endif
 
+#include <net/net_osdep.h>
 #include <net/if.h>
 #include <net/route.h>
 #include <net/if_types.h>
@@ -90,7 +91,7 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet/icmp6.h>
-#ifdef __OpenBSD__
+#ifdef HAVE_NRL_INPCB
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/in_pcb.h>
@@ -118,32 +119,9 @@
 #include <net/if_faith.h>
 #endif
 
-#include <net/net_osdep.h>
-
-#ifdef HAVE_NRL_INPCB
-struct	inpcbtable rawin6pcbtable;
-#else
-struct	in6pcb rawin6pcb;
-#endif
-#define ifatoia6(ifa)	((struct in6_ifaddr *)(ifa))
-
 /*
  * Raw interface to IP6 protocol.
  */
-
-/*
- * Initialize raw connection block queue.
- */
-void
-rip6_init()
-{
-#ifdef HAVE_NRL_INPCB
-	in_pcbinit(&rawin6pcbtable, 1);
-#else
-	rawin6pcb.in6p_next = rawin6pcb.in6p_prev = &rawin6pcb;
-#endif
-}
-
 #ifdef HAVE_NRL_INPCB
 /* inpcb members */
 #define in6pcb		inpcb
@@ -157,12 +135,36 @@ rip6_init()
 #define in6p_outputopts	inp_outputopts6
 #define in6p_ip6	inp_ipv6
 #define in6p_flowinfo	inp_flowinfo
+#define in6p_sp		inp_sp
+#define in6p_next	inp_next
+#define in6p_prev	inp_prev
 /* macro names */
 #define sotoin6pcb	sotoinpcb
 /* function names */
 #define in6_pcbdetach	in_pcbdetach
 #define in6_rtchange	in_rtchange
 #endif
+
+#ifdef __OpenBSD__
+struct	inpcbtable rawin6pcbtable;
+#else
+struct	in6pcb rawin6pcb;
+#endif
+#define ifatoia6(ifa)	((struct in6_ifaddr *)(ifa))
+
+/*
+ * Initialize raw connection block queue.
+ */
+void
+rip6_init()
+{
+#ifdef __OpenBSD__
+	in_pcbinit(&rawin6pcbtable, 1);
+#else
+	rawin6pcb.in6p_next = rawin6pcb.in6p_prev = &rawin6pcb;
+#endif
+}
+
 /*
  * Setup generic address and protocol structures
  * for raw_input routine, then pass them along with
@@ -206,7 +208,7 @@ rip6_input(mp, offp, proto)
 		    IPPROTO_DONE);
 		/* m might change if M_LOOP.  So, call mtod again */
 		ip6 = mtod(m, struct ip6_hdr *);
-		icmp6 = (struct icmp6_hdr *)((caddr_t)ip6 + off);
+		icmp6 = (struct icmp6_hdr *)((caddr_t)ip6 + *offp);
 #else
 		IP6_EXTHDR_GET(icmp6, struct icmp6_hdr *, m, *offp,
 		    sizeof(*icmp6));
@@ -228,7 +230,7 @@ rip6_input(mp, offp, proto)
 	/* KAME hack: recover scopeid */
 	(void)in6_recoverscope(&rip6src, &ip6->ip6_src, m->m_pkthdr.rcvif);
 
-#ifdef HAVE_NRL_INPCB
+#ifdef __OpenBSD__
 	for (in6p = rawin6pcbtable.inpt_queue.cqh_first;
 	     in6p != (struct inpcb *)&rawin6pcbtable.inpt_queue;
 	     in6p = in6p->inp_queue.cqe_next)
@@ -352,7 +354,7 @@ rip6_ctlinput(cmd, sa, d)
 		sa6_src = &sa6_any;
 	}
 
-#ifdef HAVE_NRL_INPCB
+#ifdef __OpenBSD__
 	(void) in6_pcbnotify(&rawin6pcbtable, sa, 0, (struct sockaddr *)sa6_src,
 	    0, cmd, cmdarg, notify);
 #else
@@ -615,7 +617,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 	if (req == PRU_CONTROL)
 		return (in6_control(so, (u_long)m, (caddr_t)nam,
 				    (struct ifnet *)control
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(HAVE_NRL_INPCB)
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 				    , p
 #endif
 				    ));
@@ -646,7 +648,11 @@ rip6_usrreq(so, req, m, nam, control, p)
 			break;
 		}
 #ifdef HAVE_NRL_INPCB
+#ifdef __OpenBSD__
 		if ((error = in_pcballoc(so, &rawin6pcbtable)) != 0)
+#else  /* bsdi, actually. */
+		if ((error = in_pcballoc(so, &rawin6pcb)) != 0)
+#endif
 #else
 		if ((error = in6_pcballoc(so, &rawin6pcb)) != 0)
 #endif

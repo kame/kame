@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.174 2000/12/12 04:31:07 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.175 2000/12/12 05:12:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2899,7 +2899,6 @@ fail:
 		m_freem(m0);
 }
 
-#if !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #ifdef HAVE_NRL_INPCB
 #define sotoin6pcb	sotoinpcb
 #define in6pcb		inpcb
@@ -3035,7 +3034,6 @@ icmp6_ctloutput(op, so, level, optname, mp)
 #undef in6pcb
 #undef in6p_icmp6filt
 #endif
-#endif /*!bsdi4*/
 
 #if !defined(HAVE_RATECHECK) || !defined(HAVE_PPSRATECHECK)
 #ifndef timersub
