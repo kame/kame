@@ -20,8 +20,8 @@ DPADD+=	${.OBJDIR}/../../../lib/libipsec/libipsec.a \
 	/usr/local/v6/lib/libipsec.a
 DPADD+=	-L${.OBJDIR}/../../../lib/libinet6/libinet6.a \
 	-L/usr/local/v6/lib/libinet6.a
-LDADD+= -L/usr/lib -lcrypto
-DPADD+= /usr/lib/libcrypto.a
+LDADD+= -lcrypto
+DPADD+= ${LIBCRYPTO}
 # for USA resident
 .if exists(/usr/local/lib/libRSAglue.a) && exists(/usr/local/lib/librsaref.a)
 LDADD+=	-L/usr/local/lib -lRSAglue -lrsaref
