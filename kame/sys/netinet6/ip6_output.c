@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.203 2001/07/26 06:53:17 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.204 2001/07/26 08:36:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -863,6 +863,7 @@ skip_ipsec2:;
 	} else {
 		/* Multicast */
 		struct	in6_multi *in6m;
+		u_int32_t zoneid;
 
 		m->m_flags = (m->m_flags & ~M_BCAST) | M_MCAST;
 
@@ -926,9 +927,9 @@ skip_ipsec2:;
 		/*
 		 * The outgoing interface must be in the scope zone of the
 		 * destination.
+		 * dst->sin6_scope_id might be 0 in !SCOPEDROUTING cases.
 		 */
-#ifndef SCOPEDROUTING
-		if (dst->sin6_scope_id == 0) { /* XXX: should've been filled */
+		if ((zoneid = dst->sin6_scope_id) == 0) {
 			struct sockaddr_in6 dst0 = *dst;
 
 			error = in6_recoverscope(&dst0, &dst->sin6_addr, ifp);
@@ -937,11 +938,9 @@ skip_ipsec2:;
 				in6_ifstat_inc(ifp, ifs6_out_discard);
 				goto bad;
 			}
-			dst->sin6_scope_id = dst0.sin6_scope_id;
+			zoneid = dst0.sin6_scope_id;
 		}
-#endif
-		if (in6_addr2scopeid(ifp, &dst->sin6_addr) !=
-		    dst->sin6_scope_id) {
+		if (in6_addr2scopeid(ifp, &dst->sin6_addr) != zoneid) {
 			/* on which interface should we count the error? */
 			ip6stat.ip6s_badscope++;
 			in6_ifstat_inc(ifp, ifs6_out_discard);
