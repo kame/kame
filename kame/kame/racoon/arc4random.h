@@ -1,4 +1,4 @@
-/*	$KAME: random.h,v 1.2 2002/06/04 05:20:27 itojun Exp $	*/
+/*	$KAME: arc4random.h,v 1.1 2002/06/04 05:23:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
