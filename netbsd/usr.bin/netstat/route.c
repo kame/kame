@@ -884,7 +884,7 @@ char *
 routename6(sa6)
 	struct sockaddr_in6 *sa6;
 {
-	static char line[MAXHOSTNAMELEN + 1];
+	static char line[NI_MAXHOST];
 #ifdef KAME_SCOPEID
 	int flag = NI_WITHSCOPEID;
 #else
