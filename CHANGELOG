@@ -1,12 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1396 2000/11/23 16:46:18 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1397 2000/11/24 06:15:29 itojun Exp $
+
+<200011>
+Fri Nov 24 15:14:37 JST 2000  itojun@iijlab.net
+	* libinet6: compile strl{cpy,cat} for better code sharing.
+	  (freebsd2/netbsd142/bsdi3/bsdi4)
 
 Fri Nov 24 01:43:21 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/freebsd4/usr.sbin/syslogd: IPv6 enabled syslogd from
 	  masahito_endo@ydc.co.jp. '-a' option does not work now.
 
-<200011>
 2000-11-21  Koji Kawano <K.Kawano@rdmg.mgcs.mei.co.jp>
 	* kame/freebsd4: we now start to support 4.2-RELEASE.
 

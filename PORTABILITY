@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$KAME: PORTABILITY,v 1.56 2000/11/22 08:10:06 itojun Exp $
+	$KAME: PORTABILITY,v 1.57 2000/11/24 06:15:30 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -348,6 +348,7 @@ across those possibilities.
 - strlcpy/strlcat.
 	comes with strlcpy/cat: netbsd15 openbsd freebsd3[3-5] freebsd4
 	does not come with them: freebsd2 freebsd3[0-2] bsdi[34] netbsd142
+		(libinet6 includes it to ease code sharing)
 
   strlcpy and strlcat -- consistent, safe, string copy and concatenation.
   Usenix 1999, by Todd C. Miller, Theo de Raadt.
