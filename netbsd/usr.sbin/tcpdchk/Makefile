@@ -3,8 +3,14 @@
 PROG=	tcpdchk
 SRCS=	tcpdchk.c fakelog.c inetcf.c scaffold.c percent_m.c
 MAN=	tcpdchk.8
-LDADD=	-lwrap
-DPADD=	${LIBWRAP}
+LDADD+=	-L${.CURDIR}/../../lib/libwrap \
+	-L${.CURDIR}/../../lib/libwrap/obj \
+	-L/usr/local/v6/lib
+LDADD+=	-lwrap
+DPADD+=	${.CURDIR}/../../lib/libwrap/libwrap.a \
+	${.CURDIR}/../../lib/libwrap/obj/libwrap.a \
+	/usr/local/v6/lib/libwrap.a
+#DPADD=	${LIBWRAP}
 
 CPPFLAGS+= -I${.CURDIR}/../../lib/libwrap
 

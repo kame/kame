@@ -39,6 +39,9 @@ __RCSID("$NetBSD: tcpdchk.c,v 1.5 1999/01/18 18:01:26 christos Exp $");
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#ifdef INET6
+#include <sys/socket.h>
+#endif
 
 #ifndef INADDR_NONE
 #define INADDR_NONE     (-1)		/* XXX should be 0xffffffff */
@@ -340,10 +343,20 @@ char   *list;
     char   *cp;
     char   *host;
     int     clients = 0;
+#ifdef INET6
+    int l;
+#endif
 
     strcpy(buf, list);
 
     for (cp = strtok(buf, sep); cp != 0; cp = strtok((char *) 0, sep)) {
+#ifdef INET6
+	l = strlen(cp);
+	if (cp[0] == '[' && cp[l - 1] == ']') {
+	    cp[l - 1] = '\0';
+	    cp++;
+	}
+#endif
 	if (STR_EQ(cp, "EXCEPT")) {
 	    clients = 0;
 	} else {
@@ -440,8 +453,22 @@ char   *pat;
 #endif
 #endif
     } else if ((mask = split_at(pat, '/')) != NULL) {	/* network/netmask */
-	if (dot_quad_addr(pat) == INADDR_NONE
-	    || dot_quad_addr(mask) == INADDR_NONE)
+#ifdef INET6
+	struct in6_addr in6;
+#endif
+	if (dot_quad_addr(pat) != INADDR_NONE
+	    || dot_quad_addr(mask) != INADDR_NONE)
+	    ; /*okay*/
+#ifdef INET6
+	else if (inet_pton(AF_INET6, pat, &in6) == 1
+	      && inet_pton(AF_INET6, mask, &in6) == 1)
+	    ; /*okay*/
+	else if (inet_pton(AF_INET6, pat, &in6) == 1
+	      && strchr(mask, ':') == NULL
+	      && 0 <= atoi(mask) && atoi(mask) <= 128)
+	    ; /*okay*/
+#endif
+	else
 	    tcpd_warn("%s/%s: bad net/mask pattern", pat, mask);
     } else if (STR_EQ(pat, "FAIL")) {		/* obsolete */
 	tcpd_warn("FAIL is no longer recognized");

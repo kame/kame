@@ -70,6 +70,7 @@ struct hostent *hp;
 	exit(1);
     }
     memset((char *) &hb->host, 0, sizeof(hb->host));
+    hb->host.h_addrtype = hp->h_addrtype;
     hb->host.h_length = hp->h_length;
     hb->host.h_addr_list = hb->addr_list;
     hb->host.h_addr_list[count] = 0;
@@ -91,6 +92,9 @@ char   *host;
     struct hostent *hp;
     static struct hostent h;
     static char *addr_list[2];
+#ifdef INET6
+    static struct in6_addr in6;
+#endif
 
     /*
      * Host address: translate it to internal form.
@@ -99,8 +103,18 @@ char   *host;
 	h.h_addr_list = addr_list;
 	h.h_addr_list[0] = (char *) &addr;
 	h.h_length = sizeof(addr);
+	h.h_addrtype = AF_INET;
 	return (dup_hostent(&h));
     }
+#ifdef INET6
+    if (inet_pton(AF_INET6, host, &in6) == 1) {
+	h.h_addr_list = addr_list;
+	h.h_addr_list[0] = (char *) &in6;
+	h.h_length = sizeof(in6);
+	h.h_addrtype = AF_INET6;
+	return (dup_hostent(&h));
+    }
+#endif
 
     /*
      * Map host name to a series of addresses. Watch out for non-internet
@@ -108,10 +122,22 @@ char   *host;
      * been "enhanced" to accept numeric addresses. Make a copy of the
      * address list so that later gethostbyXXX() calls will not clobber it.
      */
-    if (NOT_INADDR(host) == 0) {
+#ifdef INET6
+    if (NOT_INADDR(host) == 0 && inet_pton(AF_INET6, host, &in6) == 1)
+#else
+    if (NOT_INADDR(host) == 0)
+#endif
+    {
 	tcpd_warn("%s: not an internet address", host);
 	return (0);
     }
+#ifdef INET6
+    if ((hp = gethostbyname2(host, AF_INET)) == 0
+     && (hp = gethostbyname2(host, AF_INET6)) == 0) {
+	tcpd_warn("%s: host not found", host);
+	return (0);
+    }
+#else
     if ((hp = gethostbyname(host)) == 0) {
 	tcpd_warn("%s: host not found", host);
 	return (0);
@@ -120,6 +146,7 @@ char   *host;
 	tcpd_warn("%d: not an internet host", hp->h_addrtype);
 	return (0);
     }
+#endif
     if (STR_NE(host, hp->h_name)) {
 	tcpd_warn("%s: hostname alias", host);
 	tcpd_warn("(official name: %s)", hp->h_name);
@@ -133,20 +160,36 @@ int     check_dns(host)
 char   *host;
 {
     struct request_info request;
-    struct sockaddr_in sin;
+    struct sockaddr_storage sin;
     struct hostent *hp;
     int     count;
     char   *addr;
+    char *ap;
+    int alen;
 
     if ((hp = find_inet_addr(host)) == 0)
 	return (0);
     request_init(&request, RQ_CLIENT_SIN, &sin, 0);
     sock_methods(&request);
     memset((char *) &sin, 0, sizeof(sin));
-    sin.sin_family = AF_INET;
+    sin.ss_family = hp->h_addrtype;
+    switch (hp->h_addrtype) {
+    case AF_INET:
+	ap = (char *)&((struct sockaddr_in *)&sin)->sin_addr;
+	alen = sizeof(struct in6_addr);
+	break;
+#ifdef INET6
+    case AF_INET6:
+	ap = (char *)&((struct sockaddr_in6 *)&sin)->sin6_addr;
+	alen = sizeof(struct in6_addr);
+	break;
+#endif
+    default:
+	return (0);
+    }
 
     for (count = 0; (addr = hp->h_addr_list[count]) != 0; count++) {
-	memcpy((char *) &sin.sin_addr, addr, sizeof(sin.sin_addr));
+	memcpy(ap, addr, alen);
 
 	/*
 	 * Force host name and address conversions. Use the request structure
