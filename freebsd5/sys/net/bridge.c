@@ -809,7 +809,6 @@ bdg_forward(struct mbuf *m0, struct ifnet *dst)
     struct ether_header *eh;
     struct ifnet *src;
     struct ifnet *ifp, *last;
-    int s;
     int shared = bdg_copy ; /* someone else is using the mbuf */
     int once = 0;      /* loop only once */
     struct ifnet *real_dst = dst ; /* real dst from ether_output */
@@ -1031,8 +1030,6 @@ forward:
     for (;;) {
 	if (last) { /* need to forward packet leftover from previous loop */
 	    struct mbuf *m ;
-	    short mflags;
-	    int len;
 #ifdef ALTQ
 	    struct altq_pktattr pktattr;
 	    int af;
@@ -1091,7 +1088,7 @@ forward:
 	 */
 	if ( BDG_USED(ifp) && !BDG_MUTED(ifp) &&
 #ifndef ALTQ
-	     !IF_QFULL(&ifp->if_snd)  &&
+	     !_IF_QFULL(&ifp->if_snd)  &&
 #endif
 	     (ifp->if_flags & (IFF_UP|IFF_RUNNING)) == (IFF_UP|IFF_RUNNING) &&
 	     ifp != src && BDG_SAMECLUSTER(ifp, real_dst) )
