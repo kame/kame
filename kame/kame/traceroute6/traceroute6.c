@@ -332,7 +332,6 @@ int rcvhlim;
 struct in6_pktinfo *rcvpktinfo;
 
 struct sockaddr_in6 Src, Dst, Rcv;
-struct sockaddr_in6 *src = &Src, *rcv = &Rcv;
 int datalen;			/* How much data */
 /* XXX: 2064 = 127(max hops in type 0 rthdr) * sizeof(ip6_hdr) + 16(margin) */
 char rtbuf[2064];
@@ -529,8 +528,8 @@ main(argc, argv)
 	/* initialize msghdr for receiving packets */
 	rcviov[0].iov_base = (caddr_t)packet;
 	rcviov[0].iov_len = sizeof(packet);
-	rcvmhdr.msg_name = (caddr_t)rcv;
-	rcvmhdr.msg_namelen = sizeof(*rcv);
+	rcvmhdr.msg_name = (caddr_t)&Rcv;
+	rcvmhdr.msg_namelen = sizeof(Rcv);
 	rcvmhdr.msg_iov = rcviov;
 	rcvmhdr.msg_iovlen = 1;
 	rcvcmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo))
@@ -680,39 +679,73 @@ main(argc, argv)
 	/*
 	 * Source selection
 	 */
-	bzero((char *)src, sizeof(Src));
+	bzero(&Src, sizeof(Src));
 	if (source) {
-		if (inet_pton(AF_INET6, source, &Src.sin6_addr) != 1) {
-			Printf("traceroute6: unknown host %s\n", source);
+		struct addrinfo hints, *res;
+		int error;
+
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = AF_INET6;
+		hints.ai_socktype = SOCK_DGRAM;	/*dummy*/
+		hints.ai_flags = AI_NUMERICHOST;
+		error = getaddrinfo(source, "0", &hints, &res);
+		if (error) {
+			Printf("traceroute6: %s: %s\n", source,
+			    gai_strerror(error));
 			exit(1);
 		}
+		if (res->ai_addrlen > sizeof(Src)) {
+			Printf("traceroute6: %s: %s\n", source,
+			    gai_strerror(error));
+			exit(1);
+		}
+		memcpy(&Src, res->ai_addr, res->ai_addrlen);
+		freeaddrinfo(res);
 	} else {
 		struct sockaddr_in6 Nxt;
 		int dummy, len;
 
-		len = sizeof(Src);
 		Nxt = Dst;
 		Nxt.sin6_port = htons(DUMMY_PORT);
 		if (cmsg != NULL)
 			bcopy(inet6_rthdr_getaddr(cmsg, 1), &Nxt.sin6_addr,
 			      sizeof(Nxt.sin6_addr));
 		if ((dummy = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
-			perror("socket") ;
+			perror("socket");
+			exit(1);
 		}
-		if(-1 == connect(dummy, (struct sockaddr *)&Nxt, sizeof(Nxt)))
+		if (connect(dummy, (struct sockaddr *)&Nxt, Nxt.sin6_len) < 0) {
 			perror("connect");
-		if(-1 == getsockname(dummy, (struct sockaddr *)src, &len)) {
-			perror("getsockname");
-			printf("%d\n", errno);
+			exit(1);
 		}
-		close(dummy) ;
+		len = sizeof(Src);
+		if (getsockname(dummy, (struct sockaddr *)&Src, &len) < 0) {
+			perror("getsockname");
+			exit(1);
+		}
+		close(dummy);
 	}
+
+#if 1
 	ident = (getpid() & 0xffff) | 0x8000;
-	Src.sin6_family = AF_INET6;
+#else
+	ident = 0;	/*let the kernel pick one*/
+#endif
 	Src.sin6_port = htons(ident);
-	if (bind(sndsock, (struct sockaddr *)src, sizeof(Src))  < 0){
+	if (bind(sndsock, (struct sockaddr *)&Src, Src.sin6_len) < 0) {
 		perror("bind");
 		exit(1);
+	}
+
+	if (ident == 0) {
+		int len;
+
+		len = sizeof(Src);
+		if (getsockname(sndsock, (struct sockaddr *)&Src, &i) < 0) {
+			perror("getsockname");
+			exit(1);
+		}
+		ident = ntohs(Src.sin6_port);
 	}
 
 	/*
