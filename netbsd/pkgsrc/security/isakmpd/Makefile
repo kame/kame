@@ -13,6 +13,7 @@ PATCH_DIST_STRIP=	-p1
 MAINTAINER=		itojun@kame.net
 
 DEPENDS+=		openssl-0.9.4:../../security/openssl
+DEPENDS+=		gmp-2.0.2:../../devel/gmp
 
 RESTRICTED=		"Crypto; export-controlled"
 MIRROR_DISTFILE=	no
