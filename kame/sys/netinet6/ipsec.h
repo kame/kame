@@ -299,15 +299,16 @@ extern int ipsec4_in_reject_so __P((struct mbuf *, struct socket *));
 extern int ipsec4_in_reject __P((struct mbuf *, struct inpcb *));
 
 #ifdef INET6
-extern int ipsec6_delete_pcbpolicy __P((struct in6pcb *));
 extern int ipsec6_in_reject_so __P((struct mbuf *, struct socket *));
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
+extern int ipsec6_delete_pcbpolicy __P((struct inpcb *));
 extern int ipsec6_set_policy __P((struct inpcb *inp, int optname,
 	caddr_t request, int priv));
 extern int ipsec6_get_policy
 	__P((struct inpcb *inp, caddr_t request, struct mbuf **mp));
 extern int ipsec6_in_reject __P((struct mbuf *, struct inpcb *));
 #else
+extern int ipsec6_delete_pcbpolicy __P((struct in6pcb *));
 extern int ipsec6_set_policy __P((struct in6pcb *in6p, int optname,
 	caddr_t request, int priv));
 extern int ipsec6_get_policy
