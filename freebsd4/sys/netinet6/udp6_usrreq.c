@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.5 2000/04/04 11:18:11 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.6 2000/04/10 06:13:15 kjc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -527,9 +527,9 @@ udp6_output(in6p, m, addr6, control, p)
 	int flags;
 
 	if (control) {
-		if (error = ip6_setpktoptions(control, &opt,
-					      p &&
-					      suser(p), 0))
+		if ((error = ip6_setpktoptions(control, &opt,
+					       p &&
+					       suser(p), 0)) != 0)
 			goto release;
 		in6p->in6p_outputopts = &opt;
 	}
@@ -602,7 +602,7 @@ udp6_output(in6p, m, addr6, control, p)
 	}
 
 	flags = 0;
-	if (inp->inp_flags & IN6P_MINMTU)
+	if (in6p->in6p_flags & IN6P_MINMTU)
 		flags |= IPV6_MINMTU;
 
 	udpstat.udps_opackets++;
