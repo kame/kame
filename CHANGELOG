@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2029 2001/12/27 02:46:26 keiichi Exp $
+$KAME: CHANGELOG,v 1.2030 2001/12/27 08:10:32 itojun Exp $
 
 <200112>
+Thu Dec 27 17:09:51 JST 2001  itojun@iijlab.net
+	* dhcp6: use draft 22 Inform/Reply exchange as suggested in
+	  draft-droms-dnsconfig-dhcpv6-00.txt.  no backward compatibility
+	  provided.
+
 Thu Dec 27 11:42:38 JST 2001 keiichi@iij.ad.jp
 	* kame/sys/netinet6/mip6*
 	- implemented authdata sub-optoin.  this implementation uses
