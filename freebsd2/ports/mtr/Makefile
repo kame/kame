@@ -6,14 +6,19 @@
 # $FreeBSD$
 #
 
-DISTNAME=	mtr-0.39
+DISTNAME=	mtr-0.41
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.bitwizard.nl/mtr/ \
 		http://www.giovannelli.it/~gmarco/files/
 
-MAINTAINER=	billf@FreeBSD.org
+PATCHFILES=	mtr-041-v6-19990903a.diff.gz
+PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
+PATCH_DIST_STRIP=	-p1
 
-HAS_CONFIGURE=	yes
+MAINTAINER=	itojun@kame.net
+
+GNU_CONFIGURE=	yes
+CONFIGURE_ARGS=	--enable-ipv6
 
 MAN8=	mtr.8
 

@@ -1,0 +1,23 @@
+$NetBSD$
+
+--- configure-	Fri Sep  3 00:38:23 1999
++++ configure	Fri Sep  3 00:38:41 1999
+@@ -726,13 +726,13 @@
+ # Run test in a subshell; some versions of sh will print an error if
+ # an executable is not found, even if stderr is redirected.
+ # Redirect stdin to placate older versions of autoconf.  Sigh.
+-if (aclocal --version) < /dev/null > /dev/null 2>&1; then
+-   ACLOCAL=aclocal
+-   echo "$ac_t""found" 1>&6
+-else
++#if (aclocal --version) < /dev/null > /dev/null 2>&1; then
++#   ACLOCAL=aclocal
++#   echo "$ac_t""found" 1>&6
++#else
+    ACLOCAL="$missing_dir/missing aclocal"
+    echo "$ac_t""missing" 1>&6
+-fi
++#fi
+ 
+ echo $ac_n "checking for working autoconf""... $ac_c" 1>&6
+ echo "configure:739: checking for working autoconf" >&5
