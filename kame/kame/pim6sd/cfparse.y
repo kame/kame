@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.25 2002/12/15 04:23:23 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.26 2002/12/15 06:18:18 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -92,7 +92,7 @@ static int strict;		/* flag if the grammer check is strict */
 static struct attr_list *rp_attr, *bsr_attr, *grp_prefix, *regthres_attr,
 	*datathres_attr;
 static int srcmetric, srcpref, helloperiod, jpperiod, granularity,
-	datatimo, regsuptimo, probetime, asserttimo, default_vif_status;
+	datatimo, regsuptimo, probetime, asserttimo;
 static double helloperiod_coef, jpperiod_coef;
 
 static int debugonly;
