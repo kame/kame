@@ -1,9 +1,9 @@
 # New ports collection makefile for:    irc
-# Version required:     1.0
+# Version required:     2.10.2p1
 # Date created:         26 Jul 1999
 # Whom:                 sumikawa
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:09:53 itojun Exp $
+# $Id: Makefile,v 1.2 1999/12/07 12:43:57 sumikawa Exp $
 #
 
 DISTNAME=	irc2.10.2p1
