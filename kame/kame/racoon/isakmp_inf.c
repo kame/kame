@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.74 2001/11/06 02:02:58 sakane Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.75 2001/11/16 03:25:46 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -768,8 +768,7 @@ isakmp_info_recv_n(iph1, msg)
 			/* delete ph1 */
 			plog(LLV_ERROR, LOCATION, iph1->remote,
 				"delete phase1 handle.\n");
-			remph1(iph1);
-			delph1(iph1);
+			return -1;
 		} else {
 			iph2 = getph2bymsgid(iph1, msgid);
 			if (iph2 == NULL) {
@@ -788,9 +787,10 @@ isakmp_info_recv_n(iph1, msg)
 	}
 
 	/* get spi and allocate */
-	if (ntohs(n->h.len) != sizeof(*n) + n->spi_size) {
+	if (ntohs(n->h.len) < sizeof(*n) + n->spi_size) {
 		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"invalid spi_size in notification payload.\n");
+		return -1;
 	}
 	spi = val2str((u_char *)(n + 1), n->spi_size);
 
