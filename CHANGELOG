@@ -1,8 +1,20 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.711 2000/03/22 06:53:40 itojun Exp $
+$Id: CHANGELOG,v 1.712 2000/03/22 07:18:45 sakane Exp $
 
 <200003>
+Wed Mar 22 16:12:02 JST 2000 sakane@ydc.co.jp
+	* kame/sys/netkey/key.c:
+	- improve key_spdget() to get a policy by policy id.
+	- add key_spddelete2() to delete policy by policy id.
+	* kame/sys/net/pfkeyv2.h:
+	- add a new member, sadb_x_policy_id, into sadb_x_policy structure.
+	- add a new message type, SADB_X_SPDDELETE2 in order to distinguish
+	  key_spddelete().
+	* kame/kame/libipsec:
+	- simplify pfkey_send_spdget(). no require src/dst addresses.
+	- add pfkey_send_spddelete2() to delete policy by policy id.
+
 Wed Mar 22 15:52:48 JST 2000  itojun@iijlab.net
 	* netbsd/sys: synchronize with NetBSD 1.4.2.  userland still needs
 	  some work.
