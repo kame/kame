@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.23 2001/09/11 06:57:38 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.24 2001/09/11 07:20:42 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -81,8 +81,10 @@ natpt_lookForRule6(struct pcv *cv6)
 {
 	const char	*fn = __FUNCTION__;
 
+	int		 s;
 	struct cSlot	*acs;
 
+	s = splnet();
 	for (acs = TAILQ_FIRST(&csl_head);
 	     acs;
 	     acs = TAILQ_NEXT(acs, csl_list)) {
@@ -108,6 +110,7 @@ natpt_lookForRule6(struct pcv *cv6)
 			return (acs);
 		}
 	}
+	splx(s);
 	
 	return (NULL);
 }
@@ -118,8 +121,10 @@ natpt_lookForRule4(struct pcv *cv4)
 {
 	const char	*fn = __FUNCTION__;
 
+	int		 s;
 	struct cSlot	*csl;
 
+	s = splnet();
 	for (csl = TAILQ_FIRST(&csl_head);
 	     csl;
 	     csl = TAILQ_NEXT(csl, csl_list)) {
@@ -145,6 +150,7 @@ natpt_lookForRule4(struct pcv *cv4)
 			return (csl);
 		}
 	}
+	splx(s);
 	
 	return (NULL);
 }
@@ -324,10 +330,12 @@ natpt_setRules(caddr_t addr)
 int
 natpt_flushRules(caddr_t addr)
 {
+	int			 s;
 	struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
 
 	struct cSlot		*csl, *csln;
 
+	s = splnet();
 	csl = TAILQ_FIRST(&csl_head);
 	while (csl) {
 		csln = TAILQ_NEXT(csl, csl_list);
@@ -337,6 +345,7 @@ natpt_flushRules(caddr_t addr)
 		}
 		csl = csln;
 	}
+	splx(s);
 
 	return (0);
 }
