@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.66 2001/02/26 06:33:14 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.67 2001/02/26 07:07:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -276,6 +276,7 @@ rip6_input(mp, offp, proto)
 	if (last && ipsec6_in_reject(m, last)) {
 		m_freem(m);
 		ipsec6stat.in_polvio++;
+		ip6stat.ip6s_delivered--;
 		/* do not inject data into pcb */
 	} else
 #endif /*IPSEC*/
