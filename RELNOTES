@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/04/25 02:41:17 $
+		     $Date: 2000/04/25 06:15:18 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -71,11 +71,5 @@ Many of old ones have been solved.
   you want IPv6-ready tcpdump/libpcap, download them from tcpdump.org.
   We supply ports/pkgsrc for easier installation on kame/freebsd[23]
   and kame/netbsd.
-
-- stf interface may not work correctly on freebsd3.
-
-- netbsd usr.sbin/lpr has couple of bugs.  Namely,
-	(1) it does not allow lp=port@host notation,
-	(2) it will SEGV if you put rp=<numeric IPv4/v6 address>.
 
 							<end of RELNOTES>
