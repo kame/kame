@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.34 2002/05/28 05:11:58 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.35 2002/05/29 03:08:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -73,6 +73,7 @@ scope6_ifattach(ifp)
 	struct scope6_id *sid;
 
 	sid = (struct scope6_id *)malloc(sizeof(*sid), M_IFADDR, M_WAITOK);
+	bzero(sid, sizeof(*sid));
 
 	/*
 	 * XXX: IPV6_ADDR_SCOPE_xxx macros are not standard.

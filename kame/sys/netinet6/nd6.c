@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.259 2002/05/29 01:40:44 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.260 2002/05/29 03:08:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -208,6 +208,7 @@ nd6_ifattach(ifp)
 	struct nd_ifinfo *nd;
 
 	nd = (struct nd_ifinfo *)malloc(sizeof(*nd), M_IP6NDP, M_WAITOK);
+	bzero(nd, sizeof(*nd));
 
 	nd->initialized = 1;
 
