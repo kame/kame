@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1366 2000/11/06 16:54:29 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1367 2000/11/07 03:44:53 itojun Exp $
 
 <200011>
+Tue Nov  7 12:44:07 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/mail/postfix: use 20001005 + IPv6 patch.
+
 Tue Nov  7 01:49:35 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/kame/libinet6/resolv/res_init.c: fix memory leak.
 
