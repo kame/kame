@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.419 2000/01/08 15:01:51 sakane Exp $
+$Id: CHANGELOG,v 1.420 2000/01/08 18:03:08 sumikawa Exp $
 
 <200001>
+Sun Jan  9 03:03:39 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/heimdal: upgrade to 0.2l.
+
 Sat Jan  8 23:53:23 JST 2000 sakane@ydc.co.jp
 	* kame/sys/netkey/key.c:
 	  - fix kenrel crash when flushing SAD.
@@ -17,7 +20,7 @@ Sat Jan  8 04:40:33 JST 2000  itojun@iijlab.net
 	  From: deraadt@openbsd.org
 
 Sat Jan  8 03:20:05 JST 2000  itojun@iijlab.net
-	* */sys/netinet/udp_usrreq.c, kame/sys/netinet6/udp6_usrreq.c:
+	* /sys/netinet/udp_usrreq.c, kame/sys/netinet6/udp6_usrreq.c:
 	  drop incoming udp packet with dst port = 0.  it is, or seems to be,
 	  illegal based on RFC768 (99% sure but 1% in doubt).
 	  with traditional 4.4BSD code, udp socket will mistakingly accept
