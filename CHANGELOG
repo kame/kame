@@ -1,8 +1,21 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1518 2001/01/31 01:56:59 jinmei Exp $
+$KAME: CHANGELOG,v 1.1519 2001/01/31 08:43:30 sakane Exp $
 
 <200101>
+Wed Jan 31 17:43:23 JST 2001 sakane@ydc.cojp
+	* racoon:
+	If the file for saving SA information is specified in the configuration
+	file, racoon will save a SA information to the file when negotiation
+	will succeed.  If you launch racoon with -B option and if the file is
+	specified, she will install SAs into the kernel during intializing.
+	racoon cleans the file file when she shutdowns normally.
+	The function is useful when an abnormal system shutdown happened.
+	Because SAs will remain at the peer.  In this case, you can use -B
+	option then SAs will revive.  
+
+	XXX racoon simply adds a SAs to the end of the file specified.
+
 Tue Jan 30 05:03:01 JST 2001  itojun@iijlab.net
 	* route6d: correctd RTA_NETMASK handling (do not look at sa_family).
 	  bug report from IIJ SEIL team.
