@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.69 2002/11/04 06:26:36 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.70 2002/11/04 07:10:40 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1077,8 +1077,7 @@ mld_allocbuf(mh, len, in6m, type)
 	MGET(md, M_DONTWAIT, MT_DATA);
 
 	/* uses cluster in case of MLDv2 */
-	if (md && 
-	    (len > MLD_MINLEN || type == MLDV2_LISTENER_REPORT)) {
+	if (md && (len > MLD_MINLEN || type == MLDV2_LISTENER_REPORT)) {
 		/* XXX: assumes len is less than 2K Byte */
 		MCLGET(md, M_DONTWAIT);
 		if ((md->m_flags & M_EXT) == 0) {
