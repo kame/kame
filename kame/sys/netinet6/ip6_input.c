@@ -326,11 +326,14 @@ ip6_input(m)
 
 	IP6_EXTHDR_CHECK(m, 0, sizeof(struct ip6_hdr), /*nothing*/);
 
-	if (m->m_len < sizeof(struct ip6_hdr) &&
-	    (m = m_pullup(m, sizeof(struct ip6_hdr))) == 0) {
-		ip6stat.ip6s_toosmall++;
-		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_hdrerr);
-		return;
+	if (m->m_len < sizeof(struct ip6_hdr)) {
+		struct ifnet *inifp;
+		inifp = m->m_pkthdr.rcvif;
+		if ((m = m_pullup(m, sizeof(struct ip6_hdr))) == 0) {
+			ip6stat.ip6s_toosmall++;
+			in6_ifstat_inc(inifp, ifs6_in_hdrerr);
+			return;
+		}
 	}
 
 	ip6 = mtod(m, struct ip6_hdr *);
