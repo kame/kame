@@ -1,4 +1,4 @@
-/*	$KAME: if_sec.c,v 1.13 2001/07/27 18:45:13 itojun Exp $	*/
+/*	$KAME: if_sec.c,v 1.14 2001/07/28 03:09:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -230,6 +230,9 @@ sec_establish(psrc, pdst)
 			return NULL;
 		}
 	}
+
+	/* bring the interface up, we are willing to receive traffic */
+	if_up(ifp);
 
 	((struct sec_softc *)ifp)->sc_refcnt++;
 	return ifp;
