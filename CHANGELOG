@@ -1,11 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2677 2004/11/12 11:18:27 suz Exp $
+$KAME: CHANGELOG,v 1.2678 2004/11/12 11:30:13 suz Exp $
 
 <200411>
 2004-11-12  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/sys/netinet6/route6.c (route6_input): conformance fix;
+	  a Type-0 Routing-header is skipped if Segments Left is set to 
+	  zero, regardless of the Hdr-Ext-Len value. (RFC2460 section 4.4)
+
+2004-11-12  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* freebsd5: Upgrade to 5.3-RELEASE
-	ToDo:
-		- test ...
+	ToDo:   - test ...
 		- additional features like ALTQ, MIP6, SSM, ...
 
 2004-11-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
