@@ -37,11 +37,9 @@ AC_ARG_WITH(efence, [  --with-efence=DIR       specify ElectricFence directory],
 AC_MSG_RESULT(${efence_dir})
 if test "$efence_dir" != "no"; then
 	if test "x$efence_dir" = "x"; then
-		AC_CHECK_LIB(efence, EF_Print)
+		RACOON_PATH_LIBS(EF_Print, efence)
 	else
-		AC_CHECK_LIB(efence, EF_Print,
-			[LIBS="$LIBS -L$efence_dir/lib -lefence"],
-			[], [-L$efence_dir/lib])
+		RACOON_PATH_LIBS(EF_Print, efence, $efence_dir)
 	fi
 fi
 
@@ -70,53 +68,27 @@ AC_ARG_WITH(ssleay, [  --with-ssleay=DIR       specify SSLeay directory],
 	[crypto_dir=$withval])
 AC_MSG_RESULT(${crypto_dir-"default"})
 
-AC_CHECK_LIB(crypto, CAST_cfb64_encrypt)
-AC_CHECK_FUNCS(CAST_cfb64_encrypt, [needcrypto=no], [needcrypto=yes])
-if test $needcrypto = "yes"; then
-    AC_MSG_CHECKING(for libcrypto)
-    for dir in $crypto_dir /usr/local/v6 /usr/local/ssl /usr/local /usr/pkg; do
-	ssleay_lib=no
-	ssleay_include=no
-	ssleay_cmd=no
-	if test -d $dir/lib -a -f $dir/lib/libcrypto.a; then
-		ssleay_lib="$dir/lib"
-	fi
-	if test -d $dir/lib -a -f `echo $dir/lib/libcrypto.so* | head -1 | sed -e 's/ .*//'`; then
-		ssleay_lib="$dir/lib"
-		case $host_os in
-		netbsd*) LDFLAGS="$LDFLAGS -Wl,-R$dir/lib" ;;
-		esac
-	fi
-	if test -d $dir/include -a -f $dir/include/md5.h; then
-		ssleay_include="-I$dir/include"
-	else
-		if test -d $dir/include/ssleay -a -f $dir/include/ssleay/md5.h; then
-			ssleay_include="-I$dir/include/ssleay"
-		elif test -d $dir/include/openssl -a -f $dir/include/openssl/md5.h; then
-			ssleay_include="-I$dir/include -I$dir/include/openssl"
-		fi
-	fi
-	for ssleay_xcmd in ssleay openssl; do
-		if test -d $dir/bin -a -x $dir/bin/$ssleay_xcmd; then
-			ssleay_cmd="$dir/bin/$ssleay_xcmd"
-			break;
-		fi
-	done
-	if test "$ssleay_lib" != "no" -a "$ssleay_include" != "no" -a "$ssleay_cmd" != "no"; then
-		LIBS="-L$ssleay_lib $LIBS"
-		CPPFLAGS="$ssleay_include $CPPFLAGS"
-		break;
-	fi
-    done
-else
-	AC_MSG_CHECKING(for libcrypto)
-	ssleay_lib="default libcrypto"
-	ssleay_include=default path
-	if test -d /usr/include/openssl -a -f /usr/include/openssl/des.h; then
-		CPPFLAGS="-I/usr/include/openssl $CPPFLAGS"
-		ssleay_include=/usr/include/openssl
-	fi
+dnl if test "$crypto_dir" != "default"; then
+dnl 	LIBS="-L$crypto_dir/lib $LIBS"
+dnl 	if test -f $crypto_dir/include/md5.h; then
+dnl 		CFLAGS="-I$crypto_dir/include $CFLAGS"
+dnl 	elif test -d $crypto_dir/include/ssleay -a -f $dir/include/ssleay/md5.h; then
+dnl 		CFLAGS="-I$crypto_dir/include/ssleay -I$crypto_dir/include $CFLAGS"
+dnl 	elif test -d $crypto_dir/include/openssl -a -f $dir/include/openssl/md5.h; then
+dnl 		CFLAGS="-I$crypto_dir/include/openssl -I$crypto_dir/include $CFLAGS"
+dnl 	fi
+dnl fi
+
+if test "x$crypto_dir" = "x"; then
+	case $host_os in
+	netbsd*)	crypto_dir="/usr/pkg";;
+	freebsd*)	crypto_dir="/usr/local";;
+	esac
 fi
+RACOON_SEARCH_HEADER(des.h,
+	/usr/include/openssl /usr/include/ssleay ${crypto_dir}/include ${crypto_dir}/include/openssl ${crypto_dir}/include/ssleay)
+RACOON_PATH_LIBS(CAST_cfb64_encrypt, crypto,
+	${crypto_dir}/lib ${crypto_dir}/lib ${crypto_dir}/lib)
 AC_TRY_COMPILE(dnl
 [#include <sys/types.h>
 #include <stdio.h>
@@ -138,7 +110,7 @@ AC_TRY_COMPILE(dnl
 	echo ftp://psych.psy.uq.oz.au/pub/Crypto/SSL/, or visit
 	echo http://www.openssl.org/
 	exit 1])
-AC_MSG_RESULT("$ssleay_lib and $ssleay_include")
+dnl AC_MSG_RESULT("$ssleay_lib and $ssleay_include")
 
 dnl AC_MSG_CHECKING(for libssl)
 AC_CHECK_LIB(ssl, ssl_ok, [dnl
@@ -213,32 +185,10 @@ AC_MSG_RESULT($ipseclibdir)
 dnl this is gross, but we need to invoke either AC_CHECK LIB or AC_CHECK_FUNCS.
 if test "$ipseclib" != "none"; then
 	if test "$ipseclibdir" != "none"; then
-		echo "using lib$ipseclib"
-		dnl don't check items that require get{addr,name}info
-		AC_CHECK_LIB($ipseclib, ipsec_strerror,
-			[LIBS="$LIBS -l$ipseclib"
-			echo "found in default location"], [
-			unset ac_cv_lib_ipsec_ipsec_strerror
-			AC_CHECK_LIB($ipseclib, ipsec_strerror,
-				[LIBS="$LIBS -L$ipseclibdir -l$ipseclib"
-				echo "found in $ipseclibdir"],
-				[echo "Fatal: no ipsec library found."; exit 1],
-				[-L$ipseclibdir])])
+		RACOON_PATH_LIBS(ipsec_strerror, $ipseclib, $ipseclibdir)
 	else
-		if test "$ipsectrylibc" = "yes"; then
-			echo 'using libc'
-			AC_CHECK_FUNCS(ipsec_strerror, [],
-				[echo "Fatal: no ipsec library found."; exit 1])
-		else
-			echo "Fatal: no $ipseclib library found.  "
-			echo "cannot continue.  You need to fetch lib$ipseclib.a "
-			echo "from appropriate ipsec kit and compile beforehand."
-			exit 1
-		fi
+		RACOON_PATH_LIBS(ipsec_strerror, $ipseclib)
 	fi
-else
-	AC_CHECK_FUNCS(ipsec_strerror, [],
-		[echo "Fatal: no ipsec library found."; exit 1])
 fi
 
 AC_MSG_CHECKING([whether to enable ipv6])
