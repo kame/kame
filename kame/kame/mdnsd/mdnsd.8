@@ -1,4 +1,4 @@
-.\"	$KAME: mdnsd.8,v 1.39 2001/06/29 19:39:53 itojun Exp $
+.\"	$KAME: mdnsd.8,v 1.40 2001/06/30 05:57:33 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -303,3 +303,11 @@ sends ICMPv6 node information queries to link-local all node multicast address
 We should be using NI group address
 .Pq Li ff02::2:xxxx:xxxx
 instead, however, it is not useful right now due to deployment issues.
+.Pp
+.Nm
+relays EDNS0 pseudo RR from a original querier,
+while it should decide EDNS0 independently from the querier.
+Imagine cases where the original querier supports EDNS0,
+while multicast/unicast nameservers
+.Pq which are the destination of the relayed packet
+do not.
