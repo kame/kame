@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2284 2002/12/03 15:15:13 jinmei Exp $
+$KAME: CHANGELOG,v 1.2285 2002/12/04 05:42:35 fujisawa Exp $
 
 <200212>
+2002-12-04  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_trans.c: Support FTP connection from v4
+	  client to v6 server with non-passive mode.
+	* kame/sys/netinet6/natpt_{defs,trans,tslot}.[ch]: Support packet
+	  retransmission of when TCP payload was modified in FTP
+	  translation.
+
 2002-12-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/usr.bin/netstat/inet[6].c: replaced inet6print() and
 	inet6name() with a new function "sa_print()" using getnameinfo()
