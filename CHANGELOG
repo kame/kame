@@ -1,11 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2018 2001/12/21 07:58:19 jinmei Exp $
+$KAME: CHANGELOG,v 1.2019 2001/12/21 07:59:33 jinmei Exp $
 
 <200112>
 2001-12-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_raw_ctloutput): added as a new
 	function ip6_raw_ctloutput, which only handles IPV6_CHECKSUM.  The
-	purpose for the separate function is to share the logic by all *BSD.
+	purpose for the separate function is to share the logic by all
+	*BSD.
+	A new validation rule to reject odd offset values was added,
+	according to the latest specification of the advanced API.
 
 2001-12-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_ctloutput): supported a new
