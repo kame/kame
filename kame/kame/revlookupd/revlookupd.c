@@ -1,4 +1,4 @@
-/*	$KAME: revlookupd.c,v 1.1 2002/05/22 10:15:18 itojun Exp $	*/
+/*	$KAME: revlookupd.c,v 1.2 2002/05/22 12:19:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -275,10 +275,12 @@ main(argc, argv)
 		}
 	}
 
+#if 0
 	if (ready4)
 		(void)addserv(MDNS_GROUP4, -1, "mcast");
 	if (ready6)
 		(void)addserv(MDNS_GROUP6, -1, "mcast");
+#endif
 
 	signal(SIGUSR1, sighandler);
 

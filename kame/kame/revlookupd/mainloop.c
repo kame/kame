@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.1 2002/05/22 10:15:17 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.2 2002/05/22 12:19:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1150,6 +1150,8 @@ relay(sd, buf, len, from, fromlen)
 	struct in6_addr in6;
 	struct sockaddr_in6 sin6;
 	char icmp6buf[RECVBUFSIZ];
+	int nodeinfo;
+	int icmplen;
 
 	if (sizeof(*hp) > len)
 		return -1;
@@ -1183,22 +1185,24 @@ relay(sd, buf, len, from, fromlen)
 	if (dflag)
 		dnsdump("relay I", buf, len, from, fromlen);
 
+	if (type == T_PTR && ptr2in6(n, &in6) == 0)
+		nodeinfo = 1;
+	else
+		nodeinfo = 0;
+
+	/* LINTED const cast */
+	free((char *)n);
+
 	/* if the querier's buffer size is bigger than mine, lower it */
 	if (rbuflen > RECVBUFSIZ && edns0) {
 		if (update_edns0(hp, edns0, len - (edns0 - buf),
-		    RECVBUFSIZ) < 0) {
-			/* LINTED const cast */
-			free((char *)n);
+		    RECVBUFSIZ) < 0)
 			return -1;
-		}
 		dprintf("lower EDNS0 to %lu on relay\n", (u_long)RECVBUFSIZ);
 	}
 
-	if (!(hp->qr == 0 && hp->opcode == QUERY)) {
-		/* LINTED const cast */
-		free((char *)n);
+	if (!(hp->qr == 0 && hp->opcode == QUERY))
 		return -1;
-	}
 
 	/* query - relay it */
 	qc = newqcache(from, fromlen, buf, len);
@@ -1207,11 +1211,14 @@ relay(sd, buf, len, from, fromlen)
 	qc->sd = sd;
 	qc->rbuflen = rbuflen;
 
-	if (type == T_PTR && ptr2in6(n, &in6) == 0) {
-		/* LINTED const cast */
-		free((char *)n);
+	ord = hp->rd;
 
-		len = ping6(icmp6buf, sizeof(icmp6buf), qc, &in6, &in6, 0);
+	qc->id = hp->id = next_dnsid();
+
+	sent = 0;
+
+	if (nodeinfo) {
+		icmplen = ping6(icmp6buf, sizeof(icmp6buf), qc, &in6, &in6, 0);
 
 		sd = af2sockdb(PF_INET6, S_ICMP6);
 		if (sd == NULL)
@@ -1227,88 +1234,75 @@ relay(sd, buf, len, from, fromlen)
 
 		/* multicast outgoing interface is already configured */
 		sent = 0;
-		if (sendto(sd->s, icmp6buf, len, 0, (struct sockaddr *)&sin6,
-		    sin6.sin6_len) == len) {
+		if (sendto(sd->s, icmp6buf, icmplen, 0,
+		    (struct sockaddr *)&sin6, sin6.sin6_len) == icmplen) {
 #if 0
 			dprintf("sock %d sent\n", i);
 #endif
 			sent++;
 		}
+	}
 
-		if (sent == 0) {
-			dprintf("no matching socket, not sent\n");
-			delqcache(qc);
-			return -1;
-		} else
-			dprintf("sent to %d sockets\n", sent);
+	if (nodeinfo &&
+	    (IN6_IS_ADDR_LINKLOCAL(&in6) || IN6_IS_ADDR_SITELOCAL(&in6)))
+		goto done;
 
-		return 0;
-	} else {
-		/* LINTED const cast */
-		free((char *)n);
+	for (ns = LIST_FIRST(&nsdb); ns; ns = LIST_NEXT(ns, link)) {
+		if (dflag)
+			printnsdb(ns);
 
-		ord = hp->rd;
-
-		qc->id = hp->id = next_dnsid();
-
-		sent = 0;
-		for (ns = LIST_FIRST(&nsdb); ns; ns = LIST_NEXT(ns, link)) {
-			if (dflag)
-				printnsdb(ns);
-
-			gettimeofday(&tv, 0);
-			if (ns->dormant.tv_sec != -1) {
-				if (tv.tv_sec > ns->dormant.tv_sec) {
-					if (dflag)
-						printf("ns %p dormant\n", ns);
-					continue;
-				} else {
-					/* reset dormant flags */
-					ns->dormant.tv_sec = -1;
-					ns->dormant.tv_usec = -1;
-					ns->nquery = ns->nresponse = 0;
-				}
-			}
-
-			if (0 > edns0len && len > PACKETSZ) {
-				/* no EDNS0 on big message -> use TCP */
-				servtype = S_TCP;
-			} else
-				servtype = S_UDP;
-
-			sd = af2sockdb(ns->addr->sa_family, servtype);
-			if (sd == NULL)
+		gettimeofday(&tv, 0);
+		if (ns->dormant.tv_sec != -1) {
+			if (tv.tv_sec > ns->dormant.tv_sec) {
+				if (dflag)
+					printf("ns %p dormant\n", ns);
 				continue;
-
-			hp->rd = ord;
-
-			if (dflag)
-				dnsdump("relay O", buf, len, ns->addr,
-				    ns->addrlen);
-			if (sd->type == S_TCP) {
-				u_int16_t l16;
-
-				l16 = htons(len & 0xffff);
-				(void)write(sd->s, &l16, sizeof(l16));
-			}
-			if (sendto(sd->s, buf, len, 0, ns->addr,
-			    ns->addrlen) == len) {
-#if 0
-				dprintf("sock %d sent\n", i);
-#endif
-				sent++;
-				gettimeofday(&ns->lasttx, NULL);
-				ns->nquery++;
+			} else {
+				/* reset dormant flags */
+				ns->dormant.tv_sec = -1;
+				ns->dormant.tv_usec = -1;
+				ns->nquery = ns->nresponse = 0;
 			}
 		}
 
-		if (sent == 0) {
-			dprintf("no matching socket, not sent\n");
-			delqcache(qc);
-			return -1;
+		if (0 > edns0len && len > PACKETSZ) {
+			/* no EDNS0 on big message -> use TCP */
+			servtype = S_TCP;
 		} else
-			dprintf("sent to %d sockets\n", sent);
+			servtype = S_UDP;
+
+		sd = af2sockdb(ns->addr->sa_family, servtype);
+		if (sd == NULL)
+			continue;
+
+		hp->rd = ord;
+
+		if (dflag)
+			dnsdump("relay O", buf, len, ns->addr,
+			    ns->addrlen);
+		if (sd->type == S_TCP) {
+			u_int16_t l16;
+
+			l16 = htons(len & 0xffff);
+			(void)write(sd->s, &l16, sizeof(l16));
+		}
+		if (sendto(sd->s, buf, len, 0, ns->addr, ns->addrlen) == len) {
+#if 0
+			dprintf("sock %d sent\n", i);
+#endif
+			sent++;
+			gettimeofday(&ns->lasttx, NULL);
+			ns->nquery++;
+		}
 	}
+
+done:
+	if (sent == 0) {
+		dprintf("no matching socket, not sent\n");
+		delqcache(qc);
+		return -1;
+	} else
+		dprintf("sent to %d sockets\n", sent);
 
 	return 0;
 }
