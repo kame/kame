@@ -1,4 +1,4 @@
-/*	$KAME: altq.h,v 1.7 2002/04/03 05:38:49 kjc Exp $	*/
+/*	$KAME: altq.h,v 1.8 2002/10/24 09:17:52 suz Exp $	*/
 
 /*
  * Copyright (C) 1998-2002
@@ -50,7 +50,8 @@
 #define	ALTQT_CDNR		9	/* traffic conditioner */
 #define	ALTQT_BLUE		10	/* blue */
 #define	ALTQT_PRIQ		11	/* priority queue */
-#define	ALTQT_MAX		12	/* should be max discipline type + 1 */
+#define	ALTQT_JOBS		12	/* JoBS */
+#define	ALTQT_MAX		13	/* should be max discipline type + 1 */
 
 struct	altqreq {
 	char	ifname[IFNAMSIZ];	/* if name, e.g. "en0" */
