@@ -1,4 +1,4 @@
-.\"	$KAME: faithd.8,v 1.29 2001/05/23 10:16:50 itojun Exp $
+.\"	$KAME: faithd.8,v 1.30 2001/05/24 20:47:56 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -334,6 +334,7 @@ for more details.
 Add the following lines into
 .Xr inetd.conf 5 .
 Syntax may vary depending upon your operating system.
+.\" FREEBSD MERGE NOTE: freebsd43 uses "tcp6/faith", not "faith/tcp6"!
 .Bd -literal -offset
 telnet  stream  faith/tcp6  nowait  root  faithd  telnetd
 ftp     stream  faith/tcp6  nowait  root  faithd  ftpd -l
