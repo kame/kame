@@ -163,8 +163,6 @@ dump_bgp_rtable(FILE *fp, struct rt_entry *base)
 	struct optatr *optatr;
 
 	while(rte) {
-		unsigned int ifindex;
-
 		ap = rte->rt_aspath;
 
 		fprintf(fp, "    "); /* indentation */
