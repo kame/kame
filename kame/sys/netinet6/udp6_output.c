@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.69 2003/09/05 23:17:05 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.70 2003/10/31 04:40:20 ono Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -117,7 +117,7 @@
 #include <net/net_osdep.h>
 
 /*
- * UDP protocol inplementation.
+ * UDP protocol implementation.
  * Per RFC 768, August, 1980.
  */
 

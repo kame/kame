@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.116 2003/09/21 09:33:43 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.117 2003/10/31 04:40:21 ono Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -111,7 +111,7 @@
 #endif
 
 /*
- * UDP protocol inplementation.
+ * UDP protocol implementation.
  * Per RFC 768, August, 1980.
  */
 
