@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_core.c,v 1.13 2000/08/26 02:56:33 itojun Exp $	*/
+/*	$KAME: ipcomp_core.c,v 1.14 2000/09/20 21:41:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -119,7 +119,7 @@ deflate_common(m, md, lenp, mode)
 {
 	struct mbuf *mprev;
 	struct mbuf *p;
-	struct mbuf *n, *n0 = NULL, **np;
+	struct mbuf *n = NULL, *n0 = NULL, **np;
 	z_stream zs;
 	int error = 0;
 	int zerror;
@@ -183,6 +183,7 @@ deflate_common(m, md, lenp, mode)
 				offset = zs.total_out;
 				*np = n;
 				np = &n->m_next;
+				n = NULL;
 			}
 
 			/* get a fresh reply buffer */
@@ -263,6 +264,7 @@ deflate_common(m, md, lenp, mode)
 		offset = zs.total_out;
 		*np = n;
 		np = &n->m_next;
+		n = NULL;
 	}
 
 	/* switch the mbuf to the new one */
@@ -275,6 +277,8 @@ deflate_common(m, md, lenp, mode)
 fail:
 	if (m)
 		m_freem(m);
+	if (n)
+		m_freem(n);
 	if (n0)
 		m_freem(n0);
 	return error;
