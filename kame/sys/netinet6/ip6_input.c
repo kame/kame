@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.128 2000/11/08 17:50:11 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.129 2000/11/08 18:38:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -736,7 +736,6 @@ ip6_input(m)
 	    ip6_forward_rt.ro_rt->rt_ifp->if_type == IFT_LOOP) {
 		struct in6_ifaddr *ia6 =
 			(struct in6_ifaddr *)ip6_forward_rt.ro_rt->rt_ifa;
-		struct mbuf *n;
 
 #ifdef MEASURE_PERFORMANCE
 		ctr_end = read_tsc();
