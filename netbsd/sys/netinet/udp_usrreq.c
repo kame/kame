@@ -514,8 +514,8 @@ udp6_sendup(m, off, src, so)
 #endif /*IPSEC*/
 
 	if ((n = m_copy(m, 0, M_COPYALL)) != NULL) {
-		if (in6p && (in6p->in6p_flags & INP_CONTROLOPTS
-			  || so->so_options & SO_TIMESTAMP)) {
+		if (in6p && (in6p->in6p_flags & IN6P_CONTROLOPTS
+			  || in6p->in6p_socket->so_options & SO_TIMESTAMP)) {
 			struct ip6_hdr *ip6 = mtod(n, struct ip6_hdr *);
 			ip6_savecontrol(in6p, &opts, ip6, n);
 		}
