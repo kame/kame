@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.29 2003/08/27 11:53:05 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.30 2003/09/03 03:29:46 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -100,9 +100,6 @@ mip6_prefix_create(prefix, prefixlen, vltime, pltime)
 {
 	struct in6_addr mask;
 	struct mip6_prefix *mpfx;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
-#endif
 
 	MALLOC(mpfx, struct mip6_prefix *, sizeof(struct mip6_prefix),
 	       M_TEMP, M_NOWAIT);
@@ -120,10 +117,6 @@ mip6_prefix_create(prefix, prefixlen, vltime, pltime)
 	mpfx->mpfx_prefix.sin6_addr.s6_addr32[2] &= mask.s6_addr32[2];
 	mpfx->mpfx_prefix.sin6_addr.s6_addr32[3] &= mask.s6_addr32[3];
 	mpfx->mpfx_prefixlen = prefixlen;
-	mpfx->mpfx_vltime = vltime;
-	mpfx->mpfx_vlexpire = time_second + mpfx->mpfx_vltime;
-	mpfx->mpfx_pltime = pltime;
-	mpfx->mpfx_plexpire = time_second + mpfx->mpfx_pltime;
 	/* XXX mpfx->mpfx_haddr; */
 	LIST_INIT(&mpfx->mpfx_ha_list);
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
@@ -135,12 +128,59 @@ mip6_prefix_create(prefix, prefixlen, vltime, pltime)
 #endif
 
 	/* set initial timeout. */
-	mip6_prefix_settimer(mpfx, mpfx->mpfx_pltime * hz);
+	mip6_prefix_update_lifetime(mpfx, vltime, pltime);
 
 	return (mpfx);
 }
 
-int mip6_prefix_haddr_assign(mpfx, sc)
+
+#define MIP6_PREFIX_EXPIRE_TIME(ltime) ((ltime) / 4 * 3) /* XXX */
+void
+mip6_prefix_update_lifetime(mpfx, vltime, pltime)
+	struct mip6_prefix *mpfx;
+	u_int32_t vltime;
+	u_int32_t pltime;
+{
+#ifdef __FreeBSD__
+	struct timeval mono_time;
+#endif
+
+#ifdef __FreeBSD__
+	microtime(&mono_time);
+#endif
+
+	if (mpfx == NULL)
+		panic("mip6_prefix_update_lifetime: mpfx == NULL");
+
+	mip6_prefix_settimer(mpfx, -1);
+
+	mpfx->mpfx_vltime = vltime;
+	mpfx->mpfx_pltime = pltime;
+
+	if (mpfx->mpfx_vltime == ND6_INFINITE_LIFETIME) {
+		mpfx->mpfx_vlexpire = 0;
+	} else {
+		mpfx->mpfx_vlexpire = mono_time.tv_sec + mpfx->mpfx_vltime;
+	}
+	if (mpfx->mpfx_pltime == ND6_INFINITE_LIFETIME) {
+		mpfx->mpfx_plexpire = 0;
+	} else {
+		mpfx->mpfx_plexpire = mono_time.tv_sec + mpfx->mpfx_pltime;
+	}
+
+	if (mpfx->mpfx_pltime != ND6_INFINITE_LIFETIME) {
+		mip6_prefix_settimer(mpfx,
+		    MIP6_PREFIX_EXPIRE_TIME(mpfx->mpfx_pltime) * hz);
+		mpfx->mpfx_state = MIP6_PREFIX_STATE_PREFERRED;
+	} else if (mpfx->mpfx_vltime != ND6_INFINITE_LIFETIME) {
+		mip6_prefix_settimer(mpfx,
+		    MIP6_PREFIX_EXPIRE_TIME(mpfx->mpfx_vltime) * hz);
+		mpfx->mpfx_state = MIP6_PREFIX_STATE_PREFERRED;
+	}
+}
+
+int
+mip6_prefix_haddr_assign(mpfx, sc)
 	struct mip6_prefix *mpfx;
 	struct hif_softc *sc;
 {

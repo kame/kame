@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.80 2003/08/27 11:53:04 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.81 2003/09/03 03:29:46 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1030,17 +1030,9 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 
 			mip6_home_registration(hif); /* XXX */
 		} else {
-			mpfx->mpfx_vltime
-			    = ntohl(ndopt_pi->nd_opt_pi_valid_time);
-			mpfx->mpfx_pltime
-			    = ntohl(ndopt_pi->nd_opt_pi_preferred_time);
-			mpfx->mpfx_vlexpire
-			    = mono_time.tv_sec + mpfx->mpfx_vltime;
-			mpfx->mpfx_plexpire
-			    = mono_time.tv_sec + mpfx->mpfx_pltime;
-			mip6_prefix_settimer(mpfx,
-			    MIP6_PREFIX_EXPIRE_TIME(mpfx->mpfx_pltime) * hz);
-			mpfx->mpfx_state = MIP6_PREFIX_STATE_PREFERRED;
+			mip6_prefix_update_lifetime(mpfx,
+			    ntohl(ndopt_pi->nd_opt_pi_valid_time),
+			    ntohl(ndopt_pi->nd_opt_pi_preferred_time));
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 			for (ifa = ((struct ifnet *)hif)->if_addrlist; ifa;

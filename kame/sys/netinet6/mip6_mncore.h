@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.h,v 1.14 2003/08/27 11:53:04 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.h,v 1.15 2003/09/03 03:29:46 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -105,6 +105,7 @@ int mip6_ha_list_update_hainfo(struct mip6_ha_list *, struct nd_defrouter *,
 /* prefix list processing. */
 struct mip6_prefix *mip6_prefix_create(struct sockaddr_in6 *, u_int8_t,
     u_int32_t, u_int32_t);
+void mip6_prefix_update_lifetime(struct mip6_prefix *, u_int32_t, u_int32_t);
 int mip6_prefix_list_insert(struct mip6_prefix_list *, struct mip6_prefix *);
 int mip6_prefix_list_remove(struct mip6_prefix_list *,
     struct mip6_prefix *mpfx);

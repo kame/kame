@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.34 2003/08/28 07:25:55 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.35 2003/09/03 03:29:46 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -230,13 +230,6 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 	struct sockaddr_in6 haaddr;
 	int i; 
 	int error = 0;
-#ifdef __FreeBSD__
-	struct timeval mono_time;
-#endif
-
-#ifdef __FreeBSD__
-	microtime(&mono_time);
-#endif
 
 	/* sanity check. */
 	if ((sc == NULL) || (rtaddr == NULL) || (dr == NULL)
@@ -396,18 +389,10 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 		    ndopt_pi->nd_opt_pi_prefix_len);
 		if (mpfx) {
 			/* found an existing entry.  just update it. */
-			mpfx->mpfx_vltime
-			    = ntohl(ndopt_pi->nd_opt_pi_valid_time);
-			mpfx->mpfx_vlexpire = mono_time.tv_sec
-			    + mpfx->mpfx_vltime;
-			mpfx->mpfx_pltime
-			    = ntohl(ndopt_pi->nd_opt_pi_preferred_time);
-			mpfx->mpfx_plexpire = mono_time.tv_sec
-			    + mpfx->mpfx_pltime;
+			mip6_prefix_update_lifetime(mpfx,
+			    ntohl(ndopt_pi->nd_opt_pi_valid_time),
+			    ntohl(ndopt_pi->nd_opt_pi_preferred_time));
 			/* XXX mpfx->mpfx_haddr; */
-			mip6_prefix_settimer(mpfx,
-			    MIP6_PREFIX_EXPIRE_TIME(mpfx->mpfx_pltime) * hz);
-			mpfx->mpfx_state = MIP6_PREFIX_STATE_PREFERRED;
 		} else {
 			/* this is a new prefix. */
 			mpfx = mip6_prefix_create(&prefix_sa,

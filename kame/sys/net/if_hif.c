@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.63 2003/08/27 11:57:26 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.64 2003/09/03 03:29:46 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -517,13 +517,6 @@ hif_prefix_list_update_withprefix(sc, data)
 	struct mip6_prefix *nmpfx, *mpfx;
 	struct hif_softc *hif;
 	int error = 0;
-#ifdef __FreeBSD__
-	struct timeval mono_time;
-#endif
-
-#ifdef __FreeBSD__
-	microtime(&mono_time);
-#endif
 
 	if (hifr == NULL) {
 		return (EINVAL);
@@ -560,13 +553,8 @@ hif_prefix_list_update_withprefix(sc, data)
 		}
 	}
 
-	mpfx->mpfx_vltime = nmpfx->mpfx_vltime;
-	mpfx->mpfx_vlexpire = mono_time.tv_sec + mpfx->mpfx_vltime;
-	mpfx->mpfx_pltime = nmpfx->mpfx_pltime;
-	mpfx->mpfx_plexpire = mono_time.tv_sec + mpfx->mpfx_pltime;
-	mip6_prefix_settimer(mpfx,
-	    MIP6_PREFIX_EXPIRE_TIME(mpfx->mpfx_pltime) * hz);
-	mpfx->mpfx_state = MIP6_PREFIX_STATE_PREFERRED;
+	mip6_prefix_update_lifetime(mpfx, nmpfx->mpfx_vltime,
+	    nmpfx->mpfx_pltime);
 
 	return (0);
 }
