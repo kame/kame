@@ -449,7 +449,7 @@ udp_input(m, off)
 			end_of_search:
 				goto next_inp;
 			}
-			if (i == imo->imo_num_membership)
+			if (i == imo->imo_num_memberships)
 				continue;
 #undef PASS_TO_PCB
 #else
