@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.50 2001/01/22 14:04:21 sumikawa Exp $	*/
+/*	$KAME: ndp.c,v 1.51 2001/01/30 14:08:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -991,19 +991,49 @@ plist()
  	}
 #define PR pr.prefix[i]
 	for (i = 0; PR.if_index && i < PRLSTSIZ ; i++) {
-		printf("%s/%d if=%s\n",
-		       inet_ntop(AF_INET6, &PR.prefix, ntop_buf,
-				 sizeof(ntop_buf)), PR.prefixlen,
+		struct sockaddr_in6 p6 = PR.prefix;
+		char namebuf[NI_MAXHOST];
+		int niflags;
+
+		/*
+		 * copy link index to sin6_scope_id field.
+		 * XXX: KAME specific.
+		 */
+		if (IN6_IS_ADDR_LINKLOCAL(&p6.sin6_addr)) {
+			u_int16_t linkid;
+
+			memcpy(&linkid, &p6.sin6_addr.s6_addr[2],
+			       sizeof(linkid));
+			linkid = ntohs(linkid);
+			p6.sin6_scope_id = linkid;
+			p6.sin6_addr.s6_addr[2] = 0;
+			p6.sin6_addr.s6_addr[3] = 0;
+		}
+
+		niflags = NI_NUMERICHOST;
+#ifdef __KAME__
+		niflags |= NI_WITHSCOPEID;
+#endif
+		if (getnameinfo((struct sockaddr *)&p6,
+				sizeof(p6), namebuf, sizeof(namebuf),
+				NULL, 0, niflags)) {
+			warnx("getnameinfo failed");
+			continue;
+		}
+		printf("%s/%d if=%s\n", namebuf, PR.prefixlen,
 		       if_indextoname(PR.if_index, ifix_buf));
+
 		gettimeofday(&time, 0);
 		/*
 		 * meaning of fields, especially flags, is very different
 		 * by origin.  notify the difference to the users.
 		 */
 		printf("  %s", PR.origin == PR_ORIG_RA ? "" : "advertise: ");
-		printf("flags=%s%s",
+		printf("flags=%s%s%s%s",
 		       PR.raflags.onlink ? "L" : "",
-		       PR.raflags.autonomous ? "A" : "");
+		       PR.raflags.autonomous ? "A" : "",
+		       (PR.flags & NDPRF_ONLINK) != 0 ? "O" : "",
+		       (PR.flags & NDPRF_DETACHED) != 0 ? "D" : "");
 		if (PR.vltime == ND6_INFINITE_LIFETIME)
 			printf(" vltime=infinity");
 		else
@@ -1019,6 +1049,7 @@ plist()
 				sec2str(PR.expire - time.tv_sec));
 		else
 			printf(", expired");
+		printf(", ref=%d", PR.refcnt);
 		switch (PR.origin) {
 		case PR_ORIG_RA:
 			printf(", origin=RA");
