@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.20 2000/02/22 14:04:36 itojun Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.21 2000/02/29 04:24:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -284,9 +284,10 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 	nth->th_x2 = 0;
 	if ((flags & TH_SYN) == 0) {
 		if (t6p)
-			nth->th_win = htons((u_short) (win >> t6p->rcv_scale));
-		else
-			nth->th_win = htons((u_short)win);
+			win >>= t6p->rcv_scale;
+		if (win > TCP6_MAXWIN)
+			win = TCP6_MAXWIN;
+		nth->th_win = htons((u_short)win);
 		nth->th_off = sizeof (struct tcp6hdr) >> 2;
 		tlen += sizeof (struct tcp6hdr);
 	} else
