@@ -1,4 +1,4 @@
-/*	$KAME: casttest.c,v 1.2 2000/11/08 05:58:25 itojun Exp $	*/
+/*	$KAME: casttest.c,v 1.3 2001/11/28 01:43:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -160,7 +160,7 @@ again:
 		if (k_len[z] != 16)
 			continue;
 
-		set_cast128_subkey(subkey, k);
+		set_cast128_subkey(subkey, k, k_len[z]);
 
 		cast128_encrypt_round16(out, in, subkey);
 
