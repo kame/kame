@@ -79,6 +79,7 @@ struct uvif	uvifs[MAXMIFS];	/*the list of virtualsinterfaces */
 vifi_t numvifs;				/*total number of interface */
 int vifs_down;
 vifi_t reg_vif_num;		   /*register interface*/
+int phys_vif;			/* An enabled vif */
 int udp_socket;
 int total_interfaces;
 if_set			if_nullset;
@@ -135,6 +136,7 @@ void init_vifs()
 	config_vifs_from_file();
 
 	enabled_vifs = 0;
+	phys_vif = -1;
 
 	for( vifi = 0, v = uvifs ; vifi < numvifs ; ++ vifi,++v)
 	{
@@ -142,7 +144,8 @@ void init_vifs()
 			continue;
 		if(v->uv_linklocal == NULL)
 			log(LOG_ERR,0,"there is no link-local address on vif %s",v->uv_name);
-
+		if (phys_vif == -1)
+			phys_vif = vifi;
 		enabled_vifs++;
 	}
 	if (enabled_vifs < 2)
@@ -456,7 +459,7 @@ max_global_address()
 		if(v->uv_flags & (VIFF_DISABLED | VIFF_DOWN | MIFF_REGISTER))
 			continue;
 		/*
-		 * take first the max glob. add of the interface
+		 * take first the max global address of the interface
 		 * (without link local) => aliasing
 		 */
 		for(p=v->uv_addrs;p!=NULL;p=p->pa_next)
