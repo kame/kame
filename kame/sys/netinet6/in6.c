@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.293 2002/06/11 07:25:09 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.294 2002/06/11 09:22:31 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1606,7 +1606,8 @@ in6_unlink_ifa(ia, ifp)
 	 */
 	if ((oia->ia6_flags & IN6_IFF_AUTOCONF) != 0) {
 		if (oia->ia6_ndpr == NULL) {
-			lognd6((LOG_NOTICE, "in6_unlink_ifa: autoconf'ed address "
+			nd6log((LOG_NOTICE,
+			    "in6_unlink_ifa: autoconf'ed address "
 			    "%p has no prefix\n", oia));
 		} else {
 			oia->ia6_ndpr->ndpr_refcnt--;
