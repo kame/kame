@@ -102,7 +102,7 @@
  *	NetBSD 1.4 or later requires splsoftnet().
  *	other operating systems use splnet().
  *
- * - mtod()
+ * - dtom()
  *	NEVER USE IT!
  */
 
