@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.41 2000/08/14 13:31:17 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.42 2000/09/06 15:03:36 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -119,7 +119,7 @@ struct	in6_ifaddr {
 #endif
 	int	ia6_flags;
 
-	struct in6_addrlifetime ia6_lifetime;	/* NULL = infty */
+	struct in6_addrlifetime ia6_lifetime;
 	struct ifprefix *ia6_ifpr; /* back pointer to ifprefix */
 
 #ifdef MEASURE_PERFORMANCE
