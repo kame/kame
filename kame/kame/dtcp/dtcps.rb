@@ -32,7 +32,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $Id: dtcps.rb,v 1.4 2001/01/16 01:40:34 jinmei Exp $
+# $Id: dtcps.rb,v 1.5 2001/01/20 18:13:46 jinmei Exp $
 #
 
 require "socket"
@@ -132,8 +132,8 @@ def tunnelsetup(s, user, type)
       tunid = $1.to_i
       heraddr = sprintf("%s%04x", $prefix, (tunid + 1) * 4 + 2)
       myaddr = sprintf("%s%04x", $prefix, (tunid + 1) * 4 + 1)
-      debugmsg("ifconfig #{tunif} inet6 #{myaddr} #{heraddr} prefixlen 126 alias\n")
-      system("ifconfig #{tunif} inet6 #{myaddr} #{heraddr} prefixlen 126 alias")
+      debugmsg("ifconfig #{tunif} inet6 #{myaddr} #{heraddr} prefixlen 128 alias\n")
+      system("ifconfig #{tunif} inet6 #{myaddr} #{heraddr} prefixlen 128 alias")
       x = [tunif, her, me, heraddr, myaddr]
       err = nil
     else
