@@ -33,7 +33,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/ifaddrlist.c,v 1.7 2003/05/16 19:45:03 itojun Exp $ (LBL)";
+    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/ifaddrlist.c,v 1.8 2003/05/16 19:47:18 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -100,7 +100,7 @@ if_maxindex()
  * Return the interface list
  */
 int
-ifaddrlist(register struct ifaddrlist **ipaddrp, register char *errbuf)
+ifaddrlist(register struct ifaddrlist **ipaddrp, register char *errbuf, size_t l)
 {
 #ifdef HAVE_GETIFADDRS
 	struct ifaddrs *ifap, *ifa;
@@ -187,7 +187,7 @@ ifaddrlist(register struct ifaddrlist **ipaddrp, register char *errbuf)
 
 	fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (fd < 0) {
-		(void)sprintf(errbuf, "socket: %s", strerror(errno));
+		(void)snprintf(errbuf, l, "socket: %s", strerror(errno));
 		free(ifaddrlist);
 		free(ibuf);
 		return (-1);
@@ -197,7 +197,7 @@ ifaddrlist(register struct ifaddrlist **ipaddrp, register char *errbuf)
 
 	if (ioctl(fd, SIOCGIFCONF, (char *)&ifc) < 0 ||
 	    ifc.ifc_len < sizeof(struct ifreq)) {
-		(void)sprintf(errbuf, "SIOCGIFCONF: %s", strerror(errno));
+		(void)snprintf(errbuf, l, "SIOCGIFCONF: %s", strerror(errno));
 		(void)close(fd);
 		free(ifaddrlist);
 		free(ibuf);
@@ -235,7 +235,7 @@ ifaddrlist(register struct ifaddrlist **ipaddrp, register char *errbuf)
 		if (ioctl(fd, SIOCGIFFLAGS, (char *)&ifr) < 0) {
 			if (errno == ENXIO)
 				continue;
-			(void)sprintf(errbuf, "SIOCGIFFLAGS: %.*s: %s",
+			(void)snprintf(errbuf, l, "SIOCGIFFLAGS: %.*s: %s",
 			    (int)sizeof(ifr.ifr_name), ifr.ifr_name,
 			    strerror(errno));
 			(void)close(fd);
@@ -251,7 +251,7 @@ ifaddrlist(register struct ifaddrlist **ipaddrp, register char *errbuf)
 		(void)strncpy(device, ifr.ifr_name, sizeof(ifr.ifr_name));
 		device[sizeof(device) - 1] = '\0';
 		if (ioctl(fd, SIOCGIFADDR, (char *)&ifr) < 0) {
-			(void)sprintf(errbuf, "SIOCGIFADDR: %s: %s",
+			(void)snprintf(errbuf, l, "SIOCGIFADDR: %s: %s",
 			    device, strerror(errno));
 			(void)close(fd);
 			free(ifaddrlist);

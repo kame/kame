@@ -24,7 +24,7 @@ static const char copyright[] =
     "@(#) Copyright (c) 1988, 1989, 1991, 1994, 1995, 1996, 1997\n\
 The Regents of the University of California.  All rights reserved.\n";
 static const char rcsid[] =
-    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.19 2003/05/16 19:45:03 itojun Exp $ (LBL)";
+    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.20 2003/05/16 19:47:18 itojun Exp $ (LBL)";
 #endif
 
 /*
@@ -775,7 +775,7 @@ main(int argc, char **argv)
 		    sizeof(on));
 
 	/* Get the interface address list */
-	n = ifaddrlist(&al, errbuf);
+	n = ifaddrlist(&al, errbuf, sizeof(errbuf));
 	if (n < 0) {
 		Fprintf(stderr, "%s: ifaddrlist: %s\n", prog, errbuf);
 		exit(1);

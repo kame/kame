@@ -18,7 +18,7 @@
  * WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * @(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/ifaddrlist.h,v 1.1 1999/08/08 23:32:25 itojun Exp $ (LBL)
+ * @(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/ifaddrlist.h,v 1.2 2003/05/16 19:47:18 itojun Exp $ (LBL)
  */
 
 struct ifaddrlist {
@@ -26,4 +26,4 @@ struct ifaddrlist {
 	char *device;
 };
 
-int	ifaddrlist(struct ifaddrlist **, char *);
+int	ifaddrlist(struct ifaddrlist **, char *, size_t);
