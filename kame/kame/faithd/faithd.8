@@ -1,4 +1,4 @@
-.\"	$KAME: faithd.8,v 1.15 2000/11/10 12:12:09 itojun Exp $
+.\"	$KAME: faithd.8,v 1.16 2000/11/19 09:55:29 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -210,6 +210,46 @@ The operation mode requires special support for
 .Nm
 in
 .Xr inetd 8 .
+.Ss Access control
+To prevent malicious accesses,
+.Nm
+implements a simple address-based access control.
+With
+.Pa /usr/local/v6/etc/faithd.conf ,
+.Nm
+will avoid relaying unwanted traffic.
+The
+.Pa faithd.conf
+contains directives with the following format:
+.Bl -bullet
+.It
+.Xo
+.Ic Ar src/slen Li deny Ar dst/dlen
+.Xc
+.Pp
+If the source address of a query matches
+.Ar src/slen ,
+and the translated destination address matches
+.Ar dst/dlen ,
+deny the connection.
+.It
+.Xo
+.Ic Ar src/slen Li permit Ar dst/dlen
+.Xc
+.Pp
+If the source address of a query matches
+.Ar src/slen ,
+and the translated destination address matches
+.Ar dst/dlen ,
+permit the connection.
+.El
+.Pp
+The directives are evaluated in sequence,
+and the first matching entry will be effective.
+.Pp
+With inetd mode,
+traffic may be filtered by using access control functionality in 
+.Xr inetd 8 .
 .Sh EXAMPLES
 Before invoking
 .Nm Ns ,
@@ -286,6 +326,20 @@ Otherwise,
 .Nm
 will invoke service-specific daemon like
 .Xr telnetd 8 .
+.Ss Access control samples
+The following illustrates a simple
+.Pa faithd.conf
+setting.
+.Bd -literal -offset
+# permit anyone from 3ffe:501:ffff::/48 to use the translator,
+# to connect to the following IPv4 destinations:
+# - any location except 10.0.0.0/8 and 127.0.0.0/8.
+# Permit no other connections.
+#
+3ffe:501:ffff::/48 deny 10.0.0.0/8
+3ffe:501:ffff::/48 deny 127.0.0.0/8
+3ffe:501:ffff::/48 permit 0.0.0.0/0
+.Ed
 .Sh RETURN VALUES
 .Nm
 exits with
