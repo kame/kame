@@ -3,7 +3,7 @@ SRCDIR=	${.CURDIR}/../../kame/rtsold
 PROG=	rtsol
 SRCS=	rtsold.c rtsol.c if.c probe.c dump.c
 
-CPPFLAGS+=-DINET6
+CPPFLAGS+=-DINET6 -DHAVE_GETIFADDRS
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
 DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
