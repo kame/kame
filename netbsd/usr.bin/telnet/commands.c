@@ -1,4 +1,33 @@
-/*	$NetBSD: commands.c,v 1.25 1998/11/06 19:54:18 christos Exp $	*/
+/*	$NetBSD: commands.c,v 1.42.4.1 2000/06/22 07:09:05 thorpej Exp $	*/
+
+/*
+ * Copyright (C) 1997 and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 
 /*
  * Copyright (c) 1988, 1990, 1993
@@ -38,7 +67,7 @@
 #if 0
 static char sccsid[] = "@(#)commands.c	8.4 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: commands.c,v 1.25 1998/11/06 19:54:18 christos Exp $");
+__RCSID("$NetBSD: commands.c,v 1.42.4.1 2000/06/22 07:09:05 thorpej Exp $");
 #endif
 #endif /* not lint */
 
@@ -83,6 +112,12 @@ __RCSID("$NetBSD: commands.c,v 1.25 1998/11/06 19:54:18 christos Exp $");
 #include "defines.h"
 #include "types.h"
 #include <libtelnet/misc.h>
+#ifdef AUTHENTICATION
+#include <libtelnet/auth.h>
+#endif
+#ifdef ENCRYPTION
+#include <libtelnet/encrypt.h>
+#endif
 
 #if !defined(CRAY) && !defined(sysV88)
 #include <netinet/in_systm.h>
@@ -160,6 +195,7 @@ static int auth_help P((char *));
 static void filestuff P((int));
 #endif
 static int status P((int, char *[]));
+static const char *sockaddr_ntop __P((struct sockaddr *));
 typedef int (*intrtn_t) P((int, char **));
 static int call P((intrtn_t, ...));
 static Command *getcmd P((char *));
@@ -668,6 +704,12 @@ togxbinary(val)
     return 1;
 }
 
+#ifdef	ENCRYPTION
+extern int EncryptAutoEnc P((int));
+extern int EncryptAutoDec P((int));
+extern int EncryptDebug P((int));
+extern int EncryptVerbose P((int));
+#endif	/* ENCRYPTION */
 
 struct togglelist {
     char	*name;		/* name of toggle */
@@ -695,14 +737,34 @@ static struct togglelist Togglelist[] = {
 	    0,
 		&autologin,
 		    "send login name and/or authentication information" },
-#if 0
     { "authdebug",
 	"Toggle authentication debugging",
 	    auth_togdebug,
 		0,
 		     "print authentication debugging information" },
 #endif
-#endif
+#ifdef	ENCRYPTION
+    { "autoencrypt",
+      "automatic encryption of data stream",
+	    EncryptAutoEnc,
+		0,
+		     "automatically encrypt output" },
+    { "autodecrypt",
+      "automatic decryption of data stream",
+	    EncryptAutoDec,
+		0,
+		     "automatically decrypt input" },
+    { "verbose_encrypt",
+      "Toggle verbose encryption output",
+	    EncryptVerbose,
+		0,
+		     "print verbose encryption output" },
+    { "encdebug",
+      "Toggle encryption debugging",
+	    EncryptDebug,
+		0,
+		     "print encryption debugging information" },
+#endif	/* ENCRYPTION */
     { "skiprc",
 	"don't read ~/.telnetrc file",
 	    0,
@@ -1327,6 +1389,9 @@ display(argc, argv)
 	}
     }
 /*@*/optionstatus();
+#ifdef	ENCRYPTION
+    EncryptStatus();
+#endif	/* ENCRYPTION */
     return 1;
 #undef	doset
 #undef	dotog
@@ -1430,7 +1495,7 @@ shell(argc, argv)
     err = (TerminalWindowSize(&oldrows, &oldcols) == 0) ? 1 : 0;
     switch(vfork()) {
     case -1:
-	perror("Fork failed\n");
+	perror("Fork failed");
 	break;
 
     case 0:
@@ -1451,7 +1516,7 @@ shell(argc, argv)
 		execl(shellp, shellname, "-c", &saveline[1], 0);
 	    else
 		execl(shellp, shellname, 0);
-	    perror("Execl");
+	    perror("execl");
 	    _exit(1);
 	}
     default:
@@ -1481,7 +1546,7 @@ bye(argc, argv)
 	(void) NetClose(net);
 	connected = 0;
 	resettermname = 1;
-#if	defined(AUTHENTICATION)
+#if	defined(AUTHENTICATION) || defined(ENCRYPTION)
 	auth_encrypt_connect(connected);
 #endif	/* defined(AUTHENTICATION) */
 	/* reset options */
@@ -2015,6 +2080,122 @@ auth_cmd(argc, argv)
 }
 #endif
 
+#ifdef	ENCRYPTION
+/*
+ * The ENCRYPT command.
+ */
+
+struct encryptlist {
+	char	*name;
+	char	*help;
+	int	(*handler) P((char *, char *));
+	int	needconnect;
+	int	minarg;
+	int	maxarg;
+};
+
+static int
+	EncryptHelp P((char *, char *));
+typedef int (*encrypthandler) P((char *, char *));
+
+struct encryptlist EncryptList[] = {
+    { "enable", "Enable encryption. ('encrypt enable ?' for more)",
+						EncryptEnable, 1, 1, 2 },
+    { "disable", "Disable encryption. ('encrypt enable ?' for more)",
+						EncryptDisable, 0, 1, 2 },
+    { "type", "Set encryption type. ('encrypt type ?' for more)",
+						EncryptType, 0, 1, 1 },
+    { "start", "Start encryption. ('encrypt start ?' for more)",
+				(encrypthandler) EncryptStart, 1, 0, 1 },
+    { "stop", "Stop encryption. ('encrypt stop ?' for more)",
+				(encrypthandler) EncryptStop, 1, 0, 1 },
+    { "input", "Start encrypting the input stream",
+				(encrypthandler) EncryptStartInput, 1, 0, 0 },
+    { "-input", "Stop encrypting the input stream",
+				(encrypthandler) EncryptStopInput, 1, 0, 0 },
+    { "output", "Start encrypting the output stream",
+				(encrypthandler) EncryptStartOutput, 1, 0, 0 },
+    { "-output", "Stop encrypting the output stream",
+				(encrypthandler) EncryptStopOutput, 1, 0, 0 },
+
+    { "status",       "Display current status of authentication information",
+				(encrypthandler) EncryptStatus,	0, 0, 0 },
+    { "help", 0,				 EncryptHelp,	0, 0, 0 },
+    { "?",    "Print help information",		 EncryptHelp,	0, 0, 0 },
+    { 0 },
+};
+
+static int
+EncryptHelp(s1, s2)
+	char *s1, *s2;
+{
+	struct encryptlist *c;
+
+	for (c = EncryptList; c->name; c++) {
+		if (c->help) {
+			if (*c->help)
+				printf("%-15s %s\n", c->name, c->help);
+			else
+				printf("\n");
+		}
+	}
+	return (0);
+}
+
+int
+encrypt_cmd(argc, argv)
+	int argc;
+	char *argv[];
+{
+	struct encryptlist *c;
+
+	if (argc < 2) {
+		fprintf(stderr,
+		    "Need an argument to 'encrypt' command.  "
+		    "'encrypt ?' for help.\n");
+		return (0);
+	}
+
+	c = (struct encryptlist *)
+	    genget(argv[1], (char **) EncryptList, sizeof(struct encryptlist));
+	if (c == NULL) {
+		fprintf(stderr,
+		    "'%s': unknown argument ('encrypt ?' for help).\n",
+		    argv[1]);
+		return (0);
+	}
+	if (Ambiguous(c)) {
+		fprintf(stderr,
+		    "'%s': ambiguous argument ('encrypt ?' for help).\n",
+		    argv[1]);
+		return (0);
+	}
+	argc -= 2;
+	if (argc < c->minarg || argc > c->maxarg) {
+		if (c->minarg == c->maxarg) {
+			fprintf(stderr, "Need %s%d argument%s ",
+			    c->minarg < argc ? "only " : "", c->minarg,
+			    c->minarg == 1 ? "" : "s");
+		} else {
+			fprintf(stderr, "Need %s%d-%d arguments ",
+			    c->maxarg < argc ? "only " : "", c->minarg,
+			    c->maxarg);
+		}
+		fprintf(stderr,
+		    "to 'encrypt %s' command.  'encrypt ?' for help.\n",
+		    c->name);
+		return (0);
+	}
+	if (c->needconnect && !connected) {
+		if (!(argc && (isprefix(argv[2], "help") ||
+		    isprefix(argv[2], "?")))) {
+			printf("?Need to be connected first.\n");
+			return (0);
+		}
+	}
+	return ((*c->handler)(argv[2], argv[3]));
+}
+#endif	/* ENCRYPTION */
 
 #if	defined(unix) && defined(TN3270)
     static void
@@ -2081,6 +2262,9 @@ status(argc, argv)
 	    printf("%s character echo\n", (mode&MODE_ECHO) ? "Local" : "Remote");
 	    if (my_want_state_is_will(TELOPT_LFLOW))
 		printf("%s flow control\n", (mode&MODE_FLOW) ? "Local" : "No");
+#ifdef	ENCRYPTION
+	    encrypt_display();
+#endif	/* ENCRYPTION */
 	}
     } else {
 	printf("No connection.\n");
@@ -2108,7 +2292,7 @@ status(argc, argv)
 	}
     }
     if (In3270 && transcom) {
-       printf("Transparent mode command is '%s'.\n", transcom);
+	printf("Transparent mode command is '%s'.\n", transcom);
     }
 #   endif /* defined(unix) */
     (void) fflush(stdout);
@@ -2130,18 +2314,69 @@ ayt_status()
 }
 #endif
 
+static const char *
+sockaddr_ntop(sa)
+    struct sockaddr *sa;
+{
+    static char addrbuf[NI_MAXHOST];
+#ifdef NI_WITHSCOPEID
+    const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+    const int niflags = NI_NUMERICHOST;
+#endif
+
+    if (getnameinfo(sa, sa->sa_len, addrbuf, sizeof(addrbuf),
+	    NULL, 0, niflags) == 0)
+	return addrbuf;
+    else
+	return NULL;
+}
+
+#if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
+static int setpolicy __P((int, struct addrinfo *, char *));
+
+static int
+setpolicy(net, res, policy)
+	int net;
+	struct addrinfo *res;
+	char *policy;
+{
+	char *buf;
+	int level;
+	int optname;
+
+	if (policy == NULL)
+		return 0;
+
+	buf = ipsec_set_policy(policy, strlen(policy));
+	if (buf == NULL) {
+		printf("%s\n", ipsec_strerror());
+		return -1;
+	}
+	level = res->ai_family == AF_INET ? IPPROTO_IP : IPPROTO_IPV6;
+	optname = res->ai_family == AF_INET ? IP_IPSEC_POLICY : IPV6_IPSEC_POLICY;
+	if (setsockopt(net, level, optname, buf, ipsec_get_policylen(buf)) < 0){
+		perror("setsockopt");
+		return -1;
+	}
+
+	free(buf);
+	return 0;
+}
+#endif
+
     int
 tn(argc, argv)
     int argc;
     char *argv[];
 {
-    register struct hostent *host = 0;
-    struct sockaddr_in sin;
-    struct servent *sp = 0;
-    unsigned long temp;
+    struct addrinfo hints, *res, *res0;
+    char *cause = "telnet: unknown";
+    int error;
 #if	defined(IP_OPTIONS) && defined(IPPROTO_IP)
     char *srp = 0;
     unsigned long srlen;
+    int proto, opt;
 #endif
     char *cmd, *hostp = 0, *portp = 0;
     const char *user = 0;
@@ -2149,12 +2384,8 @@ tn(argc, argv)
     (void) &user;
 #endif
 
-    /* clear the socket address prior to use */
-    memset((char *)&sin, 0, sizeof(sin));
-
     if (connected) {
 	printf("?Already connected to %s\n", hostname);
-	setuid(getuid());
 	return 0;
     }
     if (argc < 2) {
@@ -2195,156 +2426,138 @@ tn(argc, argv)
 	}
     usage:
 	printf("usage: %s [-l user] [-a] host-name [port]\n", cmd);
-	setuid(getuid());
 	return 0;
     }
     if (hostp == 0)
 	goto usage;
 
-#if	defined(IP_OPTIONS) && defined(IPPROTO_IP)
+    (void) strcpy(_hostname, hostp);
     if (hostp[0] == '@' || hostp[0] == '!') {
-	if ((hostname = strrchr(hostp, ':')) == NULL)
-	    hostname = strrchr(hostp, '@');
-	hostname++;
-	srp = 0;
-	temp = sourceroute(hostp, &srp, &srlen);
-	if (temp == 0) {
-	    herror(srp);
-	    setuid(getuid());
+	char *p;
+	hostname = NULL;
+	for (p = hostp + 1; *p; p++) {
+	    if (*p == ',' || *p == '@')
+		hostname = p;
+	}
+	if (hostname == NULL) {
+	    fprintf(stderr, "%s: bad source route specification\n", hostp);
 	    return 0;
-	} else if (temp == -1) {
-	    printf("Bad source route option: %s\n", hostp);
-	    setuid(getuid());
-	    return 0;
-	} else {
-	    sin.sin_addr.s_addr = temp;
-	    sin.sin_family = AF_INET;
 	}
-    } else {
-#endif
-	temp = inet_addr(hostp);
-	if (temp != INADDR_NONE) {
-	    sin.sin_addr.s_addr = temp;
-	    sin.sin_family = AF_INET;
-	    host = gethostbyaddr((char *)&temp, sizeof(temp), AF_INET);
-	    if (host)
-	        (void) strcpy(_hostname, host->h_name);
-	    else
-	        (void) strcpy(_hostname, hostp);
-	    hostname = _hostname;
-	} else {
-	    host = gethostbyname(hostp);
-	    if (host) {
-		sin.sin_family = host->h_addrtype;
-#if	defined(h_addr)		/* In 4.3, this is a #define */
-		memmove((caddr_t)&sin.sin_addr,
-				host->h_addr_list[0], host->h_length);
-#else	/* defined(h_addr) */
-		memmove((caddr_t)&sin.sin_addr, host->h_addr, host->h_length);
-#endif	/* defined(h_addr) */
-		strncpy(_hostname, host->h_name, sizeof(_hostname));
-		_hostname[sizeof(_hostname)-1] = '\0';
-		hostname = _hostname;
-	    } else {
-		herror(hostp);
-		setuid(getuid());
-		return 0;
-	    }
-	}
-#if	defined(IP_OPTIONS) && defined(IPPROTO_IP)
-    }
-#endif
-    if (portp) {
-	if (*portp == '-') {
-	    portp++;
-	    telnetport = 1;
-	} else
-	    telnetport = 0;
-	sin.sin_port = atoi(portp);
-	if (sin.sin_port == 0) {
-	    sp = getservbyname(portp, "tcp");
-	    if (sp)
-		sin.sin_port = sp->s_port;
-	    else {
-		printf("%s: bad port number\n", portp);
-		setuid(getuid());
-		return 0;
-	    }
-	} else {
-#if	!defined(htons)
-	    u_short htons P((unsigned short));
-#endif	/* !defined(htons) */
-	    sin.sin_port = htons(sin.sin_port);
-	}
-    } else {
-	if (sp == 0) {
-	    sp = getservbyname("telnet", "tcp");
-	    if (sp == 0) {
-		fprintf(stderr, "telnet: tcp/telnet: unknown service\n");
-		setuid(getuid());
-		return 0;
-	    }
-	    sin.sin_port = sp->s_port;
-	}
+	*hostname++ = '\0';
+    } else
+	hostname = hostp;
+
+    if (!portp) {
 	telnetport = 1;
+	portp = "telnet";
+    } else if (portp[0] == '-') {
+	/* use telnet negotiation if port number/name preceded by minus sign */
+	telnetport = 1;
+	portp++;
     }
-    printf("Trying %s...\n", inet_ntoa(sin.sin_addr));
-    do {
-	net = socket(AF_INET, SOCK_STREAM, 0);
-	setuid(getuid());
-	if (net < 0) {
-	    perror("telnet: socket");
+
+    memset(&hints, 0, sizeof(hints));
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    hints.ai_protocol = 0;
+    hints.ai_flags = AI_NUMERICHOST;	/* avoid forward lookup */
+    error = getaddrinfo(hostname, portp, &hints, &res0);
+    if (!error) {
+	/* numeric */
+	if (doaddrlookup &&
+	    getnameinfo(res0->ai_addr, res0->ai_addrlen,
+		_hostname, sizeof(_hostname), NULL, 0, NI_NAMEREQD) == 0)
+	    ; /* okay */
+	else {
+	    strncpy(_hostname, hostname, sizeof(_hostname) - 1);
+	    _hostname[sizeof(_hostname) - 1] = '\0';
+	}
+    } else {
+	/* FQDN - try again with forward DNS lookup */
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = 0;
+	hints.ai_flags = AI_CANONNAME;
+	error = getaddrinfo(hostname, portp, &hints, &res0);
+	if (error == EAI_SERVICE) {
+	    fprintf(stderr, "tcp/%s: unknown service\n", portp);
+	    return 0;
+	} else if (error) {
+	    fprintf(stderr, "%s: %s\n", hostname, gai_strerror(error));
 	    return 0;
 	}
-#if	defined(IP_OPTIONS) && defined(IPPROTO_IP)
-	if (srp && setsockopt(net, IPPROTO_IP, IP_OPTIONS, (char *)srp, srlen) < 0)
-		perror("setsockopt (IP_OPTIONS)");
-#endif
-#if	defined(IPPROTO_IP) && defined(IP_TOS)
-	{
-# if	defined(HAS_GETTOS)
-	    struct tosent *tp;
-	    if (tos < 0 && (tp = gettosbyname("telnet", "tcp")))
-		tos = tp->t_tos;
-# endif
-	    if (tos < 0)
-		tos = IPTOS_LOWDELAY;	/* Low Delay bit */
-	    if (tos
-		&& (setsockopt(net, IPPROTO_IP, IP_TOS,
-		    (char *)&tos, sizeof(int)) < 0)
-		&& (errno != ENOPROTOOPT))
-		    perror("telnet: setsockopt (IP_TOS) (ignored)");
+	if (res0->ai_canonname) {
+	    (void) strncpy(_hostname, res0->ai_canonname,
+	        sizeof(_hostname) - 1);
+	} else
+	    (void) strncpy(_hostname, hostname, sizeof(_hostname) - 1);
+	_hostname[sizeof(_hostname) - 1] = '\0';
+    }
+    hostname = _hostname;
+
+    net = -1;
+    for (res = res0; res; res = res->ai_next) {
+	printf("Trying %s...\n", sockaddr_ntop(res->ai_addr));
+	net = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+	if (net < 0) {
+	    cause = "telnet: socket";
+	    continue;
 	}
-#endif	/* defined(IPPROTO_IP) && defined(IP_TOS) */
 
 	if (debug && SetSockOpt(net, SOL_SOCKET, SO_DEBUG, 1) < 0) {
-		perror("setsockopt (SO_DEBUG)");
+	    perror("setsockopt (SO_DEBUG)");
+	}
+	if (hostp[0] == '@' || hostp[0] == '!') {
+	    if ((srlen = sourceroute(res, hostp, &srp, &proto, &opt)) < 0) {
+		(void) NetClose(net);
+		net = -1;
+		continue;
+	    }
+	    if (srp && setsockopt(net, proto, opt, srp, srlen) < 0)
+		perror("setsockopt (source route)");
 	}
 
-	if (connect(net, (struct sockaddr *)&sin, sizeof (sin)) < 0) {
-#if	defined(h_addr)		/* In 4.3, this is a #define */
-	    if (host && host->h_addr_list[1]) {
+#if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
+	if (setpolicy(net, res, ipsec_policy_in) < 0) {
+	    (void) NetClose(net);
+	    net = -1;
+	    continue;
+	}
+	if (setpolicy(net, res, ipsec_policy_out) < 0) {
+	    (void) NetClose(net);
+	    net = -1;
+	    continue;
+	}
+#endif
+
+	if (connect(net, res->ai_addr, res->ai_addrlen) < 0) {
+	    if (res->ai_next) {
 		int oerrno = errno;
 
 		fprintf(stderr, "telnet: connect to address %s: ",
-						inet_ntoa(sin.sin_addr));
+						sockaddr_ntop(res->ai_addr));
 		errno = oerrno;
 		perror((char *)0);
-		host->h_addr_list++;
-		memmove((caddr_t)&sin.sin_addr,
-			host->h_addr_list[0], host->h_length);
-		(void) NetClose(net);
-		continue;
 	    }
-#endif	/* defined(h_addr) */
-	    perror("telnet: Unable to connect to remote host");
-	    return 0;
+	    cause = "telnet: Unable to connect to remote host";
+	    (void) NetClose(net);
+	    net = -1;
+	    continue;
 	}
+
 	connected++;
-#if	defined(AUTHENTICATION)
+#if	defined(AUTHENTICATION) || defined(ENCRYPTION)
 	auth_encrypt_connect(connected);
-#endif	/* defined(AUTHENTICATION) */
-    } while (connected == 0);
+#endif	/* defined(AUTHENTICATION) || defined(ENCRYPTION) */
+	break;
+    }
+    freeaddrinfo(res0);
+    if (net < 0 || connected == 0) {
+	perror(cause);
+	return 0;
+    }
+
     cmdrc(hostp, hostname);
     if (autologin && user == NULL) {
 	struct passwd *pw;
@@ -2391,6 +2604,9 @@ static char
 #if	defined(AUTHENTICATION)
 	authhelp[] =	"turn on (off) authentication ('auth ?' for more)",
 #endif
+#ifdef	ENCRYPTION
+	encrypthelp[] = "turn on (off) encryption ('encrypt ?' for more)",
+#endif	/* ENCRYPTION */
 #if	defined(unix)
 	zhelp[] =	"suspend telnet",
 #endif	/* defined(unix) */
@@ -2416,6 +2632,9 @@ static Command cmdtab[] = {
 #endif	/* defined(TN3270) && defined(unix) */
 #if	defined(AUTHENTICATION)
 	{ "auth",	authhelp,	auth_cmd,	0 },
+#endif
+#ifdef	ENCRYPTION
+	{ "encrypt",	encrypthelp,	encrypt_cmd,	0 },
 #endif
 #if	defined(unix)
 	{ "z",		zhelp,		suspend,	0 },
@@ -2683,14 +2902,13 @@ cmdrc(m1, m2)
     fclose(rcfile);
 }
 
-#if	defined(IP_OPTIONS) && defined(IPPROTO_IP)
-
 /*
  * Source route is handed in as
- *	[!]@hop1@hop2...[@|:]dst
- * If the leading ! is present, it is a
- * strict source route, otherwise it is
- * assmed to be a loose source route.
+ *	[!]@hop1@hop2...@dst
+ *
+ * If the leading ! is present, it is a strict source route, otherwise it is
+ * assmed to be a loose source route.  Note that leading ! is effective
+ * only for IPv4 case.
  *
  * We fill in the source route option as
  *	hop1,hop2,hop3...dest
@@ -2698,100 +2916,127 @@ cmdrc(m1, m2)
  * be the address to connect() to.
  *
  * Arguments:
- *	arg:	pointer to route list to decipher
+ *	ai:	The address (by struct addrinfo) for the final destination.
  *
- *	cpp: 	If *cpp is not equal to NULL, this is a
- *		pointer to a pointer to a character array
- *		that should be filled in with the option.
+ *	arg:	Pointer to route list to decipher
  *
+ *	cpp: 	Pointer to a pointer, so that sourceroute() can return
+ *		the address of result buffer (statically alloc'ed).
+ *
+ *	protop/optp:
+ *		Pointer to an integer.  The pointed variable
  *	lenp:	pointer to an integer that contains the
  *		length of *cpp if *cpp != NULL.
  *
  * Return values:
  *
- *	Returns the address of the host to connect to.  If the
+ *	Returns the length of the option pointed to by *cpp.  If the
  *	return value is -1, there was a syntax error in the
- *	option, either unknown characters, or too many hosts.
- *	If the return value is 0, one of the hostnames in the
- *	path is unknown, and *cpp is set to point to the bad
- *	hostname.
+ *	option, either arg contained unknown characters or too many hosts,
+ *	or hostname cannot be resolved.
  *
- *	*cpp:	If *cpp was equal to NULL, it will be filled
- *		in with a pointer to our static area that has
- *		the option filled in.  This will be 32bit aligned.
+ *	The caller needs to pass return value (len), *cpp, *protop and *optp
+ *	to setsockopt(2).
  *
- *	*lenp:	This will be filled in with how long the option
- *		pointed to by *cpp is.
+ *	*cpp:	Points to the result buffer.  The region is statically
+ *		allocated by the function.
+ *
+ *	*protop:
+ *		protocol # to be passed to setsockopt(2).
+ *
+ *	*optp:	option # to be passed to setsockopt(2).
  *
  */
-	unsigned long
-sourceroute(arg, cpp, lenp)
+int
+sourceroute(ai, arg, cpp, protop, optp)
+	struct addrinfo *ai;
 	char *arg;
-	char	**cpp;
-	unsigned long *lenp;
+	char **cpp;
+	int *protop;
+	int *optp;
 {
-	static char lsr[44];
 #ifdef	sysV88
 	static IOPTN ipopt;
 #endif
 	char *cp, *cp2, *lsrp, *lsrep;
-	register int tmp;
-	struct in_addr sin_addr;
-	register struct hostent *host = 0;
+	struct addrinfo hints, *res;
+	int len, error;
+	struct sockaddr_in *sin;
 	register char c;
+	static char lsr[44];
+#ifdef INET6
+	struct cmsghdr *cmsg;
+	struct sockaddr_in6 *sin6;
+	static char rhbuf[1024];
+#endif
 
 	/*
-	 * Verify the arguments, and make sure we have
-	 * at least 7 bytes for the option.
+	 * Verify the arguments.
 	 */
-	if (cpp == NULL || lenp == NULL)
-		return((unsigned long)-1);
-	if (*cpp != NULL && *lenp < 7)
-		return((unsigned long)-1);
-	/*
-	 * Decide whether we have a buffer passed to us,
-	 * or if we need to use our own static buffer.
-	 */
-	if (*cpp) {
-		lsrp = *cpp;
-		lsrep = lsrp + *lenp;
-	} else {
-		*cpp = lsrp = lsr;
-		lsrep = lsrp + 44;
-	}
+	if (cpp == NULL)
+		return -1;
 
 	cp = arg;
 
-	/*
-	 * Next, decide whether we have a loose source
-	 * route or a strict source route, and fill in
-	 * the begining of the option.
-	 */
+	*cpp = NULL;
+
+	  /* init these just in case.... */
+	lsrp = NULL;
+	lsrep = NULL;
+#ifdef INET6
+	cmsg = NULL;
+#endif
+	
+	switch (ai->ai_family) {
+	case AF_INET:
+		lsrp = lsr;
+		lsrep = lsrp + sizeof(lsr);
+
+		/*
+		 * Next, decide whether we have a loose source
+		 * route or a strict source route, and fill in
+		 * the begining of the option.
+		 */
 #ifndef	sysV88
-	if (*cp == '!') {
-		cp++;
-		*lsrp++ = IPOPT_SSRR;
-	} else
-		*lsrp++ = IPOPT_LSRR;
+		if (*cp == '!') {
+			cp++;
+			*lsrp++ = IPOPT_SSRR;
+		} else
+			*lsrp++ = IPOPT_LSRR;
 #else
-	if (*cp == '!') {
-		cp++;
-		ipopt.io_type = IPOPT_SSRR;
-	} else
-		ipopt.io_type = IPOPT_LSRR;
+		if (*cp == '!') {
+			cp++;
+			ipopt.io_type = IPOPT_SSRR;
+		} else
+			ipopt.io_type = IPOPT_LSRR;
 #endif
-
-	if (*cp != '@')
-		return((unsigned long)-1);
-
+		if (*cp != '@')
+			return -1;
 #ifndef	sysV88
-	lsrp++;		/* skip over length, we'll fill it in later */
-	*lsrp++ = 4;
+		lsrp++;		/* skip over length, we'll fill it in later */
+		*lsrp++ = 4;
 #endif
+		cp++;
+		*protop = IPPROTO_IP;
+		*optp = IP_OPTIONS;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		cmsg = inet6_rthdr_init(rhbuf, IPV6_RTHDR_TYPE_0);
+		if (*cp != '@')
+			return -1;
+		cp++;
+		*protop = IPPROTO_IPV6;
+		*optp = IPV6_PKTOPTIONS;
+		break;
+#endif
+	default:
+		return -1;
+	}
 
-	cp++;
-
-	sin_addr.s_addr = 0;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = ai->ai_family;
+	hints.ai_socktype = SOCK_STREAM;
 
 	for (c = 0;;) {
 		if (c == ':')
@@ -2803,58 +3048,86 @@ sourceroute(arg, cpp, lenp)
 					cp2++;
 			} else if (c == '@') {
 				*cp2++ = '\0';
-			} else if (c == ':') {
+			}
+#if 0	/*colon conflicts with IPv6 address*/
+			else if (c == ':') {
 				*cp2++ = '\0';
-			} else
+			}
+#endif
+			else
 				continue;
 			break;
 		}
 		if (!c)
 			cp2 = 0;
 
-		if ((tmp = inet_addr(cp)) != INADDR_NONE) {
-			sin_addr.s_addr = tmp;
-		} else if ((host = gethostbyname(cp)) != NULL) {
-#if	defined(h_addr)
-			memmove((caddr_t)&sin_addr,
-				host->h_addr_list[0], host->h_length);
-#else
-			memmove((caddr_t)&sin_addr, host->h_addr, host->h_length);
-#endif
-		} else {
-			*cpp = cp;
-			return(0);
+		error = getaddrinfo(cp, NULL, &hints, &res);
+		if (error) {
+			fprintf(stderr, "%s: %s\n", cp, gai_strerror(error));
+			return -1;
 		}
-		memmove(lsrp, (char *)&sin_addr, 4);
-		lsrp += 4;
+		if (ai->ai_family != res->ai_family) {
+			freeaddrinfo(res);
+			return -1;
+		}
+		if (ai->ai_family == AF_INET) {
+			/*
+			 * Check to make sure there is space for address
+			 */
+			if (lsrp + 4 > lsrep) {
+				freeaddrinfo(res);
+				return -1;
+			}
+			sin = (struct sockaddr_in *)res->ai_addr;
+			memcpy(lsrp, &sin->sin_addr, sizeof(struct in_addr));
+			lsrp += sizeof(struct in_addr);
+		}
+#ifdef INET6
+		else if (ai->ai_family == AF_INET6) {
+			sin6 = (struct sockaddr_in6 *)res->ai_addr;
+			inet6_rthdr_add(cmsg, &sin6->sin6_addr,
+				IPV6_RTHDR_LOOSE);
+		}
+#endif
+		else {
+			freeaddrinfo(res);
+			return -1;
+		}
+		freeaddrinfo(res);
 		if (cp2)
 			cp = cp2;
 		else
 			break;
-		/*
-		 * Check to make sure there is space for next address
-		 */
+	}
+	if (ai->ai_family == AF_INET) {
+		/* record the last hop */
 		if (lsrp + 4 > lsrep)
-			return((unsigned long)-1);
-	}
+			return -1;
+		sin = (struct sockaddr_in *)ai->ai_addr;
+		memcpy(lsrp, &sin->sin_addr, sizeof(struct in_addr));
+		lsrp += sizeof(struct in_addr);
 #ifndef	sysV88
-	if ((*(*cpp+IPOPT_OLEN) = lsrp - *cpp) <= 7) {
-		*cpp = 0;
-		*lenp = 0;
-		return((unsigned long)-1);
-	}
-	*lsrp++ = IPOPT_NOP; /* 32 bit word align it */
-	*lenp = lsrp - *cpp;
+		lsr[IPOPT_OLEN] = lsrp - lsr;
+		if (lsr[IPOPT_OLEN] <= 7 || lsr[IPOPT_OLEN] > 40)
+			return -1;
+		*lsrp++ = IPOPT_NOP;	/*32bit word align*/
+		len = lsrp - lsr;
+		*cpp = lsr;
 #else
-	ipopt.io_len = lsrp - *cpp;
-	if (ipopt.io_len <= 5) {		/* Is 3 better ? */
-		*cpp = 0;
-		*lenp = 0;
-		return((unsigned long)-1);
+		ipopt.io_len = lsrp - lsr;
+		if (ipopt.io_len <= 5)	/*is 3 better?*/
+			return -1;
+		*cpp = (char 8)&ipopt;
+#endif
 	}
-	*lenp = sizeof(ipopt);
-	*cpp = (char *) &ipopt;
+#ifdef INET6
+	else if (ai->ai_family == AF_INET6) {
+		inet6_rthdr_lasthop(cmsg, IPV6_RTHDR_LOOSE);
+		len = cmsg->cmsg_len;
+		*cpp = rhbuf;
+	}
 #endif
-	return(sin_addr.s_addr);
+	else
+		return -1;
+	return len;
 }
-#endif

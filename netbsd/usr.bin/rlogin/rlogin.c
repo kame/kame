@@ -1,4 +1,4 @@
-/*	$NetBSD: rlogin.c,v 1.21.2.1 1999/04/30 16:34:58 perry Exp $	*/
+/*	$NetBSD: rlogin.c,v 1.24 2000/01/31 14:19:35 itojun Exp $	*/
 
 /*
  * Copyright (c) 1983, 1990, 1993
@@ -43,7 +43,7 @@ __COPYRIGHT("@(#) Copyright (c) 1983, 1990, 1993\n\
 #if 0
 static char sccsid[] = "@(#)rlogin.c	8.4 (Berkeley) 4/29/95";
 #else
-__RCSID("$NetBSD: rlogin.c,v 1.21.2.1 1999/04/30 16:34:58 perry Exp $");
+__RCSID("$NetBSD: rlogin.c,v 1.24 2000/01/31 14:19:35 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -172,11 +172,9 @@ main(argc, argv)
 	struct rlimit rlim;
 #ifdef KERBEROS
 	KTEXT_ST ticket;
-	char **orig_argv = argv;
 	int sock;
 	long authopts;
 	int through_once = 0;
-	char *cp = (char *) NULL;
 	extern int _kstream_des_debug_OOB;
 	char *dest_realm = NULL;
 #endif
@@ -402,12 +400,13 @@ try_connect:
 		if (doencrypt)
 			errx(1, "the -x flag requires Kerberos authentication.");
 #endif /* CRYPT */
-		rem = rcmd(&host, sp->s_port, name, user, term, 0);
+		rem = rcmd_af(&host, sp->s_port, name, user, term, 0,
+		    PF_UNSPEC);
 		if (rem < 0)
 			exit(1);
 	}
 #else
-	rem = rcmd(&host, sp->s_port, name, user, term, 0);
+	rem = rcmd_af(&host, sp->s_port, name, user, term, 0, PF_UNSPEC);
 
 #endif /* KERBEROS */
 
@@ -417,9 +416,19 @@ try_connect:
 	if (dflag &&
 	    setsockopt(rem, SOL_SOCKET, SO_DEBUG, &one, sizeof(one)) < 0)
 		warn("setsockopt DEBUG (ignored)");
-	one = IPTOS_LOWDELAY;
-	if (setsockopt(rem, IPPROTO_IP, IP_TOS, (char *)&one, sizeof(int)) < 0)
-		warn("setsockopt TOS (ignored)");
+    {
+	struct sockaddr_storage ss;
+	int sslen;
+	sslen = sizeof(ss);
+	if (getsockname(rem, (struct sockaddr *)&ss, &sslen) == 0
+	 && ((struct sockaddr *)&ss)->sa_family == AF_INET) {
+		one = IPTOS_LOWDELAY;
+		if (setsockopt(rem, IPPROTO_IP, IP_TOS, (char *)&one,
+				sizeof(int)) < 0) {
+			warn("setsockopt TOS (ignored)");
+		}
+	}
+    }
 
 	(void)setuid(uid);
 	doit(&smask);
@@ -628,15 +637,15 @@ writer()
 				stop(0);
 				continue;
 			}
-			if (c != escapechar)
+			if (c != escapechar) {
 #ifdef KERBEROS
-				if (use_kerberos) {
+				if (use_kerberos)
 					(void)kstream_write(krem,
-				    	(char *)&escapechar, 1);
-				}
+					    (char *)&escapechar, 1);
 				else
 #endif
-				(void)write(rem, &escapechar, 1);
+					(void)write(rem, &escapechar, 1);
+			}
 		}
 
 #ifdef KERBEROS

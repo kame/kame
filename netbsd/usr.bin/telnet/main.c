@@ -1,4 +1,4 @@
-/*	$NetBSD: main.c,v 1.8 1998/02/28 12:16:56 enami Exp $	*/
+/*	$NetBSD: main.c,v 1.12.4.2 2001/03/11 21:23:57 he Exp $	*/
 
 /*
  * Copyright (c) 1988, 1990, 1993
@@ -43,7 +43,7 @@ __COPYRIGHT("@(#) Copyright (c) 1988, 1990, 1993\n\
 #if 0
 static char sccsid[] = "@(#)main.c	8.3 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: main.c,v 1.8 1998/02/28 12:16:56 enami Exp $");
+__RCSID("$NetBSD: main.c,v 1.12.4.2 2001/03/11 21:23:57 he Exp $");
 #endif
 #endif /* not lint */
 
@@ -54,6 +54,12 @@ __RCSID("$NetBSD: main.c,v 1.8 1998/02/28 12:16:56 enami Exp $");
 #include "ring.h"
 #include "externs.h"
 #include "defines.h"
+#ifdef AUTHENTICATION
+#include <libtelnet/auth.h>
+#endif
+#ifdef ENCRYPTION
+#include <libtelnet/encrypt.h>
+#endif
 
 /* These values need to be the same as defined in libtelnet/kerberos5.c */
 /* Either define them in both places, or put in some common header file. */
@@ -62,6 +68,11 @@ __RCSID("$NetBSD: main.c,v 1.8 1998/02/28 12:16:56 enami Exp $");
 
 #if 0
 #define FORWARD
+#endif
+
+#if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
+char *ipsec_policy_in = NULL;
+char *ipsec_policy_out = NULL;
 #endif
 
 int main P((int, char *[]));
@@ -91,10 +102,10 @@ usage()
 	fprintf(stderr, "Usage: %s %s%s%s%s\n",
 	    prompt,
 #ifdef	AUTHENTICATION
-	    "[-8] [-E] [-K] [-L] [-S tos] [-X atype] [-a] [-c] [-d] [-e char]",
-	    "\n\t[-k realm] [-l user] [-f/-F] [-n tracefile] ",
+	    "[-8] [-E] [-K] [-L] [-N] [-S tos] [-X atype] [-a] [-c] [-d]",
+	    "\n\t[-e char] [-k realm] [-l user] [-f/-F] [-n tracefile] ",
 #else
-	    "[-8] [-E] [-L] [-S tos] [-a] [-c] [-d] [-e char] [-l user]",
+	    "[-8] [-E] [-L] [-N] [-S tos] [-a] [-c] [-d] [-e char] [-l user]",
 	    "\n\t[-n tracefile]",
 #endif
 #if defined(TN3270) && defined(unix)
@@ -106,7 +117,14 @@ usage()
 #else
 	    "[-r] ",
 #endif
+#ifdef	ENCRYPTION
+	    "[-x] "
+#endif
+#if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
+	    "[-P policy] [host-name [port]]"
+#else
 	    "[host-name [port]]"
+#endif
 	);
 	exit(1);
 }
@@ -146,7 +164,14 @@ main(argc, argv)
 	rlogin = (strncmp(prompt, "rlog", 4) == 0) ? '~' : _POSIX_VDISABLE;
 	autologin = -1;
 
-	while ((ch = getopt(argc, argv, "8EKLS:X:acde:fFk:l:n:rt:x")) != -1) {
+#if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
+#define IPSECOPT	"P:"
+#else
+#define IPSECOPT
+#endif
+	while ((ch = getopt(argc, argv, "8EKLNS:X:acde:fFk:l:n:rt:x"
+			IPSECOPT)) != -1) {
+#undef IPSECOPT
 		switch(ch) {
 		case '8':
 			eight = 3;	/* binary output and input */
@@ -161,6 +186,9 @@ main(argc, argv)
 			break;
 		case 'L':
 			eight |= 2;	/* binary output only */
+			break;
+		case 'N':
+			doaddrlookup = 0;
 			break;
 		case 'S':
 		    {
@@ -241,7 +269,9 @@ main(argc, argv)
 #endif
 			break;
 		case 'l':
-			autologin = 1;
+			if(autologin == 0) {
+				autologin = -1;
+			}
 			user = optarg;
 			break;
 		case 'n':
@@ -274,16 +304,42 @@ main(argc, argv)
 #endif
 			break;
 		case 'x':
+#ifdef	ENCRYPTION
+			encrypt_auto(1);
+			decrypt_auto(1);
+#else	/* ENCRYPTION */
 			fprintf(stderr,
 			    "%s: Warning: -x ignored, no ENCRYPT support.\n",
 								prompt);
+#endif	/* ENCRYPTION */
 			break;
+#if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
+		case 'P':
+			if (!strncmp("in", optarg, 2))
+				ipsec_policy_in = strdup(optarg);
+			else if (!strncmp("out", optarg, 3)) 
+				ipsec_policy_out = strdup(optarg);
+			else
+				usage();
+			break;
+#endif
 		case '?':
 		default:
 			usage();
 			/* NOTREACHED */
 		}
 	}
+
+	if (autologin == -1) {		/* esc@magic.fi; force  */
+#if defined(AUTHENTICATION)
+		autologin = 1;
+#endif
+#if defined(ENCRYPTION)
+		encrypt_auto(1);
+		decrypt_auto(1);
+#endif
+	}
+
 	if (autologin == -1)
 		autologin = (rlogin == _POSIX_VDISABLE) ? 0 : 1;
 

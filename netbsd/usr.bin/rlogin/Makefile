@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.12 1999/02/18 21:22:51 scottr Exp $
+#	$NetBSD: Makefile,v 1.15.2.1 2000/10/18 04:20:57 tv Exp $
 #	@(#)Makefile	8.1 (Berkeley) 7/19/93
 
 PROG=	rlogin
@@ -6,6 +6,13 @@ SRCS=	rlogin.c
 
 BINOWN=	root
 BINMODE=4555
-#INSTALLFLAGS=-fschg
+
+# XXX Kerberos support broken right now.
+
+#SRCS+=	kcmd.c
+#CPPFLAGS+=-DKERBEROS -DCRYPT
+
+#DPADD+= ${LIBKSTREAM} ${LIBKRB} ${LIBDES} ${LIBCOM_ERR}
+#LDADD+= -lkstream -lkrb -ldes -lcom_err
 
 .include <bsd.prog.mk>

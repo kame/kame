@@ -1,4 +1,4 @@
-/*	$NetBSD: telnet.c,v 1.12.2.1 2000/01/08 18:09:59 he Exp $	*/
+/*	$NetBSD: telnet.c,v 1.15.4.2 2001/03/11 21:24:15 he Exp $	*/
 
 /*
  * Copyright (c) 1988, 1990, 1993
@@ -38,15 +38,16 @@
 #if 0
 static char sccsid[] = "@(#)telnet.c	8.4 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: telnet.c,v 1.12.2.1 2000/01/08 18:09:59 he Exp $");
+__RCSID("$NetBSD: telnet.c,v 1.15.4.2 2001/03/11 21:24:15 he Exp $");
 #endif
 #endif /* not lint */
 
-#include <sys/types.h>
+#include <sys/param.h>
 
 #if	defined(unix)
 #include <signal.h>
 #include <termcap.h>
+#include <unistd.h>
 /* By the way, we need to include curses.h before telnet.h since,
  * among other things, telnet.h #defines 'DO', which is a variable
  * declared in curses.h.
@@ -63,6 +64,14 @@ __RCSID("$NetBSD: telnet.c,v 1.12.2.1 2000/01/08 18:09:59 he Exp $");
 #include "externs.h"
 #include "types.h"
 #include "general.h"
+
+#include <libtelnet/misc.h>
+#ifdef AUTHENTICATION
+#include <libtelnet/auth.h>
+#endif
+#ifdef ENCRYPTION
+#include <libtelnet/encrypt.h>
+#endif
 
 
 #define	strip(x) ((my_want_state_is_wont(TELOPT_BINARY)) ? ((x)&0x7f) : (x))
@@ -113,6 +122,7 @@ int
 	donebinarytoggle,	/* the user has put us in binary */
 	dontlecho,	/* do we suppress local echoing right now? */
 	globalmode,
+	doaddrlookup = 1, /* do a reverse address lookup? */
 	clienteof = 0;
 
 char *prompt = 0;
@@ -193,9 +203,9 @@ init_telnet()
     ClearArray(options);
 
     connected = In3270 = ISend = localflow = donebinarytoggle = 0;
-#if	defined(AUTHENTICATION)
+#if	defined(AUTHENTICATION) || defined(ENCRYPTION)
     auth_encrypt_connect(connected);
-#endif	/* defined(AUTHENTICATION)  */
+#endif	/* defined(AUTHENTICATION) || defined(ENCRYPTION) */
     restartany = -1;
 
     SYNCHing = 0;
@@ -384,6 +394,9 @@ willoption(option)
 	    case TELOPT_STATUS:
 #if	defined(AUTHENTICATION)
 	    case TELOPT_AUTHENTICATION:
+#ifdef	ENCRYPTION
+	    case TELOPT_ENCRYPT:
+#endif	/* ENCRYPTION */
 #endif
 		new_state_ok = 1;
 		break;
@@ -414,6 +427,10 @@ willoption(option)
 	    }
 	}
 	set_my_state_do(option);
+#ifdef	ENCRYPTION
+	if (option == TELOPT_ENCRYPT)
+		encrypt_send_support();
+#endif	/* ENCRYPTION */
 }
 
 	void
@@ -501,6 +518,9 @@ dooption(option)
 	    case TELOPT_LFLOW:		/* local flow control */
 	    case TELOPT_TTYPE:		/* terminal type option */
 	    case TELOPT_SGA:		/* no big deal */
+#ifdef	ENCRYPTION
+	    case TELOPT_ENCRYPT:	/* encryption variable option */
+#endif	/* ENCRYPTION */
 		new_state_ok = 1;
 		break;
 
@@ -747,7 +767,7 @@ is_unique(name, as, ae)
 }
 
 #ifdef	TERMCAP
-char termbuf[1024];
+char *termbuf;
 
 	/*ARGSUSED*/
 	int
@@ -755,12 +775,33 @@ setup_term(tname, fd, errp)
 	char *tname;
 	int fd, *errp;
 {
+	char zz[1024], *zz_ptr;
+	char *ext_tc, *newptr;
+	
+	if ((termbuf = (char *) malloc(1024)) == NULL)
+		goto error;
+	
 	if (tgetent(termbuf, tname) == 1) {
-		termbuf[1023] = '\0';
+		  /* check for ZZ capability, which indicates termcap truncated */
+		zz_ptr = zz;
+		if (tgetstr("ZZ", &zz_ptr) != NULL) {
+			  /* it was, fish back the full termcap */
+			sscanf(zz, "%p", &ext_tc);
+			if ((newptr = (char *) realloc(termbuf,
+						       strlen(ext_tc) + 1))
+			    == NULL) {
+				goto error;
+			}
+
+			strcpy(newptr, ext_tc);
+			termbuf = newptr;
+		}
+
 		if (errp)
 			*errp = 1;
 		return(0);
 	}
+  error:
 	if (errp)
 		*errp = 0;
 	return(-1);
@@ -1010,6 +1051,67 @@ suboption()
 	}
 	break;
 #endif
+#ifdef	ENCRYPTION
+    case TELOPT_ENCRYPT:
+	if (SB_EOF())
+		return;
+	switch(SB_GET()) {
+	case ENCRYPT_START:
+		if (my_want_state_is_dont(TELOPT_ENCRYPT))
+			return;
+		encrypt_start(subpointer, SB_LEN());
+		break;
+	case ENCRYPT_END:
+		if (my_want_state_is_dont(TELOPT_ENCRYPT))
+			return;
+		encrypt_end();
+		break;
+	case ENCRYPT_SUPPORT:
+		if (my_want_state_is_wont(TELOPT_ENCRYPT))
+			return;
+		encrypt_support(subpointer, SB_LEN());
+		break;
+	case ENCRYPT_REQSTART:
+		if (my_want_state_is_wont(TELOPT_ENCRYPT))
+			return;
+		encrypt_request_start(subpointer, SB_LEN());
+		break;
+	case ENCRYPT_REQEND:
+		if (my_want_state_is_wont(TELOPT_ENCRYPT))
+			return;
+		/*
+		 * We can always send an REQEND so that we cannot
+		 * get stuck encrypting.  We should only get this
+		 * if we have been able to get in the correct mode
+		 * anyhow.
+		 */
+		encrypt_request_end();
+		break;
+	case ENCRYPT_IS:
+		if (my_want_state_is_dont(TELOPT_ENCRYPT))
+			return;
+		encrypt_is(subpointer, SB_LEN());
+		break;
+	case ENCRYPT_REPLY:
+		if (my_want_state_is_wont(TELOPT_ENCRYPT))
+			return;
+		encrypt_reply(subpointer, SB_LEN());
+		break;
+	case ENCRYPT_ENC_KEYID:
+		if (my_want_state_is_dont(TELOPT_ENCRYPT))
+			return;
+		encrypt_enc_keyid(subpointer, SB_LEN());
+		break;
+	case ENCRYPT_DEC_KEYID:
+		if (my_want_state_is_wont(TELOPT_ENCRYPT))
+			return;
+		encrypt_dec_keyid(subpointer, SB_LEN());
+		break;
+	default:
+		break;
+	}
+	break;
+#endif	/* ENCRYPTION */
     default:
 	break;
     }
@@ -1701,6 +1803,10 @@ telrcv()
 	}
 
 	c = *sbp++ & 0xff, scc--; count++;
+#ifdef	ENCRYPTION
+	if (decrypt_input)
+		c = (*decrypt_input)(c);
+#endif	/* ENCRYPTION */
 
 	switch (telrcv_state) {
 
@@ -1725,6 +1831,10 @@ telrcv()
 		*Ifrontp++ = c;
 		while (scc > 0) {
 		    c = *sbp++ & 0377, scc--; count++;
+#ifdef	ENCRYPTION
+		    if (decrypt_input)
+			c = (*decrypt_input)(c);
+#endif	/* ENCRYPTION */
 		    if (c == IAC) {
 			telrcv_state = TS_IAC;
 			break;
@@ -1743,6 +1853,10 @@ telrcv()
 	    if ((c == '\r') && my_want_state_is_dont(TELOPT_BINARY)) {
 		if (scc > 0) {
 		    c = *sbp&0xff;
+#ifdef	ENCRYPTION
+		    if (decrypt_input)
+			c = (*decrypt_input)(c);
+#endif	/* ENCRYPTION */
 		    if (c == 0) {
 			sbp++, scc--; count++;
 			/* a "true" CR */
@@ -1752,6 +1866,10 @@ telrcv()
 			sbp++, scc--; count++;
 			TTYADD('\n');
 		    } else {
+#ifdef	ENCRYPTION
+			if (decrypt_input)
+			    (*decrypt_input)(-1);
+#endif	/* ENCRYPTION */
 
 			TTYADD('\r');
 			if (crmod) {
@@ -2010,7 +2128,7 @@ telsnd()
 		}
 		if ((sc == '\n') || (sc == '\r'))
 			bol = 1;
-	} else if (sc == escape) {
+	} else if (sc == escape && escape != _POSIX_VDISABLE) {
 	    /*
 	     * Double escape is a pass through of a single escape character.
 	     */
@@ -2188,7 +2306,7 @@ telnet(user)
 {
     sys_telnet_init();
 
-#if	defined(AUTHENTICATION)
+#if	defined(AUTHENTICATION) || defined(ENCRYPTION)
     {
 	static char local_host[MAXHOSTNAMELEN + 1] = { 0 };
 
@@ -2199,13 +2317,17 @@ telnet(user)
 	auth_encrypt_init(local_host, hostname, "TELNET", 0);
 	auth_encrypt_user(user);
     }
-#endif	/* defined(AUTHENTICATION)  */
+#endif	/* defined(AUTHENTICATION) || defined(ENCRYPTION) */
 #   if !defined(TN3270)
     if (telnetport) {
 #if	defined(AUTHENTICATION)
 	if (autologin)
 		send_will(TELOPT_AUTHENTICATION, 1);
 #endif
+#ifdef	ENCRYPTION
+	send_do(TELOPT_ENCRYPT, 1);
+	send_will(TELOPT_ENCRYPT, 1);
+#endif	/* ENCRYPTION */
 	send_do(TELOPT_SGA, 1);
 	send_will(TELOPT_TTYPE, 1);
 	send_will(TELOPT_NAWS, 1);
