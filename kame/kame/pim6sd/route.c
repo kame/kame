@@ -1,4 +1,4 @@
-/*	$KAME: route.c,v 1.27 2003/09/02 09:48:45 suz Exp $	*/
+/*	$KAME: route.c,v 1.28 2004/05/19 14:05:03 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -163,40 +163,36 @@ set_incoming(srcentry_ptr, srctype)
     srcentry_ptr->metric = 0;
     srcentry_ptr->preference = 0;
 
-    if ((srcentry_ptr->incoming = local_address(&source)) != NO_VIF)
-    {
-	/* The source is a local address */
+    /* The source is a local address */
+    if ((srcentry_ptr->incoming = local_address(&source)) != NO_VIF) {
+    	/* iif of (*,G) at RP has to be register_if */
+	if (srctype == PIM_IIF_RP)
+		srcentry_ptr->incoming = reg_vif_num;
+
 	/* TODO: set the upstream to myself? */
-	srcentry_ptr->upstream = (pim_nbr_entry_t *) NULL;
+	srcentry_ptr->upstream = NULL;
 	return (TRUE);
     }
 
-    if ((srcentry_ptr->incoming = find_vif_direct(&source)) != NO_VIF)
-    {
+    if ((srcentry_ptr->incoming = find_vif_direct(&source)) != NO_VIF) {
 	/*
 	 * The source is directly connected. Check whether we are looking for
 	 * real source or RP
 	 */
 
-	if (srctype == PIM_IIF_SOURCE)
-	{
-	    srcentry_ptr->upstream = (pim_nbr_entry_t *) NULL;
+	if (srctype == PIM_IIF_SOURCE) {
+	    srcentry_ptr->upstream = NULL;
 	    return (TRUE);
-	}
-	else
-	{
+	} else {
 	    /* PIM_IIF_RP */
 	    neighbor_addr = source;
 	}
-    }
-    else
-    {
+    } else {
 	/* TODO: probably need to check the case if the iif is disabled */
 	/* Use the lastest resource: the kernel unicast routing table */
 	k_req_incoming(&source, &rpfc);
 	if ((rpfc.iif == NO_VIF) ||
-	    IN6_IS_ADDR_UNSPECIFIED(&rpfc.rpfneighbor.sin6_addr))
-	{
+	    IN6_IS_ADDR_UNSPECIFIED(&rpfc.rpfneighbor.sin6_addr)) {
 	    /* couldn't find a route */
 	    IF_DEBUG(DEBUG_PIM_MRT | DEBUG_RPF)
 		log_msg(LOG_DEBUG, 0, "NO ROUTE found for %s", sa6_fmt(&source));
@@ -216,8 +212,7 @@ set_incoming(srcentry_ptr, srctype)
      */
     v = &uvifs[srcentry_ptr->incoming];
 
-    for (n = v->uv_pim_neighbors; n != NULL; n = n->next)
-    {
+    for (n = v->uv_pim_neighbors; n != NULL; n = n->next) {
 	struct phaddr *pa;
 
 #if 0
@@ -225,8 +220,7 @@ set_incoming(srcentry_ptr, srctype)
 	if (inet6_lessthan(&neighbor_addr, &n->address))
 	    continue;
 #endif
-	if (inet6_equal(&neighbor_addr, &n->address))
-	{
+	if (inet6_equal(&neighbor_addr, &n->address)) {
 	    /*
 	     * The upstream router is found in the list of neighbors. We are
 	     * safe!
@@ -269,7 +263,7 @@ set_incoming(srcentry_ptr, srctype)
 	sa6_fmt(&source), mif_name(srcentry_ptr->incoming),
 	sa6_fmt(&neighbor_addr));
 
-    srcentry_ptr->upstream = (pim_nbr_entry_t *) NULL;
+    srcentry_ptr->upstream = NULL;
 
     return (FALSE);
 }
