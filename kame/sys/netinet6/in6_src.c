@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.82 2001/10/01 12:46:16 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.83 2001/10/01 12:51:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -441,13 +441,14 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 		if (ia_best->ia_ifp != ifp && ia->ia_ifp == ifp)
 			REPLACE(5);
 
-		/* Rule 6: Prefer matching label */
+		/*
+		 * Rule 6: Prefer matching label
+		 * Note that best_policy should be non-NULL here.
+		 */
 		if (dst_policy == NULL)
 			dst_policy = lookup_addrsel_policy(dstsock);
 		if (dst_policy->label != ADDR_LABEL_NOTAPP) {
 			new_policy = lookup_addrsel_policy(&ia->ia_addr);
-			if (best_policy == NULL)
-				best_policy = lookup_addrsel_policy(&ia_best->ia_addr);
 			if (dst_policy->label == best_policy->label &&
 			    dst_policy->label != new_policy->label)
 				NEXT(6);
