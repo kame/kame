@@ -33,7 +33,7 @@
  *
  * Author:  Mattias Pettersson <mattias.pettersson@era.ericsson.se>
  *
- * $Id: mip6_md.c,v 1.2 2000/02/07 18:17:32 itojun Exp $
+ * $Id: mip6_md.c,v 1.3 2000/02/08 04:21:36 itojun Exp $
  *
  */
 
@@ -576,15 +576,11 @@ mip6_select_defrtr()
                         mip6_debug("Removing cached routes for protocol %d. "
                               "Ref count = %d\n", pr->pr_protocol, 
                               rt->rt_refcnt);
-#endif
-/*                        mip6_debug("Removing cached routes for all protocols, "
+                        mip6_debug("Removing cached routes for all protocols, "
                           "Ref count = %d\n", rt->rt_refcnt);*/
-#if 0
                         (*pr->pr_ctlinput)(PRC_REDIRECT_HOST, rt_key(rt),
                                            NULL, NULL, 0);
-#endif
-/*                        pfctlinput(PRC_REDIRECT_HOST, rt_key(rt));*/
-#if 0
+                        pfctlinput(PRC_REDIRECT_HOST, rt_key(rt));
                     }
                 }
 #endif
@@ -593,9 +589,13 @@ mip6_select_defrtr()
                 key_sa_routechange(rt_key(rt));
 #endif
                 
+#ifdef MIP6_DEBUG
                 mip6_debug("Ref count = %d, now pfctlinput\n", rt->rt_refcnt);
+#endif
                 pfctlinput(PRC_REDIRECT_HOST, rt_key(rt)); /* New era */
+#ifdef MIP6_DEBUG
                 mip6_debug("Ref count = %d, now rt_mip6msg\n", rt->rt_refcnt);
+#endif
                 
                 rt_mip6msg(RTM_DELETE, ifp, rt); /* Useless? */
 
@@ -635,7 +635,9 @@ mip6_select_defrtr()
                 }
 #endif
 
+#ifdef MIP6_DEBUG
                 mip6_debug("Ref count = %d, now RTM_DELETE\n", rt->rt_refcnt);
+#endif
                 nd6_free(rt);
                 
             }
@@ -820,13 +822,17 @@ mip6_expired_defrouter(struct nd_defrouter *dr)
         if (++(dr->advints_lost) < mip6_max_lost_advints) {
             /* advints_lost starts at 0. max = 1 (eller mer). */
             dr->advint_expire = time_second + dr->advint / 1000;
+#ifdef MIP6_DEBUG
             mip6_debug("Adv Int #%d lost from router %s.\n", dr->advints_lost, 
                   ip6_sprintf(&dr->rtaddr));
+#endif
         }
         else {
             dr->advint_expire = 0;
+#ifdef MIP6_DEBUG
             mip6_debug("Adv Int #%d lost from router %s.\n", dr->advints_lost, 
                   ip6_sprintf(&dr->rtaddr));
+#endif
             mip6_probe_defrouter(dr);
         }
     }
@@ -960,17 +966,20 @@ void
 mip6_delete_ifaddr(struct in6_addr *addr,
                    struct ifnet *ifp)
 {
-	struct in6_aliasreq  in6_addreq;
+    struct in6_aliasreq  in6_addreq;
     int s, error = 0;
     
-	bzero(&in6_addreq, sizeof(in6_addreq));
-	in6_addreq.ifra_addr.sin6_len = sizeof(in6_addreq.ifra_addr);
-	in6_addreq.ifra_addr.sin6_family = AF_INET6;
-	in6_addreq.ifra_addr.sin6_addr = *addr;
-    
+    bzero(&in6_addreq, sizeof(in6_addreq));
+    in6_addreq.ifra_addr.sin6_len = sizeof(in6_addreq.ifra_addr);
+    in6_addreq.ifra_addr.sin6_family = AF_INET6;
+    in6_addreq.ifra_addr.sin6_addr = *addr;
+
     s =splnet();
-    error = in6_control(NULL, SIOCDIFADDR_IN6, (caddr_t)&in6_addreq, 
-                        ifp, NULL);
+    error = in6_control(NULL, SIOCDIFADDR_IN6, (caddr_t)&in6_addreq, ifp
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+			    , NULL
+#endif
+			    );
     splx(s);
     if (error) {
 #ifdef MIP6_DEBUG

@@ -33,7 +33,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6_mn.c,v 1.2 2000/02/07 17:48:33 itojun Exp $
+ * $Id: mip6_mn.c,v 1.3 2000/02/08 04:21:36 itojun Exp $
  *
  */
 
@@ -2990,15 +2990,15 @@ int mip6_write_config_data_mn(u_long cmd, void *arg)
 	input = (struct mip6_input_data *) arg;
 	np = (struct mip6_static_addr *)
 	    malloc(sizeof(struct mip6_static_addr), M_TEMP, M_WAITOK);
-		    if (np == NULL)
-	    return SYS_CALL_FAILED;
+	if (np == NULL)
+	    return ENOBUFS;
 
 	np->ip6_addr = input->ip6_addr;
 	np->prefix_len = input->prefix_len;
 	np->ifp = ifunit(input->if_name);
 	if (np->ifp == NULL) {
 	    strncpy(ifn, input->if_name, sizeof(ifn));
-	    return INVALID_IFNAME;
+	    return EINVAL;
 	}
 	LIST_INSERT_HEAD(&mip6_config.fna_list, np, addr_entry);
 	break;
@@ -3007,13 +3007,13 @@ int mip6_write_config_data_mn(u_long cmd, void *arg)
 	input = (struct mip6_input_data *) arg;
 	ifp = ifunit(input->if_name);
 	if (ifp == NULL)
-	    return INVALID_IFNAME;
+	    return EINVAL;
 	
 	p = mip6_esm_create(ifp, NULL, &input->ha_addr, &any,
 			    &input->ip6_addr, input->prefix_len,
 			    MIP6_STATE_UNDEF, PERMANENT, 0xFFFF);
 	if (p == NULL)
-	    return SYS_CALL_FAILED;
+	    return EINVAL;	/*XXX*/
 
 	break;
 
@@ -3033,7 +3033,7 @@ int mip6_write_config_data_mn(u_long cmd, void *arg)
 		break;
 	}
 	if (np == NULL){
-	    retval = ADDR_NOT_FOUND;
+	    retval = EADDRNOTAVAIL;
 	    return retval;
 	}
 	LIST_REMOVE(np, addr_entry);
@@ -3070,7 +3070,7 @@ int mip6_clear_config_data_mn(u_long cmd, caddr_t data)
 	break;
 
     case SIOCSHADDRFLUSH_MIP6:
-	retval = FUNC_NOT_ALLOWED;
+	retval = EINVAL;
 	break;
 
     case SIOCSBULISTFLUSH_MIP6:
