@@ -1,0 +1,8 @@
+SRCS=	bicdtest.c
+OBJS=	bindtest.o 
+
+bindtest: $(OBJS)
+bindtest.o: bindtest.c
+
+clean:
+	-rm -f bindtest.o bindtest
