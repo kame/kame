@@ -1968,12 +1968,18 @@ tcp6_maxseg(t6p, maxseg)
 	register struct tcp6cb *t6p;
 	register u_int maxseg;
 {
+#if 0
 	/*
 	 * See whether we (may) need to save space
 	 * for timestamp options.
+	 *
+	 * BSDI3 TCP BUG?: timetstamp option length was decremented twice and
+	 * it wasted 12 bytes on every tcp packet.
+	 * (decremented here and tcp6_output)
 	 */
 	if (t6p->t_flags & TF_USE_SCALE)
 		maxseg -= TCP6OLEN_TSTAMP_APPA;
+#endif
 	return(tcp6_mss_round(maxseg));
 }
 
@@ -2127,19 +2133,6 @@ tcp6_peer_mss(t6p, offer)
 		if (tcp6_pmtu == 0 && !in6_localaddr(&in6p->in6p_faddr))
 			mss = min(mss, tcp6_mssdflt);
 	}
-	mss -= ip6_optlen(in6p);
-#ifdef IPSEC
-    {
-	int tmp;
-
-	/* plug for AH/ESP. */
-	tmp = ipsec6_hdrsiz_tcp(t6p);
-	if (mss > tmp)
-		mss -= tmp;
-	else
-		printf("tcp6_peer_mss: invalid mss(IPsec) %d\n", tmp);
-    }
-#endif /*IPSEC*/
 	/*
 	 * The current mss, t_maxseg, is initialized to the default value.
 	 * If we compute a smaller value, reduce the current mss.
@@ -2228,19 +2221,6 @@ tcp6_send_mss(t6p)
 	}
 
 	mss -= sizeof(struct ip6tcp);
-	mss -= ip6_optlen(in6p);
-#ifdef IPSEC
-    {
-	int tmp;
-
-	/* plug for AH/ESP. */
-	tmp = ipsec6_hdrsiz_tcp(t6p);
-	if (mss > tmp)
-		mss -= tmp;
-	else
-		printf("tcp6_send_mss: invalid mss(IPsec) %d\n", tmp);
-    }
-#endif /*IPSEC*/
 
 	if (tcp6_43maxseg && !in6_localaddr(&in6p->in6p_faddr))
 		mss = min(mss, tcp6_mssdflt);
@@ -2709,16 +2689,6 @@ syn_cache_add6(so, m, off, optp, optlen, oi)
 	tcp6_iss += TCP6_ISSINCR/4;
 	sc->sc_peermaxseg = oi->maxseg;
 	sc->sc_tstmp = (tb.t_flags & TF_SEND_TSTMP) ? 1 : 0;
-#ifdef IPSEC
-    {
-	struct in6pcb *in6p;
-
-	/* plug for AH/ESP. */
-	in6p = sotoin6pcb(so);
-	sc->sc_ipsecmss = 0;
-	sc->sc_ipsecmss += ipsec6_hdrsiz_tcp(&tb);
-    }
-#endif /*IPSEC*/
 	if (tb.t_flags & TF_USE_SCALE) {
 		sc->sc_requested_s_scale = tb.requested_s_scale;
 		sc->sc_request_r_scale = 0;
@@ -2755,9 +2725,6 @@ syn_cache_respond6(sc, m, ip6, th, win, ts)
 	u_short mss;
 
 	mss = in6_maxmtu - sizeof(struct ip6_hdr) - sizeof(struct tcp6hdr);
-#ifdef IPSEC
-	mss -= sc->sc_ipsecmss;
-#endif /*IPSEC*/
 	if (tcp6_43maxseg && !in6_localaddr(&ip6->ip6_dst))
 		mss = min(mss, tcp6_mssdflt);
 

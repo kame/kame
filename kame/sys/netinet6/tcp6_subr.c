@@ -672,20 +672,6 @@ tcp6_mtudisc(in6p, errno)
 			printf("tcp6_mtudisc: new route not to host?\n");
 			usable_mtu = ro->ro_rt->rt_ifp->if_mtu
 					- sizeof(struct ip6tcp);
-#ifdef IPSEC
-		    {
-			int tmp;
-
-			/* plug for AH/ESP. */
-			tmp = ipsec6_hdrsiz_tcp(t6p);
-			if (usable_mtu > tmp)
-				usable_mtu -= tmp;
-			else {
-				printf("tcp6_mtudisc: invalid mss(IPsec) %d\n",
-					tmp);
-			}
-		    }
-#endif /*IPSEC*/
 			tcp6_changemss(t6p, min(usable_mtu, TCP6_MSS));
 			return;
 		}

@@ -106,6 +106,10 @@
 #include <netinet6/tcp6_var.h>
 #include <netinet6/tcp6_debug.h>
 
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#endif /*IPSEC*/
+
 #ifdef notyet
 extern struct mbuf *m_copypack();
 #endif
@@ -127,7 +131,7 @@ tcp6_output(t6p)
 	struct	ip6_hdr *ip6;
 	struct	tcp6hdr *th;
 	u_char	opt[MAX_TCP6OPTLEN];
-	u_int	optlen, hdrlen;
+	u_int	optlen, hdrlen, exthdrlen;
 	int	idle, sendalot;
 
 	/*
@@ -362,7 +366,13 @@ send:
 			}
 		}
  	}
- 
+
+	/* length occupied by IPv6 extension headers */
+	exthdrlen = ip6_optlen(t6p->t_in6pcb);
+#ifdef IPSEC
+	exthdrlen += ipsec6_hdrsiz_tcp(t6p);
+#endif
+
  	/*
 	 * Send a timestamp and echo-reply if this is a SYN and our side 
 	 * wants to use timestamps (TF_SEND_TSTMP is set) or both our side
@@ -380,13 +390,13 @@ send:
 
  	hdrlen += optlen;
 
-#ifdef already_accounted_for
+#if 1 /*def already_accounted_for*/
 	/*
 	 * Adjust data length if insertion of options will
 	 * bump the packet length beyond the t_maxseg length.
 	 */
-	if (len > t6p->t_maxseg - optlen) {
-		len = t6p->t_maxseg - optlen;
+	if (len > t6p->t_maxseg - optlen - exthdrlen) {
+		len = t6p->t_maxseg - optlen - exthdrlen;
 		sendalot = 1;
 		flags &= ~TH_FIN;
 	}

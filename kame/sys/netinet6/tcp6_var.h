@@ -208,9 +208,6 @@ struct syn_cache6 {
 	u_char	sc_timer;
 	u_char	sc_request_r_scale:4,
 		sc_requested_s_scale:4;
-#if 1 /*IPSEC*/
-	u_char	sc_ipsecmss;			/* bytes reserved for ipsec */
-#endif /*IPSEC*/
 };
 
 struct syn_cache_head6 {
