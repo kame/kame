@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.46 2004/06/15 09:58:03 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.47 2004/06/15 10:03:28 suz Exp $
  */
 
 /*
@@ -865,28 +865,36 @@ SetTimerV2(vifi, g, s)
  */
 struct listaddr *
 check_multicastV2_listener(v, group, g, source)
-    struct uvif    *v;
-    struct sockaddr_in6 *group;
-    struct listaddr **g;
-    struct sockaddr_in6 *source;
+	struct uvif *v;
+	struct sockaddr_in6 *group;
+	struct listaddr **g;
+	struct sockaddr_in6 *source;
 {
-    struct listaddr *s;
+	struct listaddr *s;
 
-    /*
-     * Look for the source/group in our listener list;
-     */
-    for (*g = v->uv_groups; *g != NULL; *g = (*g)->al_next) {
-	if (inet6_equal(group, &(*g)->al_addr) == 0)
-	    continue;
-
-	for (s = (*g)->sources; s != NULL; s = s->al_next) {
-	    if (source && inet6_equal(source, &s->al_addr))
-		return s;	/* group found, source found */
+	/*
+	 * group scan: if v->uv_group is given from the argument,
+	 * it's skipped to prevent unnecessary duplicated scanning
+	 */
+	if (group == NULL || g == NULL)
+		return NULL;	/* sanity check */
+	if (*g) {
+		if (!inet6_equal(group, &(*g)->al_addr))
+			return NULL;	/* invalid group is given */
+	} else {
+		*g = check_multicast_listener(v, group);
+		if (*g == NULL)
+			return NULL;	/* group not found, source not found */
 	}
-	return NULL;	/* group found, source not found */
-    }
 
-    return NULL;	/* group not found, source not found */
+	/* source scan, if necessary */
+	if (source == NULL)
+		return NULL;	/* group found, source not searched */
+	for (s = (*g)->sources; s != NULL; s = s->al_next) {
+		if (inet6_equal(source, &s->al_addr))
+			break;
+	}
+	return s;	/* group found, source searched */
 }
 
 void
