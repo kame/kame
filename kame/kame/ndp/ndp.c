@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.87 2002/05/29 09:39:24 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.88 2002/05/29 14:44:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -805,7 +805,7 @@ ether_str(sdl)
 			snprintf(hbuf, sizeof(hbuf), "<invalid>");
 #else
 		cp = (u_char *)LLADDR(sdl);
-		snprintf(ebuf, sizeof(ebuf), "%x:%x:%x:%x:%x:%x",
+		snprintf(hbuf, sizeof(hbuf), "%x:%x:%x:%x:%x:%x",
 			cp[0], cp[1], cp[2], cp[3], cp[4], cp[5]);
 #endif
 	} else
