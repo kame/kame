@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.194 2003/01/22 00:34:07 suz Exp $	*/
+/*	$KAME: mip6.c,v 1.195 2003/01/29 12:28:16 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -208,6 +208,8 @@ static int mip6_haddr_destopt_create(struct ip6_dest **,
 			ipsec_hexdump((caddr_t)(a),(l));	\
 			printf("\n");				\
 		} while (/*CONSTCOND*/ 0)
+#else
+#define mip6_hexdump(m,l,a)
 #endif
 #if defined(IPSEC) && !defined(__OpenBSD__)
 struct ipsecrequest *mip6_getipsecrequest __P((struct sockaddr_in6 *,
@@ -2638,17 +2640,19 @@ mip6_get_nodekey(index, nodekey)
  *	Check a Binding Update packet whether it is valid 
  */
 int
-mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa)
+mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa, status)
 	struct ip6_hdr *ip6;
 	struct ip6m_binding_update *ip6mu;
 	int ip6mulen;
 	struct mip6_mobility_options *mopt;
 	struct sockaddr_in6 *hoa_sa, *coa_sa;
+	u_int8_t *status;
 {
 	u_int8_t key_bm[MIP6_KBM_LEN]; /* Stated as 'Kbm' in the spec */
 	u_int8_t authdata[SHA1_RESULTLEN];
 	u_int16_t cksum_backup;
 
+	*status = IP6MA_STATUS_ACCEPTED;
 	/* Nonce index & Auth. data mobility options are required */
 	if ((mopt->valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA)) == 0) {
 		mip6log((LOG_ERR,
@@ -2656,7 +2660,7 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa)
 			 __FILE__, __LINE__, mopt->valid_options));
 		return (EINVAL);
 	}
-	if (mip6_calculate_kbm_from_index(hoa_sa, coa_sa, mopt->mopt_ho_nonce_idx, 
+	if (*status = mip6_calculate_kbm_from_index(hoa_sa, coa_sa, mopt->mopt_ho_nonce_idx, 
 			mopt->mopt_co_nonce_idx, key_bm)) {
 		return (EINVAL);
 	}
@@ -2779,24 +2783,27 @@ mip6_calculate_kbm_from_index(hoa_sa, coa_sa, ho_nonce_idx, co_nonce_idx, key_bm
 	mip6_home_cookie_t home_cookie;
 	mip6_careof_cookie_t careof_cookie;
 
-	if ((mip6_get_nonce(ho_nonce_idx, &home_nonce) != 0) ||
-	    (mip6_get_nonce(co_nonce_idx, &careof_nonce) != 0)) {
+	if (mip6_get_nonce(ho_nonce_idx, &home_nonce) != 0) {
 		mip6log((LOG_ERR,
-			 "%s:%d: home or care-of Nonce cannot be acquired.\n",
+			 "%s:%d: Home Nonce cannot be acquired.\n",
 			 __FILE__, __LINE__));
-		return (EINVAL);
+		return (IP6MA_STATUS_HOME_NONCE_EXPIRED);
 	}
-#ifdef RR_DBG
-mip6_hexdump("CN: Home   Nonce: ", sizeof(home_nonce), &home_nonce);
-mip6_hexdump("CN: Careof Nonce: ", sizeof(careof_nonce), &careof_nonce);
-#endif
+	if (mip6_get_nonce(co_nonce_idx, &careof_nonce) != 0) {
+		mip6log((LOG_ERR,
+			 "%s:%d: Care-of Nonce cannot be acquired.\n",
+			 __FILE__, __LINE__));
+		return (IP6MA_STATUS_CAREOF_NONCE_EXPIRED);
+	}
+	mip6_hexdump("CN: Home   Nonce: ", sizeof(home_nonce), &home_nonce);
+	mip6_hexdump("CN: Careof Nonce: ", sizeof(careof_nonce), &careof_nonce);
 
 	if ((mip6_get_nodekey(ho_nonce_idx, &home_nodekey) != 0) ||
 	    (mip6_get_nodekey(co_nonce_idx, &coa_nodekey) != 0)) {
 		mip6log((LOG_ERR,
 			 "%s:%d: home or care-of node key cannot be acquired.\n",
 			 __FILE__, __LINE__));
-		return (EINVAL);
+		return (IP6MA_STATUS_NONCE_EXPIRED);
 	}
 #ifdef RR_DBG
 mip6_hexdump("CN: Home   Nodekey: ", sizeof(home_nodekey), &home_nodekey);
@@ -2825,7 +2832,7 @@ mip6_hexdump("CN: Care-of Cookie: ", sizeof(careof_cookie), (u_int8_t *)&careof_
 mip6_hexdump("CN: K_bm: ", sizeof(key_bm), key_bm);
 #endif
 
-	return (0);
+	return (IP6MA_STATUS_ACCEPTED);
 }
 
 void
@@ -2858,7 +2865,7 @@ mip6_calculate_kbm(home_cookie, careof_cookie, key_bm)
 void
 mip6_calculate_authenticator(key_bm, result, addr1, addr2, data, datalen, exclude_offset, exclude_data_len)
 	u_int8_t *key_bm;		/* Kbm */
-	u_int8_t *result;		/* */
+	u_int8_t *result;
 	struct in6_addr *addr1, *addr2;
 	caddr_t data;
 	size_t datalen;
@@ -2873,17 +2880,12 @@ mip6_calculate_authenticator(key_bm, result, addr1, addr2, data, datalen, exclud
 	/* MAC_Kbm(addr1, | addr2 | (BU|BA) ) */
 	hmac_init(&hmac_ctx, key_bm, MIP6_KBM_LEN, HMAC_SHA1);
 	hmac_loop(&hmac_ctx, (u_int8_t *)addr1, sizeof(*addr1));
-#ifdef RR_DBG
-mip6_hexdump("MN: Auth: ", sizeof(*addr1), addr1);
-#endif
+	mip6_hexdump("Auth: ", sizeof(*addr1), addr1);
 	hmac_loop(&hmac_ctx, (u_int8_t *)addr2, sizeof(*addr2));
-#ifdef RR_DBG
-mip6_hexdump("MN: Auth: ", sizeof(*addr2), addr2);
-#endif
+	mip6_hexdump("MN: Auth: ", sizeof(*addr2), addr2);
 	hmac_loop(&hmac_ctx, (u_int8_t *)data, exclude_offset);
-#ifdef RR_DBG
-mip6_hexdump("MN: Auth: ", exclude_offset, data);
-#endif
+	mip6_hexdump("MN: Auth: ", exclude_offset, data);
+
 	/* Exclude authdata field in the mobility option to calculate authdata 
 	   But it should be included padding area */
 	restlen = datalen - (exclude_offset + exclude_data_len);
@@ -2891,13 +2893,10 @@ mip6_hexdump("MN: Auth: ", exclude_offset, data);
 		hmac_loop(&hmac_ctx,
 			  data + exclude_offset + exclude_data_len,
 			  restlen);
-#ifdef RR_DBG
-mip6_hexdump("MN: Auth: ", restlen, data + exclude_offset + exclude_data_len);
-#endif
+		mip6_hexdump("MN: Auth: ", restlen, 
+			data + exclude_offset + exclude_data_len);
 	}
 	hmac_result(&hmac_ctx, sha1_result);
 	bcopy(sha1_result, result, MIP6_AUTHENTICATOR_LEN);
-#ifdef RR_DBG
-mip6_hexdump("MN: Authdata: ", MIP6_AUTHENTICATOR_LEN, result);
-#endif
+	mip6_hexdump("MN: Authdata: ", MIP6_AUTHENTICATOR_LEN, result);
 }

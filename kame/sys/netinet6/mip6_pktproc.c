@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.101 2003/01/23 07:56:25 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.102 2003/01/29 12:28:16 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -673,23 +673,20 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 
 	if (!bu_safe && 
 	    mip6_is_valid_bu(ip6, ip6mu, ip6mulen, &mopt, 
-			     &bi.mbc_phaddr, &bi.mbc_pcoa)) {
+			     &bi.mbc_phaddr, &bi.mbc_pcoa, &bi.mbc_status)) {
 		mip6log((LOG_ERR,
 			 "%s:%d: RR authentication was failed.\n",
 			 __FILE__, __LINE__));
 		/* discard. */
 		m_freem(m);
 		mip6stat.mip6s_rrauthfail++;
-		/* XXX TODO
-		   bi.mbc_status = 
-			IP6MA_STATUS_HOME_NONCE_EXPIRED,
-			IP6MA_STATUS_CAREOF_NONCE_EXPIRED or
-			IP6MA_STATUS_NONCE_EXPIRED;
-		   bi.mbc_seqno = mbc->mbc_seqno;
-		   bi.mbc_send_ba = 1;
-		   error = EINVAL;
-		   goto send_ba;
-		 */
+		if (bi.mbc_status >= IP6MA_STATUS_HOME_NONCE_EXPIRED &&
+		    bi.mbc_status <= IP6MA_STATUS_NONCE_EXPIRED) {
+			bi.mbc_seqno = mbc->mbc_seqno;
+			bi.mbc_send_ba = 1;
+	 		error = EINVAL;
+			goto send_ba;
+		}
 		return (EINVAL);
 	}
 

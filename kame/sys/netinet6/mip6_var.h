@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.80 2003/01/23 08:02:34 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.81 2003/01/29 12:28:16 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -560,7 +560,7 @@ int mip6_get_nonce(int, mip6_nonce_t *);
 int mip6_get_nodekey(int, mip6_nodekey_t *);
 int mip6_is_valid_bu(struct ip6_hdr *, struct ip6m_binding_update *, int,
     struct mip6_mobility_options *, struct sockaddr_in6 *,
-    struct sockaddr_in6 *);
+    struct sockaddr_in6 *, u_int8_t *);
 int mip6_get_mobility_options(struct ip6_mobility *, int, int,
     struct mip6_mobility_options *);
 void mip6_create_keygen_token(struct in6_addr *, mip6_nodekey_t *,
