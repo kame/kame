@@ -4,4 +4,4 @@ by a separate server, nnrpd, that is spawned for each client.  Both innd
 and nnrpd have some slight variances from the NNTP protocol.
 
 This port includes IPv6 support by NORTH 6bone project. See
-	http://www.north.ad.jp/6bone/netnews/inn-e.html
+	http://www.v6.north.ad.jp/netnews/inn-e.html
