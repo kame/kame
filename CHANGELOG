@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2190 2002/06/23 11:57:34 fujisawa Exp $
+$KAME: CHANGELOG,v 1.2191 2002/06/23 14:43:13 itojun Exp $
 
 <200206>
+Sun Jun 23 23:42:56 JST 2002  itojun@iijlab.net
+	* faithd: correct ftp relay.
+
 2002-06-23 Shin'ichi Fujisawa <fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_*.c:
 	- Fix a bug that port number does not changed when translator
