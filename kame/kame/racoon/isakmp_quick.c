@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.58 2000/09/22 06:24:23 itojun Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.59 2000/09/22 08:47:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.58 2000/09/22 06:24:23 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.59 2000/09/22 08:47:47 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -153,7 +153,8 @@ quick_i1send(iph2, msg)
 	char *p;
 	int tlen;
 	int error = ISAKMP_INTERNAL_ERROR;
-	int pfsgroup;
+	int pfsgroup, idci, idcr;
+	int np;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -201,18 +202,23 @@ quick_i1send(iph2, msg)
 	}
 	YIPSDEBUG(DEBUG_KEY,
 		plog(logp, LOCATION, NULL, "IDci:");
-		PVDUMP(iph2->id));
+		PVDUMP(iph2->id););
 	YIPSDEBUG(DEBUG_KEY,
 		plog(logp, LOCATION, NULL, "IDcr:");
-		PVDUMP(iph2->id_p));
+		PVDUMP(iph2->id_p););
+
+	/* XXX we may want to skip it for transport mode */
+	idci = idcr = 1;
 
 	/* create SA;NONCE payload, and KE if need, and IDii, IDir. */
 	tlen = + sizeof(*gen) + iph2->sa->l
-		+ sizeof(*gen) + iph2->nonce->l
-		+ sizeof(*gen) + iph2->id->l
-		+ sizeof(*gen) + iph2->id_p->l;
+		+ sizeof(*gen) + iph2->nonce->l;
 	if (pfsgroup)
 		tlen += (sizeof(*gen) + iph2->dhpub->l);
+	if (idci)
+		tlen += sizeof(*gen) + iph2->id->l;
+	if (idcr)
+		tlen += sizeof(*gen) + iph2->id_p->l;
 
 	body = vmalloc(tlen);
 	if (body == NULL) {
@@ -227,18 +233,27 @@ quick_i1send(iph2, msg)
 	p = set_isakmp_payload(p, iph2->sa, ISAKMP_NPTYPE_NONCE);
 
 	/* add NONCE payload */
-	p = set_isakmp_payload(p, iph2->nonce,
-		pfsgroup ? ISAKMP_NPTYPE_KE : ISAKMP_NPTYPE_ID);
+	if (pfsgroup)
+		np = ISAKMP_NPTYPE_KE;
+	else if (idci || idcr)
+		np = ISAKMP_NPTYPE_ID;
+	else
+		np = ISAKMP_NPTYPE_NONE;
+	p = set_isakmp_payload(p, iph2->nonce, np);
 
 	/* add KE payload if need. */
+	np = (idci || idcr) ? ISAKMP_NPTYPE_ID : ISAKMP_NPTYPE_NONE;
 	if (pfsgroup)
-		p = set_isakmp_payload(p, iph2->dhpub, ISAKMP_NPTYPE_ID);
+		p = set_isakmp_payload(p, iph2->dhpub, np);
 
 	/* IDci */
-	p = set_isakmp_payload(p, iph2->id, ISAKMP_NPTYPE_ID);
+	np = (idcr) ? ISAKMP_NPTYPE_ID : ISAKMP_NPTYPE_NONE;
+	if (iph2->id)
+		p = set_isakmp_payload(p, iph2->id, np);
 
 	/* IDcr */
-	p = set_isakmp_payload(p, iph2->id_p, ISAKMP_NPTYPE_NONE);
+	if (iph2->id_p)
+		p = set_isakmp_payload(p, iph2->id_p, ISAKMP_NPTYPE_NONE);
 
 	/* generate HASH(1) */
 	iph2->hash = oakley_compute_hash1(iph2->ph1, iph2->msgid, body);
