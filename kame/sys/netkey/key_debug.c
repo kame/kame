@@ -1,4 +1,4 @@
-/*	$KAME: key_debug.c,v 1.35 2003/02/07 10:17:11 suz Exp $	*/
+/*	$KAME: key_debug.c,v 1.36 2003/06/27 06:46:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,6 +80,7 @@ static void kdebug_sadb_sa __P((struct sadb_ext *));
 static void kdebug_sadb_address __P((struct sadb_ext *));
 static void kdebug_sadb_key __P((struct sadb_ext *));
 static void kdebug_sadb_x_sa2 __P((struct sadb_ext *));
+static void kdebug_sadb_x_tag __P((struct sadb_ext *));
 
 #ifdef _KERNEL
 static void kdebug_secreplay __P((struct secreplay *));
@@ -165,6 +166,7 @@ kdebug_sadb_ext_typestr(type)
 		TYPESTR(X_EXT_KMPRIVATE),
 		TYPESTR(X_EXT_POLICY),
 		TYPESTR(X_EXT_SA2),
+		TYPESTR(X_EXT_TAG),
 		{ NULL }
 	};
 
@@ -249,6 +251,9 @@ kdebug_sadb(base)
 			break;
 		case SADB_X_EXT_SA2:
 			kdebug_sadb_x_sa2(ext);
+			break;
+		case SADB_X_EXT_TAG:
+			kdebug_sadb_x_tag(ext);
 			break;
 		default:
 			printf("kdebug_sadb: invalid ext_type %u was passed.\n",
@@ -486,6 +491,21 @@ kdebug_sadb_x_sa2(ext)
 	printf("  reserved1=%u reserved2=%u sequence=%u }\n",
 	    sa2->sadb_x_sa2_reserved1, sa2->sadb_x_sa2_reserved2,
 	    sa2->sadb_x_sa2_sequence);
+
+	return;
+}
+
+static void
+kdebug_sadb_x_tag(ext)
+	struct sadb_ext *ext;
+{
+	struct sadb_x_tag *tag = (struct sadb_x_tag *)ext;
+
+	/* sanity check */
+	if (ext == NULL)
+		panic("kdebug_sadb_x_tag: NULL pointer was passed.");
+
+	printf("sadb_x_sa2{ tag=\"%s\" }\n", tag->sadb_x_tag_name);
 
 	return;
 }
