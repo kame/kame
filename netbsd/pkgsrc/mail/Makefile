@@ -8,5 +8,6 @@
     SUBDIR += qpopper
     SUBDIR += sendmail.beta
     SUBDIR += sendmail6
+    SUBDIR += smtpfeed
 
 .include "../mk/bsd.pkg.subdir.mk"
