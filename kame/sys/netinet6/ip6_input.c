@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.332 2003/11/11 19:05:25 keiichi Exp $	*/
+/*	$KAME: ip6_input.c,v 1.333 2004/01/27 04:44:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -614,8 +614,6 @@ ip6_input(m)
 #endif /* FreeBSD5 */
 #endif /* PFIL_HOOKS */
 
-	ip6stat.ip6s_nxthist[ip6->ip6_nxt]++;
-
 #if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	/*
 	 * Check with the firewall...
@@ -636,6 +634,8 @@ ip6_input(m)
 			return;
 	}
 #endif
+
+	ip6stat.ip6s_nxthist[ip6->ip6_nxt]++;
 
 #ifdef ALTQ
 	if (altq_input != NULL && (*altq_input)(m, AF_INET6) == 0) {
