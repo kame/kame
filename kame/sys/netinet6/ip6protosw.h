@@ -109,7 +109,7 @@ struct ip6protosw {
 			__P((int, struct socket *, int, int, struct mbuf **));
 
 /* user-protocol hook */
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if !(defined(__FreeBSD__) && __FreeBSD__ < 3) && !defined(__bsdi__)
 	int	(*pr_usrreq)		/* user request: see list below */
 			__P((struct socket *, int, struct mbuf *,
 			     struct mbuf *, struct mbuf *, struct proc *));

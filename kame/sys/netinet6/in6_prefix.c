@@ -93,7 +93,7 @@ struct rr_prhead rr_prefix;
 
 extern int	in6_interfaces;
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 extern struct proc *curproc;	/*XXX*/
 #endif
 
@@ -516,7 +516,7 @@ add_each_addr(struct socket *so, struct rr_prefix *rpp, struct rp_addr *rap)
 		return;
 	}
 	error = in6_control(so, SIOCAIFADDR_IN6, (caddr_t)&ifra, rpp->rp_ifp
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 			    , curproc
 #endif
 			    );
@@ -860,7 +860,7 @@ delete_each_prefix(struct socket *so, struct rr_prefix *rpp, u_char origin)
 
 		error = in6_control(so, SIOCDIFADDR_IN6, (caddr_t)&ifra,
 				    rpp->rp_ifp
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 				    , curproc
 #endif
 				    );

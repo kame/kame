@@ -132,7 +132,7 @@ frag6_input(mp, offp, proto)
 		dst->sin6_len = sizeof(struct sockaddr_in6);
 		dst->sin6_addr = ip6->ip6_dst;
 	}
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	rtalloc((struct route *)&ro);
 #else
 	rtcalloc((struct route *)&ro);
