@@ -247,6 +247,8 @@ do { \
 	goto bad; \
 } while (0)
 
+#define MATCH_FAMILY1(x, y) \
+	((x) == PF_UNSPEC || (y) == PF_UNSPEC || (x) == (y))
 #define MATCH_FAMILY(x, y)	((x) == PF_UNSPEC || (x) == (y))
 #define MATCH(x, y)		((x) == ANY || (x) == (y))
 
@@ -438,7 +440,7 @@ getaddrinfo(hostname, servname, hints, res)
 	{
 		*pai = ai0;
 
-		if (!MATCH_FAMILY(pai->ai_family, ex->e_af))
+		if (!MATCH_FAMILY1(pai->ai_family, ex->e_af))
 			continue;
 		if (!MATCH(pai->ai_socktype, ex->e_socktype))
 			continue;
@@ -1022,7 +1024,7 @@ get_port(ai, servname, matchonly)
 
 	if (str_isnumber(servname)) {
 		if (!allownumeric)
-			return EAI_SOCKTYPE;
+			return EAI_SERVICE;
 		port = htons(atoi(servname));
 		if (port < 0 || port > 65535)
 			return EAI_SERVICE;
