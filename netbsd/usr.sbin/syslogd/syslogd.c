@@ -352,7 +352,7 @@ main(argc, argv)
 
 	/* setup pollfd set. */
 	readfds = (struct pollfd *)malloc(sizeof(struct pollfd) *
-					  (funixsize + 2));
+			(funixsize + (finet ? *finet : 0) + 2));
 	if (readfds == NULL) {
 		logerror("couldn't allocate pollfds");
 		die(0);
@@ -1339,12 +1339,12 @@ socksetup(af)
 	for (maxs = 0, r = res; r; r = r->ai_next, maxs++);
 	socks = malloc ((maxs+1) * sizeof(int));
 	if (!socks) {
-                logerror("couldn't allocate memory for sockets");
-                die(0);
+		logerror("couldn't allocate memory for sockets");
+		die(0);
 	}
 
 	*socks = 0;   /* num of sockets counter at start of array */
-        s = socks+1;
+	s = socks+1;
 	for (r = res; r; r = r->ai_next) {
 		*s = socket(r->ai_family, r->ai_socktype, r->ai_protocol);
 		if (*s < 0) {
