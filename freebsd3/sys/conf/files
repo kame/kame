@@ -610,16 +610,6 @@ netns/ns_pcb.c		optional ns
 netns/ns_proto.c	optional ns
 netns/spp_debug.c	optional ns
 netns/spp_usrreq.c	optional ns
-netpm/pm_aTT.c		optional pm
-netpm/pm_ams.c		optional pm
-netpm/pm_dispatch.c	optional pm
-netpm/pm_filter.c	optional pm
-netpm/pm_list.c		optional pm
-netpm/pm_log.c		optional pm
-netpm/pm_nat.c		optional pm
-netpm/pm_pmd.c		optional pm
-netpm/pm_route.c	optional pm
-netpm/pm_usrreq.c	optional pm
 nfs/nfs_bio.c		optional nfs
 nfs/nfs_node.c		optional nfs
 nfs/nfs_nqlease.c	optional nfs

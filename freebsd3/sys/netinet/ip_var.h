@@ -161,10 +161,6 @@ struct	ipstat {
 #define	IP_ROUTETOIF		SO_DONTROUTE	/* bypass routing tables */
 #define	IP_ALLOWBROADCAST	SO_BROADCAST	/* can send broadcast packets */
 
-#if defined(PM)
-#define	IP_PROTOCOLROUTE	0x8000		/* use protocol routing */
-#endif
-
 struct ip;
 struct inpcb;
 struct route;

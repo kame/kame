@@ -68,7 +68,6 @@
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
-#include "opt_pm.h"
 #include "opt_natpt.h"
 
 #include <sys/param.h>
@@ -123,13 +122,6 @@
 #ifdef NSIP
 #include <netns/ns.h>
 #include <netns/ns_if.h>
-#endif
-
-#ifdef PM
-void	pm_init		__P((void));
-void	pm_input	__P((struct mbuf *, int));
-int	pm_ctloutput	__P((int, struct socket *, int, int, struct mbuf **));
-struct pr_usrreqs pm_usrreqs;
 #endif
 
 #ifdef NATPT
@@ -268,14 +260,6 @@ struct protosw inetsw[] = {
   &rip_usrreqs
 },
 #endif
-#ifdef PM
-{ SOCK_RAW,	&inetdomain,	IPPROTO_PM,	PR_ATOMIC|PR_ADDR,
-  pm_input,	0,		0,		pm_ctloutput,
-  0,
-  pm_init,	0,		0,		0,
-  &pm_usrreqs
-},
-# endif
 #ifdef NATPT
 { SOCK_RAW,	&inetdomain,	IPPROTO_AHIP,	PR_ATOMIC|PR_ADDR,
   0,		0,		0,		0,
