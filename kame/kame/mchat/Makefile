@@ -35,10 +35,8 @@ SRCS=	mchat.c screen.c history.c
 
 .if (${OPSYS} != "NetBSD")
 CFLAGS+=-DINET6 -DIPSEC
-CFLAGS+=-Dss_family=__ss_family -Dss_len=__ss_len
 .else
 CPPFLAGS+=-DINET6 -DIPSEC
-CPPFLAGS+=-Dss_family=__ss_family -Dss_len=__ss_len
 .endif
 CFLAGS+=-Wall -g
 LDADD+=	-L${.OBJDIR}/../libipsec -L${.OBJDIR}/../libipsec/obj \

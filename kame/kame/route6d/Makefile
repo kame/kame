@@ -14,9 +14,9 @@ MAN=	route6d.8
 .endif
 
 .if (${OPSYS} == NetBSD)
-CPPFLAGS+=	-Dss_len=__ss_len -Dss_family=__ss_family -DINET6
+CPPFLAGS+=	-DINET6
 .else
-CFLAGS+=	-Dss_len=__ss_len -Dss_family=__ss_family -DINET6
+CFLAGS+=	-DINET6
 .endif
 .if exists(/usr/local/v6/lib/libinet6.a)
 LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
