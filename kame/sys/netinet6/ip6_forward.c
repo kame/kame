@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.63 2001/02/06 04:42:54 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.64 2001/02/06 05:08:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -65,6 +65,10 @@
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
 #include <netinet6/nd6.h>
+
+#ifdef __NetBSD__
+#include <netinet6/in6_pcb.h>
+#endif
 
 #ifdef __OpenBSD__ /*KAME IPSEC*/
 #undef IPSEC
@@ -609,8 +613,8 @@ ip6_forward(m, srcrt)
 	 * clear embedded scope identifiers if necessary.
 	 * in6_clearscope will touch the addresses only when necessary.
 	 */
-	in6_clearscope(ip6->ip6_src);
-	in6_clearscope(ip6->ip6_dst);
+	in6_clearscope(&ip6->ip6_src);
+	in6_clearscope(&ip6->ip6_dst);
 #endif
 
 #ifdef OLDIP6OUTPUT
