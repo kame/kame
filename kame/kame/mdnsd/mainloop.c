@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.89 2001/11/09 03:42:08 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.90 2001/11/16 08:39:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -420,11 +420,14 @@ recv_dns0(sd, vclen)
 	int vclen;
 {
 	struct sockaddr_storage from_ss;
-	struct sockaddr *from = (struct sockaddr *)&from_ss;
-	int fromlen = sizeof(from_ss);
+	struct sockaddr *from;
+	int fromlen;
 	char buf[RECVBUFSIZ];
 	ssize_t l;
 	struct nsdb *ns;
+
+	from = (struct sockaddr *)&from_ss;
+	fromlen = sizeof(from_ss);
 
 	/*
 	 * XXX we need to get destination address of incoming packet.
@@ -497,17 +500,18 @@ recv_icmp6(sd)
 	struct sockdb *sd;
 {
 	struct sockaddr_storage from_ss;
-	struct sockaddr *from = (struct sockaddr *)&from_ss;
-	int fromlen = sizeof(from_ss);
+	struct sockaddr *from;
+	int fromlen;
 	char buf[RECVBUFSIZ];
 	ssize_t l;
 	struct icmp6_hdr *icmp6;
 	char hbuf[NI_MAXHOST];
 
-	l = recvfrom(sd->s, buf, sizeof(buf), 0, (struct sockaddr *)&from,
-	    &fromlen);
+	from = (struct sockaddr *)&from_ss;
+	fromlen = sizeof(from_ss);
+	l = recvfrom(sd->s, buf, sizeof(buf), 0, from, &fromlen);
 
-	if (getnameinfo((struct sockaddr *)&from, fromlen, hbuf, sizeof(hbuf),
+	if (getnameinfo(from, fromlen, hbuf, sizeof(hbuf),
 	    NULL, 0, niflags))
 		strncpy(hbuf, "?", sizeof(hbuf));
 
