@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2153 2002/05/17 01:39:33 jinmei Exp $
+$KAME: CHANGELOG,v 1.2154 2002/05/17 02:17:47 jinmei Exp $
 
 <200205>
+2002-05-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6.h: changed option type values that have
+	not been officially assigned to the values documented in NTTC's
+	service specification (as of today).
+	Note: the current version has lost interoperability with former
+	versions of KAME's dhcp6.  Please upgrade all clients and servers
+	to the latest version.
+	Note: we'll change the temporary values if different type values
+	are officially assigned.
+
 2002-05-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: supported the preference option; servers can
 	specify the preference value for a particular interface.  Clients
