@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.178 2003/04/07 11:54:17 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.179 2003/04/09 10:08:28 suz Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -781,7 +781,7 @@ mip6_bu_send_bu(mbu)
 		goto free_ip6pktopts;
 	}
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 			   , NULL
 #endif
 			  );
@@ -2789,13 +2789,13 @@ mip6_tunnel_output(mp, mbc)
 	 * path MTU discovery for encapsulated packets.
 	 */
 	return (ip6_output(m, 0, 0, IPV6_MINMTU, 0, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 			   , NULL
 #endif
 			  ));
 #else
 	return (ip6_output(m, 0, 0, 0, 0, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 			   , NULL
 #endif
 			  ));

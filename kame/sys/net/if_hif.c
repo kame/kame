@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.45 2003/04/02 10:18:31 itojun Exp $	*/
+/*	$KAME: if_hif.c,v 1.46 2003/04/09 10:08:29 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1054,7 +1054,11 @@ hif_output(ifp, m, dst, rt)
 		MGETHDR(n, M_DONTWAIT, MT_HEADER);
 		maxlen = MHLEN;
 		if (n)
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000 && __FreeBSD_version < 500000
+			m_dup_pkthdr(n, m, M_DONTWAIT);
+#else
 			M_COPY_PKTHDR(n, m);
+#endif
 		if (n && m->m_pkthdr.len > maxlen) {
 			MCLGET(n, M_DONTWAIT);
 			maxlen = MCLBYTES;
@@ -1142,13 +1146,13 @@ hif_output(ifp, m, dst, rt)
 #ifdef IPV6_MINMTU
 	/* XXX */
 	return (ip6_output(m, 0, 0, IPV6_MINMTU, 0, &ifp
-#if defined(__FreeBSD__) && __FreeBSD_version > 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 			   , NULL
 #endif
 			  ));
 #else
 	return (ip6_output(m, 0, 0, 0, 0, &ifp
-#if defined(__FreeBSD__) && __FreeBSD_version > 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 			   , NULL
 #endif
 			  ));

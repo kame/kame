@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.65 2003/03/28 08:22:21 suz Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.66 2003/04/09 10:08:28 suz Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -439,7 +439,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	/* XXX IPSEC? */
 
 	error = ip6_output(n, NULL, NULL, 0, NULL, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 			   , NULL
 #endif
 			  );
@@ -849,7 +849,7 @@ mip6_icmp6_dhaad_req_output(sc)
 		return (EINVAL);
 	}
 	error = ip6_output(m, NULL, NULL, 0, NULL, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 			   , NULL
 #endif
 			  );
@@ -978,7 +978,7 @@ mip6_icmp6_mp_sol_output(mpfx, mha)
 		return (EINVAL);
 	}
 	error = ip6_output(m, 0, 0, 0, 0 ,NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 			   , NULL
 #endif
 			  );

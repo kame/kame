@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.113 2003/03/28 08:22:21 suz Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.114 2003/04/09 10:08:29 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -164,7 +164,7 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 
 	mip6stat.mip6s_ohot++;
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 			   , NULL
 #endif
 			  );
@@ -302,7 +302,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 
 	mip6stat.mip6s_ocot++;
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 			   , NULL
 #endif
 			  );
@@ -1238,7 +1238,7 @@ mip6_bu_send_hoti(mbu)
 
 	mip6stat.mip6s_ohoti++;
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 			   , NULL
 #endif
 			  );
@@ -1287,7 +1287,7 @@ mip6_bu_send_coti(mbu)
 
 	mip6stat.mip6s_ocoti++;
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 			   , NULL
 #endif
 			  );
@@ -1339,7 +1339,7 @@ mip6_bu_send_cbu(mbu)
 
 	mip6stat.mip6s_obu++;
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 			   , NULL
 #endif
 			  );
@@ -1412,7 +1412,7 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh, mopt)
 	mip6stat.mip6s_oba++;
 	mip6stat.mip6s_oba_hist[status]++;
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 			   , NULL
 #endif
 			  );

@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.21 2003/03/28 08:22:21 suz Exp $	*/
+/*	$KAME: mobility6.c,v 1.22 2003/04/09 10:08:29 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -288,7 +288,7 @@ mobility6_send_be(src, dst, status, home)
 	/* output a binding missing message. */
 	mip6stat.mip6s_obe++;
 	error = ip6_output(m, &opt, NULL, 0, NULL, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 			   , NULL
 #endif
 			  );
