@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.25 2001/01/05 17:26:03 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.26 2001/01/06 09:44:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -231,8 +231,11 @@ static int addrconfig __P((int));
 static int ip6_str2scopeid __P((char *, struct sockaddr_in6 *));
 #endif
 
+#ifndef __bsdi__
 static struct addrinfo *getanswer __P((const querybuf *, int, const char *,
 	int, const struct addrinfo *));
+#endif
+
 static int _dns_getaddrinfo __P((const struct addrinfo *, const char *,
 	struct addrinfo **));
 static struct addrinfo *_gethtent __P((FILE *fp, const char *,
@@ -555,12 +558,25 @@ getaddrinfo(hostname, servname, hints, res)
 
 	/*
 	 * hostname as alphabetical name.
-	 * first, try to query DNS for all possible address families.
+	 * We'll make sure that
+	 * - if returning addrinfo list is empty, return non-zero error
+	 *   value (already known one or EAI_NODATA).
+	 * - otherwise, 
+	 *   + if we haven't had any errors, return 0 (i.e. success).
+	 *   + if we've had an error, free the list and return the error.
+	 * without any assumption on the behavior of explore_fqdn().
 	 */
+
+	/* first, try to query DNS for all possible address families. */
 	*pai = ai0;
 	error = explore_fqdn(pai, hostname, servname, &afai);
 	if (error) {
-		/* in this case, afai must be NULL. */
+		if (afai != NULL)
+			freeaddrinfo(afai);
+		goto free;
+	}
+	if (afai == NULL) {
+		error = EAI_NODATA; /* we've had no errors. */
 		goto free;
 	}
 
@@ -608,35 +624,40 @@ getaddrinfo(hostname, servname, hints, res)
 		if (get_portmatch(pai, servname) != 0)
 			continue;
 
-		error = explore_copy(pai, afai, &cur->ai_next);
+		if ((error = explore_copy(pai, afai, &cur->ai_next)) != 0) {
+			freeaddrinfo(afai);
+			goto free;
+		}
 
 		while (cur && cur->ai_next)
 			cur = cur->ai_next;
 	}
 
-	if (afai != NULL)
-		freeaddrinfo(afai);
+	freeaddrinfo(afai);	/* afai must not be NULL at this point. */
 
-	/* XXX */
-	if (sentinel.ai_next)
-		error = 0;
+	/* we must not have got any errors. */
+	if (error != 0) /* just for diagnosis */
+		abort();
 
-	if (error)
-		goto free;
-	if (error == 0) {
-		if (sentinel.ai_next) {
+	if (sentinel.ai_next) {
 good:
-			*res = sentinel.ai_next;
-			return SUCCESS;
-		} else
-			error = EAI_FAIL;
+		*res = sentinel.ai_next;
+		return(SUCCESS);
+	} else {
+		/*
+		 * All the process succeeded, but we've had an empty list. 
+		 * This can happen if the given hints do not match our
+		 * candidates.
+		 */
+		error = EAI_NODATA;
 	}
+
 free:
 bad:
 	if (sentinel.ai_next)
 		freeaddrinfo(sentinel.ai_next);
 	*res = NULL;
-	return error;
+	return(error);
 }
 
 static char *
