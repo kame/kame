@@ -1,4 +1,4 @@
-/*	$KAME: tcp6.h,v 1.3 2000/02/22 14:04:34 itojun Exp $	*/
+/*	$KAME: tcp6.h,v 1.4 2000/02/28 10:59:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -197,6 +197,7 @@ extern int tcp6_syn_bucket_limit;
 	{ "syn_cache_interval", CTLTYPE_INT }, \
 }
 
+#ifdef __bsdi__
 #define	TCP6CTL_VARS { \
 	0, \
 	&tcp6_mssdflt, \
@@ -217,5 +218,6 @@ extern int tcp6_syn_bucket_limit;
 	&tcp6_syn_bucket_limit, \
 	&tcp6_syn_cache_interval, \
 }
+#endif
 
 #endif /* ! _NETINET6_TCP6_H_ */

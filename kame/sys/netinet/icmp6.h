@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.7 2000/02/28 09:03:06 jinmei Exp $	*/
+/*	$KAME: icmp6.h,v 1.8 2000/02/28 10:59:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -589,6 +589,7 @@ struct icmp6stat {
 	{ "nodeinfo", CTLTYPE_INT }, \
 }
 
+#ifdef __bsdi__
 #define ICMPV6CTL_VARS { \
 	0, \
 	0, \
@@ -606,6 +607,7 @@ struct icmp6stat {
 	0, \
 	&icmp6_nodeinfo, \
 }
+#endif
 
 #define RTF_PROBEMTU	RTF_PROTO1
 

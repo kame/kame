@@ -1,4 +1,4 @@
-/*	$KAME: udp6_var.h,v 1.6 2000/02/22 14:04:38 itojun Exp $	*/
+/*	$KAME: udp6_var.h,v 1.7 2000/02/28 10:59:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -97,12 +97,6 @@ struct	udp6stat {
 	{ 0, 0 }, \
 	{ "sendmax", CTLTYPE_INT }, \
 	{ "recvspace", CTLTYPE_INT }, \
-}
-
-#define UDP6CTL_VARS { \
-	0, \
-	&udp6_sendspace, \
-	&udp6_recvspace, \
 }
 #endif /*__FreeBSD__||__NetBSD__*/
 #ifdef __bsdi__

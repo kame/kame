@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.25 2000/02/22 14:04:24 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.26 2000/02/28 10:59:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -241,6 +241,7 @@ struct ipsecstat {
 	{ "debug", CTLTYPE_INT }, \
 }
 
+#ifdef __bsdi__
 #define IPSECCTL_VARS { \
 	0, \
 	0, \
@@ -272,6 +273,7 @@ struct ipsecstat {
 	&ip6_ipsec_ecn, \
 	&ipsec_debug, \
 }
+#endif
 
 #ifdef _KERNEL
 struct ipsec_output_state {

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.49 2000/02/23 08:52:52 jinmei Exp $	*/
+/*	$KAME: ipsec.c,v 1.50 2000/02/28 10:59:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3519,8 +3519,6 @@ u_char	ipsecctlermap[PRC_NCMDS] = {
 	ENOPROTOOPT
 };
 
-int *ipsec_sysvars[] = IPSECCTL_VARS;
-
 int
 ipsec_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	int *name;
@@ -3614,8 +3612,6 @@ u_char	ipsec6ctlermap[PRC_NCMDS] = {
 	0,		0,		0,		0,
 	ENOPROTOOPT
 };
-
-int *ipsec6_sysvars[] = IPSEC6CTL_VARS;
 
 int
 ipsec6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)

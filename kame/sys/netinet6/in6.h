@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.38 2000/02/22 14:04:17 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.39 2000/02/28 10:59:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -610,6 +610,7 @@ struct in6_pktinfo {
 	{ IPV6CTL_NAMES_BINDV6ONLY, IPV6CTL_TYPE_BINDV6ONLY }, \
 }
 
+#ifdef __bsdi__
 #define IPV6CTL_VARS { \
 	0, \
 	&ip6_forwarding, \
@@ -637,6 +638,7 @@ struct in6_pktinfo {
 	IPV6CTL_VARS_MAPPED_ADDR, \
 	IPV6CTL_VARS_BINDV6ONLY, \
 }
+#endif
 #endif /* !_XOPEN_SOURCE */
 
 #ifdef _KERNEL
