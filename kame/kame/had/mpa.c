@@ -1,4 +1,4 @@
-/*	$KAME: mpa.c,v 1.5 2003/08/15 07:10:26 keiichi Exp $	*/
+/*	$KAME: mpa.c,v 1.6 2003/08/20 12:44:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: mpa.c,v 1.5 2003/08/15 07:10:26 keiichi Exp $
+ * $Id: mpa.c,v 1.6 2003/08/20 12:44:36 keiichi Exp $
  */
 
 #include <sys/param.h>
@@ -141,14 +141,13 @@ mpi_solicit_input(pi, sin6_hoa, mps)
         syslog(LOG_ERR, __FUNCTION__ "cannot get home agent ifinfo.\n");
         goto err;
     }
-	
-    /* Find a Home Agent Address which hold this home address */
-    if (ha_pick(&sin6_hoa->sin6_addr, &src, haif)) {
-	/* If no appropriate home agent address was found,
-	   use the destination adderss of the mps sol pakcet, which 
-	   shows the current home agent, instead. (XXX) */
-        bcopy(&ha_addr, &src, sizeof (struct in6_addr));
-    }
+
+#ifdef TODO
+    if (ha_addr is not a home agent addr which is set in the binding cache entry for the mobile node which sent this mobile prefix solicitation) {
+	    select one global address
+    } else
+#endif
+    src = ha_addr;
     mpi_advert_output(sin6_hoa, &src, haif, mps->mp_sol_id);
 err:
 }
@@ -260,66 +259,62 @@ pi_pick(home_addr, prefix_info, haif, count)
     int naddr;
     struct hagent_entry *hap;
     struct hagent_gaddr *ha_gaddr;
-    struct hagent_gaddr hagent_addr;
     struct nd_opt_prefix_info *h_prefix_info;
     struct timeval now;
     u_int32_t vltime, pltime;
 	
     h_prefix_info = prefix_info;
-    /* search home agent list and pick appropriate prefixes */
-    for (naddr = 0, hap = &(haif->halist_pref);
+    /* search home agent list and pick all prefixes */
+    for (naddr = 0, hap = haif->halist_pref.hagent_next_pref;
          hap && naddr < count; hap = hap->hagent_next_pref) {
-        ha_gaddr = hap->hagent_galist.hagent_next_gaddr;
-        if (get_gaddr(ha_gaddr, home_addr, &hagent_addr))
-            continue;
-        /* duplication check whether MPA includes duplecated prefixes */
-        if (prefix_dup_check(h_prefix_info, ha_gaddr, naddr))
-            /* duplicated prefix is included */
-            continue;
+	for (ha_gaddr = hap->hagent_galist.hagent_next_gaddr;
+	    (ha_gaddr != NULL) && (naddr < count);
+	    ha_gaddr = ha_gaddr->hagent_next_gaddr) {
+	    /* duplication check whether MPA includes duplecated prefixes */
+	    if (prefix_dup_check(h_prefix_info, ha_gaddr, naddr))
+		/* duplicated prefix is included */
+		continue;
 
-        /* make prefix information */
-        prefix_info->nd_opt_pi_type = ND_OPT_PREFIX_INFORMATION;
-        prefix_info->nd_opt_pi_len = 4;
-        prefix_info->nd_opt_pi_prefix_len = hagent_addr.hagent_prefixlen;
-        prefix_info->nd_opt_pi_flags_reserved = 0;
+	    /* make prefix information */
+	    prefix_info->nd_opt_pi_type = ND_OPT_PREFIX_INFORMATION;
+	    prefix_info->nd_opt_pi_len = 4;
+	    prefix_info->nd_opt_pi_prefix_len = ha_gaddr->hagent_prefixlen;
+	    prefix_info->nd_opt_pi_flags_reserved = 0;
 
-        if (hagent_addr.hagent_flags.onlink)
-                prefix_info->nd_opt_pi_flags_reserved |=
-                        ND_OPT_PI_FLAG_ONLINK;
-        if (hagent_addr.hagent_flags.autonomous)
-                prefix_info->nd_opt_pi_flags_reserved |=
-                        ND_OPT_PI_FLAG_AUTO;
-        if (hagent_addr.hagent_flags.router)
-                prefix_info->nd_opt_pi_flags_reserved |=
-                        ND_OPT_PI_FLAG_ROUTER;
+	    if (ha_gaddr->hagent_flags.onlink)
+		prefix_info->nd_opt_pi_flags_reserved |= ND_OPT_PI_FLAG_ONLINK;
+	    if (ha_gaddr->hagent_flags.autonomous)
+                prefix_info->nd_opt_pi_flags_reserved |= ND_OPT_PI_FLAG_AUTO;
+	    if (ha_gaddr->hagent_flags.router)
+		prefix_info->nd_opt_pi_flags_reserved |= ND_OPT_PI_FLAG_ROUTER;
 
-
-        if (hagent_addr.hagent_vltime || hagent_addr.hagent_pltime)
-                gettimeofday(&now, NULL);
-        if (hagent_addr.hagent_vltime == 0)
-                vltime = hagent_addr.hagent_expire;
-        else
-                vltime = (hagent_addr.hagent_expire > now.tv_sec) ?
-                          hagent_addr.hagent_expire - now.tv_sec : 0;
-        if (hagent_addr.hagent_pltime == 0)
-                pltime = hagent_addr.hagent_preferred;
-        else
-                pltime = (hagent_addr.hagent_preferred > now.tv_sec) ? 
-                        hagent_addr.hagent_preferred - now.tv_sec : 0;
-        if (vltime < pltime) {
-                /*
+	    if (ha_gaddr->hagent_vltime || ha_gaddr->hagent_pltime)
+		gettimeofday(&now, NULL);
+	    if (ha_gaddr->hagent_vltime == 0)
+		vltime = ha_gaddr->hagent_expire;
+	    else
+		vltime = (ha_gaddr->hagent_expire > now.tv_sec) ?
+		    ha_gaddr->hagent_expire - now.tv_sec : 0;
+	    if (ha_gaddr->hagent_pltime == 0)
+		pltime = ha_gaddr->hagent_preferred;
+	    else
+		pltime = (ha_gaddr->hagent_preferred > now.tv_sec) ? 
+		    ha_gaddr->hagent_preferred - now.tv_sec : 0;
+	    if (vltime < pltime) {
+		/*
                  * this can happen if vltime is decrement but pltime
                  * is not.
                  */
-                pltime = vltime;
-        }
-        prefix_info->nd_opt_pi_valid_time = htonl(vltime);
-        prefix_info->nd_opt_pi_preferred_time = htonl(pltime);
-        prefix_info->nd_opt_pi_reserved2 = 0;
-        prefix_info->nd_opt_pi_prefix = hagent_addr.hagent_gaddr;
+		pltime = vltime;
+	    }
+	    prefix_info->nd_opt_pi_valid_time = htonl(vltime);
+	    prefix_info->nd_opt_pi_preferred_time = htonl(pltime);
+	    prefix_info->nd_opt_pi_reserved2 = 0;
+	    prefix_info->nd_opt_pi_prefix = ha_gaddr->hagent_gaddr;
 
-        prefix_info ++;
-        naddr ++;
+	    prefix_info ++;
+	    naddr ++;
+	}
     }
     return naddr;
 }
