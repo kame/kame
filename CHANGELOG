@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.387 1999/12/29 07:10:22 itojun Exp $
+$Id: CHANGELOG,v 1.388 1999/12/31 04:22:07 itojun Exp $
 
 <199912>
+Fri Dec 31 13:21:58 JST 1999  itojun@iijab.net
+	* netbsd/pkgsrc/net/ethereal: upgrade to 0.8.0.
+
 Wed Dec 29 16:09:41 JST 1999  itojun@iijlab.net
 	* generated first kame/bsdi4 snapshot, for BSDI BSD/OS 4.1.
 	  Will be generated regularly.  see bsdi4/TODO for twists and issues.
