@@ -138,7 +138,6 @@ struct inpcb {
 #define SR_WAIT           3             /* Waiting for SA */
 	TAILQ_ENTRY(inpcb) inp_tdb_next;
 	struct tdb     *inp_tdb;	/* If tdb_dst matches our dst, use */
-	int	inp_fflowinfo;          /* Foreign flowlabel & priority */
 #define	inp_flowinfo	inp_hu.hu_ipv6.ip6_flow
 
 	int	inp_csumoffset;

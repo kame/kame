@@ -776,8 +776,6 @@ findpcb:
 #ifdef INET6
 			case AF_INET6:
 				inp->inp_laddr6 = ipv6->ip6_dst;
-				inp->inp_fflowinfo =
-				    htonl(0x0fffffff) & ipv6->ip6_flow;
 				
 				/*inp->inp_options = ip6_srcroute();*/ /* soon. */
 				/*
