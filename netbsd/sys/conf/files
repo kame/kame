@@ -905,6 +905,9 @@ defpseudo stf:		ifnet
 defpseudo irframetty:	irframedrv, irdasir
 defpseudo hif:		ifnet
 defpseudo vrrp:		ifnet, ether
+defpseudo pf:		ifnet
+defpseudo pflog:	ifnet
+defpseudo pfsync:	ifnet
 
 defpseudo sequencer
 defpseudo clockctl
@@ -1126,6 +1129,13 @@ file	net/if_vlan.c			vlan			needs-flag
 file	net/if_pppoe.c			pppoe			needs-flag
 file	net/if_vrrp.c			vrrp			needs-flag
 #file net/net_osdep.c
+file	net/pf.c			pf			needs-flag
+file	net/pf_norm.c			pf
+file	net/pf_ioctl.c			pf
+file	net/pf_table.c			pf
+file	net/if_pflog.c			pflog			needs-flag
+file	net/if_pfsync.c			pfsync			needs-flag
+
 file	net/pfil.c			pfil_hooks | ipfilter
 file	net/ppp-deflate.c		ppp & ppp_deflate
 file	net/ppp_tty.c			ppp
