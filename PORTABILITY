@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.50 2000/06/12 14:37:14 itojun Exp $
+	$Id: PORTABILITY,v 1.51 2000/06/20 20:02:05 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -319,3 +319,7 @@ across those possibilities.
 - SADB_X_SA2 (in /usr/include/net/pfkeyv2.h) has completely different meaning
   between KAME-based systems and openbsd systems.  take caution if you plan to
   use it.
+
+- getopt(3) returns -1 on openbsd, and EOF on other platforms.  This was due
+  to POSIX changes.  Since EOF is usually defined to be -1, it is not a major
+  issue.
