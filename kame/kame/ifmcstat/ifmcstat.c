@@ -492,7 +492,9 @@ if_addrlist(ifap)
 			goto nextifap;
 		KREAD(ifap, &ia, struct in_ifaddr);
 		printf("\tinet %s\n", inet_ntoa(ia.ia_addr.sin_addr));
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifdef __bsdi__
+		mc = mc ? mc : ia.ia_multiaddrs;
+#elif !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 		mc = mc ? mc : ia.ia_multiaddrs.lh_first;
 #endif
 	nextifap:
@@ -586,7 +588,11 @@ in_multientry(mc)
 	printf("\n");
 #endif
 
+#ifdef __bsdi__
+	return(multi.inm_next);
+#else
 	return(multi.inm_list.le_next);
+#endif
 }
 
 #ifdef IGMP_V3_MEMBERSHIP_REPORT
