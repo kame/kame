@@ -514,6 +514,7 @@ crypto/des/des_ecb.c	optional ipsec_esp
 crypto/des/des_enc.c	optional ipsec_esp
 crypto/des/des_setkey.c	optional ipsec_esp
 crypto/blowfish/bf_enc.c	optional ipsec_esp
+crypto/blowfish/bf_ecb.c	optional ipsec_esp
 crypto/blowfish/bf_skey.c	optional ipsec_esp
 crypto/cast128/cast128.c	optional ipsec_esp
 #crypto/rc5/rc5.c		optional ipsec_esp

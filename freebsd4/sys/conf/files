@@ -1447,7 +1447,8 @@ libkern/strtoq.c	standard
 libkern/strtoul.c	standard
 libkern/strtouq.c	standard
 crypto/blowfish/bf_skey.c	optional crypto
-crypto/blowfish/bf_skey.c       optional crypto
+crypto/blowfish/bf_enc.c       optional crypto
+crypto/blowfish/bf_ecb.c       optional crypto
 crypto/cast128/cast128.c	optional crypto
 crypto/des/des_ecb.c	optional crypto
 crypto/des/des_ecb.c            optional crypto
