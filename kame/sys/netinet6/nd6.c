@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.322 2003/06/25 03:21:27 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.323 2003/06/25 03:37:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -539,7 +539,6 @@ nd6_llinfo_timer(arg)
 	struct rtentry *rt;
 	struct sockaddr_in6 *dst;
 	struct ifnet *ifp;
-	/* XXX: used for the DELAY case only: */
 	struct nd_ifinfo *ndi = NULL;
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
