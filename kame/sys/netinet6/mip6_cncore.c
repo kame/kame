@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.63 2004/02/13 02:52:10 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.64 2004/04/26 13:07:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -2745,7 +2745,7 @@ mip6_create_addr(addr, ifid, ndpr)
 {
 	int i, bytelen, bitlen;
 	u_int8_t mask;
-	struct in6_addr *prefix = &ndpr->ndpr_prefix;
+	struct in6_addr *prefix = &ndpr->ndpr_prefix.sin6_addr;
 	u_int8_t prefixlen = ndpr->ndpr_plen;
 	struct sockaddr_in6 sin6;
 
