@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.14 2003/07/21 04:15:14 itojun Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.15 2003/07/23 04:56:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -124,10 +124,6 @@
 #define MIP6_CONFIG_USE_IPSEC 0
 #endif /* !MIP6_CONFIG_USE_IPSEC */
 
-#ifndef MIP6_CONFIG_USE_AUTHDATA
-#define MIP6_CONFIG_USE_AUTHDATA 1
-#endif /* !MIP6CONFIG_USE_AUTHDATA */
-
 #ifndef MIP6_CONFIG_BC_LIFETIME_LIMIT
 #define MIP6_CONFIG_BC_LIFETIME_LIMIT 420
 #endif /* !MIP6_CONFIG_BC_LIFETIME_LIMIT */
@@ -224,7 +220,6 @@ mip6_init()
 	bzero(&mip6_config, sizeof(mip6_config));
 	mip6_config.mcfg_type = 0;
 	mip6_config.mcfg_use_ipsec = MIP6_CONFIG_USE_IPSEC;
-	mip6_config.mcfg_use_authdata = MIP6_CONFIG_USE_AUTHDATA;
 	mip6_config.mcfg_debug = MIP6_CONFIG_DEBUG;
 	mip6_config.mcfg_bc_lifetime_limit = MIP6_CONFIG_BC_LIFETIME_LIMIT;
 	mip6_config.mcfg_hrbc_lifetime_limit = MIP6_CONFIG_HRBC_LIFETIME_LIMIT;
@@ -360,20 +355,6 @@ mip6_ioctl(cmd, data)
 				 "%s:%d: IPsec protection disabled\n",
 				 __FILE__, __LINE__));
 			mip6_config.mcfg_use_ipsec = 0;
-			break;
-
-		case SIOCSMIP6CFG_ENABLEAUTHDATA:
-			mip6log((LOG_INFO,
-				 "%s:%d: Authdata protection enabled\n",
-				 __FILE__, __LINE__));
-			mip6_config.mcfg_use_authdata = 1;
-			break;
-
-		case SIOCSMIP6CFG_DISABLEAUTHDATA:
-			mip6log((LOG_INFO,
-				 "%s:%d: Authdata protection disabled\n",
-				 __FILE__, __LINE__));
-			mip6_config.mcfg_use_authdata = 0;
 			break;
 
 		case SIOCSMIP6CFG_ENABLEDEBUG:

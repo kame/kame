@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.91 2003/07/08 06:51:28 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.92 2003/07/23 04:56:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -58,8 +58,6 @@
 #define SIOCSMIP6CFG_ENABLEHA        2
 #define SIOCSMIP6CFG_ENABLEIPSEC     3
 #define SIOCSMIP6CFG_DISABLEIPSEC    4
-#define SIOCSMIP6CFG_ENABLEAUTHDATA  5
-#define SIOCSMIP6CFG_DISABLEAUTHDATA 6
 #define SIOCSMIP6CFG_ENABLEDEBUG     128
 #define SIOCSMIP6CFG_DISABLEDEBUG    129
 #define SIOCGBC               _IOWR('m', 122, struct mip6_req)
@@ -317,7 +315,6 @@ struct mip6_mobility_options {
 struct mip6_config {
 	u_int8_t mcfg_type;
 	u_int8_t mcfg_use_ipsec;
-	u_int8_t mcfg_use_authdata;
 	u_int8_t mcfg_debug;
 	u_int32_t mcfg_bc_lifetime_limit;
 	u_int32_t mcfg_hrbc_lifetime_limit;

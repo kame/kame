@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.44 2003/07/08 06:51:27 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.45 2003/07/23 04:56:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -168,8 +168,6 @@ main(argc, argv)
 	char *debugarg = NULL;
 	int ipsec = 0;
 	char *ipsecarg = NULL;
-	int authdata = 0;
-	char *authdataarg = NULL;
 	int ifid = 0;
 	char *ifidarg = NULL;
 	int ifnames = 0;
@@ -252,10 +250,6 @@ main(argc, argv)
 			ipsec = 1;
 			ipsecarg = optarg;
 			break;
-		case 'T':
-			authdata = 1;
-			authdataarg = optarg;
-			break;
 		case 'I':
 			ifid = 1;
 			ifidarg = optarg;
@@ -317,10 +311,6 @@ main(argc, argv)
 		printf("node type: %s\n", type);
 		printf("IPsec protection: %s\n",
 		       mip6_config.mcfg_use_ipsec ? "enable" : "disable");
-#if 0
-		printf("authentication sub-option: %s\n",
-		       mip6_config.mcfg_use_authdata ? "enable" : "disable");
-#endif
 		if (mip6_config.mcfg_type == MIP6_CONFIG_TYPE_MOBILENODE) {
 			printf("preferred IF names: ");
 			for (i = 0; i < 3; i++) {
@@ -668,24 +658,6 @@ main(argc, argv)
 		}
 	}
 	
-	if (authdata && authdataarg) {
-		int arg = atoi(authdataarg);
-		int subcmd = 0;
-
-		switch (arg) {
-		case 0:
-			subcmd = SIOCSMIP6CFG_DISABLEAUTHDATA;
-			break;
-		default:
-			subcmd = SIOCSMIP6CFG_ENABLEAUTHDATA;
-			break;
-		}
-		if(ioctl(s, SIOCSMIP6CFG, (caddr_t)&subcmd) == -1) {
-			perror("ioctl");
-			exit(1);
-		}
-	}
-
 	if (ifid && ifidarg) {
 		struct hif_ifreq *ifr;
 		struct sockaddr_in6 ifid_sa;
