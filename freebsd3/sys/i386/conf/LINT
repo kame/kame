@@ -1110,8 +1110,8 @@ disk		fd1	at fdc0 drive 1
 # mse: Logitech and ATI InPort bus mouse ports
 # sio: serial ports (see sio(4))
 
-device		olpt0	at isa? port? tty irq 7
-device		olpt1	at isa? port "IO_LPT3" tty irq 5
+#device		olpt0	at isa? port? tty irq 7
+#device		olpt1	at isa? port "IO_LPT3" tty irq 5
 device		mse0	at isa? port 0x23c tty irq 5
 
 device		sio0	at isa? port "IO_COM1" tty flags 0x10 irq 4
@@ -1619,7 +1619,7 @@ controller	isp0
 options	SCSI_ISP_NO_FWLOAD_MASK="0x12"	# disable FW load for isp1 and isp4
 options SCSI_ISP_NO_NVRAM_MASK="0x1"	# disable NVRAM for isp0
 options SCSI_ISP_PREFER_MEM_MAP="0"	# prefer I/O mapping
-options	ISP_DISABLE_1080_SUPPORT="1"	# Disable support for Qlogic 1080
+#options	ISP_DISABLE_1080_SUPPORT="1"	# Disable support for Qlogic 1080
 
 device		ax0
 device		de0
@@ -1994,6 +1994,7 @@ options		WFQ			#weighted fair queueing
 options		AFMAP			#atm flow mapping
 options		FIFOQ			#fifo queueing
 options		RED			#random early detection
+options		FLOWVALVE		#flowvalve for RED (needs RED)
 options		CBQ_RED			#red for cbq (needs (CBQ and RED)
 options		RIO			#twin red for diffserv (needs RED)
 options		CBQ_RIO			#rio for cbq (needs CBQ, RIO, CBQ_RED)

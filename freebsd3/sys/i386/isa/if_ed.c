@@ -1701,6 +1701,9 @@ ed_attach(sc, unit, flags)
 			ifp->if_flags = (IFF_BROADCAST | IFF_SIMPLEX |
 			    IFF_MULTICAST);
 
+#ifdef ALTQ
+	       ifp->if_altqflags |= ALTQF_READY;
+#endif
 		/*
 		 * Attach the interface
 		 */
@@ -2088,6 +2091,12 @@ outloop:
 		ifp->if_flags |= IFF_OACTIVE;
 		return;
 	}
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+	    m = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+	}
+	else
+#endif
 	IF_DEQUEUE(&ifp->if_snd, m);
 	if (m == 0) {
 

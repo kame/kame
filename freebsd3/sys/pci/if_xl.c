@@ -2401,13 +2401,6 @@ static void xl_start(ifp)
 			bpf_mtap(ifp, cur_tx->xl_mbuf);
 #endif
 	}
-#ifdef ALTQ /* fix imported from 1.5.2.14 1998/12/05 */
-	/*
-	 * If there are no packets queued, bail.
-	 */
-	if (cur_tx == NULL)
-		return;
-#endif
 
 	/*
 	 * If there are no packets queued, bail.
@@ -2863,6 +2856,11 @@ static void xl_watchdog(ifp)
 	xl_rxeof(sc);
 	xl_init(sc);
 
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp))
+		xl_start(ifp);
+	else
+#endif
 	if (ifp->if_snd.ifq_head != NULL)
 		xl_start(ifp);
 

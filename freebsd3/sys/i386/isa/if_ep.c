@@ -626,6 +626,9 @@ ep_attach(sc)
     ifp->if_start = epstart;
     ifp->if_ioctl = epioctl;
     ifp->if_watchdog = epwatchdog;
+#ifdef ALTQ
+    ifp->if_altqflags |= ALTQF_READY;
+#endif
 
     if (!attached) {
 	if_attach(ifp);
@@ -826,6 +829,11 @@ epstart(ifp)
     }
 startagain:
     /* Sneak a peek at the next packet */
+#ifdef ALTQ
+    if (ALTQ_IS_ON(ifp))
+        m = (*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK);
+    else
+#endif
     m = ifp->if_snd.ifq_head;
     if (m == 0) {
 	splx(s);
@@ -844,6 +852,14 @@ startagain:
     if (len + pad > ETHER_MAX_LEN) {
 	/* packet is obviously too large: toss it */
 	++ifp->if_oerrors;
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+	    m = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+	    if (m != top)
+	        panic("epstart: different mbuf dequeued!");
+	}
+	else
+#endif
 	IF_DEQUEUE(&ifp->if_snd, m);
 	m_freem(m);
 	goto readcheck;
@@ -858,6 +874,14 @@ startagain:
 	    return;
 	}
     }
+#ifdef ALTQ
+    if (ALTQ_IS_ON(ifp)) {
+        m = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+	if (m != top)
+	    panic("epstart: different mbuf dequeued!");
+    }
+    else
+#endif
     IF_DEQUEUE(&ifp->if_snd, m);
 
     outw(BASE + EP_W1_TX_PIO_WR_1, len); 
