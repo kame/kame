@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.311 2002/07/28 01:29:41 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.312 2002/07/28 01:31:42 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -713,7 +713,7 @@ sent from a user application as follows:
    the packet.  If it fails, the source address selection also fails.
    If the kernel can find an interface, choose the most appropriate
    address based on the algorithm described in
-   draft-ietf-ipngwg-default-addr-select-xx.txt .
+   draft-ietf-ipv6-default-addr-select-xx.txt .
 
    The policy table used in this algorithm is stored in the kernel.
    To install or view the policy, use the ip6addrctl(8) command.  The
