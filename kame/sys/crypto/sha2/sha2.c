@@ -1,4 +1,4 @@
-/*	$KAME: sha2.c,v 1.4 2001/03/12 08:27:48 itojun Exp $	*/
+/*	$KAME: sha2.c,v 1.5 2001/03/12 11:26:57 itojun Exp $	*/
 
 /*
  * sha2.c
@@ -61,6 +61,10 @@
  *   #define SHA2_UNROLL_TRANSFORM
  *
  */
+
+#ifdef __bsdi__
+#define assert(x)
+#endif
 
 
 /*** SHA-256/384/512 Machine Architecture Definitions *****************/
