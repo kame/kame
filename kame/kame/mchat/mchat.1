@@ -82,6 +82,15 @@ If
 .Ar name
 is omitted, it will be re-initialized to the result of 
 .Xr getlogin 2 .
+.It Li /file Ar file
+Send data of
+.Ar file .
+.It Li /log Op Ar file
+Save received data into
+.Ar file .
+If
+.Li /log
+is typed again, logging will be finished.
 .It Li /help
 Shows command help
 .Pq Li /h for short .

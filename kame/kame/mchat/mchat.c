@@ -79,6 +79,8 @@ struct session {
 	char *s_uport;				/* unicast port */
 	char *s_upolicy;			/* unicast policy */
 
+	int logging;				/* log fd */
+
 	char myname[BUFSIZ];
 };
 
@@ -102,6 +104,9 @@ static int parsecmd __P((char *, int, struct sockaddr *));
 static struct sockaddr *getsrc __P((struct sockaddr *));
 static int cmd_who __P((char *, struct sockaddr *));
 static int cmd_secret __P((char *, struct sockaddr *));
+static int cmd_file __P((char *, struct sockaddr *));
+static int cmd_log __P((char *, struct sockaddr *));
+static int logtofile __P((char *buf, int len));
 static int cmd_quit __P((char *, struct sockaddr *));
 static int cmd_help __P((char *, struct sockaddr *));
 static int cmd_name __P((char *, struct sockaddr *));
@@ -120,6 +125,8 @@ struct cmdtab {
 	{ "/s",		cmd_secret,	NULL,	"secret message, args: dstaddr msg", },
 	{ "/secret",	cmd_secret,	NULL,	"secret message, args: dstaddr msg", },
 	{ "/name",	cmd_name,	NULL,	"change name, args: name-string", },
+	{ "/file",	cmd_file,	NULL,	"send data of file, args: file", },
+	{ "/log",	cmd_log,	NULL,	"log date received, args: file", },
 	{ "/q",		cmd_quit,	NULL,	"quit", },
 	{ "/quit",	cmd_quit,	NULL,	"quit", },
 	{ "/h",		cmd_help,	NULL,	"help", },
@@ -405,9 +412,11 @@ mainloop(fd)
 			len = recvfrom(in, buf, sizeof(buf), 0,
 				(struct sockaddr *)&ss, &socklen);
 			buf[len] = '\0';
-			if (parsecmd(buf, 0, (struct sockaddr *)&ss) < 0)
+			if (parsecmd(buf, 0, (struct sockaddr *)&ss) < 0) {
+				if (session->logging)
+					logtofile(buf, strlen(buf));
 				wrecv_print("%s\n", buf);
-			else {
+			} else {
 				/* command processed, */
 			}
 		}
@@ -631,6 +640,93 @@ cmd_secret(buf, sa)
 	wstat_print(">> sending secret message to %s\n", buf);
 	sendstr(session->s_ufd, res->ai_addr, "<%s/%s> %s", session->myname, myaddr, p);
 	freeaddrinfo(res);
+	return 0;
+}
+
+static int
+cmd_file(fname, sa)
+	char *fname;
+	struct sockaddr *sa;
+{
+	int fd, len;
+	char buf[512];
+	int error;
+
+	fd = open(fname, O_RDONLY);
+	if (fd < 0) {
+		wstat_print(">> open %s: %s\n", fname, strerror(errno));
+		return 0;
+	}
+
+	wstat_print(">> sending data of file, %s\n", fname);
+
+	sa = (struct sockaddr *)&session->s_mcast;
+	while (1) {
+		len = read(fd, buf, sizeof(buf));
+		if (len == 0)
+			break;
+		if (len < 0) {
+			warn("read");
+			(void)close(fd);
+			return 0;
+		}
+		error = sendto(session->s_mfd, buf, len, 0,
+				sa, sa->sa_len);
+		if (error < 0) {
+			strcpy(buf, "(unknown)");
+			getnameinfo(sa, sa->sa_len, buf, sizeof(buf), 0, NULL,
+				NI_NUMERICHOST);
+			wstat_print(">> sendto %s: %s\n", buf, strerror(errno));
+		}
+	}
+
+	(void)close(fd);
+
+	return 0;
+}
+
+static int
+cmd_log(fname, sa)
+	char *fname;
+	struct sockaddr *sa;
+{
+	if (!session->logging) {
+		session->logging = open(fname, O_WRONLY | O_CREAT);
+		if (session->logging < 0) {
+			wstat_print(">> open %s: %s\n", fname, strerror(errno));
+			session->logging = 0;
+			return 0;
+		}
+		if (session->logging == 0) {
+			wstat_print(">> open %s: fd == zero ?\n", fname);
+			session->logging = 0;
+			return 0;
+		}
+	} else {
+		(void)close(session->logging);
+		session->logging = 0;
+	}
+
+	wstat_print(">> logging %s\n", session->logging ? "on" : "off");
+
+	return 0;
+}
+
+static int
+logtofile(buf, len)
+	char *buf;
+	int len;
+{
+	int error;
+
+	error = write(session->logging, buf, len);
+	if (error < 0) {
+		wstat_print(">> write: %s\n", strerror(errno));
+		(void)close(session->logging);
+		session->logging = 0;
+		return 0;
+	}
+
 	return 0;
 }
 
