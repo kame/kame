@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.h,v 1.15 2001/03/21 17:41:13 jinmei Exp $	*/
+/*	$KAME: rtadvd.h,v 1.16 2001/04/10 15:08:31 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -87,6 +87,16 @@ struct prefix {
 	struct in6_addr prefix;
 };
 
+struct rtinfo {
+	struct rtinfo *prev;	/* previous link */
+	struct rtinfo *next;	/* forward link */
+
+	u_int32_t ltime;	/* route lifetime */
+	u_int rtpref;		/* router preference */
+	int prefixlen;
+	struct in6_addr prefix;
+};
+
 struct soliciter {
 	struct soliciter *next;
 	struct sockaddr_in6 addr;
@@ -131,6 +141,8 @@ struct	rainfo {
 	u_short	hapref;		/* Home Agent Preference */
 	u_short	hatime;		/* Home Agent Lifetime */
 #endif
+	struct rtinfo route;	/* route information option (link head) */
+	int	routes;		/* number of route information options */
 
 	/* actual RA packet data and its length */
 	size_t ra_datalen;

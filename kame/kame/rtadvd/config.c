@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.35 2001/03/21 17:44:37 itojun Exp $	*/
+/*	$KAME: config.c,v 1.36 2001/04/10 15:08:31 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -118,6 +118,7 @@ getconfig(intface)
 	tmp = (struct rainfo *)malloc(sizeof(*ralist));
 	memset(tmp, 0, sizeof(*tmp));
 	tmp->prefix.next = tmp->prefix.prev = &tmp->prefix;
+	tmp->route.next = tmp->route.prev = &tmp->route;
 
 	/* check if we are allowed to forward packets (if not determined) */
 	if (forwarding < 0) {
@@ -428,6 +429,106 @@ getconfig(intface)
 		exit(1);
 	}
 
+	/* route information */
+
+	MAYHAVE(val, "routes", 0);
+	if (val < 0 || val > 0xffffffff) {
+		syslog(LOG_ERR,
+		       "<%s> number of route information improper", __FUNCTION__);
+		exit(1);
+	}
+	tmp->routes = val;
+	for (i = 0; i < tmp->routes; i++) {
+		struct rtinfo *rti;
+		char entbuf[256];
+		int added = (tmp->routes > 1) ? 1 : 0;
+
+		/* allocate memory to store prefix information */
+		if ((rti = malloc(sizeof(struct rtinfo))) == NULL) {
+			syslog(LOG_ERR,
+			       "<%s> can't allocate enough memory",
+			       __FUNCTION__);
+			exit(1);
+		}
+		memset(rti, 0, sizeof(*rti));
+
+		/* link into chain */
+		insque(rti, &tmp->route);
+
+		makeentry(entbuf, i, "rtrplen", added);
+		MAYHAVE(val, entbuf, 64);
+		if (val < 0 || val > 128) {
+			syslog(LOG_ERR,
+			       "<%s> prefixlen out of range",
+			       __FUNCTION__);
+			exit(1);
+		}
+		rti->prefixlen = (int)val;
+
+		makeentry(entbuf, i, "rtrflags", added);
+		MAYHAVE(val, entbuf, 0);
+		rti->rtpref = val & ND_RA_FLAG_RTPREF_MASK;
+		if (rti->rtpref == ND_RA_FLAG_RTPREF_RSV) {
+			syslog(LOG_ERR, "<%s> invalid router preference",
+			       __FUNCTION__);
+			exit(1);
+		}
+
+		makeentry(entbuf, i, "rtrltime", added);
+		/*
+		 * XXX: since default value of route lifetime is not defined in
+		 * draft-draves-route-selection-01.txt, I took the default 
+		 * value of valid lifetime of prefix as its default.
+		 * It need be much considered.
+		 */
+		MAYHAVE(val64, entbuf, DEF_ADVVALIDLIFETIME);
+		if (val64 < 0 || val64 > 0xffffffff) {
+			syslog(LOG_ERR,
+			       "<%s> rtrltime out of range",
+			       __FUNCTION__);
+			exit(1);
+		}
+		rti->ltime = (u_int32_t)val64;
+
+		makeentry(entbuf, i, "rtrprefix", added);
+		addr = (char *)agetstr(entbuf, &bp);
+		if (addr == NULL) {
+			syslog(LOG_ERR,
+			       "<%s> need %s as an route for "
+			       "interface %s",
+			       __FUNCTION__, entbuf, intface);
+			exit(1);
+		}
+		if (inet_pton(AF_INET6, addr, &rti->prefix) != 1) {
+			syslog(LOG_ERR,
+			       "<%s> inet_pton failed for %s",
+			       __FUNCTION__, addr);
+			exit(1);
+		}
+#if 0
+		/*
+		 * XXX: currently there's no restriction in route information
+		 * prefix according to draft-draves-route-selection-01.txt,
+		 * however I think the similar restriction be necessary.
+		 */
+		MAYHAVE(val64, entbuf, DEF_ADVVALIDLIFETIME);
+		if (IN6_IS_ADDR_MULTICAST(&rti->prefix)) {
+			syslog(LOG_ERR,
+			       "<%s> multicast route (%s) must "
+			       "not be advertised (IF=%s)",
+			       __FUNCTION__, addr, intface);
+			exit(1);
+		}
+		if (IN6_IS_ADDR_LINKLOCAL(&rti->prefix)) {
+			syslog(LOG_NOTICE,
+			       "<%s> link-local route (%s) must "
+			       "not be advertised on %s",
+			       __FUNCTION__, addr, intface);
+			exit(1);
+		}
+#endif
+	}
+
 	/* okey */
 	tmp->next = ralist;
 	ralist = tmp;
@@ -683,7 +784,9 @@ make_packet(struct rainfo *rainfo)
 	struct nd_opt_advinterval *ndopt_advint;
 	struct nd_opt_homeagent_info *ndopt_hai;
 #endif
+	struct nd_opt_route_info *ndopt_rti;
 	struct prefix *pfx;
+	struct rtinfo *rti;
 
 	/* calculate total length */
 	packlen = sizeof(struct nd_router_advert);
@@ -708,6 +811,9 @@ make_packet(struct rainfo *rainfo)
 	if (mobileip6 && rainfo->hatime)
 		packlen += sizeof(struct nd_opt_homeagent_info);
 #endif
+	for (rti = rainfo->route.next; rti != &rainfo->route; rti = rti->next)
+		packlen += sizeof(struct nd_opt_route_info) + 
+			   ((rti->prefixlen + 0x3f) >> 6) * 8;
 
 	/* allocate memory for the packet */
 	if ((buf = malloc(packlen)) == NULL) {
@@ -831,6 +937,19 @@ make_packet(struct rainfo *rainfo)
 		ndopt_pi->nd_opt_pi_prefix = pfx->prefix;
 
 		buf += sizeof(struct nd_opt_prefix_info);
+	}
+
+	for (rti = rainfo->route.next; rti != &rainfo->route; rti = rti->next) {
+		u_int8_t psize = (rti->prefixlen + 0x3f) >> 6;
+
+		ndopt_rti = (struct nd_opt_route_info *)buf;
+		ndopt_rti->nd_opt_rti_type = ND_OPT_ROUTE_INFO;
+		ndopt_rti->nd_opt_rti_len = 1 + psize;
+		ndopt_rti->nd_opt_rti_prefixlen = rti->prefixlen;
+		ndopt_rti->nd_opt_rti_flags = 0xff & rti->rtpref;
+		ndopt_rti->nd_opt_rti_lifetime = rti->ltime;
+		memcpy(ndopt_rti + 1, &rti->prefix, psize * 8);
+		buf += sizeof(struct nd_opt_route_info) + psize * 8;
 	}
 
 	return;

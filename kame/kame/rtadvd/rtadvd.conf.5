@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.33 2001/04/10 03:43:57 suz Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.34 2001/04/10 15:08:31 suz Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -283,6 +283,55 @@ packet, by configuring
 .Cm \&maxinterval
 explicitly.
 .Pp
+The following items are for ICMPv6 route information option,
+which will be attached to router advertisement header.
+These items are optional.
+.Bl -tag -width indent
+.It Cm \&routes
+(num) Number of routes
+Its default is 0, so it must explicitly be set to positve values
+if you want to specify any route information option.
+If its value is 0, no route information is sent.
+If its value is more than 1, you must specify the index of the routes
+for each item below.
+Indices vary from 0 to N-1, where N is the
+value of
+.Cm routes.
+Each index shall follow the name of each item, e.g.,
+.Dq rtrplen2 .
+.It Cm \&rtrplen
+(num) Prefix length field in route information option.
+The default value is 64.
+.It Cm \&rtrflags
+(num) Flags field in route information option.
+Bit 4
+.Po
+.Li 0x10
+.Pc
+and 
+and Bit 3
+.Po
+.Li 0x08
+.Pc
+are used to encode router preference for the route.
+The default value is 0x00, i.e. medium router preference.
+.It Cm \&rtrprefix
+(str) The prefix filled into the Prefix field of route information option.
+Since
+.Dq \&:
+is used for
+.Xr termcap 5
+file format as well as IPv6 numeric address, the field MUST be quoted by
+doublequote character.
+This field cannot be
+omitted if the value of
+.Cm addrs
+is more than 0.
+.It Cm \&rtrltime
+(num) route lifetime field in route information option.
+.Pq unit: seconds .
+The default value is 2592000 (30 days). (not specified in draft-draves-router-selection-01.txt now)
+.El
 You can also refer one line from another by using
 .Cm tc
 capability.
