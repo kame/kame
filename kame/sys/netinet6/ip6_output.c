@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.417 2004/02/03 07:25:22 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.418 2004/02/03 08:42:29 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -869,11 +869,14 @@ skip_ipsec2:;
 		if (exthdrs.ip6e_rthdr)
 			rh = (struct ip6_rthdr *)(mtod(exthdrs.ip6e_rthdr,
 			    struct ip6_rthdr *));
+		else {
 #ifdef MIP6
-		else
 			rh = (struct ip6_rthdr *)(mtod(exthdrs.ip6e_rthdr2,
 			    struct ip6_rthdr *));
+#else
+			rh = NULL;
 #endif /* MIP6 */
+		}
 
 		finaldst = ip6->ip6_dst;
 		switch (rh->ip6r_type) {
