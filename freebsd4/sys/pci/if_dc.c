@@ -2849,7 +2849,7 @@ static void dc_start(ifp)
 {
 	struct dc_softc		*sc;
 	struct mbuf		*m_head = NULL;
-	int			idx;
+	int			idx, coalesced;
 
 	sc = ifp->if_softc;
 
@@ -2879,7 +2879,9 @@ static void dc_start(ifp)
 				ifp->if_flags |= IFF_OACTIVE;
 				break;
 			}
-		}
+			coalesced = 1;
+		} else
+			coalesced = 0;
 
 		if (dc_encap(sc, m_head, &idx)) {
 			ifp->if_flags |= IFF_OACTIVE;
@@ -2887,7 +2889,7 @@ static void dc_start(ifp)
 		}
 
 		/* now we are committed to transmit the packet */
-		if (sc->dc_flags & DC_TX_COALESCE) {
+		if (coalesced) {
 			/* if mbuf is coalesced, it is already dequeued */
 		} else
 			IFQ_DEQUEUE(&ifp->if_snd, m_head);
