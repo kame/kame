@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.47 1999/08/23 16:58:33 jinmei Exp $
+$Id: CHANGELOG,v 1.48 1999/08/23 17:04:19 jinmei Exp $
 
 <199908>
 1999-08-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -13,7 +13,7 @@ $Id: CHANGELOG,v 1.47 1999/08/23 16:58:33 jinmei Exp $
 
 1999-08-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6: implemented per-interface ICMPv6 statistics
-	based on RFC2466. ioctl(SIOCGIFSTAT_ICMP6) is availabe as API.
+	based on RFC2466. ioctl(SIOCGIFSTAT_ICMP6) is available as API.
 
 1999-08-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* sys/netinet6/udp6_usrreq.c (udp6_output): now got rid of
