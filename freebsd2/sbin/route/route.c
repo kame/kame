@@ -119,8 +119,6 @@ extern	char *inet_ntoa(), *iso_ntoa(), *link_ntoa();
 
 void usage __P((const char *)) __dead2;
 
-char ntop_buf[INET6_ADDRSTRLEN];	/*for inet_ntop()*/
-
 void
 usage(cp)
 	const char *cp;
