@@ -1694,7 +1694,12 @@ static int dc_attach(dev)
 	ifp->if_init = dc_init;
 	ifp->if_baudrate = 10000000;
 	IFQ_SET_MAXLEN(&ifp->if_snd, DC_TX_LIST_CNT - 1);
-	IFQ_SET_READY(&ifp->if_snd);
+#ifdef ALTQ
+	/* dc_coal breaks the poll-and-dequeue rule,
+	   so don't enable ALTQ for those chips */
+	if ((sc->dc_flags & DC_TX_COALESCE) == 0)
+#endif
+		IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Do MII setup.
@@ -2483,6 +2488,11 @@ static int dc_encap(sc, m_head, txidx)
 		sc->dc_ldata->dc_tx_list[cur].dc_ctl |= DC_TXCTL_FINT;
 	if (sc->dc_flags & DC_TX_USE_TX_INTR && sc->dc_cdata.dc_tx_cnt > 64)
 		sc->dc_ldata->dc_tx_list[cur].dc_ctl |= DC_TXCTL_FINT;
+#ifdef ALTQ
+	else if ((sc->dc_flags & DC_TX_USE_TX_INTR) &&
+		 TBR_IS_ENABLED(&sc->arpcom.ac_if.if_snd))
+		sc->dc_ldata->dc_tx_list[cur].dc_ctl |= DC_TXCTL_FINT;
+#endif
 	sc->dc_ldata->dc_tx_list[*txidx].dc_status = DC_TXSTAT_OWN;
 	*txidx = frag;
 
@@ -2552,6 +2562,10 @@ static void dc_start(ifp)
 			break;
 
 		if (sc->dc_flags & DC_TX_COALESCE) {
+#ifdef ALTQ
+			/* note: dc_coal breaks the poll-and-dequeue rule
+			   and ALTQ is disabled in dc_attach for those chips */
+#endif
 			if (dc_coal(sc, &m_head)) {
 				ifp->if_flags |= IFF_OACTIVE;
 				break;
