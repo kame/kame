@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.331 2003/03/18 23:49:35 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.332 2003/04/01 03:44:32 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -148,14 +148,7 @@ RFC2492: IPv6 over ATM Networks
     * only PVC is supported.
 RFC2497: Transmission of IPv6 packet over ARCnet Networks
 RFC2545: Use of BGP-4 Multiprotocol Extensions for IPv6 Inter-Domain Routing
-RFC2553: Basic Socket Interface Extensions for IPv6
-    * IPv4 mapped address (3.7) and special behavior of IPv6 wildcard bind
-      socket (3.8) are,
-	- supported and turned on by default on KAME/FreeBSD[34]x
-	  and KAME/BSDI4,
-	- supported but turned off by default on KAME/NetBSD,
-	- not supported on KAME/FreeBSD228, KAME/OpenBSD and KAME/BSDI3.
-      see 1.12 in this document for details.
+RFC2553: (see RFC3493)
 RFC2671: Extension Mechanisms for DNS (EDNS0)
     * see USAGE for how to use it.
     * not supported on kame/freebsd4 and kame/bsdi4.
@@ -202,7 +195,14 @@ RFC3376: Internet Group Management Protocol, Version 3
 RFC3484: Default Address Selection for IPv6
     * the selection algorithm for both source and destination addresses
       is implemented based on the RFC, though some rules are still omitted.
-RFC 3493: Basic Socket Interface Extensions for IPv6 (revised)
+RFC3493: Basic Socket Interface Extensions for IPv6
+    * IPv4 mapped address (3.7) and special behavior of IPv6 wildcard bind
+      socket (3.8) are,
+	- supported and turned on by default on KAME/FreeBSD[34]
+	  and KAME/BSDI4,
+	- supported but turned off by default on KAME/NetBSD and KAME/FreeBSD5,
+	- not supported on KAME/FreeBSD228, KAME/OpenBSD and KAME/BSDI3.
+      see 1.12 in this document for details.
 draft-ietf-ipngwg-icmp-name-lookups-09: IPv6 Name Lookups Through ICMP
 draft-ietf-dhc-dhcpv6-28.txt: DHCPv6
 draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
@@ -482,9 +482,8 @@ these options; we cannot just say "send the packet to (one of the
 interfaces of) the site."
 
 Another kind of candidates is to use the sin6_scope_id member in the
-sockaddr_in6 structure, defined in RFC2553 and
-draft-ietf-ipngwg-rfc2553bis-xx.txt.  The KAME kernel interprets the
-sin6_scope_id field properly in order to disambiguate scoped
+sockaddr_in6 structure, defined in RFC2553.  The KAME kernel
+interprets the sin6_scope_id field properly in order to disambiguate scoped
 addresses.  For example, if an application passes a sockaddr_in6
 structure that has a non-zero sin6_scope_id value to the sendto(2)
 system call, the kernel should send the packet to the appropriate zone
@@ -525,7 +524,7 @@ use these APIs have to be prepared about differences in kernels
 anyway.
 
 getaddrinfo(3) and getnameinfo(3) support an extended numeric IPv6
-syntax, as documented in draft-ietf-ipngwg-rfc2553bis-xx.txt.  You can
+syntax, as documented in draft-ietf-ipngwg-scoping-arch-xx.txt.  You can
 specify the outgoing link, by using the name of the outgoing interface
 as the link, like "fe80::1%ne0" (again, note that we assume there is
 1-to-1 relationship between links and interfaces.)  This way you will
@@ -907,7 +906,7 @@ is sane or not.  Comments are welcome.
 1.10 Applications
 
 For userland programming, we support IPv6 socket API as specified in
-RFC2553, RFC2292 and upcoming internet drafts.
+RFC2553/3493, RFC2292 and upcoming internet drafts.
 
 TCP/UDP over IPv6 is available and quite stable.  You can enjoy "telnet",
 "ftp", "rlogin", "rsh", "ssh", etc.  These applications are protocol
@@ -979,7 +978,7 @@ address.  These extensions have thus not been implemented in KAME.
 
 1.12 IPv4 mapped address and IPv6 wildcard socket
 
-RFC2553 describes IPv4 mapped address (3.7) and special behavior
+RFC2553/3493 describes IPv4 mapped address (3.7) and special behavior
 of IPv6 wildcard bind socket (3.8).  The spec allows you to:
 - Accept IPv4 connections by AF_INET6 wildcard bind socket.
 - Transmit IPv4 packet over AF_INET6 socket by using special form of
@@ -1016,7 +1015,7 @@ configure the behavior.
 
 Comments on listening side:
 
-It looks that RFC2553 talks too little on wildcard bind issue,
+It looks that RFC2553/3493 talks too little on wildcard bind issue,
 specifically on (1) port space issue, (2) failure mode, (3) relationship
 between AF_INET/INET6 wildcard bind like ordering constraint, and (4) behavior
 when conflicting socket is opened/closed.  There can be several separate
@@ -1061,7 +1060,7 @@ is the key to the success:
 
 If you would like to use AF_INET6 socket for both IPv4 and IPv6 outgoing
 connection, you will need tweaked implementation in DNS support libraries,
-as documented in RFC2553 6.1.  KAME libinet6 includes the tweak in
+as documented in RFC2553/3493 6.1.  KAME libinet6 includes the tweak in
 getipnodebyname().  Note that getipnodebyname() itself is not recommended as
 it does not handle scoped IPv6 addresses at all.  For IPv6 name resolution
 getaddrinfo() is the preferred API.  getaddrinfo() does not implement the
@@ -1080,7 +1079,7 @@ and initiating side).  AF_INET6 and AF_INET sockets are totally separated.
 Port number space is totally separate between AF_INET and AF_INET6 sockets. 
 
 It should be noted that KAME/BSDI3 and KAME/FreeBSD228 are not conformant
-to RFC2553 section 3.7 and 3.8.  It is due to code sharing reasons.
+to RFC2553/3493 section 3.7 and 3.8.  It is due to code sharing reasons.
 
 1.12.2 KAME/FreeBSD[34]x
 
@@ -1119,8 +1118,8 @@ from KAME/FreeBSD[34]x.  KAME/NetBSD uses separate inpcb/in6pcb structures,
 while KAME/FreeBSD[34]x uses merged inpcb structure.
 
 It should be noted that the default configuration of KAME/NetBSD is not
-conformant to RFC2553 section 3.8.  It is intentionally turned off by default
-for security reasons.
+conformant to RFC2553/3493 section 3.8.  It is intentionally turned off by
+default for security reasons.
 
 The platform can be configured to support IPv4 mapped address/special AF_INET6
 wildcard bind (disabled by default).  Kernel behavior can be summarized as
@@ -1184,8 +1183,8 @@ KAME/BSDi4 supports connection initiation to IPv4 mapped address
 KAME/OpenBSD uses NRL-based TCP/UDP stack and inpcb source code,
 which was derived from NRL IPv6/IPsec stack.
 
-It should be noted that KAME/OpenBSD is not conformant to RFC2553 section 3.7
-and 3.8.  It is intentionally omitted for security reasons.
+It should be noted that KAME/OpenBSD is not conformant to RFC2553/3493 section
+3.7 and 3.8.  It is intentionally omitted for security reasons.
 
 1.12.5.1 KAME/OpenBSD, listening side
 
@@ -1304,7 +1303,7 @@ definition.
 
 KAME kit prior to December 1999 used RFC2553 definition.  KAME kit after
 December 1999 (including December) will conform to XNET definition,
-based on RFC2553bis discussion.
+based on RFC3493 discussion.
 
 If you look at multiple IPv6 implementations, you will be able to see
 both definitions.  As an userland programmer, the most portable way of
