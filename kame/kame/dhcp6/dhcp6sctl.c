@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6sctl.c,v 1.5 2004/06/12 12:49:51 jinmei Exp $	*/
+/*	$KAME: dhcp6sctl.c,v 1.6 2004/06/17 06:23:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -44,8 +44,15 @@
 static char *ctladdr = DEFAULT_CONTROL_ADDR;
 static char *ctlport = DEFAULT_CONTROL_PORT;
 
+static inline int put16 __P((char **, int *, u_int16_t));
+static inline int put32 __P((char **, int *, u_int32_t));
+static inline int putval __P((char **, int *, void *, size_t));
+
 static int make_command __P((int, char **, char **, size_t *));
-static int parse_duid __P((char *, int *, char *));
+static int make_remove_command __P((int, char **, char **, int *));
+static int make_binding_object __P((int, char **, char **, int *));
+static int make_ia_object __P((int, char **, char **, int *));
+static int parse_duid __P((char *, int *, char **, int *));
 static void usage __P((void));
 
 int
@@ -53,7 +60,7 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
-	int cc, ch, s, error;
+	int cc, ch, s, error, passed;
 	char *cbuf;
 	size_t clen;
 	struct addrinfo hints, *res0, *res;
@@ -73,8 +80,12 @@ main(argc, argv)
 	argc -= optind;
 	argv += optind;
 	
-	if (make_command(argc, argv, &cbuf, &clen))
-		exit(1);
+	if ((passed = make_command(argc, argv, &cbuf, &clen)) < 0)
+		errx(1, "failed to make command buffer");
+	argc -= passed;
+	argv += passed;
+	if (argc != 0)
+		warnx("redundant command argument after \"%s\"", argv[0]);
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET6;
@@ -115,6 +126,75 @@ main(argc, argv)
 	exit(0);
 }
 
+static inline int
+put16(bpp, lenp, val)
+	char **bpp;
+	int *lenp;
+	u_int16_t val;
+{
+	char *bp = *bpp;
+	int len = *lenp;
+
+	if (len < sizeof(val))
+		return (-1);
+
+	val = htons(val);
+	memcpy(bp, &val, sizeof(val));
+	bp += sizeof(val);
+	len -= sizeof(val);
+
+	*bpp = bp;
+	*lenp = len;
+
+	return (0);
+}
+
+static inline int
+put32(bpp, lenp, val)
+	char **bpp;
+	int *lenp;
+	u_int32_t val;
+{
+	char *bp = *bpp;
+	int len = *lenp;
+
+	if (len < sizeof(val))
+		return (-1);
+
+	val = htonl(val);
+	memcpy(bp, &val, sizeof(val));
+	bp += sizeof(val);
+	len -= sizeof(val);
+
+	*bpp = bp;
+	*lenp = len;
+
+	return (0);
+}
+
+static inline int
+putval(bpp, lenp, val, valsize)
+	char **bpp;
+	int *lenp;
+	void *val;
+	size_t valsize;
+{
+	char *bp = *bpp;
+	int len = *lenp;
+
+	if (len < valsize)
+		return (-1);
+
+	memcpy(bp, val, valsize);
+	bp += valsize;
+	len -= valsize;
+
+	*bpp = bp;
+	*lenp = len;
+
+	return (0);
+}
+
 static int
 make_command(argc, argv, bufp, lenp)
 	int argc;
@@ -122,99 +202,181 @@ make_command(argc, argv, bufp, lenp)
 	size_t *lenp;
 {
 	struct dhcp6ctl ctl;
-	char *buf = NULL, *bp;
-	int len, duidlen;
-	struct dhcp6ctl_iaspec iaspec;
+	char commandbuf[4096];	/* XXX: ad-hoc value */
+	char *bp, *buf;
+	int buflen, len, duidlen;
+	int argc_passed = 0, passed;
 	u_int32_t p32;
 
 	if (argc == 0) {
 		warnx("command is too short");
-		goto fail;
+		return (-1);
 	}
+
+	bp = commandbuf + sizeof(ctl);
+	buflen = sizeof(commandbuf) - sizeof(ctl);
 
 	memset(&ctl, 0, sizeof(ctl));
 	ctl.version = htons(DHCP6CTL_VERSION);
 
-	if (strcmp(argv[0], "reload") == 0) {
+	if (strcmp(argv[0], "reload") == 0)
 		ctl.command = htons(DHCP6CTL_COMMAND_RELOAD);
-		ctl.len = 0;
-		len = sizeof(ctl);
-		if ((buf = malloc(len)) == NULL) {
-			warn("malloc failed");
-			goto fail;
+	else if (strcmp(argv[0], "remove") == 0) {
+		if ((passed = make_remove_command(argc - 1, argv + 1,
+		    &bp, &buflen)) < 0) {
+			return (-1);
 		}
-		memcpy(buf, &ctl, len);
-	} else if (strcmp(argv[0], "remove") == 0) {
-		/*
-		 * right now we only accept the form of
-		 * "remove binding IA iatype IAID duid"
-		 */
-		if (argc < 6)
-			warnx("short command for %s", argv[0]);
-
-		/* XXX: should be more generic!! */
-		if (strcmp(argv[1], "binding") == 0 &&
-		    strcmp(argv[2], "IA") == 0 &&
-		    strcmp(argv[3], "IA_PD") == 0) {
-			if (parse_duid(argv[5], &duidlen, NULL)) {
-				warnx("failed to parse duid: %s", argv[5]);
-				goto fail;
-			}
-			len = sizeof(ctl) + 8 + sizeof(iaspec) + duidlen;
-			if ((buf = malloc(len)) == NULL) {
-				warn("malloc failed");
-				goto fail;
-			}
-
-			ctl.command = htons(DHCP6CTL_COMMAND_REMOVE);
-			ctl.len = htons(len - sizeof(ctl));
-			memcpy(buf, &ctl, sizeof(ctl));
-
-			bp = buf + sizeof(ctl);
-
-			p32 = htonl(DHCP6CTL_BINDING);
-			memcpy(bp, &p32, sizeof(p32));
-			bp += sizeof(p32);
-
-			p32 = htonl(DHCP6CTL_BINDING_IA);
-			memcpy(bp, &p32, sizeof(p32));
-			bp += sizeof(p32);
-
-			iaspec.type = htonl(DHCP6CTL_IA_PD);
-			iaspec.id = htonl((u_int32_t)atoi(argv[4]));
-			iaspec.duidlen = htonl(duidlen);
-			memcpy(bp, &iaspec, sizeof(iaspec));
-			bp += sizeof(iaspec);
-
-			if (parse_duid(argv[5], &duidlen, bp)) {
-				warnx("failed to parse duid: %s", argv[5]);
-				goto fail;
-			}
-		}
+		argc_passed += passed;
+		ctl.command = htons(DHCP6CTL_COMMAND_REMOVE);
 	} else {
 		warnx("unknown command: %s", argv[0]);
-		goto fail;
+		return (-1);
 	}
+
+	len = bp - commandbuf;
+	ctl.len = htons(len - sizeof(ctl));
+	memcpy(commandbuf, &ctl, sizeof(ctl));
+
+	if ((buf = malloc(len)) == NULL) {
+		warn("memory allocation failed");
+		return (-1);
+	}
+	memcpy(buf, commandbuf, len);
 
 	*lenp = len;
 	*bufp = buf;
 
-	return (0);
+	argc_passed++;
+
+	return (argc_passed);
+}
+
+static int
+make_remove_command(argc, argv, bpp, lenp)
+	int argc, *lenp;
+	char **argv, **bpp;
+{
+	int argc_passed = 0, passed;
+
+	if (argc == 0) {
+		warnx("make_remove_command: command is too short");
+		return (-1);
+	}
+
+	if (strcmp(argv[0], "binding") == 0) {
+		if (put32(bpp, lenp, DHCP6CTL_BINDING))
+			goto fail;
+		if ((passed = make_binding_object(argc - 1, argv + 1,
+		    bpp, lenp)) < 0) {
+			return (-1);
+		}
+		argc_passed += passed;
+	} else {
+		warnx("remove target not supported: %s", argv[0]);
+		return (-1);
+	}
+
+	argc_passed++;
+	return (argc_passed);
 
   fail:
-	if (buf != NULL)
-		free(buf);
+	warnx("make_remove_command failed");
 	return (-1);
 }
 
 static int
-parse_duid(str, lenp, buf)
+make_binding_object(argc, argv, bpp, lenp)
+	int argc, *lenp;
+	char **argv, **bpp;
+{
+	int argc_passed = 0, passed;
+
+	if (argc == 0) {
+		/* or allow this as "all"? */
+		warnx("make_binding_object: command is too short");
+		return (-1);
+	}
+
+	if (strcmp(argv[0], "IA") == 0) {
+		if (put32(bpp, lenp, DHCP6CTL_BINDING_IA))
+			goto fail;
+		if ((passed = make_ia_object(argc - 1, argv + 1,
+		    bpp, lenp)) < 0) {
+			return (-1);
+		}
+		argc_passed += passed;
+	} else {
+		warn("unknown binding type: %s", argv[0]);
+		return (-1);
+	}
+
+	argc_passed++;
+	return (argc_passed);
+
+  fail:
+	warnx("make_binding_object: failed");
+	return (-1);
+}
+
+static int
+make_ia_object(argc, argv, bpp, lenp)
+	int argc, *lenp;
+	char **argv, **bpp;
+{
+	struct dhcp6ctl_iaspec iaspec;
+	int duidlen, dummylen = 0;
+	int argc_passed = 0, passed = 0;
+	char *dummy = NULL;
+
+	if (argc < 3) {
+		/*
+		 * Right now, we require all three parameters of
+		 * <IA type, IAID, DUID>.  This should be more flexible in
+		 * the future.
+		 */
+		warnx("command is too short for an IA spec");
+		return (-1);
+	}
+	argc_passed += 3;
+
+	memset(&iaspec, 0, sizeof(iaspec));
+
+	if (strcmp(argv[0], "IA_PD") == 0)
+		iaspec.type = htonl(DHCP6CTL_IA_PD);
+	else {
+		warnx("IA type not supported: %s", argv[0]);
+		return (-1);
+	}
+
+	iaspec.id = htonl((u_int32_t)atoi(argv[1]));
+
+	if (parse_duid(argv[2], &duidlen, &dummy, &dummylen))
+		goto fail;
+	iaspec.duidlen = htonl(duidlen);
+
+	if (putval(bpp, lenp, &iaspec, sizeof(iaspec)))
+		goto fail;
+
+	if (parse_duid(argv[2], &duidlen, bpp, lenp))
+		goto fail;
+
+	return (argc_passed);
+
+  fail:
+	warnx("make_ia_object: failed");
+	return (-1);
+}
+
+static int
+parse_duid(str, lenp, bufp, buflenp)
 	char *str;
 	int *lenp;
-	char *buf;
+	char **bufp;
+	int *buflenp;
 {
+	char *buf = *bufp;
 	char *cp, *bp;
-	int duidlen, slen;
+	int duidlen, slen, buflen;
 	unsigned int x;
 
 	/* calculate DUID len */
@@ -235,9 +397,12 @@ parse_duid(str, lenp, buf)
 	if (buf == NULL)
 		return (0);
 
+	buflen = *buflenp;
+	if (buflen < duidlen)
+		goto bad;
+
 	for (cp = str, bp = buf; *cp != '\0';) {
-		/* this should not happen, but check it for safety. */
-		if (bp - buf > duidlen)
+		if (bp - buf >= buflen)
 			goto bad;
 
 		if (sscanf(cp, "%02x", &x) != 1)
@@ -256,6 +421,7 @@ parse_duid(str, lenp, buf)
 		}
 	}
   done:
+	*bufp = bp;
 	return (0);
 
   bad:

@@ -1,4 +1,4 @@
-/*	$KAME: control.h,v 1.3 2004/06/12 11:00:59 jinmei Exp $	*/
+/*	$KAME: control.h,v 1.4 2004/06/17 06:23:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -54,6 +54,7 @@ struct dhcp6ctl {
 } __attribute__ ((__packed__));
 
 struct dhcp6ctl_iaspec {
+	u_int32_t flags;
 	u_int32_t type;
 	u_int32_t id;
 	u_int32_t duidlen;
