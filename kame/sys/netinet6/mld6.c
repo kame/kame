@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.25 2001/01/16 14:14:18 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.26 2001/02/16 14:50:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -491,16 +491,16 @@ mld6_sendpkt(in6m, type, dst)
 	ip6_output(mh, &ip6_opts, NULL, 0, &im6o, &outif);
 	if (outif) {
 		icmp6_ifstat_inc(outif, ifs6_out_msg);
-		switch(type) {
-		 case MLD6_LISTENER_QUERY:
-			 icmp6_ifstat_inc(outif, ifs6_out_mldquery);
-			 break;
-		 case MLD6_LISTENER_REPORT:
-			 icmp6_ifstat_inc(outif, ifs6_out_mldreport);
-			 break;
-		 case MLD6_LISTENER_DONE:
-			 icmp6_ifstat_inc(outif, ifs6_out_mlddone);
-			 break;
+		switch (type) {
+		case MLD6_LISTENER_QUERY:
+			icmp6_ifstat_inc(outif, ifs6_out_mldquery);
+			break;
+		case MLD6_LISTENER_REPORT:
+			icmp6_ifstat_inc(outif, ifs6_out_mldreport);
+			break;
+		case MLD6_LISTENER_DONE:
+			icmp6_ifstat_inc(outif, ifs6_out_mlddone);
+			break;
 		}
 	}
 }
