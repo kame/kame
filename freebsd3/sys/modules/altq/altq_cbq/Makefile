@@ -1,11 +1,11 @@
 
 .PATH:	${.CURDIR}/../../../altq
 KMOD=	altq_cbq
-SRCS=	altq_cbq.c altq_rmclass.c opt_altq.h opt_inet.h
+SRCS=	altq_cbq.c altq_rmclass.c opt_altq.h opt_inet.h opt_inet6.h
 KMODDEPS=	altq_red altq_rio
 
 CFLAGS+= -DALTQ
-CLEANFILES+= opt_altq.h opt_inet.h
+CLEANFILES+= opt_altq.h opt_inet.h opt_inet6.h
 
 ALTQMOD_CBQ_RED?=	1
 ALTQMOD_CBQ_RIO?=	1
@@ -32,8 +32,11 @@ opt_inet.h:
 .if ${ALTQMOD_INET} > 0
 	echo "#define INET 1" > opt_inet.h
 .endif
+
+opt_inet6.h:
+	touch opt_inet6.h
 .if ${ALTQMOD_INET6} > 0
-	echo "#define INET6 1" >> opt_inet.h
+	echo "#define INET6 1" > opt_inet6.h
 .endif
 
 .include <bsd.kmod.mk>
