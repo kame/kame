@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.219 2004/04/08 13:27:31 jinmei Exp $	*/
+/*	$KAME: ipsec.c,v 1.220 2004/04/20 17:10:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -76,7 +76,6 @@
 #include <netinet/udp_var.h>
 #include <netinet/ip_ecn.h>
 #include <netinet/tcp.h>
-#include <netinet/udp.h>
 
 #include <netinet/ip6.h>
 #ifdef INET6
