@@ -41,11 +41,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <err.h>
+#include <stdarg.h>
 #include "rtsold.h"
 
 struct ifinfo *iflist;
 static struct timeval tm_max =	{0x7fffffff, 0x7fffffff};
 int dflag;
+static int log_upto = 999;
+static int fflag = 0;
 
 /* protocol constatns */
 #define MAX_RTR_SOLICITATION_DELAY	1 /* second */
@@ -78,7 +81,7 @@ static void TIMEVAL_ADD(struct timeval *a, struct timeval *b,
 			struct timeval *result);
 static void TIMEVAL_SUB(struct timeval *a, struct timeval *b,
 			struct timeval *result);
-static void usage();
+static void usage(char *progname);
 
 /* external functions */
 extern int ifinit();
@@ -98,17 +101,26 @@ main(argc, argv)
 	char *argv[];
 {
 	int s, ch;
-	int fflag = 0;
+	int once = 0;
 	struct timeval *timeout;
 	struct fd_set fdset;
+	char *argv0;
+	char *opts;
 
 	/*
 	 * Initialization
 	 */
-	openlog(*argv, LOG_NDELAY|LOG_PID, LOG_DAEMON);
+	argv0 = argv[0];
 
 	/* get option */
-	while((ch = getopt(argc, argv, "dfm")) != -1) {
+	if (strcmp(argv0, "rtsol") == 0) {
+		fflag = 1;
+		once = 1;
+		opts = "dD";
+	} else
+		opts = "dDfm1";
+
+	while((ch = getopt(argc, argv, opts)) != -1) {
 		switch(ch) {
 		 case 'd':
 			 dflag = 1;
@@ -122,21 +134,33 @@ main(argc, argv)
 		 case 'm':
 			 mobile_node = 1;
 			 break;
+		 case '1':
+			 once = 1;
+			 break;
 		 default:
-			 usage();
+			 usage(argv0);
 		}
 	}
 	argc -= optind;
 	argv += optind;
 	if (argc == 0)
-		usage();
+		usage(argv0);
 
 	/* set log level */
 	if (dflag == 0)
-		setlogmask(LOG_UPTO(LOG_NOTICE));
+		log_upto = LOG_NOTICE;
+	if (!fflag) {
+		openlog(argv0, LOG_NDELAY|LOG_PID, LOG_DAEMON);
+		if (log_upto >= 0)
+			setlogmask(LOG_UPTO(log_upto));
+	}
 
 	/* random value initilization */
 	srandom((u_long)time(NULL));
+
+	/* warn if accept_rtadv is down */
+	if (!getinet6sysctl(IPV6CTL_ACCEPT_RTADV))
+		warnx("kernel is configured not to accept RAs");
 
 	/* configuration per interface */
 	if (ifinit())
@@ -160,7 +184,7 @@ main(argc, argv)
 
 	FD_ZERO(&fdset);
 	FD_SET(s, &fdset);
-	while(1) {		/* main loop */
+	while (1) {		/* main loop */
 		extern int errno;
 		int e;
 		struct fd_set select_fd = fdset;
@@ -168,15 +192,25 @@ main(argc, argv)
 		timeout = rtsol_check_timer();
 		if ((e = select(s + 1, &select_fd, NULL, NULL, timeout)) < 1) {
 			if (e < 0) {
-				syslog(LOG_ERR, "<%s> select: %s",
-				       __FUNCTION__, strerror(errno));
+				warnmsg(LOG_ERR, __FUNCTION__, "select: %s",
+				       strerror(errno));
 			}
 			continue;
 		}
 
 		/* packet reception */
 		if (FD_ISSET(s, &fdset))
-		    rtsol_input(s);
+			rtsol_input(s);
+
+		if (once) {
+			struct ifinfo *ifi;
+			for (ifi = iflist; ifi; ifi = ifi->next) {
+				if (ifi->racnt == 0)
+					break;
+			}
+			if (ifi == NULL)
+				break;
+		}
 	}
 	/* NOTREACHED */
 }
@@ -188,19 +222,18 @@ ifconfig(char *ifname)
 	struct sockaddr_dl *sdl;
 
 	if ((sdl = if_nametosdl(ifname)) == NULL) {
-		syslog(LOG_ERR,
-		       "<%s> failed to get link layer information for %s",
-		       __FUNCTION__, ifname);
+		warnmsg(LOG_ERR, __FUNCTION__,
+		       "failed to get link layer information for %s", ifname);
 		return(-1);
 	}
 	if (find_ifinfo(sdl->sdl_index)) {
-		syslog(LOG_ERR, "<%s> interface %s was already cofigured",
-		       __FUNCTION__, ifname);
+		warnmsg(LOG_ERR, __FUNCTION__,
+			"interface %s was already cofigured", ifname);
 		return(-1);
 	}
 
 	if ((ifinfo = malloc(sizeof(*ifinfo))) == NULL) {
-		syslog(LOG_ERR, "<%s> memory allocation failed", __FUNCTION__);
+		warnmsg(LOG_ERR, __FUNCTION__, "memory allocation failed");
 		return(-1);
 	}
 	memset(ifinfo, 0, sizeof(*ifinfo));
@@ -267,17 +300,17 @@ make_packet(struct ifinfo *ifinfo)
 	size_t packlen = sizeof(struct nd_router_solicit), lladdroptlen = 0;
 
 	if ((lladdroptlen = lladdropt_length(ifinfo->sdl)) == 0) {
-		syslog(LOG_INFO, "<%s> link-layer address option has null length"
-		       " on %s. Treat as not included.", __FUNCTION__,
-		       ifinfo->ifname);
+		warnmsg(LOG_INFO, __FUNCTION__,
+			"link-layer address option has null length"
+		       " on %s. Treat as not included.", ifinfo->ifname);
 	}
 	packlen += lladdroptlen;
 	ifinfo->rs_datalen = packlen;
 
 	/* allocate buffer */
 	if ((buf = malloc(packlen)) == NULL) {
-		syslog(LOG_ERR, "<%s> memory allocation failed for %s",
-		       __FUNCTION__, ifinfo->ifname);
+		warnmsg(LOG_ERR, __FUNCTION__,
+			"memory allocation failed for %s", ifinfo->ifname);
 		return(-1);
 	}
 	ifinfo->rs_data = buf;
@@ -311,9 +344,10 @@ rtsol_check_timer()
 	for(ifinfo = iflist; ifinfo; ifinfo = ifinfo->next) {
 		if (TIMEVAL_LEQ(ifinfo->expire, now)) {
 			if (dflag > 1)
-				syslog(LOG_DEBUG, "<%s> timer expiration on %s, "
-				       "state = %d", __FUNCTION__,
-				       ifinfo->ifname, ifinfo->state);
+				warnmsg(LOG_DEBUG, __FUNCTION__,
+					"timer expiration on %s, "
+				       "state = %d", ifinfo->ifname,
+				       ifinfo->state);
 
 			switch(ifinfo->state) {
 			 case IFS_DOWN:
@@ -330,10 +364,9 @@ rtsol_check_timer()
 					 interface_status(ifinfo);
 
 				 if (oldstatus != ifinfo->active) {
-					 syslog(LOG_DEBUG,
-						"<%s> %s status is changed"
+					 warnmsg(LOG_DEBUG, __FUNCTION__,
+						 "%s status is changed"
 						" from %d to %d",
-						__FUNCTION__,
 						ifinfo->ifname,
 						oldstatus, ifinfo->active);
 					 probe = 1;
@@ -361,9 +394,9 @@ rtsol_check_timer()
 				 if (ifinfo->probes < MAX_RTR_SOLICITATIONS)
 					 sendpacket(ifinfo);
 				 else {
-					 syslog(LOG_INFO, "<%s> No answer "
-						"after sending %d RSs",
-						__FUNCTION__,
+					 warnmsg(LOG_INFO, __FUNCTION__,
+						 "No answer "
+						 "after sending %d RSs",
 						ifinfo->probes);
 					 ifinfo->probes = 0;
 					 ifinfo->state = IFS_IDLE;
@@ -378,7 +411,7 @@ rtsol_check_timer()
 	}
 
 	if (TIMEVAL_EQ(rtsol_timer, tm_max)) {
-		syslog(LOG_DEBUG, "<%s> there is no timer", __FUNCTION__);
+		warnmsg(LOG_DEBUG, __FUNCTION__, "there is no timer");
 		return(NULL);
 	}
 	else if (TIMEVAL_LT(rtsol_timer, now))
@@ -388,7 +421,7 @@ rtsol_check_timer()
 		TIMEVAL_SUB(&rtsol_timer, &now, &returnval);
 
 	if (dflag > 1)
-		syslog(LOG_DEBUG, "<%s> New timer is %d:%d", __FUNCTION__,
+		warnmsg(LOG_DEBUG, __FUNCTION__, "New timer is %d:%08d",
 		       returnval.tv_sec, returnval.tv_usec);
 
 	return(&returnval);
@@ -430,24 +463,25 @@ rtsol_timer_update(struct ifinfo *ifinfo)
 		 ifinfo->timer.tv_sec = RTR_SOLICITATION_INTERVAL;
 		 break;
 	 default:
-		 syslog(LOG_ERR, "<%s> illegal interface state(%d) on %s",
-			__FUNCTION__, ifinfo->state, ifinfo->ifname);
+		 warnmsg(LOG_ERR, __FUNCTION__,
+			 "illegal interface state(%d) on %s",
+			ifinfo->state, ifinfo->ifname);
 		 return;
 	}
 
 	/* reset the timer */
 	if (TIMEVAL_EQ(ifinfo->timer, tm_max)) {
 		ifinfo->expire = tm_max;
-		syslog(LOG_DEBUG, "<%s> stop timer for %s", __FUNCTION__,
-		       ifinfo->ifname);
+		warnmsg(LOG_DEBUG, __FUNCTION__,
+			"stop timer for %s", ifinfo->ifname);
 	}
 	else {
 		gettimeofday(&now, NULL);
 		TIMEVAL_ADD(&now, &ifinfo->timer, &ifinfo->expire);
 
 		if (dflag > 1)
-			syslog(LOG_DEBUG, "<%s> set timer for %s to %d:%d",
-			       __FUNCTION__, ifinfo->ifname,
+			warnmsg(LOG_DEBUG, __FUNCTION__,
+				"set timer for %s to %d:%d", ifinfo->ifname,
 			       (int)ifinfo->timer.tv_sec,
 			       (int)ifinfo->timer.tv_usec);
 	}
@@ -494,8 +528,38 @@ TIMEVAL_SUB(struct timeval *a, struct timeval *b, struct timeval *result)
 }
 
 static void
-usage()
+usage(char *progname)
 {
-	fprintf(stderr, "usage: rtsold [-dDfm] interfaces\n");
+	if (strcmp(progname, "rtsol") == 0)
+		fprintf(stderr, "usage: rtsol [-dD] interfaces\n");
+	else
+		fprintf(stderr, "usage: rtsold [-dDfm1] interfaces\n");
 	exit(1);
+}
+
+void
+#if __STDC__
+warnmsg(int priority, const char *func, const char *msg, ...)
+#else
+warnmsg(priority, func, msg, va_alist)
+	int priority;
+	const char *func;
+	const char *msg;
+	va_dcl
+#endif
+{
+	va_list ap;
+	char buf[BUFSIZ];
+
+	va_start(ap, msg);
+	if (fflag) {
+		if (priority <= log_upto) {
+			(void)vfprintf(stderr, msg, ap);
+			(void)fprintf(stderr, "\n");
+		}
+	} else {
+		snprintf(buf, sizeof(buf), "<%s> %s", func, msg);
+		vsyslog(priority, buf, ap);
+	}
+	va_end(ap);
 }

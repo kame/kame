@@ -79,8 +79,7 @@ int
 ifinit()
 {
 	if ((ifsock = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
-		syslog(LOG_ERR, "<%s> socket: %s",
-		       __FUNCTION__, strerror(errno));
+		warnmsg(LOG_ERR, __FUNCTION__, "socket: %s", strerror(errno));
 		return(-1);
 	}
 
@@ -96,39 +95,39 @@ interface_up(char *name)
 	strncpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
 
 	if (ioctl(ifsock, SIOCGIFFLAGS, (caddr_t)&ifr) < 0) {
-		syslog(LOG_WARNING, "<%s> ioctl(SIOCGIFFLAGS): %s",
-		       __FUNCTION__, strerror(errno));
+		warnmsg(LOG_WARNING, __FUNCTION__, "ioctl(SIOCGIFFLAGS): %s",
+		       strerror(errno));
 		return(-1);
 	}
 	if (!(ifr.ifr_flags & IFF_UP)) {
 		ifr.ifr_flags |= IFF_UP;
 		if (ioctl(ifsock, SIOCSIFFLAGS, (caddr_t)&ifr) < 0) {
-			syslog(LOG_ERR, "<%s> ioctl(SIOCSIFFLAGS): %s",
-			       __FUNCTION__, strerror(errno));
+			warnmsg(LOG_ERR, __FUNCTION__,
+				"ioctl(SIOCSIFFLAGS): %s", strerror(errno));
 		}
 		return(-1);
 	}
 
-	syslog(LOG_DEBUG, "<%s> checking if %s is ready...",
-	       __FUNCTION__, name);
+	warnmsg(LOG_DEBUG, __FUNCTION__, "checking if %s is ready...", name);
 
 	if (getifa(name, &ifa) < 0) {
-		syslog(LOG_WARNING, "<%s> getifa() failed, anyway I'll try",
-		       __FUNCTION__);
+		warnmsg(LOG_WARNING, __FUNCTION__,
+			"getifa() failed, anyway I'll try");
 		return 0;
 	}
 
 	if (!(ifa.ia6_flags & IN6_IFF_NOTREADY)) {
-		syslog(LOG_DEBUG, "<%s> %s is ready", __FUNCTION__, name);
+		warnmsg(LOG_DEBUG, __FUNCTION__,
+			"%s is ready", name);
 		return(0);
 	}
 	else {
 		if (ifa.ia6_flags & IN6_IFF_TENTATIVE)
-			syslog(LOG_DEBUG, "<%s> %s is tentative",
-			       __FUNCTION__, name);
+			warnmsg(LOG_DEBUG, __FUNCTION__, "%s is tentative",
+			       name);
 		if (ifa.ia6_flags & IN6_IFF_DUPLICATED)
-			syslog(LOG_DEBUG, "<%s> %s is duplicated",
-			       __FUNCTION__, name);
+			warnmsg(LOG_DEBUG, __FUNCTION__, "%s is duplicated",
+			       name);
 	}
 
 	return(-1);
@@ -145,8 +144,8 @@ interface_status(struct ifinfo *ifinfo)
 	memset(&ifr, 0, sizeof(ifr));
 	strncpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
 	if (ioctl(ifsock, SIOCGIFFLAGS, &ifr) < 0) {
-		syslog(LOG_ERR, "<%s> ioctl(SIOCGIFFLAGS) on %s: %s",
-		       __FUNCTION__, ifname, strerror(errno));
+		warnmsg(LOG_ERR, __FUNCTION__, "ioctl(SIOCGIFFLAGS) on %s: %s",
+		       ifname, strerror(errno));
 		return(-1);
 	}
 	/*
@@ -165,8 +164,9 @@ interface_status(struct ifinfo *ifinfo)
 
 	if (ioctl(ifsock, SIOCGIFMEDIA, (caddr_t)&ifmr) < 0) {
 		if (errno != EINVAL) {
-			syslog(LOG_DEBUG, "<%s> ioctl(SIOCGIFMEDIA) on %s: %s",
-			       __FUNCTION__, ifname, strerror(errno));
+			warnmsg(LOG_DEBUG, __FUNCTION__,
+				"ioctl(SIOCGIFMEDIA) on %s: %s",
+			       ifname, strerror(errno));
 			return(-1);
 		}
 		/*
@@ -231,9 +231,8 @@ lladdropt_fill(struct sockaddr_dl *sdl, struct nd_opt_hdr *ndopt)
 		 memcpy(addr, LLADDR(sdl), ETHER_ADDR_LEN);
 		 break;
 	 default:
-		 syslog(LOG_ERR,
-			"<%s> unsupported link type(%d)",
-			__FUNCTION__, sdl->sdl_type);
+		 warnmsg(LOG_ERR, __FUNCTION__,
+			 "unsupported link type(%d)", sdl->sdl_type);
 		 exit(1);
 	}
 
@@ -290,14 +289,14 @@ if_nametosdl(char *name)
 	return(ret_sdl);
 }
 
-/* unused? */
 int
-getdadcount()
+getinet6sysctl(int code)
 {
-	int mib[] = { CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_DAD_COUNT };
+	int mib[] = { CTL_NET, PF_INET6, IPPROTO_IPV6, 0 };
 	int value;
 	size_t size;
 
+	mib[3] = code;
 	size = sizeof(value);
 	if (sysctl(mib, sizeof(mib)/sizeof(mib[0]), &value, &size, NULL, 0) < 0)
 		return -1;
@@ -315,7 +314,7 @@ static struct nlist nl[] = {
 
 #define KREAD(x, y, z) { \
 	if (kvm_read(kvmd, (u_long)x, (void *)y, sizeof(z)) != sizeof(z)) { \
-		syslog(LOG_ERR, "<%s> kvm_read failed", __FUNCTION__);	\
+		warnmsg(LOG_ERR, __FUNCTION__, "kvm_read failed");	\
 		goto bad;						\
 	}								\
    }
@@ -335,21 +334,21 @@ getifa(char *name, struct in6_ifaddr *ifap)
 
 	index = (u_short)if_nametoindex(name);
 	if (index == 0) {
-		syslog(LOG_ERR, "<%s> if_nametoindex failed for %s",
-		       __FUNCTION__, name);
+		warnmsg(LOG_ERR, __FUNCTION__, "if_nametoindex failed for %s",
+		       name);
 		goto bad;
 	}
 	if ((kvmd = kvm_openfiles(NULL, NULL, NULL, O_RDONLY, buf)) == NULL) {
-		syslog(LOG_ERR, "<%s> kvm_openfiles failed", __FUNCTION__);
+		warnmsg(LOG_ERR, __FUNCTION__, "kvm_openfiles failed");
 		goto bad;
 	}
 	if (kvm_nlist(kvmd, nl) < 0) {
-		syslog(LOG_ERR, "<%s> kvm_nlist failed", __FUNCTION__);
+		warnmsg(LOG_ERR, __FUNCTION__, "kvm_nlist failed");
 		goto bad;
 	}
 	if (nl[N_IFNET].n_value == 0) {
-		syslog(LOG_ERR, "<%s> symbol \"%s\" not found",
-		       __FUNCTION__, nl[N_IFNET].n_name);
+		warnmsg(LOG_ERR, __FUNCTION__, "symbol \"%s\" not found",
+		       nl[N_IFNET].n_name);
 		goto bad;
 	}
 
@@ -367,8 +366,8 @@ getifa(char *name, struct in6_ifaddr *ifap)
 #endif
 	}
 	if (!ifp) {
-		syslog(LOG_ERR, "<%s> interface \"%s\" not found",
-		       __FUNCTION__, name);
+		warnmsg(LOG_ERR, __FUNCTION__, "interface \"%s\" not found",
+		       name);
 		goto bad;
 	}
 
@@ -397,8 +396,8 @@ getifa(char *name, struct in6_ifaddr *ifap)
 		ifa = (struct in6_ifaddr *)(((struct ifaddr *)ifap)->ifa_next);
 #endif
 	}
-	syslog(LOG_ERR, "<%s> no IPv6 link-local address for %s",
-	       __FUNCTION__, name);
+	warnmsg(LOG_ERR, __FUNCTION__, "no IPv6 link-local address for %s",
+	       name);
 
   bad:
 	kvm_close(kvmd);

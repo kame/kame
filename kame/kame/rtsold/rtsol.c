@@ -79,13 +79,13 @@ sockopen()
 	memset(&sin6_allrouters, 0, sizeof(struct sockaddr_in6));
 	if (inet_pton(AF_INET6, ALLROUTER,
 		      &sin6_allrouters.sin6_addr.s6_addr) < 0) {
-		syslog(LOG_ERR, "<%s> inet_pton failed for %s", __FUNCTION__,
+		warnmsg(LOG_ERR, __FUNCTION__, "inet_pton failed for %s",
 		       ALLROUTER);
 		return(-1);
 	}
 
 	if ((rssock = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) < 0) {
-		syslog(LOG_ERR, "<%s> socket: %s", __FUNCTION__, strerror(errno));
+		warnmsg(LOG_ERR, __FUNCTION__, "socket: %s", strerror(errno));
 		return(-1);
 	}
 
@@ -93,8 +93,8 @@ sockopen()
 	on = 1;
 	if (setsockopt(rssock, IPPROTO_IPV6, IPV6_PKTINFO, &on,
 		       sizeof(on)) < 0) {
-		syslog(LOG_ERR, "<%s> IPV6_PKTINFO: %s",
-		       __FUNCTION__, strerror(errno));
+		warnmsg(LOG_ERR, __FUNCTION__, "IPV6_PKTINFO: %s",
+		       strerror(errno));
 		exit(1);
 	}
 
@@ -102,8 +102,8 @@ sockopen()
 	/* specify to tell value of hoplimit field of received IP6 hdr */
 	if (setsockopt(rssock, IPPROTO_IPV6, IPV6_HOPLIMIT, &on,
 		       sizeof(on)) < 0) {
-		syslog(LOG_ERR, "<%s> IPV6_HOPLIMIT: %s",
-		       __FUNCTION__, strerror(errno));
+		warnmsg(LOG_ERR, __FUNCTION__, "IPV6_HOPLIMIT: %s",
+		       strerror(errno));
 		exit(1);
 	}
 
@@ -112,8 +112,8 @@ sockopen()
 	ICMP6_FILTER_SETPASS(ND_ROUTER_ADVERT, &filt);
 	if (setsockopt(rssock, IPPROTO_ICMPV6, ICMP6_FILTER, &filt,
 		       sizeof(filt)) == -1) {
-		syslog(LOG_ERR, "<%s> setsockopt(ICMP6_FILTER): %s",
-		       __FUNCTION__, strerror(errno));
+		warnmsg(LOG_ERR, __FUNCTION__, "setsockopt(ICMP6_FILTER): %s",
+		       strerror(errno));
 		return(-1);
 	}
 
@@ -168,15 +168,14 @@ sendpacket(struct ifinfo *ifinfo)
 		memcpy(CMSG_DATA(cm), &hoplimit, sizeof(int));
 	}
 
-	syslog(LOG_DEBUG,
-	       "<%s> send RS on %s, whose state is %d",
-	       __FUNCTION__, ifinfo->ifname, ifinfo->state);
+	warnmsg(LOG_DEBUG,
+	       __FUNCTION__, "send RS on %s, whose state is %d",
+	       ifinfo->ifname, ifinfo->state);
 
 	i = sendmsg(rssock, &sndmhdr, 0);
 
 	if (i < 0 || i != ifinfo->rs_datalen)
-		syslog(LOG_ERR, "<%s> sendmsg: %s", __FUNCTION__,
-		       strerror(errno));
+		warnmsg(LOG_ERR, __FUNCTION__, "sendmsg: %s", strerror(errno));
 
 	/* update counter */
 	ifinfo->probes++;
@@ -196,8 +195,7 @@ rtsol_input(int s)
 
 	/* get message */
 	if ((i = recvmsg(s, &rcvmhdr, 0)) < 0) {
-		syslog(LOG_ERR, "<%s> recvmsg: %s", __FUNCTION__,
-		       strerror(errno));
+		warnmsg(LOG_ERR, __FUNCTION__, "recvmsg: %s", strerror(errno));
 		return;
 	}
 
@@ -218,30 +216,27 @@ rtsol_input(int s)
 	}
 
 	if (ifindex == 0) {
-		syslog(LOG_ERR,
-		       "<%s> failed to get receiving interface",
-		       __FUNCTION__);
+		warnmsg(LOG_ERR,
+		       __FUNCTION__, "failed to get receiving interface");
 		return;
 	}
 	if (hlimp == NULL) {
-		syslog(LOG_ERR,
-		       "<%s> failed to get receiving hop limit",
-		       __FUNCTION__);
+		warnmsg(LOG_ERR,
+		       __FUNCTION__, "failed to get receiving hop limit");
 		return;
 	}
 
 	if (i < sizeof(struct nd_router_advert)) {
-		syslog(LOG_ERR,
-		       "<%s> packet size(%d) is too short",
-		       __FUNCTION__, i);
+		warnmsg(LOG_ERR,
+		       __FUNCTION__, "packet size(%d) is too short", i);
 		return;
 	}
 
 	icp = (struct icmp6_hdr *)rcvmhdr.msg_iov[0].iov_base;
 
 	if (icp->icmp6_type != ND_ROUTER_ADVERT) {
-		syslog(LOG_ERR, "<%s> invalid icmp type(%d) from %s on %s",
-		       __FUNCTION__, icp->icmp6_type,
+		warnmsg(LOG_ERR, __FUNCTION__,
+			"invalid icmp type(%d) from %s on %s", icp->icmp6_type,
 		       inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
 				 INET6_ADDRSTRLEN),
 		       if_indextoname(pi->ipi6_ifindex, ifnamebuf));
@@ -249,9 +244,9 @@ rtsol_input(int s)
 	}
 
 	if (*hlimp != 255) {
-		syslog(LOG_NOTICE,
-		       "<%s> invalid RA with hop limit(%d) from %s on %s",
-		       __FUNCTION__, *hlimp,
+		warnmsg(LOG_NOTICE, __FUNCTION__,
+			"invalid RA with hop limit(%d) from %s on %s",
+		       *hlimp,
 		       inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
 				 INET6_ADDRSTRLEN),
 		       if_indextoname(pi->ipi6_ifindex, ifnamebuf));
@@ -261,20 +256,21 @@ rtsol_input(int s)
 	/* xxx: more validation? */
 
 	if ((ifi = find_ifinfo(pi->ipi6_ifindex)) == NULL) {
-		syslog(LOG_NOTICE,
-		       "<%s> received RA from %s on an unexpeced IF(%s)",
-		       __FUNCTION__,
+		warnmsg(LOG_NOTICE, __FUNCTION__,
+			"received RA from %s on an unexpeced IF(%s)",
 		       inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
 				 INET6_ADDRSTRLEN),
 		       if_indextoname(pi->ipi6_ifindex, ifnamebuf));
 		return;
 	}
 
-	syslog(LOG_DEBUG, "<%s> received RA from %s on %s, state is %d",
-	       __FUNCTION__,
+	warnmsg(LOG_DEBUG, __FUNCTION__,
+		"received RA from %s on %s, state is %d",
 	       inet_ntop(AF_INET6, &from.sin6_addr, ntopbuf,
 			 INET6_ADDRSTRLEN),
 	       ifi->ifname, ifi->state);
+
+	ifi->racnt++;
 
 	switch(ifi->state) {
 	 case IFS_IDLE:		/* should be ignored */

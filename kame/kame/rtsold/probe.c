@@ -61,14 +61,13 @@ probe_init()
 				CMSG_SPACE(sizeof(int))];
 
 	if ((probesock = socket(AF_INET6, SOCK_RAW, IPPROTO_NONE)) < 0) {
-		syslog(LOG_ERR, "<%s> socket: %s", __FUNCTION__, strerror(errno));
+		warnmsg(LOG_ERR, __FUNCTION__, "socket: %s", strerror(errno));
 		return(-1);
 	}
 
 	/* make the socket send-only */
 	if (shutdown(probesock, 0)) {
-		syslog(LOG_ERR, "<%s> shutdown: %s",
-		       __FUNCTION__, strerror(errno));
+		warnmsg(LOG_ERR, __FUNCTION__, "shutdown: %s", strerror(errno));
 		return(-1);
 	}
 
@@ -93,14 +92,13 @@ defrouter_probe(int ifindex)
 	u_char ntopbuf[INET6_ADDRSTRLEN];
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
-		syslog(LOG_ERR, "<%s> socket: %s", __FUNCTION__,
-		       strerror(errno));
+		warnmsg(LOG_ERR, __FUNCTION__, "socket: %s", strerror(errno));
 		return;
 	}
 	bzero(&dr, sizeof(dr));
 	strcpy(dr.ifname, "lo0"); /* dummy interface */
 	if (ioctl(s, SIOCGDRLST_IN6, (caddr_t)&dr) < 0) {
-		syslog(LOG_ERR, "<%s> ioctl(SIOCGDRLST_IN6): %s", __FUNCTION__,
+		warnmsg(LOG_ERR, __FUNCTION__, "ioctl(SIOCGDRLST_IN6): %s",
 		       strerror(errno));
 		goto closeandend;
 	}
@@ -109,10 +107,9 @@ defrouter_probe(int ifindex)
 		if (ifindex && dr.defrouter[i].if_index == ifindex) {
 			/* sanity check */
 			if (!IN6_IS_ADDR_LINKLOCAL(&dr.defrouter[i].rtaddr)) {
-				syslog(LOG_ERR,
-				       "<%s> default router list contains a "
-				       "non-linklocal address(%s)",
-				       __FUNCTION__,
+				warnmsg(LOG_ERR, __FUNCTION__,
+					"default router list contains a "
+					"non-linklocal address(%s)",
 				       inet_ntop(AF_INET6,
 						 &dr.defrouter[i].rtaddr,
 						 ntopbuf, INET6_ADDRSTRLEN));
@@ -165,13 +162,12 @@ sendprobe(struct in6_addr *addr, int ifindex)
 		memcpy(CMSG_DATA(cm), &hoplimit, sizeof(int));
 	}
 
-	syslog(LOG_DEBUG, "<%s> probe a router %s on %s", __FUNCTION__,
+	warnmsg(LOG_DEBUG, __FUNCTION__, "probe a router %s on %s",
 	       inet_ntop(AF_INET6, addr, ntopbuf, INET6_ADDRSTRLEN),
 	       if_indextoname(ifindex, ifnamebuf));
 
 	if (sendmsg(probesock, &sndmhdr, 0))
-		syslog(LOG_ERR, "<%s> sendmsg: %s", __FUNCTION__,
-		       strerror(errno));
+		warnmsg(LOG_ERR, __FUNCTION__, "sendmsg: %s", strerror(errno));
 
 	return;
 }

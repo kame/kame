@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: rtsold.8,v 1.1 1999/08/08 23:31:46 itojun Exp $
+.\"     $Id: rtsold.8,v 1.2 1999/08/24 04:36:09 itojun Exp $
 .\"
 .Dd May 17, 1998
 .Dt RTSOLD 8
@@ -37,7 +37,10 @@
 .\"
 .Sh SYNOPSIS
 .Nm
-.Op Fl dDfm
+.Op Fl dDfm1
+.Ar interface ...
+.Nm rsol
+.Op Fl dD
 .Ar interface ...
 .\"
 .Sh DESCRIPTION
@@ -106,6 +109,9 @@ Enable more debugging including to print internal timer information.
 prevents
 .Nm
 from becoming a daemon (foreground mode).
+Warning messages are generated to standard error output,
+instead of
+.Xr syslog 3 .
 .It Fl m
 Enable mobility support.
 If this option is specified,
@@ -118,7 +124,20 @@ Moreover, if the option is specified,
 periodically sends Router Solicitation on an interface that does not support
 .Dv SIOCGIFMEDIA
 ioctl.
+.It Fl 1
+Perform only one probe.
+Transmit Router Solcitation packet until valid Router Advertisement packet
+arrives all the interfaces more than once, then exit.
 .El
+.Pp
+If you invoke the program as
+.Nm rtsol ,
+it will behave as
+.Do
+.Nm
+.Fl f1
+.Ar interfaces
+.Dc .
 .Sh RETURN VALUES
 The program exits with 0 on success, non-zero on failures.
 .\"

@@ -42,6 +42,8 @@ struct ifinfo {
 	struct timeval timer;
 	struct timeval expire;
 
+	int racnt;		/* total # of valid RAs it have got */
+
 	size_t rs_datalen;
 	u_char *rs_data;
 };
@@ -56,3 +58,9 @@ struct ifinfo *find_ifinfo(int ifindex);
 void rtsol_timer_update(struct ifinfo *ifinfo);
 
 extern int interface_status(struct ifinfo*);
+#ifdef __STDC__
+extern void warnmsg(int, const char *, const char *, ...);
+#else
+extern void warnmsg(int, const char *, const char *, va_list);
+#endif
+extern int getinet6sysctl(int code);
