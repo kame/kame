@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.84 2002/02/22 06:07:25 kjc Exp $	*/
+/*	$KAME: in_gif.c,v 1.85 2002/05/30 04:13:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -237,8 +237,8 @@ in_gif_output(ifp, family, m)
 	struct ip iphdr;	/* capsule IP header, host byte ordered */
 	int proto, error;
 	u_int8_t tos;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	struct timeval mono_time;
 #endif
 
 	if (sin_src == NULL || sin_dst == NULL ||
@@ -319,8 +319,8 @@ in_gif_output(ifp, family, m)
 		return ENOBUFS;
 	bcopy(&iphdr, mtod(m, struct ip *), sizeof(struct ip));
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	time_second = time.tv_sec;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	microtime(&mono_time);
 #endif
 
 	/*
@@ -333,11 +333,9 @@ in_gif_output(ifp, family, m)
 	 * almost duplicated logic here.
 	 */
 	if (sc->gif_ro.ro_rt && (!(sc->gif_ro.ro_rt->rt_flags & RTF_UP) ||
-				 dst->sin_family != sin_dst->sin_family ||
-				 dst->sin_addr.s_addr !=
-				 sin_dst->sin_addr.s_addr ||
-				 sc->rtcache_expire == 0 ||
-				 time_second >= sc->rtcache_expire)) {
+	    dst->sin_family != sin_dst->sin_family ||
+	    dst->sin_addr.s_addr != sin_dst->sin_addr.s_addr ||
+	    sc->rtcache_expire == 0 || mono_time.tv_sec >= sc->rtcache_expire)) {
 		/*
 		 * The cache route doesn't match, has been invalidated, or has
 		 * expired.
@@ -369,7 +367,7 @@ in_gif_output(ifp, family, m)
 			return ENETUNREACH;	/* XXX */
 		}
 
-		sc->rtcache_expire = time_second + in_gif_rtcachettl;
+		sc->rtcache_expire = mono_time.tv_sec + in_gif_rtcachettl;
 	}
 
 	error = ip_output(m, NULL, &sc->gif_ro, 0, NULL);
