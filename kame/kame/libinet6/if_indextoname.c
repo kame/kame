@@ -1,4 +1,4 @@
-/*	$KAME: if_indextoname.c,v 1.6 2000/11/07 22:33:25 jinmei Exp $	*/
+/*	$KAME: if_indextoname.c,v 1.7 2000/11/08 03:09:30 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1997, 2000
@@ -37,8 +37,8 @@
 /*
  * From RFC 2533:
  *
- *  The second function maps an interface index into its corresponding
- *  name.
+ * The second function maps an interface index into its corresponding
+ * name.
  *
  *    #include <net/if.h>
  *
