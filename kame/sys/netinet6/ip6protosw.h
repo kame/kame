@@ -1,4 +1,4 @@
-/*	$KAME: ip6protosw.h,v 1.21 2001/02/07 07:14:54 itojun Exp $	*/
+/*	$KAME: ip6protosw.h,v 1.22 2001/02/08 18:02:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,7 +108,8 @@ struct pr_usrreqs;
  * (internal) packet carries a routing header, it may point the final
  * dstination address in the routing header.
  *
- * ip6c_src: ip6c_ip6->ip6_src + scope info
+ * ip6c_src: ip6c_ip6->ip6_src + scope info + flowlabel in ip6c_ip6
+ *	(beware of flowlabel, if you try to compare it against others)
  * ip6c_dst: ip6c_finaldst + scope info
  */
 struct ip6ctlparam {

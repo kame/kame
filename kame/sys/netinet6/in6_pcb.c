@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.82 2001/01/06 07:03:39 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.83 2001/02/07 05:04:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -537,6 +537,9 @@ in6_setpeeraddr(in6p, nam)
  * any errors for each matching socket.
  *
  * Must be called at splsoftnet.
+ *
+ * Note: src (4th arg) carries the flowlabel value on the original IPv6
+ * header, in sin6_flowinfo member.
  */
 int
 in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
