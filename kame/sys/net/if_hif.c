@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.26 2002/05/14 13:31:32 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.27 2002/05/22 02:23:53 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -781,6 +781,10 @@ hif_ha_list_update_withioctl(sc, data)
 				 "%s:%d: mip6_ha memory allocation failed.\n",
 				 __FILE__, __LINE__));
 			return (ENOMEM);
+		}
+		error = mip6_ha_list_insert(&mip6_ha_list, mha);
+		if (error) {
+			return (error);
 		}
 		msha = mip6_subnet_ha_create(mha);
 		if (msha == NULL) {
