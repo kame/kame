@@ -53,9 +53,10 @@ ip6_subopt_print(const u_char *bp, int len)
 {
     int i, j;
     int optlen;
-    struct mip6_subopt_id *id;
-    struct mip6_subopt_hal *hal;
-    struct mip6_subopt_coa *coa;
+    struct in6_addr *in6, *ep;
+    /* due to unaligned-ness, we need to copy them */
+    struct mip6_subopt_id id;
+    struct mip6_subopt_coa coa;
 
     for (i = 0; i < len; i += optlen) {
 	switch (bp[i]) {
@@ -69,25 +70,28 @@ ip6_subopt_print(const u_char *bp, int len)
 	    }
 	    optlen = bp[i + 1] + 2;
 	    break;
-	case IP6SUBOPT_UNIQUEID:      /* Untested */
+	case IP6SUBOPT_UNIQUEID:	/* Untested */
 	    if (len - i < IP6OPT_UIDLEN + IP6OPT_MINLEN) {
 		printf("(UniqueId: trunc)");
 		goto trunc;
 	    }
 	    optlen = bp[i + 1] + 2;
-	    id = (struct mip6_subopt_id *)&id[i];
-	    printf("(UniqueId: %d)", ntohs(id->id));
+	    memcpy(&id, &bp[i], sizeof(id));
+	    printf("(UniqueId: %d)", ntohs(id.id));
 	    break;
-	case IP6SUBOPT_HALIST:
+	case IP6SUBOPT_HALIST:		/* this suboption is obsolete */
 	    if (len - i < IP6OPT_HAMINLEN) {
 		printf("(HAList: trunc)");
 		goto trunc;
 	    }
 	    optlen = bp[i + 1] + 2;
 	    printf("(HAList:");
-	    hal = (struct mip6_subopt_hal *)&hal[i];
-	    for (j = 0; j < bp[i + 1]; j += sizeof(struct in6_addr))
-		printf(" %s", ip6addr_string(&hal->halist[j]));
+	    in6 = (struct in6_addr *)&bp[i + 2];
+	    ep = (struct in6_addr *)&bp[i + 2 + bp[i + 1]];
+	    while (in6 < ep) {
+		printf(" %s", ip6addr_string(in6));
+		in6++;
+	    }
 	    printf(")");
 	    break;
 	case IP6SUBOPT_ALTCOA:
@@ -96,8 +100,8 @@ ip6_subopt_print(const u_char *bp, int len)
 		goto trunc;
 	    }
 	    optlen = bp[i + 1] + 2;
-	    coa = (struct mip6_subopt_coa *)&bp[i];
-	    printf("(AltCOA: %s)", ip6addr_string(&coa->coa));
+	    memcpy(&coa, &bp[i], sizeof(coa));
+	    printf("(AltCOA: %s)", ip6addr_string(&coa.coa));
 	    break;
 	default:
 	    if (len - i < IP6OPT_MINLEN) {
@@ -125,9 +129,10 @@ ip6_opt_print(const u_char *bp, int len)
 {
     int i;
     int optlen;
-    struct mip6_opt_bu *bu;
-    struct mip6_opt_ba *ba;
-    struct mip6_opt_ha *ha;
+    /* due to unaligned-ness, we need to copy them */
+    struct mip6_opt_bu bu;
+    struct mip6_opt_ba ba;
+    struct mip6_opt_ha ha;
 
     for (i = 0; i < len; i += optlen) {
 	switch (bp[i]) {
@@ -171,14 +176,14 @@ ip6_opt_print(const u_char *bp, int len)
 		goto trunc;
 	    }
 
-	    bu = (struct mip6_opt_bu *)&bp[i];
+	    memcpy(&bu, &bp[i], sizeof(bu));
 	    printf("(BindUpd flg=%s%s%s/%x plen=%d",	/*)*/
-		   (bu->flags & MIP6_BU_AFLAG) ? "A" : "",
-		   (bu->flags & MIP6_BU_HFLAG) ? "H" : "",
-		   (bu->flags & MIP6_BU_RFLAG) ? "R" : "",
-		   bu->flags, bu->prefix_len);
-	    printf(" seq=%u", ntohs(bu->seqno));
-	    printf(" life=%u", (u_int32_t)ntohl(bu->lifetime));
+		   (bu.flags & MIP6_BU_AFLAG) ? "A" : "",
+		   (bu.flags & MIP6_BU_HFLAG) ? "H" : "",
+		   (bu.flags & MIP6_BU_RFLAG) ? "R" : "",
+		   bu.flags, bu.prefix_len);
+	    printf(" seq=%u", ntohs(bu.seqno));
+	    printf(" life=%u", (u_int32_t)ntohl(bu.lifetime));
 
 	    if (bp[i + 1] > IP6OPT_BUMINLEN) {
 		printf(" subopt ");
@@ -196,11 +201,11 @@ ip6_opt_print(const u_char *bp, int len)
 		goto trunc;
 	    }
 
-	    ba = (struct mip6_opt_ba *)&bp[i];
-	    printf("(BindAck status=%d", ba->status);	/*)*/
-	    printf(" seq=%d", ntohs(ba->seqno));
-	    printf(" life=%u", (u_int32_t)ntohl(ba->lifetime));
-	    printf(" refresh=%u", (u_int32_t)ntohl(ba->refresh));
+	    memcpy(&ba, &bp[i], sizeof(ba));
+	    printf("(BindAck status=%d", ba.status);	/*)*/
+	    printf(" seq=%d", ntohs(ba.seqno));
+	    printf(" life=%u", (u_int32_t)ntohl(ba.lifetime));
+	    printf(" refresh=%u", (u_int32_t)ntohl(ba.refresh));
 
 	    if (bp[i + 1] > IP6OPT_BAMINLEN) {
 		printf(" subopt ");
@@ -237,9 +242,9 @@ ip6_opt_print(const u_char *bp, int len)
 		goto trunc;
 	    }
 
-	    ha = (struct mip6_opt_ha *)&bp[i];
+	    memcpy(&ha, &bp[i], sizeof(ha));
 	    printf("(HomeAddr %s",	/*)*/
-		   ip6addr_string((struct in6_addr *)&ha->home_addr));
+		   ip6addr_string((struct in6_addr *)&ha.home_addr));
 
 	    if (bp[i + 1] > IP6OPT_HAMINLEN) {
 		printf(" subopt ");
