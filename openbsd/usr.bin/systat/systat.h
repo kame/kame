@@ -1,4 +1,4 @@
-/*	$OpenBSD: systat.h,v 1.3 1997/06/23 22:21:49 millert Exp $	*/
+/*	$OpenBSD: systat.h,v 1.7 2002/02/16 21:27:54 millert Exp $	*/
 /*	$NetBSD: systat.h,v 1.2 1995/01/20 08:52:14 jtc Exp $	*/
 
 /*-
@@ -40,13 +40,13 @@
 
 struct  cmdtab {
 	char	*c_name;			/* command name */
-	void	(*c_refresh) __P((void));	/* display refresh */
-	void	(*c_fetch) __P((void));		/* sets up data structures */
-	void	(*c_label) __P((void));		/* label display */
-	int	(*c_init) __P((void));		/* initialize namelist, etc. */
-	WINDOW	*(*c_open) __P((void));		/* open display */
-	void	(*c_close) __P((WINDOW *));	/* close display */
-	int	(*c_cmd) __P((char *, char *));	/* display command interpreter */
+	void	(*c_refresh)(void);		/* display refresh */
+	void	(*c_fetch)(void);		/* sets up data structures */
+	void	(*c_label)(void);		/* label display */
+	int	(*c_init)(void);		/* initialize namelist, etc. */
+	WINDOW	*(*c_open)(void);		/* open display */
+	void	(*c_close)(WINDOW *);		/* close display */
+	int	(*c_cmd)(char *, char *);	/* display command interpreter */
 	char	c_flags;			/* see below */
 };
 
@@ -60,4 +60,3 @@ struct  cmdtab {
 #define NVAL(indx)  namelist[(indx)].n_value
 #define NPTR(indx)  (void *)NVAL((indx))
 #define NREAD(indx, buf, len) kvm_ckread(NPTR((indx)), (buf), (len))
-#define LONG	(sizeof (long))

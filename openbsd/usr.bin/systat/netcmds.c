@@ -1,4 +1,4 @@
-/*	$OpenBSD: netcmds.c,v 1.5 2000/01/05 11:04:22 itojun Exp $	*/
+/*	$OpenBSD: netcmds.c,v 1.10 2002/02/16 21:27:54 millert Exp $	*/
 /*	$NetBSD: netcmds.c,v 1.4 1995/05/21 17:14:38 mycroft Exp $	*/
 
 /*-
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)netcmds.c	8.1 (Berkeley) 6/6/93";
 #endif
-static char rcsid[] = "$OpenBSD: netcmds.c,v 1.5 2000/01/05 11:04:22 itojun Exp $";
+static char rcsid[] = "$OpenBSD: netcmds.c,v 1.10 2002/02/16 21:27:54 millert Exp $";
 #endif /* not lint */
 
 /*
@@ -74,14 +74,14 @@ static	struct hitem {
 
 int nports, nhosts, protos;
 
-static void changeitems __P((char *, int));
-static int selectproto __P((char *));
-static void showprotos __P((void));
-static int selectport __P((long, int));
-static void showports __P((void));
-static int addrcmp __P((struct sockaddr *, struct sockaddr *));
-static int selecthost __P((struct sockaddr *, int));
-static void showhosts __P((void));
+static void changeitems(char *, int);
+static int selectproto(char *);
+static void showprotos(void);
+static int selectport(long, int);
+static void showports(void);
+static int addrcmp(struct sockaddr *, struct sockaddr *);
+static int selecthost(struct sockaddr *, int);
+static void showhosts(void);
 
 int
 netcmd(cmd, args)
@@ -129,7 +129,7 @@ changeitems(args, onoff)
 	char *args;
 	int onoff;
 {
-	register char *cp;
+	char *cp;
 	struct servent *sp;
 	struct addrinfo hints, *res0, *res;
 
@@ -203,7 +203,7 @@ selectport(port, onoff)
 	long port;
 	int onoff;
 {
-	register struct pitem *p;
+	struct pitem *p;
 
 	if (port == -1) {
 		if (ports == 0)
@@ -229,9 +229,9 @@ selectport(port, onoff)
 
 int
 checkport(inp)
-	register struct inpcb *inp;
+	struct inpcb *inp;
 {
-	register struct pitem *p;
+	struct pitem *p;
 
 	if (ports)
 	for (p = ports; p < ports+nports; p++)
@@ -243,7 +243,7 @@ checkport(inp)
 static void
 showports()
 {
-	register struct pitem *p;
+	struct pitem *p;
 	struct servent *sp;
 
 	for (p = ports; p < ports+nports; p++) {
@@ -293,7 +293,7 @@ selecthost(sa, onoff)
 	struct sockaddr *sa;
 	int onoff;
 {
-	register struct hitem *p;
+	struct hitem *p;
 
 	if (sa == 0) {
 		if (hosts == 0)
@@ -321,14 +321,14 @@ selecthost(sa, onoff)
 
 int
 checkhost(inp)
-	register struct inpcb *inp;
+	struct inpcb *inp;
 {
-	register struct hitem *p;
+	struct hitem *p;
 
 	if (hosts)
 	for (p = hosts; p < hosts+nhosts; p++) {
-		if (((struct sockaddr *)&p->addr)->sa_family == AF_INET
-		 && !(inp->inp_flags & INP_IPV6)) {
+		if (((struct sockaddr *)&p->addr)->sa_family == AF_INET &&
+		    !(inp->inp_flags & INP_IPV6)) {
 			struct sockaddr_in *sin;
 			sin = (struct sockaddr_in *)&p->addr;
 			if (sin->sin_addr.s_addr == inp->inp_laddr.s_addr ||
@@ -336,8 +336,8 @@ checkhost(inp)
 				return (p->onoff);
 		}
 #ifdef INET6
-		if (((struct sockaddr *)&p->addr)->sa_family == AF_INET6
-		 && (inp->inp_flags & INP_IPV6)) {
+		if (((struct sockaddr *)&p->addr)->sa_family == AF_INET6 &&
+		    (inp->inp_flags & INP_IPV6)) {
 			struct sockaddr_in6 *sin6;
 			sin6 = (struct sockaddr_in6 *)&p->addr;
 			if (IN6_ARE_ADDR_EQUAL(&sin6->sin6_addr, &inp->inp_laddr6) ||
@@ -352,7 +352,7 @@ checkhost(inp)
 static void
 showhosts()
 {
-	register struct hitem *p;
+	struct hitem *p;
 	char hbuf[NI_MAXHOST];
 	struct sockaddr *sa;
 	int flags;
@@ -366,7 +366,7 @@ showhosts()
 		sa = (struct sockaddr *)&p->addr;
 		if (getnameinfo(sa, sa->sa_len, hbuf, sizeof(hbuf), NULL, 0,
 				flags) != 0)
-			strcpy(hbuf, "(invalid)");
+			strlcpy(hbuf, "(invalid)", sizeof hbuf);
 		if (!p->onoff)
 			addch('!');
 		printw("%s ", hbuf);

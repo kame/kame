@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipx.c,v 1.7 2000/10/23 19:17:09 mickey Exp $	*/
+/*	$OpenBSD: ipx.c,v 1.10 2002/02/16 21:27:50 millert Exp $	*/
 
 /*
  * Copyright (c) 1996 Michael Shalayeff
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)ns.c	8.1 (Berkeley) 6/6/93";
 #else
-static char *rcsid = "$OpenBSD: ipx.c,v 1.7 2000/10/23 19:17:09 mickey Exp $";
+static char *rcsid = "$OpenBSD: ipx.c,v 1.10 2002/02/16 21:27:50 millert Exp $";
 #endif
 #endif /* not lint */
 
@@ -77,8 +77,8 @@ struct	ipxpcb ipxpcb;
 struct	spxpcb spxpcb;
 struct	socket sockb;
 
-static char *ipx_prpr __P((struct ipx_addr *));
-static void ipx_erputil __P((int, int));
+static char *ipx_prpr(struct ipx_addr *);
+static void ipx_erputil(int, int);
 
 static	int first = 1;
 
@@ -95,7 +95,7 @@ ipxprotopr(off, name)
 	char *name;
 {
 	struct ipxpcbtable	table;
-	register struct ipxpcb	*head, *prev, *next;
+	struct ipxpcb	*head, *prev, *next;
 	int isspx;
 
 	if (off == 0)
@@ -122,14 +122,14 @@ ipxprotopr(off, name)
 				(char *)&sockb, sizeof (sockb));
 		if (isspx) {
 			kread((u_long)ipxpcb.ipxp_ppcb,
-			      (char *)&spxpcb, sizeof (spxpcb));
+			    (char *)&spxpcb, sizeof (spxpcb));
 		}
 		if (first) {
 			printf("Active Internetwork Packet Exchange connections");
 			if (aflag)
 				printf(" (including servers)");
 			putchar('\n');
-                        if (Aflag)
+			if (Aflag)
 				printf("%-*.*s %-5.5s %-6.6s %-6.6s  %-*.*s %-*.*s %s\n",
 				    PLEN, PLEN, "PCB", "Proto", "Recv-Q",
 				    "Send-Q", PLEN, PLEN, "Local Address",
@@ -284,8 +284,8 @@ ipxerr_stats(off, name)
 	char *name;
 {
 	struct ipx_errstat ipx_errstat;
-	register int j;
-	register int histoprint = 1;
+	int j;
+	int histoprint = 1;
 	int z;
 
 	if (off == 0)

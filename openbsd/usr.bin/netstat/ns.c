@@ -1,4 +1,4 @@
-/*	$OpenBSD: ns.c,v 1.5 1998/02/27 12:07:38 deraadt Exp $	*/
+/*	$OpenBSD: ns.c,v 1.7 2002/02/16 21:27:50 millert Exp $	*/
 /*	$NetBSD: ns.c,v 1.8 1995/10/03 21:42:46 thorpej Exp $	*/
 
 /*
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)ns.c	8.1 (Berkeley) 6/6/93";
 #else
-static char *rcsid = "$OpenBSD: ns.c,v 1.5 1998/02/27 12:07:38 deraadt Exp $";
+static char *rcsid = "$OpenBSD: ns.c,v 1.7 2002/02/16 21:27:50 millert Exp $";
 #endif
 #endif /* not lint */
 
@@ -76,8 +76,8 @@ struct	nspcb nspcb;
 struct	sppcb sppcb;
 struct	socket sockb;
 
-static char *ns_prpr __P((struct ns_addr *));
-static void ns_erputil __P((int, int));
+static char *ns_prpr(struct ns_addr *);
+static void ns_erputil(int, int);
 
 static	int first = 1;
 
@@ -94,7 +94,7 @@ nsprotopr(off, name)
 	char *name;
 {
 	struct nspcb cb;
-	register struct nspcb *prev, *next;
+	struct nspcb *prev, *next;
 	int isspp;
 
 	if (off == 0)
@@ -288,8 +288,8 @@ nserr_stats(off, name)
 	char *name;
 {
 	struct ns_errstat ns_errstat;
-	register int j;
-	register int histoprint = 1;
+	int j;
+	int histoprint = 1;
 	int z;
 
 	if (off == 0)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: iostat.c,v 1.12 2001/08/12 12:03:03 heko Exp $	*/
+/*	$OpenBSD: iostat.c,v 1.17 2002/02/16 21:27:54 millert Exp $	*/
 /*	$NetBSD: iostat.c,v 1.5 1996/05/10 23:16:35 thorpej Exp $	*/
 
 /*
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)iostat.c	8.1 (Berkeley) 6/6/93";
 #endif
-static char rcsid[] = "$OpenBSD: iostat.c,v 1.12 2001/08/12 12:03:03 heko Exp $";
+static char rcsid[] = "$OpenBSD: iostat.c,v 1.17 2002/02/16 21:27:54 millert Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -48,7 +48,6 @@ static char rcsid[] = "$OpenBSD: iostat.c,v 1.12 2001/08/12 12:03:03 heko Exp $"
 
 #include <string.h>
 #include <stdlib.h>
-#include <nlist.h>
 #include <paths.h>
 #include "systat.h"
 #include "extern.h"
@@ -61,11 +60,11 @@ static  double etime;
 static  int numbers = 0;		/* default display bar graphs */
 static  int secs = 0;			/* default seconds shown */
 
-static int barlabels __P((int));
-static void histogram __P((double, int, double));
-static int numlabels __P((int));
-static int stats __P((int, int, int));
-static void stat1 __P((int, int));
+static int barlabels(int);
+static void histogram(double, int, double);
+static int numlabels(int);
+static int stats(int, int, int);
+static void stat1(int, int);
 
 
 WINDOW *
@@ -195,7 +194,7 @@ barlabels(row)
 void
 showiostat()
 {
-	register int i, row, col;
+	int i, row, col;
 
 	dkswap();
 
@@ -210,7 +209,7 @@ showiostat()
 
 	/*
 	 * Interrupt CPU state not calculated yet.
-	 */ 
+	 */
 	for (i = 0; i < CPUSTATES; i++)
 		stat1(row++, i);
 
@@ -280,7 +279,7 @@ static void
 stat1(row, o)
 	int row, o;
 {
-	register int i;
+	int i;
 	double time;
 
 	time = 0;
@@ -300,8 +299,8 @@ histogram(val, colwidth, scale)
 	double scale;
 {
 	char buf[10];
-	register int k;
-	register int v = (int)(val * scale) + 0.5;
+	int k;
+	int v = (int)(val * scale) + 0.5;
 
 	k = MIN(v, colwidth);
 	if (v > colwidth) {

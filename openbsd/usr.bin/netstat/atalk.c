@@ -1,4 +1,4 @@
-/*	$OpenBSD: atalk.c,v 1.4 2001/08/18 22:14:03 brian Exp $	*/
+/*	$OpenBSD: atalk.c,v 1.7 2002/02/16 21:27:50 millert Exp $	*/
 /*	$NetBSD: atalk.c,v 1.2 1997/05/22 17:21:26 christos Exp $	*/
 
 /*
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from @(#)atalk.c	1.1 (Whistle) 6/6/96";
 #else
-static char rcsid[] = "$OpenBSD: atalk.c,v 1.4 2001/08/18 22:14:03 brian Exp $";
+static char rcsid[] = "$OpenBSD: atalk.c,v 1.7 2002/02/16 21:27:50 millert Exp $";
 #endif
 #endif /* not lint */
 
@@ -69,10 +69,10 @@ struct socket   sockb;
 
 static int first = 1;
 
-static char *at_pr_net __P((struct sockaddr_at *, int));
-static char *at_pr_host __P((struct sockaddr_at *, int));
-static char *at_pr_range __P((struct sockaddr_at *));
-static char *at_pr_port __P((struct sockaddr_at *));
+static char *at_pr_net(struct sockaddr_at *, int);
+static char *at_pr_host(struct sockaddr_at *, int);
+static char *at_pr_range(struct sockaddr_at *);
+static char *at_pr_port(struct sockaddr_at *);
 
 /*
  * Print a summary of connections related to a Network Systems
@@ -96,7 +96,7 @@ at_pr_net(sat, numeric)
 			return ("*");
 		}
 	}
-	(void) snprintf(mybuf, sizeof(mybuf), "%hu", 
+	(void) snprintf(mybuf, sizeof(mybuf), "%hu",
 	    ntohs(sat->sat_addr.s_net));
 	return mybuf;
 }
@@ -116,7 +116,7 @@ at_pr_host(sat, numeric)
 			return ("*");
 		}
 	}
-	(void) snprintf(mybuf, sizeof(mybuf), "%d", 
+	(void) snprintf(mybuf, sizeof(mybuf), "%d",
 	    (unsigned int) sat->sat_addr.s_node);
 	return mybuf;
 }
@@ -146,7 +146,7 @@ at_pr_port(sat)
 				(void) snprintf(mybuf, sizeof(mybuf), "%s",
 				    serv->s_name);
 		}
-			
+
 		return mybuf;
 	}
 }
@@ -220,7 +220,7 @@ atalk_print2(sa, mask, what)
 	const struct sockaddr *mask;
 	int what;
 {
-	size_t          n, l;
+	size_t		n, l;
 	static char     buf[100];
 	struct sockaddr_at *sat1, *sat2;
 	struct sockaddr_at thesockaddr;
@@ -264,7 +264,7 @@ atalkprotopr(off, name)
 	char  *name;
 {
 	struct ddpcb    cb;
-	register struct ddpcb *prev, *next;
+	struct ddpcb *prev, *next;
 	struct ddpcb   *initial;
 
 	if (off == 0)
@@ -274,7 +274,7 @@ atalkprotopr(off, name)
 	ddpcb = cb;
 	prev = (struct ddpcb *) off;
 	for (next = initial; next != NULL; prev = next) {
-		u_long          ppcb = (u_long) next;
+		u_long	ppcb = (u_long) next;
 
 		if (kread((u_long) next, (char *) &ddpcb, sizeof(ddpcb)) < 0)
 			return;
@@ -304,7 +304,7 @@ atalkprotopr(off, name)
 		if (Aflag)
 			printf("%8lx ", ppcb);
 		printf("%-5.5s %6ld %6ld ", name, sockb.so_rcv.sb_cc,
-		       sockb.so_snd.sb_cc);
+		    sockb.so_snd.sb_cc);
 		printf(Aflag ? " %-18.18s" : " %-22.22s", atalk_print(
 			  (struct sockaddr *) & ddpcb.ddp_lsat, 7));
 		printf(Aflag ? " %-18.18s" : " %-22.22s", atalk_print(

@@ -1,5 +1,5 @@
 /*	$NetBSD: vmstat.c,v 1.29.4.1 1996/06/05 00:21:05 cgd Exp $	*/
-/*	$OpenBSD: vmstat.c,v 1.60 2001/09/16 01:27:55 art Exp $	*/
+/*	$OpenBSD: vmstat.c,v 1.68 2002/03/15 19:11:01 art Exp $	*/
 
 /*
  * Copyright (c) 1980, 1986, 1991, 1993
@@ -48,8 +48,6 @@ static char rcsid[] = "$NetBSD: vmstat.c,v 1.29.4.1 1996/06/05 00:21:05 cgd Exp 
 #endif
 #endif /* not lint */
 
-#define __POOL_EXPOSE
-
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/proc.h>
@@ -63,7 +61,6 @@ static char rcsid[] = "$NetBSD: vmstat.c,v 1.29.4.1 1996/06/05 00:21:05 cgd Exp 
 #include <sys/sysctl.h>
 #include <sys/device.h>
 #include <sys/pool.h>
-#include <vm/vm.h>
 #include <time.h>
 #include <nlist.h>
 #include <kvm.h>
@@ -138,40 +135,42 @@ kvm_t *kd;
 #define	TIMESTAT	0x10
 #define	VMSTAT		0x20
 
-void	cpustats __P((void));
-void	dkstats __P((void));
-void	dointr __P((void));
-void	domem __P((void));
-void	dopool __P((void));
-void	dosum __P((void));
-void	dovmstat __P((u_int, int));
-void	kread __P((int, void *, size_t));
-void	usage __P((void));
-void	dotimes __P((void));
-void	doforkst __P((void));
-void	printhdr __P((void));
+void	cpustats(void);
+void	dkstats(void);
+void	dointr(void);
+void	domem(void);
+void	dopool(void);
+void	dosum(void);
+void	dovmstat(u_int, int);
+void	kread(int, void *, size_t);
+void	usage(void);
+void	dotimes(void);
+void	doforkst(void);
+void	printhdr(void);
 
-char	**choosedrives __P((char **));
+char	**choosedrives(char **);
 
 /* Namelist and memory file names. */
 char	*nlistf, *memf;
 
 extern char *__progname;
 
+int verbose = 0;
+
 int
 main(argc, argv)
-	register int argc;
-	register char **argv;
+	int argc;
+	char **argv;
 {
 	extern int optind;
 	extern char *optarg;
-	register int c, todo;
+	int c, todo;
 	u_int interval;
 	int reps;
 	char errbuf[_POSIX2_LINE_MAX];
 
 	interval = reps = todo = 0;
-	while ((c = getopt(argc, argv, "c:fiM:mN:stw:")) != -1) {
+	while ((c = getopt(argc, argv, "c:fiM:mN:stw:v")) != -1) {
 		switch (c) {
 		case 'c':
 			reps = atoi(optarg);
@@ -199,6 +198,9 @@ main(argc, argv)
 			break;
 		case 'w':
 			interval = atoi(optarg);
+			break;
+		case 'v':
+			verbose = 1;
 			break;
 		case '?':
 		default:
@@ -300,7 +302,7 @@ char **
 choosedrives(argv)
 	char **argv;
 {
-	register int i;
+	int i;
 
 	/*
 	 * Choose drives to be displayed.  Priority goes to (in order) drives
@@ -322,7 +324,7 @@ choosedrives(argv)
 			break;
 		}
 	}
-	for (i = 0; i < dk_ndrive && ndrives < 4; i++) {
+	for (i = 0; i < dk_ndrive && ndrives < 2; i++) {
 		if (dk_select[i])
 			continue;
 		dk_select[i] = 1;
@@ -417,14 +419,14 @@ dovmstat(interval, reps)
 #define pgtok(a) ((a) * ((int)uvmexp.pagesize >> 10))
 		(void)printf("%7u%7u ",
 		    pgtok(total.t_avm), pgtok(total.t_free));
-		(void)printf("%4u ", rate(uvmexp.faults - ouvmexp.faults));
+		(void)printf("%5u ", rate(uvmexp.faults - ouvmexp.faults));
 		(void)printf("%3u ", rate(uvmexp.pdreact - ouvmexp.pdreact));
 		(void)printf("%3u ", rate(uvmexp.pageins - ouvmexp.pageins));
 		(void)printf("%3u %3u ",
 		    rate(uvmexp.pdpageouts - ouvmexp.pdpageouts), 0);
 		(void)printf("%3u ", rate(uvmexp.pdscans - ouvmexp.pdscans));
 		dkstats();
-		(void)printf("%4u %4u %3u ",
+		(void)printf("%4u %5u %4u ",
 		    rate(uvmexp.intrs - ouvmexp.intrs),
 		    rate(uvmexp.syscalls - ouvmexp.syscalls),
 		    rate(uvmexp.swtch - ouvmexp.swtch));
@@ -447,23 +449,24 @@ dovmstat(interval, reps)
 void
 printhdr()
 {
-	register int i;
+	int i;
 
-	(void)printf(" procs   memory       page%*s", 20, "");
+	(void)printf(" procs   memory        page%*s", 20, "");
 	if (ndrives > 0)
-		(void)printf("%s %*sfaults   cpu\n",
+		(void)printf("%s %*sfaults     cpu\n",
 		   ((ndrives > 1) ? "disks" : "disk"),
-		   ((ndrives > 1) ? ndrives * 3 - 4 : 0), "");
+		   ((ndrives > 1) ? ndrives * 4 - 4 : 0), "");
 	else
-		(void)printf("%*s  faults   cpu\n",
+		(void)printf("%*s  faults     cpu\n",
 		   ndrives * 3, "");
 
-	(void)printf(" r b w    avm    fre  flt  re  pi  po  fr  sr ");
+	(void)printf(" r b w    avm    fre   flt  re  pi  po  fr  sr ");
 	for (i = 0; i < dk_ndrive; i++)
 		if (dk_select[i])
-			(void)printf("%c%c ", dr_name[i][0],
+			(void)printf("%c%c%c ", dr_name[i][0],
+			    dr_name[i][1],
 			    dr_name[i][strlen(dr_name[i]) - 1]);
-	(void)printf("  in   sy  cs us sy id\n");
+	(void)printf("  in    sy   cs us sy id\n");
 	hdrcnt = winlines - 2;
 }
 
@@ -580,7 +583,7 @@ dosum()
 		     uvmexp.forks_sharevm);
 
 	/* daemon counters */
-	(void)printf("%11u number of times the pagedeamon woke up\n",
+	(void)printf("%11u number of times the pagedaemon woke up\n",
 		     uvmexp.pdwoke);
 	(void)printf("%11u revolutions of the clock hand\n", uvmexp.pdrevs);
 	(void)printf("%11u pages freed by pagedaemon\n", uvmexp.pdfreed);
@@ -660,7 +663,7 @@ doforkst()
 void
 dkstats()
 {
-	register int dn, state;
+	int dn, state;
 	double etime;
 
 	/* Calculate disk stat deltas. */
@@ -675,14 +678,14 @@ dkstats()
 	for (dn = 0; dn < dk_ndrive; ++dn) {
 		if (!dk_select[dn])
 			continue;
-		(void)printf("%2.0f ", cur.dk_xfer[dn] / etime);
+		(void)printf("%3.0f ", cur.dk_xfer[dn] / etime);
 	}
 }
 
 void
 cpustats()
 {
-	register int state;
+	int state;
 	double pct, total;
 
 	total = 0;
@@ -832,10 +835,10 @@ dointr()
 void
 dointr()
 {
-	register long *intrcnt, inttotal;
+	long *intrcnt, inttotal;
 	time_t uptime;
-	register int nintr, inamlen;
-	register char *intrname;
+	int nintr, inamlen;
+	char *intrname;
 	struct evcntlist allevents;
 	struct evcnt evcnt, *evptr;
 	struct device dev;
@@ -889,9 +892,9 @@ char *kmemnames[] = INITKMEMNAMES;
 void
 domem()
 {
-	register struct kmembuckets *kp;
-	register struct kmemstats *ks;
-	register int i, j;
+	struct kmembuckets *kp;
+	struct kmemstats *ks;
+	int i, j;
 	int len, size, first;
 	u_long totuse = 0, totfree = 0;
 	quad_t totreq = 0;
@@ -932,7 +935,7 @@ domem()
 
 	for (first = 1, i = MINBUCKET, kp = &buckets[i]; i < MINBUCKET + 16;
 	     i++, kp++) {
-		if (kp->kb_calls == 0)
+		if (kp->kb_calls == 0 && !verbose)
 			continue;
 		if (first) {
 			(void)printf("Memory statistics by bucket size\n");
@@ -1067,6 +1070,11 @@ print_pool(struct pool *pp, char *name)
 		    "Idle");
 		first = 0;
 	}
+
+	/* Skip unused pools unless verbose output. */
+	if (pp->pr_nget == 0 && !verbose)
+		return;
+
 	if (pp->pr_maxpages == UINT_MAX)
 		sprintf(maxp, "inf");
 	else
@@ -1117,6 +1125,7 @@ dopool(void)
 void
 dopool_sysctl(void)
 {
+	long total = 0, inuse = 0;
 	struct pool pool;
 	size_t size;
 	int mib[4];
@@ -1155,7 +1164,15 @@ dopool_sysctl(void)
 			return;
 		}
 		print_pool(&pool, name);
+
+		inuse += (pool.pr_nget - pool.pr_nput) * pool.pr_size;
+		total += pool.pr_npages * getpagesize();	/* XXX */
 	}
+
+	inuse /= 1024;
+	total /= 1024;
+	printf("\nIn use %ldK, total allocated %ldK; utilization %.1f%%\n",
+	    inuse, total, (double)(100 * inuse) / total);
 }
 
 void
@@ -1190,7 +1207,7 @@ dopool_kvm(void)
 		print_pool(pp, name);
 
 		inuse += (pp->pr_nget - pp->pr_nput) * pp->pr_size;
-		total += pp->pr_npages * pp->pr_pagesz;
+		total += pp->pr_npages * getpagesize();	/* XXX */
 
 		addr = (long)TAILQ_NEXT(pp, pr_poollist);
 	}

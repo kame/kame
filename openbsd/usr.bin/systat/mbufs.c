@@ -1,4 +1,4 @@
-/*	$OpenBSD: mbufs.c,v 1.5 2001/05/04 16:48:34 ericj Exp $	*/
+/*	$OpenBSD: mbufs.c,v 1.9 2001/12/07 09:18:08 deraadt Exp $	*/
 /*	$NetBSD: mbufs.c,v 1.2 1995/01/20 08:52:02 jtc Exp $	*/
 
 /*-
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)mbufs.c	8.1 (Berkeley) 6/6/93";
 #endif
-static char rcsid[] = "$OpenBSD: mbufs.c,v 1.5 2001/05/04 16:48:34 ericj Exp $";
+static char rcsid[] = "$OpenBSD: mbufs.c,v 1.9 2001/12/07 09:18:08 deraadt Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -48,6 +48,7 @@ static char rcsid[] = "$OpenBSD: mbufs.c,v 1.5 2001/05/04 16:48:34 ericj Exp $";
 #include <stdlib.h>
 #include <string.h>
 #include <nlist.h>
+#include <err.h>
 #include <paths.h>
 #include "systat.h"
 #include "extern.h"
@@ -101,13 +102,13 @@ labelmbufs()
 void
 showmbufs()
 {
-	register int i, j, max, index;
+	int i, j, max, index;
 	char buf[13];
 
 	if (mb == 0)
 		return;
 	for (j = 0; j < wnd->_maxy; j++) {
-		max = 0, index = -1; 
+		max = 0, index = -1;
 		for (i = 0; i < wnd->_maxy; i++)
 			if (mb->m_mtypes[i] > max) {
 				max = mb->m_mtypes[i];

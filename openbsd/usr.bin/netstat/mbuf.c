@@ -1,4 +1,4 @@
-/*	$OpenBSD: mbuf.c,v 1.8 2001/05/18 02:41:38 provos Exp $	*/
+/*	$OpenBSD: mbuf.c,v 1.12 2002/02/23 01:12:54 art Exp $	*/
 /*	$NetBSD: mbuf.c,v 1.9 1996/05/07 02:55:03 thorpej Exp $	*/
 
 /*
@@ -38,11 +38,9 @@
 #if 0
 static char sccsid[] = "from: @(#)mbuf.c	8.1 (Berkeley) 6/6/93";
 #else
-static char *rcsid = "$OpenBSD: mbuf.c,v 1.8 2001/05/18 02:41:38 provos Exp $";
+static char *rcsid = "$OpenBSD: mbuf.c,v 1.12 2002/02/23 01:12:54 art Exp $";
 #endif
 #endif /* not lint */
-
-#define __POOL_EXPOSE
 
 #include <sys/param.h>
 #include <sys/protosw.h>
@@ -86,14 +84,15 @@ mbpr(mbaddr, mbpooladdr, mclpooladdr)
 	u_long mbaddr;
 	u_long mbpooladdr, mclpooladdr;
 {
-	register int totmem, totused, totmbufs, totpct;
-	register int i;
-	register struct mbtypes *mp;
+	int totmem, totused, totmbufs, totpct;
+	int i;
+	struct mbtypes *mp;
+	int page_size = getpagesize();
 
 	if (nmbtypes != 256) {
 		fprintf(stderr,
 		    "%s: unexpected change to mbstat; check source\n",
-		        __progname);
+		    __progname);
 		return;
 	}
 	if (mbaddr == 0) {
@@ -129,11 +128,11 @@ mbpr(mbaddr, mbpooladdr, mclpooladdr)
 			    plural((int)mbstat.m_mtypes[i]), i);
 		}
 	printf("%lu/%lu mapped pages in use\n",
-	       (u_long)(mclpool.pr_nget - mclpool.pr_nput),
-	       ((u_long)mclpool.pr_npages * mclpool.pr_itemsperpage));
-	totmem = (mbpool.pr_npages << mbpool.pr_pageshift) +
-	    (mclpool.pr_npages << mclpool.pr_pageshift);
-	totused = (mbpool.pr_nget - mbpool.pr_nput) * mbpool.pr_size + 
+	    (u_long)(mclpool.pr_nget - mclpool.pr_nput),
+	    ((u_long)mclpool.pr_npages * mclpool.pr_itemsperpage));
+	totmem = (mbpool.pr_npages * page_size) +
+	    (mclpool.pr_npages * page_size);
+	totused = (mbpool.pr_nget - mbpool.pr_nput) * mbpool.pr_size +
 	    (mclpool.pr_nget - mclpool.pr_nput) * mclpool.pr_size;
 	totpct = (totmem == 0)? 0 : ((totused * 100)/totmem);
 	printf("%u Kbytes allocated to network (%d%% in use)\n",

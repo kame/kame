@@ -1,4 +1,4 @@
-/*	$OpenBSD: disks.c,v 1.8 1997/06/23 22:21:46 millert Exp $	*/
+/*	$OpenBSD: disks.c,v 1.12 2001/12/07 09:18:08 deraadt Exp $	*/
 /*	$NetBSD: disks.c,v 1.4 1996/05/10 23:16:33 thorpej Exp $	*/
 
 /*-
@@ -38,11 +38,12 @@
 #if 0
 static char sccsid[] = "@(#)disks.c	8.1 (Berkeley) 6/6/93";
 #endif
-static char rcsid[] = "$OpenBSD: disks.c,v 1.8 1997/06/23 22:21:46 millert Exp $";
+static char rcsid[] = "$OpenBSD: disks.c,v 1.12 2001/12/07 09:18:08 deraadt Exp $";
 #endif /* not lint */
 
 #include <string.h>
 #include <ctype.h>
+#include <signal.h>
 #include "systat.h"
 #include "extern.h"
 static void dkselect(char *args, int truefalse, int selections[]);
@@ -61,7 +62,7 @@ dkcmd(cmd, args)
 		return (1);
 	}
 	if (prefix(cmd, "drives")) {
-		register int i;
+		int i;
 
 		move(CMDLINE, 0); clrtoeol();
 		for (i = 0; i < dk_ndrive; i++)
@@ -76,8 +77,8 @@ dkselect(args, truefalse, selections)
 	char *args;
 	int truefalse, selections[];
 {
-	register char *cp;
-	register int i;
+	char *cp;
+	int i;
 
 	cp = strchr(args, '\n');
 	if (cp)

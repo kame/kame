@@ -1,4 +1,4 @@
-.\"	$OpenBSD: ifconfig.8,v 1.52 2001/09/15 18:06:56 mickey Exp $
+.\"	$OpenBSD: ifconfig.8,v 1.55 2002/04/08 09:12:36 deraadt Exp $
 .\"	$NetBSD: ifconfig.8,v 1.11 1996/01/04 21:27:29 pk Exp $
 .\"     $FreeBSD: ifconfig.8,v 1.16 1998/02/01 07:03:29 steve Exp $
 .\"
@@ -257,13 +257,19 @@ or
 .Dq UTP
 would activate twisted pair.
 Refer to the interfaces' driver
-specific man page for a complete list of the available types.
+specific man page for a complete list of the available types,
+or use
+.Cm ifconfig -m interface
+for a listing of choices.
 .It Cm mediaopt Ar opts
 Set the specified media options on the interface.
 .Ar opts
 is a comma delimited list of options to apply to the interface.
 Refer to the interfaces' driver specific man page for a complete
-list of available options.
+list of available options,
+or use
+.Cm ifconfig -m interface
+for a listing of choices.
 .It Fl mediaopt Ar opts
 Disable the specified media options on the interface.
 .It Cm mtu Ar value
@@ -283,7 +289,8 @@ If the interface is a vlan pseudo interface, set the vlan tag value
 to
 .Ar vlan_tag .
 This value is a 16-bit number which is used to create an 802.1Q
-vlan header for packets sent from the vlan interface. Note that
+vlan header for packets sent from the vlan interface.
+Note that
 .Cm vlan
 and
 .Cm vlandev
@@ -294,17 +301,20 @@ If the interface is a vlan pseudo device, associate physical interface
 with it. Packets transmitted through the vlan interface will be
 diverted to the specified physical interface
 .Ar iface
-with 802.1Q vlan encapsulation. Packets with 802.1Q encapsulation received
+with 802.1Q vlan encapsulation.
+Packets with 802.1Q encapsulation received
 by the parent interface with the correct vlan tag will be diverted to
-the associated vlan pseudo-interface. The vlan interface is assigned a
+the associated vlan pseudo-interface.
+The vlan interface is assigned a
 copy of the parent interface's flags and the parent's ethernet address.
 The
 .Cm vlandev
 and
 .Cm vlan
-must both be set at the same time. If the vlan interface already has
-a physical interface associated with it, this command will fail. To
-change the association to another physical interface, the existing
+must both be set at the same time.
+If the vlan interface already has
+a physical interface associated with it, this command will fail.
+To change the association to another physical interface, the existing
 association must be cleared first.
 .Pp
 Note: if the
@@ -318,7 +328,8 @@ own (usually in firmware) and that it should pass packets to and from
 the parent unaltered.
 .It Fl vlandev
 If the driver is a vlan pseudo device, disassociate the physical interface
-from it. This breaks the link between the vlan interface and its parent,
+from it.
+This breaks the link between the vlan interface and its parent,
 clears its vlan tag, flags and its link address and shuts the interface down.
 .It Cm metric Ar n
 Set the routing metric of the interface to
@@ -373,10 +384,56 @@ for
 .Tn AFI
 37 type addresses.
 .It Cm nwid Ar id
-(IEEE 802.11 devices only, specifically
-.Xr ray 4 )
-.br
+(IEEE 802.11 devices only)
 Configure network ID for IEEE 802.11-based wireless network interfaces.
+The
+.Ar id
+can either be any text string up to 32 characters in length,
+or a series of hexadecimal digits up to 64 digits.
+The empty string allows the interface to connect to any available
+access points.
+.It Cm nwkey Ar key
+(IEEE 802.11 devices only)
+Enable WEP encryption for IEEE 802.11-based wireless network interfaces
+using the specified
+.Ar key .
+The
+.Ar key
+can either be a string, a series of hexadecimal digits, or a set of keys
+of the form
+.Ar n:k1,k2,k3,k4 ,
+where 
+.Ar n
+specifies which of the keys will be used for transmitted packets,
+and the four keys,
+.Ar k1
+through
+.Ar k4 ,
+are configured as WEP keys.
+If a set of keys is specified, a comma
+.Po So , Sc Pc
+within the key must be escaped with a backslash.
+Note that if multiple keys are used, their order must be the same within
+the network.
+For IEEE 802.11 wireless networks, the length of each key is restricted to
+40 bits, i.e. a 5-character string or 10 hexadecimal digits.
+WaveLAN/IEEE Gold and newer Prism cards will also accept a 104 bit
+(13 character) key.
+.It Cm nwkey Cm persist
+(IEEE 802.11 devices only)
+Enable WEP encryption for IEEE 802.11-based wireless network interfaces
+with the persistent key stored in the network card.
+.It Cm nwkey Cm persist: Ns Ar key
+(IEEE 802.11 devices only)
+Write
+.Ar key
+to the persistent memory of the network card, and
+enable WEP encryption for IEEE 802.11-based wireless network interfaces
+using that
+.Ar key .
+.It Fl nwkey
+(IEEE 802.11 devices only)
+Disable WEP encryption for IEEE 802.11-based wireless network interfaces.
 .It Cm phase
 The argument following this specifies the version (phase) of the
 AppleTalk network attached to the interface.
@@ -384,6 +441,15 @@ Values of 1 or 2 are permitted.
 .It Cm pltime Ar n
 (inet6 only)
 Set preferred lifetime for the address.
+.It Cm powersave
+(IEEE 802.11 devices only)
+Enable 802.11 power saving mode.
+.It Fl powersave
+(IEEE 802.11 devices only)
+Disable 802.11 power saving mode.
+.It Cm powersavesleep Ar duration
+(IEEE 802.11 devices only)
+Set the receiver sleep duration (in milliseconds) for 802.11 power saving mode.
 .It Cm prefixlen Ar n
 (inet and inet6 only)
 Effect is similar to
