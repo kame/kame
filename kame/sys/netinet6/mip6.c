@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.58 2001/10/05 06:50:09 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.59 2001/10/09 09:28:27 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1478,22 +1478,23 @@ mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 		return (0);
 	}
 	
-	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_TEMP, M_NOWAIT);
-	if (optbuf.buf == NULL)
-		return (ENOMEM);
-	bzero((caddr_t)optbuf.buf, MIP6_BUFFER_SIZE);
-
 	bzero(&haddr_opt, sizeof(struct ip6_opt_home_address));
 	haddr_opt.ip6oh_type = IP6OPT_HOME_ADDRESS;
 	haddr_opt.ip6oh_len = IP6OPT_HALEN;
 
-	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, dst);
+	mbu = mip6_bu_list_find_withhaddr(&sc->hif_bu_list, src);
 	if (mbu)
 		coa = &mbu->mbu_coa;
 	else
 		coa = &hif_coa;
 	size = sizeof(struct in6_addr);
 	bcopy((caddr_t)coa, haddr_opt.ip6oh_addr, size);
+
+	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_TEMP, M_NOWAIT);
+	if (optbuf.buf == NULL)
+		return (ENOMEM);
+	bzero((caddr_t)optbuf.buf, MIP6_BUFFER_SIZE);
+	optbuf.off = 0;
 
 	/* Add Home Address option  */
 	mip6_add_opt2dh((u_int8_t *)&haddr_opt, &optbuf);
