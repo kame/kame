@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.28 2004/02/11 22:16:30 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.29 2004/02/18 15:10:51 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -1388,12 +1388,7 @@ sctp6_peeraddr(struct socket *so,
 #endif
 		return ENOENT;
 	}
-	if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
-		sin6->sin6_scope_id = ntohs(sin6->sin6_addr.s6_addr16[1]);
-	else
-		sin6->sin6_scope_id = 0;	/*XXX*/
-	if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
-		sin6->sin6_addr.s6_addr16[1] = 0;
+	in6_recoverscope(&sin6, &sin6->sin6_addr, NULL);
 #ifdef __FreeBSD__
 	*nam = (struct sockaddr *)sin6;
 #endif
