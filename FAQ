@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.57 2001/09/26 08:34:24 itojun Exp $
+$KAME: FAQ,v 1.58 2001/09/26 08:43:48 itojun Exp $
 
 
 GENERAL
@@ -458,6 +458,35 @@ remote host)?
 	can make sure that inbound packet is always encrypted (non-encrypted
 	packets get dropped).  See sbin/ping for usage example.
 	This is a KAME-only API.  There's no standard API for this, AFAIK.
+
+Q: I see a lot of messages like follows when I try to throw packets to
+a gif tunnel interface:
+    nd6_output: failed to add route fora neighbor(ADDR), errno=17
+	The message gets generated when the kernel fails to create a neighbor
+	cache entry for NUD.  The source of the problem is considered
+	operational.  You need to change your configuration to solve the
+	problem (NOTE: with recent KAME kits, the message won't get generated
+	due to a couple of changes we made).
+
+	We are convinced that a tunnel interface has to have the either of
+	the following configuration:
+		ifconfig gif0 inet6 A B prefixlen 128 alias
+		ifconfig gif0 inet6 A prefixlen 64 alias
+	NOT the following:
+		ifconfig gif0 inet6 A B prefixlen 64 alias
+	since the last example is ambiguous when B is within A/64.  The message
+	gets generated when you use the last (3rd) configuration, which is
+	not correct in our interpretation.
+
+Q: I see a lot of messages like follows:
+    nd6_ns_input: invalid hlim(NUM) from FROM to TO on IF
+	The message gets generated when someone configures an IPv6 router
+	wrongly and neighbor solicitation messages are leaking from the router.
+	If you have time, send a note to the owner of the machine indicated
+	in FROM.
+
+	The message gets generated only with older KAME SNAP kit.  Kernel
+	upgrade is suggested if you see these messages.
 
 
 LICENSE AND CRYPTO EXPORT
