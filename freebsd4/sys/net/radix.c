@@ -733,11 +733,10 @@ rn_delete(v_arg, netmask_arg, head, rn)
 	netmask = netmask_arg;
 	x = head->rnh_treetop;
 #ifdef RADIX_MPATH
-	if (rn && (rn->rn_mask != rn_zeros)) {
+	if (rn) {
 		tt = rn;
 		/* 
 		 * Is this route(rn) a rn->dupedkey chain? 
-		 * Only default route is an exception. (rn_mask)
 		 */
 		if (rn_mpath_next(tt->rn_p))
 			mpath_enable = 1;

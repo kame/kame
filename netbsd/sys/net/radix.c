@@ -703,7 +703,7 @@ rn_delete(v_arg, netmask_arg, head, rn)
 	netmask = netmask_arg;
 	x = head->rnh_treetop;
 #ifdef RADIX_MPATH
-	if (rn && (rn->rn_mask != rn_zeros)) {
+	if (rn) {
 		tt = rn;
 		/* 
 		 * Is this route(rn) a rn->dupedkey chain? 
