@@ -1,6 +1,6 @@
 	README of KAME kit
 	KAME Project
-	$KAME: README,v 1.59 2001/08/07 06:31:01 itojun Exp $
+	$KAME: README,v 1.60 2001/08/11 08:58:39 jinmei Exp $
 
 <<<Project Overview>>>
 
@@ -170,12 +170,13 @@ Current core members are:
            Kazu YAMAMOTO  IIJ Research Laboratory
        Jun-ichiro HAGINO  IIJ Research Laboratory
           Shoichi SAKANE  YDC Corporation
-          Tatsuya JINMEI  Toshiba Corporation
+           Tatuya JINMEI  Toshiba Corporation
       Shin-ichi FUJISAWA  Yokogawa Electric Corporation
 	     Kenjiro CHO  Sony Computer Science Laboratory Inc.
 	 Shinsuke SUZUKI  Hitachi, Ltd.
 	  Shuichi KARINO  NEC Corporation
 	     Koji KAWANO  Matsushita Graphic Communication Systems, Inc.
+	   Keiichi SHIMA  IIJ Research Laboratory
 
 Alumni of core members:
          Yoshinobu INOUE  Fujitsu Limited
@@ -187,7 +188,7 @@ Alumni of core members:
 
 The core members deeply thank the original members and the
 contributors including:
-Keiichi SHIMA, Yusaku HASEGAWA, Kentaro MISU, Yasushi YAMASAKI,
+Yusaku HASEGAWA, Kentaro MISU, Yasushi YAMASAKI,
 Atsushi ONOE, Noritoshi DEMIZU, Katsushi KOBAYASHI, Takahiro
 KIKUCHI, Motonori NAKAMURA, Francis Dupont, Kazunori FUJIWARA,
 HO Sonmyong, Masanari TSUBAI, Hiroshi URA, Craig Metz, Chris the
