@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.264 2002/02/09 06:49:45 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.265 2002/02/12 08:05:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -634,7 +634,7 @@ ip6_input(m)
 	 * support IPv4-less kernel compilation, we cannot support SIIT
 	 * environment at all.  So, it makes more sense for us to reject any
 	 * malicious packets for non-SIIT environment, than try to do a
-	 * partical support for SIIT environment.
+	 * partial support for SIIT environment.
 	 */
 	if (IN6_IS_ADDR_V4MAPPED(&ip6->ip6_src) ||
 	    IN6_IS_ADDR_V4MAPPED(&ip6->ip6_dst)) {
