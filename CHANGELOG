@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.952 2000/05/29 16:33:13 itojun Exp $
+$Id: CHANGELOG,v 1.953 2000/05/30 02:21:29 itojun Exp $
 
 <200005>
+Tue May 30 11:18:03 JST 2000  itojun@iijlab.net
+	* freebsd[23]/ports/popper, netbsd/pkgsrc/mail/qpopper:
+	  mark the port broken for security issue.  users are suggested to
+	  remove the installed binary.
+	  http://www.securityfocus.com/templates/archive.pike?list=1&date=2000-05-22&msg=p04320305b5511470392c@[192.168.1.5]
+
 Tue May 30 01:29:04 JST 2000  itojun@iijlab.net
 	* freebsd[34]/sys/net/if_loop.c: correct bpf_mtap call in if_simloop().
 	  note that ifp can be anything when if_simloop() is called.
