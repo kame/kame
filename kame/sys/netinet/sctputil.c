@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.13 2002/10/17 02:15:58 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.14 2002/11/07 03:23:49 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctputil.c,v 1.153 2002/04/04 16:59:01 randall Exp	*/
 
 /*
@@ -1435,7 +1435,16 @@ sctp_notify_send_failed(struct sctp_tcb *stcb, u_int32_t error,
 	ssf->ssf_info.sinfo_assoc_id = (sctp_assoc_t)stcb;
 	ssf->ssf_assoc_id = (sctp_assoc_t)stcb;
 	m_notify->m_next = chk->data;
-	m_notify->m_flags |= M_EOR | M_NOTIFICATION;
+        if (m_notify->m_next == NULL)
+		m_notify->m_flags |= M_EOR | M_NOTIFICATION;
+        else {
+		struct mbuf *m;
+		m_notify->m_flags |= M_NOTIFICATION;
+		m = m_notify;
+		while (m->m_next != NULL)
+			m = m->m_next;
+		m->m_flags |= M_EOR;
+        }
 	m_notify->m_pkthdr.len = length;
 	m_notify->m_pkthdr.rcvif = 0;
 	m_notify->m_len = length;

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.16 2002/10/09 18:01:21 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.17 2002/11/07 03:23:48 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.c, v 1.308 2002/04/04 18:47:03 randall Exp	*/
 
 /*
@@ -3637,7 +3637,7 @@ sctp_msg_append(struct sctp_tcb *tcb,
 				if (chk->rec.data.timetodrop.tv_usec > 1000000) {
 			        /* add in the carry over */
 					chk->rec.data.timetodrop.tv_usec -= 1000000;
-					chk->rec.data.timetodrop.tv_usec++;
+					chk->rec.data.timetodrop.tv_sec++;
 				}
 			}
 		} else {
@@ -3744,7 +3744,7 @@ sctp_msg_append(struct sctp_tcb *tcb,
 				if (template.rec.data.timetodrop.tv_usec > 1000000) {
 					/* add in the carry over */
 					template.rec.data.timetodrop.tv_usec -= 1000000;
-					template.rec.data.timetodrop.tv_usec++;
+					template.rec.data.timetodrop.tv_sec++;
 				}
 			}
 		}
@@ -5868,14 +5868,6 @@ sctp_timer_validation(struct sctp_inpcb *inp,
 	return (ret);
 }
 
-int sctp_cwnd_posts[SCTP_CWND_POSTS_LIST];
-int sctp_cwnd_old[SCTP_CWND_POSTS_LIST];
-long sctp_onqueue[SCTP_CWND_POSTS_LIST];
-int sctp_chunksout[SCTP_CWND_POSTS_LIST];
-char sctp_wherefrom[SCTP_CWND_POSTS_LIST];
-int sctp_rwndval[SCTP_CWND_POSTS_LIST];
-int sctp_post_at = 0;
-
 int
 sctp_chunk_output(struct sctp_inpcb *inp,
 		  struct sctp_tcb *tcb,
@@ -5896,12 +5888,11 @@ sctp_chunk_output(struct sctp_inpcb *inp,
 	 */
 	struct sctp_association *asoc;
 	struct sctp_nets *net;
-	int error, num_out, tot_out, ret, xxxx, reason_code;
+	int error, num_out, tot_out, ret, reason_code;
 
 	asoc = &tcb->asoc;
 	tot_out = 0;
 	num_out = 0;
-	xxxx=0;
 	reason_code = 0;
 	sctp_pegs[SCTP_CALLS_TO_CO]++;
 	while (asoc->sent_queue_retran_cnt) {
@@ -5973,13 +5964,7 @@ sctp_chunk_output(struct sctp_inpcb *inp,
 			 * sending.
 			 */
 			if (((net->mtu * asoc->max_burst) + net->flight_size) < net->cwnd) {
-				xxxx = 1;
-				sctp_rwndval[sctp_post_at] = asoc->peers_rwnd;
-				sctp_onqueue[sctp_post_at] = asoc->total_output_queue_size;
-				sctp_cwnd_old[sctp_post_at] = net->cwnd;
 				net->cwnd = ((net->mtu * 4)+net->flight_size);
-				sctp_cwnd_posts[sctp_post_at] = net->cwnd;
-				sctp_wherefrom[sctp_post_at] = (char)from_where;
 			}
 		}
 /*			net->fast_retran_ip = 0;*/
@@ -6011,12 +5996,6 @@ sctp_chunk_output(struct sctp_inpcb *inp,
 #endif
 	if (tot_out == 0) {
 		sctp_pegs[SCTP_CO_NODATASNT]++;
-	}
-	if (xxxx) {
-		sctp_chunksout[sctp_post_at++] = tot_out;
-		if (sctp_post_at > SCTP_CWND_POSTS_LIST)
-			sctp_post_at = 0;
-
 	}
 	/* Now we need to clean up the control chunk chain if
 	 * a ECNE is on it. It must be marked as UNSENT again

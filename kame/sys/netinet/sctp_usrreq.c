@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.21 2002/10/09 18:01:22 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.22 2002/11/07 03:23:49 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_usrreq.c,v 1.151 2002/04/04 16:49:14 lei Exp	*/
 
 /*
@@ -1173,15 +1173,6 @@ sctp_count_max_addresses(struct sctp_inpcb *inp)
 	return (cnt);
 }
 
-extern int sctp_cwnd_posts[SCTP_CWND_POSTS_LIST];
-extern int sctp_cwnd_old[SCTP_CWND_POSTS_LIST];
-extern long sctp_onqueue[SCTP_CWND_POSTS_LIST];
-extern int sctp_chunksout[SCTP_CWND_POSTS_LIST];
-extern char sctp_wherefrom[SCTP_CWND_POSTS_LIST];
-extern int sctp_rwndval[SCTP_CWND_POSTS_LIST];
-extern int sctp_post_at;
-
-
 
 static int
 sctp_optsget(struct socket *so,
@@ -1226,6 +1217,7 @@ sctp_optsget(struct socket *so,
 	switch(opt) {
 	case SCTP_NODELAY:
 	case SCTP_AUTOCLOSE:
+	case SCTP_AUTO_ASCONF:
 	case SCTP_DISABLE_FRAGMENTS:
 	case SCTP_I_WANT_MAPPED_V4_ADDR:
 #ifdef SCTP_DEBUG
@@ -1239,6 +1231,9 @@ sctp_optsget(struct socket *so,
 			break;
 		case SCTP_I_WANT_MAPPED_V4_ADDR:
 			optval = inp->sctp_flags & SCTP_I_WANT_MAPPED_V4_ADDR;
+			break;
+		case SCTP_AUTO_ASCONF:
+		        optval = inp->sctp_flags & SCTP_PCB_FLAGS_AUTO_ASCONF;
 			break;
 		case SCTP_NODELAY:
 			optval = inp->sctp_flags & SCTP_PCB_FLAGS_NODELAY;
@@ -1289,31 +1284,6 @@ sctp_optsget(struct socket *so,
 			}
 		}
 		break;
-	case SCTP_PRINT_CWND_UPDATES:
-	{
-		int i;
-		for (i = sctp_post_at; i < SCTP_CWND_POSTS_LIST; i++) {
-			printf("old:%d->new:%d onQueue:%d sent:%d from:%d rwnd:%d\n",
-			       sctp_cwnd_old[i],
-			       sctp_cwnd_posts[i],
-			       (int)sctp_onqueue[i],
-			       sctp_chunksout[i],
-			       (int)sctp_wherefrom[i],
-			       sctp_rwndval[i]
-				);
-		}
-		for (i = 0; i < sctp_post_at; i++) {
-			printf("old:%d->new:%d onQueue:%d sent:%d from:%d rwnd:%d\n",
-			       sctp_cwnd_old[i],
-			       sctp_cwnd_posts[i],
-			       (int)sctp_onqueue[i],
-			       sctp_chunksout[i],
-			       (int)sctp_wherefrom[i],
-			       sctp_rwndval[i]
-				);
-		}
-	}
-	break;
 	case SCTP_MAXSEG:
 	{
 		u_int32_t *segsize;
@@ -1996,6 +1966,7 @@ sctp_optsset(struct socket *so,
 	switch(opt) {
 	case SCTP_NODELAY:
 	case SCTP_AUTOCLOSE:
+	case SCTP_AUTO_ASCONF:
 	case SCTP_DISABLE_FRAGMENTS:
 	case SCTP_I_WANT_MAPPED_V4_ADDR:
 		/* copy in the option value */
@@ -2011,6 +1982,10 @@ sctp_optsset(struct socket *so,
 		case SCTP_DISABLE_FRAGMENTS:
 			set_opt = SCTP_PCB_FLAGS_NO_FRAGMENT;
 			break;
+		case SCTP_AUTO_ASCONF:
+		        set_opt = SCTP_PCB_FLAGS_AUTO_ASCONF;
+			break;
+
 		case SCTP_I_WANT_MAPPED_V4_ADDR:
 			if (inp->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) {
 				set_opt = SCTP_PCB_FLAGS_NEEDS_MAPPED_V4;
@@ -2037,109 +2012,6 @@ sctp_optsset(struct socket *so,
 			inp->sctp_flags &= ~set_opt;
 		}
 		break;
-	case SCTP_DUMP_SEND_T_Q:
-	{
-		struct sctp_tcb *tcb;
-		struct sctp_tmit_chunk *chk;
-		struct sctp_association *asoc;
-		if (LIST_EMPTY(&inp->sctp_asoc_list)) {
-			printf("Nothing to dump\n");
-			break;
-		}
-		LIST_FOREACH(tcb, &inp->sctp_asoc_list, sctp_tcblist) {
-			asoc = &tcb->asoc;
-			printf("Assoc %lx send_queue\n",
-			       (unsigned long)asoc);
-			TAILQ_FOREACH(chk, &asoc->send_queue,
-				      sctp_next) {
-				printf("chk:%lx TSN:%x sent:%d snd_count:%d sz:%d\n",
-				       (unsigned long)chk,
-				       chk->rec.data.TSN_seq,
-				       chk->sent,
-				       chk->snd_count,
-				       chk->send_size);
-			}
-			printf("Assoc %lx sent_queue\n",
-			       (unsigned long)asoc);
-			TAILQ_FOREACH(chk, &asoc->sent_queue,
-				      sctp_next) {
-				printf("chk:%lx TSN:%x sent:%d snd_count:%d sz:%d\n",
-				       (unsigned long)chk,
-				       chk->rec.data.TSN_seq,
-				       chk->sent,
-				       chk->snd_count,
-				       chk->send_size);
-			}
-		}
-	}
-	case SCTP_LIST_DELIVERY_Q:
-	{
-		struct sctp_tcb *tcb;
-		struct sctp_association *asoc;
-		if (TAILQ_EMPTY(&inp->sctp_queue_list)) {
-			printf("Those awaiting events is empty\n");
-		} else {
-			TAILQ_FOREACH(tcb, &inp->sctp_queue_list,
-				      sctp_toqueue) {
-				printf("Assoc:%lx is waiting on the socket\n",
-				       (unsigned long)tcb);
-			}
-		}
-		printf("Socket stats:\n");
-		printf("cc:%d hiwat:%d lowat:%d mbcnt:%d mbmax:%d\n",
-		       (int)inp->sctp_socket->so_rcv.sb_cc,
-		       (int)inp->sctp_socket->so_rcv.sb_hiwat,
-		       (int)inp->sctp_socket->so_rcv.sb_lowat,
-		       (int)inp->sctp_socket->so_rcv.sb_mbcnt,
-		       (int)inp->sctp_socket->so_rcv.sb_mbmax);
-		LIST_FOREACH(tcb, &inp->sctp_asoc_list, sctp_tcblist) {
-			asoc = &tcb->asoc;
-			printf("tcb:%lx has %d on dq (%d sz) rwnd:%d\n",
-			       (unsigned long)tcb,
-			       (int)asoc->cnt_on_delivery_queue,
-			       (int)asoc->size_on_delivery_queue,
-			       (int)asoc->my_rwnd);
-		}
-	}
-	break;
-	case SCTP_PRINT_A_STREAM:
-	{
-		struct sctp_tcb *tcb;
-		struct sctp_stream_in *strm;
-		struct sctp_tmit_chunk *chk;
-		struct sctp_association *asoc;
-		int cnt, *num;
-
-		num = mtod(m, int *);
-		if (*num < 0) {
-			error = EINVAL;
-			break;
-		}
-		if (m->m_len < sizeof(int)) {
-			error = EINVAL;
-			break;
-		}
-		LIST_FOREACH(tcb, &inp->sctp_asoc_list, sctp_tcblist) {
-			asoc = &tcb->asoc;
-			strm = &asoc->strmin[*num];
-			if (*num >asoc->streamincnt) {
-				continue;
-			}
-			cnt = 0;
-			TAILQ_FOREACH(chk, &strm->inqueue, sctp_next) {
-				printf("Chunk[%d] ssn:%d tsn:%x sz:%d(%d) flgs:%x\n",
-				       cnt,
-				       chk->rec.data.stream_seq,
-				       chk->rec.data.TSN_seq,
-				       chk->send_size,
-				       chk->book_size,
-				       chk->rec.data.rcv_flags);
-				cnt++;
-			}
-		}
-
-	}
-	break;
 	case SCTP_MAXSEG:
 	{
 		u_int32_t *segsize;

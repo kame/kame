@@ -1,4 +1,4 @@
-/*	$KAME: sctp_indata.c,v 1.11 2002/10/17 02:15:57 itojun Exp $	*/
+/*	$KAME: sctp_indata.c,v 1.12 2002/11/07 03:23:48 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_indata.c,v 1.124 2002/04/04 18:48:39 randall Exp	*/
 
 /*
@@ -1338,7 +1338,8 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 	u_int16_t strmno, strmseq;
 
 	tsn = ntohl(ch->dp.tsn);
-	if (compare_with_wrap(asoc->cumulative_tsn, tsn, MAX_TSN)) {
+	if ((compare_with_wrap(asoc->cumulative_tsn, tsn, MAX_TSN)) ||
+             (asoc->cumulative_tsn == tsn)) {
 		/* It is a duplicate */
 		sctp_pegs[SCTP_DUPTSN_RECVD]++;
 		if (asoc->numduptsns < SCTP_MAX_DUP_TSNS) {
@@ -2606,10 +2607,6 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
 				       (int)asoc->total_output_mbuf_queue_size);
 			}
 #endif
-			sctp_ulp_notify(SCTP_NOTIFY_DG_FAIL, stcb,
-					/* Maybe there should be another notification type */
-					(SCTP_NOTIFY_DATAGRAM_SENT|SCTP_RESPONSE_TO_USER_REQ),
-					tp1);
 
 			m_freem(tp1->data);
 		}

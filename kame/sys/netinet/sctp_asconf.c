@@ -1,4 +1,4 @@
-/*	$KAME: sctp_asconf.c,v 1.9 2002/10/09 18:01:20 itojun Exp $	*/
+/*	$KAME: sctp_asconf.c,v 1.10 2002/11/07 03:23:48 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_asconf.c,v 1.72 2002/04/04 15:40:35 randall Exp	*/
 
 /*
@@ -1649,6 +1649,23 @@ sctp_addr_mgmt_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tcb,
 		return;
 	}
 
+	/* make sure we're "allowed" to add this type of addr */
+	if (ifa->ifa_addr->sa_family == AF_INET6) {
+		struct in6_ifaddr *ifa6;
+
+		/* invalid if we're not a v6 endpoint */
+		if ((ep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) == 0)
+			return;
+		/* is the v6 addr really valid ? */
+		ifa6 = (struct in6_ifaddr *)ifa;
+		if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
+				       IN6_IFF_ANYCAST |
+				       IN6_IFF_DEPRECATED |
+				       IN6_IFF_NOTREADY))
+			/* can't use an invalid address */
+			return;
+	}
+
 	/* put this address on the "pending/do not use yet" list */
 	/*
 	 * Note: we do this primarily for the subset bind case
@@ -1683,10 +1700,6 @@ sctp_addr_mgmt_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tcb,
 	 */
 	if (ifa->ifa_addr->sa_family == AF_INET6) {
 		struct sockaddr_in6 *sin6;
-
-		/* invalid if we're not a v6 endpoint */
-		if ((ep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) == 0)
-			return;
 
 		sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
 #ifdef SCTP_DEBUG
@@ -1823,7 +1836,7 @@ sctp_addr_mgmt_ep(struct sctp_inpcb *ep, struct ifaddr *ifa, uint16_t type) {
 				       IN6_IFF_ANYCAST |
 				       IN6_IFF_DEPRECATED |
 				       IN6_IFF_NOTREADY))
-			/* Can't use a non-existent addr. */
+			/* can't use an invalid address */
 			return;
 	} else if (ifa->ifa_addr->sa_family == AF_INET) {
 		/* invalid if we are a v6 only endpoint */

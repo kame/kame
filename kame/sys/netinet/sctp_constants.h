@@ -1,4 +1,4 @@
-/*	$KAME: sctp_constants.h,v 1.5 2002/10/09 18:01:20 itojun Exp $	*/
+/*	$KAME: sctp_constants.h,v 1.6 2002/11/07 03:23:48 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_constants.h,v 1.61 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef __sctp_constants_h__
@@ -512,8 +512,8 @@
 #define SCTP_NOTIFY_ADAPTION_INDICATION         19
 #define SCTP_NOTIFY_MAX			19
 
-/* clock variance is 10ms or 10,000 us's */
-#define SCTP_CLOCK_GRANULARITY	10000
+/* clock variance is 10ms */
+#define SCTP_CLOCK_GRANULARITY	10
 
 #define IP_HDR_SIZE 40		/* we use the size of a IP6 header here
 				 * this detracts a small amount for ipv4

@@ -182,12 +182,12 @@ struct protosw inetsw[] = {
  * postion for SCTP. Don't move the one above below
  * this one or IPv6/4 compatability will break
  */
-{ SOCK_DGRAM,	&inetdomain,	IPPROTO_SCTP,	PR_ATOMIC|PR_ADDR_OPT|PR_WANTRCVD,
+{ SOCK_DGRAM,	&inetdomain,	IPPROTO_SCTP,	PR_ADDR_OPT|PR_WANTRCVD,
   sctp_input,	0,		sctp_ctlinput,	sctp_ctloutput,
   sctp_usrreq,
   sctp_init,	0,		0,		sctp_drain,	0
 },
-{ SOCK_SEQPACKET,&inetdomain,	IPPROTO_SCTP,	PR_ATOMIC|PR_ADDR_OPT|PR_WANTRCVD,
+{ SOCK_SEQPACKET,&inetdomain,	IPPROTO_SCTP,	PR_ADDR_OPT|PR_WANTRCVD,
   sctp_input,	0,		sctp_ctlinput,	sctp_ctloutput,
   sctp_usrreq,
   0,		0,		0,		sctp_drain,	0
