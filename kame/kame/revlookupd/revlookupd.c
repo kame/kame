@@ -1,4 +1,4 @@
-/*	$KAME: revlookupd.c,v 1.2 2002/05/22 12:19:45 itojun Exp $	*/
+/*	$KAME: revlookupd.c,v 1.3 2002/06/04 05:06:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -162,8 +162,12 @@ main(argc, argv)
 		/*NOTREACHED*/
 	}
 
+#ifdef HAVE_ARC4RANDOM
+	dnsid = arc4random() & 0xffff;
+#else
 	srandom(time(NULL) ^ getpid());
 	dnsid = random() & 0xffff;
+#endif
 
 	if (!hostname) {
 		if (gethostname(hostnamebuf, sizeof(hostnamebuf)) != 0) {
