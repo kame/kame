@@ -145,6 +145,9 @@ void	getinetproto __P((int));
 char   *getmnton __P((struct mount *));
 int	main __P((int, char **));
 int	nfs_filestat __P((struct vnode *, struct filestat *));
+#ifdef INET6
+static const char *inet6_addrstr __P((struct in6_addr *));
+#endif
 void	socktrans __P((struct socket *, int));
 int	ufs_filestat __P((struct vnode *, struct filestat *));
 void	usage __P((void));
@@ -857,6 +860,8 @@ getinetproto(number)
 		cp ="idp"; break;
 	case IPPROTO_RAW:
 		cp ="raw"; break;
+	case IPPROTO_ICMPV6:
+		cp ="icmp6"; break;
 	default:
 		printf(" %d", number);
 		return;
