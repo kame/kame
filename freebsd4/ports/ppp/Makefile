@@ -2,11 +2,11 @@
 # Date created:			  Tue Feb 26
 # Whom:				  sumikawa
 #
-# $KAME: Makefile,v 1.3 2002/04/01 09:47:43 sumikawa Exp $
+# $KAME: Makefile,v 1.4 2002/06/03 07:14:13 jinmei Exp $
 #
 
 PORTNAME=	ppp
-PORTVERSION=	020331
+PORTVERSION=	020602
 CATEGORIES=	net ipv6
 MASTER_SITES=	http://www.awfulhak.org/~brian/
 DISTNAME=	${PORTNAME}-${PORTVERSION}.src
