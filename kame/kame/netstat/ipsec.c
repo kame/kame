@@ -169,7 +169,7 @@ ipsec_hist(hist, histmax, name, namemax, title)
 			printf("\t\t%s: " LLU "\n", name[proto],
 				(CAST)hist[proto]);
 		} else {
-			printf("\t\t#%d: " LLU "\n", proto,
+			printf("\t\t#%ld: " LLU "\n", (long)proto,
 				(CAST)hist[proto]);
 		}
 	}
