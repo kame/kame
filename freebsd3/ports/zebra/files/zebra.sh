@@ -1,6 +1,6 @@
 #! /bin/sh
 #
-# $Id: zebra.sh,v 1.1 1999/08/17 09:11:04 itojun Exp $
+# $Id: zebra.sh,v 1.2 1999/09/01 08:51:05 itojun Exp $
 #
 # zebra start/stop script by "Andreas Klemm <andreas@FreeBSD.ORG>"
 #
@@ -30,13 +30,13 @@ case $1 in
 			echo -n ' ospfd' )
 		[ -f !!PREFIX!!/etc/zebra/bgpd.conf ] && ( \
 			!!PREFIX!!/sbin/bgpd > /dev/null 2>&1 & \
-			echo -n ' ospfd' )
+			echo -n ' bgpd' )
 		[ -f !!PREFIX!!/etc/zebra/ripngd.conf ] && ( \
 			!!PREFIX!!/sbin/ripngd > /dev/null 2>&1 & \
-			echo -n ' ospfd' )
+			echo -n ' ripngd' )
 		[ -f !!PREFIX!!/etc/zebra/ospf6d.conf ] && ( \
 			!!PREFIX!!/sbin/ospf6d > /dev/null 2>&1 & \
-			echo -n ' ospfd' )
+			echo -n ' ospf6d' )
 		;;
 
 	stop)
