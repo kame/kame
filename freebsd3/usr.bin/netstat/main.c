@@ -404,6 +404,7 @@ main(argc, argv)
 	}
 	if (pflag) {
 		if (iflag && tp->pr_istats) {
+			kread(0, 0, 0);
 			intpr(interval, nl[N_IFNET].n_value, tp->pr_istats);
 			exit(0);
 		}
