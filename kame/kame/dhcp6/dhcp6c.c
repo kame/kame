@@ -845,6 +845,7 @@ client6_recvreply(s, serv)
 			to_mediator.sin_port= htons(MEDIATOR_CTRL_PORT);
 			inet_aton("127.0.0.1", &to_mediator.sin_addr);
 
+			memset(&mediator_msg, 0, sizeof(mediator_msg));
 			mediator_msg.version = htonl(MEDIATOR_CTRL_VERSION);
 			mediator_msg.lifetime = -1; /* XXX: never expire */
 
