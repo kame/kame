@@ -493,7 +493,7 @@ tcp_usrreq(so, req, m, nam, control)
 		panic("tcp_usrreq");
 	}
 	if (tp && (so->so_options & SO_DEBUG))
-		tcp_trace(TA_USER, ostate, tp, (caddr_t)0, req, 0);
+		tcp_trace(TA_USER, ostate, tp, NULL, req, 0);
 	splx(s);
 	return (error);
 }

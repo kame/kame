@@ -113,10 +113,10 @@ int	tcpconsdebug = 0;
  * Tcp debug routines
  */
 void
-tcp_trace(act, ostate, tp, headers, req, len)
+tcp_trace(act, ostate, tp, m, req, len)
 	short act, ostate;
 	struct tcpcb *tp;
-	caddr_t headers;
+	struct mbuf *m;
 	int req;
 	int len;
 {
@@ -124,11 +124,21 @@ tcp_trace(act, ostate, tp, headers, req, len)
 	tcp_seq seq, ack;
 	int flags;
 #endif
+	caddr_t headers;
 	struct tcp_debug *td = &tcp_debug[tcp_debx++];
-	struct tcpiphdr *ti = (struct tcpiphdr *)headers;
+	struct tcpiphdr *ti;
 	struct tcphdr *th;
 #ifdef INET6
 	struct tcpipv6hdr *ti6 = (struct tcpipv6hdr *)ti;
+#endif
+
+	if (m)
+		headers = mtod(m, caddr_t);
+	else
+		headers = NULL;
+	ti = (struct tcpiphdr *)headers;
+#ifdef INET6
+	ti6 = (struct tcpipv6hdr *)headers;
 #endif
 
 	if (tcp_debx == TCP_NDEBUG)
@@ -144,7 +154,7 @@ tcp_trace(act, ostate, tp, headers, req, len)
 	switch (tp->pf) {
 #ifdef INET6
 	case PF_INET6:
-		if (ti) {
+		if (ti6) {
 			th = &ti6->ti6_t;
 			td->td_ti6 = *ti6;
 		} else

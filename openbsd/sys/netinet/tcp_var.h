@@ -424,7 +424,7 @@ void	 tcp_setpersist(struct tcpcb *);
 void	 tcp_slowtimo(void);
 struct mbuf *
 	 tcp_template(struct tcpcb *);
-void	 tcp_trace(int, int, struct tcpcb *, caddr_t, int, int);
+void	 tcp_trace(int, int, struct tcpcb *, struct mbuf *, int, int);
 struct tcpcb *
 	 tcp_usrclosed(struct tcpcb *);
 int	 tcp_sysctl(int *, u_int, void *, size_t *, void *, size_t);
