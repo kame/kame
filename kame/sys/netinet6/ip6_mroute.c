@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.130 2004/08/12 04:36:11 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.131 2004/09/30 08:45:31 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -795,7 +795,7 @@ add_m6if(mifcp)
 	 * XXX: some OSes can remove ifp and clear ifindex2ifnet[id]
 	 * even for id between 0 and if_index.
 	 */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+#if defined(__FreeBSD__) && __FreeBSD_version > 500000
 	ifp = ifnet_byindex(mifcp->mif6c_pifi);
 #else
 	ifp = ifindex2ifnet[mifcp->mif6c_pifi];
@@ -1795,11 +1795,7 @@ phyint_send(ip6, mifp, m)
 		im6o.im6o_multicast_hlim = ip6->ip6_hlim;
 		im6o.im6o_multicast_loop = 1;
 		error = ip6_output(mb_copy, NULL, &ro,
-				   IPV6_FORWARDING, &im6o, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-				   , NULL
-#endif
-				  );
+				   IPV6_FORWARDING, &im6o, NULL, NULL);
 
 #ifdef MRT6DEBUG
 		if (mrt6debug & DEBUG_XMIT)
@@ -2152,14 +2148,8 @@ pim6_input(mp, offp, proto)
 #endif
 
 #ifdef __FreeBSD__
-#if (__FreeBSD_version >= 410000)
 		rc = if_simloop(mif6table[reg_mif_num].m6_ifp, m,
 		    dst.sin6_family, NULL);
-#else
-		rc = if_simloop(mif6table[reg_mif_num].m6_ifp, m,
-		    (struct sockaddr *)&dst, NULL);
-
-#endif
 #else
 		rc = looutput(mif6table[reg_mif_num].m6_ifp, m,
 		    (struct sockaddr *)&dst, (struct rtentry *) NULL);
