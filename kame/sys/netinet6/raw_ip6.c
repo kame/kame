@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.124 2002/06/07 21:26:49 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.125 2002/06/07 21:36:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -961,7 +961,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 			tmp.sin6_family = AF_INET6;
 			tmp.sin6_len = sizeof(struct sockaddr_in6);
 			bcopy(&in6p->in6p_faddr, &tmp.sin6_addr,
-				sizeof(struct in6_addr));
+			    sizeof(struct in6_addr));
 			dst = &tmp;
 		} else {
 			if (nam == NULL) {
