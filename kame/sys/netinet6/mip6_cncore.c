@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.23 2003/07/31 09:56:39 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.24 2003/07/31 11:05:31 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -76,11 +76,18 @@
 #include <net/net_osdep.h>
 
 #include <netinet/in.h>
-#include <netinet/in_pcb.h>
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
 #include <netinet/ip_encap.h>
 #include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#include <netinet/in_pcb.h>
+#endif
+#if !((defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802))
+#include <netinet6/in6_pcb.h>
+#endif
 #include <netinet/icmp6.h>
 #include <netinet6/nd6.h>
 #include <netinet6/in6_ifattach.h>
@@ -1198,6 +1205,9 @@ mip6_bc_send_brr(mbc)
 #ifdef __FreeBSD__
 extern struct inpcbhead tcb;
 #endif
+#ifdef __NetBSD__
+extern struct in6pcb tcb6;
+#endif
 static int
 mip6_bc_need_brr(mbc)
 	struct mip6_bc *mbc;
@@ -1227,7 +1237,7 @@ mip6_bc_need_brr(mbc)
 	}
 #endif
 #ifdef __NetBSD__
-	for (inp = &tbc6; inp != &tcb6; inp = inp->inp_next) {
+	for (inp = &tcb6; inp != &tcb6; inp = inp->in6p_next) {
 		if (SA6_ARE_ADDR_EQUAL(src, &inp->in6p_lsa)
 		    && SA6_ARE_ADDR_EQUAL(dst, &inp->in6p_fsa)) {
 			found++;

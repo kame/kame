@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.328 2003/07/28 11:58:14 t-momose Exp $	*/
+/*	$KAME: nd6.c,v 1.329 2003/07/31 11:05:31 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -106,6 +106,7 @@
 #include <net/if_hif.h>
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
+#include <netinet6/mip6_hacore.h>
 #endif /* MIP6 */
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
