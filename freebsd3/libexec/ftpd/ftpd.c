@@ -73,7 +73,7 @@ static char copyright[] =
 static char sccsid[] = "@(#)ftpd.c	8.4 (Berkeley) 4/16/94";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/libexec/ftpd/ftpd.c,v 1.52.2.2 1999/08/29 15:03:13 peter Exp $";
+  "$FreeBSD: src/libexec/ftpd/ftpd.c,v 1.52.2.3 1999/10/25 08:31:50 mharo Exp $";
 #endif /* not lint */
 
 /*
@@ -2037,6 +2037,7 @@ myoob(signo)
 		longjmp(urgcatch, 1);
 	}
 	if (strcmp(cp, "STAT\r\n") == 0) {
+		tmpline[0] = '\0';
 		if (file_size != (off_t) -1)
 			reply(213, "Status: %qd of %qd bytes transferred",
 			    byte_count, file_size);
