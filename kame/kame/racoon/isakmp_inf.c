@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.18 2000/01/11 16:31:01 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.19 2000/01/11 16:45:52 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -649,8 +649,7 @@ isakmp_info_send_common(iph1, payload, np, flags)
 
 	YIPSDEBUG(DEBUG_STAMP,
 		plog(logp, LOCATION, NULL,
-			"sendto Information %d:%s.\n",
-			np, s_isakmp_notify_msg(np)));
+			"sendto Information %s.\n", s_isakmp_nptype(np)));
 
 	/*
 	 * don't resend notify message because peer can use Acknowledged

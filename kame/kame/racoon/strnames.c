@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: strnames.c,v 1.2 2000/01/11 16:31:02 sakane Exp $ */
+/* YIPS @(#)$Id: strnames.c,v 1.3 2000/01/11 16:45:52 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -523,6 +523,21 @@ s_isakmp_notify_msg(type)
 {
 	if (ARRAYLEN(name_isakmp_notify_msg) > type)
 		return name_isakmp_notify_msg[type];
+
+	return num2str(type);
+}
+
+static char *name_isakmp_nptype[] = {
+	"none", "sa", "p", "t", "ke", "id", "cert", "cr", "hash",
+	"sig", "nonce", "notify", "delete", "vid"
+};
+
+char *
+s_isakmp_nptype(type)
+	u_int8_t type;
+{
+	if (ARRAYLEN(name_isakmp_nptype) > type)
+		return name_isakmp_nptype[type];
 
 	return num2str(type);
 }

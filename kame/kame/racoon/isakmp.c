@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.33 2000/01/11 15:56:03 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.34 2000/01/11 16:45:51 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -777,10 +777,6 @@ isakmp_parsewoh(np0, gen, len)
 	int tlen, plen;
 	vchar_t *result;
 	struct isakmp_parse_t *p, *ep;
-	static char *npstr[] = {
-		"none", "sa", "p", "t", "ke", "id", "cert", "cr", "hash",
-		"sig", "nonce", "n", "d", "vid"
-	};
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -813,9 +809,7 @@ isakmp_parsewoh(np0, gen, len)
 		YIPSDEBUG(DEBUG_NOTIFY,
 			plog(logp, LOCATION, NULL,
 				"seen nptype=%u(%s)\n", np,
-				(np < sizeof(npstr)/sizeof(npstr[0]))
-					? npstr[np]
-					: "?"));
+				s_isakmp_nptype(np)));
 
 		p->type = np;
 		p->len = ntohs(gen->len);
