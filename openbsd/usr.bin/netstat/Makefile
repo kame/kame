@@ -11,6 +11,7 @@ DPADD=	${LIBKVM}
 
 CPPFLAGS+=	-DINET6
 CFLAGS+=	-g
+CPPFLAGS+=	-DKAME_SCOPEID
 
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 \
 	-L${.CURDIR}/../../lib/libinet6/obj \

@@ -96,6 +96,7 @@ void	upHex __P((char *));
 
 #ifdef INET6
 struct in6_addr;
+struct sockaddr_in6;
 void	ip6protopr __P((u_long, char *));
 void	ip6_stats __P((u_long, char *));
 void	ip6_ifstats __P((char *));
@@ -104,8 +105,8 @@ void	icmp6_ifstats __P((char *));
 void	pim6_stats __P((u_long, char *));
 void	mroute6pr __P((u_long, u_long, u_long));
 void	mrt6_stats __P((u_long, u_long));
-char	*routename6 __P((char *));
-char	*netname6 __P((struct in6_addr *, struct in6_addr *));
+char	*routename6 __P((struct sockaddr_in6 *));
+char	*netname6 __P((struct sockaddr_in6 *, struct in6_addr *));
 #endif /*INET6*/
 
 char	*routename __P((in_addr_t));

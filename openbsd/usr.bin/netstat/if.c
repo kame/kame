@@ -203,10 +203,9 @@ intpr(interval, ifnetaddr)
 			case AF_INET6:
 				sin6 = (struct sockaddr_in6 *)sa;
 				printf("%-11.11s ",
-				    netname6(&ifaddr.in6.ia_addr.sin6_addr,
+				    netname6(&ifaddr.in6.ia_addr,
 					&ifaddr.in6.ia_prefixmask.sin6_addr));
-				printf("%-17.17s ",
-				    routename6((char *)&sin6->sin6_addr));
+				printf("%-17.17s ", routename6(sin6));
 				break;
 #endif
 			case AF_IPX:
