@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.4 2001/08/13 16:26:17 ume Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.40 2001/11/12 07:41:10 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.41 2001/11/12 11:11:22 jinmei Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -133,6 +133,8 @@ in6_pcbbind(inp, nam, p)
 	if ((so->so_options & (SO_REUSEADDR|SO_REUSEPORT)) == 0)
 		wild = 1;
 	if (nam) {
+		int error;
+
 		sin6 = (struct sockaddr_in6 *)nam;
 		if (nam->sa_len != sizeof(*sin6))
 			return(EINVAL);
@@ -142,13 +144,8 @@ in6_pcbbind(inp, nam, p)
 		if (nam->sa_family != AF_INET6)
 			return(EAFNOSUPPORT);
 
-		if (ip6_use_defzone && sin6->sin6_scope_id == 0) {
-			sin6->sin6_scope_id =
-				scope6_addr2default(&sin6->sin6_addr);
-		}
-		/* KAME hack: embed scopeid */
-		if (in6_embedscope(&sin6->sin6_addr, sin6) != 0)
-			return EINVAL;
+		if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
+			return(error);
 #ifndef SCOPEDROUTING
 		/* this must be cleared for ifa_ifwithaddr() */
 		sin6->sin6_scope_id = 0;
@@ -289,13 +286,8 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 	if (sin6->sin6_port == 0)
 		return (EADDRNOTAVAIL);
 
-	if (ip6_use_defzone && sin6->sin6_scope_id == 0) {
-		sin6->sin6_scope_id =
-			scope6_addr2default(&sin6->sin6_addr);
-	}
-	/* KAME hack: embed scopeid */
-	if (in6_embedscope(&sin6->sin6_addr, sin6) != 0)
-		return EINVAL;
+	if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
+		return(error);
 #ifndef SCOPEDROUTING
 	sin6->sin6_scope_id = 0;
 #endif

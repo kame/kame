@@ -208,14 +208,8 @@ in6_pcbbind(in6p, nam)
 		if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr))
 			return(EADDRNOTAVAIL);
 #endif
-
-		if (ip6_use_defzone && sin6->sin6_scope_id == 0) {
-			sin6->sin6_scope_id =
-				scope6_addr2default(&sin6->sin6_addr);
-		}
-		/* KAME hack: embed scopeid */
-		if (in6_embedscope(&sin6->sin6_addr, sin6) != 0)
-			return EINVAL;
+		if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
+			return(error);
 #ifndef SCOPEDROUTING
 		/* this must be cleared for ifa_ifwithaddr() */
 		sin6->sin6_scope_id = 0;
@@ -375,13 +369,8 @@ in6_pcbconnect(in6p, nam)
 	tmp = *sin6;
 	sin6 = &tmp;
 
-	if (ip6_use_defzone && sin6->sin6_scope_id == 0) {
-		sin6->sin6_scope_id =
-			scope6_addr2default(&sin6->sin6_addr);
-	}
-	/* KAME hack: embed scopeid */
-	if (in6_embedscope(&sin6->sin6_addr, sin6) != 0)
-		return EINVAL;
+	if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
+		return(error);
 #ifndef SCOPEDROUTING
 	sin6->sin6_scope_id = 0;
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.101 2001/11/12 12:54:52 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.102 2001/11/13 03:09:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -840,13 +840,8 @@ rip6_usrreq(so, req, m, nam, control, p)
 			error = EADDRNOTAVAIL;
 			break;
 		}
-		if (ip6_use_defzone && addr->sin6_scope_id == 0) {
-			addr->sin6_scope_id =
-				scope6_addr2default(&addr->sin6_addr);
-		}
-		/* KAME hack: embed scopeid */
-		if (in6_embedscope(&addr->sin6_addr, addr) != 0)
-			return EINVAL;
+		if ((error = scope6_check_id(addr, ip6_use_defzone)) != 0)
+			break;
 #ifndef SCOPEDROUTING
 		addr->sin6_scope_id = 0; /* for ifa_ifwithaddr */
 #endif
@@ -902,16 +897,12 @@ rip6_usrreq(so, req, m, nam, control, p)
 			break;
 		}
 
-		if (ip6_use_defzone && addr->sin6_scope_id == 0) {
-			/* protect *addr */
-			sin6 = *addr;
-			addr = &sin6;
-			addr->sin6_scope_id =
-				scope6_addr2default(&addr->sin6_addr);
-		}
-		/* KAME hack: embed scopeid */
-		if (in6_embedscope(&addr->sin6_addr, addr) != 0)
-			return EINVAL;
+		/* protect *addr */
+		sin6 = *addr;
+		addr = &sin6;
+
+		if ((error = scope6_check_id(addr, ip6_use_defzone)) != 0)
+			break;
 
 		/* Source address selection. XXX: need pcblookup? */
 		in6a = in6_selectsrc(addr, in6p->in6p_outputopts,
@@ -977,17 +968,13 @@ rip6_usrreq(so, req, m, nam, control, p)
 			}
 			tmp = *mtod(nam, struct sockaddr_in6 *);
 			dst = &tmp;
+
 			if (dst->sin6_family != AF_INET6) {
 				error = EAFNOSUPPORT;
 				break;
 			}
-			/* KAME hack: embed scopeid */
-			if (ip6_use_defzone && dst->sin6_scope_id == 0) {
-				dst->sin6_scope_id =
-					scope6_addr2default(&dst->sin6_addr);
-			}
-			if ((error = in6_embedscope(&dst->sin6_addr,
-						    dst)) != 0) {
+			if ((error = scope6_check_id(dst, ip6_use_defzone))
+			    != 0) {
 				break;
 			}
 		}

@@ -1,4 +1,4 @@
-/*	$KAME: scope6_var.h,v 1.5 2001/11/12 11:19:48 jinmei Exp $	*/
+/*	$KAME: scope6_var.h,v 1.6 2001/11/13 03:09:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -41,6 +41,7 @@ int	scope6_get_default __P((u_int32_t *));
 u_int32_t scope6_in6_addrscope __P((struct in6_addr *));
 u_int32_t scope6_addr2default __P((struct in6_addr *));
 int	scope6_setzoneid __P((struct ifnet *, struct sockaddr_in6 *));
+int	scope6_check_id __P((struct sockaddr_in6 *, int));
 #endif /* _KERNEL */
 
 #endif /* _NETINET6_SCOPE6_VAR_H_ */

@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.24 2001/11/12 11:19:48 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.25 2001/11/13 03:09:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -367,9 +367,9 @@ scope6_addr2default(addr)
 
 /*
  * XXX: some applications assume the kernel guesses a correct zone ID when the
- * outgoing interface is explicitly specified, and omit specifying ID.
+ * outgoing interface is explicitly specified, and omit specifying the ID.
  * This is a bad manner, but we handle such cases anyway.
- * This function intentionally override the argument SIN6.
+ * Note that this function intentionally overrides the argument SIN6.
  */
 int
 scope6_setzoneid(ifp, sin6)
@@ -391,3 +391,57 @@ scope6_setzoneid(ifp, sin6)
 
 	return(0);
 }	
+
+/*
+ * Check if the zone ID in SIN6 is valid according to the scope of the
+ * address.  If DFEFAULTOK is true and the zone ID is unspecified, fill the
+ * default value for the scope type in the ID field.
+ * This function also embeds the zone ID into the 128bit address field if
+ * necessary.  This format is internally used in the kernel.
+ * As a result, it is ensured that SIN6 has a valid scope zone ID and the
+ * address part is converted to the internal form.
+ *
+ * The caller must expect that SIN6 can be modified within this function;
+ * if it is not desired to override the original value a local copy must be
+ * made in advance.
+ */
+int
+scope6_check_id(sin6, defaultok)
+	struct sockaddr_in6 *sin6;
+	int defaultok;
+{
+	u_int32_t zoneid;
+	struct in6_addr *in6 = &sin6->sin6_addr;
+	struct ifnet *ifp;
+
+	if ((zoneid = sin6->sin6_scope_id) != 0) {
+		/*
+		 * At this moment, we only checks interface-local and
+		 * link-local scope IDs, and use interface indices as the
+		 * IDs assuming a one-to-one mapping between interfaces and
+		 * links.
+		 * XXX: in6_embedscope() below does the same check (in case
+		 * of !SCOPEDROUTING).  We should eventually centralize the
+		 * check in this function.
+		 */
+		if (IN6_IS_SCOPE_LINKLOCAL(in6) ||
+		    IN6_IS_ADDR_MC_INTFACELOCAL(in6)) {
+			if (if_index < zoneid)
+				return(ENXIO);
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+			ifp = ifnet_byindex(zoneid);
+#else
+			ifp = ifindex2ifnet[zoneid];
+#endif
+			if (ifp == NULL) /* XXX: this can happen for some OS */
+				return(ENXIO);
+		}
+	} else if (defaultok)
+		sin6->sin6_scope_id = scope6_addr2default(in6);
+
+	/* KAME hack: embed scopeid */
+	if (in6_embedscope(in6, sin6) != 0)
+		return(EINVAL);
+
+	return(0);
+}

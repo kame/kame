@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.237 2001/11/12 07:41:11 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.238 2001/11/13 03:09:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3910,17 +3910,19 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		case AF_INET6:
 		{
 			struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)buf;
+			int error;
+
+			if (sa6->sin6_len != sizeof(struct sockaddr_in6))
+				return(EINVAL);
 
 			if (IN6_IS_ADDR_UNSPECIFIED(&sa6->sin6_addr) ||
 			    IN6_IS_ADDR_MULTICAST(&sa6->sin6_addr)) {
 				return(EINVAL);
 			}
-			if (ip6_use_defzone && sa6->sin6_scope_id == 0) {
-				sa6->sin6_scope_id =
-					scope6_addr2default(&sa6->sin6_addr);
+			if ((error = scope6_check_id(sa6, ip6_use_defzone))
+			    != 0) {
+				return(error);
 			}
-			if (in6_embedscope(&sa6->sin6_addr, sa6) != 0)
-				return(EINVAL);
 #ifndef SCOPEDROUTING
 			sa6->sin6_scope_id = 0; /* XXX */
 #endif
