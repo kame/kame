@@ -1,0 +1,21 @@
+--- configure.in.orig	Mon Dec 20 05:02:22 1999
++++ configure.in	Wed Dec 22 17:37:52 1999
+@@ -290,7 +290,8 @@
+ 
+ 	[ AC_CHECK_FUNC(getaddrinfo, [with_inet6=yes],
+ 	  [ LDFLAGS="$LDFLAGS -L/usr/inet6/lib";
+-	    AC_CHECK_LIB(inet6, getaddrinfo, [with_inet6=yes],
++	    AC_CHECK_LIB(inet6, getaddrinfo, [with_inet6=yes
++	    LIBS="$LIBS -linet6"],
+ 	    [ echo 'configure: cannot find proper glibc version or libinet6,';
+ 	      echo '           which is required for IPv6 support.';
+ 	      exit 1]) ] )],
+@@ -502,7 +503,7 @@
+     LDEFLAGS="$LDEFLAGS -L$with_hesiod/lib"
+     LIBS="$LIBS -lhesiod"
+ else
+-    for dir in /usr/athena /usr /usr/local
++    for dir in /usr/athena /usr/local
+     do
+       if test -f "$dir/include/hesiod.h"
+       then

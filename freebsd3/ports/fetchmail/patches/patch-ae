@@ -1,16 +1,10 @@
---- driver.c.orig	Mon Jan  4 05:11:44 1999
-+++ driver.c	Tue Jan  5 19:49:13 1999
-@@ -1476,10 +1476,11 @@
- 	char buf[POPBUFSIZE+1], *realhost;
- 	int len, num, count, new, bytes, deletions = 0, *msgsizes = NULL;
- #if INET6
--	int fetches, dispatches, oldphase;
-+	int fetches, dispatches;
- #else /* INET6 */
--	int port, fetches, dispatches, oldphase;
-+	int port, fetches, dispatches;
- #endif /* INET6 */
-+	int oldphase;
- 	struct idlist *idp;
- 
- 	/* execute pre-initialization command, if any */
+*** md5.h.orig	Sat Jun 12 08:25:56 1999
+--- md5.h	Sat Jun 12 08:26:06 1999
+***************
+*** 1,4 ****
+--- 1,5 ----
+  #ifndef _MD5_H_
+  #define _MD5_H_
++ #include <sys/types.h>
+  #include <sys/md5.h>
+  #endif /* _MD5_H_ */

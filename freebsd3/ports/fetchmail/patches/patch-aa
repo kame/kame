@@ -1,15 +1,15 @@
-*** md5ify.c.orig	Fri Nov  8 20:13:11 1996
---- md5ify.c	Wed Jun 11 06:34:20 1997
+*** md5ify.c.orig	Sun Nov 22 07:37:48 1998
+--- md5ify.c	Sat Jun 12 08:12:32 1999
 ***************
-*** 16,22 ****
+*** 17,23 ****
   #include <string.h>
   #endif
   
 ! #include "md5.h"
   
   char *
-  MD5Digest (s)
---- 16,23 ----
+  MD5Digest (unsigned char *s)
+--- 17,24 ----
   #include <string.h>
   #endif
   
@@ -17,4 +17,4 @@
 ! #include <md5.h>
   
   char *
-  MD5Digest (s)
+  MD5Digest (unsigned char *s)

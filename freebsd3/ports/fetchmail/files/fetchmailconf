@@ -3,7 +3,7 @@
 # Wrapper for the real fetchmailconf.  Checks whether Python is installed,
 # and runs the real fetchmailconf or alerts the user, as appropriate.
 #
-#	$Id: fetchmailconf,v 1.1 1999/08/17 09:09:35 itojun Exp $
+# $FreeBSD: ports/mail/fetchmail/files/fetchmailconf,v 1.2 1999/08/30 12:06:24 peter Exp $
 
 PREFIX=@PREFIX@
 

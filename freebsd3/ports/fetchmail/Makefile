@@ -1,11 +1,10 @@
 # New ports collection makefile for:	fetchmail
-# Version required:     4.*
+# Version required:     5.2.1
 # Date created:		26 Oct 1996
-# Whom:			itojun@itojun.org
+# Whom:			Ville Eerola <ve@sci.fi>
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:09:34 itojun Exp $
-#
-# FreeBSD ports maintainer: Ville Eerola <ve@sci.fi>
+# $FreeBSD: ports/mail/fetchmail/Makefile,v 1.86 1999/12/25 04:11:23 cpiazza Exp $
+# $Id: Makefile,v 1.2 1999/12/27 20:18:49 sumikawa Exp $
 #
 # NOTE:  The fetchmailconf program (an interactive program for
 # writing .fetchmailrc files) requires Python, found in the Ports
@@ -13,37 +12,37 @@
 # does not need Python, so there is no RUN_DEPENDS for Python in
 # this Makefile.
 
-DISTNAME=	fetchmail-4.7.4
+DISTNAME=       fetchmail-5.2.1
 CATEGORIES=	mail
 MASTER_SITES=	ftp://ftp.ccil.org/pub/esr/fetchmail/
 
 MAINTAINER=	itojun@itojun.org
 
 GNU_CONFIGURE=	yes
-CONFIGURE_ARGS=	--enable-opie --enable-RPA --enable-pop2
+USE_AUTOCONF=	yes
+CONFIGURE_ARGS= --enable-OPIE --enable-POP2 --enable-RPA --enable-SDPS
 CONFIGURE_ARGS+=--enable-inet6
 CONFIGURE_ENV=	LDFLAGS="${CFLAGS} -L/usr/local/v6/lib"
 MAN1=		fetchmail.1
 MLINKS=		fetchmail.1 fetchmailconf.1
 
 .if exists(/usr/lib/libkrb.a) && defined(MAKE_KERBEROS4)
-CONFIGURE_ARGS+=	--with-kerberos=/usr/include
+CONFIGURE_ARGS += --with-kerberos=/usr/include
 .endif
 
 .if defined(KRB5_HOME) && exists(${KRB5_HOME}/lib/libkrb5.a)
-CONFIGURE_ARGS+=	--with-kerberos5=${KRB5_HOME}
+CONFIGURE_ARGS += --with-kerberos5=${KRB5_HOME}
 .endif
 
-FDOC=	${PREFIX}/share/doc/fetchmail
+FDOC=   ${PREFIX}/share/doc/fetchmail
 
-post-patch:
+pre-patch:
 	@${CP} -f  /usr/include/md5.h ${WRKSRC}
 	@perl -pi.bak -e 's|^#!/.*/python|#!${PREFIX}/bin/python|;' ${WRKSRC}/fetchmailconf
 	@${SED} -e "s|@PREFIX@|${PREFIX}|" ${FILESDIR}/fetchmailconf > ${WRKDIR}/fetchmailconf
 
 post-install:
 	${INSTALL} -d -m 555 -o ${DOCOWN} -g ${DOCGRP} ${FDOC}
-#	${LN} -sf fetchmail.1.gz ${PREFIX}/man/man1/fetchmailconf.1.gz
 	cd ${WRKSRC} && ${INSTALL_DATA} \
 	   sample.rcfile FAQ NOTES FEATURES README COPYING \
 	   fetchmail-FAQ.html fetchmail-features.html \

@@ -1,46 +1,47 @@
-*** configure.orig	Mon Aug  3 08:45:11 1998
---- configure	Sat Sep 19 11:49:22 1998
-***************
-*** 2880,2886 ****
-    echo $ac_n "(cached) $ac_c" 1>&6
-  else
-    ac_save_LIBS="$LIBS"
-! LIBS="-lopie  $LIBS"
-  cat > conftest.$ac_ext <<EOF
-  #line 2886 "configure"
-  #include "confdefs.h"
---- 2880,2886 ----
-    echo $ac_n "(cached) $ac_c" 1>&6
-  else
-    ac_save_LIBS="$LIBS"
-! LIBS="-lopie -lmd $LIBS"
-  cat > conftest.$ac_ext <<EOF
-  #line 2886 "configure"
-  #include "confdefs.h"
-***************
-*** 2914,2920 ****
-  #define $ac_tr_lib 1
-  EOF
-  
-!   LIBS="-lopie $LIBS"
-  
-  else
-    echo "$ac_t""no" 1>&6
---- 2914,2920 ----
-  #define $ac_tr_lib 1
-  EOF
-  
-!   LIBS="-lopie -lmd $LIBS"
-  
-  else
-    echo "$ac_t""no" 1>&6
-***************
-*** 3531,3536 ****
---- 3531,3537 ----
-  s%@host_os@%$host_os%g
-  s%@CC@%$CC%g
-  s%@INSTALL_PROGRAM@%$INSTALL_PROGRAM%g
-+ s%@INSTALL_SCRIPT@%$INSTALL_SCRIPT%g
-  s%@INSTALL_DATA@%$INSTALL_DATA%g
-  s%@CPP@%$CPP%g
-  s%@LEX@%$LEX%g
+--- configure.orig	Thu Sep 16 00:21:02 1999
++++ configure	Fri Sep 24 13:13:25 1999
+@@ -4970,7 +4970,7 @@
+   echo $ac_n "(cached) $ac_c" 1>&6
+ else
+   ac_save_LIBS="$LIBS"
+-LIBS="-lopie  $LIBS"
++LIBS="-lopie -lmd $LIBS"
+ cat > conftest.$ac_ext <<EOF
+ #line 4976 "configure"
+ #include "confdefs.h"
+@@ -5004,7 +5004,7 @@
+ #define $ac_tr_lib 1
+ EOF
+ 
+-  LIBS="-lopie $LIBS"
++  LIBS="-lopie -lmd $LIBS"
+ 
+ else
+   echo "$ac_t""no" 1>&6
+@@ -5368,7 +5368,7 @@
+ then
+   echo "Configuring kerberosIV for `uname`"
+   CEFLAGS="$CEFLAGS -DKERBEROS_V4 -I/usr/include/kerberosIV"
+-  LIBS="$LIBS -lkrb -ldes"
++  LIBS="$LIBS -lkrb -ldes -lcom_err"
+ elif test -n "$with_kerberos" -a -n "$with_kerberos5"
+ then
+     CEFLAGS="$CEFLAGS -DKERBEROS_V4 -I$with_kerberos/include"
+@@ -5399,7 +5399,7 @@
+ then
+     CEFLAGS="$CEFLAGS -DKERBEROS_V4 -I$with_kerberos/include"
+     LDEFLAGS="$LDEFLAGS -L$with_kerberos/lib"
+-    LIBS="$LIBS -lkrb -ldes"
++    LIBS="$LIBS -lkrb -ldes -lcom_err"
+ else
+   if test "$with_kerberos" != "no"
+   then
+@@ -5409,7 +5409,7 @@
+       then
+         CEFLAGS="$CEFLAGS -DKERBEROS_V4 -I$dir/include"
+         LDEFLAGS="$LDEFLAGS -L$dir/lib"
+-        LIBS="$LIBS -lkrb -ldes"
++        LIBS="$LIBS -lkrb -ldes -lcom_err"
+         break
+       fi
+     done
