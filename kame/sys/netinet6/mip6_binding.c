@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.83 2002/02/18 06:09:46 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.84 2002/02/18 07:22:59 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1126,7 +1126,7 @@ mip6_process_bu(m, opt)
 				/* this is not acting as a homeagent. */
 				if (mip6_bc_send_ba(&ip6->ip6_dst,
 						    &ip6a->ip6a_home, pcoa,
-						    MIP6_BA_STATUS_NOT_HOME_AGENT,
+						    MIP6_BA_STATUS_NOT_SUPPORTED,
 						    seqno,
 						    0,
 						    0)) {
