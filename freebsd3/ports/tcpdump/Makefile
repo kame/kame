@@ -1,13 +1,13 @@
 # New ports collection makefile for:    tcpdump
-# Version required:     20000125
+# Version required:     20000320
 # Date created:         Wed Jan 26 03:37:49 JST 2000
 # Whom:                 sumikawa
 #
 # $FreeBSD$
 #
 
-DISTNAME=	tcpdump-2000_02_14
-PKGNAME=	tcpdump-20000214
+DISTNAME=	tcpdump-2000_03_20
+PKGNAME=	tcpdump-20000320
 CATEGORIES=	net
 MASTER_SITES=	http://www.tcpdump.org/weekly/
 
