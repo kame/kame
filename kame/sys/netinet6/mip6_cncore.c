@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.36 2003/10/01 12:16:11 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.37 2003/10/01 12:19:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -572,9 +572,9 @@ mip6_exthdr_create(m, opt, mip6opt)
 #endif
 
 	/*
-	 * In section 6.1 of ID-24: "Mobility Header messages MUST NOT
-	 * be sent with a type 2 routing header, except as described
-	 * in Section 9.5.4 for Binding Acknowledgement".
+	 * From section 6.1: "Mobility Header messages MUST NOT be
+	 * sent with a type 2 routing header, except as described in
+	 * Section 9.5.4 for Binding Acknowledgement".
 	*/
 	if ((opt != NULL)
 	    && (opt->ip6po_mobility != NULL)
@@ -639,10 +639,10 @@ mip6_exthdr_create(m, opt, mip6opt)
 		else {
 			/*
 			 * From 6.1 Mobility Header: "Mobility Header
-			 * messages * also MUST NOT be used with a
-			 * Home Address * destination option, except
-			 * as described in Section * 11.7.1 and
-			 * Section 11.7.2 for Binding Update."
+			 * messages also MUST NOT be used with a Home
+			 * Address destination option, except as
+			 * described in Section 11.7.1 and Section
+			 * 11.7.2 for Binding Update."
 			 */
 			goto skip_hao;
 		}
