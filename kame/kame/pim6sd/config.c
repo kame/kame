@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.30 2002/12/08 10:49:10 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.31 2002/12/08 17:26:07 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -497,8 +497,8 @@ add_phaddr(struct uvif *v, struct sockaddr_in6 *addr, struct in6_addr *mask, str
 	struct phaddr *pa;
 	int i;
 	
-	if( (pa=malloc(sizeof(*pa))) == NULL)
-		        log(LOG_ERR, 0, "add_phaddr: memory exhausted");
+	if ((pa = malloc(sizeof(*pa))) == NULL)
+	        log(LOG_ERR, 0, "add_phaddr: memory exhausted");
 
 
 	memset(pa,0,sizeof(*pa));
