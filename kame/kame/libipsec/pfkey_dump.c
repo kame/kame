@@ -1,4 +1,4 @@
-/*	$KAME: pfkey_dump.c,v 1.31 2001/09/21 12:27:45 sakane Exp $	*/
+/*	$KAME: pfkey_dump.c,v 1.32 2001/09/25 14:16:48 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -100,6 +100,7 @@ do { \
 
 static char *str_ipaddr __P((struct sockaddr *));
 static char *str_prefport __P((u_int, u_int, u_int, u_int));
+static void str_upperspec __P((u_int, u_int, u_int));
 static char *str_time __P((time_t));
 static void str_lifetime_byte __P((struct sadb_lifetime *, char *));
 
@@ -371,7 +372,7 @@ pfkey_spdump(m)
 	struct sadb_x_policy *m_xpl;
 	struct sadb_lifetime *m_lftc = NULL, *m_lfth = NULL;
 	struct sockaddr *sa;
-	u_int16_t port;
+	u_int16_t sport = 0, dport = 0;
 
 	/* check pfkey message. */
 	if (pfkey_align(m, mhp)) {
@@ -400,12 +401,12 @@ pfkey_spdump(m)
 	case AF_INET6:
 		if (getnameinfo(sa, sa->sa_len, NULL, 0, pbuf, sizeof(pbuf),
 		    NI_NUMERICSERV) != 0)
-			port = 0;	/*XXX*/
+			sport = 0;	/*XXX*/
 		else
-			port = atoi(pbuf);
+			sport = atoi(pbuf);
 		printf("%s%s ", str_ipaddr(sa),
 			str_prefport(sa->sa_family,
-			    m_saddr->sadb_address_prefixlen, port,
+			    m_saddr->sadb_address_prefixlen, sport,
 			    m_saddr->sadb_address_proto));
 		break;
 	default:
@@ -424,12 +425,12 @@ pfkey_spdump(m)
 	case AF_INET6:
 		if (getnameinfo(sa, sa->sa_len, NULL, 0, pbuf, sizeof(pbuf),
 		    NI_NUMERICSERV) != 0)
-			port = 0;	/*XXX*/
+			dport = 0;	/*XXX*/
 		else
-			port = atoi(pbuf);
+			dport = atoi(pbuf);
 		printf("%s%s ", str_ipaddr(sa),
 			str_prefport(sa->sa_family,
-			    m_daddr->sadb_address_prefixlen, port,
+			    m_daddr->sadb_address_prefixlen, dport,
 			    m_saddr->sadb_address_proto));
 		break;
 	default:
@@ -442,10 +443,7 @@ pfkey_spdump(m)
 		printf("upper layer protocol mismatched.\n");
 		return;
 	}
-	if (m_saddr->sadb_address_proto == IPSEC_ULPROTO_ANY)
-		printf("any");
-	else
-		GETMSGSTR(str_upper, m_saddr->sadb_address_proto);
+	str_upperspec(m_saddr->sadb_address_proto, sport, dport);
 
 	/* policy */
     {
@@ -538,8 +536,9 @@ str_prefport(family, pref, port, ulp)
 	else
 		snprintf(prefbuf, sizeof(prefbuf), "/%u", pref);
 
-	if ((ulp == IPPROTO_ICMPV6 && port == (u_int16_t)~0)
-	 || (ulp != IPPROTO_ICMPV6 && port == IPSEC_PORT_ANY))
+	if (ulp == IPPROTO_ICMPV6)
+		memset(portbuf, 0, sizeof(portbuf));
+	else if (ulp != IPPROTO_ICMPV6 && port == IPSEC_PORT_ANY)
 		snprintf(portbuf, sizeof(portbuf), "[%s]", "any");
 	else
 		snprintf(portbuf, sizeof(portbuf), "[%u]", port);
@@ -547,6 +546,19 @@ str_prefport(family, pref, port, ulp)
 	snprintf(buf, sizeof(buf), "%s%s", prefbuf, portbuf);
 
 	return buf;
+}
+
+static void
+str_upperspec(ulp, p1, p2)
+	u_int ulp, p1, p2;
+{
+	if (ulp == IPSEC_ULPROTO_ANY)
+		printf("any");
+	if (ulp == IPPROTO_ICMPV6) {
+		if (!(p1 == IPSEC_PORT_ANY && p2 == IPSEC_PORT_ANY))
+			printf("icmp6 %d,%d", p1, p2);
+	} else
+		GETMSGSTR(str_upper, ulp);
 }
 
 /*
