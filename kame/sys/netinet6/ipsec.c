@@ -995,10 +995,9 @@ ipsec_init_policy(so, pcb_sp)
 	else
 		new->priv = 0;
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-	if (so->so_cred && so->so_cred->p_svuid == 0)	/*XXX*/
-		new->priv = 1;
-	else
-		new->priv = 0;
+#define _p_ so->so_cred
+	new->priv = (_p_ == 0 || suser(_p_->p_ucred, &_p_->p_acflag)) ? 0 : 1;
+#undef _p_
 #else
 	switch (so->so_proto->pr_domain->dom_family) {
 	case AF_INET:
