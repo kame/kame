@@ -65,7 +65,10 @@ struct servtab {
 };
 
 static int debug = 0;
+
+#ifndef dprintf
 #define dprintf(x)	do { if (debug) fprintf x; } while (0)
+#endif
 
 char *device = NULL;
 
@@ -232,7 +235,7 @@ client6_init()
 {
 	struct addrinfo hints;
 	struct addrinfo *res;
-	int error;
+	int error, on = 1;
 	int ifidx;
 
 	ifidx = if_nametoindex(device);
@@ -275,6 +278,11 @@ client6_init()
 			&ifidx, sizeof(ifidx)) < 0) {
 		err(1, "setsockopt(outbound, IPV6_MULTICAST_IF)");
 		/*NOTREACHED*/
+	}
+	if (setsockopt(outsock, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &on,
+		       sizeof(on)) < 0) {
+		err(1, "setsockopt(outsock, IPV6_MULTICAST_LOOP)");
+		/* NOTREACHED */
 	}
 	/* make the socket write-only */
 	if (shutdown(outsock, 0)) {
