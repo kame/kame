@@ -132,6 +132,7 @@
 #include <netinet6/nd6.h>
 
 #ifdef IPSEC
+#include <netinet6/ipsec.h>
 #include <netinet6/ah.h>
 #ifdef IPSEC_ESP
 #include <netinet6/esp.h>
@@ -174,8 +175,17 @@ struct ip6protosw inet6sw[] = {
 },
 { SOCK_DGRAM,	&inet6domain,	IPPROTO_UDP,	PR_ATOMIC | PR_ADDR,
   udp6_input,	0,		udp6_ctlinput,	ip6_ctloutput,
-  udp6_usrreq,
-  udp6_init,	0,		0,		0,
+#ifndef __FreeBSD__
+ udp6_usrreq,
+#else
+ 0,
+#endif
+#if !defined(__FreeBSD__) || __FreeBSD__ < 3
+  udp6_init,
+#else
+  0,
+#endif
+  0,		0,		0,
 #ifndef __FreeBSD__
   udp6_sysctl,
 #else
@@ -200,7 +210,11 @@ struct ip6protosw inet6sw[] = {
 #else
 { SOCK_STREAM,	&inet6domain,	IPPROTO_TCP,	PR_CONNREQUIRED | PR_WANTRCVD,
   tcp6_input,	0,		tcp6_ctlinput,	tcp_ctloutput,
+#ifndef __FreeBSD__
   tcp_usrreq,
+#else
+  0,
+#endif
 #ifdef INET	/* don't call timeout routines twice */
   tcp_init,	0,		0,		tcp_drain,
 #else
@@ -556,6 +570,7 @@ SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ND6_USELOOPBACK,
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ND6_PROXYALL,
 	nd6_proxyall, CTLFLAG_RW,	&nd6_proxyall, 0, "");
 
+#if !defined(__FreeBSD__) || __FreeBSD__ < 3
 /* net.inet6.udp6 */
 SYSCTL_INT(_net_inet6_udp6, UDP6CTL_SENDMAX,
 	sendmax, CTLFLAG_RW,	&udp6_sendspace,	0, "");
@@ -597,5 +612,6 @@ SYSCTL_INT(_net_inet6_tcp6, TCP6CTL_SYN_BUCKET_LIMIT,
 	syn_bucket_limit, CTLFLAG_RW,	&tcp6_syn_bucket_limit, 0, "");
 SYSCTL_INT(_net_inet6_tcp6, TCP6CTL_SYN_CACHE_INTER,
 	syn_cache_interval, CTLFLAG_RW, &tcp6_syn_cache_interval, 0, "");
+#endif
 
 #endif /* __FreeBSD__ */
