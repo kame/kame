@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.72 2002/05/29 08:38:48 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.73 2002/05/29 08:43:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -251,8 +251,8 @@ ah4_input(m, va_alist)
 		goto fail;
 	}
 	if (siz1 > sizeof(cksum)) {
-		ipseclog((LOG_NOTICE, "sum length too large: %s\n");
-		    ipsec4_logpacketstr(ip, spi));
+		ipseclog((LOG_NOTICE, "sum length too large: %s\n",
+		    ipsec4_logpacketstr(ip, spi)));
 		ipsecstat.in_inval++;
 		goto fail;
 	}
@@ -772,8 +772,8 @@ ah6_input(mp, offp, proto)
 		goto fail;
 	}
 	if (siz1 > sizeof(cksum)) {
-		ipseclog((LOG_NOTICE, "sum length too large: %s\n");
-		    ipsec6_logpacketstr(ip6, spi));
+		ipseclog((LOG_NOTICE, "sum length too large: %s\n",
+		    ipsec6_logpacketstr(ip6, spi)));
 		ipsec6stat.in_inval++;
 		goto fail;
 	}
