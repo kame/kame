@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.109 2001/04/06 14:23:48 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.110 2001/04/10 15:33:13 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1621,6 +1621,7 @@ pk_recvacquire(mhp)
 
 err:
 	while (n >= 0) {
+		unbindph12(iph2[n]);
 		remph2(iph2[n]);
 		delph2(iph2[n]);
 		iph2[n] = NULL;
