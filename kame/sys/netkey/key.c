@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.48 2000/01/14 10:31:09 itojun Exp $ */
+/* KAME $Id: key.c,v 1.49 2000/01/14 16:08:28 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -4001,13 +4001,6 @@ key_update(mhp)
 		key_freesav(sav);
 		return NULL;
 	}
-
-	/*
-	 * we must call key_freesav() whenever we leave a function context,
-	 * as we did not allocated a new sav (we updated existing sav).
-	 */
-	key_freesav(sav);
-	sav = NULL;
 
     {
 	struct sadb_msg *newmsg;
