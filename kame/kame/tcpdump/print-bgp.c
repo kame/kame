@@ -460,6 +460,7 @@ bgp_update_print(const u_char *dat, int length)
 	const u_char *p;
 	int len;
 	int i, j;
+	int newline;
 
 	memcpy(&bgp, dat, sizeof(bgp));
 	hlen = ntohs(bgp.bgp_len);
@@ -478,6 +479,7 @@ bgp_update_print(const u_char *dat, int length)
 		/* do something more useful!*/
 		i = 2;
 		printf(" (Path attributes:");	/* ) */
+		newline = 0;
 		while (i < 2 + len) {
 			int alen, aoff;
 
@@ -485,7 +487,11 @@ bgp_update_print(const u_char *dat, int length)
 			alen = bgp_attr_len(&bgpa);
 			aoff = bgp_attr_off(&bgpa);
 
-			printf(" (");		/* ) */
+			if (vflag && newline)
+				printf("\n\t\t");
+			else
+				printf(" ");
+			printf("(");		/* ) */
 			printf("%s", bgp_attr_type(bgpa.bgpa_type));
 			if (bgpa.bgpa_flags) {
 				printf("[%s%s%s%s]",
@@ -496,6 +502,7 @@ bgp_update_print(const u_char *dat, int length)
 			}
 
 			bgp_attr_print(&bgpa, &p[i + aoff], alen);
+			newline = 1;
 
 #if 0
 	    default:
