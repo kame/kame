@@ -1,5 +1,5 @@
 .if exists(/usr/local/lib/libcrypto.a) || exists(/usr/local/ssl/lib/libcrypto.a) || exists(/usr/lib/libcrypto.a)
-SUBDIR+=racoon kmpstat eaytest
+SUBDIR+=racoon kmpstat
 .else
 SUBDIR=
 
