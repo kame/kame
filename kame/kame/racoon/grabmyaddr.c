@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: grabmyaddr.c,v 1.13 2000/05/23 16:25:08 sakane Exp $ */
+/* YIPS @(#)$Id: grabmyaddr.c,v 1.14 2000/05/31 15:05:55 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -65,7 +65,6 @@
 #ifndef HAVE_GETIFADDRS
 static unsigned int if_maxindex __P((void));
 #endif
-static void clear_myaddr __P((struct myaddrs **));
 static struct myaddrs *find_myaddr __P((struct myaddrs *, struct myaddrs *));
 
 #ifndef HAVE_GETIFADDRS
@@ -85,7 +84,7 @@ if_maxindex()
 }
 #endif
 
-static void
+void
 clear_myaddr(db)
 	struct myaddrs **db;
 {

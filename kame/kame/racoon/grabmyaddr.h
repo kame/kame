@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: grabmyaddr.h,v 1.1 2000/01/09 01:31:22 itojun Exp $ */
+/* YIPS @(#)$Id: grabmyaddr.h,v 1.2 2000/05/31 15:05:55 sakane Exp $ */
 
 struct myaddrs {
 	struct myaddrs *next;
@@ -34,6 +34,7 @@ struct myaddrs {
 	int sock;
 };
 
+extern void clear_myaddr __P((struct myaddrs **));
 extern void grab_myaddrs __P((void));
 extern int update_myaddrs __P((void));
 extern int autoconf_myaddrsport __P((void));
