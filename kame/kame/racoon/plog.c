@@ -1,4 +1,4 @@
-/*	$KAME: plog.c,v 1.10 2000/12/16 14:18:37 sakane Exp $	*/
+/*	$KAME: plog.c,v 1.11 2000/12/17 21:51:56 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -86,7 +86,7 @@ plog_common(pri, fmt, func)
 	int pri;
 	const char *fmt, *func;
 {
-	static char buf[100];	/* XXX */
+	static char buf[800];	/* XXX shoule be allocated every time ? */
 	char *p;
 	int reslen, len;
 
@@ -147,8 +147,6 @@ plogv(int pri, const char *func, struct sockaddr *sa,
 {
 	char *newfmt;
 
-	if (pri < ARRAYLEN(ptab))
-		return;
 	if (pri > loglevel)
 		return;
 
