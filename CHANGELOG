@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2289 2002/12/08 13:46:44 jinmei Exp $
+$KAME: CHANGELOG,v 1.2290 2002/12/09 05:26:39 jinmei Exp $
 
 <200212>
 2002-12-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -33,7 +33,7 @@ Fri Dec  6 15:18:08 JST 2002	suz@crl.hitachi.co.jp
 2002-12-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/usr.bin/netstat/inet[6].c: replaced inet6print() and
 	inet6name() with a new function "sa_print()" using getnameinfo()
-	for a better support IPv6 scoped addresses.
+	for a better support of IPv6 scoped addresses.
 
 <200211>
 2002-11-29  Shin'ichi Fujisawa  <fujisawa@kame.net>
