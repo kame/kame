@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.57 2001/10/29 02:36:16 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.58 2001/10/31 05:26:49 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1436,7 +1436,7 @@ natpt_translateTCPUDPv4To4(struct pcv *cv4from, struct pAddr *pad, struct pcv *c
 	 * calculation.
 	 */
 	bzero(&aux, sizeof(struct pcvaux));
-	bzero(&ulc, sizeof(struct ulc6));
+	bzero(&ulc, sizeof(struct ulc4));
 
 	ulc.ulc_src = cv4from->ip.ip4->ip_src;
 	ulc.ulc_dst = cv4from->ip.ip4->ip_dst;
