@@ -1,4 +1,4 @@
-/*	$KAME: keydb.c,v 1.73 2003/06/30 10:02:15 sakane Exp $	*/
+/*	$KAME: keydb.c,v 1.74 2003/06/30 11:03:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -126,8 +126,10 @@ keydb_delsecpolicy(p)
 	if (p->spidx)
 		free(p->spidx, M_SECA);
 #if NPF > 0
-	else
+	else {
 		pf_tag_unref(p->tag);
+		pf_tag_purge();
+	}
 #endif
 	free(p, M_SECA);
 }
