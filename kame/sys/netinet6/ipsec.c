@@ -1951,7 +1951,7 @@ ipsec4_logpacketstr(ip, spi)
 	s = (u_int8_t *)(&ip->ip_src);
 	d = (u_int8_t *)(&ip->ip_dst);
 
-	snprintf(buf, sizeof(buf), "packet(SPI=%u ", ntohl(spi));
+	snprintf(buf, sizeof(buf), "packet(SPI=%u ", (u_int32_t)ntohl(spi));
 	for (p = buf; p && *p; p++)
 		;
 	snprintf(p, sizeof(buf) - (p - buf), "src=%d.%d.%d.%d",
@@ -1976,7 +1976,7 @@ ipsec6_logpacketstr(ip6, spi)
 	static char buf[256];
 	char *p;
 
-	snprintf(buf, sizeof(buf), "packet(SPI=%u ", ntohl(spi));
+	snprintf(buf, sizeof(buf), "packet(SPI=%u ", (u_int32_t)ntohl(spi));
 	for (p = buf; p && *p; p++)
 		;
 	snprintf(p, sizeof(buf) - (p - buf), "src=%s",
@@ -2001,7 +2001,7 @@ ipsec_logsastr(sa)
 	char *p;
 	struct secindex *idx = &sa->saidx->idx;
 
-	snprintf(buf, sizeof(buf), "SA(SPI=%u ", ntohl(sa->spi));
+	snprintf(buf, sizeof(buf), "SA(SPI=%u ", (u_int32_t)ntohl(sa->spi));
 	for (p = buf; p && *p; p++)
 		;
 	if (idx->family == AF_INET) {
