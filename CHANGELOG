@@ -1,11 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2046 2002/01/12 09:01:58 jinmei Exp $
+$KAME: CHANGELOG,v 1.2047 2002/01/14 04:08:53 jinmei Exp $
 
 <200201>
 2002-01-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/icmp6.c (icmp6_rip6_input): if the received
 	data is small enough but in an mbuf cluster, copy the data to a
-	separate mbuf that do not use a cluster.
+	separate mbuf that does not use a cluster.
 	This change will reduce the possiblity of packet loss in the
 	socket layer.
 
