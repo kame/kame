@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.41 2001/03/15 08:35:08 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.42 2001/06/22 14:19:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -96,6 +96,9 @@
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/ip6protosw.h>
+#include <netinet6/in6_var.h>
+#include <netinet6/in6_pcb.h>
+#include <netinet/icmp6.h>
 #endif
 
 #include <machine/stdarg.h>
@@ -119,6 +122,12 @@
 MALLOC_DEFINE(M_NETADDR, "Export Host", "Export host address structure");
 #endif
 
+#ifdef INET
+static struct encaptab *encap4_lookup __P((struct mbuf *, int, int));
+#endif
+#ifdef INET6
+static struct encaptab *encap6_lookup __P((struct mbuf *, int, int));
+#endif
 static void encap_add __P((struct encaptab *));
 static int mask_match __P((const struct encaptab *, const struct sockaddr *,
 		const struct sockaddr *));
@@ -152,38 +161,16 @@ encap_init()
 }
 
 #ifdef INET
-void
-#if __STDC__
-encap4_input(struct mbuf *m, ...)
-#else
-encap4_input(m, va_alist)
+static struct encaptab *
+encap4_lookup(m, off, proto)
 	struct mbuf *m;
-	va_dcl
-#endif
+	int off;
+	int proto;
 {
-	int off, proto;
 	struct ip *ip;
 	struct sockaddr_in s, d;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-	const struct ipprotosw *psw;
-#else
-	const struct protosw *psw;
-#endif
 	struct encaptab *ep, *match;
-	va_list ap;
 	int prio, matchprio;
-
-	va_start(ap, m);
-	off = va_arg(ap, int);
-#ifndef __OpenBSD__
-	proto = va_arg(ap, int);
-#endif
-	va_end(ap);
-
-	ip = mtod(m, struct ip *);
-#ifdef __OpenBSD__
-	proto = ip->ip_p;
-#endif
 
 	bzero(&s, sizeof(s));
 	s.sin_family = AF_INET;
@@ -238,6 +225,44 @@ encap4_input(m, va_alist)
 		}
 	}
 
+	return match;
+}
+
+void
+#if __STDC__
+encap4_input(struct mbuf *m, ...)
+#else
+encap4_input(m, va_alist)
+	struct mbuf *m;
+	va_dcl
+#endif
+{
+#ifdef __OpenBSD__
+	struct ip *ip;
+#endif
+	int off, proto;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+	const struct ipprotosw *psw;
+#else
+	const struct protosw *psw;
+#endif
+	struct encaptab *match;
+	va_list ap;
+
+	va_start(ap, m);
+	off = va_arg(ap, int);
+#ifndef __OpenBSD__
+	proto = va_arg(ap, int);
+#endif
+	va_end(ap);
+
+#ifdef __OpenBSD__
+	ip = mtod(m, struct ip *);
+	proto = ip->ip_p;
+#endif
+
+	match = encap4_lookup(m, off, proto);
+
 	if (match) {
 		/* found a match, "match" has the best one */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
@@ -287,18 +312,16 @@ encap4_input(m, va_alist)
 #endif
 
 #ifdef INET6
-int
-encap6_input(mp, offp, proto)
-	struct mbuf **mp;
-	int *offp;
+static struct encaptab *
+encap6_lookup(m, off, proto)
+	struct mbuf *m;
+	int off;
 	int proto;
 {
-	struct mbuf *m = *mp;
 	struct ip6_hdr *ip6;
 	struct sockaddr_in6 s, d;
-	const struct ip6protosw *psw;
-	struct encaptab *ep, *match;
 	int prio, matchprio;
+	struct encaptab *ep, *match;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 
@@ -319,7 +342,7 @@ encap6_input(mp, offp, proto)
 		if (ep->proto >= 0 && ep->proto != proto)
 			continue;
 		if (ep->func)
-			prio = (*ep->func)(m, *offp, proto, ep->arg);
+			prio = (*ep->func)(m, off, proto, ep->arg);
 		else {
 			/*
 			 * it's inbound traffic, we need to match in reverse
@@ -329,7 +352,7 @@ encap6_input(mp, offp, proto)
 			    (struct sockaddr *)&s);
 		}
 
-		/* see encap4_input() for issues here */
+		/* see encap4_lookup() for issues here */
 		if (prio <= 0)
 			continue;
 		if (prio > matchprio) {
@@ -337,6 +360,21 @@ encap6_input(mp, offp, proto)
 			match = ep;
 		}
 	}
+
+	return match;
+}
+
+int
+encap6_input(mp, offp, proto)
+	struct mbuf **mp;
+	int *offp;
+	int proto;
+{
+	struct mbuf *m = *mp;
+	const struct ip6protosw *psw;
+	struct encaptab *match;
+
+	match = encap6_lookup(m, *offp, proto);
 
 	if (match) {
 		/* found a match */
@@ -497,6 +535,86 @@ fail:
 	splx(s);
 	return NULL;
 }
+
+/* XXX encap4_ctlinput() is necessary if we set DF=1 on outer IPv4 header */
+
+#ifdef INET6
+void
+encap6_ctlinput(cmd, sa, d)
+	int cmd;
+	struct sockaddr *sa;
+	void *d;
+{
+	struct ip6_hdr *ip6;
+	struct mbuf *m;
+	int off;
+	struct ip6ctlparam *ip6cp = NULL;
+	const struct sockaddr_in6 *sa6_src = NULL;
+	void *cmdarg;
+	void (*notify) __P((struct in6pcb *, int)) = in6_rtchange;
+	int nxt;
+
+	if (sa->sa_family != AF_INET6 ||
+	    sa->sa_len != sizeof(struct sockaddr_in6))
+		return;
+
+	if ((unsigned)cmd >= PRC_NCMDS)
+		return;
+	if (PRC_IS_REDIRECT(cmd))
+		notify = in6_rtchange, d = NULL;
+	else if (cmd == PRC_HOSTDEAD)
+		d = NULL;
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	else if (cmd == PRC_MSGSIZE)
+		; /* special code is present, see below */
+#endif
+	else if (inet6ctlerrmap[cmd] == 0)
+		return;
+
+	/* if the parameter is from icmp6, decode it. */
+	if (d != NULL) {
+		ip6cp = (struct ip6ctlparam *)d;
+		m = ip6cp->ip6c_m;
+		ip6 = ip6cp->ip6c_ip6;
+		off = ip6cp->ip6c_off;
+		cmdarg = ip6cp->ip6c_cmdarg;
+		sa6_src = ip6cp->ip6c_src;
+		nxt = ip6cp->ip6c_nxt;
+	} else {
+		m = NULL;
+		ip6 = NULL;
+		cmdarg = NULL;
+		sa6_src = &sa6_any;
+		nxt = -1;
+	}
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	if (ip6 && cmd == PRC_MSGSIZE) {
+		int valid = 0;
+		struct encaptab *match;
+
+		/*
+		 * Check to see if we have a valid encap configuration.
+		 * XXX chase extension headers, or pass final nxt value
+		 * from icmp6_notify_error()
+		 */
+		match = encap6_lookup(m, off, nxt);
+
+		if (match)
+			valid++;
+
+		/*
+		 * Depending on the value of "valid" and routing table
+		 * size (mtudisc_{hi,lo}wat), we will:
+		 * - recalcurate the new MTU and create the
+		 *   corresponding routing entry, or
+		 * - ignore the MTU change notification.
+		 */
+		icmp6_mtudisc_update((struct ip6ctlparam *)d, valid);
+	}
+#endif
+}
+#endif
 
 int
 encap_detach(cookie)
