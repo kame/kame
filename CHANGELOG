@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1773 2001/07/15 19:36:54 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1774 2001/07/16 00:59:23 inoue Exp $
 
 <200107>
 2001-07-16 Shin'ichi Fujisawa	<fujisawa@kame.net>
@@ -56,6 +56,17 @@ Wed Jul 11 17:55:33 JST 2001	suz@sdl.hitachi.co.jp
 
 Tue Jul 10 15:34:09 JST 2001  itojun@iijlab.net
 	* netbsd: switch to NetBSD-1.5.1 from NetBSD-1.5.
+
+Tue Jul 10 15:34:09 JST 2001  yu-inoue@jp.fujitsu.com
+	* freebsd4/sys/netinet in.c in_pcb.c in_pcb.h 
+	* freebsd4/sys/netinet6 in6_pcb.c in6_pcb.h 
+	* kame/sys/netinet6  in6_ifattach.c
+	- "When remove a network card, freebsd4 can crash" bug fixed.
+	  When remove interface, release multicast group on interface.
+	  IPv4
+		if_detach() -> in_control() -> in_pcbpurgeif0()
+	  IPv6
+		if_detach() -> in6_ifdetach() -> in6_pcbpurgeif0()
 
 Mon Jul  9 23:01:10 JST 2001 sakane@kame.net
 	* kame/racoon:
