@@ -421,6 +421,11 @@ dump_vifs(fp)
 
 	    fprintf(fp, "\n");
 	}
+
+	fprintf(fp, " %3s %6s ", "", "");
+	fprintf(fp, "Timers: PIM hello = %d:%d, MLD query = %d:%d\n",
+		v->uv_pim_hello_timer / 60, v->uv_pim_hello_timer % 60,
+		v->uv_gq_timer / 60, v->uv_gq_timer % 60);
     }
     fprintf(fp, "\n");
 }
