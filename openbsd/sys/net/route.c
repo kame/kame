@@ -631,9 +631,6 @@ rtrequest1(req, info, ret_nrt)
 			rt_maskedcopy(dst, ndst, netmask);
 		} else
 			Bcopy(dst, ndst, dst->sa_len);
-if (!rt->rt_rmx.rmx_mtu && !(rt->rt_rmx.rmx_locks & RTV_MTU)) { /* XXX */
-  rt->rt_rmx.rmx_mtu = ifa->ifa_ifp->if_mtu;
-}
 		rn = rnh->rnh_addaddr((caddr_t)ndst, (caddr_t)netmask,
 					rnh, rt->rt_nodes);
 		if (rn == NULL) {
@@ -653,6 +650,14 @@ if (!rt->rt_rmx.rmx_mtu && !(rt->rt_rmx.rmx_locks & RTV_MTU)) { /* XXX */
 			 */
 			rt->rt_rmx = (*ret_nrt)->rt_rmx; /* copy metrics */
 			rt->rt_parent = *ret_nrt;	 /* Back ptr. to parent. */
+		} else if (!rt->rt_rmx.rmx_mtu &&
+		    !(rt->rt_rmx.rmx_locks & RTV_MTU)) { /* XXX */
+			if (rt->rt_gwroute) {
+				rt->rt_rmx.rmx_mtu =
+				    rt->rt_gwroute->rt_rmx.rmx_mtu;
+			} else {
+				rt->rt_rmx.rmx_mtu = ifa->ifa_ifp->if_mtu;
+			}
 		}
 		if (ifa->ifa_rtrequest)
 			ifa->ifa_rtrequest(req, rt, info);
@@ -706,6 +711,16 @@ rt_setgate(rt0, dst, gate)
 	}
 	if (rt->rt_flags & RTF_GATEWAY) {
 		rt->rt_gwroute = rtalloc1(gate, 1);
+		/*
+		 * If we switched gateways, grab the MTU from the new
+		 * gateway route if the current MTU is 0 or greater
+		 * than the MTU of gateway.
+		 */
+		if (rt->rt_gwroute && !(rt->rt_rmx.rmx_locks & RTV_MTU) &&
+		    (rt->rt_rmx.rmx_mtu == 0 ||
+		     rt->rt_rmx.rmx_mtu > rt->rt_gwroute->rt_rmx.rmx_mtu)) {
+			rt->rt_rmx.rmx_mtu = rt->rt_gwroute->rt_rmx.rmx_mtu;
+		}
 	}
 	return 0;
 }
@@ -789,12 +804,6 @@ rtinit(ifa, cmd, flags)
 	}
 	if (cmd == RTM_ADD && error == 0 && (rt = nrt) != NULL) {
 		rt->rt_refcnt--;
-#ifdef INET6
-		/* Initialize Path MTU for IPv6 interface route */
-		if (ifa->ifa_addr->sa_family == AF_INET6 &&
-		    !rt->rt_rmx.rmx_mtu)
-			rt->rt_rmx.rmx_mtu = ifa->ifa_ifp->if_mtu;
-#endif /* INET6 */
 		if (rt->rt_ifa != ifa) {
 			printf("rtinit: wrong ifa (%p) was (%p)\n",
 			       ifa, rt->rt_ifa);
