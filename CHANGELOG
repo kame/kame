@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1420 2000/12/02 21:00:31 kawa Exp $
+$KAME: CHANGELOG,v 1.1421 2000/12/03 01:00:15 itojun Exp $
 
 <200012>
 2000-12-03  Koji Kawano <K.Kawano@rdmg.mgcs.mei.co.jp>
@@ -19,8 +19,8 @@ Sat Dec  2 17:27:30 JST 2000  itojun@iijlab.net
 	  to syn_cache_unreach.
 
 Sat Dec  2 17:19:58 JST 2000  itojun@iijlab.net
-	* netbsd: catch up with netbsd 1.5.  ALTQ nor MIP6 do not compile.
-	  NATPT may not work.  pvcbridge does not work for now.
+	* netbsd: catch up with netbsd 1.5.  MIP6/NATPT do not compile.
+	  pvcbridge does not work for now.
 
 	  NOTE: if you use anoncvs/cvsup to update from existing tree,
 	  make sure to invoke "make TARGET=netbsd clean" before update.
