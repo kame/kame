@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.432 2004/02/28 10:22:51 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.433 2004/03/09 07:31:55 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3533,13 +3533,6 @@ ip6_setmoptions(optname, im6op, m)
 	struct route_in6 ro;
 #endif
 	struct in6_multi_mship *imm;
-#if defined(__bsdi__) && _BSDI_VERSION >= 199802
-	struct proc *p = PCPU(curproc);	/* XXX */
-#elif defined(__FreeBSD__) && __FreeBSD_version >= 500000
-	struct thread *p = curthread;
-#else
-	struct proc *p = curproc;	/* XXX */
-#endif
 #if defined(__bsdi__) && _BSDI_VERSION < 199802
 	struct ifnet *loifp = &loif;
 #endif
@@ -3638,24 +3631,7 @@ ip6_setmoptions(optname, im6op, m)
 			break;
 		}
 		mreq = mtod(m, struct ipv6_mreq *);
-		if (IN6_IS_ADDR_UNSPECIFIED(&mreq->ipv6mr_multiaddr)) {
-			/*
-			 * We use the unspecified address to specify to accept
-			 * all multicast addresses. Only super user is allowed
-			 * to do this.
-			 */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-			if (suser(p))
-#elif defined(__OpenBSD__)
-			if (suser(p, 0))
-#else
-			if (suser(p->p_ucred, &p->p_acflag))
-#endif
-			{
-				error = EACCES;
-				break;
-			}
-		} else if (!IN6_IS_ADDR_MULTICAST(&mreq->ipv6mr_multiaddr)) {
+		if (!IN6_IS_ADDR_MULTICAST(&mreq->ipv6mr_multiaddr)) {
 			error = EINVAL;
 			break;
 		}
@@ -3765,19 +3741,7 @@ ip6_setmoptions(optname, im6op, m)
 			break;
 		}
 		mreq = mtod(m, struct ipv6_mreq *);
-		if (IN6_IS_ADDR_UNSPECIFIED(&mreq->ipv6mr_multiaddr)) {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-			if (suser(p))
-#elif defined(__OpenBSD__)
-			if (suser(p, 0))
-#else
-			if (suser(p->p_ucred, &p->p_acflag))
-#endif
-			{
-				error = EACCES;
-				break;
-			}
-		} else if (!IN6_IS_ADDR_MULTICAST(&mreq->ipv6mr_multiaddr)) {
+		if (!IN6_IS_ADDR_MULTICAST(&mreq->ipv6mr_multiaddr)) {
 			error = EINVAL;
 			break;
 		}
