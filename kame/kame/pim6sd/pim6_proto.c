@@ -1236,10 +1236,10 @@ join_or_prune(mrtentry_ptr, upstream_router)
 		/* Upstream router toward S */
 		if (IF_ISEMPTY(&entry_oifs))
 		{
-		    if ( (mrtentry_ptr->group->active_rp_grp!= (rp_grp_entry_t *) NULL
-			&& (inet6_equal(&mrtentry_ptr->group->rpaddr, &my_cand_rp_address))))
+		    if (mrtentry_ptr->group->active_rp_grp != (rp_grp_entry_t *)NULL &&
+			inet6_equal(&mrtentry_ptr->group->rpaddr,
+				    &my_cand_rp_address))
 		    {
-
 			/*
 			 * (S,G) at the RP. Don't send Join/Prune (see the
 			 * end of Section 3.3.2)
