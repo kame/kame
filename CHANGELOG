@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1311 2000/10/03 03:23:59 jinmei Exp $
+$KAME: CHANGELOG,v 1.1312 2000/10/03 09:30:09 jinmei Exp $
 
 <200010>
+2000-10-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi3/sys/netinet/tcp_subr.c (ipsec4_hdrsiz_tcp):
+	* bsdi4/sys/netinet/tcp_subr.c (ipsec_hdrsiz_tcp):
+	properly set the ip_hl field before calling ipsec4_hdrsiz().
+	Without this, the policy matching routine would misunderstand the
+	IP header length, and would failed to detect the position of the
+	TCP header. As a consequence, policy matching using specific TCP
+	ports would fail.
+
 2000-10-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/crypto/rijndael/rijndael-api-fst.c: avoided assert,
 	memcpy, and memset, which are not available in the kernel of some
