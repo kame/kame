@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.37 2003/01/22 04:53:32 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.38 2003/02/06 13:43:31 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -74,6 +74,7 @@
 #define REL_MAX_RC	5
 
 #define DHCP6_DURATITION_INFINITE 0xffffffff
+#define DHCP6_DURATITION_MIN 30
 
 /* DUID: DHCP unique Identifier */
 struct duid {

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.11 2003/02/06 07:06:29 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.12 2003/02/06 13:43:31 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -173,9 +173,9 @@ update_ia(iatype, ialist, ifp, serverid)
 		if (ia->t1 == 0 || ia->t2 == 0) {
 			u_int32_t duration;
 
-			if (ia->ctl && ia->ctl->duration) {
+			if (ia->ctl && ia->ctl->duration)
 				duration = (*ia->ctl->duration)(ia->ctl);
-			} else
+			else
 				duration = 1800; /* 30min. XXX: no rationale */
 
 			if (ia->t1 == 0) {
@@ -197,6 +197,20 @@ update_ia(iatype, ialist, ifp, serverid)
 
 			dprintf(LOG_INFO, "%s" "T1(%lu) and/or T2(%lu) "
 			    "is locally determined", FNAME, ia->t1, ia->t2);
+		}
+
+		/*
+		 * Be proactive for too-small timeout values.  Note that
+		 * the adjusted values may make some information expire
+		 * without renewal.
+		 */
+		if (ia->t2 < DHCP6_DURATITION_MIN) {
+			dprintf(LOG_INFO, "%s" "T1 (%lu) or T2 (%lu) "
+			    "is too small", FNAME, ia->t1, ia->t2);
+			ia->t2 = DHCP6_DURATITION_MIN;
+			ia->t1 = ia->t2 * 5 / 8;
+			dprintf(LOG_INFO, "  adjusted to %lu and %lu",
+			    ia->t1, ia->t2);
 		}
 
 		/* set up a timer for this IA. */

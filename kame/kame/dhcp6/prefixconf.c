@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.19 2003/02/06 07:06:30 jinmei Exp $	*/
+/*	$KAME: prefixconf.c,v 1.20 2003/02/06 13:43:31 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -78,6 +78,7 @@ struct siteprefix {
 	TAILQ_ENTRY (siteprefix) link;
 
 	struct dhcp6_prefix prefix;
+	time_t updatetime;
 	struct dhcp6_timer *timer;
 	struct iactl_pd *ctl;
 	TAILQ_HEAD(, dhcp6_ifprefix) ifprefix_list; /* interface prefixes */
@@ -185,6 +186,9 @@ update_prefix(ia, pinfo, pifc, dhcpifp, ctlp, callback)
 
 		spcreate = 1;
 	}
+
+	/* update the timestamp of update */
+	sp->updatetime = time(NULL);
 
 	/* update the prefix according to pinfo */
 	sp->prefix.pltime = pinfo->pltime;
@@ -305,17 +309,20 @@ duration(iac)
 {
 	struct iactl_pd *iac_pd = (struct iactl_pd *)iac;
 	struct siteprefix *sp;
-	u_int32_t base = DHCP6_DURATITION_INFINITE;
+	u_int32_t base = DHCP6_DURATITION_INFINITE, pltime, passed;
+	time_t now;
 
-	/*
-	 * Determine the smallest pltime.
-	 * XXX: we assume the lifetimes of all prefixes are synchronized.
-	 */
+	/* Determine the smallest period until pltime expires. */
+	now = time(NULL);
 	for (sp = TAILQ_FIRST(&iac_pd->siteprefix_head); sp;
 	    sp = TAILQ_NEXT(sp, link)) {
-		if (base == DHCP6_DURATITION_INFINITE ||
-		    sp->prefix.pltime < base)
-			base = sp->prefix.pltime;
+		passed = now > sp->updatetime ?
+		    (u_int32_t)(now - sp->updatetime) : 0;
+		pltime = sp->prefix.pltime > passed ?
+		    sp->prefix.pltime - passed : 0;
+
+		if (base == DHCP6_DURATITION_INFINITE || pltime < base)
+			base = pltime;
 	}
 
 	return (base);
