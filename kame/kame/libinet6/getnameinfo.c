@@ -120,7 +120,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 	struct hostent *hp;
 	u_short port;
 	int family, i;
-	char *addr, *p;
+	char *addr;
 	u_int32_t v4a;
 	int h_error;
 	char numserv[512];
@@ -377,6 +377,8 @@ ip6_parsenumeric(sa, addr, host, hostlen, flags)
 		}
 	}
 #endif /* NI_WITHSCOPEID */
+
+	return 0;
 }
 
 /* ARGSUSED */
