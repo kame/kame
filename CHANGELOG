@@ -1,11 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1905 2001/10/10 08:38:54 sakane Exp $
+$KAME: CHANGELOG,v 1.1906 2001/10/10 08:41:37 sakane Exp $
 
 <200110>
 Wed Oct 10 17:38:05 JST 2001 sakane@kame.net
 	* kame/kame/racoon:
 	Fixed racoon crash when uni-directional policy is defined.
-	racoon can negoticate SAs even in the case of the uni-directional
+	racoon negoticate two SAs even in the case of the uni-directional
 	policy.
 
 Wed Oct 10 04:52:54 JST 2001  itojun@iijlab.net
