@@ -1,4 +1,4 @@
-/*	$KAME: gifconfig.c,v 1.15 2001/08/01 00:53:12 itojun Exp $	*/
+/*	$KAME: gifconfig.c,v 1.16 2001/08/01 00:53:50 itojun Exp $	*/
 
 /*
  * Copyright (c) 1983, 1993
@@ -97,10 +97,6 @@ int	newaddr = 0;
 int	s;
 kvm_t	*kvmd;
 
-#ifdef INET6
-char ntop_buf[INET6_ADDRSTRLEN];	/*inet_ntop()*/
-#endif
-
 void setifpsrc __P((char *, int));
 void setifpdst __P((char *, int));
 void setifflags __P((char *, int));
@@ -144,8 +140,6 @@ void in6_getprefix __P((char *, int));
 #endif
 void printb __P((char *, unsigned int, char *));
 int prefix __P((void *, int));
-
-char ntop_buf[INET6_ADDRSTRLEN];
 
 /* Known address families */
 struct afswtch {
