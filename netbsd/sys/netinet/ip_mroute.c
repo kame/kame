@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_mroute.c,v 1.50 2000/04/19 06:30:55 itojun Exp $	*/
+/*	$NetBSD: ip_mroute.c,v 1.50.4.1 2001/04/06 00:25:03 he Exp $	*/
 
 /*
  * IP multicast forwarding procedures

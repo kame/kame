@@ -1,4 +1,4 @@
-/*	$NetBSD: uipc_socket.c,v 1.50 2000/03/30 09:27:14 augustss Exp $	*/
+/*	$NetBSD: uipc_socket.c,v 1.50.4.2 2001/02/03 18:41:57 he Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1988, 1990, 1993
@@ -126,11 +126,11 @@ socreate(dom, aso, type, proto)
 }
 
 int
-sobind(so, nam)
+sobind(so, nam, p)
 	struct socket *so;
 	struct mbuf *nam;
+	struct proc *p;
 {
-	struct proc *p = curproc;		/* XXX */
 	int s = splsoftnet();
 	int error;
 
@@ -273,6 +273,7 @@ soaccept(so, nam)
 		    (struct mbuf *)0, nam, (struct mbuf *)0, (struct proc *)0);
 	else
 		error = ECONNABORTED;
+
 	splx(s);
 	return (error);
 }

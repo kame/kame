@@ -1,4 +1,4 @@
-/*	$NetBSD: tcp_subr.c,v 1.91.4.3 2000/10/17 00:48:30 tv Exp $	*/
+/*	$NetBSD: tcp_subr.c,v 1.91.4.4 2001/04/06 00:26:34 he Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.

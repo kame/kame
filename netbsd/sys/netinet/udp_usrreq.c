@@ -1,4 +1,4 @@
-/*	$NetBSD: udp_usrreq.c,v 1.66.4.1 2000/07/28 16:58:10 sommerfeld Exp $	*/
+/*	$NetBSD: udp_usrreq.c,v 1.66.4.5 2001/05/09 19:37:41 he Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.

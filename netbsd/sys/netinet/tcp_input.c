@@ -1,4 +1,4 @@
-/*	$NetBSD: tcp_input.c,v 1.108.4.7 2000/08/16 01:22:22 itojun Exp $	*/
+/*	$NetBSD: tcp_input.c,v 1.108.4.9 2001/05/09 19:37:19 he Exp $	*/
 
 /*
 %%% portions-copyright-nrl-95

@@ -1,10 +1,10 @@
-/*	$NetBSD: pcidevs_data.h,v 1.240.2.10 2000/10/30 23:28:18 tv Exp $	*/
+/*	$NetBSD: pcidevs_data.h,v 1.240.2.20 2001/06/18 16:51:54 jhawk Exp $	*/
 
 /*
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	NetBSD: pcidevs,v 1.236.2.10 2000/10/30 23:27:35 tv Exp 
+ *	NetBSD
  */
 
 /*
@@ -74,6 +74,24 @@ struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "3Com",
 	    "3c595-MII 10/100 Ethernet",
+	},
+	{
+	    PCI_VENDOR_3COM, PCI_PRODUCT_3COM_3C555,
+	    0,
+	    "3Com",
+	    "3c555 10/100 MiniPCI Ethernet",
+	},
+	{
+	    PCI_VENDOR_3COM, PCI_PRODUCT_3COM_3C556,
+	    0,
+	    "3Com",
+	    "3c556 10/100 MiniPCI Ethernet",
+	},
+	{
+	    PCI_VENDOR_3COM, PCI_PRODUCT_3COM_3C556B,
+	    0,
+	    "3Com",
+	    "3c556B 10/100 MiniPCI Ethernet",
 	},
 	{
 	    PCI_VENDOR_3COM, PCI_PRODUCT_3COM_3CSOHO100TX,
@@ -296,6 +314,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "Accton Technology",
 	    "MPX 5030/5038 Ethernet",
+	},
+	{
+	    PCI_VENDOR_ACCTON, PCI_PRODUCT_ACCTON_EN2242,
+	    0,
+	    "Accton Technology",
+	    "EN2242 10/100 Ethernet",
 	},
 	{
 	    PCI_VENDOR_ACER, PCI_PRODUCT_ACER_M1435,
@@ -544,6 +568,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    "ADMtek AL981 10/100 Ethernet",
 	},
 	{
+	    PCI_VENDOR_ADMTEK, PCI_PRODUCT_ADMTEK_AN985,
+	    0,
+	    "ADMtek",
+	    "ADMtek AN985 10/100 Ethernet",
+	},
+	{
 	    PCI_VENDOR_ADVSYS, PCI_PRODUCT_ADVSYS_1200A,
 	    0,
 	    "Advanced System Products",
@@ -595,7 +625,13 @@ struct pci_knowndev pci_knowndevs[] = {
 	    PCI_VENDOR_ALTEON, PCI_PRODUCT_ALTEON_ACENIC,
 	    0,
 	    "Alteon",
-	    "ACEnic Gigabit Ethernet",
+	    "ACEnic 1000baseSX Gigabit Ethernet",
+	},
+	{
+	    PCI_VENDOR_ALTEON, PCI_PRODUCT_ALTEON_ACENIC_COPPER,
+	    0,
+	    "Alteon",
+	    "ACEnic 1000baseT Gigabit Ethernet",
 	},
 	{
 	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_PCNET_PCI,
@@ -656,6 +692,30 @@ struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "Advanced Micro Devices",
 	    "AMD756 USB Host Controller",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_PBC766_ISA,
+	    0,
+	    "Advanced Micro Devices",
+	    "AMD766 PCI-to-ISA Bridge",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_PBC766_IDE,
+	    0,
+	    "Advanced Micro Devices",
+	    "AMD766 IDE controller",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_PBC766_PMC,
+	    0,
+	    "Advanced Micro Devices",
+	    "AMD766 Power Management Controller",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_PBC766_USB,
+	    0,
+	    "Advanced Micro Devices",
+	    "AMD766 USB Host Controller",
 	},
 	{
 	    PCI_VENDOR_APPLE, PCI_PRODUCT_APPLE_BANDIT,
@@ -742,6 +802,36 @@ struct pci_knowndev pci_knowndevs[] = {
 	    "MAC-IO I/O Controller (KeyLargo)",
 	},
 	{
+	    PCI_VENDOR_APPLE, PCI_PRODUCT_APPLE_GMAC2,
+	    0,
+	    "Apple Computer",
+	    "GMAC Ethernet",
+	},
+	{
+	    PCI_VENDOR_APPLE, PCI_PRODUCT_APPLE_PANGEA_MACIO,
+	    0,
+	    "Apple Computer",
+	    "MAC-IO I/O Controller (Pangea)",
+	},
+	{
+	    PCI_VENDOR_APPLE, PCI_PRODUCT_APPLE_PANGEA_AGP,
+	    0,
+	    "Apple Computer",
+	    "Pangea AGP Interface",
+	},
+	{
+	    PCI_VENDOR_APPLE, PCI_PRODUCT_APPLE_PANGEA_PCI1,
+	    0,
+	    "Apple Computer",
+	    "Pangea Host-PCI Bridge",
+	},
+	{
+	    PCI_VENDOR_APPLE, PCI_PRODUCT_APPLE_PANGEA_PCI2,
+	    0,
+	    "Apple Computer",
+	    "Pangea Host-PCI Bridge",
+	},
+	{
 	    PCI_VENDOR_ARC, PCI_PRODUCT_ARC_1000PV,
 	    0,
 	    "ARC Logic",
@@ -818,6 +908,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "ATI Technologies",
 	    "Mach64 GI",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RAGEXLAGP2X,
+	    0,
+	    "ATI Technologies",
+	    "Rage XL AGP 2x",
 	},
 	{
 	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_MACH64_GP,
@@ -1048,6 +1144,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    "64310",
 	},
 	{
+	    PCI_VENDOR_CHIPS, PCI_PRODUCT_CHIPS_69000,
+	    0,
+	    "Chips and Technologies",
+	    "69000",
+	},
+	{
 	    PCI_VENDOR_CHIPS, PCI_PRODUCT_CHIPS_65545,
 	    0,
 	    "Chips and Technologies",
@@ -1168,6 +1270,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    "CS4280 CrystalClear Audio Interface",
 	},
 	{
+	    PCI_VENDOR_CIRRUS, PCI_PRODUCT_CIRRUS_CS4281,
+	    0,
+	    "Cirrus Logic",
+	    "CS4281 CrystalClear Audio Interface",
+	},
+	{
 	    PCI_VENDOR_CMDTECH, PCI_PRODUCT_CMDTECH_640,
 	    0,
 	    "CMD Technology",
@@ -1256,6 +1364,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "Cogent Data Technologies",
 	    "EX110TX PCI Fast Ethernet Adapter",
+	},
+	{
+	    PCI_VENDOR_COMPAL, PCI_PRODUCT_COMPAL_38W2,
+	    0,
+	    "COMPAL Electronics, Inc.",
+	    "COMPAL 38W2 OEM Notebook",
 	},
 	{
 	    PCI_VENDOR_COMPAQ, PCI_PRODUCT_COMPAQ_PCI_EISA_BRIDGE,
@@ -1352,6 +1466,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "Compaq",
 	    "Deskpro 4000 5233MMX",
+	},
+	{
+	    PCI_VENDOR_COMPAQ, PCI_PRODUCT_COMPAQ_M700,
+	    0,
+	    "Compaq",
+	    "Armada M700",
 	},
 	{
 	    PCI_VENDOR_COMPAQ, PCI_PRODUCT_COMPAQ_NF3P_BNC,
@@ -1600,6 +1720,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    "DFE-550TX 10/100 Ethernet",
 	},
 	{
+	    PCI_VENDOR_DLINK, PCI_PRODUCT_DLINK_DFE530TXPLUS,
+	    0,
+	    "D-Link Systems",
+	    "DFE-530TXPLUS 10/100 Ethernet",
+	},
+	{
 	    PCI_VENDOR_DPT, PCI_PRODUCT_DPT_SC_RAID,
 	    0,
 	    "Distributed Processing Technology",
@@ -1706,6 +1832,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "ESS Technology Inc",
 	    "Maestro 3 Modem",
+	},
+	{
+	    PCI_VENDOR_ESSTECH2, PCI_PRODUCT_ESSTECH2_MAESTRO1,
+	    0,
+	    "ESS Technology Inc",
+	    "Maestro 1 PCI Audio Accelerator",
 	},
 	{
 	    PCI_VENDOR_O2MICRO, PCI_PRODUCT_O2MICRO_OZ6832,
@@ -2186,6 +2318,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "Intel",
 	    "82801BA LAN Controller",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801BAM_IDE,
+	    0,
+	    "Intel",
+	    "82801BAM IDE Controller",
 	},
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801BA_IDE,
@@ -2785,13 +2923,25 @@ struct pci_knowndev pci_knowndevs[] = {
 	    PCI_VENDOR_SYMBIOS, PCI_PRODUCT_SYMBIOS_875,
 	    0,
 	    "Symbios Logic",
-	    "53c875",
+	    "53c875/876",
 	},
 	{
 	    PCI_VENDOR_SYMBIOS, PCI_PRODUCT_SYMBIOS_1510,
 	    0,
 	    "Symbios Logic",
 	    "53c1510",
+	},
+	{
+	    PCI_VENDOR_SYMBIOS, PCI_PRODUCT_SYMBIOS_895A,
+	    0,
+	    "Symbios Logic",
+	    "53c895A",
+	},
+	{
+	    PCI_VENDOR_SYMBIOS, PCI_PRODUCT_SYMBIOS_1010,
+	    0,
+	    "Symbios Logic",
+	    "53c1010",
 	},
 	{
 	    PCI_VENDOR_SYMBIOS, PCI_PRODUCT_SYMBIOS_875J,
@@ -2836,6 +2986,18 @@ struct pci_knowndev pci_knowndevs[] = {
 	    "uPD72871 IEEE 1394 OHCI Host Controller",
 	},
 	{
+	    PCI_VENDOR_NEC, PCI_PRODUCT_NEC_VA26D,
+	    0,
+	    "NEC",
+	    "NEC Versa Pro LX VA26D",
+	},
+	{
+	    PCI_VENDOR_NEC, PCI_PRODUCT_NEC_VERSALX,
+	    0,
+	    "NEC",
+	    "NEC Versa LX",
+	},
+	{
 	    PCI_VENDOR_NEOMAGIC, PCI_PRODUCT_NEOMAGIC_NMMG128ZV,
 	    0,
 	    "Neomagic",
@@ -2875,7 +3037,13 @@ struct pci_knowndev pci_knowndevs[] = {
 	    PCI_VENDOR_NETGEAR, PCI_PRODUCT_NETGEAR_GA620,
 	    0,
 	    "Netgear",
-	    "GA620 Gigabit Ethernet",
+	    "GA620 1000baseSX Gigabit Ethernet",
+	},
+	{
+	    PCI_VENDOR_NETGEAR, PCI_PRODUCT_NETGEAR_GA620T,
+	    0,
+	    "Netgear",
+	    "GA620 1000baseT Gigabit Ethernet",
 	},
 	{
 	    PCI_VENDOR_NEXGEN, PCI_PRODUCT_NEXGEN_NX82C501,
@@ -3298,6 +3466,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    "Trio32/64",
 	},
 	{
+	    PCI_VENDOR_TRIDENT, PCI_PRODUCT_TRIDENT_CYBERBLADE,
+	    0,
+	    "Trident Microsystems",
+	    "CyberBlade",
+	},
+	{
 	    PCI_VENDOR_S3, PCI_PRODUCT_S3_AURORA64P,
 	    0,
 	    "S3",
@@ -3646,6 +3820,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    "SiS 7016 10/100 Ethernet",
 	},
 	{
+	    PCI_VENDOR_SILMOTION, PCI_PRODUCT_SILMOTION_LYNX_EMP,
+	    0,
+	    "Silicon Motion",
+	    "Lynx EM+",
+	},
+	{
 	    PCI_VENDOR_SILMOTION, PCI_PRODUCT_SILMOTION_LYNX_E,
 	    0,
 	    "Silicon Motion",
@@ -3920,6 +4100,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    0,
 	    "Toshiba America",
 	    "TC35856F ATM (\"Meteor\")",
+	},
+	{
+	    PCI_VENDOR_TOSHIBA2, PCI_PRODUCT_TOSHIBA2_PORTEGE,
+	    0,
+	    "Toshiba America Info Systems",
+	    "Portege Notebook",
 	},
 	{
 	    PCI_VENDOR_TOSHIBA2, PCI_PRODUCT_TOSHIBA2_HOST,
@@ -7366,6 +7552,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    NULL,
 	},
 	{
+	    PCI_VENDOR_ESSTECH2, 0,
+	    PCI_KNOWNDEV_NOPROD,
+	    "ESS Technology Inc",
+	    NULL,
+	},
+	{
 	    PCI_VENDOR_TRITECH, 0,
 	    PCI_KNOWNDEV_NOPROD,
 	    "TriTech Microelectronics",
@@ -7435,6 +7627,12 @@ struct pci_knowndev pci_knowndevs[] = {
 	    PCI_VENDOR_LMC, 0,
 	    PCI_KNOWNDEV_NOPROD,
 	    "LAN Media Corporation",
+	    NULL,
+	},
+	{
+	    PCI_VENDOR_COMPAL, 0,
+	    PCI_KNOWNDEV_NOPROD,
+	    "COMPAL Electronics, Inc.",
 	    NULL,
 	},
 	{

@@ -1,4 +1,4 @@
-/*	$NetBSD: in_proto.c,v 1.39.4.1 2000/08/16 01:22:22 itojun Exp $	*/
+/*	$NetBSD: in_proto.c,v 1.39.4.2 2001/03/11 21:09:55 he Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.

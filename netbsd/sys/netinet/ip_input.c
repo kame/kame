@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_input.c,v 1.114.4.3 2000/10/17 00:59:49 tv Exp $	*/
+/*	$NetBSD: ip_input.c,v 1.114.4.6 2001/04/24 22:21:20 he Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -488,6 +488,14 @@ ip_input(struct mbuf *m)
 #endif
 
 #ifdef PFIL_HOOKS
+#ifdef IPSEC
+	/*
+	 * let ipfilter look at packet on the wire,
+	 * not the decapsulated packet.
+	 */
+	if (ipsec_gethist(m, NULL))
+		goto nofilt;
+#endif
 	/*
 	 * Run through list of hooks for input packets.  If there are any
 	 * filters which require that additional packets in the flow are
@@ -521,6 +529,9 @@ ip_input(struct mbuf *m)
 				return;
 			ip = mtod(m, struct ip *);
 		}
+#ifdef IPSEC
+nofilt:;
+#endif
 #endif /* PFIL_HOOKS */
 
 #ifdef NATPT

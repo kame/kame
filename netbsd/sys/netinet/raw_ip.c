@@ -1,4 +1,4 @@
-/*	$NetBSD: raw_ip.c,v 1.53 2000/03/30 13:25:04 augustss Exp $	*/
+/*	$NetBSD: raw_ip.c,v 1.53.4.2 2001/04/06 00:25:38 he Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.

@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_output.c,v 1.74 2000/05/10 03:31:30 itojun Exp $	*/
+/*	$NetBSD: ip_output.c,v 1.74.4.1 2001/04/06 00:25:20 he Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -418,6 +418,7 @@ ip_output(m0, va_alist)
 		m->m_flags &= ~M_BCAST;
 
 sendit:
+
 #ifdef IPSEC
 	/* get SP for this packet */
 	if (so == NULL)

@@ -1,4 +1,4 @@
-/*	$NetBSD: protosw.h,v 1.22 2000/02/17 10:59:41 darrenr Exp $	*/
+/*	$NetBSD: protosw.h,v 1.22.4.1 2001/03/11 21:12:51 he Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1993

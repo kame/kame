@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_icmp.c,v 1.47.2.3 2000/08/16 01:22:22 itojun Exp $	*/
+/*	$NetBSD: ip_icmp.c,v 1.47.2.5 2001/04/06 00:24:30 he Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.

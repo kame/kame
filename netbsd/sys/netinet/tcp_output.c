@@ -1,4 +1,4 @@
-/*	$NetBSD: tcp_output.c,v 1.56.4.3 2000/11/10 00:12:43 tv Exp $	*/
+/*	$NetBSD: tcp_output.c,v 1.56.4.4 2001/04/06 00:26:13 he Exp $	*/
 
 /*
 %%% portions-copyright-nrl-95
