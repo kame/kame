@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 /*
- * draft-ietf-dhc-dhcpv6-22
+ * draft-ietf-dhc-dhcpv6-24
  */
 
 #ifndef __DHCP6_H_DEFINED
