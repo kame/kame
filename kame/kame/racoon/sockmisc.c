@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sockmisc.c,v 1.12 2000/07/07 10:11:27 sakane Exp $ */
+/* YIPS @(#)$Id: sockmisc.c,v 1.13 2000/07/17 01:51:12 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -188,8 +188,9 @@ getlocaladdr(remote)
 	}
 
 	if (getsockname(s, local, &local_len) < 0) {
-		plog(logp, LOCATION, NULL,
-			"getsockname (%s)\n", strerror(errno));
+		YIPSDEBUG(DEBUG_NET,
+			plog(logp, LOCATION, NULL,
+				"getsockname (%s)\n", strerror(errno)));
 		close(s);
 		return NULL;
 	}
@@ -235,8 +236,9 @@ recvfromto(s, buf, buflen, flags, from, fromlen, to, tolen)
 
 	len = sizeof(ss);
 	if (getsockname(s, (struct sockaddr *)&ss, &len) < 0) {
-		plog(logp, LOCATION, NULL,
-			"getsockname (%s)\n", strerror(errno));
+		YIPSDEBUG(DEBUG_NET,
+			plog(logp, LOCATION, NULL,
+				"getsockname (%s)\n", strerror(errno)));
 		return -1;
 	}
 
@@ -353,14 +355,16 @@ sendfromto(s, buf, buflen, src, dst)
 
 	len = sizeof(ss);
 	if (getsockname(s, (struct sockaddr *)&ss, &len) < 0) {
-		plog(logp, LOCATION, NULL,
-			"getsockname (%s)\n", strerror(errno));
+		YIPSDEBUG(DEBUG_NET,
+			plog(logp, LOCATION, NULL,
+				"getsockname (%s)\n", strerror(errno)));
 		return -1;
 	}
 
-	YIPSDEBUG(DEBUG_NOTIFY,
+	YIPSDEBUG(DEBUG_NET,
 		plog(logp, LOCATION, NULL,
-			"sockname %s\n", saddr2str((struct sockaddr *)&ss));
+			"sockname %s\n", saddr2str((struct sockaddr *)&ss)));
+	YIPSDEBUG(DEBUG_NOTIFY,
 		plog(logp, LOCATION, src,
 			"send packet to %s\n", saddr2str(dst)));
 
