@@ -1,4 +1,4 @@
-.\"	$KAME: natpt.conf.5,v 1.4 2001/11/08 04:27:00 fujisawa Exp $
+.\"	$KAME: natpt.conf.5,v 1.5 2001/11/08 06:05:54 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -154,7 +154,7 @@ This facility is same as usual V4 NAT.
 All the rules mentioned above
 .Pq Sy map from ...
 can have
-.Op  Sy proto Ar protcol
+.Op Sy proto Ar protcol
 option.  This option specifies the protocol, specify
 .Sy icmp tcp
 and
@@ -168,11 +168,47 @@ syntax error when you specify more then one same protocol.  This
 .Sy proto
 option must be specified at the last of syntax except a case of using
 .Sy bidir
-option.  This
+option.
+.Pp
+Option
 .Sy bidir
-option
-.Pq described later
-must be specified at the last of syntax.
+is used when specified bi-directional NAT.  This NAT binds global
+address to private address one-on-one statically.  Sessions can be
+initiated from hosts in the public network as well as the private
+network.  So, if you can set nat session as bidirectional, you can
+connect to the host located behind this NAT from public IPv4 network.
+.Pp
+Here are some important points to consider when using
+.Sy bidir 
+option:
+.Bl -bullet
+.It
+This
+.Sy bidir
+option must be specified at the last of syntax.
+.It
+Number of address that specify by
+.Sy from
+and
+.Sy to
+is 1.  You can not specify more than one address here because
+translation is ono-on-one.
+.It
+Does not translate port number.  So You need several IPv4 address, an
+equal number of host to be connected to.
+.It
+It is recommended that the IP address which described after
+.Sy to
+is set different from IP address assigned to interface of this NAT
+box.  Or NAT can not receive a packet destined to NAT itself because
+this NAT translate the packet which come to this IP address
+unconditionally.
+.Pp
+.Fl alias
+option of ifconfig command is usable to do this purpose.  See
+.Xr ifconfig 8
+for more detail.
+.El
 .\"
 .It Xo Sy map flush
 .Xc
@@ -244,7 +280,8 @@ map from 202.249.11.251 dport 65305 to 3ffe:0501:041c::1 dport 23
 .El
 .\"
 .Sh SEE ALSO
-.Xr natptconfig 8
+.Xr natptconfig 8 ,
+.Xr ifconfig 8
 .\"
 .Sh HISTORY
 The
