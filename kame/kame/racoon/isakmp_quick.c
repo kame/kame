@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.76 2001/04/04 02:21:54 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.77 2001/04/04 04:58:15 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1934,7 +1934,7 @@ get_proposal_r(iph2)
 	if (set_proposal_from_policy(iph2, sp_in, sp_out) < 0) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to create saprop.\n");
-		return -1;
+		return ISAKMP_INTERNAL_ERROR;
 	}
 
 	return 0;

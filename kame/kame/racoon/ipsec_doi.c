@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.131 2001/04/04 02:06:20 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.132 2001/04/04 04:58:15 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3505,7 +3505,7 @@ ipsecdoi_id2sockaddr(buf, saddr, prefixlen, ul_proto)
 
 		/* sanity check */
 		if (buf->l < alen)
-			return -1;
+			return ISAKMP_INTERNAL_ERROR;
 
 		/* get subnet mask length */
 		plen = 0;
