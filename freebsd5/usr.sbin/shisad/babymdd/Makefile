@@ -24,15 +24,15 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-SRCDIR=	${.CURDIR}/../../../kame/shisad ${.CURDIR}/../../../kame/rtadvd
+SRCDIR=	${.CURDIR}/../../../kame/shisad
 
 PROG=	babymdd
 SRCS=	babymdd.c network.c
 CFLAGS+= -g -Wall -Werror -DMIP6_MN
-CFLAGS+= -I${.OBJDIR} -I${.CURDIR}/../../../kame/shisad 
+CFLAGS+= -I${.OBJDIR} -I${SRCDIR}
 
 LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \
-	-L/usr/local/v6/lib -linet6 -lssl -lcrypto
+	-L/usr/local/v6/lib -linet6
 
 MAN8=	babymdd.8
 
