@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.24 2003/07/31 09:56:40 keiichi Exp $	*/
+/*	$KAME: mobility6.c,v 1.25 2003/07/31 12:16:02 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -190,7 +190,7 @@ mobility6_input(mp, offp, proto)
 	case IP6M_BINDING_REQUEST:
 		if (!MIP6_IS_MN)
 			break;
-		if (mip6_ip6mr_input(m, (struct ip6m_careof_test *)mh6,
+		if (mip6_ip6mr_input(m, (struct ip6m_binding_request *)mh6,
 		    mh6len) != 0)
 			return (IPPROTO_DONE);
 		break;
