@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.52 2000/04/11 03:37:13 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.53 2000/04/13 10:51:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -958,7 +958,7 @@ nd6_nud_hint(rt, dst6)
 	}
 
 	ln = (struct llinfo_nd6 *)rt->rt_llinfo;
-	if (ln->ln_state == ND6_LLINFO_INCOMPLETE)
+	if (ln->ln_state < ND6_LLINFO_REACHABLE)
 		return;
 
 	ln->ln_state = ND6_LLINFO_REACHABLE;
