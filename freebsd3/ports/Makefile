@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.26 2000/05/30 10:44:05 sumikawa Exp $
+# $Id: Makefile,v 1.27 2000/06/20 18:17:14 sumikawa Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -22,6 +22,7 @@ SUBDIR+=	ja-mnews
 SUBDIR+=	ja-w3m
 SUBDIR+=	ja-w3m-ssl
 SUBDIR+=	kaffe
+SUBDIR+=	leafnode+
 SUBDIR+=	lftp
 SUBDIR+=	libident6
 SUBDIR+=	libpcap
