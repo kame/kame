@@ -33,7 +33,7 @@
  *
  * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>
  *
- * $Id: bcache.c,v 1.2 2000/02/08 02:58:56 itojun Exp $
+ * $Id: bcache.c,v 1.3 2000/02/19 13:42:45 itojun Exp $
  *
  */
 
@@ -125,11 +125,13 @@ pr_bcentry(struct mip6_bc bcentry)
 
 	if (lflag) {
 		char flags[5] = { 0 };
+#if 0
 		char giface[IFNAMSIZ + 3] = { 0 };
 #if !(defined(__OpenBSD__) || defined(__NetBSD__))
 		char gif_name[IFNAMSIZ] = { 0 };
 #endif
 		struct ifnet gif_ifs;
+#endif
 
 		if(bcentry.hr_flag)
 			strcat(flags, "H");
@@ -138,6 +140,7 @@ pr_bcentry(struct mip6_bc bcentry)
 
 		printf("%6.6s %6d ", flags, bcentry.seqno);
 
+#if 0
 		if (bcentry.gif_ifp) {
 			kget(bcentry.gif_ifp, gif_ifs);
 #if defined(__OpenBSD__) || defined(__NetBSD__)
@@ -150,6 +153,7 @@ pr_bcentry(struct mip6_bc bcentry)
 #endif
 		}
 		printf("%6.6s ", giface);
+#endif
 	}
 
 	printf("%6u ", bcentry.lifetime);

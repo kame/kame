@@ -33,7 +33,7 @@
  *
  * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>
  *
- * $Id: haddr.c,v 1.2 2000/02/08 02:58:57 itojun Exp $
+ * $Id: haddr.c,v 1.3 2000/02/19 13:42:45 itojun Exp $
  *
  */
 
@@ -102,7 +102,9 @@ pr_haentry(struct mip6_esm haentry)
 {
 	char *cp;
 	char iface[IFNAMSIZ + 3] = { 0 };
+#if 0
 	char giface[IFNAMSIZ + 3] = { 0 };
+#endif
 
 	cp = ip6addr_print(&haentry.home_addr, haentry.prefix_len);
 
@@ -171,6 +173,7 @@ pr_haentry(struct mip6_esm haentry)
 	printf("%6.6s ", iface);
 
 	if(lflag) {
+#if 0
 #if !(defined(__OpenBSD__) || defined(__NetBSD__))
 		char gif_name[IFNAMSIZ] = { 0 };
 #endif
@@ -188,6 +191,7 @@ pr_haentry(struct mip6_esm haentry)
 #endif
 		}
 		printf("%6.6s ", giface);
+#endif
 
 		if (haentry.lifetime == 0xFFFF)
 			printf("%8x", haentry.lifetime);
