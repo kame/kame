@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.16 2000/04/27 03:37:43 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.17 2000/04/28 17:06:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1203,10 +1203,13 @@ getanswer(answer, anslen, qname, qtype, pai)
 				continue;
 			}
 #ifdef FILTER_V4MAPPED
-			if (type == T_AAAA &&
-			    IN6_IS_ADDR_V4MAPPED((struct in6_addr *)cp)) {
-				cp += n;
-				continue;
+			if (type == T_AAAA) {
+				struct in6_addr in6;
+				memcpy(&in6, cp, sizeof(in6));
+				if (IN6_IS_ADDR_V4MAPPED(&in6)) {
+					cp += n;
+					continue;
+				}
 			}
 #endif
 			if (!haveanswer) {
