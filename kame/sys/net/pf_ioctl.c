@@ -1,4 +1,4 @@
-/*	$OpenBSD: pf_ioctl.c,v 1.77 2003/07/31 22:25:54 cedric Exp $ */
+/*	$OpenBSD: pf_ioctl.c,v 1.78 2003/08/09 14:56:48 cedric Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -445,6 +445,7 @@ pf_empty_pool(struct pf_palist *poola)
 
 	while ((empty_pool_pa = TAILQ_FIRST(poola)) != NULL) {
 		pf_dynaddr_remove(&empty_pool_pa->addr);
+		pf_tbladdr_remove(&empty_pool_pa->addr);
 		TAILQ_REMOVE(poola, empty_pool_pa, entries);
 #ifdef __FreeBSD__
 		free(empty_pool_pa, M_PF);
@@ -707,6 +708,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		struct pfioc_rule	*pr = (struct pfioc_rule *)addr;
 		struct pf_ruleset	*ruleset;
 		struct pf_rule		*rule, *tail;
+		struct pf_pooladdr	*pa;
 		int			 rs_num;
 
 		ruleset = pf_find_ruleset(pr->anchor, pr->ruleset);
@@ -809,6 +811,9 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = EINVAL;
 		if (pf_tbladdr_setup(ruleset, &rule->dst.addr))
 			error = EINVAL;
+		TAILQ_FOREACH(pa, &pf_pabuf, entries)
+			if (pf_tbladdr_setup(ruleset, &pa->addr))
+				error = EINVAL;
 
 		pf_mv_pool(&pf_pabuf, &rule->rpool.list);
 		if (((((rule->action == PF_NAT) || (rule->action == PF_RDR) ||
@@ -1804,7 +1809,8 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		}
 #endif /* INET6 */
 		if (pp->addr.addr.type != PF_ADDR_ADDRMASK &&
-		    pp->addr.addr.type != PF_ADDR_DYNIFTL) {
+		    pp->addr.addr.type != PF_ADDR_DYNIFTL &&
+		    pp->addr.addr.type != PF_ADDR_TABLE) {
 			error = EINVAL;
 			break;
 		}
@@ -1886,6 +1892,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		}
 		bcopy(pa, &pp->addr, sizeof(struct pf_pooladdr));
 		pf_dynaddr_copyout(&pp->addr.addr);
+		pf_tbladdr_copyout(&pp->addr.addr);
 		splx(s);
 		break;
 	}
@@ -1893,6 +1900,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 	case DIOCCHANGEADDR: {
 		struct pfioc_pooladdr	*pca = (struct pfioc_pooladdr *)addr;
 		struct pf_pooladdr	*oldpa = NULL, *newpa = NULL;
+		struct pf_ruleset	*ruleset;
 
 		if (pca->action < PF_CHANGE_ADD_HEAD ||
 		    pca->action > PF_CHANGE_REMOVE) {
@@ -1900,11 +1908,17 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			break;
 		}
 		if (pca->addr.addr.type != PF_ADDR_ADDRMASK &&
-		    pca->addr.addr.type != PF_ADDR_DYNIFTL) {
+		    pca->addr.addr.type != PF_ADDR_DYNIFTL &&
+		    pca->addr.addr.type != PF_ADDR_TABLE) {
 			error = EINVAL;
 			break;
 		}
 
+		ruleset = pf_find_ruleset(pca->anchor, pca->ruleset);
+		if (ruleset == NULL) {
+			error = EBUSY;
+			break;
+		}
 		pool = pf_get_pool(pca->anchor, pca->ruleset, 0,
 		    pca->r_action, pca->r_num, pca->r_last, 1, 1);
 		if (pool == NULL) {
@@ -1958,7 +1972,8 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 				}
 			} else
 				newpa->ifp = NULL;
-			if (pf_dynaddr_setup(&newpa->addr, pca->af)) {
+			if (pf_dynaddr_setup(&newpa->addr, pca->af) ||
+			    pf_tbladdr_setup(ruleset, &newpa->addr)) {
 				pf_dynaddr_remove(&newpa->addr);
 #ifdef __FreeBSD__
 				free(newpa, M_PF);
@@ -1994,6 +2009,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		if (pca->action == PF_CHANGE_REMOVE) {
 			TAILQ_REMOVE(&pool->list, oldpa, entries);
 			pf_dynaddr_remove(&oldpa->addr);
+			pf_tbladdr_remove(&oldpa->addr);
 #ifdef __FreeBSD__
 			free(oldpa, M_PF);
 #else
