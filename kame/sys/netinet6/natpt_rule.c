@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.12 2000/10/17 14:23:55 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.13 2001/02/05 06:44:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -74,12 +74,11 @@ extern	struct in6_addr	 faith_prefixmask;
 extern	struct in6_addr	 natpt_prefix;
 extern	struct in6_addr	 natpt_prefixmask;
 
-extern	void	in4_len2mask	__P((struct in_addr *, int));
 extern	void	in6_len2mask	__P((struct in6_addr *, int));
 extern	int	toOneself4	__P((struct ifBox *, struct _cv *));
 extern	void	setMTU		__P((void));
 
-
+static	void	in4_len2mask	__P((struct in_addr *, int));
 /*
  *
  */
@@ -426,7 +425,7 @@ _natptSetRule(caddr_t addr)
 	{
 	    if (from->sa_family == AF_INET)
 	    {
-		in4_len2mask(&from->in4Mask, cst->prefix);
+		natpt_in4_len2mask(&from->in4Mask, cst->prefix);
 		from->in4Addr.s_addr &= from->in4Mask.s_addr;
 	    }
 	    else
@@ -548,4 +547,12 @@ _flushPtrRules(struct _cell **anchor)
     }
 
     *anchor = NULL;
+}
+
+static void
+natpt_in4_len2mask(mask, len)
+    struct in_addr *mask;
+    int len;
+{
+	mask->s_addr = 0xffffffff << (32 - len);
 }
