@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.43 2001/03/21 17:43:02 jinmei Exp $	*/
+/*	$KAME: icmp6.h,v 1.44 2001/03/29 05:34:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -79,7 +79,7 @@ struct icmp6_hdr {
 		u_int16_t	icmp6_un_data16[2]; /* type-specific field */
 		u_int8_t	icmp6_un_data8[4];  /* type-specific field */
 	} icmp6_dataun;
-};
+} __attribute__((__packed__));
 
 #define icmp6_data32	icmp6_dataun.icmp6_un_data32
 #define icmp6_data16	icmp6_dataun.icmp6_un_data16
@@ -123,7 +123,10 @@ struct icmp6_hdr {
 #define MLD6_MTRACE_RESP		141	/* mtrace response(to sender) */
 #define MLD6_MTRACE			142	/* mtrace messages */
 
-#define ICMP6_MAXTYPE			142
+#define ICMP6_HADISCOV_REQUEST		143	/* XXX To be defined */
+#define ICMP6_HADISCOV_REPLY		144	/* XXX To be defined */
+  
+#define ICMP6_MAXTYPE			144
 
 #define ICMP6_DST_UNREACH_NOROUTE	0	/* no route to destination */
 #define ICMP6_DST_UNREACH_ADMIN	 	1	/* administratively prohibited */
@@ -163,7 +166,7 @@ struct icmp6_hdr {
 struct mld6_hdr {
 	struct icmp6_hdr	mld6_hdr;
 	struct in6_addr		mld6_addr; /* multicast address */
-};
+} __attribute__((__packed__));
 
 #define mld6_type	mld6_hdr.icmp6_type
 #define mld6_code	mld6_hdr.icmp6_code
@@ -178,7 +181,7 @@ struct mld6_hdr {
 struct nd_router_solicit {	/* router solicitation */
 	struct icmp6_hdr 	nd_rs_hdr;
 	/* could be followed by options */
-};
+} __attribute__((__packed__));
 
 #define nd_rs_type	nd_rs_hdr.icmp6_type
 #define nd_rs_code	nd_rs_hdr.icmp6_code
@@ -190,7 +193,7 @@ struct nd_router_advert {	/* router advertisement */
 	u_int32_t		nd_ra_reachable;	/* reachable time */
 	u_int32_t		nd_ra_retransmit;	/* retransmit timer */
 	/* could be followed by options */
-};
+} __attribute__((__packed__));
 
 #define nd_ra_type		nd_ra_hdr.icmp6_type
 #define nd_ra_code		nd_ra_hdr.icmp6_code
@@ -218,7 +221,7 @@ struct nd_neighbor_solicit {	/* neighbor solicitation */
 	struct icmp6_hdr	nd_ns_hdr;
 	struct in6_addr		nd_ns_target;	/*target address */
 	/* could be followed by options */
-};
+} __attribute__((__packed__));
 
 #define nd_ns_type		nd_ns_hdr.icmp6_type
 #define nd_ns_code		nd_ns_hdr.icmp6_code
@@ -229,7 +232,7 @@ struct nd_neighbor_advert {	/* neighbor advertisement */
 	struct icmp6_hdr	nd_na_hdr;
 	struct in6_addr		nd_na_target;	/* target address */
 	/* could be followed by options */
-};
+} __attribute__((__packed__));
 
 #define nd_na_type		nd_na_hdr.icmp6_type
 #define nd_na_code		nd_na_hdr.icmp6_code
@@ -252,25 +255,49 @@ struct nd_redirect {		/* redirect */
 	struct in6_addr		nd_rd_target;	/* target address */
 	struct in6_addr		nd_rd_dst;	/* destination address */
 	/* could be followed by options */
-};
+} __attribute__((__packed__));
 
 #define nd_rd_type		nd_rd_hdr.icmp6_type
 #define nd_rd_code		nd_rd_hdr.icmp6_code
 #define nd_rd_cksum		nd_rd_hdr.icmp6_cksum
 #define nd_rd_reserved		nd_rd_hdr.icmp6_data32[0]
 
+struct ha_discov_req {          /* HA Address Discovery Request */
+	struct icmp6_hdr	ha_dreq_hdr;
+	u_int32_t		ha_dreq_reserved1;
+	u_int32_t		ha_dreq_reserved2;
+	struct in6_addr		ha_dreq_home;	/* MN home address */
+} __attribute__((__packed__));
+
+#define discov_req_type		ha_dreq_hdr.icmp6_type
+#define discov_req_code		ha_dreq_hdr.icmp6_code
+#define discov_req_cksum	ha_dreq_hdr.icmp6_cksum
+#define discov_req_id		ha_dreq_hdr.icmp6_data16[0]
+
+struct ha_discov_rep {		/* HA Address Discovery Reply */
+	struct icmp6_hdr	ha_drep_hdr;
+	u_int32_t		ha_drep_reserved1;
+	u_int32_t		ha_drep_reserved2;
+	/* could be followed by Home Agent addresses */
+} __attribute__((__packed__));
+
+#define discov_rep_type		ha_drep_hdr.icmp6_type
+#define discov_rep_code		ha_drep_hdr.icmp6_code
+#define discov_rep_cksum	ha_drep_hdr.icmp6_cksum
+#define discov_rep_id		ha_drep_hdr.icmp6_data16[0]
+
 struct nd_opt_hdr {		/* Neighbor discovery option header */
 	u_int8_t	nd_opt_type;
 	u_int8_t	nd_opt_len;
 	/* followed by option specific data*/
-};
+} __attribute__((__packed__));
 
 #define ND_OPT_SOURCE_LINKADDR		1
 #define ND_OPT_TARGET_LINKADDR		2
 #define ND_OPT_PREFIX_INFORMATION	3
 #define ND_OPT_REDIRECTED_HEADER	4
 #define ND_OPT_MTU			5
-#ifndef _KERNEL	/*for now*/
+#if 0
 #define ND_OPT_ADV_INTERVAL		7	/* KAME local, MIP6 - compat */
 #define ND_OPT_HA_INFORMATION		8	/* KAME local, MIP6 - compat */
 #endif
@@ -286,11 +313,11 @@ struct nd_opt_prefix_info {	/* prefix information */
 	u_int32_t	nd_opt_pi_preferred_time;
 	u_int32_t	nd_opt_pi_reserved2;
 	struct in6_addr	nd_opt_pi_prefix;
-};
+} __attribute__((__packed__));
 
 #define ND_OPT_PI_FLAG_ONLINK		0x80
 #define ND_OPT_PI_FLAG_AUTO		0x40
-#ifndef _KERNEL /*for now*/
+#if 0
 #define ND_OPT_PI_FLAG_RTADDR		0x20	/* KAME local - compat*/
 #endif
 #define ND_OPT_PI_FLAG_ROUTER		0x20	/* 2292bis-02 */
@@ -301,21 +328,21 @@ struct nd_opt_rd_hdr {		/* redirected header */
 	u_int16_t	nd_opt_rh_reserved1;
 	u_int32_t	nd_opt_rh_reserved2;
 	/* followed by IP header and data */
-};
+} __attribute__((__packed__));
 
 struct nd_opt_mtu {		/* MTU option */
 	u_int8_t	nd_opt_mtu_type;
 	u_int8_t	nd_opt_mtu_len;
 	u_int16_t	nd_opt_mtu_reserved;
 	u_int32_t	nd_opt_mtu_mtu;
-};
+} __attribute__((__packed__));
 
 struct nd_opt_advinterval {	/* Advertisement interval option */
 	u_int8_t	nd_opt_adv_type;
 	u_int8_t	nd_opt_adv_len;
 	u_int16_t	nd_opt_adv_reserved;
 	u_int32_t	nd_opt_adv_interval;
-};
+} __attribute__((__packed__));
 
 struct nd_opt_homeagent_info {	/* Home Agent info */
 	u_int8_t	nd_opt_hai_type;
@@ -323,7 +350,7 @@ struct nd_opt_homeagent_info {	/* Home Agent info */
 	u_int16_t	nd_opt_hai_reserved;
 	int16_t		nd_opt_hai_preference;
 	u_int16_t	nd_opt_hai_lifetime;
-};
+} __attribute__((__packed__));
 
 /*
  * icmp6 namelookup
@@ -338,7 +365,7 @@ struct icmp6_namelookup {
 	u_int8_t	icmp6_nl_name[3];
 #endif
 	/* could be followed by options */
-};
+} __attribute__((__packed__));
 
 /*
  * icmp6 node information
@@ -347,7 +374,7 @@ struct icmp6_nodeinfo {
 	struct icmp6_hdr icmp6_ni_hdr;
 	u_int8_t icmp6_ni_nonce[8];
 	/* could be followed by reply data */
-};
+} __attribute__((__packed__));
 
 #define ni_type		icmp6_ni_hdr.icmp6_type
 #define ni_code		icmp6_ni_hdr.icmp6_code
@@ -410,7 +437,7 @@ struct ni_reply_fqdn {
 	u_int32_t ni_fqdn_ttl;	/* TTL */
 	u_int8_t ni_fqdn_namelen; /* length in octets of the FQDN */
 	u_int8_t ni_fqdn_name[3]; /* XXX: alignment */
-};
+} __attribute__((__packed__));
 
 /*
  * Router Renumbering. as router-renum-08.txt
@@ -421,7 +448,7 @@ struct icmp6_router_renum {	/* router renumbering header */
 	u_int8_t	rr_flags;
 	u_int16_t	rr_maxdelay;
 	u_int32_t	rr_reserved;
-};
+} __attribute__((__packed__));
 
 #define ICMP6_RR_FLAGS_TEST		0x80
 #define ICMP6_RR_FLAGS_REQRESULT	0x40
@@ -443,7 +470,7 @@ struct rr_pco_match {		/* match prefix part */
 	u_int8_t	rpm_maxlen;
 	u_int16_t	rpm_reserved;
 	struct	in6_addr	rpm_prefix;
-};
+} __attribute__((__packed__));
 
 #define RPM_PCO_ADD		1
 #define RPM_PCO_CHANGE		2
@@ -459,7 +486,7 @@ struct rr_pco_use {		/* use prefix part */
 	u_int32_t	rpu_pltime;
 	u_int32_t	rpu_flags;
 	struct	in6_addr rpu_prefix;
-};
+} __attribute__((__packed__));
 #define ICMP6_RR_PCOUSE_RAFLAGS_ONLINK	0x80
 #define ICMP6_RR_PCOUSE_RAFLAGS_AUTO	0x40
 
@@ -477,7 +504,7 @@ struct rr_result {		/* router renumbering result message */
 	u_int8_t	rrr_matchedlen;
 	u_int32_t	rrr_ifid;
 	struct	in6_addr rrr_prefix;
-};
+} __attribute__((__packed__));
 #if BYTE_ORDER == BIG_ENDIAN
 #define ICMP6_RR_RESULT_FLAGS_OOB		0x0002
 #define ICMP6_RR_RESULT_FLAGS_FORBIDDEN		0x0001

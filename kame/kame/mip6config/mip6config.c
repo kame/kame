@@ -1,4 +1,4 @@
-/*	$KAME: mip6config.c,v 1.9 2001/03/29 03:28:33 itojun Exp $	*/
+/*	$KAME: mip6config.c,v 1.10 2001/03/29 05:34:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -30,11 +30,12 @@
  */
 
 /*
- * Copyright (c) 1999 and 2000 Ericsson Radio Systems AB
+ * Copyright (c) 1999, 2000 and 2001 Ericsson Radio Systems AB
  * All rights reserved.
  *
- * Author:  Hesham Soliman <Hesham.Soliman@ericsson.com.au>
- *          Magnus Braathen <Magnus.Braathen@era.ericsson.se>
+ * Authors:  Hesham Soliman <Hesham.Soliman@ericsson.com.au>
+ *           Magnus Braathen <Magnus.Braathen@era.ericsson.se>
+ *           Mattias Pettersson <Mattias.Pettersson@era.ericsson.se>
  */
 
 #include <sys/types.h>
@@ -84,6 +85,7 @@ upd_kernel(u_long cmd, struct mip6_input_data *args)
 /*
 mip6config -F (Set Default foreign IP Address)
 mip6config -H (Write home address)
+mip6config -P (Write home prefix)
 mip6config -E (Remove default foreign address from list)
 
 mip6config -f (Read from file)
@@ -108,13 +110,14 @@ mip6config -x (De-activate MN/HA functionality)
 static void
 usage()
 {
-	fprintf(stderr, "\n%s\n%s\n%s%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
+	fprintf(stderr, "\n%s\n%s\n%s%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
 "usage: mip6config -a [-F foreign_address/plen@if] [-b bu_lifetime]",
 "                     [-w br_time] [-l hr_lifetime] [-dpqrt 0/1] [-e 0/1/2]",
 "       mip6config -H home_address/plen@if%ha_addr ",
                      "[-F foreign_address/plen@if]",
 "                     [-b bu_lifetime] [-w br_time] [-l hr_lifetime]",
 "                     [-dpqrt 0/1] [-e 0/1/2]",
+"       mip6config -P home_prefix/plen (new feature)",
 "       mip6config -g [-w br_time] [-y ha_pref] [-l hr_lifetime] [-mqu 0/1]",
 "       mip6config -x",
 "       mip6config -E address",
@@ -147,6 +150,26 @@ parse_addr(char *addrline, char **addr, int *plen, char **iface)
 
 	**iface = '\0';
 	(*iface)++;
+
+	return 0;
+}
+
+/* parses a line like ipv6prefix/prefixlen */
+static int
+parse_pref(char *addrline, char **addr, int *plen)
+{
+	char *plen_ptr;
+
+	*addr = addrline;
+
+	if ((plen_ptr = strchr(*addr, '/')) == NULL) {
+		return -1;
+	}
+
+	*plen_ptr = '\0';
+	plen_ptr++;
+
+	*plen = atoi(plen_ptr);
 
 	return 0;
 }
@@ -206,6 +229,41 @@ set_homeaddr(char *homeaddr, u_long command)
 
 	input.prefix_len = plen;
 	strcpy(input.if_name, interface);
+
+	mip6_module = MIP6_MN_MODULE;
+	startmip6 = 1;
+
+	if ((retval = upd_kernel(command, (void *)&input)) > 0) {
+		/* error */
+		print_err(retval);
+	}
+
+	return retval;
+}
+
+static int
+set_homepref(char *homepref, u_long command)
+{
+	struct mip6_input_data input;
+	char *prefix;
+	int   plen;
+	int retval;
+
+	if (parse_pref(homepref, &prefix, &plen) < 0) {
+		warnx("error parsing home prefix %s\n", homepref);
+		return -1;
+	}
+
+	printf("set_homepref: prefix: %s, plen: %d\n",
+	       prefix, plen);
+
+	if (getaddress(prefix, &input.ip6_addr) < 0) {
+		warnx("unknown home prefix %s\n", prefix);
+		return -1;
+	}
+
+	input.prefix_len = plen;
+	input.ha_addr = in6addr_any;  /* No home agent known */
 
 	mip6_module = MIP6_MN_MODULE;
 	startmip6 = 1;
@@ -451,7 +509,7 @@ read_config()
 static char *delcoaddr, *coaddr, *homeaddr, *hr_lifetime, *fwd_sl_unicast;
 static char *autoconfig, *bu_lifetime, *enable_bu_to_cn, *enable_debug;
 static char *enable_ha, *ha_pref, *fwd_sl_multicast, *prom_mode, *enable_br;
-static char *enable_rev_tunnel, *br_update, *eager_md, *release;
+static char *enable_rev_tunnel, *br_update, *eager_md, *release, *homepref;
 
 int
 main(int argc, char *argv[])
@@ -469,13 +527,16 @@ main(int argc, char *argv[])
 		err(1, "socket");
 
 	while ((ch = getopt(argc, argv,
-			    "F:H:E:f:b:w:y:l:hgxu:m:p:r:t:q:d:ae:")) != -1)
+			    "F:H:P:E:f:b:w:y:l:hgxu:m:p:r:t:q:d:ae:")) != -1)
 		switch(ch) {
 		case 'F':
 			coaddr = optarg;
 			break;
 		case 'H':
 			homeaddr = optarg;
+			break;
+		case 'P':
+			homepref = optarg;
 			break;
 		case 'l':
 			hr_lifetime = optarg;
@@ -613,6 +674,9 @@ main(int argc, char *argv[])
 
 	if (homeaddr)
 		if (set_homeaddr(homeaddr, SIOCAHOMEADDR_MIP6) > 0)
+			exit(1);
+	if (homepref)
+		if (set_homepref(homepref, SIOCAHOMEPREF_MIP6) > 0)
 			exit(1);
 
 #if 0

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.66 2001/02/06 09:05:05 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.67 2001/03/29 05:34:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -348,23 +348,42 @@ ip6_forward(m, srcrt)
     skip_ipsec:
 #endif /* IPSEC */
 
-#ifdef MIP6
+#ifdef OLDMIP6
 	{
 		struct   mip6_bc   *bc;
 
-		bc = mip6_bc_find(&ip6->ip6_dst);
-		if ((bc != NULL) && (bc->hr_flag)) {
+		bc = mip6_bc_find(NULL, &ip6->ip6_dst);
+		if ((bc != NULL) && (bc->flags & IP6_BUF_HOME)) {
 			if (mip6_tunnel_output(&m, bc) != 0) {
 				ip6stat.ip6s_cantforward++;
-				if (mcopy)
-					m_freem(mcopy);
+				if (mcopy) m_freem(mcopy);
 				m_freem(m);
 				return;
 			}
 		}
 		ip6 = mtod(m, struct ip6_hdr *);	/* m has changed */
 	}
+#endif /* OLDMIP6 */
+#ifdef MIP6
+	{
+		struct   mip6_bc   *bc;
+
+		bc = mip6_bc_find(NULL, &ip6->ip6_dst);
+		if ((bc != NULL) && (bc->flags & IP6_BUF_HOME)) {
+			if (mip6_tunnel_output(&m, bc) != 0) {
+#ifdef MIP6_DEBUG
+				mip6_debug("%s: can't forward packet to MN\n",
+					   __FUNCTION__);
 #endif
+				ip6stat.ip6s_cantforward++;
+				if (mcopy)
+					m_freem(mcopy);
+/*				m_freem(m);    Correct? */
+			}
+			return;
+		}
+	}
+#endif /* MIP6 */
 
 	dst = (struct sockaddr_in6 *)&ip6_forward_rt.ro_dst;
 	if (!srcrt) {

@@ -20,7 +20,7 @@
 	statistics have been developed (mip6config and mip6stat). These
 	applications resides in user space.
 
-	The implementation follows draft-ietf-mobileip-ipv6-09.txt with
+	The implementation follows draft-ietf-mobileip-ipv6-13.txt with
 	some minor exceptions (see below for further information). The
 	implementation includes the Correspondent Node part (mandatory for
 	an IPv6 implementation that claims to be IPv6 compliant), the Home
@@ -51,7 +51,8 @@
 	- mip6_ha.c	 (Used when MIP6 option is activated)
 
 	plus a number of other kernel files have been modified to support
-	Mobile IPv6, e.g. netinet6/{nd6*,ip6_{input,output,forward}.c}.
+	Mobile IPv6, e.g. netinet6/{nd6*,ip6_{input,output,forward}.c, 
+	in6_src.c}.
 
 2.2	New and Modified Applications
 
@@ -82,7 +83,7 @@
 	To view and clear internal lists that are created by Mobile IPv6 the
 	``mip6stat'' command is used. Different lists are used in different
 	parts (Correspondent Node, Mobile Node and Home Agent) of the code
-	and therefor some commands will be enabled or disabled respectively.
+	and therefore some commands will be enabled or disabled respectively.
 
 2.2.3	Changes to router advertisement deamon
 
@@ -116,7 +117,8 @@
 	implemented previously. The new features are only shown in verbose 
 	(-v) mode.
 
-	(Note: tcpdump is not supported by Kame any more.)
+	(Note: tcpdump is not supported by Kame any more. Ethereal with latest
+	sources will support Mobile IPv6.)
 
 3.0	PREPARATIONS BEFORE RUNNING MOBILE IPv6
 
@@ -143,8 +145,12 @@
 	The printout is enabled/disabled by using the ``mip6config -d [1|0]''
 	command.
 
-	We currently suggest that you disable ``options IPSEC'' in the 
-	kernel, see below.
+	You may enable or disable ``options IPSEC'' etc. in the kernel. IPsec
+	isn't required at this point. However, if you define IPsec and a
+	SPD entry of upperspec ``any'' between e.g. Mobile Node and Home Agent,
+	together with SAs using AH, Authentication Headers will be included in
+	the Binding Updates and Binding Acknowledgement. Please see setkey(8)
+	and mip6_ipsec.sh in this directory.
 
 3.2	Setting up the Home Agent
 
@@ -192,33 +198,40 @@
 	or
 	    `mip6config -H <Home addr>/<plen>@<interface>%<Home Agent addr>''
 	or
+	    `mip6config -P <Home prefix>/<plen>''
+	or
 	    ``mip6config -f <file>
 
 	    with either line specified in <file>:
 		  ``autoconfig''
 	      or
 		  ``homeaddr <Home addr>/<plen>@<interface>%<Home Agent addr>''
+	      or
+		  ``homepref <Home prefix>/<plen>''
 
 	At the moment we recommend the manual (-H) alternative and that this
 	is written in a configuration file. See example file
 	/usr/local/v6/etc/mip6.conf.sample.
 
+	There are some more issues on this, please see QUICKSTART. Expect
+	changes in this configuration in the near future.
 
 
 4.0	OUTSTANDING ISSUES
 
 4.1	Draft compliance
 
-	The implementation follows draft-ietf-mobileip-ipv6-09.txt with the
+	The implementation follows draft-ietf-mobileip-ipv6-13.txt with the
 	following exceptions:
 
-	- Section 9.7 "Renumbering the Home subnet" has not been implemented.
+	- Section 9.8 "Renumbering the Home subnet" is not finished, nor
+	  the use of tunneled Router Solicitations and Advertisements.
 
 	- Support for multihoming and multiple arbitrary home addresses is
-	  not implemented.
-
-	- Support for IPSec has been implemented but not tested. It might be
-	  the case that there is more work to do. We have to look into this.
+	  not implemented. However, multiple Home Addresses with the same 
+	  interface identifier part are supported. This assumes that all
+	  Home Addresses are formed from all on-link prefixes on the home 
+	  subnet.
 
 4.2	Missing functionality
 
@@ -247,4 +260,13 @@
 	   * -q  (Enable sending BR to the MN)
 	   * -a  (Allow autoconfiguration of Home address)
 
-$KAME: README_MIP6.txt,v 1.4 2001/01/22 10:39:13 itojun Exp $
+	- Duplicate Address Detection requests always return OK from
+	  Home Agent.
+
+	- Dynamic Home Agent Address Discovery is not enabled in this
+	  first release (2001-03-16).
+
+	- Home Subnet Renumbering is not enabled in this first release
+	  (2001-03-16).
+
+$KAME: README_MIP6.txt,v 1.5 2001/03/29 05:34:28 itojun Exp $

@@ -1,7 +1,7 @@
-/*	$KAME: mip6stat.h,v 1.5 2001/03/29 03:28:34 itojun Exp $	*/
+/*	$KAME: mip6stat.h,v 1.6 2001/03/29 05:34:29 itojun Exp $	*/
 
 /*
- * Copyright (c) 1999 Ericsson Radio Systems AB
+ * Copyright (c) 1999, 2000 and 2001 Ericsson Radio Systems AB
  * All rights reserved.
  *
  * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.106 2001/03/15 08:29:04 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.107 2001/03/29 05:34:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -72,6 +72,7 @@
 
 #ifdef MIP6
 #include <netinet6/mip6.h>
+#include <netinet6/mip6_common.h>
 #endif
 
 #include <net/net_osdep.h>
@@ -79,23 +80,35 @@
 #define SDL(s)	((struct sockaddr_dl *)s)
 
 static struct nd_defrouter *defrtrlist_update __P((struct nd_defrouter *));
-static struct in6_ifaddr *in6_ifadd __P((struct nd_prefix *));
-/*static struct nd_pfxrouter *pfxrtr_lookup __P((struct nd_prefix *,
-  struct nd_defrouter *)); XXXYYYY */
+#ifndef MIP6
+static struct in6_ifaddr *in6_ifadd __P((struct nd_prefix *,
+	struct in6_addr *));
+static struct nd_pfxrouter *pfxrtr_lookup __P((struct nd_prefix *,
+	struct nd_defrouter *));
+#endif
 static void pfxrtr_add __P((struct nd_prefix *, struct nd_defrouter *));
 static void pfxrtr_del __P((struct nd_pfxrouter *));
-/*static struct nd_pfxrouter *find_pfxlist_reachable_router __P((struct nd_prefix *));  XXXYYY */
-/* static void defrouter_addifreq __P((struct ifnet *)); XXXYYY */
+#ifndef MIP6
+static struct nd_pfxrouter *find_pfxlist_reachable_router
+	__P((struct nd_prefix *));
+static void defrouter_addifreq __P((struct ifnet *));
+#endif
 static void nd6_rtmsg __P((int, struct rtentry *));
 
+#ifndef MIP6
 static void in6_init_address_ltimes __P((struct nd_prefix *ndpr,
 					 struct in6_addrlifetime *lt6));
+#endif
 
 static int rt6_deleteroute __P((struct radix_node *, void *));
 
 extern int nd6_recalc_reachtm_interval;
 
+#ifdef MIP6
 struct ifnet *nd6_defifp;
+#else
+static struct ifnet *nd6_defifp;
+#endif
 int nd6_defifindex;
 
 int ip6_use_tempaddr = 0;
@@ -244,6 +257,9 @@ nd6_ra_input(m, off, icmp6len)
 #endif
 	union nd_opts ndopts;
 	struct nd_defrouter *dr;
+#ifdef MIP6
+	int home = 0;
+#endif
 
 	if (ip6_accept_rtadv == 0)
 		goto freeit;
@@ -256,7 +272,11 @@ nd6_ra_input(m, off, icmp6len)
 		goto bad;
 	}
 
-	if (!IN6_IS_ADDR_LINKLOCAL(&saddr6)) {
+	if (!IN6_IS_ADDR_LINKLOCAL(&saddr6)
+#ifdef MIP6
+	    && MIP6_IS_MN_ACTIVE && !mip6_incl_br(m)
+#endif /* MIP6 */
+		) {
 		nd6log((LOG_ERR,
 		    "nd6_ra_input: src %s is not link-local\n",
 		    ip6_sprintf(&saddr6)));
@@ -283,6 +303,17 @@ nd6_ra_input(m, off, icmp6len)
 		goto freeit;
 	}
 
+#ifdef MIP6
+	if (MIP6_IS_MN_ACTIVE && mip6_incl_br(m)) {
+#ifdef MIP6_DEBUG
+		mip6_debug("%s: tunneled RA from %s\n",
+			   __FUNCTION__,
+			   ip6_sprintf(&saddr6));
+#endif
+		dr = NULL;
+		goto prefix;
+	}
+#endif /* MIP6 */
     {
 	struct nd_defrouter dr0;
 	u_int32_t advreachable = nd_ra->nd_ra_reachable;
@@ -315,14 +346,86 @@ nd6_ra_input(m, off, icmp6len)
 	dr = defrtrlist_update(&dr0);
     }
 
+#ifdef MIP6
+  prefix:
+#endif /* MIP6 */
 	/*
 	 * prefix
 	 */
 	if (ndopts.nd_opts_pi) {
 		struct nd_opt_hdr *pt;
-		struct nd_opt_prefix_info *pi;
+		struct nd_opt_prefix_info *pi = NULL;
 		struct nd_prefix pr;
 
+#ifdef MIP6
+		mip6_new_homeaddr = 0;
+
+		/*
+		 * We can be at home and hear primary home prefix plus
+		 * other home prefixes. Some of them are new to us or
+		 * old but not marked home prefixes. Make all of them 
+		 * home prefixes.
+		 * We can also be at foreign and get an RA tunneled 
+		 * (with RH + BR + Id). Do the same, but remember	
+		 *  - not to store the dr
+		 *  - to store the advint option in prefix or esm
+		 *  - to send a BU + Id to HA after parsing all the prefixes
+		 *
+		 * Note that this is not a test for Movement Detection.
+		 */
+		if (MIP6_IS_MN_ACTIVE) {
+			/* XXX Add hook later? */
+
+			for (pt = (struct nd_opt_hdr *)ndopts.nd_opts_pi;
+			     pt <= (struct nd_opt_hdr *)ndopts.nd_opts_pi_end;
+			     pt = (struct nd_opt_hdr *)((caddr_t)pt +
+							(pt->nd_opt_len << 3))) {
+				if (pt->nd_opt_type != 
+				    ND_OPT_PREFIX_INFORMATION)
+					continue;
+				pi = (struct nd_opt_prefix_info *)pt;
+
+				/*
+				 * Strong enough test? We could also
+				 * test if other non-primary home
+				 * prefixes are included, in case
+				 * the primary for some reason isn't.
+				 */
+				if (in6_are_prefix_equal(
+					&pi->nd_opt_pi_prefix,
+					&mip6_php,
+					pi->nd_opt_pi_prefix_len)) {
+				
+					if (home == 0)
+					/*
+					 * This interface is a good generator 
+					 * of our long-lasting interface ID 
+					 * for the home addresses.
+					 */
+						mip6_create_ifid(ifp, 
+							 &pi->nd_opt_pi_prefix,
+							 pi->
+							 nd_opt_pi_prefix_len);
+					home = 1;
+				}
+			}
+#ifdef MIP6_DEBUG
+			if (!home && mip6_incl_br(m))
+				/*
+				 * XXX We could set home=1 if we know this
+				 * is from HA, due to the BR. The HA could
+				 * possibly send RAs without the primary
+				 * home prefix even when there is no
+				 * renumbering taking place.
+				 */
+				mip6_debug("%s: warning, tunneled RA received,"
+					   " but can't recognize any "
+					   "prefixes\n (badly formed "
+					   "renumbering?). Skipping... \n",
+					   __FUNCTION__);
+#endif
+		}
+#endif /* MIP6 */
 		for (pt = (struct nd_opt_hdr *)ndopts.nd_opts_pi;
 		     pt <= (struct nd_opt_hdr *)ndopts.nd_opts_pi_end;
 		     pt = (struct nd_opt_hdr *)((caddr_t)pt +
@@ -381,7 +484,11 @@ nd6_ra_input(m, off, icmp6len)
 			if (in6_init_prefix_ltimes(&pr))
 				continue; /* prefix lifetime init failed */
 
-			(void)prelist_update(&pr, dr, m);
+			(void)prelist_update(&pr, dr, m
+#ifdef MIP6
+				, home
+#endif
+				);
 		}
 	}
 
@@ -459,6 +566,14 @@ nd6_ra_input(m, off, icmp6len)
 		if (ndopts.nd_opts_adv)
 			(*mip6_store_advint_hook)(ndopts.nd_opts_adv, dr);
 	}
+
+	if (MIP6_IS_MN_ACTIVE && home && mip6_incl_br(m))
+		if (mip6_new_homeaddr) {
+#if 0
+#warning			mip6_send_bu(); /* Merge with Conny */
+#endif
+			printf("blah...\n");; /*RM*/
+		}
 #endif
 
  freeit:
@@ -535,7 +650,11 @@ defrouter_addreq(new)
 }
 
 /* Add a route to a given interface as default */
+#ifdef MIP6
 void
+#else
+static void
+#endif
 defrouter_addifreq(ifp)
 	struct ifnet *ifp;
 {
@@ -838,7 +957,11 @@ defrtrlist_update(new)
 	return(n);
 }
 
+#ifdef MIP6
 struct nd_pfxrouter *
+#else
+static struct nd_pfxrouter *
+#endif
 pfxrtr_lookup(pr, dr)
 	struct nd_prefix *pr;
 	struct nd_defrouter *dr;
@@ -956,6 +1079,10 @@ nd6_prelist_add(pr, dr, newp)
 			 * to FOREIGN when the prefix is not known from before.
 			 */
 			if ((*mip6_get_md_state_hook)() == MIP6_MD_UNDEFINED) {
+#ifdef MIP6_DEBUG
+				mip6_debug("%s: WARNING, this case (hook on prelist_add) is broken. XXX\n", __FUNCTION__);
+				/* XXX No ndpr_addr available yet. */
+#endif
 				if (mip6_select_defrtr_hook)
 					(*mip6_select_defrtr_hook)(NULL, NULL);
 			}
@@ -1001,6 +1128,13 @@ prelist_remove(pr)
 #else
 	s = splnet();
 #endif
+
+#ifdef MIP6
+	/* Reset Mobile IPv6 prefix pointers */
+	mip6_phpp = NULL;
+	mip6_pp = NULL;
+#endif /* MIP6 */
+
 	/* unlink ndpr_entry from nd_prefix list */
 	LIST_REMOVE(pr, ndpr_entry);
 
@@ -1018,10 +1152,18 @@ prelist_remove(pr)
 }
 
 int
+#ifdef MIP6
+prelist_update(new, dr, m, home)
+	struct nd_prefix *new;
+	struct nd_defrouter *dr; /* may be NULL */
+	struct mbuf *m;
+	int home;
+#else
 prelist_update(new, dr, m)
 	struct nd_prefix *new;
 	struct nd_defrouter *dr; /* may be NULL */
 	struct mbuf *m;
+#endif
 {
 	struct in6_ifaddr *ia6 = NULL, *ia6_match = NULL;
 	struct ifaddr *ifa;
@@ -1036,6 +1178,9 @@ prelist_update(new, dr, m)
 	int newprefix = 0;
 	int auth;
 	struct in6_addrlifetime lt6_tmp;
+#ifdef MIP6
+	int was_onlink = 0;
+#endif /* MIP6 */
 
 	auth = 0;
 	if (m) {
@@ -1049,12 +1194,22 @@ prelist_update(new, dr, m)
 #endif
 	}
 
+
+#ifdef MIP6
+	if (MIP6_IS_MN_ACTIVE && home && mip6_incl_br(m)) {
+		/*
+		 * Tunneled RA from HA. No associated prefix.
+		 */
+		pr = nd6_prefix_lookup(new);
+		goto afteraddrconf;
+	}
+#endif /* MIP6 */
 	if ((pr = nd6_prefix_lookup(new)) != NULL) {
 		/*
 		 * nd6_prefix_lookup() ensures that pr and new have the same
 		 * prefix on a same interface.
 		 */
-#ifdef MIP6
+#ifdef OLDMIP6
 		if (mip6_get_home_prefix_hook) {
 			/*
 			 * The home prefix should be kept away from updates.
@@ -1064,7 +1219,7 @@ prelist_update(new, dr, m)
 			if (pr == (*mip6_get_home_prefix_hook)())
 				goto afteraddrconf;
 		}
-#endif /* MIP6 */
+#endif /* OLDMIP6 */
 
 		/*
 		 * Update prefix information.  Note that the on-link (L) bit
@@ -1081,6 +1236,11 @@ prelist_update(new, dr, m)
 			pr->ndpr_preferred = new->ndpr_preferred;
 			pr->ndpr_expire = new->ndpr_expire;
 		}
+
+#ifdef MIP6
+		/* Remember old state for MIP6 */
+		was_onlink = (pr->ndpr_stateflags & NDPRF_ONLINK);
+#endif
 
 		if (new->ndpr_raf_onlink &&
 		    (pr->ndpr_stateflags & NDPRF_ONLINK) == 0) {
@@ -1136,6 +1296,18 @@ prelist_update(new, dr, m)
 
 		pr = newpr;
 	}
+
+#ifdef MIP6
+	if (MIP6_IS_MN_ACTIVE && home)
+		if ((pr->ndpr_stateflags & NDPRF_HOME) == 0) {
+			pr->ndpr_stateflags |= NDPRF_HOME;
+#ifdef MIP6_DEBUG
+			mip6_debug("%s: making %s a home prefix\n",
+				   __FUNCTION__, 
+				   ip6_sprintf(&pr->ndpr_prefix.sin6_addr));
+#endif
+		}
+#endif /* MIP6 */
 
 	/*
 	 * Address autoconfiguration based on Section 5.5.3 of RFC 2462.
@@ -1272,12 +1444,17 @@ prelist_update(new, dr, m)
 		 * No address matched and the valid lifetime is non-zero.
 		 * Create a new address.
 		 */
-		if ((ia6 = in6_ifadd(new)) != NULL) {
+		if ((ia6 = in6_ifadd(new, NULL)) != NULL) {
 			/*
 			 * note that we should use pr (not new) for reference.
 			 */
 			pr->ndpr_refcnt++;
 			ia6->ia6_ndpr = pr;
+
+#if 0
+			/* XXXYYY Don't do this, according to Jinmei. */
+			pr->ndpr_addr = new->ndpr_addr;
+#endif
 
 			/*
 			 * RFC 3041 3.3 (2).
@@ -1315,32 +1492,52 @@ prelist_update(new, dr, m)
 
   afteraddrconf:
 #ifdef MIP6
-	if (newprefix) {
-		int onlink;
+	if (MIP6_IS_MN_ACTIVE && home)
+		/*
+		 * Mobile IPv6 home addresses are not updated in the 
+		 * procedure above.
+		 */
+		mip6_update_home_addrs(m, new, auth);
 
-		onlink = (pr->ndpr_stateflags & NDPRF_ONLINK); /* for MIP6 */
+	if (mip6_incl_br(m))
+		/*
+		 * Tunneled RAs from HA must not trigger movement
+		 * detection.
+		 */
+		goto end;
 
-		if (mip6_prelist_update_hook) {
-			/*
-			 * Check for home prefix. It can't be a fresh prefix
-			 * (since it's static), so check here.
-			 */
-			(*mip6_prelist_update_hook)(pr, dr, onlink);
-		}
+	if (mip6_prelist_update_hook) {
+		/*
+		 * Check for if this prefix can trigger
+		 * movement home (eager 0) or any movement
+		 * (eager 2).
+		 */
+		(*mip6_prelist_update_hook)(pr, dr, was_onlink);
+	}
+
+	if (!newprefix) {
+		/* 
+		 * XXXYYY
+		 * Really need to check this section here. I don't know
+		 * if it's doing everything right. Mattias, 20010210.
+		 */
 
 		if (mip6_probe_pfxrtrs_hook) {
 			/*
 			 * If this prefix previously was detached, maybe we
 			 * have moved.
 			 */
-			if (!onlink)
+			if (!was_onlink)
 				(*mip6_probe_pfxrtrs_hook)();
 		}
 	} else {
+#ifdef OLDMIP6
+		/* XXX This is not needed in new MIP6. mip6_prelist_update()
+		   does the work. */
 		if (mip6_eager_prefix_hook)
 			/* New prefix: if eager, try to move */
-			(*mip6_eager_prefix_hook)(new, dr);
-
+			(*mip6_eager_prefix_hook)(pr, dr);
+#endif
 		if (mip6_probe_pfxrtrs_hook) {
 			/* This is a new prefix, maybe we have moved. */
 			(*mip6_probe_pfxrtrs_hook)();
@@ -1354,7 +1551,7 @@ prelist_update(new, dr, m)
 			 * from that.
 			 */
 			if (ia6)
-				(*mip6_minus_a_case_hook)(new);
+				(*mip6_minus_a_case_hook)(pr);
 		}
 	}
 #endif /* MIP6 */
@@ -1369,7 +1566,11 @@ prelist_update(new, dr, m)
  * detect if a given prefix has a (probably) reachable advertising router.
  * XXX: lengthy function name...
  */
+#ifdef MIP6
 struct nd_pfxrouter *
+#else
+static struct nd_pfxrouter *
+#endif
 find_pfxlist_reachable_router(pr)
 	struct nd_prefix *pr;
 {
@@ -1685,6 +1886,16 @@ nd6_prefix_offlink(pr)
 		return(EEXIST);
 	}
 
+#ifdef MIP6
+	if (pr == mip6_phpp) {
+		/* Keep consistent. Don't cache off-link pr. */
+		mip6_phpp = NULL;
+#ifdef MIP6_DEBUG
+		mip6_debug("%s: primary home prefix is detached.\n",
+			   __FUNCTION__);
+#endif
+	}
+#endif
 	bzero(&sa6, sizeof(sa6));
 	sa6.sin6_family = AF_INET6;
 	sa6.sin6_len = sizeof(sa6);
@@ -1762,9 +1973,14 @@ nd6_prefix_offlink(pr)
 	return(error);
 }
 
+#ifdef MIP6
+struct in6_ifaddr *
+#else
 static struct in6_ifaddr *
-in6_ifadd(pr)
+#endif
+in6_ifadd(pr, ifid)
 	struct nd_prefix *pr;
+	struct in6_addr  *ifid;   /* Mobile IPv6 addition */
 {
 	struct ifnet *ifp = pr->ndpr_ifp;
 	struct ifaddr *ifa;
@@ -1795,6 +2011,10 @@ in6_ifadd(pr)
 	 * (4) it is easier to manage when an interface has addresses
 	 * with the same interface identifier, than to have multiple addresses
 	 * with different interface identifiers.
+	 *
+	 * Mobile IPv6 addition: allow for caller to specify a wished interface
+	 * ID. This is to not break connections when moving addresses between
+	 * interfaces.
 	 */
 	ifa = (struct ifaddr *)in6ifa_ifpforlinklocal(ifp, 0);/* 0 is OK? */
 	if (ifa)
@@ -1836,16 +2056,19 @@ in6_ifadd(pr)
 	ifra.ifra_addr.sin6_addr.s6_addr32[1] &= mask.s6_addr32[1];
 	ifra.ifra_addr.sin6_addr.s6_addr32[2] &= mask.s6_addr32[2];
 	ifra.ifra_addr.sin6_addr.s6_addr32[3] &= mask.s6_addr32[3];
-	/* interface ID */
-	ifra.ifra_addr.sin6_addr.s6_addr32[0]
-		|= (ib->ia_addr.sin6_addr.s6_addr32[0] & ~mask.s6_addr32[0]);
-	ifra.ifra_addr.sin6_addr.s6_addr32[1]
-		|= (ib->ia_addr.sin6_addr.s6_addr32[1] & ~mask.s6_addr32[1]);
-	ifra.ifra_addr.sin6_addr.s6_addr32[2]
-		|= (ib->ia_addr.sin6_addr.s6_addr32[2] & ~mask.s6_addr32[2]);
-	ifra.ifra_addr.sin6_addr.s6_addr32[3]
-		|= (ib->ia_addr.sin6_addr.s6_addr32[3] & ~mask.s6_addr32[3]);
 
+	/* interface ID */
+	if (ifid == NULL || IN6_IS_ADDR_UNSPECIFIED(ifid))
+		ifid = &ib->ia_addr.sin6_addr;
+	ifra.ifra_addr.sin6_addr.s6_addr32[0]
+		|= (ifid->s6_addr32[0] & ~mask.s6_addr32[0]);
+	ifra.ifra_addr.sin6_addr.s6_addr32[1]
+		|= (ifid->s6_addr32[0] & ~mask.s6_addr32[0]);
+	ifra.ifra_addr.sin6_addr.s6_addr32[2]
+		|= (ifid->s6_addr32[0] & ~mask.s6_addr32[0]);
+	ifra.ifra_addr.sin6_addr.s6_addr32[3]
+		|= (ifid->s6_addr32[0] & ~mask.s6_addr32[0]);
+	    
 	/* new prefix mask. */
 	ifra.ifra_prefixmask.sin6_len = sizeof(struct sockaddr_in6);
 	ifra.ifra_prefixmask.sin6_family = AF_INET6;
@@ -2021,7 +2244,11 @@ in6_init_prefix_ltimes(struct nd_prefix *ndpr)
 	return 0;
 }
 
+#ifdef MIP6
+void
+#else
 static void
+#endif
 in6_init_address_ltimes(struct nd_prefix *new, struct in6_addrlifetime *lt6)
 {
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)

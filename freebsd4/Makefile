@@ -40,6 +40,7 @@ afterinstall:
 	done
 	cp kame/mip6config/README_MIP6.txt $(PREFIX)/share/doc/kame
 	cp kame/mip6config/QUICKSTART $(PREFIX)/share/doc/kame
+	cp kame/mip6config/mip6_ipsec.sh $(PREFIX)/share/doc/kame
 	cp ${.CURDIR}/INSTALL ${PREFIX}/share/doc/kame/INSTALL.freebsd4
 	${INSTALL} -c -o ${BINOWN} -g ${BINGRP} -m 555 \
 		${.CURDIR}/kame/etc/MAKEDEV.altq ${DESTDIR}/dev

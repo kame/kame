@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.173 2001/03/28 23:28:45 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.174 2001/03/29 05:34:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -146,6 +146,10 @@ extern int ipsec_esp_network_default_level;
 
 #include <net/net_osdep.h>
 
+#ifdef MIP6
+#include <netinet6/mip6.h>
+#endif /* MIP6 */
+
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 static MALLOC_DEFINE(M_IPMOPTS, "ip6_moptions", "internet multicast options");
 #endif
@@ -185,9 +189,6 @@ extern struct ifnet *loifp;
 extern struct ifnet loif[NLOOP];
 #endif
 
-#ifdef MIP6
-int (*mip6_output_hook)(struct mbuf *m, struct ip6_pktopts **opt);
-#endif /* MIP6 */
 
 /*
  * IP6 output. The packet in mbuf chain m contains a skeletal IP6
@@ -199,6 +200,18 @@ int (*mip6_output_hook)(struct mbuf *m, struct ip6_pktopts **opt);
  * type of "mtu": rt_rmx.rmx_mtu is u_long, ifnet.ifr_mtu is int, and
  * nd_ifinfo.linkmtu is u_int32_t.  so we use u_long to hold largest one,
  * which is rt_rmx.rmx_mtu.
+ *
+ * If MIP6 is active it will have to add a Home Address option to DH1 if
+ * the mobile node is roaming or a Routing Header type 0 if there exist
+ * a Binding Cache entry for the destination node or a BU option to DH2
+ * if the mobile node initiates communication and no BUL entry exist.
+ * The only way to do this is to allocate new memory, copy the user data
+ * to the new buffer and then add the Home Address option, BU option and
+ * routing header type 0 respectively. MIP6 will set two flags in "struct
+ * pktopts" to restore the original contents once ip6_output is completed.
+ * To make this work, make sure that function exit is made through label
+ * alldone.
+ *
  */
 int
 ip6_output(m0, opt, ro, flags, im6o, ifpp)
@@ -288,19 +301,24 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	/*
 	 * Mobile IPv6
 	 *
-	 * Call Mobile IPv6 to check if there are any Destination Header
-	 * options to add.
+	 * Call Mobile IPv6 to check if there are any options that have to
+	 * be added to the packet.
 	 */
-	if (mip6_output_hook) {
-		error = (*mip6_output_hook)(m, &opt);
-		if (error)
-			goto freehdrs;
-	}
+	if (mip6_output(m, &opt))
+		goto freehdrs;
 #endif /* MIP6 */
 
 	if (opt) {
 		/* Hop-by-Hop options header */
 		MAKE_EXTHDR(opt->ip6po_hbh, &exthdrs.ip6e_hbh);
+		/* Destination options header(1st part) */
+		MAKE_EXTHDR(opt->ip6po_dest1, &exthdrs.ip6e_dest1);
+#if 0
+		/* ??????
+		   Is the comment in the if-statement realy true?
+		   If I'm a mobile node, adding a Home Address option
+		   in DH1 I don't think that I need a Routing Header.
+		*/
 		if (opt->ip6po_rthdr) {
 			/*
 			 * Destination options header(1st part)
@@ -308,6 +326,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			 */
 			MAKE_EXTHDR(opt->ip6po_dest1, &exthdrs.ip6e_dest1);
 		}
+#endif
 		/* Routing header */
 		MAKE_EXTHDR(opt->ip6po_rthdr, &exthdrs.ip6e_rthdr);
 		/* Destination options header(2nd part) */
@@ -610,6 +629,17 @@ skip_ipsec2:;
 #endif
 	}
 
+#ifdef MIP6
+	/*
+	 * Mobile IPv6
+	 *
+	 * After the IPsec processing the IPv6 header source address
+	 * and the address currently stored in the Home Address option
+	 * field must be exchanged
+	 */
+	mip6_addr_exchange(m, exthdrs.ip6e_dest1);
+#endif /* MIP6 */
+
 	/*
 	 * If there is a routing header, replace destination address field
 	 * with the first hop of the routing header.
@@ -726,7 +756,12 @@ skip_ipsec2:;
 		/* Callee frees mbuf */
 		error = ipsp_process_packet(m, tdb, AF_INET6, 0);
 		splx(s);
+
+#ifdef MIP6
+		goto alldone;
+#else
 		return error;  /* Nothing more to be done */
+#endif
 	}
 #else
 	if (needipsec && needipsectun) {
@@ -1405,6 +1440,30 @@ done:
 		key_freesp(sp);
 #endif /* IPSEC */
 
+#ifdef MIP6
+#if defined(__OpenBSD__) && defined(IPSEC)
+alldone:
+#endif
+	if (opt && opt->ip6po_flags & IP6PO_NEWDH1) {
+		if (opt->ip6po_dest1)
+			free(opt->ip6po_dest1, M_TEMP);
+		opt->ip6po_dest1 = opt->ip6po_orgdh1;
+	}
+	if (opt && opt->ip6po_flags & IP6PO_NEWDH2) {
+		if (opt->ip6po_dest2)
+			free(opt->ip6po_dest2, M_TEMP);
+		opt->ip6po_dest2 = opt->ip6po_orgdh2;
+	}
+	if (opt && opt->ip6po_flags & IP6PO_NEWRH0) {
+		if (opt->ip6po_rthdr)
+			free(opt->ip6po_rthdr, M_TEMP);
+		opt->ip6po_rthdr = opt->ip6po_orgrh0;
+	}
+	if (opt && opt->ip6po_flags & IP6PO_MIP6OPT) {
+		free(opt, M_TEMP);
+		opt = NULL;
+	}
+#endif
 	return(error);
 
 freehdrs:

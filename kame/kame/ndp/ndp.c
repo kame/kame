@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.63 2001/03/22 02:47:37 jinmei Exp $	*/
+/*	$KAME: ndp.c,v 1.64 2001/03/29 05:34:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1119,11 +1119,17 @@ plist()
 		 * meaning of fields, especially flags, is very different
 		 * by origin.  notify the difference to the users.
 		 */
-		printf("flags=%s%s%s%s",
+		printf("flags=%s%s%s%s%s",
 		       p->raflags.onlink ? "L" : "",
 		       p->raflags.autonomous ? "A" : "",
 		       (p->flags & NDPRF_ONLINK) != 0 ? "O" : "",
-		       (p->flags & NDPRF_DETACHED) != 0 ? "D" : "");
+		       (p->flags & NDPRF_DETACHED) != 0 ? "D" : "",
+#ifdef NDPRF_HOME
+		       (p->flags & NDPRF_HOME) != 0 ? "H" : ""
+#else
+		       ""
+#endif
+		       );
 		if (p->vltime == ND6_INFINITE_LIFETIME)
 			printf(" vltime=infinity");
 		else
@@ -1251,11 +1257,17 @@ plist()
 		       PR.origin == PR_ORIG_RA ? "" : "advertise: ");
 #endif
 #ifdef NDPRF_ONLINK
-		printf("flags=%s%s%s%s",
+		printf("flags=%s%s%s%s%s",
 		       PR.raflags.onlink ? "L" : "",
 		       PR.raflags.autonomous ? "A" : "",
 		       (PR.flags & NDPRF_ONLINK) != 0 ? "O" : "",
-		       (PR.flags & NDPRF_DETACHED) != 0 ? "D" : "");
+		       (PR.flags & NDPRF_DETACHED) != 0 ? "D" : "",
+#ifdef NDPRF_HOME
+		       (PR.flags & NDPRF_HOME) != 0 ? "H" : ""
+#else
+		       ""
+#endif
+		       );
 #else
 		printf("flags=%s%s",
 		       PR.raflags.onlink ? "L" : "",

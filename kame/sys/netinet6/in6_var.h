@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.55 2001/02/16 12:49:45 itojun Exp $	*/
+/*	$KAME: in6_var.h,v 1.56 2001/03/29 05:34:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -452,6 +452,7 @@ struct	in6_rrenumreq {
 					 */
 #define IN6_IFF_AUTOCONF	0x40	/* autoconfigurable address. */
 #define IN6_IFF_TEMPORARY	0x80	/* temporary (anonymous) address. */
+#define IN6_IFF_HOME		0x100	/* MIP6 home address. */
 #define IN6_IFF_NOPFX		0x8000	/* skip kernel prefix management.
 					 * XXX: this should be temporary.
 					 */

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.180 2001/03/15 08:29:04 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.181 2001/03/29 05:34:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -493,6 +493,7 @@ in6_control(so, cmd, data, ifp)
 	case SIOCSBULISTFLUSH_MIP6:
 	case SIOCACOADDR_MIP6:
 	case SIOCAHOMEADDR_MIP6:
+	case SIOCAHOMEPREF_MIP6:
 	case SIOCSBULIFETIME_MIP6:
 	case SIOCSHRLIFETIME_MIP6:
 	case SIOCDCOADDR_MIP6:
@@ -2760,34 +2761,6 @@ in6_ifawithifp(ifp, dst)
 	struct in6_ifaddr *dep[2];	/*last-resort: deprecated*/
 
 	dep[0] = dep[1] = NULL;
-
-#if 0
-#ifdef MIP6
-	/*
-	 * This is needed to assure that the Home Address is used for
-	 * outgoing packets when not at home. We can't choose any other
-	 * address if we want to keep connections up during movement.
-	 */
-	if (mip6_get_home_prefix_hook) {	/* Only Mobile Node */
-		struct nd_prefix *pr;
-		if ((pr = (*mip6_get_home_prefix_hook)()) &&
-		    !IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr))
-		{
-			if (dst_scope == in6_addrscope(&pr->ndpr_addr)) {
-#ifdef MIP6_DEBUG
-				/* Noisy but useful */
-				mip6_debug("%s: Local address %s is chosen "
-					   "for pcb to dest %s.\n",
-					   __FUNCTION__,
-					   ip6_sprintf(&pr->ndpr_addr),
-					   ip6_sprintf(dst));
-#endif
-				return(in6ifa_ifpwithaddr(ifp, &pr->ndpr_addr));
-			}
-		}
-	}
-#endif /* MIP6 */
-#endif /* 0 */
 
 	/*
 	 * We first look for addresses in the same scope.

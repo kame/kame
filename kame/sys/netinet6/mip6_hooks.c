@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hooks.c,v 1.13 2001/01/28 09:44:53 itojun Exp $	*/
+/*	$KAME: mip6_hooks.c,v 1.14 2001/03/29 05:34:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -30,12 +30,12 @@
  */
 
 /*
- * Copyright (c) 1999 and 2000 Ericsson Radio Systems AB
+ * Copyright (c) 1999, 2000 and 2001 Ericsson Radio Systems AB
  * All rights reserved.
  *
- * Author: Mattias Pettersson <mattias.pettersson@era.ericsson.se>
- *         Hesham Soliman <hesham.soliman@ericsson.com.au>
- *         Martti Kuparinen <martti.kuparinen@ericsson.com>
+ * Authors: Mattias Pettersson <mattias.pettersson@era.ericsson.se>
+ *          Hesham Soliman <hesham.soliman@ericsson.com.au>
+ *          Martti Kuparinen <martti.kuparinen@ericsson.com>
  *
  */
 
@@ -69,24 +69,13 @@
 /*
  * These are defined in sys/netinet6/
  */
-extern int (*mip6_store_dstopt_pre_hook)(struct mbuf *, u_int8_t *,
-					 u_int8_t, u_int8_t);
-extern int (*mip6_rec_ctrl_sig_hook)(struct mbuf *, int);
-extern int (*mip6_new_packet_hook)(struct mbuf *);
-extern int (*mip6_icmp6_input_hook)(struct mbuf *, int);
-extern int (*mip6_output_hook)(struct mbuf *, struct ip6_pktopts **);
-extern int (*mip6_rec_ra_hook)(struct mbuf *, int);
 
 /* Home Agent-specific hooks */
-extern struct in6_addr * (*mip6_global_addr_hook)(struct in6_addr *);
-extern struct mip6_subopt_hal * (*mip6_hal_dynamic_hook)(struct in6_addr *);
 extern int  (*mip6_write_config_data_ha_hook)(u_long, void *);
 extern int  (*mip6_clear_config_data_ha_hook)(u_long, void *);
 extern int  (*mip6_enable_func_ha_hook)(u_long, caddr_t);
-extern void (*mip6_icmp6_output_hook)(struct mbuf *);
 
 /* Mobile Node-specific hooks */
-extern int  (*mip6_route_optimize_hook)(struct mbuf *);
 extern void (*mip6_select_defrtr_hook)(struct nd_prefix *,
 				       struct nd_defrouter *);
 extern struct nd_prefix * (*mip6_get_home_prefix_hook)(void);
@@ -100,33 +89,29 @@ extern void (*mip6_probe_pfxrtrs_hook)(void);
 extern void (*mip6_store_advint_hook)(struct nd_opt_advinterval *,
 				      struct nd_defrouter *);
 extern int  (*mip6_get_md_state_hook)(void);
-extern int  (*mip6_rec_ba_hook)(struct mbuf *, int);
-extern int  (*mip6_rec_br_hook)(struct mbuf *, int);
-extern void (*mip6_stop_bu_hook)(struct in6_addr *);
 extern int  (*mip6_write_config_data_mn_hook)(u_long, void *);
 extern int  (*mip6_clear_config_data_mn_hook)(u_long, caddr_t);
 extern int  (*mip6_enable_func_mn_hook)(u_long, caddr_t);
 extern void (*mip6_minus_a_case_hook)(struct nd_prefix *);
-extern struct mip6_esm * (*mip6_esm_find_hook)(struct in6_addr *);
 
 
 void
 mip6_minus_a_case(struct nd_prefix *pr)
 {
 	struct in6_addr   addr;
+	struct in6_ifaddr *ia6;
 
-	if (IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr) ||
-	    IN6_IS_ADDR_MULTICAST(&pr->ndpr_addr) ||
-	    IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_addr)) {
+	if ((ia6 = mip6_coa_lookup(pr)) == NULL) {
 		return;
 	}
 
 	addr = in6addr_any;
-	mip6_esm_create(pr->ndpr_ifp, NULL, &addr, &pr->ndpr_addr,
+	mip6_esm_create(pr->ndpr_ifp, NULL, &addr, &ia6->ia_addr.sin6_addr,
+			&pr->ndpr_prefix.sin6_addr,
 			pr->ndpr_plen, MIP6_STATE_UNDEF, PERMANENT, 0xFFFF);
 #ifdef MIP6_DEBUG
 	mip6_debug("Late Home Address %s found for autoconfig'd case. Starting"
-		   " Mobile IPv6.\n", ip6_sprintf(&pr->ndpr_addr));
+		   " Mobile IPv6.\n", ip6_sprintf(&ia6->ia_addr.sin6_addr));
 #endif
 	mip6_minus_a_case_hook = 0;
 	mip6_enable_hooks(MIP6_SPECIFIC_HOOKS);
@@ -134,21 +119,22 @@ mip6_minus_a_case(struct nd_prefix *pr)
 }
 
 struct nd_prefix *
-mip6_find_auto_home_addr(void)
+mip6_find_auto_home_addr(struct in6_ifaddr **ia6p)
 {
 	struct nd_prefix *pr;
 #if 0
 	struct in6_ifaddr *ia6;
 #endif
 
+	if (ia6p == NULL)
+		return NULL;
+
 	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
 #ifdef MIP6_DEBUG
 		mip6_debug("%s: scanning prefix %s (pr = %p)\n", __FUNCTION__,
 			   ip6_sprintf(&pr->ndpr_prefix.sin6_addr), pr);
 #endif
-		if (IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr) ||
-		    IN6_IS_ADDR_MULTICAST(&pr->ndpr_addr) ||
-		    IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_addr)) {
+		if ((*ia6p = mip6_coa_lookup(pr)) == NULL) {
 			continue;
 		}
 #if 0
@@ -174,10 +160,11 @@ mip6_find_auto_home_addr(void)
 		}
 #endif /* 0 */
 	}
-	if (pr) {
+	if (*ia6p) {
 #ifdef MIP6_DEBUG
 		mip6_debug("Found an autoconfigured home address "
-			   "immediately: %s\n", ip6_sprintf(&pr->ndpr_addr));
+			   "immediately: %s\n", 
+			   ip6_sprintf(&(*ia6p)->ia_addr.sin6_addr));
 #endif
 	}
 	else {
@@ -202,13 +189,6 @@ mip6_enable_hooks(int scope)
 	 * here.
 	 */
 	s = splimp();
-	if (scope == MIP6_GENERIC_HOOKS) {
-		mip6_store_dstopt_pre_hook = mip6_store_dstopt_pre;
-		mip6_rec_ctrl_sig_hook = mip6_rec_ctrl_sig;
-		mip6_new_packet_hook = mip6_new_packet;
-		mip6_icmp6_input_hook = mip6_icmp6_input;
-		mip6_output_hook = mip6_output;
-	}
 
 	if (scope == MIP6_CONFIG_HOOKS) {
 		/* Activate Home Agent-specific hooks */
@@ -223,30 +203,18 @@ mip6_enable_hooks(int scope)
 	}
 
 	if (scope == MIP6_SPECIFIC_HOOKS) {
-		/* Activate Home Agent-specific hooks */
-		if (MIP6_IS_HA_ACTIVE) {
-			mip6_rec_ra_hook = mip6_rec_raha;
-			mip6_global_addr_hook = mip6_global_addr;
-			mip6_hal_dynamic_hook = mip6_hal_dynamic;
-			mip6_icmp6_output_hook = mip6_icmp6_output;
-		}
-
 		/* Activate Mobile Node-specific hooks */
 		if (MIP6_IS_MN_ACTIVE) {
-			mip6_route_optimize_hook = mip6_route_optimize;
-			mip6_rec_ra_hook = mip6_rec_ramn;
 			mip6_select_defrtr_hook = mip6_select_defrtr;
 			mip6_get_home_prefix_hook = mip6_get_home_prefix;
 			mip6_prelist_update_hook = mip6_prelist_update;
 			mip6_expired_defrouter_hook = mip6_expired_defrouter;
+#ifdef OLDMIP6
 			mip6_eager_prefix_hook = mip6_eager_prefix;
+#endif
 			mip6_probe_pfxrtrs_hook = mip6_probe_pfxrtrs;
 			mip6_store_advint_hook = mip6_store_advint;
 			mip6_get_md_state_hook = mip6_get_md_state;
-			mip6_rec_ba_hook = mip6_rec_ba;
-			mip6_rec_br_hook = mip6_rec_bu;
-			mip6_stop_bu_hook = mip6_stop_bu;
-			mip6_esm_find_hook = mip6_esm_find;
 		}
 	}
 	splx(s);
@@ -265,21 +233,9 @@ mip6_disable_hooks(int scope)
 	 */
 	s = splimp();
 
-	if (scope == MIP6_GENERIC_HOOKS) {
-		mip6_store_dstopt_pre_hook = 0;
-		mip6_rec_ctrl_sig_hook = 0;
-		mip6_new_packet_hook = 0;
-		mip6_icmp6_input_hook = 0;
-		mip6_output_hook = 0;
-	}
-
 	if (scope == MIP6_SPECIFIC_HOOKS) {
-
 		/* De-activate Home Agent-specific hooks */
 		if (MIP6_IS_HA_ACTIVE) {
-			mip6_rec_ra_hook = 0;
-			mip6_global_addr_hook = 0;
-			mip6_hal_dynamic_hook = 0;
 			mip6_write_config_data_ha_hook = 0;
 			mip6_clear_config_data_ha_hook = 0;
 			mip6_enable_func_ha_hook = 0;
@@ -287,8 +243,6 @@ mip6_disable_hooks(int scope)
 
 		/* De-activate Mobile Node-specific hooks */
 		if (MIP6_IS_MN_ACTIVE) {
-			mip6_route_optimize_hook = 0;
-			mip6_rec_ra_hook = 0;
 			mip6_select_defrtr_hook = 0;
 			mip6_get_home_prefix_hook = 0;
 			mip6_prelist_update_hook = 0;
@@ -297,13 +251,9 @@ mip6_disable_hooks(int scope)
 			mip6_probe_pfxrtrs_hook = 0;
 			mip6_store_advint_hook = 0;
 			mip6_get_md_state_hook = 0;
-			mip6_rec_ba_hook = 0;
-			mip6_rec_br_hook = 0;
-			mip6_stop_bu_hook = 0;
 			mip6_write_config_data_mn_hook = 0;
 			mip6_clear_config_data_mn_hook = 0;
 			mip6_enable_func_mn_hook = 0;
-			mip6_esm_find_hook = 0;
 			mip6_minus_a_case_hook = 0;
 		}
 	}
@@ -317,8 +267,8 @@ mip6_attach(int module)
 {
 	/*
 	 * Important that necessary settings have been done _before_ calling
-	 * mip6_attach(), e.g. home address specified or autoconfig set.
-	 * mip6config program sees to that.
+	 * mip6_attach(), e.g. home address or home prefix specified, or 
+	 * autoconfig set. "mip6config" program sees to that.
 	 */
 
 /*
@@ -395,11 +345,14 @@ mip6_attach(int module)
 		if (mip6_config.autoconfig) {
 			struct nd_prefix *pr;
 			struct in6_addr   addr;
+			struct in6_ifaddr *ia6;
 
 			addr = in6addr_any;
-			if ((pr = mip6_find_auto_home_addr()) != NULL) {
+			if ((pr = mip6_find_auto_home_addr(&ia6)) != NULL) {
 				mip6_esm_create(pr->ndpr_ifp, &addr, &addr,
-						&pr->ndpr_addr,pr->ndpr_plen,
+						&ia6->ia_addr.sin6_addr,
+						&pr->ndpr_prefix.sin6_addr,
+						pr->ndpr_plen,
 						MIP6_STATE_UNDEF, PERMANENT,
 						0xFFFF);
 				mip6_enable_hooks(MIP6_SPECIFIC_HOOKS);

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.207 2001/03/23 06:36:30 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.208 2001/03/29 05:34:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -127,6 +127,10 @@
 #include <net/if_faith.h>
 #endif
 
+#ifdef MIP6
+#include <netinet6/mip6.h>
+#endif
+
 #include <net/net_osdep.h>
 
 #ifdef HAVE_NRL_INPCB
@@ -234,9 +238,6 @@ static struct route_in6 icmp6_reflect_rt;
 #endif
 #endif
 
-#ifdef MIP6
-int (*mip6_icmp6_input_hook)(struct mbuf *m, int off) = NULL;
-#endif /* MIP6 */
 
 void
 icmp6_init()
@@ -547,23 +548,13 @@ icmp6_input(mp, offp, proto)
 	if (icmp6->icmp6_type < ICMP6_INFOMSG_MASK)
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_error);
 
-#ifdef MIP6
-	/*
-	 * Mobile IPv6
-	 *
-	 * Check for ICMP errors and modifications and extensions to Router
-	 * Advertisement.
-	 */
-	if (mip6_icmp6_input_hook) {
-		if ((*mip6_icmp6_input_hook)(m, off) != 0)
-			goto freeit;
-	}
-#endif /* MIP6 */
-	
 	switch (icmp6->icmp6_type) {
-
 	case ICMP6_DST_UNREACH:
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_dstunreach);
+#ifdef MIP6
+		if (mip6_icmp6_input(m, off, icmp6len))
+			goto freeit;
+#endif
 		switch (code) {
 		case ICMP6_DST_UNREACH_NOROUTE:
 			code = PRC_UNREACH_NET;
@@ -629,6 +620,10 @@ icmp6_input(mp, offp, proto)
 			break;
 		case ICMP6_PARAMPROB_HEADER:
 		case ICMP6_PARAMPROB_OPTION:
+#ifdef MIP6
+			if (mip6_icmp6_input(m, off, icmp6len))
+				goto freeit;
+#endif
 			code = PRC_PARAMPROB;
 			break;
 		default:
@@ -857,6 +852,10 @@ icmp6_input(mp, offp, proto)
 			m = NULL;
 			goto freeit;
 		}
+#ifdef MIP6
+		if (mip6_icmp6_input(n, off, icmp6len))
+			goto freeit;
+#endif
 		nd6_ra_input(n, off, icmp6len);
 		/* m stays. */
 		break;
@@ -916,6 +915,18 @@ icmp6_input(mp, offp, proto)
 		if (icmp6len < sizeof(struct icmp6_router_renum))
 			goto badlen;
 		break;
+
+#ifdef MIP6
+	case ICMP6_HADISCOV_REQUEST:
+		if (mip6_icmp6_input(m, off, icmp6len))
+			goto freeit;
+		break;
+		
+	case ICMP6_HADISCOV_REPLY:
+		if (mip6_icmp6_input(m, off, icmp6len))
+			goto freeit;
+		break;
+#endif
 
 	default:
 		nd6log((LOG_DEBUG,

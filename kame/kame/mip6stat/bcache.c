@@ -1,4 +1,4 @@
-/*	$KAME: bcache.c,v 1.6 2001/03/29 03:28:34 itojun Exp $	*/
+/*	$KAME: bcache.c,v 1.7 2001/03/29 05:34:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * Copyright (c) 1999 and 2000 Ericsson Radio Systems AB
+ * Copyright (c) 1999, 2000 and 2001 Ericsson Radio Systems AB
  * All rights reserved.
  *
  * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>
@@ -43,6 +43,7 @@
 #include <sys/queue.h>
 
 #include <netinet/in.h>
+#include <netinet/ip6.h>
 #include <net/if.h>
 #if defined( __FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
@@ -112,14 +113,14 @@ pr_bcentry(struct mip6_bc bcentry)
 {
 	char *cp;
 
-	cp = ip6addr_print(&bcentry.home_addr, -1);
+	cp = ip6addr_print(&bcentry.peer_home, -1);
 
 	if (nflag)
 		printf("%-*s ", WID_IP6, cp);
 	else
 		printf("%-*.*s ", WID_IP6, WID_IP6, cp);
 
-	cp = ip6addr_print(&bcentry.coa, bcentry.prefix_len);
+	cp = ip6addr_print(&bcentry.peer_coa, bcentry.prefixlen);
 	if (nflag)
 		printf("%-*s ", WID_IP6, cp);
 	else
@@ -135,10 +136,14 @@ pr_bcentry(struct mip6_bc bcentry)
 		struct ifnet gif_ifs;
 #endif
 
-		if(bcentry.hr_flag)
+		if(bcentry.flags & IP6_BUF_HOME)
 			strcat(flags, "H");
-		if(bcentry.rtr_flag)
+		if(bcentry.flags & IP6_BUF_ROUTER)
 			strcat(flags, "R");
+		if(bcentry.flags & IP6_BUF_ACK)
+			strcat(flags, "A");
+		if(bcentry.flags & IP6_BUF_DAD)
+			strcat(flags, "D");
 
 		printf("%6.6s %6d ", flags, bcentry.seqno);
 

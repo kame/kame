@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.6 2001/03/29 03:28:34 itojun Exp $	*/
+/*	$KAME: config.c,v 1.7 2001/03/29 05:34:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -30,10 +30,11 @@
  */
 
 /*
- * Copyright (c) 1999 and 2000 Ericsson Radio Systems AB
+ * Copyright (c) 1999, 2000 and 2001 Ericsson Radio Systems AB
  * All rights reserved.
  *
- * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>
+ * Authors:  Magnus Braathen <magnus.braathen@era.ericsson.se>
+ *           Mattias Pettersson <mattias.pettersson@era.ericsson.se>
  */
 
 #include <sys/types.h>
@@ -124,8 +125,6 @@ pr_configentry(struct mip6_config configentry, int mip6debug, int mip6module)
 	printf("%s  Sending Binding Request\n", BOOLQ(configentry.enable_br));
 
 	printf("%s  Autoconfiguration\n", BOOLQ(configentry.autoconfig));
-
-	printf("%s  Piggybacking\n", BOOLQ(configentry.enable_outq));
 
 	switch (configentry.eager_md) {
 	case 0:

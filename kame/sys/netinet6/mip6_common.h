@@ -1,4 +1,4 @@
-/*	$KAME: mip6_common.h,v 1.10 2000/04/06 08:30:45 sumikawa Exp $	*/
+/*	$KAME: mip6_common.h,v 1.11 2001/03/29 05:34:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,11 +30,12 @@
  */
 
 /*
- * Copyright (c) 1999 and 2000 Ericsson Radio Systems AB
+ * Copyright (c) 1999, 2000 and 2001 Ericsson Radio Systems AB
  * All rights reserved.
  *
- * Author:     Hesham Soliman <hesham.soliman@ericsson.com.au>
- *             Martti Kuparinen <martti.kuparinen@ericsson.com>
+ * Authors: Hesham Soliman <hesham.soliman@ericsson.com.au>
+ *          Martti Kuparinen <martti.kuparinen@ericsson.com>
+ *          Mattias Pettersson <mattias.pettersson@era.ericsson.se>
  */
 
 
@@ -73,6 +74,8 @@
  *                          <mip6config -F>
  * SIOCAHOMEADDR_MIP6       Add home address
  *                          <mip6config -H>
+ * SIOCAHOMEPREF_MIP6       Add home prefix
+ *                          <mip6config -P>
  * SIOCSBULIFETIME_MIP6     Set default BU lifetime
  *                          <mip6config -b>
  * SIOCSHRLIFETIME_MIP6     Set default lifetime for home registration, not BU
@@ -116,6 +119,7 @@
 #define SIOCSEAGERMD_MIP6        _IOWR('M', 22, struct mip6_input_data)
 #define SIOCSATTACH_MIP6         _IOWR('M', 23, struct mip6_input_data)
 #define SIOCSRELEASE_MIP6        _IOWR('M', 24, struct mip6_input_data)
+#define SIOCAHOMEPREF_MIP6       _IOWR('M', 25, struct mip6_input_data)
 
 
 /*

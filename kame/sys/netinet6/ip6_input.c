@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.187 2001/03/21 19:15:28 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.188 2001/03/29 05:34:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -240,11 +240,6 @@ int	natpt_in6	__P((struct mbuf *, struct mbuf **));
 extern void ip_forward	__P((struct mbuf *, int));
 #endif
 
-
-#ifdef MIP6
-int (*mip6_new_packet_hook)(struct mbuf *m) = 0;
-int (*mip6_route_optimize_hook)(struct mbuf *m) = 0;
-#endif
 
 #ifdef MEASURE_PERFORMANCE
 static unsigned long long ctr_beg, ctr_end;
@@ -1174,18 +1169,6 @@ ip6_input(m)
 	in6_ifstat_inc(deliverifp, ifs6_in_deliver);
 	nest = 0;
 
-#ifdef MIP6
-	/*
-	 * Mobile IPv6
-	 *
-	 * Assume that the received packet shall be processed by MIPv6 when
-	 * the destination header has been taken care of. Because of this,
-	 * some flags have to be reset for later evaluation.
-	 */
-	if (mip6_new_packet_hook)
-		(*mip6_new_packet_hook)(m);
-#endif /* MIP6 */
-
 	while (nxt != IPPROTO_DONE) {
 		if (ip6_hdrnestlimit && (++nest > ip6_hdrnestlimit)) {
 			ip6stat.ip6s_toomanyhdr++;
@@ -1232,11 +1215,15 @@ ip6_input(m)
 #endif
 		
 #ifdef MIP6
+		/*
+		  Check if the packet was tunneled after all extion
+		  headers have been processed.
+		*/
 		if ((nxt != IPPROTO_HOPOPTS) && (nxt != IPPROTO_DSTOPTS) &&
 		    (nxt != IPPROTO_ROUTING) && (nxt != IPPROTO_FRAGMENT) &&
 		    (nxt != IPPROTO_ESP) && (nxt != IPPROTO_AH)) {
-			if (mip6_route_optimize_hook)
-				(*mip6_route_optimize_hook)(m);
+			if (mip6_route_optimize(m))
+				goto bad;
 		}
 #endif
 		nxt = (*inet6sw[ip6_protox[nxt]].pr_input)(&m, &off, nxt);

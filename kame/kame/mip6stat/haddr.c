@@ -1,4 +1,4 @@
-/*	$KAME: haddr.c,v 1.6 2001/03/29 03:28:34 itojun Exp $	*/
+/*	$KAME: haddr.c,v 1.7 2001/03/29 05:34:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * Copyright (c) 1999 and 2000 Ericsson Radio Systems AB
+ * Copyright (c) 1999, 2000 and 2001 Ericsson Radio Systems AB
  * All rights reserved.
  *
  * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>
@@ -107,7 +107,7 @@ pr_haentry(struct mip6_esm haentry)
 	char giface[IFNAMSIZ + 3] = { 0 };
 #endif
 
-	cp = ip6addr_print(&haentry.home_addr, haentry.prefix_len);
+	cp = ip6addr_print(&haentry.home_addr, haentry.prefixlen);
 
 	if (nflag)
 		printf("%-*s ", WID_IP6P, cp);

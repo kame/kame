@@ -1,5 +1,6 @@
 debug
 #homeaddr trent_lnc1_300/64@lnc1%bach_xl0
+#homepref 3ffe:200:8:333::/64
 #coaddr 3ffe:200:8:333:210:5aff:fe2d:535f/64@lnc1
 #enable_ha
 #bu_lifetime 3600

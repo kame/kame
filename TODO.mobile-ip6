@@ -1,13 +1,13 @@
 TODOs for mobile-ip6
 KAME project
-$KAME: TODO.mobile-ip6,v 1.10 2000/07/26 08:07:08 itojun Exp $
+$KAME: TODO.mobile-ip6,v 1.11 2001/03/29 05:34:27 itojun Exp $
 
 
-- Indentation.  mip6*.c is not consistent even within a files.  At least
-  rule should be consistent across the file.
-- KLD support for platforms that support it.
+- Finish DHAAD over icmp6.
+- Finish Home network renumbering and tunneled RS/RA.
+- IPsec issues: other than manual keys of type "any".
+- KLD support for platforms that support it. (not interesting /Mattias)
 - Test.
-- relationship with IPsec.
 - there's no vprintf() in kernel for bsdi[34].  (sys/netinet6/mip6.c)
 
 done:
@@ -30,3 +30,12 @@ done:
 - Make routing table/inpcb refresh code portable.  Use of in6_rtchange with
   rnh->rnh_walktree is suggested.
 - make use of encap6_attach(), instead of gif interface.
+- Indentation.  mip6*.c is not consistent even within a files.  At least
+  rule should be consistent across the file.
+- relationship with IPsec.
+- Call ip6_output from mip6_tunnel_output.
+- mbuf leakage.
+- Minimize copying of structs.
+- No faked home nd_prefix.
+- Home addresses are not bound to physical interfaces.
+- Support I-D v13.

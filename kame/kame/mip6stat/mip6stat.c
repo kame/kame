@@ -1,4 +1,4 @@
-/*	$KAME: mip6stat.c,v 1.7 2001/03/29 03:28:34 itojun Exp $	*/
+/*	$KAME: mip6stat.c,v 1.8 2001/03/29 05:34:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -30,10 +30,11 @@
  */
 
 /*
- * Copyright (c) 1999 and 2000 Ericsson Radio Systems AB
+ * Copyright (c) 1999, 2000 and 2001 Ericsson Radio Systems AB
  * All rights reserved.
  *
- * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>
+ * Authors:  Magnus Braathen <magnus.braathen@era.ericsson.se>
+ *           Mattias Pettersson <mattias.pettersson@era.ericsson.se>
  *
  * TODO: This program should only print/clear automaticly created lists,
  *       like Binding cache, HA list, BU list. Other functions should be
@@ -79,7 +80,7 @@ struct nlist namelist[] = {
 #define HADDR       2
 	{ "_mip6_esmq" },
 #define HALIST      3
-	{ "_mip6_llq" },
+	{ "_mip6_haq" },
 #define CONFIG      4
 	{ "_mip6_config" },
 #define BULIST      5
@@ -300,7 +301,8 @@ int main(int argc,
 	if(mflag)
 		haddrpr(namelist[HADDR].n_value);
 	if(pflag)
-		configpr(namelist[CONFIG].n_value, namelist[DEBUGEN].n_value,
+		configpr(namelist[CONFIG].n_value,
+			 namelist[DEBUGEN].n_value,
 			 namelist[MODULE].n_value);
 	if(uflag)
 		bulistpr(namelist[BULIST].n_value);

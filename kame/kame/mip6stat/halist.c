@@ -1,4 +1,4 @@
-/*	$KAME: halist.c,v 1.4 2001/03/29 03:28:34 itojun Exp $	*/
+/*	$KAME: halist.c,v 1.5 2001/03/29 05:34:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * Copyright (c) 1999 and 2000 Ericsson Radio Systems AB
+ * Copyright (c) 1999, 2000 and 2001 Ericsson Radio Systems AB
  * All rights reserved.
  *
  * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>
@@ -55,34 +55,27 @@
 #include "mip6stat.h"
 
 void pr_halhdr __P((void));
-void pr_halentry __P((struct mip6_ha_list, char *));
+void pr_halentry __P((struct mip6_halst));
 
 void
 halistpr(u_long halist)
 {
-	u_long link_ptr;
-	u_long hal_ptr;
-	struct mip6_link_list linkentry;
-	struct mip6_ha_list halentry;
+	u_long             hal_ptr;
+	struct mip6_halst  halentry;
 
 	if (halist == 0) {
 		printf("symbol not in namelist\n");
 		return;
 	}
 
-	kget(halist, link_ptr);
+	kget(halist, hal_ptr);
 
 	printf("HA list:\n");
-
 	pr_halhdr();
 
-	for (; link_ptr; link_ptr = (u_long)linkentry.next) {
-		kget(link_ptr, linkentry);
-		hal_ptr = (u_long)linkentry.ha_list;
-		for (; hal_ptr; hal_ptr = (u_long)halentry.next) {
-			kget(hal_ptr, halentry);
-			pr_halentry(halentry, linkentry.ifname);
-		}
+	for (; hal_ptr; hal_ptr = (u_long)halentry.next) {
+		kget(hal_ptr, halentry);
+		pr_halentry(halentry);
 	}
 }
 
@@ -93,36 +86,43 @@ void
 pr_halhdr()
 {
 	if (lflag)
-		printf("%-*.*s %8.8s %10.10s %6.6s\n",
+		printf("%-*.*s %6.6s %10.10s %8.8s\n",
 			WID_IP6, WID_IP6, "Home agent",
-		       "Lifetime", "Preference", "Netif");
+		       "Netif", "Lifetime", "Preference");
 	else
-		printf("%-*.*s %8.8s %6.6s\n",
+		printf("%-*.*s %6.6s %8.8s\n",
 			WID_IP6, WID_IP6, "Home agent",
-			"Lifetime", "Netif");
+			"Netif", "Lifetime");
 }
 
 void
-pr_halentry(struct mip6_ha_list halentry, char *iface)
+pr_halentry(struct mip6_halst halentry)
 {
-	char *cp = "::";
-	struct mip6_addr_list addrentry;
+	char          *cp = "::";
+	char           ifname[IFNAMSIZ+1];
+	struct ifnet   ifp;
+	
 
-	if (halentry.addr_list) {
-		kget(halentry.addr_list, addrentry);
-
-		cp = ip6addr_print(&addrentry.ip6_addr, addrentry.prefix_len);
-	}
+	cp = ip6addr_print(&halentry.ll_addr, -1);
 
 	if (nflag)
 		printf("%-*s ", WID_IP6, cp);
 	else
 		printf("%-*.*s ", WID_IP6, WID_IP6, cp);
 
+	kget(halentry.ifp, ifp);
+#if defined(__FreeBSD__) || defined(__bsdi__)
+	kget(ifp.if_name, ifname);
+	printf("%4s%2d ", ifname, ifp.if_unit);
+#else
+	kget(ifp.if_xname, ifname);
+	printf("%6s ", ifname);
+#endif
+
 	printf("%8u ", halentry.lifetime);
+
 	if(lflag)
 		printf("%10d ", halentry.pref);
-	printf("%6s ", iface);
 
 	printf("\n");
 }

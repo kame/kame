@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.17 2001/01/23 05:37:28 itojun Exp $	*/
+/*	$KAME: ip6.h,v 1.18 2001/03/29 05:34:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -223,15 +223,14 @@ struct ip6_opt_binding_update {
 	u_int8_t ip6ou_prefixlen;
 	u_int8_t ip6ou_seqno[2];
 	u_int8_t ip6ou_lifetime[4];
-	u_int8_t ip6ou_coa[16];/* Optional based on flags */
 	/* followed by sub-options */
 } __attribute__((__packed__));
 
 /* Binding Update Flags */
 #define IP6_BUF_ACK	0x80	/* Request a binding ack */
 #define IP6_BUF_HOME	0x40	/* Home Registration */
-#define IP6_BUF_COA	0x20	/* Care-of-address present in option */
-#define IP6_BUF_ROUTER	0x10	/* Sending mobile node is a router */
+#define IP6_BUF_ROUTER	0x20	/* Sending mobile node is a router */
+#define IP6_BUF_DAD	0x10	/* Perform Duplicate Address Detection */
 
 /* Binding Ack Option */
 struct ip6_opt_binding_ack {

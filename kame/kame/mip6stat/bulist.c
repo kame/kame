@@ -1,4 +1,4 @@
-/*	$KAME: bulist.c,v 1.5 2001/03/29 03:28:34 itojun Exp $	*/
+/*	$KAME: bulist.c,v 1.6 2001/03/29 05:34:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * Copyright (c) 1999 and 2000 Ericsson Radio Systems AB
+ * Copyright (c) 1999, 2000 and 2001 Ericsson Radio Systems AB
  * All rights reserved.
  *
  * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>
@@ -42,6 +42,7 @@
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <netinet/in.h>
+#include <netinet/ip6.h>
 #include <net/if.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
@@ -108,7 +109,7 @@ pr_buentry(struct mip6_bul buentry)
 	char timebuf[64];
 	struct tm *tm;
 
-	cp = ip6addr_print(&buentry.dst_addr, -1);
+	cp = ip6addr_print(&buentry.peer_home, -1);
 
 	if (nflag)
 		printf("%-*s ", WID_IP6, cp);
@@ -116,20 +117,20 @@ pr_buentry(struct mip6_bul buentry)
 		printf("%-*.*s ", WID_IP6, WID_IP6, cp);
 
 	if (lflag) {
-		cp = ip6addr_print(&buentry.bind_addr, -1);
+		cp = ip6addr_print(&buentry.local_home, -1);
 		if (nflag)
 			printf("%-*s ", WID_IP6, cp);
 		else
 			printf("%-*.*s ", WID_IP6, WID_IP6, cp);
 	}
 
-	cp = ip6addr_print(&buentry.coa, -1);
+	cp = ip6addr_print(&buentry.local_coa, -1);
 	if (nflag)
 		printf("%-*s ", WID_IP6, cp);
 	else
 		printf("%-*.*s ", WID_IP6, WID_IP6, cp);
 
-	printf("%4u/%-4u ", buentry.lifetime, buentry.refreshtime);
+	printf("%4u/%-4u ", buentry.lifetime, buentry.refresh);
 
 	if (lflag) {
 		char flags[5] = { 0 };
@@ -140,13 +141,15 @@ pr_buentry(struct mip6_bul buentry)
 		strftime(timebuf, sizeof(timebuf), "%A", tm);
 
 		printf("%8.8s ", timebuf);
-		printf("%6d ", buentry.no_of_sent_bu);
+		printf("%6d ", buentry.bul_sent);
 
-		if (buentry.bu_flag)
+		if (buentry.flags & IP6_BUF_HOME)
 			strcat(flags, "H");
-		if (buentry.hr_flag)
+#if 0
+/* XXX print other flags??? */
+		if (buentry.flags & 0)
 			strcat(flags, "U");
-
+#endif 
 		printf("%6.6s", flags);
 	}
 

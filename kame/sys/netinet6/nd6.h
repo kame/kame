@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.53 2001/02/24 17:47:22 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.54 2001/03/29 05:34:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -192,6 +192,7 @@ struct	in6_ndifreq {
 /* Prefix status */
 #define NDPRF_ONLINK		0x1
 #define NDPRF_DETACHED		0x2
+#define NDPRF_HOME		0x4
 
 /* protocol constants */
 #define MAX_RTR_SOLICITATION_DELAY	1	/*1sec*/
@@ -324,7 +325,9 @@ extern struct timeout nd6_timer_ch;
 #endif
 
 /* nd6_rtr.c */
-extern struct ifnet *nd6_defifp;  /* XXXYYY */
+#ifdef MIP6
+extern struct ifnet *nd6_defifp;
+#endif
 extern int nd6_defifindex;
 extern int ip6_desync_factor;	/* seconds */
 extern u_int32_t ip6_temp_preferred_lifetime; /* seconds */
@@ -413,21 +416,37 @@ void defrouter_delreq __P((struct nd_defrouter *, int));
 void defrouter_select __P((void));
 void defrtrlist_del __P((struct nd_defrouter *));
 void prelist_remove __P((struct nd_prefix *));
+#ifdef MIP6
 int prelist_update __P((struct nd_prefix *, struct nd_defrouter *,
-	struct mbuf *));
+			struct mbuf *, int));
+#else
+int prelist_update __P((struct nd_prefix *, struct nd_defrouter *,
+			struct mbuf *));
+#endif
 int nd6_prelist_add __P((struct nd_prefix *, struct nd_defrouter *,
 			 struct nd_prefix **));
 int nd6_prefix_onlink __P((struct nd_prefix *));
 int nd6_prefix_offlink __P((struct nd_prefix *));
-struct nd_pfxrouter *find_pfxlist_reachable_router __P((struct nd_prefix *)); /* XXXYYY */
+#ifdef MIP6
+struct in6_ifaddr *in6_ifadd __P((struct nd_prefix *, struct in6_addr *));
+struct nd_pfxrouter *find_pfxlist_reachable_router __P((struct nd_prefix *));
+#endif
 void pfxlist_onlink_check __P((void));
-void defrouter_addifreq __P((struct ifnet *));           /* XXXYYY */
+#ifdef MIP6
+void defrouter_addifreq __P((struct ifnet *));
+#endif
 struct nd_defrouter *defrouter_lookup __P((struct in6_addr *,
 					   struct ifnet *));
 struct nd_prefix *nd6_prefix_lookup __P((struct nd_prefix *));
+#ifdef MIP6
 struct nd_pfxrouter *pfxrtr_lookup __P((struct nd_prefix *,
-                                        struct nd_defrouter *));  /* XXXYYY */
+                                        struct nd_defrouter *));
+#endif
 int in6_init_prefix_ltimes __P((struct nd_prefix *ndpr));
+#ifdef MIP6
+void in6_init_address_ltimes __P((struct nd_prefix *ndpr,
+				  struct in6_addrlifetime *lt6));
+#endif
 void rt6_flush __P((struct in6_addr *, struct ifnet *));
 int nd6_setdefaultiface __P((int));
 int in6_tmpifadd __P((const struct in6_ifaddr *, int));

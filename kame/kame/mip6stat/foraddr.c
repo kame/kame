@@ -1,4 +1,4 @@
-/*	$KAME: foraddr.c,v 1.5 2001/03/29 03:28:34 itojun Exp $	*/
+/*	$KAME: foraddr.c,v 1.6 2001/03/29 05:34:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * Copyright (c) 1999 and 2000 Ericsson Radio Systems AB
+ * Copyright (c) 1999, 2000 and 2001 Ericsson Radio Systems AB
  * All rights reserved.
  *
  * Author:  Magnus Braathen <magnus.braathen@era.ericsson.se>

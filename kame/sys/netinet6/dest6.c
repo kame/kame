@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.26 2001/03/13 02:15:11 k-sugyou Exp $	*/
+/*	$KAME: dest6.c,v 1.27 2001/03/29 05:34:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -61,10 +61,8 @@
 #include <netinet/icmp6.h>
 
 #ifdef MIP6
-int (*mip6_store_dstopt_pre_hook)(struct mbuf *m, u_int8_t *opt,
-				  u_int8_t off, u_int8_t dstlen) = NULL;
-int (*mip6_rec_ctrl_sig_hook)(struct mbuf *m, int off) = NULL;
-#endif /* MIP6 */
+#include <netinet6/mip6.h>
+#endif
 
 /*
  * Destination options header processing.
@@ -180,23 +178,18 @@ dest6_input(mp, offp, proto)
 			 * defined for use in a Home Address option.
 			 */
 
-#ifdef MIP6
-			if (mip6_store_dstopt_pre_hook) {
-				if ((*mip6_store_dstopt_pre_hook)(m, opt,
-				    off, dstoptlen) != 0)
-					goto bad;
-			}
-#endif
 			break;
+
 #ifdef MIP6
 		case IP6OPT_BINDING_UPDATE:
 		case IP6OPT_BINDING_ACK:
 		case IP6OPT_BINDING_REQ:
-			if (mip6_store_dstopt_pre_hook) {
-				if ((*mip6_store_dstopt_pre_hook)(m, opt,
-				    off, dstoptlen) != 0)
-					goto bad;
+			if (dstoptlen < IP6OPT_MINLEN) {
+				ip6stat.ip6s_toosmall++;
+				goto bad;
 			}
+			if (mip6_dstopt(m, dstopts, opt, dstoptlen) == -1)
+				goto bad;
 			optlen = *(opt + 1) + 2;
 			break;
 #endif /* MIP6 */
@@ -229,17 +222,6 @@ dest6_input(mp, offp, proto)
 #endif
 		ip6a->ip6a_flags |= IP6A_SWAP;
 	}
-
-#ifdef MIP6
-	if (mip6_rec_ctrl_sig_hook) {
-		/*
-		 * All Destinations options have been processed. Call MIPv6 to
-		 * process stored options.
-		 */
-		if ((*mip6_rec_ctrl_sig_hook)(m, *offp) != 0)
-			return (IPPROTO_DONE);
-	}
-#endif /* MIP6 */
 
 	*offp = off;
 	return (dstopts->ip6d_nxt);
