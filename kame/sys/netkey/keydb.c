@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.3 1999/08/12 23:58:26 sakane Exp $ */
+/* KAME $Id: keydb.c,v 1.4 1999/08/23 10:41:39 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367,
@@ -1890,6 +1890,13 @@ key_setsecidx(src0, dst0, idx, flag)
 	/* check sa_family */
 	if (src->sa_family != dst->sa_family) {
 		printf("key_setsecidx: family mismatch.\n");
+		return 1;
+	}
+
+	/* check max prefixlen */
+	if (_INALENBYAF(src->sa_family) < src0->sadb_address_prefixlen
+	 || _INALENBYAF(dst->sa_family) < dst0->sadb_address_prefixlen) {
+		printf("key_setsecidx: illegal prefixlen.\n");
 		return 1;
 	}
 
