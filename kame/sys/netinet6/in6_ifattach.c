@@ -171,6 +171,8 @@ found:
 /*
  * add link-local address to *pseudo* p2p interfaces.
  * get called when the first MAC address is made available in in6_ifattach().
+ *
+ * XXX I start feeling this as a bad idea. (itojun)
  */
 void
 in6_ifattach_p2p()
@@ -188,11 +190,13 @@ in6_ifattach_p2p()
 #endif
 	{
 		switch (ifp->if_type) {
-		case IFT_DUMMY:
 		case IFT_GIF:
-		case IFT_FAITH:
 			/* pseudo interfaces - safe to initialize here */
 			in6_ifattach(ifp, IN6_IFT_P2P, 0, 0);
+			break;
+		case IFT_DUMMY:
+		case IFT_FAITH:
+			/* this mistakingly becomes IFF_UP */
 			break;
 		case IFT_SLIP:
 			/* IPv6 is not supported */
@@ -560,7 +564,7 @@ in6_ifattach(ifp, type, laddr, noloop)
 		/* nd6_dad_start() will be called in in6_if_up */
 		break;
 	case IFT_DUMMY:
-	case IFT_GIF:
+	case IFT_GIF:	/*XXX*/
 	case IFT_LOOP:
 	case IFT_FAITH:
 	default:
