@@ -103,7 +103,7 @@ main(argc, argv)
 {
 	int ch;
 
-	while((ch = getopt(argc, argv, "dhH:")) != EOF) {
+	while((ch = getopt(argc, argv, "dH:")) != EOF) {
 		switch(ch) {
 		case 'd':
 			debug++;
@@ -115,7 +115,6 @@ main(argc, argv)
 				/* NOTREACHED */
 			}
 			break;
-		case 'h':
 		default:
 			usage();
 			exit(0);
