@@ -1,7 +1,22 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2532 2004/01/23 10:24:10 t-momose Exp $
+$KAME: CHANGELOG,v 1.2533 2004/01/24 09:22:01 keiichi Exp $
 
 <200401>
+Sat Jan 24 18:18:27 JST 2004	keiichi@iij.ad.jp
+	* kame/sys/net/if_hif.[hc], kame/sys/netinet6/mip6_icmp6.c
+	made a mobile node send a mobile prefix solicitation message
+	when it receives an unsolicited mobile prefix adv message.
+	detected by the v6pc certification WG test suite.
+
+Sat Jan 24 18:15:08 JST 2004	keiichi@iij.ad.jp
+	* kame/sys/netinet6/mip6_mncore.c
+	- made a mobile node send a mobile prefix solicitation message
+	  when it receives a binding ack message with status code 1.
+	- made a mobile node send a home registration message before
+	  the current binding expires even when a refresh interval
+	  is not explicitly specified by its home agent.
+	detected by the v6pc certification WG test suite.
+
 2004-01-23  MOMOSE Tsuyoshi  <momose@momose.org>
 	* mip6control:
 	Add a new option '-N' to show the list of nounces that a host 
