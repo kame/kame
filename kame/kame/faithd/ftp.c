@@ -1,4 +1,4 @@
-/*	$KAME: ftp.c,v 1.23 2003/08/19 21:20:33 itojun Exp $	*/
+/*	$KAME: ftp.c,v 1.24 2005/03/16 05:05:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -965,11 +965,13 @@ eprtparamfail:
 				n = 0;
 			if (n)
 				write(src, sbuf, n);
+			freeaddrinfo(res);
 			return n;
 		}
 
 		memcpy(&data6, res->ai_addr, res->ai_addrlen);
 
+		freeaddrinfo(res);
 		goto sendport;
 	} else if (strcmp(cmd, "LPSV") == 0 && !param) {
 		/*

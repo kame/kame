@@ -158,6 +158,7 @@ main(argc, argv)
 			/*NOTREACHED*/
 		}
 
+		freeaddrinfo(res0);
 		argv++;
 	}
 	if (smax >= MAXSOCK) {
