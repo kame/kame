@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1099 2000/07/05 01:43:34 itojun Exp $
+$Id: CHANGELOG,v 1.1100 2000/07/05 02:03:42 itojun Exp $
 
 <200006>
+Wed Jul  5 11:02:03 JST 2000  itojun@iijlab.net
+	* freebsd4: add netstat -sn -f pfkey.
+
 Wed Jul  5 10:40:53 JST 2000  itojun@iijlab.net
 	* freebsd[234]: split IPv6 path MTU discovery-related sysctl from
 	  net.inet.ip tree.  FreeBSD SYSCTL_xxx does not have a to report
