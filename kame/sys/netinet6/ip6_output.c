@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.343 2002/10/22 01:58:06 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.344 2002/10/31 11:25:44 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3209,10 +3209,10 @@ ip6_pcbopts(pktopt, m, so)
 
 	if (!m || m->m_len == 0) {
 		/*
-		 * Only turning off any previous options.
+		 * Only turning off any previous options, regardless of
+		 * whether the opt is just created or given.
 		 */
-		if (opt)
-			free(opt, M_IP6OPT);
+		free(opt, M_IP6OPT);
 		return (0);
 	}
 
@@ -3227,6 +3227,7 @@ ip6_pcbopts(pktopt, m, so)
 	if ((error = ip6_setpktoptions(m, opt, NULL, priv, 1,
 	    so->so_proto->pr_protocol)) != 0) {
 		ip6_clearpktopts(opt, -1); /* XXX: discard all options */
+		free(opt, M_IP6OPT);
 		return (error);
 	}
 	*pktopt = opt;
@@ -3475,7 +3476,7 @@ ip6_copypktopts(src, canwait)
 
 	dst = malloc(sizeof(*dst), M_IP6OPT, canwait);
 	if (dst == NULL && canwait == M_NOWAIT)
-		goto bad;
+		return (NULL);
 	bzero(dst, sizeof(*dst));
 	dst->needfree = 1;
 
@@ -3504,13 +3505,13 @@ ip6_copypktopts(src, canwait)
 	return (dst);
 
   bad:
-	printf("ip6_copypktopts: copy failed");
 	if (dst->ip6po_pktinfo) free(dst->ip6po_pktinfo, M_IP6OPT);
 	if (dst->ip6po_nexthop) free(dst->ip6po_nexthop, M_IP6OPT);
 	if (dst->ip6po_hbh) free(dst->ip6po_hbh, M_IP6OPT);
 	if (dst->ip6po_dest1) free(dst->ip6po_dest1, M_IP6OPT);
 	if (dst->ip6po_dest2) free(dst->ip6po_dest2, M_IP6OPT);
 	if (dst->ip6po_rthdr) free(dst->ip6po_rthdr, M_IP6OPT);
+	free(dst, M_IP6OPT);
 	return (NULL);
 }
 #undef PKTOPT_EXTHDRCPY
