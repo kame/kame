@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.62 2001/06/07 22:32:16 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.63 2001/07/28 01:12:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -240,6 +240,7 @@ stfattach(dummy)
 		}
 		sc->encap_cookie = p;
 
+		sc->sc_if.if_addrlen = 0;
 		sc->sc_if.if_mtu    = IPV6_MMTU;
 		sc->sc_if.if_flags  = 0;
 		sc->sc_if.if_ioctl  = stf_ioctl;

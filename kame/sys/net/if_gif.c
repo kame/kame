@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.64 2001/07/27 09:21:42 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.65 2001/07/28 01:12:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -172,6 +172,7 @@ gifattach0(sc)
 
 	sc->encap_cookie4 = sc->encap_cookie6 = NULL;
 
+	sc->gif_if.if_addrlen = 0;
 	sc->gif_if.if_mtu    = GIF_MTU;
 	sc->gif_if.if_flags  = IFF_POINTOPOINT | IFF_MULTICAST;
 	/* turn off ingress filter */
