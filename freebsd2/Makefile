@@ -1,11 +1,16 @@
 .include <bsd.own.mk>			# for configuration variables.
 
-SUBDIR=	lib include libexec sbin usr.bin usr.sbin share
+SUBDIR=	lib libexec sbin usr.bin usr.sbin share
 
 #build:
 #	$(MAKE) includes
 #	$(MAKE)
 #	$(MAKE) install
+
+includes:
+	(cd include; $(MAKE))
+install-includes:
+	(cd include; $(MAKE) install)
 
 PREFIX= /usr/local/v6
 DIRS=	$(PREFIX) $(PREFIX)/bin $(PREFIX)/sbin $(PREFIX)/lib $(PREFIX)/etc \

@@ -1,0 +1,72 @@
+Installation procedure - FreeBSD 2.2.8
+KAME project
+$Id: INSTALL,v 1.1 1999/08/07 18:43:38 itojun Exp $
+
+
+You'll need to follow the steps below.  They can be separated into two major
+sections - kernel build and userland build.
+
+Be sure to perform "tree preparation" procedure, described in
+../INSTALL.prepare, prior to taking the steps below.
+
+
+A. Backup
+=========
+The following procedure replaces, or overwrites, the following
+files/directories:
+	/kernel
+	/usr/include
+so you may want to back them up before going through the steps.
+
+A-1. Backup your kernel file, if you need to.
+	# cp /kernel /kernel.previous
+
+A-2. Backup /usr/include directory, if you want an untouched tree to be
+   preserved somewhere.
+	# cd /usr
+	# mkdir include.clean
+	# cd include.clean
+	# (cd ../include; tar Bpcf - . ) | tar Bpxf -
+
+
+B. Kernel build
+===============
+Consult NetBSD documentations for more detail.
+
+B-1. Go down to sys/i386/conf.
+	% cd sys/i386/conf
+
+B-2. Make a kernel configuration file, and type "config CONFIGFILE".
+     GENERIC.v6 should have commonly used IPv6 definitions, so you may want to
+     copy the file to begin with.
+	% config CONFIGFILE
+
+B-3. Build the kernel.  The process will make kernel file named "netbsd".
+	% cd ../../compile/CONFIGFILE
+	% make depend
+	% make
+
+B-4. Copy the kernel file to root directory, as root.
+	# cp kernel /
+
+
+C. Userland build
+=================
+C-1. Invoke "make includes" as normal user, then "make install-includes"
+     as root.  This will populate KAME-ready include files into /usr/include.
+	% make includes
+	# make install-includes
+
+C-2. As normal user (or root, if you prefer) perform "make".
+	% make
+
+C-3. As root, perform "make install".  This will install necessary userland
+     tools into /usr/local/v6/{bin,sbin,whatever}.  This should not replace
+     existing IPv4-only userland tools, so it is safe.
+	# make install
+
+
+D. Reboot
+=========
+D-1. Reboot with the command you like.
+	# fastboot
