@@ -382,7 +382,7 @@ if6_addrlist(ifap)
 		KREAD(ifap0, &ifa, struct ifaddr);
 		KREAD(ifa.ifa_ifp, &ifnet, struct ifnet);
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-		if (TAILQ_EMPTY(&ifnet.if_multiaddrs))
+		if (TAILQ_FIRST(&ifnet.if_multiaddrs))
 			ifmp = TAILQ_FIRST(&ifnet.if_multiaddrs);
 #else
 		if (ifnet.if_multiaddrs.lh_first)
@@ -589,7 +589,7 @@ if_addrlist(ifap)
 		KREAD(ifap0, &ifa, struct ifaddr);
 		KREAD(ifa.ifa_ifp, &ifnet, struct ifnet);
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-		if (TAILQ_EMPTY(&ifnet.if_multiaddrs))
+		if (TAILQ_FIRST(&ifnet.if_multiaddrs))
 			ifmp = TAILQ_FIRST(&ifnet.if_multiaddrs);
 #else
 		if (ifnet.if_multiaddrs.lh_first)

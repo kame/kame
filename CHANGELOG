@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2345 2003/02/12 10:10:22 suz Exp $
+$KAME: CHANGELOG,v 1.2346 2003/02/13 09:39:08 suz Exp $
 
 <200302>
+Thu Feb 13 18:37:58 JST 2003	suz@crl.hitachi.co.jp
+	* kame/kame/ifmcstat: ifmcstat works on freebsd5 now
+
 Wed Feb 12 19:09:04 JST 2003	suz@crl.hitachi.co.jp
 	* kame/kame/pim6sd: fixed a pim6sd crash by SIGHUP
 
