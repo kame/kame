@@ -1063,9 +1063,10 @@ getaddr(which, s, hpp)
 			su->sin6.sin6_scope_id = 0;
 		}
 #endif
-		if (which == RTA_DST)
-			inet6_makenetandmask(&su->sin6);
 		freeaddrinfo(res);
+		if (which == RTA_DST)
+			if (inet6_makenetandmask(&su->sin6) == 128)
+				return 1;
 		return 0;
 	    }
 #endif
