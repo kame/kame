@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/08/30 18:19:11 $
+			$Date: 1999/09/05 03:19:47 $
 
 1. IPv6
 
@@ -15,10 +15,9 @@ For details please refer to specific chapter in the document, RFCs, manpages
 come with KAME, or comments in the source code.
 
 Conformance tests have been performed on the previous KAME STABLE kit
-at TAHI project.  Results can be viewed at
-http://www.tahi.org/report/KAME/freebsd228-stable-19990809/.  We also
-attended Univ. of New Hampshire IOL tests (http://www.iol.unh.edu/) in
-the past, with our past snapshots.
+at TAHI project.  Results can be viewed at http://www.tahi.org/report/KAME/.
+We also attended Univ. of New Hampshire IOL tests (http://www.iol.unh.edu/)
+in the past, with our past snapshots.
 
 RFC1639: FTP Operation Over Big Address Records (FOOBAR)
     * RFC2428 is preferred over RFC1639.  ftp clients will first try RFC2428,
